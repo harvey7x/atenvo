@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useToast } from '@/hooks/useToast';
 import { useTheme } from '@/hooks/useTheme';
 import { useOrg } from '@/context/OrgContext';
@@ -70,12 +71,18 @@ export function Configuracoes() {
   const { currentOrg } = useOrg();
   const podeGerenciar = podeGerenciarAtendimento(currentOrg.role);
   const waCanais = useWaCanais();
-  const [tab, setTab] = useState('conta');
+  const [searchParams] = useSearchParams();
+  const TAB_IDS = ['conta', 'equipe', 'canais', 'atendimento', 'notif', 'prefs'];
+  const initialTab = searchParams.get('tab');
+  const sectionParam = searchParams.get('section');
+  const [tab, setTab] = useState(initialTab && TAB_IDS.includes(initialTab) ? initialTab : 'conta');
   const [seg, setSeg] = useState<string>(theme);
   const [menu, setMenu] = useState<{ idx: number; left: number; top: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { setSeg(theme); }, [theme]);
+  // deep-link: ?tab=...&section=... seleciona a aba ao navegar (ex.: vindo do WhatsApp)
+  useEffect(() => { if (initialTab && TAB_IDS.includes(initialTab)) setTab(initialTab); }, [initialTab]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     function onDoc(e: MouseEvent) { if (menuRef.current?.contains(e.target as Node)) return; setMenu(null); }
     function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setMenu(null); }
@@ -201,7 +208,7 @@ export function Configuracoes() {
 
           {/* ATENDIMENTO (status + etiquetas) */}
           <section className={'tab-panel' + (tab === 'atendimento' ? ' on' : '')} data-panel="atendimento">
-            <AtendimentoPanel canManage={podeGerenciar} />
+            <AtendimentoPanel canManage={podeGerenciar} section={tab === 'atendimento' ? sectionParam : null} />
           </section>
 
           {/* NOTIFICAÇÕES */}
@@ -266,11 +273,27 @@ const IcTrash2 = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor
 const IcStar = () => <svg viewBox="0 0 24 24" fill="currentColor"><path d="m12 3 2.7 5.5 6 .9-4.3 4.2 1 6L12 17l-5.4 2.6 1-6L3.3 9.4l6-.9z" /></svg>;
 const IcPlus2 = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>;
 
-function AtendimentoPanel({ canManage }: { canManage: boolean }) {
+function AtendimentoPanel({ canManage, section }: { canManage: boolean; section: string | null }) {
   const { toast } = useToast();
   const statusQ = useStatusDefs();
   const etqQ = useEtiquetas();
   const a = useAtendimentoActions();
+  const statusCardRef = useRef<HTMLDivElement>(null);
+  const etqCardRef = useRef<HTMLDivElement>(null);
+  const [destaque, setDestaque] = useState<string | null>(null);
+
+  // deep-link: rolar e destacar a seção indicada (?section=status|etiquetas)
+  useEffect(() => {
+    if (!section) return;
+    const alvo = section === 'etiquetas' ? etqCardRef.current : statusCardRef.current;
+    if (!alvo) return;
+    const t = setTimeout(() => {
+      alvo.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setDestaque(section);
+      setTimeout(() => setDestaque(null), 2200);
+    }, 120);
+    return () => clearTimeout(t);
+  }, [section]);
 
   const statuses = (statusQ.data ?? []).slice().sort((x, y) => x.ordem - y.ordem);
   const etqs = (etqQ.data ?? []).slice().sort((x, y) => x.ordem - y.ordem);
@@ -309,7 +332,7 @@ function AtendimentoPanel({ canManage }: { canManage: boolean }) {
   return (
     <>
       {/* ===== STATUS ===== */}
-      <div className="set-card">
+      <div className={'set-card' + (destaque === 'status' ? ' atd-destaque' : '')} ref={statusCardRef}>
         <div className="sc-head bordered"><h3>Status das conversas</h3><p>Estados configuráveis usados em Dados do cliente e nos filtros. {canManage ? 'Crie, renomeie, defina cor, ordene, marque padrão, desative ou exclua.' : 'Somente administradores e gestores podem editar.'}</p></div>
 
         {statusQ.isLoading && <div className="chan-row"><div className="chan-txt"><div className="d">Carregando status…</div></div></div>}
@@ -354,7 +377,7 @@ function AtendimentoPanel({ canManage }: { canManage: boolean }) {
       </div>
 
       {/* ===== ETIQUETAS ===== */}
-      <div className="set-card">
+      <div className={'set-card' + (destaque === 'etiquetas' ? ' atd-destaque' : '')} ref={etqCardRef}>
         <div className="sc-head bordered"><h3>Etiquetas</h3><p>Etiquetas coloridas aplicáveis a contatos, conversas e oportunidades. Não é possível duplicar o nome na organização.</p></div>
 
         {etqQ.isLoading && <div className="chan-row"><div className="chan-txt"><div className="d">Carregando etiquetas…</div></div></div>}

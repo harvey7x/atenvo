@@ -32,6 +32,10 @@ export interface WaContact {
   statusCor?: string | null;
   /** canal (id) da conversa, usado como padrão em "Responder por". */
   canalId?: string | null;
+  /** id do contato (para abrir em Contatos e editar). */
+  contatoId?: string | null;
+  /** id do usuário responsável (contatos.responsavel_id). */
+  respId?: string | null;
   last: string;
   email: string;
   stage: string;

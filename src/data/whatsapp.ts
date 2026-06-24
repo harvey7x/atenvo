@@ -45,7 +45,7 @@ interface DbConv {
   id: string; status: string; status_id: string | null; nao_lidas: number | null; ultima_interacao_em: string | null; criado_em: string | null;
   etiquetas: string[] | null;
   ultimo_canal_id: string | null; ultimo_numero: string | null; ultimo_provider: string | null; ultima_msg_canal_em: string | null;
-  contatos: { id: string; nome: string; telefone: string | null; email: string | null; etiquetas: string[] | null; origem: string | null; observacoes: string | null } | null;
+  contatos: { id: string; nome: string; telefone: string | null; email: string | null; etiquetas: string[] | null; origem: string | null; observacoes: string | null; responsavel_id: string | null } | null;
   canais: { id: string; nome_interno: string | null } | null;
   mensagens: DbMsg[] | null;
 }
@@ -82,6 +82,8 @@ function mapConversa(c: DbConv): WaContact {
     statusId: c.status_id ?? null,
     statusCor: null, // resolvido no cliente via useStatusDefs (cor/nome do status configurável)
     canalId: c.canais?.id ?? null,
+    contatoId: c.contatos?.id ?? null,
+    respId: c.contatos?.responsavel_id ?? null,
     last: lastMsg?.text ?? '',
     email: c.contatos?.email ?? '',
     stage: '—',
@@ -112,7 +114,7 @@ export function useWaConversations() {
         // canais!conversas_canal_id_fkey: desambigua o embed (há 2 FKs p/ canais: canal_id e ultimo_canal_id).
         // NÃO embutimos conversa_status_def aqui: a cor/nome do status é resolvida no cliente via useStatusDefs
         // (mantém o inbox funcional mesmo que a tabela auxiliar fique inacessível por grant).
-        .select('id, status, status_id, nao_lidas, ultima_interacao_em, criado_em, etiquetas, ultimo_canal_id, ultimo_numero, ultimo_provider, ultima_msg_canal_em, contatos!inner(id, nome, telefone, email, etiquetas, origem, observacoes), canais!conversas_canal_id_fkey!inner(id, nome_interno, tipo), mensagens(id, direcao, conteudo, tipo, enviada_em, recebida_em, criado_em, origem, status)')
+        .select('id, status, status_id, nao_lidas, ultima_interacao_em, criado_em, etiquetas, ultimo_canal_id, ultimo_numero, ultimo_provider, ultima_msg_canal_em, contatos!inner(id, nome, telefone, email, etiquetas, origem, observacoes, responsavel_id), canais!conversas_canal_id_fkey!inner(id, nome_interno, tipo), mensagens(id, direcao, conteudo, tipo, enviada_em, recebida_em, criado_em, origem, status)')
         .eq('organizacao_id', orgId)
         .eq('canais.tipo', 'whatsapp')
         .order('ultima_interacao_em', { ascending: false });

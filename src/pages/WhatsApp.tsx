@@ -5,7 +5,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useOrg } from '@/context/OrgContext';
 import { WA_CONTACTS, WA_SCRIPTS, initials, avatarColor, type WaContact } from '@/data/whatsappDemo';
 import { useWaConversations, useSendWaMessage, useWaCanais, mascararNumero, WA_REAL } from '@/data/whatsapp';
-import { useStatusDefs, useEtiquetas, useAssinaturaPref, useAtendimentoActions, resolverNomeAssinatura } from '@/data/atendimento';
+import { useStatusDefs, useEtiquetas, useAssinaturaPref, useAtendimentoActions, useOrgUsuarios, resolverNomeAssinatura } from '@/data/atendimento';
 import { corDaEtiqueta, podeGerenciarAtendimento, type AssinaturaModo } from '@/types/atendimento';
 import './WhatsApp.css';
 
@@ -41,6 +41,11 @@ const IcCaret = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
 const IcFocus = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3" /></svg>;
 const IcSignet = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>;
 const IcPhoneSent = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="7" y="2" width="10" height="20" rx="2.5" /><path d="M11 18h2" /></svg>;
+const IcEdit = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>;
+const IcCopy = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></svg>;
+const IcContactCard = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2" /><circle cx="9" cy="11" r="2" /><path d="M5 17a3 3 0 0 1 8 0M15 9h3M15 13h3" /></svg>;
+const IcCheckSm = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>;
+const IcArchive = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="4" rx="1" /><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4" /></svg>;
 
 function Avatar({ name, cls }: { name: string; cls?: string }) {
   return <span className={'av' + (cls ? ' ' + cls : '')} style={{ background: avatarColor(name) }}>{initials(name)}</span>;
@@ -73,8 +78,12 @@ const ASSINA_OPCOES: { id: AssinaturaModo; label: string }[] = [
 ];
 
 const FOCO_KEY = 'atenvo-wa-foco';
+const CURR_KEY = 'atenvo-wa-current';
 
-type PopKind = 'filter' | 'attach' | 'scripts' | 'status' | 'tags';
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const soDigitos = (s: string) => (s || '').replace(/\D/g, '');
+
+type PopKind = 'filter' | 'attach' | 'scripts' | 'status' | 'tags' | 'acoes';
 interface PopState { kind: PopKind; rect: DOMRect; align: 'left' | 'right'; }
 
 export function WhatsApp() {
@@ -91,8 +100,12 @@ export function WhatsApp() {
   const acoes = useAtendimentoActions();
   const podeGerenciar = podeGerenciarAtendimento(currentOrg.role);
 
+  const orgUsuariosQ = useOrgUsuarios();
   const [contacts, setContacts] = useState<WaContact[]>(() => WA_REAL ? [] : WA_CONTACTS.map((c) => ({ ...c, msgs: c.msgs.map((m) => ({ ...m })), tags: [...c.tags] })));
-  const [currentId, setCurrentId] = useState(WA_REAL ? '' : 'antonio');
+  const [currentId, setCurrentId] = useState(() => {
+    if (!WA_REAL) return 'antonio';
+    try { return sessionStorage.getItem(CURR_KEY) || ''; } catch { return ''; }
+  });
   const [tab, setTab] = useState('todos');
   const [search, setSearch] = useState('');
   const [replyChip, setReplyChip] = useState('Chip 1');       // modo mock
@@ -111,6 +124,12 @@ export function WhatsApp() {
   const [assinaModo, setAssinaModo] = useState<AssinaturaModo>('sem');
   const [assinaNome, setAssinaNome] = useState('');
 
+  // #4 edição dos dados do cliente
+  const [editMode, setEditMode] = useState(false);
+  const [editForm, setEditForm] = useState<{ nome: string; email: string; observacoes: string; respId: string }>({ nome: '', email: '', observacoes: '', respId: '' });
+  const [saving, setSaving] = useState(false);
+  const [editErr, setEditErr] = useState<string | null>(null);
+
   const realCanais = WA_REAL ? (canaisQ.data ?? []) : [];
 
   // modo real: sincroniza a lista vinda do Supabase e mantém uma seleção válida
@@ -124,6 +143,11 @@ export function WhatsApp() {
   // espelha preferência de assinatura
   useEffect(() => { if (prefQ.data) { setAssinaModo(prefQ.data.modo); setAssinaNome(prefQ.data.nome); } }, [prefQ.data]);
 
+  // preserva a conversa selecionada ao navegar (ex.: ir a Configurações e voltar)
+  useEffect(() => { if (WA_REAL && currentId) { try { sessionStorage.setItem(CURR_KEY, currentId); } catch { /* ignore */ } } }, [currentId]);
+  // ao trocar de conversa, sai do modo de edição
+  useEffect(() => { setEditMode(false); setEditErr(null); }, [currentId]);
+
   const taRef = useRef<HTMLTextAreaElement>(null);
   const msgsRef = useRef<HTMLDivElement>(null);
   const popRef = useRef<HTMLDivElement>(null);
@@ -132,6 +156,7 @@ export function WhatsApp() {
   const scriptsBtnRef = useRef<HTMLButtonElement>(null);
   const statusBtnRef = useRef<HTMLButtonElement>(null);
   const tagsBtnRef = useRef<HTMLButtonElement>(null);
+  const acoesBtnRef = useRef<HTMLButtonElement>(null);
 
   const current = contacts.find((c) => c.id === currentId) ?? contacts[0] ?? EMPTY_CONTACT;
   const filtered = contacts.filter((c) => {
@@ -217,7 +242,7 @@ export function WhatsApp() {
       const t = e.target as Node;
       if (popRef.current?.contains(t)) return;
       if (filterBtnRef.current?.contains(t) || attachBtnRef.current?.contains(t) || scriptsBtnRef.current?.contains(t)) return;
-      if (statusBtnRef.current?.contains(t) || tagsBtnRef.current?.contains(t)) return;
+      if (statusBtnRef.current?.contains(t) || tagsBtnRef.current?.contains(t) || acoesBtnRef.current?.contains(t)) return;
       setPop(null);
     }
     function onResize() { setPop(null); }
@@ -278,7 +303,7 @@ export function WhatsApp() {
   function onReplyCanal(id: string) {
     setReplyCanalId(id);
     const c = realCanais.find((x) => x.id === id);
-    if (c && current.canalId && id !== current.canalId) toast('Atenção: responder por outro número pode iniciar uma nova conversa', 'warn');
+    if (c) toast('Respondendo por ' + c.alias);
   }
 
   function insertScript(m: string, t: string) {
@@ -302,6 +327,53 @@ export function WhatsApp() {
     try { await acoes.definirEtiquetasConversa(current.id, novas); } catch (e) { toast((e as Error).message || 'Falha ao salvar etiquetas', 'warn'); }
   }
 
+  /* ---------- menu de ações (três pontos) ---------- */
+  function fallbackCopy(txt: string, cb: () => void) {
+    try { const ta = document.createElement('textarea'); ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); cb(); }
+    catch { toast('Não foi possível copiar o telefone', 'warn'); }
+  }
+  function copiarTelefone() {
+    setPop(null);
+    const num = soDigitos(current.phone);
+    if (!num) { toast('Este contato não tem telefone.', 'warn'); return; }
+    const done = () => toast('Telefone copiado: ' + num);
+    try {
+      if (navigator.clipboard?.writeText) navigator.clipboard.writeText(num).then(done).catch(() => fallbackCopy(num, done));
+      else fallbackCopy(num, done);
+    } catch { fallbackCopy(num, done); }
+  }
+  function abrirEmContatos() {
+    setPop(null);
+    navigate(current.contatoId ? `/contatos?contato=${current.contatoId}` : '/contatos');
+  }
+  function fecharConversa() {
+    setPop(null);
+    const fech = (statusQ.data ?? []).find((s) => s.slug === 'fechada' || s.nome.trim().toLowerCase() === 'fechada');
+    if (!fech || !current.id) return;
+    if (!window.confirm(`Fechar esta conversa? O status será alterado para "${fech.nome}".`)) return;
+    aplicarStatus(fech.id);
+  }
+  function iniciarEdicao() {
+    setPop(null);
+    if (!current.contatoId) { toast('Selecione uma conversa para editar.', 'warn'); return; }
+    setEditForm({ nome: current.name || '', email: current.email || '', observacoes: current.notes || '', respId: current.respId || '' });
+    setEditErr(null);
+    setEditMode(true);
+    setDataOpen(true);
+  }
+  async function salvarEdicao() {
+    if (!current.contatoId || saving) return;
+    const email = editForm.email.trim();
+    if (email && !EMAIL_RE.test(email)) { setEditErr('E-mail inválido.'); return; }
+    setSaving(true); setEditErr(null);
+    const patch = { nome: editForm.nome.trim() || current.name, email: email || null, observacoes: editForm.observacoes.trim() || null, responsavel_id: editForm.respId || null };
+    setContacts((cur) => cur.map((c) => c.id === current.id ? { ...c, name: patch.nome, email, notes: patch.observacoes ?? '', respId: patch.responsavel_id } : c));
+    try { await acoes.atualizarContato(current.contatoId, patch); toast('Dados do cliente salvos'); setEditMode(false); }
+    catch (e) { setEditErr((e as Error).message || 'Falha ao salvar'); }
+    finally { setSaving(false); }
+  }
+  function cancelarEdicao() { setEditMode(false); setEditErr(null); }
+
   const sendDisabled = draft.trim() === '' || (WA_REAL && (!current.id || !canalConectado));
   const statusDefs = statusQ.data ?? [];
   const statusAtivos = statusDefs.filter((s) => s.ativo);
@@ -311,6 +383,9 @@ export function WhatsApp() {
   const statusCorAtual = statusDefAtual?.cor ?? current.statusCor ?? null;
   const etiquetas = etiquetasQ.data ?? [];
   const etiquetasAtivas = etiquetas.filter((e) => e.ativo);
+  const orgUsuarios = orgUsuariosQ.data ?? [];
+  const respNome = current.respId ? (orgUsuarios.find((u) => u.id === current.respId)?.nome ?? null) : null;
+  const statusFechada = statusDefs.find((s) => s.slug === 'fechada' || s.nome.trim().toLowerCase() === 'fechada') ?? null;
 
   // alias do último canal resolvido pela lista de canais
   const ultimo = current.ultimoCanal;
@@ -395,7 +470,7 @@ export function WhatsApp() {
           </div>
           <div className="ch-actions">
             <button className={'icon-btn' + (foco ? ' on' : '')} title="Modo de foco (Esc para sair)" onClick={() => setFoco((v) => !v)}><IcFocus /></button>
-            <button className="icon-btn" title="Ações" onClick={() => toast('Mais ações da conversa')}><IcDots /></button>
+            <button ref={acoesBtnRef} className={'icon-btn' + (pop?.kind === 'acoes' ? ' on' : '')} title="Ações" aria-label="Ações da conversa" aria-haspopup="menu" aria-expanded={pop?.kind === 'acoes'} disabled={!current.id} onClick={(e) => { e.stopPropagation(); togglePop('acoes', acoesBtnRef, 'right'); }}><IcDots /></button>
           </div>
         </header>
 
@@ -426,6 +501,7 @@ export function WhatsApp() {
         </div>
 
         <div className="composer">
+          <div className="composer-top">
           <div className="reply-row">
             <span className="rl">Responder por:</span>
             {WA_REAL ? (
@@ -458,14 +534,13 @@ export function WhatsApp() {
             )}
             {assinaturaNome && <span className="sign-preview">*{assinaturaNome}:*</span>}
           </div>
+          </div>{/* /composer-top */}
 
-          {canalIndisponivel ? (
+          {canalIndisponivel && (
             <div className="warn warn-block">
               <IcWarn />Este número está {canalSel?.status === 'removido' ? 'removido' : 'desconectado'}. O histórico permanece, mas o envio está bloqueado.
               <button className="link-btn" onClick={() => navigate('/integracoes')}>Reconectar</button>
             </div>
-          ) : (
-            <div className="warn"><IcWarn />Atenção: responder por outro número pode gerar uma nova conversa.</div>
           )}
 
           <div className="input-wrap">
@@ -490,12 +565,30 @@ export function WhatsApp() {
       <aside className="col data-col">
         <div className="data-head">
           <h3>Dados do cliente</h3>
-          <button className="collapse-btn" aria-label="Recolher painel" onClick={() => setDataOpen(false)}><IcChevRight /></button>
+          <div className="dh-actions">
+            {current.id && !editMode && <button className="edit-btn" onClick={iniciarEdicao} title="Editar dados do cliente"><IcEdit />Editar</button>}
+            <button className="collapse-btn" aria-label="Recolher painel" onClick={() => setDataOpen(false)}><IcChevRight /></button>
+          </div>
         </div>
         <div className="data-body">
-          <div className="dfield"><div className="dlabel">Nome</div><div className="dval">{current.name}</div></div>
-          <div className="dfield"><div className="dlabel">Telefone</div><div className="dval with-ic"><IcWa />{current.phone}</div></div>
-          <div className="dfield"><div className="dlabel">E-mail</div><div className="dval">{current.email}</div></div>
+          {editMode && (
+            <div className="edit-bar">
+              {editErr && <div className="edit-err"><IcWarn />{editErr}</div>}
+              <div className="edit-actions">
+                <button className="btn-save" disabled={saving} onClick={salvarEdicao}>{saving ? 'Salvando…' : <><IcCheckSm />Salvar</>}</button>
+                <button className="btn-cancel" disabled={saving} onClick={cancelarEdicao}>Cancelar</button>
+              </div>
+            </div>
+          )}
+          <div className="dfield"><div className="dlabel">Nome</div>
+            {editMode ? <input className="edit-input" value={editForm.nome} onChange={(e) => setEditForm((f) => ({ ...f, nome: e.target.value }))} /> : <div className="dval">{current.name}</div>}
+          </div>
+          <div className="dfield"><div className="dlabel">Telefone</div>
+            <div className="dval with-ic"><IcWa />{current.phone || <span style={{ color: 'var(--muted)' }}>—</span>}{current.phone && <button className="copy-btn" title="Copiar telefone" onClick={copiarTelefone}><IcCopy /></button>}</div>
+          </div>
+          <div className="dfield"><div className="dlabel">E-mail</div>
+            {editMode ? <input className="edit-input" type="email" value={editForm.email} onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))} placeholder="email@exemplo.com" /> : <div className="dval">{current.email || <span style={{ color: 'var(--muted)' }}>—</span>}</div>}
+          </div>
 
           {/* #2 STATUS — controle editável movido para Dados do cliente */}
           <div className="dfield">
@@ -509,7 +602,14 @@ export function WhatsApp() {
           </div>
 
           <div className="dfield"><div className="dlabel">Etapa do funil</div><span className="badge-soft">{current.stage}</span></div>
-          <div className="dfield"><div className="dlabel">Responsável</div>{current.resp === 'Não atribuído' ? <div className="dval" style={{ color: 'var(--muted)' }}>Não atribuído</div> : <span className="resp-line"><Avatar name={current.resp} cls="s" />{current.resp}</span>}</div>
+          <div className="dfield"><div className="dlabel">Responsável</div>
+            {editMode ? (
+              <select className="edit-input" value={editForm.respId} onChange={(e) => setEditForm((f) => ({ ...f, respId: e.target.value }))}>
+                <option value="">Não atribuído</option>
+                {orgUsuarios.map((u) => <option key={u.id} value={u.id}>{u.nome}</option>)}
+              </select>
+            ) : (respNome ? <span className="resp-line"><Avatar name={respNome} cls="s" />{respNome}</span> : <div className="dval" style={{ color: 'var(--muted)' }}>Não atribuído</div>)}
+          </div>
           <div className="dfield"><div className="dlabel">Origem do lead</div><div className="dval with-ic"><IcWa />{current.origin}</div></div>
 
           {/* #3 ETIQUETAS coloridas */}
@@ -542,7 +642,9 @@ export function WhatsApp() {
           )}
 
           <div className="dfield"><div className="dlabel">Última interação</div><div className="dval with-ic"><span style={{ color: 'var(--muted)' }}><IcClock /></span>{current.lastInter}</div></div>
-          <div className="dfield"><div className="dlabel">Observações internas</div><div className="notes">{current.notes || <span style={{ color: 'var(--muted)' }}>Sem observações.</span>}</div></div>
+          <div className="dfield"><div className="dlabel">Observações internas</div>
+            {editMode ? <textarea className="edit-input edit-textarea" rows={3} value={editForm.observacoes} onChange={(e) => setEditForm((f) => ({ ...f, observacoes: e.target.value }))} /> : <div className="notes">{current.notes || <span style={{ color: 'var(--muted)' }}>Sem observações.</span>}</div>}
+          </div>
           <div className="dfield">
             <div className="dlabel">Documentos</div>
             {current.doc ? (
@@ -597,7 +699,7 @@ export function WhatsApp() {
                   <span className="sdot" style={{ background: s.cor }} />{s.nome}
                 </button>
               ))}
-              {podeGerenciar && <button className="pop-foot-link" onClick={() => { setPop(null); navigate('/configuracoes'); }}>Gerenciar status…</button>}
+              {podeGerenciar && <button className="pop-foot-link" onClick={() => { setPop(null); navigate('/configuracoes?tab=atendimento&section=status'); }}>Gerenciar status…</button>}
             </>
           )}
           {pop.kind === 'tags' && (
@@ -612,8 +714,16 @@ export function WhatsApp() {
                   </button>
                 );
               })}
-              {podeGerenciar && <button className="pop-foot-link" onClick={() => { setPop(null); navigate('/configuracoes'); }}>Gerenciar etiquetas…</button>}
+              {podeGerenciar && <button className="pop-foot-link" onClick={() => { setPop(null); navigate('/configuracoes?tab=atendimento&section=etiquetas'); }}>Gerenciar etiquetas…</button>}
             </>
+          )}
+          {pop.kind === 'acoes' && (
+            <div role="menu" aria-label="Ações da conversa">
+              <button role="menuitem" className="pop-item" onClick={iniciarEdicao}><IcEdit />Editar dados do cliente</button>
+              {current.phone && <button role="menuitem" className="pop-item" onClick={copiarTelefone}><IcCopy />Copiar telefone</button>}
+              {current.contatoId && <button role="menuitem" className="pop-item" onClick={abrirEmContatos}><IcContactCard />Abrir em Contatos</button>}
+              {statusFechada && current.statusId !== statusFechada.id && <button role="menuitem" className="pop-item" onClick={fecharConversa}><IcArchive />Fechar conversa</button>}
+            </div>
           )}
         </div>
       )}

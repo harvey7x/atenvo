@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useToast } from '@/hooks/useToast';
 import { useContatos, useCreateContato, useUpdateContato, useDeleteContato, type ContatoRow as Row } from '@/data/contatos';
 import { useEtiquetas } from '@/data/atendimento';
@@ -49,6 +50,20 @@ export function Contatos() {
   const [menu, setMenu] = useState<{ row: Row; left: number; top: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const pendingBtn = useRef<DOMRect | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const autoAbriu = useRef(false);
+
+  // deep-link: ?contato=<id> abre o registro correto (vindo do WhatsApp → "Abrir em Contatos")
+  useEffect(() => {
+    const id = searchParams.get('contato');
+    if (!id || autoAbriu.current || rows.length === 0) return;
+    const alvo = rows.find((r) => r.id === id);
+    if (alvo) {
+      autoAbriu.current = true;
+      setDrawer(alvo);
+      const next = new URLSearchParams(searchParams); next.delete('contato'); setSearchParams(next, { replace: true });
+    }
+  }, [rows, searchParams, setSearchParams]);
 
   const filtered = rows.filter((r) => { const q = query.trim().toLowerCase(); return !q || (r.nome + ' ' + r.email + ' ' + r.tel + ' ' + r.resp + ' ' + r.org + ' ' + r.st).toLowerCase().indexOf(q) >= 0; });
   const totalContatos = rows.length;

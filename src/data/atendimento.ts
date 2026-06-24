@@ -58,6 +58,28 @@ export function useEtiquetas() {
   });
 }
 
+export interface OrgUsuario { id: string; nome: string; papel: string }
+/** Usuários ativos da organização (para o seletor de Responsável). */
+export function useOrgUsuarios() {
+  const { currentOrg } = useOrg();
+  return useQuery({
+    queryKey: ['org-usuarios', currentOrg.id],
+    queryFn: async (): Promise<OrgUsuario[]> => {
+      if (!WA_REAL || !supabase) return [{ id: 'u-mock', nome: 'Atendente', papel: 'admin' }];
+      const { data, error } = await supabase
+        .from('organizacao_usuarios')
+        .select('papel, usuarios(id, nome)')
+        .eq('organizacao_id', currentOrg.id).eq('status', 'ativo');
+      if (error) throw new Error(error.message);
+      type Row = { papel: string; usuarios: { id: string; nome: string } | { id: string; nome: string }[] | null };
+      return ((data as unknown as Row[]) ?? []).map((r) => {
+        const u = Array.isArray(r.usuarios) ? r.usuarios[0] : r.usuarios;
+        return u ? { id: u.id, nome: u.nome, papel: r.papel } : null;
+      }).filter((x): x is OrgUsuario => x !== null).sort((a, b) => a.nome.localeCompare(b.nome));
+    },
+  });
+}
+
 export function useAssinaturaPref() {
   const { currentOrg } = useOrg();
   const { user } = useAuth();
@@ -203,6 +225,14 @@ export function useAtendimentoActions() {
     invalContatos();
   }
 
+  /* ---------- CONTATO (edição pelo painel Dados do cliente) ---------- */
+  async function atualizarContato(contatoId: string, patch: { nome?: string; email?: string | null; observacoes?: string | null; responsavel_id?: string | null }) {
+    if (!WA_REAL || !supabase) { invalConv(); invalContatos(); return; }
+    const { error } = await supabase.from('contatos').update(patch).eq('id', contatoId).eq('organizacao_id', org);
+    if (error) throw new Error(error.message);
+    invalConv(); invalContatos();
+  }
+
   /* ---------- ASSINATURA (preferência por usuário) ---------- */
   async function salvarAssinatura(pref: AssinaturaPref) {
     if (!WA_REAL || !supabase || !user) { mockPref = { ...pref }; invalPref(); return; }
@@ -216,6 +246,7 @@ export function useAtendimentoActions() {
   return {
     criarStatus, atualizarStatus, definirStatusPadrao, reordenarStatus, excluirStatus, contarConversasComStatus, definirStatusConversa,
     criarEtiqueta, atualizarEtiqueta, excluirEtiqueta, definirEtiquetasConversa, definirEtiquetasContato,
+    atualizarContato,
     salvarAssinatura,
   };
 }
