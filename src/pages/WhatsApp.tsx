@@ -305,6 +305,10 @@ export function WhatsApp() {
   const sendDisabled = draft.trim() === '' || (WA_REAL && (!current.id || !canalConectado));
   const statusDefs = statusQ.data ?? [];
   const statusAtivos = statusDefs.filter((s) => s.ativo);
+  // status do contato atual resolvido pela definição configurável (cor/nome); fallback ao rótulo legado.
+  const statusDefAtual = statusDefs.find((s) => s.id === current.statusId) ?? null;
+  const statusNomeAtual = statusDefAtual?.nome ?? current.status;
+  const statusCorAtual = statusDefAtual?.cor ?? current.statusCor ?? null;
   const etiquetas = etiquetasQ.data ?? [];
   const etiquetasAtivas = etiquetas.filter((e) => e.ativo);
 
@@ -384,8 +388,8 @@ export function WhatsApp() {
             <div className="meta-cell"><div className="k">Canal</div><span className="meta-val"><span style={{ color: 'var(--wa)', display: 'inline-flex' }}><IcWa /></span>WhatsApp</span></div>
             <div className="meta-cell"><div className="k">Origem</div><span className="meta-val chip-tag"><IcChip />{current.chip}</span></div>
             <div className="meta-cell"><div className="k">Status</div>
-              {current.status
-                ? <span className="status-badge" style={{ background: (current.statusCor ?? '#64748b') + '22', color: current.statusCor ?? 'var(--ink-2)' }}><span className="sdot" style={{ background: current.statusCor ?? '#64748b' }} />{current.status}</span>
+              {statusNomeAtual
+                ? <span className="status-badge" style={{ background: (statusCorAtual ?? '#64748b') + '22', color: statusCorAtual ?? 'var(--ink-2)' }}><span className="sdot" style={{ background: statusCorAtual ?? '#64748b' }} />{statusNomeAtual}</span>
                 : <span className="meta-val" style={{ color: 'var(--muted)' }}>—</span>}
             </div>
           </div>
@@ -498,8 +502,8 @@ export function WhatsApp() {
             <div className="dlabel">Status</div>
             <button ref={statusBtnRef} className="status-picker" disabled={!current.id}
               onClick={(e) => { e.stopPropagation(); togglePop('status', statusBtnRef, 'left'); }}>
-              <span className="sdot" style={{ background: current.statusCor ?? '#64748b' }} />
-              <span className="status-name">{current.status || 'Definir status'}</span>
+              <span className="sdot" style={{ background: statusCorAtual ?? '#64748b' }} />
+              <span className="status-name">{statusNomeAtual || 'Definir status'}</span>
               <IcChevDown />
             </button>
           </div>

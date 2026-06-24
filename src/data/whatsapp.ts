@@ -41,14 +41,12 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 interface DbMsg { id: string; direcao: string; conteudo: string | null; tipo: string; enviada_em: string | null; recebida_em: string | null; criado_em: string | null; origem: string | null; status: string | null; }
-interface DbStatusDef { id: string; nome: string; cor: string; slug: string }
 interface DbConv {
   id: string; status: string; status_id: string | null; nao_lidas: number | null; ultima_interacao_em: string | null; criado_em: string | null;
   etiquetas: string[] | null;
   ultimo_canal_id: string | null; ultimo_numero: string | null; ultimo_provider: string | null; ultima_msg_canal_em: string | null;
   contatos: { id: string; nome: string; telefone: string | null; email: string | null; etiquetas: string[] | null; origem: string | null; observacoes: string | null } | null;
   canais: { id: string; nome_interno: string | null } | null;
-  status_def: DbStatusDef | DbStatusDef[] | null;
   mensagens: DbMsg[] | null;
 }
 
@@ -69,7 +67,6 @@ function mapConversa(c: DbConv): WaContact {
     }));
   const lastMsg = msgs[msgs.length - 1];
   const chip = c.canais?.nome_interno ?? 'WhatsApp';
-  const def = Array.isArray(c.status_def) ? c.status_def[0] : c.status_def;
   const ultimoCanal: WaUltimoCanal | null = c.ultimo_canal_id || c.ultimo_numero
     ? { canalId: c.ultimo_canal_id, alias: null, numero: c.ultimo_numero, provider: c.ultimo_provider, em: c.ultima_msg_canal_em }
     : null;
@@ -81,9 +78,9 @@ function mapConversa(c: DbConv): WaContact {
     time: hhmm(c.ultima_interacao_em) || (lastMsg?.time ?? ''),
     unread: c.nao_lidas ?? 0,
     tabs: ['todos', 'meus', 'pendentes'],
-    status: def?.nome ?? STATUS_LABEL[c.status] ?? c.status,
+    status: STATUS_LABEL[c.status] ?? c.status,
     statusId: c.status_id ?? null,
-    statusCor: def?.cor ?? null,
+    statusCor: null, // resolvido no cliente via useStatusDefs (cor/nome do status configurável)
     canalId: c.canais?.id ?? null,
     last: lastMsg?.text ?? '',
     email: c.contatos?.email ?? '',
@@ -112,7 +109,10 @@ export function useWaConversations() {
     queryFn: async (): Promise<WaContact[]> => {
       const { data, error } = await supabase!
         .from('conversas')
-        .select('id, status, status_id, nao_lidas, ultima_interacao_em, criado_em, etiquetas, ultimo_canal_id, ultimo_numero, ultimo_provider, ultima_msg_canal_em, contatos!inner(id, nome, telefone, email, etiquetas, origem, observacoes), canais!inner(id, nome_interno, tipo), status_def:conversa_status_def(id, nome, cor, slug), mensagens(id, direcao, conteudo, tipo, enviada_em, recebida_em, criado_em, origem, status)')
+        // canais!conversas_canal_id_fkey: desambigua o embed (há 2 FKs p/ canais: canal_id e ultimo_canal_id).
+        // NÃO embutimos conversa_status_def aqui: a cor/nome do status é resolvida no cliente via useStatusDefs
+        // (mantém o inbox funcional mesmo que a tabela auxiliar fique inacessível por grant).
+        .select('id, status, status_id, nao_lidas, ultima_interacao_em, criado_em, etiquetas, ultimo_canal_id, ultimo_numero, ultimo_provider, ultima_msg_canal_em, contatos!inner(id, nome, telefone, email, etiquetas, origem, observacoes), canais!conversas_canal_id_fkey!inner(id, nome_interno, tipo), mensagens(id, direcao, conteudo, tipo, enviada_em, recebida_em, criado_em, origem, status)')
         .eq('organizacao_id', orgId)
         .eq('canais.tipo', 'whatsapp')
         .order('ultima_interacao_em', { ascending: false });
