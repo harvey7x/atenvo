@@ -419,5 +419,10 @@ enabled = true
 [functions.evolution-webhook]
 verify_jwt = false
 
-# As demais (asaas-subscription, evolution-manage, evolution-send) exigem o
-# JWT do usuário (verify_jwt = true por padrão) — chamadas só pelo app logado.
+# evo-debug está DESATIVADA (responde 410); publicada sem JWT.
+[functions.evo-debug]
+verify_jwt = false
+
+# As demais (evolution-manage, evolution-send, evolution-start, evolution-send-midia,
+# evolution-foto-sync) exigem o JWT do usuário (verify_jwt = true por padrão) —
+# chamadas só pelo app logado.

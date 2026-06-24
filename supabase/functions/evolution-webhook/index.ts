@@ -1,140 +1,155 @@
-// evolution-webhook — recebe eventos da Evolution (QR, conexão, mensagens).
-// Deploy com --no-verify-jwt. Autenticação via ?secret=EVOLUTION_WEBHOOK_SECRET.
-// Idempotência de mensagens por id_externo (índice único em mensagens.id_externo).
-import { corsHeaders, json } from '../_shared/cors.ts';
-import { adminClient } from '../_shared/client.ts';
+// evolution-webhook — eventos da Evolution. Sem JWT. Secret via webhook_config (constante).
+// v13: registra mensagens fromMe (enviadas pelo celular) como SAÍDA idempotente (#7).
+//      NÃO altera parser LID de entrada, secret, nem messages.update.
+import { corsHeaders, json } from './cors.ts';
+import { adminClient } from './client.ts';
 
-function normalizeNumber(jid?: string | null): string | null {
-  if (!jid) return null;
-  return jid.replace(/@.*/, '').replace(/[^0-9]/g, '') || null;
+function safeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let r = 0; for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i); return r === 0;
+}
+function digits(jid?: string | null): string | null {
+  if (!jid) return null; return jid.replace(/[:@].*/, '').replace(/[^0-9]/g, '') || null;
+}
+function firstEndingWith(cands: Array<string | undefined | null>, suffix: string): string | null {
+  for (const c of cands) if (typeof c === 'string' && c.endsWith(suffix)) return c; return null;
 }
 function textOf(message: Record<string, unknown> | undefined): string | null {
   if (!message) return null;
-  const conv = message.conversation as string | undefined;
-  if (conv) return conv;
-  const ext = (message.extendedTextMessage as { text?: string } | undefined)?.text;
-  return ext ?? null;
+  const conv = message.conversation as string | undefined; if (conv) return conv;
+  const ext = (message.extendedTextMessage as { text?: string } | undefined)?.text; if (ext) return ext;
+  const eph = (message.ephemeralMessage as { message?: Record<string, unknown> } | undefined)?.message; if (eph) return textOf(eph);
+  const vo = (message.viewOnceMessage as { message?: Record<string, unknown> } | undefined)?.message; if (vo) return textOf(vo);
+  return null;
+}
+function sanitize(obj: unknown): unknown {
+  try { return JSON.parse(JSON.stringify(obj, (k, v) => (/(apikey|authorization|token|secret)/i.test(k) ? '[REDACTED]' : v))); } catch { return null; }
 }
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  const admin = adminClient();
   try {
     const url = new URL(req.url);
-    const expected = Deno.env.get('EVOLUTION_WEBHOOK_SECRET') ?? '';
-    if (!expected || url.searchParams.get('secret') !== expected) return json({ error: 'unauthorized' }, 401);
+    const { data: cfg } = await admin.from('webhook_config').select('secret').eq('chave', 'whatsapp').maybeSingle();
+    const expected = cfg?.secret ?? '';
+    if (!expected || !safeEqual(url.searchParams.get('secret') ?? '', expected)) return json({ error: 'unauthorized' }, 401);
 
-    const evt = await req.json().catch(() => null) as
-      | { event?: string; instance?: string; data?: Record<string, unknown> }
-      | null;
-    if (!evt?.event || !evt.instance) return json({ ok: true, ignored: true });
+    const evt = await req.json().catch(() => null) as { event?: string; instance?: string; instanceId?: string; data?: Record<string, unknown> } | null;
+    let event = (evt?.event ?? '').toLowerCase();
+    if (!event) { const seg = url.pathname.split('/').filter(Boolean).pop() ?? ''; if (seg && seg !== 'evolution-webhook') event = seg.replace(/-/g, '.'); }
+    const instanceName = evt?.instance ?? '';
+    const data = (evt?.data ?? {}) as Record<string, unknown>;
+    const instanceId = (evt?.instanceId as string) ?? (data.instanceId as string) ?? null;
+    if (!event || !instanceName) return json({ ok: true, ignored: 'sem event/instance' });
 
-    const admin = adminClient();
-    const event = evt.event.toLowerCase();
-    const data = evt.data ?? {};
+    const key = (data.key ?? {}) as Record<string, unknown>;
+    const remoteJid = (key.remoteJid as string) ?? null;
+    const addressing = (data.addressingMode as string) ?? (key.addressingMode as string) ?? (remoteJid?.endsWith('@lid') ? 'lid' : (remoteJid?.endsWith('@s.whatsapp.net') ? 'pn' : null));
+    const fromMe = typeof key.fromMe === 'boolean' ? (key.fromMe as boolean) : null;
+    const provMsgId = (key.id as string) ?? null;
 
-    // resolve canal/org pela instância
-    const { data: canal } = await admin.from('canais')
-      .select('id, organizacao_id, fonte_aquisicao_id').eq('instancia_externa', evt.instance).maybeSingle();
-    if (!canal) return json({ ok: true, ignored: 'canal desconhecido' });
+    const { data: canal } = await admin.from('canais').select('id, organizacao_id, numero_conectado, provider').eq('instancia_externa', instanceName).maybeSingle();
+
+    const { data: track } = await admin.from('whatsapp_webhook_events').insert({
+      organizacao_id: canal?.organizacao_id ?? null, canal_id: canal?.id ?? null, instance_name: instanceName, instance_id: instanceId,
+      event, provider_message_id: provMsgId, remote_jid: remoteJid, addressing_mode: addressing, from_me: fromMe, payload: sanitize(data), status_processamento: 'recebido',
+    }).select('id').single();
+    const trackId = track?.id as string | undefined;
+    const finish = async (status: string, extra: Record<string, unknown> = {}) => { if (trackId) await admin.from('whatsapp_webhook_events').update({ status_processamento: status, processado_em: new Date().toISOString(), ...extra }).eq('id', trackId); };
+
+    if (!canal) { await finish('erro', { erro: 'INSTANCE_NOT_MAPPED', ignorado_motivo: instanceName }); return json({ ok: true, ignored: 'canal desconhecido' }); }
     const orgId = canal.organizacao_id as string;
 
-    // -------- conexão --------
     if (event === 'connection.update') {
       const state = (data.state as string) ?? (data.connection as string);
       if (state === 'open') {
-        const numero = normalizeNumber((data.wuid as string) ?? (data.ownerJid as string));
-        await admin.from('canais').update({
-          status_integracao: 'conectado', ativo: true,
-          ...(numero ? { numero_conectado: numero } : {}),
-          conectado_em: new Date().toISOString(), ultima_sincronizacao: new Date().toISOString(),
-        }).eq('id', canal.id);
+        const numero = digits((data.wuid as string) ?? (data.ownerJid as string));
+        await admin.from('canais').update({ status_integracao: 'conectado', ativo: true, ...(numero ? { numero_conectado: numero } : {}), conectado_em: new Date().toISOString(), ultima_sincronizacao: new Date().toISOString() }).eq('id', canal.id);
         await admin.from('integracoes').update({ status: 'conectado' }).eq('canal_id', canal.id);
-      } else if (state === 'close') {
-        await admin.from('canais').update({ status_integracao: 'desconectado' }).eq('id', canal.id);
-      }
-      return json({ ok: true });
+      } else if (state === 'close') { await admin.from('canais').update({ status_integracao: 'desconectado' }).eq('id', canal.id); }
+      await finish('processado'); return json({ ok: true });
     }
+    if (event === 'qrcode.updated') { await admin.from('integracoes').update({ status: 'sincronizando', ultima_sincronizacao: new Date().toISOString() }).eq('canal_id', canal.id); await finish('processado'); return json({ ok: true }); }
 
-    // -------- QR atualizado --------
-    if (event === 'qrcode.updated') {
-      await admin.from('integracoes').update({
-        status: 'sincronizando', ultima_sincronizacao: new Date().toISOString(),
-      }).eq('canal_id', canal.id);
-      return json({ ok: true });
-    }
-
-    // -------- mensagem recebida --------
     if (event === 'messages.upsert') {
-      const key = (data.key ?? {}) as { remoteJid?: string; fromMe?: boolean; id?: string };
-      if (key.fromMe) return json({ ok: true, ignored: 'fromMe' }); // eco do envio (já persistido)
-      if ((key.remoteJid ?? '').endsWith('@g.us')) return json({ ok: true, ignored: 'grupo' }); // grupos fora de escopo
-      const numero = normalizeNumber(key.remoteJid);
+      // #7: NÃO descartamos mais fromMe. Grupo segue não suportado.
+      if ((remoteJid ?? '').endsWith('@g.us')) { await finish('ignorado', { ignorado_motivo: 'grupo_nao_suportado' }); return json({ ok: true }); }
+
+      // remoteJid é a OUTRA parte tanto na entrada (remetente) quanto na saída (destinatário) → resolução idêntica.
+      const phoneJid = firstEndingWith([remoteJid, key.remoteJidAlt as string, data.remoteJidAlt as string, key.participantAlt as string, data.participantAlt as string, key.participant as string, data.participant as string], '@s.whatsapp.net');
+      const lidJid = firstEndingWith([remoteJid, key.remoteJidAlt as string, data.remoteJidAlt as string, key.participant as string, data.participant as string], '@lid');
+      const phone = digits(phoneJid); const lid = digits(lidJid);
       const corpo = textOf(data.message as Record<string, unknown> | undefined);
-      if (!numero || !corpo) return json({ ok: true, ignored: 'sem texto' }); // mídia/áudio fora de escopo
-      const pushName = (data.pushName as string) ?? numero;
+      if (!corpo) { await finish('ignorado', { ignorado_motivo: 'sem_texto' }); return json({ ok: true }); }
+      if (!phone && !lid) { await finish('ignorado', { ignorado_motivo: 'sem_identificador' }); return json({ ok: true }); }
+      // Em saída o pushName é do dono da conta (não do destinatário) → não usar como nome do contato.
+      const pushName = (!fromMe ? (data.pushName as string) : null) ?? (phone ?? lid!);
 
-      // contato: identidade whatsapp -> senão por telefone -> senão cria
       let contatoId: string | null = null;
-      const { data: ident } = await admin.from('contato_identidades')
-        .select('contato_id').eq('organizacao_id', orgId).eq('tipo', 'whatsapp').eq('valor_normalizado', numero).maybeSingle();
-      if (ident) contatoId = ident.contato_id;
+      if (phone) { const { data: i } = await admin.from('contato_identidades').select('contato_id').eq('organizacao_id', orgId).eq('tipo', 'whatsapp').eq('valor_normalizado', phone).maybeSingle(); if (i) contatoId = i.contato_id; }
+      if (!contatoId && lid) { const { data: i } = await admin.from('contato_identidades').select('contato_id').eq('organizacao_id', orgId).eq('tipo', 'outro').eq('provedor', 'evolution_lid').eq('valor_normalizado', lid).maybeSingle(); if (i) contatoId = i.contato_id; }
+      if (!contatoId && phone) { const { data: c } = await admin.from('contatos').select('id').eq('organizacao_id', orgId).eq('telefone', phone).maybeSingle(); if (c) contatoId = c.id; }
       if (!contatoId) {
-        const { data: byTel } = await admin.from('contatos')
-          .select('id').eq('organizacao_id', orgId).eq('telefone', numero).maybeSingle();
-        if (byTel) contatoId = byTel.id;
-      }
-      if (!contatoId) {
-        const { data: novo } = await admin.from('contatos').insert({
-          nome: pushName, telefone: numero, origem: 'WhatsApp', organizacao_id: orgId,
-        }).select('id').single();
-        contatoId = novo!.id;
-        await admin.from('contato_identidades').insert({
-          contato_id: contatoId, organizacao_id: orgId, tipo: 'whatsapp',
-          provedor: 'evolution', valor: numero, valor_normalizado: numero, principal: true,
-        });
-      }
+        const { data: novo, error: e1 } = await admin.from('contatos').insert({ nome: pushName, telefone: phone ?? null, origem: 'WhatsApp', organizacao_id: orgId }).select('id').single();
+        if (e1 || !novo) { await finish('erro', { erro: `contatos:${e1?.code ?? ''}:${(e1?.message ?? 'sem retorno').slice(0,180)}` }); return json({ ok: true }); }
+        contatoId = novo.id;
+        if (phone) await admin.from('contato_identidades').insert({ contato_id: contatoId, organizacao_id: orgId, tipo: 'whatsapp', provedor: 'evolution', valor: phoneJid ?? phone, valor_normalizado: phone, principal: true });
+      } else if (phone) { await admin.from('contatos').update({ telefone: phone }).eq('id', contatoId).is('telefone', null); }
+      if (lid) { const { data: ex } = await admin.from('contato_identidades').select('id').eq('organizacao_id', orgId).eq('tipo', 'outro').eq('provedor', 'evolution_lid').eq('valor_normalizado', lid).maybeSingle(); if (!ex) await admin.from('contato_identidades').insert({ contato_id: contatoId, organizacao_id: orgId, tipo: 'outro', provedor: 'evolution_lid', valor: lidJid ?? lid, valor_normalizado: lid, principal: false }); }
 
-      // conversa aberta deste contato neste canal -> senão cria
       let conversaId: string | null = null;
-      const { data: conv } = await admin.from('conversas')
-        .select('id').eq('organizacao_id', orgId).eq('contato_id', contatoId).eq('canal_id', canal.id)
-        .neq('status', 'fechada').order('criado_em', { ascending: false }).limit(1).maybeSingle();
-      if (conv) conversaId = conv.id;
-      if (!conversaId) {
-        const { data: nc } = await admin.from('conversas').insert({
-          organizacao_id: orgId, contato_id: contatoId, canal_id: canal.id, status: 'aberta',
-        }).select('id').single();
-        conversaId = nc!.id;
+      const { data: conv } = await admin.from('conversas').select('id').eq('organizacao_id', orgId).eq('contato_id', contatoId).eq('canal_id', canal.id).neq('status', 'fechada').order('criado_em', { ascending: false }).limit(1).maybeSingle();
+      if (conv) conversaId = conv.id; else { const { data: nc, error: e2 } = await admin.from('conversas').insert({ organizacao_id: orgId, contato_id: contatoId, canal_id: canal.id, status: 'aberta' }).select('id').single(); if (e2 || !nc) { await finish('erro', { erro: `conversas:${e2?.code ?? ''}:${(e2?.message ?? 'sem retorno').slice(0,180)}` }); return json({ ok: true }); } conversaId = nc.id; }
+
+      if (fromMe) {
+        // #7 SAÍDA pelo celular — idempotente por id_externo. Envio da Atenvo já gravou a mesma id → não duplica.
+        if (!provMsgId) { await finish('ignorado', { ignorado_motivo: 'fromMe_sem_id' }); return json({ ok: true }); }
+        const { data: existente } = await admin.from('mensagens').select('id, origem').eq('organizacao_id', orgId).eq('id_externo', provMsgId).maybeSingle();
+        if (existente) {
+          if (!existente.origem) await admin.from('mensagens').update({ origem: 'atenvo' }).eq('id', existente.id);
+          await finish('processado', { ignorado_motivo: 'fromMe_atenvo' }); return json({ ok: true });
+        }
+        const nowIso = new Date().toISOString();
+        const { error: msgErr } = await admin.from('mensagens').upsert({
+          conversa_id: conversaId, organizacao_id: orgId, direcao: 'saida', tipo: 'texto',
+          conteudo: corpo, texto_original: corpo, origem: 'telefone', id_externo: provMsgId,
+          status: 'entregue', enviada_em: nowIso, entregue_em: nowIso, metadados: { origem: 'telefone', via: 'webhook_fromMe' },
+        }, { onConflict: 'id_externo', ignoreDuplicates: true });
+        if (msgErr) { await finish('erro', { erro: `mensagens_out:${msgErr.code ?? ''}:${(msgErr.message ?? '').slice(0,180)}` }); return json({ ok: true }); }
+        await admin.from('conversas').update({ ultima_interacao_em: nowIso, ultimo_canal_id: canal.id, ultimo_numero: canal.numero_conectado ?? null, ultimo_provider: canal.provider ?? 'whatsapp', ultima_msg_canal_em: nowIso }).eq('id', conversaId);
+        await finish('processado', { ignorado_motivo: 'fromMe_telefone' }); return json({ ok: true });
       }
 
-      // mensagem (idempotente por id_externo)
-      await admin.from('mensagens').upsert(
-        {
-          conversa_id: conversaId, organizacao_id: orgId, direcao: 'entrada', tipo: 'texto',
-          conteudo: corpo, id_externo: key.id ?? null, status: 'entregue', recebida_em: new Date().toISOString(),
-        },
-        { onConflict: 'id_externo', ignoreDuplicates: true },
-      );
+      // ENTRADA — comportamento original (inalterado).
+      const { error: msgErr } = await admin.from('mensagens').upsert({ conversa_id: conversaId, organizacao_id: orgId, direcao: 'entrada', tipo: 'texto', conteudo: corpo, id_externo: provMsgId, status: 'entregue', recebida_em: new Date().toISOString() }, { onConflict: 'id_externo', ignoreDuplicates: true });
       await admin.from('conversas').update({ ultima_interacao_em: new Date().toISOString() }).eq('id', conversaId);
+      if (msgErr) { await finish('erro', { erro: `mensagens:${msgErr.code ?? ''}:${(msgErr.message ?? '').slice(0,180)}` }); return json({ ok: true }); }
+      await finish('processado', { ignorado_motivo: phone ? null : 'lid_sem_telefone' });
       return json({ ok: true });
     }
 
-    // -------- atualização de status da mensagem --------
     if (event === 'messages.update') {
-      const arr = Array.isArray(data) ? data : [data];
-      for (const it of arr as Record<string, unknown>[]) {
-        const id = (it.key as { id?: string } | undefined)?.id ?? (it.keyId as string | undefined);
+      const arr = Array.isArray(evt?.data) ? (evt!.data as unknown as Record<string, unknown>[]) : [data];
+      let n = 0; let falhas = 0;
+      const map: Record<string, string> = { PENDING: 'pendente', SERVER_ACK: 'enviada', DELIVERY_ACK: 'entregue', READ: 'lida', PLAYED: 'lida', ERROR: 'falhou' };
+      for (const it of arr) {
+        const id = ((it.key as { id?: string } | undefined)?.id) ?? (it.keyId as string | undefined);
         const status = (it.status as string | undefined)?.toUpperCase();
-        if (!id) continue;
-        const map: Record<string, string> = { DELIVERY_ACK: 'entregue', READ: 'lida', PLAYED: 'lida', SERVER_ACK: 'enviada' };
-        const novo = status ? map[status] : undefined;
-        if (novo) await admin.from('mensagens').update({ status: novo }).eq('id_externo', id);
+        if (!id || !status) continue;
+        const novo = map[status];
+        if (!novo) continue;
+        if (novo === 'falhou') {
+          const sp = (it.messageStubParameters as unknown);
+          const stub = Array.isArray(sp) ? sp.join(',') : (sp != null ? String(sp) : null);
+          await admin.from('mensagens').update({ status: 'falhou', erro_envio: `ERROR${stub ? ':' + stub.slice(0, 80) : ''}`, metadados: { erro: { status, remoteJid: (it.remoteJid as string) ?? null, instance: instanceName, stub: stub ?? null, em: new Date().toISOString() } } }).eq('id_externo', id);
+          falhas++;
+        } else { await admin.from('mensagens').update({ status: novo }).eq('id_externo', id); n++; }
       }
-      return json({ ok: true });
+      await finish('processado', { ignorado_motivo: `acks:${n}${falhas ? ` falhas:${falhas}` : ''}` }); return json({ ok: true });
     }
 
-    return json({ ok: true, ignored: event });
-  } catch (e) {
-    return json({ error: (e as Error).message ?? 'Erro inesperado.' }, 500);
-  }
+    await finish('ignorado', { ignorado_motivo: `evento_nao_tratado:${event}` });
+    return json({ ok: true });
+  } catch (e) { return json({ error: (e as Error).message ?? 'erro' }, 500); }
 });
