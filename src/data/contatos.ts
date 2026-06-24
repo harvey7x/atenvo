@@ -12,6 +12,7 @@ export interface ContatoRow {
   resp: string;
   st: string;
   ult: string;
+  tags: string[];
 }
 
 export interface NovoContato {
@@ -23,7 +24,7 @@ export interface NovoContato {
 
 /* ===================== Modo MOCK (dev sem env) ===================== */
 /* Mantém a página funcional sem backend. Em produção (env presente) NUNCA é usado. */
-const MOCK_SEED: ContatoRow[] = [
+const MOCK_SEED: Omit<ContatoRow, 'tags'>[] = [
   { id: 'm1', nome: 'Ana Beatriz', email: 'ana.beatriz@email.com', tel: '(51) 99812-3344', org: 'WhatsApp', resp: 'Henrique', st: 'Cliente', ult: 'Há 2 horas' },
   { id: 'm2', nome: 'Carlos Mendes', email: 'carlos.mendes@email.com', tel: '(51) 99721-8890', org: 'Facebook', resp: 'Marina Lopes', st: 'Lead', ult: 'Há 5 horas' },
   { id: 'm3', nome: 'Fernanda Souza', email: 'fernanda.souza@email.com', tel: '(51) 99634-1122', org: 'Lead Ads', resp: 'Antônio César', st: 'Negociando', ult: 'Ontem' },
@@ -35,7 +36,10 @@ const MOCK_SEED: ContatoRow[] = [
   { id: 'm9', nome: 'Camila Duarte', email: 'camila.duarte@email.com', tel: '(51) 99033-7755', org: 'Indicação', resp: 'Henrique', st: 'Lead', ult: 'Há 6 horas' },
   { id: 'm10', nome: 'Lucas Almeida', email: 'lucas.almeida@email.com', tel: '(51) 98922-5533', org: 'WhatsApp', resp: 'Marina Lopes', st: 'Cliente', ult: 'Há 2 dias' },
 ];
-let mockStore: ContatoRow[] = [...MOCK_SEED];
+const MOCK_TAGS: Record<string, string[]> = {
+  m1: ['Revisão de contrato'], m2: ['Juros abusivos'], m3: ['Documentação', 'Revisão de contrato'], m5: ['Juros abusivos'],
+};
+let mockStore: ContatoRow[] = MOCK_SEED.map((r) => ({ ...r, tags: MOCK_TAGS[r.id] ?? [] }));
 const uid = () => (globalThis.crypto?.randomUUID?.() ?? 'm' + Math.random().toString(36).slice(2));
 
 /* ===================== Mapeamento DB -> UI ===================== */
@@ -71,6 +75,7 @@ function mapRow(c: DbContato): ContatoRow {
     resp: (Array.isArray(c.responsavel) ? c.responsavel[0]?.nome : c.responsavel?.nome) ?? '—',
     st: statusFromEtiquetas(c.etiquetas),
     ult: fmtUlt(c.atualizado_em),
+    tags: c.etiquetas ?? [],
   };
 }
 
@@ -99,7 +104,7 @@ export function useCreateContato() {
   return useMutation({
     mutationFn: async (input: NovoContato) => {
       if (!isSupabaseConfigured || !supabase) {
-        mockStore = [{ id: uid(), nome: input.nome, email: input.email ?? '', tel: input.telefone ?? '', org: input.origem ?? 'WhatsApp', resp: '—', st: 'Lead', ult: 'Agora' }, ...mockStore];
+        mockStore = [{ id: uid(), nome: input.nome, email: input.email ?? '', tel: input.telefone ?? '', org: input.origem ?? 'WhatsApp', resp: '—', st: 'Lead', ult: 'Agora', tags: [] }, ...mockStore];
         return;
       }
       // organizacao_id = org atual (validado no backend por RLS/trigger)

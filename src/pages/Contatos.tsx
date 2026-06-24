@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useToast } from '@/hooks/useToast';
 import { useContatos, useCreateContato, useUpdateContato, useDeleteContato, type ContatoRow as Row } from '@/data/contatos';
+import { useEtiquetas } from '@/data/atendimento';
+import { corDaEtiqueta } from '@/types/atendimento';
 import './Contatos.css';
 
 const PAL = ['#5b6ee1', '#c2693a', '#7a5bb0', '#2f8f9d', '#b0566f', '#4a7a4a', '#9d7a2f', '#3d7ab0'];
@@ -37,6 +39,7 @@ const STAT_ICONS = {
 export function Contatos() {
   const { toast } = useToast();
   const { data: rows = [], isLoading, isError, error } = useContatos();
+  const { data: etiquetas = [] } = useEtiquetas();
   const createContato = useCreateContato();
   const updateContato = useUpdateContato();
   const deleteContato = useDeleteContato();
@@ -138,7 +141,7 @@ export function Contatos() {
                 )}
                 {!isLoading && !isError && filtered.map((r) => (
                   <tr key={r.id} onClick={() => setDrawer(r)}>
-                    <td><div className="contact-cell"><Av n={r.nome} /><div className="c-txt"><span className="nm">{r.nome}</span><span className="em">{r.email}</span></div></div></td>
+                    <td><div className="contact-cell"><Av n={r.nome} /><div className="c-txt"><span className="nm">{r.nome}</span><span className="em">{r.email}</span>{r.tags.length > 0 && <span className="ctags">{r.tags.slice(0, 3).map((t) => { const cor = corDaEtiqueta(t, etiquetas); return <span key={t} className="ctag" style={{ background: cor + '22', color: cor, borderColor: cor + '55' }}>{t}</span>; })}{r.tags.length > 3 && <span className="ctag more">+{r.tags.length - 3}</span>}</span>}</div></div></td>
                     <td><div className="phone-cell"><span className="phone">{r.tel}</span></div></td>
                     <td><div className="origin-cell"><Origem o={r.org} /></div></td>
                     <td><div className="responsible-cell"><Av n={r.resp} cls="sm" /><span className="rname">{r.resp}</span></div></td>
@@ -178,6 +181,7 @@ export function Contatos() {
             <div className="dl-row"><span className="dl-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg></span><div className="dl-txt"><span className="dl-label">Responsável</span><span className="dl-value"><Av n={drawer.resp} cls="sm" /><span>{drawer.resp}</span></span></div></div>
             <div className="dl-row"><span className="dl-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.1V12a10 10 0 1 1-5.9-9.1" /><path d="M22 4 12 14.1l-3-3" /></svg></span><div className="dl-txt"><span className="dl-label">Status</span><span className="dl-value"><Status s={drawer.st} /></span></div></div>
             <div className="dl-row"><span className="dl-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg></span><div className="dl-txt"><span className="dl-label">Última interação</span><span className="dl-value">{drawer.ult}</span></div></div>
+            <div className="dl-row"><span className="dl-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.6 13.4 13 21l-9-9V4h8z" /><circle cx="7.5" cy="7.5" r="1.2" /></svg></span><div className="dl-txt"><span className="dl-label">Etiquetas</span><span className="dl-value">{drawer.tags.length > 0 ? <span className="ctags">{drawer.tags.map((t) => { const cor = corDaEtiqueta(t, etiquetas); return <span key={t} className="ctag" style={{ background: cor + '22', color: cor, borderColor: cor + '55' }}>{t}</span>; })}</span> : <span style={{ color: 'var(--muted)' }}>Nenhuma</span>}</span></div></div>
           </div>
           <div className="drawer-foot">
             <button className="btn-block primary" onClick={() => toast('Abrir conversa com ' + drawer.nome)}><IcMsg />Enviar mensagem</button>
