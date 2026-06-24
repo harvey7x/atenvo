@@ -442,7 +442,6 @@ export function WhatsApp() {
             </div>
           ))}
         </div>
-        <div className="list-foot"><button onClick={() => toast('Mostrando todas as conversas')}>Ver todas as conversas</button></div>
       </section>
 
       {/* ---------- CHAT ---------- */}
