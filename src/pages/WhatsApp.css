@@ -74,14 +74,17 @@
 .wa-app .list-foot button:hover{text-decoration:underline}
 
 /* ===== CHAT COLUMN ===== */
-.wa-app .chat-col{flex:1;min-width:380px;background:var(--bg)}
-.wa-app .chat-head{padding:12px 18px;border-bottom:1px solid var(--line);background:var(--surface);display:flex;align-items:center;gap:12px;flex-wrap:nowrap}
-.wa-app .ch-id{display:flex;align-items:center;gap:12px;min-width:0}
-.wa-app .ch-id .ch-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wa-app .chat-col{flex:1;min-width:380px;background:var(--bg);container-type:inline-size}
+/* cabeçalho da conversa: grid estrutural — identidade (flex/elipse) | metadados | ações */
+.wa-app .chat-head{padding:12px 18px;border-bottom:1px solid var(--line);background:var(--surface);display:grid;grid-template-columns:minmax(0,1fr) max-content max-content;align-items:center;gap:16px}
+.wa-app .ch-id{display:flex;align-items:center;gap:12px;min-width:0;flex:1 1 auto}
+.wa-app .ch-id-text{min-width:0;overflow:hidden}
+.wa-app .ch-id .ch-name{display:block;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wa-app .ch-id .ch-name:focus-visible{outline:2px solid var(--ring);outline-offset:2px;border-radius:4px}
 .wa-app .ch-id .av{width:46px;height:46px;border-radius:50%;flex:none}
 .wa-app .ch-name{font-size:16px;font-weight:600;color:var(--ink);line-height:1.15}
-.wa-app .ch-phone{font-size:12.5px;color:var(--muted)}
-.wa-app .ch-meta{display:flex;align-items:center;justify-content:center;gap:20px;flex:1 1 auto;min-width:0;overflow:hidden}
+.wa-app .ch-phone{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wa-app .ch-meta{display:flex;align-items:center;gap:20px}
 .wa-app .ch-meta .meta-cell{white-space:nowrap}
 .wa-app .meta-cell{line-height:1.2}
 .wa-app .meta-cell .k{font-size:10.5px;color:var(--muted);font-weight:500;margin-bottom:3px}
@@ -191,7 +194,7 @@
 .wa-app .pop-scripts{min-width:288px;max-height:340px;overflow-y:auto}
 
 /* ===== status (badge no header + picker no painel) ===== */
-.wa-app .ch-left{display:flex;align-items:center;gap:8px;min-width:0;flex:0 1 auto;max-width:48%}
+.wa-app .ch-left{display:flex;align-items:center;gap:8px;min-width:0}
 .wa-app .icon-btn.on{background:var(--green-soft);color:var(--green-ink)}
 .wa-app .status-badge{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;padding:4px 10px;border-radius:999px;white-space:nowrap}
 .wa-app .sdot{width:8px;height:8px;border-radius:50%;flex:none}
@@ -298,16 +301,21 @@
   .wa-app.data-collapsed .data-col{display:flex}
   .wa-app .reopen,.wa-app.data-collapsed .reopen{display:none!important}
 }
-/* faltando espaço: esconde metadados secundários primeiro (Origem, depois Canal); botões nunca somem */
-@media (max-width:1120px){
-  .wa-app .ch-meta .meta-cell:nth-child(2){display:none} /* Origem */
-}
 @media (max-width:1000px){
   .wa-app .list-col{width:300px}
   .wa-app .ch-meta{gap:14px}
-  .wa-app .ch-meta .meta-cell:nth-child(1){display:none} /* Canal */
 }
 @media (max-width:860px){
   .wa-app .list-col{width:260px}
+}
+/* Faltando espaço NA COLUNA do chat (considera painéis abertos): some 1º Origem,
+   depois Canal, por fim Status; os botões de ação nunca somem nem quebram. */
+@container (max-width:640px){
+  .wa-app .ch-meta .meta-cell:nth-child(2){display:none} /* Origem */
+}
+@container (max-width:540px){
+  .wa-app .ch-meta .meta-cell:nth-child(1){display:none} /* Canal */
+}
+@container (max-width:430px){
   .wa-app .ch-meta{display:none}
 }

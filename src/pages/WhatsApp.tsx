@@ -455,7 +455,10 @@ export function WhatsApp() {
             )}
             <div className="ch-id">
               <Avatar name={current.name} />
-              <div><div className="ch-name">{current.name}</div><div className="ch-phone">{current.phone}</div></div>
+              <div className="ch-id-text">
+                <div className="ch-name" title={current.name} tabIndex={0} aria-label={current.name}>{current.name}</div>
+                <div className="ch-phone" title={current.phone}>{current.phone}</div>
+              </div>
             </div>
           </div>
           <div className="ch-meta">
