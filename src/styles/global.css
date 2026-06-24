@@ -227,6 +227,11 @@ select.ctrl{cursor:pointer;appearance:none;background-image:url("data:image/svg+
 /* conteúdo full-bleed (workspaces, ex.: WhatsApp) */
 .content.content-bleed{padding:0;overflow:hidden}
 
+/* modo de foco do WhatsApp: recolhe a sidebar e o topo do app para ampliar a conversa */
+body.wa-foco .sidebar{display:none}
+body.wa-foco .topbar{display:none}
+body.wa-foco .content{padding:0;overflow:hidden}
+
 /* acesso restrito por papel */
 .denied{display:flex;align-items:center;justify-content:center;min-height:70vh;padding:24px}
 .denied .d-card{max-width:480px;text-align:center;background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:34px}

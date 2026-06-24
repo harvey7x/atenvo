@@ -188,6 +188,74 @@
 .wa-app .pop-head{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em;padding:6px 10px 4px}
 .wa-app .pop-scripts{min-width:288px;max-height:340px;overflow-y:auto}
 
+/* ===== status (badge no header + picker no painel) ===== */
+.wa-app .ch-left{display:flex;align-items:center;gap:8px;min-width:0}
+.wa-app .icon-btn.on{background:var(--green-soft);color:var(--green-ink)}
+.wa-app .status-badge{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;padding:4px 10px;border-radius:999px;white-space:nowrap}
+.wa-app .sdot{width:8px;height:8px;border-radius:50%;flex:none}
+.wa-app .status-picker{display:inline-flex;align-items:center;gap:8px;width:100%;background:var(--surface-2);border:1px solid var(--line-2);border-radius:9px;padding:8px 10px;font-size:13.5px;color:var(--ink);cursor:pointer;font-family:inherit;font-weight:500}
+.wa-app .status-picker:hover{border-color:var(--green)}
+.wa-app .status-picker:disabled{opacity:.6;cursor:not-allowed}
+.wa-app .status-picker .status-name{flex:1;text-align:left}
+.wa-app .status-picker svg{width:14px;height:14px;color:var(--muted)}
+
+/* ===== etiquetas coloridas ===== */
+.wa-app .conv-tags{display:flex;gap:4px;margin-top:5px}
+.wa-app .ctag-dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.wa-app .tag.colored{display:inline-flex;align-items:center;gap:5px;border:1px solid;font-weight:600}
+.wa-app .tag-x{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border:0;background:transparent;color:currentColor;cursor:pointer;opacity:.7;padding:0}
+.wa-app .tag-x:hover{opacity:1}
+.wa-app .tag-x svg{width:11px;height:11px}
+
+/* ===== último canal ===== */
+.wa-app .last-channel{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:10px 11px}
+.wa-app .last-channel .lc-line{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.wa-app .last-channel .lc-alias{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;font-weight:600;color:var(--ink)}
+.wa-app .last-channel .lc-alias svg{width:15px;height:15px;color:var(--wa)}
+.wa-app .last-channel .lc-prov{font-size:11px;color:var(--muted);text-transform:capitalize}
+.wa-app .last-channel .lc-num{font-size:13px;color:var(--ink-2);margin-top:3px;font-family:'JetBrains Mono',ui-monospace,monospace}
+.wa-app .last-channel .lc-when{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted);margin-top:4px}
+.wa-app .last-channel .lc-when svg{width:13px;height:13px}
+
+/* ===== assinatura (Assinar como) ===== */
+.wa-app .sign-row{display:flex;align-items:center;gap:8px;margin-top:9px;flex-wrap:wrap;font-size:13px}
+.wa-app .sign-row .rl{display:inline-flex;align-items:center;gap:6px;color:var(--ink-2);font-weight:500}
+.wa-app .sign-row .rl svg{width:14px;height:14px;color:var(--muted)}
+.wa-app .sign-sel{height:32px;border-radius:8px;border:1px solid var(--line-2);background:var(--surface-2);color:var(--ink);font-size:13px;padding:0 8px;font-family:inherit;cursor:pointer}
+.wa-app .sign-input{height:32px;border-radius:8px;border:1px solid var(--line-2);background:var(--surface-2);color:var(--ink);font-size:13px;padding:0 10px;font-family:inherit;min-width:160px}
+.wa-app .sign-sel:focus,.wa-app .sign-input:focus{outline:none;border-color:var(--green);box-shadow:0 0 0 3px var(--ring)}
+.wa-app .sign-preview{font-size:12px;color:var(--green-ink);font-weight:600}
+
+/* ===== composer: canais reais / bloqueio ===== */
+.wa-app .chip-btn.off{color:var(--muted);opacity:.7;text-decoration:line-through}
+.wa-app .reply-empty{font-size:12.5px;color:var(--muted)}
+.wa-app .link-btn{background:none;border:0;color:var(--green-ink);font-weight:600;cursor:pointer;font-family:inherit;font-size:inherit;padding:0;margin-left:6px;text-decoration:underline}
+.wa-app .warn-block{color:var(--amber);background:var(--amber-soft);border:1px solid var(--amber-soft);border-radius:9px;padding:8px 10px;align-items:center}
+
+/* ===== mensagens: ack + enviada pelo celular ===== */
+.wa-app .btime .tick{margin-left:4px;font-weight:600}
+.wa-app .btime .tick.enviada{color:var(--muted)}
+.wa-app .btime .tick.entregue{color:#7c8aa0}
+.wa-app .btime .tick.lida{color:#34b3f1}
+.wa-app .btime .tick.pendente{color:var(--muted);font-weight:400}
+.wa-app .btime .tick.falhou{color:#e5484d}
+.wa-app .phone-tag{display:inline-flex;align-items:center;gap:4px;margin-right:7px;padding:1px 6px;border-radius:6px;background:var(--green-soft);color:var(--green-ink);font-size:9.5px;font-weight:600;vertical-align:middle}
+.wa-app .phone-tag svg{width:10px;height:10px}
+
+/* ===== popover extras ===== */
+.wa-app .pop-item.sel{background:var(--green-soft)}
+.wa-app .pop-item .sdot{margin-right:2px}
+.wa-app .pop-item .ck{margin-left:auto;color:var(--green-ink);font-weight:700}
+.wa-app .pop-empty{padding:8px 10px;font-size:12.5px;color:var(--muted)}
+.wa-app .pop-foot-link{display:block;width:100%;text-align:left;border:0;border-top:1px solid var(--line);margin-top:5px;padding:9px 10px 4px;background:transparent;color:var(--green-ink);font-weight:600;font-size:12.5px;cursor:pointer;font-family:inherit}
+
+/* ===== #8 MODO DE FOCO ===== */
+.wa-app.foco .chat-head{padding:8px 14px}
+.wa-app.foco .ch-id .av{width:38px;height:38px}
+.wa-app.foco .ch-meta{gap:14px}
+.wa-app.foco.list-hidden .list-col{display:none}
+.wa-app .list-toggle{flex:none}
+
 @media (max-width:1199px){
   .wa-app .data-col{position:fixed;top:0;right:0;height:100dvh;width:340px;max-width:88vw;transform:translateX(100%);transition:transform .26s ease;z-index:50;box-shadow:var(--shadow-pop)}
   .wa-app.drawer-open .data-col{transform:none;display:flex}
