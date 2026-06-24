@@ -423,6 +423,11 @@ verify_jwt = false
 [functions.evo-debug]
 verify_jwt = false
 
+# meta-webhook: webhook público do Facebook Messenger (a Meta não envia JWT do
+# Supabase; a autenticação é por verify_token no GET e assinatura HMAC no POST).
+[functions.meta-webhook]
+verify_jwt = false
+
 # As demais (evolution-manage, evolution-send, evolution-start, evolution-send-midia,
 # evolution-foto-sync) exigem o JWT do usuário (verify_jwt = true por padrão) —
 # chamadas só pelo app logado.
