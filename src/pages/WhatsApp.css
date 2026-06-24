@@ -1,0 +1,204 @@
+/* ============================================================
+   Atenvo — WhatsApp (porte fiel de prototipos/02_whatsapp.html)
+   Isolado sob .wa-app. Sidebar/topbar/toast vêm do AppShell/global.
+   Tokens do protótipo escopados em .wa-app para reproduzir o palette.
+   ============================================================ */
+.wa-app{
+  --green:#19C37D; --green-ink:#0e9d63; --green-soft:#e8f7ef; --green-soft-2:#d8f0e4;
+  --wa:#1FA855; --amber:#c97a16; --amber-soft:#fdf2e2; --blue:#3b82f6;
+  --bg:#f5f6f8; --surface:#ffffff; --surface-2:#f7f9fb; --hover:#f1f4f8;
+  --ink:#0f172a; --ink-2:#475569; --muted:#8a97a8;
+  --line:#e8ecf2; --line-2:#dfe5ec;
+  --chat-bg:#f1ede6; --chat-dot:rgba(0,0,0,.022);
+  --recv:#ffffff; --sent:#e3f6ec; --sent-ink:#0f3d2a;
+  --ring:rgba(25,195,125,.42);
+  --shadow:0 1px 2px rgba(16,24,40,.05),0 1px 3px rgba(16,24,40,.05);
+  --shadow-pop:0 12px 32px rgba(16,24,40,.16);
+  display:flex;height:100%;overflow:hidden;font-size:14px;color:var(--ink)
+}
+[data-theme="dark"] .wa-app{
+  --green-soft:rgba(25,195,125,.15); --green-soft-2:rgba(25,195,125,.22);
+  --amber-soft:rgba(201,122,22,.16);
+  --bg:#0a1220; --surface:#0f1a2c; --surface-2:#132035; --hover:#172539;
+  --ink:#eef2f8; --ink-2:#b3c0d2; --muted:#8294ac;
+  --line:#21314a; --line-2:#2a3b57;
+  --chat-bg:#0c1626; --chat-dot:rgba(255,255,255,.025);
+  --recv:#16233b; --sent:rgba(25,195,125,.2); --sent-ink:#d6f5e6;
+  --shadow:0 1px 2px rgba(0,0,0,.4); --shadow-pop:0 14px 36px rgba(0,0,0,.5)
+}
+.wa-app .col{min-width:0;height:100%;display:flex;flex-direction:column;overflow:hidden}
+
+/* avatares (iniciais) */
+.wa-app .av{display:inline-flex;align-items:center;justify-content:center;color:#fff;font-weight:600;font-size:13px;letter-spacing:.01em;overflow:hidden}
+.wa-app .av.s{font-size:11px}
+.wa-app .av.xs{font-size:9px}
+
+/* ===== LIST COLUMN ===== */
+.wa-app .list-col{width:352px;flex:none;background:var(--surface);border-right:1px solid var(--line)}
+.wa-app .list-head{padding:18px 18px 0}
+.wa-app .lh-top{display:flex;align-items:center;gap:11px}
+.wa-app .wa-badge{width:38px;height:38px;border-radius:11px;background:var(--wa);display:inline-flex;align-items:center;justify-content:center;flex:none}
+.wa-app .wa-badge svg{width:22px;height:22px;color:#fff}
+.wa-app .lh-title{font-size:19px;font-weight:600;color:var(--ink);line-height:1.1}
+.wa-app .lh-sub{font-size:12.5px;color:var(--muted)}
+.wa-app .search-row{display:flex;gap:9px;margin:16px 0 0}
+.wa-app .search{flex:1;position:relative;display:flex;align-items:center}
+.wa-app .search svg{position:absolute;left:13px;width:18px;height:18px;color:var(--muted);pointer-events:none}
+.wa-app .search input{width:100%;height:42px;border-radius:11px;border:1px solid var(--line-2);background:var(--surface-2);padding:0 14px 0 40px;font-size:13.5px;color:var(--ink);outline:none;font-family:inherit;transition:border-color .15s,box-shadow .15s}
+.wa-app .search input::placeholder{color:var(--muted)}
+.wa-app .search input:focus{border-color:var(--green);box-shadow:0 0 0 3px var(--ring)}
+.wa-app .filter-btn{width:42px;height:42px;flex:none;border-radius:11px;border:1px solid var(--line-2);background:var(--surface-2);color:var(--ink-2);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:background .14s,border-color .14s}
+.wa-app .filter-btn:hover{background:var(--hover);border-color:var(--green)}
+.wa-app .filter-btn svg{width:18px;height:18px}
+.wa-app .tabs{display:flex;gap:18px;margin:14px 2px 0;border-bottom:1px solid var(--line);padding:0 2px}
+.wa-app .tab{padding:10px 1px;font-size:13.5px;font-weight:500;color:var(--muted);background:none;border:0;cursor:pointer;position:relative;white-space:nowrap;transition:color .14s}
+.wa-app .tab:hover{color:var(--ink-2)}
+.wa-app .tab.active{color:var(--green-ink)}
+.wa-app .tab.active::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--green);border-radius:2px}
+.wa-app .conv-list{flex:1;overflow-y:auto;padding:8px 10px}
+.wa-app .conv{display:flex;gap:11px;padding:12px;border-radius:12px;cursor:pointer;position:relative;border:1px solid transparent;transition:background .12s}
+.wa-app .conv:hover{background:var(--hover)}
+.wa-app .conv.active{background:var(--green-soft);border-color:var(--green-soft-2)}
+.wa-app .conv.active::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:3px;border-radius:0 3px 3px 0;background:var(--green)}
+.wa-app .conv .av{width:44px;height:44px;border-radius:50%;flex:none}
+.wa-app .conv .cbody{flex:1;min-width:0}
+.wa-app .conv .crow{display:flex;align-items:center;gap:8px}
+.wa-app .conv .cname{font-size:14px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
+.wa-app .conv .ctime{font-size:11.5px;color:var(--muted);flex:none}
+.wa-app .conv .cchip{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--ink-2);margin:3px 0}
+.wa-app .conv .cchip svg{width:13px;height:13px;color:var(--wa)}
+.wa-app .conv .cprev{font-size:12.5px;color:var(--muted);line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.wa-app .conv .unread{flex:none;align-self:flex-end;min-width:20px;height:20px;border-radius:999px;background:var(--green);color:#fff;font-size:11px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;padding:0 6px}
+.wa-app .list-foot{padding:14px;text-align:center;border-top:1px solid var(--line)}
+.wa-app .list-foot button{background:none;border:0;color:var(--green-ink);font-size:13px;font-weight:500;cursor:pointer;font-family:inherit}
+.wa-app .list-foot button:hover{text-decoration:underline}
+
+/* ===== CHAT COLUMN ===== */
+.wa-app .chat-col{flex:1;min-width:380px;background:var(--bg)}
+.wa-app .chat-head{padding:14px 18px;border-bottom:1px solid var(--line);background:var(--surface);display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.wa-app .ch-id{display:flex;align-items:center;gap:12px;min-width:0}
+.wa-app .ch-id .av{width:46px;height:46px;border-radius:50%;flex:none}
+.wa-app .ch-name{font-size:16px;font-weight:600;color:var(--ink);line-height:1.15}
+.wa-app .ch-phone{font-size:12.5px;color:var(--muted)}
+.wa-app .ch-meta{display:flex;align-items:center;gap:22px;margin-left:auto;flex-wrap:wrap}
+.wa-app .meta-cell{line-height:1.2}
+.wa-app .meta-cell .k{font-size:10.5px;color:var(--muted);font-weight:500;margin-bottom:3px}
+.wa-app .meta-val{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:500;color:var(--ink)}
+.wa-app .meta-val svg{width:15px;height:15px}
+.wa-app .meta-val .av{width:20px;height:20px;border-radius:50%}
+.wa-app .chip-tag{display:inline-flex;align-items:center;gap:5px;color:var(--ink)}
+.wa-app .chip-tag svg{color:var(--wa)}
+.wa-app .status-sel{display:inline-flex;align-items:center;gap:6px;background:var(--green-soft);color:var(--green-ink);font-size:12.5px;font-weight:500;padding:5px 9px;border-radius:8px;border:1px solid var(--green-soft-2);cursor:pointer;font-family:inherit}
+.wa-app .status-sel svg{width:13px;height:13px}
+.wa-app .ch-actions{display:flex;align-items:center;gap:4px}
+.wa-app .icon-btn{width:34px;height:34px;border-radius:9px;border:0;background:transparent;color:var(--ink-2);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:background .14s}
+.wa-app .icon-btn:hover{background:var(--hover)}
+.wa-app .icon-btn svg{width:19px;height:19px}
+
+.wa-app .messages{flex:1;overflow-y:auto;padding:24px 26px;background-color:var(--chat-bg);background-image:radial-gradient(var(--chat-dot) 1.1px,transparent 1.1px);background-size:20px 20px}
+.wa-app .msg{max-width:62%;margin-bottom:14px;clear:both}
+.wa-app .msg.in{float:left}
+.wa-app .msg.out{float:right}
+.wa-app .bubble{padding:10px 13px;border-radius:14px;font-size:14px;line-height:1.5;color:var(--ink);box-shadow:var(--shadow);position:relative}
+.wa-app .msg.in .bubble{background:var(--recv);border-top-left-radius:4px}
+.wa-app .msg.out .bubble{background:var(--sent);color:var(--sent-ink);border-top-right-radius:4px}
+.wa-app .btime{display:block;text-align:right;font-size:10.5px;color:var(--muted);margin-top:5px}
+.wa-app .msg.out .btime{color:rgba(15,61,42,.55)}
+[data-theme="dark"] .wa-app .msg.out .btime{color:rgba(214,245,230,.5)}
+.wa-app .btime .tick{margin-left:3px;color:#34b3f1;font-weight:600}
+.wa-app .pdf-card{display:flex;align-items:center;gap:11px;padding:11px;border-radius:12px;background:var(--recv);box-shadow:var(--shadow);min-width:240px}
+.wa-app .pdf-ic{width:38px;height:38px;border-radius:9px;background:#fdecec;color:#e5484d;display:inline-flex;align-items:center;justify-content:center;flex:none;font-size:10px;font-weight:600}
+[data-theme="dark"] .wa-app .pdf-ic{background:rgba(229,72,77,.15)}
+.wa-app .pdf-info{min-width:0}
+.wa-app .pdf-name{font-size:13px;font-weight:500;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wa-app .pdf-meta{font-size:11.5px;color:var(--muted)}
+
+/* composer */
+.wa-app .composer{border-top:1px solid var(--line);background:var(--surface);padding:12px 18px 14px}
+.wa-app .reply-row{display:flex;align-items:center;gap:6px;font-size:13px}
+.wa-app .reply-row .rl{color:var(--ink-2);font-weight:500;margin-right:4px}
+.wa-app .chip-btn{background:none;border:0;font-size:13px;font-weight:500;color:var(--muted);cursor:pointer;padding:3px 4px;position:relative;font-family:inherit}
+.wa-app .chip-btn:hover{color:var(--ink-2)}
+.wa-app .chip-btn.active{color:var(--green-ink)}
+.wa-app .chip-btn.active::after{content:"";position:absolute;left:4px;right:4px;bottom:-2px;height:2px;background:var(--green);border-radius:2px}
+.wa-app .chip-div{color:var(--line-2)}
+.wa-app .warn{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--amber);margin:9px 0 10px;font-weight:500}
+.wa-app .warn svg{width:15px;height:15px;flex:none}
+.wa-app .input-wrap{border:1px solid var(--line-2);border-radius:14px;background:var(--surface-2);padding:10px 12px;transition:border-color .15s,box-shadow .15s}
+.wa-app .input-wrap:focus-within{border-color:var(--green);box-shadow:0 0 0 3px var(--ring)}
+.wa-app .msg-input{width:100%;border:0;background:transparent;resize:none;outline:none;font-family:inherit;font-size:14px;color:var(--ink);line-height:1.5;max-height:120px;min-height:24px}
+.wa-app .msg-input::placeholder{color:var(--muted)}
+.wa-app .composer-bar{display:flex;align-items:center;gap:4px;margin-top:8px}
+.wa-app .tool{width:36px;height:36px;border-radius:9px;border:0;background:transparent;color:var(--ink-2);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:background .14s,color .14s}
+.wa-app .tool:hover{background:var(--hover);color:var(--green-ink)}
+.wa-app .tool svg{width:19px;height:19px}
+.wa-app .composer-bar .spacer{flex:1}
+.wa-app .scripts-btn{display:inline-flex;align-items:center;gap:7px;height:40px;padding:0 13px;border-radius:10px;border:1px solid var(--line-2);background:var(--surface);color:var(--ink);font-size:13.5px;font-weight:500;cursor:pointer;transition:background .14s,border-color .14s;font-family:inherit}
+.wa-app .scripts-btn:hover{background:var(--hover);border-color:var(--green)}
+.wa-app .scripts-btn svg{width:16px;height:16px;color:var(--ink-2)}
+.wa-app .send-btn{width:46px;height:40px;border-radius:10px;border:0;background:var(--green);color:#04130c;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:filter .14s,opacity .14s}
+.wa-app .send-btn:hover{filter:brightness(1.06)}
+.wa-app .send-btn:disabled{opacity:.5;cursor:not-allowed}
+.wa-app .send-btn svg{width:19px;height:19px}
+
+/* ===== DATA COLUMN ===== */
+.wa-app .data-col{width:320px;flex:none;background:var(--surface);border-left:1px solid var(--line);overflow-y:auto}
+.wa-app .data-head{display:flex;align-items:center;justify-content:space-between;padding:16px 18px 14px}
+.wa-app .data-head h3{margin:0;font-size:15px;font-weight:600;color:var(--ink)}
+.wa-app .collapse-btn{width:30px;height:30px;border-radius:8px;border:0;background:transparent;color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
+.wa-app .collapse-btn:hover{background:var(--hover);color:var(--ink-2)}
+.wa-app .collapse-btn svg{width:18px;height:18px}
+.wa-app .data-body{padding:0 18px 22px}
+.wa-app .dfield{margin-bottom:17px}
+.wa-app .dlabel{font-size:11.5px;color:var(--muted);font-weight:500;margin-bottom:5px}
+.wa-app .dval{font-size:14px;color:var(--ink);line-height:1.4}
+.wa-app .dval.with-ic{display:inline-flex;align-items:center;gap:7px}
+.wa-app .dval.with-ic svg{width:16px;height:16px;color:var(--wa)}
+.wa-app .dval .av{width:22px;height:22px;border-radius:50%}
+.wa-app .badge-soft{display:inline-flex;align-items:center;padding:4px 11px;border-radius:999px;background:var(--green-soft);color:var(--green-ink);font-size:12.5px;font-weight:500}
+.wa-app .resp-line{display:inline-flex;align-items:center;gap:8px;font-size:14px;color:var(--ink)}
+.wa-app .tags{display:flex;flex-wrap:wrap;gap:7px;align-items:center}
+.wa-app .tag{font-size:12px;color:var(--ink-2);background:var(--surface-2);border:1px solid var(--line-2);padding:4px 9px;border-radius:7px}
+.wa-app .tag-add{width:26px;height:26px;border-radius:7px;border:1px dashed var(--line-2);background:transparent;color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
+.wa-app .tag-add:hover{border-color:var(--green);color:var(--green)}
+.wa-app .tag-add svg{width:14px;height:14px}
+.wa-app .notes{font-size:13px;color:var(--ink-2);line-height:1.5;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:11px 12px}
+.wa-app .doc-card{display:flex;align-items:center;gap:10px;padding:10px 11px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2)}
+.wa-app .doc-card .pdf-ic{width:34px;height:34px}
+.wa-app .doc-dl{margin-left:auto;width:30px;height:30px;border-radius:8px;border:0;background:transparent;color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex:none}
+.wa-app .doc-dl:hover{background:var(--hover);color:var(--green-ink)}
+.wa-app .doc-dl svg{width:16px;height:16px}
+.wa-app .doc-all{width:100%;margin-top:12px;height:40px;border-radius:10px;border:1px solid var(--line-2);background:var(--surface);color:var(--ink);font-size:13px;font-weight:500;cursor:pointer;transition:background .14s,border-color .14s;font-family:inherit}
+.wa-app .doc-all:hover{background:var(--hover);border-color:var(--green)}
+
+/* reopen tab + drawer */
+.wa-app .reopen{display:none;position:absolute;top:16px;right:0;z-index:20;width:30px;height:42px;border-radius:10px 0 0 10px;border:1px solid var(--line);border-right:0;background:var(--surface);color:var(--ink-2);cursor:pointer;align-items:center;justify-content:center}
+.wa-app .reopen svg{width:18px;height:18px}
+.wa-app.data-collapsed .data-col{display:none}
+.wa-app.data-collapsed .reopen{display:inline-flex}
+.wa-app .drawer-overlay{display:none;position:fixed;inset:0;background:rgba(8,14,24,.42);z-index:40}
+.wa-app.drawer-open .drawer-overlay{display:block}
+
+/* popovers */
+.wa-app .pop{position:fixed;z-index:120;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-pop);padding:7px;min-width:210px}
+.wa-app .pop-item{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:0;background:transparent;border-radius:8px;padding:9px 10px;font-size:13.5px;color:var(--ink);cursor:pointer;font-weight:500;font-family:inherit}
+.wa-app .pop-item:hover{background:var(--hover)}
+.wa-app .pop-item svg{width:17px;height:17px;color:var(--ink-2);flex:none}
+.wa-app .pop-item small{display:block;font-weight:400;color:var(--muted);font-size:11.5px;margin-top:2px}
+.wa-app .pop-head{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em;padding:6px 10px 4px}
+.wa-app .pop-scripts{min-width:288px;max-height:340px;overflow-y:auto}
+
+@media (max-width:1199px){
+  .wa-app .data-col{position:fixed;top:0;right:0;height:100dvh;width:340px;max-width:88vw;transform:translateX(100%);transition:transform .26s ease;z-index:50;box-shadow:var(--shadow-pop)}
+  .wa-app.drawer-open .data-col{transform:none;display:flex}
+  .wa-app.data-collapsed .data-col{display:flex}
+  .wa-app .reopen,.wa-app.data-collapsed .reopen{display:none!important}
+}
+@media (max-width:1000px){
+  .wa-app .list-col{width:300px}
+  .wa-app .ch-meta{gap:14px}
+}
+@media (max-width:860px){
+  .wa-app .list-col{width:260px}
+  .wa-app .ch-meta{display:none}
+}

@@ -1,0 +1,29 @@
+.onb-screen{
+  min-height:100dvh; display:grid; place-items:center; padding:24px;
+  background:var(--bg, #050607); color:var(--text, #e7ecf2);
+}
+.onb-card{
+  width:100%; max-width:420px; background:var(--surface, #0f1316);
+  border:1px solid var(--border, #1d2329); border-radius:16px; padding:32px;
+  box-shadow:0 18px 48px rgba(0,0,0,.45);
+}
+.onb-logo{margin-bottom:22px}
+.onb-card h1{font-size:22px; margin:0 0 6px; color:var(--text, #e7ecf2)}
+.onb-sub{margin:0 0 22px; color:var(--text-muted, #8a97a6); font-size:14px; line-height:1.5}
+.onb-label{display:block; font-size:13px; font-weight:600; margin-bottom:8px; color:var(--text, #e7ecf2)}
+.onb-input{
+  width:100%; box-sizing:border-box; padding:12px 14px; font-size:15px;
+  background:var(--input-bg, #0a0d10); color:var(--text, #e7ecf2);
+  border:1px solid var(--border, #232a31); border-radius:10px; outline:none;
+}
+.onb-input:focus{border-color:#19c37d; box-shadow:0 0 0 3px rgba(25,195,125,.18)}
+.onb-slug{margin:10px 2px 0; font-size:13px; color:var(--text-muted, #8a97a6)}
+.onb-slug code{color:#19c37d; background:rgba(25,195,125,.10); padding:2px 7px; border-radius:6px}
+.onb-erro{margin-top:14px; font-size:13px; color:#ef6b7d; background:rgba(239,107,125,.10); border:1px solid rgba(239,107,125,.30); padding:10px 12px; border-radius:8px}
+.onb-btn{
+  width:100%; margin-top:22px; padding:13px 16px; font-size:15px; font-weight:600;
+  color:#04130c; background:#19c37d; border:none; border-radius:10px; cursor:pointer;
+  transition:filter .15s ease;
+}
+.onb-btn:hover:not(:disabled){filter:brightness(1.07)}
+.onb-btn:disabled{opacity:.5; cursor:not-allowed}

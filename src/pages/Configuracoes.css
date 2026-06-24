@@ -1,0 +1,220 @@
+/* Atenvo — porte fiel de 10_configuracoes.html — CSS isolado sob .config-page */
+.config-page{display:flex;flex-direction:column;height:100%;min-width:0;overflow:hidden;background:var(--bg);color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;-webkit-font-smoothing:antialiased}
+.config-page {
+    --accent:#19C37D; --accent-ink:#0e9d63; --accent-soft:#e8f7ef; --accent-soft-2:#d8f0e4;
+    --wa:#1FA855; --wa-soft:#e7f6ee; --fb:#2563EB; --fb-soft:#e8f0fe; --purple:#7a5bb0; --purple-soft:#efe9f7;
+    --ok:#0e9d63; --ok-soft:#e7f6ef; --warn:#c2772a; --warn-soft:#fbeede; --err:#d6453f; --err-soft:#fbe8e7;
+    --info:#2563EB; --info-soft:#e9f0fe;
+    --bg:#f4f6f9; --surface:#ffffff; --surface-2:#f7f9fb; --hover:#f1f4f8;
+    --ink:#0f172a; --ink-2:#475569; --muted:#8a97a8;
+    --line:#e8ecf2; --line-2:#dfe5ec;
+    --logo-ink:#0f1f33;
+    --ring:rgba(25,195,125,.4);
+    --pill-track:#eceff4; --pill-off:#6b7889; --sw-off:#cdd6e1;
+    --shadow:0 1px 2px rgba(16,24,40,.05),0 1px 3px rgba(16,24,40,.05);
+    --shadow-pop:0 12px 32px rgba(16,24,40,.16);
+  }
+[data-theme="dark"] .config-page {
+    --wa-soft:rgba(31,168,85,.16); --fb-soft:rgba(37,99,235,.18); --purple-soft:rgba(122,91,176,.22);
+    --accent-soft:rgba(25,195,125,.15); --accent-soft-2:rgba(25,195,125,.24);
+    --ok-soft:rgba(25,195,125,.16); --warn-soft:rgba(194,119,42,.20); --err-soft:rgba(214,69,63,.18);
+    --info-soft:rgba(37,99,235,.16);
+    --bg:#0a1220; --surface:#0f1a2c; --surface-2:#13203a; --hover:#172539;
+    --ink:#eef2f8; --ink-2:#b3c0d2; --muted:#8294ac;
+    --line:#21314a; --line-2:#2a3b57;
+    --logo-ink:#f3f6fb;
+    --pill-track:#1a2740; --pill-off:#9fb0c6; --sw-off:#2a3b57;
+    --shadow:0 1px 2px rgba(0,0,0,.4); --shadow-pop:0 14px 36px rgba(0,0,0,.5);
+  }
+.config-page {width:100%;height:100%;margin:0}
+.config-page {height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
+    font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    -webkit-font-smoothing:antialiased;font-size:14px}
+.config-page button {font-family:inherit}
+.config-page ::-webkit-scrollbar {width:7px;height:7px}
+.config-page ::-webkit-scrollbar-track {background:transparent}
+.config-page ::-webkit-scrollbar-thumb {background:rgba(120,130,145,.30);border-radius:8px}
+.config-page ::-webkit-scrollbar-thumb:hover {background:rgba(120,130,145,.5)}
+.config-page {display:flex;height:100%;overflow:hidden}
+.config-page {min-width:0;height:100%;display:flex;flex-direction:column;overflow:hidden;flex:1}
+.config-page .sidebar {width:234px;flex:none;background:var(--surface);border-right:1px solid var(--line);padding:20px 14px 14px;display:flex;flex-direction:column;height:100dvh}
+.config-page .brand {display:flex;flex-direction:column;gap:5px;padding:4px 6px 0}
+.config-page .logo {display:inline-flex;align-items:center;gap:8px}
+.config-page .logo .mark {width:32px;height:32px;flex:none}
+.config-page .logo-text {font-size:25px;font-weight:500;letter-spacing:-.015em;color:var(--logo-ink)}
+.config-page .brand-sub {font-size:11px;font-weight:400;color:var(--muted);letter-spacing:.01em;padding-left:1px}
+.config-page .nav {margin-top:24px;display:flex;flex-direction:column;gap:3px;flex:1;overflow-y:auto}
+.config-page .nav-item {display:flex;align-items:center;gap:12px;padding:10px 11px;border-radius:10px;color:var(--ink-2);text-decoration:none;font-size:14.5px;font-weight:500;cursor:pointer;border:0;background:transparent;width:100%;text-align:left;transition:background .14s,color .14s}
+.config-page .nav-item svg {width:21px;height:21px;flex:none;color:var(--muted);transition:color .14s}
+.config-page .nav-item:hover {background:var(--hover)}
+.config-page .nav-item.active {background:var(--accent-soft);color:var(--accent-ink)}
+.config-page .nav-item.active svg {color:var(--accent)}
+.config-page .side-foot {margin-top:10px;border-top:1px solid var(--line);padding-top:12px;display:flex;flex-direction:column;gap:12px}
+.config-page .theme-row {display:flex;align-items:center;gap:10px;padding:0 4px}
+.config-page .theme-row .lbl {font-size:13px;color:var(--ink-2);font-weight:500}
+.config-page .theme-row .ic {color:var(--muted);display:inline-flex}
+.config-page .theme-row .ic svg {width:16px;height:16px}
+.config-page .tswitch {margin-left:0;width:42px;height:24px;border-radius:999px;border:0;background:var(--accent);position:relative;cursor:pointer;padding:0;transition:background .15s}
+[data-theme="light"] .config-page .tswitch {background:var(--sw-off)}
+.config-page .tswitch .knob {position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .16s;box-shadow:0 1px 2px rgba(0,0,0,.25)}
+[data-theme="dark"] .config-page .tswitch .knob {left:21px}
+.config-page .tswitch:focus-visible {outline:none;box-shadow:0 0 0 3px var(--ring)}
+.config-page .user {display:flex;align-items:center;gap:10px;padding:8px;border-radius:11px;cursor:pointer;transition:background .14s}
+.config-page .user:hover {background:var(--hover)}
+.config-page .user .meta {min-width:0;line-height:1.25}
+.config-page .user .nm {font-size:13.5px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.config-page .user .role {font-size:12px;color:var(--muted)}
+.config-page .user .chev {margin-left:auto;color:var(--muted);display:inline-flex}
+.config-page .user .chev svg {width:16px;height:16px}
+.config-page .av {display:inline-flex;align-items:center;justify-content:center;color:#fff;font-weight:600;font-size:12px;border-radius:50%;flex:none;overflow:hidden}
+.config-page .av.lg {width:38px;height:38px;font-size:13px}
+.config-page .av.xxl {width:72px;height:72px;font-size:26px}
+.config-page .topbar {display:flex;align-items:flex-start;gap:16px;padding:20px 26px 0}
+.config-page .page-title {font-size:23px;font-weight:600;color:var(--ink);line-height:1.15}
+.config-page .page-sub {font-size:13.5px;color:var(--muted);margin-top:4px}
+.config-page .utils {margin-left:auto;display:flex;align-items:center;gap:4px}
+.config-page .util-pill {display:inline-flex;gap:2px;background:var(--pill-track);border-radius:999px;padding:3px;margin-right:2px}
+.config-page .util-pill button {width:32px;height:28px;border:0;background:transparent;color:var(--pill-off);border-radius:999px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
+.config-page .util-pill button svg {width:16px;height:16px}
+.config-page .util-pill button.on {background:var(--surface);color:var(--accent);box-shadow:var(--shadow)}
+.config-page .icon-btn {width:36px;height:36px;border-radius:9px;border:0;background:transparent;color:var(--ink-2);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:background .14s}
+.config-page .icon-btn:hover {background:var(--hover)}
+.config-page .icon-btn svg {width:19px;height:19px}
+.config-page .content {flex:1;min-height:0;overflow-y:auto;padding:16px 26px 28px}
+.config-page .wrap {max-width:920px}
+.config-page .settings-tabs {display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:20px;overflow-x:auto}
+.config-page .settings-tabs button {height:44px;padding:0 16px;border:0;background:transparent;color:var(--ink-2);font-size:14px;font-weight:500;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;display:inline-flex;align-items:center;gap:8px;transition:color .14s}
+.config-page .settings-tabs button svg {width:17px;height:17px}
+.config-page .settings-tabs button:hover {color:var(--ink)}
+.config-page .settings-tabs button.on {color:var(--accent-ink);border-bottom-color:var(--accent)}
+.config-page .tab-panel {display:none}
+.config-page .tab-panel.on {display:block}
+.config-page .set-card {background:var(--surface);border:1px solid var(--line);border-radius:16px;margin-bottom:16px;overflow:hidden}
+.config-page .sc-head {padding:18px 20px}
+.config-page .sc-head.bordered {border-bottom:1px solid var(--line)}
+.config-page .sc-head h3 {font-size:15.5px;font-weight:600;color:var(--ink);margin:0}
+.config-page .sc-head p {font-size:12.5px;color:var(--muted);margin:4px 0 0;line-height:1.45}
+.config-page .sc-head .row {display:flex;align-items:center;gap:12px}
+.config-page .sc-head .row .grow {flex:1;min-width:0}
+.config-page .sc-body {padding:20px}
+.config-page .sc-foot {padding:14px 20px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px}
+.config-page .btn-primary {height:40px;padding:0 17px;border-radius:9px;background:var(--accent);border:0;color:#04130c;font-size:13.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:filter .14s}
+.config-page .btn-primary:hover {filter:brightness(1.05)}
+.config-page .btn-primary svg {width:16px;height:16px}
+.config-page .btn-ghost {height:40px;padding:0 15px;border-radius:9px;background:var(--surface);border:1px solid var(--line-2);color:var(--ink-2);font-size:13.5px;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:background .14s,border-color .14s}
+.config-page .btn-ghost:hover {background:var(--hover);border-color:var(--accent)}
+.config-page .btn-ghost svg {width:15px;height:15px;color:var(--muted)}
+.config-page .btn-ghost.danger {color:var(--err);border-color:transparent}
+.config-page .btn-ghost.danger:hover {background:var(--err-soft)}
+.config-page .btn-ghost.danger svg {color:var(--err)}
+.config-page .profile-row {display:flex;align-items:center;gap:18px;margin-bottom:22px}
+.config-page .profile-row .pinfo {min-width:0}
+.config-page .profile-row .pinfo .nm {font-size:16px;font-weight:600;color:var(--ink)}
+.config-page .profile-row .pinfo .rl {font-size:12.5px;color:var(--muted);margin-top:2px}
+.config-page .profile-row .pacts {margin-left:auto;display:flex;gap:8px}
+.config-page .form-grid {display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.config-page .fld {min-width:0}
+.config-page .fld.full {grid-column:1 / -1}
+.config-page .fld label {display:block;font-size:12.5px;font-weight:500;color:var(--ink-2);margin-bottom:6px}
+.config-page .ctrl {width:100%;height:42px;border:1px solid var(--line-2);border-radius:10px;background:var(--surface-2);padding:0 12px;font-size:13.5px;color:var(--ink);outline:none}
+.config-page .ctrl:focus {border-color:var(--accent);box-shadow:0 0 0 3px var(--ring);background:var(--surface)}
+.config-page select.ctrl {cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238a97a8' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 11px center;background-size:16px;padding-right:34px}
+.config-page .toggle-row {display:flex;align-items:center;gap:16px;padding:15px 20px;border-bottom:1px solid var(--line)}
+.config-page .toggle-row:last-child {border-bottom:0}
+.config-page .toggle-row .tr-txt {flex:1;min-width:0}
+.config-page .toggle-row .tr-txt .t {font-size:14px;font-weight:500;color:var(--ink)}
+.config-page .toggle-row .tr-txt .d {font-size:12.5px;color:var(--muted);margin-top:2px;line-height:1.45}
+.config-page .bigswitch {width:44px;height:25px;border-radius:999px;border:0;background:var(--sw-off);position:relative;cursor:pointer;padding:0;flex:none;transition:background .15s}
+.config-page .bigswitch.on {background:var(--accent)}
+.config-page .bigswitch .k {position:absolute;top:3px;left:3px;width:19px;height:19px;border-radius:50%;background:#fff;transition:left .16s;box-shadow:0 1px 2px rgba(0,0,0,.25)}
+.config-page .bigswitch.on .k {left:22px}
+.config-page .bigswitch:focus-visible {outline:none;box-shadow:0 0 0 3px var(--ring)}
+.config-page .sc-sub {padding:14px 20px 2px;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+.config-page .chan-row {display:flex;align-items:center;gap:14px;padding:16px 20px;border-bottom:1px solid var(--line)}
+.config-page .chan-row:last-child {border-bottom:0}
+.config-page .chan-ic {width:42px;height:42px;border-radius:11px;display:inline-flex;align-items:center;justify-content:center;flex:none}
+.config-page .chan-ic svg {width:22px;height:22px}
+.config-page .chan-ic.wa {background:var(--wa-soft);color:var(--wa)}
+.config-page .chan-ic.fb {background:var(--fb-soft);color:var(--fb)}
+.config-page .chan-txt {flex:1;min-width:0}
+.config-page .chan-txt .t {font-size:14px;font-weight:600;color:var(--ink)}
+.config-page .chan-txt .d {font-size:12.5px;color:var(--muted);margin-top:2px}
+.config-page .chan-act {display:flex;align-items:center;gap:12px;flex:none}
+.config-page .badge {display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;padding:4px 10px;border-radius:999px;white-space:nowrap}
+.config-page .badge .dot {width:6px;height:6px;border-radius:50%;background:currentColor}
+.config-page .badge.ok {background:var(--ok-soft);color:var(--ok)}
+.config-page .badge.warn {background:var(--warn-soft);color:var(--warn)}
+.config-page .badge.neutral {background:var(--surface-2);color:var(--muted);border:1px solid var(--line-2)}
+.config-page .badge.blue {background:var(--info-soft);color:var(--info)}
+.config-page .btn-sm {height:34px;padding:0 12px;border-radius:8px;border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);font-size:12.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.config-page .btn-sm:hover {background:var(--hover)}
+.config-page .btn-sm.acc {background:var(--accent);border-color:var(--accent);color:#04130c}
+.config-page .btn-sm svg {width:14px;height:14px}
+.config-page .team-scroll {overflow-x:auto}
+.config-page .team-table {--av:40px;--gap:12px;--pad:16px;width:100%;min-width:720px;table-layout:fixed;border-collapse:collapse;border-spacing:0;font-size:12.5px}
+.config-page .team-table col.tc-membro {width:38%}
+.config-page .team-table col.tc-funcao {width:17%}
+.config-page .team-table col.tc-status {width:16%}
+.config-page .team-table col.tc-acesso {width:19%}
+.config-page .team-table col.tc-acoes {width:10%}
+.config-page .team-table th, .config-page .team-table td {box-sizing:border-box;padding:13px 16px;vertical-align:middle}
+.config-page .team-table thead th {font-size:11px;font-weight:500;color:var(--muted);text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+.config-page .team-table tbody td {border-bottom:1px solid var(--line);color:var(--ink-2)}
+.config-page .team-table tbody tr:last-child td {border-bottom:0}
+.config-page .team-table tbody tr:hover {background:var(--surface-2)}
+.config-page .team-table th.column-center, .config-page .team-table td.column-center {text-align:center}
+.config-page .team-table th.column-membro {text-align:left;padding-left:calc(var(--pad) + var(--av) + var(--gap))}
+.config-page .member-cell {display:flex;align-items:center;gap:var(--gap);min-width:0}
+.config-page .member-cell .av {width:var(--av);height:var(--av);font-size:13px;flex:none}
+.config-page .member-cell .mt {display:flex;flex-direction:column;min-width:0}
+.config-page .member-cell .mt .nm {font-size:13px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.config-page .member-cell .mt .em {font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.config-page .cell-center {display:flex;align-items:center;justify-content:center;width:100%;min-width:0}
+.config-page .acesso {color:var(--muted);white-space:nowrap}
+.config-page .row-menu {width:32px;height:32px;border-radius:8px;border:0;background:transparent;color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
+.config-page .row-menu:hover {background:var(--hover);color:var(--ink-2)}
+.config-page .row-menu svg {width:18px;height:18px}
+.config-page .tc-foot {display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;width:100%;min-height:66px;padding:0 20px;box-sizing:border-box;border-top:1px solid var(--line)}
+.config-page .tc-foot .ft {justify-self:start;margin:0;font-size:13px;color:var(--muted);white-space:nowrap;line-height:1}
+.config-page .pager {justify-self:center;display:inline-flex;align-items:center;justify-content:center;flex-wrap:nowrap;gap:8px}
+.config-page .perpage {justify-self:end;display:inline-flex;align-items:center;flex-wrap:nowrap;gap:12px;font-size:13px;color:var(--muted);white-space:nowrap}
+.config-page .perpage select {height:38px;min-width:64px;margin:0;border:1px solid var(--line-2);border-radius:8px;background:var(--surface);color:var(--ink);font-size:13px;padding:0 10px;cursor:pointer}
+.config-page .pg {display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;min-width:38px;flex:0 0 38px;margin:0;padding:0;line-height:1;box-sizing:border-box;border-radius:9px;border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);font-size:13px;font-weight:500;cursor:pointer}
+.config-page .pg:hover {background:var(--hover)}
+.config-page .pg.on {background:var(--accent);border-color:var(--accent);color:#04130c}
+.config-page .pg svg {width:15px;height:15px}
+.config-page .pref-seg {display:inline-flex;background:var(--surface-2);border:1px solid var(--line-2);border-radius:10px;padding:3px;gap:2px}
+.config-page .pref-seg button {height:34px;padding:0 16px;border:0;background:transparent;color:var(--ink-2);font-size:13px;font-weight:500;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:7px}
+.config-page .pref-seg button svg {width:15px;height:15px}
+.config-page .pref-seg button.on {background:var(--surface);color:var(--accent-ink);box-shadow:var(--shadow)}
+.config-page .pref-row {display:flex;align-items:center;gap:16px;padding:15px 20px;border-bottom:1px solid var(--line)}
+.config-page .pref-row:last-child {border-bottom:0}
+.config-page .pref-row .pr-txt {flex:1;min-width:0}
+.config-page .pref-row .pr-txt .t {font-size:14px;font-weight:500;color:var(--ink)}
+.config-page .pref-row .pr-txt .d {font-size:12.5px;color:var(--muted);margin-top:2px}
+.config-page .pref-row .pr-ctrl {flex:none;min-width:200px;max-width:240px}
+.config-page .pref-row select.ctrl {height:40px}
+.config-page .toast-wrap {position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:200;display:flex;flex-direction:column;gap:8px;align-items:center}
+.config-page .toast {background:var(--ink);color:#fff;font-size:13px;font-weight:500;padding:10px 16px;border-radius:10px;box-shadow:var(--shadow-pop);display:flex;align-items:center;gap:9px;opacity:0;transform:translateY(8px);transition:opacity .2s,transform .2s}
+[data-theme="dark"] .config-page .toast {background:#22324a;border:1px solid var(--line-2)}
+.config-page .toast.show {opacity:1;transform:none}
+.config-page .toast svg {width:16px;height:16px;color:var(--accent)}
+.config-page .pop {position:absolute;z-index:170;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-pop);padding:7px;min-width:178px;display:none}
+.config-page .pop.show {display:block}
+.config-page .pop-item {display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:0;background:transparent;border-radius:8px;padding:9px 10px;font-size:13.5px;color:var(--ink);cursor:pointer;font-weight:500}
+.config-page .pop-item:hover {background:var(--hover)}
+.config-page .pop-item svg {width:16px;height:16px;color:var(--muted)}
+.config-page .pop-item.danger {color:var(--err)}
+.config-page .pop-item.danger svg {color:var(--err)}
+@media (max-width:720px){
+  .config-page .form-grid {grid-template-columns:1fr}
+  .config-page .pref-row {flex-wrap:wrap}
+}
+@media (max-width:860px){
+  .config-page .sidebar {width:72px;padding:18px 10px 12px}
+  .config-page .brand-sub, .config-page .logo-text, .config-page .nav-item span, .config-page .theme-row .lbl, .config-page .user .meta, .config-page .user .chev {display:none}
+  .config-page .logo {justify-content:center}
+  .config-page .nav-item {justify-content:center;padding:11px 0}
+  .config-page .theme-row {justify-content:center}
+  .config-page .user {justify-content:center;padding:8px 0}
+}

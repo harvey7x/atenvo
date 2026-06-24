@@ -1,0 +1,35 @@
+{
+  "name": "atenvo-app",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Atenvo — Plataforma de Atendimento e Gestão (frontend definitivo · fase funcional)",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "supabase:start": "supabase start",
+    "supabase:stop": "supabase stop",
+    "db:reset": "supabase db reset"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.4",
+    "@tanstack/react-query": "^5.101.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.2"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.10",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "supabase": "^2.107.0",
+    "typescript": "^5.5.4",
+    "vite": "^5.4.8",
+    "vite-plugin-singlefile": "^2.3.3"
+  },
+  "overrides": {
+    "esbuild": "^0.25.0"
+  }
+}

@@ -1,0 +1,223 @@
+/* Atenvo — porte fiel de 08_contatos.html — CSS isolado sob .contatos-page */
+.contatos-page{display:flex;flex-direction:column;height:100%;min-width:0;overflow:hidden;background:var(--bg);color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;-webkit-font-smoothing:antialiased}
+.contatos-page {
+    --accent:#19C37D; --accent-ink:#0e9d63; --accent-soft:#e8f7ef; --accent-soft-2:#d8f0e4;
+    --wa:#1FA855; --wa-soft:#e7f6ee; --fb:#2563EB; --fb-soft:#e8f0fe;
+    --purple:#7a5bb0; --purple-soft:#efe9f7;
+    --ok:#0e9d63; --ok-soft:#e7f6ef; --warn:#c2772a; --warn-soft:#fbeede; --err:#d6453f; --err-soft:#fbe8e7;
+    --info:#2563EB; --info-soft:#e9f0fe;
+    --bg:#f4f6f9; --surface:#ffffff; --surface-2:#f7f9fb; --hover:#f1f4f8;
+    --ink:#0f172a; --ink-2:#475569; --muted:#8a97a8;
+    --line:#e8ecf2; --line-2:#dfe5ec;
+    --logo-ink:#0f1f33;
+    --ring:rgba(25,195,125,.4);
+    --pill-track:#eceff4; --pill-off:#6b7889;
+    --shadow:0 1px 2px rgba(16,24,40,.05),0 1px 3px rgba(16,24,40,.05);
+    --shadow-pop:0 12px 32px rgba(16,24,40,.16);
+  }
+[data-theme="dark"] .contatos-page {
+    --wa-soft:rgba(31,168,85,.16); --fb-soft:rgba(37,99,235,.18); --purple-soft:rgba(122,91,176,.22);
+    --accent-soft:rgba(25,195,125,.15); --accent-soft-2:rgba(25,195,125,.24);
+    --ok-soft:rgba(25,195,125,.16); --warn-soft:rgba(194,119,42,.20); --err-soft:rgba(214,69,63,.18);
+    --info-soft:rgba(37,99,235,.16);
+    --bg:#0a1220; --surface:#0f1a2c; --surface-2:#13203a; --hover:#172539;
+    --ink:#eef2f8; --ink-2:#b3c0d2; --muted:#8294ac;
+    --line:#21314a; --line-2:#2a3b57;
+    --logo-ink:#f3f6fb;
+    --pill-track:#1a2740; --pill-off:#9fb0c6;
+    --shadow:0 1px 2px rgba(0,0,0,.4); --shadow-pop:0 14px 36px rgba(0,0,0,.5);
+  }
+.contatos-page {width:100%;height:100%;margin:0}
+.contatos-page {height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
+    font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    -webkit-font-smoothing:antialiased;font-size:14px}
+.contatos-page button {font-family:inherit}
+.contatos-page ::-webkit-scrollbar {width:7px;height:7px}
+.contatos-page ::-webkit-scrollbar-track {background:transparent}
+.contatos-page ::-webkit-scrollbar-thumb {background:rgba(120,130,145,.30);border-radius:8px}
+.contatos-page ::-webkit-scrollbar-thumb:hover {background:rgba(120,130,145,.5)}
+.contatos-page {display:flex;height:100%;overflow:hidden}
+.contatos-page {min-width:0;height:100%;display:flex;flex-direction:column;overflow:hidden;flex:1}
+.contatos-page .sidebar {width:234px;flex:none;background:var(--surface);border-right:1px solid var(--line);padding:20px 14px 14px;display:flex;flex-direction:column;height:100dvh}
+.contatos-page .brand {display:flex;flex-direction:column;gap:5px;padding:4px 6px 0}
+.contatos-page .logo {display:inline-flex;align-items:center;gap:8px}
+.contatos-page .logo .mark {width:32px;height:32px;flex:none}
+.contatos-page .logo-text {font-size:25px;font-weight:500;letter-spacing:-.015em;color:var(--logo-ink)}
+.contatos-page .brand-sub {font-size:11px;font-weight:400;color:var(--muted);letter-spacing:.01em;padding-left:1px}
+.contatos-page .nav {margin-top:24px;display:flex;flex-direction:column;gap:3px;flex:1;overflow-y:auto}
+.contatos-page .nav-item {display:flex;align-items:center;gap:12px;padding:10px 11px;border-radius:10px;color:var(--ink-2);text-decoration:none;font-size:14.5px;font-weight:500;cursor:pointer;border:0;background:transparent;width:100%;text-align:left;transition:background .14s,color .14s}
+.contatos-page .nav-item svg {width:21px;height:21px;flex:none;color:var(--muted);transition:color .14s}
+.contatos-page .nav-item:hover {background:var(--hover)}
+.contatos-page .nav-item.active {background:var(--accent-soft);color:var(--accent-ink)}
+.contatos-page .nav-item.active svg {color:var(--accent)}
+.contatos-page .side-foot {margin-top:10px;border-top:1px solid var(--line);padding-top:12px;display:flex;flex-direction:column;gap:12px}
+.contatos-page .theme-row {display:flex;align-items:center;gap:10px;padding:0 4px}
+.contatos-page .theme-row .lbl {font-size:13px;color:var(--ink-2);font-weight:500}
+.contatos-page .theme-row .ic {color:var(--muted);display:inline-flex}
+.contatos-page .theme-row .ic svg {width:16px;height:16px}
+.contatos-page .tswitch {margin-left:0;width:42px;height:24px;border-radius:999px;border:0;background:var(--accent);position:relative;cursor:pointer;padding:0;transition:background .15s}
+[data-theme="light"] .contatos-page .tswitch {background:#cdd6e1}
+.contatos-page .tswitch .knob {position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .16s;box-shadow:0 1px 2px rgba(0,0,0,.25)}
+[data-theme="dark"] .contatos-page .tswitch .knob {left:21px}
+.contatos-page .tswitch:focus-visible {outline:none;box-shadow:0 0 0 3px var(--ring)}
+.contatos-page .user {display:flex;align-items:center;gap:10px;padding:8px;border-radius:11px;cursor:pointer;transition:background .14s}
+.contatos-page .user:hover {background:var(--hover)}
+.contatos-page .user .meta {min-width:0;line-height:1.25}
+.contatos-page .user .nm {font-size:13.5px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.contatos-page .user .role {font-size:12px;color:var(--muted)}
+.contatos-page .user .chev {margin-left:auto;color:var(--muted);display:inline-flex}
+.contatos-page .user .chev svg {width:16px;height:16px}
+.contatos-page .av {display:inline-flex;align-items:center;justify-content:center;color:#fff;font-weight:600;font-size:12px;border-radius:50%;flex:none;overflow:hidden}
+.contatos-page .av.lg {width:38px;height:38px;font-size:13px}
+.contatos-page .av.xl {width:52px;height:52px;font-size:17px}
+.contatos-page .av.sm {width:32px;height:32px}
+.contatos-page .topbar {display:flex;align-items:flex-start;gap:16px;padding:20px 26px 0}
+.contatos-page .page-title {font-size:23px;font-weight:600;color:var(--ink);line-height:1.15}
+.contatos-page .page-sub {font-size:13.5px;color:var(--muted);margin-top:4px}
+.contatos-page .utils {margin-left:auto;display:flex;align-items:center;gap:4px}
+.contatos-page .util-pill {display:inline-flex;gap:2px;background:var(--pill-track);border-radius:999px;padding:3px;margin-right:2px}
+.contatos-page .util-pill button {width:32px;height:28px;border:0;background:transparent;color:var(--pill-off);border-radius:999px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
+.contatos-page .util-pill button svg {width:16px;height:16px}
+.contatos-page .util-pill button.on {background:var(--surface);color:var(--accent);box-shadow:var(--shadow)}
+.contatos-page .icon-btn {width:36px;height:36px;border-radius:9px;border:0;background:transparent;color:var(--ink-2);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:background .14s}
+.contatos-page .icon-btn:hover {background:var(--hover)}
+.contatos-page .icon-btn svg {width:19px;height:19px}
+.contatos-page .content {flex:1;min-height:0;overflow-y:auto;padding:18px 26px 26px}
+.contatos-page .stats {display:grid;grid-template-columns:repeat(auto-fit,minmax(232px,1fr));gap:14px;margin-bottom:16px}
+.contatos-page .stat {background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 17px;display:flex;gap:13px;align-items:flex-start}
+.contatos-page .stat-ic {width:44px;height:44px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;flex:none}
+.contatos-page .stat-ic svg {width:22px;height:22px}
+.contatos-page .stat-ic.green {background:var(--accent-soft);color:var(--accent-ink)}
+.contatos-page .stat-ic.blue {background:var(--fb-soft);color:var(--fb)}
+.contatos-page .stat-ic.amber {background:var(--warn-soft);color:var(--warn)}
+.contatos-page .stat-body {min-width:0}
+.contatos-page .stat-label {font-size:12.5px;color:var(--muted);font-weight:500}
+.contatos-page .stat-value {font-size:23px;font-weight:600;color:var(--ink);line-height:1.15;margin:3px 0 4px;letter-spacing:-.01em}
+.contatos-page .stat-delta {font-size:12px;font-weight:500}
+.contatos-page .stat-delta.up {color:var(--ok)}
+.contatos-page .stat-delta.flat {color:var(--muted)}
+.contatos-page .panel {background:var(--surface);border:1px solid var(--line);border-radius:16px}
+.contatos-page .table-card {overflow:hidden}
+.contatos-page .tc-head {display:flex;align-items:center;gap:12px;padding:16px 18px 0;flex-wrap:wrap}
+.contatos-page .tc-head h2 {font-size:15.5px;font-weight:600;color:var(--ink);margin:0}
+.contatos-page .tc-head .right {margin-left:auto;display:flex;gap:8px}
+.contatos-page .btn-ghost {height:38px;padding:0 13px;border-radius:9px;background:var(--surface);border:1px solid var(--line-2);color:var(--ink-2);font-size:13px;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:background .14s,border-color .14s}
+.contatos-page .btn-ghost:hover {background:var(--hover);border-color:var(--accent)}
+.contatos-page .btn-ghost svg {width:15px;height:15px;color:var(--muted)}
+.contatos-page .btn-primary {height:38px;padding:0 15px;border-radius:9px;background:var(--accent);border:0;color:#04130c;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:filter .14s}
+.contatos-page .btn-primary:hover {filter:brightness(1.05)}
+.contatos-page .btn-primary svg {width:16px;height:16px}
+.contatos-page .tc-search {padding:14px 18px 4px;position:relative}
+.contatos-page .tc-search svg {position:absolute;left:31px;top:50%;transform:translateY(-30%);width:17px;height:17px;color:var(--muted)}
+.contatos-page .tc-search input {width:100%;height:40px;border:1px solid var(--line-2);border-radius:10px;background:var(--surface-2);padding:0 13px 0 38px;font-size:13.5px;color:var(--ink);outline:none}
+.contatos-page .tc-search input:focus {border-color:var(--accent);box-shadow:0 0 0 3px var(--ring);background:var(--surface)}
+.contatos-page .tc-search input::placeholder {color:var(--muted)}
+.contatos-page .table-scroll {overflow-x:auto;padding-top:2px}
+.contatos-page .contacts-table {
+    --contact-avatar-size:48px; --contact-gap:14px; --cell-padding-inline:16px;
+    --responsible-avatar-size:40px; --responsible-gap:12px;
+    width:100%;min-width:1000px;table-layout:fixed;border-collapse:collapse;border-spacing:0;font-size:12.5px}
+.contatos-page .contacts-table col.col-contato {width:24%}
+.contatos-page .contacts-table col.col-telefone {width:16%}
+.contatos-page .contacts-table col.col-origem {width:14%}
+.contatos-page .contacts-table col.col-responsavel {width:19%}
+.contatos-page .contacts-table col.col-status {width:13%}
+.contatos-page .contacts-table col.col-interacao {width:11%}
+.contatos-page .contacts-table col.col-acoes {width:3%}
+.contatos-page .contacts-table th, .contatos-page .contacts-table td {box-sizing:border-box;padding:14px 16px;vertical-align:middle}
+.contatos-page .contacts-table thead th {font-size:11px;font-weight:500;color:var(--muted);border-bottom:1px solid var(--line);white-space:nowrap}
+.contatos-page .contacts-table tbody td {border-bottom:1px solid var(--line);color:var(--ink-2)}
+.contatos-page .contacts-table tbody tr:last-child td {border-bottom:0}
+.contatos-page .contacts-table tbody tr {cursor:pointer}
+.contatos-page .contacts-table tbody tr:hover {background:var(--surface-2)}
+.contatos-page .column-left {text-align:left}
+.contatos-page .column-center {text-align:center}
+.contatos-page .contacts-table th.column-contact {text-align:left;padding-left:calc(var(--cell-padding-inline) + var(--contact-avatar-size) + var(--contact-gap))}
+.contatos-page .contacts-table th.column-responsible {text-align:left;padding-left:calc(var(--cell-padding-inline) + var(--responsible-avatar-size) + var(--responsible-gap))}
+.contatos-page .cell-center, .contatos-page .phone-cell, .contatos-page .origin-cell, .contatos-page .status-cell, .contatos-page .interaction-cell, .contatos-page .actions-cell {display:flex;align-items:center;justify-content:center;width:100%;min-width:0}
+.contatos-page .phone-cell, .contatos-page .interaction-cell {white-space:nowrap}
+.contatos-page .contact-cell {display:flex;align-items:center;gap:var(--contact-gap);width:100%;min-width:0}
+.contatos-page .contact-cell .av {width:var(--contact-avatar-size);height:var(--contact-avatar-size);font-size:15px;flex:none}
+.contatos-page .responsible-cell {display:flex;align-items:center;gap:var(--responsible-gap);width:100%;min-width:0}
+.contatos-page .responsible-cell .av {width:var(--responsible-avatar-size);height:var(--responsible-avatar-size);font-size:13px;flex:none}
+.contatos-page .c-txt {display:flex;flex-direction:column;min-width:0}
+.contatos-page .c-txt .nm {font-size:13px;font-weight:600;color:var(--ink);line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.contatos-page .c-txt .em {font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.contatos-page .responsible-cell .rname {white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500;color:var(--ink-2);min-width:0}
+.contatos-page .phone {color:var(--ink-2)}
+.contatos-page .ultima {color:var(--muted)}
+.contatos-page .tag {display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;padding:4px 10px;border-radius:999px;white-space:nowrap}
+.contatos-page .tag.wa {background:var(--wa-soft);color:var(--wa)}
+.contatos-page .tag.fb {background:var(--fb-soft);color:var(--fb)}
+.contatos-page .tag.ads {background:var(--purple-soft);color:var(--purple)}
+.contatos-page .tag.ind {background:var(--surface-2);color:var(--muted);border:1px solid var(--line-2)}
+.contatos-page .st {display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;padding:4px 10px;border-radius:999px;white-space:nowrap}
+.contatos-page .st .dot {width:6px;height:6px;border-radius:50%;background:currentColor}
+.contatos-page .st.ok {background:var(--ok-soft);color:var(--ok)}
+.contatos-page .st.info {background:var(--info-soft);color:var(--info)}
+.contatos-page .st.warn {background:var(--warn-soft);color:var(--warn)}
+.contatos-page .st.neutral {background:var(--surface-2);color:var(--muted);border:1px solid var(--line-2)}
+.contatos-page .row-menu {width:32px;height:32px;border-radius:8px;border:0;background:transparent;color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
+.contatos-page .row-menu:hover {background:var(--hover);color:var(--ink-2)}
+.contatos-page .row-menu svg {width:18px;height:18px}
+.contatos-page .tc-foot {display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;width:100%;min-height:78px;padding:0 24px;box-sizing:border-box;border-top:1px solid var(--line)}
+.contatos-page .tc-foot .ft {justify-self:start;margin:0;font-size:13px;color:var(--muted);white-space:nowrap;line-height:1}
+.contatos-page .pager {justify-self:center;display:inline-flex;align-items:center;justify-content:center;flex-wrap:nowrap;gap:8px}
+.contatos-page .perpage {justify-self:end;display:inline-flex;align-items:center;flex-wrap:nowrap;gap:12px;font-size:13px;color:var(--muted);white-space:nowrap}
+.contatos-page .perpage select {height:40px;min-width:64px;margin:0;border:1px solid var(--line-2);border-radius:8px;background:var(--surface);color:var(--ink);font-size:13px;padding:0 10px;cursor:pointer}
+.contatos-page .pg {display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;min-width:40px;flex:0 0 40px;margin:0;padding:0;line-height:1;box-sizing:border-box;border-radius:9px;border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);font-size:13.5px;font-weight:500;cursor:pointer}
+.contatos-page .pg:hover {background:var(--hover)}
+.contatos-page .pg.on {background:var(--accent);border-color:var(--accent);color:#04130c}
+.contatos-page .pg svg {width:16px;height:16px}
+.contatos-page .drawer-backdrop {position:fixed;inset:0;background:rgba(8,12,20,.42);opacity:0;visibility:hidden;transition:opacity .2s;z-index:150}
+.contatos-page .drawer-backdrop.show {opacity:1;visibility:visible}
+.contatos-page .drawer {position:fixed;top:0;right:0;height:100dvh;width:384px;max-width:92vw;background:var(--surface);border-left:1px solid var(--line);box-shadow:-14px 0 44px rgba(0,0,0,.20);transform:translateX(100%);transition:transform .26s cubic-bezier(.4,0,.2,1);z-index:160;display:flex;flex-direction:column}
+.contatos-page .drawer.show {transform:none}
+.contatos-page .drawer-head {padding:22px 22px 20px;border-bottom:1px solid var(--line);display:flex;align-items:flex-start;gap:14px}
+.contatos-page .drawer-head .who {min-width:0;flex:1}
+.contatos-page .drawer-head .who .nm {font-size:17px;font-weight:600;color:var(--ink);line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.contatos-page .drawer-head .who .em {font-size:13px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.contatos-page .drawer-x {border:0;background:transparent;color:var(--muted);cursor:pointer;border-radius:8px;width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;flex:none}
+.contatos-page .drawer-x:hover {background:var(--hover)}
+.contatos-page .drawer-x svg {width:18px;height:18px}
+.contatos-page .drawer-body {padding:8px 22px;overflow-y:auto;flex:1}
+.contatos-page .dl-row {display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid var(--line)}
+.contatos-page .dl-row:last-child {border-bottom:0}
+.contatos-page .dl-ic {width:34px;height:34px;border-radius:9px;background:var(--surface-2);color:var(--muted);display:inline-flex;align-items:center;justify-content:center;flex:none}
+.contatos-page .dl-ic svg {width:17px;height:17px}
+.contatos-page .dl-txt {min-width:0;flex:1}
+.contatos-page .dl-label {font-size:11.5px;color:var(--muted);display:block}
+.contatos-page .dl-value {font-size:13.5px;color:var(--ink);font-weight:500;margin-top:2px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.contatos-page .drawer-foot {padding:16px 22px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:9px}
+.contatos-page .btn-block {width:100%;height:44px;border-radius:11px;font-size:13.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:9px;border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);transition:background .14s,border-color .14s}
+.contatos-page .btn-block:hover {background:var(--hover)}
+.contatos-page .btn-block svg {width:17px;height:17px}
+.contatos-page .btn-block.primary {background:var(--accent);border-color:var(--accent);color:#04130c}
+.contatos-page .btn-block.primary:hover {filter:brightness(1.05);background:var(--accent)}
+.contatos-page .btn-block.danger {color:var(--err);border-color:transparent}
+.contatos-page .btn-block.danger:hover {background:var(--err-soft)}
+.contatos-page .toast-wrap {position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:200;display:flex;flex-direction:column;gap:8px;align-items:center}
+.contatos-page .toast {background:var(--ink);color:#fff;font-size:13px;font-weight:500;padding:10px 16px;border-radius:10px;box-shadow:var(--shadow-pop);display:flex;align-items:center;gap:9px;opacity:0;transform:translateY(8px);transition:opacity .2s,transform .2s}
+[data-theme="dark"] .contatos-page .toast {background:#22324a;border:1px solid var(--line-2)}
+.contatos-page .toast.show {opacity:1;transform:none}
+.contatos-page .toast svg {width:16px;height:16px;color:var(--accent)}
+.contatos-page .pop {position:absolute;z-index:170;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-pop);padding:7px;min-width:184px;display:none}
+.contatos-page .pop.show {display:block}
+.contatos-page .pop-item {display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:0;background:transparent;border-radius:8px;padding:9px 10px;font-size:13.5px;color:var(--ink);cursor:pointer;font-weight:500}
+.contatos-page .pop-item:hover {background:var(--hover)}
+.contatos-page .pop-item svg {width:16px;height:16px;color:var(--muted)}
+.contatos-page .pop-item.danger {color:var(--err)}
+.contatos-page .pop-item.danger svg {color:var(--err)}
+@media (max-width:860px){
+  .contatos-page .sidebar {width:72px;padding:18px 10px 12px}
+  .contatos-page .brand-sub, .contatos-page .logo-text, .contatos-page .nav-item span, .contatos-page .theme-row .lbl, .contatos-page .user .meta, .contatos-page .user .chev {display:none}
+  .contatos-page .logo {justify-content:center}
+  .contatos-page .nav-item {justify-content:center;padding:11px 0}
+  .contatos-page .theme-row {justify-content:center}
+  .contatos-page .user {justify-content:center;padding:8px 0}
+  .contatos-page .stats {grid-template-columns:1fr}
+}
+
+/* estados de tabela (carregando / vazio / erro) — fase funcional */
+.contatos-page .empty-row{padding:34px 16px;text-align:center;color:var(--text-muted,#7a8699);font-size:14px}
+.contatos-page .empty-row.error{color:#c0556a}

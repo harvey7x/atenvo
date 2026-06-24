@@ -1,0 +1,7 @@
+node_modules
+dist
+.claude
+dist-ssr
+*.local
+.env
+.DS_Store
