@@ -212,6 +212,25 @@
 .config-page .atd-add{display:flex;align-items:center;gap:10px;padding:13px 22px;border-top:1px solid var(--line);background:var(--surface-2)}
 .config-page .atd-color{width:34px;height:30px;padding:0;border:1px solid var(--line-2);border-radius:8px;background:none;cursor:pointer;flex:none}
 .config-page .atd-color:disabled{cursor:not-allowed;opacity:.6}
+/* swatch (botao) que abre o seletor de cor das linhas de status/etiqueta */
+.config-page .atd-color-btn{width:34px;height:30px;padding:0;border:1px solid var(--line-2);border-radius:8px;cursor:pointer;flex:none;box-shadow:inset 0 0 0 2px var(--surface);transition:transform .12s,box-shadow .12s}
+.config-page .atd-color-btn:hover:not(:disabled){transform:scale(1.05);box-shadow:inset 0 0 0 2px var(--surface),0 0 0 2px var(--ring)}
+.config-page .atd-color-btn:disabled{cursor:not-allowed;opacity:.6}
+
+/* popover do seletor de cor */
+.config-page .cor-pop{position:fixed;z-index:200;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-pop);padding:12px;width:208px}
+.config-page .cor-pop-head{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:9px}
+.config-page .cor-swatches{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.config-page .cor-sw{width:30px;height:30px;border-radius:8px;border:1px solid rgba(0,0,0,.08);cursor:pointer;padding:0;transition:transform .1s}
+.config-page .cor-sw:hover{transform:scale(1.08)}
+.config-page .cor-sw.sel{box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--accent)}
+.config-page .cor-custom{display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:11px;border-top:1px solid var(--line)}
+.config-page .cor-native{position:relative;display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--ink-2);cursor:pointer}
+.config-page .cor-native input[type=color]{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:0;padding:0}
+.config-page .cor-native-sw{width:22px;height:22px;border-radius:6px;border:1px solid var(--line-2);flex:none}
+.config-page .cor-hex{margin-left:auto;font-size:11.5px;color:var(--muted);font-family:'JetBrains Mono',ui-monospace,monospace}
+.config-page .cor-aplicar{height:30px;padding:0 13px;border-radius:8px;border:0;background:var(--accent);color:#04130c;font-weight:600;font-size:12.5px;cursor:pointer;font-family:inherit}
+.config-page .cor-aplicar:hover{filter:brightness(1.06)}
 .config-page .atd-name{flex:1;min-width:120px;height:36px;border:1px solid var(--line-2);border-radius:9px;background:var(--surface);color:var(--ink);font-size:13.5px;padding:0 11px;font-family:inherit;font-weight:600}
 .config-page .atd-desc{flex:1.2;min-width:120px;height:36px;border:1px solid var(--line-2);border-radius:9px;background:var(--surface);color:var(--ink-2);font-size:13px;padding:0 11px;font-family:inherit}
 .config-page .atd-name:focus,.config-page .atd-desc:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--ring)}

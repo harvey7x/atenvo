@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useToast } from '@/hooks/useToast';
 import { useTheme } from '@/hooks/useTheme';
@@ -306,7 +306,56 @@ function AtendimentoPanel({ canManage, section }: { canManage: boolean; section:
   const [del, setDel] = useState<{ s: StatusDef; count: number } | null>(null);
   const [subId, setSubId] = useState('');
 
+  // seletor de cor (popover unico; preview imediato, persiste 1x ao confirmar)
+  const [picker, setPicker] = useState<{ kind: 'status' | 'etq'; id: string; orig: string; cor: string } | null>(null);
+  const [pickerPos, setPickerPos] = useState({ left: -9999, top: -9999 });
+  const pickerRect = useRef<DOMRect | null>(null);
+  const pickerRef = useRef<HTMLDivElement>(null);
+
   async function run(p: Promise<void>, ok: string) { try { await p; toast(ok); } catch (e) { toast((e as Error).message || 'Falha na operação', 'warn'); } }
+
+  function persistirCor(kind: 'status' | 'etq', id: string, cor: string) {
+    run(kind === 'status' ? a.atualizarStatus(id, { cor }) : a.atualizarEtiqueta(id, { cor }), 'Cor atualizada');
+  }
+  function commitPending() {
+    if (picker && picker.cor.toLowerCase() !== picker.orig.toLowerCase()) persistirCor(picker.kind, picker.id, picker.cor);
+  }
+  function openPicker(kind: 'status' | 'etq', id: string, cor: string, rect: DOMRect) {
+    commitPending(); // confirma alteração pendente de outro picker (1 toast)
+    pickerRect.current = rect;
+    setPickerPos({ left: -9999, top: -9999 });
+    setPicker({ kind, id, orig: cor, cor });
+  }
+  function fecharPicker() { commitPending(); setPicker(null); }
+  function aplicarCorPaleta(c: string) {
+    if (!picker) return;
+    const { kind, id, orig } = picker;
+    setPicker(null);
+    if (c.toLowerCase() !== orig.toLowerCase()) persistirCor(kind, id, c);
+  }
+  const corDaRow = (kind: 'status' | 'etq', id: string, cor: string) => (picker && picker.kind === kind && picker.id === id ? picker.cor : cor);
+
+  useLayoutEffect(() => {
+    if (!picker || !pickerRef.current || !pickerRect.current) return;
+    const el = pickerRef.current; const pw = el.offsetWidth; const ph = el.offsetHeight; const r = pickerRect.current;
+    const left = Math.max(10, Math.min(r.left, window.innerWidth - pw - 10));
+    let top = r.bottom + 6; if (top + ph > window.innerHeight - 10) top = Math.max(10, r.top - ph - 6);
+    setPickerPos({ left, top });
+  }, [picker]);
+
+  useEffect(() => {
+    if (!picker) return;
+    function onDown(e: MouseEvent) {
+      const t = e.target as HTMLElement;
+      if (pickerRef.current?.contains(t)) return;
+      if (t.closest && t.closest('.atd-color-btn')) return; // o proprio botao trata
+      fecharPicker();
+    }
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') fecharPicker(); }
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+  }, [picker]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function moveStatus(idx: number, dir: -1 | 1) {
     const arr = statuses.map((s) => s.id);
@@ -338,7 +387,7 @@ function AtendimentoPanel({ canManage, section }: { canManage: boolean; section:
         {statusQ.isLoading && <div className="chan-row"><div className="chan-txt"><div className="d">Carregando status…</div></div></div>}
         {statuses.map((s, idx) => (
           <div className="atd-row" key={s.id}>
-            <input type="color" className="atd-color" value={s.cor} disabled={!canManage} onChange={(e) => run(a.atualizarStatus(s.id, { cor: e.target.value }), 'Cor atualizada')} title="Cor" />
+            <button type="button" className="atd-color-btn" style={{ background: corDaRow('status', s.id, s.cor) }} disabled={!canManage} title="Alterar cor" aria-label="Alterar cor" onClick={(e) => openPicker('status', s.id, s.cor, e.currentTarget.getBoundingClientRect())} />
             <input className="atd-name" defaultValue={s.nome} disabled={!canManage}
               onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
               onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== s.nome) run(a.atualizarStatus(s.id, { nome: v }), 'Status renomeado'); }} />
@@ -384,7 +433,7 @@ function AtendimentoPanel({ canManage, section }: { canManage: boolean; section:
         {etqs.length === 0 && !etqQ.isLoading && <div className="chan-row"><div className="chan-txt"><div className="d">Nenhuma etiqueta ainda.</div></div></div>}
         {etqs.map((e) => (
           <div className="atd-row" key={e.id}>
-            <input type="color" className="atd-color" value={e.cor} disabled={!canManage} onChange={(ev) => run(a.atualizarEtiqueta(e.id, { cor: ev.target.value }), 'Cor atualizada')} title="Cor" />
+            <button type="button" className="atd-color-btn" style={{ background: corDaRow('etq', e.id, e.cor) }} disabled={!canManage} title="Alterar cor" aria-label="Alterar cor" onClick={(ev) => openPicker('etq', e.id, e.cor, ev.currentTarget.getBoundingClientRect())} />
             <input className="atd-name" defaultValue={e.nome} disabled={!canManage}
               onKeyDown={(ev) => { if (ev.key === 'Enter') (ev.target as HTMLInputElement).blur(); }}
               onBlur={(ev) => { const v = ev.target.value.trim(); if (v && v !== e.nome) run(a.atualizarEtiqueta(e.id, { nome: v }), 'Etiqueta renomeada'); }} />
@@ -406,6 +455,26 @@ function AtendimentoPanel({ canManage, section }: { canManage: boolean; section:
           </div>
         )}
       </div>
+
+      {picker && (
+        <div ref={pickerRef} className="cor-pop" style={{ left: pickerPos.left, top: pickerPos.top }} role="dialog" aria-label="Selecionar cor">
+          <div className="cor-pop-head">Cor</div>
+          <div className="cor-swatches">
+            {PALETA_CORES.map((c) => (
+              <button key={c} type="button" className={'cor-sw' + (c.toLowerCase() === picker.cor.toLowerCase() ? ' sel' : '')} style={{ background: c }} title={c} aria-label={c} onClick={() => aplicarCorPaleta(c)} />
+            ))}
+          </div>
+          <div className="cor-custom">
+            <label className="cor-native" title="Cor personalizada">
+              <input type="color" value={picker.cor} onChange={(ev) => setPicker((p) => p && ({ ...p, cor: ev.target.value }))} />
+              <span className="cor-native-sw" style={{ background: picker.cor }} />
+              Personalizada
+            </label>
+            <span className="cor-hex">{picker.cor.toUpperCase()}</span>
+            <button type="button" className="cor-aplicar" onClick={fecharPicker}>Aplicar</button>
+          </div>
+        </div>
+      )}
     </>
   );
 }
