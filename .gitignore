@@ -2,6 +2,9 @@ node_modules
 dist
 .claude
 dist-ssr
+# build artifacts gerados para Direct Upload (não versionar)
+atenvo-dist-*.zip
+*.zip
 *.local
 .env
 .env.*
