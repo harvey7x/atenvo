@@ -22,7 +22,7 @@ export function Login() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [email, setEmail] = useState('henrique@demo.atenvo.local');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [eEmail, setEEmail] = useState<string | null>(null);
@@ -50,7 +50,7 @@ export function Login() {
     setBusy(true);
     const { error } = await signIn(ev, password);
     setBusy(false);
-    if (error) { setBanner('E-mail ou senha incorretos. Verifique e tente novamente.'); return; }
+    if (error) { setBanner('E-mail ou senha inválidos.'); return; }
     const to = (location.state as LocState | null)?.from?.pathname ?? '/';
     navigate(to, { replace: true });
   }
