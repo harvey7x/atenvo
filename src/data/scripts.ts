@@ -137,3 +137,87 @@ export function substituirVariaveis(texto: string, ctx: VarCtx): string {
 }
 
 export const SCRIPT_VARIAVEIS = ['{{nome_cliente}}', '{{seu_nome}}', '{{empresa}}', '{{telefone}}', '{{data_atual}}'];
+
+/* ===================== Mídia / Anexos (Supabase Storage privado) ===================== */
+export const SCRIPT_BUCKET = 'script-midia';
+export type AnexoTipo = 'imagem' | 'video' | 'audio' | 'documento';
+export interface ScriptAnexo { id: string; scriptId: string; tipo: AnexoTipo; nome: string; mime: string; tamanho: number; path: string; }
+
+interface DbAnexo { id: string; script_id: string; tipo: AnexoTipo; nome_arquivo: string | null; mime_type: string | null; tamanho_bytes: number | null; storage_path: string; }
+function mapAnexo(r: DbAnexo): ScriptAnexo { return { id: r.id, scriptId: r.script_id, tipo: r.tipo, nome: r.nome_arquivo ?? 'arquivo', mime: r.mime_type ?? '', tamanho: r.tamanho_bytes ?? 0, path: r.storage_path }; }
+
+export function tipoDoMime(mime: string): AnexoTipo {
+  if (mime.startsWith('image/')) return 'imagem';
+  if (mime.startsWith('video/')) return 'video';
+  if (mime.startsWith('audio/')) return 'audio';
+  return 'documento';
+}
+
+/** Matriz explícita de compatibilidade de mídia por canal (tipos + tamanho máximo). */
+export interface CanalMidiaRegra { tipos: AnexoTipo[]; maxBytes: Record<AnexoTipo, number>; }
+const MB = 1024 * 1024;
+export const CANAL_MIDIA: Record<CanalScript, CanalMidiaRegra> = {
+  whatsapp: { tipos: ['imagem', 'video', 'audio', 'documento'], maxBytes: { imagem: 5 * MB, video: 16 * MB, audio: 16 * MB, documento: 100 * MB } },
+  facebook: { tipos: ['imagem', 'video', 'audio', 'documento'], maxBytes: { imagem: 25 * MB, video: 25 * MB, audio: 25 * MB, documento: 25 * MB } },
+};
+/** Valida um anexo para um canal; retorna null se ok ou a mensagem de incompatibilidade. */
+export function checarCompatibilidade(canal: CanalScript, tipo: AnexoTipo, bytes: number): string | null {
+  const r = CANAL_MIDIA[canal];
+  if (!r.tipos.includes(tipo)) return `${tipo} não é suportado no ${canal === 'whatsapp' ? 'WhatsApp' : 'Facebook'}.`;
+  if (bytes > r.maxBytes[tipo]) return `Arquivo acima do limite (${Math.round(r.maxBytes[tipo] / MB)} MB) para ${tipo} no ${canal === 'whatsapp' ? 'WhatsApp' : 'Facebook'}.`;
+  return null;
+}
+const MAX_GERAL = 100 * MB;
+
+export function useScriptAnexos(scriptId: string | null) {
+  return useQuery({
+    queryKey: ['script-anexos', scriptId],
+    enabled: SCRIPTS_REAL && !!scriptId,
+    queryFn: async (): Promise<ScriptAnexo[]> => {
+      const { data, error } = await supabase!.from('script_anexos').select('id,script_id,tipo,nome_arquivo,mime_type,tamanho_bytes,storage_path').eq('script_id', scriptId!).order('criado_em', { ascending: true });
+      if (error) throw new Error(error.message);
+      return ((data as unknown as DbAnexo[]) ?? []).map(mapAnexo);
+    },
+  });
+}
+
+export function useScriptAnexoMutations() {
+  const { currentOrg } = useOrg();
+  const qc = useQueryClient();
+  return {
+    upload: useMutation({
+      mutationFn: async (a: { scriptId: string; file: File }) => {
+        if (a.file.size > MAX_GERAL) throw new Error('Arquivo acima de 100 MB.');
+        const tipo = tipoDoMime(a.file.type || '');
+        const safe = a.file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80);
+        const path = `${currentOrg.id}/${a.scriptId}/${crypto.randomUUID()}-${safe}`;
+        const up = await supabase!.storage.from(SCRIPT_BUCKET).upload(path, a.file, { contentType: a.file.type || undefined, upsert: false });
+        if (up.error) throw new Error(up.error.message);
+        const { error } = await supabase!.from('script_anexos').insert({ script_id: a.scriptId, tipo, nome_arquivo: a.file.name, mime_type: a.file.type || null, tamanho_bytes: a.file.size, storage_path: path, organizacao_id: currentOrg.id });
+        if (error) { await supabase!.storage.from(SCRIPT_BUCKET).remove([path]); throw new Error(error.message); }
+      },
+      onSuccess: (_d, v) => qc.invalidateQueries({ queryKey: ['script-anexos', v.scriptId] }),
+    }),
+    remover: useMutation({
+      mutationFn: async (a: ScriptAnexo) => {
+        await supabase!.storage.from(SCRIPT_BUCKET).remove([a.path]); // remove o objeto antes da linha
+        const { error } = await supabase!.from('script_anexos').delete().eq('id', a.id);
+        if (error) throw new Error(error.message);
+      },
+      onSuccess: (_d, v) => qc.invalidateQueries({ queryKey: ['script-anexos', v.scriptId] }),
+    }),
+  };
+}
+
+/** URL assinada (temporária) para visualizar/baixar um anexo privado. */
+export async function urlAssinadaAnexo(path: string): Promise<string | null> {
+  const { data, error } = await supabase!.storage.from(SCRIPT_BUCKET).createSignedUrl(path, 3600);
+  if (error) return null;
+  return data?.signedUrl ?? null;
+}
+
+export function formatarTamanho(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < MB) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / MB).toFixed(1)} MB`;
+}

@@ -4,6 +4,7 @@ import { EmptyState } from '@/components/EmptyState';
 import {
   SCRIPTS_REAL, useScripts, useScriptCategorias, useScriptMutations, useScriptCategoriaMutations,
   substituirVariaveis, SCRIPT_VARIAVEIS, type Script,
+  useScriptAnexos, useScriptAnexoMutations, urlAssinadaAnexo, formatarTamanho, type ScriptAnexo,
 } from '@/data/scripts';
 import './Scripts.css';
 
@@ -48,6 +49,11 @@ export function Scripts() {
   const [saving, setSaving] = useState(false);
   const [editorOpen, setEditorOpen] = useState(() => (typeof window !== 'undefined' ? window.innerWidth >= 1100 : true));
   const msgRef = useRef<HTMLTextAreaElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const anexosQ = useScriptAnexos(isNew ? null : (currentId || null));
+  const anexos = anexosQ.data ?? [];
+  const anexoMut = useScriptAnexoMutations();
 
   // debounce da busca
   useEffect(() => { const t = setTimeout(() => setSearch(searchRaw.trim().toLowerCase()), 250); return () => clearTimeout(t); }, [searchRaw]);
@@ -128,6 +134,23 @@ export function Scripts() {
     const txt = s.conteudo;
     try { navigator.clipboard?.writeText(txt); toast('Texto copiado'); }
     catch { toast('Não foi possível copiar', 'warn'); }
+  }
+  async function enviarAnexo(file: File | null) {
+    if (!file) return;
+    if (isNew || !current.id) { toast('Salve o script antes de anexar mídia', 'warn'); return; }
+    setUploading(true);
+    try { await anexoMut.upload.mutateAsync({ scriptId: current.id, file }); toast('Anexo enviado'); }
+    catch (e) { toast((e as Error).message || 'Falha no upload', 'warn'); }
+    finally { setUploading(false); if (fileRef.current) fileRef.current.value = ''; }
+  }
+  async function abrirAnexo(a: ScriptAnexo) {
+    const url = await urlAssinadaAnexo(a.path);
+    if (url) window.open(url, '_blank'); else toast('Não foi possível abrir o anexo', 'warn');
+  }
+  async function removerAnexo(a: ScriptAnexo) {
+    if (!window.confirm(`Remover "${a.nome}"?`)) return;
+    try { await anexoMut.remover.mutateAsync(a); toast('Anexo removido'); }
+    catch (e) { toast((e as Error).message || 'Falha ao remover', 'warn'); }
   }
 
   if (!SCRIPTS_REAL) {
@@ -218,6 +241,27 @@ export function Scripts() {
               {!isNew && form.conteudo.includes('{{') && (
                 <><p className="ed-label" style={{ marginTop: 14 }}>Pré-visualização</p>
                 <div className="sc-prev" style={{ whiteSpace: 'pre-wrap' }}>{substituirVariaveis(form.conteudo, { cliente: 'Maria Silva', atendente: 'Você', empresa: 'CAF', telefone: '(11) 99999-9999' })}</div></>
+              )}
+              {!isNew && current.id && (
+                <>
+                  <p className="ed-label" style={{ marginTop: 14 }}>Mídias e anexos</p>
+                  <p className="ed-sub" style={{ fontSize: 12 }}>Áudio, imagem, vídeo ou documento (privados, com URL temporária). Cada canal tem limites próprios na hora de enviar na conversa.</p>
+                  <input ref={fileRef} type="file" style={{ display: 'none' }} onChange={(e) => enviarAnexo(e.target.files?.[0] ?? null)} />
+                  <button className="ed-btn" disabled={uploading} onClick={() => fileRef.current?.click()}>{uploading ? 'Enviando…' : <><IcPlus />Adicionar mídia</>}</button>
+                  <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {anexosQ.isLoading && <span style={{ color: 'var(--muted)', fontSize: 13 }}>Carregando anexos…</span>}
+                    {!anexosQ.isLoading && anexos.length === 0 && <span style={{ color: 'var(--muted)', fontSize: 13 }}>Nenhum anexo.</span>}
+                    {anexos.map((a) => (
+                      <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, border: '1px solid var(--line, #2a2f3a)', borderRadius: 8, padding: '6px 8px' }}>
+                        <span style={{ textTransform: 'capitalize', color: 'var(--muted)', minWidth: 70 }}>{a.tipo}</span>
+                        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={a.nome}>{a.nome}</span>
+                        <span style={{ color: 'var(--muted)' }}>{formatarTamanho(a.tamanho)}</span>
+                        <button className="ed-btn" onClick={() => abrirAnexo(a)}>Abrir</button>
+                        <button className="ed-btn" title="Remover" onClick={() => removerAnexo(a)}><IcTrash /></button>
+                      </div>
+                    ))}
+                  </div>
+                </>
               )}
             </>
           ) : (
