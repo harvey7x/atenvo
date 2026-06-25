@@ -190,7 +190,7 @@ export function Integracoes() {
                 ) : fbSel ? (
                   <div className="kv">
                     <div className="row"><div className="k" style={{ fontWeight: 600 }}>Escolha a Página para conectar</div><div className="v" /></div>
-                    {fbSel.length === 0 && <div className="adapter-note"><IcInfo /><div className="tx">Nenhuma Página disponível nesta conta do Facebook.</div></div>}
+                    {fbSel.length === 0 && <div className="adapter-note"><IcInfo /><div className="tx">Nenhuma Página encontrada nesta conta do Facebook. Você precisa ser <b>administrador de uma Página</b> e, na tela de autorização da Meta, <b>marcar a Página</b> que deseja conectar. Crie/assuma uma Página e clique novamente em “Conectar com Facebook”.</div></div>}
                     {fbSel.map((p) => (
                       <div className="row" key={p.id}>
                         <div className="k">{p.nome}</div>

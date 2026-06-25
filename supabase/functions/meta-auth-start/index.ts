@@ -46,5 +46,8 @@ Deno.serve(async (req) => {
   u.searchParams.set('state', state);
   u.searchParams.set('response_type', 'code');
   u.searchParams.set('scope', scope);
+  // re-apresenta o diálogo de consentimento (inclui a seleção de Páginas) mesmo se o
+  // usuário já autorizou antes sem escolher uma Página / tendo recusado algo (#8).
+  u.searchParams.set('auth_type', 'rerequest');
   return json({ url: u.toString() });
 });
