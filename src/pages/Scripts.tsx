@@ -30,6 +30,14 @@ function ChBadge({ c }: { c: string }) {
 
 const VAZIO: Script = { id: '', titulo: '', descricao: null, conteudo: '', categoriaId: null, canais: [], favorito: false, ativo: true, tags: [], autorId: null, criadoEm: '', atualizadoEm: '' };
 
+type CanalFiltro = 'todos' | 'whatsapp' | 'facebook' | 'ambos';
+/** Classifica um script por exclusividade de canal (vazio = disponível em ambos). */
+function classificaCanal(canais: string[]): 'whatsapp' | 'facebook' | 'ambos' {
+  const wa = canais.includes('whatsapp'); const fb = canais.includes('facebook');
+  if ((wa && fb) || canais.length === 0) return 'ambos';
+  return wa ? 'whatsapp' : 'facebook';
+}
+
 export function Scripts() {
   const { toast } = useToast();
   const scriptsQ = useScripts();
@@ -40,8 +48,7 @@ export function Scripts() {
   const [cat, setCat] = useState('all');
   const [searchRaw, setSearchRaw] = useState('');
   const [search, setSearch] = useState('');
-  const [chWa, setChWa] = useState(false);
-  const [chFb, setChFb] = useState(false);
+  const [canalFiltro, setCanalFiltro] = useState<CanalFiltro>('todos');
   const [favOnly, setFavOnly] = useState(false);
   const [currentId, setCurrentId] = useState('');
   const [isNew, setIsNew] = useState(false);
@@ -65,11 +72,16 @@ export function Scripts() {
   const list = useMemo(() => scripts.filter((s) => {
     if (cat !== 'all' && s.categoriaId !== cat) return false;
     if (favOnly && !s.favorito) return false;
-    if (chWa && !(s.canais.length === 0 || s.canais.includes('whatsapp'))) return false;
-    if (chFb && !(s.canais.length === 0 || s.canais.includes('facebook'))) return false;
+    if (canalFiltro !== 'todos' && classificaCanal(s.canais) !== canalFiltro) return false;
     if (search && s.titulo.toLowerCase().indexOf(search) < 0 && s.conteudo.toLowerCase().indexOf(search) < 0) return false;
     return true;
-  }), [scripts, cat, favOnly, chWa, chFb, search]);
+  }), [scripts, cat, favOnly, canalFiltro, search]);
+
+  const canalContagem = useMemo(() => {
+    const c: Record<CanalFiltro, number> = { todos: scripts.length, whatsapp: 0, facebook: 0, ambos: 0 };
+    for (const s of scripts) c[classificaCanal(s.canais)]++;
+    return c;
+  }, [scripts]);
 
   // mantém uma seleção válida
   useEffect(() => {
@@ -175,9 +187,12 @@ export function Scripts() {
             {cats.map((c) => <button key={c.id} className={'cat' + (cat === c.id ? ' active' : '')} onClick={() => setCat(c.id)}><IcDoc />{c.nome}<span className="cnt">{scripts.filter((s) => s.categoriaId === c.id).length}</span></button>)}
           </div>
           <div className="cats-sep" />
-          <div className="filt-group"><p className="filt-title">Canais</p>
-            <label className={'filt' + (chWa ? ' on' : '')} onClick={() => setChWa((v) => !v)}><span className="box"><IcCheck /></span><span className="fic"><IcWa /></span><span>WhatsApp</span></label>
-            <label className={'filt' + (chFb ? ' on' : '')} onClick={() => setChFb((v) => !v)}><span className="box"><IcCheck /></span><span className="fic"><IcFb /></span><span>Facebook</span></label>
+          <div className="filt-group"><p className="filt-title">Canal</p>
+            {([['todos', 'Todos'], ['whatsapp', 'WhatsApp'], ['facebook', 'Facebook'], ['ambos', 'Ambos']] as [CanalFiltro, string][]).map(([id, label]) => (
+              <label key={id} className={'filt' + (canalFiltro === id ? ' on' : '')} onClick={() => setCanalFiltro(id)}>
+                <span className="box"><IcCheck /></span>{(id === 'whatsapp' || id === 'ambos') && <span className="fic"><IcWa /></span>}{(id === 'facebook' || id === 'ambos') && <span className="fic"><IcFb /></span>}<span>{label}</span><span className="cnt">{canalContagem[id]}</span>
+              </label>
+            ))}
           </div>
           <div className="filt-group"><p className="filt-title">Favoritos</p>
             <label className={'filt' + (favOnly ? ' on' : '')} onClick={() => setFavOnly((v) => !v)}><span className="box"><IcCheck /></span><span>Apenas favoritos</span></label>

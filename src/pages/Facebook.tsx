@@ -184,15 +184,15 @@ function FacebookInbox() {
       <div className="fb-app" style={{ display: 'grid', placeItems: 'center' }}>
         <div style={{ textAlign: 'center', maxWidth: 460, padding: 24 }}>
           <div style={{ width: 56, height: 56, margin: '0 auto 14px', borderRadius: 999, background: 'rgba(59,89,152,.16)', color: '#5b7bd6', display: 'grid', placeItems: 'center' }}><IcFb /></div>
-          <h2 style={{ margin: '0 0 8px', color: 'var(--text, #e8eaed)' }}>Facebook não conectado</h2>
-          <p style={{ margin: '0 0 16px', color: 'var(--muted, #889)' }}>Conecte uma Página do Facebook em <b>Integrações</b> para receber e responder mensagens do Messenger por aqui.</p>
+          <h2 style={{ margin: '0 0 8px', color: 'var(--ink)' }}>Facebook não conectado</h2>
+          <p style={{ margin: '0 0 16px', color: 'var(--muted)' }}>Conecte uma Página do Facebook em <b>Integrações</b> para receber e responder mensagens do Messenger por aqui.</p>
           <button className="send-btn" style={{ width: 'auto', padding: '0 16px', borderRadius: 10, height: 38 }} onClick={() => navigate('/integracoes?tab=facebook')}>Ir para Integrações</button>
         </div>
       </div>
     );
   }
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--line, #2a2f3a)', background: 'var(--field, #11151c)', color: 'var(--text, #e8eaed)', fontSize: 14 };
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--line-2)', background: 'var(--surface)', color: 'var(--ink)', fontSize: 14 };
   const cls = 'fb-app' + (!dataOpen && !isMobile ? ' data-collapsed' : '') + (dataOpen && isMobile ? ' drawer-open' : '');
 
   return (
@@ -326,7 +326,7 @@ function FacebookInbox() {
               {statusNomeAtual || 'Definir status'}<IcChevDown />
             </button>
             {picker === 'status' && (
-              <div className="pop" style={{ position: 'absolute', top: '100%', left: 0, marginTop: 4, zIndex: 30 }}>
+              <div className="pop" style={{ position: 'absolute', top: '100%', left: 0, marginTop: 4, zIndex: 60, maxHeight: 280, overflowY: 'auto', minWidth: 200 }}>
                 {statusAtivos.length === 0 && <div className="pop-head">Nenhum status ativo.</div>}
                 {statusAtivos.map((s) => (
                   <button key={s.id} className={'pop-item' + (s.id === current.statusId ? ' sel' : '')} onClick={() => aplicarStatus(s.id)}>
@@ -358,7 +358,7 @@ function FacebookInbox() {
               {current.id && <button className="tag-add" title="Adicionar etiqueta" onClick={() => setPicker((p) => p === 'tags' ? null : 'tags')}><IcPlus /></button>}
             </div>
             {picker === 'tags' && (
-              <div className="pop" style={{ position: 'absolute', top: '100%', left: 0, marginTop: 4, zIndex: 30 }}>
+              <div className="pop" style={{ position: 'absolute', top: '100%', left: 0, marginTop: 4, zIndex: 60, maxHeight: 280, overflowY: 'auto', minWidth: 200 }}>
                 <div className="pop-head">Etiquetas</div>
                 {etiquetasAtivas.length === 0 && <div className="pop-item" style={{ color: 'var(--muted)' }}>Nenhuma etiqueta.</div>}
                 {etiquetasAtivas.map((e) => {
