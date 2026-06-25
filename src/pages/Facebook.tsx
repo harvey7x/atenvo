@@ -6,6 +6,7 @@ import { useOrg } from '@/context/OrgContext';
 import { initials, avatarColor } from '@/lib/avatar';
 import { FB_CONTACTS, FB_QUICK, type FbContact } from '@/data/facebookDemo';
 import { FB_REAL, useFbConversations, useSendFbMessage, useFbStatus, type FbConv } from '@/data/facebook';
+import { useScripts, substituirVariaveis } from '@/data/scripts';
 import { useStatusDefs, useEtiquetas, useAtendimentoActions, useOrgUsuarios } from '@/data/atendimento';
 import { corDaEtiqueta } from '@/types/atendimento';
 import './Facebook.css';
@@ -70,7 +71,8 @@ function FacebookInbox() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { user } = useAuth();
-  useOrg();
+  const { currentOrg } = useOrg();
+  const scriptsLib = useScripts('facebook').data ?? [];
   const live = useFbConversations();
   const sendMut = useSendFbMessage();
   const fbStatus = useFbStatus();
@@ -86,7 +88,7 @@ function FacebookInbox() {
   const [draft, setDraft] = useState('');
   const [dataOpen, setDataOpen] = useState(() => (typeof window !== 'undefined' ? window.innerWidth >= 1200 : true));
   const [isMobile, setIsMobile] = useState(() => (typeof window !== 'undefined' ? window.innerWidth < 1200 : false));
-  const [picker, setPicker] = useState<'status' | 'tags' | null>(null);
+  const [picker, setPicker] = useState<'status' | 'tags' | 'scripts' | null>(null);
   const [editMode, setEditMode] = useState(false);
   const [editForm, setEditForm] = useState({ nome: '', email: '', observacoes: '', respId: '' });
   const [saving, setSaving] = useState(false);
@@ -270,6 +272,20 @@ function FacebookInbox() {
               disabled={!canalConectado || !current.id}
               onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); } }} />
             <div className="fb-tools">
+              <span style={{ position: 'relative' }}>
+                <button className="fb-tool" disabled={!current.id} onClick={() => setPicker((p) => p === 'scripts' ? null : 'scripts')}><IcDoc /><span>Scripts</span></button>
+                {picker === 'scripts' && (
+                  <div className="pop" style={{ position: 'absolute', bottom: '100%', left: 0, marginBottom: 8, zIndex: 40, width: 300, maxHeight: 320, overflowY: 'auto' }}>
+                    <div className="pop-head">Inserir script</div>
+                    {scriptsLib.length === 0 && <div className="pop-item" style={{ color: 'var(--muted)' }}>Nenhum script para Facebook. Crie em Scripts.</div>}
+                    {scriptsLib.map((s) => (
+                      <button key={s.id} className="pop-item" onClick={() => { setDraft(substituirVariaveis(s.conteudo, { cliente: current.name, atendente: user?.name, empresa: currentOrg.name, telefone: '' })); setPicker(null); setTimeout(() => taRef.current?.focus(), 0); }}>
+                        <div><div>{s.titulo}</div><small>{s.conteudo.slice(0, 46)}…</small></div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </span>
               <span className="spacer" />
               <button className="send-btn" aria-label="Enviar" disabled={draft.trim() === '' || !current.id || !canalConectado} onClick={sendMsg}><IcSend /></button>
             </div>

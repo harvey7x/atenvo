@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/useToast';
 import { useAuth } from '@/context/AuthContext';
 import { useOrg } from '@/context/OrgContext';
-import { WA_CONTACTS, WA_SCRIPTS, initials, avatarColor, type WaContact } from '@/data/whatsappDemo';
+import { WA_CONTACTS, initials, avatarColor, type WaContact } from '@/data/whatsappDemo';
 import { useWaConversations, useSendWaMessage, useWaCanais, mascararNumero, WA_REAL } from '@/data/whatsapp';
+import { useScripts, substituirVariaveis } from '@/data/scripts';
 import { useStatusDefs, useEtiquetas, useAssinaturaPref, useAtendimentoActions, useOrgUsuarios, resolverNomeAssinatura } from '@/data/atendimento';
 import { corDaEtiqueta, podeGerenciarAtendimento, type AssinaturaModo } from '@/types/atendimento';
 import './WhatsApp.css';
@@ -101,6 +102,7 @@ export function WhatsApp() {
   const podeGerenciar = podeGerenciarAtendimento(currentOrg.role);
 
   const orgUsuariosQ = useOrgUsuarios();
+  const scriptsLib = useScripts('whatsapp').data ?? [];
   const [contacts, setContacts] = useState<WaContact[]>(() => WA_REAL ? [] : WA_CONTACTS.map((c) => ({ ...c, msgs: c.msgs.map((m) => ({ ...m })), tags: [...c.tags] })));
   const [currentId, setCurrentId] = useState(() => {
     if (!WA_REAL) return 'antonio';
@@ -307,7 +309,8 @@ export function WhatsApp() {
   }
 
   function insertScript(m: string, t: string) {
-    setDraft(m);
+    const corpo = substituirVariaveis(m, { cliente: current.name, atendente: user?.name, empresa: currentOrg.name, telefone: current.phone });
+    setDraft(corpo);
     setPop(null);
     toast('Script inserido: ' + t);
     setTimeout(() => taRef.current?.focus(), 0);
@@ -685,9 +688,10 @@ export function WhatsApp() {
           {pop.kind === 'scripts' && (
             <>
               <div className="pop-head">Inserir script</div>
-              {WA_SCRIPTS.map((s) => (
-                <button key={s.t} className="pop-item" onClick={() => insertScript(s.m, s.t)}>
-                  <div><div>{s.t}</div><small>{s.m.slice(0, 46)}…</small></div>
+              {scriptsLib.length === 0 && <div className="pop-empty">Nenhum script para WhatsApp. Crie em Scripts.</div>}
+              {scriptsLib.map((s) => (
+                <button key={s.id} className="pop-item" onClick={() => insertScript(s.conteudo, s.titulo)}>
+                  <div><div>{s.titulo}</div><small>{s.conteudo.slice(0, 46)}…</small></div>
                 </button>
               ))}
             </>
