@@ -20,7 +20,7 @@ async function graphGet(path: string, params: Record<string, string>) {
 }
 
 Deno.serve(async (req) => {
-  const FRONT = (Deno.env.get('META_FRONTEND_URL') || 'https://homologacao.atenvo.pages.dev').replace(/\/+$/, '');
+  const FRONT = (Deno.env.get('META_FRONTEND_URL') || 'https://atenvo.pages.dev').replace(/\/+$/, '');
   const back = (q: string) => Response.redirect(`${FRONT}/integracoes?tab=facebook&${q}`, 302);
   const url = new URL(req.url);
   const code = url.searchParams.get('code');
