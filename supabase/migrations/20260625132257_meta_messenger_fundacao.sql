@@ -204,12 +204,10 @@ end $$;
 revoke all on function public.meta_limpar_sessoes_expiradas() from public, anon, authenticated;
 grant execute on function public.meta_limpar_sessoes_expiradas() to service_role;
 
--- ============================ RETENÇÃO/limpeza via pg_cron (guardado; não falha se indisponível) ============================
-do $$ begin
-  create extension if not exists pg_cron;
-  perform cron.schedule('meta_sessoes_limpeza', '*/10 * * * *', 'select public.meta_limpar_sessoes_expiradas()');
-  perform cron.schedule('meta_webhook_events_retencao', '17 3 * * *',
-    'delete from public.meta_webhook_events where recebido_em < now() - interval ''30 days''');
-exception when others then
-  raise notice 'pg_cron indisponivel; agendar meta_limpar_sessoes_expiradas() externamente (%/%)', sqlstate, sqlerrm;
-end $$;
+-- ============================ RETENÇÃO/limpeza ============================
+-- A função meta_limpar_sessoes_expiradas() acima faz a limpeza Vault-safe.
+-- Agendamento (pg_cron) NÃO é criado aqui para não arriscar o apply (extensão não
+-- instalada / criação de extensão em transação). Follow-up pós-MVP: habilitar
+-- pg_cron e agendar `select public.meta_limpar_sessoes_expiradas()` (*/10 min) +
+-- retenção de meta_webhook_events (30 dias). Cada sessão também é limpa no fim do
+-- fluxo OAuth (conclusão/cancelamento) pelas Edge Functions.

@@ -428,6 +428,10 @@ verify_jwt = false
 [functions.meta-webhook]
 verify_jwt = false
 
-# As demais (evolution-manage, evolution-send, evolution-start, evolution-send-midia,
-# evolution-foto-sync) exigem o JWT do usuário (verify_jwt = true por padrão) —
+# meta-auth-callback: retorno do OAuth — a Meta redireciona o navegador SEM JWT.
+[functions.meta-auth-callback]
+verify_jwt = false
+
+# As demais (evolution-* e meta-auth-start, meta-pages, meta-manage,
+# meta-send-message) exigem o JWT do usuário (verify_jwt = true por padrão) —
 # chamadas só pelo app logado.
