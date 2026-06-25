@@ -6,11 +6,15 @@ import { DEMO_USER } from '@/data/demo';
 type AuthMode = 'supabase' | 'mock';
 const MOCK_KEY = 'atenvo-mock-session';
 
+/** Classifica a falha de login para a UI decidir a mensagem (nunca tratar erro de
+ *  servidor/config como "senha inválida"). */
+type SignInReason = 'ok' | 'invalid' | 'config' | 'server';
+
 interface AuthState {
   mode: AuthMode;
   loading: boolean;
   user: SessionUser | null;
-  signIn: (email: string, password: string) => Promise<{ error: string | null }>;
+  signIn: (email: string, password: string) => Promise<{ error: string | null; reason: SignInReason }>;
   signOut: () => Promise<void>;
 }
 
@@ -48,16 +52,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn: AuthState['signIn'] = async (email, password) => {
     if (mode === 'supabase' && supabase) {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
-      return { error: error ? error.message : null };
+      if (!error) return { error: null, reason: 'ok' };
+      const code = (error as { code?: string }).code;
+      const status = (error as { status?: number }).status;
+      const invalid = code === 'invalid_credentials' || code === 'invalid_grant'
+        || (status === 400 && /invalid login credentials/i.test(error.message));
+      // 404/5xx/rede/config => 'server' (NUNCA vira "senha inválida")
+      return { error: error.message, reason: invalid ? 'invalid' : 'server' };
     }
     // mock só é permitido no modo demonstração explícito (defesa adicional ao gate)
-    if (!isDemoMode) return { error: 'Backend não configurado. Defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.' };
+    if (!isDemoMode) return { error: 'Backend não configurado. Defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.', reason: 'config' };
     // demo: aceita qualquer credencial não vazia (sem backend real)
-    if (!email || !password) return { error: 'Informe email e senha.' };
+    if (!email || !password) return { error: 'Informe email e senha.', reason: 'invalid' };
     const u: SessionUser = { ...DEMO_USER, email };
     try { localStorage.setItem(MOCK_KEY, JSON.stringify(u)); } catch { /* ignore */ }
     setUser(u);
-    return { error: null };
+    return { error: null, reason: 'ok' };
   };
 
   const signOut: AuthState['signOut'] = async () => {

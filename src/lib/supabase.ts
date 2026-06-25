@@ -1,7 +1,17 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-const url = import.meta.env.VITE_SUPABASE_URL;
-const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+/** Normaliza a URL do projeto Supabase: remove barras finais e um sufixo de endpoint
+ *  colado por engano (ex.: ".../rest/v1", ".../auth/v1"). O supabase-js espera apenas a
+ *  origin do projeto (https://<ref>.supabase.co); com o sufixo, ele montaria
+ *  ".../rest/v1/auth/v1/token" e todo o Auth/REST retornaria 404. */
+function normalizeSupabaseUrl(raw: string | undefined): string {
+  let u = (raw ?? '').trim().replace(/\/+$/, '');
+  u = u.replace(/\/(rest|auth|storage|realtime|functions)\/v1$/i, '').replace(/\/+$/, '');
+  return u;
+}
+
+const url = normalizeSupabaseUrl(import.meta.env.VITE_SUPABASE_URL);
+const anonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY ?? '').trim();
 
 /** true quando as variáveis do Supabase estão presentes (backend real disponível). */
 export const isSupabaseConfigured = Boolean(url && anonKey);

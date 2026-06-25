@@ -39,7 +39,7 @@ export function OrgProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const realEnabled = mode === 'supabase' && isSupabaseConfigured && !!supabase && !!user;
 
-  const { data: realOrgs, isLoading, isFetched } = useQuery({
+  const { data: realOrgs, isLoading, isFetched, isError, refetch } = useQuery({
     queryKey: ['orgs', user?.id],
     enabled: realEnabled,
     queryFn: async (): Promise<Organization[]> => {
@@ -110,7 +110,7 @@ export function OrgProvider({ children }: { children: ReactNode }) {
   }
 
   // Hooks SEMPRE chamados antes de qualquer return condicional (regra dos Hooks).
-  const needsOnboarding = (realEnabled && isFetched && orgs.length === 0) || (mode === 'mock' && mockNoOrg);
+  const needsOnboarding = (realEnabled && isFetched && !isError && orgs.length === 0) || (mode === 'mock' && mockNoOrg);
   const currentOrg = orgs.find((o) => o.id === currentId) ?? orgs[0];
   const value = useMemo<OrgState>(() => ({ orgs, currentOrg, setCurrentOrg, loading }), [orgs, currentOrg, loading]);
 
@@ -118,6 +118,19 @@ export function OrgProvider({ children }: { children: ReactNode }) {
     return (
       <div style={{ display: 'grid', placeItems: 'center', minHeight: '100dvh', color: 'var(--text-muted, #889)' }}>
         Carregando organização…
+      </div>
+    );
+  }
+  // Auth OK mas a carga da organização falhou (RLS/rede/etc): NÃO é erro de senha e
+  // NÃO é "sem organização". Preserva a sessão e oferece nova tentativa (#7).
+  if (realEnabled && isError) {
+    return (
+      <div style={{ display: 'grid', placeItems: 'center', minHeight: '100dvh', textAlign: 'center', padding: 24, color: 'var(--text-muted, #889)' }}>
+        <div>
+          <p style={{ margin: '0 0 6px', fontWeight: 600 }}>Não foi possível carregar sua organização.</p>
+          <p style={{ margin: '0 0 14px', fontSize: 13 }}>Você continua autenticado. Verifique a conexão e tente novamente.</p>
+          <button onClick={() => refetch()} style={{ padding: '8px 16px', borderRadius: 8, cursor: 'pointer' }}>Tentar novamente</button>
+        </div>
       </div>
     );
   }

@@ -48,9 +48,16 @@ export function Login() {
     if (!ok) return;
 
     setBusy(true);
-    const { error } = await signIn(ev, password);
+    const { error, reason } = await signIn(ev, password);
     setBusy(false);
-    if (error) { setBanner('E-mail ou senha inválidos.'); return; }
+    if (error) {
+      setBanner(
+        reason === 'invalid' ? 'E-mail ou senha inválidos.'
+        : reason === 'config' ? 'Servidor de autenticação não configurado. Avise o administrador.'
+        : 'Não foi possível conectar ao servidor de autenticação. Tente novamente em instantes.',
+      );
+      return;
+    }
     const to = (location.state as LocState | null)?.from?.pathname ?? '/';
     navigate(to, { replace: true });
   }
