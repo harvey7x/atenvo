@@ -1,0 +1,38 @@
+name: Deploy Atenvo Production
+
+# Publica automaticamente no projeto Cloudflare Pages existente "atenvo"
+# (branch de produção "main") a cada push para main. Tokens NUNCA ficam no
+# arquivo — vêm de GitHub → Settings → Secrets and variables → Actions.
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run typecheck
+
+      - run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_ENABLE_DEMO_MODE: "false"
+
+      - name: Publish to Cloudflare Pages (atenvo / main)
+        run: npx wrangler pages deploy dist --project-name=atenvo --branch=main
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

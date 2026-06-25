@@ -206,9 +206,55 @@
 .config-page .pop-item svg {width:16px;height:16px;color:var(--muted)}
 .config-page .pop-item.danger {color:var(--err)}
 .config-page .pop-item.danger svg {color:var(--err)}
+/* ===== Atendimento: status + etiquetas ===== */
+.config-page .set-card.atd-destaque{box-shadow:0 0 0 2px var(--accent),var(--shadow);transition:box-shadow .25s}
+.config-page .atd-row{display:flex;align-items:center;gap:10px;padding:11px 22px;border-top:1px solid var(--line)}
+.config-page .atd-add{display:flex;align-items:center;gap:10px;padding:13px 22px;border-top:1px solid var(--line);background:var(--surface-2)}
+.config-page .atd-color{width:34px;height:30px;padding:0;border:1px solid var(--line-2);border-radius:8px;background:none;cursor:pointer;flex:none}
+.config-page .atd-color:disabled{cursor:not-allowed;opacity:.6}
+/* swatch (botao) que abre o seletor de cor das linhas de status/etiqueta */
+.config-page .atd-color-btn{width:34px;height:30px;padding:0;border:1px solid var(--line-2);border-radius:8px;cursor:pointer;flex:none;box-shadow:inset 0 0 0 2px var(--surface);transition:transform .12s,box-shadow .12s}
+.config-page .atd-color-btn:hover:not(:disabled){transform:scale(1.05);box-shadow:inset 0 0 0 2px var(--surface),0 0 0 2px var(--ring)}
+.config-page .atd-color-btn:disabled{cursor:not-allowed;opacity:.6}
+
+/* popover do seletor de cor */
+.config-page .cor-pop{position:fixed;z-index:200;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-pop);padding:12px;width:208px}
+.config-page .cor-pop-head{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:9px}
+.config-page .cor-swatches{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.config-page .cor-sw{width:30px;height:30px;border-radius:8px;border:1px solid rgba(0,0,0,.08);cursor:pointer;padding:0;transition:transform .1s}
+.config-page .cor-sw:hover{transform:scale(1.08)}
+.config-page .cor-sw.sel{box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--accent)}
+.config-page .cor-custom{display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:11px;border-top:1px solid var(--line)}
+.config-page .cor-native{position:relative;display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--ink-2);cursor:pointer}
+.config-page .cor-native input[type=color]{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:0;padding:0}
+.config-page .cor-native-sw{width:22px;height:22px;border-radius:6px;border:1px solid var(--line-2);flex:none}
+.config-page .cor-hex{margin-left:auto;font-size:11.5px;color:var(--muted);font-family:'JetBrains Mono',ui-monospace,monospace}
+.config-page .cor-aplicar{height:30px;padding:0 13px;border-radius:8px;border:0;background:var(--accent);color:#04130c;font-weight:600;font-size:12.5px;cursor:pointer;font-family:inherit}
+.config-page .cor-aplicar:hover{filter:brightness(1.06)}
+.config-page .atd-name{flex:1;min-width:120px;height:36px;border:1px solid var(--line-2);border-radius:9px;background:var(--surface);color:var(--ink);font-size:13.5px;padding:0 11px;font-family:inherit;font-weight:600}
+.config-page .atd-desc{flex:1.2;min-width:120px;height:36px;border:1px solid var(--line-2);border-radius:9px;background:var(--surface);color:var(--ink-2);font-size:13px;padding:0 11px;font-family:inherit}
+.config-page .atd-name:focus,.config-page .atd-desc:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--ring)}
+.config-page .atd-name:disabled,.config-page .atd-desc:disabled{background:var(--surface-2);color:var(--ink-2)}
+.config-page .atd-sys{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;border:1px solid var(--line-2);border-radius:5px;padding:2px 5px;flex:none}
+.config-page .atd-actions{display:flex;align-items:center;gap:5px;margin-left:auto;flex:none}
+.config-page .atd-mini{width:30px;height:30px;border-radius:8px;border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+.config-page .atd-mini:hover:not(:disabled){background:var(--hover);border-color:var(--accent)}
+.config-page .atd-mini:disabled{opacity:.4;cursor:not-allowed}
+.config-page .atd-mini svg{width:15px;height:15px}
+.config-page .atd-mini.danger:hover:not(:disabled){border-color:var(--err);color:var(--err)}
+.config-page .atd-toggle{width:42px;height:24px;border-radius:999px;border:0;background:var(--sw-off);position:relative;cursor:pointer;flex:none;transition:background .15s}
+.config-page .atd-toggle.on{background:var(--accent)}
+.config-page .atd-toggle:disabled{opacity:.5;cursor:not-allowed}
+.config-page .atd-toggle .k{position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .15s}
+.config-page .atd-toggle.on .k{transform:translateX(18px)}
+.config-page .atd-del{display:flex;align-items:center;flex-wrap:wrap;gap:9px;padding:13px 22px;border-top:1px solid var(--line);background:var(--warn-soft);color:var(--warn);font-size:13px}
+.config-page .atd-del svg{width:16px;height:16px;flex:none}
+.config-page .atd-del select{height:34px;border:1px solid var(--line-2);border-radius:8px;background:var(--surface);color:var(--ink);padding:0 9px;font-family:inherit}
+
 @media (max-width:720px){
   .config-page .form-grid {grid-template-columns:1fr}
   .config-page .pref-row {flex-wrap:wrap}
+  .config-page .atd-desc {display:none}
 }
 @media (max-width:860px){
   .config-page .sidebar {width:72px;padding:18px 10px 12px}

@@ -3,6 +3,19 @@ export interface WaMessage {
   text?: string;
   time: string;
   pdf?: { name: string; meta: string };
+  /** #7 mensagem enviada pelo celular (origem === 'telefone'). */
+  viaTelefone?: boolean;
+  /** status de entrega da Evolution (pendente/enviada/entregue/lida/falhou). */
+  status?: string;
+}
+
+/** #6 último canal/número usado para falar com a conversa. */
+export interface WaUltimoCanal {
+  canalId: string | null;
+  alias: string | null;
+  numero: string | null;
+  provider: string | null;
+  em: string | null;
 }
 
 export interface WaContact {
@@ -14,6 +27,15 @@ export interface WaContact {
   unread: number;
   tabs: string[];
   status: string;
+  /** id/cor do status configurável (conversa_status_def). */
+  statusId?: string | null;
+  statusCor?: string | null;
+  /** canal (id) da conversa, usado como padrão em "Responder por". */
+  canalId?: string | null;
+  /** id do contato (para abrir em Contatos e editar). */
+  contatoId?: string | null;
+  /** id do usuário responsável (contatos.responsavel_id). */
+  respId?: string | null;
   last: string;
   email: string;
   stage: string;
@@ -21,6 +43,7 @@ export interface WaContact {
   origin: string;
   tags: string[];
   lastInter: string;
+  ultimoCanal?: WaUltimoCanal | null;
   notes: string;
   doc: { name: string; meta: string } | null;
   msgs: WaMessage[];

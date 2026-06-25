@@ -130,6 +130,8 @@
 .kanban-page .lc-line.wa svg {color:var(--wa)}
 .kanban-page .lc-foot {display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);margin-top:9px}
 .kanban-page .lc-foot svg {width:14px;height:14px;flex:none}
+.kanban-page .lc-tags {display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.kanban-page .lc-tag {font-size:10.5px;font-weight:600;line-height:1.5;padding:1px 8px;border-radius:999px;border:1px solid;white-space:nowrap}
 .kanban-page .won {margin-left:auto;display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;color:var(--accent-ink);background:var(--accent-soft);padding:2px 8px;border-radius:6px}
 .kanban-page .won svg {width:12px;height:12px;color:var(--accent)}
 .kanban-page .add-lead {margin-top:2px;display:flex;align-items:center;justify-content:center;gap:7px;padding:11px;border-radius:10px;

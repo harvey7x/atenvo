@@ -1,7 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useToast } from '@/hooks/useToast';
 import { useTheme } from '@/hooks/useTheme';
+import { useOrg } from '@/context/OrgContext';
 import { useWaCanais, WA_REAL } from '@/data/whatsapp';
+import { useStatusDefs, useEtiquetas, useAtendimentoActions } from '@/data/atendimento';
+import { PALETA_CORES, podeGerenciarAtendimento, type StatusDef } from '@/types/atendimento';
 import './Configuracoes.css';
 
 const PAL = ['#5b6ee1', '#c2693a', '#7a5bb0', '#2f8f9d', '#b0566f', '#4a7a4a', '#9d7a2f', '#3d7ab0'];
@@ -26,6 +30,7 @@ const TABS = [
   { id: 'conta', label: 'Conta', ic: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg> },
   { id: 'equipe', label: 'Equipe', ic: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="8" r="3.2" /><path d="M2.5 20a6.5 6.5 0 0 1 13 0" /><path d="M16 4.2a3.2 3.2 0 0 1 0 6.3M21.5 20a6.5 6.5 0 0 0-4-6" /></svg> },
   { id: 'canais', label: 'Canais', ic: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.5 13.5a4.5 4.5 0 0 0 6.4 0l2.3-2.3a4.5 4.5 0 0 0-6.4-6.4L11.5 6M13.5 10.5a4.5 4.5 0 0 0-6.4 0l-2.3 2.3a4.5 4.5 0 0 0 6.4 6.4L12.5 18" /></svg> },
+  { id: 'atendimento', label: 'Atendimento', ic: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.6 13.4 13 21l-9-9V4h8z" /><circle cx="7.5" cy="7.5" r="1.2" /></svg> },
   { id: 'notif', label: 'Notificações', ic: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0" /></svg> },
   { id: 'prefs', label: 'Preferências', ic: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 6h16M4 12h16M4 18h16" /></svg> },
 ];
@@ -63,13 +68,21 @@ const MENU = ['Editar permissões', 'Reenviar convite', 'Remover acesso'];
 export function Configuracoes() {
   const { toast } = useToast();
   const { theme, setTheme } = useTheme();
+  const { currentOrg } = useOrg();
+  const podeGerenciar = podeGerenciarAtendimento(currentOrg.role);
   const waCanais = useWaCanais();
-  const [tab, setTab] = useState('conta');
+  const [searchParams] = useSearchParams();
+  const TAB_IDS = ['conta', 'equipe', 'canais', 'atendimento', 'notif', 'prefs'];
+  const initialTab = searchParams.get('tab');
+  const sectionParam = searchParams.get('section');
+  const [tab, setTab] = useState(initialTab && TAB_IDS.includes(initialTab) ? initialTab : 'conta');
   const [seg, setSeg] = useState<string>(theme);
   const [menu, setMenu] = useState<{ idx: number; left: number; top: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { setSeg(theme); }, [theme]);
+  // deep-link: ?tab=...&section=... seleciona a aba ao navegar (ex.: vindo do WhatsApp)
+  useEffect(() => { if (initialTab && TAB_IDS.includes(initialTab)) setTab(initialTab); }, [initialTab]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     function onDoc(e: MouseEvent) { if (menuRef.current?.contains(e.target as Node)) return; setMenu(null); }
     function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setMenu(null); }
@@ -193,6 +206,11 @@ export function Configuracoes() {
             </div>
           </section>
 
+          {/* ATENDIMENTO (status + etiquetas) */}
+          <section className={'tab-panel' + (tab === 'atendimento' ? ' on' : '')} data-panel="atendimento">
+            <AtendimentoPanel canManage={podeGerenciar} section={tab === 'atendimento' ? sectionParam : null} />
+          </section>
+
           {/* NOTIFICAÇÕES */}
           <section className={'tab-panel' + (tab === 'notif' ? ' on' : '')} data-panel="notif">
             <div className="set-card">
@@ -243,5 +261,220 @@ export function Configuracoes() {
         </div>
       )}
     </div>
+  );
+}
+
+/* ============================================================
+   Atendimento — administração de Status e Etiquetas
+   ============================================================ */
+const IcUp = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 15 6-6 6 6" /></svg>;
+const IcDown = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>;
+const IcTrash2 = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" /></svg>;
+const IcStar = () => <svg viewBox="0 0 24 24" fill="currentColor"><path d="m12 3 2.7 5.5 6 .9-4.3 4.2 1 6L12 17l-5.4 2.6 1-6L3.3 9.4l6-.9z" /></svg>;
+const IcPlus2 = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>;
+
+function AtendimentoPanel({ canManage, section }: { canManage: boolean; section: string | null }) {
+  const { toast } = useToast();
+  const statusQ = useStatusDefs();
+  const etqQ = useEtiquetas();
+  const a = useAtendimentoActions();
+  const statusCardRef = useRef<HTMLDivElement>(null);
+  const etqCardRef = useRef<HTMLDivElement>(null);
+  const [destaque, setDestaque] = useState<string | null>(null);
+
+  // deep-link: rolar e destacar a seção indicada (?section=status|etiquetas)
+  useEffect(() => {
+    if (!section) return;
+    const alvo = section === 'etiquetas' ? etqCardRef.current : statusCardRef.current;
+    if (!alvo) return;
+    const t = setTimeout(() => {
+      alvo.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setDestaque(section);
+      setTimeout(() => setDestaque(null), 2200);
+    }, 120);
+    return () => clearTimeout(t);
+  }, [section]);
+
+  const statuses = (statusQ.data ?? []).slice().sort((x, y) => x.ordem - y.ordem);
+  const etqs = (etqQ.data ?? []).slice().sort((x, y) => x.ordem - y.ordem);
+
+  const [nsName, setNsName] = useState('');
+  const [nsColor, setNsColor] = useState(PALETA_CORES[0]);
+  const [etName, setEtName] = useState('');
+  const [etColor, setEtColor] = useState(PALETA_CORES[1]);
+  const [etDesc, setEtDesc] = useState('');
+  const [del, setDel] = useState<{ s: StatusDef; count: number } | null>(null);
+  const [subId, setSubId] = useState('');
+
+  // seletor de cor (popover unico; preview imediato, persiste 1x ao confirmar)
+  const [picker, setPicker] = useState<{ kind: 'status' | 'etq'; id: string; orig: string; cor: string } | null>(null);
+  const [pickerPos, setPickerPos] = useState({ left: -9999, top: -9999 });
+  const pickerRect = useRef<DOMRect | null>(null);
+  const pickerRef = useRef<HTMLDivElement>(null);
+
+  async function run(p: Promise<void>, ok: string) { try { await p; toast(ok); } catch (e) { toast((e as Error).message || 'Falha na operação', 'warn'); } }
+
+  function persistirCor(kind: 'status' | 'etq', id: string, cor: string) {
+    run(kind === 'status' ? a.atualizarStatus(id, { cor }) : a.atualizarEtiqueta(id, { cor }), 'Cor atualizada');
+  }
+  function commitPending() {
+    if (picker && picker.cor.toLowerCase() !== picker.orig.toLowerCase()) persistirCor(picker.kind, picker.id, picker.cor);
+  }
+  function openPicker(kind: 'status' | 'etq', id: string, cor: string, rect: DOMRect) {
+    commitPending(); // confirma alteração pendente de outro picker (1 toast)
+    pickerRect.current = rect;
+    setPickerPos({ left: -9999, top: -9999 });
+    setPicker({ kind, id, orig: cor, cor });
+  }
+  function fecharPicker() { commitPending(); setPicker(null); }
+  function aplicarCorPaleta(c: string) {
+    if (!picker) return;
+    const { kind, id, orig } = picker;
+    setPicker(null);
+    if (c.toLowerCase() !== orig.toLowerCase()) persistirCor(kind, id, c);
+  }
+  const corDaRow = (kind: 'status' | 'etq', id: string, cor: string) => (picker && picker.kind === kind && picker.id === id ? picker.cor : cor);
+
+  useLayoutEffect(() => {
+    if (!picker || !pickerRef.current || !pickerRect.current) return;
+    const el = pickerRef.current; const pw = el.offsetWidth; const ph = el.offsetHeight; const r = pickerRect.current;
+    const left = Math.max(10, Math.min(r.left, window.innerWidth - pw - 10));
+    let top = r.bottom + 6; if (top + ph > window.innerHeight - 10) top = Math.max(10, r.top - ph - 6);
+    setPickerPos({ left, top });
+  }, [picker]);
+
+  useEffect(() => {
+    if (!picker) return;
+    function onDown(e: MouseEvent) {
+      const t = e.target as HTMLElement;
+      if (pickerRef.current?.contains(t)) return;
+      if (t.closest && t.closest('.atd-color-btn')) return; // o proprio botao trata
+      fecharPicker();
+    }
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') fecharPicker(); }
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+  }, [picker]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function moveStatus(idx: number, dir: -1 | 1) {
+    const arr = statuses.map((s) => s.id);
+    const j = idx + dir;
+    if (j < 0 || j >= arr.length) return;
+    [arr[idx], arr[j]] = [arr[j], arr[idx]];
+    run(a.reordenarStatus(arr), 'Ordem atualizada');
+  }
+  async function startDeleteStatus(s: StatusDef) {
+    try {
+      const count = await a.contarConversasComStatus(s.id);
+      if (count > 0) { setDel({ s, count }); setSubId(statuses.find((x) => x.id !== s.id && x.ativo)?.id ?? ''); }
+      else if (window.confirm(`Excluir o status "${s.nome}"?`)) run(a.excluirStatus(s.id, null), 'Status excluído');
+    } catch (e) { toast((e as Error).message, 'warn'); }
+  }
+  function confirmDeleteStatus() {
+    if (!del) return;
+    if (!subId) { toast('Escolha um status substituto.', 'warn'); return; }
+    const id = del.s.id; setDel(null);
+    run(a.excluirStatus(id, subId), 'Status excluído e conversas reatribuídas');
+  }
+
+  return (
+    <>
+      {/* ===== STATUS ===== */}
+      <div className={'set-card' + (destaque === 'status' ? ' atd-destaque' : '')} ref={statusCardRef}>
+        <div className="sc-head bordered"><h3>Status das conversas</h3><p>Estados configuráveis usados em Dados do cliente e nos filtros. {canManage ? 'Crie, renomeie, defina cor, ordene, marque padrão, desative ou exclua.' : 'Somente administradores e gestores podem editar.'}</p></div>
+
+        {statusQ.isLoading && <div className="chan-row"><div className="chan-txt"><div className="d">Carregando status…</div></div></div>}
+        {statuses.map((s, idx) => (
+          <div className="atd-row" key={s.id}>
+            <button type="button" className="atd-color-btn" style={{ background: corDaRow('status', s.id, s.cor) }} disabled={!canManage} title="Alterar cor" aria-label="Alterar cor" onClick={(e) => openPicker('status', s.id, s.cor, e.currentTarget.getBoundingClientRect())} />
+            <input className="atd-name" defaultValue={s.nome} disabled={!canManage}
+              onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+              onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== s.nome) run(a.atualizarStatus(s.id, { nome: v }), 'Status renomeado'); }} />
+            {s.sistema && <span className="atd-sys" title="Status de sistema">sistema</span>}
+            {s.padrao
+              ? <span className="badge ok"><span className="dot" />Padrão</span>
+              : canManage && <button className="atd-mini" title="Tornar padrão" onClick={() => run(a.definirStatusPadrao(s.id), '“' + s.nome + '” agora é o padrão')}><IcStar /></button>}
+            <div className="atd-actions">
+              <button className="atd-mini" title="Subir" disabled={!canManage || idx === 0} onClick={() => moveStatus(idx, -1)}><IcUp /></button>
+              <button className="atd-mini" title="Descer" disabled={!canManage || idx === statuses.length - 1} onClick={() => moveStatus(idx, 1)}><IcDown /></button>
+              <button className={'atd-toggle' + (s.ativo ? ' on' : '')} title={s.ativo ? 'Ativo' : 'Inativo'} disabled={!canManage} onClick={() => run(a.atualizarStatus(s.id, { ativo: !s.ativo }), s.ativo ? 'Status desativado' : 'Status ativado')}><span className="k" /></button>
+              <button className="atd-mini danger" title="Excluir" disabled={!canManage} onClick={() => startDeleteStatus(s)}><IcTrash2 /></button>
+            </div>
+          </div>
+        ))}
+
+        {del && (
+          <div className="atd-del">
+            <IcTrash2 /> O status <b>“{del.s.nome}”</b> está em uso por {del.count} conversa{del.count === 1 ? '' : 's'}. Escolha um substituto:
+            <select value={subId} onChange={(e) => setSubId(e.target.value)}>
+              <option value="">Selecione…</option>
+              {statuses.filter((x) => x.id !== del.s.id).map((x) => <option key={x.id} value={x.id}>{x.nome}</option>)}
+            </select>
+            <button className="btn-primary" onClick={confirmDeleteStatus}>Excluir e reatribuir</button>
+            <button className="btn-ghost" onClick={() => setDel(null)}>Cancelar</button>
+          </div>
+        )}
+
+        {canManage && (
+          <div className="atd-add">
+            <input type="color" className="atd-color" value={nsColor} onChange={(e) => setNsColor(e.target.value)} title="Cor" />
+            <input className="atd-name" placeholder="Novo status (ex.: Aguardando documento)" value={nsName} onChange={(e) => setNsName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && nsName.trim()) { run(a.criarStatus(nsName.trim(), nsColor), 'Status criado'); setNsName(''); } }} />
+            <button className="btn-primary" disabled={!nsName.trim()} onClick={() => { run(a.criarStatus(nsName.trim(), nsColor), 'Status criado'); setNsName(''); }}><IcPlus2 />Adicionar</button>
+          </div>
+        )}
+      </div>
+
+      {/* ===== ETIQUETAS ===== */}
+      <div className={'set-card' + (destaque === 'etiquetas' ? ' atd-destaque' : '')} ref={etqCardRef}>
+        <div className="sc-head bordered"><h3>Etiquetas</h3><p>Etiquetas coloridas aplicáveis a contatos, conversas e oportunidades. Não é possível duplicar o nome na organização.</p></div>
+
+        {etqQ.isLoading && <div className="chan-row"><div className="chan-txt"><div className="d">Carregando etiquetas…</div></div></div>}
+        {etqs.length === 0 && !etqQ.isLoading && <div className="chan-row"><div className="chan-txt"><div className="d">Nenhuma etiqueta ainda.</div></div></div>}
+        {etqs.map((e) => (
+          <div className="atd-row" key={e.id}>
+            <button type="button" className="atd-color-btn" style={{ background: corDaRow('etq', e.id, e.cor) }} disabled={!canManage} title="Alterar cor" aria-label="Alterar cor" onClick={(ev) => openPicker('etq', e.id, e.cor, ev.currentTarget.getBoundingClientRect())} />
+            <input className="atd-name" defaultValue={e.nome} disabled={!canManage}
+              onKeyDown={(ev) => { if (ev.key === 'Enter') (ev.target as HTMLInputElement).blur(); }}
+              onBlur={(ev) => { const v = ev.target.value.trim(); if (v && v !== e.nome) run(a.atualizarEtiqueta(e.id, { nome: v }), 'Etiqueta renomeada'); }} />
+            <input className="atd-desc" placeholder="Descrição (opcional)" defaultValue={e.descricao ?? ''} disabled={!canManage}
+              onBlur={(ev) => { const v = ev.target.value.trim(); if (v !== (e.descricao ?? '')) run(a.atualizarEtiqueta(e.id, { descricao: v || null }), 'Descrição atualizada'); }} />
+            <div className="atd-actions">
+              <button className={'atd-toggle' + (e.ativo ? ' on' : '')} title={e.ativo ? 'Ativa' : 'Inativa'} disabled={!canManage} onClick={() => run(a.atualizarEtiqueta(e.id, { ativo: !e.ativo }), e.ativo ? 'Etiqueta desativada' : 'Etiqueta ativada')}><span className="k" /></button>
+              <button className="atd-mini danger" title="Excluir" disabled={!canManage} onClick={() => { if (window.confirm(`Excluir a etiqueta "${e.nome}"?`)) run(a.excluirEtiqueta(e.id), 'Etiqueta excluída'); }}><IcTrash2 /></button>
+            </div>
+          </div>
+        ))}
+
+        {canManage && (
+          <div className="atd-add">
+            <input type="color" className="atd-color" value={etColor} onChange={(e) => setEtColor(e.target.value)} title="Cor" />
+            <input className="atd-name" placeholder="Nova etiqueta" value={etName} onChange={(e) => setEtName(e.target.value)} />
+            <input className="atd-desc" placeholder="Descrição (opcional)" value={etDesc} onChange={(e) => setEtDesc(e.target.value)} />
+            <button className="btn-primary" disabled={!etName.trim()} onClick={() => { run(a.criarEtiqueta(etName.trim(), etColor, etDesc.trim() || null), 'Etiqueta criada'); setEtName(''); setEtDesc(''); }}><IcPlus2 />Adicionar</button>
+          </div>
+        )}
+      </div>
+
+      {picker && (
+        <div ref={pickerRef} className="cor-pop" style={{ left: pickerPos.left, top: pickerPos.top }} role="dialog" aria-label="Selecionar cor">
+          <div className="cor-pop-head">Cor</div>
+          <div className="cor-swatches">
+            {PALETA_CORES.map((c) => (
+              <button key={c} type="button" className={'cor-sw' + (c.toLowerCase() === picker.cor.toLowerCase() ? ' sel' : '')} style={{ background: c }} title={c} aria-label={c} onClick={() => aplicarCorPaleta(c)} />
+            ))}
+          </div>
+          <div className="cor-custom">
+            <label className="cor-native" title="Cor personalizada">
+              <input type="color" value={picker.cor} onChange={(ev) => setPicker((p) => p && ({ ...p, cor: ev.target.value }))} />
+              <span className="cor-native-sw" style={{ background: picker.cor }} />
+              Personalizada
+            </label>
+            <span className="cor-hex">{picker.cor.toUpperCase()}</span>
+            <button type="button" className="cor-aplicar" onClick={fecharPicker}>Aplicar</button>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

@@ -1,9 +1,9 @@
 // evolution-manage — ações do conector de WhatsApp por QR Code.
 // action: create | qr | status | disconnect | remove
-// Gating em "create": assinatura ativa + vaga de WhatsApp + papel admin.
-import { corsHeaders, json } from '../_shared/cors.ts';
-import { adminClient, getUser, requireOrgAdmin } from '../_shared/client.ts';
-import { evolution, evolutionConfigured, extractQr } from '../_shared/evolution.ts';
+// v9: 'remove' agora é EXCLUSÃO LÓGICA (#5) — preserva canal/conversas/mensagens. Segredo do webhook via tabela.
+import { corsHeaders, json } from './cors.ts';
+import { adminClient, getUser, requireOrgAdmin } from './client.ts';
+import { evolution, evolutionConfigured, extractQr } from './evolution.ts';
 
 const QR_TTL = 60; // segundos para o contador de expiração na interface
 
@@ -30,7 +30,9 @@ Deno.serve(async (req) => {
     if (!guard.ok) return json({ error: guard.reason }, 403);
 
     const supaUrl = Deno.env.get('SUPABASE_URL')!;
-    const secret = Deno.env.get('EVOLUTION_WEBHOOK_SECRET') ?? '';
+    // Segredo SEMPRE da tabela webhook_config (fonte única de verdade). NUNCA do env: evita URL/segredo defasado.
+    const { data: wc } = await admin.from('webhook_config').select('secret').eq('chave', 'whatsapp').maybeSingle();
+    const secret = wc?.secret ?? '';
     const webhookUrl = `${supaUrl}/functions/v1/evolution-webhook?secret=${encodeURIComponent(secret)}`;
 
     // -------- CREATE: valida assinatura + vaga, cria canal (reserva vaga) e instância --------
@@ -39,12 +41,10 @@ Deno.serve(async (req) => {
       const fonteSlug: string = (body.fonte ?? 'outra').toString().trim();
       if (!alias) return json({ error: 'Informe o alias do canal.' }, 400);
 
-      // assinatura ativa?
       const { data: org } = await admin.from('organizacoes').select('assinatura_status').eq('id', orgId).single();
       if (!org || !['ativa', 'isenta'].includes(org.assinatura_status)) {
         return json({ error: 'Assinatura inativa. Assine o plano antes de conectar um WhatsApp.' }, 402);
       }
-      // vaga de WhatsApp disponível?
       const { data: lim } = await admin.from('organizacao_limites').select('limite_whatsapps').eq('organizacao_id', orgId).single();
       const { count: usados } = await admin.from('canais')
         .select('id', { count: 'exact', head: true })
@@ -53,7 +53,6 @@ Deno.serve(async (req) => {
         return json({ error: 'Limite de WhatsApp atingido. Contrate um WhatsApp adicional.' }, 409);
       }
 
-      // fonte de aquisição (lookup-or-create por org+slug)
       let fonteId: string | null = null;
       const { data: f } = await admin.from('fontes_aquisicao').select('id').eq('organizacao_id', orgId).eq('slug', fonteSlug).maybeSingle();
       if (f) fonteId = f.id;
@@ -63,7 +62,6 @@ Deno.serve(async (req) => {
         fonteId = nf?.id ?? null;
       }
 
-      // cria o canal (reserva a vaga; trigger checa_limite_canais valida no banco)
       const { data: canal, error: ec } = await admin.from('canais').insert({
         tipo: 'whatsapp', nome_interno: alias, organizacao_id: orgId,
         fonte_aquisicao_id: fonteId, provider: 'evolution', status_integracao: 'sincronizando', ativo: true,
@@ -79,18 +77,18 @@ Deno.serve(async (req) => {
 
       try {
         const created = await evolution.createInstance(instanceName, webhookUrl);
+        // garante o webhook ATUAL (URL/segredo da tabela), independente de variações do create inline
+        try { await evolution.setWebhook(instanceName, webhookUrl); } catch { /* tolerante */ }
         let qr = extractQr(created);
         if (!qr) { qr = extractQr(await evolution.connect(instanceName)); }
         return json({ canal_id: canal.id, instance: instanceName, qr_base64: qr, expires_in: QR_TTL });
       } catch (e) {
-        // rollback: libera a vaga
         await admin.from('integracoes').delete().eq('canal_id', canal.id);
         await admin.from('canais').delete().eq('id', canal.id);
         return json({ error: `Falha ao criar instância: ${(e as Error).message}` }, 502);
       }
     }
 
-    // demais ações operam sobre um canal existente da org
     const canalId: string = body.canal_id;
     if (!canalId) return json({ error: 'canal_id é obrigatório.' }, 400);
     const { data: canal } = await admin.from('canais')
@@ -99,6 +97,8 @@ Deno.serve(async (req) => {
     const instance = canal.instancia_externa as string;
 
     if (action === 'qr') {
+      // Toda RECONEXÃO re-aplica o webhook ATUAL (URL/segredo nunca defasados) antes de gerar o QR.
+      try { await evolution.setWebhook(instance, webhookUrl); } catch { /* tolerante */ }
       const qr = extractQr(await evolution.connect(instance));
       return json({ qr_base64: qr, expires_in: QR_TTL });
     }
@@ -107,7 +107,6 @@ Deno.serve(async (req) => {
       const st = await evolution.connectionState(instance);
       const state = st?.instance?.state ?? 'close';
       if (state === 'open') {
-        // descobre o número conectado
         let numero: string | null = null;
         try {
           const inst = await evolution.fetchInstance(instance) as unknown;
@@ -133,9 +132,11 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'remove') {
+      // #5 EXCLUSÃO LÓGICA: libera a sessão na Evolution, mas PRESERVA o canal e o vínculo de conversas/mensagens.
+      // canal vira 'removido' + ativo=false (libera a vaga do limite); nada de DELETE em canais/conversas/mensagens.
       try { await evolution.remove(instance); } catch { /* tolerante */ }
-      await admin.from('integracoes').delete().eq('canal_id', canalId);
-      await admin.from('canais').delete().eq('id', canalId); // libera a vaga
+      await admin.from('canais').update({ status_integracao: 'removido', ativo: false, conectado_em: null, ultima_sincronizacao: new Date().toISOString() }).eq('id', canalId);
+      await admin.from('integracoes').update({ status: 'desconectado' }).eq('canal_id', canalId);
       return json({ ok: true });
     }
 

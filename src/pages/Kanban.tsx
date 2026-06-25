@@ -1,5 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { WA_REAL } from '@/data/whatsapp';
+import { useEtiquetas } from '@/data/atendimento';
+import { corDaEtiqueta } from '@/types/atendimento';
 import { EmptyState } from '@/components/EmptyState';
 import { useToast } from '@/hooks/useToast';
 import { initials, avatarColor } from '@/lib/avatar';
@@ -8,7 +10,7 @@ import './Kanban.css';
 interface Stage { key: string; name: string; color: string; total: number; }
 interface Source { id: string; name: string; cls: string; dot: string; }
 interface Hist { ic: string; bg: string; title: string; date: string; detail: string; }
-interface Lead { id: string; name: string; source: string; chip: string; resp: string; ago: string; stage: string; created: string; lastAct: string; won?: boolean; history: Hist[]; }
+interface Lead { id: string; name: string; source: string; chip: string; resp: string; ago: string; stage: string; created: string; lastAct: string; won?: boolean; etiquetas?: string[]; history: Hist[]; }
 
 const STAGE_PALETTE = ['#3b82f6', '#19C37D', '#f59e0b', '#8b5cf6', '#0891b2', '#e11d48', '#7c3aed', '#0e9d63', '#d97706', '#64748b'];
 const SRC_EXTRA = [{ cls: 'src-c1', dot: '#2563eb' }, { cls: 'src-c2', dot: '#d97706' }, { cls: 'src-c3', dot: '#0891b2' }, { cls: 'src-c4', dot: '#be185d' }];
@@ -66,10 +68,10 @@ function genHistory(l: Omit<Lead, 'history'>): Hist[] {
   ];
 }
 const RAW_LEADS: Omit<Lead, 'history'>[] = [
-  { id: 'l1', name: 'Antônio César', source: 'Sistema URA', chip: '(11) 97777-9012', resp: 'Henrique', ago: 'Há 5 min', stage: 'novo', created: 'Hoje, 09:21', lastAct: 'Hoje, 09:21' },
+  { id: 'l1', name: 'Antônio César', source: 'Sistema URA', chip: '(11) 97777-9012', resp: 'Henrique', ago: 'Há 5 min', stage: 'novo', created: 'Hoje, 09:21', lastAct: 'Hoje, 09:21', etiquetas: ['Revisão de contrato', 'Juros abusivos'] },
   { id: 'l2', name: 'Paula Ferreira', source: 'Tráfego 1', chip: '(11) 96666-1122', resp: 'Marina Lopes', ago: 'Há 12 min', stage: 'novo', created: 'Hoje, 09:14', lastAct: 'Hoje, 09:18' },
   { id: 'l3', name: 'Bruno Lima', source: 'Tráfego 2', chip: '(11) 95555-3344', resp: 'Carlos Eduardo', ago: 'Há 18 min', stage: 'novo', created: 'Hoje, 09:08', lastAct: 'Hoje, 09:12' },
-  { id: 'l4', name: 'Marina Lopes', source: 'Tráfego 2', chip: '(11) 98888-4455', resp: 'Marina Lopes', ago: 'Há 25 min', stage: 'processo', created: 'Hoje, 08:55', lastAct: 'Hoje, 09:01' },
+  { id: 'l4', name: 'Marina Lopes', source: 'Tráfego 2', chip: '(11) 98888-4455', resp: 'Marina Lopes', ago: 'Há 25 min', stage: 'processo', created: 'Hoje, 08:55', lastAct: 'Hoje, 09:01', etiquetas: ['Documentação'] },
   { id: 'l5', name: 'Juliana M.', source: 'Sistema URA', chip: '(11) 97777-2288', resp: 'Henrique', ago: 'Há 32 min', stage: 'processo', created: 'Hoje, 08:48', lastAct: 'Hoje, 08:59' },
   { id: 'l6', name: 'Rafael Souza', source: 'Tráfego 1', chip: '(11) 94444-5566', resp: 'Paula Ferreira', ago: 'Há 45 min', stage: 'processo', created: 'Hoje, 08:35', lastAct: 'Hoje, 08:50' },
   { id: 'l7', name: 'Carlos Eduardo', source: 'Tráfego 1', chip: '(11) 93333-6677', resp: 'Carlos Eduardo', ago: 'Há 1 h', stage: 'contratacao', created: 'Hoje, 08:20', lastAct: 'Hoje, 08:45' },
@@ -96,6 +98,7 @@ let stageSeq = 0, leadSeq = 20;
 
 export function Kanban() {
   const { toast } = useToast();
+  const { data: etiquetas = [] } = useEtiquetas();
   const [stages, setStages] = useState<Stage[]>(INIT_STAGES);
   const [leads, setLeads] = useState<Lead[]>(INIT_LEADS);
   const [sources, setSources] = useState<Source[]>(INIT_SOURCES);
@@ -258,6 +261,9 @@ export function Kanban() {
                         <div className="lc-top"><Av n={l.name} /><div className="lc-id"><div className="lc-name">{l.name}</div><span className={'src-badge ' + srcCls(l.source)}>{l.source}</span></div></div>
                         <div className="lc-line wa">{IC.wa}Chip {l.chip}</div>
                         <div className="lc-line">{IC.user}{l.resp}</div>
+                        {l.etiquetas && l.etiquetas.length > 0 && (
+                          <div className="lc-tags">{l.etiquetas.map((t) => { const cor = corDaEtiqueta(t, etiquetas); return <span key={t} className="lc-tag" style={{ background: cor + '22', color: cor, borderColor: cor + '55' }}>{t}</span>; })}</div>
+                        )}
                         <div className="lc-foot">{IC.clock}{l.ago}{l.won && <span className="won">{IC.check}Ganho</span>}</div>
                       </div>
                     ))}
@@ -316,6 +322,9 @@ export function Kanban() {
             <div className="det-row"><span className="dk">{IC.chip}Chip de entrada</span><span className="dv">{current.chip}</span></div>
             <div className="det-row"><span className="dk">{IC.user}Responsável</span><span className="dv"><Av n={current.resp} cls="xs" />{current.resp}</span></div>
             <div className="det-row"><span className="dk">{IC.flag}Status atual</span><span className="dv"><span className="badge-soft" style={{ background: softColor(s.color), color: s.color }}>{s.name}</span></span></div>
+            {current.etiquetas && current.etiquetas.length > 0 && (
+              <div className="det-row"><span className="dk">{IC.tag}Etiquetas</span><span className="dv"><span className="lc-tags">{current.etiquetas.map((t) => { const cor = corDaEtiqueta(t, etiquetas); return <span key={t} className="lc-tag" style={{ background: cor + '22', color: cor, borderColor: cor + '55' }}>{t}</span>; })}</span></span></div>
+            )}
             <div className="det-row"><span className="dk">{IC.cal}Data de criação</span><span className="dv">{current.created}</span></div>
             <div className="det-row"><span className="dk">{IC.clock}Última atividade</span><span className="dv">{current.lastAct}</span></div>
             <div className="info-box">{IC.info}{current.source === 'Sistema URA' ? 'Este chip está mapeado e recebe leads automaticamente pelo Sistema URA.' : 'Lead captado por tráfego pago (' + current.source + ').'}</div>

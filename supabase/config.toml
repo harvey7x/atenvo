@@ -419,5 +419,19 @@ enabled = true
 [functions.evolution-webhook]
 verify_jwt = false
 
-# As demais (asaas-subscription, evolution-manage, evolution-send) exigem o
-# JWT do usuário (verify_jwt = true por padrão) — chamadas só pelo app logado.
+# evo-debug está DESATIVADA (responde 410); publicada sem JWT.
+[functions.evo-debug]
+verify_jwt = false
+
+# meta-webhook: webhook público do Facebook Messenger (a Meta não envia JWT do
+# Supabase; a autenticação é por verify_token no GET e assinatura HMAC no POST).
+[functions.meta-webhook]
+verify_jwt = false
+
+# meta-auth-callback: retorno do OAuth — a Meta redireciona o navegador SEM JWT.
+[functions.meta-auth-callback]
+verify_jwt = false
+
+# As demais (evolution-* e meta-auth-start, meta-pages, meta-manage,
+# meta-send-message) exigem o JWT do usuário (verify_jwt = true por padrão) —
+# chamadas só pelo app logado.
