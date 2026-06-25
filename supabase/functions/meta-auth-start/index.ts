@@ -39,7 +39,9 @@ Deno.serve(async (req) => {
   const { error } = await admin().from('meta_oauth_estados').insert({ state_hash: await sha256hex(state), organizacao_id: ctx.org, usuario_id: ctx.userId });
   if (error) return json({ error: 'estado' }, 500);
 
-  const scope = 'pages_show_list,pages_messaging,pages_manage_metadata';
+  // business_management: necessário para enumerar Páginas pertencentes a um Portfólio
+  // Empresarial (Business), que não aparecem em /me/accounts.
+  const scope = 'pages_show_list,pages_messaging,pages_manage_metadata,business_management';
   const u = new URL(`https://www.facebook.com/${GV()}/dialog/oauth`);
   u.searchParams.set('client_id', APP_ID);
   u.searchParams.set('redirect_uri', REDIRECT);

@@ -67,8 +67,9 @@ Deno.serve(async (req) => {
     const org = s.organizacao_id as string;
     const limpar = async () => { if (s.user_token_vault_id) await db.rpc('meta_delete_secret', { p_vault_id: s.user_token_vault_id }); await db.from('meta_sessao_continuacao').delete().eq('codigo_hash', await sha256hex(codigo)); };
 
-    const permitida = (s.paginas ?? []).some((p: any) => String(p.id) === String(pagina_id));
-    if (!permitida) { await limpar(); return json({ error: 'pagina_nao_permitida' }, 403); }
+    // Autorização real é validada adiante pela obtenção do page token (/{page}?fields=access_token):
+    // se o usuário não tiver acesso à Página, a Graph não devolve token e a conexão é recusada.
+    // Não dependemos da lista salva na sessão (Páginas de Business podem não constar nela).
 
     // cross-org: Página já vinculada a OUTRA organização?
     const { data: existente } = await db.from('meta_paginas').select('id,organizacao_id,canal_id').eq('pagina_id', String(pagina_id)).maybeSingle();
