@@ -85,10 +85,11 @@ export function useScriptMutations() {
   const inval = () => qc.invalidateQueries({ queryKey: ['scripts', currentOrg.id] });
   return {
     criar: useMutation({
-      mutationFn: async (s: { titulo: string; conteudo: string; canais: string[]; categoriaId?: string | null; descricao?: string | null }) => {
+      mutationFn: async (s: { titulo: string; conteudo: string; canais: string[]; categoriaId?: string | null; descricao?: string | null; tags?: string[]; favorito?: boolean; ativo?: boolean }) => {
         const { data, error } = await supabase!.from('scripts').insert({
           titulo: s.titulo.trim() || 'Novo script', conteudo: s.conteudo, canais_permitidos: s.canais,
-          categoria_id: s.categoriaId ?? null, descricao: s.descricao ?? null, autor_id: user?.id ?? null, organizacao_id: currentOrg.id,
+          categoria_id: s.categoriaId ?? null, descricao: s.descricao ?? null, tags: s.tags ?? [],
+          favorito: s.favorito ?? false, ativo: s.ativo ?? true, autor_id: user?.id ?? null, organizacao_id: currentOrg.id,
         }).select('id').single();
         if (error) throw new Error(error.message);
         return data as { id: string };

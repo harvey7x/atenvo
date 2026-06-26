@@ -70,6 +70,14 @@ export function Scripts() {
   const [confirmState, setConfirmState] = useState<{ title: string; message: string; run: () => Promise<void> } | null>(null);
   const [confirmLoading, setConfirmLoading] = useState(false);
 
+  // ---- Fluxo único de criação de script (modal) ----
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createSaving, setCreateSaving] = useState(false);
+  const [createErr, setCreateErr] = useState<Record<string, string>>({});
+  const [createFiles, setCreateFiles] = useState<File[]>([]);
+  const [createForm, setCreateForm] = useState({ titulo: '', descricao: '', conteudo: '', wa: true, fb: false, categoriaId: '', tags: '', favorito: false, ativo: true });
+  const createFileRef = useRef<HTMLInputElement>(null);
+
   function pedirConfirmacao(title: string, message: string, run: () => Promise<void>) { setConfirmState({ title, message, run }); }
   async function executarConfirm() {
     if (!confirmState) return;
@@ -109,7 +117,31 @@ export function Scripts() {
 
   const current = scripts.find((s) => s.id === currentId) ?? VAZIO;
 
-  function startNew() { setIsNew(true); setForm({ titulo: '', conteudo: '', wa: true, fb: false, categoriaId: cat !== 'all' ? cat : '' }); setEditorOpen(true); }
+  function openCreateScript(prefill?: { categoriaId?: string; canal?: CanalFiltro }) {
+    const canal = prefill?.canal;
+    const wa = canal === 'whatsapp' || canal === 'ambos' || canal === undefined || canal === 'todos';
+    const fb = canal === 'facebook' || canal === 'ambos';
+    setCreateForm({ titulo: '', descricao: '', conteudo: '', wa, fb, categoriaId: prefill?.categoriaId ?? '', tags: '', favorito: false, ativo: true });
+    setCreateFiles([]); setCreateErr({}); setCreateOpen(true);
+  }
+  async function salvarNovo() {
+    if (createSaving) return;
+    const canais: string[] = []; if (createForm.wa) canais.push('whatsapp'); if (createForm.fb) canais.push('facebook');
+    const errs: Record<string, string> = {};
+    if (!createForm.titulo.trim()) errs.titulo = 'Título é obrigatório.';
+    if (canais.length === 0) errs.canal = 'Selecione ao menos um canal.';
+    if (!createForm.conteudo.trim() && createFiles.length === 0) errs.conteudo = 'Informe o texto ou anexe uma mídia.';
+    if (Object.keys(errs).length) { setCreateErr(errs); return; }
+    setCreateSaving(true); setCreateErr({});
+    try {
+      const tags = createForm.tags.split(',').map((t) => t.trim()).filter(Boolean);
+      const r = await mut.criar.mutateAsync({ titulo: createForm.titulo, conteudo: createForm.conteudo, canais, categoriaId: createForm.categoriaId || null, descricao: createForm.descricao.trim() || null, tags, favorito: createForm.favorito, ativo: createForm.ativo });
+      for (const f of createFiles) { try { await anexoMut.upload.mutateAsync({ scriptId: r.id, file: f }); } catch { toast('Falha ao anexar ' + f.name, 'warn'); } }
+      setCreateOpen(false); setIsNew(false); setCurrentId(r.id); toast('Script criado');
+    } catch (e) { setCreateErr({ geral: (e as Error).message || 'Falha ao criar' }); }
+    finally { setCreateSaving(false); }
+  }
+  function prefillAtual() { return { categoriaId: cat !== 'all' ? cat : undefined, canal: canalFiltro }; }
   function loadScript(s: Script) {
     setIsNew(false); setCurrentId(s.id);
     setForm({ titulo: s.titulo, conteudo: s.conteudo, wa: s.canais.includes('whatsapp'), fb: s.canais.includes('facebook'), categoriaId: s.categoriaId ?? '' });
@@ -196,7 +228,7 @@ export function Scripts() {
         <div className="tb-left"><div className="page-title">Biblioteca de Scripts</div><div className="page-sub">Crie, organize e reutilize mensagens para padronizar o atendimento.</div></div>
         <div className="tb-right"><div className="tb-actions">
           <div className="search"><IcSearch /><input type="text" placeholder="Buscar scripts..." value={searchRaw} onChange={(e) => setSearchRaw(e.target.value)} /></div>
-          <button className="btn-new" onClick={startNew}><IcPlus />Novo script</button>
+          <button className="btn-new" onClick={() => openCreateScript(prefillAtual())}><IcPlus />Novo script</button>
         </div></div>
       </div>
 
@@ -227,7 +259,7 @@ export function Scripts() {
             {!scriptsQ.isLoading && !scriptsQ.isError && list.length === 0 && (
               <div style={{ padding: '28px 16px', textAlign: 'center', color: 'var(--muted)' }}>
                 <p style={{ margin: '0 0 12px' }}>{scripts.length === 0 ? 'Nenhum script ainda.' : 'Nenhum script neste filtro.'}</p>
-                <button className="btn-new" onClick={startNew}><IcPlus />{scripts.length === 0 ? 'Criar primeiro script' : 'Novo script'}</button>
+                <button className="btn-new" onClick={() => openCreateScript(prefillAtual())}><IcPlus />{scripts.length === 0 ? 'Criar primeiro script' : 'Novo script'}</button>
               </div>
             )}
             {list.map((s) => {
@@ -321,6 +353,72 @@ export function Scripts() {
             onKeyDown={(e) => { if (e.key === 'Enter') salvarCategoria(); }} />
           {catErr && <div className="atv-field-err">{catErr}</div>}
         </div>
+      </Modal>
+
+      <Modal open={createOpen} onClose={() => { if (!createSaving) setCreateOpen(false); }} title="Novo script" width={580}
+        footer={<>
+          <button className="atv-btn" disabled={createSaving} onClick={() => setCreateOpen(false)}>Cancelar</button>
+          <button className="atv-btn primary" disabled={createSaving} onClick={salvarNovo}>{createSaving ? 'Criando…' : 'Criar script'}</button>
+        </>}>
+        {createErr.geral && <div className="atv-field-err" style={{ marginBottom: 10 }}>{createErr.geral}</div>}
+        <div className="atv-field">
+          <label>Título *</label>
+          <input className="atv-input" value={createForm.titulo} onChange={(e) => setCreateForm((f) => ({ ...f, titulo: e.target.value }))} placeholder="Nome do script"
+            onKeyDown={(e) => { if (e.key === 'Enter') salvarNovo(); }} />
+          {createErr.titulo && <div className="atv-field-err">{createErr.titulo}</div>}
+        </div>
+        <div className="atv-field">
+          <label>Descrição</label>
+          <input className="atv-input" value={createForm.descricao} onChange={(e) => setCreateForm((f) => ({ ...f, descricao: e.target.value }))} placeholder="Opcional" />
+        </div>
+        <div className="atv-field">
+          <label>Categoria</label>
+          <select className="atv-select" value={createForm.categoriaId} onChange={(e) => setCreateForm((f) => ({ ...f, categoriaId: e.target.value }))}>
+            <option value="">Sem categoria</option>
+            {cats.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+          </select>
+        </div>
+        <div className="atv-field">
+          <label>Canal *</label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button type="button" className={'ed-chan-toggle wa' + (createForm.wa ? ' sel' : '')} onClick={() => setCreateForm((f) => ({ ...f, wa: !f.wa }))}><IcWa />WhatsApp</button>
+            <button type="button" className={'ed-chan-toggle fb' + (createForm.fb ? ' sel' : '')} onClick={() => setCreateForm((f) => ({ ...f, fb: !f.fb }))}><IcFb />Facebook</button>
+          </div>
+          {createErr.canal && <div className="atv-field-err">{createErr.canal}</div>}
+        </div>
+        <div className="atv-field">
+          <label>Texto</label>
+          <textarea className="atv-textarea" value={createForm.conteudo} onChange={(e) => setCreateForm((f) => ({ ...f, conteudo: e.target.value }))} placeholder="Mensagem. Use {{nome_cliente}}, {{seu_nome}}…" />
+          <div className="vars" style={{ marginTop: 6 }}>{SCRIPT_VARIAVEIS.map((v) => <button type="button" key={v} className="vchip" onClick={() => setCreateForm((f) => ({ ...f, conteudo: f.conteudo + v }))}>{v}</button>)}</div>
+          {createErr.conteudo && <div className="atv-field-err">{createErr.conteudo}</div>}
+        </div>
+        <div className="atv-field">
+          <label>Tags</label>
+          <input className="atv-input" value={createForm.tags} onChange={(e) => setCreateForm((f) => ({ ...f, tags: e.target.value }))} placeholder="Separadas por vírgula" />
+        </div>
+        <div className="atv-field" style={{ display: 'flex', gap: 18 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, margin: 0 }}><input type="checkbox" checked={createForm.favorito} onChange={(e) => setCreateForm((f) => ({ ...f, favorito: e.target.checked }))} />Favorito</label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, margin: 0 }}><input type="checkbox" checked={createForm.ativo} onChange={(e) => setCreateForm((f) => ({ ...f, ativo: e.target.checked }))} />Ativo</label>
+        </div>
+        <div className="atv-field">
+          <label>Anexos</label>
+          <input ref={createFileRef} type="file" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) setCreateFiles((p) => [...p, f]); if (createFileRef.current) createFileRef.current.value = ''; }} />
+          <button type="button" className="atv-btn" onClick={() => createFileRef.current?.click()}><IcPlus />Adicionar mídia</button>
+          <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {createFiles.map((f, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={f.name}>{f.name}</span>
+                <span style={{ color: 'var(--muted)' }}>{formatarTamanho(f.size)}</span>
+                <button type="button" className="atv-btn" title="Remover" onClick={() => setCreateFiles((p) => p.filter((_, j) => j !== i))}><IcTrash /></button>
+              </div>
+            ))}
+          </div>
+        </div>
+        {createForm.conteudo.includes('{{') && (
+          <div className="atv-field"><label>Pré-visualização</label>
+            <div className="sc-prev" style={{ whiteSpace: 'pre-wrap' }}>{substituirVariaveis(createForm.conteudo, { cliente: 'Maria Silva', atendente: 'Você', empresa: 'CAF', telefone: '(11) 99999-9999' })}</div>
+          </div>
+        )}
       </Modal>
 
       <ConfirmDialog open={!!confirmState} title={confirmState?.title ?? ''} message={confirmState?.message ?? ''}
