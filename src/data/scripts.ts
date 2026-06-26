@@ -348,15 +348,39 @@ export function useScriptEtapaCounts() {
   });
 }
 
-/** Registra a auditoria de um disparo de sequência (uma linha por execução). */
+/**
+ * Aguarda a CONFIRMAÇÃO REAL do provedor para uma mensagem já despachada.
+ * Resolve só quando o status sai de "pendente" para enviada/entregue/lida; rejeita em "falhou"
+ * (entrega recusada) ou se estourar o tempo sem confirmação. É isto que define sucesso de etapa
+ * — NUNCA o HTTP 200 da Edge Function (que só significa "requisição aceita").
+ */
+export async function aguardarConfirmacaoEnvio(mensagemId: string, opts: { timeoutMs?: number; intervalMs?: number } = {}): Promise<'enviada' | 'entregue' | 'lida'> {
+  const timeoutMs = opts.timeoutMs ?? 35000;
+  const intervalMs = opts.intervalMs ?? 1500;
+  const okSet = ['enviada', 'entregue', 'lida'];
+  const inicio = Date.now();
+  for (;;) {
+    const { data, error } = await supabase!.from('mensagens').select('status, erro_envio').eq('id', mensagemId).maybeSingle();
+    if (error) throw new Error(error.message);
+    const st = (data?.status ?? 'pendente') as string;
+    if (st === 'falhou') { const cod = (data?.erro_envio ?? '').toString().split(':')[0].trim(); throw new Error('O provedor recusou a entrega' + (cod ? ` (${cod})` : '') + '.'); }
+    if (okSet.includes(st)) return st as 'enviada' | 'entregue' | 'lida';
+    if (Date.now() - inicio > timeoutMs) throw new Error('Sem confirmação de envio do provedor a tempo.');
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+}
+
+/** Registra a auditoria de um disparo de sequência (uma linha por execução), com o RESULTADO REAL. */
 export function useRegistrarExecucaoScript() {
   const { currentOrg } = useOrg();
   return useMutation({
-    mutationFn: async (a: { scriptId: string; conversaId: string; canal: CanalScript; total: number; enviadas: number; falhas: number }) => {
-      const status = a.falhas === 0 ? 'concluida' : a.enviadas > 0 ? 'parcial' : 'falha';
+    mutationFn: async (a: { scriptId: string; conversaId: string; canal: CanalScript; total: number; enviadas: number; entregues: number; falhas: number; ultimaEtapaOk: number; erro?: string | null }) => {
+      const pendentes = Math.max(0, a.total - a.enviadas - a.falhas);
+      const status = (a.falhas === 0 && a.enviadas === a.total) ? 'concluida' : a.enviadas > 0 ? 'parcial' : 'falhou';
       const { error } = await supabase!.from('script_execucoes').insert({
         organizacao_id: currentOrg.id, script_id: a.scriptId, conversa_id: a.conversaId,
-        canal: a.canal, total_etapas: a.total, enviadas: a.enviadas, falhas: a.falhas, status,
+        canal: a.canal, total_etapas: a.total, enviadas: a.enviadas, entregues: a.entregues,
+        falhas: a.falhas, pendentes, ultima_etapa_ok: a.ultimaEtapaOk, erro: a.erro ?? null, status,
       });
       if (error) throw new Error(error.message);
     },

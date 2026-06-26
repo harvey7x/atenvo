@@ -5,7 +5,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useOrg } from '@/context/OrgContext';
 import { WA_CONTACTS, initials, avatarColor, type WaContact } from '@/data/whatsappDemo';
 import { useWaConversations, useSendWaMessage, useWaCanais, mascararNumero, WA_REAL } from '@/data/whatsapp';
-import { useScripts, useScriptEtapaCounts } from '@/data/scripts';
+import { useScripts, useScriptEtapaCounts, aguardarConfirmacaoEnvio } from '@/data/scripts';
 import { ScriptSequenceModal } from '@/components/ScriptSequenceModal';
 import { useStatusDefs, useEtiquetas, useAssinaturaPref, useAtendimentoActions, useOrgUsuarios, resolverNomeAssinatura } from '@/data/atendimento';
 import { corDaEtiqueta, podeGerenciarAtendimento, type AssinaturaModo } from '@/types/atendimento';
@@ -741,7 +741,8 @@ export function WhatsApp() {
         open={!!scriptSeq} onClose={() => setScriptSeq(null)} script={scriptSeq} canal="whatsapp"
         conversaId={currentId}
         ctx={{ cliente: current.name, atendente: user?.name, empresa: currentOrg.name, telefone: current.phone }}
-        enviarEtapa={async (texto) => { await sendMut.mutateAsync({ conversaId: currentId, text: texto, canalId: replyCanalId || current.canalId, assinaturaNome: assinaturaNome || undefined }); }}
+        enviarEtapa={async (texto) => await sendMut.mutateAsync({ conversaId: currentId, text: texto, canalId: replyCanalId || current.canalId, assinaturaNome: assinaturaNome || undefined }) ?? undefined}
+        confirmar={(mensagemId) => aguardarConfirmacaoEnvio(mensagemId)}
       />
     </div>
   );

@@ -147,13 +147,15 @@ export function useSendWaMessage() {
   return useMutation({
     // #4 assinatura aplicada no backend (evolution-send): passamos só o nome resolvido.
     // canalId = canal escolhido em "Responder por". O backend nunca confia em org vinda do cliente.
+    // Retorna o id INTERNO da mensagem (para confirmação real do provedor). NÃO é garantia de entrega.
     mutationFn: async (input: { conversaId: string; text: string; canalId?: string | null; assinaturaNome?: string }) => {
-      return invoke<{ ok: boolean }>('evolution-send', {
+      const r = await invoke<{ ok: boolean; mensagem?: { id?: string } }>('evolution-send', {
         conversa_id: input.conversaId,
         text: input.text,
         ...(input.canalId ? { canal_id: input.canalId } : {}),
         ...(input.assinaturaNome ? { assinatura_nome: input.assinaturaNome } : {}),
       });
+      return r.mensagem?.id ?? null;
     },
     onSettled: () => qc.invalidateQueries({ queryKey: ['wa-conversas', currentOrg.id] }),
   });

@@ -4,6 +4,7 @@ import { useToast } from '@/hooks/useToast';
 import { fetchEtapasTextoResolvidas, useRegistrarExecucaoScript, type VarCtx } from '@/data/scripts';
 
 type Status = 'pendente' | 'enviando' | 'ok' | 'falha';
+type Confirmado = 'enviada' | 'entregue' | 'lida';
 interface Item { posicao: number; texto: string; faltando: string[] }
 
 interface Props {
@@ -13,8 +14,10 @@ interface Props {
   canal: 'whatsapp' | 'facebook';
   ctx: VarCtx;
   conversaId: string;
-  /** Envia UMA etapa (texto) no canal. Deve resolver só após a confirmação do envio. */
-  enviarEtapa: (texto: string) => Promise<void>;
+  /** Despacha UMA etapa (texto). Deve retornar o id INTERNO da mensagem (para confirmação real). */
+  enviarEtapa: (texto: string) => Promise<string | void>;
+  /** Confirma a entrega REAL no provedor (status da mensagem). Sem isto, o sucesso seria só o HTTP 200. */
+  confirmar?: (mensagemId: string) => Promise<Confirmado>;
   onEnviado?: () => void;
 }
 
@@ -22,16 +25,21 @@ const temPendenciaTexto = (t: string) => /\{\{\s*\w+\s*\}\}/.test(t) || /\[[^\]]
 
 /**
  * Disparo de uma sequência de mensagens de TEXTO de um Script dentro de uma conversa.
- * Decisão de falha (documentada): o envio PARA na primeira etapa com erro, para preservar a
- * ordem; as etapas já confirmadas não são reenviadas no retry (apenas as restantes).
+ *
+ * CRITÉRIO DE SUCESSO (corrigido): uma etapa só é "enviada" quando o provedor CONFIRMA
+ * (status real da mensagem: enviada/entregue/lida). HTTP 200 da função, insert no banco,
+ * avanço do loop ou "3 de 3" NÃO contam como sucesso. Na primeira recusa, para imediatamente,
+ * marca só aquela como falha, mantém as demais pendentes e permite retry a partir dela.
  */
-export function ScriptSequenceModal({ open, onClose, script, canal, ctx, conversaId, enviarEtapa, onEnviado }: Props) {
+export function ScriptSequenceModal({ open, onClose, script, canal, ctx, conversaId, enviarEtapa, confirmar, onEnviado }: Props) {
   const { toast } = useToast();
   const registrar = useRegistrarExecucaoScript();
   const [carregando, setCarregando] = useState(false);
   const [erroLoad, setErroLoad] = useState<string | null>(null);
   const [itens, setItens] = useState<Item[]>([]);
   const [status, setStatus] = useState<Status[]>([]);
+  const [confirmados, setConfirmados] = useState<(Confirmado | null)[]>([]);
+  const [erros, setErros] = useState<(string | null)[]>([]);
   const [enviando, setEnviando] = useState(false);
   const [idxAtual, setIdxAtual] = useState(-1);
   const jaReg = useRef(false);
@@ -39,9 +47,9 @@ export function ScriptSequenceModal({ open, onClose, script, canal, ctx, convers
   useEffect(() => {
     if (!open || !script) return;
     let cancel = false;
-    setCarregando(true); setErroLoad(null); setItens([]); setStatus([]); setIdxAtual(-1); setEnviando(false); jaReg.current = false;
+    setCarregando(true); setErroLoad(null); setItens([]); setStatus([]); setConfirmados([]); setErros([]); setIdxAtual(-1); setEnviando(false); jaReg.current = false;
     fetchEtapasTextoResolvidas(script.id, ctx, script.conteudo || '')
-      .then((r) => { if (cancel) return; setItens(r.map((x) => ({ posicao: x.posicao, texto: x.texto, faltando: x.faltando }))); setStatus(r.map(() => 'pendente')); })
+      .then((r) => { if (cancel) return; setItens(r.map((x) => ({ posicao: x.posicao, texto: x.texto, faltando: x.faltando }))); setStatus(r.map(() => 'pendente')); setConfirmados(r.map(() => null)); setErros(r.map(() => null)); })
       .catch((e) => { if (!cancel) setErroLoad((e as Error).message || 'Falha ao carregar as mensagens'); })
       .finally(() => { if (!cancel) setCarregando(false); });
     return () => { cancel = true; };
@@ -50,47 +58,58 @@ export function ScriptSequenceModal({ open, onClose, script, canal, ctx, convers
 
   function editar(i: number, texto: string) { setItens((m) => m.map((x, j) => j === i ? { ...x, texto } : x)); }
 
-  function registrarExec(st: Status[]) {
+  function registrarExec(st: Status[], conf: (Confirmado | null)[], erroMsg: string | null) {
     if (jaReg.current || !script) return;
     const enviadas = st.filter((s) => s === 'ok').length;
     const falhas = st.filter((s) => s === 'falha').length;
-    if (enviadas === 0 && falhas === 0) return;
+    if (enviadas === 0 && falhas === 0) return; // nada saiu: nada a auditar
+    const entregues = conf.filter((c) => c === 'entregue' || c === 'lida').length;
+    let ultimaOk = 0; st.forEach((s, i) => { if (s === 'ok') ultimaOk = i + 1; });
     jaReg.current = true;
-    registrar.mutate({ scriptId: script.id, conversaId, canal, total: itens.length, enviadas, falhas });
+    registrar.mutate({ scriptId: script.id, conversaId, canal, total: itens.length, enviadas, entregues, falhas, ultimaEtapaOk: ultimaOk, erro: erroMsg });
   }
 
   async function enviarSequencia() {
     if (enviando || !script || !itens.length) return;       // impede clique duplo / execução dupla
     setEnviando(true);
     const st = [...status];
+    const conf = [...confirmados];
+    const er = [...erros];
     let parou = false;
     for (let i = 0; i < itens.length; i++) {
-      if (st[i] === 'ok') continue;                          // não reenvia etapas já confirmadas
+      if (st[i] === 'ok') continue;                          // retry: não reenvia etapas já confirmadas
       setIdxAtual(i);
       st[i] = 'enviando'; setStatus([...st]);
       try {
-        await enviarEtapa(itens[i].texto);
-        st[i] = 'ok'; setStatus([...st]);
-      } catch {
-        st[i] = 'falha'; setStatus([...st]);
-        parou = true; break;                                 // para no primeiro erro (preserva a ordem)
+        const ref = await enviarEtapa(itens[i].texto);        // HTTP 200 != sucesso
+        if (confirmar) {
+          if (!ref || typeof ref !== 'string') throw new Error('Envio sem identificador para confirmar no provedor.');
+          conf[i] = await confirmar(ref);                     // aguarda confirmação REAL; lança em falha/timeout
+        } else {
+          conf[i] = 'enviada';
+        }
+        st[i] = 'ok'; setConfirmados([...conf]); setStatus([...st]);
+      } catch (e) {
+        st[i] = 'falha'; er[i] = (e as Error).message || 'Falha no envio';
+        setErros([...er]); setStatus([...st]);
+        parou = true; break;                                  // para na 1ª recusa (preserva a ordem)
       }
     }
     setIdxAtual(-1); setEnviando(false);
     const enviadas = st.filter((s) => s === 'ok').length;
     if (!parou && enviadas === itens.length) {
-      registrarExec(st);
-      toast(`Sequência enviada: ${enviadas} ${enviadas === 1 ? 'mensagem' : 'mensagens'}`);
+      registrarExec(st, conf, null);
+      toast(`Sequência enviada e confirmada: ${enviadas} ${enviadas === 1 ? 'mensagem' : 'mensagens'}`);
       onEnviado?.();
       onClose();
     } else {
-      toast('Falha ao enviar uma etapa. Tente novamente as etapas restantes.', 'warn');
+      toast(`Falha na mensagem ${st.findIndex((s) => s === 'falha') + 1}. Corrija e tente novamente as etapas restantes.`, 'warn');
     }
   }
 
   function fechar() {
     if (enviando) return;                                    // não fecha durante o envio
-    registrarExec(status);                                   // registra parcial/falha se algo já saiu
+    registrarExec(status, confirmados, erros.find(Boolean) ?? null); // registra parcial/falhou se algo já saiu
     onClose();
   }
 
@@ -100,10 +119,11 @@ export function ScriptSequenceModal({ open, onClose, script, canal, ctx, convers
   const labelEnviar = enviando ? 'Enviando…' : todasOk ? 'Enviado' : algumaFalha ? `Tentar novamente (${restantes})` : `Enviar ${itens.length} ${itens.length === 1 ? 'mensagem' : 'mensagens'}`;
   const canalNome = canal === 'whatsapp' ? 'WhatsApp' : 'Messenger';
 
-  const chip = (s: Status) => {
-    const map: Record<Status, { t: string; c: string }> = {
-      pendente: { t: 'Pendente', c: 'var(--muted)' }, enviando: { t: 'Enviando…', c: 'var(--accent)' },
-      ok: { t: 'Enviada', c: '#19C37D' }, falha: { t: 'Falhou', c: 'var(--err)' },
+  const chip = (i: number) => {
+    const s = status[i] ?? 'pendente';
+    if (s === 'ok') { const c = confirmados[i]; const ent = c === 'entregue' || c === 'lida'; return <span style={{ fontSize: 12, fontWeight: 600, color: '#19C37D' }}>{ent ? 'Entregue' : 'Enviada ao provedor'}</span>; }
+    const map: Record<Exclude<Status, 'ok'>, { t: string; c: string }> = {
+      pendente: { t: 'Preparando', c: 'var(--muted)' }, enviando: { t: 'Enviando…', c: 'var(--accent)' }, falha: { t: 'Falhou', c: 'var(--err)' },
     };
     return <span style={{ fontSize: 12, fontWeight: 600, color: map[s].c }}>{map[s].t}</span>;
   };
@@ -130,15 +150,18 @@ export function ScriptSequenceModal({ open, onClose, script, canal, ctx, convers
         {itens.map((it, i) => {
           const falta = temPendenciaTexto(it.texto);
           return (
-            <div key={i} style={{ border: '1px solid var(--line-2)', borderRadius: 10, padding: 10, background: 'var(--surface)' }}>
+            <div key={i} style={{ border: '1px solid ' + (status[i] === 'falha' ? 'var(--err)' : 'var(--line-2)'), borderRadius: 10, padding: 10, background: 'var(--surface)' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                 <strong style={{ fontSize: 13 }}>Mensagem {it.posicao}</strong>
-                {chip(status[i] ?? 'pendente')}
+                {chip(i)}
               </div>
               {falta && it.faltando.length > 0 && (
                 <div style={{ fontSize: 12, color: 'var(--err)', marginBottom: 6 }}>
                   Dados ausentes: {it.faltando.join(', ')}. Edite a mensagem abaixo (apenas para este envio) ou cancele.
                 </div>
+              )}
+              {status[i] === 'falha' && erros[i] && (
+                <div style={{ fontSize: 12, color: 'var(--err)', marginBottom: 6 }}>Erro: {erros[i]}</div>
               )}
               <textarea className="atv-textarea" value={it.texto} disabled={enviando || status[i] === 'ok'}
                 style={falta ? { borderColor: 'var(--err)' } : undefined}

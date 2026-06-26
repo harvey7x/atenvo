@@ -88,6 +88,18 @@ Deno.serve(async (req) => {
     const idExterno = sent?.key?.id ?? null;
     const nowIso = new Date().toISOString();
 
+    // CRITÉRIO DE ACEITE: sem identificador externo válido, a Evolution NÃO aceitou o envio.
+    // Persistimos como FALHA e devolvemos erro — um corpo 2xx sem key.id não é sucesso.
+    if (!idExterno) {
+      await admin.from('mensagens').insert({
+        conversa_id, organizacao_id: conv.organizacao_id, direcao: 'saida', tipo: 'texto',
+        conteudo: corpoEnviado, texto_original: raw, assinatura_nome: assinatura || null, origem: 'atenvo',
+        autor_id: user.id, status: 'falhou', erro_envio: 'sem_id_externo',
+      });
+      console.log(`[send] corr=${corr} SEM id_externo -> falhou`);
+      return json({ error: 'A Evolution não confirmou o envio (sem identificador de mensagem).' }, 502);
+    }
+
     // PENDENTE: 201 != entrega. O webhook (messages.update) move p/ enviada/entregue/lida/falhou.
     const { data: msg } = await admin.from('mensagens').insert({
       conversa_id, organizacao_id: conv.organizacao_id, direcao: 'saida', tipo: 'texto',
