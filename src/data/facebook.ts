@@ -40,7 +40,7 @@ export function useFbStatus() {
 }
 
 /* ===================== Inbox (conversas do Facebook) ===================== */
-export interface FbMsg { dir: 'in' | 'out'; text: string; time: string; status?: string; origem?: string | null; }
+export interface FbMsg { dir: 'in' | 'out'; text: string; time: string; status?: string; origem?: string | null; id?: string; tipo?: string; anexoPath?: string | null; etapaId?: string | null; erro?: string | null; }
 export interface FbConv {
   id: string; name: string; email: string; notes: string;
   status: string; statusId: string | null; statusCor: string | null;
@@ -56,7 +56,7 @@ function hhmm(iso?: string | null): string {
 }
 const STATUS_LABEL: Record<string, string> = { aberta: 'Aberta', em_atendimento: 'Em atendimento', pendente: 'Pendente', resolvida: 'Resolvida', fechada: 'Fechada' };
 
-interface DbMsg { id: string; direcao: string; conteudo: string | null; enviada_em: string | null; recebida_em: string | null; criado_em: string | null; origem: string | null; status: string | null; }
+interface DbMsg { id: string; direcao: string; conteudo: string | null; enviada_em: string | null; recebida_em: string | null; criado_em: string | null; origem: string | null; status: string | null; tipo: string | null; erro_envio: string | null; metadados: { anexo_path?: string | null; etapa_id?: string | null } | null; }
 interface DbConv {
   id: string; status: string; status_id: string | null; nao_lidas: number | null; ultima_interacao_em: string | null; etiquetas: string[] | null;
   contatos: { id: string; nome: string; email: string | null; etiquetas: string[] | null; origem: string | null; observacoes: string | null; responsavel_id: string | null } | null;
@@ -67,9 +67,13 @@ function tsOf(m: DbMsg): number { return new Date(m.recebida_em || m.enviada_em 
 
 function mapConversa(c: DbConv): FbConv {
   const msgs: FbMsg[] = (c.mensagens ?? [])
-    .filter((m) => (m.conteudo ?? '').length > 0)
+    .filter((m) => (m.conteudo ?? '').length > 0 || !!m.metadados?.anexo_path)
     .sort((a, b) => tsOf(a) - tsOf(b))
-    .map((m) => ({ dir: m.direcao === 'saida' ? 'out' : 'in', text: m.conteudo ?? '', time: hhmm(m.recebida_em || m.enviada_em || m.criado_em), status: m.status ?? undefined, origem: m.origem }));
+    .map((m) => ({
+      dir: m.direcao === 'saida' ? 'out' : 'in', text: m.conteudo ?? '', time: hhmm(m.recebida_em || m.enviada_em || m.criado_em),
+      status: m.status ?? undefined, origem: m.origem, id: m.id, tipo: m.tipo ?? 'texto',
+      anexoPath: m.metadados?.anexo_path ?? null, etapaId: m.metadados?.etapa_id ?? null, erro: m.erro_envio ?? null,
+    }));
   const last = msgs[msgs.length - 1];
   return {
     id: c.id,
@@ -106,7 +110,7 @@ export function useFbConversations() {
     queryFn: async (): Promise<FbConv[]> => {
       const { data, error } = await supabase!
         .from('conversas')
-        .select('id, status, status_id, nao_lidas, ultima_interacao_em, etiquetas, contatos!inner(id, nome, email, etiquetas, origem, observacoes, responsavel_id), canais!conversas_canal_id_fkey!inner(id, nome_interno, tipo), mensagens(id, direcao, conteudo, enviada_em, recebida_em, criado_em, origem, status)')
+        .select('id, status, status_id, nao_lidas, ultima_interacao_em, etiquetas, contatos!inner(id, nome, email, etiquetas, origem, observacoes, responsavel_id), canais!conversas_canal_id_fkey!inner(id, nome_interno, tipo), mensagens(id, direcao, conteudo, enviada_em, recebida_em, criado_em, origem, status, tipo, erro_envio, metadados)')
         .eq('organizacao_id', orgId)
         .eq('canais.tipo', 'facebook')
         .order('ultima_interacao_em', { ascending: false });
@@ -133,6 +137,37 @@ export function useSendFbMessage() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: { conversaId: string; texto: string }) => invoke<{ ok: boolean; message_id: string }>('meta-send-message', { conversa_id: input.conversaId, texto: input.texto }),
+    onSettled: () => qc.invalidateQueries({ queryKey: ['fb-conversas', currentOrg.id] }),
+  });
+}
+
+const ERRO_MIDIA: Record<string, string> = {
+  anexo_invalido: 'Anexo inválido ou de outra organização.', tipo_incompativel: 'Tipo de arquivo não suportado no Messenger.',
+  arquivo_grande: 'Arquivo acima do limite (25 MB).', falha_url_assinada: 'Não foi possível gerar o link temporário do arquivo.',
+  sem_message_id: 'A Meta não retornou um identificador de mensagem.', token_invalido: 'Token da Página inválido. Reconecte em Integrações.',
+  canal_desconectado: 'Página desconectada.', pagina_desconectada: 'Página desconectada.', sem_psid: 'Contato sem PSID nesta Página.',
+};
+const traduzMidia = (e: string) => ERRO_MIDIA[e] ?? e;
+
+/** Envia uma etapa de IMAGEM (e legenda opcional) via meta-send-message. Lança em falha REAL. */
+export function useSendFbMedia() {
+  const { currentOrg } = useOrg();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { conversaId: string; etapaId: string; texto?: string }) => {
+      type Res = { ok?: boolean; error?: string; message_id?: string };
+      type Body = { ok?: boolean; error?: string; resultados?: { texto?: Res; anexo?: Res } };
+      const body: Record<string, unknown> = { conversa_id: input.conversaId, etapa_id: input.etapaId, ...(input.texto && input.texto.trim() ? { texto: input.texto } : {}) };
+      const { data, error } = await supabase!.functions.invoke('meta-send-message', { body });
+      let payload = data as Body | null;
+      // em não-2xx o corpo vem em error.context — lê para extrair o erro real do provedor
+      if (error) { try { payload = await (error as unknown as { context: Response }).context.json(); } catch { payload = null; } }
+      const anexo = payload?.resultados?.anexo;
+      if (!anexo?.ok) throw new Error(traduzMidia(anexo?.error || payload?.error || 'falha_envio_imagem'));
+      const cap = payload?.resultados?.texto;
+      if (input.texto && input.texto.trim() && cap && !cap.ok) throw new Error('Imagem enviada, mas a legenda falhou: ' + traduzMidia(cap.error || ''));
+      return { messageId: anexo.message_id };
+    },
     onSettled: () => qc.invalidateQueries({ queryKey: ['fb-conversas', currentOrg.id] }),
   });
 }

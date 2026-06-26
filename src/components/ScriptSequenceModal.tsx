@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { Modal } from '@/components/Modal';
 import { useToast } from '@/hooks/useToast';
-import { fetchEtapasTextoResolvidas, useRegistrarExecucaoScript, type VarCtx } from '@/data/scripts';
+import { fetchEtapasParaEnvio, urlAssinadaAnexo, formatarTamanho, useRegistrarExecucaoScript, type VarCtx, type EtapaTipo } from '@/data/scripts';
 
 type Status = 'pendente' | 'enviando' | 'ok' | 'falha';
 type Confirmado = 'enviada' | 'entregue' | 'lida';
-interface Item { posicao: number; texto: string; faltando: string[] }
+interface Item { posicao: number; tipo: EtapaTipo; texto: string; faltando: string[]; etapaId?: string; nome?: string | null; mime?: string | null; tamanho?: number | null; storagePath?: string | null; previewUrl?: string; removida?: boolean }
+export interface MidiaEtapa { etapaId: string; tipo: EtapaTipo; texto: string; nome?: string | null; mime?: string | null; tamanho?: number | null }
 
 interface Props {
   open: boolean;
@@ -14,24 +15,25 @@ interface Props {
   canal: 'whatsapp' | 'facebook';
   ctx: VarCtx;
   conversaId: string;
-  /** Despacha UMA etapa (texto). Deve retornar o id INTERNO da mensagem (para confirmação real). */
+  /** Despacha UMA etapa de TEXTO. Retorna o id INTERNO (para confirmação real, quando houver). */
   enviarEtapa: (texto: string) => Promise<string | void>;
-  /** Confirma a entrega REAL no provedor (status da mensagem). Sem isto, o sucesso seria só o HTTP 200. */
+  /** Confirma a entrega REAL (status da mensagem). WhatsApp usa; Facebook confirma de forma síncrona. */
   confirmar?: (mensagemId: string) => Promise<Confirmado>;
+  /** Despacha UMA etapa de MÍDIA (imagem). Deve lançar se o provedor não confirmar. */
+  enviarMidia?: (m: MidiaEtapa) => Promise<void>;
+  /** Inclui etapas de imagem na sequência (canal que suporta — Facebook). */
+  incluirMidia?: boolean;
   onEnviado?: () => void;
 }
 
 const temPendenciaTexto = (t: string) => /\{\{\s*\w+\s*\}\}/.test(t) || /\[[^\]]*não inform/i.test(t);
 
 /**
- * Disparo de uma sequência de mensagens de TEXTO de um Script dentro de uma conversa.
- *
- * CRITÉRIO DE SUCESSO (corrigido): uma etapa só é "enviada" quando o provedor CONFIRMA
- * (status real da mensagem: enviada/entregue/lida). HTTP 200 da função, insert no banco,
- * avanço do loop ou "3 de 3" NÃO contam como sucesso. Na primeira recusa, para imediatamente,
- * marca só aquela como falha, mantém as demais pendentes e permite retry a partir dela.
+ * Disparo de uma sequência (texto + imagem no Facebook) de um Script dentro de uma conversa.
+ * Sucesso de etapa = confirmação REAL do provedor (texto: status da mensagem; imagem: retorno
+ * válido da Send API). HTTP 200 / avanço do loop NÃO contam. Para na 1ª recusa; retry só do que faltou.
  */
-export function ScriptSequenceModal({ open, onClose, script, canal, ctx, conversaId, enviarEtapa, confirmar, onEnviado }: Props) {
+export function ScriptSequenceModal({ open, onClose, script, canal, ctx, conversaId, enviarEtapa, confirmar, enviarMidia, incluirMidia, onEnviado }: Props) {
   const { toast } = useToast();
   const registrar = useRegistrarExecucaoScript();
   const [carregando, setCarregando] = useState(false);
@@ -48,8 +50,14 @@ export function ScriptSequenceModal({ open, onClose, script, canal, ctx, convers
     if (!open || !script) return;
     let cancel = false;
     setCarregando(true); setErroLoad(null); setItens([]); setStatus([]); setConfirmados([]); setErros([]); setIdxAtual(-1); setEnviando(false); jaReg.current = false;
-    fetchEtapasTextoResolvidas(script.id, ctx, script.conteudo || '')
-      .then((r) => { if (cancel) return; setItens(r.map((x) => ({ posicao: x.posicao, texto: x.texto, faltando: x.faltando }))); setStatus(r.map(() => 'pendente')); setConfirmados(r.map(() => null)); setErros(r.map(() => null)); })
+    fetchEtapasParaEnvio(script.id, ctx, { incluirImagem: incluirMidia, fallbackConteudo: script.conteudo || '' })
+      .then(async (r) => {
+        if (cancel) return;
+        const its: Item[] = r.map((x) => ({ ...x }));
+        await Promise.all(its.map(async (it) => { if (it.tipo !== 'texto' && it.storagePath) { it.previewUrl = (await urlAssinadaAnexo(it.storagePath)) ?? undefined; } }));
+        if (cancel) return;
+        setItens(its); setStatus(its.map(() => 'pendente')); setConfirmados(its.map(() => null)); setErros(its.map(() => null));
+      })
       .catch((e) => { if (!cancel) setErroLoad((e as Error).message || 'Falha ao carregar as mensagens'); })
       .finally(() => { if (!cancel) setCarregando(false); });
     return () => { cancel = true; };
@@ -57,115 +65,132 @@ export function ScriptSequenceModal({ open, onClose, script, canal, ctx, convers
   }, [open, script?.id]);
 
   function editar(i: number, texto: string) { setItens((m) => m.map((x, j) => j === i ? { ...x, texto } : x)); }
+  function removerImagem(i: number) { setItens((m) => m.map((x, j) => j === i ? { ...x, removida: true } : x)); }
+  function restaurarImagem(i: number) { setItens((m) => m.map((x, j) => j === i ? { ...x, removida: false } : x)); }
 
-  function registrarExec(st: Status[], conf: (Confirmado | null)[], erroMsg: string | null) {
+  function registrarExec(st: Status[], conf: (Confirmado | null)[], its: Item[], erroMsg: string | null) {
     if (jaReg.current || !script) return;
-    const enviadas = st.filter((s) => s === 'ok').length;
-    const falhas = st.filter((s) => s === 'falha').length;
-    if (enviadas === 0 && falhas === 0) return; // nada saiu: nada a auditar
-    const entregues = conf.filter((c) => c === 'entregue' || c === 'lida').length;
-    let ultimaOk = 0; st.forEach((s, i) => { if (s === 'ok') ultimaOk = i + 1; });
+    const ativos = its.map((it, i) => ({ it, st: st[i], cf: conf[i] })).filter((x) => !x.it.removida);
+    const enviadas = ativos.filter((x) => x.st === 'ok').length;
+    const falhas = ativos.filter((x) => x.st === 'falha').length;
+    if (enviadas === 0 && falhas === 0) return;
+    const entregues = ativos.filter((x) => x.cf === 'entregue' || x.cf === 'lida').length;
+    let ultimaOk = 0; ativos.forEach((x, i) => { if (x.st === 'ok') ultimaOk = i + 1; });
     jaReg.current = true;
-    registrar.mutate({ scriptId: script.id, conversaId, canal, total: itens.length, enviadas, entregues, falhas, ultimaEtapaOk: ultimaOk, erro: erroMsg });
+    registrar.mutate({ scriptId: script.id, conversaId, canal, total: ativos.length, enviadas, entregues, falhas, ultimaEtapaOk: ultimaOk, erro: erroMsg });
   }
 
   async function enviarSequencia() {
-    if (enviando || !script || !itens.length) return;       // impede clique duplo / execução dupla
+    if (enviando || !script || !itens.length) return;
     setEnviando(true);
-    const st = [...status];
-    const conf = [...confirmados];
-    const er = [...erros];
+    const st = [...status]; const conf = [...confirmados]; const er = [...erros];
     let parou = false;
     for (let i = 0; i < itens.length; i++) {
-      if (st[i] === 'ok') continue;                          // retry: não reenvia etapas já confirmadas
+      const it = itens[i];
+      if (it.removida || st[i] === 'ok') continue;
       setIdxAtual(i);
       st[i] = 'enviando'; setStatus([...st]);
       try {
-        const ref = await enviarEtapa(itens[i].texto);        // HTTP 200 != sucesso
-        if (confirmar) {
-          if (!ref || typeof ref !== 'string') throw new Error('Envio sem identificador para confirmar no provedor.');
-          conf[i] = await confirmar(ref);                     // aguarda confirmação REAL; lança em falha/timeout
-        } else {
+        if (it.tipo === 'imagem') {
+          if (!enviarMidia || !it.etapaId) throw new Error('Envio de imagem indisponível neste canal.');
+          await enviarMidia({ etapaId: it.etapaId, tipo: it.tipo, texto: it.texto, nome: it.nome, mime: it.mime, tamanho: it.tamanho });
           conf[i] = 'enviada';
+        } else {
+          const ref = await enviarEtapa(it.texto);
+          if (confirmar) { if (!ref || typeof ref !== 'string') throw new Error('Envio sem identificador para confirmar.'); conf[i] = await confirmar(ref); }
+          else conf[i] = 'enviada';
         }
         st[i] = 'ok'; setConfirmados([...conf]); setStatus([...st]);
       } catch (e) {
-        st[i] = 'falha'; er[i] = (e as Error).message || 'Falha no envio';
-        setErros([...er]); setStatus([...st]);
-        parou = true; break;                                  // para na 1ª recusa (preserva a ordem)
+        st[i] = 'falha'; er[i] = (e as Error).message || 'Falha no envio'; setErros([...er]); setStatus([...st]);
+        parou = true; break;
       }
     }
     setIdxAtual(-1); setEnviando(false);
-    const enviadas = st.filter((s) => s === 'ok').length;
-    if (!parou && enviadas === itens.length) {
-      registrarExec(st, conf, null);
-      toast(`Sequência enviada e confirmada: ${enviadas} ${enviadas === 1 ? 'mensagem' : 'mensagens'}`);
-      onEnviado?.();
-      onClose();
+    const ativos = itens.map((it, i) => ({ it, st: st[i] })).filter((x) => !x.it.removida);
+    const enviadas = ativos.filter((x) => x.st === 'ok').length;
+    if (!parou && enviadas === ativos.length) {
+      registrarExec(st, conf, itens, null);
+      toast(`Sequência enviada: ${enviadas} ${enviadas === 1 ? 'mensagem' : 'mensagens'}`);
+      onEnviado?.(); onClose();
     } else {
-      toast(`Falha na mensagem ${st.findIndex((s) => s === 'falha') + 1}. Corrija e tente novamente as etapas restantes.`, 'warn');
+      toast('Falha em uma etapa. Corrija e tente novamente as restantes.', 'warn');
     }
   }
 
-  function fechar() {
-    if (enviando) return;                                    // não fecha durante o envio
-    registrarExec(status, confirmados, erros.find(Boolean) ?? null); // registra parcial/falhou se algo já saiu
-    onClose();
-  }
+  function fechar() { if (enviando) return; registrarExec(status, confirmados, itens, erros.find(Boolean) ?? null); onClose(); }
 
-  const todasOk = itens.length > 0 && status.every((s) => s === 'ok');
+  const ativos = itens.filter((it) => !it.removida);
+  const todasOk = ativos.length > 0 && itens.every((it, i) => it.removida || status[i] === 'ok');
   const algumaFalha = status.some((s) => s === 'falha');
-  const restantes = status.filter((s) => s !== 'ok').length;
-  const labelEnviar = enviando ? 'Enviando…' : todasOk ? 'Enviado' : algumaFalha ? `Tentar novamente (${restantes})` : `Enviar ${itens.length} ${itens.length === 1 ? 'mensagem' : 'mensagens'}`;
+  const restantes = itens.filter((it, i) => !it.removida && status[i] !== 'ok').length;
+  const bloqueioPendencia = !!incluirMidia && itens.some((it, i) => !it.removida && status[i] !== 'ok' && temPendenciaTexto(it.texto));
+  const labelEnviar = enviando ? 'Enviando…' : todasOk ? 'Enviado' : algumaFalha ? `Tentar novamente (${restantes})` : `Enviar ${ativos.length} ${ativos.length === 1 ? 'mensagem' : 'mensagens'}`;
   const canalNome = canal === 'whatsapp' ? 'WhatsApp' : 'Messenger';
 
   const chip = (i: number) => {
     const s = status[i] ?? 'pendente';
     if (s === 'ok') { const c = confirmados[i]; const ent = c === 'entregue' || c === 'lida'; return <span style={{ fontSize: 12, fontWeight: 600, color: '#19C37D' }}>{ent ? 'Entregue' : 'Enviada ao provedor'}</span>; }
-    const map: Record<Exclude<Status, 'ok'>, { t: string; c: string }> = {
-      pendente: { t: 'Preparando', c: 'var(--muted)' }, enviando: { t: 'Enviando…', c: 'var(--accent)' }, falha: { t: 'Falhou', c: 'var(--err)' },
-    };
+    const map: Record<Exclude<Status, 'ok'>, { t: string; c: string }> = { pendente: { t: 'Preparando', c: 'var(--muted)' }, enviando: { t: 'Enviando…', c: 'var(--accent)' }, falha: { t: 'Falhou', c: 'var(--err)' } };
     return <span style={{ fontSize: 12, fontWeight: 600, color: map[s].c }}>{map[s].t}</span>;
   };
 
   return (
     <Modal open={open} onClose={fechar} closeOnBackdrop={!enviando} width={560}
       title={<div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <span>Enviar script</span>
-        {script && <strong style={{ color: 'var(--ink)' }}>{script.titulo}</strong>}
+        <span>Enviar script</span>{script && <strong style={{ color: 'var(--ink)' }}>{script.titulo}</strong>}
         <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 999, background: 'var(--line-2)', color: 'var(--ink-2)' }}>{canalNome}</span>
       </div>}
       footer={<>
         <span style={{ marginRight: 'auto', fontSize: 13, color: 'var(--muted)' }}>
-          {enviando && idxAtual >= 0 ? `Enviando ${idxAtual + 1} de ${itens.length}` : (itens.length ? `${itens.length} ${itens.length === 1 ? 'mensagem' : 'mensagens'}` : '')}
+          {enviando && idxAtual >= 0 ? `Enviando ${idxAtual + 1} de ${ativos.length}` : (ativos.length ? `${ativos.length} ${ativos.length === 1 ? 'mensagem' : 'mensagens'}` : '')}
         </span>
         <button className="atv-btn" disabled={enviando} onClick={fechar}>{todasOk ? 'Fechar' : 'Cancelar'}</button>
-        <button className="atv-btn primary" disabled={enviando || carregando || !itens.length || todasOk} onClick={enviarSequencia}>{labelEnviar}</button>
+        <button className="atv-btn primary" disabled={enviando || carregando || !ativos.length || todasOk || bloqueioPendencia} onClick={enviarSequencia}>{labelEnviar}</button>
       </>}>
       {carregando && <div style={{ padding: 16, color: 'var(--muted)' }}>Carregando mensagens…</div>}
       {erroLoad && <div className="atv-field-err">{erroLoad}</div>}
-      {!carregando && !erroLoad && itens.length === 0 && <div style={{ padding: 16, color: 'var(--muted)' }}>Este script não tem mensagens de texto para enviar.</div>}
+      {!carregando && !erroLoad && ativos.length === 0 && <div style={{ padding: 16, color: 'var(--muted)' }}>Este script não tem mensagens para enviar.</div>}
+      {bloqueioPendencia && <div className="atv-field-err" style={{ marginBottom: 8 }}>Corrija ou remova os trechos com dados ausentes antes de enviar.</div>}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {itens.map((it, i) => {
           const falta = temPendenciaTexto(it.texto);
+          const borda = status[i] === 'falha' ? 'var(--err)' : 'var(--line-2)';
           return (
-            <div key={i} style={{ border: '1px solid ' + (status[i] === 'falha' ? 'var(--err)' : 'var(--line-2)'), borderRadius: 10, padding: 10, background: 'var(--surface)' }}>
+            <div key={i} style={{ border: '1px solid ' + borda, borderRadius: 10, padding: 10, background: 'var(--surface)', opacity: it.removida ? 0.6 : 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                <strong style={{ fontSize: 13 }}>Mensagem {it.posicao}</strong>
-                {chip(i)}
+                <strong style={{ fontSize: 13 }}>Mensagem {it.posicao}{it.tipo === 'imagem' ? ' · Imagem' : ''}</strong>
+                {it.removida ? <span style={{ fontSize: 12, color: 'var(--muted)' }}>Removida deste envio</span> : chip(i)}
               </div>
-              {falta && it.faltando.length > 0 && (
-                <div style={{ fontSize: 12, color: 'var(--err)', marginBottom: 6 }}>
-                  Dados ausentes: {it.faltando.join(', ')}. Edite a mensagem abaixo (apenas para este envio) ou cancele.
+
+              {it.tipo === 'imagem' && !it.removida && (
+                <div style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
+                  {it.previewUrl
+                    ? <img src={it.previewUrl} alt={it.nome ?? ''} style={{ width: 96, height: 96, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--line-2)' }} />
+                    : <div style={{ width: 96, height: 96, borderRadius: 8, border: '1px solid var(--line-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontSize: 11 }}>sem prévia</div>}
+                  <div style={{ flex: 1, minWidth: 0, fontSize: 12, color: 'var(--ink-2)' }}>
+                    <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.nome ?? 'imagem'}</div>
+                    <div style={{ color: 'var(--muted)' }}>{it.mime ?? 'image'}{it.tamanho ? ' · ' + formatarTamanho(it.tamanho) : ''}</div>
+                    <button type="button" className="atv-btn" style={{ marginTop: 6 }} disabled={enviando || status[i] === 'ok'} onClick={() => removerImagem(i)}>Remover imagem deste envio</button>
+                  </div>
                 </div>
               )}
-              {status[i] === 'falha' && erros[i] && (
-                <div style={{ fontSize: 12, color: 'var(--err)', marginBottom: 6 }}>Erro: {erros[i]}</div>
+              {it.tipo === 'imagem' && it.removida && (
+                <button type="button" className="atv-btn" style={{ marginBottom: 6 }} disabled={enviando} onClick={() => restaurarImagem(i)}>Restaurar imagem</button>
               )}
-              <textarea className="atv-textarea" value={it.texto} disabled={enviando || status[i] === 'ok'}
-                style={falta ? { borderColor: 'var(--err)' } : undefined}
-                onChange={(e) => editar(i, e.target.value)} />
+
+              {!it.removida && falta && it.faltando.length > 0 && (
+                <div style={{ fontSize: 12, color: 'var(--err)', marginBottom: 6 }}>Dados ausentes: {it.faltando.join(', ')}. Edite {it.tipo === 'imagem' ? 'a legenda' : 'a mensagem'} (apenas para este envio) ou remova.</div>
+              )}
+              {status[i] === 'falha' && erros[i] && <div style={{ fontSize: 12, color: 'var(--err)', marginBottom: 6 }}>Erro: {erros[i]}</div>}
+
+              {!it.removida && (
+                <textarea className="atv-textarea" value={it.texto} disabled={enviando || status[i] === 'ok'}
+                  placeholder={it.tipo === 'imagem' ? 'Legenda (opcional). Use {{nome_cliente}}…' : 'Mensagem'}
+                  style={falta ? { borderColor: 'var(--err)' } : undefined}
+                  onChange={(e) => editar(i, e.target.value)} />
+              )}
             </div>
           );
         })}

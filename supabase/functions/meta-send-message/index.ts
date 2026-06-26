@@ -21,9 +21,9 @@ Deno.serve(async (req) => {
   const uc = createClient(SUPABASE_URL, ANON, { global: { headers: { Authorization: auth } }, auth: { persistSession: false } });
   const { data: ud } = await uc.auth.getUser(); if (!ud.user) return json({ error: 'forbidden' }, 403);
 
-  const { conversa_id, texto, anexo_id } = await req.json().catch(() => ({}));
+  const { conversa_id, texto, anexo_id, etapa_id } = await req.json().catch(() => ({}));
   const temTexto = typeof texto === 'string' && texto.trim().length > 0;
-  if (!conversa_id || (!temTexto && !anexo_id)) return json({ error: 'parametros' }, 400);
+  if (!conversa_id || (!temTexto && !anexo_id && !etapa_id)) return json({ error: 'parametros' }, 400);
   const db = admin();
 
   const { data: conv } = await db.from('conversas').select('id,organizacao_id,canal_id,contato_id').eq('id', conversa_id).maybeSingle();
@@ -72,26 +72,32 @@ Deno.serve(async (req) => {
     }
   }
 
-  // ---- MÍDIA (anexo de script) ----
-  if (anexo_id) {
-    const { data: anexo } = await db.from('script_anexos').select('tipo,nome_arquivo,mime_type,tamanho_bytes,storage_path,organizacao_id').eq('id', anexo_id).maybeSingle();
-    if (!anexo || anexo.organizacao_id !== conv.organizacao_id) { resultados.anexo = { ok: false, error: 'anexo_invalido' }; return json({ ok: !!resultados.texto && (resultados.texto as { ok: boolean }).ok, resultados }, 200); }
-    const attachType = TIPO_ATTACH[anexo.tipo];
-    if (!attachType) { resultados.anexo = { ok: false, error: 'tipo_incompativel' }; }
-    else if ((anexo.tamanho_bytes ?? 0) > MAX_FB) { resultados.anexo = { ok: false, error: 'arquivo_grande', message: 'Acima de 25 MB para o Messenger.' }; }
+  // ---- MÍDIA (anexo de script OU etapa de script; mesmo bucket privado) ----
+  const midiaRef = anexo_id ? { tabela: 'script_anexos', id: anexo_id } : etapa_id ? { tabela: 'script_etapas', id: etapa_id } : null;
+  if (midiaRef) {
+    const { data: anexo } = await db.from(midiaRef.tabela).select('tipo,nome_arquivo,mime_type,tamanho_bytes,storage_path,organizacao_id').eq('id', midiaRef.id).maybeSingle();
+    // pertence à organização da conversa? (bloqueia anexo/etapa de outra org)
+    if (!anexo || anexo.organizacao_id !== conv.organizacao_id || !anexo.storage_path) { resultados.anexo = { ok: false, error: 'anexo_invalido' }; }
     else {
-      const clientReq = `req:${crypto.randomUUID()}`;
-      const { data: pend } = await db.from('mensagens').insert({ conversa_id: conv.id, organizacao_id: conv.organizacao_id, direcao: 'saida', tipo: anexo.tipo, conteudo: anexo.nome_arquivo ?? '[mídia]', autor_id: ud.user.id, status: 'pendente', origem: 'atenvo', client_request_id: clientReq, metadados: { anexo_path: anexo.storage_path }, enviada_em: new Date().toISOString() }).select('id').single();
-      try {
-        const sig = await db.storage.from('script-midia').createSignedUrl(anexo.storage_path, 600); // 10 min só p/ a Meta buscar
-        if (sig.error || !sig.data?.signedUrl) throw new Error('falha_url_assinada');
-        const r = await fetch(`${sendUrl}?access_token=${encodeURIComponent(pageToken)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ recipient: { id: ident.psid }, messaging_type: 'RESPONSE', message: { attachment: { type: attachType, payload: { url: sig.data.signedUrl, is_reusable: false } } } }) });
-        const j = await r.json(); if (!r.ok) throw new Error(j?.error?.message || `Graph ${r.status}`);
-        await persistirEReconciliar(anexo.tipo, anexo.nome_arquivo ?? '[mídia]', j.message_id, clientReq, { mid: j.message_id, anexo_path: anexo.storage_path });
-        resultados.anexo = { ok: true, message_id: j.message_id };
-      } catch (e) {
-        if (pend?.id) await db.from('mensagens').update({ status: 'falhou', erro_envio: String((e as Error).message).slice(0, 160) }).eq('id', pend.id);
-        resultados.anexo = { ok: false, error: String((e as Error).message).slice(0, 160) };
+      const attachType = TIPO_ATTACH[anexo.tipo];
+      if (!attachType) { resultados.anexo = { ok: false, error: 'tipo_incompativel' }; }
+      else if ((anexo.tamanho_bytes ?? 0) > MAX_FB) { resultados.anexo = { ok: false, error: 'arquivo_grande', message: 'Acima de 25 MB para o Messenger.' }; }
+      else {
+        const clientReq = `req:${crypto.randomUUID()}`;
+        const meta = { anexo_path: anexo.storage_path, etapa_id: etapa_id ?? null, anexo_id: anexo_id ?? null, mime: anexo.mime_type ?? null, tamanho: anexo.tamanho_bytes ?? null };
+        const { data: pend } = await db.from('mensagens').insert({ conversa_id: conv.id, organizacao_id: conv.organizacao_id, direcao: 'saida', tipo: anexo.tipo, conteudo: anexo.nome_arquivo ?? '[mídia]', autor_id: ud.user.id, status: 'pendente', origem: 'atenvo', client_request_id: clientReq, metadados: meta, enviada_em: new Date().toISOString() }).select('id').single();
+        try {
+          const sig = await db.storage.from('script-midia').createSignedUrl(anexo.storage_path, 600); // 10 min só p/ a Meta buscar
+          if (sig.error || !sig.data?.signedUrl) throw new Error('falha_url_assinada');
+          const r = await fetch(`${sendUrl}?access_token=${encodeURIComponent(pageToken)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ recipient: { id: ident.psid }, messaging_type: 'RESPONSE', message: { attachment: { type: attachType, payload: { url: sig.data.signedUrl, is_reusable: false } } } }) });
+          const j = await r.json(); if (!r.ok) throw new Error(j?.error?.message || `Graph ${r.status}`);
+          if (!j.message_id) throw new Error('sem_message_id'); // ID externo válido é obrigatório
+          await persistirEReconciliar(anexo.tipo, anexo.nome_arquivo ?? '[mídia]', j.message_id, clientReq, meta);
+          resultados.anexo = { ok: true, message_id: j.message_id };
+        } catch (e) {
+          if (pend?.id) await db.from('mensagens').update({ status: 'falhou', erro_envio: String((e as Error).message).slice(0, 160) }).eq('id', pend.id);
+          resultados.anexo = { ok: false, error: String((e as Error).message).slice(0, 160) };
+        }
       }
     }
   }

@@ -229,3 +229,13 @@
 .fb-app .hist-all{width:100%;margin-top:6px;height:40px;border-radius:10px;border:1px solid var(--line-2);background:var(--surface);color:var(--ink);font-size:13px;font-weight:500;cursor:pointer;transition:background .14s,border-color .14s;font-family:inherit}
 .fb-app .hist-all:hover{background:var(--hover);border-color:var(--green)}
 @media (max-width:1500px){ .fb-app .fb-tool span{display:none} .fb-app .fb-tool{padding:8px} }
+
+/* ===== Imagem no historico + lightbox (envio de etapa de imagem) ===== */
+.bubble-img{ padding:4px !important; background:transparent !important; border:0 !important; }
+.msg-img{ max-width:240px; max-height:240px; border-radius:10px; display:block; cursor:zoom-in; object-fit:cover; }
+.img-fallback{ width:200px; height:120px; display:flex; align-items:center; justify-content:center; background:var(--line-2); border-radius:10px; color:var(--muted); font-size:13px; }
+.img-falha{ display:flex; align-items:center; gap:6px; margin-top:4px; color:var(--err); font-size:12px; }
+.img-falha svg{ width:14px; height:14px; }
+.atv-lightbox{ position:fixed; inset:0; background:rgba(0,0,0,.82); display:flex; align-items:center; justify-content:center; z-index:1000; padding:24px; }
+.atv-lightbox img{ max-width:92vw; max-height:90vh; border-radius:8px; box-shadow:0 12px 48px rgba(0,0,0,.5); }
+.atv-lightbox-close{ position:fixed; top:14px; right:20px; background:none; border:0; color:#fff; font-size:34px; line-height:1; cursor:pointer; }

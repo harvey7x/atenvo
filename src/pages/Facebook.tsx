@@ -5,8 +5,8 @@ import { useAuth } from '@/context/AuthContext';
 import { useOrg } from '@/context/OrgContext';
 import { initials, avatarColor } from '@/lib/avatar';
 import { FB_CONTACTS, FB_QUICK, type FbContact } from '@/data/facebookDemo';
-import { FB_REAL, useFbConversations, useSendFbMessage, useFbStatus, type FbConv } from '@/data/facebook';
-import { useScripts, useScriptEtapaCounts } from '@/data/scripts';
+import { FB_REAL, useFbConversations, useSendFbMessage, useSendFbMedia, useFbStatus, type FbConv, type FbMsg } from '@/data/facebook';
+import { useScripts, useScriptEtapaCounts, urlAssinadaAnexo } from '@/data/scripts';
 import { ScriptSequenceModal } from '@/components/ScriptSequenceModal';
 import { useStatusDefs, useEtiquetas, useAtendimentoActions, useOrgUsuarios } from '@/data/atendimento';
 import { corDaEtiqueta } from '@/types/atendimento';
@@ -78,6 +78,7 @@ function FacebookInbox() {
   const [scriptSeq, setScriptSeq] = useState<{ id: string; titulo: string; conteudo: string } | null>(null);
   const live = useFbConversations();
   const sendMut = useSendFbMessage();
+  const sendMedia = useSendFbMedia();
   const fbStatus = useFbStatus();
   const statusQ = useStatusDefs();
   const etiquetasQ = useEtiquetas();
@@ -96,6 +97,8 @@ function FacebookInbox() {
   const [editForm, setEditForm] = useState({ nome: '', email: '', observacoes: '', respId: '' });
   const [saving, setSaving] = useState(false);
   const [editErr, setEditErr] = useState<string | null>(null);
+  const [imgUrls, setImgUrls] = useState<Record<string, string | null>>({}); // anexo_path -> URL assinada (null = quebrada)
+  const [lightbox, setLightbox] = useState<string | null>(null);
 
   const taRef = useRef<HTMLTextAreaElement>(null);
   const msgsRef = useRef<HTMLDivElement>(null);
@@ -137,6 +140,24 @@ function FacebookInbox() {
   const paginaAtual = useMemo(() => (fbStatus.data ?? []).find((p) => p.canal_id === current.canalId) ?? null, [fbStatus.data, current.canalId]);
   const canalConectado = !current.canalId || (paginaAtual ? paginaAtual.estado === 'conectado' : true);
   const algumaConectada = (fbStatus.data ?? []).some((p) => p.estado === 'conectado');
+
+  // URLs assinadas das imagens (sob demanda — nunca guardamos URL permanente). null = quebrada/expirada.
+  useEffect(() => {
+    const faltam = current.msgs.filter((m) => m.tipo === 'imagem' && m.anexoPath && !(m.anexoPath in imgUrls)).map((m) => m.anexoPath as string);
+    if (!faltam.length) return;
+    let vivo = true;
+    (async () => {
+      const ent = await Promise.all(faltam.map(async (p) => [p, (await urlAssinadaAnexo(p)) ?? null] as const));
+      if (vivo) setImgUrls((m) => { const n = { ...m }; for (const [p, u] of ent) n[p] = u; return n; });
+    })();
+    return () => { vivo = false; };
+  }, [current.msgs, imgUrls]);
+
+  async function retryImagem(m: FbMsg) {
+    if (!m.etapaId) { toast('Sem referência da imagem para reenviar.', 'warn'); return; }
+    try { await sendMedia.mutateAsync({ conversaId: current.id, etapaId: m.etapaId, texto: '' }); toast('Imagem reenviada'); }
+    catch (e) { toast((e as Error).message || 'Falha ao reenviar', 'warn'); }
+  }
 
   function selectContact(id: string) { setCurrentId(id); if (isMobile) setDataOpen(false); }
 
@@ -253,10 +274,22 @@ function FacebookInbox() {
         <div className="messages" ref={msgsRef}>
           {current.msgs.map((m, i) => {
             const ack = m.dir === 'out' ? ackFb(m.status) : null;
+            const ehImg = m.tipo === 'imagem' && !!m.anexoPath;
+            const falhou = m.status === 'falhou';
+            const url = ehImg ? imgUrls[m.anexoPath as string] : undefined;
             return (
               <div key={i} className={'msg ' + m.dir}>
-                <div className="bubble">{m.text}</div>
-                <span className="btime">{m.dir === 'out' && m.origem === 'pagina' && <span style={{ color: 'var(--muted)', marginRight: 6 }} title="Enviada pela Página (Business Suite)">via Página</span>}{m.time}{ack && <span className="tick" title={ack.title} style={{ color: ack.color, marginLeft: 4 }}>{ack.ticks}</span>}</span>
+                {ehImg ? (
+                  <div className="bubble bubble-img">
+                    {url ? <img src={url} alt="imagem" className="msg-img" onClick={() => setLightbox(url)} onError={() => setImgUrls((x) => ({ ...x, [m.anexoPath as string]: null }))} />
+                      : url === null ? <div className="img-fallback">Imagem indisponível</div>
+                        : <div className="img-fallback">Carregando…</div>}
+                    {falhou && <div className="img-falha"><IcWarn /><span>Falha no envio</span>{m.etapaId && <button className="link-btn" style={{ background: 'none', border: 0, color: '#5b7bd6', cursor: 'pointer', padding: 0 }} onClick={() => retryImagem(m)}>Tentar novamente</button>}</div>}
+                  </div>
+                ) : (
+                  <div className="bubble">{m.text}</div>
+                )}
+                <span className="btime">{m.dir === 'out' && m.origem === 'pagina' && <span style={{ color: 'var(--muted)', marginRight: 6 }} title="Enviada pela Página (Business Suite)">via Página</span>}{m.time}{ack && <span className="tick" title={ack.title} style={{ color: ack.color, marginLeft: 4 }}>{ack.ticks}</span>}{falhou && <span title={m.erro ?? 'Falhou'} style={{ color: 'var(--err)', marginLeft: 4, fontWeight: 700 }}>!</span>}</span>
               </div>
             );
           })}
@@ -390,10 +423,18 @@ function FacebookInbox() {
 
       <ScriptSequenceModal
         open={!!scriptSeq} onClose={() => setScriptSeq(null)} script={scriptSeq} canal="facebook"
-        conversaId={current.id}
+        conversaId={current.id} incluirMidia
         ctx={{ cliente: current.name, atendente: user?.name, empresa: currentOrg.name, telefone: '' }}
         enviarEtapa={async (texto) => { await sendMut.mutateAsync({ conversaId: current.id, texto }); }}
+        enviarMidia={async (m) => { await sendMedia.mutateAsync({ conversaId: current.id, etapaId: m.etapaId, texto: m.texto }); }}
       />
+
+      {lightbox && (
+        <div className="atv-lightbox" onClick={() => setLightbox(null)} role="dialog" aria-modal="true">
+          <button className="atv-lightbox-close" aria-label="Fechar" onClick={() => setLightbox(null)}>×</button>
+          <img src={lightbox} alt="imagem ampliada" onClick={(e) => e.stopPropagation()} onError={() => setLightbox(null)} />
+        </div>
+      )}
     </div>
   );
 }
