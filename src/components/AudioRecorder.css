@@ -1,0 +1,18 @@
+.rec-panel {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 6px 8px; border: 1px solid var(--line-2); border-radius: 10px;
+  background: var(--surface-2, var(--surface)); max-width: 100%;
+}
+.rec-info { font-size: 13px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+.rec-erro { font-size: 13px; color: var(--err); }
+.rec-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); flex: 0 0 auto; }
+.rec-dot.on { background: var(--err); animation: rec-pulse 1s infinite; }
+@keyframes rec-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+.rec-timer { font-variant-numeric: tabular-nums; font-size: 13px; color: var(--ink-2); min-width: 58px; }
+.rec-btn { border: 1px solid var(--line-2); background: var(--surface); color: var(--ink-2); border-radius: 8px; padding: 4px 10px; font-size: 13px; cursor: pointer; }
+.rec-btn:hover { color: var(--ink); }
+.rec-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.rec-btn.ghost { background: none; }
+.rec-preview { height: 34px; max-width: 220px; }
+.rec-spin { width: 13px; height: 13px; border: 2px solid var(--line-2); border-top-color: var(--accent); border-radius: 50%; display: inline-block; animation: rec-spin .7s linear infinite; }
+@keyframes rec-spin { to { transform: rotate(360deg); } }

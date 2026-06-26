@@ -5,9 +5,11 @@ import { useAuth } from '@/context/AuthContext';
 import { useOrg } from '@/context/OrgContext';
 import { initials, avatarColor } from '@/lib/avatar';
 import { FB_CONTACTS, FB_QUICK, type FbContact } from '@/data/facebookDemo';
-import { FB_REAL, useFbConversations, useSendFbMessage, useSendFbMedia, useFbStatus, type FbConv, type FbMsg } from '@/data/facebook';
+import { FB_REAL, useFbConversations, useSendFbMessage, useSendFbMedia, subirAudioGravado, useFbStatus, type FbConv, type FbMsg } from '@/data/facebook';
 import { useScripts, useScriptEtapaCounts, urlAssinadaAnexo } from '@/data/scripts';
 import { ScriptSequenceModal } from '@/components/ScriptSequenceModal';
+import { AudioMessage } from '@/components/AudioMessage';
+import { AudioRecorder } from '@/components/AudioRecorder';
 import { useStatusDefs, useEtiquetas, useAtendimentoActions, useOrgUsuarios } from '@/data/atendimento';
 import { corDaEtiqueta } from '@/types/atendimento';
 import './Facebook.css';
@@ -141,9 +143,9 @@ function FacebookInbox() {
   const canalConectado = !current.canalId || (paginaAtual ? paginaAtual.estado === 'conectado' : true);
   const algumaConectada = (fbStatus.data ?? []).some((p) => p.estado === 'conectado');
 
-  // URLs assinadas das mídias (sob demanda — nunca guardamos URL permanente). null = quebrada/expirada.
+  // URLs assinadas das IMAGENS (sob demanda — nunca guardamos URL permanente). Áudio resolve no próprio player.
   useEffect(() => {
-    const faltam = current.msgs.filter((m) => (m.tipo === 'imagem' || m.tipo === 'audio') && m.anexoPath && !(m.anexoPath in imgUrls)).map((m) => m.anexoPath as string);
+    const faltam = current.msgs.filter((m) => m.tipo === 'imagem' && m.anexoPath && !(m.anexoPath in imgUrls)).map((m) => m.anexoPath as string);
     if (!faltam.length) return;
     let vivo = true;
     (async () => {
@@ -154,9 +156,21 @@ function FacebookInbox() {
   }, [current.msgs, imgUrls]);
 
   async function retryMidia(m: FbMsg) {
-    if (!m.etapaId) { toast('Sem referência da mídia para reenviar.', 'warn'); return; }
-    try { await sendMedia.mutateAsync({ conversaId: current.id, etapaId: m.etapaId, texto: '' }); toast('Mídia reenviada'); }
-    catch (e) { toast((e as Error).message || 'Falha ao reenviar', 'warn'); }
+    try {
+      if (m.etapaId) await sendMedia.mutateAsync({ conversaId: current.id, etapaId: m.etapaId });
+      else if (m.tipo === 'audio' && m.anexoPath) await sendMedia.mutateAsync({ conversaId: current.id, audioPath: m.anexoPath, audioMime: 'audio/webm', audioNome: m.text });
+      else { toast('Sem referência da mídia para reenviar.', 'warn'); return; }
+      toast('Mídia reenviada');
+    } catch (e) { toast((e as Error).message || 'Falha ao reenviar', 'warn'); }
+  }
+
+  // Grava no microfone -> upload no bucket privado -> envio real (lança em falha; não confia só no HTTP 200).
+  async function enviarAudioGravado(blob: Blob, mime: string, ext: string) {
+    if (!current.id) throw new Error('Selecione uma conversa.');
+    if (!canalConectado) throw new Error('Página desconectada.');
+    if (blob.size > 25 * 1024 * 1024) throw new Error('Áudio acima de 25 MB.');
+    const up = await subirAudioGravado(currentOrg.id, blob, ext, mime);
+    await sendMedia.mutateAsync({ conversaId: current.id, audioPath: up.path, audioMime: mime, audioNome: up.nome, audioTamanho: up.tamanho });
   }
 
   function selectContact(id: string) { setCurrentId(id); if (isMobile) setDataOpen(false); }
@@ -277,7 +291,7 @@ function FacebookInbox() {
             const ehImg = m.tipo === 'imagem' && !!m.anexoPath;
             const ehAudio = m.tipo === 'audio' && !!m.anexoPath;
             const falhou = m.status === 'falhou';
-            const url = (ehImg || ehAudio) ? imgUrls[m.anexoPath as string] : undefined;
+            const url = ehImg ? imgUrls[m.anexoPath as string] : undefined;
             const falhaUI = falhou && <div className="img-falha"><IcWarn /><span>Falha no envio</span>{m.etapaId && <button className="link-btn" style={{ background: 'none', border: 0, color: '#5b7bd6', cursor: 'pointer', padding: 0 }} onClick={() => retryMidia(m)}>Tentar novamente</button>}</div>;
             return (
               <div key={i} className={'msg ' + m.dir}>
@@ -290,9 +304,7 @@ function FacebookInbox() {
                   </div>
                 ) : ehAudio ? (
                   <div className="bubble bubble-audio">
-                    {url ? <audio controls src={url} className="msg-audio" onError={() => setImgUrls((x) => ({ ...x, [m.anexoPath as string]: null }))} />
-                      : url === null ? <div className="img-fallback">Áudio indisponível</div>
-                        : <div className="img-fallback">Carregando…</div>}
+                    <AudioMessage path={m.anexoPath as string} nome={m.text} resolveUrl={(p) => urlAssinadaAnexo(p)} />
                     {falhaUI}
                   </div>
                 ) : (
@@ -337,6 +349,7 @@ function FacebookInbox() {
                   </div>
                 )}
               </span>
+              <AudioRecorder disabled={!current.id || !canalConectado} onEnviar={enviarAudioGravado} />
               <span className="spacer" />
               <button className="send-btn" aria-label="Enviar" disabled={draft.trim() === '' || !current.id || !canalConectado} onClick={sendMsg}><IcSend /></button>
             </div>

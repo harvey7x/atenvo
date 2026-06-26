@@ -149,15 +149,26 @@ const ERRO_MIDIA: Record<string, string> = {
 };
 const traduzMidia = (e: string) => ERRO_MIDIA[e] ?? e;
 
-/** Envia uma etapa de IMAGEM (e legenda opcional) via meta-send-message. Lança em falha REAL. */
+/** Sobe um áudio gravado no microfone para o bucket privado (sob o prefixo da org). */
+export async function subirAudioGravado(orgId: string, blob: Blob, ext: string, mime: string): Promise<{ path: string; nome: string; tamanho: number }> {
+  const nome = `gravacao-${Date.now()}.${ext}`;
+  const path = `${orgId}/inbox-audio/${crypto.randomUUID()}.${ext}`;
+  const up = await supabase!.storage.from('script-midia').upload(path, blob, { contentType: mime, upsert: false });
+  if (up.error) throw new Error(up.error.message);
+  return { path, nome, tamanho: blob.size };
+}
+
+/** Envia MÍDIA via meta-send-message: etapa de script (etapaId) OU áudio gravado (audioPath). Lança em falha REAL. */
 export function useSendFbMedia() {
   const { currentOrg } = useOrg();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { conversaId: string; etapaId: string; texto?: string }) => {
+    mutationFn: async (input: { conversaId: string; etapaId?: string; texto?: string; audioPath?: string; audioMime?: string; audioNome?: string; audioTamanho?: number }) => {
       type Res = { ok?: boolean; error?: string; message_id?: string };
       type Body = { ok?: boolean; error?: string; resultados?: { texto?: Res; anexo?: Res } };
-      const body: Record<string, unknown> = { conversa_id: input.conversaId, etapa_id: input.etapaId, ...(input.texto && input.texto.trim() ? { texto: input.texto } : {}) };
+      const body: Record<string, unknown> = { conversa_id: input.conversaId, ...(input.texto && input.texto.trim() ? { texto: input.texto } : {}) };
+      if (input.etapaId) body.etapa_id = input.etapaId;
+      if (input.audioPath) { body.audio_path = input.audioPath; body.audio_mime = input.audioMime; body.audio_nome = input.audioNome; body.audio_tamanho = input.audioTamanho; }
       const { data, error } = await supabase!.functions.invoke('meta-send-message', { body });
       let payload = data as Body | null;
       // em não-2xx o corpo vem em error.context — lê para extrair o erro real do provedor
