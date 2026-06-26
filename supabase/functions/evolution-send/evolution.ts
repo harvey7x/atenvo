@@ -21,4 +21,8 @@ export const evolution = {
   // Envio de mídia (imagem/vídeo/documento). `media` é uma URL temporária (a Evolution baixa o arquivo).
   sendMedia: (instanceName: string, number: string, mediatype: string, mimetype: string, media: string, fileName: string, caption?: string) =>
     call(`/message/sendMedia/${instanceName}`, 'POST', { number, mediatype, mimetype, media, fileName, ...(caption ? { caption } : {}) }) as Promise<{ key?: { id?: string } }>,
+  // Áudio como nota de voz (PTT). `encoding:true` faz a Evolution converter p/ ogg/opus (formato do WhatsApp).
+  // `audio` é uma URL temporária (a Evolution baixa o arquivo).
+  sendWhatsAppAudio: (instanceName: string, number: string, audio: string) =>
+    call(`/message/sendWhatsAppAudio/${instanceName}`, 'POST', { number, audio, encoding: true }) as Promise<{ key?: { id?: string } }>,
 };

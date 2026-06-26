@@ -7,12 +7,15 @@ interface Props {
   disabled?: boolean;
   /** Faz o upload + envio real. Deve lançar em falha (não considerar HTTP 200 isolado como sucesso). */
   onEnviar: (blob: Blob, mime: string, ext: string) => Promise<void>;
+  /** Habilita também a seleção de um arquivo de áudio existente (opt-in; off por padrão p/ não mudar quem já usa). */
+  permitirArquivo?: boolean;
 }
+const MAX_AUDIO = 16 * 1024 * 1024; // limite ~16MB (WhatsApp)
 
 // Preferimos AAC/MP4 (que o Messenger reproduz). webm/opus é fallback (a Meta aceita o arquivo,
 // porém NÃO reproduz no app — o áudio chega mudo). Só usamos o que o navegador suportar de fato.
 const CANDIDATOS = ['audio/mp4;codecs=mp4a.40.2', 'audio/mp4', 'audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus'];
-const EXT: Record<string, string> = { 'audio/mp4': 'm4a', 'audio/webm': 'webm', 'audio/ogg': 'ogg', 'audio/mpeg': 'mp3' };
+const EXT: Record<string, string> = { 'audio/mp4': 'm4a', 'audio/webm': 'webm', 'audio/ogg': 'ogg', 'audio/mpeg': 'mp3', 'audio/wav': 'wav', 'audio/x-wav': 'wav', 'audio/aac': 'aac' };
 function escolherMime(): string {
   const MR = (window as unknown as { MediaRecorder?: typeof MediaRecorder }).MediaRecorder;
   if (!MR) return '';
@@ -24,8 +27,9 @@ const mmss = (s: number) => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)
 const SINAL_MIN = 0.03; // pico normalizado mínimo p/ considerar que houve som
 
 const IcMic = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>;
+const IcClip = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5 12.5 20a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4l7.8-7.8" /></svg>;
 
-export function AudioRecorder({ disabled, onEnviar }: Props) {
+export function AudioRecorder({ disabled, onEnviar, permitirArquivo }: Props) {
   const [estado, setEstado] = useState<Estado>('idle');
   const [seg, setSeg] = useState(0);
   const [erro, setErro] = useState<string | null>(null);
@@ -48,6 +52,7 @@ export function AudioRecorder({ disabled, onEnviar }: Props) {
   const maxNivelRef = useRef(0);
   const barRef = useRef<HTMLDivElement>(null);
   const enviandoRef = useRef(false); // trava clique-duplo no envio
+  const fileRef = useRef<HTMLInputElement>(null); // seleção de arquivo de áudio existente
 
   function pararTimer() { if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; } }
   function pararMedidor() {
@@ -190,6 +195,19 @@ export function AudioRecorder({ disabled, onEnviar }: Props) {
     } finally { enviandoRef.current = false; }
   }
 
+  // seleção de arquivo de áudio existente (opt-in). Não aplica a trava de silêncio do microfone.
+  function escolherArquivo(f?: File | null) {
+    if (!f) return;
+    setErro(null);
+    if (!f.type.startsWith('audio/')) { setEstado('error'); setErro('Selecione um arquivo de áudio.'); return; }
+    if (f.size > MAX_AUDIO) { setEstado('error'); setErro('Áudio acima de 16 MB.'); return; }
+    pararMedidor(); pararTracks(); pararTimer();
+    blobRef.current = f; mimeRef.current = baseMime(f.type);
+    limparPreview(); setPreviewUrl(URL.createObjectURL(f));
+    setInfo({ mime: baseMime(f.type), size: f.size, dur: 0, sinal: true, verificando: false });
+    setEstado('preview');
+  }
+
   const nomeMic = (devices.find((d) => d.deviceId === deviceId)?.label || devices[0]?.label || '').slice(0, 30);
   const semSinalVivo = (estado === 'recording' || estado === 'paused') && seg >= 2 && picoVivo < 0.02;
   const seletorMic = devices.length > 1 && (
@@ -199,7 +217,17 @@ export function AudioRecorder({ disabled, onEnviar }: Props) {
   );
 
   if (estado === 'idle') {
-    return <button type="button" className="fb-tool" disabled={disabled} title="Gravar áudio" onClick={() => iniciar()}><IcMic /><span>Áudio</span></button>;
+    return (
+      <>
+        <button type="button" className="fb-tool" disabled={disabled} title="Gravar áudio" onClick={() => iniciar()}><IcMic /><span>Áudio</span></button>
+        {permitirArquivo && (
+          <>
+            <input ref={fileRef} type="file" accept="audio/*" style={{ display: 'none' }} onChange={(e) => { escolherArquivo(e.target.files?.[0]); if (e.target) e.target.value = ''; }} />
+            <button type="button" className="fb-tool" disabled={disabled} title="Selecionar arquivo de áudio" onClick={() => fileRef.current?.click()}><IcClip /><span>Arquivo</span></button>
+          </>
+        )}
+      </>
+    );
   }
 
   return (

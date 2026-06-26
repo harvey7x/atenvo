@@ -1,4 +1,6 @@
-// evolution-send — envia texto/IMAGEM e persiste a saída.
+// evolution-send — envia texto/IMAGEM/ÁUDIO e persiste a saída.
+// v15: ÁUDIO como nota de voz via /message/sendWhatsAppAudio (encoding->ogg/opus). Mesma base de
+//      isolamento por org + URL assinada curta + exige key.id + retry reaproveita o arquivo.
 // v14: IMAGEM via /message/sendMedia (URL assinada curta, isolada por org, exige key.id;
 //      retry reaproveita o arquivo da mensagem original). Demais mídias virão nas próximas etapas.
 // v13: status 'enviada' ao obter key.id (provedor aceitou ✓); webhook avança p/ entregue/lida.
@@ -87,42 +89,48 @@ Deno.serve(async (req) => {
     } catch { /* fail-open: usa base */ }
     console.log(`[send] corr=${corr} para=${base.slice(0, 6)} alvo=${alvo.slice(0, 6)}`);
 
-    // ===== MÍDIA (nesta etapa: IMAGEM). Retry herda o tipo/arquivo da mensagem original. =====
+    // ===== MÍDIA (nesta etapa: IMAGEM e ÁUDIO). Retry herda o tipo/arquivo da mensagem original. =====
     const ehMidiaRetry = !!retryMsg && !!retryMsg.tipo && retryMsg.tipo !== 'texto';
     if (midia_path || ehMidiaRetry) {
+      const TIPOS_OK = ['imagem', 'audio'];
       const meta = (retryMsg?.metadados ?? {}) as Record<string, unknown>;
       const path = (midia_path as string) || (meta.anexo_path as string) || '';
-      const tipo = ehMidiaRetry ? String(retryMsg!.tipo) : (midia_tipo === 'imagem' ? 'imagem' : '');
+      const tipo = ehMidiaRetry ? String(retryMsg!.tipo) : (TIPOS_OK.includes(midia_tipo) ? midia_tipo : '');
       const mime = (midia_mime as string) || (meta.mime as string) || '';
-      const nome = (midia_nome as string) || (meta.nome as string) || 'imagem';
+      const nome = (midia_nome as string) || (meta.nome as string) || (tipo === 'audio' ? 'audio' : 'imagem');
       const tamanho = (midia_tamanho as number) ?? (meta.tamanho as number) ?? null;
-      const caption = temTexto ? text.toString() : (retryMsg ? (retryMsg.conteudo ?? '') : '');
+      // áudio é nota de voz (PTT) — sem legenda. Demais mídias podem ter legenda.
+      const caption = tipo === 'audio' ? '' : (temTexto ? text.toString() : (retryMsg ? (retryMsg.conteudo ?? '') : ''));
       const nowIso = new Date().toISOString();
 
-      // nesta etapa SÓ imagem
-      if (tipo !== 'imagem') return json({ error: 'Tipo de mídia ainda não suportado (apenas imagem).' }, 422);
+      // nesta etapa: imagem e áudio (documento/vídeo virão depois)
+      if (!TIPOS_OK.includes(tipo)) return json({ error: 'Tipo de mídia ainda não suportado (apenas imagem e áudio).' }, 422);
       // ISOLAMENTO por organização: o caminho do arquivo precisa começar pelo id da org da conversa.
       if (!path || !path.startsWith(conv.organizacao_id + '/')) return json({ error: 'Arquivo de mídia inválido.' }, 422);
-      // família MIME compatível com imagem
-      if (!mime.startsWith('image/')) return json({ error: 'mime_incompativel' }, 422);
-      // limite de tamanho (imagem WhatsApp ~16MB)
-      if (tamanho && tamanho > 16 * 1024 * 1024) return json({ error: 'Imagem acima do limite (16MB).' }, 422);
+      // família MIME compatível com o tipo
+      const familia = tipo === 'audio' ? 'audio/' : 'image/';
+      if (!mime.startsWith(familia)) return json({ error: 'mime_incompativel' }, 422);
+      // limite de tamanho (~16MB)
+      if (tamanho && tamanho > 16 * 1024 * 1024) return json({ error: 'Arquivo acima do limite (16MB).' }, 422);
 
       // URL assinada CURTA (600s) — a Evolution baixa o arquivo; NUNCA persistimos a URL.
       const { data: signed, error: se } = await admin.storage.from('script-midia').createSignedUrl(path, 600);
       if (se || !signed?.signedUrl) return json({ error: 'Falha ao preparar a mídia.' }, 500);
 
       let sent: { key?: { id?: string } };
-      try { sent = await evolution.sendMedia(instancia, alvo, 'image', mime, signed.signedUrl, nome, caption || undefined); }
-      catch (err) { const m = (err as Error).message || 'Falha ao enviar a mídia.'; return json({ error: /not|connect|close/i.test(m) ? 'O WhatsApp deste canal desconectou. Reconecte em Integrações.' : m }, 502); }
+      try {
+        sent = tipo === 'audio'
+          ? await evolution.sendWhatsAppAudio(instancia, alvo, signed.signedUrl)               // nota de voz (PTT, ogg/opus)
+          : await evolution.sendMedia(instancia, alvo, 'image', mime, signed.signedUrl, nome, caption || undefined);
+      } catch (err) { const m = (err as Error).message || 'Falha ao enviar a mídia.'; return json({ error: /not|connect|close/i.test(m) ? 'O WhatsApp deste canal desconectou. Reconecte em Integrações.' : m }, 502); }
       const idExterno = sent?.key?.id ?? null;
       const metadados = { anexo_path: path, mime, tamanho, nome };
 
       // CRITÉRIO DE ACEITE: sem key.id, a Evolution não aceitou — marca FALHA (não "enviada").
       if (!idExterno) {
         if (retryMsg) await admin.from('mensagens').update({ status: 'falhou', erro_envio: 'sem_id_externo' }).eq('id', retryMsg.id);
-        else await admin.from('mensagens').insert({ conversa_id, organizacao_id: conv.organizacao_id, direcao: 'saida', tipo: 'imagem', conteudo: caption || null, origem: 'atenvo', autor_id: user.id, status: 'falhou', erro_envio: 'sem_id_externo', metadados });
-        console.log(`[send] corr=${corr} MIDIA sem id_externo -> falhou`);
+        else await admin.from('mensagens').insert({ conversa_id, organizacao_id: conv.organizacao_id, direcao: 'saida', tipo, conteudo: caption || null, origem: 'atenvo', autor_id: user.id, status: 'falhou', erro_envio: 'sem_id_externo', metadados });
+        console.log(`[send] corr=${corr} MIDIA(${tipo}) sem id_externo -> falhou`);
         return json({ error: 'A Evolution não confirmou o envio (sem identificador de mensagem).' }, 502);
       }
       let msg;
@@ -130,7 +138,7 @@ Deno.serve(async (req) => {
         const { data } = await admin.from('mensagens').update({ status: 'enviada', id_externo: idExterno, erro_envio: null, enviada_em: nowIso }).eq('id', retryMsg.id).select('id, conteudo, enviada_em, direcao, status').single();
         msg = data;
       } else {
-        const { data } = await admin.from('mensagens').insert({ conversa_id, organizacao_id: conv.organizacao_id, direcao: 'saida', tipo: 'imagem', conteudo: caption || null, origem: 'atenvo', autor_id: user.id, id_externo: idExterno, status: 'enviada', enviada_em: nowIso, metadados }).select('id, conteudo, enviada_em, direcao, status').single();
+        const { data } = await admin.from('mensagens').insert({ conversa_id, organizacao_id: conv.organizacao_id, direcao: 'saida', tipo, conteudo: caption || null, origem: 'atenvo', autor_id: user.id, id_externo: idExterno, status: 'enviada', enviada_em: nowIso, metadados }).select('id, conteudo, enviada_em, direcao, status').single();
         msg = data;
       }
       await admin.from('conversas').update({ ultima_interacao_em: nowIso, ultimo_canal_id: canal.id, ultimo_numero: canal.numero_conectado ?? null, ultimo_provider: canal.provider ?? 'whatsapp', ultima_msg_canal_em: nowIso }).eq('id', conversa_id);

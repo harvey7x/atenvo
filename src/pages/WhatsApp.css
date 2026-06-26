@@ -258,6 +258,17 @@
 .wa-app .msg-falha-link:disabled{color:var(--muted);cursor:default;font-weight:400}
 .wa-app .msg-falha-sep{margin:0 6px;color:var(--muted)}
 
+/* gravador de áudio reusado do Facebook: estiliza o gatilho (fb-tool) dentro do composer WA */
+.wa-app .composer-bar .fb-tool{display:inline-flex;align-items:center;gap:7px;padding:8px 11px;border-radius:9px;border:0;background:transparent;color:var(--ink-2);font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;transition:background .14s,color .14s}
+.wa-app .composer-bar .fb-tool:hover:not(:disabled){background:var(--hover);color:var(--green-ink)}
+.wa-app .composer-bar .fb-tool:disabled{opacity:.5;cursor:default}
+.wa-app .composer-bar .fb-tool svg{width:18px;height:18px;flex:none}
+@media (max-width:1500px){ .wa-app .composer-bar .fb-tool span{display:none} .wa-app .composer-bar .fb-tool{padding:8px} }
+
+/* áudio com falha no histórico */
+.wa-app .bubble-audio-falha{display:inline-flex;align-items:center;gap:7px}
+.wa-app .bubble-audio-falha svg{width:16px;height:16px;flex:none}
+
 /* imagem no histórico */
 .wa-app .bubble-img{padding:4px;max-width:330px}
 .wa-app .msg-img{display:block;max-width:312px;max-height:340px;width:auto;border-radius:9px;cursor:zoom-in;object-fit:cover}

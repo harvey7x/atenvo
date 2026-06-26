@@ -6,6 +6,8 @@ import { useOrg } from '@/context/OrgContext';
 import { WA_CONTACTS, initials, avatarColor, type WaContact, type WaMessage } from '@/data/whatsappDemo';
 import { useWaConversations, useSendWaMessage, useWaCanais, mascararNumero, subirMidiaWa, urlAssinadaMidiaWa, WA_REAL } from '@/data/whatsapp';
 import { MediaComposer } from '@/components/MediaComposer';
+import { AudioRecorder } from '@/components/AudioRecorder';
+import { AudioMessage } from '@/components/AudioMessage';
 import { useScripts, useScriptEtapaCounts, aguardarConfirmacaoEnvio } from '@/data/scripts';
 import { ScriptSequenceModal } from '@/components/ScriptSequenceModal';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -30,6 +32,7 @@ const IcSearch = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor
 const IcFunnel = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 5h18l-7 8v6l-4-2v-4z" /></svg>;
 const IcScripts = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 8h8M8 12h8M8 16h5" /></svg>;
 const IcImage = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.4" /><circle cx="8.5" cy="9.5" r="1.5" /><path d="m3 17 5-5 4 4 3-3 6 6" /></svg>;
+const IcMic = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>;
 const IcSend = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4z" /></svg>;
 const IcWarn = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /></svg>;
 const IcChevRight = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>;
@@ -358,6 +361,16 @@ export function WhatsApp() {
       text: caption || undefined,
     });
   }
+  /** Envio de ÁUDIO (gravado ou arquivo): sobe ao bucket privado e envia como nota de voz pela Evolution. */
+  async function enviarAudio(blob: Blob, mime: string, ext: string) {
+    if (!currentId) throw new Error('Selecione uma conversa.');
+    const file = new File([blob], `audio-${Date.now()}.${ext}`, { type: mime });
+    const up = await subirMidiaWa(currentOrg.id, file);
+    await sendMut.mutateAsync({
+      conversaId: currentId, canalId: replyCanalId || current.canalId,
+      midiaPath: up.path, midiaTipo: 'audio', midiaMime: up.mime, midiaNome: up.nome, midiaTamanho: up.tamanho,
+    });
+  }
 
   function onReplyChip(chip: string) {
     const prev = replyChip;
@@ -558,7 +571,22 @@ export function WhatsApp() {
             ) : null;
             return (
               <div key={i} className={'msg ' + m.dir}>
-                {m.tipo === 'imagem' ? (
+                {m.tipo === 'audio' ? (
+                  (m.dir === 'out' && m.status === 'falhou') ? (
+                    <>
+                      <div className="bubble bubble-falha bubble-audio-falha"><IcMic />Áudio não enviado</div>
+                      {tempo}
+                      {falhaActs}
+                    </>
+                  ) : m.anexoPath ? (
+                    <AudioMessage
+                      path={m.anexoPath} nome={m.nome}
+                      resolveUrl={(p) => urlAssinadaMidiaWa(p).catch(() => null)}
+                      time={m.time}
+                      statusNode={ack ? <span className={'tick ' + ack.cls} title={ack.title}>{ack.ticks}</span> : null}
+                    />
+                  ) : null
+                ) : m.tipo === 'imagem' ? (
                   <>
                     <div className={'bubble bubble-img' + (m.status === 'falhou' ? ' bubble-falha' : '')}>
                       {imgUrl
@@ -636,6 +664,7 @@ export function WhatsApp() {
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); } }} />
             <div className="composer-bar">
               <button className="tool" title="Enviar imagem" aria-label="Enviar imagem" disabled={WA_REAL && (!current.id || !canalConectado)} onClick={() => setImgModal(true)}><IcImage /></button>
+              <AudioRecorder permitirArquivo disabled={WA_REAL && (!current.id || !canalConectado)} onEnviar={enviarAudio} />
               <span className="spacer" />
               <button ref={scriptsBtnRef} className="scripts-btn" onClick={(e) => { e.stopPropagation(); togglePop('scripts', scriptsBtnRef, 'right'); }}><IcScripts />Scripts<IcCaret /></button>
               <button className="send-btn" aria-label="Enviar" disabled={sendDisabled} onClick={sendMsg}><IcSend /></button>
