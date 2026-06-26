@@ -239,3 +239,7 @@
 .atv-lightbox{ position:fixed; inset:0; background:rgba(0,0,0,.82); display:flex; align-items:center; justify-content:center; z-index:1000; padding:24px; }
 .atv-lightbox img{ max-width:92vw; max-height:90vh; border-radius:8px; box-shadow:0 12px 48px rgba(0,0,0,.5); }
 .atv-lightbox-close{ position:fixed; top:14px; right:20px; background:none; border:0; color:#fff; font-size:34px; line-height:1; cursor:pointer; }
+
+/* ===== Player de audio no historico (envio de etapa de audio) ===== */
+.bubble-audio{ padding:4px !important; background:transparent !important; border:0 !important; }
+.msg-audio{ width:240px; max-width:60vw; height:40px; display:block; }

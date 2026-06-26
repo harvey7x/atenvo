@@ -141,9 +141,9 @@ function FacebookInbox() {
   const canalConectado = !current.canalId || (paginaAtual ? paginaAtual.estado === 'conectado' : true);
   const algumaConectada = (fbStatus.data ?? []).some((p) => p.estado === 'conectado');
 
-  // URLs assinadas das imagens (sob demanda — nunca guardamos URL permanente). null = quebrada/expirada.
+  // URLs assinadas das mídias (sob demanda — nunca guardamos URL permanente). null = quebrada/expirada.
   useEffect(() => {
-    const faltam = current.msgs.filter((m) => m.tipo === 'imagem' && m.anexoPath && !(m.anexoPath in imgUrls)).map((m) => m.anexoPath as string);
+    const faltam = current.msgs.filter((m) => (m.tipo === 'imagem' || m.tipo === 'audio') && m.anexoPath && !(m.anexoPath in imgUrls)).map((m) => m.anexoPath as string);
     if (!faltam.length) return;
     let vivo = true;
     (async () => {
@@ -153,9 +153,9 @@ function FacebookInbox() {
     return () => { vivo = false; };
   }, [current.msgs, imgUrls]);
 
-  async function retryImagem(m: FbMsg) {
-    if (!m.etapaId) { toast('Sem referência da imagem para reenviar.', 'warn'); return; }
-    try { await sendMedia.mutateAsync({ conversaId: current.id, etapaId: m.etapaId, texto: '' }); toast('Imagem reenviada'); }
+  async function retryMidia(m: FbMsg) {
+    if (!m.etapaId) { toast('Sem referência da mídia para reenviar.', 'warn'); return; }
+    try { await sendMedia.mutateAsync({ conversaId: current.id, etapaId: m.etapaId, texto: '' }); toast('Mídia reenviada'); }
     catch (e) { toast((e as Error).message || 'Falha ao reenviar', 'warn'); }
   }
 
@@ -275,8 +275,10 @@ function FacebookInbox() {
           {current.msgs.map((m, i) => {
             const ack = m.dir === 'out' ? ackFb(m.status) : null;
             const ehImg = m.tipo === 'imagem' && !!m.anexoPath;
+            const ehAudio = m.tipo === 'audio' && !!m.anexoPath;
             const falhou = m.status === 'falhou';
-            const url = ehImg ? imgUrls[m.anexoPath as string] : undefined;
+            const url = (ehImg || ehAudio) ? imgUrls[m.anexoPath as string] : undefined;
+            const falhaUI = falhou && <div className="img-falha"><IcWarn /><span>Falha no envio</span>{m.etapaId && <button className="link-btn" style={{ background: 'none', border: 0, color: '#5b7bd6', cursor: 'pointer', padding: 0 }} onClick={() => retryMidia(m)}>Tentar novamente</button>}</div>;
             return (
               <div key={i} className={'msg ' + m.dir}>
                 {ehImg ? (
@@ -284,7 +286,14 @@ function FacebookInbox() {
                     {url ? <img src={url} alt="imagem" className="msg-img" onClick={() => setLightbox(url)} onError={() => setImgUrls((x) => ({ ...x, [m.anexoPath as string]: null }))} />
                       : url === null ? <div className="img-fallback">Imagem indisponível</div>
                         : <div className="img-fallback">Carregando…</div>}
-                    {falhou && <div className="img-falha"><IcWarn /><span>Falha no envio</span>{m.etapaId && <button className="link-btn" style={{ background: 'none', border: 0, color: '#5b7bd6', cursor: 'pointer', padding: 0 }} onClick={() => retryImagem(m)}>Tentar novamente</button>}</div>}
+                    {falhaUI}
+                  </div>
+                ) : ehAudio ? (
+                  <div className="bubble bubble-audio">
+                    {url ? <audio controls src={url} className="msg-audio" onError={() => setImgUrls((x) => ({ ...x, [m.anexoPath as string]: null }))} />
+                      : url === null ? <div className="img-fallback">Áudio indisponível</div>
+                        : <div className="img-fallback">Carregando…</div>}
+                    {falhaUI}
                   </div>
                 ) : (
                   <div className="bubble">{m.text}</div>

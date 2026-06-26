@@ -50,7 +50,7 @@ export function ScriptSequenceModal({ open, onClose, script, canal, ctx, convers
     if (!open || !script) return;
     let cancel = false;
     setCarregando(true); setErroLoad(null); setItens([]); setStatus([]); setConfirmados([]); setErros([]); setIdxAtual(-1); setEnviando(false); jaReg.current = false;
-    fetchEtapasParaEnvio(script.id, ctx, { incluirImagem: incluirMidia, fallbackConteudo: script.conteudo || '' })
+    fetchEtapasParaEnvio(script.id, ctx, { incluirMidia, fallbackConteudo: script.conteudo || '' })
       .then(async (r) => {
         if (cancel) return;
         const its: Item[] = r.map((x) => ({ ...x }));
@@ -91,8 +91,8 @@ export function ScriptSequenceModal({ open, onClose, script, canal, ctx, convers
       setIdxAtual(i);
       st[i] = 'enviando'; setStatus([...st]);
       try {
-        if (it.tipo === 'imagem') {
-          if (!enviarMidia || !it.etapaId) throw new Error('Envio de imagem indisponível neste canal.');
+        if (it.tipo !== 'texto') {
+          if (!enviarMidia || !it.etapaId) throw new Error('Envio de mídia indisponível neste canal.');
           await enviarMidia({ etapaId: it.etapaId, tipo: it.tipo, texto: it.texto, nome: it.nome, mime: it.mime, tamanho: it.tamanho });
           conf[i] = 'enviada';
         } else {
@@ -160,24 +160,37 @@ export function ScriptSequenceModal({ open, onClose, script, canal, ctx, convers
           return (
             <div key={i} style={{ border: '1px solid ' + borda, borderRadius: 10, padding: 10, background: 'var(--surface)', opacity: it.removida ? 0.6 : 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                <strong style={{ fontSize: 13 }}>Mensagem {it.posicao}{it.tipo === 'imagem' ? ' · Imagem' : ''}</strong>
+                <strong style={{ fontSize: 13 }}>Mensagem {it.posicao}{it.tipo === 'imagem' ? ' · Imagem' : it.tipo === 'audio' ? ' · Áudio' : ''}</strong>
                 {it.removida ? <span style={{ fontSize: 12, color: 'var(--muted)' }}>Removida deste envio</span> : chip(i)}
               </div>
 
-              {it.tipo === 'imagem' && !it.removida && (
-                <div style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
-                  {it.previewUrl
-                    ? <img src={it.previewUrl} alt={it.nome ?? ''} style={{ width: 96, height: 96, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--line-2)' }} />
-                    : <div style={{ width: 96, height: 96, borderRadius: 8, border: '1px solid var(--line-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontSize: 11 }}>sem prévia</div>}
+              {it.tipo !== 'texto' && !it.removida && (() => {
+                const rotulo = it.tipo === 'audio' ? 'áudio' : 'imagem';
+                const info = (
                   <div style={{ flex: 1, minWidth: 0, fontSize: 12, color: 'var(--ink-2)' }}>
-                    <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.nome ?? 'imagem'}</div>
-                    <div style={{ color: 'var(--muted)' }}>{it.mime ?? 'image'}{it.tamanho ? ' · ' + formatarTamanho(it.tamanho) : ''}</div>
-                    <button type="button" className="atv-btn" style={{ marginTop: 6 }} disabled={enviando || status[i] === 'ok'} onClick={() => removerImagem(i)}>Remover imagem deste envio</button>
+                    <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.nome ?? rotulo}</div>
+                    <div style={{ color: 'var(--muted)' }}>{it.mime ?? it.tipo}{it.tamanho ? ' · ' + formatarTamanho(it.tamanho) : ''}</div>
+                    <button type="button" className="atv-btn" style={{ marginTop: 6 }} disabled={enviando || status[i] === 'ok'} onClick={() => removerImagem(i)}>Remover {rotulo} deste envio</button>
                   </div>
-                </div>
-              )}
-              {it.tipo === 'imagem' && it.removida && (
-                <button type="button" className="atv-btn" style={{ marginBottom: 6 }} disabled={enviando} onClick={() => restaurarImagem(i)}>Restaurar imagem</button>
+                );
+                return it.tipo === 'imagem' ? (
+                  <div style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
+                    {it.previewUrl
+                      ? <img src={it.previewUrl} alt={it.nome ?? ''} style={{ width: 96, height: 96, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--line-2)' }} />
+                      : <div style={{ width: 96, height: 96, borderRadius: 8, border: '1px solid var(--line-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontSize: 11 }}>sem prévia</div>}
+                    {info}
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
+                    {it.previewUrl
+                      ? <audio controls src={it.previewUrl} style={{ width: '100%', height: 40 }} />
+                      : <div style={{ height: 40, borderRadius: 8, border: '1px solid var(--line-2)', display: 'flex', alignItems: 'center', padding: '0 10px', color: 'var(--muted)', fontSize: 11 }}>sem prévia</div>}
+                    {info}
+                  </div>
+                );
+              })()}
+              {it.tipo !== 'texto' && it.removida && (
+                <button type="button" className="atv-btn" style={{ marginBottom: 6 }} disabled={enviando} onClick={() => restaurarImagem(i)}>Restaurar {it.tipo === 'audio' ? 'áudio' : 'imagem'}</button>
               )}
 
               {!it.removida && falta && it.faltando.length > 0 && (

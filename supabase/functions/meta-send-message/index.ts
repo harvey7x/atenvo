@@ -12,6 +12,7 @@ const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: 
 const admin = () => createClient(SUPABASE_URL, SERVICE, { auth: { persistSession: false } });
 
 const TIPO_ATTACH: Record<string, string> = { imagem: 'image', audio: 'audio', video: 'video', documento: 'file' };
+const FAMILIA_MIME: Record<string, string> = { imagem: 'image/', audio: 'audio/', video: 'video/', documento: '' };
 const MAX_FB = 25 * 1024 * 1024;
 
 Deno.serve(async (req) => {
@@ -80,7 +81,10 @@ Deno.serve(async (req) => {
     if (!anexo || anexo.organizacao_id !== conv.organizacao_id || !anexo.storage_path) { resultados.anexo = { ok: false, error: 'anexo_invalido' }; }
     else {
       const attachType = TIPO_ATTACH[anexo.tipo];
+      const fam = FAMILIA_MIME[anexo.tipo] ?? '';
+      const mime = (anexo.mime_type ?? '').toLowerCase();
       if (!attachType) { resultados.anexo = { ok: false, error: 'tipo_incompativel' }; }
+      else if (fam && mime && !mime.startsWith(fam)) { resultados.anexo = { ok: false, error: 'mime_incompativel' }; }
       else if ((anexo.tamanho_bytes ?? 0) > MAX_FB) { resultados.anexo = { ok: false, error: 'arquivo_grande', message: 'Acima de 25 MB para o Messenger.' }; }
       else {
         const clientReq = `req:${crypto.randomUUID()}`;

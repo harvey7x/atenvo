@@ -333,10 +333,11 @@ export async function fetchEtapasTextoResolvidas(scriptId: string, ctx: VarCtx, 
 }
 
 export interface EtapaEnvio { posicao: number; tipo: EtapaTipo; texto: string; faltando: string[]; etapaId?: string; nome?: string | null; mime?: string | null; tamanho?: number | null; storagePath?: string | null; }
-/** Etapas para envio na conversa: texto sempre; imagem quando `incluirImagem` (canal que suporta). */
-export async function fetchEtapasParaEnvio(scriptId: string, ctx: VarCtx, opts: { incluirImagem?: boolean; fallbackConteudo?: string } = {}): Promise<EtapaEnvio[]> {
+const MIDIA_ENVIAVEL: EtapaTipo[] = ['imagem', 'audio']; // tipos de mídia suportados no envio (Facebook)
+/** Etapas para envio na conversa: texto sempre; mídia suportada quando `incluirMidia` (canal que suporta). */
+export async function fetchEtapasParaEnvio(scriptId: string, ctx: VarCtx, opts: { incluirMidia?: boolean; fallbackConteudo?: string } = {}): Promise<EtapaEnvio[]> {
   const etapas = await fetchEtapas(scriptId);
-  const incluir = (e: EtapaItem) => e.tipo === 'texto' ? (e.conteudo ?? '').trim().length > 0 : (!!opts.incluirImagem && e.tipo === 'imagem' && !!e.storagePath);
+  const incluir = (e: EtapaItem) => e.tipo === 'texto' ? (e.conteudo ?? '').trim().length > 0 : (!!opts.incluirMidia && MIDIA_ENVIAVEL.includes(e.tipo) && !!e.storagePath);
   let lista = etapas.filter(incluir);
   if (lista.length === 0 && (opts.fallbackConteudo ?? '').trim()) lista = [{ tipo: 'texto', conteudo: opts.fallbackConteudo! }];
   return lista.map((e, i) => { const r = resolverComFaltas(e.conteudo ?? '', ctx); return { posicao: i + 1, tipo: e.tipo, texto: r.texto, faltando: r.faltando, etapaId: e.id, nome: e.nome, mime: e.mime, tamanho: e.tamanho, storagePath: e.storagePath }; });
