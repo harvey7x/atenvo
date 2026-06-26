@@ -15,18 +15,21 @@ interface ModalProps {
 /** Modal próprio do Atenvo (tema, foco, Esc, clique-fora). Substitui prompt/alert/confirm. */
 export function Modal({ open, onClose, title, children, footer, width = 440, closeOnBackdrop = true }: ModalProps) {
   const cardRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onCloseRef.current = onClose; });
 
+  // Depende SOMENTE de `open` — o auto-foco roda uma vez na abertura, nunca a cada
+  // render (senão re-focaria o primeiro campo a cada tecla digitada).
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onCloseRef.current(); };
     document.addEventListener('keydown', onKey);
-    // foco no primeiro campo/elemento focável
     const t = setTimeout(() => {
       const el = cardRef.current?.querySelector<HTMLElement>('input,textarea,select,button');
       el?.focus();
     }, 30);
     return () => { document.removeEventListener('keydown', onKey); clearTimeout(t); };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
   return (

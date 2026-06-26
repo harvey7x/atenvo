@@ -7,7 +7,8 @@ import { Modal } from '@/components/Modal';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import {
   SCRIPTS_REAL, useScripts, useScriptCategorias, useScriptMutations, useScriptCategoriaMutations,
-  useScriptEtapaMutations, fetchEtapasTexto, substituirVariaveis, SCRIPT_VARIAVEIS, type Script,
+  useScriptEtapaMutations, fetchEtapas, urlAssinadaAnexo, formatarTamanho, substituirVariaveis, SCRIPT_VARIAVEIS,
+  type Script, type EtapaItem, type EtapaTipo,
 } from '@/data/scripts';
 import './Scripts.css';
 
@@ -25,6 +26,13 @@ const IcSearch = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor
 const IcChevL = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>;
 const IcUp = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 15 6-6 6 6" /></svg>;
 const IcDown = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>;
+const IcText = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7V5h16v2M9 5v14M7 19h10" /></svg>;
+const IcImg = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2.5" /><circle cx="8.5" cy="8.5" r="1.6" /><path d="m21 15-5-5L5 21" /></svg>;
+const IcAudio = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>;
+const IcVideo = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="14" height="14" rx="2.5" /><path d="m22 8-6 4 6 4z" /></svg>;
+const IcFileMedia = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5" /></svg>;
+const TIPO_LABEL: Record<EtapaTipo, string> = { texto: 'Texto', imagem: 'Imagem', audio: 'Áudio', video: 'Vídeo', documento: 'Documento' };
+const ACCEPT: Record<EtapaTipo, string> = { texto: '', imagem: 'image/*', audio: 'audio/*', video: 'video/*', documento: '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv' };
 
 function ChBadge({ c }: { c: string }) {
   const wa = c === 'whatsapp';
@@ -39,7 +47,7 @@ function classificaCanal(canais: string[]): 'whatsapp' | 'facebook' | 'ambos' {
   if ((wa && fb) || canais.length === 0) return 'ambos';
   return wa ? 'whatsapp' : 'facebook';
 }
-interface Msg { id?: string; conteudo: string; }
+type Step = EtapaItem & { previewUrl?: string };
 const HORA_FAKE = '09:41';
 
 export function Scripts() {
@@ -77,10 +85,11 @@ export function Scripts() {
   const [saving, setSaving] = useState(false);
   const [errs, setErrs] = useState<Record<string, string>>({});
   const [cfg, setCfg] = useState({ titulo: '', descricao: '', wa: true, fb: false, categoriaId: '', tags: '', favorito: false, ativo: true });
-  const [mensagens, setMensagens] = useState<Msg[]>([{ conteudo: '' }]);
+  const [etapas, setEtapas] = useState<Step[]>([{ tipo: 'texto', conteudo: '' }]);
   const [previewCanal, setPreviewCanal] = useState<'whatsapp' | 'facebook'>('whatsapp');
   const msgRefs = useRef<(HTMLTextAreaElement | null)[]>([]);
   const activeMsg = useRef(0);
+  const fileRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   function pedirConfirmacao(title: string, message: string, run: () => Promise<void>) { setConfirmState({ title, message, run }); }
   async function executarConfirm() {
@@ -130,38 +139,46 @@ export function Scripts() {
     const { wa, fb } = prefillCanal();
     setEditId(null);
     setCfg({ titulo: '', descricao: '', wa, fb, categoriaId: cat !== 'all' ? cat : '', tags: '', favorito: false, ativo: true });
-    setMensagens([{ conteudo: '' }]);
+    setEtapas([{ tipo: 'texto', conteudo: '' }]);
     setPreviewCanal(wa ? 'whatsapp' : 'facebook');
     setErrs({}); msgRefs.current = []; activeMsg.current = 0; setFormOpen(true);
   }
   async function openEditScript(s: Script) {
     setEditId(s.id);
     setCfg({ titulo: s.titulo, descricao: s.descricao ?? '', wa: s.canais.includes('whatsapp'), fb: s.canais.includes('facebook'), categoriaId: s.categoriaId ?? '', tags: s.tags.join(', '), favorito: s.favorito, ativo: s.ativo });
-    setMensagens([{ conteudo: s.conteudo || '' }]); // provisório enquanto carrega
+    setEtapas([{ tipo: 'texto', conteudo: s.conteudo || '' }]); // provisório enquanto carrega
     setPreviewCanal(s.canais.includes('whatsapp') || s.canais.length === 0 ? 'whatsapp' : 'facebook');
     setErrs({}); msgRefs.current = []; activeMsg.current = 0; setFormOpen(true);
     try {
-      const etapas = await fetchEtapasTexto(s.id);
-      setMensagens(etapas.length ? etapas.map((e) => ({ id: e.id, conteudo: e.conteudo })) : [{ conteudo: s.conteudo || '' }]);
+      const lista = await fetchEtapas(s.id);
+      const steps: Step[] = lista.length ? lista.map((e) => ({ ...e })) : [{ tipo: 'texto', conteudo: s.conteudo || '' }];
+      // URLs assinadas para mídias existentes (preview)
+      await Promise.all(steps.map(async (st) => { if (st.tipo !== 'texto' && st.storagePath) { st.previewUrl = (await urlAssinadaAnexo(st.storagePath)) ?? undefined; } }));
+      setEtapas(steps);
     } catch { /* mantém o fallback */ }
   }
 
-  /* ---------- operações de mensagens ---------- */
-  function setMsg(i: number, conteudo: string) { setMensagens((m) => m.map((x, j) => j === i ? { ...x, conteudo } : x)); }
-  function addMsg() { setMensagens((m) => [...m, { conteudo: '' }]); }
-  function dupMsg(i: number) { setMensagens((m) => { const n = [...m]; n.splice(i + 1, 0, { conteudo: m[i].conteudo }); return n; }); }
-  function delMsg(i: number) { setMensagens((m) => m.length <= 1 ? m : m.filter((_, j) => j !== i)); }
-  function moveMsg(i: number, dir: -1 | 1) {
-    setMensagens((m) => { const j = i + dir; if (j < 0 || j >= m.length) return m; const n = [...m]; [n[i], n[j]] = [n[j], n[i]]; return n; });
+  /* ---------- operações de etapas ---------- */
+  function setStepConteudo(i: number, conteudo: string) { setEtapas((m) => m.map((x, j) => j === i ? { ...x, conteudo } : x)); }
+  function addStep(tipo: EtapaTipo) { setEtapas((m) => [...m, { tipo, conteudo: '' }]); }
+  function dupStep(i: number) { setEtapas((m) => { const n = [...m]; n.splice(i + 1, 0, { ...m[i], id: undefined }); return n; }); }
+  function delStep(i: number) { setEtapas((m) => m.length <= 1 ? m : m.filter((_, j) => j !== i)); }
+  function moveStep(i: number, dir: -1 | 1) {
+    setEtapas((m) => { const j = i + dir; if (j < 0 || j >= m.length) return m; const n = [...m]; [n[i], n[j]] = [n[j], n[i]]; return n; });
+  }
+  function setStepFile(i: number, file: File | null) {
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    setEtapas((m) => m.map((x, j) => j === i ? { ...x, file, nome: file.name, mime: file.type, tamanho: file.size, storagePath: undefined, previewUrl: url } : x));
   }
   function insertVar(text: string) {
     const i = activeMsg.current;
+    if (etapas[i]?.tipo !== 'texto') return; // só em etapas de texto
     const ta = msgRefs.current[i];
-    if (!ta) { setMsg(i, (mensagens[i]?.conteudo ?? '') + text); return; }
+    if (!ta) { setStepConteudo(i, (etapas[i]?.conteudo ?? '') + text); return; }
     const s = ta.selectionStart, e = ta.selectionEnd;
-    const atual = mensagens[i]?.conteudo ?? '';
-    const novo = atual.slice(0, s) + text + atual.slice(e);
-    setMsg(i, novo);
+    const atual = etapas[i]?.conteudo ?? '';
+    setStepConteudo(i, atual.slice(0, s) + text + atual.slice(e));
     setTimeout(() => { ta.focus(); ta.setSelectionRange(s + text.length, s + text.length); }, 0);
   }
 
@@ -172,24 +189,23 @@ export function Scripts() {
     const e: Record<string, string> = {};
     if (!cfg.titulo.trim()) e.titulo = 'Título é obrigatório.';
     if (canais.length === 0) e.canal = 'Selecione ao menos um canal.';
-    const naoVazias = mensagens.filter((m) => m.conteudo.trim().length > 0);
-    if (naoVazias.length === 0) e.mensagens = 'Inclua ao menos uma mensagem com conteúdo.';
-    mensagens.forEach((m, i) => { if (!m.conteudo.trim()) e['msg_' + i] = 'Mensagem vazia.'; });
-    // se houver alguma não-vazia, exigimos que TODAS as restantes tenham conteúdo
-    if (naoVazias.length > 0 && naoVazias.length !== mensagens.length) { /* erros por etapa já marcados */ }
+    const cheia = (s: Step) => s.tipo === 'texto' ? s.conteudo.trim().length > 0 : (!!s.file || !!s.storagePath);
+    const naoVazias = etapas.filter(cheia);
+    if (naoVazias.length === 0) e.etapas = 'Inclua ao menos uma mensagem com conteúdo.';
+    etapas.forEach((s, i) => { if (!cheia(s)) e['st_' + i] = s.tipo === 'texto' ? 'Mensagem vazia.' : 'Selecione um arquivo.'; });
     if (Object.keys(e).length) { setErrs(e); return; }
     setSaving(true); setErrs({});
     try {
       const tags = cfg.tags.split(',').map((t) => t.trim()).filter(Boolean);
-      const conteudoCompat = mensagens[0].conteudo;
+      const primeiroTexto = etapas.find((s) => s.tipo === 'texto')?.conteudo ?? '';
       let scriptId = editId;
       if (editId) {
-        await mut.atualizar.mutateAsync({ id: editId, patch: { titulo: cfg.titulo.trim(), descricao: cfg.descricao.trim() || null, conteudo: conteudoCompat, canais_permitidos: canais, categoria_id: cfg.categoriaId || null, tags, favorito: cfg.favorito, ativo: cfg.ativo } });
+        await mut.atualizar.mutateAsync({ id: editId, patch: { titulo: cfg.titulo.trim(), descricao: cfg.descricao.trim() || null, conteudo: primeiroTexto, canais_permitidos: canais, categoria_id: cfg.categoriaId || null, tags, favorito: cfg.favorito, ativo: cfg.ativo } });
       } else {
-        const r = await mut.criar.mutateAsync({ titulo: cfg.titulo, conteudo: conteudoCompat, canais, categoriaId: cfg.categoriaId || null, descricao: cfg.descricao.trim() || null, tags, favorito: cfg.favorito, ativo: cfg.ativo });
+        const r = await mut.criar.mutateAsync({ titulo: cfg.titulo, conteudo: primeiroTexto, canais, categoriaId: cfg.categoriaId || null, descricao: cfg.descricao.trim() || null, tags, favorito: cfg.favorito, ativo: cfg.ativo });
         scriptId = r.id;
       }
-      await etapaMut.salvarTexto.mutateAsync({ scriptId: scriptId!, mensagens });
+      await etapaMut.salvarEtapas.mutateAsync({ scriptId: scriptId!, etapas });
       setFormOpen(false); setCurrentId(scriptId!); toast(editId ? 'Script salvo' : 'Script criado');
     } catch (err) { setErrs({ geral: (err as Error).message || 'Falha ao salvar' }); }
     finally { setSaving(false); }
@@ -198,11 +214,12 @@ export function Scripts() {
   async function favoritar(s: Script) { try { await mut.favoritar.mutateAsync({ id: s.id, favorito: !s.favorito }); } catch (er) { toast((er as Error).message || 'Falha', 'warn'); } }
   async function duplicar(s: Script) {
     try {
-      const etapas = await fetchEtapasTexto(s.id);
+      const lista = await fetchEtapas(s.id);
       const r = await mut.criar.mutateAsync({ titulo: s.titulo + ' (cópia)', conteudo: s.conteudo, canais: s.canais, categoriaId: s.categoriaId, descricao: s.descricao, tags: s.tags, favorito: false, ativo: s.ativo });
-      const msgs = etapas.length ? etapas.map((e) => ({ conteudo: e.conteudo })) : [{ conteudo: s.conteudo || '' }];
-      await etapaMut.salvarTexto.mutateAsync({ scriptId: r.id, mensagens: msgs });
-      setCurrentId(r.id); toast('Script duplicado');
+      const soTexto: EtapaItem[] = lista.filter((x) => x.tipo === 'texto').map((x) => ({ tipo: 'texto', conteudo: x.conteudo }));
+      const finais = soTexto.length ? soTexto : [{ tipo: 'texto' as EtapaTipo, conteudo: s.conteudo || '' }];
+      await etapaMut.salvarEtapas.mutateAsync({ scriptId: r.id, etapas: finais });
+      setCurrentId(r.id); toast(lista.some((x) => x.tipo !== 'texto') ? 'Script duplicado (mídias não copiadas)' : 'Script duplicado');
     } catch (er) { toast((er as Error).message || 'Falha', 'warn'); }
   }
   function excluir(s: Script) {
@@ -380,28 +397,54 @@ export function Scripts() {
             </div>
 
             <p className="ed-label" style={{ marginTop: 6 }}>Sequência de mensagens</p>
-            {errs.mensagens && <div className="atv-field-err" style={{ marginBottom: 8 }}>{errs.mensagens}</div>}
-            {mensagens.map((m, i) => (
+            <div className="step-toolbar">
+              <button type="button" title="Adicionar texto" onClick={() => addStep('texto')}><IcText />Texto</button>
+              <button type="button" title="Adicionar imagem" onClick={() => addStep('imagem')}><IcImg />Imagem</button>
+              <button type="button" title="Adicionar áudio" onClick={() => addStep('audio')}><IcAudio />Áudio</button>
+              <button type="button" title="Adicionar vídeo" onClick={() => addStep('video')}><IcVideo />Vídeo</button>
+              <button type="button" title="Adicionar documento" onClick={() => addStep('documento')}><IcFileMedia />Documento</button>
+            </div>
+            {errs.etapas && <div className="atv-field-err" style={{ margin: '8px 0' }}>{errs.etapas}</div>}
+            {etapas.map((s, i) => (
               <div key={i} className="msg-step">
                 <div className="msg-step-head">
-                  <strong>Mensagem {i + 1}</strong>
+                  <strong>Mensagem {i + 1} · {TIPO_LABEL[s.tipo]}</strong>
                   <span className="msg-step-actions">
-                    <button type="button" className="ms-btn" title="Mover para cima" disabled={i === 0} onClick={() => moveMsg(i, -1)}><IcUp /></button>
-                    <button type="button" className="ms-btn" title="Mover para baixo" disabled={i === mensagens.length - 1} onClick={() => moveMsg(i, 1)}><IcDown /></button>
-                    <button type="button" className="ms-btn" title="Duplicar" onClick={() => dupMsg(i)}><IcCopy /></button>
-                    <button type="button" className="ms-btn" title="Excluir" disabled={mensagens.length <= 1} onClick={() => delMsg(i)}><IcTrash /></button>
+                    <button type="button" className="ms-btn" title="Mover para cima" disabled={i === 0} onClick={() => moveStep(i, -1)}><IcUp /></button>
+                    <button type="button" className="ms-btn" title="Mover para baixo" disabled={i === etapas.length - 1} onClick={() => moveStep(i, 1)}><IcDown /></button>
+                    <button type="button" className="ms-btn" title="Duplicar" onClick={() => dupStep(i)}><IcCopy /></button>
+                    <button type="button" className="ms-btn" title="Excluir" disabled={etapas.length <= 1} onClick={() => delStep(i)}><IcTrash /></button>
                   </span>
                 </div>
-                <textarea className="atv-textarea" value={m.conteudo} placeholder="Escreva a mensagem. Use {{nome_cliente}}…"
-                  ref={(el) => { msgRefs.current[i] = el; }}
-                  onFocus={() => { activeMsg.current = i; }}
-                  onChange={(e) => setMsg(i, e.target.value)} />
-                <div className="msg-step-foot"><span className="ed-count">{m.conteudo.length} caracteres</span></div>
-                {errs['msg_' + i] && <div className="atv-field-err">{errs['msg_' + i]}</div>}
+                {s.tipo === 'texto' ? (
+                  <>
+                    <textarea className="atv-textarea" value={s.conteudo} placeholder="Escreva a mensagem. Use {{nome_cliente}}…"
+                      ref={(el) => { msgRefs.current[i] = el; }} onFocus={() => { activeMsg.current = i; }}
+                      onChange={(e) => setStepConteudo(i, e.target.value)} />
+                    <div className="msg-step-foot"><span className="ed-count">{s.conteudo.length} caracteres</span></div>
+                  </>
+                ) : (
+                  <>
+                    <input ref={(el) => { fileRefs.current[i] = el; }} type="file" accept={ACCEPT[s.tipo]} style={{ display: 'none' }}
+                      onChange={(e) => setStepFile(i, e.target.files?.[0] ?? null)} />
+                    {(s.file || s.storagePath) ? (
+                      <div className="media-edit">
+                        {s.tipo === 'imagem' && s.previewUrl && <img className="media-thumb" src={s.previewUrl} alt={s.nome ?? ''} />}
+                        {s.tipo === 'audio' && s.previewUrl && <audio controls src={s.previewUrl} style={{ width: '100%' }} />}
+                        {s.tipo === 'video' && s.previewUrl && <video controls src={s.previewUrl} style={{ maxWidth: '100%', borderRadius: 8 }} />}
+                        {s.tipo === 'documento' && <div className="doc-card"><IcFileMedia /><span>{s.nome ?? 'documento'}</span></div>}
+                        <div className="media-meta"><span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.nome ?? ''}</span>{s.tamanho ? <span style={{ color: 'var(--muted)' }}>{formatarTamanho(s.tamanho)}</span> : null}<button type="button" className="atv-btn" onClick={() => fileRefs.current[i]?.click()}>Trocar</button></div>
+                        <input className="atv-input" placeholder="Legenda (opcional)" value={s.conteudo} onChange={(e) => setStepConteudo(i, e.target.value)} />
+                      </div>
+                    ) : (
+                      <button type="button" className="atv-btn" onClick={() => fileRefs.current[i]?.click()}><IcPlus />Selecionar {TIPO_LABEL[s.tipo].toLowerCase()}</button>
+                    )}
+                  </>
+                )}
+                {errs['st_' + i] && <div className="atv-field-err">{errs['st_' + i]}</div>}
               </div>
             ))}
-            <button type="button" className="atv-btn" onClick={addMsg}><IcPlus />Adicionar mensagem de texto</button>
-            <div className="vars" style={{ marginTop: 10 }}>{SCRIPT_VARIAVEIS.map((v) => <button type="button" key={v} className="vchip" title="Inserir na mensagem em edição" onClick={() => insertVar(v)}>{v}</button>)}</div>
+            <div className="vars" style={{ marginTop: 10 }}>{SCRIPT_VARIAVEIS.map((v) => <button type="button" key={v} className="vchip" title="Inserir na mensagem de texto em edição" onClick={() => insertVar(v)}>{v}</button>)}</div>
           </div>
 
           {/* Pré-visualização */}
@@ -416,14 +459,23 @@ export function Scripts() {
               )}
             </div>
             <div className={'bp-chat ' + canalPreview}>
-              {canalPreview === 'facebook' && <div className="bp-chan-name">{current.id ? (cfg.titulo || 'Página') : 'Página'} · Messenger</div>}
-              {mensagens.filter((m) => m.conteudo.trim()).length === 0 && <div className="bp-empty">As mensagens aparecem aqui.</div>}
-              {mensagens.map((m, i) => m.conteudo.trim() ? (
-                <div key={i} className="bp-bubble">
-                  <div className="bp-text">{substituirVariaveis(m.conteudo, previewCtx)}</div>
-                  <div className="bp-time">{HORA_FAKE}</div>
-                </div>
-              ) : null)}
+              {canalPreview === 'facebook' && <div className="bp-chan-name">{(cfg.titulo || 'Página')} · Messenger</div>}
+              {etapas.filter((s) => s.tipo === 'texto' ? s.conteudo.trim() : (s.file || s.storagePath)).length === 0 && <div className="bp-empty">As mensagens aparecem aqui.</div>}
+              {etapas.map((s, i) => {
+                const visivel = s.tipo === 'texto' ? !!s.conteudo.trim() : !!(s.file || s.storagePath);
+                if (!visivel) return null;
+                return (
+                  <div key={i} className="bp-bubble">
+                    {s.tipo === 'texto' && <div className="bp-text">{substituirVariaveis(s.conteudo, previewCtx)}</div>}
+                    {s.tipo === 'imagem' && s.previewUrl && <img className="bp-media" src={s.previewUrl} alt="" />}
+                    {s.tipo === 'audio' && s.previewUrl && <audio controls src={s.previewUrl} style={{ width: 200, maxWidth: '100%' }} />}
+                    {s.tipo === 'video' && s.previewUrl && <video controls src={s.previewUrl} style={{ maxWidth: '100%', borderRadius: 8 }} />}
+                    {s.tipo === 'documento' && <div className="bp-doc"><IcFileMedia /><span>{s.nome ?? 'documento'}</span></div>}
+                    {s.tipo !== 'texto' && s.conteudo.trim() && <div className="bp-text" style={{ marginTop: 4 }}>{substituirVariaveis(s.conteudo, previewCtx)}</div>}
+                    <div className="bp-time">{HORA_FAKE}</div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>

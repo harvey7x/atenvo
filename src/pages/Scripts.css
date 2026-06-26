@@ -268,3 +268,18 @@
 .bp-chat.facebook .bp-bubble{ background:#0084ff; color:#fff; }
 .bp-text{ white-space:pre-wrap; word-break:break-word; }
 .bp-time{ font-size:10px; opacity:.7; text-align:right; margin-top:3px; }
+
+/* ===== Toolbar de tipos + midia das etapas ===== */
+.step-toolbar{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+.step-toolbar button{ display:inline-flex; align-items:center; gap:6px; height:32px; padding:0 10px; border:1px solid var(--line-2); border-radius:8px; background:var(--surface); color:var(--ink-2); font-size:13px; font-weight:500; cursor:pointer; white-space:nowrap; }
+.step-toolbar button:hover{ background:var(--hover); color:var(--ink); }
+.step-toolbar button:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
+.step-toolbar button svg{ width:16px; height:16px; }
+.media-edit{ display:flex; flex-direction:column; gap:8px; }
+.media-thumb{ max-width:100%; max-height:180px; border-radius:8px; object-fit:contain; align-self:flex-start; }
+.media-meta{ display:flex; align-items:center; gap:8px; font-size:13px; }
+.doc-card{ display:flex; align-items:center; gap:8px; padding:8px 10px; border:1px solid var(--line-2); border-radius:8px; background:var(--surface); font-size:13px; }
+.doc-card svg{ width:20px; height:20px; color:var(--ink-2); }
+.bp-media{ max-width:100%; border-radius:10px; display:block; }
+.bp-doc{ display:flex; align-items:center; gap:6px; background:rgba(127,127,127,.18); border-radius:8px; padding:6px 8px; font-size:12px; }
+.bp-doc svg{ width:18px; height:18px; }

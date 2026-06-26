@@ -223,53 +223,78 @@ export function formatarTamanho(bytes: number): string {
   return `${(bytes / MB).toFixed(1)} MB`;
 }
 
-/* ===================== Etapas (sequência de mensagens) ===================== */
-export interface EtapaTexto { id?: string; conteudo: string; }
+/* ===================== Etapas (sequência de mensagens: texto + mídia) ===================== */
+export type EtapaTipo = 'texto' | 'imagem' | 'audio' | 'video' | 'documento';
+export interface EtapaItem {
+  id?: string; tipo: EtapaTipo; conteudo: string; // conteudo = texto OU legenda da mídia
+  storagePath?: string | null; nome?: string | null; mime?: string | null; tamanho?: number | null;
+  file?: File; // upload pendente (somente no cliente, antes de salvar)
+}
+interface DbEtapa { id: string; tipo: EtapaTipo; conteudo: string | null; storage_path: string | null; nome_arquivo: string | null; mime_type: string | null; tamanho_bytes: number | null; }
 
-/** Carrega as etapas de texto de um script, na ordem. */
-export async function fetchEtapasTexto(scriptId: string): Promise<{ id: string; conteudo: string }[]> {
-  const { data, error } = await supabase!.from('script_etapas').select('id,conteudo,posicao,tipo')
+/** Carrega todas as etapas de um script, na ordem. */
+export async function fetchEtapas(scriptId: string): Promise<EtapaItem[]> {
+  const { data, error } = await supabase!.from('script_etapas')
+    .select('id,tipo,conteudo,posicao,storage_path,nome_arquivo,mime_type,tamanho_bytes')
     .eq('script_id', scriptId).order('posicao', { ascending: true });
   if (error) throw new Error(error.message);
-  return ((data as unknown as { id: string; conteudo: string | null; tipo: string }[]) ?? [])
-    .filter((r) => r.tipo === 'texto').map((r) => ({ id: r.id, conteudo: r.conteudo ?? '' }));
+  return ((data as unknown as DbEtapa[]) ?? []).map((r) => ({
+    id: r.id, tipo: r.tipo, conteudo: r.conteudo ?? '',
+    storagePath: r.storage_path, nome: r.nome_arquivo, mime: r.mime_type, tamanho: r.tamanho_bytes,
+  }));
 }
 
 export function useScriptEtapaMutations() {
   const { currentOrg } = useOrg();
   const qc = useQueryClient();
   return {
-    /** Reconcilia a sequência: atualiza/insere na ordem e remove as etapas que sobraram.
-     *  Faz inserts/updates ANTES dos deletes para nunca deixar o script sem etapas. */
-    salvarTexto: useMutation({
-      mutationFn: async (a: { scriptId: string; mensagens: { id?: string; conteudo: string }[] }) => {
-        const { data: ex, error: e0 } = await supabase!.from('script_etapas').select('id').eq('script_id', a.scriptId);
+    /** Reconcilia a sequência (texto + mídia): faz uploads + inserts/updates ANTES dos
+     *  deletes para nunca deixar o script sem etapas; remove objetos órfãos do Storage. */
+    salvarEtapas: useMutation({
+      mutationFn: async (a: { scriptId: string; etapas: EtapaItem[] }) => {
+        const { data: ex, error: e0 } = await supabase!.from('script_etapas').select('id,storage_path').eq('script_id', a.scriptId);
         if (e0) throw new Error(e0.message);
-        const existIds = new Set(((ex as { id: string }[]) ?? []).map((r) => r.id));
+        const existing = new Map(((ex as { id: string; storage_path: string | null }[]) ?? []).map((r) => [r.id, r.storage_path]));
         const keep = new Set<string>();
         let pos = 1;
-        for (const m of a.mensagens) {
-          if (m.id && existIds.has(m.id)) {
-            const { error } = await supabase!.from('script_etapas').update({ conteudo: m.conteudo, posicao: pos, tipo: 'texto' }).eq('id', m.id);
+        for (const s of a.etapas) {
+          let path = s.storagePath ?? null;
+          if (s.file) {
+            const safe = s.file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80);
+            path = `${currentOrg.id}/${a.scriptId}/${crypto.randomUUID()}-${safe}`;
+            const up = await supabase!.storage.from(SCRIPT_BUCKET).upload(path, s.file, { contentType: s.file.type || undefined, upsert: false });
+            if (up.error) throw new Error(up.error.message);
+          }
+          const row = {
+            posicao: pos, tipo: s.tipo, conteudo: s.conteudo || null, storage_path: path,
+            nome_arquivo: s.nome ?? s.file?.name ?? null, mime_type: s.mime ?? s.file?.type ?? null, tamanho_bytes: s.tamanho ?? s.file?.size ?? null,
+          };
+          if (s.id && existing.has(s.id)) {
+            const { error } = await supabase!.from('script_etapas').update(row).eq('id', s.id);
             if (error) throw new Error(error.message);
-            keep.add(m.id);
+            keep.add(s.id);
           } else {
-            const { data, error } = await supabase!.from('script_etapas').insert({ script_id: a.scriptId, organizacao_id: currentOrg.id, posicao: pos, tipo: 'texto', conteudo: m.conteudo }).select('id').single();
+            const { data, error } = await supabase!.from('script_etapas').insert({ ...row, script_id: a.scriptId, organizacao_id: currentOrg.id }).select('id').single();
             if (error) throw new Error(error.message);
             if (data) keep.add((data as { id: string }).id);
           }
           pos++;
         }
-        const del = [...existIds].filter((id) => !keep.has(id));
-        if (del.length) { const { error } = await supabase!.from('script_etapas').delete().in('id', del); if (error) throw new Error(error.message); }
+        const del = [...existing.keys()].filter((id) => !keep.has(id));
+        if (del.length) {
+          const paths = del.map((id) => existing.get(id)).filter((p): p is string => !!p);
+          if (paths.length) await supabase!.storage.from(SCRIPT_BUCKET).remove(paths);
+          const { error } = await supabase!.from('script_etapas').delete().in('id', del);
+          if (error) throw new Error(error.message);
+        }
       },
       onSuccess: () => qc.invalidateQueries({ queryKey: ['scripts', currentOrg.id] }),
     }),
   };
 }
 
-/** Resolve um script como sequência ordenada já com variáveis substituídas (para execução futura na conversa). */
-export async function resolverSequenciaScript(scriptId: string, ctx: VarCtx): Promise<string[]> {
-  const etapas = await fetchEtapasTexto(scriptId);
-  return etapas.map((e) => substituirVariaveis(e.conteudo, ctx)).filter((t) => t.trim().length > 0);
+/** Resolve um script como sequência ordenada já com variáveis substituídas (execução futura na conversa). */
+export async function resolverSequenciaScript(scriptId: string, ctx: VarCtx): Promise<{ tipo: EtapaTipo; texto: string; storagePath: string | null | undefined }[]> {
+  const etapas = await fetchEtapas(scriptId);
+  return etapas.map((e) => ({ tipo: e.tipo, texto: substituirVariaveis(e.conteudo, ctx), storagePath: e.storagePath }));
 }
