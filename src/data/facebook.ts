@@ -40,7 +40,7 @@ export function useFbStatus() {
 }
 
 /* ===================== Inbox (conversas do Facebook) ===================== */
-export interface FbMsg { dir: 'in' | 'out'; text: string; time: string; status?: string; origem?: string | null; id?: string; tipo?: string; anexoPath?: string | null; etapaId?: string | null; erro?: string | null; }
+export interface FbMsg { dir: 'in' | 'out'; text: string; time: string; status?: string; origem?: string | null; id?: string; tipo?: string; anexoPath?: string | null; etapaId?: string | null; erro?: string | null; tamanho?: number | null; mime?: string | null; }
 export interface FbConv {
   id: string; name: string; email: string; notes: string;
   status: string; statusId: string | null; statusCor: string | null;
@@ -56,7 +56,7 @@ function hhmm(iso?: string | null): string {
 }
 const STATUS_LABEL: Record<string, string> = { aberta: 'Aberta', em_atendimento: 'Em atendimento', pendente: 'Pendente', resolvida: 'Resolvida', fechada: 'Fechada' };
 
-interface DbMsg { id: string; direcao: string; conteudo: string | null; enviada_em: string | null; recebida_em: string | null; criado_em: string | null; origem: string | null; status: string | null; tipo: string | null; erro_envio: string | null; metadados: { anexo_path?: string | null; etapa_id?: string | null } | null; }
+interface DbMsg { id: string; direcao: string; conteudo: string | null; enviada_em: string | null; recebida_em: string | null; criado_em: string | null; origem: string | null; status: string | null; tipo: string | null; erro_envio: string | null; metadados: { anexo_path?: string | null; etapa_id?: string | null; tamanho?: number | null; mime?: string | null } | null; }
 interface DbConv {
   id: string; status: string; status_id: string | null; nao_lidas: number | null; ultima_interacao_em: string | null; etiquetas: string[] | null;
   contatos: { id: string; nome: string; email: string | null; etiquetas: string[] | null; origem: string | null; observacoes: string | null; responsavel_id: string | null } | null;
@@ -73,6 +73,7 @@ function mapConversa(c: DbConv): FbConv {
       dir: m.direcao === 'saida' ? 'out' : 'in', text: m.conteudo ?? '', time: hhmm(m.recebida_em || m.enviada_em || m.criado_em),
       status: m.status ?? undefined, origem: m.origem, id: m.id, tipo: m.tipo ?? 'texto',
       anexoPath: m.metadados?.anexo_path ?? null, etapaId: m.metadados?.etapa_id ?? null, erro: m.erro_envio ?? null,
+      tamanho: m.metadados?.tamanho ?? null, mime: m.metadados?.mime ?? null,
     }));
   const last = msgs[msgs.length - 1];
   return {
@@ -83,7 +84,7 @@ function mapConversa(c: DbConv): FbConv {
     status: STATUS_LABEL[c.status] ?? c.status,
     statusId: c.status_id ?? null,
     statusCor: null,
-    tags: c.etiquetas ?? c.contatos?.etiquetas ?? [],
+    tags: c.contatos?.etiquetas ?? [], // etiqueta e do CONTATO (persiste e aparece em todas as conversas dele)
     respId: c.contatos?.responsavel_id ?? null,
     contatoId: c.contatos?.id ?? null,
     canalId: c.canais?.id ?? null,
@@ -158,25 +159,35 @@ export async function subirAudioGravado(orgId: string, blob: Blob, ext: string, 
   return { path, nome, tamanho: blob.size };
 }
 
-/** Envia MÍDIA via meta-send-message: etapa de script (etapaId) OU áudio gravado (audioPath). Lança em falha REAL. */
+/** Sobe uma mídia manual (imagem/vídeo/documento) para o bucket privado (sob o prefixo da org). */
+export async function subirMidiaInbox(orgId: string, file: File): Promise<{ path: string; nome: string; tamanho: number; mime: string }> {
+  const safe = (file.name || 'arquivo').replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80) || 'arquivo';
+  const path = `${orgId}/inbox-midia/${crypto.randomUUID()}-${safe}`;
+  const up = await supabase!.storage.from('script-midia').upload(path, file, { contentType: file.type || undefined, upsert: false });
+  if (up.error) throw new Error(up.error.message);
+  return { path, nome: file.name || safe, tamanho: file.size, mime: file.type || 'application/octet-stream' };
+}
+
+/** Envia MÍDIA via meta-send-message: etapa de script, áudio gravado OU mídia manual (path direto). Lança em falha REAL. */
 export function useSendFbMedia() {
   const { currentOrg } = useOrg();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { conversaId: string; etapaId?: string; texto?: string; audioPath?: string; audioMime?: string; audioNome?: string; audioTamanho?: number }) => {
+    mutationFn: async (input: { conversaId: string; etapaId?: string; texto?: string; audioPath?: string; audioMime?: string; audioNome?: string; audioTamanho?: number; midiaPath?: string; midiaTipo?: string; midiaMime?: string; midiaNome?: string; midiaTamanho?: number }) => {
       type Res = { ok?: boolean; error?: string; message_id?: string };
       type Body = { ok?: boolean; error?: string; resultados?: { texto?: Res; anexo?: Res } };
       const body: Record<string, unknown> = { conversa_id: input.conversaId, ...(input.texto && input.texto.trim() ? { texto: input.texto } : {}) };
       if (input.etapaId) body.etapa_id = input.etapaId;
       if (input.audioPath) { body.audio_path = input.audioPath; body.audio_mime = input.audioMime; body.audio_nome = input.audioNome; body.audio_tamanho = input.audioTamanho; }
+      if (input.midiaPath) { body.midia_path = input.midiaPath; body.midia_tipo = input.midiaTipo; body.midia_mime = input.midiaMime; body.midia_nome = input.midiaNome; body.midia_tamanho = input.midiaTamanho; }
       const { data, error } = await supabase!.functions.invoke('meta-send-message', { body });
       let payload = data as Body | null;
       // em não-2xx o corpo vem em error.context — lê para extrair o erro real do provedor
       if (error) { try { payload = await (error as unknown as { context: Response }).context.json(); } catch { payload = null; } }
       const anexo = payload?.resultados?.anexo;
-      if (!anexo?.ok) throw new Error(traduzMidia(anexo?.error || payload?.error || 'falha_envio_imagem'));
+      if (!anexo?.ok) throw new Error(traduzMidia(anexo?.error || payload?.error || 'Falha ao enviar a mídia.'));
       const cap = payload?.resultados?.texto;
-      if (input.texto && input.texto.trim() && cap && !cap.ok) throw new Error('Imagem enviada, mas a legenda falhou: ' + traduzMidia(cap.error || ''));
+      if (input.texto && input.texto.trim() && cap && !cap.ok) throw new Error('Mídia enviada, mas a legenda falhou: ' + traduzMidia(cap.error || ''));
       return { messageId: anexo.message_id };
     },
     onSettled: () => qc.invalidateQueries({ queryKey: ['fb-conversas', currentOrg.id] }),

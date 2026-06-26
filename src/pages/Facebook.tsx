@@ -1,15 +1,17 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/useToast';
 import { useAuth } from '@/context/AuthContext';
 import { useOrg } from '@/context/OrgContext';
 import { initials, avatarColor } from '@/lib/avatar';
 import { FB_CONTACTS, FB_QUICK, type FbContact } from '@/data/facebookDemo';
-import { FB_REAL, useFbConversations, useSendFbMessage, useSendFbMedia, subirAudioGravado, useFbStatus, type FbConv, type FbMsg } from '@/data/facebook';
+import { FB_REAL, useFbConversations, useSendFbMessage, useSendFbMedia, subirAudioGravado, subirMidiaInbox, useFbStatus, type FbConv, type FbMsg } from '@/data/facebook';
 import { useScripts, useScriptEtapaCounts, urlAssinadaAnexo } from '@/data/scripts';
 import { ScriptSequenceModal } from '@/components/ScriptSequenceModal';
 import { AudioMessage } from '@/components/AudioMessage';
 import { AudioRecorder } from '@/components/AudioRecorder';
+import { MediaComposer, type MediaTipo } from '@/components/MediaComposer';
 import { useStatusDefs, useEtiquetas, useAtendimentoActions, useOrgUsuarios } from '@/data/atendimento';
 import { corDaEtiqueta } from '@/types/atendimento';
 import './Facebook.css';
@@ -30,6 +32,8 @@ const IcFunnel = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor
 const IcPaperclip = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5 12.5 20a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4l7.8-7.8" /></svg>;
 const IcImage = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.4" /><circle cx="8.5" cy="9.5" r="1.5" /><path d="m3 17 5-5 4 4 3-3 6 6" /></svg>;
 const IcDoc = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5M9 13h6M9 17h6" /></svg>;
+const IcVideo = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="14" height="14" rx="2.4" /><path d="m22 8-6 4 6 4z" /></svg>;
+const IcMidias = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15l-5-5L5 21" /><rect x="3" y="3" width="18" height="18" rx="2.4" /><circle cx="8.5" cy="8.5" r="1.5" /></svg>;
 const IcBolt = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7z" /></svg>;
 const IcEmoji = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M8 14s1.5 2 4 2 4-2 4-2" /><path d="M9 9h.01M15 9h.01" /></svg>;
 const IcSend = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4z" /></svg>;
@@ -75,6 +79,7 @@ function FacebookInbox() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { currentOrg } = useOrg();
+  const qc = useQueryClient();
   const scriptsLib = useScripts('facebook').data ?? [];
   const etapaCounts = useScriptEtapaCounts().data ?? {};
   const [scriptSeq, setScriptSeq] = useState<{ id: string; titulo: string; conteudo: string } | null>(null);
@@ -101,6 +106,10 @@ function FacebookInbox() {
   const [editErr, setEditErr] = useState<string | null>(null);
   const [imgUrls, setImgUrls] = useState<Record<string, string | null>>({}); // anexo_path -> URL assinada (null = quebrada)
   const [lightbox, setLightbox] = useState<string | null>(null);
+  const [etqBusca, setEtqBusca] = useState('');     // busca no seletor de etiquetas
+  const [etqSaving, setEtqSaving] = useState(false); // trava clique-duplo ao aplicar/criar etiqueta
+  const [midiaPop, setMidiaPop] = useState(false);  // popover "Mídias"
+  const [midiaModal, setMidiaModal] = useState<MediaTipo | null>(null);
 
   const taRef = useRef<HTMLTextAreaElement>(null);
   const msgsRef = useRef<HTMLDivElement>(null);
@@ -145,7 +154,7 @@ function FacebookInbox() {
 
   // URLs assinadas das IMAGENS (sob demanda — nunca guardamos URL permanente). Áudio resolve no próprio player.
   useEffect(() => {
-    const faltam = current.msgs.filter((m) => m.tipo === 'imagem' && m.anexoPath && !(m.anexoPath in imgUrls)).map((m) => m.anexoPath as string);
+    const faltam = current.msgs.filter((m) => (m.tipo === 'imagem' || m.tipo === 'video') && m.anexoPath && !(m.anexoPath in imgUrls)).map((m) => m.anexoPath as string);
     if (!faltam.length) return;
     let vivo = true;
     (async () => {
@@ -158,7 +167,8 @@ function FacebookInbox() {
   async function retryMidia(m: FbMsg) {
     try {
       if (m.etapaId) await sendMedia.mutateAsync({ conversaId: current.id, etapaId: m.etapaId });
-      else if (m.tipo === 'audio' && m.anexoPath) await sendMedia.mutateAsync({ conversaId: current.id, audioPath: m.anexoPath, audioMime: 'audio/webm', audioNome: m.text });
+      else if (m.anexoPath && m.tipo === 'audio') await sendMedia.mutateAsync({ conversaId: current.id, audioPath: m.anexoPath, audioMime: m.mime || 'audio/webm', audioNome: m.text });
+      else if (m.anexoPath && m.tipo) await sendMedia.mutateAsync({ conversaId: current.id, midiaPath: m.anexoPath, midiaTipo: m.tipo, midiaMime: m.mime || undefined, midiaNome: m.text, midiaTamanho: m.tamanho || undefined });
       else { toast('Sem referência da mídia para reenviar.', 'warn'); return; }
       toast('Mídia reenviada');
     } catch (e) { toast((e as Error).message || 'Falha ao reenviar', 'warn'); }
@@ -171,6 +181,21 @@ function FacebookInbox() {
     if (blob.size > 25 * 1024 * 1024) throw new Error('Áudio acima de 25 MB.');
     const up = await subirAudioGravado(currentOrg.id, blob, ext, mime);
     await sendMedia.mutateAsync({ conversaId: current.id, audioPath: up.path, audioMime: mime, audioNome: up.nome, audioTamanho: up.tamanho });
+  }
+
+  // Abre/baixa documento gerando a URL assinada SOB DEMANDA (nunca persistida).
+  async function abrirDocumento(m: FbMsg) {
+    if (!m.anexoPath) return;
+    try { const u = await urlAssinadaAnexo(m.anexoPath); if (u) window.open(u, '_blank', 'noopener'); else toast('Arquivo indisponível.', 'warn'); }
+    catch { toast('Arquivo indisponível.', 'warn'); }
+  }
+
+  // Mídia manual (imagem/vídeo/documento): upload no bucket privado -> envio real (lança em falha).
+  async function enviarMidiaManual(tipo: MediaTipo, file: File, caption: string) {
+    if (!current.id) throw new Error('Selecione uma conversa.');
+    if (!canalConectado) throw new Error('Página desconectada.');
+    const up = await subirMidiaInbox(currentOrg.id, file);
+    await sendMedia.mutateAsync({ conversaId: current.id, midiaPath: up.path, midiaTipo: tipo, midiaMime: up.mime, midiaNome: up.nome, midiaTamanho: up.tamanho, texto: caption });
   }
 
   function selectContact(id: string) { setCurrentId(id); if (isMobile) setDataOpen(false); }
@@ -193,11 +218,28 @@ function FacebookInbox() {
     try { await acoes.definirStatusConversa(current.id, statusId); } catch (e) { toast((e as Error).message || 'Falha ao alterar status', 'warn'); }
   }
   async function alternarEtiqueta(nome: string) {
-    if (!current.id) return;
+    if (!current.contatoId || etqSaving) return;                 // etiqueta é do CONTATO; trava clique-duplo
     const tem = current.tags.some((t) => t.toLowerCase() === nome.toLowerCase());
     const novas = tem ? current.tags.filter((t) => t.toLowerCase() !== nome.toLowerCase()) : [...current.tags, nome];
-    setContacts((cur) => cur.map((c) => c.id === current.id ? { ...c, tags: novas } : c));
-    try { await acoes.definirEtiquetasConversa(current.id, novas); } catch (e) { toast((e as Error).message || 'Falha ao salvar etiquetas', 'warn'); }
+    setEtqSaving(true);
+    setContacts((cur) => cur.map((c) => c.contatoId === current.contatoId ? { ...c, tags: novas } : c)); // todas as conversas do contato
+    try { await acoes.definirEtiquetasContato(current.contatoId, novas); }
+    catch (e) { toast((e as Error).message || 'Falha ao salvar etiquetas', 'warn'); }
+    finally { qc.invalidateQueries({ queryKey: ['fb-conversas', currentOrg.id] }); setEtqSaving(false); }
+  }
+  async function criarEAplicarEtiqueta() {
+    const nome = etqBusca.trim();
+    if (!nome || etqSaving || !current.contatoId) return;
+    if (current.tags.some((t) => t.toLowerCase() === nome.toLowerCase())) { setEtqBusca(''); return; }
+    setEtqSaving(true);
+    const novas = [...current.tags, nome];
+    try {
+      await acoes.criarEtiqueta(nome, '#19C37D', null);
+      setContacts((cur) => cur.map((c) => c.contatoId === current.contatoId ? { ...c, tags: novas } : c));
+      await acoes.definirEtiquetasContato(current.contatoId, novas);
+      setEtqBusca('');
+    } catch (e) { toast((e as Error).message || 'Falha ao criar etiqueta', 'warn'); }
+    finally { qc.invalidateQueries({ queryKey: ['etiquetas', currentOrg.id] }); qc.invalidateQueries({ queryKey: ['fb-conversas', currentOrg.id] }); setEtqSaving(false); }
   }
   function iniciarEdicao() {
     if (!current.contatoId) return;
@@ -261,6 +303,12 @@ function FacebookInbox() {
                 <div className="crow"><span className="cname">{c.name}</span><span className="ctime">{c.time}</span></div>
                 <div className="csrc"><IcMsg />{c.paginaNome}</div>
                 <div className="cprev">{c.last}</div>
+                {c.tags.length > 0 && (
+                  <div className="conv-tags">
+                    {c.tags.slice(0, 2).map((t) => { const cor = corDaEtiqueta(t, etiquetas); return <span key={t} className="ctag" style={{ background: cor + '22', color: cor, borderColor: cor + '55' }}>{t}</span>; })}
+                    {c.tags.length > 2 && <span className="ctag ctag-more">+{c.tags.length - 2}</span>}
+                  </div>
+                )}
               </div>
               {c.unread > 0 && <span className="unread">{c.unread}</span>}
             </div>
@@ -280,6 +328,14 @@ function FacebookInbox() {
                 ? <span className="meta-val"><span style={{ width: 8, height: 8, borderRadius: 999, background: statusCorAtual, display: 'inline-block', marginRight: 6 }} />{statusNomeAtual}</span>
                 : <span className="meta-val" style={{ color: 'var(--muted)' }}>—</span>}
             </div>
+            {current.tags.length > 0 && (
+              <div className="meta-cell"><div className="k">Etiquetas</div>
+                <span className="meta-val" style={{ display: 'inline-flex', gap: 4, flexWrap: 'wrap' }}>
+                  {current.tags.slice(0, 3).map((t) => { const cor = corDaEtiqueta(t, etiquetas); return <span key={t} className="ch-tag" style={{ background: cor + '22', color: cor, borderColor: cor + '55' }}>{t}</span>; })}
+                  {current.tags.length > 3 && <span className="ch-tag">+{current.tags.length - 3}</span>}
+                </span>
+              </div>
+            )}
           </div>
           <div className="ch-actions">
             <button className="icon-btn" title="Editar dados do cliente" disabled={!current.contatoId} onClick={iniciarEdicao}><IcEdit /></button>
@@ -290,9 +346,13 @@ function FacebookInbox() {
             const ack = m.dir === 'out' ? ackFb(m.status) : null;
             const ehImg = m.tipo === 'imagem' && !!m.anexoPath;
             const ehAudio = m.tipo === 'audio' && !!m.anexoPath;
+            const ehVideo = m.tipo === 'video' && !!m.anexoPath;
+            const ehDoc = m.tipo === 'documento' && !!m.anexoPath;
             const falhou = m.status === 'falhou';
-            const url = ehImg ? imgUrls[m.anexoPath as string] : undefined;
-            const falhaUI = falhou && <div className="img-falha"><IcWarn /><span>Falha no envio</span>{m.etapaId && <button className="link-btn" style={{ background: 'none', border: 0, color: '#5b7bd6', cursor: 'pointer', padding: 0 }} onClick={() => retryMidia(m)}>Tentar novamente</button>}</div>;
+            const url = (ehImg || ehVideo) ? imgUrls[m.anexoPath as string] : undefined;
+            const docExt = ehDoc ? (m.text.split('.').pop() || '').toUpperCase().slice(0, 5) : '';
+            const docTam = m.tamanho ? (m.tamanho < 1048576 ? Math.round(m.tamanho / 1024) + ' KB' : (m.tamanho / 1048576).toFixed(1) + ' MB') : '';
+            const falhaUI = falhou && <div className="img-falha"><IcWarn /><span>Falha no envio</span>{(m.etapaId || m.anexoPath) && <button className="link-btn" style={{ background: 'none', border: 0, color: '#5b7bd6', cursor: 'pointer', padding: 0 }} onClick={() => retryMidia(m)}>Tentar novamente</button>}</div>;
             return (
               <div key={i} className={'msg ' + m.dir}>
                 {ehImg ? (
@@ -305,6 +365,22 @@ function FacebookInbox() {
                 ) : ehAudio ? (
                   <div className="bubble bubble-audio">
                     <AudioMessage path={m.anexoPath as string} nome={m.text} resolveUrl={(p) => urlAssinadaAnexo(p)} />
+                    {falhaUI}
+                  </div>
+                ) : ehVideo ? (
+                  <div className="bubble bubble-vid">
+                    {url ? <video className="msg-vid" src={url} controls preload="none" onError={() => setImgUrls((x) => ({ ...x, [m.anexoPath as string]: null }))} />
+                      : url === null ? <div className="img-fallback">Vídeo indisponível</div>
+                        : <div className="img-fallback">Carregando…</div>}
+                    {falhaUI}
+                  </div>
+                ) : ehDoc ? (
+                  <div className="bubble bubble-doc">
+                    <div className="doc-msg">
+                      <span className="doc-ic"><IcDoc /></span>
+                      <div className="doc-info"><div className="doc-nome" title={m.text}>{m.text}</div><small>{docExt}{docExt && docTam ? ' · ' : ''}{docTam}</small></div>
+                      <button type="button" className="doc-open" onClick={() => abrirDocumento(m)}>Abrir</button>
+                    </div>
                     {falhaUI}
                   </div>
                 ) : (
@@ -350,6 +426,17 @@ function FacebookInbox() {
                 )}
               </span>
               <AudioRecorder disabled={!current.id || !canalConectado} onEnviar={enviarAudioGravado} />
+              <span style={{ position: 'relative' }}>
+                <button className="fb-tool" disabled={!current.id || !canalConectado} title="Enviar mídia" onClick={() => setMidiaPop((v) => !v)}><IcMidias /><span>Mídias</span></button>
+                {midiaPop && (
+                  <div className="pop" style={{ position: 'absolute', bottom: '100%', left: 0, marginBottom: 8, zIndex: 40, width: 180 }}>
+                    <div className="pop-head">Enviar mídia</div>
+                    <button className="pop-item" onClick={() => { setMidiaModal('imagem'); setMidiaPop(false); }}><IcImage />Imagem</button>
+                    <button className="pop-item" onClick={() => { setMidiaModal('video'); setMidiaPop(false); }}><IcVideo />Vídeo</button>
+                    <button className="pop-item" onClick={() => { setMidiaModal('documento'); setMidiaPop(false); }}><IcDoc />Documento</button>
+                  </div>
+                )}
+              </span>
               <span className="spacer" />
               <button className="send-btn" aria-label="Enviar" disabled={draft.trim() === '' || !current.id || !canalConectado} onClick={sendMsg}><IcSend /></button>
             </div>
@@ -422,13 +509,19 @@ function FacebookInbox() {
               {current.id && <button className="tag-add" title="Adicionar etiqueta" onClick={() => setPicker((p) => p === 'tags' ? null : 'tags')}><IcPlus /></button>}
             </div>
             {picker === 'tags' && (
-              <div className="pop" style={{ position: 'absolute', top: '100%', left: 0, marginTop: 4, zIndex: 60, maxHeight: 280, overflowY: 'auto', minWidth: 200 }}>
+              <div className="pop" style={{ position: 'absolute', top: '100%', left: 0, marginTop: 4, zIndex: 60, maxHeight: 300, overflowY: 'auto', minWidth: 220 }}>
                 <div className="pop-head">Etiquetas</div>
-                {etiquetasAtivas.length === 0 && <div className="pop-item" style={{ color: 'var(--muted)' }}>Nenhuma etiqueta.</div>}
-                {etiquetasAtivas.map((e) => {
+                <input className="atv-input" style={{ margin: '2px 8px 6px', width: 'calc(100% - 16px)' }} placeholder="Buscar ou criar…" value={etqBusca} onChange={(e) => setEtqBusca(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') criarEAplicarEtiqueta(); }} autoFocus />
+                {etiquetasAtivas.filter((e) => e.nome.toLowerCase().includes(etqBusca.trim().toLowerCase())).map((e) => {
                   const on = current.tags.some((t) => t.toLowerCase() === e.nome.toLowerCase());
-                  return <button key={e.id} className={'pop-item' + (on ? ' sel' : '')} onClick={() => alternarEtiqueta(e.nome)}><span style={{ width: 8, height: 8, borderRadius: 999, background: e.cor, display: 'inline-block', marginRight: 6 }} />{e.nome}{on && <span style={{ marginLeft: 'auto' }}>✓</span>}</button>;
+                  return <button key={e.id} className={'pop-item' + (on ? ' sel' : '')} disabled={etqSaving} onClick={() => alternarEtiqueta(e.nome)}><span style={{ width: 8, height: 8, borderRadius: 999, background: e.cor, display: 'inline-block', marginRight: 6 }} />{e.nome}{on && <span style={{ marginLeft: 'auto' }}>✓</span>}</button>;
                 })}
+                {etqBusca.trim() && !etiquetasAtivas.some((e) => e.nome.toLowerCase() === etqBusca.trim().toLowerCase()) && (
+                  <button className="pop-item" disabled={etqSaving} onClick={criarEAplicarEtiqueta}><IcPlus />Criar “{etqBusca.trim()}”</button>
+                )}
+                {etiquetasAtivas.length === 0 && !etqBusca.trim() && <div className="pop-item" style={{ color: 'var(--muted)' }}>Nenhuma etiqueta. Digite para criar.</div>}
+                {etqSaving && <div className="pop-item" style={{ color: 'var(--muted)' }}>Salvando…</div>}
               </div>
             )}
           </div>
@@ -457,6 +550,9 @@ function FacebookInbox() {
           <img src={lightbox} alt="imagem ampliada" onClick={(e) => e.stopPropagation()} onError={() => setLightbox(null)} />
         </div>
       )}
+
+      <MediaComposer open={!!midiaModal} tipo={midiaModal ?? 'imagem'} onClose={() => setMidiaModal(null)}
+        enviar={(file, caption) => enviarMidiaManual(midiaModal ?? 'imagem', file, caption)} />
     </div>
   );
 }

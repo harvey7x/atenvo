@@ -243,3 +243,20 @@
 /* ===== Player de audio no historico (envio de etapa de audio) ===== */
 .bubble-audio{ padding:4px !important; background:transparent !important; border:0 !important; }
 .msg-audio{ width:240px; max-width:60vw; height:40px; display:block; }
+
+/* ===== Chips de etiqueta na lista e no cabecalho (FB) ===== */
+.conv-tags { display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
+.ctag { font-size: 10px; line-height: 1.5; padding: 0 6px; border-radius: 999px; border: 1px solid transparent; max-width: 92px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ctag-more { background: var(--line-2); color: var(--ink-2); }
+.ch-tag { font-size: 11px; line-height: 1.6; padding: 0 7px; border-radius: 999px; border: 1px solid transparent; white-space: nowrap; }
+
+/* ===== Video e documento no historico (FB) ===== */
+.bubble-vid { padding: 4px !important; background: transparent !important; border: 0 !important; }
+.msg-vid { max-width: 260px; max-height: 240px; border-radius: 10px; display: block; background: #000; }
+.doc-msg { display: flex; align-items: center; gap: 8px; min-width: 210px; }
+.doc-ic { color: var(--ink-2); display: inline-flex; flex: 0 0 auto; }
+.doc-info { flex: 1; min-width: 0; }
+.doc-nome { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doc-info small { color: var(--muted); font-size: 11px; }
+.doc-open { flex: 0 0 auto; border: 1px solid var(--line-2); background: var(--surface); color: var(--ink-2); border-radius: 8px; font-size: 12px; padding: 2px 10px; cursor: pointer; }
+.doc-open:hover { color: var(--ink); }

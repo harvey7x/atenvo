@@ -1,0 +1,13 @@
+.media-drop {
+  border: 1.5px dashed var(--line-2); border-radius: 12px; padding: 28px 16px; text-align: center;
+  color: var(--ink-2); cursor: pointer; background: var(--surface); transition: border-color .15s, background .15s;
+}
+.media-drop:hover, .media-drop.over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 6%, var(--surface)); }
+.media-drop-hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.media-prev-img { max-width: 100%; max-height: 240px; border-radius: 10px; display: block; margin: 0 auto 8px; cursor: zoom-in; object-fit: contain; }
+.media-prev-vid { max-width: 100%; max-height: 260px; border-radius: 10px; display: block; margin: 0 auto 8px; background: #000; }
+.media-doc-card { display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--line-2); border-radius: 10px; color: var(--ink-2); margin-bottom: 8px; }
+.media-doc-nome { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.media-doc-card small { color: var(--muted); }
+.media-actions { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.media-meta { flex: 1; min-width: 0; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

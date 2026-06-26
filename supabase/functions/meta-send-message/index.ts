@@ -22,9 +22,12 @@ Deno.serve(async (req) => {
   const uc = createClient(SUPABASE_URL, ANON, { global: { headers: { Authorization: auth } }, auth: { persistSession: false } });
   const { data: ud } = await uc.auth.getUser(); if (!ud.user) return json({ error: 'forbidden' }, 403);
 
-  const { conversa_id, texto, anexo_id, etapa_id, audio_path, audio_mime, audio_nome, audio_tamanho } = await req.json().catch(() => ({}));
+  const body0 = await req.json().catch(() => ({}));
+  const { conversa_id, texto, anexo_id, etapa_id, audio_path, audio_mime, audio_nome, audio_tamanho, midia_path, midia_tipo, midia_mime, midia_nome, midia_tamanho } = body0;
+  const dPath = midia_path || audio_path;                    // upload direto (gravacao de audio OU midia manual)
+  const dTipo = midia_path ? (['imagem', 'audio', 'video', 'documento'].includes(midia_tipo) ? midia_tipo : 'documento') : 'audio';
   const temTexto = typeof texto === 'string' && texto.trim().length > 0;
-  if (!conversa_id || (!temTexto && !anexo_id && !etapa_id && !audio_path)) return json({ error: 'parametros' }, 400);
+  if (!conversa_id || (!temTexto && !anexo_id && !etapa_id && !dPath)) return json({ error: 'parametros' }, 400);
   const db = admin();
 
   const { data: conv } = await db.from('conversas').select('id,organizacao_id,canal_id,contato_id').eq('id', conversa_id).maybeSingle();
@@ -65,6 +68,7 @@ Deno.serve(async (req) => {
     try {
       const r = await fetch(`${sendUrl}?access_token=${encodeURIComponent(pageToken)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ recipient: { id: ident.psid }, messaging_type: 'RESPONSE', message: { text: texto } }) });
       const j = await r.json(); if (!r.ok) throw new Error(j?.error?.message || `Graph ${r.status}`);
+      if (!j.message_id) throw new Error('sem_message_id');
       await persistirEReconciliar('texto', texto, j.message_id, clientReq, { mid: j.message_id });
       resultados.texto = { ok: true, message_id: j.message_id };
     } catch (e) {
@@ -75,18 +79,18 @@ Deno.serve(async (req) => {
 
   // ---- MÍDIA: anexo de script, etapa de script, OU áudio gravado (path direto). Mesmo bucket privado. ----
   type Anexo = { tipo: string; nome_arquivo: string | null; mime_type: string | null; tamanho_bytes: number | null; storage_path: string };
-  const querMidia = !!(anexo_id || etapa_id || audio_path);
+  const querMidia = !!(anexo_id || etapa_id || dPath);
   let anexo: Anexo | null = null;
   if (anexo_id || etapa_id) {
     const ref = anexo_id ? { tabela: 'script_anexos', id: anexo_id } : { tabela: 'script_etapas', id: etapa_id };
     const { data } = await db.from(ref.tabela).select('tipo,nome_arquivo,mime_type,tamanho_bytes,storage_path,organizacao_id').eq('id', ref.id).maybeSingle();
     // pertence à organização da conversa? (bloqueia anexo/etapa de outra org)
     if (data && data.organizacao_id === conv.organizacao_id && data.storage_path) anexo = { tipo: data.tipo, nome_arquivo: data.nome_arquivo, mime_type: data.mime_type, tamanho_bytes: data.tamanho_bytes, storage_path: data.storage_path };
-  } else if (audio_path) {
-    const p = String(audio_path);
+  } else if (dPath) {
+    const p = String(dPath);
     // ISOLAMENTO: o objeto precisa estar sob o prefixo da organização da conversa (mesma regra da RLS do bucket).
     if (p.startsWith(conv.organizacao_id + '/')) {
-      anexo = { tipo: 'audio', nome_arquivo: (audio_nome ? String(audio_nome) : 'audio').slice(0, 120), mime_type: audio_mime ? String(audio_mime) : 'audio/webm', tamanho_bytes: Number(audio_tamanho) || 0, storage_path: p };
+      anexo = { tipo: dTipo, nome_arquivo: (midia_nome ?? audio_nome ? String(midia_nome ?? audio_nome) : 'arquivo').slice(0, 120), mime_type: (midia_mime ?? audio_mime) ? String(midia_mime ?? audio_mime) : 'application/octet-stream', tamanho_bytes: Number(midia_tamanho ?? audio_tamanho) || 0, storage_path: p };
     }
   }
   if (querMidia) {
