@@ -7,6 +7,10 @@ export interface WaMessage {
   viaTelefone?: boolean;
   /** status de entrega da Evolution (pendente/enviada/entregue/lida/falhou). */
   status?: string;
+  /** id real da mensagem (para retry sem duplicar e ação "Ver erro"). */
+  id?: string;
+  /** motivo sanitizado da falha (quando status = falhou). */
+  erro?: string;
 }
 
 /** #6 último canal/número usado para falar com a conversa. */

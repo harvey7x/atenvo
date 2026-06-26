@@ -247,6 +247,17 @@
 .wa-app .phone-tag{display:inline-flex;align-items:center;gap:4px;margin-right:7px;padding:1px 6px;border-radius:6px;background:var(--green-soft);color:var(--green-ink);font-size:9.5px;font-weight:600;vertical-align:middle}
 .wa-app .phone-tag svg{width:10px;height:10px}
 
+/* filtro com seleção ativa */
+.wa-app .filter-btn.on{border-color:var(--green);background:var(--green-soft);color:var(--green-ink)}
+
+/* mensagem com falha de envio: bolha marcada + ações "Ver erro"/"Tentar novamente" */
+.wa-app .bubble.bubble-falha{border:1px solid #e5484d55}
+.wa-app .msg-falha-acts{display:block;text-align:right;margin-top:3px;font-size:11px;line-height:1.4}
+.wa-app .msg-falha-link{background:none;border:none;padding:0;cursor:pointer;color:#e5484d;font-weight:600;font-size:11px}
+.wa-app .msg-falha-link:hover:not(:disabled){text-decoration:underline}
+.wa-app .msg-falha-link:disabled{color:var(--muted);cursor:default;font-weight:400}
+.wa-app .msg-falha-sep{margin:0 6px;color:var(--muted)}
+
 /* ===== popover extras ===== */
 .wa-app .pop-item.sel{background:var(--green-soft)}
 .wa-app .pop-item .sdot{margin-right:2px}

@@ -40,7 +40,7 @@ const STATUS_LABEL: Record<string, string> = {
   aberta: 'Aberta', em_atendimento: 'Em atendimento', pendente: 'Pendente', resolvida: 'Resolvida', fechada: 'Fechada',
 };
 
-interface DbMsg { id: string; direcao: string; conteudo: string | null; tipo: string; enviada_em: string | null; recebida_em: string | null; criado_em: string | null; origem: string | null; status: string | null; }
+interface DbMsg { id: string; direcao: string; conteudo: string | null; tipo: string; enviada_em: string | null; recebida_em: string | null; criado_em: string | null; origem: string | null; status: string | null; erro_envio: string | null; }
 interface DbConv {
   id: string; status: string; status_id: string | null; nao_lidas: number | null; ultima_interacao_em: string | null; criado_em: string | null;
   etiquetas: string[] | null;
@@ -59,12 +59,14 @@ function mapConversa(c: DbConv): WaContact {
     .filter((m) => (m.conteudo ?? '').length > 0)
     .sort((a, b) => tsOf(a) - tsOf(b))
     .map((m) => ({
+      id: m.id,
       dir: m.direcao === 'saida' ? 'out' : 'in',
       text: m.conteudo ?? '',
       time: hhmm(m.enviada_em || m.recebida_em || m.criado_em),
       viaTelefone: m.origem === 'telefone',
       status: m.status ?? undefined,
-    }));
+      erro: m.erro_envio ?? undefined,
+    } as WaMessage));
   const lastMsg = msgs[msgs.length - 1];
   const chip = c.canais?.nome_interno ?? 'WhatsApp';
   const ultimoCanal: WaUltimoCanal | null = c.ultimo_canal_id || c.ultimo_numero
@@ -114,7 +116,7 @@ export function useWaConversations() {
         // canais!conversas_canal_id_fkey: desambigua o embed (há 2 FKs p/ canais: canal_id e ultimo_canal_id).
         // NÃO embutimos conversa_status_def aqui: a cor/nome do status é resolvida no cliente via useStatusDefs
         // (mantém o inbox funcional mesmo que a tabela auxiliar fique inacessível por grant).
-        .select('id, status, status_id, nao_lidas, ultima_interacao_em, criado_em, etiquetas, ultimo_canal_id, ultimo_numero, ultimo_provider, ultima_msg_canal_em, contatos!inner(id, nome, telefone, email, etiquetas, origem, observacoes, responsavel_id), canais!conversas_canal_id_fkey!inner(id, nome_interno, tipo), mensagens(id, direcao, conteudo, tipo, enviada_em, recebida_em, criado_em, origem, status)')
+        .select('id, status, status_id, nao_lidas, ultima_interacao_em, criado_em, etiquetas, ultimo_canal_id, ultimo_numero, ultimo_provider, ultima_msg_canal_em, contatos!inner(id, nome, telefone, email, etiquetas, origem, observacoes, responsavel_id), canais!conversas_canal_id_fkey!inner(id, nome_interno, tipo), mensagens(id, direcao, conteudo, tipo, enviada_em, recebida_em, criado_em, origem, status, erro_envio)')
         .eq('organizacao_id', orgId)
         .eq('canais.tipo', 'whatsapp')
         .order('ultima_interacao_em', { ascending: false });
@@ -148,12 +150,13 @@ export function useSendWaMessage() {
     // #4 assinatura aplicada no backend (evolution-send): passamos só o nome resolvido.
     // canalId = canal escolhido em "Responder por". O backend nunca confia em org vinda do cliente.
     // Retorna o id INTERNO da mensagem (para confirmação real do provedor). NÃO é garantia de entrega.
-    mutationFn: async (input: { conversaId: string; text: string; canalId?: string | null; assinaturaNome?: string }) => {
+    mutationFn: async (input: { conversaId: string; text: string; canalId?: string | null; assinaturaNome?: string; retryMensagemId?: string }) => {
       const r = await invoke<{ ok: boolean; mensagem?: { id?: string } }>('evolution-send', {
         conversa_id: input.conversaId,
         text: input.text,
         ...(input.canalId ? { canal_id: input.canalId } : {}),
         ...(input.assinaturaNome ? { assinatura_nome: input.assinaturaNome } : {}),
+        ...(input.retryMensagemId ? { retry_mensagem_id: input.retryMensagemId } : {}),
       });
       return r.mensagem?.id ?? null;
     },

@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/useToast';
 import { useAuth } from '@/context/AuthContext';
 import { useOrg } from '@/context/OrgContext';
-import { WA_CONTACTS, initials, avatarColor, type WaContact } from '@/data/whatsappDemo';
+import { WA_CONTACTS, initials, avatarColor, type WaContact, type WaMessage } from '@/data/whatsappDemo';
 import { useWaConversations, useSendWaMessage, useWaCanais, mascararNumero, WA_REAL } from '@/data/whatsapp';
 import { useScripts, useScriptEtapaCounts, aguardarConfirmacaoEnvio } from '@/data/scripts';
 import { ScriptSequenceModal } from '@/components/ScriptSequenceModal';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useStatusDefs, useEtiquetas, useAssinaturaPref, useAtendimentoActions, useOrgUsuarios, resolverNomeAssinatura } from '@/data/atendimento';
 import { corDaEtiqueta, podeGerenciarAtendimento, type AssinaturaModo } from '@/types/atendimento';
 import './WhatsApp.css';
@@ -26,11 +27,6 @@ const IcChevDown = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentCol
 const IcDots = () => <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.7" /><circle cx="12" cy="12" r="1.7" /><circle cx="12" cy="19" r="1.7" /></svg>;
 const IcSearch = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3-3" /></svg>;
 const IcFunnel = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 5h18l-7 8v6l-4-2v-4z" /></svg>;
-const IcPaperclip = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5 12.5 20a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4l7.8-7.8" /></svg>;
-const IcMic = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>;
-const IcImage = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.4" /><circle cx="8.5" cy="9.5" r="1.5" /><path d="m3 17 5-5 4 4 3-3 6 6" /></svg>;
-const IcDoc = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5M9 13h6M9 17h6" /></svg>;
-const IcEmoji = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M8 14s1.5 2 4 2 4-2 4-2" /><path d="M9 9h.01M15 9h.01" /></svg>;
 const IcScripts = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 8h8M8 12h8M8 16h5" /></svg>;
 const IcSend = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4z" /></svg>;
 const IcWarn = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /></svg>;
@@ -65,6 +61,14 @@ function ackOf(status?: string): { ticks: string; cls: string; title: string } |
   }
 }
 
+/** Motivo de falha sanitizado p/ exibição (nunca expõe internals do provedor). */
+function traduzErroEnvio(cod?: string): string {
+  if (!cod) return 'A mensagem não pôde ser enviada. Tente novamente.';
+  if (cod === 'sem_id_externo') return 'A Evolution não confirmou o envio (a mensagem não recebeu um identificador do WhatsApp). Tente novamente.';
+  if (cod.startsWith('ERROR')) return 'O WhatsApp recusou a entrega desta mensagem. Confira o número (DDD e nono dígito) e a conexão do canal, depois tente novamente.';
+  return 'Não foi possível enviar a mensagem. Tente novamente.';
+}
+
 const TABS: { id: string; label: string }[] = [
   { id: 'todos', label: 'Todos' },
   { id: 'meus', label: 'Meus' },
@@ -85,7 +89,7 @@ const CURR_KEY = 'atenvo-wa-current';
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const soDigitos = (s: string) => (s || '').replace(/\D/g, '');
 
-type PopKind = 'filter' | 'attach' | 'scripts' | 'status' | 'tags' | 'acoes';
+type PopKind = 'filter' | 'scripts' | 'status' | 'tags' | 'acoes';
 interface PopState { kind: PopKind; rect: DOMRect; align: 'left' | 'right'; }
 
 export function WhatsApp() {
@@ -113,6 +117,11 @@ export function WhatsApp() {
   });
   const [tab, setTab] = useState('todos');
   const [search, setSearch] = useState('');
+  const [filtroCanal, setFiltroCanal] = useState<string | null>(null);   // funil: filtra por número/canal
+  const [filtroStatus, setFiltroStatus] = useState<string | null>(null); // funil: filtra por status
+  const [confirmFechar, setConfirmFechar] = useState(false);             // diálogo próprio (substitui window.confirm)
+  const [erroDialog, setErroDialog] = useState<string | null>(null);     // "Ver erro" de mensagem falhada
+  const [retryId, setRetryId] = useState<string | null>(null);           // trava de duplo-clique no retry
   const [replyChip, setReplyChip] = useState('Chip 1');       // modo mock
   const [replyCanalId, setReplyCanalId] = useState<string>(''); // modo real
   const [draft, setDraft] = useState('');
@@ -153,11 +162,11 @@ export function WhatsApp() {
   // ao trocar de conversa, sai do modo de edição
   useEffect(() => { setEditMode(false); setEditErr(null); }, [currentId]);
 
+  const enviandoRef = useRef(false); // trava envio concorrente (duplo-clique / Enter duplo)
   const taRef = useRef<HTMLTextAreaElement>(null);
   const msgsRef = useRef<HTMLDivElement>(null);
   const popRef = useRef<HTMLDivElement>(null);
   const filterBtnRef = useRef<HTMLButtonElement>(null);
-  const attachBtnRef = useRef<HTMLButtonElement>(null);
   const scriptsBtnRef = useRef<HTMLButtonElement>(null);
   const statusBtnRef = useRef<HTMLButtonElement>(null);
   const tagsBtnRef = useRef<HTMLButtonElement>(null);
@@ -165,9 +174,16 @@ export function WhatsApp() {
 
   const current = contacts.find((c) => c.id === currentId) ?? contacts[0] ?? EMPTY_CONTACT;
   const filtered = contacts.filter((c) => {
-    if (c.tabs.indexOf(tab) === -1) return false;
+    // abas reais: todos / meus (responsável = eu) / não atribuídos / pendentes (com não lidas)
+    if (tab === 'meus' && c.respId !== user?.id) return false;
+    if (tab === 'naoatrib' && !!c.respId) return false;
+    if (tab === 'pendentes' && (c.unread ?? 0) <= 0) return false;
+    // funil: por número (canal) e por status
+    if (filtroCanal && c.canalId !== filtroCanal) return false;
+    if (filtroStatus && c.statusId !== filtroStatus) return false;
+    // busca: nome, última mensagem ou telefone
     const t = search.trim().toLowerCase();
-    if (t && c.name.toLowerCase().indexOf(t) === -1 && c.last.toLowerCase().indexOf(t) === -1) return false;
+    if (t && c.name.toLowerCase().indexOf(t) === -1 && c.last.toLowerCase().indexOf(t) === -1 && (c.phone || '').toLowerCase().indexOf(t) === -1) return false;
     return true;
   });
 
@@ -246,7 +262,7 @@ export function WhatsApp() {
     function onDoc(e: MouseEvent) {
       const t = e.target as Node;
       if (popRef.current?.contains(t)) return;
-      if (filterBtnRef.current?.contains(t) || attachBtnRef.current?.contains(t) || scriptsBtnRef.current?.contains(t)) return;
+      if (filterBtnRef.current?.contains(t) || scriptsBtnRef.current?.contains(t)) return;
       if (statusBtnRef.current?.contains(t) || tagsBtnRef.current?.contains(t) || acoesBtnRef.current?.contains(t)) return;
       setPop(null);
     }
@@ -281,23 +297,38 @@ export function WhatsApp() {
   function sendMsg() {
     const v = draft.trim();
     if (!v) return;
+    if (enviandoRef.current) return; // impede dois envios concorrentes (duplo-clique / Enter duplo)
     if (WA_REAL && !currentId) return;
     if (canalIndisponivel) { toast('Este número está desconectado. Reconecte em Integrações para enviar.', 'warn'); return; }
     const now = new Date();
     const hh = ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
     const corpo = assinaturaNome ? `*${assinaturaNome}:*\n${v}` : v;
-    // append otimista (atualiza a tela imediatamente). Status "pendente" até o ack do webhook.
+    // append otimista (atualiza a tela imediatamente). Status "pendente" até a confirmação real.
     setContacts((cur) => cur.map((c) => c.id === currentId ? { ...c, last: v, msgs: [...c.msgs, { dir: 'out', text: corpo, time: hh, status: 'pendente' }] } : c));
     setDraft('');
     if (WA_REAL) {
+      enviandoRef.current = true;
       sendMut.mutate(
         { conversaId: currentId, text: v, canalId: replyCanalId || current.canalId, assinaturaNome: assinaturaNome || undefined },
-        { onError: (e) => toast((e as Error).message || 'Falha ao enviar a mensagem', 'warn') },
+        { onError: (e) => toast((e as Error).message || 'Falha ao enviar a mensagem', 'warn'), onSettled: () => { enviandoRef.current = false; } },
       );
     } else {
       toast('Mensagem enviada');
     }
   }
+  /** Retentativa: reaproveita a MESMA mensagem falhada (retry_mensagem_id), sem duplicar. */
+  function retryMsg(m: WaMessage) {
+    if (!m.id || !currentId || retryId) return;
+    if (canalIndisponivel) { toast('Este número está desconectado. Reconecte em Integrações para reenviar.', 'warn'); return; }
+    setRetryId(m.id);
+    // otimista: a mesma bolha volta para "enviando" (pendente) e limpa o erro.
+    setContacts((cur) => cur.map((c) => c.id === currentId ? { ...c, msgs: c.msgs.map((x) => x.id === m.id ? { ...x, status: 'pendente', erro: undefined } : x) } : c));
+    sendMut.mutate(
+      { conversaId: currentId, text: m.text ?? '', canalId: replyCanalId || current.canalId, retryMensagemId: m.id },
+      { onError: (e) => toast((e as Error).message || 'Falha ao reenviar a mensagem', 'warn'), onSettled: () => setRetryId(null) },
+    );
+  }
+  function verErro(m: WaMessage) { setErroDialog(traduzErroEnvio(m.erro)); }
 
   function onReplyChip(chip: string) {
     const prev = replyChip;
@@ -348,10 +379,12 @@ export function WhatsApp() {
   }
   function fecharConversa() {
     setPop(null);
-    const fech = (statusQ.data ?? []).find((s) => s.slug === 'fechada' || s.nome.trim().toLowerCase() === 'fechada');
-    if (!fech || !current.id) return;
-    if (!window.confirm(`Fechar esta conversa? O status será alterado para "${fech.nome}".`)) return;
-    aplicarStatus(fech.id);
+    if (!statusFechada || !current.id) return;
+    setConfirmFechar(true); // diálogo próprio do Atenvo (sem window.confirm)
+  }
+  function confirmarFecharConversa() {
+    setConfirmFechar(false);
+    if (statusFechada && current.id) aplicarStatus(statusFechada.id);
   }
   function iniciarEdicao() {
     setPop(null);
@@ -414,7 +447,7 @@ export function WhatsApp() {
               <IcSearch />
               <input type="text" placeholder="Buscar conversas..." value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
-            <button ref={filterBtnRef} className="filter-btn" aria-label="Filtros" onClick={(e) => { e.stopPropagation(); togglePop('filter', filterBtnRef, 'left'); }}><IcFunnel /></button>
+            <button ref={filterBtnRef} className={'filter-btn' + ((filtroCanal || filtroStatus) ? ' on' : '')} aria-label="Filtros" title={(filtroCanal || filtroStatus) ? 'Filtros ativos' : 'Filtros'} onClick={(e) => { e.stopPropagation(); togglePop('filter', filterBtnRef, 'left'); }}><IcFunnel /></button>
           </div>
           <div className="tabs">
             {TABS.map((t) => (
@@ -488,12 +521,19 @@ export function WhatsApp() {
                   </>
                 ) : (
                   <>
-                    <div className="bubble">{m.text}</div>
+                    <div className={'bubble' + (m.status === 'falhou' ? ' bubble-falha' : '')}>{m.text}</div>
                     <span className="btime">
                       {m.viaTelefone && <span className="phone-tag" title="Enviada pelo celular"><IcPhoneSent />Enviada pelo celular</span>}
                       {m.time}
-                      {ack && <span className={'tick ' + ack.cls} title={ack.title}>{ack.ticks}</span>}
+                      {ack && <span className={'tick ' + ack.cls} title={m.status === 'falhou' ? traduzErroEnvio(m.erro) : ack.title}>{ack.ticks}</span>}
                     </span>
+                    {m.dir === 'out' && m.status === 'falhou' && (
+                      <span className="msg-falha-acts">
+                        <button type="button" className="msg-falha-link" onClick={() => verErro(m)}>Ver erro</button>
+                        <span className="msg-falha-sep">·</span>
+                        <button type="button" className="msg-falha-link" disabled={!m.id || retryId === m.id} onClick={() => retryMsg(m)}>{retryId === m.id ? 'Reenviando…' : 'Tentar novamente'}</button>
+                      </span>
+                    )}
                   </>
                 )}
               </div>
@@ -550,11 +590,6 @@ export function WhatsApp() {
               value={draft} onChange={(e) => setDraft(e.target.value)} disabled={canalIndisponivel}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); } }} />
             <div className="composer-bar">
-              <button ref={attachBtnRef} className="tool" title="Anexar arquivo" onClick={(e) => { e.stopPropagation(); togglePop('attach', attachBtnRef, 'left'); }}><IcPaperclip /></button>
-              <button className="tool" title="Áudio" onClick={() => toast('Áudio')}><IcMic /></button>
-              <button className="tool" title="Imagem" onClick={() => toast('Imagem')}><IcImage /></button>
-              <button className="tool" title="Documento" onClick={() => toast('Documento')}><IcDoc /></button>
-              <button className="tool" title="Emoji" onClick={() => toast('Emoji')}><IcEmoji /></button>
               <span className="spacer" />
               <button ref={scriptsBtnRef} className="scripts-btn" onClick={(e) => { e.stopPropagation(); togglePop('scripts', scriptsBtnRef, 'right'); }}><IcScripts />Scripts<IcCaret /></button>
               <button className="send-btn" aria-label="Enviar" disabled={sendDisabled} onClick={sendMsg}><IcSend /></button>
@@ -670,16 +705,11 @@ export function WhatsApp() {
           {pop.kind === 'filter' && (
             <>
               <div className="pop-head">Filtrar por número</div>
-              {(WA_REAL ? realCanais.map((c) => c.alias) : ['Chip 1', 'Chip 2', 'Chip 3']).map((c) => <button key={c} className="pop-item" onClick={() => { toast('Filtro: ' + c); setPop(null); }}>{c}</button>)}
+              <button className={'pop-item' + (filtroCanal === null ? ' sel' : '')} onClick={() => { setFiltroCanal(null); setPop(null); }}>Todos os números{filtroCanal === null && <span className="ck">✓</span>}</button>
+              {realCanais.map((c) => <button key={c.id} className={'pop-item' + (filtroCanal === c.id ? ' sel' : '')} onClick={() => { setFiltroCanal(c.id); setPop(null); }}>{c.alias}{filtroCanal === c.id && <span className="ck">✓</span>}</button>)}
               <div className="pop-head">Status</div>
-              {(statusAtivos.length ? statusAtivos.map((s) => s.nome) : ['Em atendimento', 'Pendente']).map((s) => <button key={s} className="pop-item" onClick={() => { toast('Filtro: ' + s); setPop(null); }}>{s}</button>)}
-            </>
-          )}
-          {pop.kind === 'attach' && (
-            <>
-              <button className="pop-item" onClick={() => { toast('Anexar imagem'); setPop(null); }}><IcImage />Imagem</button>
-              <button className="pop-item" onClick={() => { toast('Anexar documento'); setPop(null); }}><IcDoc />Documento</button>
-              <button className="pop-item" onClick={() => { toast('Gravar áudio'); setPop(null); }}><IcMic />Áudio</button>
+              <button className={'pop-item' + (filtroStatus === null ? ' sel' : '')} onClick={() => { setFiltroStatus(null); setPop(null); }}>Todos os status{filtroStatus === null && <span className="ck">✓</span>}</button>
+              {statusAtivos.map((s) => <button key={s.id} className={'pop-item' + (filtroStatus === s.id ? ' sel' : '')} onClick={() => { setFiltroStatus(s.id); setPop(null); }}><span className="sdot" style={{ background: s.cor }} />{s.nome}{filtroStatus === s.id && <span className="ck">✓</span>}</button>)}
             </>
           )}
           {pop.kind === 'scripts' && (
@@ -743,6 +773,24 @@ export function WhatsApp() {
         ctx={{ cliente: current.name, atendente: user?.name, empresa: currentOrg.name, telefone: current.phone }}
         enviarEtapa={async (texto) => await sendMut.mutateAsync({ conversaId: currentId, text: texto, canalId: replyCanalId || current.canalId, assinaturaNome: assinaturaNome || undefined }) ?? undefined}
         confirmar={(mensagemId) => aguardarConfirmacaoEnvio(mensagemId)}
+      />
+
+      <ConfirmDialog
+        open={confirmFechar}
+        title="Fechar conversa"
+        message={statusFechada ? `A conversa será marcada como "${statusFechada.nome}". Você pode reabri-la mudando o status depois.` : 'Fechar esta conversa?'}
+        confirmLabel="Fechar conversa"
+        onConfirm={confirmarFecharConversa}
+        onCancel={() => setConfirmFechar(false)}
+      />
+      <ConfirmDialog
+        open={!!erroDialog}
+        title="Falha no envio"
+        message={erroDialog ?? ''}
+        confirmLabel="Entendi"
+        cancelLabel="Fechar"
+        onConfirm={() => setErroDialog(null)}
+        onCancel={() => setErroDialog(null)}
       />
     </div>
   );

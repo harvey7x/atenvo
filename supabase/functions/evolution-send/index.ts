@@ -1,4 +1,7 @@
-// evolution-send — envia texto e persiste a saída como PENDENTE.
+// evolution-send — envia texto e persiste a saída.
+// v13: status 'enviada' ao obter key.id (provedor aceitou ✓); webhook avança p/ entregue/lida.
+//      retry_mensagem_id reaproveita a MESMA mensagem falhada (sem duplicar). Assinatura *Nome:*\n (#4),
+//      persiste texto_original/assinatura_nome/origem='atenvo'; atualiza último canal/número (#6).
 // v12: assinatura *Nome:*\n (negrito), persiste texto_original/assinatura_nome/origem='atenvo' (#4),
 //      atualiza último canal/número após envio aceito (#6). NÃO altera normalização de número.
 import { corsHeaders, json } from './cors.ts';
@@ -14,13 +17,24 @@ Deno.serve(async (req) => {
     const user = await getUser(req);
     if (!user) return json({ error: 'Não autenticado.' }, 401);
 
-    const { conversa_id, text, canal_id, assinatura_nome } = await req.json().catch(() => ({}));
+    const { conversa_id, text, canal_id, assinatura_nome, retry_mensagem_id } = await req.json().catch(() => ({}));
     if (!conversa_id || !text?.toString().trim()) return json({ error: 'conversa_id e text são obrigatórios.' }, 400);
     const corr = (globalThis.crypto?.randomUUID?.() ?? String(Date.now())).slice(0, 8);
 
     const admin = adminClient();
     const { data: conv } = await admin.from('conversas').select('id, organizacao_id, contato_id, canal_id').eq('id', conversa_id).maybeSingle();
     if (!conv) return json({ error: 'Conversa não encontrada.' }, 404);
+
+    // RETRY: reaproveita a MESMA mensagem falhada (sem duplicar). Só vale p/ mensagem de saída desta conversa/org com status 'falhou'.
+    let retryMsg: { id: string; conteudo: string | null; texto_original: string | null; assinatura_nome: string | null } | null = null;
+    if (retry_mensagem_id) {
+      const { data: rm } = await admin.from('mensagens')
+        .select('id, conversa_id, organizacao_id, direcao, status, conteudo, texto_original, assinatura_nome')
+        .eq('id', retry_mensagem_id).maybeSingle();
+      if (!rm || rm.conversa_id !== conversa_id || rm.organizacao_id !== conv.organizacao_id || rm.direcao !== 'saida' || rm.status !== 'falhou')
+        return json({ error: 'Mensagem para retentativa inválida.' }, 422);
+      retryMsg = { id: rm.id as string, conteudo: rm.conteudo as string | null, texto_original: rm.texto_original as string | null, assinatura_nome: rm.assinatura_nome as string | null };
+    }
 
     const { data: mem } = await admin.from('organizacao_usuarios').select('status').eq('organizacao_id', conv.organizacao_id).eq('usuario_id', user.id).maybeSingle();
     if (!mem || mem.status !== 'ativo') return json({ error: 'Sem acesso a esta organização.' }, 403);
@@ -71,11 +85,12 @@ Deno.serve(async (req) => {
     console.log(`[send] corr=${corr} para=${base.slice(0, 6)} alvo=${alvo.slice(0, 6)}`);
 
     // ----- #4 ASSINATURA: aplica *Nome:*\n; guarda anti-dupla-assinatura em retentativa. -----
-    const raw = text.toString();
-    const assinatura = (assinatura_nome ?? '').toString().trim();
+    // RETRY: usa o corpo já assinado/persistido da mensagem original (não reassina, não duplica).
+    const raw = retryMsg ? (retryMsg.texto_original ?? retryMsg.conteudo ?? text.toString()) : text.toString();
+    const assinatura = retryMsg ? (retryMsg.assinatura_nome ?? '').toString().trim() : (assinatura_nome ?? '').toString().trim();
     const prefixo = assinatura ? `*${assinatura}:*\n` : '';
     const jaAssinado = assinatura ? raw.startsWith(`*${assinatura}:*`) : false;
-    const corpoEnviado = (assinatura && !jaAssinado) ? prefixo + raw : raw;
+    const corpoEnviado = retryMsg ? (retryMsg.conteudo ?? raw) : ((assinatura && !jaAssinado) ? prefixo + raw : raw);
 
     // envia (texto já assinado)
     let sent: { key?: { id?: string } };
@@ -91,21 +106,36 @@ Deno.serve(async (req) => {
     // CRITÉRIO DE ACEITE: sem identificador externo válido, a Evolution NÃO aceitou o envio.
     // Persistimos como FALHA e devolvemos erro — um corpo 2xx sem key.id não é sucesso.
     if (!idExterno) {
-      await admin.from('mensagens').insert({
-        conversa_id, organizacao_id: conv.organizacao_id, direcao: 'saida', tipo: 'texto',
-        conteudo: corpoEnviado, texto_original: raw, assinatura_nome: assinatura || null, origem: 'atenvo',
-        autor_id: user.id, status: 'falhou', erro_envio: 'sem_id_externo',
-      });
+      if (retryMsg) {
+        await admin.from('mensagens').update({ status: 'falhou', erro_envio: 'sem_id_externo' }).eq('id', retryMsg.id);
+      } else {
+        await admin.from('mensagens').insert({
+          conversa_id, organizacao_id: conv.organizacao_id, direcao: 'saida', tipo: 'texto',
+          conteudo: corpoEnviado, texto_original: raw, assinatura_nome: assinatura || null, origem: 'atenvo',
+          autor_id: user.id, status: 'falhou', erro_envio: 'sem_id_externo',
+        });
+      }
       console.log(`[send] corr=${corr} SEM id_externo -> falhou`);
       return json({ error: 'A Evolution não confirmou o envio (sem identificador de mensagem).' }, 502);
     }
 
-    // PENDENTE: 201 != entrega. O webhook (messages.update) move p/ enviada/entregue/lida/falhou.
-    const { data: msg } = await admin.from('mensagens').insert({
-      conversa_id, organizacao_id: conv.organizacao_id, direcao: 'saida', tipo: 'texto',
-      conteudo: corpoEnviado, texto_original: raw, assinatura_nome: assinatura || null, origem: 'atenvo',
-      autor_id: user.id, id_externo: idExterno, status: 'pendente',
-    }).select('id, conteudo, enviada_em, direcao, status').single();
+    // ENVIADA AO PROVEDOR: key.id confirma que a Evolution aceitou/enfileirou o envio (✓).
+    // O webhook (messages.update) avança p/ entregue (✓✓) e lida; ERROR volta p/ falhou.
+    // RETRY: reaproveita a MESMA linha (sem duplicar). Envio novo: insere.
+    let msg;
+    if (retryMsg) {
+      const { data } = await admin.from('mensagens').update({
+        status: 'enviada', id_externo: idExterno, erro_envio: null, enviada_em: nowIso,
+      }).eq('id', retryMsg.id).select('id, conteudo, enviada_em, direcao, status').single();
+      msg = data;
+    } else {
+      const { data } = await admin.from('mensagens').insert({
+        conversa_id, organizacao_id: conv.organizacao_id, direcao: 'saida', tipo: 'texto',
+        conteudo: corpoEnviado, texto_original: raw, assinatura_nome: assinatura || null, origem: 'atenvo',
+        autor_id: user.id, id_externo: idExterno, status: 'enviada', enviada_em: nowIso,
+      }).select('id, conteudo, enviada_em, direcao, status').single();
+      msg = data;
+    }
 
     // #6 após envio aceito: registra último canal/número/provider usado nesta conversa (mantém histórico das mensagens).
     await admin.from('conversas').update({

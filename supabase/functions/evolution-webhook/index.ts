@@ -133,18 +133,29 @@ Deno.serve(async (req) => {
       const arr = Array.isArray(evt?.data) ? (evt!.data as unknown as Record<string, unknown>[]) : [data];
       let n = 0; let falhas = 0;
       const map: Record<string, string> = { PENDING: 'pendente', SERVER_ACK: 'enviada', DELIVERY_ACK: 'entregue', READ: 'lida', PLAYED: 'lida', ERROR: 'falhou' };
+      // ranking p/ status monotônico: o ack só avança (nunca regride enviada<-entregue por ack fora de ordem).
+      const RANK: Record<string, number> = { pendente: 0, enviada: 1, entregue: 2, lida: 3 };
       for (const it of arr) {
         const id = ((it.key as { id?: string } | undefined)?.id) ?? (it.keyId as string | undefined);
         const status = (it.status as string | undefined)?.toUpperCase();
         if (!id || !status) continue;
         const novo = map[status];
         if (!novo) continue;
+        // estado atual da mensagem (por id_externo) para decidir avanço/regressão.
+        const { data: atualRow } = await admin.from('mensagens').select('status').eq('id_externo', id).maybeSingle();
+        if (!atualRow) continue;
+        const atual = (atualRow.status as string) ?? 'pendente';
         if (novo === 'falhou') {
+          // só marca falha se ainda NÃO houve confirmação real de entrega/leitura.
+          if (atual === 'entregue' || atual === 'lida') continue;
           const sp = (it.messageStubParameters as unknown);
           const stub = Array.isArray(sp) ? sp.join(',') : (sp != null ? String(sp) : null);
           await admin.from('mensagens').update({ status: 'falhou', erro_envio: `ERROR${stub ? ':' + stub.slice(0, 80) : ''}`, metadados: { erro: { status, remoteJid: (it.remoteJid as string) ?? null, instance: instanceName, stub: stub ?? null, em: new Date().toISOString() } } }).eq('id_externo', id);
           falhas++;
-        } else { await admin.from('mensagens').update({ status: novo }).eq('id_externo', id); n++; }
+        } else {
+          if ((RANK[novo] ?? 0) <= (RANK[atual] ?? -1)) continue; // não regride
+          await admin.from('mensagens').update({ status: novo }).eq('id_externo', id); n++;
+        }
       }
       await finish('processado', { ignorado_motivo: `acks:${n}${falhas ? ` falhas:${falhas}` : ''}` }); return json({ ok: true });
     }
