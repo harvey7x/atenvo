@@ -1,4 +1,5 @@
-// evolution-send — envia texto/IMAGEM/ÁUDIO e persiste a saída.
+// evolution-send — envia texto/IMAGEM/ÁUDIO/DOCUMENTO e persiste a saída.
+// v16: DOCUMENTO via /message/sendMedia (mediatype document; MIME/ext/tamanho centralizados).
 // v15: ÁUDIO como nota de voz via /message/sendWhatsAppAudio (encoding->ogg/opus). Mesma base de
 //      isolamento por org + URL assinada curta + exige key.id + retry reaproveita o arquivo.
 // v14: IMAGEM via /message/sendMedia (URL assinada curta, isolada por org, exige key.id;
@@ -13,6 +14,24 @@ import { adminClient, getUser } from './client.ts';
 import { evolution, evolutionConfigured } from './evolution.ts';
 
 const digits = (s?: string | null): string | null => ((s ?? '').replace(/[^0-9]/g, '') || null);
+
+// ===== Mídia: regras centralizadas (MIME permitido, extensões, tamanho) =====
+const DOC_MIMES = [
+  'application/pdf', 'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'text/plain', 'text/csv', 'application/zip', 'application/x-zip-compressed',
+];
+const DOC_EXTS = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt', 'csv', 'ppt', 'pptx', 'zip'];
+const MAX_IMG_AUDIO = 16 * 1024 * 1024; // imagem/áudio
+const MAX_DOC = 25 * 1024 * 1024;       // documento
+function midiaCompativel(tipo: string, mime: string, nome: string): boolean {
+  if (tipo === 'audio') return mime.startsWith('audio/');
+  if (tipo === 'imagem') return mime.startsWith('image/');
+  if (tipo === 'documento') { const ext = (nome.split('.').pop() || '').toLowerCase(); return DOC_MIMES.includes(mime) || DOC_EXTS.includes(ext); }
+  return false;
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -89,29 +108,28 @@ Deno.serve(async (req) => {
     } catch { /* fail-open: usa base */ }
     console.log(`[send] corr=${corr} para=${base.slice(0, 6)} alvo=${alvo.slice(0, 6)}`);
 
-    // ===== MÍDIA (nesta etapa: IMAGEM e ÁUDIO). Retry herda o tipo/arquivo da mensagem original. =====
+    // ===== MÍDIA (IMAGEM, ÁUDIO e DOCUMENTO). Retry herda o tipo/arquivo da mensagem original. =====
     const ehMidiaRetry = !!retryMsg && !!retryMsg.tipo && retryMsg.tipo !== 'texto';
     if (midia_path || ehMidiaRetry) {
-      const TIPOS_OK = ['imagem', 'audio'];
+      const TIPOS_OK = ['imagem', 'audio', 'documento'];
       const meta = (retryMsg?.metadados ?? {}) as Record<string, unknown>;
       const path = (midia_path as string) || (meta.anexo_path as string) || '';
       const tipo = ehMidiaRetry ? String(retryMsg!.tipo) : (TIPOS_OK.includes(midia_tipo) ? midia_tipo : '');
       const mime = (midia_mime as string) || (meta.mime as string) || '';
-      const nome = (midia_nome as string) || (meta.nome as string) || (tipo === 'audio' ? 'audio' : 'imagem');
+      const nome = (midia_nome as string) || (meta.nome as string) || (tipo === 'audio' ? 'audio' : tipo === 'documento' ? 'documento' : 'imagem');
       const tamanho = (midia_tamanho as number) ?? (meta.tamanho as number) ?? null;
-      // áudio é nota de voz (PTT) — sem legenda. Demais mídias podem ter legenda.
+      // áudio é nota de voz (PTT) — sem legenda. Imagem/documento podem ter legenda.
       const caption = tipo === 'audio' ? '' : (temTexto ? text.toString() : (retryMsg ? (retryMsg.conteudo ?? '') : ''));
       const nowIso = new Date().toISOString();
 
-      // nesta etapa: imagem e áudio (documento/vídeo virão depois)
-      if (!TIPOS_OK.includes(tipo)) return json({ error: 'Tipo de mídia ainda não suportado (apenas imagem e áudio).' }, 422);
+      if (!TIPOS_OK.includes(tipo)) return json({ error: 'Tipo de mídia ainda não suportado (apenas imagem, áudio e documento).' }, 422);
       // ISOLAMENTO por organização: o caminho do arquivo precisa começar pelo id da org da conversa.
       if (!path || !path.startsWith(conv.organizacao_id + '/')) return json({ error: 'Arquivo de mídia inválido.' }, 422);
-      // família MIME compatível com o tipo
-      const familia = tipo === 'audio' ? 'audio/' : 'image/';
-      if (!mime.startsWith(familia)) return json({ error: 'mime_incompativel' }, 422);
-      // limite de tamanho (~16MB)
-      if (tamanho && tamanho > 16 * 1024 * 1024) return json({ error: 'Arquivo acima do limite (16MB).' }, 422);
+      // MIME/extensão compatível com o tipo (regras centralizadas)
+      if (!midiaCompativel(tipo, mime, nome)) return json({ error: 'mime_incompativel' }, 422);
+      // limite de tamanho
+      const max = tipo === 'documento' ? MAX_DOC : MAX_IMG_AUDIO;
+      if (tamanho && tamanho > max) return json({ error: 'Arquivo acima do limite.' }, 422);
 
       // URL assinada CURTA (600s) — a Evolution baixa o arquivo; NUNCA persistimos a URL.
       const { data: signed, error: se } = await admin.storage.from('script-midia').createSignedUrl(path, 600);
@@ -121,7 +139,9 @@ Deno.serve(async (req) => {
       try {
         sent = tipo === 'audio'
           ? await evolution.sendWhatsAppAudio(instancia, alvo, signed.signedUrl)               // nota de voz (PTT, ogg/opus)
-          : await evolution.sendMedia(instancia, alvo, 'image', mime, signed.signedUrl, nome, caption || undefined);
+          : tipo === 'documento'
+            ? await evolution.sendMedia(instancia, alvo, 'document', mime || 'application/octet-stream', signed.signedUrl, nome, caption || undefined)
+            : await evolution.sendMedia(instancia, alvo, 'image', mime, signed.signedUrl, nome, caption || undefined);
       } catch (err) { const m = (err as Error).message || 'Falha ao enviar a mídia.'; return json({ error: /not|connect|close/i.test(m) ? 'O WhatsApp deste canal desconectou. Reconecte em Integrações.' : m }, 502); }
       const idExterno = sent?.key?.id ?? null;
       const metadados = { anexo_path: path, mime, tamanho, nome };

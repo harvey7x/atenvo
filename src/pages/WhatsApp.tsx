@@ -4,13 +4,14 @@ import { useToast } from '@/hooks/useToast';
 import { useAuth } from '@/context/AuthContext';
 import { useOrg } from '@/context/OrgContext';
 import { WA_CONTACTS, initials, avatarColor, type WaContact, type WaMessage } from '@/data/whatsappDemo';
-import { useWaConversations, useSendWaMessage, useWaCanais, mascararNumero, subirMidiaWa, urlAssinadaMidiaWa, WA_REAL } from '@/data/whatsapp';
+import { useWaConversations, useSendWaMessage, useWaCanais, useAtribuirAtendimento, mascararNumero, subirMidiaWa, urlAssinadaMidiaWa, WA_REAL } from '@/data/whatsapp';
 import { MediaComposer } from '@/components/MediaComposer';
 import { AudioRecorder } from '@/components/AudioRecorder';
 import { AudioMessage } from '@/components/AudioMessage';
 import { useScripts, useScriptEtapaCounts, aguardarConfirmacaoEnvio } from '@/data/scripts';
 import { ScriptSequenceModal } from '@/components/ScriptSequenceModal';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { Modal } from '@/components/Modal';
 import { useStatusDefs, useEtiquetas, useAssinaturaPref, useAtendimentoActions, useOrgUsuarios, resolverNomeAssinatura } from '@/data/atendimento';
 import { corDaEtiqueta, podeGerenciarAtendimento, type AssinaturaModo } from '@/types/atendimento';
 import './WhatsApp.css';
@@ -33,6 +34,9 @@ const IcFunnel = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor
 const IcScripts = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 8h8M8 12h8M8 16h5" /></svg>;
 const IcImage = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.4" /><circle cx="8.5" cy="9.5" r="1.5" /><path d="m3 17 5-5 4 4 3-3 6 6" /></svg>;
 const IcMic = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>;
+const IcDoc = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5M9 13h6M9 17h6" /></svg>;
+const IcUserPlus = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 19a6 6 0 0 0-12 0M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M18 8v6M21 11h-6" /></svg>;
+const IcTransfer = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 3l4 4-4 4M20 7H8M8 21l-4-4 4-4M4 17h12" /></svg>;
 const IcSend = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4z" /></svg>;
 const IcWarn = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /></svg>;
 const IcChevRight = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>;
@@ -93,6 +97,7 @@ const CURR_KEY = 'atenvo-wa-current';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const soDigitos = (s: string) => (s || '').replace(/\D/g, '');
+const fmtTam = (b?: number | null) => !b ? '' : b < 1024 ? b + ' B' : b < 1048576 ? (b / 1024).toFixed(0) + ' KB' : (b / 1048576).toFixed(1) + ' MB';
 
 type PopKind = 'filter' | 'scripts' | 'status' | 'tags' | 'acoes';
 interface PopState { kind: PopKind; rect: DOMRect; align: 'left' | 'right'; }
@@ -104,6 +109,7 @@ export function WhatsApp() {
   const { currentOrg } = useOrg();
   const live = useWaConversations();
   const sendMut = useSendWaMessage();
+  const atribuirMut = useAtribuirAtendimento();
   const canaisQ = useWaCanais();
   const statusQ = useStatusDefs();
   const etiquetasQ = useEtiquetas();
@@ -128,6 +134,11 @@ export function WhatsApp() {
   const [erroDialog, setErroDialog] = useState<string | null>(null);     // "Ver erro" de mensagem falhada
   const [retryId, setRetryId] = useState<string | null>(null);           // trava de duplo-clique no retry
   const [imgModal, setImgModal] = useState(false);                       // composer de imagem
+  const [docModal, setDocModal] = useState(false);                       // composer de documento
+  const [transferOpen, setTransferOpen] = useState(false);               // modal de transferência
+  const [transferBusca, setTransferBusca] = useState('');                // busca no modal
+  const [transferSel, setTransferSel] = useState<string>('');            // usuário selecionado p/ transferir
+  const [atribuindo, setAtribuindo] = useState(false);                   // trava de clique-duplo (assumir/transferir)
   const [imgUrls, setImgUrls] = useState<Record<string, string>>({});    // path -> URL assinada (sob demanda)
   const [lightbox, setLightbox] = useState<string | null>(null);         // imagem ampliada no histórico
   const [replyChip, setReplyChip] = useState('Chip 1');       // modo mock
@@ -371,6 +382,43 @@ export function WhatsApp() {
       midiaPath: up.path, midiaTipo: 'audio', midiaMime: up.mime, midiaNome: up.nome, midiaTamanho: up.tamanho,
     });
   }
+  /** Envio manual de DOCUMENTO: sobe ao bucket privado e envia pela Evolution (lança em falha -> mantém p/ retry). */
+  async function enviarDocumento(file: File, caption: string) {
+    if (!currentId) throw new Error('Selecione uma conversa.');
+    const up = await subirMidiaWa(currentOrg.id, file);
+    await sendMut.mutateAsync({
+      conversaId: currentId, canalId: replyCanalId || current.canalId,
+      midiaPath: up.path, midiaTipo: 'documento', midiaMime: up.mime, midiaNome: up.nome, midiaTamanho: up.tamanho,
+      text: caption || undefined,
+    });
+  }
+  /** Abre/baixa um documento do histórico via URL assinada gerada sob demanda. */
+  async function abrirDocumento(m: WaMessage) {
+    if (!m.anexoPath) return;
+    try { const url = await urlAssinadaMidiaWa(m.anexoPath); window.open(url, '_blank', 'noopener'); }
+    catch { toast('Não foi possível abrir o documento.', 'warn'); }
+  }
+  /** Assumir o atendimento (responsável = usuário atual). Concorrência/permissão validadas no backend. */
+  async function assumir() {
+    if (!current.contatoId || !user?.id || atribuindo) return;
+    setAtribuindo(true);
+    const esperado = current.respId || null;
+    setContacts((cur) => cur.map((c) => c.id === current.id ? { ...c, respId: user.id } : c)); // otimista
+    try { await atribuirMut.mutateAsync({ contatoId: current.contatoId, destinoId: user.id, esperadoId: esperado }); toast('Você assumiu o atendimento'); }
+    catch (e) { setContacts((cur) => cur.map((c) => c.id === current.id ? { ...c, respId: esperado } : c)); toast((e as Error).message || 'Falha ao assumir', 'warn'); }
+    finally { setAtribuindo(false); }
+  }
+  function abrirTransferir() { setPop(null); setTransferSel(''); setTransferBusca(''); setTransferOpen(true); }
+  /** Transferir o atendimento para outro usuário ativo da organização. */
+  async function transferir(destinoId: string) {
+    if (!current.contatoId || !destinoId || atribuindo) return;
+    setAtribuindo(true);
+    const esperado = current.respId || null;
+    setContacts((cur) => cur.map((c) => c.id === current.id ? { ...c, respId: destinoId } : c)); // otimista
+    try { await atribuirMut.mutateAsync({ contatoId: current.contatoId, destinoId, esperadoId: esperado }); setTransferOpen(false); setTransferSel(''); setTransferBusca(''); toast('Atendimento transferido'); }
+    catch (e) { setContacts((cur) => cur.map((c) => c.id === current.id ? { ...c, respId: esperado } : c)); toast((e as Error).message || 'Falha ao transferir', 'warn'); }
+    finally { setAtribuindo(false); }
+  }
 
   function onReplyChip(chip: string) {
     const prev = replyChip;
@@ -460,6 +508,7 @@ export function WhatsApp() {
   const etiquetasAtivas = etiquetas.filter((e) => e.ativo);
   const orgUsuarios = orgUsuariosQ.data ?? [];
   const respNome = current.respId ? (orgUsuarios.find((u) => u.id === current.respId)?.nome ?? null) : null;
+  const orgUsuariosFiltrados = orgUsuarios.filter((u) => { const t = transferBusca.trim().toLowerCase(); return !t || u.nome.toLowerCase().includes(t); });
   const statusFechada = statusDefs.find((s) => s.slug === 'fechada' || s.nome.trim().toLowerCase() === 'fechada') ?? null;
 
   // alias do último canal resolvido pela lista de canais
@@ -544,8 +593,16 @@ export function WhatsApp() {
                 ? <span className="status-badge" style={{ background: (statusCorAtual ?? '#64748b') + '22', color: statusCorAtual ?? 'var(--ink-2)' }}><span className="sdot" style={{ background: statusCorAtual ?? '#64748b' }} />{statusNomeAtual}</span>
                 : <span className="meta-val" style={{ color: 'var(--muted)' }}>—</span>}
             </div>
+            <div className="meta-cell"><div className="k">Atendente</div>
+              {respNome
+                ? <span className="meta-val resp-line"><Avatar name={respNome} cls="s" />{current.respId === user?.id ? 'Você' : respNome}</span>
+                : <span className="meta-val" style={{ color: 'var(--muted)' }}>Sem responsável</span>}
+            </div>
           </div>
           <div className="ch-actions">
+            {current.id && (current.respId
+              ? <button className="ch-resp-btn" disabled={atribuindo} title="Transferir atendimento" onClick={abrirTransferir}><IcTransfer /><span>Transferir</span></button>
+              : <button className="ch-resp-btn primary" disabled={atribuindo} title="Assumir atendimento" onClick={assumir}><IcUserPlus /><span>Assumir</span></button>)}
             <button className={'icon-btn' + (foco ? ' on' : '')} title="Modo de foco (Esc para sair)" onClick={() => setFoco((v) => !v)}><IcFocus /></button>
             <button ref={acoesBtnRef} className={'icon-btn' + (pop?.kind === 'acoes' ? ' on' : '')} title="Ações" aria-label="Ações da conversa" aria-haspopup="menu" aria-expanded={pop?.kind === 'acoes'} disabled={!current.id} onClick={(e) => { e.stopPropagation(); togglePop('acoes', acoesBtnRef, 'right'); }}><IcDots /></button>
           </div>
@@ -592,6 +649,22 @@ export function WhatsApp() {
                       {imgUrl
                         ? <img className="msg-img" src={imgUrl} alt={m.nome || 'imagem'} loading="lazy" onClick={() => setLightbox(imgUrl)} title="Ampliar" />
                         : <div className="msg-img-ph">Carregando imagem…</div>}
+                      {m.text && <div className="msg-cap">{m.text}</div>}
+                    </div>
+                    {tempo}
+                    {falhaActs}
+                  </>
+                ) : m.tipo === 'documento' ? (
+                  <>
+                    <div className={'bubble bubble-doc' + (m.status === 'falhou' ? ' bubble-falha' : '')}>
+                      <button type="button" className="doc-card" onClick={() => abrirDocumento(m)} title="Abrir documento" disabled={m.status === 'falhou'}>
+                        <span className="doc-ic"><IcDoc /></span>
+                        <span className="doc-info">
+                          <span className="doc-nome">{m.nome || 'documento'}</span>
+                          <span className="doc-meta">{(m.nome?.split('.').pop() || '').toUpperCase()}{m.tamanho ? ' · ' + fmtTam(m.tamanho) : ''}</span>
+                        </span>
+                        <span className="doc-open"><IcDownload /></span>
+                      </button>
                       {m.text && <div className="msg-cap">{m.text}</div>}
                     </div>
                     {tempo}
@@ -664,6 +737,7 @@ export function WhatsApp() {
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); } }} />
             <div className="composer-bar">
               <button className="tool" title="Enviar imagem" aria-label="Enviar imagem" disabled={WA_REAL && (!current.id || !canalConectado)} onClick={() => setImgModal(true)}><IcImage /></button>
+              <button className="tool" title="Enviar documento" aria-label="Enviar documento" disabled={WA_REAL && (!current.id || !canalConectado)} onClick={() => setDocModal(true)}><IcDoc /></button>
               <AudioRecorder permitirArquivo disabled={WA_REAL && (!current.id || !canalConectado)} onEnviar={enviarAudio} />
               <span className="spacer" />
               <button ref={scriptsBtnRef} className="scripts-btn" onClick={(e) => { e.stopPropagation(); togglePop('scripts', scriptsBtnRef, 'right'); }}><IcScripts />Scripts<IcCaret /></button>
@@ -720,7 +794,20 @@ export function WhatsApp() {
                 <option value="">Não atribuído</option>
                 {orgUsuarios.map((u) => <option key={u.id} value={u.id}>{u.nome}</option>)}
               </select>
-            ) : (respNome ? <span className="resp-line"><Avatar name={respNome} cls="s" />{respNome}</span> : <div className="dval" style={{ color: 'var(--muted)' }}>Não atribuído</div>)}
+            ) : (
+              <div className="resp-box">
+                {respNome
+                  ? <span className="resp-line"><Avatar name={respNome} cls="s" />{respNome}{current.respId === user?.id && <span className="resp-voce">Você</span>}</span>
+                  : <div className="dval" style={{ color: 'var(--muted)' }}>Sem responsável</div>}
+                {current.id && (current.respId
+                  ? (<>
+                      {current.respId === user?.id && <span className="resp-hint">Você é o responsável</span>}
+                      <button className="resp-btn" disabled={atribuindo} onClick={abrirTransferir}><IcTransfer />Transferir atendimento</button>
+                    </>)
+                  : <button className="resp-btn primary" disabled={atribuindo} onClick={assumir}><IcUserPlus />{atribuindo ? 'Assumindo…' : 'Assumir atendimento'}</button>
+                )}
+              </div>
+            )}
           </div>
           <div className="dfield"><div className="dlabel">Origem do lead</div><div className="dval with-ic"><IcWa />{current.origin}</div></div>
 
@@ -869,6 +956,27 @@ export function WhatsApp() {
       />
 
       <MediaComposer open={imgModal} tipo="imagem" onClose={() => setImgModal(false)} enviar={enviarImagem} />
+      <MediaComposer open={docModal} tipo="documento" onClose={() => setDocModal(false)} enviar={enviarDocumento} />
+
+      <Modal open={transferOpen} onClose={() => setTransferOpen(false)} title="Transferir atendimento" width={460}
+        footer={<>
+          <button className="atv-btn" disabled={atribuindo} onClick={() => setTransferOpen(false)}>Cancelar</button>
+          <button className="atv-btn primary" disabled={!transferSel || transferSel === current.respId || atribuindo} onClick={() => transferir(transferSel)}>{atribuindo ? 'Transferindo…' : 'Transferir'}</button>
+        </>}>
+        <div className="tr-atual">Responsável atual: <strong>{respNome ?? 'Sem responsável'}</strong></div>
+        <input className="atv-input" placeholder="Buscar atendente…" value={transferBusca} onChange={(e) => setTransferBusca(e.target.value)} autoFocus />
+        <div className="tr-list">
+          {orgUsuariosFiltrados.length === 0 && <div className="tr-empty">Nenhum atendente encontrado.</div>}
+          {orgUsuariosFiltrados.map((u) => (
+            <button key={u.id} type="button" className={'tr-item' + (transferSel === u.id ? ' sel' : '')} disabled={u.id === current.respId || atribuindo} onClick={() => setTransferSel(u.id)}>
+              <Avatar name={u.nome} cls="s" />
+              <span className="tr-nome">{u.nome}{u.id === user?.id ? ' (você)' : ''}{u.id === current.respId ? ' · atual' : ''}</span>
+              <span className="tr-papel">{u.papel}</span>
+              {transferSel === u.id && <span className="tr-ck"><IcCheckSm /></span>}
+            </button>
+          ))}
+        </div>
+      </Modal>
 
       {lightbox && (
         <div className="atv-lightbox" onClick={() => setLightbox(null)} role="dialog" aria-modal="true">

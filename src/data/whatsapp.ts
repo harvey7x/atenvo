@@ -143,6 +143,10 @@ export function useWaConversations() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'conversas', filter: `organizacao_id=eq.${orgId}` }, () => {
         qc.invalidateQueries({ queryKey: ['wa-conversas', orgId] });
       })
+      // responsável (assumir/transferir) vive em contatos.responsavel_id → refaz a lista em tempo real
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'contatos', filter: `organizacao_id=eq.${orgId}` }, () => {
+        qc.invalidateQueries({ queryKey: ['wa-conversas', orgId] });
+      })
       .subscribe();
     return () => { supabase!.removeChannel(ch); };
   }, [orgId, qc]);
@@ -167,6 +171,21 @@ export function useSendWaMessage() {
         ...(input.midiaPath ? { midia_path: input.midiaPath, midia_tipo: input.midiaTipo, midia_mime: input.midiaMime, midia_nome: input.midiaNome, midia_tamanho: input.midiaTamanho } : {}),
       });
       return r.mensagem?.id ?? null;
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ['wa-conversas', currentOrg.id] }),
+  });
+}
+
+/** Assumir / transferir / liberar o responsável do atendimento (via Edge Function segura). */
+export function useAtribuirAtendimento() {
+  const { currentOrg } = useOrg();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { contatoId: string; destinoId: string | null; esperadoId: string | null }) => {
+      const r = await invoke<{ ok: boolean; responsavel_id: string | null }>('atribuir-atendimento', {
+        contato_id: input.contatoId, destino_id: input.destinoId, esperado_id: input.esperadoId,
+      });
+      return r.responsavel_id ?? null;
     },
     onSettled: () => qc.invalidateQueries({ queryKey: ['wa-conversas', currentOrg.id] }),
   });
