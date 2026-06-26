@@ -32,7 +32,7 @@ export function AudioRecorder({ disabled, onEnviar }: Props) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [deviceId, setDeviceId] = useState<string>('');
-  const [info, setInfo] = useState<{ mime: string; size: number; dur: number; sinal: boolean } | null>(null);
+  const [info, setInfo] = useState<{ mime: string; size: number; dur: number; sinal: boolean; verificando?: boolean; rms?: number } | null>(null);
 
   const streamRef = useRef<MediaStream | null>(null);
   const recRef = useRef<MediaRecorder | null>(null);
@@ -42,6 +42,7 @@ export function AudioRecorder({ disabled, onEnviar }: Props) {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const acRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
+  const meterCloneRef = useRef<MediaStreamTrack | null>(null); // track CLONADA só p/ o medidor (recorder usa a original)
   const rafRef = useRef<number | null>(null);
   const maxNivelRef = useRef(0);
   const barRef = useRef<HTMLDivElement>(null);
@@ -51,6 +52,7 @@ export function AudioRecorder({ disabled, onEnviar }: Props) {
   function pararMedidor() {
     if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
     analyserRef.current = null;
+    if (meterCloneRef.current) { try { meterCloneRef.current.stop(); } catch { /* ignore */ } meterCloneRef.current = null; }
     if (acRef.current) { try { acRef.current.close(); } catch { /* ignore */ } acRef.current = null; }
   }
   function pararTracks() { streamRef.current?.getTracks().forEach((t) => t.stop()); streamRef.current = null; }
@@ -64,11 +66,16 @@ export function AudioRecorder({ disabled, onEnviar }: Props) {
   }, []);
 
   // medidor visual (Web Audio) — só validação local; nada é transmitido.
+  // IMPORTANTE: usa uma track CLONADA. Rotear a MESMA track do recorder pelo Web Audio faz o
+  // Chrome gravar SILÊNCIO. Com o clone, o MediaRecorder mantém a track original intacta.
   function montarMedidor(stream: MediaStream) {
     try {
+      const orig = stream.getAudioTracks()[0]; if (!orig) return;
+      const clone = orig.clone(); meterCloneRef.current = clone;
       const AC = (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext);
       const ac = new AC(); acRef.current = ac;
-      const src = ac.createMediaStreamSource(stream);
+      if (ac.state === 'suspended') ac.resume().catch(() => { /* ignore */ });
+      const src = ac.createMediaStreamSource(new MediaStream([clone]));
       const an = ac.createAnalyser(); an.fftSize = 1024; src.connect(an); analyserRef.current = an;
       const buf = new Uint8Array(an.fftSize);
       const loop = () => {
@@ -85,6 +92,21 @@ export function AudioRecorder({ disabled, onEnviar }: Props) {
 
   async function listarDispositivos() {
     try { const ds = await navigator.mediaDevices.enumerateDevices(); setDevices(ds.filter((d) => d.kind === 'audioinput')); } catch { /* ignore */ }
+  }
+
+  // Decodifica o Blob gravado e mede o RMS — prova local de que o ARQUIVO tem som (independe do medidor ao vivo).
+  async function medirBlob(blob: Blob, _tipo: string) {
+    try {
+      const ab = await blob.arrayBuffer();
+      const AC = (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext);
+      const ac = new AC();
+      const audio = await ac.decodeAudioData(ab);
+      let sum = 0, n = 0;
+      for (let c = 0; c < audio.numberOfChannels; c++) { const ch = audio.getChannelData(c); for (let i = 0; i < ch.length; i++) sum += ch[i] * ch[i]; n += ch.length; }
+      const rms = n ? Math.sqrt(sum / n) : 0;
+      try { ac.close(); } catch { /* ignore */ }
+      setInfo((x) => x ? { ...x, dur: audio.duration, sinal: rms >= 0.005, verificando: false, rms } : x);
+    } catch { setInfo((x) => x ? { ...x, verificando: false } : x); } // se não decodificar, mantém o medidor ao vivo
   }
 
   async function iniciar(idDispositivo?: string) {
@@ -120,11 +142,11 @@ export function AudioRecorder({ disabled, onEnviar }: Props) {
       const tipo = baseMime(mimeRef.current || rec.mimeType || 'audio/webm');
       const blob = new Blob(chunksRef.current, { type: tipo });
       blobRef.current = blob;
-      const sinal = maxNivelRef.current >= SINAL_MIN;
       limparPreview(); setPreviewUrl(URL.createObjectURL(blob));
       pararMedidor(); pararTracks(); pararTimer();             // só encerra as tracks DEPOIS de montar o Blob
-      setInfo({ mime: tipo, size: blob.size, dur: 0, sinal });
+      setInfo({ mime: tipo, size: blob.size, dur: 0, sinal: maxNivelRef.current >= SINAL_MIN, verificando: true });
       setEstado('preview');
+      void medirBlob(blob, tipo);                              // verdade absoluta: o arquivo gravado tem som?
     };
     rec.onerror = () => { pararMedidor(); pararTracks(); pararTimer(); setEstado('error'); setErro('Erro durante a gravação.'); };
     try { rec.start(); } catch { pararTracks(); pararMedidor(); setEstado('error'); setErro('Não foi possível iniciar a gravação.'); return; }
@@ -154,7 +176,7 @@ export function AudioRecorder({ disabled, onEnviar }: Props) {
   async function enviar() {
     if (enviandoRef.current) return;                    // clique-duplo
     const blob = blobRef.current; if (!blob) return;
-    if (info && !info.sinal) { setErro('Nenhum som foi detectado. Verifique o microfone selecionado.'); return; }
+    if (!info || info.verificando || !info.sinal) { setErro('Nenhum som foi detectado. Verifique o microfone selecionado.'); return; }
     enviandoRef.current = true;
     const mime = baseMime(mimeRef.current || blob.type || 'audio/webm');
     const ext = EXT[mime] ?? 'm4a';
@@ -199,12 +221,13 @@ export function AudioRecorder({ disabled, onEnviar }: Props) {
         <>
           <audio className="rec-preview" controls src={previewUrl} onLoadedMetadata={(e) => { const d = (e.currentTarget as HTMLAudioElement).duration; setInfo((x) => x ? { ...x, dur: isFinite(d) ? d : x.dur } : x); }} />
           <span className="rec-meta">{info ? `${info.dur ? mmss(info.dur) + ' · ' : ''}${baseMime(info.mime)} · ${(info.size / 1024).toFixed(0)} KB` : ''}</span>
-          {info && !info.sinal && <span className="rec-erro">Nenhum som detectado. Troque o microfone e regrave.</span>}
-          {info && info.sinal && <span className="rec-sinal">✓ sinal detectado</span>}
+          {info?.verificando && <span className="rec-meta">verificando o áudio…</span>}
+          {info && !info.verificando && !info.sinal && <span className="rec-erro">Nenhum som no áudio gravado. Troque o microfone e regrave.</span>}
+          {info && !info.verificando && info.sinal && <span className="rec-sinal">✓ som no áudio</span>}
           {seletorMic}
           <button type="button" className="rec-btn ghost" onClick={() => iniciar(deviceId || undefined)} title="Gravar novamente">Regravar</button>
           <button type="button" className="rec-btn ghost" onClick={cancelar} title="Apagar">Apagar</button>
-          <button type="button" className="rec-btn primary" disabled={!!(info && !info.sinal)} onClick={enviar} title="Enviar áudio">Enviar</button>
+          <button type="button" className="rec-btn primary" disabled={!info || info.verificando || !info.sinal} onClick={enviar} title="Enviar áudio">Enviar</button>
         </>
       )}
 
