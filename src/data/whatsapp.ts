@@ -40,7 +40,8 @@ const STATUS_LABEL: Record<string, string> = {
   aberta: 'Aberta', em_atendimento: 'Em atendimento', pendente: 'Pendente', resolvida: 'Resolvida', fechada: 'Fechada',
 };
 
-interface DbMsg { id: string; direcao: string; conteudo: string | null; tipo: string; enviada_em: string | null; recebida_em: string | null; criado_em: string | null; origem: string | null; status: string | null; erro_envio: string | null; }
+interface DbMsg { id: string; direcao: string; conteudo: string | null; tipo: string; enviada_em: string | null; recebida_em: string | null; criado_em: string | null; origem: string | null; status: string | null; erro_envio: string | null; metadados: { anexo_path?: string; mime?: string; tamanho?: number; nome?: string } | null; }
+const TIPOS_MIDIA = ['imagem', 'audio', 'video', 'documento'];
 interface DbConv {
   id: string; status: string; status_id: string | null; nao_lidas: number | null; ultima_interacao_em: string | null; criado_em: string | null;
   etiquetas: string[] | null;
@@ -56,7 +57,8 @@ function tsOf(m: DbMsg): number {
 
 function mapConversa(c: DbConv): WaContact {
   const msgs: WaMessage[] = (c.mensagens ?? [])
-    .filter((m) => (m.conteudo ?? '').length > 0)
+    // mantém texto com conteúdo OU qualquer mídia (imagem/áudio/vídeo/documento) mesmo sem legenda.
+    .filter((m) => (m.conteudo ?? '').length > 0 || (TIPOS_MIDIA.includes(m.tipo) && !!m.metadados?.anexo_path))
     .sort((a, b) => tsOf(a) - tsOf(b))
     .map((m) => ({
       id: m.id,
@@ -66,6 +68,11 @@ function mapConversa(c: DbConv): WaContact {
       viaTelefone: m.origem === 'telefone',
       status: m.status ?? undefined,
       erro: m.erro_envio ?? undefined,
+      tipo: m.tipo,
+      anexoPath: m.metadados?.anexo_path,
+      mime: m.metadados?.mime,
+      tamanho: m.metadados?.tamanho ?? null,
+      nome: m.metadados?.nome,
     } as WaMessage));
   const lastMsg = msgs[msgs.length - 1];
   const chip = c.canais?.nome_interno ?? 'WhatsApp';
@@ -116,7 +123,7 @@ export function useWaConversations() {
         // canais!conversas_canal_id_fkey: desambigua o embed (há 2 FKs p/ canais: canal_id e ultimo_canal_id).
         // NÃO embutimos conversa_status_def aqui: a cor/nome do status é resolvida no cliente via useStatusDefs
         // (mantém o inbox funcional mesmo que a tabela auxiliar fique inacessível por grant).
-        .select('id, status, status_id, nao_lidas, ultima_interacao_em, criado_em, etiquetas, ultimo_canal_id, ultimo_numero, ultimo_provider, ultima_msg_canal_em, contatos!inner(id, nome, telefone, email, etiquetas, origem, observacoes, responsavel_id), canais!conversas_canal_id_fkey!inner(id, nome_interno, tipo), mensagens(id, direcao, conteudo, tipo, enviada_em, recebida_em, criado_em, origem, status, erro_envio)')
+        .select('id, status, status_id, nao_lidas, ultima_interacao_em, criado_em, etiquetas, ultimo_canal_id, ultimo_numero, ultimo_provider, ultima_msg_canal_em, contatos!inner(id, nome, telefone, email, etiquetas, origem, observacoes, responsavel_id), canais!conversas_canal_id_fkey!inner(id, nome_interno, tipo), mensagens(id, direcao, conteudo, tipo, enviada_em, recebida_em, criado_em, origem, status, erro_envio, metadados)')
         .eq('organizacao_id', orgId)
         .eq('canais.tipo', 'whatsapp')
         .order('ultima_interacao_em', { ascending: false });
@@ -150,13 +157,14 @@ export function useSendWaMessage() {
     // #4 assinatura aplicada no backend (evolution-send): passamos só o nome resolvido.
     // canalId = canal escolhido em "Responder por". O backend nunca confia em org vinda do cliente.
     // Retorna o id INTERNO da mensagem (para confirmação real do provedor). NÃO é garantia de entrega.
-    mutationFn: async (input: { conversaId: string; text: string; canalId?: string | null; assinaturaNome?: string; retryMensagemId?: string }) => {
+    mutationFn: async (input: { conversaId: string; text?: string; canalId?: string | null; assinaturaNome?: string; retryMensagemId?: string; midiaPath?: string; midiaTipo?: string; midiaMime?: string; midiaNome?: string; midiaTamanho?: number }) => {
       const r = await invoke<{ ok: boolean; mensagem?: { id?: string } }>('evolution-send', {
         conversa_id: input.conversaId,
-        text: input.text,
+        ...(input.text ? { text: input.text } : {}),
         ...(input.canalId ? { canal_id: input.canalId } : {}),
         ...(input.assinaturaNome ? { assinatura_nome: input.assinaturaNome } : {}),
         ...(input.retryMensagemId ? { retry_mensagem_id: input.retryMensagemId } : {}),
+        ...(input.midiaPath ? { midia_path: input.midiaPath, midia_tipo: input.midiaTipo, midia_mime: input.midiaMime, midia_nome: input.midiaNome, midia_tamanho: input.midiaTamanho } : {}),
       });
       return r.mensagem?.id ?? null;
     },
@@ -195,4 +203,21 @@ export function mascararNumero(numero: string | null | undefined): string {
   const fim = d.slice(-4);
   const ini = d.slice(0, Math.min(4, d.length - 4));
   return `+${ini}•••••${fim}`;
+}
+
+/** Sobe um arquivo de mídia ao bucket PRIVADO `script-midia`, isolado por organização.
+ *  O caminho começa pelo id da org (a Edge Function valida esse prefixo). NUNCA expõe URL pública. */
+export async function subirMidiaWa(orgId: string, file: File): Promise<{ path: string; nome: string; tamanho: number; mime: string }> {
+  const safe = file.name.replace(/[^\w.\-]/g, '_').slice(-80);
+  const path = `${orgId}/wa-midia/${crypto.randomUUID()}-${safe}`;
+  const { error } = await supabase!.storage.from('script-midia').upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false });
+  if (error) throw new Error(error.message);
+  return { path, nome: file.name, tamanho: file.size, mime: file.type || 'application/octet-stream' };
+}
+
+/** URL assinada CURTA para renderizar a mídia no histórico (gerada sob demanda, nunca persistida). */
+export async function urlAssinadaMidiaWa(path: string): Promise<string> {
+  const { data, error } = await supabase!.storage.from('script-midia').createSignedUrl(path, 600);
+  if (error || !data?.signedUrl) throw new Error(error?.message || 'Falha ao gerar URL da mídia.');
+  return data.signedUrl;
 }

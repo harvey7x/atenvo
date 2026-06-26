@@ -18,4 +18,7 @@ export const evolution = {
   connectionState: (instanceName: string) => call(`/instance/connectionState/${instanceName}`, 'GET') as Promise<{ instance?: { state?: string } }>,
   whatsappNumbers: (instanceName: string, numbers: string[]) => call(`/chat/whatsappNumbers/${instanceName}`, 'POST', { numbers }) as Promise<Array<{ exists?: boolean; jid?: string; number?: string }>>,
   sendText: (instanceName: string, number: string, text: string) => call(`/message/sendText/${instanceName}`, 'POST', { number, text }) as Promise<{ key?: { id?: string } }>,
+  // Envio de mídia (imagem/vídeo/documento). `media` é uma URL temporária (a Evolution baixa o arquivo).
+  sendMedia: (instanceName: string, number: string, mediatype: string, mimetype: string, media: string, fileName: string, caption?: string) =>
+    call(`/message/sendMedia/${instanceName}`, 'POST', { number, mediatype, mimetype, media, fileName, ...(caption ? { caption } : {}) }) as Promise<{ key?: { id?: string } }>,
 };

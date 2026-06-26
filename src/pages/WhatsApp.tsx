@@ -4,7 +4,8 @@ import { useToast } from '@/hooks/useToast';
 import { useAuth } from '@/context/AuthContext';
 import { useOrg } from '@/context/OrgContext';
 import { WA_CONTACTS, initials, avatarColor, type WaContact, type WaMessage } from '@/data/whatsappDemo';
-import { useWaConversations, useSendWaMessage, useWaCanais, mascararNumero, WA_REAL } from '@/data/whatsapp';
+import { useWaConversations, useSendWaMessage, useWaCanais, mascararNumero, subirMidiaWa, urlAssinadaMidiaWa, WA_REAL } from '@/data/whatsapp';
+import { MediaComposer } from '@/components/MediaComposer';
 import { useScripts, useScriptEtapaCounts, aguardarConfirmacaoEnvio } from '@/data/scripts';
 import { ScriptSequenceModal } from '@/components/ScriptSequenceModal';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -28,6 +29,7 @@ const IcDots = () => <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12
 const IcSearch = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3-3" /></svg>;
 const IcFunnel = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 5h18l-7 8v6l-4-2v-4z" /></svg>;
 const IcScripts = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 8h8M8 12h8M8 16h5" /></svg>;
+const IcImage = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.4" /><circle cx="8.5" cy="9.5" r="1.5" /><path d="m3 17 5-5 4 4 3-3 6 6" /></svg>;
 const IcSend = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4z" /></svg>;
 const IcWarn = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /></svg>;
 const IcChevRight = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>;
@@ -122,6 +124,9 @@ export function WhatsApp() {
   const [confirmFechar, setConfirmFechar] = useState(false);             // diálogo próprio (substitui window.confirm)
   const [erroDialog, setErroDialog] = useState<string | null>(null);     // "Ver erro" de mensagem falhada
   const [retryId, setRetryId] = useState<string | null>(null);           // trava de duplo-clique no retry
+  const [imgModal, setImgModal] = useState(false);                       // composer de imagem
+  const [imgUrls, setImgUrls] = useState<Record<string, string>>({});    // path -> URL assinada (sob demanda)
+  const [lightbox, setLightbox] = useState<string | null>(null);         // imagem ampliada no histórico
   const [replyChip, setReplyChip] = useState('Chip 1');       // modo mock
   const [replyCanalId, setReplyCanalId] = useState<string>(''); // modo real
   const [draft, setDraft] = useState('');
@@ -215,6 +220,20 @@ export function WhatsApp() {
   useEffect(() => {
     if (msgsRef.current) msgsRef.current.scrollTop = msgsRef.current.scrollHeight;
   }, [currentId, current.msgs.length]);
+
+  /* URLs assinadas das imagens do histórico (sob demanda; nunca persistidas) */
+  useEffect(() => {
+    let vivo = true;
+    (async () => {
+      for (const m of current.msgs) {
+        const p = m.anexoPath;
+        if (m.tipo !== 'imagem' || !p) continue;
+        if (imgUrls[p]) continue;
+        try { const url = await urlAssinadaMidiaWa(p); if (vivo) setImgUrls((u) => (u[p] ? u : { ...u, [p]: url })); } catch { /* ignora */ }
+      }
+    })();
+    return () => { vivo = false; };
+  }, [currentId, current.msgs.length, imgUrls]);
 
   /* responsivo: estado coerente do painel de dados */
   useEffect(() => {
@@ -329,6 +348,16 @@ export function WhatsApp() {
     );
   }
   function verErro(m: WaMessage) { setErroDialog(traduzErroEnvio(m.erro)); }
+  /** Envio manual de IMAGEM: sobe ao bucket privado e envia pela Evolution (lança em falha -> mantém p/ retry). */
+  async function enviarImagem(file: File, caption: string) {
+    if (!currentId) throw new Error('Selecione uma conversa.');
+    const up = await subirMidiaWa(currentOrg.id, file);
+    await sendMut.mutateAsync({
+      conversaId: currentId, canalId: replyCanalId || current.canalId,
+      midiaPath: up.path, midiaTipo: 'imagem', midiaMime: up.mime, midiaNome: up.nome, midiaTamanho: up.tamanho,
+      text: caption || undefined,
+    });
+  }
 
   function onReplyChip(chip: string) {
     const prev = replyChip;
@@ -512,9 +541,35 @@ export function WhatsApp() {
         <div className="messages" ref={msgsRef}>
           {current.msgs.map((m, i) => {
             const ack = m.dir === 'out' ? ackOf(m.status) : null;
+            const imgUrl = m.tipo === 'imagem' && m.anexoPath ? imgUrls[m.anexoPath] : undefined;
+            const tempo = (
+              <span className="btime">
+                {m.viaTelefone && <span className="phone-tag" title="Enviada pelo celular"><IcPhoneSent />Enviada pelo celular</span>}
+                {m.time}
+                {ack && <span className={'tick ' + ack.cls} title={m.status === 'falhou' ? traduzErroEnvio(m.erro) : ack.title}>{ack.ticks}</span>}
+              </span>
+            );
+            const falhaActs = (m.dir === 'out' && m.status === 'falhou') ? (
+              <span className="msg-falha-acts">
+                <button type="button" className="msg-falha-link" onClick={() => verErro(m)}>Ver erro</button>
+                <span className="msg-falha-sep">·</span>
+                <button type="button" className="msg-falha-link" disabled={!m.id || retryId === m.id} onClick={() => retryMsg(m)}>{retryId === m.id ? 'Reenviando…' : 'Tentar novamente'}</button>
+              </span>
+            ) : null;
             return (
               <div key={i} className={'msg ' + m.dir}>
-                {m.pdf ? (
+                {m.tipo === 'imagem' ? (
+                  <>
+                    <div className={'bubble bubble-img' + (m.status === 'falhou' ? ' bubble-falha' : '')}>
+                      {imgUrl
+                        ? <img className="msg-img" src={imgUrl} alt={m.nome || 'imagem'} loading="lazy" onClick={() => setLightbox(imgUrl)} title="Ampliar" />
+                        : <div className="msg-img-ph">Carregando imagem…</div>}
+                      {m.text && <div className="msg-cap">{m.text}</div>}
+                    </div>
+                    {tempo}
+                    {falhaActs}
+                  </>
+                ) : m.pdf ? (
                   <>
                     <div className="pdf-card"><span className="pdf-ic">PDF</span><div className="pdf-info"><div className="pdf-name">{m.pdf.name}</div><div className="pdf-meta">{m.pdf.meta}</div></div></div>
                     <span className="btime">{m.time}</span>
@@ -522,18 +577,8 @@ export function WhatsApp() {
                 ) : (
                   <>
                     <div className={'bubble' + (m.status === 'falhou' ? ' bubble-falha' : '')}>{m.text}</div>
-                    <span className="btime">
-                      {m.viaTelefone && <span className="phone-tag" title="Enviada pelo celular"><IcPhoneSent />Enviada pelo celular</span>}
-                      {m.time}
-                      {ack && <span className={'tick ' + ack.cls} title={m.status === 'falhou' ? traduzErroEnvio(m.erro) : ack.title}>{ack.ticks}</span>}
-                    </span>
-                    {m.dir === 'out' && m.status === 'falhou' && (
-                      <span className="msg-falha-acts">
-                        <button type="button" className="msg-falha-link" onClick={() => verErro(m)}>Ver erro</button>
-                        <span className="msg-falha-sep">·</span>
-                        <button type="button" className="msg-falha-link" disabled={!m.id || retryId === m.id} onClick={() => retryMsg(m)}>{retryId === m.id ? 'Reenviando…' : 'Tentar novamente'}</button>
-                      </span>
-                    )}
+                    {tempo}
+                    {falhaActs}
                   </>
                 )}
               </div>
@@ -590,6 +635,7 @@ export function WhatsApp() {
               value={draft} onChange={(e) => setDraft(e.target.value)} disabled={canalIndisponivel}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); } }} />
             <div className="composer-bar">
+              <button className="tool" title="Enviar imagem" aria-label="Enviar imagem" disabled={WA_REAL && (!current.id || !canalConectado)} onClick={() => setImgModal(true)}><IcImage /></button>
               <span className="spacer" />
               <button ref={scriptsBtnRef} className="scripts-btn" onClick={(e) => { e.stopPropagation(); togglePop('scripts', scriptsBtnRef, 'right'); }}><IcScripts />Scripts<IcCaret /></button>
               <button className="send-btn" aria-label="Enviar" disabled={sendDisabled} onClick={sendMsg}><IcSend /></button>
@@ -792,6 +838,15 @@ export function WhatsApp() {
         onConfirm={() => setErroDialog(null)}
         onCancel={() => setErroDialog(null)}
       />
+
+      <MediaComposer open={imgModal} tipo="imagem" onClose={() => setImgModal(false)} enviar={enviarImagem} />
+
+      {lightbox && (
+        <div className="atv-lightbox" onClick={() => setLightbox(null)} role="dialog" aria-modal="true">
+          <button className="atv-lightbox-close" aria-label="Fechar" onClick={() => setLightbox(null)}>×</button>
+          <img src={lightbox} alt="Imagem ampliada" onClick={(e) => e.stopPropagation()} />
+        </div>
+      )}
     </div>
   );
 }

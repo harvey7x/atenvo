@@ -11,6 +11,14 @@ export interface WaMessage {
   id?: string;
   /** motivo sanitizado da falha (quando status = falhou). */
   erro?: string;
+  /** tipo da mensagem: texto | imagem | audio | video | documento. */
+  tipo?: string;
+  /** caminho do anexo no bucket privado (mídia); a URL assinada é gerada sob demanda. */
+  anexoPath?: string;
+  /** metadados de mídia para renderização. */
+  mime?: string;
+  tamanho?: number | null;
+  nome?: string;
 }
 
 /** #6 último canal/número usado para falar com a conversa. */

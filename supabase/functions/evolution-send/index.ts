@@ -1,4 +1,6 @@
-// evolution-send — envia texto e persiste a saída.
+// evolution-send — envia texto/IMAGEM e persiste a saída.
+// v14: IMAGEM via /message/sendMedia (URL assinada curta, isolada por org, exige key.id;
+//      retry reaproveita o arquivo da mensagem original). Demais mídias virão nas próximas etapas.
 // v13: status 'enviada' ao obter key.id (provedor aceitou ✓); webhook avança p/ entregue/lida.
 //      retry_mensagem_id reaproveita a MESMA mensagem falhada (sem duplicar). Assinatura *Nome:*\n (#4),
 //      persiste texto_original/assinatura_nome/origem='atenvo'; atualiza último canal/número (#6).
@@ -17,8 +19,9 @@ Deno.serve(async (req) => {
     const user = await getUser(req);
     if (!user) return json({ error: 'Não autenticado.' }, 401);
 
-    const { conversa_id, text, canal_id, assinatura_nome, retry_mensagem_id } = await req.json().catch(() => ({}));
-    if (!conversa_id || !text?.toString().trim()) return json({ error: 'conversa_id e text são obrigatórios.' }, 400);
+    const { conversa_id, text, canal_id, assinatura_nome, retry_mensagem_id, midia_path, midia_tipo, midia_mime, midia_nome, midia_tamanho } = await req.json().catch(() => ({}));
+    const temTexto = !!text?.toString().trim();
+    if (!conversa_id || (!temTexto && !midia_path && !retry_mensagem_id)) return json({ error: 'conversa_id e conteúdo (texto ou mídia) são obrigatórios.' }, 400);
     const corr = (globalThis.crypto?.randomUUID?.() ?? String(Date.now())).slice(0, 8);
 
     const admin = adminClient();
@@ -26,14 +29,14 @@ Deno.serve(async (req) => {
     if (!conv) return json({ error: 'Conversa não encontrada.' }, 404);
 
     // RETRY: reaproveita a MESMA mensagem falhada (sem duplicar). Só vale p/ mensagem de saída desta conversa/org com status 'falhou'.
-    let retryMsg: { id: string; conteudo: string | null; texto_original: string | null; assinatura_nome: string | null } | null = null;
+    let retryMsg: { id: string; conteudo: string | null; texto_original: string | null; assinatura_nome: string | null; tipo: string | null; metadados: Record<string, unknown> | null } | null = null;
     if (retry_mensagem_id) {
       const { data: rm } = await admin.from('mensagens')
-        .select('id, conversa_id, organizacao_id, direcao, status, conteudo, texto_original, assinatura_nome')
+        .select('id, conversa_id, organizacao_id, direcao, status, conteudo, texto_original, assinatura_nome, tipo, metadados')
         .eq('id', retry_mensagem_id).maybeSingle();
       if (!rm || rm.conversa_id !== conversa_id || rm.organizacao_id !== conv.organizacao_id || rm.direcao !== 'saida' || rm.status !== 'falhou')
         return json({ error: 'Mensagem para retentativa inválida.' }, 422);
-      retryMsg = { id: rm.id as string, conteudo: rm.conteudo as string | null, texto_original: rm.texto_original as string | null, assinatura_nome: rm.assinatura_nome as string | null };
+      retryMsg = { id: rm.id as string, conteudo: rm.conteudo as string | null, texto_original: rm.texto_original as string | null, assinatura_nome: rm.assinatura_nome as string | null, tipo: rm.tipo as string | null, metadados: (rm.metadados as Record<string, unknown> | null) ?? null };
     }
 
     const { data: mem } = await admin.from('organizacao_usuarios').select('status').eq('organizacao_id', conv.organizacao_id).eq('usuario_id', user.id).maybeSingle();
@@ -83,6 +86,56 @@ Deno.serve(async (req) => {
       }
     } catch { /* fail-open: usa base */ }
     console.log(`[send] corr=${corr} para=${base.slice(0, 6)} alvo=${alvo.slice(0, 6)}`);
+
+    // ===== MÍDIA (nesta etapa: IMAGEM). Retry herda o tipo/arquivo da mensagem original. =====
+    const ehMidiaRetry = !!retryMsg && !!retryMsg.tipo && retryMsg.tipo !== 'texto';
+    if (midia_path || ehMidiaRetry) {
+      const meta = (retryMsg?.metadados ?? {}) as Record<string, unknown>;
+      const path = (midia_path as string) || (meta.anexo_path as string) || '';
+      const tipo = ehMidiaRetry ? String(retryMsg!.tipo) : (midia_tipo === 'imagem' ? 'imagem' : '');
+      const mime = (midia_mime as string) || (meta.mime as string) || '';
+      const nome = (midia_nome as string) || (meta.nome as string) || 'imagem';
+      const tamanho = (midia_tamanho as number) ?? (meta.tamanho as number) ?? null;
+      const caption = temTexto ? text.toString() : (retryMsg ? (retryMsg.conteudo ?? '') : '');
+      const nowIso = new Date().toISOString();
+
+      // nesta etapa SÓ imagem
+      if (tipo !== 'imagem') return json({ error: 'Tipo de mídia ainda não suportado (apenas imagem).' }, 422);
+      // ISOLAMENTO por organização: o caminho do arquivo precisa começar pelo id da org da conversa.
+      if (!path || !path.startsWith(conv.organizacao_id + '/')) return json({ error: 'Arquivo de mídia inválido.' }, 422);
+      // família MIME compatível com imagem
+      if (!mime.startsWith('image/')) return json({ error: 'mime_incompativel' }, 422);
+      // limite de tamanho (imagem WhatsApp ~16MB)
+      if (tamanho && tamanho > 16 * 1024 * 1024) return json({ error: 'Imagem acima do limite (16MB).' }, 422);
+
+      // URL assinada CURTA (600s) — a Evolution baixa o arquivo; NUNCA persistimos a URL.
+      const { data: signed, error: se } = await admin.storage.from('script-midia').createSignedUrl(path, 600);
+      if (se || !signed?.signedUrl) return json({ error: 'Falha ao preparar a mídia.' }, 500);
+
+      let sent: { key?: { id?: string } };
+      try { sent = await evolution.sendMedia(instancia, alvo, 'image', mime, signed.signedUrl, nome, caption || undefined); }
+      catch (err) { const m = (err as Error).message || 'Falha ao enviar a mídia.'; return json({ error: /not|connect|close/i.test(m) ? 'O WhatsApp deste canal desconectou. Reconecte em Integrações.' : m }, 502); }
+      const idExterno = sent?.key?.id ?? null;
+      const metadados = { anexo_path: path, mime, tamanho, nome };
+
+      // CRITÉRIO DE ACEITE: sem key.id, a Evolution não aceitou — marca FALHA (não "enviada").
+      if (!idExterno) {
+        if (retryMsg) await admin.from('mensagens').update({ status: 'falhou', erro_envio: 'sem_id_externo' }).eq('id', retryMsg.id);
+        else await admin.from('mensagens').insert({ conversa_id, organizacao_id: conv.organizacao_id, direcao: 'saida', tipo: 'imagem', conteudo: caption || null, origem: 'atenvo', autor_id: user.id, status: 'falhou', erro_envio: 'sem_id_externo', metadados });
+        console.log(`[send] corr=${corr} MIDIA sem id_externo -> falhou`);
+        return json({ error: 'A Evolution não confirmou o envio (sem identificador de mensagem).' }, 502);
+      }
+      let msg;
+      if (retryMsg) {
+        const { data } = await admin.from('mensagens').update({ status: 'enviada', id_externo: idExterno, erro_envio: null, enviada_em: nowIso }).eq('id', retryMsg.id).select('id, conteudo, enviada_em, direcao, status').single();
+        msg = data;
+      } else {
+        const { data } = await admin.from('mensagens').insert({ conversa_id, organizacao_id: conv.organizacao_id, direcao: 'saida', tipo: 'imagem', conteudo: caption || null, origem: 'atenvo', autor_id: user.id, id_externo: idExterno, status: 'enviada', enviada_em: nowIso, metadados }).select('id, conteudo, enviada_em, direcao, status').single();
+        msg = data;
+      }
+      await admin.from('conversas').update({ ultima_interacao_em: nowIso, ultimo_canal_id: canal.id, ultimo_numero: canal.numero_conectado ?? null, ultimo_provider: canal.provider ?? 'whatsapp', ultima_msg_canal_em: nowIso }).eq('id', conversa_id);
+      return json({ ok: true, mensagem: msg });
+    }
 
     // ----- #4 ASSINATURA: aplica *Nome:*\n; guarda anti-dupla-assinatura em retentativa. -----
     // RETRY: usa o corpo já assinado/persistido da mensagem original (não reassina, não duplica).

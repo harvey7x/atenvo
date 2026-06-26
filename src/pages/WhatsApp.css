@@ -258,6 +258,12 @@
 .wa-app .msg-falha-link:disabled{color:var(--muted);cursor:default;font-weight:400}
 .wa-app .msg-falha-sep{margin:0 6px;color:var(--muted)}
 
+/* imagem no histórico */
+.wa-app .bubble-img{padding:4px;max-width:330px}
+.wa-app .msg-img{display:block;max-width:312px;max-height:340px;width:auto;border-radius:9px;cursor:zoom-in;object-fit:cover}
+.wa-app .msg-img-ph{min-width:180px;padding:34px 40px;color:var(--muted);font-size:12px;text-align:center}
+.wa-app .msg-cap{padding:6px 6px 2px;font-size:13.5px;line-height:1.45;white-space:pre-wrap;word-break:break-word}
+
 /* ===== popover extras ===== */
 .wa-app .pop-item.sel{background:var(--green-soft)}
 .wa-app .pop-item .sdot{margin-right:2px}
