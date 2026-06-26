@@ -58,7 +58,9 @@ export function Scripts() {
   const [canalFiltro, setCanalFiltro] = useState<CanalFiltro>('todos');
   const [favOnly, setFavOnly] = useState(false);
   const [currentId, setCurrentId] = useState('');
-  const [editorOpen, setEditorOpen] = useState(() => (typeof window !== 'undefined' ? window.innerWidth >= 1100 : true));
+  const [editorOpen, setEditorOpen] = useState(() => (typeof window !== 'undefined' ? window.innerWidth >= 1700 : true));
+  const [w, setW] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1920));
+  const edDrawer = w < 1700;
 
   // categoria modal
   const [catModal, setCatModal] = useState(false);
@@ -90,6 +92,7 @@ export function Scripts() {
   }
 
   useEffect(() => { const t = setTimeout(() => setSearch(searchRaw.trim().toLowerCase()), 250); return () => clearTimeout(t); }, [searchRaw]);
+  useEffect(() => { function onR() { const x = window.innerWidth; setW(x); if (x >= 1700) setEditorOpen(true); } window.addEventListener('resize', onR); return () => window.removeEventListener('resize', onR); }, []);
 
   const scripts = useMemo(() => scriptsQ.data ?? [], [scriptsQ.data]);
   const cats = catsQ.data ?? [];
@@ -240,7 +243,7 @@ export function Scripts() {
   const canalPreview = mostrarTogglePreview ? previewCanal : (cfg.wa ? 'whatsapp' : 'facebook');
 
   return (
-    <div className={'scripts-page' + (editorOpen ? '' : ' editor-closed')}>
+    <div className={'scripts-page' + (edDrawer && editorOpen ? ' editor-open has-drawer' : '')}>
       <div className="topbar">
         <div className="tb-left"><div className="page-title">Biblioteca de Scripts</div><div className="page-sub">Crie, organize e reutilize sequências de mensagens.</div></div>
         <div className="tb-right"><div className="tb-actions">
@@ -282,7 +285,7 @@ export function Scripts() {
             {list.map((s) => {
               const on = s.id === currentId;
               return (
-                <div key={s.id} className={'scard' + (on ? ' active' : '')} role="option" aria-selected={on} onClick={() => { setCurrentId(s.id); setEditorOpen(true); }}>
+                <div key={s.id} className={'scard' + (on ? ' active' : '')} role="option" aria-selected={on} onClick={() => { setCurrentId(s.id); if (edDrawer) setEditorOpen(true); }}>
                   <div className="sc-top"><div className="sc-title">{s.titulo || 'Sem título'}</div><button className={'star' + (s.favorito ? ' on' : '')} aria-label="Favoritar" onClick={(e) => { e.stopPropagation(); favoritar(s); }}>{s.favorito ? <IcStarFill /> : <IcStarLine />}</button></div>
                   <div className="sc-chans">{(s.canais.length ? s.canais : ['whatsapp', 'facebook']).map((c) => <ChBadge key={c} c={c} />)}</div>
                   <div className="sc-prev">{s.conteudo.replace(/\n+/g, ' ') || '—'}</div>
@@ -315,7 +318,7 @@ export function Scripts() {
         </aside>
       </div>
 
-      <button className="reopen" aria-label="Abrir painel" onClick={() => setEditorOpen(true)}><IcChevL /></button>
+      <button className="reopen" aria-label="Abrir painel" style={{ display: edDrawer && !editorOpen ? 'inline-flex' : 'none' }} onClick={() => setEditorOpen(true)}><IcChevL /></button>
       <div className="drawer-overlay" onClick={() => setEditorOpen(false)} />
 
       {/* ---------- Modal de categoria ---------- */}
