@@ -33,6 +33,7 @@ export function AudioRecorder({ disabled, onEnviar }: Props) {
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [deviceId, setDeviceId] = useState<string>('');
   const [info, setInfo] = useState<{ mime: string; size: number; dur: number; sinal: boolean; verificando?: boolean; rms?: number } | null>(null);
+  const [picoVivo, setPicoVivo] = useState(0); // maior nível visto na gravação atual (p/ avisar "sem sinal")
 
   const streamRef = useRef<MediaStream | null>(null);
   const recRef = useRef<MediaRecorder | null>(null);
@@ -105,7 +106,7 @@ export function AudioRecorder({ disabled, onEnviar }: Props) {
       for (let c = 0; c < audio.numberOfChannels; c++) { const ch = audio.getChannelData(c); for (let i = 0; i < ch.length; i++) sum += ch[i] * ch[i]; n += ch.length; }
       const rms = n ? Math.sqrt(sum / n) : 0;
       try { ac.close(); } catch { /* ignore */ }
-      setInfo((x) => x ? { ...x, dur: audio.duration, sinal: rms >= 0.005, verificando: false, rms } : x);
+      setInfo((x) => x ? { ...x, dur: audio.duration, sinal: rms >= 0.01, verificando: false, rms } : x); // ruído de fundo não passa
     } catch { setInfo((x) => x ? { ...x, verificando: false } : x); } // se não decodificar, mantém o medidor ao vivo
   }
 
@@ -150,8 +151,8 @@ export function AudioRecorder({ disabled, onEnviar }: Props) {
     };
     rec.onerror = () => { pararMedidor(); pararTracks(); pararTimer(); setEstado('error'); setErro('Erro durante a gravação.'); };
     try { rec.start(); } catch { pararTracks(); pararMedidor(); setEstado('error'); setErro('Não foi possível iniciar a gravação.'); return; }
-    setSeg(0); setEstado('recording');
-    timerRef.current = setInterval(() => { if (recRef.current?.state === 'recording') setSeg((s) => s + 1); }, 1000);
+    setSeg(0); setPicoVivo(0); setEstado('recording');
+    timerRef.current = setInterval(() => { setPicoVivo(maxNivelRef.current); if (recRef.current?.state === 'recording') setSeg((s) => s + 1); }, 1000);
   }
 
   function pausar() { if (recRef.current?.state === 'recording') { recRef.current.pause(); setEstado('paused'); } }
@@ -189,6 +190,8 @@ export function AudioRecorder({ disabled, onEnviar }: Props) {
     } finally { enviandoRef.current = false; }
   }
 
+  const nomeMic = (devices.find((d) => d.deviceId === deviceId)?.label || devices[0]?.label || '').slice(0, 30);
+  const semSinalVivo = (estado === 'recording' || estado === 'paused') && seg >= 2 && picoVivo < 0.02;
   const seletorMic = devices.length > 1 && (
     <select className="rec-select" value={deviceId} onChange={(e) => trocarDispositivo(e.target.value)} title="Microfone" disabled={estado === 'sending'}>
       {devices.map((d, i) => <option key={d.deviceId || i} value={d.deviceId}>{d.label || `Microfone ${i + 1}`}</option>)}
@@ -208,7 +211,8 @@ export function AudioRecorder({ disabled, onEnviar }: Props) {
           <span className={'rec-dot' + (estado === 'recording' ? ' on' : '')} />
           <span className="rec-timer">{mmss(seg)}{estado === 'paused' ? ' (pausado)' : ''}</span>
           <span className="rec-meter" title="Nível do microfone"><span ref={barRef} className="rec-meter-bar" /></span>
-          {seletorMic}
+          {semSinalVivo && <span className="rec-erro">Sem sinal — fale ou troque o microfone</span>}
+          {seletorMic || (nomeMic && <span className="rec-meta" title={nomeMic}>{nomeMic}</span>)}
           {estado === 'recording'
             ? <button type="button" className="rec-btn" onClick={pausar} title="Pausar">❚❚</button>
             : <button type="button" className="rec-btn" onClick={continuar} title="Continuar">▶</button>}
