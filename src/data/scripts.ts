@@ -222,3 +222,54 @@ export function formatarTamanho(bytes: number): string {
   if (bytes < MB) return `${(bytes / 1024).toFixed(0)} KB`;
   return `${(bytes / MB).toFixed(1)} MB`;
 }
+
+/* ===================== Etapas (sequência de mensagens) ===================== */
+export interface EtapaTexto { id?: string; conteudo: string; }
+
+/** Carrega as etapas de texto de um script, na ordem. */
+export async function fetchEtapasTexto(scriptId: string): Promise<{ id: string; conteudo: string }[]> {
+  const { data, error } = await supabase!.from('script_etapas').select('id,conteudo,posicao,tipo')
+    .eq('script_id', scriptId).order('posicao', { ascending: true });
+  if (error) throw new Error(error.message);
+  return ((data as unknown as { id: string; conteudo: string | null; tipo: string }[]) ?? [])
+    .filter((r) => r.tipo === 'texto').map((r) => ({ id: r.id, conteudo: r.conteudo ?? '' }));
+}
+
+export function useScriptEtapaMutations() {
+  const { currentOrg } = useOrg();
+  const qc = useQueryClient();
+  return {
+    /** Reconcilia a sequência: atualiza/insere na ordem e remove as etapas que sobraram.
+     *  Faz inserts/updates ANTES dos deletes para nunca deixar o script sem etapas. */
+    salvarTexto: useMutation({
+      mutationFn: async (a: { scriptId: string; mensagens: { id?: string; conteudo: string }[] }) => {
+        const { data: ex, error: e0 } = await supabase!.from('script_etapas').select('id').eq('script_id', a.scriptId);
+        if (e0) throw new Error(e0.message);
+        const existIds = new Set(((ex as { id: string }[]) ?? []).map((r) => r.id));
+        const keep = new Set<string>();
+        let pos = 1;
+        for (const m of a.mensagens) {
+          if (m.id && existIds.has(m.id)) {
+            const { error } = await supabase!.from('script_etapas').update({ conteudo: m.conteudo, posicao: pos, tipo: 'texto' }).eq('id', m.id);
+            if (error) throw new Error(error.message);
+            keep.add(m.id);
+          } else {
+            const { data, error } = await supabase!.from('script_etapas').insert({ script_id: a.scriptId, organizacao_id: currentOrg.id, posicao: pos, tipo: 'texto', conteudo: m.conteudo }).select('id').single();
+            if (error) throw new Error(error.message);
+            if (data) keep.add((data as { id: string }).id);
+          }
+          pos++;
+        }
+        const del = [...existIds].filter((id) => !keep.has(id));
+        if (del.length) { const { error } = await supabase!.from('script_etapas').delete().in('id', del); if (error) throw new Error(error.message); }
+      },
+      onSuccess: () => qc.invalidateQueries({ queryKey: ['scripts', currentOrg.id] }),
+    }),
+  };
+}
+
+/** Resolve um script como sequência ordenada já com variáveis substituídas (para execução futura na conversa). */
+export async function resolverSequenciaScript(scriptId: string, ctx: VarCtx): Promise<string[]> {
+  const etapas = await fetchEtapasTexto(scriptId);
+  return etapas.map((e) => substituirVariaveis(e.conteudo, ctx)).filter((t) => t.trim().length > 0);
+}

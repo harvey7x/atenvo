@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useToast } from '@/hooks/useToast';
+import { useAuth } from '@/context/AuthContext';
+import { useOrg } from '@/context/OrgContext';
 import { EmptyState } from '@/components/EmptyState';
 import { Modal } from '@/components/Modal';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import {
   SCRIPTS_REAL, useScripts, useScriptCategorias, useScriptMutations, useScriptCategoriaMutations,
-  substituirVariaveis, SCRIPT_VARIAVEIS, type Script,
-  useScriptAnexos, useScriptAnexoMutations, urlAssinadaAnexo, formatarTamanho, type ScriptAnexo,
+  useScriptEtapaMutations, fetchEtapasTexto, substituirVariaveis, SCRIPT_VARIAVEIS, type Script,
 } from '@/data/scripts';
 import './Scripts.css';
 
@@ -17,13 +18,13 @@ const IcStarLine = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentCol
 const IcDoc = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5M8.5 13h7M8.5 16.5h5" /></svg>;
 const IcCopy = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h8" /></svg>;
 const IcTrash = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" /></svg>;
-const IcBraces = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3c-2 0-3 1-3 3v3l-2 3 2 3v3c0 2 1 3 3 3M16 3c2 0 3 1 3 3v3l2 3-2 3v3c0 2-1 3-3 3" /></svg>;
 const IcCheck = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>;
-const IcClose = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12" /></svg>;
-const IcSave = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><path d="M17 21v-8H7v8M7 3v5h8" /></svg>;
+const IcPencil = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>;
 const IcPlus = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>;
 const IcSearch = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3-3" /></svg>;
 const IcChevL = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>;
+const IcUp = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 15 6-6 6 6" /></svg>;
+const IcDown = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>;
 
 function ChBadge({ c }: { c: string }) {
   const wa = c === 'whatsapp';
@@ -33,19 +34,23 @@ function ChBadge({ c }: { c: string }) {
 const VAZIO: Script = { id: '', titulo: '', descricao: null, conteudo: '', categoriaId: null, canais: [], favorito: false, ativo: true, tags: [], autorId: null, criadoEm: '', atualizadoEm: '' };
 
 type CanalFiltro = 'todos' | 'whatsapp' | 'facebook' | 'ambos';
-/** Classifica um script por exclusividade de canal (vazio = disponível em ambos). */
 function classificaCanal(canais: string[]): 'whatsapp' | 'facebook' | 'ambos' {
   const wa = canais.includes('whatsapp'); const fb = canais.includes('facebook');
   if ((wa && fb) || canais.length === 0) return 'ambos';
   return wa ? 'whatsapp' : 'facebook';
 }
+interface Msg { id?: string; conteudo: string; }
+const HORA_FAKE = '09:41';
 
 export function Scripts() {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const { currentOrg } = useOrg();
   const scriptsQ = useScripts();
   const catsQ = useScriptCategorias();
   const mut = useScriptMutations();
   const catMut = useScriptCategoriaMutations();
+  const etapaMut = useScriptEtapaMutations();
 
   const [cat, setCat] = useState('all');
   const [searchRaw, setSearchRaw] = useState('');
@@ -53,30 +58,27 @@ export function Scripts() {
   const [canalFiltro, setCanalFiltro] = useState<CanalFiltro>('todos');
   const [favOnly, setFavOnly] = useState(false);
   const [currentId, setCurrentId] = useState('');
-  const [isNew, setIsNew] = useState(false);
-  const [form, setForm] = useState({ titulo: '', conteudo: '', wa: true, fb: false, categoriaId: '' as string });
-  const [saving, setSaving] = useState(false);
   const [editorOpen, setEditorOpen] = useState(() => (typeof window !== 'undefined' ? window.innerWidth >= 1100 : true));
-  const msgRef = useRef<HTMLTextAreaElement>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
-  const anexosQ = useScriptAnexos(isNew ? null : (currentId || null));
-  const anexos = anexosQ.data ?? [];
-  const anexoMut = useScriptAnexoMutations();
+
+  // categoria modal
   const [catModal, setCatModal] = useState(false);
   const [catNome, setCatNome] = useState('');
   const [catErr, setCatErr] = useState<string | null>(null);
   const [catSaving, setCatSaving] = useState(false);
+  // confirmacao
   const [confirmState, setConfirmState] = useState<{ title: string; message: string; run: () => Promise<void> } | null>(null);
   const [confirmLoading, setConfirmLoading] = useState(false);
 
-  // ---- Fluxo único de criação de script (modal) ----
-  const [createOpen, setCreateOpen] = useState(false);
-  const [createSaving, setCreateSaving] = useState(false);
-  const [createErr, setCreateErr] = useState<Record<string, string>>({});
-  const [createFiles, setCreateFiles] = useState<File[]>([]);
-  const [createForm, setCreateForm] = useState({ titulo: '', descricao: '', conteudo: '', wa: true, fb: false, categoriaId: '', tags: '', favorito: false, ativo: true });
-  const createFileRef = useRef<HTMLInputElement>(null);
+  // ---- Construtor (criar/editar) ----
+  const [formOpen, setFormOpen] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [errs, setErrs] = useState<Record<string, string>>({});
+  const [cfg, setCfg] = useState({ titulo: '', descricao: '', wa: true, fb: false, categoriaId: '', tags: '', favorito: false, ativo: true });
+  const [mensagens, setMensagens] = useState<Msg[]>([{ conteudo: '' }]);
+  const [previewCanal, setPreviewCanal] = useState<'whatsapp' | 'facebook'>('whatsapp');
+  const msgRefs = useRef<(HTMLTextAreaElement | null)[]>([]);
+  const activeMsg = useRef(0);
 
   function pedirConfirmacao(title: string, message: string, run: () => Promise<void>) { setConfirmState({ title, message, run }); }
   async function executarConfirm() {
@@ -87,7 +89,6 @@ export function Scripts() {
     finally { setConfirmLoading(false); }
   }
 
-  // debounce da busca
   useEffect(() => { const t = setTimeout(() => setSearch(searchRaw.trim().toLowerCase()), 250); return () => clearTimeout(t); }, [searchRaw]);
 
   const scripts = useMemo(() => scriptsQ.data ?? [], [scriptsQ.data]);
@@ -108,83 +109,106 @@ export function Scripts() {
     return c;
   }, [scripts]);
 
-  // mantém uma seleção válida
   useEffect(() => {
-    if (isNew) return;
     if (currentId && scripts.some((s) => s.id === currentId)) return;
     setCurrentId(list[0]?.id ?? scripts[0]?.id ?? '');
-  }, [scripts, list, currentId, isNew]);
-
+  }, [scripts, list, currentId]);
   const current = scripts.find((s) => s.id === currentId) ?? VAZIO;
 
-  function openCreateScript(prefill?: { categoriaId?: string; canal?: CanalFiltro }) {
-    const canal = prefill?.canal;
-    const wa = canal === 'whatsapp' || canal === 'ambos' || canal === undefined || canal === 'todos';
-    const fb = canal === 'facebook' || canal === 'ambos';
-    setCreateForm({ titulo: '', descricao: '', conteudo: '', wa, fb, categoriaId: prefill?.categoriaId ?? '', tags: '', favorito: false, ativo: true });
-    setCreateFiles([]); setCreateErr({}); setCreateOpen(true);
+  // contexto para preview (dados demonstrativos)
+  const previewCtx = { cliente: 'Maria Silva', atendente: user?.name || 'Você', empresa: currentOrg.name || 'Empresa', telefone: '(11) 99999-9999' };
+
+  /* ---------- abertura do construtor ---------- */
+  function prefillCanal(): { wa: boolean; fb: boolean } {
+    const c = canalFiltro;
+    return { wa: c === 'whatsapp' || c === 'ambos' || c === 'todos', fb: c === 'facebook' || c === 'ambos' };
   }
-  async function salvarNovo() {
-    if (createSaving) return;
-    const canais: string[] = []; if (createForm.wa) canais.push('whatsapp'); if (createForm.fb) canais.push('facebook');
-    const errs: Record<string, string> = {};
-    if (!createForm.titulo.trim()) errs.titulo = 'Título é obrigatório.';
-    if (canais.length === 0) errs.canal = 'Selecione ao menos um canal.';
-    if (!createForm.conteudo.trim() && createFiles.length === 0) errs.conteudo = 'Informe o texto ou anexe uma mídia.';
-    if (Object.keys(errs).length) { setCreateErr(errs); return; }
-    setCreateSaving(true); setCreateErr({});
+  function openCreateScript() {
+    const { wa, fb } = prefillCanal();
+    setEditId(null);
+    setCfg({ titulo: '', descricao: '', wa, fb, categoriaId: cat !== 'all' ? cat : '', tags: '', favorito: false, ativo: true });
+    setMensagens([{ conteudo: '' }]);
+    setPreviewCanal(wa ? 'whatsapp' : 'facebook');
+    setErrs({}); msgRefs.current = []; activeMsg.current = 0; setFormOpen(true);
+  }
+  async function openEditScript(s: Script) {
+    setEditId(s.id);
+    setCfg({ titulo: s.titulo, descricao: s.descricao ?? '', wa: s.canais.includes('whatsapp'), fb: s.canais.includes('facebook'), categoriaId: s.categoriaId ?? '', tags: s.tags.join(', '), favorito: s.favorito, ativo: s.ativo });
+    setMensagens([{ conteudo: s.conteudo || '' }]); // provisório enquanto carrega
+    setPreviewCanal(s.canais.includes('whatsapp') || s.canais.length === 0 ? 'whatsapp' : 'facebook');
+    setErrs({}); msgRefs.current = []; activeMsg.current = 0; setFormOpen(true);
     try {
-      const tags = createForm.tags.split(',').map((t) => t.trim()).filter(Boolean);
-      const r = await mut.criar.mutateAsync({ titulo: createForm.titulo, conteudo: createForm.conteudo, canais, categoriaId: createForm.categoriaId || null, descricao: createForm.descricao.trim() || null, tags, favorito: createForm.favorito, ativo: createForm.ativo });
-      for (const f of createFiles) { try { await anexoMut.upload.mutateAsync({ scriptId: r.id, file: f }); } catch { toast('Falha ao anexar ' + f.name, 'warn'); } }
-      setCreateOpen(false); setIsNew(false); setCurrentId(r.id); toast('Script criado');
-    } catch (e) { setCreateErr({ geral: (e as Error).message || 'Falha ao criar' }); }
-    finally { setCreateSaving(false); }
+      const etapas = await fetchEtapasTexto(s.id);
+      setMensagens(etapas.length ? etapas.map((e) => ({ id: e.id, conteudo: e.conteudo })) : [{ conteudo: s.conteudo || '' }]);
+    } catch { /* mantém o fallback */ }
   }
-  function prefillAtual() { return { categoriaId: cat !== 'all' ? cat : undefined, canal: canalFiltro }; }
-  function loadScript(s: Script) {
-    setIsNew(false); setCurrentId(s.id);
-    setForm({ titulo: s.titulo, conteudo: s.conteudo, wa: s.canais.includes('whatsapp'), fb: s.canais.includes('facebook'), categoriaId: s.categoriaId ?? '' });
-    setEditorOpen(true);
+
+  /* ---------- operações de mensagens ---------- */
+  function setMsg(i: number, conteudo: string) { setMensagens((m) => m.map((x, j) => j === i ? { ...x, conteudo } : x)); }
+  function addMsg() { setMensagens((m) => [...m, { conteudo: '' }]); }
+  function dupMsg(i: number) { setMensagens((m) => { const n = [...m]; n.splice(i + 1, 0, { conteudo: m[i].conteudo }); return n; }); }
+  function delMsg(i: number) { setMensagens((m) => m.length <= 1 ? m : m.filter((_, j) => j !== i)); }
+  function moveMsg(i: number, dir: -1 | 1) {
+    setMensagens((m) => { const j = i + dir; if (j < 0 || j >= m.length) return m; const n = [...m]; [n[i], n[j]] = [n[j], n[i]]; return n; });
   }
   function insertVar(text: string) {
-    const ta = msgRef.current;
-    if (!ta) { setForm((f) => ({ ...f, conteudo: f.conteudo + text })); return; }
+    const i = activeMsg.current;
+    const ta = msgRefs.current[i];
+    if (!ta) { setMsg(i, (mensagens[i]?.conteudo ?? '') + text); return; }
     const s = ta.selectionStart, e = ta.selectionEnd;
-    const v = form.conteudo.slice(0, s) + text + form.conteudo.slice(e);
-    setForm((f) => ({ ...f, conteudo: v }));
+    const atual = mensagens[i]?.conteudo ?? '';
+    const novo = atual.slice(0, s) + text + atual.slice(e);
+    setMsg(i, novo);
     setTimeout(() => { ta.focus(); ta.setSelectionRange(s + text.length, s + text.length); }, 0);
   }
-  function canaisFromForm(): string[] { const c: string[] = []; if (form.wa) c.push('whatsapp'); if (form.fb) c.push('facebook'); return c; }
 
+  /* ---------- salvar ---------- */
   async function salvar() {
     if (saving) return;
-    if (!form.titulo.trim() && !form.conteudo.trim()) { toast('Preencha o título e a mensagem', 'warn'); return; }
-    setSaving(true);
+    const canais: string[] = []; if (cfg.wa) canais.push('whatsapp'); if (cfg.fb) canais.push('facebook');
+    const e: Record<string, string> = {};
+    if (!cfg.titulo.trim()) e.titulo = 'Título é obrigatório.';
+    if (canais.length === 0) e.canal = 'Selecione ao menos um canal.';
+    const naoVazias = mensagens.filter((m) => m.conteudo.trim().length > 0);
+    if (naoVazias.length === 0) e.mensagens = 'Inclua ao menos uma mensagem com conteúdo.';
+    mensagens.forEach((m, i) => { if (!m.conteudo.trim()) e['msg_' + i] = 'Mensagem vazia.'; });
+    // se houver alguma não-vazia, exigimos que TODAS as restantes tenham conteúdo
+    if (naoVazias.length > 0 && naoVazias.length !== mensagens.length) { /* erros por etapa já marcados */ }
+    if (Object.keys(e).length) { setErrs(e); return; }
+    setSaving(true); setErrs({});
     try {
-      if (isNew) {
-        const r = await mut.criar.mutateAsync({ titulo: form.titulo, conteudo: form.conteudo, canais: canaisFromForm(), categoriaId: form.categoriaId || null });
-        setIsNew(false); setCurrentId(r.id); toast('Script criado');
-      } else if (current.id) {
-        await mut.atualizar.mutateAsync({ id: current.id, patch: { titulo: form.titulo.trim() || 'Sem título', conteudo: form.conteudo, canais_permitidos: canaisFromForm(), categoria_id: form.categoriaId || null } });
-        toast('Script salvo');
+      const tags = cfg.tags.split(',').map((t) => t.trim()).filter(Boolean);
+      const conteudoCompat = mensagens[0].conteudo;
+      let scriptId = editId;
+      if (editId) {
+        await mut.atualizar.mutateAsync({ id: editId, patch: { titulo: cfg.titulo.trim(), descricao: cfg.descricao.trim() || null, conteudo: conteudoCompat, canais_permitidos: canais, categoria_id: cfg.categoriaId || null, tags, favorito: cfg.favorito, ativo: cfg.ativo } });
+      } else {
+        const r = await mut.criar.mutateAsync({ titulo: cfg.titulo, conteudo: conteudoCompat, canais, categoriaId: cfg.categoriaId || null, descricao: cfg.descricao.trim() || null, tags, favorito: cfg.favorito, ativo: cfg.ativo });
+        scriptId = r.id;
       }
-    } catch (e) { toast((e as Error).message || 'Falha ao salvar', 'warn'); }
+      await etapaMut.salvarTexto.mutateAsync({ scriptId: scriptId!, mensagens });
+      setFormOpen(false); setCurrentId(scriptId!); toast(editId ? 'Script salvo' : 'Script criado');
+    } catch (err) { setErrs({ geral: (err as Error).message || 'Falha ao salvar' }); }
     finally { setSaving(false); }
   }
-  async function favoritar(s: Script) {
-    try { await mut.favoritar.mutateAsync({ id: s.id, favorito: !s.favorito }); }
-    catch (e) { toast((e as Error).message || 'Falha', 'warn'); }
-  }
+
+  async function favoritar(s: Script) { try { await mut.favoritar.mutateAsync({ id: s.id, favorito: !s.favorito }); } catch (er) { toast((er as Error).message || 'Falha', 'warn'); } }
   async function duplicar(s: Script) {
-    try { const r = await mut.criar.mutateAsync({ titulo: s.titulo + ' (cópia)', conteudo: s.conteudo, canais: s.canais, categoriaId: s.categoriaId }); setCurrentId(r.id); toast('Script duplicado'); }
-    catch (e) { toast((e as Error).message || 'Falha', 'warn'); }
+    try {
+      const etapas = await fetchEtapasTexto(s.id);
+      const r = await mut.criar.mutateAsync({ titulo: s.titulo + ' (cópia)', conteudo: s.conteudo, canais: s.canais, categoriaId: s.categoriaId, descricao: s.descricao, tags: s.tags, favorito: false, ativo: s.ativo });
+      const msgs = etapas.length ? etapas.map((e) => ({ conteudo: e.conteudo })) : [{ conteudo: s.conteudo || '' }];
+      await etapaMut.salvarTexto.mutateAsync({ scriptId: r.id, mensagens: msgs });
+      setCurrentId(r.id); toast('Script duplicado');
+    } catch (er) { toast((er as Error).message || 'Falha', 'warn'); }
   }
   function excluir(s: Script) {
     pedirConfirmacao('Excluir script', `Excluir "${s.titulo || 'Sem título'}"? Esta ação não pode ser desfeita.`, async () => {
       await mut.excluir.mutateAsync(s.id); if (currentId === s.id) setCurrentId(''); toast('Script excluído');
     });
   }
+  function copiar(s: Script) { try { navigator.clipboard?.writeText(s.conteudo); toast('Texto copiado'); } catch { toast('Não foi possível copiar', 'warn'); } }
+
   function novaCategoria() { setCatNome(''); setCatErr(null); setCatModal(true); }
   async function salvarCategoria() {
     const nome = catNome.trim();
@@ -195,40 +219,33 @@ export function Scripts() {
     catch (e) { setCatErr((e as Error).message || 'Falha ao criar'); }
     finally { setCatSaving(false); }
   }
-  function copiar(s: Script) {
-    const txt = s.conteudo;
-    try { navigator.clipboard?.writeText(txt); toast('Texto copiado'); }
-    catch { toast('Não foi possível copiar', 'warn'); }
-  }
-  async function enviarAnexo(file: File | null) {
-    if (!file) return;
-    if (isNew || !current.id) { toast('Salve o script antes de anexar mídia', 'warn'); return; }
-    setUploading(true);
-    try { await anexoMut.upload.mutateAsync({ scriptId: current.id, file }); toast('Anexo enviado'); }
-    catch (e) { toast((e as Error).message || 'Falha no upload', 'warn'); }
-    finally { setUploading(false); if (fileRef.current) fileRef.current.value = ''; }
-  }
-  async function abrirAnexo(a: ScriptAnexo) {
-    const url = await urlAssinadaAnexo(a.path);
-    if (url) window.open(url, '_blank'); else toast('Não foi possível abrir o anexo', 'warn');
-  }
-  function removerAnexo(a: ScriptAnexo) {
-    pedirConfirmacao('Remover anexo', `Remover "${a.nome}"? O arquivo será apagado do armazenamento.`, async () => {
-      await anexoMut.remover.mutateAsync(a); toast('Anexo removido');
-    });
+
+  // estado vazio contextual
+  function textoVazio(): string {
+    if (scripts.length === 0) return 'Nenhum script ainda.';
+    if (search) return 'Nenhum resultado para a busca.';
+    if (favOnly) return 'Nenhum favorito neste filtro.';
+    if (canalFiltro === 'whatsapp') return 'Nenhum script exclusivo de WhatsApp.';
+    if (canalFiltro === 'facebook') return 'Nenhum script exclusivo de Facebook.';
+    if (canalFiltro === 'ambos') return 'Nenhum script para ambos os canais.';
+    if (cat !== 'all') return 'Nenhum script nesta categoria.';
+    return 'Nenhum script neste filtro.';
   }
 
   if (!SCRIPTS_REAL) {
     return <EmptyState icon={<IcDoc />} title="Backend não configurado" text="A biblioteca de scripts requer o backend Supabase configurado." />;
   }
 
+  const mostrarTogglePreview = cfg.wa && cfg.fb;
+  const canalPreview = mostrarTogglePreview ? previewCanal : (cfg.wa ? 'whatsapp' : 'facebook');
+
   return (
     <div className={'scripts-page' + (editorOpen ? '' : ' editor-closed')}>
       <div className="topbar">
-        <div className="tb-left"><div className="page-title">Biblioteca de Scripts</div><div className="page-sub">Crie, organize e reutilize mensagens para padronizar o atendimento.</div></div>
+        <div className="tb-left"><div className="page-title">Biblioteca de Scripts</div><div className="page-sub">Crie, organize e reutilize sequências de mensagens.</div></div>
         <div className="tb-right"><div className="tb-actions">
           <div className="search"><IcSearch /><input type="text" placeholder="Buscar scripts..." value={searchRaw} onChange={(e) => setSearchRaw(e.target.value)} /></div>
-          <button className="btn-new" onClick={() => openCreateScript(prefillAtual())}><IcPlus />Novo script</button>
+          <button className="btn-new" onClick={openCreateScript}><IcPlus />Novo script</button>
         </div></div>
       </div>
 
@@ -258,14 +275,14 @@ export function Scripts() {
             {scriptsQ.isError && <div style={{ padding: 20, color: 'var(--muted)' }}>Erro ao carregar scripts.</div>}
             {!scriptsQ.isLoading && !scriptsQ.isError && list.length === 0 && (
               <div style={{ padding: '28px 16px', textAlign: 'center', color: 'var(--muted)' }}>
-                <p style={{ margin: '0 0 12px' }}>{scripts.length === 0 ? 'Nenhum script ainda.' : 'Nenhum script neste filtro.'}</p>
-                <button className="btn-new" onClick={() => openCreateScript(prefillAtual())}><IcPlus />{scripts.length === 0 ? 'Criar primeiro script' : 'Novo script'}</button>
+                <p style={{ margin: '0 0 12px' }}>{textoVazio()}</p>
+                <button className="btn-new" onClick={openCreateScript}><IcPlus />{scripts.length === 0 ? 'Criar primeiro script' : 'Novo script'}</button>
               </div>
             )}
             {list.map((s) => {
-              const on = s.id === currentId && !isNew;
+              const on = s.id === currentId;
               return (
-                <div key={s.id} className={'scard' + (on ? ' active' : '')} role="option" aria-selected={on} onClick={() => loadScript(s)}>
+                <div key={s.id} className={'scard' + (on ? ' active' : '')} role="option" aria-selected={on} onClick={() => { setCurrentId(s.id); setEditorOpen(true); }}>
                   <div className="sc-top"><div className="sc-title">{s.titulo || 'Sem título'}</div><button className={'star' + (s.favorito ? ' on' : '')} aria-label="Favoritar" onClick={(e) => { e.stopPropagation(); favoritar(s); }}>{s.favorito ? <IcStarFill /> : <IcStarLine />}</button></div>
                   <div className="sc-chans">{(s.canais.length ? s.canais : ['whatsapp', 'facebook']).map((c) => <ChBadge key={c} c={c} />)}</div>
                   <div className="sc-prev">{s.conteudo.replace(/\n+/g, ' ') || '—'}</div>
@@ -276,61 +293,21 @@ export function Scripts() {
         </section>
 
         <aside className="panel panel-editor">
-          <div className="ed-crumb"><span>{isNew ? 'Novo script' : (catName(current.categoriaId) || 'Script')}</span>{!isNew && current.titulo && <><span className="sep">›</span><span className="cur">{current.titulo}</span></>}</div>
-          <div className="ed-actions">
-            {!isNew && current.id && <button className="ed-btn fav" onClick={() => favoritar(current)}>{current.favorito ? <IcStarFill /> : <IcStarLine />}Favoritar</button>}
-            {!isNew && current.id && <button className="ed-btn" onClick={() => duplicar(current)}><IcCopy />Duplicar</button>}
-            {!isNew && current.id && <button className="ed-btn" onClick={() => copiar(current)}><IcCopy />Copiar</button>}
-            {!isNew && current.id && <button className="ed-btn" onClick={() => excluir(current)}><IcTrash />Excluir</button>}
-            {isNew && <button className="ed-btn" onClick={() => { setIsNew(false); }}><IcClose />Cancelar</button>}
-            <button className="ed-btn primary" disabled={saving} onClick={salvar}>{isNew ? <><IcPlus />Criar script</> : <><IcSave />{saving ? 'Salvando…' : 'Salvar'}</>}</button>
-          </div>
-
-          {(isNew || current.id) ? (
+          {current.id ? (
             <>
-              <div className="ed-chans">
-                <button className={'ed-chan-toggle wa' + (form.wa ? ' sel' : '')} onClick={() => setForm((f) => ({ ...f, wa: !f.wa }))}><IcWa />WhatsApp</button>
-                <button className={'ed-chan-toggle fb' + (form.fb ? ' sel' : '')} onClick={() => setForm((f) => ({ ...f, fb: !f.fb }))}><IcFb />Facebook</button>
+              <div className="ed-crumb"><span>{catName(current.categoriaId) || 'Script'}</span>{current.titulo && <><span className="sep">›</span><span className="cur">{current.titulo}</span></>}</div>
+              <div className="ed-actions">
+                <button className="ed-btn primary" onClick={() => openEditScript(current)}><IcPencil />Editar</button>
+                <button className="ed-btn fav" onClick={() => favoritar(current)}>{current.favorito ? <IcStarFill /> : <IcStarLine />}Favoritar</button>
+                <button className="ed-btn" onClick={() => duplicar(current)}><IcCopy />Duplicar</button>
+                <button className="ed-btn" onClick={() => copiar(current)}><IcCopy />Copiar</button>
+                <button className="ed-btn" onClick={() => excluir(current)}><IcTrash />Excluir</button>
               </div>
-              <p className="ed-label">Categoria</p>
-              <select className="ed-input" value={form.categoriaId} onChange={(e) => setForm((f) => ({ ...f, categoriaId: e.target.value }))}>
-                <option value="">Sem categoria</option>
-                {cats.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
-              </select>
-              <p className="ed-label">Título do script</p>
-              <input className="ed-input" type="text" placeholder="Dê um nome ao script" value={form.titulo} onChange={(e) => setForm((f) => ({ ...f, titulo: e.target.value }))} />
-              <p className="ed-label">Mensagem</p>
-              <div className="ed-msg-wrap">
-                <textarea ref={msgRef} className="ed-msg" placeholder="Escreva a mensagem. Use variáveis como {{nome_cliente}}." value={form.conteudo} onChange={(e) => setForm((f) => ({ ...f, conteudo: e.target.value }))} />
-                <div className="ed-toolbar"><button className="tool" title="Inserir variável" onClick={() => insertVar('{{nome_cliente}}')}><IcBraces /></button><span className="ed-count">{form.conteudo.length} caracteres</span></div>
-              </div>
-              <div className="vars-head"><div className="vars-row1"><h4>Variáveis disponíveis</h4></div><div className="vars-hint">Clique para inserir; são substituídas ao usar na conversa.</div></div>
-              <div className="vars">{SCRIPT_VARIAVEIS.map((v) => <button key={v} className="vchip" onClick={() => insertVar(v)}>{v}</button>)}</div>
-              {!isNew && form.conteudo.includes('{{') && (
-                <><p className="ed-label" style={{ marginTop: 14 }}>Pré-visualização</p>
-                <div className="sc-prev" style={{ whiteSpace: 'pre-wrap' }}>{substituirVariaveis(form.conteudo, { cliente: 'Maria Silva', atendente: 'Você', empresa: 'CAF', telefone: '(11) 99999-9999' })}</div></>
-              )}
-              {!isNew && current.id && (
-                <>
-                  <p className="ed-label" style={{ marginTop: 14 }}>Mídias e anexos</p>
-                  <p className="ed-sub" style={{ fontSize: 12 }}>Áudio, imagem, vídeo ou documento (privados, com URL temporária). Cada canal tem limites próprios na hora de enviar na conversa.</p>
-                  <input ref={fileRef} type="file" style={{ display: 'none' }} onChange={(e) => enviarAnexo(e.target.files?.[0] ?? null)} />
-                  <button className="ed-btn" disabled={uploading} onClick={() => fileRef.current?.click()}>{uploading ? 'Enviando…' : <><IcPlus />Adicionar mídia</>}</button>
-                  <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {anexosQ.isLoading && <span style={{ color: 'var(--muted)', fontSize: 13 }}>Carregando anexos…</span>}
-                    {!anexosQ.isLoading && anexos.length === 0 && <span style={{ color: 'var(--muted)', fontSize: 13 }}>Nenhum anexo.</span>}
-                    {anexos.map((a) => (
-                      <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, border: '1px solid var(--line, #2a2f3a)', borderRadius: 8, padding: '6px 8px' }}>
-                        <span style={{ textTransform: 'capitalize', color: 'var(--muted)', minWidth: 70 }}>{a.tipo}</span>
-                        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={a.nome}>{a.nome}</span>
-                        <span style={{ color: 'var(--muted)' }}>{formatarTamanho(a.tamanho)}</span>
-                        <button className="ed-btn" onClick={() => abrirAnexo(a)}>Abrir</button>
-                        <button className="ed-btn" title="Remover" onClick={() => removerAnexo(a)}><IcTrash /></button>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
+              <div className="ed-chans">{(current.canais.length ? current.canais : ['whatsapp', 'facebook']).map((c) => <ChBadge key={c} c={c} />)}</div>
+              {current.descricao && <p className="ed-sub">{current.descricao}</p>}
+              <p className="ed-label">Conteúdo da primeira mensagem</p>
+              <div className="sc-prev" style={{ whiteSpace: 'pre-wrap' }}>{current.conteudo || '—'}</div>
+              <p className="ed-sub" style={{ marginTop: 10 }}>Use “Editar” para ver e alterar toda a sequência de mensagens.</p>
             </>
           ) : (
             <div style={{ padding: 24, color: 'var(--muted)', textAlign: 'center' }}>Selecione um script à esquerda ou crie um novo.</div>
@@ -338,9 +315,10 @@ export function Scripts() {
         </aside>
       </div>
 
-      <button className="reopen" aria-label="Abrir editor" onClick={() => setEditorOpen(true)}><IcChevL /></button>
+      <button className="reopen" aria-label="Abrir painel" onClick={() => setEditorOpen(true)}><IcChevL /></button>
       <div className="drawer-overlay" onClick={() => setEditorOpen(false)} />
 
+      {/* ---------- Modal de categoria ---------- */}
       <Modal open={catModal} onClose={() => !catSaving && setCatModal(false)} title="Nova categoria" width={400}
         footer={<>
           <button className="atv-btn" disabled={catSaving} onClick={() => setCatModal(false)}>Cancelar</button>
@@ -355,70 +333,97 @@ export function Scripts() {
         </div>
       </Modal>
 
-      <Modal open={createOpen} onClose={() => { if (!createSaving) setCreateOpen(false); }} title="Novo script" width={580}
+      {/* ---------- Construtor de script (criar/editar) ---------- */}
+      <Modal open={formOpen} onClose={() => { if (!saving) setFormOpen(false); }} title={editId ? 'Editar script' : 'Novo script'} width={860}
         footer={<>
-          <button className="atv-btn" disabled={createSaving} onClick={() => setCreateOpen(false)}>Cancelar</button>
-          <button className="atv-btn primary" disabled={createSaving} onClick={salvarNovo}>{createSaving ? 'Criando…' : 'Criar script'}</button>
+          <button className="atv-btn" disabled={saving} onClick={() => setFormOpen(false)}>Cancelar</button>
+          <button className="atv-btn primary" disabled={saving} onClick={salvar}>{saving ? 'Salvando…' : (editId ? 'Salvar' : 'Criar script')}</button>
         </>}>
-        {createErr.geral && <div className="atv-field-err" style={{ marginBottom: 10 }}>{createErr.geral}</div>}
-        <div className="atv-field">
-          <label>Título *</label>
-          <input className="atv-input" value={createForm.titulo} onChange={(e) => setCreateForm((f) => ({ ...f, titulo: e.target.value }))} placeholder="Nome do script"
-            onKeyDown={(e) => { if (e.key === 'Enter') salvarNovo(); }} />
-          {createErr.titulo && <div className="atv-field-err">{createErr.titulo}</div>}
-        </div>
-        <div className="atv-field">
-          <label>Descrição</label>
-          <input className="atv-input" value={createForm.descricao} onChange={(e) => setCreateForm((f) => ({ ...f, descricao: e.target.value }))} placeholder="Opcional" />
-        </div>
-        <div className="atv-field">
-          <label>Categoria</label>
-          <select className="atv-select" value={createForm.categoriaId} onChange={(e) => setCreateForm((f) => ({ ...f, categoriaId: e.target.value }))}>
-            <option value="">Sem categoria</option>
-            {cats.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
-          </select>
-        </div>
-        <div className="atv-field">
-          <label>Canal *</label>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button type="button" className={'ed-chan-toggle wa' + (createForm.wa ? ' sel' : '')} onClick={() => setCreateForm((f) => ({ ...f, wa: !f.wa }))}><IcWa />WhatsApp</button>
-            <button type="button" className={'ed-chan-toggle fb' + (createForm.fb ? ' sel' : '')} onClick={() => setCreateForm((f) => ({ ...f, fb: !f.fb }))}><IcFb />Facebook</button>
-          </div>
-          {createErr.canal && <div className="atv-field-err">{createErr.canal}</div>}
-        </div>
-        <div className="atv-field">
-          <label>Texto</label>
-          <textarea className="atv-textarea" value={createForm.conteudo} onChange={(e) => setCreateForm((f) => ({ ...f, conteudo: e.target.value }))} placeholder="Mensagem. Use {{nome_cliente}}, {{seu_nome}}…" />
-          <div className="vars" style={{ marginTop: 6 }}>{SCRIPT_VARIAVEIS.map((v) => <button type="button" key={v} className="vchip" onClick={() => setCreateForm((f) => ({ ...f, conteudo: f.conteudo + v }))}>{v}</button>)}</div>
-          {createErr.conteudo && <div className="atv-field-err">{createErr.conteudo}</div>}
-        </div>
-        <div className="atv-field">
-          <label>Tags</label>
-          <input className="atv-input" value={createForm.tags} onChange={(e) => setCreateForm((f) => ({ ...f, tags: e.target.value }))} placeholder="Separadas por vírgula" />
-        </div>
-        <div className="atv-field" style={{ display: 'flex', gap: 18 }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, margin: 0 }}><input type="checkbox" checked={createForm.favorito} onChange={(e) => setCreateForm((f) => ({ ...f, favorito: e.target.checked }))} />Favorito</label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, margin: 0 }}><input type="checkbox" checked={createForm.ativo} onChange={(e) => setCreateForm((f) => ({ ...f, ativo: e.target.checked }))} />Ativo</label>
-        </div>
-        <div className="atv-field">
-          <label>Anexos</label>
-          <input ref={createFileRef} type="file" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) setCreateFiles((p) => [...p, f]); if (createFileRef.current) createFileRef.current.value = ''; }} />
-          <button type="button" className="atv-btn" onClick={() => createFileRef.current?.click()}><IcPlus />Adicionar mídia</button>
-          <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {createFiles.map((f, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
-                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={f.name}>{f.name}</span>
-                <span style={{ color: 'var(--muted)' }}>{formatarTamanho(f.size)}</span>
-                <button type="button" className="atv-btn" title="Remover" onClick={() => setCreateFiles((p) => p.filter((_, j) => j !== i))}><IcTrash /></button>
+        {errs.geral && <div className="atv-field-err" style={{ marginBottom: 10 }}>{errs.geral}</div>}
+        <div className="builder">
+          {/* Configuração */}
+          <div className="builder-cfg">
+            <div className="atv-field">
+              <label>Título *</label>
+              <input className="atv-input" value={cfg.titulo} onChange={(e) => setCfg((f) => ({ ...f, titulo: e.target.value }))} placeholder="Nome do script" />
+              {errs.titulo && <div className="atv-field-err">{errs.titulo}</div>}
+            </div>
+            <div className="atv-field">
+              <label>Descrição</label>
+              <input className="atv-input" value={cfg.descricao} onChange={(e) => setCfg((f) => ({ ...f, descricao: e.target.value }))} placeholder="Opcional" />
+            </div>
+            <div className="atv-field">
+              <label>Categoria</label>
+              <select className="atv-select" value={cfg.categoriaId} onChange={(e) => setCfg((f) => ({ ...f, categoriaId: e.target.value }))}>
+                <option value="">Sem categoria</option>
+                {cats.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+              </select>
+            </div>
+            <div className="atv-field">
+              <label>Canal *</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button type="button" className={'ed-chan-toggle wa' + (cfg.wa ? ' sel' : '')} onClick={() => setCfg((f) => ({ ...f, wa: !f.wa }))}><IcWa />WhatsApp</button>
+                <button type="button" className={'ed-chan-toggle fb' + (cfg.fb ? ' sel' : '')} onClick={() => setCfg((f) => ({ ...f, fb: !f.fb }))}><IcFb />Facebook</button>
+              </div>
+              {errs.canal && <div className="atv-field-err">{errs.canal}</div>}
+            </div>
+            <div className="atv-field">
+              <label>Tags</label>
+              <input className="atv-input" value={cfg.tags} onChange={(e) => setCfg((f) => ({ ...f, tags: e.target.value }))} placeholder="Separadas por vírgula" />
+            </div>
+            <div className="atv-field" style={{ display: 'flex', gap: 18 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, margin: 0 }}><input type="checkbox" checked={cfg.favorito} onChange={(e) => setCfg((f) => ({ ...f, favorito: e.target.checked }))} />Favorito</label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, margin: 0 }}><input type="checkbox" checked={cfg.ativo} onChange={(e) => setCfg((f) => ({ ...f, ativo: e.target.checked }))} />Ativo</label>
+            </div>
+
+            <p className="ed-label" style={{ marginTop: 6 }}>Sequência de mensagens</p>
+            {errs.mensagens && <div className="atv-field-err" style={{ marginBottom: 8 }}>{errs.mensagens}</div>}
+            {mensagens.map((m, i) => (
+              <div key={i} className="msg-step">
+                <div className="msg-step-head">
+                  <strong>Mensagem {i + 1}</strong>
+                  <span className="msg-step-actions">
+                    <button type="button" className="ms-btn" title="Mover para cima" disabled={i === 0} onClick={() => moveMsg(i, -1)}><IcUp /></button>
+                    <button type="button" className="ms-btn" title="Mover para baixo" disabled={i === mensagens.length - 1} onClick={() => moveMsg(i, 1)}><IcDown /></button>
+                    <button type="button" className="ms-btn" title="Duplicar" onClick={() => dupMsg(i)}><IcCopy /></button>
+                    <button type="button" className="ms-btn" title="Excluir" disabled={mensagens.length <= 1} onClick={() => delMsg(i)}><IcTrash /></button>
+                  </span>
+                </div>
+                <textarea className="atv-textarea" value={m.conteudo} placeholder="Escreva a mensagem. Use {{nome_cliente}}…"
+                  ref={(el) => { msgRefs.current[i] = el; }}
+                  onFocus={() => { activeMsg.current = i; }}
+                  onChange={(e) => setMsg(i, e.target.value)} />
+                <div className="msg-step-foot"><span className="ed-count">{m.conteudo.length} caracteres</span></div>
+                {errs['msg_' + i] && <div className="atv-field-err">{errs['msg_' + i]}</div>}
               </div>
             ))}
+            <button type="button" className="atv-btn" onClick={addMsg}><IcPlus />Adicionar mensagem de texto</button>
+            <div className="vars" style={{ marginTop: 10 }}>{SCRIPT_VARIAVEIS.map((v) => <button type="button" key={v} className="vchip" title="Inserir na mensagem em edição" onClick={() => insertVar(v)}>{v}</button>)}</div>
+          </div>
+
+          {/* Pré-visualização */}
+          <div className="builder-preview">
+            <div className="bp-head">
+              <span>Pré-visualização</span>
+              {mostrarTogglePreview && (
+                <span className="bp-toggle">
+                  <button type="button" className={previewCanal === 'whatsapp' ? 'on' : ''} onClick={() => setPreviewCanal('whatsapp')}>WhatsApp</button>
+                  <button type="button" className={previewCanal === 'facebook' ? 'on' : ''} onClick={() => setPreviewCanal('facebook')}>Facebook</button>
+                </span>
+              )}
+            </div>
+            <div className={'bp-chat ' + canalPreview}>
+              {canalPreview === 'facebook' && <div className="bp-chan-name">{current.id ? (cfg.titulo || 'Página') : 'Página'} · Messenger</div>}
+              {mensagens.filter((m) => m.conteudo.trim()).length === 0 && <div className="bp-empty">As mensagens aparecem aqui.</div>}
+              {mensagens.map((m, i) => m.conteudo.trim() ? (
+                <div key={i} className="bp-bubble">
+                  <div className="bp-text">{substituirVariaveis(m.conteudo, previewCtx)}</div>
+                  <div className="bp-time">{HORA_FAKE}</div>
+                </div>
+              ) : null)}
+            </div>
           </div>
         </div>
-        {createForm.conteudo.includes('{{') && (
-          <div className="atv-field"><label>Pré-visualização</label>
-            <div className="sc-prev" style={{ whiteSpace: 'pre-wrap' }}>{substituirVariaveis(createForm.conteudo, { cliente: 'Maria Silva', atendente: 'Você', empresa: 'CAF', telefone: '(11) 99999-9999' })}</div>
-          </div>
-        )}
       </Modal>
 
       <ConfirmDialog open={!!confirmState} title={confirmState?.title ?? ''} message={confirmState?.message ?? ''}

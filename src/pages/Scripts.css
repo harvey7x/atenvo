@@ -238,3 +238,33 @@
   .scripts-page .tb-right {gap:9px}
   .scripts-page .search {width:190px}
 }
+
+/* ===== Construtor de scripts (sequência de mensagens + preview) ===== */
+.builder{ display:grid; grid-template-columns:1fr 320px; gap:16px; }
+@media (max-width:760px){ .builder{ grid-template-columns:1fr; } }
+.builder-cfg{ min-width:0; }
+.msg-step{ border:1px solid var(--line-2); border-radius:10px; padding:10px; margin-bottom:10px; background:var(--surface-2); }
+.msg-step-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; font-size:13px; color:var(--ink-2); }
+.msg-step-actions{ display:flex; gap:4px; }
+.ms-btn{ width:28px; height:28px; display:inline-grid; place-items:center; border:1px solid var(--line-2); border-radius:7px; background:var(--surface); color:var(--ink-2); cursor:pointer; }
+.ms-btn:hover{ background:var(--hover); }
+.ms-btn:disabled{ opacity:.4; cursor:not-allowed; }
+.ms-btn svg{ width:16px; height:16px; }
+.msg-step-foot{ margin-top:4px; }
+.bp-head{ display:flex; align-items:center; justify-content:space-between; font-weight:600; font-size:14px; margin-bottom:8px; color:var(--ink); }
+.bp-toggle{ display:inline-flex; border:1px solid var(--line-2); border-radius:8px; overflow:hidden; }
+.bp-toggle button{ border:0; background:var(--surface); color:var(--ink-2); padding:4px 10px; font-size:12px; cursor:pointer; }
+.bp-toggle button.on{ background:var(--accent); color:#fff; }
+.bp-chat{ border:1px solid var(--line-2); border-radius:12px; padding:12px; min-height:220px; display:flex; flex-direction:column; gap:8px; }
+.bp-chat.whatsapp{ background:#e7ded4; }
+[data-theme="dark"] .bp-chat.whatsapp{ background:#0b141a; }
+.bp-chat.facebook{ background:#f0f2f5; }
+[data-theme="dark"] .bp-chat.facebook{ background:#101826; }
+.bp-chan-name{ font-size:12px; color:var(--muted); text-align:center; }
+.bp-empty{ color:var(--muted); font-size:13px; text-align:center; margin:auto; }
+.bp-bubble{ align-self:flex-end; max-width:85%; border-radius:12px; padding:7px 10px; font-size:13px; line-height:1.4; box-shadow:0 1px 1px rgba(0,0,0,.08); }
+.bp-chat.whatsapp .bp-bubble{ background:#d9fdd3; color:#111b21; }
+[data-theme="dark"] .bp-chat.whatsapp .bp-bubble{ background:#005c4b; color:#e9edef; }
+.bp-chat.facebook .bp-bubble{ background:#0084ff; color:#fff; }
+.bp-text{ white-space:pre-wrap; word-break:break-word; }
+.bp-time{ font-size:10px; opacity:.7; text-align:right; margin-top:3px; }
