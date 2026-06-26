@@ -298,3 +298,67 @@ export async function resolverSequenciaScript(scriptId: string, ctx: VarCtx): Pr
   const etapas = await fetchEtapas(scriptId);
   return etapas.map((e) => ({ tipo: e.tipo, texto: substituirVariaveis(e.conteudo, ctx), storagePath: e.storagePath }));
 }
+
+/* ===================== Envio de sequência de TEXTO na conversa ===================== */
+const VAR_LABEL: Record<string, string> = { nome_cliente: 'Nome do cliente', telefone: 'Telefone', seu_nome: 'Seu nome', empresa: 'Empresa', data_atual: 'Data' };
+const VAR_AUSENTE: Record<string, string> = { nome_cliente: '[Nome não informado]', telefone: '[Telefone não informado]', seu_nome: '[Seu nome não informado]', empresa: '[Empresa não informada]', data_atual: '[Data não informada]' };
+
+/** Substitui variáveis e relata quais dados reais estão ausentes (sem deixar token cru). */
+export function resolverComFaltas(texto: string, ctx: VarCtx): { texto: string; faltando: string[] } {
+  const hoje = new Date().toLocaleDateString('pt-BR');
+  const tabela: Record<string, string> = {
+    nome_cliente: ctx.cliente ?? '', cliente: ctx.cliente ?? '',
+    seu_nome: ctx.atendente ?? '', atendente: ctx.atendente ?? '',
+    empresa: ctx.empresa ?? '', telefone: ctx.telefone ?? '', data_atual: hoje,
+  };
+  const faltando = new Set<string>();
+  const out = texto.replace(/\{\{\s*([a-zA-Z_]+)\s*\}\}/g, (m, k: string) => {
+    const key = k.toLowerCase();
+    if (!(key in tabela)) return m;
+    const canon = key === 'cliente' ? 'nome_cliente' : key === 'atendente' ? 'seu_nome' : key;
+    const val = tabela[key];
+    if (!val) { faltando.add(VAR_LABEL[canon] ?? canon); return VAR_AUSENTE[canon] ?? m; }
+    return val;
+  });
+  return { texto: out, faltando: [...faltando] };
+}
+
+export interface EtapaResolvida { posicao: number; original: string; texto: string; faltando: string[]; }
+/** Etapas de TEXTO (na ordem) já resolvidas para a conversa. Faz fallback para `scripts.conteudo`. */
+export async function fetchEtapasTextoResolvidas(scriptId: string, ctx: VarCtx, fallbackConteudo = ''): Promise<EtapaResolvida[]> {
+  const etapas = await fetchEtapas(scriptId);
+  const textos = etapas.filter((e) => e.tipo === 'texto' && (e.conteudo ?? '').trim().length > 0).map((e) => e.conteudo);
+  const base = textos.length ? textos : (fallbackConteudo.trim() ? [fallbackConteudo] : []);
+  return base.map((conteudo, i) => { const r = resolverComFaltas(conteudo, ctx); return { posicao: i + 1, original: conteudo, texto: r.texto, faltando: r.faltando }; });
+}
+
+/** Contagem de etapas de TEXTO por script (para exibir "N mensagens" no seletor). */
+export function useScriptEtapaCounts() {
+  const { currentOrg } = useOrg();
+  return useQuery({
+    queryKey: ['script-etapa-counts', currentOrg.id],
+    enabled: SCRIPTS_REAL,
+    queryFn: async () => {
+      const { data, error } = await supabase!.from('script_etapas').select('script_id,tipo').eq('organizacao_id', currentOrg.id);
+      if (error) throw new Error(error.message);
+      const map: Record<string, number> = {};
+      for (const r of (data as { script_id: string; tipo: string }[]) ?? []) { if (r.tipo === 'texto') map[r.script_id] = (map[r.script_id] ?? 0) + 1; }
+      return map;
+    },
+  });
+}
+
+/** Registra a auditoria de um disparo de sequência (uma linha por execução). */
+export function useRegistrarExecucaoScript() {
+  const { currentOrg } = useOrg();
+  return useMutation({
+    mutationFn: async (a: { scriptId: string; conversaId: string; canal: CanalScript; total: number; enviadas: number; falhas: number }) => {
+      const status = a.falhas === 0 ? 'concluida' : a.enviadas > 0 ? 'parcial' : 'falha';
+      const { error } = await supabase!.from('script_execucoes').insert({
+        organizacao_id: currentOrg.id, script_id: a.scriptId, conversa_id: a.conversaId,
+        canal: a.canal, total_etapas: a.total, enviadas: a.enviadas, falhas: a.falhas, status,
+      });
+      if (error) throw new Error(error.message);
+    },
+  });
+}

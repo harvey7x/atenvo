@@ -5,7 +5,8 @@ import { useAuth } from '@/context/AuthContext';
 import { useOrg } from '@/context/OrgContext';
 import { WA_CONTACTS, initials, avatarColor, type WaContact } from '@/data/whatsappDemo';
 import { useWaConversations, useSendWaMessage, useWaCanais, mascararNumero, WA_REAL } from '@/data/whatsapp';
-import { useScripts, substituirVariaveis } from '@/data/scripts';
+import { useScripts, useScriptEtapaCounts } from '@/data/scripts';
+import { ScriptSequenceModal } from '@/components/ScriptSequenceModal';
 import { useStatusDefs, useEtiquetas, useAssinaturaPref, useAtendimentoActions, useOrgUsuarios, resolverNomeAssinatura } from '@/data/atendimento';
 import { corDaEtiqueta, podeGerenciarAtendimento, type AssinaturaModo } from '@/types/atendimento';
 import './WhatsApp.css';
@@ -103,6 +104,8 @@ export function WhatsApp() {
 
   const orgUsuariosQ = useOrgUsuarios();
   const scriptsLib = useScripts('whatsapp').data ?? [];
+  const etapaCounts = useScriptEtapaCounts().data ?? {};
+  const [scriptSeq, setScriptSeq] = useState<{ id: string; titulo: string; conteudo: string } | null>(null);
   const [contacts, setContacts] = useState<WaContact[]>(() => WA_REAL ? [] : WA_CONTACTS.map((c) => ({ ...c, msgs: c.msgs.map((m) => ({ ...m })), tags: [...c.tags] })));
   const [currentId, setCurrentId] = useState(() => {
     if (!WA_REAL) return 'antonio';
@@ -308,13 +311,7 @@ export function WhatsApp() {
     if (c) toast('Respondendo por ' + c.alias);
   }
 
-  function insertScript(m: string, t: string) {
-    const corpo = substituirVariaveis(m, { cliente: current.name, atendente: user?.name, empresa: currentOrg.name, telefone: current.phone });
-    setDraft(corpo);
-    setPop(null);
-    toast('Script inserido: ' + t);
-    setTimeout(() => taRef.current?.focus(), 0);
-  }
+  function abrirScript(s: { id: string; titulo: string; conteudo: string }) { setPop(null); setScriptSeq(s); }
 
   async function aplicarStatus(statusId: string) {
     setPop(null);
@@ -687,13 +684,19 @@ export function WhatsApp() {
           )}
           {pop.kind === 'scripts' && (
             <>
-              <div className="pop-head">Inserir script</div>
+              <div className="pop-head">Enviar script</div>
               {scriptsLib.length === 0 && <div className="pop-empty">Nenhum script para WhatsApp. Crie em Scripts.</div>}
-              {scriptsLib.map((s) => (
-                <button key={s.id} className="pop-item" onClick={() => insertScript(s.conteudo, s.titulo)}>
-                  <div><div>{s.titulo}</div><small>{s.conteudo.slice(0, 46)}…</small></div>
-                </button>
-              ))}
+              {scriptsLib.map((s) => {
+                const n = etapaCounts[s.id] ?? (s.conteudo.trim() ? 1 : 0);
+                return (
+                  <button key={s.id} className="pop-item" onClick={() => abrirScript({ id: s.id, titulo: s.titulo, conteudo: s.conteudo })}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>{s.titulo}<span style={{ fontSize: 11, color: 'var(--muted)' }}>· {n} {n === 1 ? 'msg' : 'msgs'}</span></div>
+                      <small>{s.conteudo.slice(0, 46)}…</small>
+                    </div>
+                  </button>
+                );
+              })}
             </>
           )}
           {pop.kind === 'status' && (
@@ -733,6 +736,13 @@ export function WhatsApp() {
           )}
         </div>
       )}
+
+      <ScriptSequenceModal
+        open={!!scriptSeq} onClose={() => setScriptSeq(null)} script={scriptSeq} canal="whatsapp"
+        conversaId={currentId}
+        ctx={{ cliente: current.name, atendente: user?.name, empresa: currentOrg.name, telefone: current.phone }}
+        enviarEtapa={async (texto) => { await sendMut.mutateAsync({ conversaId: currentId, text: texto, canalId: replyCanalId || current.canalId, assinaturaNome: assinaturaNome || undefined }); }}
+      />
     </div>
   );
 }

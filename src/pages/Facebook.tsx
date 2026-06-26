@@ -6,7 +6,8 @@ import { useOrg } from '@/context/OrgContext';
 import { initials, avatarColor } from '@/lib/avatar';
 import { FB_CONTACTS, FB_QUICK, type FbContact } from '@/data/facebookDemo';
 import { FB_REAL, useFbConversations, useSendFbMessage, useFbStatus, type FbConv } from '@/data/facebook';
-import { useScripts, substituirVariaveis } from '@/data/scripts';
+import { useScripts, useScriptEtapaCounts } from '@/data/scripts';
+import { ScriptSequenceModal } from '@/components/ScriptSequenceModal';
 import { useStatusDefs, useEtiquetas, useAtendimentoActions, useOrgUsuarios } from '@/data/atendimento';
 import { corDaEtiqueta } from '@/types/atendimento';
 import './Facebook.css';
@@ -73,6 +74,8 @@ function FacebookInbox() {
   const { user } = useAuth();
   const { currentOrg } = useOrg();
   const scriptsLib = useScripts('facebook').data ?? [];
+  const etapaCounts = useScriptEtapaCounts().data ?? {};
+  const [scriptSeq, setScriptSeq] = useState<{ id: string; titulo: string; conteudo: string } | null>(null);
   const live = useFbConversations();
   const sendMut = useSendFbMessage();
   const fbStatus = useFbStatus();
@@ -276,13 +279,19 @@ function FacebookInbox() {
                 <button className="fb-tool" disabled={!current.id} onClick={() => setPicker((p) => p === 'scripts' ? null : 'scripts')}><IcDoc /><span>Scripts</span></button>
                 {picker === 'scripts' && (
                   <div className="pop" style={{ position: 'absolute', bottom: '100%', left: 0, marginBottom: 8, zIndex: 40, width: 300, maxHeight: 320, overflowY: 'auto' }}>
-                    <div className="pop-head">Inserir script</div>
+                    <div className="pop-head">Enviar script</div>
                     {scriptsLib.length === 0 && <div className="pop-item" style={{ color: 'var(--muted)' }}>Nenhum script para Facebook. Crie em Scripts.</div>}
-                    {scriptsLib.map((s) => (
-                      <button key={s.id} className="pop-item" onClick={() => { setDraft(substituirVariaveis(s.conteudo, { cliente: current.name, atendente: user?.name, empresa: currentOrg.name, telefone: '' })); setPicker(null); setTimeout(() => taRef.current?.focus(), 0); }}>
-                        <div><div>{s.titulo}</div><small>{s.conteudo.slice(0, 46)}…</small></div>
-                      </button>
-                    ))}
+                    {scriptsLib.map((s) => {
+                      const n = etapaCounts[s.id] ?? (s.conteudo.trim() ? 1 : 0);
+                      return (
+                        <button key={s.id} className="pop-item" onClick={() => { setScriptSeq({ id: s.id, titulo: s.titulo, conteudo: s.conteudo }); setPicker(null); }}>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>{s.titulo}<span style={{ fontSize: 11, color: 'var(--muted)' }}>· {n} {n === 1 ? 'msg' : 'msgs'}</span></div>
+                            <small>{s.conteudo.slice(0, 46)}…</small>
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </span>
@@ -378,6 +387,13 @@ function FacebookInbox() {
 
       <button className="reopen" aria-label="Abrir painel de dados" onClick={() => setDataOpen(true)}><IcChevLeft /></button>
       <div className="drawer-overlay" onClick={() => setDataOpen(false)} />
+
+      <ScriptSequenceModal
+        open={!!scriptSeq} onClose={() => setScriptSeq(null)} script={scriptSeq} canal="facebook"
+        conversaId={current.id}
+        ctx={{ cliente: current.name, atendente: user?.name, empresa: currentOrg.name, telefone: '' }}
+        enviarEtapa={async (texto) => { await sendMut.mutateAsync({ conversaId: current.id, texto }); }}
+      />
     </div>
   );
 }
