@@ -1,0 +1,40 @@
+.atv-modal-overlay{
+  position:fixed; inset:0; z-index:1000;
+  background:var(--backdrop); display:grid; place-items:center; padding:20px;
+}
+.atv-modal{
+  background:var(--surface); color:var(--ink);
+  border:1px solid var(--line-2); border-radius:14px;
+  box-shadow:var(--shadow-pop); max-width:calc(100vw - 32px);
+  max-height:calc(100dvh - 40px); overflow:auto;
+  display:flex; flex-direction:column;
+}
+.atv-modal-head{ padding:16px 18px 0; font-size:16px; font-weight:600; color:var(--ink); }
+.atv-modal-body{ padding:14px 18px; }
+.atv-modal-msg{ color:var(--ink-2); font-size:14px; line-height:1.5; }
+.atv-modal-foot{ padding:12px 18px 16px; display:flex; gap:8px; justify-content:flex-end; }
+
+/* campos do modal — sempre nos tokens do tema (nunca preto no claro) */
+.atv-field{ display:block; margin-bottom:12px; }
+.atv-field > label{ display:block; font-size:13px; font-weight:500; color:var(--ink-2); margin-bottom:6px; }
+.atv-input, .atv-textarea, .atv-select{
+  width:100%; padding:9px 11px; border-radius:9px;
+  border:1px solid var(--line-2); background:var(--surface-2); color:var(--ink);
+  font-size:14px; font-family:inherit; outline:none;
+}
+.atv-input::placeholder, .atv-textarea::placeholder{ color:var(--muted); }
+.atv-input:focus, .atv-textarea:focus, .atv-select:focus{ border-color:var(--accent); box-shadow:0 0 0 3px var(--ring); }
+.atv-textarea{ min-height:96px; resize:vertical; }
+.atv-field-err{ color:var(--err); font-size:12px; margin-top:5px; }
+
+.atv-btn{
+  height:36px; padding:0 14px; border-radius:9px; cursor:pointer;
+  border:1px solid var(--line-2); background:var(--surface); color:var(--ink);
+  font-size:14px; font-weight:500; display:inline-flex; align-items:center; gap:6px;
+}
+.atv-btn:hover{ background:var(--hover); }
+.atv-btn:disabled{ opacity:.6; cursor:not-allowed; }
+.atv-btn.primary{ background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
+.atv-btn.primary:hover{ filter:brightness(.96); background:var(--accent); }
+.atv-btn.danger{ background:var(--err); border-color:var(--err); color:#fff; font-weight:600; }
+.atv-btn.danger:hover{ filter:brightness(.96); background:var(--err); }

@@ -5,8 +5,9 @@ import { useToast } from '@/hooks/useToast';
 import { useOrg } from '@/context/OrgContext';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { WhatsAppConnect } from '@/components/WhatsAppConnect';
-import { useWaCanais, waDisconnect, waRemove } from '@/data/whatsapp';
+import { useWaCanais, waRemove } from '@/data/whatsapp';
 import { FB_REAL, useFbStatus, fbAuthStart, fbPages, fbConnect, fbDisconnect } from '@/data/facebook';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import './Integracoes.css';
 
 const IcWa = () => <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a9.9 9.9 0 0 0-8.5 15l-1.3 4.8 4.9-1.3A9.9 9.9 0 1 0 12 2z" /></svg>;
@@ -41,10 +42,23 @@ export function Integracoes() {
   const waCanais = useWaCanais();
   const fbStatus = useFbStatus();
   const [waOpen, setWaOpen] = useState(false);
-  const [busy, setBusy] = useState<string | null>(null);
+  const [busy] = useState<string | null>(null);
   const [fbBusy, setFbBusy] = useState(false);
   const [fbSel, setFbSel] = useState<{ id: string; nome: string }[] | null>(null);
   const [fbCode, setFbCode] = useState<string | null>(null);
+  const [remocao, setRemocao] = useState<{ tipo: 'whatsapp' | 'facebook'; id: string; nome: string } | null>(null);
+  const [remLoading, setRemLoading] = useState(false);
+
+  async function confirmarRemocao() {
+    if (!remocao) return;
+    setRemLoading(true);
+    try {
+      if (remocao.tipo === 'whatsapp') await waRemove(currentOrg.id, remocao.id);
+      else await fbDisconnect(remocao.id);
+      toast('Conexão removida.'); refresh(); setRemocao(null);
+    } catch (e) { toast((e as Error).message || 'Falha ao remover.', 'warn'); }
+    finally { setRemLoading(false); }
+  }
 
   const canais = waCanais.data ?? [];
   const conectados = canais.filter((c) => c.status === 'conectado').length;
@@ -80,19 +94,6 @@ export function Integracoes() {
     qc.invalidateQueries({ queryKey: ['fb-conversas', currentOrg.id] });
   }
 
-  async function disconnect(id: string) {
-    setBusy(id);
-    try { await waDisconnect(currentOrg.id, id); toast('WhatsApp desconectado.'); refresh(); }
-    catch (e) { toast((e as Error).message || 'Falha ao desconectar.'); }
-    finally { setBusy(null); }
-  }
-  async function remove(id: string) {
-    setBusy(id);
-    try { await waRemove(currentOrg.id, id); toast('Número removido. Vaga liberada.'); refresh(); }
-    catch (e) { toast((e as Error).message || 'Falha ao remover.'); }
-    finally { setBusy(null); }
-  }
-
   async function fbIniciar() {
     setFbBusy(true);
     try { const { url } = await fbAuthStart(); window.location.assign(url); }
@@ -111,12 +112,6 @@ export function Integracoes() {
       toast(msg.includes('outra_org') ? 'Esta Página já está vinculada a outra organização.' : (msg || 'Falha ao conectar a Página.'), 'warn');
     }
     finally { setFbBusy(false); }
-  }
-  async function fbDesconectar(canalId: string) {
-    setBusy(canalId);
-    try { await fbDisconnect(canalId); toast('Página desconectada. Histórico preservado.'); refresh(); }
-    catch (e) { toast((e as Error).message || 'Falha ao desconectar.'); }
-    finally { setBusy(null); }
   }
 
   const fbTokenBadge = (p: { estado: string; token_status: string | null; webhook_assinado: boolean }) => {
@@ -156,8 +151,8 @@ export function Integracoes() {
                         <div className="k">{c.alias}{c.numero ? ` · ${c.numero}` : ''}</div>
                         <div className="v" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <span className={'badge ' + (WA_ST[c.status]?.cls || 'neutral')}>{WA_ST[c.status]?.dot && <span className="dot" />}{WA_ST[c.status]?.t || c.status}</span>
-                          {c.status === 'conectado' && <button className="btn-sm" disabled={busy === c.id} onClick={() => disconnect(c.id)}>Desconectar</button>}
-                          <button className="btn-sm" disabled={busy === c.id} onClick={() => remove(c.id)}>Remover</button>
+                          {c.status === 'conectado' && <button className="btn-sm" disabled={busy === c.id} onClick={() => setWaOpen(true)}>Reconectar</button>}
+                          <button className="btn-sm" style={{ color: 'var(--err)', borderColor: 'var(--err)' }} disabled={busy === c.id} onClick={() => setRemocao({ tipo: 'whatsapp', id: c.id, nome: c.alias + (c.numero ? ' · ' + c.numero : '') })}>Remover conexão</button>
                         </div>
                       </div>
                     ))}
@@ -211,7 +206,10 @@ export function Integracoes() {
                           <div className="v" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <span className={'badge ' + b.cls}>{'dot' in b && b.dot && <span className="dot" />}{b.t}</span>
                             {p.estado === 'conectado'
-                              ? <button className="btn-sm" disabled={busy === p.canal_id} onClick={() => fbDesconectar(p.canal_id)}>Desconectar</button>
+                              ? <>
+                                  <button className="btn-sm" disabled={fbBusy} onClick={fbIniciar}>Reconectar</button>
+                                  <button className="btn-sm" style={{ color: 'var(--err)', borderColor: 'var(--err)' }} disabled={busy === p.canal_id} onClick={() => setRemocao({ tipo: 'facebook', id: p.canal_id, nome: p.pagina_nome || p.pagina_id })}>Remover conexão</button>
+                                </>
                               : <button className="btn-sm acc" disabled={fbBusy} onClick={fbIniciar}>Reconectar</button>}
                           </div>
                         </div>
@@ -245,6 +243,13 @@ export function Integracoes() {
       {waOpen && (
         <WhatsAppConnect orgId={currentOrg.id} onClose={() => setWaOpen(false)} onConnected={refresh} />
       )}
+
+      <ConfirmDialog
+        open={!!remocao}
+        title="Remover conexão"
+        message={remocao ? `O canal "${remocao.nome}" será ${remocao.tipo === 'whatsapp' ? 'removido (vaga liberada)' : 'desconectado'}. O histórico de conversas e mensagens é preservado e você poderá reconectar depois.` : ''}
+        destructive loading={remLoading} confirmLabel="Remover conexão"
+        onConfirm={confirmarRemocao} onCancel={() => { if (!remLoading) setRemocao(null); }} />
     </div>
   );
 }

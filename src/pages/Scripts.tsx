@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useToast } from '@/hooks/useToast';
 import { EmptyState } from '@/components/EmptyState';
+import { Modal } from '@/components/Modal';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import {
   SCRIPTS_REAL, useScripts, useScriptCategorias, useScriptMutations, useScriptCategoriaMutations,
   substituirVariaveis, SCRIPT_VARIAVEIS, type Script,
@@ -61,6 +63,21 @@ export function Scripts() {
   const anexosQ = useScriptAnexos(isNew ? null : (currentId || null));
   const anexos = anexosQ.data ?? [];
   const anexoMut = useScriptAnexoMutations();
+  const [catModal, setCatModal] = useState(false);
+  const [catNome, setCatNome] = useState('');
+  const [catErr, setCatErr] = useState<string | null>(null);
+  const [catSaving, setCatSaving] = useState(false);
+  const [confirmState, setConfirmState] = useState<{ title: string; message: string; run: () => Promise<void> } | null>(null);
+  const [confirmLoading, setConfirmLoading] = useState(false);
+
+  function pedirConfirmacao(title: string, message: string, run: () => Promise<void>) { setConfirmState({ title, message, run }); }
+  async function executarConfirm() {
+    if (!confirmState) return;
+    setConfirmLoading(true);
+    try { await confirmState.run(); setConfirmState(null); }
+    catch (e) { toast((e as Error).message || 'Falha', 'warn'); }
+    finally { setConfirmLoading(false); }
+  }
 
   // debounce da busca
   useEffect(() => { const t = setTimeout(() => setSearch(searchRaw.trim().toLowerCase()), 250); return () => clearTimeout(t); }, [searchRaw]);
@@ -131,16 +148,20 @@ export function Scripts() {
     try { const r = await mut.criar.mutateAsync({ titulo: s.titulo + ' (cópia)', conteudo: s.conteudo, canais: s.canais, categoriaId: s.categoriaId }); setCurrentId(r.id); toast('Script duplicado'); }
     catch (e) { toast((e as Error).message || 'Falha', 'warn'); }
   }
-  async function excluir(s: Script) {
-    if (!window.confirm(`Excluir o script "${s.titulo}"? Esta ação não pode ser desfeita.`)) return;
-    try { await mut.excluir.mutateAsync(s.id); if (currentId === s.id) setCurrentId(''); toast('Script excluído'); }
-    catch (e) { toast((e as Error).message || 'Falha', 'warn'); }
+  function excluir(s: Script) {
+    pedirConfirmacao('Excluir script', `Excluir "${s.titulo || 'Sem título'}"? Esta ação não pode ser desfeita.`, async () => {
+      await mut.excluir.mutateAsync(s.id); if (currentId === s.id) setCurrentId(''); toast('Script excluído');
+    });
   }
-  async function novaCategoria() {
-    const nome = window.prompt('Nome da nova categoria:')?.trim();
-    if (!nome) return;
-    try { await catMut.criar.mutateAsync(nome); toast('Categoria criada'); }
-    catch (e) { toast((e as Error).message || 'Falha', 'warn'); }
+  function novaCategoria() { setCatNome(''); setCatErr(null); setCatModal(true); }
+  async function salvarCategoria() {
+    const nome = catNome.trim();
+    if (!nome) { setCatErr('Informe um nome.'); return; }
+    if (cats.some((c) => c.nome.trim().toLowerCase() === nome.toLowerCase())) { setCatErr('Já existe uma categoria com esse nome.'); return; }
+    setCatSaving(true); setCatErr(null);
+    try { await catMut.criar.mutateAsync(nome); toast('Categoria criada'); setCatModal(false); }
+    catch (e) { setCatErr((e as Error).message || 'Falha ao criar'); }
+    finally { setCatSaving(false); }
   }
   function copiar(s: Script) {
     const txt = s.conteudo;
@@ -159,10 +180,10 @@ export function Scripts() {
     const url = await urlAssinadaAnexo(a.path);
     if (url) window.open(url, '_blank'); else toast('Não foi possível abrir o anexo', 'warn');
   }
-  async function removerAnexo(a: ScriptAnexo) {
-    if (!window.confirm(`Remover "${a.nome}"?`)) return;
-    try { await anexoMut.remover.mutateAsync(a); toast('Anexo removido'); }
-    catch (e) { toast((e as Error).message || 'Falha ao remover', 'warn'); }
+  function removerAnexo(a: ScriptAnexo) {
+    pedirConfirmacao('Remover anexo', `Remover "${a.nome}"? O arquivo será apagado do armazenamento.`, async () => {
+      await anexoMut.remover.mutateAsync(a); toast('Anexo removido');
+    });
   }
 
   if (!SCRIPTS_REAL) {
@@ -287,6 +308,24 @@ export function Scripts() {
 
       <button className="reopen" aria-label="Abrir editor" onClick={() => setEditorOpen(true)}><IcChevL /></button>
       <div className="drawer-overlay" onClick={() => setEditorOpen(false)} />
+
+      <Modal open={catModal} onClose={() => !catSaving && setCatModal(false)} title="Nova categoria" width={400}
+        footer={<>
+          <button className="atv-btn" disabled={catSaving} onClick={() => setCatModal(false)}>Cancelar</button>
+          <button className="atv-btn primary" disabled={catSaving} onClick={salvarCategoria}>{catSaving ? 'Criando…' : 'Criar'}</button>
+        </>}>
+        <div className="atv-field">
+          <label htmlFor="cat-nome">Nome</label>
+          <input id="cat-nome" className="atv-input" value={catNome} placeholder="Ex.: Boas-vindas"
+            onChange={(e) => { setCatNome(e.target.value); setCatErr(null); }}
+            onKeyDown={(e) => { if (e.key === 'Enter') salvarCategoria(); }} />
+          {catErr && <div className="atv-field-err">{catErr}</div>}
+        </div>
+      </Modal>
+
+      <ConfirmDialog open={!!confirmState} title={confirmState?.title ?? ''} message={confirmState?.message ?? ''}
+        destructive loading={confirmLoading} confirmLabel="Excluir"
+        onConfirm={executarConfirm} onCancel={() => { if (!confirmLoading) setConfirmState(null); }} />
     </div>
   );
 }
