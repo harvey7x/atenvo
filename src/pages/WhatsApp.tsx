@@ -626,6 +626,10 @@ export function WhatsApp() {
                 <button type="button" className="msg-falha-link" disabled={!m.id || retryId === m.id} onClick={() => retryMsg(m)}>{retryId === m.id ? 'Reenviando…' : 'Tentar novamente'}</button>
               </span>
             ) : null;
+            // horário + status discretos, para a faixa de legenda do card de mídia
+            const metaInline = (
+              <span className="media-cap-meta">{m.time}{ack && <span className={'tick ' + ack.cls} title={m.status === 'falhou' ? traduzErroEnvio(m.erro) : ack.title}>{ack.ticks}</span>}</span>
+            );
             return (
               <div key={i} className={'msg ' + m.dir}>
                 {m.tipo === 'audio' ? (
@@ -645,18 +649,23 @@ export function WhatsApp() {
                   ) : null
                 ) : m.tipo === 'imagem' ? (
                   <>
-                    <div className={'bubble bubble-img' + (m.status === 'falhou' ? ' bubble-falha' : '')}>
+                    <div className={'media-card bubble-img' + (m.status === 'falhou' ? ' media-falha' : '')}>
                       {imgUrl
                         ? <img className="msg-img" src={imgUrl} alt={m.nome || 'imagem'} loading="lazy" onClick={() => setLightbox(imgUrl)} title="Ampliar" />
                         : <div className="msg-img-ph">Carregando imagem…</div>}
-                      {m.text && <div className="msg-cap">{m.text}</div>}
+                      {m.text && (
+                        <div className="media-cap">
+                          <div className="media-cap-text">{m.text}</div>
+                          {metaInline}
+                        </div>
+                      )}
                     </div>
-                    {tempo}
+                    {!m.text && tempo}
                     {falhaActs}
                   </>
                 ) : m.tipo === 'documento' ? (
                   <>
-                    <div className={'bubble bubble-doc' + (m.status === 'falhou' ? ' bubble-falha' : '')}>
+                    <div className={'media-card bubble-doc' + (m.status === 'falhou' ? ' media-falha' : '')}>
                       <button type="button" className="doc-card" onClick={() => abrirDocumento(m)} title="Abrir documento" disabled={m.status === 'falhou'}>
                         <span className="doc-ic"><IcDoc /></span>
                         <span className="doc-info">
@@ -665,9 +674,14 @@ export function WhatsApp() {
                         </span>
                         <span className="doc-open"><IcDownload /></span>
                       </button>
-                      {m.text && <div className="msg-cap">{m.text}</div>}
+                      {m.text && (
+                        <div className="media-cap">
+                          <div className="media-cap-text">{m.text}</div>
+                          {metaInline}
+                        </div>
+                      )}
                     </div>
-                    {tempo}
+                    {!m.text && tempo}
                     {falhaActs}
                   </>
                 ) : m.pdf ? (
@@ -736,9 +750,9 @@ export function WhatsApp() {
               value={draft} onChange={(e) => setDraft(e.target.value)} disabled={canalIndisponivel}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); } }} />
             <div className="composer-bar">
-              <button className="tool" title="Enviar imagem" aria-label="Enviar imagem" disabled={WA_REAL && (!current.id || !canalConectado)} onClick={() => setImgModal(true)}><IcImage /></button>
-              <button className="tool" title="Enviar documento" aria-label="Enviar documento" disabled={WA_REAL && (!current.id || !canalConectado)} onClick={() => setDocModal(true)}><IcDoc /></button>
-              <AudioRecorder permitirArquivo disabled={WA_REAL && (!current.id || !canalConectado)} onEnviar={enviarAudio} />
+              <button className="cbar-act" title="Enviar imagem" aria-label="Enviar imagem" disabled={WA_REAL && (!current.id || !canalConectado)} onClick={() => setImgModal(true)}><IcImage /><span>Imagem</span></button>
+              <AudioRecorder disabled={WA_REAL && (!current.id || !canalConectado)} onEnviar={enviarAudio} />
+              <button className="cbar-act" title="Enviar documento" aria-label="Enviar documento" disabled={WA_REAL && (!current.id || !canalConectado)} onClick={() => setDocModal(true)}><IcDoc /><span>Arquivo</span></button>
               <span className="spacer" />
               <button ref={scriptsBtnRef} className="scripts-btn" onClick={(e) => { e.stopPropagation(); togglePop('scripts', scriptsBtnRef, 'right'); }}><IcScripts />Scripts<IcCaret /></button>
               <button className="send-btn" aria-label="Enviar" disabled={sendDisabled} onClick={sendMsg}><IcSend /></button>
@@ -955,7 +969,7 @@ export function WhatsApp() {
         onCancel={() => setErroDialog(null)}
       />
 
-      <MediaComposer open={imgModal} tipo="imagem" onClose={() => setImgModal(false)} enviar={enviarImagem} />
+      <MediaComposer open={imgModal} tipo="imagem" previewCard onClose={() => setImgModal(false)} enviar={enviarImagem} />
       <MediaComposer open={docModal} tipo="documento" onClose={() => setDocModal(false)} enviar={enviarDocumento} />
 
       <Modal open={transferOpen} onClose={() => setTransferOpen(false)} title="Transferir atendimento" width={460}

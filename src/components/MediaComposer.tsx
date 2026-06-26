@@ -9,6 +9,8 @@ interface Props {
   tipo: MediaTipo;
   /** Faz upload + envio real (deve lançar em falha; não considerar upload concluído como envio). */
   enviar: (file: File, caption: string) => Promise<void>;
+  /** Opt-in: pré-visualização da IMAGEM como card (mídia + faixa de legenda), igual ao histórico. */
+  previewCard?: boolean;
 }
 
 const ACCEPT: Record<MediaTipo, string> = {
@@ -26,7 +28,8 @@ function validar(tipo: MediaTipo, f: File): string | null {
 }
 const IcDoc = () => <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5" /></svg>;
 
-export function MediaComposer({ open, onClose, tipo, enviar }: Props) {
+export function MediaComposer({ open, onClose, tipo, enviar, previewCard }: Props) {
+  const cardImg = !!previewCard && tipo === 'imagem';
   const [file, setFile] = useState<File | null>(null);
   const [url, setUrl] = useState<string | null>(null);
   const [caption, setCaption] = useState('');
@@ -78,18 +81,31 @@ export function MediaComposer({ open, onClose, tipo, enviar }: Props) {
         </div>
       ) : (
         <div>
-          {tipo === 'imagem' && url && <img className="media-prev-img" src={url} alt={file.name} onClick={() => setLightbox(true)} title="Ampliar" />}
-          {tipo === 'video' && url && <video className="media-prev-vid" src={url} controls preload="metadata" />}
-          {tipo === 'documento' && <div className="media-doc-card"><IcDoc /><div style={{ minWidth: 0 }}><div className="media-doc-nome">{file.name}</div><small>{ext}{ext ? ' · ' : ''}{fmt(file.size)}</small></div></div>}
+          {cardImg && url ? (
+            <div className="media-prev-card">
+              <img className="media-prev-img-top" src={url} alt={file.name} onClick={() => setLightbox(true)} title="Ampliar" />
+              <div className="media-prev-band">
+                <textarea className="media-prev-cap" disabled={estado === 'sending'} placeholder="Legenda (opcional)" value={caption} onChange={(e) => setCaption(e.target.value)} />
+              </div>
+            </div>
+          ) : (
+            <>
+              {tipo === 'imagem' && url && <img className="media-prev-img" src={url} alt={file.name} onClick={() => setLightbox(true)} title="Ampliar" />}
+              {tipo === 'video' && url && <video className="media-prev-vid" src={url} controls preload="metadata" />}
+              {tipo === 'documento' && <div className="media-doc-card"><IcDoc /><div style={{ minWidth: 0 }}><div className="media-doc-nome">{file.name}</div><small>{ext}{ext ? ' · ' : ''}{fmt(file.size)}</small></div></div>}
+            </>
+          )}
 
           <div className="media-actions">
             <span className="media-meta" title={file.name}>{file.name} · {fmt(file.size)}</span>
             <button type="button" className="atv-btn" disabled={estado === 'sending'} onClick={() => inputRef.current?.click()}>Substituir</button>
             <button type="button" className="atv-btn" disabled={estado === 'sending'} onClick={remover}>Remover</button>
           </div>
-          <textarea className="atv-textarea" disabled={estado === 'sending'}
-            placeholder={tipo === 'documento' ? 'Texto para enviar junto (opcional)' : 'Legenda (opcional)'}
-            value={caption} onChange={(e) => setCaption(e.target.value)} />
+          {!cardImg && (
+            <textarea className="atv-textarea" disabled={estado === 'sending'}
+              placeholder={tipo === 'documento' ? 'Texto para enviar junto (opcional)' : 'Legenda (opcional)'}
+              value={caption} onChange={(e) => setCaption(e.target.value)} />
+          )}
         </div>
       )}
 

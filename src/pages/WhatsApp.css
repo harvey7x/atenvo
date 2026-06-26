@@ -258,27 +258,49 @@
 .wa-app .msg-falha-link:disabled{color:var(--muted);cursor:default;font-weight:400}
 .wa-app .msg-falha-sep{margin:0 6px;color:var(--muted)}
 
-/* gravador de áudio reusado do Facebook: estiliza o gatilho (fb-tool) dentro do composer WA */
-.wa-app .composer-bar .fb-tool{display:inline-flex;align-items:center;gap:7px;padding:8px 11px;border-radius:9px;border:0;background:transparent;color:var(--ink-2);font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;transition:background .14s,color .14s}
+/* ações do compositor (Imagem/Áudio/Arquivo): mesma altura, espaçamento e área clicável.
+   .cbar-act = imagem/arquivo; .fb-tool = gatilho do gravador reusado do Facebook. */
+.wa-app .composer-bar .cbar-act,
+.wa-app .composer-bar .fb-tool{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 11px;border-radius:9px;border:0;background:transparent;color:var(--ink-2);font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .14s,color .14s}
+.wa-app .composer-bar .cbar-act:hover:not(:disabled),
 .wa-app .composer-bar .fb-tool:hover:not(:disabled){background:var(--hover);color:var(--green-ink)}
-.wa-app .composer-bar .fb-tool:disabled{opacity:.5;cursor:default}
+.wa-app .composer-bar .cbar-act:focus-visible,
+.wa-app .composer-bar .fb-tool:focus-visible{outline:2px solid var(--green);outline-offset:1px}
+.wa-app .composer-bar .cbar-act:disabled,
+.wa-app .composer-bar .fb-tool:disabled{opacity:.45;cursor:default}
+.wa-app .composer-bar .cbar-act svg,
 .wa-app .composer-bar .fb-tool svg{width:18px;height:18px;flex:none}
-@media (max-width:1500px){ .wa-app .composer-bar .fb-tool span{display:none} .wa-app .composer-bar .fb-tool{padding:8px} }
+/* telas estreitas: só ícone (com tooltip), sem cortar nada */
+@media (max-width:920px){ .wa-app .composer-bar .cbar-act span, .wa-app .composer-bar .fb-tool span{display:none} .wa-app .composer-bar .cbar-act, .wa-app .composer-bar .fb-tool{padding:0 9px} }
 
 /* áudio com falha no histórico */
 .wa-app .bubble-audio-falha{display:inline-flex;align-items:center;gap:7px}
 .wa-app .bubble-audio-falha svg{width:16px;height:16px;flex:none}
 
-/* documento no histórico */
-.wa-app .bubble-doc{max-width:320px}
-.wa-app .doc-card{display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;padding:4px 2px;cursor:pointer;text-align:left;color:inherit;font-family:inherit}
-.wa-app .doc-card:disabled{cursor:default;opacity:.7}
-.wa-app .doc-ic{flex:none;width:36px;height:36px;border-radius:8px;background:var(--green-soft);color:var(--green-ink);display:inline-flex;align-items:center;justify-content:center}
+/* ===== Card de mídia (imagem + documento): mídia em cima, faixa de legenda embaixo =====
+   Elevação suave (sombra leve + borda sutil), aparência de componente único. */
+.wa-app .media-card{display:inline-block;max-width:320px;overflow:hidden;border-radius:12px;border:1px solid var(--line-2);background:var(--surface-2);box-shadow:0 1px 3px rgba(15,23,42,.10)}
+[data-theme="dark"] .wa-app .media-card{box-shadow:0 1px 4px rgba(0,0,0,.40)}
+.wa-app .media-card.media-falha{border-color:#e5484d66}
+/* faixa de legenda: superfície levemente distinta + divisória sutil + cantos inferiores via overflow do card */
+.wa-app .media-cap{padding:10px 12px;background:var(--surface);border-top:1px solid var(--line)}
+.wa-app .media-cap-text{font-size:13.5px;line-height:1.45;color:var(--ink-1);text-align:left;white-space:pre-wrap;word-break:break-word}
+.wa-app .media-cap-meta{display:block;text-align:right;margin-top:4px;font-size:10.5px;color:var(--muted)}
+.wa-app .media-cap-meta .tick{margin-left:3px;font-weight:600}
+.wa-app .media-cap-meta .tick.entregue{color:#7c8aa0}
+.wa-app .media-cap-meta .tick.lida{color:#34b3f1}
+.wa-app .media-cap-meta .tick.falhou{color:#e5484d}
+
+/* documento: linha superior (ícone + nome/ext/tam + abrir) dentro do card */
+.wa-app .bubble-doc .doc-card{display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;padding:10px 12px;cursor:pointer;text-align:left;color:inherit;font-family:inherit}
+.wa-app .bubble-doc .doc-card:hover:not(:disabled){background:var(--hover)}
+.wa-app .bubble-doc .doc-card:disabled{cursor:default;opacity:.7}
+.wa-app .doc-ic{flex:none;width:38px;height:38px;border-radius:8px;background:var(--green-soft);color:var(--green-ink);display:inline-flex;align-items:center;justify-content:center}
 .wa-app .doc-ic svg{width:20px;height:20px}
 .wa-app .doc-info{min-width:0;flex:1;display:flex;flex-direction:column}
 .wa-app .doc-nome{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .wa-app .doc-meta{font-size:11px;color:var(--muted)}
-.wa-app .doc-open{flex:none;color:var(--ink-2)}
+.wa-app .doc-open{flex:none;color:var(--ink-2);display:inline-flex}
 .wa-app .doc-open svg{width:18px;height:18px}
 
 /* responsável: painel + cabeçalho */
@@ -311,11 +333,9 @@
 .tr-ck{color:var(--green-ink);display:inline-flex}
 .tr-ck svg{width:16px;height:16px}
 
-/* imagem no histórico */
-.wa-app .bubble-img{padding:4px;max-width:330px}
-.wa-app .msg-img{display:block;max-width:312px;max-height:340px;width:auto;border-radius:9px;cursor:zoom-in;object-fit:cover}
-.wa-app .msg-img-ph{min-width:180px;padding:34px 40px;color:var(--muted);font-size:12px;text-align:center}
-.wa-app .msg-cap{padding:6px 6px 2px;font-size:13.5px;line-height:1.45;white-space:pre-wrap;word-break:break-word}
+/* imagem no histórico: imagem ocupa o topo do card (cantos do card via overflow), legenda na faixa */
+.wa-app .bubble-img .msg-img{display:block;width:100%;max-width:320px;max-height:340px;cursor:zoom-in;object-fit:cover}
+.wa-app .bubble-img .msg-img-ph{min-width:200px;padding:34px 40px;color:var(--muted);font-size:12px;text-align:center}
 
 /* ===== popover extras ===== */
 .wa-app .pop-item.sel{background:var(--green-soft)}
