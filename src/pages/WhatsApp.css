@@ -69,6 +69,13 @@
 .wa-app .conv .cchip svg{width:13px;height:13px;color:var(--wa)}
 .wa-app .conv .cprev{font-size:12.5px;color:var(--muted);line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .wa-app .conv .unread{flex:none;align-self:flex-end;min-width:20px;height:20px;border-radius:999px;background:var(--green);color:#fff;font-size:11px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;padding:0 6px}
+/* conversa aguardando resposta: faixa âmbar discreta + fundo muito suave (sem cara de erro) */
+.wa-app .conv.aguardando:not(.active){background:rgba(224,146,42,.06)}
+.wa-app .conv.aguardando:not(.active)::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:3px;border-radius:0 3px 3px 0;background:#e0922a}
+.wa-app .conv .conv-alert{flex:none;display:inline-flex;color:#e0922a}
+.wa-app .conv .conv-alert svg{width:14px;height:14px}
+.wa-app .conv .conv-wait{font-size:11px;font-weight:500;margin-top:3px;line-height:1.2}
+.wa-app .lh-top .lh-new{margin-left:auto;flex:none}
 .wa-app .list-foot{padding:14px;text-align:center;border-top:1px solid var(--line)}
 .wa-app .list-foot button{background:none;border:0;color:var(--green-ink);font-size:13px;font-weight:500;cursor:pointer;font-family:inherit}
 .wa-app .list-foot button:hover{text-decoration:underline}

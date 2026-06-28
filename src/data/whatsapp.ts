@@ -76,6 +76,15 @@ function mapConversa(c: DbConv): WaContact {
     } as WaMessage));
   const lastMsg = msgs[msgs.length - 1];
   const chip = c.canais?.nome_interno ?? 'WhatsApp';
+  // "aguardando resposta": conversa ABERTA cuja ÚLTIMA mensagem real (exclui sistema/nota_interna)
+  // é de ENTRADA (cliente) — sem resposta de saída posterior do atendente.
+  const aberta = c.status !== 'resolvida' && c.status !== 'fechada';
+  const reais = (c.mensagens ?? []).filter((m) => m.tipo !== 'sistema' && m.tipo !== 'nota_interna');
+  let ultimaReal: DbMsg | null = null;
+  for (const m of reais) { if (!ultimaReal || tsOf(m) >= tsOf(ultimaReal)) ultimaReal = m; }
+  const aguardando = aberta && !!ultimaReal && ultimaReal.direcao === 'entrada';
+  const aguardandoDesde = aguardando ? (ultimaReal!.recebida_em || ultimaReal!.criado_em || ultimaReal!.enviada_em || null) : null;
+  const lastAtMs = new Date(c.ultima_interacao_em || (ultimaReal ? (ultimaReal.recebida_em || ultimaReal.enviada_em || ultimaReal.criado_em) : null) || c.criado_em || 0).getTime();
   const ultimoCanal: WaUltimoCanal | null = c.ultimo_canal_id || c.ultimo_numero
     ? { canalId: c.ultimo_canal_id, alias: null, numero: c.ultimo_numero, provider: c.ultimo_provider, em: c.ultima_msg_canal_em }
     : null;
@@ -86,6 +95,10 @@ function mapConversa(c: DbConv): WaContact {
     chip,
     time: hhmm(c.ultima_interacao_em) || (lastMsg?.time ?? ''),
     unread: c.nao_lidas ?? 0,
+    aberta,
+    aguardando,
+    aguardandoDesde,
+    lastAtMs,
     tabs: ['todos', 'meus', 'pendentes'],
     status: STATUS_LABEL[c.status] ?? c.status,
     statusId: c.status_id ?? null,
@@ -128,7 +141,17 @@ export function useWaConversations() {
         .eq('canais.tipo', 'whatsapp')
         .order('ultima_interacao_em', { ascending: false });
       if (error) throw new Error(error.message);
-      return ((data as unknown as DbConv[]) ?? []).map(mapConversa);
+      const arr = ((data as unknown as DbConv[]) ?? []).map(mapConversa);
+      // Ordenação: 1) abertas aguardando resposta (mais antiga primeiro);
+      // 2) demais abertas por atividade mais recente; 3) encerradas por atividade.
+      const rank = (x: WaContact) => (x.aguardando ? 0 : x.aberta ? 1 : 2);
+      arr.sort((a, b) => {
+        const ra = rank(a), rb = rank(b);
+        if (ra !== rb) return ra - rb;
+        if (ra === 0) return new Date(a.aguardandoDesde || 0).getTime() - new Date(b.aguardandoDesde || 0).getTime();
+        return (b.lastAtMs || 0) - (a.lastAtMs || 0);
+      });
+      return arr;
     },
   });
 

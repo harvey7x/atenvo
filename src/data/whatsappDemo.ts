@@ -37,6 +37,11 @@ export interface WaContact {
   chip: string;
   time: string;
   unread: number;
+  /** derivados (modo real) para destaque/ordenação de "aguardando resposta". */
+  aberta?: boolean;
+  aguardando?: boolean;
+  aguardandoDesde?: string | null;
+  lastAtMs?: number;
   tabs: string[];
   status: string;
   /** id/cor do status configurável (conversa_status_def). */
