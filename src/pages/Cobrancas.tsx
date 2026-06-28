@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { WA_REAL } from '@/data/whatsapp';
-import { EmptyState } from '@/components/EmptyState';
+import { CobrancasApp } from '@/components/CobrancasApp';
 import { useToast } from '@/hooks/useToast';
 import './Cobrancas.css';
 
@@ -91,13 +91,7 @@ export function Cobrancas() {
   }
   function clearForm() { setF({ cli: '', val: '', dia: '', tot: '6', rest: '6', data: '18/05/2024', resp: '', obs: '' }); toast('Formulário limpo'); }
 
-  if (WA_REAL) return (
-    <EmptyState
-      icon={<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9" /><path d="M12 7v10M14.6 9.3c-.7-.9-3.7-1.4-3.7.6 0 1.9 3.7 1 3.7 2.9 0 2-3 1.5-3.7.6" /></svg>}
-      title="Nenhuma cobrança cadastrada"
-      text="Aqui ficam as cobranças que a sua organização faz aos próprios clientes (parcelas e contratos). Você ainda não cadastrou nenhuma."
-    />
-  );
+  if (WA_REAL) return <CobrancasApp />;
 
   return (
     <div className="cobrancas-page">
