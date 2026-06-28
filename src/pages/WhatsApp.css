@@ -142,6 +142,9 @@
 .wa-app .msg.in{float:left}
 .wa-app .msg.out{float:right}
 .wa-app .bubble{padding:10px 13px;border-radius:14px;font-size:14px;line-height:1.5;color:var(--ink);box-shadow:var(--shadow);position:relative}
+/* texto formatado do WhatsApp (negrito *..* + quebras de linha), seguro (sem HTML bruto) */
+.wa-app .wa-fmt{white-space:pre-wrap;overflow-wrap:anywhere}
+.wa-app .wa-fmt strong{font-weight:600}
 .wa-app .msg.in .bubble{background:var(--recv);border-top-left-radius:4px}
 .wa-app .msg.out .bubble{background:var(--sent);color:var(--sent-ink);border-top-right-radius:4px}
 .wa-app .btime{display:block;text-align:right;font-size:10.5px;color:var(--muted);margin-top:5px}

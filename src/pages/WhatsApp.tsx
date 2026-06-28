@@ -9,6 +9,7 @@ import { MediaComposer } from '@/components/MediaComposer';
 import { AudioRecorder } from '@/components/AudioRecorder';
 import { AudioMessage } from '@/components/AudioMessage';
 import { MsgImage } from '@/components/MsgImage';
+import { WhatsAppText } from '@/components/WhatsAppText';
 import { EmptyState } from '@/components/EmptyState';
 import { useScripts, useScriptEtapaCounts, aguardarConfirmacaoEnvio } from '@/data/scripts';
 import { ScriptSequenceModal } from '@/components/ScriptSequenceModal';
@@ -741,7 +742,7 @@ export function WhatsApp() {
                   </>
                 ) : (
                   <>
-                    <div className={'bubble' + (m.status === 'falhou' ? ' bubble-falha' : '')}>{m.text}</div>
+                    <div className={'bubble' + (m.status === 'falhou' ? ' bubble-falha' : '')}><WhatsAppText text={m.text} /></div>
                     {tempo}
                     {falhaActs}
                   </>
