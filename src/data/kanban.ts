@@ -5,7 +5,14 @@ import { useOrg } from '@/context/OrgContext';
 
 export const KANBAN_REAL = isSupabaseConfigured && !!supabase;
 
-export interface KColuna { id: string; nome: string; cor: string; ordem: number; }
+export interface KColuna { id: string; nome: string; cor: string; ordem: number; entrada: boolean; }
+
+// Rótulos do domínio previdenciário (compartilhados entre Kanban e painéis WA/FB)
+export const TIPO_BENEFICIO_OPCOES: [string, string][] = [['aposentadoria', 'Aposentadoria'], ['pensao_por_morte', 'Pensão por morte'], ['bpc_loas', 'BPC/LOAS'], ['outro', 'Outro']];
+export const TIPO_SERVICO_OPCOES: [string, string][] = [['analise_inicial', 'Análise inicial'], ['cancelamento', 'Cancelamento de descontos'], ['ressarcimento', 'Ressarcimento'], ['cancelamento_ressarcimento', 'Cancelamento e ressarcimento'], ['outro', 'Outro']];
+export const STATUS_CANCEL_OPCOES: [string, string][] = [['nao_se_aplica', 'Não se aplica'], ['nao_iniciado', 'Não iniciado'], ['em_analise', 'Em análise'], ['solicitado', 'Solicitado'], ['aguardando_retorno', 'Aguardando retorno'], ['concluido', 'Concluído'], ['nao_foi_possivel', 'Não foi possível']];
+export const STATUS_RESS_OPCOES: [string, string][] = [['nao_se_aplica', 'Não se aplica'], ['nao_iniciado', 'Não iniciado'], ['em_analise', 'Em análise'], ['solicitado', 'Solicitado'], ['aguardando_pagamento', 'Aguardando pagamento'], ['pago', 'Pago'], ['nao_foi_possivel', 'Não foi possível']];
+export const rotuloDe = (arr: [string, string][], v: string | null) => (v ? arr.find(([k]) => k === v)?.[1] ?? v : '');
 export interface KLead {
   id: string; colunaId: string | null; contatoId: string | null;
   conversaOrigemId: string | null; canalOrigemId: string | null;
@@ -126,6 +133,63 @@ interface OppCampos {
 export interface OppCriar extends OppCampos { colunaId: string; nome: string; contatoId?: string | null; }
 export interface OppEditar extends Partial<OppCampos> { id: string; }
 
+export interface FunilLite { id: string; nome: string; padrao: boolean; }
+/** Funis ativos da org (para escolher destino ao adicionar ao Kanban). */
+export function useFunisDaOrg() {
+  const { currentOrg } = useOrg();
+  const org = currentOrg.id;
+  return useQuery({
+    queryKey: ['funis-org', org], enabled: KANBAN_REAL,
+    queryFn: async (): Promise<FunilLite[]> => {
+      const { data, error } = await supabase!.from('funis').select('id, nome, padrao').eq('organizacao_id', org).eq('arquivado', false).order('padrao', { ascending: false }).order('ordem', { ascending: true });
+      if (error) throw new Error(error.message);
+      return (data as FunilLite[]) ?? [];
+    },
+  });
+}
+
+export interface OppDoContato {
+  id: string; status: string; aberta: boolean; funilId: string | null; funilNome: string; colunaNome: string; respNome: string;
+  tipoServico: string; tipoBeneficio: string | null; valor: number | null; valorDescontoMensal: number | null;
+  valorRessarcimentoEstimado: number | null; valorRessarcido: number | null; origem: string; criadoEm: string; atualizadoEm: string;
+}
+/** Oportunidades (todas as situações) de um contato, com funil/coluna/responsável/valores/datas. */
+export function useOportunidadesDoContato(contatoId: string | null) {
+  const { currentOrg } = useOrg();
+  const org = currentOrg.id;
+  return useQuery({
+    queryKey: ['opp-do-contato', org, contatoId], enabled: KANBAN_REAL && !!contatoId,
+    queryFn: async (): Promise<OppDoContato[]> => {
+      const { data, error } = await supabase!.from('oportunidades')
+        .select('id, status, funil_id, tipo_servico, tipo_beneficio, valor_estimado, valor_desconto_mensal, valor_ressarcimento_estimado, valor_ressarcido, origem, criado_em, atualizado_em, funis(nome), funil_colunas(nome), responsavel:usuarios(nome)')
+        .eq('organizacao_id', org).eq('contato_id', contatoId!).order('criado_em', { ascending: false });
+      if (error) throw new Error(error.message);
+      return (((data as unknown[]) ?? []) as Record<string, unknown>[]).map((r) => {
+        const fn = one(r.funis as { nome: string } | { nome: string }[] | null);
+        const cl = one(r.funil_colunas as { nome: string } | { nome: string }[] | null);
+        const rp = one(r.responsavel as { nome: string } | { nome: string }[] | null);
+        const status = r.status as string;
+        return {
+          id: r.id as string, status, aberta: status === 'em_andamento', funilId: (r.funil_id as string) ?? null,
+          funilNome: fn?.nome || '', colunaNome: cl?.nome || '', respNome: rp?.nome || '',
+          tipoServico: (r.tipo_servico as string) || 'analise_inicial', tipoBeneficio: (r.tipo_beneficio as string) ?? null,
+          valor: (r.valor_estimado as number) ?? null, valorDescontoMensal: (r.valor_desconto_mensal as number) ?? null,
+          valorRessarcimentoEstimado: (r.valor_ressarcimento_estimado as number) ?? null, valorRessarcido: (r.valor_ressarcido as number) ?? null,
+          origem: (r.origem as string) || '', criadoEm: (r.criado_em as string) || '', atualizadoEm: (r.atualizado_em as string) || '',
+        };
+      });
+    },
+  });
+}
+
+/** Chama a RPC idempotente (membro autenticado). Org/coluna de entrada derivadas no banco. */
+export async function chamarGarantirEntrada(p: { contatoId: string; funilId: string; origem?: string | null; conversaId?: string | null; canalId?: string | null }): Promise<string | null> {
+  if (!supabase) throw new Error('Supabase indisponível');
+  const { data, error } = await supabase.rpc('garantir_oportunidade_entrada', { p_contato: p.contatoId, p_funil: p.funilId, p_origem: p.origem ?? null, p_conversa: p.conversaId ?? null, p_canal: p.canalId ?? null });
+  if (error) throw new Error(error.message);
+  return (data as string) ?? null;
+}
+
 /** Funil padrão da org (cria um na primeira vez se o usuário tiver permissão). */
 async function garantirFunil(org: string): Promise<{ id: string; nome: string } | null> {
   const { data } = await supabase!.from('funis').select('id, nome').eq('organizacao_id', org).eq('arquivado', false).order('padrao', { ascending: false }).order('ordem', { ascending: true }).limit(1).maybeSingle();
@@ -146,7 +210,7 @@ export function useKanban() {
   const colunasQ = useQuery({
     queryKey: ['kanban-colunas', org, funilId], enabled: KANBAN_REAL && !!funilId, refetchInterval: 8000,
     queryFn: async (): Promise<KColuna[]> => {
-      const { data, error } = await supabase!.from('funil_colunas').select('id, nome, cor, ordem').eq('organizacao_id', org).eq('funil_id', funilId!).eq('arquivada', false).order('ordem', { ascending: true });
+      const { data, error } = await supabase!.from('funil_colunas').select('id, nome, cor, ordem, entrada').eq('organizacao_id', org).eq('funil_id', funilId!).eq('arquivada', false).order('ordem', { ascending: true });
       if (error) throw new Error(error.message);
       return (data as KColuna[]) ?? [];
     },

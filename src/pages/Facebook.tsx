@@ -15,6 +15,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { MediaComposer, type MediaTipo } from '@/components/MediaComposer';
 import { useStatusDefs, useEtiquetas, useAtendimentoActions, useOrgUsuarios } from '@/data/atendimento';
 import { corDaEtiqueta } from '@/types/atendimento';
+import { KanbanContatoBox } from '@/components/KanbanContatoBox';
 import './Facebook.css';
 
 /** Dispatcher: inbox real (backend configurado) ou demonstração (mock). */
@@ -497,6 +498,7 @@ function FacebookInbox() {
             {editMode ? <input style={inputStyle} type="email" placeholder="email@exemplo.com" value={editForm.email} onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))} /> : <div className="dval">{current.email || <span style={{ color: 'var(--muted)' }}>—</span>}</div>}
           </div>
           <div className="dfield"><div className="dlabel">Página / Canal</div><div className="dval with-ic"><IcFb />{current.paginaNome} · Messenger</div></div>
+          <div className="dfield"><KanbanContatoBox contatoId={current.contatoId} conversaId={current.id} canalId={current.canalId} canalTipo="facebook" /></div>
 
           <div className="dfield" style={{ position: 'relative' }}>
             <div className="dlabel">Status</div>

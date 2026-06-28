@@ -383,3 +383,7 @@
 .kb-det-v{flex:1;min-width:0;color:var(--ink);font-weight:500;word-break:break-word}
 .kb-det-tags{display:inline-flex;flex-wrap:wrap;gap:5px}
 .kb-det-resumo{white-space:pre-wrap;font-weight:400}
+
+/* coluna de entrada + destaque do deep-link */
+.kanban-page .col-entrada-tag{margin-left:8px;font-size:10px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--green-ink,#0e9d63);background:rgba(25,195,125,.14);padding:1px 7px;border-radius:999px;vertical-align:middle}
+.kanban-page .lead-card.destaque{outline:2px solid var(--green,#19C37D);outline-offset:1px;box-shadow:0 0 0 4px rgba(25,195,125,.18)}

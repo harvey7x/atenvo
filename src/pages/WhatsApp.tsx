@@ -17,6 +17,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Modal } from '@/components/Modal';
 import { useStatusDefs, useEtiquetas, useAssinaturaPref, useAtendimentoActions, useOrgUsuarios, resolverNomeAssinatura } from '@/data/atendimento';
 import { corDaEtiqueta, podeGerenciarAtendimento, type AssinaturaModo } from '@/types/atendimento';
+import { KanbanContatoBox } from '@/components/KanbanContatoBox';
 import './WhatsApp.css';
 
 /** Conversa vazia (placeholder) para quando ainda não há conversas reais carregadas. */
@@ -854,7 +855,7 @@ export function WhatsApp() {
             </button>
           </div>
 
-          <div className="dfield"><div className="dlabel">Etapa do funil</div><span className="badge-soft">{current.stage}</span></div>
+          <div className="dfield"><KanbanContatoBox contatoId={current.contatoId} conversaId={current.id} canalId={current.canalId} canalTipo="whatsapp" /></div>
           <div className="dfield"><div className="dlabel">Responsável</div>
             {editMode ? (
               <select className="edit-input" value={editForm.respId} onChange={(e) => setEditForm((f) => ({ ...f, respId: e.target.value }))}>

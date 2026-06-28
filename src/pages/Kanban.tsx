@@ -5,7 +5,11 @@ import { useToast } from '@/hooks/useToast';
 import { useEtiquetas, useOrgUsuarios } from '@/data/atendimento';
 import { useBuscaContatos, type ContatoRow as Row } from '@/data/contatos';
 import { corDaEtiqueta } from '@/types/atendimento';
-import { useKanban, useOportunidadesAbertasDeContatos, useConversasDoContato, valorRelevante, type KColuna, type KLead } from '@/data/kanban';
+import { useKanban, useOportunidadesAbertasDeContatos, useConversasDoContato, valorRelevante,
+  TIPO_BENEFICIO_OPCOES as TIPO_BENEFICIO, TIPO_SERVICO_OPCOES as TIPO_SERVICO,
+  STATUS_CANCEL_OPCOES as ST_CANCEL, STATUS_RESS_OPCOES as ST_RESS, rotuloDe as labelOf,
+  type KColuna, type KLead } from '@/data/kanban';
+import { useSearchParams } from 'react-router-dom';
 import { Modal } from '@/components/Modal';
 import { initials, avatarColor } from '@/lib/avatar';
 import './Kanban.css';
@@ -17,12 +21,7 @@ function fmtData(s?: string | null) { if (!s) return ''; const [y, m, d] = s.spl
 function fmtDataHora(iso?: string | null) { if (!iso) return ''; const dt = new Date(iso); return Number.isNaN(dt.getTime()) ? '' : dt.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); }
 function Av({ n, cls }: { n: string; cls?: string }) { return <span className={'av' + (cls ? ' ' + cls : '')} style={{ background: avatarColor(n) }}>{initials(n)}</span>; }
 
-// ---- domínio previdenciário (rótulos PT-BR) ----
-const TIPO_BENEFICIO: [string, string][] = [['aposentadoria', 'Aposentadoria'], ['pensao_por_morte', 'Pensão por morte'], ['bpc_loas', 'BPC/LOAS'], ['outro', 'Outro']];
-const TIPO_SERVICO: [string, string][] = [['analise_inicial', 'Análise inicial'], ['cancelamento', 'Cancelamento de descontos'], ['ressarcimento', 'Ressarcimento'], ['cancelamento_ressarcimento', 'Cancelamento e ressarcimento'], ['outro', 'Outro']];
-const ST_CANCEL: [string, string][] = [['nao_se_aplica', 'Não se aplica'], ['nao_iniciado', 'Não iniciado'], ['em_analise', 'Em análise'], ['solicitado', 'Solicitado'], ['aguardando_retorno', 'Aguardando retorno'], ['concluido', 'Concluído'], ['nao_foi_possivel', 'Não foi possível']];
-const ST_RESS: [string, string][] = [['nao_se_aplica', 'Não se aplica'], ['nao_iniciado', 'Não iniciado'], ['em_analise', 'Em análise'], ['solicitado', 'Solicitado'], ['aguardando_pagamento', 'Aguardando pagamento'], ['pago', 'Pago'], ['nao_foi_possivel', 'Não foi possível']];
-const labelOf = (arr: [string, string][], v: string | null) => (v ? arr.find(([k]) => k === v)?.[1] ?? v : '');
+// ---- domínio previdenciário (rótulos importados de @/data/kanban) ----
 const canalLabel = (t: string | null) => (t === 'whatsapp' ? 'WhatsApp' : t === 'facebook' ? 'Facebook' : (t || 'Canal'));
 function chipDe(l: Pick<KLead, 'canalTipo' | 'canalNome' | 'origem'>): string | null { if (l.canalNome) return canalLabel(l.canalTipo) + ' · ' + l.canalNome; return l.origem || null; }
 function maskNum(n?: string | null) { if (!n) return ''; const d = n.replace(/\D/g, ''); return d.length > 4 ? '•••• ' + d.slice(-4) : d; }
@@ -138,6 +137,10 @@ export function Kanban() {
   const [semVinculo, setSemVinculo] = useState(false);
   // detalhes da oportunidade
   const [detId, setDetId] = useState<string | null>(null);
+  // deep-link "Ver no Kanban" (?oportunidade=<uuid>)
+  const [params, setParams] = useSearchParams();
+  const [destaque, setDestaque] = useState<string | null>(null);
+  const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const editLead = leadModal?.mode === 'editar' ? (k.leads.find((l) => l.id === leadModal.id) ?? null) : null;
   const detLead = detId ? (k.leads.find((l) => l.id === detId) ?? null) : null;
@@ -161,6 +164,20 @@ export function Kanban() {
     setOptim((m) => { const n: Record<string, string> = {}; for (const id in m) { const l = k.leads.find((x) => x.id === id); if (l && l.colunaId !== m[id]) n[id] = m[id]; } return n; });
   }, [k.leads]);
   useEffect(() => { function onDoc() { setMenu(null); } document.addEventListener('click', onDoc); return () => document.removeEventListener('click', onDoc); }, []);
+  // Ver no Kanban: abre detalhes + destaca + rola até o card; ignora UUID inválido com segurança.
+  useEffect(() => {
+    const oid = params.get('oportunidade');
+    if (!oid) return;
+    const valido = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(oid);
+    if (valido && k.leads.some((l) => l.id === oid)) {
+      setDetId(oid); setDestaque(oid);
+      setTimeout(() => cardRefs.current[oid]?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 60);
+      const t = setTimeout(() => setDestaque(null), 2600);
+      setParams((p) => { p.delete('oportunidade'); return p; }, { replace: true });
+      return () => clearTimeout(t);
+    }
+    if (!valido) setParams((p) => { p.delete('oportunidade'); return p; }, { replace: true });
+  }, [params, k.leads]); // eslint-disable-line
 
   const term = search.trim().toLowerCase();
   const termDig = term.replace(/\D/g, '');
@@ -196,6 +213,7 @@ export function Kanban() {
   }
   function pedirExcluirColuna(c: KColuna) {
     setMenu(null);
+    if (c.entrada) { toast('A coluna de entrada não pode ser excluída.', 'warn'); return; }
     if (k.colunas.length <= 1) { toast('O funil precisa de ao menos uma coluna ativa.', 'warn'); return; }
     setDelDest(k.colunas.find((x) => x.id !== c.id)?.id || ''); setDelCol(c);
   }
@@ -210,7 +228,7 @@ export function Kanban() {
   }
 
   // ---- leads ----
-  function abrirNovoLead(colunaId?: string) { setLf({ ...FORM0, colunaId: colunaId || k.colunas[0]?.id || '' }); setSelContato(null); setSemVinculo(false); setLeadErr(null); setDetId(null); setLeadModal({ mode: 'novo' }); }
+  function abrirNovoLead(colunaId?: string) { setLf({ ...FORM0, colunaId: colunaId || k.colunas.find((c) => c.entrada)?.id || k.colunas[0]?.id || '' }); setSelContato(null); setSemVinculo(false); setLeadErr(null); setDetId(null); setLeadModal({ mode: 'novo' }); }
   function abrirEditarLead(l: KLead) {
     setLf({
       colunaId: l.colunaId || '', contatoId: l.contatoId || '', conversaOrigemId: l.conversaOrigemId || '', canalOrigemId: l.canalOrigemId || '',
@@ -250,7 +268,7 @@ export function Kanban() {
       if (novo) await k.criarLead({ colunaId: lf.colunaId, contatoId: selContato?.id ?? null, ...comum });
       else await k.editarLead({ id: leadModal!.id!, colunaId: lf.colunaId, ...comum });
       setLeadModal(null); toast(novo ? 'Oportunidade criada' : 'Oportunidade atualizada');
-    } catch (e) { setLeadErr('Não foi possível salvar: ' + (e as Error).message); }
+    } catch (e) { const m = (e as Error).message || ''; setLeadErr(/uq_oport_aberta|duplicate key|23505/i.test(m) ? 'Este contato já possui uma oportunidade aberta neste funil.' : ('Não foi possível salvar: ' + m)); }
     finally { setLeadBusy(false); }
   }
   async function arquivar(l: KLead) { setMenu(null); try { await k.arquivarLead(l.id); toast('Lead arquivado'); } catch (e) { toast('Falha ao arquivar: ' + (e as Error).message, 'warn'); } }
@@ -304,14 +322,14 @@ export function Kanban() {
                 <div className="column" key={col.id}>
                   <div className="col-head">
                     <span className="dot" style={{ background: col.cor }} />
-                    <div className="col-htxt"><span className="col-name-st">{col.nome}</span><span className="col-metric">{totalCount} {totalCount === 1 ? 'lead' : 'leads'}</span></div>
+                    <div className="col-htxt"><span className="col-name-st">{col.nome}{col.entrada && <span className="col-entrada-tag" title="Coluna de entrada — recebe novos leads dos canais">entrada</span>}</span><span className="col-metric">{totalCount} {totalCount === 1 ? 'lead' : 'leads'}</span></div>
                     {podeConfig && (
                       <div className="col-menu-wrap">
                         <button className="col-mbtn" aria-label={'Ações da coluna ' + col.nome} onClick={(e) => { e.stopPropagation(); setMenu(menu?.kind === 'col' && menu.id === col.id ? null : { kind: 'col', id: col.id }); }}>{IC.dots}</button>
                         {menu?.kind === 'col' && menu.id === col.id && (
                           <div className="kb-menu" onClick={(e) => e.stopPropagation()} role="menu">
                             <button className="pop-item" role="menuitem" onClick={() => abrirEditarColuna(col)}>Renomear / cor</button>
-                            <button className="pop-item danger" role="menuitem" onClick={() => pedirExcluirColuna(col)}>Excluir</button>
+                            {!col.entrada && <button className="pop-item danger" role="menuitem" onClick={() => pedirExcluirColuna(col)}>Excluir</button>}
                           </div>
                         )}
                       </div>
@@ -326,7 +344,7 @@ export function Kanban() {
                       const chip = chipDe(l);
                       const subt = [l.tipoBeneficio ? labelOf(TIPO_BENEFICIO, l.tipoBeneficio) : '', labelOf(TIPO_SERVICO, l.tipoServico)].filter(Boolean).join(' · ');
                       return (
-                        <div key={l.id} className={'lead-card' + (moving ? ' moving' : '')} draggable onClick={() => setDetId(l.id)}
+                        <div key={l.id} ref={(el) => { cardRefs.current[l.id] = el; }} className={'lead-card' + (moving ? ' moving' : '') + (destaque === l.id ? ' destaque' : '')} draggable onClick={() => setDetId(l.id)}
                           onDragStart={(e) => { dragId.current = l.id; try { e.dataTransfer.effectAllowed = 'move'; } catch { /* */ } }} onDragEnd={() => { dragId.current = null; setHover(null); }}>
                           <div className="lc-top">
                             <Av n={l.nome} />
