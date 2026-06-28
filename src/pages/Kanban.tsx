@@ -1,362 +1,262 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { WA_REAL } from '@/data/whatsapp';
-import { useEtiquetas } from '@/data/atendimento';
-import { corDaEtiqueta } from '@/types/atendimento';
-import { EmptyState } from '@/components/EmptyState';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useOrg } from '@/context/OrgContext';
 import { useToast } from '@/hooks/useToast';
+import { useEtiquetas, useOrgUsuarios } from '@/data/atendimento';
+import { useContatos } from '@/data/contatos';
+import { corDaEtiqueta } from '@/types/atendimento';
+import { useKanban, type KColuna, type KLead } from '@/data/kanban';
+import { Modal } from '@/components/Modal';
+import { EmptyState } from '@/components/EmptyState';
 import { initials, avatarColor } from '@/lib/avatar';
 import './Kanban.css';
 
-interface Stage { key: string; name: string; color: string; total: number; }
-interface Source { id: string; name: string; cls: string; dot: string; }
-interface Hist { ic: string; bg: string; title: string; date: string; detail: string; }
-interface Lead { id: string; name: string; source: string; chip: string; resp: string; ago: string; stage: string; created: string; lastAct: string; won?: boolean; etiquetas?: string[]; history: Hist[]; }
-
-const STAGE_PALETTE = ['#3b82f6', '#19C37D', '#f59e0b', '#8b5cf6', '#0891b2', '#e11d48', '#7c3aed', '#0e9d63', '#d97706', '#64748b'];
-const SRC_EXTRA = [{ cls: 'src-c1', dot: '#2563eb' }, { cls: 'src-c2', dot: '#d97706' }, { cls: 'src-c3', dot: '#0891b2' }, { cls: 'src-c4', dot: '#be185d' }];
-const RESP = ['Henrique', 'Marina Lopes', 'Carlos Eduardo', 'Paula Ferreira'];
-const softColor = (hex: string) => hex + '24';
-
-const IC = {
-  wa: <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a9.9 9.9 0 0 0-8.5 15l-1.3 4.8 4.9-1.3A9.9 9.9 0 1 0 12 2zm4.5 12c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.6.8-.8 1-.3.1-.6 0a6.7 6.7 0 0 1-2-1.2 7.4 7.4 0 0 1-1.3-1.7c-.2-.3 0-.4.1-.5l.4-.5.3-.4v-.4l-.9-2c-.2-.5-.4-.4-.6-.5h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.7 11.6 11.6 0 0 0 4.5 3.9c.6.3 1.1.4 1.5.5a3.6 3.6 0 0 0 1.6.1 2.7 2.7 0 0 0 1.8-1.2 2.2 2.2 0 0 0 .1-1.2c0-.1-.2-.2-.5-.3z" /></svg>,
-  chip: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="4" y="4" width="16" height="16" rx="3" /><rect x="9" y="9" width="6" height="6" rx="1" /><path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2" /></svg>,
-  user: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="3.4" /><path d="M5 20a7 7 0 0 1 14 0" /></svg>,
-  clock: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>,
-  cal: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="17" rx="2.5" /><path d="M3 9h18M8 2v4M16 2v4" /></svg>,
-  tag: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.6 13.4 13 21l-9-9V4h8z" /><circle cx="7.5" cy="7.5" r="1" /></svg>,
-  flag: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3.5" /><path d="M12 2v2M12 20v2M2 12h2M20 12h2" /></svg>,
-  phone: <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.6 10.8a15 15 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.2.4 2.4.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.4 0 .8-.3 1z" /></svg>,
-  doc: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5" /></svg>,
-  check: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>,
-  edit: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>,
-  close: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12" /></svg>,
-  plus: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>,
-  trash: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" /></svg>,
-  search: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3-3" /></svg>,
-  chev: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>,
-  info: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></svg>,
-  manage: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.6 13.4 13 21l-9-9V4h8z" /><circle cx="7.5" cy="7.5" r="1.2" /></svg>,
-  chevL: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>,
-} as const;
-
-const histIc: Record<string, JSX.Element> = { wa: IC.wa, phone: IC.phone, doc: IC.doc, user: IC.user, tag: IC.tag };
-
+const PALETTE = ['#3b82f6', '#19C37D', '#f59e0b', '#8b5cf6', '#0891b2', '#e11d48', '#7c3aed', '#0e9d63', '#d97706', '#64748b'];
+const fmtBRL = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
+function haDe(iso?: string) { if (!iso) return ''; const ms = Date.now() - new Date(iso).getTime(); if (!Number.isFinite(ms) || ms < 0) return ''; const m = Math.floor(ms / 60000); if (m < 1) return 'agora'; if (m < 60) return `há ${m} min`; if (m < 1440) return `há ${Math.floor(m / 60)} h`; return `há ${Math.floor(m / 1440)} d`; }
 function Av({ n, cls }: { n: string; cls?: string }) { return <span className={'av' + (cls ? ' ' + cls : '')} style={{ background: avatarColor(n) }}>{initials(n)}</span>; }
 
-const INIT_STAGES: Stage[] = [
-  { key: 'novo', name: 'Novo lead', color: '#3b82f6', total: 8 },
-  { key: 'processo', name: 'Em processo', color: '#19C37D', total: 12 },
-  { key: 'contratacao', name: 'Contratação', color: '#f59e0b', total: 6 },
-  { key: 'fechado', name: 'Fechado', color: '#8b5cf6', total: 15 },
-];
-const INIT_SOURCES: Source[] = [
-  { id: 's1', name: 'Sistema URA', cls: 'src-ura', dot: '#0f766e' },
-  { id: 's2', name: 'Tráfego 1', cls: 'src-t1', dot: '#0e9d63' },
-  { id: 's3', name: 'Tráfego 2', cls: 'src-t2', dot: '#7c5cd6' },
-];
-function genHistory(l: Omit<Lead, 'history'>): Hist[] {
-  if (l.id === 'l1') return [
-    { ic: 'phone', bg: 'var(--st-fech)', title: 'Lead recebido via Sistema URA', date: 'Hoje, 09:21', detail: 'Origem: Sistema URA · Chip (11) 97777-9012' },
-    { ic: 'wa', bg: 'var(--st-proc)', title: 'Mensagem enviada', date: 'Hoje, 09:23', detail: 'Henrique: Olá, Antônio! Tudo bem?' },
-    { ic: 'doc', bg: '#94a3b8', title: 'Dados do lead atualizados', date: 'Hoje, 09:25', detail: 'Campo "Responsável" atualizado para Henrique' },
-    { ic: 'phone', bg: 'var(--st-proc)', title: 'Ligação realizada', date: 'Hoje, 09:28', detail: 'Duração: 02:34' },
-  ];
-  const via = l.source;
-  return [
-    { ic: l.source === 'Sistema URA' ? 'phone' : 'tag', bg: 'var(--st-fech)', title: 'Lead recebido via ' + via, date: l.ago, detail: 'Origem: ' + l.source + ' · Chip ' + l.chip },
-    { ic: 'user', bg: '#94a3b8', title: 'Atribuído a ' + l.resp, date: l.ago, detail: 'Responsável definido para ' + l.resp },
-  ];
-}
-const RAW_LEADS: Omit<Lead, 'history'>[] = [
-  { id: 'l1', name: 'Antônio César', source: 'Sistema URA', chip: '(11) 97777-9012', resp: 'Henrique', ago: 'Há 5 min', stage: 'novo', created: 'Hoje, 09:21', lastAct: 'Hoje, 09:21', etiquetas: ['Revisão de contrato', 'Juros abusivos'] },
-  { id: 'l2', name: 'Paula Ferreira', source: 'Tráfego 1', chip: '(11) 96666-1122', resp: 'Marina Lopes', ago: 'Há 12 min', stage: 'novo', created: 'Hoje, 09:14', lastAct: 'Hoje, 09:18' },
-  { id: 'l3', name: 'Bruno Lima', source: 'Tráfego 2', chip: '(11) 95555-3344', resp: 'Carlos Eduardo', ago: 'Há 18 min', stage: 'novo', created: 'Hoje, 09:08', lastAct: 'Hoje, 09:12' },
-  { id: 'l4', name: 'Marina Lopes', source: 'Tráfego 2', chip: '(11) 98888-4455', resp: 'Marina Lopes', ago: 'Há 25 min', stage: 'processo', created: 'Hoje, 08:55', lastAct: 'Hoje, 09:01', etiquetas: ['Documentação'] },
-  { id: 'l5', name: 'Juliana M.', source: 'Sistema URA', chip: '(11) 97777-2288', resp: 'Henrique', ago: 'Há 32 min', stage: 'processo', created: 'Hoje, 08:48', lastAct: 'Hoje, 08:59' },
-  { id: 'l6', name: 'Rafael Souza', source: 'Tráfego 1', chip: '(11) 94444-5566', resp: 'Paula Ferreira', ago: 'Há 45 min', stage: 'processo', created: 'Hoje, 08:35', lastAct: 'Hoje, 08:50' },
-  { id: 'l7', name: 'Carlos Eduardo', source: 'Tráfego 1', chip: '(11) 93333-6677', resp: 'Carlos Eduardo', ago: 'Há 1 h', stage: 'contratacao', created: 'Hoje, 08:20', lastAct: 'Hoje, 08:45' },
-  { id: 'l8', name: 'Paula Ferreira', source: 'Tráfego 2', chip: '(11) 92222-7788', resp: 'Marina Lopes', ago: 'Há 1 h 20 min', stage: 'contratacao', created: 'Hoje, 08:00', lastAct: 'Hoje, 08:30' },
-  { id: 'l9', name: 'Bruno Lima', source: 'Tráfego 1', chip: '(11) 91111-8899', resp: 'Henrique', ago: 'Há 2 h', stage: 'fechado', won: true, created: 'Hoje, 07:15', lastAct: 'Hoje, 08:10' },
-  { id: 'l10', name: 'Marina Lopes', source: 'Sistema URA', chip: '(11) 90000-1122', resp: 'Carlos Eduardo', ago: 'Há 3 h', stage: 'fechado', won: true, created: 'Hoje, 06:30', lastAct: 'Hoje, 07:40' },
-  { id: 'l11', name: 'Antônio César', source: 'Tráfego 2', chip: '(11) 93333-2211', resp: 'Paula Ferreira', ago: 'Há 5 h', stage: 'fechado', won: true, created: 'Hoje, 04:50', lastAct: 'Hoje, 06:20' },
-];
-const INIT_LEADS: Lead[] = RAW_LEADS.map((l) => ({ ...l, history: genHistory(l) }));
-
-const FILTERS: Record<string, string[]> = {
-  resp: ['Todos', 'Henrique', 'Marina Lopes', 'Carlos Eduardo', 'Paula Ferreira'],
-  origem: ['Todos', 'WhatsApp', 'Facebook', 'Sistema URA'],
-  fonte: ['Todos', 'Sistema URA', 'Tráfego 1', 'Tráfego 2'],
-  periodo: ['Hoje', 'Últimos 7 dias', 'Últimos 30 dias', 'Este mês'],
-};
-const FILTER_DEFS = [
-  { key: 'resp', label: 'Responsável' },
-  { key: 'origem', label: 'Origem/Canal' },
-  { key: 'fonte', label: 'Fonte de aquisição' },
-];
-
-let stageSeq = 0, leadSeq = 20;
+const IC = {
+  search: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3-3" /></svg>,
+  plus: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>,
+  dots: <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.7" /><circle cx="12" cy="12" r="1.7" /><circle cx="12" cy="19" r="1.7" /></svg>,
+  user: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="3.4" /><path d="M5 20a7 7 0 0 1 14 0" /></svg>,
+  clock: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>,
+} as const;
 
 export function Kanban() {
   const { toast } = useToast();
+  const { currentOrg } = useOrg();
+  const podeConfig = currentOrg.role === 'admin' || currentOrg.role === 'gestor';
+  const k = useKanban();
   const { data: etiquetas = [] } = useEtiquetas();
-  const [stages, setStages] = useState<Stage[]>(INIT_STAGES);
-  const [leads, setLeads] = useState<Lead[]>(INIT_LEADS);
-  const [sources, setSources] = useState<Source[]>(INIT_SOURCES);
+  const { data: usuarios = [] } = useOrgUsuarios();
+  const { data: contatos = [] } = useContatos();
+
   const [search, setSearch] = useState('');
-  const [currentId, setCurrentId] = useState('l1');
-  const [dataOpen, setDataOpen] = useState(() => (typeof window !== 'undefined' ? window.innerWidth >= 1200 : true));
-  const [isMobile, setIsMobile] = useState(() => (typeof window !== 'undefined' ? window.innerWidth < 1200 : false));
-  const [editing, setEditing] = useState(false);
-  const [adding, setAdding] = useState<string | null>(null); // stage key | '__new__'
-  const [newColor, setNewColor] = useState(STAGE_PALETTE[0]);
-  const [hoverStage, setHoverStage] = useState<string | null>(null);
-  const [filterVals, setFilterVals] = useState<Record<string, string>>({ resp: 'Todos', origem: 'Todos', fonte: 'Todos', periodo: 'Últimos 30 dias' });
-  const [pop, setPop] = useState<{ kind: 'filter' | 'origens'; filterKey?: string; rect: DOMRect } | null>(null);
-  const [popPos, setPopPos] = useState({ left: -9999, top: -9999 });
+  const [optim, setOptim] = useState<Record<string, string>>({}); // id -> colunaId (otimista)
+  const [hover, setHover] = useState<string | null>(null);
   const dragId = useRef<string | null>(null);
-  const popRef = useRef<HTMLDivElement>(null);
-  // form drafts
-  const [af, setAf] = useState({ name: '', src: 'Sistema URA', chip: '', resp: 'Henrique' });
-  const [asName, setAsName] = useState('');
-  const [ed, setEd] = useState({ name: '', src: '', chip: '', resp: '', stage: '' });
-  const [orgNew, setOrgNew] = useState('');
+  const [menu, setMenu] = useState<{ kind: 'card' | 'col'; id: string } | null>(null);
 
-  const stageOf = (k: string) => stages.find((s) => s.key === k) || stages[0];
-  const leadOf = (id: string) => leads.find((l) => l.id === id) || leads[0];
-  const srcCls = (name: string) => sources.find((s) => s.name === name)?.cls || 'src-c1';
-  const current = leadOf(currentId);
+  // modal coluna
+  const [colModal, setColModal] = useState<{ mode: 'novo' | 'editar'; id?: string } | null>(null);
+  const [colForm, setColForm] = useState({ nome: '', cor: PALETTE[0] });
+  const [colBusy, setColBusy] = useState(false);
+  const [colErr, setColErr] = useState<string | null>(null);
+  // exclusão de coluna
+  const [delCol, setDelCol] = useState<KColuna | null>(null);
+  const [delDest, setDelDest] = useState('');
+  const [delBusy, setDelBusy] = useState(false);
+  // modal lead
+  const [leadModal, setLeadModal] = useState<{ mode: 'novo' | 'editar'; id?: string } | null>(null);
+  const [lf, setLf] = useState({ colunaId: '', contatoId: '', nome: '', telefone: '', respId: '', valor: '', origem: '', etiquetas: [] as string[], observacoes: '' });
+  const [leadBusy, setLeadBusy] = useState(false);
+  const [leadErr, setLeadErr] = useState<string | null>(null);
 
   useEffect(() => {
-    function onResize() { const mob = window.innerWidth < 1200; setIsMobile(mob); if (!mob) setDataOpen(true); }
-    window.addEventListener('resize', onResize); return () => window.removeEventListener('resize', onResize);
-  }, []);
-  useLayoutEffect(() => {
-    if (!pop || !popRef.current) return;
-    const el = popRef.current; const pw = el.offsetWidth; const r = pop.rect;
-    setPopPos({ left: Math.max(10, Math.min(r.left, window.innerWidth - pw - 10)), top: r.bottom + 6 });
-  }, [pop]);
-  useEffect(() => {
-    function onDoc(e: MouseEvent) { if (popRef.current?.contains(e.target as Node)) return; if ((e.target as HTMLElement).closest('.tb-filter,.tb-date,.tb-manage')) return; setPop(null); }
-    function onResize() { setPop(null); }
-    document.addEventListener('click', onDoc); window.addEventListener('resize', onResize);
-    return () => { document.removeEventListener('click', onDoc); window.removeEventListener('resize', onResize); };
-  }, []);
+    setOptim((m) => { const n: Record<string, string> = {}; for (const id in m) { const l = k.leads.find((x) => x.id === id); if (l && l.colunaId !== m[id]) n[id] = m[id]; } return n; });
+  }, [k.leads]);
+  useEffect(() => { function onDoc() { setMenu(null); } document.addEventListener('click', onDoc); return () => document.removeEventListener('click', onDoc); }, []);
 
-  function openDetail(id: string) { setCurrentId(id); setEditing(false); setDataOpen(true); }
-  function moveLead(id: string, to: string) {
-    setLeads((cur) => cur.map((l) => l.id === id ? { ...l, stage: to, won: to === 'fechado', ago: 'Agora' } : l));
-    setStages((cur) => { const from = leadOf(id).stage; if (from === to) return cur; return cur.map((s) => s.key === from ? { ...s, total: Math.max(0, s.total - 1) } : s.key === to ? { ...s, total: s.total + 1 } : s); });
-  }
-  function onDrop(to: string) {
-    const id = dragId.current; setHoverStage(null); if (!id) return;
-    const from = leadOf(id).stage;
-    if (from !== to) { moveLead(id, to); toast('Lead movido para "' + stageOf(to).name + '"'); }
-    dragId.current = null;
-  }
-  function addLead(stageKey: string) {
-    const id = 'l' + (++leadSeq);
-    const nl: Lead = { id, name: af.name.trim() || 'Novo lead', source: af.src, chip: af.chip.trim() || '(11) 90000-0000', resp: af.resp, ago: 'Agora', stage: stageKey, created: 'Hoje', lastAct: 'Hoje', won: stageKey === 'fechado', history: [] };
-    nl.history = genHistory(nl);
-    setLeads((c) => [...c, nl]);
-    setStages((c) => c.map((s) => s.key === stageKey ? { ...s, total: s.total + 1 } : s));
-    setAdding(null); setAf({ name: '', src: 'Sistema URA', chip: '', resp: 'Henrique' });
-    toast('Lead adicionado em "' + stageOf(stageKey).name + '"');
-  }
-  function createStage() {
-    const name = asName.trim() || 'Nova etapa';
-    setStages((c) => [...c, { key: 'st' + (++stageSeq) + '_' + Date.now(), name, color: newColor, total: 0 }]);
-    setAdding(null); setAsName(''); toast('Etapa "' + name + '" adicionada');
-  }
-  function removeStage(key: string) {
-    if (stages.length <= 1) { toast('Mantenha ao menos uma etapa'); return; }
-    const idx = stages.findIndex((s) => s.key === key); const removed = stages[idx];
-    const destKey = stages[idx === 0 ? 1 : 0].key; let moved = 0;
-    setLeads((c) => c.map((l) => { if (l.stage === key) { moved++; return { ...l, stage: destKey, won: destKey === 'fechado' }; } return l; }));
-    setStages((c) => c.filter((s) => s.key !== key));
-    toast('Etapa "' + removed.name + '" removida' + (moved ? ' · ' + moved + ' lead' + (moved > 1 ? 's' : '') + ' → "' + stageOf(destKey).name + '"' : ''));
-  }
-  function renameStage(key: string, name: string) { setStages((c) => c.map((s) => s.key === key ? { ...s, name } : s)); }
-  function saveEdit() {
-    const ns = ed.stage;
-    setLeads((c) => c.map((l) => l.id === currentId ? { ...l, name: ed.name.trim() || l.name, source: ed.src, chip: ed.chip.trim() || l.chip, resp: ed.resp, stage: ns, won: ns === 'fechado' } : l));
-    if (ns !== current.stage) setStages((c) => c.map((s) => s.key === current.stage ? { ...s, total: Math.max(0, s.total - 1) } : s.key === ns ? { ...s, total: s.total + 1 } : s));
-    setEditing(false); toast('Lead atualizado');
-  }
-  function startEdit() { setEd({ name: current.name, src: current.source, chip: current.chip, resp: current.resp, stage: current.stage }); setEditing(true); }
-  function pickFilter(key: string, val: string) {
-    setFilterVals((v) => ({ ...v, [key]: val }));
-    const label = key === 'periodo' ? 'Período' : FILTER_DEFS.find((f) => f.key === key)?.label || 'Filtro';
-    toast(label + ': ' + val); setPop(null);
-  }
-  function renameSource(id: string, nv: string) {
-    const src = sources.find((s) => s.id === id)!; const old = src.name; const v = nv.trim();
-    if (!v || v === old) return;
-    setLeads((c) => c.map((l) => l.source === old ? { ...l, source: v } : l));
-    setSources((c) => c.map((s) => s.id === id ? { ...s, name: v } : s));
-    toast('Origem renomeada para "' + v + '"');
-  }
-  function delSource(id: string) {
-    const src = sources.find((s) => s.id === id)!; const used = leads.filter((l) => l.source === src.name).length;
-    if (used > 0) { toast('Origem em uso por ' + used + ' lead' + (used > 1 ? 's' : '')); return; }
-    setSources((c) => c.filter((s) => s.id !== id)); toast('Origem removida');
-  }
-  function addSource() {
-    const v = orgNew.trim(); if (!v) return;
-    if (sources.some((s) => s.name === v)) { toast('Já existe uma origem com esse nome'); return; }
-    const ex = SRC_EXTRA[Math.max(0, sources.length - 3) % SRC_EXTRA.length];
-    setSources((c) => [...c, { id: 's' + Date.now(), name: v, cls: ex.cls, dot: ex.dot }]);
-    setOrgNew(''); toast('Origem "' + v + '" adicionada');
-  }
-
-  const rootCls = 'kanban-page' + (!dataOpen && !isMobile ? ' detail-collapsed' : '') + (dataOpen && isMobile ? ' drawer-open' : '');
   const term = search.trim().toLowerCase();
-  const s = stageOf(current.stage);
+  const matchBusca = (l: KLead) => !term || (l.nome + ' ' + l.telefone + ' ' + l.respNome + ' ' + l.etiquetas.join(' ')).toLowerCase().includes(term) || (term.replace(/\D/g, '').length >= 3 && (l.telefone || '').replace(/\D/g, '').includes(term.replace(/\D/g, '')));
+  const colunaDoLead = (l: KLead) => optim[l.id] ?? l.colunaId;
+  const leadsVisiveis = useMemo(() => k.leads.filter(matchBusca), [k.leads, term]); // eslint-disable-line
+  const porColuna = (colId: string) => leadsVisiveis.filter((l) => colunaDoLead(l) === colId).sort((a, b) => a.ordem - b.ordem);
+  const semResultado = term !== '' && leadsVisiveis.length === 0 && k.leads.length > 0;
 
-  if (WA_REAL) return (
-    <EmptyState
+  async function mover(id: string, colId: string) {
+    const lead = k.leads.find((l) => l.id === id); if (!lead || lead.colunaId === colId) return;
+    setOptim((m) => ({ ...m, [id]: colId }));
+    try { await k.moverLead(id, colId); toast('Lead movido'); }
+    catch (e) { setOptim((m) => { const n = { ...m }; delete n[id]; return n; }); toast('Falha ao mover: ' + (e as Error).message, 'warn'); }
+  }
+  function onDrop(colId: string) { const id = dragId.current; setHover(null); dragId.current = null; if (id) mover(id, colId); }
+
+  // ---- colunas ----
+  function abrirNovaColuna() { setColForm({ nome: '', cor: PALETTE[0] }); setColErr(null); setColModal({ mode: 'novo' }); }
+  function abrirEditarColuna(c: KColuna) { setColForm({ nome: c.nome, cor: c.cor }); setColErr(null); setColModal({ mode: 'editar', id: c.id }); setMenu(null); }
+  async function salvarColuna() {
+    if (colBusy) return; const nome = colForm.nome.trim();
+    if (!nome) { setColErr('Informe o nome da coluna.'); return; }
+    setColBusy(true); setColErr(null);
+    try { if (colModal!.mode === 'novo') await k.criarColuna({ nome, cor: colForm.cor }); else await k.editarColuna({ id: colModal!.id!, nome, cor: colForm.cor }); setColModal(null); toast(colModal!.mode === 'novo' ? 'Coluna criada' : 'Coluna atualizada'); }
+    catch (e) { setColErr('Não foi possível salvar: ' + (e as Error).message); }
+    finally { setColBusy(false); }
+  }
+  function pedirExcluirColuna(c: KColuna) {
+    setMenu(null);
+    if (k.colunas.length <= 1) { toast('O funil precisa de ao menos uma coluna ativa.', 'warn'); return; }
+    setDelDest(k.colunas.find((x) => x.id !== c.id)?.id || ''); setDelCol(c);
+  }
+  async function confirmarExcluirColuna() {
+    if (!delCol || delBusy) return;
+    const temLeads = k.leads.some((l) => colunaDoLead(l) === delCol.id);
+    if (temLeads && !delDest) { toast('Escolha a coluna de destino dos leads.', 'warn'); return; }
+    setDelBusy(true);
+    try { await k.excluirColuna(delCol.id, temLeads ? delDest : null); toast('Coluna excluída'); setDelCol(null); }
+    catch (e) { toast('Falha ao excluir: ' + (e as Error).message, 'warn'); }
+    finally { setDelBusy(false); }
+  }
+
+  // ---- leads ----
+  function abrirNovoLead(colunaId?: string) { setLf({ colunaId: colunaId || k.colunas[0]?.id || '', contatoId: '', nome: '', telefone: '', respId: '', valor: '', origem: 'Manual', etiquetas: [], observacoes: '' }); setLeadErr(null); setLeadModal({ mode: 'novo' }); }
+  function abrirEditarLead(l: KLead) { setLf({ colunaId: l.colunaId || '', contatoId: l.contatoId || '', nome: l.nome, telefone: l.telefone, respId: l.respId || '', valor: l.valor != null ? String(l.valor) : '', origem: l.origem, etiquetas: [...l.etiquetas], observacoes: l.observacoes }); setLeadErr(null); setLeadModal({ mode: 'editar', id: l.id }); setMenu(null); }
+  function onPickContato(id: string) { const c = contatos.find((x) => x.id === id); setLf((f) => ({ ...f, contatoId: id, nome: id ? (c?.nome || f.nome) : f.nome, telefone: id ? (c?.tel || f.telefone) : f.telefone })); }
+  async function salvarLead() {
+    if (leadBusy) return; const nome = lf.nome.trim();
+    if (!nome) { setLeadErr('Informe o nome do lead.'); return; }
+    if (!lf.colunaId) { setLeadErr('Selecione a coluna.'); return; }
+    const valorNum = lf.valor.trim() ? Number(lf.valor.replace(/\./g, '').replace(',', '.')) : null;
+    if (lf.valor.trim() && (valorNum == null || Number.isNaN(valorNum))) { setLeadErr('Valor inválido.'); return; }
+    setLeadBusy(true); setLeadErr(null);
+    try {
+      if (leadModal!.mode === 'novo') await k.criarLead({ colunaId: lf.colunaId, contatoId: lf.contatoId || null, nome, telefone: lf.telefone, responsavelId: lf.respId || null, valor: valorNum, origem: lf.origem, etiquetas: lf.etiquetas, observacoes: lf.observacoes });
+      else await k.editarLead({ id: leadModal!.id!, nome, telefone: lf.telefone || null, responsavelId: lf.respId || null, valor: valorNum, origem: lf.origem || null, etiquetas: lf.etiquetas, observacoes: lf.observacoes || null, colunaId: lf.colunaId });
+      setLeadModal(null); toast(leadModal!.mode === 'novo' ? 'Lead criado' : 'Lead atualizado');
+    } catch (e) { setLeadErr('Não foi possível salvar o lead: ' + (e as Error).message); }
+    finally { setLeadBusy(false); }
+  }
+  async function arquivar(l: KLead) { setMenu(null); try { await k.arquivarLead(l.id); toast('Lead arquivado'); } catch (e) { toast('Falha ao arquivar: ' + (e as Error).message, 'warn'); } }
+  function toggleEtq(t: string) { setLf((f) => ({ ...f, etiquetas: f.etiquetas.includes(t) ? f.etiquetas.filter((x) => x !== t) : [...f.etiquetas, t] })); }
+
+  // ---- estados ----
+  if (k.loading) return <div className="kanban-page"><div className="kb-info">Carregando funil…</div></div>;
+  if (k.isError) return <div className="kanban-page"><div className="kb-info error">Erro ao carregar o funil: {k.error?.message}</div></div>;
+  if (k.colunas.length === 0) return (
+    <div className="kanban-page"><EmptyState
       icon={<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="5" height="16" rx="1.3" /><rect x="10" y="4" width="5" height="11" rx="1.3" /><rect x="17" y="4" width="4" height="14" rx="1.3" /></svg>}
       title="Seu funil está vazio"
-      text="Os leads aparecem aqui automaticamente conforme chegam pelos canais conectados (WhatsApp, Facebook). Conecte um canal em Integrações para começar."
-    />
+      text="Crie a primeira coluna para começar a organizar seus leads."
+      action={podeConfig ? <button className="btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }} onClick={abrirNovaColuna}>{IC.plus}Criar primeira coluna</button> : <span style={{ color: 'var(--muted)' }}>Peça a um administrador para configurar o funil.</span>}
+    /></div>
   );
 
   return (
-    <div className={rootCls}>
+    <div className="kanban-page">
       <main className="col-main">
         <div className="toolbar">
-          <div className="tb-search">{IC.search}<input type="text" placeholder="Buscar leads..." value={search} onChange={(e) => setSearch(e.target.value)} /></div>
-          {FILTER_DEFS.map((f) => (
-            <button key={f.key} className="tb-filter" onClick={(e) => { e.stopPropagation(); setPop((p) => p?.kind === 'filter' && p.filterKey === f.key ? null : { kind: 'filter', filterKey: f.key, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() }); }}>
-              <span className="tbf-label">{f.label}</span><span className="tbf-val"><span className="fval">{filterVals[f.key]}</span><span className="chev">{IC.chev}</span></span>
-            </button>
-          ))}
-          <button className="tb-date" onClick={(e) => { e.stopPropagation(); setPop((p) => p?.kind === 'filter' && p.filterKey === 'periodo' ? null : { kind: 'filter', filterKey: 'periodo', rect: (e.currentTarget as HTMLElement).getBoundingClientRect() }); }}>{IC.cal}<span className="fval">{filterVals.periodo}</span></button>
-          <button className="tb-manage" title="Gerenciar origens" onClick={(e) => { e.stopPropagation(); setPop((p) => p?.kind === 'origens' ? null : { kind: 'origens', rect: (e.currentTarget as HTMLElement).getBoundingClientRect() }); }}>{IC.manage}Origens</button>
+          <div className="tb-search">{IC.search}<input type="text" aria-label="Buscar leads" placeholder="Buscar por nome, telefone, responsável ou etiqueta..." value={search} onChange={(e) => setSearch(e.target.value)} /></div>
+          <span className="tb-spacer" />
+          {podeConfig && <button className="btn-ghost" onClick={abrirNovaColuna}>{IC.plus}Nova coluna</button>}
+          <button className="btn-primary" onClick={() => abrirNovoLead()}>{IC.plus}Novo lead</button>
         </div>
 
-        <div className="summary">
-          {stages.map((st) => (
-            <div className="sum-card" key={st.key}><div className="sum-top"><span className="dot" style={{ background: st.color }} />{st.name}</div><div className="sum-num">{st.total}<small>Leads</small></div></div>
-          ))}
-        </div>
+        {semResultado && <div className="kb-info">Nenhum lead encontrado para “{search}”.</div>}
 
         <div className="board-scroll">
           <div className="board">
-            {stages.map((st) => {
-              const cards = leads.filter((l) => l.stage === st.key && (!term || l.name.toLowerCase().indexOf(term) !== -1));
+            {k.colunas.map((col) => {
+              const cards = porColuna(col.id);
+              const totalCount = k.leads.filter((l) => colunaDoLead(l) === col.id).length;
+              const soma = k.leads.filter((l) => colunaDoLead(l) === col.id).reduce((s, l) => s + (l.valor || 0), 0);
               return (
-                <div className="column" key={st.key}>
+                <div className="column" key={col.id}>
                   <div className="col-head">
-                    <span className="dot" style={{ background: st.color }} />
-                    <input className="col-name" value={st.name} title="Clique para renomear" onMouseDown={(e) => e.stopPropagation()} onChange={(e) => renameStage(st.key, e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} onBlur={(e) => { if (e.target.value.trim()) toast('Coluna renomeada para "' + e.target.value.trim() + '"'); }} />
-                    <button className="col-rename" title="Renomear etapa" onClick={(e) => { (e.currentTarget.parentElement?.querySelector('.col-name') as HTMLInputElement)?.select(); }}>{IC.edit}</button>
-                    <button className="col-remove" title="Remover etapa" onClick={() => removeStage(st.key)}>{IC.trash}</button>
-                    <span className="col-count">{st.total}</span>
-                  </div>
-                  <div className={'col-body' + (hoverStage === st.key ? ' drop-hover' : '')}
-                    onDragOver={(e) => { e.preventDefault(); setHoverStage(st.key); }} onDragLeave={() => setHoverStage((h) => h === st.key ? null : h)} onDrop={() => onDrop(st.key)}>
-                    {cards.map((l) => (
-                      <div key={l.id} className={'lead-card' + (l.id === currentId ? ' active' : '')} draggable onClick={() => openDetail(l.id)}
-                        onDragStart={(e) => { dragId.current = l.id; try { e.dataTransfer.effectAllowed = 'move'; } catch { /* */ } }} onDragEnd={() => { dragId.current = null; setHoverStage(null); }}>
-                        <div className="lc-top"><Av n={l.name} /><div className="lc-id"><div className="lc-name">{l.name}</div><span className={'src-badge ' + srcCls(l.source)}>{l.source}</span></div></div>
-                        <div className="lc-line wa">{IC.wa}Chip {l.chip}</div>
-                        <div className="lc-line">{IC.user}{l.resp}</div>
-                        {l.etiquetas && l.etiquetas.length > 0 && (
-                          <div className="lc-tags">{l.etiquetas.map((t) => { const cor = corDaEtiqueta(t, etiquetas); return <span key={t} className="lc-tag" style={{ background: cor + '22', color: cor, borderColor: cor + '55' }}>{t}</span>; })}</div>
+                    <span className="dot" style={{ background: col.cor }} />
+                    <div className="col-htxt"><span className="col-name-st">{col.nome}</span><span className="col-metric">{totalCount} {totalCount === 1 ? 'lead' : 'leads'}{soma > 0 ? ' · ' + fmtBRL(soma) : ''}</span></div>
+                    {podeConfig && (
+                      <div className="col-menu-wrap">
+                        <button className="col-mbtn" aria-label={'Ações da coluna ' + col.nome} onClick={(e) => { e.stopPropagation(); setMenu(menu?.kind === 'col' && menu.id === col.id ? null : { kind: 'col', id: col.id }); }}>{IC.dots}</button>
+                        {menu?.kind === 'col' && menu.id === col.id && (
+                          <div className="kb-menu" onClick={(e) => e.stopPropagation()} role="menu">
+                            <button className="pop-item" role="menuitem" onClick={() => abrirEditarColuna(col)}>Renomear / cor</button>
+                            <button className="pop-item danger" role="menuitem" onClick={() => pedirExcluirColuna(col)}>Excluir</button>
+                          </div>
                         )}
-                        <div className="lc-foot">{IC.clock}{l.ago}{l.won && <span className="won">{IC.check}Ganho</span>}</div>
                       </div>
-                    ))}
-                    {adding === st.key ? (
-                      <div className="add-form">
-                        <div className="mini-field"><div className="mini-label">Nome</div><input value={af.name} onChange={(e) => setAf({ ...af, name: e.target.value })} placeholder="Nome do lead" autoFocus /></div>
-                        <div className="mini-field"><div className="mini-label">Origem</div><select value={af.src} onChange={(e) => setAf({ ...af, src: e.target.value })}>{sources.map((o) => <option key={o.id}>{o.name}</option>)}</select></div>
-                        <div className="mini-field"><div className="mini-label">Chip / Telefone</div><input value={af.chip} onChange={(e) => setAf({ ...af, chip: e.target.value })} placeholder="(11) 90000-0000" /></div>
-                        <div className="mini-field"><div className="mini-label">Responsável</div><select value={af.resp} onChange={(e) => setAf({ ...af, resp: e.target.value })}>{RESP.map((r) => <option key={r}>{r}</option>)}</select></div>
-                        <div className="form-actions"><button className="btn-primary" onClick={() => addLead(st.key)}>Adicionar</button><button className="btn-ghost" onClick={() => setAdding(null)}>Cancelar</button></div>
-                      </div>
-                    ) : (
-                      <button className="add-lead" onClick={(e) => { e.stopPropagation(); setAf({ name: '', src: sources[0]?.name || '', chip: '', resp: 'Henrique' }); setAdding(st.key); }}>{IC.plus}Adicionar lead</button>
                     )}
+                  </div>
+                  <div className={'col-body' + (hover === col.id ? ' drop-hover' : '')}
+                    onDragOver={(e) => { e.preventDefault(); setHover(col.id); }} onDragLeave={() => setHover((h) => h === col.id ? null : h)} onDrop={() => onDrop(col.id)}>
+                    {cards.map((l) => {
+                      const moving = optim[l.id] !== undefined;
+                      return (
+                        <div key={l.id} className={'lead-card' + (moving ? ' moving' : '')} draggable onClick={() => abrirEditarLead(l)}
+                          onDragStart={(e) => { dragId.current = l.id; try { e.dataTransfer.effectAllowed = 'move'; } catch { /* */ } }} onDragEnd={() => { dragId.current = null; setHover(null); }}>
+                          <div className="lc-top">
+                            <Av n={l.nome} />
+                            <div className="lc-id"><div className="lc-name" title={l.nome}>{l.nome}</div>{l.origem && <span className="src-badge">{l.origem}</span>}</div>
+                            {l.valor != null && <span className="lc-valor">{fmtBRL(l.valor)}</span>}
+                            <div className="col-menu-wrap">
+                              <button className="lc-mbtn" aria-label={'Ações do lead ' + l.nome} onClick={(e) => { e.stopPropagation(); setMenu(menu?.kind === 'card' && menu.id === l.id ? null : { kind: 'card', id: l.id }); }}>{IC.dots}</button>
+                              {menu?.kind === 'card' && menu.id === l.id && (
+                                <div className="kb-menu" onClick={(e) => e.stopPropagation()} role="menu">
+                                  <button className="pop-item" role="menuitem" onClick={() => abrirEditarLead(l)}>Editar</button>
+                                  <div className="kb-menu-sep">Mover para</div>
+                                  {k.colunas.filter((c) => c.id !== colunaDoLead(l)).map((c) => <button key={c.id} className="pop-item" role="menuitem" onClick={() => { setMenu(null); mover(l.id, c.id); }}><span className="dot" style={{ background: c.cor }} />{c.nome}</button>)}
+                                  <button className="pop-item danger" role="menuitem" onClick={() => arquivar(l)}>Arquivar</button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          {l.telefone && <div className="lc-line">{IC.user}{l.respNome || 'Sem responsável'}</div>}
+                          {l.etiquetas.length > 0 && <div className="lc-tags">{l.etiquetas.slice(0, 3).map((t) => { const cor = corDaEtiqueta(t, etiquetas); return <span key={t} className="lc-tag" title={t} style={{ background: cor + '22', color: cor, borderColor: cor + '55' }}>{t}</span>; })}{l.etiquetas.length > 3 && <span className="lc-tag more">+{l.etiquetas.length - 3}</span>}</div>}
+                          <div className="lc-foot">{IC.clock}{haDe(l.atualizadoEm || l.criadoEm)}</div>
+                        </div>
+                      );
+                    })}
+                    {cards.length === 0 && <div className="col-empty">Sem leads</div>}
+                    <button className="add-lead" onClick={(e) => { e.stopPropagation(); abrirNovoLead(col.id); }}>{IC.plus}Adicionar lead</button>
                   </div>
                 </div>
               );
             })}
-            <div className="column ghost-col">
-              {adding === '__new__' ? (
-                <div className="add-stage-form">
-                  <div className="mini-field"><div className="mini-label">Nome da etapa</div><input value={asName} onChange={(e) => setAsName(e.target.value)} placeholder="Ex.: Pós-venda" autoFocus /></div>
-                  <div className="mini-field"><div className="mini-label">Cor</div><div className="swatches">{STAGE_PALETTE.map((c) => <button key={c} className={'swatch' + (c === newColor ? ' sel' : '')} style={{ background: c }} onClick={(e) => { e.preventDefault(); setNewColor(c); }} />)}</div></div>
-                  <div className="form-actions"><button className="btn-primary" onClick={createStage}>Adicionar</button><button className="btn-ghost" onClick={() => setAdding(null)}>Cancelar</button></div>
-                </div>
-              ) : (
-                <button className="add-stage" onClick={(e) => { e.stopPropagation(); setNewColor(STAGE_PALETTE[0]); setAdding('__new__'); }}>{IC.plus}Adicionar etapa</button>
-              )}
-            </div>
+            {podeConfig && (
+              <div className="column ghost-col"><button className="add-stage" onClick={abrirNovaColuna}>{IC.plus}Nova coluna</button></div>
+            )}
           </div>
         </div>
       </main>
 
-      {/* DETALHE */}
-      <aside className="detail-col">
-        <div className="detail-head">
-          <button className="close-btn" aria-label="Fechar" onClick={() => setDataOpen(false)}>{IC.close}</button>
-          <button className="edit-detail-btn" title="Editar lead" onClick={() => editing ? setEditing(false) : startEdit()}>{IC.edit}</button>
-          <div className="dh-top"><Av n={current.name} /><div><div className="dh-name">{current.name}<span className={'src-inline ' + srcCls(current.source)}>{current.source}</span></div><div className="dh-chip">{IC.wa}Chip {current.chip}</div></div></div>
+      {/* modal coluna */}
+      <Modal open={!!colModal} onClose={() => { if (!colBusy) setColModal(null); }} closeOnBackdrop={!colBusy} width={420}
+        title={colModal?.mode === 'novo' ? 'Nova coluna' : 'Editar coluna'}
+        footer={<><button className="atv-btn" disabled={colBusy} onClick={() => setColModal(null)}>Cancelar</button><button className="atv-btn primary" disabled={colBusy} onClick={salvarColuna}>{colBusy ? 'Salvando…' : (colModal?.mode === 'novo' ? 'Criar coluna' : 'Salvar')}</button></>}>
+        <div className="kb-form">
+          <div className="kb-field"><label className="kb-label">Nome da coluna</label><input className="atv-input" placeholder="Ex.: Proposta enviada" value={colForm.nome} onChange={(e) => setColForm({ ...colForm, nome: e.target.value })} disabled={colBusy} /></div>
+          <div className="kb-field"><label className="kb-label">Cor</label><div className="kb-swatches">{PALETTE.map((c) => <button key={c} type="button" aria-label={'Cor ' + c} className={'kb-swatch' + (c === colForm.cor ? ' sel' : '')} style={{ background: c }} onClick={() => setColForm({ ...colForm, cor: c })} disabled={colBusy} />)}</div></div>
+          {colErr && <div className="kb-err">{colErr}</div>}
         </div>
-        {editing ? (
-          <div className="detail-body">
-            <h4 className="det-title">Editar lead</h4>
-            <div className="mini-field"><div className="mini-label">Nome</div><input value={ed.name} onChange={(e) => setEd({ ...ed, name: e.target.value })} /></div>
-            <div className="mini-field" style={{ marginTop: 11 }}><div className="mini-label">Origem</div><select value={ed.src} onChange={(e) => setEd({ ...ed, src: e.target.value })}>{sources.map((o) => <option key={o.id}>{o.name}</option>)}</select></div>
-            <div className="mini-field" style={{ marginTop: 11 }}><div className="mini-label">Chip / Telefone</div><input value={ed.chip} onChange={(e) => setEd({ ...ed, chip: e.target.value })} /></div>
-            <div className="mini-field" style={{ marginTop: 11 }}><div className="mini-label">Responsável</div><select value={ed.resp} onChange={(e) => setEd({ ...ed, resp: e.target.value })}>{RESP.map((r) => <option key={r}>{r}</option>)}</select></div>
-            <div className="mini-field" style={{ marginTop: 11 }}><div className="mini-label">Etapa</div><select value={ed.stage} onChange={(e) => setEd({ ...ed, stage: e.target.value })}>{stages.map((st) => <option key={st.key} value={st.key}>{st.name}</option>)}</select></div>
-            <div className="form-actions" style={{ marginTop: 15 }}><button className="btn-primary" onClick={saveEdit}>Salvar</button><button className="btn-ghost" onClick={() => setEditing(false)}>Cancelar</button></div>
-          </div>
-        ) : (
-          <div className="detail-body">
-            <h4 className="det-title">Detalhes do lead</h4>
-            <div className="det-row"><span className="dk">{IC.wa}Canal</span><span className="dv">WhatsApp</span></div>
-            <div className="det-row"><span className="dk">{IC.tag}Origem do lead</span><span className="dv"><span className={'src-inline ' + srcCls(current.source)}>{current.source}</span></span></div>
-            <div className="det-row"><span className="dk">{IC.chip}Chip de entrada</span><span className="dv">{current.chip}</span></div>
-            <div className="det-row"><span className="dk">{IC.user}Responsável</span><span className="dv"><Av n={current.resp} cls="xs" />{current.resp}</span></div>
-            <div className="det-row"><span className="dk">{IC.flag}Status atual</span><span className="dv"><span className="badge-soft" style={{ background: softColor(s.color), color: s.color }}>{s.name}</span></span></div>
-            {current.etiquetas && current.etiquetas.length > 0 && (
-              <div className="det-row"><span className="dk">{IC.tag}Etiquetas</span><span className="dv"><span className="lc-tags">{current.etiquetas.map((t) => { const cor = corDaEtiqueta(t, etiquetas); return <span key={t} className="lc-tag" style={{ background: cor + '22', color: cor, borderColor: cor + '55' }}>{t}</span>; })}</span></span></div>
-            )}
-            <div className="det-row"><span className="dk">{IC.cal}Data de criação</span><span className="dv">{current.created}</span></div>
-            <div className="det-row"><span className="dk">{IC.clock}Última atividade</span><span className="dv">{current.lastAct}</span></div>
-            <div className="info-box">{IC.info}{current.source === 'Sistema URA' ? 'Este chip está mapeado e recebe leads automaticamente pelo Sistema URA.' : 'Lead captado por tráfego pago (' + current.source + ').'}</div>
-            <div className="det-sep" />
-            <h4 className="det-title">Histórico de atividades</h4>
-            <div className="timeline">
-              {current.history.map((h, i) => (
-                <div className="tl-item" key={i}><span className="tl-ic" style={{ background: h.bg }}>{histIc[h.ic]}</span><div className="tl-title"><span className="tl-date">{h.date}</span>{h.title}</div><div className="tl-detail">{h.detail}</div></div>
-              ))}
-            </div>
-            <button className="act-all" onClick={() => toast('Abrindo todas as atividades')}>Ver todas as atividades</button>
-          </div>
-        )}
-      </aside>
+      </Modal>
 
-      <button className="reopen" aria-label="Abrir detalhe" onClick={() => setDataOpen(true)}>{IC.chevL}</button>
-      <div className="drawer-overlay" onClick={() => setDataOpen(false)} />
-
-      {pop && (
-        <div ref={popRef} className={'pop' + (pop.kind === 'origens' ? ' pop-org' : '')} style={{ left: popPos.left, top: popPos.top, minWidth: pop.kind === 'filter' ? pop.rect.width : undefined }}>
-          {pop.kind === 'filter' && pop.filterKey && FILTERS[pop.filterKey].map((o) => (
-            <button key={o} className={'pop-item' + (filterVals[pop.filterKey!] === o ? ' sel' : '')} onClick={() => pickFilter(pop.filterKey!, o)}>{o}<span className="ck">{IC.check}</span></button>
-          ))}
-          {pop.kind === 'origens' && (<>
-            <div className="pop-head">Gerenciar origens</div>
-            {sources.map((o) => (
-              <div className="org-row" key={o.id}><span className="org-dot" style={{ background: o.dot }} /><input className="org-name" defaultValue={o.name} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} onBlur={(e) => renameSource(o.id, e.target.value)} /><button className="org-del" title="Remover" onClick={() => delSource(o.id)}>{IC.close}</button></div>
-            ))}
-            <div className="org-add"><input placeholder="Nova origem" value={orgNew} onChange={(e) => setOrgNew(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addSource(); } }} /><button className="btn-primary" style={{ flex: 'none', padding: '0 14px' }} onClick={addSource}>Adicionar</button></div>
-          </>)}
+      {/* modal excluir coluna */}
+      <Modal open={!!delCol} onClose={() => { if (!delBusy) setDelCol(null); }} closeOnBackdrop={!delBusy} width={440}
+        title="Excluir coluna"
+        footer={<><button className="atv-btn" disabled={delBusy} onClick={() => setDelCol(null)}>Cancelar</button><button className="atv-btn danger" disabled={delBusy} onClick={confirmarExcluirColuna}>{delBusy ? 'Excluindo…' : 'Excluir coluna'}</button></>}>
+        <div className="kb-form">
+          {delCol && k.leads.some((l) => colunaDoLead(l) === delCol.id) ? (
+            <>
+              <div className="atv-modal-msg">Esta coluna possui leads. Escolha para qual coluna eles devem ser movidos antes de excluir.</div>
+              <div className="kb-field"><label className="kb-label">Mover leads para</label><select className="atv-input" value={delDest} onChange={(e) => setDelDest(e.target.value)} disabled={delBusy}>{k.colunas.filter((c) => c.id !== delCol.id).map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}</select></div>
+            </>
+          ) : <div className="atv-modal-msg">Excluir a coluna <strong>{delCol?.nome}</strong>?</div>}
         </div>
-      )}
+      </Modal>
+
+      {/* modal lead */}
+      <Modal open={!!leadModal} onClose={() => { if (!leadBusy) setLeadModal(null); }} closeOnBackdrop={!leadBusy} width={560}
+        title={<div><div>{leadModal?.mode === 'novo' ? 'Novo lead' : 'Editar lead'}</div><div className="kb-modal-sub">{leadModal?.mode === 'novo' ? 'Adicione um lead ao funil.' : 'Atualize os dados do lead.'}</div></div>}
+        footer={<><button className="atv-btn" disabled={leadBusy} onClick={() => setLeadModal(null)}>Cancelar</button><button className="atv-btn primary" disabled={leadBusy} onClick={salvarLead}>{leadBusy ? 'Salvando…' : (leadModal?.mode === 'novo' ? 'Criar lead' : 'Salvar')}</button></>}>
+        <div className="kb-form">
+          {leadModal?.mode === 'novo' && (
+            <div className="kb-field"><label className="kb-label">Contato existente (opcional)</label><select className="atv-input" value={lf.contatoId} onChange={(e) => onPickContato(e.target.value)} disabled={leadBusy}><option value="">Novo / sem vínculo</option>{contatos.map((c) => <option key={c.id} value={c.id}>{c.nome}{c.tel ? ' · ' + c.tel : ''}</option>)}</select></div>
+          )}
+          <div className="kb-field"><label className="kb-label">Nome *</label><input className="atv-input" placeholder="Nome do lead/contato" value={lf.nome} onChange={(e) => setLf({ ...lf, nome: e.target.value })} disabled={leadBusy} /></div>
+          <div className="kb-row">
+            <div className="kb-field"><label className="kb-label">Telefone</label><input className="atv-input" inputMode="tel" placeholder="(11) 99999-9999" value={lf.telefone} onChange={(e) => setLf({ ...lf, telefone: e.target.value })} disabled={leadBusy} /></div>
+            <div className="kb-field"><label className="kb-label">Valor estimado (R$)</label><input className="atv-input" inputMode="decimal" placeholder="0,00" value={lf.valor} onChange={(e) => setLf({ ...lf, valor: e.target.value })} disabled={leadBusy} /></div>
+          </div>
+          <div className="kb-row">
+            <div className="kb-field"><label className="kb-label">Coluna</label><select className="atv-input" value={lf.colunaId} onChange={(e) => setLf({ ...lf, colunaId: e.target.value })} disabled={leadBusy}>{k.colunas.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}</select></div>
+            <div className="kb-field"><label className="kb-label">Responsável</label><select className="atv-input" value={lf.respId} onChange={(e) => setLf({ ...lf, respId: e.target.value })} disabled={leadBusy}><option value="">Não atribuído</option>{usuarios.map((u) => <option key={u.id} value={u.id}>{u.nome}</option>)}</select></div>
+          </div>
+          <div className="kb-field"><label className="kb-label">Origem</label><input className="atv-input" placeholder="Ex.: Manual, Indicação…" value={lf.origem} onChange={(e) => setLf({ ...lf, origem: e.target.value })} disabled={leadBusy} /></div>
+          <div className="kb-field"><label className="kb-label">Etiquetas</label><div className="kb-tags">{etiquetas.length === 0 ? <span className="kb-empty">Nenhuma etiqueta</span> : etiquetas.map((e) => { const on = lf.etiquetas.includes(e.nome); return <button key={e.id} type="button" className={'kb-tag' + (on ? ' on' : '')} style={on ? { background: e.cor + '22', color: e.cor, borderColor: e.cor + '66' } : undefined} onClick={() => toggleEtq(e.nome)} disabled={leadBusy}>{e.nome}</button>; })}</div></div>
+          <div className="kb-field"><label className="kb-label">Observações</label><textarea className="atv-input kb-textarea" rows={2} placeholder="Observações internas do lead." value={lf.observacoes} onChange={(e) => setLf({ ...lf, observacoes: e.target.value })} disabled={leadBusy} /></div>
+          {leadErr && <div className="kb-err">{leadErr}</div>}
+        </div>
+      </Modal>
     </div>
   );
 }
