@@ -4,7 +4,7 @@ import { useToast } from '@/hooks/useToast';
 import { useAuth } from '@/context/AuthContext';
 import { useOrg } from '@/context/OrgContext';
 import { WA_CONTACTS, initials, avatarColor, type WaContact, type WaMessage } from '@/data/whatsappDemo';
-import { useWaConversations, useSendWaMessage, useWaCanais, useAtribuirAtendimento, mascararNumero, subirMidiaWa, urlAssinadaMidiaWa, WA_REAL } from '@/data/whatsapp';
+import { useWaConversations, useSendWaMessage, useWaCanais, useAtribuirAtendimento, useIniciarConversaWa, normalizeWaPhone, mascararNumero, subirMidiaWa, urlAssinadaMidiaWa, WA_REAL } from '@/data/whatsapp';
 import { MediaComposer } from '@/components/MediaComposer';
 import { AudioRecorder } from '@/components/AudioRecorder';
 import { AudioMessage } from '@/components/AudioMessage';
@@ -160,6 +160,14 @@ export function WhatsApp() {
   const [lightbox, setLightbox] = useState<string | null>(null);         // imagem ampliada no histórico
   const [replyChip, setReplyChip] = useState('Chip 1');       // modo mock
   const [replyCanalId, setReplyCanalId] = useState<string>(''); // modo real
+  // Nova conversa (modal)
+  const [novoOpen, setNovoOpen] = useState(false);
+  const [novoCanal, setNovoCanal] = useState('');
+  const [novoTel, setNovoTel] = useState('');
+  const [novoNome, setNovoNome] = useState('');
+  const [novoBusy, setNovoBusy] = useState(false);
+  const [novoErr, setNovoErr] = useState<string | null>(null);
+  const iniciarMut = useIniciarConversaWa();
   const [draft, setDraft] = useState('');
   const [dataOpen, setDataOpen] = useState(() => (typeof window !== 'undefined' ? window.innerWidth >= 1200 : true));
   const [isMobile, setIsMobile] = useState(() => (typeof window !== 'undefined' ? window.innerWidth < 1200 : false));
@@ -425,6 +433,34 @@ export function WhatsApp() {
     catch (e) { setContacts((cur) => cur.map((c) => c.id === current.id ? { ...c, respId: esperado } : c)); toast((e as Error).message || 'Falha ao assumir', 'warn'); }
     finally { setAtribuindo(false); }
   }
+  /** Abre o modal de Nova conversa, pré-selecionando um canal conectado (o de resposta, se houver). */
+  function abrirNovaConversa() {
+    const conectados = realCanais.filter((c) => c.status === 'conectado');
+    setNovoErr(null); setNovoTel(''); setNovoNome('');
+    setNovoCanal(conectados.length ? (conectados.find((c) => c.id === replyCanalId)?.id ?? conectados[0].id) : '');
+    setNovoOpen(true);
+  }
+  /** Confirma: localiza/cria contato+conversa, abre a conversa e foca o compositor (sem enviar nada). */
+  async function iniciarNovaConversa() {
+    if (novoBusy) return;
+    const conectados = realCanais.filter((c) => c.status === 'conectado');
+    if (!conectados.length || !novoCanal) { setNovoErr('Selecione um WhatsApp conectado.'); return; }
+    if (!normalizeWaPhone(novoTel)) { setNovoErr('Informe um telefone válido.'); return; }
+    setNovoBusy(true); setNovoErr(null);
+    try {
+      const r = await iniciarMut.mutateAsync({ canalId: novoCanal, telefone: novoTel, nome: novoNome });
+      await live.refetch();
+      setReplyCanalId(novoCanal);
+      setCurrentId(r.conversaId);
+      setNovoOpen(false);
+      if (r.reused) toast('Conversa existente aberta.');
+      setTimeout(() => taRef.current?.focus(), 60);
+    } catch (e) {
+      setNovoErr((e as Error).message || 'Não foi possível iniciar a conversa.');
+    } finally {
+      setNovoBusy(false);
+    }
+  }
   function abrirTransferir() { setPop(null); setTransferSel(''); setTransferBusca(''); setTransferOpen(true); }
   /** Transferir o atendimento para outro usuário ativo da organização. */
   async function transferir(destinoId: string) {
@@ -549,7 +585,7 @@ export function WhatsApp() {
           <div className="lh-top">
             <span className="wa-badge"><IcWa /></span>
             <div><div className="lh-title">WhatsApp</div><div className="lh-sub">Central de Atendimento</div></div>
-            <button className="filter-btn lh-new" title="Nova conversa" aria-label="Nova conversa" onClick={() => toast('Nova conversa estará disponível em breve.')}><IcNewChat /></button>
+            <button className="filter-btn lh-new" title="Nova conversa" aria-label="Nova conversa" onClick={abrirNovaConversa}><IcNewChat /></button>
           </div>
           <div className="search-row">
             <div className="search">
@@ -996,6 +1032,33 @@ export function WhatsApp() {
 
       <MediaComposer open={imgModal} tipo="imagem" previewCard onClose={() => setImgModal(false)} enviar={enviarImagem} />
       <MediaComposer open={docModal} tipo="documento" onClose={() => setDocModal(false)} enviar={enviarDocumento} />
+
+      <Modal open={novoOpen} onClose={() => { if (!novoBusy) setNovoOpen(false); }} title="Nova conversa" width={420} closeOnBackdrop={!novoBusy}
+        footer={<>
+          <button className="atv-btn" disabled={novoBusy} onClick={() => setNovoOpen(false)}>Cancelar</button>
+          <button className="atv-btn primary" disabled={novoBusy || !realCanais.some((c) => c.status === 'conectado')} onClick={iniciarNovaConversa}>{novoBusy ? 'Iniciando…' : 'Iniciar conversa'}</button>
+        </>}>
+        {realCanais.some((c) => c.status === 'conectado') ? (
+          <div className="nc-form">
+            <label className="nc-field"><span className="nc-label">WhatsApp</span>
+              <select className="atv-input" value={novoCanal} onChange={(e) => setNovoCanal(e.target.value)} disabled={novoBusy}>
+                {realCanais.filter((c) => c.status === 'conectado').map((c) => (
+                  <option key={c.id} value={c.id}>{c.alias}{c.numero ? ' · ' + mascararNumero(c.numero) : ''}</option>
+                ))}
+              </select>
+            </label>
+            <label className="nc-field"><span className="nc-label">Telefone</span>
+              <input className="atv-input" inputMode="tel" placeholder="(11) 99999-8888" value={novoTel} onChange={(e) => setNovoTel(e.target.value)} disabled={novoBusy} />
+            </label>
+            <label className="nc-field"><span className="nc-label">Nome <span className="nc-opt">(opcional)</span></span>
+              <input className="atv-input" placeholder="Nome do contato" value={novoNome} onChange={(e) => setNovoNome(e.target.value)} disabled={novoBusy} />
+            </label>
+            {novoErr && <div className="atv-field-err">{novoErr}</div>}
+          </div>
+        ) : (
+          <div className="nc-empty"><IcWarn />Nenhum WhatsApp conectado.</div>
+        )}
+      </Modal>
 
       <Modal open={transferOpen} onClose={() => setTransferOpen(false)} title="Transferir atendimento" width={460}
         footer={<>

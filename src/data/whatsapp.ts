@@ -214,6 +214,63 @@ export function useAtribuirAtendimento() {
   });
 }
 
+/** Normaliza telefone p/ casar com o formato do webhook (dígitos; BR ganha DDI 55).
+ *  Retorna null quando não há dígitos suficientes. */
+export function normalizeWaPhone(raw: string): string | null {
+  const d = (raw || '').replace(/\D/g, '');
+  if (d.length < 10) return null;
+  if (d.startsWith('55') && d.length >= 12) return d;     // já com DDI BR (55 + DDD + número)
+  if (d.length === 10 || d.length === 11) return '55' + d; // BR sem DDI
+  return d;                                                // internacional: mantém
+}
+
+/** Inicia (ou REUTILIZA) uma conversa de WhatsApp por telefone — sem duplicar.
+ *  Reuso espelha o webhook: conversa não-fechada existente no canal é reaproveitada;
+ *  se só houver encerrada, cria uma nova. NUNCA aceita organizacao_id do cliente. */
+export function useIniciarConversaWa() {
+  const { currentOrg } = useOrg();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { canalId: string; telefone: string; nome?: string }): Promise<{ conversaId: string; reused: boolean }> => {
+      const org = currentOrg.id;
+      if (!input.canalId) throw new Error('Selecione um WhatsApp conectado.');
+      const norm = normalizeWaPhone(input.telefone);
+      if (!norm) throw new Error('Informe um telefone válido.');
+      // 1) contato por identidade whatsapp normalizada → depois por telefone (mesma lógica do webhook)
+      let contatoId: string | null = null;
+      const { data: ident } = await supabase!.from('contato_identidades')
+        .select('contato_id').eq('organizacao_id', org).eq('tipo', 'whatsapp').eq('valor_normalizado', norm).maybeSingle();
+      if (ident?.contato_id) contatoId = ident.contato_id as string;
+      if (!contatoId) {
+        const { data: ct } = await supabase!.from('contatos').select('id').eq('organizacao_id', org).eq('telefone', norm).maybeSingle();
+        if (ct?.id) contatoId = ct.id as string;
+      }
+      // 2/3) conversa NÃO fechada existente no canal → reutiliza (não duplica)
+      if (contatoId) {
+        const { data: conv } = await supabase!.from('conversas')
+          .select('id').eq('organizacao_id', org).eq('contato_id', contatoId).eq('canal_id', input.canalId)
+          .neq('status', 'fechada').order('criado_em', { ascending: false }).limit(1).maybeSingle();
+        if (conv?.id) return { conversaId: conv.id as string, reused: true };
+      } else {
+        // 5) cria contato (nome informado ou telefone como rótulo temporário)
+        const nome = (input.nome || '').trim() || norm;
+        const { data: novo, error: e1 } = await supabase!.from('contatos')
+          .insert({ nome, telefone: norm, origem: 'WhatsApp', organizacao_id: org }).select('id').single();
+        if (e1 || !novo) throw new Error('Não foi possível iniciar a conversa.');
+        contatoId = novo.id as string;
+        // identidade whatsapp (best-effort; espelha o webhook p/ dedup quando o cliente responder)
+        await supabase!.from('contato_identidades').insert({ contato_id: contatoId, organizacao_id: org, tipo: 'whatsapp', provedor: 'evolution', valor: norm, valor_normalizado: norm, principal: true });
+      }
+      // 6) cria a conversa (status 'aberta', sem responsável inicial)
+      const { data: nc, error: e2 } = await supabase!.from('conversas')
+        .insert({ organizacao_id: org, contato_id: contatoId, canal_id: input.canalId, status: 'aberta' }).select('id').single();
+      if (e2 || !nc) throw new Error('Não foi possível iniciar a conversa.');
+      return { conversaId: nc.id as string, reused: false };
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ['wa-conversas', currentOrg.id] }),
+  });
+}
+
 export interface WaCanal { id: string; alias: string; numero: string | null; status: string; provider: string | null; conectadoEm: string | null; }
 export function useWaCanais() {
   const { currentOrg } = useOrg();

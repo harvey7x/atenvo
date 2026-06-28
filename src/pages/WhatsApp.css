@@ -76,6 +76,13 @@
 .wa-app .conv .conv-alert svg{width:14px;height:14px}
 .wa-app .conv .conv-wait{font-size:11px;font-weight:500;margin-top:3px;line-height:1.2}
 .wa-app .lh-top .lh-new{margin-left:auto;flex:none}
+/* modal Nova conversa */
+.wa-app .nc-form{display:flex;flex-direction:column;gap:12px}
+.wa-app .nc-field{display:flex;flex-direction:column;gap:5px}
+.wa-app .nc-label{font-size:12px;color:var(--muted);font-weight:500}
+.wa-app .nc-opt{font-weight:400}
+.wa-app .nc-empty{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px;padding:6px 2px}
+.wa-app .nc-empty svg{width:16px;height:16px;color:#e0922a;flex:none}
 .wa-app .list-foot{padding:14px;text-align:center;border-top:1px solid var(--line)}
 .wa-app .list-foot button{background:none;border:0;color:var(--green-ink);font-size:13px;font-weight:500;cursor:pointer;font-family:inherit}
 .wa-app .list-foot button:hover{text-decoration:underline}
