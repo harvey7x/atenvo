@@ -571,23 +571,31 @@ export function WhatsApp() {
       {/* ---------- CHAT ---------- */}
       <section className="col chat-col">
         <header className="chat-head">
-          <div className="ch-left">
-            {foco && (
-              <button className="icon-btn list-toggle" title={listOpen ? 'Ocultar conversas' : 'Mostrar conversas'} onClick={() => setListOpen((v) => !v)}>
-                {listOpen ? <IcChevLeft /> : <IcChevRight />}
-              </button>
-            )}
-            <div className="ch-id">
-              <Avatar name={current.name} />
-              <div className="ch-id-text">
-                <div className="ch-name" title={current.name} tabIndex={0} aria-label={current.name}>{current.name}</div>
-                <div className="ch-phone" title={current.phone}>{current.phone}</div>
+          <div className="ch-row1">
+            <div className="ch-left">
+              {foco && (
+                <button className="icon-btn list-toggle" title={listOpen ? 'Ocultar conversas' : 'Mostrar conversas'} onClick={() => setListOpen((v) => !v)}>
+                  {listOpen ? <IcChevLeft /> : <IcChevRight />}
+                </button>
+              )}
+              <div className="ch-id">
+                <Avatar name={current.name} />
+                <div className="ch-id-text">
+                  <div className="ch-name" title={current.name} tabIndex={0} aria-label={current.name}>{current.name}</div>
+                  <div className="ch-phone" title={current.phone}>{current.phone}</div>
+                </div>
               </div>
+            </div>
+            <div className="ch-actions">
+              {current.id && (current.respId
+                ? <button className="ch-resp-btn" disabled={atribuindo} title="Transferir atendimento" onClick={abrirTransferir}><IcTransfer /><span>Transferir</span></button>
+                : <button className="ch-resp-btn primary" disabled={atribuindo} title="Assumir atendimento" onClick={assumir}><IcUserPlus /><span>Assumir</span></button>)}
+              <button className={'icon-btn' + (foco ? ' on' : '')} title="Modo de foco (Esc para sair)" onClick={() => setFoco((v) => !v)}><IcFocus /></button>
+              <button ref={acoesBtnRef} className={'icon-btn' + (pop?.kind === 'acoes' ? ' on' : '')} title="Ações" aria-label="Ações da conversa" aria-haspopup="menu" aria-expanded={pop?.kind === 'acoes'} disabled={!current.id} onClick={(e) => { e.stopPropagation(); togglePop('acoes', acoesBtnRef, 'right'); }}><IcDots /></button>
             </div>
           </div>
           <div className="ch-meta">
             <div className="meta-cell"><div className="k">Canal</div><span className="meta-val"><span style={{ color: 'var(--wa)', display: 'inline-flex' }}><IcWa /></span>WhatsApp</span></div>
-            <div className="meta-cell"><div className="k">Origem</div><span className="meta-val chip-tag"><IcChip />{current.chip}</span></div>
             <div className="meta-cell"><div className="k">Status</div>
               {statusNomeAtual
                 ? <span className="status-badge" style={{ background: (statusCorAtual ?? '#64748b') + '22', color: statusCorAtual ?? 'var(--ink-2)' }}><span className="sdot" style={{ background: statusCorAtual ?? '#64748b' }} />{statusNomeAtual}</span>
@@ -598,13 +606,6 @@ export function WhatsApp() {
                 ? <span className="meta-val resp-line"><Avatar name={respNome} cls="s" />{current.respId === user?.id ? 'Você' : respNome}</span>
                 : <span className="meta-val" style={{ color: 'var(--muted)' }}>Sem responsável</span>}
             </div>
-          </div>
-          <div className="ch-actions">
-            {current.id && (current.respId
-              ? <button className="ch-resp-btn" disabled={atribuindo} title="Transferir atendimento" onClick={abrirTransferir}><IcTransfer /><span>Transferir</span></button>
-              : <button className="ch-resp-btn primary" disabled={atribuindo} title="Assumir atendimento" onClick={assumir}><IcUserPlus /><span>Assumir</span></button>)}
-            <button className={'icon-btn' + (foco ? ' on' : '')} title="Modo de foco (Esc para sair)" onClick={() => setFoco((v) => !v)}><IcFocus /></button>
-            <button ref={acoesBtnRef} className={'icon-btn' + (pop?.kind === 'acoes' ? ' on' : '')} title="Ações" aria-label="Ações da conversa" aria-haspopup="menu" aria-expanded={pop?.kind === 'acoes'} disabled={!current.id} onClick={(e) => { e.stopPropagation(); togglePop('acoes', acoesBtnRef, 'right'); }}><IcDots /></button>
           </div>
         </header>
 
