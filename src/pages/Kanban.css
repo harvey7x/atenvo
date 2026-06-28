@@ -355,3 +355,31 @@
 .kanban-page .kb-opp-aberta{border-top:1px solid var(--line-2);padding-top:8px;display:flex;flex-direction:column;gap:3px}
 .kanban-page .kb-opp-titulo{font-size:12.5px;font-weight:600;color:#b9770f}
 .kanban-page .kb-opp-meta{font-size:11.5px;color:var(--muted)}
+
+/* ===== Seções do formulário previdenciário ===== */
+.kanban-page .kb-sec-h{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:6px 0 -2px;padding-top:8px;border-top:1px solid var(--line)}
+.kanban-page .kb-sec-h:first-child{border-top:0;padding-top:0;margin-top:0}
+.kanban-page .kb-hint{font-weight:400;text-transform:none;letter-spacing:0;font-size:11px;color:var(--muted)}
+.kanban-page .kb-tags.ro{cursor:default}
+.kanban-page .kb-tag-ro{display:inline-flex;align-items:center;font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:999px;border:1px solid transparent}
+/* ===== Card previdenciário ===== */
+.kanban-page .lc-sub{font-size:11.5px;color:var(--muted);line-height:1.3;margin-top:1px}
+.kanban-page .lc-inst{font-size:12px;color:var(--ink);font-weight:500;margin-top:2px}
+.kanban-page .lc-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px}
+.kanban-page .lc-chip{display:inline-flex;align-items:center;font-size:11px;font-weight:600;color:var(--green-ink,#0e9d63);background:rgba(25,195,125,.12);padding:2px 8px;border-radius:999px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kanban-page .lc-resp{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;color:var(--muted)}
+.kanban-page .lc-resp svg{width:13px;height:13px;flex-shrink:0}
+.kanban-page .lc-valor-line{font-size:13.5px;font-weight:700;color:var(--ink);margin-top:6px}
+/* estado vazio inline (funil só com colunas) */
+.kanban-page .kb-empty-inline{min-height:auto;padding:26px 16px;margin:0 4px 8px}
+.kanban-page .kb-empty-acts{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;justify-content:center}
+.kanban-page .kb-empty-btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line-2)}
+/* ===== Detalhes da oportunidade ===== */
+.kanban-page .kb-det,.kb-det{display:flex;flex-direction:column;gap:7px}
+.kb-det .kb-sec-h{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:8px 0 0;padding-top:8px;border-top:1px solid var(--line)}
+.kb-det .kb-sec-h:first-child{border-top:0;padding-top:0}
+.kb-det-row{display:flex;gap:12px;align-items:flex-start;font-size:13px;line-height:1.45}
+.kb-det-l{flex:0 0 42%;max-width:42%;color:var(--muted)}
+.kb-det-v{flex:1;min-width:0;color:var(--ink);font-weight:500;word-break:break-word}
+.kb-det-tags{display:inline-flex;flex-wrap:wrap;gap:5px}
+.kb-det-resumo{white-space:pre-wrap;font-weight:400}
