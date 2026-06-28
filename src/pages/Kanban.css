@@ -314,3 +314,16 @@
 .kanban-page .kb-empty{font-size:12.5px;color:var(--muted)}
 .kanban-page .kb-err{font-size:12.5px;color:#d06666;background:rgba(208,102,102,.08);border-radius:8px;padding:8px 10px}
 @media (max-width:1280px){ .kanban-page .kb-row{grid-template-columns:1fr} }
+
+/* ===== Estado vazio do Kanban (compacto) + trava de tamanho de ícones ===== */
+.kanban-page .kb-empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;min-height:46vh;padding:24px}
+.kanban-page .kb-empty-ic{width:44px;height:44px;border-radius:999px;display:grid;place-items:center;background:rgba(25,195,125,.14);color:var(--green-ink,#0e9d63);margin-bottom:12px}
+.kanban-page .kb-empty-ic svg{width:22px;height:22px}
+.kanban-page .kb-empty-title{font-size:17px;font-weight:600;color:var(--ink);margin-bottom:6px}
+.kanban-page .kb-empty-desc{font-size:13.5px;color:var(--muted);max-width:380px;line-height:1.5}
+.kanban-page .kb-empty-btn{display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;gap:9px;height:44px;padding:0 20px;margin-top:18px;border:0;border-radius:10px;background:var(--green,#19C37D);color:#04130c;font-weight:600;font-size:14px;cursor:pointer;font-family:inherit}
+.kanban-page .kb-empty-btn:hover{filter:brightness(1.05)}
+.kanban-page .kb-empty-btn svg{width:18px;height:18px;flex-shrink:0}
+/* trava global: ícones dos botões do Kanban nunca herdam tamanho gigante */
+.kanban-page .btn-primary svg,.kanban-page .btn-ghost svg,.kanban-page .add-lead svg,.kanban-page .add-stage svg{width:16px;height:16px;flex-shrink:0}
+.kanban-page .btn-primary,.kanban-page .btn-ghost{display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap}

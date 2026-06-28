@@ -6,7 +6,6 @@ import { useContatos } from '@/data/contatos';
 import { corDaEtiqueta } from '@/types/atendimento';
 import { useKanban, type KColuna, type KLead } from '@/data/kanban';
 import { Modal } from '@/components/Modal';
-import { EmptyState } from '@/components/EmptyState';
 import { initials, avatarColor } from '@/lib/avatar';
 import './Kanban.css';
 
@@ -123,17 +122,18 @@ export function Kanban() {
   // ---- estados ----
   if (k.loading) return <div className="kanban-page"><div className="kb-info">Carregando funil…</div></div>;
   if (k.isError) return <div className="kanban-page"><div className="kb-info error">Erro ao carregar o funil: {k.error?.message}</div></div>;
-  if (k.colunas.length === 0) return (
-    <div className="kanban-page"><EmptyState
-      icon={<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="5" height="16" rx="1.3" /><rect x="10" y="4" width="5" height="11" rx="1.3" /><rect x="17" y="4" width="4" height="14" rx="1.3" /></svg>}
-      title="Seu funil está vazio"
-      text="Crie a primeira coluna para começar a organizar seus leads."
-      action={podeConfig ? <button className="btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }} onClick={abrirNovaColuna}>{IC.plus}Criar primeira coluna</button> : <span style={{ color: 'var(--muted)' }}>Peça a um administrador para configurar o funil.</span>}
-    /></div>
-  );
-
   return (
     <div className="kanban-page">
+      {k.colunas.length === 0 ? (
+        <div className="kb-empty-state">
+          <span className="kb-empty-ic"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="5" height="16" rx="1.3" /><rect x="10" y="4" width="5" height="11" rx="1.3" /><rect x="17" y="4" width="4" height="14" rx="1.3" /></svg></span>
+          <div className="kb-empty-title">Seu funil está vazio</div>
+          <div className="kb-empty-desc">Crie a primeira coluna para começar a organizar seus leads.</div>
+          {podeConfig
+            ? <button type="button" className="kb-empty-btn" onClick={abrirNovaColuna}><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>Criar primeira coluna</button>
+            : <div className="kb-empty-desc" style={{ marginTop: 14 }}>Peça a um administrador para configurar o funil.</div>}
+        </div>
+      ) : (
       <main className="col-main">
         <div className="toolbar">
           <div className="tb-search">{IC.search}<input type="text" aria-label="Buscar leads" placeholder="Buscar por nome, telefone, responsável ou etiqueta..." value={search} onChange={(e) => setSearch(e.target.value)} /></div>
@@ -208,6 +208,7 @@ export function Kanban() {
           </div>
         </div>
       </main>
+      )}
 
       {/* modal coluna */}
       <Modal open={!!colModal} onClose={() => { if (!colBusy) setColModal(null); }} closeOnBackdrop={!colBusy} width={420}
