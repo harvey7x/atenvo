@@ -435,3 +435,9 @@
 /* Detalhes: linhas consistentes + seção sem conteúdo */
 .kb-det-empty{font-size:12.5px;color:var(--muted);font-style:italic}
 .kb-det-row{padding:1px 0}
+
+/* indicador de ficha judicial no card + seção nos detalhes */
+.kanban-page .lc-ficha-tag{margin-left:auto;font-size:9.5px;font-weight:700;letter-spacing:.02em;padding:1px 6px;border-radius:999px}
+.kanban-page .lc-ficha-tag.rascunho{background:rgba(217,119,6,.14);color:#b9770f}
+.kanban-page .lc-ficha-tag.finalizada{background:rgba(25,195,125,.14);color:var(--green-ink,#0e9d63)}
+.kb-det-ficha{margin-top:12px;border-top:1px solid var(--line);padding-top:12px}

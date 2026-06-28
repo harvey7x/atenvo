@@ -11,6 +11,8 @@ import { useKanban, useOportunidadesAbertasDeContatos, useConversasDoContato, va
   type KColuna, type KLead } from '@/data/kanban';
 import { useSearchParams } from 'react-router-dom';
 import { Modal } from '@/components/Modal';
+import { FichaJudicialBox } from '@/components/FichaJudicialBox';
+import { useFichasStatusDeOportunidades } from '@/data/fichaJudicial';
 import { initials, avatarColor } from '@/lib/avatar';
 import './Kanban.css';
 
@@ -112,6 +114,7 @@ export function Kanban() {
   const { data: etiquetas = [] } = useEtiquetas();
   const { data: usuarios = [] } = useOrgUsuarios();
   const navigate = useNavigate();
+  const fichaStatusMap = useFichasStatusDeOportunidades(useMemo(() => k.leads.map((l) => l.id), [k.leads])).data ?? {};
 
   const [search, setSearch] = useState('');
   const [optim, setOptim] = useState<Record<string, string>>({}); // id -> colunaId (otimista)
@@ -369,7 +372,7 @@ export function Kanban() {
                           </div>
                           {vr.valor != null && <div className="lc-valor-line">{fmtBRL(vr.valor)}{vr.mensal ? ' /mês' : ''}</div>}
                           {tags.length > 0 && <div className="lc-tags" title={tags.join(', ')}>{tags.slice(0, 3).map((t) => { const cor = corDaEtiqueta(t, etiquetas); return <span key={t} className="lc-tag" style={{ background: cor + '22', color: cor, borderColor: cor + '55' }}>{t}</span>; })}{tags.length > 3 && <span className="lc-tag more">+{tags.length - 3}</span>}</div>}
-                          <div className="lc-foot">{IC.clock}{haDe(l.atualizadoEm || l.criadoEm)}</div>
+                          <div className="lc-foot">{IC.clock}{haDe(l.atualizadoEm || l.criadoEm)}{fichaStatusMap[l.id] && <span className={'lc-ficha-tag ' + fichaStatusMap[l.id]}>{fichaStatusMap[l.id] === 'finalizada' ? 'Ficha finalizada' : 'Ficha em rascunho'}</span>}</div>
                         </div>
                       );
                     })}
@@ -561,6 +564,12 @@ export function Kanban() {
               <div className="kb-sec-h">Datas</div>
               {row('Criado em', fmtDataHora(detLead.criadoEm))}
               {row('Atualizado em', fmtDataHora(detLead.atualizadoEm))}
+              <div className="kb-det-ficha">
+                <FichaJudicialBox contatoId={detLead.contatoId} oportunidadeId={detLead.id} conversaId={detLead.conversaOrigemId} canalId={detLead.canalOrigemId}
+                  responsavelSugerido={{ id: detLead.respId, nome: detLead.respNome }}
+                  contatoAtual={{ nome: detLead.nome, telefone: detLead.telefone, email: detLead.email }}
+                  oportunidadeAtual={{ tipoBeneficio: detLead.tipoBeneficio, numeroBeneficio: detLead.numeroBeneficio, instituicao: detLead.instituicao }} />
+              </div>
             </div>
           );
         })()}

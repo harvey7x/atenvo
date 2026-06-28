@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useOportunidadesDoContato, useFunisDaOrg, chamarGarantirEntrada, valorRelevante, rotuloDe, TIPO_SERVICO_OPCOES, TIPO_BENEFICIO_OPCOES } from '@/data/kanban';
 import { Modal } from '@/components/Modal';
+import { FichaJudicialBox } from '@/components/FichaJudicialBox';
 import { useToast } from '@/hooks/useToast';
 import './KanbanContatoBox.css';
 
@@ -60,6 +61,10 @@ export function KanbanContatoBox({ contatoId, conversaId, canalId, canalTipo }: 
           {aberta.tipoBeneficio && <div className="kcb-row"><span className="kcb-l">Benefício</span><span className="kcb-v">{rotuloDe(TIPO_BENEFICIO_OPCOES, aberta.tipoBeneficio)}</span></div>}
           {(() => { const vr = valorRelevante(aberta); return vr.valor != null ? <div className="kcb-row"><span className="kcb-l">Valor</span><span className="kcb-v">{fmtBRL(vr.valor)}{vr.mensal ? ' /mês' : ''}</span></div> : null; })()}
           <button type="button" className="kcb-btn" onClick={() => navigate(`/kanban?oportunidade=${aberta.id}`)}>Ver no Kanban</button>
+          <div className="kcb-ficha">
+            <FichaJudicialBox contatoId={contatoId} oportunidadeId={aberta.id} conversaId={conversaId ?? null} canalId={canalId ?? null}
+              responsavelSugerido={{ nome: aberta.respNome }} oportunidadeAtual={{ tipoBeneficio: aberta.tipoBeneficio }} />
+          </div>
         </div>
       ) : (
         <div className="kcb-empty">

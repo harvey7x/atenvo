@@ -1,0 +1,355 @@
+import { useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { Modal } from '@/components/Modal';
+import { useToast } from '@/hooks/useToast';
+import { useAuth } from '@/context/AuthContext';
+import { useOrgUsuarios } from '@/data/atendimento';
+import { supabase } from '@/lib/supabase';
+import { parseFichaJudicial, type CampoOrigem } from '@/lib/fichaJudicialParser';
+import { formatarFichaJudicial } from '@/lib/fichaJudicialFormatter';
+import { parseMoedaBRL, cpfValido } from '@/lib/fichaJudicialNormalizers';
+import {
+  useCriarFichaJudicial, useAtualizarFichaJudicial, useFinalizarFichaJudicial,
+  type FichaJudicial, type FichaRevisao, type FichaSnapshot, type FichaTipoBeneficio,
+} from '@/data/fichaJudicial';
+import './FichaJudicialModal.css';
+
+const TIPOS_BENEF: [FichaTipoBeneficio, string][] = [['aposentadoria', 'Aposentadoria'], ['pensao_por_morte', 'Pensão por morte'], ['bpc_loas', 'BPC/LOAS'], ['outro', 'Outro']];
+const TIPOS_REV: FichaRevisao['tipo'][] = ['agibank', 'rmc', 'rcc', 'emprestimo', 'outro'];
+const hojeISO = () => new Date().toISOString().slice(0, 10);
+const isoParaInput = (iso?: string | null) => (iso && /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso : '');
+
+interface Vinculos { organizacaoId: string; contatoId: string; oportunidadeId?: string | null; conversaId?: string | null; canalId?: string | null; }
+interface ContatoAtual { nome?: string; cpf?: string; telefone?: string; email?: string }
+interface OportunidadeAtual { tipoBeneficio?: string | null; numeroBeneficio?: string | null; instituicao?: string | null }
+
+interface Props {
+  open: boolean;
+  onClose: () => void;
+  vinculos: Vinculos;
+  fichaInicial?: FichaJudicial | null;
+  modo?: 'novo' | 'continuar' | 'visualizar';
+  responsavelSugerido?: { id?: string | null; nome?: string };
+  contatoAtual?: ContatoAtual;
+  oportunidadeAtual?: OportunidadeAtual;
+}
+
+type Form = {
+  nome: string; cpf: string; cidade: string; uf: string; telefone: string; email: string; rg: string; estadoCivil: string;
+  nascimento: string; idade: string;
+  beneficioNumero: string; especieCodigo: string; especieDescricao: string; tipoBeneficio: '' | FichaTipoBeneficio;
+  bancoCodigo: string; bancoNome: string; valorBeneficio: string; dataConsulta: string;
+  responsavelId: string;
+};
+const FORM0: Form = { nome: '', cpf: '', cidade: '', uf: '', telefone: '', email: '', rg: '', estadoCivil: '', nascimento: '', idade: '', beneficioNumero: '', especieCodigo: '', especieDescricao: '', tipoBeneficio: '', bancoCodigo: '', bancoNome: '', valorBeneficio: '', dataConsulta: '', responsavelId: '' };
+
+function fichaParaForm(f: FichaJudicial): Form {
+  return {
+    nome: f.nome, cpf: f.cpf, cidade: f.cidade, uf: f.uf, telefone: f.telefone, email: f.email, rg: f.rg, estadoCivil: f.estadoCivil,
+    nascimento: isoParaInput(f.nascimento), idade: f.idadeInformada != null ? String(f.idadeInformada) : '',
+    beneficioNumero: f.beneficioNumero, especieCodigo: f.especieCodigo, especieDescricao: f.especieDescricao, tipoBeneficio: f.tipoBeneficio ?? '',
+    bancoCodigo: f.bancoCodigo, bancoNome: f.bancoNome, valorBeneficio: f.valorBeneficio != null ? String(f.valorBeneficio).replace('.', ',') : '',
+    dataConsulta: isoParaInput(f.dataConsulta), responsavelId: f.responsavelId ?? '',
+  };
+}
+
+const IND: Record<CampoOrigem | 'manual', { txt: string; cls: string }> = {
+  parser: { txt: 'Encontrado', cls: 'ok' }, calculado: { txt: 'Calculado', cls: 'ok' },
+  sugerido: { txt: 'Sugerido', cls: 'warn' }, manual: { txt: 'Manual', cls: 'man' }, nao_encontrado: { txt: 'Revisar', cls: 'warn' },
+};
+
+export function FichaJudicialModal({ open, onClose, vinculos, fichaInicial, modo = 'novo', responsavelSugerido, contatoAtual, oportunidadeAtual }: Props) {
+  const { toast } = useToast();
+  const { user } = useAuth();
+  const { data: usuarios = [] } = useOrgUsuarios();
+  const qc = useQueryClient();
+  const criar = useCriarFichaJudicial();
+  const atualizar = useAtualizarFichaJudicial();
+  const finalizar = useFinalizarFichaJudicial();
+
+  const readOnly = modo === 'visualizar' && fichaInicial?.status === 'finalizada';
+  const [fichaId, setFichaId] = useState<string | null>(fichaInicial?.id ?? null);
+  const [etapa, setEtapa] = useState<'importar' | 'revisar' | 'previa'>(fichaInicial ? (readOnly ? 'previa' : 'revisar') : 'importar');
+  const [textoConsulta, setTextoConsulta] = useState('');
+  const [textoOriginal, setTextoOriginal] = useState(fichaInicial?.textoOriginal ?? '');
+  const [form, setForm] = useState<Form>(fichaInicial ? fichaParaForm(fichaInicial) : { ...FORM0, dataConsulta: '', responsavelId: responsavelSugerido?.id ?? '' });
+  const [revisoes, setRevisoes] = useState<FichaRevisao[]>(fichaInicial?.revisoes ?? []);
+  const [origem, setOrigem] = useState<Record<string, CampoOrigem | 'manual'>>({});
+  const [dataSugerida, setDataSugerida] = useState(false);
+  // senha temporária — somente no estado local; nunca persistida
+  const [senhaInssTemporaria, setSenha] = useState('');
+  const [mostrarSenha, setMostrarSenha] = useState(false);
+  const [incluirSenhaAoCopiar, setIncluirSenha] = useState(false);
+  const [atualizarContatoChk, setAtualizarContato] = useState(false);
+  const [atualizarOportunidadeChk, setAtualizarOportunidade] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  // limpa a senha ao fechar
+  useEffect(() => { if (!open) { setSenha(''); setMostrarSenha(false); setIncluirSenha(false); } }, [open]);
+
+  const setF = (patch: Partial<Form>, manual = true) => {
+    setForm((f) => ({ ...f, ...patch }));
+    if (manual) setOrigem((o) => { const n = { ...o }; for (const k of Object.keys(patch)) n[k] = 'manual'; return n; });
+  };
+
+  function analisar() {
+    setErro(null);
+    if (!textoConsulta.trim()) { setErro('Cole o texto da consulta antes de analisar.'); return; }
+    const r = parseFichaJudicial(textoConsulta);
+    setTextoOriginal(r.textoSanitizado);
+    const novo: Form = { ...FORM0, responsavelId: form.responsavelId || (responsavelSugerido?.id ?? '') };
+    novo.nome = r.nome ?? ''; novo.cpf = r.cpf ?? ''; novo.cidade = r.cidade ?? ''; novo.uf = r.uf ?? '';
+    novo.telefone = r.telefone ?? ''; novo.email = r.email ?? '';
+    novo.nascimento = isoParaInput(r.nascimento); novo.idade = r.idadeInformada != null ? String(r.idadeInformada) : (r.idadeCalculada != null ? String(r.idadeCalculada) : '');
+    novo.beneficioNumero = r.beneficioNumero ?? ''; novo.especieCodigo = r.especieCodigo ?? ''; novo.especieDescricao = r.especieDescricao ?? '';
+    novo.tipoBeneficio = r.tipoBeneficio ?? ''; novo.bancoCodigo = r.bancoCodigo ?? ''; novo.bancoNome = r.bancoNome ?? '';
+    novo.valorBeneficio = r.valorBeneficio != null ? String(r.valorBeneficio).replace('.', ',') : '';
+    if (r.dataConsulta) { novo.dataConsulta = r.dataConsulta; setDataSugerida(false); } else { novo.dataConsulta = hojeISO(); setDataSugerida(true); }
+    setForm(novo);
+    setRevisoes(r.revisoes.map((x) => ({ tipo: x.tipo, bancoCodigo: x.bancoCodigo, bancoNome: x.bancoNome, valor: x.valor, descricaoLivre: x.descricaoLivre, origem: 'parser', confianca: x.confianca, requerConfirmacao: x.requerConfirmacao })));
+    setOrigem({ ...r.origemPorCampo, idade: r.origemPorCampo.idadeInformada ?? r.origemPorCampo.idadeCalculada ?? 'nao_encontrado', dataConsulta: r.dataConsulta ? 'parser' : 'sugerido' });
+    setEtapa('revisar');
+  }
+
+  function iniciarManual() {
+    setForm({ ...FORM0, dataConsulta: hojeISO(), responsavelId: responsavelSugerido?.id ?? '' });
+    setDataSugerida(true); setEtapa('revisar');
+  }
+
+  const dadosFmt = useMemo(() => ({
+    gerenteNome: usuarios.find((u) => u.id === form.responsavelId)?.nome || responsavelSugerido?.nome || '',
+    cidade: form.cidade, uf: form.uf, nome: form.nome, beneficioNumero: form.beneficioNumero,
+    especieCodigo: form.especieCodigo, especieDescricao: form.especieDescricao,
+    bancoCodigo: form.bancoCodigo, bancoNome: form.bancoNome, valorBeneficio: parseMoedaBRL(form.valorBeneficio) ?? null,
+    cpf: form.cpf, rg: form.rg, nascimento: form.nascimento || undefined, idade: form.idade ? Number(form.idade) : null,
+    telefone: form.telefone, estadoCivil: form.estadoCivil, email: form.email, dataConsulta: form.dataConsulta || undefined, revisoes,
+  }), [form, revisoes, usuarios, responsavelSugerido]);
+
+  const previa = useMemo(() => formatarFichaJudicial(dadosFmt, { incluirSenha: false }), [dadosFmt]);
+
+  function montarSnapshot(): FichaSnapshot {
+    return {
+      nome: form.nome, cpf: form.cpf, cidade: form.cidade, uf: form.uf, telefone: form.telefone, email: form.email, rg: form.rg, estadoCivil: form.estadoCivil,
+      nascimento: form.nascimento || null, idadeInformada: form.idade ? Number(form.idade) : null,
+      beneficioNumero: form.beneficioNumero, especieCodigo: form.especieCodigo, especieDescricao: form.especieDescricao, tipoBeneficio: form.tipoBeneficio || null,
+      bancoCodigo: form.bancoCodigo, bancoNome: form.bancoNome, valorBeneficio: parseMoedaBRL(form.valorBeneficio) ?? null, dataConsulta: form.dataConsulta || null,
+      textoOriginal, textoFicha: formatarFichaJudicial(dadosFmt, { incluirSenha: false }), revisoes,
+      parserVersion: fichaInicial?.parserVersion || '1.0.0',
+    };
+  }
+
+  async function aplicarConflitos() {
+    if (!supabase) return;
+    try {
+      if (atualizarContatoChk) {
+        const patch: Record<string, unknown> = {};
+        if (form.nome) patch.nome = form.nome;
+        if (form.cpf) patch.cpf = form.cpf;
+        if (form.telefone) patch.telefone = form.telefone;
+        if (form.email) patch.email = form.email;
+        if (Object.keys(patch).length) await supabase.from('contatos').update(patch).eq('id', vinculos.contatoId);
+        qc.invalidateQueries({ queryKey: ['contatos'] });
+        qc.invalidateQueries({ queryKey: ['busca-contatos'] });
+      }
+      if (atualizarOportunidadeChk && vinculos.oportunidadeId) {
+        const patch: Record<string, unknown> = {};
+        if (form.tipoBeneficio) patch.tipo_beneficio = form.tipoBeneficio;
+        if (form.beneficioNumero) patch.numero_beneficio = form.beneficioNumero;
+        if (form.bancoNome) patch.instituicao = [form.bancoCodigo, form.bancoNome].filter(Boolean).join(' ');
+        if (Object.keys(patch).length) await supabase.from('oportunidades').update(patch).eq('id', vinculos.oportunidadeId);
+        qc.invalidateQueries({ queryKey: ['kanban-leads'] });
+        qc.invalidateQueries({ queryKey: ['opp-do-contato'] });
+      }
+    } catch { /* conflito best-effort: não bloqueia a ficha */ }
+  }
+
+  async function salvarRascunho() {
+    if (busy) return; setBusy(true); setErro(null);
+    try {
+      const snapshot = montarSnapshot();
+      let f: FichaJudicial;
+      if (fichaId) f = await atualizar.mutateAsync({ id: fichaId, snapshot, responsavelId: form.responsavelId || null });
+      else f = await criar.mutateAsync({ vinculos, snapshot, criadoPor: user!.id });
+      setFichaId(f.id);
+      await aplicarConflitos();
+      toast('Rascunho salvo');
+    } catch (e) { setErro(traduz((e as Error).message)); }
+    finally { setBusy(false); }
+  }
+
+  function validarFinalizacao(): string | null {
+    if (!form.responsavelId) return 'Selecione o gerente/responsável.';
+    if (!form.nome.trim()) return 'Informe o nome.';
+    if (!cpfValido(form.cpf)) return 'CPF inválido.';
+    if (!form.beneficioNumero.trim()) return 'Informe o número do benefício.';
+    if (!form.especieCodigo.trim() && !form.especieDescricao.trim()) return 'Informe a espécie.';
+    if (!form.tipoBeneficio) return 'Selecione o tipo de benefício.';
+    if (!form.telefone.trim()) return 'Informe o telefone.';
+    if (!form.dataConsulta) return 'Informe a data da ficha.';
+    return null;
+  }
+
+  async function finalizarFicha() {
+    if (busy) return;
+    const v = validarFinalizacao();
+    if (v) { setErro(v); return; }
+    setBusy(true); setErro(null);
+    try {
+      const snapshot = montarSnapshot();
+      let id = fichaId;
+      if (!id) { const f = await criar.mutateAsync({ vinculos, snapshot, criadoPor: user!.id }); id = f.id; setFichaId(id); }
+      await finalizar.mutateAsync({ id: id!, snapshot, responsavelId: form.responsavelId || null });
+      await aplicarConflitos();
+      setSenha('');
+      toast('Ficha finalizada');
+      onClose();
+    } catch (e) { setErro(traduz((e as Error).message)); }
+    finally { setBusy(false); }
+  }
+
+  async function copiar() {
+    const texto = formatarFichaJudicial(dadosFmt, { incluirSenha: incluirSenhaAoCopiar, senha: senhaInssTemporaria });
+    try {
+      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(texto);
+      else { const ta = document.createElement('textarea'); ta.value = texto; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); }
+      toast('Ficha copiada para a área de transferência.');
+    } catch { setErro('Não foi possível copiar. Copie manualmente da prévia.'); }
+  }
+
+  // conflitos com contato/oportunidade
+  const conflitos = useMemo(() => {
+    const c: { campo: string; atual: string; importado: string }[] = [];
+    const add = (campo: string, atual?: string | null, imp?: string) => { if (atual && imp && atual.trim() && imp.trim() && atual.trim() !== imp.trim()) c.push({ campo, atual, importado: imp }); };
+    add('Nome', contatoAtual?.nome, form.nome);
+    add('CPF', contatoAtual?.cpf, form.cpf);
+    add('Telefone', contatoAtual?.telefone, form.telefone);
+    add('E-mail', contatoAtual?.email, form.email);
+    add('Nº benefício', oportunidadeAtual?.numeroBeneficio, form.beneficioNumero);
+    return c;
+  }, [contatoAtual, oportunidadeAtual, form]);
+
+  const titulo = (
+    <div>
+      <div>{readOnly ? 'Ficha judicial' : fichaInicial ? `Editar ficha (v${fichaInicial.versao})` : 'Nova ficha judicial'}</div>
+      <div className="fj-sub">{etapa === 'importar' ? 'Importar dados da consulta' : etapa === 'revisar' ? 'Revisar e completar' : 'Prévia da ficha'}</div>
+    </div>
+  );
+
+  const ind = (campo: string) => { const o = origem[campo]; if (!o) return null; const v = IND[o]; return v ? <span className={'fj-ind ' + v.cls}>{v.txt}</span> : null; };
+
+  const rodape = etapa === 'importar'
+    ? <><button className="atv-btn" onClick={onClose} disabled={busy}>Cancelar</button><button className="atv-btn" onClick={iniciarManual} disabled={busy}>Preencher manual</button><button className="atv-btn primary" onClick={analisar} disabled={busy}>Analisar dados</button></>
+    : etapa === 'revisar'
+      ? <><button className="atv-btn" onClick={() => setEtapa(fichaInicial ? 'previa' : 'importar')} disabled={busy}>Voltar</button><button className="atv-btn" onClick={salvarRascunho} disabled={busy || readOnly}>{busy ? 'Salvando…' : 'Salvar rascunho'}</button><button className="atv-btn primary" onClick={() => setEtapa('previa')} disabled={busy}>Ver prévia</button></>
+      : <><button className="atv-btn" onClick={() => setEtapa('revisar')} disabled={busy}>Voltar e editar</button><button className="atv-btn" onClick={copiar} disabled={busy}>Copiar ficha</button>{!readOnly && <button className="atv-btn" onClick={salvarRascunho} disabled={busy}>Salvar rascunho</button>}{!readOnly && <button className="atv-btn primary" onClick={finalizarFicha} disabled={busy}>{busy ? 'Finalizando…' : 'Finalizar ficha'}</button>}</>;
+
+  return (
+    <Modal open={open} onClose={() => { if (!busy) onClose(); }} closeOnBackdrop={!busy} width={640} title={titulo} footer={rodape}>
+      <div className="fj-body">
+        {etapa === 'importar' && (
+          <div className="fj-importar">
+            <p className="fj-desc">Copie todo o conteúdo da consulta no Promosys ou iCred e cole abaixo. A análise é local; nada é enviado antes de você revisar.</p>
+            <label className="fj-label">Texto da consulta</label>
+            <textarea className="atv-input fj-textarea" rows={10} value={textoConsulta} onChange={(e) => setTextoConsulta(e.target.value)} placeholder="Cole aqui o texto da consulta…" autoFocus />
+          </div>
+        )}
+
+        {etapa === 'revisar' && (
+          <div className="fj-rev">
+            <div className="fj-sec">Dados do cliente</div>
+            <div className="fj-grid">
+              {campo('Nome', <input className="atv-input" value={form.nome} onChange={(e) => setF({ nome: e.target.value })} disabled={readOnly} />, ind('nome'))}
+              {campo('CPF', <input className="atv-input" value={form.cpf} onChange={(e) => setF({ cpf: e.target.value })} disabled={readOnly} />, ind('cpf'))}
+              {campo('Nascimento', <input className="atv-input" type="date" value={form.nascimento} onChange={(e) => setF({ nascimento: e.target.value })} disabled={readOnly} />, ind('nascimento'))}
+              {campo('Idade', <input className="atv-input" inputMode="numeric" value={form.idade} onChange={(e) => setF({ idade: e.target.value })} disabled={readOnly} />, ind('idade'))}
+              {campo('Cidade', <input className="atv-input" value={form.cidade} onChange={(e) => setF({ cidade: e.target.value })} disabled={readOnly} />, ind('cidade'))}
+              {campo('UF', <input className="atv-input" maxLength={2} value={form.uf} onChange={(e) => setF({ uf: e.target.value.toUpperCase() })} disabled={readOnly} />, ind('uf'))}
+              {campo('Telefone', <input className="atv-input" value={form.telefone} onChange={(e) => setF({ telefone: e.target.value })} disabled={readOnly} />, ind('telefone'))}
+              {campo('E-mail', <input className="atv-input" value={form.email} onChange={(e) => setF({ email: e.target.value })} disabled={readOnly} />, ind('email'))}
+              {campo('RG', <input className="atv-input" value={form.rg} onChange={(e) => setF({ rg: e.target.value })} disabled={readOnly} />)}
+              {campo('Estado civil', <input className="atv-input" value={form.estadoCivil} onChange={(e) => setF({ estadoCivil: e.target.value })} disabled={readOnly} />)}
+            </div>
+
+            <div className="fj-sec">Benefício</div>
+            <div className="fj-grid">
+              {campo('Nº benefício', <input className="atv-input" value={form.beneficioNumero} onChange={(e) => setF({ beneficioNumero: e.target.value })} disabled={readOnly} />, ind('beneficioNumero'))}
+              {campo('Cód. espécie', <input className="atv-input" value={form.especieCodigo} onChange={(e) => setF({ especieCodigo: e.target.value })} disabled={readOnly} />, ind('especieCodigo'))}
+              {campoFull('Descrição da espécie', <input className="atv-input" value={form.especieDescricao} onChange={(e) => setF({ especieDescricao: e.target.value })} disabled={readOnly} />, ind('especieDescricao'))}
+              {campo('Tipo de benefício', <select className="atv-input" value={form.tipoBeneficio} onChange={(e) => setF({ tipoBeneficio: e.target.value as Form['tipoBeneficio'] })} disabled={readOnly}><option value="">Selecione…</option>{TIPOS_BENEF.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>, ind('tipoBeneficio'))}
+              {campo('Cód. COMPE', <input className="atv-input" value={form.bancoCodigo} onChange={(e) => setF({ bancoCodigo: e.target.value })} disabled={readOnly} />, ind('bancoCodigo'))}
+              {campo('Banco pagador', <input className="atv-input" value={form.bancoNome} onChange={(e) => setF({ bancoNome: e.target.value })} disabled={readOnly} />, ind('bancoNome'))}
+              {campo('Valor do benefício', <input className="atv-input" inputMode="decimal" placeholder="0,00" value={form.valorBeneficio} onChange={(e) => setF({ valorBeneficio: e.target.value })} disabled={readOnly} />, ind('valorBeneficio'))}
+              {campo('Data da ficha', <input className="atv-input" type="date" value={form.dataConsulta} onChange={(e) => { setF({ dataConsulta: e.target.value }); setDataSugerida(false); }} disabled={readOnly} />, dataSugerida ? <span className="fj-ind warn">Sugerida</span> : ind('dataConsulta'))}
+            </div>
+
+            <div className="fj-sec">Atendimento</div>
+            <div className="fj-grid">
+              {campo('Gerente / responsável', <select className="atv-input" value={form.responsavelId} onChange={(e) => setF({ responsavelId: e.target.value }, false)} disabled={readOnly}><option value="">Não atribuído</option>{usuarios.map((u) => <option key={u.id} value={u.id}>{u.nome}</option>)}</select>)}
+            </div>
+
+            <div className="fj-sec">Revisões</div>
+            <div className="fj-revs">
+              {revisoes.length === 0 && <div className="fj-empty">Nenhuma revisão. Adicione se necessário.</div>}
+              {revisoes.map((r, i) => (
+                <div className={'fj-revrow' + (r.requerConfirmacao ? ' confirmar' : '')} key={i}>
+                  <select className="atv-input" value={r.tipo} onChange={(e) => editRev(i, { tipo: e.target.value as FichaRevisao['tipo'] })} disabled={readOnly}>{TIPOS_REV.map((t) => <option key={t} value={t}>{t.toUpperCase()}</option>)}</select>
+                  <input className="atv-input" placeholder="Banco" value={r.bancoNome ?? ''} onChange={(e) => editRev(i, { bancoNome: e.target.value })} disabled={readOnly} />
+                  <input className="atv-input" placeholder="Cód." value={r.bancoCodigo ?? ''} onChange={(e) => editRev(i, { bancoCodigo: e.target.value })} disabled={readOnly} />
+                  <input className="atv-input" placeholder="Valor" value={r.valor != null ? String(r.valor).replace('.', ',') : ''} onChange={(e) => editRev(i, { valor: parseMoedaBRL(e.target.value) })} disabled={readOnly} />
+                  {!readOnly && <button className="fj-x" onClick={() => setRevisoes((rs) => rs.filter((_, j) => j !== i))} aria-label="Remover revisão">✕</button>}
+                  {r.requerConfirmacao && <span className="fj-ind warn">Confirmar</span>}
+                </div>
+              ))}
+              {!readOnly && <button className="atv-btn fj-addrev" onClick={() => setRevisoes((rs) => [...rs, { tipo: 'outro', origem: 'manual' }])}>+ Adicionar revisão</button>}
+            </div>
+
+            <div className="fj-sec">Dados complementares</div>
+            <div className="fj-grid">
+              {campo('Senha INSS (temporária)', <div className="fj-senha"><input className="atv-input" type={mostrarSenha ? 'text' : 'password'} value={senhaInssTemporaria} onChange={(e) => setSenha(e.target.value)} placeholder="Não é salva" disabled={readOnly} /><button type="button" className="fj-eye" onClick={() => setMostrarSenha((s) => !s)}>{mostrarSenha ? 'Ocultar' : 'Mostrar'}</button></div>, <span className="fj-ind man">Só nesta sessão</span>)}
+            </div>
+
+            {conflitos.length > 0 && !readOnly && (
+              <div className="fj-conflitos">
+                <div className="fj-sec">Divergências com o cadastro</div>
+                {conflitos.map((c) => <div className="fj-confrow" key={c.campo}><strong>{c.campo}</strong><span>atual: {c.atual}</span><span>importado: {c.importado}</span></div>)}
+                <label className="fj-chk"><input type="checkbox" checked={atualizarContatoChk} onChange={(e) => setAtualizarContato(e.target.checked)} /> Atualizar dados do contato (nome/CPF/telefone/e-mail)</label>
+                <label className="fj-chk"><input type="checkbox" checked={atualizarOportunidadeChk} onChange={(e) => setAtualizarOportunidade(e.target.checked)} /> Atualizar dados da oportunidade (benefício/instituição)</label>
+              </div>
+            )}
+          </div>
+        )}
+
+        {etapa === 'previa' && (
+          <div className="fj-previa">
+            <pre className="fj-doc">{previa}</pre>
+            {!readOnly && (
+              <label className="fj-chk fj-copychk"><input type="checkbox" checked={incluirSenhaAoCopiar} onChange={(e) => setIncluirSenha(e.target.checked)} disabled={!senhaInssTemporaria} /> Incluir senha do INSS nesta cópia</label>
+            )}
+          </div>
+        )}
+
+        {erro && <div className="fj-erro">{erro}</div>}
+      </div>
+    </Modal>
+  );
+
+  function editRev(i: number, patch: Partial<FichaRevisao>) { setRevisoes((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch, requerConfirmacao: false } : r))); }
+}
+
+function campo(label: string, input: React.ReactNode, indicador?: React.ReactNode) {
+  return <div className="fj-field"><label className="fj-label">{label} {indicador}</label>{input}</div>;
+}
+function campoFull(label: string, input: React.ReactNode, indicador?: React.ReactNode) {
+  return <div className="fj-field full"><label className="fj-label">{label} {indicador}</label>{input}</div>;
+}
+
+function traduz(msg: string): string {
+  const m = (msg || '').toLowerCase();
+  if (m.includes('ficha_finalizada_imutavel')) return 'Esta ficha foi finalizada e não pode ser editada. Crie uma nova versão.';
+  if (m.includes('finalizar:')) return 'Preencha os campos obrigatórios para finalizar.';
+  if (m.includes('senha_em_estrutura')) return 'Remova credenciais das revisões/observações.';
+  if (m.includes('row-level security') || m.includes('permission')) return 'Você não tem permissão para esta ação.';
+  if (m.includes('uq_ficha') || m.includes('duplicate')) return 'Já existe uma versão com esse número para esta oportunidade.';
+  return 'Não foi possível concluir: ' + msg;
+}
