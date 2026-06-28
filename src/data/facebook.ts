@@ -46,6 +46,8 @@ export interface FbConv {
   status: string; statusId: string | null; statusCor: string | null;
   tags: string[]; respId: string | null; contatoId: string | null;
   canalId: string | null; paginaNome: string; time: string; unread: number; last: string; lastInter: string;
+  /** derivados para destaque/ordenação de "aguardando resposta". */
+  aberta?: boolean; aguardando?: boolean; aguardandoDesde?: string | null; lastAtMs?: number;
   origin: string; tabs: string[]; msgs: FbMsg[];
 }
 
@@ -76,6 +78,15 @@ function mapConversa(c: DbConv): FbConv {
       tamanho: m.metadados?.tamanho ?? null, mime: m.metadados?.mime ?? null,
     }));
   const last = msgs[msgs.length - 1];
+  // "aguardando resposta": conversa ABERTA cuja última mensagem real (exclui sistema/nota_interna)
+  // é de ENTRADA (cliente) — sem resposta de saída posterior.
+  const aberta = c.status !== 'resolvida' && c.status !== 'fechada';
+  const reais = (c.mensagens ?? []).filter((m) => m.tipo !== 'sistema' && m.tipo !== 'nota_interna');
+  let ultimaReal: DbMsg | null = null;
+  for (const m of reais) { if (!ultimaReal || tsOf(m) >= tsOf(ultimaReal)) ultimaReal = m; }
+  const aguardando = aberta && !!ultimaReal && ultimaReal.direcao === 'entrada';
+  const aguardandoDesde = aguardando ? (ultimaReal!.recebida_em || ultimaReal!.criado_em || ultimaReal!.enviada_em || null) : null;
+  const lastAtMs = new Date(c.ultima_interacao_em || (ultimaReal ? (ultimaReal.recebida_em || ultimaReal.enviada_em || ultimaReal.criado_em) : null) || 0).getTime();
   return {
     id: c.id,
     name: c.contatos?.nome ?? 'Cliente Facebook',
@@ -91,6 +102,7 @@ function mapConversa(c: DbConv): FbConv {
     paginaNome: c.canais?.nome_interno ?? 'Página',
     time: hhmm(c.ultima_interacao_em) || (last?.time ?? ''),
     unread: c.nao_lidas ?? 0,
+    aberta, aguardando, aguardandoDesde, lastAtMs,
     last: last?.text ?? '',
     lastInter: c.ultima_interacao_em ? new Date(c.ultima_interacao_em).toLocaleString('pt-BR') : '',
     origin: c.contatos?.origem ?? 'Facebook',
@@ -116,7 +128,16 @@ export function useFbConversations() {
         .eq('canais.tipo', 'facebook')
         .order('ultima_interacao_em', { ascending: false });
       if (error) throw new Error(error.message);
-      return ((data as unknown as DbConv[]) ?? []).map(mapConversa);
+      const arr = ((data as unknown as DbConv[]) ?? []).map(mapConversa);
+      // 1) abertas aguardando (mais antiga primeiro); 2) demais abertas por atividade; 3) encerradas.
+      const rank = (x: FbConv) => (x.aguardando ? 0 : x.aberta ? 1 : 2);
+      arr.sort((a, b) => {
+        const ra = rank(a), rb = rank(b);
+        if (ra !== rb) return ra - rb;
+        if (ra === 0) return new Date(a.aguardandoDesde || 0).getTime() - new Date(b.aguardandoDesde || 0).getTime();
+        return (b.lastAtMs || 0) - (a.lastAtMs || 0);
+      });
+      return arr;
     },
   });
 

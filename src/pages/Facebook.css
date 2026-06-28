@@ -26,7 +26,7 @@
   --recv:#16233b; --sent:rgba(37,99,235,.22); --sent-ink:#dbe7fb;
   --shadow:0 1px 2px rgba(0,0,0,.4); --shadow-pop:0 14px 36px rgba(0,0,0,.5)
 }
-.fb-app .col{min-width:0;height:100%;display:flex;flex-direction:column;overflow:hidden}
+.fb-app .col{min-width:0;min-height:0;height:100%;display:flex;flex-direction:column;overflow:hidden}
 
 /* avatares (iniciais) */
 .fb-app .av{display:inline-flex;align-items:center;justify-content:center;color:#fff;font-weight:600;font-size:13px;letter-spacing:.01em;overflow:hidden}
@@ -95,11 +95,11 @@
 .fb-app .icon-btn:hover{background:var(--hover)}
 .fb-app .icon-btn svg{width:19px;height:19px}
 
-.fb-app .messages{flex:1;overflow-y:auto;padding:24px 26px;background-color:var(--chat-bg);background-image:radial-gradient(var(--chat-dot) 1.1px,transparent 1.1px);background-size:20px 20px}
+.fb-app .messages{flex:1;min-height:0;overflow-y:auto;padding:24px 26px;background-color:var(--chat-bg);background-image:radial-gradient(var(--chat-dot) 1.1px,transparent 1.1px);background-size:20px 20px}
 .fb-app .msg{max-width:62%;margin-bottom:14px;clear:both}
 .fb-app .msg.in{float:left}
 .fb-app .msg.out{float:right}
-.fb-app .bubble{padding:10px 13px;border-radius:14px;font-size:14px;line-height:1.5;color:var(--ink);box-shadow:var(--shadow);position:relative}
+.fb-app .bubble{padding:10px 13px;border-radius:14px;font-size:14px;line-height:1.5;color:var(--ink);box-shadow:var(--shadow);position:relative;max-width:560px;white-space:pre-wrap;overflow-wrap:anywhere}
 .fb-app .msg.in .bubble{background:var(--recv);border-top-left-radius:4px}
 .fb-app .msg.out .bubble{background:var(--sent);color:var(--sent-ink);border-top-right-radius:4px}
 .fb-app .btime{display:block;text-align:right;font-size:10.5px;color:var(--muted);margin-top:5px}
@@ -232,10 +232,39 @@
 
 /* ===== Imagem no historico + lightbox (envio de etapa de imagem) ===== */
 .bubble-img{ padding:4px !important; background:transparent !important; border:0 !important; }
-.msg-img{ max-width:240px; max-height:240px; border-radius:10px; display:block; cursor:zoom-in; object-fit:cover; }
-.img-fallback{ width:200px; height:120px; display:flex; align-items:center; justify-content:center; background:var(--line-2); border-radius:10px; color:var(--muted); font-size:13px; }
-.img-falha{ display:flex; align-items:center; gap:6px; margin-top:4px; color:var(--err); font-size:12px; }
-.img-falha svg{ width:14px; height:14px; }
+.msg-img{ max-width:300px; max-height:360px; border-radius:10px; display:block; cursor:zoom-in; object-fit:contain; }
+/* fallback de imagem indisponível: ícone + texto + retry (sem bloco de cor sólida) */
+.fb-app .img-fallback{ min-width:200px; display:flex; flex-direction:column; align-items:center; gap:6px; padding:24px 26px; border:1px solid var(--line-2); border-radius:10px; background:var(--surface-2); color:var(--muted); font-size:13px; text-align:center; }
+.fb-app .img-fallback.img-fallback--loading{ flex-direction:row; }
+.fb-app .img-fallback svg{ width:26px; height:26px; color:var(--muted); }
+.fb-app .img-fallback .mif-txt{ font-size:12.5px; font-weight:500; color:var(--ink-2); }
+.fb-app .img-fallback .mif-retry{ margin-top:2px; border:1px solid var(--line-2); background:var(--surface); color:var(--ink-2); font-size:12px; font-weight:600; padding:5px 12px; border-radius:8px; cursor:pointer; font-family:inherit; }
+.fb-app .img-fallback .mif-retry:hover{ border-color:#5b7bd6; color:#5b7bd6; }
+.fb-app .img-fallback .mif-retry:focus-visible{ outline:2px solid #5b7bd6; outline-offset:1px; }
+
+/* aguardando resposta — hierarquia por tempo (mesmo padrão do WhatsApp) */
+.fb-app .conv .conv-alert{ flex:none; display:inline-flex; color:var(--muted); }
+.fb-app .conv .conv-alert svg{ width:14px; height:14px; }
+.fb-app .conv .conv-wait{ font-size:11px; font-weight:500; margin-top:3px; line-height:1.2; }
+.fb-app .conv.aguardando--ambar:not(.active){ background:rgba(201,122,22,.06); }
+.fb-app .conv.aguardando--ambar:not(.active)::before{ content:""; position:absolute; left:0; top:10px; bottom:10px; width:3px; border-radius:0 3px 3px 0; background:#c97a16; }
+.fb-app .conv.aguardando--ambar .conv-alert{ color:#c97a16; }
+.fb-app .conv.aguardando--vermelho:not(.active){ background:rgba(208,102,102,.07); }
+.fb-app .conv.aguardando--vermelho:not(.active)::before{ content:""; position:absolute; left:0; top:10px; bottom:10px; width:3px; border-radius:0 3px 3px 0; background:#d06666; }
+.fb-app .conv.aguardando--vermelho .conv-alert{ color:#d06666; }
+.fb-app .conv.aguardando--critico:not(.active){ background:rgba(192,57,43,.10); }
+.fb-app .conv.aguardando--critico:not(.active)::before{ content:""; position:absolute; left:0; top:9px; bottom:9px; width:4px; border-radius:0 3px 3px 0; background:#c0392b; }
+.fb-app .conv.aguardando--critico .conv-alert{ color:#c0392b; }
+
+/* erro de envio: motivo real + retry (sem ser só "!") */
+.fb-app .msg-erro{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:4px; color:var(--err); font-size:12px; }
+.fb-app .msg-erro svg{ width:14px; height:14px; flex:none; }
+.fb-app .msg-erro-retry{ border:0; background:none; color:#5b7bd6; font-size:12px; font-weight:600; cursor:pointer; padding:0; font-family:inherit; }
+.fb-app .msg-erro-retry:focus-visible{ outline:2px solid #5b7bd6; outline-offset:2px; border-radius:4px; }
+
+/* cabeçalho: identidade trunca para não forçar 2ª linha */
+.fb-app .ch-id > div{ min-width:0; }
+.fb-app .ch-id .ch-name,.fb-app .ch-id .ch-phone{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .atv-lightbox{ position:fixed; inset:0; background:rgba(0,0,0,.82); display:flex; align-items:center; justify-content:center; z-index:1000; padding:24px; }
 .atv-lightbox img{ max-width:92vw; max-height:90vh; border-radius:8px; box-shadow:0 12px 48px rgba(0,0,0,.5); }
 .atv-lightbox-close{ position:fixed; top:14px; right:20px; background:none; border:0; color:#fff; font-size:34px; line-height:1; cursor:pointer; }

@@ -11,6 +11,7 @@ import { useScripts, useScriptEtapaCounts, urlAssinadaAnexo } from '@/data/scrip
 import { ScriptSequenceModal } from '@/components/ScriptSequenceModal';
 import { AudioMessage } from '@/components/AudioMessage';
 import { AudioRecorder } from '@/components/AudioRecorder';
+import { EmptyState } from '@/components/EmptyState';
 import { MediaComposer, type MediaTipo } from '@/components/MediaComposer';
 import { useStatusDefs, useEtiquetas, useAtendimentoActions, useOrgUsuarios } from '@/data/atendimento';
 import { corDaEtiqueta } from '@/types/atendimento';
@@ -64,9 +65,29 @@ function ackFb(status?: string): { ticks: string; title: string; color: string }
 
 const FB_TABS = [
   { id: 'todas', label: 'Todas' },
-  { id: 'naolidas', label: 'Não lidas' },
   { id: 'minhas', label: 'Minhas' },
+  { id: 'naoatrib', label: 'Não atribuídas' },
+  { id: 'pendentes', label: 'Pendentes' },
 ];
+
+const IcAlert = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 8v5M12 16h.01" /></svg>;
+const IcImgOff = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.4" /><path d="m3 17 5-5 3 3" /><circle cx="8.5" cy="9.5" r="1.3" /><path d="m21 21-18-18" /></svg>;
+
+/** "Aguardando há X" desde a última mensagem do cliente, com cor por faixa de tempo. */
+function tempoEspera(desdeIso?: string | null): { label: string; cor: string; tier: 'neutro' | 'ambar' | 'vermelho' | 'critico' } | null {
+  if (!desdeIso) return null;
+  const ms = Date.now() - new Date(desdeIso).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return null;
+  const min = Math.floor(ms / 60000);
+  let label: string;
+  if (min < 1) label = 'Aguardando agora';
+  else if (min < 60) label = `Aguardando há ${min} min`;
+  else if (min < 1440) label = `Aguardando há ${Math.floor(min / 60)} h`;
+  else label = `Aguardando há ${Math.floor(min / 1440)} d`;
+  const tier = min >= 1440 ? 'critico' : min >= 120 ? 'vermelho' : min >= 30 ? 'ambar' : 'neutro';
+  const cor = tier === 'critico' ? '#c0392b' : tier === 'vermelho' ? '#d06666' : tier === 'ambar' ? '#c97a16' : 'var(--muted)';
+  return { label, cor, tier };
+}
 
 const EMPTY_FB: FbConv = {
   id: '', name: 'Nenhuma conversa', email: '', notes: '', status: '', statusId: null, statusCor: null,
@@ -130,8 +151,9 @@ function FacebookInbox() {
 
   const current = contacts.find((c) => c.id === currentId) ?? contacts[0] ?? EMPTY_FB;
   const filtered = contacts.filter((c) => {
-    if (tab === 'naolidas' && c.unread <= 0) return false;
     if (tab === 'minhas' && c.respId !== user?.id) return false;
+    if (tab === 'naoatrib' && !!c.respId) return false;
+    if (tab === 'pendentes' && !((c.unread ?? 0) > 0 || c.aguardando)) return false;
     const t = search.trim().toLowerCase();
     if (t && c.name.toLowerCase().indexOf(t) === -1 && c.last.toLowerCase().indexOf(t) === -1) return false;
     return true;
@@ -288,7 +310,7 @@ function FacebookInbox() {
             <div className="search"><IcSearch /><input type="text" placeholder="Buscar conversas..." value={search} onChange={(e) => setSearch(e.target.value)} /></div>
           </div>
           <div className="tabs">
-            {FB_TABS.map((t) => <button key={t.id} className={'tab' + (tab === t.id ? ' active' : '')} onClick={() => setTab(t.id)}>{t.label}</button>)}
+            {FB_TABS.map((t) => <button key={t.id} className={'tab' + (tab === t.id ? ' active' : '')} title={t.id === 'pendentes' ? 'Pendentes inclui mensagens não lidas e clientes aguardando resposta.' : undefined} onClick={() => setTab(t.id)}>{t.label}</button>)}
           </div>
         </div>
         <div className="conv-list">
@@ -296,13 +318,16 @@ function FacebookInbox() {
             <div style={{ padding: '30px 12px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>Carregando conversas…</div>
           ) : filtered.length === 0 ? (
             <div style={{ padding: '30px 12px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>Nenhuma conversa nesta aba.</div>
-          ) : filtered.map((c) => (
-            <div key={c.id} className={'conv' + (c.id === currentId ? ' active' : '')} onClick={() => selectContact(c.id)}>
+          ) : filtered.map((c) => {
+            const wait = c.aguardando ? tempoEspera(c.aguardandoDesde) : null;
+            return (
+            <div key={c.id} className={'conv' + (c.id === currentId ? ' active' : '') + (c.aguardando ? ' aguardando aguardando--' + (wait?.tier ?? 'neutro') : '')} onClick={() => selectContact(c.id)}>
               <Avatar name={c.name} />
               <div className="cbody">
-                <div className="crow"><span className="cname">{c.name}</span><span className="ctime">{c.time}</span></div>
+                <div className="crow"><span className="cname">{c.name}</span>{c.aguardando && <span className="conv-alert" title="Cliente aguardando resposta" aria-label="Cliente aguardando resposta"><IcAlert /></span>}<span className="ctime">{c.time}</span></div>
                 <div className="csrc"><IcMsg />{c.paginaNome}</div>
                 <div className="cprev">{c.last}</div>
+                {wait && <div className="conv-wait" style={{ color: wait.cor }}>{wait.label}</div>}
                 {c.tags.length > 0 && (
                   <div className="conv-tags">
                     {c.tags.slice(0, 2).map((t) => { const cor = corDaEtiqueta(t, etiquetas); return <span key={t} className="ctag" style={{ background: cor + '22', color: cor, borderColor: cor + '55' }}>{t}</span>; })}
@@ -310,14 +335,18 @@ function FacebookInbox() {
                   </div>
                 )}
               </div>
-              {c.unread > 0 && <span className="unread">{c.unread}</span>}
+              {c.unread > 0 && <span className="unread" title={c.unread + ' não lidas'} aria-label={c.unread + ' mensagens não lidas'}>{c.unread > 99 ? '99+' : c.unread}</span>}
             </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 
       {/* CHAT */}
       <section className="col chat-col">
+        {!current.id ? (
+          <EmptyState icon={<IcFb />} title="Selecione uma conversa" text="Escolha uma conversa na lista para iniciar o atendimento." />
+        ) : (<>
         <header className="chat-head">
           <div className="ch-id"><Avatar name={current.name} /><div><div className="ch-name">{current.name}</div><div className="ch-phone">{current.email || 'Messenger'}</div></div></div>
           <div className="ch-meta">
@@ -338,7 +367,7 @@ function FacebookInbox() {
             )}
           </div>
           <div className="ch-actions">
-            <button className="icon-btn" title="Editar dados do cliente" disabled={!current.contatoId} onClick={iniciarEdicao}><IcEdit /></button>
+            <button className="icon-btn" title="Editar dados do cliente" aria-label="Editar dados do cliente" disabled={!current.contatoId} onClick={iniciarEdicao}><IcEdit /></button>
           </div>
         </header>
         <div className="messages" ref={msgsRef}>
@@ -352,41 +381,39 @@ function FacebookInbox() {
             const url = (ehImg || ehVideo) ? imgUrls[m.anexoPath as string] : undefined;
             const docExt = ehDoc ? (m.text.split('.').pop() || '').toUpperCase().slice(0, 5) : '';
             const docTam = m.tamanho ? (m.tamanho < 1048576 ? Math.round(m.tamanho / 1024) + ' KB' : (m.tamanho / 1048576).toFixed(1) + ' MB') : '';
-            const falhaUI = falhou && <div className="img-falha"><IcWarn /><span>Falha no envio</span>{(m.etapaId || m.anexoPath) && <button className="link-btn" style={{ background: 'none', border: 0, color: '#5b7bd6', cursor: 'pointer', padding: 0 }} onClick={() => retryMidia(m)}>Tentar novamente</button>}</div>;
+            const falhaUI = falhou ? (
+              <div className="msg-erro" role="alert">
+                <IcWarn /><span>{m.erro ? traduzErroFb(m.erro) : 'A mensagem não pôde ser enviada.'}</span>
+                {(m.etapaId || m.anexoPath) && <button type="button" className="msg-erro-retry" onClick={() => retryMidia(m)}>Tentar novamente</button>}
+              </div>
+            ) : null;
             return (
               <div key={i} className={'msg ' + m.dir}>
                 {ehImg ? (
                   <div className="bubble bubble-img">
-                    {url ? <img src={url} alt="imagem" className="msg-img" onClick={() => setLightbox(url)} onError={() => setImgUrls((x) => ({ ...x, [m.anexoPath as string]: null }))} />
-                      : url === null ? <div className="img-fallback">Imagem indisponível</div>
-                        : <div className="img-fallback">Carregando…</div>}
-                    {falhaUI}
-                  </div>
+                    {url ? <img src={url} alt={m.text || 'imagem'} className="msg-img" onClick={() => setLightbox(url)} onError={() => setImgUrls((x) => ({ ...x, [m.anexoPath as string]: null }))} />
+                      : url === null ? <div className="img-fallback"><IcImgOff /><span className="mif-txt">Imagem indisponível</span><button type="button" className="mif-retry" onClick={async () => { const u = await urlAssinadaAnexo(m.anexoPath as string).catch(() => null); setImgUrls((x) => ({ ...x, [m.anexoPath as string]: u ?? null })); }}>Tentar novamente</button></div>
+                        : <div className="img-fallback img-fallback--loading" role="status">Carregando…</div>}                  </div>
                 ) : ehAudio ? (
                   <div className="bubble bubble-audio">
-                    <AudioMessage path={m.anexoPath as string} nome={m.text} resolveUrl={(p) => urlAssinadaAnexo(p)} />
-                    {falhaUI}
-                  </div>
+                    <AudioMessage path={m.anexoPath as string} nome={m.text} resolveUrl={(p) => urlAssinadaAnexo(p)} />                  </div>
                 ) : ehVideo ? (
                   <div className="bubble bubble-vid">
                     {url ? <video className="msg-vid" src={url} controls preload="none" onError={() => setImgUrls((x) => ({ ...x, [m.anexoPath as string]: null }))} />
                       : url === null ? <div className="img-fallback">Vídeo indisponível</div>
-                        : <div className="img-fallback">Carregando…</div>}
-                    {falhaUI}
-                  </div>
+                        : <div className="img-fallback">Carregando…</div>}                  </div>
                 ) : ehDoc ? (
                   <div className="bubble bubble-doc">
                     <div className="doc-msg">
                       <span className="doc-ic"><IcDoc /></span>
                       <div className="doc-info"><div className="doc-nome" title={m.text}>{m.text}</div><small>{docExt}{docExt && docTam ? ' · ' : ''}{docTam}</small></div>
                       <button type="button" className="doc-open" onClick={() => abrirDocumento(m)}>Abrir</button>
-                    </div>
-                    {falhaUI}
-                  </div>
+                    </div>                  </div>
                 ) : (
                   <div className="bubble">{m.text}</div>
                 )}
-                <span className="btime">{m.dir === 'out' && m.origem === 'pagina' && <span style={{ color: 'var(--muted)', marginRight: 6 }} title="Enviada pela Página (Business Suite)">via Página</span>}{m.time}{ack && <span className="tick" title={ack.title} style={{ color: ack.color, marginLeft: 4 }}>{ack.ticks}</span>}{falhou && <span title={m.erro ? traduzErroFb(m.erro) : 'Falhou'} style={{ color: 'var(--err)', marginLeft: 4, fontWeight: 700 }}>!</span>}</span>
+                <span className="btime">{m.dir === 'out' && m.origem === 'pagina' && <span style={{ color: 'var(--muted)', marginRight: 6 }} title="Enviada pela Página (Business Suite)">via Página</span>}{m.time}{ack && <span className="tick" title={ack.title} style={{ color: ack.color, marginLeft: 4 }}>{ack.ticks}</span>}{falhou && <span title={m.erro ? traduzErroFb(m.erro) : 'Falhou'} aria-label="Falha no envio" style={{ color: 'var(--err)', marginLeft: 4, fontWeight: 700 }}>!</span>}</span>
+                {falhaUI}
               </div>
             );
           })}
@@ -442,6 +469,7 @@ function FacebookInbox() {
             </div>
           </div>
         </div>
+        </>)}
       </section>
 
       {/* DADOS DO CLIENTE */}
