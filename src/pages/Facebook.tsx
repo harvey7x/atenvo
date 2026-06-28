@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useOrg } from '@/context/OrgContext';
 import { initials, avatarColor } from '@/lib/avatar';
 import { FB_CONTACTS, FB_QUICK, type FbContact } from '@/data/facebookDemo';
-import { FB_REAL, useFbConversations, useSendFbMessage, useSendFbMedia, subirAudioGravado, subirMidiaInbox, useFbStatus, type FbConv, type FbMsg } from '@/data/facebook';
+import { FB_REAL, useFbConversations, useSendFbMessage, useSendFbMedia, subirAudioGravado, subirMidiaInbox, useFbStatus, traduzErroFb, type FbConv, type FbMsg } from '@/data/facebook';
 import { useScripts, useScriptEtapaCounts, urlAssinadaAnexo } from '@/data/scripts';
 import { ScriptSequenceModal } from '@/components/ScriptSequenceModal';
 import { AudioMessage } from '@/components/AudioMessage';
@@ -386,7 +386,7 @@ function FacebookInbox() {
                 ) : (
                   <div className="bubble">{m.text}</div>
                 )}
-                <span className="btime">{m.dir === 'out' && m.origem === 'pagina' && <span style={{ color: 'var(--muted)', marginRight: 6 }} title="Enviada pela Página (Business Suite)">via Página</span>}{m.time}{ack && <span className="tick" title={ack.title} style={{ color: ack.color, marginLeft: 4 }}>{ack.ticks}</span>}{falhou && <span title={m.erro ?? 'Falhou'} style={{ color: 'var(--err)', marginLeft: 4, fontWeight: 700 }}>!</span>}</span>
+                <span className="btime">{m.dir === 'out' && m.origem === 'pagina' && <span style={{ color: 'var(--muted)', marginRight: 6 }} title="Enviada pela Página (Business Suite)">via Página</span>}{m.time}{ack && <span className="tick" title={ack.title} style={{ color: ack.color, marginLeft: 4 }}>{ack.ticks}</span>}{falhou && <span title={m.erro ? traduzErroFb(m.erro) : 'Falhou'} style={{ color: 'var(--err)', marginLeft: 4, fontWeight: 700 }}>!</span>}</span>
               </div>
             );
           })}

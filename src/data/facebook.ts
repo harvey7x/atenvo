@@ -137,7 +137,20 @@ export function useSendFbMessage() {
   const { currentOrg } = useOrg();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: { conversaId: string; texto: string }) => invoke<{ ok: boolean; message_id: string }>('meta-send-message', { conversa_id: input.conversaId, texto: input.texto }),
+    mutationFn: async (input: { conversaId: string; texto: string }) => {
+      type Res = { ok?: boolean; error?: string; message?: string; message_id?: string };
+      type Body = { ok?: boolean; error?: string; message?: string; resultados?: { texto?: Res } };
+      const { data, error } = await supabase!.functions.invoke('meta-send-message', { body: { conversa_id: input.conversaId, texto: input.texto } });
+      let payload = data as Body | null;
+      // em não-2xx o corpo real vem em error.context — o erro do provedor fica em resultados.texto.error
+      if (error) { try { payload = await (error as unknown as { context: Response }).context.json(); } catch { payload = null; } }
+      const t = payload?.resultados?.texto;
+      if (!t?.ok) {
+        const real = t?.error || t?.message || payload?.error || payload?.message || (error ? error.message : '');
+        throw new Error(traduzErroFb(real) || 'Falha ao enviar a mensagem.');
+      }
+      return { ok: true, message_id: t.message_id ?? '' };
+    },
     onSettled: () => qc.invalidateQueries({ queryKey: ['fb-conversas', currentOrg.id] }),
   });
 }
@@ -149,6 +162,20 @@ const ERRO_MIDIA: Record<string, string> = {
   canal_desconectado: 'Página desconectada.', pagina_desconectada: 'Página desconectada.', sem_psid: 'Contato sem PSID nesta Página.',
 };
 const traduzMidia = (e: string) => ERRO_MIDIA[e] ?? e;
+
+/** Traduz o erro REAL devolvido pela Meta/Edge Function para uma mensagem amigável em PT-BR.
+ *  - Erro (#10) sobre envio fora da janela permitida => mensagem clara de janela de atendimento.
+ *  - Códigos curtos conhecidos (token_invalido, etc.) => texto do dicionário.
+ *  - Demais casos => a própria mensagem real (sem expor tokens/payloads).
+ *  - String vazia => '' (o chamador decide o genérico). */
+export function traduzErroFb(raw: string): string {
+  const s = (raw ?? '').trim();
+  if (!s) return '';
+  if (s.includes('(#10)') && /(fora do espa|janela|allowed window|outside.*window|24\s*h)/i.test(s)) {
+    return 'Esta conversa está fora da janela de atendimento do Messenger. O cliente precisa enviar uma nova mensagem para que você possa responder.';
+  }
+  return ERRO_MIDIA[s] ?? s;
+}
 
 /** Sobe um áudio gravado no microfone para o bucket privado (sob o prefixo da org). */
 export async function subirAudioGravado(orgId: string, blob: Blob, ext: string, mime: string): Promise<{ path: string; nome: string; tamanho: number }> {
