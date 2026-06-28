@@ -152,6 +152,7 @@ export function Kanban() {
   const bloqueado = !!(selContato && oppSel && oppSel.funilId === k.funilId);
   const podeCampos = leadModal?.mode === 'editar' || !!selContato || semVinculo;
   const vinculado = !!selContato || (leadModal?.mode === 'editar' && !!lf.contatoId);
+  const mostraGenerico = lf.tipoServico === 'analise_inicial' || lf.tipoServico === 'outro' || (parseBRL(lf.valorEstimado).v ?? 0) > 0;
 
   // herda conversa/canal/chip/atendente da conversa mais recente ao selecionar contato (novo)
   useEffect(() => {
@@ -471,9 +472,9 @@ export function Kanban() {
               <div className="kb-sec-h">Benefício</div>
               <div className="kb-row">
                 <div className="kb-field"><label className="kb-label">Tipo de benefício *</label><select className="atv-input" value={lf.tipoBeneficio} onChange={(e) => setLf({ ...lf, tipoBeneficio: e.target.value })} disabled={leadBusy}><option value="">Selecione…</option>{TIPO_BENEFICIO.map(([v, lbl]) => <option key={v} value={v}>{lbl}</option>)}</select></div>
-                <div className="kb-field"><label className="kb-label">Número do benefício</label><input className="atv-input" placeholder="Opcional" value={lf.numeroBeneficio} onChange={(e) => setLf({ ...lf, numeroBeneficio: e.target.value })} disabled={leadBusy} /></div>
+                <div className="kb-field"><label className="kb-label">Número do benefício <span className="kb-hint">(opcional)</span></label><input className="atv-input" placeholder="Ex.: 123.456.789-0" value={lf.numeroBeneficio} onChange={(e) => setLf({ ...lf, numeroBeneficio: e.target.value })} disabled={leadBusy} /></div>
               </div>
-              <div className="kb-field"><label className="kb-label">Instituição, associação ou banco</label><input className="atv-input" placeholder="Opcional" value={lf.instituicao} onChange={(e) => setLf({ ...lf, instituicao: e.target.value })} disabled={leadBusy} /></div>
+              <div className="kb-field"><label className="kb-label">Instituição, associação ou banco <span className="kb-hint">(opcional)</span></label><input className="atv-input" placeholder="Ex.: Banco Pan, BMG ou associação" value={lf.instituicao} onChange={(e) => setLf({ ...lf, instituicao: e.target.value })} disabled={leadBusy} /></div>
 
               {/* Seção: Serviço */}
               <div className="kb-sec-h">Serviço</div>
@@ -488,8 +489,8 @@ export function Kanban() {
               {/* Seção: Dados do desconto */}
               <div className="kb-sec-h">Dados do desconto</div>
               <div className="kb-row">
-                <div className="kb-field"><label className="kb-label">Tipo de desconto</label><input className="atv-input" placeholder="Opcional" value={lf.tipoDesconto} onChange={(e) => setLf({ ...lf, tipoDesconto: e.target.value })} disabled={leadBusy} /></div>
-                <div className="kb-field"><label className="kb-label">Início do desconto</label><input className="atv-input" type="date" value={lf.dataInicioDesconto} onChange={(e) => setLf({ ...lf, dataInicioDesconto: e.target.value })} disabled={leadBusy} /></div>
+                <div className="kb-field"><label className="kb-label">Tipo de desconto <span className="kb-hint">(opcional)</span></label><input className="atv-input" placeholder="Ex.: empréstimo, mensalidade associativa" value={lf.tipoDesconto} onChange={(e) => setLf({ ...lf, tipoDesconto: e.target.value })} disabled={leadBusy} /></div>
+                <div className="kb-field"><label className="kb-label">Início do desconto <span className="kb-hint">(opcional)</span></label><input className="atv-input" type="date" value={lf.dataInicioDesconto} onChange={(e) => setLf({ ...lf, dataInicioDesconto: e.target.value })} disabled={leadBusy} /></div>
               </div>
 
               {/* Seção: Valores */}
@@ -500,7 +501,7 @@ export function Kanban() {
               </div>
               <div className="kb-row">
                 <div className="kb-field"><label className="kb-label">Valor já ressarcido (R$)</label><input className="atv-input" inputMode="decimal" placeholder="0,00" value={lf.valorRessarcido} onChange={(e) => setLf({ ...lf, valorRessarcido: e.target.value })} disabled={leadBusy} /></div>
-                <div className="kb-field"><label className="kb-label">Valor estimado genérico (R$)</label><input className="atv-input" inputMode="decimal" placeholder="0,00" value={lf.valorEstimado} onChange={(e) => setLf({ ...lf, valorEstimado: e.target.value })} disabled={leadBusy} /></div>
+                {mostraGenerico && <div className="kb-field"><label className="kb-label">Valor estimado genérico (R$)</label><input className="atv-input" inputMode="decimal" placeholder="0,00" value={lf.valorEstimado} onChange={(e) => setLf({ ...lf, valorEstimado: e.target.value })} disabled={leadBusy} /></div>}
               </div>
 
               {/* Seção: Organização */}
@@ -518,13 +519,14 @@ export function Kanban() {
       </Modal>
 
       {/* drawer/modal detalhes da oportunidade */}
-      <Modal open={!!detLead} onClose={() => setDetId(null)} width={560}
+      <Modal open={!!detLead} onClose={() => setDetId(null)} width={520}
         title={detLead ? <div><div>{detLead.nome}</div><div className="kb-modal-sub">{[detLead.tipoBeneficio ? labelOf(TIPO_BENEFICIO, detLead.tipoBeneficio) : 'Benefício não informado', labelOf(TIPO_SERVICO, detLead.tipoServico)].filter(Boolean).join(' · ')}</div></div> : ''}
-        footer={detLead ? <><button className="atv-btn" onClick={() => setDetId(null)}>Fechar</button>{detLead.conversaOrigemId && <button className="atv-btn" onClick={() => abrirConversa(detLead)}>{IC.chat}Abrir conversa</button>}<button className="atv-btn primary" onClick={() => abrirEditarLead(detLead)}>Editar</button></> : null}>
+        footer={detLead ? <><button className="atv-btn" onClick={() => setDetId(null)}>Fechar</button>{detLead.conversaOrigemId && <button className="atv-btn" onClick={() => abrirConversa(detLead)}>Abrir conversa</button>}<button className="atv-btn primary" onClick={() => abrirEditarLead(detLead)}>Editar</button></> : null}>
         {detLead && (() => {
           const vr = valorRelevante(detLead);
           const tags = mergeTags(detLead.contatoEtiquetas, detLead.etiquetas);
           const coluna = k.colunas.find((c) => c.id === detLead.colunaId)?.nome || '—';
+          const temValores = detLead.valorDescontoMensal != null || detLead.valorRessarcimentoEstimado != null || detLead.valorRessarcido != null || detLead.valor != null;
           const row = (lbl: string, val: React.ReactNode) => (val ? <div className="kb-det-row"><span className="kb-det-l">{lbl}</span><span className="kb-det-v">{val}</span></div> : null);
           return (
             <div className="kb-det">
@@ -544,6 +546,7 @@ export function Kanban() {
               {row('Tipo de desconto', detLead.tipoDesconto)}
               {row('Início do desconto', fmtData(detLead.dataInicioDesconto))}
               <div className="kb-sec-h">Valores</div>
+              {!temValores && <div className="kb-det-empty">Nenhum valor informado</div>}
               {row('Valor mensal descontado', detLead.valorDescontoMensal != null ? fmtBRL(detLead.valorDescontoMensal) : null)}
               {row('Valor estimado do ressarcimento', detLead.valorRessarcimentoEstimado != null ? fmtBRL(detLead.valorRessarcimentoEstimado) : null)}
               {row('Valor já ressarcido', detLead.valorRessarcido != null ? fmtBRL(detLead.valorRessarcido) : null)}

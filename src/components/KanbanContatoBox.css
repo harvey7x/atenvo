@@ -4,7 +4,7 @@
 .kcb-info.err { color: #d06666; }
 .kcb-card { display: flex; flex-direction: column; gap: 5px; border: 1px solid var(--line-2); border-radius: 10px; padding: 11px; background: var(--surface-2, #f7f9fb); }
 .kcb-row { display: flex; gap: 10px; font-size: 12.5px; line-height: 1.4; }
-.kcb-l { flex: 0 0 38%; color: var(--muted); }
+.kcb-l { flex: 0 0 44%; max-width: 44%; color: var(--muted); }
 .kcb-v { flex: 1; min-width: 0; color: var(--ink); font-weight: 500; word-break: break-word; }
 .kcb-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
 .kcb-btn { display: inline-flex; align-items: center; justify-content: center; height: 36px; padding: 0 14px; border-radius: 9px; border: 1px solid var(--line-2); background: transparent; color: var(--ink); font-weight: 600; font-size: 13px; cursor: pointer; font-family: inherit; margin-top: 4px; }

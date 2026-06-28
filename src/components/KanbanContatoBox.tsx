@@ -55,7 +55,7 @@ export function KanbanContatoBox({ contatoId, conversaId, canalId, canalTipo }: 
         <div className="kcb-card">
           <div className="kcb-row"><span className="kcb-l">Funil</span><span className="kcb-v">{aberta.funilNome || '—'}</span></div>
           <div className="kcb-row"><span className="kcb-l">Etapa</span><span className="kcb-v">{aberta.colunaNome || '—'}</span></div>
-          <div className="kcb-row"><span className="kcb-l">Responsável</span><span className="kcb-v">{aberta.respNome || 'Não atribuído'}</span></div>
+          <div className="kcb-row"><span className="kcb-l">Resp. (oportunidade)</span><span className="kcb-v">{aberta.respNome || 'Não atribuído'}</span></div>
           <div className="kcb-row"><span className="kcb-l">Serviço</span><span className="kcb-v">{rotuloDe(TIPO_SERVICO_OPCOES, aberta.tipoServico)}</span></div>
           {aberta.tipoBeneficio && <div className="kcb-row"><span className="kcb-l">Benefício</span><span className="kcb-v">{rotuloDe(TIPO_BENEFICIO_OPCOES, aberta.tipoBeneficio)}</span></div>}
           {(() => { const vr = valorRelevante(aberta); return vr.valor != null ? <div className="kcb-row"><span className="kcb-l">Valor</span><span className="kcb-v">{fmtBRL(vr.valor)}{vr.mensal ? ' /mês' : ''}</span></div> : null; })()}
@@ -64,7 +64,7 @@ export function KanbanContatoBox({ contatoId, conversaId, canalId, canalTipo }: 
       ) : (
         <div className="kcb-empty">
           <span className="kcb-info">Sem oportunidade aberta.</span>
-          <button type="button" className="kcb-btn primary" onClick={abrir} disabled={funisQ.isLoading}>Adicionar ao Kanban</button>
+          <button type="button" className="kcb-btn" onClick={abrir} disabled={funisQ.isLoading}>Adicionar ao Kanban</button>
         </div>
       )}
 

@@ -387,3 +387,51 @@
 /* coluna de entrada + destaque do deep-link */
 .kanban-page .col-entrada-tag{margin-left:8px;font-size:10px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--green-ink,#0e9d63);background:rgba(25,195,125,.14);padding:1px 7px;border-radius:999px;vertical-align:middle}
 .kanban-page .lead-card.destaque{outline:2px solid var(--green,#19C37D);outline-offset:1px;box-shadow:0 0 0 4px rgba(25,195,125,.18)}
+
+/* ============================================================
+   Refinamento visual (proporção · simetria · hierarquia)
+   Apenas estética — sem mudança funcional.
+   ============================================================ */
+/* Barra superior: alturas iguais, busca mais larga, botões com largura automática */
+.kanban-page .toolbar{gap:10px}
+.kanban-page .tb-search{max-width:460px;min-width:220px}
+.kanban-page .tb-search input{height:40px;border-radius:10px}
+.kanban-page .tb-search svg{top:50%;transform:translateY(-50%)}
+.kanban-page .toolbar .btn-primary{flex:none;height:40px;padding:0 20px;border-radius:10px;font-size:13.5px}
+.kanban-page .toolbar .btn-ghost{height:40px;padding:0 18px;border-radius:10px;font-size:13.5px;font-weight:600}
+.kanban-page .toolbar .btn-primary svg,.kanban-page .toolbar .btn-ghost svg{width:17px;height:17px;flex-shrink:0}
+
+/* Colunas: crescem com o conteúdo e ficam limitadas pela viewport (sem área vazia) */
+.kanban-page .board{align-items:flex-start}
+.kanban-page .column{max-height:100%}
+.kanban-page .col-body{flex:0 1 auto;min-height:44px}
+
+/* Placeholder Nova coluna: discreto, altura conforme conteúdo */
+.kanban-page .ghost-col{width:240px;align-self:flex-start}
+.kanban-page .add-stage{flex:none;padding:14px;gap:7px;font-size:13px}
+.kanban-page .add-stage svg{width:18px;height:18px}
+
+/* Cabeçalho da coluna: tag de entrada menor e mais próxima do título */
+.kanban-page .col-entrada-tag{margin-left:6px;padding:1px 6px;font-size:9.5px;letter-spacing:.02em}
+
+/* Cards: avatar menor, espaçamento consistente, tempo discreto */
+.kanban-page .lead-card{padding:11px}
+.kanban-page .lc-top .av{width:32px;height:32px}
+.kanban-page .lead-card .lc-top{margin-bottom:8px}
+.kanban-page .lc-inst{margin-top:4px}
+.kanban-page .lc-meta{margin-top:8px;gap:6px}
+.kanban-page .lc-valor-line{margin-top:6px;font-size:13px}
+.kanban-page .lc-tags{margin-top:8px}
+.kanban-page .lc-foot{margin-top:8px;font-size:11px}
+.kanban-page .lc-foot svg{width:13px;height:13px}
+
+/* Botão Adicionar lead: compacto e alinhado aos cards */
+.kanban-page .add-lead{padding:9px;font-size:12.5px}
+.kanban-page .add-lead svg{width:15px;height:15px}
+
+/* Formulário: divisórias suaves e mais respiro entre seções */
+.kanban-page .kb-sec-h{margin:10px 0 0;padding-top:12px;color:var(--ink-2);font-weight:600}
+
+/* Detalhes: linhas consistentes + seção sem conteúdo */
+.kb-det-empty{font-size:12.5px;color:var(--muted);font-style:italic}
+.kb-det-row{padding:1px 0}
