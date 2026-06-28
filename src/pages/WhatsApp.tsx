@@ -577,6 +577,15 @@ export function WhatsApp() {
                 {listOpen ? <IcChevLeft /> : <IcChevRight />}
               </button>
             )}
+            {!dataOpen && (
+              <div className="ch-id">
+                <Avatar name={current.name} />
+                <div className="ch-id-text">
+                  <div className="ch-name" title={current.name} tabIndex={0} aria-label={current.name}>{current.name}</div>
+                  <div className="ch-phone" title={current.phone}>{current.phone}</div>
+                </div>
+              </div>
+            )}
             <div className="ch-meta">
             <div className="meta-cell"><div className="k">Canal</div><span className="meta-val"><span style={{ color: 'var(--wa)', display: 'inline-flex' }}><IcWa /></span>WhatsApp</span></div>
             <div className="meta-cell"><div className="k">Status</div>
