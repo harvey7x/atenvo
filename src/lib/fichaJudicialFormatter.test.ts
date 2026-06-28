@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { formatarFichaJudicial, type FichaFmtDados } from './fichaJudicialFormatter';
+import { parseMoedaBRL, formataMoedaBRL, formataTelefoneBR, normalizaTelefone, resolverTelefoneFicha } from './fichaJudicialNormalizers';
 
 const completa: FichaFmtDados = {
   gerenteNome: 'Matheus Teste',
@@ -96,4 +97,40 @@ describe('formatarFichaJudicial', () => {
     const t = formatarFichaJudicial(completa);
     expect(t).not.toMatch(/[*_`#]/);
   });
+});
+
+describe('parseMoedaBRL (regressão valor do benefício)', () => {
+  it('R$ 1.621,00 -> 1621 -> R$ 1.621,00', () => {
+    const n = parseMoedaBRL('R$ 1.621,00');
+    expect(n).toBe(1621);
+    expect(parseMoedaBRL('1621')).toBe(1621); // string do formulário (sem separador) NÃO vira 162
+    expect(formataMoedaBRL(n!)).toBe('R$ 1.621,00');
+  });
+  it('R$ 162,00', () => { expect(parseMoedaBRL('R$ 162,00')).toBe(162); });
+  it('R$ 3.135,30', () => { expect(parseMoedaBRL('R$ 3.135,30')).toBe(3135.3); });
+  it('R$ 3.576,38', () => { expect(parseMoedaBRL('R$ 3.576,38')).toBe(3576.38); });
+  it('inteiro grande sem separador não trunca', () => { expect(parseMoedaBRL('2000')).toBe(2000); expect(parseMoedaBRL('15000')).toBe(15000); });
+  it('vazio/sem número', () => { expect(parseMoedaBRL('')).toBeUndefined(); expect(parseMoedaBRL('abc')).toBeUndefined(); });
+});
+
+describe('telefone da ficha (prioridade e formatação)', () => {
+  it('1. telefone do contato prevalece sobre importado', () => {
+    expect(resolverTelefoneFicha('51991971366', '51995627580')).toEqual({ digitos: '51991971366', origem: 'contato' });
+  });
+  it('2/3. fallback para contato (cadastro/conversa)', () => {
+    expect(resolverTelefoneFicha('(51) 99197-1366', '51995627580').digitos).toBe('51991971366');
+  });
+  it('4. fallback para importado só quando contato sem telefone', () => {
+    expect(resolverTelefoneFicha('', '51995627580')).toEqual({ digitos: '51995627580', origem: 'importado' });
+    expect(resolverTelefoneFicha(null, null)).toEqual({ digitos: '', origem: 'vazio' });
+  });
+  it('5. DDI 55 removido apenas na apresentação (comprimento compatível)', () => {
+    expect(formataTelefoneBR('5551991971366')).toBe('(51) 99197-1366');
+    expect(normalizaTelefone('5551991971366')).toBe('51991971366');
+  });
+  it('5b. não remove 55 de número incompatível com DDI', () => {
+    expect(normalizaTelefone('5551991971')).toBe('5551991971'); // 10 dígitos: trata como DDD 55
+  });
+  it('6. celular com 11 dígitos', () => { expect(formataTelefoneBR('51991971366')).toBe('(51) 99197-1366'); });
+  it('7. fixo com 10 dígitos', () => { expect(formataTelefoneBR('5133334444')).toBe('(51) 3333-4444'); });
 });

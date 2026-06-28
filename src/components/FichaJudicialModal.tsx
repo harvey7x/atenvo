@@ -7,7 +7,7 @@ import { useOrgUsuarios } from '@/data/atendimento';
 import { supabase } from '@/lib/supabase';
 import { parseFichaJudicial, type CampoOrigem } from '@/lib/fichaJudicialParser';
 import { formatarFichaJudicial } from '@/lib/fichaJudicialFormatter';
-import { parseMoedaBRL, cpfValido } from '@/lib/fichaJudicialNormalizers';
+import { parseMoedaBRL, cpfValido, somenteDigitos, normalizaTelefone, formataTelefoneBR, resolverTelefoneFicha } from '@/lib/fichaJudicialNormalizers';
 import {
   useCriarFichaJudicial, useAtualizarFichaJudicial, useFinalizarFichaJudicial,
   type FichaJudicial, type FichaRevisao, type FichaSnapshot, type FichaTipoBeneficio,
@@ -72,8 +72,9 @@ export function FichaJudicialModal({ open, onClose, vinculos, fichaInicial, modo
   const [etapa, setEtapa] = useState<'importar' | 'revisar' | 'previa'>(fichaInicial ? (readOnly ? 'previa' : 'revisar') : 'importar');
   const [textoConsulta, setTextoConsulta] = useState('');
   const [textoOriginal, setTextoOriginal] = useState(fichaInicial?.textoOriginal ?? '');
-  const [form, setForm] = useState<Form>(fichaInicial ? fichaParaForm(fichaInicial) : { ...FORM0, dataConsulta: '', responsavelId: responsavelSugerido?.id ?? '' });
+  const [form, setForm] = useState<Form>(fichaInicial ? fichaParaForm(fichaInicial) : { ...FORM0, dataConsulta: '', responsavelId: responsavelSugerido?.id ?? '', telefone: resolverTelefoneFicha(contatoAtual?.telefone).digitos });
   const [revisoes, setRevisoes] = useState<FichaRevisao[]>(fichaInicial?.revisoes ?? []);
+  const [telImportado, setTelImportado] = useState(''); // telefone vindo do parser (só p/ divergência)
   const [origem, setOrigem] = useState<Record<string, CampoOrigem | 'manual'>>({});
   const [dataSugerida, setDataSugerida] = useState(false);
   // senha temporária — somente no estado local; nunca persistida
@@ -100,7 +101,9 @@ export function FichaJudicialModal({ open, onClose, vinculos, fichaInicial, modo
     setTextoOriginal(r.textoSanitizado);
     const novo: Form = { ...FORM0, responsavelId: form.responsavelId || (responsavelSugerido?.id ?? '') };
     novo.nome = r.nome ?? ''; novo.cpf = r.cpf ?? ''; novo.cidade = r.cidade ?? ''; novo.uf = r.uf ?? '';
-    novo.telefone = r.telefone ?? ''; novo.email = r.email ?? '';
+    // telefone: prioridade do contato; parser só como fallback (divergência fica em telImportado)
+    novo.telefone = resolverTelefoneFicha(contatoAtual?.telefone, r.telefone).digitos; novo.email = r.email ?? '';
+    setTelImportado(somenteDigitos(r.telefone ?? ''));
     novo.nascimento = isoParaInput(r.nascimento); novo.idade = r.idadeInformada != null ? String(r.idadeInformada) : (r.idadeCalculada != null ? String(r.idadeCalculada) : '');
     novo.beneficioNumero = r.beneficioNumero ?? ''; novo.especieCodigo = r.especieCodigo ?? ''; novo.especieDescricao = r.especieDescricao ?? '';
     novo.tipoBeneficio = r.tipoBeneficio ?? ''; novo.bancoCodigo = r.bancoCodigo ?? ''; novo.bancoNome = r.bancoNome ?? '';
@@ -108,7 +111,9 @@ export function FichaJudicialModal({ open, onClose, vinculos, fichaInicial, modo
     if (r.dataConsulta) { novo.dataConsulta = r.dataConsulta; setDataSugerida(false); } else { novo.dataConsulta = hojeISO(); setDataSugerida(true); }
     setForm(novo);
     setRevisoes(r.revisoes.map((x) => ({ tipo: x.tipo, bancoCodigo: x.bancoCodigo, bancoNome: x.bancoNome, valor: x.valor, descricaoLivre: x.descricaoLivre, origem: 'parser', confianca: x.confianca, requerConfirmacao: x.requerConfirmacao })));
-    setOrigem({ ...r.origemPorCampo, idade: r.origemPorCampo.idadeInformada ?? r.origemPorCampo.idadeCalculada ?? 'nao_encontrado', dataConsulta: r.dataConsulta ? 'parser' : 'sugerido' });
+    const om: Record<string, CampoOrigem | 'manual'> = { ...r.origemPorCampo, idade: r.origemPorCampo.idadeInformada ?? r.origemPorCampo.idadeCalculada ?? 'nao_encontrado', dataConsulta: r.dataConsulta ? 'parser' : 'sugerido' };
+    if (contatoAtual?.telefone) om.telefone = 'calculado'; // resolvido do cadastro, não do texto importado
+    setOrigem(om);
     setEtapa('revisar');
   }
 
@@ -123,14 +128,14 @@ export function FichaJudicialModal({ open, onClose, vinculos, fichaInicial, modo
     especieCodigo: form.especieCodigo, especieDescricao: form.especieDescricao,
     bancoCodigo: form.bancoCodigo, bancoNome: form.bancoNome, valorBeneficio: parseMoedaBRL(form.valorBeneficio) ?? null,
     cpf: form.cpf, rg: form.rg, nascimento: form.nascimento || undefined, idade: form.idade ? Number(form.idade) : null,
-    telefone: form.telefone, estadoCivil: form.estadoCivil, email: form.email, dataConsulta: form.dataConsulta || undefined, revisoes,
+    telefone: formataTelefoneBR(form.telefone), estadoCivil: form.estadoCivil, email: form.email, dataConsulta: form.dataConsulta || undefined, revisoes,
   }), [form, revisoes, usuarios, responsavelSugerido]);
 
   const previa = useMemo(() => formatarFichaJudicial(dadosFmt, { incluirSenha: false }), [dadosFmt]);
 
   function montarSnapshot(): FichaSnapshot {
     return {
-      nome: form.nome, cpf: form.cpf, cidade: form.cidade, uf: form.uf, telefone: form.telefone, email: form.email, rg: form.rg, estadoCivil: form.estadoCivil,
+      nome: form.nome, cpf: form.cpf, cidade: form.cidade, uf: form.uf, telefone: somenteDigitos(form.telefone), email: form.email, rg: form.rg, estadoCivil: form.estadoCivil,
       nascimento: form.nascimento || null, idadeInformada: form.idade ? Number(form.idade) : null,
       beneficioNumero: form.beneficioNumero, especieCodigo: form.especieCodigo, especieDescricao: form.especieDescricao, tipoBeneficio: form.tipoBeneficio || null,
       bancoCodigo: form.bancoCodigo, bancoNome: form.bancoNome, valorBeneficio: parseMoedaBRL(form.valorBeneficio) ?? null, dataConsulta: form.dataConsulta || null,
@@ -146,7 +151,8 @@ export function FichaJudicialModal({ open, onClose, vinculos, fichaInicial, modo
         const patch: Record<string, unknown> = {};
         if (form.nome) patch.nome = form.nome;
         if (form.cpf) patch.cpf = form.cpf;
-        if (form.telefone) patch.telefone = form.telefone;
+        // telefone: ao atualizar o contato, aplica o IMPORTADO (decisão explícita do operador)
+        if (normalizaTelefone(telImportado)) patch.telefone = normalizaTelefone(telImportado);
         if (form.email) patch.email = form.email;
         if (Object.keys(patch).length) await supabase.from('contatos').update(patch).eq('id', vinculos.contatoId);
         qc.invalidateQueries({ queryKey: ['contatos'] });
@@ -223,11 +229,14 @@ export function FichaJudicialModal({ open, onClose, vinculos, fichaInicial, modo
     const add = (campo: string, atual?: string | null, imp?: string) => { if (atual && imp && atual.trim() && imp.trim() && atual.trim() !== imp.trim()) c.push({ campo, atual, importado: imp }); };
     add('Nome', contatoAtual?.nome, form.nome);
     add('CPF', contatoAtual?.cpf, form.cpf);
-    add('Telefone', contatoAtual?.telefone, form.telefone);
     add('E-mail', contatoAtual?.email, form.email);
     add('Nº benefício', oportunidadeAtual?.numeroBeneficio, form.beneficioNumero);
+    // telefone: compara cadastro × importado (não o valor já resolvido no form); vazio/inválido não gera divergência
+    const telA = normalizaTelefone(contatoAtual?.telefone || '');
+    const telB = normalizaTelefone(telImportado || form.telefone || '');
+    if (telA && telB && telA !== telB) c.push({ campo: 'Telefone', atual: formataTelefoneBR(telA), importado: formataTelefoneBR(telB) });
     return c;
-  }, [contatoAtual, oportunidadeAtual, form]);
+  }, [contatoAtual, oportunidadeAtual, form, telImportado]);
 
   const titulo = (
     <div>

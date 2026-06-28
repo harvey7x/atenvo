@@ -10,7 +10,7 @@ import './KanbanContatoBox.css';
 const fmtBRL = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 
 /** Caixa reutilizável (WhatsApp/Facebook): mostra a oportunidade aberta do contato ou permite adicioná-lo ao Kanban via RPC. */
-export function KanbanContatoBox({ contatoId, conversaId, canalId, canalTipo }: { contatoId?: string | null; conversaId?: string | null; canalId?: string | null; canalTipo?: 'whatsapp' | 'facebook' }) {
+export function KanbanContatoBox({ contatoId, conversaId, canalId, canalTipo, contatoTelefone }: { contatoId?: string | null; conversaId?: string | null; canalId?: string | null; canalTipo?: 'whatsapp' | 'facebook'; contatoTelefone?: string | null }) {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { toast } = useToast();
@@ -63,7 +63,7 @@ export function KanbanContatoBox({ contatoId, conversaId, canalId, canalTipo }: 
           <button type="button" className="kcb-btn" onClick={() => navigate(`/kanban?oportunidade=${aberta.id}`)}>Ver no Kanban</button>
           <div className="kcb-ficha">
             <FichaJudicialBox contatoId={contatoId} oportunidadeId={aberta.id} conversaId={conversaId ?? null} canalId={canalId ?? null}
-              responsavelSugerido={{ nome: aberta.respNome }} oportunidadeAtual={{ tipoBeneficio: aberta.tipoBeneficio }} />
+              responsavelSugerido={{ nome: aberta.respNome }} contatoAtual={{ telefone: contatoTelefone ?? '' }} oportunidadeAtual={{ tipoBeneficio: aberta.tipoBeneficio }} />
           </div>
         </div>
       ) : (

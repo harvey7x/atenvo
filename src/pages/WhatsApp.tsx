@@ -855,7 +855,7 @@ export function WhatsApp() {
             </button>
           </div>
 
-          <div className="dfield"><KanbanContatoBox contatoId={current.contatoId} conversaId={current.id} canalId={current.canalId} canalTipo="whatsapp" /></div>
+          <div className="dfield"><KanbanContatoBox contatoId={current.contatoId} conversaId={current.id} canalId={current.canalId} canalTipo="whatsapp" contatoTelefone={current.phone} /></div>
           <div className="dfield"><div className="dlabel">Responsável</div>
             {editMode ? (
               <select className="edit-input" value={editForm.respId} onChange={(e) => setEditForm((f) => ({ ...f, respId: e.target.value }))}>

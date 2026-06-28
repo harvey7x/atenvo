@@ -54,15 +54,25 @@ export function formataTelefoneBR(s: string): string {
   return somenteDigitos(s);
 }
 
-/** Converte "1.234,56" / "1234,56" / "1234.56" em number. undefined se não houver número. */
+/** Converte "1.234,56" / "1234,56" / "1234.56" / "1621" em number. undefined se não houver número. */
 export function parseMoedaBRL(s: string): number | undefined {
   if (!s) return undefined;
-  const m = s.match(/-?\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|-?\d+(?:[.,]\d{1,2})?/);
+  const m = s.match(/-?\d[\d.,]*\d|-?\d/); // token completo de dígitos (com pontos/vírgulas internos)
   if (!m) return undefined;
   let t = m[0];
-  if (t.includes(',')) t = t.replace(/\./g, '').replace(',', '.'); // formato BR
+  if (t.includes(',')) t = t.replace(/\./g, '').replace(',', '.'); // BR: pontos = milhar, vírgula = decimal
+  else if (t.includes('.')) t = t.replace(/\./g, ''); // só pontos = separador de milhar
   const n = Number(t);
   return Number.isFinite(n) ? n : undefined;
+}
+
+/** Resolve o telefone da ficha por prioridade: contato (cadastro/conversa) > importado (parser). */
+export function resolverTelefoneFicha(telContato?: string | null, telImportado?: string | null): { digitos: string; origem: 'contato' | 'importado' | 'vazio' } {
+  const c = normalizaTelefone(telContato || '');
+  if (c) return { digitos: c, origem: 'contato' };
+  const p = normalizaTelefone(telImportado || '');
+  if (p) return { digitos: p, origem: 'importado' };
+  return { digitos: '', origem: 'vazio' };
 }
 
 /** Moeda BRL para exibição. */
