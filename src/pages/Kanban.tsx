@@ -120,6 +120,9 @@ export function Kanban() {
   const [optim, setOptim] = useState<Record<string, string>>({}); // id -> colunaId (otimista)
   const [hover, setHover] = useState<string | null>(null);
   const dragId = useRef<string | null>(null);
+  const boardScrollRef = useRef<HTMLDivElement>(null);
+  const autoRaf = useRef<number | null>(null);
+  const ptr = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const [menu, setMenu] = useState<{ kind: 'card' | 'col'; id: string } | null>(null);
 
   // modal coluna
@@ -168,6 +171,7 @@ export function Kanban() {
     setOptim((m) => { const n: Record<string, string> = {}; for (const id in m) { const l = k.leads.find((x) => x.id === id); if (l && l.colunaId !== m[id]) n[id] = m[id]; } return n; });
   }, [k.leads]);
   useEffect(() => { function onDoc() { setMenu(null); } document.addEventListener('click', onDoc); return () => document.removeEventListener('click', onDoc); }, []);
+  useEffect(() => () => { if (autoRaf.current != null) cancelAnimationFrame(autoRaf.current); }, []);
   // Ver no Kanban: abre detalhes + destaca + rola até o card; ignora UUID inválido com segurança.
   useEffect(() => {
     const oid = params.get('oportunidade');
@@ -202,7 +206,27 @@ export function Kanban() {
     try { await k.moverLead(id, colId); toast('Lead movido'); }
     catch (e) { setOptim((m) => { const n = { ...m }; delete n[id]; return n; }); toast('Falha ao mover: ' + (e as Error).message, 'warn'); }
   }
-  function onDrop(colId: string) { const id = dragId.current; setHover(null); dragId.current = null; if (id) mover(id, colId); }
+  function onDrop(colId: string) { pararAutoScroll(); const id = dragId.current; setHover(null); dragId.current = null; if (id) mover(id, colId); }
+
+  // Auto-scroll horizontal simétrico durante o arraste (zona lateral ~80px do container visível).
+  function pararAutoScroll() { if (autoRaf.current != null) { cancelAnimationFrame(autoRaf.current); autoRaf.current = null; } ptr.current = { x: 0, y: 0 }; }
+  function iniciarAutoScroll() {
+    if (autoRaf.current != null) return;
+    const passo = () => {
+      const el = boardScrollRef.current;
+      if (!el || dragId.current == null) { pararAutoScroll(); return; }
+      const r = el.getBoundingClientRect();
+      const edge = 80, speed = 18;
+      const { x, y } = ptr.current;
+      if (x > 0 && y >= r.top && y <= r.bottom) {
+        const max = el.scrollWidth - el.clientWidth;
+        if (x < r.left + edge) el.scrollLeft = Math.max(0, el.scrollLeft - speed);
+        else if (x > r.right - edge) el.scrollLeft = Math.min(max, el.scrollLeft + speed);
+      }
+      autoRaf.current = requestAnimationFrame(passo);
+    };
+    autoRaf.current = requestAnimationFrame(passo);
+  }
 
   // ---- colunas ----
   function abrirNovaColuna() { setColForm({ nome: '', cor: PALETTE[0] }); setColErr(null); setColModal({ mode: 'novo' }); }
@@ -317,7 +341,7 @@ export function Kanban() {
           </div>
         )}
 
-        <div className="board-scroll">
+        <div className="board-scroll" ref={boardScrollRef} onDragOver={(e) => { ptr.current = { x: e.clientX, y: e.clientY }; iniciarAutoScroll(); }}>
           <div className="board">
             {k.colunas.map((col) => {
               const cards = porColuna(col.id);
@@ -349,7 +373,7 @@ export function Kanban() {
                       const subt = [l.tipoBeneficio ? labelOf(TIPO_BENEFICIO, l.tipoBeneficio) : '', labelOf(TIPO_SERVICO, l.tipoServico)].filter(Boolean).join(' · ');
                       return (
                         <div key={l.id} ref={(el) => { cardRefs.current[l.id] = el; }} className={'lead-card' + (moving ? ' moving' : '') + (destaque === l.id ? ' destaque' : '')} draggable onClick={() => setDetId(l.id)}
-                          onDragStart={(e) => { dragId.current = l.id; try { e.dataTransfer.effectAllowed = 'move'; } catch { /* */ } }} onDragEnd={() => { dragId.current = null; setHover(null); }}>
+                          onDragStart={(e) => { dragId.current = l.id; try { e.dataTransfer.effectAllowed = 'move'; } catch { /* */ } }} onDragEnd={() => { pararAutoScroll(); dragId.current = null; setHover(null); }}>
                           <div className="lc-top">
                             <Av n={l.nome} />
                             <div className="lc-id"><div className="lc-name" title={l.nome}>{l.nome}</div>{subt && <div className="lc-sub">{subt}</div>}</div>
