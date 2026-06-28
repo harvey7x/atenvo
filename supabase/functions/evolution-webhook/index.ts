@@ -87,6 +87,7 @@ Deno.serve(async (req) => {
       const pushName = (!fromMe ? (data.pushName as string) : null) ?? (phone ?? lid!);
 
       let contatoId: string | null = null;
+      let contatoCriadoAgora = false; // true apenas no ramo que INSERE contato novo (auto-entrada no Kanban)
       if (phone) { const { data: i } = await admin.from('contato_identidades').select('contato_id').eq('organizacao_id', orgId).eq('tipo', 'whatsapp').eq('valor_normalizado', phone).maybeSingle(); if (i) contatoId = i.contato_id; }
       if (!contatoId && lid) { const { data: i } = await admin.from('contato_identidades').select('contato_id').eq('organizacao_id', orgId).eq('tipo', 'outro').eq('provedor', 'evolution_lid').eq('valor_normalizado', lid).maybeSingle(); if (i) contatoId = i.contato_id; }
       if (!contatoId && phone) { const { data: c } = await admin.from('contatos').select('id').eq('organizacao_id', orgId).eq('telefone', phone).maybeSingle(); if (c) contatoId = c.id; }
@@ -94,6 +95,7 @@ Deno.serve(async (req) => {
         const { data: novo, error: e1 } = await admin.from('contatos').insert({ nome: pushName, telefone: phone ?? null, origem: 'WhatsApp', organizacao_id: orgId }).select('id').single();
         if (e1 || !novo) { await finish('erro', { erro: `contatos:${e1?.code ?? ''}:${(e1?.message ?? 'sem retorno').slice(0,180)}` }); return json({ ok: true }); }
         contatoId = novo.id;
+        contatoCriadoAgora = true;
         if (phone) await admin.from('contato_identidades').insert({ contato_id: contatoId, organizacao_id: orgId, tipo: 'whatsapp', provedor: 'evolution', valor: phoneJid ?? phone, valor_normalizado: phone, principal: true });
       } else if (phone) { await admin.from('contatos').update({ telefone: phone }).eq('id', contatoId).is('telefone', null); }
       if (lid) { const { data: ex } = await admin.from('contato_identidades').select('id').eq('organizacao_id', orgId).eq('tipo', 'outro').eq('provedor', 'evolution_lid').eq('valor_normalizado', lid).maybeSingle(); if (!ex) await admin.from('contato_identidades').insert({ contato_id: contatoId, organizacao_id: orgId, tipo: 'outro', provedor: 'evolution_lid', valor: lidJid ?? lid, valor_normalizado: lid, principal: false }); }
@@ -125,7 +127,15 @@ Deno.serve(async (req) => {
       const { error: msgErr } = await admin.from('mensagens').upsert({ conversa_id: conversaId, organizacao_id: orgId, direcao: 'entrada', tipo: 'texto', conteudo: corpo, id_externo: provMsgId, status: 'entregue', recebida_em: new Date().toISOString() }, { onConflict: 'id_externo', ignoreDuplicates: true });
       await admin.from('conversas').update({ ultima_interacao_em: new Date().toISOString() }).eq('id', conversaId);
       if (msgErr) { await finish('erro', { erro: `mensagens:${msgErr.code ?? ''}:${(msgErr.message ?? '').slice(0,180)}` }); return json({ ok: true }); }
-      await finish('processado', { ignorado_motivo: phone ? null : 'lid_sem_telefone' });
+      // Auto-entrada no Kanban: SOMENTE contato recém-criado nesta execução (entrada, não fromMe). Best-effort: nunca quebra o webhook.
+      let kanbanErro: string | null = null;
+      if (contatoCriadoAgora && contatoId) {
+        try {
+          const { data: funil } = await admin.from('funis').select('id').eq('organizacao_id', orgId).eq('padrao', true).eq('arquivado', false).limit(1).maybeSingle();
+          if (funil?.id) { const { error: re } = await admin.rpc('garantir_oportunidade_entrada', { p_contato: contatoId, p_funil: funil.id, p_origem: 'WhatsApp', p_conversa: conversaId, p_canal: canal.id }); if (re) kanbanErro = `${re.code ?? ''}:${(re.message ?? '').slice(0, 80)}`; }
+        } catch (ke) { kanbanErro = String((ke as Error).message ?? 'rpc').slice(0, 80); }
+      }
+      await finish('processado', { ignorado_motivo: kanbanErro ? ('kanban_erro:' + kanbanErro) : (phone ? null : 'lid_sem_telefone') });
       return json({ ok: true });
     }
 

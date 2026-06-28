@@ -135,6 +135,13 @@ Deno.serve(async (req) => {
             }
             await db.from('conversas').update(patch).eq('id', conversaId);
             await db.from('meta_webhook_events').update({ status_processamento: 'processado', processado_em: new Date().toISOString() }).eq('event_key', key);
+            // Auto-entrada no Kanban: SOMENTE mensagem recebida (não echo) de contato recém-criado. Best-effort: nunca afeta a mensagem/resposta.
+            if (!isEcho && novo) {
+              try {
+                const { data: funil } = await db.from('funis').select('id').eq('organizacao_id', pg.organizacao_id).eq('padrao', true).eq('arquivado', false).limit(1).maybeSingle();
+                if (funil?.id) await db.rpc('garantir_oportunidade_entrada', { p_contato: contatoId, p_funil: funil.id, p_origem: 'Facebook', p_conversa: conversaId, p_canal: pg.canal_id });
+              } catch (_k) { /* best-effort: erro no Kanban não interrompe o webhook */ }
+            }
             if (novo) enrich.push({ org: pg.organizacao_id, metaPaginaId: pg.id, contatoId, psid });
           } else if (tipo === 'messages' && psid && !m.message?.text) {
             await db.from('meta_webhook_events').update({ status_processamento: 'ignorado', ignorado_motivo: 'sem_texto', processado_em: new Date().toISOString() }).eq('event_key', key);
