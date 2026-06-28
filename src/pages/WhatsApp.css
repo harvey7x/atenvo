@@ -26,7 +26,7 @@
   --recv:#16233b; --sent:rgba(25,195,125,.2); --sent-ink:#d6f5e6;
   --shadow:0 1px 2px rgba(0,0,0,.4); --shadow-pop:0 14px 36px rgba(0,0,0,.5)
 }
-.wa-app .col{min-width:0;height:100%;display:flex;flex-direction:column;overflow:hidden}
+.wa-app .col{min-width:0;min-height:0;height:100%;display:flex;flex-direction:column;overflow:hidden}
 
 /* avatares (iniciais) */
 .wa-app .av{display:inline-flex;align-items:center;justify-content:center;color:#fff;font-weight:600;font-size:13px;letter-spacing:.01em;overflow:hidden}
@@ -69,12 +69,33 @@
 .wa-app .conv .cchip svg{width:13px;height:13px;color:var(--wa)}
 .wa-app .conv .cprev{font-size:12.5px;color:var(--muted);line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .wa-app .conv .unread{flex:none;align-self:flex-end;min-width:20px;height:20px;border-radius:999px;background:var(--green);color:#fff;font-size:11px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;padding:0 6px}
-/* conversa aguardando resposta: faixa âmbar discreta + fundo muito suave (sem cara de erro) */
-.wa-app .conv.aguardando:not(.active){background:rgba(224,146,42,.06)}
-.wa-app .conv.aguardando:not(.active)::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:3px;border-radius:0 3px 3px 0;background:#e0922a}
-.wa-app .conv .conv-alert{flex:none;display:inline-flex;color:#e0922a}
+/* aguardando resposta — hierarquia por tempo (sem cara de erro crítico) */
+.wa-app .conv .conv-alert{flex:none;display:inline-flex;color:var(--muted)}
 .wa-app .conv .conv-alert svg{width:14px;height:14px}
 .wa-app .conv .conv-wait{font-size:11px;font-weight:500;margin-top:3px;line-height:1.2}
+/* <30min: neutro (sem faixa/fundo, ícone discreto). 30min–2h: âmbar. 2–24h: vermelho suave. >24h: crítico. */
+.wa-app .conv.aguardando--ambar:not(.active){background:rgba(201,122,22,.06)}
+.wa-app .conv.aguardando--ambar:not(.active)::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:3px;border-radius:0 3px 3px 0;background:var(--amber)}
+.wa-app .conv.aguardando--ambar .conv-alert{color:var(--amber)}
+.wa-app .conv.aguardando--vermelho:not(.active){background:rgba(208,102,102,.07)}
+.wa-app .conv.aguardando--vermelho:not(.active)::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:3px;border-radius:0 3px 3px 0;background:#d06666}
+.wa-app .conv.aguardando--vermelho .conv-alert{color:#d06666}
+.wa-app .conv.aguardando--critico:not(.active){background:rgba(192,57,43,.10)}
+.wa-app .conv.aguardando--critico:not(.active)::before{content:"";position:absolute;left:0;top:9px;bottom:9px;width:4px;border-radius:0 3px 3px 0;background:#c0392b}
+.wa-app .conv.aguardando--critico .conv-alert{color:#c0392b}
+/* fallback de imagem indisponível (sem bloco de cor vazio) */
+.wa-app .msg-img-fallback{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:200px;padding:26px 28px;text-align:center}
+.wa-app .msg-img-fallback svg{width:26px;height:26px;color:var(--muted)}
+.wa-app .mif-txt{font-size:12.5px;font-weight:500;color:var(--ink-2)}
+.wa-app .mif-nome{font-size:11.5px;color:var(--muted);max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wa-app .mif-retry{margin-top:2px;border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);font-size:12px;font-weight:600;padding:5px 12px;border-radius:8px;cursor:pointer;font-family:inherit}
+.wa-app .mif-retry:hover{border-color:var(--green);color:var(--green-ink)}
+.wa-app .mif-retry:focus-visible{outline:2px solid var(--green);outline-offset:1px}
+/* descoberta do botão Nova conversa */
+.wa-app .lh-new:hover{color:var(--green-ink)}
+.wa-app .lh-new:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+/* larguras um pouco menores em telas médias (sem comprimir a conversa) */
+@media (max-width:1366px){ .wa-app .list-col{width:320px} .wa-app .data-col{width:300px} }
 .wa-app .lh-top .lh-new{margin-left:auto;flex:none}
 /* modal Nova conversa */
 .wa-app .nc-form{display:flex;flex-direction:column;gap:12px}
@@ -116,7 +137,7 @@
 .wa-app .icon-btn:hover{background:var(--hover)}
 .wa-app .icon-btn svg{width:19px;height:19px}
 
-.wa-app .messages{flex:1;overflow-y:auto;padding:24px 26px;background-color:var(--chat-bg);background-image:radial-gradient(var(--chat-dot) 1.1px,transparent 1.1px);background-size:20px 20px}
+.wa-app .messages{flex:1;min-height:0;overflow-y:auto;padding:24px 26px;background-color:var(--chat-bg);background-image:radial-gradient(var(--chat-dot) 1.1px,transparent 1.1px);background-size:20px 20px}
 .wa-app .msg{max-width:62%;margin-bottom:14px;clear:both}
 .wa-app .msg.in{float:left}
 .wa-app .msg.out{float:right}

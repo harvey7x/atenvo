@@ -8,6 +8,8 @@ import { useWaConversations, useSendWaMessage, useWaCanais, useAtribuirAtendimen
 import { MediaComposer } from '@/components/MediaComposer';
 import { AudioRecorder } from '@/components/AudioRecorder';
 import { AudioMessage } from '@/components/AudioMessage';
+import { MsgImage } from '@/components/MsgImage';
+import { EmptyState } from '@/components/EmptyState';
 import { useScripts, useScriptEtapaCounts, aguardarConfirmacaoEnvio } from '@/data/scripts';
 import { ScriptSequenceModal } from '@/components/ScriptSequenceModal';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -57,7 +59,7 @@ const IcAlert = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
 const IcNewChat = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.5 8.5 0 0 1-12.6 7.4L3 20.5l1.7-5A8.5 8.5 0 1 1 21 11.5z" /><path d="M12 8.5v5M9.5 11h5" /></svg>;
 
 /** "Aguardando há X" desde a última mensagem do cliente, com cor por faixa de tempo. */
-function tempoEspera(desdeIso?: string | null): { label: string; cor: string } | null {
+function tempoEspera(desdeIso?: string | null): { label: string; cor: string; tier: 'neutro' | 'ambar' | 'vermelho' | 'critico' } | null {
   if (!desdeIso) return null;
   const ms = Date.now() - new Date(desdeIso).getTime();
   if (!Number.isFinite(ms) || ms < 0) return null;
@@ -67,8 +69,10 @@ function tempoEspera(desdeIso?: string | null): { label: string; cor: string } |
   else if (min < 60) label = `Aguardando há ${min} min`;
   else if (min < 1440) label = `Aguardando há ${Math.floor(min / 60)} h`;
   else label = `Aguardando há ${Math.floor(min / 1440)} d`;
-  const cor = min >= 120 ? '#d06666' : min >= 30 ? '#e0922a' : 'var(--muted)';
-  return { label, cor };
+  // hierarquia visual por tempo: <30min neutro · 30min–2h âmbar · 2–24h vermelho suave · >24h crítico
+  const tier = min >= 1440 ? 'critico' : min >= 120 ? 'vermelho' : min >= 30 ? 'ambar' : 'neutro';
+  const cor = tier === 'critico' ? '#c0392b' : tier === 'vermelho' ? '#d06666' : tier === 'ambar' ? 'var(--amber)' : 'var(--muted)';
+  return { label, cor, tier };
 }
 
 function Avatar({ name, cls }: { name: string; cls?: string }) {
@@ -156,7 +160,6 @@ export function WhatsApp() {
   const [transferBusca, setTransferBusca] = useState('');                // busca no modal
   const [transferSel, setTransferSel] = useState<string>('');            // usuário selecionado p/ transferir
   const [atribuindo, setAtribuindo] = useState(false);                   // trava de clique-duplo (assumir/transferir)
-  const [imgUrls, setImgUrls] = useState<Record<string, string>>({});    // path -> URL assinada (sob demanda)
   const [lightbox, setLightbox] = useState<string | null>(null);         // imagem ampliada no histórico
   const [replyChip, setReplyChip] = useState('Chip 1');       // modo mock
   const [replyCanalId, setReplyCanalId] = useState<string>(''); // modo real
@@ -260,19 +263,6 @@ export function WhatsApp() {
     if (msgsRef.current) msgsRef.current.scrollTop = msgsRef.current.scrollHeight;
   }, [currentId, current.msgs.length]);
 
-  /* URLs assinadas das imagens do histórico (sob demanda; nunca persistidas) */
-  useEffect(() => {
-    let vivo = true;
-    (async () => {
-      for (const m of current.msgs) {
-        const p = m.anexoPath;
-        if (m.tipo !== 'imagem' || !p) continue;
-        if (imgUrls[p]) continue;
-        try { const url = await urlAssinadaMidiaWa(p); if (vivo) setImgUrls((u) => (u[p] ? u : { ...u, [p]: url })); } catch { /* ignora */ }
-      }
-    })();
-    return () => { vivo = false; };
-  }, [currentId, current.msgs.length, imgUrls]);
 
   /* responsivo: estado coerente do painel de dados */
   useEffect(() => {
@@ -596,7 +586,7 @@ export function WhatsApp() {
           </div>
           <div className="tabs">
             {TABS.map((t) => (
-              <button key={t.id} className={'tab' + (tab === t.id ? ' active' : '')} onClick={() => setTab(t.id)}>{t.label}</button>
+              <button key={t.id} className={'tab' + (tab === t.id ? ' active' : '')} title={t.id === 'pendentes' ? 'Pendentes inclui mensagens não lidas e clientes aguardando resposta.' : undefined} onClick={() => setTab(t.id)}>{t.label}</button>
             ))}
           </div>
         </div>
@@ -606,7 +596,7 @@ export function WhatsApp() {
           ) : filtered.map((c) => {
             const wait = c.aguardando ? tempoEspera(c.aguardandoDesde) : null;
             return (
-            <div key={c.id} className={'conv' + (c.id === currentId ? ' active' : '') + (c.aguardando ? ' aguardando' : '')} onClick={() => selectContact(c.id)}>
+            <div key={c.id} className={'conv' + (c.id === currentId ? ' active' : '') + (c.aguardando ? ' aguardando aguardando--' + (wait?.tier ?? 'neutro') : '')} onClick={() => selectContact(c.id)}>
               <Avatar name={c.name} />
               <div className="cbody">
                 <div className="crow">
@@ -623,7 +613,7 @@ export function WhatsApp() {
                   </div>
                 )}
               </div>
-              {c.unread > 0 && <span className="unread">{c.unread > 99 ? '99+' : c.unread}</span>}
+              {c.unread > 0 && <span className="unread" title={c.unread + ' não lidas'} aria-label={c.unread + ' mensagens não lidas'}>{c.unread > 99 ? '99+' : c.unread}</span>}
             </div>
             );
           })}
@@ -632,6 +622,14 @@ export function WhatsApp() {
 
       {/* ---------- CHAT ---------- */}
       <section className="col chat-col">
+        {!current.id ? (
+          <EmptyState
+            icon={<IcWa />}
+            title="Selecione uma conversa"
+            text="Escolha uma conversa na lista ou inicie um novo atendimento."
+            action={<button className="atv-btn primary" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }} onClick={abrirNovaConversa}><IcNewChat />Nova conversa</button>}
+          />
+        ) : (<>
         <header className="chat-head">
           {foco && (
               <button className="icon-btn list-toggle" title={listOpen ? 'Ocultar conversas' : 'Mostrar conversas'} onClick={() => setListOpen((v) => !v)}>
@@ -672,7 +670,6 @@ export function WhatsApp() {
         <div className="messages" ref={msgsRef}>
           {current.msgs.map((m, i) => {
             const ack = m.dir === 'out' ? ackOf(m.status) : null;
-            const imgUrl = m.tipo === 'imagem' && m.anexoPath ? imgUrls[m.anexoPath] : undefined;
             const tempo = (
               <span className="btime">
                 {m.viaTelefone && <span className="phone-tag" title="Enviada pelo celular"><IcPhoneSent />Enviada pelo celular</span>}
@@ -710,17 +707,9 @@ export function WhatsApp() {
                   ) : null
                 ) : m.tipo === 'imagem' ? (
                   <>
-                    <div className={'media-card bubble-img' + (m.status === 'falhou' ? ' media-falha' : '')}>
-                      {imgUrl
-                        ? <img className="msg-img" src={imgUrl} alt={m.nome || 'imagem'} loading="lazy" onClick={() => setLightbox(imgUrl)} title="Ampliar" />
-                        : <div className="msg-img-ph">Carregando imagem…</div>}
-                      {m.text && (
-                        <div className="media-cap">
-                          <div className="media-cap-text">{m.text}</div>
-                          {metaInline}
-                        </div>
-                      )}
-                    </div>
+                    {m.anexoPath
+                      ? <MsgImage path={m.anexoPath} nome={m.nome} caption={m.text || undefined} metaNode={m.text ? metaInline : undefined} falhou={m.status === 'falhou'} onOpen={setLightbox} />
+                      : <div className="media-card bubble-img"><div className="msg-img-fallback"><span className="mif-txt">Imagem indisponível</span></div></div>}
                     {!m.text && tempo}
                     {falhaActs}
                   </>
@@ -820,6 +809,7 @@ export function WhatsApp() {
             </div>
           </div>
         </div>
+        </>)}
       </section>
 
       {/* ---------- DADOS DO CLIENTE ---------- */}
