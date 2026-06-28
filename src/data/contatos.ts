@@ -135,6 +135,31 @@ export function useContatos() {
   });
 }
 
+/** Busca contatos da org por nome/e-mail/telefone (autocomplete). Limite 12; só com termo >= 2. */
+export function useBuscaContatos(term: string) {
+  const { currentOrg } = useOrg();
+  const t = (term || '').trim();
+  return useQuery({
+    queryKey: ['busca-contatos', currentOrg.id, t],
+    enabled: isSupabaseConfigured && !!supabase && t.length >= 2,
+    queryFn: async (): Promise<ContatoRow[]> => {
+      const safe = t.replace(/[,()%*]/g, ' ').trim();
+      const dig = t.replace(/\D/g, '');
+      const ors = [`nome.ilike.%${safe}%`, `email.ilike.%${safe}%`];
+      if (dig.length >= 3) ors.push(`telefone.ilike.%${dig}%`);
+      const { data, error } = await supabase!
+        .from('contatos')
+        .select('id, nome, email, telefone, cpf, origem, etiquetas, observacoes, responsavel_id, criado_em, atualizado_em, responsavel:usuarios(nome)')
+        .eq('organizacao_id', currentOrg.id)
+        .or(ors.join(','))
+        .order('atualizado_em', { ascending: false })
+        .limit(12);
+      if (error) throw new Error(error.message);
+      return ((data as unknown as DbContato[]) ?? []).map(mapRow);
+    },
+  });
+}
+
 export function useCreateContato() {
   const qc = useQueryClient();
   const { currentOrg } = useOrg();

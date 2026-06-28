@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useOrg } from '@/context/OrgContext';
 import { useToast } from '@/hooks/useToast';
 import { useEtiquetas, useOrgUsuarios } from '@/data/atendimento';
-import { useContatos } from '@/data/contatos';
+import { useBuscaContatos, type ContatoRow as Row } from '@/data/contatos';
 import { corDaEtiqueta } from '@/types/atendimento';
-import { useKanban, type KColuna, type KLead } from '@/data/kanban';
+import { useKanban, useOportunidadesAbertasDeContatos, type KColuna, type KLead } from '@/data/kanban';
 import { Modal } from '@/components/Modal';
 import { initials, avatarColor } from '@/lib/avatar';
 import './Kanban.css';
@@ -13,6 +14,55 @@ const PALETTE = ['#3b82f6', '#19C37D', '#f59e0b', '#8b5cf6', '#0891b2', '#e11d48
 const fmtBRL = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 function haDe(iso?: string) { if (!iso) return ''; const ms = Date.now() - new Date(iso).getTime(); if (!Number.isFinite(ms) || ms < 0) return ''; const m = Math.floor(ms / 60000); if (m < 1) return 'agora'; if (m < 60) return `há ${m} min`; if (m < 1440) return `há ${Math.floor(m / 60)} h`; return `há ${Math.floor(m / 1440)} d`; }
 function Av({ n, cls }: { n: string; cls?: string }) { return <span className={'av' + (cls ? ' ' + cls : '')} style={{ background: avatarColor(n) }}>{initials(n)}</span>; }
+
+/** Combobox pesquisável de contatos (autocomplete real, sem <select>/datalist). */
+function ContatoCombobox({ onSelect, onCriarNovo }: { onSelect: (c: Row) => void; onCriarNovo: () => void }) {
+  const [term, setTerm] = useState('');
+  const [deb, setDeb] = useState('');
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { const t = setTimeout(() => setDeb(term), 300); return () => clearTimeout(t); }, [term]);
+  const q = useBuscaContatos(deb);
+  const results = q.data ?? [];
+  const oppMap = useOportunidadesAbertasDeContatos(results.map((r) => r.id)).data ?? {};
+  useEffect(() => { setActive(0); }, [deb, results.length]);
+  useEffect(() => { function onDoc(e: MouseEvent) { if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false); } document.addEventListener('mousedown', onDoc); return () => document.removeEventListener('mousedown', onDoc); }, []);
+  const mostrar = open && deb.trim().length >= 2;
+  function escolher(c: Row) { onSelect(c); setOpen(false); setTerm(''); }
+  function onKey(e: React.KeyboardEvent) {
+    if (e.key === 'ArrowDown') { e.preventDefault(); setOpen(true); setActive((a) => Math.min(a + 1, results.length - 1)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setActive((a) => Math.max(a - 1, 0)); }
+    else if (e.key === 'Enter') { if (mostrar && results[active]) { e.preventDefault(); escolher(results[active]); } }
+    else if (e.key === 'Escape') { setOpen(false); }
+  }
+  return (
+    <div className="kb-combo" ref={wrapRef}>
+      <input className="atv-input" role="combobox" aria-expanded={mostrar} aria-autocomplete="list" aria-controls="kb-combo-list" placeholder="Digite nome, telefone ou e-mail" value={term} onChange={(e) => { setTerm(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)} onKeyDown={onKey} autoFocus />
+      {mostrar && (
+        <div className="kb-combo-pop" id="kb-combo-list" role="listbox">
+          {q.isLoading ? <div className="kb-combo-info">Buscando…</div>
+            : q.isError ? <div className="kb-combo-info err">Erro na busca. Tente novamente.</div>
+            : results.length === 0 ? (
+              <div className="kb-combo-empty"><div className="kb-combo-info">Nenhum contato encontrado.</div><button type="button" className="kb-link" onMouseDown={(e) => { e.preventDefault(); onCriarNovo(); }}>Criar novo contato</button></div>
+            ) : results.map((c, i) => {
+              const opp = oppMap[c.id];
+              return (
+                <button key={c.id} type="button" role="option" aria-selected={i === active} className={'kb-combo-item' + (i === active ? ' active' : '')} onMouseEnter={() => setActive(i)} onMouseDown={(e) => { e.preventDefault(); escolher(c); }}>
+                  <Av n={c.nome || c.tel || '?'} />
+                  <div className="kb-ci-txt">
+                    <div className="kb-ci-nome">{c.nome || 'Sem nome'}</div>
+                    <div className="kb-ci-meta">{c.tel || 'Sem telefone'}{c.org && c.org !== '—' ? ' · ' + c.org : ''}{c.email ? ' · ' + c.email : ''}</div>
+                    <div className={'kb-ci-opp' + (opp ? ' tem' : '')}>{opp ? ((opp.colunaNome ? opp.colunaNome + ' · ' : '') + 'oportunidade aberta') : 'Nenhuma oportunidade aberta'}</div>
+                  </div>
+                </button>
+              );
+            })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 const IC = {
   search: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3-3" /></svg>,
@@ -29,7 +79,7 @@ export function Kanban() {
   const k = useKanban();
   const { data: etiquetas = [] } = useEtiquetas();
   const { data: usuarios = [] } = useOrgUsuarios();
-  const { data: contatos = [] } = useContatos();
+  const navigate = useNavigate();
 
   const [search, setSearch] = useState('');
   const [optim, setOptim] = useState<Record<string, string>>({}); // id -> colunaId (otimista)
@@ -51,6 +101,11 @@ export function Kanban() {
   const [lf, setLf] = useState({ colunaId: '', contatoId: '', nome: '', telefone: '', respId: '', valor: '', origem: '', etiquetas: [] as string[], observacoes: '' });
   const [leadBusy, setLeadBusy] = useState(false);
   const [leadErr, setLeadErr] = useState<string | null>(null);
+  const [selContato, setSelContato] = useState<Row | null>(null);
+  const [semVinculo, setSemVinculo] = useState(false);
+  const oppSelMap = useOportunidadesAbertasDeContatos(selContato ? [selContato.id] : []).data ?? {};
+  const oppSel = selContato ? oppSelMap[selContato.id] : undefined;
+  const bloqueado = !!(selContato && oppSel && oppSel.funilId === k.funilId);
 
   useEffect(() => {
     setOptim((m) => { const n: Record<string, string> = {}; for (const id in m) { const l = k.leads.find((x) => x.id === id); if (l && l.colunaId !== m[id]) n[id] = m[id]; } return n; });
@@ -99,18 +154,20 @@ export function Kanban() {
   }
 
   // ---- leads ----
-  function abrirNovoLead(colunaId?: string) { setLf({ colunaId: colunaId || k.colunas[0]?.id || '', contatoId: '', nome: '', telefone: '', respId: '', valor: '', origem: 'Manual', etiquetas: [], observacoes: '' }); setLeadErr(null); setLeadModal({ mode: 'novo' }); }
-  function abrirEditarLead(l: KLead) { setLf({ colunaId: l.colunaId || '', contatoId: l.contatoId || '', nome: l.nome, telefone: l.telefone, respId: l.respId || '', valor: l.valor != null ? String(l.valor) : '', origem: l.origem, etiquetas: [...l.etiquetas], observacoes: l.observacoes }); setLeadErr(null); setLeadModal({ mode: 'editar', id: l.id }); setMenu(null); }
-  function onPickContato(id: string) { const c = contatos.find((x) => x.id === id); setLf((f) => ({ ...f, contatoId: id, nome: id ? (c?.nome || f.nome) : f.nome, telefone: id ? (c?.tel || f.telefone) : f.telefone })); }
+  function abrirNovoLead(colunaId?: string) { setLf({ colunaId: colunaId || k.colunas[0]?.id || '', contatoId: '', nome: '', telefone: '', respId: '', valor: '', origem: 'Manual', etiquetas: [], observacoes: '' }); setSelContato(null); setSemVinculo(false); setLeadErr(null); setLeadModal({ mode: 'novo' }); }
+  function abrirEditarLead(l: KLead) { setLf({ colunaId: l.colunaId || '', contatoId: l.contatoId || '', nome: l.nome, telefone: l.telefone, respId: l.respId || '', valor: l.valor != null ? String(l.valor) : '', origem: l.origem, etiquetas: [...l.etiquetas], observacoes: l.observacoes }); setSelContato(null); setSemVinculo(false); setLeadErr(null); setLeadModal({ mode: 'editar', id: l.id }); setMenu(null); }
+  function onSelContato(c: Row) { setSelContato(c); setSemVinculo(false); setLf((f) => ({ ...f, contatoId: c.id, nome: c.nome, telefone: c.tel, origem: (c.org && c.org !== '—') ? c.org : f.origem })); }
   async function salvarLead() {
-    if (leadBusy) return; const nome = lf.nome.trim();
+    if (leadBusy || bloqueado) return;
+    if (leadModal!.mode === 'novo' && !selContato && !semVinculo) { setLeadErr('Selecione um contato ou escolha criar sem vínculo.'); return; }
+    const nome = (selContato ? selContato.nome : lf.nome).trim();
     if (!nome) { setLeadErr('Informe o nome do lead.'); return; }
     if (!lf.colunaId) { setLeadErr('Selecione a coluna.'); return; }
     const valorNum = lf.valor.trim() ? Number(lf.valor.replace(/\./g, '').replace(',', '.')) : null;
     if (lf.valor.trim() && (valorNum == null || Number.isNaN(valorNum))) { setLeadErr('Valor inválido.'); return; }
     setLeadBusy(true); setLeadErr(null);
     try {
-      if (leadModal!.mode === 'novo') await k.criarLead({ colunaId: lf.colunaId, contatoId: lf.contatoId || null, nome, telefone: lf.telefone, responsavelId: lf.respId || null, valor: valorNum, origem: lf.origem, etiquetas: lf.etiquetas, observacoes: lf.observacoes });
+      if (leadModal!.mode === 'novo') await k.criarLead({ colunaId: lf.colunaId, contatoId: selContato?.id ?? null, nome, telefone: selContato?.tel || lf.telefone, responsavelId: lf.respId || null, valor: valorNum, origem: lf.origem, etiquetas: lf.etiquetas, observacoes: lf.observacoes });
       else await k.editarLead({ id: leadModal!.id!, nome, telefone: lf.telefone || null, responsavelId: lf.respId || null, valor: valorNum, origem: lf.origem || null, etiquetas: lf.etiquetas, observacoes: lf.observacoes || null, colunaId: lf.colunaId });
       setLeadModal(null); toast(leadModal!.mode === 'novo' ? 'Lead criado' : 'Lead atualizado');
     } catch (e) { setLeadErr('Não foi possível salvar o lead: ' + (e as Error).message); }
@@ -238,12 +295,36 @@ export function Kanban() {
       {/* modal lead */}
       <Modal open={!!leadModal} onClose={() => { if (!leadBusy) setLeadModal(null); }} closeOnBackdrop={!leadBusy} width={560}
         title={<div><div>{leadModal?.mode === 'novo' ? 'Novo lead' : 'Editar lead'}</div><div className="kb-modal-sub">{leadModal?.mode === 'novo' ? 'Adicione um lead ao funil.' : 'Atualize os dados do lead.'}</div></div>}
-        footer={<><button className="atv-btn" disabled={leadBusy} onClick={() => setLeadModal(null)}>Cancelar</button><button className="atv-btn primary" disabled={leadBusy} onClick={salvarLead}>{leadBusy ? 'Salvando…' : (leadModal?.mode === 'novo' ? 'Criar lead' : 'Salvar')}</button></>}>
+        footer={<><button className="atv-btn" disabled={leadBusy} onClick={() => setLeadModal(null)}>Cancelar</button><button className="atv-btn primary" disabled={leadBusy || bloqueado} onClick={salvarLead}>{leadBusy ? 'Salvando…' : (leadModal?.mode === 'novo' ? 'Adicionar lead' : 'Salvar')}</button></>}>
         <div className="kb-form">
-          {leadModal?.mode === 'novo' && (
-            <div className="kb-field"><label className="kb-label">Contato existente (opcional)</label><select className="atv-input" value={lf.contatoId} onChange={(e) => onPickContato(e.target.value)} disabled={leadBusy}><option value="">Novo / sem vínculo</option>{contatos.map((c) => <option key={c.id} value={c.id}>{c.nome}{c.tel ? ' · ' + c.tel : ''}</option>)}</select></div>
+          {leadModal?.mode === 'novo' ? (
+            selContato ? (
+              <div className="kb-selcontato">
+                <div className="kb-sc-row"><Av n={selContato.nome || selContato.tel || '?'} /><div className="kb-sc-id"><div className="kb-sc-nome">{selContato.nome || 'Sem nome'}</div><div className="kb-sc-meta">{selContato.tel || 'Sem telefone'}{selContato.org && selContato.org !== '—' ? ' · ' + selContato.org : ''}</div></div></div>
+                {bloqueado && oppSel && (
+                  <div className="kb-opp-aberta">
+                    <div className="kb-opp-titulo">Este contato já possui uma oportunidade aberta neste funil.</div>
+                    <div className="kb-opp-meta">Coluna: {oppSel.colunaNome || '—'} · Resp.: {oppSel.respNome || 'Não atribuído'}{oppSel.valor != null ? ' · ' + fmtBRL(oppSel.valor) : ''}{oppSel.atualizadoEm ? ' · atualizado ' + haDe(oppSel.atualizadoEm) : ''}</div>
+                    <button type="button" className="kb-link" onClick={() => setLeadModal(null)}>Abrir oportunidade</button>
+                  </div>
+                )}
+                <div className="kb-sc-acts"><button type="button" className="kb-link" onClick={() => setSelContato(null)}>Trocar contato</button><button type="button" className="kb-link danger" onClick={() => { setSelContato(null); setLf((f) => ({ ...f, contatoId: '', nome: '', telefone: '' })); }}>Remover</button></div>
+              </div>
+            ) : semVinculo ? (
+              <>
+                <div className="kb-field"><label className="kb-label">Nome *</label><input className="atv-input" placeholder="Nome do lead" value={lf.nome} onChange={(e) => setLf({ ...lf, nome: e.target.value })} disabled={leadBusy} /></div>
+                <div className="kb-field"><label className="kb-label">Telefone</label><input className="atv-input" inputMode="tel" placeholder="(11) 99999-9999" value={lf.telefone} onChange={(e) => setLf({ ...lf, telefone: e.target.value })} disabled={leadBusy} /></div>
+                <button type="button" className="kb-link" onClick={() => setSemVinculo(false)}>Vincular a um contato existente</button>
+              </>
+            ) : (
+              <>
+                <div className="kb-field"><label className="kb-label">Pesquisar contato</label><ContatoCombobox onSelect={onSelContato} onCriarNovo={() => { setLeadModal(null); navigate('/contatos'); }} /></div>
+                <button type="button" className="kb-link" onClick={() => { setSemVinculo(true); setLf((f) => ({ ...f, nome: '', telefone: '' })); }}>Criar lead sem contato vinculado</button>
+              </>
+            )
+          ) : (
+            <div className="kb-field"><label className="kb-label">Nome *</label><input className="atv-input" value={lf.nome} onChange={(e) => setLf({ ...lf, nome: e.target.value })} disabled={leadBusy} /></div>
           )}
-          <div className="kb-field"><label className="kb-label">Nome *</label><input className="atv-input" placeholder="Nome do lead/contato" value={lf.nome} onChange={(e) => setLf({ ...lf, nome: e.target.value })} disabled={leadBusy} /></div>
           <div className="kb-row">
             <div className="kb-field"><label className="kb-label">Telefone</label><input className="atv-input" inputMode="tel" placeholder="(11) 99999-9999" value={lf.telefone} onChange={(e) => setLf({ ...lf, telefone: e.target.value })} disabled={leadBusy} /></div>
             <div className="kb-field"><label className="kb-label">Valor estimado (R$)</label><input className="atv-input" inputMode="decimal" placeholder="0,00" value={lf.valor} onChange={(e) => setLf({ ...lf, valor: e.target.value })} disabled={leadBusy} /></div>

@@ -33,6 +33,33 @@ function mapLead(l: DbLead): KLead {
   };
 }
 
+export interface OppAberta { id: string; contatoId: string; colunaId: string | null; colunaNome: string; funilId: string | null; respNome: string; valor: number | null; atualizadoEm: string; }
+/** Mapa contatoId -> oportunidade ABERTA (em_andamento) do contato. Uma query (sem N+1). */
+export function useOportunidadesAbertasDeContatos(ids: string[]) {
+  const { currentOrg } = useOrg();
+  const org = currentOrg.id;
+  const chave = [...new Set(ids)].sort().join(',');
+  return useQuery({
+    queryKey: ['opp-abertas', org, chave],
+    enabled: KANBAN_REAL && ids.length > 0,
+    queryFn: async (): Promise<Record<string, OppAberta>> => {
+      const { data, error } = await supabase!.from('oportunidades')
+        .select('id, contato_id, coluna_id, funil_id, valor_estimado, atualizado_em, funil_colunas(nome), responsavel:usuarios(nome)')
+        .eq('organizacao_id', org).eq('status', 'em_andamento').in('contato_id', [...new Set(ids)]);
+      if (error) throw new Error(error.message);
+      const map: Record<string, OppAberta> = {};
+      for (const r of ((data as unknown[]) ?? []) as Record<string, unknown>[]) {
+        const cid = r.contato_id as string | null;
+        if (!cid || map[cid]) continue;
+        const col = r.funil_colunas as { nome: string } | { nome: string }[] | null;
+        const rp = r.responsavel as { nome: string } | { nome: string }[] | null;
+        map[cid] = { id: r.id as string, contatoId: cid, colunaId: (r.coluna_id as string) ?? null, colunaNome: (Array.isArray(col) ? col[0]?.nome : col?.nome) || '', funilId: (r.funil_id as string) ?? null, respNome: (Array.isArray(rp) ? rp[0]?.nome : rp?.nome) || '', valor: (r.valor_estimado as number) ?? null, atualizadoEm: (r.atualizado_em as string) || '' };
+      }
+      return map;
+    },
+  });
+}
+
 /** Funil padrão da org (cria um na primeira vez se o usuário tiver permissão). */
 async function garantirFunil(org: string): Promise<{ id: string; nome: string } | null> {
   const { data } = await supabase!.from('funis').select('id, nome').eq('organizacao_id', org).eq('arquivado', false).order('padrao', { ascending: false }).order('ordem', { ascending: true }).limit(1).maybeSingle();
