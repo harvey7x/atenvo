@@ -610,7 +610,8 @@ export function WhatsApp() {
                 {wait && <div className="conv-wait" style={{ color: wait.cor }}>{wait.label}</div>}
                 {c.tags.length > 0 && (
                   <div className="conv-tags">
-                    {c.tags.slice(0, 4).map((t) => <span key={t} className="ctag-dot" title={t} style={{ background: corDaEtiqueta(t, etiquetas) }} />)}
+                    {c.tags.slice(0, 3).map((t) => { const cor = corDaEtiqueta(t, etiquetas); return <span key={t} className="ctag" title={t} style={{ background: cor + '22', color: cor, borderColor: cor + '55' }}>{t}</span>; })}
+                    {c.tags.length > 3 && <span className="ctag more" title={c.tags.slice(3).join(', ')}>+{c.tags.length - 3}</span>}
                   </div>
                 )}
               </div>
