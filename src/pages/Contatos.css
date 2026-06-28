@@ -225,3 +225,43 @@
 /* estados de tabela (carregando / vazio / erro) — fase funcional */
 .contatos-page .empty-row{padding:34px 16px;text-align:center;color:var(--text-muted,#7a8699);font-size:14px}
 .contatos-page .empty-row.error{color:#c0556a}
+
+/* ===== Bloco UX (modal, filtros, estados) — sem migration ===== */
+.contatos-page .modal-sub{font-size:12.5px;font-weight:400;color:var(--muted);margin-top:2px}
+.contatos-page .ct-form{display:flex;flex-direction:column;gap:12px}
+.contatos-page .ct-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.contatos-page .ct-field{display:flex;flex-direction:column;gap:5px;min-width:0}
+.contatos-page .ct-label{font-size:12px;color:var(--muted);font-weight:500}
+.contatos-page .ct-textarea{height:auto;min-height:64px;padding:9px 11px;line-height:1.45;resize:vertical}
+.contatos-page .ct-err{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12.5px;color:#d06666;background:rgba(208,102,102,.08);border-radius:8px;padding:8px 10px}
+.contatos-page .ct-err-link{border:0;background:none;color:var(--green,#19C37D);font-weight:600;font-size:12.5px;cursor:pointer;padding:0;font-family:inherit;text-decoration:underline}
+
+/* filtros */
+.contatos-page .filters-wrap{position:relative}
+.contatos-page .btn-ghost.on{border-color:var(--green,#19C37D);color:var(--green,#19C37D)}
+.contatos-page .filters-pop{position:absolute;right:0;top:calc(100% + 6px);z-index:40;width:320px;max-width:92vw;background:var(--surface);border:1px solid var(--line-2);border-radius:12px;box-shadow:0 12px 32px rgba(16,24,40,.16);padding:14px;display:flex;flex-direction:column;gap:11px}
+.contatos-page .fp-field{display:flex;flex-direction:column;gap:5px}
+.contatos-page .fp-field>label{font-size:12px;color:var(--muted);font-weight:500}
+.contatos-page .fp-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.contatos-page .fp-check{display:inline-flex;align-items:center;gap:7px;font-size:13px;color:var(--ink);cursor:pointer}
+.contatos-page .fp-tags{display:flex;flex-wrap:wrap;gap:6px}
+.contatos-page .fp-tag{border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);font-size:12px;font-weight:500;padding:4px 9px;border-radius:999px;cursor:pointer;font-family:inherit}
+.contatos-page .fp-tag.on{font-weight:600}
+.contatos-page .fp-empty{font-size:12.5px;color:var(--muted)}
+.contatos-page .fp-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:2px}
+
+/* responsável */
+.contatos-page .resp-none{color:var(--muted)}
+.contatos-page .resp-line{display:inline-flex;align-items:center;gap:8px;min-width:0}
+.contatos-page .resp-line .rname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* estado vazio */
+.contatos-page .empty-state{display:flex;flex-direction:column;align-items:center;gap:8px;padding:40px 16px;text-align:center}
+.contatos-page .empty-state .es-title{font-size:16px;font-weight:600;color:var(--ink)}
+.contatos-page .empty-state .es-desc{font-size:13px;color:var(--muted);max-width:420px;line-height:1.5}
+.contatos-page .empty-state .btn-primary{margin-top:6px}
+
+/* paginação */
+.contatos-page .pg:disabled{opacity:.45;cursor:default}
+
+@media (max-width:1280px){ .contatos-page .ct-row,.contatos-page .fp-row{grid-template-columns:1fr} }

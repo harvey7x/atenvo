@@ -13,6 +13,12 @@ export interface ContatoRow {
   st: string;
   ult: string;
   tags: string[];
+  /** campos extras (já existentes no schema) p/ modal/filtros/CSV. */
+  cpf?: string;
+  obs?: string;
+  respId?: string | null;
+  criadoEm?: string;
+  atualizadoEm?: string;
 }
 
 export interface NovoContato {
@@ -20,6 +26,31 @@ export interface NovoContato {
   telefone?: string;
   email?: string;
   origem?: string;
+  cpf?: string;
+  responsavelId?: string | null;
+  etiquetas?: string[];
+  observacoes?: string;
+}
+
+/** Normaliza telefone p/ dígitos (BR ganha DDI 55); '' quando vazio. */
+export function normalizarTelefone(raw?: string | null): string {
+  const d = (raw || '').replace(/\D/g, '');
+  if (!d) return '';
+  if (d.startsWith('55') && d.length >= 12) return d;
+  if (d.length === 10 || d.length === 11) return '55' + d;
+  return d;
+}
+/** Telefone válido = >= 10 dígitos. */
+export function telefoneValido(raw?: string | null): boolean {
+  return (raw || '').replace(/\D/g, '').length >= 10;
+}
+/** E-mail normalizado (trim + lowercase). */
+export function normalizarEmail(raw?: string | null): string {
+  return (raw || '').trim().toLowerCase();
+}
+/** Validação simples de e-mail. */
+export function emailValido(raw?: string | null): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((raw || '').trim());
 }
 
 /* ===================== Modo MOCK (dev sem env) ===================== */
@@ -61,8 +92,9 @@ function fmtUlt(iso: string | null | undefined): string {
   return d.toLocaleDateString('pt-BR');
 }
 interface DbContato {
-  id: string; nome: string; email: string | null; telefone: string | null;
-  origem: string | null; etiquetas: string[] | null; atualizado_em: string | null;
+  id: string; nome: string; email: string | null; telefone: string | null; cpf: string | null;
+  origem: string | null; etiquetas: string[] | null; observacoes: string | null;
+  responsavel_id: string | null; criado_em: string | null; atualizado_em: string | null;
   responsavel: { nome: string } | { nome: string }[] | null;
 }
 function mapRow(c: DbContato): ContatoRow {
@@ -76,6 +108,11 @@ function mapRow(c: DbContato): ContatoRow {
     st: statusFromEtiquetas(c.etiquetas),
     ult: fmtUlt(c.atualizado_em),
     tags: c.etiquetas ?? [],
+    cpf: c.cpf ?? '',
+    obs: c.observacoes ?? '',
+    respId: c.responsavel_id ?? null,
+    criadoEm: c.criado_em ?? '',
+    atualizadoEm: c.atualizado_em ?? '',
   };
 }
 
@@ -89,7 +126,7 @@ export function useContatos() {
       // RLS ja restringe ao org do usuario; o organizacao_id NUNCA vem do cliente para leitura
       const { data, error } = await supabase
         .from('contatos')
-        .select('id, nome, email, telefone, origem, etiquetas, atualizado_em, responsavel:usuarios(nome)')
+        .select('id, nome, email, telefone, cpf, origem, etiquetas, observacoes, responsavel_id, criado_em, atualizado_em, responsavel:usuarios(nome)')
         .eq('organizacao_id', currentOrg.id)
         .order('atualizado_em', { ascending: false });
       if (error) throw new Error(error.message);
@@ -107,10 +144,17 @@ export function useCreateContato() {
         mockStore = [{ id: uid(), nome: input.nome, email: input.email ?? '', tel: input.telefone ?? '', org: input.origem ?? 'WhatsApp', resp: '—', st: 'Lead', ult: 'Agora', tags: [] }, ...mockStore];
         return;
       }
-      // organizacao_id = org atual (validado no backend por RLS/trigger)
+      // organizacao_id = org atual (validado no backend por RLS/trigger). NUNCA vem do formulário.
       const { error } = await supabase.from('contatos').insert({
-        nome: input.nome, telefone: input.telefone ?? null, email: input.email ?? null,
-        origem: input.origem ?? null, organizacao_id: currentOrg.id,
+        nome: input.nome,
+        telefone: input.telefone ?? null,
+        email: input.email ?? null,
+        cpf: input.cpf ?? null,
+        origem: input.origem ?? null,
+        responsavel_id: input.responsavelId ?? null,
+        observacoes: input.observacoes ?? null,
+        etiquetas: input.etiquetas ?? [],
+        organizacao_id: currentOrg.id,
       });
       if (error) throw new Error(error.message);
     },
@@ -122,15 +166,20 @@ export function useUpdateContato() {
   const qc = useQueryClient();
   const { currentOrg } = useOrg();
   return useMutation({
-    mutationFn: async (input: { id: string; nome?: string; telefone?: string; email?: string }) => {
+    mutationFn: async (input: { id: string; nome?: string; telefone?: string | null; email?: string | null; cpf?: string | null; origem?: string | null; responsavelId?: string | null; etiquetas?: string[]; observacoes?: string | null }) => {
       if (!isSupabaseConfigured || !supabase) {
-        mockStore = mockStore.map((r) => r.id === input.id ? { ...r, ...(input.nome != null ? { nome: input.nome } : {}), ...(input.telefone != null ? { tel: input.telefone } : {}), ...(input.email != null ? { email: input.email } : {}) } : r);
+        mockStore = mockStore.map((r) => r.id === input.id ? { ...r, ...(input.nome != null ? { nome: input.nome } : {}), ...(input.telefone != null ? { tel: input.telefone } : {}), ...(input.email != null ? { email: input.email } : {}), ...(input.etiquetas ? { tags: input.etiquetas } : {}) } : r);
         return;
       }
       const patch: Record<string, unknown> = {};
       if (input.nome != null) patch.nome = input.nome;
-      if (input.telefone != null) patch.telefone = input.telefone;
-      if (input.email != null) patch.email = input.email;
+      if (input.telefone !== undefined) patch.telefone = input.telefone;
+      if (input.email !== undefined) patch.email = input.email;
+      if (input.cpf !== undefined) patch.cpf = input.cpf;
+      if (input.origem !== undefined) patch.origem = input.origem;
+      if (input.responsavelId !== undefined) patch.responsavel_id = input.responsavelId;
+      if (input.etiquetas !== undefined) patch.etiquetas = input.etiquetas;
+      if (input.observacoes !== undefined) patch.observacoes = input.observacoes;
       const { error } = await supabase.from('contatos').update(patch).eq('id', input.id).eq('organizacao_id', currentOrg.id);
       if (error) throw new Error(error.message);
     },
