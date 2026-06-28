@@ -75,18 +75,18 @@
 
 /* ===== CHAT COLUMN ===== */
 .wa-app .chat-col{flex:1;min-width:380px;background:var(--bg);container-type:inline-size}
-/* cabeçalho da conversa: UMA linha (space-between) — identidade (avatar+nome+telefone, só com
-   o painel Dados FECHADO) + metadados (Canal/Status/Atendente) à esquerda; ações à direita.
-   A identidade é renderizada condicionalmente (não ocupa largura quando o painel está aberto). */
-.wa-app .chat-head{padding:12px 20px;border-bottom:1px solid var(--line);background:var(--surface);display:flex;align-items:center;justify-content:space-between;gap:20px}
-.wa-app .ch-left{display:flex;align-items:center;gap:20px;min-width:0}
+/* cabeçalho da conversa: UMA linha (flex) — identidade (avatar+nome+telefone, só com o painel
+   Dados FECHADO) + metadados à esquerda; ações empurradas à direita por margin-left:auto.
+   A identidade é renderizada condicionalmente: quando ausente, NÃO reserva coluna/largura — os
+   metadados assumem a margem esquerda interna e o espaço até as ações é flexível. */
+.wa-app .chat-head{padding:12px 20px;border-bottom:1px solid var(--line);background:var(--surface);display:flex;align-items:center;gap:20px}
 .wa-app .ch-id{display:flex;align-items:center;gap:12px;min-width:0;flex:0 1 auto}
 .wa-app .ch-id-text{min-width:0;overflow:hidden}
 .wa-app .ch-id .ch-name{display:block;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:16px;font-weight:600;color:var(--ink);line-height:1.15}
 .wa-app .ch-id .ch-name:focus-visible{outline:2px solid var(--ring);outline-offset:2px;border-radius:4px}
 .wa-app .ch-id .ch-phone{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .wa-app .ch-id .av{width:46px;height:46px;border-radius:50%;flex:none}
-.wa-app .ch-meta{display:flex;align-items:center;gap:24px;min-width:0}
+.wa-app .ch-meta{display:flex;align-items:center;gap:32px;min-width:0}
 .wa-app .ch-meta .meta-cell{min-width:0;white-space:nowrap}
 .wa-app .meta-cell{line-height:1.2}
 .wa-app .meta-cell .k{font-size:10.5px;color:var(--muted);font-weight:500;margin-bottom:3px}
@@ -97,7 +97,7 @@
 .wa-app .chip-tag svg{color:var(--wa)}
 .wa-app .status-sel{display:inline-flex;align-items:center;gap:6px;background:var(--green-soft);color:var(--green-ink);font-size:12.5px;font-weight:500;padding:5px 9px;border-radius:8px;border:1px solid var(--green-soft-2);cursor:pointer;font-family:inherit}
 .wa-app .status-sel svg{width:13px;height:13px}
-.wa-app .ch-actions{display:flex;align-items:center;gap:6px;flex:none}
+.wa-app .ch-actions{display:flex;align-items:center;gap:10px;flex:none;margin-left:auto}
 .wa-app .icon-btn{width:34px;height:34px;border-radius:9px;border:0;background:transparent;color:var(--ink-2);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:background .14s}
 .wa-app .icon-btn:hover{background:var(--hover)}
 .wa-app .icon-btn svg{width:19px;height:19px}
@@ -196,7 +196,6 @@
 .wa-app .pop-scripts{min-width:288px;max-height:340px;overflow-y:auto}
 
 /* ===== status (badge no header + picker no painel) ===== */
-.wa-app .ch-left{display:flex;align-items:center;gap:8px;min-width:0}
 .wa-app .icon-btn.on{background:var(--green-soft);color:var(--green-ink)}
 .wa-app .status-badge{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;padding:4px 10px;border-radius:999px;white-space:nowrap}
 .wa-app .sdot{width:8px;height:8px;border-radius:50%;flex:none}

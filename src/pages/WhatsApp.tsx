@@ -571,8 +571,7 @@ export function WhatsApp() {
       {/* ---------- CHAT ---------- */}
       <section className="col chat-col">
         <header className="chat-head">
-          <div className="ch-left">
-            {foco && (
+          {foco && (
               <button className="icon-btn list-toggle" title={listOpen ? 'Ocultar conversas' : 'Mostrar conversas'} onClick={() => setListOpen((v) => !v)}>
                 {listOpen ? <IcChevLeft /> : <IcChevRight />}
               </button>
@@ -599,7 +598,6 @@ export function WhatsApp() {
                 : <span className="meta-val" style={{ color: 'var(--muted)' }}>Sem responsável</span>}
             </div>
             </div>
-          </div>
           <div className="ch-actions">
             {current.id && (current.respId
               ? <button className="ch-resp-btn" disabled={atribuindo} title="Transferir atendimento" onClick={abrirTransferir}><IcTransfer /><span>Transferir</span></button>
