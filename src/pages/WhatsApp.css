@@ -75,20 +75,12 @@
 
 /* ===== CHAT COLUMN ===== */
 .wa-app .chat-col{flex:1;min-width:380px;background:var(--bg);container-type:inline-size}
-/* cabeçalho da conversa: UMA linha horizontal compacta — identidade | metadados | ações.
-   Identidade tem piso de largura (avatar 46px nunca colapsa/sobrepõe); metadados e textos
-   truncam (min-width:0); ações ficam fixas à direita (flex:none). */
-.wa-app .chat-head{padding:12px 20px;border-bottom:1px solid var(--line);background:var(--surface);display:flex;align-items:center;gap:20px}
-.wa-app .ch-left{display:flex;align-items:center;gap:8px;min-width:150px;flex:1 1 auto}
-.wa-app .ch-id{display:flex;align-items:center;gap:12px;min-width:0;flex:1 1 auto}
-.wa-app .ch-id-text{min-width:0;overflow:hidden}
-.wa-app .ch-id .ch-name{display:block;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.wa-app .ch-id .ch-name:focus-visible{outline:2px solid var(--ring);outline-offset:2px;border-radius:4px}
-.wa-app .ch-id .av{width:46px;height:46px;border-radius:50%;flex:none}
-.wa-app .ch-name{font-size:16px;font-weight:600;color:var(--ink);line-height:1.15}
-.wa-app .ch-phone{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.wa-app .ch-meta{display:flex;align-items:center;gap:20px;flex:0 1 auto;min-width:0}
-.wa-app .ch-meta .meta-cell{min-width:0;overflow:hidden}
+/* cabeçalho da conversa: UMA linha — metadados (Canal/Status/Atendente) à esquerda; ações à direita (space-between).
+   Identidade do contato não é repetida aqui (fica no painel Dados do cliente). */
+.wa-app .chat-head{padding:12px 20px;border-bottom:1px solid var(--line);background:var(--surface);display:flex;align-items:center;justify-content:space-between;gap:20px}
+.wa-app .ch-left{display:flex;align-items:center;gap:20px;min-width:0}
+.wa-app .ch-meta{display:flex;align-items:center;gap:24px;min-width:0}
+.wa-app .ch-meta .meta-cell{min-width:0;white-space:nowrap}
 .wa-app .meta-cell{line-height:1.2}
 .wa-app .meta-cell .k{font-size:10.5px;color:var(--muted);font-weight:500;margin-bottom:3px}
 .wa-app .meta-val{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:500;color:var(--ink)}
@@ -349,7 +341,6 @@
 
 /* ===== #8 MODO DE FOCO ===== */
 .wa-app.foco .chat-head{padding:8px 14px}
-.wa-app.foco .ch-id .av{width:38px;height:38px}
 .wa-app.foco .ch-meta{gap:14px}
 .wa-app.foco.list-hidden .list-col{display:none}
 .wa-app .list-toggle{flex:none}
@@ -401,6 +392,6 @@
 @media (max-width:860px){
   .wa-app .list-col{width:260px}
 }
-/* cabeçalho em UMA linha: em telas menores os textos (nome/telefone/metadados) truncam via
-   min-width:0 e o rótulo do botão Assumir recolhe (regra .ch-resp-btn span acima); Canal,
-   Status, Atendente e ações permanecem visíveis, sem sobreposição nem scroll horizontal. */
+/* cabeçalho em UMA linha: em telas menores o rótulo do botão Assumir recolhe
+   (regra .ch-resp-btn span acima); Canal, Status, Atendente e ações permanecem
+   sempre visíveis, lado a lado, sem sobreposição nem scroll horizontal. */
