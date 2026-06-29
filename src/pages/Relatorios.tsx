@@ -7,7 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import {
   REL_REAL, PRESETS, type Preset, type RelFiltros, FILTROS_PADRAO, resolvePeriodo, type Kpi,
   useRelatorioOpcoes, useResumo, useComercial, useAtendimento, useEquipe, useFinanceiro, useOrigens,
-  exportarCSV, spHoje,
+  exportarCSV, spHoje, type ResumoData, type AtendimentoData, type ComercialData, type FinanceiroData,
 } from '@/data/relatorios';
 import './Relatorios.css';
 
@@ -16,6 +16,7 @@ const fmtInt = (n: number) => Math.round(n).toLocaleString('pt-BR');
 const fmtBRL = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const fmtPct = (n: number) => `${n.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
 const fmtMin = (n: number | null) => { if (n == null) return '—'; if (n < 60) return `${Math.round(n)} min`; const h = Math.floor(n / 60); return `${h}h ${Math.round(n % 60)}min`; };
+const pl = (n: number, s: string, p: string) => `${fmtInt(n)} ${n === 1 ? s : p}`;
 const CANAL_LABEL: Record<string, string> = { evolution: 'WhatsApp', meta: 'Facebook' };
 const canalNome = (p: string) => CANAL_LABEL[p] || p;
 const CANAL_OPCOES = [{ id: 'evolution', r: 'WhatsApp' }, { id: 'meta', r: 'Facebook' }];
@@ -27,44 +28,50 @@ const IcRefresh = () => I(<><path d="M21 12a9 9 0 1 1-3-6.7L21 8" /><path d="M21
 const IcExport = () => I(<><path d="M12 3v12M8 11l4 4 4-4M5 21h14" /></>);
 const IcSearch = () => I(<><circle cx="11" cy="11" r="7" /><path d="m20 20-3-3" /></>);
 const IcCal = () => I(<><rect x="3" y="4.5" width="18" height="16" rx="2.4" /><path d="M3 9h18M8 2.5v4M16 2.5v4" /></>);
+const IcFilter = () => I(<path d="M3 5h18l-7 8v5l-4 2v-7z" />);
+const IcEmpty = () => I(<><circle cx="12" cy="12" r="9" /><path d="M8 12h8" /></>);
 
 /* ===== KPI ===== */
 type Sentido = 'maior' | 'menor' | 'neutro';
 function Delta({ k, sentido }: { k: Kpi; sentido: Sentido }) {
   const { deltaAbs, deltaPct } = k;
-  if (sentido === 'neutro' || deltaAbs === 0) return <span className="kpi-delta neu">— estável vs período anterior</span>;
+  if (sentido === 'neutro' || deltaAbs === 0) return <span className="kpi-delta neu">— estável vs anterior</span>;
   const bom = (sentido === 'maior' && deltaAbs > 0) || (sentido === 'menor' && deltaAbs < 0);
   const seta = deltaAbs > 0 ? '▲' : '▼';
-  const txt = deltaPct == null ? `${deltaAbs > 0 ? '+' : ''}${fmtInt(deltaAbs)}` : `${deltaPct > 0 ? '+' : ''}${deltaPct.toFixed(1)}%`;
+  const txt = deltaPct == null ? '—' : `${deltaPct > 0 ? '+' : ''}${deltaPct.toFixed(1)}%`;
   return <span className={'kpi-delta ' + (bom ? 'pos' : 'neg')}>{seta} {txt} vs anterior</span>;
 }
-function KpiCard({ label, k, sentido, fmt, tooltip }: { label: string; k: Kpi | null; sentido: Sentido; fmt: (n: number) => string; tooltip: string }) {
+function KpiCard({ label, k, sentido, fmt, tooltip, nota, hero }: { label: string; k: Kpi | null; sentido: Sentido; fmt: (n: number) => string; tooltip: string; nota?: string; hero?: boolean }) {
   if (!k) return (
-    <div className="kpi"><div className="kpi-body"><div className="kpi-head"><div className="kpi-label">{label}</div><span className="kpi-info" title={tooltip}>i</span></div><div className="kpi-value" style={{ fontSize: 15, color: 'var(--muted)' }}>Dados indisponíveis</div></div></div>
+    <div className="kpi"><div className="kpi-body"><div className="kpi-head"><div className="kpi-label">{label}</div><span className="kpi-info" title={tooltip}>i</span></div><div className="kpi-value" style={{ fontSize: 15, color: 'var(--muted)' }}>Indisponível</div><div className="kpi-prev">{tooltip}</div></div></div>
   );
   return (
-    <div className="kpi">
+    <div className={'kpi' + (hero ? ' kpi-hero' : '')}>
       <div className="kpi-body">
         <div className="kpi-head"><div className="kpi-label">{label}</div><span className="kpi-info" title={tooltip}>i</span></div>
         <div className="kpi-value">{fmt(k.atual)}</div>
-        <Delta k={k} sentido={sentido} />
-        <div className="kpi-prev">Anterior: {fmt(k.anterior)}</div>
+        {nota ? <span className="kpi-delta neu">{nota}</span> : <><Delta k={k} sentido={sentido} /><div className="kpi-prev">Anterior: {fmt(k.anterior)}</div></>}
       </div>
     </div>
   );
 }
 const flat = (v: number): Kpi => ({ atual: v, anterior: v, deltaAbs: 0, deltaPct: 0 });
 
+/* ===== estados vazios compactos (zero ≠ indisponível) ===== */
+function Vazio({ titulo, texto }: { titulo: string; texto?: string }) {
+  return <div className="vazio"><IcEmpty /><div><div className="vt">{titulo}</div>{texto && <div className="vd">{texto}</div>}</div></div>;
+}
+
 /* ===== gráficos SVG ===== */
-function LineChart({ pts, money }: { pts: { label: string; v: number }[]; money?: boolean }) {
-  if (!pts.length) return <div className="fx-empty">Sem dados no período.</div>;
-  const W = 720, H = 220, pl = 44, pr = 14, pt = 14, pb = 26, n = pts.length;
-  const max = Math.max(1, ...pts.map((p) => p.v)) * 1.18;
-  const X = (i: number) => pl + (W - pl - pr) * (n > 1 ? i / (n - 1) : 0.5);
+function axMoney(gv: number, max: number, money?: boolean) { if (!money) return fmtInt(gv); return max >= 1000 ? fmtInt(gv / 1000) + 'k' : fmtInt(gv); }
+function LineChart({ pts, money, compact }: { pts: { label: string; v: number }[]; money?: boolean; compact?: boolean }) {
+  const W = 720, H = compact ? 150 : 210, pl0 = 44, pr = 14, pt = 12, pb = 24, n = pts.length;
+  const maxV = Math.max(0, ...pts.map((p) => p.v)), max = Math.max(1, maxV) * 1.18;
+  const X = (i: number) => pl0 + (W - pl0 - pr) * (n > 1 ? i / (n - 1) : 0.5);
   const Y = (v: number) => H - pb - (H - pt - pb) * (v / max);
   const line = pts.map((p, i) => (i ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(p.v).toFixed(1)).join(' ');
   const area = `${line} L${X(n - 1).toFixed(1)} ${H - pb} L${X(0).toFixed(1)} ${H - pb} Z`;
-  const grid = [0, 1, 2, 3, 4].map((g) => { const gy = pt + (H - pt - pb) * g / 4; const gv = max - max * g / 4; return <g key={g}><line className="gridln" x1={pl} y1={gy} x2={W - pr} y2={gy} /><text className="axval" x={pl - 7} y={gy + 3} textAnchor="end">{money ? fmtInt(gv / 1000) + 'k' : fmtInt(gv)}</text></g>; });
+  const grid = [0, 1, 2, 3, 4].map((g) => { const gy = pt + (H - pt - pb) * g / 4; const gv = max - max * g / 4; return <g key={g}><line className="gridln" x1={pl0} y1={gy} x2={W - pr} y2={gy} /><text className="axval" x={pl0 - 7} y={gy + 3} textAnchor="end">{axMoney(gv, maxV, money)}</text></g>; });
   const step = Math.max(1, Math.ceil(n / 8));
   return (
     <svg viewBox={`0 0 ${W} ${H}`} width="100%" preserveAspectRatio="xMidYMid meet">
@@ -75,32 +82,29 @@ function LineChart({ pts, money }: { pts: { label: string; v: number }[]; money?
     </svg>
   );
 }
-function Bars({ data, money }: { data: { label: string; v: number }[]; money?: boolean }) {
-  if (!data.length) return <div className="fx-empty">Sem dados no período.</div>;
-  const W = 620, H = 220, pl = 44, pr = 12, pt = 14, pb = 28, n = data.length, bw = Math.min(46, (W - pl - pr) / n * 0.6);
-  const max = Math.max(1, ...data.map((d) => d.v)) * 1.15;
-  const grid = [0, 1, 2, 3, 4].map((g) => { const gy = pt + (H - pt - pb) * g / 4; const gv = max - max * g / 4; return <g key={g}><line className="gridln" x1={pl} y1={gy} x2={W - pr} y2={gy} /><text className="axval" x={pl - 7} y={gy + 3} textAnchor="end">{money ? fmtInt(gv / 1000) + 'k' : fmtInt(gv)}</text></g>; });
+function Bars({ data, money, compact }: { data: { label: string; v: number }[]; money?: boolean; compact?: boolean }) {
+  const W = 620, H = compact ? 150 : 210, pl0 = 44, pr = 12, pt = 12, pb = 26, n = data.length, bw = Math.min(46, (W - pl0 - pr) / Math.max(1, n) * 0.6);
+  const maxV = Math.max(0, ...data.map((d) => d.v)), max = Math.max(1, maxV) * 1.15;
+  const grid = [0, 1, 2, 3, 4].map((g) => { const gy = pt + (H - pt - pb) * g / 4; const gv = max - max * g / 4; return <g key={g}><line className="gridln" x1={pl0} y1={gy} x2={W - pr} y2={gy} /><text className="axval" x={pl0 - 7} y={gy + 3} textAnchor="end">{axMoney(gv, maxV, money)}</text></g>; });
   return (
     <svg viewBox={`0 0 ${W} ${H}`} width="100%" preserveAspectRatio="xMidYMid meet">
       {grid}
-      {data.map((d, i) => { const x = pl + (W - pl - pr) * ((i + 0.5) / n) - bw / 2; const bh = (H - pt - pb) * (d.v / max); return <g key={i}><rect x={x} y={H - pb - bh} width={bw} height={Math.max(2, bh)} rx="4" fill={i === n - 1 ? 'var(--accent)' : 'var(--bar)'} /><text className="axlbl" x={x + bw / 2} y={H - 7} textAnchor="middle">{d.label}</text></g>; })}
+      {data.map((d, i) => { const x = pl0 + (W - pl0 - pr) * ((i + 0.5) / n) - bw / 2; const bh = (H - pt - pb) * (d.v / max); return <g key={i}><rect x={x} y={H - pb - bh} width={bw} height={Math.max(2, bh)} rx="4" fill={i === n - 1 ? 'var(--accent)' : 'var(--bar)'} /><text className="axlbl" x={x + bw / 2} y={H - 7} textAnchor="middle">{d.label}</text></g>; })}
     </svg>
   );
 }
 function Funnel({ stages }: { stages: { nome: string; total: number }[] }) {
-  if (!stages.length) return <div className="fx-empty">Sem etapas configuradas ou sem oportunidades.</div>;
   const max = Math.max(1, ...stages.map((s) => s.total));
   return <div className="funnel">{stages.map((s) => <div className="funnel-row" key={s.nome}><span className="funnel-name" title={s.nome}>{s.nome}</span><div className="funnel-bar"><i style={{ width: `${(s.total / max) * 100}%` }} /></div><span className="funnel-val">{fmtInt(s.total)}</span></div>)}</div>;
 }
 const DONUT_PAL = ['#19C37D', '#2563EB', '#7a5bb0', '#c2772a', '#d6453f', '#2f8f9d', '#b0566f'];
 function Donut({ data }: { data: { label: string; v: number }[] }) {
   const total = data.reduce((s, d) => s + d.v, 0);
-  if (total === 0) return <div className="fx-empty">Sem dados no período.</div>;
-  const size = 170, r = size / 2 - 11, C = 2 * Math.PI * r, cx = size / 2, cy = size / 2; let off = 0;
+  const size = 160, r = size / 2 - 11, C = 2 * Math.PI * r, cx = size / 2, cy = size / 2; let off = 0;
   return (
     <div className="donut-wrap">
-      <div className="donut"><svg viewBox={`0 0 ${size} ${size}`} width="170" height="170">{data.map((d, i) => { const len = d.v / total * C; const seg = <circle key={i} cx={cx} cy={cy} r={r} fill="none" stroke={DONUT_PAL[i % DONUT_PAL.length]} strokeWidth="17" strokeDasharray={`${len.toFixed(1)} ${(C - len).toFixed(1)}`} strokeDashoffset={(-off).toFixed(1)} />; off += len; return seg; })}</svg><div className="center"><div className="big">{fmtInt(total)}</div><div className="cap">total</div></div></div>
-      <div className="legend">{data.map((d, i) => <div className="li" key={i}><span className="sw" style={{ background: DONUT_PAL[i % DONUT_PAL.length] }} /><span className="ln">{d.label}</span><span className="lv">{fmtInt(d.v)}</span><span className="lp">{((d.v / total) * 100).toFixed(0)}%</span></div>)}</div>
+      <div className="donut"><svg viewBox={`0 0 ${size} ${size}`} width="160" height="160">{data.map((d, i) => { const len = total ? d.v / total * C : 0; const seg = <circle key={i} cx={cx} cy={cy} r={r} fill="none" stroke={DONUT_PAL[i % DONUT_PAL.length]} strokeWidth="17" strokeDasharray={`${len.toFixed(1)} ${(C - len).toFixed(1)}`} strokeDashoffset={(-off).toFixed(1)} />; off += len; return seg; })}</svg><div className="center"><div className="big">{fmtInt(total)}</div><div className="cap">total</div></div></div>
+      <div className="legend">{data.map((d, i) => <div className="li" key={i}><span className="sw" style={{ background: DONUT_PAL[i % DONUT_PAL.length] }} /><span className="ln">{d.label}</span><span className="lv">{fmtInt(d.v)}</span><span className="lp">{total ? ((d.v / total) * 100).toFixed(0) : 0}%</span></div>)}</div>
     </div>
   );
 }
@@ -167,11 +171,33 @@ function DataTable<T extends Record<string, unknown>>({ cols, rows, searchKeys, 
   );
 }
 
+/* ===== narrativa determinística ===== */
+function frasesResumo(r: ResumoData, a?: AtendimentoData, f?: FinanceiroData): string[] {
+  const out: string[] = [];
+  out.push(`${pl(r.novosContatos.atual, 'novo contato foi cadastrado', 'novos contatos foram cadastrados')} no período.`);
+  const fech = r.oportunidadesFechadas.atual;
+  out.push(`${pl(r.oportunidadesCriadas.atual, 'oportunidade foi criada', 'oportunidades foram criadas')} e ${fech === 0 ? 'nenhum cliente foi fechado' : pl(fech, 'cliente foi fechado', 'clientes foram fechados')}.`);
+  if (a) out.push(`A equipe recebeu ${pl(a.msgRecebidas, 'mensagem', 'mensagens')} e enviou ${pl(a.msgEnviadas, 'resposta', 'respostas')}.`);
+  out.push(r.receitaRecebida.atual > 0 ? `Entraram ${fmtBRL(r.receitaRecebida.atual)} em recebimentos.` : 'Não houve receita recebida no período.');
+  if (f && f.parCanceladas > 0) out.push(`Existem ${pl(f.parCanceladas, 'parcela cancelada', 'parcelas canceladas')}.`);
+  out.push(r.economiaPreenchida ? `A economia gerada foi de ${fmtBRL(r.economiaGerada?.atual || 0)}.` : 'A economia gerada ainda não pode ser calculada porque os valores não foram preenchidos.');
+  return out;
+}
+function pontosAtencao(r: ResumoData, a?: AtendimentoData, c?: ComercialData, f?: FinanceiroData): { txt: string; ok?: boolean }[] {
+  const out: { txt: string; ok?: boolean }[] = [];
+  if (a && a.semResposta > 0) out.push({ txt: `${pl(a.semResposta, 'conversa ficou sem resposta', 'conversas ficaram sem resposta')} no período.` });
+  if (c && c.paradasMais7d > 0) out.push({ txt: `${pl(c.paradasMais7d, 'oportunidade está parada', 'oportunidades estão paradas')} há mais de 7 dias.` });
+  if (f && f.vencida > 0) out.push({ txt: `Há ${fmtBRL(f.vencida)} em parcelas vencidas e não pagas.` });
+  if (r.conversaoComercial.deltaAbs < 0) out.push({ txt: 'A taxa de conversão caiu em relação ao período anterior.' });
+  if (!r.economiaPreenchida) out.push({ txt: 'A economia gerada não está preenchida nas cobranças.' });
+  if (out.length === 0) out.push({ txt: 'Nenhum ponto crítico identificado no período.', ok: true });
+  return out;
+}
+
 /* ===== abas ===== */
 const ABAS = [
-  { id: 'visao', label: 'Visão geral' }, { id: 'comercial', label: 'Comercial' }, { id: 'atendimento', label: 'Atendimento' },
-  { id: 'equipe', label: 'Equipe' }, { id: 'financeiro', label: 'Financeiro' }, { id: 'economia', label: 'Economia gerada' },
-  { id: 'origens', label: 'Origens' }, { id: 'dados', label: 'Dados detalhados' },
+  { id: 'resumo', label: 'Resumo' }, { id: 'vendas', label: 'Vendas' }, { id: 'atendimento', label: 'Atendimento e equipe' },
+  { id: 'financeiro', label: 'Financeiro' }, { id: 'detalhamento', label: 'Detalhamento' },
 ] as const;
 type Aba = typeof ABAS[number]['id'];
 
@@ -182,18 +208,16 @@ export function Relatorios() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const ehAtendente = currentOrg.role === 'atendente';
-  const [aba, setAba] = useState<Aba>('visao');
+  const [aba, setAba] = useState<Aba>('resumo');
   const [f, setF] = useState<RelFiltros>(() => (ehAtendente && user ? { ...FILTROS_PADRAO, responsavel: user.id } : FILTROS_PADRAO));
   const [custIni, setCustIni] = useState(spHoje());
   const [custFim, setCustFim] = useState(spHoje());
+  const [mais, setMais] = useState(false);
 
   const periodo = resolvePeriodo(f.preset, f.ini, f.fim);
   const opcoes = useRelatorioOpcoes();
   const setFiltro = (k: keyof RelFiltros, v: string) => setF((s) => ({ ...s, [k]: v || undefined }));
-  function setPreset(p: Preset) {
-    if (p === 'custom') setF((s) => ({ ...s, preset: p, ini: custIni, fim: custFim }));
-    else setF((s) => ({ ...s, preset: p, ini: undefined, fim: undefined }));
-  }
+  function setPreset(p: Preset) { if (p === 'custom') setF((s) => ({ ...s, preset: p, ini: custIni, fim: custFim })); else setF((s) => ({ ...s, preset: p, ini: undefined, fim: undefined })); }
   function aplicarCustom(ini: string, fim: string) { setCustIni(ini); setCustFim(fim); setF((s) => ({ ...s, preset: 'custom', ini, fim })); }
   function atualizar() { qc.invalidateQueries({ predicate: (qq) => String(qq.queryKey[0]).startsWith('rel-') }); toast('Dados atualizados'); }
   function limpar() { setF({ ...FILTROS_PADRAO, ...(ehAtendente && user ? { responsavel: user.id } : {}) }); }
@@ -205,25 +229,31 @@ export function Relatorios() {
   if (f.coluna) chips.push({ k: 'coluna', lbl: 'Etapa', val: opcoes.data?.colunas.find((c) => c.id === f.coluna)?.nome || '—' });
   if (f.status) chips.push({ k: 'status', lbl: 'Status', val: STATUS_OPP.find((s) => s.id === f.status)?.r || f.status });
 
-  if (!REL_REAL) return <div className="relatorios-page"><div className="content"><div className="indispo">Relatórios disponíveis com o backend configurado.</div></div></div>;
-  const abasVisiveis = ABAS.filter((a) => !(a.id === 'equipe' && ehAtendente));
+  if (!REL_REAL) return <div className="relatorios-page"><div className="content"><Vazio titulo="Relatórios indisponíveis" texto="Disponível com o backend configurado." /></div></div>;
+  const abasVisiveis = ABAS;
 
   return (
     <div className="relatorios-page">
       <div className="content">
+        {/* filtros — linha principal */}
         <div className="toolbar">
           <div className="seg">{PRESETS.map((b) => <button key={b.id} className={f.preset === b.id ? 'on' : ''} onClick={() => setPreset(b.id)}>{b.label}</button>)}</div>
           {f.preset === 'custom'
             ? <span className="custom-dates"><input type="date" value={custIni} max={custFim} onChange={(e) => aplicarCustom(e.target.value, custFim)} /><span style={{ color: 'var(--muted)' }}>até</span><input type="date" value={custFim} min={custIni} max={spHoje()} onChange={(e) => aplicarCustom(custIni, e.target.value)} /></span>
             : <span className="daterange"><IcCal /><span>{periodo.label}</span></span>}
           <select className="flt" aria-label="Canal" value={f.canal || ''} onChange={(e) => setFiltro('canal', e.target.value)}><option value="">Canal: todos</option>{CANAL_OPCOES.map((c) => <option key={c.id} value={c.id}>{c.r}</option>)}</select>
-          <select className="flt" aria-label="Origem" value={f.origem || ''} onChange={(e) => setFiltro('origem', e.target.value)}><option value="">Origem: todas</option>{(opcoes.data?.origens || []).map((o) => <option key={o} value={o}>{o}</option>)}</select>
           {!ehAtendente && <select className="flt" aria-label="Responsável" value={f.responsavel || ''} onChange={(e) => setFiltro('responsavel', e.target.value)}><option value="">Responsável: todos</option>{(opcoes.data?.responsaveis || []).map((r) => <option key={r.id} value={r.id}>{r.nome}</option>)}</select>}
-          <select className="flt" aria-label="Etapa" value={f.coluna || ''} onChange={(e) => setFiltro('coluna', e.target.value)}><option value="">Etapa: todas</option>{(opcoes.data?.colunas || []).map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}</select>
-          <select className="flt" aria-label="Status" value={f.status || ''} onChange={(e) => setFiltro('status', e.target.value)}><option value="">Status: todos</option>{STATUS_OPP.map((s) => <option key={s.id} value={s.id}>{s.r}</option>)}</select>
+          <button className={'btn-ghost' + (mais ? '' : '')} onClick={() => setMais((m) => !m)}><IcFilter />Mais filtros</button>
           <span className="tb-spacer" />
           <button className="btn-ghost" onClick={atualizar}><IcRefresh />Atualizar</button>
         </div>
+        {mais && (
+          <div className="toolbar" style={{ marginTop: -8 }}>
+            <select className="flt" aria-label="Origem" value={f.origem || ''} onChange={(e) => setFiltro('origem', e.target.value)}><option value="">Origem: todas</option>{(opcoes.data?.origens || []).map((o) => <option key={o} value={o}>{o}</option>)}</select>
+            <select className="flt" aria-label="Etapa" value={f.coluna || ''} onChange={(e) => setFiltro('coluna', e.target.value)}><option value="">Etapa: todas</option>{(opcoes.data?.colunas || []).map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}</select>
+            <select className="flt" aria-label="Status" value={f.status || ''} onChange={(e) => setFiltro('status', e.target.value)}><option value="">Status: todos</option>{STATUS_OPP.map((s) => <option key={s.id} value={s.id}>{s.r}</option>)}</select>
+          </div>
+        )}
 
         <div className={'filterbar' + (chips.length ? '' : ' empty')}>
           {chips.length > 0 && <>
@@ -239,251 +269,204 @@ export function Relatorios() {
           Período: <b style={{ color: 'var(--ink-2)' }}>{periodo.label}</b> · comparado a <b style={{ color: 'var(--ink-2)' }}>{periodo.prevLabel}</b> · {currentOrg.name}
         </div>
 
-        {aba === 'visao' && <AbaVisao f={f} />}
-        {aba === 'comercial' && <AbaComercial f={f} />}
-        {aba === 'atendimento' && <AbaAtendimento f={f} />}
-        {aba === 'equipe' && !ehAtendente && <AbaEquipe f={f} periodoLabel={periodo.label} orgNome={currentOrg.name} />}
+        {aba === 'resumo' && <AbaResumo f={f} />}
+        {aba === 'vendas' && <AbaVendas f={f} periodoLabel={periodo.label} orgNome={currentOrg.name} />}
+        {aba === 'atendimento' && <AbaAtendimento f={f} periodoLabel={periodo.label} orgNome={currentOrg.name} ehAtendente={ehAtendente} />}
         {aba === 'financeiro' && <AbaFinanceiro f={f} />}
-        {aba === 'economia' && <AbaEconomia f={f} />}
-        {aba === 'origens' && <AbaOrigens f={f} periodoLabel={periodo.label} orgNome={currentOrg.name} />}
-        {aba === 'dados' && <AbaDados f={f} periodoLabel={periodo.label} orgNome={currentOrg.name} onNav={navigate} />}
+        {aba === 'detalhamento' && <AbaDetalhamento f={f} periodoLabel={periodo.label} orgNome={currentOrg.name} ehAtendente={ehAtendente} onNav={navigate} />}
       </div>
     </div>
   );
 }
 
-/* ============ ABA: Visão geral ============ */
-function AbaVisao({ f }: { f: RelFiltros }) {
+/* ============ Resumo ============ */
+function AbaResumo({ f }: { f: RelFiltros }) {
   const q = useResumo(f);
+  const at = useAtendimento(f, true);
   const fin = useFinanceiro(f, true);
   const com = useComercial(f, true);
   return (
     <Estado q={q}>
       {q.data && <>
         <div className="kpis">
-          <KpiCard label="Novos contatos" k={q.data.novosContatos} sentido="maior" fmt={fmtInt} tooltip="Contatos criados no período (contatos.criado_em). População: contatos." />
-          <KpiCard label="Novas conversas" k={q.data.novasConversas} sentido="maior" fmt={fmtInt} tooltip="Conversas iniciadas no período (conversas.criado_em). População: conversas." />
-          <KpiCard label="Conversas atendidas" k={q.data.conversasAtendidas} sentido="maior" fmt={fmtInt} tooltip="Novas conversas do período que receberam ≥1 resposta de operador (saída com autor identificado)." />
-          <KpiCard label="Taxa de atendimento" k={q.data.taxaAtendimento} sentido="maior" fmt={fmtPct} tooltip="Conversas atendidas ÷ novas conversas do período." />
-          <KpiCard label="Oportunidades criadas" k={q.data.oportunidadesCriadas} sentido="maior" fmt={fmtInt} tooltip="Oportunidades criadas no período (oportunidades.criado_em). População: oportunidades." />
-          <KpiCard label="Oportunidades fechadas" k={q.data.oportunidadesFechadas} sentido="maior" fmt={fmtInt} tooltip="Do conjunto criado no período, as com status ganho (coorte por criação)." />
-          <KpiCard label="Conversão comercial" k={q.data.conversaoComercial} sentido="maior" fmt={fmtPct} tooltip="Oportunidades ganhas ÷ oportunidades criadas, ambas do mesmo período (coorte por criação)." />
-          <KpiCard label="Receita recebida" k={q.data.receitaRecebida} sentido="maior" fmt={fmtBRL} tooltip="Σ valor_pago de parcelas pagas com data_pagamento no período." />
-          <KpiCard label="Receita prevista" k={q.data.receitaPrevista} sentido="maior" fmt={fmtBRL} tooltip="Σ parcelas não canceladas com vencimento (data_prevista) no período." />
-          <KpiCard label="Ticket médio (mensal)" k={q.data.ticketMedio} sentido="maior" fmt={fmtBRL} tooltip="Média de valor_mensal das cobranças não canceladas criadas no período." />
-          <KpiCard label="Parcelas em atraso" k={flat(q.data.parcelasAtraso)} sentido="neutro" fmt={fmtInt} tooltip="Posição atual: parcelas previstas com vencimento anterior a hoje (não comparado a período anterior)." />
-          <KpiCard label="Inadimplência" k={q.data.taxaInadimplencia} sentido="menor" fmt={fmtPct} tooltip="Parcelas vencidas não pagas ÷ parcelas vencidas (vencimento no período)." />
-          <KpiCard label="Economia gerada" k={q.data.economiaGerada} sentido="maior" fmt={fmtBRL} tooltip="Σ valor_economizado das cobranças. Indisponível enquanto o campo não for preenchido." />
+          <KpiCard hero label="Novos contatos" k={q.data.novosContatos} sentido="maior" fmt={fmtInt} tooltip="Contatos criados no período." />
+          <KpiCard hero label="Clientes fechados" k={q.data.oportunidadesFechadas} sentido="maior" fmt={fmtInt} tooltip="Oportunidades ganhas (do conjunto criado no período)." />
+          <KpiCard hero label="Taxa de conversão" k={q.data.conversaoComercial} sentido="maior" fmt={fmtPct} tooltip="Oportunidades ganhas ÷ criadas, mesmo período." />
+          <KpiCard hero label="Receita recebida" k={q.data.receitaRecebida} sentido="maior" fmt={fmtBRL} tooltip="Σ valor pago das parcelas pagas no período." />
+          <KpiCard hero label="Valores em atraso" k={fin.data ? flat(fin.data.vencida) : flat(0)} sentido="menor" fmt={fmtBRL} nota="Posição atual" tooltip="Parcelas não pagas com vencimento anterior a hoje (posição atual, não comparada)." />
+          <KpiCard hero label="Economia gerada" k={q.data.economiaGerada} sentido="maior" fmt={fmtBRL} tooltip="Σ valor_economizado das cobranças. Indisponível enquanto não for preenchido." />
         </div>
-        <div className="grid-2">
-          <Estado q={fin}>{fin.data && <Panel title="Evolução de recebimentos" sub="Últimos 6 meses (valor pago)"><LineChart pts={fin.data.evolucao.map((m) => ({ label: m.mes.slice(5) + '/' + m.mes.slice(2, 4), v: m.recebido }))} money /></Panel>}</Estado>
-          <Estado q={com}>{com.data && <Panel title="Funil comercial" sub="Oportunidades por etapa (colunas reais)"><Funnel stages={com.data.funil.map((c) => ({ nome: c.nome, total: c.total }))} /></Panel>}</Estado>
+        <div className="narr-grid">
+          <Panel title="Resumo do período" sub="Gerado a partir dos números calculados">
+            <ul className="narr">{frasesResumo(q.data, at.data, fin.data).map((s, i) => <li key={i}>{s}</li>)}</ul>
+          </Panel>
+          <Panel title="Pontos de atenção" sub="Situações reais detectadas">
+            <ul className="narr aten">{pontosAtencao(q.data, at.data, com.data, fin.data).map((p, i) => <li key={i} className={p.ok ? 'ok' : ''}>{p.txt}</li>)}</ul>
+          </Panel>
         </div>
       </>}
     </Estado>
   );
 }
 
-/* ============ ABA: Comercial ============ */
-function AbaComercial({ f }: { f: RelFiltros }) {
+/* ============ Vendas (comercial + origens) ============ */
+function AbaVendas({ f, periodoLabel, orgNome }: { f: RelFiltros; periodoLabel: string; orgNome: string }) {
   const q = useComercial(f, true);
-  return (
-    <Estado q={q}>
-      {q.data && <>
-        <div className="kpis">
-          <KpiCard label="Oportunidades no período" k={flat(q.data.totalOpp)} sentido="neutro" fmt={fmtInt} tooltip="Oportunidades criadas no período." />
-          <KpiCard label="Taxa de conversão" k={flat(q.data.taxaConversao)} sentido="neutro" fmt={fmtPct} tooltip="Ganhos ÷ total de oportunidades." />
-          <KpiCard label="Taxa de fechamento" k={flat(q.data.taxaFechamento)} sentido="neutro" fmt={fmtPct} tooltip="Ganhos ÷ (ganhos + perdidos)." />
-          <KpiCard label="Clientes perdidos" k={flat(q.data.perdidos)} sentido="neutro" fmt={fmtInt} tooltip="Oportunidades com status perdido." />
-          <KpiCard label="Paradas há +7 dias" k={flat(q.data.paradasMais7d)} sentido="neutro" fmt={fmtInt} tooltip="Em andamento sem atualização há mais de 7 dias (atualizado_em)." />
-        </div>
-        <div className="grid-2">
-          <Panel title="Leads recebidos por dia" sub="Oportunidades criadas"><LineChart pts={q.data.leadsSerie} /></Panel>
-          <Panel title="Funil comercial" sub="Etapas reais do funil da organização"><Funnel stages={q.data.funil.map((c) => ({ nome: c.nome, total: c.total }))} /></Panel>
-        </div>
-        <Panel title="Distribuição por status"><Donut data={q.data.porStatus.map((s) => ({ label: s.status, v: s.total }))} /></Panel>
-        <div className="indispo" style={{ marginTop: 16 }}><b>Indisponível:</b> tempo médio por etapa, conversão entre etapas e motivos de perda — não há tabela de histórico de movimentação nem campo de motivo de perda no schema atual.</div>
-      </>}
-    </Estado>
-  );
-}
-
-/* ============ ABA: Atendimento ============ */
-function AbaAtendimento({ f }: { f: RelFiltros }) {
-  const q = useAtendimento(f, true);
-  const HORAS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
-  const DIAS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-  return (
-    <Estado q={q}>
-      {q.data && <>
-        <div className="kpis">
-          <KpiCard label="Total de conversas" k={flat(q.data.totalConversas)} sentido="neutro" fmt={fmtInt} tooltip="Conversas criadas no período." />
-          <KpiCard label="Abertas" k={flat(q.data.abertas)} sentido="neutro" fmt={fmtInt} tooltip="Conversas com status aberta." />
-          <KpiCard label="Resolvidas" k={flat(q.data.resolvidas)} sentido="neutro" fmt={fmtInt} tooltip="Conversas resolvidas ou fechadas." />
-          <KpiCard label="Sem resposta" k={flat(q.data.semResposta)} sentido="menor" fmt={fmtInt} tooltip="Conversas do período com entrada do cliente e nenhuma resposta de operador (saída com autor identificado)." />
-          <KpiCard label="Mensagens recebidas" k={flat(q.data.msgRecebidas)} sentido="neutro" fmt={fmtInt} tooltip="Mensagens de entrada no período." />
-          <KpiCard label="Mensagens enviadas" k={flat(q.data.msgEnviadas)} sentido="neutro" fmt={fmtInt} tooltip="Mensagens de saída no período (exclui sistema e nota interna; inclui saídas sincronizadas do aparelho)." />
-          <KpiCard label="Média msg/conversa" k={flat(q.data.mediaMsgConversa)} sentido="neutro" fmt={(n) => n.toFixed(1)} tooltip="Total de mensagens ÷ conversas do período." />
-          <KpiCard label="Taxa de atendimento" k={flat(q.data.taxaAtendimento)} sentido="maior" fmt={fmtPct} tooltip="Conversas do período com entrada que receberam resposta de operador ÷ conversas do período com entrada." />
-          <KpiCard label="Tempo até 1ª resposta (operador)" k={q.data.primeiraRespostaMin == null ? null : flat(q.data.primeiraRespostaMin)} sentido="menor" fmt={(n) => fmtMin(n)} tooltip="Média entre a 1ª entrada e a 1ª resposta de operador (saída com autor_id). Saídas sincronizadas do aparelho (sem autor) não entram — o schema não permite confirmá-las como humanas." />
-        </div>
-        <div className="grid-2">
-          <Panel title="Volume por hora do dia" sub="Mensagens (fuso de São Paulo)"><MiniBars vals={q.data.porHora} labels={HORAS} /></Panel>
-          <Panel title="Volume por dia da semana" sub="Mensagens"><MiniBars vals={q.data.porDiaSemana} labels={DIAS} /></Panel>
-        </div>
-        <Panel title="Conversas por canal"><Donut data={q.data.porCanal.map((c) => ({ label: canalNome(c.canal), v: c.total }))} /></Panel>
-        <div className="indispo" style={{ marginTop: 16 }}><b>Sobre esta seção:</b> só os filtros de <b>período</b> e <b>canal</b> se aplicam ao atendimento (conversas/mensagens); origem, etapa, status e responsável não têm relação confiável com conversas e são ignorados aqui. “Resposta” = saída com autor identificado (operador via app); saídas sincronizadas do aparelho não são contadas como atendimento humano. Tempo de atendimento/resolução e “fora de horário” dependem de marcação de jornada inexistente.</div>
-      </>}
-    </Estado>
-  );
-}
-
-/* ============ ABA: Equipe ============ */
-function AbaEquipe({ f, periodoLabel, orgNome }: { f: RelFiltros; periodoLabel: string; orgNome: string }) {
-  const q = useEquipe(f, true);
-  const com = (q.data?.comercial || []).slice().sort((a, b) => b.receitaRecebida - a.receitaRecebida);
-  const at = (q.data?.atendimento || []).filter((l) => l.mensagensEnviadas > 0).sort((a, b) => b.mensagensEnviadas - a.mensagensEnviadas);
-  const maxRec = Math.max(1, ...com.map((l) => l.receitaRecebida));
+  const or = useOrigens(f, true);
   const meta = [`Organizacao: ${orgNome}`, `Periodo: ${periodoLabel}`, `Gerado: ${new Date().toLocaleString('pt-BR')}`];
   return (
     <Estado q={q}>
       {q.data && <>
-        <div className="sech">Atendimento <span style={{ fontWeight: 400, color: 'var(--muted)', fontSize: 12 }}>· atribuído por autoria real da mensagem</span></div>
-        {!q.data.atendimentoAtribuivel
-          ? <div className="indispo"><b>Dados insuficientes para atribuição de atendimento.</b><br />Não há saídas com autor identificado nem conversas com atendente atribuído no período (conversas.atendente_id e mensagens.autor_id nulos). Não substituímos por responsável comercial.</div>
-          : <DataTable
-            cols={[
-              { key: 'nome', label: 'Atendente' },
-              { key: 'conversasRespondidas', label: 'Conversas respondidas', align: 'c' },
-              { key: 'mensagensEnviadas', label: 'Mensagens enviadas (operador)', align: 'c' },
-            ] as Col<Record<string, unknown>>[]}
-            rows={at as unknown as Record<string, unknown>[]} searchKeys={['nome']}
-            csvName={`equipe_atendimento_${periodoLabel.replace(/\D/g, '')}`} csvMeta={[...meta, 'Atribuicao por mensagens.autor_id (saida do operador via app)']} />}
-
-        <div className="sech" style={{ marginTop: 18 }}>Desempenho comercial / da carteira <span style={{ fontWeight: 400, color: 'var(--muted)', fontSize: 12 }}>· atribuído por responsável</span></div>
-        <Panel title="Ranking por receita recebida (carteira)" sub="Volume e eficiência mostrados separadamente na tabela">
-          {com.length ? <div className="barlist">{com.map((l) => <div className="barlist-row" key={l.id}><span className="barlist-name" title={l.nome}>{l.nome}</span><div className="barlist-track"><i style={{ width: `${(l.receitaRecebida / maxRec) * 100}%` }} /></div><span className="barlist-val">{fmtBRL(l.receitaRecebida)}</span></div>)}</div> : <div className="fx-empty">Sem atendentes.</div>}
+        <div className="kpis">
+          <KpiCard label="Novas oportunidades" k={flat(q.data.totalOpp)} sentido="neutro" fmt={fmtInt} nota="No período" tooltip="Oportunidades criadas no período." />
+          <KpiCard label="Clientes fechados" k={flat(Math.round((q.data.taxaConversao / 100) * q.data.totalOpp))} sentido="neutro" fmt={fmtInt} nota="No período" tooltip="Oportunidades ganhas no período." />
+          <KpiCard label="Clientes perdidos" k={flat(q.data.perdidos)} sentido="neutro" fmt={fmtInt} nota="No período" tooltip="Oportunidades com status perdido." />
+          <KpiCard label="Conversão" k={flat(q.data.taxaConversao)} sentido="neutro" fmt={fmtPct} nota="No período" tooltip="Ganhas ÷ total de oportunidades criadas." />
+        </div>
+        <div className="grid-2">
+          <Panel title="Funil comercial" sub="Etapas reais da organização">
+            {q.data.funil.length === 0 || q.data.totalOpp === 0 ? <Vazio titulo="Sem oportunidades no período" texto="Quando houver oportunidades, o funil por etapa aparece aqui." /> : <Funnel stages={q.data.funil.map((c) => ({ nome: c.nome, total: c.total }))} />}
+          </Panel>
+          <Panel title="Situação das oportunidades" sub="Distribuição por status">
+            {q.data.porStatus.length === 0 ? <Vazio titulo="Sem oportunidades no período" />
+              : q.data.porStatus.length === 1 ? <div className="compact-stat"><span className="cs-v">{fmtInt(q.data.porStatus[0].total)}</span><span className="cs-l">{q.data.porStatus[0].status}</span></div>
+              : <Donut data={q.data.porStatus.map((s) => ({ label: s.status, v: s.total }))} />}
+          </Panel>
+        </div>
+        <Panel title="Novas oportunidades por dia" sub="Oportunidades criadas">
+          {q.data.leadsSerie.length < 2 ? <Vazio titulo="Dados insuficientes para a curva" texto={`No período: ${pl(q.data.totalOpp, 'oportunidade criada', 'oportunidades criadas')}.`} /> : <LineChart pts={q.data.leadsSerie} compact />}
         </Panel>
-        <DataTable
-          cols={[
-            { key: 'nome', label: 'Responsável' },
-            { key: 'leads', label: 'Contatos', align: 'c' },
-            { key: 'oppAndamento', label: 'Em andamento', align: 'c' },
-            { key: 'oppGanho', label: 'Fechados', align: 'c' },
-            { key: 'oppPerdido', label: 'Perdidos', align: 'c' },
-            { key: 'taxaConversao', label: 'Conversão', align: 'c', fmt: (v) => fmtPct(v as number), csv: (r) => (r.taxaConversao as number).toFixed(1) },
-            { key: 'receitaContratada', label: 'Receita contratada', align: 'r', fmt: (v) => fmtBRL(v as number), csv: (r) => (r.receitaContratada as number).toFixed(2) },
-            { key: 'receitaRecebida', label: 'Receita recebida', align: 'r', fmt: (v) => fmtBRL(v as number), csv: (r) => (r.receitaRecebida as number).toFixed(2) },
-          ] as Col<Record<string, unknown>>[]}
-          rows={com as unknown as Record<string, unknown>[]}
-          searchKeys={['nome']}
-          csvName={`equipe_carteira_${periodoLabel.replace(/\D/g, '')}`}
-          csvMeta={[...meta, 'Atribuicao por responsavel_id/criado_por (comercial/carteira)']}
-        />
-        <div className="indispo" style={{ marginTop: 16 }}><b>Atribuição:</b> a seção de atendimento usa apenas a autoria real da mensagem (mensagens.autor_id); a de carteira usa responsavel_id (contatos/oportunidades/cobranças). Metas não existem no schema → comparação com meta indisponível.</div>
+        <div className="sech" style={{ marginTop: 6 }}>Origens dos leads</div>
+        <Estado q={or}>{or.data && (or.data.length === 0
+          ? <Vazio titulo="Sem origens no período" texto="As origens aparecem conforme as oportunidades são criadas." />
+          : <>
+            {or.data.length > 1 && <Panel title="Leads por origem"><Bars data={or.data.slice(0, 10).map((o) => ({ label: o.origem.slice(0, 12), v: o.leads }))} compact /></Panel>}
+            <DataTable
+              cols={[
+                { key: 'origem', label: 'Origem' }, { key: 'leads', label: 'Leads', align: 'c' },
+                { key: 'fechados', label: 'Fechados', align: 'c' }, { key: 'taxaConversao', label: 'Conversão', align: 'c', fmt: (v) => fmtPct(v as number), csv: (r) => (r.taxaConversao as number).toFixed(1) },
+              ] as Col<Record<string, unknown>>[]}
+              rows={or.data as unknown as Record<string, unknown>[]} searchKeys={['origem']}
+              csvName={`vendas_origens_${periodoLabel.replace(/\D/g, '')}`} csvMeta={meta} />
+          </>)}</Estado>
       </>}
     </Estado>
   );
 }
 
-/* ============ ABA: Financeiro ============ */
+/* ============ Atendimento e equipe ============ */
+function AbaAtendimento({ f, periodoLabel, orgNome, ehAtendente }: { f: RelFiltros; periodoLabel: string; orgNome: string; ehAtendente: boolean }) {
+  const q = useAtendimento(f, true);
+  const eq = useEquipe(f, !ehAtendente);
+  const HORAS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
+  const DIAS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+  const meta = [`Organizacao: ${orgNome}`, `Periodo: ${periodoLabel}`, `Gerado: ${new Date().toLocaleString('pt-BR')}`];
+  return (
+    <Estado q={q}>
+      {q.data && <>
+        <div className="sech">Atendimento <span style={{ fontWeight: 400, color: 'var(--muted)', fontSize: 12 }}>· por conversa/mensagem</span></div>
+        <div className="kpis">
+          <KpiCard label="Total de conversas" k={flat(q.data.totalConversas)} sentido="neutro" fmt={fmtInt} nota="No período" tooltip="Conversas criadas no período." />
+          <KpiCard label="Conversas atendidas" k={flat(q.data.totalConversas - q.data.semResposta)} sentido="neutro" fmt={fmtInt} nota="No período" tooltip="Conversas com entrada que receberam resposta de operador." />
+          <KpiCard label="Sem resposta" k={flat(q.data.semResposta)} sentido="neutro" fmt={fmtInt} nota="No período" tooltip="Conversas com entrada e nenhuma resposta de operador." />
+          <KpiCard label="Taxa de atendimento" k={flat(q.data.taxaAtendimento)} sentido="neutro" fmt={fmtPct} nota="No período" tooltip="Conversas atendidas ÷ conversas com entrada." />
+          <KpiCard label="Mensagens recebidas" k={flat(q.data.msgRecebidas)} sentido="neutro" fmt={fmtInt} nota="No período" tooltip="Mensagens de entrada no período." />
+          <KpiCard label="Mensagens enviadas" k={flat(q.data.msgEnviadas)} sentido="neutro" fmt={fmtInt} nota="No período" tooltip="Saídas (exclui sistema/nota; inclui sincronizadas do aparelho)." />
+          <KpiCard label="Tempo até 1ª resposta" k={q.data.primeiraRespostaMin == null ? null : flat(q.data.primeiraRespostaMin)} sentido="menor" fmt={(n) => fmtMin(n)} nota="Operador (autor identificado)" tooltip="Média entre a 1ª entrada e a 1ª resposta de operador. Saídas sincronizadas do aparelho (sem autor) não entram." />
+        </div>
+        <div className="grid-2">
+          <Panel title="Volume por hora" sub="Mensagens (fuso de São Paulo)">{q.data.porHora.some((v) => v > 0) ? <MiniBars vals={q.data.porHora} labels={HORAS} /> : <Vazio titulo="Sem mensagens no período" />}</Panel>
+          <Panel title="Volume por dia da semana" sub="Mensagens">{q.data.porDiaSemana.some((v) => v > 0) ? <MiniBars vals={q.data.porDiaSemana} labels={DIAS} /> : <Vazio titulo="Sem mensagens no período" />}</Panel>
+        </div>
+        <Panel title="Conversas por canal">{q.data.porCanal.length === 0 ? <Vazio titulo="Sem conversas no período" /> : <Donut data={q.data.porCanal.map((c) => ({ label: canalNome(c.canal), v: c.total }))} />}</Panel>
+
+        {!ehAtendente && <Estado q={eq}>{eq.data && <>
+          <div className="sech" style={{ marginTop: 18 }}>Carteira comercial <span style={{ fontWeight: 400, color: 'var(--muted)', fontSize: 12 }}>· por responsável</span></div>
+          <div className="sec-aviso">{eq.data.atendimentoAtribuivel
+            ? 'A atribuição de atendimento por mensagem é parcial (apenas saídas com autor identificado). A tabela abaixo é da carteira comercial, atribuída por responsável — não é contagem de atendimentos realizados.'
+            : 'O sistema ainda não possui atribuição suficiente nas conversas para calcular com precisão quem realizou mais atendimentos. A tabela abaixo reflete a carteira comercial por responsável.'}</div>
+          <DataTable
+            cols={[
+              { key: 'nome', label: 'Responsável' }, { key: 'leads', label: 'Contatos', align: 'c' },
+              { key: 'oppAndamento', label: 'Em andamento', align: 'c' }, { key: 'oppGanho', label: 'Fechados', align: 'c' }, { key: 'oppPerdido', label: 'Perdidos', align: 'c' },
+              { key: 'taxaConversao', label: 'Conversão', align: 'c', fmt: (v) => fmtPct(v as number), csv: (r) => (r.taxaConversao as number).toFixed(1) },
+              { key: 'receitaRecebida', label: 'Receita recebida', align: 'r', fmt: (v) => fmtBRL(v as number), csv: (r) => (r.receitaRecebida as number).toFixed(2) },
+            ] as Col<Record<string, unknown>>[]}
+            rows={eq.data.comercial as unknown as Record<string, unknown>[]} searchKeys={['nome']}
+            csvName={`carteira_${periodoLabel.replace(/\D/g, '')}`} csvMeta={[...meta, 'Desempenho da carteira por responsavel (responsavel_id/criado_por)']} />
+        </>}</Estado>}
+      </>}
+    </Estado>
+  );
+}
+
+/* ============ Financeiro (financeiro + economia) ============ */
 function AbaFinanceiro({ f }: { f: RelFiltros }) {
   const q = useFinanceiro(f, true);
+  const resumo = useResumo(f);
   const mes = (k: string) => k.slice(5) + '/' + k.slice(2, 4);
   return (
     <Estado q={q}>
       {q.data && <>
         <div className="kpis">
-          <KpiCard label="Receita recebida" k={flat(q.data.recebida)} sentido="neutro" fmt={fmtBRL} tooltip="Σ valor_pago de parcelas pagas com data_pagamento no período." />
-          <KpiCard label="Receita prevista" k={flat(q.data.prevista)} sentido="neutro" fmt={fmtBRL} tooltip="Σ parcelas não canceladas com vencimento no período." />
-          <KpiCard label="Receita pendente" k={flat(q.data.pendente)} sentido="neutro" fmt={fmtBRL} tooltip="Parcelas previstas a vencer (vencimento ≥ hoje)." />
-          <KpiCard label="Receita vencida" k={flat(q.data.vencida)} sentido="menor" fmt={fmtBRL} tooltip="Parcelas não pagas com vencimento anterior a hoje." />
-          <KpiCard label="Inadimplência" k={flat(q.data.inadimplencia)} sentido="menor" fmt={fmtPct} tooltip="Parcelas vencidas não pagas ÷ parcelas vencidas." />
-          <KpiCard label="Taxa de recebimento" k={flat(q.data.taxaRecebimento)} sentido="maior" fmt={fmtPct} tooltip="Parcelas vencidas pagas ÷ parcelas vencidas." />
-          <KpiCard label="Ticket médio mensal" k={flat(q.data.ticketMensal)} sentido="neutro" fmt={fmtBRL} tooltip="Média de valor_mensal das cobranças ativas." />
-          <KpiCard label="Cobranças ativas" k={flat(q.data.cobAtivas)} sentido="neutro" fmt={fmtInt} tooltip="Cobranças não finalizadas e não canceladas." />
+          <KpiCard label="Receita recebida" k={flat(q.data.recebida)} sentido="neutro" fmt={fmtBRL} nota="No período" tooltip="Σ valor pago de parcelas pagas (data_pagamento no período)." />
+          <KpiCard label="Receita prevista" k={flat(q.data.prevista)} sentido="neutro" fmt={fmtBRL} nota="No período" tooltip="Σ parcelas não canceladas com vencimento no período." />
+          <KpiCard label="Pendente" k={flat(q.data.pendente)} sentido="neutro" fmt={fmtBRL} nota="A vencer" tooltip="Parcelas previstas com vencimento ≥ hoje." />
+          <KpiCard label="Vencido" k={flat(q.data.vencida)} sentido="menor" fmt={fmtBRL} nota="Posição atual" tooltip="Parcelas não pagas com vencimento anterior a hoje." />
+          <KpiCard label="Inadimplência" k={flat(q.data.inadimplencia)} sentido="menor" fmt={fmtPct} nota="Sobre vencidas" tooltip="Parcelas vencidas não pagas ÷ parcelas vencidas." />
+          <KpiCard label="Taxa de recebimento" k={flat(q.data.taxaRecebimento)} sentido="maior" fmt={fmtPct} nota="Sobre vencidas" tooltip="Parcelas vencidas pagas ÷ parcelas vencidas." />
+          <KpiCard label="Cobranças ativas" k={flat(q.data.cobAtivas)} sentido="neutro" fmt={fmtInt} nota="Atual" tooltip="Cobranças não finalizadas e não canceladas." />
+          <KpiCard label="Ticket médio mensal" k={flat(q.data.ticketMensal)} sentido="neutro" fmt={fmtBRL} nota="Cobranças ativas" tooltip="Média de valor mensal das cobranças ativas." />
         </div>
         <div className="grid-2">
-          <Panel title="Previsão de recebimento" sub="Próximos 6 meses (previsto)"><Bars data={q.data.previsao6m.map((m) => ({ label: mes(m.mes), v: m.previsto }))} money /></Panel>
-          <Panel title="Evolução de recebimentos" sub="Últimos 6 meses"><LineChart pts={q.data.evolucao.map((m) => ({ label: mes(m.mes), v: m.recebido }))} money /></Panel>
+          <Panel title="Previsão de recebimento" sub="Próximos 6 meses (previsto)">{q.data.previsao6m.some((m) => m.previsto > 0) ? <Bars data={q.data.previsao6m.map((m) => ({ label: mes(m.mes), v: m.previsto }))} money compact /> : <Vazio titulo="Sem previsão de recebimento" texto="Nenhuma parcela prevista nos próximos 6 meses." />}</Panel>
+          <Panel title="Evolução de recebimentos" sub="Últimos 6 meses">{q.data.evolucao.some((m) => m.recebido > 0) ? <LineChart pts={q.data.evolucao.map((m) => ({ label: mes(m.mes), v: m.recebido }))} money compact /> : <Vazio titulo="Nenhum recebimento registrado" texto="Sem parcelas pagas nos últimos 6 meses." />}</Panel>
         </div>
         <div className="grid-2">
-          <Panel title="Parcelas por status"><Donut data={[{ label: 'Pagas', v: q.data.parPagas }, { label: 'Previstas', v: q.data.parPrevistas }, { label: 'Não pagas', v: q.data.parNaoPagas }, { label: 'Canceladas', v: q.data.parCanceladas }]} /></Panel>
-          <Panel title="Receita por serviço" sub="Valor mensal somado (cobranças ativas)">{q.data.porServico.length ? <Bars data={q.data.porServico.slice(0, 8).map((s) => ({ label: s.nome.slice(0, 10), v: s.total }))} money /> : <div className="fx-empty">Sem dados.</div>}</Panel>
+          <Panel title="Parcelas por status">{(q.data.parPagas + q.data.parPrevistas + q.data.parNaoPagas + q.data.parCanceladas) === 0 ? <Vazio titulo="Sem parcelas" /> : <Donut data={[{ label: 'Pagas', v: q.data.parPagas }, { label: 'Previstas', v: q.data.parPrevistas }, { label: 'Não pagas', v: q.data.parNaoPagas }, { label: 'Canceladas', v: q.data.parCanceladas }]} />}</Panel>
+          <Panel title="Receita por serviço" sub="Valor mensal somado (ativas)">{q.data.porServico.length === 0 ? <Vazio titulo="Sem cobranças ativas" /> : q.data.porServico.length === 1 ? <div className="compact-stat"><span className="cs-v">{fmtBRL(q.data.porServico[0].total)}</span><span className="cs-l">{q.data.porServico[0].nome}</span></div> : <Bars data={q.data.porServico.slice(0, 8).map((s) => ({ label: s.nome.slice(0, 10), v: s.total }))} money compact />}</Panel>
         </div>
+        <Panel title="Economia gerada">
+          {resumo.data?.economiaPreenchida && resumo.data.economiaGerada
+            ? <div className="compact-stat"><span className="cs-v">{fmtBRL(resumo.data.economiaGerada.atual)}</span><span className="cs-l">economia no período</span></div>
+            : <Vazio titulo="Ainda não há dados de economia" texto="Não existem cobranças com os valores original e renegociado preenchidos. Quando esses dados forem registrados, este relatório mostrará a economia total, média e por cliente." />}
+        </Panel>
       </>}
     </Estado>
   );
 }
 
-/* ============ ABA: Economia gerada ============ */
-function AbaEconomia({ f }: { f: RelFiltros }) {
-  const q = useResumo(f);
-  return (
-    <Estado q={q}>
-      {q.data?.economiaPreenchida && q.data.economiaGerada
-        ? <div className="kpis"><KpiCard label="Economia gerada total" k={q.data.economiaGerada} sentido="maior" fmt={fmtBRL} tooltip="Σ valor_economizado das cobranças no período." /></div>
-        : <div className="indispo"><b>Dados ainda não preenchidos.</b><br />Os campos de economia existem em <code>cobrancas</code> (valor_original_descontado, novo_valor_descontado, valor_economizado), mas nenhum registro os tem informados — por isso não mostramos zero (zero indicaria ausência de economia). Quando forem preenchidos na criação/edição da cobrança, esta aba exibirá economia total, média por cliente, maior economia, por banco/serviço/atendente/origem, % médio de redução e evolução mensal — sem alterar o schema.</div>}
-    </Estado>
-  );
-}
-
-/* ============ ABA: Origens ============ */
-function AbaOrigens({ f, periodoLabel, orgNome }: { f: RelFiltros; periodoLabel: string; orgNome: string }) {
-  const q = useOrigens(f, true);
-  return (
-    <Estado q={q}>
-      {q.data && <>
-        <Panel title="Leads por origem"><Bars data={q.data.slice(0, 10).map((o) => ({ label: o.origem.slice(0, 12), v: o.leads }))} /></Panel>
-        <DataTable
-          cols={[
-            { key: 'origem', label: 'Origem' },
-            { key: 'leads', label: 'Leads', align: 'c' },
-            { key: 'fechados', label: 'Fechados', align: 'c' },
-            { key: 'taxaConversao', label: 'Conversão', align: 'c', fmt: (v) => fmtPct(v as number), csv: (r) => (r.taxaConversao as number).toFixed(1) },
-          ] as Col<Record<string, unknown>>[]}
-          rows={q.data as unknown as Record<string, unknown>[]}
-          searchKeys={['origem']}
-          csvName={`origens_${periodoLabel.replace(/\D/g, '')}`}
-          csvMeta={[`Organizacao: ${orgNome}`, `Periodo: ${periodoLabel}`, `Gerado: ${new Date().toLocaleString('pt-BR')}`]}
-        />
-        <div className="indispo" style={{ marginTop: 16 }}><b>Indisponível:</b> custo por lead, CPA e ROI — não há dados de investimento de campanha integrados. Receita/economia por origem dependem de vínculo cobrança↔origem preenchido.</div>
-      </>}
-    </Estado>
-  );
-}
-
-/* ============ ABA: Dados detalhados ============ */
-function AbaDados({ f, periodoLabel, orgNome, onNav }: { f: RelFiltros; periodoLabel: string; orgNome: string; onNav: (p: string) => void }) {
-  const eq = useEquipe(f, true);
-  const or = useOrigens(f, true);
+/* ============ Detalhamento (seletor interno) ============ */
+function AbaDetalhamento({ f, periodoLabel, orgNome, ehAtendente, onNav }: { f: RelFiltros; periodoLabel: string; orgNome: string; ehAtendente: boolean; onNav: (p: string) => void }) {
+  const [sel, setSel] = useState<'carteira' | 'origem'>('carteira');
+  const eq = useEquipe(f, !ehAtendente && sel === 'carteira');
+  const or = useOrigens(f, sel === 'origem');
   const meta = [`Organizacao: ${orgNome}`, `Periodo: ${periodoLabel}`, `Gerado: ${new Date().toLocaleString('pt-BR')}`];
+  const opcoesSel: { id: 'carteira' | 'origem'; r: string }[] = [{ id: 'carteira', r: 'Por responsável' }, { id: 'origem', r: 'Por origem' }];
   return (
     <>
-      <div className="sech">Desempenho comercial / da carteira (por responsável)</div>
-      <Estado q={eq}>{eq.data && <DataTable
+      <div className="det-sel">{opcoesSel.filter((o) => !(o.id === 'carteira' && ehAtendente)).map((o) => <button key={o.id} className={sel === o.id ? 'on' : ''} onClick={() => setSel(o.id)}>{o.r}</button>)}</div>
+      {sel === 'carteira' && !ehAtendente && <Estado q={eq}>{eq.data && <DataTable
         cols={[
           { key: 'nome', label: 'Responsável' }, { key: 'leads', label: 'Contatos', align: 'c' }, { key: 'oppAndamento', label: 'Andamento', align: 'c' },
           { key: 'oppGanho', label: 'Fechados', align: 'c' }, { key: 'oppPerdido', label: 'Perdidos', align: 'c' },
+          { key: 'receitaContratada', label: 'Receita contratada', align: 'r', fmt: (v) => fmtBRL(v as number), csv: (r) => (r.receitaContratada as number).toFixed(2) },
           { key: 'receitaRecebida', label: 'Receita recebida', align: 'r', fmt: (v) => fmtBRL(v as number), csv: (r) => (r.receitaRecebida as number).toFixed(2) },
         ] as Col<Record<string, unknown>>[]}
         rows={eq.data.comercial as unknown as Record<string, unknown>[]} searchKeys={['nome']}
-        csvName={`detalhe_carteira_${periodoLabel.replace(/\D/g, '')}`} csvMeta={meta} />}</Estado>
-
-      <div className="sech" style={{ marginTop: 18 }}>Desempenho por origem</div>
-      <Estado q={or}>{or.data && <DataTable
+        csvName={`detalhe_carteira_${periodoLabel.replace(/\D/g, '')}`} csvMeta={meta} />}</Estado>}
+      {sel === 'origem' && <Estado q={or}>{or.data && <DataTable
         cols={[
           { key: 'origem', label: 'Origem' }, { key: 'leads', label: 'Leads', align: 'c' },
           { key: 'fechados', label: 'Fechados', align: 'c' }, { key: 'taxaConversao', label: 'Conversão', align: 'c', fmt: (v) => fmtPct(v as number), csv: (r) => (r.taxaConversao as number).toFixed(1) },
         ] as Col<Record<string, unknown>>[]}
         rows={or.data as unknown as Record<string, unknown>[]} searchKeys={['origem']}
-        csvName={`detalhe_origens_${periodoLabel.replace(/\D/g, '')}`} csvMeta={meta} />}</Estado>
-
+        csvName={`detalhe_origens_${periodoLabel.replace(/\D/g, '')}`} csvMeta={meta} />}</Estado>}
       <div className="tbl-tools" style={{ marginTop: 8 }}>
         <button className="btn-ghost" onClick={() => onNav('/cobrancas')}>Abrir Cobranças (atraso e pagamentos)</button>
         <button className="btn-ghost" onClick={() => onNav('/kanban')}>Abrir Kanban (oportunidades)</button>
       </div>
-      <div className="indispo" style={{ marginTop: 8 }}>Tabelas de clientes fechados, oportunidades perdidas, cobranças em atraso e conversas sem resposta abrem nos módulos relacionados (drill-down por registro). O detalhamento por id dentro do relatório será incremental.</div>
+      <div className="vazio" style={{ marginTop: 8 }}><IcEmpty /><div><div className="vt">Outros detalhamentos</div><div className="vd">Cobranças em atraso, oportunidades e conversas sem resposta abrem nos módulos relacionados (drill-down por registro). O detalhamento por id dentro do relatório será incremental.</div></div></div>
     </>
   );
 }
