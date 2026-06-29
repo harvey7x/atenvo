@@ -227,3 +227,48 @@
   .relatorios-page .user {justify-content:center;padding:8px 0}
   .relatorios-page .kpis {grid-template-columns:1fr}
 }
+
+/* ===== Relatórios (modo real) — extensões ===== */
+.relatorios-page .rtabs{display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid var(--line);margin-bottom:16px}
+.relatorios-page .rtab{height:36px;padding:0 14px;border:0;background:transparent;color:var(--ink-2);font-size:13.5px;font-weight:500;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.relatorios-page .rtab:hover{color:var(--ink)}
+.relatorios-page .rtab.on{color:var(--accent-ink);border-bottom-color:var(--accent);font-weight:600}
+.relatorios-page .kpi-delta.pos{color:var(--ok)}
+.relatorios-page .kpi-delta.neg{color:var(--err)}
+.relatorios-page .kpi-delta.neu{color:var(--muted)}
+.relatorios-page .kpi-prev{font-size:11px;color:var(--muted);margin-top:2px}
+.relatorios-page .kpi-info{margin-left:6px;color:var(--muted);cursor:help;font-size:11px;border:1px solid var(--line-2);border-radius:50%;width:14px;height:14px;display:inline-flex;align-items:center;justify-content:center;line-height:1}
+.relatorios-page .kpi-head{display:flex;align-items:center}
+.relatorios-page .sech{font-size:14px;font-weight:600;color:var(--ink);margin:6px 0 12px;display:flex;align-items:center;gap:8px}
+.relatorios-page .indispo{padding:26px 16px;text-align:center;color:var(--muted);font-size:13px;background:var(--surface);border:1px dashed var(--line-2);border-radius:14px}
+.relatorios-page .indispo b{color:var(--ink-2);font-weight:600}
+.relatorios-page .rloading,.relatorios-page .rerror{padding:40px 16px;text-align:center;color:var(--muted);font-size:14px}
+.relatorios-page .rerror{color:var(--err)}
+.relatorios-page .funnel{display:flex;flex-direction:column;gap:8px;padding:6px 20px 18px}
+.relatorios-page .funnel-row{display:flex;align-items:center;gap:12px}
+.relatorios-page .funnel-name{width:140px;font-size:12.5px;color:var(--ink-2);font-weight:500;flex:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.relatorios-page .funnel-bar{flex:1;height:26px;background:var(--surface-2);border-radius:7px;overflow:hidden;position:relative}
+.relatorios-page .funnel-bar i{display:block;height:100%;background:var(--accent);border-radius:7px;min-width:2px;transition:width .3s}
+.relatorios-page .funnel-val{width:44px;text-align:right;font-size:13px;font-weight:600;color:var(--ink);flex:none}
+.relatorios-page .rsearch{display:flex;align-items:center;gap:8px;height:36px;padding:0 11px;border:1px solid var(--line-2);border-radius:9px;background:var(--surface);max-width:280px;flex:1}
+.relatorios-page .rsearch input{border:0;background:transparent;outline:none;color:var(--ink);font-size:13px;width:100%}
+.relatorios-page .rsearch svg{width:15px;height:15px;color:var(--muted)}
+.relatorios-page .rep-table thead th{cursor:pointer;user-select:none}
+.relatorios-page .rep-table thead th .sortarr{opacity:.5;font-size:10px;margin-left:3px}
+.relatorios-page .tbl-tools{display:flex;align-items:center;gap:10px;padding:14px 16px;flex-wrap:wrap}
+.relatorios-page .tbl-tools .sp{margin-left:auto}
+.relatorios-page .barlist{display:flex;flex-direction:column;gap:9px;padding:8px 20px 18px}
+.relatorios-page .barlist-row{display:grid;grid-template-columns:130px 1fr 64px;align-items:center;gap:10px}
+.relatorios-page .barlist-name{font-size:12.5px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.relatorios-page .barlist-track{height:10px;background:var(--surface-2);border-radius:5px;overflow:hidden}
+.relatorios-page .barlist-track i{display:block;height:100%;background:var(--accent);border-radius:5px}
+.relatorios-page .barlist-val{font-size:12.5px;font-weight:600;color:var(--ink);text-align:right}
+.relatorios-page .minibars{display:flex;align-items:flex-end;gap:3px;height:90px;padding:10px 20px 6px}
+.relatorios-page .minibars .mb{flex:1;background:var(--bar);border-radius:3px 3px 0 0;min-height:2px}
+.relatorios-page .minibars-x{display:flex;gap:3px;padding:0 20px 14px;font-size:9.5px;color:var(--muted)}
+.relatorios-page .minibars-x span{flex:1;text-align:center}
+.relatorios-page .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.relatorios-page .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px}
+@media (max-width:1180px){.relatorios-page .grid-2,.relatorios-page .grid-3{grid-template-columns:1fr}}
+.relatorios-page .custom-dates{display:inline-flex;gap:6px;align-items:center}
+.relatorios-page .custom-dates input{height:38px;border:1px solid var(--line-2);border-radius:9px;background:var(--surface);color:var(--ink);font-size:13px;padding:0 10px}
