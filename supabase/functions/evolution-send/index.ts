@@ -1,32 +1,40 @@
 // evolution-send — envia texto/IMAGEM/ÁUDIO/DOCUMENTO e persiste a saída.
+// v20: TEXTO normalizado antes do envio (NFC, CRLF->\n, NBSP->espaço, remove zero-width/soft-hyphen/
+//      controles) — resolve "texto da ficha não envia" (caracteres invisíveis copiados). Não corta;
+//      bloqueia só acima do limite real do provider, com erro claro.
 // v19: ÁUDIO via BASE64 (Evolution 2.3.6 recusa URL remota no /message/sendWhatsAppAudio -> "Bad Request").
 //      Baixa o arquivo do bucket e envia base64 + encoding:true (preserva MIME/ext). Erro de mídia traduzido.
-//      Imagem/documento seguem por URL assinada. Retry continua reaproveitando a mesma linha (sem duplicar).
-// v18: REVERTE o destino por LID (v17). Evidência: o ERROR não vinha do destino — o PN do contato
-//      EXISTE no WhatsApp (onWhatsApp exists:true) e a instância LUIZA falhou 7/7 (PN e LID), enquanto
-//      outras instâncias entregam normalmente no mesmo servidor. Causa = conta/sessão do número remetente,
-//      não o resolvedor. Mantém o resolvedor por telefone (comprovadamente válido via onWhatsApp).
-// v16: DOCUMENTO via /message/sendMedia (mediatype document; MIME/ext/tamanho centralizados).
-// v15: ÁUDIO como nota de voz via /message/sendWhatsAppAudio (encoding->ogg/opus). Mesma base de
-//      isolamento por org + URL assinada curta + exige key.id + retry reaproveita o arquivo.
-// v14: IMAGEM via /message/sendMedia (URL assinada curta, isolada por org, exige key.id;
-//      retry reaproveita o arquivo da mensagem original). Demais mídias virão nas próximas etapas.
-// v13: status 'enviada' ao obter key.id (provedor aceitou ✓); webhook avança p/ entregue/lida.
-//      retry_mensagem_id reaproveita a MESMA mensagem falhada (sem duplicar). Assinatura *Nome:*\n (#4),
-//      persiste texto_original/assinatura_nome/origem='atenvo'; atualiza último canal/número (#6).
-// v12: assinatura *Nome:*\n (negrito), persiste texto_original/assinatura_nome/origem='atenvo' (#4),
-//      atualiza último canal/número após envio aceito (#6). NÃO altera normalização de número.
+// v18: REVERTE o destino por LID (v17): causa do ERROR era a conta/sessão do remetente, não o resolvedor.
+// v16/15/14: DOCUMENTO/ÁUDIO/IMAGEM via sendMedia/sendWhatsAppAudio (isolamento por org, exige key.id).
+// v13: status 'enviada' ao obter key.id; webhook avança p/ entregue/lida; retry reaproveita a mesma linha.
 import { corsHeaders, json } from './cors.ts';
 import { adminClient, getUser } from './client.ts';
 import { evolution, evolutionConfigured } from './evolution.ts';
 
 const digits = (s?: string | null): string | null => ((s ?? '').replace(/[^0-9]/g, '') || null);
+const WA_TEXT_MAX_BYTES = 65000; // limite prático de um único envio de texto no WhatsApp
 
 // base64 (sem prefixo data URI) em blocos — seguro para arquivos grandes.
 function toBase64(bytes: Uint8Array): string {
   let bin = ''; const chunk = 0x8000;
   for (let i = 0; i < bytes.length; i += chunk) bin += String.fromCharCode(...bytes.subarray(i, i + chunk));
   return btoa(bin);
+}
+// Normaliza texto antes do envio: NFC, CRLF->\n, NBSP->espaço normal, remove zero-width/word-joiner/BOM,
+// soft-hyphen e controles inválidos (mantém \n e \t). Preserva acentos e o conteúdo legível.
+// Resolve falhas de "texto copiado da ficha" que carregam NBSP/controles invisíveis.
+function sanitizeWaText(s: string): string {
+  const nbsp = new RegExp('\\u00A0', 'g');
+  const zeroWidth = new RegExp('[\\u200B-\\u200D\\u2060\\uFEFF]', 'g');
+  const softHyphen = new RegExp('\\u00AD', 'g');
+  const controls = new RegExp('[\\u0000-\\u0008\\u000B\\u000C\\u000E-\\u001F\\u007F]', 'g');
+  return (s ?? '')
+    .normalize('NFC')
+    .replace(/\r\n?/g, '\n')
+    .replace(nbsp, ' ')
+    .replace(zeroWidth, '')
+    .replace(softHyphen, '')
+    .replace(controls, '');
 }
 // Traduz o erro técnico do provider/storage em mensagem clara ao usuário (cru fica no log).
 function traduzMidiaErro(tipo: string, m: string): string {
@@ -142,7 +150,7 @@ Deno.serve(async (req) => {
       const nome = (midia_nome as string) || (meta.nome as string) || (tipo === 'audio' ? 'audio' : tipo === 'documento' ? 'documento' : 'imagem');
       const tamanho = (midia_tamanho as number) ?? (meta.tamanho as number) ?? null;
       // áudio é nota de voz (PTT) — sem legenda. Imagem/documento podem ter legenda.
-      const caption = tipo === 'audio' ? '' : (temTexto ? text.toString() : (retryMsg ? (retryMsg.conteudo ?? '') : ''));
+      const caption = tipo === 'audio' ? '' : sanitizeWaText((temTexto ? text.toString() : (retryMsg ? (retryMsg.conteudo ?? '') : '')));
       const nowIso = new Date().toISOString();
 
       if (!TIPOS_OK.includes(tipo)) return json({ error: 'Tipo de mídia ainda não suportado (apenas imagem, áudio e documento).' }, 422);
@@ -203,15 +211,27 @@ Deno.serve(async (req) => {
     const assinatura = retryMsg ? (retryMsg.assinatura_nome ?? '').toString().trim() : (assinatura_nome ?? '').toString().trim();
     const prefixo = assinatura ? `*${assinatura}:*\n` : '';
     const jaAssinado = assinatura ? raw.startsWith(`*${assinatura}:*`) : false;
-    const corpoEnviado = retryMsg ? (retryMsg.conteudo ?? raw) : ((assinatura && !jaAssinado) ? prefixo + raw : raw);
+    const corpoBruto = retryMsg ? (retryMsg.conteudo ?? raw) : ((assinatura && !jaAssinado) ? prefixo + raw : raw);
+    // NORMALIZA o texto (NBSP/zero-width/soft-hyphen/controles/CRLF) — preserva acentos/linhas; não corta.
+    const corpoEnviado = sanitizeWaText(corpoBruto);
+    const rawLimpo = sanitizeWaText(raw);
+    // Limite real do provider: não corta silenciosamente; acima do limite, erro claro (não dividir aqui).
+    if (new TextEncoder().encode(corpoEnviado).length > WA_TEXT_MAX_BYTES) {
+      return json({ error: 'Mensagem muito longa para um único envio do WhatsApp. Reduza o texto e tente novamente.' }, 422);
+    }
 
-    // envia (texto já assinado)
+    // envia (texto já assinado e normalizado)
     let sent: { key?: { id?: string } };
     try {
       sent = await evolution.sendText(instancia, alvo, corpoEnviado);
     } catch (err) {
       const msg = (err as Error).message || 'Falha ao enviar pela Evolution.';
-      return json({ error: /not|connect|close/i.test(msg) ? 'O WhatsApp deste canal desconectou. Reconecte em Integrações.' : msg }, 502);
+      console.error(`[send] corr=${corr} TEXTO erro provider:`, msg); // técnico cru no log
+      const m = msg.toLowerCase();
+      const amigavel = /not |connect|close/.test(m) ? 'O WhatsApp deste canal desconectou. Reconecte em Integrações.'
+        : /bad request|400|invalid|unsupported/.test(m) ? 'Não foi possível enviar este texto. Tente reescrever a mensagem.'
+        : msg;
+      return json({ error: amigavel }, 502);
     }
     const idExterno = sent?.key?.id ?? null;
     const nowIso = new Date().toISOString();
@@ -224,7 +244,7 @@ Deno.serve(async (req) => {
       } else {
         await admin.from('mensagens').insert({
           conversa_id, organizacao_id: conv.organizacao_id, direcao: 'saida', tipo: 'texto',
-          conteudo: corpoEnviado, texto_original: raw, assinatura_nome: assinatura || null, origem: 'atenvo',
+          conteudo: corpoEnviado, texto_original: rawLimpo, assinatura_nome: assinatura || null, origem: 'atenvo',
           autor_id: user.id, status: 'falhou', erro_envio: 'sem_id_externo',
         });
       }
@@ -244,7 +264,7 @@ Deno.serve(async (req) => {
     } else {
       const { data } = await admin.from('mensagens').insert({
         conversa_id, organizacao_id: conv.organizacao_id, direcao: 'saida', tipo: 'texto',
-        conteudo: corpoEnviado, texto_original: raw, assinatura_nome: assinatura || null, origem: 'atenvo',
+        conteudo: corpoEnviado, texto_original: rawLimpo, assinatura_nome: assinatura || null, origem: 'atenvo',
         autor_id: user.id, id_externo: idExterno, status: 'enviada', enviada_em: nowIso,
       }).select('id, conteudo, enviada_em, direcao, status').single();
       msg = data;
