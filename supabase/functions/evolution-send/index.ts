@@ -1,4 +1,6 @@
 // evolution-send — envia texto/IMAGEM/ÁUDIO/DOCUMENTO e persiste a saída.
+// v22: FALHA SEMPRE PERSISTE — se o provider lança (texto/mídia), grava linha status='falhou' (id p/ retry/
+//      remover; sobrevive a reload). Evita a mensagem ficar "pendente eterno" no app quando o edge retorna 502.
 // v21: ÁUDIO por formato — ogg/webm(opus) via sendWhatsAppAudio (PTT); mp4/m4a/mpeg/aac/wav via sendMedia
 //      (áudio reproduzível). Resolve "formato não compatível" no Mac/Safari (grava audio/mp4). Bloqueia áudio vazio.
 // v20: TEXTO normalizado antes do envio (NFC, CRLF->\n, NBSP->espaço, remove zero-width/soft-hyphen/
@@ -193,6 +195,10 @@ Deno.serve(async (req) => {
       } catch (err) {
         const m = (err as Error).message || 'Falha ao enviar a mídia.';
         console.error(`[send] corr=${corr} MIDIA(${tipo}) erro provider/storage:`, m); // técnico cru no log
+        // PERSISTE como FALHA (com metadados p/ retry reusar o arquivo) — evita "pendente eterno".
+        const metaFalha = { anexo_path: path, mime, tamanho, nome };
+        if (retryMsg) await admin.from('mensagens').update({ status: 'falhou', erro_envio: m.slice(0, 200) }).eq('id', retryMsg.id);
+        else await admin.from('mensagens').insert({ conversa_id, organizacao_id: conv.organizacao_id, direcao: 'saida', tipo, conteudo: caption || null, origem: 'atenvo', autor_id: user.id, status: 'falhou', erro_envio: m.slice(0, 200), metadados: metaFalha });
         return json({ error: traduzMidiaErro(tipo, m) }, 502);
       }
       const idExterno = sent?.key?.id ?? null;
@@ -237,12 +243,23 @@ Deno.serve(async (req) => {
     try {
       sent = await evolution.sendText(instancia, alvo, corpoEnviado);
     } catch (err) {
-      const msg = (err as Error).message || 'Falha ao enviar pela Evolution.';
-      console.error(`[send] corr=${corr} TEXTO erro provider:`, msg); // técnico cru no log
-      const m = msg.toLowerCase();
+      const emsg = (err as Error).message || 'Falha ao enviar pela Evolution.';
+      console.error(`[send] corr=${corr} TEXTO erro provider:`, emsg); // técnico cru no log
+      // PERSISTE como FALHA: nunca deixa o envio sem registro (evita "pendente eterno" no app). Gera linha
+      // com id p/ Tentar novamente (mesma linha, sem duplicar) e Remover; sobrevive a reload.
+      if (retryMsg) {
+        await admin.from('mensagens').update({ status: 'falhou', erro_envio: emsg.slice(0, 200) }).eq('id', retryMsg.id);
+      } else {
+        await admin.from('mensagens').insert({
+          conversa_id, organizacao_id: conv.organizacao_id, direcao: 'saida', tipo: 'texto',
+          conteudo: corpoEnviado, texto_original: rawLimpo, assinatura_nome: assinatura || null, origem: 'atenvo',
+          autor_id: user.id, status: 'falhou', erro_envio: emsg.slice(0, 200),
+        });
+      }
+      const m = emsg.toLowerCase();
       const amigavel = /not |connect|close/.test(m) ? 'O WhatsApp deste canal desconectou. Reconecte em Integrações.'
         : /bad request|400|invalid|unsupported/.test(m) ? 'Não foi possível enviar este texto. Tente reescrever a mensagem.'
-        : msg;
+        : 'O WhatsApp não confirmou o envio. Tente novamente.';
       return json({ error: amigavel }, 502);
     }
     const idExterno = sent?.key?.id ?? null;

@@ -9,6 +9,8 @@ export interface WaMessage {
   status?: string;
   /** id real da mensagem (para retry sem duplicar e ação "Ver erro"). */
   id?: string;
+  /** id de cliente da bolha otimista (sem linha no banco ainda) — p/ reconciliar/timeout sem id real. */
+  cid?: string;
   /** motivo sanitizado da falha (quando status = falhou). */
   erro?: string;
   /** tipo da mensagem: texto | imagem | audio | video | documento. */

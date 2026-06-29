@@ -354,14 +354,25 @@ export function WhatsApp() {
     const now = new Date();
     const hh = ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
     const corpo = assinaturaNome ? `*${assinaturaNome}:*\n${v}` : v;
-    // append otimista (atualiza a tela imediatamente). Status "pendente" até a confirmação real.
-    setContacts((cur) => cur.map((c) => c.id === currentId ? { ...c, last: v, msgs: [...c.msgs, { dir: 'out', text: corpo, time: hh, status: 'pendente' }] } : c));
+    // append otimista com cid (id de cliente) para reconciliar/timeout sem id real. "pendente" até confirmar.
+    const cid = 'tmp_' + now.getTime().toString(36) + Math.random().toString(36).slice(2, 7);
+    setContacts((cur) => cur.map((c) => c.id === currentId ? { ...c, last: v, msgs: [...c.msgs, { dir: 'out', text: corpo, time: hh, status: 'pendente', cid }] } : c));
     setDraft('');
     if (WA_REAL) {
       enviandoRef.current = true;
+      const convAlvo = currentId;
+      const marcarFalha = (erro: string) => setContacts((cur) => cur.map((c) => c.id === convAlvo
+        ? { ...c, msgs: c.msgs.map((x) => x.cid === cid && x.status === 'pendente' ? { ...x, status: 'falhou', erro } : x) } : c));
+      // timeout de segurança: nunca deixar "pendente" para sempre. O edge persiste 'falhou' e o refetch
+      // (onSettled da mutation) reconcilia para a linha real com id; este timeout cobre o caso de não-resposta.
+      const to = setTimeout(() => marcarFalha('Sem confirmação de envio a tempo. Tente novamente.'), 25000);
       sendMut.mutate(
         { conversaId: currentId, text: v, canalId: replyCanalId || current.canalId, assinaturaNome: assinaturaNome || undefined },
-        { onError: (e) => toast((e as Error).message || 'Falha ao enviar a mensagem', 'warn'), onSettled: () => { enviandoRef.current = false; } },
+        {
+          onError: (e) => { clearTimeout(to); marcarFalha((e as Error).message || 'Falha no envio.'); toast((e as Error).message || 'Falha ao enviar a mensagem', 'warn'); },
+          onSuccess: () => clearTimeout(to),
+          onSettled: () => { enviandoRef.current = false; },
+        },
       );
     } else {
       toast('Mensagem enviada');
