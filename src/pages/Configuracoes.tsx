@@ -118,12 +118,12 @@ function ContaPanel({ podeGerenciar }: { podeGerenciar: boolean }) {
   }
   async function trocarFoto(file: File) {
     if (!perfilQ.data) return; setBusyFoto(true);
-    try { const path = await subirAvatar(currentOrg.id, perfilQ.data.id, file); await salvarAvatar(perfilQ.data, path); setAvatarSrc(await urlAvatar(path)); perfilQ.refetch(); toast('Foto atualizada'); }
+    try { const path = await subirAvatar(currentOrg.id, perfilQ.data.id, file); await salvarAvatar(path); setAvatarSrc(await urlAvatar(path)); perfilQ.refetch(); toast('Foto atualizada'); }
     catch (e) { toast(traduzCfg((e as Error).message), 'warn'); } finally { setBusyFoto(false); }
   }
   async function removerFoto() {
     if (!perfilQ.data) return; setBusyFoto(true);
-    try { await salvarAvatar(perfilQ.data, null); setAvatarSrc(null); perfilQ.refetch(); toast('Foto removida'); }
+    try { await salvarAvatar(null); setAvatarSrc(null); perfilQ.refetch(); toast('Foto removida'); }
     catch (e) { toast(traduzCfg((e as Error).message), 'warn'); } finally { setBusyFoto(false); }
   }
   async function alterarEmail() {

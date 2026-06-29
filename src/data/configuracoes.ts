@@ -23,16 +23,16 @@ export function useMeuPerfil() {
 export function useSalvarPerfil() {
   const qc = useQueryClient(); const { user } = useAuth();
   return useMutation({
-    mutationFn: async (p: { nome: string; telefone: string; cargo: string; avatarUrl?: string | null }) => {
-      const { error } = await supabase!.rpc('atualizar_perfil', { p_nome: p.nome, p_telefone: p.telefone || null, p_cargo: p.cargo || null, p_avatar_url: p.avatarUrl === undefined ? undefined : (p.avatarUrl || null) });
+    mutationFn: async (p: { nome: string; telefone: string; cargo: string }) => {
+      const { error } = await supabase!.rpc('atualizar_perfil', { p_nome: p.nome, p_telefone: p.telefone || null, p_cargo: p.cargo || null });
       if (error) throw new Error(error.message);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['cfg-perfil', user?.id] }),
   });
 }
 /** Atualiza só o avatar (alterar/remover foto), sem mexer no resto. */
-export async function salvarAvatar(perfil: MeuPerfil, avatarUrl: string | null) {
-  const { error } = await supabase!.rpc('atualizar_perfil', { p_nome: perfil.nome || 'Usuário', p_telefone: perfil.telefone || null, p_cargo: perfil.cargo || null, p_avatar_url: avatarUrl });
+export async function salvarAvatar(avatarUrl: string | null) {
+  const { error } = await supabase!.rpc('atualizar_avatar', { p_avatar_url: avatarUrl });
   if (error) throw new Error(error.message);
 }
 /** Upload de avatar no bucket privado; retorna o path salvo em avatar_url. */
