@@ -230,17 +230,24 @@ export function WhatsApp() {
     return true;
   });
 
-  // canal selecionado para "Responder por" (modo real)
+  // "Responder por": SEMPRE o canal pelo qual ESTA conversa foi recebida.
+  // Prioridade: 1) ultimo_canal_id (último canal recebido); 2) canal_id (origem); senão vazio (escolha manual).
+  // Inclui canais DESCONECTADOS (não troca silenciosamente para outro chip). NUNCA usa o chip da conversa
+  // anterior, o primeiro da lista, nem o último envio do atendente.
+  const autoCanalRef = useRef<{ conv: string; canal: string } | null>(null);
   useEffect(() => {
     if (!WA_REAL) return;
-    const valido = realCanais.some((c) => c.id === replyCanalId);
-    if (!valido) {
-      const preferido = current.canalId && realCanais.some((c) => c.id === current.canalId)
-        ? current.canalId
-        : (realCanais.find((c) => c.status === 'conectado')?.id ?? realCanais[0]?.id ?? '');
-      setReplyCanalId(preferido);
+    const ult = current.ultimoCanal?.canalId;
+    const canalDaConversa = (ult && realCanais.some((c) => c.id === ult)) ? ult
+      : (current.canalId && realCanais.some((c) => c.id === current.canalId)) ? current.canalId
+      : '';
+    // recalcula ao trocar de conversa OU quando o canal real da conversa muda (ex.: novo inbound por outro chip).
+    // Seleção manual (onReplyCanal) persiste enquanto o canal da conversa não muda.
+    if (!autoCanalRef.current || autoCanalRef.current.conv !== currentId || autoCanalRef.current.canal !== canalDaConversa) {
+      autoCanalRef.current = { conv: currentId, canal: canalDaConversa };
+      setReplyCanalId(canalDaConversa);
     }
-  }, [currentId, realCanais.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentId, current.ultimoCanal?.canalId, current.canalId, realCanais.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const canalSel = realCanais.find((c) => c.id === replyCanalId) ?? null;
   const canalConectado = !WA_REAL || (canalSel?.status === 'conectado');
@@ -803,7 +810,7 @@ export function WhatsApp() {
 
           {canalIndisponivel && (
             <div className="warn warn-block">
-              <IcWarn />Este número está {canalSel?.status === 'removido' ? 'removido' : 'desconectado'}. O histórico permanece, mas o envio está bloqueado.
+              <IcWarn />Esta conversa entrou por <b>{canalSel?.alias}</b>, mas a conexão está {canalSel?.status === 'removido' ? 'removida' : 'desconectada'}. O histórico permanece; selecione outro canal para responder ou reconecte.
               <button className="link-btn" onClick={() => navigate('/integracoes')}>Reconectar</button>
             </div>
           )}
