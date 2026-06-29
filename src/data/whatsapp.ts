@@ -39,6 +39,14 @@ export const waDisconnect = (orgId: string, canalId: string) =>
 export const waRemove = (orgId: string, canalId: string) =>
   invoke<{ ok: boolean }>('evolution-manage', { action: 'remove', organizacao_id: orgId, canal_id: canalId });
 
+/** Remove uma mensagem de SAÍDA com falha (não entregue) via RPC segura. Retorna a conversa afetada.
+ *  A RPC valida auth/organização/acesso e recusa mensagens entregues, lidas ou de entrada. */
+export async function removerMensagemFalha(mensagemId: string): Promise<string> {
+  const { data, error } = await supabase!.rpc('remover_mensagem_falha', { p_mensagem_id: mensagemId });
+  if (error) throw new Error(error.message);
+  return data as string;
+}
+
 /* ===================== Mapeamento DB -> WaContact ===================== */
 function hhmm(iso?: string | null): string {
   if (!iso) return '';

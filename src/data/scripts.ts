@@ -369,6 +369,29 @@ export function useScriptEtapaCounts() {
   });
 }
 
+/** Traduz o erro técnico do provedor (mantido cru no log/console) em mensagem simples ao usuário.
+ *  Fonte única usada na bolha de falha e na confirmação da sequência. */
+export function traduzErroEnvio(cod?: string | null): string {
+  const raw = (cod ?? '').toString().trim();
+  if (!raw) return 'A mensagem não pôde ser enviada. Tente novamente.';
+  const c = raw.toLowerCase();
+  if (raw === 'sem_id_externo' || c.includes('sem identificador') || c.includes('não confirmou'))
+    return 'A conexão não confirmou o envio. Tente novamente em alguns minutos.';
+  if (c.includes('desconect') || c.includes('reconect') || c.includes('not connect') || /\bclose\b/.test(c))
+    return 'WhatsApp desconectado. Reconecte a conexão em Integrações.';
+  if (c.includes('(#10)') || c.includes('fora do espaço de tempo') || c.includes('24h') || c.includes('messenger'))
+    return 'A janela de 24h do Messenger expirou. O cliente precisa enviar uma nova mensagem antes de você responder.';
+  if (c.includes('limit') || c.includes('rate') || c.includes('429'))
+    return 'Limite temporário de envio atingido. Tente novamente em alguns minutos.';
+  if (c.includes('número') || c.includes('numero') || c.includes('invalid') || c.includes('inválid') || c.includes('nono dígito') || c.includes('ddd'))
+    return 'Número de destino inválido. Confira o DDD e o nono dígito.';
+  if (c.includes('instância') || c.includes('instancia') || c.includes('não está disponível'))
+    return 'A instância não está disponível. Tente novamente em alguns minutos.';
+  if (c.startsWith('error') || c.includes('recusou'))
+    return 'O WhatsApp recusou a entrega desta mensagem. Confira o número (DDD e nono dígito) e a conexão do canal, depois tente novamente.';
+  return 'O provedor recusou a mensagem. Tente novamente em alguns minutos.';
+}
+
 /**
  * Aguarda a CONFIRMAÇÃO REAL do provedor para uma mensagem já despachada.
  * Resolve só quando o status sai de "pendente" para enviada/entregue/lida; rejeita em "falhou"
@@ -384,7 +407,11 @@ export async function aguardarConfirmacaoEnvio(mensagemId: string, opts: { timeo
     const { data, error } = await supabase!.from('mensagens').select('status, erro_envio').eq('id', mensagemId).maybeSingle();
     if (error) throw new Error(error.message);
     const st = (data?.status ?? 'pendente') as string;
-    if (st === 'falhou') { const cod = (data?.erro_envio ?? '').toString().split(':')[0].trim(); throw new Error('O provedor recusou a entrega' + (cod ? ` (${cod})` : '') + '.'); }
+    if (st === 'falhou') {
+      const raw = (data?.erro_envio ?? '').toString();
+      if (raw) console.error('[envio] falha do provedor (mensagem ' + mensagemId + '):', raw); // técnico completo no log
+      throw new Error(traduzErroEnvio(raw));
+    }
     if (okSet.includes(st)) return st as 'enviada' | 'entregue' | 'lida';
     if (Date.now() - inicio > timeoutMs) throw new Error('Sem confirmação de envio do provedor a tempo.');
     await new Promise((r) => setTimeout(r, intervalMs));

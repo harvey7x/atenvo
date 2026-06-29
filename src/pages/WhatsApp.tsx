@@ -4,14 +4,14 @@ import { useToast } from '@/hooks/useToast';
 import { useAuth } from '@/context/AuthContext';
 import { useOrg } from '@/context/OrgContext';
 import { WA_CONTACTS, initials, avatarColor, type WaContact, type WaMessage } from '@/data/whatsappDemo';
-import { useWaConversations, useSendWaMessage, useWaCanais, useAtribuirAtendimento, useIniciarConversaWa, normalizeWaPhone, mascararNumero, subirMidiaWa, urlAssinadaMidiaWa, WA_REAL } from '@/data/whatsapp';
+import { useWaConversations, useSendWaMessage, useWaCanais, useAtribuirAtendimento, useIniciarConversaWa, normalizeWaPhone, mascararNumero, subirMidiaWa, urlAssinadaMidiaWa, removerMensagemFalha, WA_REAL } from '@/data/whatsapp';
 import { MediaComposer } from '@/components/MediaComposer';
 import { AudioRecorder } from '@/components/AudioRecorder';
 import { AudioMessage } from '@/components/AudioMessage';
 import { MsgImage } from '@/components/MsgImage';
 import { WhatsAppText } from '@/components/WhatsAppText';
 import { EmptyState } from '@/components/EmptyState';
-import { useScripts, useScriptEtapaCounts, aguardarConfirmacaoEnvio } from '@/data/scripts';
+import { useScripts, useScriptEtapaCounts, aguardarConfirmacaoEnvio, traduzErroEnvio } from '@/data/scripts';
 import { ScriptSequenceModal } from '@/components/ScriptSequenceModal';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Modal } from '@/components/Modal';
@@ -93,14 +93,6 @@ function ackOf(status?: string): { ticks: string; cls: string; title: string } |
   }
 }
 
-/** Motivo de falha sanitizado p/ exibição (nunca expõe internals do provedor). */
-function traduzErroEnvio(cod?: string): string {
-  if (!cod) return 'A mensagem não pôde ser enviada. Tente novamente.';
-  if (cod === 'sem_id_externo') return 'A Evolution não confirmou o envio (a mensagem não recebeu um identificador do WhatsApp). Tente novamente.';
-  if (cod.startsWith('ERROR')) return 'O WhatsApp recusou a entrega desta mensagem. Confira o número (DDD e nono dígito) e a conexão do canal, depois tente novamente.';
-  return 'Não foi possível enviar a mensagem. Tente novamente.';
-}
-
 const TABS: { id: string; label: string }[] = [
   { id: 'todos', label: 'Todos' },
   { id: 'meus', label: 'Meus' },
@@ -156,6 +148,8 @@ export function WhatsApp() {
   const [confirmFechar, setConfirmFechar] = useState(false);             // diálogo próprio (substitui window.confirm)
   const [erroDialog, setErroDialog] = useState<string | null>(null);     // "Ver erro" de mensagem falhada
   const [retryId, setRetryId] = useState<string | null>(null);           // trava de duplo-clique no retry
+  const [removerAlvo, setRemoverAlvo] = useState<WaMessage | null>(null); // mensagem com falha a remover
+  const [removendoId, setRemovendoId] = useState<string | null>(null);   // trava de duplo-clique na remoção
   const [imgModal, setImgModal] = useState(false);                       // composer de imagem
   const [docModal, setDocModal] = useState(false);                       // composer de documento
   const [transferOpen, setTransferOpen] = useState(false);               // modal de transferência
@@ -379,6 +373,19 @@ export function WhatsApp() {
     );
   }
   function verErro(m: WaMessage) { setErroDialog(traduzErroEnvio(m.erro)); }
+  /** Remove uma mensagem de SAÍDA com falha (não entregue). Atualiza a conversa na hora, sem reload. */
+  async function removerFalha(m: WaMessage) {
+    if (!m.id || removendoId) return;
+    setRemovendoId(m.id);
+    try {
+      await removerMensagemFalha(m.id);
+      setContacts((cur) => cur.map((c) => c.id === currentId ? { ...c, msgs: c.msgs.filter((x) => x.id !== m.id) } : c));
+      setRemoverAlvo(null);
+      toast('Mensagem com falha removida.');
+    } catch (e) {
+      toast((e as Error).message || 'Não foi possível remover a mensagem.', 'warn');
+    } finally { setRemovendoId(null); }
+  }
   /** Envio manual de IMAGEM: sobe ao bucket privado e envia pela Evolution (lança em falha -> mantém p/ retry). */
   async function enviarImagem(file: File, caption: string) {
     if (!currentId) throw new Error('Selecione uma conversa.');
@@ -685,6 +692,8 @@ export function WhatsApp() {
                 <button type="button" className="msg-falha-link" onClick={() => verErro(m)}>Ver erro</button>
                 <span className="msg-falha-sep">·</span>
                 <button type="button" className="msg-falha-link" disabled={!m.id || retryId === m.id} onClick={() => retryMsg(m)}>{retryId === m.id ? 'Reenviando…' : 'Tentar novamente'}</button>
+                <span className="msg-falha-sep">·</span>
+                <button type="button" className="msg-falha-link" disabled={!m.id || removendoId === m.id} onClick={() => setRemoverAlvo(m)}>{removendoId === m.id ? 'Removendo…' : 'Remover'}</button>
               </span>
             ) : null;
             // horário + status discretos, para a faixa de legenda do card de mídia
@@ -1021,6 +1030,14 @@ export function WhatsApp() {
         cancelLabel="Fechar"
         onConfirm={() => setErroDialog(null)}
         onCancel={() => setErroDialog(null)}
+      />
+      <ConfirmDialog
+        open={!!removerAlvo}
+        title="Remover esta mensagem com falha?"
+        message="Ela não foi entregue ao cliente e será retirada da conversa."
+        destructive loading={!!removendoId} confirmLabel="Remover" cancelLabel="Cancelar"
+        onConfirm={() => { if (removerAlvo) void removerFalha(removerAlvo); }}
+        onCancel={() => { if (!removendoId) setRemoverAlvo(null); }}
       />
 
       <MediaComposer open={imgModal} tipo="imagem" previewCard onClose={() => setImgModal(false)} enviar={enviarImagem} />

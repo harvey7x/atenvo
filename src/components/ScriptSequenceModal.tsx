@@ -123,9 +123,14 @@ export function ScriptSequenceModal({ open, onClose, script, canal, ctx, convers
   const ativos = itens.filter((it) => !it.removida);
   const todasOk = ativos.length > 0 && itens.every((it, i) => it.removida || status[i] === 'ok');
   const algumaFalha = status.some((s) => s === 'falha');
+  const algumOk = status.some((s) => s === 'ok');
   const restantes = itens.filter((it, i) => !it.removida && status[i] !== 'ok').length;
   const bloqueioPendencia = !!incluirMidia && itens.some((it, i) => !it.removida && status[i] !== 'ok' && temPendenciaTexto(it.texto));
-  const labelEnviar = enviando ? 'Enviando…' : todasOk ? 'Enviado' : algumaFalha ? `Tentar novamente (${restantes})` : `Enviar ${ativos.length} ${ativos.length === 1 ? 'mensagem' : 'mensagens'}`;
+  const labelEnviar = enviando ? 'Enviando…'
+    : todasOk ? 'Enviado'
+    : algumaFalha ? `Tentar novamente (${restantes})`
+    : algumOk ? `Continuar envio (${restantes})` // parte da sequência já entregue; segue do que falta
+    : `Enviar ${ativos.length} ${ativos.length === 1 ? 'mensagem' : 'mensagens'}`;
   const canalNome = canal === 'whatsapp' ? 'WhatsApp' : 'Messenger';
 
   const chip = (i: number) => {
