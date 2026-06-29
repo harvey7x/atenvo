@@ -1,4 +1,6 @@
 // evolution-send — envia texto/IMAGEM/ÁUDIO/DOCUMENTO e persiste a saída.
+// v21: ÁUDIO por formato — ogg/webm(opus) via sendWhatsAppAudio (PTT); mp4/m4a/mpeg/aac/wav via sendMedia
+//      (áudio reproduzível). Resolve "formato não compatível" no Mac/Safari (grava audio/mp4). Bloqueia áudio vazio.
 // v20: TEXTO normalizado antes do envio (NFC, CRLF->\n, NBSP->espaço, remove zero-width/soft-hyphen/
 //      controles) — resolve "texto da ficha não envia" (caracteres invisíveis copiados). Não corta;
 //      bloqueia só acima do limite real do provider, com erro claro.
@@ -165,11 +167,21 @@ Deno.serve(async (req) => {
       let sent: { key?: { id?: string } };
       try {
         if (tipo === 'audio') {
-          // ÁUDIO: Evolution 2.3.6 recusa URL remota no sendWhatsAppAudio -> enviar BASE64 do arquivo.
+          // ÁUDIO base64 (Evolution 2.3.6 recusa URL remota). CAMINHO POR FORMATO:
+          // - ogg / webm(opus): sendWhatsAppAudio (encoding:true -> ogg/opus) => nota de voz (PTT).
+          // - mp4 / m4a / mpeg(mp3) / aac / wav (Mac/Safari etc.): sendMedia mediatype=audio => arquivo
+          //   de áudio reproduzível (NÃO declaramos conversão para PTT; só trocar MIME não converte codec).
           const { data: file, error: de } = await admin.storage.from('script-midia').download(path);
           if (de || !file) return json({ error: 'Não foi possível acessar o arquivo de áudio.' }, 500);
-          const b64 = toBase64(new Uint8Array(await file.arrayBuffer()));
-          sent = await evolution.sendWhatsAppAudio(instancia, alvo, b64);                       // nota de voz (PTT); encoding:true converte p/ ogg/opus
+          const bytes = new Uint8Array(await file.arrayBuffer());
+          if (bytes.length === 0) return json({ error: 'Áudio vazio. Grave novamente.' }, 422);
+          const b64 = toBase64(bytes);
+          const mlow = (mime || '').toLowerCase();
+          if (mlow.includes('ogg') || mlow.includes('webm')) {
+            sent = await evolution.sendWhatsAppAudio(instancia, alvo, b64);                     // PTT (ogg/opus)
+          } else {
+            sent = await evolution.sendMedia(instancia, alvo, 'audio', mime || 'audio/mpeg', b64, nome && nome !== 'audio' ? nome : 'audio.m4a'); // arquivo de áudio reproduzível
+          }
         } else {
           // IMAGEM/DOCUMENTO: URL assinada CURTA (600s) — a Evolution baixa; NUNCA persistimos a URL.
           const { data: signed, error: se } = await admin.storage.from('script-midia').createSignedUrl(path, 600);

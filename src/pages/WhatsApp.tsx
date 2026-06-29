@@ -399,6 +399,7 @@ export function WhatsApp() {
   /** Envio de ÁUDIO (gravado ou arquivo): sobe ao bucket privado e envia como nota de voz pela Evolution. */
   async function enviarAudio(blob: Blob, mime: string, ext: string) {
     if (!currentId) throw new Error('Selecione uma conversa.');
+    if (!blob || blob.size === 0) throw new Error('Áudio vazio. Grave novamente.');
     const file = new File([blob], `audio-${Date.now()}.${ext}`, { type: mime });
     const up = await subirMidiaWa(currentOrg.id, file);
     await sendMut.mutateAsync({
