@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { DEMO_MODE, acaoSimulada } from '@/lib/demo';
 import { useOrg } from '@/context/OrgContext';
 import type { WaContact, WaMessage, WaUltimoCanal } from '@/data/whatsappDemo';
 
@@ -8,6 +9,7 @@ export const WA_REAL = isSupabaseConfigured && !!supabase;
 
 /* ===================== Chamadas às Edge Functions ===================== */
 async function invoke<T>(fn: string, body: Record<string, unknown>): Promise<T> {
+  if (DEMO_MODE && (fn === 'evolution-manage' || fn === 'evolution-send')) throw acaoSimulada(); // sem Evolution/WhatsApp real na demo
   const { data, error } = await supabase!.functions.invoke(fn, { body });
   if (error) {
     let msg = error.message;

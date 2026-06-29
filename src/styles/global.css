@@ -239,3 +239,11 @@ body.wa-foco .content{padding:0;overflow:hidden}
 .denied .d-ic svg{width:26px;height:26px}
 .denied h2{font-size:18px;font-weight:600;color:var(--ink);margin:0 0 8px}
 .denied p{font-size:13.5px;color:var(--muted);margin:0;line-height:1.5}
+
+/* ===== Modo demonstração ===== */
+.demo-bar{position:fixed;top:0;left:0;right:0;height:26px;z-index:400;display:flex;align-items:center;justify-content:center;gap:8px;
+  background:#7a5bb0;color:#fff;font-size:12.5px;font-weight:600;letter-spacing:.01em;box-shadow:0 1px 4px rgba(0,0,0,.18)}
+.demo-bar .demo-dot{width:7px;height:7px;border-radius:50%;background:#fff;opacity:.9}
+.app-demo{margin-top:26px}
+.app-demo,.app-demo .sidebar,.app-demo .col-main{height:calc(100dvh - 26px)}
+[data-theme="dark"] .demo-bar{background:#6b4fa0}

@@ -1,12 +1,14 @@
 import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { DEMO_MODE, acaoSimulada } from '@/lib/demo';
 import { useOrg } from '@/context/OrgContext';
 
 export const FB_REAL = isSupabaseConfigured && !!supabase;
 
 /* ===================== Chamada às Edge Functions (erros legíveis) ===================== */
 async function invoke<T>(fn: string, body: Record<string, unknown>): Promise<T> {
+  if (DEMO_MODE && (fn === 'meta-auth-start' || fn === 'meta-pages' || (fn === 'meta-manage' && body.action !== 'status'))) throw acaoSimulada(); // sem Meta/Facebook real na demo
   const { data, error } = await supabase!.functions.invoke(fn, { body });
   if (error) {
     let msg = error.message;
@@ -159,6 +161,7 @@ export function useSendFbMessage() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: { conversaId: string; texto: string }) => {
+      if (DEMO_MODE) throw acaoSimulada();
       type Res = { ok?: boolean; error?: string; message?: string; message_id?: string };
       type Body = { ok?: boolean; error?: string; message?: string; resultados?: { texto?: Res } };
       const { data, error } = await supabase!.functions.invoke('meta-send-message', { body: { conversa_id: input.conversaId, texto: input.texto } });
@@ -222,6 +225,7 @@ export function useSendFbMedia() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: { conversaId: string; etapaId?: string; texto?: string; audioPath?: string; audioMime?: string; audioNome?: string; audioTamanho?: number; midiaPath?: string; midiaTipo?: string; midiaMime?: string; midiaNome?: string; midiaTamanho?: number }) => {
+      if (DEMO_MODE) throw acaoSimulada();
       type Res = { ok?: boolean; error?: string; message_id?: string };
       type Body = { ok?: boolean; error?: string; resultados?: { texto?: Res; anexo?: Res } };
       const body: Record<string, unknown> = { conversa_id: input.conversaId, ...(input.texto && input.texto.trim() ? { texto: input.texto } : {}) };

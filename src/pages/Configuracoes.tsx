@@ -17,6 +17,7 @@ import {
 } from '@/data/configuracoes';
 import { Modal } from '@/components/Modal';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { DEMO_MODE } from '@/lib/demo';
 import { PALETA_CORES, podeGerenciarAtendimento, type StatusDef } from '@/types/atendimento';
 import './Configuracoes.css';
 
@@ -73,6 +74,7 @@ export function Configuracoes() {
     <div className="config-page">
       <div className="content">
         <div className="wrap">
+          {DEMO_MODE && podeAdmin && <DemoReset />}
           <div className="settings-tabs">
             {TABS.map((t) => <button key={t.id} className={tab === t.id ? 'on' : ''} onClick={() => setTab(t.id)}>{t.label}</button>)}
           </div>
@@ -88,6 +90,27 @@ export function Configuracoes() {
           <section className={'tab-panel' + (tab === 'prefs' ? ' on' : '')} data-panel="prefs"><PrefsPanel theme={theme} setTheme={setTheme} toast={toast} onNav={navigate} /></section>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ===================== Demonstração (reset) ===================== */
+function DemoReset() {
+  const { toast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [ultimo, setUltimo] = useState<string | null>(null);
+  async function reset() {
+    setBusy(true);
+    try { const { error } = await supabase!.rpc('demo_reset'); if (error) throw new Error(error.message); setUltimo(new Date().toLocaleString('pt-BR')); toast('Dados da demonstração restaurados.'); setOpen(false); }
+    catch (e) { toast((e as Error).message || 'Falha ao restaurar.', 'warn'); }
+    finally { setBusy(false); }
+  }
+  return (
+    <div className="set-card" style={{ marginBottom: 16 }}>
+      <div className="sc-head"><h3>Ambiente de demonstração</h3><p>Restaura a massa fictícia original (contatos, conversas, Kanban, cobranças). Afeta apenas a demo.{ultimo ? ' Último reset: ' + ultimo : ''}</p></div>
+      <div className="sc-foot"><button className="btn-ghost danger" onClick={() => setOpen(true)}>Restaurar dados da demonstração</button></div>
+      <ConfirmDialog open={open} title="Restaurar dados da demonstração?" message="Toda a massa fictícia atual será apagada e recriada do zero. Esta ação afeta apenas o ambiente de demonstração, nunca a produção." destructive loading={busy} confirmLabel="Restaurar" onConfirm={reset} onCancel={() => { if (!busy) setOpen(false); }} />
     </div>
   );
 }
