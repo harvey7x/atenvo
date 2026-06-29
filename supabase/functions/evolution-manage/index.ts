@@ -1,6 +1,7 @@
 // evolution-manage — ações do conector de WhatsApp por QR Code.
 // action: create | qr | status | disconnect | remove
-// v9: 'remove' agora é EXCLUSÃO LÓGICA (#5) — preserva canal/conversas/mensagens. Segredo do webhook via tabela.
+// v10: 'remove' é EXCLUSÃO DEFINITIVA — apaga a instância na Evolution e EXCLUI o registro local
+//      (integracoes + canais). Conversas/mensagens/oportunidades são preservadas via FKs ON DELETE SET NULL.
 import { corsHeaders, json } from './cors.ts';
 import { adminClient, getUser, requireOrgAdmin } from './client.ts';
 import { evolution, evolutionConfigured, extractQr } from './evolution.ts';
@@ -132,11 +133,15 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'remove') {
-      // #5 EXCLUSÃO LÓGICA: libera a sessão na Evolution, mas PRESERVA o canal e o vínculo de conversas/mensagens.
-      // canal vira 'removido' + ativo=false (libera a vaga do limite); nada de DELETE em canais/conversas/mensagens.
-      try { await evolution.remove(instance); } catch { /* tolerante */ }
-      await admin.from('canais').update({ status_integracao: 'removido', ativo: false, conectado_em: null, ultima_sincronizacao: new Date().toISOString() }).eq('id', canalId);
-      await admin.from('integracoes').update({ status: 'desconectado' }).eq('canal_id', canalId);
+      // EXCLUSÃO DEFINITIVA: apaga a instância na Evolution e EXCLUI o registro local da integração.
+      // 1) provedor: remove a instância (libera sessão/QR/token). Tolerante: pode já não existir.
+      try { await evolution.remove(instance); } catch { /* instância pode já estar removida */ }
+      // 2) banco: apaga integracoes e o canal. Conversas/oportunidades ficam com canal_id = null (FK SET NULL),
+      //    preservando o histórico. fichas_judiciais (FK NO ACTION) precisa ser desvinculada antes.
+      await admin.from('integracoes').delete().eq('canal_id', canalId);
+      await admin.from('fichas_judiciais').update({ canal_id: null }).eq('canal_id', canalId);
+      const { error: delErr } = await admin.from('canais').delete().eq('id', canalId);
+      if (delErr) return json({ error: `Falha ao excluir o canal: ${delErr.message}` }, 500);
       return json({ ok: true });
     }
 

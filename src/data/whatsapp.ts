@@ -278,12 +278,13 @@ export function useWaCanais() {
     queryKey: ['wa-canais', currentOrg.id],
     enabled: WA_REAL,
     queryFn: async (): Promise<WaCanal[]> => {
-      // Inclui canais com exclusão lógica (removido/arquivado): o histórico permanece legível e
-      // o canal aparece como indisponível para envio (#5). Apenas excluímos nada de fato.
+      // Lista apenas canais vigentes. A remoção agora é DEFINITIVA no servidor (Edge Function
+      // evolution-manage/remove exclui o registro), então canais 'removido' não devem aparecer aqui.
       const { data, error } = await supabase!
         .from('canais')
         .select('id, nome_interno, numero_conectado, status_integracao, provider, conectado_em')
         .eq('organizacao_id', currentOrg.id).eq('tipo', 'whatsapp').eq('provider', 'evolution')
+        .neq('status_integracao', 'removido')
         .order('criado_em', { ascending: true });
       if (error) throw new Error(error.message);
       type Row = { id: string; nome_interno: string | null; numero_conectado: string | null; status_integracao: string; provider: string | null; conectado_em: string | null };

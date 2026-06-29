@@ -113,7 +113,7 @@
 .integracoes-page .sec-head h2 {font-size:16.5px;font-weight:600;color:var(--ink);margin:0;display:flex;align-items:center;gap:9px}
 .integracoes-page .sec-head h2 .si {width:18px;height:18px;color:var(--muted)}
 .integracoes-page .sec-head p {font-size:13px;color:var(--muted);margin:4px 0 0}
-.integracoes-page .int-grid {display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.integracoes-page .int-grid {display:grid;grid-template-columns:minmax(0,1fr);gap:16px}
 .integracoes-page .int-card {background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden;display:flex;flex-direction:column;min-width:0}
 .integracoes-page .ic-head {display:flex;align-items:flex-start;gap:13px;padding:18px 20px;border-bottom:1px solid var(--line)}
 .integracoes-page .ic-logo {width:46px;height:46px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;flex:none}
@@ -132,6 +132,21 @@
 .integracoes-page .kv .k {font-size:11.5px;color:var(--muted);font-weight:500;margin-bottom:3px}
 .integracoes-page .kv .v {font-size:13px;color:var(--ink);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .integracoes-page .kv .v.mono {font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12px;letter-spacing:-.01em}
+/* Lista de conexões: uma por linha, info à esquerda + status/ações à direita, com quebra responsiva. */
+.integracoes-page .conn-list {display:flex;flex-direction:column;gap:10px;min-width:0}
+.integracoes-page .conn-head {font-size:13px;font-weight:600;color:var(--ink);margin-bottom:2px}
+.integracoes-page .conn-row {display:flex;align-items:center;justify-content:space-between;gap:12px 16px;flex-wrap:wrap;min-width:0;background:var(--surface-2);border:1px solid var(--line-2);border-radius:12px;padding:13px 15px}
+.integracoes-page .conn-info {display:flex;flex-direction:column;gap:3px;min-width:0;flex:1 1 220px}
+.integracoes-page .conn-name {font-size:14px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.integracoes-page .conn-sub {font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.integracoes-page .conn-actions {display:flex;align-items:center;gap:9px;flex-wrap:wrap;justify-content:flex-end;flex:0 1 auto}
+.integracoes-page .btn-sm.danger {color:var(--err);border-color:var(--err);background:var(--surface)}
+.integracoes-page .btn-sm.danger:hover {background:var(--err-soft)}
+.integracoes-page .btn-sm:disabled {opacity:.55;cursor:not-allowed}
+@media (max-width:560px){
+  .integracoes-page .conn-row {flex-direction:column;align-items:stretch}
+  .integracoes-page .conn-actions {width:100%;justify-content:flex-start}
+}
 .integracoes-page .ic-foot {padding:14px 20px;border-top:1px solid var(--line);display:flex;align-items:center;gap:9px;flex-wrap:wrap}
 .integracoes-page .ic-foot .sp {margin-left:auto}
 .integracoes-page .badge {display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;padding:4px 10px;border-radius:999px;white-space:nowrap}

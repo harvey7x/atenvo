@@ -5,7 +5,7 @@ import { useToast } from '@/hooks/useToast';
 import { useOrg } from '@/context/OrgContext';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { WhatsAppConnect } from '@/components/WhatsAppConnect';
-import { useWaCanais, waRemove } from '@/data/whatsapp';
+import { useWaCanais, waRemove, mascararNumero } from '@/data/whatsapp';
 import { FB_REAL, useFbStatus, fbAuthStart, fbPages, fbConnect, fbDisconnect } from '@/data/facebook';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import './Integracoes.css';
@@ -42,7 +42,6 @@ export function Integracoes() {
   const waCanais = useWaCanais();
   const fbStatus = useFbStatus();
   const [waOpen, setWaOpen] = useState(false);
-  const [busy] = useState<string | null>(null);
   const [fbBusy, setFbBusy] = useState(false);
   const [fbSel, setFbSel] = useState<{ id: string; nome: string }[] | null>(null);
   const [fbCode, setFbCode] = useState<string | null>(null);
@@ -56,7 +55,11 @@ export function Integracoes() {
       if (remocao.tipo === 'whatsapp') await waRemove(currentOrg.id, remocao.id);
       else await fbDisconnect(remocao.id);
       toast('Conexão removida.'); refresh(); setRemocao(null);
-    } catch (e) { toast((e as Error).message || 'Falha ao remover.', 'warn'); }
+    } catch (e) {
+      // Falha parcial: não fingir sucesso — mantém o item, registra o erro técnico e avisa o usuário.
+      console.error('[integracoes] falha ao remover conexão', remocao, e);
+      toast((e as Error).message || 'Falha ao remover a conexão. Tente novamente.', 'warn');
+    }
     finally { setRemLoading(false); }
   }
 
@@ -145,17 +148,24 @@ export function Integracoes() {
                 ) : canais.length === 0 ? (
                   <div className="adapter-note"><IcInfo /><div className="tx">Nenhum número conectado ainda. Clique em <b>Conectar WhatsApp</b> para ler o QR Code.</div></div>
                 ) : (
-                  <div className="kv">
-                    {canais.map((c) => (
-                      <div className="row" key={c.id}>
-                        <div className="k">{c.alias}{c.numero ? ` · ${c.numero}` : ''}</div>
-                        <div className="v" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span className={'badge ' + (WA_ST[c.status]?.cls || 'neutral')}>{WA_ST[c.status]?.dot && <span className="dot" />}{WA_ST[c.status]?.t || c.status}</span>
-                          {c.status === 'conectado' && <button className="btn-sm" disabled={busy === c.id} onClick={() => setWaOpen(true)}>Reconectar</button>}
-                          <button className="btn-sm" style={{ color: 'var(--err)', borderColor: 'var(--err)' }} disabled={busy === c.id} onClick={() => setRemocao({ tipo: 'whatsapp', id: c.id, nome: c.alias + (c.numero ? ' · ' + c.numero : '') })}>Remover conexão</button>
+                  <div className="conn-list">
+                    {canais.map((c) => {
+                      const st = WA_ST[c.status] || { t: c.status, cls: 'neutral' };
+                      const removendo = remLoading && remocao?.tipo === 'whatsapp' && remocao?.id === c.id;
+                      return (
+                        <div className="conn-row" key={c.id}>
+                          <div className="conn-info">
+                            <span className="conn-name">{c.alias}</span>
+                            <span className="conn-sub">{c.numero ? mascararNumero(c.numero) : 'Número não identificado'}</span>
+                          </div>
+                          <div className="conn-actions">
+                            <span className={'badge ' + st.cls}>{st.dot && <span className="dot" />}{st.t}</span>
+                            {c.status === 'conectado' && <button className="btn-sm" disabled={removendo} onClick={() => setWaOpen(true)}>Reconectar</button>}
+                            <button className="btn-sm danger" disabled={removendo} onClick={() => setRemocao({ tipo: 'whatsapp', id: c.id, nome: c.alias + (c.numero ? ' · ' + mascararNumero(c.numero) : '') })}>{removendo ? 'Removendo…' : 'Remover conexão'}</button>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -183,32 +193,36 @@ export function Integracoes() {
                 {!FB_REAL ? (
                   <div className="adapter-note"><IcInfo /><div className="tx">Disponível com o backend configurado.</div></div>
                 ) : fbSel ? (
-                  <div className="kv">
-                    <div className="row"><div className="k" style={{ fontWeight: 600 }}>Escolha a Página para conectar</div><div className="v" /></div>
+                  <div className="conn-list">
+                    <div className="conn-head">Escolha a Página para conectar</div>
                     {fbSel.length === 0 && <div className="adapter-note"><IcInfo /><div className="tx">Nenhuma Página encontrada nesta conta do Facebook. Você precisa ser <b>administrador de uma Página</b> e, na tela de autorização da Meta, <b>marcar a Página</b> que deseja conectar. Crie/assuma uma Página e clique novamente em “Conectar com Facebook”.</div></div>}
                     {fbSel.map((p) => (
-                      <div className="row" key={p.id}>
-                        <div className="k">{p.nome}</div>
-                        <div className="v"><button className="btn-sm acc" disabled={fbBusy} onClick={() => fbEscolher(p.id)}>Conectar esta Página</button></div>
+                      <div className="conn-row" key={p.id}>
+                        <div className="conn-info"><span className="conn-name">{p.nome}</span></div>
+                        <div className="conn-actions"><button className="btn-sm acc" disabled={fbBusy} onClick={() => fbEscolher(p.id)}>Conectar esta Página</button></div>
                       </div>
                     ))}
-                    <div className="row"><div className="k" /><div className="v"><button className="btn-sm" disabled={fbBusy} onClick={() => { setFbSel(null); setFbCode(null); }}>Cancelar</button></div></div>
+                    <div className="conn-actions" style={{ justifyContent: 'flex-start' }}><button className="btn-sm" disabled={fbBusy} onClick={() => { setFbSel(null); setFbCode(null); }}>Cancelar</button></div>
                   </div>
                 ) : fbPaginas.length === 0 ? (
                   <div className="adapter-note"><IcInfo /><div className="tx">Nenhuma Página conectada. Clique em <b>Conectar com Facebook</b> para autorizar e escolher a Página.</div></div>
                 ) : (
-                  <div className="kv">
+                  <div className="conn-list">
                     {fbPaginas.map((p) => {
                       const b = fbTokenBadge(p);
+                      const removendo = remLoading && remocao?.tipo === 'facebook' && remocao?.id === p.canal_id;
                       return (
-                        <div className="row" key={p.id}>
-                          <div className="k">{p.pagina_nome || p.pagina_id}</div>
-                          <div className="v" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div className="conn-row" key={p.id}>
+                          <div className="conn-info">
+                            <span className="conn-name">{p.pagina_nome || p.pagina_id}</span>
+                            <span className="conn-sub">Página · {p.pagina_id}</span>
+                          </div>
+                          <div className="conn-actions">
                             <span className={'badge ' + b.cls}>{'dot' in b && b.dot && <span className="dot" />}{b.t}</span>
                             {p.estado === 'conectado'
                               ? <>
-                                  <button className="btn-sm" disabled={fbBusy} onClick={fbIniciar}>Reconectar</button>
-                                  <button className="btn-sm" style={{ color: 'var(--err)', borderColor: 'var(--err)' }} disabled={busy === p.canal_id} onClick={() => setRemocao({ tipo: 'facebook', id: p.canal_id, nome: p.pagina_nome || p.pagina_id })}>Remover conexão</button>
+                                  <button className="btn-sm" disabled={fbBusy || removendo} onClick={fbIniciar}>Reconectar</button>
+                                  <button className="btn-sm danger" disabled={removendo} onClick={() => setRemocao({ tipo: 'facebook', id: p.canal_id, nome: p.pagina_nome || p.pagina_id })}>{removendo ? 'Removendo…' : 'Remover conexão'}</button>
                                 </>
                               : <button className="btn-sm acc" disabled={fbBusy} onClick={fbIniciar}>Reconectar</button>}
                           </div>
@@ -246,9 +260,9 @@ export function Integracoes() {
 
       <ConfirmDialog
         open={!!remocao}
-        title="Remover conexão"
-        message={remocao ? `O canal "${remocao.nome}" será ${remocao.tipo === 'whatsapp' ? 'removido (vaga liberada)' : 'desconectado'}. O histórico de conversas e mensagens é preservado e você poderá reconectar depois.` : ''}
-        destructive loading={remLoading} confirmLabel="Remover conexão"
+        title="Remover conexão?"
+        message={remocao ? `A conexão "${remocao.nome}" será desconectada do provedor e deixará de aparecer na lista. O histórico de conversas e mensagens é preservado. Esta ação não pode ser desfeita.` : ''}
+        destructive loading={remLoading} confirmLabel="Remover conexão" cancelLabel="Cancelar"
         onConfirm={confirmarRemocao} onCancel={() => { if (!remLoading) setRemocao(null); }} />
     </div>
   );

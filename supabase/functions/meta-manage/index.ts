@@ -1,7 +1,8 @@
-// meta-manage — conectar / status / desconectar Página. PRIVADA (JWT).
+// meta-manage — conectar / status / remover Página. PRIVADA (JWT).
 // connect: consome o código de continuação (uso único), valida dono+org, obtém o page
 // token (Vault), assina o webhook, cria/reaproveita canal+meta_paginas+credencial.
-// disconnect: desconexão LÓGICA (preserva histórico), revoga token e apaga secret.
+// disconnect: REMOÇÃO DEFINITIVA — revoga webhook, apaga o token do Vault e EXCLUI os
+//             registros locais (credenciais, identidades, meta_paginas e canal). Histórico preservado.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
@@ -126,7 +127,7 @@ Deno.serve(async (req) => {
     }
   }
 
-  // -------- DISCONNECT (lógica) --------
+  // -------- DISCONNECT = REMOÇÃO DEFINITIVA --------
   if (action === 'disconnect') {
     const { canal_id } = body; if (!canal_id) return json({ error: 'parametros' }, 400);
     const { data: canal } = await db.from('canais').select('id,organizacao_id,instancia_externa').eq('id', canal_id).eq('tipo', 'facebook').maybeSingle();
@@ -136,14 +137,20 @@ Deno.serve(async (req) => {
     const { data: mp } = await db.from('meta_paginas').select('id,pagina_id').eq('canal_id', canal_id).maybeSingle();
     if (mp) {
       const { data: cred } = await db.from('meta_pagina_credenciais').select('vault_secret_id').eq('meta_pagina_id', mp.id).maybeSingle();
-      // best-effort: des-assina o webhook
+      // 1) provedor: des-assina o webhook na Meta (best-effort) e apaga o token do Vault.
       try { if (cred?.vault_secret_id) { const tok = (await db.rpc('meta_get_secret', { p_vault_id: cred.vault_secret_id })).data as string; if (tok) await graphPostQ(`${mp.pagina_id}/subscribed_apps`, { access_token: tok }, 'DELETE'); } } catch (_) { /* ignora */ }
       if (cred?.vault_secret_id) await db.rpc('meta_delete_secret', { p_vault_id: cred.vault_secret_id });
-      await db.from('meta_pagina_credenciais').update({ token_status: 'revogado', revogado_em: new Date().toISOString(), vault_secret_id: null, atualizado_em: new Date().toISOString() }).eq('meta_pagina_id', mp.id);
-      await db.from('meta_paginas').update({ estado: 'desconectado', webhook_assinado: false, desconectado_em: new Date().toISOString(), atualizado_em: new Date().toISOString() }).eq('id', mp.id);
+      // 2) banco: EXCLUI em ordem por causa das FKs RESTRICT (credenciais e identidades -> meta_paginas).
+      await db.from('meta_pagina_credenciais').delete().eq('meta_pagina_id', mp.id);
+      await db.from('meta_contato_identidades').delete().eq('meta_pagina_id', mp.id);
+      const { error: empDel } = await db.from('meta_paginas').delete().eq('id', mp.id);
+      if (empDel) return json({ error: empDel.message }, 500);
     }
-    await db.from('canais').update({ status_integracao: 'removido', ativo: false }).eq('id', canal_id);
-    return json({ ok: true }); // histórico preservado (contatos/conversas/mensagens)
+    // 3) desvincula fichas (FK NO ACTION) e EXCLUI o canal. Conversas/oportunidades ficam SET NULL.
+    await db.from('fichas_judiciais').update({ canal_id: null }).eq('canal_id', canal_id);
+    const { error: delErr } = await db.from('canais').delete().eq('id', canal_id);
+    if (delErr) return json({ error: delErr.message }, 500);
+    return json({ ok: true }); // Página e canal removidos; histórico de conversas/mensagens preservado.
   }
 
   return json({ error: 'acao_invalida' }, 400);
