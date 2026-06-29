@@ -261,18 +261,19 @@ function AbaVisao({ f }: { f: RelFiltros }) {
     <Estado q={q}>
       {q.data && <>
         <div className="kpis">
-          <KpiCard label="Leads recebidos" k={q.data.leadsRecebidos} sentido="maior" fmt={fmtInt} tooltip="Oportunidades criadas no período (criado_em)." />
-          <KpiCard label="Leads atendidos" k={q.data.leadsAtendidos} sentido="maior" fmt={fmtInt} tooltip="Conversas distintas com ao menos uma mensagem de saída no período." />
-          <KpiCard label="Novos contatos" k={q.data.novosContatos} sentido="maior" fmt={fmtInt} tooltip="Contatos criados no período (contatos.criado_em)." />
-          <KpiCard label="Oportunidades abertas" k={q.data.oportunidadesAbertas} sentido="maior" fmt={fmtInt} tooltip="Oportunidades em andamento criadas no período." />
-          <KpiCard label="Clientes fechados" k={q.data.clientesFechados} sentido="maior" fmt={fmtInt} tooltip="Oportunidades com status ganho no período." />
-          <KpiCard label="Taxa de conversão" k={q.data.taxaConversao} sentido="maior" fmt={fmtPct} tooltip="Ganhos ÷ leads recebidos no período." />
-          <KpiCard label="Receita recebida" k={q.data.receitaRecebida} sentido="maior" fmt={fmtBRL} tooltip="Soma de valor_pago das parcelas pagas com data_pagamento no período." />
-          <KpiCard label="Receita prevista" k={q.data.receitaPrevista} sentido="maior" fmt={fmtBRL} tooltip="Soma das parcelas (não canceladas) com vencimento no período." />
+          <KpiCard label="Novos contatos" k={q.data.novosContatos} sentido="maior" fmt={fmtInt} tooltip="Contatos criados no período (contatos.criado_em). População: contatos." />
+          <KpiCard label="Novas conversas" k={q.data.novasConversas} sentido="maior" fmt={fmtInt} tooltip="Conversas iniciadas no período (conversas.criado_em). População: conversas." />
+          <KpiCard label="Conversas atendidas" k={q.data.conversasAtendidas} sentido="maior" fmt={fmtInt} tooltip="Novas conversas do período que receberam ≥1 resposta de operador (saída com autor identificado)." />
+          <KpiCard label="Taxa de atendimento" k={q.data.taxaAtendimento} sentido="maior" fmt={fmtPct} tooltip="Conversas atendidas ÷ novas conversas do período." />
+          <KpiCard label="Oportunidades criadas" k={q.data.oportunidadesCriadas} sentido="maior" fmt={fmtInt} tooltip="Oportunidades criadas no período (oportunidades.criado_em). População: oportunidades." />
+          <KpiCard label="Oportunidades fechadas" k={q.data.oportunidadesFechadas} sentido="maior" fmt={fmtInt} tooltip="Do conjunto criado no período, as com status ganho (coorte por criação)." />
+          <KpiCard label="Conversão comercial" k={q.data.conversaoComercial} sentido="maior" fmt={fmtPct} tooltip="Oportunidades ganhas ÷ oportunidades criadas, ambas do mesmo período (coorte por criação)." />
+          <KpiCard label="Receita recebida" k={q.data.receitaRecebida} sentido="maior" fmt={fmtBRL} tooltip="Σ valor_pago de parcelas pagas com data_pagamento no período." />
+          <KpiCard label="Receita prevista" k={q.data.receitaPrevista} sentido="maior" fmt={fmtBRL} tooltip="Σ parcelas não canceladas com vencimento (data_prevista) no período." />
           <KpiCard label="Ticket médio (mensal)" k={q.data.ticketMedio} sentido="maior" fmt={fmtBRL} tooltip="Média de valor_mensal das cobranças não canceladas criadas no período." />
-          <KpiCard label="Parcelas em atraso" k={q.data.parcelasAtraso} sentido="menor" fmt={fmtInt} tooltip="Parcelas previstas com vencimento anterior a hoje." />
+          <KpiCard label="Parcelas em atraso" k={flat(q.data.parcelasAtraso)} sentido="neutro" fmt={fmtInt} tooltip="Posição atual: parcelas previstas com vencimento anterior a hoje (não comparado a período anterior)." />
           <KpiCard label="Inadimplência" k={q.data.taxaInadimplencia} sentido="menor" fmt={fmtPct} tooltip="Parcelas vencidas não pagas ÷ parcelas vencidas (vencimento no período)." />
-          <KpiCard label="Economia gerada" k={q.data.economiaGerada} sentido="maior" fmt={fmtBRL} tooltip="Soma de valor_economizado das cobranças. Indisponível quando o campo não está preenchido." />
+          <KpiCard label="Economia gerada" k={q.data.economiaGerada} sentido="maior" fmt={fmtBRL} tooltip="Σ valor_economizado das cobranças. Indisponível enquanto o campo não for preenchido." />
         </div>
         <div className="grid-2">
           <Estado q={fin}>{fin.data && <Panel title="Evolução de recebimentos" sub="Últimos 6 meses (valor pago)"><LineChart pts={fin.data.evolucao.map((m) => ({ label: m.mes.slice(5) + '/' + m.mes.slice(2, 4), v: m.recebido }))} money /></Panel>}</Estado>
@@ -319,19 +320,19 @@ function AbaAtendimento({ f }: { f: RelFiltros }) {
           <KpiCard label="Total de conversas" k={flat(q.data.totalConversas)} sentido="neutro" fmt={fmtInt} tooltip="Conversas criadas no período." />
           <KpiCard label="Abertas" k={flat(q.data.abertas)} sentido="neutro" fmt={fmtInt} tooltip="Conversas com status aberta." />
           <KpiCard label="Resolvidas" k={flat(q.data.resolvidas)} sentido="neutro" fmt={fmtInt} tooltip="Conversas resolvidas ou fechadas." />
-          <KpiCard label="Sem resposta" k={flat(q.data.semResposta)} sentido="menor" fmt={fmtInt} tooltip="Conversas com entrada do cliente e nenhuma saída no período." />
+          <KpiCard label="Sem resposta" k={flat(q.data.semResposta)} sentido="menor" fmt={fmtInt} tooltip="Conversas do período com entrada do cliente e nenhuma resposta de operador (saída com autor identificado)." />
           <KpiCard label="Mensagens recebidas" k={flat(q.data.msgRecebidas)} sentido="neutro" fmt={fmtInt} tooltip="Mensagens de entrada no período." />
-          <KpiCard label="Mensagens enviadas" k={flat(q.data.msgEnviadas)} sentido="neutro" fmt={fmtInt} tooltip="Mensagens de saída (exclui sistema e nota interna)." />
-          <KpiCard label="Média msg/conversa" k={flat(q.data.mediaMsgConversa)} sentido="neutro" fmt={(n) => n.toFixed(1)} tooltip="Total de mensagens ÷ conversas no período." />
-          <KpiCard label="Taxa de resposta" k={flat(q.data.taxaResposta)} sentido="maior" fmt={fmtPct} tooltip="Conversas com entrada que receberam ao menos uma saída ÷ conversas com entrada." />
-          <KpiCard label="Tempo 1ª resposta (médio)" k={q.data.primeiraRespostaMin == null ? null : flat(q.data.primeiraRespostaMin)} sentido="menor" fmt={(n) => fmtMin(n)} tooltip="Média entre a 1ª entrada e a 1ª saída por conversa." />
+          <KpiCard label="Mensagens enviadas" k={flat(q.data.msgEnviadas)} sentido="neutro" fmt={fmtInt} tooltip="Mensagens de saída no período (exclui sistema e nota interna; inclui saídas sincronizadas do aparelho)." />
+          <KpiCard label="Média msg/conversa" k={flat(q.data.mediaMsgConversa)} sentido="neutro" fmt={(n) => n.toFixed(1)} tooltip="Total de mensagens ÷ conversas do período." />
+          <KpiCard label="Taxa de atendimento" k={flat(q.data.taxaAtendimento)} sentido="maior" fmt={fmtPct} tooltip="Conversas do período com entrada que receberam resposta de operador ÷ conversas do período com entrada." />
+          <KpiCard label="Tempo até 1ª resposta (operador)" k={q.data.primeiraRespostaMin == null ? null : flat(q.data.primeiraRespostaMin)} sentido="menor" fmt={(n) => fmtMin(n)} tooltip="Média entre a 1ª entrada e a 1ª resposta de operador (saída com autor_id). Saídas sincronizadas do aparelho (sem autor) não entram — o schema não permite confirmá-las como humanas." />
         </div>
         <div className="grid-2">
           <Panel title="Volume por hora do dia" sub="Mensagens (fuso de São Paulo)"><MiniBars vals={q.data.porHora} labels={HORAS} /></Panel>
           <Panel title="Volume por dia da semana" sub="Mensagens"><MiniBars vals={q.data.porDiaSemana} labels={DIAS} /></Panel>
         </div>
         <Panel title="Conversas por canal"><Donut data={q.data.porCanal.map((c) => ({ label: canalNome(c.canal), v: c.total }))} /></Panel>
-        <div className="indispo" style={{ marginTop: 16 }}><b>Limitação:</b> não é possível distinguir com segurança resposta humana de automática (saídas com autor majoritariamente nulo); usa-se saída não-sistema como proxy. Tempo de atendimento/resolução e “fora de horário” dependem de marcação de jornada inexistente.</div>
+        <div className="indispo" style={{ marginTop: 16 }}><b>Sobre esta seção:</b> só os filtros de <b>período</b> e <b>canal</b> se aplicam ao atendimento (conversas/mensagens); origem, etapa, status e responsável não têm relação confiável com conversas e são ignorados aqui. “Resposta” = saída com autor identificado (operador via app); saídas sincronizadas do aparelho não são contadas como atendimento humano. Tempo de atendimento/resolução e “fora de horário” dependem de marcação de jornada inexistente.</div>
       </>}
     </Estado>
   );
@@ -340,24 +341,33 @@ function AbaAtendimento({ f }: { f: RelFiltros }) {
 /* ============ ABA: Equipe ============ */
 function AbaEquipe({ f, periodoLabel, orgNome }: { f: RelFiltros; periodoLabel: string; orgNome: string }) {
   const q = useEquipe(f, true);
-  const linhas = (q.data || []).slice().sort((a, b) => b.receitaRecebida - a.receitaRecebida);
-  const maxRec = Math.max(1, ...linhas.map((l) => l.receitaRecebida));
-  const top = (campo: 'oppGanho' | 'receitaRecebida' | 'leads') => linhas.slice().sort((a, b) => (b[campo] as number) - (a[campo] as number))[0];
+  const com = (q.data?.comercial || []).slice().sort((a, b) => b.receitaRecebida - a.receitaRecebida);
+  const at = (q.data?.atendimento || []).filter((l) => l.mensagensEnviadas > 0).sort((a, b) => b.mensagensEnviadas - a.mensagensEnviadas);
+  const maxRec = Math.max(1, ...com.map((l) => l.receitaRecebida));
+  const meta = [`Organizacao: ${orgNome}`, `Periodo: ${periodoLabel}`, `Gerado: ${new Date().toLocaleString('pt-BR')}`];
   return (
     <Estado q={q}>
       {q.data && <>
-        <div className="grid-3">
-          <Panel title="Maior receita recebida">{top('receitaRecebida') && top('receitaRecebida').receitaRecebida > 0 ? <div className="sech" style={{ margin: 8 }}>{top('receitaRecebida').nome} · {fmtBRL(top('receitaRecebida').receitaRecebida)}</div> : <div className="fx-empty">Sem dados.</div>}</Panel>
-          <Panel title="Mais fechamentos">{top('oppGanho') && top('oppGanho').oppGanho > 0 ? <div className="sech" style={{ margin: 8 }}>{top('oppGanho').nome} · {fmtInt(top('oppGanho').oppGanho)}</div> : <div className="fx-empty">Sem dados.</div>}</Panel>
-          <Panel title="Maior volume de leads">{top('leads') && top('leads').leads > 0 ? <div className="sech" style={{ margin: 8 }}>{top('leads').nome} · {fmtInt(top('leads').leads)}</div> : <div className="fx-empty">Sem dados.</div>}</Panel>
-        </div>
-        <Panel title="Ranking por atendente (responsável)" sub="Volume e eficiência separados">
-          {linhas.length ? <div className="barlist">{linhas.map((l) => <div className="barlist-row" key={l.id}><span className="barlist-name" title={l.nome}>{l.nome}</span><div className="barlist-track"><i style={{ width: `${(l.receitaRecebida / maxRec) * 100}%` }} /></div><span className="barlist-val">{fmtBRL(l.receitaRecebida)}</span></div>)}</div> : <div className="fx-empty">Sem atendentes.</div>}
+        <div className="sech">Atendimento <span style={{ fontWeight: 400, color: 'var(--muted)', fontSize: 12 }}>· atribuído por autoria real da mensagem</span></div>
+        {!q.data.atendimentoAtribuivel
+          ? <div className="indispo"><b>Dados insuficientes para atribuição de atendimento.</b><br />Não há saídas com autor identificado nem conversas com atendente atribuído no período (conversas.atendente_id e mensagens.autor_id nulos). Não substituímos por responsável comercial.</div>
+          : <DataTable
+            cols={[
+              { key: 'nome', label: 'Atendente' },
+              { key: 'conversasRespondidas', label: 'Conversas respondidas', align: 'c' },
+              { key: 'mensagensEnviadas', label: 'Mensagens enviadas (operador)', align: 'c' },
+            ] as Col<Record<string, unknown>>[]}
+            rows={at as unknown as Record<string, unknown>[]} searchKeys={['nome']}
+            csvName={`equipe_atendimento_${periodoLabel.replace(/\D/g, '')}`} csvMeta={[...meta, 'Atribuicao por mensagens.autor_id (saida do operador via app)']} />}
+
+        <div className="sech" style={{ marginTop: 18 }}>Desempenho comercial / da carteira <span style={{ fontWeight: 400, color: 'var(--muted)', fontSize: 12 }}>· atribuído por responsável</span></div>
+        <Panel title="Ranking por receita recebida (carteira)" sub="Volume e eficiência mostrados separadamente na tabela">
+          {com.length ? <div className="barlist">{com.map((l) => <div className="barlist-row" key={l.id}><span className="barlist-name" title={l.nome}>{l.nome}</span><div className="barlist-track"><i style={{ width: `${(l.receitaRecebida / maxRec) * 100}%` }} /></div><span className="barlist-val">{fmtBRL(l.receitaRecebida)}</span></div>)}</div> : <div className="fx-empty">Sem atendentes.</div>}
         </Panel>
         <DataTable
           cols={[
-            { key: 'nome', label: 'Atendente' },
-            { key: 'leads', label: 'Leads', align: 'c' },
+            { key: 'nome', label: 'Responsável' },
+            { key: 'leads', label: 'Contatos', align: 'c' },
             { key: 'oppAndamento', label: 'Em andamento', align: 'c' },
             { key: 'oppGanho', label: 'Fechados', align: 'c' },
             { key: 'oppPerdido', label: 'Perdidos', align: 'c' },
@@ -365,12 +375,12 @@ function AbaEquipe({ f, periodoLabel, orgNome }: { f: RelFiltros; periodoLabel: 
             { key: 'receitaContratada', label: 'Receita contratada', align: 'r', fmt: (v) => fmtBRL(v as number), csv: (r) => (r.receitaContratada as number).toFixed(2) },
             { key: 'receitaRecebida', label: 'Receita recebida', align: 'r', fmt: (v) => fmtBRL(v as number), csv: (r) => (r.receitaRecebida as number).toFixed(2) },
           ] as Col<Record<string, unknown>>[]}
-          rows={linhas as unknown as Record<string, unknown>[]}
+          rows={com as unknown as Record<string, unknown>[]}
           searchKeys={['nome']}
-          csvName={`equipe_${periodoLabel.replace(/\D/g, '')}`}
-          csvMeta={[`Organizacao: ${orgNome}`, `Periodo: ${periodoLabel}`, `Gerado: ${new Date().toLocaleString('pt-BR')}`, 'Atribuicao por responsavel (responsavel_id/criado_por)']}
+          csvName={`equipe_carteira_${periodoLabel.replace(/\D/g, '')}`}
+          csvMeta={[...meta, 'Atribuicao por responsavel_id/criado_por (comercial/carteira)']}
         />
-        <div className="indispo" style={{ marginTop: 16 }}><b>Limitação:</b> conversas/mensagens não têm atendente atribuído de forma confiável (conversas.atendente_id nulo), então o ranking usa atribuição comercial/financeira por responsável. Metas não existem no schema → comparação com meta indisponível.</div>
+        <div className="indispo" style={{ marginTop: 16 }}><b>Atribuição:</b> a seção de atendimento usa apenas a autoria real da mensagem (mensagens.autor_id); a de carteira usa responsavel_id (contatos/oportunidades/cobranças). Metas não existem no schema → comparação com meta indisponível.</div>
       </>}
     </Estado>
   );
@@ -411,9 +421,9 @@ function AbaEconomia({ f }: { f: RelFiltros }) {
   const q = useResumo(f);
   return (
     <Estado q={q}>
-      {q.data?.economiaGerada
-        ? <div className="kpis"><KpiCard label="Economia gerada total" k={q.data.economiaGerada} sentido="maior" fmt={fmtBRL} tooltip="Σ valor_economizado das cobranças." /></div>
-        : <div className="indispo"><b>Dados indisponíveis.</b><br />Os campos de economia existem em <code>cobrancas</code> (valor_original_descontado, novo_valor_descontado, valor_economizado), mas estão sem preenchimento nos registros atuais. Quando passarem a ser informados, esta aba exibirá economia total, média por cliente, maior economia, por banco/serviço/atendente/origem, % médio de redução e evolução mensal — sem alterar o schema.</div>}
+      {q.data?.economiaPreenchida && q.data.economiaGerada
+        ? <div className="kpis"><KpiCard label="Economia gerada total" k={q.data.economiaGerada} sentido="maior" fmt={fmtBRL} tooltip="Σ valor_economizado das cobranças no período." /></div>
+        : <div className="indispo"><b>Dados ainda não preenchidos.</b><br />Os campos de economia existem em <code>cobrancas</code> (valor_original_descontado, novo_valor_descontado, valor_economizado), mas nenhum registro os tem informados — por isso não mostramos zero (zero indicaria ausência de economia). Quando forem preenchidos na criação/edição da cobrança, esta aba exibirá economia total, média por cliente, maior economia, por banco/serviço/atendente/origem, % médio de redução e evolução mensal — sem alterar o schema.</div>}
     </Estado>
   );
 }
@@ -450,15 +460,15 @@ function AbaDados({ f, periodoLabel, orgNome, onNav }: { f: RelFiltros; periodoL
   const meta = [`Organizacao: ${orgNome}`, `Periodo: ${periodoLabel}`, `Gerado: ${new Date().toLocaleString('pt-BR')}`];
   return (
     <>
-      <div className="sech">Desempenho por atendente</div>
+      <div className="sech">Desempenho comercial / da carteira (por responsável)</div>
       <Estado q={eq}>{eq.data && <DataTable
         cols={[
-          { key: 'nome', label: 'Atendente' }, { key: 'leads', label: 'Leads', align: 'c' }, { key: 'oppAndamento', label: 'Andamento', align: 'c' },
+          { key: 'nome', label: 'Responsável' }, { key: 'leads', label: 'Contatos', align: 'c' }, { key: 'oppAndamento', label: 'Andamento', align: 'c' },
           { key: 'oppGanho', label: 'Fechados', align: 'c' }, { key: 'oppPerdido', label: 'Perdidos', align: 'c' },
           { key: 'receitaRecebida', label: 'Receita recebida', align: 'r', fmt: (v) => fmtBRL(v as number), csv: (r) => (r.receitaRecebida as number).toFixed(2) },
         ] as Col<Record<string, unknown>>[]}
-        rows={eq.data as unknown as Record<string, unknown>[]} searchKeys={['nome']}
-        csvName={`detalhe_atendentes_${periodoLabel.replace(/\D/g, '')}`} csvMeta={meta} />}</Estado>
+        rows={eq.data.comercial as unknown as Record<string, unknown>[]} searchKeys={['nome']}
+        csvName={`detalhe_carteira_${periodoLabel.replace(/\D/g, '')}`} csvMeta={meta} />}</Estado>
 
       <div className="sech" style={{ marginTop: 18 }}>Desempenho por origem</div>
       <Estado q={or}>{or.data && <DataTable
