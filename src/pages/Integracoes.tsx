@@ -5,7 +5,7 @@ import { useToast } from '@/hooks/useToast';
 import { useOrg } from '@/context/OrgContext';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { WhatsAppConnect } from '@/components/WhatsAppConnect';
-import { useWaCanais, waRemove, mascararNumero, useFontesAquisicao, waUpdateComercial, type WaCanal, type ComercialInput } from '@/data/whatsapp';
+import { useWaCanais, useWaLimite, waRemove, mascararNumero, useFontesAquisicao, waUpdateComercial, type WaCanal, type ComercialInput } from '@/data/whatsapp';
 import { FB_REAL, useFbStatus, fbAuthStart, fbPages, fbConnect, fbDisconnect } from '@/data/facebook';
 import { useOrgUsuarios } from '@/data/atendimento';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -48,6 +48,7 @@ export function Integracoes() {
   const qc = useQueryClient();
   const [params, setParams] = useSearchParams();
   const waCanais = useWaCanais();
+  const waLimite = useWaLimite();
   const fbStatus = useFbStatus();
   const [waOpen, setWaOpen] = useState(false);
   const [fbBusy, setFbBusy] = useState(false);
@@ -75,6 +76,12 @@ export function Integracoes() {
 
   const canais = waCanais.data ?? [];
   const conectados = canais.filter((c) => c.status === 'conectado').length;
+  // Limite/contagem na MESMA fonte do backend (organizacao_limites + canais ativos). Sem número fixo no frontend.
+  const waUsados = waLimite.data?.usados ?? canais.length;
+  const waLimiteEfetivo = waLimite.data?.limite ?? 0;
+  const waIncluidos = waLimite.data?.incluidos ?? 0;
+  const waAdicionais = waLimite.data?.adicionais ?? 0;
+  const waCheio = waLimite.isSuccess && waUsados >= waLimiteEfetivo;
   const fbPaginas = fbStatus.data ?? [];
   const fbConectadas = fbPaginas.filter((p) => p.estado === 'conectado').length;
 
@@ -102,6 +109,7 @@ export function Integracoes() {
   }
   function refresh() {
     qc.invalidateQueries({ queryKey: ['wa-canais', currentOrg.id] });
+    qc.invalidateQueries({ queryKey: ['wa-limite', currentOrg.id] });
     qc.invalidateQueries({ queryKey: ['wa-conversas', currentOrg.id] });
     qc.invalidateQueries({ queryKey: ['fb-status', currentOrg.id] });
     qc.invalidateQueries({ queryKey: ['fb-conversas', currentOrg.id] });
@@ -139,7 +147,7 @@ export function Integracoes() {
       <div className="content">
         <div className="sum-grid">
           <div className="sum-card"><span className="sum-ic green"><IcCheck /></span><div><div className="lbl">Integrações conectadas</div><div className="val">{conectados + fbConectadas}</div></div></div>
-          <div className="sum-card"><span className="sum-ic blue"><IcWa /></span><div><div className="lbl">WhatsApp conectados</div><div className="val">{conectados} de 1</div></div></div>
+          <div className="sum-card"><span className="sum-ic blue"><IcWa /></span><div><div className="lbl">WhatsApp conectados</div><div className="val">{waUsados} de {waLimiteEfetivo}</div>{waAdicionais > 0 && <div className="sub">{waIncluidos} incluído{waIncluidos === 1 ? '' : 's'} + {waAdicionais} adicional{waAdicionais === 1 ? '' : 'is'}</div>}</div></div>
           <div className="sum-card"><span className="sum-ic gray"><IcFb /></span><div><div className="lbl">Facebook conectados</div><div className="val">{fbConectadas}</div></div></div>
         </div>
 
@@ -186,9 +194,14 @@ export function Integracoes() {
                 )}
               </div>
               <div className="ic-foot">
-                {isSupabaseConfigured
-                  ? <button className="btn-sm acc" onClick={() => setWaOpen(true)}><IcPlus />Conectar WhatsApp</button>
-                  : <button className="btn-sm" onClick={() => toast('Disponível com o backend configurado')}><IcPlus />Conectar WhatsApp</button>}
+                {!isSupabaseConfigured
+                  ? <button className="btn-sm" onClick={() => toast('Disponível com o backend configurado')}><IcPlus />Conectar WhatsApp</button>
+                  : podeConfig
+                    ? <button className="btn-sm acc" disabled={waCheio} title={waCheio ? 'Limite de WhatsApp atingido. Contrate um WhatsApp adicional.' : undefined} onClick={() => setWaOpen(true)}><IcPlus />Conectar WhatsApp</button>
+                    : null}
+                {isSupabaseConfigured && podeConfig && waCheio && (
+                  <span className="conn-sub" style={{ color: 'var(--warn)', marginLeft: 4 }}>Limite atingido ({waUsados}/{waLimiteEfetivo}). Contrate um WhatsApp adicional.</span>
+                )}
                 <span className="sp" />
                 <button className="btn-sm" onClick={() => refresh()}><IcRefresh />Atualizar</button>
               </div>

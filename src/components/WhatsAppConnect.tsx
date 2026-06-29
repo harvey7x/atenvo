@@ -25,6 +25,7 @@ export function WhatsAppConnect({ orgId, onClose, onConnected }: { orgId: string
   const connectedRef = useRef(false);
 
   async function start() {
+    if (busy) return; // impede cliques duplicados (uma criação por vez)
     if (!alias.trim()) { toast('Informe o alias do canal.'); return; }
     setBusy(true);
     try {

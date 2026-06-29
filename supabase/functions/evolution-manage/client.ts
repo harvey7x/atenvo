@@ -17,6 +17,7 @@ export async function requireOrgAdmin(admin: SupabaseClient, userId: string, org
   const { data, error } = await admin.from('organizacao_usuarios').select('papel, status').eq('organizacao_id', orgId).eq('usuario_id', userId).maybeSingle();
   if (error) return { ok: false, reason: error.message };
   if (!data || data.status !== 'ativo') return { ok: false, reason: 'Usuário não é membro ativo da organização.' };
-  if (data.papel !== 'admin') return { ok: false, reason: 'Apenas administradores podem executar esta ação.' };
+  // Admin e supervisor podem gerenciar conexões; atendente não.
+  if (data.papel !== 'admin' && data.papel !== 'supervisor') return { ok: false, reason: 'Apenas administradores ou supervisores podem executar esta ação.' };
   return { ok: true };
 }

@@ -15,6 +15,13 @@ async function invoke<T>(fn: string, body: Record<string, unknown>): Promise<T> 
     let msg = error.message;
     const ed = data as { error?: string } | null;
     if (ed?.error) msg = ed.error;
+    else {
+      // supabase-js não parseia o corpo em respostas non-2xx; lê o erro real do Response (FunctionsHttpError.context).
+      const ctx = (error as { context?: Response }).context;
+      if (ctx && typeof ctx.json === 'function') {
+        try { const b = await ctx.clone().json() as { error?: string }; if (b?.error) msg = b.error; } catch { /* mantém msg */ }
+      }
+    }
     throw new Error(msg);
   }
   return data as T;
@@ -298,6 +305,39 @@ export function useWaCanais() {
         id: r.id, alias: r.nome_interno ?? 'WhatsApp', numero: r.numero_conectado, status: r.status_integracao, provider: r.provider, conectadoEm: r.conectado_em,
         origemTipo: r.origem_tipo, gestorId: r.gestor_id, gestorNome: (Array.isArray(r.gestor) ? r.gestor[0]?.nome : r.gestor?.nome) ?? null, fonteId: r.fonte_aquisicao_id, campanha: r.campanha, observacaoComercial: r.observacao_comercial,
       }));
+    },
+  });
+}
+
+/* ===================== Limite de WhatsApp (fonte única de verdade) =====================
+ * Mesma regra do backend (evolution-manage): limite efetivo = organizacao_limites.limite_whatsapps
+ * (coluna GERADA = whatsapps_incluidos + whatsapps_adicionais) e "usados" = canais tipo=whatsapp ativo=true.
+ * Não conta canais removidos (linha excluída), Facebook, criações que falharam (revertidas) nem outra org. */
+export interface WaLimite { usados: number; limite: number; incluidos: number; adicionais: number; atingido: boolean; }
+export function useWaLimite() {
+  const { currentOrg } = useOrg();
+  return useQuery({
+    queryKey: ['wa-limite', currentOrg.id],
+    enabled: WA_REAL,
+    queryFn: async (): Promise<WaLimite> => {
+      const { data: lim, error } = await supabase!
+        .from('organizacao_limites')
+        .select('whatsapps_incluidos, whatsapps_adicionais, limite_whatsapps')
+        .eq('organizacao_id', currentOrg.id).single();
+      if (error) throw new Error(error.message);
+      const { count, error: e2 } = await supabase!
+        .from('canais')
+        .select('id', { count: 'exact', head: true })
+        .eq('organizacao_id', currentOrg.id).eq('tipo', 'whatsapp').eq('ativo', true);
+      if (e2) throw new Error(e2.message);
+      const usados = count ?? 0;
+      const limite = (lim as { limite_whatsapps: number }).limite_whatsapps ?? 0;
+      return {
+        usados, limite,
+        incluidos: (lim as { whatsapps_incluidos: number }).whatsapps_incluidos ?? 0,
+        adicionais: (lim as { whatsapps_adicionais: number }).whatsapps_adicionais ?? 0,
+        atingido: usados >= limite,
+      };
     },
   });
 }
