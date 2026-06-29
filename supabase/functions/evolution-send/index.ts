@@ -1,6 +1,8 @@
 // evolution-send — envia texto/IMAGEM/ÁUDIO/DOCUMENTO e persiste a saída.
-// v17: destino por LID — se o contato é endereçado por LID (@lid), responde PELO LID; enviar ao JID
-//      de telefone de um contato LID gera key.id mas o provider devolve ERROR (não entrega).
+// v18: REVERTE o destino por LID (v17). Evidência: o ERROR não vinha do destino — o PN do contato
+//      EXISTE no WhatsApp (onWhatsApp exists:true) e a instância LUIZA falhou 7/7 (PN e LID), enquanto
+//      outras instâncias entregam normalmente no mesmo servidor. Causa = conta/sessão do número remetente,
+//      não o resolvedor. Mantém o resolvedor por telefone (comprovadamente válido via onWhatsApp).
 // v16: DOCUMENTO via /message/sendMedia (mediatype document; MIME/ext/tamanho centralizados).
 // v15: ÁUDIO como nota de voz via /message/sendWhatsAppAudio (encoding->ogg/opus). Mesma base de
 //      isolamento por org + URL assinada curta + exige key.id + retry reaproveita o arquivo.
@@ -82,49 +84,33 @@ Deno.serve(async (req) => {
     if (liveState === 'open' && canal.status_integracao !== 'conectado') await admin.from('canais').update({ status_integracao: 'conectado' }).eq('id', canal.id);
     if (!liveState && canal.status_integracao !== 'conectado') return json({ error: 'WhatsApp não está conectado.' }, 409);
 
-    // ----- destino -----
-    // WhatsApp LID: se o contato falou por LID (endereçamento novo do WhatsApp), responder PELO LID.
-    // Enviar ao JID de telefone (@s.whatsapp.net) de um contato LID gera key.id mas o provider devolve
-    // ERROR em messages.update (não entrega). O LID é o endereço real de quem nos contatou.
-    const { data: lidRow } = await admin.from('contato_identidades')
-      .select('valor').eq('contato_id', conv.contato_id)
-      .like('valor', '%@lid').order('criado_em', { ascending: false }).limit(1).maybeSingle();
-    const lidJid = ((lidRow?.valor as string | undefined) ?? '').trim() || null;
+    // ----- destino: número EXATO salvo, sem remover o 9. -----
+    const { data: ct } = await admin.from('contatos').select('telefone').eq('id', conv.contato_id).maybeSingle();
+    const { data: ident } = await admin.from('contato_identidades').select('valor_normalizado, valor').eq('contato_id', conv.contato_id).eq('tipo', 'whatsapp').maybeSingle();
+    const tel = digits(ct?.telefone);
+    const idn = digits(ident?.valor_normalizado) ?? digits(ident?.valor);
+    const base = (tel && idn && tel !== idn) ? tel : (idn ?? tel);
+    if (!base) return json({ error: 'Contato sem número de WhatsApp.' }, 422);
 
-    let alvo: string;
-    if (lidJid) {
-      // envia ao JID de LID completo (a Evolution preserva o '@lid' no number)
-      alvo = lidJid;
-      console.log(`[send] corr=${corr} destino=LID`);
-    } else {
-      // ----- destino por telefone: número EXATO salvo, sem remover o 9. -----
-      const { data: ct } = await admin.from('contatos').select('telefone').eq('id', conv.contato_id).maybeSingle();
-      const { data: ident } = await admin.from('contato_identidades').select('valor_normalizado, valor').eq('contato_id', conv.contato_id).eq('tipo', 'whatsapp').maybeSingle();
-      const tel = digits(ct?.telefone);
-      const idn = digits(ident?.valor_normalizado) ?? digits(ident?.valor);
-      const base = (tel && idn && tel !== idn) ? tel : (idn ?? tel);
-      if (!base) return json({ error: 'Contato sem número de WhatsApp.' }, 422);
-
-      // BLOQUEIO DE AUTOENVIO: não enviar do número do canal para ele mesmo.
-      const senderNum = digits(canal.numero_conectado);
-      if (senderNum && senderNum === base) {
-        console.log(`[send] corr=${corr} BLOQUEADO autoenvio de=${senderNum.slice(0, 6)} para=${base.slice(0, 6)}`);
-        return json({ error: 'Não é possível enviar uma mensagem para o mesmo número conectado.' }, 422);
-      }
-
-      // valida existência; adota o JID canônico do WhatsApp quando o EXATO não existe.
-      alvo = base;
-      try {
-        const chk = await evolution.whatsappNumbers(instancia, [base]);
-        const arr = Array.isArray(chk) ? chk : [];
-        const hit = arr[0];
-        if (hit && hit.exists === false) {
-          const altJid = hit.jid ? digits(String(hit.jid).split('@')[0]) : null;
-          if (altJid) alvo = altJid; else return json({ error: 'Este número não tem WhatsApp ativo. Confira o DDD e o nono dígito.' }, 422);
-        }
-      } catch { /* fail-open: usa base */ }
-      console.log(`[send] corr=${corr} para=${base.slice(0, 6)} alvo=${alvo.slice(0, 6)}`);
+    // BLOQUEIO DE AUTOENVIO: não enviar do número do canal para ele mesmo.
+    const senderNum = digits(canal.numero_conectado);
+    if (senderNum && senderNum === base) {
+      console.log(`[send] corr=${corr} BLOQUEADO autoenvio de=${senderNum.slice(0, 6)} para=${base.slice(0, 6)}`);
+      return json({ error: 'Não é possível enviar uma mensagem para o mesmo número conectado.' }, 422);
     }
+
+    // valida existência; não troca por variante exceto se o EXATO não existir.
+    let alvo = base;
+    try {
+      const chk = await evolution.whatsappNumbers(instancia, [base]);
+      const arr = Array.isArray(chk) ? chk : [];
+      const hit = arr[0];
+      if (hit && hit.exists === false) {
+        const altJid = hit.jid ? digits(String(hit.jid).split('@')[0]) : null;
+        if (altJid) alvo = altJid; else return json({ error: 'Este número não tem WhatsApp ativo. Confira o DDD e o nono dígito.' }, 422);
+      }
+    } catch { /* fail-open: usa base */ }
+    console.log(`[send] corr=${corr} para=${base.slice(0, 6)} alvo=${alvo.slice(0, 6)}`);
 
     // ===== MÍDIA (IMAGEM, ÁUDIO e DOCUMENTO). Retry herda o tipo/arquivo da mensagem original. =====
     const ehMidiaRetry = !!retryMsg && !!retryMsg.tipo && retryMsg.tipo !== 'texto';
