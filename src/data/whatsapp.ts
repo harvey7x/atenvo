@@ -314,12 +314,12 @@ export function useFontesAquisicao() {
   });
 }
 export interface ComercialInput { nome_interno: string; origem_tipo: string | null; gestor_id: string | null; fonte_aquisicao_id: string | null; campanha: string | null; observacao_comercial: string | null; }
-/** Persiste os metadados comerciais nos campos existentes de canais (sem migration). */
+/** Persiste os metadados comerciais via RPC (autorização admin/supervisor validada no banco). */
 export async function waUpdateComercial(canalId: string, c: ComercialInput): Promise<void> {
-  const { error } = await supabase!.from('canais').update({
-    nome_interno: c.nome_interno?.trim() || 'WhatsApp', origem_tipo: c.origem_tipo || null, gestor_id: c.gestor_id || null,
-    fonte_aquisicao_id: c.fonte_aquisicao_id || null, campanha: c.campanha?.trim() || null, observacao_comercial: c.observacao_comercial?.trim() || null,
-  }).eq('id', canalId);
+  const { error } = await supabase!.rpc('atualizar_canal_comercial', {
+    p_canal: canalId, p_nome: c.nome_interno?.trim() || 'WhatsApp', p_origem_tipo: c.origem_tipo || null, p_gestor_id: c.gestor_id || null,
+    p_fonte_aquisicao_id: c.fonte_aquisicao_id || null, p_campanha: c.campanha?.trim() || null, p_observacao: c.observacao_comercial?.trim() || null,
+  });
   if (error) throw new Error(error.message);
 }
 
