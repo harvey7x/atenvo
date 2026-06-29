@@ -1,271 +1,418 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useToast } from '@/hooks/useToast';
 import { useTheme } from '@/hooks/useTheme';
 import { useOrg } from '@/context/OrgContext';
-import { useWaCanais, WA_REAL } from '@/data/whatsapp';
+import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/lib/supabase';
+import { WA_REAL, useWaCanais } from '@/data/whatsapp';
+import { useFbStatus } from '@/data/facebook';
 import { useStatusDefs, useEtiquetas, useAtendimentoActions } from '@/data/atendimento';
+import {
+  useMeuPerfil, useSalvarPerfil, salvarAvatar, subirAvatar, urlAvatar,
+  useOrgFull, useSalvarOrg, useMembros, useEquipeActions,
+  usePreferencias, useSalvarPreferencias, type Prefs,
+  useConfigAtendimento, useSalvarConfigAtendimento, type ConfigAtendimento,
+  traduzCfg,
+} from '@/data/configuracoes';
+import { Modal } from '@/components/Modal';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { PALETA_CORES, podeGerenciarAtendimento, type StatusDef } from '@/types/atendimento';
 import './Configuracoes.css';
 
 const PAL = ['#5b6ee1', '#c2693a', '#7a5bb0', '#2f8f9d', '#b0566f', '#4a7a4a', '#9d7a2f', '#3d7ab0'];
-function initials(n: string) { const p = n.trim().split(/\s+/); return ((p[0] || '')[0] + ((p[1] || '')[0] || '')).toUpperCase(); }
-function avColor(n: string) { if (n === 'Henrique') return '#3f6f52'; let h = 0; for (let i = 0; i < n.length; i++) h = (h * 31 + n.charCodeAt(i)) >>> 0; return PAL[h % PAL.length]; }
-function Av({ n }: { n: string }) { return <span className="av" style={{ background: avColor(n) }}>{initials(n)}</span>; }
+function initials(n: string) { const p = (n || '').trim().split(/\s+/); return ((p[0]?.[0] || '') + (p[1]?.[0] || '')).toUpperCase() || '?'; }
+function avColor(n: string) { let h = 0; for (let i = 0; i < (n || '').length; i++) h = (h * 31 + n.charCodeAt(i)) >>> 0; return PAL[h % PAL.length]; }
+function Av({ n, src }: { n: string; src?: string | null }) { return src ? <span className="av" style={{ backgroundImage: `url(${src})`, backgroundSize: 'cover' }} /> : <span className="av" style={{ background: avColor(n) }}>{initials(n)}</span>; }
 
 const IcCheck = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>;
 const IcDots = () => <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.7" /><circle cx="12" cy="12" r="1.7" /><circle cx="12" cy="19" r="1.7" /></svg>;
-const IcChevL = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>;
-const IcChevR = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg>;
-const IcWa = () => <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a9.9 9.9 0 0 0-8.5 15l-1.3 4.8 4.9-1.3A9.9 9.9 0 1 0 12 2zm4.5 12c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.6.8-.8 1-.3.1-.6 0a6.7 6.7 0 0 1-2-1.2 7.4 7.4 0 0 1-1.3-1.7c-.2-.3 0-.4.1-.5l.4-.5.3-.4v-.4l-.9-2c-.2-.5-.4-.4-.6-.5h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.7 11.6 11.6 0 0 0 4.5 3.9c.6.3 1.1.4 1.5.5a3.6 3.6 0 0 0 1.6.1 2.7 2.7 0 0 0 1.8-1.2 2.2 2.2 0 0 0 .1-1.2c0-.1-.2-.2-.5-.3z" /></svg>;
+const IcWa = () => <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a9.9 9.9 0 0 0-8.5 15l-1.3 4.8 4.9-1.3A9.9 9.9 0 1 0 12 2z" /></svg>;
 const IcFb = () => <svg viewBox="0 0 24 24" fill="currentColor"><path d="M22 12a10 10 0 1 0-11.6 9.9v-7H8v-2.9h2.4V9.8c0-2.4 1.4-3.7 3.6-3.7 1 0 2.1.2 2.1.2v2.3h-1.2c-1.2 0-1.5.7-1.5 1.4V12H16l-.4 2.9h-2.2v7A10 10 0 0 0 22 12z" /></svg>;
-const IcAds = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16v5a8 8 0 0 1-16 0z" /><path d="M9 20h6M12 13v7" /></svg>;
-const IcReconnect = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5" /></svg>;
 const IcInvite = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 7a4 4 0 1 0 0 .01M19 8v6M22 11h-6" /></svg>;
 const IcCamera = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></svg>;
 const IcSun = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="4" /><path d="M12 3v2M12 19v2M5 5l1.4 1.4M17.6 17.6 19 19M3 12h2M19 12h2M5 19l1.4-1.4M17.6 6.4 19 5" /></svg>;
 const IcMoon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" /></svg>;
+const IcExt = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 5h5v5M19 5l-9 9M19 13v6H5V5h6" /></svg>;
 
 const TABS = [
-  { id: 'conta', label: 'Conta', ic: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg> },
-  { id: 'equipe', label: 'Equipe', ic: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="8" r="3.2" /><path d="M2.5 20a6.5 6.5 0 0 1 13 0" /><path d="M16 4.2a3.2 3.2 0 0 1 0 6.3M21.5 20a6.5 6.5 0 0 0-4-6" /></svg> },
-  { id: 'canais', label: 'Canais', ic: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.5 13.5a4.5 4.5 0 0 0 6.4 0l2.3-2.3a4.5 4.5 0 0 0-6.4-6.4L11.5 6M13.5 10.5a4.5 4.5 0 0 0-6.4 0l-2.3 2.3a4.5 4.5 0 0 0 6.4 6.4L12.5 18" /></svg> },
-  { id: 'atendimento', label: 'Atendimento', ic: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.6 13.4 13 21l-9-9V4h8z" /><circle cx="7.5" cy="7.5" r="1.2" /></svg> },
-  { id: 'notif', label: 'Notificações', ic: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0" /></svg> },
-  { id: 'prefs', label: 'Preferências', ic: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 6h16M4 12h16M4 18h16" /></svg> },
+  { id: 'conta', label: 'Conta' }, { id: 'equipe', label: 'Equipe' }, { id: 'canais', label: 'Canais' },
+  { id: 'atendimento', label: 'Atendimento' }, { id: 'notif', label: 'Notificações' }, { id: 'prefs', label: 'Preferências' },
 ];
-
-interface Member { nome: string; email: string; func: string; st: string; ac: string; }
-const TEAM: Member[] = [
-  { nome: 'Henrique', email: 'henrique@atenvo.com', func: 'Administrador', st: 'Ativo', ac: 'Agora' },
-  { nome: 'Marina Lopes', email: 'marina@atenvo.com', func: 'Gestora', st: 'Ativo', ac: 'Há 12 min' },
-  { nome: 'Antônio César', email: 'antonio@atenvo.com', func: 'Atendente', st: 'Ativo', ac: 'Há 1 hora' },
-  { nome: 'Paula Ferreira', email: 'paula@atenvo.com', func: 'Atendente', st: 'Ativo', ac: 'Há 3 horas' },
-  { nome: 'Giovana Martins', email: 'giovana@atenvo.com', func: 'Atendente', st: 'Convite pendente', ac: '—' },
-  { nome: 'Rafael Souza', email: 'rafael@atenvo.com', func: 'Atendente', st: 'Inativo', ac: '10/05/2024' },
-];
-const FUNC: Record<string, string> = { Administrador: 'ok', Gestora: 'blue', Atendente: 'neutral' };
-const STC: Record<string, string> = { Ativo: 'ok', 'Convite pendente': 'warn', Inativo: 'neutral' };
-function FuncBadge({ f }: { f: string }) { return <span className={'badge ' + (FUNC[f] || 'neutral')}>{f}</span>; }
-function StBadge({ s }: { s: string }) { return <span className={'badge ' + (STC[s] || 'neutral')}>{s === 'Ativo' && <span className="dot" />}{s}</span>; }
-
+const TAB_IDS = TABS.map((t) => t.id);
+const PAPEL_LABEL: Record<string, string> = { admin: 'Administrador', supervisor: 'Supervisor', atendente: 'Atendente' };
+const PAPEL_CLS: Record<string, string> = { admin: 'ok', supervisor: 'blue', atendente: 'neutral' };
+const STATUS_LABEL: Record<string, string> = { ativo: 'Ativo', inativo: 'Inativo', convidado: 'Convite pendente' };
+const STATUS_CLS: Record<string, string> = { ativo: 'ok', inativo: 'neutral', convidado: 'warn' };
 const WA_ST: Record<string, { t: string; cls: string; dot?: boolean }> = {
-  conectado: { t: 'Conectado', cls: 'ok', dot: true },
-  sincronizando: { t: 'Sincronizando', cls: 'warn' },
-  desconectado: { t: 'Desconectado', cls: 'neutral' },
-  atencao: { t: 'Atenção', cls: 'warn' },
-  erro: { t: 'Erro', cls: 'err' },
+  conectado: { t: 'Conectado', cls: 'ok', dot: true }, sincronizando: { t: 'Sincronizando', cls: 'warn' },
+  desconectado: { t: 'Desconectado', cls: 'neutral' }, atencao: { t: 'Atenção', cls: 'warn' }, erro: { t: 'Erro', cls: 'err' },
 };
+const TIPO_ORIGEM: Record<string, string> = { trafego: 'Tráfego', ura: 'URA', organico: 'Orgânico', indicacao: 'Indicação', campanha: 'Campanha', parceiro: 'Parceiro', outro: 'Outro' };
+const DIAS_SEMANA = [{ i: 0, l: 'Dom' }, { i: 1, l: 'Seg' }, { i: 2, l: 'Ter' }, { i: 3, l: 'Qua' }, { i: 4, l: 'Qui' }, { i: 5, l: 'Sex' }, { i: 6, l: 'Sáb' }];
 
-function Switch({ on0, label }: { on0?: boolean; label: string }) {
-  const { toast } = useToast();
-  const [on, setOn] = useState(!!on0);
-  return <button className={'bigswitch' + (on ? ' on' : '')} aria-label="Alternar" onClick={() => { const nv = !on; setOn(nv); toast(label + ': ' + (nv ? 'ativado' : 'desativado')); }}><span className="k" /></button>;
+function Switch({ on, onChange, disabled }: { on: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
+  return <button type="button" className={'bigswitch' + (on ? ' on' : '')} aria-label="Alternar" disabled={disabled} onClick={() => onChange(!on)}><span className="k" /></button>;
 }
-
-const MENU = ['Editar permissões', 'Reenviar convite', 'Remover acesso'];
 
 export function Configuracoes() {
   const { toast } = useToast();
   const { theme, setTheme } = useTheme();
   const { currentOrg } = useOrg();
-  const podeGerenciar = podeGerenciarAtendimento(currentOrg.role);
-  const waCanais = useWaCanais();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const podeGerenciar = podeGerenciarAtendimento(currentOrg.role); // admin/supervisor
+  const podeAdmin = currentOrg.role === 'admin';
   const [searchParams] = useSearchParams();
-  const TAB_IDS = ['conta', 'equipe', 'canais', 'atendimento', 'notif', 'prefs'];
-  const initialTab = searchParams.get('tab');
   const sectionParam = searchParams.get('section');
+  const initialTab = searchParams.get('tab');
   const [tab, setTab] = useState(initialTab && TAB_IDS.includes(initialTab) ? initialTab : 'conta');
-  const [seg, setSeg] = useState<string>(theme);
-  const [menu, setMenu] = useState<{ idx: number; left: number; top: number } | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => { setSeg(theme); }, [theme]);
-  // deep-link: ?tab=...&section=... seleciona a aba ao navegar (ex.: vindo do WhatsApp)
   useEffect(() => { if (initialTab && TAB_IDS.includes(initialTab)) setTab(initialTab); }, [initialTab]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    function onDoc(e: MouseEvent) { if (menuRef.current?.contains(e.target as Node)) return; setMenu(null); }
-    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setMenu(null); }
-    function onResize() { setMenu(null); }
-    document.addEventListener('click', onDoc); document.addEventListener('keydown', onKey); window.addEventListener('resize', onResize);
-    return () => { document.removeEventListener('click', onDoc); document.removeEventListener('keydown', onKey); window.removeEventListener('resize', onResize); };
-  }, []);
-
-  function openMenu(e: React.MouseEvent, idx: number) {
-    e.stopPropagation();
-    if (menu && menu.idx === idx) { setMenu(null); return; }
-    const rc = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const pw = 210;
-    setMenu({ idx, left: Math.min(rc.right - pw, window.innerWidth - pw - 10), top: rc.bottom + 6 });
-  }
-  function pickTheme(th: string) {
-    setSeg(th);
-    if (th === 'system') { toast('Tema: seguindo o sistema'); return; }
-    setTheme(th as 'light' | 'dark');
-  }
 
   return (
     <div className="config-page">
       <div className="content">
         <div className="wrap">
           <div className="settings-tabs">
-            {TABS.map((t) => <button key={t.id} className={tab === t.id ? 'on' : ''} onClick={() => setTab(t.id)}>{t.ic}{t.label}</button>)}
+            {TABS.map((t) => <button key={t.id} className={tab === t.id ? 'on' : ''} onClick={() => setTab(t.id)}>{t.label}</button>)}
           </div>
 
-          {/* CONTA */}
-          <section className={'tab-panel' + (tab === 'conta' ? ' on' : '')} data-panel="conta">
-            <div className="set-card">
-              <div className="sc-head bordered"><h3>Perfil</h3><p>Suas informações pessoais exibidas na plataforma.</p></div>
-              <div className="sc-body">
-                <div className="profile-row">
-                  <span className="av xxl" style={{ background: '#3f6f52' }}>H</span>
-                  <div className="pinfo"><div className="nm">Henrique</div><div className="rl">Administrador · henrique@atenvo.com</div></div>
-                  <div className="pacts"><button className="btn-ghost" onClick={() => toast('Alterar foto')}><IcCamera />Alterar foto</button><button className="btn-ghost danger" onClick={() => toast('Remover foto')}>Remover</button></div>
-                </div>
-                <div className="form-grid">
-                  <div className="fld"><label>Nome completo</label><input className="ctrl" defaultValue="Henrique Andrade" /></div>
-                  <div className="fld"><label>Cargo</label><input className="ctrl" defaultValue="Administrador" /></div>
-                  <div className="fld"><label>Email</label><input className="ctrl" type="email" defaultValue="henrique@atenvo.com" /></div>
-                  <div className="fld"><label>Telefone</label><input className="ctrl" defaultValue="(51) 99900-1010" /></div>
-                </div>
-              </div>
-              <div className="sc-foot"><button className="btn-ghost" onClick={() => toast('Alterações descartadas')}>Cancelar</button><button className="btn-primary" onClick={() => toast('Perfil salvo')}><IcCheck />Salvar alterações</button></div>
-            </div>
-            <div className="set-card">
-              <div className="sc-head bordered"><h3>Empresa</h3><p>Dados da organização usados em documentos e relatórios.</p></div>
-              <div className="sc-body">
-                <div className="form-grid">
-                  <div className="fld full"><label>Nome da empresa</label><input className="ctrl" defaultValue="Empresa Demonstração" /></div>
-                  <div className="fld"><label>CNPJ</label><input className="ctrl" defaultValue="12.345.678/0001-90" /></div>
-                  <div className="fld"><label>Fuso horário</label><select className="ctrl"><option>(GMT-03:00) Brasília</option><option>(GMT-04:00) Manaus</option><option>(GMT-02:00) Fernando de Noronha</option></select></div>
-                  <div className="fld"><label>Idioma padrão</label><select className="ctrl"><option>Português (Brasil)</option><option>English (US)</option><option>Español</option></select></div>
-                  <div className="fld"><label>Moeda</label><select className="ctrl"><option>Real (R$)</option><option>Dólar (US$)</option></select></div>
-                </div>
-              </div>
-              <div className="sc-foot"><button className="btn-primary" onClick={() => toast('Dados da empresa salvos')}><IcCheck />Salvar alterações</button></div>
-            </div>
-          </section>
-
-          {/* EQUIPE */}
-          <section className={'tab-panel' + (tab === 'equipe' ? ' on' : '')} data-panel="equipe">
-            <div className="set-card">
-              <div className="sc-head bordered"><div className="row"><div className="grow"><h3>Membros da equipe</h3><p>Pessoas com acesso à plataforma e seus níveis de permissão.</p></div><button className="btn-primary" onClick={() => toast('Convidar novo membro')}><IcInvite />Convidar membro</button></div></div>
-              <div className="team-scroll">
-                <table className="team-table" aria-label="Membros da equipe">
-                  <colgroup><col className="tc-membro" /><col className="tc-funcao" /><col className="tc-status" /><col className="tc-acesso" /><col className="tc-acoes" /></colgroup>
-                  <thead><tr><th className="column-membro">Membro</th><th className="column-center">Função</th><th className="column-center">Status</th><th className="column-center">Último acesso</th><th className="column-center" aria-label="Ações"></th></tr></thead>
-                  <tbody>
-                    {TEAM.map((m, i) => (
-                      <tr key={m.email}>
-                        <td><div className="member-cell"><Av n={m.nome} /><div className="mt"><span className="nm">{m.nome}</span><span className="em">{m.email}</span></div></div></td>
-                        <td className="column-center"><div className="cell-center"><FuncBadge f={m.func} /></div></td>
-                        <td className="column-center"><div className="cell-center"><StBadge s={m.st} /></div></td>
-                        <td className="column-center"><div className="cell-center"><span className="acesso">{m.ac}</span></div></td>
-                        <td className="column-center"><div className="cell-center"><button type="button" className="row-menu" aria-label="Ações" onClick={(e) => openMenu(e, i)}><IcDots /></button></div></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <footer className="tc-foot">
-                <span className="ft">Mostrando 1 a 6 de 6 membros</span>
-                <nav className="pager" aria-label="Paginação dos membros"><button type="button" className="pg nav" aria-label="Página anterior" onClick={() => toast('Página anterior')}><IcChevL /></button><button type="button" className="pg on" aria-current="page">1</button><button type="button" className="pg nav" aria-label="Próxima página" onClick={() => toast('Página seguinte')}><IcChevR /></button></nav>
-                <div className="perpage"><label htmlFor="teamPer">Itens por página:</label><select id="teamPer" onChange={(e) => toast(e.target.value + ' itens por página')}><option value="10">10</option><option value="25">25</option></select></div>
-              </footer>
-            </div>
-          </section>
-
-          {/* CANAIS */}
-          <section className={'tab-panel' + (tab === 'canais' ? ' on' : '')} data-panel="canais">
-            <div className="set-card">
-              <div className="sc-head bordered"><h3>WhatsApp</h3><p>Números conectados à plataforma via Atenvo.</p></div>
-              {WA_REAL ? (
-                (waCanais.data && waCanais.data.length > 0) ? (
-                  waCanais.data.map((c) => (
-                    <div className="chan-row" key={c.id}>
-                      <span className="chan-ic wa"><IcWa /></span>
-                      <div className="chan-txt"><div className="t">{c.alias}</div><div className="d">{c.numero ?? 'Sem número'}</div></div>
-                      <div className="chan-act">
-                        <span className={'badge ' + (WA_ST[c.status]?.cls || 'neutral')}>{WA_ST[c.status]?.dot && <span className="dot" />}{WA_ST[c.status]?.t || c.status}</span>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="chan-row"><div className="chan-txt"><div className="d">Nenhum WhatsApp conectado ainda. Conecte um número em Integrações → Conector WhatsApp por QR Code.</div></div></div>
-                )
-              ) : (<>
-                <div className="chan-row"><span className="chan-ic wa"><IcWa /></span><div className="chan-txt"><div className="t">Chip 1</div><div className="d">(11) 99955-1234</div></div><div className="chan-act"><span className="badge ok"><span className="dot" />Conectado</span><Switch on0 label="Chip 1" /></div></div>
-                <div className="chan-row"><span className="chan-ic wa"><IcWa /></span><div className="chan-txt"><div className="t">Chip 2</div><div className="d">(11) 98888-5678</div></div><div className="chan-act"><span className="badge ok"><span className="dot" />Conectado</span><Switch on0 label="Chip 2" /></div></div>
-                <div className="chan-row"><span className="chan-ic wa"><IcWa /></span><div className="chan-txt"><div className="t">URA</div><div className="d">(11) 97777-9012</div></div><div className="chan-act"><span className="badge warn">Reconexão necessária</span><button className="btn-sm acc" onClick={() => toast('Reconectando URA')}><IcReconnect />Reconectar</button></div></div>
-              </>)}
-            </div>
-            <div className="set-card">
-              <div className="sc-head bordered"><h3>Facebook</h3><p>Páginas e formulários integrados.</p></div>
-              <div className="chan-row"><span className="chan-ic fb"><IcFb /></span><div className="chan-txt"><div className="t">Messenger</div><div className="d">Empresa Demonstração</div></div><div className="chan-act"><span className="badge ok"><span className="dot" />Conectado</span><Switch on0 label="Messenger" /></div></div>
-              <div className="chan-row"><span className="chan-ic fb"><IcAds /></span><div className="chan-txt"><div className="t">Lead Ads</div><div className="d">Formulários de campanha</div></div><div className="chan-act"><span className="badge ok"><span className="dot" />Conectado</span><Switch on0 label="Lead Ads" /></div></div>
-            </div>
-          </section>
-
-          {/* ATENDIMENTO (status + etiquetas) */}
+          <section className={'tab-panel' + (tab === 'conta' ? ' on' : '')} data-panel="conta"><ContaPanel podeGerenciar={podeGerenciar} /></section>
+          <section className={'tab-panel' + (tab === 'equipe' ? ' on' : '')} data-panel="equipe"><EquipePanel podeAdmin={podeAdmin} meuId={user?.id} /></section>
+          <section className={'tab-panel' + (tab === 'canais' ? ' on' : '')} data-panel="canais"><CanaisPanel podeGerenciar={podeGerenciar} onNav={navigate} /></section>
           <section className={'tab-panel' + (tab === 'atendimento' ? ' on' : '')} data-panel="atendimento">
+            <ConfigAtendimentoCard podeGerenciar={podeAdmin} />
             <AtendimentoPanel canManage={podeGerenciar} section={tab === 'atendimento' ? sectionParam : null} />
           </section>
-
-          {/* NOTIFICAÇÕES */}
-          <section className={'tab-panel' + (tab === 'notif' ? ' on' : '')} data-panel="notif">
-            <div className="set-card">
-              <div className="sc-head"><h3>Notificações</h3><p>Escolha como e quando você quer ser avisado.</p></div>
-              <div className="sc-sub">Por email</div>
-              <div className="toggle-row"><div className="tr-txt"><div className="t">Novos contatos e leads</div><div className="d">Receba um email quando um novo contato entrar.</div></div><Switch on0 label="Novos contatos e leads" /></div>
-              <div className="toggle-row"><div className="tr-txt"><div className="t">Mensagens recebidas</div><div className="d">Resumo de mensagens de clientes não respondidas.</div></div><Switch label="Mensagens recebidas" /></div>
-              <div className="toggle-row"><div className="tr-txt"><div className="t">Cobranças vencendo</div><div className="d">Avisos de contratos e parcelas próximas do vencimento.</div></div><Switch on0 label="Cobranças vencendo" /></div>
-              <div className="toggle-row"><div className="tr-txt"><div className="t">Resumo diário</div><div className="d">Um panorama do dia enviado todas as manhãs.</div></div><Switch on0 label="Resumo diário" /></div>
-              <div className="sc-sub">No aplicativo</div>
-              <div className="toggle-row"><div className="tr-txt"><div className="t">Notificações push</div><div className="d">Alertas em tempo real dentro da plataforma.</div></div><Switch on0 label="Notificações push" /></div>
-              <div className="toggle-row"><div className="tr-txt"><div className="t">Som de notificação</div><div className="d">Toque sonoro ao receber um novo atendimento.</div></div><Switch on0 label="Som de notificação" /></div>
-              <div className="toggle-row"><div className="tr-txt"><div className="t">Cliente aguardando atendimento</div><div className="d">Destaque quando alguém estiver esperando resposta.</div></div><Switch on0 label="Cliente aguardando atendimento" /></div>
-              <div className="toggle-row"><div className="tr-txt"><div className="t">Novos membros na equipe</div><div className="d">Aviso quando alguém aceitar um convite.</div></div><Switch label="Novos membros na equipe" /></div>
-            </div>
-          </section>
-
-          {/* PREFERÊNCIAS */}
-          <section className={'tab-panel' + (tab === 'prefs' ? ' on' : '')} data-panel="prefs">
-            <div className="set-card">
-              <div className="sc-head"><h3>Preferências</h3><p>Personalize a aparência e o comportamento da plataforma.</p></div>
-              <div className="pref-row">
-                <div className="pr-txt"><div className="t">Tema</div><div className="d">Claro, escuro ou seguindo o sistema.</div></div>
-                <div className="pref-seg">
-                  <button className={seg === 'light' ? 'on' : ''} onClick={() => pickTheme('light')}><IcSun />Claro</button>
-                  <button className={seg === 'dark' ? 'on' : ''} onClick={() => pickTheme('dark')}><IcMoon />Escuro</button>
-                  <button className={seg === 'system' ? 'on' : ''} onClick={() => pickTheme('system')}>Sistema</button>
-                </div>
-              </div>
-              <div className="pref-row"><div className="pr-txt"><div className="t">Idioma</div><div className="d">Idioma da interface.</div></div><div className="pr-ctrl"><select className="ctrl" onChange={(e) => toast('Preferência atualizada: ' + e.target.value)}><option>Português (Brasil)</option><option>English (US)</option><option>Español</option></select></div></div>
-              <div className="pref-row"><div className="pr-txt"><div className="t">Formato de data</div><div className="d">Como as datas são exibidas.</div></div><div className="pr-ctrl"><select className="ctrl" onChange={(e) => toast('Preferência atualizada: ' + e.target.value)}><option>DD/MM/AAAA</option><option>MM/DD/AAAA</option><option>AAAA-MM-DD</option></select></div></div>
-              <div className="pref-row"><div className="pr-txt"><div className="t">Densidade da interface</div><div className="d">Espaçamento das listas e tabelas.</div></div><div className="pr-ctrl"><select className="ctrl" onChange={(e) => toast('Preferência atualizada: ' + e.target.value)}><option>Confortável</option><option>Compacta</option></select></div></div>
-              <div className="pref-row"><div className="pr-txt"><div className="t">Página inicial</div><div className="d">Tela exibida ao entrar na plataforma.</div></div><div className="pr-ctrl"><select className="ctrl" onChange={(e) => toast('Preferência atualizada: ' + e.target.value)}><option>Painel</option><option>WhatsApp</option><option>Kanban</option><option>Cobranças</option></select></div></div>
-              <div className="toggle-row"><div className="tr-txt"><div className="t">Mostrar dicas e tutoriais</div><div className="d">Exibe sugestões contextuais pela interface.</div></div><Switch on0 label="Mostrar dicas e tutoriais" /></div>
-              <div className="toggle-row"><div className="tr-txt"><div className="t">Reproduzir sons na interface</div><div className="d">Efeitos sonoros em ações e alertas.</div></div><Switch on0 label="Reproduzir sons na interface" /></div>
-            </div>
-          </section>
+          <section className={'tab-panel' + (tab === 'notif' ? ' on' : '')} data-panel="notif"><NotifPanel /></section>
+          <section className={'tab-panel' + (tab === 'prefs' ? ' on' : '')} data-panel="prefs"><PrefsPanel theme={theme} setTheme={setTheme} toast={toast} onNav={navigate} /></section>
         </div>
       </div>
+    </div>
+  );
+}
 
-      {menu && (
-        <div ref={menuRef} className="pop show" style={{ left: menu.left, top: menu.top }}>
-          {MENU.map((m, i) => (
-            <button key={m} className={'pop-item' + (i === 2 ? ' danger' : '')} onClick={() => { toast(m + ' · ' + TEAM[menu.idx].nome); setMenu(null); }}>
-              {i === 0 ? <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg> : i === 1 ? <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4z" /></svg> : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" /></svg>}{m}
-            </button>
-          ))}
+/* ===================== Conta (Perfil + Empresa) ===================== */
+function ContaPanel({ podeGerenciar }: { podeGerenciar: boolean }) {
+  const { toast } = useToast();
+  const { currentOrg } = useOrg();
+  const { user } = useAuth();
+  const perfilQ = useMeuPerfil();
+  const salvar = useSalvarPerfil();
+  const orgQ = useOrgFull();
+  const salvarOrg = useSalvarOrg();
+  const [form, setForm] = useState({ nome: '', telefone: '', cargo: '' });
+  const [avatarSrc, setAvatarSrc] = useState<string | null>(null);
+  const [busyFoto, setBusyFoto] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [org, setOrg] = useState({ nome: '', nomeFantasia: '', documento: '', telefone: '', email: '', timezone: 'America/Sao_Paulo', moeda: 'BRL' });
+  const [orgBusy, setOrgBusy] = useState(false);
+
+  useEffect(() => { if (perfilQ.data) setForm({ nome: perfilQ.data.nome, telefone: perfilQ.data.telefone, cargo: perfilQ.data.cargo }); }, [perfilQ.data]);
+  useEffect(() => { let alive = true; urlAvatar(perfilQ.data?.avatarUrl ?? null).then((u) => { if (alive) setAvatarSrc(u); }); return () => { alive = false; }; }, [perfilQ.data?.avatarUrl]);
+  useEffect(() => { if (orgQ.data) setOrg({ nome: orgQ.data.nome, nomeFantasia: orgQ.data.nomeFantasia, documento: orgQ.data.documento, telefone: orgQ.data.telefone, email: orgQ.data.email, timezone: orgQ.data.timezone, moeda: orgQ.data.moeda }); }, [orgQ.data]);
+
+  async function salvarPerfil() {
+    try { await salvar.mutateAsync({ nome: form.nome, telefone: form.telefone, cargo: form.cargo }); toast('Perfil salvo'); }
+    catch (e) { toast(traduzCfg((e as Error).message), 'warn'); }
+  }
+  async function trocarFoto(file: File) {
+    if (!perfilQ.data) return; setBusyFoto(true);
+    try { const path = await subirAvatar(currentOrg.id, perfilQ.data.id, file); await salvarAvatar(perfilQ.data, path); setAvatarSrc(await urlAvatar(path)); perfilQ.refetch(); toast('Foto atualizada'); }
+    catch (e) { toast(traduzCfg((e as Error).message), 'warn'); } finally { setBusyFoto(false); }
+  }
+  async function removerFoto() {
+    if (!perfilQ.data) return; setBusyFoto(true);
+    try { await salvarAvatar(perfilQ.data, null); setAvatarSrc(null); perfilQ.refetch(); toast('Foto removida'); }
+    catch (e) { toast(traduzCfg((e as Error).message), 'warn'); } finally { setBusyFoto(false); }
+  }
+  async function alterarEmail() {
+    const novo = window.prompt('Novo e-mail (você receberá um link de confirmação):', user?.email || '');
+    if (!novo || novo === user?.email) return;
+    const { error } = await supabase!.auth.updateUser({ email: novo });
+    if (error) toast(error.message, 'warn'); else toast('Enviamos um link de confirmação para o novo e-mail.');
+  }
+  async function salvarEmpresa() {
+    if (org.documento && org.documento.replace(/\D/g, '').length !== 14) { toast('CNPJ deve ter 14 dígitos.', 'warn'); return; }
+    setOrgBusy(true);
+    try { await salvarOrg.mutateAsync(org); toast('Dados da empresa salvos'); }
+    catch (e) { toast(traduzCfg((e as Error).message), 'warn'); } finally { setOrgBusy(false); }
+  }
+
+  return (<>
+    <div className="set-card">
+      <div className="sc-head bordered"><h3>Perfil</h3><p>Suas informações pessoais exibidas na plataforma.</p></div>
+      <div className="sc-body">
+        {perfilQ.isLoading ? <div className="cfg-load">Carregando…</div> : perfilQ.isError ? <div className="cfg-err">Erro ao carregar perfil.</div> : <>
+          <div className="profile-row">
+            <Av n={form.nome || 'U'} src={avatarSrc} />
+            <div className="pinfo"><div className="nm">{form.nome || '—'}</div><div className="rl">{PAPEL_LABEL[currentOrg.role] || currentOrg.role} · {user?.email}</div></div>
+            <div className="pacts">
+              <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) trocarFoto(f); e.currentTarget.value = ''; }} />
+              <button className="btn-ghost" disabled={busyFoto} onClick={() => fileRef.current?.click()}><IcCamera />{busyFoto ? 'Enviando…' : 'Alterar foto'}</button>
+              {avatarSrc && <button className="btn-ghost danger" disabled={busyFoto} onClick={removerFoto}>Remover</button>}
+            </div>
+          </div>
+          <div className="form-grid">
+            <div className="fld"><label>Nome completo</label><input className="ctrl" value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} /></div>
+            <div className="fld"><label>Cargo</label><input className="ctrl" value={form.cargo} onChange={(e) => setForm({ ...form, cargo: e.target.value })} placeholder="Ex.: Atendente, Gestor" /></div>
+            <div className="fld"><label>Email</label><div className="ctrl-with-btn"><input className="ctrl" type="email" value={user?.email || ''} readOnly /><button className="btn-ghost" onClick={alterarEmail}>Alterar</button></div></div>
+            <div className="fld"><label>Telefone</label><input className="ctrl" value={form.telefone} onChange={(e) => setForm({ ...form, telefone: e.target.value })} placeholder="(00) 00000-0000" /></div>
+          </div>
+        </>}
+      </div>
+      <div className="sc-foot"><button className="btn-ghost" disabled={!perfilQ.data} onClick={() => perfilQ.data && setForm({ nome: perfilQ.data.nome, telefone: perfilQ.data.telefone, cargo: perfilQ.data.cargo })}>Cancelar</button><button className="btn-primary" disabled={salvar.isPending || !perfilQ.data} onClick={salvarPerfil}><IcCheck />{salvar.isPending ? 'Salvando…' : 'Salvar alterações'}</button></div>
+    </div>
+
+    <div className="set-card">
+      <div className="sc-head bordered"><h3>Empresa</h3><p>Dados da organização usados em documentos e relatórios.{!podeGerenciar ? ' Somente administradores e supervisores podem editar.' : ''}</p></div>
+      <div className="sc-body">
+        {orgQ.isLoading ? <div className="cfg-load">Carregando…</div> : <div className="form-grid">
+          <div className="fld full"><label>Nome da empresa</label><input className="ctrl" value={org.nome} disabled={!podeGerenciar} onChange={(e) => setOrg({ ...org, nome: e.target.value })} /></div>
+          <div className="fld"><label>Nome fantasia</label><input className="ctrl" value={org.nomeFantasia} disabled={!podeGerenciar} onChange={(e) => setOrg({ ...org, nomeFantasia: e.target.value })} /></div>
+          <div className="fld"><label>CNPJ</label><input className="ctrl" value={org.documento} disabled={!podeGerenciar} onChange={(e) => setOrg({ ...org, documento: e.target.value })} placeholder="00.000.000/0000-00" /></div>
+          <div className="fld"><label>Telefone</label><input className="ctrl" value={org.telefone} disabled={!podeGerenciar} onChange={(e) => setOrg({ ...org, telefone: e.target.value })} /></div>
+          <div className="fld"><label>Email</label><input className="ctrl" type="email" value={org.email} disabled={!podeGerenciar} onChange={(e) => setOrg({ ...org, email: e.target.value })} /></div>
+          <div className="fld"><label>Fuso horário</label><select className="ctrl" value={org.timezone} disabled={!podeGerenciar} onChange={(e) => setOrg({ ...org, timezone: e.target.value })}><option value="America/Sao_Paulo">(GMT-03:00) São Paulo</option><option value="America/Manaus">(GMT-04:00) Manaus</option><option value="America/Noronha">(GMT-02:00) Fernando de Noronha</option></select></div>
+          <div className="fld"><label>Idioma padrão</label><select className="ctrl" value="pt-BR" disabled><option value="pt-BR">Português (Brasil)</option></select></div>
+          <div className="fld"><label>Moeda</label><select className="ctrl" value={org.moeda} disabled={!podeGerenciar} onChange={(e) => setOrg({ ...org, moeda: e.target.value })}><option value="BRL">Real (R$)</option><option value="USD">Dólar (US$)</option></select></div>
+        </div>}
+      </div>
+      {podeGerenciar && <div className="sc-foot"><button className="btn-primary" disabled={orgBusy || !orgQ.data} onClick={salvarEmpresa}><IcCheck />{orgBusy ? 'Salvando…' : 'Salvar alterações'}</button></div>}
+    </div>
+  </>);
+}
+
+/* ===================== Equipe ===================== */
+function EquipePanel({ podeAdmin, meuId }: { podeAdmin: boolean; meuId?: string }) {
+  const { toast } = useToast();
+  const membrosQ = useMembros();
+  const acoes = useEquipeActions();
+  const [menu, setMenu] = useState<string | null>(null);
+  const [convite, setConvite] = useState(false);
+  const [remover, setRemover] = useState<{ id: string; nome: string } | null>(null);
+  const [remBusy, setRemBusy] = useState(false);
+  const membros = membrosQ.data ?? [];
+
+  async function run(p: Promise<unknown>, ok: string) { try { await p; toast(ok); } catch (e) { toast(traduzCfg((e as Error).message), 'warn'); } }
+  async function confirmarRemocao() {
+    if (!remover) return; setRemBusy(true);
+    try { await acoes.remover(remover.id); toast('Acesso removido.'); setRemover(null); }
+    catch (e) { toast(traduzCfg((e as Error).message), 'warn'); } finally { setRemBusy(false); }
+  }
+
+  return (
+    <div className="set-card">
+      <div className="sc-head bordered"><div className="row"><div className="grow"><h3>Membros da equipe</h3><p>Pessoas com acesso à organização e seus níveis de permissão.{!podeAdmin ? ' Somente administradores podem gerenciar.' : ''}</p></div>{podeAdmin && <button className="btn-primary" onClick={() => setConvite(true)}><IcInvite />Convidar membro</button>}</div></div>
+      <div className="team-scroll">
+        {membrosQ.isLoading ? <div className="cfg-load">Carregando equipe…</div> : (
+          <table className="team-table" aria-label="Membros da equipe">
+            <thead><tr><th className="column-membro">Membro</th><th className="column-center">Função</th><th className="column-center">Status</th>{podeAdmin && <th className="column-center" aria-label="Ações"></th>}</tr></thead>
+            <tbody>
+              {membros.map((m) => (
+                <tr key={m.id}>
+                  <td><div className="member-cell"><Av n={m.nome} /><div className="mt"><span className="nm">{m.nome}{m.id === meuId ? ' (você)' : ''}</span><span className="em">{m.email}</span></div></div></td>
+                  <td className="column-center"><div className="cell-center"><span className={'badge ' + (PAPEL_CLS[m.papel] || 'neutral')}>{PAPEL_LABEL[m.papel] || m.papel}</span></div></td>
+                  <td className="column-center"><div className="cell-center"><span className={'badge ' + (STATUS_CLS[m.status] || 'neutral')}>{m.status === 'ativo' && <span className="dot" />}{STATUS_LABEL[m.status] || m.status}</span></div></td>
+                  {podeAdmin && <td className="column-center"><div className="cell-center" style={{ position: 'relative' }}>
+                    {m.id !== meuId ? <button type="button" className="row-menu" aria-label="Ações" onClick={() => setMenu(menu === m.id ? null : m.id)}><IcDots /></button> : <span className="acesso">—</span>}
+                    {menu === m.id && (
+                      <div className="pop show" style={{ position: 'absolute', right: 0, top: '100%' }} onMouseLeave={() => setMenu(null)}>
+                        <div className="pop-lbl">Papel</div>
+                        {(['admin', 'supervisor', 'atendente'] as const).map((p) => <button key={p} className={'pop-item' + (m.papel === p ? ' sel' : '')} onClick={() => { setMenu(null); run(acoes.alterarPapel(m.id, p), 'Papel atualizado'); }}>{PAPEL_LABEL[p]}</button>)}
+                        <div className="pop-sep" />
+                        {m.status === 'ativo'
+                          ? <button className="pop-item" onClick={() => { setMenu(null); run(acoes.definirStatus(m.id, 'inativo'), 'Membro desativado'); }}>Desativar</button>
+                          : <button className="pop-item" onClick={() => { setMenu(null); run(acoes.definirStatus(m.id, 'ativo'), 'Membro ativado'); }}>Ativar</button>}
+                        {m.status === 'convidado' && <button className="pop-item" onClick={() => { setMenu(null); toast('Envio de convite por e-mail: integração pendente.', 'warn'); }}>Reenviar convite</button>}
+                        <button className="pop-item danger" onClick={() => { setMenu(null); setRemover({ id: m.id, nome: m.nome }); }}>Remover acesso</button>
+                      </div>
+                    )}
+                  </div></td>}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+      <footer className="tc-foot"><span className="ft">{membros.length} membro{membros.length === 1 ? '' : 's'}</span></footer>
+
+      {convite && <ConviteModal onClose={() => setConvite(false)} onConvidar={acoes.convidar} />}
+      <ConfirmDialog open={!!remover} title="Remover acesso?" message={remover ? `"${remover.nome}" deixará de acessar esta organização. O histórico (conversas, mensagens, autoria) é preservado. Esta ação não exclui a conta.` : ''} destructive loading={remBusy} confirmLabel="Remover acesso" onConfirm={confirmarRemocao} onCancel={() => { if (!remBusy) setRemover(null); }} />
+    </div>
+  );
+}
+
+function ConviteModal({ onClose, onConvidar }: { onClose: () => void; onConvidar: (email: string, nome: string, papel: string) => Promise<void> }) {
+  const { toast } = useToast();
+  const [email, setEmail] = useState(''); const [nome, setNome] = useState(''); const [papel, setPapel] = useState('atendente'); const [busy, setBusy] = useState(false);
+  async function enviar() {
+    if (!email.trim()) { toast('Informe o e-mail.', 'warn'); return; }
+    setBusy(true);
+    try { await onConvidar(email.trim(), nome.trim(), papel); toast('Convite registrado (status: pendente).'); onClose(); }
+    catch (e) { toast(traduzCfg((e as Error).message), 'warn'); setBusy(false); }
+  }
+  return (
+    <Modal open onClose={() => { if (!busy) onClose(); }} closeOnBackdrop={!busy} width={480}
+      title="Convidar membro"
+      footer={<><button className="atv-btn" disabled={busy} onClick={onClose}>Cancelar</button><button className="atv-btn primary" disabled={busy} onClick={enviar}>{busy ? 'Enviando…' : 'Convidar'}</button></>}>
+      <div className="cfg-form">
+        <div className="cfg-field"><label>E-mail</label><input className="ctrl" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="pessoa@empresa.com" /></div>
+        <div className="cfg-field"><label>Nome (opcional)</label><input className="ctrl" value={nome} onChange={(e) => setNome(e.target.value)} /></div>
+        <div className="cfg-field"><label>Papel</label><select className="ctrl" value={papel} onChange={(e) => setPapel(e.target.value)}><option value="atendente">Atendente</option><option value="supervisor">Supervisor</option><option value="admin">Administrador</option></select></div>
+        <div className="cfg-nota">O convidado precisa ter conta Atenvo (mesmo e-mail). O envio de convite por e-mail a novos cadastros será habilitado quando a integração de envio estiver ativa.</div>
+      </div>
+    </Modal>
+  );
+}
+
+/* ===================== Canais (resumo) ===================== */
+function CanaisPanel({ podeGerenciar, onNav }: { podeGerenciar: boolean; onNav: (p: string) => void }) {
+  const waQ = useWaCanais();
+  const fbQ = useFbStatus();
+  const wa = waQ.data ?? []; const fb = (fbQ.data ?? []).filter((p) => p.estado === 'conectado');
+  return (<>
+    <div className="set-card">
+      <div className="sc-head bordered"><div className="row"><div className="grow"><h3>WhatsApp</h3><p>Resumo das conexões. A gestão (conectar/remover) fica em Integrações.</p></div><button className="btn-ghost" onClick={() => onNav('/integracoes')}><IcExt />Abrir Integrações</button></div></div>
+      {!WA_REAL ? <div className="chan-row"><div className="chan-txt"><div className="d">Disponível com o backend configurado.</div></div></div>
+        : waQ.isLoading ? <div className="cfg-load">Carregando…</div>
+        : wa.length === 0 ? <div className="chan-row"><div className="chan-txt"><div className="d">Nenhum WhatsApp conectado. Conecte em Integrações.</div></div></div>
+        : wa.map((c) => (
+          <div className="chan-row" key={c.id}>
+            <span className="chan-ic wa"><IcWa /></span>
+            <div className="chan-txt"><div className="t">{c.alias}</div><div className="d">{c.numero || 'Sem número'}{TIPO_ORIGEM[c.origemTipo || ''] ? ' · ' + TIPO_ORIGEM[c.origemTipo as string] : ''}{c.gestorNome ? ' · Gestor: ' + c.gestorNome : ''}</div></div>
+            <div className="chan-act">
+              <span className={'badge ' + (WA_ST[c.status]?.cls || 'neutral')}>{WA_ST[c.status]?.dot && <span className="dot" />}{WA_ST[c.status]?.t || c.status}</span>
+              {podeGerenciar && <button className="btn-sm" onClick={() => onNav('/integracoes')}>Configurar origem comercial</button>}
+            </div>
+          </div>
+        ))}
+    </div>
+    <div className="set-card">
+      <div className="sc-head bordered"><h3>Facebook</h3><p>Páginas conectadas ao Messenger.</p></div>
+      {fbQ.isLoading ? <div className="cfg-load">Carregando…</div> : fb.length === 0
+        ? <div className="chan-row"><div className="chan-txt"><div className="d">Nenhuma Página conectada. Conecte em Integrações.</div></div></div>
+        : fb.map((p) => (
+          <div className="chan-row" key={p.id}><span className="chan-ic fb"><IcFb /></span><div className="chan-txt"><div className="t">{p.pagina_nome || p.pagina_id}</div><div className="d">Messenger</div></div><div className="chan-act"><span className="badge ok"><span className="dot" />Conectado</span></div></div>
+        ))}
+    </div>
+  </>);
+}
+
+/* ===================== Atendimento — configurações por organização ===================== */
+function ConfigAtendimentoCard({ podeGerenciar }: { podeGerenciar: boolean }) {
+  const { toast } = useToast();
+  const cfgQ = useConfigAtendimento();
+  const salvar = useSalvarConfigAtendimento();
+  const statusQ = useStatusDefs();
+  const [c, setC] = useState<ConfigAtendimento | null>(null);
+  useEffect(() => { if (cfgQ.data) setC(cfgQ.data); }, [cfgQ.data]);
+  if (cfgQ.isLoading || !c) return <div className="set-card"><div className="sc-head bordered"><h3>Configurações de atendimento</h3></div><div className="sc-body"><div className="cfg-load">Carregando…</div></div></div>;
+  const toggleDia = (i: number) => setC({ ...c, dias: c.dias.includes(i) ? c.dias.filter((d) => d !== i) : [...c.dias, i].sort() });
+  async function salvarCfg() { if (!c) return; try { await salvar.mutateAsync(c); toast('Configurações de atendimento salvas'); } catch (e) { toast(traduzCfg((e as Error).message), 'warn'); } }
+  const dis = !podeGerenciar;
+  return (
+    <div className="set-card">
+      <div className="sc-head bordered"><h3>Configurações de atendimento</h3><p>Horário, jornada e regras da operação — válidas para toda a organização.{dis ? ' Somente administradores editam.' : ''}</p></div>
+      <div className="sc-body">
+        <div className="form-grid">
+          <div className="fld"><label>Início do atendimento</label><input className="ctrl" type="time" value={c.horario_inicio} disabled={dis} onChange={(e) => setC({ ...c, horario_inicio: e.target.value })} /></div>
+          <div className="fld"><label>Fim do atendimento</label><input className="ctrl" type="time" value={c.horario_fim} disabled={dis} onChange={(e) => setC({ ...c, horario_fim: e.target.value })} /></div>
+          <div className="fld"><label>Conversa sem resposta após (min)</label><input className="ctrl" type="number" min={1} value={c.tempo_sem_resposta_min} disabled={dis} onChange={(e) => setC({ ...c, tempo_sem_resposta_min: Number(e.target.value) || 0 })} /></div>
+          <div className="fld"><label>Tempo de inatividade p/ encerrar (min)</label><input className="ctrl" type="number" min={0} value={c.tempo_inatividade_min} disabled={dis} onChange={(e) => setC({ ...c, tempo_inatividade_min: Number(e.target.value) || 0 })} /></div>
+          <div className="fld"><label>Status padrão de nova conversa</label><select className="ctrl" value={c.status_padrao} disabled={dis} onChange={(e) => setC({ ...c, status_padrao: e.target.value })}><option value="">Padrão do sistema</option>{(statusQ.data ?? []).map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}</select></div>
+          <div className="fld full"><label>Dias de atendimento</label><div className="dias-row">{DIAS_SEMANA.map((d) => <button key={d.i} type="button" className={'dia-chip' + (c.dias.includes(d.i) ? ' on' : '')} disabled={dis} onClick={() => toggleDia(d.i)}>{d.l}</button>)}</div></div>
+          <div className="fld full"><label>Mensagem fora do horário</label><textarea className="ctrl cfg-ta" rows={2} value={c.mensagem_fora_horario} disabled={dis} onChange={(e) => setC({ ...c, mensagem_fora_horario: e.target.value })} placeholder="Ex.: Nosso horário é das 8h às 18h. Retornaremos em breve." /></div>
         </div>
-      )}
+        <div className="cfg-nota">A aplicação automática (auto-resposta fora do horário, encerramento por inatividade, distribuição automática) depende de automação no backend — ainda não disponível; as regras ficam salvas e prontas.</div>
+      </div>
+      {podeGerenciar && <div className="sc-foot"><button className="btn-primary" disabled={salvar.isPending} onClick={salvarCfg}><IcCheck />{salvar.isPending ? 'Salvando…' : 'Salvar configurações'}</button></div>}
+    </div>
+  );
+}
+
+/* ===================== Notificações ===================== */
+const NOTIF_EMAIL = [
+  { k: 'novos_leads', t: 'Novos contatos e leads', d: 'Receba um email quando um novo contato entrar.' },
+  { k: 'sem_resposta', t: 'Mensagens não respondidas', d: 'Resumo de mensagens de clientes sem resposta.' },
+  { k: 'cobrancas_vencendo', t: 'Cobranças vencendo', d: 'Avisos de parcelas próximas do vencimento.' },
+  { k: 'resumo_diario', t: 'Resumo diário', d: 'Um panorama do dia enviado de manhã.' },
+  { k: 'convite_aceito', t: 'Convite aceito', d: 'Aviso quando alguém aceitar um convite.' },
+];
+const NOTIF_APP = [
+  { k: 'push', t: 'Notificações push', d: 'Alertas em tempo real na plataforma.' },
+  { k: 'som', t: 'Som de notificação', d: 'Toque sonoro ao receber atendimento.' },
+  { k: 'aguardando', t: 'Cliente aguardando atendimento', d: 'Destaque quando alguém espera resposta.' },
+  { k: 'novos_membros', t: 'Novos membros na equipe', d: 'Aviso quando alguém entrar na equipe.' },
+  { k: 'cobrancas', t: 'Cobranças', d: 'Alertas de cobranças e pagamentos.' },
+  { k: 'mencoes', t: 'Menções e atribuições', d: 'Quando você for atribuído a um atendimento.' },
+];
+function NotifPanel() {
+  const { toast } = useToast();
+  const prefsQ = usePreferencias();
+  const salvar = useSalvarPreferencias();
+  const [p, setP] = useState<Prefs | null>(null);
+  useEffect(() => { if (prefsQ.data) setP(prefsQ.data); }, [prefsQ.data]);
+  if (prefsQ.isLoading || !p) return <div className="set-card"><div className="sc-head"><h3>Notificações</h3></div><div className="sc-body"><div className="cfg-load">Carregando…</div></div></div>;
+  async function flip(grupo: 'notif_email' | 'notif_app', k: string, v: boolean) {
+    const np: Prefs = { ...p!, [grupo]: { ...p![grupo], [k]: v } };
+    setP(np);
+    try { await salvar.mutateAsync(np); } catch (e) { toast(traduzCfg((e as Error).message), 'warn'); setP(p); }
+  }
+  return (
+    <div className="set-card">
+      <div className="sc-head"><h3>Notificações</h3><p>Preferências individuais. As alterações são salvas automaticamente.</p></div>
+      <div className="cfg-nota" style={{ margin: '0 22px 4px' }}>O envio real de e-mail/push depende de integração de entrega — <b>Integração de envio pendente</b>. Suas preferências são persistidas mesmo assim.</div>
+      <div className="sc-sub">Por email</div>
+      {NOTIF_EMAIL.map((n) => <div className="toggle-row" key={n.k}><div className="tr-txt"><div className="t">{n.t}</div><div className="d">{n.d}</div></div><Switch on={!!p.notif_email[n.k]} onChange={(v) => flip('notif_email', n.k, v)} /></div>)}
+      <div className="sc-sub">No aplicativo</div>
+      {NOTIF_APP.map((n) => <div className="toggle-row" key={n.k}><div className="tr-txt"><div className="t">{n.t}</div><div className="d">{n.d}</div></div><Switch on={!!p.notif_app[n.k]} onChange={(v) => flip('notif_app', n.k, v)} /></div>)}
+    </div>
+  );
+}
+
+/* ===================== Preferências ===================== */
+function PrefsPanel({ theme, setTheme, toast, onNav }: { theme: string; setTheme: (t: 'light' | 'dark') => void; toast: (m: string, k?: 'ok' | 'warn') => void; onNav: (p: string) => void }) {
+  const prefsQ = usePreferencias();
+  const salvar = useSalvarPreferencias();
+  const [p, setP] = useState<Prefs | null>(null);
+  useEffect(() => { if (prefsQ.data) setP(prefsQ.data); }, [prefsQ.data]);
+  const temaSel = p?.tema || (theme as 'light' | 'dark');
+  function aplicarTema(t: 'light' | 'dark' | 'system') {
+    const resolvido = t === 'system' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : t;
+    setTheme(resolvido);
+    persist({ tema: t });
+  }
+  async function persist(patch: Partial<Prefs>) {
+    if (!p) return; const np = { ...p, ...patch }; setP(np);
+    try { await salvar.mutateAsync(np); if (patch.densidade) document.documentElement.dataset.densidade = patch.densidade; } catch (e) { toast(traduzCfg((e as Error).message), 'warn'); setP(p); }
+  }
+  useEffect(() => { if (p?.densidade) document.documentElement.dataset.densidade = p.densidade; }, [p?.densidade]);
+  if (prefsQ.isLoading || !p) return <div className="set-card"><div className="sc-head"><h3>Preferências</h3></div><div className="sc-body"><div className="cfg-load">Carregando…</div></div></div>;
+  void onNav;
+  return (
+    <div className="set-card">
+      <div className="sc-head"><h3>Preferências</h3><p>Personalize a aparência e o comportamento. Salvas na sua conta.</p></div>
+      <div className="pref-row">
+        <div className="pr-txt"><div className="t">Tema</div><div className="d">Claro, escuro ou seguindo o sistema.</div></div>
+        <div className="pref-seg">
+          <button className={temaSel === 'light' ? 'on' : ''} onClick={() => aplicarTema('light')}><IcSun />Claro</button>
+          <button className={temaSel === 'dark' ? 'on' : ''} onClick={() => aplicarTema('dark')}><IcMoon />Escuro</button>
+          <button className={temaSel === 'system' ? 'on' : ''} onClick={() => aplicarTema('system')}>Sistema</button>
+        </div>
+      </div>
+      <div className="pref-row"><div className="pr-txt"><div className="t">Idioma</div><div className="d">Idioma da interface.</div></div><div className="pr-ctrl"><select className="ctrl" value="pt-BR" disabled><option value="pt-BR">Português (Brasil)</option></select></div></div>
+      <div className="pref-row"><div className="pr-txt"><div className="t">Formato de data</div><div className="d">Como as datas são exibidas.</div></div><div className="pr-ctrl"><select className="ctrl" value={p.formato_data} onChange={(e) => persist({ formato_data: e.target.value })}><option value="dd/MM/yyyy">DD/MM/AAAA</option><option value="MM/dd/yyyy">MM/DD/AAAA</option><option value="yyyy-MM-dd">AAAA-MM-DD</option></select></div></div>
+      <div className="pref-row"><div className="pr-txt"><div className="t">Densidade da interface</div><div className="d">Espaçamento de listas e tabelas.</div></div><div className="pr-ctrl"><select className="ctrl" value={p.densidade} onChange={(e) => persist({ densidade: e.target.value as Prefs['densidade'] })}><option value="confortavel">Confortável</option><option value="compacta">Compacta</option></select></div></div>
+      <div className="pref-row"><div className="pr-txt"><div className="t">Página inicial</div><div className="d">Tela exibida ao entrar.</div></div><div className="pr-ctrl"><select className="ctrl" value={p.pagina_inicial} onChange={(e) => persist({ pagina_inicial: e.target.value })}><option value="/whatsapp">WhatsApp</option><option value="/kanban">Kanban</option><option value="/cobrancas">Cobranças</option><option value="/relatorios">Relatórios</option></select></div></div>
+      <div className="toggle-row"><div className="tr-txt"><div className="t">Mostrar dicas e tutoriais</div><div className="d">Sugestões contextuais pela interface.</div></div><Switch on={!!p.mostrar_dicas} onChange={(v) => persist({ mostrar_dicas: v })} /></div>
+      <div className="toggle-row"><div className="tr-txt"><div className="t">Reproduzir sons</div><div className="d">Efeitos sonoros em ações e alertas (respeita o som de notificação).</div></div><Switch on={!!p.sons} onChange={(v) => persist({ sons: v })} /></div>
     </div>
   );
 }
 
 /* ============================================================
-   Atendimento — administração de Status e Etiquetas
+   Atendimento — administração de Status e Etiquetas (real)
    ============================================================ */
 const IcUp = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 15 6-6 6 6" /></svg>;
 const IcDown = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>;
@@ -282,16 +429,11 @@ function AtendimentoPanel({ canManage, section }: { canManage: boolean; section:
   const etqCardRef = useRef<HTMLDivElement>(null);
   const [destaque, setDestaque] = useState<string | null>(null);
 
-  // deep-link: rolar e destacar a seção indicada (?section=status|etiquetas)
   useEffect(() => {
     if (!section) return;
     const alvo = section === 'etiquetas' ? etqCardRef.current : statusCardRef.current;
     if (!alvo) return;
-    const t = setTimeout(() => {
-      alvo.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      setDestaque(section);
-      setTimeout(() => setDestaque(null), 2200);
-    }, 120);
+    const t = setTimeout(() => { alvo.scrollIntoView({ behavior: 'smooth', block: 'start' }); setDestaque(section); setTimeout(() => setDestaque(null), 2200); }, 120);
     return () => clearTimeout(t);
   }, [section]);
 
@@ -306,33 +448,17 @@ function AtendimentoPanel({ canManage, section }: { canManage: boolean; section:
   const [del, setDel] = useState<{ s: StatusDef; count: number } | null>(null);
   const [subId, setSubId] = useState('');
 
-  // seletor de cor (popover unico; preview imediato, persiste 1x ao confirmar)
   const [picker, setPicker] = useState<{ kind: 'status' | 'etq'; id: string; orig: string; cor: string } | null>(null);
   const [pickerPos, setPickerPos] = useState({ left: -9999, top: -9999 });
   const pickerRect = useRef<DOMRect | null>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
 
   async function run(p: Promise<void>, ok: string) { try { await p; toast(ok); } catch (e) { toast((e as Error).message || 'Falha na operação', 'warn'); } }
-
-  function persistirCor(kind: 'status' | 'etq', id: string, cor: string) {
-    run(kind === 'status' ? a.atualizarStatus(id, { cor }) : a.atualizarEtiqueta(id, { cor }), 'Cor atualizada');
-  }
-  function commitPending() {
-    if (picker && picker.cor.toLowerCase() !== picker.orig.toLowerCase()) persistirCor(picker.kind, picker.id, picker.cor);
-  }
-  function openPicker(kind: 'status' | 'etq', id: string, cor: string, rect: DOMRect) {
-    commitPending(); // confirma alteração pendente de outro picker (1 toast)
-    pickerRect.current = rect;
-    setPickerPos({ left: -9999, top: -9999 });
-    setPicker({ kind, id, orig: cor, cor });
-  }
+  function persistirCor(kind: 'status' | 'etq', id: string, cor: string) { run(kind === 'status' ? a.atualizarStatus(id, { cor }) : a.atualizarEtiqueta(id, { cor }), 'Cor atualizada'); }
+  function commitPending() { if (picker && picker.cor.toLowerCase() !== picker.orig.toLowerCase()) persistirCor(picker.kind, picker.id, picker.cor); }
+  function openPicker(kind: 'status' | 'etq', id: string, cor: string, rect: DOMRect) { commitPending(); pickerRect.current = rect; setPickerPos({ left: -9999, top: -9999 }); setPicker({ kind, id, orig: cor, cor }); }
   function fecharPicker() { commitPending(); setPicker(null); }
-  function aplicarCorPaleta(c: string) {
-    if (!picker) return;
-    const { kind, id, orig } = picker;
-    setPicker(null);
-    if (c.toLowerCase() !== orig.toLowerCase()) persistirCor(kind, id, c);
-  }
+  function aplicarCorPaleta(c: string) { if (!picker) return; const { kind, id, orig } = picker; setPicker(null); if (c.toLowerCase() !== orig.toLowerCase()) persistirCor(kind, id, c); }
   const corDaRow = (kind: 'status' | 'etq', id: string, cor: string) => (picker && picker.kind === kind && picker.id === id ? picker.cor : cor);
 
   useLayoutEffect(() => {
@@ -345,56 +471,38 @@ function AtendimentoPanel({ canManage, section }: { canManage: boolean; section:
 
   useEffect(() => {
     if (!picker) return;
-    function onDown(e: MouseEvent) {
-      const t = e.target as HTMLElement;
-      if (pickerRef.current?.contains(t)) return;
-      if (t.closest && t.closest('.atd-color-btn')) return; // o proprio botao trata
-      fecharPicker();
-    }
+    function onDown(e: MouseEvent) { const t = e.target as HTMLElement; if (pickerRef.current?.contains(t)) return; if (t.closest && t.closest('.atd-color-btn')) return; fecharPicker(); }
     function onKey(e: KeyboardEvent) { if (e.key === 'Escape') fecharPicker(); }
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
+    document.addEventListener('mousedown', onDown); document.addEventListener('keydown', onKey);
     return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
   }, [picker]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function moveStatus(idx: number, dir: -1 | 1) {
-    const arr = statuses.map((s) => s.id);
-    const j = idx + dir;
-    if (j < 0 || j >= arr.length) return;
-    [arr[idx], arr[j]] = [arr[j], arr[idx]];
-    run(a.reordenarStatus(arr), 'Ordem atualizada');
+    const arr = statuses.map((s) => s.id); const j = idx + dir; if (j < 0 || j >= arr.length) return;
+    [arr[idx], arr[j]] = [arr[j], arr[idx]]; run(a.reordenarStatus(arr), 'Ordem atualizada');
   }
   async function startDeleteStatus(s: StatusDef) {
-    try {
-      const count = await a.contarConversasComStatus(s.id);
+    try { const count = await a.contarConversasComStatus(s.id);
       if (count > 0) { setDel({ s, count }); setSubId(statuses.find((x) => x.id !== s.id && x.ativo)?.id ?? ''); }
       else if (window.confirm(`Excluir o status "${s.nome}"?`)) run(a.excluirStatus(s.id, null), 'Status excluído');
     } catch (e) { toast((e as Error).message, 'warn'); }
   }
   function confirmDeleteStatus() {
-    if (!del) return;
-    if (!subId) { toast('Escolha um status substituto.', 'warn'); return; }
-    const id = del.s.id; setDel(null);
-    run(a.excluirStatus(id, subId), 'Status excluído e conversas reatribuídas');
+    if (!del) return; if (!subId) { toast('Escolha um status substituto.', 'warn'); return; }
+    const id = del.s.id; setDel(null); run(a.excluirStatus(id, subId), 'Status excluído e conversas reatribuídas');
   }
 
   return (
     <>
-      {/* ===== STATUS ===== */}
       <div className={'set-card' + (destaque === 'status' ? ' atd-destaque' : '')} ref={statusCardRef}>
         <div className="sc-head bordered"><h3>Status das conversas</h3><p>Estados configuráveis usados em Dados do cliente e nos filtros. {canManage ? 'Crie, renomeie, defina cor, ordene, marque padrão, desative ou exclua.' : 'Somente administradores e gestores podem editar.'}</p></div>
-
         {statusQ.isLoading && <div className="chan-row"><div className="chan-txt"><div className="d">Carregando status…</div></div></div>}
         {statuses.map((s, idx) => (
           <div className="atd-row" key={s.id}>
             <button type="button" className="atd-color-btn" style={{ background: corDaRow('status', s.id, s.cor) }} disabled={!canManage} title="Alterar cor" aria-label="Alterar cor" onClick={(e) => openPicker('status', s.id, s.cor, e.currentTarget.getBoundingClientRect())} />
-            <input className="atd-name" defaultValue={s.nome} disabled={!canManage}
-              onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-              onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== s.nome) run(a.atualizarStatus(s.id, { nome: v }), 'Status renomeado'); }} />
+            <input className="atd-name" defaultValue={s.nome} disabled={!canManage} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== s.nome) run(a.atualizarStatus(s.id, { nome: v }), 'Status renomeado'); }} />
             {s.sistema && <span className="atd-sys" title="Status de sistema">sistema</span>}
-            {s.padrao
-              ? <span className="badge ok"><span className="dot" />Padrão</span>
-              : canManage && <button className="atd-mini" title="Tornar padrão" onClick={() => run(a.definirStatusPadrao(s.id), '“' + s.nome + '” agora é o padrão')}><IcStar /></button>}
+            {s.padrao ? <span className="badge ok"><span className="dot" />Padrão</span> : canManage && <button className="atd-mini" title="Tornar padrão" onClick={() => run(a.definirStatusPadrao(s.id), '“' + s.nome + '” agora é o padrão')}><IcStar /></button>}
             <div className="atd-actions">
               <button className="atd-mini" title="Subir" disabled={!canManage || idx === 0} onClick={() => moveStatus(idx, -1)}><IcUp /></button>
               <button className="atd-mini" title="Descer" disabled={!canManage || idx === statuses.length - 1} onClick={() => moveStatus(idx, 1)}><IcDown /></button>
@@ -403,19 +511,14 @@ function AtendimentoPanel({ canManage, section }: { canManage: boolean; section:
             </div>
           </div>
         ))}
-
         {del && (
           <div className="atd-del">
             <IcTrash2 /> O status <b>“{del.s.nome}”</b> está em uso por {del.count} conversa{del.count === 1 ? '' : 's'}. Escolha um substituto:
-            <select value={subId} onChange={(e) => setSubId(e.target.value)}>
-              <option value="">Selecione…</option>
-              {statuses.filter((x) => x.id !== del.s.id).map((x) => <option key={x.id} value={x.id}>{x.nome}</option>)}
-            </select>
+            <select value={subId} onChange={(e) => setSubId(e.target.value)}><option value="">Selecione…</option>{statuses.filter((x) => x.id !== del.s.id).map((x) => <option key={x.id} value={x.id}>{x.nome}</option>)}</select>
             <button className="btn-primary" onClick={confirmDeleteStatus}>Excluir e reatribuir</button>
             <button className="btn-ghost" onClick={() => setDel(null)}>Cancelar</button>
           </div>
         )}
-
         {canManage && (
           <div className="atd-add">
             <input type="color" className="atd-color" value={nsColor} onChange={(e) => setNsColor(e.target.value)} title="Cor" />
@@ -425,27 +528,21 @@ function AtendimentoPanel({ canManage, section }: { canManage: boolean; section:
         )}
       </div>
 
-      {/* ===== ETIQUETAS ===== */}
       <div className={'set-card' + (destaque === 'etiquetas' ? ' atd-destaque' : '')} ref={etqCardRef}>
         <div className="sc-head bordered"><h3>Etiquetas</h3><p>Etiquetas coloridas aplicáveis a contatos, conversas e oportunidades. Não é possível duplicar o nome na organização.</p></div>
-
         {etqQ.isLoading && <div className="chan-row"><div className="chan-txt"><div className="d">Carregando etiquetas…</div></div></div>}
         {etqs.length === 0 && !etqQ.isLoading && <div className="chan-row"><div className="chan-txt"><div className="d">Nenhuma etiqueta ainda.</div></div></div>}
         {etqs.map((e) => (
           <div className="atd-row" key={e.id}>
             <button type="button" className="atd-color-btn" style={{ background: corDaRow('etq', e.id, e.cor) }} disabled={!canManage} title="Alterar cor" aria-label="Alterar cor" onClick={(ev) => openPicker('etq', e.id, e.cor, ev.currentTarget.getBoundingClientRect())} />
-            <input className="atd-name" defaultValue={e.nome} disabled={!canManage}
-              onKeyDown={(ev) => { if (ev.key === 'Enter') (ev.target as HTMLInputElement).blur(); }}
-              onBlur={(ev) => { const v = ev.target.value.trim(); if (v && v !== e.nome) run(a.atualizarEtiqueta(e.id, { nome: v }), 'Etiqueta renomeada'); }} />
-            <input className="atd-desc" placeholder="Descrição (opcional)" defaultValue={e.descricao ?? ''} disabled={!canManage}
-              onBlur={(ev) => { const v = ev.target.value.trim(); if (v !== (e.descricao ?? '')) run(a.atualizarEtiqueta(e.id, { descricao: v || null }), 'Descrição atualizada'); }} />
+            <input className="atd-name" defaultValue={e.nome} disabled={!canManage} onKeyDown={(ev) => { if (ev.key === 'Enter') (ev.target as HTMLInputElement).blur(); }} onBlur={(ev) => { const v = ev.target.value.trim(); if (v && v !== e.nome) run(a.atualizarEtiqueta(e.id, { nome: v }), 'Etiqueta renomeada'); }} />
+            <input className="atd-desc" placeholder="Descrição (opcional)" defaultValue={e.descricao ?? ''} disabled={!canManage} onBlur={(ev) => { const v = ev.target.value.trim(); if (v !== (e.descricao ?? '')) run(a.atualizarEtiqueta(e.id, { descricao: v || null }), 'Descrição atualizada'); }} />
             <div className="atd-actions">
               <button className={'atd-toggle' + (e.ativo ? ' on' : '')} title={e.ativo ? 'Ativa' : 'Inativa'} disabled={!canManage} onClick={() => run(a.atualizarEtiqueta(e.id, { ativo: !e.ativo }), e.ativo ? 'Etiqueta desativada' : 'Etiqueta ativada')}><span className="k" /></button>
               <button className="atd-mini danger" title="Excluir" disabled={!canManage} onClick={() => { if (window.confirm(`Excluir a etiqueta "${e.nome}"?`)) run(a.excluirEtiqueta(e.id), 'Etiqueta excluída'); }}><IcTrash2 /></button>
             </div>
           </div>
         ))}
-
         {canManage && (
           <div className="atd-add">
             <input type="color" className="atd-color" value={etColor} onChange={(e) => setEtColor(e.target.value)} title="Cor" />
@@ -459,17 +556,9 @@ function AtendimentoPanel({ canManage, section }: { canManage: boolean; section:
       {picker && (
         <div ref={pickerRef} className="cor-pop" style={{ left: pickerPos.left, top: pickerPos.top }} role="dialog" aria-label="Selecionar cor">
           <div className="cor-pop-head">Cor</div>
-          <div className="cor-swatches">
-            {PALETA_CORES.map((c) => (
-              <button key={c} type="button" className={'cor-sw' + (c.toLowerCase() === picker.cor.toLowerCase() ? ' sel' : '')} style={{ background: c }} title={c} aria-label={c} onClick={() => aplicarCorPaleta(c)} />
-            ))}
-          </div>
+          <div className="cor-swatches">{PALETA_CORES.map((c) => <button key={c} type="button" className={'cor-sw' + (c.toLowerCase() === picker.cor.toLowerCase() ? ' sel' : '')} style={{ background: c }} title={c} aria-label={c} onClick={() => aplicarCorPaleta(c)} />)}</div>
           <div className="cor-custom">
-            <label className="cor-native" title="Cor personalizada">
-              <input type="color" value={picker.cor} onChange={(ev) => setPicker((p) => p && ({ ...p, cor: ev.target.value }))} />
-              <span className="cor-native-sw" style={{ background: picker.cor }} />
-              Personalizada
-            </label>
+            <label className="cor-native" title="Cor personalizada"><input type="color" value={picker.cor} onChange={(ev) => setPicker((pp) => pp && ({ ...pp, cor: ev.target.value }))} /><span className="cor-native-sw" style={{ background: picker.cor }} />Personalizada</label>
             <span className="cor-hex">{picker.cor.toUpperCase()}</span>
             <button type="button" className="cor-aplicar" onClick={fecharPicker}>Aplicar</button>
           </div>
