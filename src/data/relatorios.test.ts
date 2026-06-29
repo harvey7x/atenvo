@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { kpi, agregaFinanceiro, tempoMedioPrimeiraResposta, conversao, passaOpp, resolvePeriodo, addDias, type ParcelaLite, type RelFiltros } from './relatorios';
+import { kpi, agregaFinanceiro, tempoMedioPrimeiraResposta, conversao, passaOpp, resolvePeriodo, addDias, chaveConexao, montaLinhasConexao, melhorConexao, type ParcelaLite, type RelFiltros, type ConexaoInput } from './relatorios';
 
 const F = (extra: Partial<RelFiltros> = {}): RelFiltros => ({ preset: '30d', ...extra });
 
@@ -81,4 +81,56 @@ describe('resolvePeriodo() — janelas, SP, virada de mês/ano', () => {
     const p = resolvePeriodo('custom', '2025-12-30', '2026-01-02');
     expect(p.fimDate).toBe('2026-01-03'); expect(p.dias).toBe(4); expect(p.prevIniDate).toBe('2025-12-26');
   });
+});
+
+describe('chaveConexao() — agrupamento por conexão de aquisição', () => {
+  it('id presente → o próprio id', () => { expect(chaveConexao('chip1', null)).toBe('chip1'); });
+  it('id nulo + snapshot → snap:numero (conexão removida)', () => { expect(chaveConexao(null, { numero: '999', nome: 'Chip X' })).toBe('snap:999'); });
+  it('id nulo + sem snapshot → sem', () => { expect(chaveConexao(null, null)).toBe('sem'); });
+});
+
+describe('montaLinhasConexao() — desempenho por chip', () => {
+  const P = { iniDate: '2026-06-01', fimDate: '2026-07-01', prevIniDate: '2026-05-02', hoje: '2026-06-29' };
+  const dEm = '2026-06-10T12:00:00-03:00', dPrev = '2026-05-10T12:00:00-03:00';
+  const input: ConexaoInput = {
+    contatos: [
+      { id: 'k1', chip: 'chip1', criadoEm: dEm }, { id: 'k2', chip: 'chip1', criadoEm: dEm }, { id: 'k3', chip: 'chip1', criadoEm: dEm },
+      { id: 'kprev', chip: 'chip1', criadoEm: dPrev }, // período anterior
+      { id: 'k4', chip: 'chip2', criadoEm: dEm }, { id: 'k5', chip: 'chip2', criadoEm: dEm },
+      { id: 'kr', chip: 'snap:999', criadoEm: dEm }, { id: 'ks', chip: 'sem', criadoEm: dEm },
+    ],
+    identidade: {
+      chip1: { nome: 'Chip 1', numero: '111', tipo: 'trafego', gestor: 'Gestor X', removida: false },
+      chip2: { nome: 'Chip 2', numero: '222', tipo: 'ura', gestor: '', removida: false },
+      'snap:999': { nome: 'Chip Antigo', numero: '999', tipo: 'trafego', gestor: '', removida: true },
+      sem: { nome: 'Sem conexão', numero: '', tipo: '', gestor: '', removida: false },
+    },
+    conversas: [{ id: 'c1a', chip: 'chip1', criadoEm: dEm }, { id: 'c1b', chip: 'chip1', criadoEm: dEm }, { id: 'c2', chip: 'chip2', criadoEm: dEm }],
+    comEntrada: new Set(['c1a', 'c1b', 'c2']), resp: new Set(['c1a', 'c2']),
+    firstIn: [{ conversa: 'c1a', chip: 'chip1', t: 1_000_000 }, { conversa: 'c2', chip: 'chip2', t: 1_000_000 }],
+    firstResp: [{ conversa: 'c1a', chip: 'chip1', t: 1_600_000 }, { conversa: 'c2', chip: 'chip2', t: 2_200_000 }],
+    opps: [
+      { chip: 'chip1', status: 'ganho', qualificada: true, tempoFechDias: 5 }, { chip: 'chip1', status: 'perdido', qualificada: true, tempoFechDias: null }, { chip: 'chip1', status: 'em_andamento', qualificada: false, tempoFechDias: null },
+      { chip: 'chip2', status: 'ganho', qualificada: true, tempoFechDias: 3 }, { chip: 'chip2', status: 'ganho', qualificada: true, tempoFechDias: 4 },
+    ],
+    parcelas: [{ chip: 'chip1', contato: 'k1', status: 'paga', valor: 1000, valorPago: 1000, dataPrevista: '2026-06-05', dataPagamento: '2026-06-15' }],
+    economiaPorChip: {},
+    ...P,
+  };
+  const linhas = montaLinhasConexao(input);
+  const c1 = linhas.find((l) => l.chave === 'chip1')!;
+  const c2 = linhas.find((l) => l.chave === 'chip2')!;
+  it('dois chips com volumes diferentes (chip1 mais leads, no período)', () => { expect(c1.leadsRecebidos).toBe(3); expect(c2.leadsRecebidos).toBe(2); });
+  it('período anterior contabilizado separadamente', () => { expect(c1.leadsAnterior).toBe(1); expect(c2.leadsAnterior).toBe(0); });
+  it('chip1 mais leads, MENOR conversão; chip2 menos leads, conversão maior', () => {
+    expect(c1.taxaConversao).toBeCloseTo(33.33, 1); expect(c2.taxaConversao).toBe(100); expect(c1.taxaConversao).toBeLessThan(c2.taxaConversao);
+  });
+  it('chip2 maior qualificação', () => { expect(c2.taxaQualificacao).toBe(100); expect(c2.taxaQualificacao).toBeGreaterThan(c1.taxaQualificacao); });
+  it('atendimento por conversa (chip1: 2 conversas, 1 atendida, 1 sem resposta)', () => { expect(c1.conversas).toBe(2); expect(c1.conversasAtendidas).toBe(1); expect(c1.semResposta).toBe(1); expect(c1.taxaAtendimento).toBe(50); });
+  it('1ª resposta por chip (chip1=10min)', () => { expect(c1.primeiraRespostaMin).toBe(10); });
+  it('cobrança paga ligada ao lead original entra na receita do chip', () => { expect(c1.receitaRecebida).toBe(1000); expect(c1.clientesPagantes).toBe(1); expect(c1.ticketMedio).toBe(1000); });
+  it('conexão removida preservada via snapshot (removida=true)', () => { const r = linhas.find((l) => l.chave === 'snap:999')!; expect(r.removida).toBe(true); expect(r.nome).toBe('Chip Antigo'); expect(r.leadsRecebidos).toBe(1); });
+  it('lead sem canal agrupado em "sem" (não some)', () => { expect(linhas.find((l) => l.chave === 'sem')!.leadsRecebidos).toBe(1); });
+  it('melhorConexao = chip com mais leads, ignorando "sem"', () => { expect(melhorConexao(linhas)?.chave).toBe('chip1'); });
+  it('economia não preenchida não vira zero falso', () => { expect(c1.economiaPreenchida).toBe(false); });
 });

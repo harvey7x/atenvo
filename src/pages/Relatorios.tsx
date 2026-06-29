@@ -7,6 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import {
   REL_REAL, PRESETS, type Preset, type RelFiltros, FILTROS_PADRAO, resolvePeriodo, type Kpi,
   useRelatorioOpcoes, useResumo, useComercial, useAtendimento, useEquipe, useFinanceiro, useOrigens,
+  useConexoes, melhorConexao, type ConexaoLinha,
   exportarCSV, spHoje, type ResumoData, type AtendimentoData, type ComercialData, type FinanceiroData,
 } from '@/data/relatorios';
 import './Relatorios.css';
@@ -21,6 +22,9 @@ const CANAL_LABEL: Record<string, string> = { evolution: 'WhatsApp', meta: 'Face
 const canalNome = (p: string) => CANAL_LABEL[p] || p;
 const CANAL_OPCOES = [{ id: 'evolution', r: 'WhatsApp' }, { id: 'meta', r: 'Facebook' }];
 const STATUS_OPP = [{ id: 'em_andamento', r: 'Em andamento' }, { id: 'ganho', r: 'Ganho' }, { id: 'perdido', r: 'Perdido' }, { id: 'cancelado', r: 'Cancelado' }];
+const TIPO_LABEL: Record<string, string> = { trafego: 'Tráfego', ura: 'URA', organico: 'Orgânico', indicacao: 'Indicação', campanha: 'Campanha', parceiro: 'Parceiro', outro: 'Outro' };
+const tipoNome = (t: string) => TIPO_LABEL[t] || (t || '—');
+const conexRotulo = (l: { nome: string; numero: string; removida: boolean }) => (l.removida ? `Conexão removida${l.nome && l.nome !== 'Conexão removida' ? ' (' + l.nome + ')' : ''}` : l.nome) + (l.numero ? ` — ${l.numero}` : '');
 
 /* ===== ícones ===== */
 const I = (d: ReactNode) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">{d}</svg>;
@@ -228,6 +232,7 @@ export function Relatorios() {
   if (f.responsavel && !ehAtendente) chips.push({ k: 'responsavel', lbl: 'Responsável', val: opcoes.data?.responsaveis.find((r) => r.id === f.responsavel)?.nome || '—' });
   if (f.coluna) chips.push({ k: 'coluna', lbl: 'Etapa', val: opcoes.data?.colunas.find((c) => c.id === f.coluna)?.nome || '—' });
   if (f.status) chips.push({ k: 'status', lbl: 'Status', val: STATUS_OPP.find((s) => s.id === f.status)?.r || f.status });
+  if (f.conexao) chips.push({ k: 'conexao', lbl: 'Conexão', val: opcoes.data?.conexoes.find((c) => c.id === f.conexao)?.nome || '—' });
 
   if (!REL_REAL) return <div className="relatorios-page"><div className="content"><Vazio titulo="Relatórios indisponíveis" texto="Disponível com o backend configurado." /></div></div>;
   const abasVisiveis = ABAS;
@@ -252,6 +257,7 @@ export function Relatorios() {
             <select className="flt" aria-label="Origem" value={f.origem || ''} onChange={(e) => setFiltro('origem', e.target.value)}><option value="">Origem: todas</option>{(opcoes.data?.origens || []).map((o) => <option key={o} value={o}>{o}</option>)}</select>
             <select className="flt" aria-label="Etapa" value={f.coluna || ''} onChange={(e) => setFiltro('coluna', e.target.value)}><option value="">Etapa: todas</option>{(opcoes.data?.colunas || []).map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}</select>
             <select className="flt" aria-label="Status" value={f.status || ''} onChange={(e) => setFiltro('status', e.target.value)}><option value="">Status: todos</option>{STATUS_OPP.map((s) => <option key={s.id} value={s.id}>{s.r}</option>)}</select>
+            <select className="flt" aria-label="Conexão de WhatsApp" value={f.conexao || ''} onChange={(e) => setFiltro('conexao', e.target.value)}><option value="">Conexão: todas</option>{(opcoes.data?.conexoes || []).map((c) => <option key={c.id} value={c.id}>{c.nome}{c.numero ? ' — ' + c.numero : ''}</option>)}</select>
           </div>
         )}
 
@@ -285,6 +291,8 @@ function AbaResumo({ f }: { f: RelFiltros }) {
   const at = useAtendimento(f, true);
   const fin = useFinanceiro(f, true);
   const com = useComercial(f, true);
+  const cx = useConexoes(f, true);
+  const melhor = melhorConexao(cx.data || []);
   return (
     <Estado q={q}>
       {q.data && <>
@@ -304,6 +312,11 @@ function AbaResumo({ f }: { f: RelFiltros }) {
             <ul className="narr aten">{pontosAtencao(q.data, at.data, com.data, fin.data).map((p, i) => <li key={i} className={p.ok ? 'ok' : ''}>{p.txt}</li>)}</ul>
           </Panel>
         </div>
+        <Panel title="Melhor conexão do período" sub="Conexão de WhatsApp com mais leads">
+          {melhor && melhor.leadsRecebidos > 0
+            ? <div className="compact-stat" style={{ gap: 18, flexWrap: 'wrap' }}><span className="cs-v">{conexRotulo(melhor)}</span><span className="cs-l">{fmtInt(melhor.leadsRecebidos)} leads · {fmtInt(melhor.fechados)} fechados · {fmtPct(melhor.taxaConversao)} conversão</span></div>
+            : <Vazio titulo="Sem leads por conexão no período" texto="Os leads são atribuídos à conexão de aquisição do contato." />}
+        </Panel>
       </>}
     </Estado>
   );
@@ -336,6 +349,9 @@ function AbaVendas({ f, periodoLabel, orgNome }: { f: RelFiltros; periodoLabel: 
         <Panel title="Novas oportunidades por dia" sub="Oportunidades criadas">
           {q.data.leadsSerie.length < 2 ? <Vazio titulo="Dados insuficientes para a curva" texto={`No período: ${pl(q.data.totalOpp, 'oportunidade criada', 'oportunidades criadas')}.`} /> : <LineChart pts={q.data.leadsSerie} compact />}
         </Panel>
+
+        <SecaoConexoes f={f} periodoLabel={periodoLabel} orgNome={orgNome} />
+
         <div className="sech" style={{ marginTop: 6 }}>Origens dos leads</div>
         <Estado q={or}>{or.data && (or.data.length === 0
           ? <Vazio titulo="Sem origens no período" texto="As origens aparecem conforme as oportunidades são criadas." />
@@ -351,6 +367,72 @@ function AbaVendas({ f, periodoLabel, orgNome }: { f: RelFiltros; periodoLabel: 
           </>)}</Estado>
       </>}
     </Estado>
+  );
+}
+
+/* ============ Desempenho por conexão de WhatsApp ============ */
+function frasesConexoes(linhas: ConexaoLinha[]): string[] {
+  const reais = linhas.filter((l) => l.chave !== 'sem' && l.leadsRecebidos > 0).sort((a, b) => b.leadsRecebidos - a.leadsRecebidos);
+  const out = reais.slice(0, 3).map((l) => `${l.nome} recebeu ${pl(l.leadsRecebidos, 'lead', 'leads')}, qualificou ${fmtInt(l.qualificados)} e fechou ${fmtInt(l.fechados)} — conversão de ${fmtPct(l.taxaConversao)}.`);
+  if (reais.length >= 2) {
+    const maisVol = reais[0];
+    const melhorQual = reais.slice().sort((a, b) => b.taxaQualificacao - a.taxaQualificacao)[0];
+    if (melhorQual.chave !== maisVol.chave) out.push(`${maisVol.nome} trouxe o maior volume, mas ${melhorQual.nome} entregou a melhor qualificação (${fmtPct(melhorQual.taxaQualificacao)}).`);
+  }
+  return out;
+}
+function SecaoConexoes({ f, periodoLabel, orgNome }: { f: RelFiltros; periodoLabel: string; orgNome: string }) {
+  const q = useConexoes(f, true);
+  const linhas = q.data || [];
+  const reais = linhas.filter((l) => l.chave !== 'sem');
+  const top = (campo: keyof ConexaoLinha) => reais.slice().sort((a, b) => (b[campo] as number) - (a[campo] as number))[0];
+  const menorTempo = reais.filter((l) => l.primeiraRespostaMin != null).sort((a, b) => (a.primeiraRespostaMin as number) - (b.primeiraRespostaMin as number))[0];
+  const meta = [`Organizacao: ${orgNome}`, `Periodo: ${periodoLabel}`, `Gerado: ${new Date().toLocaleString('pt-BR')}`, 'Atribuicao: conexao de aquisicao (contatos.canal_origem_id + snapshot historico)'];
+  const HCard = ({ titulo, l, valor }: { titulo: string; l?: ConexaoLinha; valor?: string }) => (
+    <Panel title={titulo}>{l ? <div className="compact-stat" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}><span className="cs-v" style={{ fontSize: 16 }}>{conexRotulo(l)}</span><span className="cs-l">{valor}</span></div> : <div className="fx-empty">Sem dados.</div>}</Panel>
+  );
+  return (
+    <>
+      <div className="sech" style={{ marginTop: 6 }}>Desempenho por conexão de WhatsApp <span style={{ fontWeight: 400, color: 'var(--muted)', fontSize: 12 }}>· por conexão de aquisição (origem preservada)</span></div>
+      <Estado q={q}>
+        {reais.length === 0 ? <Vazio titulo="Sem conexões com resultado no período" texto="Os leads são atribuídos à conexão de aquisição do contato; conexões removidas mantêm o histórico via snapshot." /> : <>
+          <div className="grid-3">
+            <HCard titulo="Mais leads" l={top('leadsRecebidos')} valor={top('leadsRecebidos') ? `${fmtInt(top('leadsRecebidos').leadsRecebidos)} leads` : ''} />
+            <HCard titulo="Mais clientes fechados" l={top('fechados')} valor={top('fechados') ? `${fmtInt(top('fechados').fechados)} fechados` : ''} />
+            <HCard titulo="Melhor taxa de conversão" l={top('taxaConversao')} valor={top('taxaConversao') ? fmtPct(top('taxaConversao').taxaConversao) : ''} />
+            <HCard titulo="Melhor taxa de qualificação" l={top('taxaQualificacao')} valor={top('taxaQualificacao') ? fmtPct(top('taxaQualificacao').taxaQualificacao) : ''} />
+            <HCard titulo="Maior receita recebida" l={top('receitaRecebida')} valor={top('receitaRecebida') ? fmtBRL(top('receitaRecebida').receitaRecebida) : ''} />
+            <HCard titulo="Menor tempo de 1ª resposta" l={menorTempo} valor={menorTempo ? fmtMin(menorTempo.primeiraRespostaMin) : ''} />
+          </div>
+          {frasesConexoes(linhas).length > 0 && <Panel title="Comparação entre conexões"><ul className="narr">{frasesConexoes(linhas).map((s, i) => <li key={i}>{s}</li>)}</ul></Panel>}
+          <DataTable
+            cols={[
+              { key: 'nome', label: 'Conexão', fmt: (_v, r) => conexRotulo(r as unknown as ConexaoLinha), csv: (r) => conexRotulo(r as unknown as ConexaoLinha) },
+              { key: 'tipo', label: 'Origem / gestor', fmt: (_v, r) => `${tipoNome(String(r.tipo || ''))}${r.gestor ? ' · ' + r.gestor : ''}`, csv: (r) => `${tipoNome(String(r.tipo || ''))}${r.gestor ? ' / ' + r.gestor : ''}` },
+              { key: 'leadsRecebidos', label: 'Leads', align: 'c' },
+              { key: 'conversas', label: 'Conversas', align: 'c' },
+              { key: 'conversasAtendidas', label: 'Atendidas', align: 'c' },
+              { key: 'semResposta', label: 'Sem resp.', align: 'c' },
+              { key: 'oportunidades', label: 'Oport.', align: 'c' },
+              { key: 'qualificados', label: 'Qualific.', align: 'c' },
+              { key: 'fechados', label: 'Fechados', align: 'c' },
+              { key: 'perdidos', label: 'Perdidos', align: 'c' },
+              { key: 'taxaAtendimento', label: 'Tx atend.', align: 'c', fmt: (v) => fmtPct(v as number), csv: (r) => (r.taxaAtendimento as number).toFixed(1) },
+              { key: 'taxaQualificacao', label: 'Tx qualif.', align: 'c', fmt: (v) => fmtPct(v as number), csv: (r) => (r.taxaQualificacao as number).toFixed(1) },
+              { key: 'taxaConversao', label: 'Tx conv.', align: 'c', fmt: (v) => fmtPct(v as number), csv: (r) => (r.taxaConversao as number).toFixed(1) },
+              { key: 'primeiraRespostaMin', label: '1ª resposta', align: 'c', fmt: (v) => fmtMin(v as number | null), csv: (r) => (r.primeiraRespostaMin == null ? '' : Math.round(r.primeiraRespostaMin as number).toString()) },
+              { key: 'tempoAteFechamentoDias', label: 'Até fechar (d)', align: 'c', fmt: (v) => (v == null ? '—' : (v as number).toFixed(1)), csv: (r) => (r.tempoAteFechamentoDias == null ? '' : (r.tempoAteFechamentoDias as number).toFixed(1)) },
+              { key: 'receitaPrevista', label: 'Rec. prevista', align: 'r', fmt: (v) => fmtBRL(v as number), csv: (r) => (r.receitaPrevista as number).toFixed(2) },
+              { key: 'receitaRecebida', label: 'Rec. recebida', align: 'r', fmt: (v) => fmtBRL(v as number), csv: (r) => (r.receitaRecebida as number).toFixed(2) },
+              { key: 'valoresAtraso', label: 'Em atraso', align: 'r', fmt: (v) => fmtBRL(v as number), csv: (r) => (r.valoresAtraso as number).toFixed(2) },
+              { key: 'economia', label: 'Economia', align: 'r', fmt: (_v, r) => (r.economiaPreenchida ? fmtBRL(r.economia as number) : '—'), csv: (r) => (r.economiaPreenchida ? (r.economia as number).toFixed(2) : '') },
+              { key: 'ticketMedio', label: 'Ticket médio', align: 'r', fmt: (v) => fmtBRL(v as number), csv: (r) => (r.ticketMedio as number).toFixed(2) },
+            ] as Col<Record<string, unknown>>[]}
+            rows={linhas as unknown as Record<string, unknown>[]} searchKeys={['nome', 'numero', 'tipo']}
+            csvName={`conexoes_${periodoLabel.replace(/\D/g, '')}`} csvMeta={meta} />
+        </>}
+      </Estado>
+    </>
   );
 }
 
