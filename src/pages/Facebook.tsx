@@ -569,7 +569,7 @@ function FacebookInbox() {
       <ScriptSequenceModal
         open={!!scriptSeq} onClose={() => setScriptSeq(null)} script={scriptSeq} canal="facebook"
         conversaId={current.id} incluirMidia
-        ctx={{ cliente: current.name, atendente: user?.name, empresa: currentOrg.name, telefone: '' }}
+        ctx={{ cliente: current.name, atendente: (user?.name || '').trim() || 'Atendente', emailAtendente: user?.email, empresa: currentOrg.name, telefone: '' }}
         enviarEtapa={async (texto) => { await sendMut.mutateAsync({ conversaId: current.id, texto }); }}
         enviarMidia={async (m) => { await sendMedia.mutateAsync({ conversaId: current.id, etapaId: m.etapaId, texto: m.texto }); }}
       />

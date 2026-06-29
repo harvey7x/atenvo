@@ -122,14 +122,24 @@ export function useScriptMutations() {
 }
 
 /* ===================== Variáveis ===================== */
-export interface VarCtx { cliente?: string; atendente?: string; empresa?: string; telefone?: string; }
-/** Substitui {{nome_cliente}}, {{seu_nome}}, {{empresa}}, {{telefone}}, {{data_atual}} (e aliases). */
+// Fonte única de interpolação (prévia, modal de envio, envio unitário, sequência, WhatsApp e Facebook).
+// `atendente` deve vir SEMPRE de usuarios.nome (resolvido no AuthContext) — nunca o e-mail.
+// O e-mail só aparece quando o template usa explicitamente {{email_atendente}}.
+export interface VarCtx { cliente?: string; atendente?: string; emailAtendente?: string; empresa?: string; telefone?: string; }
+/** Substitui {{nome_cliente}}, {{primeiro_nome_cliente}}, {{nome_atendente}}/{{seu_nome}},
+ *  {{email_atendente}}, {{nome_empresa}}/{{empresa}}, {{telefone}}, {{data_atual}} (e aliases). */
 export function substituirVariaveis(texto: string, ctx: VarCtx): string {
   const hoje = new Date().toLocaleDateString('pt-BR');
+  const cliente = ctx.cliente ?? '';
+  const primeiroNomeCliente = cliente.trim().split(/\s+/)[0] ?? '';
+  const atendente = ctx.atendente ?? '';
+  const empresa = ctx.empresa ?? '';
   const tabela: Record<string, string> = {
-    nome_cliente: ctx.cliente ?? '', cliente: ctx.cliente ?? '',
-    seu_nome: ctx.atendente ?? '', atendente: ctx.atendente ?? '',
-    empresa: ctx.empresa ?? '', telefone: ctx.telefone ?? '', data_atual: hoje,
+    nome_cliente: cliente, cliente, primeiro_nome_cliente: primeiroNomeCliente,
+    nome_atendente: atendente, seu_nome: atendente, atendente,
+    email_atendente: ctx.emailAtendente ?? '',
+    nome_empresa: empresa, empresa,
+    telefone: ctx.telefone ?? '', data_atual: hoje,
   };
   return texto.replace(/\{\{\s*([a-zA-Z_]+)\s*\}\}/g, (m, k: string) => {
     const key = k.toLowerCase();
@@ -137,7 +147,7 @@ export function substituirVariaveis(texto: string, ctx: VarCtx): string {
   });
 }
 
-export const SCRIPT_VARIAVEIS = ['{{nome_cliente}}', '{{seu_nome}}', '{{empresa}}', '{{telefone}}', '{{data_atual}}'];
+export const SCRIPT_VARIAVEIS = ['{{nome_cliente}}', '{{primeiro_nome_cliente}}', '{{nome_atendente}}', '{{email_atendente}}', '{{nome_empresa}}', '{{telefone}}', '{{data_atual}}'];
 
 /* ===================== Mídia / Anexos (Supabase Storage privado) ===================== */
 export const SCRIPT_BUCKET = 'script-midia';

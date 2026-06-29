@@ -16,9 +16,26 @@ interface AuthState {
   user: SessionUser | null;
   signIn: (email: string, password: string) => Promise<{ error: string | null; reason: SignInReason }>;
   signOut: () => Promise<void>;
+  /** Recarrega o nome do perfil (usuarios.nome) sem exigir logout — usar após salvar o perfil. */
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
+
+/** Monta o SessionUser resolvendo o nome com prioridade: usuarios.nome -> metadados do Auth -> ''.
+ *  NUNCA usa o e-mail como nome (o e-mail tem seu próprio campo). */
+async function buildSessionUser(u: { id: string; email?: string | null; user_metadata?: Record<string, unknown> } | null | undefined): Promise<SessionUser | null> {
+  if (!u) return null;
+  const metaName = ((u.user_metadata?.name as string | undefined) ?? '').trim();
+  let nome = '';
+  if (supabase) {
+    try {
+      const { data } = await supabase.from('usuarios').select('nome').eq('id', u.id).maybeSingle();
+      nome = ((data?.nome as string | undefined) ?? '').trim();
+    } catch { /* mantém metaName */ }
+  }
+  return { id: u.id, email: u.email ?? '', name: nome || metaName || '' };
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const mode: AuthMode = isSupabaseConfigured ? 'supabase' : 'mock';
@@ -28,15 +45,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let active = true;
     if (mode === 'supabase' && supabase) {
-      supabase.auth.getSession().then(({ data }) => {
+      supabase.auth.getSession().then(async ({ data }) => {
+        const su = await buildSessionUser(data.session?.user);
         if (!active) return;
-        const u = data.session?.user;
-        setUser(u ? { id: u.id, email: u.email ?? '', name: (u.user_metadata?.name as string) ?? u.email ?? 'Usuário' } : null);
+        setUser(su);
         setLoading(false);
       });
       const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
-        const u = session?.user;
-        setUser(u ? { id: u.id, email: u.email ?? '', name: (u.user_metadata?.name as string) ?? u.email ?? 'Usuário' } : null);
+        buildSessionUser(session?.user).then((su) => { if (active) setUser(su); });
       });
       return () => { active = false; sub.subscription.unsubscribe(); };
     }
@@ -79,7 +95,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const value = useMemo<AuthState>(() => ({ mode, loading, user, signIn, signOut }), [mode, loading, user]);
+  const refreshProfile: AuthState['refreshProfile'] = async () => {
+    if (mode !== 'supabase' || !supabase) return;
+    const { data } = await supabase.auth.getUser();
+    setUser(await buildSessionUser(data.user));
+  };
+
+  const value = useMemo<AuthState>(() => ({ mode, loading, user, signIn, signOut, refreshProfile }), [mode, loading, user]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

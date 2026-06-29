@@ -1000,7 +1000,7 @@ export function WhatsApp() {
       <ScriptSequenceModal
         open={!!scriptSeq} onClose={() => setScriptSeq(null)} script={scriptSeq} canal="whatsapp"
         conversaId={currentId}
-        ctx={{ cliente: current.name, atendente: user?.name, empresa: currentOrg.name, telefone: current.phone }}
+        ctx={{ cliente: current.name, atendente: (user?.name || '').trim() || 'Atendente', emailAtendente: user?.email, empresa: currentOrg.name, telefone: current.phone }}
         enviarEtapa={async (texto) => await sendMut.mutateAsync({ conversaId: currentId, text: texto, canalId: replyCanalId || current.canalId, assinaturaNome: assinaturaNome || undefined }) ?? undefined}
         confirmar={(mensagemId) => aguardarConfirmacaoEnvio(mensagemId)}
       />

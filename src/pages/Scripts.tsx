@@ -128,7 +128,7 @@ export function Scripts() {
   const current = scripts.find((s) => s.id === currentId) ?? VAZIO;
 
   // contexto para preview (dados demonstrativos)
-  const previewCtx = { cliente: 'Maria Silva', atendente: user?.name || 'Você', empresa: currentOrg.name || 'Empresa', telefone: '(11) 99999-9999' };
+  const previewCtx = { cliente: 'Maria Silva', atendente: (user?.name || '').trim() || 'Atendente', emailAtendente: user?.email, empresa: currentOrg.name || 'Empresa', telefone: '(11) 99999-9999' };
 
   /* ---------- abertura do construtor ---------- */
   function prefillCanal(): { wa: boolean; fb: boolean } {

@@ -32,7 +32,7 @@ export function Sidebar() {
   const { user } = useAuth();
   const { currentOrg } = useOrg();
   const navigate = useNavigate();
-  const name = user?.name ?? 'Usuário';
+  const name = (user?.name || '').trim() || 'Usuário';
 
   return (
     <aside className="sidebar">

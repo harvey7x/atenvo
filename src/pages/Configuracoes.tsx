@@ -119,7 +119,7 @@ function DemoReset() {
 function ContaPanel({ podeGerenciar }: { podeGerenciar: boolean }) {
   const { toast } = useToast();
   const { currentOrg } = useOrg();
-  const { user } = useAuth();
+  const { user, refreshProfile } = useAuth();
   const perfilQ = useMeuPerfil();
   const salvar = useSalvarPerfil();
   const orgQ = useOrgFull();
@@ -136,7 +136,11 @@ function ContaPanel({ podeGerenciar }: { podeGerenciar: boolean }) {
   useEffect(() => { if (orgQ.data) setOrg({ nome: orgQ.data.nome, nomeFantasia: orgQ.data.nomeFantasia, documento: orgQ.data.documento, telefone: orgQ.data.telefone, email: orgQ.data.email, timezone: orgQ.data.timezone, moeda: orgQ.data.moeda }); }, [orgQ.data]);
 
   async function salvarPerfil() {
-    try { await salvar.mutateAsync({ nome: form.nome, telefone: form.telefone, cargo: form.cargo }); toast('Perfil salvo'); }
+    try {
+      await salvar.mutateAsync({ nome: form.nome, telefone: form.telefone, cargo: form.cargo });
+      await refreshProfile(); // atualiza nome no contexto global (sidebar/scripts) sem exigir relogin
+      toast('Perfil salvo');
+    }
     catch (e) { toast(traduzCfg((e as Error).message), 'warn'); }
   }
   async function trocarFoto(file: File) {
