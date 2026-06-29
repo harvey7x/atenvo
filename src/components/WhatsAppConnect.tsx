@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { waCreateInstance, waQr, waStatus, waRemove } from '@/data/whatsapp';
+import { waCreateInstance, waReconnect, waQr, waStatus, waRemove } from '@/data/whatsapp';
 import { useToast } from '@/hooks/useToast';
 
 const FONTES: { slug: string; nome: string }[] = [
@@ -12,7 +12,7 @@ const FONTES: { slug: string; nome: string }[] = [
 
 type Stage = 'form' | 'qr' | 'connected';
 
-export function WhatsAppConnect({ orgId, onClose, onConnected }: { orgId: string; onClose: () => void; onConnected: () => void }) {
+export function WhatsAppConnect({ orgId, onClose, onConnected, reconnectCanalId, reconnectAlias }: { orgId: string; onClose: () => void; onConnected: () => void; reconnectCanalId?: string; reconnectAlias?: string }) {
   const { toast } = useToast();
   const [stage, setStage] = useState<Stage>('form');
   const [alias, setAlias] = useState('');
@@ -26,10 +26,11 @@ export function WhatsAppConnect({ orgId, onClose, onConnected }: { orgId: string
 
   async function start() {
     if (busy) return; // impede cliques duplicados (uma criação por vez)
-    if (!alias.trim()) { toast('Informe o alias do canal.'); return; }
+    if (!reconnectCanalId && !alias.trim()) { toast('Informe o alias do canal.'); return; }
     setBusy(true);
     try {
-      const r = await waCreateInstance(orgId, alias.trim(), fonte);
+      // reconexão reusa o MESMO canal histórico; criação nova insere um canal.
+      const r = reconnectCanalId ? await waReconnect(orgId, reconnectCanalId) : await waCreateInstance(orgId, alias.trim(), fonte);
       canalId.current = r.canal_id;
       setQr(r.qr_base64);
       setSecs(r.expires_in || 60);
@@ -41,6 +42,12 @@ export function WhatsAppConnect({ orgId, onClose, onConnected }: { orgId: string
       setBusy(false);
     }
   }
+
+  // reconexão: dispara automaticamente ao abrir (reusa o canal; não pede alias/fonte).
+  useEffect(() => {
+    if (reconnectCanalId) void start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function refreshQr() {
     if (!canalId.current) return;
@@ -97,13 +104,15 @@ export function WhatsAppConnect({ orgId, onClose, onConnected }: { orgId: string
         <div className="modal-head">
           <div>
             <div className="modal-kicker">Conector WhatsApp por QR Code</div>
-            <h3>{stage === 'connected' ? 'WhatsApp conectado' : 'Conectar WhatsApp'}</h3>
+            <h3>{stage === 'connected' ? 'WhatsApp conectado' : reconnectCanalId ? 'Reconectar WhatsApp' : 'Conectar WhatsApp'}</h3>
           </div>
           <button className="modal-x" aria-label="Fechar" onClick={cancel}>×</button>
         </div>
 
         <div className="modal-body">
-          {stage === 'form' && (
+          {stage === 'form' && (reconnectCanalId ? (
+            <p className="lead">Reconectando {reconnectAlias || 'a conexão'}… gerando o QR Code. O histórico (conversas, contatos e relatórios) é preservado no mesmo canal.</p>
+          ) : (
             <>
               <p className="lead">Conecte um número lendo o QR Code pelo aplicativo do WhatsApp. Nenhuma senha é digitada aqui.</p>
               <div className="field" style={{ marginBottom: 14 }}>
@@ -117,7 +126,7 @@ export function WhatsAppConnect({ orgId, onClose, onConnected }: { orgId: string
                 </select>
               </div>
             </>
-          )}
+          ))}
 
           {stage === 'qr' && (
             <div style={{ textAlign: 'center' }}>
@@ -153,7 +162,9 @@ export function WhatsAppConnect({ orgId, onClose, onConnected }: { orgId: string
           {stage === 'form' && (<>
             <button className="btn-ghost" onClick={cancel}>Cancelar</button>
             <span className="sp" />
-            <button className="btn-primary" disabled={busy} onClick={start}>{busy ? 'Criando instância…' : 'Conectar WhatsApp'}</button>
+            {reconnectCanalId
+              ? <button className="btn-primary" disabled>{busy ? 'Gerando QR…' : 'Reconectando…'}</button>
+              : <button className="btn-primary" disabled={busy} onClick={start}>{busy ? 'Criando instância…' : 'Conectar WhatsApp'}</button>}
           </>)}
           {stage === 'qr' && (<>
             <button className="btn-ghost" onClick={cancel}>Cancelar</button>

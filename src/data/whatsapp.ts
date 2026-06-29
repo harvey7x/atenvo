@@ -36,8 +36,12 @@ export const waStatus = (orgId: string, canalId: string) =>
   invoke<{ state: string; connected: boolean; numero?: string }>('evolution-manage', { action: 'status', organizacao_id: orgId, canal_id: canalId });
 export const waDisconnect = (orgId: string, canalId: string) =>
   invoke<{ ok: boolean }>('evolution-manage', { action: 'disconnect', organizacao_id: orgId, canal_id: canalId });
+/** "Desconectar": encerra a sessão/instância e desativa o canal — PRESERVA todo o histórico (não apaga o canal). */
 export const waRemove = (orgId: string, canalId: string) =>
   invoke<{ ok: boolean }>('evolution-manage', { action: 'remove', organizacao_id: orgId, canal_id: canalId });
+/** Reconectar: reusa o MESMO canal histórico e cria uma nova instância Evolution (novo QR). */
+export const waReconnect = (orgId: string, canalId: string) =>
+  invoke<CreateResult>('evolution-manage', { action: 'reconnect', organizacao_id: orgId, canal_id: canalId });
 
 /** Remove uma mensagem de SAÍDA com falha (não entregue) via RPC segura. Retorna a conversa afetada.
  *  A RPC valida auth/organização/acesso e recusa mensagens entregues, lidas ou de entrada. */

@@ -94,8 +94,41 @@ Deno.serve(async (req) => {
     if (!canalId) return json({ error: 'canal_id é obrigatório.' }, 400);
     const { data: canal } = await admin.from('canais')
       .select('id, instancia_externa, organizacao_id').eq('id', canalId).eq('organizacao_id', orgId).maybeSingle();
-    if (!canal?.instancia_externa) return json({ error: 'Canal não encontrado.' }, 404);
+    if (!canal) return json({ error: 'Canal não encontrado.' }, 404);
+
+    // RECONNECT: reusa o MESMO canal histórico (preserva nome/origem/gestor/relatórios) e cria uma
+    // NOVA instância Evolution. Usado quando o canal está desconectado (sem sessão).
+    if (action === 'reconnect') {
+      const { data: org } = await admin.from('organizacoes').select('assinatura_status').eq('id', orgId).single();
+      if (!org || !['ativa', 'isenta'].includes(org.assinatura_status)) {
+        return json({ error: 'Assinatura inativa. Assine o plano antes de reconectar.' }, 402);
+      }
+      // reativar consome 1 vaga (canal estava ativo=false). Valida o limite efetivo (incluídos+adicionais).
+      const { data: lim } = await admin.from('organizacao_limites').select('limite_whatsapps').eq('organizacao_id', orgId).single();
+      const { count: usados } = await admin.from('canais')
+        .select('id', { count: 'exact', head: true })
+        .eq('organizacao_id', orgId).eq('tipo', 'whatsapp').eq('ativo', true);
+      if ((usados ?? 0) >= (lim?.limite_whatsapps ?? 0)) {
+        return json({ error: 'Limite de WhatsApp atingido. Contrate um adicional ou desconecte outro número.' }, 409);
+      }
+      const instanceName = `atenvo_${canalId.replace(/-/g, '')}_${Date.now().toString(36)}`;
+      await admin.from('canais').update({ instancia_externa: instanceName, status_integracao: 'sincronizando', ativo: true }).eq('id', canalId);
+      await admin.from('integracoes').insert({ provedor: 'evolution', canal_id: canalId, organizacao_id: orgId, status: 'sincronizando', config: { instance: instanceName } });
+      try {
+        const created = await evolution.createInstance(instanceName, webhookUrl);
+        try { await evolution.setWebhook(instanceName, webhookUrl); } catch { /* tolerante */ }
+        let qr = extractQr(created);
+        if (!qr) { qr = extractQr(await evolution.connect(instanceName)); }
+        return json({ canal_id: canalId, instance: instanceName, qr_base64: qr, expires_in: QR_TTL });
+      } catch (e) {
+        await admin.from('integracoes').delete().eq('canal_id', canalId);
+        await admin.from('canais').update({ status_integracao: 'desconectado', ativo: false, instancia_externa: null }).eq('id', canalId);
+        return json({ error: `Falha ao criar instância: ${(e as Error).message}` }, 502);
+      }
+    }
+
     const instance = canal.instancia_externa as string;
+    if (!instance) return json({ error: 'Canal sem sessão ativa. Use Reconectar.' }, 409);
 
     if (action === 'qr') {
       // Toda RECONEXÃO re-aplica o webhook ATUAL (URL/segredo nunca defasados) antes de gerar o QR.
@@ -133,15 +166,15 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'remove') {
-      // EXCLUSÃO DEFINITIVA: apaga a instância na Evolution e EXCLUI o registro local da integração.
-      // 1) provedor: remove a instância (libera sessão/QR/token). Tolerante: pode já não existir.
-      try { await evolution.remove(instance); } catch { /* instância pode já estar removida */ }
-      // 2) banco: apaga integracoes e o canal. Conversas/oportunidades ficam com canal_id = null (FK SET NULL),
-      //    preservando o histórico. fichas_judiciais (FK NO ACTION) precisa ser desvinculada antes.
-      await admin.from('integracoes').delete().eq('canal_id', canalId);
-      await admin.from('fichas_judiciais').update({ canal_id: null }).eq('canal_id', canalId);
-      const { error: delErr } = await admin.from('canais').delete().eq('id', canalId);
-      if (delErr) return json({ error: `Falha ao excluir o canal: ${delErr.message}` }, 500);
+      // DESCONEXÃO (não é mais exclusão): encerra a sessão/instância na Evolution e DESATIVA o canal,
+      // PRESERVANDO todo o histórico — canal, conversas, mensagens, contatos, oportunidades, cobranças,
+      // origem, métricas/relatórios, snapshots e a configuração comercial do chip. NÃO faz DELETE em canais.
+      try { await evolution.logout(instance); } catch { /* já pode estar desconectada */ }
+      try { await evolution.remove(instance); } catch { /* instância pode já não existir */ }
+      await admin.from('integracoes').delete().eq('canal_id', canalId); // registro técnico descartável
+      await admin.from('canais').update({
+        status_integracao: 'desconectado', ativo: false, instancia_externa: null,
+      }).eq('id', canalId);
       return json({ ok: true });
     }
 

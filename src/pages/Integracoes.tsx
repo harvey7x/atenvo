@@ -57,6 +57,8 @@ export function Integracoes() {
   const [remocao, setRemocao] = useState<{ tipo: 'whatsapp' | 'facebook'; id: string; nome: string } | null>(null);
   const [remLoading, setRemLoading] = useState(false);
   const [config, setConfig] = useState<WaCanal | null>(null);
+  const [waFiltro, setWaFiltro] = useState<'ativos' | 'desconectados' | 'todos'>('ativos');
+  const [reconectar, setReconectar] = useState<{ id: string; alias: string } | null>(null);
   const podeConfig = currentOrg.role === 'admin' || currentOrg.role === 'gestor';
 
   async function confirmarRemocao() {
@@ -65,7 +67,7 @@ export function Integracoes() {
     try {
       if (remocao.tipo === 'whatsapp') await waRemove(currentOrg.id, remocao.id);
       else await fbDisconnect(remocao.id);
-      toast('Conexão removida.'); refresh(); setRemocao(null);
+      toast(remocao.tipo === 'whatsapp' ? 'WhatsApp desconectado. Histórico preservado.' : 'Conexão removida.'); refresh(); setRemocao(null);
     } catch (e) {
       // Falha parcial: não fingir sucesso — mantém o item, registra o erro técnico e avisa o usuário.
       console.error('[integracoes] falha ao remover conexão', remocao, e);
@@ -76,6 +78,10 @@ export function Integracoes() {
 
   const canais = waCanais.data ?? [];
   const conectados = canais.filter((c) => c.status === 'conectado').length;
+  // Ativos = conectado/sincronizando; o resto (desconectado/erro/atenção) é histórico preservado.
+  const ehAtivo = (s: string) => s === 'conectado' || s === 'sincronizando';
+  const canaisVis = canais.filter((c) => waFiltro === 'todos' ? true : waFiltro === 'ativos' ? ehAtivo(c.status) : !ehAtivo(c.status));
+  const nDesconectados = canais.filter((c) => !ehAtivo(c.status)).length;
   // Limite/contagem na MESMA fonte do backend (organizacao_limites + canais ativos). Sem número fixo no frontend.
   const waUsados = waLimite.data?.usados ?? canais.length;
   const waLimiteEfetivo = waLimite.data?.limite ?? 0;
@@ -166,31 +172,45 @@ export function Integracoes() {
                 ) : canais.length === 0 ? (
                   <div className="adapter-note"><IcInfo /><div className="tx">Nenhum número conectado ainda. Clique em <b>Conectar WhatsApp</b> para ler o QR Code.</div></div>
                 ) : (
-                  <div className="conn-list">
-                    {canais.map((c) => {
-                      const st = WA_ST[c.status] || { t: c.status, cls: 'neutral' };
-                      const removendo = remLoading && remocao?.tipo === 'whatsapp' && remocao?.id === c.id;
-                      return (
-                        <div className="conn-row" key={c.id}>
-                          <div className="conn-info">
-                            <span className="conn-name">{c.alias}</span>
-                            <span className="conn-sub">
-                              {c.numero ? mascararNumero(c.numero) : 'Número não identificado'}
-                              {tipoOrigemLabel(c.origemTipo) ? ` · ${tipoOrigemLabel(c.origemTipo)}` : ''}
-                              {c.gestorNome ? ` · Gestor: ${c.gestorNome}` : ''}
-                            </span>
-                            {!c.origemTipo && !c.gestorId && <span className="conn-sub" style={{ color: 'var(--warn)' }}>Origem comercial não configurada</span>}
+                  <>
+                    <div className="conn-actions" style={{ marginBottom: 10 }}>
+                      {(['ativos', 'desconectados', 'todos'] as const).map((f) => (
+                        <button key={f} className={'btn-sm' + (waFiltro === f ? ' acc' : '')} onClick={() => setWaFiltro(f)}>
+                          {f === 'ativos' ? 'Ativos' : f === 'desconectados' ? `Desconectados${nDesconectados ? ` (${nDesconectados})` : ''}` : 'Todos'}
+                        </button>
+                      ))}
+                    </div>
+                    {canaisVis.length === 0 ? (
+                      <div className="adapter-note"><IcInfo /><div className="tx">Nenhuma conexão neste filtro.</div></div>
+                    ) : (
+                    <div className="conn-list">
+                      {canaisVis.map((c) => {
+                        const st = WA_ST[c.status] || { t: c.status, cls: 'neutral' };
+                        const ativo = ehAtivo(c.status);
+                        const removendo = remLoading && remocao?.tipo === 'whatsapp' && remocao?.id === c.id;
+                        return (
+                          <div className="conn-row" key={c.id}>
+                            <div className="conn-info">
+                              <span className="conn-name">{c.alias}</span>
+                              <span className="conn-sub">
+                                {c.numero ? mascararNumero(c.numero) : 'Número não identificado'}
+                                {tipoOrigemLabel(c.origemTipo) ? ` · ${tipoOrigemLabel(c.origemTipo)}` : ''}
+                                {c.gestorNome ? ` · Gestor: ${c.gestorNome}` : ''}
+                              </span>
+                              {!c.origemTipo && !c.gestorId && <span className="conn-sub" style={{ color: 'var(--warn)' }}>Origem comercial não configurada</span>}
+                            </div>
+                            <div className="conn-actions">
+                              <span className={'badge ' + st.cls}>{st.dot && <span className="dot" />}{st.t}</span>
+                              {podeConfig && <button className="btn-sm" disabled={removendo} onClick={() => setConfig(c)}>Configurar origem comercial</button>}
+                              {podeConfig && !ativo && <button className="btn-sm acc" disabled={removendo || waCheio} title={waCheio ? 'Limite atingido — desconecte outro número ou contrate um adicional.' : undefined} onClick={() => setReconectar({ id: c.id, alias: c.alias })}>Reconectar</button>}
+                              {podeConfig && ativo && <button className="btn-sm danger" disabled={removendo} onClick={() => setRemocao({ tipo: 'whatsapp', id: c.id, nome: c.alias + (c.numero ? ' · ' + mascararNumero(c.numero) : '') })}>{removendo ? 'Desconectando…' : 'Desconectar'}</button>}
+                            </div>
                           </div>
-                          <div className="conn-actions">
-                            <span className={'badge ' + st.cls}>{st.dot && <span className="dot" />}{st.t}</span>
-                            {podeConfig && <button className="btn-sm" disabled={removendo} onClick={() => setConfig(c)}>Configurar origem comercial</button>}
-                            {c.status === 'conectado' && <button className="btn-sm" disabled={removendo} onClick={() => setWaOpen(true)}>Reconectar</button>}
-                            <button className="btn-sm danger" disabled={removendo} onClick={() => setRemocao({ tipo: 'whatsapp', id: c.id, nome: c.alias + (c.numero ? ' · ' + mascararNumero(c.numero) : '') })}>{removendo ? 'Removendo…' : 'Remover conexão'}</button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                        );
+                      })}
+                    </div>
+                    )}
+                  </>
                 )}
               </div>
               <div className="ic-foot">
@@ -286,12 +306,20 @@ export function Integracoes() {
       {waOpen && (
         <WhatsAppConnect orgId={currentOrg.id} onClose={() => setWaOpen(false)} onConnected={refresh} />
       )}
+      {reconectar && (
+        <WhatsAppConnect orgId={currentOrg.id} reconnectCanalId={reconectar.id} reconnectAlias={reconectar.alias}
+          onClose={() => setReconectar(null)} onConnected={refresh} />
+      )}
 
       <ConfirmDialog
         open={!!remocao}
-        title="Remover conexão?"
-        message={remocao ? `A conexão "${remocao.nome}" será desconectada do provedor e deixará de aparecer na lista. O histórico de conversas e mensagens é preservado. Esta ação não pode ser desfeita.` : ''}
-        destructive loading={remLoading} confirmLabel="Remover conexão" cancelLabel="Cancelar"
+        title={remocao?.tipo === 'whatsapp' ? 'Desconectar WhatsApp?' : 'Remover conexão?'}
+        message={remocao
+          ? (remocao.tipo === 'whatsapp'
+              ? `A conexão "${remocao.nome}" será encerrada, mas conversas, contatos, histórico e relatórios serão preservados. Você poderá reconectar o mesmo número depois.`
+              : `A conexão "${remocao.nome}" será desconectada do provedor e deixará de aparecer na lista. O histórico de conversas e mensagens é preservado.`)
+          : ''}
+        destructive loading={remLoading} confirmLabel={remocao?.tipo === 'whatsapp' ? 'Desconectar' : 'Remover conexão'} cancelLabel="Cancelar"
         onConfirm={confirmarRemocao} onCancel={() => { if (!remLoading) setRemocao(null); }} />
 
       {config && <ConfigOrigemModal canal={config} onClose={() => setConfig(null)} onSaved={() => { setConfig(null); qc.invalidateQueries({ queryKey: ['wa-canais', currentOrg.id] }); qc.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).startsWith('rel-') }); toast('Configuração salva.'); }} />}
