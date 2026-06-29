@@ -408,7 +408,9 @@ function SecaoConexoes({ f, periodoLabel, orgNome }: { f: RelFiltros; periodoLab
           <DataTable
             cols={[
               { key: 'nome', label: 'Conexão', fmt: (_v, r) => conexRotulo(r as unknown as ConexaoLinha), csv: (r) => conexRotulo(r as unknown as ConexaoLinha) },
-              { key: 'tipo', label: 'Origem / gestor', fmt: (_v, r) => `${tipoNome(String(r.tipo || ''))}${r.gestor ? ' · ' + r.gestor : ''}`, csv: (r) => `${tipoNome(String(r.tipo || ''))}${r.gestor ? ' / ' + r.gestor : ''}` },
+              { key: 'tipo', label: 'Tipo de origem', fmt: (v) => tipoNome(String(v || '')) === '—' ? 'Não configurado' : tipoNome(String(v || '')), csv: (r) => (r.tipo ? tipoNome(String(r.tipo)) : 'Não configurado') },
+              { key: 'gestor', label: 'Gestor', fmt: (v) => (v ? String(v) : 'Não configurado'), csv: (r) => (r.gestor ? String(r.gestor) : 'Não configurado') },
+              { key: 'fonte', label: 'Fonte / campanha', fmt: (_v, r) => [r.fonte, r.campanha].filter(Boolean).join(' · ') || '—', csv: (r) => [r.fonte, r.campanha].filter(Boolean).join(' / ') },
               { key: 'leadsRecebidos', label: 'Leads', align: 'c' },
               { key: 'conversas', label: 'Conversas', align: 'c' },
               { key: 'conversasAtendidas', label: 'Atendidas', align: 'c' },

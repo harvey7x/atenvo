@@ -271,7 +271,11 @@ export function useIniciarConversaWa() {
   });
 }
 
-export interface WaCanal { id: string; alias: string; numero: string | null; status: string; provider: string | null; conectadoEm: string | null; }
+export interface WaCanal {
+  id: string; alias: string; numero: string | null; status: string; provider: string | null; conectadoEm: string | null;
+  // metadados comerciais (configuráveis em Integrações)
+  origemTipo: string | null; gestorId: string | null; gestorNome: string | null; fonteId: string | null; campanha: string | null; observacaoComercial: string | null;
+}
 export function useWaCanais() {
   const { currentOrg } = useOrg();
   return useQuery({
@@ -282,17 +286,41 @@ export function useWaCanais() {
       // evolution-manage/remove exclui o registro), então canais 'removido' não devem aparecer aqui.
       const { data, error } = await supabase!
         .from('canais')
-        .select('id, nome_interno, numero_conectado, status_integracao, provider, conectado_em')
+        .select('id, nome_interno, numero_conectado, status_integracao, provider, conectado_em, origem_tipo, gestor_id, fonte_aquisicao_id, campanha, observacao_comercial, gestor:usuarios(nome)')
         .eq('organizacao_id', currentOrg.id).eq('tipo', 'whatsapp').eq('provider', 'evolution')
         .neq('status_integracao', 'removido')
         .order('criado_em', { ascending: true });
       if (error) throw new Error(error.message);
-      type Row = { id: string; nome_interno: string | null; numero_conectado: string | null; status_integracao: string; provider: string | null; conectado_em: string | null };
+      type Row = { id: string; nome_interno: string | null; numero_conectado: string | null; status_integracao: string; provider: string | null; conectado_em: string | null; origem_tipo: string | null; gestor_id: string | null; fonte_aquisicao_id: string | null; campanha: string | null; observacao_comercial: string | null; gestor: { nome: string } | { nome: string }[] | null };
       return ((data as Row[]) ?? []).map((r) => ({
         id: r.id, alias: r.nome_interno ?? 'WhatsApp', numero: r.numero_conectado, status: r.status_integracao, provider: r.provider, conectadoEm: r.conectado_em,
+        origemTipo: r.origem_tipo, gestorId: r.gestor_id, gestorNome: (Array.isArray(r.gestor) ? r.gestor[0]?.nome : r.gestor?.nome) ?? null, fonteId: r.fonte_aquisicao_id, campanha: r.campanha, observacaoComercial: r.observacao_comercial,
       }));
     },
   });
+}
+
+/* ===================== Configuração comercial da conexão ===================== */
+export interface FonteAquisicao { id: string; nome: string }
+export function useFontesAquisicao() {
+  const { currentOrg } = useOrg();
+  return useQuery({
+    queryKey: ['fontes-aquisicao', currentOrg.id], enabled: WA_REAL,
+    queryFn: async (): Promise<FonteAquisicao[]> => {
+      const { data, error } = await supabase!.from('fontes_aquisicao').select('id, nome').eq('organizacao_id', currentOrg.id).eq('ativo', true).order('nome');
+      if (error) throw new Error(error.message);
+      return (data as FonteAquisicao[]) ?? [];
+    },
+  });
+}
+export interface ComercialInput { nome_interno: string; origem_tipo: string | null; gestor_id: string | null; fonte_aquisicao_id: string | null; campanha: string | null; observacao_comercial: string | null; }
+/** Persiste os metadados comerciais nos campos existentes de canais (sem migration). */
+export async function waUpdateComercial(canalId: string, c: ComercialInput): Promise<void> {
+  const { error } = await supabase!.from('canais').update({
+    nome_interno: c.nome_interno?.trim() || 'WhatsApp', origem_tipo: c.origem_tipo || null, gestor_id: c.gestor_id || null,
+    fonte_aquisicao_id: c.fonte_aquisicao_id || null, campanha: c.campanha?.trim() || null, observacao_comercial: c.observacao_comercial?.trim() || null,
+  }).eq('id', canalId);
+  if (error) throw new Error(error.message);
 }
 
 /** Máscara amigável de número conectado (mostra DDI/DDD e os 4 últimos dígitos). */

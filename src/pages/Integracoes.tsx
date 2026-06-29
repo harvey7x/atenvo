@@ -5,10 +5,18 @@ import { useToast } from '@/hooks/useToast';
 import { useOrg } from '@/context/OrgContext';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { WhatsAppConnect } from '@/components/WhatsAppConnect';
-import { useWaCanais, waRemove, mascararNumero } from '@/data/whatsapp';
+import { useWaCanais, waRemove, mascararNumero, useFontesAquisicao, waUpdateComercial, type WaCanal, type ComercialInput } from '@/data/whatsapp';
 import { FB_REAL, useFbStatus, fbAuthStart, fbPages, fbConnect, fbDisconnect } from '@/data/facebook';
+import { useOrgUsuarios } from '@/data/atendimento';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { Modal } from '@/components/Modal';
 import './Integracoes.css';
+
+const ORIGEM_TIPOS = [
+  { id: 'trafego', r: 'Tráfego' }, { id: 'ura', r: 'URA' }, { id: 'organico', r: 'Orgânico' },
+  { id: 'indicacao', r: 'Indicação' }, { id: 'campanha', r: 'Campanha' }, { id: 'parceiro', r: 'Parceiro' }, { id: 'outro', r: 'Outro' },
+];
+const tipoOrigemLabel = (t: string | null) => ORIGEM_TIPOS.find((x) => x.id === t)?.r || null;
 
 const IcWa = () => <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a9.9 9.9 0 0 0-8.5 15l-1.3 4.8 4.9-1.3A9.9 9.9 0 1 0 12 2z" /></svg>;
 const IcFb = () => <svg viewBox="0 0 24 24" fill="currentColor"><path d="M22 12a10 10 0 1 0-11.6 9.9v-7H8v-2.9h2.4V9.8c0-2.4 1.4-3.7 3.6-3.7 1 0 2.1.2 2.1.2v2.3h-1.2c-1.2 0-1.5.7-1.5 1.4V12H16l-.4 2.9h-2.2v7A10 10 0 0 0 22 12z" /></svg>;
@@ -47,6 +55,8 @@ export function Integracoes() {
   const [fbCode, setFbCode] = useState<string | null>(null);
   const [remocao, setRemocao] = useState<{ tipo: 'whatsapp' | 'facebook'; id: string; nome: string } | null>(null);
   const [remLoading, setRemLoading] = useState(false);
+  const [config, setConfig] = useState<WaCanal | null>(null);
+  const podeConfig = currentOrg.role === 'admin' || currentOrg.role === 'gestor';
 
   async function confirmarRemocao() {
     if (!remocao) return;
@@ -156,10 +166,16 @@ export function Integracoes() {
                         <div className="conn-row" key={c.id}>
                           <div className="conn-info">
                             <span className="conn-name">{c.alias}</span>
-                            <span className="conn-sub">{c.numero ? mascararNumero(c.numero) : 'Número não identificado'}</span>
+                            <span className="conn-sub">
+                              {c.numero ? mascararNumero(c.numero) : 'Número não identificado'}
+                              {tipoOrigemLabel(c.origemTipo) ? ` · ${tipoOrigemLabel(c.origemTipo)}` : ''}
+                              {c.gestorNome ? ` · Gestor: ${c.gestorNome}` : ''}
+                            </span>
+                            {!c.origemTipo && !c.gestorId && <span className="conn-sub" style={{ color: 'var(--warn)' }}>Origem comercial não configurada</span>}
                           </div>
                           <div className="conn-actions">
                             <span className={'badge ' + st.cls}>{st.dot && <span className="dot" />}{st.t}</span>
+                            {podeConfig && <button className="btn-sm" disabled={removendo} onClick={() => setConfig(c)}>Configurar origem comercial</button>}
                             {c.status === 'conectado' && <button className="btn-sm" disabled={removendo} onClick={() => setWaOpen(true)}>Reconectar</button>}
                             <button className="btn-sm danger" disabled={removendo} onClick={() => setRemocao({ tipo: 'whatsapp', id: c.id, nome: c.alias + (c.numero ? ' · ' + mascararNumero(c.numero) : '') })}>{removendo ? 'Removendo…' : 'Remover conexão'}</button>
                           </div>
@@ -264,6 +280,43 @@ export function Integracoes() {
         message={remocao ? `A conexão "${remocao.nome}" será desconectada do provedor e deixará de aparecer na lista. O histórico de conversas e mensagens é preservado. Esta ação não pode ser desfeita.` : ''}
         destructive loading={remLoading} confirmLabel="Remover conexão" cancelLabel="Cancelar"
         onConfirm={confirmarRemocao} onCancel={() => { if (!remLoading) setRemocao(null); }} />
+
+      {config && <ConfigOrigemModal canal={config} onClose={() => setConfig(null)} onSaved={() => { setConfig(null); qc.invalidateQueries({ queryKey: ['wa-canais', currentOrg.id] }); qc.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).startsWith('rel-') }); toast('Configuração salva.'); }} />}
     </div>
+  );
+}
+
+function ConfigOrigemModal({ canal, onClose, onSaved }: { canal: WaCanal; onClose: () => void; onSaved: () => void }) {
+  const { toast } = useToast();
+  const { data: usuarios = [] } = useOrgUsuarios();
+  const { data: fontes = [] } = useFontesAquisicao();
+  const [form, setForm] = useState<ComercialInput>({
+    nome_interno: canal.alias === 'WhatsApp' ? '' : canal.alias, origem_tipo: canal.origemTipo, gestor_id: canal.gestorId,
+    fonte_aquisicao_id: canal.fonteId, campanha: canal.campanha, observacao_comercial: canal.observacaoComercial,
+  });
+  const [busy, setBusy] = useState(false);
+  const set = (k: keyof ComercialInput, v: string) => setForm((s) => ({ ...s, [k]: v || null }));
+  async function salvar() {
+    if (busy) return; setBusy(true);
+    try { await waUpdateComercial(canal.id, { ...form, nome_interno: (form.nome_interno || '').trim() || 'WhatsApp' }); onSaved(); }
+    catch (e) { toast((e as Error).message || 'Falha ao salvar.', 'warn'); setBusy(false); }
+  }
+  return (
+    <Modal open onClose={() => { if (!busy) onClose(); }} closeOnBackdrop={!busy} width={560}
+      title={<div><div>Configurar origem comercial</div><div className="cfg-sub">{canal.numero ? mascararNumero(canal.numero) : 'Conexão de WhatsApp'}</div></div>}
+      footer={<><button className="atv-btn" disabled={busy} onClick={onClose}>Cancelar</button><button className="atv-btn primary" disabled={busy} onClick={salvar}>{busy ? 'Salvando…' : 'Salvar configuração'}</button></>}>
+      <div className="cfg-form">
+        <div className="cfg-field"><label>Nome interno da conexão</label><input className="ctrl" placeholder="Ex.: Chip 1 — Tráfego Matheus" value={form.nome_interno || ''} onChange={(e) => set('nome_interno', e.target.value)} disabled={busy} /></div>
+        <div className="cfg-2col">
+          <div className="cfg-field"><label>Tipo de origem</label><select className="ctrl" value={form.origem_tipo || ''} onChange={(e) => set('origem_tipo', e.target.value)} disabled={busy}><option value="">Não definido</option>{ORIGEM_TIPOS.map((t) => <option key={t.id} value={t.id}>{t.r}</option>)}</select></div>
+          <div className="cfg-field"><label>Gestor responsável</label><select className="ctrl" value={form.gestor_id || ''} onChange={(e) => set('gestor_id', e.target.value)} disabled={busy}><option value="">Não atribuído</option>{usuarios.map((u) => <option key={u.id} value={u.id}>{u.nome}</option>)}</select></div>
+        </div>
+        <div className="cfg-2col">
+          <div className="cfg-field"><label>Fonte de aquisição</label><select className="ctrl" value={form.fonte_aquisicao_id || ''} onChange={(e) => set('fonte_aquisicao_id', e.target.value)} disabled={busy}><option value="">Não definida</option>{fontes.map((ft) => <option key={ft.id} value={ft.id}>{ft.nome}</option>)}</select></div>
+          <div className="cfg-field"><label>Campanha</label><input className="ctrl" placeholder="Opcional" value={form.campanha || ''} onChange={(e) => set('campanha', e.target.value)} disabled={busy} /></div>
+        </div>
+        <div className="cfg-field"><label>Observação comercial</label><textarea className="ctrl cfg-ta" rows={2} value={form.observacao_comercial || ''} onChange={(e) => set('observacao_comercial', e.target.value)} disabled={busy} /></div>
+      </div>
+    </Modal>
   );
 }

@@ -446,7 +446,7 @@ export function useOrigens(f: RelFiltros, enabled: boolean) {
 }
 
 /* ====================== Desempenho por conexão (chip) ====================== */
-export interface ConexaoIdent { nome: string; numero: string; tipo: string; gestor: string; removida: boolean; }
+export interface ConexaoIdent { nome: string; numero: string; tipo: string; gestor: string; fonte: string; campanha: string; removida: boolean; }
 export interface ConexaoLinha extends ConexaoIdent {
   chave: string; novosContatos: number; leadsRecebidos: number; leadsAnterior: number; conversas: number; conversasAtendidas: number; semResposta: number;
   oportunidades: number; qualificados: number; fechados: number; perdidos: number; qualifFechados: number;
@@ -478,7 +478,7 @@ export function montaLinhasConexao(inp: ConexaoInput): ConexaoLinha[] {
   const prevMs = new Date(inp.prevIniDate + 'T00:00:00-03:00').getTime();
   const linhas: ConexaoLinha[] = [];
   for (const chave of chaves) {
-    const id = inp.identidade[chave] || { nome: chave === 'sem' ? 'Sem conexão' : 'Conexão', numero: '', tipo: '', gestor: '', removida: false };
+    const id = inp.identidade[chave] || { nome: chave === 'sem' ? 'Sem conexão' : 'Conexão', numero: '', tipo: '', gestor: '', fonte: '', campanha: '', removida: false };
     const ct = inp.contatos.filter((c) => c.chip === chave);
     const novos = ct.filter((c) => { const t = new Date(c.criadoEm).getTime(); return t >= iniMs && t < fimMs; }).length;
     const leadsAnt = ct.filter((c) => { const t = new Date(c.criadoEm).getTime(); return t >= prevMs && t < iniMs; }).length;
@@ -533,27 +533,34 @@ export function useConexoes(f: RelFiltros, enabled: boolean) {
         supabase!.from('cobrancas').select('id, contato_id, status, valor_economizado').eq('organizacao_id', org).abortSignal(signal!),
         supabase!.from('cobranca_pagamentos').select('cobranca_id, status, valor, valor_pago, data_prevista, data_pagamento').eq('organizacao_id', org).abortSignal(signal!),
         supabase!.from('funil_colunas').select('id, entrada').eq('organizacao_id', org),
-        supabase!.from('canais').select('id, nome_interno, numero_conectado, origem_tipo, gestor:usuarios(nome)').eq('organizacao_id', org),
+        supabase!.from('canais').select('id, nome_interno, numero_conectado, origem_tipo, campanha, provider, gestor:usuarios(nome), fonte:fontes_aquisicao(nome)').eq('organizacao_id', org),
       ]);
       for (const r of [ct, cv, m, op, cb, pg, fc, cx]) if (r.error) throw new Error(r.error.message);
-      const canalIdent = new Map<string, ConexaoIdent>();
-      for (const r of (cx.data as Row[]) ?? []) { const g = one(r.gestor); canalIdent.set(r.id as string, { nome: (r.nome_interno as string) || 'WhatsApp', numero: (r.numero_conectado as string) || '', tipo: (r.origem_tipo as string) || '', gestor: (g?.nome as string) || '', removida: false }); }
+      const canalIdent = new Map<string, ConexaoIdent>(); const evolutionIds = new Set<string>();
+      for (const r of (cx.data as Row[]) ?? []) {
+        const g = one(r.gestor), ft = one(r.fonte);
+        canalIdent.set(r.id as string, { nome: (r.nome_interno as string) || 'WhatsApp', numero: (r.numero_conectado as string) || '', tipo: (r.origem_tipo as string) || '', gestor: (g?.nome as string) || '', fonte: (ft?.nome as string) || '', campanha: (r.campanha as string) || '', removida: false });
+        if (r.provider === 'evolution') evolutionIds.add(r.id as string);
+      }
       const entradaIds = new Set(((fc.data as Row[]) ?? []).filter((r) => r.entrada).map((r) => r.id as string));
-      // contato → chip + identidade
+      // contato → chip + identidade (SOMENTE conexões WhatsApp = provider evolution; Facebook fica fora da seção de chips)
       const contatoChip = new Map<string, string>(); const identidade: Record<string, ConexaoIdent> = {};
-      const contatos = ((ct.data as Row[]) ?? []).filter((r) => !f.conexao || (r.canal_origem_id as string) === f.conexao).map((r) => {
+      const contatos = (((ct.data as Row[]) ?? []).filter((r) => !f.conexao || (r.canal_origem_id as string) === f.conexao).map((r) => {
         const snap = r.canal_origem_snapshot as Record<string, unknown> | null;
-        const chip = chaveConexao(r.canal_origem_id as string, snap);
+        const cid = (r.canal_origem_id as string) || null;
+        if (cid && !evolutionIds.has(cid)) return null;                 // aquisição por canal não-WhatsApp → fora
+        if (!cid && snap && snap.provider && snap.provider !== 'evolution') return null; // removido não-WhatsApp → fora
+        const chip = chaveConexao(cid, snap);
         contatoChip.set(r.id as string, chip);
         if (!identidade[chip]) {
-          if (r.canal_origem_id && canalIdent.has(r.canal_origem_id as string)) identidade[chip] = canalIdent.get(r.canal_origem_id as string)!;
-          else if (snap) identidade[chip] = { nome: (snap.nome as string) || 'Conexão removida', numero: (snap.numero as string) || '', tipo: (snap.tipo as string) || '', gestor: '', removida: true };
-          else identidade[chip] = { nome: 'Sem conexão', numero: '', tipo: '', gestor: '', removida: false };
+          if (cid && canalIdent.has(cid)) identidade[chip] = canalIdent.get(cid)!;
+          else if (snap) identidade[chip] = { nome: (snap.nome as string) || 'Conexão removida', numero: (snap.numero as string) || '', tipo: (snap.tipo as string) || '', gestor: (snap.gestor_nome as string) || '', fonte: (snap.fonte_nome as string) || '', campanha: (snap.campanha as string) || '', removida: true };
+          else identidade[chip] = { nome: 'Sem conexão', numero: '', tipo: '', gestor: '', fonte: '', campanha: '', removida: false };
         }
         return { id: r.id as string, chip, criadoEm: r.criado_em as string };
-      });
+      }).filter(Boolean)) as { id: string; chip: string; criadoEm: string }[];
       const convChip = new Map<string, string>();
-      const conversas = ((cv.data as Row[]) ?? []).map((r) => { const chip = contatoChip.get(r.contato_id as string) || 'sem'; convChip.set(r.id as string, chip); return { id: r.id as string, chip, criadoEm: r.criado_em as string }; }).filter((c) => !f.conexao || c.chip === f.conexao);
+      const conversas = (((cv.data as Row[]) ?? []).map((r) => { const chip = contatoChip.get(r.contato_id as string); if (!chip) return null; convChip.set(r.id as string, chip); return { id: r.id as string, chip, criadoEm: r.criado_em as string }; }).filter(Boolean)) as { id: string; chip: string; criadoEm: string }[];
       const convValidas = new Set(conversas.map((c) => c.id));
       const msgs = ((m.data as Row[]) ?? []).filter((r) => convValidas.has(r.conversa_id as string));
       const recebidas = msgs.filter((r) => r.direcao === 'entrada');
@@ -562,13 +569,13 @@ export function useConexoes(f: RelFiltros, enabled: boolean) {
       const resp = new Set(respHumanas.map((r) => r.conversa_id as string));
       const firstIn = recebidas.map((r) => ({ conversa: r.conversa_id as string, chip: convChip.get(r.conversa_id as string) || 'sem', t: tms(r, 'recebida_em', 'criado_em') }));
       const firstResp = respHumanas.map((r) => ({ conversa: r.conversa_id as string, chip: convChip.get(r.conversa_id as string) || 'sem', t: tms(r, 'enviada_em', 'criado_em') }));
-      const opps = ((op.data as Row[]) ?? []).map((r) => {
-        const chip = contatoChip.get(r.contato_id as string) || 'sem';
+      const opps = (((op.data as Row[]) ?? []).map((r) => {
+        const chip = contatoChip.get(r.contato_id as string); if (!chip) return null;
         const col = r.coluna_id as string | null;
         const qualificada = r.status !== 'cancelado' && !!col && !entradaIds.has(col);
         const tempoFechDias = r.status === 'ganho' && r.fechado_em ? (new Date(r.fechado_em as string).getTime() - new Date(r.criado_em as string).getTime()) / 86400000 : null;
         return { chip, status: r.status as string, qualificada, tempoFechDias };
-      }).filter((o) => !f.conexao || o.chip === f.conexao);
+      }).filter(Boolean)) as { chip: string; status: string; qualificada: boolean; tempoFechDias: number | null }[];
       const cobChip = new Map<string, string>(); const economiaPorChip: Record<string, { total: number; preenchida: boolean }> = {};
       for (const r of (cb.data as Row[]) ?? []) { const chip = contatoChip.get(r.contato_id as string); if (!chip) continue; cobChip.set(r.id as string, chip); const cur = economiaPorChip[chip] || { total: 0, preenchida: false }; if (r.valor_economizado != null) { cur.preenchida = true; cur.total += num(r.valor_economizado); } economiaPorChip[chip] = cur; }
       const parcelas = ((pg.data as Row[]) ?? []).map((r) => { const chip = cobChip.get(r.cobranca_id as string); return chip ? { chip, contato: r.cobranca_id as string, status: r.status as string, valor: num(r.valor), valorPago: r.valor_pago == null ? null : num(r.valor_pago), dataPrevista: (r.data_prevista as string) ?? null, dataPagamento: (r.data_pagamento as string) ?? null } : null; }).filter(Boolean) as ConexaoInput['parcelas'];
