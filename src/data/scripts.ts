@@ -387,9 +387,9 @@ export function traduzErroEnvio(cod?: string | null): string {
     return 'Número de destino inválido. Confira o DDD e o nono dígito.';
   if (c.includes('instância') || c.includes('instancia') || c.includes('não está disponível'))
     return 'A instância não está disponível. Tente novamente em alguns minutos.';
-  if (c.startsWith('error') || c.includes('recusou'))
-    return 'O WhatsApp recusou a entrega desta mensagem. Confira o número (DDD e nono dígito) e a conexão do canal, depois tente novamente.';
-  return 'O provedor recusou a mensagem. Tente novamente em alguns minutos.';
+  if (c === 'error' || c.startsWith('error') || c.includes('recusou') || c.includes('não confirmou a entrega'))
+    return 'O WhatsApp não confirmou a entrega desta mensagem. Verifique a conexão e o número do destinatário.';
+  return 'O WhatsApp não confirmou a entrega desta mensagem. Verifique a conexão e o número do destinatário.';
 }
 
 /**

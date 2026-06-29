@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Modal } from '@/components/Modal';
 import { useToast } from '@/hooks/useToast';
 import { fetchEtapasParaEnvio, urlAssinadaAnexo, formatarTamanho, useRegistrarExecucaoScript, type VarCtx, type EtapaTipo } from '@/data/scripts';
+import { removerMensagemFalha } from '@/data/whatsapp';
 
 type Status = 'pendente' | 'enviando' | 'ok' | 'falha';
 type Confirmado = 'enviada' | 'entregue' | 'lida';
-interface Item { posicao: number; tipo: EtapaTipo; texto: string; faltando: string[]; etapaId?: string; nome?: string | null; mime?: string | null; tamanho?: number | null; storagePath?: string | null; previewUrl?: string; removida?: boolean }
+interface Item { posicao: number; tipo: EtapaTipo; texto: string; faltando: string[]; etapaId?: string; nome?: string | null; mime?: string | null; tamanho?: number | null; storagePath?: string | null; previewUrl?: string; removida?: boolean; mensagemId?: string }
 export interface MidiaEtapa { etapaId: string; tipo: EtapaTipo; texto: string; nome?: string | null; mime?: string | null; tamanho?: number | null }
 
 interface Props {
@@ -35,7 +37,10 @@ const temPendenciaTexto = (t: string) => /\{\{\s*\w+\s*\}\}/.test(t) || /\[[^\]]
  */
 export function ScriptSequenceModal({ open, onClose, script, canal, ctx, conversaId, enviarEtapa, confirmar, enviarMidia, incluirMidia, onEnviado }: Props) {
   const { toast } = useToast();
+  const qc = useQueryClient();
   const registrar = useRegistrarExecucaoScript();
+  const taRefs = useRef<(HTMLTextAreaElement | null)[]>([]);
+  const [removendo, setRemovendo] = useState<number | null>(null);
   const [carregando, setCarregando] = useState(false);
   const [erroLoad, setErroLoad] = useState<string | null>(null);
   const [itens, setItens] = useState<Item[]>([]);
@@ -68,6 +73,29 @@ export function ScriptSequenceModal({ open, onClose, script, canal, ctx, convers
   function removerImagem(i: number) { setItens((m) => m.map((x, j) => j === i ? { ...x, removida: true } : x)); }
   function restaurarImagem(i: number) { setItens((m) => m.map((x, j) => j === i ? { ...x, removida: false } : x)); }
 
+  /** Remove uma mensagem com FALHA: apaga no banco (RPC), tira do estado do modal e da conversa,
+   *  invalida a query, recalcula o contador e fecha o modal se não restar nenhuma mensagem. */
+  async function removerFalha(i: number) {
+    if (removendo !== null) return;
+    const it = itens[i];
+    setRemovendo(i);
+    try {
+      if (it.mensagemId) await removerMensagemFalha(it.mensagemId); // banco (valida org/acesso/não-entregue)
+      const restam = itens.length - 1;
+      setItens((m) => m.filter((_, j) => j !== i));
+      setStatus((s) => s.filter((_, j) => j !== i));
+      setConfirmados((c) => c.filter((_, j) => j !== i));
+      setErros((e) => e.filter((_, j) => j !== i));
+      // some da conversa (timeline) sem reload
+      qc.invalidateQueries({ predicate: (q) => { const k = String(q.queryKey[0]); return k === 'wa-conversas' || k === 'fb-conversas'; } });
+      onEnviado?.();
+      toast('Mensagem com falha removida.');
+      if (restam === 0) onClose(); // sem mensagens pendentes → fecha
+    } catch (e) {
+      toast((e as Error).message || 'Não foi possível remover a mensagem.', 'warn');
+    } finally { setRemovendo(null); }
+  }
+
   function registrarExec(st: Status[], conf: (Confirmado | null)[], its: Item[], erroMsg: string | null) {
     if (jaReg.current || !script) return;
     const ativos = its.map((it, i) => ({ it, st: st[i], cf: conf[i] })).filter((x) => !x.it.removida);
@@ -97,6 +125,8 @@ export function ScriptSequenceModal({ open, onClose, script, canal, ctx, convers
           conf[i] = 'enviada';
         } else {
           const ref = await enviarEtapa(it.texto);
+          // guarda o id da mensagem persistida (para poder REMOVER se falhar)
+          if (typeof ref === 'string') setItens((prev) => prev.map((x, j) => j === i ? { ...x, mensagemId: ref } : x));
           if (confirmar) { if (!ref || typeof ref !== 'string') throw new Error('Envio sem identificador para confirmar.'); conf[i] = await confirmar(ref); }
           else conf[i] = 'enviada';
         }
@@ -124,12 +154,13 @@ export function ScriptSequenceModal({ open, onClose, script, canal, ctx, convers
   const todasOk = ativos.length > 0 && itens.every((it, i) => it.removida || status[i] === 'ok');
   const algumaFalha = status.some((s) => s === 'falha');
   const algumOk = status.some((s) => s === 'ok');
-  const restantes = itens.filter((it, i) => !it.removida && status[i] !== 'ok').length;
+  const proximaIdx = itens.findIndex((it, i) => !it.removida && status[i] !== 'ok');
+  const proximaPos = proximaIdx >= 0 ? itens[proximaIdx].posicao : null;
   const bloqueioPendencia = !!incluirMidia && itens.some((it, i) => !it.removida && status[i] !== 'ok' && temPendenciaTexto(it.texto));
   const labelEnviar = enviando ? 'Enviando…'
     : todasOk ? 'Enviado'
-    : algumaFalha ? `Tentar novamente (${restantes})`
-    : algumOk ? `Continuar envio (${restantes})` // parte da sequência já entregue; segue do que falta
+    : algumaFalha ? `Tentar novamente mensagem ${proximaPos ?? ''}`.trim() // só a 1ª pendente é tentada; segue daí
+    : algumOk ? 'Continuar envio'                                        // parte já entregue; continua do que falta
     : `Enviar ${ativos.length} ${ativos.length === 1 ? 'mensagem' : 'mensagens'}`;
   const canalNome = canal === 'whatsapp' ? 'WhatsApp' : 'Messenger';
 
@@ -201,13 +232,21 @@ export function ScriptSequenceModal({ open, onClose, script, canal, ctx, convers
               {!it.removida && falta && it.faltando.length > 0 && (
                 <div style={{ fontSize: 12, color: 'var(--err)', marginBottom: 6 }}>Dados ausentes: {it.faltando.join(', ')}. Edite {it.tipo === 'imagem' ? 'a legenda' : 'a mensagem'} (apenas para este envio) ou remova.</div>
               )}
-              {status[i] === 'falha' && erros[i] && <div style={{ fontSize: 12, color: 'var(--err)', marginBottom: 6 }}>Erro: {erros[i]}</div>}
+              {status[i] === 'falha' && erros[i] && <div style={{ fontSize: 12, color: 'var(--err)', marginBottom: 6 }}>{erros[i]}</div>}
 
               {!it.removida && (
-                <textarea className="atv-textarea" value={it.texto} disabled={enviando || status[i] === 'ok'}
+                <textarea ref={(el) => { taRefs.current[i] = el; }} className="atv-textarea" value={it.texto} disabled={enviando || status[i] === 'ok'}
                   placeholder={it.tipo === 'imagem' ? 'Legenda (opcional). Use {{nome_cliente}}…' : 'Mensagem'}
                   style={falta ? { borderColor: 'var(--err)' } : undefined}
                   onChange={(e) => editar(i, e.target.value)} />
+              )}
+
+              {status[i] === 'falha' && !it.removida && (
+                <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+                  <button type="button" className="atv-btn primary" disabled={enviando || removendo !== null} onClick={() => void enviarSequencia()}>Tentar novamente</button>
+                  <button type="button" className="atv-btn" disabled={enviando || removendo !== null} onClick={() => taRefs.current[i]?.focus()}>Editar</button>
+                  <button type="button" className="atv-btn danger" disabled={enviando || removendo !== null} onClick={() => void removerFalha(i)}>{removendo === i ? 'Removendo…' : 'Remover'}</button>
+                </div>
               )}
             </div>
           );
