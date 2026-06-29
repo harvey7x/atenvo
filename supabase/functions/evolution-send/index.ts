@@ -1,4 +1,7 @@
 // evolution-send — envia texto/IMAGEM/ÁUDIO/DOCUMENTO e persiste a saída.
+// v19: ÁUDIO via BASE64 (Evolution 2.3.6 recusa URL remota no /message/sendWhatsAppAudio -> "Bad Request").
+//      Baixa o arquivo do bucket e envia base64 + encoding:true (preserva MIME/ext). Erro de mídia traduzido.
+//      Imagem/documento seguem por URL assinada. Retry continua reaproveitando a mesma linha (sem duplicar).
 // v18: REVERTE o destino por LID (v17). Evidência: o ERROR não vinha do destino — o PN do contato
 //      EXISTE no WhatsApp (onWhatsApp exists:true) e a instância LUIZA falhou 7/7 (PN e LID), enquanto
 //      outras instâncias entregam normalmente no mesmo servidor. Causa = conta/sessão do número remetente,
@@ -18,6 +21,22 @@ import { adminClient, getUser } from './client.ts';
 import { evolution, evolutionConfigured } from './evolution.ts';
 
 const digits = (s?: string | null): string | null => ((s ?? '').replace(/[^0-9]/g, '') || null);
+
+// base64 (sem prefixo data URI) em blocos — seguro para arquivos grandes.
+function toBase64(bytes: Uint8Array): string {
+  let bin = ''; const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) bin += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  return btoa(bin);
+}
+// Traduz o erro técnico do provider/storage em mensagem clara ao usuário (cru fica no log).
+function traduzMidiaErro(tipo: string, m: string): string {
+  const c = (m || '').toLowerCase();
+  if (/not |connect|close|logout/.test(c)) return 'O WhatsApp deste canal desconectou. Reconecte em Integrações.';
+  if (/too large|payload|413|excede|grande/.test(c)) return tipo === 'audio' ? 'O áudio excede o tamanho permitido.' : 'O arquivo excede o tamanho permitido.';
+  if (/download|fetch| url|access|not found|404/.test(c)) return tipo === 'audio' ? 'Não foi possível acessar o arquivo de áudio.' : 'Não foi possível acessar o arquivo.';
+  if (/bad request|400|unsupported|invalid|format|mime|codec|decode/.test(c)) return tipo === 'audio' ? 'O formato deste áudio não é compatível.' : 'O formato deste arquivo não é compatível.';
+  return tipo === 'audio' ? 'A conexão do WhatsApp recusou o áudio. Tente novamente.' : 'A conexão do WhatsApp recusou o arquivo. Tente novamente.';
+}
 
 // ===== Mídia: regras centralizadas (MIME permitido, extensões, tamanho) =====
 const DOC_MIMES = [
@@ -135,18 +154,27 @@ Deno.serve(async (req) => {
       const max = tipo === 'documento' ? MAX_DOC : MAX_IMG_AUDIO;
       if (tamanho && tamanho > max) return json({ error: 'Arquivo acima do limite.' }, 422);
 
-      // URL assinada CURTA (600s) — a Evolution baixa o arquivo; NUNCA persistimos a URL.
-      const { data: signed, error: se } = await admin.storage.from('script-midia').createSignedUrl(path, 600);
-      if (se || !signed?.signedUrl) return json({ error: 'Falha ao preparar a mídia.' }, 500);
-
       let sent: { key?: { id?: string } };
       try {
-        sent = tipo === 'audio'
-          ? await evolution.sendWhatsAppAudio(instancia, alvo, signed.signedUrl)               // nota de voz (PTT, ogg/opus)
-          : tipo === 'documento'
+        if (tipo === 'audio') {
+          // ÁUDIO: Evolution 2.3.6 recusa URL remota no sendWhatsAppAudio -> enviar BASE64 do arquivo.
+          const { data: file, error: de } = await admin.storage.from('script-midia').download(path);
+          if (de || !file) return json({ error: 'Não foi possível acessar o arquivo de áudio.' }, 500);
+          const b64 = toBase64(new Uint8Array(await file.arrayBuffer()));
+          sent = await evolution.sendWhatsAppAudio(instancia, alvo, b64);                       // nota de voz (PTT); encoding:true converte p/ ogg/opus
+        } else {
+          // IMAGEM/DOCUMENTO: URL assinada CURTA (600s) — a Evolution baixa; NUNCA persistimos a URL.
+          const { data: signed, error: se } = await admin.storage.from('script-midia').createSignedUrl(path, 600);
+          if (se || !signed?.signedUrl) return json({ error: 'Falha ao preparar a mídia.' }, 500);
+          sent = tipo === 'documento'
             ? await evolution.sendMedia(instancia, alvo, 'document', mime || 'application/octet-stream', signed.signedUrl, nome, caption || undefined)
             : await evolution.sendMedia(instancia, alvo, 'image', mime, signed.signedUrl, nome, caption || undefined);
-      } catch (err) { const m = (err as Error).message || 'Falha ao enviar a mídia.'; return json({ error: /not|connect|close/i.test(m) ? 'O WhatsApp deste canal desconectou. Reconecte em Integrações.' : m }, 502); }
+        }
+      } catch (err) {
+        const m = (err as Error).message || 'Falha ao enviar a mídia.';
+        console.error(`[send] corr=${corr} MIDIA(${tipo}) erro provider/storage:`, m); // técnico cru no log
+        return json({ error: traduzMidiaErro(tipo, m) }, 502);
+      }
       const idExterno = sent?.key?.id ?? null;
       const metadados = { anexo_path: path, mime, tamanho, nome };
 

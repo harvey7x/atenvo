@@ -30,6 +30,10 @@ interface Props {
 }
 
 const temPendenciaTexto = (t: string) => /\{\{\s*\w+\s*\}\}/.test(t) || /\[[^\]]*não inform/i.test(t);
+// Intervalo entre etapas da sequência (evita rajada recusada pelo provider). Aplicado só ENTRE
+// envios consecutivos no mesmo disparo — nunca antes da 1ª nem antes de um retry manual isolado.
+const INTERVALO_SEQUENCIA_MS = 2500;
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 /**
  * Disparo de uma sequência (texto + imagem no Facebook) de um Script dentro de uma conversa.
@@ -114,9 +118,11 @@ export function ScriptSequenceModal({ open, onClose, script, canal, ctx, convers
     setEnviando(true);
     const st = [...status]; const conf = [...confirmados]; const er = [...erros];
     let parou = false;
+    let enviouNesteRun = false; // controla o intervalo: só espera ENTRE envios deste disparo
     for (let i = 0; i < itens.length; i++) {
       const it = itens[i];
       if (it.removida || st[i] === 'ok') continue;
+      if (enviouNesteRun) await sleep(INTERVALO_SEQUENCIA_MS); // intervalo 1→2 e 2→3 (não antes da 1ª)
       setIdxAtual(i);
       st[i] = 'enviando'; setStatus([...st]);
       try {
@@ -132,7 +138,7 @@ export function ScriptSequenceModal({ open, onClose, script, canal, ctx, convers
           if (confirmar) { if (!ref || typeof ref !== 'string') throw new Error('Envio sem identificador para confirmar.'); conf[i] = await confirmar(ref); }
           else conf[i] = 'enviada';
         }
-        st[i] = 'ok'; setConfirmados([...conf]); setStatus([...st]);
+        st[i] = 'ok'; enviouNesteRun = true; setConfirmados([...conf]); setStatus([...st]);
       } catch (e) {
         st[i] = 'falha'; er[i] = (e as Error).message || 'Falha no envio'; setErros([...er]); setStatus([...st]);
         parou = true; break;
