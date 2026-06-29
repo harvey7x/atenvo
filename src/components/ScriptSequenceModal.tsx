@@ -17,8 +17,9 @@ interface Props {
   canal: 'whatsapp' | 'facebook';
   ctx: VarCtx;
   conversaId: string;
-  /** Despacha UMA etapa de TEXTO. Retorna o id INTERNO (para confirmação real, quando houver). */
-  enviarEtapa: (texto: string) => Promise<string | void>;
+  /** Despacha UMA etapa de TEXTO. Retorna o id INTERNO (para confirmação real, quando houver).
+   *  retryMensagemId: reaproveita a MESMA mensagem falhada no backend (sem duplicar). */
+  enviarEtapa: (texto: string, retryMensagemId?: string) => Promise<string | void>;
   /** Confirma a entrega REAL (status da mensagem). WhatsApp usa; Facebook confirma de forma síncrona. */
   confirmar?: (mensagemId: string) => Promise<Confirmado>;
   /** Despacha UMA etapa de MÍDIA (imagem). Deve lançar se o provedor não confirmar. */
@@ -124,7 +125,8 @@ export function ScriptSequenceModal({ open, onClose, script, canal, ctx, convers
           await enviarMidia({ etapaId: it.etapaId, tipo: it.tipo, texto: it.texto, nome: it.nome, mime: it.mime, tamanho: it.tamanho });
           conf[i] = 'enviada';
         } else {
-          const ref = await enviarEtapa(it.texto);
+          // retry reaproveita a MESMA mensagem falhada (it.mensagemId) -> sem duplicar no banco
+          const ref = await enviarEtapa(it.texto, it.mensagemId);
           // guarda o id da mensagem persistida (para poder REMOVER se falhar)
           if (typeof ref === 'string') setItens((prev) => prev.map((x, j) => j === i ? { ...x, mensagemId: ref } : x));
           if (confirmar) { if (!ref || typeof ref !== 'string') throw new Error('Envio sem identificador para confirmar.'); conf[i] = await confirmar(ref); }
