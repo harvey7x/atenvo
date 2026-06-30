@@ -1,4 +1,6 @@
 // evolution-webhook — eventos da Evolution. Sem JWT. Secret via webhook_config (constante).
+// v17: auto-recuperação de PN (Caso D #7): inbound com PN real garante a identidade WhatsApp também em
+//      contato LID-only já existente (idempotente; não sobrescreve PN confirmado diferente).
 // v16: P0 — inbound de TEXTO do cliente falhava no INSERT (metadados NOT NULL/23502) e a mensagem nunca
 //      aparecia no painel. Fallback de metadados no caminho de ENTRADA (texto e áudio). Afetava LUIZA/URA/ANDRIUS.
 // v15: connection.update(open) auto-consolida canal DUPLICADO do mesmo número (reconexão que criou canal
@@ -153,8 +155,19 @@ Deno.serve(async (req) => {
         if (e1 || !novo) { await finish('erro', { erro: `contatos:${e1?.code ?? ''}:${(e1?.message ?? 'sem retorno').slice(0,180)}` }); return json({ ok: true }); }
         contatoId = novo.id;
         contatoCriadoAgora = true;
-        if (phone) await admin.from('contato_identidades').insert({ contato_id: contatoId, organizacao_id: orgId, tipo: 'whatsapp', provedor: 'evolution', valor: phoneJid ?? phone, valor_normalizado: phone, principal: true });
-      } else if (phone) { await admin.from('contatos').update({ telefone: phone }).eq('id', contatoId).is('telefone', null); }
+      }
+      // #7 AUTO-RECUPERAÇÃO de PN vindo de evento REAL: garante a identidade WhatsApp (PN) do contato — vale
+      // para contato novo E para contato LID-only que passe a receber um PN. Idempotente; NÃO sobrescreve um
+      // PN confirmado DIFERENTE já existente (conflito -> mantém o existente, não cria duplicado).
+      if (phone) {
+        const { data: jaWa } = await admin.from('contato_identidades').select('valor_normalizado').eq('contato_id', contatoId).eq('tipo', 'whatsapp');
+        const temEste = (jaWa ?? []).some((r) => r.valor_normalizado === phone);
+        const temOutro = (jaWa ?? []).some((r) => r.valor_normalizado !== phone);
+        if (!temEste && !temOutro) {
+          await admin.from('contato_identidades').insert({ contato_id: contatoId, organizacao_id: orgId, tipo: 'whatsapp', provedor: 'evolution', valor: phoneJid ?? phone, valor_normalizado: phone, principal: true, metadados: { origem: 'webhook' } });
+          await admin.from('contatos').update({ telefone: phone }).eq('id', contatoId).is('telefone', null);
+        }
+      }
       if (lid) { const { data: ex } = await admin.from('contato_identidades').select('id').eq('organizacao_id', orgId).eq('tipo', 'outro').eq('provedor', 'evolution_lid').eq('valor_normalizado', lid).maybeSingle(); if (!ex) await admin.from('contato_identidades').insert({ contato_id: contatoId, organizacao_id: orgId, tipo: 'outro', provedor: 'evolution_lid', valor: lidJid ?? lid, valor_normalizado: lid, principal: false }); }
 
       let conversaId: string | null = null;

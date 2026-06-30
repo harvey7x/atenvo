@@ -78,9 +78,10 @@ Deno.serve(async (req) => {
     const user = await getUser(req);
     if (!user) return json({ error: 'Não autenticado.' }, 401);
 
-    const { conversa_id, text, canal_id, assinatura_nome, retry_mensagem_id, midia_path, midia_tipo, midia_mime, midia_nome, midia_tamanho } = await req.json().catch(() => ({}));
+    const { action, conversa_id, text, canal_id, assinatura_nome, retry_mensagem_id, midia_path, midia_tipo, midia_mime, midia_nome, midia_tamanho, vinc_numero, vinc_jid } = await req.json().catch(() => ({}));
     const temTexto = !!text?.toString().trim();
-    if (!conversa_id || (!temTexto && !midia_path && !retry_mensagem_id)) return json({ error: 'conversa_id e conteúdo (texto ou mídia) são obrigatórios.' }, 400);
+    if (!conversa_id) return json({ error: 'conversa_id é obrigatório.' }, 400);
+    if (!action && (!temTexto && !midia_path && !retry_mensagem_id)) return json({ error: 'conversa_id e conteúdo (texto ou mídia) são obrigatórios.' }, 400);
     const corr = (globalThis.crypto?.randomUUID?.() ?? String(Date.now())).slice(0, 8);
 
     const admin = adminClient();
@@ -118,6 +119,32 @@ Deno.serve(async (req) => {
     if (liveState === 'open' && canal.status_integracao !== 'conectado') await admin.from('canais').update({ status_integracao: 'conectado' }).eq('id', canal.id);
     if (!liveState && canal.status_integracao !== 'conectado') return json({ error: 'WhatsApp não está conectado.' }, 409);
 
+    // ===== Caso D: VÍNCULO MANUAL de número (conversas LID-only sem PN confirmado). =====
+    // validar_numero: normaliza (sem inventar dígitos) e checa no WhatsApp (onWhatsApp). Aceita só exists=true.
+    // vincular_numero: persiste o PN como identidade WhatsApp do contato (mantém o LID), via RPC auditada.
+    if (action === 'validar_numero' || action === 'vincular_numero') {
+      const norm = digits(action === 'vincular_numero' ? vinc_numero : (vinc_numero ?? text));
+      if (!norm || norm.length < 12) return json({ error: 'Informe o número com DDI + DDD (ex.: 5551999990000).', code: 'NUMERO_FORMATO' }, 422);
+      let exists = false; let jid: string | null = null;
+      try {
+        const chk = await evolution.whatsappNumbers(instancia, [norm]);
+        const hit = (Array.isArray(chk) ? chk : []).find((h) => h?.exists === true && !!h?.jid);
+        if (hit?.jid) { exists = true; jid = String(hit.jid); }
+      } catch { return json({ error: 'Não foi possível validar o número agora. Tente novamente.', code: 'VALIDACAO_INDISPONIVEL' }, 502); }
+      if (!exists) return json({ error: 'Este número não tem WhatsApp ativo. Confira o DDI, o DDD e o nono dígito.', code: 'SEM_WHATSAPP' }, 422);
+      const mascarado = '••••' + norm.slice(-4);
+      if (action === 'validar_numero') return json({ ok: true, exists: true, numero: norm, numero_mascarado: mascarado, jid });
+      // vincular_numero: confirma e persiste
+      const { data: rpc, error: rpcErr } = await admin.rpc('wa_vincular_numero', { p_conversa: conversa_id, p_numero: norm, p_jid: jid, p_usuario: user.id });
+      if (rpcErr) {
+        const m = rpcErr.message ?? '';
+        if (/pn_confirmado_diferente/.test(m)) return json({ error: 'Este contato já tem um número confirmado diferente. Revise antes de alterar.', code: 'CONFLITO_PN' }, 409);
+        return json({ error: 'Não foi possível vincular o número.', code: 'VINCULO_ERRO', detalhe: m.slice(0, 120) }, 500);
+      }
+      console.log(`[send] corr=${corr} vinculo_pn conv=${conversa_id} num=${norm.slice(0,6)}`);
+      return json({ ok: true, vinculado: true, numero_mascarado: mascarado, rpc });
+    }
+
     // ----- destino -----
     // A IDENTIDADE WhatsApp (valor_normalizado, derivada do JID real do inbound) tem PRIORIDADE sobre o
     // telefone do CRM (contatos.telefone), que pode estar malformado/divergente. Validamos no onWhatsApp e
@@ -127,7 +154,7 @@ Deno.serve(async (req) => {
     const tel = digits(ct?.telefone);
     const idn = digits(ident?.valor_normalizado) ?? digits(ident?.valor);
     const candidatos = [...new Set([idn, tel].filter((x): x is string => !!x))]; // identidade primeiro
-    if (!candidatos.length) return json({ error: 'Contato sem número de WhatsApp.' }, 422);
+    if (!candidatos.length) return json({ error: 'Esta conversa foi recebida por uma identidade protegida do WhatsApp e ainda não possui um número confirmado para resposta.', code: 'SEM_NUMERO_CONFIRMADO' }, 422);
 
     // BLOQUEIO DE AUTOENVIO: não enviar do número do canal para ele mesmo.
     const senderNum = digits(canal.numero_conectado);

@@ -53,6 +53,8 @@ export interface WaContact {
   statusCor?: string | null;
   /** canal (id) da conversa, usado como padrão em "Responder por". */
   canalId?: string | null;
+  /** Caso D: conversa sem número de resposta confirmado (origem LID, sem identidade PN). */
+  semDestino?: boolean;
   /** id do contato (para abrir em Contatos e editar). */
   contatoId?: string | null;
   /** id do usuário responsável (contatos.responsavel_id). */

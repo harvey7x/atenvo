@@ -4,7 +4,7 @@ import { useToast } from '@/hooks/useToast';
 import { useAuth } from '@/context/AuthContext';
 import { useOrg } from '@/context/OrgContext';
 import { WA_CONTACTS, initials, avatarColor, type WaContact, type WaMessage } from '@/data/whatsappDemo';
-import { useWaConversations, useSendWaMessage, useWaCanais, useAtribuirAtendimento, useIniciarConversaWa, normalizeWaPhone, mascararNumero, subirMidiaWa, urlAssinadaMidiaWa, removerMensagemFalha, waRecarregarAudio, WA_REAL } from '@/data/whatsapp';
+import { useWaConversations, useSendWaMessage, useWaCanais, useAtribuirAtendimento, useIniciarConversaWa, normalizeWaPhone, mascararNumero, subirMidiaWa, urlAssinadaMidiaWa, removerMensagemFalha, waRecarregarAudio, waValidarNumero, waVincularNumero, WA_REAL } from '@/data/whatsapp';
 import { MediaComposer } from '@/components/MediaComposer';
 import { AudioRecorder } from '@/components/AudioRecorder';
 import { AudioMessage } from '@/components/AudioMessage';
@@ -253,6 +253,36 @@ export function WhatsApp() {
   const canalSel = realCanais.find((c) => c.id === replyCanalId) ?? null;
   const canalConectado = !WA_REAL || (canalSel?.status === 'conectado');
   const canalIndisponivel = WA_REAL && !!canalSel && !canalConectado;
+  // Caso D: conversa sem número de resposta confirmado (origem LID). Bloqueia o envio até vincular um PN validado.
+  const semDestino = WA_REAL && !!current.id && !!current.semDestino;
+  const [vincOpen, setVincOpen] = useState(false);
+  const [vincTel, setVincTel] = useState('');
+  const [vincBusy, setVincBusy] = useState(false);
+  const [vincErr, setVincErr] = useState<string | null>(null);
+  const [vincVal, setVincVal] = useState<{ numero: string; mascarado: string; jid: string } | null>(null);
+
+  async function validarNumeroVinc() {
+    if (vincBusy || !current.id || !replyCanalId) return;
+    const tel = normalizeWaPhone(vincTel);
+    if (!tel) { setVincErr('Informe o número com DDI + DDD (ex.: 5551999990000).'); return; }
+    setVincBusy(true); setVincErr(null); setVincVal(null);
+    try {
+      const r = await waValidarNumero(current.id, replyCanalId, tel);
+      setVincVal({ numero: r.numero, mascarado: r.numero_mascarado, jid: r.jid });
+    } catch (e) { setVincErr((e as Error).message); }
+    finally { setVincBusy(false); }
+  }
+  async function confirmarVinculo() {
+    if (vincBusy || !current.id || !replyCanalId || !vincVal) return;
+    setVincBusy(true); setVincErr(null);
+    try {
+      await waVincularNumero(current.id, replyCanalId, vincVal.numero, vincVal.jid);
+      await live.refetch();
+      setVincOpen(false); setVincTel(''); setVincVal(null);
+      toast('Número vinculado e confirmado. Você já pode responder.');
+    } catch (e) { setVincErr((e as Error).message); }
+    finally { setVincBusy(false); }
+  }
 
   /* autosize textarea */
   useEffect(() => {
@@ -577,7 +607,7 @@ export function WhatsApp() {
   }
   function cancelarEdicao() { setEditMode(false); setEditErr(null); }
 
-  const sendDisabled = draft.trim() === '' || (WA_REAL && (!current.id || !canalConectado));
+  const sendDisabled = draft.trim() === '' || semDestino || (WA_REAL && (!current.id || !canalConectado));
   const statusDefs = statusQ.data ?? [];
   const statusAtivos = statusDefs.filter((s) => s.ativo);
   // status do contato atual resolvido pela definição configurável (cor/nome); fallback ao rótulo legado.
@@ -839,17 +869,23 @@ export function WhatsApp() {
               <button className="link-btn" onClick={() => navigate('/integracoes')}>Reconectar</button>
             </div>
           )}
+          {semDestino && !canalIndisponivel && (
+            <div className="warn warn-block">
+              <IcWarn />Esta conversa foi recebida por uma identidade protegida do WhatsApp e ainda não possui um número confirmado para resposta. O histórico permanece.
+              <button className="link-btn" onClick={() => { setVincErr(null); setVincVal(null); setVincTel(''); setVincOpen(true); }}>Vincular número para responder</button>
+            </div>
+          )}
 
           <div className="input-wrap">
-            <textarea ref={taRef} className="msg-input" rows={1} placeholder={canalIndisponivel ? 'Envio bloqueado: número desconectado' : 'Digite sua mensagem...'}
-              value={draft} onChange={(e) => setDraft(e.target.value)} disabled={canalIndisponivel}
+            <textarea ref={taRef} className="msg-input" rows={1} placeholder={semDestino ? 'Vincule um número para responder' : (canalIndisponivel ? 'Envio bloqueado: número desconectado' : 'Digite sua mensagem...')}
+              value={draft} onChange={(e) => setDraft(e.target.value)} disabled={canalIndisponivel || semDestino}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); } }} />
             <div className="composer-bar">
-              <button className="cbar-act" title="Enviar imagem" aria-label="Enviar imagem" disabled={WA_REAL && (!current.id || !canalConectado)} onClick={() => setImgModal(true)}><IcImage /><span>Imagem</span></button>
-              <AudioRecorder disabled={WA_REAL && (!current.id || !canalConectado)} onEnviar={enviarAudio} />
-              <button className="cbar-act" title="Enviar documento" aria-label="Enviar documento" disabled={WA_REAL && (!current.id || !canalConectado)} onClick={() => setDocModal(true)}><IcDoc /><span>Arquivo</span></button>
+              <button className="cbar-act" title="Enviar imagem" aria-label="Enviar imagem" disabled={semDestino || (WA_REAL && (!current.id || !canalConectado))} onClick={() => setImgModal(true)}><IcImage /><span>Imagem</span></button>
+              <AudioRecorder disabled={semDestino || (WA_REAL && (!current.id || !canalConectado))} onEnviar={enviarAudio} />
+              <button className="cbar-act" title="Enviar documento" aria-label="Enviar documento" disabled={semDestino || (WA_REAL && (!current.id || !canalConectado))} onClick={() => setDocModal(true)}><IcDoc /><span>Arquivo</span></button>
               <span className="spacer" />
-              <button ref={scriptsBtnRef} className="scripts-btn" onClick={(e) => { e.stopPropagation(); togglePop('scripts', scriptsBtnRef, 'right'); }}><IcScripts />Scripts<IcCaret /></button>
+              <button ref={scriptsBtnRef} className="scripts-btn" disabled={semDestino} onClick={(e) => { e.stopPropagation(); togglePop('scripts', scriptsBtnRef, 'right'); }}><IcScripts />Scripts<IcCaret /></button>
               <button className="send-btn" aria-label="Enviar" disabled={sendDisabled} onClick={sendMsg}><IcSend /></button>
             </div>
           </div>
@@ -1101,6 +1137,27 @@ export function WhatsApp() {
         ) : (
           <div className="nc-empty"><IcWarn />Nenhum WhatsApp conectado.</div>
         )}
+      </Modal>
+
+      <Modal open={vincOpen} onClose={() => { if (!vincBusy) setVincOpen(false); }} title="Vincular número para responder" width={440} closeOnBackdrop={!vincBusy}
+        footer={<>
+          <button className="atv-btn" disabled={vincBusy} onClick={() => setVincOpen(false)}>Cancelar</button>
+          {vincVal
+            ? <button className="atv-btn primary" disabled={vincBusy} onClick={confirmarVinculo}>{vincBusy ? 'Vinculando…' : 'Confirmar e vincular'}</button>
+            : <button className="atv-btn primary" disabled={vincBusy} onClick={validarNumeroVinc}>{vincBusy ? 'Validando…' : 'Validar no WhatsApp'}</button>}
+        </>}>
+        <div className="nc-form">
+          <p style={{ margin: '0 0 6px', fontSize: 13, color: 'var(--muted)' }}>
+            Esta conversa chegou por uma identidade protegida (LID), sem número para resposta. Informe o número real do cliente — validamos no WhatsApp antes de salvar. O LID é preservado e nada é inventado.
+          </p>
+          <label className="nc-field"><span className="nc-label">Telefone (DDI + DDD)</span>
+            <input className="atv-input" inputMode="tel" placeholder="55 11 99999-8888" value={vincTel} disabled={vincBusy || !!vincVal}
+              onChange={(e) => { setVincTel(e.target.value); setVincErr(null); }} />
+          </label>
+          {vincVal && <div style={{ color: 'var(--green)', fontSize: 13 }}>✓ Número com WhatsApp ativo: <strong>{vincVal.mascarado}</strong>. Confirme para vincular a este contato.</div>}
+          {vincVal && <button className="link-btn" style={{ alignSelf: 'flex-start' }} disabled={vincBusy} onClick={() => { setVincVal(null); }}>Corrigir número</button>}
+          {vincErr && <div className="atv-field-err">{vincErr}</div>}
+        </div>
       </Modal>
 
       <Modal open={transferOpen} onClose={() => setTransferOpen(false)} title="Transferir atendimento" width={460}
