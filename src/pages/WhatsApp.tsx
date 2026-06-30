@@ -245,24 +245,33 @@ export function WhatsApp() {
     return (b.lastAtMs ?? 0) - (a.lastAtMs ?? 0);
   });
 
-  // Leitura: marca a conversa ABERTA como lida quando a janela está em foco (zera não lidas, persiste no
-  // banco). Não marca se a aba está oculta — assim o badge permanece até a visualização efetiva.
-  useEffect(() => {
-    if (!WA_REAL || !currentId) return;
+  // LEITURA (regra mínima): só zera o contador quando (1) o usuário SELECIONOU ativamente a conversa
+  // (não em restauração de ID), (2) as mensagens estão carregadas, (3) o documento está visível e (4) a
+  // janela está em foco. Roda uma única vez por (conversa, contador) e evita loop de mutation/refetch.
+  const marcandoLeituraRef = useRef(false);
+  const leituraFeitaRef = useRef<string>('');
+  // true só após o usuário CLICAR numa conversa (distingue de ID restaurado no mount/reload).
+  const viewAtivaRef = useRef(false);
+  const markCurrentRead = () => {
+    if (!WA_REAL || !currentId || !viewAtivaRef.current) return;
+    if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+    if (typeof document !== 'undefined' && typeof document.hasFocus === 'function' && !document.hasFocus()) return;
     const c = contacts.find((x) => x.id === currentId);
-    if (!c || (c.unread ?? 0) === 0) return;
-    if (typeof document !== 'undefined' && document.hidden) return;
-    let vivo = true;
-    waMarcarLida(currentId, true).then(() => { if (vivo) void live.refetch(); }).catch(() => {});
-    return () => { vivo = false; };
-  }, [currentId, contacts]); // re-marca quando novo inbound chega na conversa aberta e em foco
-
-  // ao voltar o foco para a janela, marca a conversa aberta como lida
+    if (!c || !c.id || (c.unread ?? 0) === 0) return; // mensagens carregadas (conversa presente) e há não lidas
+    const chave = `${currentId}:${c.unread}`;
+    if (marcandoLeituraRef.current || leituraFeitaRef.current === chave) return; // uma vez por contador; sem loop
+    marcandoLeituraRef.current = true;
+    leituraFeitaRef.current = chave;
+    waMarcarLida(currentId, true).then(() => void live.refetch()).catch(() => { leituraFeitaRef.current = ''; })
+      .finally(() => { marcandoLeituraRef.current = false; });
+  };
+  useEffect(() => { markCurrentRead(); }, [currentId, contacts]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!WA_REAL) return;
-    const onFocus = () => { const c = contacts.find((x) => x.id === currentId); if (c && (c.unread ?? 0) > 0) waMarcarLida(currentId, true).then(() => void live.refetch()).catch(() => {}); };
-    window.addEventListener('focus', onFocus);
-    return () => window.removeEventListener('focus', onFocus);
+    const h = () => markCurrentRead();
+    window.addEventListener('focus', h);
+    document.addEventListener('visibilitychange', h);
+    return () => { window.removeEventListener('focus', h); document.removeEventListener('visibilitychange', h); };
   }, [currentId, contacts]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // "Responder por": SEMPRE o canal pelo qual ESTA conversa foi recebida.
@@ -397,6 +406,7 @@ export function WhatsApp() {
   }
 
   function selectContact(id: string) {
+    viewAtivaRef.current = true; // seleção ativa do usuário (habilita marcar como lida)
     setCurrentId(id);
     if (isMobile) setDataOpen(false);
   }
