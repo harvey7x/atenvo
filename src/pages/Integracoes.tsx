@@ -172,7 +172,7 @@ export function Integracoes() {
       <div className="content">
         <div className="sum-grid">
           <div className="sum-card"><span className="sum-ic green"><IcCheck /></span><div><div className="lbl">Integrações conectadas</div><div className="val">{conectados + fbConectadas}</div></div></div>
-          <div className="sum-card"><span className="sum-ic blue"><IcWa /></span><div><div className="lbl">WhatsApp conectados</div><div className="val">{waUsados} de {waLimiteEfetivo}</div>{waAdicionais > 0 && <div className="sub">{waIncluidos} incluído{waIncluidos === 1 ? '' : 's'} + {waAdicionais} adicional{waAdicionais === 1 ? '' : 'is'}</div>}</div></div>
+          <div className="sum-card"><span className="sum-ic blue"><IcWa /></span><div><div className="lbl">WhatsApp ativos</div><div className="val">{conectados} de {waUsados} contratado{waUsados === 1 ? '' : 's'}</div><div className="sub">{nDesconectados > 0 ? `${nDesconectados} desconectado${nDesconectados === 1 ? '' : 's'} · ` : ''}limite do plano {waLimiteEfetivo}{waAdicionais > 0 ? ` (${waIncluidos}+${waAdicionais})` : ''}</div></div></div>
           <div className="sum-card"><span className="sum-ic gray"><IcFb /></span><div><div className="lbl">Facebook conectados</div><div className="val">{fbConectadas}</div></div></div>
         </div>
 
@@ -233,7 +233,7 @@ export function Integracoes() {
                                 : <span className={'badge ' + st.cls}>{st.dot && <span className="dot" />}{st.t}</span>}
                               <button className="btn-sm" onClick={() => setDiag(c.id)}>Ver diagnóstico</button>
                               {podeConfig && <button className="btn-sm" disabled={removendo} onClick={() => setConfig(c)}>Configurar origem comercial</button>}
-                              {podeConfig && !ativo && <button className="btn-sm acc" disabled={removendo || waCheio} title={waCheio ? 'Limite atingido — desconecte outro número ou contrate um adicional.' : undefined} onClick={() => setReconectar({ id: c.id, alias: c.alias })}>Reconectar</button>}
+                              {podeConfig && !ativo && <button className="btn-sm acc" disabled={removendo} title="Reconectar reutiliza este canal (não consome uma nova vaga)." onClick={() => setReconectar({ id: c.id, alias: c.alias })}>Reconectar</button>}
                               {podeConfig && ativo && <button className="btn-sm danger" disabled={removendo} onClick={() => setRemocao({ tipo: 'whatsapp', id: c.id, nome: c.alias + (c.numero ? ' · ' + mascararNumero(c.numero) : '') })}>{removendo ? 'Desconectando…' : 'Desconectar'}</button>}
                             </div>
                           </div>

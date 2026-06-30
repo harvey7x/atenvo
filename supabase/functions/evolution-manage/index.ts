@@ -93,7 +93,7 @@ Deno.serve(async (req) => {
     const canalId: string = body.canal_id;
     if (!canalId) return json({ error: 'canal_id é obrigatório.' }, 400);
     const { data: canal } = await admin.from('canais')
-      .select('id, instancia_externa, organizacao_id').eq('id', canalId).eq('organizacao_id', orgId).maybeSingle();
+      .select('id, instancia_externa, organizacao_id, ativo').eq('id', canalId).eq('organizacao_id', orgId).maybeSingle();
     if (!canal) return json({ error: 'Canal não encontrado.' }, 404);
 
     // RECONNECT: reusa o MESMO canal histórico (preserva nome/origem/gestor/relatórios) e cria uma
@@ -103,16 +103,21 @@ Deno.serve(async (req) => {
       if (!org || !['ativa', 'isenta'].includes(org.assinatura_status)) {
         return json({ error: 'Assinatura inativa. Assine o plano antes de reconectar.' }, 402);
       }
-      // reativar consome 1 vaga (canal estava ativo=false). Valida o limite efetivo (incluídos+adicionais).
-      const { data: lim } = await admin.from('organizacao_limites').select('limite_whatsapps').eq('organizacao_id', orgId).single();
-      const { count: usados } = await admin.from('canais')
-        .select('id', { count: 'exact', head: true })
-        .eq('organizacao_id', orgId).eq('tipo', 'whatsapp').eq('ativo', true);
-      if ((usados ?? 0) >= (lim?.limite_whatsapps ?? 0)) {
-        return json({ error: 'Limite de WhatsApp atingido. Contrate um adicional ou desconecte outro número.' }, 409);
+      // Reconectar REUSA o mesmo canal histórico (mesmo canal_id) — NÃO cria canal novo. Só CONSOME vaga
+      // quando o canal estava DESATIVADO (ativo=false); um canal já ativo (ex.: desconectado, mas com a vaga
+      // mantida) NÃO consome outra vaga. O trigger trg_limite_canais (exclui o próprio id) é o backstop.
+      if (canal.ativo === false) {
+        const { data: lim } = await admin.from('organizacao_limites').select('limite_whatsapps').eq('organizacao_id', orgId).single();
+        const { count: usados } = await admin.from('canais')
+          .select('id', { count: 'exact', head: true })
+          .eq('organizacao_id', orgId).eq('tipo', 'whatsapp').eq('ativo', true);
+        if ((usados ?? 0) >= (lim?.limite_whatsapps ?? 0)) {
+          return json({ error: 'Limite de WhatsApp atingido. Contrate um adicional ou desconecte outro número.' }, 409);
+        }
       }
       const instanceName = `atenvo_${canalId.replace(/-/g, '')}_${Date.now().toString(36)}`;
-      await admin.from('canais').update({ instancia_externa: instanceName, status_integracao: 'sincronizando', ativo: true }).eq('id', canalId);
+      const { error: upErr } = await admin.from('canais').update({ instancia_externa: instanceName, status_integracao: 'sincronizando', ativo: true }).eq('id', canalId);
+      if (upErr) return json({ error: /limite/i.test(upErr.message) ? 'Limite de WhatsApp atingido. Contrate um adicional ou desconecte outro número.' : 'Não foi possível reconectar o canal.' }, 409);
       await admin.from('integracoes').insert({ provedor: 'evolution', canal_id: canalId, organizacao_id: orgId, status: 'sincronizando', config: { instance: instanceName } });
       try {
         const created = await evolution.createInstance(instanceName, webhookUrl);
