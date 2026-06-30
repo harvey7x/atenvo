@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/hooks/useTheme';
+import { useToast } from '@/hooks/useToast';
 import './Login.css';
 
 interface LocState { from?: { pathname: string } }
@@ -17,8 +18,9 @@ const W = ['74%', '52%', '64%', '46%'];
 const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function Login() {
-  const { user, loading, signIn, mode } = useAuth();
+  const { user, loading, signIn, resetPassword, mode } = useAuth();
   const { theme, setTheme } = useTheme();
+  const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -29,6 +31,7 @@ export function Login() {
   const [ePass, setEPass] = useState<string | null>(null);
   const [banner, setBanner] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [recuperando, setRecuperando] = useState(false);
 
   if (!loading && user) {
     const to = (location.state as LocState | null)?.from?.pathname ?? '/';
@@ -60,6 +63,21 @@ export function Login() {
     }
     const to = (location.state as LocState | null)?.from?.pathname ?? '/';
     navigate(to, { replace: true });
+  }
+
+  async function onForgot() {
+    if (recuperando) return;
+    const ev = email.trim();
+    if (!ev || !emailRe.test(ev)) {
+      setEEmail('Informe seu e-mail para recuperar a senha.');
+      return;
+    }
+    setRecuperando(true);
+    const { error } = await resetPassword(ev);
+    setRecuperando(false);
+    // mensagem neutra (não revela se o e-mail existe) quando o envio é aceito
+    if (error) toast(error, 'warn');
+    else toast('Se este e-mail tiver cadastro, enviamos um link de recuperação.');
   }
 
   return (
@@ -175,7 +193,7 @@ export function Login() {
 
             <div className="row-between">
               <label className="check"><input type="checkbox" defaultChecked />Manter conectado</label>
-              <button type="button" className="link" onClick={(e) => e.preventDefault()}>Esqueci minha senha</button>
+              <button type="button" className="link" onClick={onForgot} disabled={recuperando}>{recuperando ? 'Enviando…' : 'Esqueci minha senha'}</button>
             </div>
 
             <button type="submit" className="btn" disabled={busy}>

@@ -15,6 +15,8 @@ interface AuthState {
   loading: boolean;
   user: SessionUser | null;
   signIn: (email: string, password: string) => Promise<{ error: string | null; reason: SignInReason }>;
+  /** Dispara o e-mail de recuperação de senha (Supabase). Indisponível no modo demonstração. */
+  resetPassword: (email: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   /** Recarrega o nome do perfil (usuarios.nome) sem exigir logout — usar após salvar o perfil. */
   refreshProfile: () => Promise<void>;
@@ -86,6 +88,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: null, reason: 'ok' };
   };
 
+  const resetPassword: AuthState['resetPassword'] = async (email) => {
+    if (mode === 'supabase' && supabase) {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + '/login' });
+      return { error: error ? error.message : null };
+    }
+    return { error: 'Recuperação de senha indisponível no modo demonstração.' };
+  };
+
   const signOut: AuthState['signOut'] = async () => {
     if (mode === 'supabase' && supabase) {
       await supabase.auth.signOut();
@@ -101,7 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(await buildSessionUser(data.user));
   };
 
-  const value = useMemo<AuthState>(() => ({ mode, loading, user, signIn, signOut, refreshProfile }), [mode, loading, user]);
+  const value = useMemo<AuthState>(() => ({ mode, loading, user, signIn, resetPassword, signOut, refreshProfile }), [mode, loading, user]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
