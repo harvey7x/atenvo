@@ -17,5 +17,5 @@ export const evolution = {
   version: () => call('/', 'GET'),
   connectionState: (inst: string) => call(`/instance/connectionState/${inst}`, 'GET'),
   findWebhook: (inst: string) => call(`/webhook/find/${inst}`, 'GET'),
-  sendText: (inst: string, number: string, text: string) => call(`/message/sendText/${inst}`, 'POST', { number, text }),
+  // sem sendText: diagnóstico é read-only; teste real de envio usa o fluxo da aplicação (evolution-send).
 };

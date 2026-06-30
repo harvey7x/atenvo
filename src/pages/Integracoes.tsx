@@ -5,7 +5,7 @@ import { useToast } from '@/hooks/useToast';
 import { useOrg } from '@/context/OrgContext';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { WhatsAppConnect } from '@/components/WhatsAppConnect';
-import { useWaCanais, useWaLimite, useWaHealth, waRemove, waTestarEnvio, mascararNumero, useFontesAquisicao, waUpdateComercial, type WaCanal, type ComercialInput, type WaHealthCanal } from '@/data/whatsapp';
+import { useWaCanais, useWaLimite, useWaHealth, waRemove, mascararNumero, useFontesAquisicao, waUpdateComercial, type WaCanal, type ComercialInput, type WaHealthCanal } from '@/data/whatsapp';
 import { FB_REAL, useFbStatus, fbAuthStart, fbPages, fbConnect, fbDisconnect } from '@/data/facebook';
 import { useOrgUsuarios } from '@/data/atendimento';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -363,8 +363,7 @@ export function Integracoes() {
           onClose={() => setDiag(null)}
           onAtualizar={() => healthQ.refetch()}
           onReconectar={() => { setDiag(null); setReconectar({ id: h.canalId, alias: h.nome }); }}
-          onDesconectar={() => { setDiag(null); setRemocao({ tipo: 'whatsapp', id: h.canalId, nome: h.nome + ' · ' + h.numeroMasc }); }}
-          onTeste={(to, text) => waTestarEnvio(currentOrg.id, h.canalId, to, text)} />;
+          onDesconectar={() => { setDiag(null); setRemocao({ tipo: 'whatsapp', id: h.canalId, nome: h.nome + ' · ' + h.numeroMasc }); }} />;
       })()}
     </div>
   );
@@ -406,35 +405,18 @@ function ConfigOrigemModal({ canal, onClose, onSaved }: { canal: WaCanal; onClos
 }
 
 /* ===================== Diagnóstico de saúde da conexão ===================== */
-function DiagnosticoModal({ h, podeAgir, atualizando, onClose, onAtualizar, onReconectar, onDesconectar, onTeste }: {
+function DiagnosticoModal({ h, podeAgir, atualizando, onClose, onAtualizar, onReconectar, onDesconectar }: {
   h: WaHealthCanal; podeAgir: boolean; atualizando: boolean;
   onClose: () => void; onAtualizar: () => void; onReconectar: () => void; onDesconectar: () => void;
-  onTeste: (to: string, text: string) => Promise<{ aceito: boolean; key_id: string | null; status: number }>;
 }) {
-  const { toast } = useToast();
-  const [testando, setTestando] = useState(false);
-  const [testeForm, setTesteForm] = useState<{ to: string; text: string } | null>(null);
   const stOK = (s: string) => ['SERVER_ACK', 'DELIVERY_ACK', 'READ', 'PLAYED'].includes(s);
   const ativo = h.statusIntegracao === 'conectado' || h.statusIntegracao === 'sincronizando';
-  async function enviarTeste() {
-    if (!testeForm || testando) return;
-    const to = testeForm.to.replace(/[^0-9]/g, '');
-    if (to.length < 12) { toast('Informe o número com DDI e DDD (ex.: 55DD9XXXXXXXX).', 'warn'); return; }
-    setTestando(true);
-    try {
-      const r = await onTeste(to, testeForm.text || 'Teste Atenvo');
-      toast(r.aceito ? `Teste aceito pela Evolution (key ${r.key_id}). Atualize para ver o status.` : `O provedor não confirmou (HTTP ${r.status}).`, r.aceito ? undefined : 'warn');
-      setTesteForm(null);
-    } catch (e) { toast((e as Error).message || 'Falha no teste de envio.', 'warn'); }
-    finally { setTestando(false); }
-  }
   return (
     <Modal open onClose={onClose} closeOnBackdrop width={620}
       title={<div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}><span>Diagnóstico</span><strong style={{ color: 'var(--ink)' }}>{h.nome}</strong>
         <span className="badge" style={{ background: COR_BG[h.cor], color: COR_FG[h.cor] }}><span className="dot" style={{ background: COR_FG[h.cor] }} />{ESTADO_LABEL[h.estado] ?? h.estado}</span></div>}
       footer={<>
         <button className="atv-btn" disabled={atualizando} onClick={onAtualizar}>{atualizando ? 'Atualizando…' : 'Atualizar diagnóstico'}</button>
-        {podeAgir && ativo && <button className="atv-btn" onClick={() => setTesteForm({ to: '', text: 'Teste Atenvo' })}>Enviar mensagem de teste</button>}
         {podeAgir && !ativo && <button className="atv-btn primary" onClick={onReconectar}>Reconectar</button>}
         {podeAgir && ativo && <button className="atv-btn" onClick={onDesconectar}>Desconectar</button>}
         <button className="atv-btn" onClick={onClose}>Fechar</button>
@@ -467,19 +449,9 @@ function DiagnosticoModal({ h, podeAgir, atualizando, onClose, onAtualizar, onRe
             ))}
           </div>
         )}
-        {testeForm && (
-          <div style={{ marginTop: 12, borderTop: '1px solid var(--line)', paddingTop: 10 }}>
-            <div className="sechead" style={{ margin: '0 0 6px', fontSize: 13, fontWeight: 600 }}>Enviar mensagem de teste (envio REAL)</div>
-            <div className="cfg-2col">
-              <div className="cfg-field"><label>Número (DDI+DDD)</label><input className="ctrl" placeholder="55DD9XXXXXXXX" value={testeForm.to} onChange={(e) => setTesteForm((f) => f ? { ...f, to: e.target.value } : f)} /></div>
-              <div className="cfg-field"><label>Texto</label><input className="ctrl" value={testeForm.text} onChange={(e) => setTesteForm((f) => f ? { ...f, text: e.target.value } : f)} /></div>
-            </div>
-            <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-              <button className="atv-btn" disabled={testando} onClick={() => setTesteForm(null)}>Cancelar</button>
-              <button className="atv-btn primary" disabled={testando} onClick={enviarTeste}>{testando ? 'Enviando…' : 'Confirmar envio de teste'}</button>
-            </div>
-          </div>
-        )}
+        <div className="conn-sub" style={{ marginTop: 12, color: 'var(--muted)' }}>
+          Para validar o envio, envie uma mensagem real pela conversa (fluxo da aplicação) e atualize o diagnóstico — o resultado real aparece aqui. Este painel é somente leitura.
+        </div>
       </div>
     </Modal>
   );

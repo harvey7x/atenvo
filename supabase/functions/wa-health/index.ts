@@ -1,6 +1,7 @@
-// wa-health — diagnóstico de SAÚDE das conexões WhatsApp (somente leitura). NÃO altera o envio.
+// wa-health — diagnóstico de SAÚDE das conexões WhatsApp (SOMENTE LEITURA). NÃO envia mensagens.
 // action 'status' (default): membro ativo da org -> telemetria + estado read-only da Evolution + estado derivado.
-// action 'send-test': admin/supervisor -> envia UMA mensagem de teste explícita (número/texto informados).
+// Não há envio de teste aqui: validação de envio real é feita pelo fluxo da aplicação (evolution-send),
+// refletido no diagnóstico — nunca por um endpoint paralelo (que poderia dar falso positivo).
 import { corsHeaders, json } from './cors.ts';
 import { adminClient, getUser, orgRole } from './client.ts';
 import { evolution, evolutionConfigured } from './evolution.ts';
@@ -45,19 +46,9 @@ Deno.serve(async (req) => {
     const papel = await orgRole(admin, user.id, orgId);
     if (!papel) return json({ error: 'Sem acesso a esta organização.' }, 403);
     const podeAgir = papel === 'admin' || papel === 'supervisor';
-
-    // ---- Teste de envio EXPLÍCITO (não automático) ----
-    if (action === 'send-test') {
-      if (!podeAgir) return json({ error: 'Apenas administradores ou supervisores podem testar o envio.' }, 403);
-      if (!evolutionConfigured()) return json({ error: 'Evolution não configurada.' }, 503);
-      const canalId: string = body.canal_id; const to: string = (body.to ?? '').replace(/[^0-9]/g, ''); const text: string = (body.text ?? 'Teste Atenvo').toString().slice(0, 300);
-      if (!canalId || !to) return json({ error: 'Informe o canal e o número de teste.' }, 400);
-      const { data: canal } = await admin.from('canais').select('instancia_externa').eq('id', canalId).eq('organizacao_id', orgId).maybeSingle();
-      if (!canal?.instancia_externa) return json({ error: 'Canal sem sessão ativa.' }, 409);
-      const r = await evolution.sendText(canal.instancia_externa as string, to, text);
-      const keyId = (r.data as { key?: { id?: string } })?.key?.id ?? null;
-      return json({ ok: r.ok, status: r.status, ms: r.ms, key_id: keyId, aceito: !!keyId });
-    }
+    // NÃO há ação de envio aqui: o teste de envio real usa o fluxo da aplicação (evolution-send),
+    // não um endpoint paralelo (evitaria falso positivo). wa-health é apenas diagnóstico read-only.
+    if (action !== 'status') return json({ error: 'Ação inválida (somente diagnóstico read-only).' }, 400);
 
     // ---- STATUS (default): telemetria + estado read-only ----
     const { data: tele, error: te } = await admin.rpc('wa_health', { p_org: orgId });

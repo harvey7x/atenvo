@@ -375,10 +375,6 @@ export function useWaHealth() {
     queryFn: () => invoke<WaHealthResp>('wa-health', { organizacao_id: currentOrg.id, action: 'status' }),
   });
 }
-/** Teste de envio EXPLÍCITO (não automático): só após confirmação do usuário com número/texto. */
-export const waTestarEnvio = (orgId: string, canalId: string, to: string, text: string) =>
-  invoke<{ ok: boolean; status: number; key_id: string | null; aceito: boolean }>('wa-health', { organizacao_id: orgId, action: 'send-test', canal_id: canalId, to, text });
-
 /* ===================== Configuração comercial da conexão ===================== */
 export interface FonteAquisicao { id: string; nome: string }
 export function useFontesAquisicao() {
