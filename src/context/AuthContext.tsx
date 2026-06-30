@@ -17,6 +17,10 @@ interface AuthState {
   signIn: (email: string, password: string) => Promise<{ error: string | null; reason: SignInReason }>;
   /** Dispara o e-mail de recuperação de senha (Supabase). Indisponível no modo demonstração. */
   resetPassword: (email: string) => Promise<{ error: string | null }>;
+  /** true quando o usuário chegou via link de recuperação (evento PASSWORD_RECOVERY). */
+  recovery: boolean;
+  /** Define a nova senha na sessão de recuperação (ou logado). Indisponível no demo. */
+  updatePassword: (newPassword: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   /** Recarrega o nome do perfil (usuarios.nome) sem exigir logout — usar após salvar o perfil. */
   refreshProfile: () => Promise<void>;
@@ -43,6 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const mode: AuthMode = isSupabaseConfigured ? 'supabase' : 'mock';
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<SessionUser | null>(null);
+  const [recovery, setRecovery] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -53,7 +58,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(su);
         setLoading(false);
       });
-      const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+      const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+        if (event === 'PASSWORD_RECOVERY') setRecovery(true);
         buildSessionUser(session?.user).then((su) => { if (active) setUser(su); });
       });
       return () => { active = false; sub.subscription.unsubscribe(); };
@@ -90,10 +96,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const resetPassword: AuthState['resetPassword'] = async (email) => {
     if (mode === 'supabase' && supabase) {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + '/login' });
+      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + '/redefinir-senha' });
       return { error: error ? error.message : null };
     }
     return { error: 'Recuperação de senha indisponível no modo demonstração.' };
+  };
+
+  const updatePassword: AuthState['updatePassword'] = async (newPassword) => {
+    if (mode === 'supabase' && supabase) {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (!error) setRecovery(false);
+      return { error: error ? error.message : null };
+    }
+    return { error: 'Indisponível no modo demonstração.' };
   };
 
   const signOut: AuthState['signOut'] = async () => {
@@ -111,7 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(await buildSessionUser(data.user));
   };
 
-  const value = useMemo<AuthState>(() => ({ mode, loading, user, signIn, resetPassword, signOut, refreshProfile }), [mode, loading, user]);
+  const value = useMemo<AuthState>(() => ({ mode, loading, user, signIn, resetPassword, recovery, updatePassword, signOut, refreshProfile }), [mode, loading, user, recovery]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

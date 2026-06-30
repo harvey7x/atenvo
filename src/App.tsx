@@ -3,6 +3,7 @@ import { AppShell } from '@/components/AppShell';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { RequireRole } from '@/components/RequireRole';
 import { Login } from '@/pages/Login';
+import { RedefinirSenha } from '@/pages/RedefinirSenha';
 import { WhatsApp } from '@/pages/WhatsApp';
 import { Facebook } from '@/pages/Facebook';
 import { Kanban } from '@/pages/Kanban';
@@ -17,6 +18,7 @@ import { NotFound } from '@/pages/NotFound';
 
 const routes: RouteObject[] = [
   { path: '/login', element: <Login /> },
+  { path: '/redefinir-senha', element: <RedefinirSenha /> },
   {
     element: <ProtectedRoute />,
     children: [
