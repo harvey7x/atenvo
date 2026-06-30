@@ -872,7 +872,7 @@ export function WhatsApp() {
           {semDestino && !canalIndisponivel && (
             <div className="warn warn-block">
               <IcWarn />Esta conversa foi recebida por uma identidade protegida do WhatsApp e ainda não possui um número confirmado para resposta. O histórico permanece.
-              <button className="link-btn" onClick={() => { setVincErr(null); setVincVal(null); setVincTel(''); setVincOpen(true); }}>Vincular número para responder</button>
+              <button className="link-btn" onClick={() => { setVincErr(null); setVincVal(null); setVincTel(current.phone || ''); setVincOpen(true); }}>Vincular número para responder</button>
             </div>
           )}
 
@@ -1154,6 +1154,7 @@ export function WhatsApp() {
             <input className="atv-input" inputMode="tel" placeholder="55 11 99999-8888" value={vincTel} disabled={vincBusy || !!vincVal}
               onChange={(e) => { setVincTel(e.target.value); setVincErr(null); }} />
           </label>
+          {!vincVal && current.phone && <div style={{ fontSize: 12, color: 'var(--muted)' }}>Número cadastrado (não confirmado) — valide no WhatsApp para usar, ou informe outro.</div>}
           {vincVal && <div style={{ color: 'var(--green)', fontSize: 13 }}>✓ Número com WhatsApp ativo: <strong>{vincVal.mascarado}</strong>. Confirme para vincular a este contato.</div>}
           {vincVal && <button className="link-btn" style={{ alignSelf: 'flex-start' }} disabled={vincBusy} onClick={() => { setVincVal(null); }}>Corrigir número</button>}
           {vincErr && <div className="atv-field-err">{vincErr}</div>}

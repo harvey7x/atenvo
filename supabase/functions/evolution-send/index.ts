@@ -138,6 +138,7 @@ Deno.serve(async (req) => {
       const { data: rpc, error: rpcErr } = await admin.rpc('wa_vincular_numero', { p_conversa: conversa_id, p_numero: norm, p_jid: jid, p_usuario: user.id });
       if (rpcErr) {
         const m = rpcErr.message ?? '';
+        if (/pn_em_outro_contato/.test(m)) return json({ error: 'Este número já está vinculado a outro contato. Não é possível vincular aqui — revise/consolide os contatos antes.', code: 'CONFLITO_OUTRO_CONTATO' }, 409);
         if (/pn_confirmado_diferente/.test(m)) return json({ error: 'Este contato já tem um número confirmado diferente. Revise antes de alterar.', code: 'CONFLITO_PN' }, 409);
         return json({ error: 'Não foi possível vincular o número.', code: 'VINCULO_ERRO', detalhe: m.slice(0, 120) }, 500);
       }
