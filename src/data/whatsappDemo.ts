@@ -55,6 +55,10 @@ export interface WaContact {
   canalId?: string | null;
   /** Caso D: conversa sem número de resposta confirmado (origem LID, sem identidade PN). */
   semDestino?: boolean;
+  /** Inbox Etapa A: estado de arquivamento/fixação/silêncio da conversa. */
+  arquivada?: boolean;
+  fixada?: boolean;
+  silenciada?: boolean;
   /** id do contato (para abrir em Contatos e editar). */
   contatoId?: string | null;
   /** id do usuário responsável (contatos.responsavel_id). */

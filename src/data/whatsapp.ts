@@ -56,6 +56,17 @@ export const waVincularNumero = (conversaId: string, canalId: string, numero: st
   invoke<{ ok: boolean; vinculado: boolean; numero_mascarado: string }>(
     'evolution-send', { action: 'vincular_numero', conversa_id: conversaId, canal_id: canalId, vinc_numero: numero, vinc_jid: jid });
 
+/** Inbox Etapa A: arquivar/desarquivar conversa (RPC com membership). Preserva histórico/contato/oportunidade. */
+export async function waArquivar(conversaId: string, arquivar: boolean): Promise<void> {
+  const { error } = await supabase!.rpc('wa_arquivar_conversa', { p_conversa: conversaId, p_arquivar: arquivar });
+  if (error) throw new Error(error.message);
+}
+/** Inbox Etapa A: marcar conversa como lida (zera não lidas) ou não lida. */
+export async function waMarcarLida(conversaId: string, lida: boolean): Promise<void> {
+  const { error } = await supabase!.rpc('wa_marcar_lida', { p_conversa: conversaId, p_lida: lida });
+  if (error) throw new Error(error.message);
+}
+
 /** Remove uma mensagem de SAÍDA com falha (não entregue) via RPC segura. Retorna a conversa afetada.
  *  A RPC valida auth/organização/acesso e recusa mensagens entregues, lidas ou de entrada. */
 export async function removerMensagemFalha(mensagemId: string): Promise<string> {
@@ -80,6 +91,7 @@ interface DbConv {
   id: string; status: string; status_id: string | null; nao_lidas: number | null; ultima_interacao_em: string | null; criado_em: string | null;
   etiquetas: string[] | null;
   ultimo_canal_id: string | null; ultimo_numero: string | null; ultimo_provider: string | null; ultima_msg_canal_em: string | null;
+  arquivada_em: string | null; fixada_em: string | null; silenciada_ate: string | null; ultima_lida_em: string | null;
   contatos: { id: string; nome: string; telefone: string | null; email: string | null; etiquetas: string[] | null; origem: string | null; observacoes: string | null; responsavel_id: string | null; contato_identidades: { tipo: string }[] | null } | null;
   canais: { id: string; nome_interno: string | null } | null;
   mensagens: DbMsg[] | null;
@@ -143,6 +155,9 @@ function mapConversa(c: DbConv): WaContact {
     contatoId: c.contatos?.id ?? null,
     // Caso D: sem destino confirmado = contato sem identidade WhatsApp (PN). LID não conta como destino.
     semDestino: !((c.contatos?.contato_identidades ?? []).some((i) => i.tipo === 'whatsapp')),
+    arquivada: !!c.arquivada_em,
+    fixada: !!c.fixada_em,
+    silenciada: !!c.silenciada_ate && new Date(c.silenciada_ate).getTime() > Date.now(),
     respId: c.contatos?.responsavel_id ?? null,
     last: lastMsg?.text ?? '',
     email: c.contatos?.email ?? '',
@@ -174,7 +189,7 @@ export function useWaConversations() {
         // canais!conversas_canal_id_fkey: desambigua o embed (há 2 FKs p/ canais: canal_id e ultimo_canal_id).
         // NÃO embutimos conversa_status_def aqui: a cor/nome do status é resolvida no cliente via useStatusDefs
         // (mantém o inbox funcional mesmo que a tabela auxiliar fique inacessível por grant).
-        .select('id, status, status_id, nao_lidas, ultima_interacao_em, criado_em, etiquetas, ultimo_canal_id, ultimo_numero, ultimo_provider, ultima_msg_canal_em, contatos!inner(id, nome, telefone, email, etiquetas, origem, observacoes, responsavel_id, contato_identidades(tipo)), canais!conversas_canal_id_fkey!inner(id, nome_interno, tipo), mensagens(id, direcao, conteudo, tipo, enviada_em, recebida_em, criado_em, origem, status, erro_envio, metadados)')
+        .select('id, status, status_id, nao_lidas, ultima_interacao_em, criado_em, etiquetas, ultimo_canal_id, ultimo_numero, ultimo_provider, ultima_msg_canal_em, arquivada_em, fixada_em, silenciada_ate, ultima_lida_em, contatos!inner(id, nome, telefone, email, etiquetas, origem, observacoes, responsavel_id, contato_identidades(tipo)), canais!conversas_canal_id_fkey!inner(id, nome_interno, tipo), mensagens(id, direcao, conteudo, tipo, enviada_em, recebida_em, criado_em, origem, status, erro_envio, metadados)')
         .eq('organizacao_id', orgId)
         .eq('canais.tipo', 'whatsapp')
         .order('ultima_interacao_em', { ascending: false });

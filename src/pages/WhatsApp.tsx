@@ -4,7 +4,7 @@ import { useToast } from '@/hooks/useToast';
 import { useAuth } from '@/context/AuthContext';
 import { useOrg } from '@/context/OrgContext';
 import { WA_CONTACTS, initials, avatarColor, type WaContact, type WaMessage } from '@/data/whatsappDemo';
-import { useWaConversations, useSendWaMessage, useWaCanais, useAtribuirAtendimento, useIniciarConversaWa, normalizeWaPhone, mascararNumero, subirMidiaWa, urlAssinadaMidiaWa, removerMensagemFalha, waRecarregarAudio, waValidarNumero, waVincularNumero, WA_REAL } from '@/data/whatsapp';
+import { useWaConversations, useSendWaMessage, useWaCanais, useAtribuirAtendimento, useIniciarConversaWa, normalizeWaPhone, mascararNumero, subirMidiaWa, urlAssinadaMidiaWa, removerMensagemFalha, waRecarregarAudio, waValidarNumero, waVincularNumero, waArquivar, waMarcarLida, WA_REAL } from '@/data/whatsapp';
 import { MediaComposer } from '@/components/MediaComposer';
 import { AudioRecorder } from '@/components/AudioRecorder';
 import { AudioMessage } from '@/components/AudioMessage';
@@ -97,7 +97,9 @@ const TABS: { id: string; label: string }[] = [
   { id: 'todos', label: 'Todos' },
   { id: 'meus', label: 'Meus' },
   { id: 'naoatrib', label: 'Não atribuídos' },
+  { id: 'naolidas', label: 'Não lidas' },
   { id: 'pendentes', label: 'Pendentes' },
+  { id: 'arquivadas', label: 'Arquivadas' },
 ];
 
 const ASSINA_OPCOES: { id: AssinaturaModo; label: string }[] = [
@@ -217,10 +219,16 @@ export function WhatsApp() {
   const acoesBtnRef = useRef<HTMLButtonElement>(null);
 
   const current = contacts.find((c) => c.id === currentId) ?? contacts[0] ?? EMPTY_CONTACT;
+  const buscaAtiva = search.trim().length > 0;
   const filtered = contacts.filter((c) => {
-    // abas reais: todos / meus (responsável = eu) / não atribuídos / pendentes (com não lidas)
+    // Arquivadas só aparecem na aba 'arquivadas' (ou quando a busca está ativa, com badge). As demais abas
+    // operam apenas sobre conversas ativas (não arquivadas).
+    if (tab === 'arquivadas') { if (!c.arquivada) return false; }
+    else if (c.arquivada && !buscaAtiva) return false;
+    // abas reais: todos / meus / não atribuídos / não lidas / pendentes (não lidas OU aguardando)
     if (tab === 'meus' && c.respId !== user?.id) return false;
     if (tab === 'naoatrib' && !!c.respId) return false;
+    if (tab === 'naolidas' && !((c.unread ?? 0) > 0)) return false;
     if (tab === 'pendentes' && !((c.unread ?? 0) > 0 || c.aguardando)) return false;
     // funil: por número (canal) e por status
     if (filtroCanal && c.canalId !== filtroCanal) return false;
@@ -229,7 +237,33 @@ export function WhatsApp() {
     const t = search.trim().toLowerCase();
     if (t && c.name.toLowerCase().indexOf(t) === -1 && c.last.toLowerCase().indexOf(t) === -1 && (c.phone || '').toLowerCase().indexOf(t) === -1) return false;
     return true;
+  }).sort((a, b) => {
+    // ordenação: fixadas primeiro, depois não lidas, depois interação mais recente
+    if (!!a.fixada !== !!b.fixada) return a.fixada ? -1 : 1;
+    const au = (a.unread ?? 0) > 0, bu = (b.unread ?? 0) > 0;
+    if (au !== bu) return au ? -1 : 1;
+    return (b.lastAtMs ?? 0) - (a.lastAtMs ?? 0);
   });
+
+  // Leitura: marca a conversa ABERTA como lida quando a janela está em foco (zera não lidas, persiste no
+  // banco). Não marca se a aba está oculta — assim o badge permanece até a visualização efetiva.
+  useEffect(() => {
+    if (!WA_REAL || !currentId) return;
+    const c = contacts.find((x) => x.id === currentId);
+    if (!c || (c.unread ?? 0) === 0) return;
+    if (typeof document !== 'undefined' && document.hidden) return;
+    let vivo = true;
+    waMarcarLida(currentId, true).then(() => { if (vivo) void live.refetch(); }).catch(() => {});
+    return () => { vivo = false; };
+  }, [currentId, contacts]); // re-marca quando novo inbound chega na conversa aberta e em foco
+
+  // ao voltar o foco para a janela, marca a conversa aberta como lida
+  useEffect(() => {
+    if (!WA_REAL) return;
+    const onFocus = () => { const c = contacts.find((x) => x.id === currentId); if (c && (c.unread ?? 0) > 0) waMarcarLida(currentId, true).then(() => void live.refetch()).catch(() => {}); };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [currentId, contacts]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // "Responder por": SEMPRE o canal pelo qual ESTA conversa foi recebida.
   // Prioridade: 1) ultimo_canal_id (último canal recebido); 2) canal_id (origem); senão vazio (escolha manual).
@@ -579,6 +613,18 @@ export function WhatsApp() {
     setPop(null);
     navigate(current.contatoId ? `/contatos?contato=${current.contatoId}` : '/contatos');
   }
+  async function arquivarConversa(arquivar: boolean) {
+    setPop(null);
+    if (!current.id) return;
+    try { await waArquivar(current.id, arquivar); await live.refetch(); toast(arquivar ? 'Conversa arquivada' : 'Conversa desarquivada'); }
+    catch (e) { toast((e as Error).message || 'Falha ao arquivar', 'warn'); }
+  }
+  async function marcarLida(lida: boolean) {
+    setPop(null);
+    if (!current.id) return;
+    try { await waMarcarLida(current.id, lida); await live.refetch(); }
+    catch (e) { toast((e as Error).message || 'Falha ao atualizar leitura', 'warn'); }
+  }
   function fecharConversa() {
     setPop(null);
     if (!statusFechada || !current.id) return;
@@ -669,11 +715,14 @@ export function WhatsApp() {
               <Avatar name={c.name} />
               <div className="cbody">
                 <div className="crow">
-                  <span className="cname">{c.name}</span>
+                  <span className="cname" style={{ fontWeight: (c.unread ?? 0) > 0 ? 700 : undefined }}>{c.fixada && <span title="Fixada" aria-label="Fixada">📌 </span>}{c.name}</span>
                   {c.aguardando && <span className="conv-alert" title="Cliente aguardando resposta" aria-label="Cliente aguardando resposta"><IcAlert /></span>}
                   <span className="ctime">{c.time}</span>
                 </div>
-                <div className="cchip"><IcChip />{c.chip}</div>
+                <div className="cchip"><IcChip />{c.chip}
+                  {c.arquivada && <span className="ctag" style={{ marginLeft: 6 }} title="Arquivada">Arquivada</span>}
+                  {c.silenciada && <span title="Silenciada" aria-label="Silenciada" style={{ marginLeft: 6 }}>🔕</span>}
+                </div>
                 <div className="cprev">{c.last}</div>
                 {wait && <div className="conv-wait" style={{ color: wait.cor }}>{wait.label}</div>}
                 {c.tags.length > 0 && (
@@ -1069,6 +1118,12 @@ export function WhatsApp() {
           {pop.kind === 'acoes' && (
             <div role="menu" aria-label="Ações da conversa">
               <button role="menuitem" className="pop-item" onClick={iniciarEdicao}><IcEdit />Editar dados do cliente</button>
+              {(current.unread ?? 0) > 0
+                ? <button role="menuitem" className="pop-item" onClick={() => marcarLida(true)}><IcCheckSm />Marcar como lida</button>
+                : <button role="menuitem" className="pop-item" onClick={() => marcarLida(false)}><IcCheckSm />Marcar como não lida</button>}
+              {current.arquivada
+                ? <button role="menuitem" className="pop-item" onClick={() => arquivarConversa(false)}><IcArchive />Desarquivar conversa</button>
+                : <button role="menuitem" className="pop-item" onClick={() => arquivarConversa(true)}><IcArchive />Arquivar conversa</button>}
               {current.phone && <button role="menuitem" className="pop-item" onClick={copiarTelefone}><IcCopy />Copiar telefone</button>}
               {current.contatoId && <button role="menuitem" className="pop-item" onClick={abrirEmContatos}><IcContactCard />Abrir em Contatos</button>}
               {statusFechada && current.statusId !== statusFechada.id && <button role="menuitem" className="pop-item" onClick={fecharConversa}><IcArchive />Fechar conversa</button>}

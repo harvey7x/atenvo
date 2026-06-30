@@ -1,4 +1,6 @@
 // evolution-webhook — eventos da Evolution. Sem JWT. Secret via webhook_config (constante).
+// v18: Inbox Etapa A — inbound NOVO incrementa nao_lidas (idempotente via .select(); nunca fromMe) e
+//      REABRE conversa arquivada (arquivada_em=null), subindo ao topo. Webhook repetido não duplica contador.
 // v17: auto-recuperação de PN (Caso D #7): inbound com PN real garante a identidade WhatsApp também em
 //      contato LID-only já existente (idempotente; não sobrescreve PN confirmado diferente).
 // v16: P0 — inbound de TEXTO do cliente falhava no INSERT (metadados NOT NULL/23502) e a mensagem nunca
@@ -215,9 +217,23 @@ Deno.serve(async (req) => {
       // ENTRADA — texto ou áudio.
       // metadados é NOT NULL: texto não preenche metaMsg (só áudio) — usar fallback p/ não violar a constraint
       // (era a causa do P0: inbound de TEXTO do cliente falhava com 23502 e a mensagem nunca aparecia no painel).
-      const { error: msgErr } = await admin.from('mensagens').upsert({ conversa_id: conversaId, organizacao_id: orgId, direcao: 'entrada', tipo: tipoMsg, conteudo: corpo ?? null, id_externo: provMsgId, status: 'entregue', recebida_em: new Date().toISOString(), metadados: metaMsg ?? { via: 'webhook', origem: 'cliente' } }, { onConflict: 'id_externo', ignoreDuplicates: true });
-      await admin.from('conversas').update({ ultima_interacao_em: new Date().toISOString() }).eq('id', conversaId);
+      const nowEntradaIso = new Date().toISOString();
+      // .select() para saber se o INSERT criou linha NOVA (ignoreDuplicates → array vazio em webhook repetido):
+      // só então incrementamos não lidas e reabrimos arquivada — evita duplo-incremento por reentrega.
+      const { data: insArr, error: msgErr } = await admin.from('mensagens').upsert({ conversa_id: conversaId, organizacao_id: orgId, direcao: 'entrada', tipo: tipoMsg, conteudo: corpo ?? null, id_externo: provMsgId, status: 'entregue', recebida_em: nowEntradaIso, metadados: metaMsg ?? { via: 'webhook', origem: 'cliente' } }, { onConflict: 'id_externo', ignoreDuplicates: true }).select('id');
       if (msgErr) { await finish('erro', { erro: `mensagens:${msgErr.code ?? ''}:${(msgErr.message ?? '').slice(0,180)}` }); return json({ ok: true }); }
+      const inboundNovo = Array.isArray(insArr) && insArr.length > 0; // false em reentrega (idempotente)
+      if (inboundNovo) {
+        // não lida operacional++ (nunca conta fromMe — este é o ramo de ENTRADA) e REABRE conversa arquivada.
+        const { data: cv } = await admin.from('conversas').select('nao_lidas, arquivada_em').eq('id', conversaId).maybeSingle();
+        await admin.from('conversas').update({
+          ultima_interacao_em: nowEntradaIso,
+          nao_lidas: (cv?.nao_lidas ?? 0) + 1,
+          ...(cv?.arquivada_em ? { arquivada_em: null, arquivada_por: null } : {}),
+        }).eq('id', conversaId);
+      } else {
+        await admin.from('conversas').update({ ultima_interacao_em: nowEntradaIso }).eq('id', conversaId);
+      }
       // Auto-entrada no Kanban: SOMENTE contato recém-criado nesta execução (entrada, não fromMe). Best-effort: nunca quebra o webhook.
       let kanbanErro: string | null = null;
       if (contatoCriadoAgora && contatoId) {
