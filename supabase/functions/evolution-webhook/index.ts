@@ -1,4 +1,6 @@
 // evolution-webhook — eventos da Evolution. Sem JWT. Secret via webhook_config (constante).
+// v16: P0 — inbound de TEXTO do cliente falhava no INSERT (metadados NOT NULL/23502) e a mensagem nunca
+//      aparecia no painel. Fallback de metadados no caminho de ENTRADA (texto e áudio). Afetava LUIZA/URA/ANDRIUS.
 // v15: connection.update(open) auto-consolida canal DUPLICADO do mesmo número (reconexão que criou canal
 //      novo) no canal histórico via RPC wa_consolidar_canal_por_numero (idempotente, best-effort).
 // v14: INGESTÃO DE ÁUDIO (entrada e fromMe/celular): baixa a mídia (getBase64FromMediaMessage), guarda no
@@ -198,7 +200,9 @@ Deno.serve(async (req) => {
       }
 
       // ENTRADA — texto ou áudio.
-      const { error: msgErr } = await admin.from('mensagens').upsert({ conversa_id: conversaId, organizacao_id: orgId, direcao: 'entrada', tipo: tipoMsg, conteudo: corpo ?? null, id_externo: provMsgId, status: 'entregue', recebida_em: new Date().toISOString(), metadados: metaMsg }, { onConflict: 'id_externo', ignoreDuplicates: true });
+      // metadados é NOT NULL: texto não preenche metaMsg (só áudio) — usar fallback p/ não violar a constraint
+      // (era a causa do P0: inbound de TEXTO do cliente falhava com 23502 e a mensagem nunca aparecia no painel).
+      const { error: msgErr } = await admin.from('mensagens').upsert({ conversa_id: conversaId, organizacao_id: orgId, direcao: 'entrada', tipo: tipoMsg, conteudo: corpo ?? null, id_externo: provMsgId, status: 'entregue', recebida_em: new Date().toISOString(), metadados: metaMsg ?? { via: 'webhook', origem: 'cliente' } }, { onConflict: 'id_externo', ignoreDuplicates: true });
       await admin.from('conversas').update({ ultima_interacao_em: new Date().toISOString() }).eq('id', conversaId);
       if (msgErr) { await finish('erro', { erro: `mensagens:${msgErr.code ?? ''}:${(msgErr.message ?? '').slice(0,180)}` }); return json({ ok: true }); }
       // Auto-entrada no Kanban: SOMENTE contato recém-criado nesta execução (entrada, não fromMe). Best-effort: nunca quebra o webhook.
