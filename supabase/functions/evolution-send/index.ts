@@ -1,4 +1,7 @@
 // evolution-send — envia texto/IMAGEM/ÁUDIO/DOCUMENTO e persiste a saída.
+// v23: DESTINO valida candidatos no onWhatsApp e usa o que EXISTE (identidade WhatsApp tem prioridade sobre
+//      o telefone do CRM, que pode estar malformado). Corrige envio ao número errado (exists:false) -> ERROR.
+//      Erro do provider preserva o status HTTP (evolution.ts) em erro_envio (não mascara em 502 genérico).
 // v22: FALHA SEMPRE PERSISTE — se o provider lança (texto/mídia), grava linha status='falhou' (id p/ retry/
 //      remover; sobrevive a reload). Evita a mensagem ficar "pendente eterno" no app quando o edge retorna 502.
 // v21: ÁUDIO por formato — ogg/webm(opus) via sendWhatsAppAudio (PTT); mp4/m4a/mpeg/aac/wav via sendMedia
@@ -115,33 +118,38 @@ Deno.serve(async (req) => {
     if (liveState === 'open' && canal.status_integracao !== 'conectado') await admin.from('canais').update({ status_integracao: 'conectado' }).eq('id', canal.id);
     if (!liveState && canal.status_integracao !== 'conectado') return json({ error: 'WhatsApp não está conectado.' }, 409);
 
-    // ----- destino: número EXATO salvo, sem remover o 9. -----
+    // ----- destino -----
+    // A IDENTIDADE WhatsApp (valor_normalizado, derivada do JID real do inbound) tem PRIORIDADE sobre o
+    // telefone do CRM (contatos.telefone), que pode estar malformado/divergente. Validamos no onWhatsApp e
+    // enviamos para o candidato que EXISTE — nunca para um número exists:false (que o provider recusa/ERROR).
     const { data: ct } = await admin.from('contatos').select('telefone').eq('id', conv.contato_id).maybeSingle();
     const { data: ident } = await admin.from('contato_identidades').select('valor_normalizado, valor').eq('contato_id', conv.contato_id).eq('tipo', 'whatsapp').maybeSingle();
     const tel = digits(ct?.telefone);
     const idn = digits(ident?.valor_normalizado) ?? digits(ident?.valor);
-    const base = (tel && idn && tel !== idn) ? tel : (idn ?? tel);
-    if (!base) return json({ error: 'Contato sem número de WhatsApp.' }, 422);
+    const candidatos = [...new Set([idn, tel].filter((x): x is string => !!x))]; // identidade primeiro
+    if (!candidatos.length) return json({ error: 'Contato sem número de WhatsApp.' }, 422);
 
     // BLOQUEIO DE AUTOENVIO: não enviar do número do canal para ele mesmo.
     const senderNum = digits(canal.numero_conectado);
-    if (senderNum && senderNum === base) {
-      console.log(`[send] corr=${corr} BLOQUEADO autoenvio de=${senderNum.slice(0, 6)} para=${base.slice(0, 6)}`);
+    if (senderNum && candidatos.includes(senderNum)) {
+      console.log(`[send] corr=${corr} BLOQUEADO autoenvio de=${senderNum.slice(0, 6)}`);
       return json({ error: 'Não é possível enviar uma mensagem para o mesmo número conectado.' }, 422);
     }
 
-    // valida existência; não troca por variante exceto se o EXATO não existir.
-    let alvo = base;
+    // Valida no WhatsApp e escolhe o candidato que EXISTE (jid canônico). Se NENHUM existe -> 422 claro.
+    let alvo = candidatos[0];
     try {
-      const chk = await evolution.whatsappNumbers(instancia, [base]);
+      const chk = await evolution.whatsappNumbers(instancia, candidatos);
       const arr = Array.isArray(chk) ? chk : [];
-      const hit = arr[0];
-      if (hit && hit.exists === false) {
-        const altJid = hit.jid ? digits(String(hit.jid).split('@')[0]) : null;
-        if (altJid) alvo = altJid; else return json({ error: 'Este número não tem WhatsApp ativo. Confira o DDD e o nono dígito.' }, 422);
+      const existe = arr.find((h) => h?.exists === true && !!h?.jid);
+      if (existe?.jid) {
+        alvo = digits(String(existe.jid).split('@')[0]) ?? alvo;
+      } else if (arr.length && arr.every((h) => h?.exists === false)) {
+        return json({ error: 'Este número não tem WhatsApp ativo. Confira o DDD e o nono dígito.' }, 422);
       }
-    } catch { /* fail-open: usa base */ }
-    console.log(`[send] corr=${corr} para=${base.slice(0, 6)} alvo=${alvo.slice(0, 6)}`);
+      // resultado inconclusivo -> mantém a identidade (candidatos[0]) como destino (fail-open).
+    } catch { /* fail-open: usa a identidade */ }
+    console.log(`[send] corr=${corr} cands=${candidatos.length} alvo=${alvo.slice(0, 6)}`);
 
     // ===== MÍDIA (IMAGEM, ÁUDIO e DOCUMENTO). Retry herda o tipo/arquivo da mensagem original. =====
     const ehMidiaRetry = !!retryMsg && !!retryMsg.tipo && retryMsg.tipo !== 'texto';

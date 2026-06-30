@@ -8,8 +8,9 @@ async function call(path: string, method: string, body?: unknown) {
   let data: unknown = null;
   try { data = text ? JSON.parse(text) : null; } catch { data = { raw: text }; }
   if (!res.ok) {
-    const msg = (data as { message?: string; error?: string })?.message ?? (data as { error?: string })?.error ?? `Evolution HTTP ${res.status}`;
-    throw new Error(typeof msg === 'string' ? msg : `Evolution HTTP ${res.status}`);
+    const m = (data as { message?: string; error?: string })?.message ?? (data as { error?: string })?.error;
+    const detalhe = (typeof m === 'string' && m) ? m : (typeof m !== 'undefined' ? JSON.stringify(m).slice(0, 160) : 'sem corpo');
+    throw new Error(`HTTP ${res.status}: ${detalhe}`); // status preservado (não mascarar em 502 genérico)
   }
   return data;
 }
