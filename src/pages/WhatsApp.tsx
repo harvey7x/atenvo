@@ -249,20 +249,24 @@ export function WhatsApp() {
   // (não em restauração de ID), (2) as mensagens estão carregadas, (3) o documento está visível e (4) a
   // janela está em foco. Roda uma única vez por (conversa, contador) e evita loop de mutation/refetch.
   const marcandoLeituraRef = useRef(false);
-  const leituraFeitaRef = useRef<string>('');
-  // true só após o usuário CLICAR numa conversa (distingue de ID restaurado no mount/reload).
-  const viewAtivaRef = useRef(false);
+  // id da conversa que o usuário SELECIONOU explicitamente (clique). Só este id pode ser marcado como lido —
+  // distingue de ID restaurado no mount/reload e de reatribuição programática (live.data[0]).
+  const selecaoUsuarioRef = useRef<string | null>(null);
   const markCurrentRead = () => {
-    if (!WA_REAL || !currentId || !viewAtivaRef.current) return;
+    if (!WA_REAL || !currentId) return;
+    if (selecaoUsuarioRef.current !== currentId) return; // só após clique do usuário NESTA conversa
     if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
     if (typeof document !== 'undefined' && typeof document.hasFocus === 'function' && !document.hasFocus()) return;
+    if (marcandoLeituraRef.current) return; // sem chamada concorrente (guard contra loop mutation/refetch)
     const c = contacts.find((x) => x.id === currentId);
     if (!c || !c.id || (c.unread ?? 0) === 0) return; // mensagens carregadas (conversa presente) e há não lidas
-    const chave = `${currentId}:${c.unread}`;
-    if (marcandoLeituraRef.current || leituraFeitaRef.current === chave) return; // uma vez por contador; sem loop
     marcandoLeituraRef.current = true;
-    leituraFeitaRef.current = chave;
-    waMarcarLida(currentId, true).then(() => void live.refetch()).catch(() => { leituraFeitaRef.current = ''; })
+    // reage a CADA novo não lido (inbound na conversa aberta): após refetch o contador zera; novo inbound
+    // (unread>0) dispara novamente. Em falha NÃO assume lido localmente — badge permanece e retenta no
+    // próximo focus/refetch; log sanitizado (sem toast em loop).
+    waMarcarLida(currentId, true)
+      .then(() => void live.refetch())
+      .catch((e) => { console.warn('[inbox] marcar lida falhou:', ((e as Error)?.message ?? 'erro').slice(0, 80)); })
       .finally(() => { marcandoLeituraRef.current = false; });
   };
   useEffect(() => { markCurrentRead(); }, [currentId, contacts]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -406,7 +410,7 @@ export function WhatsApp() {
   }
 
   function selectContact(id: string) {
-    viewAtivaRef.current = true; // seleção ativa do usuário (habilita marcar como lida)
+    selecaoUsuarioRef.current = id; // seleção explícita do usuário (habilita marcar ESTA conversa como lida)
     setCurrentId(id);
     if (isMobile) setDataOpen(false);
   }
