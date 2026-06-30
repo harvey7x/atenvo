@@ -309,14 +309,23 @@ export function WhatsApp() {
   const [vincVal, setVincVal] = useState<{ numero: string; mascarado: string; jid: string } | null>(null);
 
   async function validarNumeroVinc() {
-    if (vincBusy || !current.id || !replyCanalId) return;
+    if (vincBusy) return;
+    // telemetria sanitizada do clique (sem número completo)
+    try { console.log(JSON.stringify({ stage: 'validar_numero_click', conversation: (current.id || '').slice(0, 8), digits_length: (vincTel || '').replace(/\D/g, '').length })); } catch { /* ignore */ }
+    if (!current.id) { setVincErr('Conversa inválida. Reabra a conversa e tente de novo.'); return; }
     const tel = normalizeWaPhone(vincTel);
-    if (!tel) { setVincErr('Informe o número com DDI + DDD (ex.: 5551999990000).'); return; }
+    if (!tel) { setVincErr('Informe um telefone válido com DDD.'); return; }
+    // NÃO retornar em silêncio: sem canal de resposta, avise (antes era um early-return mudo).
+    if (!replyCanalId) { setVincErr('Não há canal de resposta definido para esta conversa. Selecione em "Responder por" e tente novamente.'); return; }
     setVincBusy(true); setVincErr(null); setVincVal(null);
     try {
       const r = await waValidarNumero(current.id, replyCanalId, tel);
+      try { console.log(JSON.stringify({ stage: 'validar_numero_result', result: r?.exists ? 'success' : 'not_found' })); } catch { /* ignore */ }
       setVincVal({ numero: r.numero, mascarado: r.numero_mascarado, jid: r.jid });
-    } catch (e) { setVincErr((e as Error).message); }
+    } catch (e) {
+      try { console.log(JSON.stringify({ stage: 'validar_numero_result', result: 'error' })); } catch { /* ignore */ }
+      setVincErr((e as Error).message);
+    }
     finally { setVincBusy(false); }
   }
   async function confirmarVinculo() {
