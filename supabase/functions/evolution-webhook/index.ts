@@ -1,4 +1,7 @@
 // evolution-webhook — eventos da Evolution. Sem JWT. Secret via webhook_config (constante).
+// v19: MÍDIA Fase A — ingere imagem/vídeo/documento/sticker (não só áudio) via midiaOf+baixarMidia:
+//      baixa, valida tamanho/ext segura, guarda no bucket privado, persiste tipo+metadados (mime/nome/
+//      tamanho/legenda/seconds) e usa a legenda como conteúdo. Falha => pendente recuperável (nunca oculta).
 // v18: Inbox Etapa A — inbound NOVO incrementa nao_lidas (idempotente via .select(); nunca fromMe) e
 //      REABRE conversa arquivada (arquivada_em=null), subindo ao topo. Webhook repetido não duplica contador.
 // v17: auto-recuperação de PN (Caso D #7): inbound com PN real garante a identidade WhatsApp também em
@@ -59,6 +62,39 @@ function extFromMime(mime: string): string {
   const m = mime.toLowerCase();
   if (m.includes('ogg')) return 'ogg'; if (m.includes('mpeg')) return 'mp3'; if (m.includes('mp4') || m.includes('m4a')) return 'm4a';
   if (m.includes('aac')) return 'aac'; if (m.includes('wav')) return 'wav'; if (m.includes('webm')) return 'webm'; return 'ogg';
+}
+function sanitizeNome(n: unknown): string | null {
+  const s = typeof n === 'string' ? n.trim() : '';
+  if (!s) return null;
+  return s.replace(/[/\\]+/g, '_').replace(/[^\w.\- ()]+/g, '_').slice(0, 120) || null; // anti path-traversal
+}
+function numOrNull(v: unknown): number | null { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : null; }
+// extensão segura por nome de arquivo (se houver) OU por MIME.
+function extFor(mime: string, nome: string | null): string {
+  if (nome && /\.[a-z0-9]{1,8}$/i.test(nome)) return (nome.split('.').pop() ?? '').toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin';
+  const m = (mime || '').toLowerCase();
+  if (m.includes('jpeg') || m.includes('jpg')) return 'jpg'; if (m.includes('png')) return 'png'; if (m.includes('webp')) return 'webp'; if (m.includes('gif')) return 'gif';
+  if (m.includes('mp4')) return 'mp4'; if (m.includes('quicktime') || m.includes('mov')) return 'mov'; if (m.includes('3gpp')) return '3gp';
+  if (m.includes('pdf')) return 'pdf'; if (m.includes('wordprocessingml')) return 'docx'; if (m.includes('msword')) return 'doc';
+  if (m.includes('spreadsheetml')) return 'xlsx'; if (m.includes('ms-excel')) return 'xls'; if (m.includes('zip')) return 'zip'; if (m.includes('text')) return 'txt';
+  if (m.includes('audio')) return extFromMime(m);
+  return 'bin';
+}
+interface MidiaDesc { kind: 'imagem' | 'video' | 'audio' | 'documento'; mime: string; nome: string | null; caption: string | null; seconds: number | null; ptt: boolean; tamanho: number | null; }
+// descritor genérico de mídia (imagem/vídeo/áudio/documento/sticker), já desembrulhado (ephemeral/viewOnce/docWithCaption).
+function midiaOf(message: Record<string, unknown> | undefined): MidiaDesc | null {
+  const m = unwrapMsg(message); if (!m) return null;
+  const img = m.imageMessage as { mimetype?: string; caption?: string; fileLength?: unknown } | undefined;
+  if (img) return { kind: 'imagem', mime: (img.mimetype ?? 'image/jpeg').split(';')[0].trim(), nome: null, caption: img.caption ?? null, seconds: null, ptt: false, tamanho: numOrNull(img.fileLength) };
+  const vid = m.videoMessage as { mimetype?: string; caption?: string; seconds?: number; fileLength?: unknown } | undefined;
+  if (vid) return { kind: 'video', mime: (vid.mimetype ?? 'video/mp4').split(';')[0].trim(), nome: null, caption: vid.caption ?? null, seconds: typeof vid.seconds === 'number' ? vid.seconds : null, ptt: false, tamanho: numOrNull(vid.fileLength) };
+  const aud = m.audioMessage as { mimetype?: string; ptt?: boolean; seconds?: number; fileLength?: unknown } | undefined;
+  if (aud) return { kind: 'audio', mime: (aud.mimetype ?? 'audio/ogg').split(';')[0].trim(), nome: null, caption: null, seconds: typeof aud.seconds === 'number' ? aud.seconds : null, ptt: !!aud.ptt, tamanho: numOrNull(aud.fileLength) };
+  const doc = m.documentMessage as { mimetype?: string; caption?: string; fileName?: string; title?: string; fileLength?: unknown } | undefined;
+  if (doc) return { kind: 'documento', mime: (doc.mimetype ?? 'application/octet-stream').split(';')[0].trim(), nome: sanitizeNome(doc.fileName ?? doc.title), caption: doc.caption ?? null, seconds: null, ptt: false, tamanho: numOrNull(doc.fileLength) };
+  const st = m.stickerMessage as { mimetype?: string; fileLength?: unknown } | undefined;
+  if (st) return { kind: 'imagem', mime: (st.mimetype ?? 'image/webp').split(';')[0].trim(), nome: 'sticker.webp', caption: null, seconds: null, ptt: false, tamanho: numOrNull(st.fileLength) };
+  return null;
 }
 const MAX_MEDIA = 20 * 1024 * 1024; // limite de segurança p/ áudio
 // baixa a mídia descriptografada via Evolution (base64). NÃO persiste URL temporária.
@@ -141,8 +177,9 @@ Deno.serve(async (req) => {
       const phone = digits(phoneJid); const lid = digits(lidJid);
       const msgObj = data.message as Record<string, unknown> | undefined;
       const corpo = textOf(msgObj);
-      const audio = audioOf(msgObj);
-      if (!corpo && !audio) { await finish('ignorado', { ignorado_motivo: 'sem_conteudo' }); return json({ ok: true }); }
+      const midia = midiaOf(msgObj);
+      const conteudoMsg = corpo ?? midia?.caption ?? null; // legenda da mídia vira o texto exibido
+      if (!corpo && !midia) { await finish('ignorado', { ignorado_motivo: 'sem_conteudo' }); return json({ ok: true }); }
       if (!phone && !lid) { await finish('ignorado', { ignorado_motivo: 'sem_identificador' }); return json({ ok: true }); }
       // Em saída o pushName é do dono da conta (não do destinatário) → não usar como nome do contato.
       const pushName = (!fromMe ? (data.pushName as string) : null) ?? (phone ?? lid!);
@@ -176,22 +213,30 @@ Deno.serve(async (req) => {
       const { data: conv } = await admin.from('conversas').select('id').eq('organizacao_id', orgId).eq('contato_id', contatoId).eq('canal_id', canal.id).neq('status', 'fechada').order('criado_em', { ascending: false }).limit(1).maybeSingle();
       if (conv) conversaId = conv.id; else { const { data: nc, error: e2 } = await admin.from('conversas').insert({ organizacao_id: orgId, contato_id: contatoId, canal_id: canal.id, status: 'aberta' }).select('id').single(); if (e2 || !nc) { await finish('erro', { erro: `conversas:${e2?.code ?? ''}:${(e2?.message ?? 'sem retorno').slice(0,180)}` }); return json({ ok: true }); } conversaId = nc.id; }
 
-      // ---- Mídia de áudio: baixa pela Evolution e guarda no bucket privado (mesmo do envio). ----
+      // ---- MÍDIA (imagem/vídeo/áudio/documento/sticker): baixa pela Evolution e guarda no bucket privado. ----
+      // Mesma cadeia do áudio (getBase64FromMediaMessage). Falha de download => PENDENTE recuperável, nunca descarta.
+      const viaTag = fromMe ? 'webhook_fromMe' : 'webhook';
       let tipoMsg = 'texto';
       let metaMsg: Record<string, unknown> | null = null;
-      if (audio) {
-        tipoMsg = 'audio';
-        try {
-          const dl = await baixarMidia(instanceName, data);
-          const mime = dl.mime || audio.mime;
-          const ext = extFromMime(mime);
-          const path = `${orgId}/wa-midia/${(provMsgId ?? crypto.randomUUID()).replace(/[^\w-]/g, '')}.${ext}`;
-          const up = await admin.storage.from('script-midia').upload(path, dl.bytes, { contentType: mime, upsert: true });
-          if (up.error) throw new Error(up.error.message);
-          metaMsg = { anexo_path: path, mime, tamanho: dl.bytes.length, nome: `audio.${ext}`, ptt: audio.ptt, seconds: audio.seconds, via: fromMe ? 'webhook_fromMe' : 'webhook' };
-        } catch (e) {
-          // mídia não baixada: persiste a mensagem como PENDENTE (recuperável), nunca descarta.
-          metaMsg = { midia_pendente: true, media_erro: String((e as Error).message ?? 'download').slice(0, 120), mime: audio.mime, ptt: audio.ptt, seconds: audio.seconds, media_key: key, via: fromMe ? 'webhook_fromMe' : 'webhook' };
+      if (midia) {
+        tipoMsg = midia.kind;
+        const baseMeta = { mime: midia.mime, nome: midia.nome, ptt: midia.ptt, seconds: midia.seconds, tamanho: midia.tamanho, legenda: midia.caption, via: viaTag };
+        if (midia.tamanho && midia.tamanho > MAX_MEDIA) {
+          metaMsg = { ...baseMeta, midia_pendente: true, media_erro: 'arquivo_excede_limite', status_midia: 'falhou', media_key: key };
+        } else {
+          try {
+            const dl = await baixarMidia(instanceName, data);
+            if (dl.bytes.length > MAX_MEDIA) throw new Error('arquivo_excede_limite');
+            const mime = dl.mime || midia.mime;
+            const ext = extFor(mime, midia.nome);
+            const path = `${orgId}/wa-midia/${(provMsgId ?? crypto.randomUUID()).replace(/[^\w-]/g, '')}.${ext}`;
+            const up = await admin.storage.from('script-midia').upload(path, dl.bytes, { contentType: mime, upsert: true });
+            if (up.error) throw new Error(up.error.message);
+            metaMsg = { ...baseMeta, mime, tamanho: dl.bytes.length, nome: midia.nome ?? `${midia.kind}.${ext}`, anexo_path: path, status_midia: 'disponivel' };
+          } catch (e) {
+            // mídia não baixada: persiste a mensagem como PENDENTE (recuperável), nunca descarta.
+            metaMsg = { ...baseMeta, midia_pendente: true, media_erro: String((e as Error).message ?? 'download').slice(0, 120), status_midia: 'falhou', media_key: key };
+          }
         }
       }
 
@@ -206,12 +251,12 @@ Deno.serve(async (req) => {
         const nowIso = new Date().toISOString();
         const { error: msgErr } = await admin.from('mensagens').upsert({
           conversa_id: conversaId, organizacao_id: orgId, direcao: 'saida', tipo: tipoMsg,
-          conteudo: corpo ?? null, texto_original: corpo ?? null, origem: 'telefone', id_externo: provMsgId,
+          conteudo: conteudoMsg ?? null, texto_original: conteudoMsg ?? null, origem: 'telefone', id_externo: provMsgId,
           status: 'entregue', enviada_em: nowIso, entregue_em: nowIso, metadados: metaMsg ?? { origem: 'telefone', via: 'webhook_fromMe' },
         }, { onConflict: 'id_externo', ignoreDuplicates: true });
         if (msgErr) { await finish('erro', { erro: `mensagens_out:${msgErr.code ?? ''}:${(msgErr.message ?? '').slice(0,180)}` }); return json({ ok: true }); }
         await admin.from('conversas').update({ ultima_interacao_em: nowIso, ultimo_canal_id: canal.id, ultimo_numero: canal.numero_conectado ?? null, ultimo_provider: canal.provider ?? 'whatsapp', ultima_msg_canal_em: nowIso }).eq('id', conversaId);
-        await finish('processado', { ignorado_motivo: `fromMe_telefone${tipoMsg === 'audio' ? '_audio' : ''}` }); return json({ ok: true });
+        await finish('processado', { ignorado_motivo: `fromMe_telefone${tipoMsg !== 'texto' ? '_' + tipoMsg : ''}` }); return json({ ok: true });
       }
 
       // ENTRADA — texto ou áudio.
@@ -220,7 +265,7 @@ Deno.serve(async (req) => {
       const nowEntradaIso = new Date().toISOString();
       // .select() para saber se o INSERT criou linha NOVA (ignoreDuplicates → array vazio em webhook repetido):
       // só então incrementamos não lidas e reabrimos arquivada — evita duplo-incremento por reentrega.
-      const { data: insArr, error: msgErr } = await admin.from('mensagens').upsert({ conversa_id: conversaId, organizacao_id: orgId, direcao: 'entrada', tipo: tipoMsg, conteudo: corpo ?? null, id_externo: provMsgId, status: 'entregue', recebida_em: nowEntradaIso, metadados: metaMsg ?? { via: 'webhook', origem: 'cliente' } }, { onConflict: 'id_externo', ignoreDuplicates: true }).select('id');
+      const { data: insArr, error: msgErr } = await admin.from('mensagens').upsert({ conversa_id: conversaId, organizacao_id: orgId, direcao: 'entrada', tipo: tipoMsg, conteudo: conteudoMsg ?? null, id_externo: provMsgId, status: 'entregue', recebida_em: nowEntradaIso, metadados: metaMsg ?? { via: 'webhook', origem: 'cliente' } }, { onConflict: 'id_externo', ignoreDuplicates: true }).select('id');
       if (msgErr) { await finish('erro', { erro: `mensagens:${msgErr.code ?? ''}:${(msgErr.message ?? '').slice(0,180)}` }); return json({ ok: true }); }
       const inboundNovo = Array.isArray(insArr) && insArr.length > 0; // false em reentrega (idempotente)
       if (inboundNovo) {

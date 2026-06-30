@@ -9,6 +9,7 @@ import { MediaComposer } from '@/components/MediaComposer';
 import { AudioRecorder } from '@/components/AudioRecorder';
 import { AudioMessage } from '@/components/AudioMessage';
 import { MsgImage } from '@/components/MsgImage';
+import { MsgVideo } from '@/components/MsgVideo';
 import { WhatsAppText } from '@/components/WhatsAppText';
 import { EmptyState } from '@/components/EmptyState';
 import { useScripts, useScriptEtapaCounts, aguardarConfirmacaoEnvio, traduzErroEnvio } from '@/data/scripts';
@@ -875,6 +876,14 @@ export function WhatsApp() {
                     {m.anexoPath
                       ? <MsgImage path={m.anexoPath} nome={m.nome} caption={m.text || undefined} metaNode={m.text ? metaInline : undefined} falhou={m.status === 'falhou'} onOpen={setLightbox} />
                       : <div className="media-card bubble-img"><div className="msg-img-fallback"><span className="mif-txt">Imagem indisponível</span></div></div>}
+                    {!m.text && tempo}
+                    {falhaActs}
+                  </>
+                ) : m.tipo === 'video' ? (
+                  <>
+                    {m.anexoPath
+                      ? <MsgVideo path={m.anexoPath} nome={m.nome} caption={m.text || undefined} metaNode={m.text ? metaInline : undefined} falhou={m.status === 'falhou'} />
+                      : <div className="media-card bubble-img"><div className="msg-img-fallback"><span className="mif-txt">Vídeo indisponível</span></div></div>}
                     {!m.text && tempo}
                     {falhaActs}
                   </>
