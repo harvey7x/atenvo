@@ -321,6 +321,8 @@ export function WhatsApp() {
   }
   async function confirmarVinculo() {
     if (vincBusy || !current.id || !replyCanalId || !vincVal) return;
+    // telemetria sanitizada do clique (sem telefone completo) — prova handler/mutation no fluxo real.
+    try { console.log(JSON.stringify({ stage: 'confirmar_vinculo_click', conversa: current.id.slice(0, 8), canal: replyCanalId.slice(0, 8), validado: true })); } catch { /* ignore */ }
     setVincBusy(true); setVincErr(null);
     try {
       await waVincularNumero(current.id, replyCanalId, vincVal.numero, vincVal.jid);

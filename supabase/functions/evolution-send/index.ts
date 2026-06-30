@@ -123,35 +123,43 @@ Deno.serve(async (req) => {
     // validar_numero: normaliza (sem inventar dígitos) e checa no WhatsApp (onWhatsApp). Aceita só exists=true.
     // vincular_numero: persiste o PN como identidade WhatsApp do contato (mantém o LID), via RPC auditada.
     if (action === 'validar_numero' || action === 'vincular_numero') {
+      // SEGURANÇA: o backend NUNCA confia em validação do frontend. AMBAS as ações validam o número no
+      // onWhatsApp server-side. 'vincular_numero' é ATÔMICA — valida e persiste na MESMA execução, usando o
+      // JID canônico obtido AGORA (ignora qualquer vinc_jid/flag enviado pelo cliente).
+      const convMask = String(conversa_id).slice(0, 8);
       const norm = digits(vinc_numero ?? text);
-      if (!norm || norm.length < 12) return json({ error: 'Informe o número com DDI + DDD (ex.: 5551999990000).', code: 'NUMERO_FORMATO' }, 422);
-      const mascarado = '••••' + norm.slice(-4);
-
-      // validar_numero: ÚNICO passo que checa o onWhatsApp (aceita só exists=true) e devolve o jid canônico.
-      if (action === 'validar_numero') {
-        let exists = false; let jid: string | null = null;
-        try {
-          const chk = await evolution.whatsappNumbers(instancia, [norm]);
-          const hit = (Array.isArray(chk) ? chk : []).find((h) => h?.exists === true && !!h?.jid);
-          if (hit?.jid) { exists = true; jid = String(hit.jid); }
-        } catch { return json({ error: 'Não foi possível validar o número agora. Tente novamente.', code: 'VALIDACAO_INDISPONIVEL' }, 502); }
-        if (!exists) return json({ error: 'Este número não tem WhatsApp ativo. Confira o DDI, o DDD e o nono dígito.', code: 'SEM_WHATSAPP' }, 422);
-        return json({ ok: true, exists: true, numero: norm, numero_mascarado: mascarado, jid });
+      if (!norm || norm.length < 12) {
+        console.log(JSON.stringify({ stage: 'validar_e_vincular', action, conversation: convMask, provider_validation: 'formato_invalido' }));
+        return json({ error: 'Informe o número com DDI + DDD (ex.: 5551999990000).', code: 'NUMERO_FORMATO' }, 422);
       }
+      const mascarado = '••••' + norm.slice(-4);
+      let exists = false; let jid: string | null = null;
+      try {
+        const chk = await evolution.whatsappNumbers(instancia, [norm]);
+        const hit = (Array.isArray(chk) ? chk : []).find((h) => h?.exists === true && !!h?.jid);
+        if (hit?.jid) { exists = true; jid = String(hit.jid); }
+      } catch {
+        console.log(JSON.stringify({ stage: 'validar_e_vincular', action, conversation: convMask, provider_validation: 'error' }));
+        return json({ error: 'Não foi possível validar o número agora. Tente novamente.', code: 'VALIDACAO_INDISPONIVEL' }, 502);
+      }
+      console.log(JSON.stringify({ stage: 'validar_e_vincular', action, conversation: convMask, provider_validation: exists ? 'exists_true' : 'exists_false' }));
+      if (!exists) return json({ error: 'Este número não tem WhatsApp ativo. Confira o DDI, o DDD e o nono dígito.', code: 'SEM_WHATSAPP' }, 422);
+      // passo visual: só devolve a máscara + jid (não grava nada)
+      if (action === 'validar_numero') return json({ ok: true, exists: true, numero: norm, numero_mascarado: mascarado, jid });
 
-      // vincular_numero: o número JÁ foi validado no passo anterior — NÃO revalida o onWhatsApp (era um 2º
-      // ponto de falha que impedia chegar ao RPC). Persiste direto via RPC auditada, com o jid já validado.
-      const jidVinc = (typeof vinc_jid === 'string' && vinc_jid) ? vinc_jid : `${norm}@s.whatsapp.net`;
-      const { data: rpc, error: rpcErr } = await admin.rpc('wa_vincular_numero', { p_conversa: conversa_id, p_numero: norm, p_jid: jidVinc, p_usuario: user.id });
+      // confirmação ATÔMICA: já validou exists=true acima → persiste via RPC auditada com o JID validado agora.
+      const { data: rpc, error: rpcErr } = await admin.rpc('wa_vincular_numero', { p_conversa: conversa_id, p_numero: norm, p_jid: jid, p_usuario: user.id });
       if (rpcErr) {
         const m = rpcErr.message ?? '';
+        const rpcRes = /pn_em_outro_contato|pn_confirmado_diferente/.test(m) ? 'conflict' : /sem_permissao/.test(m) ? 'permission' : 'error';
+        console.log(JSON.stringify({ stage: 'validar_e_vincular', conversation: convMask, provider_validation: 'exists_true', rpc_result: rpcRes }));
         if (/pn_em_outro_contato/.test(m)) return json({ error: 'Este número já está vinculado a outro contato. Revise os contatos antes de continuar.', code: 'CONFLITO_OUTRO_CONTATO' }, 409);
         if (/pn_confirmado_diferente/.test(m)) return json({ error: 'Este contato já tem um número confirmado diferente. Revise antes de alterar.', code: 'CONFLITO_PN' }, 409);
         if (/sem_permissao/.test(m)) return json({ error: 'Você não tem permissão para vincular este número.', code: 'SEM_PERMISSAO' }, 403);
         if (/numero_invalido/.test(m)) return json({ error: 'Valide novamente o número no WhatsApp.', code: 'NUMERO_INVALIDO' }, 422);
         return json({ error: 'Não foi possível concluir o vínculo. Tente novamente.', code: 'VINCULO_ERRO', detalhe: m.slice(0, 120) }, 500);
       }
-      console.log(`[send] corr=${corr} vinculo_pn conv=${conversa_id} num=${norm.slice(0,6)}`);
+      console.log(JSON.stringify({ stage: 'validar_e_vincular', conversation: convMask, provider_validation: 'exists_true', rpc_result: 'success' }));
       return json({ ok: true, vinculado: true, numero_mascarado: mascarado, rpc });
     }
 
