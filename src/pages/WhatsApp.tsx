@@ -382,6 +382,7 @@ export function WhatsApp() {
     if (enviandoRef.current) return; // impede dois envios concorrentes (duplo-clique / Enter duplo)
     if (WA_REAL && !currentId) return;
     if (canalIndisponivel) { toast('Este número está desconectado. Reconecte em Integrações para enviar.', 'warn'); return; }
+    if (semDestino) { toast('Vincule um número confirmado para responder.', 'warn'); return; }
     const now = new Date();
     const hh = ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
     const corpo = assinaturaNome ? `*${assinaturaNome}:*\n${v}` : v;
@@ -413,6 +414,7 @@ export function WhatsApp() {
   function retryMsg(m: WaMessage) {
     if (!m.id || !currentId || retryId) return;
     if (canalIndisponivel) { toast('Este número está desconectado. Reconecte em Integrações para reenviar.', 'warn'); return; }
+    if (semDestino) { toast('Vincule um número confirmado para responder.', 'warn'); return; }
     setRetryId(m.id);
     // otimista: a mesma bolha volta para "enviando" (pendente) e limpa o erro.
     setContacts((cur) => cur.map((c) => c.id === currentId ? { ...c, msgs: c.msgs.map((x) => x.id === m.id ? { ...x, status: 'pendente', erro: undefined } : x) } : c));
@@ -749,7 +751,7 @@ export function WhatsApp() {
               <span className="msg-falha-acts">
                 <button type="button" className="msg-falha-link" onClick={() => verErro(m)}>Ver erro</button>
                 <span className="msg-falha-sep">·</span>
-                <button type="button" className="msg-falha-link" disabled={!m.id || retryId === m.id} onClick={() => retryMsg(m)}>{retryId === m.id ? 'Reenviando…' : 'Tentar novamente'}</button>
+                <button type="button" className="msg-falha-link" disabled={!m.id || retryId === m.id || semDestino} title={semDestino ? 'Vincule um número confirmado para responder' : undefined} onClick={() => retryMsg(m)}>{retryId === m.id ? 'Reenviando…' : 'Tentar novamente'}</button>
                 <span className="msg-falha-sep">·</span>
                 <button type="button" className="msg-falha-link" disabled={!m.id || removendoId === m.id} onClick={() => setRemoverAlvo(m)}>{removendoId === m.id ? 'Removendo…' : 'Remover'}</button>
               </span>
