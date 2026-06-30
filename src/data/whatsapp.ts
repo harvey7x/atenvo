@@ -257,13 +257,35 @@ export function useAtribuirAtendimento() {
   const { currentOrg } = useOrg();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { contatoId: string; destinoId: string | null; esperadoId: string | null }) => {
+    mutationFn: async (input: { contatoId: string; destinoId: string | null; esperadoId: string | null; conversaId?: string | null; motivo?: string | null }) => {
       const r = await invoke<{ ok: boolean; responsavel_id: string | null }>('atribuir-atendimento', {
         contato_id: input.contatoId, destino_id: input.destinoId, esperado_id: input.esperadoId,
+        ...(input.conversaId ? { conversa_id: input.conversaId } : {}),
+        ...(input.motivo ? { motivo: input.motivo } : {}),
       });
       return r.responsavel_id ?? null;
     },
-    onSettled: () => qc.invalidateQueries({ queryKey: ['wa-conversas', currentOrg.id] }),
+    onSettled: () => { qc.invalidateQueries({ queryKey: ['wa-conversas', currentOrg.id] }); qc.invalidateQueries({ queryKey: ['wa-atividades'] }); },
+  });
+}
+
+/** Colaboração Etapa 1: timeline de atividade da conversa (assumido/transferido/devolvido/…). Leitura RLS. */
+export interface WaAtividade { id: string; tipo: string; usuario: string | null; motivo: string | null; em: string; }
+export function useWaAtividades(conversaId: string | null) {
+  return useQuery({
+    queryKey: ['wa-atividades', conversaId],
+    enabled: WA_REAL && !!conversaId,
+    queryFn: async (): Promise<WaAtividade[]> => {
+      const { data, error } = await supabase!.from('conversa_atividades')
+        .select('id, tipo, motivo, criado_em, usuario:usuarios(nome)')
+        .eq('conversa_id', conversaId as string).order('criado_em', { ascending: false }).limit(50);
+      if (error) throw new Error(error.message);
+      type Row = { id: string; tipo: string; motivo: string | null; criado_em: string; usuario: { nome: string } | { nome: string }[] | null };
+      return ((data as Row[]) ?? []).map((r) => ({
+        id: r.id, tipo: r.tipo, motivo: r.motivo, em: r.criado_em,
+        usuario: (Array.isArray(r.usuario) ? r.usuario[0]?.nome : r.usuario?.nome) ?? null,
+      }));
+    },
   });
 }
 

@@ -18,6 +18,8 @@ Deno.serve(async (req) => {
     // esperado_id: responsável que o frontend vê agora (trava de concorrência). undefined => não checa.
     const destino_id = (body?.destino_id ?? null) as string | null;
     const esperado_id = (body?.esperado_id ?? null) as string | null;
+    const conversa_id = (body?.conversa_id ?? null) as string | null; // p/ registrar a atividade na timeline
+    const motivo = typeof body?.motivo === 'string' ? (body.motivo as string).slice(0, 280) : null;
     if (!contato_id) return json({ error: 'contato_id é obrigatório.' }, 400);
 
     const admin = adminClient();
@@ -59,6 +61,17 @@ Deno.serve(async (req) => {
       usuario_id: user.id, acao, entidade: 'contatos', entidade_id: contato_id,
       dados_antes: { responsavel_id: esperado_id }, dados_depois: { responsavel_id: destino_id }, organizacao_id: org,
     });
+
+    // TIMELINE da conversa (colaboração Etapa 1): assumido | transferido | devolvido. Best-effort (não quebra a ação).
+    if (conversa_id) {
+      const tipo = destino_id === null ? 'devolvido' : destino_id === user.id ? 'assumido' : 'transferido';
+      try {
+        await admin.from('conversa_atividades').insert({
+          organizacao_id: org, conversa_id, usuario_id: user.id, tipo,
+          de: { responsavel_id: esperado_id }, para: { responsavel_id: destino_id }, motivo,
+        });
+      } catch { /* não bloqueia a atribuição */ }
+    }
 
     return json({ ok: true, responsavel_id: destino_id });
   } catch (e) {

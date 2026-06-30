@@ -4,7 +4,7 @@ import { useToast } from '@/hooks/useToast';
 import { useAuth } from '@/context/AuthContext';
 import { useOrg } from '@/context/OrgContext';
 import { WA_CONTACTS, initials, avatarColor, type WaContact, type WaMessage } from '@/data/whatsappDemo';
-import { useWaConversations, useSendWaMessage, useWaCanais, useAtribuirAtendimento, useIniciarConversaWa, normalizeWaPhone, mascararNumero, subirMidiaWa, urlAssinadaMidiaWa, removerMensagemFalha, waRecarregarAudio, waValidarNumero, waVincularNumero, waArquivar, waMarcarLida, WA_REAL } from '@/data/whatsapp';
+import { useWaConversations, useSendWaMessage, useWaCanais, useAtribuirAtendimento, useIniciarConversaWa, normalizeWaPhone, mascararNumero, subirMidiaWa, urlAssinadaMidiaWa, removerMensagemFalha, waRecarregarAudio, waValidarNumero, waVincularNumero, waArquivar, waMarcarLida, useWaAtividades, WA_REAL } from '@/data/whatsapp';
 import { MediaComposer } from '@/components/MediaComposer';
 import { AudioRecorder } from '@/components/AudioRecorder';
 import { AudioMessage } from '@/components/AudioMessage';
@@ -143,6 +143,7 @@ export function WhatsApp() {
     if (!WA_REAL) return 'antonio';
     try { return sessionStorage.getItem(CURR_KEY) || ''; } catch { return ''; }
   });
+  const atividadesQ = useWaAtividades(WA_REAL ? (currentId || null) : null); // timeline de atendimento (colab. E1)
   const [tab, setTab] = useState('todos');
   const [search, setSearch] = useState('');
   const [filtroCanal, setFiltroCanal] = useState<string | null>(null);   // funil: filtra por número/canal
@@ -158,6 +159,7 @@ export function WhatsApp() {
   const [transferOpen, setTransferOpen] = useState(false);               // modal de transferência
   const [transferBusca, setTransferBusca] = useState('');                // busca no modal
   const [transferSel, setTransferSel] = useState<string>('');            // usuário selecionado p/ transferir
+  const [transferMotivo, setTransferMotivo] = useState('');              // motivo (obrigatório) da transferência
   const [atribuindo, setAtribuindo] = useState(false);                   // trava de clique-duplo (assumir/transferir)
   const [lightbox, setLightbox] = useState<string | null>(null);         // imagem ampliada no histórico
   const [replyChip, setReplyChip] = useState('Chip 1');       // modo mock
@@ -547,8 +549,19 @@ export function WhatsApp() {
     setAtribuindo(true);
     const esperado = current.respId || null;
     setContacts((cur) => cur.map((c) => c.id === current.id ? { ...c, respId: user.id } : c)); // otimista
-    try { await atribuirMut.mutateAsync({ contatoId: current.contatoId, destinoId: user.id, esperadoId: esperado }); toast('Você assumiu o atendimento'); }
+    try { await atribuirMut.mutateAsync({ contatoId: current.contatoId, destinoId: user.id, esperadoId: esperado, conversaId: current.id }); toast('Você assumiu o atendimento'); }
     catch (e) { setContacts((cur) => cur.map((c) => c.id === current.id ? { ...c, respId: esperado } : c)); toast((e as Error).message || 'Falha ao assumir', 'warn'); }
+    finally { setAtribuindo(false); }
+  }
+  /** Devolver o atendimento para a fila (responsável = ninguém). Registra na timeline. */
+  async function devolverParaFila() {
+    setPop(null);
+    if (!current.contatoId || atribuindo || !current.respId) return;
+    setAtribuindo(true);
+    const esperado = current.respId || null;
+    setContacts((cur) => cur.map((c) => c.id === current.id ? { ...c, respId: null } : c)); // otimista
+    try { await atribuirMut.mutateAsync({ contatoId: current.contatoId, destinoId: null, esperadoId: esperado, conversaId: current.id }); toast('Atendimento devolvido para a fila'); }
+    catch (e) { setContacts((cur) => cur.map((c) => c.id === current.id ? { ...c, respId: esperado } : c)); toast((e as Error).message || 'Falha ao devolver', 'warn'); }
     finally { setAtribuindo(false); }
   }
   /** Abre o modal de Nova conversa, pré-selecionando um canal conectado (o de resposta, se houver). */
@@ -579,14 +592,15 @@ export function WhatsApp() {
       setNovoBusy(false);
     }
   }
-  function abrirTransferir() { setPop(null); setTransferSel(''); setTransferBusca(''); setTransferOpen(true); }
-  /** Transferir o atendimento para outro usuário ativo da organização. */
+  function abrirTransferir() { setPop(null); setTransferSel(''); setTransferBusca(''); setTransferMotivo(''); setTransferOpen(true); }
+  /** Transferir o atendimento para outro usuário ativo da organização (motivo obrigatório; registra timeline). */
   async function transferir(destinoId: string) {
     if (!current.contatoId || !destinoId || atribuindo) return;
+    if (!transferMotivo.trim()) { toast('Informe o motivo da transferência.', 'warn'); return; }
     setAtribuindo(true);
     const esperado = current.respId || null;
     setContacts((cur) => cur.map((c) => c.id === current.id ? { ...c, respId: destinoId } : c)); // otimista
-    try { await atribuirMut.mutateAsync({ contatoId: current.contatoId, destinoId, esperadoId: esperado }); setTransferOpen(false); setTransferSel(''); setTransferBusca(''); toast('Atendimento transferido'); }
+    try { await atribuirMut.mutateAsync({ contatoId: current.contatoId, destinoId, esperadoId: esperado, conversaId: current.id, motivo: transferMotivo.trim() }); setTransferOpen(false); setTransferSel(''); setTransferBusca(''); setTransferMotivo(''); toast('Atendimento transferido'); }
     catch (e) { setContacts((cur) => cur.map((c) => c.id === current.id ? { ...c, respId: esperado } : c)); toast((e as Error).message || 'Falha ao transferir', 'warn'); }
     finally { setAtribuindo(false); }
   }
@@ -1025,6 +1039,7 @@ export function WhatsApp() {
                   ? (<>
                       {current.respId === user?.id && <span className="resp-hint">Você é o responsável</span>}
                       <button className="resp-btn" disabled={atribuindo} onClick={abrirTransferir}><IcTransfer />Transferir atendimento</button>
+                      <button className="resp-btn" disabled={atribuindo} onClick={devolverParaFila}>Devolver para a fila</button>
                     </>)
                   : <button className="resp-btn primary" disabled={atribuindo} onClick={assumir}><IcUserPlus />{atribuindo ? 'Assumindo…' : 'Assumir atendimento'}</button>
                 )}
@@ -1032,6 +1047,28 @@ export function WhatsApp() {
             )}
           </div>
           <div className="dfield"><div className="dlabel">Origem do lead</div><div className="dval with-ic"><IcWa />{current.origin}</div></div>
+
+          {/* Colaboração E1: histórico de atividade do atendimento (timeline) */}
+          {current.id && (atividadesQ.data?.length ?? 0) > 0 && (
+            <div className="dfield"><div className="dlabel">Atividade do atendimento</div>
+              <ul className="ativ-timeline" style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {atividadesQ.data!.map((a) => {
+                  const verbo = a.tipo === 'assumido' ? 'assumiu o atendimento'
+                    : a.tipo === 'transferido' ? 'transferiu o atendimento'
+                    : a.tipo === 'devolvido' ? 'devolveu para a fila'
+                    : a.tipo;
+                  const quando = (() => { try { return new Date(a.em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); } catch { return ''; } })();
+                  return (
+                    <li key={a.id} style={{ fontSize: 12.5, lineHeight: 1.4 }}>
+                      <span style={{ fontWeight: 600 }}>{a.usuario ?? 'Alguém'}</span> {verbo}
+                      <span style={{ color: 'var(--muted)' }}> · {quando}</span>
+                      {a.motivo && <div style={{ color: 'var(--muted)' }}>Motivo: {a.motivo}</div>}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
 
           {/* #3 ETIQUETAS coloridas */}
           <div className="dfield">
@@ -1246,7 +1283,7 @@ export function WhatsApp() {
       <Modal open={transferOpen} onClose={() => setTransferOpen(false)} title="Transferir atendimento" width={460}
         footer={<>
           <button className="atv-btn" disabled={atribuindo} onClick={() => setTransferOpen(false)}>Cancelar</button>
-          <button className="atv-btn primary" disabled={!transferSel || transferSel === current.respId || atribuindo} onClick={() => transferir(transferSel)}>{atribuindo ? 'Transferindo…' : 'Transferir'}</button>
+          <button className="atv-btn primary" disabled={!transferSel || transferSel === current.respId || !transferMotivo.trim() || atribuindo} onClick={() => transferir(transferSel)}>{atribuindo ? 'Transferindo…' : 'Transferir'}</button>
         </>}>
         <div className="tr-atual">Responsável atual: <strong>{respNome ?? 'Sem responsável'}</strong></div>
         <input className="atv-input" placeholder="Buscar atendente…" value={transferBusca} onChange={(e) => setTransferBusca(e.target.value)} autoFocus />
@@ -1261,6 +1298,9 @@ export function WhatsApp() {
             </button>
           ))}
         </div>
+        <label className="nc-field" style={{ marginTop: 10 }}><span className="nc-label">Motivo da transferência <span style={{ color: 'var(--warn)' }}>*</span></span>
+          <input className="atv-input" placeholder="Ex.: atendimento presencial, especialista, ausência…" value={transferMotivo} onChange={(e) => setTransferMotivo(e.target.value)} maxLength={280} />
+        </label>
       </Modal>
 
       {lightbox && (
