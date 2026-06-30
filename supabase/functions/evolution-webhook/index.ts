@@ -1,4 +1,6 @@
 // evolution-webhook — eventos da Evolution. Sem JWT. Secret via webhook_config (constante).
+// v15: connection.update(open) auto-consolida canal DUPLICADO do mesmo número (reconexão que criou canal
+//      novo) no canal histórico via RPC wa_consolidar_canal_por_numero (idempotente, best-effort).
 // v14: INGESTÃO DE ÁUDIO (entrada e fromMe/celular): baixa a mídia (getBase64FromMediaMessage), guarda no
 //      bucket privado e persiste tipo='audio' (idempotente por id_externo; falha de download => pendente
 //      recuperável). NÃO altera o envio de áudio (evolution-send) nem o parser LID/secret/messages.update.
@@ -115,6 +117,9 @@ Deno.serve(async (req) => {
         const numero = digits((data.wuid as string) ?? (data.ownerJid as string));
         await admin.from('canais').update({ status_integracao: 'conectado', ativo: true, ...(numero ? { numero_conectado: numero } : {}), conectado_em: new Date().toISOString(), ultima_sincronizacao: new Date().toISOString() }).eq('id', canal.id);
         await admin.from('integracoes').update({ status: 'conectado' }).eq('canal_id', canal.id);
+        // Auto-cura de canal DUPLICADO do mesmo número (reconexão que criou canal novo em vez de reusar o
+        // histórico): reabsorve no canal histórico, preservando conversas/histórico. Idempotente (best-effort).
+        if (numero) { try { await admin.rpc('wa_consolidar_canal_por_numero', { p_org: canal.organizacao_id, p_canal_ativo: canal.id }); } catch { /* não quebra o webhook */ } }
       } else if (state === 'close') { await admin.from('canais').update({ status_integracao: 'desconectado' }).eq('id', canal.id); }
       await finish('processado'); return json({ ok: true });
     }
