@@ -5,7 +5,7 @@ import { useToast } from '@/hooks/useToast';
 import { useOrg } from '@/context/OrgContext';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { WhatsAppConnect } from '@/components/WhatsAppConnect';
-import { useWaCanais, useWaLimite, waRemove, mascararNumero, useFontesAquisicao, waUpdateComercial, type WaCanal, type ComercialInput } from '@/data/whatsapp';
+import { useWaCanais, useWaLimite, useWaHealth, waRemove, waTestarEnvio, mascararNumero, useFontesAquisicao, waUpdateComercial, type WaCanal, type ComercialInput, type WaHealthCanal } from '@/data/whatsapp';
 import { FB_REAL, useFbStatus, fbAuthStart, fbPages, fbConnect, fbDisconnect } from '@/data/facebook';
 import { useOrgUsuarios } from '@/data/atendimento';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -17,6 +17,22 @@ const ORIGEM_TIPOS = [
   { id: 'indicacao', r: 'Indicação' }, { id: 'campanha', r: 'Campanha' }, { id: 'parceiro', r: 'Parceiro' }, { id: 'outro', r: 'Outro' },
 ];
 const tipoOrigemLabel = (t: string | null) => ORIGEM_TIPOS.find((x) => x.id === t)?.r || null;
+
+// Saúde: rótulo e cor do estado derivado (badge principal reflete a saúde REAL, não só "Conectado").
+const ESTADO_LABEL: Record<string, string> = {
+  saudavel: 'Saudável', enviando_sem_receber: 'Enviando · sem recebimento', instavel: 'Instável',
+  sem_dados: 'Sem dados suficientes', reconectando: 'Reconectando', possivel_restricao: 'Problema no envio',
+  falha_total: 'Falha no envio', desconectado: 'Desconectado',
+};
+const COR_BG: Record<string, string> = { verde: 'var(--ok-soft)', amarelo: 'var(--warn-soft)', laranja: '#fbe6d2', vermelho: 'var(--err-soft)' };
+const COR_FG: Record<string, string> = { verde: 'var(--ok)', amarelo: 'var(--warn)', laranja: '#c2630c', vermelho: 'var(--err)' };
+const horaCurta = (iso?: string | null) => (iso ? new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—');
+const haQuanto = (iso?: string | null) => {
+  if (!iso) return '—';
+  const min = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if (min < 1) return 'agora'; if (min < 60) return `há ${min} min`;
+  const h = Math.round(min / 60); if (h < 24) return `há ${h} h`; return `há ${Math.round(h / 24)} d`;
+};
 
 const IcWa = () => <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a9.9 9.9 0 0 0-8.5 15l-1.3 4.8 4.9-1.3A9.9 9.9 0 1 0 12 2z" /></svg>;
 const IcFb = () => <svg viewBox="0 0 24 24" fill="currentColor"><path d="M22 12a10 10 0 1 0-11.6 9.9v-7H8v-2.9h2.4V9.8c0-2.4 1.4-3.7 3.6-3.7 1 0 2.1.2 2.1.2v2.3h-1.2c-1.2 0-1.5.7-1.5 1.4V12H16l-.4 2.9h-2.2v7A10 10 0 0 0 22 12z" /></svg>;
@@ -59,6 +75,8 @@ export function Integracoes() {
   const [config, setConfig] = useState<WaCanal | null>(null);
   const [waFiltro, setWaFiltro] = useState<'ativos' | 'desconectados' | 'todos'>('ativos');
   const [reconectar, setReconectar] = useState<{ id: string; alias: string } | null>(null);
+  const healthQ = useWaHealth();
+  const [diag, setDiag] = useState<string | null>(null); // canalId em diagnóstico
   const podeConfig = currentOrg.role === 'admin' || currentOrg.role === 'gestor';
 
   async function confirmarRemocao() {
@@ -82,6 +100,7 @@ export function Integracoes() {
   const ehAtivo = (s: string) => s === 'conectado' || s === 'sincronizando';
   const canaisVis = canais.filter((c) => waFiltro === 'todos' ? true : waFiltro === 'ativos' ? ehAtivo(c.status) : !ehAtivo(c.status));
   const nDesconectados = canais.filter((c) => !ehAtivo(c.status)).length;
+  const healthMap = new Map((healthQ.data?.canais ?? []).map((h) => [h.canalId, h]));
   // Limite/contagem na MESMA fonte do backend (organizacao_limites + canais ativos). Sem número fixo no frontend.
   const waUsados = waLimite.data?.usados ?? canais.length;
   const waLimiteEfetivo = waLimite.data?.limite ?? 0;
@@ -188,6 +207,7 @@ export function Integracoes() {
                         const st = WA_ST[c.status] || { t: c.status, cls: 'neutral' };
                         const ativo = ehAtivo(c.status);
                         const removendo = remLoading && remocao?.tipo === 'whatsapp' && remocao?.id === c.id;
+                        const h = healthMap.get(c.id);
                         return (
                           <div className="conn-row" key={c.id}>
                             <div className="conn-info">
@@ -197,10 +217,21 @@ export function Integracoes() {
                                 {tipoOrigemLabel(c.origemTipo) ? ` · ${tipoOrigemLabel(c.origemTipo)}` : ''}
                                 {c.gestorNome ? ` · Gestor: ${c.gestorNome}` : ''}
                               </span>
+                              {/* saúde real (telemetria), não só "Conectado" */}
+                              {h ? (
+                                <span className="conn-sub">
+                                  Recebimento: {h.recebimento} · Envio: {h.envio}
+                                  {h.taxa !== null ? ` · ${h.entregues}/${h.enviados} envios entregues` : ''}
+                                  {h.lastErrorAt ? ` · último erro ${haQuanto(h.lastErrorAt)}` : ''}
+                                </span>
+                              ) : (healthQ.isLoading && <span className="conn-sub" style={{ color: 'var(--muted)' }}>Carregando diagnóstico…</span>)}
                               {!c.origemTipo && !c.gestorId && <span className="conn-sub" style={{ color: 'var(--warn)' }}>Origem comercial não configurada</span>}
                             </div>
                             <div className="conn-actions">
-                              <span className={'badge ' + st.cls}>{st.dot && <span className="dot" />}{st.t}</span>
+                              {h
+                                ? <span className="badge" style={{ background: COR_BG[h.cor], color: COR_FG[h.cor] }}><span className="dot" style={{ background: COR_FG[h.cor] }} />{ESTADO_LABEL[h.estado] ?? h.estado}</span>
+                                : <span className={'badge ' + st.cls}>{st.dot && <span className="dot" />}{st.t}</span>}
+                              <button className="btn-sm" onClick={() => setDiag(c.id)}>Ver diagnóstico</button>
                               {podeConfig && <button className="btn-sm" disabled={removendo} onClick={() => setConfig(c)}>Configurar origem comercial</button>}
                               {podeConfig && !ativo && <button className="btn-sm acc" disabled={removendo || waCheio} title={waCheio ? 'Limite atingido — desconecte outro número ou contrate um adicional.' : undefined} onClick={() => setReconectar({ id: c.id, alias: c.alias })}>Reconectar</button>}
                               {podeConfig && ativo && <button className="btn-sm danger" disabled={removendo} onClick={() => setRemocao({ tipo: 'whatsapp', id: c.id, nome: c.alias + (c.numero ? ' · ' + mascararNumero(c.numero) : '') })}>{removendo ? 'Desconectando…' : 'Desconectar'}</button>}
@@ -323,6 +354,18 @@ export function Integracoes() {
         onConfirm={confirmarRemocao} onCancel={() => { if (!remLoading) setRemocao(null); }} />
 
       {config && <ConfigOrigemModal canal={config} onClose={() => setConfig(null)} onSaved={() => { setConfig(null); qc.invalidateQueries({ queryKey: ['wa-canais', currentOrg.id] }); qc.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).startsWith('rel-') }); toast('Configuração salva.'); }} />}
+
+      {diag && (() => {
+        const h = healthMap.get(diag);
+        if (!h) return null;
+        const podeAgir = healthQ.data?.podeAgir ?? podeConfig;
+        return <DiagnosticoModal h={h} podeAgir={podeAgir} atualizando={healthQ.isFetching}
+          onClose={() => setDiag(null)}
+          onAtualizar={() => healthQ.refetch()}
+          onReconectar={() => { setDiag(null); setReconectar({ id: h.canalId, alias: h.nome }); }}
+          onDesconectar={() => { setDiag(null); setRemocao({ tipo: 'whatsapp', id: h.canalId, nome: h.nome + ' · ' + h.numeroMasc }); }}
+          onTeste={(to, text) => waTestarEnvio(currentOrg.id, h.canalId, to, text)} />;
+      })()}
     </div>
   );
 }
@@ -357,6 +400,86 @@ function ConfigOrigemModal({ canal, onClose, onSaved }: { canal: WaCanal; onClos
           <div className="cfg-field"><label>Campanha</label><input className="ctrl" placeholder="Opcional" value={form.campanha || ''} onChange={(e) => set('campanha', e.target.value)} disabled={busy} /></div>
         </div>
         <div className="cfg-field"><label>Observação comercial</label><textarea className="ctrl cfg-ta" rows={2} value={form.observacao_comercial || ''} onChange={(e) => set('observacao_comercial', e.target.value)} disabled={busy} /></div>
+      </div>
+    </Modal>
+  );
+}
+
+/* ===================== Diagnóstico de saúde da conexão ===================== */
+function DiagnosticoModal({ h, podeAgir, atualizando, onClose, onAtualizar, onReconectar, onDesconectar, onTeste }: {
+  h: WaHealthCanal; podeAgir: boolean; atualizando: boolean;
+  onClose: () => void; onAtualizar: () => void; onReconectar: () => void; onDesconectar: () => void;
+  onTeste: (to: string, text: string) => Promise<{ aceito: boolean; key_id: string | null; status: number }>;
+}) {
+  const { toast } = useToast();
+  const [testando, setTestando] = useState(false);
+  const [testeForm, setTesteForm] = useState<{ to: string; text: string } | null>(null);
+  const stOK = (s: string) => ['SERVER_ACK', 'DELIVERY_ACK', 'READ', 'PLAYED'].includes(s);
+  const ativo = h.statusIntegracao === 'conectado' || h.statusIntegracao === 'sincronizando';
+  async function enviarTeste() {
+    if (!testeForm || testando) return;
+    const to = testeForm.to.replace(/[^0-9]/g, '');
+    if (to.length < 12) { toast('Informe o número com DDI e DDD (ex.: 55DD9XXXXXXXX).', 'warn'); return; }
+    setTestando(true);
+    try {
+      const r = await onTeste(to, testeForm.text || 'Teste Atenvo');
+      toast(r.aceito ? `Teste aceito pela Evolution (key ${r.key_id}). Atualize para ver o status.` : `O provedor não confirmou (HTTP ${r.status}).`, r.aceito ? undefined : 'warn');
+      setTesteForm(null);
+    } catch (e) { toast((e as Error).message || 'Falha no teste de envio.', 'warn'); }
+    finally { setTestando(false); }
+  }
+  return (
+    <Modal open onClose={onClose} closeOnBackdrop width={620}
+      title={<div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}><span>Diagnóstico</span><strong style={{ color: 'var(--ink)' }}>{h.nome}</strong>
+        <span className="badge" style={{ background: COR_BG[h.cor], color: COR_FG[h.cor] }}><span className="dot" style={{ background: COR_FG[h.cor] }} />{ESTADO_LABEL[h.estado] ?? h.estado}</span></div>}
+      footer={<>
+        <button className="atv-btn" disabled={atualizando} onClick={onAtualizar}>{atualizando ? 'Atualizando…' : 'Atualizar diagnóstico'}</button>
+        {podeAgir && ativo && <button className="atv-btn" onClick={() => setTesteForm({ to: '', text: 'Teste Atenvo' })}>Enviar mensagem de teste</button>}
+        {podeAgir && !ativo && <button className="atv-btn primary" onClick={onReconectar}>Reconectar</button>}
+        {podeAgir && ativo && <button className="atv-btn" onClick={onDesconectar}>Desconectar</button>}
+        <button className="atv-btn" onClick={onClose}>Fechar</button>
+      </>}>
+      <div className="cfg-form">
+        <p className="lead" style={{ marginTop: 0 }}>{h.recomendacao}</p>
+        <div className="diag-grid">
+          <div><span className="dl">Estado da sessão</span><span className="dv">{h.evoState ?? h.statusIntegracao}</span></div>
+          <div><span className="dl">Recebimento</span><span className="dv">{h.recebimento}</span></div>
+          <div><span className="dl">Envio</span><span className="dv">{h.envio}{h.taxa !== null ? ` · ${h.entregues}/${h.enviados} (${h.taxa}%)` : ''}</span></div>
+          <div><span className="dl">Erros consecutivos</span><span className="dv">{h.consecErros}</span></div>
+          <div><span className="dl">Instância</span><span className="dv" style={{ fontSize: 11 }}>{h.instancia ?? '—'}</span></div>
+          <div><span className="dl">Número</span><span className="dv">{h.numeroMasc}</span></div>
+          <div><span className="dl">Último recebido</span><span className="dv">{haQuanto(h.lastInbound)}</span></div>
+          <div><span className="dl">Último entregue</span><span className="dv">{haQuanto(h.lastDelivered)}</span></div>
+          <div><span className="dl">Webhook</span><span className="dv">{h.webhookOk === null ? '—' : h.webhookOk ? 'ativo' : 'inativo'} · {h.lastWebhookEvent ?? '—'} ({haQuanto(h.lastWebhook)})</span></div>
+          <div><span className="dl">Evolution</span><span className="dv">{h.versao ?? '—'}</span></div>
+        </div>
+        {h.lastErrorMsg && <div className="atv-field-err" style={{ marginTop: 8 }}>Último erro técnico: {h.lastErrorMsg}</div>}
+        <div className="sechead" style={{ margin: '14px 0 6px', fontSize: 13, fontWeight: 600 }}>Últimos {h.last10.length} envios</div>
+        {h.last10.length === 0 ? <div className="conn-sub" style={{ color: 'var(--muted)' }}>Sem envios recentes.</div> : (
+          <div className="diag-l10">
+            {h.last10.map((x, i) => (
+              <div className="diag-l10-row" key={i}>
+                <span>{horaCurta(x.hora)}</span>
+                <span style={{ color: stOK(x.status) ? 'var(--ok)' : (x.status === 'ERROR' ? 'var(--err)' : 'var(--muted)') }}>{x.status}</span>
+                <span>•••{x.destino}</span>
+                <span className="diag-erro">{x.erro ?? ''}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {testeForm && (
+          <div style={{ marginTop: 12, borderTop: '1px solid var(--line)', paddingTop: 10 }}>
+            <div className="sechead" style={{ margin: '0 0 6px', fontSize: 13, fontWeight: 600 }}>Enviar mensagem de teste (envio REAL)</div>
+            <div className="cfg-2col">
+              <div className="cfg-field"><label>Número (DDI+DDD)</label><input className="ctrl" placeholder="55DD9XXXXXXXX" value={testeForm.to} onChange={(e) => setTesteForm((f) => f ? { ...f, to: e.target.value } : f)} /></div>
+              <div className="cfg-field"><label>Texto</label><input className="ctrl" value={testeForm.text} onChange={(e) => setTesteForm((f) => f ? { ...f, text: e.target.value } : f)} /></div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+              <button className="atv-btn" disabled={testando} onClick={() => setTesteForm(null)}>Cancelar</button>
+              <button className="atv-btn primary" disabled={testando} onClick={enviarTeste}>{testando ? 'Enviando…' : 'Confirmar envio de teste'}</button>
+            </div>
+          </div>
+        )}
       </div>
     </Modal>
   );

@@ -372,3 +372,14 @@
 .cfg-field label{font-size:12.5px;font-weight:600;color:var(--ink-2)}
 .cfg-ta{resize:vertical;min-height:46px;font-family:inherit;padding-top:9px}
 @media (max-width:560px){.cfg-2col{grid-template-columns:1fr}}
+
+/* ===== Diagnóstico de saúde ===== */
+.integracoes-page .diag-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;margin:6px 0}
+.integracoes-page .diag-grid > div{display:flex;flex-direction:column}
+.integracoes-page .diag-grid .dl{font-size:11px;color:var(--muted);font-weight:600}
+.integracoes-page .diag-grid .dv{font-size:13px;color:var(--ink)}
+.integracoes-page .diag-l10{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.integracoes-page .diag-l10-row{display:grid;grid-template-columns:96px 96px 64px 1fr;gap:8px;align-items:center;padding:6px 10px;border-bottom:1px solid var(--line);font-size:12px}
+.integracoes-page .diag-l10-row:last-child{border-bottom:0}
+.integracoes-page .diag-l10-row .diag-erro{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:560px){.integracoes-page .diag-grid{grid-template-columns:1fr}.integracoes-page .diag-l10-row{grid-template-columns:72px 80px 1fr}.integracoes-page .diag-l10-row .diag-erro{display:none}}

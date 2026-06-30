@@ -354,6 +354,31 @@ export function useWaLimite() {
   });
 }
 
+/* ===================== Saúde das conexões (diagnóstico real, read-only) ===================== */
+export interface WaHealthL10 { hora: string; status: string; destino: string; erro: string | null }
+export interface WaHealthCanal {
+  canalId: string; nome: string; numeroMasc: string; instancia: string | null;
+  statusIntegracao: string; ativo: boolean; evoState: string | null; webhookOk: boolean | null; versao: string | null;
+  estado: string; cor: 'verde' | 'amarelo' | 'laranja' | 'vermelho'; recebimento: string; envio: string;
+  enviados: number; entregues: number; erros: number; consecErros: number; taxa: number | null;
+  lastInbound: string | null; lastDelivered: string | null; lastWebhook: string | null; lastWebhookEvent: string | null;
+  lastErrorAt: string | null; lastErrorMsg: string | null; last10: WaHealthL10[]; recomendacao: string;
+}
+export interface WaHealthResp { canais: WaHealthCanal[]; evolutionVersion: string | null; podeAgir: boolean }
+/** Diagnóstico de saúde de TODAS as conexões WhatsApp da org (Edge Function protegida, read-only). */
+export function useWaHealth() {
+  const { currentOrg } = useOrg();
+  return useQuery({
+    queryKey: ['wa-health', currentOrg.id],
+    enabled: WA_REAL,
+    refetchInterval: 60_000,
+    queryFn: () => invoke<WaHealthResp>('wa-health', { organizacao_id: currentOrg.id, action: 'status' }),
+  });
+}
+/** Teste de envio EXPLÍCITO (não automático): só após confirmação do usuário com número/texto. */
+export const waTestarEnvio = (orgId: string, canalId: string, to: string, text: string) =>
+  invoke<{ ok: boolean; status: number; key_id: string | null; aceito: boolean }>('wa-health', { organizacao_id: orgId, action: 'send-test', canal_id: canalId, to, text });
+
 /* ===================== Configuração comercial da conexão ===================== */
 export interface FonteAquisicao { id: string; nome: string }
 export function useFontesAquisicao() {
