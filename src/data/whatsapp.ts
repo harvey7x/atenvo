@@ -42,6 +42,9 @@ export const waRemove = (orgId: string, canalId: string) =>
 /** Reconectar: reusa o MESMO canal histórico e cria uma nova instância Evolution (novo QR). */
 export const waReconnect = (orgId: string, canalId: string) =>
   invoke<CreateResult>('evolution-manage', { action: 'reconnect', organizacao_id: orgId, canal_id: canalId });
+/** Recarregar a mídia de uma mensagem de áudio pendente (download falhou no webhook). */
+export const waRecarregarAudio = (orgId: string, mensagemId: string) =>
+  invoke<{ ok: boolean }>('wa-midia', { action: 'retry-audio', organizacao_id: orgId, mensagem_id: mensagemId });
 
 /** Remove uma mensagem de SAÍDA com falha (não entregue) via RPC segura. Retorna a conversa afetada.
  *  A RPC valida auth/organização/acesso e recusa mensagens entregues, lidas ou de entrada. */
@@ -61,7 +64,7 @@ const STATUS_LABEL: Record<string, string> = {
   aberta: 'Aberta', em_atendimento: 'Em atendimento', pendente: 'Pendente', resolvida: 'Resolvida', fechada: 'Fechada',
 };
 
-interface DbMsg { id: string; direcao: string; conteudo: string | null; tipo: string; enviada_em: string | null; recebida_em: string | null; criado_em: string | null; origem: string | null; status: string | null; erro_envio: string | null; metadados: { anexo_path?: string; mime?: string; tamanho?: number; nome?: string } | null; }
+interface DbMsg { id: string; direcao: string; conteudo: string | null; tipo: string; enviada_em: string | null; recebida_em: string | null; criado_em: string | null; origem: string | null; status: string | null; erro_envio: string | null; metadados: { anexo_path?: string; mime?: string; tamanho?: number; nome?: string; midia_pendente?: boolean } | null; }
 const TIPOS_MIDIA = ['imagem', 'audio', 'video', 'documento'];
 interface DbConv {
   id: string; status: string; status_id: string | null; nao_lidas: number | null; ultima_interacao_em: string | null; criado_em: string | null;
@@ -78,8 +81,9 @@ function tsOf(m: DbMsg): number {
 
 function mapConversa(c: DbConv): WaContact {
   const msgs: WaMessage[] = (c.mensagens ?? [])
-    // mantém texto com conteúdo OU qualquer mídia (imagem/áudio/vídeo/documento) mesmo sem legenda.
-    .filter((m) => (m.conteudo ?? '').length > 0 || (TIPOS_MIDIA.includes(m.tipo) && !!m.metadados?.anexo_path))
+    // mantém texto com conteúdo OU qualquer mídia (imagem/áudio/vídeo/documento) mesmo sem legenda;
+    // também mantém mídia PENDENTE (download falhou) para mostrar "indisponível" + recarregar.
+    .filter((m) => (m.conteudo ?? '').length > 0 || (TIPOS_MIDIA.includes(m.tipo) && (!!m.metadados?.anexo_path || !!m.metadados?.midia_pendente)))
     .sort((a, b) => tsOf(a) - tsOf(b))
     .map((m) => ({
       id: m.id,
@@ -94,6 +98,7 @@ function mapConversa(c: DbConv): WaContact {
       mime: m.metadados?.mime,
       tamanho: m.metadados?.tamanho ?? null,
       nome: m.metadados?.nome,
+      midiaPendente: !!m.metadados?.midia_pendente,
     } as WaMessage));
   const lastMsg = msgs[msgs.length - 1];
   const chip = c.canais?.nome_interno ?? 'WhatsApp';

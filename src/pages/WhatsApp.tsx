@@ -4,7 +4,7 @@ import { useToast } from '@/hooks/useToast';
 import { useAuth } from '@/context/AuthContext';
 import { useOrg } from '@/context/OrgContext';
 import { WA_CONTACTS, initials, avatarColor, type WaContact, type WaMessage } from '@/data/whatsappDemo';
-import { useWaConversations, useSendWaMessage, useWaCanais, useAtribuirAtendimento, useIniciarConversaWa, normalizeWaPhone, mascararNumero, subirMidiaWa, urlAssinadaMidiaWa, removerMensagemFalha, WA_REAL } from '@/data/whatsapp';
+import { useWaConversations, useSendWaMessage, useWaCanais, useAtribuirAtendimento, useIniciarConversaWa, normalizeWaPhone, mascararNumero, subirMidiaWa, urlAssinadaMidiaWa, removerMensagemFalha, waRecarregarAudio, WA_REAL } from '@/data/whatsapp';
 import { MediaComposer } from '@/components/MediaComposer';
 import { AudioRecorder } from '@/components/AudioRecorder';
 import { AudioMessage } from '@/components/AudioMessage';
@@ -150,6 +150,7 @@ export function WhatsApp() {
   const [retryId, setRetryId] = useState<string | null>(null);           // trava de duplo-clique no retry
   const [removerAlvo, setRemoverAlvo] = useState<WaMessage | null>(null); // mensagem com falha a remover
   const [removendoId, setRemovendoId] = useState<string | null>(null);   // trava de duplo-clique na remoção
+  const [recarregando, setRecarregando] = useState<string | null>(null); // áudio pendente sendo recarregado
   const [imgModal, setImgModal] = useState(false);                       // composer de imagem
   const [docModal, setDocModal] = useState(false);                       // composer de documento
   const [transferOpen, setTransferOpen] = useState(false);               // modal de transferência
@@ -391,6 +392,14 @@ export function WhatsApp() {
     );
   }
   function verErro(m: WaMessage) { setErroDialog(traduzErroEnvio(m.erro)); }
+  /** Recarrega a mídia de um áudio pendente (re-baixa via Edge Function) e atualiza a conversa. */
+  async function recarregarAudio(m: WaMessage) {
+    if (!m.id || recarregando) return;
+    setRecarregando(m.id);
+    try { await waRecarregarAudio(currentOrg.id, m.id); await live.refetch(); }
+    catch (e) { toast((e as Error).message || 'Não foi possível recarregar o áudio.', 'warn'); }
+    finally { setRecarregando(null); }
+  }
   /** Remove uma mensagem de SAÍDA com falha (não entregue). Atualiza a conversa na hora, sem reload. */
   async function removerFalha(m: WaMessage) {
     if (!m.id || removendoId) return;
@@ -735,6 +744,11 @@ export function WhatsApp() {
                       time={m.time}
                       statusNode={ack ? <span className={'tick ' + ack.cls} title={ack.title}>{ack.ticks}</span> : null}
                     />
+                  ) : m.midiaPendente ? (
+                    <>
+                      <div className="bubble bubble-falha bubble-audio-falha"><IcMic />Áudio indisponível — <button type="button" className="msg-falha-link" disabled={!m.id || recarregando === m.id} onClick={() => recarregarAudio(m)}>{recarregando === m.id ? 'Carregando…' : 'tentar carregar novamente'}</button></div>
+                      {tempo}
+                    </>
                   ) : null
                 ) : m.tipo === 'imagem' ? (
                   <>

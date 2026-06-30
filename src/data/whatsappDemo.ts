@@ -11,6 +11,8 @@ export interface WaMessage {
   id?: string;
   /** id de cliente da bolha otimista (sem linha no banco ainda) — p/ reconciliar/timeout sem id real. */
   cid?: string;
+  /** mídia recebida mas ainda não baixada (download falhou) — UI mostra "indisponível" + recarregar. */
+  midiaPendente?: boolean;
   /** motivo sanitizado da falha (quando status = falhou). */
   erro?: string;
   /** tipo da mensagem: texto | imagem | audio | video | documento. */

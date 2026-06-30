@@ -1,6 +1,8 @@
 // evolution-webhook — eventos da Evolution. Sem JWT. Secret via webhook_config (constante).
+// v14: INGESTÃO DE ÁUDIO (entrada e fromMe/celular): baixa a mídia (getBase64FromMediaMessage), guarda no
+//      bucket privado e persiste tipo='audio' (idempotente por id_externo; falha de download => pendente
+//      recuperável). NÃO altera o envio de áudio (evolution-send) nem o parser LID/secret/messages.update.
 // v13: registra mensagens fromMe (enviadas pelo celular) como SAÍDA idempotente (#7).
-//      NÃO altera parser LID de entrada, secret, nem messages.update.
 import { corsHeaders, json } from './cors.ts';
 import { adminClient } from './client.ts';
 
@@ -24,6 +26,52 @@ function textOf(message: Record<string, unknown> | undefined): string | null {
 }
 function sanitize(obj: unknown): unknown {
   try { return JSON.parse(JSON.stringify(obj, (k, v) => (/(apikey|authorization|token|secret)/i.test(k) ? '[REDACTED]' : v))); } catch { return null; }
+}
+
+// ---- Mídia (áudio): detecção + download seguro pela Evolution ----
+const EVO_BASE = (Deno.env.get('EVOLUTION_API_URL') ?? '').replace(/\/+$/, '');
+const EVO_KEY = Deno.env.get('EVOLUTION_API_KEY') ?? '';
+// desembrulha mensagens encapsuladas (ephemeral, viewOnce, documentWithCaption).
+function unwrapMsg(m: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
+  if (!m) return m;
+  const inner = (m.ephemeralMessage as { message?: Record<string, unknown> })?.message
+    ?? (m.viewOnceMessage as { message?: Record<string, unknown> })?.message
+    ?? (m.viewOnceMessageV2 as { message?: Record<string, unknown> })?.message
+    ?? (m.documentWithCaptionMessage as { message?: Record<string, unknown> })?.message;
+  return inner ? unwrapMsg(inner) : m;
+}
+// retorna descritor de áudio (audioMessage / ptt / voice) ou null.
+function audioOf(message: Record<string, unknown> | undefined): { mime: string; ptt: boolean; seconds: number | null } | null {
+  const m = unwrapMsg(message); if (!m) return null;
+  const a = (m.audioMessage as { mimetype?: string; ptt?: boolean; seconds?: number } | undefined);
+  if (!a) return null;
+  return { mime: (a.mimetype ?? 'audio/ogg').split(';')[0].trim(), ptt: !!a.ptt, seconds: typeof a.seconds === 'number' ? a.seconds : null };
+}
+function extFromMime(mime: string): string {
+  const m = mime.toLowerCase();
+  if (m.includes('ogg')) return 'ogg'; if (m.includes('mpeg')) return 'mp3'; if (m.includes('mp4') || m.includes('m4a')) return 'm4a';
+  if (m.includes('aac')) return 'aac'; if (m.includes('wav')) return 'wav'; if (m.includes('webm')) return 'webm'; return 'ogg';
+}
+const MAX_MEDIA = 20 * 1024 * 1024; // limite de segurança p/ áudio
+// baixa a mídia descriptografada via Evolution (base64). NÃO persiste URL temporária.
+async function baixarMidia(instance: string, dataMsg: Record<string, unknown>): Promise<{ bytes: Uint8Array; mime: string }> {
+  if (!EVO_BASE || !EVO_KEY) throw new Error('evolution_nao_configurada');
+  const res = await fetch(`${EVO_BASE}/chat/getBase64FromMediaMessage/${instance}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', apikey: EVO_KEY },
+    body: JSON.stringify({ message: dataMsg, convertToMp4: false }),
+  });
+  const txt = await res.text();
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${txt.slice(0, 140)}`);
+  let j: { base64?: string; media?: string; mimetype?: string } = {};
+  try { j = JSON.parse(txt); } catch { throw new Error('resposta_invalida'); }
+  const b64 = j.base64 ?? j.media ?? '';
+  if (!b64) throw new Error('sem_base64');
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  if (bytes.length === 0) throw new Error('midia_vazia');
+  if (bytes.length > MAX_MEDIA) throw new Error('midia_grande');
+  return { bytes, mime: (j.mimetype ?? '').split(';')[0].trim() || 'audio/ogg' };
 }
 
 Deno.serve(async (req) => {
@@ -80,8 +128,10 @@ Deno.serve(async (req) => {
       const phoneJid = firstEndingWith([remoteJid, key.remoteJidAlt as string, data.remoteJidAlt as string, key.participantAlt as string, data.participantAlt as string, key.participant as string, data.participant as string], '@s.whatsapp.net');
       const lidJid = firstEndingWith([remoteJid, key.remoteJidAlt as string, data.remoteJidAlt as string, key.participant as string, data.participant as string], '@lid');
       const phone = digits(phoneJid); const lid = digits(lidJid);
-      const corpo = textOf(data.message as Record<string, unknown> | undefined);
-      if (!corpo) { await finish('ignorado', { ignorado_motivo: 'sem_texto' }); return json({ ok: true }); }
+      const msgObj = data.message as Record<string, unknown> | undefined;
+      const corpo = textOf(msgObj);
+      const audio = audioOf(msgObj);
+      if (!corpo && !audio) { await finish('ignorado', { ignorado_motivo: 'sem_conteudo' }); return json({ ok: true }); }
       if (!phone && !lid) { await finish('ignorado', { ignorado_motivo: 'sem_identificador' }); return json({ ok: true }); }
       // Em saída o pushName é do dono da conta (não do destinatário) → não usar como nome do contato.
       const pushName = (!fromMe ? (data.pushName as string) : null) ?? (phone ?? lid!);
@@ -104,6 +154,25 @@ Deno.serve(async (req) => {
       const { data: conv } = await admin.from('conversas').select('id').eq('organizacao_id', orgId).eq('contato_id', contatoId).eq('canal_id', canal.id).neq('status', 'fechada').order('criado_em', { ascending: false }).limit(1).maybeSingle();
       if (conv) conversaId = conv.id; else { const { data: nc, error: e2 } = await admin.from('conversas').insert({ organizacao_id: orgId, contato_id: contatoId, canal_id: canal.id, status: 'aberta' }).select('id').single(); if (e2 || !nc) { await finish('erro', { erro: `conversas:${e2?.code ?? ''}:${(e2?.message ?? 'sem retorno').slice(0,180)}` }); return json({ ok: true }); } conversaId = nc.id; }
 
+      // ---- Mídia de áudio: baixa pela Evolution e guarda no bucket privado (mesmo do envio). ----
+      let tipoMsg = 'texto';
+      let metaMsg: Record<string, unknown> | null = null;
+      if (audio) {
+        tipoMsg = 'audio';
+        try {
+          const dl = await baixarMidia(instanceName, data);
+          const mime = dl.mime || audio.mime;
+          const ext = extFromMime(mime);
+          const path = `${orgId}/wa-midia/${(provMsgId ?? crypto.randomUUID()).replace(/[^\w-]/g, '')}.${ext}`;
+          const up = await admin.storage.from('script-midia').upload(path, dl.bytes, { contentType: mime, upsert: true });
+          if (up.error) throw new Error(up.error.message);
+          metaMsg = { anexo_path: path, mime, tamanho: dl.bytes.length, nome: `audio.${ext}`, ptt: audio.ptt, seconds: audio.seconds, via: fromMe ? 'webhook_fromMe' : 'webhook' };
+        } catch (e) {
+          // mídia não baixada: persiste a mensagem como PENDENTE (recuperável), nunca descarta.
+          metaMsg = { midia_pendente: true, media_erro: String((e as Error).message ?? 'download').slice(0, 120), mime: audio.mime, ptt: audio.ptt, seconds: audio.seconds, media_key: key, via: fromMe ? 'webhook_fromMe' : 'webhook' };
+        }
+      }
+
       if (fromMe) {
         // #7 SAÍDA pelo celular — idempotente por id_externo. Envio da Atenvo já gravou a mesma id → não duplica.
         if (!provMsgId) { await finish('ignorado', { ignorado_motivo: 'fromMe_sem_id' }); return json({ ok: true }); }
@@ -114,17 +183,17 @@ Deno.serve(async (req) => {
         }
         const nowIso = new Date().toISOString();
         const { error: msgErr } = await admin.from('mensagens').upsert({
-          conversa_id: conversaId, organizacao_id: orgId, direcao: 'saida', tipo: 'texto',
-          conteudo: corpo, texto_original: corpo, origem: 'telefone', id_externo: provMsgId,
-          status: 'entregue', enviada_em: nowIso, entregue_em: nowIso, metadados: { origem: 'telefone', via: 'webhook_fromMe' },
+          conversa_id: conversaId, organizacao_id: orgId, direcao: 'saida', tipo: tipoMsg,
+          conteudo: corpo ?? null, texto_original: corpo ?? null, origem: 'telefone', id_externo: provMsgId,
+          status: 'entregue', enviada_em: nowIso, entregue_em: nowIso, metadados: metaMsg ?? { origem: 'telefone', via: 'webhook_fromMe' },
         }, { onConflict: 'id_externo', ignoreDuplicates: true });
         if (msgErr) { await finish('erro', { erro: `mensagens_out:${msgErr.code ?? ''}:${(msgErr.message ?? '').slice(0,180)}` }); return json({ ok: true }); }
         await admin.from('conversas').update({ ultima_interacao_em: nowIso, ultimo_canal_id: canal.id, ultimo_numero: canal.numero_conectado ?? null, ultimo_provider: canal.provider ?? 'whatsapp', ultima_msg_canal_em: nowIso }).eq('id', conversaId);
-        await finish('processado', { ignorado_motivo: 'fromMe_telefone' }); return json({ ok: true });
+        await finish('processado', { ignorado_motivo: `fromMe_telefone${tipoMsg === 'audio' ? '_audio' : ''}` }); return json({ ok: true });
       }
 
-      // ENTRADA — comportamento original (inalterado).
-      const { error: msgErr } = await admin.from('mensagens').upsert({ conversa_id: conversaId, organizacao_id: orgId, direcao: 'entrada', tipo: 'texto', conteudo: corpo, id_externo: provMsgId, status: 'entregue', recebida_em: new Date().toISOString() }, { onConflict: 'id_externo', ignoreDuplicates: true });
+      // ENTRADA — texto ou áudio.
+      const { error: msgErr } = await admin.from('mensagens').upsert({ conversa_id: conversaId, organizacao_id: orgId, direcao: 'entrada', tipo: tipoMsg, conteudo: corpo ?? null, id_externo: provMsgId, status: 'entregue', recebida_em: new Date().toISOString(), metadados: metaMsg }, { onConflict: 'id_externo', ignoreDuplicates: true });
       await admin.from('conversas').update({ ultima_interacao_em: new Date().toISOString() }).eq('id', conversaId);
       if (msgErr) { await finish('erro', { erro: `mensagens:${msgErr.code ?? ''}:${(msgErr.message ?? '').slice(0,180)}` }); return json({ ok: true }); }
       // Auto-entrada no Kanban: SOMENTE contato recém-criado nesta execução (entrada, não fromMe). Best-effort: nunca quebra o webhook.
