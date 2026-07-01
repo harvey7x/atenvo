@@ -1,0 +1,1 @@
+-- ver apply_migration wa_audio_diag (aplicada via MCP): tabela wa_audio_diag + RLS admin-select.
