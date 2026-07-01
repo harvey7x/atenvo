@@ -4,6 +4,7 @@ import './Agendamentos.css';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/useToast';
 import { Modal } from '@/components/Modal';
+import { Icon } from '@/components/icons';
 import { useOrgUsuarios } from '@/data/atendimento';
 import { useOrg } from '@/context/OrgContext';
 import { useAgendamentos, useProximosAgendamentos, useCriarAgendamento, useAtualizarAgendamento, useRemarcarAgendamento, useHistorico, useContatosBusca, checarConflitoAtendente, ERRO_CONCORRENCIA, AG_STATUS, AG_TIPOS, agStatusInfo, AG_REAL, type Agendamento, type AgStatus, type Atividade } from '@/data/agendamentos';
@@ -85,6 +86,18 @@ const hhmm = (dec: number) => `${String(Math.floor(dec)).padStart(2, '0')}:${Str
 function fmtDataBR(iso: string) { const [Y, M, D] = spParts(iso).key.split('-'); return `${D}/${M}/${Y}`; }
 /** "03/07, 14:30" no fuso SP (para o histórico). */
 function fmtDataHoraBR(iso: string) { const p = spParts(iso); const [, M, D] = p.key.split('-'); return `${D}/${M}, ${p.hora}`; }
+const MESES_L = MESES.map((m) => m.toLowerCase());
+/** Texto do período em PT-BR natural (meses minúsculos nos intervalos). */
+function fmtPeriodo(view: View, ancora: Date, rangeIni: Date): string {
+  if (view === 'mes') return `${MESES[ancora.getMonth()]} de ${ancora.getFullYear()}`;
+  if (view === 'dia') return `${DIAS_ABR[ancora.getDay()]}, ${ancora.getDate()} de ${MESES_L[ancora.getMonth()]} de ${ancora.getFullYear()}`;
+  const f = addDias(rangeIni, 6);
+  const iD = rangeIni.getDate(), iM = rangeIni.getMonth(), iY = rangeIni.getFullYear();
+  const fD = f.getDate(), fM = f.getMonth(), fY = f.getFullYear();
+  if (iY !== fY) return `${iD} de ${MESES_L[iM]} de ${iY} – ${fD} de ${MESES_L[fM]} de ${fY}`;
+  if (iM !== fM) return `${iD} de ${MESES_L[iM]} – ${fD} de ${MESES_L[fM]} de ${fY}`;
+  return `${iD}–${fD} de ${MESES_L[fM]} de ${fY}`;
+}
 
 export function Agendamentos() {
   const { user } = useAuth();
@@ -138,29 +151,18 @@ export function Agendamentos() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
+  const [painelAberto, setPainelAberto] = useState(() => window.innerWidth > 1100); // tablet/notebook: recolhido por padrão
 
   function novo(dataKey?: string, hora?: string) { setEditId(null); setPrefill({ dataKey: dataKey ?? keyOf(new Date()), hora: hora ?? '09:00' }); setModalOpen(true); }
   function abrir(a: Agendamento) { setEditId(a.id); setPrefill(null); setModalOpen(true); }
   const [prefill, setPrefill] = useState<{ dataKey: string; hora: string } | null>(null);
 
-  const tituloPeriodo = view === 'mes'
-    ? `${MESES[ancora.getMonth()]} ${ancora.getFullYear()}`
-    : view === 'dia'
-      ? `${DIAS_ABR[ancora.getDay()]}, ${ancora.getDate()} de ${MESES[ancora.getMonth()]}`
-      : (() => { const f = addDias(rangeIni, 6); return `${rangeIni.getDate()} – ${f.getDate()} de ${MESES[f.getMonth()]}, ${f.getFullYear()}`; })();
+  const tituloPeriodo = fmtPeriodo(view, ancora, rangeIni);
 
   function mover(dir: number) { setAncora((a) => view === 'mes' ? new Date(a.getFullYear(), a.getMonth() + dir, 1) : addDias(a, dir * (view === 'dia' ? 1 : 7))); }
 
   return (
     <div className="agn">
-      <div className="agn-head">
-        <div>
-          <h1 className="agn-title">Agendamentos</h1>
-          <p className="agn-sub">Organize os atendimentos presenciais da equipe.</p>
-        </div>
-        <button className="agn-novo" onClick={() => novo()}><span>+ Novo agendamento</span></button>
-      </div>
-
       <div className="agn-toolbar">
         <div className="agn-views">
           {(['dia', 'semana', 'mes'] as View[]).map((v) => (
@@ -171,7 +173,7 @@ export function Agendamentos() {
         <button className="agn-nav ic" aria-label="Anterior" onClick={() => mover(-1)}>‹</button>
         <button className="agn-nav ic" aria-label="Próximo" onClick={() => mover(1)}>›</button>
         <span className="agn-periodo">{tituloPeriodo}</span>
-        <div className="agn-filtros">
+        <div className="agn-tb-right">
           <select className="agn-select" value={fAtendente} onChange={(e) => setFAtendente(e.target.value)} title="Filtrar por atendente">
             <option value="">Todos os atendentes</option>
             {atendentes.map((u) => <option key={u.id} value={u.id}>{u.nome}</option>)}
@@ -180,10 +182,12 @@ export function Agendamentos() {
             <option value="">Todos os status</option>
             {AG_STATUS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
           </select>
+          <button className="agn-painel-tgl" onClick={() => setPainelAberto((v) => !v)} title={painelAberto ? 'Ocultar painel' : 'Mostrar painel'}>{painelAberto ? 'Ocultar painel' : 'Mostrar painel'}</button>
+          <button className="agn-novo" onClick={() => novo()}><Icon name="plus" /><span>Novo agendamento</span></button>
         </div>
       </div>
 
-      <div className="agn-body">
+      <div className={'agn-body' + (painelAberto ? '' : ' nopanel')}>
         <div className="agn-cal">
           {!AG_REAL ? (
             <div className="agn-empty">Disponível com o backend configurado.</div>
@@ -233,6 +237,7 @@ export function Agendamentos() {
           )}
         </div>
 
+        {painelAberto && (
         <aside className="agn-aside">
           <MiniCal ancora={ancora} onPick={(d) => { setAncora(d); if (view === 'mes') setView('semana'); }} hojeKey={hojeKey} />
           <div className="agn-legend">
@@ -241,6 +246,7 @@ export function Agendamentos() {
           </div>
           <ProximosPanel proximos={proximos} hojeKey={hojeKey} onAbrir={abrir} onVerTodos={() => { const d = new Date(); d.setHours(0, 0, 0, 0); setAncora(d); setView('dia'); setFStatus(''); }} />
         </aside>
+        )}
       </div>
 
       <div className="agn-resumo">
@@ -309,14 +315,16 @@ function ProximosPanel({ proximos, hojeKey, onAbrir, onVerTodos }: { proximos: A
       {grupos.length === 0 ? <div className="agn-prox-empty">Nenhum agendamento próximo.</div> : grupos.map((g) => (
         <div key={g.key} className="agn-prox-grp">
           <div className="agn-prox-day">{g.label}</div>
-          {g.itens.map((a) => { const s = spParts(a.inicioEm); const info = agStatusInfo(a.status); return (
-            <button key={a.id} className="agn-prox-i" onClick={() => onAbrir(a)}>
+          {g.itens.map((a) => { const s = spParts(a.inicioEm); const info = agStatusInfo(a.status); const nome = a.clienteNome || a.titulo || 'Sem cliente'; return (
+            <button key={a.id} className="agn-prox-i" title={`${nome}\n${s.hora}${a.atendenteNome ? '\n' + a.atendenteNome : ''}\n${info.label}`} onClick={() => onAbrir(a)}>
               <span className="agn-prox-h" style={{ color: info.cor }}>{s.hora}</span>
               <span className="agn-prox-b">
-                <span className="agn-prox-n">{a.clienteNome || a.titulo || 'Sem cliente'}</span>
-                <span className="agn-prox-s">{a.atendenteNome || 'Sem atendente'}{a.local ? ' · ' + a.local : ''}</span>
+                <span className="agn-prox-n">{nome}</span>
+                <span className="agn-prox-sub">
+                  <span className="agn-prox-at">{a.atendenteNome || 'Sem atendente'}</span>
+                  <span className="agn-prox-st" style={{ color: info.cor }}>● {info.label}</span>
+                </span>
               </span>
-              <span className="agn-prox-st" style={{ color: info.cor }}>{info.label}</span>
             </button>
           ); })}
         </div>
