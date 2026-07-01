@@ -754,9 +754,10 @@ export function WhatsApp() {
             const wait = c.aguardando ? tempoEspera(c.aguardandoDesde) : null;
             // atendente responsável (contatos.responsavel_id resolvido pela equipe da org)
             const atendNome = c.respId ? (orgUsuarios.find((u) => u.id === c.respId)?.nome ?? 'Atendente') : 'Não atribuído';
-            // cliente sem nome real (vazio ou só dígitos/telefone) → rótulo + telefone secundário
+            // cliente sem nome real (vazio ou só dígitos/telefone) → rótulo + telefone REAL secundário.
+            // Nunca exibe o LID/nome-numérico como "telefone" (identificador técnico).
             const nomeVazio = !c.name?.trim() || /^[\d\s()+\-]+$/.test(c.name.trim());
-            const telSec = c.phone ? mascararNumero(c.phone) : (/\d/.test(c.name || '') ? c.name : '');
+            const telSec = c.phone ? mascararNumero(c.phone) : '';
             // status operacional + tempo de espera ("Aguardando cliente · 12 h" / "Atrasado")
             const tempoCurto = wait ? wait.label.replace(/^Aguardando (há )?/, '') : '';
             const atrasado = wait?.tier === 'critico' || wait?.tier === 'vermelho';
@@ -773,11 +774,10 @@ export function WhatsApp() {
                   <span className="cname" style={{ fontWeight: (c.unread ?? 0) > 0 ? 700 : undefined }}>{c.fixada && <span title="Fixada" aria-label="Fixada">📌 </span>}{nomeVazio ? 'Cliente sem nome' : c.name}</span>
                   <span className="ctime">{c.time}</span>
                 </div>
-                <div className="cmeta">
-                  <span className="cmeta-at" title={'Atendente: ' + atendNome}><span className="cmeta-ic" aria-hidden="true">👤</span>{atendNome}</span>
-                  <span className="cmeta-canal" title={'Canal: WhatsApp · ' + c.chip}>WhatsApp · {c.chip}</span>
-                </div>
                 {nomeVazio && telSec && <div className="cphone">{telSec}</div>}
+                <div className="cmeta" title={'Atendente: ' + atendNome + ' · Canal: WhatsApp ' + c.chip}>
+                  <span className="cmeta-ic" aria-hidden="true">👤</span>{atendNome} · <span className="cmeta-canal">WA {c.chip}</span>
+                </div>
                 <div className="cprev">{c.last || '—'}</div>
                 <div className="crow-status">
                   <span className={'cstatus cstatus--' + barTier}>{statusTxt}{c.arquivada ? ' · Arquivada' : ''}{c.silenciada ? ' 🔕' : ''}</span>
