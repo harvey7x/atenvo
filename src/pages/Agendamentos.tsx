@@ -11,7 +11,7 @@ import { useAgendamentos, useProximosAgendamentos, useCriarAgendamento, useAtual
 
 type View = 'dia' | 'semana' | 'mes';
 const HORA_INI = 8, HORA_FIM = 19, HORA_PX = 56;
-const EV_L = 4, EV_R = 5, EV_GAP = 3; // margens/gap horizontais dos cards (px)
+const EV_L = 2, EV_R = 3, EV_GAP = 3; // margens/gap horizontais dos cards (px) — máximo de largura útil
 
 /**
  * Disposição horizontal de eventos com sobreposição temporal, por dia.
@@ -174,15 +174,18 @@ export function Agendamentos() {
         <button className="agn-nav ic" aria-label="Próximo" onClick={() => mover(1)}>›</button>
         <span className="agn-periodo">{tituloPeriodo}</span>
         <div className="agn-tb-right">
-          <select className="agn-select" value={fAtendente} onChange={(e) => setFAtendente(e.target.value)} title="Filtrar por atendente">
+          <select className="agn-select at" value={fAtendente} onChange={(e) => setFAtendente(e.target.value)} title="Filtrar por atendente">
             <option value="">Todos os atendentes</option>
             {atendentes.map((u) => <option key={u.id} value={u.id}>{u.nome}</option>)}
           </select>
-          <select className="agn-select" value={fStatus} onChange={(e) => setFStatus(e.target.value)} title="Filtrar por status">
+          <select className="agn-select st" value={fStatus} onChange={(e) => setFStatus(e.target.value)} title="Filtrar por status">
             <option value="">Todos os status</option>
             {AG_STATUS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
           </select>
-          <button className="agn-painel-tgl" onClick={() => setPainelAberto((v) => !v)} title={painelAberto ? 'Ocultar painel' : 'Mostrar painel'}>{painelAberto ? 'Ocultar painel' : 'Mostrar painel'}</button>
+          <button className="agn-painel-tgl" onClick={() => setPainelAberto((v) => !v)} title={painelAberto ? 'Ocultar painel lateral' : 'Mostrar painel lateral'} aria-label={painelAberto ? 'Ocultar painel lateral' : 'Mostrar painel lateral'}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="2" /><line x1="15" y1="4" x2="15" y2="20" /></svg>
+            <span className="agn-tgl-lbl">{painelAberto ? 'Painel' : 'Mostrar painel'}</span>
+          </button>
           <button className="agn-novo" onClick={() => novo()}><Icon name="plus" /><span>Novo agendamento</span></button>
         </div>
       </div>
@@ -312,23 +315,25 @@ function ProximosPanel({ proximos, hojeKey, onAbrir, onVerTodos }: { proximos: A
   return (
     <div className="agn-prox">
       <div className="agn-prox-head"><span className="agn-prox-t">Próximos agendamentos</span>{proximos.length > 0 && <button className="agn-prox-all" onClick={onVerTodos}>Ver todos</button>}</div>
-      {grupos.length === 0 ? <div className="agn-prox-empty">Nenhum agendamento próximo.</div> : grupos.map((g) => (
-        <div key={g.key} className="agn-prox-grp">
-          <div className="agn-prox-day">{g.label}</div>
-          {g.itens.map((a) => { const s = spParts(a.inicioEm); const info = agStatusInfo(a.status); const nome = a.clienteNome || a.titulo || 'Sem cliente'; return (
-            <button key={a.id} className="agn-prox-i" title={`${nome}\n${s.hora}${a.atendenteNome ? '\n' + a.atendenteNome : ''}\n${info.label}`} onClick={() => onAbrir(a)}>
-              <span className="agn-prox-h" style={{ color: info.cor }}>{s.hora}</span>
-              <span className="agn-prox-b">
-                <span className="agn-prox-n">{nome}</span>
-                <span className="agn-prox-sub">
+      <div className="agn-prox-scroll">
+        {grupos.length === 0 ? <div className="agn-prox-empty">Nenhum agendamento próximo.</div> : grupos.map((g) => (
+          <div key={g.key} className="agn-prox-grp">
+            <div className="agn-prox-day">{g.label}</div>
+            {g.itens.map((a) => { const s = spParts(a.inicioEm); const info = agStatusInfo(a.status); const nome = a.clienteNome || a.titulo || 'Sem cliente'; return (
+              <button key={a.id} className="agn-prox-i" title={`${nome}\n${s.hora}${a.atendenteNome ? '\n' + a.atendenteNome : ''}\n${info.label}`} onClick={() => onAbrir(a)}>
+                <span className="agn-prox-h">{s.hora}</span>
+                <span className="agn-prox-b">
+                  <span className="agn-prox-top">
+                    <span className="agn-prox-n">{nome}</span>
+                    <span className="agn-prox-st" style={{ color: info.cor }}>● {info.label}</span>
+                  </span>
                   <span className="agn-prox-at">{a.atendenteNome || 'Sem atendente'}</span>
-                  <span className="agn-prox-st" style={{ color: info.cor }}>● {info.label}</span>
                 </span>
-              </span>
-            </button>
-          ); })}
-        </div>
-      ))}
+              </button>
+            ); })}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
