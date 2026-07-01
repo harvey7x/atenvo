@@ -4,6 +4,9 @@
 //      Erro do provider preserva o status HTTP (evolution.ts) em erro_envio (não mascara em 502 genérico).
 // v22: FALHA SEMPRE PERSISTE — se o provider lança (texto/mídia), grava linha status='falhou' (id p/ retry/
 //      remover; sobrevive a reload). Evita a mensagem ficar "pendente eterno" no app quando o edge retorna 502.
+// v22: ÁUDIO por ORIGEM — gravação do painel (microfone) SEMPRE nota de voz/PTT (sendWhatsAppAudio,
+//      inclusive mp4/aac do Safari; se a Evolution recusar => erro claro, NUNCA arquivo comum silencioso).
+//      Arquivo anexado => mídia comum (sendMedia). Corrige áudio do painel chegando como arquivo/mudo.
 // v21: ÁUDIO por formato — ogg/webm(opus) via sendWhatsAppAudio (PTT); mp4/m4a/mpeg/aac/wav via sendMedia
 //      (áudio reproduzível). Resolve "formato não compatível" no Mac/Safari (grava audio/mp4). Bloqueia áudio vazio.
 // v20: TEXTO normalizado antes do envio (NFC, CRLF->\n, NBSP->espaço, remove zero-width/soft-hyphen/
@@ -92,7 +95,7 @@ Deno.serve(async (req) => {
     const user = await getUser(req);
     if (!user) return json({ error: 'Não autenticado.' }, 401);
 
-    const { action, conversa_id, text, canal_id, assinatura_nome, retry_mensagem_id, midia_path, midia_tipo, midia_mime, midia_nome, midia_tamanho, vinc_numero, vinc_jid, audio_diag } = await req.json().catch(() => ({}));
+    const { action, conversa_id, text, canal_id, assinatura_nome, retry_mensagem_id, midia_path, midia_tipo, midia_mime, midia_nome, midia_tamanho, vinc_numero, vinc_jid, audio_diag, origem_audio } = await req.json().catch(() => ({}));
     const temTexto = !!text?.toString().trim();
     if (!conversa_id) return json({ error: 'conversa_id é obrigatório.' }, 400);
     if (!action && (!temTexto && !midia_path && !retry_mensagem_id)) return json({ error: 'conversa_id e conteúdo (texto ou mídia) são obrigatórios.' }, 400);
@@ -246,14 +249,25 @@ Deno.serve(async (req) => {
           if (bytes.length === 0) return json({ error: 'Áudio vazio. Grave novamente.' }, 422);
           const b64 = toBase64(bytes);
           const mlow = (mime || '').toLowerCase();
-          const usaPtt = mlow.includes('ogg') || mlow.includes('webm');
-          // DIAGNÓSTICO (sanitizado, sem conteúdo): container real × MIME declarado, tamanhos, SHA-256 e
-          // endpoint. Permite comparar byte-a-byte com o Blob do navegador (mesma SHA-256) e ver o codec real.
-          try { console.log(JSON.stringify({ stage: 'audio_send', container_real: containerReal(bytes), mime_declarado: mime, bytes: bytes.length, base64_len: b64.length, sha256: (await sha256hex(bytes)).slice(0, 16), endpoint: usaPtt ? 'sendWhatsAppAudio(ptt)' : 'sendMedia(file)', corr })); } catch { /* ignore */ }
+          // MODO: gravação do painel (microfone) => SEMPRE nota de voz/PTT (nunca arquivo comum, mesmo mp4/aac
+          // do Safari — a Evolution transcodifica via encoding:true; se recusar, ERRO CLARO, sem cair p/ arquivo).
+          // Arquivo de áudio anexado => mídia comum (sendMedia), separado por design.
+          const gravacaoPainel = origem_audio !== 'arquivo_anexado'; // padrão: gravação (fonte do incidente)
+          const usaPtt = gravacaoPainel;
+          try { console.log(JSON.stringify({ stage: 'audio_send', origem_audio: gravacaoPainel ? 'gravacao_painel' : 'arquivo_anexado', container_real: containerReal(bytes), mime_declarado: mime, bytes: bytes.length, base64_len: b64.length, sha256: (await sha256hex(bytes)).slice(0, 16), endpoint: usaPtt ? 'sendWhatsAppAudio(ptt)' : 'sendMedia(file)', corr })); } catch { /* ignore */ }
           if (usaPtt) {
-            sent = await evolution.sendWhatsAppAudio(instancia, alvo, b64);                     // PTT (ogg/opus)
+            try {
+              sent = await evolution.sendWhatsAppAudio(instancia, alvo, b64);                   // voz/PTT (encoding:true -> ogg/opus)
+            } catch (e) {
+              const em = String((e as Error)?.message ?? '').toLowerCase();
+              // NUNCA envia gravação como arquivo comum silenciosamente: erro claro (Safari/mp4 recusado etc.).
+              const msg = /format|codec|unsupported|bad request|400|invalid|decode/.test(em)
+                ? 'Este navegador não gerou um formato compatível de mensagem de voz. Use o Chrome ou grave novamente.'
+                : 'A conexão do WhatsApp recusou a mensagem de voz. Tente novamente.';
+              return json({ error: msg, code: 'AUDIO_PTT_INCOMPATIVEL' }, 422);
+            }
           } else {
-            sent = await evolution.sendMedia(instancia, alvo, 'audio', mime || 'audio/mpeg', b64, nome && nome !== 'audio' ? nome : 'audio.m4a'); // arquivo de áudio reproduzível
+            sent = await evolution.sendMedia(instancia, alvo, 'audio', mime || 'audio/mpeg', b64, nome && nome !== 'audio' ? nome : 'audio.m4a'); // arquivo de áudio anexado
           }
           // TESTE CONTROLADO: persiste UMA linha por correlation_id (só metadados + hashes; escritor único).
           if (audio_diag && typeof audio_diag === 'object') {

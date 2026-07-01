@@ -162,7 +162,7 @@ export function AudioRecorder({ disabled, onEnviar, permitirArquivo }: Props) {
       const nivel_min = Number((cntNivelRef.current ? minNivelRef.current : 0).toFixed(4));
       const nivel_med = Number((cntNivelRef.current ? sumNivelRef.current / cntNivelRef.current : 0).toFixed(4));
       diagRef.current = {
-        correlation_id: correlationRef.current,
+        correlation_id: correlationRef.current, origem: 'gravacao_painel', // gravação pelo microfone → sempre voz/PTT
         blob_mime: mimeRef.current || rec.mimeType || tipo, blob_size: blob.size, chunks: chunksRef.current.length,
         nivel_min, nivel_med, nivel_pico,
         track_enabled: tk?.enabled ?? null, track_muted: tk?.muted ?? null, track_readyState: tk?.readyState ?? null,
@@ -226,6 +226,8 @@ export function AudioRecorder({ disabled, onEnviar, permitirArquivo }: Props) {
     if (f.size > MAX_AUDIO) { setEstado('error'); setErro('Áudio acima de 16 MB.'); return; }
     pararMedidor(); pararTracks(); pararTimer();
     blobRef.current = f; mimeRef.current = baseMime(f.type);
+    correlationRef.current = (crypto as { randomUUID?: () => string }).randomUUID?.() ?? String(Date.now());
+    diagRef.current = { correlation_id: correlationRef.current, origem: 'arquivo_anexado', blob_mime: f.type, blob_size: f.size }; // arquivo → mídia comum
     limparPreview(); setPreviewUrl(URL.createObjectURL(f));
     setInfo({ mime: baseMime(f.type), size: f.size, dur: 0, sinal: true, verificando: false });
     setEstado('preview');

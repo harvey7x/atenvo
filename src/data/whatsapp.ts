@@ -237,7 +237,7 @@ export function useSendWaMessage() {
     // #4 assinatura aplicada no backend (evolution-send): passamos só o nome resolvido.
     // canalId = canal escolhido em "Responder por". O backend nunca confia em org vinda do cliente.
     // Retorna o id INTERNO da mensagem (para confirmação real do provedor). NÃO é garantia de entrega.
-    mutationFn: async (input: { conversaId: string; text?: string; canalId?: string | null; assinaturaNome?: string; retryMensagemId?: string; midiaPath?: string; midiaTipo?: string; midiaMime?: string; midiaNome?: string; midiaTamanho?: number; audioDiag?: Record<string, unknown> }) => {
+    mutationFn: async (input: { conversaId: string; text?: string; canalId?: string | null; assinaturaNome?: string; retryMensagemId?: string; midiaPath?: string; midiaTipo?: string; midiaMime?: string; midiaNome?: string; midiaTamanho?: number; audioDiag?: Record<string, unknown>; origemAudio?: string }) => {
       const r = await invoke<{ ok: boolean; mensagem?: { id?: string } }>('evolution-send', {
         conversa_id: input.conversaId,
         ...(input.text ? { text: input.text } : {}),
@@ -246,6 +246,7 @@ export function useSendWaMessage() {
         ...(input.retryMensagemId ? { retry_mensagem_id: input.retryMensagemId } : {}),
         ...(input.midiaPath ? { midia_path: input.midiaPath, midia_tipo: input.midiaTipo, midia_mime: input.midiaMime, midia_nome: input.midiaNome, midia_tamanho: input.midiaTamanho } : {}),
         ...(input.audioDiag ? { audio_diag: input.audioDiag } : {}),
+        ...(input.origemAudio ? { origem_audio: input.origemAudio } : {}),
       });
       return r.mensagem?.id ?? null;
     },

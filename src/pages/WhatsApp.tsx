@@ -524,10 +524,12 @@ export function WhatsApp() {
     const file = new File([blob], `audio-${Date.now()}.${ext}`, { type: mime });
     const up = await subirMidiaWa(currentOrg.id, file);
     const audioDiag = diag ? { ...diag, upload_sha256: up.sha256 ?? null } : undefined; // teste controlado (correlation_id)
+    // gravação do microfone => voz/PTT; arquivo anexado => mídia comum. Padrão: gravação (fonte do incidente).
+    const origemAudio = (diag?.origem as string) === 'arquivo_anexado' ? 'arquivo_anexado' : 'gravacao_painel';
     await sendMut.mutateAsync({
       conversaId: currentId, canalId: replyCanalId || current.canalId,
       midiaPath: up.path, midiaTipo: 'audio', midiaMime: up.mime, midiaNome: up.nome, midiaTamanho: up.tamanho,
-      audioDiag,
+      audioDiag, origemAudio,
     });
   }
   /** Envio manual de DOCUMENTO: sobe ao bucket privado e envia pela Evolution (lança em falha -> mantém p/ retry). */
