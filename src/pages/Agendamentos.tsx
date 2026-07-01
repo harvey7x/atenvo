@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './Agendamentos.css';
 import { useAuth } from '@/context/AuthContext';
@@ -6,7 +6,7 @@ import { useToast } from '@/hooks/useToast';
 import { Modal } from '@/components/Modal';
 import { useOrgUsuarios } from '@/data/atendimento';
 import { useOrg } from '@/context/OrgContext';
-import { useAgendamentos, useCriarAgendamento, useAtualizarAgendamento, useContatosBusca, checarConflitoAtendente, AG_STATUS, AG_TIPOS, agStatusInfo, AG_REAL, type Agendamento, type AgStatus } from '@/data/agendamentos';
+import { useAgendamentos, useProximosAgendamentos, useCriarAgendamento, useAtualizarAgendamento, useRemarcarAgendamento, useHistorico, useContatosBusca, checarConflitoAtendente, ERRO_CONCORRENCIA, AG_STATUS, AG_TIPOS, agStatusInfo, AG_REAL, type Agendamento, type AgStatus, type Atividade } from '@/data/agendamentos';
 
 type View = 'dia' | 'semana' | 'mes';
 const HORA_INI = 8, HORA_FIM = 19, HORA_PX = 56;
@@ -37,6 +37,10 @@ const keyOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padSta
 function inicioSemana(d: Date) { const x = new Date(d); const dw = x.getDay(); x.setDate(x.getDate() - dw); x.setHours(0, 0, 0, 0); return x; } // domingo
 function addDias(d: Date, n: number) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
 const hhmm = (dec: number) => `${String(Math.floor(dec)).padStart(2, '0')}:${String(Math.round((dec % 1) * 60)).padStart(2, '0')}`;
+/** "03/07/2026" no fuso SP. */
+function fmtDataBR(iso: string) { const [Y, M, D] = spParts(iso).key.split('-'); return `${D}/${M}/${Y}`; }
+/** "03/07, 14:30" no fuso SP (para o histórico). */
+function fmtDataHoraBR(iso: string) { const p = spParts(iso); const [, M, D] = p.key.split('-'); return `${D}/${M}, ${p.hora}`; }
 
 export function Agendamentos() {
   const { user } = useAuth();
@@ -63,6 +67,18 @@ export function Agendamentos() {
   const todos = q.data ?? [];
   const ags = todos.filter((a) => (!fAtendente || a.atendenteId === fAtendente) && (!fStatus || a.status === fStatus));
 
+  const hojeKey = spParts(new Date().toISOString()).key; // "hoje" no fuso de São Paulo
+  const nowDec = spParts(new Date().toISOString()).horaDec;
+  const ehGestor = currentOrg.role === 'admin' || currentOrg.role === 'gestor';
+
+  // Próximos agendamentos: janela fixa a partir de hoje (independe da visão do calendário).
+  const proxRange = useMemo(() => {
+    const h = new Date(); h.setHours(0, 0, 0, 0);
+    return { desde: spISO(keyOf(h), '00:00'), ate: spISO(keyOf(addDias(h, 22)), '00:00') };
+  }, [hojeKey]);
+  const proxQ = useProximosAgendamentos(proxRange.desde, proxRange.ate);
+  const proximos = (proxQ.data ?? []).filter((a) => new Date(a.fimEm).getTime() >= Date.now());
+
   // resumo
   const resumo = useMemo(() => {
     const r = { total: ags.length, confirmado: 0, pendente: 0, realizado: 0, cancelado: 0, nao_compareceu: 0 } as Record<string, number>;
@@ -75,9 +91,6 @@ export function Agendamentos() {
     for (const a of ags) { const k = spParts(a.inicioEm).key; (m[k] ??= []).push(a); }
     return m;
   }, [ags]);
-
-  // próximos (a partir de agora)
-  const proximos = useMemo(() => todos.filter((a) => new Date(a.inicioEm).getTime() >= Date.now() && a.status !== 'cancelado').slice(0, 6), [todos]);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -93,9 +106,6 @@ export function Agendamentos() {
       : (() => { const f = addDias(rangeIni, 6); return `${rangeIni.getDate()} – ${f.getDate()} de ${MESES[f.getMonth()]}, ${f.getFullYear()}`; })();
 
   function mover(dir: number) { setAncora((a) => view === 'mes' ? new Date(a.getFullYear(), a.getMonth() + dir, 1) : addDias(a, dir * (view === 'dia' ? 1 : 7))); }
-
-  const hojeKey = spParts(new Date().toISOString()).key; // "hoje" no fuso de São Paulo
-  const nowDec = spParts(new Date().toISOString()).horaDec;
 
   return (
     <div className="agn">
@@ -178,18 +188,7 @@ export function Agendamentos() {
             <div className="agn-legend-t">Legenda de status</div>
             {AG_STATUS.map((s) => <div key={s.id} className="agn-legend-i"><span className="dot" style={{ background: s.cor }} />{s.label}</div>)}
           </div>
-          <div className="agn-prox">
-            <div className="agn-prox-t">Próximos agendamentos</div>
-            {proximos.length === 0 ? <div className="agn-prox-empty">Nenhum agendamento próximo.</div> : proximos.map((a) => {
-              const s = spParts(a.inicioEm); const info = agStatusInfo(a.status);
-              return (
-                <button key={a.id} className="agn-prox-i" onClick={() => abrir(a)}>
-                  <span className="agn-prox-h" style={{ color: info.cor }}>{s.hora}</span>
-                  <span className="agn-prox-b"><span className="agn-prox-n">{a.clienteNome || a.titulo || 'Sem cliente'}</span><span className="agn-prox-s">{a.tipo}{a.atendenteNome ? ' · ' + a.atendenteNome : ''}</span></span>
-                </button>
-              );
-            })}
-          </div>
+          <ProximosPanel proximos={proximos} hojeKey={hojeKey} onAbrir={abrir} onVerTodos={() => { const d = new Date(); d.setHours(0, 0, 0, 0); setAncora(d); setView('dia'); setFStatus(''); }} />
         </aside>
       </div>
 
@@ -202,7 +201,7 @@ export function Agendamentos() {
       </div>
 
       {modalOpen && <AgModal editId={editId} prefill={prefill} atendentes={atendentes} agendamento={todos.find((a) => a.id === editId) ?? null}
-        orgId={currentOrg.id} onClose={() => setModalOpen(false)} onSaved={() => { setModalOpen(false); q.refetch(); }}
+        orgId={currentOrg.id} ehGestor={ehGestor} onClose={() => { setModalOpen(false); q.refetch(); proxQ.refetch(); }} onSaved={() => { setModalOpen(false); q.refetch(); proxQ.refetch(); }}
         userId={user?.id ?? ''} toast={toast} navigate={navigate} />}
     </div>
   );
@@ -242,9 +241,42 @@ function MiniCal({ ancora, onPick, hojeKey }: { ancora: Date; onPick: (d: Date) 
   );
 }
 
-function AgModal({ editId, prefill, atendentes, agendamento, orgId, onClose, onSaved, userId, toast, navigate }: {
+function ProximosPanel({ proximos, hojeKey, onAbrir, onVerTodos }: { proximos: Agendamento[]; hojeKey: string; onAbrir: (a: Agendamento) => void; onVerTodos: () => void }) {
+  const amanhaKey = keyOf(addDias(new Date(hojeKey + 'T12:00:00'), 1));
+  const grupos = useMemo(() => {
+    const m: { key: string; label: string; itens: Agendamento[] }[] = []; const idx: Record<string, number> = {};
+    for (const a of proximos) {
+      const k = spParts(a.inicioEm).key;
+      if (idx[k] == null) { idx[k] = m.length; const [, M, D] = k.split('-'); m.push({ key: k, label: k === hojeKey ? 'Hoje' : k === amanhaKey ? 'Amanhã' : `${D}/${M}`, itens: [] }); }
+      m[idx[k]].itens.push(a);
+    }
+    return m;
+  }, [proximos, hojeKey, amanhaKey]);
+  return (
+    <div className="agn-prox">
+      <div className="agn-prox-head"><span className="agn-prox-t">Próximos agendamentos</span>{proximos.length > 0 && <button className="agn-prox-all" onClick={onVerTodos}>Ver todos</button>}</div>
+      {grupos.length === 0 ? <div className="agn-prox-empty">Nenhum agendamento próximo.</div> : grupos.map((g) => (
+        <div key={g.key} className="agn-prox-grp">
+          <div className="agn-prox-day">{g.label}</div>
+          {g.itens.map((a) => { const s = spParts(a.inicioEm); const info = agStatusInfo(a.status); return (
+            <button key={a.id} className="agn-prox-i" onClick={() => onAbrir(a)}>
+              <span className="agn-prox-h" style={{ color: info.cor }}>{s.hora}</span>
+              <span className="agn-prox-b">
+                <span className="agn-prox-n">{a.clienteNome || a.titulo || 'Sem cliente'}</span>
+                <span className="agn-prox-s">{a.atendenteNome || 'Sem atendente'}{a.local ? ' · ' + a.local : ''}</span>
+              </span>
+              <span className="agn-prox-st" style={{ color: info.cor }}>{info.label}</span>
+            </button>
+          ); })}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function AgModal({ editId, prefill, atendentes, agendamento, orgId, ehGestor, onClose, onSaved, userId, toast, navigate }: {
   editId: string | null; prefill: { dataKey: string; hora: string } | null; atendentes: { id: string; nome: string }[];
-  agendamento: Agendamento | null; orgId: string; onClose: () => void; onSaved: () => void; userId: string;
+  agendamento: Agendamento | null; orgId: string; ehGestor: boolean; onClose: () => void; onSaved: () => void; userId: string;
   toast: (m: string, k?: 'ok' | 'warn') => void; navigate: (p: string) => void;
 }) {
   const criar = useCriarAgendamento();
@@ -255,15 +287,25 @@ function AgModal({ editId, prefill, atendentes, agendamento, orgId, onClose, onS
     clienteNome: ed?.clienteNome ?? '', contatoId: ed?.contatoId ?? '', telefone: ed?.telefone ?? '',
     dataKey: p0?.key ?? prefill?.dataKey ?? new Date().toISOString().slice(0, 10),
     horaIni: p0 ? p0.hora : (prefill?.hora ?? '09:00'), horaFim: p1 ? p1.hora : addHora(prefill?.hora ?? '09:00'),
-    atendenteId: ed?.atendenteId ?? '', tipo: ed?.tipo ?? 'Reunião inicial', tipoOutro: '',
+    atendenteId: ed?.atendenteId ?? '', tipo: ed && !AG_TIPOS.includes(ed.tipo) ? 'Outro' : (ed?.tipo ?? 'Reunião inicial'),
+    tipoOutro: ed && !AG_TIPOS.includes(ed.tipo) ? ed.tipo : '',
     local: ed?.local ?? '', endereco: ed?.endereco ?? '', status: (ed?.status ?? 'pendente') as AgStatus, observacoes: ed?.observacoes ?? '',
   }));
   const [busca, setBusca] = useState('');
   const contatosQ = useContatosBusca(busca);
   const [busy, setBusy] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
-  const [avisoConflito, setAvisoConflito] = useState(false); // já avisou → segundo clique confirma
+  const [aba, setAba] = useState<'detalhes' | 'historico'>('detalhes');
+  const [remarcarOpen, setRemarcarOpen] = useState(false);
   const set = (k: string, v: unknown) => setF((x) => ({ ...x, [k]: v }));
+
+  // Permissões: novo => qualquer um; edição => gestor OU dono (criou ou é o atendente).
+  const ehDono = !!ed && (ed.criadoPor === userId || ed.atendenteId === userId);
+  const podeEditar = !editId || ehGestor || ehDono;
+  const ro = !podeEditar;
+  const podeReatribuir = ehGestor; // atendente não troca o responsável
+  const opcoesAtendente = ehGestor ? atendentes : atendentes.filter((u) => u.id === userId);
+  const atendentesMap = useMemo(() => Object.fromEntries(atendentes.map((u) => [u.id, u.nome] as const)), [atendentes]);
 
   async function salvar() {
     setErro(null);
@@ -276,37 +318,43 @@ function AgModal({ editId, prefill, atendentes, agendamento, orgId, onClose, onS
       inicioEm: spISO(f.dataKey, f.horaIni), fimEm: spISO(f.dataKey, f.horaFim),
       local: f.local || null, endereco: f.endereco || null, observacoes: f.observacoes || null,
     };
-    // aviso de conflito (não bloqueia): mesmo atendente com agendamento sobreposto. Segundo clique confirma.
-    if (f.atendenteId && !avisoConflito) {
-      const conf = await checarConflitoAtendente(orgId, f.atendenteId, base.inicioEm, base.fimEm, editId).catch(() => null);
-      if (conf) { setAvisoConflito(true); setErro('Este atendente já possui um agendamento neste horário. Clique novamente em salvar para confirmar mesmo assim.'); return; }
-    }
     setBusy(true);
     try {
-      if (editId) await atualizar.mutateAsync({ id: editId, patch: { contato_id: base.contatoId, atendente_id: base.atendenteId, tipo, cliente_nome: base.clienteNome, telefone: base.telefone, inicio_em: base.inicioEm, fim_em: base.fimEm, status: base.status, local: base.local, endereco: base.endereco, observacoes: base.observacoes } });
+      if (editId) await atualizar.mutateAsync({ id: editId, atualizadoEmEsperado: ed?.atualizadoEm, patch: { contato_id: base.contatoId, atendente_id: base.atendenteId, tipo, cliente_nome: base.clienteNome, telefone: base.telefone, inicio_em: base.inicioEm, fim_em: base.fimEm, status: base.status, local: base.local, endereco: base.endereco, observacoes: base.observacoes } });
       else await criar.mutateAsync({ ...base, criadoPor: userId });
       toast(editId ? 'Agendamento atualizado' : 'Agendamento criado'); onSaved();
-    } catch (e) { setErro((e as Error).message || 'Não foi possível salvar.'); }
+    } catch (e) { setErro(traduzErro((e as Error).message)); }
     finally { setBusy(false); }
   }
-  async function mudarStatus(s: AgStatus, motivoCampo?: 'motivo_cancelamento' | 'motivo_remarcacao') {
+  async function mudarStatus(s: AgStatus, motivoCampo?: 'motivo_cancelamento') {
     if (!editId) return;
     let motivo: string | undefined;
-    if (motivoCampo) { motivo = window.prompt(s === 'cancelado' ? 'Motivo do cancelamento:' : 'Motivo da remarcação:') || undefined; if (motivoCampo === 'motivo_cancelamento' && !motivo) return; }
+    if (motivoCampo) { motivo = window.prompt('Motivo do cancelamento:') || undefined; if (!motivo) return; }
     setBusy(true);
-    try { await atualizar.mutateAsync({ id: editId, patch: { status: s, ...(motivoCampo && motivo ? { [motivoCampo]: motivo } : {}) } }); toast('Status atualizado'); onSaved(); }
-    catch (e) { setErro((e as Error).message); } finally { setBusy(false); }
+    try { await atualizar.mutateAsync({ id: editId, atualizadoEmEsperado: ed?.atualizadoEm, patch: { status: s, ...(motivo ? { [motivoCampo!]: motivo } : {}) } }); toast('Status atualizado'); onSaved(); }
+    catch (e) { setErro(traduzErro((e as Error).message)); } finally { setBusy(false); }
   }
 
   return (
+    <>
     <Modal open onClose={() => { if (!busy) onClose(); }} title={editId ? 'Detalhe do agendamento' : 'Novo agendamento'} width={520} closeOnBackdrop={!busy}
       footer={<>
         <button className="atv-btn" disabled={busy} onClick={onClose}>Fechar</button>
-        <button className="atv-btn primary" disabled={busy} onClick={salvar}>{busy ? 'Salvando…' : (editId ? 'Salvar' : 'Criar agendamento')}</button>
+        {aba === 'detalhes' && podeEditar && <button className="atv-btn primary" disabled={busy} onClick={salvar}>{busy ? 'Salvando…' : (editId ? 'Salvar' : 'Criar agendamento')}</button>}
       </>}>
+      {editId && (
+        <div className="agn-tabs">
+          <button className={'agn-tab' + (aba === 'detalhes' ? ' on' : '')} onClick={() => setAba('detalhes')}>Detalhes</button>
+          <button className={'agn-tab' + (aba === 'historico' ? ' on' : '')} onClick={() => setAba('historico')}>Histórico</button>
+        </div>
+      )}
+      {aba === 'historico' && editId ? (
+        <Historico agendamentoId={editId} atendentesMap={atendentesMap} />
+      ) : (
       <div className="agn-form">
+        {ro && <div className="agn-ro">Você não tem permissão para editar este agendamento — visualização apenas.</div>}
         <label className="agn-fld"><span>Cliente <span className="req">*</span></span>
-          <input className="atv-input" value={f.clienteNome} placeholder="Nome do cliente" onChange={(e) => { set('clienteNome', e.target.value); setBusca(e.target.value); if (!e.target.value) set('contatoId', ''); }} />
+          <input className="atv-input" value={f.clienteNome} disabled={ro} placeholder="Nome do cliente" onChange={(e) => { set('clienteNome', e.target.value); setBusca(e.target.value); if (!e.target.value) set('contatoId', ''); }} />
           {busca.trim().length >= 2 && !f.contatoId && (contatosQ.data?.length ?? 0) > 0 && (
             <div className="agn-cts">
               {contatosQ.data!.map((c) => <button key={c.id} type="button" className="agn-ct" onClick={() => { set('contatoId', c.id); set('clienteNome', c.nome); set('telefone', c.telefone ?? ''); setBusca(''); }}>{c.nome}{c.telefone ? ' · ' + c.telefone : ''}</button>)}
@@ -315,42 +363,169 @@ function AgModal({ editId, prefill, atendentes, agendamento, orgId, onClose, onS
           {f.contatoId && <span className="agn-vinc">✓ vinculado ao contato <button type="button" className="link-btn" onClick={() => navigate(`/contatos?contato=${f.contatoId}`)}>abrir</button></span>}
         </label>
         <div className="agn-row2">
-          <label className="agn-fld"><span>Telefone</span><input className="atv-input" value={f.telefone} onChange={(e) => set('telefone', e.target.value)} placeholder="55 11 99999-8888" /></label>
+          <label className="agn-fld"><span>Telefone</span><input className="atv-input" value={f.telefone} disabled={ro} onChange={(e) => set('telefone', e.target.value)} placeholder="55 11 99999-8888" /></label>
           <label className="agn-fld"><span>Atendente</span>
-            <select className="atv-input" value={f.atendenteId} onChange={(e) => set('atendenteId', e.target.value)}><option value="">Não atribuído</option>{atendentes.map((u) => <option key={u.id} value={u.id}>{u.nome}</option>)}</select>
+            <select className="atv-input" value={f.atendenteId} disabled={ro || (!!editId && !podeReatribuir)} onChange={(e) => set('atendenteId', e.target.value)}><option value="">Não atribuído</option>{opcoesAtendente.map((u) => <option key={u.id} value={u.id}>{u.nome}</option>)}</select>
           </label>
         </div>
         <div className="agn-row3">
-          <label className="agn-fld"><span>Data</span><input className="atv-input" type="date" value={f.dataKey} onChange={(e) => set('dataKey', e.target.value)} /></label>
-          <label className="agn-fld"><span>Início</span><input className="atv-input" type="time" value={f.horaIni} onChange={(e) => set('horaIni', e.target.value)} /></label>
-          <label className="agn-fld"><span>Fim</span><input className="atv-input" type="time" value={f.horaFim} onChange={(e) => set('horaFim', e.target.value)} /></label>
+          <label className="agn-fld"><span>Data</span><input className="atv-input" type="date" value={f.dataKey} disabled={ro} onChange={(e) => set('dataKey', e.target.value)} /></label>
+          <label className="agn-fld"><span>Início</span><input className="atv-input" type="time" value={f.horaIni} disabled={ro} onChange={(e) => set('horaIni', e.target.value)} /></label>
+          <label className="agn-fld"><span>Fim</span><input className="atv-input" type="time" value={f.horaFim} disabled={ro} onChange={(e) => set('horaFim', e.target.value)} /></label>
         </div>
         <div className="agn-row2">
           <label className="agn-fld"><span>Tipo de atendimento</span>
-            <select className="atv-input" value={f.tipo} onChange={(e) => set('tipo', e.target.value)}>{AG_TIPOS.map((t) => <option key={t} value={t}>{t}</option>)}</select>
+            <select className="atv-input" value={f.tipo} disabled={ro} onChange={(e) => set('tipo', e.target.value)}>{AG_TIPOS.map((t) => <option key={t} value={t}>{t}</option>)}</select>
           </label>
           <label className="agn-fld"><span>Status</span>
-            <select className="atv-input" value={f.status} onChange={(e) => set('status', e.target.value as AgStatus)}>{AG_STATUS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}</select>
+            <select className="atv-input" value={f.status} disabled={ro} onChange={(e) => set('status', e.target.value as AgStatus)}>{AG_STATUS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}</select>
           </label>
         </div>
-        {f.tipo === 'Outro' && <label className="agn-fld"><span>Descreva o tipo</span><input className="atv-input" value={f.tipoOutro} onChange={(e) => set('tipoOutro', e.target.value)} placeholder="Tipo personalizado" /></label>}
+        {f.tipo === 'Outro' && <label className="agn-fld"><span>Descreva o tipo</span><input className="atv-input" value={f.tipoOutro} disabled={ro} onChange={(e) => set('tipoOutro', e.target.value)} placeholder="Tipo personalizado" /></label>}
         <div className="agn-row2">
-          <label className="agn-fld"><span>Unidade/Local</span><input className="atv-input" value={f.local} onChange={(e) => set('local', e.target.value)} placeholder="Ex.: Matriz" /></label>
-          <label className="agn-fld"><span>Endereço</span><input className="atv-input" value={f.endereco} onChange={(e) => set('endereco', e.target.value)} placeholder="Rua, nº, cidade" /></label>
+          <label className="agn-fld"><span>Unidade/Local</span><input className="atv-input" value={f.local} disabled={ro} onChange={(e) => set('local', e.target.value)} placeholder="Ex.: Matriz" /></label>
+          <label className="agn-fld"><span>Endereço</span><input className="atv-input" value={f.endereco} disabled={ro} onChange={(e) => set('endereco', e.target.value)} placeholder="Rua, nº, cidade" /></label>
         </div>
-        <label className="agn-fld"><span>Observações</span><textarea className="atv-input" rows={2} value={f.observacoes} onChange={(e) => set('observacoes', e.target.value)} /></label>
-        {editId && (
+        <label className="agn-fld"><span>Observações</span><textarea className="atv-input" rows={2} value={f.observacoes} disabled={ro} onChange={(e) => set('observacoes', e.target.value)} /></label>
+        {editId && podeEditar && (
           <div className="agn-acts">
             <button className="agn-act" disabled={busy} onClick={() => mudarStatus('confirmado')}>Confirmar</button>
             <button className="agn-act" disabled={busy} onClick={() => mudarStatus('realizado')}>Realizado</button>
             <button className="agn-act" disabled={busy} onClick={() => mudarStatus('nao_compareceu')}>Não compareceu</button>
-            <button className="agn-act" disabled={busy} onClick={() => mudarStatus('remarcado', 'motivo_remarcacao')}>Remarcar</button>
+            <button className="agn-act" disabled={busy} onClick={() => setRemarcarOpen(true)}>Remarcar</button>
             <button className="agn-act danger" disabled={busy} onClick={() => mudarStatus('cancelado', 'motivo_cancelamento')}>Cancelar</button>
           </div>
         )}
         {erro && <div className="atv-field-err">{erro}</div>}
       </div>
+      )}
+    </Modal>
+    {remarcarOpen && ed && <RemarcarModal ag={ed} orgId={orgId} toast={toast}
+      onClose={() => setRemarcarOpen(false)} onDone={() => { setRemarcarOpen(false); onSaved(); }} />}
+    </>
+  );
+}
+
+/** Traduz erros técnicos vindos do banco/RPC para mensagens ao usuário. */
+function traduzErro(m: string): string {
+  if (m === ERRO_CONCORRENCIA || m.includes('conflito_concorrencia')) return 'Este agendamento foi alterado por outra pessoa. Revise as informações atualizadas.';
+  if (m.includes('sem_permissao_reatribuir')) return 'Você não pode transferir este agendamento para outro atendente.';
+  if (m.includes('sem_permissao')) return 'Você não tem permissão para esta ação.';
+  if (m.includes('motivo_obrigatorio')) return 'O motivo é obrigatório.';
+  if (m.includes('periodo_invalido')) return 'O horário final deve ser após o inicial.';
+  return m || 'Não foi possível concluir a operação.';
+}
+
+function RemarcarModal({ ag, orgId, toast, onClose, onDone }: {
+  ag: Agendamento; orgId: string; toast: (m: string, k?: 'ok' | 'warn') => void; onClose: () => void; onDone: () => void;
+}) {
+  const remarcar = useRemarcarAgendamento();
+  const cur = spParts(ag.inicioEm); const curFim = spParts(ag.fimEm);
+  const [dataKey, setDataKey] = useState(cur.key);
+  const [horaIni, setHoraIni] = useState(cur.hora);
+  const [horaFim, setHoraFim] = useState(curFim.hora);
+  const [motivo, setMotivo] = useState('');
+  const [erro, setErro] = useState<string | null>(null);
+  const [conflito, setConflito] = useState<{ msg: string; podeForcar: boolean } | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const novoIni = spISO(dataKey, horaIni); const novoFim = spISO(dataKey, horaFim);
+
+  // aviso ao vivo de conflito enquanto escolhe o novo horário (o guard definitivo é a RPC)
+  useEffect(() => {
+    let vivo = true; setAviso(null);
+    if (!ag.atendenteId || horaFim <= horaIni) return;
+    checarConflitoAtendente(orgId, ag.atendenteId, novoIni, novoFim, ag.id)
+      .then((c) => { if (vivo && c) setAviso('Este atendente já possui outro agendamento nesse horário.'); })
+      .catch(() => {});
+    return () => { vivo = false; };
+  }, [dataKey, horaIni, horaFim, ag.atendenteId, ag.id, orgId, novoIni, novoFim]);
+
+  async function confirmar(forcar = false) {
+    setErro(null); setConflito(null);
+    if (horaFim <= horaIni) { setErro('O horário final deve ser após o inicial.'); return; }
+    if (!motivo.trim()) { setErro('Informe o motivo da remarcação.'); return; }
+    setBusy(true);
+    try {
+      const r = await remarcar.mutateAsync({ id: ag.id, inicioEm: novoIni, fimEm: novoFim, motivo: motivo.trim(), atualizadoEmEsperado: ag.atualizadoEm, forcar });
+      if (r.status === 'conflito') { setConflito({ msg: `${r.atendente} já possui um agendamento das ${r.inicio} às ${r.fim}.`, podeForcar: !!r.pode_forcar }); return; }
+      toast('Agendamento remarcado'); onDone();
+    } catch (e) { setErro(traduzErro((e as Error).message)); }
+    finally { setBusy(false); }
+  }
+
+  return (
+    <Modal open onClose={() => { if (!busy) onClose(); }} title="Remarcar agendamento" width={460} closeOnBackdrop={!busy}
+      footer={<>
+        <button className="atv-btn" disabled={busy} onClick={onClose}>Cancelar</button>
+        {conflito && conflito.podeForcar
+          ? <button className="atv-btn primary" disabled={busy} onClick={() => confirmar(true)}>Remarcar mesmo assim</button>
+          : <button className="atv-btn primary" disabled={busy} onClick={() => confirmar(false)}>{busy ? 'Remarcando…' : 'Confirmar remarcação'}</button>}
+      </>}>
+      <div className="agn-form">
+        <div className="agn-remsum">
+          <div><span>Cliente</span><b>{ag.clienteNome || ag.titulo || 'Sem cliente'}</b></div>
+          <div><span>Atendente</span><b>{ag.atendenteNome || 'Não atribuído'}</b></div>
+          <div><span>Período atual</span><b>{fmtDataBR(ag.inicioEm)} · {cur.hora}–{curFim.hora}</b></div>
+        </div>
+        <div className="agn-row3">
+          <label className="agn-fld"><span>Nova data</span><input className="atv-input" type="date" value={dataKey} onChange={(e) => setDataKey(e.target.value)} /></label>
+          <label className="agn-fld"><span>Novo início</span><input className="atv-input" type="time" value={horaIni} onChange={(e) => setHoraIni(e.target.value)} /></label>
+          <label className="agn-fld"><span>Novo fim</span><input className="atv-input" type="time" value={horaFim} onChange={(e) => setHoraFim(e.target.value)} /></label>
+        </div>
+        <label className="agn-fld"><span>Motivo da remarcação <span className="req">*</span></span>
+          <textarea className="atv-input" rows={2} value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Ex.: Cliente solicitou nova data" />
+        </label>
+        {aviso && !conflito && <div className="agn-aviso">⚠ {aviso}</div>}
+        {conflito && <div className="atv-field-err">{conflito.msg}{conflito.podeForcar ? ' Confirme para remarcar mesmo assim.' : ' Ajuste o horário para continuar.'}</div>}
+        {erro && <div className="atv-field-err">{erro}</div>}
+      </div>
     </Modal>
   );
+}
+
+function Historico({ agendamentoId, atendentesMap }: { agendamentoId: string; atendentesMap: Record<string, string> }) {
+  const q = useHistorico(agendamentoId);
+  const nomeAtend = (id: unknown) => id == null ? 'Não atribuído' : (atendentesMap[String(id)] ?? 'Atendente');
+  if (q.isLoading) return <div className="agn-hist-empty">Carregando histórico…</div>;
+  const itens = q.data ?? [];
+  if (!itens.length) return <div className="agn-hist-empty">Sem histórico ainda.</div>;
+  return (
+    <div className="agn-hist">
+      {itens.map((it) => {
+        const d = descreveAtividade(it, nomeAtend);
+        return (
+          <div key={it.id} className="agn-hist-i">
+            <div className="agn-hist-top"><b>{it.usuarioNome || 'Sistema'}</b> {d.acao}<span className="agn-hist-when">{fmtDataHoraBR(it.criadoEm)}</span></div>
+            {d.detalhe && <div className="agn-hist-det">{d.detalhe}</div>}
+            {it.motivo && <div className="agn-hist-motivo">Motivo: {it.motivo}</div>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Converte uma atividade de auditoria em texto legível (sem JSON, IDs ou campos técnicos). */
+function descreveAtividade(it: Atividade, nomeAtend: (id: unknown) => string): { acao: string; detalhe?: string } {
+  const lbl = (v: unknown) => v ? agStatusInfo(String(v)).label : '—';
+  switch (it.tipo) {
+    case 'criado': return { acao: 'criou o agendamento' };
+    case 'status_alterado': {
+      const para = it.para?.status;
+      if (para === 'confirmado') return { acao: 'confirmou o atendimento' };
+      if (para === 'realizado') return { acao: 'marcou como realizado' };
+      if (para === 'nao_compareceu') return { acao: 'marcou como não compareceu' };
+      if (para === 'cancelado') return { acao: 'cancelou o atendimento' };
+      if (para === 'remarcado') return { acao: 'marcou como remarcado' };
+      return { acao: 'alterou o status', detalhe: `${lbl(it.de?.status)} → ${lbl(para)}` };
+    }
+    case 'horario_alterado':
+      return { acao: 'remarcou o atendimento', detalhe: `${fmtDataHoraBR(String(it.de?.inicio_em))} → ${fmtDataHoraBR(String(it.para?.inicio_em))}` };
+    case 'atendente_alterado':
+      return { acao: 'trocou o atendente', detalhe: `${nomeAtend(it.de?.atendente_id)} → ${nomeAtend(it.para?.atendente_id)}` };
+    default: return { acao: it.tipo };
+  }
 }
 function addHora(h: string) { const [hh, mm] = h.split(':').map(Number); const t = (hh + 1) % 24; return `${String(t).padStart(2, '0')}:${String(mm).padStart(2, '0')}`; }

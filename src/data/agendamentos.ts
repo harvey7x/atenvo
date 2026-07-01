@@ -24,18 +24,28 @@ export interface Agendamento {
   tipo: string; titulo: string | null; clienteNome: string | null; telefone: string | null;
   inicioEm: string; fimEm: string; status: AgStatus;
   local: string | null; endereco: string | null; observacoes: string | null;
-  atendenteNome: string | null;
+  atendenteNome: string | null; atualizadoEm: string | null; criadoPor: string | null;
 }
 
 interface DbRow {
   id: string; contato_id: string | null; oportunidade_id: string | null; atendente_id: string | null;
   tipo: string; titulo: string | null; cliente_nome: string | null; telefone: string | null;
   inicio_em: string; fim_em: string; status: AgStatus;
-  local: string | null; endereco: string | null; observacoes: string | null;
+  local: string | null; endereco: string | null; observacoes: string | null; atualizado_em: string | null; criado_por: string | null;
   atendente: { nome: string } | { nome: string }[] | null;
   contatos: { nome: string; telefone: string | null } | { nome: string; telefone: string | null }[] | null;
 }
 const nomeDe = (x: { nome: string } | { nome: string }[] | null): string | null => (Array.isArray(x) ? x[0]?.nome : x?.nome) ?? null;
+const AG_SELECT = 'id, contato_id, oportunidade_id, atendente_id, tipo, titulo, cliente_nome, telefone, inicio_em, fim_em, status, local, endereco, observacoes, atualizado_em, criado_por, atendente:usuarios!agendamentos_atendente_id_fkey(nome), contatos(nome, telefone)';
+function mapRow(r: DbRow): Agendamento {
+  return {
+    id: r.id, contatoId: r.contato_id, oportunidadeId: r.oportunidade_id, atendenteId: r.atendente_id,
+    tipo: r.tipo, titulo: r.titulo, clienteNome: r.cliente_nome ?? nomeDe(r.contatos), telefone: r.telefone ?? (Array.isArray(r.contatos) ? r.contatos[0]?.telefone : r.contatos?.telefone) ?? null,
+    inicioEm: r.inicio_em, fimEm: r.fim_em, status: r.status,
+    local: r.local, endereco: r.endereco, observacoes: r.observacoes,
+    atendenteNome: nomeDe(r.atendente), atualizadoEm: r.atualizado_em, criadoPor: r.criado_por,
+  };
+}
 
 /** Agendamentos no intervalo [inicioISO, fimISO). RLS isola por organização. */
 export function useAgendamentos(inicioISO: string, fimISO: string) {
@@ -47,18 +57,32 @@ export function useAgendamentos(inicioISO: string, fimISO: string) {
     queryFn: async (): Promise<Agendamento[]> => {
       const { data, error } = await supabase!
         .from('agendamentos')
-        .select('id, contato_id, oportunidade_id, atendente_id, tipo, titulo, cliente_nome, telefone, inicio_em, fim_em, status, local, endereco, observacoes, atendente:usuarios!agendamentos_atendente_id_fkey(nome), contatos(nome, telefone)')
+        .select(AG_SELECT)
         .eq('organizacao_id', currentOrg.id)
         .gte('inicio_em', inicioISO).lt('inicio_em', fimISO)
         .order('inicio_em', { ascending: true });
       if (error) throw new Error(error.message);
-      return ((data as unknown as DbRow[]) ?? []).map((r) => ({
-        id: r.id, contatoId: r.contato_id, oportunidadeId: r.oportunidade_id, atendenteId: r.atendente_id,
-        tipo: r.tipo, titulo: r.titulo, clienteNome: r.cliente_nome ?? nomeDe(r.contatos), telefone: r.telefone ?? (Array.isArray(r.contatos) ? r.contatos[0]?.telefone : r.contatos?.telefone) ?? null,
-        inicioEm: r.inicio_em, fimEm: r.fim_em, status: r.status,
-        local: r.local, endereco: r.endereco, observacoes: r.observacoes,
-        atendenteNome: nomeDe(r.atendente),
-      }));
+      return ((data as unknown as DbRow[]) ?? []).map(mapRow);
+    },
+  });
+}
+
+/** Próximos agendamentos a partir de "agora" (lookahead de N dias), independente da visão do calendário. */
+export function useProximosAgendamentos(desdeISO: string, ateISO: string) {
+  const { currentOrg } = useOrg();
+  return useQuery({
+    queryKey: ['agendamentos-prox', currentOrg.id, desdeISO, ateISO],
+    enabled: AG_REAL,
+    refetchInterval: 60_000,
+    queryFn: async (): Promise<Agendamento[]> => {
+      const { data, error } = await supabase!
+        .from('agendamentos').select(AG_SELECT)
+        .eq('organizacao_id', currentOrg.id)
+        .gte('inicio_em', desdeISO).lt('inicio_em', ateISO)
+        .neq('status', 'cancelado')
+        .order('inicio_em', { ascending: true }).limit(30);
+      if (error) throw new Error(error.message);
+      return ((data as unknown as DbRow[]) ?? []).map(mapRow);
     },
   });
 }
@@ -89,12 +113,37 @@ export function useCriarAgendamento() {
   });
 }
 
+/** Erro de concorrência (duas abas): o registro mudou desde a abertura. */
+export const ERRO_CONCORRENCIA = 'conflito_concorrencia';
+
 export function useAtualizarAgendamento() {
   const { currentOrg } = useOrg(); const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { id: string; patch: Record<string, unknown> }) => {
-      const { error } = await supabase!.from('agendamentos').update(input.patch).eq('id', input.id);
+    mutationFn: async (input: { id: string; patch: Record<string, unknown>; atualizadoEmEsperado?: string | null }) => {
+      let up = supabase!.from('agendamentos').update(input.patch).eq('id', input.id);
+      // concorrência otimista: só grava se atualizado_em ainda for o que a aba abriu.
+      if (input.atualizadoEmEsperado) up = up.eq('atualizado_em', input.atualizadoEmEsperado);
+      const { data, error } = await up.select('id');
       if (error) throw new Error(error.message);
+      if (input.atualizadoEmEsperado && (!data || data.length === 0)) throw new Error(ERRO_CONCORRENCIA);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ['agendamentos', currentOrg.id] }),
+  });
+}
+
+export interface RemarcarResultado { status: 'ok' | 'conflito'; atualizado_em?: string; atendente?: string; inicio?: string; fim?: string; pode_forcar?: boolean; }
+
+/** Remarcação atômica via RPC: valida permissão/período/conflito, preserva histórico, move o mesmo registro. */
+export function useRemarcarAgendamento() {
+  const { currentOrg } = useOrg(); const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { id: string; inicioEm: string; fimEm: string; motivo: string; atualizadoEmEsperado?: string | null; forcar?: boolean }): Promise<RemarcarResultado> => {
+      const { data, error } = await supabase!.rpc('remarcar_agendamento', {
+        p_id: input.id, p_inicio: input.inicioEm, p_fim: input.fimEm, p_motivo: input.motivo,
+        p_atualizado_em_esperado: input.atualizadoEmEsperado ?? null, p_forcar: input.forcar ?? false,
+      });
+      if (error) throw new Error(error.message);
+      return data as RemarcarResultado;
     },
     onSettled: () => qc.invalidateQueries({ queryKey: ['agendamentos', currentOrg.id] }),
   });
@@ -109,6 +158,35 @@ export async function checarConflitoAtendente(orgId: string, atendenteId: string
   if (excluirId) qy = qy.neq('id', excluirId);
   const { data } = await qy.limit(1);
   return (data && data.length) ? (data[0] as { id: string; cliente_nome: string | null }) : null;
+}
+
+export interface Atividade {
+  id: string; tipo: string;
+  de: Record<string, unknown> | null; para: Record<string, unknown> | null;
+  motivo: string | null; criadoEm: string; usuarioNome: string | null;
+}
+interface AtividadeRow {
+  id: string; tipo: string; de: Record<string, unknown> | null; para: Record<string, unknown> | null;
+  motivo: string | null; criado_em: string;
+  usuario: { nome: string } | { nome: string }[] | null;
+}
+/** Histórico (auditoria) de um agendamento, isolado por org pela RLS. Nome do executor preservado mesmo se desativado. */
+export function useHistorico(agendamentoId: string | null) {
+  const { currentOrg } = useOrg();
+  return useQuery({
+    queryKey: ['ag-historico', currentOrg.id, agendamentoId],
+    enabled: AG_REAL && !!agendamentoId,
+    queryFn: async (): Promise<Atividade[]> => {
+      const { data, error } = await supabase!.from('agendamento_atividades')
+        .select('id, tipo, de, para, motivo, criado_em, usuario:usuarios!agendamento_atividades_usuario_id_fkey(nome)')
+        .eq('agendamento_id', agendamentoId!).order('criado_em', { ascending: true });
+      if (error) throw new Error(error.message);
+      return ((data as unknown as AtividadeRow[]) ?? []).map((r) => ({
+        id: r.id, tipo: r.tipo, de: r.de, para: r.para, motivo: r.motivo, criadoEm: r.criado_em,
+        usuarioNome: nomeDe(r.usuario),
+      }));
+    },
+  });
 }
 
 /** Busca contatos por nome/telefone (para o seletor do modal). */
