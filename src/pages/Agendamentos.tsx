@@ -10,6 +10,50 @@ import { useAgendamentos, useProximosAgendamentos, useCriarAgendamento, useAtual
 
 type View = 'dia' | 'semana' | 'mes';
 const HORA_INI = 8, HORA_FIM = 19, HORA_PX = 56;
+const EV_L = 4, EV_R = 5, EV_GAP = 3; // margens/gap horizontais dos cards (px)
+
+/**
+ * Disposição horizontal de eventos com sobreposição temporal, por dia.
+ * Agrupa eventos conectados por sobreposição (encadeada), atribui cada um à
+ * primeira "faixa" (coluna) livre (reutilizando colunas quando não há conflito)
+ * e devolve {col, cols} por evento (na ordem original de `evs`).
+ * Sobreposição: inicioA < fimB && inicioB < fimA (encostar não conta).
+ */
+function layoutColunas(evs: Agendamento[]): { col: number; cols: number }[] {
+  const items = evs.map((e, i) => ({ i, s: new Date(e.inicioEm).getTime(), f: new Date(e.fimEm).getTime() }));
+  items.sort((a, b) => a.s - b.s || a.f - b.f);
+  const res: { col: number; cols: number }[] = new Array(evs.length);
+  let grupo: typeof items = [];
+  let grupoFim = -Infinity;
+  const fechar = () => {
+    const fimFaixa: number[] = []; // fim do último evento em cada faixa
+    const colDe: number[] = [];
+    for (const it of grupo) {
+      let faixa = fimFaixa.findIndex((fim) => fim <= it.s); // reutiliza faixa livre
+      if (faixa === -1) { faixa = fimFaixa.length; fimFaixa.push(0); }
+      fimFaixa[faixa] = it.f;
+      colDe.push(faixa);
+    }
+    const cols = fimFaixa.length;
+    grupo.forEach((it, gi) => { res[it.i] = { col: colDe[gi], cols }; });
+    grupo = []; grupoFim = -Infinity;
+  };
+  for (const it of items) {
+    if (grupo.length && it.s >= grupoFim) fechar(); // início >= fim do grupo => novo grupo
+    grupo.push(it); grupoFim = Math.max(grupoFim, it.f);
+  }
+  if (grupo.length) fechar();
+  return res;
+}
+/** left/width para a coluna `col` de `cols`, com margens EV_L/EV_R e gap entre colunas. */
+function colStyle(col: number, cols: number): { left: string; width: string; right: string } {
+  const rem = EV_L + EV_R + (cols - 1) * EV_GAP; // px descontados da largura total
+  return {
+    left: `calc((100% - ${rem}px) / ${cols} * ${col} + ${EV_L + col * EV_GAP}px)`,
+    width: `calc((100% - ${rem}px) / ${cols})`,
+    right: 'auto',
+  };
+}
 const DIAS_ABR = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
@@ -161,7 +205,7 @@ export function Agendamentos() {
                 return (
                   <div key={k} className={'agn-daycol' + (k === hojeKey ? ' hoje' : '')} style={{ height: (HORA_FIM - HORA_INI) * HORA_PX }} onClick={(e) => { if (e.currentTarget === e.target) { const rect = (e.currentTarget as HTMLElement).getBoundingClientRect(); const dec = HORA_INI + (e.clientY - rect.top) / HORA_PX; novo(k, hhmm(Math.max(HORA_INI, Math.min(HORA_FIM - 1, Math.floor(dec * 2) / 2)))); } }}>
                     {k === hojeKey && nowDec >= HORA_INI && nowDec <= HORA_FIM && <div className="agn-now" style={{ top: (nowDec - HORA_INI) * HORA_PX }} />}
-                    {eventos.map((a) => {
+                    {(() => { const lay = layoutColunas(eventos); return eventos.map((a, idx) => {
                       const s = spParts(a.inicioEm), f = spParts(a.fimEm);
                       const top = Math.max(0, (s.horaDec - HORA_INI) * HORA_PX);
                       const rawH = (Math.min(f.horaDec, HORA_FIM) - s.horaDec) * HORA_PX;
@@ -171,8 +215,9 @@ export function Agendamentos() {
                       const nome = a.clienteNome || a.titulo || 'Sem cliente';
                       const meta = [a.atendenteNome, a.local].filter(Boolean).join(' · ');
                       const tip = `${nome}\n${s.hora} – ${f.hora}\n${a.tipo}${a.atendenteNome ? '\nAtendente: ' + a.atendenteNome : ''}\nStatus: ${info.label}${a.local ? '\nLocal: ' + a.local : ''}`;
+                      const { col, cols } = lay[idx];
                       return (
-                        <button key={a.id} className={'agn-ev ' + size} title={tip} style={{ top, height: h, background: info.cor + '26', borderColor: info.cor + '73' }} onClick={(e) => { e.stopPropagation(); abrir(a); }}>
+                        <button key={a.id} className={'agn-ev ' + size} title={tip} style={{ top, height: h, ...colStyle(col, cols), background: info.cor + '26', borderColor: info.cor + '73' }} onClick={(e) => { e.stopPropagation(); abrir(a); }}>
                           <span className="agn-ev-hora">{s.hora} – {f.hora}</span>
                           <span className="agn-ev-nome">{nome}</span>
                           {size !== 'compact' && <span className="agn-ev-tipo">{a.tipo}</span>}
@@ -180,7 +225,7 @@ export function Agendamentos() {
                           <span className="agn-ev-status" style={{ color: info.cor }}>● {info.label}</span>
                         </button>
                       );
-                    })}
+                    }); })()}
                   </div>
                 );
               })}
