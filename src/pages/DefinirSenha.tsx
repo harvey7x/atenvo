@@ -21,6 +21,7 @@ export function DefinirSenha() {
   const [erro, setErro] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [grace, setGrace] = useState(true);
+  const [senhaOk, setSenhaOk] = useState(false); // senha já definida; permite retomar só a ativação
 
   const hasTokenInUrl = typeof window !== 'undefined' && /access_token=|type=invite|type=recovery|type=magiclink|code=/.test(window.location.hash + window.location.search);
 
@@ -30,36 +31,42 @@ export function DefinirSenha() {
 
   const podeDefinir = recovery || !!user;
 
+  function mapAtivarErro(m: string): string {
+    if (m.includes('convite_expirado')) return 'Seu convite expirou. Solicite um novo ao administrador.';
+    if (m.includes('convite_email_divergente')) return 'Este link não corresponde ao seu e-mail. Use o link enviado ao seu endereço.';
+    if (m.includes('convite_inexistente')) return 'Convite não encontrado, já aceito ou cancelado. Fale com o administrador.';
+    if (m.includes('vinculo_invalido')) return 'Vínculo com a organização indisponível. Fale com o administrador.';
+    if (m.includes('limite_plano')) return 'A organização atingiu o limite de usuários. Fale com o administrador.';
+    return 'Senha definida, mas não foi possível ativar o acesso. Tente novamente ou fale com o administrador.';
+  }
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (busy) return;
     setErro(null);
-    if (senha.length < 6) { setErro('A senha deve ter ao menos 6 caracteres.'); return; }
-    if (senha !== conf) { setErro('As senhas não coincidem.'); return; }
+    // NUNCA atualiza a senha sem sessão válida do convite
+    if (!podeDefinir) { setErro('A sessão do convite não foi estabelecida. Reabra o link do convite.'); return; }
+    if (!senhaOk) {
+      if (senha.length < 6) { setErro('A senha deve ter ao menos 6 caracteres.'); return; }
+      if (senha !== conf) { setErro('As senhas não coincidem.'); return; }
+    }
     setBusy(true);
-    // 1) define a senha da própria conta
-    const { error } = await updatePassword(senha);
-    if (error) {
-      setBusy(false);
-      setErro(/expired|invalid|token|otp|session/i.test(error)
-        ? 'O link expirou ou já foi utilizado. Solicite um novo convite ao administrador.'
-        : error);
-      return;
+    // 1) define a senha (só uma vez; em retomada, pula direto para a ativação)
+    if (!senhaOk) {
+      const { error } = await updatePassword(senha);
+      if (error) {
+        setBusy(false);
+        setErro(/expired|invalid|token|otp|session/i.test(error) ? 'O link expirou ou já foi utilizado. Solicite um novo convite ao administrador.' : error);
+        return;
+      }
+      setSenhaOk(true);
     }
-    // 2) ativa o vínculo com a organização e marca o convite como aceito
-    const { data, error: e2 } = await supabase!.rpc('convite_aceitar');
+    // 2) ativa o vínculo + marca o convite como aceito (derivado de auth.uid no backend)
+    const { error: e2 } = await supabase!.rpc('convite_aceitar');
     setBusy(false);
-    if (e2) {
-      const m = e2.message || '';
-      setErro(m.includes('convite_expirado') ? 'Seu convite expirou. Solicite um novo ao administrador.'
-        : m.includes('convite_inexistente') ? 'Convite não encontrado ou já utilizado/cancelado. Fale com o administrador.'
-        : m.includes('limite_plano') ? 'A organização atingiu o limite de usuários. Fale com o administrador.'
-        : 'Senha definida, mas não foi possível ativar o acesso. Fale com o administrador.');
-      return;
-    }
+    if (e2) { setErro(mapAtivarErro(e2.message || '')); return; } // sem sucesso falso; botão vira "Ativar acesso"
     toast('Bem-vindo(a)! Sua conta está ativa.');
     navigate('/', { replace: true });
-    void data;
   }
 
   const aguardando = grace && !podeDefinir;
@@ -123,8 +130,9 @@ export function DefinirSenha() {
                   </div>
                 </div>
 
+                {senhaOk && <div className="cfg-nota" style={{ fontSize: 12, marginBottom: 8 }}>Senha definida. Conclua a ativação do seu acesso.</div>}
                 <button type="submit" className="btn" disabled={busy}>
-                  {busy ? <span className="spinner" aria-hidden="true" /> : <span>Definir senha e entrar</span>}
+                  {busy ? <span className="spinner" aria-hidden="true" /> : <span>{senhaOk ? 'Ativar acesso' : 'Definir senha e entrar'}</span>}
                 </button>
               </form>
             </>

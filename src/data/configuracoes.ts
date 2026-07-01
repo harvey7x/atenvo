@@ -95,7 +95,7 @@ export function useEquipe() {
   });
 }
 
-export interface ConviteResultado { ok?: boolean; status?: string; emailSent?: boolean; smtpPendente?: boolean; inviteLink?: string | null; convite_id?: string; error?: string; code?: string; vagas?: Vagas; }
+export interface ConviteResultado { ok?: boolean; estado?: string; entregaValidada?: boolean; modo?: 'email' | 'manual_link'; idempotente?: boolean; inviteLink?: string | null; convite_id?: string; error?: string; code?: string; vagas?: Vagas; }
 
 export function useEquipeActions() {
   const qc = useQueryClient(); const { currentOrg } = useOrg(); const org = currentOrg.id;
@@ -115,7 +115,7 @@ export function useEquipeActions() {
   return {
     alterarPapel: async (usuario: string, papel: string) => { await call('equipe_alterar_papel', { p_org: org, p_usuario: usuario, p_papel: papel }); inval(); },
     definirStatus: async (usuario: string, status: string) => { await call('equipe_definir_status', { p_org: org, p_usuario: usuario, p_status: status }); inval(); },
-    convidar: async (email: string, nome: string, papel: string) => { const r = await invoke({ action: 'convidar', email, nome, papel }); inval(); return r; },
+    convidar: async (email: string, nome: string, papel: string) => { const request_id = (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.round(Math.random() * 1e9)}`); const r = await invoke({ action: 'convidar', email, nome, papel, request_id }); inval(); return r; },
     reenviar: async (convite_id: string) => { const r = await invoke({ action: 'reenviar', convite_id }); inval(); return r; },
     cancelar: async (convite_id: string) => { const r = await invoke({ action: 'cancelar', convite_id }); inval(); return r; },
   };
@@ -177,6 +177,8 @@ export function traduzCfg(msg: string): string {
   if (m.includes('proprio')) return 'Você não pode fazer isso com a própria conta.';
   if (m.includes('ja_membro')) return 'Este usuário já faz parte da equipe.';
   if (m.includes('convite_pendente')) return 'Já existe um convite pendente para este e-mail.';
+  if (m.includes('membro_inativo')) return 'Este usuário está inativo na organização. Use "Reativar" na lista.';
+  if (m.includes('envio_falhou')) return 'Não foi possível enviar o convite (verifique o SMTP nas configurações de Auth ou use o modo de link manual).';
   if (m.includes('limite_plano')) return 'Seu plano atingiu o limite de usuários.';
   if (m.includes('sem_permissao_papel')) return 'Supervisor só pode convidar atendentes.';
   if (m.includes('email_invalido')) return 'Informe um e-mail válido.';

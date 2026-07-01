@@ -243,8 +243,12 @@ function EquipePanel({ podeAdmin, podeGerenciar, meuId }: { podeAdmin: boolean; 
     try {
       const r = await fn;
       if (r.error) { toast(traduzCfg(r.code || r.error), 'warn'); return; }
-      if (copiar && r.inviteLink) { try { await navigator.clipboard.writeText(r.inviteLink); toast('Link do convite copiado.'); return; } catch { toast(r.inviteLink); return; } }
-      toast(r.emailSent ? okMsg : 'Convite preparado. Envio de e-mail ainda não configurado (SMTP).');
+      if (copiar) {
+        if (r.inviteLink) { try { await navigator.clipboard.writeText(r.inviteLink); toast('Link do convite copiado. Compartilhe só com o convidado.'); } catch { toast(r.inviteLink); } }
+        else { toast('Copiar link só está disponível no modo de link manual.', 'warn'); }
+        return;
+      }
+      toast(r.estado === 'envio_solicitado' ? 'Convite reenviado. A entrega do e-mail ainda não foi confirmada.' : okMsg);
     } catch (e) { toast(traduzCfg((e as Error).message), 'warn'); }
   }
 
@@ -331,13 +335,16 @@ function ConviteModal({ podeAdmin, onClose, onConvidar }: { podeAdmin: boolean; 
         : <><button className="atv-btn" disabled={busy} onClick={onClose}>Cancelar</button><button className="atv-btn primary" disabled={busy || !emailOk} onClick={enviar}>{busy ? 'Enviando…' : 'Enviar convite'}</button></>}>
       {resultado ? (
         <div className="cfg-form">
-          {resultado.emailSent ? (
-            <div className="cfg-nota ok">✓ Convite enviado para <b>{email.trim().toLowerCase()}</b>. A pessoa define a própria senha pelo link do e-mail.</div>
+          {resultado.estado === 'link_gerado' && resultado.inviteLink ? (
+            <>
+              <div className="cfg-nota ok">Convite criado para <b>{email.trim().toLowerCase()}</b>. Link seguro gerado (modo link manual).</div>
+              <div className="cfg-aviso">Este link permite acesso à conta. Compartilhe somente com o usuário convidado.</div>
+              <button type="button" className="atv-btn" onClick={copiar} style={{ alignSelf: 'flex-start' }}>Copiar link do convite</button>
+            </>
           ) : (
             <>
-              <div className="cfg-aviso">O convite foi preparado, mas o envio de e-mail ainda não está configurado.</div>
-              <div className="cfg-nota">Configure o SMTP nas configurações de autenticação do Supabase para enviar convites automaticamente. Enquanto isso, você pode copiar o link seguro e enviá-lo manualmente.</div>
-              {resultado.inviteLink && <button type="button" className="atv-btn" onClick={copiar} style={{ alignSelf: 'flex-start' }}>Copiar link do convite</button>}
+              <div className="cfg-nota ok">Convite criado para <b>{email.trim().toLowerCase()}</b>. A entrega do e-mail ainda não foi confirmada.</div>
+              <div className="cfg-nota">A pessoa define a própria senha pelo link. Se o e-mail não chegar, confirme o SMTP nas configurações de autenticação do Supabase (ou use o modo de link manual).</div>
             </>
           )}
         </div>
