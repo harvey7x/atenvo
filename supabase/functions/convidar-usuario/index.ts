@@ -109,8 +109,10 @@ Deno.serve(async (req) => {
     if (ent.userId) {
       const { error: vErr } = await admin.rpc('convite_vincular', { p_convite_id: conviteId, p_auth_user_id: ent.userId });
       if (vErr) {
-        await admin.rpc('convite_remover', { p_convite_id: conviteId });
-        if (!existia && ent.userId) { try { await admin.auth.admin.deleteUser(ent.userId); } catch { /* best-effort */ } } // não deixa Auth órfão
+        await admin.rpc('convite_remover', { p_convite_id: conviteId });        // remove só convite/vínculo desta tentativa
+        // deleteUser SÓ se o Auth user foi criado NESTA requisição (flag explícita) e com o ID exato dessa criação.
+        // Usuário preexistente (existia) ou não-criado nunca é apagado — preserva vínculos de outras orgs.
+        if (ent.criado && ent.userId) { try { await admin.auth.admin.deleteUser(ent.userId); } catch { /* best-effort */ } }
         return json({ error: 'Falha ao registrar o convite.', code: 'banco_falhou', detalhe: sanitizar(vErr.message) }, 500);
       }
     }
@@ -122,7 +124,8 @@ Deno.serve(async (req) => {
   }
 });
 
-interface Entrega { estado: string; userId: string | null; link: string | null }
+// criado=true SÓ quando um Auth user novo foi criado NESTA chamada (habilita a compensação deleteUser).
+interface Entrega { estado: string; userId: string | null; link: string | null; criado: boolean }
 
 // Entrega conforme o MODO. Retorna estado explícito. NUNCA loga o link.
 async function entregar(admin: ReturnType<typeof adminClient>, email: string, nome: string, papel: string, org: string, existia: boolean): Promise<Entrega> {
@@ -132,21 +135,22 @@ async function entregar(admin: ReturnType<typeof adminClient>, email: string, no
     const tipo = existia ? 'magiclink' : 'invite';
     const gl = await admin.auth.admin.generateLink({ type: tipo as 'invite' | 'magiclink', email, options: { redirectTo: REDIRECT, data } });
     if (gl.error) {
-      if (tipo === 'invite') {
+      if (tipo === 'invite') { // corrida: já existe -> magiclink (não criamos usuário)
         const gl2 = await admin.auth.admin.generateLink({ type: 'magiclink', email, options: { redirectTo: REDIRECT, data } });
-        if (!gl2.error) return { estado: 'link_gerado', userId: gl2.data.user?.id ?? null, link: gl2.data.properties?.action_link ?? null };
+        if (!gl2.error) return { estado: 'link_gerado', userId: gl2.data.user?.id ?? null, link: gl2.data.properties?.action_link ?? null, criado: false };
       }
-      return { estado: 'envio_falhou', userId: null, link: null };
+      return { estado: 'envio_falhou', userId: null, link: null, criado: false };
     }
-    return { estado: 'link_gerado', userId: gl.data.user?.id ?? null, link: gl.data.properties?.action_link ?? null };
+    // 'invite' cria o usuário (novo); 'magiclink' é para usuário existente
+    return { estado: 'link_gerado', userId: gl.data.user?.id ?? null, link: gl.data.properties?.action_link ?? null, criado: tipo === 'invite' };
   }
   // MODO email: só inviteUserByEmail; sem link manual
   if (existia) {
     // usuário já tem conta: não há convite por e-mail (já registrado). Vínculo aguarda login/aceitação.
-    return { estado: 'convite_criado', userId: null, link: null };
+    return { estado: 'convite_criado', userId: null, link: null, criado: false };
   }
   const inv = await admin.auth.admin.inviteUserByEmail(email, { data, redirectTo: REDIRECT });
-  if (inv.error) return { estado: 'envio_falhou', userId: null, link: null };
+  if (inv.error) return { estado: 'envio_falhou', userId: null, link: null, criado: false };
   // sucesso = Auth ACEITOU a solicitação; NÃO é prova de entrega
-  return { estado: 'envio_solicitado', userId: inv.data.user?.id ?? null, link: null };
+  return { estado: 'envio_solicitado', userId: inv.data.user?.id ?? null, link: null, criado: true };
 }
