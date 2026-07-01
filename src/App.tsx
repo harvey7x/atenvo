@@ -8,6 +8,7 @@ import { WhatsApp } from '@/pages/WhatsApp';
 import { Facebook } from '@/pages/Facebook';
 import { Kanban } from '@/pages/Kanban';
 import { Contatos } from '@/pages/Contatos';
+import { Agendamentos } from '@/pages/Agendamentos';
 import { Scripts } from '@/pages/Scripts';
 import { Cobrancas } from '@/pages/Cobrancas';
 import { Integracoes } from '@/pages/Integracoes';
@@ -45,6 +46,11 @@ const routes: RouteObject[] = [
             path: 'contatos',
             handle: { title: 'Contatos', subtitle: 'Base de contatos e leads.', fullBleed: true },
             element: <Contatos />,
+          },
+          {
+            path: 'agendamentos',
+            handle: { title: 'Agendamentos', subtitle: 'Organize os atendimentos presenciais da equipe.', fullBleed: true },
+            element: <Agendamentos />,
           },
           {
             path: 'scripts',

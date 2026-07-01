@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 
 export type IconName =
-  | 'whatsapp' | 'facebook' | 'kanban' | 'contatos' | 'scripts' | 'cobrancas'
+  | 'whatsapp' | 'facebook' | 'kanban' | 'contatos' | 'agendamentos' | 'scripts' | 'cobrancas'
   | 'integracoes' | 'relatorios' | 'configuracoes' | 'plano'
   | 'sun' | 'moon' | 'bell' | 'logout' | 'chevron-right' | 'chevron-down'
   | 'check' | 'lock' | 'sync' | 'plus' | 'building' | 'users';
@@ -11,6 +11,7 @@ const P: Record<IconName, ReactNode> = {
   facebook: <path d="M22 12a10 10 0 1 0-11.6 9.9v-7H8v-2.9h2.4V9.8c0-2.4 1.4-3.7 3.6-3.7 1 0 2.1.2 2.1.2v2.3h-1.2c-1.2 0-1.5.7-1.5 1.4V12H16l-.4 2.9h-2.2v7A10 10 0 0 0 22 12z" />,
   kanban: <><rect x="3" y="4" width="5" height="16" rx="1.3" /><rect x="10" y="4" width="5" height="11" rx="1.3" /><rect x="17" y="4" width="4" height="14" rx="1.3" /></>,
   contatos: <><circle cx="9" cy="8" r="3.2" /><path d="M2.5 20a6.5 6.5 0 0 1 13 0" /><path d="M16 4.2a3.2 3.2 0 0 1 0 6.3M21.5 20a6.5 6.5 0 0 0-4-6" /></>,
+  agendamentos: <><rect x="3" y="4.5" width="18" height="16" rx="2.2" /><path d="M3 9h18M8 2.5v4M16 2.5v4M7.5 13h2M14.5 13h2M7.5 16.5h2M14.5 16.5h2" /></>,
   scripts: <><rect x="4" y="3" width="16" height="18" rx="2.2" /><path d="M8 8h8M8 12h8M8 16h5" /></>,
   cobrancas: <><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8" /><path d="M12 18V6" /><circle cx="12" cy="12" r="10" /></>,
   integracoes: <><path d="M10.5 13.5a4.5 4.5 0 0 0 6.4 0l2.3-2.3a4.5 4.5 0 0 0-6.4-6.4L11.5 6" /><path d="M13.5 10.5a4.5 4.5 0 0 0-6.4 0l-2.3 2.3a4.5 4.5 0 0 0 6.4 6.4L12.5 18" /></>,
