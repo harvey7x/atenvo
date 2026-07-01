@@ -58,24 +58,28 @@ function colStyle(col: number, cols: number): { left: string; width: string; rig
 const DIAS_ABR = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
-/** partes de um instante no fuso America/Sao_Paulo (dateKey + hora decimal). */
+/** partes de um instante no fuso America/Sao_Paulo (dateKey + hora decimal). Nunca lança: data inválida => epoch. */
 function spParts(iso: string) {
-  const d = new Date(iso);
+  const raw = new Date(iso);
+  const d = Number.isNaN(raw.getTime()) ? new Date(0) : raw;
   const p = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(d).reduce((a, x) => { a[x.type] = x.value; return a; }, {} as Record<string, string>);
   const hh = +p.hour % 24;
   return { key: `${p.year}-${p.month}-${p.day}`, hh, mm: +p.minute, horaDec: hh + (+p.minute) / 60, hora: `${p.hour}:${p.minute}` };
 }
-/** deslocamento REAL de America/Sao_Paulo (ms) para um instante — via Intl (robusto a mudança de fuso/DST). */
+/** deslocamento REAL de America/Sao_Paulo (ms) para um instante — via Intl (robusto a DST). Data inválida => 0. */
 function spOffsetMs(d: Date): number {
+  if (Number.isNaN(d.getTime())) return 0;
   const p = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).formatToParts(d).reduce((a, x) => { a[x.type] = x.value; return a; }, {} as Record<string, string>);
   const asUTC = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour % 24, +p.minute, +p.second);
   return asUTC - d.getTime();
 }
-/** ISO (UTC) a partir do horário de PAREDE em America/Sao_Paulo (yyyy-mm-dd + HH:mm), sem offset fixo. */
+/** ISO (UTC) a partir do horário de PAREDE em America/Sao_Paulo (yyyy-mm-dd + HH:mm). Entrada inválida/vazia => ''. */
 function spISO(dateKey: string, hora: string): string {
-  const [Y, M, D] = dateKey.split('-').map(Number);
-  const [h, mi] = hora.split(':').map(Number);
-  const guessUTC = Date.UTC(Y, M - 1, D, h, mi);
+  const dm = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateKey ?? '');
+  const tm = /^(\d{1,2}):(\d{2})$/.exec(hora ?? '');
+  if (!dm || !tm) return '';
+  const guessUTC = Date.UTC(+dm[1], +dm[2] - 1, +dm[3], +tm[1], +tm[2]);
+  if (!Number.isFinite(guessUTC)) return '';
   return new Date(guessUTC - spOffsetMs(new Date(guessUTC))).toISOString();
 }
 const keyOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -376,10 +380,12 @@ function AgModal({ editId, prefill, atendentes, agendamento, orgId, ehGestor, on
     if (!f.clienteNome.trim()) { setErro('Informe o cliente.'); return; }
     if (f.horaFim <= f.horaIni) { setErro('O horário final deve ser após o inicial.'); return; }
     const tipo = f.tipo === 'Outro' ? (f.tipoOutro.trim() || 'Outro') : f.tipo;
+    const inicioEm = spISO(f.dataKey, f.horaIni), fimEm = spISO(f.dataKey, f.horaFim);
+    if (!inicioEm || !fimEm) { setErro('Informe a data e os horários.'); return; }
     const base = {
       clienteNome: f.clienteNome.trim(), contatoId: f.contatoId || null, telefone: f.telefone || null,
       atendenteId: f.atendenteId || null, tipo, status: f.status,
-      inicioEm: spISO(f.dataKey, f.horaIni), fimEm: spISO(f.dataKey, f.horaFim),
+      inicioEm, fimEm,
       local: f.local || null, endereco: f.endereco || null, observacoes: f.observacoes || null,
     };
     setBusy(true);
@@ -495,20 +501,23 @@ function RemarcarModal({ ag, orgId, toast, onClose, onDone }: {
   const [busy, setBusy] = useState(false);
 
   const novoIni = spISO(dataKey, horaIni); const novoFim = spISO(dataKey, horaFim);
+  // período só é válido com data + horários preenchidos e coerentes (evita Invalid Date nos parsers)
+  const periodoValido = !!novoIni && !!novoFim && horaFim > horaIni;
 
   // aviso ao vivo de conflito enquanto escolhe o novo horário (o guard definitivo é a RPC)
   useEffect(() => {
     let vivo = true; setAviso(null);
-    if (!ag.atendenteId || horaFim <= horaIni) return;
+    if (!ag.atendenteId || !periodoValido) return;
     checarConflitoAtendente(orgId, ag.atendenteId, novoIni, novoFim, ag.id)
       .then((c) => { if (vivo && c) setAviso('Este atendente já possui outro agendamento nesse horário.'); })
       .catch(() => {});
     return () => { vivo = false; };
-  }, [dataKey, horaIni, horaFim, ag.atendenteId, ag.id, orgId, novoIni, novoFim]);
+  }, [ag.atendenteId, ag.id, orgId, novoIni, novoFim, periodoValido]);
 
   async function confirmar(forcar = false) {
     setErro(null); setConflito(null);
-    if (horaFim <= horaIni) { setErro('O horário final deve ser após o inicial.'); return; }
+    if (!dataKey || !horaIni || !horaFim) { setErro('Informe a data e os horários.'); return; }
+    if (!periodoValido) { setErro('O horário final deve ser após o inicial.'); return; }
     if (!motivo.trim()) { setErro('Informe o motivo da remarcação.'); return; }
     setBusy(true);
     try {
