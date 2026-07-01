@@ -289,7 +289,7 @@ function EquipePanel({ podeAdmin, podeGerenciar, meuId }: { podeAdmin: boolean; 
                             : <button className="pop-item" onClick={() => { setMenu(null); run(acoes.definirStatus(l.id, 'ativo'), 'Usuário reativado'); }}>Reativar</button>}
                         </>}
                         {gerConv && <>
-                          <button className="pop-item" onClick={() => { setMenu(null); acaoConvite(acoes.reenviar(l.id), 'Convite reenviado.'); }}>Reenviar convite</button>
+                          <button className="pop-item" onClick={() => { setMenu(null); acaoConvite(acoes.reenviar(l.id), 'Novo link gerado. Links anteriores podem abrir sessão, mas só um convite pendente e válido ativa o acesso.'); }}>Reenviar convite</button>
                           <button className="pop-item" onClick={() => { setMenu(null); acaoConvite(acoes.reenviar(l.id), '', true); }}>Copiar link</button>
                           <button className="pop-item danger" onClick={() => { setMenu(null); acaoConvite(acoes.cancelar(l.id), 'Convite cancelado.'); }}>Cancelar convite</button>
                         </>}

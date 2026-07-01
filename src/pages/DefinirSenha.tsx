@@ -24,6 +24,8 @@ export function DefinirSenha() {
   const [senhaOk, setSenhaOk] = useState(false); // senha já definida; permite retomar só a ativação
 
   const hasTokenInUrl = typeof window !== 'undefined' && /access_token=|type=invite|type=recovery|type=magiclink|code=/.test(window.location.hash + window.location.search);
+  // usuário preexistente (já tem senha): só aceitar o convite, sem redefinir senha.
+  const ativarSomente = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('ativar') === '1';
 
   useEffect(() => { const t = window.setTimeout(() => setGrace(false), 2500); return () => window.clearTimeout(t); }, []);
 
@@ -69,6 +71,19 @@ export function DefinirSenha() {
     navigate('/', { replace: true });
   }
 
+  // Preexistente (já tem senha): só aceita o convite, sem redefinir senha.
+  async function apenasAtivar() {
+    if (busy) return;
+    setErro(null);
+    if (!podeDefinir) { setErro('A sessão do convite não foi estabelecida. Reabra o link do convite.'); return; }
+    setBusy(true);
+    const { error: e2 } = await supabase!.rpc('convite_aceitar');
+    setBusy(false);
+    if (e2) { setErro(mapAtivarErro(e2.message || '')); return; }
+    toast('Bem-vindo(a)! Sua conta está ativa.');
+    navigate('/', { replace: true });
+  }
+
   const aguardando = grace && !podeDefinir;
   const linkInvalido = !podeDefinir && !aguardando && !hasTokenInUrl && !loading;
 
@@ -95,6 +110,17 @@ export function DefinirSenha() {
             <>
               <p className="subhead">Convite inválido ou expirado.</p>
               <div style={{ marginTop: 18 }}><Link className="link" to="/login">Ir para o login</Link></div>
+            </>
+          ) : ativarSomente ? (
+            <>
+              <p className="subhead">Você já tem uma conta. Aceite o convite para entrar nesta organização.</p>
+              <div className={'banner' + (erro ? ' show banner--error' : '')} role="alert" aria-live="polite">
+                <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 8v5M12 16h.01" /></svg></span>
+                <span>{erro}</span>
+              </div>
+              <button type="button" className="btn" disabled={busy} onClick={apenasAtivar}>
+                {busy ? <span className="spinner" aria-hidden="true" /> : <span>Aceitar convite</span>}
+              </button>
             </>
           ) : (
             <>

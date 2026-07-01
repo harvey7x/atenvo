@@ -59,7 +59,8 @@ Deno.serve(async (req) => {
       if (c.status === 'aceito' || c.status === 'cancelado') return json({ error: 'Convite não pode ser reenviado.' }, 409);
       if (c.reenviado_em && Date.now() - new Date(c.reenviado_em).getTime() < REENVIO_MIN_MS) return json({ error: 'Aguarde antes de reenviar novamente.' }, 429);
 
-      const ent = await entregar(admin, c.email, c.nome, c.papel, org, !!c.auth_user_id);
+      const { data: lk } = await admin.rpc('_auth_lookup', { p_email: c.email });
+      const ent = await entregar(admin, c.email, c.nome, c.papel, org, { existe: !!lk?.id, temSenha: !!lk?.tem_senha });
       // renova o MESMO convite lógico (não cria outro)
       await admin.from('convites').update({ status: 'pendente', expira_em: new Date(Date.now() + 7 * 864e5).toISOString(), reenviado_em: new Date().toISOString(), atualizado_em: new Date().toISOString() }).eq('id', cid);
       if (ent.userId && !c.auth_user_id) await admin.rpc('convite_vincular', { p_convite_id: cid, p_auth_user_id: ent.userId });
@@ -88,14 +89,14 @@ Deno.serve(async (req) => {
     if (st !== 'criado') return json({ error: 'Não foi possível criar o convite.', code: st }, 400);
     const conviteId = rsv.convite_id as string;
 
-    // 2) usuário já existe no Auth?
+    // 2) usuário já existe no Auth? (e já tem senha?)
     const { data: lookup } = await admin.rpc('_auth_lookup', { p_email: email });
-    const existia = !!lookup?.id;
+    const info = { existe: !!lookup?.id, temSenha: !!lookup?.tem_senha };
 
     // 3) AUTH (por modo) + compensação (saga)
     let ent: Entrega;
     try {
-      ent = await entregar(admin, email, nome, papel, org, existia);
+      ent = await entregar(admin, email, nome, papel, org, info);
     } catch (e) {
       await admin.rpc('convite_remover', { p_convite_id: conviteId }); // libera a vaga
       return json({ error: 'Falha ao preparar o convite.', code: 'envio_falhou', detalhe: sanitizar((e as Error).message) }, 502);
@@ -126,31 +127,28 @@ Deno.serve(async (req) => {
 
 // criado=true SÓ quando um Auth user novo foi criado NESTA chamada (habilita a compensação deleteUser).
 interface Entrega { estado: string; userId: string | null; link: string | null; criado: boolean }
+interface LookupInfo { existe: boolean; temSenha: boolean }
 
-// Entrega conforme o MODO. Retorna estado explícito. NUNCA loga o link.
-async function entregar(admin: ReturnType<typeof adminClient>, email: string, nome: string, papel: string, org: string, existia: boolean): Promise<Entrega> {
+// Estratégia de link EXPLÍCITA e determinística pelo estado do usuário no Auth (igual em convidar/reenviar):
+//   - não existe            -> 'invite'   (cria o usuário + define a senha)      -> /definir-senha
+//   - existe, SEM senha     -> 'recovery' (primeiro acesso: define a senha)      -> /definir-senha
+//   - existe, COM senha     -> 'magiclink'(preexistente: só autentica e aceita)  -> /definir-senha?ativar=1
+// Não alterna silenciosamente entre invite/magiclink por erro: o tipo vem do estado. NUNCA loga o link.
+async function entregar(admin: ReturnType<typeof adminClient>, email: string, nome: string, papel: string, org: string, info: LookupInfo): Promise<Entrega> {
   const data = { nome, papel, organizacao_id: org };
+  const plano: { tipo: 'invite' | 'recovery' | 'magiclink'; redirect: string; criado: boolean } =
+    !info.existe ? { tipo: 'invite', redirect: REDIRECT, criado: true }
+      : !info.temSenha ? { tipo: 'recovery', redirect: REDIRECT, criado: false }
+        : { tipo: 'magiclink', redirect: `${REDIRECT}?ativar=1`, criado: false };
+
   if (INVITE_MODE === 'manual_link') {
-    // só generateLink; nunca inviteUserByEmail
-    const tipo = existia ? 'magiclink' : 'invite';
-    const gl = await admin.auth.admin.generateLink({ type: tipo as 'invite' | 'magiclink', email, options: { redirectTo: REDIRECT, data } });
-    if (gl.error) {
-      if (tipo === 'invite') { // corrida: já existe -> magiclink (não criamos usuário)
-        const gl2 = await admin.auth.admin.generateLink({ type: 'magiclink', email, options: { redirectTo: REDIRECT, data } });
-        if (!gl2.error) return { estado: 'link_gerado', userId: gl2.data.user?.id ?? null, link: gl2.data.properties?.action_link ?? null, criado: false };
-      }
-      return { estado: 'envio_falhou', userId: null, link: null, criado: false };
-    }
-    // 'invite' cria o usuário (novo); 'magiclink' é para usuário existente
-    return { estado: 'link_gerado', userId: gl.data.user?.id ?? null, link: gl.data.properties?.action_link ?? null, criado: tipo === 'invite' };
+    const gl = await admin.auth.admin.generateLink({ type: plano.tipo, email, options: { redirectTo: plano.redirect, data } });
+    if (gl.error) return { estado: 'envio_falhou', userId: null, link: null, criado: false };
+    return { estado: 'link_gerado', userId: gl.data.user?.id ?? null, link: gl.data.properties?.action_link ?? null, criado: plano.criado };
   }
-  // MODO email: só inviteUserByEmail; sem link manual
-  if (existia) {
-    // usuário já tem conta: não há convite por e-mail (já registrado). Vínculo aguarda login/aceitação.
-    return { estado: 'convite_criado', userId: null, link: null, criado: false };
-  }
+  // MODO email: só inviteUserByEmail (usuário novo). Existentes aceitam via login/link — sem redefinir senha.
+  if (info.existe) return { estado: 'convite_criado', userId: null, link: null, criado: false };
   const inv = await admin.auth.admin.inviteUserByEmail(email, { data, redirectTo: REDIRECT });
   if (inv.error) return { estado: 'envio_falhou', userId: null, link: null, criado: false };
-  // sucesso = Auth ACEITOU a solicitação; NÃO é prova de entrega
-  return { estado: 'envio_solicitado', userId: inv.data.user?.id ?? null, link: null, criado: true };
+  return { estado: 'envio_solicitado', userId: inv.data.user?.id ?? null, link: null, criado: true }; // NÃO é prova de entrega
 }
