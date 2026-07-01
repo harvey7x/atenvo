@@ -281,6 +281,12 @@
 .config-page .cfg-field label{font-size:12.5px;font-weight:600;color:var(--ink-2)}
 .config-page .cfg-ta{resize:vertical;min-height:48px;font-family:inherit;padding-top:9px}
 .config-page .cfg-nota{font-size:12px;color:var(--muted);line-height:1.5;background:var(--surface-2);border:1px dashed var(--line-2);border-radius:10px;padding:10px 12px}
+.config-page .cfg-nota.ok{color:var(--ink-2);border-style:solid;border-color:#1d9e7555;background:#1d9e7514}
+.config-page .cfg-aviso{font-size:12.5px;color:#c07a1e;background:#c07a1e14;border:1px solid #c07a1e33;border-radius:10px;padding:10px 12px;font-weight:500}
+.config-page .team-filtros{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:12px 16px 0}
+.config-page .team-filtros .chip{border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);border-radius:999px;padding:5px 13px;font-size:12.5px;font-weight:500;cursor:pointer}
+.config-page .team-filtros .chip.on{background:#19C37D;color:#fff;border-color:transparent}
+.config-page .team-filtros .team-fpapel{margin-left:auto;max-width:180px;height:32px;padding:0 10px}
 .config-page .dias-row{display:flex;gap:7px;flex-wrap:wrap}
 .config-page .dia-chip{height:34px;min-width:46px;padding:0 12px;border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer}
 .config-page .dia-chip.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-ink)}

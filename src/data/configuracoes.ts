@@ -76,28 +76,48 @@ export function useSalvarOrg() {
 }
 
 /* ===================== Equipe ===================== */
-export interface Membro { id: string; nome: string; email: string; papel: string; status: string; }
-export function useMembros() {
+export interface Membro { usuario_id: string; nome: string; email: string; papel: string; status: string; criado_em: string; ultimo_acesso: string | null; }
+export interface Convite { id: string; email: string; nome: string | null; papel: string; status: string; expira_em: string; criado_em: string; convidado_por: string | null; }
+export interface Vagas { limite: number | null; ativos: number; pendentes: number; }
+export interface EquipeData { membros: Membro[]; convites: Convite[]; vagas: Vagas; }
+
+/** Lista unificada da equipe (membros ativos/inativos + convites pendentes/expirados) + vagas do plano. */
+export function useEquipe() {
   const { currentOrg } = useOrg(); const org = currentOrg.id;
   return useQuery({
-    queryKey: ['cfg-membros', org], enabled: CFG_REAL,
-    queryFn: async (): Promise<Membro[]> => {
-      const { data, error } = await supabase!.from('organizacao_usuarios').select('usuario_id, papel, status, usuarios(nome, email)').eq('organizacao_id', org);
+    queryKey: ['cfg-equipe', org], enabled: CFG_REAL,
+    queryFn: async (): Promise<EquipeData> => {
+      const { data, error } = await supabase!.rpc('equipe_listar', { p_org: org });
       if (error) throw new Error(error.message);
-      return ((data as Row[]) ?? []).map((r) => { const u = Array.isArray(r.usuarios) ? (r.usuarios[0] as Row) : (r.usuarios as Row); return { id: r.usuario_id as string, nome: (u?.nome as string) || '—', email: (u?.email as string) || '', papel: r.papel as string, status: r.status as string }; })
-        .sort((a, b) => (a.papel === 'admin' ? -1 : 1) - (b.papel === 'admin' ? -1 : 1) || a.nome.localeCompare(b.nome));
+      const d = (data ?? {}) as Partial<EquipeData>;
+      return { membros: d.membros ?? [], convites: d.convites ?? [], vagas: d.vagas ?? { limite: null, ativos: 0, pendentes: 0 } };
     },
   });
 }
+
+export interface ConviteResultado { ok?: boolean; status?: string; emailSent?: boolean; smtpPendente?: boolean; inviteLink?: string | null; convite_id?: string; error?: string; code?: string; vagas?: Vagas; }
+
 export function useEquipeActions() {
   const qc = useQueryClient(); const { currentOrg } = useOrg(); const org = currentOrg.id;
-  const inval = () => qc.invalidateQueries({ queryKey: ['cfg-membros', org] });
-  const call = async (fn: string, args: Record<string, unknown>) => { const { error, data } = await supabase!.rpc(fn, args); if (error) throw new Error(error.message); return data; };
+  const inval = () => qc.invalidateQueries({ queryKey: ['cfg-equipe', org] });
+  const call = async (fn: string, args: Record<string, unknown>) => { const { error } = await supabase!.rpc(fn, args); if (error) throw new Error(error.message); };
+  // Edge Function (service_role só no backend). Convite/reenvio/cancelamento.
+  const invoke = async (payload: Record<string, unknown>): Promise<ConviteResultado> => {
+    const { data, error } = await supabase!.functions.invoke('convidar-usuario', { body: { org, ...payload } });
+    if (error) {
+      const ctx = (error as { context?: Response }).context;
+      let body: ConviteResultado = {};
+      try { body = ctx ? await ctx.json() : {}; } catch { /* corpo indisponível */ }
+      return { error: body.error || (error as Error).message, code: body.code, vagas: body.vagas };
+    }
+    return data as ConviteResultado;
+  };
   return {
     alterarPapel: async (usuario: string, papel: string) => { await call('equipe_alterar_papel', { p_org: org, p_usuario: usuario, p_papel: papel }); inval(); },
     definirStatus: async (usuario: string, status: string) => { await call('equipe_definir_status', { p_org: org, p_usuario: usuario, p_status: status }); inval(); },
-    remover: async (usuario: string) => { await call('equipe_remover_membro', { p_org: org, p_usuario: usuario }); inval(); },
-    convidar: async (email: string, nome: string, papel: string) => { await call('convidar_membro', { p_org: org, p_email: email, p_nome: nome, p_papel: papel }); inval(); },
+    convidar: async (email: string, nome: string, papel: string) => { const r = await invoke({ action: 'convidar', email, nome, papel }); inval(); return r; },
+    reenviar: async (convite_id: string) => { const r = await invoke({ action: 'reenviar', convite_id }); inval(); return r; },
+    cancelar: async (convite_id: string) => { const r = await invoke({ action: 'cancelar', convite_id }); inval(); return r; },
   };
 }
 
@@ -155,8 +175,11 @@ export function traduzCfg(msg: string): string {
   if (m.includes('sem_permissao') || m.includes('row-level') || m.includes('permission')) return 'Você não tem permissão para esta ação.';
   if (m.includes('ultimo_admin')) return 'Não é possível: deixaria a organização sem administrador.';
   if (m.includes('proprio')) return 'Você não pode fazer isso com a própria conta.';
-  if (m.includes('usuario_sem_conta_atenvo')) return 'Esse e-mail ainda não tem conta na Atenvo. O envio de convite por e-mail será habilitado quando a integração de envio estiver ativa.';
-  if (m.includes('ja_membro')) return 'Esse usuário já faz parte da organização.';
-  if (m.includes('papel_invalido')) return 'Papel inválido.';
+  if (m.includes('ja_membro')) return 'Este usuário já faz parte da equipe.';
+  if (m.includes('convite_pendente')) return 'Já existe um convite pendente para este e-mail.';
+  if (m.includes('limite_plano')) return 'Seu plano atingiu o limite de usuários.';
+  if (m.includes('sem_permissao_papel')) return 'Supervisor só pode convidar atendentes.';
+  if (m.includes('email_invalido')) return 'Informe um e-mail válido.';
+  if (m.includes('papel_invalido')) return 'Perfil inválido.';
   return msg || 'Falha na operação.';
 }

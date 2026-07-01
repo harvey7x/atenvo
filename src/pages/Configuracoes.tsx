@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useToast } from '@/hooks/useToast';
 import { useTheme } from '@/hooks/useTheme';
@@ -10,7 +10,7 @@ import { useFbStatus } from '@/data/facebook';
 import { useStatusDefs, useEtiquetas, useAtendimentoActions } from '@/data/atendimento';
 import {
   useMeuPerfil, useSalvarPerfil, salvarAvatar, subirAvatar, urlAvatar,
-  useOrgFull, useSalvarOrg, useMembros, useEquipeActions,
+  useOrgFull, useSalvarOrg, useEquipe, useEquipeActions, type ConviteResultado,
   usePreferencias, useSalvarPreferencias, type Prefs,
   useConfigAtendimento, useSalvarConfigAtendimento, type ConfigAtendimento,
   traduzCfg,
@@ -43,8 +43,8 @@ const TABS = [
 const TAB_IDS = TABS.map((t) => t.id);
 const PAPEL_LABEL: Record<string, string> = { admin: 'Administrador', supervisor: 'Supervisor', atendente: 'Atendente' };
 const PAPEL_CLS: Record<string, string> = { admin: 'ok', supervisor: 'blue', atendente: 'neutral' };
-const STATUS_LABEL: Record<string, string> = { ativo: 'Ativo', inativo: 'Inativo', convidado: 'Convite pendente' };
-const STATUS_CLS: Record<string, string> = { ativo: 'ok', inativo: 'neutral', convidado: 'warn' };
+const STATUS_LABEL: Record<string, string> = { ativo: 'Ativo', inativo: 'Inativo', convidado: 'Convite pendente', pendente: 'Convite pendente', expirado: 'Convite expirado' };
+const STATUS_CLS: Record<string, string> = { ativo: 'ok', inativo: 'neutral', convidado: 'warn', pendente: 'warn', expirado: 'err' };
 const WA_ST: Record<string, { t: string; cls: string; dot?: boolean }> = {
   conectado: { t: 'Conectado', cls: 'ok', dot: true }, sincronizando: { t: 'Sincronizando', cls: 'warn' },
   desconectado: { t: 'Desconectado', cls: 'neutral' }, atencao: { t: 'Atenção', cls: 'warn' }, erro: { t: 'Erro', cls: 'err' },
@@ -80,7 +80,7 @@ export function Configuracoes() {
           </div>
 
           <section className={'tab-panel' + (tab === 'conta' ? ' on' : '')} data-panel="conta"><ContaPanel podeGerenciar={podeGerenciar} /></section>
-          <section className={'tab-panel' + (tab === 'equipe' ? ' on' : '')} data-panel="equipe"><EquipePanel podeAdmin={podeAdmin} meuId={user?.id} /></section>
+          <section className={'tab-panel' + (tab === 'equipe' ? ' on' : '')} data-panel="equipe"><EquipePanel podeAdmin={podeAdmin} podeGerenciar={podeGerenciar} meuId={user?.id} /></section>
           <section className={'tab-panel' + (tab === 'canais' ? ' on' : '')} data-panel="canais"><CanaisPanel podeGerenciar={podeGerenciar} onNav={navigate} /></section>
           <section className={'tab-panel' + (tab === 'atendimento' ? ' on' : '')} data-panel="atendimento">
             <ConfigAtendimentoCard podeGerenciar={podeAdmin} />
@@ -211,84 +211,144 @@ function ContaPanel({ podeGerenciar }: { podeGerenciar: boolean }) {
 }
 
 /* ===================== Equipe ===================== */
-function EquipePanel({ podeAdmin, meuId }: { podeAdmin: boolean; meuId?: string }) {
+const fmtQuando = (iso: string | null) => iso ? new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—';
+type LinhaEquipe = { kind: 'membro' | 'convite'; id: string; nome: string; email: string; papel: string; status: string; ultimo: string | null; data: string };
+
+function EquipePanel({ podeAdmin, podeGerenciar, meuId }: { podeAdmin: boolean; podeGerenciar: boolean; meuId?: string }) {
   const { toast } = useToast();
-  const membrosQ = useMembros();
+  const equipeQ = useEquipe();
   const acoes = useEquipeActions();
   const [menu, setMenu] = useState<string | null>(null);
   const [convite, setConvite] = useState(false);
-  const [remover, setRemover] = useState<{ id: string; nome: string } | null>(null);
-  const [remBusy, setRemBusy] = useState(false);
-  const membros = membrosQ.data ?? [];
+  const [filtro, setFiltro] = useState<'todos' | 'ativos' | 'pendentes' | 'inativos'>('todos');
+  const [fPapel, setFPapel] = useState('');
+  const eq = equipeQ.data;
+  const vagas = eq?.vagas;
+
+  const linhas: LinhaEquipe[] = useMemo(() => {
+    const ms = (eq?.membros ?? []).map((m) => ({ kind: 'membro' as const, id: m.usuario_id, nome: m.nome, email: m.email, papel: m.papel, status: m.status, ultimo: m.ultimo_acesso, data: m.criado_em }));
+    const cs = (eq?.convites ?? []).map((c) => ({ kind: 'convite' as const, id: c.id, nome: c.nome || c.email, email: c.email, papel: c.papel, status: c.status, ultimo: null, data: c.criado_em }));
+    return [...ms, ...cs];
+  }, [eq]);
+  const filtradas = linhas.filter((l) => {
+    if (fPapel && l.papel !== fPapel) return false;
+    if (filtro === 'ativos') return l.status === 'ativo';
+    if (filtro === 'inativos') return l.status === 'inativo';
+    if (filtro === 'pendentes') return l.status === 'pendente' || l.status === 'expirado';
+    return true;
+  });
 
   async function run(p: Promise<unknown>, ok: string) { try { await p; toast(ok); } catch (e) { toast(traduzCfg((e as Error).message), 'warn'); } }
-  async function confirmarRemocao() {
-    if (!remover) return; setRemBusy(true);
-    try { await acoes.remover(remover.id); toast('Acesso removido.'); setRemover(null); }
-    catch (e) { toast(traduzCfg((e as Error).message), 'warn'); } finally { setRemBusy(false); }
+  async function acaoConvite(fn: Promise<ConviteResultado>, okMsg: string, copiar?: boolean) {
+    try {
+      const r = await fn;
+      if (r.error) { toast(traduzCfg(r.code || r.error), 'warn'); return; }
+      if (copiar && r.inviteLink) { try { await navigator.clipboard.writeText(r.inviteLink); toast('Link do convite copiado.'); return; } catch { toast(r.inviteLink); return; } }
+      toast(r.emailSent ? okMsg : 'Convite preparado. Envio de e-mail ainda não configurado (SMTP).');
+    } catch (e) { toast(traduzCfg((e as Error).message), 'warn'); }
   }
 
   return (
     <div className="set-card">
-      <div className="sc-head bordered"><div className="row"><div className="grow"><h3>Membros da equipe</h3><p>Pessoas com acesso à organização e seus níveis de permissão.{!podeAdmin ? ' Somente administradores podem gerenciar.' : ''}</p></div>{podeAdmin && <button className="btn-primary" onClick={() => setConvite(true)}><IcInvite />Convidar membro</button>}</div></div>
+      <div className="sc-head bordered"><div className="row"><div className="grow"><h3>Equipe</h3><p>Pessoas com acesso à organização e convites em aberto.{vagas?.limite != null ? ` Uso do plano: ${vagas.ativos + vagas.pendentes} de ${vagas.limite} usuário${vagas.limite === 1 ? '' : 's'} (ativos + convites pendentes).` : ''}{!podeGerenciar ? ' Somente administradores/supervisores gerenciam.' : ''}</p></div>{podeGerenciar && <button className="btn-primary" onClick={() => setConvite(true)}><IcInvite />Convidar usuário</button>}</div></div>
+
+      <div className="team-filtros">
+        {(['todos', 'ativos', 'pendentes', 'inativos'] as const).map((f) => <button key={f} type="button" className={'chip' + (filtro === f ? ' on' : '')} onClick={() => setFiltro(f)}>{f === 'todos' ? 'Todos' : f === 'ativos' ? 'Ativos' : f === 'pendentes' ? 'Pendentes' : 'Inativos'}</button>)}
+        <select className="ctrl team-fpapel" value={fPapel} onChange={(e) => setFPapel(e.target.value)}><option value="">Todos os perfis</option><option value="admin">Administrador</option><option value="supervisor">Supervisor</option><option value="atendente">Atendente</option></select>
+      </div>
+
       <div className="team-scroll">
-        {membrosQ.isLoading ? <div className="cfg-load">Carregando equipe…</div> : (
-          <table className="team-table" aria-label="Membros da equipe">
-            <thead><tr><th className="column-membro">Membro</th><th className="column-center">Função</th><th className="column-center">Status</th>{podeAdmin && <th className="column-center" aria-label="Ações"></th>}</tr></thead>
+        {equipeQ.isLoading ? <div className="cfg-load">Carregando equipe…</div> : (
+          <table className="team-table" aria-label="Equipe">
+            <thead><tr><th className="column-membro">Membro</th><th className="column-center">Função</th><th className="column-center">Status</th><th className="column-center">Último acesso</th><th className="column-center">Desde</th>{podeGerenciar && <th className="column-center" aria-label="Ações"></th>}</tr></thead>
             <tbody>
-              {membros.map((m) => (
-                <tr key={m.id}>
-                  <td><div className="member-cell"><Av n={m.nome} /><div className="mt"><span className="nm">{m.nome}{m.id === meuId ? ' (você)' : ''}</span><span className="em">{m.email}</span></div></div></td>
-                  <td className="column-center"><div className="cell-center"><span className={'badge ' + (PAPEL_CLS[m.papel] || 'neutral')}>{PAPEL_LABEL[m.papel] || m.papel}</span></div></td>
-                  <td className="column-center"><div className="cell-center"><span className={'badge ' + (STATUS_CLS[m.status] || 'neutral')}>{m.status === 'ativo' && <span className="dot" />}{STATUS_LABEL[m.status] || m.status}</span></div></td>
-                  {podeAdmin && <td className="column-center"><div className="cell-center" style={{ position: 'relative' }}>
-                    {m.id !== meuId ? <button type="button" className="row-menu" aria-label="Ações" onClick={() => setMenu(menu === m.id ? null : m.id)}><IcDots /></button> : <span className="acesso">—</span>}
-                    {menu === m.id && (
+              {filtradas.map((l) => {
+                const gerConv = l.kind === 'convite' && podeGerenciar && (podeAdmin || l.papel === 'atendente');
+                const gerMemb = l.kind === 'membro' && podeAdmin && l.id !== meuId;
+                return (
+                <tr key={l.kind + l.id}>
+                  <td><div className="member-cell"><Av n={l.nome} /><div className="mt"><span className="nm">{l.nome}{l.id === meuId ? ' (você)' : ''}</span><span className="em">{l.email}</span></div></div></td>
+                  <td className="column-center"><div className="cell-center"><span className={'badge ' + (PAPEL_CLS[l.papel] || 'neutral')}>{PAPEL_LABEL[l.papel] || l.papel}</span></div></td>
+                  <td className="column-center"><div className="cell-center"><span className={'badge ' + (STATUS_CLS[l.status] || 'neutral')}>{l.status === 'ativo' && <span className="dot" />}{STATUS_LABEL[l.status] || l.status}</span></div></td>
+                  <td className="column-center"><div className="cell-center acesso">{l.kind === 'membro' ? (l.ultimo ? fmtQuando(l.ultimo) : 'Nunca') : '—'}</div></td>
+                  <td className="column-center"><div className="cell-center acesso">{fmtQuando(l.data)}</div></td>
+                  {podeGerenciar && <td className="column-center"><div className="cell-center" style={{ position: 'relative' }}>
+                    {(gerMemb || gerConv) ? <button type="button" className="row-menu" aria-label="Ações" onClick={() => setMenu(menu === l.kind + l.id ? null : l.kind + l.id)}><IcDots /></button> : <span className="acesso">—</span>}
+                    {menu === l.kind + l.id && (
                       <div className="pop show" style={{ position: 'absolute', right: 0, top: '100%' }} onMouseLeave={() => setMenu(null)}>
-                        <div className="pop-lbl">Papel</div>
-                        {(['admin', 'supervisor', 'atendente'] as const).map((p) => <button key={p} className={'pop-item' + (m.papel === p ? ' sel' : '')} onClick={() => { setMenu(null); run(acoes.alterarPapel(m.id, p), 'Papel atualizado'); }}>{PAPEL_LABEL[p]}</button>)}
-                        <div className="pop-sep" />
-                        {m.status === 'ativo'
-                          ? <button className="pop-item" onClick={() => { setMenu(null); run(acoes.definirStatus(m.id, 'inativo'), 'Membro desativado'); }}>Desativar</button>
-                          : <button className="pop-item" onClick={() => { setMenu(null); run(acoes.definirStatus(m.id, 'ativo'), 'Membro ativado'); }}>Ativar</button>}
-                        {m.status === 'convidado' && <button className="pop-item" onClick={() => { setMenu(null); toast('Envio de convite por e-mail: integração pendente.', 'warn'); }}>Reenviar convite</button>}
-                        <button className="pop-item danger" onClick={() => { setMenu(null); setRemover({ id: m.id, nome: m.nome }); }}>Remover acesso</button>
+                        {gerMemb && <>
+                          <div className="pop-lbl">Perfil</div>
+                          {(['admin', 'supervisor', 'atendente'] as const).map((p) => <button key={p} className={'pop-item' + (l.papel === p ? ' sel' : '')} onClick={() => { setMenu(null); run(acoes.alterarPapel(l.id, p), 'Perfil atualizado'); }}>{PAPEL_LABEL[p]}</button>)}
+                          <div className="pop-sep" />
+                          {l.status === 'ativo'
+                            ? <button className="pop-item" onClick={() => { setMenu(null); run(acoes.definirStatus(l.id, 'inativo'), 'Usuário desativado'); }}>Desativar</button>
+                            : <button className="pop-item" onClick={() => { setMenu(null); run(acoes.definirStatus(l.id, 'ativo'), 'Usuário reativado'); }}>Reativar</button>}
+                        </>}
+                        {gerConv && <>
+                          <button className="pop-item" onClick={() => { setMenu(null); acaoConvite(acoes.reenviar(l.id), 'Convite reenviado.'); }}>Reenviar convite</button>
+                          <button className="pop-item" onClick={() => { setMenu(null); acaoConvite(acoes.reenviar(l.id), '', true); }}>Copiar link</button>
+                          <button className="pop-item danger" onClick={() => { setMenu(null); acaoConvite(acoes.cancelar(l.id), 'Convite cancelado.'); }}>Cancelar convite</button>
+                        </>}
                       </div>
                     )}
                   </div></td>}
                 </tr>
-              ))}
+                );
+              })}
+              {filtradas.length === 0 && <tr><td colSpan={podeGerenciar ? 6 : 5}><div className="cfg-load">Nenhum registro para este filtro.</div></td></tr>}
             </tbody>
           </table>
         )}
       </div>
-      <footer className="tc-foot"><span className="ft">{membros.length} membro{membros.length === 1 ? '' : 's'}</span></footer>
+      <footer className="tc-foot"><span className="ft">{(eq?.membros.length ?? 0)} membro{(eq?.membros.length ?? 0) === 1 ? '' : 's'}{(eq?.convites.length ?? 0) > 0 ? ` · ${eq?.convites.length} convite${eq?.convites.length === 1 ? '' : 's'}` : ''}</span></footer>
 
-      {convite && <ConviteModal onClose={() => setConvite(false)} onConvidar={acoes.convidar} />}
-      <ConfirmDialog open={!!remover} title="Remover acesso?" message={remover ? `"${remover.nome}" deixará de acessar esta organização. O histórico (conversas, mensagens, autoria) é preservado. Esta ação não exclui a conta.` : ''} destructive loading={remBusy} confirmLabel="Remover acesso" onConfirm={confirmarRemocao} onCancel={() => { if (!remBusy) setRemover(null); }} />
+      {convite && <ConviteModal podeAdmin={podeAdmin} onClose={() => setConvite(false)} onConvidar={acoes.convidar} />}
     </div>
   );
 }
 
-function ConviteModal({ onClose, onConvidar }: { onClose: () => void; onConvidar: (email: string, nome: string, papel: string) => Promise<void> }) {
+function ConviteModal({ podeAdmin, onClose, onConvidar }: { podeAdmin: boolean; onClose: () => void; onConvidar: (email: string, nome: string, papel: string) => Promise<ConviteResultado> }) {
   const { toast } = useToast();
   const [email, setEmail] = useState(''); const [nome, setNome] = useState(''); const [papel, setPapel] = useState('atendente'); const [busy, setBusy] = useState(false);
+  const [resultado, setResultado] = useState<ConviteResultado | null>(null);
+  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+
   async function enviar() {
-    if (!email.trim()) { toast('Informe o e-mail.', 'warn'); return; }
+    if (!emailOk) { toast('Informe um e-mail válido.', 'warn'); return; }
     setBusy(true);
-    try { await onConvidar(email.trim(), nome.trim(), papel); toast('Convite registrado (status: pendente).'); onClose(); }
-    catch (e) { toast(traduzCfg((e as Error).message), 'warn'); setBusy(false); }
+    const r = await onConvidar(email.trim().toLowerCase(), nome.trim(), papel);
+    setBusy(false);
+    if (r.error) { toast(traduzCfg(r.code || r.error), 'warn'); return; }
+    setResultado(r); // mostra estado do convite (enviado / preparado + copiar link)
   }
+  async function copiar() { if (resultado?.inviteLink) { try { await navigator.clipboard.writeText(resultado.inviteLink); toast('Link copiado.'); } catch { toast(resultado.inviteLink!); } } }
+
   return (
     <Modal open onClose={() => { if (!busy) onClose(); }} closeOnBackdrop={!busy} width={480}
-      title="Convidar membro"
-      footer={<><button className="atv-btn" disabled={busy} onClick={onClose}>Cancelar</button><button className="atv-btn primary" disabled={busy} onClick={enviar}>{busy ? 'Enviando…' : 'Convidar'}</button></>}>
-      <div className="cfg-form">
-        <div className="cfg-field"><label>E-mail</label><input className="ctrl" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="pessoa@empresa.com" /></div>
-        <div className="cfg-field"><label>Nome (opcional)</label><input className="ctrl" value={nome} onChange={(e) => setNome(e.target.value)} /></div>
-        <div className="cfg-field"><label>Papel</label><select className="ctrl" value={papel} onChange={(e) => setPapel(e.target.value)}><option value="atendente">Atendente</option><option value="supervisor">Supervisor</option><option value="admin">Administrador</option></select></div>
-        <div className="cfg-nota">O convidado precisa ter conta Atenvo (mesmo e-mail). O envio de convite por e-mail a novos cadastros será habilitado quando a integração de envio estiver ativa.</div>
-      </div>
+      title="Convidar usuário"
+      footer={resultado
+        ? <button className="atv-btn primary" onClick={onClose}>Concluir</button>
+        : <><button className="atv-btn" disabled={busy} onClick={onClose}>Cancelar</button><button className="atv-btn primary" disabled={busy || !emailOk} onClick={enviar}>{busy ? 'Enviando…' : 'Enviar convite'}</button></>}>
+      {resultado ? (
+        <div className="cfg-form">
+          {resultado.emailSent ? (
+            <div className="cfg-nota ok">✓ Convite enviado para <b>{email.trim().toLowerCase()}</b>. A pessoa define a própria senha pelo link do e-mail.</div>
+          ) : (
+            <>
+              <div className="cfg-aviso">O convite foi preparado, mas o envio de e-mail ainda não está configurado.</div>
+              <div className="cfg-nota">Configure o SMTP nas configurações de autenticação do Supabase para enviar convites automaticamente. Enquanto isso, você pode copiar o link seguro e enviá-lo manualmente.</div>
+              {resultado.inviteLink && <button type="button" className="atv-btn" onClick={copiar} style={{ alignSelf: 'flex-start' }}>Copiar link do convite</button>}
+            </>
+          )}
+        </div>
+      ) : (
+        <div className="cfg-form">
+          <div className="cfg-field"><label>Nome</label><input className="ctrl" value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nome da pessoa" /></div>
+          <div className="cfg-field"><label>E-mail <span style={{ color: 'var(--err)' }}>*</span></label><input className="ctrl" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="pessoa@empresa.com" /></div>
+          <div className="cfg-field"><label>Perfil</label><select className="ctrl" value={papel} onChange={(e) => setPapel(e.target.value)}><option value="atendente">Atendente</option><option value="supervisor">Supervisor</option>{podeAdmin && <option value="admin">Administrador</option>}</select></div>
+          <div className="cfg-nota">Sem senha manual: a pessoa recebe um link seguro do Supabase Auth e define a própria senha. O convite consome uma vaga do plano até ser aceito ou cancelado.</div>
+        </div>
+      )}
     </Modal>
   );
 }
