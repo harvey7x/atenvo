@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { urlAssinadaMidiaWa } from '@/data/whatsapp';
+import { WhatsAppText } from '@/components/WhatsAppText';
 
 /** Vídeo do histórico com estados explícitos: carregando / pronto / indisponível.
  *  URL assinada sob demanda (renovável no "Tentar novamente"); preload='metadata' não baixa o vídeo
@@ -40,7 +41,7 @@ export function MsgVideo({ path, nome, caption, metaNode, falhou }: {
       ) : (
         <div className="msg-img-ph" role="status">Carregando vídeo…</div>
       )}
-      {caption && <div className="media-cap"><div className="media-cap-text">{caption}</div>{metaNode}</div>}
+      {caption && <div className="media-cap"><div className="media-cap-text"><WhatsAppText text={caption} /></div>{metaNode}</div>}
     </div>
   );
 }

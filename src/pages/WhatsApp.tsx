@@ -900,7 +900,7 @@ export function WhatsApp() {
                       </button>
                       {m.text && (
                         <div className="media-cap">
-                          <div className="media-cap-text">{m.text}</div>
+                          <div className="media-cap-text"><WhatsAppText text={m.text} /></div>
                           {metaInline}
                         </div>
                       )}

@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { urlAssinadaMidiaWa } from '@/data/whatsapp';
+import { WhatsAppText } from '@/components/WhatsAppText';
 
 const IcImgOff = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -53,7 +54,7 @@ export function MsgImage({ path, nome, caption, metaNode, falhou, onOpen }: {
       ) : (
         <div className="msg-img-ph" role="status">Carregando imagem…</div>
       )}
-      {caption && <div className="media-cap"><div className="media-cap-text">{caption}</div>{metaNode}</div>}
+      {caption && <div className="media-cap"><div className="media-cap-text"><WhatsAppText text={caption} /></div>{metaNode}</div>}
     </div>
   );
 }
