@@ -518,14 +518,16 @@ export function WhatsApp() {
     });
   }
   /** Envio de ÁUDIO (gravado ou arquivo): sobe ao bucket privado e envia como nota de voz pela Evolution. */
-  async function enviarAudio(blob: Blob, mime: string, ext: string) {
+  async function enviarAudio(blob: Blob, mime: string, ext: string, diag?: Record<string, unknown>) {
     if (!currentId) throw new Error('Selecione uma conversa.');
     if (!blob || blob.size === 0) throw new Error('Áudio vazio. Grave novamente.');
     const file = new File([blob], `audio-${Date.now()}.${ext}`, { type: mime });
     const up = await subirMidiaWa(currentOrg.id, file);
+    const audioDiag = diag ? { ...diag, upload_sha256: up.sha256 ?? null } : undefined; // teste controlado (correlation_id)
     await sendMut.mutateAsync({
       conversaId: currentId, canalId: replyCanalId || current.canalId,
       midiaPath: up.path, midiaTipo: 'audio', midiaMime: up.mime, midiaNome: up.nome, midiaTamanho: up.tamanho,
+      audioDiag,
     });
   }
   /** Envio manual de DOCUMENTO: sobe ao bucket privado e envia pela Evolution (lança em falha -> mantém p/ retry). */

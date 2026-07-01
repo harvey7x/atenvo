@@ -5,8 +5,9 @@ type Estado = 'idle' | 'requesting' | 'recording' | 'paused' | 'preview' | 'send
 
 interface Props {
   disabled?: boolean;
-  /** Faz o upload + envio real. Deve lançar em falha (não considerar HTTP 200 isolado como sucesso). */
-  onEnviar: (blob: Blob, mime: string, ext: string) => Promise<void>;
+  /** Faz o upload + envio real. Deve lançar em falha (não considerar HTTP 200 isolado como sucesso).
+   *  diag: metadados técnicos do teste controlado (correlation_id + hashes/decode), sem conteúdo. */
+  onEnviar: (blob: Blob, mime: string, ext: string, diag?: Record<string, unknown>) => Promise<void>;
   /** Habilita também a seleção de um arquivo de áudio existente (opt-in; off por padrão p/ não mudar quem já usa). */
   permitirArquivo?: boolean;
 }
@@ -51,6 +52,8 @@ export function AudioRecorder({ disabled, onEnviar, permitirArquivo }: Props) {
   const rafRef = useRef<number | null>(null);
   const maxNivelRef = useRef(0);
   const minNivelRef = useRef(1); const sumNivelRef = useRef(0); const cntNivelRef = useRef(0); // diag: nível min/méd/máx
+  const correlationRef = useRef<string>('');            // correlation_id do teste controlado
+  const diagRef = useRef<Record<string, unknown> | null>(null); // metadados técnicos coletados (blob+decode)
   const barRef = useRef<HTMLDivElement>(null);
   const enviandoRef = useRef(false); // trava clique-duplo no envio
   const fileRef = useRef<HTMLInputElement>(null); // seleção de arquivo de áudio existente
@@ -113,7 +116,7 @@ export function AudioRecorder({ disabled, onEnviar, permitirArquivo }: Props) {
       for (let c = 0; c < audio.numberOfChannels; c++) { const ch = audio.getChannelData(c); for (let i = 0; i < ch.length; i++) sum += ch[i] * ch[i]; n += ch.length; }
       const rms = n ? Math.sqrt(sum / n) : 0;
       // DIAGNÓSTICO: prova local de som (decode do Blob) — duração/canais/sample-rate/RMS. Sem conteúdo.
-      try { console.log(JSON.stringify({ stage: 'blob_decode', duration: Number(audio.duration.toFixed(2)), channels: audio.numberOfChannels, sample_rate: audio.sampleRate, rms: Number(rms.toFixed(5)), tem_som: rms >= 0.01 })); } catch { /* ignore */ }
+      if (diagRef.current) { Object.assign(diagRef.current, { decode_ok: true, duration: Number(audio.duration.toFixed(2)), channels: audio.numberOfChannels, sample_rate: audio.sampleRate, rms: Number(rms.toFixed(5)), tem_som: rms >= 0.01 }); }
       try { ac.close(); } catch { /* ignore */ }
       setInfo((x) => x ? { ...x, dur: audio.duration, sinal: rms >= 0.01, verificando: false, rms } : x); // ruído de fundo não passa
     } catch { setInfo((x) => x ? { ...x, verificando: false } : x); } // se não decodificar, mantém o medidor ao vivo
@@ -125,6 +128,7 @@ export function AudioRecorder({ disabled, onEnviar, permitirArquivo }: Props) {
     if (!md?.getUserMedia || !(window as unknown as { MediaRecorder?: unknown }).MediaRecorder) { setEstado('error'); setErro('Este navegador não suporta gravação de áudio.'); return; }
     setEstado('requesting');
     pararMedidor(); pararTracks(); maxNivelRef.current = 0; minNivelRef.current = 1; sumNivelRef.current = 0; cntNivelRef.current = 0;
+    correlationRef.current = (crypto as { randomUUID?: () => string }).randomUUID?.() ?? String(Date.now()); diagRef.current = null;
     let stream: MediaStream;
     try {
       stream = await md.getUserMedia({ audio: idDispositivo ? { deviceId: { exact: idDispositivo } } : true }); // só após o clique
@@ -154,12 +158,19 @@ export function AudioRecorder({ disabled, onEnviar, permitirArquivo }: Props) {
       blobRef.current = blob;
       // DIAGNÓSTICO temporário (sanitizado, sem conteúdo de áudio): metadados do Blob + níveis + track.
       const tk = streamRef.current?.getAudioTracks?.()[0];
-      const nivel = { pico: Number(maxNivelRef.current.toFixed(4)), min: Number((cntNivelRef.current ? minNivelRef.current : 0).toFixed(4)), med: Number((cntNivelRef.current ? sumNivelRef.current / cntNivelRef.current : 0).toFixed(4)) };
-      const diag = { stage: 'blob_gravado', mime_escolhido: mimeRef.current || rec.mimeType, tipo, size: blob.size, chunks: chunksRef.current.length, nivel, track_enabled: tk?.enabled ?? null, track_muted: tk?.muted ?? null, track_readyState: tk?.readyState ?? null };
+      const nivel_pico = Number(maxNivelRef.current.toFixed(4));
+      const nivel_min = Number((cntNivelRef.current ? minNivelRef.current : 0).toFixed(4));
+      const nivel_med = Number((cntNivelRef.current ? sumNivelRef.current / cntNivelRef.current : 0).toFixed(4));
+      diagRef.current = {
+        correlation_id: correlationRef.current,
+        blob_mime: mimeRef.current || rec.mimeType || tipo, blob_size: blob.size, chunks: chunksRef.current.length,
+        nivel_min, nivel_med, nivel_pico,
+        track_enabled: tk?.enabled ?? null, track_muted: tk?.muted ?? null, track_readyState: tk?.readyState ?? null,
+      };
       blob.arrayBuffer().then((ab) => crypto.subtle.digest('SHA-256', ab)).then((h) => {
         const sha = Array.from(new Uint8Array(h)).map((b) => b.toString(16).padStart(2, '0')).join('');
-        try { console.log(JSON.stringify({ ...diag, sha256: sha })); } catch { /* ignore */ }
-      }).catch(() => { try { console.log(JSON.stringify(diag)); } catch { /* ignore */ } });
+        if (diagRef.current) diagRef.current.blob_sha256 = sha;
+      }).catch(() => { /* ignore */ });
       limparPreview(); setPreviewUrl(URL.createObjectURL(blob));
       pararMedidor(); pararTracks(); pararTimer();             // só encerra as tracks DEPOIS de montar o Blob
       setInfo({ mime: tipo, size: blob.size, dur: 0, sinal: maxNivelRef.current >= SINAL_MIN, verificando: true });
@@ -200,7 +211,7 @@ export function AudioRecorder({ disabled, onEnviar, permitirArquivo }: Props) {
     const ext = EXT[mime] ?? 'm4a';
     setEstado('sending'); setErro(null);
     try {
-      await onEnviar(blob, mime, ext);                  // upload + envio + confirmação real (lança em falha)
+      await onEnviar(blob, mime, ext, diagRef.current ?? undefined); // upload + envio + confirmação real (lança em falha)
       blobRef.current = null; limparPreview(); setSeg(0); setInfo(null); setEstado('idle');
     } catch (e) {
       setEstado('error'); setErro((e as Error).message || 'Falha ao enviar o áudio.'); // preserva o blob p/ retry

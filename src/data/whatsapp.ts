@@ -237,7 +237,7 @@ export function useSendWaMessage() {
     // #4 assinatura aplicada no backend (evolution-send): passamos só o nome resolvido.
     // canalId = canal escolhido em "Responder por". O backend nunca confia em org vinda do cliente.
     // Retorna o id INTERNO da mensagem (para confirmação real do provedor). NÃO é garantia de entrega.
-    mutationFn: async (input: { conversaId: string; text?: string; canalId?: string | null; assinaturaNome?: string; retryMensagemId?: string; midiaPath?: string; midiaTipo?: string; midiaMime?: string; midiaNome?: string; midiaTamanho?: number }) => {
+    mutationFn: async (input: { conversaId: string; text?: string; canalId?: string | null; assinaturaNome?: string; retryMensagemId?: string; midiaPath?: string; midiaTipo?: string; midiaMime?: string; midiaNome?: string; midiaTamanho?: number; audioDiag?: Record<string, unknown> }) => {
       const r = await invoke<{ ok: boolean; mensagem?: { id?: string } }>('evolution-send', {
         conversa_id: input.conversaId,
         ...(input.text ? { text: input.text } : {}),
@@ -245,6 +245,7 @@ export function useSendWaMessage() {
         ...(input.assinaturaNome ? { assinatura_nome: input.assinaturaNome } : {}),
         ...(input.retryMensagemId ? { retry_mensagem_id: input.retryMensagemId } : {}),
         ...(input.midiaPath ? { midia_path: input.midiaPath, midia_tipo: input.midiaTipo, midia_mime: input.midiaMime, midia_nome: input.midiaNome, midia_tamanho: input.midiaTamanho } : {}),
+        ...(input.audioDiag ? { audio_diag: input.audioDiag } : {}),
       });
       return r.mensagem?.id ?? null;
     },
@@ -464,20 +465,20 @@ export function mascararNumero(numero: string | null | undefined): string {
 
 /** Sobe um arquivo de mídia ao bucket PRIVADO `script-midia`, isolado por organização.
  *  O caminho começa pelo id da org (a Edge Function valida esse prefixo). NUNCA expõe URL pública. */
-export async function subirMidiaWa(orgId: string, file: File): Promise<{ path: string; nome: string; tamanho: number; mime: string }> {
+export async function subirMidiaWa(orgId: string, file: File): Promise<{ path: string; nome: string; tamanho: number; mime: string; sha256?: string }> {
   const safe = file.name.replace(/[^\w.\-]/g, '_').slice(-80);
   const path = `${orgId}/wa-midia/${crypto.randomUUID()}-${safe}`;
-  // DIAGNÓSTICO (sanitizado): SHA-256 do arquivo ANTES do upload — compara com o hash do Blob e o do backend.
+  // DIAGNÓSTICO (áudio): SHA-256 do arquivo ANTES do upload — compara com o hash do Blob e o do backend.
+  let sha256: string | undefined;
   if (file.type?.startsWith('audio/')) {
     try {
       const h = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
-      const sha = Array.from(new Uint8Array(h)).map((b) => b.toString(16).padStart(2, '0')).join('');
-      console.log(JSON.stringify({ stage: 'upload', mime: file.type, size: file.size, sha256: sha, path: '…/' + path.slice(-24) }));
+      sha256 = Array.from(new Uint8Array(h)).map((b) => b.toString(16).padStart(2, '0')).join('');
     } catch { /* ignore */ }
   }
   const { error } = await supabase!.storage.from('script-midia').upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false });
   if (error) throw new Error(error.message);
-  return { path, nome: file.name, tamanho: file.size, mime: file.type || 'application/octet-stream' };
+  return { path, nome: file.name, tamanho: file.size, mime: file.type || 'application/octet-stream', sha256 };
 }
 
 /** URL assinada CURTA para renderizar a mídia no histórico (gerada sob demanda, nunca persistida). */

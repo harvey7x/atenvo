@@ -92,7 +92,7 @@ Deno.serve(async (req) => {
     const user = await getUser(req);
     if (!user) return json({ error: 'Não autenticado.' }, 401);
 
-    const { action, conversa_id, text, canal_id, assinatura_nome, retry_mensagem_id, midia_path, midia_tipo, midia_mime, midia_nome, midia_tamanho, vinc_numero, vinc_jid } = await req.json().catch(() => ({}));
+    const { action, conversa_id, text, canal_id, assinatura_nome, retry_mensagem_id, midia_path, midia_tipo, midia_mime, midia_nome, midia_tamanho, vinc_numero, vinc_jid, audio_diag } = await req.json().catch(() => ({}));
     const temTexto = !!text?.toString().trim();
     if (!conversa_id) return json({ error: 'conversa_id é obrigatório.' }, 400);
     if (!action && (!temTexto && !midia_path && !retry_mensagem_id)) return json({ error: 'conversa_id e conteúdo (texto ou mídia) são obrigatórios.' }, 400);
@@ -254,6 +254,24 @@ Deno.serve(async (req) => {
             sent = await evolution.sendWhatsAppAudio(instancia, alvo, b64);                     // PTT (ogg/opus)
           } else {
             sent = await evolution.sendMedia(instancia, alvo, 'audio', mime || 'audio/mpeg', b64, nome && nome !== 'audio' ? nome : 'audio.m4a'); // arquivo de áudio reproduzível
+          }
+          // TESTE CONTROLADO: persiste UMA linha por correlation_id (só metadados + hashes; escritor único).
+          if (audio_diag && typeof audio_diag === 'object') {
+            try {
+              const storageSha = await sha256hex(bytes);
+              const d = audio_diag as Record<string, unknown>;
+              const blobSha = (d.blob_sha256 as string) ?? null; const upSha = (d.upload_sha256 as string) ?? null;
+              await admin.from('wa_audio_diag').upsert({
+                correlation_id: String(d.correlation_id ?? corr), organizacao_id: conv.organizacao_id,
+                blob_mime: d.blob_mime ?? null, blob_size: d.blob_size ?? null, chunks: d.chunks ?? null,
+                duration: d.duration ?? null, channels: d.channels ?? null, sample_rate: d.sample_rate ?? null,
+                rms: d.rms ?? null, tem_som: d.tem_som ?? null,
+                blob_sha256: blobSha, upload_sha256: upSha, storage_sha256: storageSha,
+                container_real: containerReal(bytes), endpoint: usaPtt ? 'sendWhatsAppAudio' : 'sendMedia', ptt: usaPtt, base64_len: b64.length,
+                key_id: sent?.key?.id ?? null, http_status: 200,
+                hashes_iguais: !!blobSha && blobSha === upSha && upSha === storageSha,
+              }, { onConflict: 'correlation_id' });
+            } catch { /* diagnóstico best-effort — nunca afeta o envio */ }
           }
         } else {
           // IMAGEM/DOCUMENTO: URL assinada CURTA (600s) — a Evolution baixa; NUNCA persistimos a URL.
