@@ -164,13 +164,19 @@ export function Agendamentos() {
                     {eventos.map((a) => {
                       const s = spParts(a.inicioEm), f = spParts(a.fimEm);
                       const top = Math.max(0, (s.horaDec - HORA_INI) * HORA_PX);
-                      const h = Math.max(28, (Math.min(f.horaDec, HORA_FIM) - s.horaDec) * HORA_PX - 3);
+                      const rawH = (Math.min(f.horaDec, HORA_FIM) - s.horaDec) * HORA_PX;
+                      const h = Math.max(58, rawH - 2); // mínimo que comporta horário+nome+status
+                      const size = h >= 108 ? 'expanded' : h >= 78 ? 'normal' : 'compact';
                       const info = agStatusInfo(a.status);
+                      const nome = a.clienteNome || a.titulo || 'Sem cliente';
+                      const meta = [a.atendenteNome, a.local].filter(Boolean).join(' · ');
+                      const tip = `${nome}\n${s.hora} – ${f.hora}\n${a.tipo}${a.atendenteNome ? '\nAtendente: ' + a.atendenteNome : ''}\nStatus: ${info.label}${a.local ? '\nLocal: ' + a.local : ''}`;
                       return (
-                        <button key={a.id} className="agn-ev" style={{ top, height: h, background: info.cor + '18', borderColor: info.cor + '55' }} onClick={(e) => { e.stopPropagation(); abrir(a); }}>
+                        <button key={a.id} className={'agn-ev ' + size} title={tip} style={{ top, height: h, background: info.cor + '26', borderColor: info.cor + '73' }} onClick={(e) => { e.stopPropagation(); abrir(a); }}>
                           <span className="agn-ev-hora">{s.hora} – {f.hora}</span>
-                          <span className="agn-ev-nome">{a.clienteNome || a.titulo || 'Sem cliente'}</span>
-                          <span className="agn-ev-tipo">{a.tipo}{a.atendenteNome ? ' · ' + a.atendenteNome : ''}</span>
+                          <span className="agn-ev-nome">{nome}</span>
+                          {size !== 'compact' && <span className="agn-ev-tipo">{a.tipo}</span>}
+                          {size === 'expanded' && meta && <span className="agn-ev-meta">{meta}</span>}
                           <span className="agn-ev-status" style={{ color: info.cor }}>● {info.label}</span>
                         </button>
                       );
