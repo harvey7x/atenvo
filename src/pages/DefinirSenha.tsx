@@ -64,11 +64,23 @@ export function DefinirSenha() {
       setSenhaOk(true);
     }
     // 2) ativa o vínculo + marca o convite como aceito (derivado de auth.uid no backend)
-    const { error: e2 } = await supabase!.rpc('convite_aceitar');
+    const err = await ativar();
     setBusy(false);
-    if (e2) { setErro(mapAtivarErro(e2.message || '')); return; } // sem sucesso falso; botão vira "Ativar acesso"
+    if (err) { setErro(err); return; } // sem sucesso falso; botão vira "Ativar acesso"
     toast('Bem-vindo(a)! Sua conta está ativa.');
     navigate('/', { replace: true });
+  }
+
+  // Ativa o vínculo; logo após updateUser a sessão pode não estar pronta (ex.: navegador in-app do
+  // WhatsApp) — nesse caso atualiza a sessão e tenta 1x automaticamente antes de pedir retry manual.
+  async function ativar(): Promise<string | null> {
+    let { error } = await supabase!.rpc('convite_aceitar');
+    if (error && /autenticado|jwt|session|auth/i.test(error.message || '')) {
+      await supabase!.auth.getSession();
+      await new Promise((r) => setTimeout(r, 500));
+      ({ error } = await supabase!.rpc('convite_aceitar'));
+    }
+    return error ? mapAtivarErro(error.message || '') : null;
   }
 
   // Preexistente (já tem senha): só aceita o convite, sem redefinir senha.
@@ -77,9 +89,9 @@ export function DefinirSenha() {
     setErro(null);
     if (!podeDefinir) { setErro('A sessão do convite não foi estabelecida. Reabra o link do convite.'); return; }
     setBusy(true);
-    const { error: e2 } = await supabase!.rpc('convite_aceitar');
+    const err = await ativar();
     setBusy(false);
-    if (e2) { setErro(mapAtivarErro(e2.message || '')); return; }
+    if (err) { setErro(err); return; }
     toast('Bem-vindo(a)! Sua conta está ativa.');
     navigate('/', { replace: true });
   }
