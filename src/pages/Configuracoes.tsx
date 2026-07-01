@@ -10,7 +10,7 @@ import { useFbStatus } from '@/data/facebook';
 import { useStatusDefs, useEtiquetas, useAtendimentoActions } from '@/data/atendimento';
 import {
   useMeuPerfil, useSalvarPerfil, salvarAvatar, subirAvatar, urlAvatar,
-  useOrgFull, useSalvarOrg, useEquipe, useEquipeActions, type ConviteResultado,
+  useOrgFull, useSalvarOrg, useEquipe, useEquipeActions, useContatosBuscaCfg, type ConviteResultado, type ConvidarInput,
   usePreferencias, useSalvarPreferencias, type Prefs,
   useConfigAtendimento, useSalvarConfigAtendimento, type ConfigAtendimento,
   traduzCfg,
@@ -306,54 +306,89 @@ function EquipePanel({ podeAdmin, podeGerenciar, meuId }: { podeAdmin: boolean; 
       </div>
       <footer className="tc-foot"><span className="ft">{(eq?.membros.length ?? 0)} membro{(eq?.membros.length ?? 0) === 1 ? '' : 's'}{(eq?.convites.length ?? 0) > 0 ? ` · ${eq?.convites.length} convite${eq?.convites.length === 1 ? '' : 's'}` : ''}</span></footer>
 
-      {convite && <ConviteModal podeAdmin={podeAdmin} onClose={() => setConvite(false)} onConvidar={acoes.convidar} />}
+      {convite && <ConviteModal podeAdmin={podeAdmin} onClose={() => setConvite(false)} onConvidar={acoes.convidar} onReenviar={acoes.reenviar} />}
     </div>
   );
 }
 
-function ConviteModal({ podeAdmin, onClose, onConvidar }: { podeAdmin: boolean; onClose: () => void; onConvidar: (email: string, nome: string, papel: string) => Promise<ConviteResultado> }) {
+function ConviteModal({ podeAdmin, onClose, onConvidar, onReenviar }: { podeAdmin: boolean; onClose: () => void; onConvidar: (p: ConvidarInput) => Promise<ConviteResultado>; onReenviar: (id: string) => Promise<ConviteResultado> }) {
   const { toast } = useToast();
-  const [email, setEmail] = useState(''); const [nome, setNome] = useState(''); const [papel, setPapel] = useState('atendente'); const [busy, setBusy] = useState(false);
-  const [resultado, setResultado] = useState<ConviteResultado | null>(null);
+  const canais = (useWaCanais().data ?? []).filter((c) => c.status === 'conectado');
+  const temCanal = canais.length > 0;
+  const [email, setEmail] = useState(''); const [nome, setNome] = useState(''); const [papel, setPapel] = useState('atendente');
+  const [telefone, setTelefone] = useState(''); const [canalId, setCanalId] = useState(''); const [enviarWa, setEnviarWa] = useState(true);
+  const [busca, setBusca] = useState(''); const [contatoSel, setContatoSel] = useState(false);
+  const [busy, setBusy] = useState(false); const [resultado, setResultado] = useState<ConviteResultado | null>(null);
+  const contatosQ = useContatosBuscaCfg(busca);
   const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  useEffect(() => { if (temCanal && !canalId) setCanalId(canais[0].id); }, [temCanal, canalId, canais]);
+  const wa = enviarWa && temCanal;
+  const telOk = telefone.replace(/\D/g, '').length >= 10;
+  const podeEnviar = emailOk && (!wa || (telOk && !!canalId));
 
   async function enviar() {
     if (!emailOk) { toast('Informe um e-mail válido.', 'warn'); return; }
+    if (wa && !telOk) { toast('Informe um telefone válido para o WhatsApp.', 'warn'); return; }
     setBusy(true);
-    const r = await onConvidar(email.trim().toLowerCase(), nome.trim(), papel);
+    const r = await onConvidar({ email: email.trim().toLowerCase(), nome: nome.trim(), papel, telefone: wa ? telefone.trim() : undefined, canal_id: wa ? canalId : undefined, enviar_whatsapp: wa });
     setBusy(false);
     if (r.error) { toast(traduzCfg(r.code || r.error), 'warn'); return; }
-    setResultado(r); // mostra estado do convite (enviado / preparado + copiar link)
+    setResultado(r);
   }
-  async function copiar() { if (resultado?.inviteLink) { try { await navigator.clipboard.writeText(resultado.inviteLink); toast('Link copiado.'); } catch { toast(resultado.inviteLink!); } } }
+  async function tentarNovamente() {
+    if (!resultado?.convite_id) return;
+    setBusy(true); const r = await onReenviar(resultado.convite_id); setBusy(false);
+    if (r.error) { toast(traduzCfg(r.code || r.error), 'warn'); return; }
+    setResultado(r);
+  }
+  async function copiar(link?: string | null) { const l = link ?? resultado?.inviteLink; if (l) { try { await navigator.clipboard.writeText(l); toast('Link copiado. Compartilhe só com o convidado.'); } catch { toast(l); } } }
 
   return (
     <Modal open onClose={() => { if (!busy) onClose(); }} closeOnBackdrop={!busy} width={480}
       title="Convidar usuário"
       footer={resultado
         ? <button className="atv-btn primary" onClick={onClose}>Concluir</button>
-        : <><button className="atv-btn" disabled={busy} onClick={onClose}>Cancelar</button><button className="atv-btn primary" disabled={busy || !emailOk} onClick={enviar}>{busy ? 'Enviando…' : 'Enviar convite'}</button></>}>
+        : <><button className="atv-btn" disabled={busy} onClick={onClose}>Cancelar</button><button className="atv-btn primary" disabled={busy || !podeEnviar} onClick={enviar}>{busy ? 'Enviando…' : (wa ? 'Convidar e enviar' : 'Enviar convite')}</button></>}>
       {resultado ? (
         <div className="cfg-form">
-          {resultado.estado === 'link_gerado' && resultado.inviteLink ? (
+          {resultado.estado === 'enviado_whatsapp' ? (
+            <div className="cfg-nota ok">✓ Convite enviado pelo WhatsApp para <b>{telefone.trim()}</b>. A pessoa abre o link, define a senha e entra.</div>
+          ) : resultado.estado === 'falha_envio' ? (
             <>
-              <div className="cfg-nota ok">Convite criado para <b>{email.trim().toLowerCase()}</b>. Link seguro gerado (modo link manual).</div>
+              <div className="cfg-aviso">Convite criado, mas não foi possível enviar pelo WhatsApp.{resultado.erroEnvio ? ' ' + resultado.erroEnvio : ''} A vaga foi preservada.</div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button type="button" className="atv-btn" disabled={busy} onClick={tentarNovamente}>{busy ? 'Enviando…' : 'Tentar novamente'}</button>
+                {podeAdmin && resultado.inviteLink && <button type="button" className="atv-btn" onClick={() => copiar(resultado.inviteLink)}>Copiar link</button>}
+              </div>
+            </>
+          ) : resultado.estado === 'link_gerado' && resultado.inviteLink ? (
+            <>
+              <div className="cfg-nota ok">Convite criado para <b>{email.trim().toLowerCase()}</b>. Link seguro gerado.</div>
               <div className="cfg-aviso">Este link permite acesso à conta. Compartilhe somente com o usuário convidado.</div>
-              <button type="button" className="atv-btn" onClick={copiar} style={{ alignSelf: 'flex-start' }}>Copiar link do convite</button>
+              <button type="button" className="atv-btn" onClick={() => copiar(resultado.inviteLink)} style={{ alignSelf: 'flex-start' }}>Copiar link do convite</button>
             </>
           ) : (
-            <>
-              <div className="cfg-nota ok">Convite criado para <b>{email.trim().toLowerCase()}</b>. A entrega do e-mail ainda não foi confirmada.</div>
-              <div className="cfg-nota">A pessoa define a própria senha pelo link. Se o e-mail não chegar, confirme o SMTP nas configurações de autenticação do Supabase (ou use o modo de link manual).</div>
-            </>
+            <div className="cfg-nota ok">Convite criado para <b>{email.trim().toLowerCase()}</b>. A entrega ainda não foi confirmada.</div>
           )}
         </div>
       ) : (
         <div className="cfg-form">
-          <div className="cfg-field"><label>Nome</label><input className="ctrl" value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nome da pessoa" /></div>
+          <div className="cfg-field" style={{ position: 'relative' }}><label>Nome</label>
+            <input className="ctrl" value={nome} onChange={(e) => { setNome(e.target.value); setBusca(e.target.value); setContatoSel(false); }} placeholder="Nome da pessoa" />
+            {!contatoSel && busca.trim().length >= 2 && (contatosQ.data?.length ?? 0) > 0 && (
+              <div className="cfg-cts">{contatosQ.data!.map((c) => <button key={c.id} type="button" className="cfg-ct" onClick={() => { setNome(c.nome); if (c.telefone) setTelefone(c.telefone); setBusca(''); setContatoSel(true); }}>{c.nome}{c.telefone ? ' · ' + c.telefone : ''}</button>)}</div>
+            )}
+          </div>
           <div className="cfg-field"><label>E-mail <span style={{ color: 'var(--err)' }}>*</span></label><input className="ctrl" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="pessoa@empresa.com" /></div>
+          <div className="cfg-field"><label>Telefone (WhatsApp){wa ? <span style={{ color: 'var(--err)' }}> *</span> : ''}</label><input className="ctrl" value={telefone} onChange={(e) => setTelefone(e.target.value)} placeholder="+55 11 99999-8888" /></div>
           <div className="cfg-field"><label>Perfil</label><select className="ctrl" value={papel} onChange={(e) => setPapel(e.target.value)}><option value="atendente">Atendente</option><option value="supervisor">Supervisor</option>{podeAdmin && <option value="admin">Administrador</option>}</select></div>
-          <div className="cfg-nota">Sem senha manual: a pessoa recebe um link seguro do Supabase Auth e define a própria senha. O convite consome uma vaga do plano até ser aceito ou cancelado.</div>
+          {temCanal ? (
+            <>
+              <label className="cfg-check"><input type="checkbox" checked={enviarWa} onChange={(e) => setEnviarWa(e.target.checked)} /> Enviar convite pelo WhatsApp</label>
+              {enviarWa && <div className="cfg-field"><label>Canal de WhatsApp</label><select className="ctrl" value={canalId} onChange={(e) => setCanalId(e.target.value)}>{canais.map((c) => <option key={c.id} value={c.id}>{c.alias}{c.numero ? ' · ' + c.numero : ''}</option>)}</select></div>}
+            </>
+          ) : <div className="cfg-nota">Nenhum canal de WhatsApp conectado. O convite será criado com link seguro para copiar.</div>}
+          <div className="cfg-nota">Sem senha manual: a pessoa recebe um link seguro e define a própria senha. O convite consome uma vaga do plano até ser aceito ou cancelado.</div>
         </div>
       )}
     </Modal>

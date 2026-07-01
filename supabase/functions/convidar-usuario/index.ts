@@ -8,6 +8,44 @@
 // Link manual: retornado UMA vez, nunca persistido/logado/auditado.
 import { corsHeaders, json } from './cors.ts';
 import { adminClient, getUser } from './client.ts';
+import { evolution, evolutionConfigured } from './evolution.ts';
+
+const soDigitos = (s?: string | null) => (s ?? '').replace(/[^0-9]/g, '');
+
+// Envia o link do convite por WhatsApp reusando a Evolution (mesma integração/credenciais).
+// O LINK só trafega no payload do envio — nunca é persistido/logado/auditado. Retorna estado do envio.
+async function enviarWhatsApp(admin: ReturnType<typeof adminClient>, conviteId: string, org: string, canalId: string, telefone: string, nome: string, link: string, usuarioId: string): Promise<{ ok: boolean; erro?: string }> {
+  const marcar = (patch: Record<string, unknown>) => admin.from('convites').update(patch).eq('id', conviteId);
+  if (!evolutionConfigured()) { await marcar({ whatsapp_status: 'falha', whatsapp_erro: 'evolution_indisponivel' }); return { ok: false, erro: 'WhatsApp indisponível no servidor.' }; }
+  const num = soDigitos(telefone);
+  if (num.length < 10 || num.length > 15) { await marcar({ whatsapp_status: 'falha', whatsapp_erro: 'telefone_invalido' }); return { ok: false, erro: 'Telefone inválido (use formato internacional/E.164).' }; }
+
+  const { data: canal } = await admin.from('canais').select('id, tipo, instancia_externa, status_integracao, numero_conectado, organizacao_id').eq('id', canalId).eq('organizacao_id', org).maybeSingle();
+  if (!canal?.instancia_externa || canal.tipo !== 'whatsapp') { await marcar({ whatsapp_status: 'falha', whatsapp_erro: 'canal_invalido' }); return { ok: false, erro: 'Canal de WhatsApp inválido para esta organização.' }; }
+  const instancia = canal.instancia_externa as string;
+  // conexão viva (mesma checagem do envio existente)
+  let estado: string | undefined;
+  try { const st = await evolution.connectionState(instancia); estado = st?.instance?.state; } catch { estado = undefined; }
+  if (estado && estado !== 'open') { await marcar({ whatsapp_status: 'falha', whatsapp_erro: 'canal_desconectado' }); return { ok: false, erro: 'O WhatsApp deste canal está desconectado. Reconecte em Integrações.' }; }
+
+  await marcar({ whatsapp_status: 'enviando', telefone: num, canal_id: canalId });
+  await admin.from('audit_log').insert({ organizacao_id: org, usuario_id: usuarioId, acao: 'convite_whatsapp_solicitado', entidade: 'convite', entidade_id: conviteId, dados_depois: { telefone_mascarado: num.slice(0, 6) + '…', canal_id: canalId } });
+
+  const texto = `Olá, ${nome || 'tudo bem'}! Você foi convidado para acessar a Atenvo.\n\nClique no link abaixo para definir sua senha:\n${link}\n\nEste convite é pessoal e não deve ser compartilhado.`;
+  try {
+    const sent = await evolution.sendText(instancia, num, texto);
+    const keyId = sent?.key?.id ?? null;
+    if (!keyId) { await marcar({ whatsapp_status: 'falha', whatsapp_erro: 'sem_id_externo' }); await admin.from('audit_log').insert({ organizacao_id: org, usuario_id: usuarioId, acao: 'convite_whatsapp_falha', entidade: 'convite', entidade_id: conviteId, dados_depois: { erro: 'sem_id_externo' } }); return { ok: false, erro: 'O WhatsApp não confirmou o envio. Tente novamente.' }; }
+    await marcar({ whatsapp_status: 'enviado', whatsapp_key_id: keyId, whatsapp_enviado_em: new Date().toISOString(), whatsapp_erro: null });
+    await admin.from('audit_log').insert({ organizacao_id: org, usuario_id: usuarioId, acao: 'convite_whatsapp_enviado', entidade: 'convite', entidade_id: conviteId, dados_depois: { key_id: keyId } }); // sem link
+    return { ok: true };
+  } catch (e) {
+    const m = ((e as Error).message || '').slice(0, 160);
+    await marcar({ whatsapp_status: 'falha', whatsapp_erro: m });
+    await admin.from('audit_log').insert({ organizacao_id: org, usuario_id: usuarioId, acao: 'convite_whatsapp_falha', entidade: 'convite', entidade_id: conviteId, dados_depois: { erro: m } });
+    return { ok: false, erro: 'Não foi possível enviar pelo WhatsApp.' };
+  }
+}
 
 const PAPEIS = ['admin', 'supervisor', 'atendente'];
 const SITE = Deno.env.get('SITE_URL') ?? 'https://atenvo-cs4.pages.dev';
@@ -65,6 +103,12 @@ Deno.serve(async (req) => {
       await admin.from('convites').update({ status: 'pendente', expira_em: new Date(Date.now() + 7 * 864e5).toISOString(), reenviado_em: new Date().toISOString(), atualizado_em: new Date().toISOString() }).eq('id', cid);
       if (ent.userId && !c.auth_user_id) await admin.rpc('convite_vincular', { p_convite_id: cid, p_auth_user_id: ent.userId });
       await admin.from('audit_log').insert({ organizacao_id: org, usuario_id: user.id, acao: 'convite_reenviado', entidade: 'convite', entidade_id: cid, dados_depois: { email: c.email, estado: ent.estado } }); // sem link
+      // reenvia pelo MESMO canal/telefone do convite, se houver
+      if (c.canal_id && c.telefone && ent.link) {
+        const wa = await enviarWhatsApp(admin, cid, org, c.canal_id, c.telefone, c.nome || c.email, ent.link, user.id);
+        if (wa.ok) return json({ ok: true, estado: 'enviado_whatsapp', entregaValidada: false, modo: INVITE_MODE });
+        return json({ ok: true, estado: 'falha_envio', erroEnvio: wa.erro, entregaValidada: false, modo: INVITE_MODE, inviteLink: ent.link });
+      }
       return json({ ok: true, estado: ent.estado, entregaValidada: false, modo: INVITE_MODE, inviteLink: INVITE_MODE === 'manual_link' ? ent.link : undefined });
     }
 
@@ -73,6 +117,9 @@ Deno.serve(async (req) => {
     const nome = String(body?.nome ?? '').trim();
     const papel = String(body?.papel ?? 'atendente');
     const requestId = (body?.request_id as string | undefined) ?? undefined; // idempotência (cliente gera)
+    const telefone = String(body?.telefone ?? '').trim();
+    const canalId = (body?.canal_id as string | undefined) ?? undefined;
+    const enviarWa = body?.enviar_whatsapp !== false && !!canalId && !!telefone; // default true quando há canal+telefone
     if (!email || !EMAIL_RE.test(email)) return json({ error: 'Informe um e-mail válido.', code: 'email_invalido' }, 400);
     if (!PAPEIS.includes(papel)) return json({ error: 'Perfil inválido.', code: 'papel_invalido' }, 400);
     if (!ehAdmin && papel !== 'atendente') return json({ error: 'Supervisor só pode convidar atendentes.', code: 'sem_permissao_papel' }, 403);
@@ -116,6 +163,17 @@ Deno.serve(async (req) => {
         if (ent.criado && ent.userId) { try { await admin.auth.admin.deleteUser(ent.userId); } catch { /* best-effort */ } }
         return json({ error: 'Falha ao registrar o convite.', code: 'banco_falhou', detalhe: sanitizar(vErr.message) }, 500);
       }
+    }
+
+    // guarda telefone/canal p/ reenvio (mesmo quando não envia agora)
+    if (telefone || canalId) await admin.from('convites').update({ telefone: telefone ? soDigitos(telefone) : null, canal_id: canalId ?? null }).eq('id', conviteId);
+
+    // ENVIO AUTOMÁTICO por WhatsApp (o link vai só no payload; não é persistido/logado)
+    if (enviarWa && ent.link) {
+      const wa = await enviarWhatsApp(admin, conviteId, org, canalId!, telefone, nome || email, ent.link, user.id);
+      if (wa.ok) return json({ ok: true, convite_id: conviteId, modo: INVITE_MODE, estado: 'enviado_whatsapp', entregaValidada: false });
+      // falha: convite segue pendente, vaga preservada; devolve o link só p/ o admin copiar (fallback)
+      return json({ ok: true, convite_id: conviteId, modo: INVITE_MODE, estado: 'falha_envio', erroEnvio: wa.erro, entregaValidada: false, inviteLink: ent.link });
     }
 
     // estado do envio (NUNCA declara entregue). Link manual só no modo manual_link, uma vez, não persistido.

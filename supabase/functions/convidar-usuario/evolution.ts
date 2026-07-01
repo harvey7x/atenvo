@@ -1,0 +1,29 @@
+// Cliente da Evolution API v2. A apikey NUNCA sai do backend.
+const BASE = (Deno.env.get('EVOLUTION_API_URL') ?? '').replace(/\/+$/, '');
+const KEY = Deno.env.get('EVOLUTION_API_KEY') ?? '';
+export function evolutionConfigured(): boolean { return BASE.length > 0 && KEY.length > 0; }
+async function call(path: string, method: string, body?: unknown) {
+  const res = await fetch(`${BASE}${path}`, { method, headers: { 'Content-Type': 'application/json', 'apikey': KEY }, body: body ? JSON.stringify(body) : undefined });
+  const text = await res.text();
+  let data: unknown = null;
+  try { data = text ? JSON.parse(text) : null; } catch { data = { raw: text }; }
+  if (!res.ok) {
+    const m = (data as { message?: string; error?: string })?.message ?? (data as { error?: string })?.error;
+    const detalhe = (typeof m === 'string' && m) ? m : (typeof m !== 'undefined' ? JSON.stringify(m).slice(0, 160) : 'sem corpo');
+    throw new Error(`HTTP ${res.status}: ${detalhe}`); // status preservado (não mascarar em 502 genérico)
+  }
+  return data;
+}
+export const evolution = {
+  connect: (instanceName: string) => call(`/instance/connect/${instanceName}`, 'GET'),
+  connectionState: (instanceName: string) => call(`/instance/connectionState/${instanceName}`, 'GET') as Promise<{ instance?: { state?: string } }>,
+  whatsappNumbers: (instanceName: string, numbers: string[]) => call(`/chat/whatsappNumbers/${instanceName}`, 'POST', { numbers }) as Promise<Array<{ exists?: boolean; jid?: string; number?: string }>>,
+  sendText: (instanceName: string, number: string, text: string) => call(`/message/sendText/${instanceName}`, 'POST', { number, text }) as Promise<{ key?: { id?: string } }>,
+  // Envio de mídia (imagem/vídeo/documento). `media` é uma URL temporária (a Evolution baixa o arquivo).
+  sendMedia: (instanceName: string, number: string, mediatype: string, mimetype: string, media: string, fileName: string, caption?: string) =>
+    call(`/message/sendMedia/${instanceName}`, 'POST', { number, mediatype, mimetype, media, fileName, ...(caption ? { caption } : {}) }) as Promise<{ key?: { id?: string } }>,
+  // Áudio como nota de voz (PTT). `encoding:true` faz a Evolution converter p/ ogg/opus (formato do WhatsApp).
+  // `audio` é uma URL temporária (a Evolution baixa o arquivo).
+  sendWhatsAppAudio: (instanceName: string, number: string, audio: string) =>
+    call(`/message/sendWhatsAppAudio/${instanceName}`, 'POST', { number, audio, encoding: true }) as Promise<{ key?: { id?: string } }>,
+};

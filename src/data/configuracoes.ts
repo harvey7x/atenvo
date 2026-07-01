@@ -77,7 +77,7 @@ export function useSalvarOrg() {
 
 /* ===================== Equipe ===================== */
 export interface Membro { usuario_id: string; nome: string; email: string; papel: string; status: string; criado_em: string; ultimo_acesso: string | null; }
-export interface Convite { id: string; email: string; nome: string | null; papel: string; status: string; expira_em: string; criado_em: string; convidado_por: string | null; }
+export interface Convite { id: string; email: string; nome: string | null; papel: string; status: string; expira_em: string; criado_em: string; convidado_por: string | null; telefone?: string | null; whatsapp_status?: string | null; }
 export interface Vagas { limite: number | null; ativos: number; pendentes: number; }
 export interface EquipeData { membros: Membro[]; convites: Convite[]; vagas: Vagas; }
 
@@ -95,7 +95,23 @@ export function useEquipe() {
   });
 }
 
-export interface ConviteResultado { ok?: boolean; estado?: string; entregaValidada?: boolean; modo?: 'email' | 'manual_link'; idempotente?: boolean; inviteLink?: string | null; convite_id?: string; error?: string; code?: string; vagas?: Vagas; }
+export interface ConviteResultado { ok?: boolean; estado?: string; entregaValidada?: boolean; modo?: 'email' | 'manual_link'; idempotente?: boolean; inviteLink?: string | null; convite_id?: string; erroEnvio?: string; error?: string; code?: string; vagas?: Vagas; }
+export interface ConvidarInput { email: string; nome: string; papel: string; telefone?: string; canal_id?: string; enviar_whatsapp?: boolean; }
+export interface ContatoBusca { id: string; nome: string; telefone: string | null; }
+
+/** Busca contatos por nome/telefone (autocomplete do convite). */
+export function useContatosBuscaCfg(termo: string) {
+  const { currentOrg } = useOrg();
+  return useQuery({
+    queryKey: ['cfg-contatos', currentOrg.id, termo], enabled: CFG_REAL && termo.trim().length >= 2,
+    queryFn: async (): Promise<ContatoBusca[]> => {
+      const t = termo.trim();
+      const { data, error } = await supabase!.from('contatos').select('id, nome, telefone').eq('organizacao_id', currentOrg.id).or(`nome.ilike.%${t}%,telefone.ilike.%${t}%`).limit(6);
+      if (error) throw new Error(error.message);
+      return (data as ContatoBusca[]) ?? [];
+    },
+  });
+}
 
 export function useEquipeActions() {
   const qc = useQueryClient(); const { currentOrg } = useOrg(); const org = currentOrg.id;
@@ -115,7 +131,7 @@ export function useEquipeActions() {
   return {
     alterarPapel: async (usuario: string, papel: string) => { await call('equipe_alterar_papel', { p_org: org, p_usuario: usuario, p_papel: papel }); inval(); },
     definirStatus: async (usuario: string, status: string) => { await call('equipe_definir_status', { p_org: org, p_usuario: usuario, p_status: status }); inval(); },
-    convidar: async (email: string, nome: string, papel: string) => { const request_id = (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.round(Math.random() * 1e9)}`); const r = await invoke({ action: 'convidar', email, nome, papel, request_id }); inval(); return r; },
+    convidar: async (p: ConvidarInput) => { const request_id = (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.round(Math.random() * 1e9)}`); const r = await invoke({ action: 'convidar', ...p, request_id }); inval(); return r; },
     reenviar: async (convite_id: string) => { const r = await invoke({ action: 'reenviar', convite_id }); inval(); return r; },
     cancelar: async (convite_id: string) => { const r = await invoke({ action: 'cancelar', convite_id }); inval(); return r; },
   };

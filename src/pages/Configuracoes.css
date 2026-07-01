@@ -287,6 +287,11 @@
 .config-page .team-filtros .chip{border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);border-radius:999px;padding:5px 13px;font-size:12.5px;font-weight:500;cursor:pointer}
 .config-page .team-filtros .chip.on{background:#19C37D;color:#fff;border-color:transparent}
 .config-page .team-filtros .team-fpapel{margin-left:auto;max-width:180px;height:32px;padding:0 10px}
+.config-page .cfg-cts{position:absolute;top:100%;left:0;right:0;z-index:6;background:var(--surface);border:1px solid var(--line-2);border-radius:8px;margin-top:2px;max-height:170px;overflow:auto;box-shadow:var(--shadow)}
+.config-page .cfg-ct{display:block;width:100%;text-align:left;border:0;background:transparent;padding:8px 11px;font-size:13px;color:var(--ink);cursor:pointer}
+.config-page .cfg-ct:hover{background:var(--hover)}
+.config-page .cfg-check{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-2);cursor:pointer;user-select:none}
+.config-page .cfg-check input{width:16px;height:16px;accent-color:#19C37D}
 .config-page .dias-row{display:flex;gap:7px;flex-wrap:wrap}
 .config-page .dia-chip{height:34px;min-width:46px;padding:0 12px;border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer}
 .config-page .dia-chip.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-ink)}
