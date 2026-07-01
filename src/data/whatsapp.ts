@@ -467,6 +467,14 @@ export function mascararNumero(numero: string | null | undefined): string {
 export async function subirMidiaWa(orgId: string, file: File): Promise<{ path: string; nome: string; tamanho: number; mime: string }> {
   const safe = file.name.replace(/[^\w.\-]/g, '_').slice(-80);
   const path = `${orgId}/wa-midia/${crypto.randomUUID()}-${safe}`;
+  // DIAGNÓSTICO (sanitizado): SHA-256 do arquivo ANTES do upload — compara com o hash do Blob e o do backend.
+  if (file.type?.startsWith('audio/')) {
+    try {
+      const h = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
+      const sha = Array.from(new Uint8Array(h)).map((b) => b.toString(16).padStart(2, '0')).join('');
+      console.log(JSON.stringify({ stage: 'upload', mime: file.type, size: file.size, sha256: sha, path: '…/' + path.slice(-24) }));
+    } catch { /* ignore */ }
+  }
   const { error } = await supabase!.storage.from('script-midia').upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false });
   if (error) throw new Error(error.message);
   return { path, nome: file.name, tamanho: file.size, mime: file.type || 'application/octet-stream' };

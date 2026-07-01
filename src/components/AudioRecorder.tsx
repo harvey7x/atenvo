@@ -50,6 +50,7 @@ export function AudioRecorder({ disabled, onEnviar, permitirArquivo }: Props) {
   const meterCloneRef = useRef<MediaStreamTrack | null>(null); // track CLONADA só p/ o medidor (recorder usa a original)
   const rafRef = useRef<number | null>(null);
   const maxNivelRef = useRef(0);
+  const minNivelRef = useRef(1); const sumNivelRef = useRef(0); const cntNivelRef = useRef(0); // diag: nível min/méd/máx
   const barRef = useRef<HTMLDivElement>(null);
   const enviandoRef = useRef(false); // trava clique-duplo no envio
   const fileRef = useRef<HTMLInputElement>(null); // seleção de arquivo de áudio existente
@@ -89,6 +90,7 @@ export function AudioRecorder({ disabled, onEnviar, permitirArquivo }: Props) {
         a.getByteTimeDomainData(buf);
         let peak = 0; for (let i = 0; i < buf.length; i++) { const v = Math.abs(buf[i] - 128) / 128; if (v > peak) peak = v; }
         if (peak > maxNivelRef.current) maxNivelRef.current = peak;
+        if (peak < minNivelRef.current) minNivelRef.current = peak; sumNivelRef.current += peak; cntNivelRef.current++;
         if (barRef.current) barRef.current.style.width = Math.min(100, Math.round(peak * 140)) + '%';
         rafRef.current = requestAnimationFrame(loop);
       };
@@ -110,6 +112,8 @@ export function AudioRecorder({ disabled, onEnviar, permitirArquivo }: Props) {
       let sum = 0, n = 0;
       for (let c = 0; c < audio.numberOfChannels; c++) { const ch = audio.getChannelData(c); for (let i = 0; i < ch.length; i++) sum += ch[i] * ch[i]; n += ch.length; }
       const rms = n ? Math.sqrt(sum / n) : 0;
+      // DIAGNÓSTICO: prova local de som (decode do Blob) — duração/canais/sample-rate/RMS. Sem conteúdo.
+      try { console.log(JSON.stringify({ stage: 'blob_decode', duration: Number(audio.duration.toFixed(2)), channels: audio.numberOfChannels, sample_rate: audio.sampleRate, rms: Number(rms.toFixed(5)), tem_som: rms >= 0.01 })); } catch { /* ignore */ }
       try { ac.close(); } catch { /* ignore */ }
       setInfo((x) => x ? { ...x, dur: audio.duration, sinal: rms >= 0.01, verificando: false, rms } : x); // ruído de fundo não passa
     } catch { setInfo((x) => x ? { ...x, verificando: false } : x); } // se não decodificar, mantém o medidor ao vivo
@@ -120,7 +124,7 @@ export function AudioRecorder({ disabled, onEnviar, permitirArquivo }: Props) {
     const md = navigator.mediaDevices;
     if (!md?.getUserMedia || !(window as unknown as { MediaRecorder?: unknown }).MediaRecorder) { setEstado('error'); setErro('Este navegador não suporta gravação de áudio.'); return; }
     setEstado('requesting');
-    pararMedidor(); pararTracks(); maxNivelRef.current = 0;
+    pararMedidor(); pararTracks(); maxNivelRef.current = 0; minNivelRef.current = 1; sumNivelRef.current = 0; cntNivelRef.current = 0;
     let stream: MediaStream;
     try {
       stream = await md.getUserMedia({ audio: idDispositivo ? { deviceId: { exact: idDispositivo } } : true }); // só após o clique
@@ -148,6 +152,14 @@ export function AudioRecorder({ disabled, onEnviar, permitirArquivo }: Props) {
       const tipo = baseMime(mimeRef.current || rec.mimeType || 'audio/webm');
       const blob = new Blob(chunksRef.current, { type: tipo });
       blobRef.current = blob;
+      // DIAGNÓSTICO temporário (sanitizado, sem conteúdo de áudio): metadados do Blob + níveis + track.
+      const tk = streamRef.current?.getAudioTracks?.()[0];
+      const nivel = { pico: Number(maxNivelRef.current.toFixed(4)), min: Number((cntNivelRef.current ? minNivelRef.current : 0).toFixed(4)), med: Number((cntNivelRef.current ? sumNivelRef.current / cntNivelRef.current : 0).toFixed(4)) };
+      const diag = { stage: 'blob_gravado', mime_escolhido: mimeRef.current || rec.mimeType, tipo, size: blob.size, chunks: chunksRef.current.length, nivel, track_enabled: tk?.enabled ?? null, track_muted: tk?.muted ?? null, track_readyState: tk?.readyState ?? null };
+      blob.arrayBuffer().then((ab) => crypto.subtle.digest('SHA-256', ab)).then((h) => {
+        const sha = Array.from(new Uint8Array(h)).map((b) => b.toString(16).padStart(2, '0')).join('');
+        try { console.log(JSON.stringify({ ...diag, sha256: sha })); } catch { /* ignore */ }
+      }).catch(() => { try { console.log(JSON.stringify(diag)); } catch { /* ignore */ } });
       limparPreview(); setPreviewUrl(URL.createObjectURL(blob));
       pararMedidor(); pararTracks(); pararTimer();             // só encerra as tracks DEPOIS de montar o Blob
       setInfo({ mime: tipo, size: blob.size, dur: 0, sinal: maxNivelRef.current >= SINAL_MIN, verificando: true });
