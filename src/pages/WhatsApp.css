@@ -83,6 +83,22 @@
 .wa-app .conv.aguardando--critico:not(.active){background:rgba(192,57,43,.10)}
 .wa-app .conv.aguardando--critico:not(.active)::before{content:"";position:absolute;left:0;top:9px;bottom:9px;width:4px;border-radius:0 3px 3px 0;background:#c0392b}
 .wa-app .conv.aguardando--critico .conv-alert{color:#c0392b}
+/* ---- Card reorganizado: barra lateral discreta por estado + linha atendente/canal + status ---- */
+.wa-app .conv--aguardando:not(.active){background:rgba(201,122,22,.06)}
+.wa-app .conv--aguardando:not(.active)::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:3px;border-radius:0 3px 3px 0;background:var(--amber)}
+.wa-app .conv--critico:not(.active){background:rgba(192,57,43,.10)}
+.wa-app .conv--critico:not(.active)::before{content:"";position:absolute;left:0;top:9px;bottom:9px;width:4px;border-radius:0 3px 3px 0;background:#c0392b}
+.wa-app .conv .cmeta{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:3px 0;font-size:11.5px;color:var(--ink-2)}
+.wa-app .conv .cmeta-at{display:inline-flex;align-items:center;gap:4px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wa-app .conv .cmeta-ic{font-size:11px;line-height:1}
+.wa-app .conv .cmeta-canal{flex:none;color:var(--wa);font-weight:500;white-space:nowrap;max-width:52%;overflow:hidden;text-overflow:ellipsis}
+.wa-app .conv .cphone{font-size:11.5px;color:var(--muted);margin:1px 0}
+.wa-app .conv .crow-status{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:4px}
+.wa-app .conv .cstatus{font-size:11px;font-weight:500;line-height:1.2;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wa-app .conv .cstatus--aguardando{color:#c07a1e}
+.wa-app .conv .cstatus--critico{color:#c0392b}
+.wa-app .conv .cstatus--ativo{color:var(--green)}
+.wa-app .conv .cstatus--neutro{color:var(--muted)}
 /* fallback de imagem indisponível (sem bloco de cor vazio) */
 .wa-app .msg-img-fallback{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:200px;padding:26px 28px;text-align:center}
 .wa-app .msg-img-fallback svg{width:26px;height:26px;color:var(--muted)}

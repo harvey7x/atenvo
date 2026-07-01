@@ -30,7 +30,6 @@ const EMPTY_CONTACT: WaContact = {
 
 /* ---------- ícones (inline, idênticos ao protótipo) ---------- */
 const IcWa = () => <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a9.9 9.9 0 0 0-8.5 15l-1.3 4.8 4.9-1.3A9.9 9.9 0 1 0 12 2zm4.5 12c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.6.8-.8 1-.3.1-.6 0a6.7 6.7 0 0 1-2-1.2 7.4 7.4 0 0 1-1.3-1.7c-.2-.3 0-.4.1-.5l.4-.5.3-.4v-.4l-.9-2c-.2-.5-.4-.4-.6-.5h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.7 11.6 11.6 0 0 0 4.5 3.9c.6.3 1.1.4 1.5.5a3.6 3.6 0 0 0 1.6.1 2.7 2.7 0 0 0 1.8-1.2 2.2 2.2 0 0 0 .1-1.2c0-.1-.2-.2-.5-.3z" /></svg>;
-const IcChip = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="4" y="4" width="16" height="16" rx="3" /><rect x="9" y="9" width="6" height="6" rx="1" /><path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2" /></svg>;
 const IcClock = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>;
 const IcChevDown = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>;
 const IcDots = () => <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.7" /><circle cx="12" cy="12" r="1.7" /><circle cx="12" cy="19" r="1.7" /></svg>;
@@ -58,7 +57,6 @@ const IcCopy = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" 
 const IcContactCard = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2" /><circle cx="9" cy="11" r="2" /><path d="M5 17a3 3 0 0 1 8 0M15 9h3M15 13h3" /></svg>;
 const IcCheckSm = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>;
 const IcArchive = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="4" rx="1" /><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4" /></svg>;
-const IcAlert = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 8v5M12 16h.01" /></svg>;
 const IcNewChat = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.5 8.5 0 0 1-12.6 7.4L3 20.5l1.7-5A8.5 8.5 0 1 1 21 11.5z" /><path d="M12 8.5v5M9.5 11h5" /></svg>;
 
 /** "Aguardando há X" desde a última mensagem do cliente, com cor por faixa de tempo. */
@@ -754,29 +752,38 @@ export function WhatsApp() {
             <div style={{ padding: '30px 12px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>Nenhuma conversa nesta aba.</div>
           ) : filtered.map((c) => {
             const wait = c.aguardando ? tempoEspera(c.aguardandoDesde) : null;
+            // atendente responsável (contatos.responsavel_id resolvido pela equipe da org)
+            const atendNome = c.respId ? (orgUsuarios.find((u) => u.id === c.respId)?.nome ?? 'Atendente') : 'Não atribuído';
+            // cliente sem nome real (vazio ou só dígitos/telefone) → rótulo + telefone secundário
+            const nomeVazio = !c.name?.trim() || /^[\d\s()+\-]+$/.test(c.name.trim());
+            const telSec = c.phone ? mascararNumero(c.phone) : (/\d/.test(c.name || '') ? c.name : '');
+            // status operacional + tempo de espera ("Aguardando cliente · 12 h" / "Atrasado")
+            const tempoCurto = wait ? wait.label.replace(/^Aguardando (há )?/, '') : '';
+            const atrasado = wait?.tier === 'critico' || wait?.tier === 'vermelho';
+            const finalizado = c.status === 'Resolvida' || c.status === 'Fechada';
+            const statusTxt = wait
+              ? (atrasado ? 'Atrasado' : 'Aguardando cliente') + (tempoCurto ? ' · ' + tempoCurto : '')
+              : (finalizado ? 'Finalizado' : (c.status || 'Em atendimento'));
+            const barTier = wait ? (atrasado ? 'critico' : 'aguardando') : (c.id === currentId ? 'ativo' : 'neutro');
             return (
-            <div key={c.id} className={'conv' + (c.id === currentId ? ' active' : '') + (c.aguardando ? ' aguardando aguardando--' + (wait?.tier ?? 'neutro') : '')} onClick={() => selectContact(c.id)}>
+            <div key={c.id} className={'conv conv--' + barTier + (c.id === currentId ? ' active' : '')} onClick={() => selectContact(c.id)}>
               <Avatar name={c.name} />
               <div className="cbody">
                 <div className="crow">
-                  <span className="cname" style={{ fontWeight: (c.unread ?? 0) > 0 ? 700 : undefined }}>{c.fixada && <span title="Fixada" aria-label="Fixada">📌 </span>}{c.name}</span>
-                  {c.aguardando && <span className="conv-alert" title="Cliente aguardando resposta" aria-label="Cliente aguardando resposta"><IcAlert /></span>}
+                  <span className="cname" style={{ fontWeight: (c.unread ?? 0) > 0 ? 700 : undefined }}>{c.fixada && <span title="Fixada" aria-label="Fixada">📌 </span>}{nomeVazio ? 'Cliente sem nome' : c.name}</span>
                   <span className="ctime">{c.time}</span>
                 </div>
-                <div className="cchip"><IcChip />{c.chip}
-                  {c.arquivada && <span className="ctag" style={{ marginLeft: 6 }} title="Arquivada">Arquivada</span>}
-                  {c.silenciada && <span title="Silenciada" aria-label="Silenciada" style={{ marginLeft: 6 }}>🔕</span>}
+                <div className="cmeta">
+                  <span className="cmeta-at" title={'Atendente: ' + atendNome}><span className="cmeta-ic" aria-hidden="true">👤</span>{atendNome}</span>
+                  <span className="cmeta-canal" title={'Canal: WhatsApp · ' + c.chip}>WhatsApp · {c.chip}</span>
                 </div>
-                <div className="cprev">{c.last}</div>
-                {wait && <div className="conv-wait" style={{ color: wait.cor }}>{wait.label}</div>}
-                {c.tags.length > 0 && (
-                  <div className="conv-tags">
-                    {c.tags.slice(0, 3).map((t) => { const cor = corDaEtiqueta(t, etiquetas); return <span key={t} className="ctag" title={t} style={{ background: cor + '22', color: cor, borderColor: cor + '55' }}>{t}</span>; })}
-                    {c.tags.length > 3 && <span className="ctag more" title={c.tags.slice(3).join(', ')}>+{c.tags.length - 3}</span>}
-                  </div>
-                )}
+                {nomeVazio && telSec && <div className="cphone">{telSec}</div>}
+                <div className="cprev">{c.last || '—'}</div>
+                <div className="crow-status">
+                  <span className={'cstatus cstatus--' + barTier}>{statusTxt}{c.arquivada ? ' · Arquivada' : ''}{c.silenciada ? ' 🔕' : ''}</span>
+                  {c.unread > 0 && <span className="unread" title={c.unread + ' não lidas'} aria-label={c.unread + ' mensagens não lidas'}>{c.unread > 99 ? '99+' : c.unread}</span>}
+                </div>
               </div>
-              {c.unread > 0 && <span className="unread" title={c.unread + ' não lidas'} aria-label={c.unread + ' mensagens não lidas'}>{c.unread > 99 ? '99+' : c.unread}</span>}
             </div>
             );
           })}
