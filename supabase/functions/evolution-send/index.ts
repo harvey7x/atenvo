@@ -40,10 +40,6 @@ function containerReal(bytes: Uint8Array): string {
   if (asc.startsWith('ID3') || (bytes[0] === 0xff && (bytes[1] & 0xe0) === 0xe0)) return 'mp3';
   return 'desconhecido';
 }
-async function sha256hex(bytes: Uint8Array): Promise<string> {
-  const d = await crypto.subtle.digest('SHA-256', bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
-  return Array.from(new Uint8Array(d)).map((b) => b.toString(16).padStart(2, '0')).join('');
-}
 // Normaliza texto antes do envio: NFC, CRLF->\n, NBSP->espaço normal, remove zero-width/word-joiner/BOM,
 // soft-hyphen e controles inválidos (mantém \n e \t). Preserva acentos e o conteúdo legível.
 // Resolve falhas de "texto copiado da ficha" que carregam NBSP/controles invisíveis.
@@ -254,7 +250,7 @@ Deno.serve(async (req) => {
           // Arquivo de áudio anexado => mídia comum (sendMedia), separado por design.
           const gravacaoPainel = origem_audio !== 'arquivo_anexado'; // padrão: gravação (fonte do incidente)
           const usaPtt = gravacaoPainel;
-          try { console.log(JSON.stringify({ stage: 'audio_send', origem_audio: gravacaoPainel ? 'gravacao_painel' : 'arquivo_anexado', container_real: containerReal(bytes), mime_declarado: mime, bytes: bytes.length, base64_len: b64.length, sha256: (await sha256hex(bytes)).slice(0, 16), endpoint: usaPtt ? 'sendWhatsAppAudio(ptt)' : 'sendMedia(file)', corr })); } catch { /* ignore */ }
+          try { console.log(JSON.stringify({ stage: 'audio_send', corr, origem_audio: gravacaoPainel ? 'gravacao_painel' : 'arquivo_anexado', container_real: containerReal(bytes), mime_declarado: mime, bytes: bytes.length, endpoint: usaPtt ? 'sendWhatsAppAudio(ptt)' : 'sendMedia(file)' })); } catch { /* ignore */ }
           if (usaPtt) {
             try {
               sent = await evolution.sendWhatsAppAudio(instancia, alvo, b64);                   // voz/PTT (encoding:true -> ogg/opus)
@@ -269,21 +265,15 @@ Deno.serve(async (req) => {
           } else {
             sent = await evolution.sendMedia(instancia, alvo, 'audio', mime || 'audio/mpeg', b64, nome && nome !== 'audio' ? nome : 'audio.m4a'); // arquivo de áudio anexado
           }
-          // TESTE CONTROLADO: persiste UMA linha por correlation_id (só metadados + hashes; escritor único).
+          // OBSERVABILIDADE MÍNIMA: 1 linha por correlation_id (sem hashes/RMS/conteúdo). Escritor único.
           if (audio_diag && typeof audio_diag === 'object') {
             try {
-              const storageSha = await sha256hex(bytes);
               const d = audio_diag as Record<string, unknown>;
-              const blobSha = (d.blob_sha256 as string) ?? null; const upSha = (d.upload_sha256 as string) ?? null;
               await admin.from('wa_audio_diag').upsert({
                 correlation_id: String(d.correlation_id ?? corr), organizacao_id: conv.organizacao_id,
-                blob_mime: d.blob_mime ?? null, blob_size: d.blob_size ?? null, chunks: d.chunks ?? null,
-                duration: d.duration ?? null, channels: d.channels ?? null, sample_rate: d.sample_rate ?? null,
-                rms: d.rms ?? null, tem_som: d.tem_som ?? null,
-                blob_sha256: blobSha, upload_sha256: upSha, storage_sha256: storageSha,
-                container_real: containerReal(bytes), endpoint: usaPtt ? 'sendWhatsAppAudio' : 'sendMedia', ptt: usaPtt, base64_len: b64.length,
-                key_id: sent?.key?.id ?? null, http_status: 200,
-                hashes_iguais: !!blobSha && blobSha === upSha && upSha === storageSha,
+                blob_mime: d.blob_mime ?? mime ?? null, blob_size: d.blob_size ?? bytes.length,
+                container_real: containerReal(bytes), endpoint: usaPtt ? 'sendWhatsAppAudio' : 'sendMedia', ptt: usaPtt,
+                base64_len: b64.length, key_id: sent?.key?.id ?? null, http_status: 200,
               }, { onConflict: 'correlation_id' });
             } catch { /* diagnóstico best-effort — nunca afeta o envio */ }
           }

@@ -466,20 +466,12 @@ export function mascararNumero(numero: string | null | undefined): string {
 
 /** Sobe um arquivo de mídia ao bucket PRIVADO `script-midia`, isolado por organização.
  *  O caminho começa pelo id da org (a Edge Function valida esse prefixo). NUNCA expõe URL pública. */
-export async function subirMidiaWa(orgId: string, file: File): Promise<{ path: string; nome: string; tamanho: number; mime: string; sha256?: string }> {
+export async function subirMidiaWa(orgId: string, file: File): Promise<{ path: string; nome: string; tamanho: number; mime: string }> {
   const safe = file.name.replace(/[^\w.\-]/g, '_').slice(-80);
   const path = `${orgId}/wa-midia/${crypto.randomUUID()}-${safe}`;
-  // DIAGNÓSTICO (áudio): SHA-256 do arquivo ANTES do upload — compara com o hash do Blob e o do backend.
-  let sha256: string | undefined;
-  if (file.type?.startsWith('audio/')) {
-    try {
-      const h = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
-      sha256 = Array.from(new Uint8Array(h)).map((b) => b.toString(16).padStart(2, '0')).join('');
-    } catch { /* ignore */ }
-  }
   const { error } = await supabase!.storage.from('script-midia').upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false });
   if (error) throw new Error(error.message);
-  return { path, nome: file.name, tamanho: file.size, mime: file.type || 'application/octet-stream', sha256 };
+  return { path, nome: file.name, tamanho: file.size, mime: file.type || 'application/octet-stream' };
 }
 
 /** URL assinada CURTA para renderizar a mídia no histórico (gerada sob demanda, nunca persistida). */

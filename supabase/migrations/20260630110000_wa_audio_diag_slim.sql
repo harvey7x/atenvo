@@ -1,0 +1,3 @@
+-- limpeza da instrumentacao (aplicada via MCP wa_audio_diag_slim): remove colunas de diagnostico
+-- excessivas (hashes/RMS/decode) e apaga registros temporarios. Mantem observabilidade minima.
+-- Ver apply_migration wa_audio_diag_slim.
