@@ -27,6 +27,20 @@ function toBase64(bytes: Uint8Array): string {
   for (let i = 0; i < bytes.length; i += chunk) bin += String.fromCharCode(...bytes.subarray(i, i + chunk));
   return btoa(bin);
 }
+// container REAL por magic bytes (não confia no MIME/extensão declarados) — só p/ diagnóstico.
+function containerReal(bytes: Uint8Array): string {
+  if (bytes.length >= 4 && bytes[0] === 0x1a && bytes[1] === 0x45 && bytes[2] === 0xdf && bytes[3] === 0xa3) return 'webm/matroska';
+  const asc = new TextDecoder('latin1').decode(bytes.slice(0, 16));
+  if (asc.startsWith('OggS')) return 'ogg';
+  if (asc.slice(4, 8) === 'ftyp') return 'mp4/m4a:' + asc.slice(8, 12).replace(/[^\x20-\x7e]/g, '');
+  if (asc.startsWith('RIFF')) return 'wav';
+  if (asc.startsWith('ID3') || (bytes[0] === 0xff && (bytes[1] & 0xe0) === 0xe0)) return 'mp3';
+  return 'desconhecido';
+}
+async function sha256hex(bytes: Uint8Array): Promise<string> {
+  const d = await crypto.subtle.digest('SHA-256', bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
+  return Array.from(new Uint8Array(d)).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
 // Normaliza texto antes do envio: NFC, CRLF->\n, NBSP->espaço normal, remove zero-width/word-joiner/BOM,
 // soft-hyphen e controles inválidos (mantém \n e \t). Preserva acentos e o conteúdo legível.
 // Resolve falhas de "texto copiado da ficha" que carregam NBSP/controles invisíveis.
@@ -232,7 +246,11 @@ Deno.serve(async (req) => {
           if (bytes.length === 0) return json({ error: 'Áudio vazio. Grave novamente.' }, 422);
           const b64 = toBase64(bytes);
           const mlow = (mime || '').toLowerCase();
-          if (mlow.includes('ogg') || mlow.includes('webm')) {
+          const usaPtt = mlow.includes('ogg') || mlow.includes('webm');
+          // DIAGNÓSTICO (sanitizado, sem conteúdo): container real × MIME declarado, tamanhos, SHA-256 e
+          // endpoint. Permite comparar byte-a-byte com o Blob do navegador (mesma SHA-256) e ver o codec real.
+          try { console.log(JSON.stringify({ stage: 'audio_send', container_real: containerReal(bytes), mime_declarado: mime, bytes: bytes.length, base64_len: b64.length, sha256: (await sha256hex(bytes)).slice(0, 16), endpoint: usaPtt ? 'sendWhatsAppAudio(ptt)' : 'sendMedia(file)', corr })); } catch { /* ignore */ }
+          if (usaPtt) {
             sent = await evolution.sendWhatsAppAudio(instancia, alvo, b64);                     // PTT (ogg/opus)
           } else {
             sent = await evolution.sendMedia(instancia, alvo, 'audio', mime || 'audio/mpeg', b64, nome && nome !== 'audio' ? nome : 'audio.m4a'); // arquivo de áudio reproduzível
