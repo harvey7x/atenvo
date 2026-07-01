@@ -5,7 +5,8 @@ import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/useToast';
 import { Modal } from '@/components/Modal';
 import { useOrgUsuarios } from '@/data/atendimento';
-import { useAgendamentos, useCriarAgendamento, useAtualizarAgendamento, useContatosBusca, AG_STATUS, AG_TIPOS, agStatusInfo, SP_OFFSET, AG_REAL, type Agendamento, type AgStatus } from '@/data/agendamentos';
+import { useOrg } from '@/context/OrgContext';
+import { useAgendamentos, useCriarAgendamento, useAtualizarAgendamento, useContatosBusca, checarConflitoAtendente, AG_STATUS, AG_TIPOS, agStatusInfo, AG_REAL, type Agendamento, type AgStatus } from '@/data/agendamentos';
 
 type View = 'dia' | 'semana' | 'mes';
 const HORA_INI = 8, HORA_FIM = 19, HORA_PX = 56;
@@ -19,8 +20,19 @@ function spParts(iso: string) {
   const hh = +p.hour % 24;
   return { key: `${p.year}-${p.month}-${p.day}`, hh, mm: +p.minute, horaDec: hh + (+p.minute) / 60, hora: `${p.hour}:${p.minute}` };
 }
-/** ISO (UTC) a partir de data local SP (yyyy-mm-dd) + hora HH:mm. */
-const spISO = (dateKey: string, hora: string) => new Date(`${dateKey}T${hora}:00${SP_OFFSET}`).toISOString();
+/** deslocamento REAL de America/Sao_Paulo (ms) para um instante — via Intl (robusto a mudança de fuso/DST). */
+function spOffsetMs(d: Date): number {
+  const p = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).formatToParts(d).reduce((a, x) => { a[x.type] = x.value; return a; }, {} as Record<string, string>);
+  const asUTC = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour % 24, +p.minute, +p.second);
+  return asUTC - d.getTime();
+}
+/** ISO (UTC) a partir do horário de PAREDE em America/Sao_Paulo (yyyy-mm-dd + HH:mm), sem offset fixo. */
+function spISO(dateKey: string, hora: string): string {
+  const [Y, M, D] = dateKey.split('-').map(Number);
+  const [h, mi] = hora.split(':').map(Number);
+  const guessUTC = Date.UTC(Y, M - 1, D, h, mi);
+  return new Date(guessUTC - spOffsetMs(new Date(guessUTC))).toISOString();
+}
 const keyOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 function inicioSemana(d: Date) { const x = new Date(d); const dw = x.getDay(); x.setDate(x.getDate() - dw); x.setHours(0, 0, 0, 0); return x; } // domingo
 function addDias(d: Date, n: number) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
@@ -28,6 +40,7 @@ const hhmm = (dec: number) => `${String(Math.floor(dec)).padStart(2, '0')}:${Str
 
 export function Agendamentos() {
   const { user } = useAuth();
+  const { currentOrg } = useOrg();
   const { toast } = useToast();
   const navigate = useNavigate();
   const atendentes = useOrgUsuarios().data ?? [];
@@ -81,7 +94,7 @@ export function Agendamentos() {
 
   function mover(dir: number) { setAncora((a) => view === 'mes' ? new Date(a.getFullYear(), a.getMonth() + dir, 1) : addDias(a, dir * (view === 'dia' ? 1 : 7))); }
 
-  const hojeKey = keyOf(new Date());
+  const hojeKey = spParts(new Date().toISOString()).key; // "hoje" no fuso de São Paulo
   const nowDec = spParts(new Date().toISOString()).horaDec;
 
   return (
@@ -189,7 +202,7 @@ export function Agendamentos() {
       </div>
 
       {modalOpen && <AgModal editId={editId} prefill={prefill} atendentes={atendentes} agendamento={todos.find((a) => a.id === editId) ?? null}
-        onClose={() => setModalOpen(false)} onSaved={() => { setModalOpen(false); q.refetch(); }}
+        orgId={currentOrg.id} onClose={() => setModalOpen(false)} onSaved={() => { setModalOpen(false); q.refetch(); }}
         userId={user?.id ?? ''} toast={toast} navigate={navigate} />}
     </div>
   );
@@ -229,9 +242,9 @@ function MiniCal({ ancora, onPick, hojeKey }: { ancora: Date; onPick: (d: Date) 
   );
 }
 
-function AgModal({ editId, prefill, atendentes, agendamento, onClose, onSaved, userId, toast, navigate }: {
+function AgModal({ editId, prefill, atendentes, agendamento, orgId, onClose, onSaved, userId, toast, navigate }: {
   editId: string | null; prefill: { dataKey: string; hora: string } | null; atendentes: { id: string; nome: string }[];
-  agendamento: Agendamento | null; onClose: () => void; onSaved: () => void; userId: string;
+  agendamento: Agendamento | null; orgId: string; onClose: () => void; onSaved: () => void; userId: string;
   toast: (m: string, k?: 'ok' | 'warn') => void; navigate: (p: string) => void;
 }) {
   const criar = useCriarAgendamento();
@@ -249,6 +262,7 @@ function AgModal({ editId, prefill, atendentes, agendamento, onClose, onSaved, u
   const contatosQ = useContatosBusca(busca);
   const [busy, setBusy] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [avisoConflito, setAvisoConflito] = useState(false); // já avisou → segundo clique confirma
   const set = (k: string, v: unknown) => setF((x) => ({ ...x, [k]: v }));
 
   async function salvar() {
@@ -262,6 +276,11 @@ function AgModal({ editId, prefill, atendentes, agendamento, onClose, onSaved, u
       inicioEm: spISO(f.dataKey, f.horaIni), fimEm: spISO(f.dataKey, f.horaFim),
       local: f.local || null, endereco: f.endereco || null, observacoes: f.observacoes || null,
     };
+    // aviso de conflito (não bloqueia): mesmo atendente com agendamento sobreposto. Segundo clique confirma.
+    if (f.atendenteId && !avisoConflito) {
+      const conf = await checarConflitoAtendente(orgId, f.atendenteId, base.inicioEm, base.fimEm, editId).catch(() => null);
+      if (conf) { setAvisoConflito(true); setErro('Este atendente já possui um agendamento neste horário. Clique novamente em salvar para confirmar mesmo assim.'); return; }
+    }
     setBusy(true);
     try {
       if (editId) await atualizar.mutateAsync({ id: editId, patch: { contato_id: base.contatoId, atendente_id: base.atendenteId, tipo, cliente_nome: base.clienteNome, telefone: base.telefone, inicio_em: base.inicioEm, fim_em: base.fimEm, status: base.status, local: base.local, endereco: base.endereco, observacoes: base.observacoes } });

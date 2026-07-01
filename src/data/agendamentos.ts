@@ -100,6 +100,17 @@ export function useAtualizarAgendamento() {
   });
 }
 
+/** Aviso de conflito: mesmo atendente com agendamento sobreposto (não cancelado). Retorna o 1º conflito ou null. */
+export async function checarConflitoAtendente(orgId: string, atendenteId: string, inicioISO: string, fimISO: string, excluirId: string | null): Promise<{ id: string; cliente_nome: string | null } | null> {
+  if (!atendenteId) return null;
+  let qy = supabase!.from('agendamentos').select('id, cliente_nome')
+    .eq('organizacao_id', orgId).eq('atendente_id', atendenteId).neq('status', 'cancelado')
+    .lt('inicio_em', fimISO).gt('fim_em', inicioISO);
+  if (excluirId) qy = qy.neq('id', excluirId);
+  const { data } = await qy.limit(1);
+  return (data && data.length) ? (data[0] as { id: string; cliente_nome: string | null }) : null;
+}
+
 /** Busca contatos por nome/telefone (para o seletor do modal). */
 export function useContatosBusca(termo: string) {
   const { currentOrg } = useOrg();
