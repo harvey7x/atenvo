@@ -4,7 +4,7 @@ import { useToast } from '@/hooks/useToast';
 import { useAuth } from '@/context/AuthContext';
 import { useOrg } from '@/context/OrgContext';
 import { WA_CONTACTS, initials, avatarColor, type WaContact, type WaMessage } from '@/data/whatsappDemo';
-import { useWaConversations, useSendWaMessage, useWaCanais, useAtribuirAtendimento, useIniciarConversaWa, normalizeWaPhone, mascararNumero, subirMidiaWa, urlAssinadaMidiaWa, removerMensagemFalha, waRecarregarAudio, waValidarNumero, waVincularNumero, waArquivar, waMarcarLida, useWaAtividades, WA_REAL } from '@/data/whatsapp';
+import { useWaConversations, useSendWaMessage, useWaCanais, useWaCanalEnvioSaude, useAtribuirAtendimento, useIniciarConversaWa, normalizeWaPhone, mascararNumero, subirMidiaWa, urlAssinadaMidiaWa, removerMensagemFalha, waRecarregarAudio, waValidarNumero, waVincularNumero, waArquivar, waMarcarLida, useWaAtividades, WA_REAL } from '@/data/whatsapp';
 import { MediaComposer } from '@/components/MediaComposer';
 import { AudioRecorder } from '@/components/AudioRecorder';
 import { AudioMessage } from '@/components/AudioMessage';
@@ -320,6 +320,8 @@ export function WhatsApp() {
   const canalSel = realCanais.find((c) => c.id === replyCanalId) ?? null;
   const canalConectado = !WA_REAL || (canalSel?.status === 'conectado');
   const canalIndisponivel = WA_REAL && !!canalSel && !canalConectado;
+  // Saúde de ENVIO do canal de resposta (mesmo conectado, o outbound pode estar falhando).
+  const envioSaude = useWaCanalEnvioSaude(canalConectado ? (replyCanalId || current?.canalId) : null).data?.estado ?? 'ok';
   // Caso D: conversa sem número de resposta confirmado (origem LID). Bloqueia o envio até vincular um PN validado.
   const semDestino = WA_REAL && !!current.id && !!current.semDestino;
   const [vincOpen, setVincOpen] = useState(false);
@@ -996,6 +998,15 @@ export function WhatsApp() {
             <div className="warn warn-block">
               <IcWarn />Esta conversa entrou por <b>{canalSel?.alias}</b>, mas a conexão está {canalSel?.status === 'removido' ? 'removida' : 'desconectada'}. O histórico permanece; selecione outro canal para responder ou reconecte.
               <button className="link-btn" onClick={() => navigate('/integracoes')}>Reconectar</button>
+            </div>
+          )}
+          {/* Canal conectado, mas com envio falhando (state=open não garante envio). Recebimento segue normal. */}
+          {!canalIndisponivel && envioSaude !== 'ok' && (
+            <div className="warn warn-block">
+              <IcWarn />
+              {envioSaude === 'indisponivel'
+                ? <>O canal <b>{canalSel?.alias}</b> está recebendo mensagens, mas não consegue enviar no momento. Selecione outro canal para responder (o envio por outro número muda o remetente para o cliente).</>
+                : <>O envio pelo canal <b>{canalSel?.alias}</b> está instável agora (algumas mensagens estão falhando). Se falhar, selecione outro canal em "Responder por".</>}
             </div>
           )}
           {semDestino && !canalIndisponivel && (

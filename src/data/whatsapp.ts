@@ -353,6 +353,48 @@ export interface WaCanal {
   // metadados comerciais (configuráveis em Integrações)
   origemTipo: string | null; gestorId: string | null; gestorNome: string | null; fonteId: string | null; campanha: string | null; observacaoComercial: string | null;
 }
+export type EnvioSaudeEstado = 'ok' | 'instavel' | 'indisponivel';
+export interface CanalEnvioSaude { estado: EnvioSaudeEstado; falhasConsecutivas: number; total: number; falhas: number }
+
+/** Classifica a saúde de ENVIO a partir dos status das últimas saídas (mais RECENTE primeiro).
+ *  Pura e testável. Baseia-se na taxa REAL de falha — NÃO no state=open.
+ *  - indisponivel: >=3 saídas mais recentes seguidas com falha (ex.: o "0/N" do incidente);
+ *  - instavel: última saída falhou, ou >=40% de falha na janela (com algum sucesso);
+ *  - ok: caso contrário. Um sucesso na frente derruba o alerta (volta a saudável só com evidência). */
+export function avaliarEnvioSaude(statusesRecentePrimeiro: string[]): CanalEnvioSaude {
+  const total = statusesRecentePrimeiro.length;
+  const falhas = statusesRecentePrimeiro.filter((s) => s === 'falhou').length;
+  let consec = 0;
+  for (const s of statusesRecentePrimeiro) { if (s === 'falhou') consec++; else break; }
+  let estado: EnvioSaudeEstado = 'ok';
+  if (consec >= 3) estado = 'indisponivel';
+  else if (consec >= 1 || (total >= 3 && falhas / total >= 0.4)) estado = 'instavel';
+  return { estado, falhasConsecutivas: consec, total, falhas };
+}
+
+/** Saúde de envio do canal a partir da taxa real de falha das últimas saídas (janela de 2h, últimas 10). */
+export function useWaCanalEnvioSaude(canalId: string | null | undefined) {
+  return useQuery({
+    queryKey: ['wa-canal-envio-saude', canalId],
+    enabled: WA_REAL && !!canalId,
+    refetchInterval: 20000,
+    queryFn: async (): Promise<CanalEnvioSaude> => {
+      const desde = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+      const { data, error } = await supabase!
+        .from('mensagens')
+        .select('status, conversas!inner(canal_id)')
+        .eq('conversas.canal_id', canalId!)
+        .eq('direcao', 'saida')
+        .gte('criado_em', desde)
+        .order('criado_em', { ascending: false })
+        .limit(10);
+      if (error) throw new Error(error.message);
+      const rows = (data as unknown as { status: string }[]) ?? [];
+      return avaliarEnvioSaude(rows.map((r) => r.status));
+    },
+  });
+}
+
 export function useWaCanais() {
   const { currentOrg } = useOrg();
   return useQuery({
