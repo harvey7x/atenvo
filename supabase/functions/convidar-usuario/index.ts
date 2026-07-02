@@ -101,7 +101,9 @@ Deno.serve(async (req) => {
       const ent = await entregar(admin, c.email, c.nome, c.papel, org, { existe: !!lk?.id, temSenha: !!lk?.tem_senha });
       // renova o MESMO convite lógico (não cria outro)
       await admin.from('convites').update({ status: 'pendente', expira_em: new Date(Date.now() + 7 * 864e5).toISOString(), reenviado_em: new Date().toISOString(), atualizado_em: new Date().toISOString() }).eq('id', cid);
-      if (ent.userId && !c.auth_user_id) await admin.rpc('convite_vincular', { p_convite_id: cid, p_auth_user_id: ent.userId });
+      // re-vincula SEMPRE ao user retornado pelo link: recovery pode resolver outro auth user do mesmo
+      // e-mail (duplicado), e o convite/vínculo precisam apontar para quem a sessão do link autentica.
+      if (ent.userId) await admin.rpc('convite_vincular', { p_convite_id: cid, p_auth_user_id: ent.userId });
       await admin.from('audit_log').insert({ organizacao_id: org, usuario_id: user.id, acao: 'convite_reenviado', entidade: 'convite', entidade_id: cid, dados_depois: { email: c.email, estado: ent.estado } }); // sem link
       // reenvia pelo MESMO canal/telefone do convite, se houver
       if (c.canal_id && c.telefone && ent.link) {
