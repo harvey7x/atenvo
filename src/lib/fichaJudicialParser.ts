@@ -323,14 +323,30 @@ function extrairBanco(
   aviso('BANCO_NAO_ENCONTRADO', 'Nenhum banco pagador foi identificado.', 'bancoCodigo');
 }
 
+/** Extrai "código - banco" de uma linha de revisão no formato `934 - AGIPLAN FINANCEIRA S/A`.
+ *  Aceita hífen/travessão/espaços extras e zeros à esquerda; ignora sufixo de valor (R$ ...).
+ *  É a fonte estruturada dentro do texto: o código do consignado (ex.: 934) NÃO é COMPE, então
+ *  não pode depender da tabela COMPE. Retorna null se não houver o par código-nome. */
+function extrairCodBancoRev(linha: string): { codigo: string; nome: string } | null {
+  // remove sufixo de valor (" - R$ 123,45" / "R$ 123,45") para não entrar no nome
+  const base = linha.replace(/\s*[-–—]?\s*r\$\s*[\d.,]+.*$/i, '').trim();
+  // <código 1-4 dígitos> <hífen/travessão> <NOME começando por letra até o fim>
+  const m = base.match(/(\d{1,4})\s*[-–—]\s*([A-Za-zÀ-ÿ][^\n]*\S)\s*$/);
+  if (!m) return null;
+  const nome = m[2].replace(/\s+/g, ' ').replace(/[\s.,;:–—-]+$/, '').trim();
+  if (nome.length < 2) return null;
+  return { codigo: m[1], nome }; // preserva zeros à esquerda
+}
+
 function extrairRevisoes(linhas: string[], res: FichaJudicialParseResult, aviso: (c: string, m: string, campo?: string) => void): void {
   const out: FichaRevisaoDetectada[] = [];
   const vistos = new Set<string>();
   for (const linha of linhas) {
     const n = normalizaComparacao(linha);
     const temRev = /\brev\b/.test(n);
-    const temRmc = /\brmc\b/.test(n);
-    const temRcc = /\brcc\b/.test(n);
+    // normaliza variações: RMC = Reserva de Margem Consignável; RCC = Reserva de Cartão (de Crédito) Consignado.
+    const temRmc = /\brmc\b/.test(n) || /reserva de margem consign/.test(n);
+    const temRcc = /\brcc\b/.test(n) || /reserva de cartao( de credito)? consign/.test(n);
     const temCartao = /cartao|cartão/.test(n) && /(contrato|consignad)/.test(n);
     if (!temRev && !temRmc && !temRcc && !temCartao) continue;
 
@@ -341,11 +357,18 @@ function extrairRevisoes(linhas: string[], res: FichaJudicialParseResult, aviso:
     else if (temCartao) tipo = 'outro';
     else if (temRev) tipo = 'outro';
 
-    const codigo = (linha.match(/\b(\d{3})\b/g) || []).map(bancoPorCodigo).find(Boolean);
-    const banco = codigo || bancoPorNome(linha);
+    // 1) fonte estruturada: "código - NOME" da própria linha (ex.: 934 - AGIPLAN). NÃO exige COMPE.
+    const est = extrairCodBancoRev(linha);
+    let bancoCodigo = est?.codigo;
+    let bancoNome = est?.nome;
+    // 2) fallback: tabela COMPE por código/nome (só quando não veio o par estruturado)
+    if (!bancoCodigo && !bancoNome) {
+      const compe = (linha.match(/\b(\d{3})\b/g) || []).map(bancoPorCodigo).find(Boolean) || bancoPorNome(linha);
+      if (compe) { bancoCodigo = compe.codigo; bancoNome = compe.nome; }
+    }
     const mv = linha.match(/r\$\s*([\d.]+(?:,\d{2})?)/i); // valor só em contexto R$ (evita capturar código)
     const valor = mv ? parseMoedaBRL(mv[1]) : undefined;
-    const temBanco = !!banco;
+    const temBanco = !!(bancoCodigo || bancoNome);
     const temValor = valor !== undefined && valor > 0;
     // confiança: rótulo explícito (REV/RMC/RCC) + banco ou valor → alta; senão baixa
     const explicito = temRev || temRmc || temRcc;
@@ -354,8 +377,8 @@ function extrairRevisoes(linhas: string[], res: FichaJudicialParseResult, aviso:
 
     const rev: FichaRevisaoDetectada = {
       tipo,
-      bancoCodigo: banco?.codigo,
-      bancoNome: banco?.nome,
+      bancoCodigo,
+      bancoNome,
       valor: temValor ? valor : undefined,
       descricaoLivre: linha.replace(/\s+/g, ' ').trim(),
       origem: 'parser',

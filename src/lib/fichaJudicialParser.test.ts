@@ -333,3 +333,42 @@ describe('propriedades defensivas', () => {
     }
   });
 });
+
+describe('revisões RMC/RCC: código e banco da consulta (não-COMPE)', () => {
+  const acha = (t: string, tipo: string) => parseFichaJudicial(t).revisoes.find((r) => r.tipo === tipo);
+
+  it('extrai código e banco de "Cartão RMC — 934 - AGIPLAN FINANCEIRA S/A"', () => {
+    const r = acha('Cartão RMC — 934 - AGIPLAN FINANCEIRA S/A', 'rmc');
+    expect(r).toBeDefined();
+    expect(r!.bancoCodigo).toBe('934');
+    expect(r!.bancoNome).toBe('AGIPLAN FINANCEIRA S/A');
+  });
+
+  it('extrai código e banco de "Cartão RCC — 935 - FACTA FINANCEIRA S/A"', () => {
+    const r = acha('Cartão RCC — 935 - FACTA FINANCEIRA S/A', 'rcc');
+    expect(r).toBeDefined();
+    expect(r!.bancoCodigo).toBe('935');
+    expect(r!.bancoNome).toBe('FACTA FINANCEIRA S/A');
+  });
+
+  it('reconhece "Reserva de Margem Consignável" como RMC e "Reserva de Cartão Consignado" como RCC', () => {
+    expect(acha('Reserva de Margem Consignável 934 - AGIPLAN FINANCEIRA S/A', 'rmc')?.bancoCodigo).toBe('934');
+    expect(acha('Reserva de Cartão Consignado - 935 - FACTA FINANCEIRA S/A', 'rcc')?.bancoCodigo).toBe('935');
+  });
+
+  it('preserva zeros à esquerda e ignora o valor R$ no nome do banco', () => {
+    const r = acha('Cartão RMC — 007 - BANCO EXEMPLO S/A - R$ 1.234,56', 'rmc');
+    expect(r!.bancoCodigo).toBe('007');
+    expect(r!.bancoNome).toBe('BANCO EXEMPLO S/A');
+    expect(r!.valor).toBe(1234.56);
+  });
+
+  it('não mistura os dois tipos na mesma consulta', () => {
+    const revs = parseFichaJudicial(L(['Cartão RMC — 934 - AGIPLAN FINANCEIRA S/A', 'Cartão RCC — 935 - FACTA FINANCEIRA S/A'])).revisoes;
+    const rmc = revs.filter((r) => r.tipo === 'rmc');
+    const rcc = revs.filter((r) => r.tipo === 'rcc');
+    expect(rmc).toHaveLength(1); expect(rcc).toHaveLength(1);
+    expect(rmc[0].bancoNome).toBe('AGIPLAN FINANCEIRA S/A');
+    expect(rcc[0].bancoNome).toBe('FACTA FINANCEIRA S/A');
+  });
+});
