@@ -21,29 +21,44 @@ export function AlterarSenha() {
   const [showPw, setShowPw] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // senha JÁ trocada no Auth mas ativação (RPC) ainda não concluída -> retoma sem redefinir de novo.
+  const [senhaTrocada, setSenhaTrocada] = useState(false);
 
   if (mode === 'mock') return <Navigate to="/login" replace />;
   if (!user) return <Navigate to="/login" replace />;
   // já não precisa trocar -> não fica preso aqui
   if (!user.deveTrocarSenha) return <Navigate to="/whatsapp" replace />;
 
+  // senha forte: ao menos 8 caracteres, com letra e número.
+  const senhaForte = (s: string) => s.length >= 8 && /[A-Za-zÀ-ÿ]/.test(s) && /\d/.test(s);
+
+  // Baixa a flag (idempotente) e só então libera o acesso. Encerra outras sessões (best-effort).
+  async function liberar(): Promise<boolean> {
+    const { error: rpcErr } = await supabase!.rpc('senha_trocada');
+    if (rpcErr) { setErro('Senha alterada, mas não foi possível liberar o acesso. Toque em "Concluir" para tentar novamente.'); return false; }
+    try { await supabase!.auth.signOut({ scope: 'others' }); } catch { /* encerra outras sessões quando possível */ }
+    await refreshProfile();
+    toast('Senha alterada. Acesso liberado.');
+    navigate('/whatsapp', { replace: true });
+    return true;
+  }
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (busy) return;
     setErro(null);
-    if (senha.length < 6) { setErro('A nova senha deve ter ao menos 6 caracteres.'); return; }
+    // já trocou a senha antes (a RPC falhou): só concluir a liberação, sem redefinir.
+    if (senhaTrocada) { setBusy(true); const ok = await liberar(); if (!ok) setBusy(false); return; }
+    if (!senhaForte(senha)) { setErro('Use uma senha forte: ao menos 8 caracteres, com letras e números.'); return; }
     if (senha !== conf) { setErro('As senhas não coincidem.'); return; }
     setBusy(true);
     // 1) troca a senha (invalida a temporária)
     const { error } = await updatePassword(senha);
     if (error) { setBusy(false); setErro(error); return; }
-    // 2) baixa a flag no perfil (libera o app)
-    const { error: rpcErr } = await supabase!.rpc('senha_trocada');
-    if (rpcErr) { setBusy(false); setErro('Senha alterada, mas não foi possível liberar o acesso. Recarregue a página.'); return; }
-    // 3) recarrega o perfil e entra no app
-    await refreshProfile();
-    toast('Senha alterada. Acesso liberado.');
-    navigate('/whatsapp', { replace: true });
+    setSenhaTrocada(true);
+    // 2) libera o acesso (se falhar, o botão "Concluir" retoma sem pedir a senha de novo)
+    const ok = await liberar();
+    if (!ok) setBusy(false);
   }
 
   return (
@@ -62,12 +77,17 @@ export function AlterarSenha() {
 
         <div className="auth-content">
           <h2 className="heading">Defina sua nova senha</h2>
-          <p className="subhead">Por segurança, troque a senha temporária antes de acessar o sistema.</p>
+          <p className="subhead">{senhaTrocada ? 'Sua senha foi alterada. Falta só liberar o acesso.' : 'Por segurança, troque a senha temporária antes de acessar o sistema.'}</p>
           <form onSubmit={onSubmit} noValidate>
             <div className={'banner' + (erro ? ' show banner--error' : '')} role="alert" aria-live="polite">
               <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 8v5M12 16h.01" /></svg></span>
               <span>{erro}</span>
             </div>
+            {senhaTrocada ? (
+              <button type="submit" className="btn" disabled={busy}>
+                {busy ? <span className="spinner" aria-hidden="true" /> : <span>Concluir</span>}
+              </button>
+            ) : (<>
             <div className="field">
               <label htmlFor="nova">Nova senha</label>
               <div className="control has-icon has-trailing">
@@ -94,6 +114,7 @@ export function AlterarSenha() {
             <button type="submit" className="btn" disabled={busy}>
               {busy ? <span className="spinner" aria-hidden="true" /> : <span>Salvar nova senha</span>}
             </button>
+            </>)}
           </form>
         </div>
       </section>

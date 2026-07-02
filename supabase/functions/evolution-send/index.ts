@@ -98,6 +98,11 @@ Deno.serve(async (req) => {
     const corr = (globalThis.crypto?.randomUUID?.() ?? String(Date.now())).slice(0, 8);
 
     const admin = adminClient();
+    // Guard de troca de senha obrigatória: operação sensível (envio) é rejeitada no BACKEND enquanto
+    // o usuário precisa trocar a senha — não confia só no ProtectedRoute do front. Exceções (ler perfil,
+    // trocar senha, logout) não passam por aqui.
+    const { data: perfil } = await admin.from('usuarios').select('deve_trocar_senha').eq('id', user.id).maybeSingle();
+    if (perfil?.deve_trocar_senha) return json({ error: 'Troque sua senha temporária antes de usar o sistema.', code: 'troca_senha_obrigatoria' }, 403);
     const { data: conv } = await admin.from('conversas').select('id, organizacao_id, contato_id, canal_id').eq('id', conversa_id).maybeSingle();
     if (!conv) return json({ error: 'Conversa não encontrada.' }, 404);
 

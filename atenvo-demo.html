@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Atenvo — Demonstração</title>
+<style>
+  :root{
+    --accent:#19C37D; --accent-ink:#0e9d63; --accent-soft:#e8f7ef; --accent-soft-2:#d8f0e4;
+    --wa:#1FA855; --wa-soft:#e7f6ee; --fb:#2563EB; --fb-soft:#e8f0fe; --purple:#7a5bb0;
+    --ok:#0e9d63; --ok-soft:#e7f6ef; --warn:#c2772a; --warn-soft:#fbeede; --err:#d6453f; --err-soft:#fbe8e7;
+    --info:#2563EB; --info-soft:#e9f0fe; --bar:#cfe9dc; --grid:#eceff4;
+    --bg:#f4f6f9; --surface:#ffffff; --surface-2:#f7f9fb; --hover:#f1f4f8;
+    --ink:#0f172a; --ink-2:#475569; --muted:#8a97a8; --line:#e8ecf2; --line-2:#dfe5ec; --logo-ink:#0f1f33;
+    --ring:rgba(25,195,125,.4); --shadow:0 1px 2px rgba(16,24,40,.05),0 1px 3px rgba(16,24,40,.05); --shadow-pop:0 12px 32px rgba(16,24,40,.16);
+  }
+  [data-theme="dark"]{
+    --accent-soft:rgba(25,195,125,.15); --accent-soft-2:rgba(25,195,125,.24); --wa-soft:rgba(31,168,85,.16); --fb-soft:rgba(37,99,235,.18);
+    --ok-soft:rgba(25,195,125,.16); --warn-soft:rgba(194,119,42,.20); --err-soft:rgba(214,69,63,.18); --info-soft:rgba(37,99,235,.16); --bar:#1f3a52; --grid:#1a2740;
+    --bg:#0a1220; --surface:#0f1a2c; --surface-2:#13203a; --hover:#172539; --ink:#eef2f8; --ink-2:#b3c0d2; --muted:#8294ac; --line:#21314a; --line-2:#2a3b57; --logo-ink:#f3f6fb;
+    --shadow:0 1px 2px rgba(0,0,0,.4); --shadow-pop:0 14px 36px rgba(0,0,0,.5);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:14px;-webkit-font-smoothing:antialiased}
+  button{font-family:inherit;cursor:pointer}
+  ::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-thumb{background:rgba(120,130,145,.3);border-radius:8px}
+  .demo-bar{position:fixed;top:0;left:0;right:0;height:28px;z-index:60;display:flex;align-items:center;justify-content:center;gap:8px;background:#7a5bb0;color:#fff;font-size:12.5px;font-weight:600;box-shadow:0 1px 4px rgba(0,0,0,.2)}
+  .demo-bar .d{width:7px;height:7px;border-radius:50%;background:#fff;opacity:.9}
+  .app{display:flex;height:100dvh;margin-top:28px;height:calc(100dvh - 28px)}
+  /* sidebar */
+  .sidebar{width:236px;flex:none;background:var(--surface);border-right:1px solid var(--line);padding:18px 14px 14px;display:flex;flex-direction:column}
+  .brand{display:flex;align-items:center;gap:9px;padding:2px 6px 0}
+  .mark{width:30px;height:30px;border-radius:9px;background:var(--accent);display:flex;align-items:center;justify-content:center;color:#04130c;font-weight:800;font-size:16px}
+  .logo-text{font-size:22px;font-weight:600;color:var(--logo-ink);letter-spacing:-.02em}
+  .brand-sub{font-size:11px;color:var(--muted);padding:4px 6px 0}
+  .nav{margin-top:18px;display:flex;flex-direction:column;gap:2px;flex:1;overflow-y:auto}
+  .nav-item{display:flex;align-items:center;gap:12px;padding:9px 11px;border-radius:10px;color:var(--ink-2);font-size:14px;font-weight:500;border:0;background:transparent;width:100%;text-align:left;transition:background .12s,color .12s}
+  .nav-item svg{width:20px;height:20px;color:var(--muted)}
+  .nav-item:hover{background:var(--hover)}
+  .nav-item.on{background:var(--accent-soft);color:var(--accent-ink)}
+  .nav-item.on svg{color:var(--accent)}
+  .side-foot{margin-top:8px;border-top:1px solid var(--line);padding-top:12px;display:flex;flex-direction:column;gap:10px}
+  .theme-row{display:flex;align-items:center;gap:9px;padding:0 4px;font-size:13px;color:var(--ink-2)}
+  .tsw{margin-left:auto;width:42px;height:24px;border-radius:999px;border:0;background:var(--accent);position:relative}
+  [data-theme="light"] .tsw{background:#cdd6e1}
+  .tsw .k{position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .16s;box-shadow:0 1px 2px rgba(0,0,0,.25)}
+  [data-theme="dark"] .tsw .k{left:21px}
+  .user{display:flex;align-items:center;gap:10px;padding:8px;border-radius:11px}
+  .av{display:inline-flex;align-items:center;justify-content:center;color:#fff;font-weight:600;font-size:12px;border-radius:50%;flex:none;width:34px;height:34px}
+  .user .nm{font-size:13.5px;font-weight:600;color:var(--ink)} .user .rl{font-size:12px;color:var(--muted)}
+  /* main */
+  .col-main{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden}
+  .topbar{display:flex;align-items:center;gap:14px;padding:16px 24px;border-bottom:1px solid var(--line);background:var(--surface)}
+  .page-title{font-size:19px;font-weight:600}.page-sub{font-size:13px;color:var(--muted);margin-top:2px}
+  .content{flex:1;min-height:0;overflow-y:auto;padding:20px 24px 28px}
+  .screen{display:none}.screen.on{display:block;animation:fade .2s}
+  @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1}}
+  /* generic */
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:14px}
+  .card-h{padding:16px 18px;border-bottom:1px solid var(--line)}.card-h h3{margin:0;font-size:15px;font-weight:600}.card-h p{margin:3px 0 0;font-size:12.5px;color:var(--muted)}
+  .btn{height:38px;padding:0 14px;border-radius:9px;border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:7px}
+  .btn:hover{background:var(--hover)}
+  .btn.acc{background:var(--accent);border-color:var(--accent);color:#04130c}
+  .btn.sm{height:32px;padding:0 11px;font-size:12.5px}
+  .btn.danger{color:var(--err);border-color:var(--err)} .btn.danger:hover{background:var(--err-soft)}
+  .badge{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:999px;white-space:nowrap}
+  .badge .dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+  .badge.ok{background:var(--ok-soft);color:var(--ok)} .badge.warn{background:var(--warn-soft);color:var(--warn)} .badge.err{background:var(--err-soft);color:var(--err)}
+  .badge.blue{background:var(--info-soft);color:var(--info)} .badge.neutral{background:var(--surface-2);color:var(--muted);border:1px solid var(--line-2)}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin-bottom:16px}
+  .kpi{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:15px 16px}
+  .kpi .l{font-size:12.5px;color:var(--muted)}.kpi .v{font-size:22px;font-weight:600;margin:4px 0 3px;letter-spacing:-.01em}
+  .kpi .delta{font-size:12px;font-weight:600}.delta.up{color:var(--ok)}.delta.down{color:var(--err)}.delta.flat{color:var(--muted)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{text-align:left;font-size:11px;font-weight:600;color:var(--muted);padding:12px 14px;border-bottom:1px solid var(--line);white-space:nowrap}
+  td{padding:12px 14px;border-bottom:1px solid var(--line);color:var(--ink-2)}
+  tr:last-child td{border-bottom:0}
+  tbody tr:hover{background:var(--surface-2)}
+  .cellnm{font-weight:600;color:var(--ink)}
+  .toolbar{display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+  .search{display:flex;align-items:center;gap:8px;height:38px;padding:0 12px;border:1px solid var(--line-2);border-radius:9px;background:var(--surface);min-width:240px}
+  .search input{border:0;background:transparent;outline:none;color:var(--ink);font-size:13px;width:100%}
+  select.flt{height:38px;border:1px solid var(--line-2);border-radius:9px;background:var(--surface);color:var(--ink-2);font-size:13px;padding:0 12px}
+  .sp{margin-left:auto}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:1100px){.grid2{grid-template-columns:1fr}}
+  /* whatsapp */
+  .wa{display:grid;grid-template-columns:330px 1fr;gap:0;height:calc(100dvh - 28px - 120px);min-height:460px;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--surface)}
+  .wa-list{border-right:1px solid var(--line);display:flex;flex-direction:column;min-width:0}
+  .wa-list .hd{padding:12px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
+  .wa-items{overflow-y:auto;flex:1}
+  .ci{display:flex;gap:11px;padding:11px 13px;border-bottom:1px solid var(--line);cursor:pointer}
+  .ci:hover,.ci.on{background:var(--surface-2)}
+  .ci .mid{flex:1;min-width:0}.ci .top{display:flex;justify-content:space-between;gap:8px}
+  .ci .nm{font-weight:600;color:var(--ink);font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ci .hr{font-size:11px;color:var(--muted);flex:none}
+  .ci .pv{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+  .ci .meta{display:flex;gap:6px;align-items:center;margin-top:5px}
+  .unread{background:var(--accent);color:#04130c;font-size:10.5px;font-weight:700;border-radius:999px;min-width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;padding:0 5px}
+  .wa-thread{display:flex;flex-direction:column;min-width:0}
+  .th-hd{padding:13px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:11px}
+  .th-body{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:9px;background:var(--surface-2)}
+  .msg{max-width:74%;padding:9px 12px;border-radius:12px;font-size:13px;line-height:1.45;box-shadow:var(--shadow)}
+  .msg .t{font-size:10px;color:var(--muted);margin-top:4px;text-align:right}
+  .msg.in{align-self:flex-start;background:var(--surface);border:1px solid var(--line)}
+  .msg.out{align-self:flex-end;background:var(--accent-soft);border:1px solid var(--accent-soft-2)}
+  .th-foot{padding:12px 14px;border-top:1px solid var(--line);display:flex;gap:9px}
+  .th-foot input{flex:1;height:40px;border:1px solid var(--line-2);border-radius:10px;background:var(--surface-2);padding:0 13px;color:var(--ink);outline:none}
+  .empty{padding:40px 16px;text-align:center;color:var(--muted)}
+  /* kanban */
+  .board{display:flex;gap:12px;overflow-x:auto;padding-bottom:8px}
+  .col{flex:0 0 230px;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;max-height:calc(100dvh - 28px - 150px)}
+  .col-h{padding:11px 13px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line)}
+  .col-h .ct{margin-left:auto;font-size:11px;color:var(--muted);background:var(--surface);border:1px solid var(--line-2);border-radius:999px;padding:1px 8px}
+  .col-b{padding:10px;display:flex;flex-direction:column;gap:9px;overflow-y:auto;flex:1;min-height:60px}
+  .kc{background:var(--surface);border:1px solid var(--line-2);border-radius:10px;padding:11px;cursor:grab;box-shadow:var(--shadow)}
+  .kc:active{cursor:grabbing}
+  .kc.drag{opacity:.4}
+  .kc .nm{font-weight:600;font-size:13px;color:var(--ink)}
+  .kc .vl{font-size:13px;color:var(--accent-ink);font-weight:600;margin-top:3px}
+  .kc .mt{display:flex;gap:6px;align-items:center;margin-top:8px;flex-wrap:wrap}
+  .pill{font-size:11px;color:var(--ink-2);background:var(--surface-2);border:1px solid var(--line-2);border-radius:999px;padding:2px 8px}
+  .col.dragover{outline:2px dashed var(--accent);outline-offset:-3px}
+  /* bars / funnel */
+  .barlist{display:flex;flex-direction:column;gap:10px;padding:14px 0}
+  .brow{display:grid;grid-template-columns:150px 1fr 64px;align-items:center;gap:10px}
+  .brow .bn{font-size:12.5px;color:var(--ink-2)}
+  .btrack{height:11px;border-radius:6px;background:var(--surface-2);overflow:hidden}.btrack i{display:block;height:100%;background:var(--accent);border-radius:6px}
+  .brow .bv{font-size:12.5px;font-weight:600;text-align:right}
+  .funnel{display:flex;flex-direction:column;gap:8px;padding:8px 0}
+  .frow{display:flex;align-items:center;gap:11px}.frow .fn{width:150px;font-size:12.5px;color:var(--ink-2)}
+  .fbar{flex:1;height:24px;background:var(--surface-2);border-radius:7px;overflow:hidden}.fbar i{display:block;height:100%;background:var(--accent)}
+  .frow .fv{width:42px;text-align:right;font-weight:600}
+  /* tabs (config) */
+  .tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:16px;flex-wrap:wrap}
+  .tabs button{height:36px;padding:0 14px;border:0;background:transparent;color:var(--ink-2);font-size:13.5px;font-weight:500;border-bottom:2px solid transparent;margin-bottom:-1px}
+  .tabs button.on{color:var(--accent-ink);border-bottom-color:var(--accent);font-weight:600}
+  .tabpane{display:none}.tabpane.on{display:block}
+  .toggle-row{display:flex;align-items:center;gap:14px;padding:13px 0;border-bottom:1px solid var(--line)}
+  .toggle-row .tx{flex:1}.toggle-row .t{font-weight:600;font-size:13.5px}.toggle-row .d{font-size:12.5px;color:var(--muted)}
+  .bigsw{width:44px;height:25px;border-radius:999px;border:0;background:var(--line-2);position:relative}.bigsw.on{background:var(--accent)}
+  .bigsw .k{position:absolute;top:3px;left:3px;width:19px;height:19px;border-radius:50%;background:#fff;transition:left .16s}.bigsw.on .k{left:22px}
+  /* modal + toast */
+  .backdrop{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:80;padding:20px}
+  .backdrop.show{display:flex}
+  .modal{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow-pop);width:100%;max-width:460px;overflow:hidden}
+  .modal .mh{padding:18px 20px;border-bottom:1px solid var(--line);font-size:16px;font-weight:600}
+  .modal .mb{padding:18px 20px;font-size:13.5px;color:var(--ink-2);line-height:1.55}
+  .modal .mf{padding:14px 20px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px}
+  .field{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}.field label{font-size:12.5px;font-weight:600;color:var(--ink-2)}
+  .field .ctrl{height:40px;border:1px solid var(--line-2);border-radius:9px;background:var(--surface-2);padding:0 12px;color:var(--ink);outline:none}
+  .toasts{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:90;display:flex;flex-direction:column;gap:8px;align-items:center}
+  .toast{background:#1f2937;color:#fff;font-size:13px;font-weight:500;padding:10px 16px;border-radius:10px;box-shadow:var(--shadow-pop);max-width:420px}
+  [data-theme="dark"] .toast{background:#22324a;border:1px solid var(--line-2)}
+  .sechead{font-size:14px;font-weight:600;margin:18px 0 12px}
+  @media(max-width:860px){
+    .sidebar{width:64px;padding:14px 8px}.logo-text,.brand-sub,.nav-item span,.theme-row span,.user .meta{display:none}
+    .nav-item{justify-content:center;padding:11px 0}.brand{justify-content:center}.user{justify-content:center}
+    .wa{grid-template-columns:1fr}.wa-thread{display:none}.wa.show-thread .wa-list{display:none}.wa.show-thread .wa-thread{display:flex}
+    .grid2{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+  <div class="demo-bar"><span class="d"></span> DEMO — Ambiente com dados fictícios</div>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand"><span class="mark">A</span><span class="logo-text">Atenvo</span></div>
+      <div class="brand-sub">Plataforma de Atendimento e Gestão</div>
+      <nav class="nav" id="nav"></nav>
+      <div class="side-foot">
+        <div class="theme-row"><span>Tema</span><button class="tsw" id="tsw" onclick="toggleTheme()"><span class="k"></span></button></div>
+        <div class="user"><span class="av" style="background:#3f6f52">M</span><div class="meta"><div class="nm">Matheus</div><div class="rl">Administrador</div></div></div>
+      </div>
+    </aside>
+    <main class="col-main">
+      <div class="topbar"><div><div class="page-title" id="ptitle">WhatsApp</div><div class="page-sub" id="psub">Central de atendimento</div></div>
+        <div class="sp"></div><button class="btn" onclick="simulado()">Exportar</button><button class="btn acc" onclick="simulado()">Nova ação</button></div>
+      <div class="content" id="content"></div>
+    </main>
+  </div>
+
+  <div class="backdrop" id="backdrop" onclick="if(event.target===this)closeModal()"><div class="modal" id="modal"></div></div>
+  <div class="toasts" id="toasts"></div>
+
+<script>
+/* ====================== Dados fictícios ====================== */
+const EQUIPE = [{n:'Matheus',r:'Administrador',c:'#3f6f52'},{n:'Marina',r:'Supervisora',c:'#7a5bb0'},{n:'Carlos',r:'Atendente',c:'#c2693a'}];
+const CHIPS = [
+  {nome:'Chip 1 — Tráfego Matheus',num:'(11) 99955-1001',tipo:'Tráfego',gestor:'Matheus',st:'conectado'},
+  {nome:'Chip 2 — Tráfego Marina',num:'(11) 98844-2002',tipo:'Tráfego',gestor:'Marina',st:'conectado'},
+  {nome:'Chip 3 — Sistema URA',num:'(11) 97733-3003',tipo:'URA',gestor:'—',st:'conectado'},
+  {nome:'Facebook Demo — Central Financeira',num:'Página Messenger',tipo:'Facebook',gestor:'Marina',st:'conectado'},
+];
+const ORIGENS = ['Tráfego 1','Tráfego 2','Sistema URA','Orgânico','Indicação','Facebook'];
+const STCONV = ['Aberta','Em atendimento','Resolvida','Sem resposta'];
+const NOMES = ['João Silva','Maria Oliveira','Carlos Eduardo','Juliana Mendes','Bruno Lima','Patrícia Souza','Rafael Costa','Fernanda Alves','Lucas Pereira','Camila Rocha','Diego Santos','Aline Castro','Marcelo Dias','Tatiane Gomes','Vinícius Melo','Beatriz Nunes','Gabriel Pinto','Larissa Freitas','André Barbosa','Renata Lopes','Felipe Cardoso','Sabrina Teixeira','Rodrigo Martins','Eduarda Ramos','Thiago Moreira','Priscila Cunha'];
+function tel(i){return '+55 (11) 9'+(8000+i*131%2000).toString().padStart(4,'0')+'-'+(1000+i*97%9000).toString().padStart(4,'0');}
+function cpf(i){return '***.'+((i*137)%900+100)+'.'+((i*53)%900+100)+'-**';}
+
+const CONVERSAS = [
+  {nome:'João Silva',chip:0,resp:'Matheus',st:'Em atendimento',hr:'09:42',pv:'Perfeito, vou enviar os documentos.',un:0,msgs:[['in','Olá, vi o anúncio sobre revisão de contrato.','09:31'],['out','Oi João! Posso te ajudar com a renegociação. Você tem o número do contrato?','09:34'],['in','Tenho sim, é o 4471-AC.','09:38'],['out','Ótimo. Vou analisar e já te retorno com a simulação de economia.','09:40'],['in','Perfeito, vou enviar os documentos.','09:42']]},
+  {nome:'Maria Oliveira',chip:1,resp:'Marina',st:'Aberta',hr:'09:20',pv:'Qual o valor da parcela?',un:2,msgs:[['in','Bom dia! Recebi o contato pelo tráfego.','09:15'],['in','Qual o valor da parcela?','09:20']]},
+  {nome:'Carlos Eduardo',chip:2,resp:'Carlos',st:'Resolvida',hr:'Ontem',pv:'Obrigado pelo atendimento!',un:0,msgs:[['in','A URA me transferiu pra cá.','Ontem'],['out','Olá Carlos! Já localizei seu cadastro. Seu acordo foi aprovado.','Ontem'],['in','Obrigado pelo atendimento!','Ontem']]},
+  {nome:'Juliana Mendes',chip:0,resp:'Matheus',st:'Sem resposta',hr:'08:05',pv:'Vocês trabalham com cartão consignado?',un:1,msgs:[['in','Vocês trabalham com cartão consignado?','08:05']]},
+  {nome:'Bruno Lima',chip:1,resp:'Marina',st:'Em atendimento',hr:'10:11',pv:'Fechado, pode emitir.',un:0,msgs:[['in','Quero seguir com a proposta.','10:02'],['out','Maravilha! Vou gerar o contrato com 50% do valor economizado.','10:08'],['in','Fechado, pode emitir.','10:11']]},
+  {nome:'Patrícia Souza',chip:3,resp:'Marina',st:'Aberta',hr:'10:25',pv:'Vim pelo Facebook 🙂',un:1,msgs:[['in','Vim pelo Facebook 🙂','10:25']]},
+  {nome:'Rafael Costa',chip:2,resp:'Carlos',st:'Sem resposta',hr:'07:48',pv:'Alguém pode me ligar?',un:1,msgs:[['in','Alguém pode me ligar?','07:48']]},
+  {nome:'Fernanda Alves',chip:0,resp:'Carlos',st:'Resolvida',hr:'Ontem',pv:'Assinei a procuração.',un:0,msgs:[['out','Fernanda, enviei o link da procuração digital.','Ontem'],['in','Assinei a procuração.','Ontem']]},
+];
+const FBCONV = [
+  {nome:'Patrícia Souza',resp:'Marina',st:'Aberta',hr:'10:25',pv:'Vim pelo Facebook 🙂'},
+  {nome:'Otávio Ramos',resp:'Marina',st:'Em atendimento',hr:'09:50',pv:'Quero saber sobre revisão.'},
+  {nome:'Helena Dias',resp:'Carlos',st:'Resolvida',hr:'Ontem',pv:'Obrigada!'},
+];
+const KCOLS = ['Lead novo','Contato iniciado','Reunião','Documentação','Contratos','Procurações','Fechado','Remarketing'];
+let CARDS = [
+  {id:1,nome:'João Silva',vl:750,resp:'Matheus',or:'Tráfego 1',col:0},
+  {id:2,nome:'Maria Oliveira',vl:620,resp:'Marina',or:'Tráfego 2',col:0},
+  {id:3,nome:'Juliana Mendes',vl:540,resp:'Matheus',or:'Tráfego 1',col:1},
+  {id:4,nome:'Bruno Lima',vl:900,resp:'Marina',or:'Tráfego 2',col:2},
+  {id:5,nome:'Rafael Costa',vl:430,resp:'Carlos',or:'Sistema URA',col:1},
+  {id:6,nome:'Patrícia Souza',vl:690,resp:'Marina',or:'Facebook',col:2},
+  {id:7,nome:'Fernanda Alves',vl:380,resp:'Carlos',or:'Orgânico',col:3},
+  {id:8,nome:'Lucas Pereira',vl:1100,resp:'Matheus',or:'Indicação',col:4},
+  {id:9,nome:'Camila Rocha',vl:820,resp:'Marina',or:'Tráfego 2',col:5},
+  {id:10,nome:'Diego Santos',vl:560,resp:'Carlos',or:'Sistema URA',col:6},
+  {id:11,nome:'Aline Castro',vl:740,resp:'Marina',or:'Tráfego 2',col:6},
+  {id:12,nome:'Marcelo Dias',vl:300,resp:'Carlos',or:'Sistema URA',col:7},
+  {id:13,nome:'Beatriz Nunes',vl:980,resp:'Matheus',or:'Tráfego 1',col:3},
+  {id:14,nome:'Gabriel Pinto',vl:450,resp:'Carlos',or:'Orgânico',col:1},
+  {id:15,nome:'Renata Lopes',vl:1300,resp:'Matheus',or:'Indicação',col:6},
+];
+const CONTRATOS = [
+  {cli:'Lucas Pereira',vm:550,pg:5,tot:6,st:'Ativo'},{cli:'Camila Rocha',vm:410,pg:3,tot:6,st:'Ativo'},
+  {cli:'Diego Santos',vm:620,pg:6,tot:6,st:'Concluída'},{cli:'Aline Castro',vm:380,pg:2,tot:6,st:'Atrasada'},
+  {cli:'Renata Lopes',vm:900,pg:4,tot:6,st:'Ativo'},{cli:'Felipe Cardoso',vm:470,pg:0,tot:6,st:'Cancelada'},
+  {cli:'Beatriz Nunes',vm:700,pg:1,tot:6,st:'Atrasada'},
+];
+const REL_CHIP = [
+  {chip:'Chip 1 — Tráfego Matheus',leads:142,conv:11.3,fech:16,rec:24800,qual:48},
+  {chip:'Chip 2 — Tráfego Marina',leads:96,conv:21.9,fech:21,rec:31200,qual:57},
+  {chip:'Chip 3 — Sistema URA',leads:188,conv:6.4,fech:12,rec:14600,qual:22},
+  {chip:'Facebook Demo',leads:71,conv:14.1,fech:10,rec:16900,qual:39},
+];
+const REL_EQUIPE = [
+  {n:'Matheus',resp:120,fech:16,rec:39800},{n:'Marina',resp:138,fech:24,rec:31200},{n:'Carlos',resp:205,fech:9,rec:11600},
+];
+const SCRIPTS = [
+  {cat:'Abertura',t:'Saudação inicial',c:'Olá! Aqui é da Central Financeira. Como posso te ajudar hoje?'},
+  {cat:'Abertura',t:'Retorno de lead',c:'Oi {nome}! Vi que você demonstrou interesse na revisão de contrato. Podemos conversar?'},
+  {cat:'Negociação',t:'Simulação de economia',c:'Com base no seu contrato, conseguimos uma economia estimada de {valor}. Quer que eu detalhe?'},
+  {cat:'Negociação',t:'Honorários',c:'Nossos honorários são 50% do valor economizado, parcelados em 6x — só paga se economizar.'},
+  {cat:'Fechamento',t:'Envio de contrato',c:'Perfeito! Estou enviando o contrato digital. Assim que assinar, iniciamos o processo.'},
+  {cat:'Fechamento',t:'Procuração',c:'Para seguir, preciso da procuração assinada. Te envio o link agora mesmo.'},
+];
+
+/* ====================== Infra UI ====================== */
+const NAV = [
+  ['whatsapp','WhatsApp','M12 2a9.9 9.9 0 0 0-8.5 15l-1.3 4.8 4.9-1.3A9.9 9.9 0 1 0 12 2z',1],
+  ['facebook','Facebook','M22 12a10 10 0 1 0-11.6 9.9v-7H8v-2.9h2.4V9.8c0-2.4 1.4-3.7 3.6-3.7 1 0 2.1.2 2.1.2v2.3h-1.2c-1.2 0-1.5.7-1.5 1.4V12H16l-.4 2.9h-2.2v7A10 10 0 0 0 22 12z',1],
+  ['kanban','Kanban','',0],['contatos','Contatos','',0],['scripts','Scripts','',0],['cobrancas','Cobranças','',0],
+  ['integracoes','Integrações','',0],['relatorios','Relatórios','',0],['configuracoes','Configurações','',0],['plano','Plano e uso','',0],
+];
+const ICON = {
+  kanban:'<rect x="3" y="4" width="5" height="16" rx="1.3"/><rect x="10" y="4" width="5" height="11" rx="1.3"/><rect x="17" y="4" width="4" height="14" rx="1.3"/>',
+  contatos:'<circle cx="9" cy="8" r="3.2"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.2a3.2 3.2 0 0 1 0 6.3M21.5 20a6.5 6.5 0 0 0-4-6"/>',
+  scripts:'<rect x="4" y="3" width="16" height="18" rx="2.2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
+  cobrancas:'<circle cx="12" cy="12" r="9"/><path d="M12 7v10M14.6 9.3c-.7-.9-3.7-1.4-3.7.6 0 1.9 3.7 1 3.7 2.9 0 2-3 1.5-3.7.6"/>',
+  integracoes:'<path d="M10.5 13.5a4.5 4.5 0 0 0 6.4 0l2.3-2.3a4.5 4.5 0 0 0-6.4-6.4L11.5 6"/><path d="M13.5 10.5a4.5 4.5 0 0 0-6.4 0l-2.3 2.3a4.5 4.5 0 0 0 6.4 6.4L12.5 18"/>',
+  relatorios:'<path d="M4 20V4M4 20h16"/><rect x="7" y="11" width="3" height="6" rx="1"/><rect x="12" y="7" width="3" height="10" rx="1"/><rect x="17" y="13" width="3" height="4" rx="1"/>',
+  configuracoes:'<circle cx="12" cy="12" r="3"/><path d="M19.4 13a1.6 1.6 0 0 0 .3 1.8 2 2 0 1 1-2.8 2.8 1.6 1.6 0 0 0-2.7 1.1V20a2 2 0 1 1-4 0 1.6 1.6 0 0 0-2.6-1.2 2 2 0 1 1-2.8-2.8A1.6 1.6 0 0 0 4 13a2 2 0 1 1 0-4 1.6 1.6 0 0 0 1.5-2.6 2 2 0 1 1 2.8-2.8A1.6 1.6 0 0 0 11 4V4a2 2 0 1 1 4 0 1.6 1.6 0 0 0 2.7 1.1 2 2 0 1 1 2.8 2.8A1.6 1.6 0 0 0 20 11h.1a2 2 0 1 1 0 4z"/>',
+  plano:'<rect x="2.5" y="5.5" width="19" height="13" rx="2.4"/><path d="M2.5 9.5h19"/>',
+};
+const SUB = {whatsapp:'Central de atendimento',facebook:'Messenger',kanban:'Funil comercial',contatos:'Base de clientes',scripts:'Respostas prontas',cobrancas:'Recebimentos recorrentes',integracoes:'Conexões e canais',relatorios:'Inteligência do negócio',configuracoes:'Preferências e equipe',plano:'Assinatura e limites'};
+const fmtBRL=n=>n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const avc=n=>{const e=EQUIPE.find(x=>x.n===n);if(e)return e.c;let h=0;for(let i=0;i<n.length;i++)h=(h*31+n.charCodeAt(i))>>>0;return ['#5b6ee1','#c2693a','#2f8f9d','#b0566f','#4a7a4a'][h%5];};
+const ini=n=>{const p=n.trim().split(/\s+/);return((p[0]||'')[0]+((p[1]||'')[0]||'')).toUpperCase();};
+const stCls=s=>({'Aberta':'blue','Em atendimento':'warn','Resolvida':'ok','Sem resposta':'err','Ativo':'ok','Concluída':'neutral','Atrasada':'err','Cancelada':'neutral'}[s]||'neutral');
+
+function toast(m){const w=document.getElementById('toasts');const t=document.createElement('div');t.className='toast';t.textContent=m;w.appendChild(t);setTimeout(()=>t.remove(),2600);}
+function simulado(){toast('Esta ação está simulada no ambiente de demonstração.');}
+function modal(html){document.getElementById('modal').innerHTML=html;document.getElementById('backdrop').classList.add('show');}
+function closeModal(){document.getElementById('backdrop').classList.remove('show');}
+function toggleTheme(){const h=document.documentElement;h.dataset.theme=h.dataset.theme==='dark'?'light':'dark';}
+
+/* ====================== Navegação ====================== */
+function buildNav(){
+  document.getElementById('nav').innerHTML=NAV.map(([id,label,fill,filled],i)=>{
+    const path=filled?`<path d="${fill}"/>`:(ICON[id]||'');
+    const svg=`<svg viewBox="0 0 24 24" ${filled?'fill="currentColor"':'fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"'}>${path}</svg>`;
+    return `<button class="nav-item${i===0?' on':''}" data-id="${id}" onclick="go('${id}')">${svg}<span>${label}</span></button>`;
+  }).join('');
+}
+function go(id){
+  document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('on',b.dataset.id===id));
+  document.getElementById('ptitle').textContent=NAV.find(n=>n[0]===id)[1];
+  document.getElementById('psub').textContent=SUB[id]||'';
+  render(id);
+}
+function render(id){document.getElementById('content').innerHTML=(SCREENS[id]||(()=>'<div class="empty">Em breve.</div>'))();afterRender[id]&&afterRender[id]();}
+const afterRender={};
+
+/* ====================== Telas ====================== */
+const SCREENS={};
+let waFilterSt='',waFilterChip='',waSel=0;
+SCREENS.whatsapp=()=>{
+  return `<div class="wa" id="wa">
+    <div class="wa-list">
+      <div class="hd">
+        <div class="search"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3-3"/></svg><input id="waSearch" placeholder="Buscar conversa..." oninput="renderWaList()"></div>
+        <div style="display:flex;gap:8px">
+          <select class="flt" style="flex:1" id="waSt" onchange="waFilterSt=this.value;renderWaList()"><option value="">Status: todos</option>${STCONV.map(s=>`<option>${s}</option>`).join('')}</select>
+          <select class="flt" style="flex:1" id="waChip" onchange="waFilterChip=this.value;renderWaList()"><option value="">Chip: todos</option>${CHIPS.slice(0,3).map((c,i)=>`<option value="${i}">${c.nome.split(' — ')[0]}</option>`).join('')}</select>
+        </div>
+      </div>
+      <div class="wa-items" id="waItems"></div>
+    </div>
+    <div class="wa-thread" id="waThread"></div>
+  </div>`;
+};
+afterRender.whatsapp=()=>{renderWaList();openConversa(waSel);};
+function renderWaList(){
+  const q=(document.getElementById('waSearch')?.value||'').toLowerCase();
+  const items=CONVERSAS.map((c,i)=>({...c,i})).filter(c=>(!q||c.nome.toLowerCase().includes(q))&&(!waFilterSt||c.st===waFilterSt)&&(waFilterChip===''||c.chip==+waFilterChip));
+  const el=document.getElementById('waItems');
+  el.innerHTML=items.length?items.map(c=>`<div class="ci${c.i===waSel?' on':''}" onclick="openConversa(${c.i})">
+    <span class="av" style="background:${avc(c.nome)}">${ini(c.nome)}</span>
+    <div class="mid"><div class="top"><span class="nm">${c.nome}</span><span class="hr">${c.hr}</span></div>
+    <div class="pv">${c.pv}</div>
+    <div class="meta"><span class="badge ${stCls(c.st)}" style="font-size:10px;padding:2px 7px">${c.st}</span><span class="pill" style="font-size:10px">${CHIPS[c.chip].nome.split(' — ')[0]}</span>${c.un?`<span class="unread" style="margin-left:auto">${c.un}</span>`:''}</div></div>
+  </div>`).join(''):'<div class="empty">Nenhuma conversa.</div>';
+}
+function openConversa(i){waSel=i;const c=CONVERSAS[i];document.getElementById('wa')?.classList.add('show-thread');
+  document.querySelectorAll('.ci').forEach(x=>x.classList.remove('on'));
+  const t=document.getElementById('waThread');if(!t)return;
+  t.innerHTML=`<div class="th-hd"><span class="av" style="background:${avc(c.nome)}">${ini(c.nome)}</span>
+    <div style="flex:1"><div style="font-weight:600">${c.nome}</div><div style="font-size:12px;color:var(--muted)">${CHIPS[c.chip].nome} · Responsável: ${c.resp}</div></div>
+    <span class="badge ${stCls(c.st)}">${c.st}</span></div>
+   <div class="th-body" id="thBody">${c.msgs.map(m=>`<div class="msg ${m[0]}">${m[1]}<div class="t">${m[2]}</div></div>`).join('')}</div>
+   <div class="th-foot"><input id="msgIn" placeholder="Digite uma mensagem..." onkeydown="if(event.key==='Enter')sendMsg()"><button class="btn acc" onclick="sendMsg()">Enviar</button><button class="btn" onclick="simulado()" title="Anexo">📎</button></div>`;
+  renderWaList();
+}
+function sendMsg(){const inp=document.getElementById('msgIn');const v=(inp.value||'').trim();if(!v)return;
+  const c=CONVERSAS[waSel];const hr=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  c.msgs.push(['out',v,hr]);c.pv=v;c.un=0;inp.value='';
+  const b=document.getElementById('thBody');b.insertAdjacentHTML('beforeend',`<div class="msg out">${v}<div class="t">${hr} ✓</div></div>`);b.scrollTop=b.scrollHeight;renderWaList();toast('Mensagem fictícia enviada.');}
+
+SCREENS.facebook=()=>`<div class="card"><div class="card-h"><h3>Facebook Messenger</h3><p>Conversas da Página — Central Financeira Demo</p></div>
+  ${FBCONV.map(c=>`<div class="ci" onclick="simulado()"><span class="av" style="background:${avc(c.nome)}">${ini(c.nome)}</span>
+   <div class="mid"><div class="top"><span class="nm">${c.nome}</span><span class="hr">${c.hr}</span></div><div class="pv">${c.pv}</div>
+   <div class="meta"><span class="badge ${stCls(c.st)}" style="font-size:10px;padding:2px 7px">${c.st}</span><span class="pill" style="font-size:10px">Responsável: ${c.resp}</span></div></div></div>`).join('')}
+  <div style="padding:14px 16px"><span class="badge ok"><span class="dot"></span>Página conectada</span></div></div>`;
+
+SCREENS.kanban=()=>`<div class="board" id="board"></div>`;
+afterRender.kanban=()=>renderBoard();
+function renderBoard(){
+  const b=document.getElementById('board');
+  b.innerHTML=KCOLS.map((col,ci)=>{
+    const cards=CARDS.filter(c=>c.col===ci);
+    return `<div class="col" data-col="${ci}" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="dropCard(event,${ci})">
+      <div class="col-h">${col}<span class="ct">${cards.length}</span></div>
+      <div class="col-b">${cards.map(c=>`<div class="kc" draggable="true" data-id="${c.id}" ondragstart="dragStart(event,${c.id})" ondragend="this.classList.remove('drag')" onclick="openCardInfo(${c.id})">
+        <div class="nm">${c.nome}</div><div class="vl">${fmtBRL(c.vl)}</div>
+        <div class="mt"><span class="pill">${c.or}</span><span class="pill">${c.resp}</span></div></div>`).join('')}</div></div>`;
+  }).join('');
+}
+let dragId=null;
+function dragStart(e,id){dragId=id;e.currentTarget.classList.add('drag');e.dataTransfer.effectAllowed='move';}
+function dropCard(e,col){e.preventDefault();document.querySelectorAll('.col').forEach(c=>c.classList.remove('dragover'));
+  const c=CARDS.find(x=>x.id===dragId);if(c&&c.col!==col){c.col=col;renderBoard();toast('Card movido para "'+KCOLS[col]+'" (apenas nesta sessão).');}dragId=null;}
+function openCardInfo(id){const c=CARDS.find(x=>x.id===id);modal(`<div class="mh">${c.nome}</div><div class="mb"><b>Valor:</b> ${fmtBRL(c.vl)}<br><b>Origem:</b> ${c.or}<br><b>Responsável:</b> ${c.resp}<br><b>Etapa:</b> ${KCOLS[c.col]}</div><div class="mf"><button class="btn" onclick="closeModal()">Fechar</button><button class="btn acc" onclick="simulado()">Avançar etapa</button></div>`);}
+
+SCREENS.contatos=()=>{
+  const rows=NOMES.map((n,i)=>({n,tel:tel(i+1),or:ORIGENS[i%ORIGENS.length],resp:EQUIPE[i%3].n,st:['Cliente','Lead','Lead','Cliente'][i%4]}));
+  window.__contatos=rows;
+  return `<div class="toolbar"><div class="search"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3-3"/></svg><input id="ctSearch" placeholder="Buscar contato..." oninput="renderContatos()"></div>
+   <select class="flt" id="ctOr" onchange="renderContatos()"><option value="">Origem: todas</option>${ORIGENS.map(o=>`<option>${o}</option>`).join('')}</select>
+   <span class="sp"></span><button class="btn acc" onclick="simulado()">Novo contato</button></div>
+   <div class="card"><table><thead><tr><th>Contato</th><th>Telefone</th><th>Origem</th><th>Responsável</th><th>Status</th></tr></thead><tbody id="ctBody"></tbody></table></div>`;
+};
+afterRender.contatos=()=>renderContatos();
+function renderContatos(){const q=(document.getElementById('ctSearch')?.value||'').toLowerCase();const fo=document.getElementById('ctOr')?.value||'';
+  const rows=window.__contatos.filter(r=>(!q||r.n.toLowerCase().includes(q))&&(!fo||r.or===fo));
+  document.getElementById('ctBody').innerHTML=rows.length?rows.map((r,i)=>`<tr style="cursor:pointer" onclick="openContato(${window.__contatos.indexOf(r)})">
+    <td><div style="display:flex;align-items:center;gap:10px"><span class="av" style="width:30px;height:30px;background:${avc(r.n)}">${ini(r.n)}</span><span class="cellnm">${r.n}</span></div></td>
+    <td>${r.tel}</td><td>${r.or}</td><td>${r.resp}</td><td><span class="badge ${r.st==='Cliente'?'ok':'blue'}">${r.st}</span></td></tr>`).join(''):'<tr><td colspan="5" class="empty">Nenhum contato.</td></tr>';}
+function openContato(i){const r=window.__contatos[i];modal(`<div class="mh">${r.n}</div><div class="mb"><b>Telefone:</b> ${r.tel}<br><b>CPF:</b> ${cpf(i+1)}<br><b>Origem:</b> ${r.or}<br><b>Responsável:</b> ${r.resp}<br><b>Status:</b> ${r.st}</div><div class="mf"><button class="btn" onclick="closeModal()">Fechar</button><button class="btn acc" onclick="simulado()">Abrir conversa</button></div>`);}
+
+SCREENS.scripts=()=>{const cats=[...new Set(SCRIPTS.map(s=>s.cat))];
+  return cats.map(cat=>`<div class="sechead">${cat}</div><div class="grid2">${SCRIPTS.filter(s=>s.cat===cat).map(s=>`<div class="card"><div class="card-h"><h3>${s.t}</h3></div><div style="padding:14px 18px;font-size:13px;color:var(--ink-2);line-height:1.5">${s.c}</div><div style="padding:0 18px 14px;display:flex;gap:8px"><button class="btn sm acc" onclick="toast('Script copiado (simulado).')">Usar</button><button class="btn sm" onclick="simulado()">Enviar</button></div></div>`).join('')}</div>`).join('');};
+
+SCREENS.cobrancas=()=>{
+  const recebida=CONTRATOS.reduce((s,c)=>s+c.vm*c.pg,0),prevista=CONTRATOS.filter(c=>c.st!=='Cancelada').reduce((s,c)=>s+c.vm*(c.tot-c.pg),0);
+  const atraso=CONTRATOS.filter(c=>c.st==='Atrasada').reduce((s,c)=>s+c.vm,0),economia=86400;
+  return `<div class="kpis">
+    <div class="kpi"><div class="l">Receita recebida</div><div class="v">${fmtBRL(recebida)}</div><div class="delta up">▲ +12% vs mês anterior</div></div>
+    <div class="kpi"><div class="l">Receita prevista</div><div class="v">${fmtBRL(prevista)}</div><div class="delta flat">Próximos ciclos</div></div>
+    <div class="kpi"><div class="l">Em atraso</div><div class="v">${fmtBRL(atraso)}</div><div class="delta down">▲ 2 parcelas</div></div>
+    <div class="kpi"><div class="l">Economia gerada</div><div class="v">${fmtBRL(economia)}</div><div class="delta up">▲ +9% vs mês anterior</div></div></div>
+   <div class="card"><div class="card-h"><h3>Contratos de cobrança</h3><p>Recebimentos recorrentes (controle interno).</p></div>
+   <table><thead><tr><th>Cliente</th><th>Valor mensal</th><th>Ciclos</th><th>Status</th><th></th></tr></thead><tbody>
+   ${CONTRATOS.map((c,i)=>`<tr><td class="cellnm">${c.cli}</td><td>${fmtBRL(c.vm)}</td><td>${c.pg} de ${c.tot} pagas</td><td><span class="badge ${stCls(c.st)}">${c.st}</span></td>
+     <td style="text-align:right">${c.st==='Ativo'||c.st==='Atrasada'?`<button class="btn sm acc" onclick="registrarPgto(${i})">Registrar pagamento</button>`:''}</td></tr>`).join('')}
+   </tbody></table></div>`;
+};
+function registrarPgto(i){const c=CONTRATOS[i];modal(`<div class="mh">Registrar pagamento</div><div class="mb">Baixa da parcela ${c.pg+1} de <b>${c.cli}</b> — ${fmtBRL(c.vm)}.<br>Pagamento integral (sem parcial nesta demo).</div><div class="mf"><button class="btn" onclick="closeModal()">Cancelar</button><button class="btn acc" onclick="confirmPgto(${i})">Confirmar pagamento</button></div>`);}
+function confirmPgto(i){const c=CONTRATOS[i];if(c.pg<c.tot)c.pg++;if(c.pg>=c.tot)c.st='Concluída';else if(c.st==='Atrasada')c.st='Ativo';closeModal();render('cobrancas');toast('Pagamento fictício registrado.');}
+
+SCREENS.integracoes=()=>`<div class="card" style="margin-bottom:16px"><div class="card-h"><h3>WhatsApp</h3><p>Conexões por QR Code (Evolution).</p></div>
+  ${CHIPS.slice(0,3).map(c=>`<div class="ci" style="cursor:default"><span class="av" style="background:var(--wa)"><svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M12 2a9.9 9.9 0 0 0-8.5 15l-1.3 4.8 4.9-1.3A9.9 9.9 0 1 0 12 2z"/></svg></span>
+   <div class="mid"><div class="nm">${c.nome}</div><div class="pv">${c.num} · ${c.tipo}${c.gestor!=='—'?' · Gestor: '+c.gestor:''}</div></div>
+   <div style="display:flex;gap:8px;align-items:center"><span class="badge ok"><span class="dot"></span>Conectado</span><button class="btn sm" onclick="simulado()">Configurar origem</button><button class="btn sm danger" onclick="simulado()">Remover</button></div></div>`).join('')}
+  <div style="padding:13px 16px"><button class="btn acc" onclick="simulado()">+ Conectar WhatsApp</button></div></div>
+  <div class="card"><div class="card-h"><h3>Facebook</h3><p>Páginas do Messenger.</p></div>
+  <div class="ci" style="cursor:default"><span class="av" style="background:var(--fb)"><svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M22 12a10 10 0 1 0-11.6 9.9v-7H8v-2.9h2.4V9.8c0-2.4 1.4-3.7 3.6-3.7 1 0 2.1.2 2.1.2v2.3h-1.2c-1.2 0-1.5.7-1.5 1.4V12H16l-.4 2.9h-2.2v7A10 10 0 0 0 22 12z"/></svg></span>
+   <div class="mid"><div class="nm">Central Financeira Demo</div><div class="pv">Página Messenger · Gestor: Marina</div></div>
+   <div style="display:flex;gap:8px;align-items:center"><span class="badge ok"><span class="dot"></span>Conectado</span><button class="btn sm" onclick="simulado()">Reconectar</button></div></div>
+  <div style="padding:13px 16px"><button class="btn acc" onclick="simulado()">+ Conectar com Facebook</button></div></div>`;
+
+SCREENS.relatorios=()=>{
+  const maxLead=Math.max(...REL_CHIP.map(c=>c.leads)),maxRec=Math.max(...REL_EQUIPE.map(e=>e.rec)),maxResp=Math.max(...REL_EQUIPE.map(e=>e.resp));
+  const recTot=REL_CHIP.reduce((s,c)=>s+c.rec,0);
+  return `<div class="kpis">
+    <div class="kpi"><div class="l">Receita recebida</div><div class="v">${fmtBRL(recTot)}</div><div class="delta up">▲ +14% vs mês anterior</div></div>
+    <div class="kpi"><div class="l">Clientes fechados</div><div class="v">${REL_CHIP.reduce((s,c)=>s+c.fech,0)}</div><div class="delta up">▲ +6 vs mês anterior</div></div>
+    <div class="kpi"><div class="l">Inadimplência</div><div class="v">7,4%</div><div class="delta up">▼ -1,2% vs mês anterior</div></div>
+    <div class="kpi"><div class="l">Economia gerada</div><div class="v">${fmtBRL(312800)}</div><div class="delta up">▲ +9% vs mês anterior</div></div></div>
+   <div class="grid2">
+    <div class="card"><div class="card-h"><h3>Leads por conexão</h3><p>Chip 1 recebe mais leads; URA tem maior volume bruto.</p></div><div style="padding:6px 18px 16px"><div class="barlist">${REL_CHIP.map(c=>`<div class="brow"><span class="bn">${c.chip.split(' — ')[0]}</span><div class="btrack"><i style="width:${c.leads/maxLead*100}%"></i></div><span class="bv">${c.leads}</span></div>`).join('')}</div></div></div>
+    <div class="card"><div class="card-h"><h3>Conversão por conexão</h3><p>Chip 2 converte mais; URA converte menos (menor qualificação).</p></div><div style="padding:6px 18px 16px"><div class="barlist">${REL_CHIP.map(c=>`<div class="brow"><span class="bn">${c.chip.split(' — ')[0]}</span><div class="btrack"><i style="width:${c.conv/22*100}%"></i></div><span class="bv">${c.conv.toFixed(1)}%</span></div>`).join('')}</div></div></div>
+   </div>
+   <div class="card" style="margin-top:16px"><div class="card-h"><h3>Desempenho por conexão de WhatsApp</h3></div>
+    <table><thead><tr><th>Conexão</th><th>Leads</th><th>Qualificação</th><th>Fechados</th><th>Conversão</th><th>Receita</th></tr></thead><tbody>
+    ${REL_CHIP.map(c=>`<tr><td class="cellnm">${c.chip}</td><td>${c.leads}</td><td>${c.qual}%</td><td>${c.fech}</td><td><span class="badge ok">${c.conv.toFixed(1)}%</span></td><td>${fmtBRL(c.rec)}</td></tr>`).join('')}</tbody></table></div>
+   <div class="grid2" style="margin-top:16px">
+    <div class="card"><div class="card-h"><h3>Conversas respondidas por atendente</h3><p>Carlos responde mais conversas.</p></div><div style="padding:6px 18px 16px"><div class="barlist">${REL_EQUIPE.map(e=>`<div class="brow"><span class="bn">${e.n}</span><div class="btrack"><i style="width:${e.resp/maxResp*100}%"></i></div><span class="bv">${e.resp}</span></div>`).join('')}</div></div></div>
+    <div class="card"><div class="card-h"><h3>Receita por atendente</h3><p>Matheus gera mais receita; Marina fecha mais clientes.</p></div><div style="padding:6px 18px 16px"><div class="barlist">${REL_EQUIPE.map(e=>`<div class="brow"><span class="bn">${e.n} · ${e.fech} fech.</span><div class="btrack"><i style="width:${e.rec/maxRec*100}%"></i></div><span class="bv">${(e.rec/1000).toFixed(0)}k</span></div>`).join('')}</div></div></div>
+   </div>`;
+};
+
+let cfgTab='conta';
+SCREENS.configuracoes=()=>{
+  return `<div class="tabs">${['conta','Conta','equipe','Equipe','canais','Canais','notif','Notificações','prefs','Preferências'].reduce((a,_,i,arr)=>{if(i%2)return a;a.push(`<button class="${cfgTab===arr[i]?'on':''}" onclick="cfgTab='${arr[i]}';render('configuracoes')">${arr[i+1]}</button>`);return a;},[]).join('')}</div>
+  <div class="tabpane ${cfgTab==='conta'?'on':''}"><div class="card"><div class="card-h"><h3>Perfil</h3></div><div style="padding:16px 18px;display:flex;align-items:center;gap:14px"><span class="av" style="width:54px;height:54px;font-size:18px;background:#3f6f52">M</span><div><div style="font-weight:600;font-size:16px">Matheus</div><div style="color:var(--muted);font-size:13px">Administrador · matheus@demo.atenvo</div></div><div class="sp"></div><button class="btn" onclick="simulado()">Alterar foto</button></div></div>
+   <div class="card" style="margin-top:16px"><div class="card-h"><h3>Empresa</h3></div><div style="padding:16px 18px;display:grid;grid-template-columns:1fr 1fr;gap:14px">
+   <div class="field"><label>Nome</label><input class="ctrl" value="Central Financeira Demo"></div><div class="field"><label>CNPJ</label><input class="ctrl" value="00.000.000/0001-00"></div>
+   <div class="field"><label>Fuso horário</label><input class="ctrl" value="America/Sao_Paulo"></div><div class="field"><label>Moeda</label><input class="ctrl" value="Real (R$)"></div></div>
+   <div style="padding:0 18px 16px"><button class="btn acc" onclick="toast('Dados salvos (simulado).')">Salvar alterações</button></div></div></div>
+  <div class="tabpane ${cfgTab==='equipe'?'on':''}"><div class="card"><div class="card-h"><h3>Membros da equipe</h3></div><table><thead><tr><th>Membro</th><th>Função</th><th>Status</th></tr></thead><tbody>
+   ${EQUIPE.map(e=>`<tr><td><div style="display:flex;align-items:center;gap:10px"><span class="av" style="width:30px;height:30px;background:${e.c}">${ini(e.n)}</span><span class="cellnm">${e.n}</span></div></td><td><span class="badge ${e.r==='Administrador'?'ok':e.r==='Supervisora'?'blue':'neutral'}">${e.r}</span></td><td><span class="badge ok"><span class="dot"></span>Ativo</span></td></tr>`).join('')}</tbody></table>
+   <div style="padding:13px 16px"><button class="btn acc" onclick="simulado()">Convidar membro</button></div></div></div>
+  <div class="tabpane ${cfgTab==='canais'?'on':''}"><div class="card"><div class="card-h"><h3>Canais conectados</h3></div>${CHIPS.map(c=>`<div class="ci" style="cursor:default"><div class="mid"><div class="nm">${c.nome}</div><div class="pv">${c.num} · ${c.tipo}</div></div><span class="badge ok"><span class="dot"></span>Conectado</span></div>`).join('')}<div style="padding:13px 16px"><button class="btn" onclick="go('integracoes')">Abrir Integrações</button></div></div></div>
+  <div class="tabpane ${cfgTab==='notif'?'on':''}"><div class="card"><div class="card-h"><h3>Notificações</h3></div><div style="padding:6px 18px">
+   ${['Novos contatos e leads','Mensagens não respondidas','Cobranças vencendo','Resumo diário','Notificações push'].map((t,i)=>`<div class="toggle-row"><div class="tx"><div class="t">${t}</div></div><button class="bigsw ${i%2?'':'on'}" onclick="this.classList.toggle('on')"><span class="k"></span></button></div>`).join('')}</div></div></div>
+  <div class="tabpane ${cfgTab==='prefs'?'on':''}"><div class="card"><div class="card-h"><h3>Preferências</h3></div><div style="padding:8px 18px">
+   <div class="toggle-row"><div class="tx"><div class="t">Tema</div><div class="d">Claro ou escuro.</div></div><button class="btn" onclick="toggleTheme()">Alternar tema</button></div>
+   ${['Mostrar dicas e tutoriais','Reproduzir sons'].map(t=>`<div class="toggle-row"><div class="tx"><div class="t">${t}</div></div><button class="bigsw on" onclick="this.classList.toggle('on')"><span class="k"></span></button></div>`).join('')}</div></div></div>`;
+};
+
+SCREENS.plano=()=>`<div class="grid2"><div class="card"><div class="card-h"><h3>Plano Atenvo</h3><p>Assinatura ativa.</p></div><div style="padding:18px"><div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:26px;font-weight:700">R$ 297</span><span style="color:var(--muted)">/mês</span><span class="badge ok" style="margin-left:auto"><span class="dot"></span>Ativa</span></div>
+  <ul style="list-style:none;padding:0;margin:16px 0 0;display:flex;flex-direction:column;gap:9px;font-size:13.5px;color:var(--ink-2)">
+  <li>✓ 2 conexões de WhatsApp incluídas</li><li>✓ 1 Página de Facebook</li><li>✓ Usuários ilimitados</li><li>✓ Relatórios completos</li></ul></div></div>
+  <div class="card"><div class="card-h"><h3>Uso do mês</h3></div><div style="padding:16px 18px;display:flex;flex-direction:column;gap:16px">
+  ${[['Conexões WhatsApp',3,3],['Página Facebook',1,1],['Mensagens',4280,10000]].map(([l,u,t])=>`<div><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px"><span>${l}</span><b>${u.toLocaleString('pt-BR')} / ${t.toLocaleString('pt-BR')}</b></div><div class="btrack"><i style="width:${Math.min(100,u/t*100)}%;${u/t>=1?'background:var(--warn)':''}"></i></div></div>`).join('')}
+  </div><div style="padding:0 18px 16px"><button class="btn acc" onclick="simulado()">Contratar adicional</button></div></div></div>`;
+
+buildNav();go('whatsapp');
+</script>
+</body>
+</html>
