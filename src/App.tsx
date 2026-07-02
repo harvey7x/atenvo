@@ -4,6 +4,7 @@ import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { RequireRole } from '@/components/RequireRole';
 import { Login } from '@/pages/Login';
 import { RedefinirSenha } from '@/pages/RedefinirSenha';
+import { AlterarSenha } from '@/pages/AlterarSenha';
 import { DefinirSenha } from '@/pages/DefinirSenha';
 import { WhatsApp } from '@/pages/WhatsApp';
 import { Facebook } from '@/pages/Facebook';
@@ -25,6 +26,8 @@ const routes: RouteObject[] = [
   {
     element: <ProtectedRoute />,
     children: [
+      // Troca de senha obrigatória: fora do AppShell (sem navegação) e o guard força vir para cá.
+      { path: 'alterar-senha', element: <AlterarSenha /> },
       {
         element: <AppShell />,
         children: [

@@ -20,6 +20,7 @@ export const DEMO_USER: SessionUser = {
   id: 'usr_henrique',
   name: 'Henrique',
   email: 'henrique@atenvo.com',
+  deveTrocarSenha: false,
 };
 
 export const DEMO_ORGS: Organization[] = [

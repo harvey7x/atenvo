@@ -34,13 +34,15 @@ async function buildSessionUser(u: { id: string; email?: string | null; user_met
   if (!u) return null;
   const metaName = ((u.user_metadata?.name as string | undefined) ?? '').trim();
   let nome = '';
+  let deveTrocarSenha = false;
   if (supabase) {
     try {
-      const { data } = await supabase.from('usuarios').select('nome').eq('id', u.id).maybeSingle();
+      const { data } = await supabase.from('usuarios').select('nome, deve_trocar_senha').eq('id', u.id).maybeSingle();
       nome = ((data?.nome as string | undefined) ?? '').trim();
+      deveTrocarSenha = Boolean((data as { deve_trocar_senha?: boolean } | null)?.deve_trocar_senha);
     } catch { /* mantém metaName */ }
   }
-  return { id: u.id, email: u.email ?? '', name: nome || metaName || '' };
+  return { id: u.id, email: u.email ?? '', name: nome || metaName || '', deveTrocarSenha };
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {

@@ -13,4 +13,6 @@ export interface SessionUser {
   id: string;
   name: string;
   email: string;
+  /** true quando o usuário precisa trocar a senha antes de usar o app (ex.: senha temporária de admin). */
+  deveTrocarSenha: boolean;
 }
