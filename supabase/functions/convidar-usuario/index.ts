@@ -187,17 +187,17 @@ Deno.serve(async (req) => {
 interface Entrega { estado: string; userId: string | null; link: string | null; criado: boolean }
 interface LookupInfo { existe: boolean; temSenha: boolean }
 
-// Estratégia de link EXPLÍCITA e determinística pelo estado do usuário no Auth (igual em convidar/reenviar):
-//   - não existe            -> 'invite'   (cria o usuário + define a senha)      -> /definir-senha
-//   - existe, SEM senha     -> 'recovery' (primeiro acesso: define a senha)      -> /definir-senha
-//   - existe, COM senha     -> 'magiclink'(preexistente: só autentica e aceita)  -> /definir-senha?ativar=1
-// Não alterna silenciosamente entre invite/magiclink por erro: o tipo vem do estado. NUNCA loga o link.
+// Estratégia de link SEMPRE termina em /definir-senha com formulário de senha (o convidado precisa
+// definir a senha para entrar). NUNCA usa magiclink nem ?ativar=1: o campo tem_senha é fantasma em
+// usuários criados pelo próprio convite (nascem com hash), então não pode decidir o fluxo.
+//   - não existe -> 'invite'   (cria o usuário e define a senha)  -> /definir-senha
+//   - existe     -> 'recovery' (estabelece sessão e define a senha; funciona com ou sem senha prévia) -> /definir-senha
+// O redirect é sempre REDIRECT (sem query). NUNCA loga o link. (info.temSenha mantido só para auditoria.)
 async function entregar(admin: ReturnType<typeof adminClient>, email: string, nome: string, papel: string, org: string, info: LookupInfo): Promise<Entrega> {
   const data = { nome, papel, organizacao_id: org };
-  const plano: { tipo: 'invite' | 'recovery' | 'magiclink'; redirect: string; criado: boolean } =
+  const plano: { tipo: 'invite' | 'recovery'; redirect: string; criado: boolean } =
     !info.existe ? { tipo: 'invite', redirect: REDIRECT, criado: true }
-      : !info.temSenha ? { tipo: 'recovery', redirect: REDIRECT, criado: false }
-        : { tipo: 'magiclink', redirect: `${REDIRECT}?ativar=1`, criado: false };
+      : { tipo: 'recovery', redirect: REDIRECT, criado: false };
 
   if (INVITE_MODE === 'manual_link') {
     const gl = await admin.auth.admin.generateLink({ type: plano.tipo, email, options: { redirectTo: plano.redirect, data } });

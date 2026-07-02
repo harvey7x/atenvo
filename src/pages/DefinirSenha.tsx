@@ -7,12 +7,30 @@ import { supabase } from '@/lib/supabase';
 import './Login.css';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-type Fase = 'carregando' | 'senha' | 'ativar_somente' | 'pendente' | 'ja_ativo' | 'sem_sessao';
+type Fase = 'carregando' | 'senha' | 'pendente' | 'sucesso' | 'ja_ativo' | 'sem_sessao' | 'erro';
 
-/** Destino do link de convite (Supabase Auth). Fonte da verdade = a SESSÃO REAL do supabase-js
- *  (getSession/refreshSession/getUser), nunca o estado do React (que atrasa no navegador in-app do
- *  WhatsApp). Regras: senha salva nunca é pedida de novo; nunca "reabra o link" depois de salvar;
- *  ativação resiliente com retry; ao concluir, vai para /login. Sem senha/token/link em log. */
+export interface EstadoConvite { sessao?: boolean; convite?: string | null; vinculo?: string | null; expirado?: boolean }
+
+/** Decide a tela a partir do estado REAL do convite/vínculo (não de ?ativar=1 nem de tem_senha).
+ *  Convidado que ainda não ativou -> SEMPRE o formulário de senha. Pura e testável. */
+export function decidirFase(est: EstadoConvite | null | undefined): { fase: Fase; erro?: string } {
+  if (!est || !est.sessao) return { fase: 'sem_sessao' };
+  const convite = est.convite ?? null;
+  const vinculo = est.vinculo ?? null;
+  const expirado = Boolean(est.expirado);
+  if (convite === 'cancelado') return { fase: 'erro', erro: 'Este convite foi cancelado. Fale com quem te convidou para receber um novo.' };
+  if ((convite === 'expirado' || expirado) && vinculo !== 'ativo') return { fase: 'erro', erro: 'Este convite expirou. Peça um novo convite para concluir o acesso.' };
+  if (vinculo === 'ativo' && convite !== 'pendente') return { fase: 'ja_ativo' };       // conta já ativada -> login
+  if (convite === 'pendente' || vinculo === 'convidado') return { fase: 'senha' };       // convidado pendente -> formulário de senha
+  return { fase: 'pendente' };                                                            // sessão válida, sem convite pendente claro
+}
+
+/** Fluxo de convite (Supabase Auth). Fonte da verdade = SESSÃO REAL do supabase-js + estado do
+ *  convite/vínculo no banco (RPC convite_estado). NUNCA decide por ?ativar=1 nem por tem_senha
+ *  (fantasma em usuários criados pelo convite). Regras: convidado que ainda não ativou SEMPRE vê o
+ *  formulário de senha; senha salva nunca é pedida de novo; ao concluir, encerra a sessão e vai para
+ *  /login. Suporta os formatos de link do Supabase (code, hash com access_token, invite, recovery) —
+ *  o supabase-js estabelece a sessão a partir da URL. Sem senha/token/link em log. */
 export function DefinirSenha() {
   const { updatePassword, mode } = useAuth();
   const { theme, setTheme } = useTheme();
@@ -27,42 +45,36 @@ export function DefinirSenha() {
   const [senhaOk, setSenhaOk] = useState(false);
   const [fase, setFase] = useState<Fase>('carregando');
 
-  // Info da URL capturada UMA vez (o supabase-js limpa o hash após processar o token).
-  const [url] = useState(() => {
-    const h = typeof window !== 'undefined' ? window.location.hash : '';
-    const s = typeof window !== 'undefined' ? window.location.search : '';
-    return {
-      temToken: /access_token=|type=invite|type=recovery|type=magiclink|code=/.test(h + s),
-      precisaSenha: /type=invite|type=recovery/.test(h) || (!/type=magiclink/.test(h) && /access_token=/.test(h)),
-      ativarSomente: new URLSearchParams(s).get('ativar') === '1',
-    };
-  });
-
-  // Descobre a fase inicial pela SESSÃO REAL (aguarda o supabase-js processar o token).
+  // Descobre a fase inicial pela SESSÃO REAL + estado do convite (aguarda o supabase-js processar o
+  // token da URL, em qualquer formato: code / hash access_token / invite / recovery).
   useEffect(() => {
     if (mode !== 'supabase' || !supabase) return;
     let vivo = true;
     (async () => {
       let session = null;
-      for (let i = 0; i < 6 && vivo; i++) { // ~3s de janela
+      for (let i = 0; i < 8 && vivo; i++) { // ~4s de janela (navegador in-app do WhatsApp é mais lento)
         const { data } = await supabase!.auth.getSession();
         session = data.session;
         if (session) break;
         await sleep(500);
       }
       if (!vivo) return;
-      if (session) {
-        if (url.ativarSomente) setFase('ativar_somente');
-        else if (url.precisaSenha) setFase('senha');
-        else setFase('pendente'); // sessão sem token de senha (recarregou) -> concluir ativação
-      } else {
-        // sem sessão: link consumido/expirado ou acesso direto. NUNCA "reabra o link" como 1ª resposta —
-        // se a conta já existe, o caminho é o login normal.
+      if (!session) {
+        // Sem sessão: link consumido/expirado ou acesso direto. NUNCA "reabra o link" — se a conta já
+        // existe, o caminho é o login normal.
         setFase('sem_sessao');
+        return;
       }
+      // Estado real do convite/vínculo deste usuário (independe do formato do link e de tem_senha).
+      const { data: est, error } = await supabase!.rpc('convite_estado');
+      if (!vivo) return;
+      if (error) { setFase('senha'); return; } // falha ao consultar: há sessão de convite -> permite definir a senha
+      const { fase: f, erro: e } = decidirFase({ sessao: true, ...(est as EstadoConvite) });
+      if (e) setErro(e);
+      setFase(f);
     })();
     return () => { vivo = false; };
-  }, [mode, url]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [mode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (mode === 'mock') return <Navigate to="/login" replace />;
 
@@ -84,9 +96,11 @@ export function DefinirSenha() {
     return 'falha';
   }
 
-  // Sucesso: encerra a sessão do convite e vai para o login normal (o usuário entra com a nova senha).
+  // Sucesso: mostra a confirmação, encerra a sessão do convite e vai para o login (entra com a nova senha).
   async function finalizar() {
-    toast('Senha definida. Seu acesso está ativo.');
+    setFase('sucesso');
+    toast('Senha definida. Seu acesso foi ativado.');
+    await sleep(1500); // deixa a mensagem visível
     try { await supabase!.auth.signOut(); } catch { /* segue mesmo assim */ }
     navigate('/login', { replace: true });
   }
@@ -99,7 +113,8 @@ export function DefinirSenha() {
     if (r === 'ok') { await finalizar(); return; }
     if (r === 'ja_ativo') { setFase('ja_ativo'); return; }
     if (r === 'expirado') { setErro('Este convite expirou ou não é mais válido.'); setFase('pendente'); return; }
-    setErro('Sua senha foi definida, mas não foi possível concluir a ativação.'); setFase('pendente');
+    // senha já foi definida; a ativação falhou -> não pede senha de novo (#8)
+    setErro('Sua senha foi definida, mas a ativação não foi concluída.'); setFase('pendente');
   }
 
   async function onSubmit(e: FormEvent) {
@@ -149,9 +164,18 @@ export function DefinirSenha() {
           {fase === 'carregando' ? (
             <p className="subhead">Validando seu convite…</p>
 
+          ) : fase === 'sucesso' ? (
+            <p className="subhead">Senha definida. Seu acesso foi ativado. Levando você ao login…</p>
+
           ) : fase === 'ja_ativo' ? (
             <>
-              <p className="subhead">Seu cadastro já foi concluído. É só fazer login.</p>
+              <p className="subhead">Seu acesso já foi ativado. É só fazer login.</p>
+              <div style={{ marginTop: 18 }}><Link className="btn" to="/login" style={{ display: 'inline-flex' }}>Ir para o login</Link></div>
+            </>
+
+          ) : fase === 'erro' ? (
+            <>
+              {bannerErro}
               <div style={{ marginTop: 18 }}><Link className="btn" to="/login" style={{ display: 'inline-flex' }}>Ir para o login</Link></div>
             </>
 
@@ -159,15 +183,6 @@ export function DefinirSenha() {
             <>
               <p className="subhead">Não há uma sessão de convite ativa aqui. Se você já definiu sua senha, faça login normalmente.</p>
               <div style={{ marginTop: 18 }}><Link className="btn" to="/login" style={{ display: 'inline-flex' }}>Ir para o login</Link></div>
-            </>
-
-          ) : fase === 'ativar_somente' ? (
-            <>
-              <p className="subhead">Você já tem uma conta. Aceite o convite para entrar nesta organização.</p>
-              {bannerErro}
-              <button type="button" className="btn" disabled={busy} onClick={concluirAtivacao}>
-                {busy ? <span className="spinner" aria-hidden="true" /> : <span>Aceitar convite</span>}
-              </button>
             </>
 
           ) : fase === 'pendente' ? (
@@ -189,7 +204,7 @@ export function DefinirSenha() {
               <form onSubmit={onSubmit} noValidate>
                 {bannerErro}
                 <div className="field">
-                  <label htmlFor="nova">Senha</label>
+                  <label htmlFor="nova">Nova senha</label>
                   <div className="control has-icon has-trailing">
                     <span className="icon-left" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="11" width="16" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg></span>
                     <input className="input" id="nova" name="nova" type={showPw ? 'text' : 'password'} autoComplete="new-password" placeholder="••••••••"
@@ -212,7 +227,7 @@ export function DefinirSenha() {
                   </div>
                 </div>
                 <button type="submit" className="btn" disabled={busy}>
-                  {busy ? <span className="spinner" aria-hidden="true" /> : <span>Definir senha e ativar</span>}
+                  {busy ? <span className="spinner" aria-hidden="true" /> : <span>Definir senha e continuar</span>}
                 </button>
               </form>
             </>
