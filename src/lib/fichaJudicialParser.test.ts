@@ -372,3 +372,32 @@ describe('revisões RMC/RCC: código e banco da consulta (não-COMPE)', () => {
     expect(rcc[0].bancoNome).toBe('FACTA FINANCEIRA S/A');
   });
 });
+
+describe('revisões RMC/RCC: layout de TABELA real (uma célula por linha, com linhas em branco)', () => {
+  // Reproduz fielmente o bloco "Cartões" da consulta real (rótulo, banco e valor em linhas separadas).
+  const CARTOES = L([
+    ' Cartões',
+    'Tipo\tBanco\tContrato\tAverbação\tSituação\tValor do Contrato\tValor da Parcela\tTaxa',
+    'Cartão RMC', '', '934 - AGIPLAN FINANCEIRA S/A', '', '123456789', '', '06/06/2022', '', 'Ativo', '',
+    'R$ 2.815,00', '', 'R$ 121,92', '', '2,46%', '',
+    'Cartão RCC', '', '935 - FACTA FINANCEIRA S/A', '', '52705939', '', '19/09/2022', '', 'Ativo', '',
+    'R$ 3.124,00', '', 'R$ 121,92', '',
+  ]);
+
+  it('preenche banco/código/valor do RMC e RCC mesmo em linhas separadas', () => {
+    const revs = parseFichaJudicial(CARTOES).revisoes;
+    const rmc = revs.find((r) => r.tipo === 'rmc');
+    const rcc = revs.find((r) => r.tipo === 'rcc');
+    expect(rmc).toBeDefined(); expect(rcc).toBeDefined();
+    expect(rmc!.bancoCodigo).toBe('934'); expect(rmc!.bancoNome).toBe('AGIPLAN FINANCEIRA S/A'); expect(rmc!.valor).toBe(2815);
+    expect(rcc!.bancoCodigo).toBe('935'); expect(rcc!.bancoNome).toBe('FACTA FINANCEIRA S/A'); expect(rcc!.valor).toBe(3124);
+  });
+
+  it('as revisões ficam com confiança alta (não "Confirmar") e sem duplicar', () => {
+    const revs = parseFichaJudicial(CARTOES).revisoes;
+    expect(revs.filter((r) => r.tipo === 'rmc')).toHaveLength(1);
+    expect(revs.filter((r) => r.tipo === 'rcc')).toHaveLength(1);
+    expect(revs.find((r) => r.tipo === 'rmc')!.requerConfirmacao).toBe(false);
+    expect(revs.find((r) => r.tipo === 'rcc')!.requerConfirmacao).toBe(false);
+  });
+});

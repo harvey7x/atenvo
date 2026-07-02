@@ -341,40 +341,55 @@ function extrairCodBancoRev(linha: string): { codigo: string; nome: string } | n
 function extrairRevisoes(linhas: string[], res: FichaJudicialParseResult, aviso: (c: string, m: string, campo?: string) => void): void {
   const out: FichaRevisaoDetectada[] = [];
   const vistos = new Set<string>();
-  for (const linha of linhas) {
-    const n = normalizaComparacao(linha);
+
+  // Identifica o RÓTULO de uma revisão (RMC/RCC/REV/Cartão consignado). Normaliza variações:
+  // RMC = Reserva de Margem Consignável; RCC = Reserva de Cartão (de Crédito) Consignado.
+  const ehRmc = (n: string) => /\brmc\b/.test(n) || /reserva de margem consign/.test(n);
+  const ehRcc = (n: string) => /\brcc\b/.test(n) || /reserva de cartao( de credito)? consign/.test(n);
+  const rotulo = (n: string): FichaRevisaoDetectada['tipo'] | null => {
     const temRev = /\brev\b/.test(n);
-    // normaliza variações: RMC = Reserva de Margem Consignável; RCC = Reserva de Cartão (de Crédito) Consignado.
-    const temRmc = /\brmc\b/.test(n) || /reserva de margem consign/.test(n);
-    const temRcc = /\brcc\b/.test(n) || /reserva de cartao( de credito)? consign/.test(n);
     const temCartao = /cartao|cartão/.test(n) && /(contrato|consignad)/.test(n);
-    if (!temRev && !temRmc && !temRcc && !temCartao) continue;
+    if (!temRev && !ehRmc(n) && !ehRcc(n) && !temCartao) return null;
+    if (ehRmc(n)) return 'rmc';
+    if (ehRcc(n)) return 'rcc';
+    if (/agibank/.test(n)) return 'agibank';
+    return 'outro'; // temCartao ou temRev
+  };
+  // explícito (rótulo forte) independe do tipo: RMC/RCC/REV -> auto-preenche; agibank/cartão-só -> confirma.
+  const ehExplicito = (n: string) => ehRmc(n) || ehRcc(n) || /\brev\b/.test(n);
+  const valorDe = (s: string): number | undefined => { const m = s.match(/r\$\s*([\d.]+(?:,\d{2})?)/i); return m ? parseMoedaBRL(m[1]) : undefined; };
 
-    let tipo: FichaRevisaoDetectada['tipo'] = 'outro';
-    if (temRmc) tipo = 'rmc';
-    else if (temRcc) tipo = 'rcc';
-    else if (/agibank/.test(n)) tipo = 'agibank';
-    else if (temCartao) tipo = 'outro';
-    else if (temRev) tipo = 'outro';
+  for (let i = 0; i < linhas.length; i++) {
+    const tipo = rotulo(normalizaComparacao(linhas[i]));
+    if (!tipo) continue;
+    const linha = linhas[i];
+    const explicito = ehExplicito(normalizaComparacao(linha));
 
-    // 1) fonte estruturada: "código - NOME" da própria linha (ex.: 934 - AGIPLAN). NÃO exige COMPE.
-    const est = extrairCodBancoRev(linha);
+    // 1) "código - NOME" na PRÓPRIA linha (ex.: "Cartão RMC — 934 - AGIPLAN"); NÃO exige COMPE.
+    let est = extrairCodBancoRev(linha);
+    let valor = valorDe(linha);
+    // 2) LAYOUT DE TABELA (uma célula por linha): o rótulo ("Cartão RMC") e o "934 - AGIPLAN"/valor vêm nas
+    //    LINHAS SEGUINTES do mesmo card. Faz lookahead até o próximo rótulo (ou janela máx.), sem invadir outro card.
+    if (!est) {
+      const limite = Math.min(linhas.length, i + 14);
+      for (let j = i + 1; j < limite; j++) {
+        if (rotulo(normalizaComparacao(linhas[j]))) break; // chegou no próximo cartão/revisão
+        if (!est) est = extrairCodBancoRev(linhas[j]);
+        if (valor === undefined && est) valor = valorDe(linhas[j]); // valor só APÓS o banco (evita R$ de outra coluna)
+        if (est && valor !== undefined) break;
+      }
+    }
+    // 3) fallback COMPE (só quando não veio o par estruturado)
     let bancoCodigo = est?.codigo;
     let bancoNome = est?.nome;
-    // 2) fallback: tabela COMPE por código/nome (só quando não veio o par estruturado)
     if (!bancoCodigo && !bancoNome) {
       const compe = (linha.match(/\b(\d{3})\b/g) || []).map(bancoPorCodigo).find(Boolean) || bancoPorNome(linha);
       if (compe) { bancoCodigo = compe.codigo; bancoNome = compe.nome; }
     }
-    const mv = linha.match(/r\$\s*([\d.]+(?:,\d{2})?)/i); // valor só em contexto R$ (evita capturar código)
-    const valor = mv ? parseMoedaBRL(mv[1]) : undefined;
+
     const temBanco = !!(bancoCodigo || bancoNome);
     const temValor = valor !== undefined && valor > 0;
-    // confiança: rótulo explícito (REV/RMC/RCC) + banco ou valor → alta; senão baixa
-    const explicito = temRev || temRmc || temRcc;
     const confianca: CampoConfianca = explicito && (temBanco || temValor) ? 'alta' : explicito ? 'media' : 'baixa';
-    const requerConfirmacao = confianca !== 'alta';
-
     const rev: FichaRevisaoDetectada = {
       tipo,
       bancoCodigo,
@@ -383,7 +398,7 @@ function extrairRevisoes(linhas: string[], res: FichaJudicialParseResult, aviso:
       descricaoLivre: linha.replace(/\s+/g, ' ').trim(),
       origem: 'parser',
       confianca,
-      requerConfirmacao,
+      requerConfirmacao: confianca !== 'alta',
     };
     const chave = `${rev.tipo}|${rev.bancoCodigo ?? rev.bancoNome ?? ''}|${rev.valor ?? ''}|${normalizaComparacao(rev.descricaoLivre ?? '')}`;
     if (vistos.has(chave)) continue;
