@@ -60,8 +60,8 @@ describe('formatarFichaJudicial', () => {
   });
   it('7. revisões múltiplas, uma por linha', () => {
     const t = formatarFichaJudicial({ revisoes: [{ tipo: 'rmc', bancoCodigo: '318', bancoNome: 'Banco BMG' }, { tipo: 'rcc', bancoCodigo: '935', bancoNome: 'Facta Financeira', valor: 66 }] });
-    expect(t).toContain('REV RMC 318 - Banco BMG');
-    expect(t).toContain('REV RCC 935 - Facta Financeira - R$');
+    expect(t).toContain('Cartão RMC: Banco BMG - Cód. 318');
+    expect(t).toContain('Cartão RCC: Facta Financeira - Cód. 935 - Valor: R$');
   });
   it('8. ficha sem senha por padrão', () => {
     const t = formatarFichaJudicial(completa);
@@ -88,7 +88,7 @@ describe('formatarFichaJudicial', () => {
     expect(t).not.toContain('R$');
   });
   it('14. revisão manual sem descrição livre é construída', () => {
-    expect(formatarFichaJudicial({ revisoes: [{ tipo: 'agibank' }] })).toContain('REV AGIBANK');
+    expect(formatarFichaJudicial({ revisoes: [{ tipo: 'agibank' }] })).toContain('AGIBANK');
   });
   it('15. dados opcionais ausentes não quebram', () => {
     expect(() => formatarFichaJudicial({ nome: 'X' })).not.toThrow();

@@ -338,6 +338,24 @@ function extrairCodBancoRev(linha: string): { codigo: string; nome: string } | n
   return { codigo: m[1], nome }; // preserva zeros à esquerda
 }
 
+/**
+ * Extrai um valor monetário de uma revisão SOMENTE quando há evidência monetária confiável.
+ * Aceita: "R$ 2.815,00", "2.815,00", "Valor: R$ 2.815,00", "Valor: 3.124,50".
+ * Rejeita: inteiro solto ("2815"/"3124"), código de banco, contrato, matrícula, benefício, telefone.
+ * Sem R$, separador decimal (,dd / milhar com ponto) ou label "valor" → undefined.
+ */
+export function extrairValorMonetarioRevisao(texto: string): number | undefined {
+  const s = (texto ?? '').toString();
+  // número BRL "formatado": exige centavos (,dd) OU separador de milhar com ponto — nunca inteiro solto.
+  const BRL = String.raw`\d{1,3}(?:\.\d{3})+,\d{2}|\d+,\d{2}|\d{1,3}(?:\.\d{3})+`;
+  let m = s.match(new RegExp(String.raw`r\$\s*(${BRL}|\d+)`, 'i')); // 1) R$ explícito (contexto monetário)
+  if (!m) m = s.match(new RegExp(String.raw`valor[^\d]{0,10}(${BRL})`, 'i')); // 2) label "valor" + número monetário
+  if (!m) m = s.match(new RegExp(String.raw`(?:^|[^\d.,])(${BRL})(?![\d.,])`)); // 3) número BRL isolado (com cents/milhar)
+  if (!m) return undefined;
+  const v = parseMoedaBRL(m[1]);
+  return typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : undefined;
+}
+
 function extrairRevisoes(linhas: string[], res: FichaJudicialParseResult, aviso: (c: string, m: string, campo?: string) => void): void {
   const out: FichaRevisaoDetectada[] = [];
   const vistos = new Set<string>();
@@ -357,7 +375,6 @@ function extrairRevisoes(linhas: string[], res: FichaJudicialParseResult, aviso:
   };
   // explícito (rótulo forte) independe do tipo: RMC/RCC/REV -> auto-preenche; agibank/cartão-só -> confirma.
   const ehExplicito = (n: string) => ehRmc(n) || ehRcc(n) || /\brev\b/.test(n);
-  const valorDe = (s: string): number | undefined => { const m = s.match(/r\$\s*([\d.]+(?:,\d{2})?)/i); return m ? parseMoedaBRL(m[1]) : undefined; };
 
   for (let i = 0; i < linhas.length; i++) {
     const tipo = rotulo(normalizaComparacao(linhas[i]));
@@ -367,16 +384,19 @@ function extrairRevisoes(linhas: string[], res: FichaJudicialParseResult, aviso:
 
     // 1) "código - NOME" na PRÓPRIA linha (ex.: "Cartão RMC — 934 - AGIPLAN"); NÃO exige COMPE.
     let est = extrairCodBancoRev(linha);
-    let valor = valorDe(linha);
-    // 2) LAYOUT DE TABELA (uma célula por linha): o rótulo ("Cartão RMC") e o "934 - AGIPLAN"/valor vêm nas
-    //    LINHAS SEGUINTES do mesmo card. Faz lookahead até o próximo rótulo (ou janela máx.), sem invadir outro card.
-    if (!est) {
+    // valor SOMENTE da própria linha do rótulo (ex.: single-line "… - R$ 2.815,00") OU de linha com label "valor".
+    // NUNCA de "R$ x" solto do lookahead: no layout de tabela isso é a coluna Valor do Contrato/Parcela (ambígua),
+    // não o valor da revisão — por isso 2815/3124 NÃO devem virar valor (ver extrairValorMonetarioRevisao).
+    let valor = extrairValorMonetarioRevisao(linha);
+    // 2) LAYOUT DE TABELA (uma célula por linha): o rótulo ("Cartão RMC") e o "934 - AGIPLAN" vêm nas LINHAS
+    //    SEGUINTES do mesmo card. Lookahead até o próximo rótulo (ou janela máx.), sem invadir outro card.
+    {
       const limite = Math.min(linhas.length, i + 14);
-      for (let j = i + 1; j < limite; j++) {
+      for (let j = i + 1; j < limite && (!est || valor === undefined); j++) {
         if (rotulo(normalizaComparacao(linhas[j]))) break; // chegou no próximo cartão/revisão
         if (!est) est = extrairCodBancoRev(linhas[j]);
-        if (valor === undefined && est) valor = valorDe(linhas[j]); // valor só APÓS o banco (evita R$ de outra coluna)
-        if (est && valor !== undefined) break;
+        // valor só de linha com label "valor" explícito (nunca R$ solto de coluna de tabela)
+        if (valor === undefined && /valor/i.test(linhas[j])) valor = extrairValorMonetarioRevisao(linhas[j]);
       }
     }
     // 3) fallback COMPE (só quando não veio o par estruturado)

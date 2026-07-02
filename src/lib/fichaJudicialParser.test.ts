@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { parseFichaJudicial, PARSER_VERSION } from './fichaJudicialParser';
+import { parseFichaJudicial, PARSER_VERSION, extrairValorMonetarioRevisao } from './fichaJudicialParser';
+import { formatarFichaJudicial } from './fichaJudicialFormatter';
 
 // ===== Fixtures 100% FICTÍCIOS (CPFs matematicamente válidos só para teste) =====
 const CPF_A = '529.982.247-25'; // válido
@@ -384,13 +385,16 @@ describe('revisões RMC/RCC: layout de TABELA real (uma célula por linha, com l
     'R$ 3.124,00', '', 'R$ 121,92', '',
   ]);
 
-  it('preenche banco/código/valor do RMC e RCC mesmo em linhas separadas', () => {
+  it('preenche banco/código do RMC e RCC em linhas separadas — SEM puxar valor de coluna de tabela', () => {
     const revs = parseFichaJudicial(CARTOES).revisoes;
     const rmc = revs.find((r) => r.tipo === 'rmc');
     const rcc = revs.find((r) => r.tipo === 'rcc');
     expect(rmc).toBeDefined(); expect(rcc).toBeDefined();
-    expect(rmc!.bancoCodigo).toBe('934'); expect(rmc!.bancoNome).toBe('AGIPLAN FINANCEIRA S/A'); expect(rmc!.valor).toBe(2815);
-    expect(rcc!.bancoCodigo).toBe('935'); expect(rcc!.bancoNome).toBe('FACTA FINANCEIRA S/A'); expect(rcc!.valor).toBe(3124);
+    expect(rmc!.bancoCodigo).toBe('934'); expect(rmc!.bancoNome).toBe('AGIPLAN FINANCEIRA S/A');
+    expect(rcc!.bancoCodigo).toBe('935'); expect(rcc!.bancoNome).toBe('FACTA FINANCEIRA S/A');
+    // "R$ 2.815,00" / "R$ 3.124,00" são a coluna "Valor do Contrato" (linha própria, sem label "valor") → NÃO é o valor da revisão
+    expect(rmc!.valor).toBeUndefined();
+    expect(rcc!.valor).toBeUndefined();
   });
 
   it('as revisões ficam com confiança alta (não "Confirmar") e sem duplicar', () => {
@@ -399,5 +403,82 @@ describe('revisões RMC/RCC: layout de TABELA real (uma célula por linha, com l
     expect(revs.filter((r) => r.tipo === 'rcc')).toHaveLength(1);
     expect(revs.find((r) => r.tipo === 'rmc')!.requerConfirmacao).toBe(false);
     expect(revs.find((r) => r.tipo === 'rcc')!.requerConfirmacao).toBe(false);
+  });
+});
+
+describe('extrairValorMonetarioRevisao: só valor com evidência monetária', () => {
+  it('linha do banco "934 - AGIPLAN FINANCEIRA S/A" → não é valor', () => {
+    expect(extrairValorMonetarioRevisao('934 - AGIPLAN FINANCEIRA S/A')).toBeUndefined();
+  });
+  it('linha do banco "935 - FACTA FINANCEIRA S/A" → não é valor', () => {
+    expect(extrairValorMonetarioRevisao('935 - FACTA FINANCEIRA S/A')).toBeUndefined();
+  });
+  it('inteiro solto "2815" → não é valor', () => {
+    expect(extrairValorMonetarioRevisao('2815')).toBeUndefined();
+  });
+  it('inteiro solto "3124" → não é valor', () => {
+    expect(extrairValorMonetarioRevisao('3124')).toBeUndefined();
+  });
+  it('rejeita contrato/matrícula/benefício/telefone (inteiros longos)', () => {
+    expect(extrairValorMonetarioRevisao('Contrato 123456789')).toBeUndefined();
+    expect(extrairValorMonetarioRevisao('Matrícula 0012345')).toBeUndefined();
+    expect(extrairValorMonetarioRevisao('Benefício 1234567890')).toBeUndefined();
+    expect(extrairValorMonetarioRevisao('(51) 98160-2825')).toBeUndefined();
+  });
+  it('"R$ 2.815,00" → 2815', () => {
+    expect(extrairValorMonetarioRevisao('R$ 2.815,00')).toBe(2815);
+  });
+  it('"2.815,00" (sem R$, com centavos) → 2815', () => {
+    expect(extrairValorMonetarioRevisao('2.815,00')).toBe(2815);
+  });
+  it('"Valor: 3.124,50" → 3124.5', () => {
+    expect(extrairValorMonetarioRevisao('Valor: 3.124,50')).toBe(3124.5);
+  });
+  it('"Valor: R$ 2.815,00" → 2815', () => {
+    expect(extrairValorMonetarioRevisao('Valor: R$ 2.815,00')).toBe(2815);
+  });
+});
+
+describe('prévia da ficha: usa banco/código/valor (estado atual), não só o tipo', () => {
+  const base = { nome: 'X', dataConsulta: '2024-03-10' };
+  // normaliza NBSP (formataMoedaBRL usa espaço não-quebrável após R$) para comparação estável
+  const previa = (revisoes: unknown[]) => formatarFichaJudicial({ ...base, revisoes } as never).replace(/ /g, ' ');
+
+  it('mostra banco e código do RMC e RCC (sem valor quando vazio)', () => {
+    const txt = previa([
+      { tipo: 'rmc', bancoNome: 'AGIPLAN FINANCEIRA S/A', bancoCodigo: '934', descricaoLivre: 'Cartão RMC' },
+      { tipo: 'rcc', bancoNome: 'FACTA FINANCEIRA S/A', bancoCodigo: '935', descricaoLivre: 'Cartão RCC' },
+    ]);
+    expect(txt).toContain('Cartão RMC: AGIPLAN FINANCEIRA S/A - Cód. 934');
+    expect(txt).toContain('Cartão RCC: FACTA FINANCEIRA S/A - Cód. 935');
+    expect(txt).not.toMatch(/Valor:/); // sem valor confiável → não mostra "Valor:"
+  });
+
+  it('não usa apenas descricaoLivre: descarta "Cartão RMC" isolado quando há banco/código', () => {
+    const txt = previa([{ tipo: 'rmc', bancoNome: 'AGIPLAN FINANCEIRA S/A', bancoCodigo: '934', descricaoLivre: 'Cartão RMC' }]);
+    expect(txt).not.toMatch(/\nCartão RMC$/); // não pode terminar só com o rótulo cru
+    expect(txt).toContain('AGIPLAN FINANCEIRA S/A');
+  });
+
+  it('mostra "Valor:" só quando há valor confiável', () => {
+    const txt = previa([{ tipo: 'rmc', bancoNome: 'AGIPLAN FINANCEIRA S/A', bancoCodigo: '934', valor: 2815 }]);
+    expect(txt).toContain('Cartão RMC: AGIPLAN FINANCEIRA S/A - Cód. 934 - Valor: R$ 2.815,00');
+  });
+
+  it('reflete edição manual do formulário (banco/código/valor trocados)', () => {
+    const txt = previa([{ tipo: 'rcc', bancoNome: 'BANCO EDITADO S/A', bancoCodigo: '111', valor: 500, descricaoLivre: 'Cartão RCC' }]);
+    expect(txt).toContain('Cartão RCC: BANCO EDITADO S/A - Cód. 111 - Valor: R$ 500,00');
+    expect(txt).not.toContain('FACTA');
+  });
+
+  it('RMC e RCC juntos, sem duplicação de linha', () => {
+    const txt = previa([
+      { tipo: 'rmc', bancoNome: 'AGIPLAN FINANCEIRA S/A', bancoCodigo: '934' },
+      { tipo: 'rcc', bancoNome: 'FACTA FINANCEIRA S/A', bancoCodigo: '935' },
+    ]);
+    const rmcLinhas = txt.split('\n').filter((l) => l.startsWith('Cartão RMC'));
+    const rccLinhas = txt.split('\n').filter((l) => l.startsWith('Cartão RCC'));
+    expect(rmcLinhas).toHaveLength(1);
+    expect(rccLinhas).toHaveLength(1);
   });
 });
