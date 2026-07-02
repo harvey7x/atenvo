@@ -301,7 +301,8 @@ export function Kanban() {
   }
   async function arquivar(l: KLead) { setMenu(null); try { await k.arquivarLead(l.id); toast('Lead arquivado'); } catch (e) { toast('Falha ao arquivar: ' + (e as Error).message, 'warn'); } }
   function toggleEtq(t: string) { setLf((f) => ({ ...f, etiquetas: f.etiquetas.includes(t) ? f.etiquetas.filter((x) => x !== t) : [...f.etiquetas, t] })); }
-  function abrirConversa(l: KLead) { if (!l.conversaOrigemId) return; navigate(l.canalTipo === 'facebook' ? '/facebook' : '/whatsapp'); }
+  // Abre a Inbox SELECIONANDO a conversa vinculada ao card (conversa_id), não o default da lista.
+  function abrirConversa(l: KLead) { if (!l.conversaOrigemId) return; const base = l.canalTipo === 'facebook' ? '/facebook' : '/whatsapp'; navigate(`${base}?conversa=${encodeURIComponent(l.conversaOrigemId)}`); }
 
   // ---- estados ----
   if (k.loading) return <div className="kanban-page"><div className="kb-info">Carregando funil…</div></div>;

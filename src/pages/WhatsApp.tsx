@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useToast } from '@/hooks/useToast';
 import { useAuth } from '@/context/AuthContext';
 import { useOrg } from '@/context/OrgContext';
@@ -138,9 +138,14 @@ export function WhatsApp() {
   const etapaCounts = useScriptEtapaCounts().data ?? {};
   const [scriptSeq, setScriptSeq] = useState<{ id: string; titulo: string; conteudo: string } | null>(null);
   const [contacts, setContacts] = useState<WaContact[]>(() => WA_REAL ? [] : WA_CONTACTS.map((c) => ({ ...c, msgs: c.msgs.map((m) => ({ ...m })), tags: [...c.tags] })));
+  const [searchParams, setSearchParams] = useSearchParams();
   const [currentId, setCurrentId] = useState(() => {
     if (!WA_REAL) return 'antonio';
-    try { return sessionStorage.getItem(CURR_KEY) || ''; } catch { return ''; }
+    try {
+      const p = new URLSearchParams(window.location.search).get('conversa'); // deep-link/Kanban tem prioridade
+      if (p) return p;
+      return sessionStorage.getItem(CURR_KEY) || '';
+    } catch { return ''; }
   });
   const atividadesQ = useWaAtividades(WA_REAL ? (currentId || null) : null); // timeline de atendimento (colab. E1)
   const [tab, setTab] = useState('todos');
@@ -271,6 +276,20 @@ export function WhatsApp() {
       .finally(() => { marcandoLeituraRef.current = false; });
   };
   useEffect(() => { markCurrentRead(); }, [currentId, contacts]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Abertura direta pela rota (?conversa=<id>) — botão "Abrir conversa" do Kanban/modal do cliente ou deep-link.
+  // Seleciona ESTA conversa (não o default), limpa filtros incompatíveis para o card aparecer na lista, rola
+  // até ele e consome o parâmetro (a persistência no reload fica por conta do sessionStorage).
+  const conversaParam = searchParams.get('conversa');
+  useEffect(() => {
+    if (!WA_REAL || !conversaParam) return;
+    selecaoUsuarioRef.current = conversaParam;
+    setCurrentId(conversaParam);
+    setTab('todos'); setFiltroCanal(null); setFiltroStatus(null); setSearch('');
+    const alvo = conversaParam;
+    window.setTimeout(() => { const el = document.querySelector(`[data-cid="${alvo}"]`); if (el) (el as HTMLElement).scrollIntoView({ block: 'center', behavior: 'smooth' }); }, 220);
+    setSearchParams((p) => { const n = new URLSearchParams(p); n.delete('conversa'); return n; }, { replace: true });
+  }, [conversaParam]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!WA_REAL) return;
     const h = () => markCurrentRead();
@@ -767,7 +786,7 @@ export function WhatsApp() {
               : (finalizado ? 'Finalizado' : (c.status || 'Em atendimento'));
             const barTier = wait ? (atrasado ? 'critico' : 'aguardando') : (c.id === currentId ? 'ativo' : 'neutro');
             return (
-            <div key={c.id} className={'conv conv--' + barTier + (c.id === currentId ? ' active' : '')} onClick={() => selectContact(c.id)}>
+            <div key={c.id} data-cid={c.id} className={'conv conv--' + barTier + (c.id === currentId ? ' active' : '')} onClick={() => selectContact(c.id)}>
               <Avatar name={c.name} />
               <div className="cbody">
                 <div className="crow">
