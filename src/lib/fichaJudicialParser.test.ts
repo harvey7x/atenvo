@@ -439,36 +439,43 @@ describe('extrairValorMonetarioRevisao: só valor com evidência monetária', ()
   });
 });
 
-describe('prévia da ficha: usa banco/código/valor (estado atual), não só o tipo', () => {
+describe('prévia da ficha: linha da revisão só "Cartão RMC/RCC: {banco}" (sem código/valor/hífen)', () => {
   const base = { nome: 'X', dataConsulta: '2024-03-10' };
   // normaliza NBSP (formataMoedaBRL usa espaço não-quebrável após R$) para comparação estável
-  const previa = (revisoes: unknown[]) => formatarFichaJudicial({ ...base, revisoes } as never).replace(/ /g, ' ');
+  const previa = (revisoes: unknown[]) => formatarFichaJudicial({ ...base, revisoes } as never);
 
-  it('mostra banco e código do RMC e RCC (sem valor quando vazio)', () => {
+  it('mostra só o banco do RMC e RCC — sem código, sem valor, sem hífen', () => {
     const txt = previa([
-      { tipo: 'rmc', bancoNome: 'AGIPLAN FINANCEIRA S/A', bancoCodigo: '934', descricaoLivre: 'Cartão RMC' },
-      { tipo: 'rcc', bancoNome: 'FACTA FINANCEIRA S/A', bancoCodigo: '935', descricaoLivre: 'Cartão RCC' },
+      { tipo: 'rmc', bancoNome: 'AGIPLAN FINANCEIRA S/A', bancoCodigo: '934', valor: 2815, descricaoLivre: 'Cartão RMC' },
+      { tipo: 'rcc', bancoNome: 'FACTA FINANCEIRA S/A', bancoCodigo: '935', valor: 3124, descricaoLivre: 'Cartão RCC' },
     ]);
-    expect(txt).toContain('Cartão RMC: AGIPLAN FINANCEIRA S/A - Cód. 934');
-    expect(txt).toContain('Cartão RCC: FACTA FINANCEIRA S/A - Cód. 935');
-    expect(txt).not.toMatch(/Valor:/); // sem valor confiável → não mostra "Valor:"
+    const linhas = txt.split('\n');
+    expect(linhas).toContain('Cartão RMC: AGIPLAN FINANCEIRA S/A');
+    expect(linhas).toContain('Cartão RCC: FACTA FINANCEIRA S/A');
+    expect(txt).not.toContain('Cód.');
+    expect(txt).not.toContain('Valor: R$');
+    expect(txt).not.toContain('934'); expect(txt).not.toContain('935');
+    expect(txt).not.toMatch(/S\/A -/); // sem hífen depois do banco
   });
 
-  it('não usa apenas descricaoLivre: descarta "Cartão RMC" isolado quando há banco/código', () => {
-    const txt = previa([{ tipo: 'rmc', bancoNome: 'AGIPLAN FINANCEIRA S/A', bancoCodigo: '934', descricaoLivre: 'Cartão RMC' }]);
-    expect(txt).not.toMatch(/\nCartão RMC$/); // não pode terminar só com o rótulo cru
-    expect(txt).toContain('AGIPLAN FINANCEIRA S/A');
+  it('banco vazio → só o rótulo, sem dois-pontos/hífen sobrando', () => {
+    const linhas = previa([{ tipo: 'rmc', bancoCodigo: '934', valor: 2815 }]).split('\n');
+    expect(linhas).toContain('Cartão RMC');
+    expect(linhas).not.toContain('Cartão RMC:');
+    expect(linhas.some((l) => /Cartão RMC:\s*$/.test(l))).toBe(false);
   });
 
-  it('mostra "Valor:" só quando há valor confiável', () => {
-    const txt = previa([{ tipo: 'rmc', bancoNome: 'AGIPLAN FINANCEIRA S/A', bancoCodigo: '934', valor: 2815 }]);
-    expect(txt).toContain('Cartão RMC: AGIPLAN FINANCEIRA S/A - Cód. 934 - Valor: R$ 2.815,00');
+  it('com banco presente, ignora o rótulo cru (descricaoLivre)', () => {
+    const linhas = previa([{ tipo: 'rmc', bancoNome: 'AGIPLAN FINANCEIRA S/A', bancoCodigo: '934', descricaoLivre: 'Cartão RMC' }]).split('\n');
+    expect(linhas).toContain('Cartão RMC: AGIPLAN FINANCEIRA S/A');
+    expect(linhas).not.toContain('Cartão RMC');
   });
 
-  it('reflete edição manual do formulário (banco/código/valor trocados)', () => {
+  it('reflete edição manual do banco no formulário', () => {
     const txt = previa([{ tipo: 'rcc', bancoNome: 'BANCO EDITADO S/A', bancoCodigo: '111', valor: 500, descricaoLivre: 'Cartão RCC' }]);
-    expect(txt).toContain('Cartão RCC: BANCO EDITADO S/A - Cód. 111 - Valor: R$ 500,00');
+    expect(txt).toContain('Cartão RCC: BANCO EDITADO S/A');
     expect(txt).not.toContain('FACTA');
+    expect(txt).not.toContain('111'); expect(txt).not.toContain('500');
   });
 
   it('RMC e RCC juntos, sem duplicação de linha', () => {

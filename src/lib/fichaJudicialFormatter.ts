@@ -48,21 +48,14 @@ const ROTULO_REV: Record<FichaRevisaoFmt['tipo'], string> = {
   agibank: 'AGIBANK', rmc: 'Cartão RMC', rcc: 'Cartão RCC', emprestimo: 'Empréstimo', outro: 'Revisão',
 };
 
-// Monta a linha da revisão a partir do ESTADO ATUAL (tipo + banco + código + valor), refletindo edições do
-// formulário. descricaoLivre só é usada quando não há banco/código/valor (revisão livre digitada à mão).
+// Prévia mostra APENAS "Cartão RMC: {bancoNome}" (sem código, sem valor, sem hífen). Código e valor
+// continuam salvos/editáveis no formulário e no banco, mas não entram no texto da ficha/cópia.
+// Banco vazio → só o rótulo ("Cartão RMC"), sem dois-pontos sobrando.
 function linhaRevisao(r: FichaRevisaoFmt): string {
   const nome = lim(r.bancoNome);
-  const cod = lim(r.bancoCodigo);
   const rotulo = ROTULO_REV[r.tipo] ?? 'Revisão';
-  // sem nenhum dado estruturado: usa a descrição livre digitada; senão, ao menos o rótulo do tipo.
-  if (!nome && !cod && !valorOk(r.valor)) return lim(r.descricaoLivre) || rotulo;
-
-  let linha = rotulo;
-  if (nome && cod) linha = `${rotulo}: ${nome} - Cód. ${cod}`;
-  else if (nome) linha = `${rotulo}: ${nome}`;
-  else if (cod) linha = `${rotulo}: Cód. ${cod}`;
-  if (valorOk(r.valor)) linha += ` - Valor: ${formataMoedaBRL(r.valor)}`; // só quando valor válido; nunca "Valor:" vazio
-  return linha;
+  if (nome) return `${rotulo}: ${nome}`;
+  return lim(r.descricaoLivre) || rotulo;
 }
 
 /** Gera a ficha no padrão do escritório. Senha só quando opcoes.incluirSenha && opcoes.senha. */
