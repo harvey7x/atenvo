@@ -375,8 +375,12 @@ export function traduzErroEnvio(cod?: string | null): string {
   const raw = (cod ?? '').toString().trim();
   if (!raw) return 'A mensagem não pôde ser enviada. Tente novamente.';
   const c = raw.toLowerCase();
-  if (raw === 'sem_id_externo' || c.includes('sem identificador') || c.includes('não confirmou'))
-    return 'A conexão não confirmou o envio. Tente novamente em alguns minutos.';
+  // TIMEOUT / sem confirmação a tempo: o envio pode ter saído; conferir antes de repetir (não afirmar falha).
+  if (c.includes('a tempo') || c.includes('timeout') || c.includes('demorou'))
+    return 'O envio demorou mais que o esperado. Verifique a conversa antes de tentar novamente.';
+  // CONEXÃO não aceitou o envio (sem key.id): a mensagem NÃO saiu.
+  if (raw === 'sem_id_externo' || c.includes('sem identificador') || c.includes('não confirmou o envio'))
+    return 'A conexão não confirmou o envio (a mensagem não saiu). Tente novamente em alguns minutos.';
   if (c.includes('desconect') || c.includes('reconect') || c.includes('not connect') || /\bclose\b/.test(c))
     return 'WhatsApp desconectado. Reconecte a conexão em Integrações.';
   if (c.includes('(#10)') || c.includes('fora do espaço de tempo') || c.includes('24h') || c.includes('messenger'))
@@ -386,9 +390,11 @@ export function traduzErroEnvio(cod?: string | null): string {
   if (c.includes('número') || c.includes('numero') || c.includes('invalid') || c.includes('inválid') || c.includes('nono dígito') || c.includes('ddd'))
     return 'Número de destino inválido. Confira o DDD e o nono dígito.';
   if (c.includes('instância') || c.includes('instancia') || c.includes('não está disponível'))
-    return 'A instância não está disponível. Tente novamente em alguns minutos.';
-  if (c === 'error' || c.startsWith('error') || c.includes('recusou') || c.includes('não confirmou a entrega'))
-    return 'O WhatsApp não confirmou a entrega desta mensagem. Verifique a conexão e o número do destinatário.';
+    return 'O canal precisa ser reconectado à instância correta.';
+  // ERROR do WhatsApp: a Evolution ACEITOU (havia key.id) mas o WhatsApp devolveu ERROR na entrega —
+  // destino pode não ter WhatsApp, ou remetente recém-conectado limitado no 1º contato. Retry costuma resolver.
+  if (c === 'error' || c.startsWith('error') || c.includes('recusou'))
+    return 'O WhatsApp recusou a entrega desta mensagem. Confirme se o número tem WhatsApp ativo e tente novamente.';
   return 'O WhatsApp não confirmou a entrega desta mensagem. Verifique a conexão e o número do destinatário.';
 }
 
