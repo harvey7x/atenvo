@@ -291,36 +291,68 @@ function extrairBanco(
     if (codigo) { res.bancoCodigo = codigo; conf('bancoCodigo', c, 'parser'); }
     if (nome) { res.bancoNome = nome; conf('bancoNome', c, 'parser'); }
   };
-  const ehRevisao = (n: string) => /\brev\b|\brmc\b|\brcc\b/.test(n);
-  // 1) "código - nome" com código no COMPE (ignora linhas de revisão p/ não confundir pagador)
-  for (let i = 0; i < linhas.length; i++) {
-    if (ehRevisao(norm[i])) continue;
-    const mm = linhas[i].match(/\b(\d{3})\s*[-–]\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ /.&]+)/);
-    if (mm) { const b = bancoPorCodigo(mm[1]); if (b) { aplicar(b.codigo, b.nome, 'alta'); return; } }
+  // CONTEXTO PROIBIDO p/ banco pagador: cartão/RMC/RCC/contrato/empréstimo/consignado. Banco encontrado
+  // aqui é banco de cartão/contrato (banco_rmc/banco_rcc/banco_contrato) e NUNCA banco pagador do benefício.
+  // "margem disponível"/"reserva" sozinhos NÃO entram: são campos do próprio benefício (margem consignável).
+  // Só o contexto inequívoco de cartão/contrato bloqueia (RMC/RCC = "reserva de margem/cartão consignável").
+  const PROIBIDO = /\brmc\b|\brcc\b|\brev\b|cartao|cartão|contrato|emprestimo|empréstimo|consignad|reserva de margem|reserva de cartao|reserva de cartão|instituicao financeira|instituição financeira|\bcredor\b/;
+  // Rótulos FORTES da seção de recebimento do benefício (confiança alta).
+  const PAG_FORTE = /banco pagador|banco de pagamento|instituicao pagadora|instituição pagadora|orgao pagador|órgão pagador|dados bancarios|dados bancários|pagamento do beneficio|pagamento do benefício|meio de pagamento/;
+  // Contexto de pagamento comum (confiança média): banco/recebe + agência/conta.
+  const PAG_MEDIO = /\bbanco\b|recebe|pagamento|agencia|agência|conta corrente|\bconta\b/;
+
+  // proibSelf = linha É de cartão/contrato. proibJanela = ±2 (layout de tabela põe rótulo "Cartão RMC" e
+  // "934 - AGIPLAN" em linhas separadas). Um rótulo FORTE de pagamento ("Banco pagador") é autoritativo e
+  // só é bloqueado se a PRÓPRIA linha for de cartão/contrato; o contexto fraco usa a janela inteira.
+  const proibSelf = new Array(linhas.length).fill(false);
+  const proibJanela = new Array(linhas.length).fill(false);
+  for (let i = 0; i < norm.length; i++) {
+    if (PROIBIDO.test(norm[i])) {
+      proibSelf[i] = true;
+      for (let j = Math.max(0, i - 2); j <= Math.min(norm.length - 1, i + 2); j++) proibJanela[j] = true;
+    }
   }
-  // 2) linha de banco: código (COMPE) + nome em contexto de pagamento
-  for (let i = 0; i < linhas.length; i++) {
-    if (ehRevisao(norm[i])) continue;
-    if (!/banco|recebe|pagamento|meio de pagamento/.test(norm[i])) continue;
+  // Extrai o banco de UMA linha (código COMPE tem prioridade sobre nome). Ignora os 3 primeiros dígitos do CPF.
+  const bancoDaLinha = (i: number): { b: { codigo: string; nome: string }; viaCodigo: boolean } | null => {
     const cods = (linhas[i].match(/\b\d{3}\b/g) || []).filter((c) => c !== cpfDigitos?.slice(0, 3));
     const compe = cods.map(bancoPorCodigo).find(Boolean);
-    if (compe) { aplicar(compe.codigo, compe.nome, 'alta'); return; }
+    if (compe) return { b: compe, viaCodigo: true };
     const porNome = bancoPorNome(linhas[i]);
-    if (porNome) { aplicar(porNome.codigo, porNome.nome, 'media'); return; }
+    if (porNome) return { b: porNome, viaCodigo: false };
+    return null;
+  };
+
+  // 1) ALTA: rótulo forte de pagamento (na linha ou na seguinte). Bloqueia só se a linha lida for de cartão.
+  for (let i = 0; i < norm.length; i++) {
+    if (proibSelf[i] || !PAG_FORTE.test(norm[i])) continue;
+    for (const k of [i, i + 1]) {
+      if (k >= linhas.length || proibSelf[k]) continue;
+      const r = bancoDaLinha(k);
+      if (r) { aplicar(r.b.codigo, r.b.nome, r.viaCodigo ? 'alta' : 'media'); return; }
+    }
   }
-  // 3) célula tabulada na coluna "Banco"
+  // 2) MÉDIA: contexto de pagamento comum (banco/recebe/agência/conta), fora da JANELA de cartão/contrato.
+  for (let i = 0; i < norm.length; i++) {
+    if (proibJanela[i] || !PAG_MEDIO.test(norm[i])) continue;
+    const r = bancoDaLinha(i);
+    if (r) { aplicar(r.b.codigo, r.b.nome, 'media'); return; }
+  }
+  // 3) MÉDIA: célula tabulada na coluna "Banco" (respeita a janela de cartão/contrato).
   for (let i = 0; i < linhas.length; i++) {
-    if (!norm[i].includes('banco')) continue;
+    if (proibJanela[i] || !norm[i].includes('banco')) continue;
     const prox = linhas[i + 1];
-    if (!prox) continue;
-    const cels = celulasTab(prox).filter(Boolean);
-    for (const cel of cels) {
+    if (!prox || proibJanela[i + 1]) continue;
+    for (const cel of celulasTab(prox).filter(Boolean)) {
       const cod = cel.match(/\b(\d{3})\b/)?.[1];
       const b = cod ? bancoPorCodigo(cod) : bancoPorNome(cel);
       if (b) { aplicar(b.codigo, b.nome, 'media'); return; }
     }
   }
-  aviso('BANCO_NAO_ENCONTRADO', 'Nenhum banco pagador foi identificado.', 'bancoCodigo');
+  // 4) NÃO encontrado em seção confiável: deixa vazio, confiança BAIXA e exige revisão. NUNCA usa o
+  //    primeiro banco do documento (que pode ser de cartão/contrato) como pagador.
+  conf('bancoCodigo', 'baixa', 'nao_encontrado');
+  conf('bancoNome', 'baixa', 'nao_encontrado');
+  aviso('BANCO_NAO_ENCONTRADO', 'Banco de recebimento do benefício não identificado com segurança.', 'bancoCodigo');
 }
 
 /** Extrai "código - banco" de uma linha de revisão no formato `934 - AGIPLAN FINANCEIRA S/A`.

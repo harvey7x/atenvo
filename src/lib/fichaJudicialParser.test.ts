@@ -489,3 +489,96 @@ describe('prévia da ficha: linha da revisão só "Cartão RMC/RCC: {banco}" (se
     expect(rccLinhas).toHaveLength(1);
   });
 });
+
+// ===== Banco pagador do benefício NUNCA pode ser banco de cartão/contrato (RMC/RCC/consignado) =====
+describe('banco pagador vs cartão/contrato', () => {
+  const rev = (r: ReturnType<typeof parseFichaJudicial>, tipo: string) => (r.revisoes ?? []).find((x) => x.tipo === tipo);
+
+  it('1. benefício em CAIXA e RMC em FACTA → pagador=Caixa, nunca Facta', () => {
+    const r = parseFichaJudicial(L([
+      'Banco pagador: 104 - CAIXA ECONOMICA FEDERAL', 'Agência: 1234  Conta: 56789-0',
+      'Cartão RMC: 935 - FACTA FINANCEIRA - R$ 50,00',
+    ]));
+    expect(r.bancoCodigo).toBe('104');
+    expect(r.bancoNome).not.toMatch(/facta/i);
+    expect(r.confiancaPorCampo.bancoCodigo).toBe('alta');
+    expect(rev(r, 'rmc')?.bancoNome).toMatch(/facta/i);
+  });
+
+  it('2. benefício em BANCO DO BRASIL e RCC em PAN → pagador=BB, nunca Pan', () => {
+    const r = parseFichaJudicial(L([
+      'Dados bancários', 'Banco: 001 - BANCO DO BRASIL', 'Agência 1 Conta 2',
+      'Cartão RCC 623 - BANCO PAN R$ 30,00',
+    ]));
+    expect(r.bancoCodigo).toBe('001');
+    expect(r.bancoNome).not.toMatch(/pan/i);
+    expect(rev(r, 'rcc')?.bancoNome).toMatch(/pan/i);
+  });
+
+  it('3. só RMC/RCC, sem pagador → banco vazio + confiança baixa + aviso', () => {
+    const r = parseFichaJudicial(L(['Cartão RMC 935 - FACTA FINANCEIRA', 'Cartão RCC 623 - BANCO PAN']));
+    expect(r.bancoCodigo).toBeUndefined();
+    expect(r.bancoNome).toBeUndefined();
+    expect(r.confiancaPorCampo.bancoCodigo).toBe('baixa');
+    expect(r.avisos.some((a) => a.codigo === 'BANCO_NAO_ENCONTRADO')).toBe(true);
+    expect(rev(r, 'rmc')?.bancoNome).toMatch(/facta/i);
+    expect(rev(r, 'rcc')?.bancoNome).toMatch(/pan/i);
+  });
+
+  it('4. vários contratos + pagador explícito → pagador=Itaú, nunca Pan/Agibank', () => {
+    const r = parseFichaJudicial(L([
+      'Empréstimo consignado - Contrato 111 - 623 - BANCO PAN - R$ 200,00',
+      'Empréstimo - Contrato 222 - 121 - AGIBANK - R$ 150,00',
+      'Banco pagador do benefício: 341 - ITAU', 'Agência 0001 Conta 12345',
+    ]));
+    expect(r.bancoCodigo).toBe('341');
+    expect(r.bancoNome).not.toMatch(/pan|agibank/i);
+    expect(r.confiancaPorCampo.bancoCodigo).toBe('alta');
+  });
+
+  it('5. pagador ausente → vazio + baixa', () => {
+    const r = parseFichaJudicial(L(['Nome: Fulano Teste', 'Espécie: 41 - Aposentadoria por idade']));
+    expect(r.bancoCodigo).toBeUndefined();
+    expect(r.confiancaPorCampo.bancoCodigo).toBe('baixa');
+  });
+
+  it('6. pagador perto de agência/conta (sem rótulo forte) → média', () => {
+    const r = parseFichaJudicial(L(['Banco 237 - BRADESCO', 'Agência: 123  Conta: 456']));
+    expect(r.bancoCodigo).toBe('237');
+    expect(r.confiancaPorCampo.bancoCodigo).toBe('media');
+  });
+
+  it('7. FACTA/PAN/AGIBANK só em cartão → pagador vazio', () => {
+    const r = parseFichaJudicial(L([
+      'Cartão RMC 935 - FACTA FINANCEIRA', 'Cartão consignado 121 - AGIBANK', 'Cartão RCC 623 - BANCO PAN',
+    ]));
+    expect(r.bancoCodigo).toBeUndefined();
+    expect(r.bancoNome).toBeUndefined();
+    expect(r.confiancaPorCampo.bancoCodigo).toBe('baixa');
+  });
+
+  it('8. pagador e cartão iguais (PAN) → só vale por estar na seção de pagamento', () => {
+    const r = parseFichaJudicial(L([
+      'Banco pagador: 623 - BANCO PAN', 'Agência 1 Conta 2', 'Cartão RMC 623 - BANCO PAN R$ 40,00',
+    ]));
+    expect(r.bancoCodigo).toBe('623'); // explícito na seção de pagamento → permitido
+    expect(r.confiancaPorCampo.bancoCodigo).toBe('alta');
+    expect(rev(r, 'rmc')?.bancoNome).toMatch(/pan/i);
+  });
+
+  it('9. OCR quebrado → não trava e não vaza FACTA como pagador', () => {
+    const r = parseFichaJudicial(L(['B@nco  pag#dor :  0O1 - BANC0 D0 BRASIL', 'C@rtã0 RMC 935 FACTA']));
+    expect(r.bancoNome ?? '').not.toMatch(/facta/i);
+    expect(r.bancoCodigo).not.toBe('935');
+  });
+
+  it('10. múltiplas páginas: RMC na pág.1, pagador na pág.2 → pagador=Caixa', () => {
+    const r = parseFichaJudicial(L([
+      '--- Página 1 ---', 'Espécie: 41 - Aposentadoria', 'Cartão RMC 935 - FACTA FINANCEIRA',
+      '--- Página 2 ---', 'Dados bancários', 'Banco: 104 - CAIXA ECONOMICA FEDERAL', 'Agência 1 Conta 2',
+    ]));
+    expect(r.bancoCodigo).toBe('104');
+    expect(r.bancoNome).not.toMatch(/facta/i);
+    expect(rev(r, 'rmc')?.bancoNome).toMatch(/facta/i);
+  });
+});
