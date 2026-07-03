@@ -8,7 +8,8 @@ import { corDaEtiqueta } from '@/types/atendimento';
 import { useKanban, useOportunidadesAbertasDeContatos, useConversasDoContato, valorRelevante,
   TIPO_BENEFICIO_OPCOES as TIPO_BENEFICIO, TIPO_SERVICO_OPCOES as TIPO_SERVICO,
   STATUS_CANCEL_OPCOES as ST_CANCEL, STATUS_RESS_OPCOES as ST_RESS, rotuloDe as labelOf,
-  type KColuna, type KLead } from '@/data/kanban';
+  classificarMovimento, traduzErroKanban, MOTIVOS_PERDA, rotuloMotivoPerda, useOportunidadeEventos,
+  type KColuna, type KLead, type MovimentoTipo } from '@/data/kanban';
 import { useSearchParams } from 'react-router-dom';
 import { Modal } from '@/components/Modal';
 import { FichaJudicialBox } from '@/components/FichaJudicialBox';
@@ -119,6 +120,11 @@ export function Kanban() {
   const [search, setSearch] = useState('');
   const [optim, setOptim] = useState<Record<string, string>>({}); // id -> colunaId (otimista)
   const [hover, setHover] = useState<string | null>(null);
+  // Fechamento/perda/reabertura (Etapa 2A.1)
+  const [pend, setPend] = useState<{ lead: KLead; colDest: KColuna; tipo: MovimentoTipo } | null>(null);
+  const [movBusy, setMovBusy] = useState(false);
+  const [motPerda, setMotPerda] = useState(''); const [motPerdaDesc, setMotPerdaDesc] = useState('');
+  const [motReab, setMotReab] = useState(''); const [movErr, setMovErr] = useState<string | null>(null);
   const dragId = useRef<string | null>(null);
   const boardScrollRef = useRef<HTMLDivElement>(null);
   const autoRaf = useRef<number | null>(null);
@@ -150,6 +156,7 @@ export function Kanban() {
 
   const editLead = leadModal?.mode === 'editar' ? (k.leads.find((l) => l.id === leadModal.id) ?? null) : null;
   const detLead = detId ? (k.leads.find((l) => l.id === detId) ?? null) : null;
+  const eventosQ = useOportunidadeEventos(detId);
   const formContatoId = leadModal ? (selContato?.id || (leadModal.mode === 'editar' ? lf.contatoId : '')) : '';
   const conversas = useConversasDoContato(formContatoId || null).data ?? [];
   const clienteTags = selContato ? selContato.tags : (editLead?.contatoEtiquetas ?? []);
@@ -202,9 +209,43 @@ export function Kanban() {
 
   async function mover(id: string, colId: string) {
     const lead = k.leads.find((l) => l.id === id); if (!lead || lead.colunaId === colId) return;
-    setOptim((m) => ({ ...m, [id]: colId }));
-    try { await k.moverLead(id, colId); toast('Lead movido'); }
-    catch (e) { setOptim((m) => { const n = { ...m }; delete n[id]; return n; }); toast('Falha ao mover: ' + (e as Error).message, 'warn'); }
+    if (optim[id]) return; // já em movimentação: bloqueia novo arraste do mesmo card
+    const colDest = k.colunas.find((c) => c.id === colId); if (!colDest) return;
+    const resOrig = k.colunas.find((c) => c.id === lead.colunaId)?.resultado ?? 'neutro';
+    const tipo = classificarMovimento(resOrig, colDest.resultado);
+    if (tipo !== 'neutro') { // ganho/perdido/reabertura -> NÃO move visual antes de confirmar no banco
+      setMotPerda(''); setMotPerdaDesc(''); setMotReab(''); setMovErr(null);
+      setPend({ lead, colDest, tipo });
+      return;
+    }
+    setOptim((m) => ({ ...m, [id]: colId })); // neutra→neutra: otimista imediato
+    try { await k.moverOportunidade({ id, colunaId: colId, atualizadoEmEsperado: lead.atualizadoEm }); toast('Lead movido'); }
+    catch (e) { setOptim((m) => { const n = { ...m }; delete n[id]; return n; }); toast(traduzErroKanban((e as Error).message), 'warn'); }
+  }
+
+  // Confirmação de fechamento/perda/reabertura (arraste OU etapa via modal). Otimista só APÓS confirmar.
+  async function confirmarMov() {
+    if (!pend || movBusy) return;
+    const { lead, colDest, tipo } = pend;
+    if (tipo === 'perdido' && !motPerda) { setMovErr('Selecione o motivo da perda.'); return; }
+    if (tipo === 'perdido' && motPerda === 'outro' && !motPerdaDesc.trim()) { setMovErr('Descreva o motivo da perda.'); return; }
+    if (tipo === 'reabertura' && !motReab.trim()) { setMovErr('Informe o motivo da reabertura.'); return; }
+    setMovBusy(true); setMovErr(null);
+    const atual = k.leads.find((l) => l.id === lead.id)?.atualizadoEm ?? lead.atualizadoEm; // lock otimista com valor fresco
+    setOptim((m) => ({ ...m, [lead.id]: colDest.id }));
+    try {
+      await k.moverOportunidade({
+        id: lead.id, colunaId: colDest.id, atualizadoEmEsperado: atual,
+        motivoPerda: tipo === 'perdido' ? motPerda : undefined,
+        motivoPerdaDesc: tipo === 'perdido' && motPerda === 'outro' ? motPerdaDesc.trim() : undefined,
+        motivoReabertura: tipo === 'reabertura' ? motReab.trim() : undefined,
+      });
+      toast(tipo === 'ganho' ? 'Oportunidade fechada como ganho' : tipo === 'perdido' ? 'Oportunidade marcada como perdida' : 'Oportunidade reaberta');
+      setPend(null);
+    } catch (e) {
+      setOptim((m) => { const n = { ...m }; delete n[lead.id]; return n; });
+      setMovErr(traduzErroKanban((e as Error).message));
+    } finally { setMovBusy(false); }
   }
   function onDrop(colId: string) { pararAutoScroll(); const id = dragId.current; setHover(null); dragId.current = null; if (id) mover(id, colId); }
 
@@ -242,6 +283,7 @@ export function Kanban() {
   function pedirExcluirColuna(c: KColuna) {
     setMenu(null);
     if (c.entrada) { toast('A coluna de entrada não pode ser excluída.', 'warn'); return; }
+    if (c.resultado !== 'neutro') { toast('Colunas de ganho/perdido são estruturais e não podem ser excluídas.', 'warn'); return; }
     if (k.colunas.length <= 1) { toast('O funil precisa de ao menos uma coluna ativa.', 'warn'); return; }
     setDelDest(k.colunas.find((x) => x.id !== c.id)?.id || ''); setDelCol(c);
   }
@@ -293,10 +335,24 @@ export function Kanban() {
       valorDescontoMensal: vMensal.v, valorRessarcimentoEstimado: vRess.v, valorRessarcido: vPago.v, valor: vEst.v, observacoes: lf.observacoes || null,
     };
     try {
-      if (novo) await k.criarLead({ colunaId: lf.colunaId, contatoId: selContato?.id ?? null, ...comum });
-      else await k.editarLead({ id: leadModal!.id!, colunaId: lf.colunaId, ...comum });
-      setLeadModal(null); toast(novo ? 'Oportunidade criada' : 'Oportunidade atualizada');
-    } catch (e) { const m = (e as Error).message || ''; setLeadErr(/uq_oport_aberta|duplicate key|23505/i.test(m) ? 'Este contato já possui uma oportunidade aberta neste funil.' : ('Não foi possível salvar: ' + m)); }
+      if (novo) { await k.criarLead({ colunaId: lf.colunaId, contatoId: selContato?.id ?? null, ...comum }); setLeadModal(null); toast('Oportunidade criada'); }
+      else {
+        // Se a etapa mudou para/entre coluna terminal (ganho/perdido) ou reabertura, NÃO muda a coluna
+        // aqui: salva os demais campos e abre o modal de confirmação/motivo (mesma regra do arraste).
+        const colDest = k.colunas.find((c) => c.id === lf.colunaId) || null;
+        const colMudou = !!editLead && lf.colunaId !== (editLead.colunaId ?? '');
+        const tipo = (colMudou && colDest) ? classificarMovimento(k.colunas.find((c) => c.id === editLead!.colunaId)?.resultado ?? 'neutro', colDest.resultado) : 'neutro';
+        if (colMudou && tipo !== 'neutro' && colDest && editLead) {
+          await k.editarLead({ id: leadModal!.id!, ...comum });   // salva campos, sem alterar a coluna
+          setLeadModal(null);
+          setMotPerda(''); setMotPerdaDesc(''); setMotReab(''); setMovErr(null);
+          setPend({ lead: editLead, colDest, tipo });
+        } else {
+          await k.editarLead({ id: leadModal!.id!, colunaId: lf.colunaId, ...comum });
+          setLeadModal(null); toast('Oportunidade atualizada');
+        }
+      }
+    } catch (e) { const m = (e as Error).message || ''; setLeadErr(/uq_oport_aberta|duplicate key|23505/i.test(m) ? 'Este contato já possui uma oportunidade aberta neste funil.' : traduzErroKanban(m)); }
     finally { setLeadBusy(false); }
   }
   async function arquivar(l: KLead) { setMenu(null); try { await k.arquivarLead(l.id); toast('Lead arquivado'); } catch (e) { toast('Falha ao arquivar: ' + (e as Error).message, 'warn'); } }
@@ -373,11 +429,11 @@ export function Kanban() {
                       const chip = chipDe(l);
                       const subt = [l.tipoBeneficio ? labelOf(TIPO_BENEFICIO, l.tipoBeneficio) : '', labelOf(TIPO_SERVICO, l.tipoServico)].filter(Boolean).join(' · ');
                       return (
-                        <div key={l.id} ref={(el) => { cardRefs.current[l.id] = el; }} className={'lead-card' + (moving ? ' moving' : '') + (destaque === l.id ? ' destaque' : '')} draggable onClick={() => setDetId(l.id)}
-                          onDragStart={(e) => { dragId.current = l.id; try { e.dataTransfer.effectAllowed = 'move'; } catch { /* */ } }} onDragEnd={() => { pararAutoScroll(); dragId.current = null; setHover(null); }}>
+                        <div key={l.id} ref={(el) => { cardRefs.current[l.id] = el; }} className={'lead-card' + (moving ? ' moving' : '') + (destaque === l.id ? ' destaque' : '')} draggable={!optim[l.id]} onClick={() => setDetId(l.id)}
+                          onDragStart={(e) => { if (optim[l.id]) { e.preventDefault(); return; } dragId.current = l.id; try { e.dataTransfer.effectAllowed = 'move'; } catch { /* */ } }} onDragEnd={() => { pararAutoScroll(); dragId.current = null; setHover(null); }}>
                           <div className="lc-top">
                             <Av n={l.nome} />
-                            <div className="lc-id"><div className="lc-name" title={l.nome}>{l.nome}</div>{subt && <div className="lc-sub">{subt}</div>}</div>
+                            <div className="lc-id"><div className="lc-name" title={l.nome}>{l.nome}{l.status === 'ganho' && <span className="lc-flag ganho" title="Fechado como ganho">Ganho</span>}{l.status === 'perdido' && <span className="lc-flag perdido" title={'Perdido' + (l.motivoPerda ? ' · ' + rotuloMotivoPerda(l.motivoPerda) : '')}>Perdido</span>}</div>{subt && <div className="lc-sub">{subt}</div>}</div>
                             <div className="col-menu-wrap">
                               <button className="lc-mbtn" aria-label={'Ações do lead ' + l.nome} onClick={(e) => { e.stopPropagation(); setMenu(menu?.kind === 'card' && menu.id === l.id ? null : { kind: 'card', id: l.id }); }}>{IC.dots}</button>
                               {menu?.kind === 'card' && menu.id === l.id && (
@@ -586,6 +642,26 @@ export function Kanban() {
               {detLead.etiquetas.length > 0 && row('Etiquetas do caso', <span className="kb-det-tags">{detLead.etiquetas.map((t) => { const cor = corDaEtiqueta(t, etiquetas); return <span key={t} className="kb-tag-ro" style={{ background: cor + '22', color: cor, borderColor: cor + '55' }}>{t}</span>; })}</span>)}
               {tags.length === 0 && row('Etiquetas', '—')}
               {row('Resumo do caso', detLead.observacoes ? <span className="kb-det-resumo">{detLead.observacoes}</span> : null)}
+              {(eventosQ.data && eventosQ.data.length > 0) && (() => {
+                const colNome = (id: string | null) => (id ? (k.colunas.find((c) => c.id === id)?.nome || '—') : '—');
+                const rotulo = (ev: string) => ev === 'ganho' ? 'Fechado como ganho' : ev === 'perdido' ? 'Marcado como perdido' : 'Reaberto';
+                return (
+                  <>
+                    <div className="kb-sec-h">Histórico comercial</div>
+                    <div className="kb-hist">
+                      {eventosQ.data!.map((ev) => (
+                        <div key={ev.id} className={'kb-hist-item ' + ev.evento}>
+                          <div className="kb-hist-top"><strong>{rotulo(ev.evento)}</strong><span className="kb-hist-when">{fmtDataHora(ev.criadoEm)}</span></div>
+                          <div className="kb-hist-sub">{colNome(ev.colunaAnteriorId)} → {colNome(ev.colunaNovaId)}</div>
+                          {ev.evento === 'perdido' && ev.motivoPerda && <div className="kb-hist-sub">Motivo: {rotuloMotivoPerda(ev.motivoPerda)}</div>}
+                          {ev.evento === 'reaberto' && ev.motivoReabertura && <div className="kb-hist-sub">Motivo: {ev.motivoReabertura}</div>}
+                          <div className="kb-hist-sub">Por: {ev.executadoPorNome || 'Importação / sistema'}{ev.evento !== 'reaberto' && <> · Responsável no fechamento: {ev.respNoFechamentoId ? (ev.executadoPorNome && ev.respNoFechamentoId === ev.executadoPor ? ev.executadoPorNome : 'atribuído') : 'sem atribuição'}</>}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                );
+              })()}
               <div className="kb-sec-h">Datas</div>
               {row('Criado em', fmtDataHora(detLead.criadoEm))}
               {row('Atualizado em', fmtDataHora(detLead.atualizadoEm))}
@@ -595,6 +671,47 @@ export function Kanban() {
                   contatoAtual={{ nome: detLead.nome, telefone: detLead.telefone, email: detLead.email }}
                   oportunidadeAtual={{ tipoBeneficio: detLead.tipoBeneficio, numeroBeneficio: detLead.numeroBeneficio, instituicao: detLead.instituicao }} />
               </div>
+            </div>
+          );
+        })()}
+      </Modal>
+
+      {/* Confirmação de fechamento / perda / reabertura (arraste ou etapa via modal) */}
+      <Modal open={!!pend} onClose={() => { if (!movBusy) setPend(null); }} closeOnBackdrop={!movBusy} width={460}
+        title={pend ? (pend.tipo === 'ganho' ? 'Confirmar fechamento' : pend.tipo === 'perdido' ? 'Marcar oportunidade como perdida' : 'Reabrir oportunidade') : ''}
+        footer={pend ? <><button className="atv-btn" disabled={movBusy} onClick={() => setPend(null)}>Cancelar</button><button className="atv-btn primary" disabled={movBusy} onClick={confirmarMov}>{movBusy ? 'Salvando…' : pend.tipo === 'ganho' ? 'Confirmar fechamento' : pend.tipo === 'perdido' ? 'Marcar como perdida' : 'Reabrir'}</button></> : null}>
+        {pend && (() => {
+          const colOrig = k.colunas.find((c) => c.id === pend.lead.colunaId)?.nome || '—';
+          const drow = (l: string, v: React.ReactNode) => <div className="kb-det-row"><span className="kb-det-l">{l}</span><span className="kb-det-v">{v}</span></div>;
+          return (
+            <div className="kb-det">
+              {movErr && <div className="banner show banner--error" role="alert"><span>{movErr}</span></div>}
+              {drow('Cliente', pend.lead.nome)}
+              {drow('Etapa anterior', colOrig)}
+              {drow('Nova etapa', pend.colDest.nome)}
+              {pend.tipo !== 'reabertura' && drow('Responsável atual', pend.lead.respNome || <em>sem atribuição</em>)}
+              {pend.tipo === 'ganho' && !pend.lead.respNome && <div className="kb-det-empty">Sem responsável: o fechamento ficará como “sem atribuição”.</div>}
+              {pend.tipo === 'reabertura' && <>
+                {drow('Resultado anterior', pend.lead.status === 'ganho' ? 'Ganho' : pend.lead.status === 'perdido' ? 'Perdido' : '—')}
+                {drow('Fechado em', pend.lead.fechadoEm ? fmtDataHora(pend.lead.fechadoEm) : '—')}
+                {drow('Responsável no fechamento', pend.lead.respNoFechamentoId ? 'atribuído' : <em>sem atribuição</em>)}
+              </>}
+              {pend.tipo === 'perdido' && (
+                <div className="kb-form" style={{ marginTop: 8 }}>
+                  <label className="kb-lbl">Motivo da perda *</label>
+                  <select className="atv-input" value={motPerda} onChange={(e) => { setMotPerda(e.target.value); setMovErr(null); }}>
+                    <option value="">Selecione…</option>
+                    {MOTIVOS_PERDA.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                  </select>
+                  {motPerda === 'outro' && <><label className="kb-lbl" style={{ marginTop: 8 }}>Descrição *</label><textarea className="atv-input" rows={2} value={motPerdaDesc} onChange={(e) => { setMotPerdaDesc(e.target.value); setMovErr(null); }} placeholder="Descreva o motivo" /></>}
+                </div>
+              )}
+              {pend.tipo === 'reabertura' && (
+                <div className="kb-form" style={{ marginTop: 8 }}>
+                  <label className="kb-lbl">Motivo da reabertura *</label>
+                  <textarea className="atv-input" rows={2} value={motReab} onChange={(e) => { setMotReab(e.target.value); setMovErr(null); }} placeholder="Por que está reabrindo esta oportunidade?" />
+                </div>
+              )}
             </div>
           );
         })()}

@@ -5,7 +5,35 @@ import { useOrg } from '@/context/OrgContext';
 
 export const KANBAN_REAL = isSupabaseConfigured && !!supabase;
 
-export interface KColuna { id: string; nome: string; cor: string; ordem: number; entrada: boolean; }
+export type ColResultado = 'neutro' | 'ganho' | 'perdido';
+export interface KColuna { id: string; nome: string; cor: string; ordem: number; entrada: boolean; resultado: ColResultado; encerra: boolean; }
+
+export type MovimentoTipo = 'neutro' | 'ganho' | 'perdido' | 'reabertura';
+/** Decide o efeito de mover um card de uma coluna (resultado origem) para outra (resultado destino).
+ *  Fonte da verdade = funil_colunas.resultado (NUNCA o nome). Espelha o trigger opp_sync_fechamento. */
+export function classificarMovimento(resOrigem: ColResultado, resDestino: ColResultado): MovimentoTipo {
+  if (resDestino === 'ganho') return 'ganho';        // neutra→ganho e perdido→ganho: confirma fechamento (sem motivo)
+  if (resDestino === 'perdido') return 'perdido';    // →perdido: exige motivo de perda
+  if (resOrigem === 'ganho' || resOrigem === 'perdido') return 'reabertura'; // terminal→neutra: exige motivo de reabertura
+  return 'neutro';                                   // neutra→neutra: move direto
+}
+
+export const MOTIVOS_PERDA: [string, string][] = [
+  ['sem_interesse', 'Sem interesse'], ['nao_respondeu', 'Não respondeu'], ['nao_elegivel', 'Não elegível'],
+  ['concorrente', 'Fechou com concorrente'], ['dados_invalidos', 'Dados inválidos'], ['outro', 'Outro'],
+];
+export const rotuloMotivoPerda = (v: string | null) => (v ? MOTIVOS_PERDA.find(([k]) => k === v)?.[1] ?? v : '');
+
+/** Traduz erros do trigger/RLS/lock em mensagens legíveis (nunca SQL bruto). */
+export function traduzErroKanban(msg: string): string {
+  const m = (msg || '').toLowerCase();
+  if (m.includes('motivo_perda_desc')) return 'Descreva o motivo (você escolheu "Outro").';
+  if (m.includes('motivo_perda')) return 'Selecione o motivo da perda.';
+  if (m.includes('motivo_reabertura')) return 'Informe o motivo da reabertura.';
+  if (m.includes('conflito_otimista') || m.includes('alterada por outra')) return 'A oportunidade foi alterada por outra pessoa. Atualize o Kanban.';
+  if (m.includes('permission') || m.includes('row-level') || m.includes('rls') || m.includes('sem_permissao') || m.includes('42501')) return 'Você não tem permissão para realizar esta movimentação.';
+  return 'Não foi possível mover a oportunidade. Tente novamente.';
+}
 
 // Rótulos do domínio previdenciário (compartilhados entre Kanban e painéis WA/FB)
 export const TIPO_BENEFICIO_OPCOES: [string, string][] = [['aposentadoria', 'Aposentadoria'], ['pensao_por_morte', 'Pensão por morte'], ['bpc_loas', 'BPC/LOAS'], ['outro', 'Outro']];
@@ -19,6 +47,8 @@ export interface KLead {
   nome: string; telefone: string; email: string;
   respId: string | null; respNome: string; valor: number | null; origem: string; etiquetas: string[];
   observacoes: string; ordem: number; criadoEm: string; atualizadoEm: string;
+  // fechamento (Etapa 2A): status do funil + snapshot
+  status: string; fechadoEm: string | null; motivoPerda: string | null; respNoFechamentoId: string | null;
   // domínio previdenciário
   tipoBeneficio: string | null; tipoServico: string; statusCancelamento: string; statusRessarcimento: string;
   numeroBeneficio: string | null; instituicao: string | null; tipoDesconto: string | null; dataInicioDesconto: string | null;
@@ -32,6 +62,7 @@ interface DbLead {
   contato_nome: string | null; titulo: string | null;
   telefone: string | null; responsavel_id: string | null; valor_estimado: number | null; origem: string | null;
   etiquetas: string[] | null; observacoes: string | null; ordem: number; criado_em: string; atualizado_em: string;
+  status: string; fechado_em: string | null; motivo_perda: string | null; responsavel_no_fechamento_id: string | null;
   tipo_beneficio: string | null; tipo_servico: string; status_cancelamento: string; status_ressarcimento: string;
   numero_beneficio: string | null; instituicao: string | null; tipo_desconto: string | null; data_inicio_desconto: string | null;
   valor_desconto_mensal: number | null; valor_ressarcimento_estimado: number | null; valor_ressarcido: number | null;
@@ -54,6 +85,7 @@ function mapLead(l: DbLead): KLead {
     respId: l.responsavel_id, respNome: rp?.nome || '',
     valor: l.valor_estimado, origem: l.origem || '', etiquetas: l.etiquetas ?? [],
     observacoes: l.observacoes || '', ordem: l.ordem, criadoEm: l.criado_em, atualizadoEm: l.atualizado_em,
+    status: l.status || 'em_andamento', fechadoEm: l.fechado_em, motivoPerda: l.motivo_perda, respNoFechamentoId: l.responsavel_no_fechamento_id,
     tipoBeneficio: l.tipo_beneficio, tipoServico: l.tipo_servico || 'analise_inicial',
     statusCancelamento: l.status_cancelamento || 'nao_se_aplica', statusRessarcimento: l.status_ressarcimento || 'nao_se_aplica',
     numeroBeneficio: l.numero_beneficio, instituicao: l.instituicao, tipoDesconto: l.tipo_desconto, dataInicioDesconto: l.data_inicio_desconto,
@@ -210,9 +242,10 @@ export function useKanban() {
   const colunasQ = useQuery({
     queryKey: ['kanban-colunas', org, funilId], enabled: KANBAN_REAL && !!funilId, refetchInterval: 8000,
     queryFn: async (): Promise<KColuna[]> => {
-      const { data, error } = await supabase!.from('funil_colunas').select('id, nome, cor, ordem, entrada').eq('organizacao_id', org).eq('funil_id', funilId!).eq('arquivada', false).order('ordem', { ascending: true });
+      const { data, error } = await supabase!.from('funil_colunas').select('id, nome, cor, ordem, entrada, resultado, encerra_oportunidade').eq('organizacao_id', org).eq('funil_id', funilId!).eq('arquivada', false).order('ordem', { ascending: true });
       if (error) throw new Error(error.message);
-      return (data as KColuna[]) ?? [];
+      type CRow = { id: string; nome: string; cor: string; ordem: number; entrada: boolean; resultado: string | null; encerra_oportunidade: boolean | null };
+      return ((data as CRow[]) ?? []).map((c) => ({ id: c.id, nome: c.nome, cor: c.cor, ordem: c.ordem, entrada: c.entrada, resultado: (c.resultado as ColResultado) ?? 'neutro', encerra: Boolean(c.encerra_oportunidade) }));
     },
   });
 
@@ -220,8 +253,8 @@ export function useKanban() {
     queryKey: ['kanban-leads', org, funilId], enabled: KANBAN_REAL && !!funilId, refetchInterval: 8000,
     queryFn: async (): Promise<KLead[]> => {
       const { data, error } = await supabase!.from('oportunidades')
-        .select('id, coluna_id, contato_id, conversa_origem_id, canal_origem_id, contato_nome, titulo, telefone, responsavel_id, valor_estimado, origem, etiquetas, observacoes, ordem, criado_em, atualizado_em, tipo_beneficio, tipo_servico, status_cancelamento, status_ressarcimento, numero_beneficio, instituicao, tipo_desconto, data_inicio_desconto, valor_desconto_mensal, valor_ressarcimento_estimado, valor_ressarcido, contatos(nome, telefone, email, etiquetas), responsavel:usuarios(nome), canal_origem:canais(tipo, nome_interno, numero_conectado)')
-        .eq('organizacao_id', org).eq('funil_id', funilId!).eq('status', 'em_andamento')
+        .select('id, coluna_id, contato_id, conversa_origem_id, canal_origem_id, contato_nome, titulo, telefone, responsavel_id, valor_estimado, origem, etiquetas, observacoes, ordem, criado_em, atualizado_em, status, fechado_em, motivo_perda, responsavel_no_fechamento_id, tipo_beneficio, tipo_servico, status_cancelamento, status_ressarcimento, numero_beneficio, instituicao, tipo_desconto, data_inicio_desconto, valor_desconto_mensal, valor_ressarcimento_estimado, valor_ressarcido, contatos(nome, telefone, email, etiquetas), responsavel:usuarios(nome), canal_origem:canais(tipo, nome_interno, numero_conectado)')
+        .eq('organizacao_id', org).eq('funil_id', funilId!).in('status', ['em_andamento', 'ganho', 'perdido'])
         .order('ordem', { ascending: true }).order('criado_em', { ascending: true });
       if (error) throw new Error(error.message);
       return ((data as unknown as DbLead[]) ?? []).map(mapLead);
@@ -316,11 +349,25 @@ export function useKanban() {
     if (error) throw new Error(error.message);
     invalida();
   }
-  /** Move o lead para outra coluna (append no fim). Lança em erro (o caller faz rollback visual). */
-  async function moverLead(id: string, colunaId: string) {
-    const ordem = (leads.filter((l) => l.colunaId === colunaId).reduce((m, l) => Math.max(m, l.ordem), 0)) + 1;
-    const { error } = await supabase!.from('oportunidades').update({ coluna_id: colunaId, ordem }).eq('id', id).eq('organizacao_id', org);
-    if (error) throw new Error(error.message);
+  /** Move a oportunidade para outra coluna com CONTROLE OTIMISTA (atualizado_em esperado) e os motivos
+   *  exigidos pelo trigger. Distingue conflito (linha mudou) de permissão (linha invisível/RLS). O banco
+   *  é a fonte final de status/fechado_em/fechado_por/snapshot/histórico. Lança em erro (caller faz rollback). */
+  async function moverOportunidade(input: { id: string; colunaId: string; atualizadoEmEsperado: string; motivoPerda?: string | null; motivoPerdaDesc?: string | null; motivoReabertura?: string | null }) {
+    const ordem = (leads.filter((l) => l.colunaId === input.colunaId).reduce((m, l) => Math.max(m, l.ordem), 0)) + 1;
+    const patch: Record<string, unknown> = { coluna_id: input.colunaId, ordem };
+    if (input.motivoPerda !== undefined) patch.motivo_perda = input.motivoPerda ?? null;
+    if (input.motivoPerdaDesc !== undefined) patch.motivo_perda_desc = input.motivoPerdaDesc ?? null;
+    if (input.motivoReabertura !== undefined) patch.motivo_reabertura = input.motivoReabertura ?? null;
+    const { data, error } = await supabase!.from('oportunidades')
+      .update(patch)
+      .eq('id', input.id).eq('organizacao_id', org).eq('atualizado_em', input.atualizadoEmEsperado)
+      .select('id');
+    if (error) throw new Error(error.message);          // erro do trigger (motivo_*) / permissão
+    if (!data || data.length === 0) {
+      // 0 linhas: ou a linha mudou (lock otimista) ou não é visível (permissão). Desambigua.
+      const { data: existe } = await supabase!.from('oportunidades').select('id').eq('id', input.id).eq('organizacao_id', org).maybeSingle();
+      throw new Error(existe ? 'conflito_otimista' : 'sem_permissao');
+    }
     invalida();
   }
 
@@ -331,6 +378,22 @@ export function useKanban() {
     error: (colunasQ.error || leadsQ.error) as Error | null,
     semFunil: funilQ.isFetched && !funilId,
     refetch: () => { colunasQ.refetch(); leadsQ.refetch(); },
-    criarColuna, editarColuna, excluirColuna, criarLead, editarLead, arquivarLead, moverLead,
+    criarColuna, editarColuna, excluirColuna, criarLead, editarLead, arquivarLead, moverOportunidade,
   };
+}
+
+export interface OppEvento { id: string; evento: string; colunaAnteriorId: string | null; colunaNovaId: string | null; motivoPerda: string | null; motivoReabertura: string | null; respNoFechamentoId: string | null; executadoPor: string | null; executadoPorNome: string | null; criadoEm: string; }
+/** Histórico comercial (ganho/perdido/reaberto) de uma oportunidade — legível, sem IDs crus na UI. */
+export function useOportunidadeEventos(oppId: string | null) {
+  return useQuery({
+    queryKey: ['opp-eventos', oppId], enabled: KANBAN_REAL && !!oppId, staleTime: 30_000,
+    queryFn: async (): Promise<OppEvento[]> => {
+      const { data, error } = await supabase!.from('oportunidade_eventos')
+        .select('id, evento, coluna_anterior_id, coluna_nova_id, motivo_perda, motivo_reabertura, responsavel_no_fechamento_id, executado_por, criado_em, executor:usuarios!oportunidade_eventos_executado_por_fkey(nome)')
+        .eq('oportunidade_id', oppId!).order('criado_em', { ascending: false });
+      if (error) throw new Error(error.message);
+      type Row = { id: string; evento: string; coluna_anterior_id: string | null; coluna_nova_id: string | null; motivo_perda: string | null; motivo_reabertura: string | null; responsavel_no_fechamento_id: string | null; executado_por: string | null; criado_em: string; executor: { nome: string } | { nome: string }[] | null };
+      return ((data as unknown as Row[]) ?? []).map((r) => ({ id: r.id, evento: r.evento, colunaAnteriorId: r.coluna_anterior_id, colunaNovaId: r.coluna_nova_id, motivoPerda: r.motivo_perda, motivoReabertura: r.motivo_reabertura, respNoFechamentoId: r.responsavel_no_fechamento_id, executadoPor: r.executado_por, executadoPorNome: (Array.isArray(r.executor) ? r.executor[0]?.nome : r.executor?.nome) ?? null, criadoEm: r.criado_em }));
+    },
+  });
 }
