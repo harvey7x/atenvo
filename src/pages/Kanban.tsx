@@ -362,7 +362,7 @@ export function Kanban() {
 
   // ---- estados ----
   if (k.loading) return <div className="kanban-page"><div className="kb-info">Carregando funil…</div></div>;
-  if (k.isError) return <div className="kanban-page"><div className="kb-info error">Erro ao carregar o funil: {k.error?.message}</div></div>;
+  if (k.isError) { if (k.error) console.error('[kanban] falha ao carregar:', k.error.message); return <div className="kanban-page"><div className="kb-info error">Não foi possível carregar o Kanban. Tente atualizar a página.<button className="link-btn" style={{ marginLeft: 8 }} onClick={() => k.refetch()}>Atualizar</button></div></div>; }
 
   const vazioFunil = k.colunas.length > 0 && k.leads.length === 0;
 
@@ -655,7 +655,7 @@ export function Kanban() {
                           <div className="kb-hist-sub">{colNome(ev.colunaAnteriorId)} → {colNome(ev.colunaNovaId)}</div>
                           {ev.evento === 'perdido' && ev.motivoPerda && <div className="kb-hist-sub">Motivo: {rotuloMotivoPerda(ev.motivoPerda)}</div>}
                           {ev.evento === 'reaberto' && ev.motivoReabertura && <div className="kb-hist-sub">Motivo: {ev.motivoReabertura}</div>}
-                          <div className="kb-hist-sub">Por: {ev.executadoPorNome || 'Importação / sistema'}{ev.evento !== 'reaberto' && <> · Responsável no fechamento: {ev.respNoFechamentoId ? (ev.executadoPorNome && ev.respNoFechamentoId === ev.executadoPor ? ev.executadoPorNome : 'atribuído') : 'sem atribuição'}</>}</div>
+                          <div className="kb-hist-sub">Por: {ev.executadoPorNome || 'Importação / sistema'}{ev.evento !== 'reaberto' && <> · Responsável no fechamento: {ev.respNoFechamentoNome || 'sem atribuição'}</>}</div>
                         </div>
                       ))}
                     </div>
