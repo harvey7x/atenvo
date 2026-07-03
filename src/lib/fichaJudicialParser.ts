@@ -9,7 +9,7 @@ import { bancoPorCodigo, bancoPorNome } from '@/data/bancosCompe';
 export const PARSER_VERSION = '1.0.0';
 
 export type CampoConfianca = 'alta' | 'media' | 'baixa';
-export type CampoOrigem = 'parser' | 'calculado' | 'sugerido' | 'manual' | 'nao_encontrado';
+export type CampoOrigem = 'parser' | 'calculado' | 'sugerido' | 'manual' | 'nao_encontrado' | 'revisao_necessaria';
 export type TipoBeneficio = 'aposentadoria' | 'pensao_por_morte' | 'bpc_loas' | 'outro';
 
 export interface ParserWarning { codigo: string; campo?: string; mensagem: string; }
@@ -322,20 +322,32 @@ function extrairBanco(
     return null;
   };
 
+  // BLOQUEIO ABSOLUTO de banco pagador: PAN (623) e FACTA (935) NUNCA recebem o benefício, mesmo em
+  // contexto de pagamento explícito. Seguem válidos como banco de cartão/contrato (revisoes[]).
+  const PAGADOR_BLOQUEADO = new Set(['623', '935']);
+  const ehBloqueadoPagador = (b: { codigo: string; nome: string }) =>
+    PAGADOR_BLOQUEADO.has(b.codigo) || /\b(banco pan|panamericano|facta)\b/.test(normalizaComparacao(b.nome));
+  let viuBloqueado = false; // encontrou PAN/FACTA numa posição que SERIA de pagador
+  const tentar = (b: { codigo: string; nome: string } | undefined | null, c: CampoConfianca): boolean => {
+    if (!b) return false;
+    if (ehBloqueadoPagador(b)) { viuBloqueado = true; return false; }
+    aplicar(b.codigo, b.nome, c); return true;
+  };
+
   // 1) ALTA: rótulo forte de pagamento (na linha ou na seguinte). Bloqueia só se a linha lida for de cartão.
   for (let i = 0; i < norm.length; i++) {
     if (proibSelf[i] || !PAG_FORTE.test(norm[i])) continue;
     for (const k of [i, i + 1]) {
       if (k >= linhas.length || proibSelf[k]) continue;
       const r = bancoDaLinha(k);
-      if (r) { aplicar(r.b.codigo, r.b.nome, r.viaCodigo ? 'alta' : 'media'); return; }
+      if (r && tentar(r.b, r.viaCodigo ? 'alta' : 'media')) return;
     }
   }
   // 2) MÉDIA: contexto de pagamento comum (banco/recebe/agência/conta), fora da JANELA de cartão/contrato.
   for (let i = 0; i < norm.length; i++) {
     if (proibJanela[i] || !PAG_MEDIO.test(norm[i])) continue;
     const r = bancoDaLinha(i);
-    if (r) { aplicar(r.b.codigo, r.b.nome, 'media'); return; }
+    if (r && tentar(r.b, 'media')) return;
   }
   // 3) MÉDIA: célula tabulada na coluna "Banco" (respeita a janela de cartão/contrato).
   for (let i = 0; i < linhas.length; i++) {
@@ -344,12 +356,18 @@ function extrairBanco(
     if (!prox || proibJanela[i + 1]) continue;
     for (const cel of celulasTab(prox).filter(Boolean)) {
       const cod = cel.match(/\b(\d{3})\b/)?.[1];
-      const b = cod ? bancoPorCodigo(cod) : bancoPorNome(cel);
-      if (b) { aplicar(b.codigo, b.nome, 'media'); return; }
+      if (tentar(cod ? bancoPorCodigo(cod) : bancoPorNome(cel), 'media')) return;
     }
   }
-  // 4) NÃO encontrado em seção confiável: deixa vazio, confiança BAIXA e exige revisão. NUNCA usa o
-  //    primeiro banco do documento (que pode ser de cartão/contrato) como pagador.
+  // 4a) Só achou PAN/FACTA como candidato a pagador → NUNCA preenche; exige revisão explícita.
+  if (viuBloqueado) {
+    conf('bancoCodigo', 'baixa', 'revisao_necessaria');
+    conf('bancoNome', 'baixa', 'revisao_necessaria');
+    aviso('BANCO_PAGADOR_BLOQUEADO', 'Banco de recebimento não identificado com segurança. PAN/FACTA não devem ser usados como banco pagador.', 'bancoCodigo');
+    return;
+  }
+  // 4b) NÃO encontrado em seção confiável: deixa vazio, confiança BAIXA e exige revisão. NUNCA usa o
+  //     primeiro banco do documento (que pode ser de cartão/contrato) como pagador.
   conf('bancoCodigo', 'baixa', 'nao_encontrado');
   conf('bancoNome', 'baixa', 'nao_encontrado');
   aviso('BANCO_NAO_ENCONTRADO', 'Banco de recebimento do benefício não identificado com segurança.', 'bancoCodigo');

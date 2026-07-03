@@ -172,9 +172,9 @@ describe('ficha judicial parser', () => {
     expect(r.bancoNome).toBe('Agibank');
   });
   it('33. banco com código sem hífen', () => {
-    const r = parseFichaJudicial('Recebe o benefício: 623 BANCO PAN');
-    expect(r.bancoCodigo).toBe('623');
-    expect(r.bancoNome).toBe('Banco Pan');
+    const r = parseFichaJudicial('Recebe o benefício: 104 CAIXA ECONOMICA FEDERAL');
+    expect(r.bancoCodigo).toBe('104');
+    expect(r.bancoNome).toBe('Caixa Econômica Federal');
   });
   it('34. banco somente por nome', () => {
     const r = parseFichaJudicial('Banco: Bradesco');
@@ -557,12 +557,15 @@ describe('banco pagador vs cartão/contrato', () => {
     expect(r.confiancaPorCampo.bancoCodigo).toBe('baixa');
   });
 
-  it('8. pagador e cartão iguais (PAN) → só vale por estar na seção de pagamento', () => {
+  it('8. PAN em "Banco pagador" + RMC PAN → pagador VAZIO (bloqueio absoluto); RMC mantém PAN', () => {
     const r = parseFichaJudicial(L([
       'Banco pagador: 623 - BANCO PAN', 'Agência 1 Conta 2', 'Cartão RMC 623 - BANCO PAN R$ 40,00',
     ]));
-    expect(r.bancoCodigo).toBe('623'); // explícito na seção de pagamento → permitido
-    expect(r.confiancaPorCampo.bancoCodigo).toBe('alta');
+    expect(r.bancoCodigo).toBeUndefined();
+    expect(r.bancoNome).toBeUndefined();
+    expect(r.confiancaPorCampo.bancoCodigo).toBe('baixa');
+    expect(r.origemPorCampo.bancoCodigo).toBe('revisao_necessaria');
+    expect(r.avisos.some((a) => a.codigo === 'BANCO_PAGADOR_BLOQUEADO')).toBe(true);
     expect(rev(r, 'rmc')?.bancoNome).toMatch(/pan/i);
   });
 
@@ -580,5 +583,77 @@ describe('banco pagador vs cartão/contrato', () => {
     expect(r.bancoCodigo).toBe('104');
     expect(r.bancoNome).not.toMatch(/facta/i);
     expect(rev(r, 'rmc')?.bancoNome).toMatch(/facta/i);
+  });
+});
+
+// ===== PAN/FACTA NUNCA são banco pagador; AGIBANK/BMG/Caixa/Santander/Mercantil/Crefisa são válidos =====
+describe('PAN/FACTA bloqueados como banco pagador', () => {
+  const rev = (r: ReturnType<typeof parseFichaJudicial>, tipo: string) => (r.revisoes ?? []).find((x) => x.tipo === tipo);
+  const pag = (linha: string) => parseFichaJudicial(L([linha, 'Agência: 1234 Conta: 56789']));
+
+  it('1. AGIBANK em banco pagador explícito → aceita', () => {
+    const r = pag('Banco pagador: 121 - AGIBANK');
+    expect(r.bancoCodigo).toBe('121');
+    expect(r.confiancaPorCampo.bancoCodigo).toBe('alta');
+  });
+  it('2. BMG em banco pagador explícito → aceita', () => {
+    const r = pag('Banco pagador: 318 - BANCO BMG');
+    expect(r.bancoCodigo).toBe('318');
+  });
+  it('3. Caixa Econômica em banco pagador explícito → aceita', () => {
+    const r = pag('Banco pagador: 104 - CAIXA ECONOMICA FEDERAL');
+    expect(r.bancoCodigo).toBe('104');
+  });
+  it('4. Santander em banco pagador explícito → aceita', () => {
+    const r = pag('Banco pagador: 033 - SANTANDER');
+    expect(r.bancoCodigo).toBe('033');
+  });
+  it('5. Mercantil em banco pagador explícito → aceita', () => {
+    const r = pag('Banco pagador: 389 - BANCO MERCANTIL DO BRASIL');
+    expect(r.bancoCodigo).toBe('389');
+  });
+  it('6. Crefisa em banco pagador explícito → aceita', () => {
+    const r = pag('Banco pagador: 069 - BANCO CREFISA');
+    expect(r.bancoCodigo).toBe('069');
+  });
+
+  it('7. PAN em banco pagador explícito → NÃO aceita; marca revisão', () => {
+    const r = pag('Banco pagador: 623 - BANCO PAN');
+    expect(r.bancoCodigo).toBeUndefined();
+    expect(r.bancoNome).toBeUndefined();
+    expect(r.confiancaPorCampo.bancoCodigo).toBe('baixa');
+    expect(r.origemPorCampo.bancoCodigo).toBe('revisao_necessaria');
+    expect(r.avisos.some((a) => a.codigo === 'BANCO_PAGADOR_BLOQUEADO')).toBe(true);
+  });
+  it('8. FACTA em banco pagador explícito → NÃO aceita; marca revisão', () => {
+    const r = pag('Banco de pagamento: 935 - FACTA FINANCEIRA');
+    expect(r.bancoCodigo).toBeUndefined();
+    expect(r.origemPorCampo.bancoCodigo).toBe('revisao_necessaria');
+    expect(r.avisos.some((a) => a.codigo === 'BANCO_PAGADOR_BLOQUEADO')).toBe(true);
+  });
+
+  it('9. PAN em RMC/RCC → só cartão, nunca pagador', () => {
+    const r = parseFichaJudicial(L(['Cartão RMC 623 - BANCO PAN', 'Cartão RCC 623 - BANCO PAN']));
+    expect(r.bancoCodigo).toBeUndefined();
+    expect(rev(r, 'rmc')?.bancoNome).toMatch(/pan/i);
+    expect(rev(r, 'rcc')?.bancoNome).toMatch(/pan/i);
+  });
+  it('10. FACTA em RMC/RCC → só cartão, nunca pagador', () => {
+    const r = parseFichaJudicial(L(['Cartão RMC 935 - FACTA FINANCEIRA', 'Cartão RCC 935 - FACTA FINANCEIRA']));
+    expect(r.bancoCodigo).toBeUndefined();
+    expect(rev(r, 'rmc')?.bancoNome).toMatch(/facta/i);
+    expect(rev(r, 'rcc')?.bancoNome).toMatch(/facta/i);
+  });
+
+  it('11. AGIBANK só em RMC/contrato sem seção de pagamento → não vira pagador', () => {
+    const r = parseFichaJudicial(L(['Cartão RMC 121 - AGIBANK', 'Contrato consignado 121 - AGIBANK R$ 100,00']));
+    expect(r.bancoCodigo).toBeUndefined();
+    expect(r.confiancaPorCampo.bancoCodigo).toBe('baixa');
+  });
+  it('12. sem banco pagador confiável → vazio + revisão', () => {
+    const r = parseFichaJudicial(L(['Nome: Fulano', 'Espécie: 41 - Aposentadoria']));
+    expect(r.bancoCodigo).toBeUndefined();
+    expect(r.confiancaPorCampo.bancoCodigo).toBe('baixa');
+    expect(r.avisos.some((a) => a.codigo === 'BANCO_NAO_ENCONTRADO')).toBe(true);
   });
 });

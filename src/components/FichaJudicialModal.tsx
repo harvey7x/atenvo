@@ -56,6 +56,7 @@ function fichaParaForm(f: FichaJudicial): Form {
 const IND: Record<CampoOrigem | 'manual', { txt: string; cls: string }> = {
   parser: { txt: 'Encontrado', cls: 'ok' }, calculado: { txt: 'Calculado', cls: 'ok' },
   sugerido: { txt: 'Sugerido', cls: 'warn' }, manual: { txt: 'Manual', cls: 'man' }, nao_encontrado: { txt: 'Revisar', cls: 'warn' },
+  revisao_necessaria: { txt: 'Revisar', cls: 'warn' },
 };
 
 export function FichaJudicialModal({ open, onClose, vinculos, fichaInicial, modo = 'novo', responsavelSugerido, contatoAtual, oportunidadeAtual }: Props) {
@@ -193,7 +194,13 @@ export function FichaJudicialModal({ open, onClose, vinculos, fichaInicial, modo
     if (!form.tipoBeneficio) return 'Selecione o tipo de benefício.';
     if (!form.telefone.trim()) return 'Informe o telefone.';
     if (!form.dataConsulta) return 'Informe a data da ficha.';
+    if (bancoPagadorPendente()) return 'Revisar banco de recebimento. PAN/FACTA não devem ser usados como banco pagador do benefício.';
     return null;
+  }
+
+  // Banco pagador bloqueado (PAN/FACTA) e ainda não preenchido manualmente → exige revisão antes de gerar/copiar.
+  function bancoPagadorPendente(): boolean {
+    return origem.bancoCodigo === 'revisao_necessaria' && !form.bancoNome.trim() && !form.bancoCodigo.trim();
   }
 
   async function finalizarFicha() {
@@ -215,6 +222,7 @@ export function FichaJudicialModal({ open, onClose, vinculos, fichaInicial, modo
   }
 
   async function copiar() {
+    if (bancoPagadorPendente()) { setErro('Revisar banco de recebimento. PAN/FACTA não devem ser usados como banco pagador do benefício.'); setEtapa('revisar'); return; }
     const texto = formatarFichaJudicial(dadosFmt, { incluirSenha: incluirSenhaAoCopiar, senha: senhaInssTemporaria });
     try {
       if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(texto);
@@ -288,6 +296,7 @@ export function FichaJudicialModal({ open, onClose, vinculos, fichaInicial, modo
               {campo('Tipo de benefício', <select className="atv-input" value={form.tipoBeneficio} onChange={(e) => setF({ tipoBeneficio: e.target.value as Form['tipoBeneficio'] })} disabled={readOnly}><option value="">Selecione…</option>{TIPOS_BENEF.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>, ind('tipoBeneficio'))}
               {campo('Cód. COMPE', <input className="atv-input" value={form.bancoCodigo} onChange={(e) => setF({ bancoCodigo: e.target.value })} disabled={readOnly} />, ind('bancoCodigo'))}
               {campo('Banco pagador', <input className="atv-input" value={form.bancoNome} onChange={(e) => setF({ bancoNome: e.target.value })} disabled={readOnly} />, ind('bancoNome'))}
+              {origem.bancoCodigo === 'revisao_necessaria' && <div className="fj-ind warn" style={{ gridColumn: '1 / -1' }}>Revisar banco de recebimento. PAN/FACTA não devem ser usados como banco pagador do benefício.</div>}
               {campo('Valor do benefício', <input className="atv-input" inputMode="decimal" placeholder="0,00" value={form.valorBeneficio} onChange={(e) => setF({ valorBeneficio: e.target.value })} disabled={readOnly} />, ind('valorBeneficio'))}
               {campo('Data da ficha', <input className="atv-input" type="date" value={form.dataConsulta} onChange={(e) => { setF({ dataConsulta: e.target.value }); setDataSugerida(false); }} disabled={readOnly} />, dataSugerida ? <span className="fj-ind warn">Sugerida</span> : ind('dataConsulta'))}
             </div>
