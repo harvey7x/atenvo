@@ -42,10 +42,6 @@ create table if not exists public.oportunidade_eventos (
 );
 create index if not exists idx_opp_eventos_opp on public.oportunidade_eventos(oportunidade_id, criado_em);
 create index if not exists idx_opp_eventos_org on public.oportunidade_eventos(organizacao_id, criado_em);
-alter table public.oportunidade_eventos drop constraint if exists oportunidade_eventos_executado_por_fkey;
-alter table public.oportunidade_eventos add constraint oportunidade_eventos_executado_por_fkey foreign key (executado_por) references public.usuarios(id) on delete set null;
-alter table public.oportunidade_eventos drop constraint if exists oportunidade_eventos_resp_fech_fkey;
-alter table public.oportunidade_eventos add constraint oportunidade_eventos_resp_fech_fkey foreign key (responsavel_no_fechamento_id) references public.usuarios(id) on delete set null;
 alter table public.oportunidade_eventos enable row level security;
 drop policy if exists opp_eventos_sel on public.oportunidade_eventos;
 create policy opp_eventos_sel on public.oportunidade_eventos for select using (is_platform_admin() or is_member(organizacao_id));
@@ -95,15 +91,6 @@ end $function$;
 drop trigger if exists trg_opp_sync_fechamento on public.oportunidades;
 create trigger trg_opp_sync_fechamento before update of coluna_id on public.oportunidades
   for each row execute function public.opp_sync_fechamento();
-
--- atualizado_em muda a cada UPDATE (habilita o controle otimista por atualizado_em no frontend;
--- antes era só o default de insert, então "Atualizado em" ficava igual à criação). clock_timestamp
--- garante mudança mesmo em updates no mesmo tick de transação.
-create or replace function public.opp_touch_atualizado()
-returns trigger language plpgsql as $function$
-begin NEW.atualizado_em := clock_timestamp(); return NEW; end $function$;
-drop trigger if exists trg_opp_touch on public.oportunidades;
-create trigger trg_opp_touch before update on public.oportunidades for each row execute function public.opp_touch_atualizado();
 
 -- 5) leitura do histórico (RLS restringe por organização; INSERT só via trigger definer)
 grant select on public.oportunidade_eventos to authenticated;
