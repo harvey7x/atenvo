@@ -1,4 +1,6 @@
 // evolution-webhook — eventos da Evolution. Sem JWT. Secret via webhook_config (constante).
+// v21: @lid REUSO — evento só com LID consulta wa_lid_map CONFIRMADO por (org,canal,lid) e reutiliza o PN
+//      vinculado: resolve o contato certo sem criar novo, sem depender de cache. Mapa não confirmado nunca usado.
 // v20: @lid identidade protegida — o LID NUNCA vira nome do contato (sem PN e sem pushName real =>
 //      "Identidade protegida", identidade_tipo=lid_pendente). Ao chegar PN (evento real, #7) resolve o
 //      estado e corrige o nome placeholder. Grava mapa LID↔PN por CANAL em wa_lid_map (best-effort).
@@ -175,15 +177,25 @@ Deno.serve(async (req) => {
       if ((remoteJid ?? '').endsWith('@g.us')) { await finish('ignorado', { ignorado_motivo: 'grupo_nao_suportado' }); return json({ ok: true }); }
 
       // remoteJid é a OUTRA parte tanto na entrada (remetente) quanto na saída (destinatário) → resolução idêntica.
-      const phoneJid = firstEndingWith([remoteJid, key.remoteJidAlt as string, data.remoteJidAlt as string, key.participantAlt as string, data.participantAlt as string, key.participant as string, data.participant as string], '@s.whatsapp.net');
+      let phoneJid = firstEndingWith([remoteJid, key.remoteJidAlt as string, data.remoteJidAlt as string, key.participantAlt as string, data.participantAlt as string, key.participant as string, data.participant as string], '@s.whatsapp.net');
       const lidJid = firstEndingWith([remoteJid, key.remoteJidAlt as string, data.remoteJidAlt as string, key.participant as string, data.participant as string], '@lid');
-      const phone = digits(phoneJid); const lid = digits(lidJid);
+      let phone = digits(phoneJid); const lid = digits(lidJid);
       const msgObj = data.message as Record<string, unknown> | undefined;
       const corpo = textOf(msgObj);
       const midia = midiaOf(msgObj);
       const conteudoMsg = corpo ?? midia?.caption ?? null; // legenda da mídia vira o texto exibido
       if (!corpo && !midia) { await finish('ignorado', { ignorado_motivo: 'sem_conteudo' }); return json({ ok: true }); }
       if (!phone && !lid) { await finish('ignorado', { ignorado_motivo: 'sem_identificador' }); return json({ ok: true }); }
+      // v21: evento SÓ com LID → consulta o mapa CONFIRMADO por (org, canal, lid) e REUTILIZA o PN já vinculado
+      //      (manual ou anterior). Isso resolve o contato correto sem criar novo e sem depender de cache em memória.
+      //      NUNCA usa mapa não confirmado nem PN sem telefone.
+      let resolvidoViaMapa = false;
+      if (!phone && lid) {
+        const { data: mp } = await admin.from('wa_lid_map').select('telefone_normalizado, jid_telefone')
+          .eq('organizacao_id', orgId).eq('canal_id', canal.id).eq('lid', lid).eq('confirmado', true)
+          .not('telefone_normalizado', 'is', null).maybeSingle();
+        if (mp?.telefone_normalizado) { phone = mp.telefone_normalizado; phoneJid = mp.jid_telefone ?? `${phone}@s.whatsapp.net`; resolvidoViaMapa = true; }
+      }
       // Em saída o pushName é do dono da conta (não do destinatário) → não usar como nome do contato.
       // v19: o LID NUNCA vira nome. Sem PN e sem pushName real → "Identidade protegida" (pendente).
       const agoraIso = new Date().toISOString();
@@ -304,7 +316,7 @@ Deno.serve(async (req) => {
           if (funil?.id) { const { error: re } = await admin.rpc('garantir_oportunidade_entrada', { p_contato: contatoId, p_funil: funil.id, p_origem: 'WhatsApp', p_conversa: conversaId, p_canal: canal.id }); if (re) kanbanErro = `${re.code ?? ''}:${(re.message ?? '').slice(0, 80)}`; }
         } catch (ke) { kanbanErro = String((ke as Error).message ?? 'rpc').slice(0, 80); }
       }
-      await finish('processado', { ignorado_motivo: kanbanErro ? ('kanban_erro:' + kanbanErro) : (phone ? null : 'lid_sem_telefone') });
+      await finish('processado', { ignorado_motivo: kanbanErro ? ('kanban_erro:' + kanbanErro) : (resolvidoViaMapa ? 'lid_resolvido_via_mapa' : (phone ? null : 'lid_sem_telefone')) });
       return json({ ok: true });
     }
 

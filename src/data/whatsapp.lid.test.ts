@@ -15,14 +15,23 @@ describe('@lid — o LID nunca vira nome', () => {
     expect(webhook).toContain('canal_id: canal.id');
   });
 
+  it('webhook v21: evento só com LID CONSULTA o mapa confirmado por org+canal+lid', () => {
+    // leitura do mapa (não só escrita): filtra por confirmado=true e telefone presente
+    expect(webhook).toMatch(/if \(!phone && lid\) \{[\s\S]*from\('wa_lid_map'\)[\s\S]*\.eq\('confirmado', true\)/);
+    expect(webhook).toContain('resolvidoViaMapa');
+    expect(webhook).toContain("'lid_resolvido_via_mapa'");
+  });
+
   it('webhook: ao resolver PN corrige o nome placeholder e marca estado', () => {
     expect(webhook).toMatch(/identidade_tipo:\s*'telefone'/);
     expect(webhook).toMatch(/\.eq\('nome',\s*'Identidade protegida'\)/);
   });
 
-  it('data layer: exibição defensiva não mostra LID cru como nome', () => {
-    expect(wa).toContain('nomeEhLid');
+  it('data layer: exibição defensiva não mostra LID cru; resolvido mostra telefone', () => {
+    expect(wa).toContain('ehLidCru');
+    expect(wa).toContain('ehPlaceholder');
     expect(wa).toMatch(/\/\^\[0-9\]\{12,\}\$\//);
-    expect(wa).toMatch(/nomeEhLid \? 'Identidade protegida'/);
+    // placeholder só quando NÃO há telefone; com telefone mostra o número
+    expect(wa).toMatch(/ehPlaceholder \? \(tel \?\? 'Identidade protegida'\)/);
   });
 });
