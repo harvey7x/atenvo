@@ -80,21 +80,58 @@ export interface FunilColunaRel {
 }
 export interface RelFunil { periodo: RelPeriodo; cobertura_historico: string; colunas: FunilColunaRel[] }
 
-/* ===================== Financeiro ===================== */
+/* ===================== Financeiro (v2: ESTOQUE × FLUXO × POSIÇÃO na data de corte) ===================== */
+export interface FinContratadoServico { servico: string; valor_contratado: number }
+export interface FinContratadoCanal { canal_id: string | null; canal: string; valor_contratado: number }
+export interface FinContratadoResp { responsavel_id: string | null; nome: string; valor_contratado: number }
+export interface FinRecebidoServico { servico: string; receita_recebida: number }
+export interface FinRecebidoCanal { canal_id: string | null; canal: string; receita_recebida: number }
+export interface FinRecebidoResp { responsavel_id: string | null; nome: string; receita_recebida: number }
 export interface RelFinanceiro {
-  periodo: RelPeriodo; receita_contratada: number; receita_prevista: number; receita_recebida: number;
-  a_vencer: number; vencido: number; inadimplencia_valor_pct: number | null; inadimplencia_parcelas_pct: number | null;
-  ticket_medio_mensal: number; ticket_medio_contratado: number; economia_gerada: number;
-  receita_por_servico: { servico: string; receita_contratada: number }[];
-  receita_por_canal_origem: { canal_id: string | null; canal: string; receita_contratada: number }[];
-  receita_por_responsavel_fechamento: { responsavel_id: string | null; nome: string; receita_recebida: number }[];
+  periodo: RelPeriodo;
+  /** Data usada para reconstruir a POSIÇÃO (a vencer/vencido/inadimplência). Ecoa p_data_corte ou hoje (SP). */
+  data_corte: string;
+  /** Qualidade da reconstrução da posição na data de corte. */
+  qualidade_posicao: { status: 'completa' | 'completa_reconstruida' | 'limitada'; motivo: string | null };
+  /** Limites do modelo (ex.: pagamento parcial não é representável). */
+  modelo: { pagamento_parcial_suportado: boolean; observacao: string };
+  /** ESTOQUE — carteira viva (independe do período). */
+  estoque: {
+    carteira_contratada_ativa: number; contratos_ativos: number;
+    ticket_medio_mensal_ativo: number; ticket_medio_contratado_ativo: number; economia_gerada_ativa: number;
+  };
+  /** FLUXO do período (contratos por data_inicio; parcelas por data_prevista/data_pagamento). */
+  fluxo: {
+    novos_contratos_periodo: number; valor_contratado_periodo: number;
+    receita_prevista_periodo: number; receita_recebida_periodo: number; valor_com_vencimento_no_periodo: number;
+  };
+  /** POSIÇÃO na data de corte (saldo em aberto). */
+  posicao: {
+    saldo_total_em_aberto: number; saldo_a_vencer_data_corte: number; saldo_vencido_data_corte: number;
+    inadimplencia_valor_data_corte_pct: number | null; inadimplencia_parcelas_data_corte_pct: number | null;
+  };
+  /** CONTRATADO por dimensão (cada soma fecha com estoque.carteira_contratada_ativa). */
+  contratado: {
+    por_servico: FinContratadoServico[]; por_canal_origem: FinContratadoCanal[]; por_responsavel_fechamento: FinContratadoResp[];
+  };
+  /** RECEBIDO por dimensão (cada soma fecha com fluxo.receita_recebida_periodo). */
+  recebido: {
+    por_servico: FinRecebidoServico[]; por_canal_origem: FinRecebidoCanal[]; por_responsavel_fechamento: FinRecebidoResp[];
+  };
+  /** Saldo aberto futuro por mês (soma fecha com posicao.saldo_a_vencer_data_corte). */
   previsao_proximos_meses: { mes: string; previsto: number }[];
 }
 
 /* ===================== Qualidade ===================== */
+export interface ServicoVarianteItem { original: string; cobrancas: number; valor_contratado: number }
+export interface ServicoVarianteGrupo {
+  normalizado: string; variantes: number; cobrancas: number; impacto_financeiro: number; itens: ServicoVarianteItem[];
+}
 export interface AlertaQualidade {
   codigo: string; titulo: string; quantidade: number; percentual: number | null;
   severidade: 'alta' | 'media' | 'baixa'; orientacao: string; drill: string;
+  /** Preenchido apenas em alertas com detalhamento (ex.: servico_nao_normalizado); null nos demais. */
+  detalhe: ServicoVarianteGrupo[] | null;
 }
 export interface RelQualidade { org: string; alertas: AlertaQualidade[] }
 
@@ -145,10 +182,10 @@ export function useRelFunil(inicio: string, fim: string) {
   return useQuery({ queryKey: ['rel2b-funil', currentOrg.id, inicio, fim], enabled: REL2B_REAL, staleTime: 60_000,
     queryFn: () => rpc<RelFunil>('relatorio_funil', { p_org: currentOrg.id, p_inicio: inicio, p_fim: fim }) });
 }
-export function useRelFinanceiro(inicio: string, fim: string) {
+export function useRelFinanceiro(inicio: string, fim: string, dataCorte?: string | null) {
   const { currentOrg } = useOrg();
-  return useQuery({ queryKey: ['rel2b-fin', currentOrg.id, inicio, fim], enabled: REL2B_REAL, staleTime: 60_000,
-    queryFn: () => rpc<RelFinanceiro>('relatorio_financeiro', { p_org: currentOrg.id, p_inicio: inicio, p_fim: fim }) });
+  return useQuery({ queryKey: ['rel2b-fin', currentOrg.id, inicio, fim, dataCorte ?? null], enabled: REL2B_REAL, staleTime: 60_000,
+    queryFn: () => rpc<RelFinanceiro>('relatorio_financeiro', { p_org: currentOrg.id, p_inicio: inicio, p_fim: fim, p_data_corte: dataCorte ?? null }) });
 }
 export function useRelQualidade() {
   const { currentOrg } = useOrg();
