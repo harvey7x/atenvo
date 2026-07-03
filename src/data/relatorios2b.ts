@@ -1,0 +1,172 @@
+// ETAPA 2B — Data layer da camada oficial de dados dos Relatórios (RPCs no banco = fonte única).
+// NÃO conectado aos componentes visuais atuais. Tipos explícitos (sem `any`). Período em SP,
+// fim EXCLUSIVO. Toda RPC valida membership internamente; o front passa a org atual.
+import { useQuery } from '@tanstack/react-query';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { useOrg } from '@/context/OrgContext';
+
+export const REL2B_REAL = isSupabaseConfigured && !!supabase;
+
+/** Contrato padrão de KPI comparável (snapshot). */
+export interface KpiSnapshot {
+  codigo: string; titulo: string; unidade: string; formula: string;
+  valor: number | null; valor_anterior: number | null;
+  diferenca_absoluta: number | null; variacao_percentual: number | null;
+  cobertura: string[] | null;
+}
+
+export interface RelPeriodo { inicio: string; fim_exclusivo: string; timezone: string }
+
+/* ===================== Visão geral ===================== */
+export interface VisaoGeralOperacional {
+  contatos_novos: number; conversas_novas: number; conversas_com_inbound: number;
+  conversas_atendidas: number; conversas_sem_resposta: number; taxa_atendimento_pct: number;
+  categorias: Record<'sem_inbound' | 'inbound_sem_resposta' | 'inbound_painel' | 'inbound_so_celular' | 'inbound_humana_antes' | 'inbound_so_automacao' | 'total', number>;
+  respostas_painel: number; respostas_celular: number; respostas_sem_atribuicao: number;
+  cobertura_atribuicao_msgs_pct: number | null;
+}
+export interface VisaoGeralComercial {
+  oportunidades_criadas: number; ganhos_coorte: number; conversao_coorte_pct: number;
+  fechamentos_periodo: number; perdas_periodo: number; fechamentos_estimados: number;
+  cobertura_responsavel_opp_pct: number | null;
+}
+export interface VisaoGeralFinanceiro {
+  receita_contratada: number; receita_prevista: number; receita_recebida: number;
+  pendente: number; vencido: number; inadimplencia_valor_pct: number | null;
+  inadimplencia_parcelas_pct: number | null; ticket_medio_mensal: number; economia_gerada: number;
+}
+export interface VisaoGeralQualidade {
+  oportunidades_sem_responsavel: number; mensagens_sem_autor: number; contatos_sem_telefone: number;
+  fechamentos_com_data_estimada: number; alertas: string[];
+}
+export interface VisaoGeral {
+  periodo: RelPeriodo; operacional: VisaoGeralOperacional; comercial: VisaoGeralComercial;
+  financeiro: VisaoGeralFinanceiro; qualidade: VisaoGeralQualidade;
+}
+
+/* ===================== Canais ===================== */
+export interface CanalComercial {
+  canal_id: string | null; canal: string; contatos_originados: number; oportunidades_criadas: number;
+  ganhos_coorte: number; conversao_coorte_pct: number; fechamentos_periodo: number; perdas_periodo: number;
+  receita_contratada: number; receita_prevista: number; receita_recebida: number;
+}
+export interface CanalOperacional {
+  canal_id: string | null; canal: string; conversas: number; conversas_com_inbound: number;
+  conversas_atendidas: number; conversas_sem_resposta: number; taxa_atendimento_pct: number;
+  mensagens_recebidas: number; mensagens_enviadas: number; respostas_painel: number; respostas_celular: number;
+  primeira_resposta_min: number | null; falhas_envio: number;
+}
+export interface RelCanais { periodo: RelPeriodo; comercial: CanalComercial[]; operacional: CanalOperacional[] }
+
+/* ===================== Equipe ===================== */
+export interface EquipeUsuario {
+  usuario_id: string; nome: string; mensagens_painel: number; conversas_respondidas: number;
+  oportunidades_atuais: number; oportunidades_criadas: number; ganhos_coorte: number;
+  fechamentos_periodo: number; perdas: number; conversao_pct: number; receita_contratada: number;
+}
+export interface RelEquipe {
+  periodo: RelPeriodo; usuarios: EquipeUsuario[];
+  sem_atribuicao: { mensagens_celular: number; conversas_celular: number; oportunidades_sem_responsavel: number; fechamentos_sem_responsavel_hist: number };
+  cobertura: { atribuicao_msgs_pct: number | null; responsavel_opp_pct: number | null };
+  alertas: string[];
+}
+
+/* ===================== Funil ===================== */
+export interface FunilColunaRel {
+  coluna_id: string; coluna: string; ordem: number; resultado: 'neutro' | 'ganho' | 'perdido';
+  quantidade_atual: number; ganhos_periodo: number; perdas_periodo: number; oportunidades_paradas_7d: number;
+  idade_media_dias: number; tempo_medio_etapa_dias: number;
+  entradas_periodo: number | null; saidas_periodo: number | null; conversao_proxima_etapa_pct: number | null;
+}
+export interface RelFunil { periodo: RelPeriodo; cobertura_historico: string; colunas: FunilColunaRel[] }
+
+/* ===================== Financeiro ===================== */
+export interface RelFinanceiro {
+  periodo: RelPeriodo; receita_contratada: number; receita_prevista: number; receita_recebida: number;
+  a_vencer: number; vencido: number; inadimplencia_valor_pct: number | null; inadimplencia_parcelas_pct: number | null;
+  ticket_medio_mensal: number; ticket_medio_contratado: number; economia_gerada: number;
+  receita_por_servico: { servico: string; receita_contratada: number }[];
+  receita_por_canal_origem: { canal_id: string | null; canal: string; receita_contratada: number }[];
+  receita_por_responsavel_fechamento: { responsavel_id: string | null; nome: string; receita_recebida: number }[];
+  previsao_proximos_meses: { mes: string; previsto: number }[];
+}
+
+/* ===================== Qualidade ===================== */
+export interface AlertaQualidade {
+  codigo: string; titulo: string; quantidade: number; percentual: number | null;
+  severidade: 'alta' | 'media' | 'baixa'; orientacao: string; drill: string;
+}
+export interface RelQualidade { org: string; alertas: AlertaQualidade[] }
+
+/* ===================== Snapshot ===================== */
+export interface RelSnapshot {
+  periodo_atual: { inicio: string; fim_exclusivo: string };
+  periodo_anterior: { inicio: string; fim_exclusivo: string };
+  aviso: string | null; kpis: KpiSnapshot[];
+}
+
+/* ===================== Detalhamento ===================== */
+export interface DetalheOportunidade {
+  id: string; cliente: string; status: string; coluna: string | null; resultado: string | null;
+  responsavel: string | null; canal_origem: string | null; origem: string | null;
+  valor: number | null; criado_em: string; fechado_em: string | null; fechado_em_estimado: boolean;
+}
+export interface DetalheOportunidadesPage { total: number; limit: number; offset: number; itens: DetalheOportunidade[] }
+export interface DetalheFiltros {
+  por?: 'criacao' | 'fechamento'; canalOrigem?: string | null; responsavel?: string | null;
+  status?: string | null; coluna?: string | null; origem?: string | null;
+  order?: 'recente' | 'antigo' | 'valor'; limit?: number; offset?: number;
+}
+
+/* ===================== Chamadas às RPCs (jsonb -> tipo) ===================== */
+async function rpc<T>(fn: string, params: Record<string, unknown>): Promise<T> {
+  const { data, error } = await supabase!.rpc(fn, params);
+  if (error) throw new Error(error.message);
+  return data as T;
+}
+
+export function useRelVisaoGeral(inicio: string, fim: string) {
+  const { currentOrg } = useOrg();
+  return useQuery({ queryKey: ['rel2b-visao', currentOrg.id, inicio, fim], enabled: REL2B_REAL, staleTime: 60_000,
+    queryFn: () => rpc<VisaoGeral>('relatorio_visao_geral', { p_org: currentOrg.id, p_inicio: inicio, p_fim: fim }) });
+}
+export function useRelCanais(inicio: string, fim: string) {
+  const { currentOrg } = useOrg();
+  return useQuery({ queryKey: ['rel2b-canais', currentOrg.id, inicio, fim], enabled: REL2B_REAL, staleTime: 60_000,
+    queryFn: () => rpc<RelCanais>('relatorio_canais', { p_org: currentOrg.id, p_inicio: inicio, p_fim: fim }) });
+}
+export function useRelEquipe(inicio: string, fim: string) {
+  const { currentOrg } = useOrg();
+  return useQuery({ queryKey: ['rel2b-equipe', currentOrg.id, inicio, fim], enabled: REL2B_REAL, staleTime: 60_000,
+    queryFn: () => rpc<RelEquipe>('relatorio_equipe', { p_org: currentOrg.id, p_inicio: inicio, p_fim: fim }) });
+}
+export function useRelFunil(inicio: string, fim: string) {
+  const { currentOrg } = useOrg();
+  return useQuery({ queryKey: ['rel2b-funil', currentOrg.id, inicio, fim], enabled: REL2B_REAL, staleTime: 60_000,
+    queryFn: () => rpc<RelFunil>('relatorio_funil', { p_org: currentOrg.id, p_inicio: inicio, p_fim: fim }) });
+}
+export function useRelFinanceiro(inicio: string, fim: string) {
+  const { currentOrg } = useOrg();
+  return useQuery({ queryKey: ['rel2b-fin', currentOrg.id, inicio, fim], enabled: REL2B_REAL, staleTime: 60_000,
+    queryFn: () => rpc<RelFinanceiro>('relatorio_financeiro', { p_org: currentOrg.id, p_inicio: inicio, p_fim: fim }) });
+}
+export function useRelQualidade() {
+  const { currentOrg } = useOrg();
+  return useQuery({ queryKey: ['rel2b-qual', currentOrg.id], enabled: REL2B_REAL, staleTime: 60_000,
+    queryFn: () => rpc<RelQualidade>('relatorio_qualidade_dados', { p_org: currentOrg.id }) });
+}
+export function useRelSnapshot(iniAtual: string, fimAtual: string, iniAnt: string, fimAnt: string) {
+  const { currentOrg } = useOrg();
+  return useQuery({ queryKey: ['rel2b-snap', currentOrg.id, iniAtual, fimAtual, iniAnt, fimAnt], enabled: REL2B_REAL, staleTime: 60_000,
+    queryFn: () => rpc<RelSnapshot>('relatorio_snapshot', { p_org: currentOrg.id, p_ini_atual: iniAtual, p_fim_atual: fimAtual, p_ini_ant: iniAnt, p_fim_ant: fimAnt }) });
+}
+export function useRelDetalheOportunidades(inicio: string, fim: string, f: DetalheFiltros = {}) {
+  const { currentOrg } = useOrg();
+  return useQuery({ queryKey: ['rel2b-det-opp', currentOrg.id, inicio, fim, f], enabled: REL2B_REAL, staleTime: 30_000,
+    queryFn: () => rpc<DetalheOportunidadesPage>('relatorio_detalhe_oportunidades', {
+      p_org: currentOrg.id, p_inicio: inicio, p_fim: fim, p_por: f.por ?? 'criacao',
+      p_canal_origem: f.canalOrigem ?? null, p_responsavel: f.responsavel ?? null, p_status: f.status ?? null,
+      p_coluna: f.coluna ?? null, p_origem: f.origem ?? null, p_order: f.order ?? 'recente',
+      p_limit: f.limit ?? 50, p_offset: f.offset ?? 0,
+    }) });
+}
