@@ -7,14 +7,6 @@ import { useOrg } from '@/context/OrgContext';
 
 export const REL2B_REAL = isSupabaseConfigured && !!supabase;
 
-/** Contrato padrão de KPI comparável (snapshot). */
-export interface KpiSnapshot {
-  codigo: string; titulo: string; unidade: string; formula: string;
-  valor: number | null; valor_anterior: number | null;
-  diferenca_absoluta: number | null; variacao_percentual: number | null;
-  cobertura: string[] | null;
-}
-
 export interface RelPeriodo { inicio: string; fim_exclusivo: string; timezone: string }
 
 /* ===================== Visão geral ===================== */
@@ -135,11 +127,42 @@ export interface AlertaQualidade {
 }
 export interface RelQualidade { org: string; alertas: AlertaQualidade[] }
 
-/* ===================== Snapshot ===================== */
+/* ===================== Snapshot (comparador atual × anterior, dois cortes) ===================== */
+export type KpiTipo = 'fluxo' | 'estoque' | 'posicao';
+export type KpiUnidade = 'quantidade' | 'percentual' | 'moeda' | 'minutos';
+export type KpiSentido = 'maior_melhor' | 'menor_melhor' | 'neutro';
+/** Direção semântica: melhora/piora consideram o sentido; aumento/queda para sentido neutro. */
+export type KpiDirecao = 'melhora' | 'piora' | 'estavel' | 'aumento' | 'queda' | 'aumento_sem_base' | 'indefinido';
+export type KpiGrupo = 'atendimento' | 'comercial' | 'financeiro_fluxo' | 'financeiro_estoque' | 'financeiro_posicao';
+export type QualidadePosicao = 'completa' | 'completa_reconstruida' | 'limitada';
+
+export interface SnapshotKpi {
+  codigo: string; titulo: string; grupo: KpiGrupo;
+  tipo: KpiTipo; unidade: KpiUnidade; sentido: KpiSentido;
+  formula: string; fonte: string;
+  valor_atual: number | null; valor_anterior: number | null;
+  /** Para unidade 'percentual' vem em pontos percentuais (p.p.). */
+  diferenca_absoluta: number | null;
+  /** null para unidade 'percentual' (usa-se p.p.) e quando anterior=0 e atual>0 (sem base). */
+  variacao_percentual: number | null;
+  direcao: KpiDirecao;
+  qualidade_atual: string | null; qualidade_anterior: string | null;
+  cobertura_atual: string | null; cobertura_anterior: string | null;
+}
 export interface RelSnapshot {
-  periodo_atual: { inicio: string; fim_exclusivo: string };
-  periodo_anterior: { inicio: string; fim_exclusivo: string };
-  aviso: string | null; kpis: KpiSnapshot[];
+  periodo_atual: { inicio: string; fim_exclusivo: string; data_corte: string; timezone: string };
+  periodo_anterior: { inicio: string; fim_exclusivo: string; data_corte: string; timezone: string };
+  comparabilidade: {
+    duracao_atual_dias: number; duracao_anterior_dias: number; mesma_duracao: boolean;
+    offset_corte_atual_dias: number; offset_corte_anterior_dias: number; cortes_equivalentes: boolean;
+    atual_parcial: boolean; anterior_parcial: boolean; periodos_comparaveis: boolean; aviso_periodo: string | null;
+  };
+  qualidade_financeira: {
+    atual: { status: QualidadePosicao; motivo: string | null };
+    anterior: { status: QualidadePosicao; motivo: string | null };
+    orientacao: string | null;
+  };
+  kpis: SnapshotKpi[];
 }
 
 /* ===================== Detalhamento ===================== */
@@ -192,10 +215,18 @@ export function useRelQualidade() {
   return useQuery({ queryKey: ['rel2b-qual', currentOrg.id], enabled: REL2B_REAL, staleTime: 60_000,
     queryFn: () => rpc<RelQualidade>('relatorio_qualidade_dados', { p_org: currentOrg.id }) });
 }
-export function useRelSnapshot(iniAtual: string, fimAtual: string, iniAnt: string, fimAnt: string) {
+export interface SnapshotPeriodos {
+  iniAtual: string; fimAtual: string; corteAtual: string;
+  iniAnterior: string; fimAnterior: string; corteAnterior: string;
+}
+export function useRelSnapshot(p: SnapshotPeriodos) {
   const { currentOrg } = useOrg();
-  return useQuery({ queryKey: ['rel2b-snap', currentOrg.id, iniAtual, fimAtual, iniAnt, fimAnt], enabled: REL2B_REAL, staleTime: 60_000,
-    queryFn: () => rpc<RelSnapshot>('relatorio_snapshot', { p_org: currentOrg.id, p_ini_atual: iniAtual, p_fim_atual: fimAtual, p_ini_ant: iniAnt, p_fim_ant: fimAnt }) });
+  return useQuery({ queryKey: ['rel2b-snap', currentOrg.id, p], enabled: REL2B_REAL, staleTime: 60_000,
+    queryFn: () => rpc<RelSnapshot>('relatorio_snapshot', {
+      p_org: currentOrg.id,
+      p_inicio_atual: p.iniAtual, p_fim_atual: p.fimAtual, p_corte_atual: p.corteAtual,
+      p_inicio_anterior: p.iniAnterior, p_fim_anterior: p.fimAnterior, p_corte_anterior: p.corteAnterior,
+    }) });
 }
 export function useRelDetalheOportunidades(inicio: string, fim: string, f: DetalheFiltros = {}) {
   const { currentOrg } = useOrg();
