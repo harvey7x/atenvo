@@ -51,16 +51,52 @@ export interface CanalOperacional {
 export interface RelCanais { periodo: RelPeriodo; comercial: CanalComercial[]; operacional: CanalOperacional[] }
 
 /* ===================== Equipe ===================== */
+/** Operacional = autor humano no painel (mensagens.autor_id). Celular/automação NÃO entram aqui. */
+export interface EquipeOperacional {
+  mensagens_painel: number; conversas_respondidas: number; primeiras_respostas: number;
+  primeira_resposta_media_min: number | null; primeira_resposta_mediana_min: number | null;
+  atendimentos_assumidos: number; transferencias_recebidas: number; transferencias_realizadas: number;
+  conversas_sob_responsabilidade: number; conversas_inbound_sem_resposta_sob_resp: number;
+}
+/** Coorte (criadas/ganhos/conversão) por dono atual; carteira_atual = estoque por responsavel_id;
+ *  fechamentos/perdas/contratado/recebido/ticket = resultado histórico por responsavel_no_fechamento_id. */
+export interface EquipeComercial {
+  oportunidades_criadas_sob_resp: number; carteira_atual: number; ganhos_coorte: number;
+  conversao_coorte_pct: number | null; fechamentos_periodo: number; perdas_periodo: number;
+  valor_contratado_periodo: number; receita_recebida_periodo: number;
+  carteira_contratada_fechamentos: number; ticket_medio_fechamentos: number | null;
+}
 export interface EquipeUsuario {
-  usuario_id: string; nome: string; mensagens_painel: number; conversas_respondidas: number;
-  oportunidades_atuais: number; oportunidades_criadas: number; ganhos_coorte: number;
-  fechamentos_periodo: number; perdas: number; conversao_pct: number; receita_contratada: number;
+  usuario_id: string; nome: string; vinculo: 'ativo' | 'inativo';
+  operacional: EquipeOperacional; comercial: EquipeComercial;
+}
+export interface EquipeSemAtribuicao {
+  operacional: { mensagens_celular: number; conversas_respondidas_so_celular: number; primeiras_respostas_celular: number; outras_saidas_sem_autor: number };
+  comercial: { oportunidades_sem_responsavel: number; carteira_atual_sem_responsavel: number; fechamentos_sem_snapshot: number; valor_contratado_sem_atribuicao: number; receita_recebida_sem_atribuicao: number };
+}
+export interface EquipeCobertura {
+  codigo: string; atribuidos: number; elegiveis: number; sem_atribuicao: number;
+  percentual: number | null; qualidade: 'alta' | 'media' | 'baixa' | 'sem_dados'; orientacao: string;
+}
+export interface EquipeRankingItem { usuario_id: string; nome: string; posicao: number; valor: number | null }
+export interface EquipeRanking {
+  metrica: string; sentido: KpiSentido; cobertura_pct: number | null; qualidade: string; itens: EquipeRankingItem[];
 }
 export interface RelEquipe {
-  periodo: RelPeriodo; usuarios: EquipeUsuario[];
-  sem_atribuicao: { mensagens_celular: number; conversas_celular: number; oportunidades_sem_responsavel: number; fechamentos_sem_responsavel_hist: number };
-  cobertura: { atribuicao_msgs_pct: number | null; responsavel_opp_pct: number | null };
-  alertas: string[];
+  periodo: RelPeriodo; usuarios: EquipeUsuario[]; sem_atribuicao: EquipeSemAtribuicao;
+  cobertura: EquipeCobertura[]; rankings: EquipeRanking[];
+  totais: {
+    saida_painel_total: number; saida_humana_total: number;
+    primeira_resposta_elegiveis: number; primeira_resposta_painel: number;
+    oportunidades_criadas_total: number; fechamentos_total: number;
+    receita_recebida_total: number; valor_contratado_total: number;
+  };
+}
+/* Drill-down paginado da equipe */
+export type EquipeDimensao = 'mensagens' | 'primeiras_respostas' | 'oportunidades' | 'fechamentos' | 'receitas';
+export interface RelDetalheEquipe {
+  periodo: RelPeriodo; dimensao: EquipeDimensao; usuario: string | null; sem_atribuicao: boolean;
+  total: number; limit: number; offset: number; itens: Record<string, unknown>[];
 }
 
 /* ===================== Funil ===================== */
@@ -199,6 +235,13 @@ export function useRelEquipe(inicio: string, fim: string) {
   const { currentOrg } = useOrg();
   return useQuery({ queryKey: ['rel2b-equipe', currentOrg.id, inicio, fim], enabled: REL2B_REAL, staleTime: 60_000,
     queryFn: () => rpc<RelEquipe>('relatorio_equipe', { p_org: currentOrg.id, p_inicio: inicio, p_fim: fim }) });
+}
+/** Drill-down da equipe. usuario=null abre a fatia "Sem atribuição" da dimensão. */
+export function useRelDetalheEquipe(inicio: string, fim: string, dimensao: EquipeDimensao, usuario: string | null, limit = 50, offset = 0) {
+  const { currentOrg } = useOrg();
+  return useQuery({ queryKey: ['rel2b-det-equipe', currentOrg.id, inicio, fim, dimensao, usuario, limit, offset], enabled: REL2B_REAL, staleTime: 30_000,
+    queryFn: () => rpc<RelDetalheEquipe>('relatorio_detalhe_equipe', {
+      p_org: currentOrg.id, p_inicio: inicio, p_fim: fim, p_dimensao: dimensao, p_usuario: usuario, p_limit: limit, p_offset: offset }) });
 }
 export function useRelFunil(inicio: string, fim: string) {
   const { currentOrg } = useOrg();
