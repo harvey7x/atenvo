@@ -1,4 +1,7 @@
 // evolution-webhook — eventos da Evolution. Sem JWT. Secret via webhook_config (constante).
+// v20: @lid identidade protegida — o LID NUNCA vira nome do contato (sem PN e sem pushName real =>
+//      "Identidade protegida", identidade_tipo=lid_pendente). Ao chegar PN (evento real, #7) resolve o
+//      estado e corrige o nome placeholder. Grava mapa LID↔PN por CANAL em wa_lid_map (best-effort).
 // v19: MÍDIA Fase A — ingere imagem/vídeo/documento/sticker (não só áudio) via midiaOf+baixarMidia:
 //      baixa, valida tamanho/ext segura, guarda no bucket privado, persiste tipo+metadados (mime/nome/
 //      tamanho/legenda/seconds) e usa a legenda como conteúdo. Falha => pendente recuperável (nunca oculta).
@@ -182,7 +185,11 @@ Deno.serve(async (req) => {
       if (!corpo && !midia) { await finish('ignorado', { ignorado_motivo: 'sem_conteudo' }); return json({ ok: true }); }
       if (!phone && !lid) { await finish('ignorado', { ignorado_motivo: 'sem_identificador' }); return json({ ok: true }); }
       // Em saída o pushName é do dono da conta (não do destinatário) → não usar como nome do contato.
-      const pushName = (!fromMe ? (data.pushName as string) : null) ?? (phone ?? lid!);
+      // v19: o LID NUNCA vira nome. Sem PN e sem pushName real → "Identidade protegida" (pendente).
+      const agoraIso = new Date().toISOString();
+      const pushNameReal = !fromMe ? sanitizeNome(data.pushName as string) : null;
+      const nomeContato = pushNameReal ?? phone ?? 'Identidade protegida';
+      const identTipo = phone ? 'telefone' : 'lid_pendente';
 
       let contatoId: string | null = null;
       let contatoCriadoAgora = false; // true apenas no ramo que INSERE contato novo (auto-entrada no Kanban)
@@ -190,7 +197,7 @@ Deno.serve(async (req) => {
       if (!contatoId && lid) { const { data: i } = await admin.from('contato_identidades').select('contato_id').eq('organizacao_id', orgId).eq('tipo', 'outro').eq('provedor', 'evolution_lid').eq('valor_normalizado', lid).maybeSingle(); if (i) contatoId = i.contato_id; }
       if (!contatoId && phone) { const { data: c } = await admin.from('contatos').select('id').eq('organizacao_id', orgId).eq('telefone', phone).maybeSingle(); if (c) contatoId = c.id; }
       if (!contatoId) {
-        const { data: novo, error: e1 } = await admin.from('contatos').insert({ nome: pushName, telefone: phone ?? null, origem: 'WhatsApp', organizacao_id: orgId }).select('id').single();
+        const { data: novo, error: e1 } = await admin.from('contatos').insert({ nome: nomeContato, telefone: phone ?? null, origem: 'WhatsApp', organizacao_id: orgId, identidade_tipo: identTipo, identidade_fonte: phone ? 'webhook_pn' : 'webhook_lid', identidade_resolvida_em: phone ? agoraIso : null }).select('id').single();
         if (e1 || !novo) { await finish('erro', { erro: `contatos:${e1?.code ?? ''}:${(e1?.message ?? 'sem retorno').slice(0,180)}` }); return json({ ok: true }); }
         contatoId = novo.id;
         contatoCriadoAgora = true;
@@ -204,10 +211,20 @@ Deno.serve(async (req) => {
         const temOutro = (jaWa ?? []).some((r) => r.valor_normalizado !== phone);
         if (!temEste && !temOutro) {
           await admin.from('contato_identidades').insert({ contato_id: contatoId, organizacao_id: orgId, tipo: 'whatsapp', provedor: 'evolution', valor: phoneJid ?? phone, valor_normalizado: phone, principal: true, metadados: { origem: 'webhook' } });
-          await admin.from('contatos').update({ telefone: phone }).eq('id', contatoId).is('telefone', null);
+          // resolve identidade: grava telefone/estado e corrige o nome se estava como "Identidade protegida" (nunca sobrescreve nome real).
+          await admin.from('contatos').update({ telefone: phone, identidade_tipo: 'telefone', identidade_resolvida_em: agoraIso, identidade_fonte: 'webhook_pn' }).eq('id', contatoId).is('telefone', null);
+          await admin.from('contatos').update({ nome: pushNameReal ?? phone }).eq('id', contatoId).eq('nome', 'Identidade protegida');
         }
       }
       if (lid) { const { data: ex } = await admin.from('contato_identidades').select('id').eq('organizacao_id', orgId).eq('tipo', 'outro').eq('provedor', 'evolution_lid').eq('valor_normalizado', lid).maybeSingle(); if (!ex) await admin.from('contato_identidades').insert({ contato_id: contatoId, organizacao_id: orgId, tipo: 'outro', provedor: 'evolution_lid', valor: lidJid ?? lid, valor_normalizado: lid, principal: false }); }
+      // v19: mapa LID↔PN por CANAL (o mesmo LID pode ser pessoas diferentes em números distintos). Best-effort.
+      if (lid) {
+        try {
+          const { data: mapRow } = await admin.from('wa_lid_map').select('id, telefone_normalizado').eq('organizacao_id', orgId).eq('canal_id', canal.id).eq('lid', lid).maybeSingle();
+          if (!mapRow) await admin.from('wa_lid_map').insert({ organizacao_id: orgId, canal_id: canal.id, lid, jid_telefone: phoneJid ?? null, telefone_normalizado: phone ?? null, fonte: 'webhook', confirmado: !!phone });
+          else if (phone && mapRow.telefone_normalizado !== phone) await admin.from('wa_lid_map').update({ jid_telefone: phoneJid ?? null, telefone_normalizado: phone, confirmado: true }).eq('id', mapRow.id);
+        } catch { /* não bloqueia o webhook */ }
+      }
 
       let conversaId: string | null = null;
       const { data: conv } = await admin.from('conversas').select('id').eq('organizacao_id', orgId).eq('contato_id', contatoId).eq('canal_id', canal.id).neq('status', 'fechada').order('criado_em', { ascending: false }).limit(1).maybeSingle();

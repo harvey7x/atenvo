@@ -136,9 +136,13 @@ function mapConversa(c: DbConv): WaContact {
   const ultimoCanal: WaUltimoCanal | null = c.ultimo_canal_id || c.ultimo_numero
     ? { canalId: c.ultimo_canal_id, alias: null, numero: c.ultimo_numero, provider: c.ultimo_provider, em: c.ultima_msg_canal_em }
     : null;
+  // Caso D / @lid: sem PN confirmado. Nunca exibir um LID cru como nome (defesa extra ao backfill).
+  const temPn = (c.contatos?.contato_identidades ?? []).some((i) => i.tipo === 'whatsapp');
+  const nomeCru = c.contatos?.nome ?? null;
+  const nomeEhLid = !!nomeCru && !c.contatos?.telefone && !temPn && /^[0-9]{12,}$/.test(nomeCru);
   return {
     id: c.id,
-    name: c.contatos?.nome ?? 'Contato',
+    name: nomeEhLid ? 'Identidade protegida' : (nomeCru ?? 'Contato'),
     phone: c.contatos?.telefone ?? '',
     chip,
     time: hhmm(c.ultima_interacao_em) || (lastMsg?.time ?? ''),
@@ -154,7 +158,7 @@ function mapConversa(c: DbConv): WaContact {
     canalId: c.canais?.id ?? null,
     contatoId: c.contatos?.id ?? null,
     // Caso D: sem destino confirmado = contato sem identidade WhatsApp (PN). LID não conta como destino.
-    semDestino: !((c.contatos?.contato_identidades ?? []).some((i) => i.tipo === 'whatsapp')),
+    semDestino: !temPn,
     arquivada: !!c.arquivada_em,
     fixada: !!c.fixada_em,
     silenciada: !!c.silenciada_ate && new Date(c.silenciada_ate).getTime() > Date.now(),
