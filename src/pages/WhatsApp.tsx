@@ -320,8 +320,10 @@ export function WhatsApp() {
   const canalSel = realCanais.find((c) => c.id === replyCanalId) ?? null;
   const canalConectado = !WA_REAL || (canalSel?.status === 'conectado');
   const canalIndisponivel = WA_REAL && !!canalSel && !canalConectado;
+  // Contenção: número com restrição de conta no WhatsApp -> bloqueado só para ENVIO (recebe normal).
+  const canalRestrito = WA_REAL && !!canalSel?.envioRestrito;
   // Saúde de ENVIO do canal de resposta (mesmo conectado, o outbound pode estar falhando).
-  const envioSaude = useWaCanalEnvioSaude(canalConectado ? (replyCanalId || current?.canalId) : null).data?.estado ?? 'ok';
+  const envioSaude = useWaCanalEnvioSaude(canalConectado && !canalRestrito ? (replyCanalId || current?.canalId) : null).data?.estado ?? 'ok';
   // Caso D: conversa sem número de resposta confirmado (origem LID). Bloqueia o envio até vincular um PN validado.
   const semDestino = WA_REAL && !!current.id && !!current.semDestino;
   const [vincOpen, setVincOpen] = useState(false);
@@ -462,6 +464,7 @@ export function WhatsApp() {
     if (!v) return;
     if (enviandoRef.current) return; // impede dois envios concorrentes (duplo-clique / Enter duplo)
     if (WA_REAL && !currentId) return;
+    if (canalRestrito) { toast('O número deste canal está com restrição no WhatsApp e está indisponível para envio. Selecione outro canal.', 'warn'); return; }
     if (canalIndisponivel) { toast('Este número está desconectado. Reconecte em Integrações para enviar.', 'warn'); return; }
     if (semDestino) { toast('Vincule um número confirmado para responder.', 'warn'); return; }
     const now = new Date();
@@ -494,6 +497,7 @@ export function WhatsApp() {
   /** Retentativa: reaproveita a MESMA mensagem falhada (retry_mensagem_id), sem duplicar. */
   function retryMsg(m: WaMessage) {
     if (!m.id || !currentId || retryId) return;
+    if (canalRestrito) { toast('O número deste canal está com restrição no WhatsApp e está indisponível para envio. Selecione outro canal.', 'warn'); return; }
     if (canalIndisponivel) { toast('Este número está desconectado. Reconecte em Integrações para reenviar.', 'warn'); return; }
     if (semDestino) { toast('Vincule um número confirmado para responder.', 'warn'); return; }
     setRetryId(m.id);
@@ -1000,8 +1004,14 @@ export function WhatsApp() {
               <button className="link-btn" onClick={() => navigate('/integracoes')}>Reconectar</button>
             </div>
           )}
+          {/* Conta com restrição no WhatsApp: bloqueado só para ENVIO; recebimento segue normal. */}
+          {!canalIndisponivel && canalRestrito && (
+            <div className="warn warn-block">
+              <IcWarn />O número <b>{canalSel?.alias}</b> está com restrição no WhatsApp e está indisponível para envio. Selecione outro canal em "Responder por" para responder.
+            </div>
+          )}
           {/* Canal conectado, mas com envio falhando (state=open não garante envio). Recebimento segue normal. */}
-          {!canalIndisponivel && envioSaude !== 'ok' && (
+          {!canalIndisponivel && !canalRestrito && envioSaude !== 'ok' && (
             <div className="warn warn-block">
               <IcWarn />
               {envioSaude === 'indisponivel'
@@ -1017,13 +1027,13 @@ export function WhatsApp() {
           )}
 
           <div className="input-wrap">
-            <textarea ref={taRef} className="msg-input" rows={1} placeholder={semDestino ? 'Vincule um número para responder' : (canalIndisponivel ? 'Envio bloqueado: número desconectado' : 'Digite sua mensagem...')}
-              value={draft} onChange={(e) => setDraft(e.target.value)} disabled={canalIndisponivel || semDestino}
+            <textarea ref={taRef} className="msg-input" rows={1} placeholder={semDestino ? 'Vincule um número para responder' : (canalIndisponivel ? 'Envio bloqueado: número desconectado' : (canalRestrito ? 'Envio bloqueado: número com restrição no WhatsApp' : 'Digite sua mensagem...'))}
+              value={draft} onChange={(e) => setDraft(e.target.value)} disabled={canalIndisponivel || semDestino || canalRestrito}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); } }} />
             <div className="composer-bar">
-              <button className="cbar-act" title="Enviar imagem" aria-label="Enviar imagem" disabled={semDestino || (WA_REAL && (!current.id || !canalConectado))} onClick={() => setImgModal(true)}><IcImage /><span>Imagem</span></button>
-              <AudioRecorder disabled={semDestino || (WA_REAL && (!current.id || !canalConectado))} onEnviar={enviarAudio} />
-              <button className="cbar-act" title="Enviar documento" aria-label="Enviar documento" disabled={semDestino || (WA_REAL && (!current.id || !canalConectado))} onClick={() => setDocModal(true)}><IcDoc /><span>Arquivo</span></button>
+              <button className="cbar-act" title="Enviar imagem" aria-label="Enviar imagem" disabled={semDestino || canalRestrito || (WA_REAL && (!current.id || !canalConectado))} onClick={() => setImgModal(true)}><IcImage /><span>Imagem</span></button>
+              <AudioRecorder disabled={semDestino || canalRestrito || (WA_REAL && (!current.id || !canalConectado))} onEnviar={enviarAudio} />
+              <button className="cbar-act" title="Enviar documento" aria-label="Enviar documento" disabled={semDestino || canalRestrito || (WA_REAL && (!current.id || !canalConectado))} onClick={() => setDocModal(true)}><IcDoc /><span>Arquivo</span></button>
               <span className="spacer" />
               <button ref={scriptsBtnRef} className="scripts-btn" disabled={semDestino} onClick={(e) => { e.stopPropagation(); togglePop('scripts', scriptsBtnRef, 'right'); }}><IcScripts />Scripts<IcCaret /></button>
               <button className="send-btn" aria-label="Enviar" disabled={sendDisabled} onClick={sendMsg}><IcSend /></button>

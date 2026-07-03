@@ -122,8 +122,11 @@ Deno.serve(async (req) => {
 
     // CANAL: usa EXATAMENTE o canal escolhido em "Responder por" (canal_id). Sem fallback implícito ao canal da conversa.
     const canalId = (canal_id as string) || (conv.canal_id as string);
-    const { data: canal } = await admin.from('canais').select('id, instancia_externa, status_integracao, numero_conectado, provider').eq('id', canalId).eq('organizacao_id', conv.organizacao_id).maybeSingle();
+    const { data: canal } = await admin.from('canais').select('id, instancia_externa, status_integracao, numero_conectado, provider, envio_restrito').eq('id', canalId).eq('organizacao_id', conv.organizacao_id).maybeSingle();
     if (!canal?.instancia_externa) return json({ error: 'Canal de WhatsApp selecionado não encontrado.' }, 404);
+    // Contenção: canal com restrição de conta no WhatsApp fica BLOQUEADO só para envio (recebimento segue).
+    // Não é erro da Evolution nem altera a mecânica de envio — apenas impede novos disparos/retries.
+    if (canal.envio_restrito) return json({ error: 'O número deste canal está com restrição no WhatsApp e está indisponível para envio. Selecione outro canal.', code: 'canal_restrito' }, 409);
     const instancia = canal.instancia_externa as string;
     console.log(`[send] corr=${corr} canalSel=${canal_id ?? '-'} canalUsado=${canal.id} inst=${instancia} de=${digits(canal.numero_conectado)?.slice(0, 6) ?? '-'}`);
 

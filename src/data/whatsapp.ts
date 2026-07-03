@@ -350,6 +350,8 @@ export function useIniciarConversaWa() {
 
 export interface WaCanal {
   id: string; alias: string; numero: string | null; status: string; provider: string | null; conectadoEm: string | null;
+  /** true quando o número está com restrição de conta no WhatsApp -> bloqueado só para ENVIO (recebe normal). */
+  envioRestrito: boolean;
   // metadados comerciais (configuráveis em Integrações)
   origemTipo: string | null; gestorId: string | null; gestorNome: string | null; fonteId: string | null; campanha: string | null; observacaoComercial: string | null;
 }
@@ -405,14 +407,14 @@ export function useWaCanais() {
       // evolution-manage/remove exclui o registro), então canais 'removido' não devem aparecer aqui.
       const { data, error } = await supabase!
         .from('canais')
-        .select('id, nome_interno, numero_conectado, status_integracao, provider, conectado_em, origem_tipo, gestor_id, fonte_aquisicao_id, campanha, observacao_comercial, gestor:usuarios(nome)')
+        .select('id, nome_interno, numero_conectado, status_integracao, provider, conectado_em, envio_restrito, origem_tipo, gestor_id, fonte_aquisicao_id, campanha, observacao_comercial, gestor:usuarios(nome)')
         .eq('organizacao_id', currentOrg.id).eq('tipo', 'whatsapp').eq('provider', 'evolution')
         .neq('status_integracao', 'removido')
         .order('criado_em', { ascending: true });
       if (error) throw new Error(error.message);
-      type Row = { id: string; nome_interno: string | null; numero_conectado: string | null; status_integracao: string; provider: string | null; conectado_em: string | null; origem_tipo: string | null; gestor_id: string | null; fonte_aquisicao_id: string | null; campanha: string | null; observacao_comercial: string | null; gestor: { nome: string } | { nome: string }[] | null };
+      type Row = { id: string; nome_interno: string | null; numero_conectado: string | null; status_integracao: string; provider: string | null; conectado_em: string | null; envio_restrito: boolean | null; origem_tipo: string | null; gestor_id: string | null; fonte_aquisicao_id: string | null; campanha: string | null; observacao_comercial: string | null; gestor: { nome: string } | { nome: string }[] | null };
       return ((data as Row[]) ?? []).map((r) => ({
-        id: r.id, alias: r.nome_interno ?? 'WhatsApp', numero: r.numero_conectado, status: r.status_integracao, provider: r.provider, conectadoEm: r.conectado_em,
+        id: r.id, alias: r.nome_interno ?? 'WhatsApp', numero: r.numero_conectado, status: r.status_integracao, provider: r.provider, conectadoEm: r.conectado_em, envioRestrito: Boolean(r.envio_restrito),
         origemTipo: r.origem_tipo, gestorId: r.gestor_id, gestorNome: (Array.isArray(r.gestor) ? r.gestor[0]?.nome : r.gestor?.nome) ?? null, fonteId: r.fonte_aquisicao_id, campanha: r.campanha, observacaoComercial: r.observacao_comercial,
       }));
     },

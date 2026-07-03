@@ -60,8 +60,10 @@ Deno.serve(async (req) => {
     const { data: mem } = await admin.from('organizacao_usuarios').select('status').eq('organizacao_id', conv.organizacao_id).eq('usuario_id', user.id).maybeSingle();
     if (!mem || mem.status !== 'ativo') return json({ error: 'Sem acesso a esta organização.' }, 403);
 
-    const { data: canal } = await admin.from('canais').select('instancia_externa, status_integracao').eq('id', conv.canal_id).maybeSingle();
+    const { data: canal } = await admin.from('canais').select('instancia_externa, status_integracao, envio_restrito').eq('id', conv.canal_id).maybeSingle();
     if (!canal?.instancia_externa) return json({ error: 'Canal de WhatsApp não encontrado.' }, 404);
+    // Contenção: canal com restrição de conta no WhatsApp fica bloqueado para envio (recebimento segue).
+    if (canal.envio_restrito) return json({ error: 'O número deste canal está com restrição no WhatsApp e está indisponível para envio. Selecione outro canal.', code: 'canal_restrito' }, 409);
     if (canal.status_integracao !== 'conectado') return json({ error: 'WhatsApp não está conectado.' }, 409);
 
     let numero: string | null = null;
