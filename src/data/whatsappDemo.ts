@@ -55,6 +55,8 @@ export interface WaContact {
   canalId?: string | null;
   /** Caso D: conversa sem número de resposta confirmado (origem LID, sem identidade PN). */
   semDestino?: boolean;
+  /** SLA (S4.2): conversa marcada como "precisa de atendimento humano". */
+  precisaHumano?: boolean;
   /** Inbox Etapa A: estado de arquivamento/fixação/silêncio da conversa. */
   arquivada?: boolean;
   fixada?: boolean;

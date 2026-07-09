@@ -17,6 +17,8 @@ import { ScriptSequenceModal } from '@/components/ScriptSequenceModal';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Modal } from '@/components/Modal';
 import { useStatusDefs, useEtiquetas, useAssinaturaPref, useAtendimentoActions, useOrgUsuarios, resolverNomeAssinatura } from '@/data/atendimento';
+import { useSlaAlertas } from '@/data/sla';
+import { indexPorChave, sevRank, sevClass, tipoLabel, tipoEmoji } from '@/data/slaView';
 import { corDaEtiqueta, podeGerenciarAtendimento, type AssinaturaModo } from '@/types/atendimento';
 import { KanbanContatoBox } from '@/components/KanbanContatoBox';
 import './WhatsApp.css';
@@ -124,6 +126,10 @@ export function WhatsApp() {
   const { user } = useAuth();
   const { currentOrg } = useOrg();
   const live = useWaConversations();
+  // SLA (S4.2): alertas ativos indexados por conversa_id (só leitura; não altera o motor).
+  const slaQ = useSlaAlertas();
+  const slaPorConversa = useMemo(() => indexPorChave(slaQ.data?.itens ?? [], 'conversa_id'), [slaQ.data]);
+  const slaSevDe = (id: string) => { const arr = slaPorConversa.get(id); return arr && arr.length ? sevRank(arr[0].severidade) : 0; };
   const sendMut = useSendWaMessage();
   const atribuirMut = useAtribuirAtendimento();
   const canaisQ = useWaCanais();
@@ -244,7 +250,10 @@ export function WhatsApp() {
     if (t && c.name.toLowerCase().indexOf(t) === -1 && c.last.toLowerCase().indexOf(t) === -1 && (c.phone || '').toLowerCase().indexOf(t) === -1) return false;
     return true;
   }).sort((a, b) => {
-    // ordenação: fixadas primeiro, depois não lidas, depois interação mais recente
+    // SLA (S4.2): conversas com alerta ativo no topo, por severidade (imediato>critico>vermelho>amarelo>leve)
+    const sa = slaSevDe(a.id), sb = slaSevDe(b.id);
+    if (sa !== sb) return sb - sa;
+    // ordenação atual: fixadas primeiro, depois não lidas, depois interação mais recente
     if (!!a.fixada !== !!b.fixada) return a.fixada ? -1 : 1;
     const au = (a.unread ?? 0) > 0, bu = (b.unread ?? 0) > 0;
     if (au !== bu) return au ? -1 : 1;
@@ -791,6 +800,7 @@ export function WhatsApp() {
               ? (atrasado ? 'Atrasado' : 'Aguardando cliente') + (tempoCurto ? ' · ' + tempoCurto : '')
               : (finalizado ? 'Finalizado' : (c.status || 'Em atendimento'));
             const barTier = wait ? (atrasado ? 'critico' : 'aguardando') : (c.id === currentId ? 'ativo' : 'neutro');
+            const slaChips = slaPorConversa.get(c.id) ?? [];
             return (
             <div key={c.id} data-cid={c.id} className={'conv conv--' + barTier + (c.id === currentId ? ' active' : '')} onClick={() => selectContact(c.id)}>
               <Avatar name={c.name} />
@@ -803,6 +813,16 @@ export function WhatsApp() {
                 <div className="cmeta" title={'Atendente: ' + atendNome + ' · Canal: WhatsApp ' + c.chip}>
                   <span className="cmeta-ic" aria-hidden="true">👤</span>{atendNome} · <span className="cmeta-canal">WA {c.chip}</span>
                 </div>
+                {(slaChips.length > 0 || c.precisaHumano) && (
+                  <div className="conv-sla">
+                    {slaChips.map((a) => (
+                      <span key={a.id} className={'conv-sla-chip ' + sevClass(a.severidade)} title={a.detalhe ?? a.titulo}>
+                        {tipoEmoji(a.tipo)} {tipoLabel(a.tipo)}
+                      </span>
+                    ))}
+                    {c.precisaHumano && <span className="conv-sla-chip ph" title="Conversa marcada como precisa de atendimento humano">🙋 Precisa humano</span>}
+                  </div>
+                )}
                 <div className="cprev">{c.last || '—'}</div>
                 <div className="crow-status">
                   <span className={'cstatus cstatus--' + barTier}>{statusTxt}{c.arquivada ? ' · Arquivada' : ''}{c.silenciada ? ' 🔕' : ''}</span>

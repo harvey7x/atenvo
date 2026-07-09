@@ -330,3 +330,7 @@ body.wa-foco .content{padding:0;overflow:hidden}
 .sla-bell-drop{position:absolute;top:42px;right:0;z-index:60;width:360px;max-width:92vw;max-height:70vh;overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-pop);padding:8px}
 .sla-bell-head{font-size:12.5px;font-weight:700;color:var(--ink);padding:6px 8px 8px}
 .sla-bell-body{padding:0 2px 2px}
+/* chips de SLA no card do Inbox (S4.2) */
+.conv-sla{display:flex;flex-wrap:wrap;gap:4px;margin:3px 0 1px}
+.conv-sla-chip{font-size:10.5px;font-weight:600;line-height:1.5;padding:0 6px;border-radius:6px;color:var(--sla-c);background:var(--sla-soft);border:1px solid var(--sla-c);white-space:nowrap}
+.conv-sla-chip.ph{color:#8b2fb0;background:rgba(139,47,176,.10);border-color:#8b2fb0}
