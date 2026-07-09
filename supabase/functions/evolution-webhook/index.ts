@@ -1,4 +1,6 @@
 // evolution-webhook — eventos da Evolution. Sem JWT. Secret via webhook_config (constante).
+// v24 (B3.3): dispatch fire-and-forget ao bot-runner em inbound NOVO de cliente (texto/áudio), dry_run:true
+//      FIXO (nunca envia). Gates de negócio são do runner; não bloqueia nem quebra o webhook.
 // v23: ao reconectar (connection.update=open) limpa alerta_silenciado do canal ("silenciar até reconexão").
 // v22: mensagens do health check (prefixo "Teste automático Atenvo") são ignoradas (ignorado_motivo=
 //      health_check) — não criam contato/conversa/lead nem poluem o inbox/relatórios.
@@ -50,6 +52,8 @@ function sanitize(obj: unknown): unknown {
 // ---- Mídia (áudio): detecção + download seguro pela Evolution ----
 const EVO_BASE = (Deno.env.get('EVOLUTION_API_URL') ?? '').replace(/\/+$/, '');
 const EVO_KEY = Deno.env.get('EVOLUTION_API_KEY') ?? '';
+// B3.3: base das Edge Functions (para o dispatch fire-and-forget ao bot-runner).
+const FUNCTIONS_BASE = (Deno.env.get('SUPABASE_URL') ?? '').replace(/\/+$/, '') + '/functions/v1';
 // desembrulha mensagens encapsuladas (ephemeral, viewOnce, documentWithCaption).
 function unwrapMsg(m: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
   if (!m) return m;
@@ -314,6 +318,27 @@ Deno.serve(async (req) => {
       } else {
         await admin.from('conversas').update({ ultima_interacao_em: nowEntradaIso }).eq('id', conversaId);
       }
+
+      // ---- B3.3: dispatch fire-and-forget ao bot-runner (só inbound NOVO de cliente, texto/áudio) ----
+      // dry_run:true FIXO → o bot só simula/loga; jamais envia a cliente. Os gates de negócio (master,
+      // bot_pode_atuar, humano/responsável, precisa_humano, idempotência, lock, saúde do canal) são do
+      // RUNNER (fonte de verdade). Aqui só o filtro básico. Nunca bloqueia nem quebra o webhook.
+      const inboundMsgId = (insArr?.[0]?.id as string | undefined) ?? null;
+      if (inboundNovo && inboundMsgId && (tipoMsg === 'texto' || tipoMsg === 'audio')) {
+        const dispatch = (async () => {
+          try {
+            const { data: bs } = await admin.from('webhook_config').select('secret').eq('chave', 'bot_runner').maybeSingle();
+            if (!bs?.secret) return;
+            await fetch(`${FUNCTIONS_BASE}/bot-runner`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'x-bot-secret': bs.secret as string },
+              body: JSON.stringify({ conversa_id: conversaId, inbound_msg_id: inboundMsgId, inbound_text: conteudoMsg ?? '', inbound_tipo: tipoMsg, dry_run: true }),
+            });
+          } catch { /* fire-and-forget: erro do runner nunca afeta o webhook */ }
+        })();
+        try { (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime?.waitUntil?.(dispatch); } catch { /* sem waitUntil: segue fire-and-forget */ }
+      }
+
       // Auto-entrada no Kanban: SOMENTE contato recém-criado nesta execução (entrada, não fromMe). Best-effort: nunca quebra o webhook.
       let kanbanErro: string | null = null;
       if (contatoCriadoAgora && contatoId) {
