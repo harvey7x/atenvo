@@ -45,7 +45,7 @@ export const DEFAULT_COPY: Copy = {
     cpf: 'Esse CPF não parece completo. Pode mandar os 11 números?',
     generico: 'Pode me responder pra eu seguir com a sua triagem?',
   },
-  audio: 'Recebi seu áudio. Vou encaminhar para um especialista ouvir e te responder certinho, combinado?',
+  audio: 'Recebi seu áudio. Para não atrasar sua análise, me manda essa informação por escrito, por favor. Assim eu já deixo tudo certo para o especialista verificar seu caso e te orientar ainda hoje.',
 };
 
 const norm = (s: string) => (s ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
