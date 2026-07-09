@@ -1,6 +1,7 @@
 import { Outlet, useMatches } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
+import { GlobalWhatsAppAlert } from './GlobalWhatsAppAlert';
 import { DEMO_MODE } from '@/lib/demo';
 
 interface RouteMeta { fullBleed?: boolean }
@@ -18,6 +19,7 @@ export function AppShell() {
       <Sidebar />
       <main className="col-main">
         <Topbar />
+        <GlobalWhatsAppAlert />
         <div className={'content' + (fullBleed ? ' content-bleed' : '')}>
           <Outlet />
         </div>

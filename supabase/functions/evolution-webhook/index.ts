@@ -1,4 +1,7 @@
 // evolution-webhook — eventos da Evolution. Sem JWT. Secret via webhook_config (constante).
+// v23: ao reconectar (connection.update=open) limpa alerta_silenciado do canal ("silenciar até reconexão").
+// v22: mensagens do health check (prefixo "Teste automático Atenvo") são ignoradas (ignorado_motivo=
+//      health_check) — não criam contato/conversa/lead nem poluem o inbox/relatórios.
 // v21: @lid REUSO — evento só com LID consulta wa_lid_map CONFIRMADO por (org,canal,lid) e reutiliza o PN
 //      vinculado: resolve o contato certo sem criar novo, sem depender de cache. Mapa não confirmado nunca usado.
 // v20: @lid identidade protegida — o LID NUNCA vira nome do contato (sem PN e sem pushName real =>
@@ -162,7 +165,8 @@ Deno.serve(async (req) => {
       const state = (data.state as string) ?? (data.connection as string);
       if (state === 'open') {
         const numero = digits((data.wuid as string) ?? (data.ownerJid as string));
-        await admin.from('canais').update({ status_integracao: 'conectado', ativo: true, ...(numero ? { numero_conectado: numero } : {}), conectado_em: new Date().toISOString(), ultima_sincronizacao: new Date().toISOString() }).eq('id', canal.id);
+        // v23: reconectou → limpa silêncio de alerta ("silenciar até reconexão" se resolve sozinho).
+        await admin.from('canais').update({ status_integracao: 'conectado', ativo: true, ...(numero ? { numero_conectado: numero } : {}), conectado_em: new Date().toISOString(), ultima_sincronizacao: new Date().toISOString(), alerta_silenciado: false, alerta_silenciado_ate: null, alerta_silenciado_motivo: null, alerta_silenciado_por: null }).eq('id', canal.id);
         await admin.from('integracoes').update({ status: 'conectado' }).eq('canal_id', canal.id);
         // Auto-cura de canal DUPLICADO do mesmo número (reconexão que criou canal novo em vez de reusar o
         // histórico): reabsorve no canal histórico, preservando conversas/histórico. Idempotente (best-effort).
@@ -184,6 +188,8 @@ Deno.serve(async (req) => {
       const corpo = textOf(msgObj);
       const midia = midiaOf(msgObj);
       const conteudoMsg = corpo ?? midia?.caption ?? null; // legenda da mídia vira o texto exibido
+      // v22: mensagens do HEALTH CHECK (wa-health-check) não viram lead/conversa/inbox. Marcador estável no texto.
+      if (corpo && /^\s*teste autom[aá]tico atenvo\b/i.test(corpo)) { await finish('ignorado', { ignorado_motivo: 'health_check' }); return json({ ok: true }); }
       if (!corpo && !midia) { await finish('ignorado', { ignorado_motivo: 'sem_conteudo' }); return json({ ok: true }); }
       if (!phone && !lid) { await finish('ignorado', { ignorado_motivo: 'sem_identificador' }); return json({ ok: true }); }
       // v21: evento SÓ com LID → consulta o mapa CONFIRMADO por (org, canal, lid) e REUTILIZA o PN já vinculado

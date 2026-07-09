@@ -247,3 +247,36 @@ body.wa-foco .content{padding:0;overflow:hidden}
 .app-demo{margin-top:26px}
 .app-demo,.app-demo .sidebar,.app-demo .col-main{height:calc(100dvh - 26px)}
 [data-theme="dark"] .demo-bar{background:#6b4fa0}
+
+/* ============================================================
+   Aviso global de canais WhatsApp (GlobalWhatsAppAlert)
+   ============================================================ */
+.gwa{flex:0 0 auto;border-bottom:1px solid var(--line);background:var(--gwa-soft);border-left:3px solid var(--gwa-c)}
+.gwa-critico{--gwa-c:var(--err);--gwa-soft:var(--err-soft)}
+.gwa-alto{--gwa-c:var(--warn);--gwa-soft:var(--warn-soft)}
+.gwa-medio{--gwa-c:#b8860b;--gwa-soft:#fdf6d8}
+[data-theme="dark"] .gwa-medio{--gwa-c:#e0b83a;--gwa-soft:rgba(224,184,58,.16)}
+.gwa-bar{display:flex;align-items:center;gap:10px;padding:9px 20px;min-height:44px}
+.gwa-bar-dot{flex:0 0 auto;width:8px;height:8px;border-radius:50%;background:var(--gwa-c)}
+.gwa-bar-text{flex:1;min-width:0;font-size:13px;font-weight:500;color:var(--ink);line-height:1.35}
+.gwa-bar-actions{flex:0 0 auto;display:flex;align-items:center;gap:8px}
+.gwa-btn-ghost{font-size:12.5px;font-weight:600;color:var(--ink-2);background:transparent;border:1px solid var(--line-2);border-radius:8px;padding:5px 11px;cursor:pointer}
+.gwa-btn-ghost:hover:not(:disabled){background:var(--surface);color:var(--ink)}
+.gwa-btn-solid{font-size:12.5px;font-weight:600;color:#fff;background:var(--gwa-c);border:1px solid var(--gwa-c);border-radius:8px;padding:5px 12px;cursor:pointer}
+.gwa-btn-solid:hover:not(:disabled){filter:brightness(.94)}
+.gwa-btn-ghost:disabled,.gwa-btn-solid:disabled{opacity:.5;cursor:default}
+.gwa-list{list-style:none;margin:0;padding:2px 20px 12px;display:flex;flex-direction:column;gap:6px}
+.gwa-list-solo{padding-top:0}
+.gwa-item{border:1px solid var(--line);border-left:3px solid var(--gwa-c);border-radius:8px;background:var(--surface);padding:8px 12px}
+.gwa-item-main{display:flex;align-items:center;gap:9px}
+.gwa-item-dot{flex:0 0 auto;width:7px;height:7px;border-radius:50%;background:var(--gwa-c)}
+.gwa-item-titulo{flex:1;min-width:0;font-size:12.5px;color:var(--ink);line-height:1.35}
+.gwa-item-sil{flex:0 0 auto}
+.gwa-silbox{margin-top:9px;padding-top:9px;border-top:1px dashed var(--line-2);display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.gwa-sil-durs{display:flex;gap:6px}
+.gwa-sil-durs button{font-size:12px;font-weight:600;color:var(--ink-2);background:var(--surface-2);border:1px solid var(--line-2);border-radius:7px;padding:5px 10px;cursor:pointer}
+.gwa-sil-durs button.on{color:var(--gwa-c);border-color:var(--gwa-c);background:var(--gwa-soft)}
+.gwa-sil-motivo{flex:1;min-width:180px;font-size:12.5px;color:var(--ink);background:var(--surface);border:1px solid var(--line-2);border-radius:8px;padding:6px 10px}
+.gwa-sil-motivo:focus{outline:none;border-color:var(--gwa-c);box-shadow:0 0 0 3px var(--gwa-soft)}
+.gwa-sil-actions{display:flex;gap:8px}
+.gwa-sil-erro{flex-basis:100%;font-size:12px;color:var(--err)}

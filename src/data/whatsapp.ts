@@ -532,3 +532,71 @@ export async function urlAssinadaMidiaWa(path: string): Promise<string> {
   if (error || !data?.signedUrl) throw new Error(error?.message || 'Falha ao gerar URL da mídia.');
   return data.signedUrl;
 }
+
+/* ===================== Alerta global de canais WhatsApp (F2) ===================== */
+export type WaAlertaSeveridade = 'critico' | 'alto' | 'medio';
+export interface WaAlertaGlobalItem {
+  canal_id: string;
+  nome_interno: string;
+  severidade: WaAlertaSeveridade;
+  tipo_alerta: 'envio_restrito' | 'health_falha' | 'desconectado' | 'health_atencao';
+  titulo: string;
+  acao_label: string;
+  acao_url: string;
+}
+export interface WaAlertasGlobais {
+  total: number;
+  criticos: number;
+  altos: number;
+  medios: number;
+  severidade_max: number;
+  acao_url: string;
+  itens: WaAlertaGlobalItem[];
+}
+
+/** Alertas globais dos canais WhatsApp (só problemas ativos e não silenciados). Refetch leve, sem probe ao vivo. */
+export function useWaAlertasGlobais() {
+  const { currentOrg } = useOrg();
+  return useQuery({
+    queryKey: ['wa-alertas-globais', currentOrg.id],
+    enabled: WA_REAL && !!currentOrg.id,
+    staleTime: 60_000,
+    refetchInterval: 120_000,
+    refetchOnWindowFocus: true,
+    queryFn: async (): Promise<WaAlertasGlobais> => {
+      const { data, error } = await supabase!.rpc('wa_canais_alertas_globais', { p_org: currentOrg.id });
+      if (error) throw new Error(error.message);
+      return (data ?? { total: 0, criticos: 0, altos: 0, medios: 0, severidade_max: 0, acao_url: '/integracoes', itens: [] }) as WaAlertasGlobais;
+    },
+  });
+}
+
+/** Silenciar alerta de um canal (admin/supervisor). p_ate null = "até reconexão". */
+export function useSilenciarAlertaCanal() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (p: { canalId: string; ate: string | null; motivo: string }) => {
+      const { error } = await supabase!.rpc('wa_canal_silenciar_alerta', { p_canal: p.canalId, p_ate: p.ate, p_motivo: p.motivo });
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['wa-alertas-globais'] });
+      qc.invalidateQueries({ queryKey: ['wa-canais'] });
+    },
+  });
+}
+
+/** Reativar alerta de um canal (admin/supervisor). */
+export function useReativarAlertaCanal() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (canalId: string) => {
+      const { error } = await supabase!.rpc('wa_canal_reativar_alerta', { p_canal: canalId });
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['wa-alertas-globais'] });
+      qc.invalidateQueries({ queryKey: ['wa-canais'] });
+    },
+  });
+}
