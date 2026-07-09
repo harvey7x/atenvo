@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { useOrg } from '@/context/OrgContext';
@@ -8,10 +7,11 @@ export const SLA_REAL = isSupabaseConfigured && !!supabase;
 
 const VAZIO: SlaAlertasResumo = { total: 0, imediatos: 0, criticos: 0, vermelhos: 0, amarelos: 0, leves: 0, itens: [] };
 
-/** Alertas de SLA ativos (role-aware no backend). Refetch leve + realtime na tabela sla_alertas. */
+/** Alertas de SLA ativos (role-aware no backend). Refetch leve (30s); o cron atualiza a cada 1 min.
+    Sem canal realtime: este hook é montado em vários componentes ao mesmo tempo (barra/sino/Inbox/
+    Kanban) e um canal de topic único (sla-<org>) colidiria (.on após subscribe). O refetch cobre. */
 export function useSlaAlertas() {
   const { currentOrg } = useOrg();
-  const qc = useQueryClient();
   const orgId = currentOrg.id;
 
   const query = useQuery({
@@ -26,17 +26,6 @@ export function useSlaAlertas() {
       return (data ?? VAZIO) as SlaAlertasResumo;
     },
   });
-
-  useEffect(() => {
-    if (!SLA_REAL || !orgId) return;
-    const ch = supabase!
-      .channel(`sla-${orgId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sla_alertas', filter: `organizacao_id=eq.${orgId}` }, () => {
-        qc.invalidateQueries({ queryKey: ['sla-alertas', orgId] });
-      })
-      .subscribe();
-    return () => { supabase!.removeChannel(ch); };
-  }, [orgId, qc]);
 
   return query;
 }
