@@ -39,7 +39,7 @@ function SilenciarBox({ alertaId, onDone }: { alertaId: string; onDone: () => vo
   );
 }
 
-function Item({ alerta, onNavigate }: { alerta: SlaAlerta; onNavigate?: () => void }) {
+function Item({ alerta, onNavigate, hideAbrir }: { alerta: SlaAlerta; onNavigate?: () => void; hideAbrir?: boolean }) {
   const { currentOrg } = useOrg();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -63,7 +63,7 @@ function Item({ alerta, onNavigate }: { alerta: SlaAlerta; onNavigate?: () => vo
         </span>
       </div>
       <div className="sla-item-actions">
-        <button type="button" className="sla-btn-ghost" onClick={abrir}>Abrir</button>
+        {!hideAbrir && <button type="button" className="sla-btn-ghost" onClick={abrir}>Abrir</button>}
         {podeGerir && !abrirSil && (
           <button type="button" className="sla-btn-ghost" onClick={() => setAbrirSil(true)}>Silenciar</button>
         )}
@@ -79,11 +79,11 @@ function Item({ alerta, onNavigate }: { alerta: SlaAlerta; onNavigate?: () => vo
   );
 }
 
-export function SlaAlertList({ itens, onNavigate }: { itens: SlaAlerta[]; onNavigate?: () => void }) {
+export function SlaAlertList({ itens, onNavigate, hideAbrir }: { itens: SlaAlerta[]; onNavigate?: () => void; hideAbrir?: boolean }) {
   if (!itens.length) return <div className="sla-empty">Nenhum alerta de atendimento ativo.</div>;
   return (
     <ul className="sla-list">
-      {itens.map((a) => <Item key={a.id} alerta={a} onNavigate={onNavigate} />)}
+      {itens.map((a) => <Item key={a.id} alerta={a} onNavigate={onNavigate} hideAbrir={hideAbrir} />)}
     </ul>
   );
 }

@@ -338,3 +338,11 @@ body.wa-foco .content{padding:0;overflow:hidden}
 .lc-sla{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
 .lc-sla-chip{font-size:10px;font-weight:600;line-height:1.5;padding:0 6px;border-radius:6px;color:var(--sla-c);background:var(--sla-soft);border:1px solid var(--sla-c);white-space:nowrap}
 .lc-sla-chip.prio{color:#b8860b;background:rgba(184,134,11,.12);border-color:#b8860b}
+/* banner de SLA na conversa aberta (S4.4) */
+.sla-conv{flex:0 0 auto;background:var(--sla-soft);border-bottom:1px solid var(--line);border-left:3px solid var(--sla-c)}
+.sla-conv-bar{display:flex;align-items:center;gap:8px;padding:7px 14px;min-height:38px;flex-wrap:wrap}
+.sla-conv-dot{flex:0 0 auto;width:7px;height:7px;border-radius:50%;background:var(--sla-c)}
+.sla-conv-emoji{flex:0 0 auto;font-size:13px}
+.sla-conv-text{flex:1;min-width:120px;font-size:12.5px;font-weight:600;color:var(--ink);line-height:1.35}
+.sla-conv-toggle{flex:0 0 auto}
+.sla-conv-list{padding:0 14px 10px}

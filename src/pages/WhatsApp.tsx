@@ -19,6 +19,7 @@ import { Modal } from '@/components/Modal';
 import { useStatusDefs, useEtiquetas, useAssinaturaPref, useAtendimentoActions, useOrgUsuarios, resolverNomeAssinatura } from '@/data/atendimento';
 import { useSlaAlertas } from '@/data/sla';
 import { indexPorChave, sevRank, sevClass, tipoLabel, tipoEmoji } from '@/data/slaView';
+import { SlaConversaBanner } from '@/components/SlaConversaBanner';
 import { corDaEtiqueta, podeGerenciarAtendimento, type AssinaturaModo } from '@/types/atendimento';
 import { KanbanContatoBox } from '@/components/KanbanContatoBox';
 import './WhatsApp.css';
@@ -881,6 +882,8 @@ export function WhatsApp() {
             <button ref={acoesBtnRef} className={'icon-btn' + (pop?.kind === 'acoes' ? ' on' : '')} title="Ações" aria-label="Ações da conversa" aria-haspopup="menu" aria-expanded={pop?.kind === 'acoes'} disabled={!current.id} onClick={(e) => { e.stopPropagation(); togglePop('acoes', acoesBtnRef, 'right'); }}><IcDots /></button>
           </div>
         </header>
+
+        <SlaConversaBanner alertas={slaPorConversa.get(currentId) ?? []} />
 
         <div className="messages" ref={msgsRef}>
           {current.msgs.map((m, i) => {
