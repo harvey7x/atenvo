@@ -14,12 +14,25 @@ import { useSearchParams } from 'react-router-dom';
 import { Modal } from '@/components/Modal';
 import { FichaJudicialBox } from '@/components/FichaJudicialBox';
 import { useFichasStatusDeOportunidades } from '@/data/fichaJudicial';
+import { useSlaAlertas } from '@/data/sla';
+import { indexPorChave, sevRank, sevClass, tipoLabel, type SlaTipo } from '@/data/slaView';
 import { initials, avatarColor } from '@/lib/avatar';
 import './Kanban.css';
 
 const PALETTE = ['#3b82f6', '#19C37D', '#f59e0b', '#8b5cf6', '#0891b2', '#e11d48', '#7c3aed', '#0e9d63', '#d97706', '#64748b'];
 const fmtBRL = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 function haDe(iso?: string | null) { if (!iso) return ''; const ms = Date.now() - new Date(iso).getTime(); if (!Number.isFinite(ms) || ms < 0) return ''; const m = Math.floor(ms / 60000); if (m < 1) return 'agora'; if (m < 60) return `há ${m} min`; if (m < 1440) return `há ${Math.floor(m / 60)} h`; return `há ${Math.floor(m / 1440)} d`; }
+// Texto curto do chip de SLA no card. "Parado há Xh" usa movimentado_em; prazos usam entrada_em (calculado no motor).
+function slaChipTexto(tipo: SlaTipo, movimentadoEm: string): string {
+  switch (tipo) {
+    case 'parado_ha_muito_tempo': return `Parado ${haDe(movimentadoEm)}`;
+    case 'prazo_2_dias_em_risco': return 'Prazo em risco';
+    case 'prazo_2_dias_estourado': return '2 dias estourado';
+    case 'lead_quente_aguardando': return 'Lead quente';
+    case 'cliente_qualificado_aguardando_atendimento': return 'Qualificado aguardando';
+    default: return tipoLabel(tipo);
+  }
+}
 function fmtData(s?: string | null) { if (!s) return ''; const [y, m, d] = s.split('-'); return d && m && y ? `${d}/${m}/${y}` : s; }
 function fmtDataHora(iso?: string | null) { if (!iso) return ''; const dt = new Date(iso); return Number.isNaN(dt.getTime()) ? '' : dt.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); }
 function Av({ n, cls }: { n: string; cls?: string }) { return <span className={'av' + (cls ? ' ' + cls : '')} style={{ background: avatarColor(n) }}>{initials(n)}</span>; }
@@ -204,7 +217,17 @@ export function Kanban() {
   };
   const colunaDoLead = (l: KLead) => optim[l.id] ?? l.colunaId;
   const leadsVisiveis = useMemo(() => k.leads.filter(matchBusca), [k.leads, term]); // eslint-disable-line
-  const porColuna = (colId: string) => leadsVisiveis.filter((l) => colunaDoLead(l) === colId).sort((a, b) => a.ordem - b.ordem);
+  // SLA (S4.3): alertas ativos por oportunidade_id (só leitura; não altera regras do Kanban).
+  const slaQ = useSlaAlertas();
+  const slaPorOpp = useMemo(() => indexPorChave(slaQ.data?.itens ?? [], 'oportunidade_id'), [slaQ.data]);
+  const slaSevDe = (id: string) => { const arr = slaPorOpp.get(id); return arr && arr.length ? sevRank(arr[0].severidade) : 0; };
+  const porColuna = (colId: string) => leadsVisiveis.filter((l) => colunaDoLead(l) === colId).sort((a, b) => {
+    const sa = slaSevDe(a.id), sb = slaSevDe(b.id);           // 1) severidade do alerta (imediato→leve)
+    if (sa !== sb) return sb - sa;
+    const pa = a.prioridade === 'alta' ? 1 : 0, pb = b.prioridade === 'alta' ? 1 : 0; // 2) prioridade alta
+    if (pa !== pb) return pb - pa;
+    return a.ordem - b.ordem;                                  // 3) ordem atual
+  });
   const semResultado = term !== '' && leadsVisiveis.length === 0 && k.leads.length > 0;
 
   async function mover(id: string, colId: string) {
@@ -453,6 +476,12 @@ export function Kanban() {
                           </div>
                           {vr.valor != null && <div className="lc-valor-line">{fmtBRL(vr.valor)}{vr.mensal ? ' /mês' : ''}</div>}
                           {tags.length > 0 && <div className="lc-tags" title={tags.join(', ')}>{tags.slice(0, 3).map((t) => { const cor = corDaEtiqueta(t, etiquetas); return <span key={t} className="lc-tag" style={{ background: cor + '22', color: cor, borderColor: cor + '55' }}>{t}</span>; })}{tags.length > 3 && <span className="lc-tag more">+{tags.length - 3}</span>}</div>}
+                          {(() => { const sa = slaPorOpp.get(l.id) ?? []; if (!sa.length && l.prioridade !== 'alta') return null; return (
+                            <div className="lc-sla">
+                              {sa.map((a) => <span key={a.id} className={'lc-sla-chip ' + sevClass(a.severidade)} title={a.detalhe ?? a.titulo}>{slaChipTexto(a.tipo, l.movimentadoEm)}</span>)}
+                              {l.prioridade === 'alta' && <span className="lc-sla-chip prio" title="Prioridade alta">⭐ Prioridade alta</span>}
+                            </div>
+                          ); })()}
                           <div className="lc-foot">{IC.clock}{haDe(l.atualizadoEm || l.criadoEm)}{fichaStatusMap[l.id] && <span className={'lc-ficha-tag ' + fichaStatusMap[l.id]}>{fichaStatusMap[l.id] === 'finalizada' ? 'Ficha finalizada' : 'Ficha em rascunho'}</span>}</div>
                         </div>
                       );

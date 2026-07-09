@@ -47,6 +47,8 @@ export interface KLead {
   nome: string; telefone: string; email: string;
   respId: string | null; respNome: string; valor: number | null; origem: string; etiquetas: string[];
   observacoes: string; ordem: number; criadoEm: string; atualizadoEm: string;
+  // SLA (S4.3): tempo de entrada/última movimentação de coluna + prioridade
+  entradaEm: string; movimentadoEm: string; prioridade: string | null;
   // fechamento (Etapa 2A): status do funil + snapshot
   status: string; fechadoEm: string | null; motivoPerda: string | null; respNoFechamentoId: string | null;
   // domínio previdenciário
@@ -62,6 +64,7 @@ interface DbLead {
   contato_nome: string | null; titulo: string | null;
   telefone: string | null; responsavel_id: string | null; valor_estimado: number | null; origem: string | null;
   etiquetas: string[] | null; observacoes: string | null; ordem: number; criado_em: string; atualizado_em: string;
+  entrada_em: string; movimentado_em: string; prioridade: string | null;
   status: string; fechado_em: string | null; motivo_perda: string | null; responsavel_no_fechamento_id: string | null;
   tipo_beneficio: string | null; tipo_servico: string; status_cancelamento: string; status_ressarcimento: string;
   numero_beneficio: string | null; instituicao: string | null; tipo_desconto: string | null; data_inicio_desconto: string | null;
@@ -85,6 +88,7 @@ function mapLead(l: DbLead): KLead {
     respId: l.responsavel_id, respNome: rp?.nome || '',
     valor: l.valor_estimado, origem: l.origem || '', etiquetas: l.etiquetas ?? [],
     observacoes: l.observacoes || '', ordem: l.ordem, criadoEm: l.criado_em, atualizadoEm: l.atualizado_em,
+    entradaEm: l.entrada_em, movimentadoEm: l.movimentado_em, prioridade: l.prioridade ?? null,
     status: l.status || 'em_andamento', fechadoEm: l.fechado_em, motivoPerda: l.motivo_perda, respNoFechamentoId: l.responsavel_no_fechamento_id,
     tipoBeneficio: l.tipo_beneficio, tipoServico: l.tipo_servico || 'analise_inicial',
     statusCancelamento: l.status_cancelamento || 'nao_se_aplica', statusRessarcimento: l.status_ressarcimento || 'nao_se_aplica',
@@ -253,7 +257,7 @@ export function useKanban() {
     queryKey: ['kanban-leads', org, funilId], enabled: KANBAN_REAL && !!funilId, refetchInterval: 8000,
     queryFn: async (): Promise<KLead[]> => {
       const { data, error } = await supabase!.from('oportunidades')
-        .select('id, coluna_id, contato_id, conversa_origem_id, canal_origem_id, contato_nome, titulo, telefone, responsavel_id, valor_estimado, origem, etiquetas, observacoes, ordem, criado_em, atualizado_em, status, fechado_em, motivo_perda, responsavel_no_fechamento_id, tipo_beneficio, tipo_servico, status_cancelamento, status_ressarcimento, numero_beneficio, instituicao, tipo_desconto, data_inicio_desconto, valor_desconto_mensal, valor_ressarcimento_estimado, valor_ressarcido, contatos(nome, telefone, email, etiquetas), responsavel:usuarios!oportunidades_responsavel_id_fkey(nome), canal_origem:canais(tipo, nome_interno, numero_conectado)')
+        .select('id, coluna_id, contato_id, conversa_origem_id, canal_origem_id, contato_nome, titulo, telefone, responsavel_id, valor_estimado, origem, etiquetas, observacoes, ordem, criado_em, atualizado_em, entrada_em, movimentado_em, prioridade, status, fechado_em, motivo_perda, responsavel_no_fechamento_id, tipo_beneficio, tipo_servico, status_cancelamento, status_ressarcimento, numero_beneficio, instituicao, tipo_desconto, data_inicio_desconto, valor_desconto_mensal, valor_ressarcimento_estimado, valor_ressarcido, contatos(nome, telefone, email, etiquetas), responsavel:usuarios!oportunidades_responsavel_id_fkey(nome), canal_origem:canais(tipo, nome_interno, numero_conectado)')
         .eq('organizacao_id', org).eq('funil_id', funilId!).in('status', ['em_andamento', 'ganho', 'perdido'])
         .order('ordem', { ascending: true }).order('criado_em', { ascending: true });
       if (error) throw new Error(error.message);
