@@ -55,14 +55,30 @@ Deno.serve(async (req) => {
     if (!body.conversa_id) return json({ error: 'conversa_id_obrigatorio' }, 400);
     const conversaId = body.conversa_id;
 
-    // ---- estado + contexto ----
+    // ---- estado + conversa (com responsavel_id + precisa_humano) ----
     const { data: estado } = await admin.rpc('bot_estado_get_or_create', { p_conversa: conversaId });
     if (!estado) return json({ error: 'conversa_inexistente' }, 404);
-    if (estado.pausado) return json({ ok: true, skipped: 'ja_pausado', motivo: estado.motivo_pausa });
-
     const { data: conv } = await admin.from('conversas')
-      .select('id, organizacao_id, contato_id, canal_id, atendente_id').eq('id', conversaId).maybeSingle();
+      .select('id, organizacao_id, contato_id, canal_id, atendente_id, precisa_humano, contatos(responsavel_id)').eq('id', conversaId).maybeSingle();
     if (!conv) return json({ error: 'conversa_inexistente' }, 404);
+    const responsavelId = (Array.isArray(conv.contatos) ? conv.contatos[0]?.responsavel_id : (conv.contatos as any)?.responsavel_id) ?? null;
+    const logRunner = async (outcome: string, motivo?: string | null, extra: Record<string, unknown> = {}) => {
+      try { await admin.from('audit_log').insert({ usuario_id: null, acao: 'bot_runner', entidade: 'conversas', entidade_id: conversaId, dados_depois: { outcome, motivo: motivo ?? null, dry_run: dryRun, ...extra }, organizacao_id: conv.organizacao_id }); } catch { /* log best-effort */ }
+    };
+
+    // ---- guardas (antes de qualquer trabalho) ----
+    if (estado.pausado) { await logRunner('bot_ignorado', 'ja_pausado'); return json({ ok: true, skipped: 'ja_pausado', motivo: estado.motivo_pausa }); }
+    // idempotência: mesmo inbound já processado nesta conversa
+    if (!body.start && body.inbound_msg_id && estado.ultimo_inbound_msg_id === body.inbound_msg_id) {
+      await logRunner('inbound_duplicado', body.inbound_msg_id); return json({ ok: true, skipped: 'inbound_duplicado' });
+    }
+    // precisa_humano: não responde (preserva a flag; não pausa)
+    if (conv.precisa_humano) { await logRunner('bot_ignorado', 'precisa_humano'); return json({ ok: true, skipped: 'precisa_humano' }); }
+    // lock por conversa (lease 30s): evita execução concorrente
+    const { data: claimed } = await admin.rpc('bot_claim_conversa', { p_conversa: conversaId, p_ttl_seg: 30 });
+    if (!claimed) { await logRunner('lock_ativo', 'execucao_concorrente'); return json({ ok: true, skipped: 'lock_ativo' }); }
+    try {
+    try {
     const { data: canal } = await admin.from('canais')
       .select('id, nome_interno, instancia_externa, origem_tipo').eq('id', conv.canal_id).maybeSingle();
     const { data: cfg } = await admin.from('bot_canal_config')
@@ -80,11 +96,12 @@ Deno.serve(async (req) => {
     // ---- pausa por humano (atendente atribuído OU resposta humana) ----
     const { data: humano } = await admin.from('mensagens')
       .select('id, autor_id, origem, tipo').eq('conversa_id', conversaId).eq('direcao', 'saida').limit(50);
-    const houveHumano = conv.atendente_id != null || (humano ?? []).some((m: any) =>
+    const houveHumano = conv.atendente_id != null || responsavelId != null || (humano ?? []).some((m: any) =>
       (m.autor_id != null && !['sistema', 'nota_interna'].includes(m.tipo)) || (m.autor_id == null && m.origem === 'telefone'));
     if (houveHumano) {
       const { texto, json: rj } = montarResumo({ dados, canalNome, origem, etapa: estado.etapa, leadQuente: estado.lead_quente, leadQuenteMotivos: estado.lead_quente_motivos ?? [] });
       await admin.rpc('bot_pausar', { p_conversa: conversaId, p_motivo: 'humano_assumiu', p_resumo_texto: texto, p_resumo_json: rj });
+      await logRunner('bot_ignorado', 'humano_assumiu');
       return json({ ok: true, paused: 'humano_assumiu', dry_run: dryRun });
     }
 
@@ -94,12 +111,13 @@ Deno.serve(async (req) => {
       const enviados = await drenar(admin, rows, dryRun, canal, conv);
       const { texto, json: rj } = montarResumo({ dados, canalNome, origem, etapa: estado.etapa, leadQuente: estado.lead_quente, leadQuenteMotivos: estado.lead_quente_motivos ?? [] });
       await admin.rpc('bot_pausar', { p_conversa: conversaId, p_motivo: 'audio', p_resumo_texto: texto, p_resumo_json: rj });
+      await logRunner('bot_ignorado', 'audio');
       return json({ ok: true, paused: 'audio', dry_run: dryRun, mensagens: [copy.audio], enviados_reais: enviados });
     }
 
     // ---- elegibilidade (não bloqueia teste com force; produção exigirá elegivel) ----
     const { data: eleg } = await admin.rpc('bot_pode_atuar', { p_conversa: conversaId });
-    if (!eleg?.elegivel && !force) return json({ ok: true, skipped: 'inelegivel', elegibilidade: eleg });
+    if (!eleg?.elegivel && !force) { await logRunner('bot_ignorado', eleg?.motivo ?? 'inelegivel'); return json({ ok: true, skipped: 'inelegivel', elegibilidade: eleg }); }
 
     // ---- decide a etapa ----
     const etapaAtual = (body.start ? 'inicio' : estado.etapa) as Etapa | 'inicio';
@@ -152,12 +170,20 @@ Deno.serve(async (req) => {
       resumo = r.json;
     }
 
+    await logRunner('bot_respondeu', null, { mensagens: mensagens.length, enviados_reais: enviados, etapa_nova: dec.proximaEtapa });
     return json({
       ok: true, dry_run: dryRun, elegibilidade: eleg,
       etapa_anterior: etapaAtual, etapa_nova: dec.proximaEtapa,
       acoes: dec.acoes, lead_quente_motivos: motivosLQ,
       mensagens, enviados_reais: enviados, resumo,
     });
+    } catch (e) {
+      await logRunner('bot_falhou', (e as Error)?.message?.slice(0, 200));
+      return json({ ok: false, skipped: 'bot_falhou', erro: (e as Error)?.message?.slice(0, 200) }, 200);
+    }
+    } finally {
+      await admin.rpc('bot_release_conversa', { p_conversa: conversaId });
+    }
   } catch (e) { return json({ error: (e as Error)?.message ?? 'erro' }, 500); }
 });
 
