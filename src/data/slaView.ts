@@ -90,15 +90,16 @@ export function resumoHumano(r: SlaAlertasResumo): string {
   return `${r.total} acompanhamento${plural ? 's' : ''} pendente${plural ? 's' : ''}`;
 }
 
-/** Tempo relativo curto a partir de um ISO ("há 21 min" / "há 3 h" / "há 2 d" / "agora"). */
+/** Tempo relativo curto e padronizado dos alertas (nunca minutos gigantes):
+    <1min "agora" · 1-59 "há X min" · 60-1439 "há X h" (90→"há 1 h") · 24-47h "há 1 dia" · 2d+ "há X dias". */
 export function tempoRelativo(iso: string, nowMs: number = Date.now()): string {
   const ms = nowMs - new Date(iso).getTime();
-  if (!Number.isFinite(ms) || ms < 0) return 'agora';
-  const min = Math.floor(ms / 60000);
-  if (min < 1) return 'agora';
+  if (!Number.isFinite(ms) || ms < 60_000) return 'agora';
+  const min = Math.floor(ms / 60_000);
   if (min < 60) return `há ${min} min`;
   if (min < 1440) return `há ${Math.floor(min / 60)} h`;
-  return `há ${Math.floor(min / 1440)} d`;
+  const dias = Math.floor(min / 1440);
+  return dias === 1 ? 'há 1 dia' : `há ${dias} dias`;
 }
 
 /** Frase-status (linha 2 do card), sem número gigante no título. */

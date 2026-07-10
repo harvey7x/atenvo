@@ -818,7 +818,7 @@ export function WhatsApp() {
                   <div className="conv-sla">
                     {slaChips.map((a) => (
                       <span key={a.id} className={'conv-sla-chip ' + sevClass(a.severidade) + ' int-' + sevIntensidade(a.severidade)} title={a.detalhe ?? a.titulo}>
-                        {tipoEmoji(a.tipo)} {tipoLabel(a.tipo)}
+                        {sevIntensidade(a.severidade) !== 'discreto' && <>{tipoEmoji(a.tipo)} </>}{tipoLabel(a.tipo)}
                       </span>
                     ))}
                     {c.precisaHumano && <span className="conv-sla-chip ph" title="Conversa marcada como precisa de atendimento humano">🙋 Precisa humano</span>}

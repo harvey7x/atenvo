@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useSlaAlertas } from '@/data/sla';
-import { ordenarAlertas, maxSeveridade, sevClass, type SlaSeveridade } from '@/data/slaView';
+import { ordenarAlertas, maxSeveridade, sevClass, tipoLabel, fraseTipo, tempoRelativo, type SlaSeveridade } from '@/data/slaView';
 
 /* Estado de UI da central de SLA (abrir/fechar o dropdown do sino a partir da barra/toasts) +
    toasts estilo WhatsApp para NOVOS alertas. Client-side apenas; não toca backend/SLA engine. */
@@ -55,7 +55,7 @@ export function SlaNotifier() {
 
     const top = ordenarAlertas(novos)[0];
     const t: ToastItem = novos.length === 1
-      ? { id: nextId(), titulo: 'Novo alerta de atendimento', texto: top.titulo, sev: top.severidade }
+      ? { id: nextId(), titulo: tipoLabel(top.tipo), texto: `${fraseTipo(top.tipo)} ${tempoRelativo(top.criado_em)}`, sev: top.severidade }
       : { id: nextId(), titulo: `${novos.length} novos alertas de atendimento`, texto: 'Toque para abrir a central', sev: maxSeveridade(novos) ?? 'amarelo' };
     setToasts((cur) => [...cur, t].slice(-3));    // máx. 3 na pilha
     setTimeout(() => { if (mountedRef.current) setToasts((cur) => cur.filter((x) => x.id !== t.id)); }, 5000);

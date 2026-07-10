@@ -85,11 +85,14 @@ describe('resumoHumano', () => {
 
 describe('tempoRelativo', () => {
   const now = new Date('2026-07-09T12:00:00Z').getTime();
-  it('formata min/h/d', () => {
-    expect(tempoRelativo('2026-07-09T11:39:00Z', now)).toBe('há 21 min');
-    expect(tempoRelativo('2026-07-09T09:00:00Z', now)).toBe('há 3 h');
-    expect(tempoRelativo('2026-07-07T12:00:00Z', now)).toBe('há 2 d');
-    expect(tempoRelativo('2026-07-09T11:59:40Z', now)).toBe('agora');
+  const antes = (min: number) => new Date(now - min * 60_000).toISOString();
+  it('regras: agora / min / h (>=60 vira h) / dia / dias', () => {
+    expect(tempoRelativo(antes(0.5), now)).toBe('agora');   // < 1 min
+    expect(tempoRelativo(antes(30), now)).toBe('há 30 min');
+    expect(tempoRelativo(antes(90), now)).toBe('há 1 h');   // 90 min -> 1 h
+    expect(tempoRelativo(antes(1424), now)).toBe('há 23 h'); // 1424 min -> 23 h
+    expect(tempoRelativo(antes(1440), now)).toBe('há 1 dia');
+    expect(tempoRelativo(antes(2880), now)).toBe('há 2 dias'); // 2880 min -> 2 dias
   });
 });
 
