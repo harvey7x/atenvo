@@ -254,12 +254,11 @@ export function WhatsApp() {
     if (t && c.name.toLowerCase().indexOf(t) === -1 && c.last.toLowerCase().indexOf(t) === -1 && (c.phone || '').toLowerCase().indexOf(t) === -1) return false;
     return true;
   }).sort((a, b) => {
-    // Ordenação natural tipo WhatsApp (abas normais): fixadas → não lidas → interação mais recente.
-    // Os alertas SLA NÃO forçam a ordem aqui (aparecem só como chip discreto). A visão por
-    // prioridade fica na aba "Prioridade" (blocos), calculada à parte.
+    // Ordenação natural tipo WhatsApp (abas normais): FIXADAS no topo → depois recência pura
+    // (última interação mais recente primeiro). Não-lidas é só BADGE visual, NÃO reordena — assim
+    // atrasados antigos (com mensagens não lidas) não sobem indevidamente. SLA/severidade NÃO
+    // influenciam a ordem (só chip/status). A visão por prioridade fica na aba "Prioridade" (blocos).
     if (!!a.fixada !== !!b.fixada) return a.fixada ? -1 : 1;
-    const au = (a.unread ?? 0) > 0, bu = (b.unread ?? 0) > 0;
-    if (au !== bu) return au ? -1 : 1;
     return (b.lastAtMs ?? 0) - (a.lastAtMs ?? 0);
   });
 
