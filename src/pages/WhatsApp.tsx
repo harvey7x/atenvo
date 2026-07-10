@@ -18,7 +18,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Modal } from '@/components/Modal';
 import { useStatusDefs, useEtiquetas, useAssinaturaPref, useAtendimentoActions, useOrgUsuarios, resolverNomeAssinatura } from '@/data/atendimento';
 import { useSlaAlertas } from '@/data/sla';
-import { indexPorChave, sevRank, sevClass, sevIntensidade, tipoLabel, tipoEmoji, tempoRelativo } from '@/data/slaView';
+import { indexPorChave, sevClass, sevIntensidade, tipoLabel, tipoEmoji, tempoRelativo } from '@/data/slaView';
 import { SlaConversaBanner } from '@/components/SlaConversaBanner';
 import { classificar, isNovo, statusKind, tempoCurto, tierTempo, minutosDesde, type SinaisConversa, type Grupo } from '@/data/inboxGroups';
 import { corDaEtiqueta, podeGerenciarAtendimento, type AssinaturaModo } from '@/types/atendimento';
@@ -132,7 +132,6 @@ export function WhatsApp() {
   // SLA (S4.2): alertas ativos indexados por conversa_id (só leitura; não altera o motor).
   const slaQ = useSlaAlertas();
   const slaPorConversa = useMemo(() => indexPorChave(slaQ.data?.itens ?? [], 'conversa_id'), [slaQ.data]);
-  const slaSevDe = (id: string) => { const arr = slaPorConversa.get(id); return arr && arr.length ? sevRank(arr[0].severidade) : 0; };
   const sendMut = useSendWaMessage();
   const atribuirMut = useAtribuirAtendimento();
   const canaisQ = useWaCanais();
@@ -157,9 +156,9 @@ export function WhatsApp() {
     } catch { return ''; }
   });
   const atividadesQ = useWaAtividades(WA_REAL ? (currentId || null) : null); // timeline de atendimento (colab. E1)
-  const [tab, setTab] = useState('prioridade');
-  const [gruposRecolhidos, setGruposRecolhidos] = useState<Set<string>>(new Set());
-  const [verMaisAcomp, setVerMaisAcomp] = useState(false);
+  const [tab, setTab] = useState('todos');
+  const [gruposRecolhidos, setGruposRecolhidos] = useState<Set<string>>(() => new Set(['backlog'])); // backlog recolhido por padrão
+  const [blocosVerMais, setBlocosVerMais] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
   const [filtroCanal, setFiltroCanal] = useState<string | null>(null);   // funil: filtra por número/canal
   const [filtroStatus, setFiltroStatus] = useState<string | null>(null); // funil: filtra por status
@@ -255,10 +254,9 @@ export function WhatsApp() {
     if (t && c.name.toLowerCase().indexOf(t) === -1 && c.last.toLowerCase().indexOf(t) === -1 && (c.phone || '').toLowerCase().indexOf(t) === -1) return false;
     return true;
   }).sort((a, b) => {
-    // SLA (S4.2): conversas com alerta ativo no topo, por severidade (imediato>critico>vermelho>amarelo>leve)
-    const sa = slaSevDe(a.id), sb = slaSevDe(b.id);
-    if (sa !== sb) return sb - sa;
-    // ordenação atual: fixadas primeiro, depois não lidas, depois interação mais recente
+    // Ordenação natural tipo WhatsApp (abas normais): fixadas → não lidas → interação mais recente.
+    // Os alertas SLA NÃO forçam a ordem aqui (aparecem só como chip discreto). A visão por
+    // prioridade fica na aba "Prioridade" (blocos), calculada à parte.
     if (!!a.fixada !== !!b.fixada) return a.fixada ? -1 : 1;
     const au = (a.unread ?? 0) > 0, bu = (b.unread ?? 0) > 0;
     if (au !== bu) return au ? -1 : 1;
@@ -281,22 +279,24 @@ export function WhatsApp() {
     };
   };
   const grupos = useMemo(() => {
-    const g: Record<Grupo, WaContact[]> = { urgente: [], atencao: [], acompanhamento: [] };
+    const g: Record<Grupo, WaContact[]> = { urgente: [], atencao: [], acompanhamento: [], backlog: [] };
     if (tab !== 'prioridade') return g;
     const now = Date.now();
     for (const c of filtered) g[classificar(sinaisDe(c), now)].push(c);
     const porEspera = (a: WaContact, b: WaContact) => new Date(a.aguardandoDesde || 0).getTime() - new Date(b.aguardandoDesde || 0).getTime();
     g.urgente.sort(porEspera);      // mais tempo esperando primeiro
     g.atencao.sort(porEspera);
+    g.backlog.sort(porEspera);
     g.acompanhamento.sort((a, b) => (b.lastAtMs || 0) - (a.lastAtMs || 0)); // mais recente primeiro
     return g;
   }, [tab, filtered, slaPorConversa]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Card da aba Prioridade (valoriza a última mensagem do cliente; tempo humano; status curto).
   const renderPrioCard = (c: WaContact) => {
+    const now = Date.now();
     const sin = sinaisDe(c);
-    const novo = isNovo(sin);
-    const kind = statusKind(sin);
+    const novo = isNovo(sin, now);
+    const kind = statusKind(sin, now);
     const atendNome = c.respId ? (orgUsuarios.find((u) => u.id === c.respId)?.nome ?? 'Atendente') : null;
     const nomeVazio = !c.name?.trim() || /^[\d\s()+\-]+$/.test(c.name.trim());
     const nome = nomeVazio ? 'Cliente sem nome' : c.name;
@@ -852,17 +852,20 @@ export function WhatsApp() {
         </div>
         {tab === 'prioridade' ? (
           <div className="conv-list prio">
-            {(grupos.urgente.length + grupos.atencao.length + grupos.acompanhamento.length) === 0 ? (
+            {(grupos.urgente.length + grupos.atencao.length + grupos.acompanhamento.length + grupos.backlog.length) === 0 ? (
               <div style={{ padding: '30px 12px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>Nenhuma conversa pendente. 🎉</div>
             ) : ([
               { id: 'urgente' as const, emoji: '🔥', label: 'Urgentes', hint: 'sem resposta' },
               { id: 'atencao' as const, emoji: '⚠️', label: 'Atenção', hint: 'atrasados' },
               { id: 'acompanhamento' as const, emoji: '✅', label: 'Acompanhamentos', hint: '' },
+              { id: 'backlog' as const, emoji: '🗂️', label: 'Backlog antigo', hint: '+48h' },
             ]).map((sec) => {
               const arr = grupos[sec.id];
               if (!arr.length) return null;
               const recolhido = gruposRecolhidos.has(sec.id);
-              const mostra = sec.id === 'acompanhamento' && !verMaisAcomp ? arr.slice(0, 4) : arr;
+              const expandido = blocosVerMais.has(sec.id);
+              const LIM = 5;
+              const mostra = expandido ? arr : arr.slice(0, LIM);
               return (
                 <div className={'prio-sec prio-' + sec.id} key={sec.id}>
                   <button type="button" className="prio-sec-h" aria-expanded={!recolhido}
@@ -872,9 +875,10 @@ export function WhatsApp() {
                     <span className="prio-sec-chev">{recolhido ? '▸' : '▾'}</span>
                   </button>
                   {!recolhido && mostra.map(renderPrioCard)}
-                  {!recolhido && sec.id === 'acompanhamento' && arr.length > 4 && (
-                    <button type="button" className="prio-vermais" onClick={() => setVerMaisAcomp((v) => !v)}>
-                      {verMaisAcomp ? 'Ver menos' : `Ver outros ${arr.length - 4} acompanhamentos`} ⌄
+                  {!recolhido && arr.length > LIM && (
+                    <button type="button" className="prio-vermais"
+                      onClick={() => setBlocosVerMais((s) => { const n = new Set(s); if (n.has(sec.id)) n.delete(sec.id); else n.add(sec.id); return n; })}>
+                      {expandido ? 'Ver menos' : `Ver outros ${arr.length - LIM}`} ⌄
                     </button>
                   )}
                 </div>

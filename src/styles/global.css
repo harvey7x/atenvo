@@ -395,6 +395,8 @@ body.wa-foco .content{padding:0;overflow:hidden}
 .prio-urgente{--sec-c:#c0392b;--sec-soft:rgba(214,69,63,.12)}
 .prio-atencao{--sec-c:#c2772a;--sec-soft:var(--warn-soft)}
 .prio-acompanhamento{--sec-c:#2563eb;--sec-soft:var(--info-soft)}
+.prio-backlog{--sec-c:#94a3b8;--sec-soft:rgba(148,163,184,.16)}
+.prio-backlog .pcard{opacity:.9}
 .prio-sec-h{display:flex;align-items:center;gap:8px;width:100%;background:transparent;border:0;cursor:pointer;padding:4px 6px 7px}
 .prio-sec-t{flex:1;text-align:left;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--sec-c)}
 .prio-sec-t em{font-style:normal;font-weight:600;color:var(--muted);text-transform:none;letter-spacing:0}
@@ -403,7 +405,8 @@ body.wa-foco .content{padding:0;overflow:hidden}
 .prio-vermais{width:100%;text-align:center;font-size:12px;font-weight:600;color:var(--accent-ink);background:transparent;border:0;cursor:pointer;padding:8px}
 .prio-vermais:hover{color:var(--accent)}
 /* card premium do inbox */
-.pcard{display:flex;gap:11px;padding:10px 11px;border-radius:12px;cursor:pointer;border:1px solid var(--line);border-left:3px solid var(--sec-c,var(--line-2));background:var(--surface);margin-bottom:6px;transition:background .12s,border-color .12s}
+.pcard{display:flex;align-items:flex-start;gap:11px;padding:10px 11px;border-radius:12px;cursor:pointer;border:1px solid var(--line);border-left:3px solid var(--sec-c,var(--line-2));background:var(--surface);margin-bottom:6px;transition:background .12s,border-color .12s}
+.pcard .av{flex:0 0 auto}
 .pcard:hover{background:var(--surface-2)}
 .pcard.active{background:var(--accent-soft);border-color:var(--accent-soft-2)}
 .pcard-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}

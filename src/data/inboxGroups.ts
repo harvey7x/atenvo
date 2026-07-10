@@ -3,7 +3,10 @@ import type { SlaSeveridade, SlaTipo } from '@/data/slaView';
 /* Classificação visual do Inbox em 3 blocos (Urgentes / Atenção / Acompanhamentos).
    Puro e testável. NÃO decide nada no backend — só organiza a lista já carregada. */
 
-export type Grupo = 'urgente' | 'atencao' | 'acompanhamento';
+export type Grupo = 'urgente' | 'atencao' | 'acompanhamento' | 'backlog';
+
+const NOVO_MAX_MIN = 120;    // "novo" só até 2h
+const BACKLOG_MIN = 2880;    // > 48h = backlog antigo
 
 export interface SinaisConversa {
   aguardando: boolean;                 // última mensagem real é do cliente (aguardando resposta)
@@ -42,34 +45,35 @@ export function tempoCurto(iso: string | null, nowMs: number = Date.now()): stri
   return dias === 1 ? '1 dia' : `${dias} dias`;
 }
 
-/** Cliente novo sem primeira resposta: aguardando, sem responsável e sem nenhuma saída ainda. */
-export function isNovo(s: SinaisConversa): boolean {
-  return s.aguardando && !s.temResponsavel && !s.houveResposta;
+/** Cliente NOVO: aguardando, sem responsável, sem nenhuma saída E idade < 2h.
+    (o corte de idade impede "NOVO" em conversa de vários dias.) */
+export function isNovo(s: SinaisConversa, nowMs: number = Date.now()): boolean {
+  if (!(s.aguardando && !s.temResponsavel && !s.houveResposta)) return false;
+  const min = minutosDesde(s.aguardandoDesde, nowMs);
+  return min != null && min < NOVO_MAX_MIN;
 }
 
 const ALERTA_CRITICO = (s: SinaisConversa): boolean =>
   s.precisaHumano || s.sevAlerta === 'imediato' || s.sevAlerta === 'critico'
   || s.tipoAlerta === 'lead_quente_aguardando' || s.tipoAlerta === 'audio_recebido_precisa_humano';
 
-/** Regra final aprovada de classificação. */
+/** Regra final aprovada de classificação (só usada na aba Prioridade). */
 export function classificar(s: SinaisConversa, nowMs: number = Date.now()): Grupo {
-  if (ALERTA_CRITICO(s)) return 'urgente';
+  if (ALERTA_CRITICO(s)) return 'urgente';                       // áudio/lead quente/imediato/crítico
   const min = s.aguardando ? minutosDesde(s.aguardandoDesde, nowMs) : null;
-  // lead novo recente (< 2h) sem responsável e sem resposta → Urgente
-  if (isNovo(s) && min != null && min < 120) return 'urgente';
-  // atrasado / parado (>= 2h) ou alerta amarelo → Atenção (inclui novo que passou de 2h)
-  if (s.aguardando && min != null && min >= 120) return 'atencao';
+  if (isNovo(s, nowMs)) return 'urgente';                        // lead novo recente (< 2h)
+  if (min != null && min >= BACKLOG_MIN) return 'backlog';       // aguardando > 48h → backlog antigo
+  if (min != null && min >= NOVO_MAX_MIN) return 'atencao';      // 2h–48h → Atenção
   if (s.sevAlerta === 'amarelo') return 'atencao';
-  // resto (tem responsável / já respondido / leve / retorno sem urgência) → Acompanhamento
-  return 'acompanhamento';
+  return 'acompanhamento';                                       // responsável / já respondido / leve / normal
 }
 
 export type StatusKind = 'audio' | 'lead_quente' | 'primeira_mensagem' | 'aguardando_primeira' | 'aguardando' | 'em_acompanhamento';
 
-export function statusKind(s: SinaisConversa): StatusKind {
+export function statusKind(s: SinaisConversa, nowMs: number = Date.now()): StatusKind {
   if (s.tipoAlerta === 'audio_recebido_precisa_humano') return 'audio';
   if (s.tipoAlerta === 'lead_quente_aguardando') return 'lead_quente';
-  if (isNovo(s)) return s.primeiraMensagem ? 'primeira_mensagem' : 'aguardando_primeira';
+  if (isNovo(s, nowMs)) return s.primeiraMensagem ? 'primeira_mensagem' : 'aguardando_primeira';
   if (s.aguardando) return 'aguardando';
   return 'em_acompanhamento';
 }

@@ -27,9 +27,13 @@ describe('classificar', () => {
     expect(classificar(s({ precisaHumano: true, aguardandoDesde: atras(500) }), NOW)).toBe('urgente');
     expect(classificar(s({ tipoAlerta: 'audio_recebido_precisa_humano' }), NOW)).toBe('urgente');
   });
-  it('novo/aguardando acima de 2h → atenção', () => {
+  it('aguardando entre 2h e 48h → atenção (inclui novo que passou de 2h)', () => {
     expect(classificar(s({ aguardandoDesde: atras(16 * 60) }), NOW)).toBe('atencao'); // 16h
     expect(classificar(s({ aguardandoDesde: atras(20 * 60) }), NOW)).toBe('atencao'); // 20h
+  });
+  it('aguardando > 48h → backlog (não domina)', () => {
+    expect(classificar(s({ aguardandoDesde: atras(60 * 60) }), NOW)).toBe('backlog'); // 60h
+    expect(classificar(s({ aguardandoDesde: atras(10 * 1440) }), NOW)).toBe('backlog'); // 10 dias
   });
   it('alerta amarelo → atenção', () => {
     expect(classificar(s({ sevAlerta: 'amarelo', aguardandoDesde: atras(10), houveResposta: true }), NOW)).toBe('atencao');
@@ -42,18 +46,20 @@ describe('classificar', () => {
 });
 
 describe('isNovo + statusKind', () => {
-  it('isNovo só quando sem responsável e sem resposta', () => {
-    expect(isNovo(s({}))).toBe(true);
-    expect(isNovo(s({ temResponsavel: true }))).toBe(false);
-    expect(isNovo(s({ houveResposta: true }))).toBe(false);
+  it('NOVO só se sem responsável, sem resposta E < 2h', () => {
+    expect(isNovo(s({ aguardandoDesde: atras(30) }), NOW)).toBe(true);
+    expect(isNovo(s({ aguardandoDesde: atras(10 * 1440) }), NOW)).toBe(false); // 10 dias → nunca NOVO
+    expect(isNovo(s({ temResponsavel: true }), NOW)).toBe(false);
+    expect(isNovo(s({ houveResposta: true }), NOW)).toBe(false);
   });
   it('statusKind', () => {
-    expect(statusKind(s({ tipoAlerta: 'audio_recebido_precisa_humano' }))).toBe('audio');
-    expect(statusKind(s({ tipoAlerta: 'lead_quente_aguardando' }))).toBe('lead_quente');
-    expect(statusKind(s({ primeiraMensagem: true }))).toBe('primeira_mensagem');
-    expect(statusKind(s({ primeiraMensagem: false }))).toBe('aguardando_primeira');
-    expect(statusKind(s({ temResponsavel: true, houveResposta: true }))).toBe('aguardando');
-    expect(statusKind(s({ aguardando: false, houveResposta: true, temResponsavel: true }))).toBe('em_acompanhamento');
+    expect(statusKind(s({ tipoAlerta: 'audio_recebido_precisa_humano' }), NOW)).toBe('audio');
+    expect(statusKind(s({ tipoAlerta: 'lead_quente_aguardando' }), NOW)).toBe('lead_quente');
+    expect(statusKind(s({ primeiraMensagem: true, aguardandoDesde: atras(5) }), NOW)).toBe('primeira_mensagem');
+    expect(statusKind(s({ primeiraMensagem: false, aguardandoDesde: atras(5) }), NOW)).toBe('aguardando_primeira');
+    expect(statusKind(s({ aguardandoDesde: atras(10 * 1440) }), NOW)).toBe('aguardando'); // velho não é "primeira"
+    expect(statusKind(s({ temResponsavel: true, houveResposta: true }), NOW)).toBe('aguardando');
+    expect(statusKind(s({ aguardando: false, houveResposta: true, temResponsavel: true }), NOW)).toBe('em_acompanhamento');
   });
 });
 
