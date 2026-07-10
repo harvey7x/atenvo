@@ -79,6 +79,9 @@ Deno.serve(async (req) => {
     if (!claimed) { await logRunner('lock_ativo', 'execucao_concorrente'); return json({ ok: true, skipped: 'lock_ativo' }); }
     try {
     try {
+    // B3.4: gancho de falha CONTROLADA (só via x-bot-secret; o webhook nunca envia). Prova o caminho
+    // bot_falhou: cai no catch (loga + retorna 200) e o finally libera o lock. Inerte em produção.
+    if ((body as { _forcar_falha?: boolean })._forcar_falha) throw new Error('falha_controlada_teste');
     const { data: canal } = await admin.from('canais')
       .select('id, nome_interno, instancia_externa, origem_tipo').eq('id', conv.canal_id).maybeSingle();
     const { data: cfg } = await admin.from('bot_canal_config')
@@ -105,7 +108,12 @@ Deno.serve(async (req) => {
       return json({ ok: true, paused: 'humano_assumiu', dry_run: dryRun });
     }
 
-    // ---- pausa por áudio (envia 1 aviso, para, entrega ao humano; sem transcrição) ----
+    // ---- elegibilidade (fonte de verdade: master/canal/saúde/nova/opp/destino). Bloqueia ANTES do áudio:
+    //      "bot off = nada acontece" (master off, canal não habilitado, humano, precisa_humano → ignora). ----
+    const { data: eleg } = await admin.rpc('bot_pode_atuar', { p_conversa: conversaId });
+    if (!eleg?.elegivel && !force) { await logRunner('bot_ignorado', eleg?.motivo ?? 'inelegivel'); return json({ ok: true, skipped: 'inelegivel', elegibilidade: eleg }); }
+
+    // ---- pausa por áudio (só quando o bot está ATIVO/elegível): 1 aviso, pausa, entrega ao humano; sem transcrição ----
     if (body.inbound_tipo === 'audio') {
       const rows = await enfileirar(admin, conversaId, conv.canal_id, 'audio', [copy.audio], calcularDelays(1, min, max));
       const enviados = await drenar(admin, rows, dryRun, canal, conv);
@@ -114,10 +122,6 @@ Deno.serve(async (req) => {
       await logRunner('bot_ignorado', 'audio');
       return json({ ok: true, paused: 'audio', dry_run: dryRun, mensagens: [copy.audio], enviados_reais: enviados });
     }
-
-    // ---- elegibilidade (não bloqueia teste com force; produção exigirá elegivel) ----
-    const { data: eleg } = await admin.rpc('bot_pode_atuar', { p_conversa: conversaId });
-    if (!eleg?.elegivel && !force) { await logRunner('bot_ignorado', eleg?.motivo ?? 'inelegivel'); return json({ ok: true, skipped: 'inelegivel', elegibilidade: eleg }); }
 
     // ---- decide a etapa ----
     const etapaAtual = (body.start ? 'inicio' : estado.etapa) as Etapa | 'inicio';
