@@ -3,15 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import { useOrg } from '@/context/OrgContext';
 import { useAuth } from '@/context/AuthContext';
 import { useSilenciarSlaAlerta, useResolverSlaAlerta } from '@/data/sla';
-import { sevClass, tipoEmoji, podeGerirAlerta, type SlaAlerta } from '@/data/slaView';
+import { sevClass, sevIntensidade, podeGerirAlerta, type SlaAlerta } from '@/data/slaView';
 
-/* Lista de alertas de SLA + ações (Abrir / Silenciar / Resolver). Reutilizada pela barra
-   global (GlobalSlaAlert) e pelo dropdown do sino. Silenciar/Resolver só p/ quem tem permissão. */
+/* Lista compacta de alertas de SLA. Card enxuto: 1 ícone (no título), "Abrir" como ação principal
+   discreta e Silenciar/Resolver num menu "…". Gates de permissão iguais (admin/supervisor ou responsável). */
 
 function presetAte(kind: '1h' | 'amanha'): string {
   const d = new Date();
   if (kind === '1h') { d.setHours(d.getHours() + 1); return d.toISOString(); }
-  d.setDate(d.getDate() + 1); d.setHours(8, 0, 0, 0); return d.toISOString(); // amanhã 08:00 local
+  d.setDate(d.getDate() + 1); d.setHours(8, 0, 0, 0); return d.toISOString();
 }
 
 function SilenciarBox({ alertaId, onDone }: { alertaId: string; onDone: () => void }) {
@@ -22,7 +22,7 @@ function SilenciarBox({ alertaId, onDone }: { alertaId: string; onDone: () => vo
   return (
     <div className="sla-silbox" role="group" aria-label="Silenciar alerta">
       <div className="sla-sil-durs">
-        <button type="button" className={kind === '1h' ? 'on' : ''} onClick={() => setKind('1h')}>Por 1 hora</button>
+        <button type="button" className={kind === '1h' ? 'on' : ''} onClick={() => setKind('1h')}>1 hora</button>
         <button type="button" className={kind === 'amanha' ? 'on' : ''} onClick={() => setKind('amanha')}>Até amanhã</button>
       </div>
       <input className="sla-sil-motivo" placeholder="Motivo (obrigatório)" value={motivo} maxLength={280}
@@ -31,10 +31,10 @@ function SilenciarBox({ alertaId, onDone }: { alertaId: string; onDone: () => vo
         <button type="button" className="sla-btn-ghost" onClick={onDone} disabled={silenciar.isPending}>Cancelar</button>
         <button type="button" className="sla-btn-solid" disabled={!podeConfirmar}
           onClick={() => silenciar.mutate({ alertaId, ate: presetAte(kind), motivo: motivo.trim() }, { onSuccess: onDone })}>
-          {silenciar.isPending ? 'Silenciando…' : 'Silenciar'}
+          {silenciar.isPending ? '…' : 'Silenciar'}
         </button>
       </div>
-      {silenciar.isError && <div className="sla-sil-erro">Não foi possível silenciar. Tente novamente.</div>}
+      {silenciar.isError && <div className="sla-sil-erro">Não foi possível silenciar.</div>}
     </div>
   );
 }
@@ -44,37 +44,34 @@ function Item({ alerta, onNavigate, hideAbrir }: { alerta: SlaAlerta; onNavigate
   const { user } = useAuth();
   const navigate = useNavigate();
   const resolver = useResolverSlaAlerta();
+  const [menu, setMenu] = useState(false);
   const [abrirSil, setAbrirSil] = useState(false);
   const podeGerir = podeGerirAlerta(currentOrg.role, alerta, user?.id);
 
-  const abrir = () => {
-    onNavigate?.();
-    navigate(alerta.conversa_id ? '/whatsapp' : '/kanban');
-  };
+  const abrir = () => { onNavigate?.(); navigate(alerta.conversa_id ? '/whatsapp' : '/kanban'); };
 
   return (
-    <li className={'sla-item ' + sevClass(alerta.severidade)}>
-      <div className="sla-item-main">
-        <span className="sla-item-dot" aria-hidden="true" />
-        <span className="sla-item-emoji" aria-hidden="true">{tipoEmoji(alerta.tipo)}</span>
-        <span className="sla-item-txt">
-          <span className="sla-item-titulo">{alerta.titulo}</span>
-          {alerta.detalhe && <span className="sla-item-det">{alerta.detalhe}</span>}
-        </span>
+    <li className={'sla-item ' + sevClass(alerta.severidade) + ' int-' + sevIntensidade(alerta.severidade)}>
+      <div className="sla-item-row">
+        <span className="sla-item-titulo" title={alerta.detalhe ?? alerta.titulo}>{alerta.titulo}</span>
+        <div className="sla-item-acts">
+          {!hideAbrir && <button type="button" className="sla-abrir" onClick={abrir}>Abrir</button>}
+          {podeGerir && (
+            <div className="sla-kebab-wrap">
+              <button type="button" className="sla-kebab" aria-label="Ações" aria-expanded={menu} onClick={() => setMenu((v) => !v)}>⋯</button>
+              {menu && (
+                <div className="sla-kebab-menu" role="menu" onMouseLeave={() => setMenu(false)}>
+                  <button type="button" role="menuitem" onClick={() => { setMenu(false); setAbrirSil(true); }}>Silenciar</button>
+                  <button type="button" role="menuitem" disabled={resolver.isPending}
+                    onClick={() => { setMenu(false); resolver.mutate(alerta.id); }}>Resolver</button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
-      <div className="sla-item-actions">
-        {!hideAbrir && <button type="button" className="sla-btn-ghost" onClick={abrir}>Abrir</button>}
-        {podeGerir && !abrirSil && (
-          <button type="button" className="sla-btn-ghost" onClick={() => setAbrirSil(true)}>Silenciar</button>
-        )}
-        {podeGerir && (
-          <button type="button" className="sla-btn-solid" disabled={resolver.isPending}
-            onClick={() => resolver.mutate(alerta.id)}>
-            {resolver.isPending ? '…' : 'Resolver'}
-          </button>
-        )}
-      </div>
-      {podeGerir && abrirSil && <SilenciarBox alertaId={alerta.id} onDone={() => setAbrirSil(false)} />}
+      {alerta.detalhe && <div className="sla-item-meta">{alerta.detalhe}</div>}
+      {abrirSil && <SilenciarBox alertaId={alerta.id} onDone={() => setAbrirSil(false)} />}
     </li>
   );
 }

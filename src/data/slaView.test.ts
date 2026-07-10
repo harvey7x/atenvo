@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   sevRank, sevClass, maxSeveridade, tipoLabel, tipoEmoji, resumoPartes, resumoTexto,
-  indexPorChave, ordenarAlertas, podeGerirAlerta, type SlaAlerta,
+  indexPorChave, ordenarAlertas, podeGerirAlerta, sevIntensidade, type SlaAlerta,
 } from './slaView';
 
 function mk(over: Partial<SlaAlerta>): SlaAlerta {
@@ -21,6 +21,13 @@ describe('severidade', () => {
     expect(sevRank('amarelo')).toBeGreaterThan(sevRank('leve'));
   });
   it('sevClass', () => { expect(sevClass('critico')).toBe('sla-critico'); });
+  it('sevIntensidade', () => {
+    expect(sevIntensidade('imediato')).toBe('forte');
+    expect(sevIntensidade('critico')).toBe('forte');
+    expect(sevIntensidade('vermelho')).toBe('forte');
+    expect(sevIntensidade('amarelo')).toBe('suave');
+    expect(sevIntensidade('leve')).toBe('discreto');
+  });
   it('maxSeveridade', () => {
     expect(maxSeveridade([{ severidade: 'leve' }, { severidade: 'vermelho' }, { severidade: 'amarelo' }])).toBe('vermelho');
     expect(maxSeveridade([])).toBeNull();
@@ -36,8 +43,11 @@ describe('tipo', () => {
 
 describe('resumo', () => {
   const r = { total: 6, imediatos: 1, criticos: 1, vermelhos: 2, amarelos: 1, leves: 1, itens: [] };
-  it('partes só > 0, na ordem de severidade', () => {
-    expect(resumoPartes(r)).toEqual(['1 imediato', '1 crítico', '2 urgentes', '1 em atenção', '1 leve']);
+  it('partes só > 0, na ordem de severidade (linguagem premium)', () => {
+    expect(resumoPartes(r)).toEqual(['1 imediato', '1 crítico', '2 urgentes', '1 em atenção', '1 acompanhamento']);
+  });
+  it('leve pluraliza como acompanhamentos', () => {
+    expect(resumoPartes({ imediatos: 0, criticos: 0, vermelhos: 0, amarelos: 1, leves: 16 })).toEqual(['1 em atenção', '16 acompanhamentos']);
   });
   it('texto', () => {
     expect(resumoTexto(r)).toContain('6 alertas de atendimento');

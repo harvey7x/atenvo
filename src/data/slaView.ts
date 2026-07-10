@@ -63,15 +63,22 @@ export const TIPO_META: Record<SlaTipo, { label: string; emoji: string }> = {
 export function tipoLabel(t: SlaTipo): string { return TIPO_META[t]?.label ?? t; }
 export function tipoEmoji(t: SlaTipo): string { return TIPO_META[t]?.emoji ?? '•'; }
 
-/** Partes do resumo textual, por severidade (só as > 0). */
+/** Partes do resumo textual, por severidade (só as > 0). Linguagem "premium" (não alarmista). */
 export function resumoPartes(r: Pick<SlaAlertasResumo, 'imediatos' | 'criticos' | 'vermelhos' | 'amarelos' | 'leves'>): string[] {
   const p: string[] = [];
   if (r.imediatos > 0) p.push(`${r.imediatos} imediato${r.imediatos > 1 ? 's' : ''}`);
   if (r.criticos > 0) p.push(`${r.criticos} crítico${r.criticos > 1 ? 's' : ''}`);
   if (r.vermelhos > 0) p.push(`${r.vermelhos} urgente${r.vermelhos > 1 ? 's' : ''}`);
   if (r.amarelos > 0) p.push(`${r.amarelos} em atenção`);
-  if (r.leves > 0) p.push(`${r.leves} leve${r.leves > 1 ? 's' : ''}`);
+  if (r.leves > 0) p.push(`${r.leves} acompanhamento${r.leves > 1 ? 's' : ''}`);
   return p;
+}
+
+/** Intensidade visual: forte (imediato/critico/vermelho), suave (amarelo), discreto (leve). */
+export function sevIntensidade(s: SlaSeveridade): 'forte' | 'suave' | 'discreto' {
+  if (s === 'imediato' || s === 'critico' || s === 'vermelho') return 'forte';
+  if (s === 'amarelo') return 'suave';
+  return 'discreto';
 }
 
 export function resumoTexto(r: SlaAlertasResumo): string {

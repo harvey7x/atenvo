@@ -18,7 +18,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Modal } from '@/components/Modal';
 import { useStatusDefs, useEtiquetas, useAssinaturaPref, useAtendimentoActions, useOrgUsuarios, resolverNomeAssinatura } from '@/data/atendimento';
 import { useSlaAlertas } from '@/data/sla';
-import { indexPorChave, sevRank, sevClass, tipoLabel, tipoEmoji } from '@/data/slaView';
+import { indexPorChave, sevRank, sevClass, sevIntensidade, tipoLabel, tipoEmoji } from '@/data/slaView';
 import { SlaConversaBanner } from '@/components/SlaConversaBanner';
 import { corDaEtiqueta, podeGerenciarAtendimento, type AssinaturaModo } from '@/types/atendimento';
 import { KanbanContatoBox } from '@/components/KanbanContatoBox';
@@ -817,7 +817,7 @@ export function WhatsApp() {
                 {(slaChips.length > 0 || c.precisaHumano) && (
                   <div className="conv-sla">
                     {slaChips.map((a) => (
-                      <span key={a.id} className={'conv-sla-chip ' + sevClass(a.severidade)} title={a.detalhe ?? a.titulo}>
+                      <span key={a.id} className={'conv-sla-chip ' + sevClass(a.severidade) + ' int-' + sevIntensidade(a.severidade)} title={a.detalhe ?? a.titulo}>
                         {tipoEmoji(a.tipo)} {tipoLabel(a.tipo)}
                       </span>
                     ))}
