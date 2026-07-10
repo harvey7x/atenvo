@@ -18,8 +18,9 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Modal } from '@/components/Modal';
 import { useStatusDefs, useEtiquetas, useAssinaturaPref, useAtendimentoActions, useOrgUsuarios, resolverNomeAssinatura } from '@/data/atendimento';
 import { useSlaAlertas } from '@/data/sla';
-import { indexPorChave, sevRank, sevClass, sevIntensidade, tipoLabel, tipoEmoji } from '@/data/slaView';
+import { indexPorChave, sevRank, sevClass, sevIntensidade, tipoLabel, tipoEmoji, tempoRelativo } from '@/data/slaView';
 import { SlaConversaBanner } from '@/components/SlaConversaBanner';
+import { classificar, isNovo, statusKind, tempoCurto, tierTempo, minutosDesde, type SinaisConversa, type Grupo } from '@/data/inboxGroups';
 import { corDaEtiqueta, podeGerenciarAtendimento, type AssinaturaModo } from '@/types/atendimento';
 import { KanbanContatoBox } from '@/components/KanbanContatoBox';
 import './WhatsApp.css';
@@ -96,6 +97,7 @@ function ackOf(status?: string): { ticks: string; cls: string; title: string } |
 }
 
 const TABS: { id: string; label: string }[] = [
+  { id: 'prioridade', label: 'Prioridade' },
   { id: 'todos', label: 'Todos' },
   { id: 'meus', label: 'Meus' },
   { id: 'naoatrib', label: 'Não atribuídos' },
@@ -155,7 +157,9 @@ export function WhatsApp() {
     } catch { return ''; }
   });
   const atividadesQ = useWaAtividades(WA_REAL ? (currentId || null) : null); // timeline de atendimento (colab. E1)
-  const [tab, setTab] = useState('todos');
+  const [tab, setTab] = useState('prioridade');
+  const [gruposRecolhidos, setGruposRecolhidos] = useState<Set<string>>(new Set());
+  const [verMaisAcomp, setVerMaisAcomp] = useState(false);
   const [search, setSearch] = useState('');
   const [filtroCanal, setFiltroCanal] = useState<string | null>(null);   // funil: filtra por número/canal
   const [filtroStatus, setFiltroStatus] = useState<string | null>(null); // funil: filtra por status
@@ -260,6 +264,70 @@ export function WhatsApp() {
     if (au !== bu) return au ? -1 : 1;
     return (b.lastAtMs ?? 0) - (a.lastAtMs ?? 0);
   });
+
+  // Aba "Prioridade" (S4.x): agrupa a MESMA lista filtrada em blocos Urgentes/Atenção/Acompanhamentos.
+  // Só reorganiza no cliente — não toca no SLA engine/backend. Abas antigas seguem na lista plana.
+  const sinaisDe = (c: WaContact): SinaisConversa => {
+    const al = slaPorConversa.get(c.id)?.[0];
+    return {
+      aguardando: !!c.aguardando,
+      aguardandoDesde: c.aguardandoDesde ?? null,
+      temResponsavel: !!c.respId,
+      houveResposta: (c.msgs ?? []).some((m) => m.dir === 'out'),
+      primeiraMensagem: (c.msgs ?? []).length <= 1,
+      precisaHumano: !!c.precisaHumano,
+      sevAlerta: al?.severidade ?? null,
+      tipoAlerta: al?.tipo ?? null,
+    };
+  };
+  const grupos = useMemo(() => {
+    const g: Record<Grupo, WaContact[]> = { urgente: [], atencao: [], acompanhamento: [] };
+    if (tab !== 'prioridade') return g;
+    const now = Date.now();
+    for (const c of filtered) g[classificar(sinaisDe(c), now)].push(c);
+    const porEspera = (a: WaContact, b: WaContact) => new Date(a.aguardandoDesde || 0).getTime() - new Date(b.aguardandoDesde || 0).getTime();
+    g.urgente.sort(porEspera);      // mais tempo esperando primeiro
+    g.atencao.sort(porEspera);
+    g.acompanhamento.sort((a, b) => (b.lastAtMs || 0) - (a.lastAtMs || 0)); // mais recente primeiro
+    return g;
+  }, [tab, filtered, slaPorConversa]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Card da aba Prioridade (valoriza a última mensagem do cliente; tempo humano; status curto).
+  const renderPrioCard = (c: WaContact) => {
+    const sin = sinaisDe(c);
+    const novo = isNovo(sin);
+    const kind = statusKind(sin);
+    const atendNome = c.respId ? (orgUsuarios.find((u) => u.id === c.respId)?.nome ?? 'Atendente') : null;
+    const nomeVazio = !c.name?.trim() || /^[\d\s()+\-]+$/.test(c.name.trim());
+    const nome = nomeVazio ? 'Cliente sem nome' : c.name;
+    const tier = c.aguardando ? tierTempo(minutosDesde(c.aguardandoDesde ?? null)) : 'neutro';
+    const tempo = c.aguardando ? tempoCurto(c.aguardandoDesde ?? null) : (c.time || '');
+    const statusLabel =
+      kind === 'audio' ? 'Áudio recebido'
+        : kind === 'lead_quente' ? 'Lead quente'
+          : kind === 'primeira_mensagem' ? 'Primeira mensagem'
+            : kind === 'aguardando_primeira' ? 'Aguardando primeira resposta'
+              : kind === 'aguardando' ? `Aguardando resposta ${tempoRelativo(c.aguardandoDesde ?? '')}`
+                : 'Em acompanhamento';
+    return (
+      <div key={c.id} data-cid={c.id} className={'pcard t-' + tier + (c.id === currentId ? ' active' : '')} onClick={() => selectContact(c.id)}>
+        <Avatar name={c.name} />
+        <div className="pcard-body">
+          <div className="pcard-r1">
+            <span className="pcard-name">{c.fixada && <span aria-hidden="true">📌 </span>}{nome}</span>
+            {novo && <span className="pcard-novo">NOVO</span>}
+            <span className={'pcard-time t-' + tier}>{tempo}</span>
+          </div>
+          <div className="pcard-meta">{c.chip}{atendNome ? ' · ' + atendNome : ' · Sem responsável'}{c.silenciada ? ' · 🔕' : ''}</div>
+          <div className="pcard-prev">{c.last || '—'}</div>
+          <div className="pcard-r4">
+            <span className="pcard-status">{statusLabel}</span>
+            {c.unread > 0 && <span className="unread">{c.unread > 99 ? '99+' : c.unread}</span>}
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   // LEITURA (regra mínima): só zera o contador quando (1) o usuário SELECIONOU ativamente a conversa
   // (não em restauração de ID), (2) as mensagens estão carregadas, (3) o documento está visível e (4) a
@@ -782,6 +850,38 @@ export function WhatsApp() {
             ))}
           </div>
         </div>
+        {tab === 'prioridade' ? (
+          <div className="conv-list prio">
+            {(grupos.urgente.length + grupos.atencao.length + grupos.acompanhamento.length) === 0 ? (
+              <div style={{ padding: '30px 12px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>Nenhuma conversa pendente. 🎉</div>
+            ) : ([
+              { id: 'urgente' as const, emoji: '🔥', label: 'Urgentes', hint: 'sem resposta' },
+              { id: 'atencao' as const, emoji: '⚠️', label: 'Atenção', hint: 'atrasados' },
+              { id: 'acompanhamento' as const, emoji: '✅', label: 'Acompanhamentos', hint: '' },
+            ]).map((sec) => {
+              const arr = grupos[sec.id];
+              if (!arr.length) return null;
+              const recolhido = gruposRecolhidos.has(sec.id);
+              const mostra = sec.id === 'acompanhamento' && !verMaisAcomp ? arr.slice(0, 4) : arr;
+              return (
+                <div className={'prio-sec prio-' + sec.id} key={sec.id}>
+                  <button type="button" className="prio-sec-h" aria-expanded={!recolhido}
+                    onClick={() => setGruposRecolhidos((s) => { const n = new Set(s); if (n.has(sec.id)) n.delete(sec.id); else n.add(sec.id); return n; })}>
+                    <span className="prio-sec-t">{sec.emoji} {sec.label}{sec.hint && <em> ({sec.hint})</em>}</span>
+                    <span className="prio-sec-n">{arr.length}</span>
+                    <span className="prio-sec-chev">{recolhido ? '▸' : '▾'}</span>
+                  </button>
+                  {!recolhido && mostra.map(renderPrioCard)}
+                  {!recolhido && sec.id === 'acompanhamento' && arr.length > 4 && (
+                    <button type="button" className="prio-vermais" onClick={() => setVerMaisAcomp((v) => !v)}>
+                      {verMaisAcomp ? 'Ver menos' : `Ver outros ${arr.length - 4} acompanhamentos`} ⌄
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
         <div className="conv-list">
           {filtered.length === 0 ? (
             <div style={{ padding: '30px 12px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>Nenhuma conversa nesta aba.</div>
@@ -834,6 +934,7 @@ export function WhatsApp() {
             );
           })}
         </div>
+        )}
       </section>
 
       {/* ---------- CHAT ---------- */}

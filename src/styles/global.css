@@ -386,3 +386,35 @@ body.wa-foco .content{padding:0;overflow:hidden}
 .sla-conv-text{flex:1;min-width:120px;font-size:12.5px;font-weight:600;color:var(--ink);line-height:1.35}
 .sla-conv-toggle{flex:0 0 auto}
 .sla-conv-list{padding:0 14px 10px}
+
+/* ============================================================
+   Inbox — aba "Prioridade": blocos Urgentes / Atenção / Acompanhamentos
+   ============================================================ */
+.conv-list.prio{padding:8px 8px 14px}
+.prio-sec{margin-bottom:10px}
+.prio-urgente{--sec-c:#c0392b;--sec-soft:rgba(214,69,63,.12)}
+.prio-atencao{--sec-c:#c2772a;--sec-soft:var(--warn-soft)}
+.prio-acompanhamento{--sec-c:#2563eb;--sec-soft:var(--info-soft)}
+.prio-sec-h{display:flex;align-items:center;gap:8px;width:100%;background:transparent;border:0;cursor:pointer;padding:4px 6px 7px}
+.prio-sec-t{flex:1;text-align:left;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--sec-c)}
+.prio-sec-t em{font-style:normal;font-weight:600;color:var(--muted);text-transform:none;letter-spacing:0}
+.prio-sec-n{flex:0 0 auto;font-size:11px;font-weight:800;color:var(--sec-c);background:var(--sec-soft);border-radius:20px;padding:1px 8px}
+.prio-sec-chev{flex:0 0 auto;font-size:10px;color:var(--muted)}
+.prio-vermais{width:100%;text-align:center;font-size:12px;font-weight:600;color:var(--accent-ink);background:transparent;border:0;cursor:pointer;padding:8px}
+.prio-vermais:hover{color:var(--accent)}
+/* card premium do inbox */
+.pcard{display:flex;gap:11px;padding:10px 11px;border-radius:12px;cursor:pointer;border:1px solid var(--line);border-left:3px solid var(--sec-c,var(--line-2));background:var(--surface);margin-bottom:6px;transition:background .12s,border-color .12s}
+.pcard:hover{background:var(--surface-2)}
+.pcard.active{background:var(--accent-soft);border-color:var(--accent-soft-2)}
+.pcard-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.pcard-r1{display:flex;align-items:baseline;gap:7px}
+.pcard-name{flex:1;min-width:0;font-size:13.5px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pcard-novo{flex:0 0 auto;font-size:9px;font-weight:800;letter-spacing:.05em;color:#fff;background:var(--accent);border-radius:5px;padding:2px 6px;line-height:1}
+.pcard-time{flex:0 0 auto;font-size:12px;font-weight:600;color:var(--muted)}
+.pcard-time.t-ambar{color:var(--warn)}
+.pcard-time.t-vermelho{color:#d06666}
+.pcard-time.t-critico{color:#c0392b;font-weight:700}
+.pcard-meta{font-size:11.5px;color:var(--ink-2);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pcard-prev{font-size:13px;color:var(--ink);line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:1px 0}
+.pcard-r4{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:2px}
+.pcard-status{min-width:0;font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
