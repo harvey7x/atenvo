@@ -2,7 +2,6 @@ import { Outlet, useMatches } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { GlobalWhatsAppAlert } from './GlobalWhatsAppAlert';
-import { GlobalSlaAlert } from './GlobalSlaAlert';
 import { SlaUiProvider, SlaNotifier } from './SlaNotificationToast';
 import { DEMO_MODE } from '@/lib/demo';
 
@@ -23,7 +22,6 @@ export function AppShell() {
         <main className="col-main">
           <Topbar />
           <GlobalWhatsAppAlert />
-          <GlobalSlaAlert />
           <div className={'content' + (fullBleed ? ' content-bleed' : '')}>
             <Outlet />
           </div>
