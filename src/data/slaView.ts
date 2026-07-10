@@ -81,6 +81,47 @@ export function sevIntensidade(s: SlaSeveridade): 'forte' | 'suave' | 'discreto'
   return 'discreto';
 }
 
+/** Resumo humano para a barra global (não alarmista). */
+export function resumoHumano(r: SlaAlertasResumo): string {
+  if (r.total === 0) return '';
+  const plural = r.total > 1;
+  if (r.imediatos + r.criticos + r.vermelhos > 0) return `${r.total} atendimento${plural ? 's' : ''} aguardando ação`;
+  if (r.amarelos > 0) return `${r.total} atendimento${plural ? 's' : ''} aguardando resposta`;
+  return `${r.total} acompanhamento${plural ? 's' : ''} pendente${plural ? 's' : ''}`;
+}
+
+/** Tempo relativo curto a partir de um ISO ("há 21 min" / "há 3 h" / "há 2 d" / "agora"). */
+export function tempoRelativo(iso: string, nowMs: number = Date.now()): string {
+  const ms = nowMs - new Date(iso).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return 'agora';
+  const min = Math.floor(ms / 60000);
+  if (min < 1) return 'agora';
+  if (min < 60) return `há ${min} min`;
+  if (min < 1440) return `há ${Math.floor(min / 60)} h`;
+  return `há ${Math.floor(min / 1440)} d`;
+}
+
+/** Frase-status (linha 2 do card), sem número gigante no título. */
+export function fraseTipo(t: SlaTipo): string {
+  switch (t) {
+    case 'atendimento_sem_resposta': return 'Aguardando resposta';
+    case 'cliente_qualificado_aguardando_atendimento': return 'Qualificado, aguardando atendente';
+    case 'lead_quente_aguardando': return 'Lead quente aguardando';
+    case 'audio_recebido_precisa_humano': return 'Cliente enviou áudio';
+    case 'parado_ha_muito_tempo': return 'Parado no Kanban';
+    case 'prazo_2_dias_em_risco': return 'Perto do prazo de 2 dias';
+    case 'prazo_2_dias_estourado': return '2 dias sem fechamento';
+    default: return tipoLabel(t);
+  }
+}
+
+/** Nome de exibição do contato (evita mostrar telefone/numérico cru). */
+export function nomeContatoExib(nome: string | null | undefined, _telefone?: string | null): string {
+  const n = (nome ?? '').trim();
+  if (!n || /^[\d\s()+\-]+$/.test(n)) return 'Cliente sem nome';
+  return n;
+}
+
 export function resumoTexto(r: SlaAlertasResumo): string {
   const partes = resumoPartes(r);
   return `${r.total} alerta${r.total > 1 ? 's' : ''} de atendimento${partes.length ? ' — ' + partes.join(', ') : ''}.`;

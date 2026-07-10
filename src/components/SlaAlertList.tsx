@@ -2,11 +2,13 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useOrg } from '@/context/OrgContext';
 import { useAuth } from '@/context/AuthContext';
-import { useSilenciarSlaAlerta, useResolverSlaAlerta } from '@/data/sla';
-import { sevClass, sevIntensidade, podeGerirAlerta, type SlaAlerta } from '@/data/slaView';
+import { initials, avatarColor } from '@/lib/avatar';
+import { useSilenciarSlaAlerta, useResolverSlaAlerta, useSlaAlvos, type SlaAlvo } from '@/data/sla';
+import { sevClass, sevIntensidade, sevRank, tipoLabel, fraseTipo, tempoRelativo, podeGerirAlerta, type SlaAlerta } from '@/data/slaView';
 
-/* Lista compacta de alertas de SLA. Card enxuto: 1 ícone (no título), "Abrir" como ação principal
-   discreta e Silenciar/Resolver num menu "…". Gates de permissão iguais (admin/supervisor ou responsável). */
+/* Card premium de alerta (estilo central de notificações): avatar do contato, tipo do alerta como
+   título curto, "nome · canal", frase + tempo, "Abrir conversa" (verde discreto) e Silenciar/Resolver
+   no menu "…". Navegação abre a conversa exata via /whatsapp?conversa=<id>. */
 
 function presetAte(kind: '1h' | 'amanha'): string {
   const d = new Date();
@@ -39,7 +41,7 @@ function SilenciarBox({ alertaId, onDone }: { alertaId: string; onDone: () => vo
   );
 }
 
-function Item({ alerta, onNavigate, hideAbrir }: { alerta: SlaAlerta; onNavigate?: () => void; hideAbrir?: boolean }) {
+function Item({ alerta, alvo, onNavigate, hideAbrir }: { alerta: SlaAlerta; alvo?: SlaAlvo; onNavigate?: () => void; hideAbrir?: boolean }) {
   const { currentOrg } = useOrg();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -48,14 +50,24 @@ function Item({ alerta, onNavigate, hideAbrir }: { alerta: SlaAlerta; onNavigate
   const [abrirSil, setAbrirSil] = useState(false);
   const podeGerir = podeGerirAlerta(currentOrg.role, alerta, user?.id);
 
-  const abrir = () => { onNavigate?.(); navigate(alerta.conversa_id ? '/whatsapp' : '/kanban'); };
+  const nome = alvo?.nome ?? 'Cliente';
+  const canal = alvo?.canal ?? null;
+  const abrir = () => {
+    onNavigate?.();
+    navigate(alerta.conversa_id ? `/whatsapp?conversa=${alerta.conversa_id}` : '/kanban');
+  };
 
   return (
     <li className={'sla-item ' + sevClass(alerta.severidade) + ' int-' + sevIntensidade(alerta.severidade)}>
-      <div className="sla-item-row">
-        <span className="sla-item-titulo" title={alerta.detalhe ?? alerta.titulo}>{alerta.titulo}</span>
+      <span className="sla-item-av" aria-hidden="true" style={{ background: avatarColor(nome) }}>{initials(nome)}</span>
+      <div className="sla-item-main">
+        <div className="sla-item-top">
+          <span className="sla-item-tipo">{tipoLabel(alerta.tipo)}</span>
+        </div>
+        <div className="sla-item-quem" title={nome + (canal ? ' · ' + canal : '')}>{nome}{canal && <span className="sla-item-canal"> · {canal}</span>}</div>
+        <div className="sla-item-frase">{fraseTipo(alerta.tipo)} {tempoRelativo(alerta.criado_em)}</div>
         <div className="sla-item-acts">
-          {!hideAbrir && <button type="button" className="sla-abrir" onClick={abrir}>Abrir</button>}
+          {!hideAbrir && <button type="button" className="sla-abrir" onClick={abrir}>{alerta.conversa_id ? 'Abrir conversa' : 'Abrir card'}</button>}
           {podeGerir && (
             <div className="sla-kebab-wrap">
               <button type="button" className="sla-kebab" aria-label="Ações" aria-expanded={menu} onClick={() => setMenu((v) => !v)}>⋯</button>
@@ -69,18 +81,29 @@ function Item({ alerta, onNavigate, hideAbrir }: { alerta: SlaAlerta; onNavigate
             </div>
           )}
         </div>
+        {abrirSil && <SilenciarBox alertaId={alerta.id} onDone={() => setAbrirSil(false)} />}
       </div>
-      {alerta.detalhe && <div className="sla-item-meta">{alerta.detalhe}</div>}
-      {abrirSil && <SilenciarBox alertaId={alerta.id} onDone={() => setAbrirSil(false)} />}
     </li>
   );
 }
 
-export function SlaAlertList({ itens, onNavigate, hideAbrir }: { itens: SlaAlerta[]; onNavigate?: () => void; hideAbrir?: boolean }) {
-  if (!itens.length) return <div className="sla-empty">Nenhum alerta de atendimento ativo.</div>;
+export function SlaAlertList({ itens, onNavigate, hideAbrir, agrupar }: {
+  itens: SlaAlerta[]; onNavigate?: () => void; hideAbrir?: boolean; agrupar?: boolean;
+}) {
+  const alvos = useSlaAlvos(itens);
+  if (!itens.length) return <div className="sla-empty">Tudo em dia — nenhum atendimento pendente. 🎉</div>;
+
+  const render = (arr: SlaAlerta[]) => (
+    <ul className="sla-list">{arr.map((a) => <Item key={a.id} alerta={a} alvo={alvos.get(a.id)} onNavigate={onNavigate} hideAbrir={hideAbrir} />)}</ul>
+  );
+  if (!agrupar) return render(itens);
+
+  const atencao = itens.filter((a) => sevRank(a.severidade) >= 2);   // amarelo+
+  const acomp = itens.filter((a) => sevRank(a.severidade) < 2);      // leve
   return (
-    <ul className="sla-list">
-      {itens.map((a) => <Item key={a.id} alerta={a} onNavigate={onNavigate} hideAbrir={hideAbrir} />)}
-    </ul>
+    <div className="sla-secoes">
+      {atencao.length > 0 && <><div className="sla-secao-h">Atenção agora</div>{render(atencao)}</>}
+      {acomp.length > 0 && <><div className="sla-secao-h">Acompanhamento</div>{render(acomp)}</>}
+    </div>
   );
 }

@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   sevRank, sevClass, maxSeveridade, tipoLabel, tipoEmoji, resumoPartes, resumoTexto,
-  indexPorChave, ordenarAlertas, podeGerirAlerta, sevIntensidade, type SlaAlerta,
+  indexPorChave, ordenarAlertas, podeGerirAlerta, sevIntensidade,
+  resumoHumano, tempoRelativo, fraseTipo, nomeContatoExib, type SlaAlerta,
 } from './slaView';
 
 function mk(over: Partial<SlaAlerta>): SlaAlerta {
@@ -70,6 +71,38 @@ describe('index/ordenar', () => {
       mk({ id: 'c', severidade: 'critico', criado_em: '2026-07-09T08:00:00Z' }),
     ];
     expect(ordenarAlertas(itens).map((a) => a.id)).toEqual(['c', 'b', 'a']);
+  });
+});
+
+describe('resumoHumano', () => {
+  it('urgente / atenção / acompanhamento', () => {
+    expect(resumoHumano({ total: 8, imediatos: 0, criticos: 1, vermelhos: 0, amarelos: 0, leves: 7, itens: [] })).toBe('8 atendimentos aguardando ação');
+    expect(resumoHumano({ total: 3, imediatos: 0, criticos: 0, vermelhos: 0, amarelos: 2, leves: 1, itens: [] })).toBe('3 atendimentos aguardando resposta');
+    expect(resumoHumano({ total: 8, imediatos: 0, criticos: 0, vermelhos: 0, amarelos: 0, leves: 8, itens: [] })).toBe('8 acompanhamentos pendentes');
+    expect(resumoHumano({ total: 1, imediatos: 0, criticos: 0, vermelhos: 0, amarelos: 0, leves: 1, itens: [] })).toBe('1 acompanhamento pendente');
+  });
+});
+
+describe('tempoRelativo', () => {
+  const now = new Date('2026-07-09T12:00:00Z').getTime();
+  it('formata min/h/d', () => {
+    expect(tempoRelativo('2026-07-09T11:39:00Z', now)).toBe('há 21 min');
+    expect(tempoRelativo('2026-07-09T09:00:00Z', now)).toBe('há 3 h');
+    expect(tempoRelativo('2026-07-07T12:00:00Z', now)).toBe('há 2 d');
+    expect(tempoRelativo('2026-07-09T11:59:40Z', now)).toBe('agora');
+  });
+});
+
+describe('fraseTipo + nomeContatoExib', () => {
+  it('frase por tipo', () => {
+    expect(fraseTipo('atendimento_sem_resposta')).toBe('Aguardando resposta');
+    expect(fraseTipo('audio_recebido_precisa_humano')).toBe('Cliente enviou áudio');
+  });
+  it('nome exibição trata vazio/numérico', () => {
+    expect(nomeContatoExib('IVO MARCIANO')).toBe('IVO MARCIANO');
+    expect(nomeContatoExib('555199999999')).toBe('Cliente sem nome');
+    expect(nomeContatoExib('')).toBe('Cliente sem nome');
+    expect(nomeContatoExib(null)).toBe('Cliente sem nome');
   });
 });
 

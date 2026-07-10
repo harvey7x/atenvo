@@ -26,11 +26,14 @@ export function SlaBell() {
           <div className="sla-bell-backdrop" onClick={fecharCentral} />
           <div className="sla-bell-drop" role="dialog" aria-label="Central de alertas de atendimento">
             <div className="sla-bell-head">
-              <span>Central de atendimento</span>
-              {total > 0 && <span className="sla-bell-count">{total}</span>}
+              <div className="sla-bell-head-txt">
+                <span className="sla-bell-title">Central de atendimento</span>
+                <span className="sla-bell-sub">Alertas que precisam de ação da equipe</span>
+              </div>
+              {total > 0 && <span className={'sla-bell-count' + (urgente ? ' urg' : '')}>{total}</span>}
             </div>
             <div className="sla-bell-body">
-              <SlaAlertList itens={itens} onNavigate={fecharCentral} />
+              <SlaAlertList itens={itens} onNavigate={fecharCentral} agrupar />
             </div>
           </div>
         </>
