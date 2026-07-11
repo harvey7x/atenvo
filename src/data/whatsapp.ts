@@ -277,7 +277,14 @@ export function useAtribuirAtendimento() {
       });
       return r.responsavel_id ?? null;
     },
-    onSettled: () => { qc.invalidateQueries({ queryKey: ['wa-conversas', currentOrg.id] }); qc.invalidateQueries({ queryKey: ['wa-atividades'] }); },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['wa-conversas', currentOrg.id] });
+      qc.invalidateQueries({ queryKey: ['wa-atividades'] });
+      // Responsável é sincronizado no backend (trigger) para conversas + oportunidades.
+      // Invalida o Kanban para o card refletir o novo responsável imediatamente.
+      qc.invalidateQueries({ queryKey: ['kanban-leads', currentOrg.id] });
+      qc.invalidateQueries({ queryKey: ['opp-do-contato', currentOrg.id] });
+    },
   });
 }
 
