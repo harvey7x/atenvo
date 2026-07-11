@@ -297,7 +297,8 @@ function AbaResumo({ f }: { f: RelFiltros }) {
     <Estado q={q}>
       {q.data && <>
         <div className="kpis">
-          <KpiCard hero label="Novos contatos" k={q.data.novosContatos} sentido="maior" fmt={fmtInt} tooltip="Contatos criados no período." />
+          <KpiCard hero label="Pessoas que chamaram" k={cx.data ? flat(cx.data.reduce((s, l) => s + l.pessoasQueChamaram, 0)) : null} sentido="maior" fmt={fmtInt} nota="No período" tooltip="Pessoas únicas com ≥1 mensagem recebida (inbound) no período, deduplicadas por telefone (ignora 9º dígito/DDI). Não inclui contatos que só receberam mensagem nossa (outbound)." />
+          <KpiCard hero label="Novos contatos" k={q.data.novosContatos} sentido="maior" fmt={fmtInt} tooltip="Contatos criados no período (inclui outbound-only e possíveis duplicados) — não é o mesmo que pessoas que chamaram." />
           <KpiCard hero label="Clientes fechados" k={q.data.oportunidadesFechadas} sentido="maior" fmt={fmtInt} tooltip="Oportunidades ganhas (do conjunto criado no período)." />
           <KpiCard hero label="Taxa de conversão" k={q.data.conversaoComercial} sentido="maior" fmt={fmtPct} tooltip="Oportunidades ganhas ÷ criadas, mesmo período." />
           <KpiCard hero label="Receita recebida" k={q.data.receitaRecebida} sentido="maior" fmt={fmtBRL} tooltip="Σ valor pago das parcelas pagas no período." />
@@ -312,10 +313,10 @@ function AbaResumo({ f }: { f: RelFiltros }) {
             <ul className="narr aten">{pontosAtencao(q.data, at.data, com.data, fin.data).map((p, i) => <li key={i} className={p.ok ? 'ok' : ''}>{p.txt}</li>)}</ul>
           </Panel>
         </div>
-        <Panel title="Melhor conexão do período" sub="Conexão de WhatsApp com mais leads">
-          {melhor && melhor.leadsRecebidos > 0
-            ? <div className="compact-stat" style={{ gap: 18, flexWrap: 'wrap' }}><span className="cs-v">{conexRotulo(melhor)}</span><span className="cs-l">{fmtInt(melhor.leadsRecebidos)} leads · {fmtInt(melhor.fechados)} fechados · {fmtPct(melhor.taxaConversao)} conversão</span></div>
-            : <Vazio titulo="Sem leads por conexão no período" texto="Os leads são atribuídos à conexão de aquisição do contato." />}
+        <Panel title="Melhor conexão do período" sub="Conexão de WhatsApp com mais pessoas que chamaram">
+          {melhor && melhor.pessoasQueChamaram > 0
+            ? <div className="compact-stat" style={{ gap: 18, flexWrap: 'wrap' }}><span className="cs-v">{conexRotulo(melhor)}</span><span className="cs-l">{fmtInt(melhor.pessoasQueChamaram)} pessoas · {fmtInt(melhor.fechados)} fechados · {fmtPct(melhor.taxaConversao)} conversão</span></div>
+            : <Vazio titulo="Sem pessoas que chamaram no período" texto="Pessoas são atribuídas à conexão de aquisição do contato." />}
         </Panel>
       </>}
     </Estado>
@@ -372,8 +373,8 @@ function AbaVendas({ f, periodoLabel, orgNome }: { f: RelFiltros; periodoLabel: 
 
 /* ============ Desempenho por conexão de WhatsApp ============ */
 function frasesConexoes(linhas: ConexaoLinha[]): string[] {
-  const reais = linhas.filter((l) => l.chave !== 'sem' && l.leadsRecebidos > 0).sort((a, b) => b.leadsRecebidos - a.leadsRecebidos);
-  const out = reais.slice(0, 3).map((l) => `${l.nome} recebeu ${pl(l.leadsRecebidos, 'lead', 'leads')}, qualificou ${fmtInt(l.qualificados)} e fechou ${fmtInt(l.fechados)} — conversão de ${fmtPct(l.taxaConversao)}.`);
+  const reais = linhas.filter((l) => l.chave !== 'sem' && l.pessoasQueChamaram > 0).sort((a, b) => b.pessoasQueChamaram - a.pessoasQueChamaram);
+  const out = reais.slice(0, 3).map((l) => `${l.nome}: ${pl(l.pessoasQueChamaram, 'pessoa chamou', 'pessoas chamaram')} (${fmtInt(l.contatosCriados)} contatos criados), qualificou ${fmtInt(l.qualificados)} e fechou ${fmtInt(l.fechados)} — conversão de ${fmtPct(l.taxaConversao)}.`);
   if (reais.length >= 2) {
     const maisVol = reais[0];
     const melhorQual = reais.slice().sort((a, b) => b.taxaQualificacao - a.taxaQualificacao)[0];
@@ -395,9 +396,9 @@ function SecaoConexoes({ f, periodoLabel, orgNome }: { f: RelFiltros; periodoLab
     <>
       <div className="sech" style={{ marginTop: 6 }}>Desempenho por conexão de WhatsApp <span style={{ fontWeight: 400, color: 'var(--muted)', fontSize: 12 }}>· por conexão de aquisição (origem preservada)</span></div>
       <Estado q={q}>
-        {reais.length === 0 ? <Vazio titulo="Sem conexões com resultado no período" texto="Os leads são atribuídos à conexão de aquisição do contato; conexões removidas mantêm o histórico via snapshot." /> : <>
+        {reais.length === 0 ? <Vazio titulo="Sem conexões com resultado no período" texto="As pessoas são atribuídas à conexão de aquisição do contato; conexões removidas mantêm o histórico via snapshot." /> : <>
           <div className="grid-3">
-            <HCard titulo="Mais leads" l={top('leadsRecebidos')} valor={top('leadsRecebidos') ? `${fmtInt(top('leadsRecebidos').leadsRecebidos)} leads` : ''} />
+            <HCard titulo="Mais pessoas que chamaram" l={top('pessoasQueChamaram')} valor={top('pessoasQueChamaram') ? `${fmtInt(top('pessoasQueChamaram').pessoasQueChamaram)} pessoas` : ''} />
             <HCard titulo="Mais clientes fechados" l={top('fechados')} valor={top('fechados') ? `${fmtInt(top('fechados').fechados)} fechados` : ''} />
             <HCard titulo="Melhor taxa de conversão" l={top('taxaConversao')} valor={top('taxaConversao') ? fmtPct(top('taxaConversao').taxaConversao) : ''} />
             <HCard titulo="Melhor taxa de qualificação" l={top('taxaQualificacao')} valor={top('taxaQualificacao') ? fmtPct(top('taxaQualificacao').taxaQualificacao) : ''} />
@@ -411,8 +412,11 @@ function SecaoConexoes({ f, periodoLabel, orgNome }: { f: RelFiltros; periodoLab
               { key: 'tipo', label: 'Tipo de origem', fmt: (v) => tipoNome(String(v || '')) === '—' ? 'Não configurado' : tipoNome(String(v || '')), csv: (r) => (r.tipo ? tipoNome(String(r.tipo)) : 'Não configurado') },
               { key: 'gestor', label: 'Gestor', fmt: (v) => (v ? String(v) : 'Não configurado'), csv: (r) => (r.gestor ? String(r.gestor) : 'Não configurado') },
               { key: 'fonte', label: 'Fonte / campanha', fmt: (_v, r) => [r.fonte, r.campanha].filter(Boolean).join(' · ') || '—', csv: (r) => [r.fonte, r.campanha].filter(Boolean).join(' / ') },
-              { key: 'leadsRecebidos', label: 'Leads', align: 'c' },
-              { key: 'conversas', label: 'Conversas', align: 'c' },
+              { key: 'pessoasQueChamaram', label: 'Pessoas que chamaram', align: 'c' },
+              { key: 'contatosCriados', label: 'Contatos criados', align: 'c' },
+              { key: 'difContatosPessoas', label: 'Dif.', align: 'c' },
+              { key: 'conversasRecebidas', label: 'Conversas', align: 'c' },
+              { key: 'msgsInbound', label: 'Msgs inbound', align: 'c' },
               { key: 'conversasAtendidas', label: 'Atendidas', align: 'c' },
               { key: 'semResposta', label: 'Sem resp.', align: 'c' },
               { key: 'oportunidades', label: 'Oport.', align: 'c' },

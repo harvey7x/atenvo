@@ -446,19 +446,36 @@ export function useOrigens(f: RelFiltros, enabled: boolean) {
 }
 
 /* ====================== Desempenho por conexão (chip) ====================== */
+
+/** Chave canônica de telefone para DEDUP de pessoas: DDD + 8 dígitos finais,
+ *  ignorando o DDI 55 e o 9º dígito de celular (mesma pessoa vinda com e sem o 9
+ *  colapsa numa chave só). Fora do padrão BR, cai no número normalizado como veio.
+ *  Retorna null quando não há dígitos (contato sem telefone / LID puro). */
+export function chaveCanonicaTelefone(raw: string | null | undefined): string | null {
+  const d = (raw || '').replace(/\D/g, '');
+  if (!d) return null;
+  // remove DDI 55 só quando o restante fica com 10 (DDD+8) ou 11 (DDD+9+8) dígitos
+  const core = d.startsWith('55') && (d.length - 2 === 10 || d.length - 2 === 11) ? d.slice(2) : d;
+  if (core.length === 10 || core.length === 11) return core.slice(0, 2) + core.slice(-8); // DDD + 8 finais
+  return d; // número fora do padrão BR: mantém como veio (não arrisca colisão)
+}
+
 export interface ConexaoIdent { nome: string; numero: string; tipo: string; gestor: string; fonte: string; campanha: string; removida: boolean; }
 export interface ConexaoLinha extends ConexaoIdent {
   chave: string; novosContatos: number; leadsRecebidos: number; leadsAnterior: number; conversas: number; conversasAtendidas: number; semResposta: number;
+  // Métricas separadas (Etapa 1): pessoas reais que chamaram vs contatos criados (podem incluir outbound-only/duplicados).
+  pessoasQueChamaram: number; contatosCriados: number; conversasRecebidas: number; msgsInbound: number; difContatosPessoas: number;
   oportunidades: number; qualificados: number; fechados: number; perdidos: number; qualifFechados: number;
   taxaAtendimento: number; taxaQualificacao: number; taxaConversao: number; convQualificados: number;
   primeiraRespostaMin: number | null; tempoAteFechamentoDias: number | null;
   receitaPrevista: number; receitaRecebida: number; valoresAtraso: number; economia: number; economiaPreenchida: boolean; clientesPagantes: number; ticketMedio: number;
 }
 export interface ConexaoInput {
-  contatos: { id: string; chip: string; criadoEm: string }[];
+  contatos: { id: string; chip: string; criadoEm: string; tel: string | null }[];
   identidade: Record<string, ConexaoIdent>;
   conversas: { id: string; chip: string; criadoEm: string }[];
   comEntrada: Set<string>; resp: Set<string>;
+  contatosComInbound: Set<string>; // contatos com ≥1 mensagem direcao='entrada' no período
   firstIn: { conversa: string; chip: string; t: number }[]; firstResp: { conversa: string; chip: string; t: number }[];
   opps: { chip: string; status: string; qualificada: boolean; tempoFechDias: number | null }[];
   parcelas: { chip: string; contato: string; status: string; valor: number; valorPago: number | null; dataPrevista: string | null; dataPagamento: string | null }[];
@@ -487,6 +504,13 @@ export function montaLinhasConexao(inp: ConexaoInput): ConexaoLinha[] {
     const atendidas = convs.filter((c) => inp.resp.has(c.id)).length;
     const comEnt = convs.filter((c) => inp.comEntrada.has(c.id));
     const semResp = comEnt.filter((c) => !inp.resp.has(c.id)).length;
+    // Pessoas que chamaram: contatos do chip com inbound real, deduplicados por chave canônica
+    // (9º dígito/DDI colapsam); sem telefone (LID puro) conta como 1 via fallback por contato.
+    const pessoasSet = new Set<string>();
+    for (const c of ct) if (inp.contatosComInbound.has(c.id)) pessoasSet.add(chaveCanonicaTelefone(c.tel) ?? ('noid:' + c.id));
+    const pessoasQueChamaram = pessoasSet.size;
+    const conversasRecebidas = comEnt.length;                                   // conversas com inbound no período
+    const msgsInbound = inp.firstIn.filter((x) => x.chip === chave).length;     // mensagens de entrada no período
     const prMin = tempoMedioPrimeiraResposta(inp.firstIn.filter((x) => x.chip === chave).map((x) => ({ c: x.conversa, t: x.t })), inp.firstResp.filter((x) => x.chip === chave).map((x) => ({ c: x.conversa, t: x.t })));
     const ops = inp.opps.filter((o) => o.chip === chave);
     const oportunidades = ops.length;
@@ -504,6 +528,7 @@ export function montaLinhasConexao(inp: ConexaoInput): ConexaoLinha[] {
     linhas.push({
       chave, ...id,
       novosContatos: novos, leadsRecebidos: novos, leadsAnterior: leadsAnt,
+      pessoasQueChamaram, contatosCriados: novos, conversasRecebidas, msgsInbound, difContatosPessoas: novos - pessoasQueChamaram,
       conversas, conversasAtendidas: atendidas, semResposta: semResp,
       oportunidades, qualificados, fechados, perdidos, qualifFechados,
       taxaAtendimento: r1(atendidas, comEnt.length), taxaQualificacao: r1(qualificados, oportunidades), taxaConversao: r1(fechados, novos), convQualificados: r1(qualifFechados, qualificados),
@@ -512,12 +537,12 @@ export function montaLinhasConexao(inp: ConexaoInput): ConexaoLinha[] {
       clientesPagantes: pagantes.size, ticketMedio: pagantes.size ? receitaRecebida / pagantes.size : 0,
     });
   }
-  return linhas.sort((a, b) => b.leadsRecebidos - a.leadsRecebidos || b.receitaRecebida - a.receitaRecebida);
+  return linhas.sort((a, b) => b.pessoasQueChamaram - a.pessoasQueChamaram || b.contatosCriados - a.contatosCriados || b.receitaRecebida - a.receitaRecebida);
 }
 export function melhorConexao(linhas: ConexaoLinha[]): ConexaoLinha | null {
   const reais = linhas.filter((l) => l.chave !== 'sem');
   if (!reais.length) return null;
-  return reais.slice().sort((a, b) => b.leadsRecebidos - a.leadsRecebidos || b.fechados - a.fechados)[0];
+  return reais.slice().sort((a, b) => b.pessoasQueChamaram - a.pessoasQueChamaram || b.fechados - a.fechados)[0];
 }
 
 export function useConexoes(f: RelFiltros, enabled: boolean) {
@@ -526,7 +551,7 @@ export function useConexoes(f: RelFiltros, enabled: boolean) {
     queryKey: ['rel-conexoes', org, chaveFiltros(f)], enabled: REL_REAL && enabled, staleTime: 60_000,
     queryFn: async ({ signal }): Promise<ConexaoLinha[]> => {
       const [ct, cv, m, op, cb, pg, fc, cx] = await Promise.all([
-        supabase!.from('contatos').select('id, canal_origem_id, canal_origem_snapshot, criado_em').eq('organizacao_id', org).abortSignal(signal!),
+        supabase!.from('contatos').select('id, canal_origem_id, canal_origem_snapshot, criado_em, telefone').eq('organizacao_id', org).abortSignal(signal!),
         supabase!.from('conversas').select('id, contato_id, criado_em').eq('organizacao_id', org).gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).abortSignal(signal!),
         supabase!.from('mensagens').select('conversa_id, direcao, tipo, autor_id, criado_em, enviada_em, recebida_em').eq('organizacao_id', org).gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).abortSignal(signal!),
         supabase!.from('oportunidades').select('contato_id, status, coluna_id, criado_em, fechado_em').eq('organizacao_id', org).gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).abortSignal(signal!),
@@ -557,15 +582,18 @@ export function useConexoes(f: RelFiltros, enabled: boolean) {
           else if (snap) identidade[chip] = { nome: (snap.nome as string) || 'Conexão removida', numero: (snap.numero as string) || '', tipo: (snap.tipo as string) || '', gestor: (snap.gestor_nome as string) || '', fonte: (snap.fonte_nome as string) || '', campanha: (snap.campanha as string) || '', removida: true };
           else identidade[chip] = { nome: 'Sem conexão', numero: '', tipo: '', gestor: '', fonte: '', campanha: '', removida: false };
         }
-        return { id: r.id as string, chip, criadoEm: r.criado_em as string };
-      }).filter(Boolean)) as { id: string; chip: string; criadoEm: string }[];
-      const convChip = new Map<string, string>();
-      const conversas = (((cv.data as Row[]) ?? []).map((r) => { const chip = contatoChip.get(r.contato_id as string); if (!chip) return null; convChip.set(r.id as string, chip); return { id: r.id as string, chip, criadoEm: r.criado_em as string }; }).filter(Boolean)) as { id: string; chip: string; criadoEm: string }[];
+        return { id: r.id as string, chip, criadoEm: r.criado_em as string, tel: (r.telefone as string) ?? null };
+      }).filter(Boolean)) as { id: string; chip: string; criadoEm: string; tel: string | null }[];
+      const convChip = new Map<string, string>(); const convContato = new Map<string, string>();
+      const conversas = (((cv.data as Row[]) ?? []).map((r) => { const chip = contatoChip.get(r.contato_id as string); if (!chip) return null; convChip.set(r.id as string, chip); convContato.set(r.id as string, r.contato_id as string); return { id: r.id as string, chip, criadoEm: r.criado_em as string }; }).filter(Boolean)) as { id: string; chip: string; criadoEm: string }[];
       const convValidas = new Set(conversas.map((c) => c.id));
       const msgs = ((m.data as Row[]) ?? []).filter((r) => convValidas.has(r.conversa_id as string));
       const recebidas = msgs.filter((r) => r.direcao === 'entrada');
       const respHumanas = msgs.filter((r) => r.direcao === 'saida' && r.tipo !== 'sistema' && r.tipo !== 'nota_interna' && r.autor_id != null);
       const comEntrada = new Set(recebidas.map((r) => r.conversa_id as string));
+      // contatos com ≥1 inbound real no período (via conversa → contato)
+      const contatosComInbound = new Set<string>();
+      for (const r of recebidas) { const cid = convContato.get(r.conversa_id as string); if (cid) contatosComInbound.add(cid); }
       const resp = new Set(respHumanas.map((r) => r.conversa_id as string));
       const firstIn = recebidas.map((r) => ({ conversa: r.conversa_id as string, chip: convChip.get(r.conversa_id as string) || 'sem', t: tms(r, 'recebida_em', 'criado_em') }));
       const firstResp = respHumanas.map((r) => ({ conversa: r.conversa_id as string, chip: convChip.get(r.conversa_id as string) || 'sem', t: tms(r, 'enviada_em', 'criado_em') }));
@@ -579,7 +607,7 @@ export function useConexoes(f: RelFiltros, enabled: boolean) {
       const cobChip = new Map<string, string>(); const economiaPorChip: Record<string, { total: number; preenchida: boolean }> = {};
       for (const r of (cb.data as Row[]) ?? []) { const chip = contatoChip.get(r.contato_id as string); if (!chip) continue; cobChip.set(r.id as string, chip); const cur = economiaPorChip[chip] || { total: 0, preenchida: false }; if (r.valor_economizado != null) { cur.preenchida = true; cur.total += num(r.valor_economizado); } economiaPorChip[chip] = cur; }
       const parcelas = ((pg.data as Row[]) ?? []).map((r) => { const chip = cobChip.get(r.cobranca_id as string); return chip ? { chip, contato: r.cobranca_id as string, status: r.status as string, valor: num(r.valor), valorPago: r.valor_pago == null ? null : num(r.valor_pago), dataPrevista: (r.data_prevista as string) ?? null, dataPagamento: (r.data_pagamento as string) ?? null } : null; }).filter(Boolean) as ConexaoInput['parcelas'];
-      return montaLinhasConexao({ contatos, identidade, conversas, comEntrada, resp, firstIn, firstResp, opps, parcelas, economiaPorChip, iniDate: p.iniDate, fimDate: p.fimDate, prevIniDate: p.prevIniDate, hoje: spHoje() });
+      return montaLinhasConexao({ contatos, identidade, conversas, comEntrada, resp, contatosComInbound, firstIn, firstResp, opps, parcelas, economiaPorChip, iniDate: p.iniDate, fimDate: p.fimDate, prevIniDate: p.prevIniDate, hoje: spHoje() });
     },
   });
 }

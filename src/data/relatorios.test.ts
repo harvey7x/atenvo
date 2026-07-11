@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { kpi, agregaFinanceiro, tempoMedioPrimeiraResposta, conversao, passaOpp, resolvePeriodo, addDias, chaveConexao, montaLinhasConexao, melhorConexao, type ParcelaLite, type RelFiltros, type ConexaoInput } from './relatorios';
+import { kpi, agregaFinanceiro, tempoMedioPrimeiraResposta, conversao, passaOpp, resolvePeriodo, addDias, chaveConexao, chaveCanonicaTelefone, montaLinhasConexao, melhorConexao, type ParcelaLite, type RelFiltros, type ConexaoInput } from './relatorios';
 
 const F = (extra: Partial<RelFiltros> = {}): RelFiltros => ({ preset: '30d', ...extra });
 
@@ -94,10 +94,10 @@ describe('montaLinhasConexao() — desempenho por chip', () => {
   const dEm = '2026-06-10T12:00:00-03:00', dPrev = '2026-05-10T12:00:00-03:00';
   const input: ConexaoInput = {
     contatos: [
-      { id: 'k1', chip: 'chip1', criadoEm: dEm }, { id: 'k2', chip: 'chip1', criadoEm: dEm }, { id: 'k3', chip: 'chip1', criadoEm: dEm },
-      { id: 'kprev', chip: 'chip1', criadoEm: dPrev }, // período anterior
-      { id: 'k4', chip: 'chip2', criadoEm: dEm }, { id: 'k5', chip: 'chip2', criadoEm: dEm },
-      { id: 'kr', chip: 'snap:999', criadoEm: dEm }, { id: 'ks', chip: 'sem', criadoEm: dEm },
+      { id: 'k1', chip: 'chip1', criadoEm: dEm, tel: '5551900000001' }, { id: 'k2', chip: 'chip1', criadoEm: dEm, tel: '5551900000002' }, { id: 'k3', chip: 'chip1', criadoEm: dEm, tel: '5551900000003' },
+      { id: 'kprev', chip: 'chip1', criadoEm: dPrev, tel: '5551900000009' }, // período anterior
+      { id: 'k4', chip: 'chip2', criadoEm: dEm, tel: '5551900000004' }, { id: 'k5', chip: 'chip2', criadoEm: dEm, tel: '5551900000005' },
+      { id: 'kr', chip: 'snap:999', criadoEm: dEm, tel: '5551900000006' }, { id: 'ks', chip: 'sem', criadoEm: dEm, tel: '5551900000007' },
     ],
     identidade: {
       chip1: { nome: 'Chip 1', numero: '111', tipo: 'trafego', gestor: 'Gestor X', fonte: 'Tráfego 1', campanha: '', removida: false },
@@ -107,6 +107,7 @@ describe('montaLinhasConexao() — desempenho por chip', () => {
     },
     conversas: [{ id: 'c1a', chip: 'chip1', criadoEm: dEm }, { id: 'c1b', chip: 'chip1', criadoEm: dEm }, { id: 'c2', chip: 'chip2', criadoEm: dEm }],
     comEntrada: new Set(['c1a', 'c1b', 'c2']), resp: new Set(['c1a', 'c2']),
+    contatosComInbound: new Set(['k1', 'k2', 'k3', 'k4', 'k5', 'kr']),
     firstIn: [{ conversa: 'c1a', chip: 'chip1', t: 1_000_000 }, { conversa: 'c2', chip: 'chip2', t: 1_000_000 }],
     firstResp: [{ conversa: 'c1a', chip: 'chip1', t: 1_600_000 }, { conversa: 'c2', chip: 'chip2', t: 2_200_000 }],
     opps: [
@@ -133,4 +134,80 @@ describe('montaLinhasConexao() — desempenho por chip', () => {
   it('lead sem canal agrupado em "sem" (não some)', () => { expect(linhas.find((l) => l.chave === 'sem')!.leadsRecebidos).toBe(1); });
   it('melhorConexao = chip com mais leads, ignorando "sem"', () => { expect(melhorConexao(linhas)?.chave).toBe('chip1'); });
   it('economia não preenchida não vira zero falso', () => { expect(c1.economiaPreenchida).toBe(false); });
+  it('pessoas que chamaram = contatos do chip com inbound, dedup canônica (aqui distintos)', () => {
+    expect(c1.pessoasQueChamaram).toBe(3); expect(c2.pessoasQueChamaram).toBe(2);
+    expect(c1.contatosCriados).toBe(3); expect(c1.difContatosPessoas).toBe(0);
+    expect(c1.conversasRecebidas).toBe(2); expect(c1.msgsInbound).toBe(1);
+  });
+});
+
+describe('chaveCanonicaTelefone() — dedup por DDD + 8 finais', () => {
+  it('9º dígito: com e sem 9 → mesma chave', () => {
+    expect(chaveCanonicaTelefone('555181580190')).toBe('5181580190');   // 55 51 8158-0190
+    expect(chaveCanonicaTelefone('5551981580190')).toBe('5181580190');  // 55 51 9 8158-0190
+    expect(chaveCanonicaTelefone('555181580190')).toBe(chaveCanonicaTelefone('5551981580190'));
+  });
+  it('com e sem DDI 55 → mesma chave', () => {
+    expect(chaveCanonicaTelefone('51981580190')).toBe('5181580190');    // sem DDI (DDD+9+8)
+    expect(chaveCanonicaTelefone('5181580190')).toBe('5181580190');     // sem DDI (DDD+8)
+  });
+  it('formatação (parênteses/traços/espaços) não afeta', () => {
+    expect(chaveCanonicaTelefone('(51) 98158-0190')).toBe('5181580190');
+  });
+  it('DDDs diferentes com mesmos 8 finais NÃO colidem', () => {
+    expect(chaveCanonicaTelefone('5551981580190')).not.toBe(chaveCanonicaTelefone('5553981580190'));
+  });
+  it('vazio/null → null', () => { expect(chaveCanonicaTelefone(null)).toBeNull(); expect(chaveCanonicaTelefone('')).toBeNull(); });
+  it('número curto/fora do padrão (não 10-11 díg) → mantém dígitos (sem colisão)', () => {
+    expect(chaveCanonicaTelefone('12345')).toBe('12345');
+    expect(chaveCanonicaTelefone('abc')).toBeNull();
+  });
+});
+
+describe('Pessoas que chamaram — regras de negócio (dedup/outbound/LID)', () => {
+  const P = { iniDate: '2026-06-01', fimDate: '2026-07-01', prevIniDate: '2026-05-02', hoje: '2026-06-29' };
+  const dEm = '2026-06-10T12:00:00-03:00';
+  const base = (over: Partial<ConexaoInput>): ConexaoInput => ({
+    contatos: [], identidade: { A: { nome: 'A', numero: '', tipo: '', gestor: '', fonte: '', campanha: '', removida: false } },
+    conversas: [], comEntrada: new Set(), resp: new Set(), contatosComInbound: new Set(),
+    firstIn: [], firstResp: [], opps: [], parcelas: [], economiaPorChip: {}, ...P, ...over,
+  });
+  const linhaA = (inp: ConexaoInput) => montaLinhasConexao(inp).find((l) => l.chave === 'A')!;
+
+  it('outbound-only NÃO conta como pessoa que chamou (mas conta como contato criado)', () => {
+    const l = linhaA(base({
+      contatos: [{ id: 'p1', chip: 'A', criadoEm: dEm, tel: '5551900000010' }, { id: 'p2', chip: 'A', criadoEm: dEm, tel: '5551900000011' }],
+      contatosComInbound: new Set(['p1']), // p2 só recebeu outbound
+    }));
+    expect(l.contatosCriados).toBe(2);
+    expect(l.pessoasQueChamaram).toBe(1);
+    expect(l.difContatosPessoas).toBe(1);
+  });
+  it('duplicado por 9º dígito com inbound colapsa em 1 pessoa', () => {
+    const l = linhaA(base({
+      contatos: [{ id: 'd1', chip: 'A', criadoEm: dEm, tel: '555181580190' }, { id: 'd2', chip: 'A', criadoEm: dEm, tel: '5551981580190' }],
+      contatosComInbound: new Set(['d1', 'd2']),
+    }));
+    expect(l.contatosCriados).toBe(2);
+    expect(l.pessoasQueChamaram).toBe(1); // mesma pessoa, chave canônica única
+  });
+  it('LID puro (sem telefone) com inbound conta como 1 pessoa (fallback por contato)', () => {
+    const l = linhaA(base({
+      contatos: [{ id: 'lid1', chip: 'A', criadoEm: dEm, tel: null }, { id: 'lid2', chip: 'A', criadoEm: dEm, tel: null }],
+      contatosComInbound: new Set(['lid1', 'lid2']),
+    }));
+    expect(l.pessoasQueChamaram).toBe(2); // sem telefone não deduplica: cada um é 1 pessoa
+  });
+  it('agregação por canal: cada chip conta suas próprias pessoas', () => {
+    const linhas = montaLinhasConexao(base({
+      identidade: { A: { nome: 'A', numero: '', tipo: '', gestor: '', fonte: '', campanha: '', removida: false }, B: { nome: 'B', numero: '', tipo: '', gestor: '', fonte: '', campanha: '', removida: false } },
+      contatos: [
+        { id: 'a1', chip: 'A', criadoEm: dEm, tel: '5551900000020' }, { id: 'a2', chip: 'A', criadoEm: dEm, tel: '5551900000021' },
+        { id: 'b1', chip: 'B', criadoEm: dEm, tel: '5551900000022' },
+      ],
+      contatosComInbound: new Set(['a1', 'a2', 'b1']),
+    }));
+    expect(linhas.find((l) => l.chave === 'A')!.pessoasQueChamaram).toBe(2);
+    expect(linhas.find((l) => l.chave === 'B')!.pessoasQueChamaram).toBe(1);
+  });
 });
