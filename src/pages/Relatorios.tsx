@@ -7,7 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import {
   REL_REAL, PRESETS, type Preset, type RelFiltros, FILTROS_PADRAO, resolvePeriodo, type Kpi,
   useRelatorioOpcoes, useResumo, useComercial, useAtendimento, useEquipe, useFinanceiro, useOrigens,
-  useConexoes, type ConexaoLinha,
+  useConexoes, type ConexaoLinha, montaLinhasEquipe,
   exportarCSV, spHoje,
 } from '@/data/relatorios';
 import './Relatorios.css';
@@ -287,17 +287,8 @@ function AbaResumo({ f, periodoLabel, orgNome, ehAtendente }: { f: RelFiltros; p
   // tabela por conexão: ordena Clientes fechados → Pessoas que chamaram → Taxa de conversão
   const conexRows = (cx.data || []).filter((l) => l.chave !== 'sem')
     .slice().sort((a, b) => b.fechados - a.fechados || b.pessoasQueChamaram - a.pessoasQueChamaram || b.taxaConversao - a.taxaConversao);
-  // tabela por atendente: junta carteira comercial + atendimento; ordena Fechados → Taxa → Contatos
-  const equipeRows = eq.data ? (() => {
-    const atMap = new Map(eq.data.atendimento.map((a) => [a.id, a]));
-    return eq.data.comercial.map((c) => ({
-      nome: c.nome, contatos: c.leads, trabalhadas: c.oppAndamento + c.oppGanho + c.oppPerdido,
-      fechados: c.clientesFechados, taxaConversao: c.taxaConversao,
-      mensagensEnviadas: atMap.get(c.id)?.mensagensEnviadas ?? 0,
-      semResposta: atMap.get(c.id)?.conversasSemResposta ?? 0,
-      receitaRecebida: c.receitaRecebida,
-    })).sort((a, b) => b.fechados - a.fechados || b.taxaConversao - a.taxaConversao || b.contatos - a.contatos);
-  })() : [];
+  // tabela por atendente: FONTE ÚNICA (mesma dos demais abas)
+  const equipeRows = eq.data ? montaLinhasEquipe(eq.data) : [];
 
   const semRespostaTotal = at.data?.semResposta ?? 0;
   const paradas7d = com.data?.paradasMais7d ?? 0;
@@ -341,11 +332,12 @@ function AbaResumo({ f, periodoLabel, orgNome, ehAtendente }: { f: RelFiltros; p
             cols={[
               { key: 'nome', label: 'Atendente' },
               { key: 'contatos', label: 'Contatos atendidos', align: 'c' },
-              { key: 'trabalhadas', label: 'Oportunidades trabalhadas', align: 'c' },
-              { key: 'fechados', label: 'Clientes fechados', align: 'c' },
-              { key: 'taxaConversao', label: 'Taxa de conversão', align: 'c', fmt: (v) => fmtPct(v as number), csv: (r) => (r.taxaConversao as number).toFixed(1) },
+              { key: 'oppTrabalhadas', label: 'Oportunidades trabalhadas', align: 'c' },
+              { key: 'clientesFechados', label: 'Clientes fechados', align: 'c' },
+              { key: 'negociosFechados', label: 'Negócios fechados', align: 'c' },
+              { key: 'taxaOperacional', label: 'Taxa operacional', align: 'c', fmt: (v) => fmtPct(v as number), csv: (r) => (r.taxaOperacional as number).toFixed(1) },
               { key: 'mensagensEnviadas', label: 'Mensagens enviadas', align: 'c' },
-              { key: 'semResposta', label: 'Conversas sem resposta', align: 'c' },
+              { key: 'conversasSemResposta', label: 'Conversas sem resposta', align: 'c' },
               { key: 'receitaRecebida', label: 'Receita recebida', align: 'r', fmt: (v) => fmtBRL(v as number), csv: (r) => (r.receitaRecebida as number).toFixed(2) },
             ] as Col<Record<string, unknown>>[]}
             rows={equipeRows as unknown as Record<string, unknown>[]} searchKeys={['nome']}
@@ -511,19 +503,18 @@ function AbaAtendimento({ f, periodoLabel, orgNome, ehAtendente }: { f: RelFiltr
         <Panel title="Conversas por canal">{q.data.porCanal.length === 0 ? <Vazio titulo="Sem conversas no período" /> : <Donut data={q.data.porCanal.map((c) => ({ label: canalNome(c.canal), v: c.total }))} />}</Panel>
 
         {!ehAtendente && <Estado q={eq}>{eq.data && <>
-          <div className="sech" style={{ marginTop: 18 }}>Carteira comercial <span style={{ fontWeight: 400, color: 'var(--muted)', fontSize: 12 }}>· por responsável</span></div>
-          <div className="sec-aviso">{eq.data.atendimentoAtribuivel
-            ? 'A atribuição de atendimento por mensagem é parcial (apenas saídas com autor identificado). A tabela abaixo é da carteira comercial, atribuída por responsável — não é contagem de atendimentos realizados.'
-            : 'O sistema ainda não possui atribuição suficiente nas conversas para calcular com precisão quem realizou mais atendimentos. A tabela abaixo reflete a carteira comercial por responsável.'}</div>
+          <div className="sech" style={{ marginTop: 18 }}>Desempenho por atendente <span style={{ fontWeight: 400, color: 'var(--muted)', fontSize: 12 }}>· mesma fonte da Resumo</span></div>
+          <div className="sec-aviso">Clientes/Negócios fechados usam a regra oficial (ganho por fechado_em, com fallback de responsável). "Em andamento" é a carteira atual (por criação). "Não atribuído" aparece quando há fechamento sem responsável.</div>
           <DataTable
             cols={[
-              { key: 'nome', label: 'Responsável' }, { key: 'leads', label: 'Contatos', align: 'c' },
-              { key: 'oppAndamento', label: 'Em andamento', align: 'c' }, { key: 'oppGanho', label: 'Fechados', align: 'c' }, { key: 'oppPerdido', label: 'Perdidos', align: 'c' },
-              { key: 'taxaConversao', label: 'Conversão', align: 'c', fmt: (v) => fmtPct(v as number), csv: (r) => (r.taxaConversao as number).toFixed(1) },
+              { key: 'nome', label: 'Atendente' }, { key: 'contatos', label: 'Contatos', align: 'c' },
+              { key: 'oppAndamento', label: 'Em andamento', align: 'c' },
+              { key: 'clientesFechados', label: 'Clientes fechados', align: 'c' }, { key: 'negociosFechados', label: 'Negócios fechados', align: 'c' },
+              { key: 'taxaOperacional', label: 'Taxa operacional', align: 'c', fmt: (v) => fmtPct(v as number), csv: (r) => (r.taxaOperacional as number).toFixed(1) },
               { key: 'receitaRecebida', label: 'Receita recebida', align: 'r', fmt: (v) => fmtBRL(v as number), csv: (r) => (r.receitaRecebida as number).toFixed(2) },
             ] as Col<Record<string, unknown>>[]}
-            rows={eq.data.comercial as unknown as Record<string, unknown>[]} searchKeys={['nome']}
-            csvName={`carteira_${periodoLabel.replace(/\D/g, '')}`} csvMeta={[...meta, 'Desempenho da carteira por responsavel (responsavel_id/criado_por)']} />
+            rows={montaLinhasEquipe(eq.data) as unknown as Record<string, unknown>[]} searchKeys={['nome']}
+            csvName={`atendentes_${periodoLabel.replace(/\D/g, '')}`} csvMeta={[...meta, 'Clientes/Negocios fechados: ganho por fechado_em com fallback de responsavel']} />
         </>}</Estado>}
       </>}
     </Estado>
@@ -578,13 +569,14 @@ function AbaDetalhamento({ f, periodoLabel, orgNome, ehAtendente, onNav }: { f: 
       <div className="det-sel">{opcoesSel.filter((o) => !(o.id === 'carteira' && ehAtendente)).map((o) => <button key={o.id} className={sel === o.id ? 'on' : ''} onClick={() => setSel(o.id)}>{o.r}</button>)}</div>
       {sel === 'carteira' && !ehAtendente && <Estado q={eq}>{eq.data && <DataTable
         cols={[
-          { key: 'nome', label: 'Responsável' }, { key: 'leads', label: 'Contatos', align: 'c' }, { key: 'oppAndamento', label: 'Andamento', align: 'c' },
-          { key: 'oppGanho', label: 'Fechados', align: 'c' }, { key: 'oppPerdido', label: 'Perdidos', align: 'c' },
+          { key: 'nome', label: 'Atendente' }, { key: 'contatos', label: 'Contatos', align: 'c' },
+          { key: 'oppAndamento', label: 'Em andamento', align: 'c' }, { key: 'oppPerdido', label: 'Perdidos', align: 'c' },
+          { key: 'clientesFechados', label: 'Clientes fechados', align: 'c' }, { key: 'negociosFechados', label: 'Negócios fechados', align: 'c' },
           { key: 'receitaContratada', label: 'Receita contratada', align: 'r', fmt: (v) => fmtBRL(v as number), csv: (r) => (r.receitaContratada as number).toFixed(2) },
           { key: 'receitaRecebida', label: 'Receita recebida', align: 'r', fmt: (v) => fmtBRL(v as number), csv: (r) => (r.receitaRecebida as number).toFixed(2) },
         ] as Col<Record<string, unknown>>[]}
-        rows={eq.data.comercial as unknown as Record<string, unknown>[]} searchKeys={['nome']}
-        csvName={`detalhe_carteira_${periodoLabel.replace(/\D/g, '')}`} csvMeta={meta} />}</Estado>}
+        rows={montaLinhasEquipe(eq.data) as unknown as Record<string, unknown>[]} searchKeys={['nome']}
+        csvName={`detalhe_atendentes_${periodoLabel.replace(/\D/g, '')}`} csvMeta={meta} />}</Estado>}
       {sel === 'conexoes' && <SecaoConexoes f={f} periodoLabel={periodoLabel} orgNome={orgNome} />}
       {sel === 'origem' && <Estado q={or}>{or.data && <DataTable
         cols={[

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { kpi, agregaFinanceiro, tempoMedioPrimeiraResposta, conversao, passaOpp, resolvePeriodo, addDias, chaveConexao, chaveCanonicaTelefone, montaLinhasConexao, melhorConexao, type ParcelaLite, type RelFiltros, type ConexaoInput } from './relatorios';
+import { kpi, agregaFinanceiro, tempoMedioPrimeiraResposta, conversao, passaOpp, resolvePeriodo, addDias, chaveConexao, chaveCanonicaTelefone, montaLinhasConexao, montaLinhasEquipe, melhorConexao, type ParcelaLite, type RelFiltros, type ConexaoInput, type EquipeData } from './relatorios';
 
 const F = (extra: Partial<RelFiltros> = {}): RelFiltros => ({ preset: '30d', ...extra });
 
@@ -266,4 +266,36 @@ describe('métricas por período — 30 dias NUNCA menor que 7 dias', () => {
     expect(l30.msgsOutbound).toBeGreaterThanOrEqual(l7.msgsOutbound);
     expect(l30.contatosCriados).toBe(3); expect(l7.contatosCriados).toBe(2);
   });
+});
+
+describe('montaLinhasEquipe — fonte única por atendente (reconciliação)', () => {
+  const eq: EquipeData = {
+    comercial: [
+      { id: 'u1', nome: 'A', leads: 10, oppAndamento: 2, oppGanho: 5, oppPerdido: 1, clientesFechados: 8, negociosFechados: 9, taxaConversao: 80, receitaContratada: 0, receitaRecebida: 100 },
+      { id: 'u2', nome: 'B', leads: 5, oppAndamento: 0, oppGanho: 0, oppPerdido: 0, clientesFechados: 2, negociosFechados: 2, taxaConversao: 40, receitaContratada: 0, receitaRecebida: 0 },
+      { id: '__nao_atribuido__', nome: 'Não atribuído', leads: 0, oppAndamento: 0, oppGanho: 0, oppPerdido: 0, clientesFechados: 2, negociosFechados: 2, taxaConversao: 0, receitaContratada: 0, receitaRecebida: 0 },
+    ],
+    atendimento: [
+      { id: 'u1', nome: 'A', conversasRespondidas: 3, mensagensEnviadas: 50, conversasSemResposta: 2 },
+      { id: 'u2', nome: 'B', conversasRespondidas: 1, mensagensEnviadas: 10, conversasSemResposta: 1 },
+    ],
+    atendimentoAtribuivel: true,
+  };
+  const rows = montaLinhasEquipe(eq);
+  it('soma de clientes/negócios por atendente = total geral (12 clientes, 13 negócios)', () => {
+    expect(rows.reduce((s, r) => s + r.clientesFechados, 0)).toBe(12);
+    expect(rows.reduce((s, r) => s + r.negociosFechados, 0)).toBe(13);
+  });
+  it('"Não atribuído" não some e mantém seus fechamentos', () => {
+    const na = rows.find((r) => r.id === '__nao_atribuido__');
+    expect(na).toBeTruthy(); expect(na!.clientesFechados).toBe(2); expect(na!.negociosFechados).toBe(2);
+    expect(na!.mensagensEnviadas).toBe(0); // sem entrada em atendimento
+  });
+  it('merge com atendimento (msgs enviadas + sem resposta) e oportunidades trabalhadas', () => {
+    const a = rows.find((r) => r.id === 'u1')!;
+    expect(a.mensagensEnviadas).toBe(50); expect(a.conversasSemResposta).toBe(2);
+    expect(a.oppTrabalhadas).toBe(8); // 2 andamento + 5 ganho + 1 perdido
+    expect(a.taxaOperacional).toBe(80);
+  });
+  it('ordena por clientes fechados desc (A no topo)', () => { expect(rows[0].id).toBe('u1'); });
 });

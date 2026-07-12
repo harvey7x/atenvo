@@ -446,6 +446,33 @@ export function useEquipe(f: RelFiltros, enabled: boolean) {
   });
 }
 
+/* ===== FONTE ÚNICA das métricas por atendente (consumida por Resumo/Atendimento/Detalhamento) =====
+   Todas as abas devem usar montaLinhasEquipe — nenhuma pode recalcular "fechados" por conta própria. */
+export interface LinhaEquipe {
+  id: string; nome: string;
+  contatos: number;            // contatos atribuídos/atendidos (carteira do período)
+  oppTrabalhadas: number;      // oportunidades trabalhadas (andamento + ganho + perdido, por criação)
+  oppAndamento: number; oppPerdido: number;
+  clientesFechados: number;    // OFICIAL: contatos distintos com ganho por fechado_em (fallback de responsável)
+  negociosFechados: number;    // OFICIAL: oportunidades ganhas por fechado_em (fallback de responsável)
+  taxaOperacional: number;     // clientes fechados ÷ contatos atribuídos (pode passar de 100% em janela curta)
+  mensagensEnviadas: number; conversasSemResposta: number;
+  receitaContratada: number; receitaRecebida: number;
+}
+export function montaLinhasEquipe(eq: EquipeData): LinhaEquipe[] {
+  const atMap = new Map(eq.atendimento.map((a) => [a.id, a]));
+  return eq.comercial.map((c) => ({
+    id: c.id, nome: c.nome, contatos: c.leads,
+    oppTrabalhadas: c.oppAndamento + c.oppGanho + c.oppPerdido,
+    oppAndamento: c.oppAndamento, oppPerdido: c.oppPerdido,
+    clientesFechados: c.clientesFechados, negociosFechados: c.negociosFechados,
+    taxaOperacional: c.taxaConversao, // useEquipe já calcula clientes ÷ contatos
+    mensagensEnviadas: atMap.get(c.id)?.mensagensEnviadas ?? 0,
+    conversasSemResposta: atMap.get(c.id)?.conversasSemResposta ?? 0,
+    receitaContratada: c.receitaContratada, receitaRecebida: c.receitaRecebida,
+  })).sort((a, b) => b.clientesFechados - a.clientesFechados || b.negociosFechados - a.negociosFechados || b.contatos - a.contatos);
+}
+
 /* ====================== Financeiro ====================== */
 export interface FinanceiroData extends FinAgg {
   cobAtivas: number; cobFinalizadas: number; cobCanceladas: number;
