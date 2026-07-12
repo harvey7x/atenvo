@@ -115,6 +115,11 @@ describe('montaLinhasConexao() — desempenho por chip', () => {
       { chip: 'chip1', status: 'ganho', qualificada: true, tempoFechDias: 5 }, { chip: 'chip1', status: 'perdido', qualificada: true, tempoFechDias: null }, { chip: 'chip1', status: 'em_andamento', qualificada: false, tempoFechDias: null },
       { chip: 'chip2', status: 'ganho', qualificada: true, tempoFechDias: 3 }, { chip: 'chip2', status: 'ganho', qualificada: true, tempoFechDias: 4 },
     ],
+    // fechamentos (fechado_em): chip1 tem 3 negócios em 2 clientes distintos (k1 duas vezes); chip2 tem 1 negócio/1 cliente
+    fechamentos: [
+      { chip: 'chip1', contato: 'k1' }, { chip: 'chip1', contato: 'k1' }, { chip: 'chip1', contato: 'k2' },
+      { chip: 'chip2', contato: 'k4' },
+    ],
     parcelas: [{ chip: 'chip1', contato: 'k1', status: 'paga', valor: 1000, valorPago: 1000, dataPrevista: '2026-06-05', dataPagamento: '2026-06-15' }],
     economiaPorChip: {},
     ...P,
@@ -124,8 +129,16 @@ describe('montaLinhasConexao() — desempenho por chip', () => {
   const c2 = linhas.find((l) => l.chave === 'chip2')!;
   it('dois chips com volumes diferentes (chip1 mais leads, no período)', () => { expect(c1.leadsRecebidos).toBe(3); expect(c2.leadsRecebidos).toBe(2); });
   it('período anterior contabilizado separadamente', () => { expect(c1.leadsAnterior).toBe(1); expect(c2.leadsAnterior).toBe(0); });
-  it('chip1 mais leads, MENOR conversão; chip2 menos leads, conversão maior', () => {
-    expect(c1.taxaConversao).toBeCloseTo(33.33, 1); expect(c2.taxaConversao).toBe(100); expect(c1.taxaConversao).toBeLessThan(c2.taxaConversao);
+  it('P2/P4: clientes distintos vs negócios fechados (por fechado_em)', () => {
+    expect(c1.fechados).toBe(2); expect(c1.negociosFechados).toBe(3); // 3 negócios, 2 clientes (k1 repetido)
+    expect(c2.fechados).toBe(1); expect(c2.negociosFechados).toBe(1);
+  });
+  it('P3: taxa principal = clientes fechados ÷ pessoas que chamaram', () => {
+    expect(c1.taxaConversao).toBeCloseTo(66.67, 1); // 2 clientes / 3 pessoas
+    expect(c2.taxaConversao).toBe(50);              // 1 cliente / 2 pessoas
+  });
+  it('conversão de oportunidades (detalhe) = ganhas criadas ÷ criadas', () => {
+    expect(c1.conversaoOportunidades).toBeCloseTo(33.33, 1); expect(c2.conversaoOportunidades).toBe(100);
   });
   it('chip2 maior qualificação', () => { expect(c2.taxaQualificacao).toBe(100); expect(c2.taxaQualificacao).toBeGreaterThan(c1.taxaQualificacao); });
   it('atendimento por conversa (chip1: 2 conversas, 1 atendida, 1 sem resposta)', () => { expect(c1.conversas).toBe(2); expect(c1.conversasAtendidas).toBe(1); expect(c1.semResposta).toBe(1); expect(c1.taxaAtendimento).toBe(50); });
@@ -172,7 +185,7 @@ describe('Pessoas que chamaram — regras de negócio (dedup/outbound/LID)', () 
   const base = (over: Partial<ConexaoInput>): ConexaoInput => ({
     contatos: [], identidade: { A: { nome: 'A', numero: '', tipo: '', gestor: '', fonte: '', campanha: '', removida: false } },
     conversas: [], comEntrada: new Set(), resp: new Set(), contatosComInbound: new Set(),
-    firstIn: [], firstResp: [], outbound: [], opps: [], parcelas: [], economiaPorChip: {}, ...P, ...over,
+    firstIn: [], firstResp: [], outbound: [], opps: [], fechamentos: [], parcelas: [], economiaPorChip: {}, ...P, ...over,
   });
   const linhaA = (inp: ConexaoInput) => montaLinhasConexao(inp).find((l) => l.chave === 'A')!;
 
@@ -237,7 +250,7 @@ describe('métricas por período — 30 dias NUNCA menor que 7 dias', () => {
       contatosComInbound: new Set(inbound),
       firstIn: Array.from({ length: inN }, () => ({ conversa: 'x', chip: 'A', t: 0 })),
       firstResp: [], outbound: Array.from({ length: outN }, () => ({ chip: 'A' })),
-      opps: [], parcelas: [], economiaPorChip: {}, ...P,
+      opps: [], fechamentos: [], parcelas: [], economiaPorChip: {}, ...P,
     }).find((l) => l.chave === 'A')!;
   const l30 = mk({ iniDate: '2026-06-12', fimDate: '2026-07-12', prevIniDate: '2026-05-13', hoje: '2026-07-11' }, ['a1', 'a2', 'a3'], 20, 10);
   const l7  = mk({ iniDate: '2026-07-05', fimDate: '2026-07-12', prevIniDate: '2026-06-28', hoje: '2026-07-11' }, ['a1', 'a3'], 6, 3);

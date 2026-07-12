@@ -183,7 +183,8 @@ export function useRelatorioOpcoes() {
 /* ====================== Resumo executivo ====================== */
 export interface ResumoData {
   novosContatos: Kpi; novasConversas: Kpi; conversasAtendidas: Kpi; taxaAtendimento: Kpi;
-  oportunidadesCriadas: Kpi; oportunidadesFechadas: Kpi; conversaoComercial: Kpi;
+  // oportunidadesFechadas = CLIENTES distintos fechados no período (por fechado_em, P2/P4); negociosFechados = oportunidades ganhas
+  oportunidadesCriadas: Kpi; oportunidadesFechadas: Kpi; negociosFechados: Kpi; conversaoComercial: Kpi;
   receitaRecebida: Kpi; receitaPrevista: Kpi; ticketMedio: Kpi; parcelasAtraso: number; taxaInadimplencia: Kpi;
   economiaGerada: Kpi | null; economiaPreenchida: boolean;
 }
@@ -202,17 +203,26 @@ export function useResumo(f: RelFiltros) {
       if (f.status) qOpp = qOpp.eq('status', f.status);
       if (f.origem) qOpp = qOpp.eq('origem', f.origem);
       if (f.conexao) qOpp = qOpp.eq('canal_origem_id', f.conexao);
+      // P2: oportunidades GANHAS fechadas no período (por fechado_em) → clientes distintos + negócios
+      let qOppFech = supabase!.from('oportunidades').select('contato_id, fechado_em').eq('organizacao_id', org).eq('status', 'ganho').gte('fechado_em', p.prevIniISO).lt('fechado_em', p.fimISO).abortSignal(signal!);
+      if (f.responsavel) qOppFech = qOppFech.eq('responsavel_id', f.responsavel);
+      if (f.coluna) qOppFech = qOppFech.eq('coluna_id', f.coluna);
+      if (f.origem) qOppFech = qOppFech.eq('origem', f.origem);
+      if (f.conexao) qOppFech = qOppFech.eq('canal_origem_id', f.conexao);
       let qConv = supabase!.from('conversas').select('id, criado_em, contato_id').eq('organizacao_id', org).gte('criado_em', p.prevIniISO).lt('criado_em', p.fimISO).abortSignal(signal!);
       if (f.canal) qConv = qConv.eq('ultimo_provider', f.canal); // canal só afeta conversas (atendimento)
       // resposta humana = saída com autor_id (operador via app); telefone sincronizado fica de fora
       const qResp = fetchAll(() => supabase!.from('mensagens').select('conversa_id, criado_em').eq('organizacao_id', org).eq('direcao', 'saida').not('autor_id', 'is', null).gte('criado_em', p.prevIniISO).lt('criado_em', p.fimISO).abortSignal(signal!)).then(wrapRows);
       const qPag = supabase!.from('cobranca_pagamentos').select('status, valor, valor_pago, data_prevista, data_pagamento, cobranca_id').eq('organizacao_id', org).abortSignal(signal!);
       const qCob = supabase!.from('cobrancas').select('id, valor_mensal, status, valor_economizado, responsavel_id, contato_id, criado_em').eq('organizacao_id', org).abortSignal(signal!);
-      const [c, o, cv, resp, pag, cob, cids] = await Promise.all([qContatos, qOpp, qConv, qResp, qPag, qCob, cidsConexao(org, f.conexao, signal!)]);
-      for (const r of [c, o, cv, resp, pag, cob]) if (r.error) throw new Error(r.error.message);
+      const [c, o, of_, cv, resp, pag, cob, cids] = await Promise.all([qContatos, qOpp, qOppFech, qConv, qResp, qPag, qCob, cidsConexao(org, f.conexao, signal!)]);
+      for (const r of [c, o, of_, cv, resp, pag, cob]) if (r.error) throw new Error(r.error.message);
 
       const C = particao((c.data as Row[]) ?? [], 'criado_em', p);
       const O = particao((o.data as Row[]) ?? [], 'criado_em', p);
+      // P2/P4: clientes distintos (por contato) e negócios (por oportunidade) fechados no período, por fechado_em
+      const OF = particao((of_.data as Row[]) ?? [], 'fechado_em', p);
+      const clientesFech = (rows: Row[]) => new Set(rows.map((r) => r.contato_id as string).filter(Boolean)).size;
       // conexão afeta conversas em 1 hop (via contato de aquisição)
       const cvRows = ((cv.data as Row[]) ?? []).filter((r) => !cids || cids.has(r.contato_id as string));
       const V = particao(cvRows, 'criado_em', p);
@@ -244,8 +254,9 @@ export function useResumo(f: RelFiltros) {
         conversasAtendidas: kpi(convAtA, convAtP),
         taxaAtendimento: kpi(V.atual.length ? (convAtA / V.atual.length) * 100 : 0, V.anterior.length ? (convAtP / V.anterior.length) * 100 : 0),
         oportunidadesCriadas: kpi(convo.criadas, convoP.criadas),
-        oportunidadesFechadas: kpi(convo.ganhas, convoP.ganhas),
-        conversaoComercial: kpi(convo.taxa, convoP.taxa),
+        oportunidadesFechadas: kpi(clientesFech(OF.atual), clientesFech(OF.anterior)), // CLIENTES distintos (fechado_em)
+        negociosFechados: kpi(OF.atual.length, OF.anterior.length),                    // oportunidades ganhas (fechado_em)
+        conversaoComercial: kpi(convo.taxa, convoP.taxa),                              // conversão de OPORTUNIDADES (ganhas/criadas) — detalhe
         receitaRecebida: kpi(finA.recebida, finP.recebida),
         receitaPrevista: kpi(finA.prevista, finP.prevista),
         ticketMedio: kpi(ticket(Cob.atual), ticket(Cob.anterior)),
@@ -306,8 +317,7 @@ export function useAtendimento(f: RelFiltros, enabled: boolean) {
     queryKey: ['rel-atend', org, chaveFiltros(f)], enabled: REL_REAL && enabled, staleTime: 60_000,
     queryFn: async ({ signal }): Promise<AtendimentoData> => {
       // conversas da org (todas, p/ mapear canal de mensagens antigas); filtra por canal quando aplicável
-      let qConv = supabase!.from('conversas').select('id, status, criado_em, ultimo_provider, contato_id').eq('organizacao_id', org).abortSignal(signal!);
-      if (f.canal) qConv = qConv.eq('ultimo_provider', f.canal);
+      const qConv = fetchAll(() => { let q = supabase!.from('conversas').select('id, status, criado_em, ultimo_provider, contato_id').eq('organizacao_id', org).abortSignal(signal!); if (f.canal) q = q.eq('ultimo_provider', f.canal); return q; }).then(wrapRows);
       const qMsg = fetchAll(() => supabase!.from('mensagens').select('conversa_id, direcao, tipo, autor_id, criado_em, enviada_em, recebida_em').eq('organizacao_id', org).gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).abortSignal(signal!)).then(wrapRows);
       const [cv, m, cids] = await Promise.all([qConv, qMsg, cidsConexao(org, f.conexao, signal!)]);
       if (cv.error) throw new Error(cv.error.message); if (m.error) throw new Error(m.error.message);
@@ -321,8 +331,8 @@ export function useAtendimento(f: RelFiltros, enabled: boolean) {
       const enviadas = msgs.filter((r) => r.direcao === 'saida' && r.tipo !== 'sistema' && r.tipo !== 'nota_interna');
       const respHumanas = enviadas.filter((r) => r.autor_id != null); // evidência de autoria humana
       const respSet = new Set(respHumanas.map((r) => r.conversa_id as string));
-      const periodoIds = new Set(convPeriodo.map((r) => r.id as string));
-      const comEntrada = new Set(recebidas.filter((r) => periodoIds.has(r.conversa_id as string)).map((r) => r.conversa_id as string));
+      // P1: conversa com inbound NO PERÍODO (por mensagem), independentemente da data de criação da conversa
+      const comEntrada = new Set(recebidas.map((r) => r.conversa_id as string));
       const atendidasPeriodo = [...comEntrada].filter((id) => respSet.has(id)).length;
       const semResposta = [...comEntrada].filter((id) => !respSet.has(id)).length;
       const primeiraRespostaMin = tempoMedioPrimeiraResposta(
@@ -350,7 +360,7 @@ export function useAtendimento(f: RelFiltros, enabled: boolean) {
 }
 
 /* ====================== Equipe (atendimento × comercial) ====================== */
-export interface LinhaComercial { id: string; nome: string; leads: number; oppAndamento: number; oppGanho: number; oppPerdido: number; taxaConversao: number; receitaContratada: number; receitaRecebida: number; }
+export interface LinhaComercial { id: string; nome: string; leads: number; oppAndamento: number; oppGanho: number; oppPerdido: number; clientesFechados: number; negociosFechados: number; taxaConversao: number; receitaContratada: number; receitaRecebida: number; }
 export interface LinhaAtend { id: string; nome: string; conversasRespondidas: number; mensagensEnviadas: number; conversasSemResposta: number; }
 export interface EquipeData { comercial: LinhaComercial[]; atendimento: LinhaAtend[]; atendimentoAtribuivel: boolean; }
 export function useEquipe(f: RelFiltros, enabled: boolean) {
@@ -366,18 +376,23 @@ export function useEquipe(f: RelFiltros, enabled: boolean) {
       if (f.origem) qOp = qOp.eq('origem', f.origem);
       if (f.status) qOp = qOp.eq('status', f.status);
       if (f.conexao) qOp = qOp.eq('canal_origem_id', f.conexao);
-      const [us, ct, op, cb, ms, cvv, mi] = await Promise.all([
+      // P2/P5: oportunidades GANHAS fechadas no período (por fechado_em) + responsável da opp e do contato (p/ fallback)
+      let qOpFech = supabase!.from('oportunidades').select('contato_id, responsavel_id, contato:contatos(responsavel_id)').eq('organizacao_id', org).eq('status', 'ganho').gte('fechado_em', p.iniISO).lt('fechado_em', p.fimISO).abortSignal(signal!);
+      if (f.coluna) qOpFech = qOpFech.eq('coluna_id', f.coluna);
+      if (f.origem) qOpFech = qOpFech.eq('origem', f.origem);
+      if (f.conexao) qOpFech = qOpFech.eq('canal_origem_id', f.conexao);
+      const [us, ct, op, opf, cb, ms, cvv, mi] = await Promise.all([
         supabase!.from('organizacao_usuarios').select('usuarios(id, nome)').eq('organizacao_id', org).eq('status', 'ativo').abortSignal(signal!),
-        qCt, qOp,
+        qCt, qOp, fetchAll(() => qOpFech).then(wrapRows),
         supabase!.from('cobrancas').select('id, responsavel_id, criado_por, valor_mensal, ciclos_totais, status').eq('organizacao_id', org).abortSignal(signal!),
         fetchAll(() => supabase!.from('mensagens').select('autor_id, conversa_id').eq('organizacao_id', org).eq('direcao', 'saida').not('autor_id', 'is', null).gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).abortSignal(signal!)).then(wrapRows),
-        // conversas do período + responsável do contato (p/ "sem resposta" por atendente)
-        supabase!.from('conversas').select('id, contato:contatos(responsavel_id)').eq('organizacao_id', org).gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).abortSignal(signal!),
+        // P1: TODAS as conversas + responsável do contato (mapear "sem resposta" independentemente da criação da conversa)
+        fetchAll(() => supabase!.from('conversas').select('id, contato:contatos(responsavel_id)').eq('organizacao_id', org).abortSignal(signal!)).then(wrapRows),
         fetchAll(() => supabase!.from('mensagens').select('conversa_id').eq('organizacao_id', org).eq('direcao', 'entrada').gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).abortSignal(signal!)).then(wrapRows),
       ]);
-      for (const r of [us, ct, op, cb, ms, cvv, mi]) if (r.error) throw new Error(r.error.message);
+      for (const r of [us, ct, op, opf, cb, ms, cvv, mi]) if (r.error) throw new Error(r.error.message);
       const com = new Map<string, LinhaComercial>(); const at = new Map<string, LinhaAtend>();
-      for (const r of (us.data as Row[]) ?? []) { const u = one(r.usuarios); if (!u) continue; const id = u.id as string, nome = u.nome as string; com.set(id, { id, nome, leads: 0, oppAndamento: 0, oppGanho: 0, oppPerdido: 0, taxaConversao: 0, receitaContratada: 0, receitaRecebida: 0 }); at.set(id, { id, nome, conversasRespondidas: 0, mensagensEnviadas: 0, conversasSemResposta: 0 }); }
+      for (const r of (us.data as Row[]) ?? []) { const u = one(r.usuarios); if (!u) continue; const id = u.id as string, nome = u.nome as string; com.set(id, { id, nome, leads: 0, oppAndamento: 0, oppGanho: 0, oppPerdido: 0, clientesFechados: 0, negociosFechados: 0, taxaConversao: 0, receitaContratada: 0, receitaRecebida: 0 }); at.set(id, { id, nome, conversasRespondidas: 0, mensagensEnviadas: 0, conversasSemResposta: 0 }); }
       const getC = (id: string | null) => (id ? com.get(id) ?? null : null);
       for (const r of (ct.data as Row[]) ?? []) { const l = getC(r.responsavel_id as string); if (l) l.leads += 1; }
       for (const r of (op.data as Row[]) ?? []) { const l = getC(r.responsavel_id as string); if (!l) continue; if (r.status === 'em_andamento') l.oppAndamento += 1; else if (r.status === 'ganho') l.oppGanho += 1; else if (r.status === 'perdido') l.oppPerdido += 1; }
@@ -387,16 +402,30 @@ export function useEquipe(f: RelFiltros, enabled: boolean) {
       const convPorAutor = new Map<string, Set<string>>();
       for (const r of msgs) { const a = r.autor_id as string; const l = at.get(a); if (!l) continue; l.mensagensEnviadas += 1; const set = convPorAutor.get(a) || new Set<string>(); set.add(r.conversa_id as string); convPorAutor.set(a, set); }
       for (const [a, set] of convPorAutor) { const l = at.get(a); if (l) l.conversasRespondidas = set.size; }
-      // conversas sem resposta por atendente: conversa com inbound e sem resposta humana, atribuída ao responsável do contato
+      // conversa → responsável do contato (TODAS as conversas — P1, independe da criação da conversa)
+      const convResp = new Map<string, string | null>();
+      for (const r of (cvv.data as Row[]) ?? []) { const cont = one(r.contato) as { responsavel_id?: string | null } | null; convResp.set(r.id as string, cont?.responsavel_id ?? null); }
+      // conversas sem resposta por atendente: conversa com inbound NO PERÍODO e sem resposta humana, atribuída ao responsável do contato
       const respondidas = new Set(msgs.map((r) => r.conversa_id as string));
       const comEntrada = new Set(((mi.data as Row[]) ?? []).map((r) => r.conversa_id as string));
-      for (const r of (cvv.data as Row[]) ?? []) {
-        const id = r.id as string;
-        if (!comEntrada.has(id) || respondidas.has(id)) continue;
-        const cont = one(r.contato) as { responsavel_id?: string | null } | null;
-        const l = getC(cont?.responsavel_id ?? null);
+      for (const id of comEntrada) {
+        if (respondidas.has(id)) continue;
+        const l = getC(convResp.get(id) ?? null);
         if (l) at.get(l.id)!.conversasSemResposta += 1;
       }
+      // P5: clientes/negócios fechados por atendente (fechado_em) com fallback opp.responsavel → contato.responsavel (≡ conversa.atendente via trigger de sync)
+      const NAO_ATRIB = '__nao_atribuido__';
+      const fechClientes = new Map<string, Set<string>>(); const fechNegocios = new Map<string, number>();
+      for (const r of (opf.data as Row[]) ?? []) {
+        const cont = one(r.contato) as { responsavel_id?: string | null } | null;
+        const resp = (r.responsavel_id as string) || (cont?.responsavel_id ?? null);
+        const key = resp && com.has(resp) ? resp : NAO_ATRIB;
+        const cid = r.contato_id as string;
+        if (!fechClientes.has(key)) fechClientes.set(key, new Set());
+        if (cid) fechClientes.get(key)!.add(cid);
+        fechNegocios.set(key, (fechNegocios.get(key) || 0) + 1);
+      }
+      for (const [id, l] of com) { l.clientesFechados = fechClientes.get(id)?.size ?? 0; l.negociosFechados = fechNegocios.get(id) ?? 0; }
       const atendimentoAtribuivel = msgs.length > 0;
       // receita recebida por responsável (parcelas pagas no período)
       const cobRows = (cb.data as Row[]) ?? [];
@@ -404,9 +433,15 @@ export function useEquipe(f: RelFiltros, enabled: boolean) {
       const { data: pg, error: epg } = await supabase!.from('cobranca_pagamentos').select('cobranca_id, valor_pago').eq('organizacao_id', org).eq('status', 'paga').gte('data_pagamento', p.iniDate).lt('data_pagamento', p.fimDate).abortSignal(signal!);
       if (epg) throw new Error(epg.message);
       for (const r of (pg as Row[]) ?? []) { const l = getC(respByCob.get(r.cobranca_id as string) || null); if (l) l.receitaRecebida += num(r.valor_pago); }
-      for (const l of com.values()) { const fech = l.oppGanho + l.oppPerdido; l.taxaConversao = fech === 0 ? 0 : (l.oppGanho / fech) * 100; }
+      // P3: taxa por atendente = clientes fechados ÷ contatos atribuídos
+      for (const l of com.values()) { l.taxaConversao = l.leads === 0 ? 0 : (l.clientesFechados / l.leads) * 100; }
       const filtroResp = (id: string) => !f.responsavel || f.responsavel === id;
-      return { comercial: [...com.values()].filter((l) => filtroResp(l.id)), atendimento: [...at.values()].filter((l) => filtroResp(l.id)), atendimentoAtribuivel };
+      const comercial = [...com.values()].filter((l) => filtroResp(l.id));
+      // linha "Não atribuído" p/ reconciliar fechamentos sem responsável (só na visão geral)
+      if (!f.responsavel && ((fechClientes.get(NAO_ATRIB)?.size ?? 0) > 0 || (fechNegocios.get(NAO_ATRIB) ?? 0) > 0)) {
+        comercial.push({ id: NAO_ATRIB, nome: 'Não atribuído', leads: 0, oppAndamento: 0, oppGanho: 0, oppPerdido: 0, clientesFechados: fechClientes.get(NAO_ATRIB)?.size ?? 0, negociosFechados: fechNegocios.get(NAO_ATRIB) ?? 0, taxaConversao: 0, receitaContratada: 0, receitaRecebida: 0 });
+      }
+      return { comercial, atendimento: [...at.values()].filter((l) => filtroResp(l.id)), atendimentoAtribuivel };
     },
   });
 }
@@ -499,8 +534,9 @@ export interface ConexaoLinha extends ConexaoIdent {
   chave: string; novosContatos: number; leadsRecebidos: number; leadsAnterior: number; conversas: number; conversasAtendidas: number; semResposta: number;
   // Métricas separadas (Etapa 1): pessoas reais que chamaram vs contatos criados (podem incluir outbound-only/duplicados).
   pessoasQueChamaram: number; contatosCriados: number; conversasRecebidas: number; msgsInbound: number; msgsOutbound: number; difContatosPessoas: number;
-  oportunidades: number; qualificados: number; fechados: number; perdidos: number; qualifFechados: number;
-  taxaAtendimento: number; taxaQualificacao: number; taxaConversao: number; convQualificados: number;
+  // fechados = CLIENTES distintos fechados no período (por fechado_em); negociosFechados = oportunidades ganhas (por fechado_em)
+  oportunidades: number; qualificados: number; fechados: number; negociosFechados: number; perdidos: number; qualifFechados: number;
+  taxaAtendimento: number; taxaQualificacao: number; taxaConversao: number; conversaoOportunidades: number; convQualificados: number;
   primeiraRespostaMin: number | null; tempoAteFechamentoDias: number | null;
   receitaPrevista: number; receitaRecebida: number; valoresAtraso: number; economia: number; economiaPreenchida: boolean; clientesPagantes: number; ticketMedio: number;
 }
@@ -512,7 +548,8 @@ export interface ConexaoInput {
   contatosComInbound: Set<string>; // contatos com ≥1 mensagem direcao='entrada' no período
   firstIn: { conversa: string; chip: string; t: number }[]; firstResp: { conversa: string; chip: string; t: number }[];
   outbound: { chip: string }[]; // toda mensagem direcao='saida' no período (p/ contagem por chip)
-  opps: { chip: string; status: string; qualificada: boolean; tempoFechDias: number | null }[];
+  opps: { chip: string; status: string; qualificada: boolean; tempoFechDias: number | null }[]; // oportunidades CRIADAS no período (criado_em)
+  fechamentos: { chip: string; contato: string }[]; // oportunidades GANHAS fechadas no período (fechado_em) — P2/P4
   parcelas: { chip: string; contato: string; status: string; valor: number; valorPago: number | null; dataPrevista: string | null; dataPagamento: string | null }[];
   economiaPorChip: Record<string, { total: number; preenchida: boolean }>;
   iniDate: string; fimDate: string; prevIniDate: string; hoje: string;
@@ -550,11 +587,15 @@ export function montaLinhasConexao(inp: ConexaoInput): ConexaoLinha[] {
     const prMin = tempoMedioPrimeiraResposta(inp.firstIn.filter((x) => x.chip === chave).map((x) => ({ c: x.conversa, t: x.t })), inp.firstResp.filter((x) => x.chip === chave).map((x) => ({ c: x.conversa, t: x.t })));
     const ops = inp.opps.filter((o) => o.chip === chave);
     const oportunidades = ops.length;
-    const fechados = ops.filter((o) => o.status === 'ganho').length;
+    const oppsGanhasCriadas = ops.filter((o) => o.status === 'ganho').length; // p/ "Conversão de oportunidades" (detalhe)
     const perdidos = ops.filter((o) => o.status === 'perdido').length;
     const qualificados = ops.filter((o) => o.qualificada).length;
     const qualifFechados = ops.filter((o) => o.qualificada && o.status === 'ganho').length;
     const tf = ops.map((o) => o.tempoFechDias).filter((v): v is number => v != null);
+    // Clientes fechados (P2/P4): oportunidades GANHAS fechadas no período (fechado_em); cliente distinto vs negócio
+    const fech = inp.fechamentos.filter((o) => o.chip === chave);
+    const negociosFechados = fech.length;
+    const fechados = new Set(fech.map((o) => o.contato)).size; // CLIENTES distintos
     const par = inp.parcelas.filter((p) => p.chip === chave);
     const receitaRecebida = par.filter((p) => p.status === 'paga' && p.dataPagamento && inRange(p.dataPagamento, inp.iniDate, inp.fimDate)).reduce((s, p) => s + (p.valorPago || 0), 0);
     const receitaPrevista = par.filter((p) => p.status !== 'cancelada' && p.dataPrevista && inRange(p.dataPrevista, inp.iniDate, inp.fimDate)).reduce((s, p) => s + (p.valor || 0), 0);
@@ -566,8 +607,9 @@ export function montaLinhasConexao(inp: ConexaoInput): ConexaoLinha[] {
       novosContatos: novos, leadsRecebidos: novos, leadsAnterior: leadsAnt,
       pessoasQueChamaram, contatosCriados: novos, conversasRecebidas, msgsInbound, msgsOutbound, difContatosPessoas: novos - pessoasQueChamaram,
       conversas, conversasAtendidas: atendidas, semResposta: semResp,
-      oportunidades, qualificados, fechados, perdidos, qualifFechados,
-      taxaAtendimento: r1(atendidas, comEnt.length), taxaQualificacao: r1(qualificados, oportunidades), taxaConversao: r1(fechados, novos), convQualificados: r1(qualifFechados, qualificados),
+      oportunidades, qualificados, fechados, negociosFechados, perdidos, qualifFechados,
+      // P3: taxa principal = clientes fechados ÷ pessoas que chamaram; conversão de oportunidades fica separada (detalhe)
+      taxaAtendimento: r1(atendidas, comEnt.length), taxaQualificacao: r1(qualificados, oportunidades), taxaConversao: r1(fechados, pessoasQueChamaram), conversaoOportunidades: r1(oppsGanhasCriadas, oportunidades), convQualificados: r1(qualifFechados, qualificados),
       primeiraRespostaMin: prMin, tempoAteFechamentoDias: tf.length ? tf.reduce((a, b) => a + b, 0) / tf.length : null,
       receitaPrevista, receitaRecebida, valoresAtraso, economia: ec.total, economiaPreenchida: ec.preenchida,
       clientesPagantes: pagantes.size, ticketMedio: pagantes.size ? receitaRecebida / pagantes.size : 0,
@@ -586,17 +628,20 @@ export function useConexoes(f: RelFiltros, enabled: boolean) {
   return useQuery({
     queryKey: ['rel-conexoes', org, chaveFiltros(f)], enabled: REL_REAL && enabled, staleTime: 60_000,
     queryFn: async ({ signal }): Promise<ConexaoLinha[]> => {
-      const [ct, cv, m, op, cb, pg, fc, cx] = await Promise.all([
+      const [ct, cv, m, op, opFech, cb, pg, fc, cx] = await Promise.all([
         fetchAll(() => supabase!.from('contatos').select('id, canal_origem_id, canal_origem_snapshot, criado_em, telefone').eq('organizacao_id', org).is('mesclado_em', null).abortSignal(signal!)).then(wrapRows),
-        fetchAll(() => supabase!.from('conversas').select('id, contato_id, criado_em').eq('organizacao_id', org).gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).abortSignal(signal!)).then(wrapRows),
+        // P1: TODAS as conversas da org (sem filtro de período) p/ mapear qualquer mensagem do período à sua conversa/contato
+        fetchAll(() => supabase!.from('conversas').select('id, contato_id').eq('organizacao_id', org).abortSignal(signal!)).then(wrapRows),
         fetchAll(() => supabase!.from('mensagens').select('conversa_id, direcao, tipo, autor_id, criado_em, enviada_em, recebida_em').eq('organizacao_id', org).gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).abortSignal(signal!)).then(wrapRows),
         fetchAll(() => supabase!.from('oportunidades').select('contato_id, status, coluna_id, criado_em, fechado_em').eq('organizacao_id', org).gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).abortSignal(signal!)).then(wrapRows),
+        // P2: oportunidades GANHAS fechadas no período (por fechado_em) → clientes/negócios fechados
+        fetchAll(() => supabase!.from('oportunidades').select('contato_id, fechado_em, criado_em').eq('organizacao_id', org).eq('status', 'ganho').gte('fechado_em', p.iniISO).lt('fechado_em', p.fimISO).abortSignal(signal!)).then(wrapRows),
         fetchAll(() => supabase!.from('cobrancas').select('id, contato_id, status, valor_economizado').eq('organizacao_id', org).abortSignal(signal!)).then(wrapRows),
         fetchAll(() => supabase!.from('cobranca_pagamentos').select('cobranca_id, status, valor, valor_pago, data_prevista, data_pagamento').eq('organizacao_id', org).abortSignal(signal!)).then(wrapRows),
         supabase!.from('funil_colunas').select('id, entrada').eq('organizacao_id', org),
         supabase!.from('canais').select('id, nome_interno, numero_conectado, origem_tipo, campanha, provider, gestor:usuarios(nome), fonte:fontes_aquisicao(nome)').eq('organizacao_id', org),
       ]);
-      for (const r of [ct, cv, m, op, cb, pg, fc, cx]) if (r.error) throw new Error(r.error.message);
+      for (const r of [ct, cv, m, op, opFech, cb, pg, fc, cx]) if (r.error) throw new Error(r.error.message);
       const canalIdent = new Map<string, ConexaoIdent>(); const evolutionIds = new Set<string>();
       for (const r of (cx.data as Row[]) ?? []) {
         const g = one(r.gestor), ft = one(r.fonte);
@@ -620,22 +665,28 @@ export function useConexoes(f: RelFiltros, enabled: boolean) {
         }
         return { id: r.id as string, chip, criadoEm: r.criado_em as string, tel: (r.telefone as string) ?? null };
       }).filter(Boolean)) as { id: string; chip: string; criadoEm: string; tel: string | null }[];
+      // mapa conversa → chip/contato de TODAS as conversas (P1: independe da data de criação da conversa)
       const convChip = new Map<string, string>(); const convContato = new Map<string, string>();
-      const conversas = (((cv.data as Row[]) ?? []).map((r) => { const chip = contatoChip.get(r.contato_id as string); if (!chip) return null; convChip.set(r.id as string, chip); convContato.set(r.id as string, r.contato_id as string); return { id: r.id as string, chip, criadoEm: r.criado_em as string }; }).filter(Boolean)) as { id: string; chip: string; criadoEm: string }[];
-      const convValidas = new Set(conversas.map((c) => c.id));
-      const msgs = ((m.data as Row[]) ?? []).filter((r) => convValidas.has(r.conversa_id as string));
-      const recebidas = msgs.filter((r) => r.direcao === 'entrada');
-      const respHumanas = msgs.filter((r) => r.direcao === 'saida' && r.tipo !== 'sistema' && r.tipo !== 'nota_interna' && r.autor_id != null);
-      // toda saída real (exclui sistema/nota interna) — mensagens outbound por chip
-      const saidas = msgs.filter((r) => r.direcao === 'saida' && r.tipo !== 'sistema' && r.tipo !== 'nota_interna');
-      const outbound = saidas.map((r) => ({ chip: convChip.get(r.conversa_id as string) || 'sem' }));
-      const comEntrada = new Set(recebidas.map((r) => r.conversa_id as string));
-      // contatos com ≥1 inbound real no período (via conversa → contato)
+      for (const r of (cv.data as Row[]) ?? []) { const chip = contatoChip.get(r.contato_id as string); if (!chip) continue; convChip.set(r.id as string, chip); convContato.set(r.id as string, r.contato_id as string); }
+      // P1: mensagens são filtradas SÓ por mensagens.criado_em no período (já na query); mapeiam-se à conversa/contato via os mapas acima
+      const msgs = (m.data as Row[]) ?? [];
+      const recebidas = msgs.filter((r) => r.direcao === 'entrada' && convChip.has(r.conversa_id as string));
+      const respHumanas = msgs.filter((r) => r.direcao === 'saida' && r.tipo !== 'sistema' && r.tipo !== 'nota_interna' && r.autor_id != null && convChip.has(r.conversa_id as string));
+      const saidas = msgs.filter((r) => r.direcao === 'saida' && r.tipo !== 'sistema' && r.tipo !== 'nota_interna' && convChip.has(r.conversa_id as string));
+      const outbound = saidas.map((r) => ({ chip: convChip.get(r.conversa_id as string)! }));
+      // conversas com inbound NO PERÍODO (distintas) — base das métricas de conversa
+      const convComInbound = new Map<string, string>();
+      for (const r of recebidas) convComInbound.set(r.conversa_id as string, convChip.get(r.conversa_id as string)!);
+      const conversas = [...convComInbound].map(([id, chip]) => ({ id, chip, criadoEm: '' }));
+      const comEntrada = new Set(convComInbound.keys());
+      // contatos com ≥1 inbound real no período (via conversa → contato), independentemente da criação da conversa
       const contatosComInbound = new Set<string>();
       for (const r of recebidas) { const cid = convContato.get(r.conversa_id as string); if (cid) contatosComInbound.add(cid); }
       const resp = new Set(respHumanas.map((r) => r.conversa_id as string));
-      const firstIn = recebidas.map((r) => ({ conversa: r.conversa_id as string, chip: convChip.get(r.conversa_id as string) || 'sem', t: tms(r, 'recebida_em', 'criado_em') }));
-      const firstResp = respHumanas.map((r) => ({ conversa: r.conversa_id as string, chip: convChip.get(r.conversa_id as string) || 'sem', t: tms(r, 'enviada_em', 'criado_em') }));
+      const firstIn = recebidas.map((r) => ({ conversa: r.conversa_id as string, chip: convChip.get(r.conversa_id as string)!, t: tms(r, 'recebida_em', 'criado_em') }));
+      const firstResp = respHumanas.map((r) => ({ conversa: r.conversa_id as string, chip: convChip.get(r.conversa_id as string)!, t: tms(r, 'enviada_em', 'criado_em') }));
+      // P2: fechamentos (ganho por fechado_em) mapeados ao chip via contato; contatos mesclados/não-WhatsApp ficam de fora (sem chip)
+      const fechamentos = (((opFech.data as Row[]) ?? []).map((r) => { const chip = contatoChip.get(r.contato_id as string); return chip ? { chip, contato: r.contato_id as string } : null; }).filter(Boolean)) as { chip: string; contato: string }[];
       const opps = (((op.data as Row[]) ?? []).map((r) => {
         const chip = contatoChip.get(r.contato_id as string); if (!chip) return null;
         const col = r.coluna_id as string | null;
@@ -646,7 +697,7 @@ export function useConexoes(f: RelFiltros, enabled: boolean) {
       const cobChip = new Map<string, string>(); const economiaPorChip: Record<string, { total: number; preenchida: boolean }> = {};
       for (const r of (cb.data as Row[]) ?? []) { const chip = contatoChip.get(r.contato_id as string); if (!chip) continue; cobChip.set(r.id as string, chip); const cur = economiaPorChip[chip] || { total: 0, preenchida: false }; if (r.valor_economizado != null) { cur.preenchida = true; cur.total += num(r.valor_economizado); } economiaPorChip[chip] = cur; }
       const parcelas = ((pg.data as Row[]) ?? []).map((r) => { const chip = cobChip.get(r.cobranca_id as string); return chip ? { chip, contato: r.cobranca_id as string, status: r.status as string, valor: num(r.valor), valorPago: r.valor_pago == null ? null : num(r.valor_pago), dataPrevista: (r.data_prevista as string) ?? null, dataPagamento: (r.data_pagamento as string) ?? null } : null; }).filter(Boolean) as ConexaoInput['parcelas'];
-      return montaLinhasConexao({ contatos, identidade, conversas, comEntrada, resp, contatosComInbound, firstIn, firstResp, outbound, opps, parcelas, economiaPorChip, iniDate: p.iniDate, fimDate: p.fimDate, prevIniDate: p.prevIniDate, hoje: spHoje() });
+      return montaLinhasConexao({ contatos, identidade, conversas, comEntrada, resp, contatosComInbound, firstIn, firstResp, outbound, opps, fechamentos, parcelas, economiaPorChip, iniDate: p.iniDate, fimDate: p.fimDate, prevIniDate: p.prevIniDate, hoje: spHoje() });
     },
   });
 }

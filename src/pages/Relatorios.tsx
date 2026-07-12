@@ -292,7 +292,7 @@ function AbaResumo({ f, periodoLabel, orgNome, ehAtendente }: { f: RelFiltros; p
     const atMap = new Map(eq.data.atendimento.map((a) => [a.id, a]));
     return eq.data.comercial.map((c) => ({
       nome: c.nome, contatos: c.leads, trabalhadas: c.oppAndamento + c.oppGanho + c.oppPerdido,
-      fechados: c.oppGanho, taxaConversao: c.taxaConversao,
+      fechados: c.clientesFechados, taxaConversao: c.taxaConversao,
       mensagensEnviadas: atMap.get(c.id)?.mensagensEnviadas ?? 0,
       semResposta: atMap.get(c.id)?.conversasSemResposta ?? 0,
       receitaRecebida: c.receitaRecebida,
@@ -310,8 +310,8 @@ function AbaResumo({ f, periodoLabel, orgNome, ehAtendente }: { f: RelFiltros; p
         {/* Bloco 1 — cards executivos */}
         <div className="kpis">
           <KpiCard hero label="Pessoas que chamaram" k={cx.data ? flat(pessoasTotal) : null} sentido="maior" fmt={fmtInt} nota="No período" tooltip="Pessoas únicas com ≥1 mensagem recebida (inbound) no período, deduplicadas por telefone (ignora 9º dígito/DDI). Não inclui contatos que só receberam mensagem nossa (outbound)." />
-          <KpiCard hero label="Clientes fechados" k={q.data.oportunidadesFechadas} sentido="maior" fmt={fmtInt} tooltip="Oportunidades ganhas (do conjunto criado no período)." />
-          <KpiCard hero label="Taxa de conversão" k={q.data.conversaoComercial} sentido="maior" fmt={fmtPct} tooltip="Oportunidades ganhas ÷ criadas, mesmo período." />
+          <KpiCard hero label="Clientes fechados" k={q.data.oportunidadesFechadas} sentido="maior" fmt={fmtInt} tooltip="Clientes (contatos distintos) com oportunidade ganha FECHADA no período (por fechado_em). Não conta o mesmo cliente duas vezes." />
+          <KpiCard hero label="Taxa de conversão" k={cx.data ? flat(pessoasTotal > 0 ? (q.data.oportunidadesFechadas.atual / pessoasTotal) * 100 : 0) : null} sentido="maior" fmt={fmtPct} nota="Clientes ÷ pessoas" tooltip="Clientes fechados ÷ pessoas que chamaram no período." />
           <KpiCard hero label="Receita recebida" k={q.data.receitaRecebida} sentido="maior" fmt={fmtBRL} tooltip="Σ valor pago das parcelas pagas no período." />
           <KpiCard hero label="Valores em atraso" k={fin.data ? flat(fin.data.vencida) : flat(0)} sentido="menor" fmt={fmtBRL} nota="Posição atual" tooltip="Parcelas não pagas com vencimento anterior a hoje (posição atual, não comparada)." />
           <KpiCard hero label="Conversas sem resposta" k={at.data ? flat(at.data.semResposta) : null} sentido="menor" fmt={fmtInt} nota="No período" tooltip="Conversas com entrada e nenhuma resposta de operador no período." />
@@ -375,7 +375,7 @@ function AbaVendas({ f, periodoLabel, orgNome }: { f: RelFiltros; periodoLabel: 
       {q.data && <>
         <div className="kpis">
           <KpiCard label="Novas oportunidades" k={flat(q.data.totalOpp)} sentido="neutro" fmt={fmtInt} nota="No período" tooltip="Oportunidades criadas no período." />
-          <KpiCard label="Clientes fechados" k={flat(Math.round((q.data.taxaConversao / 100) * q.data.totalOpp))} sentido="neutro" fmt={fmtInt} nota="No período" tooltip="Oportunidades ganhas no período." />
+          <KpiCard label="Negócios fechados" k={flat(Math.round((q.data.taxaConversao / 100) * q.data.totalOpp))} sentido="neutro" fmt={fmtInt} nota="No período" tooltip="Oportunidades ganhas no período (por criação). Clientes distintos ficam no Resumo." />
           <KpiCard label="Clientes perdidos" k={flat(q.data.perdidos)} sentido="neutro" fmt={fmtInt} nota="No período" tooltip="Oportunidades com status perdido." />
           <KpiCard label="Conversão" k={flat(q.data.taxaConversao)} sentido="neutro" fmt={fmtPct} nota="No período" tooltip="Ganhas ÷ total de oportunidades criadas." />
         </div>
@@ -459,13 +459,15 @@ function SecaoConexoes({ f, periodoLabel, orgNome }: { f: RelFiltros; periodoLab
               { key: 'msgsInbound', label: 'Msgs inbound', align: 'c' },
               { key: 'conversasAtendidas', label: 'Atendidas', align: 'c' },
               { key: 'semResposta', label: 'Sem resp.', align: 'c' },
-              { key: 'oportunidades', label: 'Oport.', align: 'c' },
+              { key: 'oportunidades', label: 'Oport. criadas', align: 'c' },
               { key: 'qualificados', label: 'Qualific.', align: 'c' },
-              { key: 'fechados', label: 'Fechados', align: 'c' },
+              { key: 'fechados', label: 'Clientes fechados', align: 'c' },
+              { key: 'negociosFechados', label: 'Negócios fechados', align: 'c' },
               { key: 'perdidos', label: 'Perdidos', align: 'c' },
               { key: 'taxaAtendimento', label: 'Tx atend.', align: 'c', fmt: (v) => fmtPct(v as number), csv: (r) => (r.taxaAtendimento as number).toFixed(1) },
               { key: 'taxaQualificacao', label: 'Tx qualif.', align: 'c', fmt: (v) => fmtPct(v as number), csv: (r) => (r.taxaQualificacao as number).toFixed(1) },
-              { key: 'taxaConversao', label: 'Tx conv.', align: 'c', fmt: (v) => fmtPct(v as number), csv: (r) => (r.taxaConversao as number).toFixed(1) },
+              { key: 'taxaConversao', label: 'Tx conv. (cli/pess)', align: 'c', fmt: (v) => fmtPct(v as number), csv: (r) => (r.taxaConversao as number).toFixed(1) },
+              { key: 'conversaoOportunidades', label: 'Conv. oport.', align: 'c', fmt: (v) => fmtPct(v as number), csv: (r) => (r.conversaoOportunidades as number).toFixed(1) },
               { key: 'primeiraRespostaMin', label: '1ª resposta', align: 'c', fmt: (v) => fmtMin(v as number | null), csv: (r) => (r.primeiraRespostaMin == null ? '' : Math.round(r.primeiraRespostaMin as number).toString()) },
               { key: 'tempoAteFechamentoDias', label: 'Até fechar (d)', align: 'c', fmt: (v) => (v == null ? '—' : (v as number).toFixed(1)), csv: (r) => (r.tempoAteFechamentoDias == null ? '' : (r.tempoAteFechamentoDias as number).toFixed(1)) },
               { key: 'receitaPrevista', label: 'Rec. prevista', align: 'r', fmt: (v) => fmtBRL(v as number), csv: (r) => (r.receitaPrevista as number).toFixed(2) },
