@@ -7,8 +7,8 @@ import { useAuth } from '@/context/AuthContext';
 import {
   REL_REAL, PRESETS, type Preset, type RelFiltros, FILTROS_PADRAO, resolvePeriodo, type Kpi,
   useRelatorioOpcoes, useResumo, useComercial, useAtendimento, useEquipe, useFinanceiro, useOrigens,
-  useConexoes, melhorConexao, type ConexaoLinha,
-  exportarCSV, spHoje, type ResumoData, type AtendimentoData, type ComercialData, type FinanceiroData,
+  useConexoes, type ConexaoLinha,
+  exportarCSV, spHoje,
 } from '@/data/relatorios';
 import './Relatorios.css';
 
@@ -175,27 +175,15 @@ function DataTable<T extends Record<string, unknown>>({ cols, rows, searchKeys, 
   );
 }
 
-/* ===== narrativa determinística ===== */
-function frasesResumo(r: ResumoData, a?: AtendimentoData, f?: FinanceiroData): string[] {
-  const out: string[] = [];
-  out.push(`${pl(r.novosContatos.atual, 'novo contato foi cadastrado', 'novos contatos foram cadastrados')} no período.`);
-  const fech = r.oportunidadesFechadas.atual;
-  out.push(`${pl(r.oportunidadesCriadas.atual, 'oportunidade foi criada', 'oportunidades foram criadas')} e ${fech === 0 ? 'nenhum cliente foi fechado' : pl(fech, 'cliente foi fechado', 'clientes foram fechados')}.`);
-  if (a) out.push(`A equipe recebeu ${pl(a.msgRecebidas, 'mensagem', 'mensagens')} e enviou ${pl(a.msgEnviadas, 'resposta', 'respostas')}.`);
-  out.push(r.receitaRecebida.atual > 0 ? `Entraram ${fmtBRL(r.receitaRecebida.atual)} em recebimentos.` : 'Não houve receita recebida no período.');
-  if (f && f.parCanceladas > 0) out.push(`Existem ${pl(f.parCanceladas, 'parcela cancelada', 'parcelas canceladas')}.`);
-  out.push(r.economiaPreenchida ? `A economia gerada foi de ${fmtBRL(r.economiaGerada?.atual || 0)}.` : 'A economia gerada ainda não pode ser calculada porque os valores não foram preenchidos.');
-  return out;
-}
-function pontosAtencao(r: ResumoData, a?: AtendimentoData, c?: ComercialData, f?: FinanceiroData): { txt: string; ok?: boolean }[] {
-  const out: { txt: string; ok?: boolean }[] = [];
-  if (a && a.semResposta > 0) out.push({ txt: `${pl(a.semResposta, 'conversa ficou sem resposta', 'conversas ficaram sem resposta')} no período.` });
-  if (c && c.paradasMais7d > 0) out.push({ txt: `${pl(c.paradasMais7d, 'oportunidade está parada', 'oportunidades estão paradas')} há mais de 7 dias.` });
-  if (f && f.vencida > 0) out.push({ txt: `Há ${fmtBRL(f.vencida)} em parcelas vencidas e não pagas.` });
-  if (r.conversaoComercial.deltaAbs < 0) out.push({ txt: 'A taxa de conversão caiu em relação ao período anterior.' });
-  if (!r.economiaPreenchida) out.push({ txt: 'A economia gerada não está preenchida nas cobranças.' });
-  if (out.length === 0) out.push({ txt: 'Nenhum ponto crítico identificado no período.', ok: true });
-  return out;
+/* ===== card compacto de gargalo (operacional) ===== */
+function GargCard({ titulo, valor, sub, alerta }: { titulo: string; valor: string; sub: string; alerta?: boolean }) {
+  return (
+    <div className={'garg' + (alerta ? ' garg-al' : '')}>
+      <div className="garg-t">{titulo}</div>
+      <div className="garg-v">{valor}</div>
+      <div className="garg-s">{sub}</div>
+    </div>
+  );
 }
 
 /* ===== abas ===== */
@@ -275,7 +263,7 @@ export function Relatorios() {
           Período: <b style={{ color: 'var(--ink-2)' }}>{periodo.label}</b> · comparado a <b style={{ color: 'var(--ink-2)' }}>{periodo.prevLabel}</b> · {currentOrg.name}
         </div>
 
-        {aba === 'resumo' && <AbaResumo f={f} />}
+        {aba === 'resumo' && <AbaResumo f={f} periodoLabel={periodo.label} orgNome={currentOrg.name} ehAtendente={ehAtendente} />}
         {aba === 'vendas' && <AbaVendas f={f} periodoLabel={periodo.label} orgNome={currentOrg.name} />}
         {aba === 'atendimento' && <AbaAtendimento f={f} periodoLabel={periodo.label} orgNome={currentOrg.name} ehAtendente={ehAtendente} />}
         {aba === 'financeiro' && <AbaFinanceiro f={f} />}
@@ -285,39 +273,93 @@ export function Relatorios() {
   );
 }
 
-/* ============ Resumo ============ */
-function AbaResumo({ f }: { f: RelFiltros }) {
+/* ============ Resumo (visão executiva) ============ */
+function AbaResumo({ f, periodoLabel, orgNome, ehAtendente }: { f: RelFiltros; periodoLabel: string; orgNome: string; ehAtendente: boolean }) {
   const q = useResumo(f);
   const at = useAtendimento(f, true);
   const fin = useFinanceiro(f, true);
   const com = useComercial(f, true);
   const cx = useConexoes(f, true);
-  const melhor = melhorConexao(cx.data || []);
+  const eq = useEquipe(f, !ehAtendente);
+  const meta = [`Organizacao: ${orgNome}`, `Periodo: ${periodoLabel}`, `Gerado: ${new Date().toLocaleString('pt-BR')}`];
+
+  const pessoasTotal = (cx.data || []).reduce((s, l) => s + l.pessoasQueChamaram, 0);
+  // tabela por conexão: ordena Clientes fechados → Pessoas que chamaram → Taxa de conversão
+  const conexRows = (cx.data || []).filter((l) => l.chave !== 'sem')
+    .slice().sort((a, b) => b.fechados - a.fechados || b.pessoasQueChamaram - a.pessoasQueChamaram || b.taxaConversao - a.taxaConversao);
+  // tabela por atendente: junta carteira comercial + atendimento; ordena Fechados → Taxa → Contatos
+  const equipeRows = eq.data ? (() => {
+    const atMap = new Map(eq.data.atendimento.map((a) => [a.id, a]));
+    return eq.data.comercial.map((c) => ({
+      nome: c.nome, contatos: c.leads, trabalhadas: c.oppAndamento + c.oppGanho + c.oppPerdido,
+      fechados: c.oppGanho, taxaConversao: c.taxaConversao,
+      mensagensEnviadas: atMap.get(c.id)?.mensagensEnviadas ?? 0,
+      semResposta: atMap.get(c.id)?.conversasSemResposta ?? 0,
+      receitaRecebida: c.receitaRecebida,
+    })).sort((a, b) => b.fechados - a.fechados || b.taxaConversao - a.taxaConversao || b.contatos - a.contatos);
+  })() : [];
+
+  const semRespostaTotal = at.data?.semResposta ?? 0;
+  const paradas7d = com.data?.paradasMais7d ?? 0;
+  const canalBaixa = conexRows.filter((l) => l.oportunidades > 0).slice().sort((a, b) => a.taxaConversao - b.taxaConversao)[0];
+  const atendenteSobre = equipeRows.slice().sort((a, b) => b.contatos - a.contatos)[0];
+
   return (
     <Estado q={q}>
       {q.data && <>
+        {/* Bloco 1 — cards executivos */}
         <div className="kpis">
-          <KpiCard hero label="Pessoas que chamaram" k={cx.data ? flat(cx.data.reduce((s, l) => s + l.pessoasQueChamaram, 0)) : null} sentido="maior" fmt={fmtInt} nota="No período" tooltip="Pessoas únicas com ≥1 mensagem recebida (inbound) no período, deduplicadas por telefone (ignora 9º dígito/DDI). Não inclui contatos que só receberam mensagem nossa (outbound)." />
-          <KpiCard hero label="Novos contatos" k={q.data.novosContatos} sentido="maior" fmt={fmtInt} tooltip="Contatos criados no período (inclui outbound-only e possíveis duplicados) — não é o mesmo que pessoas que chamaram." />
+          <KpiCard hero label="Pessoas que chamaram" k={cx.data ? flat(pessoasTotal) : null} sentido="maior" fmt={fmtInt} nota="No período" tooltip="Pessoas únicas com ≥1 mensagem recebida (inbound) no período, deduplicadas por telefone (ignora 9º dígito/DDI). Não inclui contatos que só receberam mensagem nossa (outbound)." />
           <KpiCard hero label="Clientes fechados" k={q.data.oportunidadesFechadas} sentido="maior" fmt={fmtInt} tooltip="Oportunidades ganhas (do conjunto criado no período)." />
           <KpiCard hero label="Taxa de conversão" k={q.data.conversaoComercial} sentido="maior" fmt={fmtPct} tooltip="Oportunidades ganhas ÷ criadas, mesmo período." />
           <KpiCard hero label="Receita recebida" k={q.data.receitaRecebida} sentido="maior" fmt={fmtBRL} tooltip="Σ valor pago das parcelas pagas no período." />
           <KpiCard hero label="Valores em atraso" k={fin.data ? flat(fin.data.vencida) : flat(0)} sentido="menor" fmt={fmtBRL} nota="Posição atual" tooltip="Parcelas não pagas com vencimento anterior a hoje (posição atual, não comparada)." />
-          <KpiCard hero label="Economia gerada" k={q.data.economiaGerada} sentido="maior" fmt={fmtBRL} tooltip="Σ valor_economizado das cobranças. Indisponível enquanto não for preenchido." />
+          <KpiCard hero label="Conversas sem resposta" k={at.data ? flat(at.data.semResposta) : null} sentido="menor" fmt={fmtInt} nota="No período" tooltip="Conversas com entrada e nenhuma resposta de operador no período." />
         </div>
-        <div className="narr-grid">
-          <Panel title="Resumo do período" sub="Gerado a partir dos números calculados">
-            <ul className="narr">{frasesResumo(q.data, at.data, fin.data).map((s, i) => <li key={i}>{s}</li>)}</ul>
-          </Panel>
-          <Panel title="Pontos de atenção" sub="Situações reais detectadas">
-            <ul className="narr aten">{pontosAtencao(q.data, at.data, com.data, fin.data).map((p, i) => <li key={i} className={p.ok ? 'ok' : ''}>{p.txt}</li>)}</ul>
-          </Panel>
+
+        {/* Bloco 2 — desempenho por número/conexão (protagonista) */}
+        <div className="sech">Desempenho por número / conexão <span className="sech-sub">· por conexão de aquisição</span></div>
+        <Estado q={cx}>{conexRows.length === 0 ? <Vazio titulo="Sem conexões com resultado no período" /> : <DataTable
+          cols={[
+            { key: 'nome', label: 'Número / Conexão', fmt: (_v, r) => conexRotulo(r as unknown as ConexaoLinha), csv: (r) => conexRotulo(r as unknown as ConexaoLinha) },
+            { key: 'pessoasQueChamaram', label: 'Pessoas que chamaram', align: 'c' },
+            { key: 'contatosCriados', label: 'Contatos criados', align: 'c' },
+            { key: 'oportunidades', label: 'Oportunidades', align: 'c' },
+            { key: 'fechados', label: 'Clientes fechados', align: 'c' },
+            { key: 'taxaConversao', label: 'Taxa de conversão', align: 'c', fmt: (v) => fmtPct(v as number), csv: (r) => (r.taxaConversao as number).toFixed(1) },
+            { key: 'msgsInbound', label: 'Mensagens inbound', align: 'c' },
+            { key: 'msgsOutbound', label: 'Mensagens outbound', align: 'c' },
+            { key: 'semResposta', label: 'Conversas sem resposta', align: 'c' },
+          ] as Col<Record<string, unknown>>[]}
+          rows={conexRows as unknown as Record<string, unknown>[]} searchKeys={['nome', 'numero']}
+          csvName={`resumo_conexoes_${periodoLabel.replace(/\D/g, '')}`} csvMeta={meta} />}</Estado>
+
+        {/* Bloco 3 — desempenho por atendente */}
+        {!ehAtendente && <>
+          <div className="sech" style={{ marginTop: 18 }}>Desempenho por atendente <span className="sech-sub">· por responsável</span></div>
+          <Estado q={eq}>{equipeRows.length === 0 ? <Vazio titulo="Sem atendentes com dados no período" /> : <DataTable
+            cols={[
+              { key: 'nome', label: 'Atendente' },
+              { key: 'contatos', label: 'Contatos atendidos', align: 'c' },
+              { key: 'trabalhadas', label: 'Oportunidades trabalhadas', align: 'c' },
+              { key: 'fechados', label: 'Clientes fechados', align: 'c' },
+              { key: 'taxaConversao', label: 'Taxa de conversão', align: 'c', fmt: (v) => fmtPct(v as number), csv: (r) => (r.taxaConversao as number).toFixed(1) },
+              { key: 'mensagensEnviadas', label: 'Mensagens enviadas', align: 'c' },
+              { key: 'semResposta', label: 'Conversas sem resposta', align: 'c' },
+              { key: 'receitaRecebida', label: 'Receita recebida', align: 'r', fmt: (v) => fmtBRL(v as number), csv: (r) => (r.receitaRecebida as number).toFixed(2) },
+            ] as Col<Record<string, unknown>>[]}
+            rows={equipeRows as unknown as Record<string, unknown>[]} searchKeys={['nome']}
+            csvName={`resumo_atendentes_${periodoLabel.replace(/\D/g, '')}`} csvMeta={meta} />}</Estado>
+        </>}
+
+        {/* Bloco 4 — gargalos operacionais */}
+        <div className="sech" style={{ marginTop: 18 }}>Gargalos e alertas <span className="sech-sub">· operacional</span></div>
+        <div className="garg-grid">
+          <GargCard titulo="Conversas sem resposta" valor={fmtInt(semRespostaTotal)} sub="Precisam de retorno" alerta={semRespostaTotal > 0} />
+          <GargCard titulo="Oportunidades paradas" valor={fmtInt(paradas7d)} sub="Há mais de 7 dias sem atualização" alerta={paradas7d > 0} />
+          <GargCard titulo="Canal com baixa conversão" valor={canalBaixa ? `${conexRotulo(canalBaixa)}` : '—'} sub={canalBaixa ? `Conversão de ${fmtPct(canalBaixa.taxaConversao)}` : 'Sem dados'} alerta={!!canalBaixa && canalBaixa.taxaConversao < 5} />
+          <GargCard titulo="Atendente sobrecarregado" valor={atendenteSobre ? atendenteSobre.nome : '—'} sub={atendenteSobre ? `${fmtInt(atendenteSobre.contatos)} contatos na carteira` : 'Sem dados'} />
         </div>
-        <Panel title="Melhor conexão do período" sub="Conexão de WhatsApp com mais pessoas que chamaram">
-          {melhor && melhor.pessoasQueChamaram > 0
-            ? <div className="compact-stat" style={{ gap: 18, flexWrap: 'wrap' }}><span className="cs-v">{conexRotulo(melhor)}</span><span className="cs-l">{fmtInt(melhor.pessoasQueChamaram)} pessoas · {fmtInt(melhor.fechados)} fechados · {fmtPct(melhor.taxaConversao)} conversão</span></div>
-            : <Vazio titulo="Sem pessoas que chamaram no período" texto="Pessoas são atribuídas à conexão de aquisição do contato." />}
-        </Panel>
       </>}
     </Estado>
   );
@@ -350,8 +392,6 @@ function AbaVendas({ f, periodoLabel, orgNome }: { f: RelFiltros; periodoLabel: 
         <Panel title="Novas oportunidades por dia" sub="Oportunidades criadas">
           {q.data.leadsSerie.length < 2 ? <Vazio titulo="Dados insuficientes para a curva" texto={`No período: ${pl(q.data.totalOpp, 'oportunidade criada', 'oportunidades criadas')}.`} /> : <LineChart pts={q.data.leadsSerie} compact />}
         </Panel>
-
-        <SecaoConexoes f={f} periodoLabel={periodoLabel} orgNome={orgNome} />
 
         <div className="sech" style={{ marginTop: 6 }}>Origens dos leads</div>
         <Estado q={or}>{or.data && (or.data.length === 0
@@ -526,11 +566,11 @@ function AbaFinanceiro({ f }: { f: RelFiltros }) {
 
 /* ============ Detalhamento (seletor interno) ============ */
 function AbaDetalhamento({ f, periodoLabel, orgNome, ehAtendente, onNav }: { f: RelFiltros; periodoLabel: string; orgNome: string; ehAtendente: boolean; onNav: (p: string) => void }) {
-  const [sel, setSel] = useState<'carteira' | 'origem'>('carteira');
+  const [sel, setSel] = useState<'carteira' | 'origem' | 'conexoes'>('carteira');
   const eq = useEquipe(f, !ehAtendente && sel === 'carteira');
   const or = useOrigens(f, sel === 'origem');
   const meta = [`Organizacao: ${orgNome}`, `Periodo: ${periodoLabel}`, `Gerado: ${new Date().toLocaleString('pt-BR')}`];
-  const opcoesSel: { id: 'carteira' | 'origem'; r: string }[] = [{ id: 'carteira', r: 'Por responsável' }, { id: 'origem', r: 'Por origem' }];
+  const opcoesSel: { id: 'carteira' | 'origem' | 'conexoes'; r: string }[] = [{ id: 'carteira', r: 'Por responsável' }, { id: 'conexoes', r: 'Por conexão' }, { id: 'origem', r: 'Por origem' }];
   return (
     <>
       <div className="det-sel">{opcoesSel.filter((o) => !(o.id === 'carteira' && ehAtendente)).map((o) => <button key={o.id} className={sel === o.id ? 'on' : ''} onClick={() => setSel(o.id)}>{o.r}</button>)}</div>
@@ -543,6 +583,7 @@ function AbaDetalhamento({ f, periodoLabel, orgNome, ehAtendente, onNav }: { f: 
         ] as Col<Record<string, unknown>>[]}
         rows={eq.data.comercial as unknown as Record<string, unknown>[]} searchKeys={['nome']}
         csvName={`detalhe_carteira_${periodoLabel.replace(/\D/g, '')}`} csvMeta={meta} />}</Estado>}
+      {sel === 'conexoes' && <SecaoConexoes f={f} periodoLabel={periodoLabel} orgNome={orgNome} />}
       {sel === 'origem' && <Estado q={or}>{or.data && <DataTable
         cols={[
           { key: 'origem', label: 'Origem' }, { key: 'leads', label: 'Leads', align: 'c' },
