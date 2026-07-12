@@ -129,7 +129,7 @@ const toParcela = (r: Row): ParcelaLite => ({ status: r.status as string, valor:
 /** Contatos cuja conexão de aquisição = chip (para filtrar domínios ligados ao contato em 1 hop). */
 async function cidsConexao(org: string, conexao: string | undefined, signal: AbortSignal): Promise<Set<string> | null> {
   if (!conexao) return null;
-  const { data } = await supabase!.from('contatos').select('id').eq('organizacao_id', org).eq('canal_origem_id', conexao).abortSignal(signal);
+  const { data } = await supabase!.from('contatos').select('id').eq('organizacao_id', org).eq('canal_origem_id', conexao).is('mesclado_em', null).abortSignal(signal);
   return new Set(((data as Row[]) ?? []).map((r) => r.id as string));
 }
 
@@ -171,7 +171,7 @@ export function useResumo(f: RelFiltros) {
   return useQuery({
     queryKey: ['rel-resumo', org, chaveFiltros(f)], enabled: REL_REAL, staleTime: 60_000,
     queryFn: async ({ signal }): Promise<ResumoData> => {
-      let qContatos = supabase!.from('contatos').select('id, criado_em, origem, responsavel_id').eq('organizacao_id', org).gte('criado_em', p.prevIniISO).lt('criado_em', p.fimISO).abortSignal(signal!);
+      let qContatos = supabase!.from('contatos').select('id, criado_em, origem, responsavel_id').eq('organizacao_id', org).is('mesclado_em', null).gte('criado_em', p.prevIniISO).lt('criado_em', p.fimISO).abortSignal(signal!);
       if (f.responsavel) qContatos = qContatos.eq('responsavel_id', f.responsavel);
       if (f.origem) qContatos = qContatos.eq('origem', f.origem);
       if (f.conexao) qContatos = qContatos.eq('canal_origem_id', f.conexao);
@@ -337,7 +337,7 @@ export function useEquipe(f: RelFiltros, enabled: boolean) {
   return useQuery({
     queryKey: ['rel-equipe', org, chaveFiltros(f)], enabled: REL_REAL && enabled, staleTime: 60_000,
     queryFn: async ({ signal }): Promise<EquipeData> => {
-      let qCt = supabase!.from('contatos').select('responsavel_id, criado_em, origem').eq('organizacao_id', org).gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).abortSignal(signal!);
+      let qCt = supabase!.from('contatos').select('responsavel_id, criado_em, origem').eq('organizacao_id', org).is('mesclado_em', null).gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).abortSignal(signal!);
       if (f.origem) qCt = qCt.eq('origem', f.origem);
       if (f.conexao) qCt = qCt.eq('canal_origem_id', f.conexao);
       let qOp = supabase!.from('oportunidades').select('responsavel_id, status, criado_em, coluna_id, origem').eq('organizacao_id', org).gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).abortSignal(signal!);
@@ -551,7 +551,7 @@ export function useConexoes(f: RelFiltros, enabled: boolean) {
     queryKey: ['rel-conexoes', org, chaveFiltros(f)], enabled: REL_REAL && enabled, staleTime: 60_000,
     queryFn: async ({ signal }): Promise<ConexaoLinha[]> => {
       const [ct, cv, m, op, cb, pg, fc, cx] = await Promise.all([
-        supabase!.from('contatos').select('id, canal_origem_id, canal_origem_snapshot, criado_em, telefone').eq('organizacao_id', org).abortSignal(signal!),
+        supabase!.from('contatos').select('id, canal_origem_id, canal_origem_snapshot, criado_em, telefone').eq('organizacao_id', org).is('mesclado_em', null).abortSignal(signal!),
         supabase!.from('conversas').select('id, contato_id, criado_em').eq('organizacao_id', org).gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).abortSignal(signal!),
         supabase!.from('mensagens').select('conversa_id, direcao, tipo, autor_id, criado_em, enviada_em, recebida_em').eq('organizacao_id', org).gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).abortSignal(signal!),
         supabase!.from('oportunidades').select('contato_id, status, coluna_id, criado_em, fechado_em').eq('organizacao_id', org).gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).abortSignal(signal!),

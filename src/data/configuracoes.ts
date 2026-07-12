@@ -106,7 +106,7 @@ export function useContatosBuscaCfg(termo: string) {
     queryKey: ['cfg-contatos', currentOrg.id, termo], enabled: CFG_REAL && termo.trim().length >= 2,
     queryFn: async (): Promise<ContatoBusca[]> => {
       const t = termo.trim();
-      const { data, error } = await supabase!.from('contatos').select('id, nome, telefone').eq('organizacao_id', currentOrg.id).or(`nome.ilike.%${t}%,telefone.ilike.%${t}%`).limit(6);
+      const { data, error } = await supabase!.from('contatos').select('id, nome, telefone').eq('organizacao_id', currentOrg.id).is('mesclado_em', null).or(`nome.ilike.%${t}%,telefone.ilike.%${t}%`).limit(6);
       if (error) throw new Error(error.message);
       return (data as ContatoBusca[]) ?? [];
     },

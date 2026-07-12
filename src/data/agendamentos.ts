@@ -199,6 +199,7 @@ export function useContatosBusca(termo: string) {
       const t = termo.trim();
       const { data, error } = await supabase!.from('contatos')
         .select('id, nome, telefone').eq('organizacao_id', currentOrg.id)
+        .is('mesclado_em', null) // oculta contatos absorvidos por merge (soft-merge)
         .or(`nome.ilike.%${t}%,telefone.ilike.%${t}%`).limit(8);
       if (error) throw new Error(error.message);
       return (data as { id: string; nome: string; telefone: string | null }[]) ?? [];

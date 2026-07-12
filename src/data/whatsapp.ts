@@ -336,7 +336,7 @@ export function useIniciarConversaWa() {
         .select('contato_id').eq('organizacao_id', org).eq('tipo', 'whatsapp').eq('valor_normalizado', norm).maybeSingle();
       if (ident?.contato_id) contatoId = ident.contato_id as string;
       if (!contatoId) {
-        const { data: ct } = await supabase!.from('contatos').select('id').eq('organizacao_id', org).eq('telefone', norm).maybeSingle();
+        const { data: ct } = await supabase!.from('contatos').select('id').eq('organizacao_id', org).eq('telefone', norm).is('mesclado_em', null).maybeSingle();
         if (ct?.id) contatoId = ct.id as string;
       }
       // 2/3) conversa NÃO fechada existente no canal → reutiliza (não duplica)

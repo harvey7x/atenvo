@@ -128,6 +128,7 @@ export function useContatos() {
         .from('contatos')
         .select('id, nome, email, telefone, cpf, origem, etiquetas, observacoes, responsavel_id, criado_em, atualizado_em, responsavel:usuarios(nome)')
         .eq('organizacao_id', currentOrg.id)
+        .is('mesclado_em', null) // oculta contatos absorvidos por merge (soft-merge)
         .order('atualizado_em', { ascending: false });
       if (error) throw new Error(error.message);
       return ((data as unknown as DbContato[]) ?? []).map(mapRow);
@@ -151,6 +152,7 @@ export function useBuscaContatos(term: string) {
         .from('contatos')
         .select('id, nome, email, telefone, cpf, origem, etiquetas, observacoes, responsavel_id, criado_em, atualizado_em, responsavel:usuarios(nome)')
         .eq('organizacao_id', currentOrg.id)
+        .is('mesclado_em', null) // oculta contatos absorvidos por merge (soft-merge)
         .or(ors.join(','))
         .order('atualizado_em', { ascending: false })
         .limit(12);
