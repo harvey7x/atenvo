@@ -110,6 +110,7 @@ describe('montaLinhasConexao() — desempenho por chip', () => {
     contatosComInbound: new Set(['k1', 'k2', 'k3', 'k4', 'k5', 'kr']),
     firstIn: [{ conversa: 'c1a', chip: 'chip1', t: 1_000_000 }, { conversa: 'c2', chip: 'chip2', t: 1_000_000 }],
     firstResp: [{ conversa: 'c1a', chip: 'chip1', t: 1_600_000 }, { conversa: 'c2', chip: 'chip2', t: 2_200_000 }],
+    outbound: [{ chip: 'chip1' }, { chip: 'chip1' }, { chip: 'chip1' }, { chip: 'chip2' }, { chip: 'chip2' }],
     opps: [
       { chip: 'chip1', status: 'ganho', qualificada: true, tempoFechDias: 5 }, { chip: 'chip1', status: 'perdido', qualificada: true, tempoFechDias: null }, { chip: 'chip1', status: 'em_andamento', qualificada: false, tempoFechDias: null },
       { chip: 'chip2', status: 'ganho', qualificada: true, tempoFechDias: 3 }, { chip: 'chip2', status: 'ganho', qualificada: true, tempoFechDias: 4 },
@@ -138,6 +139,7 @@ describe('montaLinhasConexao() — desempenho por chip', () => {
     expect(c1.pessoasQueChamaram).toBe(3); expect(c2.pessoasQueChamaram).toBe(2);
     expect(c1.contatosCriados).toBe(3); expect(c1.difContatosPessoas).toBe(0);
     expect(c1.conversasRecebidas).toBe(2); expect(c1.msgsInbound).toBe(1);
+    expect(c1.msgsOutbound).toBe(3); expect(c2.msgsOutbound).toBe(2); // saída por chip
   });
 });
 
@@ -170,7 +172,7 @@ describe('Pessoas que chamaram — regras de negócio (dedup/outbound/LID)', () 
   const base = (over: Partial<ConexaoInput>): ConexaoInput => ({
     contatos: [], identidade: { A: { nome: 'A', numero: '', tipo: '', gestor: '', fonte: '', campanha: '', removida: false } },
     conversas: [], comEntrada: new Set(), resp: new Set(), contatosComInbound: new Set(),
-    firstIn: [], firstResp: [], opps: [], parcelas: [], economiaPorChip: {}, ...P, ...over,
+    firstIn: [], firstResp: [], outbound: [], opps: [], parcelas: [], economiaPorChip: {}, ...P, ...over,
   });
   const linhaA = (inp: ConexaoInput) => montaLinhasConexao(inp).find((l) => l.chave === 'A')!;
 
