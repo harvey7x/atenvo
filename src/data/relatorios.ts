@@ -109,6 +109,27 @@ export function passaOpp(o: OppLite, f: RelFiltros): boolean {
 
 /* ====================== Utilidades internas ====================== */
 type Row = Record<string, unknown>;
+
+/** Página do PostgREST/Supabase: cada resposta é limitada a ~1000 linhas. */
+const PAGE_SIZE = 1000;
+type Rangeable = { range: (from: number, to: number) => PromiseLike<{ data: unknown; error: { message: string } | null }> };
+/** Busca TODAS as linhas paginando por .range(). Sem isto, períodos grandes (ex.: mensagens
+ *  em 30 dias) vinham TRUNCADOS em 1000 linhas arbitrárias, quebrando a invariante
+ *  "30 dias >= 7 dias" (7d podia mostrar mais que 30d). `make` deve devolver uma query nova a cada chamada. */
+async function fetchAll(make: () => Rangeable): Promise<Row[]> {
+  const out: Row[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await make().range(from, from + PAGE_SIZE - 1);
+    if (error) throw new Error(error.message);
+    const rows = (data as Row[]) ?? [];
+    out.push(...rows);
+    if (rows.length < PAGE_SIZE) break;
+  }
+  return out;
+}
+/** Embrulha linhas paginadas no formato { data, error } p/ manter o código a jusante inalterado. */
+const wrapRows = (rows: Row[]) => ({ data: rows, error: null as { message: string } | null });
+
 const one = (v: unknown): Row | null => (Array.isArray(v) ? ((v[0] as Row) ?? null) : ((v as Row) ?? null));
 const num = (v: unknown) => (v == null ? 0 : Number(v) || 0);
 const tms = (r: Row, ...f: string[]) => { for (const k of f) { const v = r[k]; if (v) return new Date(v as string).getTime(); } return 0; };
@@ -184,7 +205,7 @@ export function useResumo(f: RelFiltros) {
       let qConv = supabase!.from('conversas').select('id, criado_em, contato_id').eq('organizacao_id', org).gte('criado_em', p.prevIniISO).lt('criado_em', p.fimISO).abortSignal(signal!);
       if (f.canal) qConv = qConv.eq('ultimo_provider', f.canal); // canal só afeta conversas (atendimento)
       // resposta humana = saída com autor_id (operador via app); telefone sincronizado fica de fora
-      const qResp = supabase!.from('mensagens').select('conversa_id, criado_em').eq('organizacao_id', org).eq('direcao', 'saida').not('autor_id', 'is', null).gte('criado_em', p.prevIniISO).lt('criado_em', p.fimISO).abortSignal(signal!);
+      const qResp = fetchAll(() => supabase!.from('mensagens').select('conversa_id, criado_em').eq('organizacao_id', org).eq('direcao', 'saida').not('autor_id', 'is', null).gte('criado_em', p.prevIniISO).lt('criado_em', p.fimISO).abortSignal(signal!)).then(wrapRows);
       const qPag = supabase!.from('cobranca_pagamentos').select('status, valor, valor_pago, data_prevista, data_pagamento, cobranca_id').eq('organizacao_id', org).abortSignal(signal!);
       const qCob = supabase!.from('cobrancas').select('id, valor_mensal, status, valor_economizado, responsavel_id, contato_id, criado_em').eq('organizacao_id', org).abortSignal(signal!);
       const [c, o, cv, resp, pag, cob, cids] = await Promise.all([qContatos, qOpp, qConv, qResp, qPag, qCob, cidsConexao(org, f.conexao, signal!)]);
@@ -287,7 +308,7 @@ export function useAtendimento(f: RelFiltros, enabled: boolean) {
       // conversas da org (todas, p/ mapear canal de mensagens antigas); filtra por canal quando aplicável
       let qConv = supabase!.from('conversas').select('id, status, criado_em, ultimo_provider, contato_id').eq('organizacao_id', org).abortSignal(signal!);
       if (f.canal) qConv = qConv.eq('ultimo_provider', f.canal);
-      const qMsg = supabase!.from('mensagens').select('conversa_id, direcao, tipo, autor_id, criado_em, enviada_em, recebida_em').eq('organizacao_id', org).gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).abortSignal(signal!);
+      const qMsg = fetchAll(() => supabase!.from('mensagens').select('conversa_id, direcao, tipo, autor_id, criado_em, enviada_em, recebida_em').eq('organizacao_id', org).gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).abortSignal(signal!)).then(wrapRows);
       const [cv, m, cids] = await Promise.all([qConv, qMsg, cidsConexao(org, f.conexao, signal!)]);
       if (cv.error) throw new Error(cv.error.message); if (m.error) throw new Error(m.error.message);
       // conexão de aquisição restringe via contato (1 hop)
@@ -349,10 +370,10 @@ export function useEquipe(f: RelFiltros, enabled: boolean) {
         supabase!.from('organizacao_usuarios').select('usuarios(id, nome)').eq('organizacao_id', org).eq('status', 'ativo').abortSignal(signal!),
         qCt, qOp,
         supabase!.from('cobrancas').select('id, responsavel_id, criado_por, valor_mensal, ciclos_totais, status').eq('organizacao_id', org).abortSignal(signal!),
-        supabase!.from('mensagens').select('autor_id, conversa_id').eq('organizacao_id', org).eq('direcao', 'saida').not('autor_id', 'is', null).gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).abortSignal(signal!),
+        fetchAll(() => supabase!.from('mensagens').select('autor_id, conversa_id').eq('organizacao_id', org).eq('direcao', 'saida').not('autor_id', 'is', null).gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).abortSignal(signal!)).then(wrapRows),
         // conversas do período + responsável do contato (p/ "sem resposta" por atendente)
         supabase!.from('conversas').select('id, contato:contatos(responsavel_id)').eq('organizacao_id', org).gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).abortSignal(signal!),
-        supabase!.from('mensagens').select('conversa_id').eq('organizacao_id', org).eq('direcao', 'entrada').gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).abortSignal(signal!),
+        fetchAll(() => supabase!.from('mensagens').select('conversa_id').eq('organizacao_id', org).eq('direcao', 'entrada').gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).abortSignal(signal!)).then(wrapRows),
       ]);
       for (const r of [us, ct, op, cb, ms, cvv, mi]) if (r.error) throw new Error(r.error.message);
       const com = new Map<string, LinhaComercial>(); const at = new Map<string, LinhaAtend>();
@@ -566,12 +587,12 @@ export function useConexoes(f: RelFiltros, enabled: boolean) {
     queryKey: ['rel-conexoes', org, chaveFiltros(f)], enabled: REL_REAL && enabled, staleTime: 60_000,
     queryFn: async ({ signal }): Promise<ConexaoLinha[]> => {
       const [ct, cv, m, op, cb, pg, fc, cx] = await Promise.all([
-        supabase!.from('contatos').select('id, canal_origem_id, canal_origem_snapshot, criado_em, telefone').eq('organizacao_id', org).is('mesclado_em', null).abortSignal(signal!),
-        supabase!.from('conversas').select('id, contato_id, criado_em').eq('organizacao_id', org).gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).abortSignal(signal!),
-        supabase!.from('mensagens').select('conversa_id, direcao, tipo, autor_id, criado_em, enviada_em, recebida_em').eq('organizacao_id', org).gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).abortSignal(signal!),
-        supabase!.from('oportunidades').select('contato_id, status, coluna_id, criado_em, fechado_em').eq('organizacao_id', org).gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).abortSignal(signal!),
-        supabase!.from('cobrancas').select('id, contato_id, status, valor_economizado').eq('organizacao_id', org).abortSignal(signal!),
-        supabase!.from('cobranca_pagamentos').select('cobranca_id, status, valor, valor_pago, data_prevista, data_pagamento').eq('organizacao_id', org).abortSignal(signal!),
+        fetchAll(() => supabase!.from('contatos').select('id, canal_origem_id, canal_origem_snapshot, criado_em, telefone').eq('organizacao_id', org).is('mesclado_em', null).abortSignal(signal!)).then(wrapRows),
+        fetchAll(() => supabase!.from('conversas').select('id, contato_id, criado_em').eq('organizacao_id', org).gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).abortSignal(signal!)).then(wrapRows),
+        fetchAll(() => supabase!.from('mensagens').select('conversa_id, direcao, tipo, autor_id, criado_em, enviada_em, recebida_em').eq('organizacao_id', org).gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).abortSignal(signal!)).then(wrapRows),
+        fetchAll(() => supabase!.from('oportunidades').select('contato_id, status, coluna_id, criado_em, fechado_em').eq('organizacao_id', org).gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).abortSignal(signal!)).then(wrapRows),
+        fetchAll(() => supabase!.from('cobrancas').select('id, contato_id, status, valor_economizado').eq('organizacao_id', org).abortSignal(signal!)).then(wrapRows),
+        fetchAll(() => supabase!.from('cobranca_pagamentos').select('cobranca_id, status, valor, valor_pago, data_prevista, data_pagamento').eq('organizacao_id', org).abortSignal(signal!)).then(wrapRows),
         supabase!.from('funil_colunas').select('id, entrada').eq('organizacao_id', org),
         supabase!.from('canais').select('id, nome_interno, numero_conectado, origem_tipo, campanha, provider, gestor:usuarios(nome), fonte:fontes_aquisicao(nome)').eq('organizacao_id', org),
       ]);

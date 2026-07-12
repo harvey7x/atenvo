@@ -213,3 +213,44 @@ describe('Pessoas que chamaram — regras de negócio (dedup/outbound/LID)', () 
     expect(linhas.find((l) => l.chave === 'B')!.pessoasQueChamaram).toBe(1);
   });
 });
+
+describe('resolvePeriodo — 7 dias contido em 30 dias', () => {
+  it('30d contém 7d: mesmo fim, início 30d <= início 7d, durações corretas', () => {
+    const p7 = resolvePeriodo('7d'); const p30 = resolvePeriodo('30d');
+    expect(p30.fimISO).toBe(p7.fimISO);                 // ambos terminam hoje+1 (exclusivo)
+    expect(p30.iniISO <= p7.iniISO).toBe(true);         // 30d começa antes (ou igual)
+    expect(p7.dias).toBe(7); expect(p30.dias).toBe(30);
+  });
+});
+
+describe('métricas por período — 30 dias NUNCA menor que 7 dias', () => {
+  // dataset compartilhado; o recorte de 7d é subconjunto do de 30d
+  const contatos = [
+    { id: 'a1', chip: 'A', criadoEm: '2026-07-06T12:00:00-03:00', tel: '5551990000001' }, // 7d e 30d
+    { id: 'a2', chip: 'A', criadoEm: '2026-06-20T12:00:00-03:00', tel: '5551990000002' }, // só 30d
+    { id: 'a3', chip: 'A', criadoEm: '2026-07-07T12:00:00-03:00', tel: '555190000001'  }, // 9º-dígito dup de a1 (mesma pessoa), 7d
+  ];
+  const ident = { A: { nome: 'A', numero: '', tipo: '', gestor: '', fonte: '', campanha: '', removida: false } };
+  const mk = (P: { iniDate: string; fimDate: string; prevIniDate: string; hoje: string }, inbound: string[], outN: number, inN: number) =>
+    montaLinhasConexao({
+      contatos, identidade: ident, conversas: [], comEntrada: new Set(), resp: new Set(),
+      contatosComInbound: new Set(inbound),
+      firstIn: Array.from({ length: inN }, () => ({ conversa: 'x', chip: 'A', t: 0 })),
+      firstResp: [], outbound: Array.from({ length: outN }, () => ({ chip: 'A' })),
+      opps: [], parcelas: [], economiaPorChip: {}, ...P,
+    }).find((l) => l.chave === 'A')!;
+  const l30 = mk({ iniDate: '2026-06-12', fimDate: '2026-07-12', prevIniDate: '2026-05-13', hoje: '2026-07-11' }, ['a1', 'a2', 'a3'], 20, 10);
+  const l7  = mk({ iniDate: '2026-07-05', fimDate: '2026-07-12', prevIniDate: '2026-06-28', hoje: '2026-07-11' }, ['a1', 'a3'], 6, 3);
+
+  it('pessoas 30d >= 7d; quem chamou no 7d também está no 30d; dedup canônico igual', () => {
+    expect(l7.pessoasQueChamaram).toBe(1);   // a1 e a3 = mesma pessoa (canônico)
+    expect(l30.pessoasQueChamaram).toBe(2);  // + a2
+    expect(l30.pessoasQueChamaram).toBeGreaterThanOrEqual(l7.pessoasQueChamaram);
+  });
+  it('contatos criados / inbound / outbound: 30d >= 7d', () => {
+    expect(l30.contatosCriados).toBeGreaterThanOrEqual(l7.contatosCriados);
+    expect(l30.msgsInbound).toBeGreaterThanOrEqual(l7.msgsInbound);
+    expect(l30.msgsOutbound).toBeGreaterThanOrEqual(l7.msgsOutbound);
+    expect(l30.contatosCriados).toBe(3); expect(l7.contatosCriados).toBe(2);
+  });
+});
