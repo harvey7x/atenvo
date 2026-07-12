@@ -11,6 +11,7 @@ import { AudioMessage } from '@/components/AudioMessage';
 import { MsgImage } from '@/components/MsgImage';
 import { MsgVideo } from '@/components/MsgVideo';
 import { WhatsAppText } from '@/components/WhatsAppText';
+import { formatarNomeCliente } from '@/lib/nomeCliente';
 import { EmptyState } from '@/components/EmptyState';
 import { useScripts, useScriptEtapaCounts, aguardarConfirmacaoEnvio, traduzErroEnvio } from '@/data/scripts';
 import { ScriptSequenceModal } from '@/components/ScriptSequenceModal';
@@ -298,7 +299,7 @@ export function WhatsApp() {
     const kind = statusKind(sin, now);
     const atendNome = c.respId ? (orgUsuarios.find((u) => u.id === c.respId)?.nome ?? 'Atendente') : null;
     const nomeVazio = !c.name?.trim() || /^[\d\s()+\-]+$/.test(c.name.trim());
-    const nome = nomeVazio ? 'Cliente sem nome' : c.name;
+    const nome = nomeVazio ? 'Cliente sem nome' : formatarNomeCliente(c.name);
     const tier = c.aguardando ? tierTempo(minutosDesde(c.aguardandoDesde ?? null)) : 'neutro';
     const tempo = c.aguardando ? tempoCurto(c.aguardandoDesde ?? null) : (c.time || '');
     const statusLabel =
@@ -910,7 +911,7 @@ export function WhatsApp() {
               <Avatar name={c.name} />
               <div className="cbody">
                 <div className="crow">
-                  <span className="cname" style={{ fontWeight: (c.unread ?? 0) > 0 ? 700 : undefined }}>{c.fixada && <span title="Fixada" aria-label="Fixada">📌 </span>}{nomeVazio ? 'Cliente sem nome' : c.name}</span>
+                  <span className="cname" style={{ fontWeight: (c.unread ?? 0) > 0 ? 700 : undefined }}>{c.fixada && <span title="Fixada" aria-label="Fixada">📌 </span>}{nomeVazio ? 'Cliente sem nome' : formatarNomeCliente(c.name)}</span>
                   <span className="ctime">{c.time}</span>
                 </div>
                 {nomeVazio && telSec && <div className="cphone">{telSec}</div>}
@@ -960,7 +961,7 @@ export function WhatsApp() {
               <div className="ch-id">
                 <Avatar name={current.name} />
                 <div className="ch-id-text">
-                  <div className="ch-name" title={current.name} tabIndex={0} aria-label={current.name}>{current.name}</div>
+                  <div className="ch-name" title={formatarNomeCliente(current.name) || current.name} tabIndex={0} aria-label={formatarNomeCliente(current.name) || current.name}>{formatarNomeCliente(current.name) || current.name}</div>
                   <div className="ch-phone" title={current.phone}>{current.phone}</div>
                 </div>
               </div>
@@ -1190,7 +1191,7 @@ export function WhatsApp() {
             </div>
           )}
           <div className="dfield"><div className="dlabel">Nome</div>
-            {editMode ? <input className="edit-input" value={editForm.nome} onChange={(e) => setEditForm((f) => ({ ...f, nome: e.target.value }))} /> : <div className="dval">{current.name}</div>}
+            {editMode ? <input className="edit-input" value={editForm.nome} onChange={(e) => setEditForm((f) => ({ ...f, nome: e.target.value }))} /> : <div className="dval">{formatarNomeCliente(current.name) || current.name}</div>}
           </div>
           <div className="dfield"><div className="dlabel">Telefone</div>
             <div className="dval with-ic"><IcWa />{current.phone || <span style={{ color: 'var(--muted)' }}>—</span>}{current.phone && <button className="copy-btn" title="Copiar telefone" onClick={copiarTelefone}><IcCopy /></button>}</div>
