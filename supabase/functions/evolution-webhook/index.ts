@@ -1,4 +1,7 @@
 // evolution-webhook — eventos da Evolution. Sem JWT. Secret via webhook_config (constante).
+// v25: FIAÇÃO DO ÁUDIO — no dispatch ao bot-runner, áudio INBOUND curto (≤MAX_AUDIO_SEG/≤MAX_AUDIO_TRANSC,
+//      envs) passa o base64 já baixado (getBase64FromMediaMessage) + mime real (ogg, sem codecs) p/ transcrição.
+//      Áudio longo/grande NÃO manda base64 → runner cai no aviso+pausa. Só !fromMe (nunca transcreve saída).
 // v24 (B3.3): dispatch fire-and-forget ao bot-runner em inbound NOVO de cliente (texto/áudio), dry_run:true
 //      FIXO (nunca envia). Gates de negócio são do runner; não bloqueia nem quebra o webhook.
 // v23: ao reconectar (connection.update=open) limpa alerta_silenciado do canal ("silenciar até reconexão").
@@ -109,8 +112,13 @@ function midiaOf(message: Record<string, unknown> | undefined): MidiaDesc | null
   return null;
 }
 const MAX_MEDIA = 20 * 1024 * 1024; // limite de segurança p/ áudio
+// transcrição tem teto MENOR que o de armazenamento: áudio muito longo/grande NÃO vai pro Gemini
+// (custo/contexto) — cai no aviso+pausa. O bucket ainda guarda o arquivo até MAX_MEDIA.
+// Env p/ afinar sem redeploy quando vir os áudios reais (idoso fala 2–3 min: default 120s / 8MB).
+const MAX_AUDIO_SEG = Number(Deno.env.get('MAX_AUDIO_SEG')) || 120;
+const MAX_AUDIO_TRANSC = Number(Deno.env.get('MAX_AUDIO_TRANSC')) || 8 * 1024 * 1024;
 // baixa a mídia descriptografada via Evolution (base64). NÃO persiste URL temporária.
-async function baixarMidia(instance: string, dataMsg: Record<string, unknown>): Promise<{ bytes: Uint8Array; mime: string }> {
+async function baixarMidia(instance: string, dataMsg: Record<string, unknown>): Promise<{ bytes: Uint8Array; mime: string; b64: string }> {
   if (!EVO_BASE || !EVO_KEY) throw new Error('evolution_nao_configurada');
   const res = await fetch(`${EVO_BASE}/chat/getBase64FromMediaMessage/${instance}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json', apikey: EVO_KEY },
@@ -127,7 +135,7 @@ async function baixarMidia(instance: string, dataMsg: Record<string, unknown>): 
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
   if (bytes.length === 0) throw new Error('midia_vazia');
   if (bytes.length > MAX_MEDIA) throw new Error('midia_grande');
-  return { bytes, mime: (j.mimetype ?? '').split(';')[0].trim() || 'audio/ogg' };
+  return { bytes, mime: (j.mimetype ?? '').split(';')[0].trim() || 'audio/ogg', b64 };
 }
 
 Deno.serve(async (req) => {
@@ -257,6 +265,8 @@ Deno.serve(async (req) => {
       const viaTag = fromMe ? 'webhook_fromMe' : 'webhook';
       let tipoMsg = 'texto';
       let metaMsg: Record<string, unknown> | null = null;
+      let audioB64: string | null = null;   // base64 SÓ p/ áudio INBOUND dentro do teto de transcrição
+      let audioMime: string | null = null;
       if (midia) {
         tipoMsg = midia.kind;
         const baseMeta = { mime: midia.mime, nome: midia.nome, ptt: midia.ptt, seconds: midia.seconds, tamanho: midia.tamanho, legenda: midia.caption, via: viaTag };
@@ -272,6 +282,10 @@ Deno.serve(async (req) => {
             const up = await admin.storage.from('script-midia').upload(path, dl.bytes, { contentType: mime, upsert: true });
             if (up.error) throw new Error(up.error.message);
             metaMsg = { ...baseMeta, mime, tamanho: dl.bytes.length, nome: midia.nome ?? `${midia.kind}.${ext}`, anexo_path: path, status_midia: 'disponivel' };
+            // áudio INBOUND curto → guarda o base64 p/ o bot-runner transcrever (Gemini). Longo/grande → withhold (aviso+pausa).
+            if (!fromMe && midia.kind === 'audio' && dl.bytes.length <= MAX_AUDIO_TRANSC && (midia.seconds == null || midia.seconds <= MAX_AUDIO_SEG)) {
+              audioB64 = dl.b64; audioMime = mime;
+            }
           } catch (e) {
             // mídia não baixada: persiste a mensagem como PENDENTE (recuperável), nunca descarta.
             metaMsg = { ...baseMeta, midia_pendente: true, media_erro: String((e as Error).message ?? 'download').slice(0, 120), status_midia: 'falhou', media_key: key };
@@ -332,7 +346,7 @@ Deno.serve(async (req) => {
             await fetch(`${FUNCTIONS_BASE}/bot-runner`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'x-bot-secret': bs.secret as string },
-              body: JSON.stringify({ conversa_id: conversaId, inbound_msg_id: inboundMsgId, inbound_text: conteudoMsg ?? '', inbound_tipo: tipoMsg, dry_run: true }),
+              body: JSON.stringify({ conversa_id: conversaId, inbound_msg_id: inboundMsgId, inbound_text: conteudoMsg ?? '', inbound_tipo: tipoMsg, dry_run: true, ...(audioB64 ? { inbound_audio_b64: audioB64, inbound_audio_mime: audioMime } : {}) }),
             });
           } catch { /* fire-and-forget: erro do runner nunca afeta o webhook */ }
         })();

@@ -123,11 +123,15 @@ Deno.serve(async (req) => {
     // ---- áudio: tenta transcrever (Gemini). Sucesso → trata como texto. Falha/sem base64 → comportamento atual (aviso + pausa) ----
     let inboundText = body.inbound_text ?? '';
     if (body.inbound_tipo === 'audio') {
+      const temB64 = !!body.inbound_audio_b64;
       const transcrito = body.inbound_audio_b64 ? await transcreverAudio(body.inbound_audio_b64, body.inbound_audio_mime) : null;
       if (transcrito) {
         inboundText = transcrito; // segue o fluxo como se fosse texto
         await logRunner('audio_transcrito', null, { chars: transcrito.length });
       } else {
+        // base64 veio mas a transcrição voltou vazia (quota/áudio corrompido/formato) → visível no audit_log,
+        // distinto de "áudio grande/não-fiado" (sem base64). Em ambos, cai no aviso+pausa abaixo (nunca silêncio).
+        if (temB64) await logRunner('audio_transcricao_falhou', body.inbound_audio_mime ?? null);
         const rows = await enfileirar(admin, conversaId, conv.canal_id, 'audio', [copy.audio], calcularDelays(1, min, max));
         const enviados = await drenar(admin, rows, dryRun, canal, conv);
         const { texto, json: rj } = montarResumo({ dados, canalNome, origem, etapa: estado.etapa, leadQuente: estado.lead_quente, leadQuenteMotivos: estado.lead_quente_motivos ?? [] });

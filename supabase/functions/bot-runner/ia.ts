@@ -92,6 +92,9 @@ export async function gerarResposta(p: { messages: Msg[]; system: string; difici
 // ---------- Transcrição de áudio (Gemini). Falha → null (mantém o comportamento atual: avisa+pausa) ----------
 export async function transcreverAudio(base64: string, mime = 'audio/ogg'): Promise<string | null> {
   try {
+    // backstop: base64 gigante não vai pro Gemini (custo/contexto). ~12M chars ≈ 9MB bytes — folga acima do
+    // teto do webhook (8MB → ~10,7M chars) e MUITO abaixo do limite de 20MB do inline_data.
+    if (!base64 || base64.length > 12_000_000) return null;
     const key = env('GEMINI_API_KEY');
     if (!key) return null;
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${key}`, {
