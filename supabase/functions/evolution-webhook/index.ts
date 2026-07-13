@@ -1,4 +1,7 @@
 // evolution-webhook — eventos da Evolution. Sem JWT. Secret via webhook_config (constante).
+// v26: REMARKETING — antes do dispatch ao bot-runner, chama bot_remarketing_inbound: lead que responde em
+//      remarketing volta pra LEAD NOVO (entrada) ANTES do runner checar elegibilidade; opt-out → PERDIDO e
+//      pula o dispatch. Best-effort (try/catch): erro/timeout da RPC nunca quebra o webhook nem trava o lead comum.
 // v25: FIAÇÃO DO ÁUDIO — no dispatch ao bot-runner, áudio INBOUND curto (≤MAX_AUDIO_SEG/≤MAX_AUDIO_TRANSC,
 //      envs) passa o base64 já baixado (getBase64FromMediaMessage) + mime real (ogg, sem codecs) p/ transcrição.
 //      Áudio longo/grande NÃO manda base64 → runner cai no aviso+pausa. Só !fromMe (nunca transcreve saída).
@@ -333,12 +336,25 @@ Deno.serve(async (req) => {
         await admin.from('conversas').update({ ultima_interacao_em: nowEntradaIso }).eq('id', conversaId);
       }
 
+      const inboundMsgId = (insArr?.[0]?.id as string | undefined) ?? null;
+
+      // ---- REMARKETING: se o lead estava numa cadência, re-roteia a opp ANTES do dispatch ao runner.
+      //      respondeu → opp volta pra LEAD NOVO (entrada), senão bot_pode_atuar bloquearia o lead que respondeu;
+      //      opt-out → PERDIDO + NÃO dispara o bot. AWAITED de propósito: o move de coluna precisa commitar
+      //      antes do fetch fire-and-forget. Best-effort: erro NUNCA afeta o fluxo normal (lead comum segue igual).
+      let rmktDesfecho: string | null = null;
+      if (inboundNovo && inboundMsgId) {
+        try {
+          const { data: r } = await admin.rpc('bot_remarketing_inbound', { p_conversa: conversaId, p_texto: conteudoMsg ?? '' });
+          rmktDesfecho = (r as string) ?? null;
+        } catch { /* best-effort: erro/timeout do remarketing nunca quebra o webhook */ }
+      }
+
       // ---- B3.3: dispatch fire-and-forget ao bot-runner (só inbound NOVO de cliente, texto/áudio) ----
       // dry_run:true FIXO → o bot só simula/loga; jamais envia a cliente. Os gates de negócio (master,
       // bot_pode_atuar, humano/responsável, precisa_humano, idempotência, lock, saúde do canal) são do
       // RUNNER (fonte de verdade). Aqui só o filtro básico. Nunca bloqueia nem quebra o webhook.
-      const inboundMsgId = (insArr?.[0]?.id as string | undefined) ?? null;
-      if (inboundNovo && inboundMsgId && (tipoMsg === 'texto' || tipoMsg === 'audio')) {
+      if (inboundNovo && inboundMsgId && rmktDesfecho !== 'optout' && (tipoMsg === 'texto' || tipoMsg === 'audio')) {
         const dispatch = (async () => {
           try {
             const { data: bs } = await admin.from('webhook_config').select('secret').eq('chave', 'bot_runner').maybeSingle();
