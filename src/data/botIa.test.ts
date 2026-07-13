@@ -26,6 +26,11 @@ describe('guardrail — saidaSuja (trava de código)', () => {
     expect(saidaSuja('não dá pra dizer quanto o senhor vai receber sem analisar o caso')).toBeNull();
     expect(saidaSuja('o senhor não precisa saber pegar a senha, nosso consultor te orienta por telefone')).toBeNull();
   });
+  it('PASSA o passo novo de ACESSO AO EXTRATO (orientação por telefone)', () => {
+    expect(saidaSuja('um consultor liga e te ajuda a acessar o extrato passo a passo')).toBeNull();
+    expect(saidaSuja('a senhora não precisa mexer em nada, a gente te acompanha na ligação')).toBeNull();
+    expect(saidaSuja('me manda sua senha do Meu INSS que eu acesso pra você')).toBe('credencial'); // ainda BARRA
+  });
   it('PASSA a linha de venda (juros acima do teto) e as frases honestas', () => {
     expect(saidaSuja('quem tem empréstimo nessas financeiras muitas vezes está pagando juros acima do que o INSS permite')).toBeNull();
     expect(saidaSuja('vale a pena verificar se há algo no seu nome')).toBeNull();
