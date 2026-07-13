@@ -8,13 +8,19 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import {
   DEFAULT_COPY, decideProximo, calcularDelays, avaliarLeadQuente, montarResumo, primeiroNome,
+  validarNome, extrairCpf,
   type Copy, type Etapa,
 } from './fluxo.ts';
+import { gerarResposta, transcreverAudio, pareceDificil, parseEstado, type Msg } from './ia.ts';
+import { systemMatheo } from './prompt.ts';
+import { saidaSuja } from './guardrail.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const EVO_BASE = (Deno.env.get('EVOLUTION_API_URL') ?? '').replace(/\/+$/, '');
 const EVO_KEY = Deno.env.get('EVOLUTION_API_KEY') ?? '';
+// Fluxo por IA (default LIGADO). Se cair (quota/crédito/timeout), o index usa o copy determinístico.
+const IA_ATIVA = (Deno.env.get('IA_ATIVA') ?? 'sim').toLowerCase() === 'sim';
 
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'content-type, x-bot-secret', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, 'Content-Type': 'application/json' } });
@@ -48,6 +54,7 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({})) as {
       conversa_id?: string; inbound_text?: string; inbound_tipo?: string; inbound_msg_id?: string;
+      inbound_audio_b64?: string; inbound_audio_mime?: string; // áudio p/ transcrição (opcional; webhook passa quando houver)
       dry_run?: boolean; force?: boolean; start?: boolean;
     };
     const dryRun = body.dry_run !== false;      // DEFAULT seguro: dry_run=true
@@ -113,19 +120,36 @@ Deno.serve(async (req) => {
     const { data: eleg } = await admin.rpc('bot_pode_atuar', { p_conversa: conversaId });
     if (!eleg?.elegivel && !force) { await logRunner('bot_ignorado', eleg?.motivo ?? 'inelegivel'); return json({ ok: true, skipped: 'inelegivel', elegibilidade: eleg }); }
 
-    // ---- pausa por áudio (só quando o bot está ATIVO/elegível): 1 aviso, pausa, entrega ao humano; sem transcrição ----
+    // ---- áudio: tenta transcrever (Gemini). Sucesso → trata como texto. Falha/sem base64 → comportamento atual (aviso + pausa) ----
+    let inboundText = body.inbound_text ?? '';
     if (body.inbound_tipo === 'audio') {
-      const rows = await enfileirar(admin, conversaId, conv.canal_id, 'audio', [copy.audio], calcularDelays(1, min, max));
-      const enviados = await drenar(admin, rows, dryRun, canal, conv);
-      const { texto, json: rj } = montarResumo({ dados, canalNome, origem, etapa: estado.etapa, leadQuente: estado.lead_quente, leadQuenteMotivos: estado.lead_quente_motivos ?? [] });
-      await admin.rpc('bot_pausar', { p_conversa: conversaId, p_motivo: 'audio', p_resumo_texto: texto, p_resumo_json: rj });
-      await logRunner('bot_ignorado', 'audio');
-      return json({ ok: true, paused: 'audio', dry_run: dryRun, mensagens: [copy.audio], enviados_reais: enviados });
+      const transcrito = body.inbound_audio_b64 ? await transcreverAudio(body.inbound_audio_b64, body.inbound_audio_mime) : null;
+      if (transcrito) {
+        inboundText = transcrito; // segue o fluxo como se fosse texto
+        await logRunner('audio_transcrito', null, { chars: transcrito.length });
+      } else {
+        const rows = await enfileirar(admin, conversaId, conv.canal_id, 'audio', [copy.audio], calcularDelays(1, min, max));
+        const enviados = await drenar(admin, rows, dryRun, canal, conv);
+        const { texto, json: rj } = montarResumo({ dados, canalNome, origem, etapa: estado.etapa, leadQuente: estado.lead_quente, leadQuenteMotivos: estado.lead_quente_motivos ?? [] });
+        await admin.rpc('bot_pausar', { p_conversa: conversaId, p_motivo: 'audio', p_resumo_texto: texto, p_resumo_json: rj });
+        await logRunner('bot_ignorado', 'audio');
+        return json({ ok: true, paused: 'audio', dry_run: dryRun, mensagens: [copy.audio], enviados_reais: enviados });
+      }
     }
 
-    // ---- decide a etapa ----
-    const etapaAtual = (body.start ? 'inicio' : estado.etapa) as Etapa | 'inicio';
-    const dec = decideProximo(etapaAtual, body.inbound_text ?? '', dados);
+    // ======== FLUXO POR IA (plano A) — se cair/desligado, segue pro determinístico (plano B) abaixo ========
+    if (IA_ATIVA) {
+      const respostaIa = await tratarComIA({
+        admin, conversaId, conv, canal, estado, dados, copy, min, max,
+        inboundText, inboundMsgId: body.inbound_msg_id ?? null, dryRun, canalNome, origem, logRunner,
+      }).catch(async (e) => { await logRunner('ia_indisponivel', (e as Error)?.message?.slice(0, 160)); return null; });
+      if (respostaIa) return respostaIa;
+      // respostaIa === null → IA fora do ar ou guardrail barrou 2x → cai no determinístico (rede de segurança)
+    }
+
+    // ---- decide a etapa (DETERMINÍSTICO — rede de segurança) ----
+    const etapaAtual = (body.start ? 'inicio' : (estado.etapa === 'ia' ? 'inicio' : estado.etapa)) as Etapa | 'inicio';
+    const dec = decideProximo(etapaAtual, inboundText, dados);
 
     // validação falhou (nome/CPF): reprompt 1x, senão segue com "não informado"
     if (!dec.valid) {
@@ -151,7 +175,7 @@ Deno.serve(async (req) => {
     if (dec.acoes.coletarCpf) {
       await admin.rpc('bot_registrar_cpf', { p_conversa: conversaId, p_cpf_digits: dec.acoes.coletarCpf.digits, p_cpf_mascarado: dec.acoes.coletarCpf.mascarado });
     }
-    const motivosLQ = Array.from(new Set([...(dec.leadQuenteMotivos ?? []), ...avaliarLeadQuente({ ...dados, ...dec.dados }, body.inbound_text ?? '')]));
+    const motivosLQ = Array.from(new Set([...(dec.leadQuenteMotivos ?? []), ...avaliarLeadQuente({ ...dados, ...dec.dados }, inboundText)]));
     if (motivosLQ.length > 0) await admin.rpc('bot_marcar_lead_quente', { p_conversa: conversaId, p_motivos: motivosLQ });
 
     // ---- monta mensagens do burst ----
@@ -230,4 +254,143 @@ async function drenar(admin: any, rows: Array<{ id: string; ordem: number; texto
     }
   }
   return enviados;
+}
+
+// ---- histórico da conversa -> mensagens p/ a IA (últimas ~20; só texto do lead e do bot) ----
+async function carregarHistorico(admin: any, conversaId: string): Promise<Msg[]> {
+  const { data } = await admin.from('mensagens')
+    .select('direcao, tipo, conteudo, origem, criado_em').eq('conversa_id', conversaId)
+    .eq('tipo', 'texto').order('criado_em', { ascending: true }).limit(40);
+  const msgs: Msg[] = [];
+  for (const m of (data ?? []) as any[]) {
+    if (!m.conteudo) continue;
+    if (m.direcao === 'entrada') msgs.push({ role: 'user', content: String(m.conteudo) });
+    else if (m.direcao === 'saida' && m.origem === 'bot') msgs.push({ role: 'assistant', content: String(m.conteudo) });
+  }
+  return msgs.slice(-20);
+}
+
+// ---- move a oportunidade para a coluna do funil pelo NOME (PRESENCIAL / REUNIÃO MARCADA / LEAD NOVO) ----
+async function moverColunaPorNome(admin: any, oppId: string, nomeColuna: string): Promise<void> {
+  const { data: opp } = await admin.from('oportunidades').select('funil_id').eq('id', oppId).maybeSingle();
+  if (!opp?.funil_id) return;
+  const { data: col } = await admin.from('funil_colunas').select('id')
+    .eq('funil_id', opp.funil_id).eq('nome', nomeColuna).eq('arquivada', false).maybeSingle();
+  if (col?.id) await admin.from('oportunidades').update({ coluna_id: col.id }).eq('id', oppId);
+}
+
+// ======== FLUXO POR IA: gera resposta, passa pelo GUARDRAIL, persiste estado, roteia desfecho ========
+// Retorna a Response quando responde; retorna null quando a IA cai ou o guardrail barra 2x
+// (o chamador então usa o copy determinístico — a máquina de estados é a REDE DE SEGURANÇA).
+async function tratarComIA(p: {
+  admin: any; conversaId: string; conv: any; canal: any; estado: any; dados: Record<string, unknown>;
+  copy: Copy; min: number; max: number; inboundText: string; inboundMsgId: string | null; dryRun: boolean;
+  canalNome: string; origem: string; logRunner: (o: string, m?: string | null, e?: Record<string, unknown>) => Promise<void>;
+}): Promise<Response | null> {
+  const { admin, conversaId, conv, canal, estado, dados, min, max, inboundText, inboundMsgId, dryRun, canalNome, origem, logRunner } = p;
+
+  // 1) histórico -> messages (+ inbound atual se ainda não estiver lá)
+  const messages = await carregarHistorico(admin, conversaId);
+  if (inboundText && (!messages.length || messages[messages.length - 1].content !== inboundText)) {
+    messages.push({ role: 'user', content: inboundText });
+  }
+  if (!messages.length) messages.push({ role: 'user', content: 'Oi' }); // seed p/ abertura
+
+  // 2) contexto (não repetir o que já sabe)
+  const ctx: string[] = [];
+  if (dados.nome_completo) ctx.push(`nome=${dados.nome_completo}`);
+  if (dados.cpf_mascarado) ctx.push('cpf=ja_informado');
+  if (dados.banco) ctx.push(`banco=${dados.banco}`);
+  if (Array.isArray(dados.financeiras) && (dados.financeiras as string[]).length) ctx.push(`financeiras=${(dados.financeiras as string[]).join('/')}`);
+  const system = systemMatheo(ctx.join(', ') || null);
+
+  // 3) gera (Claude p/ difícil, Gemini p/ simples). Se ambos caírem, LANÇA -> chamador cai no determinístico.
+  const dificil = pareceDificil(inboundText, dados, messages);
+  let resposta = await gerarResposta({ messages, system, dificil });
+
+  // 4) GUARDRAIL: separa texto/estado; sujo -> regenera 1x; ainda sujo -> descarta (null -> determinístico)
+  let { texto, estado: est } = parseEstado(resposta);
+  let violou = saidaSuja(texto);
+  if (violou) {
+    await logRunner('bot_guardrail', violou, { tentativa: 1, texto: texto.slice(0, 200) });
+    const reforco = system + `\n\n⚠️ Você violou uma trava (${violou}): nunca cite valores, percentuais, prazos ou garantias. Reescreva sem isso.`;
+    resposta = await gerarResposta({ messages, system: reforco, dificil: true });
+    ({ texto, estado: est } = parseEstado(resposta));
+    violou = saidaSuja(texto);
+    if (violou) { await logRunner('bot_guardrail', violou, { tentativa: 2, descartado: true, texto: texto.slice(0, 200) }); return null; }
+  }
+
+  // 5) merge estado -> dados (SEM CPF cru: PII só via bot_registrar_cpf)
+  const merge: Record<string, unknown> = {};
+  if (est?.nome_completo) merge.nome_completo = est.nome_completo;
+  if (est?.genero) merge.genero = est.genero;
+  if (est?.banco) merge.banco = est.banco;
+  if (Array.isArray(est?.financeiras) && est!.financeiras!.length) merge.financeiras = est!.financeiras;
+  if (typeof est?.tem_emprestimo === 'boolean') merge.tem_emprestimo = est!.tem_emprestimo;
+  if (typeof est?.interesse === 'boolean') merge.interesse = est!.interesse;
+  if (est?.desfecho) merge.desfecho = est.desfecho;
+  if (est?.dia_horario) merge.dia_horario = est.dia_horario;
+  if (est?.resumo) merge.resumo = est.resumo;
+
+  // 6) coletas (nome cria opp; cpf grava PII no contato + mascarado no estado)
+  if (est?.nome_completo && validarNome(est.nome_completo)) {
+    await admin.rpc('bot_coletar_nome', { p_conversa: conversaId, p_nome: est.nome_completo.trim() });
+  }
+  if (est?.cpf) {
+    const cpf = extrairCpf(est.cpf);
+    if (cpf.valido) await admin.rpc('bot_registrar_cpf', { p_conversa: conversaId, p_cpf_digits: cpf.digits, p_cpf_mascarado: cpf.mascarado });
+  }
+
+  // 7) lead quente: financeira-chave OU aceitou o presencial
+  const fins = (Array.isArray(est?.financeiras) ? est!.financeiras! : []).map((s) => String(s).toLowerCase());
+  const motivosLQ: string[] = [];
+  if (fins.includes('agibank')) motivosLQ.push('citou_agibank');
+  if (fins.includes('bmg')) motivosLQ.push('citou_bmg');
+  if (fins.includes('facta')) motivosLQ.push('citou_facta');
+  if (est?.desfecho === 'escritorio') motivosLQ.push('quer_presencial');
+  if (motivosLQ.length) await admin.rpc('bot_marcar_lead_quente', { p_conversa: conversaId, p_motivos: motivosLQ });
+
+  // 8) avança etapa 'ia' + merge + inbound (idempotência)
+  await admin.rpc('bot_avancar_etapa', { p_conversa: conversaId, p_etapa: 'ia', p_dados: merge, p_reprompts: 0, p_inbound_msg: inboundMsgId });
+
+  // 9) balões -> outbox (etapa ÚNICA por turno p/ não colidir no unique(conversa,etapa,ordem)) -> drena
+  const baloes = texto.split(/\s*\|\|\s*/).map((s) => s.trim()).filter(Boolean).slice(0, 4);
+  const tag = `ia_${inboundMsgId ?? Date.now()}`;
+  const rows = baloes.length ? await enfileirar(admin, conversaId, conv.canal_id, tag, baloes, calcularDelays(baloes.length, min, max)) : [];
+  const enviados = await drenar(admin, rows, dryRun, canal, conv);
+
+  // 10) oportunidade + resumo: relê estado fresco (nome/cpf/opp já persistidos pelas RPCs acima)
+  const { data: estFresh } = await admin.from('bot_conversa_estado').select('oportunidade_id, dados_qualificacao').eq('conversa_id', conversaId).maybeSingle();
+  const oppId = estFresh?.oportunidade_id ?? null;
+  const dadosFinais = (estFresh?.dados_qualificacao ?? { ...dados, ...merge }) as Record<string, unknown>;
+  if (oppId && (est?.banco || fins.length)) {
+    const patch: Record<string, unknown> = {};
+    if (est?.banco) patch.instituicao = est.banco;      // banco -> instituicao
+    if (fins.length) patch.etiquetas = fins;            // financeiras -> etiquetas
+    if (Object.keys(patch).length) await admin.from('oportunidades').update(patch).eq('id', oppId);
+  }
+
+  // 11) desfecho / opt-out / humano
+  if (est?.optout) {
+    await admin.rpc('bot_pausar', { p_conversa: conversaId, p_motivo: 'optout' });
+    await logRunner('bot_respondeu', 'optout', { mensagens: baloes.length, enviados_reais: enviados });
+    return json({ ok: true, dry_run: dryRun, etapa_nova: 'ia', desfecho: 'optout', mensagens: baloes, enviados_reais: enviados });
+  }
+  if (est?.desfecho === 'atendente' || est?.quer_humano) {
+    if (oppId) await moverColunaPorNome(admin, oppId, 'LEAD NOVO');
+    await admin.from('conversas').update({ precisa_humano: true, precisa_humano_motivo: 'bot_encaminhou', precisa_humano_em: new Date().toISOString() }).eq('id', conversaId);
+    await logRunner('bot_respondeu', 'encaminhou_humano', { mensagens: baloes.length, enviados_reais: enviados });
+    return json({ ok: true, dry_run: dryRun, etapa_nova: 'ia', desfecho: 'atendente', mensagens: baloes, enviados_reais: enviados });
+  }
+  if (est?.desfecho === 'escritorio' || est?.desfecho === 'reuniao') {
+    if (oppId) await moverColunaPorNome(admin, oppId, est.desfecho === 'escritorio' ? 'PRESENCIAL' : 'REUNIÃO MARCADA');
+    const lq = motivosLQ.length > 0 || estado.lead_quente;
+    const r = montarResumo({ dados: dadosFinais, canalNome, origem, etapa: 'concluido', leadQuente: lq, leadQuenteMotivos: motivosLQ });
+    await admin.rpc('bot_concluir', { p_conversa: conversaId, p_resumo_texto: r.texto, p_resumo_json: r.json });
+    await logRunner('bot_respondeu', `desfecho_${est.desfecho}`, { mensagens: baloes.length, enviados_reais: enviados });
+    return json({ ok: true, dry_run: dryRun, etapa_nova: 'concluido', desfecho: est.desfecho, mensagens: baloes, enviados_reais: enviados, resumo: r.json });
+  }
+
+  await logRunner('bot_respondeu', 'ia', { mensagens: baloes.length, enviados_reais: enviados, dificil });
+  return json({ ok: true, dry_run: dryRun, etapa_nova: 'ia', mensagens: baloes, enviados_reais: enviados, lead_quente_motivos: motivosLQ });
 }
