@@ -4,7 +4,8 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { DEMO_MODE, acaoSimulada } from '@/lib/demo';
 import { useOrg } from '@/context/OrgContext';
 import type { WaContact, WaMessage, WaUltimoCanal } from '@/data/whatsappDemo';
-import { previewUltimaMensagem, type EtapaVariante } from '@/lib/conversaEtiquetas';
+import { previewUltimaMensagem, type OppStatus } from '@/lib/conversaEtiquetas';
+type EtapaVariante = 'ganho' | 'perdido' | 'neutro';
 
 export const WA_REAL = isSupabaseConfigured && !!supabase;
 
@@ -172,6 +173,8 @@ function mapConversa(c: DbConv): WaContact {
     silenciada: !!c.silenciada_ate && new Date(c.silenciada_ate).getTime() > Date.now(),
     respId: c.contatos?.responsavel_id ?? null,
     atendenteId: c.atendente_id ?? null,
+    // v27: canais.nome_interno via conversas.canal_id = CANAL ATUAL do atendimento (ANDRIUS/URA/LUIZA/RMKT)
+    canalAtual: c.canais?.nome_interno ?? null,
     // preview limpo: texto/legenda vence; sem texto, rótulo da mídia ("Mensagem de voz (0:12)").
     // Usa a última mensagem REAL (exclui sistema/nota_interna) — nota interna não vira preview.
     last: previewUltimaMensagem(ultimaReal
@@ -193,7 +196,7 @@ function mapConversa(c: DbConv): WaContact {
 /* ===================== Etapa do Kanban por contato (etiqueta da lista) =====================
  * Uma query por org (não N por conversa). Preferência: oportunidade EM ANDAMENTO mais recente;
  * senão, a mais recente de qualquer situação. Best-effort: erro => Map vazio (lista segue viva). */
-interface EtapaContato { etapa: string; entrada: boolean; resultado: EtapaVariante; respId: string | null; emAndamento: boolean }
+interface EtapaContato { etapa: string; entrada: boolean; resultado: EtapaVariante; status: OppStatus; respId: string | null; emAndamento: boolean }
 async function etapasPorContato(orgId: string): Promise<Map<string, EtapaContato>> {
   const map = new Map<string, EtapaContato>();
   try {
@@ -215,10 +218,12 @@ async function etapasPorContato(orgId: string): Promise<Map<string, EtapaContato
       // já ordenado por atualizado_em desc: o 1º visto é o mais recente.
       // só substitui quando o anterior NÃO está em andamento e o atual está.
       if (prev && !(emAndamento && !prev.emAndamento)) continue;
+      const st = r.status;
       map.set(cid, {
         etapa: col.nome,
         entrada: !!col.entrada,
         resultado: (col.resultado === 'ganho' || col.resultado === 'perdido') ? col.resultado : 'neutro',
+        status: (st === 'ganho' || st === 'perdido' || st === 'cancelado') ? st : 'em_andamento',
         respId: r.responsavel_id ?? null,
         emAndamento,
       });
@@ -255,7 +260,8 @@ export function useWaConversations() {
       for (const c of arr) {
         const e = c.contatoId ? etapas.get(c.contatoId) : null;
         if (!e) continue;
-        c.etapa = e.etapa; c.etapaEntrada = e.entrada; c.etapaResultado = e.resultado; c.oppRespId = e.respId;
+        c.etapa = e.etapa; c.etapaEntrada = e.entrada; c.etapaResultado = e.resultado;
+        c.oppStatus = e.status; c.oppRespId = e.respId;
         c.stage = e.etapa;
       }
       // Ordenação: 1) abertas aguardando resposta (mais antiga primeiro);
@@ -392,12 +398,21 @@ export function useIniciarConversaWa() {
         const { data: ct } = await supabase!.from('contatos').select('id').eq('organizacao_id', org).eq('telefone', norm).is('mesclado_em', null).maybeSingle();
         if (ct?.id) contatoId = ct.id as string;
       }
-      // 2/3) conversa NÃO fechada existente no canal → reutiliza (não duplica)
+      // 2/3) v27: UM atendimento ativo por CONTATO (não por canal). Se já existe conversa ativa,
+      // reutiliza e só move o CANAL ATUAL para o canal escolhido — nunca cria duplicata.
       if (contatoId) {
         const { data: conv } = await supabase!.from('conversas')
-          .select('id').eq('organizacao_id', org).eq('contato_id', contatoId).eq('canal_id', input.canalId)
-          .neq('status', 'fechada').order('criado_em', { ascending: false }).limit(1).maybeSingle();
-        if (conv?.id) return { conversaId: conv.id as string, reused: true };
+          .select('id, canal_id').eq('organizacao_id', org).eq('contato_id', contatoId)
+          .neq('status', 'fechada')
+          .order('arquivada_em', { ascending: true, nullsFirst: true })
+          .order('ultima_interacao_em', { ascending: false, nullsFirst: false })
+          .limit(1).maybeSingle();
+        if (conv?.id) {
+          if (conv.canal_id !== input.canalId) {
+            await supabase!.from('conversas').update({ canal_id: input.canalId, ultimo_canal_id: input.canalId }).eq('id', conv.id);
+          }
+          return { conversaId: conv.id as string, reused: true };
+        }
       } else {
         // 5) cria contato (nome informado ou telefone como rótulo temporário)
         const nome = (input.nome || '').trim() || norm;
@@ -408,9 +423,9 @@ export function useIniciarConversaWa() {
         // identidade whatsapp (best-effort; espelha o webhook p/ dedup quando o cliente responder)
         await supabase!.from('contato_identidades').insert({ contato_id: contatoId, organizacao_id: org, tipo: 'whatsapp', provedor: 'evolution', valor: norm, valor_normalizado: norm, principal: true });
       }
-      // 6) cria a conversa (status 'aberta', sem responsável inicial)
+      // 6) cria a conversa (status 'aberta', sem responsável inicial). canal_origem_id = aquisição.
       const { data: nc, error: e2 } = await supabase!.from('conversas')
-        .insert({ organizacao_id: org, contato_id: contatoId, canal_id: input.canalId, status: 'aberta' }).select('id').single();
+        .insert({ organizacao_id: org, contato_id: contatoId, canal_id: input.canalId, canal_origem_id: input.canalId, status: 'aberta' }).select('id').single();
       if (e2 || !nc) throw new Error('Não foi possível iniciar a conversa.');
       return { conversaId: nc.id as string, reused: false };
     },

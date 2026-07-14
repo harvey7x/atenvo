@@ -101,14 +101,18 @@
   padding:1px 6px;border-radius:4px;border:1px solid transparent;
   max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
 }
-/* LEAD NOVO — amarelo/laranja discreto */
-.wa-app .conv .ctag--lead{background:var(--amber-soft);color:var(--amber);border-color:rgba(201,122,22,.28)}
 /* Atendente — azul/roxo discreto */
 .wa-app .conv .ctag--atendente{background:rgba(59,130,246,.10);color:#2563eb;border-color:rgba(59,130,246,.26)}
-/* Etapa do Kanban — cinza neutro (padrão), verde quando ganho, apagado quando perdido */
-.wa-app .conv .ctag--etapa{background:var(--surface-2);color:var(--ink-2);border-color:var(--line-2)}
-.wa-app .conv .ctag--etapa-ganho{background:var(--green-soft);color:var(--green-ink);border-color:rgba(25,195,125,.32)}
-.wa-app .conv .ctag--etapa-perdido{background:transparent;color:var(--muted);border-color:var(--line-2)}
+/* SITUAÇÃO */
+.wa-app .conv .ctag--lead{background:var(--amber-soft);color:var(--amber);border-color:rgba(201,122,22,.28)}      /* LEAD NOVO */
+.wa-app .conv .ctag--atendimento{background:var(--surface-2);color:var(--ink-2);border-color:var(--line-2)}       /* EM ATENDIMENTO */
+.wa-app .conv .ctag--aguardando{background:var(--amber-soft);color:var(--amber);border-color:rgba(201,122,22,.22)} /* AGUARDANDO CLIENTE */
+.wa-app .conv .ctag--etapa{background:var(--surface-2);color:var(--ink-2);border-color:var(--line-2)}             /* CONTRATOS, DOCUMENTOS... */
+.wa-app .conv .ctag--ganho{background:var(--green-soft);color:var(--green-ink);border-color:rgba(25,195,125,.32)} /* CLIENTE FECHADO */
+.wa-app .conv .ctag--perdido{background:transparent;color:var(--muted);border-color:var(--line-2)}                /* PERDIDO */
+.wa-app .conv .ctag--cancelado{background:transparent;color:var(--muted);border-color:var(--line-2)}              /* CANCELADO */
+/* CANAL ATUAL — verde WhatsApp bem apagado (é contexto, não protagonista) */
+.wa-app .conv .ctag--canal{background:transparent;color:var(--wa);border-color:rgba(31,168,85,.30);font-weight:600}
 [data-theme="dark"] .wa-app .conv .ctag--atendente{background:rgba(59,130,246,.18);color:#93b4fc;border-color:rgba(59,130,246,.34)}
 .wa-app .conv .crow-status{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:2px}
 .wa-app .conv .cstatus{font-size:11px;font-weight:500;line-height:1.2;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

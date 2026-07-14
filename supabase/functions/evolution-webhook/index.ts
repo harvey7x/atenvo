@@ -1,4 +1,9 @@
 // evolution-webhook — eventos da Evolution. Sem JWT. Secret via webhook_config (constante).
+// v27: UM ATENDIMENTO ATIVO POR CONTATO. A conversa deixa de ser chaveada por (contato+canal): cliente
+//      que veio pelo ANDRIUS e passa a ser atendido pela URA/LUIZA/RMKT CONTINUA na mesma conversa —
+//      só o CANAL ATUAL muda. conversas.canal_id = CANAL ATUAL (card / responder por / continuidade);
+//      a AQUISIÇÃO fica congelada em conversas.canal_origem_id. Nenhuma conversa/mensagem é apagada;
+//      a duplicata legada é tratada por secundarizar_conversa (arquiva, preserva histórico).
 // v26: REMARKETING — antes do dispatch ao bot-runner, chama bot_remarketing_inbound: lead que responde em
 //      remarketing volta pra LEAD NOVO (entrada) ANTES do runner checar elegibilidade; opt-out → PERDIDO e
 //      pula o dispatch. Best-effort (try/catch): erro/timeout da RPC nunca quebra o webhook nem trava o lead comum.
@@ -259,9 +264,28 @@ Deno.serve(async (req) => {
         } catch { /* não bloqueia o webhook */ }
       }
 
+      // v27: UM atendimento ativo por CONTATO (a conversa NÃO é mais chaveada por canal).
+      // Cliente que veio pelo ANDRIUS e passa a ser atendido pela URA/LUIZA/RMKT continua na MESMA
+      // conversa — só o CANAL ATUAL (canal_id) muda. Isso mata a duplicata visual na lista.
+      // Preferimos a conversa NÃO arquivada; uma arquivada (ex.: secundarizada) só é reusada se for a
+      // ÚNICA — aí o fluxo de reabertura abaixo a traz de volta (cliente voltou a falar).
       let conversaId: string | null = null;
-      const { data: conv } = await admin.from('conversas').select('id').eq('organizacao_id', orgId).eq('contato_id', contatoId).eq('canal_id', canal.id).neq('status', 'fechada').order('criado_em', { ascending: false }).limit(1).maybeSingle();
-      if (conv) conversaId = conv.id; else { const { data: nc, error: e2 } = await admin.from('conversas').insert({ organizacao_id: orgId, contato_id: contatoId, canal_id: canal.id, status: 'aberta' }).select('id').single(); if (e2 || !nc) { await finish('erro', { erro: `conversas:${e2?.code ?? ''}:${(e2?.message ?? 'sem retorno').slice(0,180)}` }); return json({ ok: true }); } conversaId = nc.id; }
+      const { data: conv } = await admin.from('conversas')
+        .select('id')
+        .eq('organizacao_id', orgId).eq('contato_id', contatoId)
+        .neq('status', 'fechada')
+        .order('arquivada_em', { ascending: true, nullsFirst: true })     // não-arquivada primeiro
+        .order('ultima_interacao_em', { ascending: false, nullsFirst: false })
+        .limit(1).maybeSingle();
+      if (conv) conversaId = conv.id;
+      else {
+        // conversa nova: canal_id = canal ATUAL; canal_origem_id = canal de AQUISIÇÃO (imutável).
+        const { data: nc, error: e2 } = await admin.from('conversas')
+          .insert({ organizacao_id: orgId, contato_id: contatoId, canal_id: canal.id, canal_origem_id: canal.id, status: 'aberta' })
+          .select('id').single();
+        if (e2 || !nc) { await finish('erro', { erro: `conversas:${e2?.code ?? ''}:${(e2?.message ?? 'sem retorno').slice(0,180)}` }); return json({ ok: true }); }
+        conversaId = nc.id;
+      }
 
       // ---- MÍDIA (imagem/vídeo/áudio/documento/sticker): baixa pela Evolution e guarda no bucket privado. ----
       // Mesma cadeia do áudio (getBase64FromMediaMessage). Falha de download => PENDENTE recuperável, nunca descarta.
@@ -311,7 +335,8 @@ Deno.serve(async (req) => {
           status: 'entregue', enviada_em: nowIso, entregue_em: nowIso, metadados: metaMsg ?? { origem: 'telefone', via: 'webhook_fromMe' },
         }, { onConflict: 'id_externo', ignoreDuplicates: true });
         if (msgErr) { await finish('erro', { erro: `mensagens_out:${msgErr.code ?? ''}:${(msgErr.message ?? '').slice(0,180)}` }); return json({ ok: true }); }
-        await admin.from('conversas').update({ ultima_interacao_em: nowIso, ultimo_canal_id: canal.id, ultimo_numero: canal.numero_conectado ?? null, ultimo_provider: canal.provider ?? 'whatsapp', ultima_msg_canal_em: nowIso }).eq('id', conversaId);
+        // v27: saída pelo celular também move o CANAL ATUAL (atendente passou a falar por outro número).
+        await admin.from('conversas').update({ ultima_interacao_em: nowIso, canal_id: canal.id, ultimo_canal_id: canal.id, ultimo_numero: canal.numero_conectado ?? null, ultimo_provider: canal.provider ?? 'whatsapp', ultima_msg_canal_em: nowIso }).eq('id', conversaId);
         await finish('processado', { ignorado_motivo: `fromMe_telefone${tipoMsg !== 'texto' ? '_' + tipoMsg : ''}` }); return json({ ok: true });
       }
 
@@ -324,16 +349,27 @@ Deno.serve(async (req) => {
       const { data: insArr, error: msgErr } = await admin.from('mensagens').upsert({ conversa_id: conversaId, organizacao_id: orgId, direcao: 'entrada', tipo: tipoMsg, conteudo: conteudoMsg ?? null, id_externo: provMsgId, status: 'entregue', recebida_em: nowEntradaIso, metadados: metaMsg ?? { via: 'webhook', origem: 'cliente' } }, { onConflict: 'id_externo', ignoreDuplicates: true }).select('id');
       if (msgErr) { await finish('erro', { erro: `mensagens:${msgErr.code ?? ''}:${(msgErr.message ?? '').slice(0,180)}` }); return json({ ok: true }); }
       const inboundNovo = Array.isArray(insArr) && insArr.length > 0; // false em reentrega (idempotente)
+      // v27: CANAL ATUAL do atendimento = o número por onde o cliente acabou de falar. canal_id passa a
+      // ser "canal atual" (card + continuidade); ultimo_canal_* alimenta o "Responder por".
+      // A AQUISIÇÃO fica congelada em canal_origem_id (nunca é tocada aqui).
+      const canalPatch = {
+        canal_id: canal.id,
+        ultimo_canal_id: canal.id,
+        ultimo_numero: canal.numero_conectado ?? null,
+        ultimo_provider: canal.provider ?? 'whatsapp',
+        ultima_msg_canal_em: nowEntradaIso,
+      };
       if (inboundNovo) {
         // não lida operacional++ (nunca conta fromMe — este é o ramo de ENTRADA) e REABRE conversa arquivada.
         const { data: cv } = await admin.from('conversas').select('nao_lidas, arquivada_em').eq('id', conversaId).maybeSingle();
         await admin.from('conversas').update({
           ultima_interacao_em: nowEntradaIso,
           nao_lidas: (cv?.nao_lidas ?? 0) + 1,
+          ...canalPatch,
           ...(cv?.arquivada_em ? { arquivada_em: null, arquivada_por: null } : {}),
         }).eq('id', conversaId);
       } else {
-        await admin.from('conversas').update({ ultima_interacao_em: nowEntradaIso }).eq('id', conversaId);
+        await admin.from('conversas').update({ ultima_interacao_em: nowEntradaIso, ...canalPatch }).eq('id', conversaId);
       }
 
       const inboundMsgId = (insArr?.[0]?.id as string | undefined) ?? null;

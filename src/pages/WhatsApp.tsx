@@ -927,8 +927,8 @@ export function WhatsApp() {
                   <div className="cbadges">
                     {badges.map((e) => (
                       <span key={e.tipo + e.texto}
-                            className={'ctag ctag--' + e.tipo + (e.tipo === 'etapa' ? ' ctag--etapa-' + (e.variante ?? 'neutro') : '')}
-                            title={e.tipo === 'lead' ? 'Lead novo — ainda não assumido' : e.tipo === 'atendente' ? 'Atendente responsável' : 'Etapa do Kanban'}>
+                            className={'ctag ctag--' + (e.tipo === 'situacao' ? (e.variante ?? 'atendimento') : e.tipo)}
+                            title={e.tipo === 'atendente' ? 'Atendente responsável' : e.tipo === 'canal' ? 'Canal atual do atendimento' : 'Situação'}>
                         {e.texto}
                       </span>
                     ))}

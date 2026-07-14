@@ -62,10 +62,26 @@ async function achaOuCriaContato(db: any, org: string, metaPaginaId: string, psi
   return { id: novo.id, novo: true };
 }
 
+// UM atendimento ativo por CONTATO (mesma regra do evolution-webhook v27). A conversa NÃO é chaveada
+// por canal: se o contato já tem atendimento ativo (mesmo que por WhatsApp), REUSA e só move o CANAL
+// ATUAL para cá. Sem isso, o unique index "1 conversa ativa por contato" faria este insert FALHAR e a
+// mensagem do Facebook se perderia. canal_origem_id preserva a aquisição.
 async function achaOuCriaConversa(db: any, org: string, contatoId: string, canalId: string): Promise<string> {
-  const { data: conv } = await db.from('conversas').select('id').eq('organizacao_id', org).eq('contato_id', contatoId).eq('canal_id', canalId).not('status', 'in', '(resolvida,fechada)').order('ultima_interacao_em', { ascending: false }).limit(1).maybeSingle();
-  if (conv) return conv.id;
-  const { data: nova } = await db.from('conversas').insert({ organizacao_id: org, contato_id: contatoId, canal_id: canalId, status: 'aberta', ultimo_canal_id: canalId, ultimo_provider: 'meta', ultima_interacao_em: new Date().toISOString(), ultima_msg_canal_em: new Date().toISOString() }).select('id').single();
+  const agora = new Date().toISOString();
+  const { data: conv } = await db.from('conversas').select('id')
+    .eq('organizacao_id', org).eq('contato_id', contatoId)
+    .not('status', 'in', '(resolvida,fechada)')
+    .order('arquivada_em', { ascending: true, nullsFirst: true })   // não-arquivada primeiro
+    .order('ultima_interacao_em', { ascending: false, nullsFirst: false })
+    .limit(1).maybeSingle();
+  if (conv) {
+    // canal ATUAL passa a ser este (o cliente está falando por aqui agora)
+    await db.from('conversas').update({
+      canal_id: canalId, ultimo_canal_id: canalId, ultimo_provider: 'meta', ultima_msg_canal_em: agora,
+    }).eq('id', conv.id);
+    return conv.id;
+  }
+  const { data: nova } = await db.from('conversas').insert({ organizacao_id: org, contato_id: contatoId, canal_id: canalId, canal_origem_id: canalId, status: 'aberta', ultimo_canal_id: canalId, ultimo_provider: 'meta', ultima_interacao_em: agora, ultima_msg_canal_em: agora }).select('id').single();
   return nova.id;
 }
 
