@@ -12,6 +12,7 @@ import { MsgImage } from '@/components/MsgImage';
 import { MsgVideo } from '@/components/MsgVideo';
 import { WhatsAppText } from '@/components/WhatsAppText';
 import { formatarNomeCliente } from '@/lib/nomeCliente';
+import { etiquetasDaConversa, responsavelEfetivo } from '@/lib/conversaEtiquetas';
 import { EmptyState } from '@/components/EmptyState';
 import { useScripts, useScriptEtapaCounts, aguardarConfirmacaoEnvio, traduzErroEnvio } from '@/data/scripts';
 import { ScriptSequenceModal } from '@/components/ScriptSequenceModal';
@@ -810,6 +811,8 @@ export function WhatsApp() {
   const etiquetas = etiquetasQ.data ?? [];
   const etiquetasAtivas = etiquetas.filter((e) => e.ativo);
   const orgUsuarios = orgUsuariosQ.data ?? [];
+  // resolve nome do usuário p/ a etiqueta de atendente (conversa -> contato -> oportunidade)
+  const nomePorId = (id: string): string | null => orgUsuarios.find((u) => u.id === id)?.nome ?? null;
   const respNome = current.respId ? (orgUsuarios.find((u) => u.id === current.respId)?.nome ?? null) : null;
   const orgUsuariosFiltrados = orgUsuarios.filter((u) => { const t = transferBusca.trim().toLowerCase(); return !t || u.nome.toLowerCase().includes(t); });
   const statusFechada = statusDefs.find((s) => s.slug === 'fechada' || s.nome.trim().toLowerCase() === 'fechada') ?? null;
@@ -891,8 +894,9 @@ export function WhatsApp() {
             <div style={{ padding: '30px 12px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>Nenhuma conversa nesta aba.</div>
           ) : filtered.map((c) => {
             const wait = c.aguardando ? tempoEspera(c.aguardandoDesde) : null;
-            // atendente responsável (contatos.responsavel_id resolvido pela equipe da org)
-            const atendNome = c.respId ? (orgUsuarios.find((u) => u.id === c.respId)?.nome ?? 'Atendente') : 'Não atribuído';
+            // atendente responsável — mesma ordem da etiqueta: conversa -> contato -> oportunidade
+            const atendId = responsavelEfetivo(c);
+            const atendNome = atendId ? (nomePorId(atendId) ?? 'Atendente') : 'Não atribuído';
             // cliente sem nome real (vazio ou só dígitos/telefone) → rótulo + telefone REAL secundário.
             // Nunca exibe o LID/nome-numérico como "telefone" (identificador técnico).
             const nomeVazio = !c.name?.trim() || /^[\d\s()+\-]+$/.test(c.name.trim());
@@ -906,8 +910,11 @@ export function WhatsApp() {
               : (finalizado ? 'Finalizado' : (c.status || 'Em atendimento'));
             const barTier = wait ? (atrasado ? 'critico' : 'aguardando') : (c.id === currentId ? 'ativo' : 'neutro');
             const slaChips = slaPorConversa.get(c.id) ?? [];
+            // Etiquetas (padrão WhatsApp Business): [LEAD NOVO] OU [ATENDENTE] [ETAPA].
+            const badges = etiquetasDaConversa(c, nomePorId);
             return (
-            <div key={c.id} data-cid={c.id} className={'conv conv--' + barTier + (c.id === currentId ? ' active' : '')} onClick={() => selectContact(c.id)}>
+            <div key={c.id} data-cid={c.id} className={'conv conv--' + barTier + (c.id === currentId ? ' active' : '')}
+                 title={'Atendente: ' + atendNome + ' · Canal: WhatsApp ' + c.chip} onClick={() => selectContact(c.id)}>
               <Avatar name={c.name} />
               <div className="cbody">
                 <div className="crow">
@@ -915,11 +922,16 @@ export function WhatsApp() {
                   <span className="ctime">{c.time}</span>
                 </div>
                 {nomeVazio && telSec && <div className="cphone">{telSec}</div>}
-                <div className="cmeta" title={'Atendente: ' + atendNome + ' · Canal: WhatsApp ' + c.chip}>
-                  <span className="cmeta-ic" aria-hidden="true">👤</span>{atendNome} · <span className="cmeta-canal">WA {c.chip}</span>
-                </div>
-                {(slaChips.length > 0 || c.precisaHumano) && (
-                  <div className="conv-sla">
+                <div className="cprev">{c.last || '—'}</div>
+                {(badges.length > 0 || slaChips.length > 0 || c.precisaHumano) && (
+                  <div className="cbadges">
+                    {badges.map((e) => (
+                      <span key={e.tipo + e.texto}
+                            className={'ctag ctag--' + e.tipo + (e.tipo === 'etapa' ? ' ctag--etapa-' + (e.variante ?? 'neutro') : '')}
+                            title={e.tipo === 'lead' ? 'Lead novo — ainda não assumido' : e.tipo === 'atendente' ? 'Atendente responsável' : 'Etapa do Kanban'}>
+                        {e.texto}
+                      </span>
+                    ))}
                     {slaChips.map((a) => (
                       <span key={a.id} className={'conv-sla-chip ' + sevClass(a.severidade) + ' int-' + sevIntensidade(a.severidade)} title={a.detalhe ?? a.titulo}>
                         {sevIntensidade(a.severidade) !== 'discreto' && <>{tipoEmoji(a.tipo)} </>}{tipoLabel(a.tipo)}
@@ -928,7 +940,6 @@ export function WhatsApp() {
                     {c.precisaHumano && <span className="conv-sla-chip ph" title="Conversa marcada como precisa de atendimento humano">🙋 Precisa humano</span>}
                   </div>
                 )}
-                <div className="cprev">{c.last || '—'}</div>
                 <div className="crow-status">
                   <span className={'cstatus cstatus--' + barTier}>{statusTxt}{c.arquivada ? ' · Arquivada' : ''}{c.silenciada ? ' 🔕' : ''}</span>
                   {c.unread > 0 && <span className="unread" title={c.unread + ' não lidas'} aria-label={c.unread + ' mensagens não lidas'}>{c.unread > 99 ? '99+' : c.unread}</span>}

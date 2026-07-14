@@ -70,10 +70,12 @@ export function systemRemarketing(angulo: AnguloRemarketing, contexto?: string |
 /** Preenche {nome} no texto (fallback ou saída da IA), com vocativo neutro se não houver nome. */
 export function preencherNome(texto: string, primeiro?: string | null): string {
   const nome = (primeiro ?? '').trim();
-  if (nome) return texto.replaceAll('{nome}', nome);
+  // regex global em vez de replaceAll: o tsconfig do frontend (que type-checa este módulo
+  // pelos testes) tem lib < es2021, onde String.replaceAll não existe.
+  if (nome) return texto.replace(/\{nome\}/g, nome);
   // sem nome: remove o vocativo inicial "{nome}, " / "Oi, {nome}! " sem deixar buraco
   return texto
     .replace(/Oi,\s*\{nome\}!\s*/g, 'Oi! ')
     .replace(/\{nome\},\s*/g, '')
-    .replaceAll('{nome}', '');
+    .replace(/\{nome\}/g, '');
 }

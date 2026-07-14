@@ -65,6 +65,16 @@ export interface WaContact {
   contatoId?: string | null;
   /** id do usuário responsável (contatos.responsavel_id). */
   respId?: string | null;
+  /** id do atendente da CONVERSA (conversas.atendente_id) — 1ª preferência p/ a etiqueta. */
+  atendenteId?: string | null;
+  /** etapa/coluna atual do Kanban (oportunidade do contato) — etiqueta [CONTRATOS]. */
+  etapa?: string | null;
+  /** a coluna é a ENTRADA do funil (não conta como oportunidade avançada). */
+  etapaEntrada?: boolean;
+  /** resultado da coluna (ganho/perdido/neutro) — só para a cor da etiqueta. */
+  etapaResultado?: 'ganho' | 'perdido' | 'neutro' | null;
+  /** responsável da oportunidade (3ª preferência p/ a etiqueta de atendente). */
+  oppRespId?: string | null;
   last: string;
   email: string;
   stage: string;
