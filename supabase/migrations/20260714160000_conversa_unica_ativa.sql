@@ -1,4 +1,4 @@
--- ⚠️ PENDENTE — NÃO ESTÁ EM supabase/migrations DE PROPÓSITO.
+-- Proteção contra duplicidade ativa (aplicada APÓS o backfill de unificação: 0 duplicatas restantes).
 -- Este index FALHA hoje: existem 24 contatos com conversa ativa duplicada. Ele só pode ser aplicado
 -- DEPOIS do backfill (secundarizar_conversa) aprovado e executado. Mover para supabase/migrations
 -- nesse momento.
