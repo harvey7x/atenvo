@@ -230,12 +230,25 @@ export function Integracoes() {
                                   {h.lastErrorAt ? ` · último erro ${haQuanto(h.lastErrorAt)}` : ''}
                                 </span>
                               ) : (healthQ.isLoading && <span className="conn-sub" style={{ color: 'var(--muted)' }}>Carregando diagnóstico…</span>)}
+                              {/* ENTREGA (outbound) — separada da sessão: conectado ≠ entrega funcionando */}
+                              {ativo && (c.entregaStatus === 'restrito' || c.entregaStatus === 'instavel') && (
+                                <span className="conn-sub" style={{ color: 'var(--warn)' }}>
+                                  {c.entregaStatus === 'restrito'
+                                    ? 'Canal conectado, mas com falha de entrega. Evite reenviar ou reconectar agora.'
+                                    : 'Canal conectado, mas algumas mensagens não estão sendo entregues.'}
+                                </span>
+                              )}
                               {!c.origemTipo && !c.gestorId && <span className="conn-sub" style={{ color: 'var(--warn)' }}>Origem comercial não configurada</span>}
                             </div>
                             <div className="conn-actions">
                               {h
                                 ? <span className="badge" style={{ background: COR_BG[h.cor], color: COR_FG[h.cor] }}><span className="dot" style={{ background: COR_FG[h.cor] }} />{ESTADO_LABEL[h.estado] ?? h.estado}</span>
                                 : <span className={'badge ' + st.cls}>{st.dot && <span className="dot" />}{st.t}</span>}
+                              {ativo && (c.entregaStatus === 'restrito' || c.entregaStatus === 'instavel') && (
+                                <span className="badge" style={{ background: 'var(--warn-soft, #f6ebd8)', color: 'var(--warn)' }} title="Saúde de entrega (envio real ao cliente), separada da conexão">
+                                  <span className="dot" style={{ background: 'var(--warn)' }} />Entrega: {c.entregaStatus === 'restrito' ? 'restrita' : 'instável'}
+                                </span>
+                              )}
                               <button className="btn-sm" onClick={() => setDiag(c.id)}>Ver diagnóstico</button>
                               {podeConfig && <button className="btn-sm" disabled={removendo} onClick={() => setConfig(c)}>Configurar origem comercial</button>}
                               {podeConfig && !ativo && <button className="btn-sm acc" disabled={removendo} title="Reconectar reutiliza este canal (não consome uma nova vaga)." onClick={() => setReconectar({ id: c.id, alias: c.alias })}>Reconectar</button>}

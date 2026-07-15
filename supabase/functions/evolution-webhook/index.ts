@@ -1,4 +1,8 @@
 // evolution-webhook — eventos da Evolution. Sem JWT. Secret via webhook_config (constante).
+// v28: SAÚDE DE ENTREGA (outbound) separada da sessão. No messages.update, ERROR/DELIVERY_ACK/READ de
+//      SAÍDA classificam canais.entrega_status (ok/instavel/restrito): ERROR sem stub→restrito, com stub→
+//      instavel; entrega real a destino EXTERNO recupera ok (self-send não conta). NÃO altera envio_restrito
+//      nem health_check_status. Filtro de teste agora ignora "Teste de entrega Atenvo" também (não vira lead).
 // v27: UM ATENDIMENTO ATIVO POR CONTATO. A conversa deixa de ser chaveada por (contato+canal): cliente
 //      que veio pelo ANDRIUS e passa a ser atendido pela URA/LUIZA/RMKT CONTINUA na mesma conversa —
 //      só o CANAL ATUAL muda. conversas.canal_id = CANAL ATUAL (card / responder por / continuidade);
@@ -37,6 +41,7 @@
 // v13: registra mensagens fromMe (enviadas pelo celular) como SAÍDA idempotente (#7).
 import { corsHeaders, json } from './cors.ts';
 import { adminClient } from './client.ts';
+import { classificarEntrega, eventoDoStatus, type EntregaStatus } from './entrega.ts';
 
 function safeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
@@ -169,7 +174,7 @@ Deno.serve(async (req) => {
     const fromMe = typeof key.fromMe === 'boolean' ? (key.fromMe as boolean) : null;
     const provMsgId = (key.id as string) ?? null;
 
-    const { data: canal } = await admin.from('canais').select('id, organizacao_id, numero_conectado, provider').eq('instancia_externa', instanceName).maybeSingle();
+    const { data: canal } = await admin.from('canais').select('id, organizacao_id, numero_conectado, provider, entrega_status, entrega_erros_recentes').eq('instancia_externa', instanceName).maybeSingle();
 
     const { data: track } = await admin.from('whatsapp_webhook_events').insert({
       organizacao_id: canal?.organizacao_id ?? null, canal_id: canal?.id ?? null, instance_name: instanceName, instance_id: instanceId,
@@ -209,7 +214,7 @@ Deno.serve(async (req) => {
       const midia = midiaOf(msgObj);
       const conteudoMsg = corpo ?? midia?.caption ?? null; // legenda da mídia vira o texto exibido
       // v22: mensagens do HEALTH CHECK (wa-health-check) não viram lead/conversa/inbox. Marcador estável no texto.
-      if (corpo && /^\s*teste autom[aá]tico atenvo\b/i.test(corpo)) { await finish('ignorado', { ignorado_motivo: 'health_check' }); return json({ ok: true }); }
+      if (corpo && /^\s*teste (autom[aá]tico|de entrega) atenvo\b/i.test(corpo)) { await finish('ignorado', { ignorado_motivo: 'health_check' }); return json({ ok: true }); }
       if (!corpo && !midia) { await finish('ignorado', { ignorado_motivo: 'sem_conteudo' }); return json({ ok: true }); }
       if (!phone && !lid) { await finish('ignorado', { ignorado_motivo: 'sem_identificador' }); return json({ ok: true }); }
       // v21: evento SÓ com LID → consulta o mapa CONFIRMADO por (org, canal, lid) e REUTILIZA o PN já vinculado
@@ -423,6 +428,13 @@ Deno.serve(async (req) => {
       const map: Record<string, string> = { PENDING: 'pendente', SERVER_ACK: 'enviada', DELIVERY_ACK: 'entregue', READ: 'lida', PLAYED: 'lida', ERROR: 'falhou' };
       // ranking p/ status monotônico: o ack só avança (nunca regride enviada<-entregue por ack fora de ordem).
       const RANK: Record<string, number> = { pendente: 0, enviada: 1, entregue: 2, lida: 3 };
+      // Saúde de ENTREGA (outbound) — acumula o efeito dos ACKs deste lote no canal. Independe do
+      // health_check_status (sessão) e NÃO altera envio_restrito. canal é garantido não-nulo aqui (guard acima).
+      let entregaEstado: { status: EntregaStatus; erros: number } = {
+        status: ((canal.entrega_status as EntregaStatus) ?? 'desconhecido'), erros: (canal.entrega_erros_recentes as number) ?? 0,
+      };
+      let entregaTocou = false, entregaErroEm = false;
+      const numCanal = digits(canal.numero_conectado as string);
       for (const it of arr) {
         const id = ((it.key as { id?: string } | undefined)?.id) ?? (it.keyId as string | undefined);
         const status = (it.status as string | undefined)?.toUpperCase();
@@ -430,22 +442,38 @@ Deno.serve(async (req) => {
         const novo = map[status];
         if (!novo) continue;
         // estado atual da mensagem (por id_externo) para decidir avanço/regressão.
-        const { data: atualRow } = await admin.from('mensagens').select('status').eq('id_externo', id).maybeSingle();
+        const { data: atualRow } = await admin.from('mensagens').select('status, direcao').eq('id_externo', id).maybeSingle();
         if (!atualRow) continue;
         const atual = (atualRow.status as string) ?? 'pendente';
+        const sp = (it.messageStubParameters as unknown);
+        const stub = Array.isArray(sp) ? sp.join(',') : (sp != null ? String(sp) : null);
         if (novo === 'falhou') {
           // só marca falha se ainda NÃO houve confirmação real de entrega/leitura.
           if (atual === 'entregue' || atual === 'lida') continue;
-          const sp = (it.messageStubParameters as unknown);
-          const stub = Array.isArray(sp) ? sp.join(',') : (sp != null ? String(sp) : null);
           await admin.from('mensagens').update({ status: 'falhou', erro_envio: `ERROR${stub ? ':' + stub.slice(0, 80) : ''}`, metadados: { erro: { status, remoteJid: (it.remoteJid as string) ?? null, instance: instanceName, stub: stub ?? null, em: new Date().toISOString() } } }).eq('id_externo', id);
           falhas++;
         } else {
           if ((RANK[novo] ?? 0) <= (RANK[atual] ?? -1)) continue; // não regride
           await admin.from('mensagens').update({ status: novo }).eq('id_externo', id); n++;
         }
+        // ---- classifica ENTREGA só p/ mensagem de SAÍDA (ACK é sobre o que ENVIAMOS) ----
+        if ((atualRow.direcao as string) === 'saida') {
+          const destino = digits(it.remoteJid as string);
+          const externo = !!destino && destino !== numCanal;                 // self-send não prova entrega a cliente
+          const ev = eventoDoStatus(status, !!stub, externo);
+          if (ev) {
+            const patch = classificarEntrega(ev, entregaEstado);
+            if (patch) { entregaEstado = { status: patch.entrega_status, erros: patch.entrega_erros_recentes }; entregaTocou = true; if (patch.marcarErroEm) entregaErroEm = true; }
+          }
+        }
       }
-      await finish('processado', { ignorado_motivo: `acks:${n}${falhas ? ` falhas:${falhas}` : ''}` }); return json({ ok: true });
+      if (entregaTocou) {
+        await admin.from('canais').update({
+          entrega_status: entregaEstado.status, entrega_erros_recentes: entregaEstado.erros,
+          ...(entregaErroEm ? { entrega_ultimo_erro_em: new Date().toISOString() } : {}),
+        }).eq('id', canal.id); // NÃO toca health_check_status nem envio_restrito
+      }
+      await finish('processado', { ignorado_motivo: `acks:${n}${falhas ? ` falhas:${falhas}` : ''}${entregaTocou ? ` entrega:${entregaEstado.status}` : ''}` }); return json({ ok: true });
     }
 
     await finish('ignorado', { ignorado_motivo: `evento_nao_tratado:${event}` });

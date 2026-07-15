@@ -403,6 +403,9 @@ export function WhatsApp() {
   const canalRestrito = WA_REAL && !!canalSel?.envioRestrito;
   // Saúde de ENVIO do canal de resposta (mesmo conectado, o outbound pode estar falhando).
   const envioSaude = useWaCanalEnvioSaude(canalConectado && !canalRestrito ? (replyCanalId || current?.canalId) : null).data?.estado ?? 'ok';
+  // Saúde de ENTREGA persistida (webhook classifica pelos ACKs reais): sessão conectada ≠ entrega funcionando.
+  const canalEntrega = WA_REAL ? (canalSel?.entregaStatus ?? 'desconhecido') : 'ok';
+  const canalEntregaProblema = canalEntrega === 'restrito' || canalEntrega === 'instavel';
   // Caso D: conversa sem número de resposta confirmado (origem LID). Bloqueia o envio até vincular um PN validado.
   const semDestino = WA_REAL && !!current.id && !!current.semDestino;
   const [vincOpen, setVincOpen] = useState(false);
@@ -1150,12 +1153,14 @@ export function WhatsApp() {
             </div>
           )}
           {/* Canal conectado, mas com envio falhando (state=open não garante envio). Recebimento segue normal. */}
-          {!canalIndisponivel && !canalRestrito && envioSaude !== 'ok' && (
+          {!canalIndisponivel && !canalRestrito && (envioSaude !== 'ok' || canalEntregaProblema) && (
             <div className="warn warn-block">
               <IcWarn />
-              {envioSaude === 'indisponivel'
-                ? <>O canal <b>{canalSel?.alias}</b> está recebendo mensagens, mas não consegue enviar no momento. Selecione outro canal para responder (o envio por outro número muda o remetente para o cliente).</>
-                : <>O envio pelo canal <b>{canalSel?.alias}</b> está instável agora (algumas mensagens estão falhando). Se falhar, selecione outro canal em "Responder por".</>}
+              {canalEntrega === 'restrito'
+                ? <>Este canal (<b>{canalSel?.alias}</b>) está conectado, mas <b>falhou na entrega</b> de mensagens recentes. Prefira outro canal em "Responder por" e evite reconectar repetidamente.</>
+                : envioSaude === 'indisponivel'
+                  ? <>O canal <b>{canalSel?.alias}</b> está recebendo mensagens, mas não consegue enviar no momento. Selecione outro canal para responder (o envio por outro número muda o remetente para o cliente).</>
+                  : <>O envio pelo canal <b>{canalSel?.alias}</b> está instável agora (algumas mensagens estão falhando). Se falhar, selecione outro canal em "Responder por".</>}
             </div>
           )}
           {semDestino && !canalIndisponivel && (
