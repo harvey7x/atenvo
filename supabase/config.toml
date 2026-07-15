@@ -432,6 +432,16 @@ verify_jwt = false
 [functions.meta-auth-callback]
 verify_jwt = false
 
+# Funções SECRET-GATED (autenticação por header próprio, NÃO pelo JWT do usuário):
+# cron/webhook as chamam sem Authorization. Precisam de verify_jwt=false — senão o gateway
+# do Supabase rejeita antes da função rodar (ex.: cron wa-health-check-diario / bot-remarketing).
+[functions.wa-health-check]
+verify_jwt = false
+[functions.bot-runner]
+verify_jwt = false
+[functions.bot-remarketing]
+verify_jwt = false
+
 # As demais (evolution-* e meta-auth-start, meta-pages, meta-manage,
 # meta-send-message) exigem o JWT do usuário (verify_jwt = true por padrão) —
 # chamadas só pelo app logado.
