@@ -94,8 +94,11 @@ Deno.serve(async (req) => {
     const canalId: string = body.canal_id;
     if (!canalId) return json({ error: 'canal_id é obrigatório.' }, 400);
     const { data: canal } = await admin.from('canais')
-      .select('id, instancia_externa, organizacao_id, ativo').eq('id', canalId).eq('organizacao_id', orgId).maybeSingle();
+      .select('id, instancia_externa, organizacao_id, ativo, status_integracao').eq('id', canalId).eq('organizacao_id', orgId).maybeSingle();
     if (!canal) return json({ error: 'Canal não encontrado.' }, 404);
+    // Canal APOSENTADO/removido não pode reconectar nem gerar QR (evita ressuscitar sessão zumbi do mesmo número).
+    if (canal.status_integracao === 'removido' && (action === 'reconnect' || action === 'qr'))
+      return json({ error: 'Este canal foi removido/aposentado. Crie um novo WhatsApp em vez de reconectá-lo.', code: 'canal_removido' }, 409);
 
     // RECONNECT: reusa o MESMO canal histórico (preserva nome/origem/gestor/relatórios) e cria uma
     // NOVA instância Evolution. Usado quando o canal está desconectado (sem sessão).

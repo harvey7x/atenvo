@@ -1,4 +1,7 @@
 // evolution-webhook — eventos da Evolution. Sem JWT. Secret via webhook_config (constante).
+// v29: (a) canal 'removido' NÃO é reativado por connection.update (fim do "canal aposentado volta sozinho");
+//      (b) consolidação por número virou DETECÇÃO DE CONFLITO (wa_consolidar_canal_por_numero não funde mais
+//      silenciosamente — marca conflito_com); (c) entrega suavizada (instavel antes de restrito, 3 erros).
 // v28: SAÚDE DE ENTREGA (outbound) separada da sessão. No messages.update, ERROR/DELIVERY_ACK/READ de
 //      SAÍDA classificam canais.entrega_status (ok/instavel/restrito): ERROR sem stub→restrito, com stub→
 //      instavel; entrega real a destino EXTERNO recupera ok (self-send não conta). NÃO altera envio_restrito
@@ -174,7 +177,7 @@ Deno.serve(async (req) => {
     const fromMe = typeof key.fromMe === 'boolean' ? (key.fromMe as boolean) : null;
     const provMsgId = (key.id as string) ?? null;
 
-    const { data: canal } = await admin.from('canais').select('id, organizacao_id, numero_conectado, provider, entrega_status, entrega_erros_recentes').eq('instancia_externa', instanceName).maybeSingle();
+    const { data: canal } = await admin.from('canais').select('id, organizacao_id, numero_conectado, provider, status_integracao, entrega_status, entrega_erros_recentes').eq('instancia_externa', instanceName).maybeSingle();
 
     const { data: track } = await admin.from('whatsapp_webhook_events').insert({
       organizacao_id: canal?.organizacao_id ?? null, canal_id: canal?.id ?? null, instance_name: instanceName, instance_id: instanceId,
@@ -189,6 +192,8 @@ Deno.serve(async (req) => {
     if (event === 'connection.update') {
       const state = (data.state as string) ?? (data.connection as string);
       if (state === 'open') {
+        // Canal APOSENTADO/removido NÃO é ressuscitado por um evento de conexão (instância zumbi / reconexão indevida).
+        if (canal.status_integracao === 'removido') { await finish('ignorado', { ignorado_motivo: 'canal_removido' }); return json({ ok: true }); }
         const numero = digits((data.wuid as string) ?? (data.ownerJid as string));
         // v23: reconectou → limpa silêncio de alerta ("silenciar até reconexão" se resolve sozinho).
         await admin.from('canais').update({ status_integracao: 'conectado', ativo: true, ...(numero ? { numero_conectado: numero } : {}), conectado_em: new Date().toISOString(), ultima_sincronizacao: new Date().toISOString(), alerta_silenciado: false, alerta_silenciado_ate: null, alerta_silenciado_motivo: null, alerta_silenciado_por: null }).eq('id', canal.id);

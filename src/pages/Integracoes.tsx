@@ -238,10 +238,18 @@ export function Integracoes() {
                                     : 'Canal conectado, mas algumas mensagens não estão sendo entregues.'}
                                 </span>
                               )}
+                              {/* CONFLITO de número: este canal autenticou um número que já é de outro canal — não foi fundido. */}
+                              {c.conflitoCom && (
+                                <span className="conn-sub" style={{ color: 'var(--crit, #b23f38)' }}>
+                                  Este número já está cadastrado como <b>{canais.find((k) => k.id === c.conflitoCom)?.alias ?? 'outro canal'}</b>. Este canal em conflito não será usado — reconecte o canal existente ou remova este.
+                                </span>
+                              )}
                               {!c.origemTipo && !c.gestorId && <span className="conn-sub" style={{ color: 'var(--warn)' }}>Origem comercial não configurada</span>}
                             </div>
                             <div className="conn-actions">
-                              {h
+                              {c.conflitoCom
+                                ? <span className="badge" style={{ background: 'var(--crit-soft, #f7e3e1)', color: 'var(--crit, #b23f38)' }}><span className="dot" style={{ background: 'var(--crit, #b23f38)' }} />Conflito de número</span>
+                                : h
                                 ? <span className="badge" style={{ background: COR_BG[h.cor], color: COR_FG[h.cor] }}><span className="dot" style={{ background: COR_FG[h.cor] }} />{ESTADO_LABEL[h.estado] ?? h.estado}</span>
                                 : <span className={'badge ' + st.cls}>{st.dot && <span className="dot" />}{st.t}</span>}
                               {ativo && (c.entregaStatus === 'restrito' || c.entregaStatus === 'instavel') && (
@@ -251,7 +259,7 @@ export function Integracoes() {
                               )}
                               <button className="btn-sm" onClick={() => setDiag(c.id)}>Ver diagnóstico</button>
                               {podeConfig && <button className="btn-sm" disabled={removendo} onClick={() => setConfig(c)}>Configurar origem comercial</button>}
-                              {podeConfig && !ativo && <button className="btn-sm acc" disabled={removendo} title="Reconectar reutiliza este canal (não consome uma nova vaga)." onClick={() => setReconectar({ id: c.id, alias: c.alias })}>Reconectar</button>}
+                              {podeConfig && !ativo && !c.conflitoCom && <button className="btn-sm acc" disabled={removendo} title="Reconectar reutiliza este canal (não consome uma nova vaga)." onClick={() => setReconectar({ id: c.id, alias: c.alias })}>Reconectar</button>}
                               {podeConfig && ativo && <button className="btn-sm danger" disabled={removendo} onClick={() => setRemocao({ tipo: 'whatsapp', id: c.id, nome: c.alias + (c.numero ? ' · ' + mascararNumero(c.numero) : ''), modo: 'desconectar' })}>{removendo ? 'Desconectando…' : 'Desconectar'}</button>}
                               {podeConfig && <button className="btn-sm danger" disabled={removendo} title="Remove da lista sem apagar o histórico (conversas, mensagens e relatórios são preservados)." onClick={() => setRemocao({ tipo: 'whatsapp', id: c.id, nome: c.alias + (c.numero ? ' · ' + mascararNumero(c.numero) : ''), modo: 'ocultar' })}>Remover</button>}
                             </div>
