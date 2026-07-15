@@ -435,18 +435,41 @@ Deno.serve(async (req) => {
       };
       let entregaTocou = false, entregaErroEm = false;
       const numCanal = digits(canal.numero_conectado as string);
+      // aplica um evento de entrega ao estado acumulado do canal (destino externo = prova real).
+      const aplicaEntrega = (statusProv: string, temStub: boolean, externo: boolean) => {
+        const ev = eventoDoStatus(statusProv, temStub, externo);
+        if (!ev) return;
+        const patch = classificarEntrega(ev, entregaEstado);
+        if (patch) { entregaEstado = { status: patch.entrega_status, erros: patch.entrega_erros_recentes }; entregaTocou = true; if (patch.marcarErroEm) entregaErroEm = true; }
+      };
       for (const it of arr) {
         const id = ((it.key as { id?: string } | undefined)?.id) ?? (it.keyId as string | undefined);
         const status = (it.status as string | undefined)?.toUpperCase();
         if (!id || !status) continue;
         const novo = map[status];
         if (!novo) continue;
-        // estado atual da mensagem (por id_externo) para decidir avanço/regressão.
-        const { data: atualRow } = await admin.from('mensagens').select('status, direcao').eq('id_externo', id).maybeSingle();
-        if (!atualRow) continue;
-        const atual = (atualRow.status as string) ?? 'pendente';
         const sp = (it.messageStubParameters as unknown);
         const stub = Array.isArray(sp) ? sp.join(',') : (sp != null ? String(sp) : null);
+        // estado atual da mensagem (por id_externo) para decidir avanço/regressão.
+        const { data: atualRow } = await admin.from('mensagens').select('status, direcao').eq('id_externo', id).maybeSingle();
+        if (!atualRow) {
+          // Fase 2: pode ser o ACK de um PROBE de entrega (não vive em mensagens, e sim em canal_health_runs).
+          const { data: run } = await admin.from('canal_health_runs')
+            .select('id, dados').eq('message_id', id).eq('tipo', 'entrega').eq('canal_id', canal.id)
+            .order('criado_em', { ascending: false }).limit(1).maybeSingle();
+          if (run && (run.dados as { aguardando_ack?: boolean } | null)?.aguardando_ack) {
+            aplicaEntrega(status, !!stub, true);                              // probe = destino externo autorizado
+            const entregue = status === 'DELIVERY_ACK' || status === 'READ' || status === 'PLAYED';
+            await admin.from('canal_health_runs').update({
+              sucesso: entregue, status_resultado: entregue ? 'entregue' : status,
+              erro: entregue ? null : `ERROR${stub ? ':' + stub.slice(0, 80) : ''}`,
+              erro_tipo: entregue ? null : (stub ? 'instavel' : 'restrito'),
+              dados: { ...(run.dados as object), aguardando_ack: false, ack: status },
+            }).eq('id', run.id);
+          }
+          continue;
+        }
+        const atual = (atualRow.status as string) ?? 'pendente';
         if (novo === 'falhou') {
           // só marca falha se ainda NÃO houve confirmação real de entrega/leitura.
           if (atual === 'entregue' || atual === 'lida') continue;
@@ -459,12 +482,7 @@ Deno.serve(async (req) => {
         // ---- classifica ENTREGA só p/ mensagem de SAÍDA (ACK é sobre o que ENVIAMOS) ----
         if ((atualRow.direcao as string) === 'saida') {
           const destino = digits(it.remoteJid as string);
-          const externo = !!destino && destino !== numCanal;                 // self-send não prova entrega a cliente
-          const ev = eventoDoStatus(status, !!stub, externo);
-          if (ev) {
-            const patch = classificarEntrega(ev, entregaEstado);
-            if (patch) { entregaEstado = { status: patch.entrega_status, erros: patch.entrega_erros_recentes }; entregaTocou = true; if (patch.marcarErroEm) entregaErroEm = true; }
-          }
+          aplicaEntrega(status, !!stub, !!destino && destino !== numCanal);   // self-send não prova entrega a cliente
         }
       }
       if (entregaTocou) {

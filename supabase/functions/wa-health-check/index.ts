@@ -1,4 +1,6 @@
 // wa-health-check — teste ativo de saúde do canal WhatsApp (envia p/ número interno autorizado).
+// tipo='entrega' (Fase 2): probe de ENTREGA real — envia a canais.entrega_teste_phone (externo autorizado,
+//   nunca cliente/self) e confirma pelo ACK (o webhook finaliza o run e classifica entrega_status).
 // Chamado pelo pg_cron (automatico) ou pela RPC wa_canal_executar_health_check_manual (manual), sempre
 // com header x-health-secret == webhook_config.health_check. Deploy com --no-verify-jwt (auth pelo secret).
 // NUNCA envia para cliente: só para canais.health_check_target_phone. Não cria contato/conversa/lead
@@ -40,6 +42,48 @@ Deno.serve(async (req) => {
     if (!EVO_BASE || !EVO_KEY) return json({ error: 'evolution_nao_configurada' }, 503);
 
     const body = await req.json().catch(() => ({})) as { canal_id?: string; tipo?: string; criado_por?: string };
+
+    // ============ PROBE DE ENTREGA (Fase 2) — envia a número INTERNO/autorizado e confirma pelo ACK real ============
+    // Só canal CONECTADO e com entrega_teste_phone configurado. NUNCA cliente, NUNCA self-send como prova.
+    // Grava um run tipo='entrega' PENDENTE; o evolution-webhook finaliza pelo DELIVERY_ACK/READ (ok) ou ERROR
+    // (restrito/instavel). NÃO altera envio_restrito nem health_check_status (sessão).
+    if (body.tipo === 'entrega') {
+      if (!body.canal_id) return json({ error: 'canal_id_obrigatorio' }, 400);
+      const { data: c } = await admin.from('canais')
+        .select('id, organizacao_id, nome_interno, instancia_externa, status_integracao, entrega_teste_phone, numero_conectado')
+        .eq('id', body.canal_id).maybeSingle();
+      if (!c) return json({ error: 'canal_nao_encontrado' }, 404);
+      if (c.status_integracao !== 'conectado' || !c.instancia_externa) return json({ error: 'canal_nao_conectado', nota: 'probe roda só em canal conectado' }, 409);
+      const alvo = (c.entrega_teste_phone ?? '').replace(/\D/g, '');
+      if (!alvo) return json({ error: 'entrega_teste_phone_nao_configurado', nota: 'configure o número interno autorizado do canal' }, 409);
+      if (alvo === (c.numero_conectado ?? '').replace(/\D/g, '')) return json({ error: 'alvo_igual_ao_proprio_numero', nota: 'self-send não prova entrega; use um número externo autorizado' }, 409);
+
+      const t0 = Date.now();
+      const st = await evoCall(`/instance/connectionState/${c.instancia_externa}`, 'GET');
+      const state = st.data?.instance?.state ?? null;
+      if (state !== 'open') return json({ error: `sessao_${state ?? 'desconhecida'}`, nota: 'sessão não está open' }, 409);
+
+      const texto = 'Teste de entrega Atenvo — não responder';
+      const snd = await evoCall(`/message/sendText/${c.instancia_externa}`, 'POST', { number: alvo, text: texto });
+      const msgId: string | null = snd.data?.key?.id ?? null;
+      const aceito = snd.ok && (!!msgId || !!snd.data?.status);
+      const masc = alvo.length > 4 ? '••••' + alvo.slice(-4) : alvo;
+      const erroSend = aceito ? null : ((snd.data?.message ?? snd.data?.error ?? snd.netError ?? `send HTTP ${snd.status}`)?.toString?.().slice(0, 200) ?? 'falha_envio');
+
+      await admin.from('canal_health_runs').insert({
+        organizacao_id: c.organizacao_id, canal_id: c.id, tipo: 'entrega',
+        sucesso: false,                                                       // PENDENTE: só o ACK confirma entrega
+        status_resultado: aceito ? 'aguardando_ack' : String(snd.status),
+        erro: erroSend, erro_tipo: aceito ? null : 'infra',
+        message_id: msgId, instancia_externa: c.instancia_externa, target_phone: masc, latencia_ms: Date.now() - t0,
+        dados: { aguardando_ack: aceito, destino_masc: masc }, criado_por: body.criado_por ?? null,
+      });
+
+      if (!aceito) return json({ ok: false, tipo: 'entrega', aceito: false, erro: erroSend, destino: masc });
+      return json({ ok: true, tipo: 'entrega', aceito: true, pendente: true, message_id: msgId, destino: masc,
+        nota: 'Enviado ao número interno; aguardando ACK de entrega (DELIVERY_ACK/ERROR) via webhook.' });
+    }
+
     const manual = body.tipo === 'manual' && !!body.canal_id;
 
     // ---- seleção de canais ----
