@@ -41,6 +41,10 @@ export const waDisconnect = (orgId: string, canalId: string) =>
 /** "Desconectar": encerra a sessão/instância e desativa o canal — PRESERVA todo o histórico (não apaga o canal). */
 export const waRemove = (orgId: string, canalId: string) =>
   invoke<{ ok: boolean }>('evolution-manage', { action: 'remove', organizacao_id: orgId, canal_id: canalId });
+/** "Remover da lista": oculta o canal (status 'removido') — some das Integrações, mas PRESERVA todo o
+ *  histórico (conversas/mensagens/oportunidades/relatórios). Funciona mesmo com o canal já desconectado. */
+export const waOcultar = (orgId: string, canalId: string) =>
+  invoke<{ ok: boolean }>('evolution-manage', { action: 'ocultar', organizacao_id: orgId, canal_id: canalId });
 /** Reconectar: reusa o MESMO canal histórico e cria uma nova instância Evolution (novo QR). */
 export const waReconnect = (orgId: string, canalId: string) =>
   invoke<CreateResult>('evolution-manage', { action: 'reconnect', organizacao_id: orgId, canal_id: canalId });

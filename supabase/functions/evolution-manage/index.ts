@@ -1,5 +1,6 @@
 // evolution-manage — ações do conector de WhatsApp por QR Code.
-// action: create | qr | status | disconnect | remove
+// action: create | qr | status | disconnect | remove | reconnect | ocultar
+// 'ocultar' remove o canal da LISTA (status 'removido') SEM apagar histórico; funciona em canal já desconectado.
 // v10: 'remove' é EXCLUSÃO DEFINITIVA — apaga a instância na Evolution e EXCLUI o registro local
 //      (integracoes + canais). Conversas/mensagens/oportunidades são preservadas via FKs ON DELETE SET NULL.
 import { corsHeaders, json } from './cors.ts';
@@ -130,6 +131,23 @@ Deno.serve(async (req) => {
         await admin.from('canais').update({ status_integracao: 'desconectado', ativo: false, instancia_externa: null }).eq('id', canalId);
         return json({ error: `Falha ao criar instância: ${(e as Error).message}` }, 502);
       }
+    }
+
+    // OCULTAR: remove o canal da LISTA de conexões sem apagar nada. Marca status 'removido'
+    // (a listagem já filtra status <> 'removido'). Encerra a sessão se ainda houver instância.
+    // PRESERVA canal, conversas, mensagens, contatos, oportunidades, cobranças, origem e relatórios.
+    // Funciona mesmo com o canal já desconectado (sem instância) — por isso vem ANTES do guard abaixo.
+    if (action === 'ocultar') {
+      const inst = canal.instancia_externa as string | null;
+      if (inst) {
+        try { await evolution.logout(inst); } catch { /* sessão já pode estar encerrada */ }
+        try { await evolution.remove(inst); } catch { /* instância pode já não existir */ }
+      }
+      await admin.from('integracoes').delete().eq('canal_id', canalId); // registro técnico descartável
+      await admin.from('canais').update({
+        status_integracao: 'removido', ativo: false, instancia_externa: null,
+      }).eq('id', canalId);
+      return json({ ok: true });
     }
 
     const instance = canal.instancia_externa as string;

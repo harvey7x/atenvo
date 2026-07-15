@@ -5,7 +5,7 @@ import { useToast } from '@/hooks/useToast';
 import { useOrg } from '@/context/OrgContext';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { WhatsAppConnect } from '@/components/WhatsAppConnect';
-import { useWaCanais, useWaLimite, useWaHealth, waRemove, mascararNumero, useFontesAquisicao, waUpdateComercial, type WaCanal, type ComercialInput, type WaHealthCanal } from '@/data/whatsapp';
+import { useWaCanais, useWaLimite, useWaHealth, waRemove, waOcultar, mascararNumero, useFontesAquisicao, waUpdateComercial, type WaCanal, type ComercialInput, type WaHealthCanal } from '@/data/whatsapp';
 import { FB_REAL, useFbStatus, fbAuthStart, fbPages, fbConnect, fbDisconnect } from '@/data/facebook';
 import { useOrgUsuarios } from '@/data/atendimento';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -70,7 +70,8 @@ export function Integracoes() {
   const [fbBusy, setFbBusy] = useState(false);
   const [fbSel, setFbSel] = useState<{ id: string; nome: string }[] | null>(null);
   const [fbCode, setFbCode] = useState<string | null>(null);
-  const [remocao, setRemocao] = useState<{ tipo: 'whatsapp' | 'facebook'; id: string; nome: string } | null>(null);
+  // modo: 'desconectar' encerra a sessão (preserva canal); 'ocultar' remove da lista (status 'removido').
+  const [remocao, setRemocao] = useState<{ tipo: 'whatsapp' | 'facebook'; id: string; nome: string; modo?: 'desconectar' | 'ocultar' } | null>(null);
   const [remLoading, setRemLoading] = useState(false);
   const [config, setConfig] = useState<WaCanal | null>(null);
   const [waFiltro, setWaFiltro] = useState<'ativos' | 'desconectados' | 'todos'>('ativos');
@@ -83,9 +84,13 @@ export function Integracoes() {
     if (!remocao) return;
     setRemLoading(true);
     try {
-      if (remocao.tipo === 'whatsapp') await waRemove(currentOrg.id, remocao.id);
-      else await fbDisconnect(remocao.id);
-      toast(remocao.tipo === 'whatsapp' ? 'WhatsApp desconectado. Histórico preservado.' : 'Conexão removida.'); refresh(); setRemocao(null);
+      if (remocao.tipo === 'whatsapp') {
+        if (remocao.modo === 'ocultar') await waOcultar(currentOrg.id, remocao.id);
+        else await waRemove(currentOrg.id, remocao.id);
+      } else await fbDisconnect(remocao.id);
+      toast(remocao.modo === 'ocultar' ? 'Conexão removida da lista. Histórico preservado.'
+        : remocao.tipo === 'whatsapp' ? 'WhatsApp desconectado. Histórico preservado.' : 'Conexão removida.');
+      refresh(); setRemocao(null);
     } catch (e) {
       // Falha parcial: não fingir sucesso — mantém o item, registra o erro técnico e avisa o usuário.
       console.error('[integracoes] falha ao remover conexão', remocao, e);
@@ -234,7 +239,8 @@ export function Integracoes() {
                               <button className="btn-sm" onClick={() => setDiag(c.id)}>Ver diagnóstico</button>
                               {podeConfig && <button className="btn-sm" disabled={removendo} onClick={() => setConfig(c)}>Configurar origem comercial</button>}
                               {podeConfig && !ativo && <button className="btn-sm acc" disabled={removendo} title="Reconectar reutiliza este canal (não consome uma nova vaga)." onClick={() => setReconectar({ id: c.id, alias: c.alias })}>Reconectar</button>}
-                              {podeConfig && ativo && <button className="btn-sm danger" disabled={removendo} onClick={() => setRemocao({ tipo: 'whatsapp', id: c.id, nome: c.alias + (c.numero ? ' · ' + mascararNumero(c.numero) : '') })}>{removendo ? 'Desconectando…' : 'Desconectar'}</button>}
+                              {podeConfig && ativo && <button className="btn-sm danger" disabled={removendo} onClick={() => setRemocao({ tipo: 'whatsapp', id: c.id, nome: c.alias + (c.numero ? ' · ' + mascararNumero(c.numero) : ''), modo: 'desconectar' })}>{removendo ? 'Desconectando…' : 'Desconectar'}</button>}
+                              {podeConfig && <button className="btn-sm danger" disabled={removendo} title="Remove da lista sem apagar o histórico (conversas, mensagens e relatórios são preservados)." onClick={() => setRemocao({ tipo: 'whatsapp', id: c.id, nome: c.alias + (c.numero ? ' · ' + mascararNumero(c.numero) : ''), modo: 'ocultar' })}>Remover</button>}
                             </div>
                           </div>
                         );
@@ -344,13 +350,15 @@ export function Integracoes() {
 
       <ConfirmDialog
         open={!!remocao}
-        title={remocao?.tipo === 'whatsapp' ? 'Desconectar WhatsApp?' : 'Remover conexão?'}
+        title={remocao?.modo === 'ocultar' ? 'Remover da lista?' : remocao?.tipo === 'whatsapp' ? 'Desconectar WhatsApp?' : 'Remover conexão?'}
         message={remocao
-          ? (remocao.tipo === 'whatsapp'
-              ? `A conexão "${remocao.nome}" será encerrada, mas conversas, contatos, histórico e relatórios serão preservados. Você poderá reconectar o mesmo número depois.`
-              : `A conexão "${remocao.nome}" será desconectada do provedor e deixará de aparecer na lista. O histórico de conversas e mensagens é preservado.`)
+          ? (remocao.modo === 'ocultar'
+              ? `A conexão "${remocao.nome}" vai sumir da lista de Integrações, mas TODO o histórico (conversas, mensagens, contatos, oportunidades e relatórios) é preservado. Se ela ainda estiver conectada, a sessão é encerrada.`
+              : remocao.tipo === 'whatsapp'
+                ? `A conexão "${remocao.nome}" será encerrada, mas conversas, contatos, histórico e relatórios serão preservados. Você poderá reconectar o mesmo número depois.`
+                : `A conexão "${remocao.nome}" será desconectada do provedor e deixará de aparecer na lista. O histórico de conversas e mensagens é preservado.`)
           : ''}
-        destructive loading={remLoading} confirmLabel={remocao?.tipo === 'whatsapp' ? 'Desconectar' : 'Remover conexão'} cancelLabel="Cancelar"
+        destructive loading={remLoading} confirmLabel={remocao?.modo === 'ocultar' ? 'Remover da lista' : remocao?.tipo === 'whatsapp' ? 'Desconectar' : 'Remover conexão'} cancelLabel="Cancelar"
         onConfirm={confirmarRemocao} onCancel={() => { if (!remLoading) setRemocao(null); }} />
 
       {config && <ConfigOrigemModal canal={config} onClose={() => setConfig(null)} onSaved={() => { setConfig(null); qc.invalidateQueries({ queryKey: ['wa-canais', currentOrg.id] }); qc.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).startsWith('rel-') }); toast('Configuração salva.'); }} />}
