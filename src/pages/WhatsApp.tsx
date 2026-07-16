@@ -1069,15 +1069,13 @@ export function WhatsApp() {
                       {falhaActs}
                     </>
                   ) : m.anexoPath ? (
-                    <>
-                      <AudioMessage
-                        path={m.anexoPath} nome={m.nome}
-                        resolveUrl={(p) => urlAssinadaMidiaWa(p).catch(() => null)}
-                        time={m.time}
-                        statusNode={ack ? <span className={'tick ' + ack.cls} title={ack.title}>{ack.ticks}</span> : null}
-                      />
-                      {dlBtn}
-                    </>
+                    <AudioMessage
+                      path={m.anexoPath} nome={m.nome}
+                      resolveUrl={(p) => urlAssinadaMidiaWa(p).catch(() => null)}
+                      time={m.time}
+                      statusNode={ack ? <span className={'tick ' + ack.cls} title={ack.title}>{ack.ticks}</span> : null}
+                      acaoNode={dlBtn}
+                    />
                   ) : m.midiaPendente ? (
                     <>
                       <div className="bubble bubble-falha bubble-audio-falha"><IcMic />Áudio indisponível — <button type="button" className="msg-falha-link" disabled={!m.id || recarregando === m.id} onClick={() => recarregarAudio(m)}>{recarregando === m.id ? 'Carregando…' : 'tentar carregar novamente'}</button></div>
@@ -1087,34 +1085,36 @@ export function WhatsApp() {
                 ) : m.tipo === 'imagem' ? (
                   <>
                     {m.anexoPath
-                      ? <MsgImage path={m.anexoPath} nome={m.nome} caption={m.text || undefined} metaNode={m.text ? metaInline : undefined} falhou={m.status === 'falhou'} onOpen={setLightbox} />
+                      ? <MsgImage path={m.anexoPath} nome={m.nome} caption={m.text || undefined} metaNode={m.text ? metaInline : undefined} falhou={m.status === 'falhou'} onOpen={setLightbox} acaoNode={dlBtn} />
                       : <div className="media-card bubble-img"><div className="msg-img-fallback"><span className="mif-txt">Imagem indisponível</span></div></div>}
-                    {dlBtn}
                     {!m.text && tempo}
                     {falhaActs}
                   </>
                 ) : m.tipo === 'video' ? (
                   <>
                     {m.anexoPath
-                      ? <MsgVideo path={m.anexoPath} nome={m.nome} caption={m.text || undefined} metaNode={m.text ? metaInline : undefined} falhou={m.status === 'falhou'} />
+                      ? <MsgVideo path={m.anexoPath} nome={m.nome} caption={m.text || undefined} metaNode={m.text ? metaInline : undefined} falhou={m.status === 'falhou'} acaoNode={dlBtn} />
                       : <div className="media-card bubble-img"><div className="msg-img-fallback"><span className="mif-txt">Vídeo indisponível</span></div></div>}
-                    {dlBtn}
                     {!m.text && tempo}
                     {falhaActs}
                   </>
                 ) : m.tipo === 'documento' ? (
                   <>
                     <div className={'media-card bubble-doc' + (m.status === 'falhou' ? ' media-falha' : '')}>
-                      <button type="button" className="doc-card" onClick={() => baixarMidia(m)} title={rotuloBaixarMidia(m.tipo)} disabled={m.status === 'falhou' || baixando === (m.id ?? m.anexoPath)}>
+                      <div className="doc-card doc-card-info">
                         <span className="doc-ic"><IcDoc /></span>
                         <span className="doc-info">
                           <span className="doc-nome">{m.nome || 'documento'}</span>
-                          <span className="doc-meta">{(m.nome?.split('.').pop() || '').toUpperCase()}{m.tamanho ? ' · ' + fmtTam(m.tamanho) : ''}{baixando === (m.id ?? m.anexoPath) ? ' · baixando…' : ''}</span>
+                          <span className="doc-meta">{(m.nome?.split('.').pop() || '').toUpperCase()}{m.tamanho ? ' · ' + fmtTam(m.tamanho) : ''}</span>
                         </span>
-                        <span className="doc-open"><IcDownload /></span>
-                      </button>
+                      </div>
                       {m.anexoPath && m.status !== 'falhou' && (
-                        <button type="button" className="doc-abrir" onClick={() => abrirDocumento(m)} title="Abrir em nova aba">Abrir</button>
+                        <div className="doc-acts">
+                          <button type="button" className="doc-act" onClick={() => baixarMidia(m)} disabled={baixando === (m.id ?? m.anexoPath)} title={rotuloBaixarMidia(m.tipo)}>
+                            <IcDownload />{baixando === (m.id ?? m.anexoPath) ? 'Baixando…' : 'Baixar'}
+                          </button>
+                          <button type="button" className="doc-act doc-act-sec" onClick={() => abrirDocumento(m)} title="Abrir em nova aba">Abrir</button>
+                        </div>
                       )}
                       {m.text && (
                         <div className="media-cap">

@@ -5,8 +5,10 @@ import { WhatsAppText } from '@/components/WhatsAppText';
 /** Vídeo do histórico com estados explícitos: carregando / pronto / indisponível.
  *  URL assinada sob demanda (renovável no "Tentar novamente"); preload='metadata' não baixa o vídeo
  *  inteiro — só ao dar play. Não persiste URL nem altera o dado. */
-export function MsgVideo({ path, nome, caption, metaNode, falhou }: {
+export function MsgVideo({ path, nome, caption, metaNode, falhou, acaoNode }: {
   path: string; nome?: string | null; caption?: string; metaNode?: ReactNode; falhou?: boolean;
+  /** ação sobreposta ao vídeo (ex.: baixar) — canto SUPERIOR direito, p/ não cobrir os controles. */
+  acaoNode?: ReactNode;
 }) {
   const [url, setUrl] = useState<string | null>(null);
   const [estado, setEstado] = useState<'loading' | 'ok' | 'erro'>('loading');
@@ -37,7 +39,10 @@ export function MsgVideo({ path, nome, caption, metaNode, falhou }: {
           <button type="button" className="mif-retry" onClick={resolver}>Tentar novamente</button>
         </div>
       ) : url ? (
-        <video className="msg-video" src={url} controls preload="metadata" style={{ maxWidth: '100%', borderRadius: 10, display: 'block' }} />
+        <div className="media-frame media-frame-video">
+          <video className="msg-video" src={url} controls preload="metadata" style={{ maxWidth: '100%', borderRadius: 10, display: 'block' }} />
+          {acaoNode}
+        </div>
       ) : (
         <div className="msg-img-ph" role="status">Carregando vídeo…</div>
       )}

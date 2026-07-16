@@ -11,8 +11,10 @@ const IcImgOff = () => (
 /** Imagem do histórico com estados explícitos: carregando / carregada / indisponível.
  *  Resolve a URL assinada sob demanda (renovável no "Tentar novamente"). Não persiste URL,
  *  não envia nada e não altera o dado — apenas exibe. */
-export function MsgImage({ path, nome, caption, metaNode, falhou, onOpen }: {
+export function MsgImage({ path, nome, caption, metaNode, falhou, onOpen, acaoNode }: {
   path: string; nome?: string | null; caption?: string; metaNode?: ReactNode; falhou?: boolean; onOpen: (url: string) => void;
+  /** ação sobreposta à imagem (ex.: baixar) — fica dentro do frame, canto inferior direito. */
+  acaoNode?: ReactNode;
 }) {
   const [url, setUrl] = useState<string | null>(null);
   const [estado, setEstado] = useState<'loading' | 'ok' | 'erro'>('loading');
@@ -46,11 +48,14 @@ export function MsgImage({ path, nome, caption, metaNode, falhou, onOpen }: {
           <button type="button" className="mif-retry" onClick={resolver}>Tentar novamente</button>
         </div>
       ) : url ? (
-        <img
-          className="msg-img" src={url} alt={nome || 'imagem'} loading="lazy"
-          onLoad={() => setEstado('ok')} onError={() => setEstado('erro')}
-          onClick={() => onOpen(url)} title="Ampliar"
-        />
+        <div className="media-frame">
+          <img
+            className="msg-img" src={url} alt={nome || 'imagem'} loading="lazy"
+            onLoad={() => setEstado('ok')} onError={() => setEstado('erro')}
+            onClick={() => onOpen(url)} title="Ampliar"
+          />
+          {estado === 'ok' && acaoNode}
+        </div>
       ) : (
         <div className="msg-img-ph" role="status">Carregando imagem…</div>
       )}

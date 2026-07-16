@@ -20,10 +20,12 @@ interface Props {
   statusNode?: ReactNode;
   falhou?: boolean;
   onRetry?: () => void;
+  /** ação dentro do card (ex.: baixar) — fica na linha de meta, à direita. Não vira bolha separada. */
+  acaoNode?: ReactNode;
 }
 
 /** Player de áudio reutilizável para o histórico (play/pause, progresso, velocidade, URL sob demanda). */
-export function AudioMessage({ path, nome, resolveUrl, time, statusNode, falhou, onRetry }: Props) {
+export function AudioMessage({ path, nome, resolveUrl, time, statusNode, falhou, onRetry, acaoNode }: Props) {
   const ref = useRef<HTMLAudioElement>(null);
   const [loading, setLoading] = useState(false);
   const [indisponivel, setIndisponivel] = useState(false);
@@ -92,6 +94,7 @@ export function AudioMessage({ path, nome, resolveUrl, time, statusNode, falhou,
           <span className="audio-clock">{mmss(cur)} / {mmss(dur)}</span>
           {nome && <span className="audio-nome" title={nome}>{nome}</span>}
           <button type="button" className="audio-rate" onClick={ciclarVelocidade} title="Velocidade">{rate}x</button>
+          {acaoNode}
         </div>
       </div>
       <span className="audio-time-meta">{time}{statusNode}{falhou && onRetry && <button type="button" className="audio-retry" onClick={onRetry}>Tentar novamente</button>}</span>
