@@ -62,6 +62,41 @@ Deno.serve(async (req) => {
       return json({ ok: true, refreshed });
     }
 
+    // C2 (ops): rotate_webhook_secret — rotaciona o segredo do webhook ATOMICAMENTE no servidor.
+    // Autentica com o secret ATUAL (antigo). Gera um novo (crypto), grava em webhook_config, re-empurra
+    // por header nas instâncias conectadas, lê de volta e auto-testa. O secret NOVO nunca sai do servidor
+    // (retorna só mascarado + status). Sem reconectar/QR, sem query string, sem migration.
+    if (action === 'rotate_webhook_secret') {
+      const { data: wc0 } = await admin.from('webhook_config').select('secret').eq('chave', 'whatsapp').maybeSingle();
+      const cur = wc0?.secret ?? '';
+      if (!cur || !safeEqual(req.headers.get('x-webhook-secret') ?? '', cur)) return json({ error: 'unauthorized' }, 401);
+      const novo = 'whk_' + crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
+      const { error: upErr } = await admin.from('webhook_config').update({ secret: novo }).eq('chave', 'whatsapp');
+      if (upErr) return json({ error: 'falha_update', detalhe: upErr.message }, 500);
+      const url2 = `${Deno.env.get('SUPABASE_URL')!}/functions/v1/evolution-webhook`;
+      const { data: conectados } = await admin.from('canais')
+        .select('nome_interno, instancia_externa')
+        .eq('provider', 'evolution').eq('status_integracao', 'conectado').not('instancia_externa', 'is', null);
+      const refreshed: unknown[] = [];
+      for (const c of conectados ?? []) {
+        const inst = c.instancia_externa as string;
+        try {
+          await evolution.setWebhook(inst, url2, novo);
+          const cfg = await evolution.getWebhook(inst).catch(() => null) as Record<string, unknown> | null;
+          const w = (cfg?.webhook ?? cfg ?? {}) as Record<string, unknown>;
+          const storedUrl = String(w.url ?? '');
+          const hdrs = (w.headers ?? {}) as Record<string, unknown>;
+          refreshed.push({ canal: c.nome_interno, ok: true,
+            url_sem_secret: storedUrl.length > 0 && !/[?&]secret=/.test(storedUrl),
+            header_x_webhook_secret_armazenado: Object.keys(hdrs).some((k) => k.toLowerCase() === 'x-webhook-secret') });
+        } catch (e) { refreshed.push({ canal: c.nome_interno, ok: false, erro: (e as Error).message }); }
+      }
+      // Auto-teste server-side (não expõe o secret): novo->200, antigo->401, sem secret->401.
+      const st = (h: string | null) => fetch(url2, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(h ? { 'x-webhook-secret': h } : {}) }, body: '{}' }).then((r) => r.status).catch(() => 0);
+      const selftest = { header_novo: await st(novo), header_antigo: await st(cur), sem_secret: await st(null) };
+      return json({ ok: true, rotacionado: true, novo_mascarado: novo.slice(0, 4) + '…' + novo.slice(-3), tamanho: novo.length, refreshed, selftest });
+    }
+
     const user = await getUser(req);
     if (!user) return json({ error: 'Não autenticado.' }, 401);
     const orgId: string = body.organizacao_id;
