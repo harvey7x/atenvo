@@ -39,8 +39,10 @@ const SAUDE_BG: Record<string, string> = {
   saudavel: 'var(--ok-soft)', atencao: 'var(--warn-soft)', instavel: 'var(--warn-soft)',
   restrito: 'var(--err-soft)', sem_dados: 'var(--surface-2)', inativo: 'var(--surface-2)',
 };
+/** Nunca mostrar ACK cru (PENDING/SERVER_ACK) no painel. */
 const RESULTADO_LABEL: Record<string, string> = {
-  entregue: 'entregue', lida: 'lida', ERROR: 'erro', timeout: 'sem resposta', aguardando_ack: 'aguardando ACK',
+  entregue: 'Entregue', lida: 'Lida', ERROR: 'Erro', timeout: 'Timeout', aguardando_ack: 'Aguardando ACK',
+  SERVER_ACK: 'Aceito pelo servidor', PENDING: 'Aguardando ACK',
 };
 /** Mesmo slot determinístico do agendador (agenda.ts): minutos até o próximo teste deste canal. */
 function proximoTeste(canalId: string): number | null {
@@ -301,15 +303,24 @@ export function Integracoes() {
                             <div className="conn-actions">
                               <button className="btn-sm" onClick={() => setDiag(c.id)}>Ver diagnóstico</button>
                               {ea && ea.apto && podeConfig && (
-                                <button className="btn-sm" disabled={testando === c.id}
-                                  title="Envia agora um teste técnico ao número interno e aguarda o ACK real"
+                                <button className="btn-sm" disabled={testando === c.id || ea.pendente_recente}
+                                  title={ea.pendente_recente
+                                    ? 'Já existe um teste aguardando ACK. Aguarde o resultado (até 5 min) para não duplicar.'
+                                    : ea.estado === 'pausado'
+                                    ? 'Canal pausado por falhas recentes — o teste manual roda mesmo assim.'
+                                    : 'Envia agora um teste técnico ao número interno e aguarda o ACK real'}
                                   onClick={async () => {
                                     setTestando(c.id);
-                                    try { await rodarTeste.mutateAsync(c.id); toast('Teste enviado. O resultado aparece quando o ACK chegar.'); }
-                                    catch { toast('Não foi possível rodar o teste agora.', 'warn'); }
+                                    try {
+                                      const r = await rodarTeste.mutateAsync(c.id) as { resultados?: { pulado?: string }[] };
+                                      const pulado = r?.resultados?.[0]?.pulado;
+                                      if (pulado === 'ja_aguardando_ack') toast('Já há um teste aguardando ACK. Aguarde o resultado.', 'warn');
+                                      else if (pulado) toast(`Teste não enviado (${pulado}).`, 'warn');
+                                      else toast('Teste enviado. O resultado aparece quando o ACK chegar.');
+                                    } catch { toast('Não foi possível rodar o teste agora.', 'warn'); }
                                     finally { setTestando(null); }
                                   }}>
-                                  {testando === c.id ? 'Testando…' : 'Rodar teste agora'}
+                                  {testando === c.id ? 'Testando…' : ea.pendente_recente ? 'Aguardando ACK…' : 'Rodar teste agora'}
                                 </button>
                               )}
                               {podeConfig && <button className="btn-sm" disabled={removendo} onClick={() => setConfig(c)}>Configurar origem comercial</button>}
@@ -542,6 +553,7 @@ function DiagnosticoModal({ h, podeAgir, atualizando, entregaAuto, proximoMin, c
               <div><span className="dl">Destino</span><span className="dv">{entregaAuto.destino}</span></div>
               <div><span className="dl">Frequência</span><span className="dv">{entregaAuto.frequencia_hora}/h (a cada 12 min)</span></div>
               <div><span className="dl">Última hora</span><span className="dv">{entregaAuto.entregues_1h}/{entregaAuto.total_1h || 0} entregues · {entregaAuto.falhas_1h} falhas</span></div>
+              <div><span className="dl">Últimos 5 testes</span><span className="dv">{entregaAuto.entregues_5} entregues · {entregaAuto.erros_5} erro · {entregaAuto.timeouts_5} timeout</span></div>
               <div><span className="dl">Último teste</span><span className="dv">{entregaAuto.ultimo_em ? `${RESULTADO_LABEL[entregaAuto.ultimo_resultado ?? ''] ?? entregaAuto.ultimo_resultado} ${haQuanto(entregaAuto.ultimo_em)}` : '—'}</span></div>
               <div><span className="dl">Latência do ACK</span><span className="dv">{entregaAuto.ultimo_latencia_ms != null ? `${entregaAuto.ultimo_latencia_ms} ms` : '—'}</span></div>
               <div><span className="dl">Próximo teste</span><span className="dv">{entregaAuto.estado === 'pausado' ? '—' : proximoMin != null ? `em ${proximoMin} min` : '—'}</span></div>
@@ -551,14 +563,21 @@ function DiagnosticoModal({ h, podeAgir, atualizando, entregaAuto, proximoMin, c
             </div>
             <div className="conn-sub" style={{ marginTop: 6, color: 'var(--muted)' }}>
               {entregaAuto.saude === 'restrito'
-                ? 'O canal aceita o envio mas o WhatsApp não entrega (ERROR no ACK). Normalmente é restrição do número para envio via API — use outro canal para automação.'
+                ? 'O canal aceita o envio mas o WhatsApp responde ERROR — recusa real de entrega. Normalmente é restrição do número para envio via API: use outro canal para automação.'
+                : entregaAuto.timeouts_5 >= 2
+                ? 'Os testes estão sendo aceitos mas o ACK final não chega (timeout). Isso indica sessão/rota instável — não é o mesmo que o WhatsApp recusar a entrega.'
                 : entregaAuto.saude === 'sem_dados'
                 ? 'Nenhum teste concluído ainda. O primeiro roda automaticamente na próxima janela.'
                 : 'Teste técnico ao número interno da equipe (nunca cliente). Não cria lead nem conversa.'}
             </div>
           </>
         )}
-        <div className="sechead" style={{ margin: '14px 0 6px', fontSize: 13, fontWeight: 600 }}>Últimos {h.last10.length} envios</div>
+        {/* Atenção: esta lista é o ENVIO REAL a clientes (telemetria de mensagens) — não é o teste
+            automático. Por isso aparecem destinos de clientes aqui, e não o ••••2825. */}
+        <div className="sechead" style={{ margin: '14px 0 6px', fontSize: 13, fontWeight: 600 }}>
+          Últimos {h.last10.length} envios a clientes
+          <span className="conn-sub" style={{ fontWeight: 400, marginLeft: 6, color: 'var(--muted)' }}>(mensagens reais — não são os testes)</span>
+        </div>
         {h.last10.length === 0 ? <div className="conn-sub" style={{ color: 'var(--muted)' }}>Sem envios recentes.</div> : (
           <div className="diag-l10">
             {h.last10.map((x, i) => (

@@ -569,6 +569,12 @@ Deno.serve(async (req) => {
                 latencia_ms: Math.max(0, Date.now() - new Date(run.executado_em as string).getTime()),
                 dados: { ...(run.dados as object), aguardando_ack: false, ack: status },
               }).eq('id', run.id);
+            } else {
+              // ACK intermediário (PENDING/SERVER_ACK): o servidor aceitou, mas NÃO é entrega.
+              // Registra p/ diagnóstico e mantém o run aberto até o ACK final (ou o timeout de 5min).
+              await admin.from('canal_health_runs').update({
+                dados: { ...(run.dados as object), ack_intermediario: status, ack_intermediario_em: new Date().toISOString() },
+              }).eq('id', run.id);
             }
           }
           continue;

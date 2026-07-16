@@ -29,14 +29,16 @@ export interface RunResumo {
   executado_em: string;
 }
 
-const ENTREGUE = (s: string | null) => s === 'entregue' || s === 'lida';
-const ERRO = (s: string | null) => s === 'ERROR';
+export const ENTREGUE = (s: string | null) => s === 'entregue' || s === 'lida';
+export const ERRO = (s: string | null) => s === 'ERROR';
+export const TIMEOUT = (s: string | null) => s === 'timeout';
 
 /**
- * Pausa automática por restrição, calculada do HISTÓRICO (sem coluna nova; expira sozinha):
- *  - 3 ERROR seguidos, OU
- *  - 0 entregas nos últimos 5 testes (com 5 testes já concluídos).
- * Retorna o ISO até quando pausar, ou null. `runs` deve vir do mais recente p/ o mais antigo.
+ * Pausa automática, calculada do HISTÓRICO (sem coluna nova; expira sozinha):
+ *  - 3 ERROR seguidos (recusa real do WhatsApp), OU
+ *  - 3 timeouts seguidos (sem ACK final — provável problema de sessão/rota), OU
+ *  - 0 entregas nos últimos 5 testes concluídos.
+ * Retorna o ISO até quando pausar, ou null. `runs` vem do mais recente p/ o mais antigo.
  * NUNCA mexe em envio_restrito nem bloqueia atendimento manual — só suspende o TESTE.
  */
 export function pausaAte(runs: RunResumo[], agoraMs: number, pausaMin: number = PAUSA_MIN): string | null {
@@ -44,9 +46,20 @@ export function pausaAte(runs: RunResumo[], agoraMs: number, pausaMin: number = 
   if (concluidos.length === 0) return null;
 
   const tresErrosSeguidos = concluidos.length >= 3 && concluidos.slice(0, 3).every((r) => ERRO(r.status_resultado));
+  const tresTimeoutsSeguidos = concluidos.length >= 3 && concluidos.slice(0, 3).every((r) => TIMEOUT(r.status_resultado));
   const cincoSemEntrega = concluidos.length >= 5 && !concluidos.slice(0, 5).some((r) => ENTREGUE(r.status_resultado));
-  if (!tresErrosSeguidos && !cincoSemEntrega) return null;
+  if (!tresErrosSeguidos && !tresTimeoutsSeguidos && !cincoSemEntrega) return null;
 
   const fim = new Date(concluidos[0].executado_em).getTime() + pausaMin * 60_000;
   return fim > agoraMs ? new Date(fim).toISOString() : null;   // pausa expirada → volta a testar
+}
+
+/**
+ * Já existe um teste RECENTE aguardando ACK para este canal? Se sim, NÃO enviar outro
+ * (evita duplicar teste e falsear a estatística enquanto o ACK do anterior não chegou).
+ * Um pendente ANTIGO (> TIMEOUT_MIN) não bloqueia: ele será varrido para timeout.
+ */
+export function temTestePendenteRecente(runs: RunResumo[], agoraMs: number, timeoutMin: number = TIMEOUT_MIN): boolean {
+  return runs.some((r) => r.status_resultado === 'aguardando_ack'
+    && agoraMs - new Date(r.executado_em).getTime() < timeoutMin * 60_000);
 }

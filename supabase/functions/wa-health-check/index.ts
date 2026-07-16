@@ -10,7 +10,7 @@
 //   espalhados por slot determinístico (agenda.ts) p/ não haver rajada. Pausa 1h sozinho se o canal
 //   der 3 ERROR seguidos ou 0 entregas em 5 — sem NUNCA tocar em envio_restrito/atendimento manual.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { estaNaVez, pausaAte, slotDoCanal, TIMEOUT_MIN, type RunResumo } from './agenda.ts';
+import { estaNaVez, pausaAte, slotDoCanal, temTestePendenteRecente, TIMEOUT_MIN, type RunResumo } from './agenda.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -102,14 +102,16 @@ Deno.serve(async (req) => {
       const agora = new Date();
       const forcar = body.canal_id ?? null;   // "Rodar teste agora": ignora slot e pausa (ato humano)
 
-      // 1) fecha runs pendentes sem ACK → timeout (preserva o resto de `dados`)
+      // 1) fecha runs pendentes sem ACK final → timeout. Cobre os 3 tipos de probe (nenhum pode ficar
+      //    PENDING para sempre). Timeout ≠ ERROR: é ausência de resposta, não recusa do WhatsApp.
       const limite = new Date(agora.getTime() - TIMEOUT_MIN * 60_000).toISOString();
       const { data: pend } = await admin.from('canal_health_runs')
-        .select('id, dados').eq('tipo', 'entrega_automatica').eq('status_resultado', 'aguardando_ack')
-        .lt('executado_em', limite);
+        .select('id, dados').in('tipo', ['entrega', 'entrega_conexao', 'entrega_automatica'])
+        .eq('status_resultado', 'aguardando_ack').lt('executado_em', limite);
       for (const p of pend ?? []) {
         await admin.from('canal_health_runs').update({
-          status_resultado: 'timeout', erro: `sem ACK em ${TIMEOUT_MIN} min`, erro_tipo: 'timeout',
+          status_resultado: 'timeout', erro: `sem ACK final em ${TIMEOUT_MIN} min`, erro_tipo: 'timeout_ack',
+          sucesso: false,
           dados: { ...((p.dados as Record<string, unknown>) ?? {}), aguardando_ack: false, timeout: true },
         }).eq('id', p.id);
       }
@@ -131,6 +133,11 @@ Deno.serve(async (req) => {
         const { data: ult } = await admin.from('canal_health_runs')
           .select('status_resultado, executado_em').eq('canal_id', c.id).eq('tipo', 'entrega_automatica')
           .order('executado_em', { ascending: false }).limit(6);
+        // ANTI-RAJADA/duplicidade: se o teste anterior ainda aguarda ACK (<5min), não manda outro —
+        // vale inclusive p/ o "Rodar teste agora", senão a estatística vira ruído.
+        if (temTestePendenteRecente((ult ?? []) as RunResumo[], agora.getTime())) {
+          resultados.push({ canal: c.nome_interno, pulado: 'ja_aguardando_ack' }); continue;
+        }
         const pausado = pausaAte((ult ?? []) as RunResumo[], agora.getTime());
         if (pausado && !forcar) { resultados.push({ canal: c.nome_interno, pulado: 'pausado', ate: pausado }); continue; }
 

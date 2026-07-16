@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { slotDoCanal, estaNaVez, pausaAte, SLOTS, type RunResumo } from '../../supabase/functions/wa-health-check/agenda';
+import { slotDoCanal, estaNaVez, pausaAte, temTestePendenteRecente, SLOTS, type RunResumo } from '../../supabase/functions/wa-health-check/agenda';
 
 const A = '35014965-0e51-4c7e-aa12-627547f66374';
 const B = 'a6bde9ea-16f6-41e8-bb7f-8c4de14467a5';
@@ -60,5 +60,32 @@ describe('pausa automática por restrição (calculada do histórico)', () => {
   it('run ainda aguardando ACK não conta para a decisão', () => {
     const runs = [run('aguardando_ack', 0), run('ERROR', 12), run('ERROR', 24), run('ERROR', 36)];
     expect(pausaAte(runs, AGORA)).not.toBeNull(); // os 3 ERROR concluídos mandam
+  });
+  it('3 TIMEOUTS seguidos também pausam (sem ACK final = provável sessão/rota)', () => {
+    expect(pausaAte([run('timeout', 2), run('timeout', 14), run('timeout', 26)], AGORA)).not.toBeNull();
+  });
+  it('2 timeouts seguidos ainda NÃO pausam', () => {
+    expect(pausaAte([run('timeout', 2), run('timeout', 14), run('entregue', 26)], AGORA)).toBeNull();
+  });
+  it('timeout + erro alternados não disparam a regra dos 3 seguidos (mas 0-em-5 sim)', () => {
+    const misto = [run('timeout', 2), run('ERROR', 14), run('timeout', 26)];
+    expect(pausaAte(misto, AGORA)).toBeNull();                       // só 3 concluídos, nenhum trio puro
+    const cinco = [...misto, run('ERROR', 38), run('timeout', 50)];
+    expect(pausaAte(cinco, AGORA)).not.toBeNull();                   // 5 sem nenhuma entrega
+  });
+});
+
+describe('anti-rajada: não enviar teste novo enquanto o anterior aguarda ACK', () => {
+  it('pendente RECENTE (<5min) bloqueia novo envio', () => {
+    expect(temTestePendenteRecente([run('aguardando_ack', 2)], AGORA)).toBe(true);
+  });
+  it('pendente ANTIGO (>5min) NÃO bloqueia — será varrido p/ timeout', () => {
+    expect(temTestePendenteRecente([run('aguardando_ack', 9)], AGORA)).toBe(false);
+  });
+  it('sem pendente, libera', () => {
+    expect(temTestePendenteRecente([run('entregue', 1), run('ERROR', 13)], AGORA)).toBe(false);
+  });
+  it('exatamente no limite de 5min não bloqueia', () => {
+    expect(temTestePendenteRecente([run('aguardando_ack', 5)], AGORA)).toBe(false);
   });
 });

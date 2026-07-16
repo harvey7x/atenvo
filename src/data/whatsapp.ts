@@ -641,6 +641,12 @@ export interface EntregaAutoResumo {
   entregues_1h: number;
   falhas_1h: number;
   total_1h: number;
+  /** Janela de decisão: últimos 5 testes concluídos (timeout ≠ erro). */
+  entregues_5: number;
+  erros_5: number;
+  timeouts_5: number;
+  /** Já existe teste aguardando ACK há < 5 min ⇒ não oferecer outro (anti-rajada). */
+  pendente_recente: boolean;
   saude: EntregaSaude;
 }
 
