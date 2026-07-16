@@ -161,7 +161,11 @@ Deno.serve(async (req) => {
     const url = new URL(req.url);
     const { data: cfg } = await admin.from('webhook_config').select('secret').eq('chave', 'whatsapp').maybeSingle();
     const expected = cfg?.secret ?? '';
-    if (!expected || !safeEqual(url.searchParams.get('secret') ?? '', expected)) return json({ error: 'unauthorized' }, 401);
+    // C2 concluída: auth SOMENTE por header x-webhook-secret. Fallback de ?secret= REMOVIDO —
+    // o segredo nunca trafega na URL (logs/proxies/painel da Evolution). Instâncias novas/reconectadas
+    // e o refresh_webhook (evolution-manage) já gravam a URL sem secret + header.
+    const hdrSecret = req.headers.get('x-webhook-secret') ?? '';
+    if (!expected || !safeEqual(hdrSecret, expected)) return json({ error: 'unauthorized' }, 401);
 
     const evt = await req.json().catch(() => null) as { event?: string; instance?: string; instanceId?: string; data?: Record<string, unknown> } | null;
     let event = (evt?.event ?? '').toLowerCase();

@@ -26,16 +26,21 @@ export function extractQr(d: unknown): string | null {
 
 const WH_EVENTS = ['QRCODE_UPDATED', 'CONNECTION_UPDATE', 'MESSAGES_UPSERT', 'MESSAGES_UPDATE', 'SEND_MESSAGE'];
 
+// C2: o segredo do webhook vai no HEADER x-webhook-secret (não na URL). Enviado à Evolution v2
+// no campo webhook.headers. `secret` é opcional só p/ compatibilidade de assinatura; sempre passado.
+const whHeaders = (secret?: string) => (secret ? { 'x-webhook-secret': secret } : undefined);
+
 export const evolution = {
-  createInstance: (instanceName: string, webhookUrl: string) =>
+  createInstance: (instanceName: string, webhookUrl: string, secret?: string) =>
     call('/instance/create', 'POST', {
       instanceName, integration: 'WHATSAPP-BAILEYS', qrcode: true,
-      webhook: { url: webhookUrl, enabled: true, webhookByEvents: false, events: WH_EVENTS },
+      webhook: { url: webhookUrl, enabled: true, webhookByEvents: false, events: WH_EVENTS, headers: whHeaders(secret) },
     }),
-  setWebhook: (instanceName: string, webhookUrl: string) =>
+  setWebhook: (instanceName: string, webhookUrl: string, secret?: string) =>
     call(`/webhook/set/${instanceName}`, 'POST', {
-      webhook: { enabled: true, url: webhookUrl, webhookByEvents: false, webhookBase64: false, events: WH_EVENTS },
+      webhook: { enabled: true, url: webhookUrl, webhookByEvents: false, webhookBase64: false, events: WH_EVENTS, headers: whHeaders(secret) },
     }),
+  getWebhook: (instanceName: string) => call(`/webhook/find/${instanceName}`, 'GET'),
   connect: (instanceName: string) => call(`/instance/connect/${instanceName}`, 'GET'),
   connectionState: (instanceName: string) => call(`/instance/connectionState/${instanceName}`, 'GET') as Promise<{ instance?: { state?: string } }>,
   fetchInstance: (instanceName: string) => call(`/instance/fetchInstances?instanceName=${encodeURIComponent(instanceName)}`, 'GET'),

@@ -14,20 +14,58 @@ function normalizeNumber(jid?: string | null): string | null {
   return jid.replace(/@.*/, '').replace(/[^0-9]/g, '') || null;
 }
 
+// Comparação constante-time (mesmo padrão do evolution-webhook) para o gate por secret.
+function safeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let r = 0;
+  for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return r === 0;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   try {
     if (!evolutionConfigured()) return json({ error: 'Evolution não configurada (defina EVOLUTION_API_URL e EVOLUTION_API_KEY).' }, 503);
 
-    const user = await getUser(req);
-    if (!user) return json({ error: 'Não autenticado.' }, 401);
-
+    const admin = adminClient();
     const body = await req.json().catch(() => ({}));
     const action: string = body.action;
+
+    // C2 (ops): refresh_webhook — re-empurra o setWebhook nas instâncias CONECTADAS, no lugar,
+    // SEM reconectar/QR e sem derrubar a sessão. Gated pelo webhook secret (x-webhook-secret),
+    // não por JWT: é ação de operação/rotação. Só reescreve config de webhook na Evolution (nenhum dado).
+    if (action === 'refresh_webhook') {
+      const { data: wc0 } = await admin.from('webhook_config').select('secret').eq('chave', 'whatsapp').maybeSingle();
+      const exp = wc0?.secret ?? '';
+      if (!exp || !safeEqual(req.headers.get('x-webhook-secret') ?? '', exp)) return json({ error: 'unauthorized' }, 401);
+      const url2 = `${Deno.env.get('SUPABASE_URL')!}/functions/v1/evolution-webhook`;
+      const { data: conectados } = await admin.from('canais')
+        .select('nome_interno, instancia_externa')
+        .eq('provider', 'evolution').eq('status_integracao', 'conectado').not('instancia_externa', 'is', null);
+      const refreshed: unknown[] = [];
+      for (const c of conectados ?? []) {
+        const inst = c.instancia_externa as string;
+        try {
+          await evolution.setWebhook(inst, url2, exp);
+          // Lê de volta a config na Evolution p/ PROVAR (sem vazar o secret): URL sem ?secret e header presente.
+          const cfg = await evolution.getWebhook(inst).catch(() => null) as Record<string, unknown> | null;
+          const w = (cfg?.webhook ?? cfg ?? {}) as Record<string, unknown>;
+          const storedUrl = String(w.url ?? '');
+          const hdrs = (w.headers ?? {}) as Record<string, unknown>;
+          refreshed.push({
+            canal: c.nome_interno, ok: true,
+            url_sem_secret: storedUrl.length > 0 && !/[?&]secret=/.test(storedUrl),
+            header_x_webhook_secret_armazenado: Object.keys(hdrs).some((k) => k.toLowerCase() === 'x-webhook-secret'),
+          });
+        } catch (e) { refreshed.push({ canal: c.nome_interno, ok: false, erro: (e as Error).message }); }
+      }
+      return json({ ok: true, refreshed });
+    }
+
+    const user = await getUser(req);
+    if (!user) return json({ error: 'Não autenticado.' }, 401);
     const orgId: string = body.organizacao_id;
     if (!orgId) return json({ error: 'organizacao_id é obrigatório.' }, 400);
-
-    const admin = adminClient();
     const guard = await requireOrgAdmin(admin, user.id, orgId);
     if (!guard.ok) return json({ error: guard.reason }, 403);
 
@@ -35,7 +73,8 @@ Deno.serve(async (req) => {
     // Segredo SEMPRE da tabela webhook_config (fonte única de verdade). NUNCA do env: evita URL/segredo defasado.
     const { data: wc } = await admin.from('webhook_config').select('secret').eq('chave', 'whatsapp').maybeSingle();
     const secret = wc?.secret ?? '';
-    const webhookUrl = `${supaUrl}/functions/v1/evolution-webhook?secret=${encodeURIComponent(secret)}`;
+    // C2: o segredo vai no HEADER x-webhook-secret (setWebhook/createInstance), NUNCA na URL.
+    const webhookUrl = `${supaUrl}/functions/v1/evolution-webhook`;
 
     // -------- CREATE: valida assinatura + vaga, cria canal (reserva vaga) e instância --------
     if (action === 'create') {
@@ -78,9 +117,9 @@ Deno.serve(async (req) => {
       });
 
       try {
-        const created = await evolution.createInstance(instanceName, webhookUrl);
+        const created = await evolution.createInstance(instanceName, webhookUrl, secret);
         // garante o webhook ATUAL (URL/segredo da tabela), independente de variações do create inline
-        try { await evolution.setWebhook(instanceName, webhookUrl); } catch { /* tolerante */ }
+        try { await evolution.setWebhook(instanceName, webhookUrl, secret); } catch { /* tolerante */ }
         let qr = extractQr(created);
         if (!qr) { qr = extractQr(await evolution.connect(instanceName)); }
         return json({ canal_id: canal.id, instance: instanceName, qr_base64: qr, expires_in: QR_TTL });
@@ -124,8 +163,8 @@ Deno.serve(async (req) => {
       if (upErr) return json({ error: /limite/i.test(upErr.message) ? 'Limite de WhatsApp atingido. Contrate um adicional ou desconecte outro número.' : 'Não foi possível reconectar o canal.' }, 409);
       await admin.from('integracoes').insert({ provedor: 'evolution', canal_id: canalId, organizacao_id: orgId, status: 'sincronizando', config: { instance: instanceName } });
       try {
-        const created = await evolution.createInstance(instanceName, webhookUrl);
-        try { await evolution.setWebhook(instanceName, webhookUrl); } catch { /* tolerante */ }
+        const created = await evolution.createInstance(instanceName, webhookUrl, secret);
+        try { await evolution.setWebhook(instanceName, webhookUrl, secret); } catch { /* tolerante */ }
         let qr = extractQr(created);
         if (!qr) { qr = extractQr(await evolution.connect(instanceName)); }
         return json({ canal_id: canalId, instance: instanceName, qr_base64: qr, expires_in: QR_TTL });
@@ -158,7 +197,7 @@ Deno.serve(async (req) => {
 
     if (action === 'qr') {
       // Toda RECONEXÃO re-aplica o webhook ATUAL (URL/segredo nunca defasados) antes de gerar o QR.
-      try { await evolution.setWebhook(instance, webhookUrl); } catch { /* tolerante */ }
+      try { await evolution.setWebhook(instance, webhookUrl, secret); } catch { /* tolerante */ }
       const qr = extractQr(await evolution.connect(instance));
       return json({ qr_base64: qr, expires_in: QR_TTL });
     }
