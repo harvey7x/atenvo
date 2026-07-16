@@ -5,7 +5,7 @@ import { useToast } from '@/hooks/useToast';
 import { useOrg } from '@/context/OrgContext';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { WhatsAppConnect } from '@/components/WhatsAppConnect';
-import { useWaCanais, useWaLimite, useWaHealth, waRemove, waOcultar, mascararNumero, useFontesAquisicao, waUpdateComercial, type WaCanal, type ComercialInput, type WaHealthCanal } from '@/data/whatsapp';
+import { useWaCanais, useWaLimite, useWaHealth, waRemove, waOcultar, mascararNumero, useFontesAquisicao, waUpdateComercial, useEntregaAutoResumo, useRodarTesteEntrega, type WaCanal, type ComercialInput, type WaHealthCanal } from '@/data/whatsapp';
 import { FB_REAL, useFbStatus, fbAuthStart, fbPages, fbConnect, fbDisconnect } from '@/data/facebook';
 import { useOrgUsuarios } from '@/data/atendimento';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -25,6 +25,33 @@ const ESTADO_LABEL: Record<string, string> = {
   falha_total: 'Falha no envio', desconectado: 'Desconectado',
 };
 const COR_BG: Record<string, string> = { verde: 'var(--ok-soft)', amarelo: 'var(--warn-soft)', laranja: '#fbe6d2', vermelho: 'var(--err-soft)' };
+
+/* ---- Entrega automática: rótulos/cores por saúde (5 testes/h ao número interno) ---- */
+const SAUDE_LABEL: Record<string, string> = {
+  saudavel: 'saudável', atencao: 'atenção', instavel: 'instável', restrito: 'restrita',
+  sem_dados: 'aguardando 1º teste', inativo: 'inativa',
+};
+const SAUDE_COR: Record<string, string> = {
+  saudavel: 'var(--ok)', atencao: 'var(--warn)', instavel: 'var(--warn)',
+  restrito: 'var(--err, #b23f38)', sem_dados: 'var(--muted)', inativo: 'var(--muted)',
+};
+const SAUDE_BG: Record<string, string> = {
+  saudavel: 'var(--ok-soft)', atencao: 'var(--warn-soft)', instavel: 'var(--warn-soft)',
+  restrito: 'var(--err-soft)', sem_dados: 'var(--surface-2)', inativo: 'var(--surface-2)',
+};
+const RESULTADO_LABEL: Record<string, string> = {
+  entregue: 'entregue', lida: 'lida', ERROR: 'erro', timeout: 'sem resposta', aguardando_ack: 'aguardando ACK',
+};
+/** Mesmo slot determinístico do agendador (agenda.ts): minutos até o próximo teste deste canal. */
+function proximoTeste(canalId: string): number | null {
+  let h = 0;
+  for (let i = 0; i < canalId.length; i++) h = (Math.imul(h, 31) + canalId.charCodeAt(i)) >>> 0;
+  const slot = h % 12;
+  const min = new Date().getUTCMinutes();
+  const falta = (slot - (min % 12) + 12) % 12;
+  return falta === 0 ? 12 : falta;
+}
+const hhmm = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 const COR_FG: Record<string, string> = { verde: 'var(--ok)', amarelo: 'var(--warn)', laranja: '#c2630c', vermelho: 'var(--err)' };
 const horaCurta = (iso?: string | null) => (iso ? new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—');
 const haQuanto = (iso?: string | null) => {
@@ -77,6 +104,9 @@ export function Integracoes() {
   const [waFiltro, setWaFiltro] = useState<'ativos' | 'desconectados' | 'todos'>('ativos');
   const [reconectar, setReconectar] = useState<{ id: string; alias: string } | null>(null);
   const healthQ = useWaHealth();
+  const entregaQ = useEntregaAutoResumo();                       // painel de entrega automática (5/h por canal)
+  const rodarTeste = useRodarTesteEntrega();
+  const [testando, setTestando] = useState<string | null>(null);
   const [diag, setDiag] = useState<string | null>(null); // canalId em diagnóstico
   const podeConfig = currentOrg.role === 'admin' || currentOrg.role === 'gestor';
 
@@ -213,6 +243,7 @@ export function Integracoes() {
                         const ativo = ehAtivo(c.status);
                         const removendo = remLoading && remocao?.tipo === 'whatsapp' && remocao?.id === c.id;
                         const h = healthMap.get(c.id);
+                        const ea = entregaQ.data?.find((x) => x.canal_id === c.id);
                         return (
                           <div className="conn-row" key={c.id}>
                             <div className="conn-info">
@@ -244,6 +275,17 @@ export function Integracoes() {
                                   Este número já está cadastrado como <b>{canais.find((k) => k.id === c.conflitoCom)?.alias ?? 'outro canal'}</b>. Este canal em conflito não será usado — reconecte o canal existente ou remova este.
                                 </span>
                               )}
+                              {/* MONITORAMENTO AUTOMÁTICO DE ENTREGA: prova contínua de que o canal entrega de verdade. */}
+                              {ea && ea.apto && (
+                                <span className="conn-sub" title={`Teste técnico automático ao número interno ${ea.destino}. Não usa cliente real.`}>
+                                  Entrega automática: <b style={{ color: SAUDE_COR[ea.saude] }}>{SAUDE_LABEL[ea.saude]}</b>
+                                  {ea.estado === 'pausado' && ea.pausado_ate ? ` · pausada até ${hhmm(ea.pausado_ate)}` : ` · ${ea.frequencia_hora}/h`}
+                                  {` · destino ${ea.destino}`}
+                                  {ea.total_1h > 0 && ` · última hora: ${ea.entregues_1h}/${ea.total_1h} entregues`}
+                                  {ea.ultimo_em && ` · último: ${RESULTADO_LABEL[ea.ultimo_resultado ?? ''] ?? ea.ultimo_resultado} ${haQuanto(ea.ultimo_em)}`}
+                                  {ea.estado === 'ativo' && proximoTeste(c.id) && ` · próximo em ${proximoTeste(c.id)} min`}
+                                </span>
+                              )}
                               {!c.origemTipo && !c.gestorId && <span className="conn-sub" style={{ color: 'var(--warn)' }}>Origem comercial não configurada</span>}
                             </div>
                             <div className="conn-actions">
@@ -257,7 +299,25 @@ export function Integracoes() {
                                   <span className="dot" style={{ background: 'var(--warn)' }} />Entrega: {c.entregaStatus === 'restrito' ? 'restrita' : 'instável'}
                                 </span>
                               )}
+                              {ea && ea.apto && (
+                                <span className="badge" style={{ background: SAUDE_BG[ea.saude], color: SAUDE_COR[ea.saude] }}
+                                      title={`Entrega automática (${ea.frequencia_hora}/h ao ${ea.destino}) — última hora: ${ea.entregues_1h}/${ea.total_1h} entregues`}>
+                                  <span className="dot" style={{ background: SAUDE_COR[ea.saude] }} />Entrega auto: {SAUDE_LABEL[ea.saude]}
+                                </span>
+                              )}
                               <button className="btn-sm" onClick={() => setDiag(c.id)}>Ver diagnóstico</button>
+                              {ea && ea.apto && podeConfig && (
+                                <button className="btn-sm" disabled={testando === c.id}
+                                  title="Envia agora um teste técnico ao número interno e aguarda o ACK real"
+                                  onClick={async () => {
+                                    setTestando(c.id);
+                                    try { await rodarTeste.mutateAsync(c.id); toast('Teste enviado. O resultado aparece quando o ACK chegar.'); }
+                                    catch { toast('Não foi possível rodar o teste agora.', 'warn'); }
+                                    finally { setTestando(null); }
+                                  }}>
+                                  {testando === c.id ? 'Testando…' : 'Rodar teste agora'}
+                                </button>
+                              )}
                               {podeConfig && <button className="btn-sm" disabled={removendo} onClick={() => setConfig(c)}>Configurar origem comercial</button>}
                               {podeConfig && !ativo && !c.conflitoCom && <button className="btn-sm acc" disabled={removendo} title="Reconectar reutiliza este canal (não consome uma nova vaga)." onClick={() => setReconectar({ id: c.id, alias: c.alias })}>Reconectar</button>}
                               {podeConfig && ativo && <button className="btn-sm danger" disabled={removendo} onClick={() => setRemocao({ tipo: 'whatsapp', id: c.id, nome: c.alias + (c.numero ? ' · ' + mascararNumero(c.numero) : ''), modo: 'desconectar' })}>{removendo ? 'Desconectando…' : 'Desconectar'}</button>}

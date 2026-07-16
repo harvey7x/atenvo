@@ -335,6 +335,22 @@ Deno.serve(async (req) => {
     // (a listagem já filtra status <> 'removido'). Encerra a sessão se ainda houver instância.
     // PRESERVA canal, conversas, mensagens, contatos, oportunidades, cobranças, origem e relatórios.
     // Funciona mesmo com o canal já desconectado (sem instância) — por isso vem ANTES do guard abaixo.
+    // "Rodar teste agora" (painel de Integrações): dispara o teste de entrega deste canal, ignorando
+    // slot/pausa (é ato humano). JWT + admin/supervisor já validados acima; delega ao wa-health-check
+    // (fonte única da regra) com o secret lido do banco — nunca exposto ao front.
+    if (action === 'testar_entrega') {
+      if (!canalId) return json({ error: 'canal_id é obrigatório.' }, 400);
+      const { data: hc } = await admin.from('webhook_config').select('secret').eq('chave', 'health_check').maybeSingle();
+      if (!hc?.secret) return json({ error: 'health_check_secret_ausente' }, 503);
+      const r = await fetch(`${Deno.env.get('SUPABASE_URL')!}/functions/v1/wa-health-check`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-health-secret': hc.secret as string },
+        body: JSON.stringify({ tipo: 'entrega_automatica', canal_id: canalId }),
+      });
+      const body2 = await r.json().catch(() => null);
+      return json({ ok: r.ok, ...(body2 ?? {}) }, r.ok ? 200 : 502);
+    }
+
     if (action === 'ocultar') {
       const inst = canal.instancia_externa as string | null;
       if (inst) {

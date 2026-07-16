@@ -623,6 +623,55 @@ export async function urlAssinadaMidiaWa(path: string): Promise<string> {
 
 export { rotuloBaixarMidia, nomeArquivoMidia } from './midiaNome';
 
+/* ===================== Monitoramento automático de entrega ===================== */
+
+export type EntregaSaude = 'saudavel' | 'atencao' | 'instavel' | 'restrito' | 'sem_dados' | 'inativo';
+
+export interface EntregaAutoResumo {
+  canal_id: string;
+  canal: string;
+  apto: boolean;
+  estado: 'ativo' | 'pausado' | 'inativo';
+  pausado_ate: string | null;
+  destino: string;
+  frequencia_hora: number;
+  ultimo_em: string | null;
+  ultimo_resultado: string | null;
+  ultimo_latencia_ms: number | null;
+  entregues_1h: number;
+  falhas_1h: number;
+  total_1h: number;
+  saude: EntregaSaude;
+}
+
+/** Painel de entrega automática por canal (RPC valida is_member no banco). Atualiza sozinho. */
+export function useEntregaAutoResumo() {
+  const { currentOrg } = useOrg();
+  return useQuery({
+    queryKey: ['wa-entrega-auto', currentOrg.id],
+    enabled: WA_REAL && !!currentOrg.id,
+    refetchInterval: 60_000,                       // acompanha o cron (1 teste/12min por canal)
+    queryFn: async (): Promise<EntregaAutoResumo[]> => {
+      const { data, error } = await supabase!.rpc('wa_entrega_auto_resumo', { p_org: currentOrg.id });
+      if (error) throw new Error(error.message);
+      return (data ?? []) as EntregaAutoResumo[];
+    },
+  });
+}
+
+/** "Rodar teste agora" (ignora slot/pausa) — ação de admin/supervisor validada na Edge Function. */
+export function useRodarTesteEntrega() {
+  const qc = useQueryClient();
+  const { currentOrg } = useOrg();
+  return useMutation({
+    mutationFn: (canalId: string) =>
+      invoke<{ ok: boolean; resultados?: unknown[] }>('evolution-manage', {
+        action: 'testar_entrega', organizacao_id: currentOrg.id, canal_id: canalId,
+      }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['wa-entrega-auto', currentOrg.id] }); },
+  });
+}
+
 /**
  * URL assinada CURTA (60s) que FORÇA o download com o nome correto (Content-Disposition).
  * Bucket privado; a policy do Storage valida is_member(org) pela 1ª pasta do path → outra org não acessa.
