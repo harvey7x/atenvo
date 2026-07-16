@@ -551,17 +551,25 @@ Deno.serve(async (req) => {
         if (!atualRow) {
           // Fase 2: pode ser o ACK de um PROBE de entrega (não vive em mensagens, e sim em canal_health_runs).
           const { data: run } = await admin.from('canal_health_runs')
-            .select('id, dados').eq('message_id', id).in('tipo', ['entrega', 'entrega_conexao']).eq('canal_id', canal.id)
+            .select('id, dados, executado_em').eq('message_id', id).in('tipo', ['entrega', 'entrega_conexao', 'entrega_automatica']).eq('canal_id', canal.id)
             .order('criado_em', { ascending: false }).limit(1).maybeSingle();
           if (run && (run.dados as { aguardando_ack?: boolean } | null)?.aguardando_ack) {
-            aplicaEntrega(status, !!stub, true);                              // probe = destino externo autorizado
+            // Só ACK TERMINAL fecha o run. PENDING/SERVER_ACK são aceitação do servidor (passos
+            // intermediários), NÃO entrega e NÃO falha — se fechássemos aqui, o DELIVERY_ACK real
+            // chegaria depois e seria ignorado (probe saudável apareceria como restrito).
             const entregue = status === 'DELIVERY_ACK' || status === 'READ' || status === 'PLAYED';
-            await admin.from('canal_health_runs').update({
-              sucesso: entregue, status_resultado: entregue ? 'entregue' : status,
-              erro: entregue ? null : `ERROR${stub ? ':' + stub.slice(0, 80) : ''}`,
-              erro_tipo: entregue ? null : (stub ? 'instavel' : 'restrito'),
-              dados: { ...(run.dados as object), aguardando_ack: false, ack: status },
-            }).eq('id', run.id);
+            const falhou = status === 'ERROR';
+            if (entregue || falhou) {
+              aplicaEntrega(status, !!stub, true);                            // probe = destino externo autorizado
+              await admin.from('canal_health_runs').update({
+                sucesso: entregue, status_resultado: entregue ? 'entregue' : status,
+                erro: entregue ? null : `ERROR${stub ? ':' + stub.slice(0, 80) : ''}`,
+                erro_tipo: entregue ? null : (stub ? 'instavel' : 'restrito'),
+                // latência REAL até o ACK (envio → confirmação do provedor)
+                latencia_ms: Math.max(0, Date.now() - new Date(run.executado_em as string).getTime()),
+                dados: { ...(run.dados as object), aguardando_ack: false, ack: status },
+              }).eq('id', run.id);
+            }
           }
           continue;
         }
