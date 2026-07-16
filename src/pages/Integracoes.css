@@ -140,6 +140,14 @@
 .integracoes-page .conn-info {display:flex;flex-direction:column;gap:3px;min-width:0;flex:1 1 220px}
 .integracoes-page .conn-name {font-size:14px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .integracoes-page .conn-sub {font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* Resumo do canal: no máx. 3 chips curtos (Sessão/Entrega/Auto). O detalhe vive em "Ver diagnóstico". */
+.integracoes-page .conn-chips {display:flex;flex-wrap:wrap;gap:6px;margin-top:5px}
+.integracoes-page .conn-chip {display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:999px;
+  font-size:11.5px;font-weight:500;line-height:1.7;white-space:nowrap}
+.integracoes-page .conn-chip .dot {width:6px;height:6px;border-radius:50%;flex:none}
+/* Alerta curto: uma linha só, sem reticências — some quando não há problema. */
+.integracoes-page .conn-alerta {margin-top:5px;font-size:12px;line-height:1.45}
 .integracoes-page .conn-actions {display:flex;align-items:center;gap:9px;flex-wrap:wrap;justify-content:flex-end;flex:0 1 auto}
 .integracoes-page .btn-sm.danger {color:var(--err);border-color:var(--err);background:var(--surface)}
 .integracoes-page .btn-sm.danger:hover {background:var(--err-soft)}

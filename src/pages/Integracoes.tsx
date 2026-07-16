@@ -5,7 +5,7 @@ import { useToast } from '@/hooks/useToast';
 import { useOrg } from '@/context/OrgContext';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { WhatsAppConnect } from '@/components/WhatsAppConnect';
-import { useWaCanais, useWaLimite, useWaHealth, waRemove, waOcultar, mascararNumero, useFontesAquisicao, waUpdateComercial, useEntregaAutoResumo, useRodarTesteEntrega, type WaCanal, type ComercialInput, type WaHealthCanal } from '@/data/whatsapp';
+import { useWaCanais, useWaLimite, useWaHealth, waRemove, waOcultar, mascararNumero, useFontesAquisicao, waUpdateComercial, useEntregaAutoResumo, useRodarTesteEntrega, type WaCanal, type ComercialInput, type WaHealthCanal, type EntregaAutoResumo } from '@/data/whatsapp';
 import { FB_REAL, useFbStatus, fbAuthStart, fbPages, fbConnect, fbDisconnect } from '@/data/facebook';
 import { useOrgUsuarios } from '@/data/atendimento';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -244,67 +244,61 @@ export function Integracoes() {
                         const removendo = remLoading && remocao?.tipo === 'whatsapp' && remocao?.id === c.id;
                         const h = healthMap.get(c.id);
                         const ea = entregaQ.data?.find((x) => x.canal_id === c.id);
+
+                        // ---- Resumo em 3 chips (o detalhe fica em "Ver diagnóstico") ----
+                        const chipSessao = c.conflitoCom
+                          ? { txt: 'Conflito', bg: 'var(--crit-soft, #f7e3e1)', fg: 'var(--crit, #b23f38)', title: 'Número já pertence a outro canal — este não será usado.' }
+                          : h
+                          ? { txt: ESTADO_LABEL[h.estado] ?? h.estado, bg: COR_BG[h.cor], fg: COR_FG[h.cor], title: `Recebimento: ${h.recebimento} · Envio: ${h.envio}` }
+                          : { txt: st.t, bg: 'var(--surface-2)', fg: 'var(--muted)', title: 'Estado da sessão do WhatsApp' };
+                        const ENTREGA_CHIP: Record<string, { txt: string; bg: string; fg: string; title: string }> = {
+                          ok: { txt: 'Ok', bg: 'var(--ok-soft)', fg: 'var(--ok)', title: 'Mensagens estão sendo entregues.' },
+                          instavel: { txt: 'Instável', bg: 'var(--warn-soft, #f6ebd8)', fg: 'var(--warn)', title: 'Algumas mensagens não estão sendo entregues.' },
+                          restrito: { txt: 'Restrita', bg: 'var(--err-soft)', fg: 'var(--err, #b23f38)', title: 'O WhatsApp está recusando a entrega deste canal.' },
+                        };
+                        const chipEntrega = ENTREGA_CHIP[c.entregaStatus ?? ''] ?? { txt: 'Aguardando', bg: 'var(--surface-2)', fg: 'var(--muted)', title: 'Ainda sem sinal de entrega.' };
+                        const chipAuto = ea?.apto
+                          ? {
+                              txt: ea.estado === 'pausado' ? 'Pausado' : ea.total_1h > 0 ? `${ea.entregues_1h}/${ea.total_1h}` : '—',
+                              bg: SAUDE_BG[ea.saude], fg: SAUDE_COR[ea.saude],
+                              title: `Teste automático ${ea.frequencia_hora}/h ao ${ea.destino} — entregues na última hora`,
+                            }
+                          : null;
+                        // ---- Um alerta curto, só quando há problema (o mais grave vence) ----
+                        const alerta = c.conflitoCom
+                          ? { txt: `Número já cadastrado como ${canais.find((k) => k.id === c.conflitoCom)?.alias ?? 'outro canal'}. Reconecte o existente ou remova este.`, cor: 'var(--crit, #b23f38)' }
+                          : ativo && c.entregaStatus === 'restrito'
+                          ? { txt: 'Envio via API falhando. Use outro canal.', cor: 'var(--err, #b23f38)' }
+                          : ativo && c.entregaStatus === 'instavel'
+                          ? { txt: 'Algumas mensagens não estão sendo entregues.', cor: 'var(--warn)' }
+                          : ea?.apto && ea.saude === 'sem_dados'
+                          ? { txt: 'Aguardando primeiro teste automático.', cor: 'var(--muted)' }
+                          : !c.origemTipo && !c.gestorId
+                          ? { txt: 'Origem comercial não configurada.', cor: 'var(--warn)' }
+                          : null;
                         return (
                           <div className="conn-row" key={c.id}>
                             <div className="conn-info">
+                              {/* Linha 1: identidade. Linha 2: no máx. 3 chips. Linha 3: um alerta curto.
+                                  Todo o resto (destino, 5/h, último ACK, próximo, histórico) vive em "Ver diagnóstico". */}
                               <span className="conn-name">{c.alias}</span>
-                              <span className="conn-sub">
-                                {c.numero ? mascararNumero(c.numero) : 'Número não identificado'}
-                                {tipoOrigemLabel(c.origemTipo) ? ` · ${tipoOrigemLabel(c.origemTipo)}` : ''}
-                                {c.gestorNome ? ` · Gestor: ${c.gestorNome}` : ''}
+                              <span className="conn-sub">{c.numero ? mascararNumero(c.numero) : 'Número não identificado'}</span>
+                              <span className="conn-chips">
+                                <span className="conn-chip" style={{ background: chipSessao.bg, color: chipSessao.fg }} title={chipSessao.title}>
+                                  <span className="dot" style={{ background: chipSessao.fg }} />Sessão: {chipSessao.txt}
+                                </span>
+                                <span className="conn-chip" style={{ background: chipEntrega.bg, color: chipEntrega.fg }} title={chipEntrega.title}>
+                                  <span className="dot" style={{ background: chipEntrega.fg }} />Entrega: {chipEntrega.txt}
+                                </span>
+                                {chipAuto && (
+                                  <span className="conn-chip" style={{ background: chipAuto.bg, color: chipAuto.fg }} title={chipAuto.title}>
+                                    <span className="dot" style={{ background: chipAuto.fg }} />Auto: {chipAuto.txt}
+                                  </span>
+                                )}
                               </span>
-                              {/* saúde real (telemetria), não só "Conectado" */}
-                              {h ? (
-                                <span className="conn-sub">
-                                  Recebimento: {h.recebimento} · Envio: {h.envio}
-                                  {h.taxa !== null ? ` · ${h.entregues}/${h.enviados} envios entregues` : ''}
-                                  {h.lastErrorAt ? ` · último erro ${haQuanto(h.lastErrorAt)}` : ''}
-                                </span>
-                              ) : (healthQ.isLoading && <span className="conn-sub" style={{ color: 'var(--muted)' }}>Carregando diagnóstico…</span>)}
-                              {/* ENTREGA (outbound) — separada da sessão: conectado ≠ entrega funcionando */}
-                              {ativo && (c.entregaStatus === 'restrito' || c.entregaStatus === 'instavel') && (
-                                <span className="conn-sub" style={{ color: 'var(--warn)' }}>
-                                  {c.entregaStatus === 'restrito'
-                                    ? 'Canal conectado, mas com falha de entrega. Evite reenviar ou reconectar agora.'
-                                    : 'Canal conectado, mas algumas mensagens não estão sendo entregues.'}
-                                </span>
-                              )}
-                              {/* CONFLITO de número: este canal autenticou um número que já é de outro canal — não foi fundido. */}
-                              {c.conflitoCom && (
-                                <span className="conn-sub" style={{ color: 'var(--crit, #b23f38)' }}>
-                                  Este número já está cadastrado como <b>{canais.find((k) => k.id === c.conflitoCom)?.alias ?? 'outro canal'}</b>. Este canal em conflito não será usado — reconecte o canal existente ou remova este.
-                                </span>
-                              )}
-                              {/* MONITORAMENTO AUTOMÁTICO DE ENTREGA: prova contínua de que o canal entrega de verdade. */}
-                              {ea && ea.apto && (
-                                <span className="conn-sub" title={`Teste técnico automático ao número interno ${ea.destino}. Não usa cliente real.`}>
-                                  Entrega automática: <b style={{ color: SAUDE_COR[ea.saude] }}>{SAUDE_LABEL[ea.saude]}</b>
-                                  {ea.estado === 'pausado' && ea.pausado_ate ? ` · pausada até ${hhmm(ea.pausado_ate)}` : ` · ${ea.frequencia_hora}/h`}
-                                  {` · destino ${ea.destino}`}
-                                  {ea.total_1h > 0 && ` · última hora: ${ea.entregues_1h}/${ea.total_1h} entregues`}
-                                  {ea.ultimo_em && ` · último: ${RESULTADO_LABEL[ea.ultimo_resultado ?? ''] ?? ea.ultimo_resultado} ${haQuanto(ea.ultimo_em)}`}
-                                  {ea.estado === 'ativo' && proximoTeste(c.id) && ` · próximo em ${proximoTeste(c.id)} min`}
-                                </span>
-                              )}
-                              {!c.origemTipo && !c.gestorId && <span className="conn-sub" style={{ color: 'var(--warn)' }}>Origem comercial não configurada</span>}
+                              {alerta && <span className="conn-alerta" style={{ color: alerta.cor }}>{alerta.txt}</span>}
                             </div>
                             <div className="conn-actions">
-                              {c.conflitoCom
-                                ? <span className="badge" style={{ background: 'var(--crit-soft, #f7e3e1)', color: 'var(--crit, #b23f38)' }}><span className="dot" style={{ background: 'var(--crit, #b23f38)' }} />Conflito de número</span>
-                                : h
-                                ? <span className="badge" style={{ background: COR_BG[h.cor], color: COR_FG[h.cor] }}><span className="dot" style={{ background: COR_FG[h.cor] }} />{ESTADO_LABEL[h.estado] ?? h.estado}</span>
-                                : <span className={'badge ' + st.cls}>{st.dot && <span className="dot" />}{st.t}</span>}
-                              {ativo && (c.entregaStatus === 'restrito' || c.entregaStatus === 'instavel') && (
-                                <span className="badge" style={{ background: 'var(--warn-soft, #f6ebd8)', color: 'var(--warn)' }} title="Saúde de entrega (envio real ao cliente), separada da conexão">
-                                  <span className="dot" style={{ background: 'var(--warn)' }} />Entrega: {c.entregaStatus === 'restrito' ? 'restrita' : 'instável'}
-                                </span>
-                              )}
-                              {ea && ea.apto && (
-                                <span className="badge" style={{ background: SAUDE_BG[ea.saude], color: SAUDE_COR[ea.saude] }}
-                                      title={`Entrega automática (${ea.frequencia_hora}/h ao ${ea.destino}) — última hora: ${ea.entregues_1h}/${ea.total_1h} entregues`}>
-                                  <span className="dot" style={{ background: SAUDE_COR[ea.saude] }} />Entrega auto: {SAUDE_LABEL[ea.saude]}
-                                </span>
-                              )}
                               <button className="btn-sm" onClick={() => setDiag(c.id)}>Ver diagnóstico</button>
                               {ea && ea.apto && podeConfig && (
                                 <button className="btn-sm" disabled={testando === c.id}
@@ -449,6 +443,9 @@ export function Integracoes() {
         if (!h) return null;
         const podeAgir = healthQ.data?.podeAgir ?? podeConfig;
         return <DiagnosticoModal h={h} podeAgir={podeAgir} atualizando={healthQ.isFetching}
+          entregaAuto={entregaQ.data?.find((x) => x.canal_id === diag) ?? null}
+          proximoMin={proximoTeste(diag)}
+          canal={canais.find((k) => k.id === diag) ?? null}
           onClose={() => setDiag(null)}
           onAtualizar={() => healthQ.refetch()}
           onReconectar={() => { setDiag(null); setReconectar({ id: h.canalId, alias: h.nome }); }}
@@ -494,8 +491,12 @@ function ConfigOrigemModal({ canal, onClose, onSaved }: { canal: WaCanal; onClos
 }
 
 /* ===================== Diagnóstico de saúde da conexão ===================== */
-function DiagnosticoModal({ h, podeAgir, atualizando, onClose, onAtualizar, onReconectar, onDesconectar }: {
+function DiagnosticoModal({ h, podeAgir, atualizando, entregaAuto, proximoMin, canal, onClose, onAtualizar, onReconectar, onDesconectar }: {
   h: WaHealthCanal; podeAgir: boolean; atualizando: boolean;
+  /** Resumo do monitoramento automático — os detalhes que saíram do card principal. */
+  entregaAuto?: EntregaAutoResumo | null; proximoMin?: number | null;
+  /** Canal (origem comercial/gestor saíram do card e vivem aqui). */
+  canal?: WaCanal | null;
   onClose: () => void; onAtualizar: () => void; onReconectar: () => void; onDesconectar: () => void;
 }) {
   const stOK = (s: string) => ['SERVER_ACK', 'DELIVERY_ACK', 'READ', 'PLAYED'].includes(s);
@@ -523,8 +524,40 @@ function DiagnosticoModal({ h, podeAgir, atualizando, onClose, onAtualizar, onRe
           <div><span className="dl">Último entregue</span><span className="dv">{haQuanto(h.lastDelivered)}</span></div>
           <div><span className="dl">Webhook</span><span className="dv">{h.webhookOk === null ? '—' : h.webhookOk ? 'ativo' : 'inativo'} · {h.lastWebhookEvent ?? '—'} ({haQuanto(h.lastWebhook)})</span></div>
           <div><span className="dl">Evolution</span><span className="dv">{h.versao ?? '—'}</span></div>
+          <div><span className="dl">Origem comercial</span><span className="dv">{tipoOrigemLabel(canal?.origemTipo ?? null) ?? 'não configurada'}</span></div>
+          <div><span className="dl">Gestor</span><span className="dv">{canal?.gestorNome ?? '—'}</span></div>
         </div>
         {h.lastErrorMsg && <div className="atv-field-err" style={{ marginTop: 8 }}>Último erro técnico: {h.lastErrorMsg}</div>}
+
+        {/* ENTREGA AUTOMÁTICA — detalhes que saíram do card principal p/ manter a lista limpa. */}
+        {entregaAuto?.apto && (
+          <>
+            <div className="sechead" style={{ margin: '14px 0 6px', fontSize: 13, fontWeight: 600 }}>
+              Entrega automática
+              <span className="badge" style={{ marginLeft: 8, background: SAUDE_BG[entregaAuto.saude], color: SAUDE_COR[entregaAuto.saude] }}>
+                <span className="dot" style={{ background: SAUDE_COR[entregaAuto.saude] }} />{SAUDE_LABEL[entregaAuto.saude]}
+              </span>
+            </div>
+            <div className="diag-grid">
+              <div><span className="dl">Destino</span><span className="dv">{entregaAuto.destino}</span></div>
+              <div><span className="dl">Frequência</span><span className="dv">{entregaAuto.frequencia_hora}/h (a cada 12 min)</span></div>
+              <div><span className="dl">Última hora</span><span className="dv">{entregaAuto.entregues_1h}/{entregaAuto.total_1h || 0} entregues · {entregaAuto.falhas_1h} falhas</span></div>
+              <div><span className="dl">Último teste</span><span className="dv">{entregaAuto.ultimo_em ? `${RESULTADO_LABEL[entregaAuto.ultimo_resultado ?? ''] ?? entregaAuto.ultimo_resultado} ${haQuanto(entregaAuto.ultimo_em)}` : '—'}</span></div>
+              <div><span className="dl">Latência do ACK</span><span className="dv">{entregaAuto.ultimo_latencia_ms != null ? `${entregaAuto.ultimo_latencia_ms} ms` : '—'}</span></div>
+              <div><span className="dl">Próximo teste</span><span className="dv">{entregaAuto.estado === 'pausado' ? '—' : proximoMin != null ? `em ${proximoMin} min` : '—'}</span></div>
+              {entregaAuto.estado === 'pausado' && entregaAuto.pausado_ate && (
+                <div><span className="dl">Pausado até</span><span className="dv">{hhmm(entregaAuto.pausado_ate)}</span></div>
+              )}
+            </div>
+            <div className="conn-sub" style={{ marginTop: 6, color: 'var(--muted)' }}>
+              {entregaAuto.saude === 'restrito'
+                ? 'O canal aceita o envio mas o WhatsApp não entrega (ERROR no ACK). Normalmente é restrição do número para envio via API — use outro canal para automação.'
+                : entregaAuto.saude === 'sem_dados'
+                ? 'Nenhum teste concluído ainda. O primeiro roda automaticamente na próxima janela.'
+                : 'Teste técnico ao número interno da equipe (nunca cliente). Não cria lead nem conversa.'}
+            </div>
+          </>
+        )}
         <div className="sechead" style={{ margin: '14px 0 6px', fontSize: 13, fontWeight: 600 }}>Últimos {h.last10.length} envios</div>
         {h.last10.length === 0 ? <div className="conn-sub" style={{ color: 'var(--muted)' }}>Sem envios recentes.</div> : (
           <div className="diag-l10">
