@@ -179,6 +179,45 @@ Deno.serve(async (req) => {
       return json({ ok: true, instance: alvo, passos, auditado: !!org });
     }
 
+    // OPS: run_delivery_test — dispara AGORA o mesmo teste técnico de entrega dos canais conectados
+    // (mesmo destino/texto/registro do teste automático em connection.update=open). Útil quando o canal
+    // já conectou antes do deploy, ou p/ re-testar sem reconectar/QR. Gated por x-webhook-secret.
+    // Travas idênticas: só whatsapp conectado, sem conflito, com instância, nunca self-send.
+    // NÃO cria lead/conversa (texto casa com o filtro health_check) e NÃO altera envio_restrito.
+    if (action === 'run_delivery_test') {
+      const { data: wc0 } = await admin.from('webhook_config').select('secret').eq('chave', 'whatsapp').maybeSingle();
+      const exp = wc0?.secret ?? '';
+      if (!exp || !safeEqual(req.headers.get('x-webhook-secret') ?? '', exp)) return json({ error: 'unauthorized' }, 401);
+      const DEST = '5551998872825';
+      const TXT = 'Teste de entrega Atenvo: canal conectado com sucesso.';
+      const { data: alvos } = await admin.from('canais')
+        .select('id, nome_interno, organizacao_id, instancia_externa, numero_conectado, conflito_com')
+        .eq('provider', 'evolution').eq('tipo', 'whatsapp').eq('status_integracao', 'conectado')
+        .not('instancia_externa', 'is', null);
+      const resultados: unknown[] = [];
+      for (const c of alvos ?? []) {
+        if (c.conflito_com) { resultados.push({ canal: c.nome_interno, pulado: 'canal_em_conflito' }); continue; }
+        if (((c.numero_conectado as string) ?? '').replace(/\D/g, '') === DEST) {
+          resultados.push({ canal: c.nome_interno, pulado: 'self_send' }); continue;
+        }
+        const t0 = Date.now();
+        let ok = false, msgId: string | null = null, erro: string | null = null;
+        try {
+          const r = await evolution.sendText(c.instancia_externa as string, DEST, TXT);
+          msgId = r?.key?.id ?? null; ok = !!msgId; if (!ok) erro = 'resposta sem key.id';
+        } catch (e) { erro = (e as Error).message; }
+        await admin.from('canal_health_runs').insert({
+          organizacao_id: c.organizacao_id, canal_id: c.id, executado_em: new Date().toISOString(),
+          tipo: 'entrega_conexao', sucesso: false,                    // só vira true no ACK REAL
+          status_resultado: ok ? 'aguardando_ack' : 'erro', erro, erro_tipo: ok ? null : 'infra',
+          message_id: msgId, instancia_externa: c.instancia_externa, target_phone: DEST,
+          latencia_ms: Date.now() - t0, dados: { aguardando_ack: ok, origem: 'manual:run_delivery_test' },
+        });
+        resultados.push({ canal: c.nome_interno, enviado_aceito: ok, message_id: msgId, erro });
+      }
+      return json({ ok: true, destino: DEST, resultados });
+    }
+
     const user = await getUser(req);
     if (!user) return json({ error: 'Não autenticado.' }, 401);
     const orgId: string = body.organizacao_id;
