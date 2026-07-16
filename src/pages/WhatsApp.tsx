@@ -1045,18 +1045,18 @@ export function WhatsApp() {
             const metaInline = (
               <span className="media-cap-meta">{m.time}{ack && <span className={'tick ' + ack.cls} title={m.status === 'falhou' ? traduzErroEnvio(m.erro) : ack.title}>{ack.ticks}</span>}</span>
             );
-            // Botão de download da mídia (nome/extensão corretos via URL assinada curta).
+            // Ação de baixar a mídia: ÍCONE apenas (sem texto) — dentro da própria mídia.
+            // Nome/extensão corretos via URL assinada curta (a lógica não muda, só o visual).
             const dlBtn = (m.anexoPath && m.status !== 'falhou') ? (
               <button
                 type="button"
-                className="midia-dl"
+                className={'midia-dl' + (baixando === (m.id ?? m.anexoPath) ? ' is-baixando' : '')}
                 onClick={() => baixarMidia(m)}
                 disabled={baixando === (m.id ?? m.anexoPath)}
                 title={rotuloBaixarMidia(m.tipo)}
                 aria-label={rotuloBaixarMidia(m.tipo)}
               >
                 <IcDownload />
-                <span>{baixando === (m.id ?? m.anexoPath) ? 'Baixando…' : 'Baixar'}</span>
               </button>
             ) : null;
             return (

@@ -393,29 +393,30 @@
 .wa-app .media-frame{position:relative;display:block;line-height:0}
 .wa-app .media-frame .msg-img,.wa-app .media-frame .msg-video{display:block;max-width:100%;border-radius:10px}
 
-/* botão base */
-.wa-app .midia-dl{display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border-radius:999px;
-  font-size:12px;line-height:1.5;cursor:pointer;border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2)}
-.wa-app .midia-dl svg{width:14px;height:14px}
-.wa-app .midia-dl:disabled{opacity:.6;cursor:default}
+/* botão base: SÓ ícone, circular — nunca pílula com texto */
+.wa-app .midia-dl{display:inline-flex;align-items:center;justify-content:center;padding:0;border-radius:50%;
+  cursor:pointer;border:1px solid transparent;background:transparent;color:var(--ink-2);flex:none}
+.wa-app .midia-dl:disabled{cursor:default}
+.wa-app .midia-dl.is-baixando{opacity:.55}
 
-/* sobreposto à IMAGEM: canto inferior direito, translúcido, aparece no hover da mídia (sempre visível no toque) */
-.wa-app .media-frame .midia-dl{position:absolute;right:10px;bottom:10px;z-index:2;
-  background:rgba(17,19,23,.62);color:#fff;border-color:rgba(255,255,255,.22);
+/* IMAGEM: círculo 36px sobreposto no canto inferior direito, dentro da mídia */
+.wa-app .media-frame .midia-dl{position:absolute;right:10px;bottom:10px;z-index:2;width:36px;height:36px;
+  background:rgba(17,19,23,.58);color:#fff;border-color:rgba(255,255,255,.20);
   backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
-  box-shadow:0 2px 8px rgba(0,0,0,.28);opacity:0;transform:translateY(3px);
+  box-shadow:0 2px 10px rgba(0,0,0,.30);opacity:0;transform:scale(.94);
   transition:opacity .16s ease,transform .16s ease,background .16s ease}
+.wa-app .media-frame .midia-dl svg{width:17px;height:17px}
 .wa-app .media-frame:hover .midia-dl,.wa-app .media-frame .midia-dl:focus-visible{opacity:1;transform:none}
-.wa-app .media-frame .midia-dl:hover:not(:disabled){background:rgba(17,19,23,.82);border-color:rgba(255,255,255,.34)}
-/* VÍDEO: canto superior direito p/ não cobrir os controles nativos */
+.wa-app .media-frame .midia-dl:hover:not(:disabled){background:rgba(17,19,23,.80);transform:scale(1.06)}
+/* VÍDEO: canto SUPERIOR direito p/ não cobrir os controles nativos */
 .wa-app .media-frame-video .midia-dl{top:10px;bottom:auto}
-/* sem hover (touch): mantém visível para ser alcançável */
+/* touch (sem hover): ícone sempre visível/alcançável */
 @media (hover:none){ .wa-app .media-frame .midia-dl{opacity:1;transform:none} }
 
-/* ÁUDIO: entra na linha de meta do card, discreto — sem margem/bolha extra */
-.wa-app .audio-meta .midia-dl{padding:1px 7px;font-size:11px;border-radius:7px;background:transparent;border-color:transparent;color:var(--ink-2)}
+/* ÁUDIO: ícone pequeno dentro do card, depois do 1x — card segue compacto */
+.wa-app .audio-meta .midia-dl{width:24px;height:24px}
+.wa-app .audio-meta .midia-dl svg{width:13px;height:13px}
 .wa-app .audio-meta .midia-dl:hover:not(:disabled){color:var(--ink);background:var(--surface);border-color:var(--line-2)}
-.wa-app .audio-meta .midia-dl svg{width:12px;height:12px}
 
 /* DOCUMENTO: a linha do card é só INFORMAÇÃO (ícone+nome+tamanho); as ações são os botões abaixo. */
 .wa-app .bubble-doc .doc-card-info{cursor:default;padding-bottom:6px}
