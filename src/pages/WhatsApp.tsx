@@ -4,7 +4,7 @@ import { useToast } from '@/hooks/useToast';
 import { useAuth } from '@/context/AuthContext';
 import { useOrg } from '@/context/OrgContext';
 import { WA_CONTACTS, initials, avatarColor, type WaContact, type WaMessage } from '@/data/whatsappDemo';
-import { useWaConversations, useSendWaMessage, useWaCanais, useWaCanalEnvioSaude, useAtribuirAtendimento, useIniciarConversaWa, normalizeWaPhone, mascararNumero, subirMidiaWa, urlAssinadaMidiaWa, removerMensagemFalha, waRecarregarAudio, waValidarNumero, waVincularNumero, waArquivar, waMarcarLida, useWaAtividades, WA_REAL } from '@/data/whatsapp';
+import { useWaConversations, useSendWaMessage, useWaCanais, useWaCanalEnvioSaude, useAtribuirAtendimento, useIniciarConversaWa, normalizeWaPhone, mascararNumero, subirMidiaWa, urlAssinadaMidiaWa, urlDownloadMidiaWa, nomeArquivoMidia, rotuloBaixarMidia, removerMensagemFalha, waRecarregarAudio, waValidarNumero, waVincularNumero, waArquivar, waMarcarLida, useWaAtividades, WA_REAL } from '@/data/whatsapp';
 import { MediaComposer } from '@/components/MediaComposer';
 import { AudioRecorder } from '@/components/AudioRecorder';
 import { AudioMessage } from '@/components/AudioMessage';
@@ -170,6 +170,7 @@ export function WhatsApp() {
   const [removerAlvo, setRemoverAlvo] = useState<WaMessage | null>(null); // mensagem com falha a remover
   const [removendoId, setRemovendoId] = useState<string | null>(null);   // trava de duplo-clique na remoção
   const [recarregando, setRecarregando] = useState<string | null>(null); // áudio pendente sendo recarregado
+  const [baixando, setBaixando] = useState<string | null>(null);         // mídia sendo baixada (gerando URL assinada)
   const [imgModal, setImgModal] = useState(false);                       // composer de imagem
   const [docModal, setDocModal] = useState(false);                       // composer de documento
   const [transferOpen, setTransferOpen] = useState(false);               // modal de transferência
@@ -647,11 +648,28 @@ export function WhatsApp() {
       text: caption || undefined,
     });
   }
-  /** Abre/baixa um documento do histórico via URL assinada gerada sob demanda. */
+  /** Abre um documento do histórico via URL assinada gerada sob demanda. */
   async function abrirDocumento(m: WaMessage) {
     if (!m.anexoPath) return;
     try { const url = await urlAssinadaMidiaWa(m.anexoPath); window.open(url, '_blank', 'noopener'); }
     catch { toast('Não foi possível abrir o documento.', 'warn'); }
+  }
+  /**
+   * Baixa a mídia com o nome/extensão corretos. URL assinada de 60s com Content-Disposition
+   * (bucket privado; a policy do Storage garante que só a própria organização acessa).
+   */
+  async function baixarMidia(m: WaMessage) {
+    if (!m.anexoPath || baixando) return;
+    const nome = nomeArquivoMidia(m);
+    setBaixando(m.id ?? m.anexoPath);
+    try {
+      const url = await urlDownloadMidiaWa(m.anexoPath, nome);
+      const a = document.createElement('a');
+      a.href = url; a.download = nome; a.rel = 'noopener';
+      document.body.appendChild(a); a.click(); a.remove();
+    } catch {
+      toast('Não foi possível baixar o arquivo. Tente novamente.', 'warn');
+    } finally { setBaixando(null); }
   }
   /** Assumir o atendimento (responsável = usuário atual). Concorrência/permissão validadas no backend. */
   async function assumir() {
@@ -1027,6 +1045,20 @@ export function WhatsApp() {
             const metaInline = (
               <span className="media-cap-meta">{m.time}{ack && <span className={'tick ' + ack.cls} title={m.status === 'falhou' ? traduzErroEnvio(m.erro) : ack.title}>{ack.ticks}</span>}</span>
             );
+            // Botão de download da mídia (nome/extensão corretos via URL assinada curta).
+            const dlBtn = (m.anexoPath && m.status !== 'falhou') ? (
+              <button
+                type="button"
+                className="midia-dl"
+                onClick={() => baixarMidia(m)}
+                disabled={baixando === (m.id ?? m.anexoPath)}
+                title={rotuloBaixarMidia(m.tipo)}
+                aria-label={rotuloBaixarMidia(m.tipo)}
+              >
+                <IcDownload />
+                <span>{baixando === (m.id ?? m.anexoPath) ? 'Baixando…' : 'Baixar'}</span>
+              </button>
+            ) : null;
             return (
               <div key={i} className={'msg ' + m.dir}>
                 {m.tipo === 'audio' ? (
@@ -1037,12 +1069,15 @@ export function WhatsApp() {
                       {falhaActs}
                     </>
                   ) : m.anexoPath ? (
-                    <AudioMessage
-                      path={m.anexoPath} nome={m.nome}
-                      resolveUrl={(p) => urlAssinadaMidiaWa(p).catch(() => null)}
-                      time={m.time}
-                      statusNode={ack ? <span className={'tick ' + ack.cls} title={ack.title}>{ack.ticks}</span> : null}
-                    />
+                    <>
+                      <AudioMessage
+                        path={m.anexoPath} nome={m.nome}
+                        resolveUrl={(p) => urlAssinadaMidiaWa(p).catch(() => null)}
+                        time={m.time}
+                        statusNode={ack ? <span className={'tick ' + ack.cls} title={ack.title}>{ack.ticks}</span> : null}
+                      />
+                      {dlBtn}
+                    </>
                   ) : m.midiaPendente ? (
                     <>
                       <div className="bubble bubble-falha bubble-audio-falha"><IcMic />Áudio indisponível — <button type="button" className="msg-falha-link" disabled={!m.id || recarregando === m.id} onClick={() => recarregarAudio(m)}>{recarregando === m.id ? 'Carregando…' : 'tentar carregar novamente'}</button></div>
@@ -1054,6 +1089,7 @@ export function WhatsApp() {
                     {m.anexoPath
                       ? <MsgImage path={m.anexoPath} nome={m.nome} caption={m.text || undefined} metaNode={m.text ? metaInline : undefined} falhou={m.status === 'falhou'} onOpen={setLightbox} />
                       : <div className="media-card bubble-img"><div className="msg-img-fallback"><span className="mif-txt">Imagem indisponível</span></div></div>}
+                    {dlBtn}
                     {!m.text && tempo}
                     {falhaActs}
                   </>
@@ -1062,20 +1098,24 @@ export function WhatsApp() {
                     {m.anexoPath
                       ? <MsgVideo path={m.anexoPath} nome={m.nome} caption={m.text || undefined} metaNode={m.text ? metaInline : undefined} falhou={m.status === 'falhou'} />
                       : <div className="media-card bubble-img"><div className="msg-img-fallback"><span className="mif-txt">Vídeo indisponível</span></div></div>}
+                    {dlBtn}
                     {!m.text && tempo}
                     {falhaActs}
                   </>
                 ) : m.tipo === 'documento' ? (
                   <>
                     <div className={'media-card bubble-doc' + (m.status === 'falhou' ? ' media-falha' : '')}>
-                      <button type="button" className="doc-card" onClick={() => abrirDocumento(m)} title="Abrir documento" disabled={m.status === 'falhou'}>
+                      <button type="button" className="doc-card" onClick={() => baixarMidia(m)} title={rotuloBaixarMidia(m.tipo)} disabled={m.status === 'falhou' || baixando === (m.id ?? m.anexoPath)}>
                         <span className="doc-ic"><IcDoc /></span>
                         <span className="doc-info">
                           <span className="doc-nome">{m.nome || 'documento'}</span>
-                          <span className="doc-meta">{(m.nome?.split('.').pop() || '').toUpperCase()}{m.tamanho ? ' · ' + fmtTam(m.tamanho) : ''}</span>
+                          <span className="doc-meta">{(m.nome?.split('.').pop() || '').toUpperCase()}{m.tamanho ? ' · ' + fmtTam(m.tamanho) : ''}{baixando === (m.id ?? m.anexoPath) ? ' · baixando…' : ''}</span>
                         </span>
                         <span className="doc-open"><IcDownload /></span>
                       </button>
+                      {m.anexoPath && m.status !== 'falhou' && (
+                        <button type="button" className="doc-abrir" onClick={() => abrirDocumento(m)} title="Abrir em nova aba">Abrir</button>
+                      )}
                       {m.text && (
                         <div className="media-cap">
                           <div className="media-cap-text"><WhatsAppText text={m.text} /></div>

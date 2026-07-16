@@ -387,6 +387,17 @@
 .wa-app .doc-open{flex:none;color:var(--ink-2);display:inline-flex}
 .wa-app .doc-open svg{width:18px;height:18px}
 
+/* Baixar mídia recebida: ação discreta sob a bolha (imagem/vídeo/áudio) + "Abrir" no card de documento. */
+.wa-app .midia-dl{display:inline-flex;align-items:center;gap:5px;margin-top:4px;padding:3px 9px;border:1px solid var(--line-2);
+  border-radius:999px;background:var(--surface);color:var(--ink-2);font-size:12px;line-height:1.6;cursor:pointer}
+.wa-app .midia-dl:hover:not(:disabled){color:var(--ink);border-color:var(--line)}
+.wa-app .midia-dl:disabled{opacity:.6;cursor:default}
+.wa-app .midia-dl svg{width:14px;height:14px}
+.wa-app .msg.out .midia-dl{align-self:flex-end}
+.wa-app .doc-abrir{margin-top:4px;align-self:flex-start;border:1px solid var(--line-2);background:var(--surface);
+  color:var(--ink-2);border-radius:8px;font-size:12px;padding:2px 10px;cursor:pointer}
+.wa-app .doc-abrir:hover{color:var(--ink)}
+
 /* responsável: painel + cabeçalho */
 .wa-app .resp-box{display:flex;flex-direction:column;gap:7px;align-items:flex-start}
 .wa-app .resp-line{display:inline-flex;align-items:center;gap:7px;font-size:13.5px}

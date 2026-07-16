@@ -23,6 +23,8 @@ export interface WaMessage {
   mime?: string;
   tamanho?: number | null;
   nome?: string;
+  /** data da mensagem (AAAA-MM-DD) — usada no nome sugerido do arquivo baixado. */
+  dataISO?: string;
 }
 
 /** #6 último canal/número usado para falar com a conversa. */

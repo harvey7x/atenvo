@@ -128,6 +128,7 @@ function mapConversa(c: DbConv): WaContact {
       mime: m.metadados?.mime,
       tamanho: m.metadados?.tamanho ?? null,
       nome: m.metadados?.nome,
+      dataISO: (m.recebida_em || m.enviada_em || m.criado_em || '').slice(0, 10) || undefined,
       midiaPendente: !!m.metadados?.midia_pendente,
     } as WaMessage));
   const lastMsg = msgs[msgs.length - 1];
@@ -617,6 +618,19 @@ export async function subirMidiaWa(orgId: string, file: File): Promise<{ path: s
 export async function urlAssinadaMidiaWa(path: string): Promise<string> {
   const { data, error } = await supabase!.storage.from('script-midia').createSignedUrl(path, 600);
   if (error || !data?.signedUrl) throw new Error(error?.message || 'Falha ao gerar URL da mídia.');
+  return data.signedUrl;
+}
+
+export { rotuloBaixarMidia, nomeArquivoMidia } from './midiaNome';
+
+/**
+ * URL assinada CURTA (60s) que FORÇA o download com o nome correto (Content-Disposition).
+ * Bucket privado; a policy do Storage valida is_member(org) pela 1ª pasta do path → outra org não acessa.
+ * Nunca usa getPublicUrl nem expõe service_role.
+ */
+export async function urlDownloadMidiaWa(path: string, filename: string): Promise<string> {
+  const { data, error } = await supabase!.storage.from('script-midia').createSignedUrl(path, 60, { download: filename });
+  if (error || !data?.signedUrl) throw new Error(error?.message || 'Falha ao gerar o link de download.');
   return data.signedUrl;
 }
 
