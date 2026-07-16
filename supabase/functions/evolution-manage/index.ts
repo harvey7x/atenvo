@@ -14,6 +14,17 @@ function normalizeNumber(jid?: string | null): string | null {
   return jid.replace(/@.*/, '').replace(/[^0-9]/g, '') || null;
 }
 
+// LGPD: mascara número/JID preservando prefixo + últimos 4 (mesmo padrão do evolution-webhook).
+function maskJid(v: unknown): string | null {
+  if (typeof v !== 'string' || !v) return null;
+  const at = v.indexOf('@');
+  const num = at >= 0 ? v.slice(0, at) : v;
+  const dom = at >= 0 ? v.slice(at) : '';
+  const d = num.replace(/\D/g, '');
+  const masked = d.length >= 8 ? `${d.slice(0, 4)}****${d.slice(-4)}` : (d ? '****' : num);
+  return masked + dom;
+}
+
 // Comparação constante-time (mesmo padrão do evolution-webhook) para o gate por secret.
 function safeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
@@ -95,6 +106,77 @@ Deno.serve(async (req) => {
       const st = (h: string | null) => fetch(url2, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(h ? { 'x-webhook-secret': h } : {}) }, body: '{}' }).then((r) => r.status).catch(() => 0);
       const selftest = { header_novo: await st(novo), header_antigo: await st(cur), sem_secret: await st(null) };
       return json({ ok: true, rotacionado: true, novo_mascarado: novo.slice(0, 4) + '…' + novo.slice(-3), tamanho: novo.length, refreshed, selftest });
+    }
+
+    // OPS (READ-ONLY): list_instances — lista instâncias na Evolution e correlaciona com os canais do Atenvo.
+    // Gated por x-webhook-secret. NÃO faz logout/delete. ownerJid mascarado (LGPD). Só diagnóstico.
+    if (action === 'list_instances') {
+      const { data: wc0 } = await admin.from('webhook_config').select('secret').eq('chave', 'whatsapp').maybeSingle();
+      const exp = wc0?.secret ?? '';
+      if (!exp || !safeEqual(req.headers.get('x-webhook-secret') ?? '', exp)) return json({ error: 'unauthorized' }, 401);
+      let raw: unknown;
+      try { raw = await evolution.fetchAllInstances(); }
+      catch (e) { return json({ error: 'evolution_falhou', detalhe: (e as Error).message }, 502); }
+      const arr = Array.isArray(raw) ? raw : [];
+      const { data: canais } = await admin.from('canais')
+        .select('id, nome_interno, instancia_externa, status_integracao, numero_conectado').eq('provider', 'evolution');
+      const byInst = new Map((canais ?? []).filter((c) => c.instancia_externa).map((c) => [c.instancia_externa as string, c]));
+      const itens = arr.map((i) => {
+        const o = (((i as Record<string, unknown>).instance ?? i) ?? {}) as Record<string, unknown>;
+        const name = ((o.name ?? o.instanceName) as string) ?? null;
+        const status = ((o.connectionStatus ?? o.status ?? o.state) as string) ?? null;
+        const owner = ((o.ownerJid ?? o.owner) as string) ?? null;
+        const digits = (owner ?? '').replace(/\D/g, '');
+        const canal = name ? byInst.get(name) : undefined;
+        const canalRemovido = canal ? canal.status_integracao === 'removido' : null;
+        const orfa = !canal || canalRemovido === true;
+        const numCanal = ((canal?.numero_conectado as string) ?? '').replace(/\D/g, '');
+        const rel1390 = digits.endsWith('1390') || numCanal.endsWith('1390');
+        return {
+          instanceName: name, connectionStatus: status, ownerJid: maskJid(owner),
+          numero_final: digits ? digits.slice(-4) : null,
+          canal_atenvo: canal ? `${canal.nome_interno} (${canal.status_integracao})` : null,
+          canal_removido: canalRemovido, orfa, relacionada_1390: rel1390,
+          recomenda_limpeza: orfa && rel1390,
+          risco: !orfa ? 'NAO LIMPAR: canal nao-removido aponta p/ ela'
+               : (rel1390 ? 'baixo: orfa do 1390' : 'NAO MEXER: orfa fora do escopo 1390'),
+        };
+      });
+      return json({ ok: true, total_evolution: arr.length, itens });
+    }
+
+    // OPS: delete_orphan_instance — logout+delete de UMA instância ÓRFÃ na Evolution.
+    // TRAVA: recusa se qualquer canal NÃO-removido apontar para ela (protege ANDRIUS/URA/ativos).
+    // Não apaga nada no Atenvo (canais/conversas/mensagens/contatos intactos). Gated por x-webhook-secret.
+    if (action === 'delete_orphan_instance') {
+      const { data: wc0 } = await admin.from('webhook_config').select('secret').eq('chave', 'whatsapp').maybeSingle();
+      const exp = wc0?.secret ?? '';
+      if (!exp || !safeEqual(req.headers.get('x-webhook-secret') ?? '', exp)) return json({ error: 'unauthorized' }, 401);
+      const alvo = (body.instance ?? '').toString().trim();
+      if (!alvo) return json({ error: 'instance é obrigatório.' }, 400);
+      const { data: dono } = await admin.from('canais')
+        .select('id, nome_interno, organizacao_id, status_integracao').eq('instancia_externa', alvo).maybeSingle();
+      if (dono && dono.status_integracao !== 'removido') {
+        return json({ error: 'instancia_em_uso', canal: dono.nome_interno, status: dono.status_integracao }, 409);
+      }
+      const passos: Record<string, string> = {};
+      try { await evolution.logout(alvo); passos.logout = 'ok'; } catch (e) { passos.logout = `falhou: ${(e as Error).message}`; }
+      try { await evolution.remove(alvo); passos.delete = 'ok'; } catch (e) { passos.delete = `falhou: ${(e as Error).message}`; }
+      // auditoria (best-effort): resolve a org pelo canal cujo id origina o instanceName
+      const hex = alvo.replace(/^atenvo_/, '').split('_')[0];
+      const canalId = hex.length === 32
+        ? `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}` : null;
+      const { data: origem } = canalId
+        ? await admin.from('canais').select('organizacao_id, nome_interno').eq('id', canalId).maybeSingle()
+        : { data: null };
+      const org = (dono?.organizacao_id ?? origem?.organizacao_id) as string | undefined;
+      if (org) {
+        await admin.from('audit_log').insert({
+          organizacao_id: org, usuario_id: null, acao: 'evolution_instancia_orfa_removida', entidade: 'canais',
+          entidade_id: canalId, dados_depois: { instance: alvo, passos, canal_origem: origem?.nome_interno ?? null },
+        });
+      }
+      return json({ ok: true, instance: alvo, passos, auditado: !!org });
     }
 
     const user = await getUser(req);

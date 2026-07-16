@@ -64,8 +64,46 @@ function textOf(message: Record<string, unknown> | undefined): string | null {
   const vo = (message.viewOnceMessage as { message?: Record<string, unknown> } | undefined)?.message; if (vo) return textOf(vo);
   return null;
 }
+// LGPD: mascara número/JID preservando prefixo + últimos 4 dígitos. Ex.: 5551****1390@s.whatsapp.net
+function maskJid(v: unknown): string | null {
+  if (typeof v !== 'string' || !v) return null;
+  const at = v.indexOf('@');
+  const num = at >= 0 ? v.slice(0, at) : v;
+  const dom = at >= 0 ? v.slice(at) : '';
+  const d = num.replace(/\D/g, '');
+  const masked = d.length >= 8 ? `${d.slice(0, 4)}****${d.slice(-4)}` : (d ? '****' : num);
+  return masked + dom;
+}
+
+// LGPD: whatsapp_webhook_events.payload é DIAGNÓSTICO e NUNCA re-lido por código, então persistimos
+// só metadados técnicos + identificadores MASCARADOS. NADA de corpo de mensagem, mídia, citação,
+// nome, foto de perfil, tokens/secrets. (Idempotência é por provider_message_id, não pelo payload.)
 function sanitize(obj: unknown): unknown {
-  try { return JSON.parse(JSON.stringify(obj, (k, v) => (/(apikey|authorization|token|secret)/i.test(k) ? '[REDACTED]' : v))); } catch { return null; }
+  try {
+    const d = (obj ?? {}) as Record<string, unknown>;
+    const key = (d.key ?? {}) as Record<string, unknown>;
+    const msg = (unwrapMsg(d.message as Record<string, unknown> | undefined) ?? {}) as Record<string, unknown>;
+    const tipos = Object.keys(msg).filter((k) => k !== 'messageContextInfo' && k !== 'contextInfo');
+    const texto = textOf(msg);
+    const MIDIA = ['imageMessage', 'audioMessage', 'videoMessage', 'documentMessage', 'stickerMessage', 'albumMessage'];
+    return {
+      status: d.status ?? d.state ?? null,
+      statusReason: d.statusReason ?? d.statusCode ?? null,
+      instanceId: d.instanceId ?? null,
+      source: d.source ?? null,
+      messageTimestamp: d.messageTimestamp ?? null,
+      messageId: (key.id as string) ?? (d.keyId as string) ?? (d.messageId as string) ?? null,
+      remoteJid: maskJid(key.remoteJid ?? d.remoteJid ?? d.wuid),
+      participant: maskJid(key.participant),
+      fromMe: typeof key.fromMe === 'boolean' ? key.fromMe : (typeof d.fromMe === 'boolean' ? d.fromMe : null),
+      addressingMode: key.addressingMode ?? d.addressingMode ?? null,
+      messageType: (d.messageType as string) ?? tipos[0] ?? null,
+      hasText: typeof texto === 'string' && texto.length > 0,
+      textLen: typeof texto === 'string' ? texto.length : 0,
+      hasMedia: MIDIA.some((k) => k in msg),
+      hasName: !!(d.pushName || d.profileName),
+    };
+  } catch { return null; }
 }
 
 // ---- Mídia (áudio): detecção + download seguro pela Evolution ----
@@ -154,6 +192,53 @@ async function baixarMidia(instance: string, dataMsg: Record<string, unknown>): 
   return { bytes, mime: (j.mimetype ?? '').split(';')[0].trim() || 'audio/ogg', b64 };
 }
 
+// ---- Teste de entrega AO CONECTAR (diagnóstico técnico, NÃO é bot) ----
+// Em connection.update=open, envia UM texto ao número interno autorizado e registra em
+// canal_health_runs (tipo 'entrega_conexao', aguardando_ack). O ACK REAL chega por messages.update e
+// fecha o run (DELIVERY_ACK/READ -> entregue; ERROR -> erro real). O texto casa com o filtro de
+// health_check (linha ~264), então NÃO vira lead/conversa. NUNCA altera envio_restrito.
+const TESTE_CONEXAO_DESTINO = '5551998872825';                                   // número interno autorizado
+const TESTE_CONEXAO_TEXTO = 'Teste de entrega Atenvo: canal conectado com sucesso.';
+
+async function testeEntregaAoConectar(admin: ReturnType<typeof adminClient>, canalId: string, orgId: string) {
+  try {
+    if (!EVO_BASE || !EVO_KEY) return;
+    // Re-lê o canal APÓS a consolidação: conflito/removido/sem-instância abortam o teste.
+    const { data: c } = await admin.from('canais')
+      .select('tipo, status_integracao, conflito_com, numero_conectado, instancia_externa')
+      .eq('id', canalId).maybeSingle();
+    if (!c || c.tipo !== 'whatsapp') return;
+    if (c.status_integracao !== 'conectado') return;              // conflito vira 'atencao' -> não envia
+    if (c.conflito_com) return;                                    // canal em conflito -> não envia
+    const inst = c.instancia_externa as string | null;
+    if (!inst) return;                                             // sem instância válida
+    if (digits((c.numero_conectado as string) ?? '') === TESTE_CONEXAO_DESTINO) return; // nunca self-send
+    const t0 = Date.now();
+    let ok = false, msgId: string | null = null, erro: string | null = null, http = 0;
+    try {
+      const res = await fetch(`${EVO_BASE}/message/sendText/${inst}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': EVO_KEY },
+        body: JSON.stringify({ number: TESTE_CONEXAO_DESTINO, text: TESTE_CONEXAO_TEXTO }),
+      });
+      http = res.status;
+      const b = await res.json().catch(() => null) as { key?: { id?: string } } | null;
+      msgId = b?.key?.id ?? null;
+      ok = res.ok && !!msgId;
+      if (!ok) erro = `send HTTP ${res.status}`;
+    } catch (e) { erro = (e as Error).message; }
+    await admin.from('canal_health_runs').insert({
+      organizacao_id: orgId, canal_id: canalId, executado_em: new Date().toISOString(),
+      tipo: 'entrega_conexao',
+      sucesso: false,                                              // só vira true no ACK REAL de entrega
+      status_resultado: ok ? 'aguardando_ack' : String(http || 'erro'),
+      erro, erro_tipo: ok ? null : 'infra',
+      message_id: msgId, instancia_externa: inst, target_phone: TESTE_CONEXAO_DESTINO,
+      latencia_ms: Date.now() - t0,
+      dados: { aguardando_ack: ok, origem: 'connection.update:open' },
+    });
+  } catch { /* diagnóstico NUNCA pode quebrar o webhook */ }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   const admin = adminClient();
@@ -185,7 +270,7 @@ Deno.serve(async (req) => {
 
     const { data: track } = await admin.from('whatsapp_webhook_events').insert({
       organizacao_id: canal?.organizacao_id ?? null, canal_id: canal?.id ?? null, instance_name: instanceName, instance_id: instanceId,
-      event, provider_message_id: provMsgId, remote_jid: remoteJid, addressing_mode: addressing, from_me: fromMe, payload: sanitize(data), status_processamento: 'recebido',
+      event, provider_message_id: provMsgId, remote_jid: maskJid(remoteJid), addressing_mode: addressing, from_me: fromMe, payload: sanitize(data), status_processamento: 'recebido',
     }).select('id').single();
     const trackId = track?.id as string | undefined;
     const finish = async (status: string, extra: Record<string, unknown> = {}) => { if (trackId) await admin.from('whatsapp_webhook_events').update({ status_processamento: status, processado_em: new Date().toISOString(), ...extra }).eq('id', trackId); };
@@ -205,6 +290,8 @@ Deno.serve(async (req) => {
         // Auto-cura de canal DUPLICADO do mesmo número (reconexão que criou canal novo em vez de reusar o
         // histórico): reabsorve no canal histórico, preservando conversas/histórico. Idempotente (best-effort).
         if (numero) { try { await admin.rpc('wa_consolidar_canal_por_numero', { p_org: canal.organizacao_id, p_canal_ativo: canal.id }); } catch { /* não quebra o webhook */ } }
+        // Teste de entrega técnico ao conectar (após a consolidação, p/ não disparar em canal conflitado).
+        await testeEntregaAoConectar(admin, canal.id as string, orgId);
       } else if (state === 'close') { await admin.from('canais').update({ status_integracao: 'desconectado' }).eq('id', canal.id); }
       await finish('processado'); return json({ ok: true });
     }
@@ -464,7 +551,7 @@ Deno.serve(async (req) => {
         if (!atualRow) {
           // Fase 2: pode ser o ACK de um PROBE de entrega (não vive em mensagens, e sim em canal_health_runs).
           const { data: run } = await admin.from('canal_health_runs')
-            .select('id, dados').eq('message_id', id).eq('tipo', 'entrega').eq('canal_id', canal.id)
+            .select('id, dados').eq('message_id', id).in('tipo', ['entrega', 'entrega_conexao']).eq('canal_id', canal.id)
             .order('criado_em', { ascending: false }).limit(1).maybeSingle();
           if (run && (run.dados as { aguardando_ack?: boolean } | null)?.aguardando_ack) {
             aplicaEntrega(status, !!stub, true);                              // probe = destino externo autorizado

@@ -41,6 +41,7 @@ export const evolution = {
       webhook: { enabled: true, url: webhookUrl, webhookByEvents: false, webhookBase64: false, events: WH_EVENTS, headers: whHeaders(secret) },
     }),
   getWebhook: (instanceName: string) => call(`/webhook/find/${instanceName}`, 'GET'),
+  fetchAllInstances: () => call('/instance/fetchInstances', 'GET'),
   connect: (instanceName: string) => call(`/instance/connect/${instanceName}`, 'GET'),
   connectionState: (instanceName: string) => call(`/instance/connectionState/${instanceName}`, 'GET') as Promise<{ instance?: { state?: string } }>,
   fetchInstance: (instanceName: string) => call(`/instance/fetchInstances?instanceName=${encodeURIComponent(instanceName)}`, 'GET'),
