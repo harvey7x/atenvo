@@ -154,6 +154,44 @@ async function cidsConexao(org: string, conexao: string | undefined, signal: Abo
   return new Set(((data as Row[]) ?? []).map((r) => r.id as string));
 }
 
+/**
+ * Número INTERNO da equipe (testes/monitoramento de entrega). Chave canônica.
+ * NUNCA entra em métrica comercial: os "contatos" desse número são artefatos dos nossos próprios
+ * testes, não clientes. É só FILTRO DE RELATÓRIO — nada é apagado do banco (esses contatos existem
+ * e continuam visíveis no atendimento). Ver [[merge-contatos-tooling]]: também é bloqueio duro no merge.
+ */
+export const TEL_INTERNO_CANONICO = '5181602825';
+
+/** contato_id → chave de PESSOA (telefone canônico; sem telefone, cai no próprio id p/ não fundir estranhos). */
+export type MapaPessoa = Map<string, string>;
+
+/**
+ * Carrega, de uma vez, o mapa contato→pessoa e o conjunto de contatos INTERNOS.
+ * Base das métricas comerciais: pessoa única por telefone canônico (não contato bruto) e sem o interno.
+ */
+async function carregaPessoas(org: string, signal: AbortSignal): Promise<{ pessoa: MapaPessoa; internos: Set<string> }> {
+  const { data } = await supabase!.from('contatos').select('id, telefone').eq('organizacao_id', org).is('mesclado_em', null).abortSignal(signal);
+  const pessoa: MapaPessoa = new Map(); const internos = new Set<string>();
+  for (const r of ((data as Row[]) ?? [])) {
+    const id = r.id as string;
+    const k = chaveCanonicaTelefone(r.telefone as string | null);
+    pessoa.set(id, k ?? ('cid:' + id));                 // sem telefone → cada contato é uma pessoa
+    if (k === TEL_INTERNO_CANONICO) internos.add(id);
+  }
+  return { pessoa, internos };
+}
+
+/** Pessoas ÚNICAS (telefone canônico) a partir de linhas com contato_id, ignorando o número interno. */
+function pessoasUnicas(rows: Row[], pessoa: MapaPessoa, internos: Set<string>): number {
+  const s = new Set<string>();
+  for (const r of rows) {
+    const cid = r.contato_id as string;
+    if (!cid || internos.has(cid)) continue;
+    s.add(pessoa.get(cid) ?? ('cid:' + cid));
+  }
+  return s.size;
+}
+
 /* ====================== Opções de filtro ====================== */
 export interface RelOpcoes { responsaveis: { id: string; nome: string }[]; origens: string[]; colunas: { id: string; nome: string; ordem: number }[]; conexoes: { id: string; nome: string; numero: string }[]; }
 export function useRelatorioOpcoes() {
@@ -182,7 +220,11 @@ export function useRelatorioOpcoes() {
 
 /* ====================== Resumo executivo ====================== */
 export interface ResumoData {
-  novosContatos: Kpi; novasConversas: Kpi; conversasAtendidas: Kpi; taxaAtendimento: Kpi;
+  /** OPERACIONAL: linhas criadas em `contatos` (contagem bruta). NÃO é métrica comercial principal. */
+  novosContatos: Kpi;
+  /** COMERCIAL: pessoas únicas por telefone canônico criadas no período (sem o número interno). */
+  pessoasUnicas: Kpi;
+  novasConversas: Kpi; conversasAtendidas: Kpi; taxaAtendimento: Kpi;
   // oportunidadesFechadas = CLIENTES distintos fechados no período (por fechado_em, P2/P4); negociosFechados = oportunidades ganhas
   oportunidadesCriadas: Kpi; oportunidadesFechadas: Kpi; negociosFechados: Kpi; conversaoComercial: Kpi;
   receitaRecebida: Kpi; receitaPrevista: Kpi; ticketMedio: Kpi; parcelasAtraso: number; taxaInadimplencia: Kpi;
@@ -215,16 +257,19 @@ export function useResumo(f: RelFiltros) {
       const qResp = fetchAll(() => supabase!.from('mensagens').select('conversa_id, criado_em').eq('organizacao_id', org).eq('direcao', 'saida').not('autor_id', 'is', null).gte('criado_em', p.prevIniISO).lt('criado_em', p.fimISO).abortSignal(signal!)).then(wrapRows);
       const qPag = supabase!.from('cobranca_pagamentos').select('status, valor, valor_pago, data_prevista, data_pagamento, cobranca_id').eq('organizacao_id', org).abortSignal(signal!);
       const qCob = supabase!.from('cobrancas').select('id, valor_mensal, status, valor_economizado, responsavel_id, contato_id, criado_em').eq('organizacao_id', org).abortSignal(signal!);
-      const [c, o, of_, cv, resp, pag, cob, cids] = await Promise.all([qContatos, qOpp, qOppFech, qConv, qResp, qPag, qCob, cidsConexao(org, f.conexao, signal!)]);
+      const [c, o, of_, cv, resp, pag, cob, cids, pes] = await Promise.all([qContatos, qOpp, qOppFech, qConv, qResp, qPag, qCob, cidsConexao(org, f.conexao, signal!), carregaPessoas(org, signal!)]);
       for (const r of [c, o, of_, cv, resp, pag, cob]) if (r.error) throw new Error(r.error.message);
 
-      const C = particao((c.data as Row[]) ?? [], 'criado_em', p);
-      const O = particao((o.data as Row[]) ?? [], 'criado_em', p);
-      // P2/P4: clientes distintos (por contato) e negócios (por oportunidade) fechados no período, por fechado_em
-      const OF = particao((of_.data as Row[]) ?? [], 'fechado_em', p);
-      const clientesFech = (rows: Row[]) => new Set(rows.map((r) => r.contato_id as string).filter(Boolean)).size;
+      // B: o número INTERNO da equipe sai de TODA métrica comercial (filtro de relatório, nada é apagado).
+      const semInterno = (rows: Row[], campoId: string) => rows.filter((r) => !pes.internos.has(r[campoId] as string));
+      const C = particao(semInterno((c.data as Row[]) ?? [], 'id'), 'criado_em', p);
+      const O = particao(semInterno((o.data as Row[]) ?? [], 'contato_id'), 'criado_em', p);
+      // P2/P4: CLIENTE FECHADO = PESSOA ÚNICA (telefone canônico) com ganho no período, por fechado_em.
+      // A: antes deduplicava por contato_id — 2 contatos duplicados do mesmo telefone contavam 2 clientes.
+      const OF = particao(semInterno((of_.data as Row[]) ?? [], 'contato_id'), 'fechado_em', p);
+      const clientesFech = (rows: Row[]) => pessoasUnicas(rows, pes.pessoa, pes.internos);
       // conexão afeta conversas em 1 hop (via contato de aquisição)
-      const cvRows = ((cv.data as Row[]) ?? []).filter((r) => !cids || cids.has(r.contato_id as string));
+      const cvRows = semInterno((cv.data as Row[]) ?? [], 'contato_id').filter((r) => !cids || cids.has(r.contato_id as string));
       const V = particao(cvRows, 'criado_em', p);
       const respondidas = new Set(((resp.data as Row[]) ?? []).map((r) => r.conversa_id as string));
       const atendidas = (convs: Row[]) => convs.filter((r) => respondidas.has(r.id as string)).length;
@@ -249,7 +294,12 @@ export function useResumo(f: RelFiltros) {
       const econ = (rows: Row[]) => rows.reduce((s, r) => s + num(r.valor_economizado), 0);
 
       return {
-        novosContatos: kpi(C.atual.length, C.anterior.length),
+        novosContatos: kpi(C.atual.length, C.anterior.length),                    // operacional (linhas criadas)
+        // C: métrica COMERCIAL de volume — pessoa única, não contato bruto.
+        pessoasUnicas: kpi(
+          new Set(C.atual.map((r) => pes.pessoa.get(r.id as string) ?? ('cid:' + r.id))).size,
+          new Set(C.anterior.map((r) => pes.pessoa.get(r.id as string) ?? ('cid:' + r.id))).size,
+        ),
         novasConversas: kpi(V.atual.length, V.anterior.length),
         conversasAtendidas: kpi(convAtA, convAtP),
         taxaAtendimento: kpi(V.atual.length ? (convAtA / V.atual.length) * 100 : 0, V.anterior.length ? (convAtP / V.anterior.length) * 100 : 0),
@@ -277,15 +327,16 @@ export function useComercial(f: RelFiltros, enabled: boolean) {
   return useQuery({
     queryKey: ['rel-comercial', org, chaveFiltros(f)], enabled: REL_REAL && enabled, staleTime: 60_000,
     queryFn: async ({ signal }): Promise<ComercialData> => {
-      let qOpp = supabase!.from('oportunidades').select('id, status, criado_em, atualizado_em, coluna_id, funil_colunas(nome, ordem)').eq('organizacao_id', org).gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).abortSignal(signal!);
+      let qOpp = supabase!.from('oportunidades').select('id, contato_id, status, criado_em, atualizado_em, coluna_id, funil_colunas(nome, ordem)').eq('organizacao_id', org).gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).abortSignal(signal!);
       if (f.responsavel) qOpp = qOpp.eq('responsavel_id', f.responsavel);
       if (f.coluna) qOpp = qOpp.eq('coluna_id', f.coluna);
       if (f.origem) qOpp = qOpp.eq('origem', f.origem);
       if (f.status) qOpp = qOpp.eq('status', f.status);
       if (f.conexao) qOpp = qOpp.eq('canal_origem_id', f.conexao);
-      const { data, error } = await qOpp;
+      const [{ data, error }, pes] = await Promise.all([qOpp, carregaPessoas(org, signal!)]);
       if (error) throw new Error(error.message);
-      const rows = (data as Row[]) ?? [];
+      // B: número interno fora do funil/conversão (filtro de relatório; nada é apagado do banco).
+      const rows = ((data as Row[]) ?? []).filter((r) => !pes.internos.has(r.contato_id as string));
       const cv = conversao(rows.map((r) => ({ status: r.status as string })));
       const fechadasNoFunil = cv.ganhas + cv.perdidas;
       const colMap = new Map<string, FunilColuna>();
@@ -368,10 +419,10 @@ export function useEquipe(f: RelFiltros, enabled: boolean) {
   return useQuery({
     queryKey: ['rel-equipe', org, chaveFiltros(f)], enabled: REL_REAL && enabled, staleTime: 60_000,
     queryFn: async ({ signal }): Promise<EquipeData> => {
-      let qCt = supabase!.from('contatos').select('responsavel_id, criado_em, origem').eq('organizacao_id', org).is('mesclado_em', null).gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).abortSignal(signal!);
+      let qCt = supabase!.from('contatos').select('id, responsavel_id, criado_em, origem').eq('organizacao_id', org).is('mesclado_em', null).gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).abortSignal(signal!);
       if (f.origem) qCt = qCt.eq('origem', f.origem);
       if (f.conexao) qCt = qCt.eq('canal_origem_id', f.conexao);
-      let qOp = supabase!.from('oportunidades').select('responsavel_id, status, criado_em, coluna_id, origem').eq('organizacao_id', org).gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).abortSignal(signal!);
+      let qOp = supabase!.from('oportunidades').select('contato_id, responsavel_id, status, criado_em, coluna_id, origem, contato:contatos(responsavel_id)').eq('organizacao_id', org).gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).abortSignal(signal!);
       if (f.coluna) qOp = qOp.eq('coluna_id', f.coluna);
       if (f.origem) qOp = qOp.eq('origem', f.origem);
       if (f.status) qOp = qOp.eq('status', f.status);
@@ -381,7 +432,7 @@ export function useEquipe(f: RelFiltros, enabled: boolean) {
       if (f.coluna) qOpFech = qOpFech.eq('coluna_id', f.coluna);
       if (f.origem) qOpFech = qOpFech.eq('origem', f.origem);
       if (f.conexao) qOpFech = qOpFech.eq('canal_origem_id', f.conexao);
-      const [us, ct, op, opf, cb, ms, cvv, mi] = await Promise.all([
+      const [us, ct, op, opf, cb, ms, cvv, mi, pes] = await Promise.all([
         supabase!.from('organizacao_usuarios').select('usuarios(id, nome)').eq('organizacao_id', org).eq('status', 'ativo').abortSignal(signal!),
         qCt, qOp, fetchAll(() => qOpFech).then(wrapRows),
         supabase!.from('cobrancas').select('id, responsavel_id, criado_por, valor_mensal, ciclos_totais, status').eq('organizacao_id', org).abortSignal(signal!),
@@ -389,13 +440,34 @@ export function useEquipe(f: RelFiltros, enabled: boolean) {
         // P1: TODAS as conversas + responsável do contato (mapear "sem resposta" independentemente da criação da conversa)
         fetchAll(() => supabase!.from('conversas').select('id, contato:contatos(responsavel_id)').eq('organizacao_id', org).abortSignal(signal!)).then(wrapRows),
         fetchAll(() => supabase!.from('mensagens').select('conversa_id').eq('organizacao_id', org).eq('direcao', 'entrada').gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).abortSignal(signal!)).then(wrapRows),
+        carregaPessoas(org, signal!),
       ]);
       for (const r of [us, ct, op, opf, cb, ms, cvv, mi]) if (r.error) throw new Error(r.error.message);
       const com = new Map<string, LinhaComercial>(); const at = new Map<string, LinhaAtend>();
       for (const r of (us.data as Row[]) ?? []) { const u = one(r.usuarios); if (!u) continue; const id = u.id as string, nome = u.nome as string; com.set(id, { id, nome, leads: 0, oppAndamento: 0, oppGanho: 0, oppPerdido: 0, clientesFechados: 0, negociosFechados: 0, taxaConversao: 0, receitaContratada: 0, receitaRecebida: 0 }); at.set(id, { id, nome, conversasRespondidas: 0, mensagensEnviadas: 0, conversasSemResposta: 0 }); }
       const getC = (id: string | null) => (id ? com.get(id) ?? null : null);
-      for (const r of (ct.data as Row[]) ?? []) { const l = getC(r.responsavel_id as string); if (l) l.leads += 1; }
-      for (const r of (op.data as Row[]) ?? []) { const l = getC(r.responsavel_id as string); if (!l) continue; if (r.status === 'em_andamento') l.oppAndamento += 1; else if (r.status === 'ganho') l.oppGanho += 1; else if (r.status === 'perdido') l.oppPerdido += 1; }
+      // D: atribuição = opp.responsavel_id → contato.responsavel_id (≡ conversa.atendente_id via trigger de sync) → "Não atribuído".
+      // A linha "Não atribuído" é criada sob demanda para que nada some do ranking por falta de dono.
+      const NAO_ATRIB = '__nao_atribuido__';
+      const linhaNaoAtrib = (): LinhaComercial => {
+        let l = com.get(NAO_ATRIB);
+        if (!l) { l = { id: NAO_ATRIB, nome: 'Não atribuído', leads: 0, oppAndamento: 0, oppGanho: 0, oppPerdido: 0, clientesFechados: 0, negociosFechados: 0, taxaConversao: 0, receitaContratada: 0, receitaRecebida: 0 }; com.set(NAO_ATRIB, l); }
+        return l;
+      };
+      const respOpp = (r: Row): string | null => {
+        const cont = one(r.contato) as { responsavel_id?: string | null } | null;
+        return (r.responsavel_id as string) || (cont?.responsavel_id ?? null);
+      };
+      // B: o número interno da equipe sai de TODA métrica comercial (filtro de relatório; nada é apagado do banco).
+      for (const r of (ct.data as Row[]) ?? []) {
+        if (pes.internos.has(r.id as string)) continue;
+        const l = getC(r.responsavel_id as string); if (l) l.leads += 1;
+      }
+      for (const r of (op.data as Row[]) ?? []) {
+        if (pes.internos.has(r.contato_id as string)) continue;
+        const l = getC(respOpp(r)) ?? linhaNaoAtrib();
+        if (r.status === 'em_andamento') l.oppAndamento += 1; else if (r.status === 'ganho') l.oppGanho += 1; else if (r.status === 'perdido') l.oppPerdido += 1;
+      }
       for (const r of (cb.data as Row[]) ?? []) { const l = getC((r.responsavel_id as string) || (r.criado_por as string)); if (l && r.status !== 'cancelado') l.receitaContratada += num(r.valor_mensal) * num(r.ciclos_totais); }
       // atendimento real por autor_id
       const msgs = (ms.data as Row[]) ?? [];
@@ -413,16 +485,16 @@ export function useEquipe(f: RelFiltros, enabled: boolean) {
         const l = getC(convResp.get(id) ?? null);
         if (l) at.get(l.id)!.conversasSemResposta += 1;
       }
-      // P5: clientes/negócios fechados por atendente (fechado_em) com fallback opp.responsavel → contato.responsavel (≡ conversa.atendente via trigger de sync)
-      const NAO_ATRIB = '__nao_atribuido__';
+      // P5/A/D: clientes/negócios fechados por atendente (fechado_em), atribuição com fallback (D).
+      // A: "cliente fechado" conta PESSOA ÚNICA por telefone canônico — não linha de `contatos`.
       const fechClientes = new Map<string, Set<string>>(); const fechNegocios = new Map<string, number>();
       for (const r of (opf.data as Row[]) ?? []) {
-        const cont = one(r.contato) as { responsavel_id?: string | null } | null;
-        const resp = (r.responsavel_id as string) || (cont?.responsavel_id ?? null);
-        const key = resp && com.has(resp) ? resp : NAO_ATRIB;
         const cid = r.contato_id as string;
+        if (pes.internos.has(cid)) continue;
+        const resp = respOpp(r);
+        const key = resp && com.has(resp) ? resp : linhaNaoAtrib().id;
         if (!fechClientes.has(key)) fechClientes.set(key, new Set());
-        if (cid) fechClientes.get(key)!.add(cid);
+        if (cid) fechClientes.get(key)!.add(pes.pessoa.get(cid) ?? ('cid:' + cid));
         fechNegocios.set(key, (fechNegocios.get(key) || 0) + 1);
       }
       for (const [id, l] of com) { l.clientesFechados = fechClientes.get(id)?.size ?? 0; l.negociosFechados = fechNegocios.get(id) ?? 0; }
@@ -436,11 +508,8 @@ export function useEquipe(f: RelFiltros, enabled: boolean) {
       // P3: taxa por atendente = clientes fechados ÷ contatos atribuídos
       for (const l of com.values()) { l.taxaConversao = l.leads === 0 ? 0 : (l.clientesFechados / l.leads) * 100; }
       const filtroResp = (id: string) => !f.responsavel || f.responsavel === id;
-      const comercial = [...com.values()].filter((l) => filtroResp(l.id));
-      // linha "Não atribuído" p/ reconciliar fechamentos sem responsável (só na visão geral)
-      if (!f.responsavel && ((fechClientes.get(NAO_ATRIB)?.size ?? 0) > 0 || (fechNegocios.get(NAO_ATRIB) ?? 0) > 0)) {
-        comercial.push({ id: NAO_ATRIB, nome: 'Não atribuído', leads: 0, oppAndamento: 0, oppGanho: 0, oppPerdido: 0, clientesFechados: fechClientes.get(NAO_ATRIB)?.size ?? 0, negociosFechados: fechNegocios.get(NAO_ATRIB) ?? 0, taxaConversao: 0, receitaContratada: 0, receitaRecebida: 0 });
-      }
+      // "Não atribuído" já vive em `com` (criada sob demanda); só aparece na visão geral.
+      const comercial = [...com.values()].filter((l) => (l.id === NAO_ATRIB ? !f.responsavel : filtroResp(l.id)));
       return { comercial, atendimento: [...at.values()].filter((l) => filtroResp(l.id)), atendimentoAtribuivel };
     },
   });
@@ -520,23 +589,29 @@ export function useFinanceiro(f: RelFiltros, enabled: boolean) {
 }
 
 /* ====================== Origens ====================== */
-export interface LinhaOrigem { origem: string; leads: number; fechados: number; taxaConversao: number; }
+/** C: esta tabela conta OPORTUNIDADES por origem — nunca chamar de "leads" nem de "pessoas". */
+export interface LinhaOrigem { origem: string; oportunidades: number; ganhas: number; taxaConversao: number; }
 export function useOrigens(f: RelFiltros, enabled: boolean) {
   const { currentOrg } = useOrg(); const org = currentOrg.id; const p = resolvePeriodo(f.preset, f.ini, f.fim);
   return useQuery({
     queryKey: ['rel-origens', org, chaveFiltros(f)], enabled: REL_REAL && enabled, staleTime: 60_000,
     queryFn: async ({ signal }): Promise<LinhaOrigem[]> => {
-      let q = supabase!.from('oportunidades').select('origem, fonte_aquisicao, status').eq('organizacao_id', org).gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).abortSignal(signal!);
+      let q = supabase!.from('oportunidades').select('contato_id, origem, fonte_aquisicao, status').eq('organizacao_id', org).gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).abortSignal(signal!);
       if (f.responsavel) q = q.eq('responsavel_id', f.responsavel);
       if (f.coluna) q = q.eq('coluna_id', f.coluna);
       if (f.status) q = q.eq('status', f.status);
       if (f.conexao) q = q.eq('canal_origem_id', f.conexao);
-      const { data, error } = await q;
+      const [{ data, error }, pes] = await Promise.all([q, carregaPessoas(org, signal!)]);
       if (error) throw new Error(error.message);
       const map = new Map<string, LinhaOrigem>();
-      for (const r of (data as Row[]) ?? []) { const k = (r.origem as string) || (r.fonte_aquisicao as string) || 'Não informado'; const cur = map.get(k) || { origem: k, leads: 0, fechados: 0, taxaConversao: 0 }; cur.leads += 1; if (r.status === 'ganho') cur.fechados += 1; map.set(k, cur); }
-      const lista = [...map.values()]; for (const l of lista) l.taxaConversao = l.leads === 0 ? 0 : (l.fechados / l.leads) * 100;
-      return lista.sort((a, b) => b.leads - a.leads);
+      for (const r of (data as Row[]) ?? []) {
+        if (pes.internos.has(r.contato_id as string)) continue; // B: número interno fora do comercial
+        const k = (r.origem as string) || (r.fonte_aquisicao as string) || 'Não informado';
+        const cur = map.get(k) || { origem: k, oportunidades: 0, ganhas: 0, taxaConversao: 0 };
+        cur.oportunidades += 1; if (r.status === 'ganho') cur.ganhas += 1; map.set(k, cur);
+      }
+      const lista = [...map.values()]; for (const l of lista) l.taxaConversao = l.oportunidades === 0 ? 0 : (l.ganhas / l.oportunidades) * 100;
+      return lista.sort((a, b) => b.oportunidades - a.oportunidades);
     },
   });
 }
@@ -576,7 +651,7 @@ export interface ConexaoInput {
   firstIn: { conversa: string; chip: string; t: number }[]; firstResp: { conversa: string; chip: string; t: number }[];
   outbound: { chip: string }[]; // toda mensagem direcao='saida' no período (p/ contagem por chip)
   opps: { chip: string; status: string; qualificada: boolean; tempoFechDias: number | null }[]; // oportunidades CRIADAS no período (criado_em)
-  fechamentos: { chip: string; contato: string }[]; // oportunidades GANHAS fechadas no período (fechado_em) — P2/P4
+  fechamentos: { chip: string; contato: string }[]; // oportunidades GANHAS fechadas no período (fechado_em) — P2/P4. `contato` = PESSOA canônica (A), não contato_id.
   parcelas: { chip: string; contato: string; status: string; valor: number; valorPago: number | null; dataPrevista: string | null; dataPagamento: string | null }[];
   economiaPorChip: Record<string, { total: number; preenchida: boolean }>;
   iniDate: string; fimDate: string; prevIniDate: string; hoje: string;
@@ -678,9 +753,15 @@ export function useConexoes(f: RelFiltros, enabled: boolean) {
       const entradaIds = new Set(((fc.data as Row[]) ?? []).filter((r) => r.entrada).map((r) => r.id as string));
       // contato → chip + identidade (SOMENTE conexões WhatsApp = provider evolution; Facebook fica fora da seção de chips)
       const contatoChip = new Map<string, string>(); const identidade: Record<string, ConexaoIdent> = {};
+      // A: contato → pessoa canônica (dedup por telefone), usada nos fechamentos.
+      const pessoaPorContato = new Map<string, string>();
       const contatos = (((ct.data as Row[]) ?? []).filter((r) => !f.conexao || (r.canal_origem_id as string) === f.conexao).map((r) => {
         const snap = r.canal_origem_snapshot as Record<string, unknown> | null;
         const cid = (r.canal_origem_id as string) || null;
+        const chaveTel = chaveCanonicaTelefone(r.telefone as string | null);
+        // B: número interno da equipe fora de tudo — sem chip, some de contatos/opps/fechamentos/conversas.
+        if (chaveTel === TEL_INTERNO_CANONICO) return null;
+        pessoaPorContato.set(r.id as string, chaveTel ?? ('cid:' + r.id));
         if (cid && !evolutionIds.has(cid)) return null;                 // aquisição por canal não-WhatsApp → fora
         if (!cid && snap && snap.provider && snap.provider !== 'evolution') return null; // removido não-WhatsApp → fora
         const chip = chaveConexao(cid, snap);
@@ -713,7 +794,11 @@ export function useConexoes(f: RelFiltros, enabled: boolean) {
       const firstIn = recebidas.map((r) => ({ conversa: r.conversa_id as string, chip: convChip.get(r.conversa_id as string)!, t: tms(r, 'recebida_em', 'criado_em') }));
       const firstResp = respHumanas.map((r) => ({ conversa: r.conversa_id as string, chip: convChip.get(r.conversa_id as string)!, t: tms(r, 'enviada_em', 'criado_em') }));
       // P2: fechamentos (ganho por fechado_em) mapeados ao chip via contato; contatos mesclados/não-WhatsApp ficam de fora (sem chip)
-      const fechamentos = (((opFech.data as Row[]) ?? []).map((r) => { const chip = contatoChip.get(r.contato_id as string); return chip ? { chip, contato: r.contato_id as string } : null; }).filter(Boolean)) as { chip: string; contato: string }[];
+      // A: `contato` carrega a PESSOA canônica — "clientes fechados" conta pessoa única, não linha de `contatos`.
+      const fechamentos = (((opFech.data as Row[]) ?? []).map((r) => {
+        const cid = r.contato_id as string; const chip = contatoChip.get(cid);
+        return chip ? { chip, contato: pessoaPorContato.get(cid) ?? ('cid:' + cid) } : null;
+      }).filter(Boolean)) as { chip: string; contato: string }[];
       const opps = (((op.data as Row[]) ?? []).map((r) => {
         const chip = contatoChip.get(r.contato_id as string); if (!chip) return null;
         const col = r.coluna_id as string | null;

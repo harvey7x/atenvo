@@ -1,3 +1,18 @@
+/* ============================================================================
+ * ⚠️  DEPRECATED — CÓDIGO MORTO. NÃO USE. NÃO CONSERTE. NÃO REATIVE.
+ * ============================================================================
+ * A tela de Relatórios (`src/pages/Relatorios.tsx`) usa EXCLUSIVAMENTE
+ * `src/data/relatorios.ts`. Este arquivo não é importado por nenhuma tela —
+ * só pelos próprios testes, que o leem como texto (`?raw`).
+ *
+ * As 9 RPCs `relatorio_*` que ele chama também são código morto no banco e NÃO
+ * refletem as regras comerciais vigentes (pessoa única por telefone canônico,
+ * exclusão do número interno, fallback de atribuição de vendedor).
+ * Qualquer número saído daqui é, por definição, NÃO CONFIÁVEL.
+ *
+ * Se for mexer em relatório: mexa em `src/data/relatorios.ts`.
+ * Mantido apenas por decisão do dono (2026-07-16); a remoção é uma etapa própria.
+ * ============================================================================ */
 // ETAPA 2B — Data layer da camada oficial de dados dos Relatórios (RPCs no banco = fonte única).
 // NÃO conectado aos componentes visuais atuais. Tipos explícitos (sem `any`). Período em SP,
 // fim EXCLUSIVO. Toda RPC valida membership internamente; o front passa a org atual.

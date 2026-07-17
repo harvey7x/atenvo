@@ -301,7 +301,7 @@ function AbaResumo({ f, periodoLabel, orgNome, ehAtendente }: { f: RelFiltros; p
         {/* Bloco 1 — cards executivos */}
         <div className="kpis">
           <KpiCard hero label="Pessoas que chamaram" k={cx.data ? flat(pessoasTotal) : null} sentido="maior" fmt={fmtInt} nota="No período" tooltip="Pessoas únicas com ≥1 mensagem recebida (inbound) no período, deduplicadas por telefone (ignora 9º dígito/DDI). Não inclui contatos que só receberam mensagem nossa (outbound)." />
-          <KpiCard hero label="Clientes fechados" k={q.data.oportunidadesFechadas} sentido="maior" fmt={fmtInt} tooltip="Clientes (contatos distintos) com oportunidade ganha FECHADA no período (por fechado_em). Não conta o mesmo cliente duas vezes." />
+          <KpiCard hero label="Clientes fechados" k={q.data.oportunidadesFechadas} sentido="maior" fmt={fmtInt} tooltip="Pessoas únicas (deduplicadas por telefone: ignora 9º dígito/DDI) com oportunidade ganha FECHADA no período (por fechado_em). Não conta a mesma pessoa duas vezes, mesmo que ela tenha contatos duplicados." />
           <KpiCard hero label="Taxa de conversão" k={cx.data ? flat(pessoasTotal > 0 ? (q.data.oportunidadesFechadas.atual / pessoasTotal) * 100 : 0) : null} sentido="maior" fmt={fmtPct} nota="Clientes ÷ pessoas" tooltip="Clientes fechados ÷ pessoas que chamaram no período." />
           <KpiCard hero label="Receita recebida" k={q.data.receitaRecebida} sentido="maior" fmt={fmtBRL} tooltip="Σ valor pago das parcelas pagas no período." />
           <KpiCard hero label="Valores em atraso" k={fin.data ? flat(fin.data.vencida) : flat(0)} sentido="menor" fmt={fmtBRL} nota="Posição atual" tooltip="Parcelas não pagas com vencimento anterior a hoje (posição atual, não comparada)." />
@@ -385,15 +385,15 @@ function AbaVendas({ f, periodoLabel, orgNome }: { f: RelFiltros; periodoLabel: 
           {q.data.leadsSerie.length < 2 ? <Vazio titulo="Dados insuficientes para a curva" texto={`No período: ${pl(q.data.totalOpp, 'oportunidade criada', 'oportunidades criadas')}.`} /> : <LineChart pts={q.data.leadsSerie} compact />}
         </Panel>
 
-        <div className="sech" style={{ marginTop: 6 }}>Origens dos leads</div>
+        <div className="sech" style={{ marginTop: 6 }}>Oportunidades por origem</div>
         <Estado q={or}>{or.data && (or.data.length === 0
           ? <Vazio titulo="Sem origens no período" texto="As origens aparecem conforme as oportunidades são criadas." />
           : <>
-            {or.data.length > 1 && <Panel title="Leads por origem"><Bars data={or.data.slice(0, 10).map((o) => ({ label: o.origem.slice(0, 12), v: o.leads }))} compact /></Panel>}
+            {or.data.length > 1 && <Panel title="Oportunidades por origem"><Bars data={or.data.slice(0, 10).map((o) => ({ label: o.origem.slice(0, 12), v: o.oportunidades }))} compact /></Panel>}
             <DataTable
               cols={[
-                { key: 'origem', label: 'Origem' }, { key: 'leads', label: 'Leads', align: 'c' },
-                { key: 'fechados', label: 'Fechados', align: 'c' }, { key: 'taxaConversao', label: 'Conversão', align: 'c', fmt: (v) => fmtPct(v as number), csv: (r) => (r.taxaConversao as number).toFixed(1) },
+                { key: 'origem', label: 'Origem' }, { key: 'oportunidades', label: 'Oportunidades', align: 'c' },
+                { key: 'ganhas', label: 'Ganhas', align: 'c' }, { key: 'taxaConversao', label: 'Conversão', align: 'c', fmt: (v) => fmtPct(v as number), csv: (r) => (r.taxaConversao as number).toFixed(1) },
               ] as Col<Record<string, unknown>>[]}
               rows={or.data as unknown as Record<string, unknown>[]} searchKeys={['origem']}
               csvName={`vendas_origens_${periodoLabel.replace(/\D/g, '')}`} csvMeta={meta} />
@@ -580,8 +580,8 @@ function AbaDetalhamento({ f, periodoLabel, orgNome, ehAtendente, onNav }: { f: 
       {sel === 'conexoes' && <SecaoConexoes f={f} periodoLabel={periodoLabel} orgNome={orgNome} />}
       {sel === 'origem' && <Estado q={or}>{or.data && <DataTable
         cols={[
-          { key: 'origem', label: 'Origem' }, { key: 'leads', label: 'Leads', align: 'c' },
-          { key: 'fechados', label: 'Fechados', align: 'c' }, { key: 'taxaConversao', label: 'Conversão', align: 'c', fmt: (v) => fmtPct(v as number), csv: (r) => (r.taxaConversao as number).toFixed(1) },
+          { key: 'origem', label: 'Origem' }, { key: 'oportunidades', label: 'Oportunidades', align: 'c' },
+          { key: 'ganhas', label: 'Ganhas', align: 'c' }, { key: 'taxaConversao', label: 'Conversão', align: 'c', fmt: (v) => fmtPct(v as number), csv: (r) => (r.taxaConversao as number).toFixed(1) },
         ] as Col<Record<string, unknown>>[]}
         rows={or.data as unknown as Record<string, unknown>[]} searchKeys={['origem']}
         csvName={`detalhe_origens_${periodoLabel.replace(/\D/g, '')}`} csvMeta={meta} />}</Estado>}

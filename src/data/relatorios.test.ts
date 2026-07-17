@@ -189,6 +189,24 @@ describe('Pessoas que chamaram — regras de negócio (dedup/outbound/LID)', () 
   });
   const linhaA = (inp: ConexaoInput) => montaLinhasConexao(inp).find((l) => l.chave === 'A')!;
 
+  // A: "clientes fechados" conta PESSOA única. O hook passa a chave canônica em `fechamentos.contato`,
+  // então dois contatos duplicados (9º dígito) da mesma pessoa chegam aqui com a MESMA chave.
+  it('clientes fechados = pessoa única: 2 contatos duplicados da mesma pessoa contam 1 cliente (mas 2 negócios)', () => {
+    const l = linhaA(base({
+      contatos: [{ id: 'p1', chip: 'A', criadoEm: dEm, tel: '5551999990010' }, { id: 'p2', chip: 'A', criadoEm: dEm, tel: '555199990010' }],
+      fechamentos: [{ chip: 'A', contato: '5199990010' }, { chip: 'A', contato: '5199990010' }],
+    }));
+    expect(l.fechados).toBe(1);
+    expect(l.negociosFechados).toBe(2);
+  });
+  it('pessoas distintas continuam contando separado', () => {
+    const l = linhaA(base({
+      contatos: [{ id: 'p1', chip: 'A', criadoEm: dEm, tel: '5551999990010' }, { id: 'p2', chip: 'A', criadoEm: dEm, tel: '5551999990011' }],
+      fechamentos: [{ chip: 'A', contato: '5199990010' }, { chip: 'A', contato: '5199990011' }],
+    }));
+    expect(l.fechados).toBe(2);
+  });
+
   it('outbound-only NÃO conta como pessoa que chamou (mas conta como contato criado)', () => {
     const l = linhaA(base({
       contatos: [{ id: 'p1', chip: 'A', criadoEm: dEm, tel: '5551900000010' }, { id: 'p2', chip: 'A', criadoEm: dEm, tel: '5551900000011' }],
