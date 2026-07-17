@@ -14,6 +14,7 @@ import { WhatsAppText } from '@/components/WhatsAppText';
 import { formatarNomeCliente } from '@/lib/nomeCliente';
 import { etiquetasDaConversa, responsavelEfetivo } from '@/lib/conversaEtiquetas';
 import { analisarNome, conversaAtiva, decidirDono, decidirNome, estadoHigiene, textoBloqueio } from '@/lib/higieneConversa';
+import { HIGIENE_CORTE_ISO, HIGIENE_DIAS_ADAPTACAO } from '@/config/higiene';
 import { useHigieneConversa, useRegistrarAdiamento, HIGIENE_VAZIO } from '@/data/higiene';
 import { EmptyState } from '@/components/EmptyState';
 import { useScripts, useScriptEtapaCounts, aguardarConfirmacaoEnvio, traduzErroEnvio } from '@/data/scripts';
@@ -425,7 +426,7 @@ export function WhatsApp() {
   const ativa = conversaAtiva({ status: current.status, arquivada: current.arquivada });
   const donoEfetivo = responsavelEfetivo(current);
   const agoraMs = Date.now();
-  const acaoDono = decidirDono({ ativa, temDono: !!donoEfetivo, conversaCriadaEm: current.criadaEm ?? null, agoraMs });
+  const acaoDono = decidirDono({ ativa, temDono: !!donoEfetivo, conversaCriadaEm: current.criadaEm ?? null, agoraMs, corteISO: HIGIENE_CORTE_ISO, diasAdaptacao: HIGIENE_DIAS_ADAPTACAO });
   const decNome = decidirNome({ ativa, nome: current.name, adiamentos: hig.adiamentos, liberadoAte: hig.liberadoAte, agoraMs });
   const higiene = estadoHigiene(acaoDono, decNome);
   const higieneBloqueia = WA_REAL && !!current.id && higiene.bloqueiaEnvio;

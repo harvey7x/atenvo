@@ -1,9 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import {
   analisarNome, nomeFraco, conversaAtiva, decidirDono, decidirNome, estadoHigiene, textoBloqueio,
-  HIGIENE_CORTE_ISO, HIGIENE_DIAS_ADAPTACAO,
 } from './higieneConversa';
+import { resolverCorte, resolverDiasAdaptacao, CORTE_PADRAO, DIAS_ADAPTACAO_PADRAO } from '@/config/higiene';
 
+// A regra não tem data própria: o corte é sempre injetado. Aqui usamos o padrão versionado.
+const HIGIENE_CORTE_ISO = CORTE_PADRAO;
+const HIGIENE_DIAS_ADAPTACAO = DIAS_ADAPTACAO_PADRAO;
+const cfg = { corteISO: HIGIENE_CORTE_ISO, diasAdaptacao: HIGIENE_DIAS_ADAPTACAO };
 const CORTE = new Date(HIGIENE_CORTE_ISO).getTime();
 const D = 86400000;
 const antes = new Date(CORTE - 5 * D).toISOString();   // conversa que já existia
@@ -71,7 +75,7 @@ describe('conversaAtiva() — bloqueio só vale em conversa ativa', () => {
 });
 
 describe('decidirDono() — entrada progressiva', () => {
-  const base = { ativa: true, temDono: false, agoraMs: durante };
+  const base = { ativa: true, temDono: false, agoraMs: durante, ...cfg };
 
   it('com dono efetivo → livre', () => {
     expect(decidirDono({ ...base, temDono: true, conversaCriadaEm: depois })).toBe('livre');
@@ -151,5 +155,63 @@ describe('estadoHigiene() — composição', () => {
   it('alerta de dono NÃO bloqueia (fase de adaptação)', () => {
     const e = estadoHigiene('alerta', nomeOk);
     expect(e.bloqueiaEnvio).toBe(false); expect(e.motivoBloqueio).toBeNull();
+  });
+});
+
+
+describe('config/higiene — resolução da data de corte (sem hardcode na regra)', () => {
+  it('sem env → cai no padrão versionado, e isso é esperado', () => {
+    for (const v of [undefined, null, '', '   ']) {
+      const r = resolverCorte(v);
+      expect(r.iso).toBe(CORTE_PADRAO); expect(r.origem).toBe('padrao'); expect(r.envValida).toBe(true);
+    }
+  });
+  it('env válida vence o padrão', () => {
+    const r = resolverCorte('2026-09-01T00:00:00-03:00');
+    expect(r.origem).toBe('env');
+    expect(new Date(r.iso).getTime()).toBe(new Date('2026-09-01T00:00:00-03:00').getTime());
+  });
+  it('env inválida NÃO quebra: cai no padrão e sinaliza', () => {
+    for (const v of ['amanha', '2026-13-45', '', ' ']) {
+      const r = resolverCorte(v || undefined);
+      expect(r.iso).toBe(CORTE_PADRAO); expect(r.origem).toBe('padrao');
+    }
+  });
+  it('ARMADILHA: data BR "01/09/2026" é rejeitada — new Date() a leria como 9 de JANEIRO', () => {
+    // sem validação estrita, quem digitasse 1º de setembro moveria o corte 8 meses sem erro
+    const r = resolverCorte('01/09/2026');
+    expect(r.origem).toBe('padrao');
+    expect(r.envValida).toBe(false);
+    expect(r.iso).toBe(CORTE_PADRAO);
+  });
+  it('aceita ISO com e sem hora/fuso', () => {
+    expect(resolverCorte('2026-08-01').origem).toBe('env');
+    expect(resolverCorte('2026-08-01T00:00:00-03:00').origem).toBe('env');
+    expect(resolverCorte('2026-08-01T03:00:00Z').origem).toBe('env');
+  });
+  it('dias de adaptação: env válida, inválida e negativa', () => {
+    expect(resolverDiasAdaptacao('14')).toBe(14);
+    expect(resolverDiasAdaptacao('0')).toBe(0);
+    expect(resolverDiasAdaptacao(undefined)).toBe(DIAS_ADAPTACAO_PADRAO);
+    expect(resolverDiasAdaptacao('abc')).toBe(DIAS_ADAPTACAO_PADRAO);
+    expect(resolverDiasAdaptacao('-3')).toBe(DIAS_ADAPTACAO_PADRAO);
+  });
+  it('corte configurado move a fronteira nova/antiga de verdade', () => {
+    const corteFuturo = '2026-12-01T00:00:00-03:00';
+    const agora = new Date('2026-12-05T00:00:00-03:00').getTime();
+    // criada antes do corte novo = ANTIGA → alerta (ainda dentro da adaptação)
+    expect(decidirDono({ ativa: true, temDono: false, conversaCriadaEm: '2026-11-20T00:00:00-03:00',
+      agoraMs: agora, corteISO: corteFuturo, diasAdaptacao: 7 })).toBe('alerta');
+    // criada depois do corte novo = NOVA → bloqueia
+    expect(decidirDono({ ativa: true, temDono: false, conversaCriadaEm: '2026-12-02T00:00:00-03:00',
+      agoraMs: agora, corteISO: corteFuturo, diasAdaptacao: 7 })).toBe('bloqueia');
+  });
+  it('corte INVÁLIDO nunca trava a operação — só alerta', () => {
+    expect(decidirDono({ ativa: true, temDono: false, conversaCriadaEm: depois,
+      agoraMs: passado, corteISO: 'data-quebrada', diasAdaptacao: 7 })).toBe('alerta');
+  });
+  it('diasAdaptacao=0 → antiga bloqueia imediatamente (entrada sem adaptação)', () => {
+    expect(decidirDono({ ativa: true, temDono: false, conversaCriadaEm: antes,
+      agoraMs: durante, corteISO: HIGIENE_CORTE_ISO, diasAdaptacao: 0 })).toBe('bloqueia');
   });
 });

@@ -16,12 +16,12 @@
  * O backend (evolution-send) não muda — para não quebrar retry, automação nem Edge.
  */
 
-/* ===================== Configuração da entrada progressiva ===================== */
+/* ===================== Configuração da entrada progressiva =====================
+ * A DATA DE CORTE NÃO MORA AQUI. Este módulo é puro de propósito: não lê ambiente
+ * e não chama new Date() — quem decide o corte é `src/config/higiene.ts` (env >
+ * constante versionada) e passa por parâmetro. Assim a regra é testável com
+ * qualquer data e não muda de comportamento conforme o ambiente. */
 
-/** Corte: conversa criada a partir daqui é "nova" e já entra com bloqueio duro. */
-export const HIGIENE_CORTE_ISO = '2026-07-17T00:00:00-03:00';
-/** Dias de adaptação/mutirão para as conversas que já existiam antes do corte. */
-export const HIGIENE_DIAS_ADAPTACAO = 7;
 /** Adiamentos de nome permitidos por conversa antes de o preenchimento virar obrigatório. */
 export const HIGIENE_MAX_ADIAMENTOS = 2;
 /** Janela liberada quando o atendente marca "cliente ainda não informou". */
@@ -96,8 +96,9 @@ export interface EntradaDono {
   /** conversas.criado_em (ISO). null/inválido = tratamos como ANTIGA (não trava quem não sabemos datar). */
   conversaCriadaEm?: string | null;
   agoraMs: number;
-  corteISO?: string;
-  diasAdaptacao?: number;
+  /** OBRIGATÓRIOS: vêm de `src/config/higiene.ts`. Sem default aqui — nada de data implícita. */
+  corteISO: string;
+  diasAdaptacao: number;
 }
 
 /** Conversa sem responsável: alerta forte sempre; bloqueio conforme a entrada progressiva. */
@@ -105,9 +106,10 @@ export function decidirDono(i: EntradaDono): AcaoHigiene {
   if (!i.ativa) return 'livre';
   if (i.temDono) return 'livre';
 
-  const corte = new Date(i.corteISO ?? HIGIENE_CORTE_ISO).getTime();
-  const dias = i.diasAdaptacao ?? HIGIENE_DIAS_ADAPTACAO;
-  const fimAdaptacao = corte + dias * 86400000;
+  const corte = new Date(i.corteISO).getTime();
+  // corte inválido nunca deve travar a operação: sem corte confiável, só alerta.
+  if (Number.isNaN(corte)) return 'alerta';
+  const fimAdaptacao = corte + Math.max(0, i.diasAdaptacao) * 86400000;
 
   const criadaMs = i.conversaCriadaEm ? new Date(i.conversaCriadaEm).getTime() : NaN;
 
