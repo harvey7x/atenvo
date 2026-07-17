@@ -176,6 +176,7 @@ function mapConversa(c: DbConv): WaContact {
     precisaHumano: !!c.precisa_humano,
     fixada: !!c.fixada_em,
     silenciada: !!c.silenciada_ate && new Date(c.silenciada_ate).getTime() > Date.now(),
+    criadaEm: c.criado_em ?? null,
     respId: c.contatos?.responsavel_id ?? null,
     atendenteId: c.atendente_id ?? null,
     // v27: canais.nome_interno via conversas.canal_id = CANAL ATUAL do atendimento (ANDRIUS/URA/LUIZA/RMKT)

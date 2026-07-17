@@ -65,6 +65,8 @@ export interface WaContact {
   silenciada?: boolean;
   /** id do contato (para abrir em Contatos e editar). */
   contatoId?: string | null;
+  /** conversas.criado_em (ISO) — higiene: separa conversa NOVA (bloqueia já) de ANTIGA (adaptação). */
+  criadaEm?: string | null;
   /** id do usuário responsável (contatos.responsavel_id). */
   respId?: string | null;
   /** id do atendente da CONVERSA (conversas.atendente_id) — 1ª preferência p/ a etiqueta. */

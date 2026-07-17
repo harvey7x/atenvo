@@ -13,6 +13,8 @@ import { MsgVideo } from '@/components/MsgVideo';
 import { WhatsAppText } from '@/components/WhatsAppText';
 import { formatarNomeCliente } from '@/lib/nomeCliente';
 import { etiquetasDaConversa, responsavelEfetivo } from '@/lib/conversaEtiquetas';
+import { analisarNome, conversaAtiva, decidirDono, decidirNome, estadoHigiene, textoBloqueio } from '@/lib/higieneConversa';
+import { useHigieneConversa, useRegistrarAdiamento, HIGIENE_VAZIO } from '@/data/higiene';
 import { EmptyState } from '@/components/EmptyState';
 import { useScripts, useScriptEtapaCounts, aguardarConfirmacaoEnvio, traduzErroEnvio } from '@/data/scripts';
 import { ScriptSequenceModal } from '@/components/ScriptSequenceModal';
@@ -272,7 +274,9 @@ export function WhatsApp() {
     return {
       aguardando: !!c.aguardando,
       aguardandoDesde: c.aguardandoDesde ?? null,
-      temResponsavel: !!c.respId,
+      // usa o responsável EFETIVO (conversa → contato → oportunidade): antes olhava só
+      // contatos.responsavel_id e tratava como "livre" conversa cuja opp já tinha dono.
+      temResponsavel: !!responsavelEfetivo(c),
       houveResposta: (c.msgs ?? []).some((m) => m.dir === 'out'),
       primeiraMensagem: (c.msgs ?? []).length <= 1,
       precisaHumano: !!c.precisaHumano,
@@ -409,6 +413,22 @@ export function WhatsApp() {
   const canalEntregaProblema = canalEntrega === 'restrito' || canalEntrega === 'instavel';
   // Caso D: conversa sem número de resposta confirmado (origem LID). Bloqueia o envio até vincular um PN validado.
   const semDestino = WA_REAL && !!current.id && !!current.semDestino;
+
+  /* ── Higiene obrigatória (regra pura em @/lib/higieneConversa) ──────────────────
+     1) conversa ativa sem responsável EFETIVO → alerta forte; bloqueia envio conforme
+        a entrada progressiva (nova bloqueia já; antiga só depois da adaptação);
+     2) nome fraco → alerta com 2 adiamentos e depois bloqueio, com escape de 24h.
+     Bloqueio é de FRONT (regra operacional, não segurança): o backend não muda. */
+  const higQ = useHigieneConversa(current.id || null);
+  const hig = higQ.data ?? HIGIENE_VAZIO;
+  const adiarMut = useRegistrarAdiamento();
+  const ativa = conversaAtiva({ status: current.status, arquivada: current.arquivada });
+  const donoEfetivo = responsavelEfetivo(current);
+  const agoraMs = Date.now();
+  const acaoDono = decidirDono({ ativa, temDono: !!donoEfetivo, conversaCriadaEm: current.criadaEm ?? null, agoraMs });
+  const decNome = decidirNome({ ativa, nome: current.name, adiamentos: hig.adiamentos, liberadoAte: hig.liberadoAte, agoraMs });
+  const higiene = estadoHigiene(acaoDono, decNome);
+  const higieneBloqueia = WA_REAL && !!current.id && higiene.bloqueiaEnvio;
   const [vincOpen, setVincOpen] = useState(false);
   const [vincTel, setVincTel] = useState('');
   const [vincBusy, setVincBusy] = useState(false);
@@ -542,6 +562,35 @@ export function WhatsApp() {
     acoes.salvarAssinatura({ modo, nome }).catch((e) => toast((e as Error).message || 'Falha ao salvar assinatura', 'warn'));
   }
 
+  /** Trava de higiene compartilhada por texto e mídia. true = não pode enviar agora. */
+  function bloquearPorHigiene(): boolean {
+    if (!higieneBloqueia) return false;
+    if (higiene.motivoBloqueio === 'dono') toast('Esta conversa não tem responsável. Clique em "Assumir atendimento" para responder.', 'warn');
+    else toast('Preencha o nome completo do cliente para continuar respondendo.', 'warn');
+    return true;
+  }
+
+  /** "Lembrar depois" — consome 1 dos 2 adiamentos permitidos nesta conversa. */
+  async function adiarNome() {
+    if (!current.id || adiarMut.isPending) return;
+    try {
+      const r = await adiarMut.mutateAsync({ conversaId: current.id, tipo: 'nome_adiado' });
+      const restam = Math.max(0, 2 - r.adiamentos);
+      toast(restam > 0
+        ? `Ok. Depois de mais ${restam === 1 ? 'um adiamento' : `${restam} adiamentos`} o nome vira obrigatório.`
+        : 'Último adiamento usado. Na próxima o nome será obrigatório para responder.');
+    } catch (e) { toast((e as Error).message || 'Falha ao adiar', 'warn'); }
+  }
+
+  /** "Cliente ainda não informou" — libera a conversa por 24h e fica registrado. */
+  async function nomeNaoInformado() {
+    if (!current.id || adiarMut.isPending) return;
+    try {
+      await adiarMut.mutateAsync({ conversaId: current.id, tipo: 'nome_nao_informado' });
+      toast('Liberado por 24h. O aviso volta depois — registre o nome assim que o cliente informar.');
+    } catch (e) { toast((e as Error).message || 'Falha ao liberar', 'warn'); }
+  }
+
   function sendMsg() {
     const v = draft.trim();
     if (!v) return;
@@ -550,6 +599,9 @@ export function WhatsApp() {
     if (canalRestrito) { toast('O número deste canal está com restrição no WhatsApp e está indisponível para envio. Selecione outro canal.', 'warn'); return; }
     if (canalIndisponivel) { toast('Este número está desconectado. Reconecte em Integrações para enviar.', 'warn'); return; }
     if (semDestino) { toast('Vincule um número confirmado para responder.', 'warn'); return; }
+    // HIGIENE: trava o envio NOVO pelo painel. Não vale para retryMsg() — lá a mensagem já
+    // foi escrita e falhou; travar só deixaria a falha presa sem ganho de cadastro.
+    if (bloquearPorHigiene()) return;
     const now = new Date();
     const hh = ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
     const corpo = assinaturaNome ? `*${assinaturaNome}:*\n${v}` : v;
@@ -616,6 +668,7 @@ export function WhatsApp() {
   /** Envio manual de IMAGEM: sobe ao bucket privado e envia pela Evolution (lança em falha -> mantém p/ retry). */
   async function enviarImagem(file: File, caption: string) {
     if (!currentId) throw new Error('Selecione uma conversa.');
+    if (higieneBloqueia) throw new Error(higiene.motivoBloqueio === 'dono' ? 'Assuma o atendimento para responder.' : 'Preencha o nome completo do cliente para responder.');
     const up = await subirMidiaWa(currentOrg.id, file);
     await sendMut.mutateAsync({
       conversaId: currentId, canalId: replyCanalId || current.canalId,
@@ -626,6 +679,7 @@ export function WhatsApp() {
   /** Envio de ÁUDIO (gravado ou arquivo): sobe ao bucket privado e envia como nota de voz pela Evolution. */
   async function enviarAudio(blob: Blob, mime: string, ext: string, diag?: Record<string, unknown>) {
     if (!currentId) throw new Error('Selecione uma conversa.');
+    if (higieneBloqueia) throw new Error(higiene.motivoBloqueio === 'dono' ? 'Assuma o atendimento para responder.' : 'Preencha o nome completo do cliente para responder.');
     if (!blob || blob.size === 0) throw new Error('Áudio vazio. Grave novamente.');
     const file = new File([blob], `audio-${Date.now()}.${ext}`, { type: mime });
     const up = await subirMidiaWa(currentOrg.id, file);
@@ -641,6 +695,7 @@ export function WhatsApp() {
   /** Envio manual de DOCUMENTO: sobe ao bucket privado e envia pela Evolution (lança em falha -> mantém p/ retry). */
   async function enviarDocumento(file: File, caption: string) {
     if (!currentId) throw new Error('Selecione uma conversa.');
+    if (higieneBloqueia) throw new Error(higiene.motivoBloqueio === 'dono' ? 'Assuma o atendimento para responder.' : 'Preencha o nome completo do cliente para responder.');
     const up = await subirMidiaWa(currentOrg.id, file);
     await sendMut.mutateAsync({
       conversaId: currentId, canalId: replyCanalId || current.canalId,
@@ -933,6 +988,8 @@ export function WhatsApp() {
             const slaChips = slaPorConversa.get(c.id) ?? [];
             // Etiquetas (padrão WhatsApp Business): [LEAD NOVO] OU [ATENDENTE] [ETAPA].
             const badges = etiquetasDaConversa(c, nomePorId);
+            // Higiene: cadastro fraco vira badge na lista. A etiqueta LEAD NOVO já sinaliza "sem dono".
+            const nomeRuim = analisarNome(c.name).fraco && conversaAtiva({ status: c.status, arquivada: c.arquivada });
             return (
             <div key={c.id} data-cid={c.id} className={'conv conv--' + barTier + (c.id === currentId ? ' active' : '')}
                  title={'Atendente: ' + atendNome + ' · Canal: WhatsApp ' + c.chip} onClick={() => selectContact(c.id)}>
@@ -944,8 +1001,9 @@ export function WhatsApp() {
                 </div>
                 {nomeVazio && telSec && <div className="cphone">{telSec}</div>}
                 <div className="cprev">{c.last || '—'}</div>
-                {(badges.length > 0 || slaChips.length > 0 || c.precisaHumano) && (
+                {(badges.length > 0 || slaChips.length > 0 || c.precisaHumano || nomeRuim) && (
                   <div className="cbadges">
+                    {nomeRuim && <span className="ctag ctag--higiene" title="Cadastro incompleto: preencha o nome completo do cliente">Nome incompleto</span>}
                     {badges.map((e) => (
                       <span key={e.tipo + e.texto}
                             className={'ctag ctag--' + (e.tipo === 'situacao' ? (e.variante ?? 'atendimento') : e.tipo)}
@@ -1012,7 +1070,9 @@ export function WhatsApp() {
             </div>
             </div>
           <div className="ch-actions">
-            {current.id && (current.respId
+            {/* responsável EFETIVO (conversa → contato → oportunidade): antes olhava só
+                contatos.responsavel_id e oferecia "Assumir" em conversa que já tinha dono na oportunidade. */}
+            {current.id && (donoEfetivo
               ? <button className="ch-resp-btn" disabled={atribuindo} title="Transferir atendimento" onClick={abrirTransferir}><IcTransfer /><span>Transferir</span></button>
               : <button className="ch-resp-btn primary" disabled={atribuindo} title="Assumir atendimento" onClick={assumir}><IcUserPlus /><span>Assumir</span></button>)}
             <button className={'icon-btn' + (foco ? ' on' : '')} title="Modo de foco (Esc para sair)" onClick={() => setFoco((v) => !v)}><IcFocus /></button>
@@ -1021,6 +1081,49 @@ export function WhatsApp() {
         </header>
 
         <SlaConversaBanner alertas={slaPorConversa.get(currentId) ?? []} />
+
+        {/* HIGIENE 1 — conversa sem responsável. Alerta forte no topo; bloqueia envio quando
+            a entrada progressiva mandar (nova = já; antiga = depois da adaptação). */}
+        {WA_REAL && !!current.id && higiene.dono !== 'livre' && (
+          <div className={'hig-banner' + (higiene.dono === 'bloqueia' ? ' hig-bloq' : '')}>
+            <IcWarn />
+            <div className="hig-txt">
+              <b>Esta conversa ainda não tem responsável.</b>{' '}
+              {higiene.dono === 'bloqueia'
+                ? 'Assuma o atendimento para responder e evitar perda de lead.'
+                : 'Assuma o atendimento para responder e evitar perda de lead. Em breve isto será obrigatório.'}
+            </div>
+            <button className="hig-btn" disabled={atribuindo} onClick={assumir}>
+              <IcUserPlus />Assumir atendimento
+            </button>
+          </div>
+        )}
+
+        {/* HIGIENE 2 — cadastro do nome. Progressiva: 2 adiamentos, depois obrigatório;
+            "cliente ainda não informou" libera 24h. Só cobra quando já há responsável. */}
+        {WA_REAL && !!current.id && higiene.dono === 'livre' && decNome.acao !== 'livre' && (
+          <div className={'hig-banner' + (decNome.acao === 'bloqueia' ? ' hig-bloq' : ' hig-nome')}>
+            <IcWarn />
+            <div className="hig-txt">
+              <b>{decNome.acao === 'bloqueia' ? 'Preencha o nome completo para continuar.' : 'O cadastro deste cliente está incompleto.'}</b>{' '}
+              {decNome.analise.motivo === 'comercio'
+                ? 'O nome parece ser de um comércio. Se for pessoa física, corrija para o nome completo.'
+                : 'Preencha o nome completo para facilitar follow-up, relatórios e atendimento.'}
+              {decNome.podeAdiar && decNome.adiamentosRestantes < 2 && (
+                <span className="hig-sub"> · resta {decNome.adiamentosRestantes === 1 ? '1 adiamento' : `${decNome.adiamentosRestantes} adiamentos`}</span>
+              )}
+            </div>
+            <button className="hig-btn" onClick={iniciarEdicao}>Editar nome</button>
+            {decNome.podeAdiar && (
+              <button className="hig-btn ghost" disabled={adiarMut.isPending} onClick={adiarNome}>Lembrar depois</button>
+            )}
+            {decNome.acao === 'bloqueia' && (
+              <button className="hig-btn ghost" disabled={adiarMut.isPending} onClick={nomeNaoInformado} title="Libera por 24h e fica registrado">
+                Cliente ainda não informou
+              </button>
+            )}
+          </div>
+        )}
 
         <div className="messages" ref={msgsRef}>
           {current.msgs.map((m, i) => {
@@ -1211,13 +1314,13 @@ export function WhatsApp() {
           )}
 
           <div className="input-wrap">
-            <textarea ref={taRef} className="msg-input" rows={1} placeholder={semDestino ? 'Vincule um número para responder' : (canalIndisponivel ? 'Envio bloqueado: número desconectado' : (canalRestrito ? 'Envio bloqueado: número com restrição no WhatsApp' : 'Digite sua mensagem...'))}
-              value={draft} onChange={(e) => setDraft(e.target.value)} disabled={canalIndisponivel || semDestino || canalRestrito}
+            <textarea ref={taRef} className="msg-input" rows={1} placeholder={semDestino ? 'Vincule um número para responder' : (canalIndisponivel ? 'Envio bloqueado: número desconectado' : (canalRestrito ? 'Envio bloqueado: número com restrição no WhatsApp' : (textoBloqueio(higiene) ?? 'Digite sua mensagem...')))}
+              value={draft} onChange={(e) => setDraft(e.target.value)} disabled={canalIndisponivel || semDestino || canalRestrito || higieneBloqueia}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); } }} />
             <div className="composer-bar">
-              <button className="cbar-act" title="Enviar imagem" aria-label="Enviar imagem" disabled={semDestino || canalRestrito || (WA_REAL && (!current.id || !canalConectado))} onClick={() => setImgModal(true)}><IcImage /><span>Imagem</span></button>
-              <AudioRecorder disabled={semDestino || canalRestrito || (WA_REAL && (!current.id || !canalConectado))} onEnviar={enviarAudio} />
-              <button className="cbar-act" title="Enviar documento" aria-label="Enviar documento" disabled={semDestino || canalRestrito || (WA_REAL && (!current.id || !canalConectado))} onClick={() => setDocModal(true)}><IcDoc /><span>Arquivo</span></button>
+              <button className="cbar-act" title="Enviar imagem" aria-label="Enviar imagem" disabled={semDestino || canalRestrito || higieneBloqueia || (WA_REAL && (!current.id || !canalConectado))} onClick={() => setImgModal(true)}><IcImage /><span>Imagem</span></button>
+              <AudioRecorder disabled={semDestino || canalRestrito || higieneBloqueia || (WA_REAL && (!current.id || !canalConectado))} onEnviar={enviarAudio} />
+              <button className="cbar-act" title="Enviar documento" aria-label="Enviar documento" disabled={semDestino || canalRestrito || higieneBloqueia || (WA_REAL && (!current.id || !canalConectado))} onClick={() => setDocModal(true)}><IcDoc /><span>Arquivo</span></button>
               <span className="spacer" />
               <button ref={scriptsBtnRef} className="scripts-btn" disabled={semDestino} onClick={(e) => { e.stopPropagation(); togglePop('scripts', scriptsBtnRef, 'right'); }}><IcScripts />Scripts<IcCaret /></button>
               <button className="send-btn" aria-label="Enviar" disabled={sendDisabled} onClick={sendMsg}><IcSend /></button>

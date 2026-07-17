@@ -113,6 +113,8 @@
 .wa-app .conv .ctag--cancelado{background:transparent;color:var(--muted);border-color:var(--line-2)}              /* CANCELADO */
 /* CANAL ATUAL — verde WhatsApp bem apagado (é contexto, não protagonista) */
 .wa-app .conv .ctag--canal{background:transparent;color:var(--wa);border-color:rgba(31,168,85,.30);font-weight:600}
+/* HIGIENE — cadastro incompleto (auditoria 2026-07: 49% dos contatos sem nome utilizável) */
+.wa-app .conv .ctag--higiene{background:rgba(192,52,44,.10);color:#c0342c;border-color:rgba(192,52,44,.28)}
 [data-theme="dark"] .wa-app .conv .ctag--atendente{background:rgba(59,130,246,.18);color:#93b4fc;border-color:rgba(59,130,246,.34)}
 .wa-app .conv .crow-status{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:2px}
 .wa-app .conv .cstatus{font-size:11px;font-weight:500;line-height:1.2;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -320,6 +322,31 @@
 .wa-app .reply-empty{font-size:12.5px;color:var(--muted)}
 .wa-app .link-btn{background:none;border:0;color:var(--green-ink);font-weight:600;cursor:pointer;font-family:inherit;font-size:inherit;padding:0;margin-left:6px;text-decoration:underline}
 .wa-app .warn-block{color:var(--amber);background:var(--amber-soft);border:1px solid var(--amber-soft);border-radius:9px;padding:8px 10px;align-items:center}
+
+/* ===== HIGIENE OBRIGATÓRIA — alerta forte no topo da conversa =====
+   Precisa incomodar: fica acima das mensagens, colorido e com a ação ao lado.
+   Âmbar = alerta (ainda dá para enviar). Vermelho = envio bloqueado. */
+.wa-app .hig-banner{
+  display:flex;align-items:center;gap:10px;margin:8px 12px 0;padding:10px 12px;
+  border-radius:9px;font-size:12.5px;line-height:1.4;
+  background:var(--amber-soft);color:var(--amber);border:1px solid rgba(201,122,22,.32);
+}
+.wa-app .hig-banner svg{flex:none;width:16px;height:16px}
+.wa-app .hig-banner .hig-txt{flex:1;min-width:0}
+.wa-app .hig-banner .hig-txt b{color:inherit}
+.wa-app .hig-banner .hig-sub{opacity:.85;font-weight:600}
+.wa-app .hig-banner .hig-btn{
+  flex:none;display:inline-flex;align-items:center;gap:5px;cursor:pointer;
+  padding:5px 11px;border-radius:7px;font-size:12px;font-weight:700;
+  background:var(--amber);color:#fff;border:1px solid transparent;
+}
+.wa-app .hig-banner .hig-btn svg{width:14px;height:14px}
+.wa-app .hig-banner .hig-btn.ghost{background:transparent;color:inherit;border-color:currentColor;font-weight:600}
+.wa-app .hig-banner .hig-btn:disabled{opacity:.55;cursor:default}
+/* bloqueado: vermelho — o envio está travado */
+.wa-app .hig-banner.hig-bloq{background:rgba(192,52,44,.09);color:#c0342c;border-color:rgba(192,52,44,.30)}
+.wa-app .hig-banner.hig-bloq .hig-btn{background:#c0342c}
+.wa-app .hig-banner.hig-bloq .hig-btn.ghost{background:transparent;color:#c0342c}
 
 /* ===== mensagens: ack + enviada pelo celular ===== */
 .wa-app .btime .tick{margin-left:4px;font-weight:600}
