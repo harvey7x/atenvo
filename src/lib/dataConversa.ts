@@ -72,3 +72,32 @@ export function precisaSeparador(iso: string | null | undefined, isoAnterior: st
   if (!isoAnterior) return true;         // primeira mensagem da lista sempre abre o dia
   return atual !== chaveDiaSP(isoAnterior);
 }
+
+/** Item do fio: um separador de dia OU uma mensagem. Genérico em T para não depender do tipo do app. */
+export type ItemConversa<T> =
+  | { tipo: 'sep'; chave: string; label: string }
+  | { tipo: 'msg'; chave: string; msg: T; indice: number };
+
+/**
+ * Monta a sequência renderizável: insere um separador antes da primeira mensagem de cada dia.
+ * `getISO` extrai o timestamp de cada mensagem. Puro e testável — o componente só faz o JSX.
+ * A chave do separador inclui a chave do dia (estável), então não depende de índice quebrado.
+ */
+export function construirItensConversa<T>(
+  msgs: readonly T[],
+  getISO: (m: T) => string | null | undefined,
+  agora?: Date,
+): ItemConversa<T>[] {
+  const out: ItemConversa<T>[] = [];
+  let diaAnterior = '';
+  msgs.forEach((m, i) => {
+    const iso = getISO(m);
+    const dia = chaveDiaSP(iso);
+    if (dia && dia !== diaAnterior) {
+      out.push({ tipo: 'sep', chave: 'sep-' + dia, label: rotuloDia(iso, agora) });
+      diaAnterior = dia;
+    }
+    out.push({ tipo: 'msg', chave: 'msg-' + i, msg: m, indice: i });
+  });
+  return out;
+}

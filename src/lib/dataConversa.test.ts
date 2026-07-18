@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { chaveDiaSP, rotuloDia, precisaSeparador } from './dataConversa';
+import { chaveDiaSP, rotuloDia, precisaSeparador, construirItensConversa } from './dataConversa';
 
 // "Agora" fixo para todos os testes relativos: 16/07/2026 (quinta) 15:00 em SP = 18:00 UTC.
 const AGORA = new Date('2026-07-16T18:00:00Z');
@@ -79,5 +79,47 @@ describe('precisaSeparador() — quando abrir um novo dia', () => {
   });
   it('sem data na atual → não quebra o fio', () => {
     expect(precisaSeparador(null, spm('2026-07-16'))).toBe(false);
+  });
+});
+
+describe('construirItensConversa() — sequência renderizável (integração)', () => {
+  const AG = new Date('2026-07-16T18:00:00Z'); // 15h SP
+  const msg = (dia: string, hh: string) => ({ ts: new Date(`${dia}T${hh}-03:00`).toISOString(), t: `${dia} ${hh}` });
+  const get = (m: { ts: string }) => m.ts;
+
+  it('3 mensagens no MESMO dia (hoje) → 1 separador "Hoje" + 3 mensagens', () => {
+    const msgs = [msg('2026-07-16','17:18'), msg('2026-07-16','17:19'), msg('2026-07-16','22:26')];
+    const itens = construirItensConversa(msgs, get, AG);
+    const seps = itens.filter((i) => i.tipo === 'sep');
+    expect(seps).toHaveLength(1);
+    expect(seps[0]).toMatchObject({ label: 'Hoje' });
+    expect(itens.filter((i) => i.tipo === 'msg')).toHaveLength(3);
+    expect(itens[0].tipo).toBe('sep'); // separador vem ANTES da 1ª msg
+  });
+
+  it('mensagens em DOIS dias → 2 separadores (Ontem, depois Hoje)', () => {
+    const msgs = [msg('2026-07-15','18:10'), msg('2026-07-16','17:18'), msg('2026-07-16','17:19')];
+    const itens = construirItensConversa(msgs, get, AG);
+    const seps = itens.filter((i) => i.tipo === 'sep').map((i) => (i as { label: string }).label);
+    expect(seps).toEqual(['Ontem', 'Hoje']);
+  });
+
+  it('chaves são estáveis e únicas', () => {
+    const msgs = [msg('2026-07-15','18:10'), msg('2026-07-16','17:18')];
+    const chaves = construirItensConversa(msgs, get, AG).map((i) => i.chave);
+    expect(new Set(chaves).size).toBe(chaves.length);
+    expect(chaves).toContain('sep-2026-07-15');
+    expect(chaves).toContain('sep-2026-07-16');
+  });
+
+  it('mensagem sem tsISO não gera separador nem quebra a lista', () => {
+    const msgs = [{ ts: '' }, msg('2026-07-16','17:18')];
+    const itens = construirItensConversa(msgs, (m) => m.ts, AG);
+    expect(itens.filter((i) => i.tipo === 'msg')).toHaveLength(2); // as 2 msgs continuam
+    expect(itens.filter((i) => i.tipo === 'sep')).toHaveLength(1); // só a datada abre dia
+  });
+
+  it('lista vazia → nenhum item', () => {
+    expect(construirItensConversa([], get, AG)).toEqual([]);
   });
 });
