@@ -94,6 +94,22 @@ export function montarInstanteSP(data: string, hora: string): string {
   return Number.isFinite(t) ? new Date(t).toISOString() : '';
 }
 
+export type AtalhoAg = 'hoje5' | 'hojeTarde' | 'amanha9' | 'amanha14' | 'em3dias';
+
+/** Atalhos de data/hora do modal (botões rápidos). Puro/testável; ancorado no dia SP. */
+export function atalhoAgendar(atalho: AtalhoAg, agoraMs: number): { data: string; hora: string } {
+  const hoje = partesSP(agoraMs).data;
+  const DIA = 86_400_000;
+  switch (atalho) {
+    case 'hoje5':     return partesSP(agoraMs + 5 * 60_000);
+    case 'hojeTarde': return { data: hoje, hora: '15:00' };
+    case 'amanha9':   return { data: partesSP(agoraMs + DIA).data, hora: '09:00' };
+    case 'amanha14':  return { data: partesSP(agoraMs + DIA).data, hora: '14:00' };
+    case 'em3dias':   return { data: partesSP(agoraMs + 3 * DIA).data, hora: '09:00' };
+    default:          return defaultQuandoAgendar(agoraMs, 5);
+  }
+}
+
 /** Resumo legível do envio: "Será enviada hoje às 12:35 por RMKT 5". Puro. */
 export function resumoEnvio(i: { executarEmMs: number; agoraMs: number; canalNome: string | null | undefined }): string | null {
   if (!Number.isFinite(i.executarEmMs)) return null;

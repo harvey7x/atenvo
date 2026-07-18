@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   canalValidoParaEnvio, rotuloCanal, podeAgendar, estaExpirada, proximoStatus,
   partesSP, defaultQuandoAgendar, montarInstanteSP, resumoEnvio, avisoJanelaLonga, agendaEditavel,
-  agendaReagendavel, rangePeriodo, contarCards,
+  agendaReagendavel, rangePeriodo, contarCards, atalhoAgendar,
 } from './agendamentoMensagem';
 
 const canalOk = { id: 'c1', nome: 'ANDRIUS', ativo: true, status_integracao: 'conectado', envio_restrito: false, conflito_com: null };
@@ -183,6 +183,15 @@ describe('rangePeriodo()', () => {
     expect(partesSP(r.ateMs)).toEqual({ data: '2026-07-25', hora: '00:00' });
   });
   it('todas → null', () => { expect(rangePeriodo('todas', T)).toBeNull(); });
+});
+
+describe('atalhoAgendar()', () => {
+  // T = 2026-07-18 12:35 SP
+  it('hoje5 → hoje, agora+5min', () => { expect(atalhoAgendar('hoje5', T)).toEqual({ data: '2026-07-18', hora: '12:40' }); });
+  it('hojeTarde → hoje 15:00', () => { expect(atalhoAgendar('hojeTarde', T)).toEqual({ data: '2026-07-18', hora: '15:00' }); });
+  it('amanha9 → amanhã 09:00', () => { expect(atalhoAgendar('amanha9', T)).toEqual({ data: '2026-07-19', hora: '09:00' }); });
+  it('amanha14 → amanhã 14:00', () => { expect(atalhoAgendar('amanha14', T)).toEqual({ data: '2026-07-19', hora: '14:00' }); });
+  it('em3dias → +3 dias 09:00', () => { expect(atalhoAgendar('em3dias', T)).toEqual({ data: '2026-07-21', hora: '09:00' }); });
 });
 
 describe('contarCards()', () => {

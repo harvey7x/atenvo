@@ -5,12 +5,10 @@ import { useToast } from '@/hooks/useToast';
 import { useOrgUsuarios } from '@/data/atendimento';
 import {
   useWaCanais, useAgendamentosOrg, useEditarAgendamento, useCancelarAgendamento, useReagendarAgendamento,
-  mascararNumero, WA_REAL, type AgendamentoOrg,
+  WA_REAL, type AgendamentoOrg,
 } from '@/data/whatsapp';
-import {
-  canalValidoParaEnvio, podeAgendar, partesSP, montarInstanteSP, defaultQuandoAgendar,
-  resumoEnvio, contarCards, rangePeriodo, agendaEditavel, agendaReagendavel, type PeriodoAg,
-} from '@/lib/agendamentoMensagem';
+import { contarCards, rangePeriodo, agendaEditavel, agendaReagendavel, type PeriodoAg } from '@/lib/agendamentoMensagem';
+import { AgendarMensagemModal, type AgendarSubmit } from '@/components/AgendarMensagemModal';
 import './AgendamentosMensagens.css';
 
 const ST_META: Record<string, { label: string; cls: string }> = {
@@ -41,11 +39,6 @@ export function AgendamentosMensagens() {
   const editarMut = useEditarAgendamento();
   const cancelarMut = useCancelarAgendamento();
   const reagendarMut = useReagendarAgendamento();
-  const mBusy = editarMut.isPending || reagendarMut.isPending;
-
-  const canaisAgendaveis = canais.filter((c) => canalValidoParaEnvio({
-    id: c.id, nome: c.alias, ativo: true, status_integracao: c.status, envio_restrito: c.envioRestrito, conflito_com: c.conflitoCom,
-  }).ok);
 
   // ── filtros ──────────────────────────────────────────────────────────────
   const [fPeriodo, setFPeriodo] = useState<PeriodoAg>('todas');
@@ -81,51 +74,25 @@ export function AgendamentosMensagens() {
     setFStatus(status); setFPeriodo(periodo); setFCanal(''); setFCriador(''); setFTipo(''); setFBusca('');
   }
 
-  // ── modal editar / reagendar / ver ────────────────────────────────────────
+  // ── modais: editar/reagendar (via AgendarMensagemModal) e ver ─────────────
   const [modo, setModo] = useState<Modo>(null);
   const [sel, setSel] = useState<AgendamentoOrg | null>(null);
-  const [mCanal, setMCanal] = useState('');
-  const [mTexto, setMTexto] = useState('');
-  const [mData, setMData] = useState('');
-  const [mHora, setMHora] = useState('');
-  const [mErr, setMErr] = useState<string | null>(null);
 
-  function abrirEditar(r: AgendamentoOrg) {
-    setSel(r); setModo('editar'); setMErr(null); setMTexto(r.texto ?? '');
-    setMCanal(canaisAgendaveis.some((c) => c.id === r.canalId) ? r.canalId : (canaisAgendaveis[0]?.id ?? ''));
-    const p = partesSP(new Date(r.executarEm).getTime());
-    setMData(p.data); setMHora(p.hora);
-  }
-  function abrirReagendar(r: AgendamentoOrg) {
-    setSel(r); setModo('reagendar'); setMErr(null); setMTexto(r.texto ?? '');
-    setMCanal(canaisAgendaveis.some((c) => c.id === r.canalId) ? r.canalId : (canaisAgendaveis[0]?.id ?? ''));
-    const q = defaultQuandoAgendar(Date.now(), 5);
-    setMData(q.data); setMHora(q.hora);
-  }
+  function abrirEditar(r: AgendamentoOrg) { setSel(r); setModo('editar'); }
+  function abrirReagendar(r: AgendamentoOrg) { setSel(r); setModo('reagendar'); }
   function abrirVer(r: AgendamentoOrg) { setSel(r); setModo('ver'); }
-  function fecharModal() { if (!mBusy) { setModo(null); setSel(null); } }
+  function fecharComposicao() { setModo(null); setSel(null); }
 
-  async function confirmar() {
-    if (!sel || mBusy) return;
-    setMErr(null);
-    const executarISO = montarInstanteSP(mData, mHora);
-    const canalObj = canais.find((c) => c.id === mCanal);
-    const v = podeAgendar({
-      texto: mTexto, temTelefone: !!sel.telefone,
-      canal: canalObj ? { id: canalObj.id, nome: canalObj.alias, ativo: true, status_integracao: canalObj.status, envio_restrito: canalObj.envioRestrito, conflito_com: canalObj.conflitoCom } : null,
-      executarEmMs: executarISO ? new Date(executarISO).getTime() : NaN, agoraMs: Date.now(),
-    });
-    if (!v.ok) { setMErr(v.erro); return; }
-    try {
-      if (modo === 'editar') {
-        await editarMut.mutateAsync({ id: sel.id, conversaId: sel.conversaId, canalId: mCanal, texto: mTexto.trim(), executarEm: executarISO });
-        toast('Agendamento atualizado.');
-      } else {
-        await reagendarMut.mutateAsync({ id: sel.id, conversaId: sel.conversaId, canalId: mCanal, executarEm: executarISO });
-        toast('Mensagem reagendada — voltou para a fila.');
-      }
-      setModo(null); setSel(null);
-    } catch (e) { setMErr((e as Error).message || 'Falha ao salvar.'); }
+  async function submeterComposicao(v: AgendarSubmit) {
+    if (!sel) return;
+    if (modo === 'reagendar') {
+      await reagendarMut.mutateAsync({ id: sel.id, conversaId: sel.conversaId, canalId: v.canalId, executarEm: v.executarISO });
+      toast('Mensagem reagendada — voltou para a fila.');
+    } else {
+      await editarMut.mutateAsync({ id: sel.id, conversaId: sel.conversaId, canalId: v.canalId, texto: v.texto, executarEm: v.executarISO });
+      toast('Agendamento atualizado.');
+    }
+    setModo(null); setSel(null);
   }
 
   async function cancelar(r: AgendamentoOrg) {
@@ -136,10 +103,6 @@ export function AgendamentosMensagens() {
   }
 
   const abrirConversa = (r: AgendamentoOrg) => navigate(`/whatsapp?conversa=${encodeURIComponent(r.conversaId)}`);
-
-  const mCanalNome = canaisAgendaveis.find((c) => c.id === mCanal)?.alias ?? null;
-  const mExecMs = mData && mHora ? new Date(`${mData}T${mHora}:00-03:00`).getTime() : NaN;
-  const mResumo = resumoEnvio({ executarEmMs: mExecMs, agoraMs: Date.now(), canalNome: mCanalNome });
 
   if (!WA_REAL) {
     return <div className="agm-wrap"><div className="agm-empty">Disponível com o backend configurado.</div></div>;
@@ -220,7 +183,7 @@ export function AgendamentosMensagens() {
                   <td className="agm-nowrap">{r.telefone ?? '—'}</td>
                   <td>{r.nomeCanal ?? '—'}</td>
                   <td>{tipoLbl(r.tipo)}</td>
-                  <td className="agm-preview" title={r.texto ?? ''}>{r.texto ?? '—'}</td>
+                  <td className="agm-preview" title={r.texto ?? ''} onClick={() => abrirVer(r)}>{r.texto ?? '—'}</td>
                   <td>{nomePorId(r.criadoPor) ?? '—'}</td>
                   <td><span className={'agm-st agm-st-' + st.cls}>{st.label}</span></td>
                   <td className="agm-center">{r.tentativas}</td>
@@ -242,35 +205,16 @@ export function AgendamentosMensagens() {
         </table>
       </div>
 
-      {/* Modal editar / reagendar */}
-      <Modal open={modo === 'editar' || modo === 'reagendar'} onClose={fecharModal} width={460}
-        title={modo === 'reagendar' ? 'Reagendar mensagem' : 'Editar agendamento'}
-        closeOnBackdrop={!mBusy}
-        footer={<>
-          <button className="agm-btn" disabled={mBusy} onClick={fecharModal}>Cancelar</button>
-          <button className="agm-btn primary" disabled={mBusy} onClick={confirmar}>{mBusy ? 'Salvando…' : (modo === 'reagendar' ? 'Reagendar' : 'Salvar')}</button>
-        </>}>
-        <div className="agm-form">
-          <label className="agm-fld"><span>Enviar por</span>
-            <select value={mCanal} onChange={(e) => setMCanal(e.target.value)} disabled={mBusy}>
-              {canaisAgendaveis.length === 0 && <option value="">Nenhum canal conectado</option>}
-              {canaisAgendaveis.map((c) => <option key={c.id} value={c.id}>{c.alias}{c.numero ? ' · ' + mascararNumero(c.numero) : ''} — conectado</option>)}
-            </select>
-          </label>
-          <label className="agm-fld"><span>Mensagem</span>
-            <textarea rows={4} value={mTexto} maxLength={4096} disabled={mBusy || modo === 'reagendar'}
-              onChange={(e) => setMTexto(e.target.value)}
-              placeholder="Escreva a mensagem que será enviada automaticamente…" />
-          </label>
-          {modo === 'reagendar' && <div className="agm-hint">Reagendar mantém o texto; ajuste o canal e o horário.</div>}
-          <div className="agm-row2">
-            <label className="agm-fld"><span>Data</span><input type="date" value={mData} onChange={(e) => setMData(e.target.value)} disabled={mBusy} /></label>
-            <label className="agm-fld"><span>Hora</span><input type="time" value={mHora} onChange={(e) => setMHora(e.target.value)} disabled={mBusy} /></label>
-          </div>
-          {mResumo && <div className="agm-resumo">{mResumo}</div>}
-          {mErr && <div className="agm-erro">{mErr}</div>}
-        </div>
-      </Modal>
+      {/* Modal editar / reagendar — composição rica compartilhada */}
+      <AgendarMensagemModal
+        open={modo === 'editar' || modo === 'reagendar'}
+        modo={modo === 'reagendar' ? 'reagendar' : 'editar'}
+        canais={canais}
+        temTelefone={!!sel?.telefone}
+        initial={sel ? { canalId: sel.canalId, texto: sel.texto ?? '', executarEm: sel.executarEm } : null}
+        onClose={fecharComposicao}
+        onSubmit={submeterComposicao}
+      />
 
       {/* Modal ver (somente leitura) */}
       <Modal open={modo === 'ver'} onClose={() => { setModo(null); setSel(null); }} width={480} title="Detalhes do agendamento"

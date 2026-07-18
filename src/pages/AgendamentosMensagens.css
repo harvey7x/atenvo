@@ -30,7 +30,8 @@
 .agm-nowrap{white-space:nowrap}
 .agm-center{text-align:center}
 .agm-muted{color:var(--muted)}
-.agm-preview{max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink)}
+.agm-preview{max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink);cursor:pointer}
+.agm-preview:hover{text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
 .agm-err{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#c0342c}
 .agm-empty-row{text-align:center;color:var(--muted);padding:28px !important}
 .agm-actcol{text-align:right}
