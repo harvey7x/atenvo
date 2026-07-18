@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   canalValidoParaEnvio, rotuloCanal, podeAgendar, estaExpirada, proximoStatus,
   partesSP, defaultQuandoAgendar, montarInstanteSP, resumoEnvio, avisoJanelaLonga, agendaEditavel,
+  agendaReagendavel, rangePeriodo, contarCards,
 } from './agendamentoMensagem';
 
 const canalOk = { id: 'c1', nome: 'ANDRIUS', ativo: true, status_integracao: 'conectado', envio_restrito: false, conflito_com: null };
@@ -153,5 +154,52 @@ describe('agendaEditavel()', () => {
     for (const s of ['processando', 'enviada', 'falhou', 'cancelada', 'expirada', 'bloqueada', null, undefined]) {
       expect(agendaEditavel(s)).toBe(false);
     }
+  });
+});
+
+describe('agendaReagendavel()', () => {
+  it('falhou/bloqueada/expirada → reagendável', () => {
+    for (const s of ['falhou', 'bloqueada', 'expirada']) expect(agendaReagendavel(s)).toBe(true);
+  });
+  it('agendada/enviada/cancelada/processando → não', () => {
+    for (const s of ['agendada', 'enviada', 'cancelada', 'processando', null, undefined]) expect(agendaReagendavel(s)).toBe(false);
+  });
+});
+
+describe('rangePeriodo()', () => {
+  it('hoje → [00:00 SP, 00:00 SP amanhã)', () => {
+    const r = rangePeriodo('hoje', T)!;
+    expect(partesSP(r.desdeMs)).toEqual({ data: '2026-07-18', hora: '00:00' });
+    expect(partesSP(r.ateMs)).toEqual({ data: '2026-07-19', hora: '00:00' });
+  });
+  it('amanha → dia seguinte', () => {
+    const r = rangePeriodo('amanha', T)!;
+    expect(partesSP(r.desdeMs)).toEqual({ data: '2026-07-19', hora: '00:00' });
+    expect(partesSP(r.ateMs)).toEqual({ data: '2026-07-20', hora: '00:00' });
+  });
+  it('7d → 7 dias a partir de hoje', () => {
+    const r = rangePeriodo('7d', T)!;
+    expect(partesSP(r.desdeMs)).toEqual({ data: '2026-07-18', hora: '00:00' });
+    expect(partesSP(r.ateMs)).toEqual({ data: '2026-07-25', hora: '00:00' });
+  });
+  it('todas → null', () => { expect(rangePeriodo('todas', T)).toBeNull(); });
+});
+
+describe('contarCards()', () => {
+  const agora = Date.UTC(2026, 6, 18, 13, 0, 0); // 10:00 SP dia 18
+  const items = [
+    { status: 'agendada', executarEmMs: T },                          // hoje 12:35 → hoje + prox7
+    { status: 'agendada', executarEmMs: agora + 3 * 86_400_000 },     // +3d → prox7
+    { status: 'agendada', executarEmMs: agora - 86_400_000 },         // ontem (atrasada) → nenhum
+    { status: 'enviada', executarEmMs: T },
+    { status: 'falhou', executarEmMs: T },
+    { status: 'bloqueada', executarEmMs: T },
+    { status: 'cancelada', executarEmMs: T },
+  ];
+  it('conta por card corretamente', () => {
+    expect(contarCards(items, agora)).toEqual({ hoje: 1, prox7: 2, enviadas: 1, falhas: 1, bloqueadas: 1, canceladas: 1 });
+  });
+  it('lista vazia → tudo zero', () => {
+    expect(contarCards([], agora)).toEqual({ hoje: 0, prox7: 0, enviadas: 0, falhas: 0, bloqueadas: 0, canceladas: 0 });
   });
 });

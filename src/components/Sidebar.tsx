@@ -12,7 +12,7 @@ const MAIN: NavEntry[] = [
   { to: '/facebook', label: 'Facebook', icon: 'facebook' },
   { to: '/kanban', label: 'Kanban', icon: 'kanban' },
   { to: '/contatos', label: 'Contatos', icon: 'contatos' },
-  { to: '/agendamentos', label: 'Agendamentos', icon: 'agendamentos' },
+  { to: '/agendamentos', label: 'Agendamentos de Mensagens', icon: 'agendamentos' },
   { to: '/scripts', label: 'Scripts', icon: 'scripts' },
   { to: '/cobrancas', label: 'Cobranças', icon: 'cobrancas' },
   { to: '/integracoes', label: 'Integrações', icon: 'integracoes' },

@@ -801,7 +801,7 @@ export function useAgendarMensagem() {
       if (error) throw new Error(traduzErroAgendamento(error.message));
       return data as { id: string };
     },
-    onSettled: (_r, _e, v) => { qc.invalidateQueries({ queryKey: ['mensagens-agendadas', v.conversaId] }); },
+    onSettled: (_r, _e, v) => { qc.invalidateQueries({ queryKey: ['mensagens-agendadas', v.conversaId] }); qc.invalidateQueries({ queryKey: ['mensagens-agendadas-org'] }); },
   });
 }
 
@@ -816,7 +816,7 @@ export function useEditarAgendamento() {
       if (error) throw new Error(traduzErroAgendamento(error.message));
       return data as { id: string };
     },
-    onSettled: (_r, _e, v) => { qc.invalidateQueries({ queryKey: ['mensagens-agendadas', v.conversaId] }); },
+    onSettled: (_r, _e, v) => { qc.invalidateQueries({ queryKey: ['mensagens-agendadas', v.conversaId] }); qc.invalidateQueries({ queryKey: ['mensagens-agendadas-org'] }); },
   });
 }
 
@@ -828,11 +828,71 @@ export function useCancelarAgendamento() {
       const { error } = await supabase!.rpc('cancelar_agendamento', { p_id: input.id });
       if (error) throw new Error(traduzErroAgendamento(error.message));
     },
-    onSettled: (_r, _e, v) => { qc.invalidateQueries({ queryKey: ['mensagens-agendadas', v.conversaId] }); },
+    onSettled: (_r, _e, v) => { qc.invalidateQueries({ queryKey: ['mensagens-agendadas', v.conversaId] }); qc.invalidateQueries({ queryKey: ['mensagens-agendadas-org'] }); },
   });
 }
 
-/** Traduz os códigos de erro das RPCs de agendamento (agendar/editar/cancelar) para texto amigável. */
+/* ===================== Central de agendamentos (Fase 2B) ===================== */
+export interface AgendamentoOrg {
+  id: string; conversaId: string; contatoId: string | null; contatoNome: string | null; telefone: string | null;
+  canalId: string; nomeCanal: string | null; tipo: string; texto: string | null;
+  executarEm: string; status: string; tentativas: number;
+  ultimoErro: string | null; motivoBloqueio: string | null;
+  criadoPor: string | null; criadoEm: string; enviadaEm: string | null; mensagemIdEnviada: string | null;
+}
+
+/** Lista TODAS as mensagens agendadas da organização (para a central). Isolado por org + RLS. */
+export function useAgendamentosOrg() {
+  const { currentOrg } = useOrg();
+  return useQuery({
+    queryKey: ['mensagens-agendadas-org', currentOrg.id],
+    enabled: WA_REAL,
+    refetchInterval: 30_000,
+    queryFn: async (): Promise<AgendamentoOrg[]> => {
+      const { data, error } = await supabase!
+        .from('mensagens_agendadas')
+        .select('id, conversa_id, contato_id, canal_id, nome_canal_snapshot, tipo, texto, executar_em, status, tentativas, ultimo_erro, motivo_bloqueio, criado_por, criado_em, enviada_em, mensagem_id_enviada, contatos(nome, telefone)')
+        .eq('organizacao_id', currentOrg.id)
+        .order('executar_em', { ascending: false });
+      if (error) throw new Error(error.message);
+      type Row = {
+        id: string; conversa_id: string; contato_id: string | null; canal_id: string; nome_canal_snapshot: string | null;
+        tipo: string; texto: string | null; executar_em: string; status: string; tentativas: number;
+        ultimo_erro: string | null; motivo_bloqueio: string | null; criado_por: string | null; criado_em: string;
+        enviada_em: string | null; mensagem_id_enviada: string | null;
+        contatos: { nome: string; telefone: string | null } | { nome: string; telefone: string | null }[] | null;
+      };
+      const nomeDe = (c: Row['contatos']) => (Array.isArray(c) ? c[0] : c) ?? null;
+      return ((data as unknown as Row[]) ?? []).map((r) => {
+        const ct = nomeDe(r.contatos);
+        return {
+          id: r.id, conversaId: r.conversa_id, contatoId: r.contato_id, contatoNome: ct?.nome ?? null, telefone: ct?.telefone ?? null,
+          canalId: r.canal_id, nomeCanal: r.nome_canal_snapshot, tipo: r.tipo, texto: r.texto,
+          executarEm: r.executar_em, status: r.status, tentativas: r.tentativas,
+          ultimoErro: r.ultimo_erro, motivoBloqueio: r.motivo_bloqueio,
+          criadoPor: r.criado_por, criadoEm: r.criado_em, enviadaEm: r.enviada_em, mensagemIdEnviada: r.mensagem_id_enviada,
+        };
+      });
+    },
+  });
+}
+
+/** Reagenda uma mensagem falhada/bloqueada/expirada (volta pra 'agendada' com novo canal/horário). */
+export function useReagendarAgendamento() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { id: string; conversaId: string; canalId: string; executarEm: string }) => {
+      const { data, error } = await supabase!.rpc('reagendar_agendamento', {
+        p_id: input.id, p_canal: input.canalId, p_executar_em: input.executarEm,
+      });
+      if (error) throw new Error(traduzErroAgendamento(error.message));
+      return data as { id: string };
+    },
+    onSettled: (_r, _e, v) => { qc.invalidateQueries({ queryKey: ['mensagens-agendadas', v.conversaId] }); qc.invalidateQueries({ queryKey: ['mensagens-agendadas-org'] }); },
+  });
+}
+
+/** Traduz os códigos de erro das RPCs de agendamento (agendar/editar/cancelar/reagendar) para texto amigável. */
 function traduzErroAgendamento(msg: string): string {
   const m = (msg || '').toLowerCase();
   if (m.includes('texto_vazio')) return 'Escreva a mensagem antes de agendar.';
@@ -842,6 +902,8 @@ function traduzErroAgendamento(msg: string): string {
   if (m.includes('agendamento_nao_encontrado')) return 'Agendamento não encontrado.';
   if (m.includes('nao_editavel')) return 'Este agendamento não pode mais ser editado (já saiu de "agendada").';
   if (m.includes('nao_cancelavel')) return 'Este agendamento não pode mais ser cancelado (já saiu de "agendada").';
+  if (m.includes('nao_reagendavel')) return 'Só é possível reagendar mensagens que falharam, foram bloqueadas ou expiraram.';
+  if (m.includes('reagendar_indisponivel_tipo')) return 'Reagendar mídia chega na Fase 3.';
   if (m.includes('edicao_indisponivel_tipo')) return 'Edição de mídia agendada chega na Fase 3.';
   if (m.includes('sem_acesso')) return 'Você não tem acesso a esta organização.';
   if (m.includes('contato_sem_telefone')) return 'Este contato não tem número acionável.';

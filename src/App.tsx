@@ -10,7 +10,9 @@ import { WhatsApp } from '@/pages/WhatsApp';
 import { Facebook } from '@/pages/Facebook';
 import { Kanban } from '@/pages/Kanban';
 import { Contatos } from '@/pages/Contatos';
-import { Agendamentos } from '@/pages/Agendamentos';
+// Presencial preservado no código (src/pages/Agendamentos.tsx), fora da navegação — a rota
+// /agendamentos foi reaproveitada para a central de Agendamentos de Mensagens (Fase 2B).
+import { AgendamentosMensagens } from '@/pages/AgendamentosMensagens';
 import { Scripts } from '@/pages/Scripts';
 import { Cobrancas } from '@/pages/Cobrancas';
 import { Integracoes } from '@/pages/Integracoes';
@@ -54,8 +56,8 @@ const routes: RouteObject[] = [
           },
           {
             path: 'agendamentos',
-            handle: { title: 'Agendamentos', subtitle: 'Organize os atendimentos presenciais da equipe.', fullBleed: true },
-            element: <Agendamentos />,
+            handle: { title: 'Agendamentos de Mensagens', subtitle: 'Acompanhe mensagens programadas, enviadas, falhas e canceladas.', fullBleed: true },
+            element: <AgendamentosMensagens />,
           },
           {
             path: 'scripts',

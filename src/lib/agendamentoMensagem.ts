@@ -129,6 +129,49 @@ export function agendaEditavel(status: string | null | undefined): boolean {
   return status === 'agendada';
 }
 
+/** Falha/bloqueio/expiração podem ser reagendados (voltam pra fila). Terminal deliberado (cancelada) não. */
+export function agendaReagendavel(status: string | null | undefined): boolean {
+  return status === 'falhou' || status === 'bloqueada' || status === 'expirada';
+}
+
+/* ===================== Central de agendamentos (Fase 2B) ===================== */
+
+export type PeriodoAg = 'hoje' | 'amanha' | '7d' | '30d' | 'todas';
+
+/** Janela [desde, até) em epoch ms para o filtro de período, ancorada no dia SP. null = todas. */
+export function rangePeriodo(periodo: PeriodoAg, agoraMs: number): { desdeMs: number; ateMs: number } | null {
+  const inicioHoje = new Date(montarInstanteSP(partesSP(agoraMs).data, '00:00')).getTime();
+  const DIA = 86_400_000;
+  switch (periodo) {
+    case 'hoje':   return { desdeMs: inicioHoje, ateMs: inicioHoje + DIA };
+    case 'amanha': return { desdeMs: inicioHoje + DIA, ateMs: inicioHoje + 2 * DIA };
+    case '7d':     return { desdeMs: inicioHoje, ateMs: inicioHoje + 7 * DIA };
+    case '30d':    return { desdeMs: inicioHoje, ateMs: inicioHoje + 30 * DIA };
+    case 'todas':
+    default:       return null;
+  }
+}
+
+export interface ItemCard { status: string; executarEmMs: number }
+export interface ResumoCards { hoje: number; prox7: number; enviadas: number; falhas: number; bloqueadas: number; canceladas: number }
+
+/** Contagens dos cards de resumo. Puro/testável. */
+export function contarCards(items: ItemCard[], agoraMs: number): ResumoCards {
+  const inicioHoje = new Date(montarInstanteSP(partesSP(agoraMs).data, '00:00')).getTime();
+  const fimHoje = inicioHoje + 86_400_000;
+  const fim7 = agoraMs + 7 * 86_400_000;
+  const r: ResumoCards = { hoje: 0, prox7: 0, enviadas: 0, falhas: 0, bloqueadas: 0, canceladas: 0 };
+  for (const it of items) {
+    if (it.status === 'agendada' && it.executarEmMs >= inicioHoje && it.executarEmMs < fimHoje) r.hoje++;
+    if (it.status === 'agendada' && it.executarEmMs >= agoraMs && it.executarEmMs < fim7) r.prox7++;
+    if (it.status === 'enviada') r.enviadas++;
+    else if (it.status === 'falhou') r.falhas++;
+    else if (it.status === 'bloqueada') r.bloqueadas++;
+    else if (it.status === 'cancelada') r.canceladas++;
+  }
+  return r;
+}
+
 /* ===================== Decisões do processador ===================== */
 
 /** Follow-up muito atrasado não deve disparar surpresa: além da janela, expira. */
