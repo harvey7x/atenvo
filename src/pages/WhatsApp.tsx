@@ -15,8 +15,8 @@ import { formatarNomeCliente } from '@/lib/nomeCliente';
 import { etiquetasDaConversa, responsavelEfetivo } from '@/lib/conversaEtiquetas';
 import { analisarNome, conversaAtiva, decidirDono, decidirNome, estadoHigiene, textoBloqueio } from '@/lib/higieneConversa';
 import { construirItensConversa } from '@/lib/dataConversa';
-import { canalValidoParaEnvio, podeAgendar } from '@/lib/agendamentoMensagem';
-import { useAgendarMensagem, useMensagensAgendadas } from '@/data/whatsapp';
+import { canalValidoParaEnvio, podeAgendar, partesSP, defaultQuandoAgendar, montarInstanteSP, resumoEnvio, avisoJanelaLonga } from '@/lib/agendamentoMensagem';
+import { useAgendarMensagem, useMensagensAgendadas, useEditarAgendamento, useCancelarAgendamento, type MensagemAgendada } from '@/data/whatsapp';
 import { HIGIENE_CORTE_ISO, HIGIENE_DIAS_ADAPTACAO } from '@/config/higiene';
 import { useHigieneConversa, useRegistrarAdiamento, HIGIENE_VAZIO } from '@/data/higiene';
 import { EmptyState } from '@/components/EmptyState';
@@ -180,6 +180,7 @@ export function WhatsApp() {
   const [imgModal, setImgModal] = useState(false);                       // composer de imagem
   const [docModal, setDocModal] = useState(false);                       // composer de documento
   const [agendarOpen, setAgendarOpen] = useState(false);                 // modal "Agendar mensagem" (Fase 1: texto)
+  const [agEditId, setAgEditId] = useState<string | null>(null);         // Fase 2A: id em edição (null = criando)
   const [agCanal, setAgCanal] = useState('');                            // canal escolhido no agendamento
   const [agTexto, setAgTexto] = useState('');
   const [agData, setAgData] = useState('');                              // yyyy-mm-dd
@@ -440,8 +441,11 @@ export function WhatsApp() {
   const higiene = estadoHigiene(acaoDono, decNome);
   const higieneBloqueia = WA_REAL && !!current.id && higiene.bloqueiaEnvio;
 
-  /* ── Agendamento de mensagens (Fase 1: texto) ─────────────────────────────── */
+  /* ── Agendamento de mensagens (Fase 1: texto · Fase 2A: editar/cancelar) ────── */
   const agendarMut = useAgendarMensagem();
+  const editarMut = useEditarAgendamento();
+  const cancelarMut = useCancelarAgendamento();
+  const agBusy = agendarMut.isPending || editarMut.isPending;
   const agendadasQ = useMensagensAgendadas(current.id || null);
   const agendadas = agendadasQ.data ?? [];
   // canais válidos para envio (conectado, ativo, não restrito/conflito/removido)
@@ -450,20 +454,28 @@ export function WhatsApp() {
   }).ok);
   function abrirAgendar() {
     if (!current.id) return;
-    setAgErr(null); setAgTexto('');
+    setAgErr(null); setAgEditId(null); setAgTexto('');
     // canal padrão = canal da conversa, se válido; senão o 1º válido
     const daConversa = replyCanalId && canaisAgendaveis.some((c) => c.id === replyCanalId) ? replyCanalId : (canaisAgendaveis[0]?.id ?? '');
     setAgCanal(daConversa);
-    const amanha = new Date(Date.now() + 86400000);
-    setAgData(amanha.toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' })); // yyyy-mm-dd
-    setAgHora('09:00');
+    // Fase 2A: default = HOJE, hora = agora + 5 min (SP)
+    const q = defaultQuandoAgendar(Date.now(), 5);
+    setAgData(q.data); setAgHora(q.hora);
+    setAgendarOpen(true);
+  }
+  function abrirEditar(a: MensagemAgendada) {
+    if (!current.id || a.status !== 'agendada') return;
+    setAgErr(null); setAgEditId(a.id); setAgTexto(a.texto ?? '');
+    setAgCanal(canaisAgendaveis.some((c) => c.id === a.canalId) ? a.canalId : (canaisAgendaveis[0]?.id ?? ''));
+    const p = partesSP(new Date(a.executarEm).getTime());
+    setAgData(p.data); setAgHora(p.hora);
     setAgendarOpen(true);
   }
   async function confirmarAgendar() {
-    if (!current.id || agendarMut.isPending) return;
+    if (!current.id || agBusy) return;
     setAgErr(null);
     // monta o instante em America/Sao_Paulo (UTC-3 fixo) a partir de data+hora
-    const executarISO = agData && agHora ? new Date(`${agData}T${agHora}:00-03:00`).toISOString() : '';
+    const executarISO = montarInstanteSP(agData, agHora);
     const canalObj = realCanais.find((c) => c.id === agCanal);
     const v = podeAgendar({
       texto: agTexto, temTelefone: !current.semDestino,
@@ -472,11 +484,30 @@ export function WhatsApp() {
     });
     if (!v.ok) { setAgErr(v.erro); return; }
     try {
-      await agendarMut.mutateAsync({ conversaId: current.id, canalId: agCanal, texto: agTexto.trim(), executarEm: executarISO });
-      setAgendarOpen(false);
-      toast('Mensagem agendada — será enviada automaticamente no horário.');
+      if (agEditId) {
+        await editarMut.mutateAsync({ id: agEditId, conversaId: current.id, canalId: agCanal, texto: agTexto.trim(), executarEm: executarISO });
+        setAgendarOpen(false);
+        toast('Agendamento atualizado.');
+      } else {
+        await agendarMut.mutateAsync({ conversaId: current.id, canalId: agCanal, texto: agTexto.trim(), executarEm: executarISO });
+        setAgendarOpen(false);
+        toast('Mensagem agendada — será enviada automaticamente no horário.');
+      }
     } catch (e) { setAgErr((e as Error).message || 'Falha ao agendar.'); }
   }
+  async function cancelarAgendamento(a: MensagemAgendada) {
+    if (!current.id || a.status !== 'agendada' || cancelarMut.isPending) return;
+    if (!window.confirm('Cancelar este agendamento? A mensagem não será enviada.')) return;
+    try {
+      await cancelarMut.mutateAsync({ id: a.id, conversaId: current.id });
+      toast('Agendamento cancelado.');
+    } catch (e) { toast((e as Error).message || 'Falha ao cancelar.'); }
+  }
+  // resumo + aviso (discretos) para o modal — recalculados a cada tecla
+  const agExecMs = agData && agHora ? new Date(`${agData}T${agHora}:00-03:00`).getTime() : NaN;
+  const agCanalNome = canaisAgendaveis.find((c) => c.id === agCanal)?.alias ?? null;
+  const agResumo = resumoEnvio({ executarEmMs: agExecMs, agoraMs: Date.now(), canalNome: agCanalNome });
+  const agAviso = avisoJanelaLonga({ executarEmMs: agExecMs, agoraMs: Date.now(), ultimaInteracaoMs: current.lastAtMs });
 
   const [vincOpen, setVincOpen] = useState(false);
   const [vincTel, setVincTel] = useState('');
@@ -1367,17 +1398,29 @@ export function WhatsApp() {
 
           {agendadas.filter((a) => ['agendada', 'processando', 'falhou', 'bloqueada'].includes(a.status)).length > 0 && (
             <div className="ag-lista">
-              {agendadas.filter((a) => ['agendada', 'processando', 'falhou', 'bloqueada'].includes(a.status)).map((a) => (
+              {agendadas.filter((a) => ['agendada', 'processando', 'falhou', 'bloqueada'].includes(a.status)).map((a) => {
+                const criador = a.criadoPor ? nomePorId(a.criadoPor) : null;
+                const tipoLbl = a.tipo === 'imagem' ? 'Imagem' : a.tipo === 'audio' ? 'Áudio' : a.tipo === 'documento' ? 'Documento' : 'Texto';
+                return (
                 <div key={a.id} className={'ag-item ag-' + a.status}>
                   <IcClock />
                   <div className="ag-item-txt">
                     <b>{a.status === 'agendada' ? 'Agendada' : a.status === 'processando' ? 'Enviando…' : a.status === 'bloqueada' ? 'Bloqueada' : 'Falhou'}</b>
                     {' '}para {new Date(a.executarEm).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                    {' · '}{tipoLbl}
                     {a.nomeCanal ? ` · via ${a.nomeCanal}` : ''}
+                    {criador ? ` · por ${criador}` : ''}
                     {(a.motivoBloqueio || a.ultimoErro) && <span className="ag-item-err"> · {a.motivoBloqueio || a.ultimoErro}</span>}
                   </div>
+                  {a.status === 'agendada' && (
+                    <div className="ag-item-acts">
+                      <button type="button" className="ag-mini" onClick={() => abrirEditar(a)} disabled={agBusy || cancelarMut.isPending}>Editar</button>
+                      <button type="button" className="ag-mini danger" onClick={() => cancelarAgendamento(a)} disabled={agBusy || cancelarMut.isPending}>Cancelar</button>
+                    </div>
+                  )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
@@ -1647,14 +1690,14 @@ export function WhatsApp() {
       <MediaComposer open={imgModal} tipo="imagem" previewCard onClose={() => setImgModal(false)} enviar={enviarImagem} />
       <MediaComposer open={docModal} tipo="documento" onClose={() => setDocModal(false)} enviar={enviarDocumento} />
 
-      <Modal open={agendarOpen} onClose={() => { if (!agendarMut.isPending) setAgendarOpen(false); }} title="Agendar mensagem" width={460} closeOnBackdrop={!agendarMut.isPending}
+      <Modal open={agendarOpen} onClose={() => { if (!agBusy) setAgendarOpen(false); }} title={agEditId ? 'Editar agendamento' : 'Agendar mensagem'} width={460} closeOnBackdrop={!agBusy}
         footer={<>
-          <button className="atv-btn" disabled={agendarMut.isPending} onClick={() => setAgendarOpen(false)}>Cancelar</button>
-          <button className="atv-btn primary" disabled={agendarMut.isPending} onClick={confirmarAgendar}>{agendarMut.isPending ? 'Agendando…' : 'Agendar'}</button>
+          <button className="atv-btn" disabled={agBusy} onClick={() => setAgendarOpen(false)}>Cancelar</button>
+          <button className="atv-btn primary" disabled={agBusy} onClick={confirmarAgendar}>{agBusy ? (agEditId ? 'Salvando…' : 'Agendando…') : (agEditId ? 'Salvar' : 'Agendar')}</button>
         </>}>
         <div className="nc-form">
           <label className="nc-field"><span className="nc-label">Enviar por</span>
-            <select className="atv-input" value={agCanal} onChange={(e) => setAgCanal(e.target.value)} disabled={agendarMut.isPending}>
+            <select className="atv-input" value={agCanal} onChange={(e) => setAgCanal(e.target.value)} disabled={agBusy}>
               {canaisAgendaveis.length === 0 && <option value="">Nenhum canal conectado</option>}
               {canaisAgendaveis.map((c) => (
                 <option key={c.id} value={c.id}>{c.alias}{c.numero ? ' · ' + mascararNumero(c.numero) : ''} — conectado</option>
@@ -1662,22 +1705,24 @@ export function WhatsApp() {
             </select>
           </label>
           <label className="nc-field"><span className="nc-label">Mensagem</span>
-            <textarea className="atv-input" rows={4} placeholder="Escreva a mensagem que será enviada automaticamente…" value={agTexto} onChange={(e) => setAgTexto(e.target.value)} disabled={agendarMut.isPending} maxLength={4096} />
+            <textarea className="atv-input" rows={4} placeholder="Escreva a mensagem que será enviada automaticamente…" value={agTexto} onChange={(e) => setAgTexto(e.target.value)} disabled={agBusy} maxLength={4096} />
           </label>
           <div style={{ display: 'flex', gap: 10 }}>
             <label className="nc-field" style={{ flex: 1 }}><span className="nc-label">Data</span>
-              <input type="date" className="atv-input" value={agData} onChange={(e) => setAgData(e.target.value)} disabled={agendarMut.isPending} />
+              <input type="date" className="atv-input" value={agData} onChange={(e) => setAgData(e.target.value)} disabled={agBusy} />
             </label>
             <label className="nc-field" style={{ flex: 1 }}><span className="nc-label">Hora</span>
-              <input type="time" className="atv-input" value={agHora} onChange={(e) => setAgHora(e.target.value)} disabled={agendarMut.isPending} />
+              <input type="time" className="atv-input" value={agHora} onChange={(e) => setAgHora(e.target.value)} disabled={agBusy} />
             </label>
           </div>
           {agTexto.trim() && agCanal && (
             <div className="ag-preview">
-              <div className="ag-preview-lbl">Prévia · via {canaisAgendaveis.find((c) => c.id === agCanal)?.alias ?? '—'}</div>
+              <div className="ag-preview-lbl">Prévia · via {agCanalNome ?? '—'}</div>
               <div className="ag-preview-bubble">{agTexto.trim()}</div>
             </div>
           )}
+          {agResumo && agTexto.trim() && agCanal && <div className="ag-resumo">{agResumo}</div>}
+          {agAviso && <div className="ag-aviso">{agAviso}</div>}
           {agErr && <div className="atv-field-err">{agErr}</div>}
         </div>
       </Modal>

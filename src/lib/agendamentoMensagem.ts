@@ -66,6 +66,69 @@ export function podeAgendar(i: EntradaAgendar): ResultadoAgendar {
   return { ok: true, erro: null };
 }
 
+/* ===================== Padrões, resumo e avisos do modal (Fase 2A) ===================== */
+
+/** America/Sao_Paulo é UTC-3 fixo (Brasil sem horário de verão desde 2019). */
+const SP_OFFSET_MS = 3 * 3_600_000;
+
+/** Partes de parede (data yyyy-mm-dd / hora hh:mm) em SP para um instante epoch. Puro/testável. */
+export function partesSP(epochMs: number): { data: string; hora: string } {
+  const d = new Date(epochMs - SP_OFFSET_MS);
+  const yyyy = d.getUTCFullYear();
+  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(d.getUTCDate()).padStart(2, '0');
+  const hh = String(d.getUTCHours()).padStart(2, '0');
+  const mi = String(d.getUTCMinutes()).padStart(2, '0');
+  return { data: `${yyyy}-${mm}-${dd}`, hora: `${hh}:${mi}` };
+}
+
+/** Default do modal (Fase 2A): data = hoje, hora = agora + N min (em SP). */
+export function defaultQuandoAgendar(agoraMs: number, adiantarMin = 5): { data: string; hora: string } {
+  return partesSP(agoraMs + adiantarMin * 60_000);
+}
+
+/** Monta o instante ISO (UTC) a partir de data (yyyy-mm-dd) + hora (hh:mm) tratadas como SP. */
+export function montarInstanteSP(data: string, hora: string): string {
+  if (!data || !hora) return '';
+  const t = new Date(`${data}T${hora}:00-03:00`).getTime();
+  return Number.isFinite(t) ? new Date(t).toISOString() : '';
+}
+
+/** Resumo legível do envio: "Será enviada hoje às 12:35 por RMKT 5". Puro. */
+export function resumoEnvio(i: { executarEmMs: number; agoraMs: number; canalNome: string | null | undefined }): string | null {
+  if (!Number.isFinite(i.executarEmMs)) return null;
+  const alvo = partesSP(i.executarEmMs);
+  const hoje = partesSP(i.agoraMs).data;
+  const amanha = partesSP(i.agoraMs + 86_400_000).data;
+  let quando: string;
+  if (alvo.data === hoje) quando = `hoje às ${alvo.hora}`;
+  else if (alvo.data === amanha) quando = `amanhã às ${alvo.hora}`;
+  else { const [y, m, d] = alvo.data.split('-'); quando = `em ${d}/${m}/${y} às ${alvo.hora}`; }
+  const canal = (i.canalNome ?? '').trim() || 'canal selecionado';
+  return `Será enviada ${quando} por ${canal}`;
+}
+
+/**
+ * Aviso discreto (NÃO bloqueia): conversa parada há +24h (fora da janela do WhatsApp) ou
+ * agendamento muito distante. Retorna a mensagem mais relevante ou null. Puro/testável.
+ */
+export function avisoJanelaLonga(i: {
+  executarEmMs: number; agoraMs: number; ultimaInteracaoMs?: number | null; distanteDias?: number;
+}): string | null {
+  if (!Number.isFinite(i.executarEmMs)) return null;
+  const parada = typeof i.ultimaInteracaoMs === 'number' && i.ultimaInteracaoMs > 0
+    && (i.agoraMs - i.ultimaInteracaoMs) > 24 * 3_600_000;
+  if (parada) return 'Esta conversa está parada há mais de 24h — o WhatsApp pode restringir a entrega. O canal será revalidado no envio.';
+  const dias = i.distanteDias ?? 7;
+  if (i.executarEmMs - i.agoraMs > dias * 86_400_000) return `Agendamento distante (mais de ${dias} dias). O canal será revalidado no momento do envio.`;
+  return null;
+}
+
+/** Uma linha agendada só pode ser editada/cancelada enquanto está 'agendada'. */
+export function agendaEditavel(status: string | null | undefined): boolean {
+  return status === 'agendada';
+}
+
 /* ===================== Decisões do processador ===================== */
 
 /** Follow-up muito atrasado não deve disparar surpresa: além da janela, expira. */

@@ -805,13 +805,44 @@ export function useAgendarMensagem() {
   });
 }
 
-/** Traduz os códigos de erro da RPC agendar_mensagem para texto amigável. */
+/** Edita um agendamento ainda 'agendada' (texto/canal/data-hora) via RPC segura. */
+export function useEditarAgendamento() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { id: string; conversaId: string; canalId: string; texto: string; executarEm: string }) => {
+      const { data, error } = await supabase!.rpc('editar_agendamento', {
+        p_id: input.id, p_canal: input.canalId, p_texto: input.texto, p_executar_em: input.executarEm,
+      });
+      if (error) throw new Error(traduzErroAgendamento(error.message));
+      return data as { id: string };
+    },
+    onSettled: (_r, _e, v) => { qc.invalidateQueries({ queryKey: ['mensagens-agendadas', v.conversaId] }); },
+  });
+}
+
+/** Cancela um agendamento ainda 'agendada' (não sai a mensagem) via RPC segura. */
+export function useCancelarAgendamento() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { id: string; conversaId: string }) => {
+      const { error } = await supabase!.rpc('cancelar_agendamento', { p_id: input.id });
+      if (error) throw new Error(traduzErroAgendamento(error.message));
+    },
+    onSettled: (_r, _e, v) => { qc.invalidateQueries({ queryKey: ['mensagens-agendadas', v.conversaId] }); },
+  });
+}
+
+/** Traduz os códigos de erro das RPCs de agendamento (agendar/editar/cancelar) para texto amigável. */
 function traduzErroAgendamento(msg: string): string {
   const m = (msg || '').toLowerCase();
   if (m.includes('texto_vazio')) return 'Escreva a mensagem antes de agendar.';
   if (m.includes('texto_muito_longo')) return 'Mensagem muito longa (máximo 4096 caracteres).';
   if (m.includes('horario_invalido')) return 'Escolha um horário no futuro.';
   if (m.includes('conversa_nao_encontrada')) return 'Conversa não encontrada.';
+  if (m.includes('agendamento_nao_encontrado')) return 'Agendamento não encontrado.';
+  if (m.includes('nao_editavel')) return 'Este agendamento não pode mais ser editado (já saiu de "agendada").';
+  if (m.includes('nao_cancelavel')) return 'Este agendamento não pode mais ser cancelado (já saiu de "agendada").';
+  if (m.includes('edicao_indisponivel_tipo')) return 'Edição de mídia agendada chega na Fase 3.';
   if (m.includes('sem_acesso')) return 'Você não tem acesso a esta organização.';
   if (m.includes('contato_sem_telefone')) return 'Este contato não tem número acionável.';
   if (m.includes('canal_invalido')) return 'Canal inválido para esta organização.';
