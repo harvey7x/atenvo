@@ -188,6 +188,29 @@
 .wa-app .msg{max-width:62%;margin-bottom:14px;clear:both}
 .wa-app .msg.in{float:left}
 .wa-app .msg.out{float:right}
+.wa-app .msg{position:relative}
+/* Responder: botão discreto que aparece no hover, na borda interna da bolha */
+.wa-app .msg-reply-btn{position:absolute;top:4px;opacity:0;width:28px;height:28px;border-radius:50%;border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:opacity .12s,color .12s,border-color .12s;z-index:3;box-shadow:var(--shadow)}
+.wa-app .msg.in .msg-reply-btn{right:-34px}
+.wa-app .msg.out .msg-reply-btn{left:-34px}
+.wa-app .msg:hover .msg-reply-btn{opacity:1}
+.wa-app .msg-reply-btn:hover{color:var(--green-ink);border-color:var(--green)}
+.wa-app .msg-reply-btn svg{width:15px;height:15px}
+/* mini-caixa da mensagem citada (dentro da bolha, acima do conteúdo) */
+.wa-app .msg-quoted{max-width:100%;border-left:3px solid var(--green);background:rgba(0,0,0,.05);border-radius:7px;padding:4px 9px;margin-bottom:3px;overflow:hidden}
+[data-theme="dark"] .wa-app .msg-quoted{background:rgba(255,255,255,.07)}
+.wa-app .mq-rem{display:block;font-weight:600;color:var(--green-ink);font-size:11.5px;line-height:1.3}
+[data-theme="dark"] .wa-app .mq-rem{color:var(--green)}
+.wa-app .mq-txt{display:block;color:var(--ink-2);font-size:12.5px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* caixa "Respondendo a" no compositor */
+.wa-app .reply-box{display:flex;align-items:stretch;gap:9px;background:var(--surface-2);border:1px solid var(--line-2);border-radius:10px;padding:8px 10px;margin-bottom:8px}
+.wa-app .reply-box-bar{width:3px;border-radius:3px;background:var(--green);flex:none}
+.wa-app .reply-box-body{flex:1;min-width:0}
+.wa-app .reply-box-rem{font-size:12px;font-weight:600;color:var(--green-ink)}
+[data-theme="dark"] .wa-app .reply-box-rem{color:var(--green)}
+.wa-app .reply-box-txt{font-size:12.5px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wa-app .reply-box-x{flex:none;border:0;background:transparent;color:var(--muted);font-size:20px;line-height:1;cursor:pointer;padding:0 4px;align-self:center}
+.wa-app .reply-box-x:hover{color:var(--ink)}
 .wa-app .bubble{padding:10px 13px;border-radius:14px;font-size:14px;line-height:1.5;color:var(--ink);box-shadow:var(--shadow);position:relative}
 /* texto formatado do WhatsApp (negrito *..* + quebras de linha), seguro (sem HTML bruto) */
 .wa-app .wa-fmt{white-space:pre-wrap;overflow-wrap:anywhere}

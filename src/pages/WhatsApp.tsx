@@ -183,6 +183,8 @@ export function WhatsApp() {
   const [agendarOpen, setAgendarOpen] = useState(false);                 // modal "Agendar mensagem"
   const [agEditId, setAgEditId] = useState<string | null>(null);         // id em edição (null = criando)
   const [agInitial, setAgInitial] = useState<{ canalId?: string; texto?: string; executarEm?: string; tipo?: string; nomeArquivo?: string } | null>(null);
+  // Responder mensagem específica (quoted reply)
+  const [replyTo, setReplyTo] = useState<{ id: string; idExt?: string; fromMe: boolean; tipo: string; texto: string; remetente: string } | null>(null);
   const [transferOpen, setTransferOpen] = useState(false);               // modal de transferência
   const [transferBusca, setTransferBusca] = useState('');                // busca no modal
   const [transferSel, setTransferSel] = useState<string>('');            // usuário selecionado p/ transferir
@@ -645,6 +647,23 @@ export function WhatsApp() {
     } catch (e) { toast((e as Error).message || 'Falha ao liberar', 'warn'); }
   }
 
+  /* ── Responder mensagem específica ─────────────────────────────────────── */
+  function rotuloRespostaMsg(m: WaMessage): string {
+    if (m.tipo === 'audio') return 'Mensagem de voz';
+    if (m.tipo === 'imagem') return (m.text ?? '').trim() || 'Imagem';
+    if (m.tipo === 'video') return (m.text ?? '').trim() || 'Vídeo';
+    if (m.tipo === 'documento') return m.nome || 'Documento';
+    return (m.text ?? '').trim();
+  }
+  function iniciarResposta(m: WaMessage) {
+    if (!m.id) return; // precisa do id local p/ vincular a resposta
+    const remetente = m.dir === 'out' ? (assinaturaNome?.trim() || 'Você') : (current.name || 'Cliente');
+    setReplyTo({ id: m.id, idExt: m.idExterno, fromMe: m.dir === 'out', tipo: m.tipo || 'texto', texto: rotuloRespostaMsg(m).slice(0, 300), remetente });
+    taRef.current?.focus();
+  }
+  const replyPayload = replyTo ? { id: replyTo.id, idExt: replyTo.idExt, fromMe: replyTo.fromMe, preview: { remetente: replyTo.remetente, tipo: replyTo.tipo, texto: replyTo.texto } } : undefined;
+  const replyPreviewBolha = replyTo ? { remetente: replyTo.remetente, tipo: replyTo.tipo, texto: replyTo.texto } : undefined;
+
   function sendMsg() {
     const v = draft.trim();
     if (!v) return;
@@ -661,8 +680,9 @@ export function WhatsApp() {
     const corpo = assinaturaNome ? `*${assinaturaNome}:*\n${v}` : v;
     // append otimista com cid (id de cliente) para reconciliar/timeout sem id real. "pendente" até confirmar.
     const cid = 'tmp_' + now.getTime().toString(36) + Math.random().toString(36).slice(2, 7);
-    setContacts((cur) => cur.map((c) => c.id === currentId ? { ...c, last: v, msgs: [...c.msgs, { dir: 'out', text: corpo, time: hh, status: 'pendente', cid }] } : c));
+    setContacts((cur) => cur.map((c) => c.id === currentId ? { ...c, last: v, msgs: [...c.msgs, { dir: 'out', text: corpo, time: hh, status: 'pendente', cid, quoted: replyPreviewBolha }] } : c));
     setDraft('');
+    const replyEnvio = replyPayload; // captura o contexto antes de limpar
     if (WA_REAL) {
       enviandoRef.current = true;
       const convAlvo = currentId;
@@ -672,10 +692,10 @@ export function WhatsApp() {
       // (onSettled da mutation) reconcilia para a linha real com id; este timeout cobre o caso de não-resposta.
       const to = setTimeout(() => marcarFalha('Sem confirmação de envio a tempo. Tente novamente.'), 25000);
       sendMut.mutate(
-        { conversaId: currentId, text: v, canalId: replyCanalId || current.canalId, assinaturaNome: assinaturaNome || undefined },
+        { conversaId: currentId, text: v, canalId: replyCanalId || current.canalId, assinaturaNome: assinaturaNome || undefined, replyTo: replyEnvio },
         {
           onError: (e) => { clearTimeout(to); marcarFalha((e as Error).message || 'Falha no envio.'); toast((e as Error).message || 'Falha ao enviar a mensagem', 'warn'); },
-          onSuccess: () => clearTimeout(to),
+          onSuccess: () => { clearTimeout(to); setReplyTo(null); }, // resposta enviada → limpa o contexto
           onSettled: () => { enviandoRef.current = false; },
         },
       );
@@ -727,8 +747,9 @@ export function WhatsApp() {
     await sendMut.mutateAsync({
       conversaId: currentId, canalId: replyCanalId || current.canalId,
       midiaPath: up.path, midiaTipo: 'imagem', midiaMime: up.mime, midiaNome: up.nome, midiaTamanho: up.tamanho,
-      text: caption || undefined,
+      text: caption || undefined, replyTo: replyPayload,
     });
+    setReplyTo(null);
   }
   /** Envio de ÁUDIO (gravado ou arquivo): sobe ao bucket privado e envia como nota de voz pela Evolution. */
   async function enviarAudio(blob: Blob, mime: string, ext: string, diag?: Record<string, unknown>) {
@@ -743,8 +764,9 @@ export function WhatsApp() {
     await sendMut.mutateAsync({
       conversaId: currentId, canalId: replyCanalId || current.canalId,
       midiaPath: up.path, midiaTipo: 'audio', midiaMime: up.mime, midiaNome: up.nome, midiaTamanho: up.tamanho,
-      audioDiag, origemAudio,
+      audioDiag, origemAudio, replyTo: replyPayload,
     });
+    setReplyTo(null);
   }
   /** Envio manual de DOCUMENTO: sobe ao bucket privado e envia pela Evolution (lança em falha -> mantém p/ retry). */
   async function enviarDocumento(file: File, caption: string) {
@@ -754,8 +776,9 @@ export function WhatsApp() {
     await sendMut.mutateAsync({
       conversaId: currentId, canalId: replyCanalId || current.canalId,
       midiaPath: up.path, midiaTipo: 'documento', midiaMime: up.mime, midiaNome: up.nome, midiaTamanho: up.tamanho,
-      text: caption || undefined,
+      text: caption || undefined, replyTo: replyPayload,
     });
+    setReplyTo(null);
   }
   /** Abre um documento do histórico via URL assinada gerada sob demanda. */
   async function abrirDocumento(m: WaMessage) {
@@ -1219,8 +1242,17 @@ export function WhatsApp() {
                 <IcDownload />
               </button>
             ) : null;
+            const rotuloQ = (q?: { tipo?: string; texto?: string }) => q?.texto?.trim() || (q?.tipo === 'audio' ? 'Mensagem de voz' : q?.tipo === 'imagem' ? 'Imagem' : q?.tipo === 'video' ? 'Vídeo' : q?.tipo === 'documento' ? 'Documento' : '');
             return (
               <div key={item.chave} className={'msg ' + m.dir}>
+                {m.quoted && (
+                  <div className="msg-quoted"><span className="mq-rem">{m.quoted.remetente || (m.dir === 'out' ? 'Você' : current.name)}</span><span className="mq-txt">{rotuloQ(m.quoted)}</span></div>
+                )}
+                {m.id && !semDestino && (
+                  <button type="button" className="msg-reply-btn" title="Responder" aria-label="Responder" onClick={() => iniciarResposta(m)}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 17 3 12l6-5" /><path d="M3 12h11a6 6 0 0 1 6 6v1" /></svg>
+                  </button>
+                )}
                 {m.tipo === 'audio' ? (
                   (m.dir === 'out' && m.status === 'falhou') ? (
                     <>
@@ -1399,6 +1431,16 @@ export function WhatsApp() {
             </div>
           )}
 
+          {replyTo && (
+            <div className="reply-box">
+              <span className="reply-box-bar" />
+              <div className="reply-box-body">
+                <div className="reply-box-rem">Respondendo a {replyTo.remetente}</div>
+                <div className="reply-box-txt">{replyTo.texto || (replyTo.tipo === 'audio' ? 'Mensagem de voz' : replyTo.tipo === 'imagem' ? 'Imagem' : replyTo.tipo === 'video' ? 'Vídeo' : replyTo.tipo === 'documento' ? 'Documento' : '')}</div>
+              </div>
+              <button type="button" className="reply-box-x" aria-label="Cancelar resposta" onClick={() => setReplyTo(null)}>×</button>
+            </div>
+          )}
           <div className="input-wrap">
             <textarea ref={taRef} className="msg-input" rows={1} placeholder={semDestino ? 'Vincule um número para responder' : (canalIndisponivel ? 'Envio bloqueado: número desconectado' : (canalRestrito ? 'Envio bloqueado: número com restrição no WhatsApp' : (textoBloqueio(higiene) ?? 'Digite sua mensagem...')))}
               value={draft} onChange={(e) => setDraft(e.target.value)} disabled={canalIndisponivel || semDestino || canalRestrito || higieneBloqueia}

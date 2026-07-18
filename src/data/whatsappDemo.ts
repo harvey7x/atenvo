@@ -27,6 +27,12 @@ export interface WaMessage {
   dataISO?: string;
   /** ISO COMPLETO (não fatiado) da mensagem — base do separador de dia no fuso de SP. */
   tsISO?: string;
+  /** id externo (WhatsApp) — necessário para citar esta mensagem numa resposta (quoted). */
+  idExterno?: string;
+  /** id local da mensagem que ESTA respondeu (link de resposta). */
+  respondidaAId?: string;
+  /** prévia da mensagem citada, para renderizar a mini-caixa dentro da bolha. */
+  quoted?: { remetente?: string; tipo?: string; texto?: string };
 }
 
 /** #6 último canal/número usado para falar com a conversa. */

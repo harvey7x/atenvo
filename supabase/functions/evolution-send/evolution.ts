@@ -18,12 +18,15 @@ export const evolution = {
   connect: (instanceName: string) => call(`/instance/connect/${instanceName}`, 'GET'),
   connectionState: (instanceName: string) => call(`/instance/connectionState/${instanceName}`, 'GET') as Promise<{ instance?: { state?: string } }>,
   whatsappNumbers: (instanceName: string, numbers: string[]) => call(`/chat/whatsappNumbers/${instanceName}`, 'POST', { numbers }) as Promise<Array<{ exists?: boolean; jid?: string; number?: string }>>,
-  sendText: (instanceName: string, number: string, text: string) => call(`/message/sendText/${instanceName}`, 'POST', { number, text }) as Promise<{ key?: { id?: string } }>,
+  // `quoted` (opcional) = resposta a uma mensagem específica (reply/citação). Shape Evolution v2:
+  // { key: { id, remoteJid, fromMe }, message: { conversation } }. Quando ausente, envio normal.
+  sendText: (instanceName: string, number: string, text: string, quoted?: unknown) =>
+    call(`/message/sendText/${instanceName}`, 'POST', { number, text, ...(quoted ? { quoted } : {}) }) as Promise<{ key?: { id?: string } }>,
   // Envio de mídia (imagem/vídeo/documento). `media` é uma URL temporária (a Evolution baixa o arquivo).
-  sendMedia: (instanceName: string, number: string, mediatype: string, mimetype: string, media: string, fileName: string, caption?: string) =>
-    call(`/message/sendMedia/${instanceName}`, 'POST', { number, mediatype, mimetype, media, fileName, ...(caption ? { caption } : {}) }) as Promise<{ key?: { id?: string } }>,
+  sendMedia: (instanceName: string, number: string, mediatype: string, mimetype: string, media: string, fileName: string, caption?: string, quoted?: unknown) =>
+    call(`/message/sendMedia/${instanceName}`, 'POST', { number, mediatype, mimetype, media, fileName, ...(caption ? { caption } : {}), ...(quoted ? { quoted } : {}) }) as Promise<{ key?: { id?: string } }>,
   // Áudio como nota de voz (PTT). `encoding:true` faz a Evolution converter p/ ogg/opus (formato do WhatsApp).
   // `audio` é uma URL temporária (a Evolution baixa o arquivo).
-  sendWhatsAppAudio: (instanceName: string, number: string, audio: string) =>
-    call(`/message/sendWhatsAppAudio/${instanceName}`, 'POST', { number, audio, encoding: true }) as Promise<{ key?: { id?: string } }>,
+  sendWhatsAppAudio: (instanceName: string, number: string, audio: string, quoted?: unknown) =>
+    call(`/message/sendWhatsAppAudio/${instanceName}`, 'POST', { number, audio, encoding: true, ...(quoted ? { quoted } : {}) }) as Promise<{ key?: { id?: string } }>,
 };

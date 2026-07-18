@@ -114,7 +114,11 @@ Deno.serve(async (req) => {
     }
     if (!user && !serviceMode) return json({ error: 'Não autenticado.' }, 401);
 
-    const { action, conversa_id, text, canal_id, assinatura_nome, retry_mensagem_id, midia_path, midia_tipo, midia_mime, midia_nome, midia_tamanho, vinc_numero, vinc_jid, audio_diag, origem_audio, ator_id, agendamento_id } = await req.json().catch(() => ({}));
+    const { action, conversa_id, text, canal_id, assinatura_nome, retry_mensagem_id, midia_path, midia_tipo, midia_mime, midia_nome, midia_tamanho, vinc_numero, vinc_jid, audio_diag, origem_audio, ator_id, agendamento_id, reply_to_id, reply_to_id_ext, reply_to_from_me, reply_preview } = await req.json().catch(() => ({}));
+    // Resposta a uma mensagem específica (quoted reply). `respostaCols` grava o link local
+    // (respondida_a_id); o objeto `quoted` (montado após resolver o destino) vai à Evolution.
+    const respostaCols: Record<string, unknown> = (typeof reply_to_id === 'string' && reply_to_id) ? { respondida_a_id: reply_to_id } : {};
+    const replyPrev = (reply_preview && typeof reply_preview === 'object') ? reply_preview as Record<string, unknown> : null;
     // Autor da mensagem: usuário logado (fluxo manual) OU, no modo service, quem agendou (ator_id).
     // NUNCA usar user.id direto nos INSERTs — no modo service user é null e estouraria APÓS o envio.
     const autorId: string | null = user?.id ?? (typeof ator_id === 'string' ? ator_id : null);
@@ -264,6 +268,12 @@ Deno.serve(async (req) => {
     } catch { /* fail-open: usa a identidade */ }
     console.log(`[send] corr=${corr} cands=${candidatos.length} alvo=${alvo.slice(0, 6)}`);
 
+    // QUOTED (resposta a mensagem específica): monta o contexto que a Evolution usa para citar.
+    // Requer o id externo da mensagem citada + se ela é fromMe (saída) + o jid do chat (o alvo).
+    const quoted = (typeof reply_to_id_ext === 'string' && reply_to_id_ext)
+      ? { key: { id: reply_to_id_ext, remoteJid: `${alvo}@s.whatsapp.net`, fromMe: !!reply_to_from_me }, message: { conversation: (replyPrev?.texto ?? '').toString().slice(0, 300) } }
+      : undefined;
+
     // ===== MÍDIA (IMAGEM, ÁUDIO e DOCUMENTO). Retry herda o tipo/arquivo da mensagem original. =====
     const ehMidiaRetry = !!retryMsg && !!retryMsg.tipo && retryMsg.tipo !== 'texto';
     if (midia_path || ehMidiaRetry) {
@@ -308,7 +318,7 @@ Deno.serve(async (req) => {
           try { console.log(JSON.stringify({ stage: 'audio_send', corr, origem_audio: gravacaoPainel ? 'gravacao_painel' : 'arquivo_anexado', container_real: containerReal(bytes), mime_declarado: mime, bytes: bytes.length, endpoint: usaPtt ? 'sendWhatsAppAudio(ptt)' : 'sendMedia(file)' })); } catch { /* ignore */ }
           if (usaPtt) {
             try {
-              sent = await evolution.sendWhatsAppAudio(instancia, alvo, b64);                   // voz/PTT (encoding:true -> ogg/opus)
+              sent = await evolution.sendWhatsAppAudio(instancia, alvo, b64, quoted);            // voz/PTT (encoding:true -> ogg/opus)
             } catch (e) {
               const em = String((e as Error)?.message ?? '').toLowerCase();
               // NUNCA envia gravação como arquivo comum silenciosamente: erro claro (Safari/mp4 recusado etc.).
@@ -318,7 +328,7 @@ Deno.serve(async (req) => {
               return json({ error: msg, code: 'AUDIO_PTT_INCOMPATIVEL' }, 422);
             }
           } else {
-            sent = await evolution.sendMedia(instancia, alvo, 'audio', mime || 'audio/mpeg', b64, nome && nome !== 'audio' ? nome : 'audio.m4a'); // arquivo de áudio anexado
+            sent = await evolution.sendMedia(instancia, alvo, 'audio', mime || 'audio/mpeg', b64, nome && nome !== 'audio' ? nome : 'audio.m4a', undefined, quoted); // arquivo de áudio anexado
           }
           // OBSERVABILIDADE MÍNIMA: 1 linha por correlation_id (sem hashes/RMS/conteúdo). Escritor único.
           if (audio_diag && typeof audio_diag === 'object') {
@@ -338,7 +348,7 @@ Deno.serve(async (req) => {
           if (se || !signed?.signedUrl) return json({ error: 'Falha ao preparar a mídia.' }, 500);
           const mediatype = tipo === 'documento' ? 'document' : tipo === 'video' ? 'video' : 'image';
           const mimeEnv = mime || (tipo === 'documento' ? 'application/octet-stream' : tipo === 'video' ? 'video/mp4' : 'image/jpeg');
-          sent = await evolution.sendMedia(instancia, alvo, mediatype, mimeEnv, signed.signedUrl, nome, caption || undefined);
+          sent = await evolution.sendMedia(instancia, alvo, mediatype, mimeEnv, signed.signedUrl, nome, caption || undefined, quoted);
         }
       } catch (err) {
         const m = (err as Error).message || 'Falha ao enviar a mídia.';
@@ -350,8 +360,8 @@ Deno.serve(async (req) => {
         return json({ error: traduzMidiaErro(tipo, m) }, 502);
       }
       const idExterno = sent?.key?.id ?? null;
-      // carimba agendamento_id p/ idempotência (modo service); envio manual não manda esse campo.
-      const metadados = { anexo_path: path, mime, tamanho, nome, ...(agendamento_id ? { agendamento_id } : {}) };
+      // carimba agendamento_id p/ idempotência (modo service) e a prévia do quoted (contexto da resposta).
+      const metadados = { anexo_path: path, mime, tamanho, nome, ...(agendamento_id ? { agendamento_id } : {}), ...(replyPrev ? { quoted: replyPrev } : {}) };
 
       // CRITÉRIO DE ACEITE: sem key.id, a Evolution não aceitou — marca FALHA (não "enviada").
       if (!idExterno) {
@@ -365,7 +375,7 @@ Deno.serve(async (req) => {
         const { data } = await admin.from('mensagens').update({ status: 'enviada', id_externo: idExterno, erro_envio: null, enviada_em: nowIso }).eq('id', retryMsg.id).select('id, conteudo, enviada_em, direcao, status').single();
         msg = data;
       } else {
-        const { data } = await admin.from('mensagens').insert({ conversa_id, organizacao_id: conv.organizacao_id, direcao: 'saida', tipo, conteudo: caption || null, origem: 'atenvo', autor_id: autorId, id_externo: idExterno, status: 'enviada', enviada_em: nowIso, metadados }).select('id, conteudo, enviada_em, direcao, status').single();
+        const { data } = await admin.from('mensagens').insert({ conversa_id, organizacao_id: conv.organizacao_id, direcao: 'saida', tipo, conteudo: caption || null, origem: 'atenvo', autor_id: autorId, id_externo: idExterno, status: 'enviada', enviada_em: nowIso, metadados, ...respostaCols }).select('id, conteudo, enviada_em, direcao, status').single();
         msg = data;
       }
       await admin.from('conversas').update({ ultima_interacao_em: nowIso, ultimo_canal_id: canal.id, ultimo_numero: canal.numero_conectado ?? null, ultimo_provider: canal.provider ?? 'whatsapp', ultima_msg_canal_em: nowIso }).eq('id', conversa_id);
@@ -390,7 +400,7 @@ Deno.serve(async (req) => {
     // envia (texto já assinado e normalizado)
     let sent: { key?: { id?: string } };
     try {
-      sent = await evolution.sendText(instancia, alvo, corpoEnviado);
+      sent = await evolution.sendText(instancia, alvo, corpoEnviado, quoted);
     } catch (err) {
       const emsg = (err as Error).message || 'Falha ao enviar pela Evolution.';
       console.error(`[send] corr=${corr} TEXTO erro provider:`, emsg); // técnico cru no log
@@ -440,12 +450,14 @@ Deno.serve(async (req) => {
       }).eq('id', retryMsg.id).select('id, conteudo, enviada_em, direcao, status').single();
       msg = data;
     } else {
+      // metadados: idempotência do agendamento (modo service) + prévia do quoted (resposta). Só grava se houver algo.
+      const metaTexto = { ...(agendamento_id ? { agendamento_id } : {}), ...(replyPrev ? { quoted: replyPrev } : {}) };
       const { data } = await admin.from('mensagens').insert({
         conversa_id, organizacao_id: conv.organizacao_id, direcao: 'saida', tipo: 'texto',
         conteudo: corpoEnviado, texto_original: rawLimpo, assinatura_nome: assinatura || null, origem: 'atenvo',
         autor_id: autorId, id_externo: idExterno, status: 'enviada', enviada_em: nowIso,
-        // vínculo p/ idempotência do agendamento (só no modo service; envio manual não manda agendamento_id)
-        ...(agendamento_id ? { metadados: { agendamento_id } } : {}),
+        ...(Object.keys(metaTexto).length ? { metadados: metaTexto } : {}),
+        ...respostaCols,
       }).select('id, conteudo, enviada_em, direcao, status').single();
       msg = data;
     }
