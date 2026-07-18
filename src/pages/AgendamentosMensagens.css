@@ -77,4 +77,12 @@
 .agm-ver dt{color:var(--muted);font-weight:600}
 .agm-ver dd{margin:0;color:var(--ink)}
 .agm-ver-txt{font-size:13px;color:var(--ink);white-space:pre-wrap;word-break:break-word;background:var(--surface-2);border:1px solid var(--line-2);border-radius:8px;padding:10px}
-.agm-ver-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;color:var(--muted);margin-bottom:5px}
+.agm-ver-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;color:var(--muted);margin:4px 0 6px}
+/* lista de mensagens internas da sequência (no detalhe) */
+.agm-itens{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;max-height:340px;overflow-y:auto}
+.agm-item{border:1px solid var(--line-2);border-radius:9px;padding:9px 11px;background:var(--surface-2)}
+.agm-item-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px}
+.agm-item-ord{font-weight:600;color:var(--ink-2)}
+.agm-item-tipo{color:var(--ink-2);font-weight:600}
+.agm-item-txt{font-size:13px;color:var(--ink);margin-top:4px;white-space:pre-wrap;word-break:break-word}
+.agm-item-meta{display:flex;gap:10px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin-top:5px}

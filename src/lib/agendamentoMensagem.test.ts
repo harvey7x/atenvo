@@ -4,7 +4,7 @@ import {
   partesSP, defaultQuandoAgendar, montarInstanteSP, resumoEnvio, avisoJanelaLonga, agendaEditavel,
   agendaReagendavel, rangePeriodo, contarCards, atalhoAgendar,
   mascararHora, horaValida, mascararDataBR, dataBRparaISO, isoParaDataBR,
-  midiaValida,
+  midiaValida, statusSequencia,
 } from './agendamentoMensagem';
 
 const canalOk = { id: 'c1', nome: 'ANDRIUS', ativo: true, status_integracao: 'conectado', envio_restrito: false, conflito_com: null };
@@ -258,6 +258,19 @@ describe('máscara/validação de data BR', () => {
   it('ida e volta', () => {
     expect(dataBRparaISO(isoParaDataBR('2026-12-31'))).toBe('2026-12-31');
   });
+});
+
+describe('statusSequencia()', () => {
+  it('todos agendada → agendada', () => { expect(statusSequencia(['agendada', 'agendada'])).toBe('agendada'); });
+  it('agendada + processando → agendada', () => { expect(statusSequencia(['agendada', 'processando'])).toBe('agendada'); });
+  it('todos enviada → enviada', () => { expect(statusSequencia(['enviada', 'enviada', 'enviada'])).toBe('enviada'); });
+  it('enviada + agendada → parcial', () => { expect(statusSequencia(['enviada', 'agendada'])).toBe('parcial'); });
+  it('qualquer falhou → falha', () => { expect(statusSequencia(['enviada', 'falhou', 'agendada'])).toBe('falha'); });
+  it('qualquer bloqueada (sem falha) → bloqueada', () => { expect(statusSequencia(['agendada', 'bloqueada'])).toBe('bloqueada'); });
+  it('todos cancelada → cancelada', () => { expect(statusSequencia(['cancelada', 'cancelada'])).toBe('cancelada'); });
+  it('todos expirada → expirada', () => { expect(statusSequencia(['expirada'])).toBe('expirada'); });
+  it('vazio → agendada', () => { expect(statusSequencia([])).toBe('agendada'); });
+  it('mistura terminal (enviada+cancelada) → parcial', () => { expect(statusSequencia(['enviada', 'cancelada'])).toBe('parcial'); });
 });
 
 describe('atalhoAgendar()', () => {

@@ -243,6 +243,21 @@ export function rangePeriodo(periodo: PeriodoAg, agoraMs: number): { desdeMs: nu
   }
 }
 
+/** Status geral de um grupo/sequência a partir dos status dos itens. Puro/testável.
+ *  Prioridade: falha > bloqueada > (só enviada) enviada > (só cancelada) cancelada >
+ *  (só expirada) expirada > (só agendada/processando) agendada > (mistura) parcial. */
+export function statusSequencia(sts: string[]): string {
+  if (!sts.length) return 'agendada';
+  if (sts.includes('falhou')) return 'falha';
+  if (sts.includes('bloqueada')) return 'bloqueada';
+  const todos = (s: string) => sts.every((x) => x === s);
+  if (todos('enviada')) return 'enviada';
+  if (todos('cancelada')) return 'cancelada';
+  if (todos('expirada')) return 'expirada';
+  if (sts.every((x) => x === 'agendada' || x === 'processando')) return 'agendada';
+  return 'parcial';
+}
+
 export interface ItemCard { status: string; executarEmMs: number }
 export interface ResumoCards { hoje: number; prox7: number; enviadas: number; falhas: number; bloqueadas: number; canceladas: number }
 

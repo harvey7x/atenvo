@@ -878,6 +878,7 @@ export interface AgendamentoOrg {
   executarEm: string; status: string; tentativas: number;
   ultimoErro: string | null; motivoBloqueio: string | null;
   criadoPor: string | null; criadoEm: string; enviadaEm: string | null; mensagemIdEnviada: string | null;
+  sequenciaId: string | null; ordemNaSequencia: number | null;
 }
 
 /** Lista TODAS as mensagens agendadas da organização (para a central). Isolado por org + RLS. */
@@ -890,7 +891,7 @@ export function useAgendamentosOrg() {
     queryFn: async (): Promise<AgendamentoOrg[]> => {
       const { data, error } = await supabase!
         .from('mensagens_agendadas')
-        .select('id, conversa_id, contato_id, canal_id, nome_canal_snapshot, tipo, texto, nome_arquivo, executar_em, status, tentativas, ultimo_erro, motivo_bloqueio, criado_por, criado_em, enviada_em, mensagem_id_enviada, contatos(nome, telefone)')
+        .select('id, conversa_id, contato_id, canal_id, nome_canal_snapshot, tipo, texto, nome_arquivo, executar_em, status, tentativas, ultimo_erro, motivo_bloqueio, criado_por, criado_em, enviada_em, mensagem_id_enviada, sequencia_id, ordem_na_sequencia, contatos(nome, telefone)')
         .eq('organizacao_id', currentOrg.id)
         .order('executar_em', { ascending: false });
       if (error) throw new Error(error.message);
@@ -898,7 +899,7 @@ export function useAgendamentosOrg() {
         id: string; conversa_id: string; contato_id: string | null; canal_id: string; nome_canal_snapshot: string | null;
         tipo: string; texto: string | null; nome_arquivo: string | null; executar_em: string; status: string; tentativas: number;
         ultimo_erro: string | null; motivo_bloqueio: string | null; criado_por: string | null; criado_em: string;
-        enviada_em: string | null; mensagem_id_enviada: string | null;
+        enviada_em: string | null; mensagem_id_enviada: string | null; sequencia_id: string | null; ordem_na_sequencia: number | null;
         contatos: { nome: string; telefone: string | null } | { nome: string; telefone: string | null }[] | null;
       };
       const nomeDe = (c: Row['contatos']) => (Array.isArray(c) ? c[0] : c) ?? null;
@@ -910,6 +911,7 @@ export function useAgendamentosOrg() {
           executarEm: r.executar_em, status: r.status, tentativas: r.tentativas,
           ultimoErro: r.ultimo_erro, motivoBloqueio: r.motivo_bloqueio,
           criadoPor: r.criado_por, criadoEm: r.criado_em, enviadaEm: r.enviada_em, mensagemIdEnviada: r.mensagem_id_enviada,
+          sequenciaId: r.sequencia_id, ordemNaSequencia: r.ordem_na_sequencia,
         };
       });
     },
