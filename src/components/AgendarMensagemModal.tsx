@@ -32,11 +32,12 @@ interface Props {
 }
 
 const IcImg = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="8.5" cy="9.5" r="1.5" /><path d="m21 16-5-5L5 21" /></svg>;
-const IcAudio = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>;
 const IcVideo = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="14" height="14" rx="2.5" /><path d="m22 8-6 4 6 4z" /></svg>;
 const IcDoc = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6M8 13h8M8 17h8" /></svg>;
 const IcCal = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2" /><path d="M3 9.5h18M8 2.5v4M16 2.5v4" /></svg>;
 const IcClk = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>;
+const IcPlay = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>;
+const mmss = (s: number) => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
 
 const TIPO_LABEL: Record<string, string> = { texto: 'Texto', imagem: 'Imagem', audio: 'Áudio', video: 'Vídeo', documento: 'Documento' };
 const ACCEPT: Record<string, string> = {
@@ -71,6 +72,7 @@ export function AgendarMensagemModal({ open, modo, canais, temTelefone, ultimaIn
   const [blocos, setBlocos] = useState<Bloco[]>([]);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [durMap, setDurMap] = useState<Record<number, number>>({}); // duração (s) do áudio por bloco.key
   const keyRef = useRef(0);
   const novaKey = () => ++keyRef.current;
 
@@ -163,7 +165,15 @@ export function AgendarMensagemModal({ open, modo, canais, temTelefone, ultimaIn
       <div className="agmod-bubble agmod-bubble-midia">
         {b.tipo === 'imagem' && (b.objUrl ? <img className="agmod-pv-img" src={b.objUrl} alt="" /> : <div className="agmod-doccard"><IcImg /><span>{nome ?? 'imagem'}</span></div>)}
         {b.tipo === 'video' && (b.objUrl ? <video className="agmod-pv-vid" src={b.objUrl} controls preload="metadata" /> : <div className="agmod-doccard"><IcVideo /><span>{nome ?? 'vídeo'}</span></div>)}
-        {b.tipo === 'audio' && <div className="agmod-audio"><span><IcAudio /> {b.objUrl ? 'Áudio gravado' : (nome ?? 'áudio')}</span>{b.objUrl && <audio controls src={b.objUrl} />}</div>}
+        {b.tipo === 'audio' && (
+          <div className="agmod-audiobolha">
+            <span className="agmod-audio-play" aria-hidden="true"><IcPlay /></span>
+            <span className="agmod-audio-wave" aria-hidden="true" />
+            <span className="agmod-audio-dur">{durMap[b.key] ? mmss(durMap[b.key]) : (b.objUrl ? '0:00' : '')}</span>
+            {b.objUrl && <audio style={{ display: 'none' }} preload="metadata" src={b.objUrl}
+              onLoadedMetadata={(e) => { const d = e.currentTarget.duration; if (isFinite(d) && d > 0) setDurMap((m) => ({ ...m, [b.key]: d })); }} />}
+          </div>
+        )}
         {b.tipo === 'documento' && <div className="agmod-doccard"><IcDoc /><span>{nome ?? 'documento'}{b.file ? ` · ${fmtTam(b.file.size)}` : ''}</span></div>}
         {b.tipo !== 'audio' && b.texto.trim() && <div className="agmod-bubble-txt" style={{ marginTop: 6 }}>{b.texto}</div>}
         <div className="agmod-bubble-time">{horaPreview}</div>
