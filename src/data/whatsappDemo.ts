@@ -25,6 +25,8 @@ export interface WaMessage {
   nome?: string;
   /** data da mensagem (AAAA-MM-DD) — usada no nome sugerido do arquivo baixado. */
   dataISO?: string;
+  /** ISO COMPLETO (não fatiado) da mensagem — base do separador de dia no fuso de SP. */
+  tsISO?: string;
 }
 
 /** #6 último canal/número usado para falar com a conversa. */

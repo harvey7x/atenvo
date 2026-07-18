@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useToast } from '@/hooks/useToast';
 import { useAuth } from '@/context/AuthContext';
@@ -14,6 +14,7 @@ import { WhatsAppText } from '@/components/WhatsAppText';
 import { formatarNomeCliente } from '@/lib/nomeCliente';
 import { etiquetasDaConversa, responsavelEfetivo } from '@/lib/conversaEtiquetas';
 import { analisarNome, conversaAtiva, decidirDono, decidirNome, estadoHigiene, textoBloqueio } from '@/lib/higieneConversa';
+import { precisaSeparador, rotuloDia } from '@/lib/dataConversa';
 import { HIGIENE_CORTE_ISO, HIGIENE_DIAS_ADAPTACAO } from '@/config/higiene';
 import { useHigieneConversa, useRegistrarAdiamento, HIGIENE_VAZIO } from '@/data/higiene';
 import { EmptyState } from '@/components/EmptyState';
@@ -1128,6 +1129,8 @@ export function WhatsApp() {
 
         <div className="messages" ref={msgsRef}>
           {current.msgs.map((m, i) => {
+            // Separador de dia (estilo WhatsApp): abre quando o dia (fuso SP) muda vs. a msg anterior.
+            const sepData = precisaSeparador(m.tsISO, current.msgs[i - 1]?.tsISO) ? rotuloDia(m.tsISO) : null;
             const ack = m.dir === 'out' ? ackOf(m.status) : null;
             const tempo = (
               <span className="btime">
@@ -1164,7 +1167,9 @@ export function WhatsApp() {
               </button>
             ) : null;
             return (
-              <div key={i} className={'msg ' + m.dir}>
+              <Fragment key={i}>
+              {sepData && <div className="day-sep"><span>{sepData}</span></div>}
+              <div className={'msg ' + m.dir}>
                 {m.tipo === 'audio' ? (
                   (m.dir === 'out' && m.status === 'falhou') ? (
                     <>
@@ -1243,6 +1248,7 @@ export function WhatsApp() {
                   </>
                 )}
               </div>
+              </Fragment>
             );
           })}
           <div style={{ clear: 'both' }} />

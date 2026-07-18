@@ -129,6 +129,8 @@ function mapConversa(c: DbConv): WaContact {
       tamanho: m.metadados?.tamanho ?? null,
       nome: m.metadados?.nome,
       dataISO: (m.recebida_em || m.enviada_em || m.criado_em || '').slice(0, 10) || undefined,
+      // ISO completo (mesma fonte do horário exibido) para o separador de dia calcular no fuso de SP.
+      tsISO: m.enviada_em || m.recebida_em || m.criado_em || undefined,
       midiaPendente: !!m.metadados?.midia_pendente,
     } as WaMessage));
   const lastMsg = msgs[msgs.length - 1];
