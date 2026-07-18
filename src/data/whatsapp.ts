@@ -765,6 +765,7 @@ export interface MensagemAgendada {
   id: string; conversaId: string; canalId: string; nomeCanal: string | null; tipo: string;
   texto: string | null; nomeArquivo: string | null; executarEm: string; status: string; tentativas: number;
   ultimoErro: string | null; motivoBloqueio: string | null; criadoPor: string | null; criadoEm: string;
+  sequenciaId: string | null; ordemNaSequencia: number | null;
 }
 
 /** Lista os agendamentos de uma conversa (leitura por RLS). */
@@ -776,15 +777,16 @@ export function useMensagensAgendadas(conversaId: string | null | undefined) {
     queryFn: async (): Promise<MensagemAgendada[]> => {
       const { data, error } = await supabase!
         .from('mensagens_agendadas')
-        .select('id, conversa_id, canal_id, nome_canal_snapshot, tipo, texto, nome_arquivo, executar_em, status, tentativas, ultimo_erro, motivo_bloqueio, criado_por, criado_em')
+        .select('id, conversa_id, canal_id, nome_canal_snapshot, tipo, texto, nome_arquivo, executar_em, status, tentativas, ultimo_erro, motivo_bloqueio, criado_por, criado_em, sequencia_id, ordem_na_sequencia')
         .eq('conversa_id', conversaId!)
         .order('executar_em', { ascending: true });
       if (error) throw new Error(error.message);
-      type Row = { id: string; conversa_id: string; canal_id: string; nome_canal_snapshot: string | null; tipo: string; texto: string | null; nome_arquivo: string | null; executar_em: string; status: string; tentativas: number; ultimo_erro: string | null; motivo_bloqueio: string | null; criado_por: string | null; criado_em: string };
+      type Row = { id: string; conversa_id: string; canal_id: string; nome_canal_snapshot: string | null; tipo: string; texto: string | null; nome_arquivo: string | null; executar_em: string; status: string; tentativas: number; ultimo_erro: string | null; motivo_bloqueio: string | null; criado_por: string | null; criado_em: string; sequencia_id: string | null; ordem_na_sequencia: number | null };
       return ((data as Row[]) ?? []).map((r) => ({
         id: r.id, conversaId: r.conversa_id, canalId: r.canal_id, nomeCanal: r.nome_canal_snapshot, tipo: r.tipo,
         texto: r.texto, nomeArquivo: r.nome_arquivo, executarEm: r.executar_em, status: r.status, tentativas: r.tentativas,
         ultimoErro: r.ultimo_erro, motivoBloqueio: r.motivo_bloqueio, criadoPor: r.criado_por, criadoEm: r.criado_em,
+        sequenciaId: r.sequencia_id, ordemNaSequencia: r.ordem_na_sequencia,
       }));
     },
   });
@@ -817,6 +819,22 @@ export function useAgendarMidia() {
       });
       if (error) throw new Error(traduzErroAgendamento(error.message));
       return data as { id: string };
+    },
+    onSettled: (_r, _e, v) => { qc.invalidateQueries({ queryKey: ['mensagens-agendadas', v.conversaId] }); qc.invalidateQueries({ queryKey: ['mensagens-agendadas-org'] }); },
+  });
+}
+
+export interface SeqItem { tipo: string; texto?: string | null; storage_path?: string; mime?: string; nome?: string; tamanho?: number; origem_audio?: string }
+/** Agenda uma SEQUÊNCIA (vários blocos num único agendamento). Cada item vira uma linha (RPC atômica). */
+export function useAgendarSequencia() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { conversaId: string; canalId: string; executarEm: string; itens: SeqItem[] }) => {
+      const { data, error } = await supabase!.rpc('agendar_sequencia', {
+        p_conversa: input.conversaId, p_canal: input.canalId, p_executar_em: input.executarEm, p_itens: input.itens,
+      });
+      if (error) throw new Error(traduzErroAgendamento(error.message));
+      return data as Array<{ id: string }>;
     },
     onSettled: (_r, _e, v) => { qc.invalidateQueries({ queryKey: ['mensagens-agendadas', v.conversaId] }); qc.invalidateQueries({ queryKey: ['mensagens-agendadas-org'] }); },
   });

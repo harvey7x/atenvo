@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { Modal } from '@/components/Modal';
+import { AudioRecorder } from '@/components/AudioRecorder';
 import { useOrg } from '@/context/OrgContext';
 import { mascararNumero, subirMidiaWa } from '@/data/whatsapp';
 import {
-  canalValidoParaEnvio, podeAgendar, partesSP, montarInstanteSP, defaultQuandoAgendar,
+  canalValidoParaEnvio, partesSP, montarInstanteSP, defaultQuandoAgendar,
   resumoEnvio, avisoJanelaLonga, atalhoAgendar, midiaValida, type AtalhoAg,
   mascararHora, horaValida, mascararDataBR, dataBRparaISO, isoParaDataBR,
 } from '@/lib/agendamentoMensagem';
@@ -11,7 +12,13 @@ import './AgendarMensagemModal.css';
 
 export interface CanalOpcao { id: string; alias: string; numero: string | null; status: string; envioRestrito: boolean; conflitoCom: string | null }
 export interface MidiaSubmit { path: string; mime: string; nome: string; tamanho: number; origemAudio?: string }
-export interface AgendarSubmit { tipo: string; canalId: string; texto: string; executarISO: string; midia?: MidiaSubmit | null }
+export interface SeqItemSubmit { tipo: string; texto: string; midia?: MidiaSubmit | null }
+export interface AgendarSubmit {
+  modo: 'sequencia' | 'editar' | 'reagendar';
+  canalId: string; executarISO: string;
+  tipo?: string; texto?: string;            // editar/reagendar (bloco único)
+  itens?: SeqItemSubmit[];                   // sequencia (criar)
+}
 
 interface Props {
   open: boolean;
@@ -21,83 +28,67 @@ interface Props {
   ultimaInteracaoMs?: number | null;
   initial?: { canalId?: string; texto?: string; executarEm?: string; tipo?: string; nomeArquivo?: string } | null;
   onClose: () => void;
-  /** Roda a mutação; lançar Error mostra a mensagem no modal. Sucesso → o pai fecha. */
   onSubmit: (v: AgendarSubmit) => Promise<void>;
 }
 
-const IcText = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7V5h16v2M9 5v14M7 19h4" /></svg>;
 const IcImg = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="8.5" cy="9.5" r="1.5" /><path d="m21 16-5-5L5 21" /></svg>;
 const IcAudio = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>;
 const IcVideo = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="14" height="14" rx="2.5" /><path d="m22 8-6 4 6 4z" /></svg>;
 const IcDoc = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6M8 13h8M8 17h8" /></svg>;
 const IcCal = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2" /><path d="M3 9.5h18M8 2.5v4M16 2.5v4" /></svg>;
-const IcClock = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>;
+const IcClk = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>;
 
-const TIPOS = [
-  { id: 'texto', label: 'Texto', Icon: IcText },
-  { id: 'imagem', label: 'Imagem', Icon: IcImg },
-  { id: 'audio', label: 'Áudio', Icon: IcAudio },
-  { id: 'video', label: 'Vídeo', Icon: IcVideo },
-  { id: 'documento', label: 'Documento', Icon: IcDoc },
-] as const;
-
+const TIPO_LABEL: Record<string, string> = { texto: 'Texto', imagem: 'Imagem', audio: 'Áudio', video: 'Vídeo', documento: 'Documento' };
 const ACCEPT: Record<string, string> = {
-  imagem: 'image/*', audio: 'audio/*', video: 'video/*',
+  imagem: 'image/*', video: 'video/*',
   documento: '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,application/pdf',
 };
-
 const ATALHOS: { id: AtalhoAg; label: string }[] = [
-  { id: 'hoje5', label: 'Hoje +5 min' },
-  { id: 'hojeTarde', label: 'Hoje à tarde' },
-  { id: 'amanha9', label: 'Amanhã 09:00' },
-  { id: 'amanha14', label: 'Amanhã 14:00' },
-  { id: 'em3dias', label: 'Em 3 dias' },
+  { id: 'hoje5', label: 'Hoje +5 min' }, { id: 'hojeTarde', label: 'Hoje à tarde' },
+  { id: 'amanha9', label: 'Amanhã 09:00' }, { id: 'amanha14', label: 'Amanhã 14:00' }, { id: 'em3dias', label: 'Em 3 dias' },
 ];
-
+const PLACEHOLDER: Record<string, string> = {
+  imagem: 'Selecione uma imagem para pré-visualizar.',
+  audio: 'Grave ou selecione um áudio para pré-visualizar.',
+  video: 'Selecione um vídeo para pré-visualizar.',
+  documento: 'Selecione um documento para pré-visualizar.',
+};
 const fmtTam = (b: number) => b < 1024 ? b + ' B' : b < 1048576 ? (b / 1024).toFixed(0) + ' KB' : (b / 1048576).toFixed(1) + ' MB';
+
+interface Bloco { key: number; tipo: string; texto: string; file: File | null; objUrl: string | null; fileErr: string | null; nomeExistente?: string | null; origemAudio?: string }
 
 export function AgendarMensagemModal({ open, modo, canais, temTelefone, ultimaInteracaoMs, initial, onClose, onSubmit }: Props) {
   const { currentOrg } = useOrg();
+  const builder = modo === 'criar';
+  const captionRO = modo === 'reagendar';
   const canaisAgendaveis = canais.filter((c) => canalValidoParaEnvio({
     id: c.id, nome: c.alias, ativo: true, status_integracao: c.status, envio_restrito: c.envioRestrito, conflito_com: c.conflitoCom,
   }).ok);
 
-  const [tipo, setTipo] = useState<string>('texto');
   const [canal, setCanal] = useState('');
-  const [texto, setTexto] = useState('');
   const [dataBR, setDataBR] = useState('');
   const [hora, setHora] = useState('');
-  const [file, setFile] = useState<File | null>(null);
-  const [objUrl, setObjUrl] = useState<string | null>(null);
-  const [fileErr, setFileErr] = useState<string | null>(null);
+  const [blocos, setBlocos] = useState<Bloco[]>([]);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const keyRef = useRef(0);
+  const novaKey = () => ++keyRef.current;
 
-  // Semeia na ABERTURA (não a cada render/tecla).
   useEffect(() => {
     if (!open) return;
-    setErr(null); setFileErr(null); setFile(null);
-    setTipo(initial?.tipo ?? 'texto');
+    setErr(null); setBusy(false);
     const defCanal = initial?.canalId && canaisAgendaveis.some((c) => c.id === initial.canalId) ? initial.canalId : (canaisAgendaveis[0]?.id ?? '');
     setCanal(defCanal);
-    setTexto(initial?.texto ?? '');
     const q = (modo === 'editar' && initial?.executarEm) ? partesSP(new Date(initial.executarEm).getTime()) : defaultQuandoAgendar(Date.now(), 5);
     setDataBR(isoParaDataBR(q.data)); setHora(q.hora);
+    setBlocos(builder
+      ? [{ key: novaKey(), tipo: 'texto', texto: '', file: null, objUrl: null, fileErr: null }]
+      : [{ key: novaKey(), tipo: initial?.tipo ?? 'texto', texto: initial?.texto ?? '', file: null, objUrl: null, fileErr: null, nomeExistente: initial?.nomeArquivo ?? null }]);
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Object URL do arquivo escolhido (preview) — com limpeza.
-  useEffect(() => {
-    if (!file) { setObjUrl(null); return; }
-    const u = URL.createObjectURL(file);
-    setObjUrl(u);
-    return () => URL.revokeObjectURL(u);
-  }, [file]);
+  // revoga object URLs ao fechar
+  useEffect(() => { if (!open) blocos.forEach((b) => b.objUrl && URL.revokeObjectURL(b.objUrl)); }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const ehMidia = tipo !== 'texto';
-  const midiaTravada = ehMidia && modo !== 'criar';          // editar/reagendar não troca o arquivo
-  const captionRO = modo === 'reagendar';                    // reagendar mantém texto/legenda
-  const semCaption = tipo === 'audio';                       // áudio (PTT) não tem legenda
   const canalNome = canaisAgendaveis.find((c) => c.id === canal)?.alias ?? null;
   const dataISO = dataBRparaISO(dataBR);
   const dataErr = dataBR.length > 0 && !dataISO;
@@ -105,76 +96,88 @@ export function AgendarMensagemModal({ open, modo, canais, temTelefone, ultimaIn
   const execMs = dataISO && horaValida(hora) ? new Date(`${dataISO}T${hora}:00-03:00`).getTime() : NaN;
   const resumo = resumoEnvio({ executarEmMs: execMs, agoraMs: Date.now(), canalNome });
   const aviso = avisoJanelaLonga({ executarEmMs: execMs, agoraMs: Date.now(), ultimaInteracaoMs });
-  const temConteudo = ehMidia ? (midiaTravada ? true : !!file) : !!texto.trim();
-  const podeSubmeter = !busy && !!canal && Number.isFinite(execMs) && temConteudo && !fileErr;
+
+  const blocoOk = (b: Bloco) => b.tipo === 'texto' ? !!b.texto.trim() : (!builder ? true : !!b.file) && !b.fileErr;
+  const podeSubmeter = !busy && !!canal && Number.isFinite(execMs) && blocos.length > 0 && blocos.every(blocoOk);
 
   const titulo = modo === 'reagendar' ? 'Reagendar mensagem' : modo === 'editar' ? 'Editar agendamento' : 'Agendar mensagem';
-  const btnLabel = busy ? 'Salvando…' : modo === 'reagendar' ? 'Reagendar' : modo === 'editar' ? 'Salvar' : 'Agendar';
+  const btnLabel = busy ? 'Salvando…' : modo === 'reagendar' ? 'Reagendar' : modo === 'editar' ? 'Salvar' : (blocos.length > 1 ? `Agendar ${blocos.length} mensagens` : 'Agendar');
 
-  function escolherTipo(t: string) {
-    if (modo !== 'criar') return;
-    setTipo(t); setFile(null); setFileErr(null);
-    if (t === 'audio') setTexto(''); // áudio não tem legenda
+  function patch(idx: number, p: Partial<Bloco>) { setBlocos((bs) => bs.map((b, i) => i === idx ? { ...b, ...p } : b)); }
+  function addBloco() { setBlocos((bs) => [...bs, { key: novaKey(), tipo: 'texto', texto: '', file: null, objUrl: null, fileErr: null }]); }
+  function removeBloco(idx: number) { setBlocos((bs) => { const b = bs[idx]; if (b?.objUrl) URL.revokeObjectURL(b.objUrl); return bs.filter((_, i) => i !== idx); }); }
+  function dupBloco(idx: number) { setBlocos((bs) => { const b = bs[idx]; const copia: Bloco = { ...b, key: novaKey(), file: null, objUrl: null, fileErr: null, nomeExistente: null }; return [...bs.slice(0, idx + 1), copia, ...bs.slice(idx + 1)]; }); }
+  function moveBloco(idx: number, dir: number) { setBlocos((bs) => { const j = idx + dir; if (j < 0 || j >= bs.length) return bs; const c = [...bs]; [c[idx], c[j]] = [c[j], c[idx]]; return c; }); }
+  function trocarTipo(idx: number, tipo: string) {
+    setBlocos((bs) => bs.map((b, i) => { if (i !== idx) return b; if (b.objUrl) URL.revokeObjectURL(b.objUrl); return { ...b, tipo, file: null, objUrl: null, fileErr: null, texto: tipo === 'audio' ? '' : b.texto }; }));
   }
-  function escolherArquivo(f?: File | null) {
-    if (!f) return;
-    const v = midiaValida(tipo, f.type, f.name, f.size);
-    if (!v.ok) { setFileErr(v.erro); return; }
-    setFileErr(null); setFile(f);
+  function setArquivo(idx: number, f: File | null, origem?: string) {
+    const b = blocos[idx];
+    if (b?.objUrl) URL.revokeObjectURL(b.objUrl);
+    if (!f) { patch(idx, { file: null, objUrl: null, fileErr: null }); return; }  // Remover
+    const v = midiaValida(b.tipo, f.type, f.name, f.size);
+    if (!v.ok) { patch(idx, { file: null, objUrl: null, fileErr: v.erro }); return; }
+    patch(idx, { file: f, objUrl: URL.createObjectURL(f), fileErr: null, origemAudio: origem });
   }
 
   async function confirmar() {
-    if (busy || !podeSubmeter) return;
+    if (!podeSubmeter) return;
     setErr(null);
-    const executarISO = montarInstanteSP(dataISO, hora);
     const canalObj = canais.find((c) => c.id === canal);
-    const v = podeAgendar({
-      texto, temTelefone, ehMidia, temMidia: ehMidia ? temConteudo : undefined,
-      canal: canalObj ? { id: canalObj.id, nome: canalObj.alias, ativo: true, status_integracao: canalObj.status, envio_restrito: canalObj.envioRestrito, conflito_com: canalObj.conflitoCom } : null,
-      executarEmMs: execMs, agoraMs: Date.now(),
-    });
-    if (!v.ok) { setErr(v.erro); return; }
+    const vc = canalValidoParaEnvio(canalObj ? { id: canalObj.id, nome: canalObj.alias, ativo: true, status_integracao: canalObj.status, envio_restrito: canalObj.envioRestrito, conflito_com: canalObj.conflitoCom } : null);
+    if (!temTelefone) { setErr('Este contato não tem número acionável.'); return; }
+    if (!vc.ok) { setErr(`Canal indisponível: ${vc.motivo}.`); return; }
+    if (!Number.isFinite(execMs) || execMs < Date.now() + 60_000) { setErr('Escolha um horário no futuro.'); return; }
+    const executarISO = montarInstanteSP(dataISO, hora);
     setBusy(true);
     try {
-      let midia: MidiaSubmit | null = null;
-      if (ehMidia && modo === 'criar' && file) {
-        const up = await subirMidiaWa(currentOrg.id, file);
-        midia = { path: up.path, mime: up.mime, nome: up.nome, tamanho: up.tamanho, ...(tipo === 'audio' ? { origemAudio: 'arquivo_anexado' } : {}) };
+      if (!builder) {
+        // editar/reagendar: bloco único, mídia mantém arquivo (sem upload).
+        const b = blocos[0];
+        await onSubmit({ modo, canalId: canal, executarISO, tipo: b.tipo, texto: b.tipo === 'audio' ? '' : b.texto.trim() });
+      } else {
+        // sequência: sobe cada mídia e monta os itens na ordem.
+        const itens: SeqItemSubmit[] = [];
+        for (const b of blocos) {
+          if (b.tipo === 'texto') { itens.push({ tipo: 'texto', texto: b.texto.trim() }); continue; }
+          if (!b.file) throw new Error(`Anexe o arquivo da mensagem de ${TIPO_LABEL[b.tipo].toLowerCase()}.`);
+          const up = await subirMidiaWa(currentOrg.id, b.file);
+          itens.push({ tipo: b.tipo, texto: b.tipo === 'audio' ? '' : b.texto.trim(), midia: { path: up.path, mime: up.mime, nome: up.nome, tamanho: up.tamanho, ...(b.tipo === 'audio' ? { origemAudio: b.origemAudio ?? 'gravacao_painel' } : {}) } });
+        }
+        await onSubmit({ modo: 'sequencia', canalId: canal, executarISO, itens });
       }
-      await onSubmit({ tipo, canalId: canal, texto: semCaption ? '' : texto.trim(), executarISO, midia });
     } catch (e) { setErr((e as Error).message || 'Falha ao salvar.'); }
     finally { setBusy(false); }
   }
 
   const horaPreview = hora || '--:--';
-  const nomeExibicao = file?.name ?? initial?.nomeArquivo ?? null;
 
-  function renderPreview() {
-    if (tipo === 'texto') {
-      if (!texto.trim()) return <div className="agmod-pv-empty">Pré-visualização da mensagem aparecerá aqui.</div>;
-      return <div className="agmod-bubble"><div className="agmod-bubble-txt">{texto}</div><div className="agmod-bubble-time">{horaPreview}</div></div>;
+  function previewBloco(b: Bloco) {
+    const nome = b.file?.name ?? b.nomeExistente ?? null;
+    if (b.tipo === 'texto') {
+      if (!b.texto.trim()) return <div className="agmod-pv-empty">Escreva a mensagem para pré-visualizar.</div>;
+      return <div className="agmod-bubble"><div className="agmod-bubble-txt">{b.texto}</div><div className="agmod-bubble-time">{horaPreview}</div></div>;
     }
-    if (!file && !midiaTravada) return <div className="agmod-pv-empty">Anexe um arquivo para pré-visualizar.</div>;
+    if (!b.file && !b.nomeExistente) return <div className="agmod-pv-empty">{PLACEHOLDER[b.tipo]}</div>;
     return (
       <div className="agmod-bubble agmod-bubble-midia">
-        {tipo === 'imagem' && (objUrl ? <img className="agmod-pv-img" src={objUrl} alt="" /> : <div className="agmod-doccard"><IcImg /><span>{nomeExibicao ?? 'imagem'}</span></div>)}
-        {tipo === 'video' && (objUrl ? <video className="agmod-pv-vid" src={objUrl} controls preload="metadata" /> : <div className="agmod-doccard"><IcVideo /><span>{nomeExibicao ?? 'vídeo'}</span></div>)}
-        {tipo === 'audio' && <div className="agmod-audio"><IcAudio /><span>{objUrl ? 'Mensagem de voz' : (nomeExibicao ?? 'áudio')}</span>{objUrl && <audio controls src={objUrl} />}</div>}
-        {tipo === 'documento' && <div className="agmod-doccard"><IcDoc /><span>{nomeExibicao ?? 'documento'}</span></div>}
-        {!semCaption && texto.trim() && <div className="agmod-bubble-txt" style={{ marginTop: 6 }}>{texto}</div>}
+        {b.tipo === 'imagem' && (b.objUrl ? <img className="agmod-pv-img" src={b.objUrl} alt="" /> : <div className="agmod-doccard"><IcImg /><span>{nome ?? 'imagem'}</span></div>)}
+        {b.tipo === 'video' && (b.objUrl ? <video className="agmod-pv-vid" src={b.objUrl} controls preload="metadata" /> : <div className="agmod-doccard"><IcVideo /><span>{nome ?? 'vídeo'}</span></div>)}
+        {b.tipo === 'audio' && <div className="agmod-audio"><span><IcAudio /> {b.objUrl ? 'Áudio gravado' : (nome ?? 'áudio')}</span>{b.objUrl && <audio controls src={b.objUrl} />}</div>}
+        {b.tipo === 'documento' && <div className="agmod-doccard"><IcDoc /><span>{nome ?? 'documento'}{b.file ? ` · ${fmtTam(b.file.size)}` : ''}</span></div>}
+        {b.tipo !== 'audio' && b.texto.trim() && <div className="agmod-bubble-txt" style={{ marginTop: 6 }}>{b.texto}</div>}
         <div className="agmod-bubble-time">{horaPreview}</div>
       </div>
     );
   }
 
   return (
-    <Modal open={open} onClose={() => { if (!busy) onClose(); }} title={titulo} width={820} closeOnBackdrop={!busy}
+    <Modal open={open} onClose={() => { if (!busy) onClose(); }} title={titulo} width={860} closeOnBackdrop={!busy}
       footer={<>
         <button className="atv-btn" disabled={busy} onClick={onClose}>Cancelar</button>
         <button className="atv-btn primary" disabled={!podeSubmeter} onClick={confirmar}>{btnLabel}</button>
       </>}>
       <div className="agmod">
-        {/* Coluna esquerda — composição */}
         <div className="agmod-cfg">
           <label className="agmod-fld"><span>Enviar por</span>
             <select className="atv-input" value={canal} onChange={(e) => setCanal(e.target.value)} disabled={busy}>
@@ -183,55 +186,59 @@ export function AgendarMensagemModal({ open, modo, canais, temTelefone, ultimaIn
             </select>
           </label>
 
-          <div className="agmod-fld"><span>Tipo de mensagem</span>
-            <div className="agmod-tipos">
-              {TIPOS.map((t) => (
-                <button key={t.id} type="button" className={'agmod-tipo' + (t.id === tipo ? ' on' : '')}
-                  disabled={busy || (modo !== 'criar' && t.id !== tipo)} title={t.label} onClick={() => escolherTipo(t.id)}>
-                  <t.Icon /><span>{t.label}</span>
-                </button>
-              ))}
-            </div>
-            {modo !== 'criar' && ehMidia && <div className="agmod-hint">Para trocar o arquivo, cancele e crie um novo agendamento.</div>}
-          </div>
-
-          {/* Conteúdo: texto OU anexo */}
-          {!ehMidia ? (
-            <label className="agmod-fld"><span>Mensagem</span>
-              <textarea className="atv-input agmod-ta" rows={4} maxLength={4096} value={texto} disabled={busy || captionRO}
-                placeholder="Escreva a mensagem que será enviada automaticamente…" onChange={(e) => setTexto(e.target.value)} />
-              <div className="agmod-count">{texto.length}/4096{captionRO ? ' · reagendar mantém o texto' : ''}</div>
-            </label>
-          ) : (
-            <>
-              <div className="agmod-fld"><span>Arquivo</span>
-                <input ref={fileRef} type="file" accept={ACCEPT[tipo]} style={{ display: 'none' }} onChange={(e) => escolherArquivo(e.target.files?.[0])} />
-                {midiaTravada ? (
-                  <div className="agmod-filecard"><span className="agmod-filenome">{nomeExibicao ?? '—'}</span><span className="agmod-filemuted">arquivo mantido</span></div>
-                ) : file ? (
-                  <div className="agmod-filecard">
-                    <span className="agmod-filenome" title={file.name}>{file.name}</span>
-                    <span className="agmod-filemuted">{fmtTam(file.size)}</span>
-                    <button type="button" className="agmod-filebtn" disabled={busy} onClick={() => fileRef.current?.click()}>Trocar</button>
-                    <button type="button" className="agmod-filebtn" disabled={busy} onClick={() => { setFile(null); setFileErr(null); }}>Remover</button>
-                  </div>
-                ) : (
-                  <button type="button" className="agmod-filepick" disabled={busy} onClick={() => fileRef.current?.click()}>
-                    Selecionar {tipo === 'imagem' ? 'imagem' : tipo === 'video' ? 'vídeo' : tipo === 'audio' ? 'áudio' : 'documento'} (até {tipo === 'documento' ? 25 : 16} MB)
-                  </button>
+          {/* Blocos de mensagem */}
+          {blocos.map((b, idx) => (
+            <div className="agmod-bloco" key={b.key}>
+              <div className="agmod-bloco-head">
+                <strong>Mensagem {idx + 1}{blocos.length > 1 ? '' : ''}</strong>
+                {builder ? (
+                  <select className="agmod-bloco-tipo" value={b.tipo} disabled={busy} onChange={(e) => trocarTipo(idx, e.target.value)}>
+                    {Object.entries(TIPO_LABEL).map(([id, lbl]) => <option key={id} value={id}>{lbl}</option>)}
+                  </select>
+                ) : <span className="agmod-bloco-tipolbl">{TIPO_LABEL[b.tipo] ?? b.tipo}</span>}
+                {builder && (
+                  <span className="agmod-bloco-acts">
+                    <button type="button" title="Mover para cima" disabled={busy || idx === 0} onClick={() => moveBloco(idx, -1)}>↑</button>
+                    <button type="button" title="Mover para baixo" disabled={busy || idx === blocos.length - 1} onClick={() => moveBloco(idx, 1)}>↓</button>
+                    <button type="button" title="Duplicar" disabled={busy} onClick={() => dupBloco(idx)}>⧉</button>
+                    <button type="button" title="Remover" disabled={busy || blocos.length === 1} onClick={() => removeBloco(idx)}>✕</button>
+                  </span>
                 )}
-                {fileErr && <div className="agmod-fielderr">{fileErr}</div>}
               </div>
-              {!semCaption && (
-                <label className="agmod-fld"><span>Legenda (opcional)</span>
-                  <textarea className="atv-input agmod-ta" rows={2} maxLength={4096} value={texto} disabled={busy || captionRO}
-                    placeholder="Texto para enviar junto com a mídia…" onChange={(e) => setTexto(e.target.value)} />
-                </label>
-              )}
-            </>
-          )}
 
-          <div className="agmod-fld"><span>Quando enviar</span>
+              {b.tipo === 'texto' ? (
+                <textarea className="atv-input agmod-ta" rows={3} maxLength={4096} value={b.texto} disabled={busy || captionRO}
+                  placeholder="Escreva a mensagem…" onChange={(e) => patch(idx, { texto: e.target.value })} />
+              ) : (
+                <>
+                  {b.tipo === 'audio' ? (
+                    (b.file || b.nomeExistente) ? (
+                      <div className="agmod-filecard">
+                        <span className="agmod-filenome">{b.file ? 'Áudio gravado' : b.nomeExistente}</span>
+                        {b.objUrl && <audio controls src={b.objUrl} style={{ height: 30 }} />}
+                        {builder && <button type="button" className="agmod-filebtn" disabled={busy} onClick={() => { if (b.objUrl) URL.revokeObjectURL(b.objUrl); patch(idx, { file: null, objUrl: null }); }}>Remover</button>}
+                      </div>
+                    ) : (
+                      <AudioRecorder permitirArquivo rotuloEnviar="Usar áudio" disabled={busy}
+                        onEnviar={async (blob, mime, ext, diag) => { setArquivo(idx, new File([blob], `audio.${ext}`, { type: mime }), (diag?.origem as string) ?? 'gravacao_painel'); }} />
+                    )
+                  ) : (
+                    <BlocoArquivo b={b} idx={idx} busy={busy} travado={!builder} onPick={setArquivo} />
+                  )}
+                  {b.fileErr && <div className="agmod-fielderr">{b.fileErr}</div>}
+                  {b.tipo !== 'audio' && (
+                    <textarea className="atv-input agmod-ta" rows={2} maxLength={4096} value={b.texto} disabled={busy || captionRO}
+                      placeholder="Legenda (opcional)" onChange={(e) => patch(idx, { texto: e.target.value })} />
+                  )}
+                </>
+              )}
+            </div>
+          ))}
+
+          {builder && <button type="button" className="agmod-add" disabled={busy || blocos.length >= 20} onClick={addBloco}>+ Adicionar mensagem</button>}
+          {!builder && modo !== 'reagendar' && blocos[0]?.tipo !== 'texto' && <div className="agmod-hint">Para trocar o arquivo, cancele e crie um novo agendamento.</div>}
+
+          <div className="agmod-fld"><span>Quando enviar{blocos.length > 1 ? ' (1 min entre cada, na ordem)' : ''}</span>
             <div className="agmod-atalhos">
               {ATALHOS.map((a) => (
                 <button key={a.id} type="button" className="agmod-atalho" disabled={busy}
@@ -240,35 +247,54 @@ export function AgendarMensagemModal({ open, modo, canais, temTelefone, ultimaIn
             </div>
             <div className="agmod-row2">
               <label className="agmod-sub"><span>Data</span>
-                <div className={'agmod-inwrap' + (dataErr ? ' err' : '')}>
-                  <IcCal />
-                  <input className="agmod-inmask" inputMode="numeric" placeholder="DD/MM/AAAA" maxLength={10}
-                    value={dataBR} onChange={(e) => setDataBR(mascararDataBR(e.target.value))} disabled={busy} />
-                </div>
+                <div className={'agmod-inwrap' + (dataErr ? ' err' : '')}><IcCal />
+                  <input className="agmod-inmask" inputMode="numeric" placeholder="DD/MM/AAAA" maxLength={10} value={dataBR} onChange={(e) => setDataBR(mascararDataBR(e.target.value))} disabled={busy} /></div>
               </label>
               <label className="agmod-sub"><span>Hora</span>
-                <div className={'agmod-inwrap' + (horaErr ? ' err' : '')}>
-                  <IcClock />
-                  <input className="agmod-inmask" inputMode="numeric" placeholder="HH:mm" maxLength={5}
-                    value={hora} onChange={(e) => setHora(mascararHora(e.target.value))} disabled={busy} />
-                </div>
+                <div className={'agmod-inwrap' + (horaErr ? ' err' : '')}><IcClk />
+                  <input className="agmod-inmask" inputMode="numeric" placeholder="HH:mm" maxLength={5} value={hora} onChange={(e) => setHora(mascararHora(e.target.value))} disabled={busy} /></div>
               </label>
             </div>
             {(dataErr || horaErr) && <div className="agmod-fielderr">{dataErr ? 'Data inválida (use DD/MM/AAAA).' : 'Hora inválida (use HH:mm de 00:00 a 23:59).'}</div>}
           </div>
 
-          {resumo && <div className="agmod-resumo">{resumo}</div>}
+          {resumo && <div className="agmod-resumo">{resumo}{blocos.length > 1 ? ` · ${blocos.length} mensagens` : ''}</div>}
           {aviso && <div className="agmod-aviso">{aviso}</div>}
           {err && <div className="atv-field-err">{err}</div>}
         </div>
 
-        {/* Coluna direita — pré-visualização */}
+        {/* Pré-visualização */}
         <div className="agmod-preview">
           <div className="agmod-pv-head">Pré-visualização</div>
-          <div className="agmod-chat">{renderPreview()}</div>
+          <div className="agmod-chat">
+            {blocos.map((b) => <div key={b.key}>{previewBloco(b)}</div>)}
+          </div>
           {canalNome && <div className="agmod-pv-canal">via {canalNome}</div>}
         </div>
       </div>
     </Modal>
+  );
+}
+
+function BlocoArquivo({ b, idx, busy, travado, onPick }: { b: Bloco; idx: number; busy: boolean; travado: boolean; onPick: (idx: number, f: File | null) => void }) {
+  const ref = useRef<HTMLInputElement>(null);
+  const nome = b.file?.name ?? b.nomeExistente ?? null;
+  if (travado) return <div className="agmod-filecard"><span className="agmod-filenome">{nome ?? '—'}</span><span className="agmod-filemuted">arquivo mantido</span></div>;
+  return (
+    <>
+      <input ref={ref} type="file" accept={ACCEPT[b.tipo]} style={{ display: 'none' }} onChange={(e) => { onPick(idx, e.target.files?.[0] ?? null); if (e.target) e.target.value = ''; }} />
+      {b.file ? (
+        <div className="agmod-filecard">
+          <span className="agmod-filenome" title={b.file.name}>{b.file.name}</span>
+          <span className="agmod-filemuted">{fmtTam(b.file.size)}</span>
+          <button type="button" className="agmod-filebtn" disabled={busy} onClick={() => ref.current?.click()}>Trocar</button>
+          <button type="button" className="agmod-filebtn" disabled={busy} onClick={() => onPick(idx, null)}>Remover</button>
+        </div>
+      ) : (
+        <button type="button" className="agmod-filepick" disabled={busy} onClick={() => ref.current?.click()}>
+          Selecionar {b.tipo === 'imagem' ? 'imagem' : b.tipo === 'video' ? 'vídeo' : 'documento'} (até {b.tipo === 'documento' ? 25 : 16} MB)
+        </button>
+      )}
+    </>
   );
 }

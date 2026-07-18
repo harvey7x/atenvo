@@ -16,7 +16,7 @@ import { etiquetasDaConversa, responsavelEfetivo } from '@/lib/conversaEtiquetas
 import { analisarNome, conversaAtiva, decidirDono, decidirNome, estadoHigiene, textoBloqueio } from '@/lib/higieneConversa';
 import { construirItensConversa } from '@/lib/dataConversa';
 import { canalValidoParaEnvio } from '@/lib/agendamentoMensagem';
-import { useAgendarMensagem, useAgendarMidia, useMensagensAgendadas, useEditarAgendamento, useCancelarAgendamento, type MensagemAgendada } from '@/data/whatsapp';
+import { useAgendarSequencia, useMensagensAgendadas, useEditarAgendamento, useCancelarAgendamento, type MensagemAgendada } from '@/data/whatsapp';
 import { AgendarMensagemModal, type AgendarSubmit } from '@/components/AgendarMensagemModal';
 import { HIGIENE_CORTE_ISO, HIGIENE_DIAS_ADAPTACAO } from '@/config/higiene';
 import { useHigieneConversa, useRegistrarAdiamento, HIGIENE_VAZIO } from '@/data/higiene';
@@ -439,8 +439,7 @@ export function WhatsApp() {
   const higieneBloqueia = WA_REAL && !!current.id && higiene.bloqueiaEnvio;
 
   /* ── Agendamento de mensagens (texto · editar/cancelar) ─ modal em AgendarMensagemModal ── */
-  const agendarMut = useAgendarMensagem();
-  const agendarMidiaMut = useAgendarMidia();
+  const agendarSeqMut = useAgendarSequencia();
   const editarMut = useEditarAgendamento();
   const cancelarMut = useCancelarAgendamento();
   const agendadasQ = useMensagensAgendadas(current.id || null);
@@ -460,17 +459,18 @@ export function WhatsApp() {
   }
   async function submeterAgendar(v: AgendarSubmit) {
     if (!current.id) return;
-    if (agEditId) {
+    if (v.modo === 'editar') {
       // edição: legenda(texto)/canal/data — mídia mantém o arquivo (RPC editar_agendamento).
-      await editarMut.mutateAsync({ id: agEditId, conversaId: current.id, canalId: v.canalId, texto: v.texto, executarEm: v.executarISO });
+      await editarMut.mutateAsync({ id: agEditId!, conversaId: current.id, canalId: v.canalId, texto: v.texto ?? '', executarEm: v.executarISO });
       toast('Agendamento atualizado.');
-    } else if (v.tipo === 'texto') {
-      await agendarMut.mutateAsync({ conversaId: current.id, canalId: v.canalId, texto: v.texto, executarEm: v.executarISO });
-      toast('Mensagem agendada — será enviada automaticamente no horário.');
     } else {
-      if (!v.midia) throw new Error('Anexe o arquivo de mídia.');
-      await agendarMidiaMut.mutateAsync({ conversaId: current.id, canalId: v.canalId, tipo: v.tipo, texto: v.texto, path: v.midia.path, mime: v.midia.mime, nome: v.midia.nome, tamanho: v.midia.tamanho, origemAudio: v.midia.origemAudio, executarEm: v.executarISO });
-      toast('Mídia agendada — será enviada automaticamente no horário.');
+      // criar (1..N blocos) → sequência atômica (mídia já subiu no modal).
+      const itens = (v.itens ?? []).map((it) => ({
+        tipo: it.tipo, texto: it.texto || null,
+        storage_path: it.midia?.path, mime: it.midia?.mime, nome: it.midia?.nome, tamanho: it.midia?.tamanho, origem_audio: it.midia?.origemAudio,
+      }));
+      await agendarSeqMut.mutateAsync({ conversaId: current.id, canalId: v.canalId, executarEm: v.executarISO, itens });
+      toast(itens.length > 1 ? `${itens.length} mensagens agendadas — serão enviadas no horário.` : 'Mensagem agendada — será enviada automaticamente no horário.');
     }
     setAgendarOpen(false);
   }

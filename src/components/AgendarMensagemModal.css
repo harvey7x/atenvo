@@ -26,6 +26,20 @@
 .agmod-tipo.off svg{color:var(--muted)}
 .agmod-hint{font-size:11.5px;color:var(--muted)}
 
+/* blocos de sequência */
+.agmod-bloco{display:flex;flex-direction:column;gap:8px;border:1px solid var(--line-2);border-radius:10px;padding:10px;background:var(--surface-2)}
+.agmod-bloco-head{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-2)}
+.agmod-bloco-head>strong{color:var(--ink);font-weight:600}
+.agmod-bloco-tipo{height:28px;border:1px solid var(--line-2);border-radius:7px;background:var(--surface);color:var(--ink);font-size:12px;padding:0 6px}
+.agmod-bloco-tipolbl{font-weight:600;color:var(--ink)}
+.agmod-bloco-acts{margin-left:auto;display:flex;gap:3px}
+.agmod-bloco-acts button{width:26px;height:26px;border:1px solid var(--line-2);border-radius:6px;background:var(--surface);color:var(--ink-2);cursor:pointer;font-size:13px;line-height:1;display:inline-flex;align-items:center;justify-content:center}
+.agmod-bloco-acts button:hover:not(:disabled){background:var(--surface);color:var(--ink);border-color:var(--accent,#1d9e75)}
+.agmod-bloco-acts button:disabled{opacity:.4;cursor:default}
+.agmod-add{align-self:flex-start;height:34px;padding:0 14px;border:1px dashed var(--line-2);border-radius:9px;background:var(--surface);color:var(--ink-2);font-size:13px;font-weight:600;cursor:pointer}
+.agmod-add:hover:not(:disabled){border-color:var(--accent,#1d9e75);color:var(--ink)}
+.agmod-add:disabled{opacity:.5;cursor:default}
+
 /* atalhos de horário */
 .agmod-atalhos{display:flex;flex-wrap:wrap;gap:6px}
 .agmod-atalho{height:30px;padding:0 10px;border:1px solid var(--line-2);border-radius:999px;background:var(--surface);color:var(--ink-2);

@@ -10,6 +10,8 @@ interface Props {
   onEnviar: (blob: Blob, mime: string, ext: string, diag?: Record<string, unknown>) => Promise<void>;
   /** Habilita também a seleção de um arquivo de áudio existente (opt-in; off por padrão p/ não mudar quem já usa). */
   permitirArquivo?: boolean;
+  /** Rótulo do botão de confirmação (default "Enviar"). No agendamento vira "Usar áudio" (captura, não envia). */
+  rotuloEnviar?: string;
 }
 const MAX_AUDIO = 16 * 1024 * 1024; // limite ~16MB (WhatsApp)
 
@@ -30,7 +32,7 @@ const SINAL_MIN = 0.03; // pico normalizado mínimo p/ considerar que houve som
 const IcMic = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>;
 const IcClip = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5 12.5 20a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4l7.8-7.8" /></svg>;
 
-export function AudioRecorder({ disabled, onEnviar, permitirArquivo }: Props) {
+export function AudioRecorder({ disabled, onEnviar, permitirArquivo, rotuloEnviar }: Props) {
   const [estado, setEstado] = useState<Estado>('idle');
   const [seg, setSeg] = useState(0);
   const [erro, setErro] = useState<string | null>(null);
@@ -268,7 +270,7 @@ export function AudioRecorder({ disabled, onEnviar, permitirArquivo }: Props) {
           {seletorMic}
           <button type="button" className="rec-btn ghost" onClick={() => iniciar(deviceId || undefined)} title="Gravar novamente">Regravar</button>
           <button type="button" className="rec-btn ghost" onClick={cancelar} title="Apagar">Apagar</button>
-          <button type="button" className="rec-btn primary" disabled={!info || info.verificando || !info.sinal} onClick={enviar} title="Enviar áudio">Enviar</button>
+          <button type="button" className="rec-btn primary" disabled={!info || info.verificando || !info.sinal} onClick={enviar} title={rotuloEnviar ?? 'Enviar áudio'}>{rotuloEnviar ?? 'Enviar'}</button>
         </>
       )}
 

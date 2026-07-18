@@ -85,11 +85,11 @@ export function AgendamentosMensagens() {
 
   async function submeterComposicao(v: AgendarSubmit) {
     if (!sel) return;
-    if (modo === 'reagendar') {
+    if (v.modo === 'reagendar') {
       await reagendarMut.mutateAsync({ id: sel.id, conversaId: sel.conversaId, canalId: v.canalId, executarEm: v.executarISO });
       toast('Mensagem reagendada — voltou para a fila.');
     } else {
-      await editarMut.mutateAsync({ id: sel.id, conversaId: sel.conversaId, canalId: v.canalId, texto: v.texto, executarEm: v.executarISO });
+      await editarMut.mutateAsync({ id: sel.id, conversaId: sel.conversaId, canalId: v.canalId, texto: v.texto ?? '', executarEm: v.executarISO });
       toast('Agendamento atualizado.');
     }
     setModo(null); setSel(null);
