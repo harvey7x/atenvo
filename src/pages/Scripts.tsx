@@ -8,7 +8,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import {
   SCRIPTS_REAL, useScripts, useScriptCategorias, useScriptMutations, useScriptCategoriaMutations,
   useScriptEtapaMutations, fetchEtapas, urlAssinadaAnexo, formatarTamanho, substituirVariaveis, SCRIPT_VARIAVEIS,
-  type Script, type EtapaItem, type EtapaTipo,
+  type Script, type ScriptCategoria, type EtapaItem, type EtapaTipo,
 } from '@/data/scripts';
 import './Scripts.css';
 
@@ -31,6 +31,7 @@ const IcImg = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 const IcAudio = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>;
 const IcVideo = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="14" height="14" rx="2.5" /><path d="m22 8-6 4 6 4z" /></svg>;
 const IcFileMedia = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5" /></svg>;
+const IcDots = () => <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="12" cy="19" r="2" /></svg>;
 const TIPO_LABEL: Record<EtapaTipo, string> = { texto: 'Texto', imagem: 'Imagem', audio: 'Áudio', video: 'Vídeo', documento: 'Documento' };
 const ACCEPT: Record<EtapaTipo, string> = { texto: '', imagem: 'image/*', audio: 'audio/*', video: 'video/*', documento: '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv' };
 
@@ -70,11 +71,15 @@ export function Scripts() {
   const [w, setW] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1920));
   const edDrawer = w < 1700;
 
-  // categoria modal
+  // categoria modal (criar/renomear)
   const [catModal, setCatModal] = useState(false);
+  const [catEditId, setCatEditId] = useState<string | null>(null);
   const [catNome, setCatNome] = useState('');
   const [catErr, setCatErr] = useState<string | null>(null);
   const [catSaving, setCatSaving] = useState(false);
+  // menus de ações (três pontos)
+  const [menuScript, setMenuScript] = useState<string | null>(null);
+  const [menuCat, setMenuCat] = useState<string | null>(null);
   // confirmacao
   const [confirmState, setConfirmState] = useState<{ title: string; message: string; run: () => Promise<void> } | null>(null);
   const [confirmLoading, setConfirmLoading] = useState(false);
@@ -229,15 +234,32 @@ export function Scripts() {
   }
   function copiar(s: Script) { try { navigator.clipboard?.writeText(s.conteudo); toast('Texto copiado'); } catch { toast('Não foi possível copiar', 'warn'); } }
 
-  function novaCategoria() { setCatNome(''); setCatErr(null); setCatModal(true); }
+  function novaCategoria() { setCatEditId(null); setCatNome(''); setCatErr(null); setCatModal(true); }
+  function editarCategoria(c: ScriptCategoria) { setMenuCat(null); setCatEditId(c.id); setCatNome(c.nome); setCatErr(null); setCatModal(true); }
   async function salvarCategoria() {
     const nome = catNome.trim();
     if (!nome) { setCatErr('Informe um nome.'); return; }
-    if (cats.some((c) => c.nome.trim().toLowerCase() === nome.toLowerCase())) { setCatErr('Já existe uma categoria com esse nome.'); return; }
+    // não duplicar na org (ignora a própria categoria ao renomear)
+    if (cats.some((c) => c.id !== catEditId && c.nome.trim().toLowerCase() === nome.toLowerCase())) { setCatErr('Já existe uma categoria com esse nome.'); return; }
     setCatSaving(true); setCatErr(null);
-    try { await catMut.criar.mutateAsync(nome); toast('Categoria criada'); setCatModal(false); }
-    catch (e) { setCatErr((e as Error).message || 'Falha ao criar'); }
+    try {
+      if (catEditId) { await catMut.renomear.mutateAsync({ id: catEditId, nome }); toast('Categoria renomeada'); }
+      else { await catMut.criar.mutateAsync(nome); toast('Categoria criada'); }
+      setCatModal(false);
+    } catch (e) { setCatErr((e as Error).message || 'Falha ao salvar'); }
     finally { setCatSaving(false); }
+  }
+  function excluirCategoria(c: ScriptCategoria) {
+    setMenuCat(null);
+    const n = scripts.filter((s) => s.categoriaId === c.id).length;
+    const msg = n === 0
+      ? `Apagar a categoria "${c.nome}"? Esta ação não pode ser desfeita.`
+      : `A categoria "${c.nome}" possui ${n} ${n === 1 ? 'script' : 'scripts'}. Eles serão movidos para "Sem categoria" (não serão apagados). Apagar a categoria?`;
+    pedirConfirmacao('Apagar categoria', msg, async () => {
+      await catMut.excluir.mutateAsync(c.id);
+      if (cat === c.id) setCat('all');
+      toast('Categoria apagada');
+    });
   }
 
   // estado vazio contextual
@@ -261,6 +283,7 @@ export function Scripts() {
 
   return (
     <div className={'scripts-page' + (edDrawer && editorOpen ? ' editor-open has-drawer' : '')}>
+      {(menuScript || menuCat) && <div className="kebab-backdrop" onClick={() => { setMenuScript(null); setMenuCat(null); }} />}
       <div className="topbar">
         <div className="tb-left"><div className="page-title">Biblioteca de Scripts</div><div className="page-sub">Crie, organize e reutilize sequências de mensagens.</div></div>
         <div className="tb-right"><div className="tb-actions">
@@ -274,7 +297,18 @@ export function Scripts() {
           <div className="cats-head"><h3>Categorias</h3><button className="mini-add" title="Nova categoria" onClick={novaCategoria}><IcPlus /></button></div>
           <div>
             <button className={'cat' + (cat === 'all' ? ' active' : '')} onClick={() => setCat('all')}><span style={{ width: 17 }} />Todas as categorias<span className="cnt">{scripts.length}</span></button>
-            {cats.map((c) => <button key={c.id} className={'cat' + (cat === c.id ? ' active' : '')} onClick={() => setCat(c.id)}><IcDoc />{c.nome}<span className="cnt">{scripts.filter((s) => s.categoriaId === c.id).length}</span></button>)}
+            {cats.map((c) => (
+              <div key={c.id} className={'cat-row' + (cat === c.id ? ' active' : '')}>
+                <button className={'cat' + (cat === c.id ? ' active' : '')} onClick={() => setCat(c.id)}><IcDoc /><span className="cat-nm">{c.nome}</span><span className="cnt">{scripts.filter((s) => s.categoriaId === c.id).length}</span></button>
+                <button className="cat-kebab" aria-label="Ações da categoria" onClick={(e) => { e.stopPropagation(); setMenuScript(null); setMenuCat(menuCat === c.id ? null : c.id); }}><IcDots /></button>
+                {menuCat === c.id && (
+                  <div className="kebab-menu cat-menu" onClick={(e) => e.stopPropagation()}>
+                    <button onClick={() => editarCategoria(c)}><IcPencil />Editar</button>
+                    <button className="danger" onClick={() => excluirCategoria(c)}><IcTrash />Apagar</button>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
           <div className="cats-sep" />
           <div className="filt-group"><p className="filt-title">Canal</p>
@@ -303,7 +337,20 @@ export function Scripts() {
               const on = s.id === currentId;
               return (
                 <div key={s.id} className={'scard' + (on ? ' active' : '')} role="option" aria-selected={on} onClick={() => { setCurrentId(s.id); if (edDrawer) setEditorOpen(true); }}>
-                  <div className="sc-top"><div className="sc-title">{s.titulo || 'Sem título'}</div><button className={'star' + (s.favorito ? ' on' : '')} aria-label="Favoritar" onClick={(e) => { e.stopPropagation(); favoritar(s); }}>{s.favorito ? <IcStarFill /> : <IcStarLine />}</button></div>
+                  <div className="sc-top">
+                    <div className="sc-title">{s.titulo || 'Sem título'}</div>
+                    <div className="sc-acts">
+                      <button className={'star' + (s.favorito ? ' on' : '')} aria-label="Favoritar" onClick={(e) => { e.stopPropagation(); favoritar(s); }}>{s.favorito ? <IcStarFill /> : <IcStarLine />}</button>
+                      <button className="sc-kebab" aria-label="Ações do script" onClick={(e) => { e.stopPropagation(); setMenuCat(null); setMenuScript(menuScript === s.id ? null : s.id); }}><IcDots /></button>
+                      {menuScript === s.id && (
+                        <div className="kebab-menu" onClick={(e) => e.stopPropagation()}>
+                          <button onClick={() => { setMenuScript(null); openEditScript(s); }}><IcPencil />Editar</button>
+                          <button onClick={() => { setMenuScript(null); duplicar(s); }}><IcCopy />Duplicar</button>
+                          <button className="danger" onClick={() => { setMenuScript(null); excluir(s); }}><IcTrash />Apagar</button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                   <div className="sc-chans">{(s.canais.length ? s.canais : ['whatsapp', 'facebook']).map((c) => <ChBadge key={c} c={c} />)}</div>
                   <div className="sc-prev">{s.conteudo.replace(/\n+/g, ' ') || '—'}</div>
                 </div>
@@ -339,10 +386,10 @@ export function Scripts() {
       <div className="drawer-overlay" onClick={() => setEditorOpen(false)} />
 
       {/* ---------- Modal de categoria ---------- */}
-      <Modal open={catModal} onClose={() => !catSaving && setCatModal(false)} title="Nova categoria" width={400}
+      <Modal open={catModal} onClose={() => !catSaving && setCatModal(false)} title={catEditId ? 'Renomear categoria' : 'Nova categoria'} width={400}
         footer={<>
           <button className="atv-btn" disabled={catSaving} onClick={() => setCatModal(false)}>Cancelar</button>
-          <button className="atv-btn primary" disabled={catSaving} onClick={salvarCategoria}>{catSaving ? 'Criando…' : 'Criar'}</button>
+          <button className="atv-btn primary" disabled={catSaving} onClick={salvarCategoria}>{catSaving ? 'Salvando…' : (catEditId ? 'Salvar' : 'Criar')}</button>
         </>}>
         <div className="atv-field">
           <label htmlFor="cat-nome">Nome</label>

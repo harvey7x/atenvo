@@ -55,6 +55,23 @@ export function useScriptCategoriaMutations() {
       },
       onSuccess: inval,
     }),
+    renomear: useMutation({
+      mutationFn: async (a: { id: string; nome: string }) => {
+        const { error } = await supabase!.from('script_categorias').update({ nome: a.nome.trim() })
+          .eq('id', a.id).eq('organizacao_id', currentOrg.id);
+        if (error) throw new Error(error.message);
+      },
+      onSuccess: inval,
+    }),
+    // apaga a categoria; os scripts vinculados viram "Sem categoria" (FK categoria_id ON DELETE SET NULL).
+    // Nunca apaga scripts. RLS exige admin/supervisor para delete.
+    excluir: useMutation({
+      mutationFn: async (id: string) => {
+        const { error } = await supabase!.from('script_categorias').delete().eq('id', id).eq('organizacao_id', currentOrg.id);
+        if (error) throw new Error(error.message);
+      },
+      onSuccess: () => { inval(); qc.invalidateQueries({ queryKey: ['scripts', currentOrg.id] }); },
+    }),
   };
 }
 
@@ -106,6 +123,13 @@ export function useScriptMutations() {
     }),
     excluir: useMutation({
       mutationFn: async (id: string) => {
+        // Best-effort: remove as mídias do script no Storage (evita órfãos). As linhas de
+        // script_etapas/script_anexos caem por ON DELETE CASCADE; o Storage não é cascateado.
+        try {
+          const prefix = `${currentOrg.id}/${id}`;
+          const { data: objs } = await supabase!.storage.from(SCRIPT_BUCKET).list(prefix);
+          if (objs?.length) await supabase!.storage.from(SCRIPT_BUCKET).remove(objs.map((o) => `${prefix}/${o.name}`));
+        } catch { /* limpeza de storage é best-effort; não bloqueia a exclusão */ }
         const { error } = await supabase!.from('scripts').delete().eq('id', id).eq('organizacao_id', currentOrg.id);
         if (error) throw new Error(error.message);
       },
