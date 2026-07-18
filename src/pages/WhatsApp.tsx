@@ -15,6 +15,8 @@ import { formatarNomeCliente } from '@/lib/nomeCliente';
 import { etiquetasDaConversa, responsavelEfetivo } from '@/lib/conversaEtiquetas';
 import { analisarNome, conversaAtiva, decidirDono, decidirNome, estadoHigiene, textoBloqueio } from '@/lib/higieneConversa';
 import { construirItensConversa } from '@/lib/dataConversa';
+import { canalValidoParaEnvio, podeAgendar } from '@/lib/agendamentoMensagem';
+import { useAgendarMensagem, useMensagensAgendadas } from '@/data/whatsapp';
 import { HIGIENE_CORTE_ISO, HIGIENE_DIAS_ADAPTACAO } from '@/config/higiene';
 import { useHigieneConversa, useRegistrarAdiamento, HIGIENE_VAZIO } from '@/data/higiene';
 import { EmptyState } from '@/components/EmptyState';
@@ -177,6 +179,12 @@ export function WhatsApp() {
   const [baixando, setBaixando] = useState<string | null>(null);         // mídia sendo baixada (gerando URL assinada)
   const [imgModal, setImgModal] = useState(false);                       // composer de imagem
   const [docModal, setDocModal] = useState(false);                       // composer de documento
+  const [agendarOpen, setAgendarOpen] = useState(false);                 // modal "Agendar mensagem" (Fase 1: texto)
+  const [agCanal, setAgCanal] = useState('');                            // canal escolhido no agendamento
+  const [agTexto, setAgTexto] = useState('');
+  const [agData, setAgData] = useState('');                              // yyyy-mm-dd
+  const [agHora, setAgHora] = useState('');                              // hh:mm
+  const [agErr, setAgErr] = useState<string | null>(null);
   const [transferOpen, setTransferOpen] = useState(false);               // modal de transferência
   const [transferBusca, setTransferBusca] = useState('');                // busca no modal
   const [transferSel, setTransferSel] = useState<string>('');            // usuário selecionado p/ transferir
@@ -431,6 +439,45 @@ export function WhatsApp() {
   const decNome = decidirNome({ ativa, nome: current.name, adiamentos: hig.adiamentos, liberadoAte: hig.liberadoAte, agoraMs });
   const higiene = estadoHigiene(acaoDono, decNome);
   const higieneBloqueia = WA_REAL && !!current.id && higiene.bloqueiaEnvio;
+
+  /* ── Agendamento de mensagens (Fase 1: texto) ─────────────────────────────── */
+  const agendarMut = useAgendarMensagem();
+  const agendadasQ = useMensagensAgendadas(current.id || null);
+  const agendadas = agendadasQ.data ?? [];
+  // canais válidos para envio (conectado, ativo, não restrito/conflito/removido)
+  const canaisAgendaveis = realCanais.filter((c) => canalValidoParaEnvio({
+    id: c.id, nome: c.alias, ativo: true, status_integracao: c.status, envio_restrito: c.envioRestrito, conflito_com: c.conflitoCom,
+  }).ok);
+  function abrirAgendar() {
+    if (!current.id) return;
+    setAgErr(null); setAgTexto('');
+    // canal padrão = canal da conversa, se válido; senão o 1º válido
+    const daConversa = replyCanalId && canaisAgendaveis.some((c) => c.id === replyCanalId) ? replyCanalId : (canaisAgendaveis[0]?.id ?? '');
+    setAgCanal(daConversa);
+    const amanha = new Date(Date.now() + 86400000);
+    setAgData(amanha.toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' })); // yyyy-mm-dd
+    setAgHora('09:00');
+    setAgendarOpen(true);
+  }
+  async function confirmarAgendar() {
+    if (!current.id || agendarMut.isPending) return;
+    setAgErr(null);
+    // monta o instante em America/Sao_Paulo (UTC-3 fixo) a partir de data+hora
+    const executarISO = agData && agHora ? new Date(`${agData}T${agHora}:00-03:00`).toISOString() : '';
+    const canalObj = realCanais.find((c) => c.id === agCanal);
+    const v = podeAgendar({
+      texto: agTexto, temTelefone: !current.semDestino,
+      canal: canalObj ? { id: canalObj.id, nome: canalObj.alias, ativo: true, status_integracao: canalObj.status, envio_restrito: canalObj.envioRestrito, conflito_com: canalObj.conflitoCom } : null,
+      executarEmMs: executarISO ? new Date(executarISO).getTime() : NaN, agoraMs: Date.now(),
+    });
+    if (!v.ok) { setAgErr(v.erro); return; }
+    try {
+      await agendarMut.mutateAsync({ conversaId: current.id, canalId: agCanal, texto: agTexto.trim(), executarEm: executarISO });
+      setAgendarOpen(false);
+      toast('Mensagem agendada — será enviada automaticamente no horário.');
+    } catch (e) { setAgErr((e as Error).message || 'Falha ao agendar.'); }
+  }
+
   const [vincOpen, setVincOpen] = useState(false);
   const [vincTel, setVincTel] = useState('');
   const [vincBusy, setVincBusy] = useState(false);
@@ -1318,6 +1365,22 @@ export function WhatsApp() {
             </div>
           )}
 
+          {agendadas.filter((a) => ['agendada', 'processando', 'falhou', 'bloqueada'].includes(a.status)).length > 0 && (
+            <div className="ag-lista">
+              {agendadas.filter((a) => ['agendada', 'processando', 'falhou', 'bloqueada'].includes(a.status)).map((a) => (
+                <div key={a.id} className={'ag-item ag-' + a.status}>
+                  <IcClock />
+                  <div className="ag-item-txt">
+                    <b>{a.status === 'agendada' ? 'Agendada' : a.status === 'processando' ? 'Enviando…' : a.status === 'bloqueada' ? 'Bloqueada' : 'Falhou'}</b>
+                    {' '}para {new Date(a.executarEm).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                    {a.nomeCanal ? ` · via ${a.nomeCanal}` : ''}
+                    {(a.motivoBloqueio || a.ultimoErro) && <span className="ag-item-err"> · {a.motivoBloqueio || a.ultimoErro}</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="input-wrap">
             <textarea ref={taRef} className="msg-input" rows={1} placeholder={semDestino ? 'Vincule um número para responder' : (canalIndisponivel ? 'Envio bloqueado: número desconectado' : (canalRestrito ? 'Envio bloqueado: número com restrição no WhatsApp' : (textoBloqueio(higiene) ?? 'Digite sua mensagem...')))}
               value={draft} onChange={(e) => setDraft(e.target.value)} disabled={canalIndisponivel || semDestino || canalRestrito || higieneBloqueia}
@@ -1326,6 +1389,7 @@ export function WhatsApp() {
               <button className="cbar-act" title="Enviar imagem" aria-label="Enviar imagem" disabled={semDestino || canalRestrito || higieneBloqueia || (WA_REAL && (!current.id || !canalConectado))} onClick={() => setImgModal(true)}><IcImage /><span>Imagem</span></button>
               <AudioRecorder disabled={semDestino || canalRestrito || higieneBloqueia || (WA_REAL && (!current.id || !canalConectado))} onEnviar={enviarAudio} />
               <button className="cbar-act" title="Enviar documento" aria-label="Enviar documento" disabled={semDestino || canalRestrito || higieneBloqueia || (WA_REAL && (!current.id || !canalConectado))} onClick={() => setDocModal(true)}><IcDoc /><span>Arquivo</span></button>
+              <button className="cbar-act" title="Agendar mensagem" aria-label="Agendar mensagem" disabled={semDestino || higieneBloqueia || (WA_REAL && (!current.id || canaisAgendaveis.length === 0))} onClick={abrirAgendar}><IcClock /><span>Agendar</span></button>
               <span className="spacer" />
               <button ref={scriptsBtnRef} className="scripts-btn" disabled={semDestino} onClick={(e) => { e.stopPropagation(); togglePop('scripts', scriptsBtnRef, 'right'); }}><IcScripts />Scripts<IcCaret /></button>
               <button className="send-btn" aria-label="Enviar" disabled={sendDisabled} onClick={sendMsg}><IcSend /></button>
@@ -1582,6 +1646,41 @@ export function WhatsApp() {
 
       <MediaComposer open={imgModal} tipo="imagem" previewCard onClose={() => setImgModal(false)} enviar={enviarImagem} />
       <MediaComposer open={docModal} tipo="documento" onClose={() => setDocModal(false)} enviar={enviarDocumento} />
+
+      <Modal open={agendarOpen} onClose={() => { if (!agendarMut.isPending) setAgendarOpen(false); }} title="Agendar mensagem" width={460} closeOnBackdrop={!agendarMut.isPending}
+        footer={<>
+          <button className="atv-btn" disabled={agendarMut.isPending} onClick={() => setAgendarOpen(false)}>Cancelar</button>
+          <button className="atv-btn primary" disabled={agendarMut.isPending} onClick={confirmarAgendar}>{agendarMut.isPending ? 'Agendando…' : 'Agendar'}</button>
+        </>}>
+        <div className="nc-form">
+          <label className="nc-field"><span className="nc-label">Enviar por</span>
+            <select className="atv-input" value={agCanal} onChange={(e) => setAgCanal(e.target.value)} disabled={agendarMut.isPending}>
+              {canaisAgendaveis.length === 0 && <option value="">Nenhum canal conectado</option>}
+              {canaisAgendaveis.map((c) => (
+                <option key={c.id} value={c.id}>{c.alias}{c.numero ? ' · ' + mascararNumero(c.numero) : ''} — conectado</option>
+              ))}
+            </select>
+          </label>
+          <label className="nc-field"><span className="nc-label">Mensagem</span>
+            <textarea className="atv-input" rows={4} placeholder="Escreva a mensagem que será enviada automaticamente…" value={agTexto} onChange={(e) => setAgTexto(e.target.value)} disabled={agendarMut.isPending} maxLength={4096} />
+          </label>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <label className="nc-field" style={{ flex: 1 }}><span className="nc-label">Data</span>
+              <input type="date" className="atv-input" value={agData} onChange={(e) => setAgData(e.target.value)} disabled={agendarMut.isPending} />
+            </label>
+            <label className="nc-field" style={{ flex: 1 }}><span className="nc-label">Hora</span>
+              <input type="time" className="atv-input" value={agHora} onChange={(e) => setAgHora(e.target.value)} disabled={agendarMut.isPending} />
+            </label>
+          </div>
+          {agTexto.trim() && agCanal && (
+            <div className="ag-preview">
+              <div className="ag-preview-lbl">Prévia · via {canaisAgendaveis.find((c) => c.id === agCanal)?.alias ?? '—'}</div>
+              <div className="ag-preview-bubble">{agTexto.trim()}</div>
+            </div>
+          )}
+          {agErr && <div className="atv-field-err">{agErr}</div>}
+        </div>
+      </Modal>
 
       <Modal open={novoOpen} onClose={() => { if (!novoBusy) setNovoOpen(false); }} title="Nova conversa" width={420} closeOnBackdrop={!novoBusy}
         footer={<>

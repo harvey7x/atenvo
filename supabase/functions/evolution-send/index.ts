@@ -22,6 +22,14 @@ import { adminClient, getUser } from './client.ts';
 import { evolution, evolutionConfigured } from './evolution.ts';
 
 const digits = (s?: string | null): string | null => ((s ?? '').replace(/[^0-9]/g, '') || null);
+
+// Comparação de segredo em tempo constante — não vaza o tamanho/prefixo por timing.
+function seguroIgual(a: string, b: string): boolean {
+  if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
 const WA_TEXT_MAX_BYTES = 65000; // limite prático de um único envio de texto no WhatsApp
 
 // base64 (sem prefixo data URI) em blocos — seguro para arquivos grandes.
@@ -88,21 +96,37 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   try {
     if (!evolutionConfigured()) return json({ error: 'Evolution não configurada.' }, 503);
+    const admin = adminClient();
+    // AUTENTICAÇÃO — dois caminhos:
+    //  (1) FLUXO NORMAL: JWT de usuário (idêntico ao de sempre; envio manual não muda).
+    //  (2) MODO SERVICE: header x-agendamento-secret == webhook_config.agendamento — usado SÓ pelo
+    //      processador de mensagens agendadas (cron). Nunca acessível pelo front (segredo só no backend).
+    //      NÃO relaxa nenhuma validação de org/canal/conversa abaixo — só dispensa o JWT de usuário.
     const user = await getUser(req);
-    if (!user) return json({ error: 'Não autenticado.' }, 401);
+    let serviceMode = false;
+    if (!user) {
+      const svcSecret = req.headers.get('x-agendamento-secret') ?? '';
+      if (svcSecret) {
+        const { data: cfg } = await admin.from('webhook_config').select('secret').eq('chave', 'agendamento').maybeSingle();
+        if (cfg?.secret && seguroIgual(svcSecret, cfg.secret as string)) serviceMode = true;
+      }
+    }
+    if (!user && !serviceMode) return json({ error: 'Não autenticado.' }, 401);
 
-    const { action, conversa_id, text, canal_id, assinatura_nome, retry_mensagem_id, midia_path, midia_tipo, midia_mime, midia_nome, midia_tamanho, vinc_numero, vinc_jid, audio_diag, origem_audio } = await req.json().catch(() => ({}));
+    const { action, conversa_id, text, canal_id, assinatura_nome, retry_mensagem_id, midia_path, midia_tipo, midia_mime, midia_nome, midia_tamanho, vinc_numero, vinc_jid, audio_diag, origem_audio, ator_id, agendamento_id } = await req.json().catch(() => ({}));
+    // Autor da mensagem: usuário logado (fluxo manual) OU, no modo service, quem agendou (ator_id).
+    // NUNCA usar user.id direto nos INSERTs — no modo service user é null e estouraria APÓS o envio.
+    const autorId: string | null = user?.id ?? (typeof ator_id === 'string' ? ator_id : null);
     const temTexto = !!text?.toString().trim();
     if (!conversa_id) return json({ error: 'conversa_id é obrigatório.' }, 400);
     if (!action && (!temTexto && !midia_path && !retry_mensagem_id)) return json({ error: 'conversa_id e conteúdo (texto ou mídia) são obrigatórios.' }, 400);
     const corr = (globalThis.crypto?.randomUUID?.() ?? String(Date.now())).slice(0, 8);
 
-    const admin = adminClient();
-    // Guard de troca de senha obrigatória: operação sensível (envio) é rejeitada no BACKEND enquanto
-    // o usuário precisa trocar a senha — não confia só no ProtectedRoute do front. Exceções (ler perfil,
-    // trocar senha, logout) não passam por aqui.
-    const { data: perfil } = await admin.from('usuarios').select('deve_trocar_senha').eq('id', user.id).maybeSingle();
-    if (perfil?.deve_trocar_senha) return json({ error: 'Troque sua senha temporária antes de usar o sistema.', code: 'troca_senha_obrigatoria' }, 403);
+    // Guard de troca de senha obrigatória (só no fluxo de usuário; o cron não tem usuário).
+    if (user) {
+      const { data: perfil } = await admin.from('usuarios').select('deve_trocar_senha').eq('id', user.id).maybeSingle();
+      if (perfil?.deve_trocar_senha) return json({ error: 'Troque sua senha temporária antes de usar o sistema.', code: 'troca_senha_obrigatoria' }, 403);
+    }
     const { data: conv } = await admin.from('conversas').select('id, organizacao_id, contato_id, canal_id').eq('id', conversa_id).maybeSingle();
     if (!conv) return json({ error: 'Conversa não encontrada.' }, 404);
 
@@ -117,8 +141,16 @@ Deno.serve(async (req) => {
       retryMsg = { id: rm.id as string, conteudo: rm.conteudo as string | null, texto_original: rm.texto_original as string | null, assinatura_nome: rm.assinatura_nome as string | null, tipo: rm.tipo as string | null, metadados: (rm.metadados as Record<string, unknown> | null) ?? null };
     }
 
-    const { data: mem } = await admin.from('organizacao_usuarios').select('status').eq('organizacao_id', conv.organizacao_id).eq('usuario_id', user.id).maybeSingle();
-    if (!mem || mem.status !== 'ativo') return json({ error: 'Sem acesso a esta organização.' }, 403);
+    // Vínculo do ATOR: no fluxo de usuário, exige membro ativo. No modo service, o `ator_id`
+    // (quem agendou) é validado contra a org DA CONVERSA — o envio segue mesmo que essa pessoa
+    // tenha saído depois (decisão do dono: follow-up agendado não se perde), mas nunca cruza org.
+    if (user) {
+      const { data: mem } = await admin.from('organizacao_usuarios').select('status').eq('organizacao_id', conv.organizacao_id).eq('usuario_id', user.id).maybeSingle();
+      if (!mem || mem.status !== 'ativo') return json({ error: 'Sem acesso a esta organização.' }, 403);
+    } else if (serviceMode && ator_id) {
+      const { data: memAtor } = await admin.from('organizacao_usuarios').select('status').eq('organizacao_id', conv.organizacao_id).eq('usuario_id', ator_id).maybeSingle();
+      console.log(`[send] service corr=${corr} conv=${conversa_id} ator=${ator_id} ator_vinculo=${memAtor?.status ?? 'nenhum'}`);
+    }
 
     // CANAL: usa EXATAMENTE o canal escolhido em "Responder por" (canal_id). Sem fallback implícito ao canal da conversa.
     const canalId = (canal_id as string) || (conv.canal_id as string);
@@ -144,6 +176,8 @@ Deno.serve(async (req) => {
     // validar_numero: normaliza (sem inventar dígitos) e checa no WhatsApp (onWhatsApp). Aceita só exists=true.
     // vincular_numero: persiste o PN como identidade WhatsApp do contato (mantém o LID), via RPC auditada.
     if (action === 'validar_numero' || action === 'vincular_numero') {
+      // ações de vínculo são exclusivas do fluxo de usuário (o processador nunca envia `action`).
+      if (!user) return json({ error: 'Não autenticado.' }, 401);
       // SEGURANÇA: o backend NUNCA confia em validação do frontend. AMBAS as ações validam o número no
       // onWhatsApp server-side. 'vincular_numero' é ATÔMICA — valida e persiste na MESMA execução, usando o
       // JID canônico obtido AGORA (ignora qualquer vinc_jid/flag enviado pelo cliente).
@@ -299,7 +333,7 @@ Deno.serve(async (req) => {
         // PERSISTE como FALHA (com metadados p/ retry reusar o arquivo) — evita "pendente eterno".
         const metaFalha = { anexo_path: path, mime, tamanho, nome };
         if (retryMsg) await admin.from('mensagens').update({ status: 'falhou', erro_envio: m.slice(0, 200) }).eq('id', retryMsg.id);
-        else await admin.from('mensagens').insert({ conversa_id, organizacao_id: conv.organizacao_id, direcao: 'saida', tipo, conteudo: caption || null, origem: 'atenvo', autor_id: user.id, status: 'falhou', erro_envio: m.slice(0, 200), metadados: metaFalha });
+        else await admin.from('mensagens').insert({ conversa_id, organizacao_id: conv.organizacao_id, direcao: 'saida', tipo, conteudo: caption || null, origem: 'atenvo', autor_id: autorId, status: 'falhou', erro_envio: m.slice(0, 200), metadados: metaFalha });
         return json({ error: traduzMidiaErro(tipo, m) }, 502);
       }
       const idExterno = sent?.key?.id ?? null;
@@ -308,7 +342,7 @@ Deno.serve(async (req) => {
       // CRITÉRIO DE ACEITE: sem key.id, a Evolution não aceitou — marca FALHA (não "enviada").
       if (!idExterno) {
         if (retryMsg) await admin.from('mensagens').update({ status: 'falhou', erro_envio: 'sem_id_externo' }).eq('id', retryMsg.id);
-        else await admin.from('mensagens').insert({ conversa_id, organizacao_id: conv.organizacao_id, direcao: 'saida', tipo, conteudo: caption || null, origem: 'atenvo', autor_id: user.id, status: 'falhou', erro_envio: 'sem_id_externo', metadados });
+        else await admin.from('mensagens').insert({ conversa_id, organizacao_id: conv.organizacao_id, direcao: 'saida', tipo, conteudo: caption || null, origem: 'atenvo', autor_id: autorId, status: 'falhou', erro_envio: 'sem_id_externo', metadados });
         console.log(`[send] corr=${corr} MIDIA(${tipo}) sem id_externo -> falhou`);
         return json({ error: 'A Evolution não confirmou o envio (sem identificador de mensagem).' }, 502);
       }
@@ -317,7 +351,7 @@ Deno.serve(async (req) => {
         const { data } = await admin.from('mensagens').update({ status: 'enviada', id_externo: idExterno, erro_envio: null, enviada_em: nowIso }).eq('id', retryMsg.id).select('id, conteudo, enviada_em, direcao, status').single();
         msg = data;
       } else {
-        const { data } = await admin.from('mensagens').insert({ conversa_id, organizacao_id: conv.organizacao_id, direcao: 'saida', tipo, conteudo: caption || null, origem: 'atenvo', autor_id: user.id, id_externo: idExterno, status: 'enviada', enviada_em: nowIso, metadados }).select('id, conteudo, enviada_em, direcao, status').single();
+        const { data } = await admin.from('mensagens').insert({ conversa_id, organizacao_id: conv.organizacao_id, direcao: 'saida', tipo, conteudo: caption || null, origem: 'atenvo', autor_id: autorId, id_externo: idExterno, status: 'enviada', enviada_em: nowIso, metadados }).select('id, conteudo, enviada_em, direcao, status').single();
         msg = data;
       }
       await admin.from('conversas').update({ ultima_interacao_em: nowIso, ultimo_canal_id: canal.id, ultimo_numero: canal.numero_conectado ?? null, ultimo_provider: canal.provider ?? 'whatsapp', ultima_msg_canal_em: nowIso }).eq('id', conversa_id);
@@ -339,6 +373,17 @@ Deno.serve(async (req) => {
       return json({ error: 'Mensagem muito longa para um único envio do WhatsApp. Reduza o texto e tente novamente.' }, 422);
     }
 
+    // IDEMPOTÊNCIA (modo service/agendamento): se este agendamento JÁ teve mensagem ENVIADA, não
+    // reenvia — fecha a duplicação quando o processador re-tenta após uma resposta HTTP perdida.
+    if (agendamento_id) {
+      const { data: jaEnviada } = await admin.from('mensagens')
+        .select('id, conteudo, enviada_em, direcao, status')
+        .eq('conversa_id', conversa_id).eq('status', 'enviada')
+        .filter('metadados->>agendamento_id', 'eq', agendamento_id as string)
+        .maybeSingle();
+      if (jaEnviada) { console.log(`[send] corr=${corr} idempotente: agendamento ${agendamento_id} já enviado`); return json({ ok: true, mensagem: jaEnviada, idempotente: true }); }
+    }
+
     // envia (texto já assinado e normalizado)
     let sent: { key?: { id?: string } };
     try {
@@ -354,7 +399,7 @@ Deno.serve(async (req) => {
         await admin.from('mensagens').insert({
           conversa_id, organizacao_id: conv.organizacao_id, direcao: 'saida', tipo: 'texto',
           conteudo: corpoEnviado, texto_original: rawLimpo, assinatura_nome: assinatura || null, origem: 'atenvo',
-          autor_id: user.id, status: 'falhou', erro_envio: emsg.slice(0, 200),
+          autor_id: autorId, status: 'falhou', erro_envio: emsg.slice(0, 200),
         });
       }
       const m = emsg.toLowerCase();
@@ -375,7 +420,7 @@ Deno.serve(async (req) => {
         await admin.from('mensagens').insert({
           conversa_id, organizacao_id: conv.organizacao_id, direcao: 'saida', tipo: 'texto',
           conteudo: corpoEnviado, texto_original: rawLimpo, assinatura_nome: assinatura || null, origem: 'atenvo',
-          autor_id: user.id, status: 'falhou', erro_envio: 'sem_id_externo',
+          autor_id: autorId, status: 'falhou', erro_envio: 'sem_id_externo',
         });
       }
       console.log(`[send] corr=${corr} SEM id_externo -> falhou`);
@@ -395,7 +440,9 @@ Deno.serve(async (req) => {
       const { data } = await admin.from('mensagens').insert({
         conversa_id, organizacao_id: conv.organizacao_id, direcao: 'saida', tipo: 'texto',
         conteudo: corpoEnviado, texto_original: rawLimpo, assinatura_nome: assinatura || null, origem: 'atenvo',
-        autor_id: user.id, id_externo: idExterno, status: 'enviada', enviada_em: nowIso,
+        autor_id: autorId, id_externo: idExterno, status: 'enviada', enviada_em: nowIso,
+        // vínculo p/ idempotência do agendamento (só no modo service; envio manual não manda agendamento_id)
+        ...(agendamento_id ? { metadados: { agendamento_id } } : {}),
       }).select('id, conteudo, enviada_em, direcao, status').single();
       msg = data;
     }

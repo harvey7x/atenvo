@@ -759,3 +759,66 @@ export function useReativarAlertaCanal() {
     },
   });
 }
+
+/* ===================== Agendamento de mensagens (Fase 1: texto) ===================== */
+export interface MensagemAgendada {
+  id: string; conversaId: string; canalId: string; nomeCanal: string | null; tipo: string;
+  texto: string | null; executarEm: string; status: string; tentativas: number;
+  ultimoErro: string | null; motivoBloqueio: string | null; criadoPor: string | null; criadoEm: string;
+}
+
+/** Lista os agendamentos de uma conversa (leitura por RLS). */
+export function useMensagensAgendadas(conversaId: string | null | undefined) {
+  return useQuery({
+    queryKey: ['mensagens-agendadas', conversaId],
+    enabled: WA_REAL && !!conversaId,
+    staleTime: 20_000,
+    queryFn: async (): Promise<MensagemAgendada[]> => {
+      const { data, error } = await supabase!
+        .from('mensagens_agendadas')
+        .select('id, conversa_id, canal_id, nome_canal_snapshot, tipo, texto, executar_em, status, tentativas, ultimo_erro, motivo_bloqueio, criado_por, criado_em')
+        .eq('conversa_id', conversaId!)
+        .order('executar_em', { ascending: true });
+      if (error) throw new Error(error.message);
+      type Row = { id: string; conversa_id: string; canal_id: string; nome_canal_snapshot: string | null; tipo: string; texto: string | null; executar_em: string; status: string; tentativas: number; ultimo_erro: string | null; motivo_bloqueio: string | null; criado_por: string | null; criado_em: string };
+      return ((data as Row[]) ?? []).map((r) => ({
+        id: r.id, conversaId: r.conversa_id, canalId: r.canal_id, nomeCanal: r.nome_canal_snapshot, tipo: r.tipo,
+        texto: r.texto, executarEm: r.executar_em, status: r.status, tentativas: r.tentativas,
+        ultimoErro: r.ultimo_erro, motivoBloqueio: r.motivo_bloqueio, criadoPor: r.criado_por, criadoEm: r.criado_em,
+      }));
+    },
+  });
+}
+
+/** Agenda uma mensagem de texto (via RPC segura). `executarEm` = ISO. */
+export function useAgendarMensagem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { conversaId: string; canalId: string; texto: string; executarEm: string }) => {
+      const { data, error } = await supabase!.rpc('agendar_mensagem', {
+        p_conversa: input.conversaId, p_canal: input.canalId, p_texto: input.texto, p_executar_em: input.executarEm,
+      });
+      if (error) throw new Error(traduzErroAgendamento(error.message));
+      return data as { id: string };
+    },
+    onSettled: (_r, _e, v) => { qc.invalidateQueries({ queryKey: ['mensagens-agendadas', v.conversaId] }); },
+  });
+}
+
+/** Traduz os códigos de erro da RPC agendar_mensagem para texto amigável. */
+function traduzErroAgendamento(msg: string): string {
+  const m = (msg || '').toLowerCase();
+  if (m.includes('texto_vazio')) return 'Escreva a mensagem antes de agendar.';
+  if (m.includes('texto_muito_longo')) return 'Mensagem muito longa (máximo 4096 caracteres).';
+  if (m.includes('horario_invalido')) return 'Escolha um horário no futuro.';
+  if (m.includes('conversa_nao_encontrada')) return 'Conversa não encontrada.';
+  if (m.includes('sem_acesso')) return 'Você não tem acesso a esta organização.';
+  if (m.includes('contato_sem_telefone')) return 'Este contato não tem número acionável.';
+  if (m.includes('canal_invalido')) return 'Canal inválido para esta organização.';
+  if (m.includes('canal_inativo')) return 'O canal escolhido está inativo.';
+  if (m.includes('canal_removido')) return 'O canal escolhido foi removido.';
+  if (m.includes('canal_desconectado')) return 'O canal escolhido está desconectado.';
+  if (m.includes('canal_restrito')) return 'O canal escolhido está com envio restrito.';
+  if (m.includes('canal_em_conflito')) return 'O canal escolhido está em conflito.';
+  return msg || 'Falha ao agendar.';
+}

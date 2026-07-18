@@ -441,6 +441,15 @@ verify_jwt = false
 verify_jwt = false
 [functions.bot-remarketing]
 verify_jwt = false
+# mensagens-agendadas-processar: cron secret-gated (x-agendamento-secret), sem JWT.
+[functions.mensagens-agendadas-processar]
+verify_jwt = false
+# evolution-send: tem DOIS caminhos de auth internos — JWT de usuário (envio manual, idêntico
+# ao de sempre) e modo service por x-agendamento-secret (processador de agendadas). Por isso o
+# gateway NÃO pode pré-exigir JWT (senão o cron é rejeitado antes de rodar). A validação continua
+# 100% dentro da função (getUser + secret). Deploy SEMPRE com o nome, senão volta a verify_jwt=true.
+[functions.evolution-send]
+verify_jwt = false
 
 # As demais (evolution-* e meta-auth-start, meta-pages, meta-manage,
 # meta-send-message) exigem o JWT do usuário (verify_jwt = true por padrão) —
