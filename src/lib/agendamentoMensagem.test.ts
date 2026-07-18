@@ -3,6 +3,7 @@ import {
   canalValidoParaEnvio, rotuloCanal, podeAgendar, estaExpirada, proximoStatus,
   partesSP, defaultQuandoAgendar, montarInstanteSP, resumoEnvio, avisoJanelaLonga, agendaEditavel,
   agendaReagendavel, rangePeriodo, contarCards, atalhoAgendar,
+  mascararHora, horaValida, mascararDataBR, dataBRparaISO, isoParaDataBR,
 } from './agendamentoMensagem';
 
 const canalOk = { id: 'c1', nome: 'ANDRIUS', ativo: true, status_integracao: 'conectado', envio_restrito: false, conflito_com: null };
@@ -183,6 +184,55 @@ describe('rangePeriodo()', () => {
     expect(partesSP(r.ateMs)).toEqual({ data: '2026-07-25', hora: '00:00' });
   });
   it('todas → null', () => { expect(rangePeriodo('todas', T)).toBeNull(); });
+});
+
+describe('máscara/validação de hora', () => {
+  it('mascararHora insere ":" progressivamente', () => {
+    expect(mascararHora('1')).toBe('1');
+    expect(mascararHora('15')).toBe('15');
+    expect(mascararHora('154')).toBe('15:4');
+    expect(mascararHora('1547')).toBe('15:47');
+    expect(mascararHora('15:47')).toBe('15:47');
+    expect(mascararHora('15477')).toBe('15:47'); // trunca
+    expect(mascararHora('ab12cd')).toBe('12');
+  });
+  it('horaValida', () => {
+    expect(horaValida('00:00')).toBe(true);
+    expect(horaValida('23:59')).toBe(true);
+    expect(horaValida('15:47')).toBe(true);
+    expect(horaValida('24:00')).toBe(false);
+    expect(horaValida('12:60')).toBe(false);
+    expect(horaValida('9:30')).toBe(false);
+    expect(horaValida('1530')).toBe(false);
+    expect(horaValida('')).toBe(false);
+  });
+});
+
+describe('máscara/validação de data BR', () => {
+  it('mascararDataBR insere "/" progressivamente', () => {
+    expect(mascararDataBR('2')).toBe('2');
+    expect(mascararDataBR('22')).toBe('22');
+    expect(mascararDataBR('2207')).toBe('22/07');
+    expect(mascararDataBR('22072026')).toBe('22/07/2026');
+    expect(mascararDataBR('220720261')).toBe('22/07/2026'); // trunca
+  });
+  it('dataBRparaISO valida data real', () => {
+    expect(dataBRparaISO('22/07/2026')).toBe('2026-07-22');
+    expect(dataBRparaISO('01/01/2026')).toBe('2026-01-01');
+    expect(dataBRparaISO('29/02/2024')).toBe('2024-02-29'); // bissexto
+    expect(dataBRparaISO('29/02/2025')).toBe('');           // não bissexto
+    expect(dataBRparaISO('31/04/2026')).toBe('');           // abril não tem 31
+    expect(dataBRparaISO('00/07/2026')).toBe('');
+    expect(dataBRparaISO('22/13/2026')).toBe('');
+    expect(dataBRparaISO('22/07/26')).toBe('');             // formato incompleto
+  });
+  it('isoParaDataBR', () => {
+    expect(isoParaDataBR('2026-07-22')).toBe('22/07/2026');
+    expect(isoParaDataBR('')).toBe('');
+  });
+  it('ida e volta', () => {
+    expect(dataBRparaISO(isoParaDataBR('2026-12-31'))).toBe('2026-12-31');
+  });
 });
 
 describe('atalhoAgendar()', () => {

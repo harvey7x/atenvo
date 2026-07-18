@@ -87,6 +87,45 @@ export function defaultQuandoAgendar(agoraMs: number, adiantarMin = 5): { data: 
   return partesSP(agoraMs + adiantarMin * 60_000);
 }
 
+/* ---- máscara/validação de data e hora (inputs visuais, sem picker nativo) ---- */
+
+/** Máscara parcial HH:mm enquanto digita (só dígitos, insere ":"). */
+export function mascararHora(raw: string): string {
+  const d = (raw || '').replace(/\D/g, '').slice(0, 4);
+  return d.length <= 2 ? d : d.slice(0, 2) + ':' + d.slice(2);
+}
+
+/** hh:mm válido (00-23:00-59). */
+export function horaValida(hhmm: string): boolean {
+  const m = /^(\d{2}):(\d{2})$/.exec(hhmm || '');
+  if (!m) return false;
+  return +m[1] <= 23 && +m[2] <= 59;
+}
+
+/** Máscara parcial DD/MM/AAAA enquanto digita (só dígitos, insere "/"). */
+export function mascararDataBR(raw: string): string {
+  const d = (raw || '').replace(/\D/g, '').slice(0, 8);
+  if (d.length <= 2) return d;
+  if (d.length <= 4) return d.slice(0, 2) + '/' + d.slice(2);
+  return d.slice(0, 2) + '/' + d.slice(2, 4) + '/' + d.slice(4);
+}
+
+/** DD/MM/AAAA → yyyy-mm-dd se for data real; senão '' (data inválida). */
+export function dataBRparaISO(br: string): string {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(br || '');
+  if (!m) return '';
+  const dd = +m[1], mm = +m[2], yyyy = +m[3];
+  const dt = new Date(Date.UTC(yyyy, mm - 1, dd));
+  if (dt.getUTCFullYear() !== yyyy || dt.getUTCMonth() !== mm - 1 || dt.getUTCDate() !== dd) return '';
+  return `${yyyy}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
+}
+
+/** yyyy-mm-dd → DD/MM/AAAA (para exibição). */
+export function isoParaDataBR(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '');
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : '';
+}
+
 /** Monta o instante ISO (UTC) a partir de data (yyyy-mm-dd) + hora (hh:mm) tratadas como SP. */
 export function montarInstanteSP(data: string, hora: string): string {
   if (!data || !hora) return '';

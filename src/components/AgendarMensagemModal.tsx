@@ -4,6 +4,7 @@ import { mascararNumero } from '@/data/whatsapp';
 import {
   canalValidoParaEnvio, podeAgendar, partesSP, montarInstanteSP, defaultQuandoAgendar,
   resumoEnvio, avisoJanelaLonga, atalhoAgendar, type AtalhoAg,
+  mascararHora, horaValida, mascararDataBR, dataBRparaISO, isoParaDataBR,
 } from '@/lib/agendamentoMensagem';
 import './AgendarMensagemModal.css';
 
@@ -27,6 +28,9 @@ const IcImg = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 const IcAudio = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>;
 const IcDoc = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6M8 13h8M8 17h8" /></svg>;
 
+const IcCal = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2" /><path d="M3 9.5h18M8 2.5v4M16 2.5v4" /></svg>;
+const IcClock = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>;
+
 const TIPOS = [
   { id: 'texto', label: 'Texto', Icon: IcText, ativo: true },
   { id: 'imagem', label: 'Imagem', Icon: IcImg, ativo: false },
@@ -49,8 +53,8 @@ export function AgendarMensagemModal({ open, modo, canais, temTelefone, ultimaIn
 
   const [canal, setCanal] = useState('');
   const [texto, setTexto] = useState('');
-  const [data, setData] = useState('');
-  const [hora, setHora] = useState('');
+  const [dataBR, setDataBR] = useState('');   // DD/MM/AAAA (campo visual)
+  const [hora, setHora] = useState('');       // HH:mm (campo visual)
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -61,20 +65,21 @@ export function AgendarMensagemModal({ open, modo, canais, temTelefone, ultimaIn
     const defCanal = initial?.canalId && canaisAgendaveis.some((c) => c.id === initial.canalId) ? initial.canalId : (canaisAgendaveis[0]?.id ?? '');
     setCanal(defCanal);
     setTexto(initial?.texto ?? '');
-    if (modo === 'editar' && initial?.executarEm) {
-      const p = partesSP(new Date(initial.executarEm).getTime());
-      setData(p.data); setHora(p.hora);
-    } else {
-      const q = defaultQuandoAgendar(Date.now(), 5);
-      setData(q.data); setHora(q.hora);
-    }
+    const q = (modo === 'editar' && initial?.executarEm)
+      ? partesSP(new Date(initial.executarEm).getTime())
+      : defaultQuandoAgendar(Date.now(), 5);
+    setDataBR(isoParaDataBR(q.data)); setHora(q.hora);
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const canalNome = canaisAgendaveis.find((c) => c.id === canal)?.alias ?? null;
-  const execMs = data && hora ? new Date(`${data}T${hora}:00-03:00`).getTime() : NaN;
+  const dataISO = dataBRparaISO(dataBR);
+  const dataErr = dataBR.length > 0 && !dataISO;
+  const horaErr = hora.length > 0 && !horaValida(hora);
+  const execMs = dataISO && horaValida(hora) ? new Date(`${dataISO}T${hora}:00-03:00`).getTime() : NaN;
   const resumo = resumoEnvio({ executarEmMs: execMs, agoraMs: Date.now(), canalNome });
   const aviso = avisoJanelaLonga({ executarEmMs: execMs, agoraMs: Date.now(), ultimaInteracaoMs });
   const textoRO = modo === 'reagendar'; // reagendar mantém o texto
+  const podeSubmeter = !busy && !!canal && (textoRO || !!texto.trim()) && Number.isFinite(execMs);
 
   const titulo = modo === 'reagendar' ? 'Reagendar mensagem' : modo === 'editar' ? 'Editar agendamento' : 'Agendar mensagem';
   const btnLabel = busy ? 'Salvando…' : modo === 'reagendar' ? 'Reagendar' : modo === 'editar' ? 'Salvar' : 'Agendar';
@@ -82,7 +87,7 @@ export function AgendarMensagemModal({ open, modo, canais, temTelefone, ultimaIn
   async function confirmar() {
     if (busy) return;
     setErr(null);
-    const executarISO = montarInstanteSP(data, hora);
+    const executarISO = montarInstanteSP(dataISO, hora);
     const canalObj = canais.find((c) => c.id === canal);
     const v = podeAgendar({
       texto, temTelefone,
@@ -102,7 +107,7 @@ export function AgendarMensagemModal({ open, modo, canais, temTelefone, ultimaIn
     <Modal open={open} onClose={() => { if (!busy) onClose(); }} title={titulo} width={780} closeOnBackdrop={!busy}
       footer={<>
         <button className="atv-btn" disabled={busy} onClick={onClose}>Cancelar</button>
-        <button className="atv-btn primary" disabled={busy} onClick={confirmar}>{btnLabel}</button>
+        <button className="atv-btn primary" disabled={!podeSubmeter} onClick={confirmar}>{btnLabel}</button>
       </>}>
       <div className="agmod">
         {/* Coluna esquerda — composição */}
@@ -127,7 +132,7 @@ export function AgendarMensagemModal({ open, modo, canais, temTelefone, ultimaIn
           </div>
 
           <label className="agmod-fld"><span>Mensagem</span>
-            <textarea className="atv-input agmod-ta" rows={5} maxLength={4096} value={texto} disabled={busy || textoRO}
+            <textarea className="atv-input agmod-ta" rows={4} maxLength={4096} value={texto} disabled={busy || textoRO}
               placeholder="Escreva a mensagem que será enviada automaticamente…" onChange={(e) => setTexto(e.target.value)} />
             <div className="agmod-count">{texto.length}/4096{textoRO ? ' · reagendar mantém o texto' : ''}</div>
           </label>
@@ -136,13 +141,26 @@ export function AgendarMensagemModal({ open, modo, canais, temTelefone, ultimaIn
             <div className="agmod-atalhos">
               {ATALHOS.map((a) => (
                 <button key={a.id} type="button" className="agmod-atalho" disabled={busy}
-                  onClick={() => { const q = atalhoAgendar(a.id, Date.now()); setData(q.data); setHora(q.hora); }}>{a.label}</button>
+                  onClick={() => { const q = atalhoAgendar(a.id, Date.now()); setDataBR(isoParaDataBR(q.data)); setHora(q.hora); }}>{a.label}</button>
               ))}
             </div>
             <div className="agmod-row2">
-              <label className="agmod-sub"><span>Data</span><input type="date" className="atv-input" value={data} onChange={(e) => setData(e.target.value)} disabled={busy} /></label>
-              <label className="agmod-sub"><span>Hora</span><input type="time" className="atv-input" value={hora} onChange={(e) => setHora(e.target.value)} disabled={busy} /></label>
+              <label className="agmod-sub"><span>Data</span>
+                <div className={'agmod-inwrap' + (dataErr ? ' err' : '')}>
+                  <IcCal />
+                  <input className="agmod-inmask" inputMode="numeric" placeholder="DD/MM/AAAA" maxLength={10}
+                    value={dataBR} onChange={(e) => setDataBR(mascararDataBR(e.target.value))} disabled={busy} />
+                </div>
+              </label>
+              <label className="agmod-sub"><span>Hora</span>
+                <div className={'agmod-inwrap' + (horaErr ? ' err' : '')}>
+                  <IcClock />
+                  <input className="agmod-inmask" inputMode="numeric" placeholder="HH:mm" maxLength={5}
+                    value={hora} onChange={(e) => setHora(mascararHora(e.target.value))} disabled={busy} />
+                </div>
+              </label>
             </div>
+            {(dataErr || horaErr) && <div className="agmod-fielderr">{dataErr ? 'Data inválida (use DD/MM/AAAA).' : 'Hora inválida (use HH:mm de 00:00 a 23:59).'}</div>}
           </div>
 
           {resumo && <div className="agmod-resumo">{resumo}</div>}

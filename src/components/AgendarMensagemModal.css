@@ -1,11 +1,20 @@
 .agmod{display:grid;grid-template-columns:1fr 280px;gap:16px}
 @media (max-width:720px){.agmod{grid-template-columns:1fr}}
 
-.agmod-cfg{min-width:0;display:flex;flex-direction:column;gap:14px}
+.agmod-cfg{min-width:0;display:flex;flex-direction:column;gap:12px}
 .agmod-fld{display:flex;flex-direction:column;gap:7px}
 .agmod-fld>span{font-size:12.5px;font-weight:600;color:var(--ink-2)}
-.agmod-ta{min-height:110px;resize:vertical;font-family:inherit}
+.agmod-ta{min-height:88px;resize:vertical;font-family:inherit}
 .agmod-count{font-size:11px;color:var(--muted);text-align:right}
+
+/* campos data/hora com ícone (sem picker nativo) */
+.agmod-inwrap{display:flex;align-items:center;gap:7px;border:1px solid var(--line-2);border-radius:9px;background:var(--surface-2);padding:0 10px;height:38px;transition:border-color .14s,box-shadow .14s}
+.agmod-inwrap:focus-within{border-color:var(--accent,#1d9e75);box-shadow:0 0 0 3px var(--ring,rgba(29,158,117,.15))}
+.agmod-inwrap.err{border-color:#c0342c}
+.agmod-inwrap svg{width:15px;height:15px;color:var(--muted);flex:none}
+.agmod-inmask{flex:1;min-width:0;border:0;background:transparent;color:var(--ink);font-size:14px;font-family:inherit;outline:none;letter-spacing:.02em}
+.agmod-inmask::placeholder{color:var(--muted)}
+.agmod-fielderr{font-size:11.5px;color:#c0342c;margin-top:2px}
 
 /* tipos de mensagem */
 .agmod-tipos{display:flex;flex-wrap:wrap;gap:8px}
@@ -31,9 +40,9 @@
 .agmod-aviso{font-size:11.5px;color:#8a5a12;background:var(--amber-soft,rgba(201,122,22,.1));border:1px solid rgba(201,122,22,.28);border-radius:8px;padding:7px 10px}
 
 /* pré-visualização estilo WhatsApp */
-.agmod-preview{display:flex;flex-direction:column;gap:6px;min-width:0}
+.agmod-preview{display:flex;flex-direction:column;gap:6px;min-width:0;align-self:start}
 .agmod-pv-head{font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;color:var(--muted)}
-.agmod-chat{flex:1;min-height:180px;border:1px solid var(--line-2);border-radius:12px;padding:12px;background:#e7ded4;display:flex;flex-direction:column;gap:8px}
+.agmod-chat{min-height:96px;border:1px solid var(--line-2);border-radius:12px;padding:12px;background:#e7ded4;display:flex;flex-direction:column;gap:8px}
 [data-theme="dark"] .agmod-chat{background:#0b141a}
 .agmod-pv-empty{color:#5b6b73;font-size:12.5px;text-align:center;margin:auto;max-width:180px}
 [data-theme="dark"] .agmod-pv-empty{color:#8696a0}
