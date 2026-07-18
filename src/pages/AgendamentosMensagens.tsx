@@ -20,7 +20,7 @@ const ST_META: Record<string, { label: string; cls: string }> = {
   cancelada:   { label: 'Cancelada',   cls: 'canc' },
   expirada:    { label: 'Expirada',    cls: 'exp' },
 };
-const TIPO_LABEL: Record<string, string> = { texto: 'Texto', imagem: 'Imagem', audio: 'Áudio', documento: 'Documento', texto_midia: 'Texto + mídia' };
+const TIPO_LABEL: Record<string, string> = { texto: 'Texto', imagem: 'Imagem', audio: 'Áudio', video: 'Vídeo', documento: 'Documento', texto_midia: 'Texto + mídia' };
 const tipoLbl = (t: string) => TIPO_LABEL[t] ?? t;
 
 const fmtSP = (iso: string) => new Date(iso).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
@@ -152,6 +152,7 @@ export function AgendamentosMensagens() {
           <option value="texto">Texto</option>
           <option value="imagem">Imagem</option>
           <option value="audio">Áudio</option>
+          <option value="video">Vídeo</option>
           <option value="documento">Documento</option>
         </select>
         <input className="agm-search" placeholder="Buscar cliente ou telefone…" value={fBusca} onChange={(e) => setFBusca(e.target.value)} />
@@ -183,7 +184,7 @@ export function AgendamentosMensagens() {
                   <td className="agm-nowrap">{r.telefone ?? '—'}</td>
                   <td>{r.nomeCanal ?? '—'}</td>
                   <td>{tipoLbl(r.tipo)}</td>
-                  <td className="agm-preview" title={r.texto ?? ''} onClick={() => abrirVer(r)}>{r.texto ?? '—'}</td>
+                  <td className="agm-preview" title={r.texto ?? r.nomeArquivo ?? ''} onClick={() => abrirVer(r)}>{r.texto || r.nomeArquivo || '—'}</td>
                   <td>{nomePorId(r.criadoPor) ?? '—'}</td>
                   <td><span className={'agm-st agm-st-' + st.cls}>{st.label}</span></td>
                   <td className="agm-center">{r.tentativas}</td>
@@ -211,7 +212,7 @@ export function AgendamentosMensagens() {
         modo={modo === 'reagendar' ? 'reagendar' : 'editar'}
         canais={canais}
         temTelefone={!!sel?.telefone}
-        initial={sel ? { canalId: sel.canalId, texto: sel.texto ?? '', executarEm: sel.executarEm } : null}
+        initial={sel ? { canalId: sel.canalId, texto: sel.texto ?? '', executarEm: sel.executarEm, tipo: sel.tipo, nomeArquivo: sel.nomeArquivo ?? undefined } : null}
         onClose={fecharComposicao}
         onSubmit={submeterComposicao}
       />
@@ -229,6 +230,7 @@ export function AgendamentosMensagens() {
               <dt>Cliente</dt><dd>{sel.contatoNome ?? '—'} {sel.telefone ? `· ${sel.telefone}` : ''}</dd>
               <dt>Canal</dt><dd>{sel.nomeCanal ?? '—'}</dd>
               <dt>Tipo</dt><dd>{tipoLbl(sel.tipo)}</dd>
+              {sel.nomeArquivo && <><dt>Arquivo</dt><dd>{sel.nomeArquivo}</dd></>}
               <dt>Envio em</dt><dd>{fmtSP(sel.executarEm)}</dd>
               <dt>Criado por</dt><dd>{nomePorId(sel.criadoPor) ?? '—'} · {fmtSP(sel.criadoEm)}</dd>
               <dt>Tentativas</dt><dd>{sel.tentativas}</dd>

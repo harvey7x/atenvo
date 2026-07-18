@@ -49,13 +49,20 @@ export interface EntradaAgendar {
   agoraMs: number;
   /** margem mínima no futuro (default 60s) — evita "agendar" para já / passado por atraso de clique. */
   minFuturoMs?: number;
+  /** Fase 3: quando é mídia, o texto (legenda) é opcional e o que importa é ter o arquivo. */
+  ehMidia?: boolean;
+  temMidia?: boolean;
 }
 
 export interface ResultadoAgendar { ok: boolean; erro: string | null }
 
 export function podeAgendar(i: EntradaAgendar): ResultadoAgendar {
   const texto = (i.texto ?? '').trim();
-  if (!texto) return { ok: false, erro: 'Escreva a mensagem.' };
+  if (i.ehMidia) {
+    if (!i.temMidia) return { ok: false, erro: 'Anexe o arquivo de mídia.' };
+  } else {
+    if (!texto) return { ok: false, erro: 'Escreva a mensagem.' };
+  }
   if (texto.length > 4096) return { ok: false, erro: 'Mensagem muito longa (máximo 4096 caracteres).' };
   if (!i.temTelefone) return { ok: false, erro: 'Este contato não tem número acionável.' };
   const v = canalValidoParaEnvio(i.canal);
@@ -63,6 +70,35 @@ export function podeAgendar(i: EntradaAgendar): ResultadoAgendar {
   if (!Number.isFinite(i.executarEmMs)) return { ok: false, erro: 'Escolha data e hora.' };
   const min = i.minFuturoMs ?? 60_000;
   if (i.executarEmMs < i.agoraMs + min) return { ok: false, erro: 'Escolha um horário no futuro.' };
+  return { ok: true, erro: null };
+}
+
+/* ===================== Mídia (Fase 3): validação espelhada do evolution-send ===================== */
+
+export type TipoMidia = 'imagem' | 'audio' | 'video' | 'documento';
+export const LIM_MIDIA_MB: Record<TipoMidia, number> = { imagem: 16, audio: 16, video: 16, documento: 25 };
+const DOC_MIMES_UI = [
+  'application/pdf', 'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'text/plain', 'text/csv', 'application/zip', 'application/x-zip-compressed',
+];
+const DOC_EXTS_UI = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt', 'csv', 'ppt', 'pptx', 'zip'];
+
+/** Valida mime/extensão/tamanho do anexo por tipo (mesmas regras do backend). Puro/testável. */
+export function midiaValida(tipo: string, mime: string, nome: string, tamanhoBytes: number): ResultadoAgendar {
+  const lim = LIM_MIDIA_MB[tipo as TipoMidia];
+  if (!lim) return { ok: false, erro: 'Tipo de mídia inválido.' };
+  if (tamanhoBytes > lim * 1024 * 1024) return { ok: false, erro: `Arquivo acima de ${lim} MB.` };
+  const m = (mime ?? '').toLowerCase();
+  if (tipo === 'imagem' && !m.startsWith('image/')) return { ok: false, erro: 'Selecione um arquivo de imagem.' };
+  if (tipo === 'audio' && !m.startsWith('audio/')) return { ok: false, erro: 'Selecione um arquivo de áudio.' };
+  if (tipo === 'video' && !m.startsWith('video/')) return { ok: false, erro: 'Selecione um arquivo de vídeo.' };
+  if (tipo === 'documento') {
+    const ext = (nome.split('.').pop() ?? '').toLowerCase();
+    if (!DOC_MIMES_UI.includes(m) && !DOC_EXTS_UI.includes(ext)) return { ok: false, erro: 'Formato de documento não suportado.' };
+  }
   return { ok: true, erro: null };
 }
 

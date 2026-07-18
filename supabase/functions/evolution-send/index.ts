@@ -88,6 +88,7 @@ const MAX_DOC = 25 * 1024 * 1024;       // documento
 function midiaCompativel(tipo: string, mime: string, nome: string): boolean {
   if (tipo === 'audio') return mime.startsWith('audio/');
   if (tipo === 'imagem') return mime.startsWith('image/');
+  if (tipo === 'video') return mime.startsWith('video/');
   if (tipo === 'documento') { const ext = (nome.split('.').pop() || '').toLowerCase(); return DOC_MIMES.includes(mime) || DOC_EXTS.includes(ext); }
   return false;
 }
@@ -129,6 +130,18 @@ Deno.serve(async (req) => {
     }
     const { data: conv } = await admin.from('conversas').select('id, organizacao_id, contato_id, canal_id').eq('id', conversa_id).maybeSingle();
     if (!conv) return json({ error: 'Conversa não encontrada.' }, 404);
+
+    // IDEMPOTÊNCIA (modo service/agendamento) — vale p/ TEXTO E MÍDIA: se este agendamento JÁ teve mensagem
+    // ENVIADA, não reenvia (fecha a duplicação quando o processador re-tenta após resposta HTTP perdida).
+    // Checado ANTES dos ramos de mídia/texto para cobrir os dois caminhos.
+    if (agendamento_id) {
+      const { data: jaEnviada } = await admin.from('mensagens')
+        .select('id, conteudo, enviada_em, direcao, status')
+        .eq('conversa_id', conversa_id).eq('status', 'enviada')
+        .filter('metadados->>agendamento_id', 'eq', agendamento_id as string)
+        .maybeSingle();
+      if (jaEnviada) { console.log(`[send] corr=${corr} idempotente: agendamento ${agendamento_id} já enviado`); return json({ ok: true, mensagem: jaEnviada, idempotente: true }); }
+    }
 
     // RETRY: reaproveita a MESMA mensagem falhada (sem duplicar). Só vale p/ mensagem de saída desta conversa/org com status 'falhou'.
     let retryMsg: { id: string; conteudo: string | null; texto_original: string | null; assinatura_nome: string | null; tipo: string | null; metadados: Record<string, unknown> | null } | null = null;
@@ -254,18 +267,18 @@ Deno.serve(async (req) => {
     // ===== MÍDIA (IMAGEM, ÁUDIO e DOCUMENTO). Retry herda o tipo/arquivo da mensagem original. =====
     const ehMidiaRetry = !!retryMsg && !!retryMsg.tipo && retryMsg.tipo !== 'texto';
     if (midia_path || ehMidiaRetry) {
-      const TIPOS_OK = ['imagem', 'audio', 'documento'];
+      const TIPOS_OK = ['imagem', 'audio', 'video', 'documento'];
       const meta = (retryMsg?.metadados ?? {}) as Record<string, unknown>;
       const path = (midia_path as string) || (meta.anexo_path as string) || '';
       const tipo = ehMidiaRetry ? String(retryMsg!.tipo) : (TIPOS_OK.includes(midia_tipo) ? midia_tipo : '');
       const mime = (midia_mime as string) || (meta.mime as string) || '';
-      const nome = (midia_nome as string) || (meta.nome as string) || (tipo === 'audio' ? 'audio' : tipo === 'documento' ? 'documento' : 'imagem');
+      const nome = (midia_nome as string) || (meta.nome as string) || (tipo === 'audio' ? 'audio' : tipo === 'video' ? 'video' : tipo === 'documento' ? 'documento' : 'imagem');
       const tamanho = (midia_tamanho as number) ?? (meta.tamanho as number) ?? null;
       // áudio é nota de voz (PTT) — sem legenda. Imagem/documento podem ter legenda.
       const caption = tipo === 'audio' ? '' : sanitizeWaText((temTexto ? text.toString() : (retryMsg ? (retryMsg.conteudo ?? '') : '')));
       const nowIso = new Date().toISOString();
 
-      if (!TIPOS_OK.includes(tipo)) return json({ error: 'Tipo de mídia ainda não suportado (apenas imagem, áudio e documento).' }, 422);
+      if (!TIPOS_OK.includes(tipo)) return json({ error: 'Tipo de mídia ainda não suportado (apenas imagem, áudio, vídeo e documento).' }, 422);
       // ISOLAMENTO por organização: o caminho do arquivo precisa começar pelo id da org da conversa.
       if (!path || !path.startsWith(conv.organizacao_id + '/')) return json({ error: 'Arquivo de mídia inválido.' }, 422);
       // MIME/extensão compatível com o tipo (regras centralizadas)
@@ -320,24 +333,25 @@ Deno.serve(async (req) => {
             } catch { /* diagnóstico best-effort — nunca afeta o envio */ }
           }
         } else {
-          // IMAGEM/DOCUMENTO: URL assinada CURTA (600s) — a Evolution baixa; NUNCA persistimos a URL.
+          // IMAGEM/VÍDEO/DOCUMENTO: URL assinada CURTA (600s) — a Evolution baixa; NUNCA persistimos a URL.
           const { data: signed, error: se } = await admin.storage.from('script-midia').createSignedUrl(path, 600);
           if (se || !signed?.signedUrl) return json({ error: 'Falha ao preparar a mídia.' }, 500);
-          sent = tipo === 'documento'
-            ? await evolution.sendMedia(instancia, alvo, 'document', mime || 'application/octet-stream', signed.signedUrl, nome, caption || undefined)
-            : await evolution.sendMedia(instancia, alvo, 'image', mime, signed.signedUrl, nome, caption || undefined);
+          const mediatype = tipo === 'documento' ? 'document' : tipo === 'video' ? 'video' : 'image';
+          const mimeEnv = mime || (tipo === 'documento' ? 'application/octet-stream' : tipo === 'video' ? 'video/mp4' : 'image/jpeg');
+          sent = await evolution.sendMedia(instancia, alvo, mediatype, mimeEnv, signed.signedUrl, nome, caption || undefined);
         }
       } catch (err) {
         const m = (err as Error).message || 'Falha ao enviar a mídia.';
         console.error(`[send] corr=${corr} MIDIA(${tipo}) erro provider/storage:`, m); // técnico cru no log
         // PERSISTE como FALHA (com metadados p/ retry reusar o arquivo) — evita "pendente eterno".
-        const metaFalha = { anexo_path: path, mime, tamanho, nome };
+        const metaFalha = { anexo_path: path, mime, tamanho, nome, ...(agendamento_id ? { agendamento_id } : {}) };
         if (retryMsg) await admin.from('mensagens').update({ status: 'falhou', erro_envio: m.slice(0, 200) }).eq('id', retryMsg.id);
         else await admin.from('mensagens').insert({ conversa_id, organizacao_id: conv.organizacao_id, direcao: 'saida', tipo, conteudo: caption || null, origem: 'atenvo', autor_id: autorId, status: 'falhou', erro_envio: m.slice(0, 200), metadados: metaFalha });
         return json({ error: traduzMidiaErro(tipo, m) }, 502);
       }
       const idExterno = sent?.key?.id ?? null;
-      const metadados = { anexo_path: path, mime, tamanho, nome };
+      // carimba agendamento_id p/ idempotência (modo service); envio manual não manda esse campo.
+      const metadados = { anexo_path: path, mime, tamanho, nome, ...(agendamento_id ? { agendamento_id } : {}) };
 
       // CRITÉRIO DE ACEITE: sem key.id, a Evolution não aceitou — marca FALHA (não "enviada").
       if (!idExterno) {
@@ -371,17 +385,6 @@ Deno.serve(async (req) => {
     // Limite real do provider: não corta silenciosamente; acima do limite, erro claro (não dividir aqui).
     if (new TextEncoder().encode(corpoEnviado).length > WA_TEXT_MAX_BYTES) {
       return json({ error: 'Mensagem muito longa para um único envio do WhatsApp. Reduza o texto e tente novamente.' }, 422);
-    }
-
-    // IDEMPOTÊNCIA (modo service/agendamento): se este agendamento JÁ teve mensagem ENVIADA, não
-    // reenvia — fecha a duplicação quando o processador re-tenta após uma resposta HTTP perdida.
-    if (agendamento_id) {
-      const { data: jaEnviada } = await admin.from('mensagens')
-        .select('id, conteudo, enviada_em, direcao, status')
-        .eq('conversa_id', conversa_id).eq('status', 'enviada')
-        .filter('metadados->>agendamento_id', 'eq', agendamento_id as string)
-        .maybeSingle();
-      if (jaEnviada) { console.log(`[send] corr=${corr} idempotente: agendamento ${agendamento_id} já enviado`); return json({ ok: true, mensagem: jaEnviada, idempotente: true }); }
     }
 
     // envia (texto já assinado e normalizado)

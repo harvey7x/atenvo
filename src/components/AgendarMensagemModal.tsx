@@ -1,15 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Modal } from '@/components/Modal';
-import { mascararNumero } from '@/data/whatsapp';
+import { useOrg } from '@/context/OrgContext';
+import { mascararNumero, subirMidiaWa } from '@/data/whatsapp';
 import {
   canalValidoParaEnvio, podeAgendar, partesSP, montarInstanteSP, defaultQuandoAgendar,
-  resumoEnvio, avisoJanelaLonga, atalhoAgendar, type AtalhoAg,
+  resumoEnvio, avisoJanelaLonga, atalhoAgendar, midiaValida, type AtalhoAg,
   mascararHora, horaValida, mascararDataBR, dataBRparaISO, isoParaDataBR,
 } from '@/lib/agendamentoMensagem';
 import './AgendarMensagemModal.css';
 
 export interface CanalOpcao { id: string; alias: string; numero: string | null; status: string; envioRestrito: boolean; conflitoCom: string | null }
-export interface AgendarSubmit { canalId: string; texto: string; executarISO: string }
+export interface MidiaSubmit { path: string; mime: string; nome: string; tamanho: number; origemAudio?: string }
+export interface AgendarSubmit { tipo: string; canalId: string; texto: string; executarISO: string; midia?: MidiaSubmit | null }
 
 interface Props {
   open: boolean;
@@ -17,7 +19,7 @@ interface Props {
   canais: CanalOpcao[];
   temTelefone: boolean;
   ultimaInteracaoMs?: number | null;
-  initial?: { canalId?: string; texto?: string; executarEm?: string } | null;
+  initial?: { canalId?: string; texto?: string; executarEm?: string; tipo?: string; nomeArquivo?: string } | null;
   onClose: () => void;
   /** Roda a mutação; lançar Error mostra a mensagem no modal. Sucesso → o pai fecha. */
   onSubmit: (v: AgendarSubmit) => Promise<void>;
@@ -26,17 +28,23 @@ interface Props {
 const IcText = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7V5h16v2M9 5v14M7 19h4" /></svg>;
 const IcImg = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="8.5" cy="9.5" r="1.5" /><path d="m21 16-5-5L5 21" /></svg>;
 const IcAudio = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>;
+const IcVideo = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="14" height="14" rx="2.5" /><path d="m22 8-6 4 6 4z" /></svg>;
 const IcDoc = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6M8 13h8M8 17h8" /></svg>;
-
 const IcCal = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2" /><path d="M3 9.5h18M8 2.5v4M16 2.5v4" /></svg>;
 const IcClock = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>;
 
 const TIPOS = [
-  { id: 'texto', label: 'Texto', Icon: IcText, ativo: true },
-  { id: 'imagem', label: 'Imagem', Icon: IcImg, ativo: false },
-  { id: 'audio', label: 'Áudio', Icon: IcAudio, ativo: false },
-  { id: 'documento', label: 'Documento', Icon: IcDoc, ativo: false },
+  { id: 'texto', label: 'Texto', Icon: IcText },
+  { id: 'imagem', label: 'Imagem', Icon: IcImg },
+  { id: 'audio', label: 'Áudio', Icon: IcAudio },
+  { id: 'video', label: 'Vídeo', Icon: IcVideo },
+  { id: 'documento', label: 'Documento', Icon: IcDoc },
 ] as const;
+
+const ACCEPT: Record<string, string> = {
+  imagem: 'image/*', audio: 'audio/*', video: 'video/*',
+  documento: '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,application/pdf',
+};
 
 const ATALHOS: { id: AtalhoAg; label: string }[] = [
   { id: 'hoje5', label: 'Hoje +5 min' },
@@ -46,31 +54,50 @@ const ATALHOS: { id: AtalhoAg; label: string }[] = [
   { id: 'em3dias', label: 'Em 3 dias' },
 ];
 
+const fmtTam = (b: number) => b < 1024 ? b + ' B' : b < 1048576 ? (b / 1024).toFixed(0) + ' KB' : (b / 1048576).toFixed(1) + ' MB';
+
 export function AgendarMensagemModal({ open, modo, canais, temTelefone, ultimaInteracaoMs, initial, onClose, onSubmit }: Props) {
+  const { currentOrg } = useOrg();
   const canaisAgendaveis = canais.filter((c) => canalValidoParaEnvio({
     id: c.id, nome: c.alias, ativo: true, status_integracao: c.status, envio_restrito: c.envioRestrito, conflito_com: c.conflitoCom,
   }).ok);
 
+  const [tipo, setTipo] = useState<string>('texto');
   const [canal, setCanal] = useState('');
   const [texto, setTexto] = useState('');
-  const [dataBR, setDataBR] = useState('');   // DD/MM/AAAA (campo visual)
-  const [hora, setHora] = useState('');       // HH:mm (campo visual)
+  const [dataBR, setDataBR] = useState('');
+  const [hora, setHora] = useState('');
+  const [file, setFile] = useState<File | null>(null);
+  const [objUrl, setObjUrl] = useState<string | null>(null);
+  const [fileErr, setFileErr] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
-  // Semeia os campos na ABERTURA (não a cada render/tecla).
+  // Semeia na ABERTURA (não a cada render/tecla).
   useEffect(() => {
     if (!open) return;
-    setErr(null);
+    setErr(null); setFileErr(null); setFile(null);
+    setTipo(initial?.tipo ?? 'texto');
     const defCanal = initial?.canalId && canaisAgendaveis.some((c) => c.id === initial.canalId) ? initial.canalId : (canaisAgendaveis[0]?.id ?? '');
     setCanal(defCanal);
     setTexto(initial?.texto ?? '');
-    const q = (modo === 'editar' && initial?.executarEm)
-      ? partesSP(new Date(initial.executarEm).getTime())
-      : defaultQuandoAgendar(Date.now(), 5);
+    const q = (modo === 'editar' && initial?.executarEm) ? partesSP(new Date(initial.executarEm).getTime()) : defaultQuandoAgendar(Date.now(), 5);
     setDataBR(isoParaDataBR(q.data)); setHora(q.hora);
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Object URL do arquivo escolhido (preview) — com limpeza.
+  useEffect(() => {
+    if (!file) { setObjUrl(null); return; }
+    const u = URL.createObjectURL(file);
+    setObjUrl(u);
+    return () => URL.revokeObjectURL(u);
+  }, [file]);
+
+  const ehMidia = tipo !== 'texto';
+  const midiaTravada = ehMidia && modo !== 'criar';          // editar/reagendar não troca o arquivo
+  const captionRO = modo === 'reagendar';                    // reagendar mantém texto/legenda
+  const semCaption = tipo === 'audio';                       // áudio (PTT) não tem legenda
   const canalNome = canaisAgendaveis.find((c) => c.id === canal)?.alias ?? null;
   const dataISO = dataBRparaISO(dataBR);
   const dataErr = dataBR.length > 0 && !dataISO;
@@ -78,33 +105,70 @@ export function AgendarMensagemModal({ open, modo, canais, temTelefone, ultimaIn
   const execMs = dataISO && horaValida(hora) ? new Date(`${dataISO}T${hora}:00-03:00`).getTime() : NaN;
   const resumo = resumoEnvio({ executarEmMs: execMs, agoraMs: Date.now(), canalNome });
   const aviso = avisoJanelaLonga({ executarEmMs: execMs, agoraMs: Date.now(), ultimaInteracaoMs });
-  const textoRO = modo === 'reagendar'; // reagendar mantém o texto
-  const podeSubmeter = !busy && !!canal && (textoRO || !!texto.trim()) && Number.isFinite(execMs);
+  const temConteudo = ehMidia ? (midiaTravada ? true : !!file) : !!texto.trim();
+  const podeSubmeter = !busy && !!canal && Number.isFinite(execMs) && temConteudo && !fileErr;
 
   const titulo = modo === 'reagendar' ? 'Reagendar mensagem' : modo === 'editar' ? 'Editar agendamento' : 'Agendar mensagem';
   const btnLabel = busy ? 'Salvando…' : modo === 'reagendar' ? 'Reagendar' : modo === 'editar' ? 'Salvar' : 'Agendar';
 
+  function escolherTipo(t: string) {
+    if (modo !== 'criar') return;
+    setTipo(t); setFile(null); setFileErr(null);
+    if (t === 'audio') setTexto(''); // áudio não tem legenda
+  }
+  function escolherArquivo(f?: File | null) {
+    if (!f) return;
+    const v = midiaValida(tipo, f.type, f.name, f.size);
+    if (!v.ok) { setFileErr(v.erro); return; }
+    setFileErr(null); setFile(f);
+  }
+
   async function confirmar() {
-    if (busy) return;
+    if (busy || !podeSubmeter) return;
     setErr(null);
     const executarISO = montarInstanteSP(dataISO, hora);
     const canalObj = canais.find((c) => c.id === canal);
     const v = podeAgendar({
-      texto, temTelefone,
+      texto, temTelefone, ehMidia, temMidia: ehMidia ? temConteudo : undefined,
       canal: canalObj ? { id: canalObj.id, nome: canalObj.alias, ativo: true, status_integracao: canalObj.status, envio_restrito: canalObj.envioRestrito, conflito_com: canalObj.conflitoCom } : null,
-      executarEmMs: executarISO ? new Date(executarISO).getTime() : NaN, agoraMs: Date.now(),
+      executarEmMs: execMs, agoraMs: Date.now(),
     });
     if (!v.ok) { setErr(v.erro); return; }
     setBusy(true);
-    try { await onSubmit({ canalId: canal, texto: texto.trim(), executarISO }); }
-    catch (e) { setErr((e as Error).message || 'Falha ao salvar.'); }
+    try {
+      let midia: MidiaSubmit | null = null;
+      if (ehMidia && modo === 'criar' && file) {
+        const up = await subirMidiaWa(currentOrg.id, file);
+        midia = { path: up.path, mime: up.mime, nome: up.nome, tamanho: up.tamanho, ...(tipo === 'audio' ? { origemAudio: 'arquivo_anexado' } : {}) };
+      }
+      await onSubmit({ tipo, canalId: canal, texto: semCaption ? '' : texto.trim(), executarISO, midia });
+    } catch (e) { setErr((e as Error).message || 'Falha ao salvar.'); }
     finally { setBusy(false); }
   }
 
   const horaPreview = hora || '--:--';
+  const nomeExibicao = file?.name ?? initial?.nomeArquivo ?? null;
+
+  function renderPreview() {
+    if (tipo === 'texto') {
+      if (!texto.trim()) return <div className="agmod-pv-empty">Pré-visualização da mensagem aparecerá aqui.</div>;
+      return <div className="agmod-bubble"><div className="agmod-bubble-txt">{texto}</div><div className="agmod-bubble-time">{horaPreview}</div></div>;
+    }
+    if (!file && !midiaTravada) return <div className="agmod-pv-empty">Anexe um arquivo para pré-visualizar.</div>;
+    return (
+      <div className="agmod-bubble agmod-bubble-midia">
+        {tipo === 'imagem' && (objUrl ? <img className="agmod-pv-img" src={objUrl} alt="" /> : <div className="agmod-doccard"><IcImg /><span>{nomeExibicao ?? 'imagem'}</span></div>)}
+        {tipo === 'video' && (objUrl ? <video className="agmod-pv-vid" src={objUrl} controls preload="metadata" /> : <div className="agmod-doccard"><IcVideo /><span>{nomeExibicao ?? 'vídeo'}</span></div>)}
+        {tipo === 'audio' && <div className="agmod-audio"><IcAudio /><span>{objUrl ? 'Mensagem de voz' : (nomeExibicao ?? 'áudio')}</span>{objUrl && <audio controls src={objUrl} />}</div>}
+        {tipo === 'documento' && <div className="agmod-doccard"><IcDoc /><span>{nomeExibicao ?? 'documento'}</span></div>}
+        {!semCaption && texto.trim() && <div className="agmod-bubble-txt" style={{ marginTop: 6 }}>{texto}</div>}
+        <div className="agmod-bubble-time">{horaPreview}</div>
+      </div>
+    );
+  }
 
   return (
-    <Modal open={open} onClose={() => { if (!busy) onClose(); }} title={titulo} width={780} closeOnBackdrop={!busy}
+    <Modal open={open} onClose={() => { if (!busy) onClose(); }} title={titulo} width={820} closeOnBackdrop={!busy}
       footer={<>
         <button className="atv-btn" disabled={busy} onClick={onClose}>Cancelar</button>
         <button className="atv-btn primary" disabled={!podeSubmeter} onClick={confirmar}>{btnLabel}</button>
@@ -122,20 +186,50 @@ export function AgendarMensagemModal({ open, modo, canais, temTelefone, ultimaIn
           <div className="agmod-fld"><span>Tipo de mensagem</span>
             <div className="agmod-tipos">
               {TIPOS.map((t) => (
-                <button key={t.id} type="button" className={'agmod-tipo' + (t.id === 'texto' ? ' on' : '') + (t.ativo ? '' : ' off')}
-                  disabled={!t.ativo || busy} title={t.ativo ? t.label : 'Disponível na próxima fase'}>
+                <button key={t.id} type="button" className={'agmod-tipo' + (t.id === tipo ? ' on' : '')}
+                  disabled={busy || (modo !== 'criar' && t.id !== tipo)} title={t.label} onClick={() => escolherTipo(t.id)}>
                   <t.Icon /><span>{t.label}</span>
                 </button>
               ))}
             </div>
-            <div className="agmod-hint">Imagem, áudio e documento chegam na próxima fase.</div>
+            {modo !== 'criar' && ehMidia && <div className="agmod-hint">Para trocar o arquivo, cancele e crie um novo agendamento.</div>}
           </div>
 
-          <label className="agmod-fld"><span>Mensagem</span>
-            <textarea className="atv-input agmod-ta" rows={4} maxLength={4096} value={texto} disabled={busy || textoRO}
-              placeholder="Escreva a mensagem que será enviada automaticamente…" onChange={(e) => setTexto(e.target.value)} />
-            <div className="agmod-count">{texto.length}/4096{textoRO ? ' · reagendar mantém o texto' : ''}</div>
-          </label>
+          {/* Conteúdo: texto OU anexo */}
+          {!ehMidia ? (
+            <label className="agmod-fld"><span>Mensagem</span>
+              <textarea className="atv-input agmod-ta" rows={4} maxLength={4096} value={texto} disabled={busy || captionRO}
+                placeholder="Escreva a mensagem que será enviada automaticamente…" onChange={(e) => setTexto(e.target.value)} />
+              <div className="agmod-count">{texto.length}/4096{captionRO ? ' · reagendar mantém o texto' : ''}</div>
+            </label>
+          ) : (
+            <>
+              <div className="agmod-fld"><span>Arquivo</span>
+                <input ref={fileRef} type="file" accept={ACCEPT[tipo]} style={{ display: 'none' }} onChange={(e) => escolherArquivo(e.target.files?.[0])} />
+                {midiaTravada ? (
+                  <div className="agmod-filecard"><span className="agmod-filenome">{nomeExibicao ?? '—'}</span><span className="agmod-filemuted">arquivo mantido</span></div>
+                ) : file ? (
+                  <div className="agmod-filecard">
+                    <span className="agmod-filenome" title={file.name}>{file.name}</span>
+                    <span className="agmod-filemuted">{fmtTam(file.size)}</span>
+                    <button type="button" className="agmod-filebtn" disabled={busy} onClick={() => fileRef.current?.click()}>Trocar</button>
+                    <button type="button" className="agmod-filebtn" disabled={busy} onClick={() => { setFile(null); setFileErr(null); }}>Remover</button>
+                  </div>
+                ) : (
+                  <button type="button" className="agmod-filepick" disabled={busy} onClick={() => fileRef.current?.click()}>
+                    Selecionar {tipo === 'imagem' ? 'imagem' : tipo === 'video' ? 'vídeo' : tipo === 'audio' ? 'áudio' : 'documento'} (até {tipo === 'documento' ? 25 : 16} MB)
+                  </button>
+                )}
+                {fileErr && <div className="agmod-fielderr">{fileErr}</div>}
+              </div>
+              {!semCaption && (
+                <label className="agmod-fld"><span>Legenda (opcional)</span>
+                  <textarea className="atv-input agmod-ta" rows={2} maxLength={4096} value={texto} disabled={busy || captionRO}
+                    placeholder="Texto para enviar junto com a mídia…" onChange={(e) => setTexto(e.target.value)} />
+                </label>
+              )}
+            </>
+          )}
 
           <div className="agmod-fld"><span>Quando enviar</span>
             <div className="agmod-atalhos">
@@ -171,15 +265,7 @@ export function AgendarMensagemModal({ open, modo, canais, temTelefone, ultimaIn
         {/* Coluna direita — pré-visualização */}
         <div className="agmod-preview">
           <div className="agmod-pv-head">Pré-visualização</div>
-          <div className="agmod-chat">
-            {!texto.trim() && <div className="agmod-pv-empty">Pré-visualização da mensagem aparecerá aqui.</div>}
-            {texto.trim() && (
-              <div className="agmod-bubble">
-                <div className="agmod-bubble-txt">{texto}</div>
-                <div className="agmod-bubble-time">{horaPreview}</div>
-              </div>
-            )}
-          </div>
+          <div className="agmod-chat">{renderPreview()}</div>
           {canalNome && <div className="agmod-pv-canal">via {canalNome}</div>}
         </div>
       </div>

@@ -763,7 +763,7 @@ export function useReativarAlertaCanal() {
 /* ===================== Agendamento de mensagens (Fase 1: texto) ===================== */
 export interface MensagemAgendada {
   id: string; conversaId: string; canalId: string; nomeCanal: string | null; tipo: string;
-  texto: string | null; executarEm: string; status: string; tentativas: number;
+  texto: string | null; nomeArquivo: string | null; executarEm: string; status: string; tentativas: number;
   ultimoErro: string | null; motivoBloqueio: string | null; criadoPor: string | null; criadoEm: string;
 }
 
@@ -776,14 +776,14 @@ export function useMensagensAgendadas(conversaId: string | null | undefined) {
     queryFn: async (): Promise<MensagemAgendada[]> => {
       const { data, error } = await supabase!
         .from('mensagens_agendadas')
-        .select('id, conversa_id, canal_id, nome_canal_snapshot, tipo, texto, executar_em, status, tentativas, ultimo_erro, motivo_bloqueio, criado_por, criado_em')
+        .select('id, conversa_id, canal_id, nome_canal_snapshot, tipo, texto, nome_arquivo, executar_em, status, tentativas, ultimo_erro, motivo_bloqueio, criado_por, criado_em')
         .eq('conversa_id', conversaId!)
         .order('executar_em', { ascending: true });
       if (error) throw new Error(error.message);
-      type Row = { id: string; conversa_id: string; canal_id: string; nome_canal_snapshot: string | null; tipo: string; texto: string | null; executar_em: string; status: string; tentativas: number; ultimo_erro: string | null; motivo_bloqueio: string | null; criado_por: string | null; criado_em: string };
+      type Row = { id: string; conversa_id: string; canal_id: string; nome_canal_snapshot: string | null; tipo: string; texto: string | null; nome_arquivo: string | null; executar_em: string; status: string; tentativas: number; ultimo_erro: string | null; motivo_bloqueio: string | null; criado_por: string | null; criado_em: string };
       return ((data as Row[]) ?? []).map((r) => ({
         id: r.id, conversaId: r.conversa_id, canalId: r.canal_id, nomeCanal: r.nome_canal_snapshot, tipo: r.tipo,
-        texto: r.texto, executarEm: r.executar_em, status: r.status, tentativas: r.tentativas,
+        texto: r.texto, nomeArquivo: r.nome_arquivo, executarEm: r.executar_em, status: r.status, tentativas: r.tentativas,
         ultimoErro: r.ultimo_erro, motivoBloqueio: r.motivo_bloqueio, criadoPor: r.criado_por, criadoEm: r.criado_em,
       }));
     },
@@ -797,6 +797,23 @@ export function useAgendarMensagem() {
     mutationFn: async (input: { conversaId: string; canalId: string; texto: string; executarEm: string }) => {
       const { data, error } = await supabase!.rpc('agendar_mensagem', {
         p_conversa: input.conversaId, p_canal: input.canalId, p_texto: input.texto, p_executar_em: input.executarEm,
+      });
+      if (error) throw new Error(traduzErroAgendamento(error.message));
+      return data as { id: string };
+    },
+    onSettled: (_r, _e, v) => { qc.invalidateQueries({ queryKey: ['mensagens-agendadas', v.conversaId] }); qc.invalidateQueries({ queryKey: ['mensagens-agendadas-org'] }); },
+  });
+}
+
+/** Agenda uma mensagem de MÍDIA (imagem/áudio/vídeo/documento). O arquivo já foi subido ao bucket. */
+export function useAgendarMidia() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { conversaId: string; canalId: string; tipo: string; texto: string; path: string; mime: string; nome: string; tamanho: number; executarEm: string; origemAudio?: string }) => {
+      const { data, error } = await supabase!.rpc('agendar_midia', {
+        p_conversa: input.conversaId, p_canal: input.canalId, p_tipo: input.tipo, p_texto: input.texto || null,
+        p_storage_path: input.path, p_mime: input.mime, p_nome: input.nome, p_tamanho: input.tamanho,
+        p_executar_em: input.executarEm, p_origem_audio: input.origemAudio ?? null,
       });
       if (error) throw new Error(traduzErroAgendamento(error.message));
       return data as { id: string };
@@ -835,7 +852,7 @@ export function useCancelarAgendamento() {
 /* ===================== Central de agendamentos (Fase 2B) ===================== */
 export interface AgendamentoOrg {
   id: string; conversaId: string; contatoId: string | null; contatoNome: string | null; telefone: string | null;
-  canalId: string; nomeCanal: string | null; tipo: string; texto: string | null;
+  canalId: string; nomeCanal: string | null; tipo: string; texto: string | null; nomeArquivo: string | null;
   executarEm: string; status: string; tentativas: number;
   ultimoErro: string | null; motivoBloqueio: string | null;
   criadoPor: string | null; criadoEm: string; enviadaEm: string | null; mensagemIdEnviada: string | null;
@@ -851,13 +868,13 @@ export function useAgendamentosOrg() {
     queryFn: async (): Promise<AgendamentoOrg[]> => {
       const { data, error } = await supabase!
         .from('mensagens_agendadas')
-        .select('id, conversa_id, contato_id, canal_id, nome_canal_snapshot, tipo, texto, executar_em, status, tentativas, ultimo_erro, motivo_bloqueio, criado_por, criado_em, enviada_em, mensagem_id_enviada, contatos(nome, telefone)')
+        .select('id, conversa_id, contato_id, canal_id, nome_canal_snapshot, tipo, texto, nome_arquivo, executar_em, status, tentativas, ultimo_erro, motivo_bloqueio, criado_por, criado_em, enviada_em, mensagem_id_enviada, contatos(nome, telefone)')
         .eq('organizacao_id', currentOrg.id)
         .order('executar_em', { ascending: false });
       if (error) throw new Error(error.message);
       type Row = {
         id: string; conversa_id: string; contato_id: string | null; canal_id: string; nome_canal_snapshot: string | null;
-        tipo: string; texto: string | null; executar_em: string; status: string; tentativas: number;
+        tipo: string; texto: string | null; nome_arquivo: string | null; executar_em: string; status: string; tentativas: number;
         ultimo_erro: string | null; motivo_bloqueio: string | null; criado_por: string | null; criado_em: string;
         enviada_em: string | null; mensagem_id_enviada: string | null;
         contatos: { nome: string; telefone: string | null } | { nome: string; telefone: string | null }[] | null;
@@ -867,7 +884,7 @@ export function useAgendamentosOrg() {
         const ct = nomeDe(r.contatos);
         return {
           id: r.id, conversaId: r.conversa_id, contatoId: r.contato_id, contatoNome: ct?.nome ?? null, telefone: ct?.telefone ?? null,
-          canalId: r.canal_id, nomeCanal: r.nome_canal_snapshot, tipo: r.tipo, texto: r.texto,
+          canalId: r.canal_id, nomeCanal: r.nome_canal_snapshot, tipo: r.tipo, texto: r.texto, nomeArquivo: r.nome_arquivo,
           executarEm: r.executar_em, status: r.status, tentativas: r.tentativas,
           ultimoErro: r.ultimo_erro, motivoBloqueio: r.motivo_bloqueio,
           criadoPor: r.criado_por, criadoEm: r.criado_em, enviadaEm: r.enviada_em, mensagemIdEnviada: r.mensagem_id_enviada,
@@ -903,8 +920,12 @@ function traduzErroAgendamento(msg: string): string {
   if (m.includes('nao_editavel')) return 'Este agendamento não pode mais ser editado (já saiu de "agendada").';
   if (m.includes('nao_cancelavel')) return 'Este agendamento não pode mais ser cancelado (já saiu de "agendada").';
   if (m.includes('nao_reagendavel')) return 'Só é possível reagendar mensagens que falharam, foram bloqueadas ou expiraram.';
-  if (m.includes('reagendar_indisponivel_tipo')) return 'Reagendar mídia chega na Fase 3.';
-  if (m.includes('edicao_indisponivel_tipo')) return 'Edição de mídia agendada chega na Fase 3.';
+  if (m.includes('reagendar_indisponivel_tipo')) return 'Este tipo não pode ser reagendado.';
+  if (m.includes('edicao_indisponivel_tipo')) return 'Este tipo não pode ser editado.';
+  if (m.includes('tipo_midia_invalido')) return 'Tipo de mídia inválido.';
+  if (m.includes('midia_path_invalido')) return 'Arquivo de mídia inválido para esta organização.';
+  if (m.includes('mime_incompativel')) return 'O formato do arquivo não é compatível com o tipo escolhido.';
+  if (m.includes('arquivo_muito_grande')) return 'Arquivo acima do limite permitido.';
   if (m.includes('sem_acesso')) return 'Você não tem acesso a esta organização.';
   if (m.includes('contato_sem_telefone')) return 'Este contato não tem número acionável.';
   if (m.includes('canal_invalido')) return 'Canal inválido para esta organização.';

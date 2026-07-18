@@ -27,7 +27,9 @@ function seguroIgual(a: string, b: string): boolean {
 
 interface Agendada {
   id: string; organizacao_id: string; conversa_id: string; canal_id: string;
-  texto: string | null; executar_em: string; tentativas: number; max_tentativas: number;
+  tipo: string; texto: string | null;
+  storage_path: string | null; mime_type: string | null; nome_arquivo: string | null; tamanho_bytes: number | null;
+  executar_em: string; tentativas: number; max_tentativas: number;
   criado_por: string | null; metadados: Record<string, unknown> | null;
 }
 
@@ -94,14 +96,35 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // 3) envia via evolution-send (modo service). Ele revalida live-state e registra na conversa.
+      // 3) monta o payload por TIPO e envia via evolution-send (modo service). Ele revalida live-state e registra na conversa.
+      //    Texto: { text }. Mídia (imagem/audio/video/documento): campos midia_* + texto vira legenda.
+      //    'texto_midia' (legado, não gerado hoje) cai no tipo concreto guardado em metadados, senão documento.
       let ok = false, problemaCanal = false, erro: string | null = null, mensagemId: string | null = null;
+      const tipoEnvio = m.tipo === 'texto_midia'
+        ? (typeof m.metadados?.midia_tipo === 'string' ? String(m.metadados.midia_tipo) : 'documento')
+        : m.tipo;
+      const ehMidia = tipoEnvio !== 'texto';
+      const corpo: Record<string, unknown> = { conversa_id: m.conversa_id, canal_id: m.canal_id, ator_id: m.criado_por, agendamento_id: m.id };
+      if (ehMidia) {
+        if (!m.storage_path) { // linha de mídia sem arquivo = inconsistência: falha clara, sem tentar enviar
+          patch.status = 'falhou'; patch.ultimo_erro = 'mídia agendada sem arquivo';
+          await marcar(admin, m.id, patch);
+          resultados.push({ id: m.id, status: 'falhou', motivo: 'sem storage_path' });
+          continue;
+        }
+        corpo.midia_path = m.storage_path; corpo.midia_tipo = tipoEnvio; corpo.midia_mime = m.mime_type;
+        corpo.midia_nome = m.nome_arquivo; corpo.midia_tamanho = m.tamanho_bytes;
+        if (m.texto) corpo.text = m.texto; // legenda (imagem/vídeo/documento; áudio ignora)
+        if (tipoEnvio === 'audio' && typeof m.metadados?.origem_audio === 'string') corpo.origem_audio = m.metadados.origem_audio;
+      } else {
+        corpo.text = m.texto;
+      }
       try {
         const resp = await fetch(`${SUPABASE_URL}/functions/v1/evolution-send`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-agendamento-secret': wc.secret as string },
           // agendamento_id = chave de idempotência: se o envio já ocorreu (resposta perdida), evolution-send não reenvia.
-          body: JSON.stringify({ conversa_id: m.conversa_id, text: m.texto, canal_id: m.canal_id, ator_id: m.criado_por, agendamento_id: m.id }),
+          body: JSON.stringify(corpo),
         });
         const body = await resp.json().catch(() => ({}));
         if (resp.ok && body?.ok) { ok = true; mensagemId = body?.mensagem?.id ?? null; }

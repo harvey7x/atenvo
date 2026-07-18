@@ -4,6 +4,7 @@ import {
   partesSP, defaultQuandoAgendar, montarInstanteSP, resumoEnvio, avisoJanelaLonga, agendaEditavel,
   agendaReagendavel, rangePeriodo, contarCards, atalhoAgendar,
   mascararHora, horaValida, mascararDataBR, dataBRparaISO, isoParaDataBR,
+  midiaValida,
 } from './agendamentoMensagem';
 
 const canalOk = { id: 'c1', nome: 'ANDRIUS', ativo: true, status_integracao: 'conectado', envio_restrito: false, conflito_com: null };
@@ -52,6 +53,30 @@ describe('podeAgendar()', () => {
   it('horário no passado → erro', () => { expect(podeAgendar({ ...base, executarEmMs: AG - 1000 }).ok).toBe(false); });
   it('horário muito próximo (dentro da margem) → erro', () => { expect(podeAgendar({ ...base, executarEmMs: AG + 10_000 }).ok).toBe(false); });
   it('data inválida (NaN) → erro', () => { expect(podeAgendar({ ...base, executarEmMs: NaN }).ok).toBe(false); });
+
+  it('mídia sem arquivo → erro', () => {
+    const r = podeAgendar({ ...base, texto: '', ehMidia: true, temMidia: false });
+    expect(r.ok).toBe(false); expect(r.erro).toMatch(/[Aa]nexe/);
+  });
+  it('mídia com arquivo e sem legenda → ok', () => {
+    expect(podeAgendar({ ...base, texto: '', ehMidia: true, temMidia: true }).ok).toBe(true);
+  });
+  it('mídia com legenda longa demais → erro', () => {
+    expect(podeAgendar({ ...base, texto: 'x'.repeat(4097), ehMidia: true, temMidia: true }).ok).toBe(false);
+  });
+});
+
+describe('midiaValida()', () => {
+  it('imagem ok', () => { expect(midiaValida('imagem', 'image/jpeg', 'foto.jpg', 1_000_000).ok).toBe(true); });
+  it('imagem mime errado', () => { expect(midiaValida('imagem', 'application/pdf', 'x.pdf', 100).ok).toBe(false); });
+  it('audio ok', () => { expect(midiaValida('audio', 'audio/ogg', 'a.ogg', 100).ok).toBe(true); });
+  it('video ok', () => { expect(midiaValida('video', 'video/mp4', 'v.mp4', 100).ok).toBe(true); });
+  it('documento por mime', () => { expect(midiaValida('documento', 'application/pdf', 'c.pdf', 100).ok).toBe(true); });
+  it('documento por extensão (mime vazio)', () => { expect(midiaValida('documento', '', 'planilha.xlsx', 100).ok).toBe(true); });
+  it('documento formato inválido', () => { expect(midiaValida('documento', 'application/x-msdownload', 'v.exe', 100).ok).toBe(false); });
+  it('imagem acima de 16MB → erro', () => { expect(midiaValida('imagem', 'image/png', 'g.png', 17 * 1024 * 1024).ok).toBe(false); });
+  it('documento até 25MB → ok', () => { expect(midiaValida('documento', 'application/pdf', 'g.pdf', 24 * 1024 * 1024).ok).toBe(true); });
+  it('tipo inválido → erro', () => { expect(midiaValida('texto', 'x', 'y', 1).ok).toBe(false); });
 });
 
 describe('estaExpirada()', () => {

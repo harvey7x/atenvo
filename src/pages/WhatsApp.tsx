@@ -16,8 +16,8 @@ import { etiquetasDaConversa, responsavelEfetivo } from '@/lib/conversaEtiquetas
 import { analisarNome, conversaAtiva, decidirDono, decidirNome, estadoHigiene, textoBloqueio } from '@/lib/higieneConversa';
 import { construirItensConversa } from '@/lib/dataConversa';
 import { canalValidoParaEnvio } from '@/lib/agendamentoMensagem';
-import { useAgendarMensagem, useMensagensAgendadas, useEditarAgendamento, useCancelarAgendamento, type MensagemAgendada } from '@/data/whatsapp';
-import { AgendarMensagemModal } from '@/components/AgendarMensagemModal';
+import { useAgendarMensagem, useAgendarMidia, useMensagensAgendadas, useEditarAgendamento, useCancelarAgendamento, type MensagemAgendada } from '@/data/whatsapp';
+import { AgendarMensagemModal, type AgendarSubmit } from '@/components/AgendarMensagemModal';
 import { HIGIENE_CORTE_ISO, HIGIENE_DIAS_ADAPTACAO } from '@/config/higiene';
 import { useHigieneConversa, useRegistrarAdiamento, HIGIENE_VAZIO } from '@/data/higiene';
 import { EmptyState } from '@/components/EmptyState';
@@ -182,7 +182,7 @@ export function WhatsApp() {
   const [docModal, setDocModal] = useState(false);                       // composer de documento
   const [agendarOpen, setAgendarOpen] = useState(false);                 // modal "Agendar mensagem"
   const [agEditId, setAgEditId] = useState<string | null>(null);         // id em edição (null = criando)
-  const [agInitial, setAgInitial] = useState<{ canalId?: string; texto?: string; executarEm?: string } | null>(null);
+  const [agInitial, setAgInitial] = useState<{ canalId?: string; texto?: string; executarEm?: string; tipo?: string; nomeArquivo?: string } | null>(null);
   const [transferOpen, setTransferOpen] = useState(false);               // modal de transferência
   const [transferBusca, setTransferBusca] = useState('');                // busca no modal
   const [transferSel, setTransferSel] = useState<string>('');            // usuário selecionado p/ transferir
@@ -440,6 +440,7 @@ export function WhatsApp() {
 
   /* ── Agendamento de mensagens (texto · editar/cancelar) ─ modal em AgendarMensagemModal ── */
   const agendarMut = useAgendarMensagem();
+  const agendarMidiaMut = useAgendarMidia();
   const editarMut = useEditarAgendamento();
   const cancelarMut = useCancelarAgendamento();
   const agendadasQ = useMensagensAgendadas(current.id || null);
@@ -455,16 +456,21 @@ export function WhatsApp() {
   }
   function abrirEditar(a: MensagemAgendada) {
     if (!current.id || a.status !== 'agendada') return;
-    setAgEditId(a.id); setAgInitial({ canalId: a.canalId, texto: a.texto ?? '', executarEm: a.executarEm }); setAgendarOpen(true);
+    setAgEditId(a.id); setAgInitial({ canalId: a.canalId, texto: a.texto ?? '', executarEm: a.executarEm, tipo: a.tipo, nomeArquivo: a.nomeArquivo ?? undefined }); setAgendarOpen(true);
   }
-  async function submeterAgendar(v: { canalId: string; texto: string; executarISO: string }) {
+  async function submeterAgendar(v: AgendarSubmit) {
     if (!current.id) return;
     if (agEditId) {
+      // edição: legenda(texto)/canal/data — mídia mantém o arquivo (RPC editar_agendamento).
       await editarMut.mutateAsync({ id: agEditId, conversaId: current.id, canalId: v.canalId, texto: v.texto, executarEm: v.executarISO });
       toast('Agendamento atualizado.');
-    } else {
+    } else if (v.tipo === 'texto') {
       await agendarMut.mutateAsync({ conversaId: current.id, canalId: v.canalId, texto: v.texto, executarEm: v.executarISO });
       toast('Mensagem agendada — será enviada automaticamente no horário.');
+    } else {
+      if (!v.midia) throw new Error('Anexe o arquivo de mídia.');
+      await agendarMidiaMut.mutateAsync({ conversaId: current.id, canalId: v.canalId, tipo: v.tipo, texto: v.texto, path: v.midia.path, mime: v.midia.mime, nome: v.midia.nome, tamanho: v.midia.tamanho, origemAudio: v.midia.origemAudio, executarEm: v.executarISO });
+      toast('Mídia agendada — será enviada automaticamente no horário.');
     }
     setAgendarOpen(false);
   }
@@ -1368,7 +1374,7 @@ export function WhatsApp() {
             <div className="ag-lista">
               {agendadas.filter((a) => ['agendada', 'processando', 'falhou', 'bloqueada'].includes(a.status)).map((a) => {
                 const criador = a.criadoPor ? nomePorId(a.criadoPor) : null;
-                const tipoLbl = a.tipo === 'imagem' ? 'Imagem' : a.tipo === 'audio' ? 'Áudio' : a.tipo === 'documento' ? 'Documento' : 'Texto';
+                const tipoLbl = a.tipo === 'imagem' ? 'Imagem' : a.tipo === 'audio' ? 'Áudio' : a.tipo === 'video' ? 'Vídeo' : a.tipo === 'documento' ? 'Documento' : 'Texto';
                 return (
                 <div key={a.id} className={'ag-item ag-' + a.status}>
                   <IcClock />
@@ -1376,6 +1382,7 @@ export function WhatsApp() {
                     <b>{a.status === 'agendada' ? 'Agendada' : a.status === 'processando' ? 'Enviando…' : a.status === 'bloqueada' ? 'Bloqueada' : 'Falhou'}</b>
                     {' '}para {new Date(a.executarEm).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                     {' · '}{tipoLbl}
+                    {a.nomeArquivo ? ` · ${a.nomeArquivo}` : ''}
                     {a.nomeCanal ? ` · via ${a.nomeCanal}` : ''}
                     {criador ? ` · por ${criador}` : ''}
                     {(a.motivoBloqueio || a.ultimoErro) && <span className="ag-item-err"> · {a.motivoBloqueio || a.ultimoErro}</span>}
