@@ -20,6 +20,7 @@
 import { corsHeaders, json } from './cors.ts';
 import { adminClient, getUser } from './client.ts';
 import { evolution, evolutionConfigured } from './evolution.ts';
+import { enviadorDe } from './transporte.ts';
 
 const digits = (s?: string | null): string | null => ((s ?? '').replace(/[^0-9]/g, '') || null);
 
@@ -171,23 +172,30 @@ Deno.serve(async (req) => {
 
     // CANAL: usa EXATAMENTE o canal escolhido em "Responder por" (canal_id). Sem fallback implícito ao canal da conversa.
     const canalId = (canal_id as string) || (conv.canal_id as string);
-    const { data: canal } = await admin.from('canais').select('id, instancia_externa, status_integracao, numero_conectado, provider, envio_restrito').eq('id', canalId).eq('organizacao_id', conv.organizacao_id).maybeSingle();
-    if (!canal?.instancia_externa) return json({ error: 'Canal de WhatsApp selecionado não encontrado.' }, 404);
+    const { data: canal } = await admin.from('canais').select('id, instancia_externa, status_integracao, numero_conectado, provider, envio_restrito, transporte, cloud_phone_number_id').eq('id', canalId).eq('organizacao_id', conv.organizacao_id).maybeSingle();
+    if (!canal) return json({ error: 'Canal de WhatsApp selecionado não encontrado.' }, 404);
+    // Bloco 3 — DISPATCHER: o canal decide o transporte (Evolution QR x Cloud API oficial).
+    // Daqui para baixo o código NÃO sabe qual é: `tx` tem a mesma interface nos dois casos.
+    const tx = enviadorDe(canal);
+    if (!tx.ehCloud && !canal.instancia_externa) return json({ error: 'Canal de WhatsApp selecionado não encontrado.' }, 404);
     // Contenção: canal com restrição de conta no WhatsApp fica BLOQUEADO só para envio (recebimento segue).
     // Não é erro da Evolution nem altera a mecânica de envio — apenas impede novos disparos/retries.
     if (canal.envio_restrito) return json({ error: 'O número deste canal está com restrição no WhatsApp e está indisponível para envio. Selecione outro canal.', code: 'canal_restrito' }, 409);
-    const instancia = canal.instancia_externa as string;
+    const instancia = (canal.instancia_externa ?? '') as string;
     console.log(`[send] corr=${corr} canalSel=${canal_id ?? '-'} canalUsado=${canal.id} inst=${instancia} de=${digits(canal.numero_conectado)?.slice(0, 6) ?? '-'}`);
 
-    // estado real da instância
-    let liveState: string | undefined;
-    try { const st = await evolution.connectionState(instancia); liveState = st?.instance?.state; } catch { liveState = undefined; }
-    if (liveState && liveState !== 'open') {
-      if (canal.status_integracao !== 'desconectado') await admin.from('canais').update({ status_integracao: 'desconectado' }).eq('id', canal.id);
-      return json({ error: 'O WhatsApp deste canal desconectou. Abra Integrações e reconecte (QR Code).' }, 409);
+    // estado real da instância — SÓ para Evolution. A Cloud API não tem sessão/QR: não há
+    // "instância conectada" para consultar, e o próprio envio já devolve o erro da Meta.
+    if (!tx.ehCloud) {
+      let liveState: string | undefined;
+      try { const st = await evolution.connectionState(instancia); liveState = st?.instance?.state; } catch { liveState = undefined; }
+      if (liveState && liveState !== 'open') {
+        if (canal.status_integracao !== 'desconectado') await admin.from('canais').update({ status_integracao: 'desconectado' }).eq('id', canal.id);
+        return json({ error: 'O WhatsApp deste canal desconectou. Abra Integrações e reconecte (QR Code).' }, 409);
+      }
+      if (liveState === 'open' && canal.status_integracao !== 'conectado') await admin.from('canais').update({ status_integracao: 'conectado' }).eq('id', canal.id);
+      if (!liveState && canal.status_integracao !== 'conectado') return json({ error: 'WhatsApp não está conectado.' }, 409);
     }
-    if (liveState === 'open' && canal.status_integracao !== 'conectado') await admin.from('canais').update({ status_integracao: 'conectado' }).eq('id', canal.id);
-    if (!liveState && canal.status_integracao !== 'conectado') return json({ error: 'WhatsApp não está conectado.' }, 409);
 
     // ===== Caso D: VÍNCULO MANUAL de número (conversas LID-only sem PN confirmado). =====
     // validar_numero: normaliza (sem inventar dígitos) e checa no WhatsApp (onWhatsApp). Aceita só exists=true.
@@ -195,6 +203,9 @@ Deno.serve(async (req) => {
     if (action === 'validar_numero' || action === 'vincular_numero') {
       // ações de vínculo são exclusivas do fluxo de usuário (o processador nunca envia `action`).
       if (!user) return json({ error: 'Não autenticado.' }, 401);
+      // A Cloud API NÃO tem equivalente do onWhatsApp: não existe como checar um número antes.
+      // Em canal oficial o destino vem do wa_id do inbound, então o vínculo manual não se aplica.
+      if (tx.ehCloud) return json({ error: 'Vínculo manual de número não se aplica a canal oficial (Cloud API).', code: 'NAO_SUPORTADO_CLOUD' }, 422);
       // SEGURANÇA: o backend NUNCA confia em validação do frontend. AMBAS as ações validam o número no
       // onWhatsApp server-side. 'vincular_numero' é ATÔMICA — valida e persiste na MESMA execução, usando o
       // JID canônico obtido AGORA (ignora qualquer vinc_jid/flag enviado pelo cliente).
@@ -255,17 +266,22 @@ Deno.serve(async (req) => {
 
     // Valida no WhatsApp e escolhe o candidato que EXISTE (jid canônico). Se NENHUM existe -> 422 claro.
     let alvo = candidatos[0];
-    try {
-      const chk = await evolution.whatsappNumbers(instancia, candidatos);
-      const arr = Array.isArray(chk) ? chk : [];
-      const existe = arr.find((h) => h?.exists === true && !!h?.jid);
-      if (existe?.jid) {
-        alvo = digits(String(existe.jid).split('@')[0]) ?? alvo;
-      } else if (arr.length && arr.every((h) => h?.exists === false)) {
-        return json({ error: 'Este número não tem WhatsApp ativo. Confira o DDD e o nono dígito.' }, 422);
-      }
-      // resultado inconclusivo -> mantém a identidade (candidatos[0]) como destino (fail-open).
-    } catch { /* fail-open: usa a identidade */ }
+    // A validação prévia é EXCLUSIVA da Evolution (onWhatsApp). A Cloud API não expõe nada
+    // equivalente: o destino é o wa_id que a própria Meta nos entregou no inbound, e um número
+    // inválido só é reportado depois, no `statuses` (failed) — que o cloud-webhook já persiste.
+    if (!tx.ehCloud) {
+      try {
+        const chk = await evolution.whatsappNumbers(instancia, candidatos);
+        const arr = Array.isArray(chk) ? chk : [];
+        const existe = arr.find((h) => h?.exists === true && !!h?.jid);
+        if (existe?.jid) {
+          alvo = digits(String(existe.jid).split('@')[0]) ?? alvo;
+        } else if (arr.length && arr.every((h) => h?.exists === false)) {
+          return json({ error: 'Este número não tem WhatsApp ativo. Confira o DDD e o nono dígito.' }, 422);
+        }
+        // resultado inconclusivo -> mantém a identidade (candidatos[0]) como destino (fail-open).
+      } catch { /* fail-open: usa a identidade */ }
+    }
     console.log(`[send] corr=${corr} cands=${candidatos.length} alvo=${alvo.slice(0, 6)}`);
 
     // QUOTED (resposta a mensagem específica): monta o contexto que a Evolution usa para citar.
@@ -318,7 +334,7 @@ Deno.serve(async (req) => {
           try { console.log(JSON.stringify({ stage: 'audio_send', corr, origem_audio: gravacaoPainel ? 'gravacao_painel' : 'arquivo_anexado', container_real: containerReal(bytes), mime_declarado: mime, bytes: bytes.length, endpoint: usaPtt ? 'sendWhatsAppAudio(ptt)' : 'sendMedia(file)' })); } catch { /* ignore */ }
           if (usaPtt) {
             try {
-              sent = await evolution.sendWhatsAppAudio(instancia, alvo, b64, quoted);            // voz/PTT (encoding:true -> ogg/opus)
+              sent = await tx.sendWhatsAppAudio(alvo, b64, quoted);            // voz/PTT (encoding:true -> ogg/opus)
             } catch (e) {
               const em = String((e as Error)?.message ?? '').toLowerCase();
               // NUNCA envia gravação como arquivo comum silenciosamente: erro claro (Safari/mp4 recusado etc.).
@@ -328,7 +344,7 @@ Deno.serve(async (req) => {
               return json({ error: msg, code: 'AUDIO_PTT_INCOMPATIVEL' }, 422);
             }
           } else {
-            sent = await evolution.sendMedia(instancia, alvo, 'audio', mime || 'audio/mpeg', b64, nome && nome !== 'audio' ? nome : 'audio.m4a', undefined, quoted); // arquivo de áudio anexado
+            sent = await tx.sendMedia(alvo, 'audio', mime || 'audio/mpeg', b64, nome && nome !== 'audio' ? nome : 'audio.m4a', undefined, quoted); // arquivo de áudio anexado
           }
           // OBSERVABILIDADE MÍNIMA: 1 linha por correlation_id (sem hashes/RMS/conteúdo). Escritor único.
           if (audio_diag && typeof audio_diag === 'object') {
@@ -348,7 +364,7 @@ Deno.serve(async (req) => {
           if (se || !signed?.signedUrl) return json({ error: 'Falha ao preparar a mídia.' }, 500);
           const mediatype = tipo === 'documento' ? 'document' : tipo === 'video' ? 'video' : 'image';
           const mimeEnv = mime || (tipo === 'documento' ? 'application/octet-stream' : tipo === 'video' ? 'video/mp4' : 'image/jpeg');
-          sent = await evolution.sendMedia(instancia, alvo, mediatype, mimeEnv, signed.signedUrl, nome, caption || undefined, quoted);
+          sent = await tx.sendMedia(alvo, mediatype, mimeEnv, signed.signedUrl, nome, caption || undefined, quoted);
         }
       } catch (err) {
         const m = (err as Error).message || 'Falha ao enviar a mídia.';
@@ -400,7 +416,7 @@ Deno.serve(async (req) => {
     // envia (texto já assinado e normalizado)
     let sent: { key?: { id?: string } };
     try {
-      sent = await evolution.sendText(instancia, alvo, corpoEnviado, quoted);
+      sent = await tx.sendText(alvo, corpoEnviado, quoted);
     } catch (err) {
       const emsg = (err as Error).message || 'Falha ao enviar pela Evolution.';
       console.error(`[send] corr=${corr} TEXTO erro provider:`, emsg); // técnico cru no log

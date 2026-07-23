@@ -447,6 +447,8 @@ export function useIniciarConversaWa() {
 
 export interface WaCanal {
   id: string; alias: string; numero: string | null; status: string; provider: string | null; conectadoEm: string | null;
+  /** 'evolution' (QR/Baileys) ou 'cloud_api' (WhatsApp Cloud API oficial). Define o transporte de saída. */
+  transporte: string;
   /** true quando o número está com restrição de conta no WhatsApp -> bloqueado só para ENVIO (recebe normal). */
   envioRestrito: boolean;
   /** saúde de ENTREGA (outbound), independente da sessão: ok|instavel|restrito|desconhecido. */
@@ -509,14 +511,17 @@ export function useWaCanais() {
       // evolution-manage/remove exclui o registro), então canais 'removido' não devem aparecer aqui.
       const { data, error } = await supabase!
         .from('canais')
-        .select('id, nome_interno, numero_conectado, status_integracao, provider, conectado_em, envio_restrito, entrega_status, entrega_erros_recentes, conflito_com, origem_tipo, gestor_id, fonte_aquisicao_id, campanha, observacao_comercial, gestor:usuarios(nome)')
-        .eq('organizacao_id', currentOrg.id).eq('tipo', 'whatsapp').eq('provider', 'evolution')
+        .select('id, nome_interno, numero_conectado, status_integracao, provider, transporte, conectado_em, envio_restrito, entrega_status, entrega_erros_recentes, conflito_com, origem_tipo, gestor_id, fonte_aquisicao_id, campanha, observacao_comercial, gestor:usuarios(nome)')
+        // Bloco 3: o filtro por provider='evolution' saiu — canal oficial (Cloud API) tem
+        // provider='meta' e ficaria INVISÍVEL no "Responder por". `tipo='whatsapp'` já exclui
+        // o canal do Messenger (CAF, tipo='facebook'), então a lista continua correta.
+        .eq('organizacao_id', currentOrg.id).eq('tipo', 'whatsapp')
         .neq('status_integracao', 'removido')
         .order('criado_em', { ascending: true });
       if (error) throw new Error(error.message);
-      type Row = { id: string; nome_interno: string | null; numero_conectado: string | null; status_integracao: string; provider: string | null; conectado_em: string | null; envio_restrito: boolean | null; entrega_status: string | null; entrega_erros_recentes: number | null; conflito_com: string | null; origem_tipo: string | null; gestor_id: string | null; fonte_aquisicao_id: string | null; campanha: string | null; observacao_comercial: string | null; gestor: { nome: string } | { nome: string }[] | null };
+      type Row = { id: string; nome_interno: string | null; numero_conectado: string | null; status_integracao: string; provider: string | null; transporte: string | null; conectado_em: string | null; envio_restrito: boolean | null; entrega_status: string | null; entrega_erros_recentes: number | null; conflito_com: string | null; origem_tipo: string | null; gestor_id: string | null; fonte_aquisicao_id: string | null; campanha: string | null; observacao_comercial: string | null; gestor: { nome: string } | { nome: string }[] | null };
       return ((data as Row[]) ?? []).map((r) => ({
-        id: r.id, alias: r.nome_interno ?? 'WhatsApp', numero: r.numero_conectado, status: r.status_integracao, provider: r.provider, conectadoEm: r.conectado_em, envioRestrito: Boolean(r.envio_restrito),
+        id: r.id, alias: r.nome_interno ?? 'WhatsApp', numero: r.numero_conectado, status: r.status_integracao, provider: r.provider, transporte: r.transporte ?? 'evolution', conectadoEm: r.conectado_em, envioRestrito: Boolean(r.envio_restrito),
         entregaStatus: (['ok', 'instavel', 'restrito'].includes(r.entrega_status ?? '') ? r.entrega_status : 'desconhecido') as WaCanal['entregaStatus'], entregaErrosRecentes: r.entrega_erros_recentes ?? 0, conflitoCom: r.conflito_com,
         origemTipo: r.origem_tipo, gestorId: r.gestor_id, gestorNome: (Array.isArray(r.gestor) ? r.gestor[0]?.nome : r.gestor?.nome) ?? null, fonteId: r.fonte_aquisicao_id, campanha: r.campanha, observacaoComercial: r.observacao_comercial,
       }));

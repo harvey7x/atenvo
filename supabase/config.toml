@@ -432,6 +432,13 @@ verify_jwt = false
 [functions.meta-auth-callback]
 verify_jwt = false
 
+# cloud-webhook: webhook público da WhatsApp Cloud API. A Meta NÃO envia JWT do Supabase —
+# sem verify_jwt=false o gateway rejeita o GET de verificação e a assinatura do webhook nunca
+# é concluída. A autenticação é interna: META_WA_VERIFY_TOKEN no GET e HMAC
+# X-Hub-Signature-256 (META_WA_APP_SECRET) sobre o corpo cru no POST.
+[functions.cloud-webhook]
+verify_jwt = false
+
 # Funções SECRET-GATED (autenticação por header próprio, NÃO pelo JWT do usuário):
 # cron/webhook as chamam sem Authorization. Precisam de verify_jwt=false — senão o gateway
 # do Supabase rejeita antes da função rodar (ex.: cron wa-health-check-diario / bot-remarketing).
