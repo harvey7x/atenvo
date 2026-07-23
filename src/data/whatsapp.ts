@@ -109,8 +109,11 @@ function tsOf(m: DbMsg): number {
   return new Date(m.enviada_em || m.recebida_em || m.criado_em || 0).getTime();
 }
 
-function mapConversa(c: DbConv): WaContact {
-  const msgs: WaMessage[] = (c.mensagens ?? [])
+/** Linhas de `mensagens` -> bolhas da UI. FONTE ÚNICA: usada pela lista (últimas N) e pelo
+ *  histórico completo da conversa aberta (useWaMensagens) — as duas precisam produzir bolhas
+ *  idênticas, senão o histórico "muda de forma" ao abrir a conversa. */
+export function mapMensagens(rows: DbMsg[]): WaMessage[] {
+  return (rows ?? [])
     // mantém texto com conteúdo OU qualquer mídia (imagem/áudio/vídeo/documento) mesmo sem legenda;
     // também mantém mídia PENDENTE (download falhou) para mostrar "indisponível" + recarregar.
     .filter((m) => (m.conteudo ?? '').length > 0 || (TIPOS_MIDIA.includes(m.tipo) && (!!m.metadados?.anexo_path || !!m.metadados?.midia_pendente)))
@@ -136,6 +139,10 @@ function mapConversa(c: DbConv): WaContact {
       respondidaAId: m.respondida_a_id ?? undefined,
       quoted: m.metadados?.quoted && (m.metadados.quoted.texto || m.metadados.quoted.tipo) ? m.metadados.quoted : undefined,
     } as WaMessage));
+}
+
+function mapConversa(c: DbConv): WaContact {
+  const msgs: WaMessage[] = mapMensagens(c.mensagens ?? []);
   const lastMsg = msgs[msgs.length - 1];
   const chip = c.canais?.nome_interno ?? 'WhatsApp';
   // "aguardando resposta": conversa ABERTA cuja ÚLTIMA mensagem real (exclui sistema/nota_interna)
@@ -252,7 +259,11 @@ export function useWaConversations() {
   const query = useQuery({
     queryKey: ['wa-conversas', orgId],
     enabled: WA_REAL,
-    refetchInterval: 6000, // backstop caso o realtime não dispare
+    // PERF: o realtime (abaixo) é a fonte de frescor; este intervalo é só BACKSTOP, como o
+    // comentário sempre disse. Antes eram 6s — e como o fetch levava ~3,8s, a requisição mal
+    // terminava antes da próxima começar. 30s + refetch ao focar a aba mantém a inbox fresca.
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
     queryFn: async (): Promise<WaContact[]> => {
       const { data, error } = await supabase!
         .from('conversas')
@@ -262,6 +273,16 @@ export function useWaConversations() {
         .select('id, status, status_id, nao_lidas, ultima_interacao_em, criado_em, precisa_humano, atendente_id, etiquetas, ultimo_canal_id, ultimo_numero, ultimo_provider, ultima_msg_canal_em, arquivada_em, fixada_em, silenciada_ate, ultima_lida_em, contatos!inner(id, nome, telefone, email, etiquetas, origem, observacoes, responsavel_id, contato_identidades(tipo)), canais!conversas_canal_id_fkey!inner(id, nome_interno, tipo), mensagens(id, direcao, conteudo, tipo, enviada_em, recebida_em, criado_em, origem, status, erro_envio, id_externo, respondida_a_id, metadados)')
         .eq('organizacao_id', orgId)
         .eq('canais.tipo', 'whatsapp')
+        // PERF: o embed de mensagens NÃO tinha limite — trazia TODAS as mensagens de TODAS as
+        // conversas (9.547 linhas / 5,5 MB por fetch), das quais ~95% a lista nunca mostra.
+        // PostgREST aplica ORDER/LIMIT de recurso embutido POR LINHA-PAI (LATERAL), então isto
+        // vira "as 10 últimas mensagens de cada conversa".
+        // Por que 10 e não 1: os derivados do card precisam da última mensagem REAL (o preview e
+        // `aguardando` ignoram tipo 'sistema'/'nota_interna'), e a aba Prioridade olha se houve
+        // alguma SAÍDA recente (selo "NOVO"). Com 10, essas regras continuam exatas na prática.
+        // O histórico COMPLETO da conversa aberta vem de useWaMensagens, sob demanda.
+        .order('criado_em', { referencedTable: 'mensagens', ascending: false })
+        .limit(10, { referencedTable: 'mensagens' })
         .order('ultima_interacao_em', { ascending: false });
       if (error) throw new Error(error.message);
       const arr = ((data as unknown as DbConv[]) ?? []).map(mapConversa);
@@ -288,26 +309,60 @@ export function useWaConversations() {
     },
   });
 
-  // realtime: invalida ao chegar mensagem/conversa nova
+  // realtime: invalida ao chegar mensagem/conversa nova.
+  // PERF: os eventos chegam em RAJADA (cada ACK de status de saída é um UPDATE em `mensagens`) e
+  // antes cada um disparava um refetch da lista inteira. Agora as invalidações da LISTA são
+  // coalescidas numa só por janela; o histórico da conversa aberta é invalidado na hora (é barato
+  // e é o que o atendente está olhando).
   useEffect(() => {
     if (!WA_REAL) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const invalidarListaEmBreve = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => { timer = null; qc.invalidateQueries({ queryKey: ['wa-conversas', orgId] }); }, 900);
+    };
+    // prefixo ['wa-msgs'] atinge só as queries de histórico; a da lista é ['wa-conversas', orgId].
+    const invalidarHistorico = () => qc.invalidateQueries({ queryKey: ['wa-msgs'] });
     const ch = supabase!
       .channel(`wa-${orgId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'mensagens', filter: `organizacao_id=eq.${orgId}` }, () => {
-        qc.invalidateQueries({ queryKey: ['wa-conversas', orgId] });
+        invalidarHistorico();
+        invalidarListaEmBreve();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'conversas', filter: `organizacao_id=eq.${orgId}` }, () => {
-        qc.invalidateQueries({ queryKey: ['wa-conversas', orgId] });
+        invalidarListaEmBreve();
       })
       // responsável (assumir/transferir) vive em contatos.responsavel_id → refaz a lista em tempo real
       .on('postgres_changes', { event: '*', schema: 'public', table: 'contatos', filter: `organizacao_id=eq.${orgId}` }, () => {
-        qc.invalidateQueries({ queryKey: ['wa-conversas', orgId] });
+        invalidarListaEmBreve();
       })
       .subscribe();
-    return () => { supabase!.removeChannel(ch); };
+    return () => { if (timer) clearTimeout(timer); supabase!.removeChannel(ch); };
   }, [orgId, qc]);
 
   return query;
+}
+
+/** Histórico COMPLETO da conversa ABERTA, sob demanda.
+ *  A lista passou a trazer só as últimas mensagens de cada conversa (payload leve); o histórico
+ *  integral — que é o que o atendente lê — vem por aqui, de UMA conversa só. Usa exatamente as
+ *  mesmas colunas e o mesmo mapeamento (mapMensagens) da lista, então a bolha não muda de forma:
+ *  mídia (anexo/pendente), status/erro para "Ver erro" e retry, id_externo/respondida_a_id/quoted
+ *  para a resposta citada e tsISO para o separador de dia continuam todos presentes. */
+export function useWaMensagens(conversaId: string | null | undefined) {
+  return useQuery({
+    queryKey: ['wa-msgs', conversaId ?? ''],
+    enabled: WA_REAL && !!conversaId,
+    queryFn: async (): Promise<WaMessage[]> => {
+      const { data, error } = await supabase!
+        .from('mensagens')
+        .select('id, direcao, conteudo, tipo, enviada_em, recebida_em, criado_em, origem, status, erro_envio, id_externo, respondida_a_id, metadados')
+        .eq('conversa_id', conversaId!)
+        .order('criado_em', { ascending: true });
+      if (error) throw new Error(error.message);
+      return mapMensagens((data as unknown as DbMsg[]) ?? []);
+    },
+  });
 }
 
 export function useSendWaMessage() {

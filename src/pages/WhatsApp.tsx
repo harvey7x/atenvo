@@ -4,7 +4,7 @@ import { useToast } from '@/hooks/useToast';
 import { useAuth } from '@/context/AuthContext';
 import { useOrg } from '@/context/OrgContext';
 import { WA_CONTACTS, initials, avatarColor, type WaContact, type WaMessage } from '@/data/whatsappDemo';
-import { useWaConversations, useSendWaMessage, useWaCanais, useWaCanalEnvioSaude, useAtribuirAtendimento, useIniciarConversaWa, normalizeWaPhone, mascararNumero, subirMidiaWa, urlAssinadaMidiaWa, urlDownloadMidiaWa, nomeArquivoMidia, rotuloBaixarMidia, removerMensagemFalha, waRecarregarAudio, waValidarNumero, waVincularNumero, waArquivar, waMarcarLida, useWaAtividades, WA_REAL } from '@/data/whatsapp';
+import { useWaConversations, useWaMensagens, useSendWaMessage, useWaCanais, useWaCanalEnvioSaude, useAtribuirAtendimento, useIniciarConversaWa, normalizeWaPhone, mascararNumero, subirMidiaWa, urlAssinadaMidiaWa, urlDownloadMidiaWa, nomeArquivoMidia, rotuloBaixarMidia, removerMensagemFalha, waRecarregarAudio, waValidarNumero, waVincularNumero, waArquivar, waMarcarLida, useWaAtividades, WA_REAL } from '@/data/whatsapp';
 import { MediaComposer } from '@/components/MediaComposer';
 import { AudioRecorder } from '@/components/AudioRecorder';
 import { AudioMessage } from '@/components/AudioMessage';
@@ -223,13 +223,37 @@ export function WhatsApp() {
 
   const realCanais = WA_REAL ? (canaisQ.data ?? []) : [];
 
-  // modo real: sincroniza a lista vinda do Supabase e mantém uma seleção válida
+  // PERF: histórico COMPLETO só da conversa aberta. A lista agora traz apenas as últimas
+  // mensagens de cada conversa (payload ~10x menor), então o histórico integral vem daqui.
+  const msgsQ = useWaMensagens(WA_REAL ? currentId : null);
+  // refs para o efeito da lista enxergar o valor ATUAL sem entrar nas dependências (o efeito
+  // precisa rodar só quando live.data muda, senão vira loop).
+  const currentIdRef = useRef(currentId);
+  currentIdRef.current = currentId;
+  const historicoRef = useRef<WaMessage[] | undefined>(undefined);
+  historicoRef.current = msgsQ.data;
+
+  // modo real: sincroniza a lista vinda do Supabase e mantém uma seleção válida.
+  // ARMADILHA: substituir a lista inteira apagaria o histórico da conversa ABERTA (que agora vem
+  // truncado no payload da lista). Por isso a conversa aberta recebe de volta o histórico completo
+  // já carregado. O resto da semântica é idêntico ao de antes — inclusive a reconciliação das
+  // bolhas otimistas, que continua acontecendo por substituição.
   useEffect(() => {
     if (WA_REAL && live.data) {
-      setContacts(live.data);
+      const abertaId = currentIdRef.current;
+      const hist = historicoRef.current;
+      setContacts(hist?.length && abertaId
+        ? live.data.map((c) => (c.id === abertaId ? { ...c, msgs: hist } : c))
+        : live.data);
       setCurrentId((id) => (id && live.data!.some((c) => c.id === id)) ? id : (live.data![0]?.id ?? ''));
     }
   }, [live.data]);
+
+  // hidrata o histórico completo assim que ele chega (ou troca de conversa)
+  useEffect(() => {
+    if (!WA_REAL || !currentId || !msgsQ.data) return;
+    setContacts((cur) => cur.map((c) => (c.id === currentId ? { ...c, msgs: msgsQ.data! } : c)));
+  }, [msgsQ.data, currentId]);
 
   // espelha preferência de assinatura
   useEffect(() => { if (prefQ.data) { setAssinaModo(prefQ.data.modo); setAssinaNome(prefQ.data.nome); } }, [prefQ.data]);
