@@ -27,7 +27,8 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Modal } from '@/components/Modal';
 import { useStatusDefs, useEtiquetas, useAssinaturaPref, useAtendimentoActions, useOrgUsuarios, resolverNomeAssinatura } from '@/data/atendimento';
 import { useSlaAlertas } from '@/data/sla';
-import { indexPorChave, sevClass, sevIntensidade, tipoLabel, tipoEmoji, tempoRelativo } from '@/data/slaView';
+import { indexPorChave, sevClass, sevIntensidade, tipoLabel, tempoRelativo, maxSeveridade } from '@/data/slaView';
+import { siglaCanal, dividirChips, tituloOcultos, type ChipCard } from '@/lib/cardConversa';
 import { SlaConversaBanner } from '@/components/SlaConversaBanner';
 import { classificar, isNovo, statusKind, tempoCurto, tierTempo, minutosDesde, type SinaisConversa, type Grupo } from '@/data/inboxGroups';
 import { corDaEtiqueta, podeGerenciarAtendimento, type AssinaturaModo } from '@/types/atendimento';
@@ -222,6 +223,12 @@ export function WhatsApp() {
   const [editErr, setEditErr] = useState<string | null>(null);
 
   const realCanais = WA_REAL ? (canaisQ.data ?? []) : [];
+
+  // O card mostra tempo RELATIVO ("há 15 min"). Antes o refetch de 6s forçava re-render e o
+  // rótulo se atualizava de carona; com o refetch em 30s (Bloco 1) ele congelaria na tela.
+  // Este tick de 1 min mantém o rótulo honesto sem tráfego nenhum.
+  const [relogioMs, setRelogioMs] = useState(() => Date.now());
+  useEffect(() => { const t = setInterval(() => setRelogioMs(Date.now()), 60_000); return () => clearInterval(t); }, []);
 
   // PERF: histórico COMPLETO só da conversa aberta. A lista agora traz apenas as últimas
   // mensagens de cada conversa (payload ~10x menor), então o histórico integral vem daqui.
@@ -1102,39 +1109,60 @@ export function WhatsApp() {
             const badges = etiquetasDaConversa(c, nomePorId);
             // Higiene: cadastro fraco vira badge na lista. A etiqueta LEAD NOVO já sinaliza "sem dono".
             const nomeRuim = analisarNome(c.name).fraco && conversaAtiva({ status: c.status, arquivada: c.arquivada });
+            // ---- fileira de chips por PRIORIDADE SEMÂNTICA (não por ordem de array) ----
+            // O canal saiu daqui (virou micro-badge no avatar) e o atendente virou pill à direita.
+            // Sobra o que é sinal operacional, na ordem em que o atendente precisa ler.
+            const eAtendente = badges.find((b) => b.tipo === 'atendente');
+            const eSituacao = badges.find((b) => b.tipo === 'situacao');
+            const chips: ChipCard[] = [];
+            // 1) SITUAÇÃO — sempre emitida pelo modelo e sempre a primeira a ser lida.
+            if (eSituacao) chips.push({ key: 'sit', cls: 'ctag ctag--' + (eSituacao.variante ?? 'atendimento'), txt: eSituacao.texto, title: 'Situação' });
+            // 2) ATRASO (cliente): calculado aqui sobre aguardandoDesde. É a única fonte quando o
+            //    motor de SLA não emitiu alerta — por isso não pode depender dele.
+            if (atrasado && tempoCurto) chips.push({ key: 'atraso', cls: 'ctag ctag--atraso', txt: 'Atrasado · ' + tempoCurto, title: 'Sem resposta há ' + tempoCurto });
+            // 3) SLA: só o de MAIOR severidade vira chip; os demais entram no "+N".
+            const sevTop = maxSeveridade(slaChips);
+            const slaTop = sevTop ? slaChips.find((a) => a.severidade === sevTop) : undefined;
+            if (slaTop) chips.push({ key: 'sla', cls: 'conv-sla-chip ' + sevClass(slaTop.severidade) + ' int-' + sevIntensidade(slaTop.severidade), txt: tipoLabel(slaTop.tipo), title: slaTop.detalhe ?? slaTop.titulo });
+            if (c.precisaHumano) chips.push({ key: 'ph', cls: 'conv-sla-chip ph', txt: 'Precisa humano', title: 'Conversa marcada como precisa de atendimento humano' });
+            if (nomeRuim) chips.push({ key: 'hig', cls: 'ctag ctag--higiene', txt: 'Nome incompleto', title: 'Cadastro incompleto: preencha o nome completo do cliente' });
+            if (finalizado) chips.push({ key: 'fim', cls: 'ctag ctag--fim', txt: 'Finalizado', title: 'Conversa ' + (c.status ?? 'finalizada') });
+            for (const a of slaChips) {
+              if (slaTop && a.id === slaTop.id) continue;
+              chips.push({ key: 'sla-' + a.id, cls: 'conv-sla-chip ' + sevClass(a.severidade), txt: tipoLabel(a.tipo), title: a.detalhe ?? a.titulo });
+            }
+            const { visiveis: chipsVis, ocultos: chipsOcultos } = dividirChips(chips);
             return (
             <div key={c.id} data-cid={c.id} className={'conv conv--' + barTier + (c.id === currentId ? ' active' : '')}
-                 title={'Atendente: ' + atendNome + ' · Canal: WhatsApp ' + c.chip} onClick={() => selectContact(c.id)}>
-              <Avatar name={c.name} />
+                 title={'Atendente: ' + atendNome + ' · Canal: WhatsApp ' + c.chip + ' · ' + statusTxt + ' · ' + c.time}
+                 onClick={() => selectContact(c.id)}>
+              {/* canal deixou de ser chip de texto: virou micro-badge no avatar (sigla + nome no tooltip) */}
+              <span className="cav">
+                <Avatar name={c.name} />
+                <i className="cav-canal" title={'Canal atual: ' + c.chip} aria-label={'Canal ' + c.chip}>{siglaCanal(c.chip)}</i>
+              </span>
               <div className="cbody">
                 <div className="crow">
-                  <span className="cname" style={{ fontWeight: (c.unread ?? 0) > 0 ? 700 : undefined }}>{c.fixada && <span title="Fixada" aria-label="Fixada">📌 </span>}{nomeVazio ? 'Cliente sem nome' : formatarNomeCliente(c.name)}</span>
-                  <span className="ctime">{c.time}</span>
+                  {c.fixada && <i className="cflag" title="Fixada" aria-label="Fixada">📌</i>}
+                  {c.silenciada && <i className="cflag" title="Silenciada" aria-label="Silenciada">🔕</i>}
+                  {c.arquivada && <i className="cflag" title="Arquivada" aria-label="Arquivada">🗄️</i>}
+                  <span className="cname">{nomeVazio ? 'Cliente sem nome' : formatarNomeCliente(c.name)}</span>
+                  {nomeVazio && telSec && <span className="cphone-inline">· {telSec}</span>}
+                  <span className="ctime" title={'Última interação: ' + c.time}>{c.lastAtMs ? tempoRelativo(new Date(c.lastAtMs).toISOString(), relogioMs) : c.time}</span>
                 </div>
-                {nomeVazio && telSec && <div className="cphone">{telSec}</div>}
-                <div className="cprev">{c.last || '—'}</div>
-                {(badges.length > 0 || slaChips.length > 0 || c.precisaHumano || nomeRuim) && (
-                  <div className="cbadges">
-                    {nomeRuim && <span className="ctag ctag--higiene" title="Cadastro incompleto: preencha o nome completo do cliente">Nome incompleto</span>}
-                    {badges.map((e) => (
-                      <span key={e.tipo + e.texto}
-                            className={'ctag ctag--' + (e.tipo === 'situacao' ? (e.variante ?? 'atendimento') : e.tipo)}
-                            title={e.tipo === 'atendente' ? 'Atendente responsável' : e.tipo === 'canal' ? 'Canal atual do atendimento' : 'Situação'}>
-                        {e.texto}
-                      </span>
-                    ))}
-                    {slaChips.map((a) => (
-                      <span key={a.id} className={'conv-sla-chip ' + sevClass(a.severidade) + ' int-' + sevIntensidade(a.severidade)} title={a.detalhe ?? a.titulo}>
-                        {sevIntensidade(a.severidade) !== 'discreto' && <>{tipoEmoji(a.tipo)} </>}{tipoLabel(a.tipo)}
-                      </span>
-                    ))}
-                    {c.precisaHumano && <span className="conv-sla-chip ph" title="Conversa marcada como precisa de atendimento humano">🙋 Precisa humano</span>}
-                  </div>
-                )}
-                <div className="crow-status">
-                  <span className={'cstatus cstatus--' + barTier}>{statusTxt}{c.arquivada ? ' · Arquivada' : ''}{c.silenciada ? ' 🔕' : ''}</span>
+                <div className="crow crow-prev">
+                  <span className="cprev">{c.last || '—'}</span>
                   {c.unread > 0 && <span className="unread" title={c.unread + ' não lidas'} aria-label={c.unread + ' mensagens não lidas'}>{c.unread > 99 ? '99+' : c.unread}</span>}
                 </div>
+                {(chipsVis.length > 0 || chipsOcultos.length > 0 || eAtendente) && (
+                  <div className="cbadges">
+                    {chipsVis.map((ch) => <span key={ch.key} className={ch.cls} title={ch.title}>{ch.txt}</span>)}
+                    {chipsOcultos.length > 0 && (
+                      <span className="ctag ctag--mais" title={tituloOcultos(chipsOcultos)}>+{chipsOcultos.length}</span>
+                    )}
+                    {eAtendente && <span className="cresp" title="Atendente responsável">{eAtendente.texto}</span>}
+                  </div>
+                )}
               </div>
             </div>
             );

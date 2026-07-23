@@ -619,3 +619,50 @@
 @media (prefers-reduced-motion:reduce){
   .wa-app .conv-skel-av,.wa-app .conv-skel-lines i{animation:none}
 }
+
+/* ===================== Bloco 2 — CARD COMPACTO =====================
+   Referência: inbox premium (Helena CRM). O card tinha até 11 elementos simultâneos e altura
+   variável (a fileira de etiquetas quebrava linha). Agora são 3 linhas de altura estável:
+     1) nome + tempo relativo   2) prévia + não lidas   3) até 2 chips + "+N" + atendente
+   Nada foi removido do modelo: canal virou micro-badge no avatar, atendente virou pill à direita
+   e o excedente de chips vai para "+N" com tudo no tooltip. */
+.wa-app .conv{gap:12px;padding:10px 12px;border-radius:12px;align-items:flex-start}
+/* fundo tingido em vários cards seguidos era o que mais poluía: fica só a barra lateral */
+.wa-app .conv--aguardando:not(.active),
+.wa-app .conv--critico:not(.active){background:transparent}
+.wa-app .conv--aguardando:not(.active):hover,
+.wa-app .conv--critico:not(.active):hover{background:var(--hover)}
+
+/* avatar + micro-badge do canal (sigla; nome completo no tooltip) */
+.wa-app .conv .cav{position:relative;flex:none;display:block;width:38px;height:38px}
+.wa-app .conv .cav-canal{
+  position:absolute;right:-3px;bottom:-3px;min-width:17px;height:17px;padding:0 3px;
+  border-radius:999px;background:var(--wa);color:#fff;border:2px solid var(--surface);
+  font-size:8.5px;font-weight:800;font-style:normal;letter-spacing:.02em;
+  display:flex;align-items:center;justify-content:center;box-sizing:content-box}
+.wa-app .conv.active .cav-canal{border-color:var(--green-soft)}
+
+/* linha 1 — nome, marcadores e tempo relativo */
+.wa-app .conv .crow{align-items:center;gap:6px}
+.wa-app .conv .cflag{font-size:10px;line-height:1;flex:none;font-style:normal}
+.wa-app .conv .cname{font-size:14px;font-weight:700;flex:0 1 auto;min-width:0}
+.wa-app .conv .cphone-inline{font-size:11px;color:var(--muted);flex:none;white-space:nowrap}
+.wa-app .conv .ctime{margin-left:auto;font-size:11px;color:var(--muted);flex:none;white-space:nowrap}
+
+/* linha 2 — prévia + não lidas (badge sobe para junto do conteúdo, como na referência) */
+.wa-app .conv .crow-prev{align-items:center;gap:8px;margin-top:2px}
+.wa-app .conv .cprev{flex:1;min-width:0;font-size:12.5px;color:var(--ink-2);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:0}
+.wa-app .conv .unread{align-self:center;min-width:18px;height:18px;font-size:10.5px;padding:0 5px;
+  background:#e5484d;color:#fff}
+
+/* linha 3 — chips: NUNCA quebra em 2 linhas (era a origem da altura variável) */
+.wa-app .conv .cbadges{flex-wrap:nowrap;overflow:hidden;gap:5px;margin-top:5px}
+.wa-app .conv .ctag--atraso{background:rgba(229,72,77,.10);color:#c93b40;border-color:rgba(229,72,77,.30)}
+.wa-app .conv .ctag--fim{background:var(--surface-2);color:var(--muted);border-color:var(--line-2)}
+.wa-app .conv .ctag--mais{background:var(--surface-2);color:var(--ink-2);border-color:var(--line-2);cursor:help}
+/* atendente: pill outline discreto, encostado à direita (padrão da referência) */
+.wa-app .conv .cresp{margin-left:auto;flex:none;font-size:10px;font-weight:600;letter-spacing:.02em;
+  padding:1px 7px;border-radius:999px;border:1px solid var(--line-2);color:var(--muted);
+  background:transparent;max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+[data-theme="dark"] .wa-app .conv .ctag--atraso{background:rgba(229,72,77,.18);color:#ff9b9e;border-color:rgba(229,72,77,.36)}
