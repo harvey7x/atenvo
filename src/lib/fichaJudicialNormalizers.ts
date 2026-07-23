@@ -75,9 +75,9 @@ export function resolverTelefoneFicha(telContato?: string | null, telImportado?:
   return { digitos: '', origem: 'vazio' };
 }
 
-/** Moeda BRL para exibição. */
+/** Moeda BRL para exibição. Espaço normal (o ICU usa NBSP e a ficha vai para o WhatsApp como texto). */
 export function formataMoedaBRL(n: number): string {
-  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n);
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n).replace(/[\u00A0\u202F]/g, ' ');
 }
 
 /** "dd/mm/aaaa" → "yyyy-mm-dd" (validado, sem timezone). undefined se inválida. */
@@ -89,6 +89,15 @@ export function parseDataBR(s: string): string | undefined {
   const diasNoMes = [31, (yyyy % 4 === 0 && (yyyy % 100 !== 0 || yyyy % 400 === 0)) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
   if (dd > diasNoMes[mm - 1]) return undefined;
   return `${m[3]}-${m[2]}-${m[1]}`;
+}
+
+/** Data de hoje em America/Sao_Paulo, "yyyy-mm-dd". Nunca usa UTC (à noite viraria o dia seguinte). */
+export function hojeISOSaoPaulo(agora: Date = new Date()): string {
+  const p = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(agora);
+  const g = (t: string) => p.find((x) => x.type === t)?.value ?? '';
+  return `${g('year')}-${g('month')}-${g('day')}`;
 }
 
 /** Idade em anos entre nascimento e referência (ambos "yyyy-mm-dd"). undefined se inválido. */

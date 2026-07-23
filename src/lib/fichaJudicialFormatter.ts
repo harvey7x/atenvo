@@ -1,6 +1,7 @@
 // Gerador puro da ficha judicial (texto para WhatsApp). Sem efeitos; nunca imprime
-// undefined/null/NaN nem R$ 0,00; mantém os labels do padrão do escritório.
+// undefined/null/NaN nem R$ 0,00; layout FIXO — mesmas linhas, mesma ordem, sempre.
 import { formataMoedaBRL } from './fichaJudicialNormalizers';
+import { encurtarNomeBanco, resolverBancoFicha } from '@/data/bancosFicha';
 
 export interface FichaRevisaoFmt {
   tipo: 'agibank' | 'rmc' | 'rcc' | 'emprestimo' | 'outro';
@@ -28,11 +29,12 @@ export interface FichaFmtDados {
   telefone?: string;
   estadoCivil?: string;
   email?: string;
-  dataConsulta?: string; // ISO yyyy-mm-dd
+  dataConsulta?: string; // ISO yyyy-mm-dd — sai como DATA
   revisoes?: FichaRevisaoFmt[];
 }
 
 export interface FichaFmtOpcoes {
+  /** Inclui a senha do INSS na linha "INSS:" (só na cópia; nunca é salva). */
   incluirSenha?: boolean;
   senha?: string;
 }
@@ -44,24 +46,28 @@ const isoParaBR = (iso?: string) => {
 };
 const valorOk = (v?: number | null): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0;
 
-const ROTULO_REV: Record<FichaRevisaoFmt['tipo'], string> = {
-  agibank: 'AGIBANK', rmc: 'Cartão RMC', rcc: 'Cartão RCC', emprestimo: 'Empréstimo', outro: 'Revisão',
-};
+/** Ordem fixa das REVs: empréstimos, depois RMC, depois RCC. */
+const ORDEM: Record<FichaRevisaoFmt['tipo'], number> = { emprestimo: 0, agibank: 0, rmc: 1, rcc: 2, outro: 3 };
+const PREFIXO: Record<FichaRevisaoFmt['tipo'], string> = { emprestimo: 'REV', agibank: 'REV', rmc: 'REV RMC', rcc: 'REV RCC', outro: 'REV' };
 
-// Prévia mostra APENAS "Cartão RMC: {bancoNome}" (sem código, sem valor, sem hífen). Código e valor
-// continuam salvos/editáveis no formulário e no banco, mas não entram no texto da ficha/cópia.
-// Banco vazio → só o rótulo ("Cartão RMC"), sem dois-pontos sobrando.
+/**
+ * Linha de revisão no padrão do escritório: "REV RMC BANRISUL" (nunca "Cartão RMC: <razão social>").
+ * Sem banco identificado não há linha — melhor faltar do que sair "REV RMC" sozinho.
+ * Valor entra só quando existir: "REV RMC BMG - R$ 55,00".
+ */
 function linhaRevisao(r: FichaRevisaoFmt): string {
-  const nome = lim(r.bancoNome);
-  const rotulo = ROTULO_REV[r.tipo] ?? 'Revisão';
-  if (nome) return `${rotulo}: ${nome}`;
-  return lim(r.descricaoLivre) || rotulo;
+  // banco conhecido → nome curto da tabela; desconhecido (digitado à mão) → encurta a razão social
+  const conhecido = resolverBancoFicha(r.bancoCodigo, r.bancoNome);
+  const nome = (conhecido?.conhecido ? conhecido.nomeCurto : encurtarNomeBanco(lim(r.bancoNome))).toUpperCase();
+  if (!nome) return '';
+  const base = `${PREFIXO[r.tipo] ?? 'REV'} ${nome}`;
+  return valorOk(r.valor) ? `${base} - ${formataMoedaBRL(r.valor)}` : base;
 }
 
-/** Gera a ficha no padrão do escritório. Senha só quando opcoes.incluirSenha && opcoes.senha. */
+/** Gera a ficha no padrão do escritório. Senha do INSS só quando opcoes.incluirSenha && opcoes.senha. */
 export function formatarFichaJudicial(dados: FichaFmtDados, opcoes: FichaFmtOpcoes = {}): string {
-  const cidade = lim(dados.cidade);
-  const uf = lim(dados.uf);
+  const cidade = lim(dados.cidade).toUpperCase();
+  const uf = lim(dados.uf).toUpperCase();
   const cidadeLinha = cidade ? (uf ? `${cidade} / ${uf}` : cidade) : '';
 
   const especie = [lim(dados.especieCodigo), lim(dados.especieDescricao)].filter(Boolean).join(' - ');
@@ -70,14 +76,14 @@ export function formatarFichaJudicial(dados: FichaFmtDados, opcoes: FichaFmtOpco
   const nasc = isoParaBR(dados.nascimento);
   const idadePart = typeof dados.idade === 'number' && Number.isFinite(dados.idade) && dados.idade >= 0 ? `${dados.idade} anos` : '';
   const idadeLinha = [nasc, idadePart].filter(Boolean).join(' - ');
-  const data = isoParaBR(dados.dataConsulta);
+  const inss = opcoes.incluirSenha ? lim(opcoes.senha) : '';
 
   const linhas: string[] = [
     'FICHA JUDICIAL',
     '',
     `GERENTE: ${lim(dados.gerenteNome)}`,
     `CIDADE: ${cidadeLinha}`,
-    `NOME: ${lim(dados.nome)}`,
+    `NOME: ${lim(dados.nome).toUpperCase()}`,
     `BENEFÍCIO: ${lim(dados.beneficioNumero)}`,
     `ESPÉCIE: ${especie}`,
     `RECEBE O BENEFICIO: ${banco}`,
@@ -88,14 +94,16 @@ export function formatarFichaJudicial(dados: FichaFmtDados, opcoes: FichaFmtOpco
     `TELEFONE: ${lim(dados.telefone)}`,
     `ESTADO CIVIL: ${lim(dados.estadoCivil)}`,
     `EMAIL: ${lim(dados.email)}`,
+    `INSS: ${inss}`,
+    `DATA: ${isoParaBR(dados.dataConsulta)}`,
   ];
 
-  if (opcoes.incluirSenha && lim(opcoes.senha)) linhas.push(`Senha INSS: ${lim(opcoes.senha)}`);
+  const revs = [...(dados.revisoes ?? [])]
+    .sort((a, b) => (ORDEM[a.tipo] ?? 9) - (ORDEM[b.tipo] ?? 9))
+    .map(linhaRevisao)
+    .filter(Boolean);
+  if (revs.length) linhas.push('', ...revs);
 
-  linhas.push(`DATA: ${data}`);
-
-  const revs = (dados.revisoes ?? []).map(linhaRevisao).filter(Boolean);
-  if (revs.length) { linhas.push('', ...revs); }
-
-  return linhas.join('\n');
+  // campo vazio sai como "RG:" (sem espaço solto no fim da linha)
+  return linhas.map((l) => l.replace(/\s+$/, '')).join('\n');
 }

@@ -101,25 +101,25 @@ describe('ficha judicial parser', () => {
     const r = parseFichaJudicial('Nome: Carlos Eduardo Teste');
     expect(r.nome).toBe('Carlos Eduardo Teste');
   });
-  it('17. nascimento com idade calculada', () => {
-    const r = parseFichaJudicial(L(['Data de nascimento: 20/08/1955', 'Data da consulta: 10/03/2024']));
+  it('17. nascimento com idade calculada na data da ficha', () => {
+    const r = parseFichaJudicial('Data de nascimento: 20/08/1955', { dataFicha: '2024-03-10' });
     expect(r.nascimento).toBe('1955-08-20');
     expect(r.idadeCalculada).toBe(68);
   });
-  it('18. idade divergente gera aviso', () => {
-    const r = parseFichaJudicial(L(['Data de nascimento: 15/05/1960', 'Idade: 40 anos', 'Data da consulta: 10/03/2024']));
+  it('18. idade colada divergente da calculada gera aviso (vale a calculada)', () => {
+    const r = parseFichaJudicial(L(['Data de nascimento: 15/05/1960', 'Idade: 40 anos']), { dataFicha: '2024-03-10' });
     expect(r.idadeInformada).toBe(40);
     expect(r.idadeCalculada).toBe(63);
     expect(r.avisos.some((a) => a.codigo === 'IDADE_DIVERGENTE')).toBe(true);
   });
   it('19. cidade com - RS', () => {
-    const r = parseFichaJudicial(L(['Endereço: Rua X, 1', 'Pelotas - RS']));
-    expect(r.cidade).toBe('Pelotas');
+    const r = parseFichaJudicial(L(['Endereço', 'Rua X, 1', 'Pelotas - RS']));
+    expect(r.cidade).toBe('PELOTAS');
     expect(r.uf).toBe('RS');
   });
   it('20. cidade com / RS', () => {
-    const r = parseFichaJudicial('Caxias do Sul / RS');
-    expect(r.cidade).toBe('Caxias do Sul');
+    const r = parseFichaJudicial(L(['Endereço', 'Caxias do Sul / RS']));
+    expect(r.cidade).toBe('CAXIAS DO SUL');
     expect(r.uf).toBe('RS');
   });
   it('21. telefone com máscara', () => {
@@ -169,12 +169,12 @@ describe('ficha judicial parser', () => {
   it('32. banco com código e hífen', () => {
     const r = parseFichaJudicial('Banco: 121 - AGIBANK');
     expect(r.bancoCodigo).toBe('121');
-    expect(r.bancoNome).toBe('Agibank');
+    expect(r.bancoNome).toBe('AGIBANK');
   });
   it('33. banco com código sem hífen', () => {
     const r = parseFichaJudicial('Recebe o benefício: 104 CAIXA ECONOMICA FEDERAL');
     expect(r.bancoCodigo).toBe('104');
-    expect(r.bancoNome).toBe('Caixa Econômica Federal');
+    expect(r.bancoNome).toBe('CAIXA');
   });
   it('34. banco somente por nome', () => {
     const r = parseFichaJudicial('Banco: Bradesco');
@@ -187,7 +187,7 @@ describe('ficha judicial parser', () => {
     expect(r.avisos.some((a) => a.codigo === 'BANCO_NAO_ENCONTRADO')).toBe(true);
   });
   it('36. banco 121', () => {
-    expect(parseFichaJudicial('Banco: 121 - Agibank').bancoNome).toBe('Agibank');
+    expect(parseFichaJudicial('Banco: 121 - Agibank').bancoNome).toBe('AGIBANK');
   });
   it('37. banco 756', () => {
     const r = parseFichaJudicial('Banco: 756 - SICOOB');
@@ -210,37 +210,38 @@ describe('ficha judicial parser', () => {
     const r = parseFichaJudicial(L(['Base de cálculo: R$ 999,99', 'Valor Benefício: R$ 2.000,50']));
     expect(r.valorBeneficio).toBe(2000.5);
   });
-  it('42. DDB não vira data da consulta', () => {
-    const r = parseFichaJudicial('DDB: 01/02/2010');
-    expect(r.dataConsulta).toBeUndefined();
-    expect(r.avisos.some((a) => a.codigo === 'DATA_CONSULTA_NAO_ENCONTRADA')).toBe(true);
+  it('42. DATA da ficha é sempre a data passada (não a DDB do texto)', () => {
+    const r = parseFichaJudicial('DDB: 01/02/2010', { dataFicha: '2026-07-23' });
+    expect(r.dataConsulta).toBe('2026-07-23');
   });
-  it('43. data explícita da consulta', () => {
-    expect(parseFichaJudicial('Data da consulta: 10/03/2024').dataConsulta).toBe('2024-03-10');
+  it('43. DATA da ficha ignora a data colada e usa a data atual passada', () => {
+    expect(parseFichaJudicial('Data da consulta: 10/03/2024', { dataFicha: '2026-07-23' }).dataConsulta).toBe('2026-07-23');
   });
   it('44. REV AGIBANK explícita', () => {
     const r = parseFichaJudicial('REV AGIBANK');
     expect(r.revisoes.length).toBe(1);
-    expect(r.revisoes[0].tipo).toBe('agibank');
-    expect(r.revisoes[0].bancoNome).toBe('Agibank');
+    expect(r.revisoes[0].bancoNome).toBe('AGIBANK');
     expect(r.revisoes[0].requerConfirmacao).toBe(false);
   });
   it('45. RMC com banco', () => {
     const r = parseFichaJudicial('REV RMC - 318 - BANCO BMG S A');
     expect(r.revisoes[0].tipo).toBe('rmc');
     expect(r.revisoes[0].bancoCodigo).toBe('318');
+    expect(r.revisoes[0].bancoNome).toBe('BMG');
     expect(r.revisoes[0].valor).toBeUndefined();
   });
   it('46. RCC com banco', () => {
     const r = parseFichaJudicial('REV RCC - 935 - FACTA FINANCEIRA S/A');
     expect(r.revisoes[0].tipo).toBe('rcc');
     expect(r.revisoes[0].bancoCodigo).toBe('935');
+    expect(r.revisoes[0].bancoNome).toBe('FACTA');
   });
   it('47. revisão com valor', () => {
     const r = parseFichaJudicial('REV RMC DAYCOVAL - R$ 66,00');
     expect(r.revisoes[0].tipo).toBe('rmc');
     expect(r.revisoes[0].valor).toBe(66);
     expect(r.revisoes[0].bancoCodigo).toBe('707');
+    expect(r.revisoes[0].bancoNome).toBe('DAYCOVAL');
   });
   it('48. banco pagador sem revisão não cria revisão', () => {
     const r = parseFichaJudicial('Recebe o benefício: 121 - AGIBANK');
@@ -290,15 +291,14 @@ describe('ficha judicial parser', () => {
     expect(r.cpf).toBe(CPF_A);
     expect(r.beneficioNumero).toBe('1234567890');
     expect(r.nascimento).toBe('1955-08-20');
-    expect(r.cidade).toBe('Porto Alegre');
+    expect(r.cidade).toBe('PORTO ALEGRE');
     expect(r.uf).toBe('RS');
     expect(r.telefone).toBe('51991234567');
     expect(r.especieCodigo).toBe('41');
     expect(r.tipoBeneficio).toBe('aposentadoria');
     expect(r.bancoCodigo).toBe('121');
-    expect(r.bancoNome).toBe('Agibank');
+    expect(r.bancoNome).toBe('AGIBANK');
     expect(r.valorBeneficio).toBe(1412);
-    expect(r.dataConsulta).toBe('2024-03-10');
     expect(r.email).toBe('cliente.teste@exemplo.com');
   });
 });
@@ -338,29 +338,29 @@ describe('propriedades defensivas', () => {
 describe('revisões RMC/RCC: código e banco da consulta (não-COMPE)', () => {
   const acha = (t: string, tipo: string) => parseFichaJudicial(t).revisoes.find((r) => r.tipo === tipo);
 
-  it('extrai código e banco de "Cartão RMC — 934 - AGIPLAN FINANCEIRA S/A"', () => {
+  it('extrai e normaliza "Cartão RMC — 934 - AGIPLAN FINANCEIRA S/A" para AGIBANK', () => {
     const r = acha('Cartão RMC — 934 - AGIPLAN FINANCEIRA S/A', 'rmc');
     expect(r).toBeDefined();
     expect(r!.bancoCodigo).toBe('934');
-    expect(r!.bancoNome).toBe('AGIPLAN FINANCEIRA S/A');
+    expect(r!.bancoNome).toBe('AGIBANK');
   });
 
-  it('extrai código e banco de "Cartão RCC — 935 - FACTA FINANCEIRA S/A"', () => {
+  it('extrai e normaliza "Cartão RCC — 935 - FACTA FINANCEIRA S/A" para FACTA', () => {
     const r = acha('Cartão RCC — 935 - FACTA FINANCEIRA S/A', 'rcc');
     expect(r).toBeDefined();
     expect(r!.bancoCodigo).toBe('935');
-    expect(r!.bancoNome).toBe('FACTA FINANCEIRA S/A');
+    expect(r!.bancoNome).toBe('FACTA');
   });
 
   it('reconhece "Reserva de Margem Consignável" como RMC e "Reserva de Cartão Consignado" como RCC', () => {
-    expect(acha('Reserva de Margem Consignável 934 - AGIPLAN FINANCEIRA S/A', 'rmc')?.bancoCodigo).toBe('934');
-    expect(acha('Reserva de Cartão Consignado - 935 - FACTA FINANCEIRA S/A', 'rcc')?.bancoCodigo).toBe('935');
+    expect(acha('Reserva de Margem Consignável 934 - AGIPLAN FINANCEIRA S/A', 'rmc')?.bancoNome).toBe('AGIBANK');
+    expect(acha('Reserva de Cartão Consignado - 935 - FACTA FINANCEIRA S/A', 'rcc')?.bancoNome).toBe('FACTA');
   });
 
   it('preserva zeros à esquerda e ignora o valor R$ no nome do banco', () => {
     const r = acha('Cartão RMC — 007 - BANCO EXEMPLO S/A - R$ 1.234,56', 'rmc');
-    expect(r!.bancoCodigo).toBe('007');
-    expect(r!.bancoNome).toBe('BANCO EXEMPLO S/A');
+    expect(r!.bancoCodigo).toBe('007');            // banco fora da tabela: código preservado
+    expect(r!.bancoNome).toBe('EXEMPLO');          // razão social encurtada (sem BANCO/S/A)
     expect(r!.valor).toBe(1234.56);
   });
 
@@ -369,8 +369,8 @@ describe('revisões RMC/RCC: código e banco da consulta (não-COMPE)', () => {
     const rmc = revs.filter((r) => r.tipo === 'rmc');
     const rcc = revs.filter((r) => r.tipo === 'rcc');
     expect(rmc).toHaveLength(1); expect(rcc).toHaveLength(1);
-    expect(rmc[0].bancoNome).toBe('AGIPLAN FINANCEIRA S/A');
-    expect(rcc[0].bancoNome).toBe('FACTA FINANCEIRA S/A');
+    expect(rmc[0].bancoNome).toBe('AGIBANK');
+    expect(rcc[0].bancoNome).toBe('FACTA');
   });
 });
 
@@ -390,8 +390,8 @@ describe('revisões RMC/RCC: layout de TABELA real (uma célula por linha, com l
     const rmc = revs.find((r) => r.tipo === 'rmc');
     const rcc = revs.find((r) => r.tipo === 'rcc');
     expect(rmc).toBeDefined(); expect(rcc).toBeDefined();
-    expect(rmc!.bancoCodigo).toBe('934'); expect(rmc!.bancoNome).toBe('AGIPLAN FINANCEIRA S/A');
-    expect(rcc!.bancoCodigo).toBe('935'); expect(rcc!.bancoNome).toBe('FACTA FINANCEIRA S/A');
+    expect(rmc!.bancoCodigo).toBe('934'); expect(rmc!.bancoNome).toBe('AGIBANK');
+    expect(rcc!.bancoCodigo).toBe('935'); expect(rcc!.bancoNome).toBe('FACTA');
     // "R$ 2.815,00" / "R$ 3.124,00" são a coluna "Valor do Contrato" (linha própria, sem label "valor") → NÃO é o valor da revisão
     expect(rmc!.valor).toBeUndefined();
     expect(rcc!.valor).toBeUndefined();
@@ -439,56 +439,44 @@ describe('extrairValorMonetarioRevisao: só valor com evidência monetária', ()
   });
 });
 
-describe('prévia da ficha: linha da revisão só "Cartão RMC/RCC: {banco}" (sem código/valor/hífen)', () => {
-  const base = { nome: 'X', dataConsulta: '2024-03-10' };
-  // normaliza NBSP (formataMoedaBRL usa espaço não-quebrável após R$) para comparação estável
+describe('prévia da ficha: REV RMC/RCC no padrão do escritório (nome curto, sem razão social)', () => {
+  const base = { nome: 'X', dataConsulta: '2026-07-23' };
   const previa = (revisoes: unknown[]) => formatarFichaJudicial({ ...base, revisoes } as never);
 
-  it('mostra só o banco do RMC e RCC — sem código, sem valor, sem hífen', () => {
+  it('mostra REV RMC/RCC com nome curto — sem código, sem razão social', () => {
     const txt = previa([
-      { tipo: 'rmc', bancoNome: 'AGIPLAN FINANCEIRA S/A', bancoCodigo: '934', valor: 2815, descricaoLivre: 'Cartão RMC' },
-      { tipo: 'rcc', bancoNome: 'FACTA FINANCEIRA S/A', bancoCodigo: '935', valor: 3124, descricaoLivre: 'Cartão RCC' },
+      { tipo: 'rmc', bancoNome: 'AGIBANK', bancoCodigo: '934' },
+      { tipo: 'rcc', bancoNome: 'FACTA', bancoCodigo: '935' },
     ]);
     const linhas = txt.split('\n');
-    expect(linhas).toContain('Cartão RMC: AGIPLAN FINANCEIRA S/A');
-    expect(linhas).toContain('Cartão RCC: FACTA FINANCEIRA S/A');
-    expect(txt).not.toContain('Cód.');
-    expect(txt).not.toContain('Valor: R$');
+    expect(linhas).toContain('REV RMC AGIBANK');
+    expect(linhas).toContain('REV RCC FACTA');
+    expect(txt).not.toContain('Cartão');
     expect(txt).not.toContain('934'); expect(txt).not.toContain('935');
-    expect(txt).not.toMatch(/S\/A -/); // sem hífen depois do banco
+    expect(txt).not.toContain('FINANCEIRA');
   });
 
-  it('banco vazio → só o rótulo, sem dois-pontos/hífen sobrando', () => {
-    const linhas = previa([{ tipo: 'rmc', bancoCodigo: '934', valor: 2815 }]).split('\n');
-    expect(linhas).toContain('Cartão RMC');
-    expect(linhas).not.toContain('Cartão RMC:');
-    expect(linhas.some((l) => /Cartão RMC:\s*$/.test(l))).toBe(false);
+  it('sem banco algum → nenhuma linha de REV (melhor faltar do que sair "REV RMC" sozinho)', () => {
+    const linhas = previa([{ tipo: 'rmc' }]).split('\n');
+    expect(linhas.some((l) => l.startsWith('REV'))).toBe(false);
+  });
+  it('só código (934) resolve o nome curto e sai "REV RMC AGIBANK"', () => {
+    expect(previa([{ tipo: 'rmc', bancoCodigo: '934' }])).toContain('REV RMC AGIBANK');
   });
 
-  it('com banco presente, ignora o rótulo cru (descricaoLivre)', () => {
-    const linhas = previa([{ tipo: 'rmc', bancoNome: 'AGIPLAN FINANCEIRA S/A', bancoCodigo: '934', descricaoLivre: 'Cartão RMC' }]).split('\n');
-    expect(linhas).toContain('Cartão RMC: AGIPLAN FINANCEIRA S/A');
-    expect(linhas).not.toContain('Cartão RMC');
+  it('valor entra quando presente: "REV RMC BMG - R$ 55,00"', () => {
+    expect(previa([{ tipo: 'rmc', bancoNome: 'BMG', valor: 55 }])).toContain('REV RMC BMG - R$ 55,00');
   });
 
-  it('reflete edição manual do banco no formulário', () => {
-    const txt = previa([{ tipo: 'rcc', bancoNome: 'BANCO EDITADO S/A', bancoCodigo: '111', valor: 500, descricaoLivre: 'Cartão RCC' }]);
-    expect(txt).toContain('Cartão RCC: BANCO EDITADO S/A');
-    expect(txt).not.toContain('FACTA');
-    expect(txt).not.toContain('111'); expect(txt).not.toContain('500');
+  it('ordem fixa: empréstimo, depois RMC, depois RCC', () => {
+    const linhas = previa([
+      { tipo: 'rcc', bancoNome: 'FACTA' },
+      { tipo: 'rmc', bancoNome: 'BANRISUL' },
+      { tipo: 'emprestimo', bancoNome: 'AGIBANK' },
+    ]).split('\n').filter((l) => l.startsWith('REV'));
+    expect(linhas).toEqual(['REV AGIBANK', 'REV RMC BANRISUL', 'REV RCC FACTA']);
   });
-
-  it('RMC e RCC juntos, sem duplicação de linha', () => {
-    const txt = previa([
-      { tipo: 'rmc', bancoNome: 'AGIPLAN FINANCEIRA S/A', bancoCodigo: '934' },
-      { tipo: 'rcc', bancoNome: 'FACTA FINANCEIRA S/A', bancoCodigo: '935' },
-    ]);
-    const rmcLinhas = txt.split('\n').filter((l) => l.startsWith('Cartão RMC'));
-    const rccLinhas = txt.split('\n').filter((l) => l.startsWith('Cartão RCC'));
-    expect(rmcLinhas).toHaveLength(1);
-    expect(rccLinhas).toHaveLength(1);
-  });
-});
+});;
 
 // ===== Banco pagador do benefício NUNCA pode ser banco de cartão/contrato (RMC/RCC/consignado) =====
 describe('banco pagador vs cartão/contrato', () => {
@@ -606,7 +594,7 @@ describe('PAN/FACTA bloqueados como banco pagador', () => {
   });
   it('4. Santander em banco pagador explícito → aceita', () => {
     const r = pag('Banco pagador: 033 - SANTANDER');
-    expect(r.bancoCodigo).toBe('033');
+    expect(r.bancoCodigo).toBe('33');
   });
   it('5. Mercantil em banco pagador explícito → aceita', () => {
     const r = pag('Banco pagador: 389 - BANCO MERCANTIL DO BRASIL');

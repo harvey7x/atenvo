@@ -14,7 +14,7 @@ const completa: FichaFmtDados = {
   nascimento: '1955-08-20', idade: 68,
   telefone: '(51) 99123-4567', estadoCivil: 'Casado(a)', email: 'cliente@exemplo.com',
   dataConsulta: '2024-03-10',
-  revisoes: [{ tipo: 'rmc', descricaoLivre: 'REV RMC DAYCOVAL - R$ 66,00' }],
+  revisoes: [{ tipo: 'rmc', bancoCodigo: '707', bancoNome: 'Daycoval', valor: 66 }],
 };
 
 describe('formatarFichaJudicial', () => {
@@ -22,7 +22,7 @@ describe('formatarFichaJudicial', () => {
     const t = formatarFichaJudicial(completa);
     expect(t).toContain('FICHA JUDICIAL');
     expect(t).toContain('GERENTE: Matheus Teste');
-    expect(t).toContain('CIDADE: Porto Alegre / RS');
+    expect(t).toContain('CIDADE: PORTO ALEGRE / RS');
     expect(t).toContain('ESPÉCIE: 41 - Aposentadoria por idade');
     expect(t).toContain('RECEBE O BENEFICIO: 121 Agibank');
     expect(t).toContain('VALOR BENEFICIO: R$');
@@ -32,18 +32,18 @@ describe('formatarFichaJudicial', () => {
   });
   it('2. campos vazios mantêm labels sem lixo', () => {
     const t = formatarFichaJudicial({});
-    expect(t).toContain('GERENTE: ');
-    expect(t).toContain('CIDADE: ');
+    expect(t).toContain('GERENTE:');
+    expect(t).toContain('CIDADE:');
     expect(t).not.toContain('undefined');
     expect(t).not.toContain('null');
     expect(t).not.toContain('NaN');
     expect(t).not.toContain('R$ 0,00');
   });
   it('3a. cidade sem UF não recebe barra', () => {
-    expect(formatarFichaJudicial({ cidade: 'Pelotas' })).toContain('CIDADE: Pelotas\n');
+    expect(formatarFichaJudicial({ cidade: 'Pelotas' })).toContain('CIDADE: PELOTAS\n');
   });
   it('3b. cidade com UF', () => {
-    expect(formatarFichaJudicial({ cidade: 'Pelotas', uf: 'RS' })).toContain('CIDADE: Pelotas / RS');
+    expect(formatarFichaJudicial({ cidade: 'Pelotas', uf: 'RS' })).toContain('CIDADE: PELOTAS / RS');
   });
   it('4. espécie incompleta sem hífen sobrando', () => {
     expect(formatarFichaJudicial({ especieCodigo: '41' })).toContain('ESPÉCIE: 41\n');
@@ -55,27 +55,27 @@ describe('formatarFichaJudicial', () => {
   });
   it('6. valor ausente não imprime R$ 0,00', () => {
     const t = formatarFichaJudicial({ valorBeneficio: 0 });
-    expect(t).toContain('VALOR BENEFICIO: \n');
+    expect(t).toContain('VALOR BENEFICIO:\n');
     expect(t).not.toContain('R$');
   });
   it('7. revisões múltiplas, uma por linha', () => {
     const t = formatarFichaJudicial({ revisoes: [{ tipo: 'rmc', bancoCodigo: '318', bancoNome: 'Banco BMG' }, { tipo: 'rcc', bancoCodigo: '935', bancoNome: 'Facta Financeira', valor: 66 }] });
-    expect(t).toContain('Cartão RMC: Banco BMG');
-    expect(t).toContain('Cartão RCC: Facta Financeira');
-    expect(t).not.toContain('Cód.'); // prévia não mostra código
-    expect(t).not.toContain('Valor: R$'); // nem valor na linha da revisão
+    expect(t).toContain('REV RMC BMG');
+    expect(t).toContain('REV RCC FACTA - R$ 66,00');
+    expect(t).not.toContain('Cartão'); // nunca o rótulo antigo
+    expect(t).not.toContain('Financeira'); // nem razão social
   });
   it('8. ficha sem senha por padrão', () => {
     const t = formatarFichaJudicial(completa);
-    expect(t).not.toContain('Senha INSS:');
+    expect(t).toContain('INSS:\n');
   });
   it('9. cópia temporária com senha quando ativada', () => {
     const t = formatarFichaJudicial(completa, { incluirSenha: true, senha: 'segredo-temp' });
-    expect(t).toContain('Senha INSS: segredo-temp');
+    expect(t).toContain('INSS: segredo-temp');
   });
   it('10. senha não aparece se toggle ativo mas senha vazia', () => {
     const t = formatarFichaJudicial(completa, { incluirSenha: true, senha: '' });
-    expect(t).not.toContain('Senha INSS:');
+    expect(t).toContain('INSS:\n');
   });
   it('11. idade sem nascimento', () => {
     expect(formatarFichaJudicial({ idade: 70 })).toContain('IDADE: 70 anos');
@@ -90,7 +90,9 @@ describe('formatarFichaJudicial', () => {
     expect(t).not.toContain('R$');
   });
   it('14. revisão manual sem descrição livre é construída', () => {
-    expect(formatarFichaJudicial({ revisoes: [{ tipo: 'agibank' }] })).toContain('AGIBANK');
+    expect(formatarFichaJudicial({ revisoes: [{ tipo: 'agibank', bancoNome: 'Agibank' }] })).toContain('REV AGIBANK');
+    // sem banco não há linha: melhor faltar do que sair "REV RMC" sozinho
+    expect(formatarFichaJudicial({ revisoes: [{ tipo: 'rmc' }] })).not.toContain('REV');
   });
   it('15. dados opcionais ausentes não quebram', () => {
     expect(() => formatarFichaJudicial({ nome: 'X' })).not.toThrow();
@@ -106,7 +108,7 @@ describe('parseMoedaBRL (regressão valor do benefício)', () => {
     const n = parseMoedaBRL('R$ 1.621,00');
     expect(n).toBe(1621);
     expect(parseMoedaBRL('1621')).toBe(1621); // string do formulário (sem separador) NÃO vira 162
-    expect(formataMoedaBRL(n!)).toBe('R$ 1.621,00');
+    expect(formataMoedaBRL(n!)).toBe('R$ 1.621,00');
   });
   it('R$ 162,00', () => { expect(parseMoedaBRL('R$ 162,00')).toBe(162); });
   it('R$ 3.135,30', () => { expect(parseMoedaBRL('R$ 3.135,30')).toBe(3135.3); });
