@@ -7,7 +7,7 @@ import { useOrgUsuarios } from '@/data/atendimento';
 import { supabase } from '@/lib/supabase';
 import { parseFichaJudicial, PARSER_VERSION, type CampoOrigem, type FichaJudicialParseResult } from '@/lib/fichaJudicialParser';
 import { formatarFichaJudicial } from '@/lib/fichaJudicialFormatter';
-import { parseMoedaBRL, cpfValido, somenteDigitos, normalizaTelefone, formataTelefoneBR, calculaIdade, hojeISOSaoPaulo } from '@/lib/fichaJudicialNormalizers';
+import { parseMoedaBRL, cpfValido, somenteDigitos, normalizaTelefone, formataTelefoneBR, calculaIdade, hojeISOSaoPaulo, resolverTelefoneFicha } from '@/lib/fichaJudicialNormalizers';
 import { conferirFichaComBloco } from '@/lib/fichaJudicialValidacao';
 import {
   useCriarFichaJudicial, useAtualizarFichaJudicial, useFinalizarFichaJudicial,
@@ -115,8 +115,10 @@ export function FichaJudicialModal({ open, onClose, vinculos, fichaInicial, modo
       responsavelId: form.responsavelId || (responsavelSugerido?.id ?? ''),
     };
     novo.nome = (r.nome ?? '').toUpperCase(); novo.cpf = r.cpf ?? ''; novo.cidade = r.cidade ?? ''; novo.uf = r.uf ?? '';
-    // telefone: SEMPRE o da seção TELEFONES do bloco. Cadastro antigo não entra na ficha.
-    novo.telefone = r.telefone ?? '';
+    // TELEFONE: SEMPRE o do contato/conversa atual do Atenvo (número do painel "Dados do cliente").
+    // O telefone do Promosys pode estar desatualizado/errado e NUNCA alimenta a ficha — nem como fallback.
+    // Guardamos o do Promosys só em telImportado para exibir o alerta de divergência.
+    novo.telefone = resolverTelefoneFicha(contatoAtual?.telefone, r.telefone).digitos;
     // e-mail: o Promosys não traz; usa o salvo no contato, se houver
     novo.email = r.email ?? contatoAtual?.email ?? '';
     setTelImportado(somenteDigitos(r.telefone ?? ''));
@@ -127,7 +129,9 @@ export function FichaJudicialModal({ open, onClose, vinculos, fichaInicial, modo
     novo.dataConsulta = r.dataConsulta || dataFicha;
     setForm(novo);
     setRevisoes(r.revisoes.map((x) => ({ tipo: x.tipo, bancoCodigo: x.bancoCodigo, bancoNome: x.bancoNome, valor: x.valor, origem: 'parser', confianca: x.confianca, requerConfirmacao: x.requerConfirmacao })));
-    setOrigem({ ...r.origemPorCampo, idade: r.idadeCalculada != null ? 'calculado' : 'nao_encontrado', dataConsulta: 'calculado' });
+    // telefone: origem é o CONTATO (não o parser). Vazio quando o contato não tem número no Atenvo.
+    const telOficial = normalizaTelefone(contatoAtual?.telefone ?? '');
+    setOrigem({ ...r.origemPorCampo, telefone: telOficial ? 'calculado' : 'nao_encontrado', idade: r.idadeCalculada != null ? 'calculado' : 'nao_encontrado', dataConsulta: 'calculado' });
     setEtapa('revisar');
   }
 
@@ -155,16 +159,30 @@ export function FichaJudicialModal({ open, onClose, vinculos, fichaInicial, modo
 
   const previa = useMemo(() => formatarFichaJudicial(dadosFmt, { incluirSenha: false }), [dadosFmt]);
 
+  // Alerta de telefone: o Promosys NUNCA alimenta a ficha. Se trouxe número diferente do contato, avisa
+  // que foi ignorado; se o contato não tem número no Atenvo, avisa que a ficha ficará sem telefone.
+  const alertaTelefone = useMemo(
+    () => (parse ? resolverTelefoneFicha(contatoAtual?.telefone, telImportado).alerta : null),
+    [parse, contatoAtual, telImportado],
+  );
+
+  // Avisos do parser sobre o telefone do Promosys não valem mais (o número não entra na ficha).
+  const PROMOSYS_TEL_IRRELEVANTE = new Set(['TELEFONE_NAO_ENCONTRADO', 'TELEFONES_CONCORRENTES']);
   // Alertas do bloco colado (campo obrigatório não encontrado) — nunca inventamos o dado.
-  const alertas = useMemo(() => (parse?.avisos ?? []).filter((a) => a.mensagem.startsWith('ALERTA')), [parse]);
-  const observacoes = useMemo(() => (parse?.avisos ?? []).filter((a) => !a.mensagem.startsWith('ALERTA')), [parse]);
+  const alertas = useMemo(() => {
+    const base = (parse?.avisos ?? []).filter((a) => a.mensagem.startsWith('ALERTA') && !PROMOSYS_TEL_IRRELEVANTE.has(a.codigo)).map((a) => a.mensagem);
+    if (alertaTelefone) base.push(alertaTelefone);
+    return base;
+  }, [parse, alertaTelefone]);
+  const observacoes = useMemo(() => (parse?.avisos ?? []).filter((a) => !a.mensagem.startsWith('ALERTA') && !PROMOSYS_TEL_IRRELEVANTE.has(a.codigo)).map((a) => a.mensagem), [parse]);
   // Conferência final: tudo que estiver na ficha e não no bloco colado aparece aqui (anti-ficha-antiga).
+  // Telefone NÃO entra na conferência: por regra a ficha diverge do Promosys (usa o número do contato).
   const divergencias = useMemo(() => (parse ? conferirFichaComBloco(parse, {
     nome: form.nome, cpf: form.cpf, beneficioNumero: form.beneficioNumero,
     especieCodigo: form.especieCodigo, especieDescricao: form.especieDescricao,
     valorBeneficio: parseMoedaBRL(form.valorBeneficio) ?? null,
     bancoCodigo: form.bancoCodigo, bancoNome: form.bancoNome,
-    telefone: form.telefone, nascimento: form.nascimento,
+    nascimento: form.nascimento,
     revisoes,
   }) : []), [parse, form, revisoes]);
 
@@ -186,8 +204,7 @@ export function FichaJudicialModal({ open, onClose, vinculos, fichaInicial, modo
         const patch: Record<string, unknown> = {};
         if (form.nome) patch.nome = form.nome;
         if (form.cpf) patch.cpf = form.cpf;
-        // telefone: ao atualizar o contato, aplica o IMPORTADO (decisão explícita do operador)
-        if (normalizaTelefone(telImportado)) patch.telefone = normalizaTelefone(telImportado);
+        // TELEFONE do contato NUNCA é sobrescrito pelo Promosys: o número do Atenvo é a fonte da verdade.
         if (form.email) patch.email = form.email;
         if (Object.keys(patch).length) await supabase.from('contatos').update(patch).eq('id', vinculos.contatoId);
         qc.invalidateQueries({ queryKey: ['contatos'] });
@@ -226,7 +243,7 @@ export function FichaJudicialModal({ open, onClose, vinculos, fichaInicial, modo
     if (!form.beneficioNumero.trim()) return 'Informe o número do benefício.';
     if (!form.especieCodigo.trim() && !form.especieDescricao.trim()) return 'Informe a espécie.';
     if (!form.tipoBeneficio) return 'Selecione o tipo de benefício.';
-    if (!form.telefone.trim()) return 'Informe o telefone.';
+    if (!form.telefone.trim()) return 'Sem telefone: o contato do Atenvo não tem número. Informe o telefone manualmente.';
     if (!form.dataConsulta) return 'Informe a data da ficha.';
     if (bancoPagadorPendente()) return 'Revisar banco de recebimento. PAN/FACTA não devem ser usados como banco pagador do benefício.';
     return null;
@@ -273,12 +290,10 @@ export function FichaJudicialModal({ open, onClose, vinculos, fichaInicial, modo
     add('CPF', contatoAtual?.cpf, form.cpf);
     add('E-mail', contatoAtual?.email, form.email);
     add('Nº benefício', oportunidadeAtual?.numeroBeneficio, form.beneficioNumero);
-    // telefone: compara cadastro × importado (não o valor já resolvido no form); vazio/inválido não gera divergência
-    const telA = normalizaTelefone(contatoAtual?.telefone || '');
-    const telB = normalizaTelefone(telImportado || form.telefone || '');
-    if (telA && telB && telA !== telB) c.push({ campo: 'Telefone', atual: formataTelefoneBR(telA), importado: formataTelefoneBR(telB) });
+    // Telefone NÃO entra aqui: o número do Promosys é ignorado por regra e o telefone do contato
+    // nunca é sobrescrito. A divergência com o Promosys é mostrada no alerta dedicado (alertaTelefone).
     return c;
-  }, [contatoAtual, oportunidadeAtual, form, telImportado]);
+  }, [contatoAtual, oportunidadeAtual, form]);
 
   const titulo = (
     <div>
@@ -313,11 +328,11 @@ export function FichaJudicialModal({ open, onClose, vinculos, fichaInicial, modo
           <div className="fj-rev">
             {alertas.length > 0 && (
               <div className="fj-alertas">
-                {alertas.map((a) => <div className="fj-alerta" key={a.codigo}>{a.mensagem}</div>)}
+                {alertas.map((m, i) => <div className="fj-alerta" key={i}>{m}</div>)}
               </div>
             )}
             {observacoes.length > 0 && (
-              <div className="fj-obs">{observacoes.map((a) => <div key={a.codigo + (a.campo ?? '')}>{a.mensagem}</div>)}</div>
+              <div className="fj-obs">{observacoes.map((m, i) => <div key={i}>{m}</div>)}</div>
             )}
             {divergencias.length > 0 && (
               <div className="fj-alertas">
@@ -333,7 +348,7 @@ export function FichaJudicialModal({ open, onClose, vinculos, fichaInicial, modo
               {campo('Idade', <input className="atv-input" value={idadeCalc != null ? `${idadeCalc} anos` : ''} readOnly disabled title="Calculada a partir do nascimento e da data da ficha" />, <span className="fj-ind ok">Calculada</span>)}
               {campo('Cidade', <input className="atv-input" value={form.cidade} onChange={(e) => setF({ cidade: e.target.value })} disabled={readOnly} />, ind('cidade'))}
               {campo('UF', <input className="atv-input" maxLength={2} value={form.uf} onChange={(e) => setF({ uf: e.target.value.toUpperCase() })} disabled={readOnly} />, ind('uf'))}
-              {campo('Telefone', <input className="atv-input" value={form.telefone} onChange={(e) => setF({ telefone: e.target.value })} disabled={readOnly} />, ind('telefone'))}
+              {campo('Telefone', <input className="atv-input" value={form.telefone} onChange={(e) => setF({ telefone: e.target.value })} disabled={readOnly} title="Vem do contato/conversa do Atenvo — o número do Promosys nunca é usado" />, form.telefone.trim() ? <span className="fj-ind ok">Do contato</span> : <span className="fj-ind warn">Sem telefone</span>)}
               {campo('E-mail', <input className="atv-input" value={form.email} onChange={(e) => setF({ email: e.target.value })} disabled={readOnly} />, ind('email'))}
               {campo('RG', <input className="atv-input" value={form.rg} onChange={(e) => setF({ rg: e.target.value })} disabled={readOnly} />)}
               {campo('Estado civil', <input className="atv-input" value={form.estadoCivil} onChange={(e) => setF({ estadoCivil: e.target.value })} disabled={readOnly} />)}
@@ -382,7 +397,7 @@ export function FichaJudicialModal({ open, onClose, vinculos, fichaInicial, modo
               <div className="fj-conflitos">
                 <div className="fj-sec">Divergências com o cadastro</div>
                 {conflitos.map((c) => <div className="fj-confrow" key={c.campo}><strong>{c.campo}</strong><span>atual: {c.atual}</span><span>importado: {c.importado}</span></div>)}
-                <label className="fj-chk"><input type="checkbox" checked={atualizarContatoChk} onChange={(e) => setAtualizarContato(e.target.checked)} /> Atualizar dados do contato (nome/CPF/telefone/e-mail)</label>
+                <label className="fj-chk"><input type="checkbox" checked={atualizarContatoChk} onChange={(e) => setAtualizarContato(e.target.checked)} /> Atualizar dados do contato (nome/CPF/e-mail)</label>
                 <label className="fj-chk"><input type="checkbox" checked={atualizarOportunidadeChk} onChange={(e) => setAtualizarOportunidade(e.target.checked)} /> Atualizar dados da oportunidade (benefício/instituição)</label>
               </div>
             )}
@@ -392,7 +407,7 @@ export function FichaJudicialModal({ open, onClose, vinculos, fichaInicial, modo
         {etapa === 'previa' && (
           <div className="fj-previa">
             {alertas.length > 0 && (
-              <div className="fj-alertas">{alertas.map((a) => <div className="fj-alerta" key={a.codigo}>{a.mensagem}</div>)}</div>
+              <div className="fj-alertas">{alertas.map((m, i) => <div className="fj-alerta" key={i}>{m}</div>)}</div>
             )}
             <pre className="fj-doc">{previa}</pre>
             {!readOnly && (

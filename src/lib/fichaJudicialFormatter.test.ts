@@ -117,16 +117,24 @@ describe('parseMoedaBRL (regressão valor do benefício)', () => {
   it('vazio/sem número', () => { expect(parseMoedaBRL('')).toBeUndefined(); expect(parseMoedaBRL('abc')).toBeUndefined(); });
 });
 
-describe('telefone da ficha (prioridade e formatação)', () => {
-  it('1. telefone do contato prevalece sobre importado', () => {
-    expect(resolverTelefoneFicha('51991971366', '51995627580')).toEqual({ digitos: '51991971366', origem: 'contato' });
+describe('telefone da ficha (contato do Atenvo, NUNCA Promosys)', () => {
+  it('1. usa o telefone do contato; Promosys diferente gera alerta e é ignorado', () => {
+    const r = resolverTelefoneFicha('51991971366', '51995627580');
+    expect(r.digitos).toBe('51991971366');
+    expect(r.origem).toBe('contato');
+    expect(r.alerta).toBe('Telefone do Promosys ignorado. Usando telefone do contato Atenvo: (51) 99197-1366.');
   });
-  it('2/3. fallback para contato (cadastro/conversa)', () => {
-    expect(resolverTelefoneFicha('(51) 99197-1366', '51995627580').digitos).toBe('51991971366');
+  it('2. telefone do contato mascarado é normalizado; sem alerta quando Promosys ausente', () => {
+    const r = resolverTelefoneFicha('(51) 99197-1366', null);
+    expect(r.digitos).toBe('51991971366');
+    expect(r.alerta).toBeNull();
   });
-  it('4. fallback para importado só quando contato sem telefone', () => {
-    expect(resolverTelefoneFicha('', '51995627580')).toEqual({ digitos: '51995627580', origem: 'importado' });
-    expect(resolverTelefoneFicha(null, null)).toEqual({ digitos: '', origem: 'vazio' });
+  it('3. Promosys igual ao contato → sem alerta', () => {
+    expect(resolverTelefoneFicha('51991971366', '51991971366').alerta).toBeNull();
+  });
+  it('4. contato SEM telefone → vazio + alerta; Promosys NUNCA é fallback', () => {
+    expect(resolverTelefoneFicha('', '51995627580')).toEqual({ digitos: '', origem: 'vazio', alerta: 'ALERTA: o contato do Atenvo não tem telefone. Preencha o telefone manualmente.' });
+    expect(resolverTelefoneFicha(null, null).digitos).toBe('');
   });
   it('5. DDI 55 removido apenas na apresentação (comprimento compatível)', () => {
     expect(formataTelefoneBR('5551991971366')).toBe('(51) 99197-1366');

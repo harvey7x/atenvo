@@ -66,13 +66,25 @@ export function parseMoedaBRL(s: string): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
-/** Resolve o telefone da ficha por prioridade: contato (cadastro/conversa) > importado (parser). */
-export function resolverTelefoneFicha(telContato?: string | null, telImportado?: string | null): { digitos: string; origem: 'contato' | 'importado' | 'vazio' } {
-  const c = normalizaTelefone(telContato || '');
-  if (c) return { digitos: c, origem: 'contato' };
-  const p = normalizaTelefone(telImportado || '');
-  if (p) return { digitos: p, origem: 'importado' };
-  return { digitos: '', origem: 'vazio' };
+/**
+ * Telefone OFICIAL da ficha judicial.
+ * REGRA CRÍTICA: o número vem SEMPRE do contato/conversa atual do Atenvo. O telefone do Promosys
+ * (`telPromosys`) NUNCA alimenta a ficha — nem como fallback. Ele serve apenas para gerar o alerta de
+ * divergência. Sem telefone no contato → vazio + alerta (o operador preenche à mão; nunca inventamos).
+ */
+export function resolverTelefoneFicha(
+  telContato?: string | null,
+  telPromosys?: string | null,
+): { digitos: string; origem: 'contato' | 'vazio'; alerta: string | null } {
+  const oficial = normalizaTelefone(telContato || '');
+  const promosys = normalizaTelefone(telPromosys || '');
+  if (!oficial) {
+    return { digitos: '', origem: 'vazio', alerta: 'ALERTA: o contato do Atenvo não tem telefone. Preencha o telefone manualmente.' };
+  }
+  if (promosys && promosys !== oficial) {
+    return { digitos: oficial, origem: 'contato', alerta: `Telefone do Promosys ignorado. Usando telefone do contato Atenvo: ${formataTelefoneBR(oficial)}.` };
+  }
+  return { digitos: oficial, origem: 'contato', alerta: null };
 }
 
 /** Moeda BRL para exibição. Espaço normal (o ICU usa NBSP e a ficha vai para o WhatsApp como texto). */

@@ -13,7 +13,6 @@ export interface FichaConferivel {
   valorBeneficio?: number | null;
   bancoCodigo?: string;
   bancoNome?: string;
-  telefone?: string;
   nascimento?: string;
   revisoes?: { tipo: string; bancoNome?: string }[];
 }
@@ -41,7 +40,8 @@ export function conferirFichaComBloco(p: FichaJudicialParseResult, f: FichaConfe
   }
   if (p.bancoNome && !eq(p.bancoNome, f.bancoNome ?? '')) add('Banco pagador', f.bancoNome || '(vazio)', p.bancoNome);
   if (p.bancoCodigo && dig(p.bancoCodigo) !== dig(f.bancoCodigo)) add('Cód. do banco', f.bancoCodigo || '(vazio)', p.bancoCodigo);
-  if (p.telefone && dig(p.telefone) !== dig(f.telefone)) add('Telefone', f.telefone || '(vazio)', p.telefone);
+  // Telefone é OMITIDO de propósito: por regra a ficha usa o número do contato do Atenvo, não o do
+  // Promosys — logo divergir do bloco é o comportamento correto, não um erro a sinalizar aqui.
   if (p.nascimento && p.nascimento !== (f.nascimento || '')) add('Nascimento', f.nascimento || '(vazio)', p.nascimento);
 
   // REVs: qualquer REV da ficha que não exista no bloco é contaminação de ficha anterior.
