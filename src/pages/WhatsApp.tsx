@@ -1068,7 +1068,18 @@ export function WhatsApp() {
         ) : (
         <div className="conv-list">
           {filtered.length === 0 ? (
-            <div style={{ padding: '30px 12px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>Nenhuma conversa nesta aba.</div>
+            // "vazio" e "carregando" são coisas diferentes: enquanto a lista não chega, dizer
+            // "Nenhuma conversa" é MENTIRA e é o que dava a sensação de tela piscando vazia.
+            (WA_REAL && live.isLoading && contacts.length === 0)
+              ? <div className="conv-skel" aria-busy="true" aria-label="Carregando conversas">
+                  {[0, 1, 2, 3, 4, 5].map((i) => (
+                    <div className="conv-skel-row" key={i}>
+                      <span className="conv-skel-av" />
+                      <span className="conv-skel-lines"><i style={{ width: (58 + (i % 3) * 12) + '%' }} /><i style={{ width: (72 - (i % 4) * 9) + '%' }} /></span>
+                    </div>
+                  ))}
+                </div>
+              : <div style={{ padding: '30px 12px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>Nenhuma conversa nesta aba.</div>
           ) : filtered.map((c) => {
             const wait = c.aguardando ? tempoEspera(c.aguardandoDesde) : null;
             // atendente responsável — mesma ordem da etiqueta: conversa -> contato -> oportunidade
