@@ -243,7 +243,7 @@
   .scripts-page .app:not(.editor-open) .reopen {display:inline-flex}
 }
 @media (max-width:1023px){
-  .scripts-page .panel-cats {position:fixed;top:0;left:234px;height:100dvh;width:300px;max-width:80vw;transform:translateX(-340px);transition:transform .26s ease;z-index:50;border-radius:0;box-shadow:var(--shadow-pop)}
+  .scripts-page .panel-cats {position:fixed;top:0;left:var(--sb-w);height:100dvh;width:300px;max-width:80vw;transform:translateX(-340px);transition:transform .26s ease;z-index:50;border-radius:0;box-shadow:var(--shadow-pop)}
   .scripts-page.cats-open .panel-cats {transform:none}
   .scripts-page .cats-toggle {display:inline-flex}
 }

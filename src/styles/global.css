@@ -42,23 +42,69 @@ a{color:inherit;text-decoration:none}
 *{scrollbar-width:thin;scrollbar-color:rgba(120,130,145,.30) transparent}
 
 /* ===== APP SHELL ===== */
+/* largura da barra lateral — compacta por padrão; body.sb-expandida vem do componente Sidebar */
+:root{--sb-w:72px}
+body.sb-expandida{--sb-w:234px}
 .app{display:flex;height:100dvh;overflow:hidden}
 .col-main{min-width:0;height:100dvh;display:flex;flex-direction:column;overflow:hidden;flex:1}
 
-.sidebar{width:234px;flex:none;background:var(--surface);border-right:1px solid var(--line);padding:20px 14px 14px;display:flex;flex-direction:column;height:100dvh}
+.sidebar{width:var(--sb-w);flex:none;background:var(--surface);border-right:1px solid var(--line);padding:20px 14px 14px;display:flex;flex-direction:column;height:100dvh;
+  transition:width .18s ease}
 .brand{display:flex;flex-direction:column;gap:5px;padding:4px 6px 0}
+.brand-top{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%}
 .logo{display:inline-flex;align-items:center;gap:8px}
 .logo .mark{width:32px;height:32px;flex:none}
-.logo-text{font-size:25px;font-weight:500;letter-spacing:-.015em;color:var(--logo-ink)}
+.logo-text{font-size:25px;font-weight:500;letter-spacing:-.015em;color:var(--logo-ink);white-space:nowrap}
 .brand-sub{font-size:11px;font-weight:400;color:var(--muted);letter-spacing:.01em;padding-left:1px}
-.nav{margin-top:22px;display:flex;flex-direction:column;gap:3px;flex:1;overflow-y:auto}
+.nav{margin-top:22px;display:flex;flex-direction:column;gap:3px;flex:1;overflow-y:auto;overflow-x:hidden}
 .nav-group-label{font-size:10.5px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;padding:14px 11px 6px}
-.nav-item{display:flex;align-items:center;gap:12px;padding:10px 11px;border-radius:10px;color:var(--ink-2);font-size:14.5px;font-weight:500;cursor:pointer;border:0;background:transparent;width:100%;text-align:left;transition:background .14s,color .14s}
+.nav-item{position:relative;display:flex;align-items:center;gap:12px;padding:10px 11px;border-radius:10px;color:var(--ink-2);font-size:14.5px;font-weight:500;cursor:pointer;border:0;background:transparent;width:100%;text-align:left;transition:background .14s,color .14s}
 .nav-item svg{width:21px;height:21px;flex:none;color:var(--muted);transition:color .14s}
+.nav-item .nav-tx{white-space:nowrap;overflow:hidden}
 .nav-item:hover{background:var(--hover)}
 .nav-item.active{background:var(--accent-soft);color:var(--accent-ink)}
 .nav-item.active svg{color:var(--accent)}
+.nav-item:focus-visible{outline:none;box-shadow:0 0 0 2px var(--ring)}
+
+/* ---- barra lateral compacta (icon rail) ---- */
+/* sem padding lateral: o trilho ocupa a largura toda para o indicador do item ativo
+   encostar na borda esquerda sem ser cortado pelo overflow do .nav */
+.sidebar.compacta{padding:18px 0 12px;align-items:center}
+.sidebar.compacta .brand{padding:0;align-items:center;width:100%}
+.sidebar.compacta .brand-top{flex-direction:column;justify-content:center;gap:10px}
+.sidebar.compacta .logo{justify-content:center}
+.sidebar.compacta .nav{margin-top:16px;width:100%;align-items:center}
+.sidebar.compacta .nav-item{width:44px;height:44px;padding:0;justify-content:center;gap:0;border-radius:12px}
+.sidebar.compacta .nav-item .nav-tx{display:none}
+/* item ativo no trilho: pastilha cheia + anel discreto (nada fora da caixa, para não
+   ser cortado pelo overflow do .nav) */
+.sidebar.compacta .nav-item.active{box-shadow:inset 0 0 0 1px var(--accent)}
+.nav-sep{width:26px;height:1px;background:var(--line);margin:10px 0 8px;flex:none}
+
+/* botão de recolher/expandir */
+.sb-toggle{flex:none;width:26px;height:26px;border:0;border-radius:8px;background:transparent;color:var(--muted);
+  display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:background .14s,color .14s}
+.sb-toggle svg{width:16px;height:16px;transition:transform .18s ease}
+.sb-toggle:hover{background:var(--hover);color:var(--ink-2)}
+.sb-toggle:focus-visible{outline:none;box-shadow:0 0 0 2px var(--ring)}
+.sidebar:not(.compacta) .sb-toggle svg{transform:rotate(180deg)}
+
+/* tooltip do modo compacto (position:fixed — não é cortado pelo overflow da barra) */
+.sb-tip{position:fixed;z-index:350;transform:translateY(-50%);pointer-events:none;white-space:nowrap;
+  background:var(--ink);color:#fff;font-size:12.5px;font-weight:500;line-height:1;padding:7px 10px;border-radius:8px;
+  box-shadow:var(--shadow-pop)}
+[data-theme="dark"] .sb-tip{background:#22324a;border:1px solid var(--line-2)}
+
 .side-foot{margin-top:10px;border-top:1px solid var(--line);padding-top:12px;display:flex;flex-direction:column;gap:12px}
+.sidebar.compacta .side-foot{width:44px;align-items:center;gap:8px}
+.foot-ic{width:38px;height:38px;border:0;border-radius:11px;background:transparent;color:var(--muted);
+  display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:background .14s,color .14s}
+.foot-ic svg{width:19px;height:19px}
+.foot-ic:hover{background:var(--hover);color:var(--ink-2)}
+.foot-ic:focus-visible{outline:none;box-shadow:0 0 0 2px var(--ring)}
+.sidebar.compacta .user{width:44px;padding:3px 0;justify-content:center;border-radius:12px}
+.sidebar.compacta .user .meta,.sidebar.compacta .user .chev{display:none}
+.user:focus-visible{outline:none;box-shadow:0 0 0 2px var(--ring)}
 .theme-row{display:flex;align-items:center;gap:10px;padding:0 4px}
 .theme-row .lbl{font-size:13px;color:var(--ink-2);font-weight:500}
 .theme-row .ic{color:var(--muted);display:inline-flex}.theme-row .ic svg{width:16px;height:16px}
@@ -214,11 +260,10 @@ select.ctrl{cursor:pointer;appearance:none;background-image:url("data:image/svg+
 
 .center-screen{min-height:100dvh;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:14px}
 
+/* em telas estreitas a barra é forçada a compacta pelo próprio componente (matchMedia),
+   sem sobrescrever a preferência salva — por isso não há mais regras de largura aqui. */
 @media (max-width:860px){
-  .sidebar{width:72px;padding:18px 10px 12px}
-  .brand-sub,.logo-text,.nav-item span,.nav-group-label,.theme-row .lbl,.user .meta,.user .chev{display:none}
-  .logo{justify-content:center}.nav-item{justify-content:center;padding:11px 0}
-  .theme-row{justify-content:center}.user{justify-content:center;padding:8px 0}
+  body.sb-expandida{--sb-w:72px}
 }
 
 /* toast variante warn (porte WhatsApp) */
