@@ -269,13 +269,11 @@ Deno.serve(async (req) => {
             nao_lidas: ((cv?.nao_lidas as number) ?? 0) + 1,
           }).eq('id', conversaId);
 
-          // --- Kanban: auto-entrada só para contato NOVO. Best-effort. ---
-          if (contatoNovo) {
-            try {
-              const { data: funil } = await db.from('funis').select('id').eq('organizacao_id', orgId).eq('padrao', true).eq('arquivado', false).limit(1).maybeSingle();
-              if (funil?.id) await db.rpc('garantir_oportunidade_entrada', { p_contato: contatoId, p_funil: funil.id, p_origem: 'WhatsApp', p_conversa: conversaId, p_canal: canal.id });
-            } catch (_k) { /* Kanban nunca interrompe a ingestão */ }
-          }
+          // --- Kanban: todo inbound garante LEAD NOVO (não só contato novo). RPC central resolve
+          //     o funil principal, é idempotente e não reentra opp fechada. Best-effort. ---
+          try {
+            await db.rpc('garantir_oportunidade_lead_novo', { p_contato: contatoId, p_conversa: conversaId, p_canal: canal.id, p_origem: 'WhatsApp' });
+          } catch (_k) { /* Kanban nunca interrompe a ingestão */ }
 
           // --- bot: DESLIGADO no Bloco 2 (transporte primeiro). ---
           if (BOT_DISPATCH) { /* dispatch entra num bloco próprio, com master consciente */ }

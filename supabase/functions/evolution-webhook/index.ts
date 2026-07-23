@@ -520,12 +520,15 @@ Deno.serve(async (req) => {
         try { (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime?.waitUntil?.(dispatch); } catch { /* sem waitUntil: segue fire-and-forget */ }
       }
 
-      // Auto-entrada no Kanban: SOMENTE contato recém-criado nesta execução (entrada, não fromMe). Best-effort: nunca quebra o webhook.
+      // Auto-entrada no Kanban: TODO inbound de contato garante LEAD NOVO (não só recém-criado —
+      // contato pré-existente sem oportunidade também entra ao voltar a falar). A RPC central
+      // resolve o funil principal, é idempotente (não duplica opp ativa) e NÃO reentra contato
+      // que já teve opp fechada (decisão do dono). Best-effort: nunca quebra o webhook.
       let kanbanErro: string | null = null;
-      if (contatoCriadoAgora && contatoId) {
+      if (contatoId) {
         try {
-          const { data: funil } = await admin.from('funis').select('id').eq('organizacao_id', orgId).eq('padrao', true).eq('arquivado', false).limit(1).maybeSingle();
-          if (funil?.id) { const { error: re } = await admin.rpc('garantir_oportunidade_entrada', { p_contato: contatoId, p_funil: funil.id, p_origem: 'WhatsApp', p_conversa: conversaId, p_canal: canal.id }); if (re) kanbanErro = `${re.code ?? ''}:${(re.message ?? '').slice(0, 80)}`; }
+          const { error: re } = await admin.rpc('garantir_oportunidade_lead_novo', { p_contato: contatoId, p_conversa: conversaId, p_canal: canal.id, p_origem: 'WhatsApp' });
+          if (re) kanbanErro = `${re.code ?? ''}:${(re.message ?? '').slice(0, 80)}`;
         } catch (ke) { kanbanErro = String((ke as Error).message ?? 'rpc').slice(0, 80); }
       }
       await finish('processado', { ignorado_motivo: kanbanErro ? ('kanban_erro:' + kanbanErro) : (resolvidoViaMapa ? 'lid_resolvido_via_mapa' : (phone ? null : 'lid_sem_telefone')) });
