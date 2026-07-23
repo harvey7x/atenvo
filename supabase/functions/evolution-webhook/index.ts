@@ -1,4 +1,10 @@
 // evolution-webhook — eventos da Evolution. Sem JWT. Secret via webhook_config (constante).
+// v30: NONO DÍGITO — a resolução do contato deixa de ser por igualdade exata de valor_normalizado
+//      e passa pela RPC wa_resolver_contato_por_numero (chave canônica = DDD + últimos 8). A
+//      Evolution entrega o mesmo cliente ora como 55+DDD+8 ora como 55+DDD+9, e o casamento exato
+//      criava um CONTATO NOVO a cada troca de forma (14 grupos / 29 contatos duplicados até aqui).
+//      A RPC absorveu também o fallback por contatos.telefone. Nada mais muda: valor_normalizado
+//      continua intacto (é ele que vira destino do envio), LID/wa_lid_map iguais, conversa igual.
 // v29: (a) canal 'removido' NÃO é reativado por connection.update (fim do "canal aposentado volta sozinho");
 //      (b) consolidação por número virou DETECÇÃO DE CONFLITO (wa_consolidar_canal_por_numero não funde mais
 //      silenciosamente — marca conflito_com); (c) entrega suavizada (instavel antes de restrito, 3 erros).
@@ -332,9 +338,17 @@ Deno.serve(async (req) => {
 
       let contatoId: string | null = null;
       let contatoCriadoAgora = false; // true apenas no ramo que INSERE contato novo (auto-entrada no Kanban)
-      if (phone) { const { data: i } = await admin.from('contato_identidades').select('contato_id').eq('organizacao_id', orgId).eq('tipo', 'whatsapp').eq('valor_normalizado', phone).maybeSingle(); if (i) contatoId = i.contato_id; }
+      // v30: resolve por CHAVE CANÔNICA (DDD + últimos 8), não por igualdade exata. A Evolution
+      // entrega o mesmo cliente ora com ora sem o nono dígito — o casamento exato criava contato
+      // novo a cada troca de forma (14 grupos duplicados até aqui). A RPC também cobre o fallback
+      // por contatos.telefone, então o lookup manual por telefone saiu daqui.
+      // `phone` já vem de digits(), que corta em ':'/'@' antes de tirar não-dígitos — sem esse
+      // corte, um JID com sufixo de dispositivo viraria um número errado.
+      if (phone) {
+        const { data: cid } = await admin.rpc('wa_resolver_contato_por_numero', { p_org: orgId, p_numero: phone });
+        if (cid) contatoId = cid as string;
+      }
       if (!contatoId && lid) { const { data: i } = await admin.from('contato_identidades').select('contato_id').eq('organizacao_id', orgId).eq('tipo', 'outro').eq('provedor', 'evolution_lid').eq('valor_normalizado', lid).maybeSingle(); if (i) contatoId = i.contato_id; }
-      if (!contatoId && phone) { const { data: c } = await admin.from('contatos').select('id').eq('organizacao_id', orgId).eq('telefone', phone).maybeSingle(); if (c) contatoId = c.id; }
       if (!contatoId) {
         const { data: novo, error: e1 } = await admin.from('contatos').insert({ nome: nomeContato, telefone: phone ?? null, origem: 'WhatsApp', organizacao_id: orgId, identidade_tipo: identTipo, identidade_fonte: phone ? 'webhook_pn' : 'webhook_lid', identidade_resolvida_em: phone ? agoraIso : null }).select('id').single();
         if (e1 || !novo) { await finish('erro', { erro: `contatos:${e1?.code ?? ''}:${(e1?.message ?? 'sem retorno').slice(0,180)}` }); return json({ ok: true }); }
