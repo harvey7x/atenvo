@@ -1146,8 +1146,11 @@ export function WhatsApp() {
                   {c.fixada && <i className="cflag" title="Fixada" aria-label="Fixada">📌</i>}
                   {c.silenciada && <i className="cflag" title="Silenciada" aria-label="Silenciada">🔕</i>}
                   {c.arquivada && <i className="cflag" title="Arquivada" aria-label="Arquivada">🗄️</i>}
-                  <span className="cname">{nomeVazio ? 'Cliente sem nome' : formatarNomeCliente(c.name)}</span>
-                  {nomeVazio && telSec && <span className="cphone-inline">· {telSec}</span>}
+                  {/* sem nome cadastrado: o telefone MASCARADO é o identificador real do cliente e
+                      vira o rótulo — "Cliente sem nome" + telefone ocupava duas vagas e truncava os
+                      dois. A pendência de cadastro continua sinalizada pelo chip "Nome incompleto".
+                      Sem telefone (contato LID-only) cai no rótulo genérico, nunca no LID. */}
+                  <span className="cname">{nomeVazio ? (telSec || 'Cliente sem nome') : formatarNomeCliente(c.name)}</span>
                   <span className="ctime" title={'Última interação: ' + c.time}>{c.lastAtMs ? tempoRelativo(new Date(c.lastAtMs).toISOString(), relogioMs) : c.time}</span>
                 </div>
                 <div className="crow crow-prev">

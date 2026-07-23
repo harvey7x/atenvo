@@ -646,7 +646,6 @@
 .wa-app .conv .crow{align-items:center;gap:6px}
 .wa-app .conv .cflag{font-size:10px;line-height:1;flex:none;font-style:normal}
 .wa-app .conv .cname{font-size:14px;font-weight:700;flex:0 1 auto;min-width:0}
-.wa-app .conv .cphone-inline{font-size:11px;color:var(--muted);flex:none;white-space:nowrap}
 .wa-app .conv .ctime{margin-left:auto;font-size:11px;color:var(--muted);flex:none;white-space:nowrap}
 
 /* linha 2 — prévia + não lidas (badge sobe para junto do conteúdo, como na referência) */
