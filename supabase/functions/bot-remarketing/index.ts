@@ -175,10 +175,14 @@ Deno.serve(async (req) => {
       // seja, ler dali para enviar faria o remarketing sair pelo chip de TRÁFEGO, que é
       // exatamente o que derrubava os números. A coluna fica como registro histórico
       // ("de onde a conversa veio") e NUNCA mais decide destino.
+      // organizacao_id vem da FILA (bot_remarketing_due). Sem ela, wa_canal_disparo(null) devolve
+      // null e o toque vira 'sem_canal_disparo' pelo motivo errado — parecendo comportamento certo.
       const orgRow = (row.organizacao_id as string | null) ?? null;
-      const { data: canalDisparoId } = orgRow
-        ? await admin.rpc('wa_canal_disparo', { p_org: orgRow })
-        : { data: null };
+      if (!orgRow) {
+        resultados.push({ id: row.id, toque: row.toque, status_envio: 'sem_organizacao' });
+        continue;
+      }
+      const { data: canalDisparoId } = await admin.rpc('wa_canal_disparo', { p_org: orgRow });
 
       if (!canalDisparoId) {
         // Nenhum canal de disparo, ou ambíguo (2+ sem disparo_padrao). NÃO cai para a Evolution
