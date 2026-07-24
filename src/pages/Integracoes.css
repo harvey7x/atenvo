@@ -401,6 +401,11 @@
 .integracoes-page .adapter-note.matq-aviso svg{color:var(--purple)}
 .integracoes-page .adapter-note.matq-aviso .tx{color:var(--ink-2)}
 .integracoes-page .adapter-note.matq-aviso .tx b{color:var(--ink)}
+/* Pílula de score da conta na linha do chip — cor pela classe (saudavel/atencao/risco). */
+.integracoes-page .badge.matq-score{font-variant-numeric:tabular-nums}
+.integracoes-page .badge.matq-score.sc-saudavel{background:var(--ok-soft);color:var(--ok)}
+.integracoes-page .badge.matq-score.sc-atencao{background:var(--warn-soft);color:var(--warn)}
+.integracoes-page .badge.matq-score.sc-risco{background:var(--err-soft);color:var(--err)}
 
 /* ---- Modais (renderizados fora de .integracoes-page: sem prefixo de página) ---- */
 .matq-lead{font-size:13px;color:var(--ink-2);line-height:1.55;margin:0 0 14px}

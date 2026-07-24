@@ -15,7 +15,7 @@ import {
   MATURACAO_REAL, usePainelMaturacao, useCriarChip, useAtualizarChip, useExcluirChip,
   useQrChip, useStatusChip, formatarNumero,
   useProxyChip, useDefinirProxy, useRemoverProxy, useAplicarProxy, PROXY_PROTOCOLOS,
-  STATUS_MATURACAO_LABEL, STATUS_INTEGRACAO_LABEL,
+  STATUS_MATURACAO_LABEL, STATUS_INTEGRACAO_LABEL, SCORE_CLASSE_LABEL,
   type ChipPainel, type StatusIntegracao, type StatusMaturacao, type ProxyProtocolo,
 } from '@/data/maturacao';
 import './Integracoes.css';
@@ -529,6 +529,10 @@ export function Integracoes() {
                               <span className={'badge ' + st.cls}>{st.dot && <span className="dot" />}{st.t}</span>
                               <span className="badge" style={{ background: cor.bg, color: cor.fg }} title="Situação do aquecimento deste número">
                                 <span className="dot" style={{ background: cor.fg }} />{STATUS_MATURACAO_LABEL[c.status_maturacao]}
+                              </span>
+                              {/* Score da conta: cai antes de o número banir. Detalhe e média ficam na página Maturação. */}
+                              <span className={'badge matq-score sc-' + c.score_classe} title={`Saúde da conta: ${SCORE_CLASSE_LABEL[c.score_classe]} (${c.score}/100). O placar completo fica na página Maturação.`}>
+                                <span className="dot" />Saúde {c.score}
                               </span>
                               {/* Proxy: opcional. Sem ele o chip sai pelo IP do servidor — o mesmo de todos os outros. */}
                               {c.proxy_pendente ? (

@@ -11,6 +11,14 @@ export type StatusIntegracao = 'desconectado' | 'sincronizando' | 'conectado' | 
 export type StatusMaturacao = 'novo' | 'aquecendo' | 'pausado' | 'maduro' | 'banido' | 'erro';
 export type TipoConteudo = 'texto' | 'figurinha' | 'audio' | 'imagem';
 export type CategoriaConteudo = 'abertura' | 'resposta' | 'conversa';
+/** Classe do score da conta (RPC maturacao_painel): saudavel ≥75, atencao ≥50, risco <50. */
+export type ScoreClasse = 'saudavel' | 'atencao' | 'risco';
+/** Preset de rampa ativo. 'custom' = curva editada à mão (não bate com nenhum preset). */
+export type PerfilRampa = 'expresso_7' | 'rapido_14' | 'padrao_30' | 'conservador_45' | 'custom';
+/** As 4 opções que a UI oferece (custom não é escolhível, só um estado). */
+export type PerfilKey = Exclude<PerfilRampa, 'custom'>;
+/** Nível de risco de ban do preset — pinta o chip de risco no card. */
+export type RiscoPerfil = 'baixo' | 'medio' | 'alto' | 'recomendado';
 /** Protocolos aceitos pelo check de `maturacao_chips.proxy_protocolo`. */
 export type ProxyProtocolo = 'http' | 'https' | 'socks4' | 'socks5';
 export const PROXY_PROTOCOLOS: ProxyProtocolo[] = ['http', 'https', 'socks4', 'socks5'];
@@ -29,13 +37,16 @@ export interface MaturacaoConfig {
   min_sementes: number;
   pct_sementes: number;
   dias_para_maduro: number;
+  /** Preset de rampa ativo. Trocado pela RPC `maturacao_aplicar_perfil`; edição manual da curva marca 'custom'. */
+  perfil_rampa: PerfilRampa;
   atualizado_em: string;
   atualizado_por: string | null;
 }
 
-/** Só os campos que a tela edita — o `rampa` (jsonb) é curadoria de backend, não de UI. */
+/** Só os campos que a tela edita — o `rampa` (jsonb) é curadoria de backend, não de UI.
+ *  `perfil_rampa: 'custom'` acompanha uma edição manual da curva (o rótulo passa a refletir isso). */
 export type ConfigPatch = Partial<Pick<MaturacaoConfig,
-  'modo' | 'hora_inicio' | 'hora_fim' | 'dias_semana' | 'dia_sementes' | 'min_sementes' | 'pct_sementes' | 'dias_para_maduro'>>;
+  'modo' | 'hora_inicio' | 'hora_fim' | 'dias_semana' | 'dia_sementes' | 'min_sementes' | 'pct_sementes' | 'dias_para_maduro' | 'perfil_rampa'>>;
 
 /** Linha do painel (RPC maturacao_painel). Os contadores vêm como bigint → number no JSON. */
 export interface ChipPainel {
@@ -59,6 +70,10 @@ export interface ChipPainel {
   /** Configurado mas AINDA NÃO aplicado na Evolution — o tráfego continua saindo pelo servidor. */
   proxy_pendente: boolean;
   proxy_ultimo_erro: string | null;
+  /** Placar 0–100 da conta: entrega, leitura, erro, conexão e progresso. Cai ANTES de o chip banir. */
+  score: number;
+  /** Faixa do score para pintar o card: saudavel ≥75, atencao ≥50, risco <50. */
+  score_classe: ScoreClasse;
 }
 
 /** Campos do proxy que o cliente pode LER (a senha está fora do grant de SELECT, de propósito). */
@@ -115,6 +130,7 @@ export function traduzMaturacao(msg: string): string {
   const m = (msg || '').toLowerCase();
   if (m.includes('sem_acesso') || m.includes('row-level') || m.includes('permission')) return 'Somente administradores da organização podem gerenciar a maturação.';
   if (m.includes('perfil_incompleto')) return 'Preencha foto, nome e recado no celular e marque “Perfil pronto” antes de iniciar a rampa.';
+  if (m.includes('perfil_invalido')) return 'Perfil de aquecimento inválido. Escolha Expresso, Rápido, Padrão ou Conservador.';
   if (m.includes('chip_desconectado')) return 'O chip precisa estar conectado para iniciar. Leia o QR Code primeiro.';
   if (m.includes('chip_banido')) return 'Este chip foi banido pelo WhatsApp e não pode voltar a aquecer.';
   if (m.includes('chip_nao_encontrado')) return 'Chip não encontrado (pode já ter sido excluído).';
@@ -203,6 +219,26 @@ export function useSalvarConfig() {
       return data as MaturacaoConfig;
     },
     onSuccess: (row) => { qc.setQueryData(['mat-config', org], row); },
+  });
+}
+
+/** Aplica um preset de rampa. A curva canônica é escrita no banco pela RPC (não pelo front),
+ *  então trocar de perfil é uma decisão só. Invalida config E painel (o score/progresso mudam). */
+export function useAplicarPerfil() {
+  const qc = useQueryClient();
+  const { currentOrg } = useOrg();
+  const org = currentOrg.id;
+  return useMutation({
+    mutationFn: async (perfil: PerfilKey): Promise<MaturacaoConfig> => {
+      const { data, error } = await supabase!.rpc('maturacao_aplicar_perfil', { p_org: org, p_perfil: perfil });
+      if (error) erro(error.message);
+      return data as MaturacaoConfig;
+    },
+    onSuccess: (row) => {
+      qc.setQueryData(['mat-config', org], row);
+      qc.invalidateQueries({ queryKey: ['mat-config', org] });
+      qc.invalidateQueries({ queryKey: ['mat-painel', org] });
+    },
   });
 }
 
@@ -506,6 +542,40 @@ export function saudeChip(c: Pick<ChipPainel, 'enviadas_7d' | 'entregues_7d' | '
 
 export const SAUDE_LABEL: Record<Saude, string> = {
   verde: 'Saudável', amarelo: 'Atenção', vermelho: 'Risco', sem_dados: 'Sem dados',
+};
+
+/* ---- Score da conta (0–100) ---- */
+export const SCORE_CLASSE_LABEL: Record<ScoreClasse, string> = {
+  saudavel: 'Saudável', atencao: 'Atenção', risco: 'Risco',
+};
+
+/** Faixa do score → classe. Mesma régua da RPC (≥75 / ≥50 / <50); usada p/ a média do pool no front. */
+export function classeScore(score: number): ScoreClasse {
+  if (score >= 75) return 'saudavel';
+  if (score >= 50) return 'atencao';
+  return 'risco';
+}
+
+/* ---- Presets de rampa (espelham maturacao_aplicar_perfil) ---- */
+export interface PerfilPreset {
+  key: PerfilKey;
+  label: string;
+  /** Volume de mensagens/dia por chip, do início ao topo da rampa. */
+  resumo: string;
+  duracao_dias: number;
+  risco: RiscoPerfil;
+}
+
+/** Descrição dos 4 presets para a UI. Valores batem com a RPC do backend. */
+export const PERFIS: PerfilPreset[] = [
+  { key: 'expresso_7',     label: 'Expresso · 7 dias',      resumo: '15→100 msgs/dia por chip', duracao_dias: 7,  risco: 'alto' },
+  { key: 'rapido_14',      label: 'Rápido · 14 dias',       resumo: '10→75 msgs/dia por chip',  duracao_dias: 14, risco: 'medio' },
+  { key: 'padrao_30',      label: 'Padrão · 30 dias',       resumo: '6→60 msgs/dia por chip',   duracao_dias: 30, risco: 'recomendado' },
+  { key: 'conservador_45', label: 'Conservador · 45 dias',  resumo: '4→50 msgs/dia por chip',   duracao_dias: 45, risco: 'baixo' },
+];
+
+export const RISCO_LABEL: Record<RiscoPerfil, string> = {
+  alto: 'Risco alto', medio: 'Risco médio', recomendado: 'Recomendado', baixo: 'Baixo risco',
 };
 
 export const STATUS_MATURACAO_LABEL: Record<StatusMaturacao, string> = {

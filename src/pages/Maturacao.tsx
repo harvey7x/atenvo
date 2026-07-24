@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/useToast';
 import { useOrg } from '@/context/OrgContext';
@@ -7,12 +7,13 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import {
   MATURACAO_REAL, usePainelMaturacao, useConfigMaturacao, useSalvarConfig,
   useCriarChip, useAtualizarChip, useIniciarChip, usePausarChip, useExcluirChip,
-  useQrChip, useStatusChip,
+  useQrChip, useStatusChip, useAplicarPerfil,
   useSementes, useAdicionarSemente, useExcluirSemente,
   useConteudo, useAdicionarConteudo, useExcluirConteudo,
-  saudeChip, formatarNumero, SAUDE_LABEL, STATUS_MATURACAO_LABEL, STATUS_INTEGRACAO_LABEL,
+  saudeChip, formatarNumero, classeScore, SAUDE_LABEL, STATUS_MATURACAO_LABEL, STATUS_INTEGRACAO_LABEL,
+  SCORE_CLASSE_LABEL, PERFIS, RISCO_LABEL,
   TIPO_LABEL, CATEGORIA_LABEL, DIAS_SEMANA,
-  type ChipPainel, type ConfigPatch, type TipoConteudo, type CategoriaConteudo,
+  type ChipPainel, type ConfigPatch, type TipoConteudo, type CategoriaConteudo, type PerfilPreset,
 } from '@/data/maturacao';
 import './Maturacao.css';
 
@@ -28,6 +29,7 @@ const IcCheck = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
 const IcSeed = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 21c0-6 3-10 8-11 0 6-3 10-8 11z" /><path d="M12 21C7 20 4 16 4 10c5 1 8 5 8 11z" /></svg>;
 const IcLib = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="3" width="16" height="18" rx="2.2" /><path d="M8 8h8M8 12h8M8 16h5" /></svg>;
 const IcGear = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z" /></svg>;
+const IcRamp = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 17l6-6 4 4 8-8" /><path d="M15 7h6v6" /></svg>;
 
 const OPERADORAS = ['Vivo', 'Claro', 'TIM', 'Oi', 'Outra'];
 const msgErro = (e: unknown) => (e as Error)?.message || 'Falha na operação.';
@@ -63,6 +65,10 @@ export function Maturacao() {
 
   const aquecendo = chips.filter((c) => c.status_maturacao === 'aquecendo').length;
   const emRisco = chips.filter((c) => saudeChip(c) === 'vermelho').length;
+
+  // Saúde média do pool: média simples dos scores dos chips (guardada contra pool vazio).
+  const mediaScore = chips.length ? Math.round(chips.reduce((s, c) => s + c.score, 0) / chips.length) : null;
+  const mediaClasse = mediaScore == null ? null : classeScore(mediaScore);
 
   async function confirmarModo() {
     if (!trocarModo) return;
@@ -112,6 +118,22 @@ export function Maturacao() {
         </button>
       </div>
 
+      {/* ---- Saúde média do pool: placar geral, num relance ---- */}
+      {mediaScore != null && mediaClasse && (
+        <div className={'mat-media sc-' + mediaClasse}>
+          <div className="mat-media-ring" style={{ '--p': mediaScore } as CSSProperties}>
+            <b>{mediaScore}</b><i>/100</i>
+          </div>
+          <div className="mat-media-tx">
+            <strong>Saúde média do pool · {SCORE_CLASSE_LABEL[mediaClasse]}</strong>
+            <span>
+              Média do score de {chips.length} chip{chips.length === 1 ? '' : 's'}. É o placar que avisa cedo
+              quando um número começa a ser restringido — cai antes de o chip cair.
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* ---- Chips ---- */}
       <section className="mat-sec">
         <header className="mat-sec-h">
@@ -150,6 +172,7 @@ export function Maturacao() {
         )}
       </section>
 
+      <EstrategiaSec />
       <SementesSec />
       <ConteudoSec />
       <ConfigSec />
@@ -245,6 +268,17 @@ function ChipCard({ chip, diasMaduro, onConectar, onExcluir }: {
           <span className={'mat-st i-' + chip.status_integracao}>{STATUS_INTEGRACAO_LABEL[chip.status_integracao]}</span>
         </div>
       </header>
+
+      {/* Score da conta: métrica mais destacada do card — cai antes de o número banir. */}
+      <div className={'mat-score sc-' + chip.score_classe}>
+        <div className="mat-score-ring" style={{ '--p': chip.score } as CSSProperties}>
+          <b>{chip.score}</b>
+        </div>
+        <div className="mat-score-tx">
+          <span className="mat-score-lbl">Saúde da conta</span>
+          <span className="mat-score-cls">{SCORE_CLASSE_LABEL[chip.score_classe]}</span>
+        </div>
+      </div>
 
       <div className="mat-ramp">
         <div className="mat-ramp-l">
@@ -554,6 +588,85 @@ function ConteudoSec() {
         <button className="mat-btn cta" disabled={adicionar.isPending} onClick={add}><IcPlus />{adicionar.isPending ? 'Adicionando…' : 'Adicionar'}</button>
       </div>
       {err && <div className="atv-field-err">{err}</div>}
+    </section>
+  );
+}
+
+/* ============================================================================
+   ESTRATÉGIA DE AQUECIMENTO — preset de rampa (7 / 14 / 30 / 45 dias)
+   ========================================================================== */
+function EstrategiaSec() {
+  const { toast } = useToast();
+  const config = useConfigMaturacao();
+  const aplicar = useAplicarPerfil();
+  const [confirmar, setConfirmar] = useState<PerfilPreset | null>(null);
+
+  const ativo = config.data?.perfil_rampa ?? 'padrao_30';
+  const custom = ativo === 'custom';
+
+  async function aplica(p: PerfilPreset) {
+    try {
+      await aplicar.mutateAsync(p.key);
+      toast(`Perfil "${p.label}" aplicado. Os chips em aquecimento passam a seguir a nova curva.`);
+      setConfirmar(null);
+    } catch (e) { toast(msgErro(e), 'warn'); }
+  }
+
+  function escolher(p: PerfilPreset) {
+    if (!custom && p.key === ativo) return;      // já é o ativo
+    if (p.risco === 'alto') { setConfirmar(p); return; }  // pede confirmação
+    void aplica(p);
+  }
+
+  return (
+    <section className="mat-sec">
+      <header className="mat-sec-h">
+        <div>
+          <h2><IcRamp />Estratégia de aquecimento</h2>
+          <p>Define a curva de volume e a duração até o número ficar maduro. Trocar o perfil vale para todo o pool e recalcula a rampa dos chips que já estão aquecendo.</p>
+        </div>
+        {custom && <span className="mat-perfil-custom" title="A curva foi editada à mão e não corresponde a nenhum preset.">Personalizado</span>}
+      </header>
+
+      <div className="mat-perfis">
+        {PERFIS.map((p) => {
+          const sel = !custom && p.key === ativo;
+          return (
+            <button
+              key={p.key}
+              type="button"
+              className={'mat-perfil r-' + p.risco + (sel ? ' sel' : '')}
+              disabled={aplicar.isPending}
+              aria-pressed={sel}
+              onClick={() => escolher(p)}
+            >
+              <div className="mat-perfil-h">
+                <b>{p.label}</b>
+                {sel && <span className="mat-perfil-on"><IcCheck />Ativo</span>}
+              </div>
+              <span className="mat-perfil-vol">{p.resumo}</span>
+              <span className="mat-perfil-dur">Maduro em {p.duracao_dias} dias</span>
+              <span className={'mat-risco r-' + p.risco}>{RISCO_LABEL[p.risco]}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mat-perfil-nota">
+        <IcInfo />
+        <span>Quanto mais curto o perfil, maior o volume em chip novo — e maior o risco de ban. O <b>score de saúde</b> de cada chip acima é como você percebe cedo se algum número começou a ser restringido.</span>
+      </div>
+
+      <ConfirmDialog
+        open={!!confirmar}
+        title="Aquecer no ritmo expresso?"
+        message="Aquecer rápido com volume alto aumenta o risco de ban. Os chips que já estão em aquecimento passam a seguir a nova curva, e os que já ultrapassaram a nova duração serão marcados como maduros. Use só com um pool grande e acompanhando o score de perto."
+        confirmLabel="Aplicar mesmo assim"
+        destructive
+        loading={aplicar.isPending}
+        onConfirm={() => { if (confirmar) void aplica(confirmar); }}
+        onCancel={() => { if (!aplicar.isPending) setConfirmar(null); }}
+      />
     </section>
   );
 }
