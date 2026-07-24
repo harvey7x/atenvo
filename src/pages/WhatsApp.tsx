@@ -1153,9 +1153,12 @@ export function WhatsApp() {
                         <span className={'ctag ctag--' + (hSit.variante ?? 'atendimento') + (cor ? ' ctag--kanban' : '')}
                               style={cor ? { background: cor, borderColor: cor } : undefined} title="Etapa no Kanban">{hSit.texto}</span>
                       ); })()}
+                      {/* Só o nome do canal (ex.: URA). O número mascarado polui o chip e é redundante
+                          com o alias; quem precisa dele acha no tooltip. A janela abaixo já sinaliza o
+                          caso cloud, então o número não faz falta na etiqueta. */}
                       {canalSel
                         ? <span className="cresp" title={`Respondendo por ${canalSel.alias}${canalSel.numero ? ' · ' + mascararNumero(canalSel.numero) : ''}`}>
-                            {canalSel.alias}{canalSel.numero ? ' · ' + mascararNumero(canalSel.numero) : ''}
+                            {canalSel.alias}
                           </span>
                         : current.chip && <span className="cresp" title="Canal atual do atendimento">{current.chip}</span>}
                       {canalEhCloud && janela && (
@@ -1166,7 +1169,9 @@ export function WhatsApp() {
                           {rotuloJanela(janela)}
                         </span>
                       )}
-                      <span className="cresp" title="Atendente responsável">{respNome ? (current.respId === user?.id ? 'Você' : respNome) : 'Não atribuído'}</span>
+                      {/* Nome real do atendente, sempre — inclusive quando é o próprio usuário logado.
+                          "Você" escondia de quem olha o cabeçalho de quem realmente está no caso. */}
+                      <span className="cresp" title="Atendente responsável">{respNome ?? 'Não atribuído'}</span>
                     </div>
                   </div>
                 </div>
