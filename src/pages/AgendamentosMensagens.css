@@ -182,6 +182,8 @@
 .agm2-p-acoes{flex:none;display:flex;flex-wrap:wrap;gap:6px;padding:10px 14px;border-top:1px solid var(--line);
   background:var(--surface-2)}
 
+.agm2-confirma{margin:0;font-size:13px;line-height:1.55;color:var(--ink-2)}
+
 /* ---- modal "Novo agendamento" (escolher o cliente) ---------------------- */
 .agm2-novo{display:flex;flex-direction:column;gap:10px}
 .agm2-novo-h{margin:0;font-size:12.5px;color:var(--muted)}

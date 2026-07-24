@@ -57,14 +57,15 @@ interface Grupo {
   criadoPor: string | null; criadoEm: string; conversaId: string; sequenciaId: string | null;
 }
 
-/** Abas -> status geral do grupo. 'visao' não filtra. */
-const ABAS: { id: string; label: string; status: string }[] = [
-  { id: 'visao', label: 'Visão geral', status: '' },
-  { id: 'prog', label: 'Programados', status: 'agendada' },
-  { id: 'env', label: 'Enviados', status: 'enviada' },
-  { id: 'fal', label: 'Falhas', status: 'falha' },
-  { id: 'blk', label: 'Bloqueados', status: 'bloqueada' },
-  { id: 'can', label: 'Cancelados', status: 'cancelada' },
+/** Abas -> status geral do grupo. 'visao' não filtra. `vazio` é o texto de quando a aba
+ *  não tem nada — dizer "ajuste os filtros" numa aba vazia sem filtro nenhum é mentira. */
+const ABAS: { id: string; label: string; status: string; vazio: string }[] = [
+  { id: 'visao', label: 'Visão geral', status: '',           vazio: 'Nenhum agendamento por aqui.' },
+  { id: 'prog',  label: 'Programados', status: 'agendada',   vazio: 'Nada na fila — nenhuma mensagem esperando para sair.' },
+  { id: 'env',   label: 'Enviados',    status: 'enviada',    vazio: 'Nenhuma mensagem agendada foi enviada ainda.' },
+  { id: 'fal',   label: 'Falhas',      status: 'falha',      vazio: 'Nenhuma falha. Todo agendamento saiu como devia.' },
+  { id: 'blk',   label: 'Bloqueados',  status: 'bloqueada',  vazio: 'Nenhum agendamento bloqueado.' },
+  { id: 'can',   label: 'Cancelados',  status: 'cancelada',  vazio: 'Nenhum agendamento cancelado.' },
 ];
 
 export function AgendamentosMensagens() {
@@ -113,7 +114,8 @@ export function AgendamentosMensagens() {
   const [fTipo, setFTipo] = useState('');
   const [fBusca, setFBusca] = useState('');
   const [filtrosAbertos, setFiltrosAbertos] = useState(false);
-  const statusAba = ABAS.find((a) => a.id === aba)?.status ?? '';
+  const abaAtual = ABAS.find((a) => a.id === aba) ?? ABAS[0];
+  const statusAba = abaAtual.status;
 
   // Cards contam AGENDAMENTOS/SEQUÊNCIAS (não mensagens): 1 entrada por grupo, pelo status geral.
   const cards = useMemo(
@@ -150,6 +152,7 @@ export function AgendamentosMensagens() {
   const [buscaContato, setBuscaContato] = useState('');
   const [novoErr, setNovoErr] = useState<string | null>(null);
   const contatosQ = useBuscaContatos(buscaContato);
+  const [confirmar, setConfirmar] = useState<{ titulo: string; texto: string; rotulo: string; acao: () => Promise<void> } | null>(null);
 
   /** Escolhe o contato do "Novo agendamento" e resolve a conversa por onde a mensagem sairá. */
   async function escolherContato(c: { id: string; nome: string; tel: string }) {
@@ -178,18 +181,33 @@ export function AgendamentosMensagens() {
     setComp(null);
   }
 
-  async function cancelarItem(item: AgendamentoOrg) {
-    if (!agendaEditavel(item.status) || cancelarMut.isPending) return;
-    if (!window.confirm('Cancelar este agendamento? A mensagem não será enviada.')) return;
-    try { await cancelarMut.mutateAsync({ id: item.id, conversaId: item.conversaId }); toast('Agendamento cancelado.'); }
-    catch (e) { toast((e as Error).message || 'Falha ao cancelar.'); }
+  /* Confirmação pelo Modal do Atenvo, não pelo window.confirm: o nativo ignora o tema,
+     não dá para rotular o botão ("Cancelar" x "Cancelar agendamento" fica ambíguo) e
+     congela a página inteira enquanto está aberto. */
+  function pedirCancelarItem(item: AgendamentoOrg) {
+    if (!agendaEditavel(item.status)) return;
+    setConfirmar({
+      titulo: 'Cancelar agendamento',
+      texto: 'A mensagem não será enviada. Isto não pode ser desfeito — para enviar depois é preciso agendar de novo.',
+      rotulo: 'Cancelar agendamento',
+      acao: async () => {
+        try { await cancelarMut.mutateAsync({ id: item.id, conversaId: item.conversaId }); toast('Agendamento cancelado.'); }
+        catch (e) { toast((e as Error).message || 'Falha ao cancelar.'); }
+      },
+    });
   }
-  async function cancelarSequencia(g: Grupo) {
+  function pedirCancelarSequencia(g: Grupo) {
     const pend = g.itens.filter((i) => i.status === 'agendada');
-    if (!pend.length || cancelarMut.isPending) return;
-    if (!window.confirm(`Cancelar ${pend.length} ${pend.length === 1 ? 'mensagem pendente' : 'mensagens pendentes'} desta sequência? Elas não serão enviadas (as já enviadas permanecem).`)) return;
-    try { for (const i of pend) await cancelarMut.mutateAsync({ id: i.id, conversaId: i.conversaId }); toast('Mensagens pendentes canceladas.'); }
-    catch (e) { toast((e as Error).message || 'Falha ao cancelar.'); }
+    if (!pend.length) return;
+    setConfirmar({
+      titulo: 'Cancelar mensagens pendentes',
+      texto: `${pend.length} ${pend.length === 1 ? 'mensagem ainda não saiu' : 'mensagens ainda não saíram'} desta sequência e ${pend.length === 1 ? 'será cancelada' : 'serão canceladas'}. As já enviadas permanecem.`,
+      rotulo: pend.length === 1 ? 'Cancelar 1 mensagem' : `Cancelar ${pend.length} mensagens`,
+      acao: async () => {
+        try { for (const i of pend) await cancelarMut.mutateAsync({ id: i.id, conversaId: i.conversaId }); toast('Mensagens pendentes canceladas.'); }
+        catch (e) { toast((e as Error).message || 'Falha ao cancelar.'); }
+      },
+    });
   }
 
   const abrirConversa = (conversaId: string) => navigate(`/whatsapp?conversa=${encodeURIComponent(conversaId)}`);
@@ -277,16 +295,18 @@ export function AgendamentosMensagens() {
       {/* ─── lista + painel ───────────────────────────────────────────────── */}
       <div className="agm2-main">
         <div className="agm2-lista">
-          <div className="agm2-lista-h">
-            <span className="cl-quando">Data / hora</span>
-            <span className="cl-cli">Cliente</span>
-            <span className="cl-canal">Canal</span>
-            <span className="cl-tipo">Tipo</span>
-            <span className="cl-cont">Conteúdo</span>
-            <span className="cl-at">Atendente</span>
-            <span className="cl-st">Status</span>
-            <span className="cl-tent">Tent.</span>
-          </div>
+          {!erro && (carregando || filtrados.length > 0) && (
+            <div className="agm2-lista-h">
+              <span className="cl-quando">Data / hora</span>
+              <span className="cl-cli">Cliente</span>
+              <span className="cl-canal">Canal</span>
+              <span className="cl-tipo">Tipo</span>
+              <span className="cl-cont">Conteúdo</span>
+              <span className="cl-at">Atendente</span>
+              <span className="cl-st">Status</span>
+              <span className="cl-tent">Tent.</span>
+            </div>
+          )}
 
           {carregando && [0, 1, 2, 3, 4].map((i) => (
             <div className="agm2-skel" key={i}><span className="sk sk-av" /><span className="sk sk-l1" /><span className="sk sk-l2" /></div>
@@ -306,13 +326,21 @@ export function AgendamentosMensagens() {
                 <span className="agm2-vazio-ic"><IcSend /></span>
                 <h3>Nenhuma mensagem programada</h3>
                 <p>Agende uma mensagem para ela sair sozinha na hora certa.</p>
-                <button className="agm2-btn cta" onClick={() => setNovoOpen(true)}><IcPlus />Novo agendamento</button>
+                <button className="agm2-btn cta" onClick={() => { setNovoOpen(true); setNovoErr(null); setBuscaContato(''); }}><IcPlus />Novo agendamento</button>
               </div>
-            ) : (
+            ) : filtroAtivo ? (
               <div className="agm2-vazio">
                 <h3>Nada com esses filtros</h3>
                 <p>Ajuste os filtros ou veja todos os agendamentos.</p>
-                <button className="agm2-btn" onClick={() => { limpar(); setAba('visao'); }}>Limpar filtros</button>
+                <button className="agm2-btn" onClick={limpar}>Limpar filtros</button>
+              </div>
+            ) : (
+              /* aba vazia sem filtro nenhum: é um resultado, não um erro de busca */
+              <div className="agm2-vazio">
+                <span className="agm2-vazio-ic"><IcSend /></span>
+                <h3>{abaAtual.label}: nada aqui</h3>
+                <p>{abaAtual.vazio}</p>
+                {aba !== 'visao' && <button className="agm2-btn" onClick={() => setAba('visao')}>Ver todos os agendamentos</button>}
               </div>
             )
           )}
@@ -419,14 +447,14 @@ export function AgendamentosMensagens() {
                   {podeEditar && (
                     <>
                       <button className="agm2-btn sm" onClick={() => setComp({ modo: 'editar', item, temTelefone: !!item.telefone })}>Editar</button>
-                      <button className="agm2-btn sm danger" disabled={cancelarMut.isPending} onClick={() => cancelarItem(item)}>Cancelar</button>
+                      <button className="agm2-btn sm danger" disabled={cancelarMut.isPending} onClick={() => pedirCancelarItem(item)}>Cancelar</button>
                     </>
                   )}
                   {podeReagendar && (
                     <button className="agm2-btn sm" onClick={() => setComp({ modo: 'reagendar', item, temTelefone: !!item.telefone })}>Reagendar</button>
                   )}
                   {podeCancelarSeq && (
-                    <button className="agm2-btn sm danger" disabled={cancelarMut.isPending} onClick={() => cancelarSequencia(sel)}>Cancelar pendentes</button>
+                    <button className="agm2-btn sm danger" disabled={cancelarMut.isPending} onClick={() => pedirCancelarSequencia(sel)}>Cancelar pendentes</button>
                   )}
                 </div>
               )}
@@ -458,6 +486,19 @@ export function AgendamentosMensagens() {
             )}
           </ul>
         </div>
+      </Modal>
+
+      {/* Confirmação de cancelamento (destrutivo e sem volta) */}
+      <Modal open={!!confirmar} onClose={() => setConfirmar(null)} width={420} title={confirmar?.titulo}
+        closeOnBackdrop={!cancelarMut.isPending}
+        footer={<>
+          <button className="agm2-btn" disabled={cancelarMut.isPending} onClick={() => setConfirmar(null)}>Voltar</button>
+          <button className="agm2-btn danger" disabled={cancelarMut.isPending}
+            onClick={async () => { const c = confirmar; if (!c) return; await c.acao(); setConfirmar(null); }}>
+            {cancelarMut.isPending ? 'Cancelando…' : confirmar?.rotulo}
+          </button>
+        </>}>
+        <p className="agm2-confirma">{confirmar?.texto}</p>
       </Modal>
 
       {/* Composição: criar / editar / reagendar */}
