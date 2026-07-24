@@ -29,7 +29,6 @@ import { Modal } from '@/components/Modal';
 import { useStatusDefs, useEtiquetas, useAssinaturaPref, useAtendimentoActions, useOrgUsuarios, resolverNomeAssinatura } from '@/data/atendimento';
 import { useSlaAlertas } from '@/data/sla';
 import { indexPorChave, tipoLabel, tempoRelativo } from '@/data/slaView';
-import { siglaCanal } from '@/lib/cardConversa';
 import { corDaEtiqueta, podeGerenciarAtendimento, type AssinaturaModo } from '@/types/atendimento';
 import { KanbanContatoBox } from '@/components/KanbanContatoBox';
 import './WhatsApp.css';
@@ -1053,6 +1052,7 @@ export function WhatsApp() {
             // não foram tocados; só a apresentação mudou.
             const eAtendente = badges.find((b) => b.tipo === 'atendente');
             const eSituacao = badges.find((b) => b.tipo === 'situacao');
+            const eCanal = badges.find((b) => b.tipo === 'canal');
             const alertas: string[] = [];
             if (atrasado && tempoCurto) alertas.push('Sem resposta há ' + tempoCurto);
             for (const a of slaChips) alertas.push(tipoLabel(a.tipo) + (a.detalhe ? ' — ' + a.detalhe : ''));
@@ -1062,11 +1062,8 @@ export function WhatsApp() {
             <div key={c.id} data-cid={c.id} className={'conv conv--' + barTier + (c.id === currentId ? ' active' : '') + ((c.unread ?? 0) > 0 ? ' has-unread' : '')}
                  title={'Atendente: ' + atendNome + ' · Canal: WhatsApp ' + c.chip + ' · ' + statusTxt + ' · ' + c.time}
                  onClick={() => selectContact(c.id)}>
-              {/* canal deixou de ser chip de texto: virou micro-badge no avatar (sigla + nome no tooltip) */}
-              <span className="cav">
-                <Avatar name={c.name} />
-                <i className="cav-canal" title={'Canal atual: ' + c.chip} aria-label={'Canal ' + c.chip}>{siglaCanal(c.chip)}</i>
-              </span>
+              {/* canal e atendente voltaram a ser chips na fileira (pedido do dono) — o avatar fica limpo */}
+              <span className="cav"><Avatar name={c.name} /></span>
               <div className="cbody">
                 <div className="crow">
                   {c.fixada && <i className="cflag" title="Fixada" aria-label="Fixada">📌</i>}
@@ -1086,13 +1083,18 @@ export function WhatsApp() {
                   {alertas.length > 0 && (
                     <span className="ctag ctag--alerta" title={alertas.join(' · ')} aria-label={alertas.join('. ')}>⚠{alertas.length > 1 ? ' ' + alertas.length : ''}</span>
                   )}
+                  {/* canal (por onde o cliente entrou) e atendente como chips, no estilo do cabeçalho.
+                      Antes: canal era a sigla no avatar e atendente era o pill da direita — o dono quis
+                      os dois visíveis na fileira. Sem atendente, mostra "Não atribuído". */}
+                  {eCanal && <span className="ctag ctag--canal" title={'Canal atual: ' + c.chip}>{eCanal.texto}</span>}
+                  <span className="ctag ctag--atendente" title="Atendente responsável">{eAtendente ? eAtendente.texto : 'Não atribuído'}</span>
                   {finalizado && <span className="ctag ctag--fim" title={'Conversa ' + (c.status ?? 'finalizada')}>Finalizado</span>}
                 </div>
                 <div className="cprev">{c.last || '—'}</div>
               </div>
-              {/* coluna direita (referência): pill do atendente, tempo relativo e badge de não lidas */}
+              {/* coluna direita: tempo relativo e badge de não lidas. O atendente saiu daqui e virou
+                  chip na fileira (pedido do dono), junto do canal. */}
               <div className="cright">
-                <span className="cresp" title="Atendente responsável">{eAtendente ? eAtendente.texto : 'Não atribuído'}</span>
                 <span className="ctime" title={'Última interação: ' + c.time}>{c.lastAtMs ? tempoRelativo(new Date(c.lastAtMs).toISOString(), relogioMs) : c.time}</span>
                 {c.unread > 0 && <span className="unread" title={c.unread + ' não lidas'} aria-label={c.unread + ' mensagens não lidas'}>{c.unread > 99 ? '99+' : c.unread}</span>}
               </div>

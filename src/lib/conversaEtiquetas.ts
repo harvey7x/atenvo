@@ -56,7 +56,7 @@ export function ehLeadNovo(c: ConversaEtiquetaInput): boolean {
  *   5) com responsável            -> EM ATENDIMENTO
  * A coluna de ENTRADA nunca vira texto cru: com atendente ela lê "EM ATENDIMENTO", nunca "LEAD NOVO". */
 export function situacaoDaConversa(c: ConversaEtiquetaInput): { texto: string; variante: SituacaoVariante } {
-  if (c.oppStatus === 'ganho')     return { texto: 'CLIENTE FECHADO', variante: 'ganho' };
+  if (c.oppStatus === 'ganho')     return { texto: 'FECHADO', variante: 'ganho' };
   if (c.oppStatus === 'perdido')   return { texto: 'PERDIDO', variante: 'perdido' };
   if (c.oppStatus === 'cancelado') return { texto: 'CANCELADO', variante: 'cancelado' };
 

@@ -22,9 +22,9 @@ describe('card: [ATENDENTE] [SITUAÇÃO] [CANAL ATUAL]', () => {
     expect(textos({ respId: 'u1', etapa: 'Contratos', etapaEntrada: false, canalAtual: 'ANDRIUS' }))
       .toEqual(['MATHEUS', 'CONTRATOS', 'ANDRIUS']);
   });
-  it('cliente fechado → [GIOVANA] [CLIENTE FECHADO] [ANDRIUS]', () => {
+  it('cliente fechado → [GIOVANA] [FECHADO] [ANDRIUS]', () => {
     expect(textos({ respId: 'u3', etapa: 'CLIENTE FECHADO', oppStatus: 'ganho', canalAtual: 'ANDRIUS' }))
-      .toEqual(['GIOVANA', 'CLIENTE FECHADO', 'ANDRIUS']);
+      .toEqual(['GIOVANA', 'FECHADO', 'ANDRIUS']);
   });
   it('cliente perdido → [MATHEUS] [PERDIDO] [RMKT]', () => {
     expect(textos({ respId: 'u1', etapa: 'PERDIDO', oppStatus: 'perdido', canalAtual: 'RMKT' }))
@@ -48,7 +48,7 @@ describe('card: [ATENDENTE] [SITUAÇÃO] [CANAL ATUAL]', () => {
 
 describe('precedência da SITUAÇÃO', () => {
   it('resultado da oportunidade vence a etapa', () => {
-    expect(situacaoDaConversa({ etapa: 'CONTRATOS', etapaEntrada: false, oppStatus: 'ganho' }).texto).toBe('CLIENTE FECHADO');
+    expect(situacaoDaConversa({ etapa: 'CONTRATOS', etapaEntrada: false, oppStatus: 'ganho' }).texto).toBe('FECHADO');
     expect(situacaoDaConversa({ etapa: 'CONTRATOS', etapaEntrada: false, oppStatus: 'perdido' }).texto).toBe('PERDIDO');
   });
   it('etapa avançada vence LEAD NOVO mesmo sem responsável', () => {
