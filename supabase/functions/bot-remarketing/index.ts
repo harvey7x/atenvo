@@ -164,6 +164,10 @@ Deno.serve(async (req) => {
 
     const resultados: any[] = [];
     let enviados = 0;
+    // "não tem template aprovado" é problema de CONFIGURAÇÃO da org, igual para todos os leads dela.
+    // Sem esta memória por tick, cada lead bloqueado geraria uma linha de audit_log a cada 10 min —
+    // ruído que esconde o que importa. Aqui a org é avisada UMA vez por execução.
+    const orgSemTemplate = new Set<string>();
     for (const row of fila) {
       if (enviados >= restante) break;
 
@@ -187,13 +191,17 @@ Deno.serve(async (req) => {
             // REGRA DURA: sem template aprovado o toque NÃO sai e NÃO consome a cadência —
             // se consumisse, o lead perderia toques em silêncio por um problema de configuração.
             resultados.push({ id: row.id, toque: row.toque, status_envio: 'bloqueada_janela', motivo: 'sem_template_aprovado' });
-            try {
-              await admin.from('audit_log').insert({
-                usuario_id: null, acao: 'bot_remarketing', entidade: 'bot_remarketing', entidade_id: row.id,
-                organizacao_id: orgRow,
-                dados_depois: { toque: row.toque, status_envio: 'bloqueada_janela', motivo: 'sem_template_aprovado', transporte: 'cloud_api', dry_run: dryRun },
-              });
-            } catch { /* audit best-effort */ }
+            const chaveOrg = String(orgRow ?? '-');
+            if (!orgSemTemplate.has(chaveOrg)) {
+              orgSemTemplate.add(chaveOrg);
+              try {
+                await admin.from('audit_log').insert({
+                  usuario_id: null, acao: 'bot_remarketing', entidade: 'bot_remarketing', entidade_id: row.id,
+                  organizacao_id: orgRow,
+                  dados_depois: { status_envio: 'bloqueada_janela', motivo: 'sem_template_aprovado', transporte: 'cloud_api', dry_run: dryRun, nota: 'um registro por execução — o bloqueio vale para todos os leads fora da janela desta organização' },
+                });
+              } catch { /* audit best-effort */ }
+            }
             continue;
           }
         }

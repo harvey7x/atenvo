@@ -173,21 +173,28 @@ Deno.serve(async (req) => {
     }
 
     // ---------------------------------------------------------------- remover
+    // NÃO é DELETE. A casa já decidiu isso no evolution-manage (`remove`/`ocultar`): apagar o canal
+    // levaria junto a atribuição das conversas, a origem dos leads, os relatórios e as cobranças
+    // que apontam para ele. Aqui o canal sai da lista e para de operar — o histórico fica inteiro.
+    // O cloud-webhook ignora canal 'removido', então ele também deixa de ingerir.
     if (action === 'remover') {
       const canalId: string = body.canal_id ?? '';
       if (!canalId) return json({ error: 'canal_id é obrigatório.' }, 400);
-      // .eq('transporte','cloud_api') não é decoração: garante que esta função NUNCA apague
+      // .eq('transporte','cloud_api') não é decoração: garante que esta função NUNCA toque
       // um canal da Evolution, mesmo se receber um id errado.
       const { data: canal } = await admin.from('canais')
         .select('id, nome_interno, cloud_phone_number_id').eq('id', canalId)
         .eq('organizacao_id', orgId).eq('transporte', 'cloud_api').maybeSingle();
       if (!canal) return json({ error: 'Canal da API oficial não encontrado.' }, 404);
-      const { error: eDel } = await admin.from('canais').delete().eq('id', canalId).eq('transporte', 'cloud_api');
-      if (eDel) return json({ error: 'Não foi possível remover o canal.', detalhe: eDel.message.slice(0, 180) }, 500);
+      const { error: eUpd } = await admin.from('canais')
+        .update({ status_integracao: 'removido', ativo: false })
+        .eq('id', canalId).eq('transporte', 'cloud_api');
+      if (eUpd) return json({ error: 'Não foi possível remover o canal.', detalhe: eUpd.message.slice(0, 180) }, 500);
       try {
         await admin.from('audit_log').insert({
           usuario_id: user.id, acao: 'cloud_remover', entidade: 'canais', entidade_id: canalId, organizacao_id: orgId,
           dados_antes: { nome_interno: canal.nome_interno, phone_number_id: canal.cloud_phone_number_id },
+          dados_depois: { status_integracao: 'removido', ativo: false },
         });
       } catch { /* audit best-effort */ }
       return json({ ok: true });

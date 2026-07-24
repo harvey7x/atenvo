@@ -9,7 +9,7 @@
  *
  * NADA AQUI LIGA NADA SOZINHO: cadastrar o número não liga o bot, não muda o envio dos canais
  * existentes e não dispara mensagem. É cadastro + diagnóstico. */
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { Modal } from '@/components/Modal';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useToast } from '@/hooks/useToast';
@@ -39,11 +39,17 @@ const CAT_TPL = [
   { id: 'AUTHENTICATION', r: 'Autenticação (código de acesso)' },
 ];
 
+/** As dicas dos formulários usavam .mock-note, que no CSS só existe sob .login-card/.login-page —
+ *  fora do login o texto saía sem estilo nenhum. Estilo local, sem inventar classe global. */
+const dica: CSSProperties = { marginTop: 6, fontSize: 11.5, color: 'var(--muted)', lineHeight: 1.5 };
+
 interface Props { podeConfig: boolean }
 
 export function IntegracaoCloudApi({ podeConfig }: Props) {
   const { toast } = useToast();
-  const diagQ = useCloudDiagnostico();
+  // cloud-manage exige admin/supervisor: pedir o diagnóstico para um atendente devolveria 403 e
+  // a tela mostraria "Apenas administradores…" como se fosse falha. Ele vê a seção, sem o painel.
+  const diagQ = useCloudDiagnostico(podeConfig);
   const tplQ = useWaTemplates();
   const { vincular, verificar, remover } = useCloudAcoes();
   const tplAcoes = useTemplateAcoes();
@@ -55,6 +61,8 @@ export function IntegracaoCloudApi({ podeConfig }: Props) {
   const [tplEdit, setTplEdit] = useState<Partial<WaTemplate> | null>(null);
   const [tplErro, setTplErro] = useState<string | null>(null);
   const [removerTpl, setRemoverTpl] = useState<WaTemplate | null>(null);
+  // por canal, não global: com dois números, verificar um deixava o outro "Verificando…" também.
+  const [verificando, setVerificando] = useState<string | null>(null);
 
   const d = diagQ.data;
   const canais = d?.canais ?? [];
@@ -71,7 +79,11 @@ export function IntegracaoCloudApi({ podeConfig }: Props) {
     try {
       const r = await vincular.mutateAsync(form);
       setNovoOpen(false); setForm({ alias: '', phoneNumberId: '', wabaId: '' });
-      toast(r.verificado ? 'Número oficial cadastrado e confirmado na Meta.' : 'Número cadastrado. Falta confirmar com a Meta.');
+      // o `aviso` diz POR QUE a Meta não confirmou (token ausente, id errado, permissão) —
+      // engolir isso deixaria o usuário sem saber o que consertar.
+      toast(r.verificado
+        ? 'Número oficial cadastrado e confirmado na Meta.'
+        : `Número cadastrado, mas ainda não confirmado: ${r.aviso ?? 'a Meta não respondeu.'}`);
     } catch (e) { setErroForm((e as Error).message); }
   }
 
@@ -116,7 +128,12 @@ export function IntegracaoCloudApi({ podeConfig }: Props) {
           </div>
 
           <div className="ic-body">
-            {diagQ.isLoading && <div className="adapter-note"><div className="tx">Carregando a configuração da conta oficial…</div></div>}
+            {!podeConfig && (
+              <div className="adapter-note"><IcInfo /><div className="tx">
+                A configuração da conta oficial fica com administradores e supervisores.
+              </div></div>
+            )}
+            {podeConfig && diagQ.isLoading && <div className="adapter-note"><div className="tx">Carregando a configuração da conta oficial…</div></div>}
             {diagQ.error && <div className="adapter-note"><div className="tx">Não foi possível ler a configuração: {(diagQ.error as Error).message}</div></div>}
 
             {d && (
@@ -179,14 +196,16 @@ export function IntegracaoCloudApi({ podeConfig }: Props) {
                         </div>
                         <div className="conn-actions">
                           {podeConfig && (
-                            <button className="btn-sm" disabled={verificar.isPending}
+                            <button className="btn-sm" disabled={verificando === c.id}
                               onClick={async () => {
+                                setVerificando(c.id);
                                 try {
                                   const r = await verificar.mutateAsync(c.id);
                                   toast(`Confirmado: ${r.nome_verificado ?? 'número'}${r.qualidade ? ` · qualidade ${r.qualidade}` : ''}.`);
                                 } catch (e) { toast((e as Error).message); }
+                                finally { setVerificando(null); }
                               }}>
-                              {verificar.isPending ? 'Verificando…' : 'Verificar na Meta'}
+                              {verificando === c.id ? 'Verificando…' : 'Verificar na Meta'}
                             </button>
                           )}
                           {podeConfig && <button className="btn-sm danger" onClick={() => setRemoverCanal(c)}>Remover</button>}
@@ -200,7 +219,7 @@ export function IntegracaoCloudApi({ podeConfig }: Props) {
           </div>
 
           <div className="ic-foot">
-            <button className="atv-btn primary" disabled={!podeConfig} onClick={() => { setErroForm(null); setNovoOpen(true); }}>
+            <button className="atv-btn primary" disabled={!podeConfig || !d} onClick={() => { setErroForm(null); setNovoOpen(true); }}>
               Cadastrar número oficial
             </button>
             <span className="sp" />
@@ -238,7 +257,12 @@ export function IntegracaoCloudApi({ podeConfig }: Props) {
             </div>
 
             {tplQ.isLoading && <div className="adapter-note"><div className="tx">Carregando modelos…</div></div>}
-            {!tplQ.isLoading && templates.length === 0 && (
+            {tplQ.error && (
+              <div className="adapter-note"><IcInfo /><div className="tx">
+                Não foi possível carregar os modelos: {(tplQ.error as Error).message}. A lista abaixo pode estar incompleta — não conclua que não há modelo cadastrado.
+              </div></div>
+            )}
+            {!tplQ.isLoading && !tplQ.error && templates.length === 0 && (
               <div className="adapter-note"><div className="tx">Nenhum modelo cadastrado. Crie o modelo aqui e depois submeta na Meta — ou use “Sincronizar com a Meta” se já tiver criado por lá.</div></div>
             )}
 
@@ -321,14 +345,14 @@ export function IntegracaoCloudApi({ podeConfig }: Props) {
           <label>Phone number ID</label>
           <input className="ctrl" value={form.phoneNumberId} inputMode="numeric" placeholder="Só números"
             onChange={(e) => setForm((f) => ({ ...f, phoneNumberId: e.target.value.replace(/\D/g, '') }))} />
-          <p className="mock-note">Painel da Meta → seu app → WhatsApp → API Setup. É o número comprido embaixo do telefone, <b>não</b> o telefone.</p>
+          <p style={dica}>Painel da Meta → seu app → WhatsApp → API Setup. É o número comprido embaixo do telefone, <b>não</b> o telefone.</p>
         </div>
         <div className="field">
           <label>WhatsApp Business Account ID (WABA)</label>
           <input className="ctrl" value={form.wabaId} inputMode="numeric" placeholder="Opcional agora, obrigatório para sincronizar modelos"
             onChange={(e) => setForm((f) => ({ ...f, wabaId: e.target.value.replace(/\D/g, '') }))} />
         </div>
-        {erroForm && <p className="mock-note" style={{ color: 'var(--err)' }}>{erroForm}</p>}
+        {erroForm && <p style={{ ...dica, color: 'var(--err)' }}>{erroForm}</p>}
       </Modal>
 
       {/* ---------------- modal: criar/editar modelo ---------------- */}
@@ -346,7 +370,7 @@ export function IntegracaoCloudApi({ podeConfig }: Props) {
           <label>Nome do modelo</label>
           <input className="ctrl" value={tplEdit?.nome ?? ''} placeholder="retomada_contato"
             onChange={(e) => setTplEdit((t) => ({ ...t, nome: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '_') }))} />
-          <p className="mock-note">Tem que ser exatamente o mesmo nome cadastrado na Meta. Só minúsculas, números e underline.</p>
+          <p style={dica}>Tem que ser exatamente o mesmo nome cadastrado na Meta. Só minúsculas, números e underline.</p>
         </div>
         <div className="field">
           <label>Idioma</label>
@@ -367,7 +391,7 @@ export function IntegracaoCloudApi({ podeConfig }: Props) {
           <textarea className="ctrl" style={{ height: 110, padding: 10, resize: 'vertical' }}
             value={tplEdit?.corpo ?? ''} placeholder="Olá {{1}}, tudo bem? Podemos retomar sua consulta?"
             onChange={(e) => setTplEdit((t) => ({ ...t, corpo: e.target.value }))} />
-          <p className="mock-note">Use <b>{'{{1}}'}</b>, <b>{'{{2}}'}</b>… para as partes que mudam. O texto tem que ser idêntico ao aprovado pela Meta.</p>
+          <p style={dica}>Use <b>{'{{1}}'}</b>, <b>{'{{2}}'}</b>… para as partes que mudam. O texto tem que ser idêntico ao aprovado pela Meta.</p>
         </div>
         {varsPreview.length > 0 && (
           <div className="field">
@@ -383,10 +407,10 @@ export function IntegracaoCloudApi({ podeConfig }: Props) {
                   onChange={(e) => setTplEdit((t) => ({ ...t, variaveis: varsPreview.map((x) => x.pos === v.pos ? { ...x, exemplo: e.target.value } : x) }))} />
               </div>
             ))}
-            <p className="mock-note">A variável com rótulo “nome” é preenchida com o primeiro nome do cliente. As outras usam o exemplo.</p>
+            <p style={dica}>A variável com rótulo “nome” é preenchida com o primeiro nome do cliente. As outras usam o exemplo.</p>
           </div>
         )}
-        {tplErro && <p className="mock-note" style={{ color: 'var(--err)' }}>{tplErro}</p>}
+        {tplErro && <p style={{ ...dica, color: 'var(--err)' }}>{tplErro}</p>}
       </Modal>
 
       <ConfirmDialog

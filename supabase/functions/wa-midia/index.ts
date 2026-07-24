@@ -116,14 +116,17 @@ Deno.serve(async (req) => {
     const up = await admin.storage.from('script-midia').upload(path, dl.bytes, { contentType: mime, upsert: true });
     if (up.error) return json({ error: 'Falha ao guardar a mídia.' }, 500);
 
-    // metadados reescritos SEM midia_pendente/media_erro (é assim que o front sabe que resolveu),
-    // preservando os ponteiros de origem para um eventual retry futuro.
+    // Os metadados são ATUALIZADOS, não reescritos. A versão anterior montava um objeto novo do
+    // zero e, com isso, apagava tudo que não fosse de mídia — inclusive o `referral` do
+    // Click-to-WhatsApp, que é a AQUISIÇÃO do lead (de qual anúncio ele veio). Recarregar um áudio
+    // não pode custar a origem do lead. Só as chaves de pendência saem.
+    const { midia_pendente: _p, media_erro: _e, ...preservado } = meta;
     await admin.from('mensagens').update({
       metadados: {
-        anexo_path: path, mime, tamanho: dl.bytes.length, nome: (meta.nome as string) ?? `${msg.tipo}.${extBase}`,
-        ptt: meta.ptt ?? null, seconds: meta.seconds ?? null, via: meta.via ?? 'webhook', status_midia: 'disponivel',
-        ...(meta.media_id ? { media_id: meta.media_id } : {}),
-        ...(meta.media_key ? { media_key: meta.media_key } : {}),
+        ...preservado,
+        anexo_path: path, mime, tamanho: dl.bytes.length,
+        nome: (meta.nome as string) ?? `${msg.tipo}.${extBase}`,
+        status_midia: 'disponivel',
       },
     }).eq('id', mensagemId);
     return json({ ok: true });

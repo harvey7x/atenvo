@@ -96,32 +96,43 @@ function paraBase64(bytes: Uint8Array): string {
   for (let i = 0; i < bytes.length; i += passo) bin += String.fromCharCode(...bytes.subarray(i, i + passo));
   return btoa(bin);
 }
-async function graphGet(path: string, timeoutMs: number): Promise<Response> {
+/** O timeout precisa cobrir a LEITURA DO CORPO, não só os headers: um download que trava no meio
+ *  do arquivo devolve a Response na hora e só prende no arrayBuffer(). Por isso quem lê o corpo é
+ *  esta função — e o clearTimeout só acontece depois. */
+async function graphGet(path: string, timeoutMs: number): Promise<{ ok: boolean; status: number; texto?: string; bytes?: Uint8Array; contentType: string }> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    return await fetch(/^https?:\/\//i.test(path) ? path : `https://graph.facebook.com/${GRAPH_V()}/${path}`, {
+    const res = await fetch(/^https?:\/\//i.test(path) ? path : `https://graph.facebook.com/${GRAPH_V()}/${path}`, {
       headers: { Authorization: `Bearer ${META_TOKEN()}` }, signal: ctrl.signal,
     });
+    const contentType = (res.headers.get('content-type') ?? '').split(';')[0].trim();
+    if (!res.ok) return { ok: false, status: res.status, contentType };
+    // JSON (metadados) vira texto; binário (o arquivo) vira bytes. Os dois dentro do mesmo timeout.
+    if (contentType.includes('json')) return { ok: true, status: res.status, texto: await res.text(), contentType };
+    return { ok: true, status: res.status, bytes: new Uint8Array(await res.arrayBuffer()), contentType };
   } finally { clearTimeout(t); }
 }
 /** media_id -> metadados (url temporária) -> download. A URL da Meta expira em ~5 min E exige o
  *  MESMO Bearer para baixar — por isso ela nunca é persistida; o que guardamos é o media_id. */
-async function baixarMidiaCloud(mediaId: string): Promise<{ bytes: Uint8Array; mime: string; b64: string }> {
+async function baixarMidiaCloud(mediaId: string): Promise<{ bytes: Uint8Array; mime: string }> {
   if (!META_TOKEN()) throw new Error('token_meta_ausente');
   const metaRes = await graphGet(mediaId, 15000);
   if (!metaRes.ok) throw new Error(`meta HTTP ${metaRes.status}`);
-  const info = await metaRes.json().catch(() => ({})) as { url?: string; mime_type?: string; file_size?: number };
+  let info: { url?: string; mime_type?: string; file_size?: number } = {};
+  try { info = JSON.parse(metaRes.texto ?? '{}'); } catch { throw new Error('resposta_invalida'); }
   if (!info.url) throw new Error('sem_url');
   // corta antes de baixar quando a Meta já informa o tamanho (evita puxar 100MB para descartar).
   if (typeof info.file_size === 'number' && info.file_size > MAX_MEDIA) throw new Error('arquivo_excede_limite');
   const binRes = await graphGet(info.url, 45000);
   if (!binRes.ok) throw new Error(`download HTTP ${binRes.status}`);
-  const bytes = new Uint8Array(await binRes.arrayBuffer());
+  const bytes = binRes.bytes ?? new Uint8Array(0);
   if (bytes.length === 0) throw new Error('midia_vazia');
   if (bytes.length > MAX_MEDIA) throw new Error('arquivo_excede_limite');
-  const mime = (binRes.headers.get('content-type') ?? info.mime_type ?? '').split(';')[0].trim();
-  return { bytes, mime, b64: paraBase64(bytes) };
+  const mime = (binRes.contentType || info.mime_type || '').split(';')[0].trim();
+  // o base64 NÃO é calculado aqui: só o áudio dentro do teto de transcrição precisa dele, e
+  // converter um vídeo de 20 MB só para descartar são ~27 MB de string à toa na função.
+  return { bytes, mime };
 }
 
 const TIPO_MIDIA: Record<string, string> = {
@@ -223,8 +234,10 @@ Deno.serve(async (req) => {
       const inst = `cloud:${phoneNumberId}`;
 
       const { data: canal } = await db.from('canais')
-        .select('id, organizacao_id, numero_conectado, ativo')
-        .eq('cloud_phone_number_id', phoneNumberId).eq('transporte', 'cloud_api').maybeSingle();
+        .select('id, organizacao_id, numero_conectado, ativo, status_integracao')
+        .eq('cloud_phone_number_id', phoneNumberId).eq('transporte', 'cloud_api')
+        // canal removido pelo painel não volta a ingerir sozinho (mesma decisão do evolution-webhook).
+        .neq('status_integracao', 'removido').maybeSingle();
 
       // phone_number_id desconhecido: registra e segue com 200 (nunca 4xx para a Meta).
       if (!canal) {
@@ -348,7 +361,7 @@ Deno.serve(async (req) => {
               metaMidia.status_midia = 'disponivel';
               delete metaMidia.midia_pendente;               // baixou: some o marcador de pendência
               // áudio inbound dentro do teto → base64 p/ o bot-runner transcrever (mesmo Gemini).
-              if (tipo === 'audio' && dl.bytes.length <= MAX_AUDIO_TRANSC) { audioB64 = dl.b64; audioMime = mime; }
+              if (tipo === 'audio' && dl.bytes.length <= MAX_AUDIO_TRANSC) { audioB64 = paraBase64(dl.bytes); audioMime = mime; }
             } catch (e) {
               metaMidia.midia_pendente = true;
               metaMidia.status_midia = 'falhou';
@@ -365,7 +378,14 @@ Deno.serve(async (req) => {
           // .select() para saber se o INSERT criou linha NOVA — com ignoreDuplicates a reentrega
           // devolve array vazio. Sem isso, reentrega da Meta incrementava não-lidas de novo e
           // redisparava o bot (mesma lição do evolution-webhook).
-          const { data: insArr } = await db.from('mensagens').upsert({
+          //
+          // O `error` TEM que ser lido: o supabase-js não lança em erro do PostgREST, devolve
+          // { data: null, error }. Sem checar, uma FALHA de INSERT fica idêntica a uma REENTREGA
+          // (ambas dão insArr sem linhas) — e aí a conversa subiria no inbox, o Kanban criaria um
+          // LEAD NOVO e o evento seria marcado 'processado', tudo sem a mensagem existir. Como
+          // sempre respondemos 200, a Meta não reentrega: a mensagem do cliente sumiria de vez.
+          // É exatamente o P0 de 07/2026 (metadados NOT NULL / 23502) esperando para se repetir.
+          const { data: insArr, error: msgErr } = await db.from('mensagens').upsert({
             conversa_id: conversaId, organizacao_id: orgId, direcao: 'entrada', tipo,
             conteudo: texto, status: 'entregue', origem: 'whatsapp_cloud', id_externo: wamid,
             recebida_em: agora,
@@ -373,6 +393,12 @@ Deno.serve(async (req) => {
             metadados: { ...metaMidia, wamid, wa_id: waId, phone_number_id: phoneNumberId,
                          ...(referral ? { referral } : {}), ...(m.context?.id ? { resposta_a_wamid: m.context.id } : {}) },
           }, { onConflict: 'id_externo', ignoreDuplicates: true }).select('id');
+          if (msgErr) {
+            // 'erro' deixa o evento VISÍVEL e reprocessável, em vez de 'processado' e perdido.
+            // O continue vem antes de conversa/Kanban/dispatch: efeito colateral sem mensagem é pior que nada.
+            await fim('erro', { erro: `mensagens:${msgErr.code ?? ''}:${(msgErr.message ?? '').slice(0, 180)}` });
+            continue;
+          }
           const inboundNovo = Array.isArray(insArr) && insArr.length > 0;
           const inboundMsgId = (insArr?.[0]?.id as string | undefined) ?? null;
 
@@ -381,13 +407,15 @@ Deno.serve(async (req) => {
             const { data: cv } = await db.from('conversas').select('nao_lidas').eq('id', conversaId).maybeSingle();
             await db.from('conversas').update({
               ultima_interacao_em: agora, ultima_msg_canal_em: agora, ultimo_canal_id: canal.id,
-              canal_id: canal.id, ultimo_provider: 'meta_cloud', arquivada_em: null,
+              canal_id: canal.id, ultimo_numero: canal.numero_conectado ?? null,
+              ultimo_provider: 'meta_cloud', arquivada_em: null,
               nao_lidas: ((cv?.nao_lidas as number) ?? 0) + 1,
             }).eq('id', conversaId);
           } else {
             await db.from('conversas').update({
               ultima_interacao_em: agora, ultima_msg_canal_em: agora, ultimo_canal_id: canal.id,
-              canal_id: canal.id, ultimo_provider: 'meta_cloud',
+              canal_id: canal.id, ultimo_numero: canal.numero_conectado ?? null,
+              ultimo_provider: 'meta_cloud',
             }).eq('id', conversaId);
           }
 
@@ -402,8 +430,11 @@ Deno.serve(async (req) => {
           //      justamente o lead que respondeu; opt-out → PERDIDO e NÃO dispara o bot.
           //      AWAITED de propósito: o move de coluna precisa commitar antes do fire-and-forget.
           //      Best-effort — erro/timeout aqui nunca afeta a ingestão. Idêntico ao evolution-webhook. ----
+          //      NÃO é gated por BOT_DISPATCH: "não quero mais receber" é vontade do CLIENTE, não
+          //      função do bot. Se dependesse do toggle, um opt-out pelo número oficial seria
+          //      ignorado em silêncio enquanto o remarketing seguisse mandando pela Evolution.
           let rmktDesfecho: string | null = null;
-          if (BOT_DISPATCH && inboundNovo && inboundMsgId) {
+          if (inboundNovo && inboundMsgId) {
             try {
               const { data: r } = await db.rpc('bot_remarketing_inbound', { p_conversa: conversaId, p_texto: texto ?? '' });
               rmktDesfecho = (r as string) ?? null;
