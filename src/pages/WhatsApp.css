@@ -655,8 +655,9 @@
 .wa-app .conv .unread{align-self:center;min-width:18px;height:18px;font-size:10.5px;padding:0 5px;
   background:#e5484d;color:#fff}
 
-/* linha 3 — chips: NUNCA quebra em 2 linhas (era a origem da altura variável) */
-.wa-app .conv .cbadges{flex-wrap:nowrap;overflow:hidden;gap:5px;margin-top:5px}
+/* linha 3 — chips. Passam a poder quebrar numa 2ª linha quando há um 3º ticket: o dono prefere ver
+   TODOS os tickets a manter a altura fixa. A altura só cresce quando existem 3+ chips de fato. */
+.wa-app .conv .cbadges{flex-wrap:wrap;overflow:visible;gap:5px;margin-top:5px}
 .wa-app :is(.conv,.ch-tags) .ctag--atraso{background:rgba(229,72,77,.10);color:#c93b40;border-color:rgba(229,72,77,.30)}
 .wa-app :is(.conv,.ch-tags) .ctag--fim{background:var(--surface-2);color:var(--muted);border-color:var(--line-2)}
 .wa-app :is(.conv,.ch-tags) .ctag--mais{background:var(--surface-2);color:var(--ink-2);border-color:var(--line-2);cursor:help}
@@ -804,26 +805,26 @@
 /* ===== CARD FINO — 85px era alto demais para uma lista de 370 conversas =====
    Alvo ~64px: menos padding, avatar menor, entrelinhas justas e tags em escala menor.
    Nada sai do card: as 3 linhas (nome / tags / prévia) e a coluna direita continuam. */
-.wa-app .conv-list{padding:4px 8px}
-.wa-app .conv{padding:6px 10px;gap:9px;border-radius:10px}
-/* avatar 38 -> 33 (e o micro-badge do canal acompanha) */
-.wa-app .conv .cav{width:31px;height:31px}
-.wa-app .conv .av{width:31px;height:31px;font-size:11px}
-.wa-app .conv .cav-canal{min-width:15px;height:15px;font-size:7.5px;border-width:1.5px;right:-2px;bottom:-2px}
-/* linhas justas */
-.wa-app .conv .crow{gap:5px}
-.wa-app .conv .cname{font-size:12.5px;line-height:1.25}
-.wa-app .conv .cbadges{margin-top:2px;gap:4px}
-.wa-app .conv .cprev{margin-top:1px;font-size:11.5px;line-height:1.25}
-/* tags e pills menores */
-.wa-app :is(.conv,.ch-tags) .ctag{font-size:8.5px;padding:1.5px 6px;border-radius:4px;line-height:1.5}
-.wa-app .conv .cresp{font-size:9.5px;padding:1px 7px;max-width:104px}
-.wa-app .conv .ctime{font-size:10.5px}
-.wa-app .conv .cright{gap:3px;max-width:108px}
-.wa-app .conv .unread{min-width:16px;height:16px;font-size:9.5px;padding:0 4px}
-.wa-app .conv .cflag{font-size:9px}
-/* cabeçalho de grupo também afina */
-.wa-app .conv-grupo-h{font-size:10.5px;padding:3px 18px;margin:6px -8px 3px}
+.wa-app .conv-list{padding:5px 8px}
+.wa-app .conv{padding:8px 11px;gap:10px;border-radius:11px}
+/* avatar 38 -> 34 (e o micro-badge do canal acompanha) */
+.wa-app .conv .cav{width:34px;height:34px}
+.wa-app .conv .av{width:34px;height:34px;font-size:12px}
+.wa-app .conv .cav-canal{min-width:16px;height:16px;font-size:8px;border-width:1.5px;right:-2px;bottom:-2px}
+/* linhas com um respiro a mais (o dono pediu "um pouco maior") */
+.wa-app .conv .crow{gap:6px}
+.wa-app .conv .cname{font-size:13.5px;line-height:1.25}
+.wa-app .conv .cbadges{margin-top:4px;gap:5px}
+.wa-app .conv .cprev{margin-top:2px;font-size:12px;line-height:1.3}
+/* tags e pills um degrau maiores (o .ch-tags do cabeçalho tem estilo próprio, não muda) */
+.wa-app :is(.conv,.ch-tags) .ctag{font-size:9.5px;padding:2px 7px;border-radius:5px;line-height:1.5}
+.wa-app .conv .cresp{font-size:10px;padding:1.5px 8px;max-width:112px}
+.wa-app .conv .ctime{font-size:11px}
+.wa-app .conv .cright{gap:4px;max-width:112px}
+.wa-app .conv .unread{min-width:18px;height:18px;font-size:10.5px;padding:0 5px}
+.wa-app .conv .cflag{font-size:9.5px}
+/* cabeçalho de grupo acompanha */
+.wa-app .conv-grupo-h{font-size:11px;padding:4px 18px;margin:7px -8px 3px}
 
 /* ===== Cabeçalho: chips uniformes + botões quadrados (pedido do dono) =====
    LEAD NOVO, canal e atendente passam a usar o MESMO estilo do chip "Não atribuído" do card
