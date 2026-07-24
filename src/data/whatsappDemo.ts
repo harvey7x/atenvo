@@ -85,6 +85,8 @@ export interface WaContact {
   etapaEntrada?: boolean;
   /** resultado da coluna (ganho/perdido/neutro) — só para a cor da etiqueta. */
   etapaResultado?: 'ganho' | 'perdido' | 'neutro' | null;
+  /** cor da COLUNA do Kanban — a etiqueta da lista/cabeçalho usa exatamente a mesma cor do quadro. */
+  etapaCor?: string | null;
   /** status da oportunidade — ganho/perdido/cancelado vencem a etapa na etiqueta de SITUAÇÃO. */
   oppStatus?: 'em_andamento' | 'ganho' | 'perdido' | 'cancelado' | null;
   /** responsável da oportunidade (3ª preferência p/ a etiqueta de atendente). */

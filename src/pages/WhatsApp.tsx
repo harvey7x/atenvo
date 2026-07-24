@@ -104,6 +104,14 @@ function ackOf(status?: string): { ticks: string; cls: string; title: string } |
   }
 }
 
+/** Cor da etiqueta de etapa. Só pinta com a cor da COLUNA quando o texto exibido É a coluna do
+ *  Kanban — "EM ATENDIMENTO"/"AGUARDANDO CLIENTE" são estados derivados, não existem no quadro,
+ *  e continuam com a cor semântica. Assim a lista nunca mostra uma cor que o Kanban não tem. */
+function corDaEtapa(c: WaContact, texto: string): string | null {
+  const nomeCol = (c.etapa ?? '').trim().toLocaleUpperCase('pt-BR');
+  return c.etapaCor && nomeCol && texto === nomeCol ? c.etapaCor : null;
+}
+
 const TABS: { id: string; label: string }[] = [
   { id: 'todos', label: 'Todos' },
   { id: 'meus', label: 'Meus' },
@@ -1061,7 +1069,10 @@ export function WhatsApp() {
                   <span className="cname">{nomeVazio ? (telSec || 'Cliente sem nome') : formatarNomeCliente(c.name)}</span>
                 </div>
                 <div className="cbadges">
-                  {eSituacao && <span className={'ctag ctag--' + (eSituacao.variante ?? 'atendimento')} title="Etapa no Kanban">{eSituacao.texto}</span>}
+                  {eSituacao && (() => { const cor = corDaEtapa(c, eSituacao.texto); return (
+                    <span className={'ctag ctag--' + (eSituacao.variante ?? 'atendimento') + (cor ? ' ctag--kanban' : '')}
+                          style={cor ? { background: cor, borderColor: cor } : undefined} title="Etapa no Kanban">{eSituacao.texto}</span>
+                  ); })()}
                   {alertas.length > 0 && (
                     <span className="ctag ctag--alerta" title={alertas.join(' · ')} aria-label={alertas.join('. ')}>⚠{alertas.length > 1 ? ' ' + alertas.length : ''}</span>
                   )}
@@ -1128,7 +1139,10 @@ export function WhatsApp() {
                   <div className="ch-id-text">
                     <div className="ch-name" title={hNome} tabIndex={0} aria-label={hNome}>{hNome}</div>
                     <div className="ch-tags">
-                      {hSit && <span className={'ctag ctag--' + (hSit.variante ?? 'atendimento')} title="Etapa no Kanban">{hSit.texto}</span>}
+                      {hSit && (() => { const cor = corDaEtapa(current, hSit.texto); return (
+                        <span className={'ctag ctag--' + (hSit.variante ?? 'atendimento') + (cor ? ' ctag--kanban' : '')}
+                              style={cor ? { background: cor, borderColor: cor } : undefined} title="Etapa no Kanban">{hSit.texto}</span>
+                      ); })()}
                       {current.chip && <span className="cresp" title="Canal atual do atendimento">{current.chip}</span>}
                       <span className="cresp" title="Atendente responsável">{respNome ? (current.respId === user?.id ? 'Você' : respNome) : 'Não atribuído'}</span>
                     </div>

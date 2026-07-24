@@ -847,3 +847,7 @@
 .wa-app .ch-arq:hover:not(:disabled){border-color:var(--green);color:var(--green-ink)}
 .wa-app .chat-head .icon-btn{border-radius:8px}
 @media (max-width:1400px){ .wa-app .ch-arq span{display:none} .wa-app .ch-arq{padding:0 10px} }
+
+/* Etiqueta que representa uma COLUNA do Kanban usa a cor da própria coluna (inline).
+   Texto branco: a paleta de colunas do Kanban é toda de tons médios/escuros. */
+.wa-app :is(.conv,.ch-tags) .ctag--kanban{color:#fff !important}

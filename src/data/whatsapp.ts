@@ -214,17 +214,17 @@ function mapConversa(c: DbConv): WaContact {
 /* ===================== Etapa do Kanban por contato (etiqueta da lista) =====================
  * Uma query por org (não N por conversa). Preferência: oportunidade EM ANDAMENTO mais recente;
  * senão, a mais recente de qualquer situação. Best-effort: erro => Map vazio (lista segue viva). */
-interface EtapaContato { etapa: string; entrada: boolean; resultado: EtapaVariante; status: OppStatus; respId: string | null; emAndamento: boolean }
+interface EtapaContato { etapa: string; cor: string | null; entrada: boolean; resultado: EtapaVariante; status: OppStatus; respId: string | null; emAndamento: boolean }
 async function etapasPorContato(orgId: string): Promise<Map<string, EtapaContato>> {
   const map = new Map<string, EtapaContato>();
   try {
     const { data, error } = await supabase!
       .from('oportunidades')
-      .select('contato_id, status, responsavel_id, atualizado_em, funil_colunas(nome, entrada, resultado)')
+      .select('contato_id, status, responsavel_id, atualizado_em, funil_colunas(nome, cor, entrada, resultado)')
       .eq('organizacao_id', orgId)
       .order('atualizado_em', { ascending: false });
     if (error) return map;
-    type Col = { nome: string | null; entrada: boolean | null; resultado: string | null };
+    type Col = { nome: string | null; cor: string | null; entrada: boolean | null; resultado: string | null };
     type Row = { contato_id: string | null; status: string | null; responsavel_id: string | null; funil_colunas: Col | Col[] | null };
     for (const r of ((data as unknown as Row[]) ?? [])) {
       const cid = r.contato_id;
@@ -239,6 +239,7 @@ async function etapasPorContato(orgId: string): Promise<Map<string, EtapaContato
       const st = r.status;
       map.set(cid, {
         etapa: col.nome,
+        cor: col.cor ?? null,
         entrada: !!col.entrada,
         resultado: (col.resultado === 'ganho' || col.resultado === 'perdido') ? col.resultado : 'neutro',
         status: (st === 'ganho' || st === 'perdido' || st === 'cancelado') ? st : 'em_andamento',
@@ -292,7 +293,7 @@ export function useWaConversations() {
       for (const c of arr) {
         const e = c.contatoId ? etapas.get(c.contatoId) : null;
         if (!e) continue;
-        c.etapa = e.etapa; c.etapaEntrada = e.entrada; c.etapaResultado = e.resultado;
+        c.etapa = e.etapa; c.etapaCor = e.cor; c.etapaEntrada = e.entrada; c.etapaResultado = e.resultado;
         c.oppStatus = e.status; c.oppRespId = e.respId;
         c.stage = e.etapa;
       }
