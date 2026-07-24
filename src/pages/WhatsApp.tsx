@@ -27,8 +27,8 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Modal } from '@/components/Modal';
 import { useStatusDefs, useEtiquetas, useAssinaturaPref, useAtendimentoActions, useOrgUsuarios, resolverNomeAssinatura } from '@/data/atendimento';
 import { useSlaAlertas } from '@/data/sla';
-import { indexPorChave, sevClass, sevIntensidade, tipoLabel, tempoRelativo, maxSeveridade } from '@/data/slaView';
-import { siglaCanal, dividirChips, tituloOcultos, type ChipCard } from '@/lib/cardConversa';
+import { indexPorChave, tipoLabel, tempoRelativo } from '@/data/slaView';
+import { siglaCanal } from '@/lib/cardConversa';
 import { SlaConversaBanner } from '@/components/SlaConversaBanner';
 import { classificar, isNovo, statusKind, tempoCurto, tierTempo, minutosDesde, type SinaisConversa, type Grupo } from '@/data/inboxGroups';
 import { corDaEtiqueta, podeGerenciarAtendimento, type AssinaturaModo } from '@/types/atendimento';
@@ -1109,29 +1109,19 @@ export function WhatsApp() {
             const badges = etiquetasDaConversa(c, nomePorId);
             // Higiene: cadastro fraco vira badge na lista. A etiqueta LEAD NOVO já sinaliza "sem dono".
             const nomeRuim = analisarNome(c.name).fraco && conversaAtiva({ status: c.status, arquivada: c.arquivada });
-            // ---- fileira de chips por PRIORIDADE SEMÂNTICA (não por ordem de array) ----
-            // O canal saiu daqui (virou micro-badge no avatar) e o atendente virou pill à direita.
-            // Sobra o que é sinal operacional, na ordem em que o atendente precisa ler.
+            // ---- fileira de chips: ETAPA + ATENDENTE + canal (pedido do dono: "o card precisa
+            // deixar claro em qual etapa do Kanban está, quem atende e por onde entrou").
+            // "Atrasado · Xh", "Nome incompleto", SLA e precisa-humano SAÍRAM do card visível:
+            // viram UM indicador ⚠ discreto com tudo no tooltip. A REGRA continua viva — barra
+            // lateral colorida (barTier), aba Prioridade, bloqueios de envio e o motor de SLA
+            // não foram tocados; só a apresentação mudou.
             const eAtendente = badges.find((b) => b.tipo === 'atendente');
             const eSituacao = badges.find((b) => b.tipo === 'situacao');
-            const chips: ChipCard[] = [];
-            // 1) SITUAÇÃO — sempre emitida pelo modelo e sempre a primeira a ser lida.
-            if (eSituacao) chips.push({ key: 'sit', cls: 'ctag ctag--' + (eSituacao.variante ?? 'atendimento'), txt: eSituacao.texto, title: 'Situação' });
-            // 2) ATRASO (cliente): calculado aqui sobre aguardandoDesde. É a única fonte quando o
-            //    motor de SLA não emitiu alerta — por isso não pode depender dele.
-            if (atrasado && tempoCurto) chips.push({ key: 'atraso', cls: 'ctag ctag--atraso', txt: 'Atrasado · ' + tempoCurto, title: 'Sem resposta há ' + tempoCurto });
-            // 3) SLA: só o de MAIOR severidade vira chip; os demais entram no "+N".
-            const sevTop = maxSeveridade(slaChips);
-            const slaTop = sevTop ? slaChips.find((a) => a.severidade === sevTop) : undefined;
-            if (slaTop) chips.push({ key: 'sla', cls: 'conv-sla-chip ' + sevClass(slaTop.severidade) + ' int-' + sevIntensidade(slaTop.severidade), txt: tipoLabel(slaTop.tipo), title: slaTop.detalhe ?? slaTop.titulo });
-            if (c.precisaHumano) chips.push({ key: 'ph', cls: 'conv-sla-chip ph', txt: 'Precisa humano', title: 'Conversa marcada como precisa de atendimento humano' });
-            if (nomeRuim) chips.push({ key: 'hig', cls: 'ctag ctag--higiene', txt: 'Nome incompleto', title: 'Cadastro incompleto: preencha o nome completo do cliente' });
-            if (finalizado) chips.push({ key: 'fim', cls: 'ctag ctag--fim', txt: 'Finalizado', title: 'Conversa ' + (c.status ?? 'finalizada') });
-            for (const a of slaChips) {
-              if (slaTop && a.id === slaTop.id) continue;
-              chips.push({ key: 'sla-' + a.id, cls: 'conv-sla-chip ' + sevClass(a.severidade), txt: tipoLabel(a.tipo), title: a.detalhe ?? a.titulo });
-            }
-            const { visiveis: chipsVis, ocultos: chipsOcultos } = dividirChips(chips);
+            const alertas: string[] = [];
+            if (atrasado && tempoCurto) alertas.push('Sem resposta há ' + tempoCurto);
+            for (const a of slaChips) alertas.push(tipoLabel(a.tipo) + (a.detalhe ? ' — ' + a.detalhe : ''));
+            if (c.precisaHumano) alertas.push('Precisa de atendimento humano');
+            if (nomeRuim) alertas.push('Cadastro incompleto: preencha o nome do cliente');
             return (
             <div key={c.id} data-cid={c.id} className={'conv conv--' + barTier + (c.id === currentId ? ' active' : '')}
                  title={'Atendente: ' + atendNome + ' · Canal: WhatsApp ' + c.chip + ' · ' + statusTxt + ' · ' + c.time}
@@ -1157,15 +1147,14 @@ export function WhatsApp() {
                   <span className="cprev">{c.last || '—'}</span>
                   {c.unread > 0 && <span className="unread" title={c.unread + ' não lidas'} aria-label={c.unread + ' mensagens não lidas'}>{c.unread > 99 ? '99+' : c.unread}</span>}
                 </div>
-                {(chipsVis.length > 0 || chipsOcultos.length > 0 || eAtendente) && (
-                  <div className="cbadges">
-                    {chipsVis.map((ch) => <span key={ch.key} className={ch.cls} title={ch.title}>{ch.txt}</span>)}
-                    {chipsOcultos.length > 0 && (
-                      <span className="ctag ctag--mais" title={tituloOcultos(chipsOcultos)}>+{chipsOcultos.length}</span>
-                    )}
-                    {eAtendente && <span className="cresp" title="Atendente responsável">{eAtendente.texto}</span>}
-                  </div>
-                )}
+                <div className="cbadges">
+                  {eSituacao && <span className={'ctag ctag--' + (eSituacao.variante ?? 'atendimento')} title="Etapa no Kanban">{eSituacao.texto}</span>}
+                  {alertas.length > 0 && (
+                    <span className="ctag ctag--alerta" title={alertas.join(' · ')} aria-label={alertas.join('. ')}>⚠{alertas.length > 1 ? ' ' + alertas.length : ''}</span>
+                  )}
+                  {finalizado && <span className="ctag ctag--fim" title={'Conversa ' + (c.status ?? 'finalizada')}>Finalizado</span>}
+                  <span className="cresp" title="Atendente responsável">{eAtendente ? eAtendente.texto : 'Não atribuído'}</span>
+                </div>
               </div>
             </div>
             );
@@ -1190,28 +1179,34 @@ export function WhatsApp() {
                 {listOpen ? <IcChevLeft /> : <IcChevRight />}
               </button>
             )}
-            {!dataOpen && (
-              <div className="ch-id">
-                <Avatar name={current.name} />
-                <div className="ch-id-text">
-                  <div className="ch-name" title={formatarNomeCliente(current.name) || current.name} tabIndex={0} aria-label={formatarNomeCliente(current.name) || current.name}>{formatarNomeCliente(current.name) || current.name}</div>
-                  <div className="ch-phone" title={current.phone}>{current.phone}</div>
+            {/* Cabeçalho focado no CLIENTE (referência Helena CRM): avatar + nome em destaque e as
+                tags logo abaixo — etapa do Kanban, canal, atendente e status. Substitui as células
+                técnicas "Canal / Status / Atendente" (a informação é a MESMA, muda a apresentação).
+                Sem nome cadastrado, o telefone mascarado vira o rótulo (mesma regra do card). */}
+            {(() => {
+              const hNomeVazio = !current.name?.trim() || /^[\d\s()+\-]+$/.test(current.name.trim());
+              const hNome = hNomeVazio ? (current.phone ? mascararNumero(current.phone) : 'Cliente sem nome') : (formatarNomeCliente(current.name) || current.name);
+              const hSit = current.id ? etiquetasDaConversa(current, nomePorId).find((b) => b.tipo === 'situacao') : null;
+              return (
+                <div className="ch-id ch-id--cliente">
+                  <Avatar name={current.name} />
+                  <div className="ch-id-text">
+                    <div className="ch-name" title={hNome} tabIndex={0} aria-label={hNome}>{hNome}</div>
+                    <div className="ch-tags">
+                      {hSit && <span className={'ctag ctag--' + (hSit.variante ?? 'atendimento')} title="Etapa no Kanban">{hSit.texto}</span>}
+                      {current.chip && <span className="ctag ctag--canal" title="Canal atual do atendimento">{current.chip.toLocaleUpperCase('pt-BR')}</span>}
+                      <span className="ctag ctag--atendente" title="Atendente responsável">{respNome ? (current.respId === user?.id ? 'VOCÊ' : respNome.toLocaleUpperCase('pt-BR')) : 'Não atribuído'}</span>
+                      {statusNomeAtual && (
+                        <span className="status-badge" style={{ background: (statusCorAtual ?? '#64748b') + '22', color: statusCorAtual ?? 'var(--ink-2)' }}>
+                          <span className="sdot" style={{ background: statusCorAtual ?? '#64748b' }} />{statusNomeAtual}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            )}
-            <div className="ch-meta">
-            <div className="meta-cell"><div className="k">Canal</div><span className="meta-val"><span style={{ color: 'var(--wa)', display: 'inline-flex' }}><IcWa /></span>WhatsApp</span></div>
-            <div className="meta-cell"><div className="k">Status</div>
-              {statusNomeAtual
-                ? <span className="status-badge" style={{ background: (statusCorAtual ?? '#64748b') + '22', color: statusCorAtual ?? 'var(--ink-2)' }}><span className="sdot" style={{ background: statusCorAtual ?? '#64748b' }} />{statusNomeAtual}</span>
-                : <span className="meta-val" style={{ color: 'var(--muted)' }}>—</span>}
-            </div>
-            <div className="meta-cell"><div className="k">Atendente</div>
-              {respNome
-                ? <span className="meta-val resp-line"><Avatar name={respNome} cls="s" />{current.respId === user?.id ? 'Você' : respNome}</span>
-                : <span className="meta-val" style={{ color: 'var(--muted)' }}>Sem responsável</span>}
-            </div>
-            </div>
+              );
+            })()}
+            {current.phone && <span className="ch-phone-pill" title="Telefone do cliente"><span style={{ color: 'var(--wa)', display: 'inline-flex' }}><IcWa /></span>{current.phone}</span>}
           <div className="ch-actions">
             {/* responsável EFETIVO (conversa → contato → oportunidade): antes olhava só
                 contatos.responsavel_id e oferecia "Assumir" em conversa que já tinha dono na oportunidade. */}

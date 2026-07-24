@@ -96,26 +96,26 @@
 /* ---- Etiquetas do item (padrão WhatsApp Business): [LEAD NOVO] ou [ATENDENTE] [ETAPA] ----
    Pequenas e discretas: não competem com o nome nem com a última mensagem. */
 .wa-app .conv .cbadges{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin-top:4px}
-.wa-app .conv .ctag{
+.wa-app :is(.conv,.ch-tags) .ctag{
   flex:none;font-size:10px;font-weight:700;letter-spacing:.02em;line-height:1.5;
   padding:1px 6px;border-radius:4px;border:1px solid transparent;
   max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
 }
 /* Atendente — azul/roxo discreto */
-.wa-app .conv .ctag--atendente{background:rgba(59,130,246,.10);color:#2563eb;border-color:rgba(59,130,246,.26)}
+.wa-app :is(.conv,.ch-tags) .ctag--atendente{background:rgba(59,130,246,.10);color:#2563eb;border-color:rgba(59,130,246,.26)}
 /* SITUAÇÃO */
-.wa-app .conv .ctag--lead{background:var(--amber-soft);color:var(--amber);border-color:rgba(201,122,22,.28)}      /* LEAD NOVO */
-.wa-app .conv .ctag--atendimento{background:var(--surface-2);color:var(--ink-2);border-color:var(--line-2)}       /* EM ATENDIMENTO */
-.wa-app .conv .ctag--aguardando{background:var(--amber-soft);color:var(--amber);border-color:rgba(201,122,22,.22)} /* AGUARDANDO CLIENTE */
-.wa-app .conv .ctag--etapa{background:var(--surface-2);color:var(--ink-2);border-color:var(--line-2)}             /* CONTRATOS, DOCUMENTOS... */
-.wa-app .conv .ctag--ganho{background:var(--green-soft);color:var(--green-ink);border-color:rgba(25,195,125,.32)} /* CLIENTE FECHADO */
-.wa-app .conv .ctag--perdido{background:transparent;color:var(--muted);border-color:var(--line-2)}                /* PERDIDO */
-.wa-app .conv .ctag--cancelado{background:transparent;color:var(--muted);border-color:var(--line-2)}              /* CANCELADO */
+.wa-app :is(.conv,.ch-tags) .ctag--lead{background:var(--amber-soft);color:var(--amber);border-color:rgba(201,122,22,.28)}      /* LEAD NOVO */
+.wa-app :is(.conv,.ch-tags) .ctag--atendimento{background:var(--surface-2);color:var(--ink-2);border-color:var(--line-2)}       /* EM ATENDIMENTO */
+.wa-app :is(.conv,.ch-tags) .ctag--aguardando{background:var(--amber-soft);color:var(--amber);border-color:rgba(201,122,22,.22)} /* AGUARDANDO CLIENTE */
+.wa-app :is(.conv,.ch-tags) .ctag--etapa{background:var(--surface-2);color:var(--ink-2);border-color:var(--line-2)}             /* CONTRATOS, DOCUMENTOS... */
+.wa-app :is(.conv,.ch-tags) .ctag--ganho{background:var(--green-soft);color:var(--green-ink);border-color:rgba(25,195,125,.32)} /* CLIENTE FECHADO */
+.wa-app :is(.conv,.ch-tags) .ctag--perdido{background:transparent;color:var(--muted);border-color:var(--line-2)}                /* PERDIDO */
+.wa-app :is(.conv,.ch-tags) .ctag--cancelado{background:transparent;color:var(--muted);border-color:var(--line-2)}              /* CANCELADO */
 /* CANAL ATUAL — verde WhatsApp bem apagado (é contexto, não protagonista) */
-.wa-app .conv .ctag--canal{background:transparent;color:var(--wa);border-color:rgba(31,168,85,.30);font-weight:600}
+.wa-app :is(.conv,.ch-tags) .ctag--canal{background:transparent;color:var(--wa);border-color:rgba(31,168,85,.30);font-weight:600}
 /* HIGIENE — cadastro incompleto (auditoria 2026-07: 49% dos contatos sem nome utilizável) */
-.wa-app .conv .ctag--higiene{background:rgba(192,52,44,.10);color:#c0342c;border-color:rgba(192,52,44,.28)}
-[data-theme="dark"] .wa-app .conv .ctag--atendente{background:rgba(59,130,246,.18);color:#93b4fc;border-color:rgba(59,130,246,.34)}
+.wa-app :is(.conv,.ch-tags) .ctag--higiene{background:rgba(192,52,44,.10);color:#c0342c;border-color:rgba(192,52,44,.28)}
+[data-theme="dark"] .wa-app :is(.conv,.ch-tags) .ctag--atendente{background:rgba(59,130,246,.18);color:#93b4fc;border-color:rgba(59,130,246,.34)}
 .wa-app .conv .crow-status{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:2px}
 .wa-app .conv .cstatus{font-size:11px;font-weight:500;line-height:1.2;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .wa-app .conv .cstatus--aguardando{color:#c07a1e}
@@ -321,8 +321,8 @@
 .wa-app .conv-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px;min-width:0}
 .wa-app .ctag-dot{width:8px;height:8px;border-radius:50%;display:inline-block}
 /* etiquetas como chips abertos (nome visível), compactos e leves */
-.wa-app .conv .ctag{display:inline-block;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10.5px;font-weight:500;line-height:1.5;padding:1px 7px;border-radius:999px;border:1px solid transparent}
-.wa-app .conv .ctag.more{max-width:none;background:var(--hover);color:var(--muted);border-color:var(--line-2)}
+.wa-app :is(.conv,.ch-tags) .ctag{display:inline-block;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10.5px;font-weight:500;line-height:1.5;padding:1px 7px;border-radius:999px;border:1px solid transparent}
+.wa-app :is(.conv,.ch-tags) .ctag.more{max-width:none;background:var(--hover);color:var(--muted);border-color:var(--line-2)}
 .wa-app .tag.colored{display:inline-flex;align-items:center;gap:5px;border:1px solid;font-weight:600}
 .wa-app .tag-x{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border:0;background:transparent;color:currentColor;cursor:pointer;opacity:.7;padding:0}
 .wa-app .tag-x:hover{opacity:1}
@@ -657,14 +657,14 @@
 
 /* linha 3 — chips: NUNCA quebra em 2 linhas (era a origem da altura variável) */
 .wa-app .conv .cbadges{flex-wrap:nowrap;overflow:hidden;gap:5px;margin-top:5px}
-.wa-app .conv .ctag--atraso{background:rgba(229,72,77,.10);color:#c93b40;border-color:rgba(229,72,77,.30)}
-.wa-app .conv .ctag--fim{background:var(--surface-2);color:var(--muted);border-color:var(--line-2)}
-.wa-app .conv .ctag--mais{background:var(--surface-2);color:var(--ink-2);border-color:var(--line-2);cursor:help}
+.wa-app :is(.conv,.ch-tags) .ctag--atraso{background:rgba(229,72,77,.10);color:#c93b40;border-color:rgba(229,72,77,.30)}
+.wa-app :is(.conv,.ch-tags) .ctag--fim{background:var(--surface-2);color:var(--muted);border-color:var(--line-2)}
+.wa-app :is(.conv,.ch-tags) .ctag--mais{background:var(--surface-2);color:var(--ink-2);border-color:var(--line-2);cursor:help}
 /* atendente: pill outline discreto, encostado à direita (padrão da referência) */
 .wa-app .conv .cresp{margin-left:auto;flex:none;font-size:10px;font-weight:600;letter-spacing:.02em;
   padding:1px 7px;border-radius:999px;border:1px solid var(--line-2);color:var(--muted);
   background:transparent;max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-[data-theme="dark"] .wa-app .conv .ctag--atraso{background:rgba(229,72,77,.18);color:#ff9b9e;border-color:rgba(229,72,77,.36)}
+[data-theme="dark"] .wa-app :is(.conv,.ch-tags) .ctag--atraso{background:rgba(229,72,77,.18);color:#ff9b9e;border-color:rgba(229,72,77,.36)}
 
 /* ===== Bloco 3 — avisos da conversa em UMA linha =====
    Eram até 4 blocos empilhados no compositor + 1 banner de higiene, cada um com 2 linhas de texto.
@@ -704,3 +704,23 @@
 .wa-app .sla-conv-bar{min-height:28px;padding:4px 14px;flex-wrap:nowrap}
 .wa-app .sla-conv-text{font-size:12px;font-weight:500;min-width:0;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ===== Bloco 4 — cabeçalho focado no cliente + card "Kanban primeiro" =====
+   Referência Helena CRM: cliente em destaque, tags logo abaixo do nome, telefone em pill
+   discreta e ações à direita. As células técnicas "Canal / Status / Atendente" saíram — a
+   informação é a mesma, reapresentada como tags. */
+.wa-app .ch-id--cliente{flex:1}
+.wa-app .ch-id--cliente .av{width:42px;height:42px}
+.wa-app .ch-id--cliente .ch-name{font-size:15.5px;font-weight:700}
+.wa-app .ch-tags{display:flex;align-items:center;gap:5px;margin-top:4px;flex-wrap:nowrap;overflow:hidden;min-width:0}
+.wa-app .ch-tags .status-badge{flex:none}
+.wa-app .ch-phone-pill{flex:none;display:inline-flex;align-items:center;gap:6px;font-size:12px;
+  color:var(--ink-2);background:var(--surface-2);border:1px solid var(--line-2);border-radius:999px;
+  padding:4px 11px;white-space:nowrap}
+.wa-app .ch-phone-pill svg{width:13px;height:13px}
+@media (max-width:1350px){.wa-app .ch-phone-pill{display:none}} /* o telefone segue no painel direito */
+
+/* indicador discreto de alertas do card: "Atrasado"/"Nome incompleto"/SLA saíram do card
+   visível (pedido do dono) e moram aqui — tooltip carrega TODOS; a barra lateral colorida
+   continua sinalizando atraso. Âmbar neutro: vermelho ficou exclusivo do badge de não lidas. */
+.wa-app .conv .ctag--alerta{background:var(--amber-soft);color:var(--amber);border-color:rgba(201,122,22,.25);cursor:help;font-style:normal}
