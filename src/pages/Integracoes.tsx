@@ -132,8 +132,14 @@ export function Integracoes() {
     finally { setRemLoading(false); }
   }
 
-  const canais = waCanais.data ?? [];
-  const conectados = canais.filter((c) => c.status === 'conectado').length;
+  // Esta seção é a do QR Code (Evolution). Canal da API oficial tem seção própria e NÃO entra
+  // aqui: ele não tem sessão, não desconecta e não reconecta — mostrá-lo com "Sessão: Desconectado"
+  // e um botão "Reconectar" seria oferecer uma ação que não existe.
+  // Só a LISTA é filtrada: nas contagens de limite o número oficial continua consumindo vaga,
+  // porque no banco ele consome mesmo (trigger checa_limite_canais conta por tipo='whatsapp').
+  const canaisTodos = waCanais.data ?? [];
+  const canais = canaisTodos.filter((c) => c.transporte !== 'cloud_api');
+  const conectados = canaisTodos.filter((c) => c.status === 'conectado').length;
   // Ativos = conectado/sincronizando; o resto (desconectado/erro/atenção) é histórico preservado.
   const ehAtivo = (s: string) => s === 'conectado' || s === 'sincronizando';
   const canaisVis = canais.filter((c) => waFiltro === 'todos' ? true : waFiltro === 'ativos' ? ehAtivo(c.status) : !ehAtivo(c.status));
