@@ -461,3 +461,9 @@
 .kanban-page .lc-unread{position:absolute;top:-4px;right:-4px;min-width:16px;height:16px;padding:0 4px;
   border-radius:999px;background:#e5484d;color:#fff;font-size:9.5px;font-weight:700;font-style:normal;
   display:flex;align-items:center;justify-content:center;border:2px solid var(--surface);box-sizing:content-box}
+
+/* Arrasto de COLUNA: pega pelo cabeçalho; a de entrada não arrasta (fica fixa na 1ª posição). */
+.kanban-page .col-head[draggable="true"]{cursor:grab}
+.kanban-page .col-head[draggable="true"]:active{cursor:grabbing}
+.kanban-page .column.col-dragging{opacity:.45}
+.kanban-page .column.col-drop{box-shadow:inset 3px 0 0 var(--green)}

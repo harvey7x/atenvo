@@ -146,6 +146,38 @@ export function Kanban() {
   const [motPerda, setMotPerda] = useState(''); const [motPerdaDesc, setMotPerdaDesc] = useState('');
   const [motReab, setMotReab] = useState(''); const [movErr, setMovErr] = useState<string | null>(null);
   const dragId = useRef<string | null>(null);
+  // Arrasto de COLUNA — ref PRÓPRIO: cards e colunas usam o mesmo HTML5 draggable e o .column
+  // contém os .lead-card, então sem separar os dois o drop de card cairia no handler da coluna.
+
+  const [hoverCol, setHoverCol] = useState<string | null>(null);
+  // Ordem otimista: colunasQ tem refetch de 8s; sem isso a coluna volta sozinha para o lugar antigo.
+  const [ordemOtim, setOrdemOtim] = useState<string[] | null>(null);
+  const dragColId = useRef<string | null>(null);
+  /** Solta a coluna arrastada ANTES da coluna alvo. Aplica a ordem na hora (otimista) e persiste
+   *  pela RPC transacional; se o servidor recusar, desfaz e avisa — nunca deixa o quadro mentindo. */
+  async function soltarColuna(alvoId: string) {
+    const de = dragColId.current;
+    dragColId.current = null; setHoverCol(null);
+    if (!de || de === alvoId) return;
+    const atual = (ordemOtim ?? k.colunas.map((c) => c.id));
+    const entradaId = k.colunas.find((c) => c.entrada)?.id ?? null;
+    if (de === entradaId || alvoId === entradaId) { toast('A coluna de entrada fica sempre na primeira posição.', 'warn'); return; }
+    const sem = atual.filter((id) => id !== de);
+    const at = sem.indexOf(alvoId);
+    if (at < 0) return;
+    const nova = [...sem.slice(0, at), de, ...sem.slice(at)];
+    setOrdemOtim(nova);
+    try { await k.reordenarColunas(nova); toast('Ordem das colunas atualizada'); }
+    catch (e) { setOrdemOtim(null); toast((e as Error).message || 'Não foi possível reordenar', 'warn'); }
+  }
+
+  // Assim que o servidor devolver a MESMA ordem que aplicamos, larga o lock otimista e volta a
+  // seguir o banco (senão uma reordenação feita por outro usuário nunca apareceria nesta aba).
+  useEffect(() => {
+    if (!ordemOtim) return;
+    const doServidor = k.colunas.map((c) => c.id).join(',');
+    if (doServidor === ordemOtim.join(',')) setOrdemOtim(null);
+  }, [k.colunas, ordemOtim]);
   const boardScrollRef = useRef<HTMLDivElement>(null);
   const autoRaf = useRef<number | null>(null);
   const ptr = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -430,12 +462,23 @@ export function Kanban() {
 
         <div className="board-scroll" ref={boardScrollRef} onDragOver={(e) => { ptr.current = { x: e.clientX, y: e.clientY }; iniciarAutoScroll(); }}>
           <div className="board">
-            {k.colunas.map((col) => {
+            {(ordemOtim
+                ? ordemOtim.map((id) => k.colunas.find((c) => c.id === id)).filter((c): c is typeof k.colunas[number] => !!c)
+                : k.colunas
+              ).map((col) => {
               const cards = porColuna(col.id);
               const totalCount = k.leads.filter((l) => colunaDoLead(l) === col.id).length;
               return (
-                <div className="column" key={col.id}>
-                  <div className="col-head">
+                <div className={'column' + (dragColId.current === col.id ? ' col-dragging' : '') + (hoverCol === col.id ? ' col-drop' : '')} key={col.id}
+                     onDragOver={(e) => { if (!dragColId.current || dragColId.current === col.id) return; e.preventDefault(); setHoverCol(col.id); }}
+                     onDrop={(e) => { if (!dragColId.current) return; e.preventDefault(); e.stopPropagation(); soltarColuna(col.id); }}>
+                  <div className="col-head"
+                       draggable={podeConfig && !col.entrada}
+                       onDragStart={(e) => {
+                         if (!podeConfig || col.entrada) { e.preventDefault(); return; }
+                         dragColId.current = col.id; try { e.dataTransfer.effectAllowed = 'move'; } catch { /* */ }
+                       }}
+                       onDragEnd={() => { dragColId.current = null; setHoverCol(null); }}>
                     <span className="dot" style={{ background: col.cor }} />
                     <div className="col-htxt"><span className="col-name-st">{col.nome}{col.entrada && <span className="col-entrada-tag" title="Coluna de entrada — recebe novos leads dos canais">entrada</span>}</span><span className="col-metric">{totalCount} {totalCount === 1 ? 'lead' : 'leads'}</span></div>
                     {podeConfig && (

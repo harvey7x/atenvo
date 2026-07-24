@@ -377,6 +377,18 @@ export function useKanban() {
     if (error) throw new Error(error.message);
     invalida();
   }
+  /** Reordena as colunas do funil. Recebe os ids na ORDEM DESEJADA e delega para a RPC
+   *  reordenar_colunas_funil, que renumera tudo numa transação só — N updates soltos deixariam o
+   *  quadro com ordem parcial se algum falhasse no meio.
+   *  A coluna de ENTRADA é fixada em 0 pela própria RPC (há um trigger no banco que aborta se ela
+   *  sair da primeira posição), então o front nunca produz um estado recusado. */
+  async function reordenarColunas(idsNaOrdem: string[]) {
+    if (!funilId) return;
+    const { error } = await supabase!.rpc('reordenar_colunas_funil', { p_funil: funilId, p_ids: idsNaOrdem });
+    if (error) throw new Error(error.message);
+    invalida();
+  }
+
   /** Arquiva o lead (status='cancelado') — sai do quadro sem exclusão física. */
   async function arquivarLead(id: string) {
     const { error } = await supabase!.from('oportunidades').update({ status: 'cancelado' }).eq('id', id).eq('organizacao_id', org);
@@ -412,7 +424,7 @@ export function useKanban() {
     error: (colunasQ.error || leadsQ.error) as Error | null,
     semFunil: funilQ.isFetched && !funilId,
     refetch: () => { colunasQ.refetch(); leadsQ.refetch(); },
-    criarColuna, editarColuna, excluirColuna, criarLead, editarLead, arquivarLead, moverOportunidade,
+    criarColuna, editarColuna, excluirColuna, reordenarColunas, criarLead, editarLead, arquivarLead, moverOportunidade,
   };
 }
 
