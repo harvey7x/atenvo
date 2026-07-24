@@ -278,6 +278,8 @@ Deno.serve(async (req) => {
       // ══════ 8) ENVIO — sempre pela Cloud API, sempre pelo canal de disparo ══════
       let envio: { ok: boolean; id?: string; erro?: string; codigo?: number } = { ok: true };
       let statusEnvio = 'simulada';
+      let outboxErro: string | null = null;      // envio OK mas a mensagem não entrou na conversa
+      let contabilidadeErro: string | null = null; // envio OK mas a cadência não avançou
       const modoEnvio = dentroJanela ? 'cloud_texto' : 'cloud_template';
       if (ATIVO && !dryRun) {
         // DESTINO: só contato com wa_id de inbound registrado. A Cloud API não tem onWhatsApp,
@@ -310,16 +312,30 @@ Deno.serve(async (req) => {
           statusEnvio = envio.ok ? 'enviada' : 'falhou';
 
           // 131050 = a pessoa pediu à Meta para parar de receber marketing deste número.
-          // "Do not retry sending messages to this user" — vira estado, não tentativa perdida.
+          // "Do not retry sending messages to this user" — vira ESTADO, não tentativa perdida.
+          //
+          // O status só muda DEPOIS de a persistência dar certo. Marcar antes fazia a resposta
+          // dizer 'optout_meta' mesmo quando wa_optout ficava vazia — e aí o contato voltaria à
+          // fila amanhã, e todo dia depois, contra alguém que pediu à Meta para parar. É onde a
+          // Meta mais olha, e quem apanha é o número pago.
           if (envio.codigo === 131050) {
-            statusEnvio = 'optout_meta';
-            try { await admin.rpc('wa_optout_registrar', { p_contato: row.contato_id, p_canal: canal.id, p_motivo: 'erro_131050', p_detalhe: envio.erro ?? null }); }
-            catch { /* best-effort */ }
+            const { error: eOpt } = await admin.rpc('wa_optout_registrar', {
+              p_contato: row.contato_id, p_canal: canal.id, p_motivo: 'erro_131050', p_detalhe: envio.erro ?? null,
+            });
+            if (eOpt) {
+              statusEnvio = 'optout_nao_persistido';
+              envio.erro = `optout_falhou:${(eOpt.message ?? '').slice(0, 160)}`;
+            } else {
+              statusEnvio = 'optout_meta';
+            }
           }
 
           if (envio.ok && row.conversa_id) {
             const nowIso = new Date().toISOString();
-            await admin.from('mensagens').insert({
+            // OUTBOX: a mensagem JÁ saiu e a Meta JÁ cobrou. Se este insert falhar em silêncio, o
+            // cliente recebeu algo que não existe na conversa — o atendente vê a resposta dele
+            // vinda do nada. Erro aqui não pode ser engolido.
+            const { error: eMsg } = await admin.from('mensagens').insert({
               organizacao_id: orgRow ?? undefined, conversa_id: row.conversa_id,
               direcao: 'saida', tipo: 'texto', conteudo: texto, autor_id: null, origem: 'bot',
               status: 'enviada', id_externo: envio.id ?? null,
@@ -327,16 +343,32 @@ Deno.serve(async (req) => {
                 ? { via: 'remarketing', transporte: 'cloud_api', canal_disparo: canal.nome_interno }
                 : { via: 'remarketing', transporte: 'cloud_api', canal_disparo: canal.nome_interno, template: tpl!.nome, template_id: tpl!.id, toque: toqueTemplate },
             });
+            if (eMsg) outboxErro = (eMsg.message ?? 'insert_falhou').slice(0, 200);
             await admin.from('conversas').update({ ultima_interacao_em: nowIso }).eq('id', row.conversa_id);
           }
         }
       }
 
-      // 9) avança a cadência só se o envio não falhou de fato (em dry_run sempre avança — simula progressão)
+      // 9) CONTABILIDADE. Avança a cadência só se o envio não falhou de fato (em dry_run sempre
+      //    avança — simula progressão). Idempotente por (fila, toque): p_toque_esperado faz a RPC
+      //    virar no-op se alguém já contabilizou este mesmo toque, então repetir não pula passo.
+      //
+      //    Se o envio DEU CERTO e isto falhar, o toque não avança e no próximo ciclo o MESMO lead
+      //    recebe o MESMO template — pago duas vezes, e repetição idêntica é sinal de spam para a
+      //    Meta. Não dá para desfazer um envio já cobrado; o que dá é NÃO deixar isso virar
+      //    silêncio: status próprio + audit_log com o wamid, para achar exatamente o que saiu.
       let proximo: string | null = null;
-      if (statusEnvio !== 'falhou' && statusEnvio !== 'optout_meta') {
-        const { data: prox } = await admin.rpc('bot_remarketing_registrar_toque', { p_id: row.id });
-        proximo = (prox as string) ?? null;
+      if (statusEnvio !== 'falhou' && statusEnvio !== 'optout_meta' && statusEnvio !== 'optout_nao_persistido') {
+        const { data: prox, error: eCad } = await admin.rpc('bot_remarketing_registrar_toque', {
+          p_id: row.id, p_toque_esperado: row.toque ?? 0, p_wamid: envio.id ?? null,
+        });
+        if (eCad) {
+          contabilidadeErro = (eCad.message ?? 'registrar_toque_falhou').slice(0, 200);
+          if (statusEnvio === 'enviada') statusEnvio = 'enviada_sem_contabilidade';
+        } else {
+          proximo = (prox as string) ?? null;
+        }
+        // conta no teto do dia de qualquer jeito: o dinheiro foi gasto mesmo que a cadência não tenha andado.
         enviados++;
       }
 
@@ -346,11 +378,13 @@ Deno.serve(async (req) => {
         await admin.from('audit_log').insert({
           usuario_id: null, acao: 'bot_remarketing', entidade: 'bot_remarketing', entidade_id: row.id,
           organizacao_id: brOrg?.organizacao_id ?? null,
-          dados_depois: { toque: row.toque, angulo: angulo.foco, via, status_envio: statusEnvio, erro: envio.erro ?? null, dry_run: dryRun, proximo_em: proximo, modo_envio: modoEnvio, template: tpl?.nome ?? null },
+          dados_depois: { toque: row.toque, angulo: angulo.foco, via, status_envio: statusEnvio, erro: envio.erro ?? null, dry_run: dryRun, proximo_em: proximo, modo_envio: modoEnvio, template: tpl?.nome ?? null,
+            wamid: envio.id ?? null, outbox_erro: outboxErro, contabilidade_erro: contabilidadeErro },
         });
       } catch { /* audit best-effort */ }
 
-      resultados.push({ id: row.id, toque: row.toque, via, status_envio: statusEnvio, modo_envio: modoEnvio, template: tpl?.nome ?? null, texto: dryRun ? texto : undefined, proximo_em: proximo });
+      resultados.push({ id: row.id, toque: row.toque, via, status_envio: statusEnvio, modo_envio: modoEnvio, template: tpl?.nome ?? null, texto: dryRun ? texto : undefined, proximo_em: proximo,
+        ...(outboxErro ? { outbox_erro: outboxErro } : {}), ...(contabilidadeErro ? { contabilidade_erro: contabilidadeErro } : {}) });
     }
 
     return json({ ok: true, sync, ativo: ATIVO, dry_run: dryRun, sp, teto: TETO_DIA, hoje, processados: fila.length, enviados, resultados });

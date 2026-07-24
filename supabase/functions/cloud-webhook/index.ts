@@ -244,22 +244,45 @@ Deno.serve(async (req) => {
         for (const pref of (v.user_preferences ?? []) as Ev[]) {
           const num = digits(pref.wa_id);
           if (!num || String(pref.category ?? '') !== 'marketing_messages') continue;
+          // A TESTEMUNHA FICA FORA DO TRY. Antes o insert do evento estava dentro do mesmo
+          // try/catch da RPC: se a persistência do opt-out estourasse, o registro do evento
+          // era pulado junto e um "pare de me mandar promoções" da Meta sumia sem rastro —
+          // a testemunha só testemunhava quando não precisava dela.
+          let desfecho = 'processado';
+          let erroPref: string | null = null;
           try {
-            const { data: cid } = await db.rpc('wa_resolver_contato_por_numero', { p_org: canalPref.organizacao_id, p_numero: num });
-            if (!cid) continue;
-            if (String(pref.value ?? '') === 'stop') {
-              await db.rpc('wa_optout_registrar', { p_contato: cid, p_canal: canalPref.id, p_motivo: 'user_preferences', p_detalhe: String(pref.detail ?? '').slice(0, 300) });
+            const { data: cid, error: eCid } = await db.rpc('wa_resolver_contato_por_numero', { p_org: canalPref.organizacao_id, p_numero: num });
+            if (eCid) throw new Error(`resolver:${eCid.message ?? ''}`);
+            if (!cid) {
+              desfecho = 'ignorado';
+              erroPref = 'contato_nao_encontrado';
+            } else if (String(pref.value ?? '') === 'stop') {
+              const { error } = await db.rpc('wa_optout_registrar', { p_contato: cid, p_canal: canalPref.id, p_motivo: 'user_preferences', p_detalhe: String(pref.detail ?? '').slice(0, 300) });
+              if (error) throw new Error(`optout:${error.message ?? ''}`);
             } else if (String(pref.value ?? '') === 'resume') {
-              await db.rpc('wa_optout_remover', { p_contato: cid, p_canal: canalPref.id });
+              const { error } = await db.rpc('wa_optout_remover', { p_contato: cid, p_canal: canalPref.id });
+              if (error) throw new Error(`resume:${error.message ?? ''}`);
+            } else {
+              desfecho = 'ignorado';
+              erroPref = `valor_desconhecido:${String(pref.value ?? '')}`;
             }
+          } catch (e) {
+            desfecho = 'erro';
+            erroPref = String((e as Error)?.message ?? 'falha').slice(0, 200);
+          }
+          // fora do try: registra SEMPRE, inclusive (e principalmente) quando deu errado.
+          try {
             await db.from('whatsapp_webhook_events').insert({
               organizacao_id: canalPref.organizacao_id, canal_id: canalPref.id,
               instance_name: `cloud:${pnid}`, event: 'cloud.user_preferences',
               remote_jid: maskNum(pref.wa_id), from_me: false,
               payload: { value: pref.value ?? null, category: pref.category ?? null },
-              status_processamento: 'processado', processado_em: new Date().toISOString(),
+              status_processamento: desfecho,
+              ...(desfecho === 'erro' ? { erro: erroPref } : {}),
+              ...(desfecho === 'ignorado' ? { ignorado_motivo: erroPref } : {}),
+              processado_em: new Date().toISOString(),
             });
-          } catch { /* best-effort: preferência nunca quebra o webhook */ }
+          } catch { /* último recurso: o webhook nunca cai por causa do log */ }
         }
         continue;
       }
