@@ -30,7 +30,6 @@ import { useSlaAlertas } from '@/data/sla';
 import { indexPorChave, tipoLabel, tempoRelativo } from '@/data/slaView';
 import { siglaCanal } from '@/lib/cardConversa';
 import { SlaConversaBanner } from '@/components/SlaConversaBanner';
-import { classificar, isNovo, statusKind, tempoCurto, tierTempo, minutosDesde, type SinaisConversa, type Grupo } from '@/data/inboxGroups';
 import { corDaEtiqueta, podeGerenciarAtendimento, type AssinaturaModo } from '@/types/atendimento';
 import { KanbanContatoBox } from '@/components/KanbanContatoBox';
 import './WhatsApp.css';
@@ -107,7 +106,6 @@ function ackOf(status?: string): { ticks: string; cls: string; title: string } |
 }
 
 const TABS: { id: string; label: string }[] = [
-  { id: 'prioridade', label: 'Prioridade' },
   { id: 'todos', label: 'Todos' },
   { id: 'meus', label: 'Meus' },
   { id: 'naoatrib', label: 'Não atribuídos' },
@@ -167,8 +165,6 @@ export function WhatsApp() {
   });
   const atividadesQ = useWaAtividades(WA_REAL ? (currentId || null) : null); // timeline de atendimento (colab. E1)
   const [tab, setTab] = useState('todos');
-  const [gruposRecolhidos, setGruposRecolhidos] = useState<Set<string>>(() => new Set(['backlog'])); // backlog recolhido por padrão
-  const [blocosVerMais, setBlocosVerMais] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
   const [filtroCanal, setFiltroCanal] = useState<string | null>(null);   // funil: filtra por número/canal
   const [filtroStatus, setFiltroStatus] = useState<string | null>(null); // funil: filtra por status
@@ -303,14 +299,14 @@ export function WhatsApp() {
     // Ordenação natural tipo WhatsApp (abas normais): FIXADAS no topo → depois recência pura
     // (última interação mais recente primeiro). Não-lidas é só BADGE visual, NÃO reordena — assim
     // atrasados antigos (com mensagens não lidas) não sobem indevidamente. SLA/severidade NÃO
-    // influenciam a ordem (só chip/status). A visão por prioridade fica na aba "Prioridade" (blocos).
+    // influenciam a ordem (só chip/status).
     if (!!a.fixada !== !!b.fixada) return a.fixada ? -1 : 1;
     return (b.lastAtMs ?? 0) - (a.lastAtMs ?? 0);
   });
 
   // Contadores das abas (pills, ref. Helena). Usam os MESMOS predicados do filtro acima —
   // inclusive canal/status/busca e a regra de arquivadas — senão o número mente em relação ao
-  // que a aba mostra ao ser clicada. Prioridade fica sem contador: os blocos dela já contam.
+  // que a aba mostra ao ser clicada.
   const tabCounts = useMemo(() => {
     const t = search.trim().toLowerCase();
     const base = contacts.filter((c) => {
@@ -330,73 +326,6 @@ export function WhatsApp() {
     } as Record<string, number>;
   }, [contacts, filtroCanal, filtroStatus, search, buscaAtiva, user?.id]);
 
-  // Aba "Prioridade" (S4.x): agrupa a MESMA lista filtrada em blocos Urgentes/Atenção/Acompanhamentos.
-  // Só reorganiza no cliente — não toca no SLA engine/backend. Abas antigas seguem na lista plana.
-  const sinaisDe = (c: WaContact): SinaisConversa => {
-    const al = slaPorConversa.get(c.id)?.[0];
-    return {
-      aguardando: !!c.aguardando,
-      aguardandoDesde: c.aguardandoDesde ?? null,
-      // usa o responsável EFETIVO (conversa → contato → oportunidade): antes olhava só
-      // contatos.responsavel_id e tratava como "livre" conversa cuja opp já tinha dono.
-      temResponsavel: !!responsavelEfetivo(c),
-      houveResposta: (c.msgs ?? []).some((m) => m.dir === 'out'),
-      primeiraMensagem: (c.msgs ?? []).length <= 1,
-      precisaHumano: !!c.precisaHumano,
-      sevAlerta: al?.severidade ?? null,
-      tipoAlerta: al?.tipo ?? null,
-    };
-  };
-  const grupos = useMemo(() => {
-    const g: Record<Grupo, WaContact[]> = { urgente: [], atencao: [], acompanhamento: [], backlog: [] };
-    if (tab !== 'prioridade') return g;
-    const now = Date.now();
-    for (const c of filtered) g[classificar(sinaisDe(c), now)].push(c);
-    const porEspera = (a: WaContact, b: WaContact) => new Date(a.aguardandoDesde || 0).getTime() - new Date(b.aguardandoDesde || 0).getTime();
-    g.urgente.sort(porEspera);      // mais tempo esperando primeiro
-    g.atencao.sort(porEspera);
-    g.backlog.sort(porEspera);
-    g.acompanhamento.sort((a, b) => (b.lastAtMs || 0) - (a.lastAtMs || 0)); // mais recente primeiro
-    return g;
-  }, [tab, filtered, slaPorConversa]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Card da aba Prioridade (valoriza a última mensagem do cliente; tempo humano; status curto).
-  const renderPrioCard = (c: WaContact) => {
-    const now = Date.now();
-    const sin = sinaisDe(c);
-    const novo = isNovo(sin, now);
-    const kind = statusKind(sin, now);
-    const atendNome = c.respId ? (orgUsuarios.find((u) => u.id === c.respId)?.nome ?? 'Atendente') : null;
-    const nomeVazio = !c.name?.trim() || /^[\d\s()+\-]+$/.test(c.name.trim());
-    const nome = nomeVazio ? 'Cliente sem nome' : formatarNomeCliente(c.name);
-    const tier = c.aguardando ? tierTempo(minutosDesde(c.aguardandoDesde ?? null)) : 'neutro';
-    const tempo = c.aguardando ? tempoCurto(c.aguardandoDesde ?? null) : (c.time || '');
-    const statusLabel =
-      kind === 'audio' ? 'Áudio recebido'
-        : kind === 'lead_quente' ? 'Lead quente'
-          : kind === 'primeira_mensagem' ? 'Primeira mensagem'
-            : kind === 'aguardando_primeira' ? 'Aguardando primeira resposta'
-              : kind === 'aguardando' ? `Aguardando resposta ${tempoRelativo(c.aguardandoDesde ?? '')}`
-                : 'Em acompanhamento';
-    return (
-      <div key={c.id} data-cid={c.id} className={'pcard t-' + tier + (c.id === currentId ? ' active' : '')} onClick={() => selectContact(c.id)}>
-        <Avatar name={c.name} />
-        <div className="pcard-body">
-          <div className="pcard-r1">
-            <span className="pcard-name">{c.fixada && <span aria-hidden="true">📌 </span>}{nome}</span>
-            {novo && <span className="pcard-novo">NOVO</span>}
-            <span className={'pcard-time t-' + tier}>{tempo}</span>
-          </div>
-          <div className="pcard-meta">{c.chip}{atendNome ? ' · ' + atendNome : ' · Sem responsável'}{c.silenciada ? ' · 🔕' : ''}</div>
-          <div className="pcard-prev">{c.last || '—'}</div>
-          <div className="pcard-r4">
-            <span className="pcard-status">{statusLabel}</span>
-            {c.unread > 0 && <span className="unread">{c.unread > 99 ? '99+' : c.unread}</span>}
-          </div>
-        </div>
-      </div>
-    );
-  };
 
   // LEITURA (regra mínima): só zera o contador quando (1) o usuário SELECIONOU ativamente a conversa
   // (não em restauração de ID), (2) as mensagens estão carregadas, (3) o documento está visível e (4) a
@@ -1062,42 +991,6 @@ export function WhatsApp() {
             ))}
           </div>
         </div>
-        {tab === 'prioridade' ? (
-          <div className="conv-list prio">
-            {(grupos.urgente.length + grupos.atencao.length + grupos.acompanhamento.length + grupos.backlog.length) === 0 ? (
-              <div style={{ padding: '30px 12px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>Nenhuma conversa pendente. 🎉</div>
-            ) : ([
-              { id: 'urgente' as const, emoji: '🔥', label: 'Urgentes', hint: 'sem resposta' },
-              { id: 'atencao' as const, emoji: '⚠️', label: 'Atenção', hint: 'atrasados' },
-              { id: 'acompanhamento' as const, emoji: '✅', label: 'Acompanhamentos', hint: '' },
-              { id: 'backlog' as const, emoji: '🗂️', label: 'Backlog antigo', hint: '+48h' },
-            ]).map((sec) => {
-              const arr = grupos[sec.id];
-              if (!arr.length) return null;
-              const recolhido = gruposRecolhidos.has(sec.id);
-              const expandido = blocosVerMais.has(sec.id);
-              const LIM = 5;
-              const mostra = expandido ? arr : arr.slice(0, LIM);
-              return (
-                <div className={'prio-sec prio-' + sec.id} key={sec.id}>
-                  <button type="button" className="prio-sec-h" aria-expanded={!recolhido}
-                    onClick={() => setGruposRecolhidos((s) => { const n = new Set(s); if (n.has(sec.id)) n.delete(sec.id); else n.add(sec.id); return n; })}>
-                    <span className="prio-sec-t">{sec.emoji} {sec.label}{sec.hint && <em> ({sec.hint})</em>}</span>
-                    <span className="prio-sec-n">{arr.length}</span>
-                    <span className="prio-sec-chev">{recolhido ? '▸' : '▾'}</span>
-                  </button>
-                  {!recolhido && mostra.map(renderPrioCard)}
-                  {!recolhido && arr.length > LIM && (
-                    <button type="button" className="prio-vermais"
-                      onClick={() => setBlocosVerMais((s) => { const n = new Set(s); if (n.has(sec.id)) n.delete(sec.id); else n.add(sec.id); return n; })}>
-                      {expandido ? 'Ver menos' : `Ver outros ${arr.length - LIM}`} ⌄
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        ) : (
         <div className="conv-list">
           {filtered.length === 0 ? (
             // "vazio" e "carregando" são coisas diferentes: enquanto a lista não chega, dizer
@@ -1139,7 +1032,7 @@ export function WhatsApp() {
             // deixar claro em qual etapa do Kanban está, quem atende e por onde entrou").
             // "Atrasado · Xh", "Nome incompleto", SLA e precisa-humano SAÍRAM do card visível:
             // viram UM indicador ⚠ discreto com tudo no tooltip. A REGRA continua viva — barra
-            // lateral colorida (barTier), aba Prioridade, bloqueios de envio e o motor de SLA
+            // lateral colorida (barTier), bloqueios de envio e o motor de SLA
             // não foram tocados; só a apresentação mudou.
             const eAtendente = badges.find((b) => b.tipo === 'atendente');
             const eSituacao = badges.find((b) => b.tipo === 'situacao');
@@ -1204,7 +1097,6 @@ export function WhatsApp() {
             ));
           })()}
         </div>
-        )}
       </section>
 
       {/* ---------- CHAT ---------- */}
