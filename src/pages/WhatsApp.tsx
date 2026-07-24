@@ -1392,7 +1392,6 @@ export function WhatsApp() {
             <div className="warn warn-slim warn-bloq"
                  title={`Esta conversa entrou por ${canalSel?.alias}, mas a conexão está ${canalSel?.status === 'removido' ? 'removida' : 'desconectada'}. O histórico permanece; selecione outro canal para responder ou reconecte.`}>
               <IcWarn /><span className="warn-txt"><b>{canalSel?.alias}</b> {canalSel?.status === 'removido' ? 'removido' : 'desconectado'} — selecione outro canal</span>
-              <button className="link-btn" onClick={() => navigate('/integracoes')}>Reconectar</button>
             </div>
           )}
           {/* Conta com restrição no WhatsApp: bloqueado só para ENVIO; recebimento segue normal. */}
