@@ -259,13 +259,21 @@ async function planejarOrg(admin: SupabaseClient, cfg: Record<string, unknown>):
     orcamento.set(ab.para.id, saldo - 1);
   }
 
-  if (linhas.length) {
-    const { error } = await admin.from('maturacao_agenda').insert(linhas);
-    if (error) return { org, erro: error.message };
+  // Nenhuma linha gerada => NÃO avança rampa. Avançar aqui queimaria um dia em
+  // silêncio: o chip apareceria no dia 2 sem nunca ter feito o dia 1.
+  if (!linhas.length) {
+    return { org, planejadas: 0, pulado: 'nenhuma_linha_gerada', chips: planejarPara.length };
   }
 
-  // avança o dia da rampa só de quem realmente foi planejado
+  const { error } = await admin.from('maturacao_agenda').insert(linhas);
+  if (error) return { org, erro: error.message };
+
+  // avança o dia SÓ de quem realmente recebeu linhas — não de todo mundo que
+  // entrou no cálculo. Um chip pode ficar sem linha (ex.: sem parceiro disponível)
+  // e ele precisa repetir o mesmo dia, não pular.
+  const comLinhas = new Set(linhas.map((l) => l.chip_origem_id));
   for (const [chipId, dia] of diaDoChip.entries()) {
+    if (!comLinhas.has(chipId)) continue;
     await admin.from('maturacao_chips')
       .update({ dia_rampa: dia, atualizado_em: new Date().toISOString() })
       .eq('id', chipId);

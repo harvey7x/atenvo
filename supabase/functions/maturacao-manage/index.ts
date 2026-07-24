@@ -169,7 +169,10 @@ Deno.serve(async (req) => {
         const { data: r } = await admin.rpc('maturacao_auto_iniciar', { p_chip: chip!.id });
         iniciou = !!r;
         if (iniciou) {
-          fetch(`${SUPABASE_URL}/functions/v1/maturacao-planner`, {
+          // AWAIT obrigatório: fetch disparado sem await morre junto com o isolate do
+          // Edge quando a resposta é devolvida — foi por isso que conectar o 2º chip
+          // não replanejou. Custa ~500ms numa ação que o admin fez de propósito.
+          await fetch(`${SUPABASE_URL}/functions/v1/maturacao-planner`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-maturacao-secret': secret },
             body: '{}',
