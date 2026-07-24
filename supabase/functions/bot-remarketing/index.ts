@@ -202,10 +202,13 @@ Deno.serve(async (req) => {
       // 6.1) gera a mensagem (IA é a parte lenta, ~1-2s no Claude). Fora da janela o texto da IA
       //      NÃO é enviado — quem vai é o template — mas continua servindo de contexto/histórico.
       const angulo = anguloDoToque(row.toque ?? 0);
-      const primeiro = primeiroNome(await nomeDoContato(admin, row));
-      const { texto, via } = dentroJanela || !ehCloud
-        ? await gerarToque(admin, row, angulo)
-        : { texto: preencherTemplate(tpl!.corpo, varsDoTemplate(tpl!, primeiro)), via: 'template' as const };
+      const usaTemplate = ehCloud && !dentroJanela;
+      // o nome só é buscado no ramo do template — no ramo normal quem já busca é o gerarToque,
+      // e consultar duas vezes seria custo novo num caminho que não mudou.
+      const primeiro = usaTemplate ? primeiroNome(await nomeDoContato(admin, row)) : '';
+      const { texto, via } = usaTemplate
+        ? { texto: preencherTemplate(tpl!.corpo, varsDoTemplate(tpl!, primeiro)), via: 'template' as const }
+        : await gerarToque(admin, row, angulo);
 
       // 7) checagem FINAL anti-race — IMEDIATAMENTE antes do envio, depois da IA: relê a coluna FRESCA
       //     do banco (RPC = query nova, não valor cacheado do due), sob FOR UPDATE. Se o time fechou/moveu
