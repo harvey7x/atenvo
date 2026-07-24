@@ -2,30 +2,46 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Modal } from '@/components/Modal';
 import { useToast } from '@/hooks/useToast';
+import { useOrg } from '@/context/OrgContext';
 import { useOrgUsuarios } from '@/data/atendimento';
+import { useBuscaContatos } from '@/data/contatos';
 import {
   useWaCanais, useAgendamentosOrg, useEditarAgendamento, useCancelarAgendamento, useReagendarAgendamento,
-  WA_REAL, type AgendamentoOrg,
+  useAgendarSequencia, conversaAtivaDoContato, WA_REAL, type AgendamentoOrg,
 } from '@/data/whatsapp';
 import { contarCards, rangePeriodo, agendaEditavel, agendaReagendavel, statusSequencia, type PeriodoAg } from '@/lib/agendamentoMensagem';
 import { AgendarMensagemModal, type AgendarSubmit } from '@/components/AgendarMensagemModal';
 import './AgendamentosMensagens.css';
 
 const ST_META: Record<string, { label: string; cls: string }> = {
-  agendada:    { label: 'Agendada',    cls: 'ag' },
-  processando: { label: 'Enviando…',   cls: 'proc' },
-  enviada:     { label: 'Enviada',     cls: 'env' },
-  parcial:     { label: 'Parcial',     cls: 'proc' },
-  falha:       { label: 'Falha',       cls: 'fail' },
-  falhou:      { label: 'Falhou',      cls: 'fail' },
-  bloqueada:   { label: 'Bloqueada',   cls: 'blk' },
-  cancelada:   { label: 'Cancelada',   cls: 'canc' },
-  expirada:    { label: 'Expirada',    cls: 'exp' },
+  agendada:    { label: 'Programada', cls: 'ag' },
+  processando: { label: 'Enviando…',  cls: 'proc' },
+  enviada:     { label: 'Enviada',    cls: 'env' },
+  parcial:     { label: 'Parcial',    cls: 'proc' },
+  falha:       { label: 'Falha',      cls: 'fail' },
+  falhou:      { label: 'Falhou',     cls: 'fail' },
+  bloqueada:   { label: 'Bloqueada',  cls: 'blk' },
+  cancelada:   { label: 'Cancelada',  cls: 'canc' },
+  expirada:    { label: 'Expirada',   cls: 'exp' },
 };
 const TIPO_LABEL: Record<string, string> = { texto: 'Texto', imagem: 'Imagem', audio: 'Áudio', video: 'Vídeo', documento: 'Documento', texto_midia: 'Texto + mídia' };
 const tipoLbl = (t: string) => TIPO_LABEL[t] ?? t;
 const stMeta = (s: string) => ST_META[s] ?? { label: s, cls: 'ag' };
 const fmtSP = (iso: string) => new Date(iso).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+const fmtHora = (iso: string) => new Date(iso).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' });
+const fmtDia = (iso: string) => new Date(iso).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: '2-digit' });
+const iniciais = (n: string) => n.trim().split(/\s+/).slice(0, 2).map((p) => p[0]).join('').toLocaleUpperCase('pt-BR') || '?';
+
+/* ícones dos cards — um por status, para o número não ficar sozinho */
+const IcSend = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4z" /><path d="M22 2 11 13" /></svg>;
+const IcCheck = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="m8.5 12 2.5 2.5 4.5-5" /></svg>;
+const IcWarn = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /><path d="M12 9v4M12 17h.01" /></svg>;
+const IcBlock = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="m5.6 5.6 12.8 12.8" /></svg>;
+const IcX = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="m15 9-6 6M9 9l6 6" /></svg>;
+const IcSearch = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.2-3.2" /></svg>;
+const IcFiltro = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M3 5h18l-7 8v6l-4 2v-8z" /></svg>;
+const IcPlus = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>;
+const IcClose = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"><path d="m6 6 12 12M18 6 6 18" /></svg>;
 
 /** Um agendamento operacional: mensagem avulsa OU uma sequência inteira (agrupada). */
 interface Grupo {
@@ -41,9 +57,20 @@ interface Grupo {
   criadoPor: string | null; criadoEm: string; conversaId: string; sequenciaId: string | null;
 }
 
+/** Abas -> status geral do grupo. 'visao' não filtra. */
+const ABAS: { id: string; label: string; status: string }[] = [
+  { id: 'visao', label: 'Visão geral', status: '' },
+  { id: 'prog', label: 'Programados', status: 'agendada' },
+  { id: 'env', label: 'Enviados', status: 'enviada' },
+  { id: 'fal', label: 'Falhas', status: 'falha' },
+  { id: 'blk', label: 'Bloqueados', status: 'bloqueada' },
+  { id: 'can', label: 'Cancelados', status: 'cancelada' },
+];
+
 export function AgendamentosMensagens() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { currentOrg } = useOrg();
   const canais = useWaCanais().data ?? [];
   const orgUsuarios = useOrgUsuarios().data ?? [];
   const nomePorId = (id: string | null) => (id ? orgUsuarios.find((u) => u.id === id)?.nome ?? null : null);
@@ -53,6 +80,7 @@ export function AgendamentosMensagens() {
   const editarMut = useEditarAgendamento();
   const cancelarMut = useCancelarAgendamento();
   const reagendarMut = useReagendarAgendamento();
+  const criarSeqMut = useAgendarSequencia();
 
   // ── AGRUPAMENTO: por sequencia_id quando existir, senão pelo próprio id ──────
   const grupos = useMemo<Grupo[]>(() => {
@@ -77,50 +105,73 @@ export function AgendamentosMensagens() {
     return out.sort((a, b) => new Date(b.primeiro.executarEm).getTime() - new Date(a.primeiro.executarEm).getTime());
   }, [rows]);
 
-  // ── filtros ──────────────────────────────────────────────────────────────
+  // ── abas + filtros ────────────────────────────────────────────────────────
+  const [aba, setAba] = useState('visao');
   const [fPeriodo, setFPeriodo] = useState<PeriodoAg>('todas');
-  const [fStatus, setFStatus] = useState('');
   const [fCanal, setFCanal] = useState('');
   const [fCriador, setFCriador] = useState('');
   const [fTipo, setFTipo] = useState('');
   const [fBusca, setFBusca] = useState('');
+  const [filtrosAbertos, setFiltrosAbertos] = useState(false);
+  const statusAba = ABAS.find((a) => a.id === aba)?.status ?? '';
 
-  // cards contam AGENDAMENTOS/SEQUÊNCIAS (não mensagens): 1 entrada por grupo, pelo status geral.
+  // Cards contam AGENDAMENTOS/SEQUÊNCIAS (não mensagens): 1 entrada por grupo, pelo status geral.
   const cards = useMemo(
     () => contarCards(grupos.map((g) => ({ status: g.statusGeral === 'falha' ? 'falhou' : g.statusGeral, executarEmMs: new Date(g.primeiro.executarEm).getTime() })), Date.now()),
     [grupos],
   );
+  const programados = useMemo(() => grupos.filter((g) => g.statusGeral === 'agendada').length, [grupos]);
 
   const filtrados = useMemo(() => {
     const range = rangePeriodo(fPeriodo, Date.now());
     const busca = fBusca.trim().toLowerCase();
     return grupos.filter((g) => {
       if (range) { const ms = new Date(g.primeiro.executarEm).getTime(); if (ms < range.desdeMs || ms >= range.ateMs) return false; }
-      if (fStatus && g.statusGeral !== fStatus) return false;
+      if (statusAba && g.statusGeral !== statusAba) return false;
       if (fCanal && g.canalId !== fCanal) return false;
       if (fCriador && g.criadoPor !== fCriador) return false;
       if (fTipo && !g.itens.some((i) => i.tipo === fTipo)) return false;
-      if (busca) { const alvo = `${g.contatoNome ?? ''} ${g.telefone ?? ''}`.toLowerCase(); if (!alvo.includes(busca)) return false; }
+      if (busca) {
+        const alvo = `${g.contatoNome ?? ''} ${g.telefone ?? ''} ${g.itens.map((i) => i.texto ?? '').join(' ')}`.toLowerCase();
+        if (!alvo.includes(busca)) return false;
+      }
       return true;
     });
-  }, [grupos, fPeriodo, fStatus, fCanal, fCriador, fTipo, fBusca]);
+  }, [grupos, fPeriodo, statusAba, fCanal, fCriador, fTipo, fBusca]);
 
-  function aplicarCard(status: string, periodo: PeriodoAg) {
-    setFStatus(status); setFPeriodo(periodo); setFCanal(''); setFCriador(''); setFTipo(''); setFBusca('');
+  function limpar() { setFPeriodo('todas'); setFCanal(''); setFCriador(''); setFTipo(''); setFBusca(''); }
+  const filtroAtivo = fPeriodo !== 'todas' || !!fCanal || !!fCriador || !!fTipo || !!fBusca;
+
+  // ── seleção (painel lateral) e composição ─────────────────────────────────
+  const [selKey, setSelKey] = useState<string | null>(null);
+  const sel = useMemo(() => filtrados.find((g) => g.key === selKey) ?? null, [filtrados, selKey]);
+  const [comp, setComp] = useState<{ modo: 'criar' | 'editar' | 'reagendar'; item?: AgendamentoOrg; conversaId?: string; canalId?: string; temTelefone?: boolean } | null>(null);
+  const [novoOpen, setNovoOpen] = useState(false);
+  const [buscaContato, setBuscaContato] = useState('');
+  const [novoErr, setNovoErr] = useState<string | null>(null);
+  const contatosQ = useBuscaContatos(buscaContato);
+
+  /** Escolhe o contato do "Novo agendamento" e resolve a conversa por onde a mensagem sairá. */
+  async function escolherContato(c: { id: string; nome: string; tel: string }) {
+    setNovoErr(null);
+    try {
+      const conv = await conversaAtivaDoContato(currentOrg.id, c.id);
+      if (!conv) { setNovoErr(`${c.nome} ainda não tem conversa aberta. Abra uma conversa no WhatsApp antes de agendar — o envio sai por ela.`); return; }
+      setNovoOpen(false); setBuscaContato('');
+      setComp({ modo: 'criar', conversaId: conv.id, canalId: conv.canalId ?? undefined, temTelefone: !!c.tel });
+    } catch (e) { setNovoErr((e as Error).message || 'Não foi possível abrir o agendamento.'); }
   }
-  function limpar() { setFPeriodo('todas'); setFStatus(''); setFCanal(''); setFCriador(''); setFTipo(''); setFBusca(''); }
-  const filtroAtivo = fPeriodo !== 'todas' || !!fStatus || !!fCanal || !!fCriador || !!fTipo || !!fBusca;
-
-  // ── modais ────────────────────────────────────────────────────────────────
-  const [verGrupo, setVerGrupo] = useState<Grupo | null>(null);
-  const [comp, setComp] = useState<{ modo: 'editar' | 'reagendar'; item: AgendamentoOrg } | null>(null);
 
   async function submeterComposicao(v: AgendarSubmit) {
     if (!comp) return;
-    if (v.modo === 'reagendar') {
+    if (v.modo === 'sequencia') {
+      if (!comp.conversaId) return;
+      await criarSeqMut.mutateAsync({ conversaId: comp.conversaId, canalId: v.canalId, executarEm: v.executarISO, itens: v.itens ?? [] });
+      toast('Agendamento criado.');
+    } else if (v.modo === 'reagendar' && comp.item) {
       await reagendarMut.mutateAsync({ id: comp.item.id, conversaId: comp.item.conversaId, canalId: v.canalId, executarEm: v.executarISO });
       toast('Mensagem reagendada — voltou para a fila.');
-    } else {
+    } else if (comp.item) {
       await editarMut.mutateAsync({ id: comp.item.id, conversaId: comp.item.conversaId, canalId: v.canalId, texto: v.texto ?? '', executarEm: v.executarISO });
       toast('Agendamento atualizado.');
     }
@@ -142,170 +193,278 @@ export function AgendamentosMensagens() {
   }
 
   const abrirConversa = (conversaId: string) => navigate(`/whatsapp?conversa=${encodeURIComponent(conversaId)}`);
-
-  function previaGrupo(g: Grupo): string {
-    const p = g.primeiro;
-    const base = (p.texto?.trim()) || p.nomeArquivo || tipoLbl(p.tipo);
-    return g.ehSequencia ? `${base}` : (p.texto || p.nomeArquivo || '—');
-  }
+  const previa = (g: Grupo) => (g.primeiro.texto?.trim()) || g.primeiro.nomeArquivo || tipoLbl(g.primeiro.tipo);
 
   if (!WA_REAL) {
-    return <div className="agm-wrap"><div className="agm-empty">Disponível com o backend configurado.</div></div>;
+    return <div className="agm2"><div className="agm2-vazio"><h3>Disponível com o backend configurado.</h3></div></div>;
   }
 
+  const carregando = rowsQ.isLoading;
+  const erro = rowsQ.isError;
+
   return (
-    <div className="agm-wrap">
-      {/* Cards de resumo — contam agendamentos/sequências agrupados */}
-      <div className="agm-cards">
-        <button className="agm-card" onClick={() => aplicarCard('agendada', 'hoje')}><span className="agm-card-n">{cards.hoje}</span><span className="agm-card-l">Agendadas hoje</span></button>
-        <button className="agm-card" onClick={() => aplicarCard('agendada', '7d')}><span className="agm-card-n">{cards.prox7}</span><span className="agm-card-l">Próximos 7 dias</span></button>
-        <button className="agm-card" onClick={() => aplicarCard('enviada', 'todas')}><span className="agm-card-n">{cards.enviadas}</span><span className="agm-card-l">Enviadas</span></button>
-        <button className="agm-card agm-card-warn" onClick={() => aplicarCard('falha', 'todas')}><span className="agm-card-n">{cards.falhas}</span><span className="agm-card-l">Falhas</span></button>
-        <button className="agm-card agm-card-warn" onClick={() => aplicarCard('bloqueada', 'todas')}><span className="agm-card-n">{cards.bloqueadas}</span><span className="agm-card-l">Bloqueadas</span></button>
-        <button className="agm-card" onClick={() => aplicarCard('cancelada', 'todas')}><span className="agm-card-n">{cards.canceladas}</span><span className="agm-card-l">Canceladas</span></button>
+    <div className={'agm2' + (sel ? ' com-painel' : '')}>
+      {/* ─── barra superior: abas + ações ─────────────────────────────────── */}
+      <div className="agm2-top">
+        <nav className="agm2-abas" role="tablist">
+          {ABAS.map((a) => (
+            <button key={a.id} role="tab" aria-selected={aba === a.id}
+              className={'agm2-aba' + (aba === a.id ? ' on' : '')}
+              onClick={() => { setAba(a.id); setSelKey(null); }}>{a.label}</button>
+          ))}
+        </nav>
+        <div className="agm2-top-acoes">
+          <select className="agm2-sel" value={fPeriodo} onChange={(e) => setFPeriodo(e.target.value as PeriodoAg)} aria-label="Período">
+            <option value="todas">Todo o período</option>
+            <option value="hoje">Hoje</option>
+            <option value="amanha">Amanhã</option>
+            <option value="7d">Próximos 7 dias</option>
+            <option value="30d">Próximos 30 dias</option>
+          </select>
+          <button className={'agm2-btn' + (filtrosAbertos || filtroAtivo ? ' on' : '')} onClick={() => setFiltrosAbertos((v) => !v)}>
+            <IcFiltro />Filtros{filtroAtivo ? ' ·' : ''}
+          </button>
+          <button className="agm2-btn cta" onClick={() => { setNovoOpen(true); setNovoErr(null); setBuscaContato(''); }}>
+            <IcPlus />Novo agendamento
+          </button>
+        </div>
       </div>
 
-      {/* Filtros */}
-      <div className="agm-filters">
-        <select value={fPeriodo} onChange={(e) => setFPeriodo(e.target.value as PeriodoAg)}>
-          <option value="todas">Todas as datas</option>
-          <option value="hoje">Hoje</option>
-          <option value="amanha">Amanhã</option>
-          <option value="7d">Próximos 7 dias</option>
-          <option value="30d">Próximos 30 dias</option>
-        </select>
-        <select value={fStatus} onChange={(e) => setFStatus(e.target.value)}>
-          <option value="">Todos os status</option>
-          <option value="agendada">Agendada</option>
-          <option value="enviada">Enviada</option>
-          <option value="parcial">Parcial</option>
-          <option value="falha">Falha</option>
-          <option value="bloqueada">Bloqueada</option>
-          <option value="cancelada">Cancelada</option>
-          <option value="expirada">Expirada</option>
-        </select>
-        <select value={fCanal} onChange={(e) => setFCanal(e.target.value)}>
-          <option value="">Todos os canais</option>
-          {canais.map((c) => <option key={c.id} value={c.id}>{c.alias}</option>)}
-        </select>
-        <select value={fCriador} onChange={(e) => setFCriador(e.target.value)}>
-          <option value="">Todos os atendentes</option>
-          {orgUsuarios.map((u) => <option key={u.id} value={u.id}>{u.nome}</option>)}
-        </select>
-        <select value={fTipo} onChange={(e) => setFTipo(e.target.value)}>
-          <option value="">Todos os tipos</option>
-          <option value="texto">Texto</option>
-          <option value="imagem">Imagem</option>
-          <option value="audio">Áudio</option>
-          <option value="video">Vídeo</option>
-          <option value="documento">Documento</option>
-        </select>
-        <input className="agm-search" placeholder="Buscar cliente ou telefone…" value={fBusca} onChange={(e) => setFBusca(e.target.value)} />
-        {filtroAtivo && <button className="agm-clear" onClick={limpar}>Limpar</button>}
+      {/* ─── indicadores ──────────────────────────────────────────────────── */}
+      <div className="agm2-cards">
+        {[
+          { id: 'prog', ic: <IcSend />, n: programados, l: 'Programados', cls: 'c-prog' },
+          { id: 'env', ic: <IcCheck />, n: cards.enviadas, l: 'Enviados', cls: 'c-env' },
+          { id: 'fal', ic: <IcWarn />, n: cards.falhas, l: 'Falhas', cls: 'c-fal' },
+          { id: 'blk', ic: <IcBlock />, n: cards.bloqueadas, l: 'Bloqueados', cls: 'c-blk' },
+          { id: 'can', ic: <IcX />, n: cards.canceladas, l: 'Cancelados', cls: 'c-can' },
+        ].map((c) => (
+          <button key={c.id} className={'agm2-card ' + c.cls + (aba === c.id ? ' on' : '')}
+            onClick={() => { setAba(aba === c.id ? 'visao' : c.id); setSelKey(null); }}>
+            <span className="agm2-card-ic">{c.ic}</span>
+            <span className="agm2-card-n">{c.n}</span>
+            <span className="agm2-card-l">{c.l}</span>
+          </button>
+        ))}
       </div>
 
-      {/* Tabela — 1 linha por agendamento/sequência */}
-      <div className="agm-tablewrap">
-        <table className="agm-table">
-          <thead>
-            <tr>
-              <th>Data/hora</th><th>Cliente</th><th>Telefone</th><th>Canal</th><th>Tipo</th>
-              <th>Prévia</th><th>Criado por</th><th>Status</th><th className="agm-center">Msgs</th><th className="agm-center">Tent.</th><th>Erro/motivo</th><th>Criado em</th><th className="agm-actcol">Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtrados.length === 0 && (
-              <tr><td colSpan={13} className="agm-empty-row">{rowsQ.isLoading ? 'Carregando…' : 'Nenhum agendamento com esses filtros.'}</td></tr>
+      {/* ─── filtros (recolhíveis) ────────────────────────────────────────── */}
+      {(filtrosAbertos || filtroAtivo) && (
+        <div className="agm2-filtros">
+          <span className="agm2-busca"><IcSearch />
+            <input placeholder="Buscar por cliente, telefone ou conteúdo…" value={fBusca} onChange={(e) => setFBusca(e.target.value)} />
+          </span>
+          <select className="agm2-sel" value={fCanal} onChange={(e) => setFCanal(e.target.value)}>
+            <option value="">Todos os canais</option>
+            {canais.map((c) => <option key={c.id} value={c.id}>{c.alias}</option>)}
+          </select>
+          <select className="agm2-sel" value={fCriador} onChange={(e) => setFCriador(e.target.value)}>
+            <option value="">Todos os atendentes</option>
+            {orgUsuarios.map((u) => <option key={u.id} value={u.id}>{u.nome}</option>)}
+          </select>
+          <select className="agm2-sel" value={fTipo} onChange={(e) => setFTipo(e.target.value)}>
+            <option value="">Todos os tipos</option>
+            <option value="texto">Texto</option>
+            <option value="imagem">Imagem</option>
+            <option value="audio">Áudio</option>
+            <option value="video">Vídeo</option>
+            <option value="documento">Documento</option>
+          </select>
+          {filtroAtivo && <button className="agm2-limpar" onClick={limpar}>Limpar filtros</button>}
+        </div>
+      )}
+
+      {/* ─── lista + painel ───────────────────────────────────────────────── */}
+      <div className="agm2-main">
+        <div className="agm2-lista">
+          <div className="agm2-lista-h">
+            <span className="cl-quando">Data / hora</span>
+            <span className="cl-cli">Cliente</span>
+            <span className="cl-canal">Canal</span>
+            <span className="cl-tipo">Tipo</span>
+            <span className="cl-cont">Conteúdo</span>
+            <span className="cl-at">Atendente</span>
+            <span className="cl-st">Status</span>
+            <span className="cl-tent">Tent.</span>
+          </div>
+
+          {carregando && [0, 1, 2, 3, 4].map((i) => (
+            <div className="agm2-skel" key={i}><span className="sk sk-av" /><span className="sk sk-l1" /><span className="sk sk-l2" /></div>
+          ))}
+
+          {!carregando && erro && (
+            <div className="agm2-vazio">
+              <h3>Não foi possível carregar</h3>
+              <p>Houve uma falha ao buscar os agendamentos.</p>
+              <button className="agm2-btn" onClick={() => rowsQ.refetch()}>Tentar novamente</button>
+            </div>
+          )}
+
+          {!carregando && !erro && filtrados.length === 0 && (
+            grupos.length === 0 ? (
+              <div className="agm2-vazio">
+                <span className="agm2-vazio-ic"><IcSend /></span>
+                <h3>Nenhuma mensagem programada</h3>
+                <p>Agende uma mensagem para ela sair sozinha na hora certa.</p>
+                <button className="agm2-btn cta" onClick={() => setNovoOpen(true)}><IcPlus />Novo agendamento</button>
+              </div>
+            ) : (
+              <div className="agm2-vazio">
+                <h3>Nada com esses filtros</h3>
+                <p>Ajuste os filtros ou veja todos os agendamentos.</p>
+                <button className="agm2-btn" onClick={() => { limpar(); setAba('visao'); }}>Limpar filtros</button>
+              </div>
+            )
+          )}
+
+          {!carregando && !erro && filtrados.map((g) => {
+            const st = stMeta(g.statusGeral);
+            const nome = g.contatoNome ?? g.telefone ?? 'Cliente';
+            return (
+              <button key={g.key} className={'agm2-row' + (selKey === g.key ? ' on' : '')} onClick={() => setSelKey(selKey === g.key ? null : g.key)}>
+                <span className="cl-quando"><b>{fmtDia(g.primeiro.executarEm)}</b><i>{fmtHora(g.primeiro.executarEm)}</i></span>
+                <span className="cl-cli">
+                  <i className="agm2-av">{iniciais(nome)}</i>
+                  <span className="agm2-cli-t"><b>{nome}</b><i>{g.telefone ?? '—'}</i></span>
+                </span>
+                <span className="cl-canal">{g.nomeCanal ? <em className="agm2-pill">{g.nomeCanal}</em> : '—'}</span>
+                <span className="cl-tipo"><em className={'agm2-chip' + (g.ehSequencia ? ' seq' : '')}>{g.ehSequencia ? `Sequência · ${g.count}` : tipoLbl(g.primeiro.tipo)}</em></span>
+                <span className="cl-cont" title={previa(g)}>{previa(g)}</span>
+                <span className="cl-at">{nomePorId(g.criadoPor) ?? '—'}</span>
+                <span className="cl-st"><em className={'agm2-st ' + st.cls}>{st.label}</em></span>
+                <span className="cl-tent">{g.tentativas}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* ─── painel lateral de detalhes ─────────────────────────────────── */}
+        {sel && (() => {
+          const st = stMeta(sel.statusGeral);
+          const item = sel.itens[0];
+          const enviadas = sel.itens.filter((i) => i.status === 'enviada').length;
+          const falhas = sel.itens.filter((i) => i.status === 'falhou' || i.status === 'bloqueada').length;
+          const taxa = sel.count > 0 ? Math.round((enviadas / sel.count) * 100) : 0;
+          const podeCancelarSeq = sel.ehSequencia && sel.itens.some((i) => i.status === 'agendada');
+          return (
+            <aside className="agm2-painel" aria-label="Detalhes do agendamento">
+              <div className="agm2-p-h">
+                <strong>Detalhes do agendamento</strong>
+                <button className="agm2-p-x" aria-label="Fechar" onClick={() => setSelKey(null)}><IcClose /></button>
+              </div>
+
+              <div className="agm2-p-cli">
+                <i className="agm2-av g">{iniciais(sel.contatoNome ?? sel.telefone ?? 'Cliente')}</i>
+                <div className="agm2-p-cli-t">
+                  <b>{sel.contatoNome ?? sel.telefone ?? 'Cliente'}</b>
+                  <i>{sel.telefone ?? '—'}</i>
+                </div>
+                <button className="agm2-btn sm" onClick={() => abrirConversa(sel.conversaId)}>Abrir conversa</button>
+              </div>
+
+              <dl className="agm2-p-dl">
+                <div><dt>Canal</dt><dd>{sel.nomeCanal ?? '—'}</dd></div>
+                <div><dt>Status</dt><dd><em className={'agm2-st ' + st.cls}>{st.label}</em></dd></div>
+                <div><dt>Tipo</dt><dd>{sel.ehSequencia ? `Sequência · ${sel.count}` : tipoLbl(sel.primeiro.tipo)}</dd></div>
+                <div><dt>Tentativas</dt><dd>{sel.tentativas}</dd></div>
+                <div><dt>Criado por</dt><dd>{nomePorId(sel.criadoPor) ?? '—'}</dd></div>
+                <div><dt>Criado em</dt><dd>{fmtSP(sel.criadoEm)}</dd></div>
+                <div><dt>Agendado para</dt><dd>{fmtSP(sel.primeiro.executarEm)}</dd></div>
+                {sel.primeiro.enviadaEm && <div><dt>Enviado em</dt><dd>{fmtSP(sel.primeiro.enviadaEm)}</dd></div>}
+              </dl>
+
+              {/* Desempenho: só faz sentido em SEQUÊNCIA (em mensagem única seria sempre 0% ou 100%). */}
+              {sel.ehSequencia && (
+                <>
+                  <div className="agm2-p-lbl">Resumo de desempenho</div>
+                  <div className="agm2-p-kpis">
+                    <span className="agm2-kpi"><b>{sel.count}</b><i>Mensagens</i></span>
+                    <span className="agm2-kpi ok"><b>{enviadas}</b><i>Enviadas</i></span>
+                    <span className={'agm2-kpi' + (falhas > 0 ? ' bad' : '')}><b>{falhas}</b><i>Falhas</i></span>
+                    <span className="agm2-kpi"><b>{taxa}%</b><i>Sucesso</i></span>
+                  </div>
+                </>
+              )}
+
+              <div className="agm2-p-lbl">{sel.ehSequencia ? `Mensagens (${sel.count})` : 'Mensagem'}</div>
+              <ol className="agm2-p-msgs">
+                {sel.itens.map((i, idx) => {
+                  const ist = stMeta(i.status);
+                  const ierro = i.motivoBloqueio || i.ultimoErro;
+                  return (
+                    <li key={i.id}>
+                      <div className="agm2-p-msg-h">
+                        <span>{sel.ehSequencia ? `${idx + 1}. ` : ''}{fmtSP(i.executarEm)}</span>
+                        <em className={'agm2-st ' + ist.cls}>{ist.label}</em>
+                      </div>
+                      <div className="agm2-p-msg-t">{i.texto || i.nomeArquivo || '—'}</div>
+                      {(i.enviadaEm || ierro) && (
+                        <div className="agm2-p-msg-m">
+                          {i.enviadaEm && <span className="ok">✓ Enviada em {fmtSP(i.enviadaEm)}</span>}
+                          {ierro && <span className="bad">{ierro}</span>}
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ol>
+
+              <div className="agm2-p-acoes">
+                {!sel.ehSequencia && agendaEditavel(item.status) && (
+                  <>
+                    <button className="agm2-btn sm" onClick={() => setComp({ modo: 'editar', item, temTelefone: !!item.telefone })}>Editar</button>
+                    <button className="agm2-btn sm danger" disabled={cancelarMut.isPending} onClick={() => cancelarItem(item)}>Cancelar</button>
+                  </>
+                )}
+                {!sel.ehSequencia && agendaReagendavel(item.status) && (
+                  <button className="agm2-btn sm" onClick={() => setComp({ modo: 'reagendar', item, temTelefone: !!item.telefone })}>Reagendar</button>
+                )}
+                {podeCancelarSeq && (
+                  <button className="agm2-btn sm danger" disabled={cancelarMut.isPending} onClick={() => cancelarSequencia(sel)}>Cancelar pendentes</button>
+                )}
+              </div>
+            </aside>
+          );
+        })()}
+      </div>
+
+      {/* ─── "Novo agendamento": escolher o cliente ───────────────────────── */}
+      <Modal open={novoOpen} onClose={() => setNovoOpen(false)} width={480} title="Novo agendamento"
+        footer={<button className="agm2-btn" onClick={() => setNovoOpen(false)}>Cancelar</button>}>
+        <div className="agm2-novo">
+          <p className="agm2-novo-h">Para qual cliente?</p>
+          <span className="agm2-busca full"><IcSearch />
+            <input autoFocus placeholder="Buscar por nome ou telefone…" value={buscaContato} onChange={(e) => { setBuscaContato(e.target.value); setNovoErr(null); }} />
+          </span>
+          {novoErr && <p className="agm2-novo-err">{novoErr}</p>}
+          <ul className="agm2-novo-lista">
+            {(contatosQ.data ?? []).slice(0, 8).map((c) => (
+              <li key={c.id}>
+                <button onClick={() => escolherContato(c)}>
+                  <i className="agm2-av">{iniciais(c.nome)}</i>
+                  <span><b>{c.nome}</b><i>{c.tel || 'Sem telefone'}</i></span>
+                </button>
+              </li>
+            ))}
+            {buscaContato.trim().length > 1 && (contatosQ.data ?? []).length === 0 && !contatosQ.isLoading && (
+              <li className="agm2-novo-vazio">Nenhum cliente encontrado.</li>
             )}
-            {filtrados.map((g) => {
-              const st = stMeta(g.statusGeral);
-              const item = g.itens[0];
-              const podeCancelarSeq = g.ehSequencia && g.itens.some((i) => i.status === 'agendada');
-              return (
-                <tr key={g.key}>
-                  <td className="agm-nowrap">{fmtSP(g.primeiro.executarEm)}</td>
-                  <td>{g.contatoNome ?? '—'}</td>
-                  <td className="agm-nowrap">{g.telefone ?? '—'}</td>
-                  <td>{g.nomeCanal ?? '—'}</td>
-                  <td>{g.ehSequencia ? 'Sequência' : tipoLbl(g.primeiro.tipo)}</td>
-                  <td className="agm-preview" title={previaGrupo(g)} onClick={() => setVerGrupo(g)}>{previaGrupo(g)}</td>
-                  <td>{nomePorId(g.criadoPor) ?? '—'}</td>
-                  <td><span className={'agm-st agm-st-' + st.cls}>{st.label}</span></td>
-                  <td className="agm-center">{g.count}</td>
-                  <td className="agm-center">{g.tentativas}</td>
-                  <td className="agm-err" title={g.erro ?? ''}>{g.erro || '—'}</td>
-                  <td className="agm-nowrap agm-muted">{fmtSP(g.criadoEm)}</td>
-                  <td className="agm-acts">
-                    <button className="agm-mini" onClick={() => setVerGrupo(g)}>Ver</button>
-                    {!g.ehSequencia && agendaEditavel(item.status) && <>
-                      <button className="agm-mini" onClick={() => setComp({ modo: 'editar', item })}>Editar</button>
-                      <button className="agm-mini danger" onClick={() => cancelarItem(item)} disabled={cancelarMut.isPending}>Cancelar</button>
-                    </>}
-                    {!g.ehSequencia && agendaReagendavel(item.status) && <button className="agm-mini" onClick={() => setComp({ modo: 'reagendar', item })}>Reagendar</button>}
-                    {podeCancelarSeq && <button className="agm-mini danger" onClick={() => cancelarSequencia(g)} disabled={cancelarMut.isPending}>Cancelar pendentes</button>}
-                    <button className="agm-mini" onClick={() => abrirConversa(g.conversaId)}>Abrir conversa</button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+          </ul>
+        </div>
+      </Modal>
 
-      {/* Modal editar / reagendar (só agendamento avulso) */}
+      {/* Composição: criar / editar / reagendar */}
       <AgendarMensagemModal
         open={!!comp}
         modo={comp?.modo ?? 'editar'}
         canais={canais}
-        temTelefone={!!comp?.item.telefone}
-        initial={comp ? { canalId: comp.item.canalId, texto: comp.item.texto ?? '', executarEm: comp.item.executarEm, tipo: comp.item.tipo, nomeArquivo: comp.item.nomeArquivo ?? undefined } : null}
+        temTelefone={comp?.temTelefone ?? true}
+        initial={comp?.item
+          ? { canalId: comp.item.canalId, texto: comp.item.texto ?? '', executarEm: comp.item.executarEm, tipo: comp.item.tipo, nomeArquivo: comp.item.nomeArquivo ?? undefined }
+          : (comp?.canalId ? { canalId: comp.canalId } : null)}
         onClose={() => setComp(null)}
         onSubmit={submeterComposicao}
       />
-
-      {/* Drawer/Modal de detalhes do agendamento (com mensagens internas) */}
-      <Modal open={!!verGrupo} onClose={() => setVerGrupo(null)} width={620} title="Detalhes do agendamento"
-        footer={<>
-          {verGrupo && <button className="agm-btn" onClick={() => abrirConversa(verGrupo.conversaId)}>Abrir conversa</button>}
-          <button className="agm-btn primary" onClick={() => setVerGrupo(null)}>Fechar</button>
-        </>}>
-        {verGrupo && (
-          <div className="agm-ver">
-            <dl>
-              <dt>Status geral</dt><dd><span className={'agm-st agm-st-' + stMeta(verGrupo.statusGeral).cls}>{stMeta(verGrupo.statusGeral).label}</span></dd>
-              <dt>Cliente</dt><dd>{verGrupo.contatoNome ?? '—'} {verGrupo.telefone ? `· ${verGrupo.telefone}` : ''}</dd>
-              <dt>Canal</dt><dd>{verGrupo.nomeCanal ?? '—'}</dd>
-              <dt>Tipo</dt><dd>{verGrupo.ehSequencia ? `Sequência · ${verGrupo.count} mensagens` : tipoLbl(verGrupo.primeiro.tipo)}</dd>
-              <dt>Início em</dt><dd>{fmtSP(verGrupo.primeiro.executarEm)}</dd>
-              <dt>Criado por</dt><dd>{nomePorId(verGrupo.criadoPor) ?? '—'} · {fmtSP(verGrupo.criadoEm)}</dd>
-              {verGrupo.ehSequencia && verGrupo.sequenciaId && <><dt>Sequência</dt><dd className="agm-muted">{verGrupo.sequenciaId}</dd></>}
-            </dl>
-            <div className="agm-ver-lbl">{verGrupo.ehSequencia ? `Mensagens (${verGrupo.count})` : 'Mensagem'}</div>
-            <ol className="agm-itens">
-              {verGrupo.itens.map((i, idx) => {
-                const ist = stMeta(i.status);
-                const ierro = i.motivoBloqueio || i.ultimoErro;
-                return (
-                  <li key={i.id} className="agm-item">
-                    <div className="agm-item-top">
-                      <span className="agm-item-ord">{verGrupo.ehSequencia ? `${idx + 1}.` : ''} {fmtSP(i.executarEm)}</span>
-                      <span className="agm-item-tipo">{tipoLbl(i.tipo)}</span>
-                      <span className={'agm-st agm-st-' + ist.cls}>{ist.label}</span>
-                    </div>
-                    <div className="agm-item-txt">{i.texto || i.nomeArquivo || '—'}</div>
-                    <div className="agm-item-meta">
-                      {i.nomeArquivo ? <span>📎 {i.nomeArquivo}</span> : null}
-                      <span>tent. {i.tentativas}</span>
-                      {i.mensagemIdEnviada ? <span>enviada ✓</span> : null}
-                      {ierro ? <span className="agm-err">· {ierro}</span> : null}
-                    </div>
-                  </li>
-                );
-              })}
-            </ol>
-          </div>
-        )}
-      </Modal>
     </div>
   );
 }

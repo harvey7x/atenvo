@@ -891,6 +891,20 @@ export function useAgendarMidia() {
 
 export interface SeqItem { tipo: string; texto?: string | null; storage_path?: string; mime?: string; nome?: string; tamanho?: number; origem_audio?: string }
 /** Agenda uma SEQUÊNCIA (vários blocos num único agendamento). Cada item vira uma linha (RPC atômica). */
+/** Conversa ativa mais recente de um contato. A central de Agendamentos precisa disto para o
+ *  "Novo agendamento": agendar_sequencia exige uma conversa (é por ela que o envio sai). Consulta
+ *  pontual e leve, disparada só quando o usuário escolhe o contato. */
+export async function conversaAtivaDoContato(orgId: string, contatoId: string): Promise<{ id: string; canalId: string | null } | null> {
+  const { data, error } = await supabase!
+    .from('conversas')
+    .select('id, canal_id')
+    .eq('organizacao_id', orgId).eq('contato_id', contatoId).is('arquivada_em', null)
+    .order('ultima_interacao_em', { ascending: false })
+    .limit(1).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? { id: data.id as string, canalId: (data.canal_id as string) ?? null } : null;
+}
+
 export function useAgendarSequencia() {
   const qc = useQueryClient();
   return useMutation({
