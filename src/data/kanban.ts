@@ -134,6 +134,36 @@ export function useConversasDoContato(contatoId: string | null) {
 
 export interface OppAberta { id: string; contatoId: string; colunaId: string | null; colunaNome: string; funilId: string | null; respNome: string; valor: number | null; atualizadoEm: string; }
 /** Mapa contatoId -> oportunidade ABERTA (em_andamento) do contato. Uma query (sem N+1). */
+/** Não lidas por CONTATO — a bolinha de "mensagem nova do cliente" no card do Kanban.
+ *  Query separada e leve DE PROPÓSITO: o Kanban já traz 385 oportunidades com 3 embeds, e um
+ *  embed de conversas ali multiplicaria as linhas — foi exatamente o erro que custou caro na
+ *  lista do WhatsApp. Aqui vêm só as conversas que TÊM não lida (medido: 0,2 ms), e o cruzamento
+ *  por contato_id acontece no cliente.
+ *  Só conversa NÃO arquivada conta, e as não lidas do contato são somadas (o schema garante uma
+ *  conversa ativa por contato, então na prática é uma linha só). */
+export function useNaoLidasPorContato() {
+  const { currentOrg } = useOrg();
+  const org = currentOrg.id;
+  return useQuery({
+    queryKey: ['kanban-naolidas', org],
+    enabled: KANBAN_REAL,
+    refetchInterval: 8000,
+    queryFn: async (): Promise<Record<string, number>> => {
+      const { data, error } = await supabase!.from('conversas')
+        .select('contato_id, nao_lidas')
+        .eq('organizacao_id', org).gt('nao_lidas', 0).is('arquivada_em', null);
+      if (error) throw new Error(error.message);
+      const map: Record<string, number> = {};
+      for (const r of ((data as unknown[]) ?? []) as Record<string, unknown>[]) {
+        const cid = r.contato_id as string | null;
+        if (!cid) continue;
+        map[cid] = (map[cid] ?? 0) + ((r.nao_lidas as number) ?? 0);
+      }
+      return map;
+    },
+  });
+}
+
 export function useOportunidadesAbertasDeContatos(ids: string[]) {
   const { currentOrg } = useOrg();
   const org = currentOrg.id;

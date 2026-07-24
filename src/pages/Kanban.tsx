@@ -9,7 +9,7 @@ import { useKanban, useOportunidadesAbertasDeContatos, useConversasDoContato, va
   TIPO_BENEFICIO_OPCOES as TIPO_BENEFICIO, TIPO_SERVICO_OPCOES as TIPO_SERVICO,
   STATUS_CANCEL_OPCOES as ST_CANCEL, STATUS_RESS_OPCOES as ST_RESS, rotuloDe as labelOf,
   classificarMovimento, traduzErroKanban, MOTIVOS_PERDA, rotuloMotivoPerda, useOportunidadeEventos,
-  type KColuna, type KLead, type MovimentoTipo } from '@/data/kanban';
+  type KColuna, type KLead, type MovimentoTipo, useNaoLidasPorContato } from '@/data/kanban';
 import { useSearchParams } from 'react-router-dom';
 import { Modal } from '@/components/Modal';
 import { FichaJudicialBox } from '@/components/FichaJudicialBox';
@@ -23,6 +23,10 @@ const PALETTE = ['#3b82f6', '#19C37D', '#f59e0b', '#8b5cf6', '#0891b2', '#e11d48
 const fmtBRL = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 function haDe(iso?: string | null) { if (!iso) return ''; const ms = Date.now() - new Date(iso).getTime(); if (!Number.isFinite(ms) || ms < 0) return ''; const m = Math.floor(ms / 60000); if (m < 1) return 'agora'; if (m < 60) return `há ${m} min`; if (m < 1440) return `há ${Math.floor(m / 60)} h`; return `há ${Math.floor(m / 1440)} d`; }
 // Texto curto do chip de SLA no card. "Parado há Xh" usa movimentado_em; prazos usam entrada_em (calculado no motor).
+// Estagnação NÃO vira chip no card: "Parado há X d" e "2 dias estourado" medem a mesma coisa por
+// caminhos diferentes (movimentado_em x entrada_em) e apareciam JUNTOS em 84% dos cards com alerta
+// (70 de 83, medido em produção). O alerta continua vivo no motor de SLA e no sino da Topbar.
+const SLA_OCULTO_NO_CARD = new Set<SlaTipo>(['parado_ha_muito_tempo', 'prazo_2_dias_estourado', 'prazo_2_dias_em_risco']);
 function slaChipTexto(tipo: SlaTipo, movimentadoEm: string): string {
   switch (tipo) {
     case 'parado_ha_muito_tempo': return `Parado ${haDe(movimentadoEm)}`;
@@ -39,7 +43,9 @@ function Av({ n, cls }: { n: string; cls?: string }) { return <span className={'
 
 // ---- domínio previdenciário (rótulos importados de @/data/kanban) ----
 const canalLabel = (t: string | null) => (t === 'whatsapp' ? 'WhatsApp' : t === 'facebook' ? 'Facebook' : (t || 'Canal'));
-function chipDe(l: Pick<KLead, 'canalTipo' | 'canalNome' | 'origem'>): string | null { if (l.canalNome) return canalLabel(l.canalTipo) + ' · ' + l.canalNome; return l.origem || null; }
+// Só o NOME do canal no card (ANDRIUS, TRAFEGO 1, LUIZA...). O prefixo "WhatsApp ·" repetia em
+// todo card sem informar nada — canalLabel segue usado no formulário e no modal, onde faz sentido.
+function chipDe(l: Pick<KLead, 'canalTipo' | 'canalNome' | 'origem'>): string | null { return l.canalNome || l.origem || null; }
 function maskNum(n?: string | null) { if (!n) return ''; const d = n.replace(/\D/g, ''); return d.length > 4 ? '•••• ' + d.slice(-4) : d; }
 function defaultsStatus(serv: string): { c: string; r: string } {
   if (serv === 'cancelamento') return { c: 'nao_iniciado', r: 'nao_se_aplica' };
@@ -129,6 +135,7 @@ export function Kanban() {
   const { data: usuarios = [] } = useOrgUsuarios();
   const navigate = useNavigate();
   const fichaStatusMap = useFichasStatusDeOportunidades(useMemo(() => k.leads.map((l) => l.id), [k.leads])).data ?? {};
+  const naoLidasMap = useNaoLidasPorContato().data ?? {};
 
   const [search, setSearch] = useState('');
   const [optim, setOptim] = useState<Record<string, string>>({}); // id -> colunaId (otimista)
@@ -450,12 +457,21 @@ export function Kanban() {
                       const vr = valorRelevante(l);
                       const tags = mergeTags(l.contatoEtiquetas, l.etiquetas);
                       const chip = chipDe(l);
-                      const subt = [l.tipoBeneficio ? labelOf(TIPO_BENEFICIO, l.tipoBeneficio) : '', labelOf(TIPO_SERVICO, l.tipoServico)].filter(Boolean).join(' · ');
+                      // tipo_servico tem DEFAULT no banco, então "Análise inicial" saía em todo card.
+                      // Só mostra o serviço quando ele é diferente do padrão ou quando há benefício.
+                      const servLbl = l.tipoServico && l.tipoServico !== 'analise_inicial' ? labelOf(TIPO_SERVICO, l.tipoServico) : '';
+                      const subt = [l.tipoBeneficio ? labelOf(TIPO_BENEFICIO, l.tipoBeneficio) : '', servLbl].filter(Boolean).join(' · ');
                       return (
                         <div key={l.id} ref={(el) => { cardRefs.current[l.id] = el; }} className={'lead-card' + (moving ? ' moving' : '') + (destaque === l.id ? ' destaque' : '')} draggable={!optim[l.id]} onClick={() => setDetId(l.id)}
                           onDragStart={(e) => { if (optim[l.id]) { e.preventDefault(); return; } dragId.current = l.id; try { e.dataTransfer.effectAllowed = 'move'; } catch { /* */ } }} onDragEnd={() => { pararAutoScroll(); dragId.current = null; setHover(null); }}>
                           <div className="lc-top">
-                            <Av n={l.nome} />
+                            <span className="lc-av">
+                              <Av n={l.nome} />
+                              {(naoLidasMap[l.contatoId ?? ''] ?? 0) > 0 && (
+                                <i className="lc-unread" title={naoLidasMap[l.contatoId ?? ''] + ' mensagem(ns) nova(s) do cliente'}
+                                   aria-label={naoLidasMap[l.contatoId ?? ''] + ' mensagens novas'}>{Math.min(naoLidasMap[l.contatoId ?? ''], 99)}</i>
+                              )}
+                            </span>
                             <div className="lc-id"><div className="lc-name" title={l.nome}>{l.nome}{l.status === 'ganho' && <span className="lc-flag ganho" title="Fechado como ganho">Ganho</span>}{l.status === 'perdido' && <span className="lc-flag perdido" title={'Perdido' + (l.motivoPerda ? ' · ' + rotuloMotivoPerda(l.motivoPerda) : '')}>Perdido</span>}</div>{subt && <div className="lc-sub">{subt}</div>}</div>
                             <div className="col-menu-wrap">
                               <button className="lc-mbtn" aria-label={'Ações do lead ' + l.nome} onClick={(e) => { e.stopPropagation(); setMenu(menu?.kind === 'card' && menu.id === l.id ? null : { kind: 'card', id: l.id }); }}>{IC.dots}</button>
@@ -476,9 +492,9 @@ export function Kanban() {
                           </div>
                           {vr.valor != null && <div className="lc-valor-line">{fmtBRL(vr.valor)}{vr.mensal ? ' /mês' : ''}</div>}
                           {tags.length > 0 && <div className="lc-tags" title={tags.join(', ')}>{tags.slice(0, 3).map((t) => { const cor = corDaEtiqueta(t, etiquetas); return <span key={t} className="lc-tag" style={{ background: cor + '22', color: cor, borderColor: cor + '55' }}>{t}</span>; })}{tags.length > 3 && <span className="lc-tag more">+{tags.length - 3}</span>}</div>}
-                          {(() => { const sa = slaPorOpp.get(l.id) ?? []; if (!sa.length && l.prioridade !== 'alta') return null; return (
+                          {(() => { const sa = (slaPorOpp.get(l.id) ?? []).filter((a) => !SLA_OCULTO_NO_CARD.has(a.tipo)); if (!sa.length && l.prioridade !== 'alta') return null; return (
                             <div className="lc-sla">
-                              {sa.map((a) => <span key={a.id} className={'lc-sla-chip ' + sevClass(a.severidade)} title={a.detalhe ?? a.titulo}>{slaChipTexto(a.tipo, l.movimentadoEm)}</span>)}
+                              {sa.filter((a) => !SLA_OCULTO_NO_CARD.has(a.tipo)).map((a) => <span key={a.id} className={'lc-sla-chip ' + sevClass(a.severidade)} title={a.detalhe ?? a.titulo}>{slaChipTexto(a.tipo, l.movimentadoEm)}</span>)}
                               {l.prioridade === 'alta' && <span className="lc-sla-chip prio" title="Prioridade alta">⭐ Prioridade alta</span>}
                             </div>
                           ); })()}
