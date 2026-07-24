@@ -21,6 +21,7 @@ import {
 
 const IcMeta = () => <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a9.9 9.9 0 0 0-8.5 15l-1.3 4.8 4.9-1.3A9.9 9.9 0 1 0 12 2z" /></svg>;
 const IcCheck = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>;
+const IcInfo = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 16v-4M12 8h.01" /></svg>;
 const IcX = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M6 6l12 12M18 6L6 18" /></svg>;
 
 /** Rótulo e cor do status de aprovação. O nome vem da Meta; a tradução é nossa. */
@@ -115,8 +116,8 @@ export function IntegracaoCloudApi({ podeConfig }: Props) {
           </div>
 
           <div className="ic-body">
-            {diagQ.isLoading && <div className="adapter-note">Carregando a configuração da conta oficial…</div>}
-            {diagQ.error && <div className="adapter-note">Não foi possível ler a configuração: {(diagQ.error as Error).message}</div>}
+            {diagQ.isLoading && <div className="adapter-note"><div className="tx">Carregando a configuração da conta oficial…</div></div>}
+            {diagQ.error && <div className="adapter-note"><div className="tx">Não foi possível ler a configuração: {(diagQ.error as Error).message}</div></div>}
 
             {d && (
               <>
@@ -154,7 +155,7 @@ export function IntegracaoCloudApi({ podeConfig }: Props) {
 
                 {/* ---- números oficiais cadastrados ---- */}
                 {canais.length === 0 && (
-                  <div className="adapter-note">Nenhum número oficial cadastrado. Cadastre o número que aparece no painel da Meta em <b>WhatsApp &gt; API Setup</b>.</div>
+                  <div className="adapter-note"><div className="tx">Nenhum número oficial cadastrado. Cadastre o número que aparece no painel da Meta em <b>WhatsApp &gt; API Setup</b>.</div></div>
                 )}
                 {canais.length > 0 && (
                   <div className="conn-list">
@@ -168,7 +169,12 @@ export function IntegracaoCloudApi({ podeConfig }: Props) {
                             {c.cloud_waba_id ? ` · WABA ${c.cloud_waba_id}` : ' · sem WABA'}
                           </span>
                           <span className="conn-chips">
-                            <span className="conn-chip">{c.status_integracao === 'conectado' ? 'Confirmado na Meta' : 'Aguardando confirmação'}</span>
+                            {/* "conectado" sozinho não prova nada: um canal criado por SQL nasce assim.
+                                O que prova é a Meta ter devolvido o número em "Verificar na Meta". */}
+                            <span className="conn-chip">
+                              {c.status_integracao === 'conectado' && c.numero_conectado ? 'Confirmado na Meta' : 'Aguardando confirmação'}
+                            </span>
+                            {!c.cloud_waba_id && <span className="conn-chip">sem WABA — não sincroniza modelos</span>}
                           </span>
                         </div>
                         <div className="conn-actions">
@@ -223,14 +229,17 @@ export function IntegracaoCloudApi({ podeConfig }: Props) {
 
           <div className="ic-body">
             <div className="adapter-note">
-              Fora da janela de 24 horas o WhatsApp oficial só entrega <b>modelo aprovado pela Meta</b>.
-              Sem um modelo aprovado marcado abaixo, o remarketing <b>não envia</b> para esses contatos — ele registra
-              <b> bloqueado pela janela</b> e não gasta o toque. Nunca cai para texto livre.
+              <IcInfo />
+              <div className="tx">
+                Fora da janela de 24 horas o WhatsApp oficial só entrega <b>modelo aprovado pela Meta</b>.
+                Sem um modelo aprovado marcado abaixo, o remarketing <b>não envia</b> para esses contatos — ele registra
+                <b> bloqueado pela janela</b> e não gasta o toque. Nunca cai para texto livre.
+              </div>
             </div>
 
-            {tplQ.isLoading && <div className="adapter-note">Carregando modelos…</div>}
+            {tplQ.isLoading && <div className="adapter-note"><div className="tx">Carregando modelos…</div></div>}
             {!tplQ.isLoading && templates.length === 0 && (
-              <div className="adapter-note">Nenhum modelo cadastrado. Crie o modelo aqui e depois submeta na Meta — ou use “Sincronizar com a Meta” se já tiver criado por lá.</div>
+              <div className="adapter-note"><div className="tx">Nenhum modelo cadastrado. Crie o modelo aqui e depois submeta na Meta — ou use “Sincronizar com a Meta” se já tiver criado por lá.</div></div>
             )}
 
             {templates.length > 0 && (
