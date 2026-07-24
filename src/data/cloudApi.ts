@@ -242,12 +242,11 @@ export function useJanelaCanal(canalId: string | null | undefined, contatoId: st
   });
 }
 
-/** "faltam 3 h" / "faltam 12 min". O atendente precisa saber se dá tempo, não a hora exata. */
+/** Rótulo CURTO — o cabeçalho da conversa é estreito e corta qualquer coisa longa com reticências.
+ *  O "por quê" inteiro fica no title do elemento, não aqui. */
 export function rotuloJanela(j: JanelaCanal | undefined): string {
   if (!j) return '';
-  if (!j.aberta) return 'janela fechada — só modelo';
+  if (!j.aberta) return 'janela fechada';
   const m = j.minutosRestantes ?? 0;
-  return m >= 120 ? `janela aberta · faltam ${Math.floor(m / 60)} h`
-    : m >= 60 ? 'janela aberta · falta 1 h'
-    : `janela aberta · faltam ${Math.max(1, m)} min`;
+  return m >= 60 ? `janela · ${Math.floor(m / 60)} h` : `janela · ${Math.max(1, m)} min`;
 }
