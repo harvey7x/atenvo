@@ -1206,7 +1206,9 @@ export function WhatsApp() {
                 </div>
               );
             })()}
-            {current.phone && <span className="ch-phone-pill" title="Telefone do cliente"><span style={{ color: 'var(--wa)', display: 'inline-flex' }}><IcWa /></span>{current.phone}</span>}
+            {/* pill de telefone só quando o painel direito está FECHADO — aberto, ele já mostra o
+                telefone, e a duplicata roubava a largura que cortava o pill de status das tags. */}
+            {!dataOpen && current.phone && <span className="ch-phone-pill" title="Telefone do cliente"><span style={{ color: 'var(--wa)', display: 'inline-flex' }}><IcWa /></span>{current.phone}</span>}
           <div className="ch-actions">
             {/* responsável EFETIVO (conversa → contato → oportunidade): antes olhava só
                 contatos.responsavel_id e oferecia "Assumir" em conversa que já tinha dono na oportunidade. */}
