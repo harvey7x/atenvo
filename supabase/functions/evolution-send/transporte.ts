@@ -20,11 +20,16 @@ export interface CanalEnvio {
   cloud_phone_number_id?: string | null;
 }
 export interface Enviado { key?: { id?: string } }
+/** Template aprovado da Cloud API. `variaveis` preenche {{1}},{{2}}… do BODY, na ordem. */
+export interface TemplateEnvio { nome: string; idioma: string; variaveis?: string[] }
 export interface Enviador {
   ehCloud: boolean;
   sendText(numero: string, texto: string, quoted?: unknown): Promise<Enviado>;
   sendMedia(numero: string, mediatype: string, mimetype: string, media: string, fileName?: string, caption?: string, quoted?: unknown): Promise<Enviado>;
   sendWhatsAppAudio(numero: string, audio: string, quoted?: unknown): Promise<Enviado>;
+  /** Fora da janela de 24h a Meta SÓ aceita template. Na Evolution isso não existe — lá qualquer
+   *  texto sai a qualquer hora — então o adaptador Evolution lança em vez de fingir que enviou. */
+  sendTemplate(numero: string, tpl: TemplateEnvio): Promise<Enviado>;
 }
 
 export function ehCloudApi(canal: CanalEnvio): boolean {
@@ -124,6 +129,21 @@ function enviadorCloud(phoneNumberId: string): Enviador {
         type: 'audio', audio: fonte, ...contextoDe(quoted),
       }));
     },
+    async sendTemplate(numero, tpl) {
+      guard();
+      // O `components` só vai quando há variável: template sem {{n}} recebendo um BODY com
+      // parameters vazio é recusado pela Meta (132000, "number of parameters does not match").
+      const params = (tpl.variaveis ?? []).map((v) => ({ type: 'text', text: String(v ?? '') }));
+      return comoEvolution(await graph(`${phoneNumberId}/messages`, {
+        messaging_product: 'whatsapp', recipient_type: 'individual', to: numero,
+        type: 'template',
+        template: {
+          name: tpl.nome,
+          language: { code: tpl.idioma || 'pt_BR' },
+          ...(params.length ? { components: [{ type: 'body', parameters: params }] } : {}),
+        },
+      }));
+    },
   };
 }
 
@@ -134,6 +154,9 @@ function enviadorEvolution(instancia: string): Enviador {
     sendMedia: (numero, mediatype, mimetype, media, fileName, caption, quoted) =>
       evolution.sendMedia(instancia, numero, mediatype, mimetype, media, fileName ?? '', caption, quoted),
     sendWhatsAppAudio: (numero, audio, quoted) => evolution.sendWhatsAppAudio(instancia, numero, audio, quoted),
+    // Não existe template no Baileys. Lançar é melhor que enviar o corpo como texto solto: o
+    // template tem cara de mensagem aprovada e mandá-lo cru mudaria o que o cliente lê.
+    sendTemplate: () => { throw new Error('Template só existe na API oficial (Cloud API).'); },
   };
 }
 

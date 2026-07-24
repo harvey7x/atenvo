@@ -8,6 +8,13 @@
 // está NO AR e usa META_APP_SECRET/META_VERIFY_TOKEN. Nome compartilhado criaria chance de
 // derrubar o webhook que traz os leads. Defensivo ganha.
 //
+// v2 (Blocos 1 e 4 do descongelamento):
+//  * MÍDIA: media_id -> GET /{media_id} (Bearer) -> url temporária -> download (Bearer) -> bucket
+//    privado, MESMO caminho da Evolution. Áudio inbound dentro do teto vira base64 p/ transcrição.
+//  * BOT: dispatch fire-and-forget ao bot-runner com dry_run:true FIXO, na MESMA ordem do
+//    evolution-webhook (bot_remarketing_inbound AWAITED antes do dispatch). Toggle CLOUD_BOT_DISPATCH.
+//  * inboundNovo por .select() no upsert — sem isso a reentrega da Meta incrementava não-lidas de novo.
+//
 // INVARIANTES:
 //  * `statuses` NUNCA vira mensagem, NUNCA cria contato/conversa/lead e NUNCA chama o bot.
 //  * idempotência por `wamid` em mensagens.id_externo (unique uq_mensagens_id_externo).
@@ -15,13 +22,26 @@
 //  * phone_number_id desconhecido => 200 + evento ignorado. NUNCA 4xx: a Meta reenfileira e,
 //    com falha repetida, DESATIVA a assinatura do webhook.
 //  * sempre 200 no fim; erro de persistência vira evento 'erro' reprocessável, não 500.
+//  * mídia que não baixa NUNCA descarta a mensagem: vira status_midia='falhou' + midia_pendente.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const admin = () => createClient(SUPABASE_URL, SERVICE, { auth: { persistSession: false } });
-// Bloco 2 NÃO liga o bot. O dispatch entra depois, com o master ligado conscientemente.
+// Toggle do dispatch ao bot. O CÓDIGO existe (v2); o default 'nao' mantém o canal oficial mudo até
+// o dono ligar conscientemente. Mesmo ligado, o runner recebe dry_run:true — nada chega a cliente.
 const BOT_DISPATCH = (Deno.env.get('CLOUD_BOT_DISPATCH') ?? 'nao').toLowerCase() === 'sim';
+const FUNCTIONS_BASE = (Deno.env.get('SUPABASE_URL') ?? '').replace(/\/+$/, '') + '/functions/v1';
+
+// ---- mídia: mesmos tetos da Evolution (envs compartilhadas de propósito: um número só para afinar) ----
+const GRAPH_V = () => Deno.env.get('META_GRAPH_VERSION') || 'v21.0';
+// MESMO token do envio (evolution-send/transporte.ts). Só em secret: nunca no banco, nunca logado.
+const META_TOKEN = () => Deno.env.get('META_WHATSAPP_TOKEN') ?? '';
+const MAX_MEDIA = 20 * 1024 * 1024;
+const MAX_AUDIO_TRANSC = Number(Deno.env.get('MAX_AUDIO_TRANSC')) || 8 * 1024 * 1024;
+// MAX_AUDIO_SEG existe na Evolution porque o Baileys informa a duração. A Cloud API NÃO manda
+// `seconds` em audio — aqui o corte é só por tamanho, exatamente como o ramo `seconds == null`
+// da Evolution já se comporta hoje. Não é regra nova; é a mesma regra com um dado a menos.
 
 function safeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
@@ -44,6 +64,65 @@ function maskNum(v?: string | null): string | null {
 }
 
 type Ev = Record<string, any>;
+
+/* ===================== BLOCO 4 — MÍDIA DA CLOUD API ===================== */
+
+// Espelho de extFromMime/extFor do evolution-webhook. Duplicado de propósito: Edge Functions não
+// compartilham módulo entre si sem acoplar deploys, e um webhook não pode quebrar por causa do outro.
+function extFromMime(mime: string): string {
+  const m = mime.toLowerCase();
+  if (m.includes('ogg')) return 'ogg'; if (m.includes('mpeg')) return 'mp3'; if (m.includes('mp4') || m.includes('m4a')) return 'm4a';
+  if (m.includes('aac')) return 'aac'; if (m.includes('wav')) return 'wav'; if (m.includes('webm')) return 'webm'; return 'ogg';
+}
+function extFor(mime: string, nome: string | null): string {
+  if (nome && /\.[a-z0-9]{1,8}$/i.test(nome)) return (nome.split('.').pop() ?? '').toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin';
+  const m = (mime || '').toLowerCase();
+  if (m.includes('jpeg') || m.includes('jpg')) return 'jpg'; if (m.includes('png')) return 'png'; if (m.includes('webp')) return 'webp'; if (m.includes('gif')) return 'gif';
+  if (m.includes('mp4')) return 'mp4'; if (m.includes('quicktime') || m.includes('mov')) return 'mov'; if (m.includes('3gpp')) return '3gp';
+  if (m.includes('pdf')) return 'pdf'; if (m.includes('wordprocessingml')) return 'docx'; if (m.includes('msword')) return 'doc';
+  if (m.includes('spreadsheetml')) return 'xlsx'; if (m.includes('ms-excel')) return 'xls'; if (m.includes('zip')) return 'zip'; if (m.includes('text')) return 'txt';
+  if (m.includes('audio')) return extFromMime(m);
+  return 'bin';
+}
+function sanitizeNome(n: unknown): string | null {
+  const s = typeof n === 'string' ? n.trim() : '';
+  if (!s) return null;
+  return s.replace(/[/\\]+/g, '_').replace(/[^\w.\- ()]+/g, '_').slice(0, 120) || null; // anti path-traversal
+}
+/** bytes -> base64 em blocos. String.fromCharCode(...bytes) estoura a pilha em arquivo de MBs. */
+function paraBase64(bytes: Uint8Array): string {
+  let bin = '';
+  const passo = 0x8000;
+  for (let i = 0; i < bytes.length; i += passo) bin += String.fromCharCode(...bytes.subarray(i, i + passo));
+  return btoa(bin);
+}
+async function graphGet(path: string, timeoutMs: number): Promise<Response> {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    return await fetch(/^https?:\/\//i.test(path) ? path : `https://graph.facebook.com/${GRAPH_V()}/${path}`, {
+      headers: { Authorization: `Bearer ${META_TOKEN()}` }, signal: ctrl.signal,
+    });
+  } finally { clearTimeout(t); }
+}
+/** media_id -> metadados (url temporária) -> download. A URL da Meta expira em ~5 min E exige o
+ *  MESMO Bearer para baixar — por isso ela nunca é persistida; o que guardamos é o media_id. */
+async function baixarMidiaCloud(mediaId: string): Promise<{ bytes: Uint8Array; mime: string; b64: string }> {
+  if (!META_TOKEN()) throw new Error('token_meta_ausente');
+  const metaRes = await graphGet(mediaId, 15000);
+  if (!metaRes.ok) throw new Error(`meta HTTP ${metaRes.status}`);
+  const info = await metaRes.json().catch(() => ({})) as { url?: string; mime_type?: string; file_size?: number };
+  if (!info.url) throw new Error('sem_url');
+  // corta antes de baixar quando a Meta já informa o tamanho (evita puxar 100MB para descartar).
+  if (typeof info.file_size === 'number' && info.file_size > MAX_MEDIA) throw new Error('arquivo_excede_limite');
+  const binRes = await graphGet(info.url, 45000);
+  if (!binRes.ok) throw new Error(`download HTTP ${binRes.status}`);
+  const bytes = new Uint8Array(await binRes.arrayBuffer());
+  if (bytes.length === 0) throw new Error('midia_vazia');
+  if (bytes.length > MAX_MEDIA) throw new Error('arquivo_excede_limite');
+  const mime = (binRes.headers.get('content-type') ?? info.mime_type ?? '').split(';')[0].trim();
+  return { bytes, mime, b64: paraBase64(bytes) };
+}
 
 const TIPO_MIDIA: Record<string, string> = {
   image: 'imagem', audio: 'audio', video: 'video', document: 'documento', sticker: 'imagem',
@@ -246,28 +325,71 @@ Deno.serve(async (req) => {
 
           // --- mensagem (idempotente por wamid) ---
           const { tipo, texto, meta } = conteudoDe(m);
+
+          // --- BLOCO 4: mídia. Baixa ANTES de gravar para a mensagem já nascer com o anexo.
+          //     Falhar aqui NUNCA descarta a mensagem: ela entra pendente e é recuperável. ---
+          const metaMidia: Record<string, unknown> = { ...meta };
+          let audioB64: string | null = null;
+          let audioMime: string | null = null;
+          const mediaId = typeof meta.media_id === 'string' ? meta.media_id : null;
+          if (mediaId) {
+            try {
+              const dl = await baixarMidiaCloud(mediaId);
+              const mime = dl.mime || String(meta.mime ?? '') || 'application/octet-stream';
+              const nome = sanitizeNome(meta.nome);
+              const ext = extFor(mime, nome);
+              const path = `${orgId}/wa-midia/${wamid.replace(/[^\w-]/g, '')}.${ext}`;
+              const up = await db.storage.from('script-midia').upload(path, dl.bytes, { contentType: mime, upsert: true });
+              if (up.error) throw new Error(up.error.message);
+              metaMidia.mime = mime;
+              metaMidia.tamanho = dl.bytes.length;
+              metaMidia.nome = nome ?? `${tipo}.${ext}`;
+              metaMidia.anexo_path = path;
+              metaMidia.status_midia = 'disponivel';
+              delete metaMidia.midia_pendente;               // baixou: some o marcador de pendência
+              // áudio inbound dentro do teto → base64 p/ o bot-runner transcrever (mesmo Gemini).
+              if (tipo === 'audio' && dl.bytes.length <= MAX_AUDIO_TRANSC) { audioB64 = dl.b64; audioMime = mime; }
+            } catch (e) {
+              metaMidia.midia_pendente = true;
+              metaMidia.status_midia = 'falhou';
+              metaMidia.media_erro = String((e as Error).message ?? 'download').slice(0, 120);
+            }
+          }
+
           // Click-to-WhatsApp: o anúncio de origem vem aqui. É a aquisição do lead — preservar.
           const referral = m.referral ? {
             ctwa_clid: m.referral.ctwa_clid ?? null, source_id: m.referral.source_id ?? null,
             source_type: m.referral.source_type ?? null, source_url: m.referral.source_url ?? null,
             headline: m.referral.headline ?? null,
           } : null;
-          await db.from('mensagens').upsert({
+          // .select() para saber se o INSERT criou linha NOVA — com ignoreDuplicates a reentrega
+          // devolve array vazio. Sem isso, reentrega da Meta incrementava não-lidas de novo e
+          // redisparava o bot (mesma lição do evolution-webhook).
+          const { data: insArr } = await db.from('mensagens').upsert({
             conversa_id: conversaId, organizacao_id: orgId, direcao: 'entrada', tipo,
             conteudo: texto, status: 'entregue', origem: 'whatsapp_cloud', id_externo: wamid,
             recebida_em: agora,
             // metadados é NOT NULL — nunca passar null aqui (P0 de 07/2026).
-            metadados: { ...meta, wamid, wa_id: waId, phone_number_id: phoneNumberId,
+            metadados: { ...metaMidia, wamid, wa_id: waId, phone_number_id: phoneNumberId,
                          ...(referral ? { referral } : {}), ...(m.context?.id ? { resposta_a_wamid: m.context.id } : {}) },
-          }, { onConflict: 'id_externo', ignoreDuplicates: true });
+          }, { onConflict: 'id_externo', ignoreDuplicates: true }).select('id');
+          const inboundNovo = Array.isArray(insArr) && insArr.length > 0;
+          const inboundMsgId = (insArr?.[0]?.id as string | undefined) ?? null;
 
-          // --- conversa: sobe no inbox, reabre se arquivada, incrementa não lidas ---
-          const { data: cv } = await db.from('conversas').select('nao_lidas').eq('id', conversaId).maybeSingle();
-          await db.from('conversas').update({
-            ultima_interacao_em: agora, ultima_msg_canal_em: agora, ultimo_canal_id: canal.id,
-            canal_id: canal.id, ultimo_provider: 'meta_cloud', arquivada_em: null,
-            nao_lidas: ((cv?.nao_lidas as number) ?? 0) + 1,
-          }).eq('id', conversaId);
+          // --- conversa: sobe no inbox; só a PRIMEIRA entrega reabre arquivada e conta não lida ---
+          if (inboundNovo) {
+            const { data: cv } = await db.from('conversas').select('nao_lidas').eq('id', conversaId).maybeSingle();
+            await db.from('conversas').update({
+              ultima_interacao_em: agora, ultima_msg_canal_em: agora, ultimo_canal_id: canal.id,
+              canal_id: canal.id, ultimo_provider: 'meta_cloud', arquivada_em: null,
+              nao_lidas: ((cv?.nao_lidas as number) ?? 0) + 1,
+            }).eq('id', conversaId);
+          } else {
+            await db.from('conversas').update({
+              ultima_interacao_em: agora, ultima_msg_canal_em: agora, ultimo_canal_id: canal.id,
+              canal_id: canal.id, ultimo_provider: 'meta_cloud',
+            }).eq('id', conversaId);
+          }
 
           // --- Kanban: todo inbound garante LEAD NOVO (não só contato novo). RPC central resolve
           //     o funil principal, é idempotente e não reentra opp fechada. Best-effort. ---
@@ -275,8 +397,42 @@ Deno.serve(async (req) => {
             await db.rpc('garantir_oportunidade_lead_novo', { p_contato: contatoId, p_conversa: conversaId, p_canal: canal.id, p_origem: 'WhatsApp' });
           } catch (_k) { /* Kanban nunca interrompe a ingestão */ }
 
-          // --- bot: DESLIGADO no Bloco 2 (transporte primeiro). ---
-          if (BOT_DISPATCH) { /* dispatch entra num bloco próprio, com master consciente */ }
+          // ---- REMARKETING: se o lead estava numa cadência, re-roteia a opp ANTES do dispatch.
+          //      Respondeu → opp volta pra LEAD NOVO (entrada), senão bot_pode_atuar bloquearia
+          //      justamente o lead que respondeu; opt-out → PERDIDO e NÃO dispara o bot.
+          //      AWAITED de propósito: o move de coluna precisa commitar antes do fire-and-forget.
+          //      Best-effort — erro/timeout aqui nunca afeta a ingestão. Idêntico ao evolution-webhook. ----
+          let rmktDesfecho: string | null = null;
+          if (BOT_DISPATCH && inboundNovo && inboundMsgId) {
+            try {
+              const { data: r } = await db.rpc('bot_remarketing_inbound', { p_conversa: conversaId, p_texto: texto ?? '' });
+              rmktDesfecho = (r as string) ?? null;
+            } catch { /* best-effort: remarketing nunca quebra o webhook */ }
+          }
+
+          // ---- BLOCO 1: dispatch fire-and-forget ao bot-runner (só inbound NOVO, texto/áudio) ----
+          // dry_run:true FIXO → o runner só simula/loga; jamais envia a cliente. Os gates de negócio
+          // (master, bot_pode_atuar, humano/responsável, precisa_humano, idempotência, lock, saúde do
+          // canal) são do RUNNER, que é agnóstico de transporte — por isso este bloco é o mesmo da
+          // Evolution, palavra por palavra, trocando só a origem do áudio.
+          if (BOT_DISPATCH && inboundNovo && inboundMsgId && rmktDesfecho !== 'optout' && (tipo === 'texto' || tipo === 'audio')) {
+            const dispatch = (async () => {
+              try {
+                const { data: bs } = await db.from('webhook_config').select('secret').eq('chave', 'bot_runner').maybeSingle();
+                if (!bs?.secret) return;
+                await fetch(`${FUNCTIONS_BASE}/bot-runner`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'x-bot-secret': bs.secret as string },
+                  body: JSON.stringify({
+                    conversa_id: conversaId, inbound_msg_id: inboundMsgId, inbound_text: texto ?? '',
+                    inbound_tipo: tipo, dry_run: true,
+                    ...(audioB64 ? { inbound_audio_b64: audioB64, inbound_audio_mime: audioMime } : {}),
+                  }),
+                });
+              } catch { /* fire-and-forget: erro do runner nunca afeta o webhook */ }
+            })();
+            try { (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime?.waitUntil?.(dispatch); } catch { /* sem waitUntil: segue fire-and-forget */ }
+          }
 
           await fim('processado');
         } catch (_e) {

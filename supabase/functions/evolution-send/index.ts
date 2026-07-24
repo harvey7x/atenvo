@@ -246,6 +246,22 @@ Deno.serve(async (req) => {
       return json({ ok: true, vinculado: true, numero_mascarado: mascarado, rpc });
     }
 
+    // ===== JANELA DE 24H (Bloco 5) — SÓ Cloud API. A Evolution não tem esta regra e não é tocada. =====
+    // A Meta só aceita texto/mídia livre dentro de 24h contadas da ÚLTIMA MENSAGEM DO CLIENTE
+    // (conversas.ultima_entrada_em, mantida por trigger). Fora disso ela recusa com 131047.
+    // Barrar aqui, com mensagem em português, é melhor que deixar a Meta recusar: o atendente
+    // entende o porquê e a mensagem não fica registrada como "falhou" por motivo obscuro.
+    // Fica DEPOIS de validar_numero/vincular_numero de propósito — aquelas ações não enviam nada.
+    if (tx.ehCloud) {
+      const { data: dentro } = await admin.rpc('wa_dentro_janela', { p_conversa: conversa_id });
+      if (dentro !== true) {
+        return json({
+          error: 'Passaram mais de 24 horas desde a última mensagem deste cliente. No WhatsApp oficial, fora dessa janela só é permitido enviar um modelo (template) aprovado pela Meta.',
+          code: 'FORA_JANELA_24H',
+        }, 409);
+      }
+    }
+
     // ----- destino -----
     // A IDENTIDADE WhatsApp (valor_normalizado, derivada do JID real do inbound) tem PRIORIDADE sobre o
     // telefone do CRM (contatos.telefone), que pode estar malformado/divergente. Validamos no onWhatsApp e

@@ -6,7 +6,15 @@
 //  * Guardas: janela seg-sáb 09-18 SP, teto diário (env), 1 toque/opp/dia (RPC), pausa/humano/sem-whatsapp (RPC),
 //    e checagem FINAL da coluna no instante do envio (anti-race: time fechou o cliente entre o tick e o disparo).
 //  * IA por toque (Claude→Gemini) + MESMO guardrail.ts; se a IA cair/guardrail barrar 2x → copy fixo do ângulo.
+//
+// BLOCO 5 — JANELA DE 24H (só afeta canal transporte='cloud_api'; Evolution segue idêntica):
+//    dentro da janela  → texto livre gerado pela IA, como sempre;
+//    fora da janela    → template APROVADO, com as variáveis preenchidas;
+//    fora e sem template → NÃO ENVIA. Marca 'bloqueada_janela' e NÃO consome o toque da cadência
+//    (senão o lead perderia toques em silêncio). Nunca, em hipótese alguma, cai para texto livre:
+//    a Meta recusaria (131047) e, pior, texto livre fora da janela é o que derruba número oficial.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { enviadorDe } from '../evolution-send/transporte.ts';
 import { gerarResposta, type Msg } from '../bot-runner/ia.ts';
 import { saidaSuja } from '../bot-runner/guardrail.ts';
 import { primeiroNome } from '../bot-runner/fluxo.ts';
@@ -92,6 +100,35 @@ async function gerarToque(admin: any, row: any, angulo: ReturnType<typeof angulo
 // remove qualquer bloco <estado> que a IA possa emitir por hábito, e apara.
 function limparSaida(s: string): string { return (s ?? '').replace(/<estado>[\s\S]*/i, '').trim(); }
 
+/* ===================== Templates (fora da janela de 24h) ===================== */
+
+export interface TemplateRow {
+  id: string; nome: string; idioma: string; corpo: string;
+  variaveis: unknown; meta_template_id: string | null;
+}
+/** Nome do contato (para {{1}} do template). Consulta pontual, só quando vai usar. */
+async function nomeDoContato(admin: any, row: { contato_id?: string | null }): Promise<string> {
+  if (!row.contato_id) return '';
+  const { data } = await admin.from('contatos').select('nome').eq('id', row.contato_id).maybeSingle();
+  return String(data?.nome ?? '');
+}
+/** Valores das {{1}},{{2}}… na ORDEM cadastrada. Hoje só sabemos preencher a variável de nome;
+ *  qualquer outra sai com o `exemplo` cadastrado — nunca vazio, porque a Meta recusa parâmetro
+ *  em branco (132000) e um template pela metade é pior que não enviar. */
+function varsDoTemplate(tpl: TemplateRow, primeiro: string): string[] {
+  const defs = Array.isArray(tpl.variaveis) ? tpl.variaveis as Array<Record<string, unknown>> : [];
+  return defs.map((d) => {
+    const rotulo = String(d?.rotulo ?? '').toLowerCase();
+    if (/nome|primeiro|cliente/.test(rotulo) && primeiro) return primeiro;
+    const ex = String(d?.exemplo ?? '').trim();
+    return ex || primeiro || 'cliente';
+  });
+}
+/** Reconstrói o corpo com as variáveis, para gravar na conversa o que o cliente realmente leu. */
+function preencherTemplate(corpo: string, vars: string[]): string {
+  return (corpo ?? '').replace(/\{\{\s*(\d+)\s*\}\}/g, (_m, n) => vars[Number(n) - 1] ?? '');
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   try {
@@ -130,9 +167,45 @@ Deno.serve(async (req) => {
     for (const row of fila) {
       if (enviados >= restante) break;
 
-      // 6) gera a mensagem PRIMEIRO (IA é a parte lenta, ~1-2s no Claude)
+      // 6) TRANSPORTE + JANELA primeiro. Vem ANTES da IA de propósito: se o toque está bloqueado
+      //    pela janela, gerar o texto seria pagar Claude/Gemini para jogar fora. (Na Evolution nada
+      //    muda: ehCloud=false, dentroJanela=true, e o fluxo segue exatamente como sempre foi.)
+      const { data: canal } = await admin.from('canais')
+        .select('id, organizacao_id, instancia_externa, transporte, cloud_phone_number_id')
+        .eq('id', row.canal_id).maybeSingle();
+      const ehCloud = (canal?.transporte as string | null) === 'cloud_api';
+      const orgRow = (canal?.organizacao_id as string | null) ?? row.organizacao_id ?? null;
+      let dentroJanela = true;
+      let tpl: TemplateRow | null = null;
+      if (ehCloud) {
+        const { data: d } = await admin.rpc('wa_dentro_janela', { p_conversa: row.conversa_id });
+        dentroJanela = d === true;
+        if (!dentroJanela) {
+          const { data: t } = orgRow ? await admin.rpc('wa_template_para_envio', { p_org: orgRow }) : { data: null };
+          tpl = ((Array.isArray(t) ? t[0] : t) ?? null) as TemplateRow | null;
+          if (!tpl) {
+            // REGRA DURA: sem template aprovado o toque NÃO sai e NÃO consome a cadência —
+            // se consumisse, o lead perderia toques em silêncio por um problema de configuração.
+            resultados.push({ id: row.id, toque: row.toque, status_envio: 'bloqueada_janela', motivo: 'sem_template_aprovado' });
+            try {
+              await admin.from('audit_log').insert({
+                usuario_id: null, acao: 'bot_remarketing', entidade: 'bot_remarketing', entidade_id: row.id,
+                organizacao_id: orgRow,
+                dados_depois: { toque: row.toque, status_envio: 'bloqueada_janela', motivo: 'sem_template_aprovado', transporte: 'cloud_api', dry_run: dryRun },
+              });
+            } catch { /* audit best-effort */ }
+            continue;
+          }
+        }
+      }
+
+      // 6.1) gera a mensagem (IA é a parte lenta, ~1-2s no Claude). Fora da janela o texto da IA
+      //      NÃO é enviado — quem vai é o template — mas continua servindo de contexto/histórico.
       const angulo = anguloDoToque(row.toque ?? 0);
-      const { texto, via } = await gerarToque(admin, row, angulo);
+      const primeiro = primeiroNome(await nomeDoContato(admin, row));
+      const { texto, via } = dentroJanela || !ehCloud
+        ? await gerarToque(admin, row, angulo)
+        : { texto: preencherTemplate(tpl!.corpo, varsDoTemplate(tpl!, primeiro)), via: 'template' as const };
 
       // 7) checagem FINAL anti-race — IMEDIATAMENTE antes do envio, depois da IA: relê a coluna FRESCA
       //     do banco (RPC = query nova, não valor cacheado do due), sob FOR UPDATE. Se o time fechou/moveu
@@ -143,17 +216,40 @@ Deno.serve(async (req) => {
       // 8) envio real só com ATIVO && !dryRun; senão simula
       let envio: { ok: boolean; id?: string; erro?: string } = { ok: true };
       let statusEnvio = 'simulada';
+      const modoEnvio = ehCloud ? (dentroJanela ? 'cloud_texto' : 'cloud_template') : 'evolution_texto';
       if (ATIVO && !dryRun) {
-        const { data: canal } = await admin.from('canais').select('instancia_externa').eq('id', row.canal_id).maybeSingle();
         const { data: ident } = await admin.from('contato_identidades')
           .select('valor_normalizado').eq('contato_id', row.contato_id).eq('tipo', 'whatsapp')
           .not('valor_normalizado', 'is', null).order('principal', { ascending: false }).limit(1).maybeSingle();
         const destino = ident?.valor_normalizado ?? null;
-        if (!canal?.instancia_externa || !destino) {
+        const temTransporte = ehCloud ? !!canal?.cloud_phone_number_id : !!canal?.instancia_externa;
+        if (!temTransporte || !destino) {
           envio = { ok: false, erro: !destino ? 'sem_destino' : 'sem_instancia' };
           statusEnvio = 'falhou';
+        } else if (ehCloud) {
+          // Cloud API: dentro da janela vai o texto da IA; fora, o template aprovado. `texto` já é o
+          // corpo do template preenchido nesse caso, então o histórico registra o que o cliente leu.
+          const tx = enviadorDe(canal as { transporte?: string | null; instancia_externa?: string | null; cloud_phone_number_id?: string | null });
+          try {
+            const enviado = dentroJanela
+              ? await tx.sendText(destino, texto)
+              : await tx.sendTemplate(destino, { nome: tpl!.nome, idioma: tpl!.idioma, variaveis: varsDoTemplate(tpl!, primeiro) });
+            envio = { ok: !!enviado?.key?.id, id: enviado?.key?.id, erro: enviado?.key?.id ? undefined : 'sem_id_externo' };
+          } catch (e) { envio = { ok: false, erro: (e as Error)?.message?.slice(0, 300) ?? 'erro_cloud' }; }
+          statusEnvio = envio.ok ? 'enviada' : 'falhou';
+          if (envio.ok && row.conversa_id) {
+            const nowIso = new Date().toISOString();
+            await admin.from('mensagens').insert({
+              organizacao_id: orgRow ?? undefined, conversa_id: row.conversa_id,
+              direcao: 'saida', tipo: 'texto', conteudo: texto, autor_id: null, origem: 'bot',
+              status: 'enviada', id_externo: envio.id ?? null,
+              metadados: dentroJanela ? { via: 'remarketing', transporte: 'cloud_api' }
+                                      : { via: 'remarketing', transporte: 'cloud_api', template: tpl!.nome, template_id: tpl!.id },
+            });
+            await admin.from('conversas').update({ ultima_interacao_em: nowIso }).eq('id', row.conversa_id);
+          }
         } else {
-          envio = await evoSendText(canal.instancia_externa, destino, texto);
+          envio = await evoSendText(canal!.instancia_externa as string, destino, texto);
           statusEnvio = envio.ok ? 'enviada' : 'falhou';
           if (envio.ok && row.conversa_id) {
             const nowIso = new Date().toISOString();
@@ -180,11 +276,11 @@ Deno.serve(async (req) => {
         await admin.from('audit_log').insert({
           usuario_id: null, acao: 'bot_remarketing', entidade: 'bot_remarketing', entidade_id: row.id,
           organizacao_id: brOrg?.organizacao_id ?? null,
-          dados_depois: { toque: row.toque, angulo: angulo.foco, via, status_envio: statusEnvio, erro: envio.erro ?? null, dry_run: dryRun, proximo_em: proximo },
+          dados_depois: { toque: row.toque, angulo: angulo.foco, via, status_envio: statusEnvio, erro: envio.erro ?? null, dry_run: dryRun, proximo_em: proximo, modo_envio: modoEnvio, template: tpl?.nome ?? null },
         });
       } catch { /* audit best-effort */ }
 
-      resultados.push({ id: row.id, toque: row.toque, via, status_envio: statusEnvio, texto: dryRun ? texto : undefined, proximo_em: proximo });
+      resultados.push({ id: row.id, toque: row.toque, via, status_envio: statusEnvio, modo_envio: modoEnvio, template: tpl?.nome ?? null, texto: dryRun ? texto : undefined, proximo_em: proximo });
     }
 
     return json({ ok: true, sync, ativo: ATIVO, dry_run: dryRun, sp, teto: TETO_DIA, hoje, processados: fila.length, enviados, resultados });

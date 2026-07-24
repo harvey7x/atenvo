@@ -10,6 +10,7 @@ import { FB_REAL, useFbStatus, fbAuthStart, fbPages, fbConnect, fbDisconnect } f
 import { useOrgUsuarios } from '@/data/atendimento';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Modal } from '@/components/Modal';
+import { IntegracaoCloudApi } from '@/components/IntegracaoCloudApi';
 import './Integracoes.css';
 
 const ORIGEM_TIPOS = [
@@ -414,6 +415,9 @@ export function Integracoes() {
             </div>
           </div>
         </section>
+
+        {/* API OFICIAL (Cloud API) — seção própria: é o único bloco do painel que fala com a Meta. */}
+        <IntegracaoCloudApi podeConfig={podeConfig} />
 
         {/* SAÚDE */}
         <section className="int-section">
