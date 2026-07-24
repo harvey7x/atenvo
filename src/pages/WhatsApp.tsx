@@ -1112,7 +1112,8 @@ export function WhatsApp() {
                   ))}
                 </div>
               : <div style={{ padding: '30px 12px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>Nenhuma conversa nesta aba.</div>
-          ) : filtered.map((c) => {
+          ) : (() => {
+            const renderConv = (c: WaContact) => {
             const wait = c.aguardando ? tempoEspera(c.aguardandoDesde) : null;
             // atendente responsável — mesma ordem da etiqueta: conversa -> contato -> oportunidade
             const atendId = responsavelEfetivo(c);
@@ -1148,7 +1149,7 @@ export function WhatsApp() {
             if (c.precisaHumano) alertas.push('Precisa de atendimento humano');
             if (nomeRuim) alertas.push('Cadastro incompleto: preencha o nome do cliente');
             return (
-            <div key={c.id} data-cid={c.id} className={'conv conv--' + barTier + (c.id === currentId ? ' active' : '')}
+            <div key={c.id} data-cid={c.id} className={'conv conv--' + barTier + (c.id === currentId ? ' active' : '') + ((c.unread ?? 0) > 0 ? ' has-unread' : '')}
                  title={'Atendente: ' + atendNome + ' · Canal: WhatsApp ' + c.chip + ' · ' + statusTxt + ' · ' + c.time}
                  onClick={() => selectContact(c.id)}>
               {/* canal deixou de ser chip de texto: virou micro-badge no avatar (sigla + nome no tooltip) */}
@@ -1166,11 +1167,6 @@ export function WhatsApp() {
                       dois. A pendência de cadastro continua sinalizada pelo chip "Nome incompleto".
                       Sem telefone (contato LID-only) cai no rótulo genérico, nunca no LID. */}
                   <span className="cname">{nomeVazio ? (telSec || 'Cliente sem nome') : formatarNomeCliente(c.name)}</span>
-                  <span className="ctime" title={'Última interação: ' + c.time}>{c.lastAtMs ? tempoRelativo(new Date(c.lastAtMs).toISOString(), relogioMs) : c.time}</span>
-                </div>
-                <div className="crow crow-prev">
-                  <span className="cprev">{c.last || '—'}</span>
-                  {c.unread > 0 && <span className="unread" title={c.unread + ' não lidas'} aria-label={c.unread + ' mensagens não lidas'}>{c.unread > 99 ? '99+' : c.unread}</span>}
                 </div>
                 <div className="cbadges">
                   {eSituacao && <span className={'ctag ctag--' + (eSituacao.variante ?? 'atendimento')} title="Etapa no Kanban">{eSituacao.texto}</span>}
@@ -1178,12 +1174,35 @@ export function WhatsApp() {
                     <span className="ctag ctag--alerta" title={alertas.join(' · ')} aria-label={alertas.join('. ')}>⚠{alertas.length > 1 ? ' ' + alertas.length : ''}</span>
                   )}
                   {finalizado && <span className="ctag ctag--fim" title={'Conversa ' + (c.status ?? 'finalizada')}>Finalizado</span>}
-                  <span className="cresp" title="Atendente responsável">{eAtendente ? eAtendente.texto : 'Não atribuído'}</span>
                 </div>
+                <div className="cprev">{c.last || '—'}</div>
+              </div>
+              {/* coluna direita (referência): pill do atendente, tempo relativo e badge de não lidas */}
+              <div className="cright">
+                <span className="cresp" title="Atendente responsável">{eAtendente ? eAtendente.texto : 'Não atribuído'}</span>
+                <span className="ctime" title={'Última interação: ' + c.time}>{c.lastAtMs ? tempoRelativo(new Date(c.lastAtMs).toISOString(), relogioMs) : c.time}</span>
+                {c.unread > 0 && <span className="unread" title={c.unread + ' não lidas'} aria-label={c.unread + ' mensagens não lidas'}>{c.unread > 99 ? '99+' : c.unread}</span>}
               </div>
             </div>
             );
-          })}
+            };
+            // Cabeçalhos de grupo (referência): "Não atribuídos" primeiro (é o que exige ação),
+            // depois atendentes em ordem alfabética. Agrupa a MESMA lista filtrada — ordenação
+            // interna (fixadas/recência) preservada dentro de cada grupo.
+            const grupos = new Map<string, typeof filtered>();
+            for (const c of filtered) { const k = responsavelEfetivo(c) ?? ''; if (!grupos.has(k)) grupos.set(k, []); grupos.get(k)!.push(c); }
+            const nomeDe = (k: string) => (k === user?.id ? 'Você' : (nomePorId(k) ?? 'Atendente'));
+            const chaves = [...grupos.keys()].sort((a, b) => {
+              if (!a) return -1; if (!b) return 1;
+              return nomeDe(a).localeCompare(nomeDe(b), 'pt-BR');
+            });
+            return chaves.map((k) => (
+              <div className="conv-grupo" key={k || 'sem'}>
+                <div className="conv-grupo-h">{k ? <>Atendimento distribuído para <b>{nomeDe(k)}</b></> : 'Não atribuídos'}</div>
+                {grupos.get(k)!.map(renderConv)}
+              </div>
+            ));
+          })()}
         </div>
         )}
       </section>

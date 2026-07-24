@@ -760,3 +760,43 @@
 .wa-app .send-btn:disabled{opacity:.35;box-shadow:none}
 .wa-app .composer-bar{gap:6px}
 .wa-app .composer-bar .cbar-act{border-radius:999px}
+
+/* ===== LISTA NO FORMATO DA REFERÊNCIA (pedido: "quero que crie igual") =====
+   Estrutura idêntica: nome + tags SÓLIDAS coloridas abaixo + prévia; coluna direita com pill
+   do atendente, tempo relativo e badge vermelho; cabeçalhos de grupo por atendente.
+   Adaptações combinadas: sigla do canal no avatar (5 números), etapa Kanban no lugar de
+   "departamento", verde Atenvo no item ativo. Nenhuma regra muda. */
+
+/* duas colunas */
+.wa-app .conv{align-items:flex-start;gap:10px}
+.wa-app .conv .cright{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:5px;max-width:122px}
+.wa-app .conv .cright .ctime{margin-left:0}
+.wa-app .conv .cresp{max-width:120px;border-radius:999px;background:var(--surface-2);color:var(--ink-2);font-weight:600}
+.wa-app .conv .cbadges{margin-top:4px;order:0}
+.wa-app .conv .cprev{margin-top:4px}
+.wa-app .conv.has-unread .cprev{color:var(--green-ink);font-weight:500}
+/* separador fino entre cards, como na referência */
+.wa-app .conv-grupo .conv + .conv{box-shadow:0 -1px 0 var(--line)}
+.wa-app .conv-grupo .conv + .conv:hover,.wa-app .conv-grupo .conv.active + .conv{box-shadow:none}
+
+/* cabeçalho de grupo */
+.wa-app .conv-grupo-h{font-size:11.5px;color:var(--muted);background:var(--surface-2);
+  margin:8px -10px 4px;padding:5px 20px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.wa-app .conv-grupo:first-child .conv-grupo-h{margin-top:0}
+.wa-app .conv-grupo-h b{color:var(--ink-2);font-weight:700}
+
+/* tags SÓLIDAS saturadas — a assinatura visual da referência */
+.wa-app .conv .ctag{font-size:9.5px;font-weight:800;letter-spacing:.04em;padding:2.5px 7px;border-radius:5px;text-transform:uppercase}
+.wa-app .conv .ctag--lead{background:#f59e0b;color:#fff;border-color:transparent}
+.wa-app .conv .ctag--atendimento{background:#3b82f6;color:#fff;border-color:transparent}
+.wa-app .conv .ctag--aguardando{background:#f97316;color:#fff;border-color:transparent}
+.wa-app .conv .ctag--etapa{background:#6366f1;color:#fff;border-color:transparent}
+.wa-app .conv .ctag--ganho{background:#19c37d;color:#fff;border-color:transparent}
+.wa-app .conv .ctag--alerta{background:var(--amber-soft);color:var(--amber);border-color:rgba(201,122,22,.25);cursor:help}
+/* badge de não lidas vermelho e redondo, canto direito inferior (como a referência) */
+.wa-app .conv .cright .unread{align-self:flex-end}
+
+/* tabs: contador VERMELHO como a referência; ativa = pill cinza com texto forte */
+.wa-app .tab-n{background:#e5484d;color:#fff}
+.wa-app .tab.active{background:var(--surface-2);color:var(--ink);border-color:var(--line-2)}
+.wa-app .tab.active .tab-n{background:#e5484d;color:#fff}
