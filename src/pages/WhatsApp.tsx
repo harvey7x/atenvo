@@ -1388,12 +1388,8 @@ export function WhatsApp() {
               o que é só informativo. NENHUMA das flags mudou: quem bloqueia continua sendo
               canalIndisponivel / canalRestrito / semDestino / higieneBloqueia, e o placeholder do
               textarea segue dizendo o motivo no ponto de ação. */}
-          {canalIndisponivel && (
-            <div className="warn warn-slim warn-bloq"
-                 title={`Esta conversa entrou por ${canalSel?.alias}, mas a conexão está ${canalSel?.status === 'removido' ? 'removida' : 'desconectada'}. O histórico permanece; selecione outro canal para responder ou reconecte.`}>
-              <IcWarn /><span className="warn-txt"><b>{canalSel?.alias}</b> {canalSel?.status === 'removido' ? 'removido' : 'desconectado'} — selecione outro canal</span>
-            </div>
-          )}
+          {/* aviso de canal desconectado REMOVIDO a pedido do dono. O bloqueio continua:
+              canalIndisponivel segue desabilitando o envio e o placeholder do textarea diz o motivo. */}
           {/* Conta com restrição no WhatsApp: bloqueado só para ENVIO; recebimento segue normal. */}
           {!canalIndisponivel && canalRestrito && (
             <div className="warn warn-slim warn-bloq"
