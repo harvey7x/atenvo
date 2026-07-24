@@ -308,6 +308,28 @@ export function WhatsApp() {
     return (b.lastAtMs ?? 0) - (a.lastAtMs ?? 0);
   });
 
+  // Contadores das abas (pills, ref. Helena). Usam os MESMOS predicados do filtro acima —
+  // inclusive canal/status/busca e a regra de arquivadas — senão o número mente em relação ao
+  // que a aba mostra ao ser clicada. Prioridade fica sem contador: os blocos dela já contam.
+  const tabCounts = useMemo(() => {
+    const t = search.trim().toLowerCase();
+    const base = contacts.filter((c) => {
+      if (filtroCanal && c.canalId !== filtroCanal) return false;
+      if (filtroStatus && c.statusId !== filtroStatus) return false;
+      if (t && c.name.toLowerCase().indexOf(t) === -1 && c.last.toLowerCase().indexOf(t) === -1 && (c.phone || '').toLowerCase().indexOf(t) === -1) return false;
+      return true;
+    });
+    const ativos = base.filter((c) => !c.arquivada || buscaAtiva);
+    return {
+      todos: ativos.length,
+      meus: ativos.filter((c) => c.respId === user?.id).length,
+      naoatrib: ativos.filter((c) => !c.respId).length,
+      naolidas: ativos.filter((c) => (c.unread ?? 0) > 0).length,
+      pendentes: ativos.filter((c) => (c.unread ?? 0) > 0 || c.aguardando).length,
+      arquivadas: base.filter((c) => c.arquivada).length,
+    } as Record<string, number>;
+  }, [contacts, filtroCanal, filtroStatus, search, buscaAtiva, user?.id]);
+
   // Aba "Prioridade" (S4.x): agrupa a MESMA lista filtrada em blocos Urgentes/Atenção/Acompanhamentos.
   // Só reorganiza no cliente — não toca no SLA engine/backend. Abas antigas seguem na lista plana.
   const sinaisDe = (c: WaContact): SinaisConversa => {
@@ -1033,7 +1055,10 @@ export function WhatsApp() {
           </div>
           <div className="tabs">
             {TABS.map((t) => (
-              <button key={t.id} className={'tab' + (tab === t.id ? ' active' : '')} title={t.id === 'pendentes' ? 'Pendentes inclui mensagens não lidas e clientes aguardando resposta.' : undefined} onClick={() => setTab(t.id)}>{t.label}</button>
+              <button key={t.id} className={'tab' + (tab === t.id ? ' active' : '')} title={t.id === 'pendentes' ? 'Pendentes inclui mensagens não lidas e clientes aguardando resposta.' : undefined} onClick={() => setTab(t.id)}>
+                {t.label}
+                {tabCounts[t.id] != null && tabCounts[t.id] > 0 && <span className="tab-n">{tabCounts[t.id]}</span>}
+              </button>
             ))}
           </div>
         </div>

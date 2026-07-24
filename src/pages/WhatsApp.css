@@ -724,3 +724,39 @@
    visível (pedido do dono) e moram aqui — tooltip carrega TODOS; a barra lateral colorida
    continua sinalizando atraso. Âmbar neutro: vermelho ficou exclusivo do badge de não lidas. */
 .wa-app .conv .ctag--alerta{background:var(--amber-soft);color:var(--amber);border-color:rgba(201,122,22,.25);cursor:help;font-style:normal}
+
+/* ===== Acabamento premium: tabs, busca, botões, compositor (ref. Helena) =====
+   SÓ apresentação. Nenhum handler, flag ou regra muda aqui. */
+
+/* Tabs em pill com contador — sai o sublinhado, entra fundo suave no ativo. */
+.wa-app .tabs{gap:6px;border-bottom:0;margin:14px 0 0;padding:2px 0;overflow-x:auto;scrollbar-width:none}
+.wa-app .tabs::-webkit-scrollbar{display:none}
+.wa-app .tab{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;
+  font-size:12.5px;font-weight:600;color:var(--ink-2);border:1px solid transparent;flex:none}
+.wa-app .tab:hover{background:var(--hover);color:var(--ink)}
+.wa-app .tab.active{background:var(--green-soft);color:var(--green-ink);border-color:var(--green-soft-2)}
+.wa-app .tab.active::after{display:none}
+.wa-app .tab-n{font-size:10.5px;font-weight:700;line-height:1.5;padding:0 6px;border-radius:999px;
+  background:var(--surface-2);color:var(--muted)}
+.wa-app .tab.active .tab-n{background:var(--surface);color:var(--green-ink)}
+
+/* Busca em pill + botões de filtro/nova conversa redondos. */
+.wa-app .search input{border-radius:999px;height:40px}
+.wa-app .filter-btn{border-radius:999px;width:40px;height:40px}
+.wa-app .filter-btn.lh-new{background:var(--green-soft);border-color:var(--green-soft-2);color:var(--green-ink)}
+.wa-app .filter-btn.lh-new:hover{background:var(--green-soft-2)}
+.wa-app .filter-btn:focus-visible,.wa-app .tab:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+
+/* Botões do cabeçalho: Assumir sólido, Transferir outline — ambos em pill; ícones redondos. */
+.wa-app .ch-resp-btn{border-radius:999px;padding:7px 14px}
+.wa-app .ch-resp-btn.primary{box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.wa-app .icon-btn{border-radius:999px}
+.wa-app .icon-btn:hover{background:var(--hover)}
+
+/* Compositor: ferramentas e Scripts consistentes, Enviar circular. */
+.wa-app .tool{border-radius:999px}
+.wa-app .scripts-btn{border-radius:999px;height:38px}
+.wa-app .send-btn{width:40px;height:40px;border-radius:999px;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.wa-app .send-btn:disabled{opacity:.35;box-shadow:none}
+.wa-app .composer-bar{gap:6px}
+.wa-app .composer-bar .cbar-act{border-radius:999px}
