@@ -665,3 +665,42 @@
   padding:1px 7px;border-radius:999px;border:1px solid var(--line-2);color:var(--muted);
   background:transparent;max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 [data-theme="dark"] .wa-app .conv .ctag--atraso{background:rgba(229,72,77,.18);color:#ff9b9e;border-color:rgba(229,72,77,.36)}
+
+/* ===== Bloco 3 — avisos da conversa em UMA linha =====
+   Eram até 4 blocos empilhados no compositor + 1 banner de higiene, cada um com 2 linhas de texto.
+   Agora cada aviso é uma faixa de ~28px: rótulo curto + ação; a explicação completa vive no title.
+   DUAS intensidades de propósito (a distinção sustenta a entrada progressiva da higiene):
+     .warn-bloq / .hig-bloq  -> IMPEDE o envio: vermelho, precisa incomodar
+     .warn-info              -> só informa: sem barra, sem fundo, tom mais leve de todos
+   O motivo do bloqueio continua no placeholder do textarea — este CSS não substitui aquilo. */
+.wa-app .warn-slim{
+  display:flex;align-items:center;gap:7px;min-height:28px;
+  margin:6px 12px 0;padding:4px 10px;border-radius:8px;
+  font-size:12px;line-height:1.3;background:var(--surface-2);border:1px solid var(--line-2);
+  border-left:3px solid var(--amber)}
+.wa-app .warn-slim svg{width:14px;height:14px;flex:none;color:var(--amber)}
+.wa-app .warn-slim .warn-txt{flex:1;min-width:0;color:var(--ink-2);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wa-app .warn-slim .link-btn{flex:none;font-size:11.5px;font-weight:600}
+/* bloqueia envio — mantém o vermelho de propósito */
+.wa-app .warn-slim.warn-bloq{border-left-color:#c0392b;background:rgba(192,57,43,.06);border-color:rgba(192,57,43,.22)}
+.wa-app .warn-slim.warn-bloq svg{color:#c0392b}
+.wa-app .warn-slim.warn-bloq .warn-txt{color:var(--ink)}
+/* apenas informativo (não bloqueia nada) — o mais leve de todos */
+.wa-app .warn-slim.warn-info{background:transparent;border-color:transparent;border-left-color:transparent;padding-left:0}
+.wa-app .warn-slim.warn-info .warn-txt{color:var(--muted)}
+.wa-app .warn-slim.warn-info svg{color:var(--muted)}
+
+/* higiene em uma linha (mantém os botões todos) */
+.wa-app .hig-banner.hig-slim{align-items:center;padding:5px 10px;gap:8px;min-height:30px}
+.wa-app .hig-banner.hig-slim .hig-txt{font-size:12px;line-height:1.3;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
+.wa-app .hig-banner.hig-slim .hig-btn{font-size:11.5px;padding:3px 9px;flex:none}
+.wa-app .hig-banner.hig-slim svg{width:14px;height:14px;flex:none}
+
+/* banner de SLA da conversa — mesma dieta, sem tocar no componente.
+   O padding/altura moram em .sla-conv-bar (global.css:428); .sla-conv só carrega o fundo. */
+.wa-app .sla-conv{background:transparent}
+.wa-app .sla-conv-bar{min-height:28px;padding:4px 14px;flex-wrap:nowrap}
+.wa-app .sla-conv-text{font-size:12px;font-weight:500;min-width:0;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

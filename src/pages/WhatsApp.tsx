@@ -1228,16 +1228,14 @@ export function WhatsApp() {
         {/* HIGIENE 1 — conversa sem responsável. Alerta forte no topo; bloqueia envio quando
             a entrada progressiva mandar (nova = já; antiga = depois da adaptação). */}
         {WA_REAL && !!current.id && higiene.dono !== 'livre' && (
-          <div className={'hig-banner' + (higiene.dono === 'bloqueia' ? ' hig-bloq' : '')}>
+          <div className={'hig-banner hig-slim' + (higiene.dono === 'bloqueia' ? ' hig-bloq' : '')}
+               title={higiene.dono === 'bloqueia'
+                 ? 'Esta conversa ainda não tem responsável. Assuma o atendimento para responder e evitar perda de lead.'
+                 : 'Esta conversa ainda não tem responsável. Assuma o atendimento para responder e evitar perda de lead. Em breve isto será obrigatório.'}>
             <IcWarn />
-            <div className="hig-txt">
-              <b>Esta conversa ainda não tem responsável.</b>{' '}
-              {higiene.dono === 'bloqueia'
-                ? 'Assuma o atendimento para responder e evitar perda de lead.'
-                : 'Assuma o atendimento para responder e evitar perda de lead. Em breve isto será obrigatório.'}
-            </div>
+            <div className="hig-txt"><b>Sem responsável</b>{higiene.dono === 'bloqueia' ? ' — obrigatório para responder' : ''}</div>
             <button className="hig-btn" disabled={atribuindo} onClick={assumir}>
-              <IcUserPlus />Assumir atendimento
+              <IcUserPlus />Assumir
             </button>
           </div>
         )}
@@ -1245,13 +1243,15 @@ export function WhatsApp() {
         {/* HIGIENE 2 — cadastro do nome. Progressiva: 2 adiamentos, depois obrigatório;
             "cliente ainda não informou" libera 24h. Só cobra quando já há responsável. */}
         {WA_REAL && !!current.id && higiene.dono === 'livre' && decNome.acao !== 'livre' && (
-          <div className={'hig-banner' + (decNome.acao === 'bloqueia' ? ' hig-bloq' : ' hig-nome')}>
+          <div className={'hig-banner hig-slim' + (decNome.acao === 'bloqueia' ? ' hig-bloq' : ' hig-nome')}
+               title={(decNome.acao === 'bloqueia' ? 'Preencha o nome completo para continuar. ' : 'O cadastro deste cliente está incompleto. ')
+                 + (decNome.analise.motivo === 'comercio'
+                   ? 'O nome parece ser de um comércio. Se for pessoa física, corrija para o nome completo.'
+                   : 'Preencha o nome completo para facilitar follow-up, relatórios e atendimento.')}>
             <IcWarn />
             <div className="hig-txt">
-              <b>{decNome.acao === 'bloqueia' ? 'Preencha o nome completo para continuar.' : 'O cadastro deste cliente está incompleto.'}</b>{' '}
-              {decNome.analise.motivo === 'comercio'
-                ? 'O nome parece ser de um comércio. Se for pessoa física, corrija para o nome completo.'
-                : 'Preencha o nome completo para facilitar follow-up, relatórios e atendimento.'}
+              <b>{decNome.acao === 'bloqueia' ? 'Nome obrigatório' : 'Cadastro incompleto'}</b>
+              {decNome.analise.motivo === 'comercio' && <span className="hig-sub"> · parece comércio</span>}
               {decNome.podeAdiar && decNome.adiamentosRestantes < 2 && (
                 <span className="hig-sub"> · resta {decNome.adiamentosRestantes === 1 ? '1 adiamento' : `${decNome.adiamentosRestantes} adiamentos`}</span>
               )}
@@ -1438,33 +1438,50 @@ export function WhatsApp() {
           </div>
           </div>{/* /composer-top */}
 
+          {/* Avisos do compositor — Bloco 3. Eram até 4 blocos empilhados com texto de 2 linhas cada;
+              viraram UMA linha, com a explicação completa no title. Duas intensidades de propósito:
+              .warn-bloq (vermelho) para o que IMPEDE o envio — "precisa incomodar" — e o tom leve para
+              o que é só informativo. NENHUMA das flags mudou: quem bloqueia continua sendo
+              canalIndisponivel / canalRestrito / semDestino / higieneBloqueia, e o placeholder do
+              textarea segue dizendo o motivo no ponto de ação. */}
           {canalIndisponivel && (
-            <div className="warn warn-block">
-              <IcWarn />Esta conversa entrou por <b>{canalSel?.alias}</b>, mas a conexão está {canalSel?.status === 'removido' ? 'removida' : 'desconectada'}. O histórico permanece; selecione outro canal para responder ou reconecte.
+            <div className="warn warn-slim warn-bloq"
+                 title={`Esta conversa entrou por ${canalSel?.alias}, mas a conexão está ${canalSel?.status === 'removido' ? 'removida' : 'desconectada'}. O histórico permanece; selecione outro canal para responder ou reconecte.`}>
+              <IcWarn /><span className="warn-txt"><b>{canalSel?.alias}</b> {canalSel?.status === 'removido' ? 'removido' : 'desconectado'} — selecione outro canal</span>
               <button className="link-btn" onClick={() => navigate('/integracoes')}>Reconectar</button>
             </div>
           )}
           {/* Conta com restrição no WhatsApp: bloqueado só para ENVIO; recebimento segue normal. */}
           {!canalIndisponivel && canalRestrito && (
-            <div className="warn warn-block">
-              <IcWarn />O número <b>{canalSel?.alias}</b> está com restrição no WhatsApp e está indisponível para envio. Selecione outro canal em "Responder por" para responder.
+            <div className="warn warn-slim warn-bloq"
+                 title={`O número ${canalSel?.alias} está com restrição no WhatsApp e está indisponível para envio. Selecione outro canal em "Responder por" para responder.`}>
+              <IcWarn /><span className="warn-txt"><b>{canalSel?.alias}</b> com restrição no WhatsApp — selecione outro canal</span>
             </div>
           )}
-          {/* Canal conectado, mas com envio falhando (state=open não garante envio). Recebimento segue normal. */}
+          {/* Canal conectado, mas com envio falhando (state=open não garante envio). Recebimento segue
+              normal. NÃO bloqueia nada → fica no tom mais leve de todos (sem barra vermelha). */}
           {!canalIndisponivel && !canalRestrito && (envioSaude !== 'ok' || canalEntregaProblema) && (
-            <div className="warn warn-block">
+            <div className="warn warn-slim warn-info"
+                 title={canalEntrega === 'restrito'
+                   ? `Este canal (${canalSel?.alias}) está conectado, mas falhou na entrega de mensagens recentes. Prefira outro canal em "Responder por" e evite reconectar repetidamente.`
+                   : envioSaude === 'indisponivel'
+                     ? `O canal ${canalSel?.alias} está recebendo mensagens, mas não consegue enviar no momento. Selecione outro canal para responder (o envio por outro número muda o remetente para o cliente).`
+                     : `O envio pelo canal ${canalSel?.alias} está instável agora (algumas mensagens estão falhando). Se falhar, selecione outro canal em "Responder por".`}>
               <IcWarn />
-              {canalEntrega === 'restrito'
-                ? <>Este canal (<b>{canalSel?.alias}</b>) está conectado, mas <b>falhou na entrega</b> de mensagens recentes. Prefira outro canal em "Responder por" e evite reconectar repetidamente.</>
-                : envioSaude === 'indisponivel'
-                  ? <>O canal <b>{canalSel?.alias}</b> está recebendo mensagens, mas não consegue enviar no momento. Selecione outro canal para responder (o envio por outro número muda o remetente para o cliente).</>
-                  : <>O envio pelo canal <b>{canalSel?.alias}</b> está instável agora (algumas mensagens estão falhando). Se falhar, selecione outro canal em "Responder por".</>}
+              <span className="warn-txt">
+                {canalEntrega === 'restrito'
+                  ? <><b>{canalSel?.alias}</b> falhou na entrega recente</>
+                  : envioSaude === 'indisponivel'
+                    ? <><b>{canalSel?.alias}</b> recebe, mas não envia agora</>
+                    : <>Envio instável por <b>{canalSel?.alias}</b></>}
+              </span>
             </div>
           )}
           {semDestino && !canalIndisponivel && (
-            <div className="warn warn-block">
-              <IcWarn />Esta conversa foi recebida por uma identidade protegida do WhatsApp e ainda não possui um número confirmado para resposta. O histórico permanece.
-              <button className="link-btn" onClick={() => { setVincErr(null); setVincVal(null); setVincTel(current.phone || ''); setVincOpen(true); }}>Vincular número para responder</button>
+            <div className="warn warn-slim warn-bloq"
+                 title="Esta conversa foi recebida por uma identidade protegida do WhatsApp e ainda não possui um número confirmado para resposta. O histórico permanece.">
+              <IcWarn /><span className="warn-txt">Identidade protegida — sem número para resposta</span>
+              <button className="link-btn" onClick={() => { setVincErr(null); setVincVal(null); setVincTel(current.phone || ''); setVincOpen(true); }}>Vincular número</button>
             </div>
           )}
 

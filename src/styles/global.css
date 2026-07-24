@@ -466,3 +466,20 @@ body.wa-foco .content{padding:0;overflow:hidden}
 .pcard-prev{font-size:13px;color:var(--ink);line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:1px 0}
 .pcard-r4{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:2px}
 .pcard-status{min-width:0;font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ===== Bloco 3 — barra global de canais: de faixa que empurra a página para linha discreta =====
+   Só CSS: o JSX (e com ele o gate de permissão do Silenciar) fica intocado.
+   O fundo saturado em largura total dava cara de erro permanente. Agora o fundo é neutro e a
+   severidade fica na barra lateral + no dot — EXCETO crítico, que mantém um leve tingimento
+   porque precisa ser notado. */
+.gwa{background:var(--surface)}
+.gwa.gwa-critico{background:var(--gwa-soft)}
+.gwa-bar{min-height:32px;padding:5px 20px;gap:8px}
+.gwa-bar-text{font-size:12px;font-weight:500;color:var(--ink-2);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gwa.gwa-critico .gwa-bar-text{color:var(--ink);font-weight:600}
+.gwa-bar-dot{width:7px;height:7px}
+.gwa-btn-ghost,.gwa-btn-solid{font-size:11.5px;padding:3px 9px;border-radius:7px}
+/* "Ver detalhes" deixa de ser botão sólido colorido (competia com o conteúdo da página) */
+.gwa-btn-solid{background:transparent;color:var(--gwa-c);border-color:var(--gwa-c)}
+.gwa-btn-solid:hover:not(:disabled){background:var(--gwa-soft);filter:none}
