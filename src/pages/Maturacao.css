@@ -1,0 +1,166 @@
+/* ============================================================================
+   MATURAÇÃO DE NÚMEROS — aquecimento de chips de WhatsApp.
+   Subsistema isolado: nada aqui toca Inbox/Kanban/Relatórios. A tela reflete isso
+   sendo autoexplicativa — o admin precisa entender o risco antes de ligar o modo
+   ativo. Tokens do design system (global.css); nenhuma cor solta.
+   ========================================================================== */
+.mat{display:flex;flex-direction:column;gap:18px;min-width:0;max-width:1180px}
+
+/* ---- banner de modo: primeira coisa que se lê na página ------------------ */
+.mat-modo{display:flex;align-items:center;gap:12px;padding:13px 16px;border-radius:14px;
+  border:1px solid var(--m-c);background:var(--m-soft);box-shadow:inset 3px 0 0 var(--m-c)}
+.mat-modo.dry{--m-c:var(--warn);--m-soft:var(--warn-soft)}
+.mat-modo.ativo{--m-c:var(--ok);--m-soft:var(--ok-soft)}
+.mat-modo-ic{flex:none;display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;
+  border-radius:10px;background:var(--surface);color:var(--m-c)}
+.mat-modo-ic svg{width:17px;height:17px}
+.mat-modo-tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.mat-modo-tx strong{font-size:12.5px;font-weight:800;letter-spacing:.03em;color:var(--m-c)}
+.mat-modo-tx span{font-size:12.5px;color:var(--ink-2);line-height:1.45}
+
+/* ---- seções -------------------------------------------------------------- */
+.mat-sec{display:flex;flex-direction:column;gap:12px;padding:16px;border:1px solid var(--line);
+  border-radius:16px;background:var(--surface)}
+.mat-sec-h{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.mat-sec-h>div{flex:1;min-width:220px}
+.mat-sec-h h2{margin:0;display:flex;align-items:center;gap:8px;font-size:15.5px;font-weight:600;color:var(--ink)}
+.mat-sec-h h2 svg{width:17px;height:17px;color:var(--muted);flex:none}
+.mat-sec-h p{margin:5px 0 0;font-size:12.5px;color:var(--muted);line-height:1.5;max-width:760px}
+
+/* ---- botões -------------------------------------------------------------- */
+.mat-btn{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 14px;border-radius:10px;flex:none;
+  border:1px solid var(--line-2);background:var(--surface);color:var(--ink);font-size:13px;font-weight:600;
+  cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .14s,border-color .14s}
+.mat-btn:hover:not(:disabled){background:var(--hover);border-color:var(--accent)}
+.mat-btn:disabled{opacity:.5;cursor:not-allowed}
+.mat-btn:focus-visible{outline:none;box-shadow:0 0 0 3px var(--ring)}
+.mat-btn svg{width:15px;height:15px;flex:none}
+.mat-btn.sm{height:30px;padding:0 11px;font-size:12px;border-radius:8px}
+.mat-btn.sm svg{width:13px;height:13px}
+.mat-btn.cta{background:var(--accent);border-color:var(--accent);color:#04130c}
+.mat-btn.cta:hover:not(:disabled){filter:brightness(1.06);background:var(--accent);border-color:var(--accent)}
+.mat-btn.danger{color:var(--err);border-color:var(--err-soft)}
+.mat-btn.danger:hover:not(:disabled){background:var(--err-soft);border-color:var(--err)}
+.mat-sp{flex:1}
+
+/* ---- grade de chips ------------------------------------------------------ */
+.mat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px}
+.mat-card{display:flex;flex-direction:column;gap:11px;padding:14px;border-radius:14px;background:var(--surface);
+  border:1px solid var(--line-2);box-shadow:inset 3px 0 0 var(--s-c)}
+.mat-card.s-verde{--s-c:var(--ok)}
+.mat-card.s-amarelo{--s-c:var(--warn)}
+.mat-card.s-vermelho{--s-c:var(--err)}
+.mat-card.s-sem_dados{--s-c:var(--line-2)}
+.mat-card-h{display:flex;align-items:flex-start;gap:10px}
+.mat-card-id{flex:1;min-width:0;display:flex;align-items:center;gap:9px}
+.mat-sem{flex:none;width:11px;height:11px;border-radius:50%;background:var(--s-c);
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--s-c) 22%,transparent)}
+.mat-card-id>div{min-width:0;display:flex;flex-direction:column;line-height:1.3}
+.mat-card-id b{font-size:14px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mat-card-id i{font-size:11.5px;font-style:normal;color:var(--muted)}
+.mat-card-badges{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+
+.mat-st{display:inline-block;font-size:10px;font-weight:700;padding:3px 8px;border-radius:999px;white-space:nowrap;
+  background:var(--surface-2);color:var(--muted);border:1px solid var(--line-2)}
+.mat-st.m-aquecendo{background:var(--ok-soft);color:var(--ok);border-color:var(--ok)}
+.mat-st.m-pausado{background:var(--warn-soft);color:var(--warn);border-color:var(--warn)}
+.mat-st.m-maduro{background:var(--info-soft);color:var(--info);border-color:var(--info)}
+.mat-st.m-banido,.mat-st.m-erro{background:var(--err-soft);color:var(--err);border-color:var(--err)}
+.mat-st.i-conectado{background:var(--ok-soft);color:var(--ok);border-color:var(--ok)}
+.mat-st.i-sincronizando{background:var(--warn-soft);color:var(--warn);border-color:var(--warn)}
+.mat-st.i-erro{background:var(--err-soft);color:var(--err);border-color:var(--err)}
+
+/* ---- rampa --------------------------------------------------------------- */
+.mat-ramp{display:flex;flex-direction:column;gap:5px}
+.mat-ramp-l{display:flex;align-items:baseline;justify-content:space-between;gap:8px;font-size:12.5px;color:var(--ink-2)}
+.mat-ramp-l b{font-size:12.5px;font-weight:700;color:var(--ink)}
+.mat-ramp-bar{height:7px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line);overflow:hidden}
+.mat-ramp-bar>i{display:block;height:100%;border-radius:999px;background:var(--s-c);transition:width .3s}
+.mat-ramp-s{font-size:11px;color:var(--muted)}
+
+/* ---- contadores 7d ------------------------------------------------------- */
+.mat-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.mat-kpi{display:flex;flex-direction:column;align-items:center;gap:1px;padding:8px 4px;border-radius:10px;
+  background:var(--surface-2);border:1px solid var(--line-2)}
+.mat-kpi b{font-size:15px;font-weight:800;color:var(--ink);line-height:1.1}
+.mat-kpi i{font-size:10px;font-style:normal;color:var(--muted)}
+.mat-kpi.ok b{color:var(--ok)}
+.mat-kpi.bad b{color:var(--err)}
+.mat-card-obs{font-size:11.5px;color:var(--muted);line-height:1.45}
+
+/* ---- checkbox de perfil pronto ------------------------------------------ */
+.mat-check{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:10px;cursor:pointer;
+  border:1px dashed var(--line-2);background:var(--surface-2);font-size:12.5px;color:var(--ink-2)}
+.mat-check.on{border-style:solid;border-color:var(--ok);background:var(--ok-soft);color:var(--ok)}
+.mat-check input{width:15px;height:15px;flex:none;accent-color:var(--accent);cursor:pointer}
+
+.mat-card-acts{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.mat-card-hint{font-size:11.5px;color:var(--warn);line-height:1.4}
+
+/* ---- listas simples (sementes / conteúdo) ------------------------------- */
+.mat-lista{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.mat-linha{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--line)}
+.mat-linha:last-child{border-bottom:0}
+.mat-linha:hover{background:var(--hover)}
+.mat-linha-tx{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.35}
+.mat-linha-tx b{font-size:13px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mat-linha-tx i{font-size:11.5px;font-style:normal;color:var(--muted)}
+.mat-vazio-linha{padding:14px 12px;font-size:12.5px;color:var(--muted)}
+
+/* ---- formulários inline -------------------------------------------------- */
+.mat-form,.mat-cfg{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap}
+.mat-cfg{align-items:flex-start}
+.mat-fld{display:flex;flex-direction:column;gap:5px;flex:1;min-width:180px}
+.mat-fld.curta{flex:none;width:190px}
+.mat-fld.larga{flex:1;min-width:240px}
+.mat-fld>span{font-size:12.5px;font-weight:500;color:var(--ink-2)}
+.mat-fld>em{font-size:11px;font-style:normal;color:var(--muted);line-height:1.4}
+.mat-fld>em.bad{color:var(--err)}
+
+.mat-range{display:flex;align-items:center;gap:10px}
+.mat-range input{flex:1;min-width:0;accent-color:var(--accent)}
+.mat-range b{font-size:13px;font-weight:700;color:var(--ink);min-width:38px;text-align:right}
+
+.mat-dias{display:flex;gap:5px;flex-wrap:wrap}
+.mat-dia{height:32px;min-width:44px;padding:0 10px;border-radius:9px;border:1px solid var(--line-2);
+  background:var(--surface);color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
+.mat-dia:hover{background:var(--hover);color:var(--ink)}
+.mat-dia.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-ink)}
+.mat-dia:focus-visible{outline:none;box-shadow:0 0 0 3px var(--ring)}
+
+.mat-cfg-acts{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.mat-cfg-nota{font-size:11.5px;color:var(--muted)}
+
+/* ---- estados ------------------------------------------------------------- */
+.mat-vazio{display:flex;flex-direction:column;align-items:center;gap:6px;padding:34px 20px;text-align:center;
+  font-size:12.5px;color:var(--muted)}
+.mat-vazio svg{width:30px;height:30px;color:var(--muted);margin-bottom:4px}
+.mat-vazio h3{margin:0;font-size:14.5px;font-weight:700;color:var(--ink)}
+.mat-vazio p{margin:0;max-width:400px;line-height:1.5}
+.mat-erro{padding:14px;border-radius:12px;background:var(--err-soft);border:1px solid var(--err);
+  font-size:12.5px;color:var(--err);line-height:1.45}
+.mat-nota{display:flex;align-items:flex-start;gap:10px;padding:13px 15px;border-radius:12px;background:var(--info-soft);
+  font-size:12.5px;color:var(--ink-2);line-height:1.5}
+.mat-nota svg{width:16px;height:16px;color:var(--info);flex:none;margin-top:1px}
+
+/* ---- modais -------------------------------------------------------------- */
+.mat-lead{margin:0 0 14px;font-size:12.5px;color:var(--muted);line-height:1.5}
+.mat-modal-sub{font-size:12px;font-weight:400;color:var(--muted);margin-top:2px}
+.mat-qr{text-align:center}
+.mat-qr-box{width:230px;height:230px;margin:0 auto;display:grid;place-items:center;background:#fff;
+  border-radius:12px;padding:8px}
+.mat-qr-box img{width:100%;height:100%;object-fit:contain}
+.mat-qr-box span{color:#555;font-size:12.5px}
+.mat-qr-meta{margin-top:8px;font-size:12.5px;color:var(--muted)}
+.mat-qr-ok{text-align:center;padding:10px 0}
+.mat-qr-ok-ic{display:inline-flex;align-items:center;justify-content:center;width:52px;height:52px;border-radius:50%;
+  background:var(--ok-soft);color:var(--ok);margin-bottom:10px}
+.mat-qr-ok-ic svg{width:26px;height:26px}
+.mat-qr-ok h3{margin:0 0 6px;font-size:15px;font-weight:600;color:var(--ink)}
+.mat-qr-ok p{margin:0;font-size:12.5px;color:var(--muted);line-height:1.5}
+
+/* ---- responsivo ---------------------------------------------------------- */
+@media (max-width:760px){
+  .mat-grid{grid-template-columns:1fr}
+  .mat-fld.curta{width:100%;flex:1}
+}

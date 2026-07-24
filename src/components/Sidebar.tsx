@@ -19,7 +19,10 @@ const MAIN: NavEntry[] = [
   { to: '/relatorios', label: 'Relatórios', icon: 'relatorios' },
   { to: '/configuracoes', label: 'Configurações', icon: 'configuracoes' },
 ];
-const ADMIN: NavEntry[] = [{ to: '/plano-uso', label: 'Plano e uso', icon: 'plano' }];
+const ADMIN: NavEntry[] = [
+  { to: '/maturacao', label: 'Maturação', icon: 'maturacao' },
+  { to: '/plano-uso', label: 'Plano e uso', icon: 'plano' },
+];
 
 const ROLE_LABEL: Record<string, string> = { admin: 'Administrador', gestor: 'Gestor', atendente: 'Atendente' };
 

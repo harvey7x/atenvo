@@ -458,6 +458,16 @@ verify_jwt = false
 [functions.evolution-send]
 verify_jwt = false
 
+# Maturação de números: webhook/planner/runner são chamados por cron ou pela Evolution,
+# sempre com x-maturacao-secret e sem Authorization. `maturacao-manage` fica de FORA desta
+# lista de propósito — só a app logada o chama, então mantém verify_jwt = true.
+[functions.maturacao-webhook]
+verify_jwt = false
+[functions.maturacao-planner]
+verify_jwt = false
+[functions.maturacao-runner]
+verify_jwt = false
+
 # As demais (evolution-* e meta-auth-start, meta-pages, meta-manage,
 # meta-send-message) exigem o JWT do usuário (verify_jwt = true por padrão) —
 # chamadas só pelo app logado.

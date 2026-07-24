@@ -18,6 +18,7 @@ import { Integracoes } from '@/pages/Integracoes';
 import { Relatorios } from '@/pages/Relatorios';
 import { Configuracoes } from '@/pages/Configuracoes';
 import { PlanoUso } from '@/pages/PlanoUso';
+import { Maturacao } from '@/pages/Maturacao';
 import { NotFound } from '@/pages/NotFound';
 
 const routes: RouteObject[] = [
@@ -77,6 +78,11 @@ const routes: RouteObject[] = [
             path: 'configuracoes',
             handle: { title: 'Configurações', subtitle: 'Conta, equipe, notificações e canais já conectados.', fullBleed: true },
             element: <Configuracoes />,
+          },
+          {
+            path: 'maturacao',
+            handle: { title: 'Maturação de Números', subtitle: 'Aquecimento de chips de WhatsApp — isolado do atendimento.' },
+            element: <RequireRole role="admin"><Maturacao /></RequireRole>,
           },
           {
             path: 'plano-uso',
