@@ -467,3 +467,5 @@
 .kanban-page .col-head[draggable="true"]:active{cursor:grabbing}
 .kanban-page .column.col-dragging{opacity:.45}
 .kanban-page .column.col-drop{box-shadow:inset 3px 0 0 var(--green)}
+/* Sem isto o mousedown no título começa uma SELEÇÃO DE TEXTO em vez do arrasto do elemento. */
+.kanban-page .col-head[draggable="true"]{user-select:none;-webkit-user-select:none}

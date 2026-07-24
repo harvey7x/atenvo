@@ -153,11 +153,12 @@ export function Kanban() {
   // Ordem otimista: colunasQ tem refetch de 8s; sem isso a coluna volta sozinha para o lugar antigo.
   const [ordemOtim, setOrdemOtim] = useState<string[] | null>(null);
   const dragColId = useRef<string | null>(null);
+  const [colArrastando, setColArrastando] = useState<string | null>(null); // só p/ feedback visual (ref não re-renderiza)
   /** Solta a coluna arrastada ANTES da coluna alvo. Aplica a ordem na hora (otimista) e persiste
    *  pela RPC transacional; se o servidor recusar, desfaz e avisa — nunca deixa o quadro mentindo. */
   async function soltarColuna(alvoId: string) {
     const de = dragColId.current;
-    dragColId.current = null; setHoverCol(null);
+    dragColId.current = null; setColArrastando(null); setHoverCol(null);
     if (!de || de === alvoId) return;
     const atual = (ordemOtim ?? k.colunas.map((c) => c.id));
     const entradaId = k.colunas.find((c) => c.entrada)?.id ?? null;
@@ -469,16 +470,18 @@ export function Kanban() {
               const cards = porColuna(col.id);
               const totalCount = k.leads.filter((l) => colunaDoLead(l) === col.id).length;
               return (
-                <div className={'column' + (dragColId.current === col.id ? ' col-dragging' : '') + (hoverCol === col.id ? ' col-drop' : '')} key={col.id}
+                <div className={'column' + (colArrastando === col.id ? ' col-dragging' : '') + (hoverCol === col.id ? ' col-drop' : '')} key={col.id}
                      onDragOver={(e) => { if (!dragColId.current || dragColId.current === col.id) return; e.preventDefault(); setHoverCol(col.id); }}
                      onDrop={(e) => { if (!dragColId.current) return; e.preventDefault(); e.stopPropagation(); soltarColuna(col.id); }}>
                   <div className="col-head"
                        draggable={podeConfig && !col.entrada}
                        onDragStart={(e) => {
                          if (!podeConfig || col.entrada) { e.preventDefault(); return; }
-                         dragColId.current = col.id; try { e.dataTransfer.effectAllowed = 'move'; } catch { /* */ }
+                         dragColId.current = col.id; setColArrastando(col.id);
+                         // setData é exigido por alguns navegadores para o arrasto sequer iniciar.
+                         try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', col.id); } catch { /* */ }
                        }}
-                       onDragEnd={() => { dragColId.current = null; setHoverCol(null); }}>
+                       onDragEnd={() => { dragColId.current = null; setColArrastando(null); setHoverCol(null); }}>
                     <span className="dot" style={{ background: col.cor }} />
                     <div className="col-htxt"><span className="col-name-st">{col.nome}{col.entrada && <span className="col-entrada-tag" title="Coluna de entrada — recebe novos leads dos canais">entrada</span>}</span><span className="col-metric">{totalCount} {totalCount === 1 ? 'lead' : 'leads'}</span></div>
                     {podeConfig && (
@@ -494,7 +497,7 @@ export function Kanban() {
                     )}
                   </div>
                   <div className={'col-body' + (hover === col.id ? ' drop-hover' : '')}
-                    onDragOver={(e) => { e.preventDefault(); setHover(col.id); }} onDragLeave={() => setHover((h) => h === col.id ? null : h)} onDrop={() => onDrop(col.id)}>
+                    onDragOver={(e) => { if (dragColId.current) return; e.preventDefault(); setHover(col.id); }} onDragLeave={() => setHover((h) => h === col.id ? null : h)} onDrop={(e) => { if (dragColId.current) return; onDrop(col.id); void e; }}>
                     {cards.map((l) => {
                       const moving = optim[l.id] !== undefined;
                       const vr = valorRelevante(l);
