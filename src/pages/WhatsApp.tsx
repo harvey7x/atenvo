@@ -66,7 +66,6 @@ const IcSignet = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor
 const IcPhoneSent = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="7" y="2" width="10" height="20" rx="2.5" /><path d="M11 18h2" /></svg>;
 const IcEdit = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>;
 const IcCopy = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></svg>;
-const IcContactCard = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2" /><circle cx="9" cy="11" r="2" /><path d="M5 17a3 3 0 0 1 8 0M15 9h3M15 13h3" /></svg>;
 const IcCheckSm = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>;
 const IcArchive = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="4" rx="1" /><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4" /></svg>;
 const IcNewChat = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.5 8.5 0 0 1-12.6 7.4L3 20.5l1.7-5A8.5 8.5 0 1 1 21 11.5z" /><path d="M12 8.5v5M9.5 11h5" /></svg>;
@@ -897,10 +896,6 @@ export function WhatsApp() {
       else fallbackCopy(num, done);
     } catch { fallbackCopy(num, done); }
   }
-  function abrirEmContatos() {
-    setPop(null);
-    navigate(current.contatoId ? `/contatos?contato=${current.contatoId}` : '/contatos');
-  }
   async function arquivarConversa(arquivar: boolean) {
     setPop(null);
     if (!current.id) return;
@@ -1688,7 +1683,6 @@ export function WhatsApp() {
                 ? <button role="menuitem" className="pop-item" onClick={() => arquivarConversa(false)}><IcArchive />Desarquivar conversa</button>
                 : <button role="menuitem" className="pop-item" onClick={() => arquivarConversa(true)}><IcArchive />Arquivar conversa</button>}
               {current.phone && <button role="menuitem" className="pop-item" onClick={copiarTelefone}><IcCopy />Copiar telefone</button>}
-              {current.contatoId && <button role="menuitem" className="pop-item" onClick={abrirEmContatos}><IcContactCard />Abrir em Contatos</button>}
               {statusFechada && current.statusId !== statusFechada.id && <button role="menuitem" className="pop-item" onClick={fecharConversa}><IcArchive />Fechar conversa</button>}
             </div>
           )}

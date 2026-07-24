@@ -9,7 +9,6 @@ import { DefinirSenha } from '@/pages/DefinirSenha';
 import { WhatsApp } from '@/pages/WhatsApp';
 import { Facebook } from '@/pages/Facebook';
 import { Kanban } from '@/pages/Kanban';
-import { Contatos } from '@/pages/Contatos';
 // Presencial preservado no código (src/pages/Agendamentos.tsx), fora da navegação — a rota
 // /agendamentos foi reaproveitada para a central de Agendamentos de Mensagens (Fase 2B).
 import { AgendamentosMensagens } from '@/pages/AgendamentosMensagens';
@@ -48,11 +47,6 @@ const routes: RouteObject[] = [
             path: 'kanban',
             handle: { title: 'Kanban', subtitle: 'Funil comercial em colunas.', fullBleed: true },
             element: <Kanban />,
-          },
-          {
-            path: 'contatos',
-            handle: { title: 'Contatos', subtitle: 'Base de contatos e leads.', fullBleed: true },
-            element: <Contatos />,
           },
           {
             path: 'agendamentos',

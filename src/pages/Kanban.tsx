@@ -456,7 +456,6 @@ export function Kanban() {
             <div className="kb-empty-desc">Novos contatos dos canais conectados aparecerão automaticamente aqui.</div>
             <div className="kb-empty-acts">
               <button type="button" className="kb-empty-btn" onClick={() => abrirNovoLead()}><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>Adicionar lead</button>
-              <button type="button" className="kb-empty-btn ghost" onClick={() => navigate('/contatos')}>Abrir contatos</button>
             </div>
           </div>
         )}
@@ -617,7 +616,7 @@ export function Kanban() {
               </>
             ) : (
               <>
-                <div className="kb-field"><label className="kb-label">Pesquisar contato</label><ContatoCombobox onSelect={onSelContato} onCriarNovo={() => { setLeadModal(null); navigate('/contatos'); }} /></div>
+                <div className="kb-field"><label className="kb-label">Pesquisar contato</label><ContatoCombobox onSelect={onSelContato} onCriarNovo={() => { setSemVinculo(true); setLf((f) => ({ ...f, nome: '', telefone: '' })); }} /></div>
                 <button type="button" className="kb-link" onClick={() => { setSemVinculo(true); setLf((f) => ({ ...f, nome: '', telefone: '' })); }}>Criar lead sem contato vinculado</button>
               </>
             )

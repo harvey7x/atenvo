@@ -12,7 +12,6 @@ const MAIN: NavEntry[] = [
   { to: '/whatsapp', label: 'WhatsApp', icon: 'whatsapp' },
   { to: '/facebook', label: 'Facebook', icon: 'facebook' },
   { to: '/kanban', label: 'Kanban', icon: 'kanban' },
-  { to: '/contatos', label: 'Contatos', icon: 'contatos' },
   { to: '/agendamentos', label: 'Agendamentos', icon: 'agendamentos' },
   { to: '/scripts', label: 'Scripts', icon: 'scripts' },
   { to: '/cobrancas', label: 'Cobranças', icon: 'cobrancas' },
