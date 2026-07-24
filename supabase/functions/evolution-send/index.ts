@@ -23,6 +23,9 @@ import { evolution, evolutionConfigured } from './evolution.ts';
 import { enviadorDe } from './transporte.ts';
 
 const digits = (s?: string | null): string | null => ((s ?? '').replace(/[^0-9]/g, '') || null);
+/** Últimos 4 do número, para a mensagem de erro dizer QUAL número está fora da janela sem
+ *  expor o número inteiro num texto que pode acabar em log. */
+const mascararFinal = (s?: string | null): string => { const d = digits(s); return d ? `•••${d.slice(-4)}` : 'oficial'; };
 
 // Comparação de segredo em tempo constante — não vaza o tamanho/prefixo por timing.
 function seguroIgual(a: string, b: string): boolean {
@@ -252,11 +255,14 @@ Deno.serve(async (req) => {
     // Barrar aqui, com mensagem em português, é melhor que deixar a Meta recusar: o atendente
     // entende o porquê e a mensagem não fica registrada como "falhou" por motivo obscuro.
     // Fica DEPOIS de validar_numero/vincular_numero de propósito — aquelas ações não enviam nada.
+    // A janela é do PAR (canal, contato), não da conversa: existe UMA conversa por contato, então
+    // perguntar pela conversa devolveria "aberta" por causa do inbound em OUTRO número — janela
+    // fantasma, e a Meta recusaria com 131047 depois de já ter aceitado o envio aqui.
     if (tx.ehCloud) {
-      const { data: dentro } = await admin.rpc('wa_dentro_janela', { p_conversa: conversa_id });
+      const { data: dentro } = await admin.rpc('wa_dentro_janela', { p_canal: canal.id, p_contato: conv.contato_id });
       if (dentro !== true) {
         return json({
-          error: 'Passaram mais de 24 horas desde a última mensagem deste cliente. No WhatsApp oficial, fora dessa janela só é permitido enviar um modelo (template) aprovado pela Meta.',
+          error: `Passaram mais de 24 horas desde a última mensagem deste cliente para o número ${canal.numero_conectado ? mascararFinal(canal.numero_conectado) : 'oficial'}. No WhatsApp oficial a janela é por número: fora dela, só um modelo (template) aprovado pela Meta pode sair. Se o cliente falou com outro número seu, responda por lá.`,
           code: 'FORA_JANELA_24H',
         }, 409);
       }

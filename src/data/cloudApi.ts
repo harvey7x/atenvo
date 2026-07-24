@@ -35,6 +35,8 @@ async function invoke<T>(fn: string, body: Record<string, unknown>): Promise<T> 
 export interface CloudCanal {
   id: string; nome_interno: string | null; numero_conectado: string | null;
   cloud_phone_number_id: string | null; cloud_waba_id: string | null; status_integracao: string;
+  /** 'atendimento' recebe o tráfego e conversa; 'disparo' só manda remarketing por template. */
+  papel: string; disparo_padrao: boolean;
 }
 export interface CloudDiagnostico {
   ok: boolean;
@@ -44,6 +46,8 @@ export interface CloudDiagnostico {
   cloud_api_ativo: boolean;
   bot_dispatch: boolean;
   canais: CloudCanal[];
+  /** Resolvido pela MESMA função que o worker usa (wa_canal_disparo). null = nenhum ou ambíguo. */
+  canal_disparo_id: string | null;
   templates_aprovados: number;
 }
 
@@ -66,10 +70,18 @@ export function useCloudAcoes() {
     qc.invalidateQueries({ queryKey: ['wa-limite'] });      // e consome vaga de WhatsApp
   };
   const vincular = useMutation({
-    mutationFn: (v: { alias: string; phoneNumberId: string; wabaId: string }) =>
+    mutationFn: (v: { alias: string; phoneNumberId: string; wabaId: string; papel: string }) =>
       invoke<{ ok: boolean; canal: CloudCanal; verificado: boolean; aviso: string | null }>('cloud-manage', {
         action: 'vincular', organizacao_id: currentOrg.id,
-        alias: v.alias, phone_number_id: v.phoneNumberId, waba_id: v.wabaId,
+        alias: v.alias, phone_number_id: v.phoneNumberId, waba_id: v.wabaId, papel: v.papel,
+      }),
+    onSuccess: recarregar,
+  });
+  const definirPapel = useMutation({
+    mutationFn: (v: { canalId: string; papel: string; disparoPadrao: boolean }) =>
+      invoke<{ ok: boolean; papel: string; disparo_padrao: boolean }>('cloud-manage', {
+        action: 'papel', organizacao_id: currentOrg.id,
+        canal_id: v.canalId, papel: v.papel, disparo_padrao: v.disparoPadrao,
       }),
     onSuccess: recarregar,
   });
@@ -84,7 +96,7 @@ export function useCloudAcoes() {
       invoke<{ ok: boolean }>('cloud-manage', { action: 'remover', organizacao_id: currentOrg.id, canal_id: canalId }),
     onSuccess: recarregar,
   });
-  return { vincular, verificar, remover };
+  return { vincular, verificar, remover, definirPapel };
 }
 
 /* ===================== Templates ===================== */
@@ -95,6 +107,8 @@ export interface WaTemplate {
   variaveis: WaTemplateVar[]; status: string; statusMotivo: string | null;
   usarEmRemarketing: boolean; wabaId: string | null; metaTemplateId: string | null;
   sincronizadoEm: string | null; atualizadoEm: string;
+  /** Passo da cadência (1..5) que este modelo atende. null = não faz parte do remarketing. */
+  toque: number | null;
 }
 
 export function useWaTemplates(habilitado = true) {
@@ -105,22 +119,22 @@ export function useWaTemplates(habilitado = true) {
     queryFn: async (): Promise<WaTemplate[]> => {
       const { data, error } = await supabase!
         .from('wa_templates')
-        .select('id, nome, idioma, categoria, corpo, variaveis, status, status_motivo, usar_em_remarketing, waba_id, meta_template_id, sincronizado_em, atualizado_em')
+        .select('id, nome, idioma, categoria, corpo, variaveis, status, status_motivo, usar_em_remarketing, waba_id, meta_template_id, sincronizado_em, atualizado_em, toque')
         .eq('organizacao_id', currentOrg.id).eq('ativo', true)
-        .order('usar_em_remarketing', { ascending: false })
+        .order('toque', { ascending: true, nullsFirst: false })
         .order('nome', { ascending: true });
       if (error) throw new Error(error.message);
       type Row = {
         id: string; nome: string; idioma: string; categoria: string; corpo: string; variaveis: unknown;
         status: string; status_motivo: string | null; usar_em_remarketing: boolean; waba_id: string | null;
-        meta_template_id: string | null; sincronizado_em: string | null; atualizado_em: string;
+        meta_template_id: string | null; sincronizado_em: string | null; atualizado_em: string; toque: number | null;
       };
       return ((data as unknown as Row[]) ?? []).map((r) => ({
         id: r.id, nome: r.nome, idioma: r.idioma, categoria: r.categoria, corpo: r.corpo,
         variaveis: Array.isArray(r.variaveis) ? r.variaveis as WaTemplateVar[] : [],
         status: r.status, statusMotivo: r.status_motivo, usarEmRemarketing: r.usar_em_remarketing,
         wabaId: r.waba_id, metaTemplateId: r.meta_template_id,
-        sincronizadoEm: r.sincronizado_em, atualizadoEm: r.atualizado_em,
+        sincronizadoEm: r.sincronizado_em, atualizadoEm: r.atualizado_em, toque: r.toque,
       }));
     },
   });
@@ -149,11 +163,11 @@ export function useTemplateAcoes() {
     if (error) throw new Error(traduzErroTemplate(error.message));
   };
   const salvar = useMutation({
-    mutationFn: (v: { id?: string; nome: string; idioma: string; categoria: string; corpo: string; variaveis: WaTemplateVar[]; canalId?: string | null; wabaId?: string | null }) =>
+    mutationFn: (v: { id?: string; nome: string; idioma: string; categoria: string; corpo: string; variaveis: WaTemplateVar[]; canalId?: string | null; wabaId?: string | null; toque?: number | null }) =>
       rpc('wa_template_salvar', {
         p_org: currentOrg.id, p_nome: v.nome, p_idioma: v.idioma, p_categoria: v.categoria,
         p_corpo: v.corpo, p_variaveis: v.variaveis, p_canal: v.canalId ?? null,
-        p_waba: v.wabaId ?? null, p_id: v.id ?? null,
+        p_waba: v.wabaId ?? null, p_id: v.id ?? null, p_toque: v.toque ?? null,
       }),
     onSuccess: recarregar,
   });
@@ -163,7 +177,7 @@ export function useTemplateAcoes() {
     onSuccess: recarregar,
   });
   const usarNoRemarketing = useMutation({
-    mutationFn: (id: string) => rpc('wa_template_remarketing', { p_id: id }),
+    mutationFn: (v: { id: string; toque: number }) => rpc('wa_template_remarketing', { p_id: v.id, p_toque: v.toque }),
     onSuccess: recarregar,
   });
   const remover = useMutation({
@@ -189,5 +203,51 @@ export function traduzErroTemplate(msg: string): string {
   if (m.includes('canal_invalido')) return 'Canal inválido para esta organização.';
   if (m.includes('status_invalido')) return 'Status inválido.';
   if (m.includes('uq_wa_templates_nome_idioma')) return 'Já existe um template com esse nome e idioma.';
+  if (m.includes('uq_wa_templates_remarketing')) return 'Já existe um modelo em uso para esse toque.';
+  if (m.includes('toque_invalido')) return 'Informe o passo da cadência (1 a 5).';
+  if (m.includes('wat_remarketing_exige_toque')) return 'Um modelo usado no remarketing precisa ter o passo da cadência definido.';
   return msg;
+}
+
+/* ===================== Janela de 24h por (canal, contato) ===================== */
+
+export interface JanelaCanal {
+  /** Aberta = dá para mandar texto livre. Fechada = só modelo aprovado. */
+  aberta: boolean;
+  ultimaEntradaEm: string | null;
+  /** Minutos que faltam para fechar. null quando já está fechada. */
+  minutosRestantes: number | null;
+}
+
+/** Estado da janela do PAR (canal, contato). Só faz sentido em canal cloud_api — a Evolution não
+ *  tem janela. Consulta leve, direto na tabela (RLS já limita à org), sem RPC. */
+export function useJanelaCanal(canalId: string | null | undefined, contatoId: string | null | undefined, ehCloud: boolean) {
+  return useQuery({
+    queryKey: ['canal-janela', canalId ?? '', contatoId ?? ''],
+    enabled: REAL && ehCloud && !!canalId && !!contatoId,
+    refetchInterval: 60_000,          // o relógio anda; o rótulo tem que andar junto
+    queryFn: async (): Promise<JanelaCanal> => {
+      const { data, error } = await supabase!
+        .from('canal_janela')
+        .select('ultima_entrada_em')
+        .eq('canal_id', canalId!).eq('contato_id', contatoId!)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      const iso = (data?.ultima_entrada_em as string | undefined) ?? null;
+      if (!iso) return { aberta: false, ultimaEntradaEm: null, minutosRestantes: null };
+      const fechaEm = new Date(iso).getTime() + 24 * 60 * 60 * 1000;
+      const restam = Math.round((fechaEm - Date.now()) / 60000);
+      return { aberta: restam > 0, ultimaEntradaEm: iso, minutosRestantes: restam > 0 ? restam : null };
+    },
+  });
+}
+
+/** "faltam 3 h" / "faltam 12 min". O atendente precisa saber se dá tempo, não a hora exata. */
+export function rotuloJanela(j: JanelaCanal | undefined): string {
+  if (!j) return '';
+  if (!j.aberta) return 'janela fechada — só modelo';
+  const m = j.minutosRestantes ?? 0;
+  return m >= 120 ? `janela aberta · faltam ${Math.floor(m / 60)} h`
+    : m >= 60 ? 'janela aberta · falta 1 h'
+    : `janela aberta · faltam ${Math.max(1, m)} min`;
 }

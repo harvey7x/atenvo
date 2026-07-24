@@ -63,8 +63,12 @@ Deno.serve(async (req) => {
     // O checklist que o dono precisa ver ANTES de mexer no painel da Meta. Só booleanos.
     if (action === 'diagnostico') {
       const { data: canais } = await admin.from('canais')
-        .select('id, nome_interno, numero_conectado, cloud_phone_number_id, cloud_waba_id, status_integracao')
-        .eq('organizacao_id', orgId).eq('transporte', 'cloud_api').neq('status_integracao', 'removido');
+        .select('id, nome_interno, numero_conectado, cloud_phone_number_id, cloud_waba_id, status_integracao, papel, disparo_padrao')
+        .eq('organizacao_id', orgId).eq('transporte', 'cloud_api').neq('status_integracao', 'removido')
+        .order('criado_em', { ascending: true });
+      // resolvido pela MESMA função que o worker usa — painel e envio não podem discordar sobre
+      // qual número dispara.
+      const { data: canalDisparo } = await admin.rpc('wa_canal_disparo', { p_org: orgId });
       const { count: templatesAprovados } = await admin.from('wa_templates')
         .select('id', { count: 'exact', head: true })
         .eq('organizacao_id', orgId).eq('ativo', true).eq('status', 'aprovado');
@@ -81,6 +85,7 @@ Deno.serve(async (req) => {
         cloud_api_ativo: (Deno.env.get('CLOUD_API_ATIVO') ?? 'sim').toLowerCase() === 'sim',
         bot_dispatch: (Deno.env.get('CLOUD_BOT_DISPATCH') ?? 'nao').toLowerCase() === 'sim',
         canais: canais ?? [],
+        canal_disparo_id: (canalDisparo as string | null) ?? null,
         templates_aprovados: templatesAprovados ?? 0,
       });
     }
@@ -90,6 +95,8 @@ Deno.serve(async (req) => {
       const alias = String(body.alias ?? '').trim().slice(0, 80);
       const phoneNumberId = soDigitos(body.phone_number_id);
       const wabaId = soDigitos(body.waba_id);
+      const papel = ['atendimento', 'disparo', 'ambos'].includes(String(body.papel ?? ''))
+        ? String(body.papel) : 'atendimento';
       if (!alias) return json({ error: 'Dê um nome interno para este número (ex.: OFICIAL).' }, 400);
       if (!phoneNumberId) return json({ error: 'Informe o Phone number ID (só números), que fica no painel da Meta.' }, 400);
 
@@ -123,7 +130,7 @@ Deno.serve(async (req) => {
       const { data: novo, error: e1 } = await admin.from('canais').insert({
         tipo: 'whatsapp', nome_interno: alias, organizacao_id: orgId,
         provider: 'meta_cloud', transporte: 'cloud_api',
-        cloud_phone_number_id: phoneNumberId, cloud_waba_id: wabaId,
+        cloud_phone_number_id: phoneNumberId, cloud_waba_id: wabaId, papel,
         numero_conectado: numero,
         // sem sessão/QR: 'conectado' só quando a Meta confirmou quem é o número.
         status_integracao: verificado ? 'conectado' : 'sincronizando',
@@ -138,7 +145,7 @@ Deno.serve(async (req) => {
       try {
         await admin.from('audit_log').insert({
           usuario_id: user.id, acao: 'cloud_vincular', entidade: 'canais', entidade_id: novo.id, organizacao_id: orgId,
-          dados_depois: { alias, phone_number_id: phoneNumberId, waba_id: wabaId, verificado },
+          dados_depois: { alias, phone_number_id: phoneNumberId, waba_id: wabaId, papel, verificado },
         });
       } catch { /* audit best-effort */ }
 
@@ -170,6 +177,39 @@ Deno.serve(async (req) => {
         qualidade: r.body?.quality_rating ?? null,
         plataforma: r.body?.platform_type ?? null,
       });
+    }
+
+    // ---------------------------------------------------------------- papel
+    // Trocar o papel de um número é decisão de arquitetura (quem atende x quem dispara), então
+    // fica auditada. `disparo_padrao` é o desempate quando há mais de um canal de disparo.
+    if (action === 'papel') {
+      const canalId: string = body.canal_id ?? '';
+      const papel = String(body.papel ?? '');
+      const padrao = body.disparo_padrao === true;
+      if (!canalId) return json({ error: 'canal_id é obrigatório.' }, 400);
+      if (!['atendimento', 'disparo', 'ambos'].includes(papel)) return json({ error: 'Papel inválido.' }, 400);
+      const { data: canal } = await admin.from('canais')
+        .select('id, nome_interno, papel, disparo_padrao').eq('id', canalId)
+        .eq('organizacao_id', orgId).eq('transporte', 'cloud_api').maybeSingle();
+      if (!canal) return json({ error: 'Canal da API oficial não encontrado.' }, 404);
+      // só faz sentido ser padrão quem dispara
+      const padraoFinal = padrao && (papel === 'disparo' || papel === 'ambos');
+      if (padraoFinal) {
+        // o índice único é parcial (um padrão ativo por org): limpar antes evita violar a constraint
+        await admin.from('canais').update({ disparo_padrao: false })
+          .eq('organizacao_id', orgId).eq('disparo_padrao', true).neq('id', canalId);
+      }
+      const { error: eUpd } = await admin.from('canais')
+        .update({ papel, disparo_padrao: padraoFinal }).eq('id', canalId).eq('transporte', 'cloud_api');
+      if (eUpd) return json({ error: 'Não foi possível salvar o papel.', detalhe: eUpd.message.slice(0, 180) }, 500);
+      try {
+        await admin.from('audit_log').insert({
+          usuario_id: user.id, acao: 'cloud_papel', entidade: 'canais', entidade_id: canalId, organizacao_id: orgId,
+          dados_antes: { papel: canal.papel, disparo_padrao: canal.disparo_padrao },
+          dados_depois: { papel, disparo_padrao: padraoFinal },
+        });
+      } catch { /* audit best-effort */ }
+      return json({ ok: true, papel, disparo_padrao: padraoFinal });
     }
 
     // ---------------------------------------------------------------- remover
@@ -237,6 +277,10 @@ Deno.serve(async (req) => {
             pos: i + 1, rotulo: i === 0 ? 'nome' : `var${i + 1}`, exemplo: exemplos[i] ?? '',
           }));
           const status = STATUS_META[String(t.status ?? '').toUpperCase()] ?? 'pendente';
+          // o toque sai do NOME quando ele segue o padrão caf_retomada_01..05 — assim um template
+          // criado direto no painel da Meta já chega com o passo certo, sem digitação.
+          const mToque = nome.match(/_(\d{1,2})$/);
+          const toqueDoNome = mToque ? Math.min(20, Math.max(1, Number(mToque[1]))) : null;
 
           const { data: existente } = await admin.from('wa_templates').select('id')
             .eq('organizacao_id', orgId).eq('nome', nome).eq('idioma', idioma).eq('ativo', true).maybeSingle();
@@ -245,6 +289,7 @@ Deno.serve(async (req) => {
               corpo, variaveis, categoria: String(t.category ?? 'MARKETING').toUpperCase(),
               status, status_motivo: null, meta_template_id: String(t.id ?? '') || null,
               waba_id: waba, canal_id: canalDoWaba, sincronizado_em: new Date().toISOString(),
+              ...(toqueDoNome ? { toque: toqueDoNome } : {}),
             }).eq('id', existente.id);
             atualizados++;
           } else {
@@ -252,6 +297,7 @@ Deno.serve(async (req) => {
               organizacao_id: orgId, canal_id: canalDoWaba, waba_id: waba, nome, idioma,
               categoria: String(t.category ?? 'MARKETING').toUpperCase(), corpo, variaveis,
               status, meta_template_id: String(t.id ?? '') || null, sincronizado_em: new Date().toISOString(),
+              toque: toqueDoNome,
             });
             if (eIns) erros.push(`${nome}: ${eIns.message.slice(0, 90)}`); else importados++;
           }

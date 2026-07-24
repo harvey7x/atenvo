@@ -23,6 +23,9 @@
 //    com falha repetida, DESATIVA a assinatura do webhook.
 //  * sempre 200 no fim; erro de persistência vira evento 'erro' reprocessável, não 500.
 //  * mídia que não baixa NUNCA descarta a mensagem: vira status_midia='falhou' + midia_pendente.
+//  * todo inbound registra o relógio da janela em canal_janela (canal, contato) — a janela de 24h
+//    é contada contra o NÚMERO REMETENTE, não contra a conversa (que é única por contato).
+//  * change.field='user_preferences' (stop/resume de marketing) vira wa_optout — NÃO é mensagem.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
@@ -228,6 +231,39 @@ Deno.serve(async (req) => {
 
   for (const entry of body.entry ?? []) {
     for (const change of entry.changes ?? []) {
+      // ---- user_preferences: a pessoa tocou em "parar promoções" DENTRO do WhatsApp ----
+      // Chega antes de qualquer envio nosso, e é o único jeito de saber do 'resume'. Sem isto,
+      // só descobriríamos pelo 131050 — depois de já ter tentado disparar.
+      if (change.field === 'user_preferences') {
+        const v = (change.value ?? {}) as Ev;
+        const pnid = String(v.metadata?.phone_number_id ?? '');
+        const { data: canalPref } = await db.from('canais').select('id, organizacao_id')
+          .eq('cloud_phone_number_id', pnid).eq('transporte', 'cloud_api')
+          .neq('status_integracao', 'removido').maybeSingle();
+        if (!canalPref) continue;
+        for (const pref of (v.user_preferences ?? []) as Ev[]) {
+          const num = digits(pref.wa_id);
+          if (!num || String(pref.category ?? '') !== 'marketing_messages') continue;
+          try {
+            const { data: cid } = await db.rpc('wa_resolver_contato_por_numero', { p_org: canalPref.organizacao_id, p_numero: num });
+            if (!cid) continue;
+            if (String(pref.value ?? '') === 'stop') {
+              await db.rpc('wa_optout_registrar', { p_contato: cid, p_canal: canalPref.id, p_motivo: 'user_preferences', p_detalhe: String(pref.detail ?? '').slice(0, 300) });
+            } else if (String(pref.value ?? '') === 'resume') {
+              await db.rpc('wa_optout_remover', { p_contato: cid, p_canal: canalPref.id });
+            }
+            await db.from('whatsapp_webhook_events').insert({
+              organizacao_id: canalPref.organizacao_id, canal_id: canalPref.id,
+              instance_name: `cloud:${pnid}`, event: 'cloud.user_preferences',
+              remote_jid: maskNum(pref.wa_id), from_me: false,
+              payload: { value: pref.value ?? null, category: pref.category ?? null },
+              status_processamento: 'processado', processado_em: new Date().toISOString(),
+            });
+          } catch { /* best-effort: preferência nunca quebra o webhook */ }
+        }
+        continue;
+      }
+
       if (change.field !== 'messages') continue;
       const value = (change.value ?? {}) as Ev;
       const phoneNumberId = String(value.metadata?.phone_number_id ?? '');
@@ -418,6 +454,13 @@ Deno.serve(async (req) => {
               ultimo_provider: 'meta_cloud',
             }).eq('id', conversaId);
           }
+
+          // --- JANELA DE 24H: o relógio é do PAR (canal, contato). A Meta conta a janela contra o
+          //     NÚMERO REMETENTE (131047), então quem abre janela aqui é ESTE canal, não a conversa
+          //     (que é única por contato e pode ter nascido em outro número). Best-effort. ---
+          try {
+            await db.rpc('wa_janela_registrar', { p_canal: canal.id, p_contato: contatoId, p_quando: agora });
+          } catch (_j) { /* janela nunca interrompe a ingestão */ }
 
           // --- Kanban: todo inbound garante LEAD NOVO (não só contato novo). RPC central resolve
           //     o funil principal, é idempotente e não reentra opp fechada. Best-effort. ---
