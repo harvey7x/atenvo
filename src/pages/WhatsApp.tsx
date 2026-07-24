@@ -1130,27 +1130,27 @@ export function WhatsApp() {
                     <div className="ch-name" title={hNome} tabIndex={0} aria-label={hNome}>{hNome}</div>
                     <div className="ch-tags">
                       {hSit && <span className={'ctag ctag--' + (hSit.variante ?? 'atendimento')} title="Etapa no Kanban">{hSit.texto}</span>}
-                      {current.chip && <span className="ctag ctag--canal" title="Canal atual do atendimento">{current.chip.toLocaleUpperCase('pt-BR')}</span>}
-                      <span className="ctag ctag--atendente" title="Atendente responsável">{respNome ? (current.respId === user?.id ? 'VOCÊ' : respNome.toLocaleUpperCase('pt-BR')) : 'Não atribuído'}</span>
-                      {statusNomeAtual && (
-                        <span className="status-badge" style={{ background: (statusCorAtual ?? '#64748b') + '22', color: statusCorAtual ?? 'var(--ink-2)' }}>
-                          <span className="sdot" style={{ background: statusCorAtual ?? '#64748b' }} />{statusNomeAtual}
-                        </span>
-                      )}
+                      {current.chip && <span className="cresp" title="Canal atual do atendimento">{current.chip}</span>}
+                      <span className="cresp" title="Atendente responsável">{respNome ? (current.respId === user?.id ? 'Você' : respNome) : 'Não atribuído'}</span>
                     </div>
                   </div>
                 </div>
               );
             })()}
-            {/* pill de telefone só quando o painel direito está FECHADO — aberto, ele já mostra o
-                telefone, e a duplicata roubava a largura que cortava o pill de status das tags. */}
-            {!dataOpen && current.phone && <span className="ch-phone-pill" title="Telefone do cliente"><span style={{ color: 'var(--wa)', display: 'inline-flex' }}><IcWa /></span>{current.phone}</span>}
+
           <div className="ch-actions">
             {/* responsável EFETIVO (conversa → contato → oportunidade): antes olhava só
                 contatos.responsavel_id e oferecia "Assumir" em conversa que já tinha dono na oportunidade. */}
             {current.id && (donoEfetivo
               ? <button className="ch-resp-btn" disabled={atribuindo} title="Transferir atendimento" onClick={abrirTransferir}><IcTransfer /><span>Transferir</span></button>
               : <button className="ch-resp-btn primary" disabled={atribuindo} title="Assumir atendimento" onClick={assumir}><IcUserPlus /><span>Assumir</span></button>)}
+            {current.id && (
+              <button className="ch-resp-btn ch-arq" disabled={!current.id}
+                      title={current.arquivada ? 'Desarquivar conversa' : 'Arquivar conversa'}
+                      onClick={() => arquivarConversa(!current.arquivada)}>
+                <IcArchive /><span>{current.arquivada ? 'Desarquivar' : 'Arquivar'}</span>
+              </button>
+            )}
             <button className={'icon-btn' + (foco ? ' on' : '')} title="Modo de foco (Esc para sair)" onClick={() => setFoco((v) => !v)}><IcFocus /></button>
             <button ref={acoesBtnRef} className={'icon-btn' + (pop?.kind === 'acoes' ? ' on' : '')} title="Ações" aria-label="Ações da conversa" aria-haspopup="menu" aria-expanded={pop?.kind === 'acoes'} disabled={!current.id} onClick={(e) => { e.stopPropagation(); togglePop('acoes', acoesBtnRef, 'right'); }}><IcDots /></button>
           </div>

@@ -824,3 +824,26 @@
 .wa-app .conv .cflag{font-size:9px}
 /* cabeçalho de grupo também afina */
 .wa-app .conv-grupo-h{font-size:10.5px;padding:3px 18px;margin:6px -8px 3px}
+
+/* ===== Cabeçalho: chips uniformes + botões quadrados (pedido do dono) =====
+   LEAD NOVO, canal e atendente passam a usar o MESMO estilo do chip "Não atribuído" do card
+   (pill outline discreto), tudo em maiúsculo. Saíram o pill de telefone (o painel direito já
+   mostra) e o status "Aberta" (redundante com a etapa do Kanban). */
+.wa-app .ch-tags .cresp,
+.wa-app .ch-tags .ctag{
+  font-size:10px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;
+  padding:3px 9px;border-radius:7px;line-height:1.5;
+  background:var(--surface-2);color:var(--ink-2);border:1px solid var(--line-2);max-width:170px}
+/* a etapa do Kanban mantém a cor (é a informação mais importante), mesmo formato dos demais */
+.wa-app .ch-tags .ctag--lead{background:var(--amber-soft);color:var(--amber);border-color:rgba(201,122,22,.35)}
+.wa-app .ch-tags .ctag--atendimento{background:rgba(59,130,246,.12);color:#2563eb;border-color:rgba(59,130,246,.32)}
+[data-theme="dark"] .wa-app .ch-tags .ctag--atendimento{background:rgba(59,130,246,.2);color:#93b4fc;border-color:rgba(59,130,246,.4)}
+.wa-app .ch-tags .ctag--aguardando{background:var(--amber-soft);color:var(--amber);border-color:rgba(201,122,22,.35)}
+.wa-app .ch-tags .ctag--ganho{background:var(--green-soft);color:var(--green-ink);border-color:rgba(25,195,125,.38)}
+
+/* botões do cabeçalho: quadrados (raio 8) em vez de pill */
+.wa-app .ch-resp-btn{border-radius:8px;padding:0 14px;height:36px;font-size:12.5px}
+.wa-app .ch-arq{background:var(--surface-2);color:var(--ink-2)}
+.wa-app .ch-arq:hover:not(:disabled){border-color:var(--green);color:var(--green-ink)}
+.wa-app .chat-head .icon-btn{border-radius:8px}
+@media (max-width:1400px){ .wa-app .ch-arq span{display:none} .wa-app .ch-arq{padding:0 10px} }
