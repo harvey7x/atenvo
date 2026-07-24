@@ -68,4 +68,23 @@ export const evolution = {
   // confirmação de leitura (tiquinho azul) do lado de quem recebeu — reciprocidade real
   markMessageAsRead: (instanceName: string, remoteJid: string, id: string, fromMe = false) =>
     call(`/chat/markMessageAsRead/${instanceName}`, 'POST', { readMessages: [{ remoteJid, fromMe, id }] }),
+
+  // ── PROXY por instância ────────────────────────────────────────────────────
+  // É o único ponto onde o IP do tráfego de aquecimento muda: depois do QR quem fala
+  // com o WhatsApp é o servidor Evolution, não o celular. `port` vai como string
+  // porque a Evolution v2 aceita/normaliza assim em ambas as versões.
+  setProxy: (instanceName: string, cfg: { host: string; port: number; protocol: string; username?: string | null; password?: string | null }) =>
+    call(`/proxy/set/${instanceName}`, 'POST', {
+      enabled: true,
+      host: cfg.host,
+      port: String(cfg.port),
+      protocol: cfg.protocol,
+      username: cfg.username ?? '',
+      password: cfg.password ?? '',
+    }),
+  removeProxy: (instanceName: string) =>
+    call(`/proxy/set/${instanceName}`, 'POST', {
+      enabled: false, host: '', port: '', protocol: '', username: '', password: '',
+    }),
+  findProxy: (instanceName: string) => call(`/proxy/find/${instanceName}`, 'GET'),
 };

@@ -14,8 +14,9 @@ import { IntegracaoCloudApi } from '@/components/IntegracaoCloudApi';
 import {
   MATURACAO_REAL, usePainelMaturacao, useCriarChip, useAtualizarChip, useExcluirChip,
   useQrChip, useStatusChip, formatarNumero,
+  useProxyChip, useDefinirProxy, useRemoverProxy, useAplicarProxy, PROXY_PROTOCOLOS,
   STATUS_MATURACAO_LABEL, STATUS_INTEGRACAO_LABEL,
-  type ChipPainel, type StatusIntegracao, type StatusMaturacao,
+  type ChipPainel, type StatusIntegracao, type StatusMaturacao, type ProxyProtocolo,
 } from '@/data/maturacao';
 import './Integracoes.css';
 
@@ -88,6 +89,7 @@ const WA_ST: Record<string, { t: string; cls: string; dot?: boolean }> = {
 /* ---- Maturação (pool de aquecimento) — nada aqui toca atendimento ---- */
 const IcQr = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.4" /><rect x="14" y="3" width="7" height="7" rx="1.4" /><rect x="3" y="14" width="7" height="7" rx="1.4" /><path d="M14 14h3v3M21 14v7h-7v-3" /></svg>;
 const IcSeed = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 21c0-6 3-10 8-11 0 6-3 10-8 11z" /><path d="M12 21C7 20 4 16 4 10c5 1 8 5 8 11z" /></svg>;
+const IcProxy = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c2.5 2.6 2.5 15.4 0 18M12 3C9.5 5.6 9.5 18.4 12 21" /></svg>;
 
 const MAT_CONN: Record<StatusIntegracao, { t: string; cls: string; dot?: boolean }> = {
   conectado: { t: 'Conectado', cls: 'ok', dot: true },
@@ -149,6 +151,7 @@ export function Integracoes() {
   const [matNovo, setMatNovo] = useState(false);
   const [matQr, setMatQr] = useState<{ id: string; apelido: string; perfilOk: boolean } | null>(null);
   const [matExcluir, setMatExcluir] = useState<ChipPainel | null>(null);
+  const [matProxy, setMatProxy] = useState<ChipPainel | null>(null);
   const matChips = matPainel.data ?? [];
   const matConectados = matChips.filter((c) => c.status_integracao === 'conectado').length;
 
@@ -527,15 +530,27 @@ export function Integracoes() {
                               <span className="badge" style={{ background: cor.bg, color: cor.fg }} title="Situação do aquecimento deste número">
                                 <span className="dot" style={{ background: cor.fg }} />{STATUS_MATURACAO_LABEL[c.status_maturacao]}
                               </span>
+                              {/* Proxy: opcional. Sem ele o chip sai pelo IP do servidor — o mesmo de todos os outros. */}
+                              {c.proxy_pendente ? (
+                                <span className="badge warn" title={`Proxy configurado (${c.proxy_resumo ?? '—'}) mas ainda não aplicado à sessão: o tráfego continua saindo pelo IP do servidor. Abra "Proxy" e salve novamente para aplicar.`}>Proxy pendente</span>
+                              ) : c.proxy_ativo ? (
+                                <span className="badge ok matq-proxy-badge" title={`Todo o tráfego deste número sai por ${c.proxy_resumo}.`}>{c.proxy_resumo}</span>
+                              ) : (
+                                <span className="badge neutral" title="Sem proxy: este número sai pelo IP do servidor, igual aos demais do pool. É opcional — só configure um proxy em que você confia, porque proxy instável derruba a sessão.">Sem proxy</span>
+                              )}
                             </span>
                             {conectado && !c.perfil_ok && (
                               <span className="conn-alerta" style={{ color: 'var(--warn)' }}>Perfil do celular não confirmado — o aquecimento não inicia sem foto, nome e recado.</span>
+                            )}
+                            {c.proxy_ultimo_erro && (
+                              <span className="conn-alerta" style={{ color: 'var(--err)' }}>Proxy não aplicado: {c.proxy_ultimo_erro}</span>
                             )}
                           </div>
                           <div className="conn-actions">
                             <button className="btn-sm acc" disabled={excluindo} onClick={() => setMatQr({ id: c.chip_id, apelido: c.apelido, perfilOk: c.perfil_ok })}>
                               <IcQr />{conectado ? 'Reconectar' : 'Conectar'}
                             </button>
+                            <button className="btn-sm" disabled={excluindo} onClick={() => setMatProxy(c)}><IcProxy />Proxy</button>
                             <button className="btn-sm danger" disabled={excluindo} onClick={() => setMatExcluir(c)}>{excluindo ? 'Excluindo…' : 'Excluir'}</button>
                           </div>
                         </div>
@@ -582,6 +597,9 @@ export function Integracoes() {
           onClose={() => setMatNovo(false)}
           onCriado={(id, apelido) => { setMatNovo(false); setMatQr({ id, apelido, perfilOk: false }); }}
         />
+      )}
+      {matProxy && (
+        <MatProxyModal chip={matProxy} onClose={() => { setMatProxy(null); matRefresh(); }} />
       )}
       {matQr && (
         <MatQrModal
@@ -773,45 +791,247 @@ function DiagnosticoModal({ h, podeAgir, atualizando, entregaAuto, proximoMin, c
    MATURAÇÃO — criar número e conectar a sessão de aquecimento
    Só CONEXÃO/gestão do número: rampa, saúde, sementes e biblioteca vivem em /maturacao.
    ========================================================================== */
+
+/* ---- Proxy do chip: formulário compartilhado entre "novo número" e "editar proxy" ---- */
+interface ProxyForm { protocolo: ProxyProtocolo; host: string; porta: string; usuario: string; senha: string }
+const PROXY_VAZIO: ProxyForm = { protocolo: 'http', host: '', porta: '', usuario: '', senha: '' };
+/** Nota curta e sempre visível: proxy é escolha, não obrigação — e proxy ruim é pior que nenhum. */
+const PROXY_NOTA = (
+  <p className="matq-lead matq-proxy-nota">
+    <b>Opcional.</b> Sem proxy, este número sai pelo mesmo IP do servidor que os outros chips — é assim que funciona hoje.
+    Com proxy, o WhatsApp vê um IP só deste número. Mas <b>proxy instável derruba a sessão e custa a rampa inteira</b>:
+    só use um proxy em que você confia.
+  </p>
+);
+
+/** Valida/normaliza antes de chamar a RPC — a mensagem local é melhor que o `raise` traduzido. */
+function validaProxy(f: ProxyForm): { erro: string } | { host: string; porta: number } {
+  const host = f.host.trim();
+  if (!host) return { erro: 'Informe o endereço (host ou IP) do proxy.' };
+  const porta = Number(f.porta);
+  if (!Number.isInteger(porta) || porta < 1 || porta > 65535) return { erro: 'Informe a porta do proxy (entre 1 e 65535).' };
+  return { host, porta };
+}
+
+function MatProxyCampos({ id, valor, onChange, disabled, senhaPlaceholder }: {
+  id: string; valor: ProxyForm; onChange: (v: ProxyForm) => void; disabled?: boolean; senhaPlaceholder: string;
+}) {
+  const set = (p: Partial<ProxyForm>) => onChange({ ...valor, ...p });
+  return (
+    <>
+      <div className="matq-proxy-grid">
+        <div className="atv-field">
+          <label htmlFor={`${id}-proto`}>Protocolo</label>
+          <select id={`${id}-proto`} className="atv-select" value={valor.protocolo} disabled={disabled}
+            onChange={(e) => set({ protocolo: e.target.value as ProxyProtocolo })}>
+            {PROXY_PROTOCOLOS.map((p) => <option key={p} value={p}>{p}</option>)}
+          </select>
+        </div>
+        <div className="atv-field">
+          <label htmlFor={`${id}-host`}>Endereço (host ou IP)</label>
+          <input id={`${id}-host`} className="atv-input" placeholder="Ex.: 189.45.20.10" value={valor.host}
+            disabled={disabled} onChange={(e) => set({ host: e.target.value })} />
+        </div>
+        <div className="atv-field">
+          <label htmlFor={`${id}-porta`}>Porta</label>
+          <input id={`${id}-porta`} className="atv-input" type="number" min={1} max={65535} placeholder="1080"
+            value={valor.porta} disabled={disabled} onChange={(e) => set({ porta: e.target.value })} />
+        </div>
+      </div>
+      <div className="matq-proxy-grid2">
+        <div className="atv-field">
+          <label htmlFor={`${id}-user`}>Usuário (opcional)</label>
+          <input id={`${id}-user`} className="atv-input" autoComplete="off" value={valor.usuario}
+            disabled={disabled} onChange={(e) => set({ usuario: e.target.value })} />
+        </div>
+        <div className="atv-field">
+          <label htmlFor={`${id}-senha`}>Senha (opcional)</label>
+          {/* A senha guardada NUNCA volta do servidor: em branco significa "manter a atual". */}
+          <input id={`${id}-senha`} className="atv-input" type="password" autoComplete="new-password"
+            placeholder={senhaPlaceholder} value={valor.senha} disabled={disabled}
+            onChange={(e) => set({ senha: e.target.value })} />
+        </div>
+      </div>
+    </>
+  );
+}
+
+/** Edita/remove o proxy de um chip já existente. Salvar = gravar no banco + empurrar na Evolution. */
+function MatProxyModal({ chip, onClose }: { chip: ChipPainel; onClose: () => void }) {
+  const { toast } = useToast();
+  // O painel só traz o resumo; usuário vem da tabela (a senha está fora do grant de SELECT).
+  // Sem esse prefill, salvar host/porta apagaria o usuário e a autenticação do proxy quebraria.
+  const atual = useProxyChip(chip.chip_id);
+  const definir = useDefinirProxy();
+  const remover = useRemoverProxy();
+  const aplicar = useAplicarProxy();
+  const [form, setForm] = useState<ProxyForm>(PROXY_VAZIO);
+  const [err, setErr] = useState<string | null>(null);
+  const [confirmar, setConfirmar] = useState(false);
+  const prefilled = useRef(false);
+
+  useEffect(() => {
+    if (prefilled.current || !atual.data) return;
+    prefilled.current = true;
+    const d = atual.data;
+    setForm({
+      protocolo: d.proxy_protocolo ?? 'http',
+      host: d.proxy_host ?? '',
+      porta: d.proxy_porta != null ? String(d.proxy_porta) : '',
+      usuario: d.proxy_usuario ?? '',
+      senha: '',
+    });
+  }, [atual.data]);
+
+  const temProxy = !!chip.proxy_resumo;
+  const ocupado = definir.isPending || remover.isPending || aplicar.isPending || atual.isLoading;
+
+  async function salvar() {
+    const v = validaProxy(form);
+    if ('erro' in v) { setErr(v.erro); return; }
+    setErr(null);
+    try {
+      await definir.mutateAsync({
+        chipId: chip.chip_id, protocolo: form.protocolo, host: v.host, porta: v.porta,
+        usuario: form.usuario, senha: form.senha,
+      });
+      const r = await aplicar.mutateAsync(chip.chip_id);
+      if (r.ok && r.aplicado) toast('Proxy salvo e aplicado. O tráfego deste número passa a sair por ele.');
+      else toast(`Proxy salvo, mas não foi aplicado à sessão: ${r.erro || 'o servidor de aquecimento recusou a configuração.'} O número continua saindo pelo IP do servidor.`, 'warn');
+      onClose();
+    } catch (e) { setErr(msgErro(e)); }
+  }
+
+  async function confirmarRemocao() {
+    setErr(null);
+    try {
+      await remover.mutateAsync(chip.chip_id);
+      const r = await aplicar.mutateAsync(chip.chip_id);   // empurra a REMOÇÃO para a instância
+      if (r.ok) toast('Proxy removido. Este número volta a sair pelo IP do servidor.');
+      else toast(`Proxy removido do cadastro, mas a sessão não foi atualizada: ${r.erro || 'o servidor de aquecimento não respondeu.'}`, 'warn');
+      onClose();
+    } catch (e) { setConfirmar(false); setErr(msgErro(e)); }
+  }
+
+  return (
+    <>
+      <Modal open onClose={() => { if (!ocupado) onClose(); }} closeOnBackdrop={!ocupado} width={520}
+        title={<div><div>Proxy do número em maturação</div><div className="cfg-sub">{chip.apelido} · {temProxy ? (chip.proxy_resumo ?? '') : 'sem proxy'}</div></div>}
+        footer={<>
+          <button className="atv-btn" disabled={ocupado} onClick={onClose}>Cancelar</button>
+          {temProxy && <button className="atv-btn danger" disabled={ocupado} onClick={() => setConfirmar(true)}>Remover proxy</button>}
+          <button className="atv-btn primary" disabled={ocupado} onClick={() => void salvar()}>
+            {definir.isPending || aplicar.isPending ? 'Aplicando…' : 'Salvar e aplicar'}
+          </button>
+        </>}>
+        {PROXY_NOTA}
+        {chip.proxy_pendente && (
+          <div className="matq-proxy-aviso warn">Este proxy está salvo mas <b>ainda não foi aplicado</b> à sessão. Salve novamente para tentar aplicar.</div>
+        )}
+        {chip.proxy_ultimo_erro && (
+          <div className="matq-proxy-aviso err">Última tentativa de aplicar falhou: {chip.proxy_ultimo_erro}</div>
+        )}
+        <MatProxyCampos id="intmat-px" valor={form} onChange={setForm} disabled={ocupado}
+          senhaPlaceholder={temProxy ? 'deixe em branco para manter a atual' : 'se o proxy exigir senha'} />
+        {err && <div className="atv-field-err">{err}</div>}
+      </Modal>
+      <ConfirmDialog
+        open={confirmar}
+        title="Remover o proxy deste número?"
+        message={`O número "${chip.apelido}" volta a sair pelo IP do servidor, o mesmo dos outros chips do pool. A sessão continua conectada — só a rota de saída muda.`}
+        destructive confirmLabel="Remover proxy" loading={remover.isPending || aplicar.isPending}
+        onConfirm={() => void confirmarRemocao()}
+        onCancel={() => { if (!remover.isPending && !aplicar.isPending) setConfirmar(false); }} />
+    </>
+  );
+}
+
 function MatNovoModal({ onClose, onCriado }: { onClose: () => void; onCriado: (chipId: string, apelido: string) => void }) {
   const { toast } = useToast();
   const criar = useCriarChip();
+  const definir = useDefinirProxy();
+  const aplicar = useAplicarProxy();
   const [apelido, setApelido] = useState('');
   const [operadora, setOperadora] = useState('');
+  const [usarProxy, setUsarProxy] = useState(false);
+  const [proxy, setProxy] = useState<ProxyForm>(PROXY_VAZIO);
   const [err, setErr] = useState<string | null>(null);
+  // O chip já criado não pode ser criado de novo se o proxy falhar: guarda o id para o retry.
+  const criadoRef = useRef<string | null>(null);
+  const ocupado = criar.isPending || definir.isPending || aplicar.isPending;
 
   async function salvar() {
     const nome = apelido.trim();
     if (!nome) { setErr('Informe um apelido para o número.'); return; }
+    // Validar o proxy ANTES de criar: erro de digitação não deve deixar um chip órfão no pool.
+    let px: { host: string; porta: number } | null = null;
+    if (usarProxy) {
+      const v = validaProxy(proxy);
+      if ('erro' in v) { setErr(v.erro); return; }
+      px = v;
+    }
     setErr(null);
     try {
-      const r = await criar.mutateAsync({ apelido: nome, operadora });
-      toast('Número criado. Leia o QR Code para conectar.');
-      if (r?.chip_id) onCriado(r.chip_id, nome);
-      else onClose();
+      let id = criadoRef.current;
+      if (!id) {
+        const r = await criar.mutateAsync({ apelido: nome, operadora });
+        id = r?.chip_id ?? null;
+        criadoRef.current = id;
+      }
+      if (!id) { toast('Número criado. Leia o QR Code para conectar.'); onClose(); return; }
+      // O proxy tem de estar em pé ANTES do pareamento: trocar o IP com a sessão já ativa é
+      // exatamente o movimento que o WhatsApp lê como sequestro de conta.
+      if (px) {
+        await definir.mutateAsync({
+          chipId: id, protocolo: proxy.protocolo, host: px.host, porta: px.porta,
+          usuario: proxy.usuario, senha: proxy.senha,
+        });
+        const r2 = await aplicar.mutateAsync(id);
+        if (!r2.ok || !r2.aplicado) {
+          setErr(`Número criado, mas o proxy não foi aplicado: ${r2.erro || 'o servidor de aquecimento recusou a configuração.'} Corrija o proxy e salve de novo — não leia o QR Code antes disso.`);
+          return;
+        }
+        toast('Número criado com proxy aplicado. Leia o QR Code para conectar.');
+      } else {
+        toast('Número criado. Leia o QR Code para conectar.');
+      }
+      onCriado(id, nome);
     } catch (e) { setErr(msgErro(e)); }
   }
 
   return (
-    <Modal open onClose={() => { if (!criar.isPending) onClose(); }} closeOnBackdrop={!criar.isPending} width={460}
+    <Modal open onClose={() => { if (!ocupado) onClose(); }} closeOnBackdrop={!ocupado} width={usarProxy ? 520 : 460}
       title="Adicionar número para maturação"
       footer={<>
-        <button className="atv-btn" disabled={criar.isPending} onClick={onClose}>Cancelar</button>
-        <button className="atv-btn primary" disabled={criar.isPending} onClick={salvar}>{criar.isPending ? 'Criando…' : 'Criar e conectar'}</button>
+        <button className="atv-btn" disabled={ocupado} onClick={onClose}>Cancelar</button>
+        <button className="atv-btn primary" disabled={ocupado} onClick={() => void salvar()}>{ocupado ? 'Criando…' : 'Criar e conectar'}</button>
       </>}>
       <p className="matq-lead">O número ganha uma sessão própria de aquecimento, separada das conexões de atendimento: não aparece no Inbox, não recebe conversas de clientes e não consome o limite do plano.</p>
       <div className="atv-field">
         <label htmlFor="intmat-apelido">Apelido</label>
         <input id="intmat-apelido" className="atv-input" placeholder="Ex.: Chip 4 — Vivo" value={apelido} maxLength={40}
-          onChange={(e) => setApelido(e.target.value)} disabled={criar.isPending} />
+          onChange={(e) => setApelido(e.target.value)} disabled={ocupado} />
       </div>
       <div className="atv-field">
         <label htmlFor="intmat-operadora">Operadora (opcional)</label>
-        <select id="intmat-operadora" className="atv-select" value={operadora} onChange={(e) => setOperadora(e.target.value)} disabled={criar.isPending}>
+        <select id="intmat-operadora" className="atv-select" value={operadora} onChange={(e) => setOperadora(e.target.value)} disabled={ocupado}>
           <option value="">Não informada</option>
           {OPERADORAS.map((o) => <option key={o} value={o}>{o}</option>)}
         </select>
       </div>
+
+      {/* Proxy no cadastro: dá para configurar depois, mas o melhor momento é ANTES de parear. */}
+      <label className="matq-proxy-toggle">
+        <input type="checkbox" checked={usarProxy} disabled={ocupado} onChange={(e) => setUsarProxy(e.target.checked)} />
+        <span>Configurar proxy (opcional)</span>
+      </label>
+      {usarProxy && (
+        <div className="matq-proxy-bloco">
+          {PROXY_NOTA}
+          <MatProxyCampos id="intmat-npx" valor={proxy} onChange={setProxy} disabled={ocupado}
+            senhaPlaceholder="se o proxy exigir senha" />
+        </div>
+      )}
       {err && <div className="atv-field-err">{err}</div>}
     </Modal>
   );

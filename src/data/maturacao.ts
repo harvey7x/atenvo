@@ -11,6 +11,9 @@ export type StatusIntegracao = 'desconectado' | 'sincronizando' | 'conectado' | 
 export type StatusMaturacao = 'novo' | 'aquecendo' | 'pausado' | 'maduro' | 'banido' | 'erro';
 export type TipoConteudo = 'texto' | 'figurinha' | 'audio' | 'imagem';
 export type CategoriaConteudo = 'abertura' | 'resposta' | 'conversa';
+/** Protocolos aceitos pelo check de `maturacao_chips.proxy_protocolo`. */
+export type ProxyProtocolo = 'http' | 'https' | 'socks4' | 'socks5';
+export const PROXY_PROTOCOLOS: ProxyProtocolo[] = ['http', 'https', 'socks4', 'socks5'];
 
 export interface MaturacaoConfig {
   organizacao_id: string;
@@ -49,6 +52,38 @@ export interface ChipPainel {
   erros_7d: number;
   pendentes_hoje: number;
   ultimo_erro_em: string | null;
+  /** `protocolo://host:porta` quando há proxy configurado. Nunca inclui usuário/senha. */
+  proxy_resumo: string | null;
+  /** Configurado E já empurrado para a instância na Evolution. */
+  proxy_ativo: boolean;
+  /** Configurado mas AINDA NÃO aplicado na Evolution — o tráfego continua saindo pelo servidor. */
+  proxy_pendente: boolean;
+  proxy_ultimo_erro: string | null;
+}
+
+/** Campos do proxy que o cliente pode LER (a senha está fora do grant de SELECT, de propósito). */
+export interface ProxyChip {
+  proxy_protocolo: ProxyProtocolo | null;
+  proxy_host: string | null;
+  proxy_porta: number | null;
+  proxy_usuario: string | null;
+}
+
+/** Entrada das RPCs de proxy. `senha` vazia PRESERVA a senha guardada (o cliente não a lê). */
+export interface ProxyInput {
+  chipId: string;
+  protocolo: ProxyProtocolo;
+  host: string;
+  porta: number;
+  usuario?: string;
+  senha?: string;
+}
+
+/** Resposta da action `proxy` da Edge. `ok:false` = salvo no banco, mas a Evolution recusou. */
+export interface ProxyAplicado {
+  ok: boolean;
+  aplicado: boolean;
+  erro?: string;
 }
 
 export interface Semente {
@@ -91,25 +126,32 @@ export function traduzMaturacao(msg: string): string {
   if (m.includes('conteudo_vazio')) return 'Escreva o texto da mensagem.';
   if (m.includes('conteudo_nao_encontrado')) return 'Conteúdo não encontrado (pode já ter sido excluído).';
   if (m.includes('mcfg_janela')) return 'A hora final precisa ser maior que a hora inicial.';
+  if (m.includes('protocolo_invalido')) return 'Escolha o protocolo do proxy: http, https, socks4 ou socks5.';
+  if (m.includes('host_obrigatorio')) return 'Informe o endereço (host ou IP) do proxy.';
+  if (m.includes('porta_invalida')) return 'Informe a porta do proxy (entre 1 e 65535).';
+  if (m.includes('mchip_proxy_completo')) return 'Proxy incompleto: protocolo, host e porta precisam ser informados juntos.';
   return msg || 'Falha na operação.';
 }
 
 function erro(msg: string): never { throw new Error(traduzMaturacao(msg)); }
 
+/** Corpo JSON de uma resposta non-2xx da Edge — supabase-js não parseia, só entrega o Response. */
+async function corpoEdge(error: unknown, data: unknown): Promise<{ error?: string; erro?: string } | null> {
+  const d = data as { error?: string; erro?: string } | null;
+  if (d && (d.error || d.erro)) return d;
+  const ctx = (error as { context?: Response })?.context;
+  if (ctx && typeof ctx.json === 'function') {
+    try { return await ctx.clone().json() as { error?: string; erro?: string }; } catch { /* corpo não-JSON */ }
+  }
+  return null;
+}
+
 /** Edge Function `maturacao-manage`. Lê o erro real do corpo (supabase-js não parseia non-2xx). */
 async function invoke<T>(body: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase!.functions.invoke('maturacao-manage', { body });
   if (error) {
-    let msg = error.message;
-    const ed = data as { error?: string } | null;
-    if (ed?.error) msg = ed.error;
-    else {
-      const ctx = (error as { context?: Response }).context;
-      if (ctx && typeof ctx.json === 'function') {
-        try { const b = await ctx.clone().json() as { error?: string }; if (b?.error) msg = b.error; } catch { /* mantém msg */ }
-      }
-    }
-    erro(msg);
+    const b = await corpoEdge(error, data);
+    erro(b?.error || error.message);
   }
   return data as T;
 }
@@ -230,6 +272,99 @@ export function useExcluirChip() {
   const org = currentOrg.id;
   return useMutation({
     mutationFn: async (chipId: string) => invoke<{ ok?: boolean }>({ action: 'remover', chip_id: chipId }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['mat-painel', org] }); },
+  });
+}
+
+/* ===================== Proxy por chip (OPCIONAL) =====================
+   Depois do QR quem fala com o WhatsApp é o servidor Evolution, então todos os chips saem
+   pelo MESMO IP — assinatura clássica de fazenda. O proxy por instância resolve isso, mas é
+   opcional de propósito: proxy instável derruba a sessão e custa a rampa inteira.
+   A senha NUNCA volta para o cliente (fora do grant de SELECT); mandar senha vazia na RPC
+   preserva a que já está guardada. */
+
+/** Lê os campos editáveis do proxy (sem a senha) para pré-preencher o formulário.
+ *  Sem isso, salvar host/porta apagaria o usuário guardado e quebraria a autenticação. */
+export function useProxyChip(chipId: string | null) {
+  const { currentOrg } = useOrg();
+  const org = currentOrg.id;
+  return useQuery({
+    queryKey: ['mat-proxy', org, chipId],
+    enabled: MATURACAO_REAL && !!chipId,
+    gcTime: 0,
+    staleTime: 0,
+    queryFn: async (): Promise<ProxyChip> => {
+      const { data, error } = await supabase!.from('maturacao_chips')
+        .select('proxy_protocolo, proxy_host, proxy_porta, proxy_usuario')
+        .eq('id', chipId!).maybeSingle();
+      if (error) erro(error.message);
+      return (data as ProxyChip | null) ?? { proxy_protocolo: null, proxy_host: null, proxy_porta: null, proxy_usuario: null };
+    },
+  });
+}
+
+/** Guarda o proxy no banco. Fica PENDENTE até a Edge empurrar para a Evolution (`useAplicarProxy`). */
+export function useDefinirProxy() {
+  const qc = useQueryClient();
+  const { currentOrg } = useOrg();
+  const org = currentOrg.id;
+  return useMutation({
+    mutationFn: async (p: ProxyInput) => {
+      const { error } = await supabase!.rpc('maturacao_chip_proxy_definir', {
+        p_chip: p.chipId,
+        p_protocolo: p.protocolo,
+        p_host: p.host,
+        p_porta: p.porta,
+        p_usuario: p.usuario?.trim() || null,
+        // vazio = manter a senha atual (o cliente não consegue lê-la para reenviar)
+        p_senha: p.senha || null,
+      });
+      if (error) erro(error.message);
+    },
+    onSuccess: (_d, p) => {
+      qc.invalidateQueries({ queryKey: ['mat-painel', org] });
+      qc.invalidateQueries({ queryKey: ['mat-proxy', org, p.chipId] });
+    },
+  });
+}
+
+/** Apaga o proxy: o chip volta a sair pelo IP do servidor. Aplique depois para valer na sessão. */
+export function useRemoverProxy() {
+  const qc = useQueryClient();
+  const { currentOrg } = useOrg();
+  const org = currentOrg.id;
+  return useMutation({
+    mutationFn: async (chipId: string) => {
+      const { error } = await supabase!.rpc('maturacao_chip_proxy_remover', { p_chip: chipId });
+      if (error) erro(error.message);
+    },
+    onSuccess: (_d, chipId) => {
+      qc.invalidateQueries({ queryKey: ['mat-painel', org] });
+      qc.invalidateQueries({ queryKey: ['mat-proxy', org, chipId] });
+    },
+  });
+}
+
+/** Empurra o proxy guardado (ou a remoção dele) para a instância na Evolution.
+ *  NÃO lança quando a Evolution recusa: devolve `{ ok:false, erro }` porque o cadastro já foi
+ *  salvo e o painel precisa mostrar "pendente" + o motivo, não um estado inventado. */
+export function useAplicarProxy() {
+  const qc = useQueryClient();
+  const { currentOrg } = useOrg();
+  const org = currentOrg.id;
+  return useMutation({
+    mutationFn: async (chipId: string): Promise<ProxyAplicado> => {
+      const { data, error } = await supabase!.functions.invoke('maturacao-manage', {
+        body: { action: 'proxy', chip_id: chipId },
+      });
+      if (error) {
+        const b = await corpoEdge(error, data);
+        // `erro` = a Evolution recusou o proxy (502 com o motivo). `error` = falha de acesso/rota.
+        if (b?.erro) return { ok: false, aplicado: false, erro: b.erro };
+        erro(b?.error || error.message);
+      }
+      return (data as ProxyAplicado) ?? { ok: false, aplicado: false };
+    },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['mat-painel', org] }); },
   });
 }

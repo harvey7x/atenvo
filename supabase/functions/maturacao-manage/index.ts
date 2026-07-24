@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
     if (action !== 'criar') {
       if (!body.chip_id) return json({ error: 'chip_id obrigatório' }, 400);
       const { data } = await admin.from('maturacao_chips')
-        .select('id, organizacao_id, apelido, instancia_externa, numero_conectado, status_integracao, status_maturacao')
+        .select('id, organizacao_id, apelido, instancia_externa, numero_conectado, status_integracao, status_maturacao, proxy_protocolo, proxy_host, proxy_porta, proxy_usuario, proxy_senha')
         .eq('id', body.chip_id).maybeSingle();
       if (!data) return json({ error: 'chip não encontrado' }, 404);
       chip = data;
@@ -96,6 +96,41 @@ Deno.serve(async (req) => {
 
     const instancia = chip!.instancia_externa as string | null;
     if (!instancia) return json({ error: 'chip sem instância' }, 409);
+
+    // ── proxy: empurra (ou remove) o proxy guardado no banco para a instância ──
+    // A senha nunca trafega para o cliente: ela sai daqui direto para a Evolution.
+    // Falha NÃO derruba o chip — só registra o erro para o painel mostrar, porque
+    // proxy quebrado com fallback silencioso é pior que proxy ausente.
+    if (action === 'proxy') {
+      const temProxy = !!chip!.proxy_host;
+      try {
+        if (temProxy) {
+          await evolution.setProxy(instancia, {
+            host: chip!.proxy_host as string,
+            port: chip!.proxy_porta as number,
+            protocol: chip!.proxy_protocolo as string,
+            username: chip!.proxy_usuario as string | null,
+            password: chip!.proxy_senha as string | null,
+          });
+        } else {
+          await evolution.removeProxy(instancia);
+        }
+        await admin.from('maturacao_chips').update({
+          proxy_aplicado_em: temProxy ? new Date().toISOString() : null,
+          proxy_ultimo_erro: null,
+          atualizado_em: new Date().toISOString(),
+        }).eq('id', chip!.id);
+        return json({ ok: true, aplicado: temProxy });
+      } catch (e) {
+        const erro = ((e as Error)?.message ?? 'erro').slice(0, 300);
+        await admin.from('maturacao_chips').update({
+          proxy_aplicado_em: null,
+          proxy_ultimo_erro: erro,
+          atualizado_em: new Date().toISOString(),
+        }).eq('id', chip!.id);
+        return json({ ok: false, aplicado: false, erro }, 502);
+      }
+    }
 
     // ── qr: (re)conecta e devolve o QR para leitura no celular ────────────────
     if (action === 'qr') {
