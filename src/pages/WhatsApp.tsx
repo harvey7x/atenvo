@@ -17,6 +17,7 @@ import { analisarNome, conversaAtiva, decidirDono, decidirNome, estadoHigiene, t
 import { construirItensConversa } from '@/lib/dataConversa';
 import { canalValidoParaEnvio } from '@/lib/agendamentoMensagem';
 import { useAgendarSequencia, useMensagensAgendadas, useEditarAgendamento, useCancelarAgendamento, type MensagemAgendada } from '@/data/whatsapp';
+import { useJanelaCanal, rotuloJanela } from '@/data/cloudApi';
 import { AgendarMensagemModal, type AgendarSubmit } from '@/components/AgendarMensagemModal';
 import { HIGIENE_CORTE_ISO, HIGIENE_DIAS_ADAPTACAO } from '@/config/higiene';
 import { useHigieneConversa, useRegistrarAdiamento, HIGIENE_VAZIO } from '@/data/higiene';
@@ -385,21 +386,34 @@ export function WhatsApp() {
   // Inclui canais DESCONECTADOS (não troca silenciosamente para outro chip). NUNCA usa o chip da conversa
   // anterior, o primeiro da lista, nem o último envio do atendente.
   const autoCanalRef = useRef<{ conv: string; canal: string } | null>(null);
+  // Escolha MANUAL do atendente. Com dois números de papéis diferentes, trocar o canal na mão passa
+  // a ser decisão consciente ("respondo pelo número que ele conhece") — e o recálculo automático
+  // atropelava isso sozinho assim que chegava um inbound por outro número. Agora só o próprio
+  // atendente desfaz, trocando de conversa ou escolhendo de novo.
+  const canalManualRef = useRef<string | null>(null);
   useEffect(() => {
     if (!WA_REAL) return;
     const ult = current.ultimoCanal?.canalId;
     const canalDaConversa = (ult && realCanais.some((c) => c.id === ult)) ? ult
       : (current.canalId && realCanais.some((c) => c.id === current.canalId)) ? current.canalId
       : '';
-    // recalcula ao trocar de conversa OU quando o canal real da conversa muda (ex.: novo inbound por outro chip).
-    // Seleção manual (onReplyCanal) persiste enquanto o canal da conversa não muda.
-    if (!autoCanalRef.current || autoCanalRef.current.conv !== currentId || autoCanalRef.current.canal !== canalDaConversa) {
+    const trocouDeConversa = autoCanalRef.current?.conv !== currentId;
+    if (trocouDeConversa) canalManualRef.current = null;   // conversa nova, escolha nova
+    // recalcula ao trocar de conversa OU quando o canal real da conversa muda (ex.: novo inbound por outro chip),
+    // MAS nunca por cima de uma escolha manual dentro da mesma conversa.
+    if (!autoCanalRef.current || trocouDeConversa || autoCanalRef.current.canal !== canalDaConversa) {
       autoCanalRef.current = { conv: currentId, canal: canalDaConversa };
-      setReplyCanalId(canalDaConversa);
+      if (trocouDeConversa || !canalManualRef.current) setReplyCanalId(canalDaConversa);
     }
   }, [currentId, current.ultimoCanal?.canalId, current.canalId, realCanais.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const canalSel = realCanais.find((c) => c.id === replyCanalId) ?? null;
+  // JANELA DE 24H: só existe na Cloud API, e é do PAR (canal, contato) — falar com um número não
+  // abre a janela do outro. Sem isto o atendente escreve, o envio falha com 131047 e ele não
+  // entende por quê (o erro cru da Meta não é traduzido em lugar nenhum).
+  const canalEhCloud = (canalSel?.transporte ?? 'evolution') === 'cloud_api';
+  const janelaQ = useJanelaCanal(canalSel?.id ?? null, current.contatoId ?? null, canalEhCloud);
+  const janela = janelaQ.data;
   const canalConectado = !WA_REAL || (canalSel?.status === 'conectado');
   const canalIndisponivel = WA_REAL && !!canalSel && !canalConectado;
   // Contenção: número com restrição de conta no WhatsApp -> bloqueado só para ENVIO (recebe normal).
@@ -861,6 +875,7 @@ export function WhatsApp() {
   }
   function onReplyCanal(id: string) {
     setReplyCanalId(id);
+    canalManualRef.current = id;      // a partir daqui, o automático não mexe mais nesta conversa
     const c = realCanais.find((x) => x.id === id);
     if (c) toast('Respondendo por ' + c.alias);
   }
@@ -1138,7 +1153,19 @@ export function WhatsApp() {
                         <span className={'ctag ctag--' + (hSit.variante ?? 'atendimento') + (cor ? ' ctag--kanban' : '')}
                               style={cor ? { background: cor, borderColor: cor } : undefined} title="Etapa no Kanban">{hSit.texto}</span>
                       ); })()}
-                      {current.chip && <span className="cresp" title="Canal atual do atendimento">{current.chip}</span>}
+                      {canalSel
+                        ? <span className="cresp" title={`Respondendo por ${canalSel.alias}${canalSel.numero ? ' · ' + mascararNumero(canalSel.numero) : ''}`}>
+                            {canalSel.alias}{canalSel.numero ? ' · ' + mascararNumero(canalSel.numero) : ''}
+                          </span>
+                        : current.chip && <span className="cresp" title="Canal atual do atendimento">{current.chip}</span>}
+                      {canalEhCloud && janela && (
+                        <span className={'ctag ctag--' + (janela.aberta ? 'atendimento' : 'alerta')}
+                              title={janela.aberta
+                                ? 'Dentro das 24 horas: dá para responder com texto livre por este número.'
+                                : 'Passaram 24 horas desde a última mensagem do cliente PARA ESTE número. Só um modelo aprovado pela Meta pode sair daqui.'}>
+                          {rotuloJanela(janela)}
+                        </span>
+                      )}
                       <span className="cresp" title="Atendente responsável">{respNome ? (current.respId === user?.id ? 'Você' : respNome) : 'Não atribuído'}</span>
                     </div>
                   </div>

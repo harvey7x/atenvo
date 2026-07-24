@@ -5,6 +5,11 @@
 //  * auth por x-bot-secret == webhook_config.bot_remarketing (padrão do cron). Deploy --no-verify-jwt.
 //  * Guardas: janela seg-sáb 09-18 SP, teto diário (env), 1 toque/opp/dia (RPC), pausa/humano/sem-whatsapp (RPC),
 //    e checagem FINAL da coluna no instante do envio (anti-race: time fechou o cliente entre o tick e o disparo).
+//
+// DOIS NÚMEROS (24/07/2026): o toque sai SEMPRE pelo CANAL DE DISPARO (papel='disparo',
+// transporte='cloud_api'), resolvido por wa_canal_disparo() NO MOMENTO DO ENVIO — nunca por
+// bot_remarketing.canal_id, que é cópia congelada do canal de ENTRADA (chip de tráfego).
+// Sem canal de disparo => NÃO envia. Nunca cai para a Evolution por omissão.
 //  * IA por toque (Claude→Gemini) + MESMO guardrail.ts; se a IA cair/guardrail barrar 2x → copy fixo do ângulo.
 //
 // BLOCO 5 — JANELA DE 24H (só afeta canal transporte='cloud_api'; Evolution segue idêntica):
@@ -22,8 +27,8 @@ import { anguloDoToque, systemRemarketing, preencherNome } from '../bot-runner/r
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const EVO_BASE = (Deno.env.get('EVOLUTION_API_URL') ?? '').replace(/\/+$/, '');
-const EVO_KEY = Deno.env.get('EVOLUTION_API_KEY') ?? '';
+// Este worker NÃO fala mais com a Evolution: o remarketing sai exclusivamente pelo canal de
+// disparo (cloud_api). Sem EVO_BASE/EVO_KEY aqui, não há como voltar a cair no chip de tráfego.
 const ATIVO = (Deno.env.get('REMARKETING_ATIVO') ?? 'nao').toLowerCase() === 'sim';
 const TETO_DIA = Math.max(0, Number(Deno.env.get('REMARKETING_TETO_DIA')) || 20);
 
@@ -44,20 +49,12 @@ function dentroDaJanela(s: { weekday: string; hour: number }): boolean {
   return s.weekday !== 'Sun' && s.hour >= 9 && s.hour < 18; // seg-sáb, 09:00-17:59
 }
 
-async function evoSendText(instancia: string, numero: string, texto: string): Promise<{ ok: boolean; id?: string; erro?: string }> {
-  try {
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 20000);
-    const res = await fetch(`${EVO_BASE}/message/sendText/${instancia}`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json', apikey: EVO_KEY },
-      body: JSON.stringify({ number: numero, text: texto }), signal: ctrl.signal,
-    });
-    clearTimeout(t);
-    const txt = await res.text();
-    let data: any = null; try { data = txt ? JSON.parse(txt) : null; } catch { data = { raw: txt }; }
-    if (res.ok && (data?.key?.id || data?.status)) return { ok: true, id: data?.key?.id ?? null };
-    return { ok: false, erro: (data?.message ?? data?.error ?? `HTTP ${res.status}`)?.toString?.().slice(0, 300) };
-  } catch (e) { return { ok: false, erro: (e as Error)?.message ?? 'network' }; }
+/** Extrai o código numérico do erro da Meta da mensagem do adaptador. O transporte junta
+ *  message/error_user_msg/details numa string; 131050 (opt-out) e 131047 (fora da janela)
+ *  precisam ser distinguidos de falha de rede, senão o painel acusa o canal como restrito à toa. */
+function codigoMeta(msg: string): number | undefined {
+  const m = (msg || '').match(/\b(13\d{4})\b/);
+  return m ? Number(m[1]) : undefined;
 }
 
 // gera a mensagem do toque: IA (Claude→Gemini) → guardrail → fallback fixo do ângulo (nunca morre/suja).
@@ -168,49 +165,103 @@ Deno.serve(async (req) => {
     // Sem esta memória por tick, cada lead bloqueado geraria uma linha de audit_log a cada 10 min —
     // ruído que esconde o que importa. Aqui a org é avisada UMA vez por execução.
     const orgSemTemplate = new Set<string>();
+    const orgSemCanal = new Set<string>();
     for (const row of fila) {
       if (enviados >= restante) break;
 
-      // 6) TRANSPORTE + JANELA primeiro. Vem ANTES da IA de propósito: se o toque está bloqueado
-      //    pela janela, gerar o texto seria pagar Claude/Gemini para jogar fora. (Na Evolution nada
-      //    muda: ehCloud=false, dentroJanela=true, e o fluxo segue exatamente como sempre foi.)
+      // ══════ 6) CANAL DE DISPARO — resolvido AGORA, não na entrada da fila ══════
+      // bot_remarketing.canal_id é cópia CONGELADA de conversas.canal_id, tirada quando a opp
+      // entrou em REMARKETING. As 52 linhas existentes apontam 100% para canal Evolution — ou
+      // seja, ler dali para enviar faria o remarketing sair pelo chip de TRÁFEGO, que é
+      // exatamente o que derrubava os números. A coluna fica como registro histórico
+      // ("de onde a conversa veio") e NUNCA mais decide destino.
+      // organizacao_id vem da FILA (bot_remarketing_due). Sem ela, wa_canal_disparo(null) devolve
+      // null e o toque vira 'sem_canal_disparo' pelo motivo errado — parecendo comportamento certo.
+      const orgRow = (row.organizacao_id as string | null) ?? null;
+      if (!orgRow) {
+        resultados.push({ id: row.id, toque: row.toque, status_envio: 'sem_organizacao' });
+        continue;
+      }
+      const { data: canalDisparoId } = await admin.rpc('wa_canal_disparo', { p_org: orgRow });
+
+      if (!canalDisparoId) {
+        // Nenhum canal de disparo, ou ambíguo (2+ sem disparo_padrao). NÃO cai para a Evolution
+        // por omissão — cair de volta no número de tráfego é o bug que esta frente existe para matar.
+        resultados.push({ id: row.id, toque: row.toque, status_envio: 'sem_canal_disparo' });
+        const chaveOrg = String(orgRow ?? '-');
+        if (!orgSemCanal.has(chaveOrg)) {
+          orgSemCanal.add(chaveOrg);
+          try {
+            await admin.from('audit_log').insert({
+              usuario_id: null, acao: 'bot_remarketing', entidade: 'bot_remarketing', entidade_id: row.id,
+              organizacao_id: orgRow,
+              dados_depois: { status_envio: 'sem_canal_disparo', dry_run: dryRun, nota: 'nenhum canal cloud_api com papel disparo ativo, ou mais de um sem disparo_padrao — um registro por execução' },
+            });
+          } catch { /* audit best-effort */ }
+        }
+        continue;
+      }
+
       const { data: canal } = await admin.from('canais')
-        .select('id, organizacao_id, instancia_externa, transporte, cloud_phone_number_id')
-        .eq('id', row.canal_id).maybeSingle();
+        .select('id, organizacao_id, nome_interno, numero_conectado, instancia_externa, transporte, cloud_phone_number_id, envio_restrito, status_integracao, ativo')
+        .eq('id', canalDisparoId as string).maybeSingle();
+      // wa_canal_disparo já garante cloud_api + ativo + papel; isto é cinto e suspensório.
       const ehCloud = (canal?.transporte as string | null) === 'cloud_api';
-      const orgRow = (canal?.organizacao_id as string | null) ?? row.organizacao_id ?? null;
-      let dentroJanela = true;
+      if (!canal || !ehCloud) {
+        resultados.push({ id: row.id, toque: row.toque, status_envio: 'sem_canal_disparo', motivo: 'canal_invalido' });
+        continue;
+      }
+      // O worker NÃO passa pelo evolution-send, então as barreiras de "quem pode disparar"
+      // precisam existir aqui dentro — senão ele contorna todas elas.
+      if (canal.envio_restrito) {
+        resultados.push({ id: row.id, toque: row.toque, status_envio: 'canal_restrito' });
+        continue;
+      }
+
+      // ══════ 6.2) OPT-OUT DA META — antes de qualquer trabalho ══════
+      // 131050/user_preferences: a pessoa disse à Meta que não quer marketing deste número.
+      // Reenviar depois disso é o caminho mais rápido para derrubar o rating.
+      const { data: optout } = await admin.rpc('wa_optout_ativo', { p_contato: row.contato_id, p_canal: canal.id });
+      if (optout === true) {
+        resultados.push({ id: row.id, toque: row.toque, status_envio: 'optout_meta' });
+        // não consome o toque: se um dia der 'resume', a cadência continua de onde parou.
+        continue;
+      }
+
+      // ══════ 6.3) JANELA POR (CANAL DE DISPARO, CONTATO) ══════
+      // A janela é do NÚMERO REMETENTE. Perguntar pela conversa daria "aberta" por causa do
+      // inbound no número de atendimento — janela fantasma, e a Meta recusaria com 131047.
+      const { data: d } = await admin.rpc('wa_dentro_janela', { p_canal: canal.id, p_contato: row.contato_id });
+      const dentroJanela = d === true;
+      // toque do banco é 0-based (índice de ANGULOS); o template é 1-based, como no painel.
+      const toqueTemplate = (row.toque ?? 0) + 1;
       let tpl: TemplateRow | null = null;
-      if (ehCloud) {
-        const { data: d } = await admin.rpc('wa_dentro_janela', { p_conversa: row.conversa_id });
-        dentroJanela = d === true;
-        if (!dentroJanela) {
-          const { data: t } = orgRow ? await admin.rpc('wa_template_para_envio', { p_org: orgRow }) : { data: null };
-          tpl = ((Array.isArray(t) ? t[0] : t) ?? null) as TemplateRow | null;
-          if (!tpl) {
-            // REGRA DURA: sem template aprovado o toque NÃO sai e NÃO consome a cadência —
-            // se consumisse, o lead perderia toques em silêncio por um problema de configuração.
-            resultados.push({ id: row.id, toque: row.toque, status_envio: 'bloqueada_janela', motivo: 'sem_template_aprovado' });
-            const chaveOrg = String(orgRow ?? '-');
-            if (!orgSemTemplate.has(chaveOrg)) {
-              orgSemTemplate.add(chaveOrg);
-              try {
-                await admin.from('audit_log').insert({
-                  usuario_id: null, acao: 'bot_remarketing', entidade: 'bot_remarketing', entidade_id: row.id,
-                  organizacao_id: orgRow,
-                  dados_depois: { status_envio: 'bloqueada_janela', motivo: 'sem_template_aprovado', transporte: 'cloud_api', dry_run: dryRun, nota: 'um registro por execução — o bloqueio vale para todos os leads fora da janela desta organização' },
-                });
-              } catch { /* audit best-effort */ }
-            }
-            continue;
+      if (!dentroJanela) {
+        const { data: t } = await admin.rpc('wa_template_para_envio', { p_org: orgRow, p_toque: toqueTemplate });
+        tpl = ((Array.isArray(t) ? t[0] : t) ?? null) as TemplateRow | null;
+        if (!tpl) {
+          // REGRA DURA: sem template aprovado para ESTE toque, não sai e NÃO consome a cadência —
+          // se consumisse, o lead perderia toques em silêncio por um problema de configuração.
+          resultados.push({ id: row.id, toque: row.toque, status_envio: 'bloqueada_janela', motivo: `sem_template_toque_${toqueTemplate}` });
+          const chaveToque = `${orgRow ?? '-'}|${toqueTemplate}`;
+          if (!orgSemTemplate.has(chaveToque)) {
+            orgSemTemplate.add(chaveToque);
+            try {
+              await admin.from('audit_log').insert({
+                usuario_id: null, acao: 'bot_remarketing', entidade: 'bot_remarketing', entidade_id: row.id,
+                organizacao_id: orgRow,
+                dados_depois: { status_envio: 'bloqueada_janela', motivo: 'sem_template_aprovado', toque: toqueTemplate, transporte: 'cloud_api', dry_run: dryRun, nota: 'um registro por execução e por toque' },
+              });
+            } catch { /* audit best-effort */ }
           }
+          continue;
         }
       }
 
       // 6.1) gera a mensagem (IA é a parte lenta, ~1-2s no Claude). Fora da janela o texto da IA
       //      NÃO é enviado — quem vai é o template — mas continua servindo de contexto/histórico.
       const angulo = anguloDoToque(row.toque ?? 0);
-      const usaTemplate = ehCloud && !dentroJanela;
+      const usaTemplate = !dentroJanela;   // o canal de disparo é sempre cloud_api
       // o nome só é buscado no ramo do template — no ramo normal quem já busca é o gerarToque,
       // e consultar duas vezes seria custo novo num caminho que não mudou.
       const primeiro = usaTemplate ? primeiroNome(await nomeDoContato(admin, row)) : '';
@@ -224,49 +275,57 @@ Deno.serve(async (req) => {
       const { data: pode } = await admin.rpc('bot_remarketing_checar_envio', { p_id: row.id });
       if (!pode) { resultados.push({ id: row.id, skipped: 'saiu_da_coluna' }); continue; }
 
-      // 8) envio real só com ATIVO && !dryRun; senão simula
-      let envio: { ok: boolean; id?: string; erro?: string } = { ok: true };
+      // ══════ 8) ENVIO — sempre pela Cloud API, sempre pelo canal de disparo ══════
+      let envio: { ok: boolean; id?: string; erro?: string; codigo?: number } = { ok: true };
       let statusEnvio = 'simulada';
-      const modoEnvio = ehCloud ? (dentroJanela ? 'cloud_texto' : 'cloud_template') : 'evolution_texto';
+      const modoEnvio = dentroJanela ? 'cloud_texto' : 'cloud_template';
       if (ATIVO && !dryRun) {
+        // DESTINO: só contato com wa_id de inbound registrado. A Cloud API não tem onWhatsApp,
+        // então não dá para validar o número antes — e cada template é dinheiro. Nunca outbound-first.
         const { data: ident } = await admin.from('contato_identidades')
           .select('valor_normalizado').eq('contato_id', row.contato_id).eq('tipo', 'whatsapp')
           .not('valor_normalizado', 'is', null).order('principal', { ascending: false }).limit(1).maybeSingle();
         const destino = ident?.valor_normalizado ?? null;
-        const temTransporte = ehCloud ? !!canal?.cloud_phone_number_id : !!canal?.instancia_externa;
-        if (!temTransporte || !destino) {
-          envio = { ok: false, erro: !destino ? 'sem_destino' : 'sem_instancia' };
+        // ANTI-AUTOENVIO: o worker não passa pelo evolution-send, que é quem normalmente barra isso.
+        const ehProprioNumero = !!destino && !!canal.cloud_phone_number_id
+          && destino === (canal as { numero_conectado?: string | null }).numero_conectado;
+
+        if (!canal.cloud_phone_number_id || !destino) {
+          envio = { ok: false, erro: !destino ? 'sem_destino' : 'sem_phone_number_id' };
           statusEnvio = 'falhou';
-        } else if (ehCloud) {
-          // Cloud API: dentro da janela vai o texto da IA; fora, o template aprovado. `texto` já é o
-          // corpo do template preenchido nesse caso, então o histórico registra o que o cliente leu.
+        } else if (ehProprioNumero) {
+          envio = { ok: false, erro: 'autoenvio' };
+          statusEnvio = 'falhou';
+        } else {
           const tx = enviadorDe(canal as { transporte?: string | null; instancia_externa?: string | null; cloud_phone_number_id?: string | null });
           try {
             const enviado = dentroJanela
               ? await tx.sendText(destino, texto)
               : await tx.sendTemplate(destino, { nome: tpl!.nome, idioma: tpl!.idioma, variaveis: varsDoTemplate(tpl!, primeiro) });
             envio = { ok: !!enviado?.key?.id, id: enviado?.key?.id, erro: enviado?.key?.id ? undefined : 'sem_id_externo' };
-          } catch (e) { envio = { ok: false, erro: (e as Error)?.message?.slice(0, 300) ?? 'erro_cloud' }; }
+          } catch (e) {
+            const msg = (e as Error)?.message ?? 'erro_cloud';
+            envio = { ok: false, erro: msg.slice(0, 300), codigo: codigoMeta(msg) };
+          }
           statusEnvio = envio.ok ? 'enviada' : 'falhou';
+
+          // 131050 = a pessoa pediu à Meta para parar de receber marketing deste número.
+          // "Do not retry sending messages to this user" — vira estado, não tentativa perdida.
+          if (envio.codigo === 131050) {
+            statusEnvio = 'optout_meta';
+            try { await admin.rpc('wa_optout_registrar', { p_contato: row.contato_id, p_canal: canal.id, p_motivo: 'erro_131050', p_detalhe: envio.erro ?? null }); }
+            catch { /* best-effort */ }
+          }
+
           if (envio.ok && row.conversa_id) {
             const nowIso = new Date().toISOString();
             await admin.from('mensagens').insert({
               organizacao_id: orgRow ?? undefined, conversa_id: row.conversa_id,
               direcao: 'saida', tipo: 'texto', conteudo: texto, autor_id: null, origem: 'bot',
               status: 'enviada', id_externo: envio.id ?? null,
-              metadados: dentroJanela ? { via: 'remarketing', transporte: 'cloud_api' }
-                                      : { via: 'remarketing', transporte: 'cloud_api', template: tpl!.nome, template_id: tpl!.id },
-            });
-            await admin.from('conversas').update({ ultima_interacao_em: nowIso }).eq('id', row.conversa_id);
-          }
-        } else {
-          envio = await evoSendText(canal!.instancia_externa as string, destino, texto);
-          statusEnvio = envio.ok ? 'enviada' : 'falhou';
-          if (envio.ok && row.conversa_id) {
-            const nowIso = new Date().toISOString();
-            await admin.from('mensagens').insert({
-              organizacao_id: row.organizacao_id ?? undefined, conversa_id: row.conversa_id, direcao: 'saida', tipo: 'texto',
-              conteudo: texto, autor_id: null, origem: 'bot', status: 'enviada', id_externo: envio.id ?? null,
+              metadados: dentroJanela
+                ? { via: 'remarketing', transporte: 'cloud_api', canal_disparo: canal.nome_interno }
+                : { via: 'remarketing', transporte: 'cloud_api', canal_disparo: canal.nome_interno, template: tpl!.nome, template_id: tpl!.id, toque: toqueTemplate },
             });
             await admin.from('conversas').update({ ultima_interacao_em: nowIso }).eq('id', row.conversa_id);
           }
@@ -275,7 +334,7 @@ Deno.serve(async (req) => {
 
       // 9) avança a cadência só se o envio não falhou de fato (em dry_run sempre avança — simula progressão)
       let proximo: string | null = null;
-      if (statusEnvio !== 'falhou') {
+      if (statusEnvio !== 'falhou' && statusEnvio !== 'optout_meta') {
         const { data: prox } = await admin.rpc('bot_remarketing_registrar_toque', { p_id: row.id });
         proximo = (prox as string) ?? null;
         enviados++;

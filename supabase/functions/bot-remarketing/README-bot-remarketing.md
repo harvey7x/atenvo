@@ -94,3 +94,50 @@ bot-runner (master OFF) seguem intactos. Zero dependência nova.
 - RPCs validadas no banco: cadência D+1/3/6/10/15→concluído, janela SP, opt-out regex, anti-race.
 - 3 cenários do lead-que-responde (respondeu→LEAD NOVO / opt-out→PERDIDO / lead comum→sem_remarketing): OK.
 - Cron ativo `*/10` (secret por subquery), rodou 1× em dry_run: `entrou:0`, sem erro.
+
+---
+
+## Dois números: quem dispara é o canal de DISPARO (24/07/2026)
+
+`bot_remarketing.canal_id` é cópia **congelada** do canal da conversa (o chip que recebeu o lead).
+Ele **não decide destino** — serve só como registro de origem. O canal de saída é resolvido **no
+momento do envio** por `wa_canal_disparo(org)`:
+
+1. o canal `cloud_api` ativo marcado como `disparo_padrao`; senão
+2. se existir **exatamente um** canal com `papel in ('disparo','ambos')`, ele; senão
+3. **nada** — e aí o toque não sai (`sem_canal_disparo`). Chutar entre dois números pagos é pior
+   que não mandar, e cair na Evolution por omissão é o bug que derrubava os chips.
+
+### Barreiras que moram DENTRO deste worker
+
+Ele **não passa pelo `evolution-send`**, então tudo que barra envio precisa estar aqui:
+
+| barreira | onde |
+|---|---|
+| master `REMARKETING_ATIVO` + `dry_run` | topo do handler |
+| janela seg–sáb 09–18 (SP) | `dentroDaJanela()` |
+| teto diário (`REMARKETING_TETO_DIA`) | contagem antes da fila |
+| 1 toque por opp por dia, pausa/humano/sem-WhatsApp | `bot_remarketing_due` (SQL) |
+| anti-race: opp saiu da coluna durante a IA | `bot_remarketing_checar_envio` |
+| **canal de disparo existe e é único** | `wa_canal_disparo` |
+| **canal com `envio_restrito`** | checado no worker |
+| **opt-out da Meta (131050 / user_preferences)** | `wa_optout_ativo` |
+| **janela de 24h do par (canal, contato)** | `wa_dentro_janela` |
+| **template aprovado para AQUELE toque** | `wa_template_para_envio(org, toque)` |
+| destino só com `wa_id` de inbound registrado | `contato_identidades` |
+| **anti-autoenvio** (não mandar para o próprio número) | checado no worker |
+
+### Pacing: entregar pouco no começo NÃO é bug
+
+Modelo de marketing recém-aprovado passa por *template pacing*: a Meta **retém** parte dos envios
+para colher reação inicial e **descarta** os retidos se o sinal for ruim
+(<https://developers.facebook.com/documentation/business-messaging/whatsapp/templates/template-pacing/>).
+O primeiro disparo entregar bem menos que o esperado é o comportamento normal.
+
+Outros códigos que **não** são falha de envio e não devem acusar o canal como restrito:
+`131049` (limite por usuário — esperar 24 h antes de reenviar) e `131050` (opt-out — nunca reenviar).
+
+### Numeração do toque
+
+`bot_remarketing.toque` é **0-based** (índice de `ANGULOS`). `wa_templates.toque` é **1-based**
+(1..5, como no painel e nos nomes `caf_retomada_01..05`). O worker converte com `+ 1`.

@@ -33,6 +33,18 @@ const ST_TPL: Record<string, { t: string; cls: string }> = {
   desativado: { t: 'Desativado', cls: 'neutral' },
   rascunho: { t: 'Rascunho — não enviado à Meta', cls: 'neutral' },
 };
+/** Papel do número. A qualidade é medida POR NÚMERO: quem dispara marketing leva mais bloqueio,
+ *  e separar preserva a reputação de quem recebe o anúncio. */
+const PAPEL_TPL: Record<string, { t: string; cls: string; sub: string }> = {
+  atendimento: { t: 'Atendimento', cls: 'ok', sub: 'Recebe o tráfego do anúncio e conversa. Nunca dispara remarketing.' },
+  disparo: { t: 'Disparo', cls: 'blue', sub: 'Só remarketing por modelo aprovado. Não recebe anúncio.' },
+  ambos: { t: 'Atendimento e disparo', cls: 'warn', sub: 'Faz os dois — a qualidade do número fica exposta ao marketing.' },
+};
+const PAPEIS = [
+  { id: 'atendimento', r: 'Atendimento — recebe o tráfego e conversa' },
+  { id: 'disparo', r: 'Disparo — só remarketing por modelo' },
+  { id: 'ambos', r: 'Ambos (não recomendado: mistura a reputação)' },
+];
 const CAT_TPL = [
   { id: 'MARKETING', r: 'Marketing (reengajamento, oferta)' },
   { id: 'UTILITY', r: 'Utilidade (atualização de um pedido/processo)' },
@@ -51,11 +63,12 @@ export function IntegracaoCloudApi({ podeConfig }: Props) {
   // a tela mostraria "Apenas administradores…" como se fosse falha. Ele vê a seção, sem o painel.
   const diagQ = useCloudDiagnostico(podeConfig);
   const tplQ = useWaTemplates();
-  const { vincular, verificar, remover } = useCloudAcoes();
+  const { vincular, verificar, remover, definirPapel } = useCloudAcoes();
   const tplAcoes = useTemplateAcoes();
 
   const [novoOpen, setNovoOpen] = useState(false);
-  const [form, setForm] = useState({ alias: '', phoneNumberId: '', wabaId: '' });
+  const [form, setForm] = useState({ alias: '', phoneNumberId: '', wabaId: '', papel: 'atendimento' });
+  const [papelEdit, setPapelEdit] = useState<{ canal: CloudCanal; papel: string; padrao: boolean } | null>(null);
   const [erroForm, setErroForm] = useState<string | null>(null);
   const [removerCanal, setRemoverCanal] = useState<CloudCanal | null>(null);
   const [tplEdit, setTplEdit] = useState<Partial<WaTemplate> | null>(null);
@@ -78,7 +91,7 @@ export function IntegracaoCloudApi({ podeConfig }: Props) {
     setErroForm(null);
     try {
       const r = await vincular.mutateAsync(form);
-      setNovoOpen(false); setForm({ alias: '', phoneNumberId: '', wabaId: '' });
+      setNovoOpen(false); setForm({ alias: '', phoneNumberId: '', wabaId: '', papel: 'atendimento' });
       // o `aviso` diz POR QUE a Meta não confirmou (token ausente, id errado, permissão) —
       // engolir isso deixaria o usuário sem saber o que consertar.
       toast(r.verificado
@@ -96,7 +109,11 @@ export function IntegracaoCloudApi({ podeConfig }: Props) {
         id: tplEdit.id, nome: (tplEdit.nome ?? '').trim().toLowerCase(),
         idioma: tplEdit.idioma || 'pt_BR', categoria: tplEdit.categoria || 'MARKETING',
         corpo, variaveis: variaveisDoCorpo(corpo, tplEdit.variaveis ?? []),
-        wabaId: tplEdit.wabaId ?? canais.find((c) => c.cloud_waba_id)?.cloud_waba_id ?? null,
+        toque: tplEdit.toque ?? null,
+        // WABA: prefere o do canal de DISPARO (é dele que o modelo vai sair)
+        wabaId: tplEdit.wabaId
+          ?? canais.find((c) => c.id === d?.canal_disparo_id)?.cloud_waba_id
+          ?? canais.find((c) => c.cloud_waba_id)?.cloud_waba_id ?? null,
       });
       setTplEdit(null);
       toast('Template salvo. Ele só pode ser usado depois de aprovado pela Meta.');
@@ -109,7 +126,7 @@ export function IntegracaoCloudApi({ podeConfig }: Props) {
     <section className="int-section" id="api-oficial">
       <div className="sec-head">
         <h2><svg className="si" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2 4 6v6c0 5 3.4 9.4 8 10 4.6-.6 8-5 8-10V6z" /><path d="m9 12 2 2 4-4" /></svg>API Oficial (WhatsApp Cloud API)</h2>
-        <p>Número oficial aprovado pela Meta. Não usa QR Code e não desconecta sozinho — em troca, só permite texto livre nas 24 horas seguintes à última mensagem do cliente.</p>
+        <p>Números oficiais aprovados pela Meta. Não usam QR Code e não desconectam sozinhos — em troca, cada número só permite texto livre nas 24 horas seguintes à última mensagem que o cliente mandou <b>para aquele número</b>. Falar com um número não abre a janela do outro.</p>
       </div>
 
       <div className="int-grid">
@@ -170,6 +187,16 @@ export function IntegracaoCloudApi({ podeConfig }: Props) {
                   </div>
                 </div>
 
+                {/* Sem canal de disparo resolvido, o remarketing NÃO envia — em vez de cair no
+                    número de tráfego, que é o que derrubava os chips. Precisa aparecer. */}
+                {canais.length > 0 && !d.canal_disparo_id && (
+                  <div className="adapter-note"><IcInfo /><div className="tx">
+                    Nenhum número está definido como <b>disparo</b> (ou há mais de um sem padrão definido).
+                    Enquanto isso, o remarketing <b>não envia</b> — ele registra <b>sem canal de disparo</b>.
+                    Use o botão <b>Papel</b> no número que deve disparar.
+                  </div></div>
+                )}
+
                 {/* ---- números oficiais cadastrados ---- */}
                 {canais.length === 0 && (
                   <div className="adapter-note"><div className="tx">Nenhum número oficial cadastrado. Cadastre o número que aparece no painel da Meta em <b>WhatsApp &gt; API Setup</b>.</div></div>
@@ -186,6 +213,10 @@ export function IntegracaoCloudApi({ podeConfig }: Props) {
                             {c.cloud_waba_id ? ` · WABA ${c.cloud_waba_id}` : ' · sem WABA'}
                           </span>
                           <span className="conn-chips">
+                            <span className={`badge ${(PAPEL_TPL[c.papel] ?? PAPEL_TPL.atendimento).cls}`}>
+                              {(PAPEL_TPL[c.papel] ?? PAPEL_TPL.atendimento).t}
+                            </span>
+                            {d?.canal_disparo_id === c.id && <span className="conn-chip">é quem dispara</span>}
                             {/* "conectado" sozinho não prova nada: um canal criado por SQL nasce assim.
                                 O que prova é a Meta ter devolvido o número em "Verificar na Meta". */}
                             <span className="conn-chip">
@@ -208,6 +239,7 @@ export function IntegracaoCloudApi({ podeConfig }: Props) {
                               {verificando === c.id ? 'Verificando…' : 'Verificar na Meta'}
                             </button>
                           )}
+                          {podeConfig && <button className="btn-sm" onClick={() => setPapelEdit({ canal: c, papel: c.papel, padrao: c.disparo_padrao })}>Papel</button>}
                           {podeConfig && <button className="btn-sm danger" onClick={() => setRemoverCanal(c)}>Remover</button>}
                         </div>
                       </div>
@@ -250,9 +282,11 @@ export function IntegracaoCloudApi({ podeConfig }: Props) {
             <div className="adapter-note">
               <IcInfo />
               <div className="tx">
-                Fora da janela de 24 horas o WhatsApp oficial só entrega <b>modelo aprovado pela Meta</b>.
-                Sem um modelo aprovado marcado abaixo, o remarketing <b>não envia</b> para esses contatos — ele registra
-                <b> bloqueado pela janela</b> e não gasta o toque. Nunca cai para texto livre.
+                O número de disparo nunca tem janela aberta na primeira abordagem — o cliente nunca escreveu
+                para ele. Então <b>todo primeiro toque é modelo</b>. São 5 passos com textos diferentes; cada
+                passo precisa do seu próprio modelo aprovado. Faltando o modelo de um passo, o remarketing
+                <b> não envia</b> aquele toque: registra <b>bloqueado pela janela</b> e não gasta o passo.
+                Nunca cai para texto livre.
               </div>
             </div>
 
@@ -275,9 +309,13 @@ export function IntegracaoCloudApi({ podeConfig }: Props) {
                       <div className="conn-info">
                         <span className="conn-name">
                           {t.nome}
-                          {t.usarEmRemarketing && <span className="badge ok" style={{ marginLeft: 8 }}>usado no remarketing</span>}
+                          {t.usarEmRemarketing && t.toque && <span className="badge ok" style={{ marginLeft: 8 }}>toque {t.toque} do remarketing</span>}
                         </span>
-                        <span className="conn-sub">{t.idioma} · {t.categoria}{t.variaveis.length ? ` · ${t.variaveis.length} variável(is)` : ''}</span>
+                        <span className="conn-sub">
+                          {t.idioma} · {t.categoria}
+                          {t.toque ? ` · passo ${t.toque}` : ''}
+                          {t.variaveis.length ? ` · ${t.variaveis.length} variável(is)` : ''}
+                        </span>
                         <span className="conn-sub" style={{ whiteSpace: 'pre-wrap' }}>{t.corpo.slice(0, 160)}{t.corpo.length > 160 ? '…' : ''}</span>
                         <span className="conn-chips">
                           <span className={`badge ${st.cls}`}>{st.t}</span>
@@ -287,10 +325,12 @@ export function IntegracaoCloudApi({ podeConfig }: Props) {
                       <div className="conn-actions">
                         {podeConfig && <button className="btn-sm" onClick={() => { setTplErro(null); setTplEdit(t); }}>Editar</button>}
                         {podeConfig && t.status === 'aprovado' && !t.usarEmRemarketing && (
-                          <button className="btn-sm acc" onClick={async () => {
-                            try { await tplAcoes.usarNoRemarketing.mutateAsync(t.id); toast('Modelo definido para o remarketing.'); }
-                            catch (e) { toast((e as Error).message); }
-                          }}>Usar no remarketing</button>
+                          <button className="btn-sm acc" disabled={!t.toque} title={t.toque ? '' : 'Defina o passo da cadência em Editar'}
+                            onClick={async () => {
+                              if (!t.toque) return;
+                              try { await tplAcoes.usarNoRemarketing.mutateAsync({ id: t.id, toque: t.toque }); toast(`Modelo definido para o toque ${t.toque}.`); }
+                              catch (e) { toast((e as Error).message); }
+                            }}>Usar no toque {t.toque ?? '—'}</button>
                         )}
                         {podeConfig && t.status === 'rascunho' && (
                           <button className="btn-sm" onClick={async () => {
@@ -352,7 +392,51 @@ export function IntegracaoCloudApi({ podeConfig }: Props) {
           <input className="ctrl" value={form.wabaId} inputMode="numeric" placeholder="Opcional agora, obrigatório para sincronizar modelos"
             onChange={(e) => setForm((f) => ({ ...f, wabaId: e.target.value.replace(/\D/g, '') }))} />
         </div>
+        <div className="field">
+          <label>Papel deste número</label>
+          <select className="ctrl" value={form.papel} onChange={(e) => setForm((f) => ({ ...f, papel: e.target.value }))}>
+            {PAPEIS.map((p) => <option key={p.id} value={p.id}>{p.r}</option>)}
+          </select>
+          <p style={dica}>A qualidade é medida por número. Quem dispara marketing leva mais bloqueio — separar protege a reputação de quem recebe o anúncio.</p>
+        </div>
         {erroForm && <p style={{ ...dica, color: 'var(--err)' }}>{erroForm}</p>}
+      </Modal>
+
+      {/* ---------------- modal: papel do número ---------------- */}
+      <Modal open={!!papelEdit} onClose={() => setPapelEdit(null)} width={520} title="Papel do número"
+        closeOnBackdrop={!definirPapel.isPending}
+        footer={<>
+          <button className="atv-btn" onClick={() => setPapelEdit(null)} disabled={definirPapel.isPending}>Cancelar</button>
+          <button className="atv-btn primary" disabled={definirPapel.isPending}
+            onClick={async () => {
+              if (!papelEdit) return;
+              try {
+                await definirPapel.mutateAsync({ canalId: papelEdit.canal.id, papel: papelEdit.papel, disparoPadrao: papelEdit.padrao });
+                setPapelEdit(null); toast('Papel salvo.');
+              } catch (e) { toast((e as Error).message); }
+            }}>
+            {definirPapel.isPending ? 'Salvando…' : 'Salvar'}
+          </button>
+        </>}>
+        <p style={{ ...dica, marginTop: 0 }}>{papelEdit?.canal.nome_interno}</p>
+        <div className="field">
+          <label>Função</label>
+          <select className="ctrl" value={papelEdit?.papel ?? 'atendimento'}
+            onChange={(e) => setPapelEdit((v) => (v ? { ...v, papel: e.target.value } : v))}>
+            {PAPEIS.map((p) => <option key={p.id} value={p.id}>{p.r}</option>)}
+          </select>
+          <p style={dica}>{(PAPEL_TPL[papelEdit?.papel ?? 'atendimento'] ?? PAPEL_TPL.atendimento).sub}</p>
+        </div>
+        {(papelEdit?.papel === 'disparo' || papelEdit?.papel === 'ambos') && (
+          <div className="field">
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+              <input type="checkbox" checked={papelEdit?.padrao ?? false}
+                onChange={(e) => setPapelEdit((v) => (v ? { ...v, padrao: e.target.checked } : v))} />
+              É o número de disparo padrão
+            </label>
+            <p style={dica}>Com mais de um número de disparo, o remarketing precisa saber qual usar. Sem essa marcação e com dois candidatos, ele <b>não envia</b> — chutar entre dois números pagos é pior que não mandar.</p>
+          </div>
+        )}
       </Modal>
 
       {/* ---------------- modal: criar/editar modelo ---------------- */}
@@ -379,6 +463,19 @@ export function IntegracaoCloudApi({ podeConfig }: Props) {
             <option value="en_US">Inglês (en_US)</option>
             <option value="es_ES">Espanhol (es_ES)</option>
           </select>
+        </div>
+        <div className="field">
+          <label>Passo da cadência</label>
+          <select className="ctrl" value={String(tplEdit?.toque ?? '')}
+            onChange={(e) => setTplEdit((t) => ({ ...t, toque: e.target.value ? Number(e.target.value) : null }))}>
+            <option value="">Não faz parte do remarketing</option>
+            <option value="1">Toque 1 — D+1, lembrete</option>
+            <option value="2">Toque 2 — D+3, credibilidade</option>
+            <option value="3">Toque 3 — D+6, o custo de não verificar</option>
+            <option value="4">Toque 4 — D+10, facilidade</option>
+            <option value="5">Toque 5 — D+15, encerramento</option>
+          </select>
+          <p style={dica}>Cada passo manda um texto diferente. Repetir o mesmo modelo nos cinco é o padrão que a Meta pontua como spam.</p>
         </div>
         <div className="field">
           <label>Categoria</label>

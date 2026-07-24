@@ -489,6 +489,15 @@ Deno.serve(async (req) => {
 
       const inboundMsgId = (insArr?.[0]?.id as string | undefined) ?? null;
 
+      // ---- JANELA DE 24H (dois números): registra que ESTE contato falou com ESTE canal.
+      //      Só serve para o envio pela Cloud API — a Evolution não tem janela e nada aqui muda
+      //      para ela. Existe neste webhook porque o relógio tem que valer para qualquer número
+      //      que um dia vire cloud_api. Best-effort: erro nunca afeta a ingestão.
+      if (inboundNovo && contatoId) {
+        try { await admin.rpc('wa_janela_registrar', { p_canal: canal.id, p_contato: contatoId, p_quando: nowEntradaIso }); }
+        catch { /* janela nunca interrompe a ingestão */ }
+      }
+
       // ---- REMARKETING: se o lead estava numa cadência, re-roteia a opp ANTES do dispatch ao runner.
       //      respondeu → opp volta pra LEAD NOVO (entrada), senão bot_pode_atuar bloquearia o lead que respondeu;
       //      opt-out → PERDIDO + NÃO dispara o bot. AWAITED de propósito: o move de coluna precisa commitar
