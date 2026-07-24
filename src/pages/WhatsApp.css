@@ -800,3 +800,27 @@
 .wa-app .tab-n{background:#e5484d;color:#fff}
 .wa-app .tab.active{background:var(--surface-2);color:var(--ink);border-color:var(--line-2)}
 .wa-app .tab.active .tab-n{background:#e5484d;color:#fff}
+
+/* ===== CARD FINO — 85px era alto demais para uma lista de 370 conversas =====
+   Alvo ~64px: menos padding, avatar menor, entrelinhas justas e tags em escala menor.
+   Nada sai do card: as 3 linhas (nome / tags / prévia) e a coluna direita continuam. */
+.wa-app .conv-list{padding:4px 8px}
+.wa-app .conv{padding:6px 10px;gap:9px;border-radius:10px}
+/* avatar 38 -> 33 (e o micro-badge do canal acompanha) */
+.wa-app .conv .cav{width:31px;height:31px}
+.wa-app .conv .av{width:31px;height:31px;font-size:11px}
+.wa-app .conv .cav-canal{min-width:15px;height:15px;font-size:7.5px;border-width:1.5px;right:-2px;bottom:-2px}
+/* linhas justas */
+.wa-app .conv .crow{gap:5px}
+.wa-app .conv .cname{font-size:12.5px;line-height:1.25}
+.wa-app .conv .cbadges{margin-top:2px;gap:4px}
+.wa-app .conv .cprev{margin-top:1px;font-size:11.5px;line-height:1.25}
+/* tags e pills menores */
+.wa-app :is(.conv,.ch-tags) .ctag{font-size:8.5px;padding:1.5px 6px;border-radius:4px;line-height:1.5}
+.wa-app .conv .cresp{font-size:9.5px;padding:1px 7px;max-width:104px}
+.wa-app .conv .ctime{font-size:10.5px}
+.wa-app .conv .cright{gap:3px;max-width:108px}
+.wa-app .conv .unread{min-width:16px;height:16px;font-size:9.5px;padding:0 4px}
+.wa-app .conv .cflag{font-size:9px}
+/* cabeçalho de grupo também afina */
+.wa-app .conv-grupo-h{font-size:10.5px;padding:3px 18px;margin:6px -8px 3px}
