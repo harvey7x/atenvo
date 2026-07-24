@@ -696,9 +696,15 @@ export function Kanban() {
         footer={detLead ? <><button className="atv-btn" onClick={() => setDetId(null)}>Fechar</button>{detLead.conversaOrigemId && <button className="atv-btn" onClick={() => abrirConversa(detLead)}>Abrir conversa</button>}<button className="atv-btn primary" onClick={() => abrirEditarLead(detLead)}>Editar</button></> : null}>
         {detLead && (() => {
           const vr = valorRelevante(detLead);
-          const tags = mergeTags(detLead.contatoEtiquetas, detLead.etiquetas);
           const coluna = k.colunas.find((c) => c.id === detLead.colunaId)?.nome || '—';
           const temValores = detLead.valorDescontoMensal != null || detLead.valorRessarcimentoEstimado != null || detLead.valorRessarcido != null || detLead.valor != null;
+          // Seções só aparecem quando têm conteúdo — antes o modal exibia "Não informado",
+          // "Nenhum valor informado" e "Etiquetas —" mesmo sem dado nenhum, o que enchia a tela
+          // de linhas que não dizem nada. Nenhum campo foi REMOVIDO: some só quando está vazio.
+          const servNaoPadrao = !!detLead.tipoServico && detLead.tipoServico !== 'analise_inicial';
+          const temBenefServ = !!(detLead.tipoBeneficio || detLead.numeroBeneficio || detLead.instituicao
+            || servNaoPadrao || detLead.tipoDesconto || detLead.dataInicioDesconto
+            || mostraCancel(detLead.tipoServico) || mostraRess(detLead.tipoServico));
           const row = (lbl: string, val: React.ReactNode) => (val ? <div className="kb-det-row"><span className="kb-det-l">{lbl}</span><span className="kb-det-v">{val}</span></div> : null);
           return (
             <div className="kb-det">
@@ -708,17 +714,16 @@ export function Kanban() {
               {row('E-mail', detLead.email)}
               {row('Canal / chip', detLead.canalNome ? canalLabel(detLead.canalTipo) + ' · ' + detLead.canalNome + (detLead.canalNumero ? ' · ' + maskNum(detLead.canalNumero) : '') : (detLead.origem || null))}
               {row('Responsável', detLead.respNome || 'Não atribuído')}
-              <div className="kb-sec-h">Benefício e serviço</div>
-              {row('Tipo de benefício', detLead.tipoBeneficio ? labelOf(TIPO_BENEFICIO, detLead.tipoBeneficio) : 'Não informado')}
+              {temBenefServ && <div className="kb-sec-h">Benefício e serviço</div>}
+              {row('Tipo de benefício', detLead.tipoBeneficio ? labelOf(TIPO_BENEFICIO, detLead.tipoBeneficio) : null)}
               {row('Número do benefício', detLead.numeroBeneficio)}
               {row('Instituição', detLead.instituicao)}
-              {row('Serviço', labelOf(TIPO_SERVICO, detLead.tipoServico))}
+              {row('Serviço', detLead.tipoServico && detLead.tipoServico !== 'analise_inicial' ? labelOf(TIPO_SERVICO, detLead.tipoServico) : null)}
               {mostraCancel(detLead.tipoServico) && row('Situação do cancelamento', labelOf(ST_CANCEL, detLead.statusCancelamento))}
               {mostraRess(detLead.tipoServico) && row('Situação do ressarcimento', labelOf(ST_RESS, detLead.statusRessarcimento))}
               {row('Tipo de desconto', detLead.tipoDesconto)}
               {row('Início do desconto', fmtData(detLead.dataInicioDesconto))}
-              <div className="kb-sec-h">Valores</div>
-              {!temValores && <div className="kb-det-empty">Nenhum valor informado</div>}
+              {temValores && <div className="kb-sec-h">Valores</div>}
               {row('Valor mensal descontado', detLead.valorDescontoMensal != null ? fmtBRL(detLead.valorDescontoMensal) : null)}
               {row('Valor estimado do ressarcimento', detLead.valorRessarcimentoEstimado != null ? fmtBRL(detLead.valorRessarcimentoEstimado) : null)}
               {row('Valor já ressarcido', detLead.valorRessarcido != null ? fmtBRL(detLead.valorRessarcido) : null)}
@@ -728,7 +733,6 @@ export function Kanban() {
               {row('Etapa', coluna)}
               {clienteTagsDet(detLead, etiquetas)}
               {detLead.etiquetas.length > 0 && row('Etiquetas do caso', <span className="kb-det-tags">{detLead.etiquetas.map((t) => { const cor = corDaEtiqueta(t, etiquetas); return <span key={t} className="kb-tag-ro" style={{ background: cor + '22', color: cor, borderColor: cor + '55' }}>{t}</span>; })}</span>)}
-              {tags.length === 0 && row('Etiquetas', '—')}
               {row('Resumo do caso', detLead.observacoes ? <span className="kb-det-resumo">{detLead.observacoes}</span> : null)}
               {(eventosQ.data && eventosQ.data.length > 0) && (() => {
                 const colNome = (id: string | null) => (id ? (k.colunas.find((c) => c.id === id)?.nome || '—') : '—');
