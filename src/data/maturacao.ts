@@ -244,7 +244,13 @@ export function useQrChip() {
   });
 }
 
-export interface StatusChip { status_integracao: StatusIntegracao; numero_conectado: string | null }
+export interface StatusChip {
+  status_integracao: StatusIntegracao;
+  numero_conectado: string | null;
+  /** true quando ESTA chamada colocou o chip em aquecimento (a RPC de auto-início é idempotente:
+   *  se o webhook chegou primeiro, volta false mesmo com o chip já aquecendo). */
+  aquecimento_iniciado?: boolean;
+}
 
 /** Polling do status enquanto o modal de QR está aberto (3s). Desligado quando `chipId` é null. */
 export function useStatusChip(chipId: string | null) {

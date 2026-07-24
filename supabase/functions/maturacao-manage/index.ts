@@ -125,7 +125,29 @@ Deno.serve(async (req) => {
       }
 
       await admin.from('maturacao_chips').update(patch).eq('id', chip!.id);
-      return json({ ok: true, status_integracao: patch.status_integracao, numero_conectado: patch.numero_conectado ?? chip!.numero_conectado });
+
+      // O front faz polling deste endpoint enquanto o QR está aberto e pode ver a conexão
+      // antes do webhook. Chamar aqui também garante o início mesmo se o evento se perder.
+      // A RPC é idempotente, então os dois caminhos juntos não iniciam duas vezes.
+      let iniciou = false;
+      if (aberto) {
+        const { data: r } = await admin.rpc('maturacao_auto_iniciar', { p_chip: chip!.id });
+        iniciou = !!r;
+        if (iniciou) {
+          fetch(`${SUPABASE_URL}/functions/v1/maturacao-planner`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-maturacao-secret': secret },
+            body: '{}',
+          }).catch(() => null);
+        }
+      }
+
+      return json({
+        ok: true,
+        status_integracao: patch.status_integracao,
+        numero_conectado: patch.numero_conectado ?? chip!.numero_conectado,
+        aquecimento_iniciado: iniciou,
+      });
     }
 
     // ── remover: exclusão definitiva (mesma decisão já tomada em Integrações) ──

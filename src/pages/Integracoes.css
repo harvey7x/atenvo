@@ -391,3 +391,32 @@
 .integracoes-page .diag-l10-row:last-child{border-bottom:0}
 .integracoes-page .diag-l10-row .diag-erro{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media(max-width:560px){.integracoes-page .diag-grid{grid-template-columns:1fr}.integracoes-page .diag-l10-row{grid-template-columns:72px 80px 1fr}.integracoes-page .diag-l10-row .diag-erro{display:none}}
+
+/* ===== Maturação de números (prefixo matq-) — pool de aquecimento, fora do atendimento =====
+   Cor roxa de propósito: nada aqui é métrica/conexão de atendimento. */
+.integracoes-page .sum-ic.purple{background:var(--purple-soft);color:var(--purple)}
+.integracoes-page .badge.matq-badge{background:var(--purple-soft);color:var(--purple)}
+/* Aviso de separação: primeiro elemento do corpo do card, por isso sem margin-top. */
+.integracoes-page .adapter-note.matq-aviso{margin-top:0;margin-bottom:14px;background:var(--purple-soft);border-style:solid;border-color:transparent}
+.integracoes-page .adapter-note.matq-aviso svg{color:var(--purple)}
+.integracoes-page .adapter-note.matq-aviso .tx{color:var(--ink-2)}
+.integracoes-page .adapter-note.matq-aviso .tx b{color:var(--ink)}
+
+/* ---- Modais (renderizados fora de .integracoes-page: sem prefixo de página) ---- */
+.matq-lead{font-size:13px;color:var(--ink-2);line-height:1.55;margin:0 0 14px}
+/* Checkbox obrigatório do perfil: caixa destacada, impossível de não ver. */
+.matq-check{display:flex;gap:11px;align-items:flex-start;border:1.6px solid var(--warn,#c2772a);background:var(--warn-soft,#fbeede);
+  border-radius:12px;padding:13px 14px;margin:0 0 16px;cursor:pointer}
+.matq-check.on{border-color:var(--ok,#0e9d63);background:var(--ok-soft,#e7f6ef)}
+.matq-check input{width:19px;height:19px;flex:none;margin-top:1px;accent-color:var(--ok,#0e9d63);cursor:pointer}
+.matq-check-tx{display:flex;flex-direction:column;gap:3px;min-width:0}
+.matq-check-tx b{font-size:13.5px;font-weight:600;color:var(--ink)}
+.matq-check-tx i{font-style:normal;font-size:12px;color:var(--ink-2);line-height:1.45}
+.matq-qr{display:flex;flex-direction:column;align-items:center;text-align:center}
+.matq-qr .matq-lead{text-align:left;align-self:stretch}
+.matq-qr-box{width:236px;height:236px;border:1px solid var(--line-2);border-radius:14px;background:var(--surface);
+  display:flex;align-items:center;justify-content:center;overflow:hidden;padding:8px}
+.matq-qr-box img{width:100%;height:100%;object-fit:contain;border-radius:8px}
+.matq-qr-box span{font-size:12.5px;color:var(--muted);padding:0 18px;line-height:1.5}
+.matq-qr-box.vazio{border-style:dashed;background:var(--surface-2)}
+.matq-qr-meta{font-size:12px;color:var(--muted);margin-top:8px}

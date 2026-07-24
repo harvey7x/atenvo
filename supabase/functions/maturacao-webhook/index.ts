@@ -90,6 +90,24 @@ Deno.serve(async (req) => {
         if (conectado && !chip.numero_conectado) patch.conectado_em = new Date().toISOString();
         await admin.from('maturacao_chips').update(patch).eq('id', chip.id);
         await admin.from('maturacao_eventos').insert({ ...base, tipo: 'conexao', status: estado, dados: { estado } });
+
+        // Conectou = já começa. A RPC mantém os mesmos guardas do início manual (perfil pronto,
+        // sessão aberta, chip novo/pausado) e é idempotente, então reconexão não reinicia rampa.
+        if (conectado) {
+          const { data: iniciou } = await admin.rpc('maturacao_auto_iniciar', { p_chip: chip.id });
+          if (iniciou) {
+            await admin.from('maturacao_eventos').insert({
+              ...base, tipo: 'conexao', status: 'aquecimento_iniciado',
+            });
+            // Replaneja AGORA. Sem isto o chip só entraria no plano das 07h do dia seguinte.
+            // O planner já corta a janela em "agora", então não gera horário vencido.
+            emSegundoPlano(fetch(`${SUPABASE_URL}/functions/v1/maturacao-planner`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'x-maturacao-secret': wc.secret as string },
+              body: '{}',
+            }));
+          }
+        }
       }
       return json({ ok: true });
     }

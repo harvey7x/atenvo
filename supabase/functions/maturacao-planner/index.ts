@@ -23,6 +23,8 @@ const FRACAO_ABERTURA = 0.6;
 const GAP_MINIMO_MIN = 3;      // nunca dois envios do mesmo chip a menos disto
 const RESPOSTA_MIN = 1;        // atraso mínimo de uma resposta (min)
 const RESPOSTA_MAX = 8;        // atraso máximo de uma resposta (min)
+const MARGEM_INICIO_MIN = 5;   // folga entre "agora" e o primeiro envio planejado
+const JANELA_MINIMA_MIN = 60;  // sobrando menos que isto, o dia fica para amanhã
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -57,11 +59,13 @@ function offsetMinutos(d: Date, tz: string): number {
   return (comoUtc - d.getTime()) / 60000;
 }
 
-function hojeLocal(agora: Date, tz: string): { ano: number; mes: number; dia: number; diaSemana: number } {
+function hojeLocal(agora: Date, tz: string): { ano: number; mes: number; dia: number; diaSemana: number; minutoDoDia: number } {
   const dtf = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' });
   const [ano, mes, dia] = dtf.format(agora).split('-').map(Number);
   const diaSemana = new Date(Date.UTC(ano, mes - 1, dia)).getUTCDay();
-  return { ano, mes, dia, diaSemana };
+  const hf = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false });
+  const [h, m] = hf.format(agora).split(':').map(Number);
+  return { ano, mes, dia, diaSemana, minutoDoDia: (h % 24) * 60 + m };
 }
 
 // instante UTC correspondente a HH:MM do dia local
@@ -83,10 +87,13 @@ function faixaDoDia(rampa: Faixa[], dia: number): Faixa | null {
 
 // Horários espalhados na janela com folga mínima entre envios do mesmo chip.
 // Sem o gap, o sorteio uniforme junta dois envios em segundos — padrão de robô.
-function horarios(qtd: number, hIni: number, hFim: number, dia: { ano: number; mes: number; dia: number }, tz: string): Date[] {
+//
+// A janela é em MINUTOS do dia (não em horas) porque o planner também roda no meio do dia,
+// quando um chip acabou de conectar: aí o início efetivo é "agora", não hora_inicio.
+function horarios(qtd: number, iniMin: number, fimMin: number, dia: { ano: number; mes: number; dia: number }, tz: string): Date[] {
   if (qtd <= 0) return [];
-  const janela = (hFim - hIni) * 60;
-  const brutos = Array.from({ length: qtd }, () => aleatorio(0, Math.max(1, janela - 1))).sort((a, b) => a - b);
+  const janela = Math.max(1, fimMin - iniMin);
+  const brutos = Array.from({ length: qtd }, () => aleatorio(0, janela - 1)).sort((a, b) => a - b);
   const ajustados: number[] = [];
   let anterior = -Infinity;
   for (const m of brutos) {
@@ -95,7 +102,10 @@ function horarios(qtd: number, hIni: number, hFim: number, dia: { ano: number; m
     ajustados.push(v);
     anterior = v;
   }
-  return ajustados.map((m) => instanteLocal(dia, hIni + Math.floor(m / 60), m % 60, tz));
+  return ajustados.map((m) => {
+    const abs = iniMin + m;
+    return instanteLocal(dia, Math.floor(abs / 60), abs % 60, tz);
+  });
 }
 
 interface LinhaAgenda {
@@ -140,6 +150,20 @@ async function planejarOrg(admin: SupabaseClient, cfg: Record<string, unknown>):
   const rampa = (cfg.rampa as Faixa[]) ?? [];
   const hIni = (cfg.hora_inicio as number) ?? 8;
   const hFim = (cfg.hora_fim as number) ?? 21;
+
+  // O planner também roda no MEIO DO DIA, logo que um chip conecta. Se a janela começasse
+  // sempre em hora_inicio, todos os horários anteriores a agora já nasceriam vencidos e o
+  // runner os encontraria de uma vez só — uma rajada, exatamente o que queima chip.
+  // Por isso a janela efetiva começa em "agora + margem" e o volume é proporcional ao que
+  // sobrou do dia (não se comprime um dia inteiro em duas horas).
+  const janelaIniMin = hIni * 60;
+  const janelaFimMin = hFim * 60;
+  const inicioEfetivoMin = Math.max(janelaIniMin, local.minutoDoDia + MARGEM_INICIO_MIN);
+  const restanteMin = janelaFimMin - inicioEfetivoMin;
+  if (restanteMin < JANELA_MINIMA_MIN) {
+    return { org, pulado: 'janela_do_dia_quase_encerrada', restante_min: restanteMin };
+  }
+  const fracaoDoDia = Math.min(1, restanteMin / Math.max(1, janelaFimMin - janelaIniMin));
   const diaSementes = (cfg.dia_sementes as number) ?? 15;
   const pctSementes = (cfg.pct_sementes as number) ?? 25;
   const diasParaMaduro = (cfg.dias_para_maduro as number) ?? 45;
@@ -156,7 +180,7 @@ async function planejarOrg(admin: SupabaseClient, cfg: Record<string, unknown>):
     const faixa = faixaDoDia(rampa, dia);
     if (!faixa) continue;
     diaDoChip.set(c.id, dia);
-    orcamento.set(c.id, aleatorio(faixa.min, faixa.max));
+    orcamento.set(c.id, Math.max(1, Math.round(aleatorio(faixa.min, faixa.max) * fracaoDoDia)));
     planejarPara.push(c);
   }
 
@@ -183,7 +207,7 @@ async function planejarOrg(admin: SupabaseClient, cfg: Record<string, unknown>):
     const qtdSemente = usaSementes ? Math.round(qtdAbertura * (pctSementes / 100)) : 0;
     const filaSementes = embaralhar(sementes);
 
-    const quandos = horarios(qtdAbertura, hIni, hFim, local, tz);
+    const quandos = horarios(qtdAbertura, inicioEfetivoMin, janelaFimMin, local, tz);
 
     quandos.forEach((quando, i) => {
       const paraSemente = i < qtdSemente;

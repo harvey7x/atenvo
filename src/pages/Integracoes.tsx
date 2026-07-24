@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/useToast';
@@ -11,6 +11,12 @@ import { useOrgUsuarios } from '@/data/atendimento';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Modal } from '@/components/Modal';
 import { IntegracaoCloudApi } from '@/components/IntegracaoCloudApi';
+import {
+  MATURACAO_REAL, usePainelMaturacao, useCriarChip, useAtualizarChip, useExcluirChip,
+  useQrChip, useStatusChip, formatarNumero,
+  STATUS_MATURACAO_LABEL, STATUS_INTEGRACAO_LABEL,
+  type ChipPainel, type StatusIntegracao, type StatusMaturacao,
+} from '@/data/maturacao';
 import './Integracoes.css';
 
 const ORIGEM_TIPOS = [
@@ -79,6 +85,27 @@ const WA_ST: Record<string, { t: string; cls: string; dot?: boolean }> = {
   erro: { t: 'Erro', cls: 'err' },
 };
 
+/* ---- Maturação (pool de aquecimento) — nada aqui toca atendimento ---- */
+const IcQr = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.4" /><rect x="14" y="3" width="7" height="7" rx="1.4" /><rect x="3" y="14" width="7" height="7" rx="1.4" /><path d="M14 14h3v3M21 14v7h-7v-3" /></svg>;
+const IcSeed = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 21c0-6 3-10 8-11 0 6-3 10-8 11z" /><path d="M12 21C7 20 4 16 4 10c5 1 8 5 8 11z" /></svg>;
+
+const MAT_CONN: Record<StatusIntegracao, { t: string; cls: string; dot?: boolean }> = {
+  conectado: { t: 'Conectado', cls: 'ok', dot: true },
+  sincronizando: { t: 'Sincronizando', cls: 'warn' },
+  desconectado: { t: 'Não conectado', cls: 'neutral' },
+  erro: { t: 'Erro', cls: 'err' },
+};
+const MAT_ST_COR: Record<StatusMaturacao, { bg: string; fg: string }> = {
+  novo: { bg: 'var(--surface-2)', fg: 'var(--muted)' },
+  aquecendo: { bg: 'var(--purple-soft)', fg: 'var(--purple)' },
+  pausado: { bg: 'var(--warn-soft)', fg: 'var(--warn)' },
+  maduro: { bg: 'var(--ok-soft)', fg: 'var(--ok)' },
+  banido: { bg: 'var(--err-soft)', fg: 'var(--err)' },
+  erro: { bg: 'var(--err-soft)', fg: 'var(--err)' },
+};
+const OPERADORAS = ['Vivo', 'Claro', 'TIM', 'Oi', 'Outra'];
+const msgErro = (e: unknown) => (e as Error)?.message || 'Falha na operação.';
+
 const FB_MOTIVO: Record<string, string> = {
   login: 'Login do Facebook cancelado ou negado.',
   state: 'Sessão de conexão inválida ou expirada. Tente novamente.',
@@ -112,6 +139,29 @@ export function Integracoes() {
   const [testando, setTestando] = useState<string | null>(null);
   const [diag, setDiag] = useState<string | null>(null); // canalId em diagnóstico
   const podeConfig = currentOrg.role === 'admin' || currentOrg.role === 'gestor';
+  // Maturação é SÓ admin: as RPCs usam _eh_admin_org e o maturacao-manage exige papel 'admin'.
+  // Usar podeConfig aqui mostraria os botões ao gestor e ele tomaria "sem acesso" ao clicar.
+  const podeMaturacao = currentOrg.role === 'admin';
+
+  /* ---- Maturação: pool de aquecimento, isolado do atendimento ---- */
+  const matPainel = usePainelMaturacao();
+  const matExcluirChip = useExcluirChip();
+  const [matNovo, setMatNovo] = useState(false);
+  const [matQr, setMatQr] = useState<{ id: string; apelido: string; perfilOk: boolean } | null>(null);
+  const [matExcluir, setMatExcluir] = useState<ChipPainel | null>(null);
+  const matChips = matPainel.data ?? [];
+  const matConectados = matChips.filter((c) => c.status_integracao === 'conectado').length;
+
+  function matRefresh() { qc.invalidateQueries({ queryKey: ['mat-painel', currentOrg.id] }); }
+
+  async function matConfirmarExclusao() {
+    if (!matExcluir) return;
+    try {
+      await matExcluirChip.mutateAsync(matExcluir.chip_id);
+      toast('Número removido da maturação. A sessão de aquecimento foi derrubada.');
+      setMatExcluir(null);
+    } catch (e) { toast(msgErro(e), 'warn'); }
+  }
 
   async function confirmarRemocao() {
     if (!remocao) return;
@@ -218,6 +268,10 @@ export function Integracoes() {
           <div className="sum-card"><span className="sum-ic green"><IcCheck /></span><div><div className="lbl">Integrações conectadas</div><div className="val">{conectados + fbConectadas}</div></div></div>
           <div className="sum-card"><span className="sum-ic blue"><IcWa /></span><div><div className="lbl">WhatsApp ativos</div><div className="val">{conectados} de {waUsados} contratado{waUsados === 1 ? '' : 's'}</div><div className="sub">{nDesconectados > 0 ? `${nDesconectados} desconectado${nDesconectados === 1 ? '' : 's'} · ` : ''}limite do plano {waLimiteEfetivo}{waAdicionais > 0 ? ` (${waIncluidos}+${waAdicionais})` : ''}</div></div></div>
           <div className="sum-card"><span className="sum-ic gray"><IcFb /></span><div><div className="lbl">Facebook conectados</div><div className="val">{fbConectadas}</div></div></div>
+          {/* Roxo de propósito: maturação NÃO é métrica de atendimento (não entra no total acima). */}
+          {podeMaturacao && (
+            <div className="sum-card"><span className="sum-ic purple"><IcSeed /></span><div><div className="lbl">Em maturação (fora do atendimento)</div><div className="val">{matConectados} conectado{matConectados === 1 ? '' : 's'}</div><div className="sub">{matChips.length} número{matChips.length === 1 ? '' : 's'} no pool · não consome o limite do plano</div></div></div>
+          )}
         </div>
 
         {/* WHATSAPP */}
@@ -425,6 +479,84 @@ export function Integracoes() {
         {/* API OFICIAL (Cloud API) — seção própria: é o único bloco do painel que fala com a Meta. */}
         <IntegracaoCloudApi podeConfig={podeConfig} />
 
+        {/* MATURAÇÃO — pool de aquecimento. Aqui só se CONECTA/gerencia o número; a rampa,
+            saúde, sementes e biblioteca continuam na página própria (/maturacao). */}
+        <section className="int-section" id="maturacao">
+          <div className="sec-head">
+            <h2><svg className="si" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 21c0-6 3-10 8-11 0 6-3 10-8 11z" /><path d="M12 21C7 20 4 16 4 10c5 1 8 5 8 11z" /></svg>Maturação de Números</h2>
+            <p>Chips novos ganhando reputação antes de entrar em operação. Nada aqui se mistura com o atendimento.</p>
+          </div>
+          <div className="int-grid">
+            <div className="int-card">
+              <div className="ic-head">
+                <span className="ic-logo ext"><IcSeed /></span>
+                <div className="ic-ttl">
+                  <div className="t">Pool de aquecimento <span className="badge matq-badge">Fora do atendimento</span></div>
+                  <div className="s">Conecte e gerencie os números em maturação. A rampa e a saúde ficam na página Maturação.</div>
+                </div>
+              </div>
+              <div className="ic-body">
+                <div className="adapter-note matq-aviso">
+                  <IcInfo />
+                  <div className="tx"><b>Números em aquecimento.</b> Ficam totalmente separados do atendimento — não aparecem no Inbox, não recebem conversas de clientes e não consomem o limite do seu plano.</div>
+                </div>
+                {!isSupabaseConfigured || !MATURACAO_REAL ? (
+                  <div className="adapter-note"><IcInfo /><div className="tx">Disponível com o backend configurado.</div></div>
+                ) : !podeMaturacao ? (
+                  <div className="adapter-note"><IcInfo /><div className="tx">Somente administradores da organização gerenciam os números em maturação.</div></div>
+                ) : matPainel.isLoading ? (
+                  <div className="adapter-note"><IcInfo /><div className="tx">Carregando números em maturação…</div></div>
+                ) : matPainel.isError ? (
+                  <div className="adapter-note"><IcInfo /><div className="tx">{msgErro(matPainel.error)}</div></div>
+                ) : matChips.length === 0 ? (
+                  <div className="adapter-note"><IcInfo /><div className="tx">Nenhum número em maturação. Clique em <b>Adicionar número para maturação</b> para criar a sessão e ler o QR Code.</div></div>
+                ) : (
+                  <div className="conn-list">
+                    {matChips.map((c) => {
+                      const st = MAT_CONN[c.status_integracao] ?? MAT_CONN.desconectado;
+                      const cor = MAT_ST_COR[c.status_maturacao] ?? MAT_ST_COR.novo;
+                      const conectado = c.status_integracao === 'conectado';
+                      const excluindo = matExcluirChip.isPending && matExcluir?.chip_id === c.chip_id;
+                      return (
+                        <div className="conn-row" key={c.chip_id}>
+                          <div className="conn-info">
+                            <span className="conn-name">{c.apelido}</span>
+                            <span className="conn-sub">{c.numero_conectado ? formatarNumero(c.numero_conectado) : 'não conectado'}</span>
+                            <span className="conn-chips">
+                              <span className={'badge ' + st.cls}>{st.dot && <span className="dot" />}{st.t}</span>
+                              <span className="badge" style={{ background: cor.bg, color: cor.fg }} title="Situação do aquecimento deste número">
+                                <span className="dot" style={{ background: cor.fg }} />{STATUS_MATURACAO_LABEL[c.status_maturacao]}
+                              </span>
+                            </span>
+                            {conectado && !c.perfil_ok && (
+                              <span className="conn-alerta" style={{ color: 'var(--warn)' }}>Perfil do celular não confirmado — o aquecimento não inicia sem foto, nome e recado.</span>
+                            )}
+                          </div>
+                          <div className="conn-actions">
+                            <button className="btn-sm acc" disabled={excluindo} onClick={() => setMatQr({ id: c.chip_id, apelido: c.apelido, perfilOk: c.perfil_ok })}>
+                              <IcQr />{conectado ? 'Reconectar' : 'Conectar'}
+                            </button>
+                            <button className="btn-sm danger" disabled={excluindo} onClick={() => setMatExcluir(c)}>{excluindo ? 'Excluindo…' : 'Excluir'}</button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+              <div className="ic-foot">
+                {!isSupabaseConfigured || !MATURACAO_REAL
+                  ? <button className="btn-sm" onClick={() => toast('Disponível com o backend configurado')}><IcPlus />Adicionar número para maturação</button>
+                  : podeMaturacao
+                    ? <button className="btn-sm acc" onClick={() => setMatNovo(true)}><IcPlus />Adicionar número para maturação</button>
+                    : null}
+                <span className="sp" />
+                <button className="btn-sm" onClick={() => matRefresh()}><IcRefresh />Atualizar</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* SAÚDE */}
         <section className="int-section">
           <div className="sec-head"><h2><svg className="si" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12h4l2 6 4-14 2 8h6" /></svg>Saúde das integrações</h2><p>Eventos recentes de conexões e mensagens.</p></div>
@@ -443,6 +575,35 @@ export function Integracoes() {
         <WhatsAppConnect orgId={currentOrg.id} reconnectCanalId={reconectar.id} reconnectAlias={reconectar.alias}
           onClose={() => setReconectar(null)} onConnected={refresh} />
       )}
+
+      {/* Maturação: criar já emenda no QR — criar sem conectar deixa um número inerte no pool. */}
+      {matNovo && (
+        <MatNovoModal
+          onClose={() => setMatNovo(false)}
+          onCriado={(id, apelido) => { setMatNovo(false); setMatQr({ id, apelido, perfilOk: false }); }}
+        />
+      )}
+      {matQr && (
+        <MatQrModal
+          chipId={matQr.id} apelido={matQr.apelido} perfilOkInicial={matQr.perfilOk}
+          onClose={() => { setMatQr(null); matRefresh(); }}
+          onConectado={({ iniciado }) => {
+            setMatQr(null); matRefresh();
+            if (iniciado) toast('Número conectado. O aquecimento começou automaticamente.');
+            else toast('Número conectado, mas o aquecimento não iniciou: confirme foto, nome e recado do celular.', 'warn');
+          }}
+        />
+      )}
+
+      <ConfirmDialog
+        open={!!matExcluir}
+        title="Excluir número da maturação?"
+        message={matExcluir
+          ? `O número "${matExcluir.apelido}" será excluído DEFINITIVAMENTE do pool de aquecimento: a sessão é derrubada e o histórico de agenda e eventos dele é apagado. Isso não afeta nenhuma conexão de atendimento.`
+          : ''}
+        destructive confirmLabel="Excluir número" loading={matExcluirChip.isPending}
+        onConfirm={matConfirmarExclusao}
+        onCancel={() => { if (!matExcluirChip.isPending) setMatExcluir(null); }} />
 
       <ConfirmDialog
         open={!!remocao}
@@ -604,6 +765,144 @@ function DiagnosticoModal({ h, podeAgir, atualizando, entregaAuto, proximoMin, c
           Para validar o envio, envie uma mensagem real pela conversa (fluxo da aplicação) e atualize o diagnóstico — o resultado real aparece aqui. Este painel é somente leitura.
         </div>
       </div>
+    </Modal>
+  );
+}
+
+/* ============================================================================
+   MATURAÇÃO — criar número e conectar a sessão de aquecimento
+   Só CONEXÃO/gestão do número: rampa, saúde, sementes e biblioteca vivem em /maturacao.
+   ========================================================================== */
+function MatNovoModal({ onClose, onCriado }: { onClose: () => void; onCriado: (chipId: string, apelido: string) => void }) {
+  const { toast } = useToast();
+  const criar = useCriarChip();
+  const [apelido, setApelido] = useState('');
+  const [operadora, setOperadora] = useState('');
+  const [err, setErr] = useState<string | null>(null);
+
+  async function salvar() {
+    const nome = apelido.trim();
+    if (!nome) { setErr('Informe um apelido para o número.'); return; }
+    setErr(null);
+    try {
+      const r = await criar.mutateAsync({ apelido: nome, operadora });
+      toast('Número criado. Leia o QR Code para conectar.');
+      if (r?.chip_id) onCriado(r.chip_id, nome);
+      else onClose();
+    } catch (e) { setErr(msgErro(e)); }
+  }
+
+  return (
+    <Modal open onClose={() => { if (!criar.isPending) onClose(); }} closeOnBackdrop={!criar.isPending} width={460}
+      title="Adicionar número para maturação"
+      footer={<>
+        <button className="atv-btn" disabled={criar.isPending} onClick={onClose}>Cancelar</button>
+        <button className="atv-btn primary" disabled={criar.isPending} onClick={salvar}>{criar.isPending ? 'Criando…' : 'Criar e conectar'}</button>
+      </>}>
+      <p className="matq-lead">O número ganha uma sessão própria de aquecimento, separada das conexões de atendimento: não aparece no Inbox, não recebe conversas de clientes e não consome o limite do plano.</p>
+      <div className="atv-field">
+        <label htmlFor="intmat-apelido">Apelido</label>
+        <input id="intmat-apelido" className="atv-input" placeholder="Ex.: Chip 4 — Vivo" value={apelido} maxLength={40}
+          onChange={(e) => setApelido(e.target.value)} disabled={criar.isPending} />
+      </div>
+      <div className="atv-field">
+        <label htmlFor="intmat-operadora">Operadora (opcional)</label>
+        <select id="intmat-operadora" className="atv-select" value={operadora} onChange={(e) => setOperadora(e.target.value)} disabled={criar.isPending}>
+          <option value="">Não informada</option>
+          {OPERADORAS.map((o) => <option key={o} value={o}>{o}</option>)}
+        </select>
+      </div>
+      {err && <div className="atv-field-err">{err}</div>}
+    </Modal>
+  );
+}
+
+function MatQrModal({ chipId, apelido, perfilOkInicial, onClose, onConectado }: {
+  chipId: string; apelido: string; perfilOkInicial: boolean;
+  onClose: () => void;
+  /** Chamado uma única vez quando a sessão sobe: o pai fecha o modal e avisa o usuário. */
+  onConectado: (r: { iniciado: boolean }) => void;
+}) {
+  const pedirQr = useQrChip();
+  const atualizar = useAtualizarChip();
+  const status = useStatusChip(chipId);                       // polling de 3s enquanto o modal está aberto
+  const [perfilOk, setPerfilOk] = useState(perfilOkInicial);
+  const [img, setImg] = useState<string | null>(null);
+  const [secs, setSecs] = useState(60);
+  const [err, setErr] = useState<string | null>(null);
+  const conectado = status.data?.status_integracao === 'conectado';
+  const jaTratou = useRef(false);
+
+  const gerar = useCallback(async () => {
+    setErr(null);
+    try {
+      const r = await pedirQr.mutateAsync(chipId);
+      setImg(r.conectado ? null : (r.qr ?? null));
+      setSecs(60);
+    } catch (e) { setErr(msgErro(e)); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chipId]);
+
+  // O QR só é pedido depois da confirmação do perfil: sem perfil o aquecimento não inicia,
+  // então conectar antes disso só deixaria um número parado e exposto.
+  useEffect(() => { if (perfilOk && !conectado) void gerar(); }, [perfilOk, conectado, gerar]);
+
+  // O QR da Evolution expira: renova sozinho enquanto a sessão não sobe.
+  useEffect(() => {
+    if (conectado || !perfilOk) return;
+    const t = setInterval(() => {
+      setSecs((s) => { if (s <= 1) { void gerar(); return 60; } return s - 1; });
+    }, 1000);
+    return () => clearInterval(t);
+  }, [conectado, perfilOk, gerar]);
+
+  // Conectou: o backend inicia o aquecimento sozinho (maturacao_auto_iniciar, no webhook e no
+  // próprio status), mas SÓ com perfil_ok. `aquecimento_iniciado` só vem true na chamada que de
+  // fato iniciou — se o webhook chegou primeiro ele volta false, por isso o perfil confirmado
+  // também conta como início.
+  useEffect(() => {
+    if (!conectado || jaTratou.current) return;
+    jaTratou.current = true;
+    onConectado({ iniciado: perfilOk || !!status.data?.aquecimento_iniciado });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conectado]);
+
+  async function marcarPerfil(v: boolean) {
+    setPerfilOk(v); setErr(null);
+    try { await atualizar.mutateAsync({ chipId, perfilOk: v }); }
+    catch (e) { setPerfilOk(!v); setErr(msgErro(e)); }
+  }
+
+  return (
+    <Modal open onClose={onClose} closeOnBackdrop width={470}
+      title={<div><div>Conectar número em maturação</div><div className="cfg-sub">{apelido} · fora do atendimento</div></div>}
+      footer={<>
+        <button className="atv-btn" onClick={onClose}>Fechar</button>
+        <button className="atv-btn" disabled={!perfilOk || pedirQr.isPending} onClick={() => void gerar()}>{pedirQr.isPending ? 'Gerando…' : 'Gerar novo QR'}</button>
+      </>}>
+      {/* Caixa destacada e ACIMA do QR: chip sem foto/nome é o padrão mais fácil de detectar. */}
+      <label className={'matq-check' + (perfilOk ? ' on' : '')}>
+        <input type="checkbox" checked={perfilOk} disabled={atualizar.isPending} onChange={(e) => void marcarPerfil(e.target.checked)} />
+        <span className="matq-check-tx">
+          <b>Já defini foto, nome e recado neste celular</b>
+          <i>Chip sem foto e nome é o padrão mais fácil de detectar. O aquecimento não inicia sem isso.</i>
+        </span>
+      </label>
+
+      {perfilOk ? (
+        <div className="matq-qr">
+          <p className="matq-lead">Abra o WhatsApp deste número → <b>Aparelhos conectados</b> → <b>Conectar um aparelho</b> e aponte para o código.</p>
+          <div className="matq-qr-box">{img ? <img src={img} alt="QR Code de conexão do número em maturação" /> : <span>Gerando QR Code…</span>}</div>
+          <div className="matq-qr-meta">Expira em <b>{secs}s</b> · renova automaticamente</div>
+          <div className="matq-qr-meta">Aguardando leitura… ({STATUS_INTEGRACAO_LABEL[status.data?.status_integracao ?? 'desconectado']})</div>
+          <div className="matq-qr-meta">Assim que a sessão subir, o aquecimento começa sozinho.</div>
+        </div>
+      ) : (
+        <div className="matq-qr">
+          <div className="matq-qr-box vazio"><span>Confirme o perfil acima para liberar o QR Code.</span></div>
+        </div>
+      )}
+      {err && <div className="atv-field-err">{err}</div>}
     </Modal>
   );
 }
