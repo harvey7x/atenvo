@@ -1166,6 +1166,7 @@ export function WhatsApp() {
                       dois. A pendência de cadastro continua sinalizada pelo chip "Nome incompleto".
                       Sem telefone (contato LID-only) cai no rótulo genérico, nunca no LID. */}
                   <span className="cname">{nomeVazio ? (telSec || 'Cliente sem nome') : formatarNomeCliente(c.name)}</span>
+                  {alertas.length > 0 && <i className={'cdot' + (atrasado ? ' cdot--r' : '')} title={alertas.join(' · ')} aria-label={alertas.join('. ')} />}
                   <span className="ctime" title={'Última interação: ' + c.time}>{c.lastAtMs ? tempoRelativo(new Date(c.lastAtMs).toISOString(), relogioMs) : c.time}</span>
                 </div>
                 <div className="crow crow-prev">
@@ -1174,9 +1175,6 @@ export function WhatsApp() {
                 </div>
                 <div className="cbadges">
                   {eSituacao && <span className={'ctag ctag--' + (eSituacao.variante ?? 'atendimento')} title="Etapa no Kanban">{eSituacao.texto}</span>}
-                  {alertas.length > 0 && (
-                    <span className="ctag ctag--alerta" title={alertas.join(' · ')} aria-label={alertas.join('. ')}>⚠{alertas.length > 1 ? ' ' + alertas.length : ''}</span>
-                  )}
                   {finalizado && <span className="ctag ctag--fim" title={'Conversa ' + (c.status ?? 'finalizada')}>Finalizado</span>}
                   <span className="cresp" title="Atendente responsável">{eAtendente ? eAtendente.texto : 'Não atribuído'}</span>
                 </div>
@@ -1250,12 +1248,12 @@ export function WhatsApp() {
         {/* HIGIENE 1 — conversa sem responsável. Alerta forte no topo; bloqueia envio quando
             a entrada progressiva mandar (nova = já; antiga = depois da adaptação). */}
         {WA_REAL && !!current.id && higiene.dono !== 'livre' && (
-          <div className={'hig-banner hig-slim' + (higiene.dono === 'bloqueia' ? ' hig-bloq' : '')}
+          <div className={'hig-banner hig-pill' + (higiene.dono === 'bloqueia' ? ' hig-bloq' : '')}
                title={higiene.dono === 'bloqueia'
                  ? 'Esta conversa ainda não tem responsável. Assuma o atendimento para responder e evitar perda de lead.'
                  : 'Esta conversa ainda não tem responsável. Assuma o atendimento para responder e evitar perda de lead. Em breve isto será obrigatório.'}>
             <IcWarn />
-            <div className="hig-txt"><b>Sem responsável</b>{higiene.dono === 'bloqueia' ? ' — obrigatório para responder' : ''}</div>
+            <div className="hig-txt"><b>Sem responsável</b> · assuma para responder</div>
             <button className="hig-btn" disabled={atribuindo} onClick={assumir}>
               <IcUserPlus />Assumir
             </button>
@@ -1265,7 +1263,7 @@ export function WhatsApp() {
         {/* HIGIENE 2 — cadastro do nome. Progressiva: 2 adiamentos, depois obrigatório;
             "cliente ainda não informou" libera 24h. Só cobra quando já há responsável. */}
         {WA_REAL && !!current.id && higiene.dono === 'livre' && decNome.acao !== 'livre' && (
-          <div className={'hig-banner hig-slim' + (decNome.acao === 'bloqueia' ? ' hig-bloq' : ' hig-nome')}
+          <div className={'hig-banner hig-pill' + (decNome.acao === 'bloqueia' ? ' hig-bloq' : ' hig-nome')}
                title={(decNome.acao === 'bloqueia' ? 'Preencha o nome completo para continuar. ' : 'O cadastro deste cliente está incompleto. ')
                  + (decNome.analise.motivo === 'comercio'
                    ? 'O nome parece ser de um comércio. Se for pessoa física, corrija para o nome completo.'

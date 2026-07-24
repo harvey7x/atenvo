@@ -760,3 +760,88 @@
 .wa-app .send-btn:disabled{opacity:.35;box-shadow:none}
 .wa-app .composer-bar{gap:6px}
 .wa-app .composer-bar .cbar-act{border-radius:999px}
+
+/* ============================================================================
+   V2 PREMIUM — a rodada anterior mexeu em raios e paddings (±3px) e o dono
+   NÃO percebeu diferença, com razão. Perceptível = ESCALA e ESPAÇO:
+   avatar/tipografia maiores no cabeçalho, barras de largura total viram pílulas
+   flutuantes centradas (como os eventos inline da referência), compositor sem
+   moldura pesada, card com tags coloridas e alerta reduzido a um ponto.
+   Nenhuma flag/handler muda — apresentação, apenas. */
+
+/* ---- P1: CABEÇALHO — cliente grande, tags com cor, ações com presença ---- */
+.wa-app .chat-head{padding:14px 22px;gap:16px}
+.wa-app .ch-id--cliente .av{width:48px;height:48px;font-size:15px}
+.wa-app .ch-id--cliente .ch-name{font-size:17px;font-weight:700;letter-spacing:-.01em}
+.wa-app .ch-tags{gap:6px;margin-top:5px}
+.wa-app .ch-tags .ctag{font-size:10.5px;padding:2.5px 9px;border-radius:6px;max-width:180px}
+.wa-app .ch-resp-btn{height:38px;padding:0 18px;font-size:13px}
+.wa-app .ch-resp-btn svg{width:16px;height:16px}
+.wa-app .chat-head .icon-btn{width:38px;height:38px}
+.wa-app .ch-phone-pill{height:32px;font-size:12.5px}
+
+/* etapas com COR (referência usa pills saturadas; aqui saturação moderada, semântica mantida) */
+.wa-app :is(.conv,.ch-tags) .ctag--atendimento{background:rgba(59,130,246,.11);color:#2563eb;border-color:rgba(59,130,246,.25)}
+[data-theme="dark"] .wa-app :is(.conv,.ch-tags) .ctag--atendimento{background:rgba(59,130,246,.18);color:#93b4fc;border-color:rgba(59,130,246,.32)}
+.wa-app :is(.conv,.ch-tags) .ctag--lead{background:rgba(201,122,22,.13)}
+.wa-app :is(.conv,.ch-tags) .ctag--ganho{background:rgba(25,195,125,.16)}
+
+/* ---- P2: "Sem responsável" deixa de ser BARRA e vira pílula flutuante compacta ---- */
+.wa-app .hig-banner.hig-pill{
+  width:fit-content;max-width:min(92%,560px);margin:10px auto 0;
+  padding:4px 5px 4px 13px;border-radius:999px;font-size:12px;
+  background:var(--surface);color:var(--ink-2);border:1px solid var(--line-2);
+  box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.wa-app .hig-banner.hig-pill svg{width:14px;height:14px;color:var(--amber)}
+.wa-app .hig-banner.hig-pill .hig-txt{flex:0 1 auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wa-app .hig-banner.hig-pill .hig-txt b{color:var(--ink)}
+.wa-app .hig-banner.hig-pill .hig-btn{height:26px;padding:0 12px;border-radius:999px;font-size:11.5px;background:var(--green);color:#fff}
+.wa-app .hig-banner.hig-pill .hig-btn.ghost{background:transparent;color:var(--ink-2);border-color:var(--line-2)}
+/* bloqueio: continua DISTINTO (borda/ícone vermelhos), mas sem faixa vermelha atravessando */
+.wa-app .hig-banner.hig-pill.hig-bloq{background:var(--surface);color:var(--ink-2);border-color:rgba(192,52,44,.38)}
+.wa-app .hig-banner.hig-pill.hig-bloq svg{color:#c0342c}
+.wa-app .hig-banner.hig-pill.hig-bloq .hig-txt b{color:#c0342c}
+.wa-app .hig-banner.hig-pill.hig-bloq .hig-btn{background:var(--green)}
+.wa-app .hig-banner.hig-pill.hig-bloq .hig-btn.ghost{background:transparent;color:var(--ink-2)}
+
+/* avisos de canal no compositor: mesma linguagem de pílula flutuante */
+.wa-app .warn-slim{width:fit-content;max-width:92%;margin:8px auto 0;border-radius:999px;
+  min-height:26px;padding:2px 12px;font-size:11.5px;background:var(--surface);
+  border:1px solid var(--line-2);box-shadow:0 1px 2px rgba(0,0,0,.05)}
+.wa-app .warn-slim.warn-bloq{background:var(--surface);border-color:rgba(192,57,43,.35)}
+.wa-app .warn-slim.warn-bloq .warn-txt{color:var(--ink-2)}
+.wa-app .warn-slim.warn-bloq .warn-txt b{color:#c0342c}
+.wa-app .warn-slim svg{width:13px;height:13px}
+
+/* banner de SLA: idem — pílula, não faixa */
+.wa-app .sla-conv{background:transparent;border-bottom:0;box-shadow:none}
+.wa-app .sla-conv-bar{width:fit-content;max-width:92%;margin:8px auto 0;min-height:26px;
+  padding:2px 12px;border:1px solid var(--line-2);border-radius:999px;background:var(--surface);
+  box-shadow:0 1px 2px rgba(0,0,0,.05);font-size:11.5px}
+.wa-app .sla-conv-text{font-size:11.5px}
+
+/* ---- P3: COMPOSITOR — sem moldura pesada, mais respiro ---- */
+.wa-app .composer{border-top:0;padding:10px 22px 18px}
+.wa-app .input-wrap{border-radius:22px;border-color:var(--line);padding:12px 16px;
+  box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.wa-app .input-wrap:focus-within{border-color:var(--green);box-shadow:0 0 0 3px var(--ring)}
+.wa-app .msg-input{font-size:14.5px}
+.wa-app .composer-bar{margin-top:10px;gap:8px}
+.wa-app .composer-bar .cbar-act{font-size:12.5px;color:var(--muted)}
+.wa-app .composer-bar .cbar-act:hover:not(:disabled){color:var(--green-ink)}
+.wa-app .send-btn{width:44px;height:44px}
+.wa-app .send-btn svg{width:20px;height:20px}
+.wa-app .reply-row{font-size:12px;color:var(--muted)}
+.wa-app .chip-btn{font-size:12px}
+
+/* ---- P4: LISTA — atendimento, não painel de inconsistência ---- */
+.wa-app .conv{padding:12px 14px;border-radius:14px}
+.wa-app .conv .cname{font-size:14px}
+.wa-app .conv .cprev{font-size:13px}
+.wa-app .conv .cbadges{margin-top:6px}
+.wa-app :is(.conv,.ch-tags) .ctag{font-size:10.5px;padding:2px 8px;border-radius:6px}
+.wa-app .conv .cresp{font-size:10.5px;padding:2px 9px;background:var(--surface-2)}
+/* alerta = PONTO discreto ao lado do tempo (tooltip carrega tudo; barra lateral continua) */
+.wa-app .conv .cdot{width:7px;height:7px;border-radius:50%;background:var(--amber);flex:none;cursor:help;font-style:normal}
+.wa-app .conv .cdot--r{background:#e5484d}
+.wa-app .conv-list{padding:10px 12px}
