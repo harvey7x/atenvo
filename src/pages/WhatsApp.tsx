@@ -1354,9 +1354,8 @@ export function WhatsApp() {
             {WA_REAL ? (
               realCanais.length === 0 ? (
                 <span className="reply-empty">Nenhum número conectado · <button className="link-btn" onClick={() => navigate('/integracoes')}>conectar</button></span>
-              ) : realCanais.map((c, idx) => (
+              ) : realCanais.map((c) => (
                 <span key={c.id} style={{ display: 'inline-flex', alignItems: 'center' }}>
-                  {idx > 0 && <span className="chip-div">|</span>}
                   <button className={'chip-btn' + (replyCanalId === c.id ? ' active' : '') + (c.status !== 'conectado' ? ' off' : '')} title={c.status !== 'conectado' ? 'Indisponível (' + c.status + ')' : c.alias} onClick={() => onReplyCanal(c.id)}>{c.alias}</button>
                 </span>
               ))
@@ -1381,7 +1380,7 @@ export function WhatsApp() {
             )}
             {assinaturaNome && <span className="sign-preview">*{assinaturaNome}:*</span>}
           </div>
-          </div>{/* /composer-top */}
+          <div className="composer-avisos">
 
           {/* Avisos do compositor — Bloco 3. Eram até 4 blocos empilhados com texto de 2 linhas cada;
               viraram UMA linha, com a explicação completa no title. Duas intensidades de propósito:
@@ -1430,6 +1429,9 @@ export function WhatsApp() {
             </div>
           )}
 
+          </div>{/* /composer-avisos */}
+          </div>{/* /composer-top */}
+
           {agendadas.filter((a) => ['agendada', 'processando', 'falhou', 'bloqueada'].includes(a.status)).length > 0 && (
             <div className="ag-lista">
               {agendadas.filter((a) => ['agendada', 'processando', 'falhou', 'bloqueada'].includes(a.status)).map((a) => {
@@ -1474,10 +1476,10 @@ export function WhatsApp() {
               value={draft} onChange={(e) => setDraft(e.target.value)} disabled={canalIndisponivel || semDestino || canalRestrito || higieneBloqueia}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); } }} />
             <div className="composer-bar">
-              <button className="cbar-act" title="Enviar imagem" aria-label="Enviar imagem" disabled={semDestino || canalRestrito || higieneBloqueia || (WA_REAL && (!current.id || !canalConectado))} onClick={() => setImgModal(true)}><IcImage /><span>Imagem</span></button>
+              <button className="cbar-act" title="Enviar imagem" aria-label="Enviar imagem" disabled={semDestino || canalRestrito || higieneBloqueia || (WA_REAL && (!current.id || !canalConectado))} onClick={() => setImgModal(true)}><IcImage /></button>
               <AudioRecorder disabled={semDestino || canalRestrito || higieneBloqueia || (WA_REAL && (!current.id || !canalConectado))} onEnviar={enviarAudio} />
-              <button className="cbar-act" title="Enviar documento" aria-label="Enviar documento" disabled={semDestino || canalRestrito || higieneBloqueia || (WA_REAL && (!current.id || !canalConectado))} onClick={() => setDocModal(true)}><IcDoc /><span>Arquivo</span></button>
-              <button className="cbar-act" title="Agendar mensagem" aria-label="Agendar mensagem" disabled={semDestino || higieneBloqueia || (WA_REAL && (!current.id || canaisAgendaveis.length === 0))} onClick={abrirAgendar}><IcClock /><span>Agendar</span></button>
+              <button className="cbar-act" title="Enviar documento" aria-label="Enviar documento" disabled={semDestino || canalRestrito || higieneBloqueia || (WA_REAL && (!current.id || !canalConectado))} onClick={() => setDocModal(true)}><IcDoc /></button>
+              <button className="cbar-act" title="Agendar mensagem" aria-label="Agendar mensagem" disabled={semDestino || higieneBloqueia || (WA_REAL && (!current.id || canaisAgendaveis.length === 0))} onClick={abrirAgendar}><IcClock /></button>
               <span className="spacer" />
               <button ref={scriptsBtnRef} className="scripts-btn" disabled={semDestino} onClick={(e) => { e.stopPropagation(); togglePop('scripts', scriptsBtnRef, 'right'); }}><IcScripts />Scripts<IcCaret /></button>
               <button className="send-btn" aria-label="Enviar" disabled={sendDisabled} onClick={sendMsg}><IcSend /></button>

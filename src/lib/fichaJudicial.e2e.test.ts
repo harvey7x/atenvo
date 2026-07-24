@@ -299,7 +299,10 @@ describe('TELEFONE vem do contato do Atenvo, NUNCA do Promosys', () => {
 
 describe('DATA da ficha', () => {
   it('usa a data atual de America/Sao_Paulo', () => {
-    const { r } = gerar(BLOCO_MARIA, '5551999416800', 'Matheus', undefined as unknown as string);
+    // NÃO usar gerar(): passar `undefined` ali dispara o parâmetro default (dataFicha = DATA_FICHA),
+    // então o teste comparava a constante fixa com a data real e só passava no dia 2026-07-23.
+    // Chamando o parser direto sem a opção, exercitamos de fato o fallback para hojeISOSaoPaulo().
+    const r = parseFichaJudicial(BLOCO_MARIA, {});
     expect(r.dataConsulta).toBe(hojeISOSaoPaulo());
   });
   it('23h de 23/07 em SP ainda é 23/07 (UTC já virou o dia)', () => {

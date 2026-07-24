@@ -851,3 +851,41 @@
 /* Etiqueta que representa uma COLUNA do Kanban usa a cor da própria coluna (inline).
    Texto branco: a paleta de colunas do Kanban é toda de tons médios/escuros. */
 .wa-app :is(.conv,.ch-tags) .ctag--kanban{color:#fff !important}
+
+/* ===== COMPOSITOR MINIMIZADO (proposta aprovada pelo dono) =====
+   Uma linha só no topo: canais como tabs discretas + assinatura + AVISO à direita (antes o aviso
+   era uma faixa própria abaixo, ocupando altura). Embaixo, input limpo com ações em ícone.
+   Zero mudança de lógica: mesmos handlers, mesmos disabled, mesmos títulos/aria-label. */
+.wa-app .composer-top{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:8px}
+.wa-app .composer-avisos{margin-left:auto;display:flex;align-items:center;gap:6px;min-width:0}
+/* aviso vira pill compacta e para de atravessar a tela */
+.wa-app .composer-avisos .warn-slim{margin:0;max-width:340px;border-radius:999px;min-height:26px;
+  padding:2px 12px;font-size:11.5px;background:var(--surface-2);border:1px solid var(--line-2)}
+.wa-app .composer-avisos .warn-slim.warn-bloq{background:rgba(229,72,77,.07);border-color:rgba(229,72,77,.3)}
+.wa-app .composer-avisos .warn-slim svg{width:12px;height:12px}
+.wa-app .composer-avisos .warn-slim .warn-txt{font-size:11.5px}
+
+/* canais: tab ativa em pill, demais em texto discreto (sem barra separadora) */
+.wa-app .reply-row{gap:2px}
+.wa-app .chip-btn{padding:4px 11px;border-radius:999px;font-size:12.5px;color:var(--muted)}
+.wa-app .chip-btn:hover{background:var(--hover);color:var(--ink-2)}
+.wa-app .chip-btn.active{background:var(--green-soft);color:var(--green-ink);font-weight:600}
+.wa-app .chip-btn.active::after{display:none}
+.wa-app .chip-btn.off{text-decoration:line-through;opacity:.55}
+
+/* assinatura em select limpo */
+.wa-app .sign-sel{border-radius:999px;height:32px;padding:0 30px 0 12px;font-size:12.5px}
+
+/* input + ações em ícone; enviar sólido circular */
+.wa-app .input-wrap{display:flex;align-items:flex-end;gap:8px;border-radius:24px;padding:8px 8px 8px 18px}
+.wa-app .input-wrap .msg-input{flex:1;min-width:0;padding:8px 0}
+.wa-app .composer-bar{margin-top:0;gap:4px;flex:none}
+.wa-app .composer-bar .cbar-act,.wa-app .composer-bar .fb-tool{
+  width:34px;height:34px;padding:0;border-radius:999px;justify-content:center;
+  border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2)}
+.wa-app .composer-bar .cbar-act:hover:not(:disabled),.wa-app .composer-bar .fb-tool:hover:not(:disabled){
+  background:var(--hover);color:var(--green-ink);border-color:var(--green)}
+.wa-app .composer-bar .cbar-act:disabled,.wa-app .composer-bar .fb-tool:disabled{opacity:.4}
+.wa-app .composer-bar .spacer{flex:none;width:4px}
+.wa-app .scripts-btn{height:34px;border-radius:999px;font-size:12.5px;padding:0 12px}
+.wa-app .send-btn{width:38px;height:38px;border-radius:999px;color:#fff;flex:none}
