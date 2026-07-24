@@ -5,7 +5,11 @@
    painel lateral de detalhes. Só apresentação — nenhuma regra de agendamento
    ou de envio foi tocada. Tokens do design system (global.css), sem cor solta.
    ========================================================================== */
-.agm2{display:flex;flex-direction:column;gap:14px;padding:16px 20px;min-width:0}
+/* A rota é fullBleed: .content é overflow:hidden, ou seja, NÃO rola. Quem tem de
+   administrar a altura é a página — senão a lista simplesmente é cortada no rodapé
+   e as últimas linhas ficam inalcançáveis. Daí height:100% + a lista rolando por
+   dentro. Abaixo de 1000px isso é desfeito (ver media query no fim). */
+.agm2{display:flex;flex-direction:column;gap:14px;padding:16px 20px;min-width:0;height:100%;overflow:hidden}
 
 /* ---- barra superior: abas + ações --------------------------------------- */
 .agm2-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
@@ -74,15 +78,15 @@
 .agm2-limpar:hover{color:var(--ink);border-color:var(--accent)}
 
 /* ---- área principal: lista + painel ------------------------------------- */
-.agm2-main{display:flex;gap:12px;min-width:0;align-items:flex-start}
-.agm2-lista{flex:1;min-width:0;border:1px solid var(--line-2);border-radius:14px;background:var(--surface);overflow:hidden}
+.agm2-main{display:flex;gap:12px;min-width:0;flex:1;min-height:0;align-items:stretch}
+.agm2-lista{flex:1;min-width:0;border:1px solid var(--line-2);border-radius:14px;background:var(--surface);overflow-y:auto}
 
 /* Cabeçalho e linhas dividem o MESMO grid — alinhamento de tabela sem <table>,
    o que deixa cada célula livre para empilhar duas linhas de texto. */
 .agm2-lista-h,.agm2-row{display:grid;align-items:center;gap:12px;
   grid-template-columns:92px minmax(150px,1.4fr) 96px 120px minmax(140px,1.6fr) 108px 104px 44px}
-.agm2-lista-h{padding:9px 16px;border-bottom:1px solid var(--line);background:var(--surface-2);
-  font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.agm2-lista-h{position:sticky;top:0;z-index:1;padding:9px 16px;border-bottom:1px solid var(--line);
+  background:var(--surface-2);font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
 .agm2-row{position:relative;width:100%;padding:11px 16px;border:0;border-bottom:1px solid var(--line);
   background:transparent;cursor:pointer;font-family:inherit;text-align:left;transition:background .12s}
 .agm2-row:last-child{border-bottom:0}
@@ -136,9 +140,13 @@
 @media (prefers-reduced-motion:reduce){.agm2-skel .sk{animation:none}}
 
 /* ---- painel lateral de detalhes ----------------------------------------- */
+/* Cabeçalho e ações ficam FORA da área que rola: o "Cancelar" de uma sequência longa
+   não pode depender de o usuário rolar até o fim para existir. */
 .agm2-painel{flex:none;width:344px;border:1px solid var(--line-2);border-radius:14px;background:var(--surface);
-  padding:14px;display:flex;flex-direction:column;gap:12px;max-height:calc(100vh - 220px);overflow-y:auto}
-.agm2-p-h{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.agm2-p-corpo{flex:1;min-height:0;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:12px}
+.agm2-p-h{flex:none;display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:11px 10px 11px 14px;border-bottom:1px solid var(--line)}
 .agm2-p-h strong{font-size:13.5px;color:var(--ink)}
 .agm2-p-x{width:28px;height:28px;border-radius:8px;border:0;background:transparent;color:var(--muted);cursor:pointer;
   display:inline-flex;align-items:center;justify-content:center}
@@ -147,7 +155,8 @@
 .agm2-p-cli{display:flex;align-items:center;gap:10px;padding:11px;border-radius:12px;background:var(--surface-2);
   border:1px solid var(--line-2)}
 .agm2-p-cli-t{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.3}
-.agm2-p-cli-t b{font-size:13px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* aqui o nome pode quebrar em 2 linhas — no painel importa ler o nome inteiro */
+.agm2-p-cli-t b{font-size:13px;color:var(--ink);word-break:break-word}
 .agm2-p-cli-t i{font-size:11.5px;font-style:normal;color:var(--muted)}
 .agm2-p-dl{margin:0;display:flex;flex-direction:column;gap:7px}
 .agm2-p-dl>div{display:flex;align-items:center;justify-content:space-between;gap:10px}
@@ -170,7 +179,8 @@
 .agm2-p-msg-m{margin-top:6px;display:flex;flex-direction:column;gap:2px;font-size:11px;line-height:1.45}
 .agm2-p-msg-m .ok{color:var(--ok)}
 .agm2-p-msg-m .bad{color:var(--err);word-break:break-word}
-.agm2-p-acoes{display:flex;flex-wrap:wrap;gap:6px;padding-top:10px;border-top:1px solid var(--line)}
+.agm2-p-acoes{flex:none;display:flex;flex-wrap:wrap;gap:6px;padding:10px 14px;border-top:1px solid var(--line);
+  background:var(--surface-2)}
 
 /* ---- modal "Novo agendamento" (escolher o cliente) ---------------------- */
 .agm2-novo{display:flex;flex-direction:column;gap:10px}
@@ -193,8 +203,12 @@
   .agm2-lista-h,.agm2-row{grid-template-columns:90px minmax(140px,1.4fr) 90px 112px 100px 100px 42px}
 }
 @media (max-width:1000px){
-  .agm2-main{flex-direction:column}
-  .agm2-painel{width:100%;max-height:none}
+  /* empilhado, quem rola volta a ser a página inteira — lista e painel crescem à vontade */
+  .agm2{height:auto;overflow-y:auto}
+  .agm2-main{flex-direction:column;flex:none}
+  .agm2-lista{overflow-y:visible}
+  .agm2-painel{width:100%;overflow:visible}
+  .agm2-p-corpo{overflow:visible}
   .agm2-lista-h .cl-at,.agm2-row .cl-at{display:none}
   .agm2-lista-h,.agm2-row{grid-template-columns:84px minmax(120px,1.4fr) 86px 106px 96px 40px}
 }

@@ -346,6 +346,8 @@ export function AgendamentosMensagens() {
           const falhas = sel.itens.filter((i) => i.status === 'falhou' || i.status === 'bloqueada').length;
           const taxa = sel.count > 0 ? Math.round((enviadas / sel.count) * 100) : 0;
           const podeCancelarSeq = sel.ehSequencia && sel.itens.some((i) => i.status === 'agendada');
+          const podeEditar = !sel.ehSequencia && agendaEditavel(item.status);
+          const podeReagendar = !sel.ehSequencia && agendaReagendavel(item.status);
           return (
             <aside className="agm2-painel" aria-label="Detalhes do agendamento">
               <div className="agm2-p-h">
@@ -353,6 +355,7 @@ export function AgendamentosMensagens() {
                 <button className="agm2-p-x" aria-label="Fechar" onClick={() => setSelKey(null)}><IcClose /></button>
               </div>
 
+              <div className="agm2-p-corpo">
               <div className="agm2-p-cli">
                 <i className="agm2-av g">{iniciais(sel.contatoNome ?? sel.telefone ?? 'Cliente')}</i>
                 <div className="agm2-p-cli-t">
@@ -408,21 +411,25 @@ export function AgendamentosMensagens() {
                   );
                 })}
               </ol>
-
-              <div className="agm2-p-acoes">
-                {!sel.ehSequencia && agendaEditavel(item.status) && (
-                  <>
-                    <button className="agm2-btn sm" onClick={() => setComp({ modo: 'editar', item, temTelefone: !!item.telefone })}>Editar</button>
-                    <button className="agm2-btn sm danger" disabled={cancelarMut.isPending} onClick={() => cancelarItem(item)}>Cancelar</button>
-                  </>
-                )}
-                {!sel.ehSequencia && agendaReagendavel(item.status) && (
-                  <button className="agm2-btn sm" onClick={() => setComp({ modo: 'reagendar', item, temTelefone: !!item.telefone })}>Reagendar</button>
-                )}
-                {podeCancelarSeq && (
-                  <button className="agm2-btn sm danger" disabled={cancelarMut.isPending} onClick={() => cancelarSequencia(sel)}>Cancelar pendentes</button>
-                )}
               </div>
+
+              {/* rodapé só existe quando há ação — nada de barra vazia em agendamento já enviado */}
+              {(podeEditar || podeReagendar || podeCancelarSeq) && (
+                <div className="agm2-p-acoes">
+                  {podeEditar && (
+                    <>
+                      <button className="agm2-btn sm" onClick={() => setComp({ modo: 'editar', item, temTelefone: !!item.telefone })}>Editar</button>
+                      <button className="agm2-btn sm danger" disabled={cancelarMut.isPending} onClick={() => cancelarItem(item)}>Cancelar</button>
+                    </>
+                  )}
+                  {podeReagendar && (
+                    <button className="agm2-btn sm" onClick={() => setComp({ modo: 'reagendar', item, temTelefone: !!item.telefone })}>Reagendar</button>
+                  )}
+                  {podeCancelarSeq && (
+                    <button className="agm2-btn sm danger" disabled={cancelarMut.isPending} onClick={() => cancelarSequencia(sel)}>Cancelar pendentes</button>
+                  )}
+                </div>
+              )}
             </aside>
           );
         })()}
