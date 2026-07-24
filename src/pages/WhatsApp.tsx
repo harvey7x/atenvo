@@ -29,7 +29,6 @@ import { useStatusDefs, useEtiquetas, useAssinaturaPref, useAtendimentoActions, 
 import { useSlaAlertas } from '@/data/sla';
 import { indexPorChave, tipoLabel, tempoRelativo } from '@/data/slaView';
 import { siglaCanal } from '@/lib/cardConversa';
-import { SlaConversaBanner } from '@/components/SlaConversaBanner';
 import { corDaEtiqueta, podeGerenciarAtendimento, type AssinaturaModo } from '@/types/atendimento';
 import { KanbanContatoBox } from '@/components/KanbanContatoBox';
 import './WhatsApp.css';
@@ -1156,7 +1155,6 @@ export function WhatsApp() {
           </div>
         </header>
 
-        <SlaConversaBanner alertas={slaPorConversa.get(currentId) ?? []} />
 
         {/* HIGIENE 1 — conversa sem responsável. Alerta forte no topo; bloqueia envio quando
             a entrada progressiva mandar (nova = já; antiga = depois da adaptação). */}
