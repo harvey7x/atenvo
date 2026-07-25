@@ -505,6 +505,10 @@ Deno.serve(async (req) => {
               const { data: r } = await db.rpc('bot_remarketing_inbound', { p_conversa: conversaId, p_texto: texto ?? '' });
               rmktDesfecho = (r as string) ?? null;
             } catch { /* best-effort: remarketing nunca quebra o webhook */ }
+            // RELACIONAMENTO: cliente respondeu → regua_inbound pausa a ativação e cancela o próximo envio
+            // (no-op sem relacionamento ativo). Best-effort: nunca quebra o webhook.
+            try { await db.rpc('regua_inbound', { p_conversa: conversaId, p_texto: texto ?? '' }); }
+            catch { /* best-effort */ }
           }
 
           // ---- BLOCO 1: dispatch fire-and-forget ao bot-runner (só inbound NOVO, texto/áudio) ----
