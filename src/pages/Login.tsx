@@ -1,25 +1,29 @@
+/* Login — primeira tela migrada para o Atenvo Obsidian (Fase 3.1, piloto).
+ *
+ * REGRA DE OURO: só o VISUAL mudou. Toda a lógica (validação, signIn, recuperação
+ * de senha, redirecionamento pós-login, modo mock) está intacta e na mesma ordem.
+ *
+ * O que saiu do visual antigo, por decisão do ATENVO-DESIGN.md:
+ * - o painel-hero com gradiente navy e a prévia decorativa de Kanban (gradiente
+ *   decorativo e ilustração são anti-padrões da seção 9); o login vira um card
+ *   único centrado sobre o canvas + orbs;
+ * - o logo SVG com o verde antigo → wordmark provisório "atenvo" (seção 5);
+ * - o alternador claro/escuro DESTA tela: a página agora é sempre obsidian
+ *   (o alternador continua existindo dentro do app até o shell migrar). */
 import { useState, type FormEvent } from 'react';
 import { useLocation, useNavigate, Navigate } from 'react-router-dom';
+import { AlertTriangle, Eye, EyeOff, Lock } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { useTheme } from '@/hooks/useTheme';
 import { useToast } from '@/hooks/useToast';
+import { AmbientOrbs, Button, Field, Input } from '@/components/ui';
 import './Login.css';
 
 interface LocState { from?: { pathname: string } }
 
-/* Prévia decorativa do Kanban (idêntica ao protótipo 01_login) */
-const COLS: { name: string; count: number; cards: [string | null, number][] }[] = [
-  { name: 'Novos leads', count: 32, cards: [['#19c37d', 2], ['#19c37d', 1], [null, 2]] },
-  { name: 'Em atendimento', count: 18, cards: [['#19c37d', 2], ['#f0a33d', 1], ['#19c37d', 2]] },
-  { name: 'Proposta', count: 7, cards: [['#f0a33d', 2], ['#19c37d', 1], ['#f0a33d', 2]] },
-  { name: 'Fechados', count: 12, cards: [['#19c37d', 2], ['#3b82f6', 1], ['#19c37d', 2]] },
-];
-const W = ['74%', '52%', '64%', '46%'];
 const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function Login() {
   const { user, loading, signIn, resetPassword, mode } = useAuth();
-  const { theme, setTheme } = useTheme();
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
@@ -81,139 +85,76 @@ export function Login() {
   }
 
   return (
-    <main className="login-page">
-      {/* ESQUERDA — marca */}
-      <section className="brand-panel">
-        <div className="bg-lines" aria-hidden="true">
-          <svg viewBox="0 0 600 820" preserveAspectRatio="xMidYMid slice" fill="none">
-            <path d="M-40 120 C 200 50, 440 150, 720 60" stroke="rgba(255,255,255,.045)" strokeWidth="1.3" />
-            <path d="M-40 188 C 220 128, 450 218, 720 140" stroke="rgba(255,255,255,.028)" strokeWidth="1.1" />
-            <path d="M-30 706 C 150 770, 380 706, 680 520" stroke="rgba(25,195,125,.55)" strokeWidth="1.6" />
-            <path d="M-30 770 C 180 812, 430 778, 700 648" stroke="rgba(25,195,125,.22)" strokeWidth="1.3" />
-          </svg>
-        </div>
+    <main className="lgn">
+      <AmbientOrbs />
+      <div className="lgn__col">
+        <div className="lgn__brand">atenvo</div>
 
-        <div className="logo">
-          <svg className="mark" viewBox="0 0 40 40" fill="none" role="img" aria-label="Atenvo">
-            <circle cx="17" cy="21" r="12.8" fill="none" stroke="#19c37d" strokeWidth="3.7" strokeLinecap="round" strokeDasharray="72 9" transform="rotate(-52 17 21)" />
-            <polygon points="30.5,4 32.3,9.2 37.5,11 32.3,12.8 30.5,18 28.7,12.8 23.5,11 28.7,9.2" fill="#19c37d" />
-          </svg>
-          <span className="logo-text">Atenvo</span>
-        </div>
+        <section className="lgn__card">
+          <h1 className="lgn__title">Acessar a plataforma</h1>
+          <p className="lgn__sub">Entre com suas credenciais para continuar.</p>
 
-        <div className="brand-copy">
-          <h1 className="hero-title">Atendimento, CRM<br />e funil <span className="accent">em um só lugar.</span></h1>
-          <p className="hero-sub">Centralize conversas, leads e acompanhamento para <span className="em">vender mais</span> e <span className="em">atender melhor.</span></p>
-        </div>
-
-        <div className="kanban-row" aria-hidden="true">
-          <div className="kanban">
-            <div className="kanban-side">
-              <svg className="kanban-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="8" /></svg>
-              <svg className="kanban-ic active" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a8 8 0 0 1-11.5 7.2L4 21l1.8-5.5A8 8 0 1 1 21 12z" /></svg>
-              <svg className="kanban-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="8" r="3" /><path d="M3 20a6 6 0 0 1 12 0M17 11a3 3 0 0 0 0-6M21 20a6 6 0 0 0-4-5.6" /></svg>
-              <svg className="kanban-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 5h18l-7 8v6l-4-2v-4z" /></svg>
-              <svg className="kanban-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19V5M4 15l4-4 4 3 8-8M20 9V5h-4" /></svg>
-              <svg className="kanban-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 13a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V20a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 6.6 18l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.6 1.6 0 0 0 4 12.6H4a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 6 6.6l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.6 1.6 0 0 0 11 4.6V4a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 2.7 1.1l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8z" /></svg>
-            </div>
-            <div className="kanban-board">
-              {COLS.map((col, ci) => (
-                <div className="pv-col" key={ci}>
-                  <div className="pv-col-head">
-                    <span className="pv-col-title">{col.name}</span>
-                    <span className="pv-count">{col.count}</span>
-                  </div>
-                  {col.cards.map((cd, ri) => (
-                    <div className="pv-card" key={ri}>
-                      <div className="pv-av" />
-                      <div className="pv-lines">
-                        {Array.from({ length: cd[1] + 1 }).map((_, k) => (
-                          <div className="pv-l" key={k} style={{ width: W[(ci + ri + k) % W.length] }} />
-                        ))}
-                      </div>
-                      {cd[0] && <div className="pv-dot" style={{ background: cd[0] }} />}
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* DIREITA — auth */}
-      <section className="auth-panel">
-        <div className="theme-toggle">
-          <div className="pill" role="group" aria-label="Tema">
-            <button type="button" className={'tp-btn' + (theme === 'light' ? ' on' : '')} aria-label="Tema claro" aria-pressed={theme === 'light'} onClick={() => setTheme('light')}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>
-            </button>
-            <button type="button" className={'tp-btn' + (theme === 'dark' ? ' on' : '')} aria-label="Tema escuro" aria-pressed={theme === 'dark'} onClick={() => setTheme('dark')}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" /></svg>
-            </button>
-          </div>
-        </div>
-
-        <div className="auth-content">
-          <h2 className="heading">Acessar a plataforma</h2>
-          <p className="subhead">Entre com suas credenciais para continuar.</p>
-
-          <form onSubmit={onSubmit} noValidate>
-            <div className={'banner' + (banner ? ' show banner--error' : '')} role="alert" aria-live="polite">
-              <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 8v5M12 16h.01" /></svg></span>
-              <span>{banner}</span>
-            </div>
-
-            <div className={'field' + (eEmail ? ' is-invalid' : '')}>
-              <label htmlFor="email">E-mail</label>
-              <div className="control has-icon">
-                <span className="icon-left" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></svg></span>
-                <input className="input" id="email" name="email" type="email" inputMode="email" autoComplete="username" placeholder="seu@email.com"
-                  value={email} onChange={(e) => { setEmail(e.target.value); setEEmail(null); }} />
+          <form onSubmit={onSubmit} noValidate className="lgn__form">
+            {banner && (
+              <div className="lgn__banner" role="alert" aria-live="polite">
+                <AlertTriangle size={16} strokeWidth={1.5} aria-hidden="true" />
+                <span>{banner}</span>
               </div>
-              <small className="hint">{eEmail}</small>
-            </div>
+            )}
 
-            <div className={'field' + (ePass ? ' is-invalid' : '')}>
-              <label htmlFor="password">Senha</label>
-              <div className="control has-icon has-trailing">
-                <span className="icon-left" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="11" width="16" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg></span>
-                <input className="input" id="password" name="password" type={showPw ? 'text' : 'password'} autoComplete="current-password" placeholder="••••••••"
-                  value={password} onChange={(e) => { setPassword(e.target.value); setEPass(null); }} />
-                <button type="button" className="pw-toggle" aria-label={showPw ? 'Ocultar senha' : 'Mostrar senha'} aria-pressed={showPw} onClick={() => setShowPw((s) => !s)}>
-                  {showPw ? (
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.7 6.2A9.8 9.8 0 0 1 12 5c6.5 0 10 7 10 7a16 16 0 0 1-3.2 3.9M6.1 7.1A16 16 0 0 0 2 12s3.5 7 10 7a9.8 9.8 0 0 0 4.3-1M3 3l18 18M9.9 9.9a3 3 0 0 0 4.2 4.2" /></svg>
-                  ) : (
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" /><circle cx="12" cy="12" r="3" /></svg>
-                  )}
+            <Field label="E-mail" error={eEmail ?? undefined}>
+              <Input
+                id="email" name="email" type="email" inputMode="email" autoComplete="username"
+                placeholder="seu@email.com" aria-invalid={eEmail ? 'true' : undefined}
+                value={email} onChange={(e) => { setEmail(e.target.value); setEEmail(null); }}
+              />
+            </Field>
+
+            <Field label="Senha" error={ePass ?? undefined}>
+              <span className="lgn__pw">
+                <Input
+                  id="password" name="password" type={showPw ? 'text' : 'password'} autoComplete="current-password"
+                  placeholder="Sua senha" aria-invalid={ePass ? 'true' : undefined}
+                  value={password} onChange={(e) => { setPassword(e.target.value); setEPass(null); }}
+                />
+                <button
+                  type="button" className="lgn__pw-toggle"
+                  aria-label={showPw ? 'Ocultar senha' : 'Mostrar senha'} aria-pressed={showPw}
+                  onClick={() => setShowPw((s) => !s)}
+                >
+                  {showPw ? <EyeOff size={16} strokeWidth={1.5} /> : <Eye size={16} strokeWidth={1.5} />}
                 </button>
-              </div>
-              <small className="hint">{ePass}</small>
+              </span>
+            </Field>
+
+            <div className="lgn__row">
+              <label className="lgn__check">
+                <input type="checkbox" defaultChecked />
+                Manter conectado
+              </label>
+              <button type="button" className="lgn__link" onClick={onForgot} disabled={recuperando}>
+                {recuperando ? 'Enviando…' : 'Esqueci minha senha'}
+              </button>
             </div>
 
-            <div className="row-between">
-              <label className="check"><input type="checkbox" defaultChecked />Manter conectado</label>
-              <button type="button" className="link" onClick={onForgot} disabled={recuperando}>{recuperando ? 'Enviando…' : 'Esqueci minha senha'}</button>
-            </div>
+            <Button type="submit" variant="primary" size="lg" loading={busy} style={{ width: '100%' }}>
+              Entrar
+            </Button>
 
-            <button type="submit" className="btn" disabled={busy}>
-              {busy ? <span className="spinner" aria-hidden="true" /> : <span>Entrar</span>}
-            </button>
-
-            <div className="restricted">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="11" width="16" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
+            <div className="lgn__restricted">
+              <Lock size={16} strokeWidth={1.5} aria-hidden="true" />
               Acesso restrito a colaboradores autorizados.
             </div>
 
             {mode === 'mock' && (
-              <div className="mock-note">
+              <div className="lgn__mock">
                 Modo de demonstração: sem backend, qualquer e-mail válido e senha (6+) entram.
                 Configure <code>VITE_SUPABASE_URL</code> e <code>VITE_SUPABASE_ANON_KEY</code> para usar o Supabase Auth real.
               </div>
             )}
           </form>
-        </div>
-      </section>
+        </section>
+      </div>
     </main>
   );
 }
