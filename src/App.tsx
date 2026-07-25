@@ -12,6 +12,7 @@ import { Kanban } from '@/pages/Kanban';
 // Presencial preservado no código (src/pages/Agendamentos.tsx), fora da navegação — a rota
 // /agendamentos foi reaproveitada para a central de Agendamentos de Mensagens (Fase 2B).
 import { AgendamentosMensagens } from '@/pages/AgendamentosMensagens';
+import { Relacionamento } from '@/pages/Relacionamento';
 import { Scripts } from '@/pages/Scripts';
 import { Cobrancas } from '@/pages/Cobrancas';
 import { Integracoes } from '@/pages/Integracoes';
@@ -53,6 +54,11 @@ const routes: RouteObject[] = [
             path: 'agendamentos',
             handle: { title: 'Agendamentos de Mensagens', subtitle: 'Acompanhe mensagens programadas, enviadas, falhas e canceladas.', fullBleed: true },
             element: <AgendamentosMensagens />,
+          },
+          {
+            path: 'relacionamento',
+            handle: { title: 'Relacionamento', subtitle: 'Réguas leves de relacionamento e nutrição — ativadas manualmente por cliente.', fullBleed: true },
+            element: <Relacionamento />,
           },
           {
             path: 'scripts',

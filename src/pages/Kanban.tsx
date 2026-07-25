@@ -13,6 +13,7 @@ import { useKanban, useOportunidadesAbertasDeContatos, useConversasDoContato, va
 import { useSearchParams } from 'react-router-dom';
 import { Modal } from '@/components/Modal';
 import { FichaJudicialBox } from '@/components/FichaJudicialBox';
+import { RelacionamentoContatoBox } from '@/components/RelacionamentoContatoBox';
 import { useFichasStatusDeOportunidades } from '@/data/fichaJudicial';
 import { useSlaAlertas } from '@/data/sla';
 import { indexPorChave, sevRank, sevClass, tipoLabel, type SlaTipo } from '@/data/slaView';
@@ -764,6 +765,9 @@ export function Kanban() {
                   responsavelSugerido={{ id: detLead.respId, nome: detLead.respNome }}
                   contatoAtual={{ nome: detLead.nome, telefone: detLead.telefone, email: detLead.email }}
                   oportunidadeAtual={{ tipoBeneficio: detLead.tipoBeneficio, numeroBeneficio: detLead.numeroBeneficio, instituicao: detLead.instituicao }} />
+              </div>
+              <div className="kb-det-ficha">
+                <RelacionamentoContatoBox contatoId={detLead.contatoId} conversaId={detLead.conversaOrigemId} canalId={detLead.canalOrigemId} />
               </div>
             </div>
           );

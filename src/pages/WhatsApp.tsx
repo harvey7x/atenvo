@@ -31,6 +31,7 @@ import { useSlaAlertas } from '@/data/sla';
 import { indexPorChave, tipoLabel, tempoRelativo } from '@/data/slaView';
 import { corDaEtiqueta, podeGerenciarAtendimento, type AssinaturaModo } from '@/types/atendimento';
 import { KanbanContatoBox } from '@/components/KanbanContatoBox';
+import { RelacionamentoContatoBox } from '@/components/RelacionamentoContatoBox';
 import './WhatsApp.css';
 
 /** Conversa vazia (placeholder) para quando ainda não há conversas reais carregadas. */
@@ -1554,6 +1555,7 @@ export function WhatsApp() {
           </div>
 
           <div className="dfield"><KanbanContatoBox contatoId={current.contatoId} conversaId={current.id} canalId={current.canalId} canalTipo="whatsapp" contatoTelefone={current.phone} /></div>
+          <div className="dfield"><RelacionamentoContatoBox contatoId={current.contatoId} conversaId={current.id} canalId={current.canalId} /></div>
           <div className="dfield"><div className="dlabel">Responsável</div>
             {editMode ? (
               <select className="edit-input" value={editForm.respId} onChange={(e) => setEditForm((f) => ({ ...f, respId: e.target.value }))}>
