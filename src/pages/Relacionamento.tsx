@@ -1,16 +1,18 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Modal } from '@/components/Modal';
+import { AudioRecorder } from '@/components/AudioRecorder';
 import { useToast } from '@/hooks/useToast';
 import { useOrg } from '@/context/OrgContext';
 import { useAuth } from '@/context/AuthContext';
+import { subirMidiaWa, urlAssinadaMidiaWa } from '@/data/whatsapp';
 import {
   useReguas, usePassos, useAtivacoes, useHistoricoEnvios, useCanaisNormais, useContatosBusca,
   useSalvarRegua, useArquivarRegua, useExcluirRegua, useSalvarPasso, useRemoverPasso,
   useAtivarRelacionamento, usePausar, useRetomar, useDesativar, useTrocarRegua,
-  OBJETIVOS, objetivoInfo, REGUA_STATUS, ATIV_STATUS, PASSO_TIPOS, DIAS_SEMANA,
+  OBJETIVOS, objetivoInfo, REGUA_STATUS, ATIV_STATUS, PASSO_TIPOS, passoTipoLabel, DIAS_SEMANA,
   podeGerirReguas, traduzErro,
-  type Regua, type Passo, type Ativacao, type ReguaInput, type PassoInput, type AgendamentoTipo,
+  type Regua, type Passo, type Ativacao, type ReguaInput, type PassoInput, type PassoTipo, type AgendamentoTipo,
 } from '@/data/relacionamento';
 import './Relacionamento.css';
 
@@ -269,7 +271,7 @@ function PassosEditor({ reguaId }: { reguaId: string }) {
         {lista.map((p) => (
           <div className="rel-passo-card" key={p.id} onClick={() => setEditando(p)}>
             <span className="rel-passo-ord">{p.ordem}</span>
-            <div className="rel-passo-main"><div className="rel-passo-t">{p.tituloInterno}</div><div className="rel-passo-s">{PASSO_TIPOS.find((t) => t.id === p.tipo)?.label} · {descPasso(p)}</div></div>
+            <div className="rel-passo-main"><div className="rel-passo-t">{p.tituloInterno}</div><div className="rel-passo-s">{passoTipoLabel(p.tipo)} · {descPasso(p)}</div></div>
             <button className="btn btn-sm rel-danger" onClick={(e) => { e.stopPropagation(); remover.mutateAsync({ id: p.id, reguaId }).then(() => toast('Passo removido')).catch((err) => toast(traduzErro((err as Error).message), 'warn')); }}>Remover</button>
           </div>
         ))}
@@ -280,18 +282,60 @@ function PassosEditor({ reguaId }: { reguaId: string }) {
   );
 }
 
+type MediaState = { path: string; mime: string; nome: string; tamanho: number } | null;
+const ACCEPT_PASSO: Record<string, string> = {
+  imagem: 'image/*',
+  documento: '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,application/pdf,application/msword',
+};
+
 function PassoModal({ reguaId, passo, proximaOrdem, onClose, onSalvar }: { reguaId: string; passo: Passo | null; proximaOrdem: number; onClose: () => void; onSalvar: (v: PassoInput) => Promise<void> }) {
   const { user } = useAuth(); // nome do atendente para a prévia
+  const { currentOrg } = useOrg();
+  const { toast } = useToast();
   const [titulo, setTitulo] = useState(passo?.tituloInterno ?? '');
+  const [tipo, setTipo] = useState<PassoTipo>((passo?.tipo as PassoTipo) ?? 'texto');
   const [texto, setTexto] = useState(passo?.texto ?? '');
+  const [media, setMedia] = useState<MediaState>(passo?.storagePath ? { path: passo.storagePath, mime: passo.mimeType ?? '', nome: passo.nomeArquivo ?? 'arquivo', tamanho: 0 } : null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [agTipo, setAgTipo] = useState<AgendamentoTipo>(passo?.agendamentoTipo ?? 'semanal');
   const [diaSemana, setDiaSemana] = useState(passo?.diaSemana ?? 1);
   const [hora, setHora] = useState((passo?.hora ?? '08:30').slice(0, 5));
   const [offsetDias, setOffsetDias] = useState(passo?.offsetHoras != null ? Math.round(passo.offsetHoras / 24) : 1);
   const [data, setData] = useState(passo?.data ?? '');
 
+  const ehMidia = tipo !== 'texto';
+  const ehImagem = tipo === 'imagem';
+  const ehAudio = tipo === 'audio';
+
+  // prévia da imagem já existente (ao editar um passo salvo)
+  useEffect(() => {
+    let vivo = true;
+    if (ehImagem && media?.path && !previewUrl) urlAssinadaMidiaWa(media.path).then((u) => { if (vivo) setPreviewUrl(u); }).catch(() => { /* prévia é opcional */ });
+    return () => { vivo = false; };
+  }, [ehImagem, media?.path, previewUrl]);
+
+  function trocarTipo(t: PassoTipo) { setTipo(t); if (t === 'texto') { setMedia(null); setPreviewUrl(null); } }
+  async function anexar(file: File) {
+    if (file.size > 25 * 1024 * 1024) { toast('Arquivo acima de 25 MB.', 'warn'); return; }
+    setUploading(true);
+    try { const m = await subirMidiaWa(currentOrg.id, file); setMedia(m); setPreviewUrl(file.type.startsWith('image/') ? URL.createObjectURL(file) : null); }
+    catch (e) { toast('Falha no upload: ' + (e as Error).message, 'warn'); }
+    finally { setUploading(false); }
+  }
+  async function anexarAudio(blob: Blob, mime: string, ext: string) {
+    const file = new File([blob], `audio-relacionamento.${ext}`, { type: mime });
+    const m = await subirMidiaWa(currentOrg.id, file); // lança em falha → AudioRecorder mostra o erro
+    setMedia(m);
+  }
+
+  const conteudoOk = ehMidia ? (!!media && !uploading) : !!texto.trim();
   function montar(): PassoInput {
-    const base: PassoInput = { id: passo?.id ?? null, reguaId, ordem: passo?.ordem ?? proximaOrdem, titulo: titulo.trim() || 'Passo', tipo: 'texto', texto: texto, agendamentoTipo: agTipo };
+    const base: PassoInput = {
+      id: passo?.id ?? null, reguaId, ordem: passo?.ordem ?? proximaOrdem, titulo: titulo.trim() || 'Passo',
+      tipo, texto: ehAudio ? null : (texto.trim() || null), agendamentoTipo: agTipo,
+      storagePath: media?.path ?? null, mime: media?.mime ?? null, nome: media?.nome ?? null, tamanho: media?.tamanho ?? null,
+    };
     if (agTipo === 'semanal') { base.diaSemana = diaSemana; base.hora = hora; }
     else if (agTipo === 'data_fixa') { base.data = data; base.hora = hora; }
     else base.offsetHoras = offsetDias * 24;
@@ -300,11 +344,40 @@ function PassoModal({ reguaId, passo, proximaOrdem, onClose, onSalvar }: { regua
 
   return (
     <Modal open onClose={onClose} width={560} title={<div className="rel-modal-title">{passo ? 'Editar passo' : 'Novo passo'}</div>}
-      footer={<div className="rel-modal-foot"><span style={{ flex: 1 }} /><button className="btn" onClick={onClose}>Cancelar</button><button className="btn btn-primary" onClick={() => onSalvar(montar())} disabled={!texto.trim()}>Salvar passo</button></div>}>
+      footer={<div className="rel-modal-foot"><span style={{ flex: 1 }} /><button className="btn" onClick={onClose}>Cancelar</button><button className="btn btn-primary" onClick={() => onSalvar(montar())} disabled={!conteudoOk}>Salvar passo</button></div>}>
       <div className="field"><label>Título interno (não enviado)</label><input className="ctrl" value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Ex.: Boa semana" /></div>
-      <div className="field"><label>Mensagem</label><textarea className="ctrl rel-textarea" value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Bom dia, {{primeiro_nome}}! …" />
-        <div className="rel-vars">Variáveis: <code>{'{{primeiro_nome}}'}</code> <code>{'{{saudacao}}'}</code> <code>{'{{nome_atendente}}'}</code></div>
+
+      <div className="field"><label>Tipo</label>
+        <div className="rel-tipos">
+          {PASSO_TIPOS.map((t) => <button key={t.id} type="button" className={'rel-tipo' + (tipo === t.id ? ' on' : '')} onClick={() => trocarTipo(t.id)}>{t.label}</button>)}
+        </div>
       </div>
+
+      {ehMidia && (
+        <div className="field"><label>{ehAudio ? 'Áudio' : ehImagem ? 'Imagem' : 'Documento'}</label>
+          {ehAudio ? (
+            media ? <div className="rel-attach-done"><span className="rel-doc-chip">🎙️ Áudio anexado</span><button type="button" className="btn btn-sm" onClick={() => setMedia(null)}>Trocar</button></div>
+              : <AudioRecorder onEnviar={anexarAudio} permitirArquivo rotuloEnviar="Usar áudio" />
+          ) : media ? (
+            <div className="rel-attach-done">
+              {ehImagem && previewUrl ? <img className="rel-thumb" src={previewUrl} alt="prévia" /> : <span className="rel-doc-chip">📄 {media.nome}</span>}
+              <button type="button" className="btn btn-sm rel-danger" onClick={() => { setMedia(null); setPreviewUrl(null); }}>Remover</button>
+            </div>
+          ) : (
+            <label className={'rel-attach-btn' + (uploading ? ' busy' : '')}>{uploading ? 'Enviando…' : `Anexar ${ehImagem ? 'imagem' : 'documento'}`}
+              <input type="file" accept={ACCEPT_PASSO[tipo]} hidden disabled={uploading} onChange={(e) => { const f = e.target.files?.[0]; if (f) anexar(f); e.currentTarget.value = ''; }} />
+            </label>
+          )}
+        </div>
+      )}
+
+      {!ehAudio && (
+        <div className="field"><label>{ehMidia ? 'Legenda (opcional)' : 'Mensagem'}</label>
+          <textarea className="ctrl rel-textarea" value={texto} onChange={(e) => setTexto(e.target.value)} placeholder={ehMidia ? 'Legenda…' : 'Bom dia, {{primeiro_nome}}! …'} />
+          <div className="rel-vars">Variáveis: <code>{'{{primeiro_nome}}'}</code> <code>{'{{saudacao}}'}</code> <code>{'{{nome_atendente}}'}</code></div>
+        </div>
+      )}
+
       <div className="rel-row2">
         <div className="field"><label>Agendamento</label><select className="ctrl" value={agTipo} onChange={(e) => setAgTipo(e.target.value as AgendamentoTipo)}><option value="semanal">Semanal</option><option value="relativo">Relativo (D+X)</option><option value="data_fixa">Data fixa</option></select></div>
         {agTipo === 'semanal' && <div className="field"><label>Dia</label><select className="ctrl" value={diaSemana} onChange={(e) => setDiaSemana(Number(e.target.value))}>{DIAS_SEMANA.map((d, i) => <option key={i} value={i}>{d}</option>)}</select></div>}
@@ -316,9 +389,16 @@ function PassoModal({ reguaId, passo, proximaOrdem, onClose, onSalvar }: { regua
       <div className="rel-ed-eyebrow">Prévia</div>
       <div className="rel-wa">
         <div className="rel-wa-top"><span className="rel-wa-av">CAF</span><div><div className="rel-wa-n">CAF Assessoria</div><div className="rel-wa-s">online</div></div></div>
-        <div className="rel-wa-body"><div className="rel-wa-bubble">{previewTexto(texto, user?.name || 'atendente') || 'Sua mensagem aparece aqui…'}<span className="rel-wa-time">{hora}</span></div></div>
+        <div className="rel-wa-body">
+          <div className="rel-wa-bubble">
+            {ehImagem && previewUrl && <img className="rel-wa-img" src={previewUrl} alt="" />}
+            {tipo === 'documento' && media && <span className="rel-wa-doc">📄 {media.nome}</span>}
+            {ehAudio ? <span className="rel-wa-audio">🎙️ Mensagem de áudio</span>
+              : <span className="rel-wa-txt">{previewTexto(texto, user?.name || 'atendente') || (ehMidia ? '' : 'Sua mensagem aparece aqui…')}</span>}
+            <span className="rel-wa-time">{hora}</span>
+          </div>
+        </div>
       </div>
-      <div className="rel-hint">Anexo de imagem/áudio/documento chega no próximo incremento — por ora, passos de texto.</div>
     </Modal>
   );
 }

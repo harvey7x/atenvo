@@ -115,6 +115,26 @@
 .rel-busca-item:last-child { border-bottom: 0; }
 .rel-busca-item:hover { background: var(--hover); }
 
+/* seletor de tipo do passo */
+.rel-tipos { display: flex; gap: 6px; flex-wrap: wrap; }
+.rel-tipo { border: 1px solid var(--line-2); background: var(--surface); color: var(--ink-2); font-family: var(--font); font-size: 12.5px; font-weight: 550; padding: 7px 13px; border-radius: 8px; cursor: pointer; }
+.rel-tipo:hover { background: var(--hover); }
+.rel-tipo.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* anexo de mídia */
+.rel-attach-btn { display: inline-flex; align-items: center; gap: 8px; border: 1.5px dashed var(--line-2); background: none; color: var(--accent-ink); font-weight: 550; font-size: 13px; padding: 11px 14px; border-radius: 10px; cursor: pointer; }
+.rel-attach-btn:hover { border-color: var(--accent); }
+.rel-attach-btn.busy { opacity: .6; cursor: default; }
+.rel-attach-done { display: flex; align-items: center; gap: 10px; }
+.rel-thumb { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
+.rel-doc-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 7px 11px; font-size: 12.5px; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* mídia dentro da prévia do WhatsApp */
+.rel-wa-txt { display: block; }
+.rel-wa-img { display: block; max-width: 200px; max-height: 150px; border-radius: 6px; margin-bottom: 5px; }
+.rel-wa-doc { display: inline-flex; align-items: center; gap: 6px; background: rgba(0,0,0,.06); border-radius: 6px; padding: 6px 9px; font-size: 12px; margin-bottom: 4px; }
+.rel-wa-audio { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; }
+
 @media (max-width: 900px) {
   .rel-kpis { grid-template-columns: repeat(2, 1fr); }
   .rel-grid2 { grid-template-columns: 1fr; }

@@ -44,8 +44,8 @@ export const PASSO_TIPOS: { id: PassoTipo; label: string }[] = [
   { id: 'imagem', label: 'Imagem' },
   { id: 'audio', label: 'Áudio' },
   { id: 'documento', label: 'Documento' },
-  { id: 'texto_midia', label: 'Texto + mídia' },
 ];
+export const passoTipoLabel = (t: string) => PASSO_TIPOS.find((x) => x.id === t)?.label ?? t;
 
 export type AgendamentoTipo = 'relativo' | 'semanal' | 'data_fixa';
 export const DIAS_SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']; // índice 0..6 = dow
