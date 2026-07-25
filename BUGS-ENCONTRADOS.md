@@ -22,3 +22,27 @@ Nenhum bug **funcional** encontrado (a fase foi só leitura de estilos). Ficam r
 3. **Colisão `.cfg-*`** — `Integracoes.css` define `.cfg-field/.cfg-form/.cfg-ta` sem prefixo,
    e `Configuracoes.css` define os mesmos nomes sob `.config-page`. Ordem de import decide
    quem ganha. Resolver quando cada tela for migrada.
+
+## Fase 3.2 (shell, 25/07/2026)
+
+4. **Kanban: loop de re-renderização ao abrir a tela ("Maximum update depth exceeded")**
+   — encontrado durante a validação do shell novo, mas **NÃO é causado pelo redesign**.
+
+   FATOS (medidos no navegador, dev server, org real com 269 leads na coluna de entrada):
+   - Ao navegar para /kanban com a página recém-carregada (cache de dados frio), o console
+     recebe um fluxo contínuo de erros "Maximum update depth exceeded" (~130–270 em 6s),
+     com stack apontando para o componente `Kanban`. A tela continua funcionando e o loop
+     cessa quando as queries assentam; navegações seguintes (cache quente) não geram erro.
+   - Teste de isolamento por bisseção (git stash seletivo, protocolo idêntico a frio):
+     o loop ocorreu com o shell novo E TAMBÉM com o código 100% anterior ao redesign
+     (272 erros no controle). Ou seja: pré-existente e dependente de DADOS — começou a
+     se manifestar durante a janela de testes, com qualquer versão do visual.
+
+   SUSPEITA (não confirmada): o efeito em `src/pages/Kanban.tsx:231-233` roda a cada
+   mudança de identidade de `k.leads` e sempre grava um objeto NOVO em `setOptim`
+   (mesmo quando o conteúdo não mudou), o que realimenta re-render enquanto as queries
+   do Kanban (leads/SLA/fichas) estiverem trocando de identidade em sequência.
+
+   RISCO: hoje é ruído de console + trabalho desperdiçado de render na entrada da tela
+   (pode virar travamento perceptível com mais leads). Investigar na migração do Kanban
+   (Fase 3), fora de qualquer mudança visual.

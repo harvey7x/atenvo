@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR" data-theme="light">
+<html lang="pt-BR" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -8,13 +8,9 @@
     <!-- Fonte agora é self-hosted via @fontsource/inter (ATENVO-DESIGN.md §5 proíbe
          Google Fonts em runtime). Pesos: só 400 e 500. O JetBrains Mono saiu junto —
          o pouco que usava --mono cai no monoespaçado do sistema até a tela migrar. -->
-    <script>
-      (function () {
-        var t = 'light';
-        try { var s = localStorage.getItem('atenvo-theme'); if (s === 'dark' || s === 'light') t = s; } catch (e) {}
-        document.documentElement.setAttribute('data-theme', t);
-      })();
-    </script>
+    <!-- Tema fixo obsidian (ATENVO-DESIGN.md §1): data-theme="dark" direto no <html>,
+         sem script de bootstrap — o app não alterna mais entre claro/escuro. -->
+
   </head>
   <body>
     <div id="root"></div>

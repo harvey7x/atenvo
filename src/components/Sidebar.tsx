@@ -1,211 +1,92 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
-import { Logo } from './Logo';
-import { Icon, type IconName } from './icons';
-import { useTheme } from '@/hooks/useTheme';
-import { useAuth } from '@/context/AuthContext';
+/* Sidebar — rail obsidian (Fase 3.2). Só o VISUAL mudou: mesmas rotas, na mesma
+ * ordem, e a mesma trava de admin para Maturação/Plano e uso.
+ *
+ * O que saiu, por decisão do ATENVO-DESIGN.md §7 (sidebar de 52–56px, só ícones):
+ * - o modo expandido e o botão de recolher/expandir — a preferência antiga em
+ *   localStorage fica órfã, sem efeito;
+ * - o alternador de tema — o app agora é sempre obsidian (ver useTheme);
+ * - o bloco do usuário no rodapé — o avatar foi para a topbar (doc §7), com o
+ *   mesmo destino (/configuracoes).
+ * O tooltip com o nome de cada item continua (hover e foco por teclado), no mesmo
+ * padrão fixed do anterior para não ser cortado pelo overflow do rail. */
+import { useCallback, useRef, useState } from 'react';
+import { NavLink } from 'react-router-dom';
+import {
+  BarChart3, CalendarClock, CreditCard, FileText, HeartHandshake,
+  MessageCircle, MessageSquare, Plug, Receipt, Settings, SquareKanban, Thermometer,
+  type LucideIcon,
+} from 'lucide-react';
 import { useOrg } from '@/context/OrgContext';
+import '@/styles/shell.css';
 
-interface NavEntry { to: string; label: string; icon: IconName; }
+interface NavEntry { to: string; label: string; icon: LucideIcon }
 
 const MAIN: NavEntry[] = [
-  { to: '/whatsapp', label: 'WhatsApp', icon: 'whatsapp' },
-  { to: '/facebook', label: 'Facebook', icon: 'facebook' },
-  { to: '/kanban', label: 'Kanban', icon: 'kanban' },
-  { to: '/agendamentos', label: 'Agendamentos', icon: 'agendamentos' },
-  { to: '/relacionamento', label: 'Relacionamento', icon: 'relacionamento' },
-  { to: '/scripts', label: 'Scripts', icon: 'scripts' },
-  { to: '/cobrancas', label: 'Cobranças', icon: 'cobrancas' },
-  { to: '/integracoes', label: 'Integrações', icon: 'integracoes' },
-  { to: '/relatorios', label: 'Relatórios', icon: 'relatorios' },
-  { to: '/configuracoes', label: 'Configurações', icon: 'configuracoes' },
+  { to: '/whatsapp', label: 'WhatsApp', icon: MessageCircle },
+  /* o lucide não tem ícones de marca — balão quadrado (Messenger) diferencia do circular do WhatsApp */
+  { to: '/facebook', label: 'Facebook', icon: MessageSquare },
+  { to: '/kanban', label: 'Kanban', icon: SquareKanban },
+  { to: '/agendamentos', label: 'Agendamentos', icon: CalendarClock },
+  { to: '/relacionamento', label: 'Relacionamento', icon: HeartHandshake },
+  { to: '/scripts', label: 'Scripts', icon: FileText },
+  { to: '/cobrancas', label: 'Cobranças', icon: Receipt },
+  { to: '/integracoes', label: 'Integrações', icon: Plug },
+  { to: '/relatorios', label: 'Relatórios', icon: BarChart3 },
+  { to: '/configuracoes', label: 'Configurações', icon: Settings },
 ];
 const ADMIN: NavEntry[] = [
-  { to: '/maturacao', label: 'Maturação', icon: 'maturacao' },
-  { to: '/plano-uso', label: 'Plano e uso', icon: 'plano' },
+  { to: '/maturacao', label: 'Maturação', icon: Thermometer },
+  { to: '/plano-uso', label: 'Plano e uso', icon: CreditCard },
 ];
 
-const ROLE_LABEL: Record<string, string> = { admin: 'Administrador', gestor: 'Gestor', atendente: 'Atendente' };
-
-const LS_KEY = 'atenvo.sidebar.expandida';
-const NARROW = '(max-width:860px)';
-
-function initials(name: string) {
-  const p = name.trim().split(/\s+/);
-  return ((p[0]?.[0] ?? '') + (p[1]?.[0] ?? '')).toUpperCase();
-}
-
-/** Preferência do usuário (localStorage) — padrão: compacta. Em telas estreitas a
-    preferência é ignorada e a barra fica sempre compacta (sem sobrescrever o valor salvo). */
-function usePrefExpandida() {
-  const [pref, setPref] = useState<boolean>(() => {
-    try { return localStorage.getItem(LS_KEY) === '1'; } catch { return false; }
-  });
-  const [narrow, setNarrow] = useState<boolean>(() =>
-    typeof window !== 'undefined' ? window.matchMedia(NARROW).matches : false);
-
-  useEffect(() => {
-    const mq = window.matchMedia(NARROW);
-    const on = () => setNarrow(mq.matches);
-    on(); // ressincroniza no mount (a largura pode ter mudado antes do listener existir)
-    mq.addEventListener('change', on);
-    // 'resize' é redundante na maioria dos casos, mas o evento 'change' da media query
-    // não dispara em alguns cenários de viewport emulada — sem ele o botão sumia.
-    window.addEventListener('resize', on);
-    return () => { mq.removeEventListener('change', on); window.removeEventListener('resize', on); };
-  }, []);
-
-  const toggle = useCallback(() => {
-    setPref((v) => {
-      const n = !v;
-      try { localStorage.setItem(LS_KEY, n ? '1' : '0'); } catch { /* ignora */ }
-      return n;
-    });
-  }, []);
-
-  return { expandida: pref && !narrow, narrow, toggle };
-}
-
-/** Tooltip do modo compacto: posicionado em `fixed` para não ser cortado
-    pelo overflow da barra. Aparece no hover e no foco por teclado. */
 interface TipState { label: string; top: number; left: number }
 
 export function Sidebar() {
-  const { theme, toggle: toggleTheme } = useTheme();
-  const { user } = useAuth();
   const { currentOrg } = useOrg();
-  const navigate = useNavigate();
-  const { expandida, narrow, toggle } = usePrefExpandida();
-  const compacta = !expandida;
-  const name = (user?.name || '').trim() || 'Usuário';
   const asideRef = useRef<HTMLElement | null>(null);
   const [tip, setTip] = useState<TipState | null>(null);
 
-  // classe no <body> para o restante do layout reagir à largura (mesmo padrão de body.wa-foco)
-  useLayoutEffect(() => {
-    document.body.classList.toggle('sb-expandida', expandida);
-    return () => document.body.classList.remove('sb-expandida');
-  }, [expandida]);
-
   const showTip = useCallback((label: string) => (ev: { currentTarget: HTMLElement }) => {
-    if (!compacta) return;
     const r = ev.currentTarget.getBoundingClientRect();
     const side = asideRef.current?.getBoundingClientRect();
     setTip({ label, top: r.top + r.height / 2, left: (side ? side.right : r.right) + 8 });
-  }, [compacta]);
+  }, []);
   const hideTip = useCallback(() => setTip(null), []);
-  useEffect(() => { if (!compacta) setTip(null); }, [compacta]);
 
-  const item = (e: NavEntry) => (
-    <NavLink
-      key={e.to}
-      to={e.to}
-      className={({ isActive }) => 'nav-item' + (isActive ? ' active' : '')}
-      aria-label={e.label}
-      title={compacta ? undefined : e.label}
-      onMouseEnter={showTip(e.label)}
-      onFocus={showTip(e.label)}
-      onMouseLeave={hideTip}
-      onBlur={hideTip}
-    >
-      <Icon name={e.icon} />
-      <span className="nav-tx">{e.label}</span>
-    </NavLink>
-  );
-
-  const labelTema = (t: string) => (t === 'dark' ? 'Mudar para tema claro' : 'Mudar para tema escuro');
-  const temaLabel = labelTema(theme);
-  // ao alternar o tema com o tooltip aberto, o texto precisa acompanhar o novo estado
-  const onTema = () => {
-    toggleTheme();
-    setTip((t) => (t ? { ...t, label: labelTema(theme === 'dark' ? 'light' : 'dark') } : t));
+  const item = (e: NavEntry) => {
+    const Ic = e.icon;
+    return (
+      <NavLink
+        key={e.to}
+        to={e.to}
+        className={({ isActive }) => 'shx-item' + (isActive ? ' active' : '')}
+        aria-label={e.label}
+        onMouseEnter={showTip(e.label)}
+        onFocus={showTip(e.label)}
+        onMouseLeave={hideTip}
+        onBlur={hideTip}
+      >
+        <Ic size={18} strokeWidth={1.5} aria-hidden="true" />
+      </NavLink>
+    );
   };
 
   return (
-    <aside
-      ref={asideRef}
-      className={'sidebar' + (compacta ? ' compacta' : '')}
-      aria-label="Navegação principal"
-    >
-      <div className="brand">
-        <div className="brand-top">
-          <Logo showText={!compacta} />
-          {!narrow && (
-            <button
-              type="button"
-              className="sb-toggle"
-              aria-label={compacta ? 'Expandir menu lateral' : 'Recolher menu lateral'}
-              aria-expanded={expandida}
-              title={compacta ? 'Expandir menu' : 'Recolher menu'}
-              onClick={toggle}
-            >
-              <Icon name="chevron-right" />
-            </button>
-          )}
-        </div>
-        {!compacta && <span className="brand-sub">Plataforma de Atendimento e Gestão</span>}
-      </div>
+    <aside ref={asideRef} className="shx-side" aria-label="Navegação principal">
+      <div className="shx-mark" aria-hidden="true">a</div>
 
-      <nav className="nav">
+      <nav className="shx-nav">
         {MAIN.map(item)}
         {currentOrg.role === 'admin' && (
           <>
-            {compacta ? <div className="nav-sep" role="separator" /> : <div className="nav-group-label">Administração</div>}
+            <div className="shx-sep" role="separator" />
             {ADMIN.map(item)}
           </>
         )}
       </nav>
 
-      <div className="side-foot">
-        {compacta ? (
-          <button
-            type="button"
-            className="foot-ic"
-            aria-label={temaLabel}
-            onClick={onTema}
-            onMouseEnter={showTip(temaLabel)}
-            onFocus={showTip(temaLabel)}
-            onMouseLeave={hideTip}
-            onBlur={hideTip}
-          >
-            <Icon name={theme === 'dark' ? 'moon' : 'sun'} />
-          </button>
-        ) : (
-          <div className="theme-row">
-            <span className="lbl">Tema</span>
-            <span className="ic"><Icon name="sun" /></span>
-            <button
-              className="tswitch"
-              aria-label="Alternar tema"
-              aria-pressed={theme === 'dark'}
-              onClick={toggleTheme}
-            >
-              <span className="knob" />
-            </button>
-            <span className="ic"><Icon name="moon" /></span>
-          </div>
-        )}
-
-        <button
-          className="user"
-          onClick={() => navigate('/configuracoes')}
-          aria-label={`${name} — ${ROLE_LABEL[currentOrg.role] ?? ''}. Abrir configurações`}
-          onMouseEnter={showTip(name)}
-          onFocus={showTip(name)}
-          onMouseLeave={hideTip}
-          onBlur={hideTip}
-        >
-          <span className="av lg" style={{ background: '#3f6f52' }}>{initials(name)}</span>
-          <div className="meta">
-            <div className="nm">{name}</div>
-            <div className="role">{ROLE_LABEL[currentOrg.role]}</div>
-          </div>
-          <span className="chev"><Icon name="chevron-right" /></span>
-        </button>
-      </div>
-
       {tip && (
-        <div className="sb-tip" role="tooltip" style={{ top: tip.top, left: tip.left }}>
+        <div className="shx-tip" role="tooltip" style={{ top: tip.top, left: tip.left }}>
           {tip.label}
         </div>
       )}

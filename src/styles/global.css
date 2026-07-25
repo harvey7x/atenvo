@@ -42,95 +42,26 @@ a{color:inherit;text-decoration:none}
 *{scrollbar-width:thin;scrollbar-color:rgba(120,130,145,.30) transparent}
 
 /* ===== APP SHELL ===== */
-/* largura da barra lateral — compacta por padrão; body.sb-expandida vem do componente Sidebar */
-:root{--sb-w:72px}
-body.sb-expandida{--sb-w:234px}
+/* O shell (rail + topbar) migrou para o Obsidian: src/styles/shell.css (.shx-*).
+   O CSS antigo do shell foi removido daqui — só ficam as classes que outras telas
+   ainda usam: .logo (ConfigError/Onboarding/NotFound), .av (avatares em 7 telas),
+   .topbar/.page-title/.page-sub (o Scripts renderiza o próprio cabeçalho com elas)
+   e .icon-btn (botões de ícone espalhados pelas páginas). */
 .app{display:flex;height:100dvh;overflow:hidden}
 .col-main{min-width:0;height:100dvh;display:flex;flex-direction:column;overflow:hidden;flex:1}
 
-.sidebar{width:var(--sb-w);flex:none;background:var(--surface);border-right:1px solid var(--line);padding:20px 14px 14px;display:flex;flex-direction:column;height:100dvh;
-  transition:width .18s ease}
-.brand{display:flex;flex-direction:column;gap:5px;padding:4px 6px 0}
-.brand-top{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%}
 .logo{display:inline-flex;align-items:center;gap:8px}
 .logo .mark{width:32px;height:32px;flex:none}
 .logo-text{font-size:25px;font-weight:500;letter-spacing:-.015em;color:var(--logo-ink);white-space:nowrap}
-.brand-sub{font-size:11px;font-weight:400;color:var(--muted);letter-spacing:.01em;padding-left:1px}
-.nav{margin-top:22px;display:flex;flex-direction:column;gap:3px;flex:1;overflow-y:auto;overflow-x:hidden}
-.nav-group-label{font-size:10.5px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;padding:14px 11px 6px}
-.nav-item{position:relative;display:flex;align-items:center;gap:12px;padding:10px 11px;border-radius:10px;color:var(--ink-2);font-size:14.5px;font-weight:500;cursor:pointer;border:0;background:transparent;width:100%;text-align:left;transition:background .14s,color .14s}
-.nav-item svg{width:21px;height:21px;flex:none;color:var(--muted);transition:color .14s}
-.nav-item .nav-tx{white-space:nowrap;overflow:hidden}
-.nav-item:hover{background:var(--hover)}
-.nav-item.active{background:var(--accent-soft);color:var(--accent-ink)}
-.nav-item.active svg{color:var(--accent)}
-.nav-item:focus-visible{outline:none;box-shadow:0 0 0 2px var(--ring)}
 
-/* ---- barra lateral compacta (icon rail) ---- */
-/* sem padding lateral: o trilho ocupa a largura toda para o indicador do item ativo
-   encostar na borda esquerda sem ser cortado pelo overflow do .nav */
-.sidebar.compacta{padding:18px 0 12px;align-items:center}
-.sidebar.compacta .brand{padding:0;align-items:center;width:100%}
-.sidebar.compacta .brand-top{flex-direction:column;justify-content:center;gap:10px}
-.sidebar.compacta .logo{justify-content:center}
-.sidebar.compacta .nav{margin-top:16px;width:100%;align-items:center}
-.sidebar.compacta .nav-item{width:44px;height:44px;padding:0;justify-content:center;gap:0;border-radius:12px}
-.sidebar.compacta .nav-item .nav-tx{display:none}
-/* item ativo no trilho: pastilha cheia + anel discreto (nada fora da caixa, para não
-   ser cortado pelo overflow do .nav) */
-.sidebar.compacta .nav-item.active{box-shadow:inset 0 0 0 1px var(--accent)}
-.nav-sep{width:26px;height:1px;background:var(--line);margin:10px 0 8px;flex:none}
-
-/* botão de recolher/expandir */
-.sb-toggle{flex:none;width:26px;height:26px;border:0;border-radius:8px;background:transparent;color:var(--muted);
-  display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:background .14s,color .14s}
-.sb-toggle svg{width:16px;height:16px;transition:transform .18s ease}
-.sb-toggle:hover{background:var(--hover);color:var(--ink-2)}
-.sb-toggle:focus-visible{outline:none;box-shadow:0 0 0 2px var(--ring)}
-.sidebar:not(.compacta) .sb-toggle svg{transform:rotate(180deg)}
-
-/* tooltip do modo compacto (position:fixed — não é cortado pelo overflow da barra) */
-.sb-tip{position:fixed;z-index:350;transform:translateY(-50%);pointer-events:none;white-space:nowrap;
-  background:var(--ink);color:#fff;font-size:12.5px;font-weight:500;line-height:1;padding:7px 10px;border-radius:8px;
-  box-shadow:var(--shadow-pop)}
-[data-theme="dark"] .sb-tip{background:#22324a;border:1px solid var(--line-2)}
-
-.side-foot{margin-top:10px;border-top:1px solid var(--line);padding-top:12px;display:flex;flex-direction:column;gap:12px}
-.sidebar.compacta .side-foot{width:44px;align-items:center;gap:8px}
-.foot-ic{width:38px;height:38px;border:0;border-radius:11px;background:transparent;color:var(--muted);
-  display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:background .14s,color .14s}
-.foot-ic svg{width:19px;height:19px}
-.foot-ic:hover{background:var(--hover);color:var(--ink-2)}
-.foot-ic:focus-visible{outline:none;box-shadow:0 0 0 2px var(--ring)}
-.sidebar.compacta .user{width:44px;padding:3px 0;justify-content:center;border-radius:12px}
-.sidebar.compacta .user .meta,.sidebar.compacta .user .chev{display:none}
-.user:focus-visible{outline:none;box-shadow:0 0 0 2px var(--ring)}
-.theme-row{display:flex;align-items:center;gap:10px;padding:0 4px}
-.theme-row .lbl{font-size:13px;color:var(--ink-2);font-weight:500}
-.theme-row .ic{color:var(--muted);display:inline-flex}.theme-row .ic svg{width:16px;height:16px}
-.tswitch{width:42px;height:24px;border-radius:999px;border:0;background:var(--accent);position:relative;cursor:pointer;padding:0;transition:background .15s}
-[data-theme="light"] .tswitch{background:var(--sw-off)}
-.tswitch .knob{position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .16s;box-shadow:0 1px 2px rgba(0,0,0,.25)}
-[data-theme="dark"] .tswitch .knob{left:21px}
-.tswitch:focus-visible{outline:none;box-shadow:0 0 0 3px var(--ring)}
-.user{display:flex;align-items:center;gap:10px;padding:8px;border-radius:11px;cursor:pointer;transition:background .14s;border:0;background:transparent;width:100%;text-align:left}
-.user:hover{background:var(--hover)}
-.user .meta{min-width:0;line-height:1.25;flex:1}
-.user .nm{font-size:13.5px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.user .role{font-size:12px;color:var(--muted)}
-.user .chev{color:var(--muted);display:inline-flex}.user .chev svg{width:16px;height:16px}
 .av{display:inline-flex;align-items:center;justify-content:center;color:#fff;font-weight:600;font-size:12px;border-radius:50%;flex:none;overflow:hidden}
 .av.lg{width:38px;height:38px;font-size:13px}
 .av.xxl{width:72px;height:72px;font-size:26px}
 
+/* legado: usado pelo cabeçalho interno do Scripts até aquela tela migrar */
 .topbar{display:flex;align-items:flex-start;gap:16px;padding:12px 26px 6px}
 .page-title{font-size:21px;font-weight:600;color:var(--ink);line-height:1.15}
 .page-sub{font-size:13px;color:var(--muted);margin-top:2px;max-width:620px}
-.utils{margin-left:auto;display:flex;align-items:center;gap:8px}
-.util-pill{display:inline-flex;gap:2px;background:var(--pill-track);border-radius:999px;padding:3px}
-.util-pill button{width:32px;height:28px;border:0;background:transparent;color:var(--pill-off);border-radius:999px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
-.util-pill button svg{width:16px;height:16px}
-.util-pill button.on{background:var(--surface);color:var(--accent);box-shadow:var(--shadow)}
 .icon-btn{width:36px;height:36px;border-radius:9px;border:0;background:transparent;color:var(--ink-2);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:background .14s}
 .icon-btn:hover{background:var(--hover)}.icon-btn svg{width:19px;height:19px}
 .content{flex:1;min-height:0;overflow-y:auto;padding:18px 26px 30px}
@@ -260,12 +191,6 @@ select.ctrl{cursor:pointer;appearance:none;background-image:url("data:image/svg+
 
 .center-screen{min-height:100dvh;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:14px}
 
-/* em telas estreitas a barra é forçada a compacta pelo próprio componente (matchMedia),
-   sem sobrescrever a preferência salva — por isso não há mais regras de largura aqui. */
-@media (max-width:860px){
-  body.sb-expandida{--sb-w:72px}
-}
-
 /* toast variante warn (porte WhatsApp) */
 .toast.toast-warn svg{color:#e0a23a}
 
@@ -273,8 +198,8 @@ select.ctrl{cursor:pointer;appearance:none;background-image:url("data:image/svg+
 .content.content-bleed{padding:0;overflow:hidden}
 
 /* modo de foco do WhatsApp: recolhe a sidebar e o topo do app para ampliar a conversa */
-body.wa-foco .sidebar{display:none}
-body.wa-foco .topbar{display:none}
+body.wa-foco .shx-side{display:none}
+body.wa-foco .shx-top{display:none}
 body.wa-foco .content{padding:0;overflow:hidden}
 
 /* acesso restrito por papel */
@@ -290,7 +215,7 @@ body.wa-foco .content{padding:0;overflow:hidden}
   background:#7a5bb0;color:#fff;font-size:12.5px;font-weight:600;letter-spacing:.01em;box-shadow:0 1px 4px rgba(0,0,0,.18)}
 .demo-bar .demo-dot{width:7px;height:7px;border-radius:50%;background:#fff;opacity:.9}
 .app-demo{margin-top:26px}
-.app-demo,.app-demo .sidebar,.app-demo .col-main{height:calc(100dvh - 26px)}
+.app-demo,.app-demo .shx-side,.app-demo .col-main{height:calc(100dvh - 26px)}
 [data-theme="dark"] .demo-bar{background:#6b4fa0}
 
 /* ============================================================

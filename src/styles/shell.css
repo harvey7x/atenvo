@@ -1,0 +1,101 @@
+/* ============================================================================
+   SHELL — Atenvo Obsidian (Fase 3.2): sidebar 56px só-ícones + topbar 48px.
+   Especificação: ATENVO-DESIGN.md §7 (Sidebar/Topbar). Prefixo .shx- para não
+   colidir com o CSS legado (.topbar/.page-title seguem vivos DENTRO do Scripts
+   até aquela tela migrar). Únicos valores fora de token: os dois literais que o
+   próprio documento fixa (fundo do item ativo e largura do rail).
+   ========================================================================== */
+
+:root { --sb-w: 56px; } /* páginas antigas leem --sb-w; o rail novo é fixo (doc: 52–56px) */
+
+/* ------------------------------- sidebar ------------------------------- */
+.shx-side {
+  width: var(--sb-w); flex: none;
+  display: flex; flex-direction: column; align-items: center;
+  padding: var(--space-3) 0;
+  border-right: 1px solid var(--border-hairline);
+  background: var(--glass-bg);
+  box-shadow: var(--glass-highlight);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  z-index: var(--z-sticky);
+}
+@supports not (backdrop-filter: blur(1px)) { .shx-side { background: var(--surface-1); } }
+
+/* wordmark mínimo do rail: "a" de atenvo — não é clicável (o brand antigo também não era) */
+.shx-mark {
+  display: flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; margin-bottom: var(--space-3);
+  color: var(--accent-text); user-select: none;
+  font-family: var(--font-sans); font-size: 15px; font-weight: 500; letter-spacing: -0.03em;
+}
+
+.shx-nav { display: flex; flex-direction: column; align-items: center; gap: var(--space-1); flex: 1; min-height: 0; }
+.shx-item {
+  display: flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; border-radius: var(--radius-md);
+  color: var(--text-muted);
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+.shx-item:hover { background: var(--surface-2); color: var(--text-secondary); }
+/* item ativo: literal FIXADO pelo documento (§7 Sidebar) */
+.shx-item.active { background: rgba(255, 255, 255, 0.07); color: var(--text-primary); }
+.shx-item:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-tint); }
+
+.shx-sep { width: 24px; height: 1px; margin: var(--space-2) 0; background: var(--border-hairline); }
+
+/* tooltip do rail: position fixed (não é cortado pelo overflow), mesmo padrão do antigo */
+.shx-tip {
+  position: fixed; z-index: var(--z-dropdown); transform: translateY(-50%);
+  pointer-events: none; white-space: nowrap;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border-default); border-radius: var(--radius-sm);
+  background: var(--surface-3); color: var(--text-primary);
+  font-size: 11px; line-height: 1.4;
+}
+
+/* -------------------------------- topbar -------------------------------- */
+.shx-top {
+  height: 48px; flex: none;
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: 0 var(--space-4);
+  border-bottom: 1px solid var(--border-hairline);
+  background: var(--glass-bg);
+  box-shadow: var(--glass-highlight);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  z-index: var(--z-sticky);
+}
+@supports not (backdrop-filter: blur(1px)) { .shx-top { background: var(--surface-1); } }
+
+.shx-title {
+  font-size: 18px; font-weight: 500; letter-spacing: -0.01em;
+  color: var(--text-primary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  min-width: 0; flex: 1;
+}
+.shx-right { display: flex; align-items: center; gap: var(--space-2); flex: none; }
+
+/* avatar do usuário (direita da topbar, doc §7) — leva às configurações */
+.shx-avatar {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border: 0; border-radius: 50%; cursor: pointer;
+  background: var(--surface-3); color: var(--text-primary);
+  font-family: var(--font-sans); font-size: 11px; font-weight: 500;
+}
+.shx-avatar:hover { background: var(--accent-tint); color: var(--accent-text); }
+.shx-avatar:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-tint); }
+
+/* botão de ícone da topbar (sair) — tokens novos; o .icon-btn legado segue nas telas antigas */
+.shx-iconbtn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border: 0; border-radius: var(--radius-sm); cursor: pointer;
+  background: transparent; color: var(--text-secondary);
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+.shx-iconbtn:hover { background: var(--surface-2); color: var(--text-primary); }
+.shx-iconbtn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-tint); }
+
+@media (prefers-reduced-motion: reduce) {
+  .shx-item, .shx-iconbtn { transition: none; }
+}
