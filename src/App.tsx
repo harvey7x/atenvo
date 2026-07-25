@@ -21,6 +21,8 @@ import { Configuracoes } from '@/pages/Configuracoes';
 import { PlanoUso } from '@/pages/PlanoUso';
 import { Maturacao } from '@/pages/Maturacao';
 import { NotFound } from '@/pages/NotFound';
+// TEMPORÁRIA (redesign Fase 2): vitrine dos componentes Obsidian. Sai na Fase 4.
+import { DesignGallery } from '@/pages/DesignGallery';
 
 const routes: RouteObject[] = [
   { path: '/login', element: <Login /> },
@@ -31,6 +33,9 @@ const routes: RouteObject[] = [
     children: [
       // Troca de senha obrigatória: fora do AppShell (sem navegação) e o guard força vir para cá.
       { path: 'alterar-senha', element: <AlterarSenha /> },
+      // TEMPORÁRIA (redesign Fase 2): fora do AppShell de propósito — a vitrine é 100% obsidian,
+      // sem o shell antigo por cima. Atrás do login; não é página pública.
+      { path: 'design', element: <DesignGallery /> },
       {
         element: <AppShell />,
         children: [

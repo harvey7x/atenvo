@@ -1,0 +1,262 @@
+/* ============================================================================
+   BIBLIOTECA DE COMPONENTES — Atenvo Obsidian (Fase 2)
+   Implementa a seção 7 do ATENVO-DESIGN.md. Regras que este arquivo obedece:
+   - só var(--token): zero hex/rgba fora do tokens.css;
+   - todas as classes têm prefixo .ui- para NÃO vazar nas telas antigas
+     (o CSS do app é global — sem prefixo, redesenharíamos telas por acidente);
+   - pesos 400/500, sentence case, transições 120–160ms var(--ease-out);
+   - estados obrigatórios: hover, focus-visible (anel accent), active,
+     disabled (texto --text-disabled, SEM opacity), loading, empty.
+   ========================================================================== */
+
+/* ---------- foco por teclado: um anel só, igual em tudo ---------- */
+.ui-btn:focus-visible,
+.ui-input:focus-visible,
+.ui-select:focus-visible,
+.ui-textarea:focus-visible,
+.ui-menu-item:focus-visible,
+.ui-focus-demo {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-tint);
+}
+
+/* ============================== BOTÃO ============================== */
+.ui-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
+  height: var(--control-h-md); padding: 0 var(--space-3);
+  border-radius: var(--radius-sm); border: 1px solid transparent;
+  font-family: var(--font-sans); font-size: 13px; font-weight: 500; line-height: 1;
+  cursor: pointer; white-space: nowrap; user-select: none;
+  transition: background var(--dur-fast) var(--ease-out),
+              border-color var(--dur-fast) var(--ease-out),
+              color var(--dur-fast) var(--ease-out);
+}
+.ui-btn--sm { height: var(--control-h-sm); padding: 0 var(--space-2); font-size: 12px; }
+.ui-btn--lg { height: var(--control-h-lg); padding: 0 var(--space-4); }
+
+/* primário — MÁXIMO 1 por vista (regra do documento). Sem gradiente, sem sombra. */
+.ui-btn--primary { background: var(--accent); color: var(--on-accent); }
+.ui-btn--primary:hover:not(:disabled) { background: var(--accent-hover); }
+.ui-btn--primary:active:not(:disabled) { background: var(--accent); }
+
+.ui-btn--secondary { background: transparent; border-color: var(--border-default); color: var(--text-primary); }
+.ui-btn--secondary:hover:not(:disabled) { background: var(--surface-2); border-color: var(--border-strong); }
+.ui-btn--secondary:active:not(:disabled) { background: var(--surface-3); }
+
+.ui-btn--ghost { background: transparent; color: var(--text-secondary); }
+.ui-btn--ghost:hover:not(:disabled) { background: var(--surface-2); color: var(--text-primary); }
+.ui-btn--ghost:active:not(:disabled) { background: var(--surface-3); }
+
+/* destrutivo — ghost em --danger; ação irreversível SEMPRE confirma em modal */
+.ui-btn--destructive { background: transparent; color: var(--danger); }
+.ui-btn--destructive:hover:not(:disabled) { background: var(--danger-tint); }
+.ui-btn--destructive:active:not(:disabled) { background: var(--danger-tint); }
+
+/* disabled: texto apagado de verdade, nunca opacity (regra do doc) */
+.ui-btn:disabled { color: var(--text-disabled); cursor: not-allowed; }
+.ui-btn--primary:disabled { background: var(--surface-3); }
+.ui-btn--secondary:disabled { border-color: var(--border-hairline); }
+
+/* loading: pulso sancionado do skeleton, num ponto discreto ao lado do rótulo */
+.ui-btn__dot {
+  width: 6px; height: 6px; border-radius: 50%; background: currentColor;
+  animation: ui-pulse 1.2s var(--ease-out) infinite;
+}
+@keyframes ui-pulse { 0%, 100% { opacity: 0.25; } 50% { opacity: 0.9; } }
+
+/* ============================== CAMPOS ============================== */
+.ui-field { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.ui-field__label { font-size: 12px; font-weight: 400; color: var(--text-secondary); }
+.ui-field__hint { font-size: 11px; color: var(--text-muted); }
+.ui-field__error { font-size: 11px; color: var(--danger); }
+
+.ui-input, .ui-select, .ui-textarea {
+  height: var(--control-h-md); padding: 0 var(--space-3);
+  background: var(--surface-1); color: var(--text-primary);
+  border: 1px solid var(--border-default); border-radius: var(--radius-sm);
+  font-family: var(--font-sans); font-size: 13px;
+  transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+}
+.ui-textarea { height: auto; min-height: 72px; padding: var(--space-2) var(--space-3); resize: vertical; }
+.ui-input::placeholder, .ui-textarea::placeholder { color: var(--text-muted); }
+.ui-input:hover:not(:disabled):not(:focus-visible),
+.ui-select:hover:not(:disabled):not(:focus-visible),
+.ui-textarea:hover:not(:disabled):not(:focus-visible) { border-color: var(--border-strong); }
+.ui-input:disabled, .ui-select:disabled, .ui-textarea:disabled {
+  color: var(--text-disabled); background: var(--surface-2); cursor: not-allowed;
+}
+.ui-input[aria-invalid="true"], .ui-textarea[aria-invalid="true"] { border-color: var(--danger-tint-border); }
+.ui-select { appearance: none; padding-right: var(--space-6); }
+.ui-select-wrap { position: relative; display: inline-flex; min-width: 0; }
+.ui-select-wrap > .ui-select { width: 100%; }
+.ui-select-wrap > svg {
+  position: absolute; right: var(--space-2); top: 50%; transform: translateY(-50%);
+  pointer-events: none; color: var(--text-muted);
+}
+
+/* ============================== CARDS ============================== */
+.ui-card {
+  background: var(--surface-1);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+}
+/* glass: SÓ superfícies fixas e únicas (dashboard/destaque) — nunca item de lista */
+.ui-card--glass {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-highlight);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  padding: var(--space-3) var(--space-4);
+}
+@supports not (backdrop-filter: blur(1px)) {
+  .ui-card--glass { background: var(--surface-1); }
+}
+
+/* ============================== TABELA DENSA ============================== */
+.ui-table-wrap { overflow-x: auto; border: 1px solid var(--border-hairline); border-radius: var(--radius-lg); background: var(--surface-1); }
+.ui-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ui-table th {
+  text-align: left; font-size: 11px; font-weight: 400; color: var(--text-muted);
+  padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border-hairline);
+  white-space: nowrap;
+}
+.ui-table td {
+  padding: 10px var(--space-3); /* linhas ~37px, dentro da faixa 36–40 do doc */
+  border-bottom: 1px solid var(--border-hairline); color: var(--text-primary);
+}
+.ui-table tr:last-child td { border-bottom: none; }
+.ui-table tbody tr { transition: background var(--dur-fast) var(--ease-out); }
+.ui-table tbody tr:hover { background: var(--surface-2); }
+.ui-table .ui-td-num { text-align: right; font-variant-numeric: tabular-nums; }
+.ui-table .ui-td-meta { color: var(--text-secondary); font-size: 12px; }
+
+/* ============================== BADGE ============================== */
+.ui-badge {
+  display: inline-flex; align-items: center; gap: var(--space-1);
+  font-size: 11px; font-weight: 400; line-height: 1.5;
+  padding: 2px 7px; border-radius: var(--radius-sm);
+  border: 1px solid transparent; white-space: nowrap;
+}
+.ui-badge--neutral { background: var(--surface-2); color: var(--text-secondary); border-color: var(--border-hairline); }
+.ui-badge--accent  { background: var(--accent-tint); color: var(--accent-text); border-color: var(--accent-tint-border); }
+.ui-badge--success { background: var(--accent-tint); color: var(--success); border-color: var(--accent-tint-border); }
+.ui-badge--warning { background: var(--warning-tint); color: var(--warning); border-color: var(--warning-tint); }
+.ui-badge--danger  { background: var(--danger-tint); color: var(--danger); border-color: var(--danger-tint-border); }
+
+/* ============================== MODAL ============================== */
+.ui-modal-overlay {
+  position: fixed; inset: 0; z-index: var(--z-overlay);
+  background: var(--surface-overlay);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  display: flex; align-items: center; justify-content: center; padding: var(--space-5);
+}
+.ui-modal {
+  position: relative; z-index: var(--z-modal);
+  width: 100%; max-width: 480px; max-height: calc(100vh - 2 * var(--space-7));
+  display: flex; flex-direction: column;
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--glass-highlight);
+  backdrop-filter: blur(var(--glass-blur-strong));
+  -webkit-backdrop-filter: blur(var(--glass-blur-strong));
+}
+@supports not (backdrop-filter: blur(1px)) { .ui-modal { background: var(--surface-1); } }
+.ui-modal--lg { max-width: 640px; }
+.ui-modal__head {
+  padding: var(--space-4) var(--space-5) var(--space-3);
+  font-size: 15px; font-weight: 500; letter-spacing: -0.01em; color: var(--text-primary);
+}
+.ui-modal__body { padding: 0 var(--space-5) var(--space-4); overflow-y: auto; font-size: 13px; color: var(--text-primary); }
+.ui-modal__foot {
+  display: flex; justify-content: flex-end; gap: var(--space-2);
+  padding: var(--space-3) var(--space-5) var(--space-4);
+  border-top: 1px solid var(--border-hairline);
+}
+
+/* ============================== DROPDOWN ============================== */
+.ui-dd { position: relative; display: inline-block; }
+.ui-menu {
+  position: absolute; top: calc(100% + var(--space-1)); left: 0; z-index: var(--z-dropdown);
+  min-width: 180px; padding: var(--space-1);
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border); border-radius: var(--radius-md);
+  box-shadow: var(--glass-highlight);
+  backdrop-filter: blur(var(--glass-blur-strong));
+  -webkit-backdrop-filter: blur(var(--glass-blur-strong));
+}
+@supports not (backdrop-filter: blur(1px)) { .ui-menu { background: var(--surface-1); } }
+.ui-menu-item {
+  display: flex; align-items: center; gap: var(--space-2); width: 100%;
+  padding: var(--space-2) var(--space-2); border: 0; border-radius: var(--radius-sm);
+  background: transparent; color: var(--text-primary);
+  font-family: var(--font-sans); font-size: 13px; text-align: left; cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out);
+}
+.ui-menu-item:hover { background: var(--surface-2); }
+.ui-menu-item:active { background: var(--surface-3); }
+.ui-menu-item--danger { color: var(--danger); }
+.ui-menu-item--danger:hover { background: var(--danger-tint); }
+.ui-menu-item:disabled { color: var(--text-disabled); cursor: not-allowed; background: transparent; }
+.ui-menu__sep { height: 1px; margin: var(--space-1) 0; background: var(--border-hairline); }
+
+/* ============================== TOAST ============================== */
+.ui-toasts {
+  position: fixed; right: var(--space-4); bottom: var(--space-4); z-index: var(--z-toast);
+  display: flex; flex-direction: column; gap: var(--space-2); max-width: 360px;
+}
+.ui-toast {
+  display: flex; align-items: flex-start; gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border); border-radius: var(--radius-md);
+  box-shadow: var(--glass-highlight);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  color: var(--text-primary); font-size: 13px;
+}
+@supports not (backdrop-filter: blur(1px)) { .ui-toast { background: var(--surface-1); } }
+.ui-toast > svg { flex: none; margin-top: 1px; }
+.ui-toast--success > svg { color: var(--success); }
+.ui-toast--danger > svg { color: var(--danger); }
+.ui-toast--warning > svg { color: var(--warning); }
+
+/* ============================== SKELETON ============================== */
+.ui-skel {
+  display: block; background: var(--surface-2); border-radius: var(--radius-sm);
+  animation: ui-pulse 1.2s var(--ease-out) infinite;
+}
+.ui-skel--circle { border-radius: 50%; }
+
+/* ============================== EMPTY STATE ============================== */
+.ui-empty {
+  display: flex; flex-direction: column; align-items: center; gap: var(--space-2);
+  padding: var(--space-7) var(--space-5); text-align: center;
+}
+.ui-empty > svg { color: var(--text-muted); }
+.ui-empty__text { font-size: 13px; color: var(--text-secondary); max-width: 320px; }
+
+/* ============================== TOOLTIP ============================== */
+.ui-tip { position: relative; display: inline-flex; }
+.ui-tip__bubble {
+  position: absolute; bottom: calc(100% + var(--space-1)); left: 50%; transform: translateX(-50%);
+  z-index: var(--z-dropdown);
+  padding: var(--space-1) var(--space-2);
+  background: var(--surface-3); color: var(--text-primary);
+  border: 1px solid var(--border-default); border-radius: var(--radius-sm);
+  font-size: 11px; white-space: nowrap;
+  opacity: 0; pointer-events: none; visibility: hidden;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+.ui-tip:hover > .ui-tip__bubble,
+.ui-tip:focus-within > .ui-tip__bubble { opacity: 1; visibility: visible; }
+
+/* ============================== MOVIMENTO ============================== */
+@media (prefers-reduced-motion: reduce) {
+  .ui-btn, .ui-input, .ui-select, .ui-textarea, .ui-table tbody tr,
+  .ui-menu-item, .ui-tip__bubble { transition: none; }
+  .ui-skel, .ui-btn__dot { animation: none; }
+}
