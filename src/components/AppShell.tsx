@@ -1,6 +1,7 @@
 import { Outlet, useMatches } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
+import { AmbientOrbs } from './ui/AmbientOrbs';
 import { GlobalWhatsAppAlert } from './GlobalWhatsAppAlert';
 import { SlaUiProvider, SlaNotifier } from './SlaNotificationToast';
 import { DEMO_MODE } from '@/lib/demo';
@@ -12,6 +13,8 @@ export function AppShell() {
   const fullBleed = matches.some((m) => (m.handle as RouteMeta | undefined)?.fullBleed);
   return (
     <SlaUiProvider>
+      {/* luz ambiente fica FORA do container com scroll (regra da seção 3 do design) */}
+      <AmbientOrbs />
       <div className={'app' + (DEMO_MODE ? ' app-demo' : '')}>
         {DEMO_MODE && (
           <div className="demo-bar" role="note" aria-label="Ambiente de demonstração">

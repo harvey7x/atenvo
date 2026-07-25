@@ -1,0 +1,49 @@
+/* ============================================================================
+   BASE — Atenvo Obsidian (Fase 1 da migração)
+   Reset mínimo + luz ambiente (orbs) + receita de vidro, conforme as seções
+   3, 4 e 5 do ATENVO-DESIGN.md. Importado DEPOIS do global.css de propósito:
+   enquanto a migração tela-a-tela não termina, estas regras precisam vencer o
+   reset antigo (body claro) sem precisar editar o global.css ainda.
+   ========================================================================== */
+
+/* ---- Reset base: canvas escuro, Inter 13px, texto primário ---- */
+body {
+  background: var(--bg-canvas);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+}
+
+/* Pesos acima de 500 são proibidos pelo design system e as fontes 600+ nem são
+   carregadas. Sem isto o navegador "engrossaria" o 500 por conta própria
+   (faux bold) nas telas antigas que ainda pedem 600/700 — pior que exibir 500. */
+body { font-synthesis-weight: none; font-synthesis: none; }
+
+/* ---- Luz ambiente (seção 3): máx. 2 por página, estáticas, atrás de tudo ---- */
+.ambient-orb {
+  position: fixed;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: var(--z-ambient);
+}
+.ambient-orb--accent {
+  top: -120px; right: -80px; width: 420px; height: 340px;
+  /* mesma cor do token --accent (#2f9e77) — se o acento mudar, isto muda junto */
+  background: rgba(47, 158, 119, 0.14); filter: blur(90px);
+}
+.ambient-orb--cool {
+  bottom: -160px; left: 160px; width: 380px; height: 300px;
+  background: rgba(84, 120, 214, 0.10); filter: blur(100px);
+}
+
+/* ---- Receita de vidro (seção 4): sempre as 3 partes juntas ---- */
+.glass {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-highlight);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+}
+@supports not (backdrop-filter: blur(1px)) {
+  .glass { background: var(--surface-1); }
+}
