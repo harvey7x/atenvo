@@ -1,26 +1,28 @@
-/* Caixa de Relacionamento no painel do cliente (WhatsApp/Kanban). Mesma linguagem do KanbanContatoBox. */
-.rcb { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 12px 13px; }
-.rcb-h { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 660; margin-bottom: 9px; }
-.rcb-info { font-size: 13px; color: var(--ink-2); }
+/* Caixa de Relacionamento no painel do cliente (WhatsApp/Kanban) — Obsidian (Fase 3.3).
+   Mesma linguagem do KanbanContatoBox: tokens, pesos ≤500, sem CAPS por CSS;
+   primário em tint (o único sólido da tela de atendimento é o Enviar). */
+.rcb { border: 1px solid var(--border-hairline); border-radius: var(--radius-lg); background: var(--surface-1); padding: 12px 13px; }
+.rcb-h { font-size: 11px; letter-spacing: .02em; color: var(--text-secondary); font-weight: 500; margin-bottom: 9px; }
+.rcb-info { font-size: 13px; color: var(--text-secondary); }
 .rcb-empty { display: flex; flex-direction: column; gap: 9px; align-items: flex-start; }
 .rcb-card { display: flex; flex-direction: column; gap: 6px; }
 .rcb-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; }
-.rcb-l { color: var(--muted); }
-.rcb-v { font-weight: 550; text-align: right; }
+.rcb-l { color: var(--text-muted); }
+.rcb-v { font-weight: 500; text-align: right; }
 .rcb-acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 
-.rcb-btn { border: 1px solid var(--line-2); background: var(--surface); color: var(--ink); font-family: var(--font); font-size: 12.5px; font-weight: 550; padding: 7px 11px; border-radius: 8px; cursor: pointer; }
-.rcb-btn:hover { background: var(--hover); }
-.rcb-btn:disabled { opacity: .55; cursor: default; }
-.rcb-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-.rcb-btn.primary:hover { filter: brightness(1.05); background: var(--accent); }
-.rcb-btn.ghost { border-color: transparent; background: none; color: var(--accent-ink); }
-.rcb-btn.ghost:hover { background: var(--hover); }
-.rcb-btn.danger { color: var(--err); border-color: color-mix(in srgb, var(--err) 35%, transparent); }
-.rcb-btn.danger:hover { background: var(--err-soft); }
+.rcb-btn { border: 1px solid var(--border-default); background: transparent; color: var(--text-primary); font-family: var(--font-sans); font-size: 12.5px; font-weight: 500; padding: 7px 11px; border-radius: var(--radius-sm); cursor: pointer; }
+.rcb-btn:hover { background: var(--surface-2); }
+.rcb-btn:disabled { color: var(--text-disabled); cursor: default; }
+.rcb-btn.primary { background: var(--accent-tint); border-color: var(--accent-tint-border); color: var(--accent-text); }
+.rcb-btn.primary:hover { border-color: var(--accent); background: var(--accent-tint); }
+.rcb-btn.ghost { border-color: transparent; background: none; color: var(--accent-text); }
+.rcb-btn.ghost:hover { background: var(--surface-2); }
+.rcb-btn.danger { color: var(--danger); border-color: var(--danger-tint-border); }
+.rcb-btn.danger:hover { background: var(--danger-tint); }
 
 .rcb-modal { display: flex; flex-direction: column; gap: 12px; }
 .rcb-field { display: flex; flex-direction: column; gap: 6px; }
-.rcb-lbl { font-size: 12px; font-weight: 600; color: var(--ink-2); }
-.rcb-hint { font-size: 11.5px; color: var(--muted); }
-.rcb-modal-txt { font-size: 12.5px; color: var(--ink-2); line-height: 1.45; margin: 0; }
+.rcb-lbl { font-size: 12px; font-weight: 500; color: var(--text-secondary); }
+.rcb-hint { font-size: 11.5px; color: var(--text-muted); }
+.rcb-modal-txt { font-size: 12.5px; color: var(--text-secondary); line-height: 1.45; margin: 0; }

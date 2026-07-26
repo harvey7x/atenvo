@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useToast } from '@/hooks/useToast';
 import { useAuth } from '@/context/AuthContext';
@@ -32,6 +32,13 @@ import { indexPorChave, tipoLabel, tempoRelativo } from '@/data/slaView';
 import { corDaEtiqueta, podeGerenciarAtendimento, type AssinaturaModo } from '@/types/atendimento';
 import { KanbanContatoBox } from '@/components/KanbanContatoBox';
 import { RelacionamentoContatoBox } from '@/components/RelacionamentoContatoBox';
+import {
+  AlertTriangle, Archive, ArrowLeftRight, BellOff, Check, ChevronDown, ChevronLeft, ChevronRight,
+  Clock, Copy, Download, FileText, Filter, Image as ImageIcon, Maximize, MessageCircle,
+  MessageCirclePlus, Mic, MoreVertical, NotebookText, PenLine, Pin, Plus, Search, Send, Smartphone,
+  UserPlus, X,
+} from 'lucide-react';
+import { tintDeHex } from '@/lib/tint';
 import './WhatsApp.css';
 
 /** Conversa vazia (placeholder) para quando ainda não há conversas reais carregadas. */
@@ -41,35 +48,37 @@ const EMPTY_CONTACT: WaContact = {
   origin: '', tags: [], lastInter: '', ultimoCanal: null, notes: '', doc: null, msgs: [],
 };
 
-/* ---------- ícones (inline, idênticos ao protótipo) ---------- */
-const IcWa = () => <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a9.9 9.9 0 0 0-8.5 15l-1.3 4.8 4.9-1.3A9.9 9.9 0 1 0 12 2zm4.5 12c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.6.8-.8 1-.3.1-.6 0a6.7 6.7 0 0 1-2-1.2 7.4 7.4 0 0 1-1.3-1.7c-.2-.3 0-.4.1-.5l.4-.5.3-.4v-.4l-.9-2c-.2-.5-.4-.4-.6-.5h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.7 11.6 11.6 0 0 0 4.5 3.9c.6.3 1.1.4 1.5.5a3.6 3.6 0 0 0 1.6.1 2.7 2.7 0 0 0 1.8-1.2 2.2 2.2 0 0 0 .1-1.2c0-.1-.2-.2-.5-.3z" /></svg>;
-const IcClock = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>;
-const IcChevDown = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>;
-const IcDots = () => <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.7" /><circle cx="12" cy="12" r="1.7" /><circle cx="12" cy="19" r="1.7" /></svg>;
-const IcSearch = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3-3" /></svg>;
-const IcFunnel = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 5h18l-7 8v6l-4-2v-4z" /></svg>;
-const IcScripts = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 8h8M8 12h8M8 16h5" /></svg>;
-const IcImage = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.4" /><circle cx="8.5" cy="9.5" r="1.5" /><path d="m3 17 5-5 4 4 3-3 6 6" /></svg>;
-const IcMic = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>;
-const IcDoc = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5M9 13h6M9 17h6" /></svg>;
-const IcUserPlus = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 19a6 6 0 0 0-12 0M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M18 8v6M21 11h-6" /></svg>;
-const IcTransfer = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 3l4 4-4 4M20 7H8M8 21l-4-4 4-4M4 17h12" /></svg>;
-const IcSend = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4z" /></svg>;
-const IcWarn = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /></svg>;
-const IcChevRight = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>;
-const IcChevLeft = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>;
-const IcDownload = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v12M7 11l5 4 5-4M5 21h14" /></svg>;
-const IcPlus = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>;
-const IcX = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12" /></svg>;
-const IcCaret = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 14 }}><path d="m6 9 6 6 6-6" /></svg>;
-const IcFocus = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3" /></svg>;
-const IcSignet = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>;
-const IcPhoneSent = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="7" y="2" width="10" height="20" rx="2.5" /><path d="M11 18h2" /></svg>;
-const IcEdit = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>;
-const IcCopy = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></svg>;
-const IcCheckSm = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>;
-const IcArchive = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="4" rx="1" /><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4" /></svg>;
-const IcNewChat = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.5 8.5 0 0 1-12.6 7.4L3 20.5l1.7-5A8.5 8.5 0 1 1 21 11.5z" /><path d="M12 8.5v5M9.5 11h5" /></svg>;
+/* ---------- ícones: lucide-react (set único do ATENVO-DESIGN.md §6), stroke 1.5 ----------
+ * Mesmos nomes Ic* de antes — os ~56 pontos de uso não mudam. Onde o CSS dos pais tem regra
+ * `svg{width:…}` ela continua mandando; o size aqui é o fallback quando não há regra. */
+const IcWa = () => <MessageCircle size={18} strokeWidth={1.5} aria-hidden="true" />;
+const IcClock = () => <Clock size={18} strokeWidth={1.5} aria-hidden="true" />;
+const IcChevDown = () => <ChevronDown size={18} strokeWidth={1.5} aria-hidden="true" />;
+const IcDots = () => <MoreVertical size={18} strokeWidth={1.5} aria-hidden="true" />;
+const IcSearch = () => <Search size={18} strokeWidth={1.5} aria-hidden="true" />;
+const IcFunnel = () => <Filter size={18} strokeWidth={1.5} aria-hidden="true" />;
+const IcScripts = () => <NotebookText size={16} strokeWidth={1.5} aria-hidden="true" />;
+const IcImage = () => <ImageIcon size={18} strokeWidth={1.5} aria-hidden="true" />;
+const IcMic = () => <Mic size={18} strokeWidth={1.5} aria-hidden="true" />;
+const IcDoc = () => <FileText size={18} strokeWidth={1.5} aria-hidden="true" />;
+const IcUserPlus = () => <UserPlus size={16} strokeWidth={1.5} aria-hidden="true" />;
+const IcTransfer = () => <ArrowLeftRight size={16} strokeWidth={1.5} aria-hidden="true" />;
+const IcSend = () => <Send size={18} strokeWidth={1.5} aria-hidden="true" />;
+const IcWarn = () => <AlertTriangle size={16} strokeWidth={1.5} aria-hidden="true" />;
+const IcChevRight = () => <ChevronRight size={18} strokeWidth={1.5} aria-hidden="true" />;
+const IcChevLeft = () => <ChevronLeft size={18} strokeWidth={1.5} aria-hidden="true" />;
+const IcDownload = () => <Download size={16} strokeWidth={1.5} aria-hidden="true" />;
+const IcPlus = () => <Plus size={16} strokeWidth={1.5} aria-hidden="true" />;
+const IcX = () => <X size={16} strokeWidth={1.5} aria-hidden="true" />;
+const IcCaret = () => <ChevronDown size={14} strokeWidth={1.5} aria-hidden="true" style={{ width: 14 }} />;
+const IcFocus = () => <Maximize size={18} strokeWidth={1.5} aria-hidden="true" />;
+const IcSignet = () => <PenLine size={16} strokeWidth={1.5} aria-hidden="true" />;
+const IcPhoneSent = () => <Smartphone size={12} strokeWidth={1.5} aria-hidden="true" />;
+const IcEdit = () => <PenLine size={14} strokeWidth={1.5} aria-hidden="true" />;
+const IcCopy = () => <Copy size={15} strokeWidth={1.5} aria-hidden="true" />;
+const IcCheckSm = () => <Check size={15} strokeWidth={1.5} aria-hidden="true" />;
+const IcArchive = () => <Archive size={16} strokeWidth={1.5} aria-hidden="true" />;
+const IcNewChat = () => <MessageCirclePlus size={16} strokeWidth={1.5} aria-hidden="true" />;
 
 /** "Aguardando há X" desde a última mensagem do cliente, com cor por faixa de tempo. */
 function tempoEspera(desdeIso?: string | null): { label: string; cor: string; tier: 'neutro' | 'ambar' | 'vermelho' | 'critico' } | null {
@@ -93,12 +102,13 @@ function Avatar({ name, cls }: { name: string; cls?: string }) {
 }
 
 /** Status de entrega -> rótulo/ticks. Status desconhecido/nulo NUNCA vira "entregue". */
-function ackOf(status?: string): { ticks: string; cls: string; title: string } | null {
+function ackOf(status?: string): { ticks: ReactNode; cls: string; title: string } | null {
   switch (status) {
     case 'lida': return { ticks: '✓✓', cls: 'lida', title: 'Lida' };
     case 'entregue': return { ticks: '✓✓', cls: 'entregue', title: 'Entregue' };
     case 'enviada': return { ticks: '✓', cls: 'enviada', title: 'Enviada' };
-    case 'pendente': return { ticks: '🕗', cls: 'pendente', title: 'Pendente' };
+    // pendente era o emoji 🕗 (proibido pelo ATENVO-DESIGN.md §6) — vira o relógio do lucide
+    case 'pendente': return { ticks: <Clock size={11} strokeWidth={1.5} aria-hidden="true" />, cls: 'pendente', title: 'Pendente' };
     case 'falhou': return { ticks: '!', cls: 'falhou', title: 'Falhou' };
     default: return null; // desconhecido: sem tick (não presumir entrega)
   }
@@ -1067,9 +1077,9 @@ export function WhatsApp() {
               <span className="cav"><Avatar name={c.name} /></span>
               <div className="cbody">
                 <div className="crow">
-                  {c.fixada && <i className="cflag" title="Fixada" aria-label="Fixada">📌</i>}
-                  {c.silenciada && <i className="cflag" title="Silenciada" aria-label="Silenciada">🔕</i>}
-                  {c.arquivada && <i className="cflag" title="Arquivada" aria-label="Arquivada">🗄️</i>}
+                  {c.fixada && <i className="cflag" title="Fixada" aria-label="Fixada"><Pin size={11} strokeWidth={1.5} aria-hidden="true" /></i>}
+                  {c.silenciada && <i className="cflag" title="Silenciada" aria-label="Silenciada"><BellOff size={11} strokeWidth={1.5} aria-hidden="true" /></i>}
+                  {c.arquivada && <i className="cflag" title="Arquivada" aria-label="Arquivada"><Archive size={11} strokeWidth={1.5} aria-hidden="true" /></i>}
                   {/* sem nome cadastrado: o telefone MASCARADO é o identificador real do cliente e
                       vira o rótulo — "Cliente sem nome" + telefone ocupava duas vagas e truncava os
                       dois. A pendência de cadastro continua sinalizada pelo chip "Nome incompleto".
@@ -1077,12 +1087,14 @@ export function WhatsApp() {
                   <span className="cname">{nomeVazio ? (telSec || 'Cliente sem nome') : formatarNomeCliente(c.name)}</span>
                 </div>
                 <div className="cbadges">
-                  {eSituacao && (() => { const cor = corDaEtapa(c, eSituacao.texto); return (
-                    <span className={'ctag ctag--' + (eSituacao.variante ?? 'atendimento') + (cor ? ' ctag--kanban' : '')}
-                          style={cor ? { background: cor, borderColor: cor } : undefined} title="Etapa no Kanban">{eSituacao.texto}</span>
+                  {eSituacao && (() => {
+                    // cor da coluna do Kanban (banco) dessaturada pela receita do design system
+                    const cor = corDaEtapa(c, eSituacao.texto); const t = cor ? tintDeHex(cor) : null; return (
+                    <span className={'ctag ctag--' + (eSituacao.variante ?? 'atendimento') + (t ? ' ctag--kanban' : '')}
+                          style={t ? { background: t.bg, borderColor: t.border, color: t.text } : undefined} title="Etapa no Kanban">{eSituacao.texto}</span>
                   ); })()}
                   {alertas.length > 0 && (
-                    <span className="ctag ctag--alerta" title={alertas.join(' · ')} aria-label={alertas.join('. ')}>⚠{alertas.length > 1 ? ' ' + alertas.length : ''}</span>
+                    <span className="ctag ctag--alerta" title={alertas.join(' · ')} aria-label={alertas.join('. ')}><AlertTriangle size={10} strokeWidth={1.5} aria-hidden="true" />{alertas.length > 1 ? ' ' + alertas.length : ''}</span>
                   )}
                   {/* canal (por onde o cliente entrou) e atendente como chips, no estilo do cabeçalho.
                       Antes: canal era a sigla no avatar e atendente era o pill da direita — o dono quis
@@ -1152,9 +1164,10 @@ export function WhatsApp() {
                   <div className="ch-id-text">
                     <div className="ch-name" title={hNome} tabIndex={0} aria-label={hNome}>{hNome}</div>
                     <div className="ch-tags">
-                      {hSit && (() => { const cor = corDaEtapa(current, hSit.texto); return (
-                        <span className={'ctag ctag--' + (hSit.variante ?? 'atendimento') + (cor ? ' ctag--kanban' : '')}
-                              style={cor ? { background: cor, borderColor: cor } : undefined} title="Etapa no Kanban">{hSit.texto}</span>
+                      {hSit && (() => {
+                        const cor = corDaEtapa(current, hSit.texto); const t = cor ? tintDeHex(cor) : null; return (
+                        <span className={'ctag ctag--' + (hSit.variante ?? 'atendimento') + (t ? ' ctag--kanban' : '')}
+                              style={t ? { background: t.bg, borderColor: t.border, color: t.text } : undefined} title="Etapa no Kanban">{hSit.texto}</span>
                       ); })()}
                       {/* Só o nome do canal (ex.: URA). O número mascarado polui o chip e é redundante
                           com o alias; quem precisa dele acha no tooltip. A janela abaixo já sinaliza o
@@ -1548,7 +1561,7 @@ export function WhatsApp() {
             <div className="dlabel">Status</div>
             <button ref={statusBtnRef} className="status-picker" disabled={!current.id}
               onClick={(e) => { e.stopPropagation(); togglePop('status', statusBtnRef, 'left'); }}>
-              <span className="sdot" style={{ background: statusCorAtual ?? '#64748b' }} />
+              <span className="sdot" style={{ background: statusCorAtual ?? 'var(--text-disabled)' }} />
               <span className="status-name">{statusNomeAtual || 'Definir status'}</span>
               <IcChevDown />
             </button>
@@ -1592,7 +1605,7 @@ export function WhatsApp() {
                   const quando = (() => { try { return new Date(a.em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); } catch { return ''; } })();
                   return (
                     <li key={a.id} style={{ fontSize: 12.5, lineHeight: 1.4 }}>
-                      <span style={{ fontWeight: 600 }}>{a.usuario ?? 'Alguém'}</span> {verbo}
+                      <span style={{ fontWeight: 500 }}>{a.usuario ?? 'Alguém'}</span> {verbo}
                       <span style={{ color: 'var(--muted)' }}> · {quando}</span>
                       {a.motivo && <div style={{ color: 'var(--muted)' }}>Motivo: {a.motivo}</div>}
                     </li>
@@ -1607,9 +1620,10 @@ export function WhatsApp() {
             <div className="dlabel">Etiquetas</div>
             <div className="tags">
               {current.tags.map((t) => {
-                const cor = corDaEtiqueta(t, etiquetas);
+                // cor da etiqueta (banco) dessaturada pela receita do design system
+                const tt = tintDeHex(corDaEtiqueta(t, etiquetas));
                 return (
-                  <span className="tag colored" key={t} style={{ background: cor + '22', color: cor, borderColor: cor + '55' }}>
+                  <span className="tag colored" key={t} style={{ background: tt.bg, color: tt.text, borderColor: tt.border }}>
                     {t}
                     {current.id && <button className="tag-x" title="Remover" onClick={() => alternarEtiqueta(t)}><IcX /></button>}
                   </span>
@@ -1658,11 +1672,11 @@ export function WhatsApp() {
           {pop.kind === 'filter' && (
             <>
               <div className="pop-head">Filtrar por número</div>
-              <button className={'pop-item' + (filtroCanal === null ? ' sel' : '')} onClick={() => { setFiltroCanal(null); setPop(null); }}>Todos os números{filtroCanal === null && <span className="ck">✓</span>}</button>
-              {realCanais.map((c) => <button key={c.id} className={'pop-item' + (filtroCanal === c.id ? ' sel' : '')} onClick={() => { setFiltroCanal(c.id); setPop(null); }}>{c.alias}{filtroCanal === c.id && <span className="ck">✓</span>}</button>)}
+              <button className={'pop-item' + (filtroCanal === null ? ' sel' : '')} onClick={() => { setFiltroCanal(null); setPop(null); }}>Todos os números{filtroCanal === null && <span className="ck"><Check size={13} strokeWidth={1.5} aria-hidden="true" /></span>}</button>
+              {realCanais.map((c) => <button key={c.id} className={'pop-item' + (filtroCanal === c.id ? ' sel' : '')} onClick={() => { setFiltroCanal(c.id); setPop(null); }}>{c.alias}{filtroCanal === c.id && <span className="ck"><Check size={13} strokeWidth={1.5} aria-hidden="true" /></span>}</button>)}
               <div className="pop-head">Status</div>
-              <button className={'pop-item' + (filtroStatus === null ? ' sel' : '')} onClick={() => { setFiltroStatus(null); setPop(null); }}>Todos os status{filtroStatus === null && <span className="ck">✓</span>}</button>
-              {statusAtivos.map((s) => <button key={s.id} className={'pop-item' + (filtroStatus === s.id ? ' sel' : '')} onClick={() => { setFiltroStatus(s.id); setPop(null); }}><span className="sdot" style={{ background: s.cor }} />{s.nome}{filtroStatus === s.id && <span className="ck">✓</span>}</button>)}
+              <button className={'pop-item' + (filtroStatus === null ? ' sel' : '')} onClick={() => { setFiltroStatus(null); setPop(null); }}>Todos os status{filtroStatus === null && <span className="ck"><Check size={13} strokeWidth={1.5} aria-hidden="true" /></span>}</button>
+              {statusAtivos.map((s) => <button key={s.id} className={'pop-item' + (filtroStatus === s.id ? ' sel' : '')} onClick={() => { setFiltroStatus(s.id); setPop(null); }}><span className="sdot" style={{ background: s.cor }} />{s.nome}{filtroStatus === s.id && <span className="ck"><Check size={13} strokeWidth={1.5} aria-hidden="true" /></span>}</button>)}
             </>
           )}
           {pop.kind === 'scripts' && (
@@ -1702,7 +1716,7 @@ export function WhatsApp() {
                 const on = current.tags.some((t) => t.toLowerCase() === e.nome.toLowerCase());
                 return (
                   <button key={e.id} className={'pop-item' + (on ? ' sel' : '')} onClick={() => alternarEtiqueta(e.nome)}>
-                    <span className="sdot" style={{ background: e.cor }} />{e.nome}{on && <span className="ck">✓</span>}
+                    <span className="sdot" style={{ background: e.cor }} />{e.nome}{on && <span className="ck"><Check size={13} strokeWidth={1.5} aria-hidden="true" /></span>}
                   </button>
                 );
               })}
