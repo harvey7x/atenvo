@@ -9,14 +9,14 @@
 
 - **Dashboard**: APROVADA — vira a home `/` no corte final. Versão enxuta: só KPIs com fonte já existente em `src/data/*`, "Precisa de ação" agregando queries atuais, tabela de cobranças reaproveitada. Nenhuma métrica que exija engenharia de dados nova.
 - **Contatos**: APROVADA — UI sobre `src/data/contatos.ts`, paridade com o que a camada já oferece.
-- **Relacionamento**: ADIADA — fora do escopo do redesign (produto novo). Fora do plano e da sidebar v2.
+- **Relacionamento**: ENTROU na ordem (decisão 2026-07-27, revisão da ADIADA): o frontend v1 chegou ao main (rota /relacionamento + src/pages/Relacionamento.tsx + src/data/relacionamento.ts) e a paridade agora o exige. Sessão dele: entre Kanban e Facebook; página real no main = verdade funcional, pg-relacionamento do mockup = verdade visual; item volta à sidebar v2 (grupo Gestão). Novos commits do módulo chegam pela cadência de merge — recriar contra a versão estável.
 - **Agendamentos**: recriar a central real (6 status, sequências) com os padrões do mockup, não o calendário. `Agendamentos.tsx` (morto) → lista de limpeza do corte final.
 - **Configurações**: abas reais com o layout do mockup. **Integrações e demais divergências**: paridade funcional manda.
 - **Notificação de resposta**: na sessão do shell, só o componente visual + botão de simulação; fiação realtime na sessão do WhatsApp.
 
 ## Ordem final aprovada
 
-1a Fundação (tokens.css + base.css + componentes base + vitrine em `/v2`) → 1b Shell (AppShellV2: sidebar 64→242 hover-overlay, topbar, luz/grão, rotas `/v2/*`) → Login (+NotFound/ConfigError) → Plano e uso → Fluxos de senha → Cobranças → Agendamentos → Scripts → Configurações → Maturação → Contatos → Relatórios → Dashboard → Integrações → Kanban → Facebook → WhatsApp.
+1a Fundação → 1b Shell → Login (+NotFound/ConfigError) → Plano e uso → Fluxos de senha → Cobranças → Agendamentos → Scripts → Configurações → Maturação → Contatos → Relatórios → Dashboard → Integrações → Kanban → **Relacionamento** → Facebook → WhatsApp. (Relacionamento incluído em 2026-07-27; o restante conforme aprovação original.)
 
 Processo: a cada 3-4 sessões (e sempre que `bot-cloud-1390` chegar ao main), merge do main em `redesign/platina` com reporte de conflitos. Fluxos de senha: extração de hooks 100% idêntica em comportamento + teste manual dos 3 fluxos + convite nos modos mock e supabase antes do commit.
 
