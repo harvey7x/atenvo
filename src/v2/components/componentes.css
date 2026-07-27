@@ -213,6 +213,23 @@
   box-shadow: 0 0 0 3px rgba(255, 255, 255, .07);
 }
 
+/* estado inválido + dica do campo (contrato, item 7 — o mockup não
+   desenha erro de campo; segue a semântica rubro dos padrões dele) */
+.v2 .campo.invalida .inp { border-color: rgba(229, 102, 92, .55); }
+.v2 .campo.invalida .inp:focus { box-shadow: 0 0 0 3px rgba(229, 102, 92, .10); }
+.v2 .campo .hint { display: block; font-size: 11px; color: var(--rubro); margin-top: 5px; min-height: 14px; }
+
+/* input com botão embutido (ex.: olho da senha) */
+.v2 .controle { position: relative; }
+.v2 .controle .inp { padding-right: 38px; }
+.v2 .controle .olho {
+  position: absolute; top: 0; right: 0; width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  background: none; border: none; color: var(--txt-3); cursor: pointer; padding: 0;
+}
+.v2 .controle .olho:hover { color: var(--txt-2); }
+.v2 .controle .olho:focus-visible { outline: none; box-shadow: 0 0 0 2px rgba(255, 255, 255, .35); border-radius: 7px; }
+
 /* --- Toggle ------------------------------------------------- */
 .v2 .tgl {
   width: 36px; height: 20px; border-radius: 99px;

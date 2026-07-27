@@ -26,6 +26,9 @@ import { NotFound } from '@/pages/NotFound';
 const VitrineV2 = lazy(() => import('@/v2/pages/Vitrine'));
 const AppShellV2 = lazy(() => import('@/v2/shell/AppShellV2'));
 const EmConstrucaoV2 = lazy(() => import('@/v2/pages/EmConstrucao'));
+const LoginV2 = lazy(() => import('@/v2/pages/Login'));
+const NaoEncontradaV2 = lazy(() => import('@/v2/pages/NaoEncontrada'));
+const ErroConfiguracaoV2 = lazy(() => import('@/v2/pages/ErroConfiguracao'));
 
 /** Rota v2 ainda não recriada: marcador de posição dentro do shell. */
 function emConstrucao(slug: string, titulo: string, subtitulo: string): RouteObject {
@@ -124,6 +127,32 @@ const routes: RouteObject[] = [
               element: (
                 <Suspense fallback={null}>
                   <VitrineV2 />
+                </Suspense>
+              ),
+            },
+            {
+              path: 'login',
+              element: (
+                <Suspense fallback={null}>
+                  <LoginV2 />
+                </Suspense>
+              ),
+            },
+            {
+              // prévia para aprovação — no corte final, main.tsx troca ConfigError
+              path: 'config-error',
+              element: (
+                <Suspense fallback={null}>
+                  <ErroConfiguracaoV2 />
+                </Suspense>
+              ),
+            },
+            {
+              // 404 do mundo v2 — no corte final vira o catch-all '*' do app
+              path: '*',
+              element: (
+                <Suspense fallback={null}>
+                  <NaoEncontradaV2 />
                 </Suspense>
               ),
             },

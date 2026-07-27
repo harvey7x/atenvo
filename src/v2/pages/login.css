@@ -1,0 +1,78 @@
+/* ============================================================
+   Família visual do login — portada do mockup (linhas 726–751):
+   tela cheia sobre --base com luz própria (.luz2), cartão de
+   vidro 372px, marca, serifona e rodapé. Compartilhada por
+   Login, NaoEncontrada, ErroConfiguracao e (nas próximas
+   sessões) pelos fluxos de senha.
+   ============================================================ */
+.v2.tela-login {
+  position: relative; min-height: 100dvh; overflow: hidden;
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+}
+.v2 .luz2 {
+  position: absolute; inset: 0; pointer-events: none; opacity: var(--fx);
+  background:
+    radial-gradient(50% 60% at 30% 10%, rgba(255, 255, 255, .09) 0%, transparent 70%),
+    radial-gradient(56% 66% at 78% 92%, rgba(255, 255, 255, .045) 0%, transparent 72%);
+}
+.v2 .lg-card { position: relative; width: 372px; padding: 30px 30px 24px; border-radius: 18px; }
+.v2 .lg-card .marca2 {
+  width: 42px; height: 42px; border-radius: 12px; margin-bottom: 18px;
+  background: linear-gradient(180deg, #FFF, #C9CDD4); color: #0E0F12;
+  display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 19px;
+  box-shadow: 0 10px 30px rgba(255, 255, 255, calc(.14 * var(--fx))), inset 0 1px 0 #fff;
+}
+/* h1 semântico com o desenho do h2 do mockup (páginas soltas precisam de h1) */
+.v2 .lg-card h1 {
+  font-family: var(--serif); font-style: italic; font-weight: 400; font-size: 27px;
+  letter-spacing: -.01em; margin: 9px 0 4px;
+}
+.v2 .lg-card .sub { font-size: 12.5px; color: var(--txt-2); margin-bottom: 20px; }
+.v2 .lg-card .campo { margin-bottom: 13px; }
+/* no cartão, a hint só existe quando há erro — preserva o ritmo de 13px do mockup */
+.v2 .lg-card .campo .hint { min-height: 0; margin-top: 4px; }
+.v2 .lg-l { display: flex; justify-content: space-between; align-items: baseline; }
+.v2 .lg-l a, .v2 .lg-l button {
+  font-size: 11px; color: var(--txt-2); text-decoration: none;
+  border-bottom: 1px solid rgba(255, 255, 255, .2); cursor: pointer;
+  background: none; border-top: none; border-left: none; border-right: none;
+  font-family: var(--fonte); padding: 0;
+}
+.v2 .lg-l button:disabled { opacity: .6; cursor: default; }
+.v2 .entrar {
+  width: 100%; height: 41px; margin-top: 5px; border: none; border-radius: 10px; cursor: pointer;
+  font-family: var(--fonte); font-size: 13.5px; font-weight: 600; color: #101215;
+  background: linear-gradient(180deg, #FFF, #D6DAE0);
+  box-shadow: 0 12px 30px rgba(255, 255, 255, calc(.12 * var(--fx))), inset 0 1px 0 #fff;
+  transition: transform .2s var(--ease);
+}
+.v2 .entrar:hover:not(:disabled) { transform: translateY(-1px); }
+.v2 .entrar:disabled { opacity: .7; cursor: default; }
+.v2 .lg-pe {
+  margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--linha);
+  font-size: 10.5px; color: var(--txt-3); text-align: center; line-height: 1.6;
+}
+.v2 .lg-pe b { color: var(--txt-2); font-weight: 500; }
+.v2 .lg-pe code {
+  font-family: ui-monospace, monospace; font-size: 10px;
+  background: rgba(255, 255, 255, .05); border: 1px solid rgba(255, 255, 255, .09);
+  border-radius: 5px; padding: 1px 5px;
+}
+
+/* faixa de retorno no topo do cartão: erro (rubro) ou aviso (verde) */
+.v2 .lg-banner {
+  display: none; align-items: flex-start; gap: 8px; font-size: 11.5px; line-height: 1.45;
+  border-radius: 9px; padding: 8px 11px; margin-bottom: 13px;
+}
+.v2 .lg-banner.show { display: flex; }
+.v2 .lg-banner.erro { background: var(--rubro-bg); color: var(--rubro); border: 1px solid rgba(229, 102, 92, .26); }
+.v2 .lg-banner.aviso { background: var(--verde-bg); color: var(--verde); border: 1px solid rgba(74, 190, 140, .26); }
+
+/* lista de variáveis ausentes (ErroConfiguracao) */
+.v2 .lg-vars { list-style: none; margin: 0 0 14px; display: flex; flex-direction: column; gap: 7px; }
+.v2 .lg-vars code {
+  font-family: ui-monospace, monospace; font-size: 11px; color: var(--rubro);
+  background: var(--rubro-bg); border: 1px solid rgba(229, 102, 92, .26);
+  border-radius: 6px; padding: 3px 8px;
+}
+.v2 .lg-card code.ok { color: var(--verde); background: var(--verde-bg); border-color: rgba(74, 190, 140, .26); }
