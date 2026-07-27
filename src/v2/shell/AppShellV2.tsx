@@ -40,7 +40,8 @@ const GRUPOS: { rotulo: string; itens: ItemNav[] }[] = [
     itens: [
       { slug: 'integracoes', rotulo: 'Integrações' },
       { slug: 'maturacao', rotulo: 'Maturação', admin: true },
-      { slug: 'configuracoes', rotulo: 'Configurações', admin: true },
+      // paridade: /configuracoes NÃO tem RequireRole no app antigo (as abas variam por papel)
+      { slug: 'configuracoes', rotulo: 'Configurações' },
       { slug: 'plano-uso', rotulo: 'Plano e uso', admin: true },
     ],
   },

@@ -30,6 +30,8 @@ const EmConstrucaoV2 = lazy(() => import('@/v2/pages/EmConstrucao'));
 const LoginV2 = lazy(() => import('@/v2/pages/Login'));
 const NaoEncontradaV2 = lazy(() => import('@/v2/pages/NaoEncontrada'));
 const ErroConfiguracaoV2 = lazy(() => import('@/v2/pages/ErroConfiguracao'));
+const RequireAuthV2 = lazy(() => import('@/v2/guards/RequireAuthV2'));
+const RequireRoleV2 = lazy(() => import('@/v2/guards/RequireRoleV2'));
 
 /** Rota v2 ainda não recriada: marcador de posição dentro do shell. */
 function emConstrucao(slug: string, titulo: string, subtitulo: string): RouteObject {
@@ -163,25 +165,54 @@ const routes: RouteObject[] = [
               ),
             },
             {
+              // Guard de auth do mundo v2: sem sessão → /v2/login com retorno.
               element: (
                 <Suspense fallback={null}>
-                  <AppShellV2 />
+                  <RequireAuthV2 />
                 </Suspense>
               ),
               children: [
-                emConstrucao('dashboard', 'Dashboard', 'Sua operação, em ordem.'),
-                emConstrucao('whatsapp', 'WhatsApp', 'Caixa de atendimento do WhatsApp.'),
-                emConstrucao('facebook', 'Facebook', 'Caixa de atendimento do Messenger e Facebook.'),
-                emConstrucao('kanban', 'Kanban', 'Funil comercial em colunas.'),
-                emConstrucao('agendamentos', 'Agendamentos', 'Mensagens programadas, enviadas, falhas e canceladas.'),
-                emConstrucao('contatos', 'Contatos', 'Todos os contatos da organização.'),
-                emConstrucao('scripts', 'Scripts', 'Biblioteca de scripts e mídias.'),
-                emConstrucao('cobrancas', 'Cobranças', 'Cobranças da organização aos próprios clientes.'),
-                emConstrucao('relatorios', 'Relatórios', 'Desempenho do atendimento e das cobranças.'),
-                emConstrucao('integracoes', 'Integrações', 'Conexões do canal e serviços do sistema.'),
-                emConstrucao('maturacao', 'Maturação', 'Aquecimento de chips — isolado do atendimento.'),
-                emConstrucao('configuracoes', 'Configurações', 'Perfil, equipe e comportamento do sistema.'),
-                emConstrucao('plano-uso', 'Plano e uso', 'Assinatura, consumo e adicionais da organização.'),
+                {
+                  element: (
+                    <Suspense fallback={null}>
+                      <AppShellV2 />
+                    </Suspense>
+                  ),
+                  children: [
+                    emConstrucao('dashboard', 'Dashboard', 'Sua operação, em ordem.'),
+                    emConstrucao('whatsapp', 'WhatsApp', 'Caixa de atendimento do WhatsApp.'),
+                    emConstrucao('facebook', 'Facebook', 'Caixa de atendimento do Messenger e Facebook.'),
+                    emConstrucao('kanban', 'Kanban', 'Funil comercial em colunas.'),
+                    emConstrucao('agendamentos', 'Agendamentos', 'Mensagens programadas, enviadas, falhas e canceladas.'),
+                    emConstrucao('contatos', 'Contatos', 'Todos os contatos da organização.'),
+                    emConstrucao('scripts', 'Scripts', 'Biblioteca de scripts e mídias.'),
+                    emConstrucao('cobrancas', 'Cobranças', 'Cobranças da organização aos próprios clientes.'),
+                    emConstrucao('relatorios', 'Relatórios', 'Desempenho do atendimento e das cobranças.'),
+                    emConstrucao('integracoes', 'Integrações', 'Conexões do canal e serviços do sistema.'),
+                    {
+                      // paridade: admin-only por URL, não só no menu
+                      path: 'maturacao',
+                      element: (
+                        <Suspense fallback={null}>
+                          <RequireRoleV2 role="admin">
+                            <EmConstrucaoV2 titulo="Maturação" subtitulo="Aquecimento de chips — isolado do atendimento." />
+                          </RequireRoleV2>
+                        </Suspense>
+                      ),
+                    },
+                    emConstrucao('configuracoes', 'Configurações', 'Perfil, equipe e comportamento do sistema.'),
+                    {
+                      path: 'plano-uso',
+                      element: (
+                        <Suspense fallback={null}>
+                          <RequireRoleV2 role="admin">
+                            <EmConstrucaoV2 titulo="Plano e uso" subtitulo="Assinatura, consumo e adicionais da organização." />
+                          </RequireRoleV2>
+                        </Suspense>
+                      ),
+                    },
+                  ],
+                },
               ],
             },
           ],
