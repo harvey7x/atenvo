@@ -10,7 +10,7 @@ import { instalarSpotlight } from '../lib/spotlight';
 import { ICONES } from './icones';
 import { NotificacaoResposta, type DadosNotificacao } from './NotificacaoResposta';
 import { IntroEntrada } from './IntroEntrada';
-import { retirarIntroPendente } from './intro';
+import { decidirIntroNaChegada } from './intro';
 
 /* Navegação real do app (INVENTARIO.md + decisões aprovadas):
    Relacionamento fica fora (adiada); Facebook, Scripts e Maturação são
@@ -82,12 +82,13 @@ export default function AppShellV2() {
   const [badgePop, setBadgePop] = useState(0);
   const fecharNotif = useCallback(() => setNotif(null), []);
 
-  // Intro "o sistema acorda": decidida ANTES do primeiro paint (sem flash),
-  // consumindo a flag do login; reduced-motion pula direto. Nunca em refresh
-  // ou navegação — só o signIn marca a flag. geracaoPagina re-dispara a
-  // cascata da página quando o overlay abre.
+  // Intro "o sistema acorda": decidida ANTES do primeiro paint (sem flash).
+  // Chegada = signIn (sempre) OU boot autenticado fora do cooldown (intro.ts);
+  // navegação interna nunca re-decide. reduced-motion pula a exibição, mas o
+  // timestamp já foi registrado na decisão (lógica uniforme). geracaoPagina
+  // re-dispara a cascata da página quando o overlay abre.
   const [intro, setIntro] = useState(
-    () => retirarIntroPendente() && !window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+    () => decidirIntroNaChegada(user?.id ?? 'anon') && !window.matchMedia('(prefers-reduced-motion: reduce)').matches,
   );
   const [contadorIntro, setContadorIntro] = useState(0);
   const [geracaoPagina, setGeracaoPagina] = useState(0);
