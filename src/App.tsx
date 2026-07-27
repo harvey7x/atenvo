@@ -33,6 +33,9 @@ const ErroConfiguracaoV2 = lazy(() => import('@/v2/pages/ErroConfiguracao'));
 const RequireAuthV2 = lazy(() => import('@/v2/guards/RequireAuthV2'));
 const RequireRoleV2 = lazy(() => import('@/v2/guards/RequireRoleV2'));
 const PlanoUsoV2 = lazy(() => import('@/v2/pages/PlanoUso'));
+const RedefinirSenhaV2 = lazy(() => import('@/v2/pages/RedefinirSenha'));
+const DefinirSenhaV2 = lazy(() => import('@/v2/pages/DefinirSenha'));
+const AlterarSenhaV2 = lazy(() => import('@/v2/pages/AlterarSenha'));
 
 /** Rota v2 ainda não recriada: marcador de posição dentro do shell. */
 function emConstrucao(slug: string, titulo: string, subtitulo: string): RouteObject {
@@ -148,6 +151,23 @@ const routes: RouteObject[] = [
               ),
             },
             {
+              // públicas: fluxos por token (recuperação e convite), como no v1
+              path: 'redefinir-senha',
+              element: (
+                <Suspense fallback={null}>
+                  <RedefinirSenhaV2 />
+                </Suspense>
+              ),
+            },
+            {
+              path: 'definir-senha',
+              element: (
+                <Suspense fallback={null}>
+                  <DefinirSenhaV2 />
+                </Suspense>
+              ),
+            },
+            {
               // prévia para aprovação — no corte final, main.tsx troca ConfigError
               path: 'config-error',
               element: (
@@ -173,6 +193,15 @@ const routes: RouteObject[] = [
                 </Suspense>
               ),
               children: [
+                {
+                  // troca obrigatória: fora do shell (sem navegação), como no v1
+                  path: 'alterar-senha',
+                  element: (
+                    <Suspense fallback={null}>
+                      <AlterarSenhaV2 />
+                    </Suspense>
+                  ),
+                },
                 {
                   element: (
                     <Suspense fallback={null}>

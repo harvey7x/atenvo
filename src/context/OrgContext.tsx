@@ -5,6 +5,10 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { DEMO_ORGS } from '@/data/demo';
 import { Onboarding } from '@/pages/Onboarding';
+// Redesign Platina: no mundo /v2 o onboarding é o v2 (mesma prop onProvision).
+import { lazy, Suspense } from 'react';
+const OnboardingV2 = lazy(() => import('@/v2/pages/Onboarding'));
+const emRotaV2 = () => { try { return window.location.pathname.startsWith('/v2'); } catch { return false; } };
 import { slugify, randomSuffix } from '@/lib/slug';
 import { resolverContextoInicial } from '@/lib/resolverContexto';
 
@@ -21,8 +25,10 @@ function mapRole(papel: string): OrgRole {
 const useHashRouting = typeof window !== 'undefined' && window.location.protocol === 'file:';
 function gotoWhatsApp() {
   try {
-    if (useHashRouting) window.location.hash = '#/whatsapp';
-    else window.history.replaceState({}, '', '/whatsapp');
+    // Redesign Platina: quem provisiona a partir do /v2 permanece no mundo v2.
+    const destino = emRotaV2() ? '/v2/dashboard' : '/whatsapp';
+    if (useHashRouting) window.location.hash = `#${destino}`;
+    else window.history.replaceState({}, '', destino);
   } catch { /* ignore */ }
 }
 
@@ -165,6 +171,13 @@ export function OrgProvider({ children }: { children: ReactNode }) {
   }
   // Sem nenhum vínculo -> onboarding (cria a empresa e vincula como admin).
   if (contexto === 'sem_organizacao') {
+    if (emRotaV2()) {
+      return (
+        <Suspense fallback={null}>
+          <OnboardingV2 onProvision={onProvision} />
+        </Suspense>
+      );
+    }
     return <Onboarding onProvision={onProvision} />;
   }
   // 'trocar_senha' e 'com_organizacao': renderiza o app; o ProtectedRoute cuida da rota

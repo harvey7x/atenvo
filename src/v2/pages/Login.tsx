@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import '../fontes';
@@ -9,7 +9,7 @@ import './login.css';
 
 import { DESTINO_PADRAO_V2 as DESTINO_PADRAO } from '../destino';
 
-interface LocState { from?: { pathname: string } }
+interface LocState { from?: { pathname: string }; aviso?: string }
 
 const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -31,7 +31,14 @@ export default function LoginV2() {
   const [verSenha, setVerSenha] = useState(false);
   const [eEmail, setEEmail] = useState<string | null>(null);
   const [eSenha, setESenha] = useState<string | null>(null);
-  const [banner, setBanner] = useState<Banner>(null);
+  // aviso vindo dos fluxos de senha (no v1 era toast; aqui chega por state) —
+  // lido no mount E a cada navegação, para não depender de remontagem
+  const avisoInicial = (location.state as LocState | null)?.aviso;
+  const [banner, setBanner] = useState<Banner>(avisoInicial ? { tom: 'aviso', texto: avisoInicial } : null);
+  useEffect(() => {
+    const av = (location.state as LocState | null)?.aviso;
+    if (av) setBanner({ tom: 'aviso', texto: av });
+  }, [location.state]);
   const [busy, setBusy] = useState(false);
   const [recuperando, setRecuperando] = useState(false);
 
