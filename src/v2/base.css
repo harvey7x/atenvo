@@ -2,7 +2,7 @@
    Base Platina — efeitos globais e padrões de página, fiéis ao
    mockup design-ref/atenvo-sistema-completo-platina.html.
    Tudo escopado sob `.v2` (o app antigo carrega o global.css
-   dele em todas as rotas; nomes como .btn/.card colidiriam).
+   dele em todas as rotas; nomes como .btn/.card colidiam — por isso os 8 nomes que o v1 também usa levam prefixo p-).
    Keyframes têm prefixo v2- porque o namespace deles é global.
 
    Hierarquia de movimento (contrato, item 6):

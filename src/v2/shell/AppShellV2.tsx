@@ -100,9 +100,9 @@ export default function AppShellV2() {
     <div className="v2 app-v2">
       <div className="luz" />
       <div className="grao" />
-      <div className="app">
-        <aside className="sidebar">
-          <div className="logo">
+      <div className="p-app">
+        <aside className="p-sidebar">
+          <div className="p-logo">
             <div className="marca">A</div>
             <span className="word lab">atenvo</span>
           </div>
@@ -148,7 +148,7 @@ export default function AppShellV2() {
         </aside>
 
         <main className="principal">
-          <div className="topbar">
+          <div className="p-topbar">
             <div className="busca">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
                 <circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" />

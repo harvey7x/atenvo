@@ -41,7 +41,7 @@ export function NotificacaoResposta({ dados, aoFechar, aoResponder, aoVerConvers
         <div key={dados.seq ?? 0}>
           <button type="button" className="fechar" onClick={aoFechar} aria-label="Fechar notificação">×</button>
           <div className="corpo">
-            <div className="av">{dados.iniciais}<i aria-hidden /></div>
+            <div className="p-av">{dados.iniciais}<i aria-hidden /></div>
             <div style={{ minWidth: 0, flex: 1 }}>
               <div className="l1">
                 <span className="quem">{dados.quem}</span>

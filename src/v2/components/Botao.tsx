@@ -7,7 +7,7 @@ type BotaoProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 
 function classes(base: string, mini?: boolean, extra?: string) {
-  return ['btn', base, mini ? 'btn-mini' : '', extra ?? ''].filter(Boolean).join(' ');
+  return ['p-btn', base, mini ? 'btn-mini' : '', extra ?? ''].filter(Boolean).join(' ');
 }
 
 /** Ação primária platina — no máximo uma por tela (contrato + manual de extensão). */

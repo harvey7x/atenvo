@@ -5,14 +5,14 @@
    ============================================================ */
 
 /* --- Botões ------------------------------------------------- */
-.v2 .btn {
+.v2 .p-btn {
   display: inline-flex; align-items: center; gap: 7px;
   font-family: var(--fonte); font-size: 12.5px; font-weight: 500;
   border-radius: var(--r-ctl); padding: 7.5px 13px; cursor: pointer;
   border: 1px solid transparent; color: var(--txt);
   transition: transform .2s var(--ease), box-shadow .2s, background .2s;
 }
-.v2 .btn:disabled { opacity: .5; cursor: default; }
+.v2 .p-btn:disabled { opacity: .5; cursor: default; }
 .v2 .btn-sec { background: rgba(255, 255, 255, .05); border-color: rgba(255, 255, 255, .12); }
 .v2 .btn-sec:hover:not(:disabled) { background: rgba(255, 255, 255, .085); }
 .v2 .btn-pri {
@@ -264,6 +264,11 @@
 .v2 .status-bar .seg i.ambar.brilho { box-shadow: 0 0 8px rgba(217, 164, 74, calc(.5 * var(--fx))); }
 .v2 .status-bar .seg i.rubro.brilho { box-shadow: 0 0 8px rgba(229, 102, 92, calc(.6 * var(--fx))); }
 .v2 .status-bar .fim { margin-left: auto; letter-spacing: .14em; font-size: 9.5px; }
+
+/* divisor interno de painel (mockup .cfg-div) */
+.v2 .cfg-div { border-top: 1px solid var(--linha); margin: 16px 0 14px; }
+/* título de seção interna de painel (mockup .cfg-sec) */
+.v2 .cfg-sec { font-size: 13px; font-weight: 600; margin-bottom: 13px; }
 
 /* --- Skeleton (carregando: vidro com shimmer sutil) --------- */
 .v2 .skel {
