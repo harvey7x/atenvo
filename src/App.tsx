@@ -22,8 +22,22 @@ import { PlanoUso } from '@/pages/PlanoUso';
 import { Maturacao } from '@/pages/Maturacao';
 import { NotFound } from '@/pages/NotFound';
 
-// Redesign Platina (design-ref/CONTRATO.md): vitrine da fundação, carregada sob demanda.
+// Redesign Platina (design-ref/CONTRATO.md): tudo carregado sob demanda.
 const VitrineV2 = lazy(() => import('@/v2/pages/Vitrine'));
+const AppShellV2 = lazy(() => import('@/v2/shell/AppShellV2'));
+const EmConstrucaoV2 = lazy(() => import('@/v2/pages/EmConstrucao'));
+
+/** Rota v2 ainda não recriada: marcador de posição dentro do shell. */
+function emConstrucao(slug: string, titulo: string, subtitulo: string): RouteObject {
+  return {
+    path: slug,
+    element: (
+      <Suspense fallback={null}>
+        <EmConstrucaoV2 titulo={titulo} subtitulo={subtitulo} />
+      </Suspense>
+    ),
+  };
+}
 
 const routes: RouteObject[] = [
   { path: '/login', element: <Login /> },
@@ -97,17 +111,45 @@ const routes: RouteObject[] = [
       },
     ],
   },
-  // Vitrine só no dev local: a branch gera preview público no CF Pages e o
-  // trabalho de redesign não deve vazar antes do corte final.
+  // Redesign v2 só no dev local: a branch gera preview público no CF Pages e o
+  // trabalho não deve vazar antes do corte final. /v2 = vitrine (aprovação);
+  // /v2/<página> = shell v2 com as páginas recriadas (ou marcador de posição).
   ...(import.meta.env.DEV
     ? [
         {
           path: '/v2',
-          element: (
-            <Suspense fallback={null}>
-              <VitrineV2 />
-            </Suspense>
-          ),
+          children: [
+            {
+              index: true,
+              element: (
+                <Suspense fallback={null}>
+                  <VitrineV2 />
+                </Suspense>
+              ),
+            },
+            {
+              element: (
+                <Suspense fallback={null}>
+                  <AppShellV2 />
+                </Suspense>
+              ),
+              children: [
+                emConstrucao('dashboard', 'Dashboard', 'Sua operação, em ordem.'),
+                emConstrucao('whatsapp', 'WhatsApp', 'Caixa de atendimento do WhatsApp.'),
+                emConstrucao('facebook', 'Facebook', 'Caixa de atendimento do Messenger e Facebook.'),
+                emConstrucao('kanban', 'Kanban', 'Funil comercial em colunas.'),
+                emConstrucao('agendamentos', 'Agendamentos', 'Mensagens programadas, enviadas, falhas e canceladas.'),
+                emConstrucao('contatos', 'Contatos', 'Todos os contatos da organização.'),
+                emConstrucao('scripts', 'Scripts', 'Biblioteca de scripts e mídias.'),
+                emConstrucao('cobrancas', 'Cobranças', 'Cobranças da organização aos próprios clientes.'),
+                emConstrucao('relatorios', 'Relatórios', 'Desempenho do atendimento e das cobranças.'),
+                emConstrucao('integracoes', 'Integrações', 'Conexões do canal e serviços do sistema.'),
+                emConstrucao('maturacao', 'Maturação', 'Aquecimento de chips — isolado do atendimento.'),
+                emConstrucao('configuracoes', 'Configurações', 'Perfil, equipe e comportamento do sistema.'),
+                emConstrucao('plano-uso', 'Plano e uso', 'Assinatura, consumo e adicionais da organização.'),
+              ],
+            },
+          ],
         } satisfies RouteObject,
       ]
     : []),
