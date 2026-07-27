@@ -11,10 +11,10 @@ export default function NaoEncontrada() {
     <div className="v2 tela-login">
       <div className="luz2" />
       <div className="grao" />
-      <div className="lg-card vidro pg-entra" style={{ textAlign: 'center' }}>
-        <div className="marca2" style={{ margin: '0 auto 18px' }}>A</div>
+      <div className="lg-card vidro pg-entra">
+        <div className="marca2">A</div>
         <div className="caps">Atenvo</div>
-        <h1>Página não encontrada.</h1>
+        <h1 className="p-display">Página não encontrada.</h1>
         <div className="sub">O endereço acessado não existe.</div>
         <Link to={INICIO} className="entrar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>
           Voltar ao início

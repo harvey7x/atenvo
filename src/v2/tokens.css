@@ -28,7 +28,8 @@
   --r-card: 16px;
   --r-ctl: 9px;
   --fonte: 'Instrument Sans Variable', 'Instrument Sans', system-ui, sans-serif;
-  --serif: 'Newsreader Variable', 'Newsreader', Georgia, serif;
+  /* Família única (Adendo nº 1): a antiga --serif/Newsreader foi aposentada;
+     momentos de display usam .p-display (base.css). */
   --ease: cubic-bezier(.2, .8, .2, 1);
 
   /* Dial de intensidade dos efeitos (contrato, item 6):

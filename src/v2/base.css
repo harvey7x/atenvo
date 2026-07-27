@@ -116,11 +116,17 @@
   margin-bottom: 16px;
 }
 .v2 .ph h2 { font-size: 19px; font-weight: 600; letter-spacing: -.02em; }
-.v2 .ph .serifona {
-  font-family: var(--serif); font-style: italic; font-weight: 400; font-size: 29px;
-  letter-spacing: -.01em; line-height: 1.1; margin-top: 6px;
+
+/* --- display platina (Adendo nº 1) --------------------------
+   Momentos de display (saudações, títulos de auth): Instrument
+   Sans 600 com preenchimento em gradiente platina — o destaque
+   vem de peso e luz, não de outra fonte. */
+.v2 .p-display {
+  font-weight: 600; font-size: 30px; letter-spacing: -.02em; line-height: 1.12;
+  background: linear-gradient(92deg, #FFFFFF, #C9CDD4);
+  -webkit-background-clip: text; background-clip: text;
+  color: transparent; -webkit-text-fill-color: transparent;
 }
-.v2 .ph .serifona b { font-weight: 500; }
 .v2 .ph p { font-size: 12.5px; color: var(--txt-2); margin-top: 5px; }
 .v2 .acoes { display: flex; gap: 9px; align-items: center; }
 

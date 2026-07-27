@@ -1,9 +1,12 @@
 /* ============================================================
    Família visual do login — portada do mockup (linhas 726–751):
    tela cheia sobre --base com luz própria (.luz2), cartão de
-   vidro 372px, marca, serifona e rodapé. Compartilhada por
-   Login, NaoEncontrada, ErroConfiguracao e (nas próximas
-   sessões) pelos fluxos de senha.
+   vidro 372px. Compartilhada por Login, fluxos de senha,
+   Onboarding, NaoEncontrada e ErroConfiguracao.
+   Adendo nº 1: cabeçalho (marca, eyebrow, título .p-display e
+   subtítulo) CENTRADO; formulários seguem largura total com
+   label à esquerda; estados sem formulário são cerimônia,
+   totalmente centrados.
    ============================================================ */
 .v2.tela-login {
   position: relative; min-height: 100dvh; overflow: hidden;
@@ -16,18 +19,16 @@
     radial-gradient(56% 66% at 78% 92%, rgba(255, 255, 255, .045) 0%, transparent 72%);
 }
 .v2 .lg-card { position: relative; width: 372px; padding: 30px 30px 24px; border-radius: 18px; }
+/* cabeçalho centrado (Adendo nº 1) */
 .v2 .lg-card .marca2 {
-  width: 42px; height: 42px; border-radius: 12px; margin-bottom: 18px;
+  width: 42px; height: 42px; border-radius: 12px; margin: 0 auto 18px;
   background: linear-gradient(180deg, #FFF, #C9CDD4); color: #0E0F12;
   display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 19px;
   box-shadow: 0 10px 30px rgba(255, 255, 255, calc(.14 * var(--fx))), inset 0 1px 0 #fff;
 }
-/* h1 semântico com o desenho do h2 do mockup (páginas soltas precisam de h1) */
-.v2 .lg-card h1 {
-  font-family: var(--serif); font-style: italic; font-weight: 400; font-size: 27px;
-  letter-spacing: -.01em; margin: 9px 0 4px;
-}
-.v2 .lg-card .sub { font-size: 12.5px; color: var(--txt-2); margin-bottom: 20px; }
+.v2 .lg-card > .caps { display: block; text-align: center; }
+.v2 .lg-card h1 { margin: 9px 0 4px; font-size: 27px; text-align: center; }
+.v2 .lg-card .sub { font-size: 12.5px; color: var(--txt-2); margin-bottom: 20px; text-align: center; }
 .v2 .lg-card .campo { margin-bottom: 13px; }
 /* no cartão, a hint só existe quando há erro — preserva o ritmo de 13px do mockup */
 .v2 .lg-card .campo .hint { min-height: 0; margin-top: 4px; }

@@ -23,7 +23,7 @@ export default function ErroConfiguracao() {
       <div className="lg-card vidro pg-entra">
         <div className="marca2">A</div>
         <div className="caps">Atenvo</div>
-        <h1>Configuração ausente.</h1>
+        <h1 className="p-display">Configuração ausente.</h1>
         <div className="sub">
           O acesso está bloqueado porque o backend não está configurado. Defina as
           variáveis de ambiente do Supabase e publique novamente.
@@ -40,7 +40,7 @@ export default function ErroConfiguracao() {
             quando a configuração está incompleta.
           </div>
         )}
-        <div className="lg-pe" style={{ textAlign: 'left' }}>
+        <div className="lg-pe">
           Para um ambiente apenas de demonstração (sem backend), habilite
           explicitamente <code className="ok">VITE_ENABLE_DEMO_MODE=true</code>.
         </div>

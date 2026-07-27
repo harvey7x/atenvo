@@ -9,6 +9,8 @@ import './shell.css';
 import { instalarSpotlight } from '../lib/spotlight';
 import { ICONES } from './icones';
 import { NotificacaoResposta, type DadosNotificacao } from './NotificacaoResposta';
+import { IntroEntrada } from './IntroEntrada';
+import { retirarIntroPendente } from './intro';
 
 /* Navegação real do app (INVENTARIO.md + decisões aprovadas):
    Relacionamento fica fora (adiada); Facebook, Scripts e Maturação são
@@ -80,6 +82,22 @@ export default function AppShellV2() {
   const [badgePop, setBadgePop] = useState(0);
   const fecharNotif = useCallback(() => setNotif(null), []);
 
+  // Intro "o sistema acorda": decidida ANTES do primeiro paint (sem flash),
+  // consumindo a flag do login; reduced-motion pula direto. Nunca em refresh
+  // ou navegação — só o signIn marca a flag. geracaoPagina re-dispara a
+  // cascata da página quando o overlay abre.
+  const [intro, setIntro] = useState(
+    () => retirarIntroPendente() && !window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+  );
+  const [contadorIntro, setContadorIntro] = useState(0);
+  const [geracaoPagina, setGeracaoPagina] = useState(0);
+  const abrirIntro = useCallback(() => setGeracaoPagina((g) => g + 1), []);
+  const terminarIntro = useCallback(() => setIntro(false), []);
+  function replayIntro() {
+    setContadorIntro((n) => n + 1);
+    setIntro(true);
+  }
+
   // Botão interno de simulação (decisão aprovada, item 8): só o visual,
   // disparado à mão — a fiação realtime entra na sessão do WhatsApp.
   // seq nova a cada disparo: reinicia o timer e a barra de progresso.
@@ -138,6 +156,16 @@ export default function AppShellV2() {
             })}
           </nav>
           <div className="canal"><i aria-hidden /><span>Canal · operante</span></div>
+          {import.meta.env.DEV && (
+            <div className="dev-ferramentas">
+              <button type="button" className="p-btn btn-sec btn-mini" onClick={simularResposta}>
+                Simular resposta
+              </button>
+              <button type="button" className="p-btn btn-sec btn-mini" onClick={replayIntro}>
+                Replay intro
+              </button>
+            </div>
+          )}
           <div className="rodape-sb">
             <div className="avatar">{iniciaisDe(nome)}</div>
             <div className="lab">
@@ -156,11 +184,6 @@ export default function AppShellV2() {
               Buscar contatos, conversas, cobranças…<kbd>⌘K</kbd>
             </div>
             <div className="top-dir">
-              {import.meta.env.DEV && (
-                <button type="button" className="ib" style={{ width: 'auto', padding: '0 10px', fontSize: 11.5 }} onClick={simularResposta}>
-                  Simular resposta
-                </button>
-              )}
               <button type="button" className="ib" aria-label="Notificações">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
                   <path d="M18 9a6 6 0 10-12 0c0 6-2.5 7-2.5 7h17S18 15 18 9zM10 20a2.2 2.2 0 004 0" />
@@ -172,8 +195,9 @@ export default function AppShellV2() {
           </div>
 
           <div className="palco">
-            {/* key pelo caminho: re-executa a entrada de página (pg-entra) a cada troca */}
-            <div className="pagina pg-entra" key={location.pathname}>
+            {/* key por caminho + geração: re-executa a entrada (pg-entra + cascata)
+                a cada troca de rota e quando a intro abre o palco */}
+            <div className="pagina pg-entra" key={`${location.pathname}#${geracaoPagina}`}>
               <Outlet />
             </div>
           </div>
@@ -188,6 +212,15 @@ export default function AppShellV2() {
           />
         </main>
       </div>
+
+      {intro && (
+        <IntroEntrada
+          key={contadorIntro}
+          nome={nome === 'Equipe' ? '' : nome.split(/\s+/)[0]}
+          aoAbrir={abrirIntro}
+          aoTerminar={terminarIntro}
+        />
+      )}
     </div>
   );
 }

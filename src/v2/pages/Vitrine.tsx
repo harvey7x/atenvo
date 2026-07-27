@@ -96,8 +96,7 @@ export default function Vitrine() {
         <header className="vit-topo">
           <div>
             <span className="caps">Atenvo · Platina — fundação</span>
-            {/* Instrument Sans no título: Newsreader itálica é SÓ dashboard/login
-                (contrato, item 5) — a amostra fica na seção Tipografia. */}
+            {/* Título em Instrument Sans — a amostra de display fica na seção Tipografia. */}
             <h2 style={{ fontSize: 21, fontWeight: 600, letterSpacing: '-.02em', margin: '7px 0 0' }}>
               Vitrine dos componentes
             </h2>
@@ -124,8 +123,11 @@ export default function Vitrine() {
             <div style={{ fontSize: 13, fontWeight: 500 }}>Instrument Sans 500 — rótulos, nomes e botões</div>
             <div style={{ fontSize: 12.5, color: 'var(--txt-2)' }}>Instrument Sans 400 — corpo e subtítulos</div>
             <div className="num" style={{ fontSize: 13 }}>0123456789 · tabular-nums em qualquer número (classe .num)</div>
-            <div className="serifona" style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontSize: 27 }}>
-              Newsreader itálica — <b style={{ fontWeight: 500 }}>só</b> na saudação do dashboard e no login.
+            <div className="p-display" style={{ marginTop: 4 }}>
+              Display platina — saudações e títulos de auth (.p-display).
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--txt-3)' }}>
+              Família única: Instrument Sans (Adendo nº 1). O destaque vem de peso e luz, não de outra fonte.
             </div>
           </CardVidro>
         </Secao>

@@ -39,7 +39,7 @@ export default function OnboardingV2({ onProvision }: { onProvision: (nome: stri
       <div className="lg-card vidro pg-entra">
         <div className="marca2">A</div>
         <div className="caps">Bem-vindo ao Atenvo</div>
-        <h1>Crie sua organização.</h1>
+        <h1 className="p-display">Crie sua organização.</h1>
         <div className="sub">Para começar, dê um nome à empresa que você vai gerenciar na Atenvo.</div>
 
         <div className={erro ? 'lg-banner show erro' : 'lg-banner'} role="alert">{erro}</div>

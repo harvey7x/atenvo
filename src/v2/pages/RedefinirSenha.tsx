@@ -70,7 +70,7 @@ export default function RedefinirSenhaV2() {
       <div className="lg-card vidro pg-entra">
         <div className="marca2">A</div>
         <div className="caps">Bem-vindo ao Atenvo</div>
-        <h1>Defina uma nova senha.</h1>
+        <h1 className="p-display">Defina uma nova senha.</h1>
 
         {aguardando ? (
           <div className="sub">Validando o link de recuperação…</div>

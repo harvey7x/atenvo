@@ -16,7 +16,9 @@
 5. Tokens e efeitos: use exclusivamente os tokens de `src/v2/tokens.css`
    (extraídos do mockup). Cor existe apenas como semântica (verde/âmbar/rubro)
    e no pulso do canal. Ação primária é o botão platina. Tipografia: Instrument
-   Sans; Newsreader itálica SÓ na saudação do dashboard e no login.
+   Sans, família única. Momentos de display (saudações, títulos de auth) usam
+   .p-display — 600, gradiente platina. Onde o mockup mostrar Newsreader
+   itálica, vale esta regra (Adendo nº 1).
 6. Hierarquia de movimento: ambiente (luz em deriva, lento) · carga (entrada em
    cascata, contadores, uma vez) · interação (hover, spotlight, instantâneo).
    DADO É CALMO: tabelas e formulários não têm efeito interno além de hover.
