@@ -1,8 +1,10 @@
 // bot-runner — motor do bot de atendimento inicial. MODO SEGURO:
-//  * dry_run=true por DEFAULT (não envia nada à Evolution; grava outbox como 'simulada').
+//  * dry_run=true por DEFAULT (não envia nada; grava outbox como 'simulada'). Quem chama decide.
+//  * ENVIO real roteia por canais.transporte via enviadorDe (Evolution OU Cloud API) — mesma
+//    implementação do envio manual. Falha/transporte não suportado vira motivo explícito no outbox.
 //  * auth por x-bot-secret == webhook_config.bot_runner. Deploy com --no-verify-jwt.
-//  * NÃO é chamado pelo webhook (B3, sob nova aprovação). Master global segue OFF;
-//    em teste passa-se force=true (com dry_run) para exercitar a máquina sem enviar.
+//  * Chamado pelos webhooks (evolution/cloud) com dry_run vindo de flag; master global e config do
+//    canal ainda precisam estar ligados. Em teste passa-se force=true (com dry_run) sem enviar.
 //  * Pausa se humano assumir/responder ou se o cliente mandar áudio (sem transcrição).
 //  * Coleta de nome -> atualiza contato com segurança + Kanban idempotente. CPF nunca completo em nota/UI.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -14,33 +16,19 @@ import {
 import { gerarResposta, transcreverAudio, pareceDificil, parseEstado, type Msg } from './ia.ts';
 import { systemMatheo } from './prompt.ts';
 import { saidaSuja } from './guardrail.ts';
+// ENVIO: reusa o MESMO adaptador do envio manual (evolution-send). enviadorDe(canal) roteia por
+// canais.transporte — Evolution (Baileys) OU Cloud API oficial — devolvendo sempre { key: { id } }.
+// Importar (não copiar) garante UMA implementação de envio Cloud API, sem duas divergindo no tempo.
+import { enviadorDe } from '../evolution-send/transporte.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const EVO_BASE = (Deno.env.get('EVOLUTION_API_URL') ?? '').replace(/\/+$/, '');
-const EVO_KEY = Deno.env.get('EVOLUTION_API_KEY') ?? '';
 // Fluxo por IA (default LIGADO). Se cair (quota/crédito/timeout), o index usa o copy determinístico.
 const IA_ATIVA = (Deno.env.get('IA_ATIVA') ?? 'sim').toLowerCase() === 'sim';
 
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'content-type, x-bot-secret', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, 'Content-Type': 'application/json' } });
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, Math.max(0, ms)));
-
-async function evoSendText(instancia: string, numero: string, texto: string): Promise<{ ok: boolean; id?: string; erro?: string }> {
-  try {
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 20000);
-    const res = await fetch(`${EVO_BASE}/message/sendText/${instancia}`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json', apikey: EVO_KEY },
-      body: JSON.stringify({ number: numero, text: texto }), signal: ctrl.signal,
-    });
-    clearTimeout(t);
-    const txt = await res.text();
-    let data: any = null; try { data = txt ? JSON.parse(txt) : null; } catch { data = { raw: txt }; }
-    if (res.ok && (data?.key?.id || data?.status)) return { ok: true, id: data?.key?.id ?? null };
-    return { ok: false, erro: (data?.message ?? data?.error ?? `HTTP ${res.status}`)?.toString?.().slice(0, 300) };
-  } catch (e) { return { ok: false, erro: (e as Error)?.message ?? 'network' }; }
-}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
@@ -90,7 +78,7 @@ Deno.serve(async (req) => {
     // bot_falhou: cai no catch (loga + retorna 200) e o finally libera o lock. Inerte em produção.
     if ((body as { _forcar_falha?: boolean })._forcar_falha) throw new Error('falha_controlada_teste');
     const { data: canal } = await admin.from('canais')
-      .select('id, nome_interno, instancia_externa, origem_tipo').eq('id', conv.canal_id).maybeSingle();
+      .select('id, nome_interno, instancia_externa, origem_tipo, transporte, cloud_phone_number_id').eq('id', conv.canal_id).maybeSingle();
     const { data: cfg } = await admin.from('bot_canal_config')
       .select('mensagens, intervalo_min_ms, intervalo_max_ms').eq('canal_id', conv.canal_id).maybeSingle();
     const { data: cfgOrg } = await admin.from('bot_config')
@@ -237,24 +225,36 @@ async function drenar(admin: any, rows: Array<{ id: string; ordem: number; texto
       .not('valor_normalizado', 'is', null).order('principal', { ascending: false }).limit(1).maybeSingle();
     destino = ident?.valor_normalizado ?? null;
   }
+  // transporte do canal decide o caminho de saída (NÃO a existência de instancia_externa): um canal
+  // Cloud API sai pela Graph API, um canal Evolution pela instância Baileys. Default 'evolution'.
+  const transporte = (canal?.transporte ?? 'evolution') as string;
   for (const row of ordenadas) {
     if (dryRun) { await admin.rpc('bot_registrar_envio', { p_saida: row.id, p_status: 'simulada' }); continue; }
     const espera = new Date(row.enviar_apos).getTime() - Date.now();
     await sleep(espera);
-    if (!canal?.instancia_externa || !destino) {
-      await admin.rpc('bot_registrar_envio', { p_saida: row.id, p_status: 'falhou', p_erro: !destino ? 'sem_destino' : 'sem_instancia' });
-      continue;
-    }
-    const r = await evoSendText(canal.instancia_externa, destino, row.texto);
-    if (r.ok) {
+    // pré-checagens: cada bloqueio tem MOTIVO EXPLÍCITO — nunca um 'sem_instancia' mudo para um
+    // canal Cloud (o falso motivo de antes). Falha nunca vira silêncio (mesma regra do remarketing).
+    const bloqueio = !destino ? 'sem_destino'
+      : (transporte === 'cloud_api' && !canal?.cloud_phone_number_id) ? 'sem_phone_number_id'
+      : (transporte === 'evolution' && !canal?.instancia_externa) ? 'sem_instancia'
+      : (transporte !== 'cloud_api' && transporte !== 'evolution') ? `transporte_nao_suportado:${transporte}`
+      : null;
+    if (bloqueio) { await admin.rpc('bot_registrar_envio', { p_saida: row.id, p_status: 'falhou', p_erro: bloqueio }); continue; }
+    try {
+      // enviadorDe roteia por transporte e devolve { key: { id } }; sem id => trata como falha
+      // (mesmo critério de aceite do envio manual). O adaptador Cloud lança com a mensagem da Meta
+      // (ex.: janela 24h, CLOUD_API_ATIVO off) — que vira o motivo registrado, nunca um silêncio.
+      const sent = await enviadorDe(canal).sendText(destino!, row.texto);
+      const idExterno = sent?.key?.id ?? null;
+      if (!idExterno) throw new Error('sem_id_retorno');
       const { data: msg } = await admin.from('mensagens').insert({
         organizacao_id: conv.organizacao_id, conversa_id: conv.id, direcao: 'saida', tipo: 'texto',
-        conteudo: row.texto, autor_id: null, origem: 'bot', status: 'enviada', id_externo: r.id,
+        conteudo: row.texto, autor_id: null, origem: 'bot', status: 'enviada', id_externo: idExterno,
       }).select('id').maybeSingle();
-      await admin.rpc('bot_registrar_envio', { p_saida: row.id, p_status: 'enviada', p_mensagem: msg?.id ?? null, p_id_externo: r.id ?? null });
+      await admin.rpc('bot_registrar_envio', { p_saida: row.id, p_status: 'enviada', p_mensagem: msg?.id ?? null, p_id_externo: idExterno });
       enviados++;
-    } else {
-      await admin.rpc('bot_registrar_envio', { p_saida: row.id, p_status: 'falhou', p_erro: r.erro ?? 'falha_envio' });
+    } catch (e) {
+      await admin.rpc('bot_registrar_envio', { p_saida: row.id, p_status: 'falhou', p_erro: String((e as Error)?.message ?? 'falha_envio').slice(0, 300) });
     }
   }
   return enviados;

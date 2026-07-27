@@ -32,8 +32,13 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const admin = () => createClient(SUPABASE_URL, SERVICE, { auth: { persistSession: false } });
 // Toggle do dispatch ao bot. O CÓDIGO existe (v2); o default 'nao' mantém o canal oficial mudo até
-// o dono ligar conscientemente. Mesmo ligado, o runner recebe dry_run:true — nada chega a cliente.
+// o dono ligar conscientemente. Mesmo ligado, o dry_run abaixo decide se o runner simula ou envia.
 const BOT_DISPATCH = (Deno.env.get('CLOUD_BOT_DISPATCH') ?? 'nao').toLowerCase() === 'sim';
+// dry_run do dispatch ao bot, LIDO DE FLAG (liga/desliga o envio real SEM redeploy). Default SEGURO
+// = simular: só o valor explícito 'nao' manda de verdade; unset ou qualquer outra coisa mantém a
+// simulação. Duas travas independentes: BOT_DISPATCH decide se CHAMA o bot; BOT_DRY_RUN decide se
+// o bot ENVIA. Para o cliente receber, as duas + os gates do runner (master/canal/humano) têm que ceder.
+const BOT_DRY_RUN = (Deno.env.get('CLOUD_BOT_DRY_RUN') ?? 'sim').toLowerCase() !== 'nao';
 const FUNCTIONS_BASE = (Deno.env.get('SUPABASE_URL') ?? '').replace(/\/+$/, '') + '/functions/v1';
 
 // ---- mídia: mesmos tetos da Evolution (envs compartilhadas de propósito: um número só para afinar) ----
@@ -508,10 +513,10 @@ Deno.serve(async (req) => {
           }
 
           // ---- BLOCO 1: dispatch fire-and-forget ao bot-runner (só inbound NOVO, texto/áudio) ----
-          // dry_run:true FIXO → o runner só simula/loga; jamais envia a cliente. Os gates de negócio
-          // (master, bot_pode_atuar, humano/responsável, precisa_humano, idempotência, lock, saúde do
-          // canal) são do RUNNER, que é agnóstico de transporte — por isso este bloco é o mesmo da
-          // Evolution, palavra por palavra, trocando só a origem do áudio.
+          // dry_run vem da flag BOT_DRY_RUN (default 'sim' = simula/loga, nada chega a cliente). Os
+          // gates de negócio (master, bot_pode_atuar, humano/responsável, precisa_humano, idempotência,
+          // lock, saúde do canal) são do RUNNER, que é agnóstico de transporte — por isso este bloco é
+          // o mesmo da Evolution, palavra por palavra, trocando só a origem do áudio.
           if (BOT_DISPATCH && inboundNovo && inboundMsgId && rmktDesfecho !== 'optout' && (tipo === 'texto' || tipo === 'audio')) {
             const dispatch = (async () => {
               try {
@@ -522,7 +527,7 @@ Deno.serve(async (req) => {
                   headers: { 'Content-Type': 'application/json', 'x-bot-secret': bs.secret as string },
                   body: JSON.stringify({
                     conversa_id: conversaId, inbound_msg_id: inboundMsgId, inbound_text: texto ?? '',
-                    inbound_tipo: tipo, dry_run: true,
+                    inbound_tipo: tipo, dry_run: BOT_DRY_RUN,
                     ...(audioB64 ? { inbound_audio_b64: audioB64, inbound_audio_mime: audioMime } : {}),
                   }),
                 });
