@@ -1,0 +1,1211 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Atenvo — Sistema completo · Platina</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --base:#0A0B0D;
+    --vidro-a:rgba(255,255,255,.055); --vidro-b:rgba(255,255,255,.02);
+    --fio-a:rgba(255,255,255,.28); --fio-b:rgba(255,255,255,.05);
+    --linha:rgba(255,255,255,.065);
+    --txt:#F4F5F7; --txt-2:#9BA1AB; --txt-3:#5E646E;
+    --verde:#4ABE8C; --verde-bg:rgba(74,190,140,.12);
+    --ambar:#D9A44A; --ambar-bg:rgba(217,164,74,.12);
+    --rubro:#E5665C; --rubro-bg:rgba(229,102,92,.13);
+    --r-card:16px; --r-ctl:9px;
+    --fonte:'Instrument Sans',system-ui,sans-serif;
+    --serif:'Newsreader',Georgia,serif;
+    --ease:cubic-bezier(.2,.8,.2,1);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#0D0E11;font-family:var(--fonte);color:var(--txt);
+       -webkit-font-smoothing:antialiased;padding:34px 24px 60px;min-width:1160px}
+  .num{font-variant-numeric:tabular-nums}
+  .wrap{max-width:1120px;margin:0 auto}
+  .caps{font-size:10.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--txt-3)}
+
+  .doc{margin-bottom:20px;display:flex;align-items:flex-end;justify-content:space-between;gap:20px}
+  .doc h1{font-size:24px;font-weight:600;letter-spacing:-.025em;margin:7px 0 8px}
+  .doc p{font-size:13.5px;color:var(--txt-2);max-width:620px;line-height:1.55}
+  .doc .bts{display:flex;gap:9px;flex-shrink:0}
+  .btn-doc{display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-family:var(--fonte);
+    font-size:12.5px;font-weight:600;border-radius:10px;padding:9px 15px;
+    transition:transform .2s var(--ease)}
+  .btn-doc:hover{transform:translateY(-1px)}
+  .btn-doc.claro{color:#101215;background:linear-gradient(180deg,#FFF,#D9DCE1);
+    border:none;box-shadow:0 10px 26px rgba(255,255,255,.10), inset 0 1px 0 #fff}
+  .btn-doc.fant{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.13);color:var(--txt)}
+
+  .shell{position:relative;border-radius:18px;overflow:hidden;height:738px;
+    background:var(--base);border:1px solid rgba(255,255,255,.10);
+    box-shadow:0 44px 96px rgba(0,0,0,.6)}
+  .luz{position:absolute;inset:0;pointer-events:none;
+    background:
+      radial-gradient(46% 58% at 14% 6%, rgba(255,255,255,.085) 0%, transparent 70%),
+      radial-gradient(50% 62% at 86% 10%, rgba(255,255,255,.05) 0%, transparent 70%),
+      radial-gradient(56% 66% at 68% 98%, rgba(255,255,255,.035) 0%, transparent 72%)}
+  .luz::before{content:"";position:absolute;inset:-24%;
+    background:conic-gradient(from 140deg at 50% 26%,
+      rgba(255,255,255,.16),rgba(255,255,255,.02),rgba(255,255,255,.10),rgba(255,255,255,.16));
+    filter:blur(100px);opacity:.35;animation:veu 48s ease-in-out infinite alternate}
+  @keyframes veu{from{transform:translate3d(-3%,-2%,0)}to{transform:translate3d(3%,2.5%,0) rotate(6deg)}}
+  .grao{position:absolute;inset:0;pointer-events:none;opacity:.05;mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='180' height='180' filter='url(%23g)'/></svg>")}
+  .app{position:relative;z-index:1;height:100%;padding-left:64px}
+
+  .vidro{position:relative;background:linear-gradient(180deg,var(--vidro-a),var(--vidro-b));
+    backdrop-filter:blur(18px) saturate(140%);-webkit-backdrop-filter:blur(18px) saturate(140%);
+    border-radius:var(--r-card)}
+  .vidro::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;
+    background:linear-gradient(180deg,var(--fio-a),var(--fio-b) 36%,rgba(255,255,255,.02) 75%,rgba(255,255,255,.07));
+    -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+    -webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
+  .spot::after{content:"";position:absolute;inset:0;border-radius:inherit;opacity:0;
+    transition:opacity .3s var(--ease);pointer-events:none;
+    background:radial-gradient(260px circle at var(--mx,50%) var(--my,40%),rgba(255,255,255,.10),transparent 62%)}
+  .spot:hover::after{opacity:1}
+  .spot{transition:transform .25s var(--ease), box-shadow .25s var(--ease)}
+  .spot:hover{transform:translateY(-2px);box-shadow:0 16px 36px rgba(0,0,0,.5)}
+
+  .sidebar{position:absolute;left:0;top:0;bottom:0;width:64px;z-index:30;
+    display:flex;flex-direction:column;padding:13px 11px 10px;overflow:hidden;
+    border-right:1px solid var(--linha);
+    background:linear-gradient(180deg,rgba(20,21,25,.74),rgba(14,15,18,.68));
+    backdrop-filter:blur(22px) saturate(140%);-webkit-backdrop-filter:blur(22px) saturate(140%);
+    transition:width .36s var(--ease), box-shadow .36s var(--ease)}
+  .sidebar:hover{width:242px;box-shadow:30px 0 80px rgba(0,0,0,.55)}
+  .lab{opacity:0;transform:translateX(-8px);white-space:nowrap;
+    transition:opacity .22s .07s, transform .3s .07s var(--ease)}
+  .sidebar:hover .lab{opacity:1;transform:none}
+  .logo{display:flex;align-items:center;gap:11px;padding:2px 4px 0;height:30px}
+  .logo .marca{width:29px;height:29px;flex-shrink:0;border-radius:9px;
+    background:linear-gradient(180deg,#FFF,#C9CDD4);color:#0E0F12;
+    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;
+    box-shadow:0 6px 18px rgba(255,255,255,.12), inset 0 1px 0 #fff}
+  .logo .word{font-weight:600;font-size:15px;letter-spacing:.02em}
+  .tenant{margin:11px 2px 0;display:flex;align-items:center;justify-content:space-between;
+    background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:9px;
+    padding:6px 10px;font-size:12px;color:var(--txt-2);cursor:pointer;opacity:0;transition:opacity .22s .07s}
+  .sidebar:hover .tenant{opacity:1}
+  .tenant b{font-weight:500;color:var(--txt)}
+  .grupo{margin-top:9px;padding-top:8px;border-top:1px solid var(--linha)}
+  .grupo:first-of-type{border-top:none;margin-top:11px;padding-top:0}
+  .glabel{padding:0 6px;margin-bottom:4px;height:12px;font-size:10px}
+  .item{position:relative;display:flex;align-items:center;gap:13px;padding:7.5px 10px;margin:1px 0;
+    border-radius:8px;font-size:12.5px;color:var(--txt-2);cursor:pointer;transition:background .18s,color .18s}
+  .item svg{width:17px;height:17px;flex-shrink:0}
+  .item:hover{color:var(--txt);background:rgba(255,255,255,.055)}
+  .item.on{color:#fff;background:rgba(255,255,255,.075);font-weight:500}
+  .item.on::before{content:"";position:absolute;left:-11px;top:7px;bottom:7px;width:3px;
+    border-radius:0 3px 3px 0;background:#fff;box-shadow:0 0 14px rgba(255,255,255,.55)}
+  .mini{position:absolute;top:6px;left:31px;width:7px;height:7px;border-radius:50%;
+    transition:opacity .18s;border:1.5px solid #101114}
+  .mini.claro{background:#fff;box-shadow:0 0 8px rgba(255,255,255,.7)}
+  .mini.rubro{background:var(--rubro);box-shadow:0 0 8px rgba(229,102,92,.7)}
+  .sidebar:hover .mini{opacity:0}
+  .badge-n{margin-left:auto;font-size:10.5px;font-weight:600;border-radius:99px;padding:1px 7px;
+    background:rgba(255,255,255,.10);color:var(--txt);border:1px solid rgba(255,255,255,.14)}
+  .badge-n.rubro{background:var(--rubro-bg);color:var(--rubro);border-color:rgba(229,102,92,.3)}
+  .canal{margin:9px 2px 0;display:flex;align-items:center;gap:9px;font-size:10.5px;
+    color:var(--verde);background:var(--verde-bg);border:1px solid rgba(74,190,140,.2);
+    border-radius:8px;padding:6px 10px;opacity:0;transition:opacity .22s .07s}
+  .sidebar:hover .canal{opacity:1}
+  .canal i{width:6px;height:6px;border-radius:50%;background:var(--verde);flex-shrink:0;
+    animation:pulsa 2.6s ease-out infinite}
+  @keyframes pulsa{0%{box-shadow:0 0 0 0 rgba(74,190,140,.45)}70%{box-shadow:0 0 0 7px rgba(74,190,140,0)}100%{box-shadow:0 0 0 0 rgba(74,190,140,0)}}
+  .rodape-sb{margin-top:auto;border-top:1px solid var(--linha);padding:9px 2px 2px;
+    display:flex;align-items:center;gap:11px}
+  .avatar{width:29px;height:29px;flex-shrink:0;border-radius:50%;display:flex;align-items:center;
+    justify-content:center;font-size:12px;font-weight:600;color:var(--txt);
+    background:linear-gradient(150deg,#2B2E34,#17191D);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.16), 0 0 0 1.5px rgba(255,255,255,.20)}
+  .rodape-sb .nome{font-size:12.5px;font-weight:500;line-height:1.2}
+  .rodape-sb .cargo{font-size:10.5px;color:var(--txt-3)}
+
+  .principal{height:100%;display:flex;flex-direction:column;min-width:0}
+  .topbar{height:54px;flex-shrink:0;display:flex;align-items:center;gap:14px;padding:0 22px;
+    border-bottom:1px solid var(--linha);
+    background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.008));
+    backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+  .busca{display:flex;align-items:center;gap:9px;width:320px;font-size:13px;color:var(--txt-3);
+    background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.10);
+    border-radius:var(--r-ctl);padding:7.5px 12px;box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+  .busca kbd{margin-left:auto;font-size:10.5px;color:var(--txt-3);font-family:var(--fonte);
+    background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.10);border-radius:5px;padding:1px 6px}
+  .top-dir{margin-left:auto;display:flex;align-items:center;gap:10px}
+  .ib{position:relative;width:33px;height:33px;border-radius:var(--r-ctl);color:var(--txt-2);
+    background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.10);
+    display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .ib .pt{position:absolute;top:7px;right:8px;width:7px;height:7px;border-radius:50%;
+    background:#fff;border:1.5px solid #121316;box-shadow:0 0 8px rgba(255,255,255,.8);
+    opacity:0;transform:scale(.4);transition:.3s var(--ease)}
+  .ib .pt.on{opacity:1;transform:none}
+
+  .palco{flex:1;position:relative;min-height:0}
+  .pagina{display:none;position:absolute;inset:0;padding:20px 24px;overflow:hidden}
+  .pagina.ativa{display:block;animation:pgIn .32s var(--ease)}
+  @keyframes pgIn{from{opacity:0;transform:translateY(8px)}to{opacity:1}}
+  .sobe{opacity:0;transform:translateY(10px)}
+  .pagina.ativa .sobe{animation:entra .6s var(--ease) forwards}
+  @keyframes entra{to{opacity:1;transform:none}}
+
+  .ph{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:16px}
+  .ph h2{font-size:19px;font-weight:600;letter-spacing:-.02em}
+  .ph .serifona{font-family:var(--serif);font-style:italic;font-weight:400;font-size:29px;
+    letter-spacing:-.01em;line-height:1.1;margin-top:6px}
+  .ph .serifona b{font-weight:500}
+  .ph p{font-size:12.5px;color:var(--txt-2);margin-top:5px}
+  .acoes{display:flex;gap:9px;align-items:center}
+  .btn{display:inline-flex;align-items:center;gap:7px;font-family:var(--fonte);font-size:12.5px;
+    font-weight:500;border-radius:var(--r-ctl);padding:7.5px 13px;cursor:pointer;border:1px solid transparent;
+    transition:transform .2s var(--ease), box-shadow .2s, background .2s}
+  .btn-sec{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.12);color:var(--txt)}
+  .btn-sec:hover{background:rgba(255,255,255,.085)}
+  .btn-pri{position:relative;overflow:hidden;color:#101215;font-weight:600;
+    background:linear-gradient(180deg,#FFF,#D6DAE0);
+    box-shadow:0 10px 26px rgba(255,255,255,.10), inset 0 1px 0 #fff}
+  .btn-pri:hover{transform:translateY(-1px)}
+  .btn-pri::after{content:"";position:absolute;top:0;bottom:0;left:-70%;width:45%;
+    background:linear-gradient(100deg,transparent,rgba(255,255,255,.85),transparent);
+    transform:skewX(-18deg);transition:left .55s var(--ease)}
+  .btn-pri:hover::after{left:120%}
+  .btn-mini{font-size:11.5px;padding:5px 11px;border-radius:8px}
+
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
+  .kpi{padding:14px 16px 10px;overflow:hidden}
+  .kpi .rot{font-size:12px;font-weight:500;color:var(--txt-2)}
+  .kpi .val{font-size:25px;font-weight:600;letter-spacing:-.025em;margin:7px 0 7px}
+  .kpi .val .cent{font-size:15px;color:var(--txt-3);font-weight:500}
+  .delta{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;
+    border-radius:99px;padding:2px 9px}
+  .d-ok{background:var(--verde-bg);color:var(--verde)}
+  .d-at{background:var(--ambar-bg);color:var(--ambar)}
+  .d-ne{background:rgba(255,255,255,.055);color:var(--txt-2)}
+  .d-er{background:var(--rubro-bg);color:var(--rubro)}
+  .spark{display:block;width:100%;height:30px;margin-top:9px}
+  .spark path{fill:none;stroke:url(#gPrata);stroke-width:2;stroke-linecap:round;
+    stroke-dasharray:1;stroke-dashoffset:1}
+  .pagina.ativa .spark path{animation:desenha 1.2s .5s var(--ease) forwards}
+  .spark polygon{fill:url(#gPrataArea);opacity:0}
+  .pagina.ativa .spark polygon{animation:surge .8s 1.3s forwards}
+  @keyframes desenha{to{stroke-dashoffset:0}}
+  @keyframes surge{to{opacity:1}}
+
+  .card-cab{display:flex;align-items:center;justify-content:space-between;
+    padding:12px 16px;border-bottom:1px solid var(--linha)}
+  .card-cab h3{font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px}
+  .cont{background:var(--rubro-bg);color:var(--rubro);font-size:10.5px;font-weight:600;
+    border-radius:99px;padding:1px 8px;border:1px solid rgba(229,102,92,.26)}
+  .card-cab a{font-size:12px;font-weight:500;color:var(--txt);text-decoration:none;
+    border-bottom:1px solid rgba(255,255,255,.22);padding-bottom:1px}
+  .li{position:relative;display:flex;gap:12px;padding:10.5px 16px 10.5px 19px;
+    border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer;transition:background .18s}
+  .li:last-child{border-bottom:none}
+  .li:hover{background:rgba(255,255,255,.035)}
+  .li::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:3px;border-radius:0 3px 3px 0}
+  .li.crit::before{background:var(--rubro);box-shadow:0 0 12px rgba(229,102,92,.65)}
+  .li.aten::before{background:var(--ambar);box-shadow:0 0 10px rgba(217,164,74,.45)}
+  .li.info::before{background:#fff;box-shadow:0 0 10px rgba(255,255,255,.4)}
+  .li .t{font-size:12.5px;font-weight:500}
+  .li .s{font-size:11.5px;color:var(--txt-2);margin-top:2px}
+  .li .h{margin-left:auto;font-size:11px;color:var(--txt-3);white-space:nowrap;padding-top:2px}
+
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  thead th{text-align:left;font-size:10.5px;font-weight:500;letter-spacing:.05em;
+    text-transform:uppercase;color:var(--txt-3);padding:8px 15px;
+    border-bottom:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.02)}
+  tbody td{padding:0 15px;height:40px;border-bottom:1px solid rgba(255,255,255,.045);
+    vertical-align:middle;color:var(--txt-2)}
+  tbody tr:last-child td{border-bottom:none}
+  tbody tr{transition:background .16s}
+  tbody tr:hover{background:rgba(255,255,255,.032)}
+  tbody tr.sel{background:rgba(255,255,255,.05)}
+  td.d,th.d{text-align:right}
+  td.nome{color:var(--txt);font-weight:500}
+  .val-t{font-weight:600;color:var(--txt)}
+  .val-t .cent{color:var(--txt-3);font-weight:400}
+  .st{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:500;
+    border-radius:99px;padding:2px 9px}
+  .st i{width:6px;height:6px;border-radius:50%;display:block}
+  .s-ok{background:var(--verde-bg);color:var(--verde)} .s-ok i{background:var(--verde)}
+  .s-at{background:var(--ambar-bg);color:var(--ambar)} .s-at i{background:var(--ambar)}
+  .s-er{background:var(--rubro-bg);color:var(--rubro)} .s-er i{background:var(--rubro);box-shadow:0 0 8px rgba(229,102,92,.6)}
+  .s-ne{background:rgba(255,255,255,.05);color:var(--txt-2);border:1px solid rgba(255,255,255,.1)} .s-ne i{background:var(--txt-3)}
+  .cbx{width:14px;height:14px;border:1.5px solid rgba(255,255,255,.28);border-radius:4px;display:inline-block;vertical-align:-2px}
+  .cbx.on{background:#fff;border-color:#fff;position:relative}
+  .cbx.on::after{content:"";position:absolute;left:4px;top:1px;width:4px;height:8px;
+    border:solid #0E0F12;border-width:0 2px 2px 0;transform:rotate(45deg)}
+  .bulk{display:flex;align-items:center;gap:12px;padding:8px 15px;
+    background:linear-gradient(180deg,#FFF,#DFE2E7);color:#101215;border-radius:12px 12px 0 0}
+  .bulk .c{font-size:12px;font-weight:600}
+  .bulk .bs{margin-left:auto;display:flex;gap:7px}
+  .bulk button{font-family:var(--fonte);font-size:11.5px;font-weight:600;color:#101215;
+    background:rgba(0,0,0,.06);border:1px solid rgba(0,0,0,.14);border-radius:7px;
+    padding:4.5px 11px;cursor:pointer}
+  .chips{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:13px}
+  .chip{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:500;
+    background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.11);color:var(--txt-2);
+    border-radius:8px;padding:5px 11px;cursor:pointer}
+  .chip.on{background:rgba(255,255,255,.10);border-color:rgba(255,255,255,.28);color:var(--txt)}
+  .chip .x{opacity:.6}
+  .segm{display:inline-flex;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);
+    border-radius:var(--r-ctl);padding:3px;gap:2px}
+  .segm span{font-size:11.5px;font-weight:500;color:var(--txt-2);padding:4.5px 12px;border-radius:6px;cursor:pointer;white-space:nowrap}
+  .segm span.on{background:rgba(255,255,255,.10);color:var(--txt);box-shadow:inset 0 1px 0 rgba(255,255,255,.1)}
+  .rodape-tab{display:flex;align-items:center;justify-content:space-between;padding:9px 15px;
+    border-top:1px solid var(--linha);font-size:11.5px;color:var(--txt-2)}
+  .pag{display:flex;gap:5px}
+  .pag span{min-width:26px;height:26px;display:flex;align-items:center;justify-content:center;
+    border:1px solid rgba(255,255,255,.11);border-radius:6px;font-size:11.5px;cursor:pointer;color:var(--txt-2)}
+  .pag span.on{background:linear-gradient(180deg,#FFF,#DDE0E5);border-color:transparent;color:#101215;font-weight:600}
+
+  .grade{display:grid;gap:12px}
+  .g57{grid-template-columns:5fr 7fr}
+  .g2{grid-template-columns:1fr 1fr}
+  .status-bar{margin-top:12px;display:flex;align-items:center;gap:20px;padding:8px 15px;
+    border-radius:12px;font-size:10.5px;color:var(--txt-3)}
+  .status-bar .seg{display:flex;align-items:center;gap:7px}
+  .status-bar .seg i{width:5px;height:5px;border-radius:50%;display:block}
+  .status-bar .fim{margin-left:auto;letter-spacing:.14em;font-size:9.5px}
+
+  .campo label{display:block;font-size:12px;font-weight:500;margin-bottom:5px}
+  .inp{width:100%;height:36px;background:rgba(255,255,255,.045);
+    border:1px solid rgba(255,255,255,.13);border-radius:var(--r-ctl);
+    padding:0 11px;font-family:var(--fonte);font-size:13px;color:var(--txt)}
+  .inp::placeholder{color:var(--txt-3)}
+  .inp:focus{outline:none;border-color:rgba(255,255,255,.5);box-shadow:0 0 0 3px rgba(255,255,255,.07)}
+  .tgl{width:36px;height:20px;border-radius:99px;background:linear-gradient(180deg,#FFF,#D6DAE0);
+    position:relative;cursor:pointer;flex-shrink:0}
+  .tgl::after{content:"";position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:50%;background:#101215}
+  .tgl.off{background:rgba(255,255,255,.12)}
+  .tgl.off::after{right:auto;left:2px;background:#9BA1AB}
+
+  /* WhatsApp */
+  .pg-wa{padding:0 !important}
+  .pg-wa.ativa{display:flex}
+  .wa-fila{width:296px;flex-shrink:0;border-right:1px solid var(--linha);display:flex;flex-direction:column;
+    background:rgba(255,255,255,.015)}
+  .wa-ftopo{padding:13px 14px 11px;border-bottom:1px solid var(--linha)}
+  .wa-ftopo .l1{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .wa-ftopo h3{font-size:15px;font-weight:600}
+  .canal-mini{display:inline-flex;align-items:center;gap:6px;font-size:10px;font-weight:500;
+    background:var(--verde-bg);color:var(--verde);border-radius:99px;padding:2.5px 8px}
+  .canal-mini i{width:5px;height:5px;border-radius:50%;background:var(--verde)}
+  .conv{position:relative;display:flex;gap:10px;padding:10.5px 13px 10.5px 16px;
+    border-bottom:1px solid rgba(255,255,255,.045);cursor:pointer;transition:background .16s}
+  .conv:hover{background:rgba(255,255,255,.03)}
+  .conv::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:3px;border-radius:0 3px 3px 0}
+  .conv.urg::before{background:var(--rubro);box-shadow:0 0 10px rgba(229,102,92,.6)}
+  .conv.esp::before{background:var(--ambar)}
+  .conv.ativa2{background:rgba(255,255,255,.06)}
+  .conv.ativa2::before{background:#fff;box-shadow:0 0 10px rgba(255,255,255,.5)}
+  .conv .av2{width:33px;height:33px;flex-shrink:0;border-radius:50%;display:flex;align-items:center;
+    justify-content:center;font-size:12px;font-weight:600;
+    background:linear-gradient(150deg,#2B2E34,#17191D);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.14), 0 0 0 1px rgba(255,255,255,.14)}
+  .conv .tx{min-width:0;flex:1}
+  .conv .n{font-size:12.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .conv .p{font-size:11.5px;color:var(--txt-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+  .conv .m{text-align:right;flex-shrink:0}
+  .conv .h2{font-size:10px;color:var(--txt-3)}
+  .conv .nl{display:inline-flex;min-width:16px;height:16px;align-items:center;justify-content:center;
+    margin-top:4px;background:linear-gradient(180deg,#FFF,#D9DCE1);color:#101215;
+    font-size:9.5px;font-weight:700;border-radius:99px;padding:0 5px}
+  .conv .cr{font-size:9.5px;font-weight:600;margin-top:4px;color:var(--ambar)}
+  .conv .cr.g{color:var(--rubro)}
+  .wa-conv{flex:1;display:flex;flex-direction:column;min-width:0}
+  .wa-ctopo{padding:9px 14px;border-bottom:1px solid var(--linha);display:flex;align-items:center;gap:10px;
+    background:rgba(255,255,255,.02)}
+  .wa-ctopo .nm{font-size:13px;font-weight:600}
+  .wa-ctopo .sb{font-size:10.5px;color:var(--txt-2);margin-top:1px}
+  .wa-ctopo .dir{margin-left:auto;display:flex;align-items:center;gap:8px}
+  .janela{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:500;
+    background:var(--verde-bg);color:var(--verde);border-radius:99px;padding:2.5px 8px}
+  .msgs{flex:1;padding:13px 16px;display:flex;flex-direction:column;gap:8px;overflow:hidden}
+  .dia{align-self:center;font-size:10px;font-weight:500;color:var(--txt-2);
+    background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);
+    border-radius:99px;padding:2.5px 11px}
+  .bolha{max-width:64%;font-size:12.5px;line-height:1.45;padding:8px 12px;border-radius:12px}
+  .bolha .hh{font-size:9.5px;margin-top:4px;text-align:right;color:var(--txt-3)}
+  .rec{align-self:flex-start;background:rgba(255,255,255,.055);
+    border:1px solid rgba(255,255,255,.09);border-bottom-left-radius:4px}
+  .env2{align-self:flex-end;background:rgba(255,255,255,.11);
+    border:1px solid rgba(255,255,255,.17);border-bottom-right-radius:4px;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.1)}
+  .bt-tag{display:flex;align-items:center;gap:4px;font-size:9px;font-weight:700;
+    letter-spacing:.08em;text-transform:uppercase;color:var(--txt-2);margin-bottom:3px}
+  .audio{display:flex;align-items:center;gap:9px;min-width:200px}
+  .play{width:26px;height:26px;border-radius:50%;background:linear-gradient(180deg,#FFF,#D9DCE1);
+    color:#101215;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .onda{flex:1;height:18px;display:flex;align-items:center;gap:2px}
+  .onda i{width:2px;background:rgba(255,255,255,.4);border-radius:2px;display:block}
+  .transc{font-size:11px;color:var(--txt-2);font-style:italic;margin-top:6px;padding-top:6px;
+    border-top:1px dashed rgba(255,255,255,.15)}
+  .composer{padding:9px 14px 12px;border-top:1px solid var(--linha);background:rgba(255,255,255,.015)}
+  .rapidas{display:flex;gap:6px;margin-bottom:8px}
+  .rapida{font-size:10.5px;color:var(--txt-2);background:rgba(255,255,255,.045);
+    border:1px solid rgba(255,255,255,.1);border-radius:99px;padding:3.5px 10px;cursor:pointer}
+  .rapida:hover{color:var(--txt);border-color:rgba(255,255,255,.24)}
+  .cmsg{display:flex;align-items:center;gap:8px}
+  .cmsg .cx{flex:1;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);
+    border-radius:10px;padding:9px 12px;font-size:12.5px;color:var(--txt-3)}
+  .env-b{width:36px;height:36px;border-radius:10px;background:linear-gradient(180deg,#FFF,#D6DAE0);
+    color:#101215;display:flex;align-items:center;justify-content:center;cursor:pointer;
+    box-shadow:inset 0 1px 0 #fff}
+  .wa-ctx{width:266px;flex-shrink:0;border-left:1px solid var(--linha);
+    background:rgba(255,255,255,.015);overflow:hidden}
+  .ctx-topo{padding:14px;border-bottom:1px solid var(--linha);text-align:center}
+  .ctx-topo .av2{width:44px;height:44px;font-size:15px;margin:0 auto 8px}
+  .ctx-topo .n2{font-size:13px;font-weight:600}
+  .ctx-topo .t2{font-size:11px;color:var(--txt-2);margin-top:2px}
+  .ctx-topo .bb{display:flex;gap:7px;margin-top:10px}
+  .ctx-topo .bb .btn{flex:1;justify-content:center}
+  .ctx-b{padding:11px 14px;border-bottom:1px solid var(--linha)}
+  .ctx-b:last-child{border-bottom:none}
+  .ctx-t{font-size:9.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--txt-3);margin-bottom:8px;display:flex;justify-content:space-between}
+  .cx-l{display:flex;justify-content:space-between;font-size:11.5px;padding:3px 0;align-items:center}
+  .cx-l .k{color:var(--txt-2)} .cx-l .v{font-weight:500;text-align:right}
+  .funil{display:flex;gap:3px;margin-top:5px}
+  .funil i{flex:1;height:3px;border-radius:2px;background:rgba(255,255,255,.12)}
+  .funil i.on{background:#fff;box-shadow:0 0 6px rgba(255,255,255,.5)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <svg width="0" height="0" style="position:absolute">
+    <defs>
+      <linearGradient id="gPrata" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#FFF" stop-opacity=".9"/><stop offset="1" stop-color="#9BA1AB" stop-opacity=".55"/>
+      </linearGradient>
+      <linearGradient id="gPrataArea" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#FFF" stop-opacity=".14"/><stop offset="1" stop-color="#FFF" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+  </svg>
+
+  <div class="doc">
+    <div>
+      <div class="caps">Atenvo · Platina — sistema completo</div>
+      <h1>As 12 telas, navegáveis</h1>
+      <p>Começa no login. Depois, o menu lateral navega de verdade: cada clique abre a tela correspondente, com as animações replay a cada troca. Este arquivo é a especificação viva do redesign.</p>
+    </div>
+    <div class="bts">
+      <button class="btn-doc fant" id="btnLogin">Ver tela de login</button>
+      <button class="btn-doc claro" id="btnSim">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg>
+        Simular resposta de cliente</button>
+    </div>
+  </div>
+
+  <div class="shell">
+    <div class="luz"></div>
+    <div class="grao"></div>
+
+    <div class="app">
+      <aside class="sidebar">
+        <div class="logo"><div class="marca">A</div><span class="word lab">atenvo</span></div>
+        <div class="tenant"><b>CAF Assessoria</b>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9BA1AB" stroke-width="2"><path d="M7 15l5 5 5-5M7 9l5-5 5 5"/></svg></div>
+        <nav>
+          <div class="grupo"><div class="glabel caps lab">Operação</div>
+            <div class="item on" data-pg="dashboard" title="Dashboard">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+              <span class="lab">Dashboard</span></div>
+            <div class="item" data-pg="whatsapp" title="WhatsApp">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M21 11.5a8.4 8.4 0 01-9 8.4 8.9 8.9 0 01-3.8-.8L3 20l1-4.9a8.3 8.3 0 01-1-4A8.4 8.4 0 0112 3a8.4 8.4 0 019 8.5z"/></svg>
+              <span class="lab">WhatsApp</span><span class="mini claro"></span><span class="badge-n lab" id="waBadge">12</span></div>
+            <div class="item" data-pg="kanban" title="Kanban">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="5" height="16" rx="1.3"/><rect x="10" y="4" width="5" height="11" rx="1.3"/><rect x="17" y="4" width="4" height="7" rx="1.3"/></svg>
+              <span class="lab">Kanban</span></div>
+            <div class="item" data-pg="agendamentos" title="Agendamentos">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>
+              <span class="lab">Agendamentos</span></div>
+          </div>
+          <div class="grupo"><div class="glabel caps lab">Gestão</div>
+            <div class="item" data-pg="contatos" title="Contatos">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="9" cy="8" r="3.4"/><path d="M3.5 20c.6-3.4 2.8-5 5.5-5s4.9 1.6 5.5 5M16 4.6a3.4 3.4 0 010 6.8"/></svg>
+              <span class="lab">Contatos</span></div>
+            <div class="item" data-pg="relacionamento" title="Relacionamento">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 20s-7-4.3-9-8.5C1.6 8.4 3.6 5 7 5c2 0 3.4 1 5 3 1.6-2 3-3 5-3 3.4 0 5.4 3.4 4 6.5-2 4.2-9 8.5-9 8.5z"/></svg>
+              <span class="lab">Relacionamento</span></div>
+            <div class="item" data-pg="cobrancas" title="Cobranças">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 3h14v18l-2.3-1.5L14.4 21l-2.4-1.5L9.6 21l-2.3-1.5L5 21zM9 8h6M9 12h6"/></svg>
+              <span class="lab">Cobranças</span><span class="mini rubro"></span><span class="badge-n rubro lab">5</span></div>
+            <div class="item" data-pg="relatorios" title="Relatórios">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 20V10M10 20V4M16 20v-8M21 20H3"/></svg>
+              <span class="lab">Relatórios</span></div>
+          </div>
+          <div class="grupo"><div class="glabel caps lab">Sistema</div>
+            <div class="item" data-pg="integracoes" title="Integrações">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M9 7V3M15 7V3M7 7h10v5a5 5 0 01-10 0zM12 17v4"/></svg>
+              <span class="lab">Integrações</span></div>
+            <div class="item" data-pg="config" title="Configurações">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg>
+              <span class="lab">Configurações</span></div>
+            <div class="item" data-pg="planos" title="Planos e uso">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3l9 5-9 5-9-5zM3 13l9 5 9-5"/></svg>
+              <span class="lab">Planos e uso</span></div>
+          </div>
+        </nav>
+        <div class="canal"><i></i><span>Canal 1390 · operante</span></div>
+        <div class="rodape-sb"><div class="avatar">G</div>
+          <div class="lab"><div class="nome">Gums</div><div class="cargo">Administrador</div></div></div>
+      </aside>
+
+      <main class="principal">
+        <div class="topbar">
+          <div class="busca">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+            Buscar contatos, conversas, cobranças…<kbd>⌘K</kbd>
+          </div>
+          <div class="top-dir">
+            <div class="ib"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 9a6 6 0 10-12 0c0 6-2.5 7-2.5 7h17S18 15 18 9zM10 20a2.2 2.2 0 004 0"/></svg><span class="pt" id="sino"></span></div>
+            <div class="avatar" style="width:33px;height:33px">G</div>
+          </div>
+        </div>
+
+        <div class="palco">
+
+          <section class="pagina ativa" id="pg-dashboard">
+            <div class="ph sobe" style="animation-delay:.04s">
+              <div>
+                <div class="caps">Bem-vindo ao Atenvo</div>
+                <div class="serifona"><span id="saud">Boa tarde</span>, <b>Gums</b>.</div>
+                <p>segunda-feira, 27 de julho · sua operação, em ordem</p>
+              </div>
+              <div class="acoes">
+                <button class="btn btn-sec">Últimos 7 dias</button>
+                <button class="btn btn-pri">＋ Novo contato</button>
+              </div>
+            </div>
+            <div class="kpis">
+              <div class="kpi vidro spot sobe" style="animation-delay:.1s">
+                <div class="rot">Conversas aguardando</div>
+                <div class="val num"><span class="cnt" data-v="14" data-f="int">0</span></div>
+                <span class="delta d-at">3 há mais de 30 min</span>
+                <svg class="spark" viewBox="0 0 120 34" preserveAspectRatio="none"><polygon points="0,26 20,22 40,25 60,17 80,20 100,12 120,15 120,34 0,34"/><path pathLength="1" d="M0,26 L20,22 L40,25 L60,17 L80,20 L100,12 L120,15"/></svg>
+              </div>
+              <div class="kpi vidro spot sobe" style="animation-delay:.17s">
+                <div class="rot">Novos leads hoje</div>
+                <div class="val num"><span class="cnt" data-v="27" data-f="int">0</span></div>
+                <span class="delta d-ok">↑ 18% vs. semana passada</span>
+                <svg class="spark" viewBox="0 0 120 34" preserveAspectRatio="none"><polygon points="0,28 20,26 40,21 60,23 80,15 100,10 120,6 120,34 0,34"/><path pathLength="1" d="M0,28 L20,26 L40,21 L60,23 L80,15 L100,10 L120,6"/></svg>
+              </div>
+              <div class="kpi vidro spot sobe" style="animation-delay:.24s">
+                <div class="rot">A receber na semana</div>
+                <div class="val num">R$ <span class="cnt" data-v="18640" data-f="mil">0</span><span class="cent">,00</span></div>
+                <span class="delta d-ne">23 parcelas</span>
+                <svg class="spark" viewBox="0 0 120 34" preserveAspectRatio="none"><polygon points="0,22 20,24 40,18 60,20 80,14 100,16 120,11 120,34 0,34"/><path pathLength="1" d="M0,22 L20,24 L40,18 L60,20 L80,14 L100,16 L120,11"/></svg>
+              </div>
+              <div class="kpi vidro spot sobe" style="animation-delay:.31s">
+                <div class="rot">Taxa de resposta</div>
+                <div class="val num"><span class="cnt" data-v="96" data-f="int">0</span><span class="cent">%</span></div>
+                <span class="delta d-ok">↑ 2 p.p. este mês</span>
+                <svg class="spark" viewBox="0 0 120 34" preserveAspectRatio="none"><polygon points="0,18 20,16 40,17 60,13 80,14 100,10 120,9 120,34 0,34"/><path pathLength="1" d="M0,18 L20,16 L40,17 L60,13 L80,14 L100,10 L120,9"/></svg>
+              </div>
+            </div>
+            <div class="grade g57">
+              <div class="vidro spot sobe" style="animation-delay:.38s">
+                <div class="card-cab"><h3>Precisa de ação <span class="cont">3</span></h3></div>
+                <div class="li crit"><div><div class="t">Cobrança vencida — José Carlos F.</div><div class="s">Parcela 5/12 · R$ 280,00 · há 2 dias</div></div><div class="h num">25 jul</div></div>
+                <div class="li aten"><div><div class="t">Sem resposta — Maria Aparecida</div><div class="s">Aguardando a equipe há 42 min</div></div><div class="h num">14:38</div></div>
+                <div class="li info"><div><div class="t">Ligação agendada — Sr. Antônio</div><div class="s">Meu INSS · consultora Giovana</div></div><div class="h num">15:30</div></div>
+              </div>
+              <div class="vidro spot sobe" style="animation-delay:.45s">
+                <div class="card-cab"><h3>Cobranças da semana</h3><a href="#" data-vai="cobrancas">Ver todas</a></div>
+                <table>
+                  <thead><tr><th>Cliente</th><th>Parcela</th><th class="d">Valor</th><th>Status</th><th class="d">Venc.</th></tr></thead>
+                  <tbody>
+                    <tr><td class="nome">Maria Aparecida Souza</td><td class="num">3/12</td><td class="d val-t num">R$ 320<span class="cent">,00</span></td><td><span class="st s-ok"><i></i>Pago</span></td><td class="d num">25 jul</td></tr>
+                    <tr><td class="nome">José Carlos Ferreira</td><td class="num">5/12</td><td class="d val-t num">R$ 280<span class="cent">,00</span></td><td><span class="st s-er"><i></i>Vencido</span></td><td class="d num">25 jul</td></tr>
+                    <tr><td class="nome">Antônio Pereira Lima</td><td class="num">1/10</td><td class="d val-t num">R$ 450<span class="cent">,00</span></td><td><span class="st s-at"><i></i>Pendente</span></td><td class="d num">29 jul</td></tr>
+                    <tr><td class="nome">Terezinha M. Alves</td><td class="num">8/24</td><td class="d val-t num">R$ 190<span class="cent">,00</span></td><td><span class="st s-ok"><i></i>Pago</span></td><td class="d num">26 jul</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div class="status-bar vidro sobe" style="animation-delay:.52s">
+              <span class="seg"><i style="background:var(--verde);box-shadow:0 0 8px rgba(74,190,140,.6)"></i>Canal 1390 · operante</span>
+              <span class="seg"><i style="background:var(--verde)"></i>Bot Matheo · fila 0</span>
+              <span class="seg"><i style="background:var(--txt-3)"></i>Sincronizado 14:39</span>
+              <span class="fim">ATENVO · CAF ASSESSORIA</span>
+            </div>
+          </section>
+
+          <section class="pagina pg-wa" id="pg-whatsapp">
+            <div class="wa-fila">
+              <div class="wa-ftopo">
+                <div class="l1"><h3>Conversas</h3><span class="canal-mini"><i></i>1390</span></div>
+                <div class="segm" style="width:100%"><span class="on">Todas 12</span><span>Minhas 4</span><span>Sem resp. 3</span></div>
+              </div>
+              <div class="conv urg"><div class="av2">JC</div>
+                <div class="tx"><div class="n">José Carlos Ferreira</div><div class="p">Não consegui entrar no aplicativo…</div></div>
+                <div class="m"><div class="h2 num">14:02</div><div class="cr g num">58 min</div></div></div>
+              <div class="conv ativa2"><div class="av2">MA</div>
+                <div class="tx"><div class="n">Maria Aparecida Souza</div><div class="p">Áudio · 0:34</div></div>
+                <div class="m"><div class="h2 num">14:38</div><div class="nl num">2</div></div></div>
+              <div class="conv esp"><div class="av2">AP</div>
+                <div class="tx"><div class="n">Antônio Pereira Lima</div><div class="p">Matheo: Perfeito, seu Antônio…</div></div>
+                <div class="m"><div class="h2 num">13:47</div><div class="cr num">33 min</div></div></div>
+              <div class="conv"><div class="av2">TM</div>
+                <div class="tx"><div class="n">Terezinha M. Alves</div><div class="p">Você: Combinado, te ligo amanhã.</div></div>
+                <div class="m"><div class="h2 num">11:20</div></div></div>
+              <div class="conv"><div class="av2">SR</div>
+                <div class="tx"><div class="n">Sebastião R. Nunes</div><div class="p">Obrigado, moço. Deus abençoe</div></div>
+                <div class="m"><div class="h2 num">10:05</div></div></div>
+              <div class="conv"><div class="av2">IF</div>
+                <div class="tx"><div class="n">Ivone F. Cardoso</div><div class="p">Matheo: Vale verificar, sim…</div></div>
+                <div class="m"><div class="h2">Ontem</div></div></div>
+            </div>
+            <div class="wa-conv">
+              <div class="wa-ctopo">
+                <div class="av2" style="width:32px;height:32px">MA</div>
+                <div><div class="nm">Maria Aparecida Souza</div>
+                  <div class="sb num">(51) 98812-4407 · Documentação pendente</div></div>
+                <div class="dir">
+                  <span class="janela">Janela aberta · 21h</span>
+                  <button class="btn btn-sec btn-mini">Assumir</button>
+                </div>
+              </div>
+              <div class="msgs">
+                <div class="dia">Hoje</div>
+                <div class="bolha rec">Boa tarde! Vi o anúncio de vocês sobre desconto no benefício.<div class="hh num">14:31</div></div>
+                <div class="bolha env2"><div class="bt-tag">◈ Matheo</div>Boa tarde, dona Maria! Aqui é o Matheo, da CAF Assessoria. Muitos aposentados têm descontos que valem a pena verificar. Posso conferir o seu?<div class="hh num">14:32</div></div>
+                <div class="bolha rec">Pode sim, meu filho<div class="hh num">14:35</div></div>
+                <div class="bolha rec" style="max-width:70%">
+                  <div class="audio">
+                    <div class="play"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg></div>
+                    <div class="onda"><i style="height:6px"></i><i style="height:11px"></i><i style="height:15px"></i><i style="height:9px"></i><i style="height:13px"></i><i style="height:17px"></i><i style="height:11px"></i><i style="height:7px"></i><i style="height:14px"></i><i style="height:10px"></i><i style="height:16px"></i><i style="height:8px"></i><i style="height:12px"></i><i style="height:6px"></i><i style="height:10px"></i><i style="height:15px"></i></div>
+                    <span class="num" style="font-size:10.5px;color:var(--txt-3)">0:34</span>
+                  </div>
+                  <div class="transc">"Meu nome é Maria Aparecida, eu recebo aposentadoria desde 2019 e vi uns descontos que eu não reconheço."</div>
+                  <div class="hh num">14:38</div>
+                </div>
+              </div>
+              <div class="composer">
+                <div class="rapidas"><span class="rapida">Pedir CPF</span><span class="rapida">Explicar o processo</span><span class="rapida">Agendar ligação</span><span class="rapida">Encaminhar</span></div>
+                <div class="cmsg"><div class="cx">Escreva uma mensagem…</div>
+                  <div class="env-b"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12l16-8-6 16-2.5-6.5z"/></svg></div></div>
+              </div>
+            </div>
+            <div class="wa-ctx">
+              <div class="ctx-topo">
+                <div class="av2">MA</div>
+                <div class="n2">Maria Aparecida Souza</div>
+                <div class="t2 num">(51) 98812-4407</div>
+                <div class="bb"><button class="btn btn-sec btn-mini">Ligar</button><button class="btn btn-pri btn-mini">Abrir ficha</button></div>
+              </div>
+              <div class="ctx-b"><div class="ctx-t">Funil</div>
+                <div class="cx-l"><span class="k">Etapa</span><span class="v">Documentação</span></div>
+                <div class="funil"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></div>
+                <div class="cx-l" style="margin-top:7px"><span class="k">Origem</span><span class="v">Anúncio CTWA</span></div>
+                <div class="cx-l"><span class="k">Consultora</span><span class="v">Giovana</span></div>
+              </div>
+              <div class="ctx-b"><div class="ctx-t">Cobranças <a href="#" data-vai="cobrancas" style="color:var(--txt-2)">ver</a></div>
+                <div class="cx-l"><span class="k num">3/12 · 25 jul</span><span class="st s-ok"><i></i>Pago</span></div>
+                <div class="cx-l"><span class="k num">4/12 · 25 ago</span><span class="st s-at"><i></i>Pendente</span></div>
+              </div>
+              <div class="ctx-b"><div class="ctx-t">Agendamento</div>
+                <div class="cx-l"><span class="k">Ligação de orientação</span><span class="v num">28 jul · 10h</span></div>
+              </div>
+              <div class="ctx-b"><div class="ctx-t">Nota interna</div>
+                <div style="font-size:11.5px;color:var(--txt-2);line-height:1.5">Prefere áudio. A filha ajuda com o celular — ligar depois das 18h.</div>
+              </div>
+            </div>
+          </section>
+
+          <style>
+            .kb-cols{display:flex;gap:11px;height:calc(100% - 62px)}
+            .kb-col{flex:1;min-width:0;display:flex;flex-direction:column;
+              background:rgba(255,255,255,.022);border:1px solid rgba(255,255,255,.055);
+              border-radius:13px;padding:10px 9px}
+            .kb-cab{display:flex;align-items:center;gap:6px;padding:1px 4px 8px}
+            .kb-cab .pt2{width:6px;height:6px;border-radius:50%}
+            .kb-cab .n{font-size:11.5px;font-weight:600}
+            .kb-cab .q{font-size:10.5px;color:var(--txt-3)}
+            .kb-cab .s2{margin-left:auto;font-size:10.5px;font-weight:500;color:var(--txt-2)}
+            .kc{position:relative;background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.025));
+              border:1px solid rgba(255,255,255,.1);border-radius:11px;padding:9px 10px 9px 12px;
+              margin-bottom:8px;cursor:grab;transition:transform .2s var(--ease), box-shadow .2s}
+            .kc:hover{transform:translateY(-1px)}
+            .kc::before{content:"";position:absolute;left:0;top:9px;bottom:9px;width:3px;border-radius:0 3px 3px 0}
+            .kc.parado::before{background:var(--rubro);box-shadow:0 0 10px rgba(229,102,92,.6)}
+            .kc.quente::before{background:var(--ambar)}
+            .kc .n{font-size:12px;font-weight:500;line-height:1.3}
+            .kc .v{font-size:12px;font-weight:600;margin-top:4px}
+            .kc .r{display:flex;align-items:center;gap:6px;margin-top:7px}
+            .kc .av3{width:18px;height:18px;border-radius:50%;font-size:8.5px;font-weight:600;
+              display:flex;align-items:center;justify-content:center;color:var(--txt);
+              background:linear-gradient(150deg,#2B2E34,#17191D);box-shadow:0 0 0 1px rgba(255,255,255,.16)}
+            .kc .t3{margin-left:auto;font-size:9.5px;color:var(--txt-3)}
+            .kc .t3.al{color:var(--rubro);font-weight:600}
+            .kc.drag{box-shadow:0 18px 40px rgba(0,0,0,.55);transform:rotate(-1.6deg);border-color:rgba(255,255,255,.35)}
+            .fantasma{border:1.5px dashed rgba(255,255,255,.18);border-radius:11px;height:66px;margin-bottom:8px}
+
+            .ag-grid{display:grid;grid-template-columns:repeat(5,1fr) 220px;gap:10px;height:calc(100% - 62px)}
+            .ag-dia{background:rgba(255,255,255,.022);border:1px solid rgba(255,255,255,.055);
+              border-radius:12px;padding:9px;display:flex;flex-direction:column;gap:7px;min-width:0}
+            .ag-dia.hoje{border-color:rgba(255,255,255,.22);background:rgba(255,255,255,.04)}
+            .ag-dcab{display:flex;align-items:baseline;gap:6px;padding:0 2px 3px}
+            .ag-dcab .d1{font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--txt-3)}
+            .ag-dcab .d2{font-size:13px;font-weight:600}
+            .ag-dia.hoje .ag-dcab .d1{color:var(--txt)}
+            .ev{position:relative;background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.02));
+              border:1px solid rgba(255,255,255,.09);border-radius:9px;padding:7px 9px 7px 11px}
+            .ev::before{content:"";position:absolute;left:0;top:7px;bottom:7px;width:3px;border-radius:0 3px 3px 0;
+              background:#fff;box-shadow:0 0 8px rgba(255,255,255,.35)}
+            .ev.pend::before{background:var(--ambar);box-shadow:0 0 8px rgba(217,164,74,.4)}
+            .ev .h3{font-size:9.5px;color:var(--txt-3)}
+            .ev .t4{font-size:11px;font-weight:500;margin-top:1px;line-height:1.3}
+            .ev .s4{font-size:10px;color:var(--txt-2)}
+            .ag-lado{display:flex;flex-direction:column}
+            .ag-lado .card-cab{padding:11px 14px}
+            .ag-lado .li{padding:9.5px 14px 9.5px 17px}
+
+            .rl-chart{padding:16px 18px 12px}
+            .rl-chart .tt{font-size:12.5px;font-weight:600;margin-bottom:14px;display:flex;justify-content:space-between;align-items:baseline}
+            .rl-chart .tt span{font-size:11px;color:var(--txt-3);font-weight:400}
+            .barras{display:flex;align-items:flex-end;gap:14px;height:120px;padding:0 4px}
+            .bwrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;height:100%;justify-content:flex-end}
+            .bval{font-size:10px;color:var(--txt-2);opacity:0}
+            .pagina.ativa .bval{animation:entra .4s 1s forwards}
+            .barv{width:100%;max-width:34px;border-radius:6px 6px 3px 3px;
+              background:linear-gradient(180deg,rgba(255,255,255,.55),rgba(255,255,255,.12));
+              transform:scaleY(0);transform-origin:bottom}
+            .pagina.ativa .barv{animation:cresce .7s var(--ease) forwards}
+            .barv.hoje2{background:linear-gradient(180deg,#FFF,rgba(255,255,255,.35));
+              box-shadow:0 0 18px rgba(255,255,255,.25)}
+            @keyframes cresce{to{transform:scaleY(1)}}
+            .blab{font-size:10px;color:var(--txt-3)}
+
+            .int-card{padding:15px 16px;display:flex;flex-direction:column;gap:9px}
+            .int-l1{display:flex;align-items:center;gap:11px}
+            .int-ic{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;
+              background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);color:var(--txt)}
+            .int-n{font-size:13px;font-weight:600}
+            .int-s{font-size:11px;color:var(--txt-2);margin-top:1px}
+            .int-l2{display:flex;align-items:center;justify-content:space-between;margin-top:2px}
+            .mono{font-family:ui-monospace,monospace;font-size:10.5px;color:var(--txt-2);
+              background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);
+              border-radius:7px;padding:6px 9px;display:flex;align-items:center;gap:8px;overflow:hidden}
+            .mono b{color:var(--txt);font-weight:500;cursor:pointer}
+
+            .cfg{display:grid;grid-template-columns:186px 1fr;gap:12px;height:calc(100% - 62px)}
+            .cfg-nav{padding:10px 8px;display:flex;flex-direction:column;gap:2px}
+            .cfg-nav .it{padding:8px 11px;border-radius:8px;font-size:12.5px;color:var(--txt-2);cursor:pointer}
+            .cfg-nav .it:hover{color:var(--txt);background:rgba(255,255,255,.05)}
+            .cfg-nav .it.on{background:rgba(255,255,255,.08);color:#fff;font-weight:500}
+            .cfg-painel{padding:18px 20px;overflow:hidden}
+            .cfg-sec{font-size:13px;font-weight:600;margin-bottom:13px}
+            .cfg-div{border-top:1px solid var(--linha);margin:16px 0 14px}
+            .tgl-l{display:flex;align-items:center;gap:11px;padding:7px 0;font-size:12.5px}
+            .tgl-l .d{color:var(--txt-3);font-size:11px;margin-top:1px}
+
+            .plano-atual{padding:17px 18px}
+            .plano-atual .l1{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+            .plano-atual .n{font-size:15px;font-weight:600}
+            .plano-atual .preco{font-size:23px;font-weight:600;letter-spacing:-.02em;margin:8px 0 2px}
+            .plano-atual .preco small{font-size:12px;color:var(--txt-3);font-weight:400}
+            .plano-atual .r{font-size:11.5px;color:var(--txt-2)}
+            .medidor{padding:4px 0 10px}
+            .medidor .l{display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:6px}
+            .medidor .l b{font-weight:500;color:var(--txt)}
+            .medidor .l span{color:var(--txt-2)}
+            .trilho2{height:5px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden}
+            .fill{height:100%;border-radius:99px;width:0;
+              background:linear-gradient(90deg,rgba(255,255,255,.9),rgba(255,255,255,.45))}
+            .pagina.ativa .fill{transition:width 1s .3s var(--ease)}
+            .fill.alto{background:linear-gradient(90deg,var(--ambar),rgba(217,164,74,.55))}
+
+            .login{position:absolute;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;
+              background:var(--base);transition:opacity .5s var(--ease)}
+            .login.some{opacity:0;pointer-events:none}
+            .login .luz2{position:absolute;inset:0;pointer-events:none;
+              background:radial-gradient(50% 60% at 30% 10%, rgba(255,255,255,.09) 0%, transparent 70%),
+                         radial-gradient(56% 66% at 78% 92%, rgba(255,255,255,.045) 0%, transparent 72%)}
+            .lg-card{position:relative;width:372px;padding:30px 30px 24px;border-radius:18px}
+            .lg-card .marca2{width:42px;height:42px;border-radius:12px;margin-bottom:18px;
+              background:linear-gradient(180deg,#FFF,#C9CDD4);color:#0E0F12;
+              display:flex;align-items:center;justify-content:center;font-weight:700;font-size:19px;
+              box-shadow:0 10px 30px rgba(255,255,255,.14), inset 0 1px 0 #fff}
+            .lg-card h2{font-family:var(--serif);font-style:italic;font-weight:400;font-size:27px;
+              letter-spacing:-.01em;margin:9px 0 4px}
+            .lg-card .sub{font-size:12.5px;color:var(--txt-2);margin-bottom:20px}
+            .lg-card .campo{margin-bottom:13px}
+            .lg-l{display:flex;justify-content:space-between;align-items:baseline}
+            .lg-l a{font-size:11px;color:var(--txt-2);text-decoration:none;border-bottom:1px solid rgba(255,255,255,.2)}
+            .entrar{width:100%;height:41px;margin-top:5px;border:none;border-radius:10px;cursor:pointer;
+              font-family:var(--fonte);font-size:13.5px;font-weight:600;color:#101215;
+              background:linear-gradient(180deg,#FFF,#D6DAE0);
+              box-shadow:0 12px 30px rgba(255,255,255,.12), inset 0 1px 0 #fff;
+              transition:transform .2s var(--ease)}
+            .entrar:hover{transform:translateY(-1px)}
+            .lg-pe{margin-top:18px;padding-top:14px;border-top:1px solid var(--linha);
+              font-size:10.5px;color:var(--txt-3);text-align:center;line-height:1.6}
+            .lg-pe b{color:var(--txt-2);font-weight:500}
+
+            .notif{position:absolute;top:66px;right:20px;width:344px;z-index:40;border-radius:14px;overflow:hidden;
+              opacity:0;transform:translateX(26px);pointer-events:none;
+              transition:opacity .45s var(--ease), transform .5s var(--ease)}
+            .notif.show{opacity:1;transform:none;pointer-events:auto}
+            .notif .corpo{display:flex;gap:12px;padding:13px 14px 11px}
+            .notif .av{width:37px;height:37px;flex-shrink:0;border-radius:50%;position:relative;
+              display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;
+              background:linear-gradient(150deg,#2E3138,#191B1F);
+              box-shadow:inset 0 1px 0 rgba(255,255,255,.14), 0 0 0 1.5px rgba(255,255,255,.16)}
+            .notif .av i{position:absolute;bottom:-1px;right:-1px;width:10px;height:10px;border-radius:50%;
+              background:var(--verde);border:2px solid #16181C}
+            .notif .quem{font-size:12.5px;font-weight:600}
+            .notif .qdo{margin-left:auto;font-size:10px;color:var(--txt-3)}
+            .notif .l1{display:flex;align-items:baseline;gap:8px}
+            .notif .msg{font-size:12px;color:var(--txt-2);margin-top:3px;line-height:1.45}
+            .notif .fonte{margin-top:6px;font-size:9.5px;font-weight:600;letter-spacing:.12em;
+              text-transform:uppercase;color:var(--txt-3);display:flex;align-items:center;gap:6px}
+            .notif .fonte i{width:5px;height:5px;border-radius:50%;background:var(--verde)}
+            .notif .acoes-n{display:flex;gap:8px;padding:0 14px 12px 63px}
+            .bm{font-family:var(--fonte);font-size:11.5px;font-weight:600;border-radius:8px;
+              padding:5.5px 11px;cursor:pointer;border:1px solid transparent}
+            .bm.claro{background:linear-gradient(180deg,#FFF,#D9DCE1);color:#101215;box-shadow:inset 0 1px 0 #fff}
+            .bm.fant{background:transparent;border-color:rgba(255,255,255,.14);color:var(--txt-2)}
+            .notif .fechar{position:absolute;top:8px;right:11px;color:var(--txt-3);cursor:pointer;font-size:15px;padding:3px}
+            .notif .prog{position:absolute;left:0;bottom:0;height:2px;width:100%;transform-origin:left;transform:scaleX(0);
+              background:linear-gradient(90deg,rgba(255,255,255,.55),rgba(255,255,255,.12))}
+            .notif.show .prog{animation:esvazia 9s linear forwards}
+            @keyframes esvazia{from{transform:scaleX(1)}to{transform:scaleX(0)}}
+            @keyframes pop{0%{transform:scale(1)}45%{transform:scale(1.4)}100%{transform:scale(1)}}
+            .pop{animation:pop .5s var(--ease)}
+
+            @media (prefers-reduced-motion:reduce){
+              *,*::before,*::after{animation:none!important;transition:none!important}
+              .sobe,.bval{opacity:1;transform:none}
+              .spark path{stroke-dashoffset:0}.spark polygon{opacity:1}
+              .barv{transform:scaleY(1)}
+            }
+          </style>
+
+          <section class="pagina" id="pg-kanban">
+            <div class="ph sobe">
+              <div><h2>Kanban</h2><p class="num">38 leads ativos · R$ 47.200,00 em potencial</p></div>
+              <div class="acoes"><button class="btn btn-sec">Todos os consultores</button>
+                <button class="btn btn-pri">＋ Novo lead</button></div>
+            </div>
+            <div class="kb-cols">
+              <div class="kb-col sobe" style="animation-delay:.08s">
+                <div class="kb-cab"><span class="pt2" style="background:var(--txt-3)"></span><span class="n">Novo lead</span><span class="q num">9</span><span class="s2 num">R$ 11,7k</span></div>
+                <div class="kc"><div class="n">Ivone F. Cardoso</div><div class="v num">R$ 1.300,00</div><div class="r"><span class="av3">G</span><span class="t3 num">há 2h</span></div></div>
+                <div class="kc"><div class="n">Sebastião R. Nunes</div><div class="v num">R$ 1.300,00</div><div class="r"><span class="av3">M</span><span class="t3 num">há 5h</span></div></div>
+                <div class="kc"><div class="n">Raimundo A. Silva</div><div class="v num">R$ 1.300,00</div><div class="r"><span class="av3">G</span><span class="t3">ontem</span></div></div>
+              </div>
+              <div class="kb-col sobe" style="animation-delay:.15s">
+                <div class="kb-cab"><span class="pt2" style="background:#fff;box-shadow:0 0 8px rgba(255,255,255,.5)"></span><span class="n">Em atendimento</span><span class="q num">12</span><span class="s2 num">R$ 15,6k</span></div>
+                <div class="kc quente"><div class="n">Maria Aparecida Souza</div><div class="v num">R$ 1.300,00</div><div class="r"><span class="av3">G</span><span class="t3 num">há 12 min</span></div></div>
+                <div class="fantasma"></div>
+                <div class="kc"><div class="n">Terezinha M. Alves</div><div class="v num">R$ 1.300,00</div><div class="r"><span class="av3">M</span><span class="t3 num">há 3h</span></div></div>
+              </div>
+              <div class="kb-col sobe" style="animation-delay:.22s">
+                <div class="kb-cab"><span class="pt2" style="background:var(--ambar)"></span><span class="n">Documentação</span><span class="q num">8</span><span class="s2 num">R$ 10,4k</span></div>
+                <div class="kc drag"><div class="n">Antônio Pereira Lima</div><div class="v num">R$ 1.300,00</div><div class="r"><span class="av3">G</span><span class="t3 num">há 1d</span></div></div>
+                <div class="kc parado"><div class="n">José Carlos Ferreira</div><div class="v num">R$ 1.300,00</div><div class="r"><span class="av3">M</span><span class="t3 al num">parado 9d</span></div></div>
+                <div class="kc"><div class="n">Neusa B. Martins</div><div class="v num">R$ 1.300,00</div><div class="r"><span class="av3">G</span><span class="t3 num">há 2d</span></div></div>
+              </div>
+              <div class="kb-col sobe" style="animation-delay:.29s">
+                <div class="kb-cab"><span class="pt2" style="background:var(--verde)"></span><span class="n">Fechado</span><span class="q num">6</span><span class="s2 num">R$ 7,8k</span></div>
+                <div class="kc"><div class="n">Aparecida L. Rocha</div><div class="v num">R$ 1.300,00</div><div class="r"><span class="av3">M</span><span class="t3 num">25 jul</span></div></div>
+                <div class="kc"><div class="n">Devanir S. Prado</div><div class="v num">R$ 1.300,00</div><div class="r"><span class="av3">G</span><span class="t3 num">24 jul</span></div></div>
+              </div>
+              <div class="kb-col sobe" style="animation-delay:.36s">
+                <div class="kb-cab"><span class="pt2" style="background:var(--rubro)"></span><span class="n">Perdido</span><span class="q num">3</span><span class="s2 num">R$ 3,9k</span></div>
+                <div class="kc" style="opacity:.6"><div class="n">Cleusa M. Barros</div><div class="v num">R$ 1.300,00</div><div class="r"><span class="av3">M</span><span class="t3">opt-out</span></div></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="pagina" id="pg-agendamentos">
+            <div class="ph sobe">
+              <div><h2>Agendamentos</h2><p>semana de 27 a 31 de julho</p></div>
+              <div class="acoes"><div class="segm"><span class="on">Semana</span><span>Dia</span><span>Mês</span></div>
+                <button class="btn btn-pri">＋ Agendar</button></div>
+            </div>
+            <div class="ag-grid">
+              <div class="ag-dia hoje sobe" style="animation-delay:.08s">
+                <div class="ag-dcab"><span class="d1">Seg</span><span class="d2 num">27</span><span class="caps" style="margin-left:auto;font-size:8.5px;color:#fff">Hoje</span></div>
+                <div class="ev" style="opacity:.45"><div class="h3 num">09:00</div><div class="t4">Reunião da equipe</div></div>
+                <div class="ev"><div class="h3 num">15:30</div><div class="t4">Ligação — Sr. Antônio</div><div class="s4">Meu INSS · Giovana</div></div>
+                <div class="ev"><div class="h3 num">17:00</div><div class="t4">Corte de cobranças</div><div class="s4">lembretes em lote</div></div>
+              </div>
+              <div class="ag-dia sobe" style="animation-delay:.14s">
+                <div class="ag-dcab"><span class="d1">Ter</span><span class="d2 num">28</span></div>
+                <div class="ev"><div class="h3 num">10:00</div><div class="t4">Ligação — D. Maria Ap.</div><div class="s4">orientação · Giovana</div></div>
+                <div class="ev pend"><div class="h3 num">14:00</div><div class="t4">Retorno — Sebastião</div><div class="s4">aguarda confirmação</div></div>
+              </div>
+              <div class="ag-dia sobe" style="animation-delay:.2s">
+                <div class="ag-dcab"><span class="d1">Qua</span><span class="d2 num">29</span></div>
+                <div class="ev"><div class="h3 num">11:00</div><div class="t4">Reunião — advogado Rafael</div><div class="s4">casos da semana</div></div>
+              </div>
+              <div class="ag-dia sobe" style="animation-delay:.26s">
+                <div class="ag-dcab"><span class="d1">Qui</span><span class="d2 num">30</span></div>
+                <div class="ev"><div class="h3 num">09:30</div><div class="t4">Ligação — Ivone F.</div><div class="s4">primeiro contato</div></div>
+                <div class="ev"><div class="h3 num">16:00</div><div class="t4">Follow-up — Neusa</div><div class="s4">documentos</div></div>
+              </div>
+              <div class="ag-dia sobe" style="animation-delay:.32s">
+                <div class="ag-dcab"><span class="d1">Sex</span><span class="d2 num">31</span></div>
+                <div class="ev"><div class="h3 num">10:00</div><div class="t4">Fechamento da semana</div><div class="s4">equipe</div></div>
+              </div>
+              <div class="ag-lado vidro spot sobe" style="animation-delay:.38s">
+                <div class="card-cab"><h3>Hoje</h3><span class="caps" style="font-size:9px">2 restantes</span></div>
+                <div class="li info"><div><div class="t">Ligação — Sr. Antônio</div><div class="s">Giovana</div></div><div class="h num">15:30</div></div>
+                <div class="li info"><div><div class="t">Corte de cobranças</div><div class="s">automático</div></div><div class="h num">17:00</div></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="pagina" id="pg-contatos">
+            <div class="ph sobe">
+              <div><h2>Contatos</h2><p class="num">1.284 contatos · 38 em atendimento</p></div>
+              <div class="acoes"><button class="btn btn-sec">Importar</button><button class="btn btn-pri">＋ Novo contato</button></div>
+            </div>
+            <div class="chips sobe" style="animation-delay:.08s">
+              <span class="chip on">Com cobrança vencida <span class="x">×</span></span>
+              <span class="chip">+ Etapa</span><span class="chip">+ Consultor</span><span class="chip">+ Origem</span>
+              <span class="chip" style="border-style:dashed;opacity:.7">Limpar</span>
+            </div>
+            <div class="vidro spot sobe" style="animation-delay:.15s;border-radius:12px">
+              <div class="bulk"><span class="cbx on" style="border-color:#101215"></span><span class="c num">2 selecionados</span>
+                <div class="bs"><button>Enviar mensagem</button><button>Mudar etapa</button><button>Exportar</button></div></div>
+              <table>
+                <thead><tr><th style="width:36px"></th><th>Nome</th><th>Telefone</th><th>Etapa</th><th>Consultor</th><th class="d">Último contato</th><th>Status</th></tr></thead>
+                <tbody>
+                  <tr class="sel"><td><span class="cbx on"></span></td><td class="nome">José Carlos Ferreira</td><td class="num">(51) 99214-8830</td><td>Documentação</td><td>Matheus</td><td class="d num">há 58 min</td><td><span class="st s-er"><i></i>Vencido</span></td></tr>
+                  <tr class="sel"><td><span class="cbx on"></span></td><td class="nome">Maria Aparecida Souza</td><td class="num">(51) 98812-4407</td><td>Documentação</td><td>Giovana</td><td class="d num">agora</td><td><span class="st s-ok"><i></i>Em dia</span></td></tr>
+                  <tr><td><span class="cbx"></span></td><td class="nome">Antônio Pereira Lima</td><td class="num">(51) 98120-7745</td><td>Em atendimento</td><td>Giovana</td><td class="d num">há 33 min</td><td><span class="st s-at"><i></i>Pendente</span></td></tr>
+                  <tr><td><span class="cbx"></span></td><td class="nome">Terezinha M. Alves</td><td class="num">(51) 99760-3312</td><td>Fechado</td><td>Matheus</td><td class="d num">há 3h</td><td><span class="st s-ok"><i></i>Em dia</span></td></tr>
+                  <tr><td><span class="cbx"></span></td><td class="nome">Sebastião R. Nunes</td><td class="num">(51) 98455-1029</td><td>Novo lead</td><td>Matheus</td><td class="d num">há 5h</td><td><span class="st s-ne"><i></i>—</span></td></tr>
+                  <tr><td><span class="cbx"></span></td><td class="nome">Ivone F. Cardoso</td><td class="num">(51) 99331-6688</td><td>Novo lead</td><td>Giovana</td><td class="d num">ontem</td><td><span class="st s-ne"><i></i>—</span></td></tr>
+                </tbody>
+              </table>
+              <div class="rodape-tab"><span class="num">6 de 1.284</span>
+                <div class="pag"><span>‹</span><span class="on">1</span><span>2</span><span>3</span><span>…</span><span>214</span><span>›</span></div></div>
+            </div>
+          </section>
+
+          <section class="pagina" id="pg-relacionamento">
+            <div class="ph sobe">
+              <div><h2>Relacionamento</h2><p>fila de toques do dia · ordenada por urgência</p></div>
+              <div class="acoes"><div class="segm"><span class="on">Follow-ups 8</span><span>Aniversários 2</span><span>Reativação 5</span></div></div>
+            </div>
+            <div class="grade" style="grid-template-columns:7fr 5fr">
+              <div class="vidro spot sobe" style="animation-delay:.1s">
+                <div class="card-cab"><h3>Follow-ups pendentes <span class="cont">8</span></h3></div>
+                <div class="li crit"><div><div class="t">José Carlos Ferreira</div><div class="s">3 dias sem retorno após cobrança · último toque: 24 jul</div></div>
+                  <button class="btn btn-sec btn-mini" style="align-self:center">Abrir conversa</button></div>
+                <div class="li aten"><div><div class="t">Neusa B. Martins</div><div class="s">Aguardando documentos há 2 dias</div></div>
+                  <button class="btn btn-sec btn-mini" style="align-self:center">Abrir conversa</button></div>
+                <div class="li aten"><div><div class="t">Raimundo A. Silva</div><div class="s">Lead novo sem primeiro contato · desde ontem</div></div>
+                  <button class="btn btn-sec btn-mini" style="align-self:center">Abrir conversa</button></div>
+                <div class="li info"><div><div class="t">Terezinha M. Alves</div><div class="s">Pós-fechamento · pesquisa de satisfação</div></div>
+                  <button class="btn btn-sec btn-mini" style="align-self:center">Abrir conversa</button></div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:12px">
+                <div class="kpi vidro spot sobe" style="animation-delay:.17s">
+                  <div class="rot">Toques em dia</div>
+                  <div class="val num"><span class="cnt" data-v="92" data-f="int">0</span><span class="cent">%</span></div>
+                  <span class="delta d-ok">↑ 5 p.p. esta semana</span>
+                </div>
+                <div class="vidro spot sobe" style="animation-delay:.24s">
+                  <div class="card-cab"><h3>Aniversários</h3></div>
+                  <div class="li info"><div><div class="t">D. Aparecida L. Rocha</div><div class="s">faz 71 anos amanhã</div></div><div class="h num">28 jul</div></div>
+                  <div class="li info"><div><div class="t">Sr. Devanir S. Prado</div><div class="s">faz 68 anos</div></div><div class="h num">31 jul</div></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="pagina" id="pg-cobrancas">
+            <div class="ph sobe">
+              <div><h2>Cobranças</h2><p class="num">128 parcelas ativas em julho</p></div>
+              <div class="acoes"><button class="btn btn-sec">Exportar</button><button class="btn btn-pri">＋ Nova cobrança</button></div>
+            </div>
+            <div class="kpis" style="grid-template-columns:repeat(3,1fr)">
+              <div class="kpi vidro spot sobe" style="animation-delay:.08s"><div class="rot">A receber na semana</div>
+                <div class="val num">R$ 18.640<span class="cent">,00</span></div><span class="delta d-ne">23 parcelas</span></div>
+              <div class="kpi vidro spot sobe" style="animation-delay:.14s"><div class="rot">Vencidas</div>
+                <div class="val num">R$ 730<span class="cent">,00</span></div><span class="delta d-er">5 parcelas · agir hoje</span></div>
+              <div class="kpi vidro spot sobe" style="animation-delay:.2s"><div class="rot">Recebido no mês</div>
+                <div class="val num">R$ 42.310<span class="cent">,00</span></div><span class="delta d-ok">↑ 11% vs. junho</span></div>
+            </div>
+            <div class="vidro spot sobe" style="animation-delay:.27s;border-radius:12px">
+              <div class="bulk"><span class="cbx on" style="border-color:#101215"></span><span class="c num">2 selecionadas</span>
+                <div class="bs"><button>Marcar como paga</button><button>Enviar lembrete</button><button>Exportar</button></div></div>
+              <table>
+                <thead><tr><th style="width:36px"></th><th>Cliente</th><th>Parcela</th><th class="d">Valor</th><th>Status</th><th class="d">Vencimento ↓</th></tr></thead>
+                <tbody>
+                  <tr class="sel"><td><span class="cbx on"></span></td><td class="nome">Maria Aparecida Souza</td><td class="num">3/12</td><td class="d val-t num">R$ 320<span class="cent">,00</span></td><td><span class="st s-ok"><i></i>Pago</span></td><td class="d num">25 jul</td></tr>
+                  <tr class="sel"><td><span class="cbx on"></span></td><td class="nome">José Carlos Ferreira</td><td class="num">5/12</td><td class="d val-t num">R$ 280<span class="cent">,00</span></td><td><span class="st s-er"><i></i>Vencido</span></td><td class="d num">25 jul</td></tr>
+                  <tr><td><span class="cbx"></span></td><td class="nome">Terezinha M. Alves</td><td class="num">8/24</td><td class="d val-t num">R$ 190<span class="cent">,00</span></td><td><span class="st s-ok"><i></i>Pago</span></td><td class="d num">26 jul</td></tr>
+                  <tr><td><span class="cbx"></span></td><td class="nome">Antônio Pereira Lima</td><td class="num">1/10</td><td class="d val-t num">R$ 450<span class="cent">,00</span></td><td><span class="st s-at"><i></i>Pendente</span></td><td class="d num">29 jul</td></tr>
+                  <tr><td><span class="cbx"></span></td><td class="nome">Neusa B. Martins</td><td class="num">2/12</td><td class="d val-t num">R$ 260<span class="cent">,00</span></td><td><span class="st s-at"><i></i>Pendente</span></td><td class="d num">30 jul</td></tr>
+                </tbody>
+              </table>
+              <div class="rodape-tab"><span class="num">5 de 128 parcelas</span>
+                <div class="pag"><span>‹</span><span class="on">1</span><span>2</span><span>3</span><span>…</span><span>26</span><span>›</span></div></div>
+            </div>
+          </section>
+
+          <section class="pagina" id="pg-integracoes">
+            <div class="ph sobe">
+              <div><h2>Integrações</h2><p>conexões do canal e serviços do sistema</p></div>
+            </div>
+            <div class="grade g2">
+              <div class="int-card vidro spot sobe" style="animation-delay:.08s">
+                <div class="int-l1"><div class="int-ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M21 11.5a8.4 8.4 0 01-9 8.4 8.9 8.9 0 01-3.8-.8L3 20l1-4.9a8.3 8.3 0 01-1-4A8.4 8.4 0 0112 3a8.4 8.4 0 019 8.5z"/></svg></div>
+                  <div><div class="int-n">WhatsApp Cloud API</div><div class="int-s num">Meta oficial · +55 51 9178-1390</div></div></div>
+                <div class="mono"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">…supabase.co/functions/v1/cloud-webhook</span><b>Copiar</b></div>
+                <div class="int-l2"><span class="st s-ok"><i></i>Conectado</span><button class="btn btn-sec btn-mini">Gerenciar</button></div>
+              </div>
+              <div class="int-card vidro spot sobe" style="animation-delay:.15s">
+                <div class="int-l1"><div class="int-ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 2a4 4 0 014 4v5a4 4 0 01-8 0V6a4 4 0 014-4zM5 11a7 7 0 0014 0M12 18v3"/></svg></div>
+                  <div><div class="int-n">Transcrição de áudio</div><div class="int-s">Gemini · áudios viram texto na conversa</div></div></div>
+                <div class="int-l2"><span class="st s-ok"><i></i>Conectado</span><button class="btn btn-sec btn-mini">Gerenciar</button></div>
+              </div>
+              <div class="int-card vidro spot sobe" style="animation-delay:.22s">
+                <div class="int-l1"><div class="int-ic">◈</div>
+                  <div><div class="int-n">Bot Matheo</div><div class="int-s">atendimento automático · regras invioláveis ativas</div></div></div>
+                <div class="int-l2"><span class="st s-ok"><i></i>Ativo</span><button class="btn btn-sec btn-mini">Configurar</button></div>
+              </div>
+              <div class="int-card vidro spot sobe" style="animation-delay:.29s">
+                <div class="int-l1"><div class="int-ic" style="opacity:.55"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M9 7V3M15 7V3M7 7h10v5a5 5 0 01-10 0zM12 17v4"/></svg></div>
+                  <div><div class="int-n" style="color:var(--txt-2)">Evolution API</div><div class="int-s">conector antigo · aposentado em jul/2026</div></div></div>
+                <div class="int-l2"><span class="st s-ne"><i></i>Desativada</span><button class="btn btn-sec btn-mini" style="opacity:.5">Histórico</button></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="pagina" id="pg-relatorios">
+            <div class="ph sobe">
+              <div><h2>Relatórios</h2><p>julho de 2026 · todos os consultores · todos os canais</p></div>
+              <div class="acoes"><button class="btn btn-sec">Julho ▾</button><button class="btn btn-sec">Exportar PDF</button></div>
+            </div>
+            <div class="kpis" style="grid-template-columns:repeat(3,1fr)">
+              <div class="kpi vidro spot sobe" style="animation-delay:.07s"><div class="rot">Recuperado para clientes</div>
+                <div class="val num">R$ 214<span class="cent">mil</span></div><span class="delta d-ok">↑ 23% vs. junho</span></div>
+              <div class="kpi vidro spot sobe" style="animation-delay:.13s"><div class="rot">Conversão lead → contrato</div>
+                <div class="val num">16<span class="cent">%</span></div><span class="delta d-ok">↑ 2 p.p.</span></div>
+              <div class="kpi vidro spot sobe" style="animation-delay:.19s"><div class="rot">Tempo médio de resposta</div>
+                <div class="val num">4<span class="cent">min</span></div><span class="delta d-ne">meta: 5 min</span></div>
+            </div>
+            <div class="grade g57">
+              <div class="vidro spot rl-chart sobe" style="animation-delay:.26s">
+                <div class="tt">Novos leads por dia <span>últimos 7 dias</span></div>
+                <div class="barras">
+                  <div class="bwrap"><span class="bval num">18</span><div class="barv" style="height:48%;animation-delay:.35s"></div><span class="blab">Ter</span></div>
+                  <div class="bwrap"><span class="bval num">22</span><div class="barv" style="height:58%;animation-delay:.42s"></div><span class="blab">Qua</span></div>
+                  <div class="bwrap"><span class="bval num">15</span><div class="barv" style="height:40%;animation-delay:.49s"></div><span class="blab">Qui</span></div>
+                  <div class="bwrap"><span class="bval num">25</span><div class="barv" style="height:66%;animation-delay:.56s"></div><span class="blab">Sex</span></div>
+                  <div class="bwrap"><span class="bval num">9</span><div class="barv" style="height:24%;animation-delay:.63s"></div><span class="blab">Sáb</span></div>
+                  <div class="bwrap"><span class="bval num">7</span><div class="barv" style="height:19%;animation-delay:.7s"></div><span class="blab">Dom</span></div>
+                  <div class="bwrap"><span class="bval num">27</span><div class="barv hoje2" style="height:72%;animation-delay:.77s"></div><span class="blab" style="color:var(--txt)">Hoje</span></div>
+                </div>
+              </div>
+              <div class="vidro spot sobe" style="animation-delay:.33s">
+                <div class="card-cab"><h3>Por consultor</h3></div>
+                <table>
+                  <thead><tr><th>Consultor</th><th class="d">Leads</th><th class="d">Contratos</th><th class="d">Conversão</th><th class="d">Resp. média</th></tr></thead>
+                  <tbody>
+                    <tr><td class="nome">Giovana</td><td class="d num">64</td><td class="d num">12</td><td class="d val-t num">19%</td><td class="d num">3 min</td></tr>
+                    <tr><td class="nome">Matheus</td><td class="d num">58</td><td class="d num">8</td><td class="d val-t num">14%</td><td class="d num">6 min</td></tr>
+                    <tr><td class="nome">Bot Matheo</td><td class="d num">122</td><td class="d num">—</td><td class="d num" style="color:var(--txt-3)">triagem</td><td class="d num">8 s</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <section class="pagina" id="pg-config">
+            <div class="ph sobe"><div><h2>Configurações</h2><p>perfil, equipe e comportamento do sistema</p></div></div>
+            <div class="cfg">
+              <div class="cfg-nav vidro sobe" style="animation-delay:.08s">
+                <div class="it on">Perfil</div><div class="it">Equipe</div><div class="it">Bot Matheo</div>
+                <div class="it">Notificações</div><div class="it">Aparência</div><div class="it">Segurança</div>
+              </div>
+              <div class="cfg-painel vidro spot sobe" style="animation-delay:.15s">
+                <div class="cfg-sec">Perfil</div>
+                <div class="grade g2" style="gap:13px">
+                  <div class="campo"><label>Nome completo</label><input class="inp" value="Gums"></div>
+                  <div class="campo"><label>Cargo</label><input class="inp" value="Administrador"></div>
+                  <div class="campo"><label>E-mail</label><input class="inp" value="gums@cafassessoria.com.br"></div>
+                  <div class="campo"><label>Telefone</label><input class="inp num" value="(51) 9 9999-0000"></div>
+                </div>
+                <div class="cfg-div"></div>
+                <div class="cfg-sec">Notificações no painel</div>
+                <div class="tgl-l"><span class="tgl"></span><div>Avisar quando um cliente responder<div class="d">notificação no canto, como o WhatsApp</div></div></div>
+                <div class="tgl-l"><span class="tgl"></span><div>Alerta de cobrança vencendo<div class="d">na véspera do vencimento</div></div></div>
+                <div class="tgl-l"><span class="tgl off"></span><div>Resumo diário por e-mail<div class="d">todo dia às 18h</div></div></div>
+                <div style="display:flex;gap:9px;justify-content:flex-end;margin-top:14px">
+                  <button class="btn btn-sec">Cancelar</button><button class="btn btn-pri">Salvar alterações</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="pagina" id="pg-planos">
+            <div class="ph sobe"><div><h2>Planos e uso</h2><p>assinatura da CAF Assessoria</p></div></div>
+            <div class="grade" style="grid-template-columns:5fr 7fr">
+              <div class="plano-atual vidro spot sobe" style="animation-delay:.08s">
+                <div class="l1"><span class="n">Plano Profissional</span><span class="st s-ok"><i></i>Ativo</span></div>
+                <div class="preco num">R$ 297<small>/mês</small></div>
+                <div class="r num">renova em 12 de agosto · cartão final 4412</div>
+                <div class="cfg-div"></div>
+                <div style="font-size:11.5px;color:var(--txt-2);line-height:1.7">
+                  Canal oficial WhatsApp · Bot Matheo · 5 usuários<br>Kanban, cobranças e relatórios ilimitados
+                </div>
+                <div style="display:flex;gap:8px;margin-top:14px">
+                  <button class="btn btn-sec btn-mini">Gerenciar assinatura</button>
+                  <button class="btn btn-sec btn-mini">Notas fiscais</button>
+                </div>
+              </div>
+              <div class="vidro spot sobe" style="animation-delay:.16s;padding:17px 18px">
+                <div class="cfg-sec" style="margin-bottom:15px">Uso do ciclo · 12 jul → 12 ago</div>
+                <div class="medidor"><div class="l"><b>Conversas no mês</b><span class="num">8.412 de 10.000</span></div>
+                  <div class="trilho2"><div class="fill alto" data-w="84%"></div></div></div>
+                <div class="medidor"><div class="l"><b>Contatos</b><span class="num">1.284 de 2.000</span></div>
+                  <div class="trilho2"><div class="fill" data-w="64%"></div></div></div>
+                <div class="medidor"><div class="l"><b>Usuários</b><span class="num">4 de 5</span></div>
+                  <div class="trilho2"><div class="fill" data-w="80%"></div></div></div>
+                <div class="cfg-div"></div>
+                <div style="display:flex;align-items:center;justify-content:space-between">
+                  <div style="font-size:12px;color:var(--txt-2);max-width:300px;line-height:1.55">
+                    No ritmo atual, as conversas esgotam <b style="color:var(--ambar)">dia 6 de agosto</b>. O plano Escala dobra o limite.</div>
+                  <button class="btn btn-pri">Conhecer o Escala</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+        </div>
+
+        <div class="notif vidro" id="notif">
+          <span class="fechar" id="notifX">×</span>
+          <div class="corpo">
+            <div class="av">MA<i></i></div>
+            <div style="min-width:0;flex:1">
+              <div class="l1"><span class="quem">Maria Aparecida Souza</span><span class="qdo">agora</span></div>
+              <div class="msg">"Consegui a foto do documento, meu filho. Pode conferir se está boa assim?"</div>
+              <div class="fonte"><i></i>WhatsApp · Canal 1390</div>
+            </div>
+          </div>
+          <div class="acoes-n"><button class="bm claro">Responder</button><button class="bm fant" data-vai="whatsapp">Ver conversa</button></div>
+          <div class="prog"></div>
+        </div>
+      </main>
+    </div>
+
+    <div class="login" id="login">
+      <div class="luz2"></div><div class="grao"></div>
+      <div class="lg-card vidro">
+        <div class="marca2">A</div>
+        <div class="caps">Bem-vindo ao Atenvo</div>
+        <h2>Acesse sua operação.</h2>
+        <div class="sub">Equipe · CAF Assessoria</div>
+        <div class="campo"><label>E-mail</label>
+          <input class="inp" value="gums@cafassessoria.com.br"></div>
+        <div class="campo">
+          <div class="lg-l"><label>Senha</label><a href="#">Esqueci minha senha</a></div>
+          <input class="inp" type="password" value="............"></div>
+        <button class="entrar" id="entrar">Entrar</button>
+        <div class="lg-pe">Conexão protegida · dados hospedados no Brasil<br>
+          Problemas para acessar? Fale com o <b>administrador da sua conta</b>.</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  var reduz=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  var h=new Date().getHours();
+  document.getElementById('saud').textContent = h<12?'Bom dia':(h<18?'Boa tarde':'Boa noite');
+
+  function fmt(v,f){return f==='mil'?v.toLocaleString('pt-BR'):String(v);}
+  function contar(escopo){
+    escopo.querySelectorAll('.cnt').forEach(function(el){
+      var alvo=parseInt(el.dataset.v,10), f=el.dataset.f;
+      if(reduz){el.textContent=fmt(alvo,f);return;}
+      el.textContent='0'; var t0=null;
+      function passo(ts){if(!t0)t0=ts;
+        var p=Math.min((ts-t0)/900,1), e=1-Math.pow(1-p,3);
+        el.textContent=fmt(Math.round(alvo*e),f);
+        if(p<1)requestAnimationFrame(passo);}
+      setTimeout(function(){requestAnimationFrame(passo);},320);
+    });
+  }
+
+  function medir(pg){
+    pg.querySelectorAll('.fill').forEach(function(f){
+      f.style.width='0';
+      requestAnimationFrame(function(){requestAnimationFrame(function(){f.style.width=f.dataset.w;});});
+    });
+  }
+
+  var itens=document.querySelectorAll('.item[data-pg]');
+  function irPara(pg){
+    document.querySelectorAll('.pagina').forEach(function(p){p.classList.remove('ativa');});
+    itens.forEach(function(i){i.classList.toggle('on', i.dataset.pg===pg);});
+    var alvo=document.getElementById('pg-'+pg);
+    void alvo.offsetWidth;
+    alvo.classList.add('ativa');
+    if(pg==='dashboard')contar(alvo);
+    if(pg==='planos')medir(alvo);
+    if(pg==='relacionamento')contar(alvo);
+  }
+  itens.forEach(function(i){i.addEventListener('click',function(){irPara(i.dataset.pg);});});
+  document.querySelectorAll('[data-vai]').forEach(function(a){
+    a.addEventListener('click',function(ev){ev.preventDefault();irPara(a.dataset.vai);});
+  });
+
+  document.addEventListener('mousemove',function(ev){
+    var card=ev.target.closest('.spot'); if(!card)return;
+    var r=card.getBoundingClientRect();
+    card.style.setProperty('--mx',((ev.clientX-r.left)/r.width*100)+'%');
+    card.style.setProperty('--my',((ev.clientY-r.top)/r.height*100)+'%');
+  });
+
+  var login=document.getElementById('login');
+  var notif=document.getElementById('notif'), sino=document.getElementById('sino'),
+      badge=document.getElementById('waBadge'), timer=null;
+  function esconder(){notif.classList.remove('show'); if(timer){clearTimeout(timer);timer=null;}}
+  function notificar(){
+    if(!login.classList.contains('some'))return;
+    esconder(); void notif.offsetWidth;
+    notif.classList.add('show'); sino.classList.add('on');
+    badge.textContent=parseInt(badge.textContent,10)+1;
+    badge.classList.remove('pop'); void badge.offsetWidth; badge.classList.add('pop');
+    timer=setTimeout(esconder, 9200);
+  }
+
+  document.getElementById('entrar').addEventListener('click',function(){
+    login.classList.add('some'); irPara('dashboard');
+    setTimeout(notificar, 3600);
+  });
+  document.getElementById('btnLogin').addEventListener('click',function(){
+    esconder(); login.classList.remove('some');
+  });
+  document.getElementById('btnSim').addEventListener('click',function(){
+    if(!login.classList.contains('some')){login.classList.add('some');irPara('dashboard');}
+    setTimeout(notificar,150);
+  });
+  document.getElementById('notifX').addEventListener('click',esconder);
+  notif.querySelector('.bm.fant').addEventListener('click',function(){irPara('whatsapp');esconder();});
+
+  contar(document.getElementById('pg-dashboard'));
+})();
+</script>
+</body>
+</html>
