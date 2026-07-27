@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 
 export type IconName =
   | 'whatsapp' | 'facebook' | 'kanban' | 'contatos' | 'agendamentos' | 'scripts' | 'cobrancas'
-  | 'integracoes' | 'relatorios' | 'configuracoes' | 'plano' | 'maturacao'
+  | 'integracoes' | 'relatorios' | 'configuracoes' | 'plano' | 'maturacao' | 'relacionamento'
   | 'sun' | 'moon' | 'bell' | 'logout' | 'chevron-right' | 'chevron-down'
   | 'check' | 'lock' | 'sync' | 'plus' | 'building' | 'users';
 
@@ -19,6 +19,7 @@ const P: Record<IconName, ReactNode> = {
   configuracoes: <><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" /><circle cx="12" cy="12" r="3" /></>,
   plano: <><rect x="2.5" y="5.5" width="19" height="13" rx="2.4" /><path d="M2.5 9.5h19" /></>,
   maturacao: <><path d="M10 13.6V5a2 2 0 0 1 4 0v8.6a4.5 4.5 0 1 1-4 0z" /><path d="M12 9.5v5.2" /><circle cx="12" cy="17.5" r="1.6" /></>,
+  relacionamento: <><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v8A1.5 1.5 0 0 1 18.5 15H9l-4 4z" /><path d="M12 12.1l-2-1.9a1.4 1.4 0 0 1 2-2 1.4 1.4 0 0 1 2 2z" /></>,
   sun: <><circle cx="12" cy="12" r="4" /><path d="M12 3v2M12 19v2M5 5l1.4 1.4M17.6 17.6 19 19M3 12h2M19 12h2M5 19l1.4-1.4M17.6 6.4 19 5" /></>,
   moon: <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />,
   bell: <><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0" /></>,

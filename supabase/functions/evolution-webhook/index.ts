@@ -1,4 +1,6 @@
 // evolution-webhook — eventos da Evolution. Sem JWT. Secret via webhook_config (constante).
+// v31: RELACIONAMENTO — no inbound, chama regua_inbound(conversa, texto): se o cliente responde e a régua
+//      pausa por resposta, pausa a ativação e cancela o próximo envio (no-op sem relacionamento ativo). Best-effort.
 // v30: NONO DÍGITO — a resolução do contato deixa de ser por igualdade exata de valor_normalizado
 //      e passa pela RPC wa_resolver_contato_por_numero (chave canônica = DDD + últimos 8). A
 //      Evolution entrega o mesmo cliente ora como 55+DDD+8 ora como 55+DDD+9, e o casamento exato
@@ -508,6 +510,10 @@ Deno.serve(async (req) => {
           const { data: r } = await admin.rpc('bot_remarketing_inbound', { p_conversa: conversaId, p_texto: conteudoMsg ?? '' });
           rmktDesfecho = (r as string) ?? null;
         } catch { /* best-effort: erro/timeout do remarketing nunca quebra o webhook */ }
+        // RELACIONAMENTO (v31): cliente respondeu → se a régua pausa por resposta, pausa a ativação e cancela o
+        // próximo envio. No-op se o contato não estiver em relacionamento ativo. Best-effort: nunca quebra o webhook.
+        try { await admin.rpc('regua_inbound', { p_conversa: conversaId, p_texto: conteudoMsg ?? '' }); }
+        catch { /* best-effort */ }
       }
 
       // ---- B3.3: dispatch fire-and-forget ao bot-runner (só inbound NOVO de cliente, texto/áudio) ----
