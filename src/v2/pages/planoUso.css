@@ -1,0 +1,79 @@
+/* ============================================================
+   Plano e uso — CSS do pg-planos do mockup (linhas 710–724)
+   + padrões do manual de extensão para o que o mockup não
+   mostra (cards de adicionais com stepper, nota informativa).
+   ============================================================ */
+
+/* card do plano atual */
+.v2 .plano-atual { padding: 17px 18px; }
+.v2 .plano-atual .l1 { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.v2 .plano-atual .n { font-size: 15px; font-weight: 600; }
+.v2 .plano-atual .preco { font-size: 23px; font-weight: 600; letter-spacing: -.02em; margin: 8px 0 2px; }
+.v2 .plano-atual .preco small { font-size: 12px; color: var(--txt-3); font-weight: 400; }
+.v2 .plano-atual .r { font-size: 11.5px; color: var(--txt-2); }
+
+/* inclusos no plano-base */
+.v2 .plano-incl { list-style: none; margin: 0; display: flex; flex-direction: column; gap: 7px; font-size: 11.5px; color: var(--txt-2); line-height: 1.5; }
+.v2 .plano-incl li { display: flex; gap: 8px; align-items: center; }
+.v2 .plano-incl li i { color: var(--verde); font-style: normal; font-size: 11px; flex-shrink: 0; }
+
+/* medidores de uso */
+.v2 .medidor { padding: 4px 0 10px; }
+.v2 .medidor .l { display: flex; justify-content: space-between; font-size: 11.5px; margin-bottom: 6px; }
+.v2 .medidor .l b { font-weight: 500; color: var(--txt); }
+.v2 .medidor .l span { color: var(--txt-2); }
+.v2 .trilho2 { height: 5px; border-radius: 99px; background: rgba(255, 255, 255, .08); overflow: hidden; }
+.v2 .fill {
+  height: 100%; border-radius: 99px; width: 0;
+  background: linear-gradient(90deg, rgba(255, 255, 255, .9), rgba(255, 255, 255, .45));
+  transition: width 1s .3s var(--ease);
+}
+.v2 .fill.alto { background: linear-gradient(90deg, var(--ambar), rgba(217, 164, 74, .55)); }
+.v2 .medidor .nota-m { font-size: 10.5px; color: var(--txt-3); margin-top: 5px; }
+.v2 .medidor .nota-m .lim { color: var(--ambar); font-weight: 600; }
+
+/* cards de contratação de adicionais (manual de extensão; anatomia .int-card) */
+.v2 .addons { grid-template-columns: repeat(3, 1fr); }
+.v2 .p-addon { padding: 15px 16px; display: flex; flex-direction: column; gap: 9px; }
+.v2 .p-addon .l1 { display: flex; align-items: center; gap: 11px; }
+.v2 .p-addon .ic {
+  width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center;
+  justify-content: center; background: rgba(255, 255, 255, .07);
+  border: 1px solid rgba(255, 255, 255, .12); color: var(--txt); flex-shrink: 0;
+}
+.v2 .p-addon .ic svg { width: 17px; height: 17px; }
+.v2 .p-addon .nm { font-size: 13px; font-weight: 600; }
+.v2 .p-addon .pr { font-size: 11px; color: var(--txt-2); margin-top: 1px; }
+.v2 .p-addon .ds { font-size: 11.5px; color: var(--txt-2); line-height: 1.5; flex: 1; }
+.v2 .p-addon .rodo { display: flex; align-items: center; justify-content: space-between; margin-top: 2px; }
+.v2 .p-stepper {
+  display: inline-flex; align-items: center; background: rgba(255, 255, 255, .04);
+  border: 1px solid rgba(255, 255, 255, .09); border-radius: var(--r-ctl); padding: 3px; gap: 2px;
+}
+.v2 .p-stepper button {
+  width: 26px; height: 26px; display: flex; align-items: center; justify-content: center;
+  background: none; border: none; border-radius: 6px; color: var(--txt-2);
+  font-family: var(--fonte); font-size: 14px; cursor: pointer;
+}
+.v2 .p-stepper button:hover:not(:disabled) { background: rgba(255, 255, 255, .08); color: var(--txt); }
+.v2 .p-stepper button:disabled { opacity: .4; cursor: default; }
+.v2 .p-stepper .q { min-width: 26px; text-align: center; font-size: 12.5px; font-weight: 600; }
+.v2 .p-addon .sub { text-align: right; }
+.v2 .p-addon .sub .sl { font-size: 9.5px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--txt-3); }
+.v2 .p-addon .sub .sv { font-size: 14px; font-weight: 600; margin-top: 1px; }
+
+/* aviso inline (substitui o toast v1 da contratação) */
+.v2 .aviso-plano {
+  display: flex; align-items: flex-start; gap: 8px; font-size: 11.5px; line-height: 1.45;
+  border-radius: 9px; padding: 8px 11px; margin-bottom: 12px;
+  background: var(--verde-bg); color: var(--verde); border: 1px solid rgba(74, 190, 140, .26);
+}
+.v2 .aviso-plano button {
+  margin-left: auto; background: none; border: none; color: inherit; cursor: pointer;
+  font-size: 13px; padding: 0 2px; opacity: .7; font-family: var(--fonte);
+}
+
+/* nota informativa do rodapé */
+.v2 .nota-info { display: flex; gap: 10px; padding: 12px 15px; font-size: 11.5px; color: var(--txt-2); line-height: 1.55; border-radius: 12px; }
+.v2 .nota-info svg { flex-shrink: 0; margin-top: 1px; color: var(--txt-3); }
+.v2 .nota-info b { color: var(--txt); font-weight: 500; }

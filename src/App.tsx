@@ -32,6 +32,7 @@ const NaoEncontradaV2 = lazy(() => import('@/v2/pages/NaoEncontrada'));
 const ErroConfiguracaoV2 = lazy(() => import('@/v2/pages/ErroConfiguracao'));
 const RequireAuthV2 = lazy(() => import('@/v2/guards/RequireAuthV2'));
 const RequireRoleV2 = lazy(() => import('@/v2/guards/RequireRoleV2'));
+const PlanoUsoV2 = lazy(() => import('@/v2/pages/PlanoUso'));
 
 /** Rota v2 ainda não recriada: marcador de posição dentro do shell. */
 function emConstrucao(slug: string, titulo: string, subtitulo: string): RouteObject {
@@ -206,7 +207,7 @@ const routes: RouteObject[] = [
                       element: (
                         <Suspense fallback={null}>
                           <RequireRoleV2 role="admin">
-                            <EmConstrucaoV2 titulo="Plano e uso" subtitulo="Assinatura, consumo e adicionais da organização." />
+                            <PlanoUsoV2 />
                           </RequireRoleV2>
                         </Suspense>
                       ),
