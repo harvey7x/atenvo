@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { createBrowserRouter, createHashRouter, RouterProvider, Navigate, type RouteObject } from 'react-router-dom';
 import { AppShell } from '@/components/AppShell';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
@@ -20,6 +21,9 @@ import { Configuracoes } from '@/pages/Configuracoes';
 import { PlanoUso } from '@/pages/PlanoUso';
 import { Maturacao } from '@/pages/Maturacao';
 import { NotFound } from '@/pages/NotFound';
+
+// Redesign Platina (design-ref/CONTRATO.md): vitrine da fundação, carregada sob demanda.
+const VitrineV2 = lazy(() => import('@/v2/pages/Vitrine'));
 
 const routes: RouteObject[] = [
   { path: '/login', element: <Login /> },
@@ -93,6 +97,20 @@ const routes: RouteObject[] = [
       },
     ],
   },
+  // Vitrine só no dev local: a branch gera preview público no CF Pages e o
+  // trabalho de redesign não deve vazar antes do corte final.
+  ...(import.meta.env.DEV
+    ? [
+        {
+          path: '/v2',
+          element: (
+            <Suspense fallback={null}>
+              <VitrineV2 />
+            </Suspense>
+          ),
+        } satisfies RouteObject,
+      ]
+    : []),
   { path: '*', element: <NotFound /> },
 ];
 

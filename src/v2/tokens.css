@@ -1,0 +1,38 @@
+/* ============================================================
+   Tokens Platina — extraídos do :root do mockup
+   design-ref/atenvo-sistema-completo-platina.html
+   Regra do contrato (item 5): páginas v2 usam EXCLUSIVAMENTE
+   estes tokens. Cor existe apenas como semântica (verde/âmbar/
+   rubro) e no pulso do canal.
+
+   Escopo: os tokens vivem em `.v2` (não em :root) para não
+   interferir no app antigo. Qualquer subárvore v2 — inclusive
+   portais de modal — precisa da classe `v2` no elemento raiz.
+   ============================================================ */
+.v2 {
+  --base: #0A0B0D;
+  --vidro-a: rgba(255, 255, 255, .055);
+  --vidro-b: rgba(255, 255, 255, .02);
+  --fio-a: rgba(255, 255, 255, .28);
+  --fio-b: rgba(255, 255, 255, .05);
+  --linha: rgba(255, 255, 255, .065);
+  --txt: #F4F5F7;
+  --txt-2: #9BA1AB;
+  --txt-3: #5E646E;
+  --verde: #4ABE8C;
+  --verde-bg: rgba(74, 190, 140, .12);
+  --ambar: #D9A44A;
+  --ambar-bg: rgba(217, 164, 74, .12);
+  --rubro: #E5665C;
+  --rubro-bg: rgba(229, 102, 92, .13);
+  --r-card: 16px;
+  --r-ctl: 9px;
+  --fonte: 'Instrument Sans Variable', 'Instrument Sans', system-ui, sans-serif;
+  --serif: 'Newsreader Variable', 'Newsreader', Georgia, serif;
+  --ease: cubic-bezier(.2, .8, .2, 1);
+
+  /* Dial de intensidade dos efeitos (contrato, item 6):
+     1 = demo, 0.5 = operação. As opacidades da luz ambiente,
+     do grão e dos glows multiplicam por ele. */
+  --fx: 1;
+}

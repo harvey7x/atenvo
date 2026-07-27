@@ -1,0 +1,272 @@
+/* ============================================================
+   Componentes base Platina — estilos portados 1:1 do mockup
+   design-ref/atenvo-sistema-completo-platina.html.
+   Escopo `.v2` (ver base.css). Glows multiplicam por --fx.
+   ============================================================ */
+
+/* --- Botões ------------------------------------------------- */
+.v2 .btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-family: var(--fonte); font-size: 12.5px; font-weight: 500;
+  border-radius: var(--r-ctl); padding: 7.5px 13px; cursor: pointer;
+  border: 1px solid transparent; color: var(--txt);
+  transition: transform .2s var(--ease), box-shadow .2s, background .2s;
+}
+.v2 .btn:disabled { opacity: .5; cursor: default; }
+.v2 .btn-sec { background: rgba(255, 255, 255, .05); border-color: rgba(255, 255, 255, .12); }
+.v2 .btn-sec:hover:not(:disabled) { background: rgba(255, 255, 255, .085); }
+.v2 .btn-pri {
+  position: relative; overflow: hidden; color: #101215; font-weight: 600;
+  background: linear-gradient(180deg, #FFF, #D6DAE0);
+  box-shadow: 0 10px 26px rgba(255, 255, 255, calc(.10 * var(--fx))), inset 0 1px 0 #fff;
+}
+.v2 .btn-pri:hover:not(:disabled) { transform: translateY(-1px); }
+.v2 .btn-pri::after {
+  content: ""; position: absolute; top: 0; bottom: 0; left: -70%; width: 45%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .85), transparent);
+  transform: skewX(-18deg); transition: left .55s var(--ease);
+}
+.v2 .btn-pri:hover:not(:disabled)::after { left: 120%; }
+.v2 .btn-mini { font-size: 11.5px; padding: 5px 11px; border-radius: 8px; }
+
+/* --- Cabeçalho de card (.card-cab) -------------------------- */
+.v2 .card-cab {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px; border-bottom: 1px solid var(--linha);
+}
+.v2 .card-cab h3 { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.v2 .cont {
+  background: var(--rubro-bg); color: var(--rubro); font-size: 10.5px; font-weight: 600;
+  border-radius: 99px; padding: 1px 8px; border: 1px solid rgba(229, 102, 92, .26);
+}
+.v2 .card-cab a {
+  font-size: 12px; font-weight: 500; color: var(--txt); text-decoration: none;
+  border-bottom: 1px solid rgba(255, 255, 255, .22); padding-bottom: 1px; cursor: pointer;
+}
+
+/* --- KPI (contador + sparkline) ----------------------------- */
+.v2 .kpi { padding: 14px 16px 10px; overflow: hidden; }
+.v2 .kpi .rot { font-size: 12px; font-weight: 500; color: var(--txt-2); }
+.v2 .kpi .val { font-size: 25px; font-weight: 600; letter-spacing: -.025em; margin: 7px 0 7px; }
+.v2 .kpi .val .cent { font-size: 15px; color: var(--txt-3); font-weight: 500; }
+.v2 .delta {
+  display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 500;
+  border-radius: 99px; padding: 2px 9px;
+}
+.v2 .d-ok { background: var(--verde-bg); color: var(--verde); }
+.v2 .d-at { background: var(--ambar-bg); color: var(--ambar); }
+.v2 .d-ne { background: rgba(255, 255, 255, .055); color: var(--txt-2); }
+.v2 .d-er { background: var(--rubro-bg); color: var(--rubro); }
+.v2 .spark { display: block; width: 100%; height: 30px; margin-top: 9px; }
+.v2 .spark path {
+  fill: none; stroke: url(#gPrata); stroke-width: 2; stroke-linecap: round;
+  stroke-dasharray: 1; stroke-dashoffset: 1;
+  animation: v2-desenha 1.2s .5s var(--ease) forwards;
+}
+.v2 .spark polygon { fill: url(#gPrataArea); opacity: 0; animation: v2-surge .8s 1.3s forwards; }
+@keyframes v2-desenha { to { stroke-dashoffset: 0; } }
+@keyframes v2-surge { to { opacity: 1; } }
+
+/* --- Badge de status (.st) ---------------------------------- */
+.v2 .st {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 500;
+  border-radius: 99px; padding: 2px 9px;
+}
+.v2 .st i { width: 6px; height: 6px; border-radius: 50%; display: block; }
+.v2 .s-ok { background: var(--verde-bg); color: var(--verde); }
+.v2 .s-ok i { background: var(--verde); }
+.v2 .s-at { background: var(--ambar-bg); color: var(--ambar); }
+.v2 .s-at i { background: var(--ambar); }
+.v2 .s-er { background: var(--rubro-bg); color: var(--rubro); }
+.v2 .s-er i { background: var(--rubro); box-shadow: 0 0 8px rgba(229, 102, 92, calc(.6 * var(--fx))); }
+.v2 .s-ne { background: rgba(255, 255, 255, .05); color: var(--txt-2); border: 1px solid rgba(255, 255, 255, .1); }
+.v2 .s-ne i { background: var(--txt-3); }
+
+/* --- Item com trilho colorido (.li) ------------------------- */
+.v2 .li {
+  position: relative; display: flex; gap: 12px; padding: 10.5px 16px 10.5px 19px;
+  border-bottom: 1px solid rgba(255, 255, 255, .05); cursor: pointer;
+  transition: background .18s;
+}
+.v2 .li:last-child { border-bottom: none; }
+.v2 .li:hover { background: rgba(255, 255, 255, .035); }
+.v2 .li::before {
+  content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px;
+  border-radius: 0 3px 3px 0;
+}
+.v2 .li.crit::before { background: var(--rubro); box-shadow: 0 0 12px rgba(229, 102, 92, calc(.65 * var(--fx))); }
+.v2 .li.aten::before { background: var(--ambar); box-shadow: 0 0 10px rgba(217, 164, 74, calc(.45 * var(--fx))); }
+.v2 .li.info::before { background: #fff; box-shadow: 0 0 10px rgba(255, 255, 255, calc(.4 * var(--fx))); }
+.v2 .li .t { font-size: 12.5px; font-weight: 500; }
+.v2 .li .s { font-size: 11.5px; color: var(--txt-2); margin-top: 2px; }
+.v2 .li .h { margin-left: auto; font-size: 11px; color: var(--txt-3); white-space: nowrap; padding-top: 2px; }
+
+/* --- Tabela padrão ------------------------------------------ */
+.v2 table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.v2 thead th {
+  text-align: left; font-size: 10.5px; font-weight: 500; letter-spacing: .05em;
+  text-transform: uppercase; color: var(--txt-3); padding: 8px 15px;
+  border-bottom: 1px solid rgba(255, 255, 255, .08); background: rgba(255, 255, 255, .02);
+}
+.v2 tbody td {
+  padding: 0 15px; height: 40px; border-bottom: 1px solid rgba(255, 255, 255, .045);
+  vertical-align: middle; color: var(--txt-2);
+}
+.v2 tbody tr:last-child td { border-bottom: none; }
+.v2 tbody tr { transition: background .16s; }
+.v2 tbody tr:hover { background: rgba(255, 255, 255, .032); }
+.v2 tbody tr.sel { background: rgba(255, 255, 255, .05); }
+.v2 td.d, .v2 th.d { text-align: right; }
+.v2 td.nome { color: var(--txt); font-weight: 500; }
+.v2 .val-t { font-weight: 600; color: var(--txt); }
+.v2 .val-t .cent { color: var(--txt-3); font-weight: 400; }
+
+/* checkbox */
+.v2 .cbx {
+  width: 14px; height: 14px; border: 1.5px solid rgba(255, 255, 255, .28);
+  border-radius: 4px; display: inline-block; vertical-align: -2px; cursor: pointer;
+  background: none; padding: 0;
+}
+.v2 .cbx.on { background: #fff; border-color: #fff; position: relative; }
+.v2 .cbx.on::after {
+  content: ""; position: absolute; left: 4px; top: 1px; width: 4px; height: 8px;
+  border: solid #0E0F12; border-width: 0 2px 2px 0; transform: rotate(45deg);
+}
+
+/* barra de seleção (bulk) platina */
+.v2 .bulk {
+  display: flex; align-items: center; gap: 12px; padding: 8px 15px;
+  background: linear-gradient(180deg, #FFF, #DFE2E7); color: #101215;
+  border-radius: 12px 12px 0 0;
+}
+.v2 .bulk .c { font-size: 12px; font-weight: 600; }
+.v2 .bulk .bs { margin-left: auto; display: flex; gap: 7px; }
+.v2 .bulk button {
+  font-family: var(--fonte); font-size: 11.5px; font-weight: 600; color: #101215;
+  background: rgba(0, 0, 0, .06); border: 1px solid rgba(0, 0, 0, .14); border-radius: 7px;
+  padding: 4.5px 11px; cursor: pointer;
+}
+.v2 .bulk .cbx { border-color: #101215; }
+
+/* rodapé + paginação */
+.v2 .rodape-tab {
+  display: flex; align-items: center; justify-content: space-between; padding: 9px 15px;
+  border-top: 1px solid var(--linha); font-size: 11.5px; color: var(--txt-2);
+}
+.v2 .pag { display: flex; gap: 5px; }
+/* mesmos valores do .pag span do mockup — aqui em <button> (e a reticência em <span>) */
+.v2 .pag button, .v2 .pag span {
+  min-width: 26px; height: 26px; display: flex; align-items: center; justify-content: center;
+  border: 1px solid rgba(255, 255, 255, .11); border-radius: 6px; font-size: 11.5px;
+  cursor: pointer; color: var(--txt-2); background: none; font-family: var(--fonte); padding: 0;
+}
+.v2 .pag span { border-color: transparent; cursor: default; }
+.v2 .pag button:disabled { opacity: .4; cursor: default; }
+.v2 .pag button.on {
+  background: linear-gradient(180deg, #FFF, #DDE0E5); border-color: transparent;
+  color: #101215; font-weight: 600;
+}
+.v2 .pag button:focus-visible { outline: none; box-shadow: 0 0 0 2px rgba(255, 255, 255, .35); }
+
+/* --- Chips de filtro ---------------------------------------- */
+.v2 .chips { display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 13px; }
+.v2 .chip {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 500;
+  background: rgba(255, 255, 255, .045); border: 1px solid rgba(255, 255, 255, .11);
+  color: var(--txt-2); border-radius: 8px; padding: 5px 11px; cursor: pointer;
+  font-family: var(--fonte);
+}
+.v2 .chip.on { background: rgba(255, 255, 255, .10); border-color: rgba(255, 255, 255, .28); color: var(--txt); }
+.v2 .chip .x { opacity: .6; }
+.v2 .chip.limpar { border-style: dashed; opacity: .7; }
+
+/* --- Controle segmentado ------------------------------------ */
+.v2 .segm {
+  display: inline-flex; background: rgba(255, 255, 255, .04);
+  border: 1px solid rgba(255, 255, 255, .09); border-radius: var(--r-ctl);
+  padding: 3px; gap: 2px;
+}
+/* mesmos valores do .segm span do mockup — aqui em <button> operável */
+.v2 .segm button {
+  font-family: var(--fonte); background: none; border: none;
+  font-size: 11.5px; font-weight: 500; color: var(--txt-2); padding: 4.5px 12px;
+  border-radius: 6px; cursor: pointer; white-space: nowrap;
+}
+.v2 .segm button.on {
+  background: rgba(255, 255, 255, .10); color: var(--txt);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1);
+}
+.v2 .segm button:focus-visible {
+  outline: none; box-shadow: 0 0 0 2px rgba(255, 255, 255, .35);
+}
+
+/* --- Campo / Input ------------------------------------------ */
+.v2 .campo label { display: block; font-size: 12px; font-weight: 500; margin-bottom: 5px; }
+.v2 .inp {
+  width: 100%; height: 36px; background: rgba(255, 255, 255, .045);
+  border: 1px solid rgba(255, 255, 255, .13); border-radius: var(--r-ctl);
+  padding: 0 11px; font-family: var(--fonte); font-size: 13px; color: var(--txt);
+}
+.v2 .inp::placeholder { color: var(--txt-3); }
+.v2 .inp:focus {
+  outline: none; border-color: rgba(255, 255, 255, .5);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, .07);
+}
+
+/* --- Toggle ------------------------------------------------- */
+.v2 .tgl {
+  width: 36px; height: 20px; border-radius: 99px;
+  background: linear-gradient(180deg, #FFF, #D6DAE0);
+  position: relative; cursor: pointer; flex-shrink: 0; border: none; padding: 0;
+}
+.v2 .tgl::after {
+  content: ""; position: absolute; top: 2px; right: 2px; width: 16px; height: 16px;
+  border-radius: 50%; background: #101215;
+}
+.v2 .tgl.off { background: rgba(255, 255, 255, .12); }
+.v2 .tgl.off::after { right: auto; left: 2px; background: #9BA1AB; }
+.v2 .tgl:disabled { opacity: .5; cursor: default; }
+.v2 .tgl:focus-visible { outline: none; box-shadow: 0 0 0 2px rgba(255, 255, 255, .35); }
+.v2 .tgl-l { display: flex; align-items: center; gap: 11px; padding: 7px 0; font-size: 12.5px; }
+.v2 .tgl-l .d { color: var(--txt-3); font-size: 11px; margin-top: 1px; }
+
+/* --- Barra de status ---------------------------------------- */
+.v2 .status-bar {
+  margin-top: 12px; display: flex; align-items: center; gap: 20px; padding: 8px 15px;
+  border-radius: 12px; font-size: 10.5px; color: var(--txt-3);
+}
+.v2 .status-bar .seg { display: flex; align-items: center; gap: 7px; }
+.v2 .status-bar .seg i { width: 5px; height: 5px; border-radius: 50%; display: block; flex-shrink: 0; }
+/* como no mockup: ponto colorido plano por padrão; glow estático só com .brilho
+   (na status-bar do mockup, apenas o canal operante brilha — e nada pulsa) */
+.v2 .status-bar .seg i.verde { background: var(--verde); }
+.v2 .status-bar .seg i.ambar { background: var(--ambar); }
+.v2 .status-bar .seg i.rubro { background: var(--rubro); }
+.v2 .status-bar .seg i.neutro { background: var(--txt-3); }
+.v2 .status-bar .seg i.verde.brilho { box-shadow: 0 0 8px rgba(74, 190, 140, calc(.6 * var(--fx))); }
+.v2 .status-bar .seg i.ambar.brilho { box-shadow: 0 0 8px rgba(217, 164, 74, calc(.5 * var(--fx))); }
+.v2 .status-bar .seg i.rubro.brilho { box-shadow: 0 0 8px rgba(229, 102, 92, calc(.6 * var(--fx))); }
+.v2 .status-bar .fim { margin-left: auto; letter-spacing: .14em; font-size: 9.5px; }
+
+/* --- Skeleton (carregando: vidro com shimmer sutil) --------- */
+.v2 .skel {
+  position: relative; overflow: hidden; border-radius: 8px;
+  background: rgba(255, 255, 255, .05);
+}
+.v2 .skel::after {
+  content: ""; position: absolute; inset: 0; transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent,
+    rgba(255, 255, 255, calc(.07 * var(--fx))), transparent);
+  animation: v2-shimmer 1.8s ease-in-out infinite;
+}
+@keyframes v2-shimmer { to { transform: translateX(100%); } }
+
+/* --- Estados vazio / erro (contrato, item 7) ---------------- */
+.v2 .estado {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; gap: 4px; padding: 34px 20px;
+}
+.v2 .estado .ic { font-size: 19px; color: var(--txt-3); margin-bottom: 4px; }
+.v2 .estado .t { font-size: 12.5px; font-weight: 500; color: var(--txt); }
+.v2 .estado .s { font-size: 11.5px; color: var(--txt-2); max-width: 300px; line-height: 1.5; }
+.v2 .estado .acao { margin-top: 10px; }
