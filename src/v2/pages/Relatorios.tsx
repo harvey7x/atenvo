@@ -8,7 +8,7 @@ import {
   useRelatorioOpcoes, useResumo, useComercial, useAtendimento, useEquipe, useFinanceiro, useOrigens,
   useConexoes, type ConexaoLinha, type LinhaEquipe, type ResumoData, type ComercialData,
   type AtendimentoData, type FinanceiroData, type LinhaOrigem, montaLinhasEquipe,
-  exportarCSV, spHoje, kpi,
+  exportarCSV, spHoje, kpi, melhorConexao,
 } from '@/data/relatorios';
 import {
   BotaoSec, CardVidro, Chip, EstadoVazio, Input, Segmentado,
@@ -42,8 +42,8 @@ type Sentido = 'maior' | 'menor' | 'neutro';
 const flat = (v: number): KpiNum => ({ atual: v, anterior: v, deltaAbs: 0, deltaPct: 0 });
 
 /* ===== KPI estático (.kpi do mockup; dado é calmo) ===== */
-function KpiCard({ label, k, sentido, fmt, tooltip, nota, sobe, atraso }: {
-  label: string; k: KpiNum | null; sentido: Sentido; fmt: (n: number) => string; tooltip: string; nota?: string; sobe?: boolean; atraso?: number;
+function KpiCard({ label, k, sentido, fmt, tooltip, nota, sobe, atraso, spark }: {
+  label: string; k: KpiNum | null; sentido: Sentido; fmt: (n: number) => string; tooltip: string; nota?: string; sobe?: boolean; atraso?: number; spark?: number[];
 }) {
   let delta: ReactNode = null;
   if (k && !nota) {
@@ -66,6 +66,11 @@ function KpiCard({ label, k, sentido, fmt, tooltip, nota, sobe, atraso }: {
         <>
           <div className="val num">{fmt(k.atual)}</div>
           {nota ? <span className="delta d-ne" style={{ marginTop: 6 }}>{nota}</span> : <>{delta}<div className="ant num">Anterior: {fmt(k.anterior)}</div></>}
+          {spark && spark.length >= 2 && (
+            <div className="rl2-spark" aria-hidden>
+              {spark.map((v, i) => { const mx = Math.max(1, ...spark); return <i key={i} style={{ height: `${Math.max(6, (v / mx) * 100)}%` }} />; })}
+            </div>
+          )}
         </>
       )}
     </CardVidro>
@@ -230,6 +235,225 @@ function RelTabela<T extends Record<string, unknown>>({ cols, rows, searchKeys, 
 /* ===== gargalo operacional ===== */
 function Garg({ titulo, valor, sub, alerta }: { titulo: string; valor: string; sub: string; alerta?: boolean }) {
   return <div className={'rl2-garg' + (alerta ? ' al' : '')}><div className="t">{titulo}</div><div className="v num">{valor}</div><div className="s">{sub}</div></div>;
+}
+
+/* ============================================================
+   v2.1 — CAMADA VISUAL: funil do tráfego, ranking, insights.
+   Zero query nova: tudo agregação client-side dos hooks já
+   carregados. AMOSTRA_MINIMA declarada: abaixo dela o cartão
+   mostra o absoluto sem veredito.
+   ============================================================ */
+const AMOSTRA_MINIMA = 8;
+
+const ETAPAS_TRAFEGO: { k: keyof ConexaoLinha; r: string }[] = [
+  { k: 'pessoasQueChamaram', r: 'Pessoas que chamaram' },
+  { k: 'conversasAtendidas', r: 'Conversas atendidas' },
+  { k: 'oportunidades', r: 'Oportunidades' },
+  { k: 'qualificados', r: 'Qualificados' },
+  { k: 'fechados', r: 'Clientes fechados' },
+];
+
+/** Funil do tráfego: as colunas já existentes das conexões SÃO as etapas. */
+function FunilTrafego({ linhas }: { linhas: ConexaoLinha[] }) {
+  const reais = linhas.filter((l) => l.chave !== 'sem');
+  const soma = (k: keyof ConexaoLinha) => linhas.reduce((s, l) => s + ((l[k] as number) || 0), 0);
+  const agreg = ETAPAS_TRAFEGO.map((e) => ({ r: e.r, v: soma(e.k) }));
+  const max = Math.max(1, ...agreg.map((a) => a.v));
+  const melhor = melhorConexao(linhas);
+  const comOpp = reais.filter((l) => l.oportunidades > 0);
+  const pior = comOpp.length >= 2 ? comOpp.slice().sort((a, b) => a.taxaConversao - b.taxaConversao)[0] : null;
+  if (agreg[0].v === 0) return <Vazio titulo="Sem tráfego no período" texto="O funil aparece quando houver pessoas chamando." />;
+  return (
+    <>
+      <Painel title="Funil do tráfego" sub="etapas = colunas já medidas por conexão · taxa sobre a etapa anterior">
+        <div className="rl2-ft">
+          {agreg.map((e, i) => {
+            const antes = i > 0 ? agreg[i - 1].v : 0;
+            const taxa = i === 0 ? null : antes > 0 ? (e.v / antes) * 100 : null;
+            return (
+              <div className="et" key={e.r}>
+                <span className="en">{e.r}</span>
+                <div className="eb"><i style={{ width: `${(e.v / max) * 100}%` }} /></div>
+                <span className="ev num">{fmtInt(e.v)}</span>
+                <span className="ex num" title="Taxa sobre a etapa anterior — populações podem se sobrepor (ex.: uma pessoa com mais de uma conversa)">{taxa == null ? '' : `${taxa.toFixed(0)}%`}</span>
+              </div>
+            );
+          })}
+        </div>
+      </Painel>
+      {reais.length > 0 && (
+        <div className="rl2-ftg" style={{ marginBottom: 12 }}>
+          {reais.map((l) => {
+            const base = Math.max(1, l.pessoasQueChamaram);
+            const ehMelhor = melhor?.chave === l.chave && reais.length >= 2;
+            const ehPior = pior?.chave === l.chave && !ehMelhor;
+            return (
+              <div className={'rl2-ftc' + (ehMelhor ? ' melhor' : '')} key={l.chave}>
+                <div className="cn">
+                  <span className="nome-cx">{conexRotulo(l)}</span>
+                  {ehMelhor && <span className="tag m">Melhor</span>}
+                  {ehPior && <span className="tag p">Menor conversão</span>}
+                </div>
+                <div className="cx-tx num">{fmtPct(l.taxaConversao)} de conversão · {fmtInt(l.fechados)} fechado{l.fechados === 1 ? '' : 's'}</div>
+                <div className="mf">
+                  {ETAPAS_TRAFEGO.map((e) => {
+                    const v = (l[e.k] as number) || 0;
+                    return (
+                      <div className="r" key={e.k}>
+                        <span>{e.r.replace('Pessoas que chamaram', 'Pessoas').replace('Conversas atendidas', 'Atendidas').replace('Clientes fechados', 'Fechados')}</span>
+                        <div className="b"><i style={{ width: `${(v / base) * 100}%` }} /></div>
+                        <span className="n num">{fmtInt(v)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </>
+  );
+}
+
+/** Ranking de atendentes: pódio pelo período do filtro; métrica selecionável
+    entre colunas que o v1 já tem. Bot (se existir) e "Não atribuído" não competem. */
+const METRICAS_RANK: { k: keyof LinhaEquipe; r: string; fmt: (n: number) => string }[] = [
+  { k: 'clientesFechados', r: 'Clientes fechados', fmt: fmtInt },
+  { k: 'negociosFechados', r: 'Negócios fechados', fmt: fmtInt },
+  { k: 'contatos', r: 'Contatos atendidos', fmt: fmtInt },
+  { k: 'taxaOperacional', r: 'Taxa operacional', fmt: fmtPct },
+  { k: 'mensagensEnviadas', r: 'Mensagens enviadas', fmt: fmtInt },
+  { k: 'receitaRecebida', r: 'Receita recebida', fmt: fmtBRL },
+];
+function RankingAtendentes({ linhas }: { linhas: LinhaEquipe[] }) {
+  const [mk, setMk] = useState<keyof LinhaEquipe>('clientesFechados');
+  const met = METRICAS_RANK.find((m) => m.k === mk)!;
+  const ehTriagem = (l: LinhaEquipe) => /bot|matheo/i.test(l.nome);
+  const ehAgregado = (l: LinhaEquipe) => l.id === 'nao' || l.nome === 'Não atribuído';
+  const competidores = linhas.filter((l) => !ehTriagem(l) && !ehAgregado(l))
+    .slice().sort((a, b) => ((b[mk] as number) || 0) - ((a[mk] as number) || 0));
+  const foraDoPodio = linhas.filter((l) => ehTriagem(l) || ehAgregado(l));
+  if (competidores.length === 0) return null;
+  const podio = competidores.slice(0, 3);
+  const resto = competidores.slice(3);
+  return (
+    <Painel title="Ranking de atendentes" sub="pelo período e filtros ativos">
+      <div className="rl2-rk-metric" style={{ marginBottom: 11 }}>
+        <span style={{ fontSize: 10.5, color: 'var(--txt-3)' }}>Ordenar por</span>
+        <select className="inp rl2-sel" value={mk} onChange={(e) => setMk(e.target.value as keyof LinhaEquipe)} aria-label="Métrica do ranking">
+          {METRICAS_RANK.map((m) => <option key={m.k} value={m.k}>{m.r}</option>)}
+        </select>
+      </div>
+      <div className="rl2-podio">
+        {podio.map((l, i) => (
+          <div className={'rl2-pod' + (i === 0 ? ' ouro' : '')} key={l.id}>
+            <span className="pos">{i + 1}º</span>
+            <div className="nm">{l.nome}</div>
+            <div className="mv">{met.fmt((l[mk] as number) || 0)}</div>
+            <div className="ml">{met.r}</div>
+          </div>
+        ))}
+      </div>
+      {(resto.length > 0 || foraDoPodio.length > 0) && (
+        <div className="rl2-rk-linhas">
+          {resto.map((l, i) => (
+            <div className="rl2-rk" key={l.id}>
+              <span className="p num">{i + 4}º</span>
+              <span className="n">{l.nome}</span>
+              <span className="v num">{met.fmt((l[mk] as number) || 0)}</span>
+            </div>
+          ))}
+          {foraDoPodio.map((l) => (
+            <div className="rl2-rk triagem" key={l.id}>
+              <span className="p">—</span>
+              <span className="n">{l.nome}{ehTriagem(l) ? ' · triagem (não compete)' : ' · agregado (não compete)'}</span>
+              <span className="v num">{met.fmt((l[mk] as number) || 0)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </Painel>
+  );
+}
+
+/** Insights honestos: computados client-side, regra visível, amostra mínima declarada. */
+interface Insight { t: string; v: string; f: string; como: string; amostra: number; }
+function computaInsights(args: {
+  at: AtendimentoData | null | undefined; fin: FinanceiroData | null | undefined;
+  linhasCx: ConexaoLinha[]; pessoasTotal: number; fechadosTotal: number;
+}): Insight[] {
+  const { at, fin, linhasCx, pessoasTotal, fechadosTotal } = args;
+  const out: Insight[] = [];
+  const reais = linhasCx.filter((l) => l.chave !== 'sem');
+  if (at) {
+    const atendidas = at.totalConversas - at.semResposta;
+    if (at.primeiraRespostaMin != null) out.push({
+      t: 'Tempo até 1ª resposta', v: fmtMin(at.primeiraRespostaMin),
+      f: `média sobre ${pl(atendidas, 'conversa atendida', 'conversas atendidas')}`,
+      como: 'Como calculamos: média entre a 1ª mensagem recebida e a 1ª resposta de operador (autor identificado), por conversa do período.',
+      amostra: atendidas,
+    });
+    out.push({
+      t: 'Conversas sem resposta', v: fmtInt(at.semResposta),
+      f: at.totalConversas > 0 ? `${fmtPct((at.semResposta / at.totalConversas) * 100)} das ${pl(at.totalConversas, 'conversa do período', 'conversas do período')}` : 'sem conversas no período',
+      como: 'Como calculamos: conversas com mensagem recebida e nenhuma resposta de operador no período.',
+      amostra: at.totalConversas,
+    });
+    const somaMsgs = at.porHora.reduce((s, v) => s + v, 0);
+    if (somaMsgs > 0) {
+      const hPico = at.porHora.indexOf(Math.max(...at.porHora));
+      const DIAS = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+      const dPico = at.porDiaSemana.indexOf(Math.max(...at.porDiaSemana));
+      out.push({
+        t: 'Pico de atividade', v: `${String(hPico).padStart(2, '0')}h · ${DIAS[dPico]}`,
+        f: `hora e dia com mais mensagens (${fmtInt(somaMsgs)} no período)`,
+        como: 'Como calculamos: histograma de mensagens por hora e por dia da semana (fuso de São Paulo); mostramos o maior de cada.',
+        amostra: somaMsgs,
+      });
+    }
+  }
+  out.push({
+    t: 'Conversão do período', v: pessoasTotal > 0 ? fmtPct((fechadosTotal / pessoasTotal) * 100) : '—',
+    f: `${pl(fechadosTotal, 'cliente fechado', 'clientes fechados')} de ${pl(pessoasTotal, 'pessoa que chamou', 'pessoas que chamaram')}`,
+    como: 'Como calculamos: clientes fechados (pessoa única por telefone, ganho por fechado_em) ÷ pessoas que chamaram (inbound, dedup por telefone).',
+    amostra: pessoasTotal,
+  });
+  const melhor = melhorConexao(linhasCx);
+  if (melhor && reais.length >= 2) out.push({
+    t: 'Melhor conexão', v: melhor.nome,
+    f: `${pl(melhor.pessoasQueChamaram, 'pessoa', 'pessoas')} · ${fmtInt(melhor.fechados)} fechado${melhor.fechados === 1 ? '' : 's'} · ${fmtPct(melhor.taxaConversao)}`,
+    como: 'Como calculamos: conexão com mais pessoas que chamaram (desempate por clientes fechados), pela conexão de aquisição do contato.',
+    amostra: melhor.pessoasQueChamaram,
+  });
+  if (fin && fin.vencTotalQtd > 0) out.push({
+    t: 'Inadimplência', v: fmtPct(fin.inadimplencia),
+    f: `sobre ${pl(fin.vencTotalQtd, 'parcela vencida', 'parcelas vencidas')} · ${fmtBRL(fin.vencida)} em aberto`,
+    como: 'Como calculamos: parcelas vencidas e não pagas ÷ parcelas vencidas no período (posição de hoje para o valor em aberto).',
+    amostra: fin.vencTotalQtd,
+  });
+  return out;
+}
+function SecaoInsights({ insights }: { insights: Insight[] }) {
+  if (insights.length === 0) return null;
+  return (
+    <>
+      <div className="rl2-sec" style={{ marginTop: 0 }}>Leituras do período <span>· computadas dos dados acima · passe o mouse para ver a regra</span></div>
+      <div className="rl2-ins">
+        {insights.map((i) => {
+          const pequena = i.amostra < AMOSTRA_MINIMA;
+          return (
+            <div className={'rl2-in' + (pequena ? ' amostra' : '')} key={i.t} title={i.como}>
+              <div className="t">{i.t}</div>
+              <div className="v">{pequena ? `${fmtInt(i.amostra)} evento${i.amostra === 1 ? '' : 's'} no período` : i.v}</div>
+              <div className="f">{pequena ? 'amostra pequena — sem veredito' : i.f}</div>
+              <div className="como">{i.como.replace('Como calculamos: ', '')}</div>
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
 }
 
 /* ===== modo demonstração: seeds por aba ===== */
@@ -491,6 +715,11 @@ function AbaResumo({ f, demo, seed, periodoLabel, orgNome, ehAtendente }: { f: R
           <KpiCard sobe atraso={0.22} label="Conversas sem resposta" k={dAt ? flat(dAt.semResposta) : null} sentido="menor" fmt={fmtInt} nota="No período" tooltip="Conversas com entrada e nenhuma resposta de operador no período." />
         </div>
 
+        <SecaoInsights insights={computaInsights({ at: dAt, fin: dFin, linhasCx, pessoasTotal, fechadosTotal: dResumo.oportunidadesFechadas.atual })} />
+
+        <div className="rl2-sec">Funil do tráfego <span>· agregado do período + por conexão</span></div>
+        <Estado q={cx} demo={demo}><FunilTrafego linhas={linhasCx} /></Estado>
+
         <div className="rl2-sec">Desempenho por número / conexão <span>· por conexão de aquisição</span></div>
         <Estado q={cx} demo={demo}>{conexRows.length === 0 ? <Vazio titulo="Sem conexões com resultado no período" /> : <RelTabela
           cols={[
@@ -509,6 +738,7 @@ function AbaResumo({ f, demo, seed, periodoLabel, orgNome, ehAtendente }: { f: R
 
         {!ehAtendente && <>
           <div className="rl2-sec">Desempenho por atendente <span>· por responsável</span></div>
+          <RankingAtendentes linhas={equipeRows} />
           <Estado q={eq} demo={demo}>{equipeRows.length === 0 ? <Vazio titulo="Sem atendentes com dados no período" /> : <RelTabela
             cols={[
               { key: 'nome', label: 'Atendente' },
@@ -549,7 +779,7 @@ function AbaVendas({ f, demo, seed, periodoLabel, orgNome }: { f: RelFiltros; de
     <Estado q={q} demo={demo}>
       {d && <>
         <div className="rl2-kpis" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
-          <KpiCard label="Novas oportunidades" k={flat(d.totalOpp)} sentido="neutro" fmt={fmtInt} nota="No período" tooltip="Oportunidades criadas no período." />
+          <KpiCard label="Novas oportunidades" k={flat(d.totalOpp)} sentido="neutro" fmt={fmtInt} nota="No período" tooltip="Oportunidades criadas no período." spark={d.leadsSerie.map((s) => s.v)} />
           <KpiCard label="Negócios fechados" k={flat(Math.round((d.taxaConversao / 100) * d.totalOpp))} sentido="neutro" fmt={fmtInt} nota="No período" tooltip="Oportunidades ganhas no período (por criação). Clientes distintos ficam no Resumo." />
           <KpiCard label="Clientes perdidos" k={flat(d.perdidos)} sentido="neutro" fmt={fmtInt} nota="No período" tooltip="Oportunidades com status perdido." />
           <KpiCard label="Conversão" k={flat(d.taxaConversao)} sentido="neutro" fmt={fmtPct} nota="No período" tooltip="Ganhas ÷ total de oportunidades criadas." />
