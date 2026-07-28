@@ -40,6 +40,8 @@ type TabelaPadraoProps<T> = {
     rotuloContagem?: (n: number) => string;
   };
   rodape?: { texto: ReactNode; paginacao?: Paginacao };
+  /** Linha inteira clicável (ex.: abrir detalhe). Cliques em botões/checkbox internos não disparam. */
+  aoClicarLinha?: (linha: T) => void;
 };
 
 export function Checkbox({ marcado, aoAlternar, rotulo }: {
@@ -71,7 +73,7 @@ function paginasVisiveis(pagina: number, total: number): (number | '…')[] {
   return [1, '…', pagina - 1, pagina, pagina + 1, '…', total];
 }
 
-export function TabelaPadrao<T>({ colunas, linhas, chave, selecao, rodape }: TabelaPadraoProps<T>) {
+export function TabelaPadrao<T>({ colunas, linhas, chave, selecao, rodape, aoClicarLinha }: TabelaPadraoProps<T>) {
   const ids = linhas.map(chave);
   const selecionadas = selecao?.selecionadas ?? new Set<string>();
   const pg = rodape?.paginacao;
@@ -111,7 +113,16 @@ export function TabelaPadrao<T>({ colunas, linhas, chave, selecao, rodape }: Tab
             const id = ids[i];
             const sel = selecionadas.has(id);
             return (
-              <tr key={id} className={sel ? 'sel' : undefined}>
+              <tr
+                key={id}
+                className={sel ? 'sel' : undefined}
+                style={aoClicarLinha ? { cursor: 'pointer' } : undefined}
+                onClick={aoClicarLinha ? (ev) => {
+                  // não rouba cliques de controles internos (checkbox, botões, links)
+                  if ((ev.target as HTMLElement).closest('button, a, input, select')) return;
+                  aoClicarLinha(linha);
+                } : undefined}
+              >
                 {selecao && (
                   <td>
                     <Checkbox marcado={sel} aoAlternar={() => selecao.aoAlternar(id)} />

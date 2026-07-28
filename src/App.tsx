@@ -33,6 +33,7 @@ const ErroConfiguracaoV2 = lazy(() => import('@/v2/pages/ErroConfiguracao'));
 const RequireAuthV2 = lazy(() => import('@/v2/guards/RequireAuthV2'));
 const RequireRoleV2 = lazy(() => import('@/v2/guards/RequireRoleV2'));
 const PlanoUsoV2 = lazy(() => import('@/v2/pages/PlanoUso'));
+const CobrancasV2 = lazy(() => import('@/v2/pages/Cobrancas'));
 const RedefinirSenhaV2 = lazy(() => import('@/v2/pages/RedefinirSenha'));
 const DefinirSenhaV2 = lazy(() => import('@/v2/pages/DefinirSenha'));
 const AlterarSenhaV2 = lazy(() => import('@/v2/pages/AlterarSenha'));
@@ -216,7 +217,14 @@ const routes: RouteObject[] = [
                     emConstrucao('agendamentos', 'Agendamentos', 'Mensagens programadas, enviadas, falhas e canceladas.'),
                     emConstrucao('contatos', 'Contatos', 'Todos os contatos da organização.'),
                     emConstrucao('scripts', 'Scripts', 'Biblioteca de scripts e mídias.'),
-                    emConstrucao('cobrancas', 'Cobranças', 'Cobranças da organização aos próprios clientes.'),
+                    {
+                      path: 'cobrancas',
+                      element: (
+                        <Suspense fallback={null}>
+                          <CobrancasV2 />
+                        </Suspense>
+                      ),
+                    },
                     emConstrucao('relatorios', 'Relatórios', 'Desempenho do atendimento e das cobranças.'),
                     emConstrucao('integracoes', 'Integrações', 'Conexões do canal e serviços do sistema.'),
                     {

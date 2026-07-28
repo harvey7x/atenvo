@@ -45,6 +45,7 @@
 }
 
 /* --- KPI (contador + sparkline) ----------------------------- */
+.v2 .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 14px; }
 .v2 .kpi { padding: 14px 16px 10px; overflow: hidden; }
 .v2 .kpi .rot { font-size: 12px; font-weight: 500; color: var(--txt-2); }
 .v2 .kpi .val { font-size: 25px; font-weight: 600; letter-spacing: -.025em; margin: 7px 0 7px; }
@@ -282,6 +283,47 @@
   animation: v2-shimmer 1.8s ease-in-out infinite;
 }
 @keyframes v2-shimmer { to { transform: translateX(100%); } }
+
+/* --- Modal v2 (regra 10: portal com classe v2 na raiz) ------ */
+.v2 .veu {
+  position: fixed; inset: 0; z-index: 90;
+  background: rgba(6, 7, 9, .62);
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+  animation: v2-veu-entra .18s var(--ease);
+}
+@keyframes v2-veu-entra { from { opacity: 0; } }
+.v2 .p-modal {
+  max-width: calc(100vw - 48px); max-height: calc(100dvh - 48px);
+  display: flex; flex-direction: column; border-radius: var(--r-card);
+  animation: v2-modal-entra .22s var(--ease);
+}
+@keyframes v2-modal-entra { from { opacity: 0; transform: translateY(10px) scale(.985); } }
+.v2 .p-modal-cab {
+  padding: 15px 18px 13px; border-bottom: 1px solid var(--linha);
+  font-size: 14px; font-weight: 600; flex-shrink: 0;
+}
+.v2 .p-modal-cab .mod-sub { font-size: 11.5px; color: var(--txt-2); font-weight: 400; margin-top: 3px; }
+.v2 .p-modal-corpo { padding: 15px 18px; overflow-y: auto; min-height: 0; }
+.v2 .p-modal-rodape {
+  padding: 12px 18px; border-top: 1px solid var(--linha); flex-shrink: 0;
+  display: flex; gap: 9px; justify-content: flex-end; align-items: center;
+}
+.v2 .p-modal-msg { font-size: 12.5px; color: var(--txt-2); line-height: 1.55; }
+/* botão destrutivo (confirmações rubras) */
+.v2 .btn-perigo { background: var(--rubro-bg); border-color: rgba(229, 102, 92, .35); color: var(--rubro); }
+.v2 .btn-perigo:hover:not(:disabled) { background: rgba(229, 102, 92, .2); }
+
+/* aviso inline (retorno de mutações — substitui os toasts v1) */
+.v2 .aviso-inline {
+  display: flex; align-items: flex-start; gap: 8px; font-size: 11.5px; line-height: 1.45;
+  border-radius: 9px; padding: 8px 11px; margin-bottom: 12px;
+  background: var(--verde-bg); color: var(--verde); border: 1px solid rgba(74, 190, 140, .26);
+}
+.v2 .aviso-inline.erro { background: var(--rubro-bg); color: var(--rubro); border-color: rgba(229, 102, 92, .26); }
+.v2 .aviso-inline button {
+  margin-left: auto; background: none; border: none; color: inherit; cursor: pointer;
+  font-size: 13px; padding: 0 2px; opacity: .7; font-family: var(--fonte);
+}
 
 /* --- Estados vazio / erro (contrato, item 7) ---------------- */
 .v2 .estado {

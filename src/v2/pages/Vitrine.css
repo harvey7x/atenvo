@@ -20,5 +20,4 @@
 .v2.vitrine .cor b { font-weight: 600; color: var(--txt); font-size: 11px; }
 .v2.vitrine .tipo-linha { display: flex; flex-direction: column; gap: 8px; padding: 16px 18px; }
 .v2.vitrine .g3 { grid-template-columns: 1fr 1fr 1fr; }
-.v2.vitrine .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
 .v2.vitrine .nota { font-size: 11px; color: var(--txt-3); margin-top: 8px; line-height: 1.5; }

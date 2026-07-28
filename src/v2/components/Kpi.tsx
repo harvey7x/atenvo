@@ -109,17 +109,20 @@ type KpiProps = {
   delta?: { tom: TomDelta; texto: ReactNode };
   /** Pontos da sparkline (omitida se ausente). */
   spark?: number[];
+  /** Tinge o valor na semântica (ex.: vencidas em rubro, recebido em verde). */
+  tomValor?: 'ok' | 'erro';
   sobe?: boolean;
   atraso?: number;
 };
 
 /** Card de KPI do dashboard: rótulo, contador animado, delta e sparkline. */
-export function Kpi({ rotulo, valor, formato = 'int', prefixo, sufixo, delta, spark, sobe, atraso }: KpiProps) {
+export function Kpi({ rotulo, valor, formato = 'int', prefixo, sufixo, delta, spark, tomValor, sobe, atraso }: KpiProps) {
   const texto = useContador(valor, formato);
+  const corValor = tomValor === 'ok' ? 'var(--verde)' : tomValor === 'erro' ? 'var(--rubro)' : undefined;
   return (
     <CardVidro spot sobe={sobe} atraso={atraso} className="kpi">
       <div className="rot">{rotulo}</div>
-      <div className="val num">
+      <div className="val num" style={corValor ? { color: corValor } : undefined}>
         {prefixo}
         <span>{texto}</span>
         {sufixo !== undefined && <span className="cent">{sufixo}</span>}
