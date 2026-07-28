@@ -41,6 +41,7 @@ const MaturacaoV2 = lazy(() => import('@/v2/pages/Maturacao'));
 const ContatosV2 = lazy(() => import('@/v2/pages/Contatos'));
 const RelatoriosV2 = lazy(() => import('@/v2/pages/Relatorios'));
 const IntegracoesV2 = lazy(() => import('@/v2/pages/Integracoes'));
+const KanbanV2 = lazy(() => import('@/v2/pages/Kanban'));
 const ManutencaoV2 = lazy(() => import('@/v2/pages/Manutencao'));
 const RedefinirSenhaV2 = lazy(() => import('@/v2/pages/RedefinirSenha'));
 const DefinirSenhaV2 = lazy(() => import('@/v2/pages/DefinirSenha'));
@@ -243,7 +244,14 @@ const routes: RouteObject[] = [
                         </Suspense>
                       ),
                     },
-                    emConstrucao('kanban', 'Kanban', 'Funil comercial em colunas.'),
+                    {
+                      path: 'kanban',
+                      element: (
+                        <Suspense fallback={null}>
+                          <KanbanV2 />
+                        </Suspense>
+                      ),
+                    },
                     {
                       path: 'agendamentos',
                       element: (

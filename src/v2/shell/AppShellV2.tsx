@@ -177,7 +177,8 @@ export default function AppShellV2() {
           <div className="palco">
             {/* key por caminho + geração: re-executa a entrada (pg-entra + cascata)
                 a cada troca de rota e quando a intro abre o palco */}
-            <div className="pagina pg-entra" key={location.pathname}>
+            {/* páginas cheias (kanban, inbox) gerenciam a própria altura — shell.css .pagina.cheia */}
+            <div className={/^\/v2\/(kanban|whatsapp)(\/|$)/.test(location.pathname) ? 'pagina pg-entra cheia' : 'pagina pg-entra'} key={location.pathname}>
               <Outlet />
             </div>
           </div>
