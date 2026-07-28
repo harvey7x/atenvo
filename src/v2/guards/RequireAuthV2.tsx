@@ -25,10 +25,10 @@ export default function RequireAuthV2() {
     );
   }
   if (!user) {
-    return <Navigate to="/v2/login" state={{ from: location }} replace />;
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
-  if (user.deveTrocarSenha && location.pathname !== '/v2/alterar-senha') {
-    return <Navigate to="/v2/alterar-senha" replace />;
+  if (user.deveTrocarSenha && location.pathname !== '/alterar-senha') {
+    return <Navigate to="/alterar-senha" replace />;
   }
   return <Outlet />;
 }

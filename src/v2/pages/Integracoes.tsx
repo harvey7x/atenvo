@@ -806,7 +806,7 @@ export default function IntegracoesV2() {
               <span className="int-s num">
                 {matConectados} conectado{matConectados === 1 ? '' : 's'} · {matTotal} número{matTotal === 1 ? '' : 's'} no pool
               </span>
-              <BotaoSec mini onClick={() => nav('/v2/maturacao')}>Abrir Maturação</BotaoSec>
+              <BotaoSec mini onClick={() => nav('/maturacao')}>Abrir Maturação</BotaoSec>
             </div>
           )}
         </div>

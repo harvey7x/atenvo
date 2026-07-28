@@ -58,7 +58,7 @@ export function useNotificacaoInbound(opts: {
         if (m.origem && ORIGENS_SILENCIOSAS.has(m.origem)) return;
         if (!m.conversa_id) return;
         // conversa aberta E janela focada na página do WhatsApp → sem toast (o inbox já mostra)
-        const naPagina = window.location.pathname.startsWith('/v2/whatsapp');
+        const naPagina = window.location.pathname.startsWith('/whatsapp');
         let abertaId: string | null = null;
         try { abertaId = sessionStorage.getItem(CURR_KEY); } catch { /* privado */ }
         const focada = document.visibilityState === 'visible' && document.hasFocus();

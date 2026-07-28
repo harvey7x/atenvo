@@ -851,7 +851,7 @@ function PainelCanais({ anima, demo, seed, podeGerenciar, onNav }: { anima: bool
           <div className="cfg-sec" style={{ marginBottom: 4 }}>WhatsApp</div>
           <p style={{ fontSize: 11.5, color: 'var(--txt-2)', marginBottom: 13 }}>Resumo das conexões. A gestão (conectar/remover) fica em Integrações.</p>
         </div>
-        <BotaoSec onClick={() => onNav('/v2/integracoes')}>Abrir Integrações</BotaoSec>
+        <BotaoSec onClick={() => onNav('/integracoes')}>Abrir Integrações</BotaoSec>
       </div>
       {waIndisponivel ? (
         <p style={{ fontSize: 11.5, color: 'var(--txt-3)', padding: '10px 0' }}>Disponível com o backend configurado.</p>
@@ -873,7 +873,7 @@ function PainelCanais({ anima, demo, seed, podeGerenciar, onNav }: { anima: bool
             </div>
             <div className="ac">
               <BadgeStatus tom={WA_ST[c.status]?.tom || 'neutro'}>{WA_ST[c.status]?.t || c.status}</BadgeStatus>
-              {podeGerenciar && <BotaoMini onClick={() => onNav('/v2/integracoes')}>Configurar origem comercial</BotaoMini>}
+              {podeGerenciar && <BotaoMini onClick={() => onNav('/integracoes')}>Configurar origem comercial</BotaoMini>}
             </div>
           </div>
         ))

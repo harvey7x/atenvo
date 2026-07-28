@@ -24,8 +24,8 @@ export default function AlterarSenhaV2() {
   const [senha, setSenha] = useState('');
   const [conf, setConf] = useState('');
 
-  if (mode === 'mock') return <Navigate to="/v2/login" replace />;
-  if (!user) return <Navigate to="/v2/login" replace />;
+  if (mode === 'mock') return <Navigate to="/login" replace />;
+  if (!user) return <Navigate to="/login" replace />;
   // já não precisa trocar -> não fica preso aqui
   if (!user.deveTrocarSenha) return <Navigate to={DESTINO_PADRAO_V2} replace />;
 

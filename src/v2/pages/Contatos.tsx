@@ -189,13 +189,13 @@ export default function ContatosV2() {
   async function abrirConversa(c: ContatoRow) {
     if (demo) {
       const cv = extras?.conversas.get(c.id);
-      if (cv) navigate(`/v2/whatsapp?conversa=${encodeURIComponent(cv)}`);
+      if (cv) navigate(`/whatsapp?conversa=${encodeURIComponent(cv)}`);
       else setAviso({ tom: 'erro', texto: 'Este contato não tem conversa ativa.' });
       return;
     }
     try {
       const cv = await conversaAtivaDoContato(currentOrg.id, c.id);
-      if (cv) navigate(`/v2/whatsapp?conversa=${encodeURIComponent(cv.id)}`);
+      if (cv) navigate(`/whatsapp?conversa=${encodeURIComponent(cv.id)}`);
       else setAviso({ tom: 'erro', texto: 'Este contato não tem conversa ativa.' });
     } catch (e) { setAviso({ tom: 'erro', texto: (e as Error).message || 'Falha ao localizar a conversa.' }); }
   }
@@ -360,7 +360,7 @@ export default function ContatosV2() {
           agsOrg={demo ? null : (agsQ.data ?? null)}
           aoFechar={() => setDetId(null)}
           aoAbrirConversa={() => abrirConversa(det)}
-          aoAgendar={() => navigate('/v2/agendamentos')}
+          aoAgendar={() => navigate('/agendamentos')}
           aoBloquear={(v) => alternarBloqueio(det, v)}
           aoEditar={() => setForm({ modo: 'editar', alvo: det })}
           aoExcluir={() => setExcluir(det)}
@@ -492,7 +492,7 @@ function FichaContato({ contato, demo, extras, bloqueado, cobSituacao, agsOrg, a
                   <b>{o.tipoServico || o.funilNome}</b>
                   <i>{o.colunaNome}{o.aberta ? '' : o.status === 'ganho' ? ' · ganho' : ' · perdido'}{o.respNome ? ` · ${o.respNome}` : ''}</i>
                 </div>
-                {o.aberta && <BotaoMini onClick={() => navigate(`/v2/kanban?oportunidade=${encodeURIComponent(o.id)}`)}>Abrir no Kanban</BotaoMini>}
+                {o.aberta && <BotaoMini onClick={() => navigate(`/kanban?oportunidade=${encodeURIComponent(o.id)}`)}>Abrir no Kanban</BotaoMini>}
               </div>
             ))
           )}
@@ -501,7 +501,7 @@ function FichaContato({ contato, demo, extras, bloqueado, cobSituacao, agsOrg, a
         <div className="fx-b">
           <div className="fx-t">
             Cobranças
-            {(cobrancas.length > 0 || cobSituacao) && <BotaoMini onClick={() => navigate('/v2/cobrancas')}>Ver todas</BotaoMini>}
+            {(cobrancas.length > 0 || cobSituacao) && <BotaoMini onClick={() => navigate('/cobrancas')}>Ver todas</BotaoMini>}
           </div>
           {demo ? (
             cobSituacao

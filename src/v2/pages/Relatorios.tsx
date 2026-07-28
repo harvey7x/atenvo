@@ -1073,8 +1073,8 @@ function AbaDetalhamento({ f, demo, seed, periodoLabel, orgNome, ehAtendente, on
         rows={dOr as unknown as Record<string, unknown>[]} searchKeys={['origem']}
         csvName={`detalhe_origens_${periodoLabel.replace(/\D/g, '')}`} csvMeta={meta} />}</Estado>}
       <div className="rl2-toolbar" style={{ marginTop: 4 }}>
-        <BotaoSec mini onClick={() => onNav('/v2/cobrancas')}>Abrir Cobranças (atraso e pagamentos)</BotaoSec>
-        <BotaoSec mini onClick={() => onNav('/v2/kanban')}>Abrir Kanban (oportunidades)</BotaoSec>
+        <BotaoSec mini onClick={() => onNav('/cobrancas')}>Abrir Cobranças (atraso e pagamentos)</BotaoSec>
+        <BotaoSec mini onClick={() => onNav('/kanban')}>Abrir Kanban (oportunidades)</BotaoSec>
       </div>
       <CardVidro className="rl2-painel">
         <EstadoVazio

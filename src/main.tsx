@@ -8,7 +8,11 @@ import { AuthProvider } from '@/context/AuthContext';
 import { OrgProvider } from '@/context/OrgContext';
 import { ToastProvider } from '@/hooks/useToast';
 import { ConfigError } from '@/pages/ConfigError';
-import { isMisconfigured } from '@/lib/supabase';
+import { isMisconfigured, isDemoMode } from '@/lib/supabase';
+
+// Intensidade dos efeitos (contrato item 6): produção = --fx 0.5 (padrão em tokens.css);
+// só o modo demonstração sobe para 1 via html[data-demo]. O corte torna 0.5 o default real.
+if (typeof document !== 'undefined' && isDemoMode) document.documentElement.setAttribute('data-demo', '');
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, retry: 1, refetchOnWindowFocus: false } },

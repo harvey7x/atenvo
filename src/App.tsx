@@ -1,5 +1,6 @@
-import { lazy, Suspense } from 'react';
-import { createBrowserRouter, createHashRouter, RouterProvider, Navigate, type RouteObject } from 'react-router-dom';
+import { lazy, Suspense, type ReactNode } from 'react';
+import { createBrowserRouter, createHashRouter, RouterProvider, Navigate, useParams, type RouteObject } from 'react-router-dom';
+// v1 — preservado APENAS em /v1/* como fallback técnico (sem link na interface). Nada é deletado.
 import { AppShell } from '@/components/AppShell';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { RequireRole } from '@/components/RequireRole';
@@ -21,14 +22,11 @@ import { Relatorios } from '@/pages/Relatorios';
 import { Configuracoes } from '@/pages/Configuracoes';
 import { PlanoUso } from '@/pages/PlanoUso';
 import { Maturacao } from '@/pages/Maturacao';
-import { NotFound } from '@/pages/NotFound';
 
-// Redesign Platina (design-ref/CONTRATO.md): tudo carregado sob demanda.
-const VitrineV2 = lazy(() => import('@/v2/pages/Vitrine'));
+// ===== Redesign Platina (design-ref/CONTRATO.md): AGORA as rotas OFICIAIS. Tudo sob demanda. =====
 const AppShellV2 = lazy(() => import('@/v2/shell/AppShellV2'));
 const LoginV2 = lazy(() => import('@/v2/pages/Login'));
 const NaoEncontradaV2 = lazy(() => import('@/v2/pages/NaoEncontrada'));
-const ErroConfiguracaoV2 = lazy(() => import('@/v2/pages/ErroConfiguracao'));
 const RequireAuthV2 = lazy(() => import('@/v2/guards/RequireAuthV2'));
 const RequireRoleV2 = lazy(() => import('@/v2/guards/RequireRoleV2'));
 const PlanoUsoV2 = lazy(() => import('@/v2/pages/PlanoUso'));
@@ -47,292 +45,90 @@ const RedefinirSenhaV2 = lazy(() => import('@/v2/pages/RedefinirSenha'));
 const DefinirSenhaV2 = lazy(() => import('@/v2/pages/DefinirSenha'));
 const AlterarSenhaV2 = lazy(() => import('@/v2/pages/AlterarSenha'));
 
+function Lz({ children }: { children: ReactNode }) {
+  return <Suspense fallback={null}>{children}</Suspense>;
+}
+
+// Compat: bookmarks do preview antigo (/v2/<x>) caem na rota oficial equivalente (/<x>).
+function RedirDeV2() {
+  const { '*': resto } = useParams();
+  return <Navigate to={'/' + (resto ?? '')} replace />;
+}
+
 const routes: RouteObject[] = [
-  { path: '/login', element: <Login /> },
-  { path: '/redefinir-senha', element: <RedefinirSenha /> },
-  { path: '/definir-senha', element: <DefinirSenha /> },
+  // ============ ROTAS OFICIAIS = Platina (o corte) ============
+  { path: '/login', element: <Lz><LoginV2 /></Lz> },
+  { path: '/redefinir-senha', element: <Lz><RedefinirSenhaV2 /></Lz> },
+  { path: '/definir-senha', element: <Lz><DefinirSenhaV2 /></Lz> },
   {
-    element: <ProtectedRoute />,
+    element: <Lz><RequireAuthV2 /></Lz>,
     children: [
-      // Troca de senha obrigatória: fora do AppShell (sem navegação) e o guard força vir para cá.
-      { path: 'alterar-senha', element: <AlterarSenha /> },
+      // troca de senha obrigatória: fora do shell (sem navegação); o guard força vir para cá.
+      { path: 'alterar-senha', element: <Lz><AlterarSenhaV2 /></Lz> },
       {
-        element: <AppShell />,
+        element: <Lz><AppShellV2 /></Lz>,
         children: [
+          // Home: entra pelo WhatsApp (entrada do v1) até o Dashboard existir.
           { index: true, element: <Navigate to="/whatsapp" replace /> },
+          { path: 'dashboard', element: <Lz><ManutencaoV2 area="Dashboard" /></Lz> },
+          { path: 'whatsapp', element: <Lz><WhatsAppV2 /></Lz> },
+          { path: 'facebook', element: <Lz><ManutencaoV2 area="Facebook" /></Lz> },
+          { path: 'relacionamento', element: <Lz><ManutencaoV2 area="Relacionamento" /></Lz> },
+          { path: 'kanban', element: <Lz><KanbanV2 /></Lz> },
+          { path: 'agendamentos', element: <Lz><AgendamentosV2 /></Lz> },
+          { path: 'contatos', element: <Lz><ContatosV2 /></Lz> },
+          { path: 'scripts', element: <Lz><ScriptsV2 /></Lz> },
+          { path: 'cobrancas', element: <Lz><CobrancasV2 /></Lz> },
+          { path: 'relatorios', element: <Lz><RelatoriosV2 /></Lz> },
+          { path: 'integracoes', element: <Lz><IntegracoesV2 /></Lz> },
+          // paridade: admin-only por URL, não só no menu
+          { path: 'maturacao', element: <Lz><RequireRoleV2 role="admin"><MaturacaoV2 /></RequireRoleV2></Lz> },
+          { path: 'configuracoes', element: <Lz><ConfiguracoesV2 /></Lz> },
+          { path: 'plano-uso', element: <Lz><RequireRoleV2 role="admin"><PlanoUsoV2 /></RequireRoleV2></Lz> },
+        ],
+      },
+    ],
+  },
+
+  // ============ v1 preservado em /v1/* (fallback técnico, sem link; nada deletado) ============
+  {
+    path: '/v1',
+    children: [
+      { path: 'login', element: <Login /> },
+      { path: 'redefinir-senha', element: <RedefinirSenha /> },
+      { path: 'definir-senha', element: <DefinirSenha /> },
+      {
+        element: <ProtectedRoute />,
+        children: [
+          { path: 'alterar-senha', element: <AlterarSenha /> },
           {
-            path: 'whatsapp',
-            handle: { title: 'WhatsApp', subtitle: 'Caixa de atendimento do WhatsApp.', fullBleed: true },
-            element: <WhatsApp />,
-          },
-          {
-            path: 'facebook',
-            handle: { title: 'Facebook', subtitle: 'Caixa de atendimento do Messenger e Facebook.', fullBleed: true },
-            element: <Facebook />,
-          },
-          {
-            path: 'kanban',
-            handle: { title: 'Kanban', subtitle: 'Funil comercial em colunas.', fullBleed: true },
-            element: <Kanban />,
-          },
-          {
-            path: 'agendamentos',
-            handle: { title: 'Agendamentos de Mensagens', subtitle: 'Acompanhe mensagens programadas, enviadas, falhas e canceladas.', fullBleed: true },
-            element: <AgendamentosMensagens />,
-          },
-          {
-            path: 'relacionamento',
-            handle: { title: 'Relacionamento', subtitle: 'Réguas leves de relacionamento e nutrição — ativadas manualmente por cliente.', fullBleed: true },
-            element: <Relacionamento />,
-          },
-          {
-            path: 'scripts',
-            handle: { title: 'Scripts', subtitle: 'Biblioteca de scripts e mídias.', fullBleed: true },
-            element: <Scripts />,
-          },
-          {
-            path: 'cobrancas',
-            handle: { title: 'Cobranças', subtitle: 'Cobranças que sua organização faz aos próprios clientes.', fullBleed: true },
-            element: <Cobrancas />,
-          },
-          {
-            path: 'integracoes',
-            handle: { title: 'Integrações', subtitle: 'Conecte, configure e monitore os serviços externos utilizados pela sua operação.', fullBleed: true },
-            element: <Integracoes />,
-          },
-          {
-            path: 'relatorios',
-            handle: { title: 'Relatórios', subtitle: 'Desempenho do atendimento e das cobranças.', fullBleed: true },
-            element: <Relatorios />,
-          },
-          {
-            path: 'configuracoes',
-            handle: { title: 'Configurações', subtitle: 'Conta, equipe, notificações e canais já conectados.', fullBleed: true },
-            element: <Configuracoes />,
-          },
-          {
-            path: 'maturacao',
-            handle: { title: 'Maturação de Números', subtitle: 'Aquecimento de chips de WhatsApp — isolado do atendimento.' },
-            element: <RequireRole role="admin"><Maturacao /></RequireRole>,
-          },
-          {
-            path: 'plano-uso',
-            handle: { title: 'Plano e uso', subtitle: 'Assinatura, consumo e contratação de adicionais da sua organização.' },
-            element: <RequireRole role="admin"><PlanoUso /></RequireRole>,
+            element: <AppShell />,
+            children: [
+              { index: true, element: <Navigate to="/v1/whatsapp" replace /> },
+              { path: 'whatsapp', handle: { title: 'WhatsApp', subtitle: 'Caixa de atendimento do WhatsApp.', fullBleed: true }, element: <WhatsApp /> },
+              { path: 'facebook', handle: { title: 'Facebook', subtitle: 'Caixa de atendimento do Messenger e Facebook.', fullBleed: true }, element: <Facebook /> },
+              { path: 'kanban', handle: { title: 'Kanban', subtitle: 'Funil comercial em colunas.', fullBleed: true }, element: <Kanban /> },
+              { path: 'agendamentos', handle: { title: 'Agendamentos de Mensagens', subtitle: 'Acompanhe mensagens programadas, enviadas, falhas e canceladas.', fullBleed: true }, element: <AgendamentosMensagens /> },
+              { path: 'relacionamento', handle: { title: 'Relacionamento', subtitle: 'Réguas leves de relacionamento e nutrição — ativadas manualmente por cliente.', fullBleed: true }, element: <Relacionamento /> },
+              { path: 'scripts', handle: { title: 'Scripts', subtitle: 'Biblioteca de scripts e mídias.', fullBleed: true }, element: <Scripts /> },
+              { path: 'cobrancas', handle: { title: 'Cobranças', subtitle: 'Cobranças que sua organização faz aos próprios clientes.', fullBleed: true }, element: <Cobrancas /> },
+              { path: 'integracoes', handle: { title: 'Integrações', subtitle: 'Conecte, configure e monitore os serviços externos utilizados pela sua operação.', fullBleed: true }, element: <Integracoes /> },
+              { path: 'relatorios', handle: { title: 'Relatórios', subtitle: 'Desempenho do atendimento e das cobranças.', fullBleed: true }, element: <Relatorios /> },
+              { path: 'configuracoes', handle: { title: 'Configurações', subtitle: 'Conta, equipe, notificações e canais já conectados.', fullBleed: true }, element: <Configuracoes /> },
+              { path: 'maturacao', handle: { title: 'Maturação de Números', subtitle: 'Aquecimento de chips de WhatsApp — isolado do atendimento.' }, element: <RequireRole role="admin"><Maturacao /></RequireRole> },
+              { path: 'plano-uso', handle: { title: 'Plano e uso', subtitle: 'Assinatura, consumo e contratação de adicionais da sua organização.' }, element: <RequireRole role="admin"><PlanoUso /></RequireRole> },
+            ],
           },
         ],
       },
     ],
   },
-  // Redesign v2 só no dev local: a branch gera preview público no CF Pages e o
-  // trabalho não deve vazar antes do corte final. /v2 = vitrine (aprovação);
-  // /v2/<página> = shell v2 com as páginas recriadas (ou marcador de posição).
-  ...(import.meta.env.DEV
-    ? [
-        {
-          path: '/v2',
-          children: [
-            {
-              index: true,
-              element: (
-                <Suspense fallback={null}>
-                  <VitrineV2 />
-                </Suspense>
-              ),
-            },
-            {
-              path: 'login',
-              element: (
-                <Suspense fallback={null}>
-                  <LoginV2 />
-                </Suspense>
-              ),
-            },
-            {
-              // públicas: fluxos por token (recuperação e convite), como no v1
-              path: 'redefinir-senha',
-              element: (
-                <Suspense fallback={null}>
-                  <RedefinirSenhaV2 />
-                </Suspense>
-              ),
-            },
-            {
-              path: 'definir-senha',
-              element: (
-                <Suspense fallback={null}>
-                  <DefinirSenhaV2 />
-                </Suspense>
-              ),
-            },
-            {
-              // prévia para aprovação — no corte final, main.tsx troca ConfigError
-              path: 'config-error',
-              element: (
-                <Suspense fallback={null}>
-                  <ErroConfiguracaoV2 />
-                </Suspense>
-              ),
-            },
-            {
-              // 404 do mundo v2 — no corte final vira o catch-all '*' do app
-              path: '*',
-              element: (
-                <Suspense fallback={null}>
-                  <NaoEncontradaV2 />
-                </Suspense>
-              ),
-            },
-            {
-              // Guard de auth do mundo v2: sem sessão → /v2/login com retorno.
-              element: (
-                <Suspense fallback={null}>
-                  <RequireAuthV2 />
-                </Suspense>
-              ),
-              children: [
-                {
-                  // troca obrigatória: fora do shell (sem navegação), como no v1
-                  path: 'alterar-senha',
-                  element: (
-                    <Suspense fallback={null}>
-                      <AlterarSenhaV2 />
-                    </Suspense>
-                  ),
-                },
-                {
-                  element: (
-                    <Suspense fallback={null}>
-                      <AppShellV2 />
-                    </Suspense>
-                  ),
-                  children: [
-                    {
-                      path: 'dashboard',
-                      element: (
-                        <Suspense fallback={null}>
-                          <ManutencaoV2 area="Dashboard" />
-                        </Suspense>
-                      ),
-                    },
-                    {
-                      path: 'whatsapp',
-                      element: (
-                        <Suspense fallback={null}>
-                          <WhatsAppV2 />
-                        </Suspense>
-                      ),
-                    },
-                    {
-                      path: 'facebook',
-                      element: (
-                        <Suspense fallback={null}>
-                          <ManutencaoV2 area="Facebook" />
-                        </Suspense>
-                      ),
-                    },
-                    {
-                      path: 'relacionamento',
-                      element: (
-                        <Suspense fallback={null}>
-                          <ManutencaoV2 area="Relacionamento" />
-                        </Suspense>
-                      ),
-                    },
-                    {
-                      path: 'kanban',
-                      element: (
-                        <Suspense fallback={null}>
-                          <KanbanV2 />
-                        </Suspense>
-                      ),
-                    },
-                    {
-                      path: 'agendamentos',
-                      element: (
-                        <Suspense fallback={null}>
-                          <AgendamentosV2 />
-                        </Suspense>
-                      ),
-                    },
-                    {
-                      path: 'contatos',
-                      element: (
-                        <Suspense fallback={null}>
-                          <ContatosV2 />
-                        </Suspense>
-                      ),
-                    },
-                    {
-                      path: 'scripts',
-                      element: (
-                        <Suspense fallback={null}>
-                          <ScriptsV2 />
-                        </Suspense>
-                      ),
-                    },
-                    {
-                      path: 'cobrancas',
-                      element: (
-                        <Suspense fallback={null}>
-                          <CobrancasV2 />
-                        </Suspense>
-                      ),
-                    },
-                    {
-                      path: 'relatorios',
-                      element: (
-                        <Suspense fallback={null}>
-                          <RelatoriosV2 />
-                        </Suspense>
-                      ),
-                    },
-                    {
-                      path: 'integracoes',
-                      element: (
-                        <Suspense fallback={null}>
-                          <IntegracoesV2 />
-                        </Suspense>
-                      ),
-                    },
-                    {
-                      // paridade: admin-only por URL, não só no menu
-                      path: 'maturacao',
-                      element: (
-                        <Suspense fallback={null}>
-                          <RequireRoleV2 role="admin">
-                            <MaturacaoV2 />
-                          </RequireRoleV2>
-                        </Suspense>
-                      ),
-                    },
-                    {
-                      path: 'configuracoes',
-                      element: (
-                        <Suspense fallback={null}>
-                          <ConfiguracoesV2 />
-                        </Suspense>
-                      ),
-                    },
-                    {
-                      path: 'plano-uso',
-                      element: (
-                        <Suspense fallback={null}>
-                          <RequireRoleV2 role="admin">
-                            <PlanoUsoV2 />
-                          </RequireRoleV2>
-                        </Suspense>
-                      ),
-                    },
-                  ],
-                },
-              ],
-            },
-          ],
-        } satisfies RouteObject,
-      ]
-    : []),
-  { path: '*', element: <NotFound /> },
+
+  // compat de bookmarks do preview antigo
+  { path: '/v2/*', element: <RedirDeV2 /> },
+
+  // 404 — o mundo Platina é o oficial
+  { path: '*', element: <Lz><NaoEncontradaV2 /></Lz> },
 ];
 
 // Hash router quando aberto como arquivo local (file://); browser router quando hospedado.

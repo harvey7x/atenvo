@@ -298,7 +298,7 @@ export default function AgendamentosV2() {
     });
   }
 
-  const abrirConversa = (conversaId: string) => navigate(`/v2/whatsapp?conversa=${encodeURIComponent(conversaId)}`);
+  const abrirConversa = (conversaId: string) => navigate(`/whatsapp?conversa=${encodeURIComponent(conversaId)}`);
   const previa = (g: Grupo) => (g.primeiro.texto?.trim()) || g.primeiro.nomeArquivo || tipoLbl(g.primeiro.tipo);
   const agora = Date.now();
 

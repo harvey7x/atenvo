@@ -892,3 +892,16 @@ Paridade obrigatória:
 - RESTRIÇÃO DE AMBIENTE: renderiza fora de QueryClientProvider/AuthProvider/OrgProvider/ToastProvider (só ThemeProvider) — a v2 não pode usar useAuth, useOrg, react-query nem toasts
 - Resiliência visual: estilos com CSS vars + fallback dark hardcodado (funciona mesmo se o tema não aplicar); layout centralizado full-viewport (100dvh) como card único
 - Sem ações, botões, formulários, filtros ou permissões — página puramente informativa e estática; nenhum estado de loading/erro/vazio além da própria lista condicional
+
+---
+
+## Sessão do CORTE (2026-07-28, commit "v2: corte — platina em producao")
+
+O redesign Platina virou as rotas OFICIAIS (fim do gate `import.meta.env.DEV` / `/v2/*`).
+- **App.tsx reescrito**: rotas oficiais (raiz) = páginas v2 + AppShellV2; login oficial = LoginV2; guards RequireAuthV2/RequireRoleV2 (admin em maturacao/plano-uso). Home `/` → `/whatsapp`. Dashboard/Facebook/Relacionamento → `ManutencaoV2 area=...`. Catch-all `*` → NaoEncontradaV2. Compat `/v2/*` → redireciona para a raiz equivalente.
+- **v1 preservado em `/v1/*`** (ProtectedRoute + AppShell + páginas v1), sem link na interface; nada deletado.
+- **Literais de rota `/v2/x` → `/x`** em todo src/v2 (guards, shell, senha, cross-links, hooks) via substituição ancorada em aspas (imports `@/v2/` intactos). `destino.ts` DESTINO_PADRAO_V2 → `/whatsapp`.
+- **--fx**: default de produção agora `0.5` (tokens.css); `html[data-demo] .v2 { --fx:1 }` + main.tsx marca `data-demo` quando `isDemoMode`. Modo Apresentação (Relatórios) segue forçando `--fx:1`.
+- **Ficha judicial**: comportamento inalterado (só a casca v2 já existente).
+- Smoke-test no build de produção (modo demo, seguro): login→shell→logout, WhatsApp leitura, cobrança criada, opt-out em WhatsApp+Contatos, 3 telas de manutenção, `/v1/*` acessível, 1366×768 sem cortes, reduced-motion, zero erros de console. Kanban renderiza com colunas+cards arrastáveis (DnD rAF não simulável no pane oculto).
+- **AVISO ao dono (config manual no Supabase, fora do código)**: allowlist de Redirect URLs (Auth → URL Configuration) — Site URL `https://atenvo-cs4.pages.dev` + `/definir-senha`, `/definir-senha?ativar=1`, `/definir-senha**` (convite) e `/redefinir-senha` (recuperação, AuthContext usa origin). Paths idênticos aos do v1 — se já estavam na allowlist, nada muda. Deploy no CF Pages é MANUAL, disparado pelo dono; NÃO feito nesta sessão, nada empurrado.

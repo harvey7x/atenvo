@@ -629,7 +629,7 @@ export default function WhatsAppV2() {
                       {s.favorito ? '★ ' : ''}{s.titulo}
                     </button>
                   ))}
-                  <button type="button" className="rapida" onClick={() => nav('/v2/scripts')} title="Abrir o arsenal de scripts">Todos os scripts…</button>
+                  <button type="button" className="rapida" onClick={() => nav('/scripts')} title="Abrir o arsenal de scripts">Todos os scripts…</button>
                 </div>
               )}
 
@@ -640,7 +640,7 @@ export default function WhatsAppV2() {
                     <button key={chip} type="button" className={'wa-chipbtn' + (inbox.replyChip === chip ? ' on' : '')} onClick={() => inbox.onReplyChip(chip)}>{chip}</button>
                   ))
                 ) : inbox.realCanais.length === 0 ? (
-                  <>Nenhum número conectado · <button type="button" className="lnk" style={{ background: 'none', border: 'none', color: 'var(--txt-2)', textDecoration: 'underline', cursor: 'pointer', fontSize: 10.5, fontFamily: 'var(--fonte)' }} onClick={() => nav('/v2/integracoes')}>conectar</button></>
+                  <>Nenhum número conectado · <button type="button" className="lnk" style={{ background: 'none', border: 'none', color: 'var(--txt-2)', textDecoration: 'underline', cursor: 'pointer', fontSize: 10.5, fontFamily: 'var(--fonte)' }} onClick={() => nav('/integracoes')}>conectar</button></>
                 ) : (
                   inbox.realCanais.map((c) => (
                     <button
@@ -804,7 +804,7 @@ export default function WhatsAppV2() {
 
           {cobrancasCtx.length > 0 && (
             <div className="ctx-b spot">
-              <div className="ctx-t">Cobranças <button type="button" className="lk" onClick={() => nav('/v2/cobrancas')}>ver</button></div>
+              <div className="ctx-t">Cobranças <button type="button" className="lk" onClick={() => nav('/cobrancas')}>ver</button></div>
               {cobrancasCtx.map((cb) => (
                 <div className="cx-l" key={cb.id}>
                   <span className="k num">
@@ -928,7 +928,7 @@ export default function WhatsAppV2() {
                   <span className="dot" style={{ background: s.cor }} />{s.nome} {current.statusId === s.id && <span className="ck">✓</span>}
                 </button>
               ))}
-              {podeGerenciar && <button type="button" className="lk" onClick={() => { setPop(null); nav('/v2/configuracoes?tab=atendimento&section=status'); }}>Gerenciar status…</button>}
+              {podeGerenciar && <button type="button" className="lk" onClick={() => { setPop(null); nav('/configuracoes?tab=atendimento&section=status'); }}>Gerenciar status…</button>}
             </>
           )}
           {pop.kind === 'tags' && (
@@ -940,7 +940,7 @@ export default function WhatsAppV2() {
                   <span className="dot" style={{ background: t.cor }} />{t.nome} {current.tags.includes(t.nome) && <span className="ck">✓</span>}
                 </button>
               ))}
-              {podeGerenciar && <button type="button" className="lk" onClick={() => { setPop(null); nav('/v2/configuracoes?tab=atendimento&section=etiquetas'); }}>Gerenciar etiquetas…</button>}
+              {podeGerenciar && <button type="button" className="lk" onClick={() => { setPop(null); nav('/configuracoes?tab=atendimento&section=etiquetas'); }}>Gerenciar etiquetas…</button>}
             </>
           )}
         </div>,
@@ -1284,7 +1284,7 @@ function KanbanCtx({ contatoId, demo, etapa, etapaCor, origem, respNome, lead, a
           <div className="cx-l"><span className="k">Responsável</span><span className="v">{aberta.respNome || 'Não atribuído'}</span></div>
           <div className="cx-l"><span className="k">Origem</span><span className="v">{origem}</span></div>
           <div style={{ marginTop: 7 }}>
-            <BotaoMini onClick={() => nav(demo ? '/v2/kanban' : `/v2/kanban?oportunidade=${encodeURIComponent(aberta.id)}`)}>Abrir no Kanban</BotaoMini>
+            <BotaoMini onClick={() => nav(demo ? '/kanban' : `/kanban?oportunidade=${encodeURIComponent(aberta.id)}`)}>Abrir no Kanban</BotaoMini>
           </div>
           {demo ? (
             /* representação da ficha no demo — MESMAS classes fjb do componente real (aplica o override Platina) */

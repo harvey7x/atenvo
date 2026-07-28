@@ -34,6 +34,8 @@
 
   /* Dial de intensidade dos efeitos (contrato, item 6):
      1 = demo, 0.5 = operação. As opacidades da luz ambiente,
-     do grão e dos glows multiplicam por ele. */
-  --fx: 1;
+     do grão e dos glows multiplicam por ele. Produção = 0.5;
+     o modo demonstração (main.tsx marca html[data-demo]) sobe para 1. */
+  --fx: 0.5;
 }
+html[data-demo] .v2 { --fx: 1; }

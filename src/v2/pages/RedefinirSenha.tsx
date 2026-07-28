@@ -36,7 +36,7 @@ export default function RedefinirSenhaV2() {
   }, []);
 
   // sem backend real não há recuperação
-  if (mode === 'mock') return <Navigate to="/v2/login" replace />;
+  if (mode === 'mock') return <Navigate to="/login" replace />;
 
   // sessão de recuperação (ou já logado) habilita o formulário
   const podeDefinir = recovery || !!user;
@@ -57,7 +57,7 @@ export default function RedefinirSenhaV2() {
       return;
     }
     await signOut();
-    navigate('/v2/login', { replace: true, state: { aviso: 'Senha redefinida. Entre com a nova senha.' } });
+    navigate('/login', { replace: true, state: { aviso: 'Senha redefinida. Entre com a nova senha.' } });
   }
 
   const aguardando = grace && !podeDefinir; // ainda processando o token
@@ -79,7 +79,7 @@ export default function RedefinirSenhaV2() {
             <div className="lg-banner show erro" role="alert">
               Link de recuperação inválido ou expirado. Solicite um novo na tela de login.
             </div>
-            <Link to="/v2/login" className="entrar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>
+            <Link to="/login" className="entrar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>
               Voltar ao login
             </Link>
           </>

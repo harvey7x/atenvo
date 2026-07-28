@@ -96,7 +96,7 @@ export default function AppShellV2() {
   }, []);
   // sino: o v1 abre a "Central de atendimento" (SLA) — não portada ao v2. Fallback declarado
   // no reporte: leva ao Inbox (onde os inbounds notificados vivem) e marca o pulso como visto.
-  const abrirNotificacoes = useCallback(() => { setSinoOn(false); setBadgePop(0); navigate('/v2/whatsapp'); }, [navigate]);
+  const abrirNotificacoes = useCallback(() => { setSinoOn(false); setBadgePop(0); navigate('/whatsapp'); }, [navigate]);
   // avatar: menu de usuário real — Configurações (rota v2) + Sair (signOut do v1, como a Topbar antiga).
   const sair = useCallback(async () => { setMenuUsuario(false); await signOut(); navigate('/login', { replace: true }); }, [signOut, navigate]);
   // fecha o menu ao trocar de rota
@@ -114,7 +114,7 @@ export default function AppShellV2() {
   });
   // ao abrir o Inbox, o não-visto foi visto: zera o contador e apaga o pulso do sino
   useEffect(() => {
-    if (location.pathname.startsWith('/v2/whatsapp')) { setBadgePop(0); setSinoOn(false); }
+    if (location.pathname.startsWith('/whatsapp')) { setBadgePop(0); setSinoOn(false); }
   }, [location.pathname]);
 
   // Botão de simulação (DEV): segue como fallback de demonstração do visual.
@@ -156,7 +156,7 @@ export default function AppShellV2() {
                   {itens.map((i) => (
                     <NavLink
                       key={i.slug}
-                      to={`/v2/${i.slug}`}
+                      to={`/${i.slug}`}
                       className={({ isActive }) => (isActive ? 'item on' : 'item')}
                       title={i.rotulo}
                     >
@@ -216,7 +216,7 @@ export default function AppShellV2() {
                       <div className="um-nome">{nome}</div>
                       <div className="um-cargo">{papel}</div>
                     </div>
-                    <button type="button" role="menuitem" className="um-item" onClick={() => { setMenuUsuario(false); navigate('/v2/configuracoes'); }}>Configurações</button>
+                    <button type="button" role="menuitem" className="um-item" onClick={() => { setMenuUsuario(false); navigate('/configuracoes'); }}>Configurações</button>
                     <button type="button" role="menuitem" className="um-item perigo" onClick={sair}>Sair</button>
                   </div>
                 </>,
@@ -240,7 +240,7 @@ export default function AppShellV2() {
             aoVerConversa={() => {
               const alvo = notif?.conversaId;
               fecharNotif();
-              navigate(alvo ? `/v2/whatsapp?conversa=${encodeURIComponent(alvo)}` : '/v2/whatsapp');
+              navigate(alvo ? `/whatsapp?conversa=${encodeURIComponent(alvo)}` : '/whatsapp');
             }}
           />
         </main>
