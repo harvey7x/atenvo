@@ -387,7 +387,7 @@ export default function WhatsAppV2() {
     for (const a of slaPorConversa.get(c.id) ?? []) out.push(tipoLabel(a.tipo) + (a.detalhe ? ' — ' + a.detalhe : ''));
     if (c.precisaHumano) out.push('Precisa de atendimento humano');
     if (analisarNome(c.name).fraco && conversaAtiva({ status: c.status, arquivada: c.arquivada })) out.push('Cadastro incompleto: preencha o nome do cliente');
-    if (c.contatoId && bloqueados.has(c.contatoId)) out.push(optoutTexto);
+    // opt-out NÃO entra no agregado ⚠ — já tem chip dedicado "Não incomodar" (evita sinal em dobro)
     return out;
   };
 
@@ -445,6 +445,7 @@ export default function WhatsAppV2() {
                     const atrasado = wait && (wait.tier === 'critico' || wait.tier === 'vermelho');
                     const alertas = alertasDe(c);
                     const finalizado = c.status === 'Resolvida' || c.status === 'Fechada';
+                    const sit = situacaoDe(c);
                     return (
                       <button
                         key={c.id} type="button" data-cid={c.id}
@@ -462,10 +463,11 @@ export default function WhatsAppV2() {
                           </span>
                           <span className="p">{c.last || '—'}</span>
                           <span className="chips">
-                            {(() => { const sit = situacaoDe(c); const cor = corDaSituacao(c, sit.texto); return <span className={'cchip etapa sit-' + sit.variante} title="Situação no funil" style={cor ? { background: cor + '26', color: cor } : undefined}>{sit.texto}</span>; })()}
+                            {(() => { const cor = corDaSituacao(c, sit.texto); return <span className={'cchip etapa sit-' + sit.variante} title="Situação no funil" style={cor ? { background: cor + '26', color: cor } : undefined}>{sit.texto}</span>; })()}
                             {alertas.length > 0 && <span className="cchip alerta" title={alertas.join(' · ')}>⚠{alertas.length > 1 ? ' ' + alertas.length : ''}</span>}
                             {c.contatoId && bloqueados.has(c.contatoId) && <span className="cchip alerta" style={{ color: 'var(--rubro)', borderColor: 'rgba(229,102,92,.4)' }} title={optoutTexto}>Não incomodar</span>}
-                            {finalizado && <span className="cchip fim">Finalizado</span>}
+                            {/* "Finalizado" só quando a situação NÃO já é terminal (ganho/perdido/cancelado) — evita verde ao lado de PERDIDO (Adendo 3) */}
+                            {finalizado && !['ganho', 'perdido', 'cancelado'].includes(sit.variante) && <span className="cchip fim">Finalizado</span>}
                           </span>
                         </span>
                         <span className="m">
@@ -1050,18 +1052,22 @@ function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, optout,
   aoRemover: (m: WaMessage) => void; aoLightbox: (url: string) => void; aoRecarregarAudio: (m: WaMessage) => void;
 }) {
   const [url, setUrl] = useState<string | null>(null);
+  const [urlErro, setUrlErro] = useState(false);
   // v1: imagem/vídeo resolvem a URL assinada eager; ÁUDIO só no play (AudioBolha) — não emitir N signed-URLs por abertura de conversa
   const precisaUrl = !demo && !!m.anexoPath && ['imagem', 'video'].includes(m.tipo ?? '');
   useEffect(() => {
     let vivo = true;
+    setUrl(null); setUrlErro(false);
     if (precisaUrl && m.anexoPath) {
-      urlAssinadaMidiaWa(m.anexoPath).then((u) => { if (vivo) setUrl(u); }).catch(() => { if (vivo) setUrl(null); });
+      urlAssinadaMidiaWa(m.anexoPath).then((u) => { if (vivo) setUrl(u); }).catch(() => { if (vivo) setUrlErro(true); });
     }
     return () => { vivo = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [m.anexoPath]);
+  // enquanto a URL assinada não resolveu (anexo presente) é CARREGANDO, não "indisponível" (v1 não pisca)
+  const carregandoMidia = precisaUrl && !url && !urlErro;
   const ack = m.dir === 'out' ? ackOf(m.status) : null;
-  const falhou = m.status === 'falhou';
+  const falhou = m.dir === 'out' && m.status === 'falhou';   // só saída falha (v1); inbound nunca é "não enviado"
 
   const falhaActs = falhou && (
     <div className="msg-falha-acts">
@@ -1091,7 +1097,8 @@ function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, optout,
               {url ? <img className="m-img" loading="lazy" src={url} alt="Imagem" title="Ampliar" onClick={() => aoLightbox(url)} /> : <div className="audio-ind">Imagem de demonstração</div>}
               {m.text && <div className="m-cap"><WaTexto texto={m.text} /></div>}
             </>
-          : <div className="audio-ind">Imagem indisponível</div>  /* v1: sem anexo/URL — nunca bolha vazia */
+          : carregandoMidia ? <div className="audio-ind">Carregando imagem…</div>
+          : <div className="audio-ind">Imagem indisponível</div>  /* só quando anexo ausente ou URL falhou — nunca durante a carga */
       )}
       {m.tipo === 'video' && (
         url
@@ -1099,7 +1106,9 @@ function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, optout,
               <video className="m-video" src={url} controls preload="metadata" />
               {m.text && <div className="m-cap"><WaTexto texto={m.text} /></div>}
             </>
-          : <div className="audio-ind">{demo ? 'Vídeo de demonstração' : 'Vídeo indisponível'}</div>
+          : demo ? <div className="audio-ind">Vídeo de demonstração</div>
+          : carregandoMidia ? <div className="audio-ind">Carregando vídeo…</div>
+          : <div className="audio-ind">Vídeo indisponível</div>
       )}
       {m.tipo === 'audio' && (
         falhou
@@ -1254,7 +1263,7 @@ function KanbanCtx({ contatoId, demo, etapa, etapaCor, origem, respNome, lead, a
               <div className="fjb-card">
                 <span className="fjb-tag vazia">Nenhuma ficha</span>
                 <div className="fjb-info">Importe a consulta do Promosys/iCred e gere a ficha judicial.</div>
-                <div className="fjb-acts"><button type="button" className="fjb-btn primary">Criar ficha</button></div>
+                <div className="fjb-acts"><button type="button" className="fjb-btn primary" onClick={() => aoAvisar({ tom: 'ok', texto: 'Modo demonstração: a ficha real (importar, revisar, finalizar) abre no ambiente com backend.' })}>Criar ficha</button></div>
               </div>
             </div>
           ) : (

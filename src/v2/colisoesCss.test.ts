@@ -42,13 +42,17 @@ function classesDeSeletores(css: string): string[][] {
 }
 
 /* Overrides INTENCIONAIS de componentes v1 reusados inteiros dentro do .v2
-   (contrato: não editar arquivos v1). A FichaJudicialBox/Modal (classes `fjb-*`)
-   é reusada em /v2/whatsapp e /v2/kanban; o CSS v1 pinta fundo claro/verde-cru,
-   então componentes.css re-declara `.v2 .fjb-*` na pele Platina (specificity
-   0,2,0 vence o 0,1,0 do v1). Isso torna os seletores v1 `.fjb-*` "satisfazíveis"
-   — de propósito e sob controle. Excluí-los do conjunto v2 evita falso-positivo
-   sem cegar o guard para colisões acidentais (fjb-* é exclusivo desse componente). */
-const OVERRIDE_V1_REUSADO = (c: string) => c.startsWith('fjb-');
+   (contrato: nao editar arquivos v1). Componentes v1 reusados em paginas v2
+   (FichaJudicialBox/Modal, prefixos fjb e fj; o Modal.tsx v1 prefixo atv, base de
+   MediaComposer + ScriptSequenceModal + FichaJudicialModal) trazem CSS de tema CLARO.
+   componentes.css re-declara essas familias na pele Platina (specificity 0,2,0 vence o
+   0,1,0 do v1), tornando os seletores v1 "satisfaziveis" de proposito. Excluimos essas
+   familias (prefixos exclusivos desses componentes) para evitar falso-positivo sem cegar
+   o guard para redeclaracoes acidentais de OUTRAS classes.
+   LIMITE do guard: ele pega REDECLARACAO em CSS v2; NAO pega um componente v1 reusado
+   cujo CSS v1 estilize o DOM v2 sem oposicao (foi o caso do modal branco) — a defesa
+   contra isso e a varredura de TSX (2o teste) + o override. */
+const OVERRIDE_V1_REUSADO = (c: string) => c.startsWith('fjb') || c.startsWith('fj-') || c.startsWith('atv-');
 
 describe('colisões de CSS v1 × v2', () => {
   it('nenhum seletor do app antigo pode ser satisfeito pelo DOM v2', () => {
@@ -73,5 +77,51 @@ describe('colisões de CSS v1 × v2', () => {
       }
     }
     expect(riscos, `Seletores v1 que pegam dentro do .v2 — renomeie a classe v2:\n${riscos.join('\n')}`).toEqual([]);
+  });
+
+  /* REFORÇO (reforça o guard após o modal branco): o teste acima só pega REDECLARAÇÃO
+     em CSS. Este pega o outro vetor — código TSX v2 que escreve uma classe definida SÓ
+     no CSS v1 e SEM override no CSS v2: cairia no tema claro do v1 (o que aconteceu com
+     o modal reusado). Se falhar: dê à classe um estilo `.v2 ...` (override) ou troque por
+     classe v2. As famílias reusadas (fjb-/fj-/atv-) já têm override em componentes.css,
+     então passam naturalmente por estarem no CSS v2. */
+  it('nenhuma classe SÓ-do-v1 é usada no TSX v2 sem um estilo v2 correspondente', () => {
+    const tsx: string[] = [];
+    const varre = (dir: string) => {
+      for (const nome of readdirSync(dir)) {
+        const p = join(dir, nome);
+        if (statSync(p).isDirectory()) varre(p);
+        else if (nome.endsWith('.tsx')) tsx.push(p);
+      }
+    };
+    varre(join(RAIZ, 'v2'));
+
+    const clsDeCss = (dirs: string[]) => {
+      const set = new Set<string>();
+      for (const dir of dirs) for (const f of csssEm(dir)) {
+        for (const lista of classesDeSeletores(readFileSync(f, 'utf8'))) lista.forEach((c) => set.add(c));
+      }
+      return set;
+    };
+    const v2cssCls = clsDeCss([join(RAIZ, 'v2')]);
+    // classes v1 que aplicam GLOBALMENTE (seletor de classe ÚNICA, sem ancestral/qualificador):
+    // essas pegam o DOM v2 mesmo sem redeclaração. `.wa-app .wa-link` (2 classes) NÃO conta.
+    const v1SoloCls = new Set<string>();
+    for (const dir of [join(RAIZ, 'styles'), join(RAIZ, 'pages'), join(RAIZ, 'components')]) {
+      for (const f of csssEm(dir)) {
+        for (const lista of classesDeSeletores(readFileSync(f, 'utf8'))) if (lista.length === 1) v1SoloCls.add(lista[0]);
+      }
+    }
+
+    const usadasNoTsx = new Set<string>();
+    for (const f of tsx) {
+      const src = readFileSync(f, 'utf8');
+      for (const m of src.matchAll(/className\s*=\s*(?:"([^"]*)"|'([^']*)'|\{`([^`]*)`\})/g)) {
+        const bruto = (m[1] ?? m[2] ?? m[3] ?? '').replace(/\$\{[^}]*\}/g, ' ');
+        for (const tok of bruto.split(/\s+/)) if (/^[a-zA-Z][\w-]*$/.test(tok)) usadasNoTsx.add(tok);
+      }
+    }
+    const vazando = [...usadasNoTsx].filter((c) => v1SoloCls.has(c) && !v2cssCls.has(c) && !OVERRIDE_V1_REUSADO(c));
+    expect(vazando, `Classes só-do-v1 (seletor global) usadas no TSX v2 sem estilo .v2 (herdam o tema claro):\n${vazando.join(', ')}`).toEqual([]);
   });
 });

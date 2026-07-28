@@ -84,7 +84,8 @@ export function seedWa(): WaContact[] {
       ...base,
       id: 'wa-cleusa', name: 'Cleusa M. Barros', phone: '5551987770005', contatoId: 'wa-cleusa-ct',
       time: 'Ontem', unread: 0, lastAtMs: agora - 1500 * min, respId: 'u-mock', status: 'Fechada',
-      etapa: 'PERDIDO', etapaCor: '#e11d48',
+      // perdida via oppStatus (como no dado real) — NÃO via etapa string; a situação vira 'perdido'
+      etapa: 'Documentação', etapaCor: '#f59e0b', oppStatus: 'perdido',
       last: 'Não tenho interesse, obrigada.', lastInter: 'ontem',
       msgs: [
         IN('Não tenho interesse, obrigada.', '16:12', { tsISO: iso(agora - 1500 * min), id: 'wc-1' }),

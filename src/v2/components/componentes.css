@@ -455,3 +455,42 @@
 .v2 .fjb-btn.primary:hover:not(:disabled) { transform: translateY(-1px); }
 .v2 .fjb-hist-row { color: var(--txt-3); }
 .v2 .fjb-hist-row .v { color: var(--txt); }
+
+/* --- Modais v1 REUSADOS dentro do .v2 (Modal.tsx + FichaJudicialModal + MediaComposer +
+   ScriptSequenceModal). O CSS v1 usa tokens de tema CLARO (--surface/--ink/--line/--accent…)
+   inexistentes no .v2 → caíam em fallback branco/preto (modal ilegível). Redefinimos os tokens
+   v1 no subtree do overlay: conserta chrome + inputs + textos + os .fj-* de uma vez.
+   Botões .primary viram platina (gradiente, que token não expressa). Guard: allowlist atv-/fj-. */
+.v2 .atv-modal-overlay {
+  --backdrop: rgba(6, 7, 9, .62);
+  --surface: #17191D;
+  --surface-2: rgba(255, 255, 255, .045);
+  --ink: var(--txt);
+  --ink-2: var(--txt-2);
+  --muted: var(--txt-3);
+  --line: var(--linha);
+  --line-2: rgba(255, 255, 255, .1);
+  --hover: rgba(255, 255, 255, .06);
+  --accent: #C9CED6;
+  --ring: rgba(255, 255, 255, .12);
+  --err: var(--rubro);
+  --green: var(--verde);
+  --green-ink: var(--verde);
+  --shadow-pop: 0 24px 60px rgba(0, 0, 0, .5);
+}
+/* pele de vidro no card do modal (fio de luz no topo, como a família Platina) */
+.v2 .atv-modal { position: relative; background: linear-gradient(180deg, var(--vidro-a), var(--vidro-b)); backdrop-filter: blur(18px) saturate(140%); -webkit-backdrop-filter: blur(18px) saturate(140%); }
+.v2 .atv-modal::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none;
+  background: linear-gradient(180deg, var(--fio-a), var(--fio-b) 36%, rgba(255, 255, 255, .02) 75%, rgba(255, 255, 255, .07));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+}
+.v2 .atv-btn.primary { background: linear-gradient(180deg, #FFF, #D6DAE0); border: 0; color: #101215; font-weight: 600; box-shadow: inset 0 1px 0 #fff; }
+.v2 .atv-btn.primary:hover:not(:disabled) { background: linear-gradient(180deg, #FFF, #D6DAE0); filter: none; transform: translateY(-1px); }
+.v2 .atv-btn.danger { background: var(--rubro-bg); border-color: rgba(229, 102, 92, .35); color: var(--rubro); }
+.v2 .atv-btn.danger:hover:not(:disabled) { background: rgba(229, 102, 92, .2); filter: none; }
+/* textos de contraste da ficha (hex escuros do v1 → tokens Platina, legíveis no escuro) */
+.v2 .fj-ind.ok { color: var(--verde); }
+.v2 .fj-ind.warn { color: var(--ambar); }
+.v2 .fj-alerta { color: var(--ambar); }
+.v2 .fj-erro { color: var(--rubro); }

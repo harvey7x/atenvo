@@ -172,7 +172,7 @@ export function useInboxWhatsApp(opts: {
   const canalIndisponivel = WA_REAL && !!canalSel && canalSel.status !== 'conectado';
   // v1 L420: SÓ envioRestrito bloqueia; entregaStatus 'restrito'/'instavel' é aviso não-bloqueante (composer).
   const canalRestrito = WA_REAL && !!canalSel?.envioRestrito;
-  const envioSaudeQ = useWaCanalEnvioSaude(WA_REAL ? canalSel?.id ?? null : null);
+  const envioSaudeQ = useWaCanalEnvioSaude(WA_REAL ? (canalSel?.id ?? current.canalId ?? null) : null);
   const semDestino = WA_REAL && !!current.semDestino;
 
   /* opt-out (relacionamento_bloqueio) — inviolável: bloqueia TODA rota de envio, inclusive retry */
@@ -316,7 +316,7 @@ export function useInboxWhatsApp(opts: {
     await sendMut.mutateAsync({ conversaId: currentId, canalId: replyCanalId || current.canalId, midiaPath: up.path, midiaTipo: 'imagem', midiaMime: up.mime, midiaNome: up.nome, midiaTamanho: up.tamanho, text: caption || undefined, replyTo: replyPayload() });
     setReplyTo(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentId, replyCanalId, current.canalId, replyTo, higieneBloqueia, higiene.motivoBloqueio, optout]);
+  }, [currentId, replyCanalId, current.canalId, currentOrg.id, replyTo, higieneBloqueia, higiene.motivoBloqueio, optout]);
   const enviarAudio = useCallback(async (blob: Blob, mime: string, ext: string, diag?: Record<string, unknown>) => {
     guardaMidia();
     if (!blob || !blob.size) throw new Error('Áudio vazio. Grave novamente.');   // tolera blob nulo (v1 L760)
@@ -327,7 +327,7 @@ export function useInboxWhatsApp(opts: {
     await sendMut.mutateAsync({ conversaId: currentId, canalId: replyCanalId || current.canalId, midiaPath: up.path, midiaTipo: 'audio', midiaMime: up.mime, midiaNome: up.nome, midiaTamanho: up.tamanho, audioDiag: diag, origemAudio, replyTo: replyPayload() });
     setReplyTo(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentId, replyCanalId, current.canalId, replyTo, higieneBloqueia, higiene.motivoBloqueio, optout]);
+  }, [currentId, replyCanalId, current.canalId, currentOrg.id, replyTo, higieneBloqueia, higiene.motivoBloqueio, optout]);
   const enviarDocumento = useCallback(async (file: File, caption: string) => {
     guardaMidia();
     if (!WA_REAL) { aoAvisar({ tom: 'ok', texto: 'Mensagem enviada' }); return; }
@@ -335,7 +335,7 @@ export function useInboxWhatsApp(opts: {
     await sendMut.mutateAsync({ conversaId: currentId, canalId: replyCanalId || current.canalId, midiaPath: up.path, midiaTipo: 'documento', midiaMime: up.mime, midiaNome: up.nome, midiaTamanho: up.tamanho, text: caption || undefined, replyTo: replyPayload() });
     setReplyTo(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentId, replyCanalId, current.canalId, replyTo, higieneBloqueia, higiene.motivoBloqueio, optout]);
+  }, [currentId, replyCanalId, current.canalId, currentOrg.id, replyTo, higieneBloqueia, higiene.motivoBloqueio, optout]);
 
   /* ---------- atribuição (v1 L806-867) — otimista com rollback ---------- */
   const [atribuindo, setAtribuindo] = useState(false);
