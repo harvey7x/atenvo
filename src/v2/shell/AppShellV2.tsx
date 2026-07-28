@@ -69,7 +69,7 @@ const NOTIF_DEMO: DadosNotificacao = {
 
 /** Shell autenticado v2: sidebar em overlay (64→242 no hover), topbar e palco. */
 export default function AppShellV2() {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const { currentOrg } = useOrg();
   const location = useLocation();
   const navigate = useNavigate();
@@ -79,8 +79,16 @@ export default function AppShellV2() {
   const [notif, setNotif] = useState<(DadosNotificacao & { conversaId?: string }) | null>(null);
   const [sinoOn, setSinoOn] = useState(false);
   const [badgePop, setBadgePop] = useState(0);
+  const [menuUsuario, setMenuUsuario] = useState(false);
   const seqRef = useRef(0);
   const fecharNotif = useCallback(() => setNotif(null), []);
+  // sino: o v1 abre a "Central de atendimento" (SLA) — não portada ao v2. Fallback declarado
+  // no reporte: leva ao Inbox (onde os inbounds notificados vivem) e marca o pulso como visto.
+  const abrirNotificacoes = useCallback(() => { setSinoOn(false); setBadgePop(0); navigate('/v2/whatsapp'); }, [navigate]);
+  // avatar: menu de usuário real — Configurações (rota v2) + Sair (signOut do v1, como a Topbar antiga).
+  const sair = useCallback(async () => { setMenuUsuario(false); await signOut(); navigate('/login', { replace: true }); }, [signOut, navigate]);
+  // fecha o menu ao trocar de rota
+  useEffect(() => { setMenuUsuario(false); }, [location.pathname]);
 
   // Fiação realtime (dívida da 1b, quitada na sessão do WhatsApp): o feed
   // postgres_changes já usado pelo app alimenta o toast — só mensagem de
@@ -177,13 +185,30 @@ export default function AppShellV2() {
               <span className="busca-texto">Buscar contatos, conversas, cobranças…</span><kbd>⌘K</kbd>
             </div>
             <div className="top-dir">
-              <button type="button" className="ib" aria-label="Notificações">
+              <button type="button" className="ib" aria-label="Notificações" title="Notificações — abrir o Inbox" onClick={abrirNotificacoes}>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
                   <path d="M18 9a6 6 0 10-12 0c0 6-2.5 7-2.5 7h17S18 15 18 9zM10 20a2.2 2.2 0 004 0" />
                 </svg>
                 <span className={sinoOn ? 'pt on' : 'pt'} aria-hidden />
               </button>
-              <div className="avatar" style={{ width: 33, height: 33 }}>{iniciaisDe(nome)}</div>
+              <div className="top-usuario">
+                <button type="button" className="avatar avatar-btn" aria-label="Menu do usuário" aria-haspopup="menu"
+                  aria-expanded={menuUsuario} title={nome} style={{ width: 33, height: 33 }}
+                  onClick={() => setMenuUsuario((v) => !v)}>{iniciaisDe(nome)}</button>
+                {menuUsuario && (
+                  <>
+                    <div className="um-backdrop" onClick={() => setMenuUsuario(false)} aria-hidden />
+                    <div className="usuario-menu" role="menu" aria-label="Menu do usuário">
+                      <div className="um-head">
+                        <div className="um-nome">{nome}</div>
+                        <div className="um-cargo">{papel}</div>
+                      </div>
+                      <button type="button" role="menuitem" className="um-item" onClick={() => { setMenuUsuario(false); navigate('/v2/configuracoes'); }}>Configurações</button>
+                      <button type="button" role="menuitem" className="um-item perigo" onClick={sair}>Sair</button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </div>
 

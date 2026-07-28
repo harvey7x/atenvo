@@ -265,8 +265,6 @@
 .v2 .wa-conv-vazia .t { font-size: 14px; font-weight: 600; color: var(--txt); }
 .v2 .wa-conv-vazia .d { font-size: 12px; }
 
-/* responsivo: contexto colapsável */
-.v2 .wa-ctx-reabrir { position: absolute; right: 10px; top: 64px; z-index: 5; }
 /* variantes semânticas do chip de situação (ganho/perdido vencem a cor de etapa) */
 .v2 .conv2 .cchip.sit-ganho, .v2 .wa-hchip.sit-ganho { color: var(--verde); border-color: rgba(74, 190, 140, .35); }
 .v2 .conv2 .cchip.sit-perdido, .v2 .conv2 .cchip.sit-cancelado, .v2 .wa-hchip.sit-perdido, .v2 .wa-hchip.sit-cancelado { color: var(--rubro); border-color: rgba(229, 102, 92, .35); }

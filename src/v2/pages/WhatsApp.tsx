@@ -550,6 +550,7 @@ export default function WhatsAppV2() {
                   ? <BotaoMini title="Transferir atendimento" onClick={() => setTransferirAberto(true)}>Transferir</BotaoMini>
                   : <BotaoPrimario mini title="Assumir atendimento" disabled={inbox.atribuindo} onClick={inbox.assumir}>Assumir</BotaoPrimario>}
                 <BotaoMini title={current.arquivada ? 'Desarquivar conversa' : 'Arquivar conversa'} onClick={() => inbox.arquivar(!current.arquivada)}>{current.arquivada ? 'Desarquivar' : 'Arquivar'}</BotaoMini>
+                {!ctxAberto && <BotaoMini title="Abrir painel de dados do contato" onClick={() => setCtxAberto(true)}>Dados</BotaoMini>}
                 <button type="button" className={'ib2' + (foco ? ' on' : '')} title="Modo de foco (Esc para sair)" onClick={() => setFoco((f) => !f)} style={{ width: 26, height: 26 }}><IcFoco /></button>
                 <button type="button" className="ib2" title="Ações" aria-label="Ações da conversa" style={{ width: 26, height: 26 }} onClick={(e) => abrirPop('acoes', e)}><IcDots /></button>
               </div>
@@ -749,10 +750,9 @@ export default function WhatsAppV2() {
         )}
       </section>
 
-      {/* ===================== CONTEXTO ===================== */}
-      {!ctxAberto && current.id && (
-        <div className="wa-ctx-reabrir"><BotaoMini aria-label="Abrir painel de dados" onClick={() => setCtxAberto(true)}>Dados</BotaoMini></div>
-      )}
+      {/* ===================== CONTEXTO =====================
+          O reabrir "Dados" agora é um botão irmão na fileira de ações do cabeçalho
+          (.wa-ctopo .dir, condicionado a !ctxAberto) — não flutua mais solto sobre o header. */}
       {current.id && (
         <aside className={'wa-ctx' + (ctxAberto ? '' : ' recolhido')} aria-hidden={!ctxAberto} {...(!ctxAberto ? ({ inert: '' } as Record<string, string>) : {})}>
          <div className="wa-ctx-inner">

@@ -452,14 +452,22 @@
 .v2 .fjb-tag.rascunho { background: var(--ambar-bg); color: var(--ambar); }
 .v2 .fjb-tag.finalizada { background: var(--verde-bg); color: var(--verde); }
 .v2 .fjb-tag.vazia { background: rgba(255, 255, 255, .06); color: var(--txt-3); }
-.v2 .fjb-btn { border: 1px solid rgba(255, 255, 255, .12); background: rgba(255, 255, 255, .05); color: var(--txt); }
+/* .fjb-btn: o reset .v2 * zera height/padding do botão v1 → restaura o tamanho do BotaoPrimario.
+   O .primary é o platina completo (gradiente prata + sheen no hover), irmão do .btn-pri. */
+.v2 .fjb-btn { height: 34px; padding: 0 14px; border: 1px solid rgba(255, 255, 255, .12); background: rgba(255, 255, 255, .05); color: var(--txt); }
 .v2 .fjb-btn:hover:not(:disabled) { background: rgba(255, 255, 255, .085); }
 .v2 .fjb-btn.primary {
-  border: 0; color: #101215; font-weight: 600;
+  position: relative; overflow: hidden; border: 0; color: #101215; font-weight: 600;
   background: linear-gradient(180deg, #FFF, #D6DAE0);
   box-shadow: 0 10px 26px rgba(255, 255, 255, calc(.10 * var(--fx))), inset 0 1px 0 #fff;
 }
+.v2 .fjb-btn.primary::after {
+  content: ""; position: absolute; top: 0; bottom: 0; left: -70%; width: 45%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .85), transparent);
+  transform: skewX(-18deg); transition: left .55s var(--ease);
+}
 .v2 .fjb-btn.primary:hover:not(:disabled) { transform: translateY(-1px); }
+.v2 .fjb-btn.primary:hover:not(:disabled)::after { left: 120%; }
 .v2 .fjb-hist-row { color: var(--txt-3); }
 .v2 .fjb-hist-row .v { color: var(--txt); }
 
@@ -505,3 +513,27 @@
 .v2 .fj-ind.warn { color: var(--ambar); }
 .v2 .fj-alerta { color: var(--ambar); }
 .v2 .fj-erro { color: var(--rubro); }
+
+/* RESPIRO dos modais/ficha v1 reusados: o reset `.v2 * { padding:0; margin:0 }` (base.css)
+   tem a MESMA especificidade (0,1,0) das classes v1 e vem depois na cascata → zerava TODO o
+   padding interno (chrome, inputs, seções, caixas de alerta, botões) → "achatado, colado nas
+   bordas". Restauramos no nível .v2 .<classe> (0,2,0), com o ritmo do ModalV2 (.p-modal). */
+.v2 .atv-modal-head { padding: 15px 18px 13px; }
+.v2 .atv-modal-body { padding: 15px 18px; }
+.v2 .atv-modal-foot { padding: 12px 18px; }
+.v2 .atv-input { padding: 9px 11px; }
+.v2 .atv-btn { height: 36px; padding: 0 14px; }
+.v2 .fj-sec { padding-top: 12px; margin-top: 4px; }
+.v2 .fj-sec:first-child { padding-top: 0; margin-top: 0; }
+.v2 .fj-alertas, .v2 .fj-conflitos { padding: 10px; }
+.v2 .fj-doc { padding: 14px; }
+.v2 .fj-erro { padding: 8px 10px; }
+.v2 .fj-ind { padding: 1px 6px; }
+.v2 .fj-eye { padding: 0 10px; }
+.v2 .fj-x { padding: 4px 6px; }
+.v2 .fj-revrow.confirmar { padding: 4px; }
+.v2 .fj-sub { margin-top: 2px; }
+.v2 .fj-copychk { margin-top: 10px; }
+.v2 .fjb-card { padding: 11px; }
+.v2 .fjb-tag { padding: 1px 7px; }
+.v2 .fjb-acts { margin-top: 2px; }
