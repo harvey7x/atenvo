@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 
 /* O global.css (e os CSS de página) do app v1 carregam em TODAS as rotas.
    O escopo `.v2` garante que o v2 não vaza para fora — mas o contrário só é
@@ -123,5 +123,83 @@ describe('colisões de CSS v1 × v2', () => {
     }
     const vazando = [...usadasNoTsx].filter((c) => v1SoloCls.has(c) && !v2cssCls.has(c) && !OVERRIDE_V1_REUSADO(c));
     expect(vazando, `Classes só-do-v1 (seletor global) usadas no TSX v2 sem estilo .v2 (herdam o tema claro):\n${vazando.join(', ')}`).toEqual([]);
+  });
+
+  /* TESTE 3 — o vetor que os dois de cima NÃO pegam: um COMPONENTE v1 (arquivo em
+     src/components, ex. Modal.tsx) importado e renderizado dentro do v2. As classes dele
+     (.atv-modal-overlay/.atv-modal) são escritas no TSX do V1, então o teste 2 (que varre só
+     TSX v2) nunca as vê; e o teste 1 as ignora pelo allowlist. Foi exatamente o "modal branco":
+     o CSS v1 do componente usa tokens de tema CLARO (--surface/--ink/--line/--accent/--backdrop…)
+     que, dentro do .v2, caíam no valor claro do :root do v1 → chrome branco/ilegível.
+     A DEFESA estrutural é neutralizar esses tokens na RAIZ do .v2 (componentes.css), para que
+     QUALQUER superfície v1 reusada (modal, dropdown, lightbox, composer, gravador, tooltip)
+     herde a pele escura — não só o overlay do modal. Este teste falha se essa neutralização
+     for removida/incompleta, tornando o guard capaz de pegar a regressão do modal branco. */
+  it('tokens de tema claro do v1 estão neutralizados na raiz do .v2 (defesa do modal branco)', () => {
+    // tokens de "chrome" do v1 que, sem override, pintam superfícies reusadas de claro
+    const CHROME_V1 = ['surface', 'ink', 'line', 'accent', 'muted', 'backdrop', 'hover', 'ring', 'shadow-pop'];
+
+    // custom properties declaradas em regras cujo seletor é exatamente `.v2` (raiz do subtree)
+    const tokensNaRaizV2 = new Set<string>();
+    for (const f of csssEm(join(RAIZ, 'v2'))) {
+      const css = readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+      for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+        const seletores = m[1].split(',').map((s) => s.trim());
+        if (!seletores.includes('.v2')) continue;
+        for (const d of m[2].matchAll(/--([\w-]+)\s*:/g)) tokensNaRaizV2.add(d[1]);
+      }
+    }
+
+    const faltando = CHROME_V1.filter((t) => !tokensNaRaizV2.has(t));
+    expect(
+      faltando,
+      `Tokens de tema claro do v1 SEM redefinição na raiz .v2 — um componente v1 reusado (Modal, ` +
+        `MediaComposer, dropdown…) cairá no tema claro (o bug do modal branco):\n${faltando.join(', ')}`,
+    ).toEqual([]);
+  });
+
+  /* TESTE 4 — leak de CSS ENTRE PÁGINAS no WhatsApp (code-split). Cada página v2 é lazy(import),
+     então kanban.css / agendamentos.css / etc. só carregam na SUA rota. Se WhatsApp.tsx usa no TSX
+     uma classe definida SÓ no CSS de outra página, ao abrir /v2/whatsapp sem ter visitado aquela
+     rota a classe fica sem estilo → <button>/<div> cru = vazamento de tema claro (foi o caso de
+     .kb-link/.kb-err do Kanban usados no WhatsApp; agora promovidos a componentes.css). O CSS
+     "compartilhado" (components/, sempre carregado no .v2) e o próprio whatsapp.css são seguros.
+     Escopo: a PÁGINA WHATSAPP — o alvo desta sessão e o pedido "classes vazando nas superfícies wa-*".
+     Se falhar: promova a classe para componentes.css ou defina-a em whatsapp.css. */
+  it('WhatsApp não usa classe definida só no CSS de OUTRA página v2 (code-split)', () => {
+    const paginasDir = join(RAIZ, 'v2', 'pages');
+    const waTsx = join(paginasDir, 'WhatsApp.tsx');
+    const waCss = join(paginasDir, 'whatsapp.css');
+
+    // classes sempre carregadas no .v2: components/ (importado por Botao/Campo/AudioRecorderV2…)
+    const compartilhadas = new Set<string>();
+    for (const f of csssEm(join(RAIZ, 'v2', 'components'))) {
+      for (const lista of classesDeSeletores(readFileSync(f, 'utf8'))) lista.forEach((c) => compartilhadas.add(c));
+    }
+    // classes do próprio whatsapp.css (seguras) e das OUTRAS páginas (perigosas se usadas no WA)
+    const doWhats = new Set<string>();
+    const deOutraPagina = new Map<string, string[]>(); // classe -> [arquivos css de outras páginas]
+    for (const f of csssEm(paginasDir)) {
+      const classes = new Set<string>();
+      for (const lista of classesDeSeletores(readFileSync(f, 'utf8'))) lista.forEach((c) => classes.add(c));
+      if (f === waCss) { classes.forEach((c) => doWhats.add(c)); continue; }
+      for (const c of classes) deOutraPagina.set(c, [...(deOutraPagina.get(c) ?? []), basename(f)]);
+    }
+
+    // classes escritas no className do WhatsApp.tsx
+    const usadas = new Set<string>();
+    const src = readFileSync(waTsx, 'utf8');
+    for (const m of src.matchAll(/className\s*=\s*(?:"([^"]*)"|'([^']*)'|\{`([^`]*)`\})/g)) {
+      const bruto = (m[1] ?? m[2] ?? m[3] ?? '').replace(/\$\{[^}]*\}/g, ' ');
+      for (const tok of bruto.split(/\s+/)) if (/^[a-zA-Z][\w-]*$/.test(tok)) usadas.add(tok);
+    }
+
+    const problemas: string[] = [];
+    for (const c of usadas) {
+      if (c === 'v2' || compartilhadas.has(c) || doWhats.has(c)) continue;
+      const donos = deOutraPagina.get(c);
+      if (donos) problemas.push(`WhatsApp.tsx usa .${c} definida só em ${donos.join(', ')} (não carregada em /v2/whatsapp)`);
+    }
+    expect(problemas, `Classe de outra página usada no WhatsApp (code-split não carrega o CSS):\n${problemas.join('\n')}`).toEqual([]);
   });
 });

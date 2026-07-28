@@ -14,14 +14,17 @@
 .v2 .wa-ftopo .l1 { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .v2 .wa-ftopo h3 { font-size: 15px; font-weight: 600; }
 .v2 .wa-ftopo .l1 .bts { display: flex; gap: 5px; }
-.v2 .wa-ftopo .ib2 {
+/* botão-ícone do WhatsApp (.ib do mockup): vidro, borda sutil, hover.
+   ESCOPO GERAL (não só .wa-ftopo) — o cabeçalho da conversa (.wa-ctopo)
+   também usa .ib2 (foco/menu) e não pode herdar o <button> cru. */
+.v2 .ib2 {
   width: 26px; height: 26px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, .12);
-  background: rgba(255, 255, 255, .05); color: var(--txt-2); cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
+  background: rgba(255, 255, 255, .05); color: var(--txt-2); cursor: pointer; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; padding: 0; font-family: var(--fonte);
 }
-.v2 .wa-ftopo .ib2:hover { color: var(--txt); background: rgba(255, 255, 255, .09); }
-.v2 .wa-ftopo .ib2.on { color: var(--txt); border-color: rgba(255, 255, 255, .3); }
-.v2 .wa-ftopo .ib2 svg { width: 13px; height: 13px; }
+.v2 .ib2:hover { color: var(--txt); background: rgba(255, 255, 255, .09); }
+.v2 .ib2.on { color: var(--txt); border-color: rgba(255, 255, 255, .3); }
+.v2 .ib2 svg { width: 13px; height: 13px; }
 .v2 .wa-busca { position: relative; margin-bottom: 9px; }
 .v2 .wa-busca svg { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); width: 12px; height: 12px; color: var(--txt-3); pointer-events: none; }
 .v2 .wa-busca input { width: 100%; padding-left: 27px; font-size: 12px; height: 30px; }

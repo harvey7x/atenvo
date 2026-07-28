@@ -26,7 +26,7 @@ import { useSendWaMessage } from '@/data/whatsapp';
 import { useInboxWhatsApp, type AvisoInbox } from '../hooks/useInboxWhatsApp';
 import { AudioRecorderV2 } from '../components/AudioRecorderV2';
 import { AgendarMensagemModalV2 } from './AgendarMensagemModalV2';
-import { criarRaizPortalV2 } from '../components/portal';
+import { CLASSE_RAIZ_PORTAL } from '../components/portal';
 import { BotaoMini, BotaoPrimario, BotaoSec, ConfirmDialogV2, ModalV2, Skeleton } from '../components';
 import { seedWa } from './whatsappSeed';
 import './whatsapp.css';
@@ -75,6 +75,10 @@ const ackOf = (status?: string): { s: string; cls: string; title: string } | nul
   : status === 'pendente' ? { s: '🕗', cls: 'pendente', title: 'Pendente' }
   : status === 'falhou' ? { s: '!', cls: 'falhou', title: 'Falhou' }
   : null;
+
+/** Tamanho de arquivo adaptativo B/KB/MB (paridade v1 L136): evita '0.0 MB' para poucos KB. */
+const fmtTam = (b?: number | null): string =>
+  !b ? '' : b < 1024 ? b + ' B' : b < 1_048_576 ? (b / 1024).toFixed(0) + ' KB' : (b / 1_048_576).toFixed(1) + ' MB';
 
 /** Tiers da barra lateral de espera (v1 L75-89): <30min neutro · 30min–2h âmbar · 2–24h vermelho · ≥24h crítico. */
 function tierEspera(aguardandoDesde: string | null | undefined, agoraMs: number): { tier: string; label: string } | null {
@@ -195,7 +199,10 @@ export default function WhatsAppV2() {
   const optout = inbox.optout;
   const podeGerenciar = podeGerenciarAtendimento(currentOrg.role);
   const usuarios = usuariosQ.data ?? [];
-  const nomePorId = (id: string) => usuarios.find((u) => u.id === id)?.nome;
+  // Map memoizado em vez de usuarios.find() por linha da fila: o cabeçalho e cada card
+  // resolvem o nome do responsável a cada render (inclusive a cada tecla no composer).
+  const nomeMap = useMemo(() => new Map(usuarios.map((u) => [u.id, u.nome])), [usuarios]);
+  const nomePorId = (id: string) => nomeMap.get(id);
 
   /* assinatura (v1: select inline; persistida em organizacao_usuarios) */
   const [assinaMode, setAssinaMode] = useState<string>('sem');
@@ -223,8 +230,11 @@ export default function WhatsAppV2() {
     setTab('todos'); setFiltroCanal(null); setFiltroStatus(null); setSearch('');
     const t = window.setTimeout(() => {
       document.querySelector(`[data-cid="${CSS.escape(conversaParam)}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      // só limpa o parâmetro DEPOIS de rolar: apagá-lo muda conversaParam→null, o que
+      // dispara o cleanup deste effect (clearTimeout). Se limpássemos antes, o timer
+      // morreria antes dos 220ms e a rolagem nunca ocorreria (regressão vs v1).
+      setParams((p) => { p.delete('conversa'); return p; }, { replace: true });
     }, 220);
-    setParams((p) => { p.delete('conversa'); return p; }, { replace: true });
     return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversaParam]);
@@ -280,14 +290,28 @@ export default function WhatsAppV2() {
     if (optout) { aoAvisar({ tom: 'erro', texto: optoutTexto }); return; }
     inbox.sendMsg(draft, assinaturaNome || null, () => setDraft(''));
   };
+  // auto-altura da caixa (paridade v1 L531-536): roda também na limpeza programática do draft
+  // (setDraft('') após enviar não dispara onChange), colapsando o campo em vez de deixá-lo esticado.
+  useEffect(() => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
+  }, [draft]);
   const sendDisabled = draft.trim() === '' || inbox.semDestino || optout || (WA_REAL && (!current.id || !inbox.canalConectado));
   const midiaDisabled = inbox.semDestino || inbox.canalRestrito || inbox.higieneBloqueia || optout || (WA_REAL && (!current.id || !inbox.canalConectado));
   const canaisAgendaveis = inbox.realCanais.filter((c) => canalValidoParaEnvio({ id: c.id, status_integracao: c.status, envio_restrito: c.envioRestrito, conflito_com: c.conflitoCom, ativo: true }).ok);
   const agendarDisabled = inbox.semDestino || inbox.higieneBloqueia || optout || (WA_REAL && (!current.id || canaisAgendaveis.length === 0));
+  // itens do fio memoizados: construirItensConversa formata Intl.DateTimeFormat por mensagem;
+  // sem memo isso refazia a cada tecla do composer / tick de 60s. Só depende das mensagens.
+  const itensConversa = useMemo(() => construirItensConversa(current.msgs, (m) => m.tsISO ?? null), [current.msgs]);
 
   /* ---------- popovers em portal (regra 10) ---------- */
   const raizPop = useMemo(() => {
-    const { className } = criarRaizPortalV2(document);
+    // usa a CONSTANTE (sem efeito colateral): criarRaizPortalV2() anexaria um <div> ao body
+    // que aqui só leríamos pelo className — deixando um nó órfão por montagem. A raiz real é
+    // o div [data-wa-pop] criado/reutilizado abaixo, que já carrega a classe .v2 (regra 10).
+    const className = CLASSE_RAIZ_PORTAL;
     let el = document.querySelector(`.${className.split(' ').join('.')}[data-wa-pop]`) as HTMLElement | null;
     if (!el) {
       el = document.createElement('div');
@@ -561,7 +585,7 @@ export default function WhatsAppV2() {
             )}
 
             <div className="wa-msgs" ref={msgsRef}>
-              {construirItensConversa(current.msgs, (m) => m.tsISO ?? null).map((item, i) =>
+              {itensConversa.map((item, i) =>
                 item.tipo === 'sep' ? (
                   <div className="dia" key={'sep-' + i}>{item.label}</div>
                 ) : (
@@ -597,7 +621,7 @@ export default function WhatsAppV2() {
                 <div className="rapidas" role="list" aria-label="Respostas rápidas (Scripts)">
                   {scripts.slice(0, 8).map((s) => (
                     <button
-                      key={s.id} type="button" className="rapida" role="listitem" disabled={inbox.semDestino || optout}
+                      key={s.id} type="button" className="rapida" role="listitem" disabled={composerBloqueado}
                       title={(s.conteudo || '').slice(0, 120) + ` · ${etapaCounts[s.id] ?? 1} msg${(etapaCounts[s.id] ?? 1) === 1 ? '' : 's'}`}
                       onClick={() => { if (optout) { aoAvisar({ tom: 'erro', texto: optoutTexto }); return; } setScriptSeq(s); }}
                     >
@@ -1023,8 +1047,14 @@ export default function WhatsAppV2() {
         onClose={() => setScriptSeq(null)}
         ctx={{ cliente: current.name, atendente: user?.name || 'Atendente', emailAtendente: user?.email ?? '', empresa: currentOrg.name, telefone: current.phone }}
         enviarEtapa={async (texto, retryMensagemId) => {
-          // opt-out INVIOLÁVEL também aqui: cada etapa revalida (o bloqueio pode chegar por realtime com o modal aberto)
+          // TODAS as travas do composer valem também aqui — o caminho de script não pode furar
+          // o que sendMsg bloqueia (o estado pode mudar por realtime com o modal aberto). Espelha
+          // as mesmas verificações/mensagens de useInboxWhatsApp.sendMsg, na mesma ordem.
+          if (inbox.canalRestrito) throw new Error('O número deste canal está com restrição no WhatsApp e está indisponível para envio. Selecione outro canal.');
+          if (inbox.canalIndisponivel) throw new Error('Este número está desconectado. Reconecte em Integrações para enviar.');
+          if (inbox.semDestino) throw new Error('Vincule um número confirmado para responder.');
           if (optout) throw new Error(optoutTexto);
+          if (inbox.higieneBloqueia) throw new Error(textoBloqueio(inbox.higiene) ?? 'Atendimento sem responsável ou com cadastro incompleto — assuma e complete o nome para enviar.');
           if (demo) { aoAvisar({ tom: 'ok', texto: 'Mensagem enviada' }); return; }
           const id = await sendMut.mutateAsync({ conversaId: current.id, canalId: inbox.replyCanalId || current.canalId, assinaturaNome: assinaturaNome || undefined, text: texto, retryMensagemId });
           return id ?? undefined;
@@ -1122,7 +1152,7 @@ function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, optout,
           <span className="ic"><IcDoc /></span>
           <span className="inf">
             <span className="nm">{m.nome || 'documento'}</span>
-            <span className="mt num">{(m.mime ?? '').split('/')[1]?.toUpperCase() ?? 'Arquivo'}{m.tamanho ? ' · ' + (m.tamanho / 1048576).toFixed(1) + ' MB' : ''}</span>
+            <span className="mt num">{(m.nome?.split('.').pop() || '').toUpperCase() || 'Arquivo'}{m.tamanho ? ' · ' + fmtTam(m.tamanho) : ''}</span>
             {!demo && m.anexoPath && (
               <span className="acts">
                 <button type="button" className="lnk" onClick={async () => { const u = await urlDownloadMidiaWa(m.anexoPath!, m.nome || 'documento'); window.location.assign(u); }}>Baixar</button>

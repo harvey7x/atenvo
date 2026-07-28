@@ -397,6 +397,13 @@
 .v2 .form-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .v2 .form-grid textarea.inp, .v2 .form-2col textarea.inp { height: auto; padding: 8px 11px; resize: vertical; font-family: var(--fonte); }
 .v2 .form-grid select.inp, .v2 .form-2col select.inp { appearance: none; }
+/* aviso de erro + link-ação: usados por Kanban E WhatsApp (modal "Adicionar ao Kanban" e
+   VincularModal LID). Promovidos de kanban.css — senão o WhatsApp, que não importa kanban.css,
+   renderizava .kb-link como <button> cru (tema claro) e .kb-err sem a caixa rubra. */
+.v2 .kb-err { font-size: 11.5px; color: var(--rubro); background: var(--rubro-bg); border-radius: 8px; padding: 7px 10px; margin-top: 10px; }
+.v2 .kb-link { background: none; border: none; padding: 0; color: var(--txt-2); font-size: 11.5px; font-family: var(--fonte); text-decoration: underline; cursor: pointer; }
+.v2 .kb-link:hover { color: var(--txt); }
+.v2 .kb-link.perigo { color: var(--rubro); }
 
 /* --- Gravador de áudio (AudioRecorderV2) ---------------------
    Pele Platina do AudioRecorder v1 — classes `arec-*` novas para
@@ -456,12 +463,16 @@
 .v2 .fjb-hist-row { color: var(--txt-3); }
 .v2 .fjb-hist-row .v { color: var(--txt); }
 
-/* --- Modais v1 REUSADOS dentro do .v2 (Modal.tsx + FichaJudicialModal + MediaComposer +
-   ScriptSequenceModal). O CSS v1 usa tokens de tema CLARO (--surface/--ink/--line/--accent…)
-   inexistentes no .v2 → caíam em fallback branco/preto (modal ilegível). Redefinimos os tokens
-   v1 no subtree do overlay: conserta chrome + inputs + textos + os .fj-* de uma vez.
+/* --- Componentes v1 REUSADOS dentro do .v2 (Modal.tsx + FichaJudicialBox/Modal +
+   MediaComposer + AudioRecorder + ScriptSequenceModal + RelacionamentoContatoBox). O CSS v1
+   usa tokens de tema CLARO (--surface/--ink/--line/--accent…) inexistentes no .v2 → caíam em
+   fallback branco/preto (modal ilegível, chrome claro). Redefinimos esses tokens na RAIZ do
+   subtree .v2 — não só no overlay do modal — para que QUALQUER superfície v1 reusada (modal,
+   dropdown, lightbox, composer, gravador, tooltip, futuros) herde a pele Platina escura por
+   padrão. Foi o vetor do "modal branco": um componente v1 reusado fora do .atv-modal-overlay
+   caía no tema claro. Guard: colisoesCss test 3 exige que estes tokens existam no escopo .v2.
    Botões .primary viram platina (gradiente, que token não expressa). Guard: allowlist atv-/fj-. */
-.v2 .atv-modal-overlay {
+.v2 {
   --backdrop: rgba(6, 7, 9, .62);
   --surface: #17191D;
   --surface-2: rgba(255, 255, 255, .045);

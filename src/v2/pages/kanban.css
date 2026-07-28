@@ -141,10 +141,8 @@
 .v2 .kb-sec-h:first-child { margin-top: 0; }
 .v2 .kb-hint { font-weight: 400; color: var(--txt-3); text-transform: none; letter-spacing: 0; }
 .v2 .campo .kb-hint { font-size: 10.5px; }
-.v2 .kb-err { font-size: 11.5px; color: var(--rubro); background: var(--rubro-bg); border-radius: 8px; padding: 7px 10px; margin-top: 10px; }
-.v2 .kb-link { background: none; border: none; padding: 0; color: var(--txt-2); font-size: 11.5px; font-family: var(--fonte); text-decoration: underline; cursor: pointer; }
-.v2 .kb-link:hover { color: var(--txt); }
-.v2 .kb-link.perigo { color: var(--rubro); }
+/* .kb-err / .kb-link promovidas a componentes.css (compartilhadas): o WhatsApp usa .kb-err
+   (modal "Adicionar ao Kanban") e .kb-link (VincularModal LID) e não carrega kanban.css. */
 
 /* swatches de cor da coluna */
 .v2 .kb-swatches { display: flex; gap: 7px; flex-wrap: wrap; }
