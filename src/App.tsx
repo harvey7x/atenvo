@@ -40,6 +40,7 @@ const ConfiguracoesV2 = lazy(() => import('@/v2/pages/Configuracoes'));
 const MaturacaoV2 = lazy(() => import('@/v2/pages/Maturacao'));
 const ContatosV2 = lazy(() => import('@/v2/pages/Contatos'));
 const RelatoriosV2 = lazy(() => import('@/v2/pages/Relatorios'));
+const IntegracoesV2 = lazy(() => import('@/v2/pages/Integracoes'));
 const ManutencaoV2 = lazy(() => import('@/v2/pages/Manutencao'));
 const RedefinirSenhaV2 = lazy(() => import('@/v2/pages/RedefinirSenha'));
 const DefinirSenhaV2 = lazy(() => import('@/v2/pages/DefinirSenha'));
@@ -283,7 +284,14 @@ const routes: RouteObject[] = [
                         </Suspense>
                       ),
                     },
-                    emConstrucao('integracoes', 'Integrações', 'Conexões do canal e serviços do sistema.'),
+                    {
+                      path: 'integracoes',
+                      element: (
+                        <Suspense fallback={null}>
+                          <IntegracoesV2 />
+                        </Suspense>
+                      ),
+                    },
                     {
                       // paridade: admin-only por URL, não só no menu
                       path: 'maturacao',

@@ -1,0 +1,148 @@
+/* ============================================================
+   Integrações — hub de conexões (anatomia int-card do mockup
+   pg-integracoes). Cards de canal em grade 2 col; a realidade
+   vence a ficção do mockup: canais reais, transporte real.
+   Regra 8: vidro só nos cards de canal visíveis (como no mockup);
+   linhas internas (números oficiais, templates, páginas FB) são
+   sólidas.
+   ============================================================ */
+
+.v2 .intg-grade { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.v2 .intg-grade.uma { grid-template-columns: 1fr; }
+
+/* seção: cabeçalho h3 + sub (padrão sec-head do v1 na régua do mockup) */
+.v2 .intg-sec { margin-top: 22px; }
+.v2 .intg-sec-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 11px; }
+.v2 .intg-sec-head h3 { font-size: 14px; font-weight: 600; letter-spacing: -.01em; display: flex; align-items: center; gap: 8px; }
+.v2 .intg-sec-head h3 svg { width: 15px; height: 15px; color: var(--txt-2); }
+.v2 .intg-sec-head p { font-size: 11.5px; color: var(--txt-2); margin-top: 3px; }
+
+/* int-card (mockup verbatim, adaptado aos tokens v2) */
+.v2 .int-card { padding: 15px 16px; display: flex; flex-direction: column; gap: 9px; border-radius: 12px; }
+.v2 .int-l1 { display: flex; align-items: center; gap: 11px; min-width: 0; }
+.v2 .int-ic {
+  width: 34px; height: 34px; border-radius: 9px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255, 255, 255, .07); border: 1px solid rgba(255, 255, 255, .12); color: var(--txt);
+}
+.v2 .int-ic svg { width: 17px; height: 17px; }
+.v2 .int-l1 .tx { min-width: 0; flex: 1; }
+.v2 .int-n { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.v2 .int-n > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .int-s { font-size: 11px; color: var(--txt-2); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .int-l2 { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 2px; flex-wrap: wrap; }
+.v2 .mono {
+  font-family: ui-monospace, monospace; font-size: 10.5px; color: var(--txt-2);
+  background: rgba(255, 255, 255, .04); border: 1px solid rgba(255, 255, 255, .09);
+  border-radius: 7px; padding: 6px 9px; display: flex; align-items: center; gap: 8px; overflow: hidden;
+}
+.v2 .mono > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.v2 .mono b { color: var(--txt); font-weight: 500; cursor: pointer; flex-shrink: 0; }
+.v2 .mono b:hover { text-decoration: underline; }
+
+/* etiqueta de transporte no título do card */
+.v2 .intg-transp {
+  font-size: 9.5px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--txt-3); border: 1px solid rgba(255, 255, 255, .13); border-radius: 5px;
+  padding: 1.5px 6px; flex-shrink: 0;
+}
+
+/* chips de estado (Sessão / Entrega / Auto) — semântica por tom */
+.v2 .intg-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.v2 .intg-chip {
+  display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 500;
+  border-radius: 99px; padding: 2px 9px; background: rgba(255, 255, 255, .05);
+  border: 1px solid rgba(255, 255, 255, .1); color: var(--txt-2); cursor: default;
+}
+.v2 .intg-chip i { width: 6px; height: 6px; border-radius: 50%; display: block; background: var(--txt-3); }
+.v2 .intg-chip.t-ok { background: var(--verde-bg); border-color: rgba(74, 190, 140, .3); color: var(--verde); }
+.v2 .intg-chip.t-ok i { background: var(--verde); }
+.v2 .intg-chip.t-at { background: var(--ambar-bg); border-color: rgba(217, 164, 74, .3); color: var(--ambar); }
+.v2 .intg-chip.t-at i { background: var(--ambar); }
+.v2 .intg-chip.t-er { background: var(--rubro-bg); border-color: rgba(229, 102, 92, .3); color: var(--rubro); }
+.v2 .intg-chip.t-er i { background: var(--rubro); }
+
+/* alerta único do canal (o mais grave vence) */
+.v2 .intg-alerta { font-size: 11px; line-height: 1.45; }
+.v2 .intg-alerta.t-er { color: var(--rubro); }
+.v2 .intg-alerta.t-at { color: var(--ambar); }
+.v2 .intg-alerta.t-ne { color: var(--txt-3); }
+
+/* ações do canal (rodapé do card) */
+.v2 .intg-acoes { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+
+/* nota de adaptador (estados: sem backend / vazio / permissão) */
+.v2 .intg-nota {
+  font-size: 11.5px; color: var(--txt-2); line-height: 1.55;
+  background: rgba(255, 255, 255, .03); border: 1px dashed rgba(255, 255, 255, .12);
+  border-radius: 9px; padding: 10px 12px;
+}
+.v2 .intg-nota b { color: var(--txt); font-weight: 600; }
+
+/* rodapé de seção (Conectar / Atualizar / limite) */
+.v2 .intg-foot { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; margin-top: 11px; }
+.v2 .intg-foot .lim { font-size: 11px; color: var(--ambar); }
+
+/* linhas internas (números oficiais, templates, páginas FB) — sólidas */
+.v2 .intg-linha {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: rgba(255, 255, 255, .03); border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: 9px; padding: 9px 11px;
+}
+.v2 .intg-linha .tx { flex: 1; min-width: 140px; }
+.v2 .intg-linha .nm { font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.v2 .intg-linha .sb { font-size: 10.5px; color: var(--txt-2); margin-top: 1px; }
+.v2 .intg-linhas { display: flex; flex-direction: column; gap: 7px; }
+
+/* checklist da conta oficial */
+.v2 .intg-check { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 14px; }
+.v2 .intg-check .it { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--txt-2); }
+.v2 .intg-check .it b { font-weight: 500; color: var(--txt-2); font-family: ui-monospace, monospace; font-size: 10.5px; }
+.v2 .intg-check .it .ok { color: var(--verde); }
+.v2 .intg-check .it .falta { color: var(--rubro); }
+.v2 .intg-check .it .neutro { color: var(--txt-3); }
+
+/* diagnóstico (modal): grade de pares dl/dv + últimos envios */
+.v2 .diag-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 16px; }
+.v2 .diag-grid .par { display: flex; justify-content: space-between; gap: 10px; font-size: 11.5px; padding: 3px 0; border-bottom: 1px solid rgba(255, 255, 255, .06); }
+.v2 .diag-grid .par dt { color: var(--txt-3); flex-shrink: 0; }
+.v2 .diag-grid .par dd { color: var(--txt); text-align: right; overflow: hidden; text-overflow: ellipsis; }
+.v2 .diag-sec { display: flex; align-items: center; gap: 8px; margin: 14px 0 8px; font-size: 12px; font-weight: 600; }
+.v2 .diag-sec .obs { font-size: 10.5px; font-weight: 400; color: var(--txt-3); }
+.v2 .diag-l10 { display: flex; flex-direction: column; gap: 3px; font-size: 11px; }
+.v2 .diag-l10 .row { display: flex; gap: 10px; padding: 3px 0; border-bottom: 1px solid rgba(255, 255, 255, .05); }
+.v2 .diag-l10 .row .h { color: var(--txt-3); flex-shrink: 0; width: 96px; }
+.v2 .diag-l10 .row .st { flex-shrink: 0; width: 120px; }
+.v2 .diag-l10 .row .d { color: var(--txt-2); flex-shrink: 0; }
+.v2 .diag-l10 .row .e { color: var(--rubro); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .diag-nota { font-size: 11px; color: var(--txt-2); line-height: 1.55; margin-top: 9px; }
+.v2 .diag-err { font-size: 11px; color: var(--rubro); background: var(--rubro-bg); border-radius: 8px; padding: 7px 10px; margin-top: 9px; }
+
+/* modal de conexão (QR) */
+.v2 .intg-qr-box {
+  width: 240px; height: 240px; margin: 12px auto 0; background: #fff; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center; overflow: hidden;
+}
+.v2 .intg-qr-box img { width: 216px; height: 216px; }
+.v2 .intg-qr-box .ger { color: #55585E; font-size: 12px; }
+.v2 .intg-qr-info { text-align: center; font-size: 11.5px; color: var(--txt-2); margin-top: 10px; }
+.v2 .intg-qr-aguarda { display: flex; align-items: center; justify-content: center; gap: 7px; font-size: 11.5px; color: var(--txt-2); margin-top: 6px; }
+.v2 .intg-qr-aguarda i { width: 7px; height: 7px; border-radius: 50%; background: var(--ambar); animation: intg-pulsa 1.4s ease-in-out infinite; }
+@keyframes intg-pulsa { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+.v2 .intg-conectado { text-align: center; padding: 10px 0 4px; }
+.v2 .intg-conectado .circ {
+  width: 52px; height: 52px; border-radius: 50%; margin: 0 auto 12px;
+  background: var(--verde-bg); border: 1px solid rgba(74, 190, 140, .4);
+  display: flex; align-items: center; justify-content: center; color: var(--verde);
+}
+.v2 .intg-conectado .circ svg { width: 24px; height: 24px; }
+.v2 .intg-conectado h4 { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+
+.v2 .intg-lead { font-size: 12px; color: var(--txt-2); line-height: 1.6; }
+.v2 .intg-lead b { color: var(--txt); font-weight: 600; }
+
+@media (max-width: 900px) {
+  .v2 .intg-grade { grid-template-columns: 1fr; }
+  .v2 .intg-check { grid-template-columns: 1fr; }
+  .v2 .diag-grid { grid-template-columns: 1fr; }
+}
