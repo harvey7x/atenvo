@@ -62,8 +62,9 @@ export function useNotificacaoInbound(opts: {
         let abertaId: string | null = null;
         try { abertaId = sessionStorage.getItem(CURR_KEY); } catch { /* privado */ }
         const focada = document.visibilityState === 'visible' && document.hasFocus();
-        cb.current.aoBadge();
+        // conversa aberta E focada → o inbox já mostra: nem toast nem badge
         if (naPagina && focada && abertaId === m.conversa_id) return;
+        cb.current.aoBadge();
         // identifica quem falou (leitura leve na MESMA tabela que a lista já consulta)
         let quem = 'Cliente';
         let fonte = 'WhatsApp';

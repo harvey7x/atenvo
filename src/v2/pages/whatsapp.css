@@ -253,6 +253,11 @@
 
 /* responsivo: contexto colapsável */
 .v2 .wa-ctx-reabrir { position: absolute; right: 10px; top: 64px; z-index: 5; }
+/* variantes semânticas do chip de situação (ganho/perdido vencem a cor de etapa) */
+.v2 .conv2 .cchip.sit-ganho, .v2 .wa-hchip.sit-ganho { color: var(--verde); border-color: rgba(74, 190, 140, .35); }
+.v2 .conv2 .cchip.sit-perdido, .v2 .conv2 .cchip.sit-cancelado, .v2 .wa-hchip.sit-perdido, .v2 .wa-hchip.sit-cancelado { color: var(--rubro); border-color: rgba(229, 102, 92, .35); }
+.v2 .conv2 .cchip.sit-lead, .v2 .wa-hchip.sit-lead { color: var(--ambar); border-color: rgba(217, 164, 74, .3); }
+
 @media (max-width: 1200px) {
-  .v2 .wa-ctx { position: absolute; right: 0; top: 0; bottom: 0; z-index: 40; box-shadow: -18px 0 40px rgba(0, 0, 0, .45); background: #141619; }
+  .v2 .wa-ctx { position: absolute; right: 0; top: 0; bottom: 0; z-index: 40; box-shadow: -18px 0 40px rgba(0, 0, 0, .45); background: #17191D; }
 }

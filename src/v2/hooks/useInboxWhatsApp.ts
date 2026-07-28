@@ -9,6 +9,7 @@ import { useHigieneConversa, useRegistrarAdiamento, HIGIENE_VAZIO } from '@/data
 import { decidirDono, decidirNome, estadoHigiene, conversaAtiva } from '@/lib/higieneConversa';
 import { responsavelEfetivo } from '@/lib/conversaEtiquetas';
 import { HIGIENE_CORTE_ISO, HIGIENE_DIAS_ADAPTACAO } from '@/config/higiene';
+import { useBloqueiosOrg } from './bloqueiosOrg';
 import { useAuth } from '@/context/AuthContext';
 import { useOrg } from '@/context/OrgContext';
 import {
@@ -41,6 +42,8 @@ export function useInboxWhatsApp(opts: {
   aoAvisar: (a: AvisoInbox) => void;
   /** seed do demo (deep-copy é feita aqui); default WA_CONTACTS. */
   seedDemo?: WaContact[];
+  /** contatos em opt-out no demo (no real vem de useBloqueiosOrg). */
+  bloqueadosDemo?: Set<string>;
 }) {
   const { aoAvisar } = opts;
   const { user } = useAuth();
@@ -167,9 +170,15 @@ export function useInboxWhatsApp(opts: {
   const canalSel = realCanais.find((c) => c.id === replyCanalId) ?? null;
   const canalConectado = WA_REAL ? canalSel?.status === 'conectado' : true;
   const canalIndisponivel = WA_REAL && !!canalSel && canalSel.status !== 'conectado';
-  const canalRestrito = WA_REAL && !!canalSel && (canalSel.envioRestrito || canalSel.entregaStatus === 'restrito') && canalSel.status === 'conectado';
+  // v1 L420: SÓ envioRestrito bloqueia; entregaStatus 'restrito'/'instavel' é aviso não-bloqueante (composer).
+  const canalRestrito = WA_REAL && !!canalSel?.envioRestrito;
   const envioSaudeQ = useWaCanalEnvioSaude(WA_REAL ? canalSel?.id ?? null : null);
   const semDestino = WA_REAL && !!current.semDestino;
+
+  /* opt-out (relacionamento_bloqueio) — inviolável: bloqueia TODA rota de envio, inclusive retry */
+  const bloqueiosQ = useBloqueiosOrg();
+  const bloqueados = demo ? (opts.bloqueadosDemo ?? new Set<string>()) : (bloqueiosQ.data ?? new Set<string>());
+  const optout = !!current.contatoId && bloqueados.has(current.contatoId);
 
   /* ---------- higiene (v1 L434-443) ---------- */
   const higQ = useHigieneConversa(WA_REAL ? current.id || null : null);
@@ -187,13 +196,15 @@ export function useInboxWhatsApp(opts: {
 
   const bloquearPorHigiene = useCallback((): boolean => {
     if (!higieneBloqueia) return false;
-    if (higiene.dono !== 'livre') aoAvisar({ tom: 'erro', texto: 'Esta conversa não tem responsável. Clique em "Assumir atendimento" para responder.' });
+    // v1: o texto segue o MOTIVO do bloqueio, não o estado do dono (dono='alerta' + nome bloqueia → é nome)
+    if (higiene.motivoBloqueio === 'dono') aoAvisar({ tom: 'erro', texto: 'Esta conversa não tem responsável. Clique em "Assumir atendimento" para responder.' });
     else aoAvisar({ tom: 'erro', texto: 'Preencha o nome completo do cliente para continuar respondendo.' });
     return true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [higieneBloqueia, higiene.dono]);
+  }, [higieneBloqueia, higiene.motivoBloqueio]);
 
   const adiarNome = useCallback(async () => {
+    if (!current.id || adiarMut.isPending) return;                 // v1 L633: trava de duplo-clique
     try {
       const r = await adiarMut.mutateAsync({ conversaId: current.id, tipo: 'nome_adiado' });
       const restam = Math.max(0, 2 - r.adiamentos);
@@ -207,6 +218,7 @@ export function useInboxWhatsApp(opts: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current.id]);
   const nomeNaoInformado = useCallback(async () => {
+    if (!current.id || adiarMut.isPending) return;                 // v1 L645: trava de duplo-clique
     try {
       await adiarMut.mutateAsync({ conversaId: current.id, tipo: 'nome_nao_informado' });
       aoAvisar({ tom: 'ok', texto: 'Liberado por 24h. O aviso volta depois — registre o nome assim que o cliente informar.' });
@@ -230,6 +242,7 @@ export function useInboxWhatsApp(opts: {
     if (canalRestrito) { aoAvisar({ tom: 'erro', texto: 'O número deste canal está com restrição no WhatsApp e está indisponível para envio. Selecione outro canal.' }); return; }
     if (canalIndisponivel) { aoAvisar({ tom: 'erro', texto: 'Este número está desconectado. Reconecte em Integrações para enviar.' }); return; }
     if (semDestino) { aoAvisar({ tom: 'erro', texto: 'Vincule um número confirmado para responder.' }); return; }
+    if (optout) { aoAvisar({ tom: 'erro', texto: 'Contato marcado como não incomodar — mensagens bloqueadas.' }); return; }
     if (bloquearPorHigiene()) return;                          // higiene NÃO vale para retry (v1 L677)
     const now = new Date();
     const hh = ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
@@ -253,13 +266,14 @@ export function useInboxWhatsApp(opts: {
       },
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentId, canalRestrito, canalIndisponivel, semDestino, bloquearPorHigiene, replyTo, replyCanalId, current.canalId]);
+  }, [currentId, canalRestrito, canalIndisponivel, semDestino, optout, bloquearPorHigiene, replyTo, replyCanalId, current.canalId]);
 
   const retryMsg = useCallback((m: WaMessage) => {
     if (!m.id || !currentId || retryId) return;
     if (canalRestrito) { aoAvisar({ tom: 'erro', texto: 'O número deste canal está com restrição no WhatsApp e está indisponível para reenviar. Selecione outro canal.' }); return; }
     if (canalIndisponivel) { aoAvisar({ tom: 'erro', texto: 'Este número está desconectado. Reconecte em Integrações para enviar.' }); return; }
     if (semDestino) { aoAvisar({ tom: 'erro', texto: 'Vincule um número confirmado para responder.' }); return; }
+    if (optout) { aoAvisar({ tom: 'erro', texto: 'Contato marcado como não incomodar — mensagens bloqueadas.' }); return; }
     setRetryId(m.id);
     setContacts((cur) => aplicarRetry(cur, currentId, m.id!));
     if (!WA_REAL) { setRetryId(null); return; }
@@ -271,7 +285,7 @@ export function useInboxWhatsApp(opts: {
       },
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentId, retryId, canalRestrito, canalIndisponivel, semDestino, replyCanalId, current.canalId]);
+  }, [currentId, retryId, canalRestrito, canalIndisponivel, semDestino, optout, replyCanalId, current.canalId]);
 
   const removerFalha = useCallback(async (m: WaMessage) => {
     if (!m.id || removendoId) return;
@@ -288,8 +302,10 @@ export function useInboxWhatsApp(opts: {
 
   /* mídia (upload ANTES do envio; sem bolha otimista — v1 L745-784) */
   const guardaMidia = () => {
-    if (higiene.dono !== 'livre' && higieneBloqueia) throw new Error('Assuma o atendimento para responder.');
-    if (higiene.dono === 'livre' && higieneBloqueia) throw new Error('Preencha o nome completo do cliente para responder.');
+    if (optout) throw new Error('Contato marcado como não incomodar — mensagens bloqueadas.');
+    if (!higieneBloqueia) return;
+    // v1: motivo do bloqueio decide o texto (não o estado do dono)
+    throw new Error(higiene.motivoBloqueio === 'dono' ? 'Assuma o atendimento para responder.' : 'Preencha o nome completo do cliente para responder.');
   };
   const replyPayload = () => (replyTo ? { id: replyTo.id, idExt: replyTo.idExt, fromMe: replyTo.fromMe, preview: { remetente: replyTo.remetente, tipo: replyTo.tipo, texto: replyTo.texto } } : undefined);
   const enviarImagem = useCallback(async (file: File, caption: string) => {
@@ -299,7 +315,7 @@ export function useInboxWhatsApp(opts: {
     await sendMut.mutateAsync({ conversaId: currentId, canalId: replyCanalId || current.canalId, midiaPath: up.path, midiaTipo: 'imagem', midiaMime: up.mime, midiaNome: up.nome, midiaTamanho: up.tamanho, text: caption || undefined, replyTo: replyPayload() });
     setReplyTo(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentId, replyCanalId, current.canalId, replyTo, higieneBloqueia, higiene.dono]);
+  }, [currentId, replyCanalId, current.canalId, replyTo, higieneBloqueia, higiene.motivoBloqueio, optout]);
   const enviarAudio = useCallback(async (blob: Blob, mime: string, ext: string, diag?: Record<string, unknown>) => {
     guardaMidia();
     if (!blob.size) throw new Error('Áudio vazio.');
@@ -310,7 +326,7 @@ export function useInboxWhatsApp(opts: {
     await sendMut.mutateAsync({ conversaId: currentId, canalId: replyCanalId || current.canalId, midiaPath: up.path, midiaTipo: 'audio', midiaMime: up.mime, midiaNome: up.nome, midiaTamanho: up.tamanho, audioDiag: diag, origemAudio, replyTo: replyPayload() });
     setReplyTo(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentId, replyCanalId, current.canalId, replyTo, higieneBloqueia, higiene.dono]);
+  }, [currentId, replyCanalId, current.canalId, replyTo, higieneBloqueia, higiene.motivoBloqueio, optout]);
   const enviarDocumento = useCallback(async (file: File, caption: string) => {
     guardaMidia();
     if (!WA_REAL) { aoAvisar({ tom: 'ok', texto: 'Mensagem enviada' }); return; }
@@ -318,12 +334,12 @@ export function useInboxWhatsApp(opts: {
     await sendMut.mutateAsync({ conversaId: currentId, canalId: replyCanalId || current.canalId, midiaPath: up.path, midiaTipo: 'documento', midiaMime: up.mime, midiaNome: up.nome, midiaTamanho: up.tamanho, text: caption || undefined, replyTo: replyPayload() });
     setReplyTo(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentId, replyCanalId, current.canalId, replyTo, higieneBloqueia, higiene.dono]);
+  }, [currentId, replyCanalId, current.canalId, replyTo, higieneBloqueia, higiene.motivoBloqueio, optout]);
 
   /* ---------- atribuição (v1 L806-867) — otimista com rollback ---------- */
   const [atribuindo, setAtribuindo] = useState(false);
   const assumir = useCallback(async () => {
-    if (atribuindo || !current.id) return;
+    if (atribuindo || !current.id || !current.contatoId || !user?.id) return;
     setAtribuindo(true);
     const esperado = current.respId ?? null;
     setContacts((cur) => patchConversa(cur, current.id, { respId: user?.id ?? null }));
@@ -337,7 +353,7 @@ export function useInboxWhatsApp(opts: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current.id, current.contatoId, current.respId, atribuindo, user?.id]);
   const devolver = useCallback(async () => {
-    if (atribuindo || !current.id) return;
+    if (atribuindo || !current.id || !current.contatoId || !current.respId) return;
     setAtribuindo(true);
     const esperado = current.respId ?? null;
     setContacts((cur) => patchConversa(cur, current.id, { respId: null }));
@@ -349,10 +365,10 @@ export function useInboxWhatsApp(opts: {
       aoAvisar({ tom: 'erro', texto: (e as Error)?.message || 'Falha ao devolver.' });
     } finally { setAtribuindo(false); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current.id, current.respId, atribuindo]);
+  }, [current.id, current.contatoId, current.respId, atribuindo]);
   const transferir = useCallback(async (destinoId: string, motivo: string) => {
     if (!motivo.trim()) { aoAvisar({ tom: 'erro', texto: 'Informe o motivo da transferência.' }); return false; }
-    if (atribuindo || !current.id) return false;
+    if (atribuindo || !current.id || !current.contatoId || !destinoId) return false;
     setAtribuindo(true);
     const esperado = current.respId ?? null;
     setContacts((cur) => patchConversa(cur, current.id, { respId: destinoId }));
@@ -414,9 +430,9 @@ export function useInboxWhatsApp(opts: {
     selectContact, selecionarPorDeepLink,
     live, msgsQ, relogioMs,
     realCanais, canalSel, replyCanalId, replyChip, onReplyCanal, onReplyChip,
-    canalConectado, canalIndisponivel, canalRestrito, semDestino,
+    canalConectado, canalIndisponivel, canalRestrito, semDestino, optout, bloqueados,
     envioSaude: envioSaudeQ.data?.estado ?? 'ok',
-    higiene, higieneBloqueia, decNome, donoEfetivo, bloquearPorHigiene, adiarNome, nomeNaoInformado,
+    higiene, higieneBloqueia, decNome, donoEfetivo, bloquearPorHigiene, adiarNome, nomeNaoInformado, adiando: adiarMut.isPending,
     replyTo, setReplyTo,
     sendMsg, retryMsg, removerFalha, retryId, removendoId,
     enviarImagem, enviarAudio, enviarDocumento,

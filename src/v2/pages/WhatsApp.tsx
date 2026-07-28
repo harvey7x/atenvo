@@ -11,8 +11,8 @@ import { indexPorChave, tipoLabel, tempoRelativo } from '@/data/slaView';
 import { useOportunidadesDoContato, useFunisDaOrg, chamarGarantirEntrada } from '@/data/kanban';
 import { useCobrancas } from '@/data/cobrancas';
 import { corDaEtiqueta, podeGerenciarAtendimento, type AssinaturaModo } from '@/types/atendimento';
-import { textoBloqueio } from '@/lib/higieneConversa';
-import { responsavelEfetivo } from '@/lib/conversaEtiquetas';
+import { textoBloqueio, analisarNome, conversaAtiva } from '@/lib/higieneConversa';
+import { responsavelEfetivo, situacaoDaConversa, type ConversaEtiquetaInput } from '@/lib/conversaEtiquetas';
 import { construirItensConversa } from '@/lib/dataConversa';
 import { formatarNomeCliente } from '@/lib/nomeCliente';
 import { canalValidoParaEnvio } from '@/lib/agendamentoMensagem';
@@ -24,7 +24,6 @@ import { ScriptSequenceModal } from '@/components/ScriptSequenceModal';
 import { FichaJudicialBox } from '@/components/FichaJudicialBox';
 import { useSendWaMessage } from '@/data/whatsapp';
 import { useInboxWhatsApp, type AvisoInbox } from '../hooks/useInboxWhatsApp';
-import { useBloqueiosOrg } from '../hooks/bloqueiosOrg';
 import { AudioRecorderV2 } from '../components/AudioRecorderV2';
 import { AgendarMensagemModalV2 } from './AgendarMensagemModalV2';
 import { criarRaizPortalV2 } from '../components/portal';
@@ -87,6 +86,17 @@ function tierEspera(aguardandoDesde: string | null | undefined, agoraMs: number)
 }
 const nomeVazio = (n: string | undefined) => !n?.trim() || /^[\d\s()+\-]+$/.test(n ?? '');
 const nomeExibicao = (c: WaContact) => (nomeVazio(c.name) ? (c.phone ? mascararNumero(c.phone) : 'Cliente sem nome') : formatarNomeCliente(c.name));
+/** Situação derivada (v1: sempre há um chip — LEAD NOVO / EM ATENDIMENTO / AGUARDANDO / FECHADO / etapa). */
+const entradaEtiqueta = (c: WaContact): ConversaEtiquetaInput => ({
+  atendenteId: c.atendenteId, respId: c.respId, oppRespId: c.oppRespId, etapa: c.etapa, etapaEntrada: c.etapaEntrada,
+  oppStatus: c.oppStatus ?? undefined, aguardando: c.aguardando, canalAtual: c.canalAtual,
+});
+const situacaoDe = (c: WaContact) => situacaoDaConversa(entradaEtiqueta(c));
+/** Cor da coluna do Kanban só quando o texto exibido É o nome da etapa avançada (v1 corDaEtapa). */
+const corDaSituacao = (c: WaContact, texto: string): string | null => {
+  const nomeCol = (c.etapa ?? '').trim().toLocaleUpperCase('pt-BR');
+  return c.etapaCor && nomeCol && texto === nomeCol ? c.etapaCor : null;
+};
 const mmss = (s: number | null | undefined) => (s == null ? '' : `${Math.floor(s / 60)}:${('0' + Math.floor(s % 60)).slice(-2)}`);
 const ONDA = [6, 11, 15, 9, 13, 17, 11, 7, 14, 10, 16, 8, 12, 6, 10, 15];
 
@@ -106,7 +116,7 @@ export default function WhatsAppV2() {
   }, []);
   useEffect(() => () => window.clearTimeout(avisoTimer.current), []);
 
-  const inbox = useInboxWhatsApp({ aoAvisar, seedDemo: useMemo(() => seedWa(), []) });
+  const inbox = useInboxWhatsApp({ aoAvisar, seedDemo: useMemo(() => seedWa(), []), bloqueadosDemo: useMemo(() => new Set(['wa-cleusa-ct']), []) });
   const { demo, contacts, current, currentId, relogioMs } = inbox;
   const sendMut = useSendWaMessage();
 
@@ -171,8 +181,7 @@ export default function WhatsAppV2() {
   ]), []);
   const scripts = WA_REAL ? (scriptsQ.data ?? []) : scriptsDemo;
   const etapaCounts = useScriptEtapaCounts().data ?? {};
-  const bloqueiosQ = useBloqueiosOrg();
-  const bloqueados = demo ? new Set(['wa-cleusa-ct']) : (bloqueiosQ.data ?? new Set<string>());
+  const bloqueados = inbox.bloqueados;
   const canalEhCloud = inbox.canalSel?.transporte === 'cloud_api';
   const janelaQ = useJanelaCanal(WA_REAL && canalEhCloud ? inbox.canalSel?.id ?? null : null, WA_REAL ? current.contatoId ?? null : null, canalEhCloud);
   const agendadasQ = useMensagensAgendadas(WA_REAL ? currentId || null : null);
@@ -181,7 +190,7 @@ export default function WhatsAppV2() {
   const cancelarAgMut = useCancelarAgendamento();
   const cobrancasQ = useCobrancas();
 
-  const optout = !!current.contatoId && bloqueados.has(current.contatoId);
+  const optout = inbox.optout;
   const podeGerenciar = podeGerenciarAtendimento(currentOrg.role);
   const usuarios = usuariosQ.data ?? [];
   const nomePorId = (id: string) => usuarios.find((u) => u.id === id)?.nome;
@@ -271,7 +280,7 @@ export default function WhatsAppV2() {
   };
   const sendDisabled = draft.trim() === '' || inbox.semDestino || optout || (WA_REAL && (!current.id || !inbox.canalConectado));
   const midiaDisabled = inbox.semDestino || inbox.canalRestrito || inbox.higieneBloqueia || optout || (WA_REAL && (!current.id || !inbox.canalConectado));
-  const canaisAgendaveis = inbox.realCanais.filter((c) => canalValidoParaEnvio(c).ok);
+  const canaisAgendaveis = inbox.realCanais.filter((c) => canalValidoParaEnvio({ id: c.id, status_integracao: c.status, envio_restrito: c.envioRestrito, conflito_com: c.conflitoCom, ativo: true }).ok);
   const agendarDisabled = inbox.semDestino || inbox.higieneBloqueia || optout || (WA_REAL && (!current.id || canaisAgendaveis.length === 0));
 
   /* ---------- popovers em portal (regra 10) ---------- */
@@ -328,18 +337,19 @@ export default function WhatsAppV2() {
   };
   const copiarTelefone = async () => {
     if (!current.phone) { aoAvisar({ tom: 'erro', texto: 'Este contato não tem telefone.' }); return; }
+    const tel = current.phone.replace(/\D/g, '') || current.phone;
     try {
-      await navigator.clipboard.writeText(current.phone);
-      aoAvisar({ tom: 'ok', texto: 'Telefone copiado: ' + current.phone });
+      await navigator.clipboard.writeText(tel);
+      aoAvisar({ tom: 'ok', texto: 'Telefone copiado: ' + tel });
     } catch {
       try {
         const ta = document.createElement('textarea');
-        ta.value = current.phone;
+        ta.value = tel;
         document.body.appendChild(ta);
         ta.select();
         document.execCommand('copy');
         ta.remove();
-        aoAvisar({ tom: 'ok', texto: 'Telefone copiado: ' + current.phone });
+        aoAvisar({ tom: 'ok', texto: 'Telefone copiado: ' + tel });
       } catch { aoAvisar({ tom: 'erro', texto: 'Não foi possível copiar o telefone' }); }
     }
   };
@@ -374,7 +384,7 @@ export default function WhatsAppV2() {
     if (atrasado && wait) out.push('Sem resposta ' + wait.label.replace('Aguardando ', ''));
     for (const a of slaPorConversa.get(c.id) ?? []) out.push(tipoLabel(a.tipo) + (a.detalhe ? ' — ' + a.detalhe : ''));
     if (c.precisaHumano) out.push('Precisa de atendimento humano');
-    if (nomeVazio(c.name)) out.push('Cadastro incompleto: preencha o nome do cliente');
+    if (analisarNome(c.name).fraco && conversaAtiva({ status: c.status, arquivada: c.arquivada })) out.push('Cadastro incompleto: preencha o nome do cliente');
     if (c.contatoId && bloqueados.has(c.contatoId)) out.push(optoutTexto);
     return out;
   };
@@ -450,7 +460,7 @@ export default function WhatsAppV2() {
                           </span>
                           <span className="p">{c.last || '—'}</span>
                           <span className="chips">
-                            {c.etapa && <span className="cchip etapa" title="Etapa no Kanban" style={c.etapaCor ? { background: c.etapaCor + '26', color: c.etapaCor } : undefined}>{c.etapa}</span>}
+                            {(() => { const sit = situacaoDe(c); const cor = corDaSituacao(c, sit.texto); return <span className={'cchip etapa sit-' + sit.variante} title="Situação no funil" style={cor ? { background: cor + '26', color: cor } : undefined}>{sit.texto}</span>; })()}
                             {alertas.length > 0 && <span className="cchip alerta" title={alertas.join(' · ')}>⚠{alertas.length > 1 ? ' ' + alertas.length : ''}</span>}
                             {c.contatoId && bloqueados.has(c.contatoId) && <span className="cchip alerta" style={{ color: 'var(--rubro)', borderColor: 'rgba(229,102,92,.4)' }} title={optoutTexto}>Não incomodar</span>}
                             {finalizado && <span className="cchip fim">Finalizado</span>}
@@ -495,7 +505,7 @@ export default function WhatsAppV2() {
                 <div className="nm">{nomeExibicao(current)}</div>
                 <div className="sb num">
                   {current.phone ? mascararNumero(current.phone) : 'sem número'}
-                  {current.etapa && <span className="wa-hchip etapa" title="Etapa no Kanban" style={current.etapaCor ? { background: current.etapaCor + '26', color: current.etapaCor } : undefined}>{current.etapa}</span>}
+                  {(() => { const sit = situacaoDe(current); const cor = corDaSituacao(current, sit.texto); return <span className={'wa-hchip etapa sit-' + sit.variante} title="Situação no funil" style={cor ? { background: cor + '26', color: cor } : undefined}>{sit.texto}</span>; })()}
                   {inbox.canalSel
                     ? <span className="wa-hchip" title={`Respondendo por ${inbox.canalSel.alias}${inbox.canalSel.numero ? ' · ' + mascararNumero(inbox.canalSel.numero) : ''}`}>{inbox.canalSel.alias}</span>
                     : current.chip && <span className="wa-hchip" title="Canal atual do atendimento">{current.chip}</span>}
@@ -540,8 +550,8 @@ export default function WhatsAppV2() {
                 </span>
                 <span className="acts">
                   <BotaoMini onClick={iniciarEdicao}>Editar nome</BotaoMini>
-                  {inbox.decNome.podeAdiar && <BotaoMini onClick={inbox.adiarNome}>Lembrar depois</BotaoMini>}
-                  {inbox.decNome.acao === 'bloqueia' && <BotaoMini title="Libera por 24h e fica registrado" onClick={inbox.nomeNaoInformado}>Cliente ainda não informou</BotaoMini>}
+                  {inbox.decNome.podeAdiar && <BotaoMini disabled={inbox.adiando} onClick={inbox.adiarNome}>Lembrar depois</BotaoMini>}
+                  {inbox.decNome.acao === 'bloqueia' && <BotaoMini disabled={inbox.adiando} title="Libera por 24h e fica registrado" onClick={inbox.nomeNaoInformado}>Cliente ainda não informou</BotaoMini>}
                 </span>
               </div>
             )}
@@ -554,7 +564,7 @@ export default function WhatsAppV2() {
                   <Bolha
                     key={item.msg.id ?? item.msg.cid ?? 'i' + i}
                     m={item.msg} demo={demo} nomeCliente={nomeExibicao(current)}
-                    retryId={inbox.retryId} removendoId={inbox.removendoId} semDestino={inbox.semDestino}
+                    retryId={inbox.retryId} removendoId={inbox.removendoId} semDestino={inbox.semDestino} optout={optout}
                     aoResponder={(m) => {
                       inbox.setReplyTo({
                         id: m.id ?? '', idExt: m.idExterno, fromMe: m.dir === 'out', tipo: m.tipo,
@@ -635,7 +645,7 @@ export default function WhatsAppV2() {
                   <b>{inbox.canalSel.alias}</b> com restrição no WhatsApp — selecione outro canal
                 </div>
               )}
-              {!inbox.canalRestrito && WA_REAL && inbox.canalSel && inbox.canalSel.status === 'conectado' && (inbox.canalSel.entregaStatus === 'restrito' || inbox.envioSaude !== 'ok') && (
+              {!inbox.canalRestrito && WA_REAL && inbox.canalSel && inbox.canalSel.status === 'conectado' && (inbox.canalSel.entregaStatus === 'restrito' || inbox.canalSel.entregaStatus === 'instavel' || inbox.envioSaude !== 'ok') && (
                 <div className="wa-aviso info" title={
                   inbox.canalSel.entregaStatus === 'restrito'
                     ? `Este canal (${inbox.canalSel.alias}) está conectado, mas falhou na entrega de mensagens recentes. Prefira outro canal em "Responder por" e evite reconectar repetidamente.`
@@ -661,8 +671,8 @@ export default function WhatsAppV2() {
                   <IcClock />
                   <b>{a.status === 'agendada' ? 'Agendada' : a.status === 'processando' ? 'Enviando…' : a.status === 'bloqueada' ? 'Bloqueada' : 'Falhou'}</b>
                   para {new Date(a.executarEm).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' })}
-                  · {a.tipo === 'texto' ? 'Texto' : a.tipo[0].toUpperCase() + a.tipo.slice(1)}
-                  {a.nomeArquivo ? ` · ${a.nomeArquivo}` : ''}{a.nomeCanal ? ` · via ${a.nomeCanal}` : ''}{a.criadoPor ? ` · por ${a.criadoPor}` : ''}
+                  · {({ texto: 'Texto', imagem: 'Imagem', audio: 'Áudio', video: 'Vídeo', documento: 'Documento' } as Record<string, string>)[a.tipo] ?? a.tipo}
+                  {a.nomeArquivo ? ` · ${a.nomeArquivo}` : ''}{a.nomeCanal ? ` · via ${a.nomeCanal}` : ''}{a.criadoPor && nomePorId(a.criadoPor) ? ` · por ${nomePorId(a.criadoPor)}` : ''}
                   {(a.ultimoErro || a.motivoBloqueio) && <span className="err">{a.ultimoErro ?? a.motivoBloqueio}</span>}
                   {a.status === 'agendada' && (
                     <>
@@ -893,8 +903,8 @@ export default function WhatsAppV2() {
           {pop.kind === 'tags' && (
             <>
               <div className="ph2">Etiquetas</div>
-              {(etiquetasQ.data ?? []).length === 0 && <div className="vazio">{podeGerenciar ? 'Nenhuma etiqueta. Crie em Configurações.' : 'Peça a um gestor.'}</div>}
-              {(etiquetasQ.data ?? []).map((t) => (
+              {(etiquetasQ.data ?? []).filter((t) => t.ativo).length === 0 && <div className="vazio">{podeGerenciar ? 'Nenhuma etiqueta. Crie em Configurações.' : 'Peça a um gestor.'}</div>}
+              {(etiquetasQ.data ?? []).filter((t) => t.ativo).map((t) => (
                 <button key={t.nome} type="button" className="it" onClick={() => alternarEtiqueta(t.nome)}>
                   <span className="dot" style={{ background: t.cor }} />{t.nome} {current.tags.includes(t.nome) && <span className="ck">✓</span>}
                 </button>
@@ -1012,7 +1022,7 @@ export default function WhatsAppV2() {
         confirmar={(id) => (demo ? Promise.resolve('enviada' as const) : aguardarConfirmacaoEnvio(id))}
       />
       {lightbox && (
-        <div className="p-veu" role="dialog" aria-modal onMouseDown={(e) => { if (e.target === e.currentTarget) setLightbox(null); }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 96 }}>
+        <div className="veu" role="dialog" aria-modal onMouseDown={(e) => { if (e.target === e.currentTarget) setLightbox(null); }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 96 }}>
           <button type="button" aria-label="Fechar" onClick={() => setLightbox(null)} style={{ position: 'fixed', top: 14, right: 18, fontSize: 22, background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}>×</button>
           <img src={lightbox} alt="Imagem ampliada" style={{ maxWidth: '86vw', maxHeight: '86vh', borderRadius: 10 }} />
         </div>
@@ -1026,13 +1036,14 @@ export default function WhatsAppV2() {
    selo do bot (origemBot → "◈ Matheo"), áudio com onda + .transc,
    imagem/vídeo/documento, quoted, ticks, falha, responder.
    ================================================================ */
-function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, aoResponder, aoVerErro, aoRetry, aoRemover, aoLightbox, aoRecarregarAudio }: {
-  m: WaMessage; demo: boolean; nomeCliente: string; retryId: string | null; removendoId: string | null; semDestino: boolean;
+function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, optout, aoResponder, aoVerErro, aoRetry, aoRemover, aoLightbox, aoRecarregarAudio }: {
+  m: WaMessage; demo: boolean; nomeCliente: string; retryId: string | null; removendoId: string | null; semDestino: boolean; optout: boolean;
   aoResponder: (m: WaMessage) => void; aoVerErro: (m: WaMessage) => void; aoRetry: (m: WaMessage) => void;
   aoRemover: (m: WaMessage) => void; aoLightbox: (url: string) => void; aoRecarregarAudio: (m: WaMessage) => void;
 }) {
   const [url, setUrl] = useState<string | null>(null);
-  const precisaUrl = !demo && !!m.anexoPath && ['imagem', 'video', 'audio'].includes(m.tipo ?? '');
+  // v1: imagem/vídeo resolvem a URL assinada eager; ÁUDIO só no play (AudioBolha) — não emitir N signed-URLs por abertura de conversa
+  const precisaUrl = !demo && !!m.anexoPath && ['imagem', 'video'].includes(m.tipo ?? '');
   useEffect(() => {
     let vivo = true;
     if (precisaUrl && m.anexoPath) {
@@ -1047,10 +1058,10 @@ function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, aoRespo
   const falhaActs = falhou && (
     <div className="msg-falha-acts">
       <button type="button" className="lnk" onClick={() => aoVerErro(m)}>Ver erro</button>·
-      <button type="button" className="lnk" disabled={!m.id || retryId === m.id || semDestino} title={semDestino ? 'Vincule um número confirmado para responder.' : undefined} onClick={() => aoRetry(m)}>
+      <button type="button" className="lnk" disabled={!m.id || retryId === m.id || semDestino || optout} title={semDestino ? 'Vincule um número confirmado para responder.' : undefined} onClick={() => aoRetry(m)}>
         {retryId === m.id ? 'Reenviando…' : 'Tentar novamente'}
       </button>·
-      <button type="button" className="lnk" disabled={removendoId === m.id} onClick={() => aoRemover(m)}>{removendoId === m.id ? 'Removendo…' : 'Remover'}</button>
+      <button type="button" className="lnk" disabled={!m.id || removendoId === m.id} onClick={() => aoRemover(m)}>{removendoId === m.id ? 'Removendo…' : 'Remover'}</button>
     </div>
   );
 
@@ -1068,7 +1079,7 @@ function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, aoRespo
       )}
       {m.tipo === 'imagem' && (url || demo) && (
         <>
-          {url ? <img className="m-img" src={url} alt="Imagem" title="Ampliar" onClick={() => aoLightbox(url)} /> : <div className="audio-ind">Imagem de demonstração</div>}
+          {url ? <img className="m-img" loading="lazy" src={url} alt="Imagem" title="Ampliar" onClick={() => aoLightbox(url)} /> : <div className="audio-ind">Imagem de demonstração</div>}
           {m.text && <div className="m-cap"><WaTexto texto={m.text} /></div>}
         </>
       )}
@@ -1081,7 +1092,7 @@ function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, aoRespo
       {m.tipo === 'audio' && (
         m.midiaPendente
           ? <div className="audio-ind">Áudio indisponível — <button type="button" className="lnk" onClick={() => aoRecarregarAudio(m)}>tentar carregar novamente</button></div>
-          : <AudioBolha url={url} dur={m.tamanho == null ? null : null} segundos={(m as WaMessage & { seconds?: number }).seconds ?? null} demo={demo} />
+          : <AudioBolha anexoPath={demo ? null : m.anexoPath ?? null} segundos={(m as WaMessage & { seconds?: number }).seconds ?? null} demo={demo} />
       )}
       {m.tipo === 'documento' && (
         <div className="doc2">
@@ -1132,31 +1143,42 @@ function WaTexto({ texto }: { texto: string }) {
   return <span className="wa-fmt">{partes}</span>;
 }
 
-/** Player de áudio na pele do mockup (.audio2 onda + play claro) — comportamento do AudioMessage v1. */
-function AudioBolha({ url, segundos, demo }: { url: string | null; dur?: string | null; segundos: number | null; demo: boolean }) {
+/** Player de áudio na pele do mockup (.audio2). A URL assinada é resolvida SÓ no play (v1: preload none),
+    para não emitir uma rajada de signed-URLs por abertura de conversa. */
+function AudioBolha({ anexoPath, segundos, demo }: { anexoPath: string | null; segundos: number | null; demo: boolean }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [tocando, setTocando] = useState(false);
+  const [carregando, setCarregando] = useState(false);
   const [pos, setPos] = useState(0);
   const [durS, setDurS] = useState(segundos ?? 0);
   const [rate, setRate] = useState(1);
   useEffect(() => () => { audioRef.current?.pause(); }, []);
-  const toggle = () => {
-    if (!url) return;
-    if (!audioRef.current) {
-      const a = new Audio(url);
-      a.addEventListener('timeupdate', () => setPos(a.currentTime));
-      a.addEventListener('loadedmetadata', () => { if (Number.isFinite(a.duration)) setDurS(a.duration); });
-      a.addEventListener('ended', () => { setTocando(false); setPos(0); });
-      audioRef.current = a;
+  const montarAudio = (src: string) => {
+    const a = new Audio(src);
+    a.addEventListener('timeupdate', () => setPos(a.currentTime));
+    a.addEventListener('loadedmetadata', () => { if (Number.isFinite(a.duration)) setDurS(a.duration); });
+    a.addEventListener('ended', () => { setTocando(false); setPos(0); });
+    audioRef.current = a;
+    return a;
+  };
+  const toggle = async () => {
+    if (tocando) { audioRef.current?.pause(); setTocando(false); return; }
+    let a = audioRef.current;
+    if (!a) {
+      if (demo || !anexoPath) return;                    // demo: sem áudio real
+      setCarregando(true);
+      try { a = montarAudio(await urlAssinadaMidiaWa(anexoPath)); }   // signed-URL SÓ agora
+      catch { setCarregando(false); return; }
+      setCarregando(false);
     }
-    const a = audioRef.current;
-    if (tocando) { a.pause(); setTocando(false); }
-    else { a.playbackRate = rate; a.play().catch(() => setTocando(false)); setTocando(true); }
+    a.playbackRate = rate;
+    a.play().catch(() => setTocando(false));
+    setTocando(true);
   };
   const prog = durS > 0 ? pos / durS : 0;
   return (
     <div className="audio2">
-      <button type="button" className="play" title={demo && !url ? 'Áudio de demonstração' : tocando ? 'Pausar' : 'Reproduzir'} onClick={toggle} disabled={!url}>
+      <button type="button" className="play" title={demo ? 'Áudio de demonstração' : carregando ? 'Carregando…' : tocando ? 'Pausar' : 'Reproduzir'} onClick={toggle} disabled={demo || carregando}>
         {tocando ? <svg viewBox="0 0 24 24" fill="currentColor" width="10" height="10" aria-hidden><path d="M7 5h3v14H7zM14 5h3v14h-3z" /></svg> : <IcPlay />}
       </button>
       <div className="onda" onClick={(e) => {
@@ -1343,7 +1365,6 @@ function TransferirModal({ usuarios, atualId, atualNome, meuId, busy, aoFechar, 
         {filtrados.map((u) => (
           <button
             key={u.id} type="button" disabled={u.id === atualId}
-            className="wa-pop-item-like"
             style={{ display: 'flex', gap: 8, alignItems: 'center', textAlign: 'left', background: sel === u.id ? 'rgba(255,255,255,.08)' : 'none', border: '1px solid ' + (sel === u.id ? 'rgba(255,255,255,.25)' : 'transparent'), borderRadius: 8, padding: '6px 9px', color: 'var(--txt)', fontFamily: 'var(--fonte)', fontSize: 12.5, cursor: u.id === atualId ? 'default' : 'pointer', opacity: u.id === atualId ? .55 : 1 }}
             onClick={() => setSel(u.id)}
           >

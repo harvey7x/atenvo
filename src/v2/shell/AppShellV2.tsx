@@ -92,6 +92,10 @@ export default function AppShellV2() {
       setNotif({ ...d, seq: seqRef.current });
     }, []),
   });
+  // ao abrir o Inbox, o não-visto foi visto: zera o contador e apaga o pulso do sino
+  useEffect(() => {
+    if (location.pathname.startsWith('/v2/whatsapp')) { setBadgePop(0); setSinoOn(false); }
+  }, [location.pathname]);
 
   // Botão de simulação (DEV): segue como fallback de demonstração do visual.
   function simularResposta() {
