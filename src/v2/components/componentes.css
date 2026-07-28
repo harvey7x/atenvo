@@ -271,6 +271,24 @@
 /* título de seção interna de painel (mockup .cfg-sec) */
 .v2 .cfg-sec { font-size: 13px; font-weight: 600; margin-bottom: 13px; }
 
+/* --- Barras de atividade (anatomia .barv do pg-relatorios) -- */
+.v2 .barras { display: flex; align-items: flex-end; gap: 14px; height: 120px; padding: 0 4px; }
+.v2 .bwrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; justify-content: flex-end; cursor: pointer; background: none; border: none; padding: 0; font-family: var(--fonte); }
+.v2 .bval { font-size: 10px; color: var(--txt-2); opacity: 0; animation: v2-entra .4s 1s forwards; }
+.v2 .barv {
+  width: 100%; max-width: 34px; border-radius: 6px 6px 3px 3px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .55), rgba(255, 255, 255, .12));
+  transform: scaleY(0); transform-origin: bottom;
+  animation: v2-cresce .7s var(--ease) forwards;
+}
+.v2 .barv.hoje2 {
+  background: linear-gradient(180deg, #FFF, rgba(255, 255, 255, .35));
+  box-shadow: 0 0 18px rgba(255, 255, 255, calc(.25 * var(--fx)));
+}
+@keyframes v2-cresce { to { transform: scaleY(1); } }
+.v2 .blab { font-size: 10px; color: var(--txt-3); }
+.v2 .blab.hoje-lb { color: var(--txt); }
+
 /* --- Skeleton (carregando: vidro com shimmer sutil) --------- */
 .v2 .skel {
   position: relative; overflow: hidden; border-radius: 8px;

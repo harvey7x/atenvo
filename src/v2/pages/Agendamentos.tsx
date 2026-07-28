@@ -10,8 +10,8 @@ import {
 } from '@/data/whatsapp';
 import { rangePeriodo, agendaEditavel, agendaReagendavel, statusSequencia, type PeriodoAg } from '@/lib/agendamentoMensagem';
 import {
-  BadgeStatus, BotaoMini, BotaoPrimario, BotaoSec, CardVidro, ConfirmDialogV2,
-  EstadoErro, EstadoVazio, Input, ModalV2, Segmentado, Skeleton, TabelaPadrao,
+  BadgeStatus, BotaoMini, BotaoPrimario, BotaoSec, CardCab, CardVidro, ConfirmDialogV2,
+  EstadoErro, EstadoVazio, Input, Kpi, ModalV2, Segmentado, Skeleton, TabelaPadrao, TrilhoItem,
   type Coluna, type TomStatus,
 } from '../components';
 import { AgendarMensagemModalV2, type AgendarSubmit, type CanalOpcao } from './AgendarMensagemModalV2';
@@ -97,19 +97,31 @@ function seedAgendamentos(): AgendamentoOrg[] {
     criadoPor: null, criadoEm: mk(-1440), enviadaEm: null, mensagemIdEnviada: null,
     sequenciaId: null, ordemNaSequencia: null, ...extra,
   });
+  const dia = (d: number, hh: number, mi = 0) => { const x = new Date(); x.setDate(x.getDate() + d); x.setHours(hh, mi, 0, 0); return x.toISOString(); };
   return [
-    // sequência de 3 (1 enviada, 2 programadas) — Maria
+    // sequência de 3 (1 enviada hoje, 2 programadas hoje) — Maria
     base(1, { sequenciaId: 'seq-1', ordemNaSequencia: 1, contatoNome: 'Maria Aparecida Souza', telefone: '(51) 98812-4407', texto: 'Bom dia, dona Maria! Passando para lembrar da nossa ligação.', status: 'enviada', enviadaEm: mk(-30), executarEm: mk(-30), tentativas: 1 }),
     base(2, { sequenciaId: 'seq-1', ordemNaSequencia: 2, contatoNome: 'Maria Aparecida Souza', telefone: '(51) 98812-4407', texto: 'Segue o passo a passo para conferir o desconto no aplicativo Meu INSS.', executarEm: mk(90) }),
     base(3, { sequenciaId: 'seq-1', ordemNaSequencia: 3, contatoNome: 'Maria Aparecida Souza', telefone: '(51) 98812-4407', tipo: 'documento', nomeArquivo: 'passo-a-passo.pdf', texto: '', executarEm: mk(150) }),
-    // avulsas
+    // programadas: hoje, amanhã e ao longo da semana
     base(4, { contatoNome: 'José Carlos Ferreira', telefone: '(51) 99214-8830', texto: 'Seu José, conseguiu acessar o aplicativo?', executarEm: mk(240) }),
+    base(9, { contatoNome: 'Neusa B. Martins', telefone: '(51) 98444-2211', texto: 'Dona Neusa, os documentos chegaram direitinho.', executarEm: dia(1, 9, 0) }),
+    base(10, { contatoNome: 'Raimundo A. Silva', telefone: '(51) 99555-7788', texto: 'Seu Raimundo, bom dia! Podemos falar amanhã?', executarEm: dia(1, 14, 30), nomeCanal: 'ANDRIUS', canalId: 'canal-demo-2' }),
+    base(11, { contatoNome: 'Aparecida L. Rocha', telefone: '(51) 98777-3344', texto: 'Dona Aparecida, sua consulta de acompanhamento.', executarEm: dia(3, 10, 0) }),
+    base(12, { contatoNome: 'Devanir S. Prado', telefone: '(51) 99666-1122', texto: 'Seu Devanir, novidades do seu processo.', executarEm: dia(5, 11, 0) }),
+    // enviadas
     base(5, { contatoNome: 'Antônio Pereira Lima', telefone: '(51) 98120-7745', texto: 'Sr. Antônio, sua ligação de orientação é amanhã às 10h.', status: 'enviada', enviadaEm: mk(-1200), executarEm: mk(-1200), tentativas: 1 }),
+    // precisa de ação: 2 falhas + 1 bloqueada
     base(6, { contatoNome: 'Terezinha M. Alves', telefone: '(51) 99760-3312', texto: 'Dona Terezinha, tudo bem?', status: 'falhou', ultimoErro: 'Número não está no WhatsApp.', executarEm: mk(-2000), tentativas: 3, nomeCanal: 'ANDRIUS', canalId: 'canal-demo-2' }),
+    base(13, { contatoNome: 'Cleusa M. Barros', telefone: '(51) 98333-9900', texto: 'Dona Cleusa, seguem as orientações combinadas.', status: 'falhou', ultimoErro: 'Canal desconectado no horário do envio.', executarEm: mk(-800), tentativas: 2 }),
     base(7, { contatoNome: 'Sebastião R. Nunes', telefone: '(51) 98455-1029', texto: 'Seu Sebastião, o documento chegou.', status: 'bloqueada', motivoBloqueio: 'Contato pediu para não receber mensagens (opt-out).', executarEm: mk(-500) }),
     base(8, { contatoNome: 'Ivone F. Cardoso', telefone: '(51) 99331-6688', texto: 'Dona Ivone, confirmando nosso horário.', status: 'cancelada', executarEm: mk(-3000) }),
   ];
 }
+
+/** Dia SP (yyyy-mm-dd) de um ISO — agregações do painel são todas client-side. */
+const diaSP = (iso: string) => new Date(iso).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+const horaSP = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' });
 
 type Aviso = { tom: 'ok' | 'erro'; texto: string } | null;
 
@@ -164,15 +176,16 @@ export default function AgendamentosV2() {
   }, [grupos]);
   const abaAtual = ABAS.find((a) => a.id === aba) ?? ABAS[0];
 
-  // filtros — os mesmos do v1
+  // filtros — os mesmos do v1 (+ fDia: filtro de apresentação do painel, client-side)
   const [fPeriodo, setFPeriodo] = useState<PeriodoAg>('todas');
   const [fCanal, setFCanal] = useState('');
   const [fCriador, setFCriador] = useState('');
   const [fTipo, setFTipo] = useState('');
   const [fBusca, setFBusca] = useState('');
+  const [fDia, setFDia] = useState<string>(''); // yyyy-mm-dd (clique na barra da semana)
   const [filtrosAbertos, setFiltrosAbertos] = useState(false);
-  const filtroAtivo = fPeriodo !== 'todas' || !!fCanal || !!fCriador || !!fTipo || !!fBusca;
-  function limpar() { setFPeriodo('todas'); setFCanal(''); setFCriador(''); setFTipo(''); setFBusca(''); }
+  const filtroAtivo = fPeriodo !== 'todas' || !!fCanal || !!fCriador || !!fTipo || !!fBusca || !!fDia;
+  function limpar() { setFPeriodo('todas'); setFCanal(''); setFCriador(''); setFTipo(''); setFBusca(''); setFDia(''); }
 
   const filtrados = useMemo(() => {
     const range = rangePeriodo(fPeriodo, Date.now());
@@ -183,13 +196,14 @@ export default function AgendamentosV2() {
       if (fCanal && g.canalId !== fCanal) return false;
       if (fCriador && g.criadoPor !== fCriador) return false;
       if (fTipo && !g.itens.some((i) => i.tipo === fTipo)) return false;
+      if (fDia && !g.itens.some((i) => diaSP(i.executarEm) === fDia)) return false;
       if (busca) {
         const alvo = `${g.contatoNome ?? ''} ${g.telefone ?? ''} ${g.itens.map((i) => i.texto ?? '').join(' ')}`.toLowerCase();
         if (!alvo.includes(busca)) return false;
       }
       return true;
     });
-  }, [grupos, fPeriodo, abaAtual.status, fCanal, fCriador, fTipo, fBusca]);
+  }, [grupos, fPeriodo, abaAtual.status, fCanal, fCriador, fTipo, fBusca, fDia]);
 
   // seleção (painel lateral), composição, confirmação
   const [selKey, setSelKey] = useState<string | null>(null);
@@ -301,6 +315,57 @@ export default function AgendamentosV2() {
   const previa = (g: Grupo) => (g.primeiro.texto?.trim()) || g.primeiro.nomeArquivo || tipoLbl(g.primeiro.tipo);
   const agora = Date.now();
 
+  /* ── painel de comando (v2.1): TUDO agregação client-side dos dados já
+     carregados — nenhuma query, nenhuma ação nova. ─────────────────────── */
+  const ehPainel = aba === 'visao' && !fDia;
+  const hojeStr = diaSP(new Date(agora).toISOString());
+  const painel = useMemo(() => {
+    const naFila = grupos.filter((g) => g.statusGeral === 'agendada').length;
+    const enviadasHoje = rows.filter((r) => r.status === 'enviada' && r.enviadaEm && diaSP(r.enviadaEm) === hojeStr).length;
+    const precisaAcao = grupos.filter((g) => g.statusGeral === 'falha' || g.statusGeral === 'bloqueada');
+    // taxa de sucesso do período filtrado (mensagens com desfecho)
+    const itensF = filtrados.flatMap((g) => g.itens);
+    const env = itensF.filter((i) => i.status === 'enviada').length;
+    const ruim = itensF.filter((i) => i.status === 'falhou' || i.status === 'bloqueada').length;
+    const taxa = env + ruim > 0 ? Math.round((env / (env + ruim)) * 100) : 0;
+    // próximos ~8 da fila, agrupados por Hoje / Amanhã / data
+    const amanhaStr = diaSP(new Date(agora + 86_400_000).toISOString());
+    const fila = rows.filter((r) => r.status === 'agendada')
+      .sort((a, b) => a.executarEm.localeCompare(b.executarEm)).slice(0, 8);
+    const gruposTl: { rotulo: string; itens: AgendamentoOrg[] }[] = [];
+    for (const item of fila) {
+      const d = diaSP(item.executarEm);
+      const rotulo = d === hojeStr ? 'Hoje' : d === amanhaStr ? 'Amanhã'
+        : new Date(item.executarEm).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit' });
+      const ultimo = gruposTl[gruposTl.length - 1];
+      if (ultimo && ultimo.rotulo === rotulo) ultimo.itens.push(item);
+      else gruposTl.push({ rotulo, itens: [item] });
+    }
+    // atividade da semana (hoje..+6): programadas + enviadas por dia
+    const semana = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(agora + i * 86_400_000);
+      const iso = diaSP(d.toISOString());
+      const prog = rows.filter((r) => r.status === 'agendada' && diaSP(r.executarEm) === iso).length;
+      const envd = rows.filter((r) => r.status === 'enviada' && r.enviadaEm && diaSP(r.enviadaEm) === iso).length;
+      return {
+        iso,
+        rotulo: i === 0 ? 'Hoje' : d.toLocaleDateString('pt-BR', { weekday: 'short', timeZone: 'America/Sao_Paulo' }).replace('.', ''),
+        total: prog + envd,
+        hoje: i === 0,
+      };
+    });
+    const maxSemana = Math.max(1, ...semana.map((s) => s.total));
+    return { naFila, enviadasHoje, precisaAcao, taxa, temDesfecho: env + ruim > 0, gruposTl, filaVazia: fila.length === 0, semana, maxSemana };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [grupos, rows, filtrados, hojeStr]);
+
+  /** Posição na sequência ("2/3") de um item da timeline, quando houver. */
+  function posicaoSeq(item: AgendamentoOrg): string | null {
+    if (!item.sequenciaId || item.ordemNaSequencia == null) return null;
+    const g = grupos.find((x) => x.key === item.sequenciaId);
+    return g ? `${item.ordemNaSequencia}/${g.count}` : null;
+  }
+
   const COLUNAS: Coluna<Grupo>[] = [
     { chave: 'dest', titulo: 'Destinatário', render: (g) => <div className="ag-cli"><div className="nm">{g.contatoNome ?? g.telefone ?? 'Cliente'}</div><div className="tel num">{g.telefone ?? '—'}</div></div> },
     { chave: 'conteudo', titulo: 'Conteúdo', render: (g) => <span className="ag-previa" title={previa(g)}>{previa(g)}</span> },
@@ -388,11 +453,101 @@ export default function AgendamentosV2() {
                 <option value="video">Vídeo</option>
                 <option value="documento">Documento</option>
               </select>
+              {fDia && (
+                <BotaoMini onClick={() => setFDia('')} aria-label="Remover filtro de dia">
+                  Dia {fDia.split('-').reverse().slice(0, 2).join('/')} ×
+                </BotaoMini>
+              )}
               {filtroAtivo && <BotaoMini onClick={limpar}>Limpar filtros</BotaoMini>}
             </div>
           )}
 
           <div className={sel ? 'ag-main com-painel' : 'ag-main'}>
+            {ehPainel ? (
+              <div className="pc-coluna">
+                <div className="kpis sobe" style={{ marginBottom: 0, animationDelay: '.12s' }}>
+                  <Kpi rotulo="Na fila" valor={painel.naFila} delta={{ tom: 'neutro', texto: 'agendamentos programados' }} />
+                  <Kpi rotulo="Enviadas hoje" valor={painel.enviadasHoje} tomValor={painel.enviadasHoje > 0 ? 'ok' : undefined} delta={{ tom: painel.enviadasHoje > 0 ? 'ok' : 'neutro', texto: 'mensagens que já saíram' }} />
+                  <Kpi rotulo="Precisa de ação" valor={painel.precisaAcao.length} tomValor={painel.precisaAcao.length > 0 ? 'erro' : undefined} delta={{ tom: painel.precisaAcao.length > 0 ? 'erro' : 'neutro', texto: 'falhas e bloqueios' }} />
+                  <Kpi rotulo="Taxa de sucesso" valor={painel.taxa} sufixo="%" delta={{ tom: painel.temDesfecho ? (painel.taxa >= 90 ? 'ok' : 'atencao') : 'neutro', texto: painel.temDesfecho ? 'do período filtrado' : 'sem envios no período' }} />
+                </div>
+
+                <div className="pc-grade sobe" style={{ animationDelay: '.2s' }}>
+                  <CardVidro spot>
+                    <CardCab titulo="Próximos envios" />
+                    {painel.filaVazia ? (
+                      <EstadoVazio
+                        titulo="Nada programado"
+                        descricao="A fila está limpa. Agende uma mensagem para ela sair sozinha na hora certa."
+                        acao={{ rotulo: '＋ Novo agendamento', onClick: () => { setNovoAberto(true); setNovoErr(null); setBuscaContato(''); } }}
+                      />
+                    ) : painel.gruposTl.map((gt) => (
+                      <div key={gt.rotulo}>
+                        <div className="caps tl-grupo-cab">{gt.rotulo}</div>
+                        {gt.itens.map((item) => {
+                          const pos = posicaoSeq(item);
+                          return (
+                            <button type="button" className="tl-item" key={item.id} onClick={() => setSelKey(item.sequenciaId ?? item.id)}>
+                              <span className="tl-hora num">{horaSP(item.executarEm)}</span>
+                              <span className="tl-corpo">
+                                <span className="t">{item.contatoNome ?? item.telefone ?? 'Cliente'}</span>
+                                <span className="s">{item.texto?.trim() || item.nomeArquivo || tipoLbl(item.tipo)}</span>
+                              </span>
+                              <span className="tl-meta">
+                                {pos && <em className="ag-pill seq num">{pos}</em>}
+                                {item.nomeCanal && <em className="ag-pill">{item.nomeCanal}</em>}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </CardVidro>
+
+                  <div className="pc-coluna">
+                    <CardVidro spot style={{ padding: '15px 17px 12px' }}>
+                      <div className="cfg-sec" style={{ marginBottom: 12 }}>Atividade da semana</div>
+                      <div className="barras" style={{ height: 96 }}>
+                        {painel.semana.map((s, i) => (
+                          <button type="button" className="bwrap" key={s.iso} title={`Ver o dia ${s.iso.split('-').reverse().slice(0, 2).join('/')}`}
+                            onClick={() => setFDia(s.iso)}>
+                            <span className="bval num" style={{ animationDelay: `${.6 + i * .06}s` }}>{s.total}</span>
+                            <span className={s.hoje ? 'barv hoje2' : 'barv'}
+                              style={{ height: `${Math.max(8, (s.total / painel.maxSemana) * 100)}%`, animationDelay: `${.25 + i * .07}s` }} />
+                            <span className={s.hoje ? 'blab hoje-lb' : 'blab'}>{s.rotulo}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </CardVidro>
+
+                    {painel.precisaAcao.length > 0 && (
+                      <CardVidro spot>
+                        <CardCab titulo="Precisa de ação" contador={painel.precisaAcao.length} />
+                        {painel.precisaAcao.map((g) => {
+                          const item = g.itens[0];
+                          const motivo = item.motivoBloqueio || item.ultimoErro || stMeta(g.statusGeral).label;
+                          const podeReagendar = !g.ehSequencia && agendaReagendavel(item.status);
+                          return (
+                            <TrilhoItem
+                              key={g.key}
+                              tom="crit"
+                              titulo={g.contatoNome ?? g.telefone ?? 'Cliente'}
+                              sub={motivo}
+                              direita={
+                                <span style={{ display: 'flex', gap: 5, alignSelf: 'center' }}>
+                                  {podeReagendar && <BotaoMini onClick={() => setComp({ modo: 'reagendar', item, temTelefone: !!item.telefone })}>Reagendar</BotaoMini>}
+                                  <BotaoMini onClick={() => setSelKey(g.key)}>Ver</BotaoMini>
+                                </span>
+                              }
+                            />
+                          );
+                        })}
+                      </CardVidro>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
             <CardVidro spot={!sel} sobe style={{ borderRadius: 12, animationDelay: '.12s' }}>
               {filtrados.length === 0 ? (
                 grupos.length === 0 ? (
@@ -424,6 +579,7 @@ export default function AgendamentosV2() {
                 />
               )}
             </CardVidro>
+            )}
 
             {sel && (() => {
               const st = stMeta(sel.statusGeral);

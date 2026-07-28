@@ -74,6 +74,35 @@
   flex-wrap: wrap;
 }
 
+/* ---- painel de comando (Visão geral, v2.1) ---- */
+.v2 .pc-grade { display: grid; grid-template-columns: 7fr 5fr; gap: 12px; align-items: start; }
+.v2 .pc-coluna { display: flex; flex-direction: column; gap: 12px; }
+
+/* timeline dos próximos envios */
+.v2 .tl-grupo-cab { padding: 10px 16px 4px; }
+.v2 .tl-item {
+  position: relative; display: flex; gap: 12px; align-items: flex-start;
+  padding: 9.5px 16px 9.5px 19px; border-bottom: 1px solid rgba(255, 255, 255, .05);
+  cursor: pointer; transition: background .18s; width: 100%; text-align: left;
+  background: none; border-left: none; border-right: none; border-top: none; font-family: var(--fonte);
+}
+.v2 .tl-item:last-child { border-bottom: none; }
+.v2 .tl-item:hover { background: rgba(255, 255, 255, .035); }
+.v2 .tl-item::before {
+  content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px;
+  border-radius: 0 3px 3px 0; background: #fff;
+  box-shadow: 0 0 10px rgba(255, 255, 255, calc(.4 * var(--fx)));
+}
+.v2 .tl-hora { width: 42px; flex-shrink: 0; font-size: 12.5px; font-weight: 600; color: var(--txt); padding-top: 1px; }
+.v2 .tl-corpo { min-width: 0; flex: 1; }
+.v2 .tl-corpo .t { display: block; font-size: 12.5px; font-weight: 500; color: var(--txt); }
+.v2 .tl-corpo .s {
+  display: block;
+  font-size: 11.5px; color: var(--txt-2); margin-top: 2px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+}
+.v2 .tl-meta { display: flex; gap: 6px; align-items: center; flex-shrink: 0; padding-top: 1px; }
+
 /* ---- composição (AgendarMensagemModalV2) ---- */
 .v2 .agc { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 16px; }
 .v2 .agc-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
