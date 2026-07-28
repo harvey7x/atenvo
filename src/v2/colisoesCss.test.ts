@@ -1,20 +1,32 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 
 /* O global.css (e os CSS de página) do app v1 carregam em TODAS as rotas.
    O escopo `.v2` garante que o v2 não vaza para fora — mas o contrário só é
    garantido se NENHUM seletor v1 puder ser satisfeito pelo DOM v2. Um seletor
    v1 "pega" dentro do v2 quando TODAS as classes dele também existem no CSS
-   v2 (ex.: `.addon .nm` quando o v2 usa .addon e .nm — foi um bug real, com
-   texto azul do tema claro vazando para os cards). Quando este teste falhar:
-   renomeie a classe v2 com o prefixo `p-` (padrão das 8 originais: p-btn,
-   p-app, p-sidebar, p-topbar, p-logo, p-av, p-addon, p-stepper). */
+   v2 (bugs reais: `.addon .nm` azul do tema claro; `.rel` do Relacionamento
+   pintando a célula Quando de branco). Quando este teste falhar: renomeie a
+   classe v2 (prefixo `p-` ou nome mais específico).
 
-const CSS_V2 = import.meta.glob('./**/*.css', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
-const CSS_V1 = import.meta.glob(
-  ['../styles/*.css', '../pages/*.css', '../components/**/*.css'],
-  { query: '?raw', import: 'default', eager: true },
-) as Record<string, string>;
+   IMPORTANTE: a varredura lê o filesystem EM RUNTIME (não import.meta.glob):
+   globs expandem no transform e o cache do vitest não invalida quando um
+   merge traz CSS v1 novo — foi assim que o `.rel` passou despercebido. */
+
+const RAIZ = join(__dirname, '..');
+
+function csssEm(dir: string): string[] {
+  let out: string[] = [];
+  for (const nome of readdirSync(dir)) {
+    const p = join(dir, nome);
+    const st = statSync(p);
+    if (st.isDirectory()) out = out.concat(csssEm(p));
+    else if (nome.endsWith('.css')) out.push(p);
+  }
+  return out;
+}
 
 function classesDeSeletores(css: string): string[][] {
   const semComentario = css.replace(/\/\*[\s\S]*?\*\//g, '').replace(/@media[^{]+\{/g, '');
@@ -32,19 +44,24 @@ function classesDeSeletores(css: string): string[][] {
 describe('colisões de CSS v1 × v2', () => {
   it('nenhum seletor do app antigo pode ser satisfeito pelo DOM v2', () => {
     const v2cls = new Set<string>();
-    for (const css of Object.values(CSS_V2)) {
-      for (const lista of classesDeSeletores(css)) lista.forEach((c) => v2cls.add(c));
+    for (const f of csssEm(join(RAIZ, 'v2'))) {
+      for (const lista of classesDeSeletores(readFileSync(f, 'utf8'))) lista.forEach((c) => v2cls.add(c));
     }
     v2cls.delete('v2');
 
+    const v1files = [
+      ...csssEm(join(RAIZ, 'styles')),
+      ...csssEm(join(RAIZ, 'pages')),
+      ...csssEm(join(RAIZ, 'components')),
+    ];
     const riscos: string[] = [];
-    for (const [arquivo, css] of Object.entries(CSS_V1)) {
-      for (const lista of classesDeSeletores(css)) {
+    for (const f of v1files) {
+      for (const lista of classesDeSeletores(readFileSync(f, 'utf8'))) {
         if (lista.every((c) => v2cls.has(c))) {
-          riscos.push(`${arquivo}: .${lista.join(' .')}`);
+          riscos.push(`${f.replace(RAIZ, 'src')}: .${lista.join(' .')}`);
         }
       }
     }
-    expect(riscos, `Seletores v1 que pegam dentro do .v2 — renomeie a classe v2 com prefixo p-:\n${riscos.join('\n')}`).toEqual([]);
+    expect(riscos, `Seletores v1 que pegam dentro do .v2 — renomeie a classe v2:\n${riscos.join('\n')}`).toEqual([]);
   });
 });

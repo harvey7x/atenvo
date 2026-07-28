@@ -34,6 +34,7 @@ const RequireAuthV2 = lazy(() => import('@/v2/guards/RequireAuthV2'));
 const RequireRoleV2 = lazy(() => import('@/v2/guards/RequireRoleV2'));
 const PlanoUsoV2 = lazy(() => import('@/v2/pages/PlanoUso'));
 const CobrancasV2 = lazy(() => import('@/v2/pages/Cobrancas'));
+const AgendamentosV2 = lazy(() => import('@/v2/pages/Agendamentos'));
 const RedefinirSenhaV2 = lazy(() => import('@/v2/pages/RedefinirSenha'));
 const DefinirSenhaV2 = lazy(() => import('@/v2/pages/DefinirSenha'));
 const AlterarSenhaV2 = lazy(() => import('@/v2/pages/AlterarSenha'));
@@ -214,7 +215,14 @@ const routes: RouteObject[] = [
                     emConstrucao('whatsapp', 'WhatsApp', 'Caixa de atendimento do WhatsApp.'),
                     emConstrucao('facebook', 'Facebook', 'Caixa de atendimento do Messenger e Facebook.'),
                     emConstrucao('kanban', 'Kanban', 'Funil comercial em colunas.'),
-                    emConstrucao('agendamentos', 'Agendamentos', 'Mensagens programadas, enviadas, falhas e canceladas.'),
+                    {
+                      path: 'agendamentos',
+                      element: (
+                        <Suspense fallback={null}>
+                          <AgendamentosV2 />
+                        </Suspense>
+                      ),
+                    },
                     emConstrucao('contatos', 'Contatos', 'Todos os contatos da organização.'),
                     emConstrucao('scripts', 'Scripts', 'Biblioteca de scripts e mídias.'),
                     {

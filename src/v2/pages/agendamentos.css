@@ -1,0 +1,131 @@
+/* ============================================================
+   Agendamentos — central de mensagens agendadas. Layout REAL do
+   v1 vestido nos padrões do mockup: Segmentado, chips, tabela
+   padrão, painel lateral (anatomia principal/contexto do
+   pg-whatsapp) e bolhas de preview (.bolha do mockup).
+   ============================================================ */
+
+/* topo: segmentado + ações */
+.v2 .ag-topo { display: flex; align-items: center; gap: 12px; margin-bottom: 13px; flex-wrap: wrap; }
+.v2 .ag-topo .acoes { margin-left: auto; }
+.v2 .ag-sel {
+  height: 33px; background: rgba(255, 255, 255, .045); border: 1px solid rgba(255, 255, 255, .13);
+  border-radius: var(--r-ctl); padding: 0 9px; font-family: var(--fonte); font-size: 12px;
+  color: var(--txt); appearance: auto;
+}
+.v2 .ag-sel:focus { outline: none; border-color: rgba(255, 255, 255, .5); }
+
+/* filtros recolhíveis */
+.v2 .ag-filtros { display: flex; gap: 9px; align-items: center; margin-bottom: 13px; flex-wrap: wrap; }
+.v2 .ag-filtros .busca-inp { width: 280px; }
+
+/* lista + painel lateral (principal/contexto) */
+.v2 .ag-main { display: grid; grid-template-columns: 1fr; gap: 12px; align-items: start; }
+.v2 .ag-main.com-painel { grid-template-columns: minmax(0, 1fr) 330px; }
+
+/* células */
+.v2 .ag-cli .nm { color: var(--txt); font-weight: 500; }
+.v2 .ag-cli .tel { font-size: 10.5px; color: var(--txt-3); margin-top: 1px; }
+.v2 .ag-quando .qdo-rel { color: var(--txt); font-weight: 500; }
+.v2 .ag-quando .qdo-abs { font-size: 10.5px; color: var(--txt-3); margin-top: 1px; }
+.v2 .ag-previa { display: block; max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2 .ag-pill {
+  display: inline-flex; font-size: 10.5px; font-weight: 500; font-style: normal;
+  background: rgba(255, 255, 255, .05); border: 1px solid rgba(255, 255, 255, .11);
+  border-radius: 99px; padding: 2px 9px; color: var(--txt-2);
+}
+.v2 .ag-pill.seq { color: var(--txt); border-color: rgba(255, 255, 255, .28); }
+
+/* painel lateral de detalhes */
+.v2 .ag-painel { position: sticky; top: 0; overflow: hidden; }
+.v2 .ag-painel .cab {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 14px; border-bottom: 1px solid var(--linha);
+  font-size: 12.5px; font-weight: 600;
+}
+.v2 .ag-painel .fechar-p {
+  background: none; border: none; color: var(--txt-3); cursor: pointer;
+  font-size: 15px; padding: 2px 4px; font-family: var(--fonte);
+}
+.v2 .ag-painel .corpo { padding: 12px 14px; max-height: calc(100dvh - 260px); overflow-y: auto; }
+.v2 .ag-p-cli { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.v2 .ag-p-cli .nm { font-size: 13px; font-weight: 600; }
+.v2 .ag-p-cli .tel { font-size: 11px; color: var(--txt-2); margin-top: 1px; }
+.v2 .ag-p-cli .p-btn { margin-left: auto; }
+.v2 .ag-dl { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; margin-bottom: 4px; }
+.v2 .ag-dl .item-dl .k { font-size: 9.5px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--txt-3); }
+.v2 .ag-dl .item-dl .v { font-size: 12px; font-weight: 500; margin-top: 2px; }
+.v2 .ag-sec { font-size: 9.5px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--txt-3); margin: 14px 0 8px; }
+.v2 .ag-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
+.v2 .ag-kpi { text-align: center; border: 1px solid var(--linha); border-radius: 9px; padding: 7px 4px; }
+.v2 .ag-kpi b { display: block; font-size: 14px; font-weight: 600; }
+.v2 .ag-kpi i { display: block; font-style: normal; font-size: 9.5px; color: var(--txt-3); margin-top: 1px; }
+.v2 .ag-kpi.ok b { color: var(--verde); }
+.v2 .ag-kpi.bad b { color: var(--rubro); }
+.v2 .ag-msgs { list-style: none; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.v2 .ag-msgs li { border: 1px solid var(--linha); border-radius: 10px; padding: 8px 10px; }
+.v2 .ag-msgs .m-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 10.5px; color: var(--txt-2); }
+.v2 .ag-msgs .m-t { font-size: 12px; margin-top: 5px; line-height: 1.45; word-break: break-word; }
+.v2 .ag-msgs .m-m { font-size: 10.5px; margin-top: 5px; }
+.v2 .ag-msgs .m-m .ok { color: var(--verde); }
+.v2 .ag-msgs .m-m .bad { color: var(--rubro); display: block; margin-top: 2px; }
+.v2 .ag-p-acoes {
+  display: flex; gap: 7px; padding: 11px 14px; border-top: 1px solid var(--linha);
+  flex-wrap: wrap;
+}
+
+/* ---- composição (AgendarMensagemModalV2) ---- */
+.v2 .agc { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 16px; }
+.v2 .agc-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.v2 .agc-bloco { border: 1px solid var(--linha); border-radius: 11px; padding: 10px 11px; }
+.v2 .agc-bloco-cab { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.v2 .agc-bloco-cab strong { font-size: 11.5px; font-weight: 600; }
+.v2 .agc-bloco-cab select { margin-left: 2px; }
+.v2 .agc-bloco-acoes { margin-left: auto; display: flex; gap: 3px; }
+.v2 .agc-bloco-acoes button {
+  width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
+  background: rgba(255, 255, 255, .04); border: 1px solid rgba(255, 255, 255, .1);
+  border-radius: 6px; color: var(--txt-2); cursor: pointer; font-size: 11px; font-family: var(--fonte);
+}
+.v2 .agc-bloco-acoes button:hover:not(:disabled) { color: var(--txt); background: rgba(255, 255, 255, .08); }
+.v2 .agc-bloco-acoes button:disabled { opacity: .35; cursor: default; }
+.v2 .agc-add {
+  background: none; border: 1.5px dashed rgba(255, 255, 255, .18); border-radius: 10px;
+  color: var(--txt-2); font-family: var(--fonte); font-size: 12px; padding: 8px; cursor: pointer;
+}
+.v2 .agc-add:hover:not(:disabled) { color: var(--txt); border-color: rgba(255, 255, 255, .3); }
+.v2 .agc-atalhos { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.v2 .agc-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.v2 .agc-resumo { font-size: 11.5px; color: var(--txt-2); }
+.v2 .agc-aviso {
+  font-size: 11.5px; line-height: 1.45; border-radius: 9px; padding: 7px 10px;
+  background: var(--ambar-bg); color: var(--ambar); border: 1px solid rgba(217, 164, 74, .26);
+}
+.v2 .agc-file {
+  display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--txt-2);
+  border: 1px solid var(--linha); border-radius: 9px; padding: 7px 10px;
+}
+.v2 .agc-file .nome { color: var(--txt); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .agc-file .p-btn { margin-left: auto; }
+.v2 .agc-pick {
+  background: rgba(255, 255, 255, .04); border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 9px; color: var(--txt-2); font-family: var(--fonte); font-size: 12px;
+  padding: 9px; cursor: pointer; width: 100%;
+}
+.v2 .agc-pick:hover:not(:disabled) { color: var(--txt); }
+
+/* preview em bolhas (anatomia .bolha/.env2 do mockup) */
+.v2 .agc-preview { border-left: 1px solid var(--linha); padding-left: 16px; display: flex; flex-direction: column; min-width: 0; }
+.v2 .agc-pv-cab { font-size: 9.5px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--txt-3); margin-bottom: 10px; }
+.v2 .agc-chat { flex: 1; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; max-height: 380px; }
+.v2 .agc-chat .bolha {
+  align-self: flex-end; max-width: 92%; font-size: 12px; line-height: 1.45; padding: 8px 12px;
+  border-radius: 12px; border-bottom-right-radius: 4px;
+  background: rgba(255, 255, 255, .11); border: 1px solid rgba(255, 255, 255, .17);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1); word-break: break-word;
+}
+.v2 .agc-chat .bolha .hh { font-size: 9.5px; margin-top: 4px; text-align: right; color: var(--txt-3); }
+.v2 .agc-chat .bolha img, .v2 .agc-chat .bolha video { max-width: 100%; border-radius: 8px; display: block; }
+.v2 .agc-chat .vazio-pv { font-size: 11.5px; color: var(--txt-3); align-self: flex-end; }
+.v2 .agc-pv-canal { font-size: 10.5px; color: var(--txt-3); margin-top: 10px; text-align: right; }
+.v2 .agc-doc { display: flex; align-items: center; gap: 7px; font-size: 11.5px; }
