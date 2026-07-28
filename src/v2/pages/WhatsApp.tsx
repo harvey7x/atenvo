@@ -1,0 +1,1421 @@
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { WA_REAL, mascararNumero, urlAssinadaMidiaWa, urlDownloadMidiaWa, waRecarregarAudio, waValidarNumero, waVincularNumero, useWaAtividades, useMensagensAgendadas, useAgendarSequencia, useEditarAgendamento, useCancelarAgendamento, normalizeWaPhone } from '@/data/whatsapp';
+import type { WaContact, WaMessage } from '@/data/whatsappDemo';
+import { useStatusDefs, useEtiquetas, useOrgUsuarios, useAssinaturaPref, useAtendimentoActions } from '@/data/atendimento';
+import { useScripts, useScriptEtapaCounts, traduzErroEnvio, aguardarConfirmacaoEnvio, type Script } from '@/data/scripts';
+import { useJanelaCanal, rotuloJanela } from '@/data/cloudApi';
+import { useSlaAlertas } from '@/data/sla';
+import { indexPorChave, tipoLabel, tempoRelativo } from '@/data/slaView';
+import { useOportunidadesDoContato, useFunisDaOrg, chamarGarantirEntrada } from '@/data/kanban';
+import { useCobrancas } from '@/data/cobrancas';
+import { corDaEtiqueta, podeGerenciarAtendimento, type AssinaturaModo } from '@/types/atendimento';
+import { textoBloqueio } from '@/lib/higieneConversa';
+import { responsavelEfetivo } from '@/lib/conversaEtiquetas';
+import { construirItensConversa } from '@/lib/dataConversa';
+import { formatarNomeCliente } from '@/lib/nomeCliente';
+import { canalValidoParaEnvio } from '@/lib/agendamentoMensagem';
+import { initials } from '@/lib/avatar';
+import { useAuth } from '@/context/AuthContext';
+import { useOrg } from '@/context/OrgContext';
+import { MediaComposer } from '@/components/MediaComposer';
+import { ScriptSequenceModal } from '@/components/ScriptSequenceModal';
+import { FichaJudicialBox } from '@/components/FichaJudicialBox';
+import { useSendWaMessage } from '@/data/whatsapp';
+import { useInboxWhatsApp, type AvisoInbox } from '../hooks/useInboxWhatsApp';
+import { useBloqueiosOrg } from '../hooks/bloqueiosOrg';
+import { AudioRecorderV2 } from '../components/AudioRecorderV2';
+import { AgendarMensagemModalV2 } from './AgendarMensagemModalV2';
+import { criarRaizPortalV2 } from '../components/portal';
+import { BotaoMini, BotaoPrimario, BotaoSec, ConfirmDialogV2, ModalV2, Skeleton } from '../components';
+import { seedWa } from './whatsappSeed';
+import './whatsapp.css';
+
+/* ------------------------------------------------------------------
+   WhatsApp v2 — inbox de atendimento (anatomia pg-wa: fila 296px ·
+   conversa · contexto 266px). A máquina vive em useInboxWhatsApp
+   (extração fiel da v1); aqui é só UI. Respostas rápidas = ponte dos
+   Scripts (useScripts reais → ScriptSequenceModal, nunca envio cego).
+   OPT-OUT inviolável: contato em relacionamento_bloqueio mostra o
+   estado e bloqueia envio com motivo visível (precedente Contatos).
+   REGRA DE OURO: mutações só no demo; no real esta página só é
+   validada em leitura — enviar mensagem é falar com cliente real.
+   ------------------------------------------------------------------ */
+
+const FOCO_KEY = 'atenvo-wa-foco';
+const TABS = [
+  ['todos', 'Todos'], ['meus', 'Meus'], ['naoatrib', 'Não atribuídos'],
+  ['naolidas', 'Não lidas'], ['pendentes', 'Pendentes'], ['arquivadas', 'Arquivadas'],
+] as const;
+type TabId = typeof TABS[number][0];
+const ASSINA_OPCOES = [['sem', 'Sem assinatura'], ['atendente', 'Nome do atendente'], ['empresa', 'Nome da empresa'], ['personalizado', 'Nome personalizado']] as const;
+
+const Ic = ({ children, fill }: { children: ReactNode; fill?: boolean }) => (
+  <svg viewBox="0 0 24 24" fill={fill ? 'currentColor' : 'none'} stroke={fill ? 'none' : 'currentColor'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>{children}</svg>
+);
+const IcWa = () => <Ic><path d="M21 11.5a8.4 8.4 0 01-9 8.4 8.9 8.9 0 01-3.8-.8L3 20l1-4.9a8.3 8.3 0 01-1-4A8.4 8.4 0 0112 3a8.4 8.4 0 019 8.5z" /></Ic>;
+const IcBusca = () => <Ic><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></Ic>;
+const IcMais = () => <Ic><path d="M12 5v14M5 12h14" /></Ic>;
+const IcFunil = () => <Ic><path d="M3 5h18l-7 8v5l-4 2v-7z" /></Ic>;
+const IcDots = () => <Ic fill><circle cx="12" cy="5" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="12" cy="19" r="1.5" /></Ic>;
+const IcImg = () => <Ic><rect x="3" y="4" width="18" height="16" rx="2.5" /><circle cx="9" cy="10" r="1.6" /><path d="m5 18 5-5 3 3 3-3 3 3" /></Ic>;
+const IcDoc = () => <Ic><path d="M13 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9z" /><path d="M13 3v6h6" /></Ic>;
+const IcClock = () => <Ic><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></Ic>;
+const IcSend = () => <Ic><path d="M4 12l16-8-6 16-2.5-6.5z" /></Ic>;
+const IcTel = () => <Ic><path d="M5 4h4l2 5-2.5 1.5a12 12 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2" /></Ic>;
+const IcCopy = () => <Ic><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></Ic>;
+const IcReply = () => <Ic><path d="M9 14 4 9l5-5" /><path d="M4 9h11a5 5 0 0 1 5 5v6" /></Ic>;
+const IcPlay = () => <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M8 5.5v13l11-6.5z" /></svg>;
+
+const ackOf = (status?: string): { s: string; cls: string; title: string } | null =>
+  status === 'lida' ? { s: '✓✓', cls: 'lida', title: 'Lida' }
+  : status === 'entregue' ? { s: '✓✓', cls: 'entregue', title: 'Entregue' }
+  : status === 'enviada' ? { s: '✓', cls: 'enviada', title: 'Enviada' }
+  : status === 'pendente' ? { s: '🕗', cls: 'pendente', title: 'Pendente' }
+  : status === 'falhou' ? { s: '!', cls: 'falhou', title: 'Falhou' }
+  : null;
+
+/** Tiers da barra lateral de espera (v1 L75-89): <30min neutro · 30min–2h âmbar · 2–24h vermelho · ≥24h crítico. */
+function tierEspera(aguardandoDesde: string | null | undefined, agoraMs: number): { tier: string; label: string } | null {
+  if (!aguardandoDesde) return null;
+  const min = Math.floor((agoraMs - new Date(aguardandoDesde).getTime()) / 60_000);
+  if (!Number.isFinite(min) || min < 0) return null;
+  const label = min < 1 ? 'Aguardando agora' : min < 60 ? `Aguardando há ${min} min` : min < 1440 ? `Aguardando há ${Math.floor(min / 60)} h` : `Aguardando há ${Math.floor(min / 1440)} d`;
+  const tier = min < 30 ? 'neutro' : min < 120 ? 'ambar' : min < 1440 ? 'vermelho' : 'critico';
+  return { tier, label };
+}
+const nomeVazio = (n: string | undefined) => !n?.trim() || /^[\d\s()+\-]+$/.test(n ?? '');
+const nomeExibicao = (c: WaContact) => (nomeVazio(c.name) ? (c.phone ? mascararNumero(c.phone) : 'Cliente sem nome') : formatarNomeCliente(c.name));
+const mmss = (s: number | null | undefined) => (s == null ? '' : `${Math.floor(s / 60)}:${('0' + Math.floor(s % 60)).slice(-2)}`);
+const ONDA = [6, 11, 15, 9, 13, 17, 11, 7, 14, 10, 16, 8, 12, 6, 10, 15];
+
+type Pop = { kind: 'filtro' | 'acoes' | 'status' | 'tags'; x: number; y: number } | null;
+
+export default function WhatsAppV2() {
+  const nav = useNavigate();
+  const [params, setParams] = useSearchParams();
+  const { user } = useAuth();
+  const { currentOrg } = useOrg();
+  const [aviso, setAviso] = useState<AvisoInbox | null>(null);
+  const avisoTimer = useRef(0);
+  const aoAvisar = useCallback((a: AvisoInbox) => {
+    setAviso(a);
+    window.clearTimeout(avisoTimer.current);
+    avisoTimer.current = window.setTimeout(() => setAviso(null), 4200);
+  }, []);
+  useEffect(() => () => window.clearTimeout(avisoTimer.current), []);
+
+  const inbox = useInboxWhatsApp({ aoAvisar, seedDemo: useMemo(() => seedWa(), []) });
+  const { demo, contacts, current, currentId, relogioMs } = inbox;
+  const sendMut = useSendWaMessage();
+
+  /* ---------- UI ---------- */
+  const [draft, setDraft] = useState('');
+  const [tab, setTab] = useState<TabId>('todos');
+  const [search, setSearch] = useState('');
+  const [filtroCanal, setFiltroCanal] = useState<string | null>(null);
+  const [filtroStatus, setFiltroStatus] = useState<string | null>(null);
+  const [pop, setPop] = useState<Pop>(null);
+  const [foco, setFoco] = useState(() => { try { return localStorage.getItem(FOCO_KEY) === '1'; } catch { return false; } });
+  const [ctxAberto, setCtxAberto] = useState(true);
+  const [lightbox, setLightbox] = useState<string | null>(null);
+  const [novaConversa, setNovaConversa] = useState(false);
+  const [transferirAberto, setTransferirAberto] = useState(false);
+  const [vincAberto, setVincAberto] = useState(false);
+  const [fecharConfirm, setFecharConfirm] = useState(false);
+  const [verErro, setVerErro] = useState<string | null>(null);
+  const [removerAlvo, setRemoverAlvo] = useState<WaMessage | null>(null);
+  const [imgModal, setImgModal] = useState(false);
+  const [docModal, setDocModal] = useState(false);
+  const [agendarAberto, setAgendarAberto] = useState(false);
+  const [agEditId, setAgEditId] = useState<string | null>(null);
+  const [scriptSeq, setScriptSeq] = useState<Script | null>(null);
+  const [editMode, setEditMode] = useState(false);
+  const [editForm, setEditForm] = useState({ nome: '', email: '', observacoes: '', responsavelId: '' });
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const msgsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => { try { localStorage.setItem(FOCO_KEY, foco ? '1' : '0'); } catch { /* privado */ } }, [foco]);
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (pop) { setPop(null); return; }
+      setFoco(false);
+    };
+    document.addEventListener('keydown', h);
+    return () => document.removeEventListener('keydown', h);
+  }, [pop]);
+  useEffect(() => { setEditMode(false); }, [currentId]);
+  /* autoscroll do chat ao trocar/receber */
+  useEffect(() => {
+    const el = msgsRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [currentId, current.msgs.length]);
+
+  /* ---------- dados satélites ---------- */
+  const slaQ = useSlaAlertas();
+  const slaPorConversa = useMemo(() => indexPorChave(slaQ.data?.itens ?? [], 'conversa_id'), [slaQ.data]);
+  const atividadesQ = useWaAtividades(WA_REAL ? currentId || null : null);
+  const statusQ = useStatusDefs();
+  const etiquetasQ = useEtiquetas();
+  const usuariosQ = useOrgUsuarios();
+  const assinaturaQ = useAssinaturaPref();
+  const acoes = useAtendimentoActions();
+  const scriptsQ = useScripts('whatsapp');
+  const scriptsDemo: Script[] = useMemo(() => (WA_REAL ? [] : [
+    { id: 'sd-1', titulo: 'Boas-vindas ao cliente', descricao: null, conteudo: 'Olá {{nome_cliente}}! Aqui é {{seu_nome}}, da {{empresa}}. Como posso ajudar?', categoriaId: null, canais: ['whatsapp'], favorito: true, ativo: true, tags: [], autorId: null, criadoEm: '', atualizadoEm: '' },
+    { id: 'sd-2', titulo: 'Pedir CPF', descricao: null, conteudo: 'Para conferir os descontos no benefício eu preciso do seu CPF, pode me enviar?', categoriaId: null, canais: ['whatsapp'], favorito: true, ativo: true, tags: [], autorId: null, criadoEm: '', atualizadoEm: '' },
+    { id: 'sd-3', titulo: 'Explicar o processo', descricao: null, conteudo: 'A análise é simples: conferimos seu benefício, identificamos descontos indevidos e cuidamos do cancelamento e do ressarcimento.', categoriaId: null, canais: ['whatsapp'], favorito: false, ativo: true, tags: [], autorId: null, criadoEm: '', atualizadoEm: '' },
+    { id: 'sd-4', titulo: 'Agendar ligação', descricao: null, conteudo: 'Posso te ligar para explicar melhor. Qual o melhor horário para você?', categoriaId: null, canais: ['whatsapp'], favorito: false, ativo: true, tags: [], autorId: null, criadoEm: '', atualizadoEm: '' },
+  ]), []);
+  const scripts = WA_REAL ? (scriptsQ.data ?? []) : scriptsDemo;
+  const etapaCounts = useScriptEtapaCounts().data ?? {};
+  const bloqueiosQ = useBloqueiosOrg();
+  const bloqueados = demo ? new Set(['wa-cleusa-ct']) : (bloqueiosQ.data ?? new Set<string>());
+  const canalEhCloud = inbox.canalSel?.transporte === 'cloud_api';
+  const janelaQ = useJanelaCanal(WA_REAL && canalEhCloud ? inbox.canalSel?.id ?? null : null, WA_REAL ? current.contatoId ?? null : null, canalEhCloud);
+  const agendadasQ = useMensagensAgendadas(WA_REAL ? currentId || null : null);
+  const agendarSeqMut = useAgendarSequencia();
+  const editarAgMut = useEditarAgendamento();
+  const cancelarAgMut = useCancelarAgendamento();
+  const cobrancasQ = useCobrancas();
+
+  const optout = !!current.contatoId && bloqueados.has(current.contatoId);
+  const podeGerenciar = podeGerenciarAtendimento(currentOrg.role);
+  const usuarios = usuariosQ.data ?? [];
+  const nomePorId = (id: string) => usuarios.find((u) => u.id === id)?.nome;
+
+  /* assinatura (v1: select inline; persistida em organizacao_usuarios) */
+  const [assinaMode, setAssinaMode] = useState<string>('sem');
+  const [assinaCustom, setAssinaCustom] = useState('');
+  useEffect(() => {
+    const p = assinaturaQ.data;
+    if (!p) return;
+    setAssinaMode(p.modo ?? 'sem');
+    setAssinaCustom(p.nome ?? '');
+  }, [assinaturaQ.data]);
+  const assinaturaNome = assinaMode === 'atendente' ? (user?.name || 'Atendente')
+    : assinaMode === 'empresa' ? currentOrg.name
+    : assinaMode === 'personalizado' ? assinaCustom.trim()
+    : '';
+  const persistAssinatura = (modo: string, nome: string) => {
+    if (!WA_REAL) return;
+    acoes.salvarAssinatura({ modo: modo as AssinaturaModo, nome }).catch(() => aoAvisar({ tom: 'erro', texto: 'Falha ao salvar assinatura' }));
+  };
+
+  /* ---------- deep-link ?conversa= (v1 L363-375) ---------- */
+  const conversaParam = params.get('conversa');
+  useEffect(() => {
+    if (!conversaParam) return;
+    inbox.selecionarPorDeepLink(conversaParam);
+    setTab('todos'); setFiltroCanal(null); setFiltroStatus(null); setSearch('');
+    const t = window.setTimeout(() => {
+      document.querySelector(`[data-cid="${CSS.escape(conversaParam)}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }, 220);
+    setParams((p) => { p.delete('conversa'); return p; }, { replace: true });
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversaParam]);
+
+  /* ---------- fila: filtro/contadores/ordenação (v1 L287-334) ---------- */
+  const buscaAtiva = search.trim().length > 0;
+  const term = search.trim().toLowerCase();
+  const passaBase = (c: WaContact) =>
+    (!filtroCanal || c.canalId === filtroCanal) &&
+    (!filtroStatus || c.statusId === filtroStatus) &&
+    (!term || c.name.toLowerCase().includes(term) || c.last.toLowerCase().includes(term) || (c.phone ?? '').toLowerCase().includes(term));
+  const passaTab = (c: WaContact, t: TabId) =>
+    t === 'arquivadas' ? !!c.arquivada
+    : (!c.arquivada || buscaAtiva) && (
+      t === 'todos' ? true
+      : t === 'meus' ? c.respId === user?.id
+      : t === 'naoatrib' ? !c.respId
+      : t === 'naolidas' ? (c.unread ?? 0) > 0
+      : (c.unread ?? 0) > 0 || !!c.aguardando
+    );
+  const tabCounts = useMemo(() => {
+    const base = contacts.filter(passaBase);
+    const n: Record<string, number> = {};
+    for (const [t] of TABS) n[t] = base.filter((c) => passaTab(c, t)).length;
+    return n;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contacts, filtroCanal, filtroStatus, term, user?.id]);
+  const visiveis = useMemo(() => {
+    const lista = contacts.filter((c) => passaBase(c) && passaTab(c, tab));
+    return lista.sort((a, b) => (a.fixada === b.fixada ? (b.lastAtMs ?? 0) - (a.lastAtMs ?? 0) : a.fixada ? -1 : 1));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contacts, tab, filtroCanal, filtroStatus, term, user?.id]);
+  /* agrupamento por responsável — Não atribuídos primeiro, nomes alfabéticos (v1 L1105-1120) */
+  const grupos = useMemo(() => {
+    const m = new Map<string, WaContact[]>();
+    for (const c of visiveis) {
+      const k = responsavelEfetivo(c) ?? '';
+      m.set(k, [...(m.get(k) ?? []), c]);
+    }
+    return [...m.entries()].sort((a, b) => (a[0] === '' ? -1 : b[0] === '' ? 1 : (nomePorId(a[0]) ?? '').localeCompare(nomePorId(b[0]) ?? '', 'pt-BR')));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visiveis, usuarios]);
+
+  /* ---------- envio / composer ---------- */
+  const optoutTexto = 'Contato marcado como não incomodar — mensagens bloqueadas.';
+  const composerBloqueado = inbox.canalIndisponivel || inbox.semDestino || inbox.canalRestrito || inbox.higieneBloqueia || optout;
+  const placeholder = optout ? 'Envio bloqueado: contato pediu para não ser incomodado'
+    : inbox.semDestino ? 'Vincule um número para responder'
+    : inbox.canalIndisponivel ? 'Envio bloqueado: número desconectado'
+    : inbox.canalRestrito ? 'Envio bloqueado: número com restrição no WhatsApp'
+    : (textoBloqueio(inbox.higiene) ?? 'Digite sua mensagem...');
+  const enviar = () => {
+    if (optout) { aoAvisar({ tom: 'erro', texto: optoutTexto }); return; }
+    inbox.sendMsg(draft, assinaturaNome || null, () => setDraft(''));
+  };
+  const sendDisabled = draft.trim() === '' || inbox.semDestino || optout || (WA_REAL && (!current.id || !inbox.canalConectado));
+  const midiaDisabled = inbox.semDestino || inbox.canalRestrito || inbox.higieneBloqueia || optout || (WA_REAL && (!current.id || !inbox.canalConectado));
+  const canaisAgendaveis = inbox.realCanais.filter((c) => canalValidoParaEnvio(c).ok);
+  const agendarDisabled = inbox.semDestino || inbox.higieneBloqueia || optout || (WA_REAL && (!current.id || canaisAgendaveis.length === 0));
+
+  /* ---------- popovers em portal (regra 10) ---------- */
+  const raizPop = useMemo(() => {
+    const { className } = criarRaizPortalV2(document);
+    let el = document.querySelector(`.${className.split(' ').join('.')}[data-wa-pop]`) as HTMLElement | null;
+    if (!el) {
+      el = document.createElement('div');
+      el.className = className;
+      el.setAttribute('data-wa-pop', '1');
+      document.body.appendChild(el);
+    }
+    return el;
+  }, []);
+  useEffect(() => {
+    if (!pop) return;
+    const f = (e: MouseEvent) => { if (!(e.target as HTMLElement).closest('.wa-pop')) setPop(null); };
+    const r = () => setPop(null);
+    document.addEventListener('mousedown', f);
+    window.addEventListener('resize', r);
+    return () => { document.removeEventListener('mousedown', f); window.removeEventListener('resize', r); };
+  }, [pop]);
+  const abrirPop = (kind: Pop extends null ? never : Exclude<Pop, null>['kind'], e: React.MouseEvent) => {
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const x = Math.min(r.left, window.innerWidth - 300);
+    setPop((p) => (p?.kind === kind ? null : { kind, x, y: r.bottom + 6 }));
+  };
+
+  /* ---------- edição de dados (painel) ---------- */
+  const iniciarEdicao = () => {
+    setEditForm({ nome: current.name, email: current.email, observacoes: current.notes, responsavelId: current.respId ?? '' });
+    setEditMode(true);
+    setCtxAberto(true);
+  };
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const [salvandoEdicao, setSalvandoEdicao] = useState(false);
+  const salvarEdicao = async () => {
+    if (salvandoEdicao) return;
+    if (editForm.email && !EMAIL_RE.test(editForm.email)) { aoAvisar({ tom: 'erro', texto: 'E-mail inválido.' }); return; }
+    setSalvandoEdicao(true);
+    inbox.aplicarEdicaoLocal({ name: editForm.nome, email: editForm.email, notes: editForm.observacoes, respId: editForm.responsavelId || null });
+    try {
+      if (WA_REAL && current.contatoId) {
+        await acoes.atualizarContato(current.contatoId, {
+          nome: editForm.nome, email: editForm.email || null, observacoes: editForm.observacoes || null,
+          responsavel_id: editForm.responsavelId || null,
+        });
+      }
+      aoAvisar({ tom: 'ok', texto: 'Dados do cliente salvos' });
+      setEditMode(false);
+    } catch (e) {
+      aoAvisar({ tom: 'erro', texto: (e as Error)?.message || 'Falha ao salvar.' });
+    } finally { setSalvandoEdicao(false); }
+  };
+  const copiarTelefone = async () => {
+    if (!current.phone) { aoAvisar({ tom: 'erro', texto: 'Este contato não tem telefone.' }); return; }
+    try {
+      await navigator.clipboard.writeText(current.phone);
+      aoAvisar({ tom: 'ok', texto: 'Telefone copiado: ' + current.phone });
+    } catch {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = current.phone;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+        aoAvisar({ tom: 'ok', texto: 'Telefone copiado: ' + current.phone });
+      } catch { aoAvisar({ tom: 'erro', texto: 'Não foi possível copiar o telefone' }); }
+    }
+  };
+
+  const statusAtivos = statusQ.data?.filter((s) => s.ativo) ?? [];
+  const statusFechada = statusQ.data?.find((s) => (s.slug ?? s.nome).toLowerCase() === 'fechada');
+  const aplicarStatus = async (id: string) => {
+    const st = statusAtivos.find((s) => s.id === id);
+    inbox.setContacts((cur) => cur.map((c) => (c.id === current.id ? { ...c, statusId: id, status: st?.nome ?? c.status, statusCor: st?.cor ?? c.statusCor } : c)));
+    if (!WA_REAL) return;
+    try { await acoes.definirStatusConversa(current.id, id); } catch { aoAvisar({ tom: 'erro', texto: 'Falha ao alterar status' }); }
+  };
+  const alternarEtiqueta = async (nome: string) => {
+    const novas = current.tags.includes(nome) ? current.tags.filter((t) => t !== nome) : [...current.tags, nome];
+    inbox.setContacts((cur) => cur.map((c) => (c.id === current.id ? { ...c, tags: novas } : c)));
+    if (!WA_REAL) return;
+    try { await acoes.definirEtiquetasConversa(current.id, novas); } catch { aoAvisar({ tom: 'erro', texto: 'Falha ao salvar etiquetas' }); }
+  };
+
+  /* cobranças do contexto (agregação client-side — precedente Contatos) */
+  const cobrancasCtx = useMemo(() => {
+    const todas = cobrancasQ.data ?? [];
+    return todas
+      .filter((p) => p.contatoId && p.contatoId === current.contatoId)
+      .slice(0, 2);
+  }, [cobrancasQ.data, current.contatoId]);
+
+  const alertasDe = (c: WaContact): string[] => {
+    const wait = tierEspera(c.aguardando ? c.aguardandoDesde : null, relogioMs);
+    const atrasado = wait && (wait.tier === 'critico' || wait.tier === 'vermelho');
+    const out: string[] = [];
+    if (atrasado && wait) out.push('Sem resposta ' + wait.label.replace('Aguardando ', ''));
+    for (const a of slaPorConversa.get(c.id) ?? []) out.push(tipoLabel(a.tipo) + (a.detalhe ? ' — ' + a.detalhe : ''));
+    if (c.precisaHumano) out.push('Precisa de atendimento humano');
+    if (nomeVazio(c.name)) out.push('Cadastro incompleto: preencha o nome do cliente');
+    if (c.contatoId && bloqueados.has(c.contatoId)) out.push(optoutTexto);
+    return out;
+  };
+
+  /* ---------- render ---------- */
+  return (
+    <div className="wa-pg">
+      {/* ===================== FILA ===================== */}
+      {!foco && (
+        <aside className="wa-fila">
+          <div className="wa-ftopo">
+            <div className="l1">
+              <h3>Conversas</h3>
+              <div className="bts">
+                <button type="button" className={'ib2' + (filtroCanal || filtroStatus ? ' on' : '')} title={filtroCanal || filtroStatus ? 'Filtros ativos' : 'Filtros'} onClick={(e) => abrirPop('filtro', e)}><IcFunil /></button>
+                <button type="button" className="ib2" title="Nova conversa" aria-label="Nova conversa" onClick={() => setNovaConversa(true)}><IcMais /></button>
+              </div>
+            </div>
+            <div className="wa-busca">
+              <IcBusca />
+              <input className="inp" placeholder="Buscar conversas..." value={search} onChange={(e) => setSearch(e.target.value)} />
+            </div>
+            <div className="wa-abas" role="tablist">
+              {TABS.map(([id, rot]) => (
+                <button
+                  key={id} type="button" role="tab" aria-selected={tab === id}
+                  className={'wa-aba' + (tab === id ? ' on' : '')}
+                  title={id === 'pendentes' ? 'Pendentes inclui mensagens não lidas e clientes aguardando resposta.' : undefined}
+                  onClick={() => setTab(id)}
+                >
+                  {rot}{(tabCounts[id] ?? 0) > 0 && <span className="n num">{tabCounts[id]}</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="wa-lista">
+            {WA_REAL && inbox.live.isLoading && contacts.length === 0 ? (
+              <div className="wa-skel" aria-busy aria-label="Carregando conversas">
+                {[0, 1, 2, 3, 4, 5].map((i) => (
+                  <div className="row" key={i}>
+                    <Skeleton largura={33} altura={33} raio={99} />
+                    <div style={{ flex: 1 }}><Skeleton largura="60%" /><div style={{ height: 5 }} /><Skeleton largura="85%" /></div>
+                  </div>
+                ))}
+              </div>
+            ) : visiveis.length === 0 ? (
+              <div className="wa-vazio">Nenhuma conversa nesta aba.</div>
+            ) : (
+              grupos.map(([respId, lista]) => (
+                <div key={respId || '(fila)'}>
+                  <div className="wa-grupo">
+                    {respId ? <>Atendimento distribuído para <b>{respId === user?.id ? 'Você' : nomePorId(respId) ?? 'Atendente'}</b></> : 'Não atribuídos'}
+                  </div>
+                  {lista.map((c) => {
+                    const wait = tierEspera(c.aguardando ? c.aguardandoDesde : null, relogioMs);
+                    const atrasado = wait && (wait.tier === 'critico' || wait.tier === 'vermelho');
+                    const alertas = alertasDe(c);
+                    const finalizado = c.status === 'Resolvida' || c.status === 'Fechada';
+                    return (
+                      <button
+                        key={c.id} type="button" data-cid={c.id}
+                        className={'conv2' + (wait ? ` t-${wait.tier}` : '') + (c.id === currentId ? ' ativa' : '')}
+                        title={`Atendente: ${c.respId ? nomePorId(c.respId) ?? 'Atendente' : 'Não atribuído'} · Canal: WhatsApp ${c.chip} · ${finalizado ? 'Finalizado' : c.status || 'Em atendimento'} · ${c.time}`}
+                        onClick={() => inbox.selectContact(c.id)}
+                      >
+                        <span className="av2">{initials(nomeExibicao(c))}{c.canalAtual && <span className="sig">{c.canalAtual.slice(0, 2)}</span>}</span>
+                        <span className="tx">
+                          <span className="n">
+                            {c.fixada && <span className="fl" title="Fixada">📌</span>}
+                            {c.silenciada && <span className="fl" title="Silenciada">🔕</span>}
+                            {c.arquivada && <span className="fl" title="Arquivada">🗄️</span>}
+                            {nomeExibicao(c)}
+                          </span>
+                          <span className="p">{c.last || '—'}</span>
+                          <span className="chips">
+                            {c.etapa && <span className="cchip etapa" title="Etapa no Kanban" style={c.etapaCor ? { background: c.etapaCor + '26', color: c.etapaCor } : undefined}>{c.etapa}</span>}
+                            {alertas.length > 0 && <span className="cchip alerta" title={alertas.join(' · ')}>⚠{alertas.length > 1 ? ' ' + alertas.length : ''}</span>}
+                            {c.contatoId && bloqueados.has(c.contatoId) && <span className="cchip alerta" style={{ color: 'var(--rubro)', borderColor: 'rgba(229,102,92,.4)' }} title={optoutTexto}>Não incomodar</span>}
+                            {finalizado && <span className="cchip fim">Finalizado</span>}
+                          </span>
+                        </span>
+                        <span className="m">
+                          <span className="h2 num" title={'Última interação: ' + c.time}>{c.lastAtMs ? tempoRelativo(new Date(c.lastAtMs).toISOString(), relogioMs) : c.time}</span>
+                          {(c.unread ?? 0) > 0 && <span className="nl num" title={`${c.unread} não lidas`}>{(c.unread ?? 0) > 99 ? '99+' : c.unread}</span>}
+                          {wait && <span className={'cr num' + (atrasado ? ' g' : '')}>{wait.label.replace('Aguardando ', '').replace('há ', '')}</span>}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ))
+            )}
+          </div>
+        </aside>
+      )}
+
+      {/* ===================== CONVERSA ===================== */}
+      <section className="wa-conv">
+        {aviso && (
+          <div className={aviso.tom === 'erro' ? 'aviso-inline erro' : 'aviso-inline'} role="status" style={{ margin: '8px 14px 0', flexShrink: 0 }}>
+            {aviso.texto}
+            <button type="button" onClick={() => setAviso(null)} aria-label="Fechar aviso">×</button>
+          </div>
+        )}
+        {!current.id ? (
+          <div className="wa-conv-vazia">
+            <IcWa />
+            <div className="t">Selecione uma conversa</div>
+            <div className="d">Escolha uma conversa na lista ou inicie um novo atendimento.</div>
+            <BotaoPrimario onClick={() => setNovaConversa(true)}>Nova conversa</BotaoPrimario>
+          </div>
+        ) : (
+          <>
+            <div className="wa-ctopo">
+              <button type="button" className="ib2 wa-ftopo-solto" style={{ display: 'none' }} aria-hidden />
+              <span className="av2 conv2-av" style={{ display: 'flex', width: 32, height: 32, borderRadius: '50%', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 12, background: 'linear-gradient(150deg,#2B2E34,#17191D)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,.14), 0 0 0 1px rgba(255,255,255,.14)' }}>{initials(nomeExibicao(current))}</span>
+              <div className="idw">
+                <div className="nm">{nomeExibicao(current)}</div>
+                <div className="sb num">
+                  {current.phone ? mascararNumero(current.phone) : 'sem número'}
+                  {current.etapa && <span className="wa-hchip etapa" title="Etapa no Kanban" style={current.etapaCor ? { background: current.etapaCor + '26', color: current.etapaCor } : undefined}>{current.etapa}</span>}
+                  {inbox.canalSel
+                    ? <span className="wa-hchip" title={`Respondendo por ${inbox.canalSel.alias}${inbox.canalSel.numero ? ' · ' + mascararNumero(inbox.canalSel.numero) : ''}`}>{inbox.canalSel.alias}</span>
+                    : current.chip && <span className="wa-hchip" title="Canal atual do atendimento">{current.chip}</span>}
+                  {WA_REAL && canalEhCloud && janelaQ.data && (
+                    <span className={'janela' + (janelaQ.data.aberta ? '' : ' fechada')} title={janelaQ.data.aberta ? 'Dentro das 24 horas: dá para responder com texto livre por este número.' : 'Passaram 24 horas desde a última mensagem do cliente PARA ESTE número. Só um modelo aprovado pela Meta pode sair daqui.'}>
+                      {rotuloJanela(janelaQ.data)}
+                    </span>
+                  )}
+                  <span className="wa-hchip" title="Atendente responsável">{current.respId ? nomePorId(current.respId) ?? 'Atendente' : 'Não atribuído'}</span>
+                </div>
+              </div>
+              <div className="dir">
+                {inbox.donoEfetivo
+                  ? <BotaoMini title="Transferir atendimento" onClick={() => setTransferirAberto(true)}>Transferir</BotaoMini>
+                  : <BotaoPrimario mini title="Assumir atendimento" disabled={inbox.atribuindo} onClick={inbox.assumir}>Assumir</BotaoPrimario>}
+                <BotaoMini title={current.arquivada ? 'Desarquivar conversa' : 'Arquivar conversa'} onClick={() => inbox.arquivar(!current.arquivada)}>{current.arquivada ? 'Desarquivar' : 'Arquivar'}</BotaoMini>
+                <button type="button" className={'ib2' + (foco ? ' on' : '')} title="Modo de foco (Esc para sair)" onClick={() => setFoco((f) => !f)} style={{ width: 26, height: 26 }}><IcFunil /></button>
+                <button type="button" className="ib2" title="Ações" aria-label="Ações da conversa" style={{ width: 26, height: 26 }} onClick={(e) => abrirPop('acoes', e)}><IcDots /></button>
+              </div>
+            </div>
+
+            {/* OPT-OUT inviolável — precedente Contatos */}
+            {optout && (
+              <div className="wa-banner bloq" role="alert">
+                <b>Não incomodar ativo.</b> Nenhuma mensagem (bot, régua ou agendamento) é enviada a este contato.
+              </div>
+            )}
+            {/* higiene 1 — dono */}
+            {WA_REAL && !!current.id && inbox.higiene.dono !== 'livre' && (
+              <div className={'wa-banner' + (inbox.higiene.dono === 'bloqueia' ? ' bloq' : '')} title={'Esta conversa ainda não tem responsável. Assuma o atendimento para responder e evitar perda de lead.' + (inbox.higiene.dono === 'bloqueia' ? '' : ' Em breve isto será obrigatório.')}>
+                <span><b>Sem responsável</b>{inbox.higiene.dono === 'bloqueia' ? ' — obrigatório para responder' : ''}</span>
+                <span className="acts"><BotaoMini disabled={inbox.atribuindo} onClick={inbox.assumir}>Assumir</BotaoMini></span>
+              </div>
+            )}
+            {/* higiene 2 — nome */}
+            {WA_REAL && !!current.id && inbox.higiene.dono === 'livre' && inbox.decNome.acao !== 'livre' && (
+              <div className={'wa-banner' + (inbox.decNome.acao === 'bloqueia' ? ' bloq' : '')}>
+                <span>
+                  <b>{inbox.decNome.acao === 'bloqueia' ? 'Nome obrigatório' : 'Cadastro incompleto'}</b>
+                  {inbox.decNome.analise?.motivo === 'comercio' ? ' · parece comércio' : ''}
+                  {inbox.decNome.podeAdiar && inbox.decNome.adiamentosRestantes < 2 ? (inbox.decNome.adiamentosRestantes === 1 ? ' · resta 1 adiamento' : ` · restam ${inbox.decNome.adiamentosRestantes} adiamentos`) : ''}
+                </span>
+                <span className="acts">
+                  <BotaoMini onClick={iniciarEdicao}>Editar nome</BotaoMini>
+                  {inbox.decNome.podeAdiar && <BotaoMini onClick={inbox.adiarNome}>Lembrar depois</BotaoMini>}
+                  {inbox.decNome.acao === 'bloqueia' && <BotaoMini title="Libera por 24h e fica registrado" onClick={inbox.nomeNaoInformado}>Cliente ainda não informou</BotaoMini>}
+                </span>
+              </div>
+            )}
+
+            <div className="wa-msgs" ref={msgsRef}>
+              {construirItensConversa(current.msgs, (m) => m.tsISO ?? null).map((item, i) =>
+                item.tipo === 'sep' ? (
+                  <div className="dia" key={'sep-' + i}>{item.label}</div>
+                ) : (
+                  <Bolha
+                    key={item.msg.id ?? item.msg.cid ?? 'i' + i}
+                    m={item.msg} demo={demo} nomeCliente={nomeExibicao(current)}
+                    retryId={inbox.retryId} removendoId={inbox.removendoId} semDestino={inbox.semDestino}
+                    aoResponder={(m) => {
+                      inbox.setReplyTo({
+                        id: m.id ?? '', idExt: m.idExterno, fromMe: m.dir === 'out', tipo: m.tipo,
+                        texto: (m.text || (m.tipo === 'audio' ? 'Mensagem de voz' : m.tipo === 'imagem' ? 'Imagem' : m.tipo === 'video' ? 'Vídeo' : m.tipo === 'documento' ? 'Documento' : '')).slice(0, 300),
+                        remetente: m.dir === 'out' ? (assinaturaNome || 'Você') : (current.name || 'Cliente'),
+                      });
+                      textareaRef.current?.focus();
+                    }}
+                    aoVerErro={(m) => setVerErro(traduzErroEnvio(m.erro ?? ''))}
+                    aoRetry={inbox.retryMsg}
+                    aoRemover={(m) => setRemoverAlvo(m)}
+                    aoLightbox={setLightbox}
+                    aoRecarregarAudio={async (m) => {
+                      if (!WA_REAL || !m.id) return;
+                      try { await waRecarregarAudio(currentOrg.id, m.id); await inbox.msgsQ.refetch(); }
+                      catch { aoAvisar({ tom: 'erro', texto: 'Não foi possível recarregar o áudio.' }); }
+                    }}
+                  />
+                ),
+              )}
+            </div>
+
+            <div className="wa-composer">
+              {/* respostas rápidas — A PONTE: scripts reais; clique abre o fluxo de envio com confirmação (nunca envio cego) */}
+              {scripts.length > 0 && (
+                <div className="rapidas" role="list" aria-label="Respostas rápidas (Scripts)">
+                  {scripts.slice(0, 8).map((s) => (
+                    <button
+                      key={s.id} type="button" className="rapida" role="listitem" disabled={inbox.semDestino || optout}
+                      title={(s.conteudo || '').slice(0, 120) + ` · ${etapaCounts[s.id] ?? 1} msg${(etapaCounts[s.id] ?? 1) === 1 ? '' : 's'}`}
+                      onClick={() => { if (optout) { aoAvisar({ tom: 'erro', texto: optoutTexto }); return; } setScriptSeq(s); }}
+                    >
+                      {s.favorito ? '★ ' : ''}{s.titulo}
+                    </button>
+                  ))}
+                  <button type="button" className="rapida" onClick={() => nav('/v2/scripts')} title="Abrir o arsenal de scripts">Todos os scripts…</button>
+                </div>
+              )}
+
+              <div className="wa-linha-resp">
+                Responder por:
+                {demo ? (
+                  ['Chip 1', 'Chip 2', 'Chip 3'].map((chip) => (
+                    <button key={chip} type="button" className={'wa-chipbtn' + (inbox.replyChip === chip ? ' on' : '')} onClick={() => inbox.onReplyChip(chip)}>{chip}</button>
+                  ))
+                ) : inbox.realCanais.length === 0 ? (
+                  <>Nenhum número conectado · <button type="button" className="lnk" style={{ background: 'none', border: 'none', color: 'var(--txt-2)', textDecoration: 'underline', cursor: 'pointer', fontSize: 10.5, fontFamily: 'var(--fonte)' }} onClick={() => nav('/v2/integracoes')}>conectar</button></>
+                ) : (
+                  inbox.realCanais.map((c) => (
+                    <button
+                      key={c.id} type="button"
+                      className={'wa-chipbtn' + (inbox.replyCanalId === c.id ? ' on' : '') + (c.status !== 'conectado' ? ' off' : '')}
+                      title={c.status !== 'conectado' ? `Indisponível (${c.status})` : undefined}
+                      onClick={() => inbox.onReplyCanal(c.id)}
+                    >
+                      {c.alias}
+                    </button>
+                  ))
+                )}
+                <span className="wa-assina">
+                  Assinar como:
+                  <select className="inp" value={assinaMode} onChange={(e) => { setAssinaMode(e.target.value); persistAssinatura(e.target.value, assinaCustom); }}>
+                    {ASSINA_OPCOES.map(([v, r]) => <option key={v} value={v}>{r}</option>)}
+                  </select>
+                  {assinaMode === 'personalizado' && (
+                    <input className="inp" placeholder="Nome na assinatura" value={assinaCustom} onChange={(e) => setAssinaCustom(e.target.value)} onBlur={() => persistAssinatura(assinaMode, assinaCustom)} />
+                  )}
+                  {assinaturaNome && <span className="prev">*{assinaturaNome}:*</span>}
+                </span>
+              </div>
+
+              {/* avisos do composer (cascata v1 + opt-out) */}
+              {optout && (
+                <div className="wa-aviso bloq" title={optoutTexto}><b>Não incomodar</b> — este contato pediu para não receber mensagens</div>
+              )}
+              {inbox.canalRestrito && inbox.canalSel && (
+                <div className="wa-aviso bloq" title={`O número ${inbox.canalSel.alias} está com restrição no WhatsApp e está indisponível para envio. Selecione outro canal em "Responder por" para responder.`}>
+                  <b>{inbox.canalSel.alias}</b> com restrição no WhatsApp — selecione outro canal
+                </div>
+              )}
+              {!inbox.canalRestrito && WA_REAL && inbox.canalSel && inbox.canalSel.status === 'conectado' && (inbox.canalSel.entregaStatus === 'restrito' || inbox.envioSaude !== 'ok') && (
+                <div className="wa-aviso info" title={
+                  inbox.canalSel.entregaStatus === 'restrito'
+                    ? `Este canal (${inbox.canalSel.alias}) está conectado, mas falhou na entrega de mensagens recentes. Prefira outro canal em "Responder por" e evite reconectar repetidamente.`
+                    : inbox.envioSaude === 'indisponivel'
+                      ? `O envio por ${inbox.canalSel.alias} não está saindo agora. Você pode responder por outro número — o envio por outro número muda o remetente para o cliente.`
+                      : `O envio pelo canal ${inbox.canalSel.alias} está instável agora (algumas mensagens estão falhando). Se falhar, selecione outro canal em "Responder por".`
+                }>
+                  {inbox.canalSel.entregaStatus === 'restrito' ? <><b>{inbox.canalSel.alias}</b> falhou na entrega recente</>
+                    : inbox.envioSaude === 'indisponivel' ? <><b>{inbox.canalSel.alias}</b> recebe, mas não envia agora</>
+                    : <>Envio instável por <b>{inbox.canalSel.alias}</b></>}
+                </div>
+              )}
+              {inbox.semDestino && (
+                <div className="wa-aviso bloq" title="Esta conversa foi recebida por uma identidade protegida do WhatsApp e ainda não possui um número confirmado para resposta. O histórico permanece.">
+                  Identidade protegida — sem número para resposta
+                  <button type="button" className="lnk" onClick={() => setVincAberto(true)}>Vincular número</button>
+                </div>
+              )}
+
+              {/* agendadas na conversa */}
+              {(agendadasQ.data ?? []).filter((a) => ['agendada', 'processando', 'falhou', 'bloqueada'].includes(a.status)).map((a) => (
+                <div className="ag-mini num" key={a.id}>
+                  <IcClock />
+                  <b>{a.status === 'agendada' ? 'Agendada' : a.status === 'processando' ? 'Enviando…' : a.status === 'bloqueada' ? 'Bloqueada' : 'Falhou'}</b>
+                  para {new Date(a.executarEm).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' })}
+                  · {a.tipo === 'texto' ? 'Texto' : a.tipo[0].toUpperCase() + a.tipo.slice(1)}
+                  {a.nomeArquivo ? ` · ${a.nomeArquivo}` : ''}{a.nomeCanal ? ` · via ${a.nomeCanal}` : ''}{a.criadoPor ? ` · por ${a.criadoPor}` : ''}
+                  {(a.ultimoErro || a.motivoBloqueio) && <span className="err">{a.ultimoErro ?? a.motivoBloqueio}</span>}
+                  {a.status === 'agendada' && (
+                    <>
+                      <button type="button" className="lnk" onClick={() => { setAgEditId(a.id); setAgendarAberto(true); }}>Editar</button>
+                      <button
+                        type="button" className="lnk"
+                        onClick={async () => {
+                          if (!window.confirm('Cancelar este agendamento? A mensagem não será enviada.')) return;
+                          try { await cancelarAgMut.mutateAsync({ id: a.id, conversaId: current.id }); aoAvisar({ tom: 'ok', texto: 'Agendamento cancelado.' }); }
+                          catch (e) { aoAvisar({ tom: 'erro', texto: (e as Error)?.message || 'Falha ao cancelar.' }); }
+                        }}
+                      >
+                        Cancelar
+                      </button>
+                    </>
+                  )}
+                </div>
+              ))}
+
+              {inbox.replyTo && (
+                <div className="reply-box">
+                  <div>
+                    <div className="rem">Respondendo a {inbox.replyTo.remetente}</div>
+                    <div className="tt">{inbox.replyTo.texto || (inbox.replyTo.tipo === 'audio' ? 'Mensagem de voz' : inbox.replyTo.tipo === 'imagem' ? 'Imagem' : inbox.replyTo.tipo === 'video' ? 'Vídeo' : 'Documento')}</div>
+                  </div>
+                  <button type="button" className="x" aria-label="Cancelar resposta" onClick={() => inbox.setReplyTo(null)}>×</button>
+                </div>
+              )}
+
+              <div className="cmsg">
+                <textarea
+                  ref={textareaRef} rows={1} value={draft} placeholder={placeholder} disabled={composerBloqueado}
+                  onChange={(e) => { setDraft(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'; }}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviar(); } }}
+                />
+                <div className="tools">
+                  <button type="button" className="tool" title="Enviar imagem" disabled={midiaDisabled} onClick={() => setImgModal(true)}><IcImg /></button>
+                  <AudioRecorderV2 disabled={midiaDisabled} onEnviar={inbox.enviarAudio} permitirArquivo />
+                  <button type="button" className="tool" title="Enviar documento" disabled={midiaDisabled} onClick={() => setDocModal(true)}><IcDoc /></button>
+                  <button type="button" className="tool" title="Agendar mensagem" disabled={agendarDisabled} onClick={() => { setAgEditId(null); setAgendarAberto(true); }}><IcClock /></button>
+                </div>
+                <button type="button" className="env-b" title="Enviar" disabled={sendDisabled} onClick={enviar}><IcSend /></button>
+              </div>
+            </div>
+          </>
+        )}
+      </section>
+
+      {/* ===================== CONTEXTO ===================== */}
+      {!ctxAberto && current.id && (
+        <div className="wa-ctx-reabrir"><BotaoMini aria-label="Abrir painel de dados" onClick={() => setCtxAberto(true)}>Dados</BotaoMini></div>
+      )}
+      {ctxAberto && current.id && (
+        <aside className="wa-ctx">
+          <div className="ctx-topo">
+            <div className="av2">{initials(nomeExibicao(current))}</div>
+            <div className="n2">{nomeExibicao(current)}</div>
+            <div className="t2 num">
+              {current.phone ? mascararNumero(current.phone) : 'sem número'}
+              {current.phone && <button type="button" className="cp" title="Copiar telefone" onClick={copiarTelefone}><IcCopy /></button>}
+            </div>
+            <div className="bb">
+              <BotaoMini onClick={() => setCtxAberto(false)}>Recolher</BotaoMini>
+              {editMode
+                ? <BotaoPrimario mini disabled={salvandoEdicao} onClick={salvarEdicao}>{salvandoEdicao ? 'Salvando…' : 'Salvar'}</BotaoPrimario>
+                : <BotaoPrimario mini onClick={iniciarEdicao}>Editar</BotaoPrimario>}
+            </div>
+            {editMode && <div style={{ marginTop: 6 }}><BotaoMini onClick={() => setEditMode(false)}>Cancelar</BotaoMini></div>}
+          </div>
+
+          {optout && (
+            <div className="ctx-b">
+              <div className="ctx-optout"><b>Não incomodar ativo.</b> Nenhuma mensagem (bot, régua ou agendamento) é enviada a este contato.</div>
+            </div>
+          )}
+
+          {editMode && (
+            <div className="ctx-b ctx-edit">
+              <div className="campo"><label>Nome</label><input className="inp" value={editForm.nome} onChange={(e) => setEditForm((f) => ({ ...f, nome: e.target.value }))} /></div>
+              <div className="campo"><label>E-mail</label><input className="inp" placeholder="email@exemplo.com" value={editForm.email} onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))} /></div>
+              <div className="campo"><label>Responsável</label>
+                <select className="inp" value={editForm.responsavelId} onChange={(e) => setEditForm((f) => ({ ...f, responsavelId: e.target.value }))}>
+                  <option value="">Não atribuído</option>
+                  {usuarios.map((u) => <option key={u.id} value={u.id}>{u.nome}</option>)}
+                </select>
+              </div>
+              <div className="campo"><label>Observações</label><textarea className="inp" rows={2} value={editForm.observacoes} onChange={(e) => setEditForm((f) => ({ ...f, observacoes: e.target.value }))} /></div>
+            </div>
+          )}
+
+          <div className="ctx-b">
+            <div className="ctx-t">Status</div>
+            <button type="button" className="ctx-status" onClick={(e) => abrirPop('status', e)}>
+              <span className="dot" style={{ background: current.statusCor ?? 'var(--txt-3)' }} />
+              {current.status || 'Definir status'}
+            </button>
+          </div>
+
+          <KanbanCtx contatoId={current.contatoId ?? null} demo={demo} etapa={current.etapa} etapaCor={current.etapaCor} origem={current.origin} respNome={current.respId ? nomePorId(current.respId) : undefined} lead={current} aoAvisar={aoAvisar} />
+
+          {cobrancasCtx.length > 0 && (
+            <div className="ctx-b">
+              <div className="ctx-t">Cobranças <button type="button" className="lk" onClick={() => nav('/v2/cobrancas')}>ver</button></div>
+              {cobrancasCtx.map((cb) => (
+                <div className="cx-l" key={cb.id}>
+                  <span className="k num">
+                    {cb.ciclosPagos}/{cb.ciclosTotais}
+                    {cb.proximaCobranca ? ' · ' + cb.proximaCobranca.split('-').reverse().slice(0, 2).join('/') : ''}
+                  </span>
+                  <span className="v" style={{ color: /atras|venc/i.test(cb.status) ? 'var(--rubro)' : /quitad|conclu/i.test(cb.status) ? 'var(--verde)' : 'var(--ambar)' }}>
+                    {/atras|venc/i.test(cb.status) ? 'Vencida' : /quitad|conclu/i.test(cb.status) ? 'Pago' : 'Pendente'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="ctx-b">
+            <div className="ctx-t">Etiquetas <button type="button" className="lk" onClick={(e) => abrirPop('tags', e)}>+</button></div>
+            <div className="ctx-tags">
+              {current.tags.length === 0 && <span className="ctx-nota">Nenhuma etiqueta</span>}
+              {current.tags.map((t) => {
+                const cor = corDaEtiqueta(t, etiquetasQ.data);
+                return (
+                  <span key={t} className="ctx-tag" style={{ background: cor + '22', color: cor, borderColor: cor + '55' }}>
+                    {t}
+                    <button type="button" className="x" aria-label={'Remover etiqueta ' + t} onClick={() => alternarEtiqueta(t)}>×</button>
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="ctx-b">
+            <div className="ctx-t">Responsável</div>
+            <div className="cx-l">
+              <span className="k">{current.respId ? (current.respId === user?.id ? 'Você' : nomePorId(current.respId) ?? 'Atendente') : 'Sem responsável'}</span>
+              <span className="v">
+                {inbox.donoEfetivo
+                  ? <button type="button" className="lk" style={{ background: 'none', border: 'none', color: 'var(--txt-2)', textDecoration: 'underline', cursor: 'pointer', fontSize: 10.5, fontFamily: 'var(--fonte)' }} onClick={inbox.devolver}>Devolver para a fila</button>
+                  : <button type="button" className="lk" style={{ background: 'none', border: 'none', color: 'var(--txt-2)', textDecoration: 'underline', cursor: 'pointer', fontSize: 10.5, fontFamily: 'var(--fonte)' }} onClick={inbox.assumir}>{inbox.atribuindo ? 'Assumindo…' : 'Assumir atendimento'}</button>}
+              </span>
+            </div>
+          </div>
+
+          {(atividadesQ.data ?? []).length > 0 && (
+            <div className="ctx-b">
+              <div className="ctx-t">Atividade do atendimento</div>
+              <ul className="ativ-tl">
+                {(atividadesQ.data ?? []).map((a) => (
+                  <li key={a.id}>
+                    <b>{a.usuario ?? 'Alguém'}</b> {a.tipo === 'assumido' ? 'assumiu o atendimento' : a.tipo === 'transferido' ? 'transferiu o atendimento' : a.tipo === 'devolvido' ? 'devolveu para a fila' : a.tipo}
+                    {' · '}{new Date(a.em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                    {a.motivo && <div className="mot">Motivo: {a.motivo}</div>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {current.ultimoCanal?.alias && (
+            <div className="ctx-b">
+              <div className="ctx-t">Último canal utilizado</div>
+              <div className="ctx-nota num">
+                {current.ultimoCanal.alias}
+                {current.ultimoCanal.numero ? ' · ' + mascararNumero(current.ultimoCanal.numero) : ''}
+                {current.ultimoCanal.em ? ' · ' + new Date(current.ultimoCanal.em).toLocaleString('pt-BR') : ''}
+              </div>
+            </div>
+          )}
+
+          <div className="ctx-b">
+            <div className="ctx-t">Nota interna</div>
+            <div className="ctx-nota">{current.notes || 'Sem observações.'}</div>
+          </div>
+          <div className="ctx-b">
+            <div className="ctx-t">Origem do lead</div>
+            <div className="cx-l"><span className="k"><IcWa /></span><span className="v">{current.origin}</span></div>
+            <div className="cx-l"><span className="k">Última interação</span><span className="v num">{current.lastInter || current.time}</span></div>
+          </div>
+        </aside>
+      )}
+
+      {/* ===================== POPOVERS (portal) ===================== */}
+      {pop && createPortal(
+        <div className="wa-pop" style={{ left: pop.x, top: pop.y }} role={pop.kind === 'acoes' ? 'menu' : undefined}>
+          {pop.kind === 'filtro' && (
+            <>
+              <div className="ph2">Filtrar por número</div>
+              <button type="button" className="it" onClick={() => { setFiltroCanal(null); setPop(null); }}>Todos os números {!filtroCanal && <span className="ck">✓</span>}</button>
+              {inbox.realCanais.map((c) => (
+                <button key={c.id} type="button" className="it" onClick={() => { setFiltroCanal(c.id); setPop(null); }}>{c.alias} {filtroCanal === c.id && <span className="ck">✓</span>}</button>
+              ))}
+              <div className="ph2">Status</div>
+              <button type="button" className="it" onClick={() => { setFiltroStatus(null); setPop(null); }}>Todos os status {!filtroStatus && <span className="ck">✓</span>}</button>
+              {statusAtivos.map((s) => (
+                <button key={s.id} type="button" className="it" onClick={() => { setFiltroStatus(s.id); setPop(null); }}>
+                  <span className="dot" style={{ background: s.cor }} />{s.nome} {filtroStatus === s.id && <span className="ck">✓</span>}
+                </button>
+              ))}
+            </>
+          )}
+          {pop.kind === 'acoes' && (
+            <>
+              <button type="button" className="it" onClick={() => { setPop(null); iniciarEdicao(); }}>Editar dados do cliente</button>
+              {(current.unread ?? 0) > 0
+                ? <button type="button" className="it" onClick={() => { setPop(null); inbox.marcarLida(true); }}>Marcar como lida</button>
+                : <button type="button" className="it" onClick={() => { setPop(null); inbox.marcarLida(false); }}>Marcar como não lida</button>}
+              <button type="button" className="it" onClick={() => { setPop(null); inbox.arquivar(!current.arquivada); }}>{current.arquivada ? 'Desarquivar conversa' : 'Arquivar conversa'}</button>
+              {current.phone && <button type="button" className="it" onClick={() => { setPop(null); copiarTelefone(); }}>Copiar telefone</button>}
+              {statusFechada && current.status !== statusFechada.nome && (
+                <button type="button" className="it" onClick={() => { setPop(null); setFecharConfirm(true); }}>Fechar conversa</button>
+              )}
+            </>
+          )}
+          {pop.kind === 'status' && (
+            <>
+              <div className="ph2">Status da conversa</div>
+              {statusAtivos.length === 0 && <div className="vazio">Nenhum status ativo.</div>}
+              {statusAtivos.map((s) => (
+                <button key={s.id} type="button" className="it" onClick={() => { setPop(null); aplicarStatus(s.id); }}>
+                  <span className="dot" style={{ background: s.cor }} />{s.nome} {current.statusId === s.id && <span className="ck">✓</span>}
+                </button>
+              ))}
+              {podeGerenciar && <button type="button" className="lk" onClick={() => { setPop(null); nav('/v2/configuracoes?tab=atendimento&section=status'); }}>Gerenciar status…</button>}
+            </>
+          )}
+          {pop.kind === 'tags' && (
+            <>
+              <div className="ph2">Etiquetas</div>
+              {(etiquetasQ.data ?? []).length === 0 && <div className="vazio">{podeGerenciar ? 'Nenhuma etiqueta. Crie em Configurações.' : 'Peça a um gestor.'}</div>}
+              {(etiquetasQ.data ?? []).map((t) => (
+                <button key={t.nome} type="button" className="it" onClick={() => alternarEtiqueta(t.nome)}>
+                  <span className="dot" style={{ background: t.cor }} />{t.nome} {current.tags.includes(t.nome) && <span className="ck">✓</span>}
+                </button>
+              ))}
+              {podeGerenciar && <button type="button" className="lk" onClick={() => { setPop(null); nav('/v2/configuracoes?tab=atendimento&section=etiquetas'); }}>Gerenciar etiquetas…</button>}
+            </>
+          )}
+        </div>,
+        raizPop,
+      )}
+
+      {/* ===================== MODAIS ===================== */}
+      {novaConversa && (
+        <NovaConversaModal
+          canais={inbox.realCanais.filter((c) => c.status === 'conectado')}
+          demo={demo}
+          aoFechar={() => setNovaConversa(false)}
+          aoIniciar={async (canalId, tel, nome) => {
+            const ok = await inbox.iniciarNovaConversa(canalId, tel, nome);
+            if (ok) { setNovaConversa(false); window.setTimeout(() => textareaRef.current?.focus(), 60); }
+            return ok;
+          }}
+        />
+      )}
+      {transferirAberto && (
+        <TransferirModal
+          usuarios={usuarios} atualId={current.respId ?? null} meuId={user?.id ?? null}
+          atualNome={current.respId ? nomePorId(current.respId) ?? null : null}
+          busy={inbox.atribuindo}
+          aoFechar={() => setTransferirAberto(false)}
+          aoTransferir={async (destinoId, motivo) => {
+            const ok = await inbox.transferir(destinoId, motivo);
+            if (ok) setTransferirAberto(false);
+          }}
+        />
+      )}
+      {vincAberto && (
+        <VincularModal
+          telInicial={current.phone} conversaId={current.id} canalId={inbox.replyCanalId || current.canalId || ''}
+          demo={demo}
+          aoFechar={() => setVincAberto(false)}
+          aoVinculado={async () => { setVincAberto(false); await inbox.live.refetch(); aoAvisar({ tom: 'ok', texto: 'Número vinculado e confirmado. Você já pode responder.' }); }}
+        />
+      )}
+      <ConfirmDialogV2
+        aberto={fecharConfirm}
+        titulo="Fechar conversa"
+        mensagem={statusFechada ? `A conversa será marcada como "${statusFechada.nome}". Você pode reabri-la mudando o status depois.` : 'Fechar esta conversa?'}
+        rotuloConfirmar="Fechar conversa"
+        aoConfirmar={() => { setFecharConfirm(false); if (statusFechada) aplicarStatus(statusFechada.id); }}
+        aoCancelar={() => setFecharConfirm(false)}
+      />
+      <ConfirmDialogV2
+        aberto={verErro !== null}
+        titulo="Falha no envio"
+        mensagem={verErro ?? ''}
+        rotuloConfirmar="Entendi"
+        aoConfirmar={() => setVerErro(null)}
+        aoCancelar={() => setVerErro(null)}
+      />
+      <ConfirmDialogV2
+        aberto={!!removerAlvo}
+        titulo="Remover esta mensagem com falha?"
+        mensagem="Ela não foi entregue ao cliente e será retirada da conversa."
+        rotuloConfirmar="Remover"
+        destrutivo
+        carregando={!!inbox.removendoId}
+        aoConfirmar={async () => { if (removerAlvo) { await inbox.removerFalha(removerAlvo); setRemoverAlvo(null); } }}
+        aoCancelar={() => setRemoverAlvo(null)}
+      />
+      <MediaComposer
+        open={imgModal} tipo="imagem" previewCard
+        onClose={() => setImgModal(false)}
+        enviar={async (file, caption) => { await inbox.enviarImagem(file, caption); setImgModal(false); }}
+      />
+      <MediaComposer
+        open={docModal} tipo="documento"
+        onClose={() => setDocModal(false)}
+        enviar={async (file, caption) => { await inbox.enviarDocumento(file, caption); setDocModal(false); }}
+      />
+      {agendarAberto && (
+        <AgendarMensagemModalV2
+          aberto modo={agEditId ? 'editar' : 'criar'} demo={demo}
+          canais={canaisAgendaveis.map((c) => ({ id: c.id, alias: c.alias, numero: c.numero, status: c.status, envioRestrito: c.envioRestrito, conflitoCom: c.conflitoCom }))}
+          temTelefone={!!current.phone}
+          ultimaInteracaoMs={current.lastAtMs ?? null}
+          initial={agEditId ? (() => {
+            const a = (agendadasQ.data ?? []).find((x) => x.id === agEditId);
+            return a ? { canalId: a.canalId, texto: a.texto ?? '', executarEm: a.executarEm, tipo: a.tipo, nomeArquivo: a.nomeArquivo ?? undefined } : null;
+          })() : null}
+          aoFechar={() => { setAgendarAberto(false); setAgEditId(null); }}
+          aoSubmeter={async (v) => {
+            if (demo) { aoAvisar({ tom: 'ok', texto: 'Mensagem agendada — será enviada automaticamente no horário.' }); return; }
+            if (agEditId) {
+              await editarAgMut.mutateAsync({ id: agEditId, conversaId: current.id, canalId: v.canalId, texto: v.texto ?? '', executarEm: v.executarISO });
+              aoAvisar({ tom: 'ok', texto: 'Agendamento atualizado.' });
+            } else {
+              const itens = v.itens ?? [];
+              await agendarSeqMut.mutateAsync({ conversaId: current.id, canalId: v.canalId, executarEm: v.executarISO, itens });
+              aoAvisar({ tom: 'ok', texto: itens.length > 1 ? `${itens.length} mensagens agendadas — serão enviadas no horário.` : 'Mensagem agendada — será enviada automaticamente no horário.' });
+            }
+          }}
+        />
+      )}
+      <ScriptSequenceModal
+        open={!!scriptSeq} script={scriptSeq}
+        canal="whatsapp" conversaId={current.id}
+        onClose={() => setScriptSeq(null)}
+        ctx={{ cliente: current.name, atendente: user?.name || 'Atendente', emailAtendente: user?.email ?? '', empresa: currentOrg.name, telefone: current.phone }}
+        enviarEtapa={async (texto, retryMensagemId) => {
+          if (demo) { aoAvisar({ tom: 'ok', texto: 'Mensagem enviada' }); return; }
+          const id = await sendMut.mutateAsync({ conversaId: current.id, canalId: inbox.replyCanalId || current.canalId, assinaturaNome: assinaturaNome || undefined, text: texto, retryMensagemId });
+          return id ?? undefined;
+        }}
+        confirmar={(id) => (demo ? Promise.resolve('enviada' as const) : aguardarConfirmacaoEnvio(id))}
+      />
+      {lightbox && (
+        <div className="p-veu" role="dialog" aria-modal onMouseDown={(e) => { if (e.target === e.currentTarget) setLightbox(null); }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 96 }}>
+          <button type="button" aria-label="Fechar" onClick={() => setLightbox(null)} style={{ position: 'fixed', top: 14, right: 18, fontSize: 22, background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}>×</button>
+          <img src={lightbox} alt="Imagem ampliada" style={{ maxWidth: '86vw', maxHeight: '86vh', borderRadius: 10 }} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ================================================================
+   Bolha de mensagem — .rec/.env2 do mockup com o conteúdo da v1:
+   selo do bot (origemBot → "◈ Matheo"), áudio com onda + .transc,
+   imagem/vídeo/documento, quoted, ticks, falha, responder.
+   ================================================================ */
+function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, aoResponder, aoVerErro, aoRetry, aoRemover, aoLightbox, aoRecarregarAudio }: {
+  m: WaMessage; demo: boolean; nomeCliente: string; retryId: string | null; removendoId: string | null; semDestino: boolean;
+  aoResponder: (m: WaMessage) => void; aoVerErro: (m: WaMessage) => void; aoRetry: (m: WaMessage) => void;
+  aoRemover: (m: WaMessage) => void; aoLightbox: (url: string) => void; aoRecarregarAudio: (m: WaMessage) => void;
+}) {
+  const [url, setUrl] = useState<string | null>(null);
+  const precisaUrl = !demo && !!m.anexoPath && ['imagem', 'video', 'audio'].includes(m.tipo ?? '');
+  useEffect(() => {
+    let vivo = true;
+    if (precisaUrl && m.anexoPath) {
+      urlAssinadaMidiaWa(m.anexoPath).then((u) => { if (vivo) setUrl(u); }).catch(() => { if (vivo) setUrl(null); });
+    }
+    return () => { vivo = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [m.anexoPath]);
+  const ack = m.dir === 'out' ? ackOf(m.status) : null;
+  const falhou = m.status === 'falhou';
+
+  const falhaActs = falhou && (
+    <div className="msg-falha-acts">
+      <button type="button" className="lnk" onClick={() => aoVerErro(m)}>Ver erro</button>·
+      <button type="button" className="lnk" disabled={!m.id || retryId === m.id || semDestino} title={semDestino ? 'Vincule um número confirmado para responder.' : undefined} onClick={() => aoRetry(m)}>
+        {retryId === m.id ? 'Reenviando…' : 'Tentar novamente'}
+      </button>·
+      <button type="button" className="lnk" disabled={removendoId === m.id} onClick={() => aoRemover(m)}>{removendoId === m.id ? 'Removendo…' : 'Remover'}</button>
+    </div>
+  );
+
+  return (
+    <div className={'bolha ' + (m.dir === 'out' ? 'env2' : 'rec') + (falhou ? ' falha' : '')}>
+      {m.id && !semDestino && (
+        <button type="button" className="resp-btn" title="Responder" aria-label="Responder" onClick={() => aoResponder(m)}><IcReply /></button>
+      )}
+      {m.origemBot && <div className="bt-tag">◈ Matheo</div>}
+      {m.quoted && (
+        <div className="mq">
+          <div className="rem">{m.quoted.remetente || (m.dir === 'out' ? 'Você' : nomeCliente)}</div>
+          <div className="tt">{m.quoted.texto || (m.quoted.tipo === 'audio' ? 'Mensagem de voz' : m.quoted.tipo === 'imagem' ? 'Imagem' : m.quoted.tipo === 'video' ? 'Vídeo' : 'Documento')}</div>
+        </div>
+      )}
+      {m.tipo === 'imagem' && (url || demo) && (
+        <>
+          {url ? <img className="m-img" src={url} alt="Imagem" title="Ampliar" onClick={() => aoLightbox(url)} /> : <div className="audio-ind">Imagem de demonstração</div>}
+          {m.text && <div className="m-cap"><WaTexto texto={m.text} /></div>}
+        </>
+      )}
+      {m.tipo === 'video' && url && (
+        <>
+          <video className="m-video" src={url} controls preload="metadata" />
+          {m.text && <div className="m-cap"><WaTexto texto={m.text} /></div>}
+        </>
+      )}
+      {m.tipo === 'audio' && (
+        m.midiaPendente
+          ? <div className="audio-ind">Áudio indisponível — <button type="button" className="lnk" onClick={() => aoRecarregarAudio(m)}>tentar carregar novamente</button></div>
+          : <AudioBolha url={url} dur={m.tamanho == null ? null : null} segundos={(m as WaMessage & { seconds?: number }).seconds ?? null} demo={demo} />
+      )}
+      {m.tipo === 'documento' && (
+        <div className="doc2">
+          <span className="ic"><IcDoc /></span>
+          <span className="inf">
+            <span className="nm">{m.nome || 'documento'}</span>
+            <span className="mt num">{(m.mime ?? '').split('/')[1]?.toUpperCase() ?? 'Arquivo'}{m.tamanho ? ' · ' + (m.tamanho / 1048576).toFixed(1) + ' MB' : ''}</span>
+            {!demo && m.anexoPath && (
+              <span className="acts">
+                <button type="button" className="lnk" onClick={async () => { const u = await urlDownloadMidiaWa(m.anexoPath!, m.nome || 'documento'); window.location.assign(u); }}>Baixar</button>
+                <button type="button" className="lnk" title="Abrir em nova aba" onClick={async () => { const u = await urlAssinadaMidiaWa(m.anexoPath!); window.open(u, '_blank', 'noopener'); }}>Abrir</button>
+              </span>
+            )}
+          </span>
+        </div>
+      )}
+      {m.pdf && (
+        <div className="doc2"><span className="ic"><IcDoc /></span><span className="inf"><span className="nm">{m.pdf.name}</span><span className="mt">{m.pdf.meta}</span></span></div>
+      )}
+      {(m.tipo === 'texto' || (!m.tipo && m.text)) && m.text && <WaTexto texto={m.text} />}
+      {m.transcricao && <div className="transc">“{m.transcricao}”</div>}
+      {falhaActs}
+      <div className="hh num">
+        {m.viaTelefone && <span className="fone-tag" title="Enviada pelo celular"><IcTel />Enviada pelo celular</span>}
+        {m.time}
+        {ack && <span className={'tick ' + ack.cls} title={ack.cls === 'falhou' ? traduzErroEnvio(m.erro ?? '') : ack.title}>{ack.s}</span>}
+      </div>
+    </div>
+  );
+}
+
+/** *negrito* + links, sem HTML bruto (equivalente ao WhatsAppText do v1). */
+function WaTexto({ texto }: { texto: string }) {
+  const partes = useMemo(() => {
+    const out: ReactNode[] = [];
+    const re = /(\*[^*\s][^*]*[^*\s]\*|\*[^*\s]\*|https?:\/\/\S+|www\.\S+)/g;
+    let i = 0, k = 0, m: RegExpExecArray | null;
+    while ((m = re.exec(texto))) {
+      if (m.index > i) out.push(texto.slice(i, m.index));
+      const t = m[0];
+      if (t.startsWith('*')) out.push(<strong key={k++}>{t.slice(1, -1)}</strong>);
+      else out.push(<a key={k++} className="wa-link" href={t.startsWith('www.') ? 'https://' + t : t} target="_blank" rel="noopener noreferrer nofollow">{t}</a>);
+      i = m.index + t.length;
+    }
+    if (i < texto.length) out.push(texto.slice(i));
+    return out;
+  }, [texto]);
+  return <span className="wa-fmt">{partes}</span>;
+}
+
+/** Player de áudio na pele do mockup (.audio2 onda + play claro) — comportamento do AudioMessage v1. */
+function AudioBolha({ url, segundos, demo }: { url: string | null; dur?: string | null; segundos: number | null; demo: boolean }) {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [tocando, setTocando] = useState(false);
+  const [pos, setPos] = useState(0);
+  const [durS, setDurS] = useState(segundos ?? 0);
+  const [rate, setRate] = useState(1);
+  useEffect(() => () => { audioRef.current?.pause(); }, []);
+  const toggle = () => {
+    if (!url) return;
+    if (!audioRef.current) {
+      const a = new Audio(url);
+      a.addEventListener('timeupdate', () => setPos(a.currentTime));
+      a.addEventListener('loadedmetadata', () => { if (Number.isFinite(a.duration)) setDurS(a.duration); });
+      a.addEventListener('ended', () => { setTocando(false); setPos(0); });
+      audioRef.current = a;
+    }
+    const a = audioRef.current;
+    if (tocando) { a.pause(); setTocando(false); }
+    else { a.playbackRate = rate; a.play().catch(() => setTocando(false)); setTocando(true); }
+  };
+  const prog = durS > 0 ? pos / durS : 0;
+  return (
+    <div className="audio2">
+      <button type="button" className="play" title={demo && !url ? 'Áudio de demonstração' : tocando ? 'Pausar' : 'Reproduzir'} onClick={toggle} disabled={!url}>
+        {tocando ? <svg viewBox="0 0 24 24" fill="currentColor" width="10" height="10" aria-hidden><path d="M7 5h3v14H7zM14 5h3v14h-3z" /></svg> : <IcPlay />}
+      </button>
+      <div className="onda" onClick={(e) => {
+        if (!audioRef.current || durS <= 0) return;
+        const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        const p = (e.clientX - r.left) / r.width;
+        audioRef.current.currentTime = p * durS;
+        setPos(p * durS);
+      }}>
+        {ONDA.map((h, i) => <i key={i} className={i / ONDA.length <= prog && prog > 0 ? 'done' : ''} style={{ height: h }} />)}
+      </div>
+      <span className="dur num">{tocando || pos > 0 ? mmss(pos) + ' / ' : ''}{mmss(durS) || '·'}</span>
+      <button type="button" className="rate num" title="Velocidade" onClick={() => {
+        const nx = rate === 1 ? 1.5 : rate === 1.5 ? 2 : 1;
+        setRate(nx);
+        if (audioRef.current) audioRef.current.playbackRate = nx;
+      }}>{rate}x</button>
+    </div>
+  );
+}
+
+/* ================================================================
+   Contexto: bloco Funil/Kanban — "Abrir no Kanban" via deep-link
+   /v2/kanban?oportunidade= (KanbanContatoBox v1 recriado; hooks reais
+   reusados; ficha judicial reusada inteira no real).
+   ================================================================ */
+function KanbanCtx({ contatoId, demo, etapa, etapaCor, origem, respNome, lead, aoAvisar }: {
+  contatoId: string | null; demo: boolean; etapa?: string | null; etapaCor?: string | null;
+  origem: string; respNome?: string; lead: WaContact; aoAvisar: (a: AvisoInbox) => void;
+}) {
+  const nav = useNavigate();
+  const oppsQ = useOportunidadesDoContato(!demo ? contatoId : null);
+  const funisQ = useFunisDaOrg();
+  const [addAberto, setAddAberto] = useState(false);
+  const [funilSel, setFunilSel] = useState('');
+  const [addBusy, setAddBusy] = useState(false);
+  if (!contatoId) return null;
+  const aberta = demo
+    ? (etapa ? { id: 'demo-opp', funilNome: 'Funil comercial', colunaNome: etapa, respNome: respNome ?? '', tipoServico: 'analise_inicial', tipoBeneficio: 'aposentadoria', valor: null } : null)
+    : (oppsQ.data ?? []).find((o) => o.aberta) ?? null;
+  return (
+    <div className="ctx-b">
+      <div className="ctx-t">Funil</div>
+      {(!demo && oppsQ.isLoading) ? (
+        <div className="ctx-nota">Carregando…</div>
+      ) : aberta ? (
+        <>
+          <div className="cx-l"><span className="k">Etapa</span><span className="v" style={etapaCor ? { color: etapaCor } : undefined}>{aberta.colunaNome ?? etapa ?? '—'}</span></div>
+          <div className="cx-l"><span className="k">Funil</span><span className="v">{aberta.funilNome ?? '—'}</span></div>
+          <div className="cx-l"><span className="k">Responsável</span><span className="v">{aberta.respNome || 'Não atribuído'}</span></div>
+          <div className="cx-l"><span className="k">Origem</span><span className="v">{origem}</span></div>
+          <div style={{ marginTop: 7 }}>
+            <BotaoMini onClick={() => nav(demo ? '/v2/kanban' : `/v2/kanban?oportunidade=${encodeURIComponent(aberta.id)}`)}>Abrir no Kanban</BotaoMini>
+          </div>
+          {!demo && (
+            <div style={{ marginTop: 10 }}>
+              <FichaJudicialBox contatoId={contatoId} oportunidadeId={aberta.id} conversaId={lead.id} canalId={lead.canalId ?? null} contatoAtual={{ nome: lead.name, telefone: lead.phone, email: lead.email }} />
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          <div className="ctx-nota">Sem oportunidade aberta.</div>
+          <div style={{ marginTop: 7 }}><BotaoMini onClick={() => { setFunilSel(funisQ.data?.find((f) => f.padrao)?.id ?? funisQ.data?.[0]?.id ?? ''); setAddAberto(true); }}>Adicionar ao Kanban</BotaoMini></div>
+        </>
+      )}
+      <ModalV2
+        aberto={addAberto}
+        aoFechar={() => { if (!addBusy) setAddAberto(false); }}
+        largura={420}
+        titulo="Adicionar ao Kanban"
+        rodape={
+          <>
+            <BotaoSec disabled={addBusy} onClick={() => setAddAberto(false)}>Cancelar</BotaoSec>
+            <BotaoPrimario disabled={addBusy || (!demo && !funilSel)} onClick={async () => {
+              if (demo) { aoAvisar({ tom: 'ok', texto: 'Adicionado ao Kanban' }); setAddAberto(false); return; }
+              setAddBusy(true);
+              try {
+                await chamarGarantirEntrada({ contatoId, funilId: funilSel, origem: 'WhatsApp', conversaId: lead.id, canalId: lead.canalId ?? undefined });
+                aoAvisar({ tom: 'ok', texto: 'Adicionado ao Kanban' });
+                setAddAberto(false);
+              } catch (e) { aoAvisar({ tom: 'erro', texto: (e as Error)?.message || 'Falha ao adicionar.' }); }
+              finally { setAddBusy(false); }
+            }}>{addBusy ? 'Adicionando…' : 'Adicionar'}</BotaoPrimario>
+          </>
+        }
+      >
+        <p style={{ fontSize: 12.5, color: 'var(--txt-2)', lineHeight: 1.55 }}>
+          O contato entrará na <b>coluna de entrada</b> do funil, com origem <b>WhatsApp</b>, herdando conversa, canal e atendente.
+        </p>
+        {(funisQ.data ?? []).length === 0 && !demo ? (
+          <div className="kb-err" role="alert" style={{ marginTop: 10 }}>Nenhum funil disponível.</div>
+        ) : (funisQ.data ?? []).length > 1 && (
+          <div className="campo" style={{ marginTop: 10 }}>
+            <label>Funil</label>
+            <select className="inp" value={funilSel} onChange={(e) => setFunilSel(e.target.value)}>
+              {(funisQ.data ?? []).map((f) => <option key={f.id} value={f.id}>{f.nome}{f.padrao ? ' (padrão)' : ''}</option>)}
+            </select>
+          </div>
+        )}
+      </ModalV2>
+    </div>
+  );
+}
+
+/* ================================================================ */
+function NovaConversaModal({ canais, demo, aoFechar, aoIniciar }: {
+  canais: { id: string; alias: string; numero: string | null }[]; demo: boolean;
+  aoFechar: () => void; aoIniciar: (canalId: string, tel: string, nome: string) => Promise<boolean>;
+}) {
+  const [canalId, setCanalId] = useState(canais[0]?.id ?? '');
+  const [tel, setTel] = useState('');
+  const [nome, setNome] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const iniciar = async () => {
+    setErro(null);
+    if (!demo) {
+      if (!canalId) { setErro('Selecione um WhatsApp conectado.'); return; }
+      if (!normalizeWaPhone(tel)) { setErro('Informe um telefone válido.'); return; }
+    }
+    setBusy(true);
+    try { await aoIniciar(canalId, tel, nome); }
+    catch (e) { setErro((e as Error)?.message || 'Falha ao iniciar.'); }
+    finally { setBusy(false); }
+  };
+  return (
+    <ModalV2
+      aberto aoFechar={() => { if (!busy) aoFechar(); }} largura={420} titulo="Nova conversa"
+      rodape={
+        <>
+          <BotaoSec disabled={busy} onClick={aoFechar}>Cancelar</BotaoSec>
+          <BotaoPrimario disabled={busy || (!demo && canais.length === 0)} onClick={iniciar}>{busy ? 'Iniciando…' : 'Iniciar conversa'}</BotaoPrimario>
+        </>
+      }
+    >
+      {erro && <div className="aviso-inline erro" role="alert" style={{ marginBottom: 10 }}>{erro}</div>}
+      <div className="form-grid">
+        <div className="campo">
+          <label>WhatsApp</label>
+          {canais.length === 0 && !demo ? (
+            <div className="ctx-nota">Nenhum WhatsApp conectado.</div>
+          ) : (
+            <select className="inp" value={canalId} onChange={(e) => setCanalId(e.target.value)}>
+              {(demo ? [{ id: 'demo', alias: 'Chip 1', numero: '5551999990000' }] : canais).map((c) => (
+                <option key={c.id} value={c.id}>{c.alias}{c.numero ? ' · ' + mascararNumero(c.numero) : ''}</option>
+              ))}
+            </select>
+          )}
+        </div>
+        <div className="campo"><label>Telefone</label><input className="inp" placeholder="(11) 99999-8888" inputMode="tel" value={tel} onChange={(e) => setTel(e.target.value)} /></div>
+        <div className="campo"><label>Nome (opcional)</label><input className="inp" placeholder="Nome do contato" value={nome} onChange={(e) => setNome(e.target.value)} /></div>
+      </div>
+    </ModalV2>
+  );
+}
+
+function TransferirModal({ usuarios, atualId, atualNome, meuId, busy, aoFechar, aoTransferir }: {
+  usuarios: { id: string; nome: string; papel?: string }[]; atualId: string | null; atualNome: string | null; meuId: string | null;
+  busy: boolean; aoFechar: () => void; aoTransferir: (destinoId: string, motivo: string) => Promise<void>;
+}) {
+  const [busca, setBusca] = useState('');
+  const [sel, setSel] = useState<string | null>(null);
+  const [motivo, setMotivo] = useState('');
+  const filtrados = usuarios.filter((u) => u.nome.toLowerCase().includes(busca.trim().toLowerCase()));
+  return (
+    <ModalV2
+      aberto aoFechar={() => { if (!busy) aoFechar(); }} largura={460} titulo="Transferir atendimento"
+      rodape={
+        <>
+          <BotaoSec disabled={busy} onClick={aoFechar}>Cancelar</BotaoSec>
+          <BotaoPrimario disabled={busy || !sel || !motivo.trim() || sel === atualId} onClick={() => sel && aoTransferir(sel, motivo)}>
+            {busy ? 'Transferindo…' : 'Transferir'}
+          </BotaoPrimario>
+        </>
+      }
+    >
+      <p style={{ fontSize: 12, color: 'var(--txt-2)', marginBottom: 10 }}>Responsável atual: <b style={{ color: 'var(--txt)' }}>{atualNome ?? 'Sem responsável'}</b></p>
+      <div className="campo" style={{ marginBottom: 8 }}>
+        <input className="inp" placeholder="Buscar atendente…" autoFocus value={busca} onChange={(e) => setBusca(e.target.value)} />
+      </div>
+      <div style={{ maxHeight: 180, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 3, marginBottom: 10 }}>
+        {filtrados.length === 0 && <div className="ctx-nota">Nenhum atendente encontrado.</div>}
+        {filtrados.map((u) => (
+          <button
+            key={u.id} type="button" disabled={u.id === atualId}
+            className="wa-pop-item-like"
+            style={{ display: 'flex', gap: 8, alignItems: 'center', textAlign: 'left', background: sel === u.id ? 'rgba(255,255,255,.08)' : 'none', border: '1px solid ' + (sel === u.id ? 'rgba(255,255,255,.25)' : 'transparent'), borderRadius: 8, padding: '6px 9px', color: 'var(--txt)', fontFamily: 'var(--fonte)', fontSize: 12.5, cursor: u.id === atualId ? 'default' : 'pointer', opacity: u.id === atualId ? .55 : 1 }}
+            onClick={() => setSel(u.id)}
+          >
+            {u.nome}{u.id === meuId ? ' (você)' : ''}{u.id === atualId ? ' · atual' : ''}
+            {u.papel && <span style={{ marginLeft: 'auto', fontSize: 10.5, color: 'var(--txt-3)' }}>{u.papel === 'gestor' ? 'Supervisor' : u.papel}</span>}
+          </button>
+        ))}
+      </div>
+      <div className="campo">
+        <label>Motivo da transferência *</label>
+        <input className="inp" maxLength={280} placeholder="Ex.: atendimento presencial, especialista, ausência…" value={motivo} onChange={(e) => setMotivo(e.target.value)} />
+      </div>
+    </ModalV2>
+  );
+}
+
+function VincularModal({ telInicial, conversaId, canalId, demo, aoFechar, aoVinculado }: {
+  telInicial: string; conversaId: string; canalId: string; demo: boolean;
+  aoFechar: () => void; aoVinculado: () => Promise<void>;
+}) {
+  const [tel, setTel] = useState(telInicial ?? '');
+  const [validado, setValidado] = useState<{ numero: string; mascarado: string; jid: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const validar = async () => {
+    setErro(null);
+    if (demo) { setErro('Disponível com o backend configurado.'); return; }
+    setBusy(true);
+    try {
+      const r = await waValidarNumero(conversaId, canalId, tel);
+      if (!r.exists) { setErro('Este número não tem WhatsApp ativo.'); return; }
+      setValidado({ numero: r.numero, mascarado: r.numero_mascarado, jid: r.jid });
+    } catch (e) { setErro((e as Error)?.message || 'Falha ao validar.'); }
+    finally { setBusy(false); }
+  };
+  const vincular = async () => {
+    if (!validado) return;
+    setBusy(true);
+    try { await waVincularNumero(conversaId, canalId, validado.numero, validado.jid); await aoVinculado(); }
+    catch (e) { setErro((e as Error)?.message || 'Falha ao vincular.'); }
+    finally { setBusy(false); }
+  };
+  return (
+    <ModalV2
+      aberto aoFechar={() => { if (!busy) aoFechar(); }} largura={440} titulo="Vincular número para responder"
+      rodape={
+        <>
+          <BotaoSec disabled={busy} onClick={aoFechar}>Cancelar</BotaoSec>
+          {validado
+            ? <BotaoPrimario disabled={busy} onClick={vincular}>{busy ? 'Vinculando…' : 'Confirmar e vincular'}</BotaoPrimario>
+            : <BotaoPrimario disabled={busy || !tel.trim()} onClick={validar}>{busy ? 'Validando…' : 'Validar no WhatsApp'}</BotaoPrimario>}
+        </>
+      }
+    >
+      <p style={{ fontSize: 12, color: 'var(--txt-2)', lineHeight: 1.55, marginBottom: 10 }}>
+        Esta conversa chegou por uma identidade protegida (LID), sem número para resposta. Informe o número real do
+        cliente — validamos no WhatsApp antes de salvar. O LID é preservado e nada é inventado.
+      </p>
+      {erro && <div className="aviso-inline erro" role="alert" style={{ marginBottom: 10 }}>{erro}</div>}
+      <div className="campo">
+        <label>Telefone (DDI + DDD)</label>
+        <input className="inp" placeholder="55 11 99999-8888" value={tel} disabled={!!validado} onChange={(e) => setTel(e.target.value)} />
+      </div>
+      {!validado && telInicial && (
+        <p style={{ fontSize: 11, color: 'var(--txt-3)', marginTop: 6 }}>Número cadastrado (não confirmado) — valide no WhatsApp para usar, ou informe outro.</p>
+      )}
+      {validado && (
+        <p style={{ fontSize: 12, color: 'var(--verde)', marginTop: 8 }}>
+          ✓ Número com WhatsApp ativo: <b>{validado.mascarado}</b>. Confirme para vincular a este contato.{' '}
+          <button type="button" className="kb-link" onClick={() => setValidado(null)}>Corrigir número</button>
+        </p>
+      )}
+    </ModalV2>
+  );
+}

@@ -26,7 +26,6 @@ import { NotFound } from '@/pages/NotFound';
 // Redesign Platina (design-ref/CONTRATO.md): tudo carregado sob demanda.
 const VitrineV2 = lazy(() => import('@/v2/pages/Vitrine'));
 const AppShellV2 = lazy(() => import('@/v2/shell/AppShellV2'));
-const EmConstrucaoV2 = lazy(() => import('@/v2/pages/EmConstrucao'));
 const LoginV2 = lazy(() => import('@/v2/pages/Login'));
 const NaoEncontradaV2 = lazy(() => import('@/v2/pages/NaoEncontrada'));
 const ErroConfiguracaoV2 = lazy(() => import('@/v2/pages/ErroConfiguracao'));
@@ -42,22 +41,11 @@ const ContatosV2 = lazy(() => import('@/v2/pages/Contatos'));
 const RelatoriosV2 = lazy(() => import('@/v2/pages/Relatorios'));
 const IntegracoesV2 = lazy(() => import('@/v2/pages/Integracoes'));
 const KanbanV2 = lazy(() => import('@/v2/pages/Kanban'));
+const WhatsAppV2 = lazy(() => import('@/v2/pages/WhatsApp'));
 const ManutencaoV2 = lazy(() => import('@/v2/pages/Manutencao'));
 const RedefinirSenhaV2 = lazy(() => import('@/v2/pages/RedefinirSenha'));
 const DefinirSenhaV2 = lazy(() => import('@/v2/pages/DefinirSenha'));
 const AlterarSenhaV2 = lazy(() => import('@/v2/pages/AlterarSenha'));
-
-/** Rota v2 ainda não recriada: marcador de posição dentro do shell. */
-function emConstrucao(slug: string, titulo: string, subtitulo: string): RouteObject {
-  return {
-    path: slug,
-    element: (
-      <Suspense fallback={null}>
-        <EmConstrucaoV2 titulo={titulo} subtitulo={subtitulo} />
-      </Suspense>
-    ),
-  };
-}
 
 const routes: RouteObject[] = [
   { path: '/login', element: <Login /> },
@@ -227,7 +215,14 @@ const routes: RouteObject[] = [
                         </Suspense>
                       ),
                     },
-                    emConstrucao('whatsapp', 'WhatsApp', 'Caixa de atendimento do WhatsApp.'),
+                    {
+                      path: 'whatsapp',
+                      element: (
+                        <Suspense fallback={null}>
+                          <WhatsAppV2 />
+                        </Suspense>
+                      ),
+                    },
                     {
                       path: 'facebook',
                       element: (

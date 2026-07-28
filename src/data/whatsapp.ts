@@ -124,6 +124,8 @@ export function mapMensagens(rows: DbMsg[]): WaMessage[] {
       text: m.conteudo ?? '',
       time: hhmm(m.enviada_em || m.recebida_em || m.criado_em),
       viaTelefone: m.origem === 'telefone',
+      origemBot: m.origem === 'bot' || undefined,
+      transcricao: (m.metadados as { transcricao?: string } | null)?.transcricao || undefined,
       status: m.status ?? undefined,
       erro: m.erro_envio ?? undefined,
       tipo: m.tipo,
