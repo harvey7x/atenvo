@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useOrg } from '@/context/OrgContext';
@@ -15,7 +15,7 @@ import {
 } from '../components';
 import RelatoriosApresentacao from './RelatoriosApresentacao';
 import CortinaRelatorios, { type HeroiCortina } from './CortinaRelatorios';
-import { decidirCortina, EVENTO_REPLAY_CORTINA } from './relatoriosCortina';
+import { decidirCortina } from './relatoriosCortina';
 import './relatorios.css';
 
 /* ------------------------------------------------------------------
@@ -581,21 +581,10 @@ export default function RelatoriosV2() {
   const [apresentar, setApresentar] = useState(false);
 
   // v2.2 — cortina de entrada (exclusiva desta página; Adendo nº 5).
-  // Decisão na montagem, com cooldown por usuário/página; reduced-motion
-  // pula direto (o timestamp já foi registrado na decisão positiva).
-  const [cortina, setCortina] = useState(() => {
-    const roda = decidirCortina(user?.id ?? 'anon');
-    if (!roda) return false;
-    return !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  });
+  // Roda em TODA abertura da página; reduced-motion pula direto.
+  const [cortina, setCortina] = useState(() => decidirCortina() && !window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   // agregados dos números-herói: MESMOS hooks/queryKeys da AbaResumo
   // (cache compartilhado; enabled só enquanto o pano está fechado no real)
-  // replay de dev com a página já aberta (o botão do shell dispara o evento)
-  useEffect(() => {
-    const rodaDeNovo = () => setCortina(!window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-    window.addEventListener(EVENTO_REPLAY_CORTINA, rodaDeNovo);
-    return () => window.removeEventListener(EVENTO_REPLAY_CORTINA, rodaDeNovo);
-  }, []);
   const cortinaResumoQ = useResumo(f);
   const cortinaCxQ = useConexoes(f, !demo && cortina);
   const heroisCortina: HeroiCortina[] | null = useMemo(() => {
