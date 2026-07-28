@@ -1,0 +1,116 @@
+/* ============================================================
+   Relatórios — verdade funcional do v1 (5 abas, filtros, tabelas
+   com busca/ordenação/CSV) vestida nos padrões do mockup
+   pg-relatorios: KPIs .kpi, barras verticais .barv com valor em
+   cima e rótulo embaixo, tabelas caps, período no subtítulo.
+   Dado é calmo: sem contadores animados nesta página.
+   ============================================================ */
+
+/* filtros */
+.v2 .rl2-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.v2 .rl2-datas { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--txt-3); }
+.v2 .rl2-datas .inp { width: 132px; height: 30px; font-size: 11.5px; }
+.v2 .rl2-sel { width: auto; height: 30px; font-size: 11.5px; padding: 0 9px; }
+.v2 .rl2-chips { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin-bottom: 12px; }
+.v2 .rl2-chips .rot { font-size: 10.5px; color: var(--txt-3); }
+.v2 .rl2-escopo { font-size: 11.5px; color: var(--txt-3); margin: 2px 0 14px; }
+.v2 .rl2-escopo b { color: var(--txt-2); font-weight: 500; }
+
+/* KPI estático (dado é calmo — sem contador nesta página) */
+.v2 .rl2-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.v2 .rl2-kpi { padding: 13px 15px; border-radius: var(--r-card); }
+.v2 .rl2-kpi .rot { font-size: 10.5px; letter-spacing: .05em; text-transform: uppercase; color: var(--txt-3); margin-bottom: 7px; display: flex; align-items: center; gap: 5px; }
+.v2 .rl2-kpi .info { cursor: help; opacity: .6; font-size: 9px; border: 1px solid var(--txt-3); border-radius: 50%; width: 12px; height: 12px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.v2 .rl2-kpi .val { font-size: 21px; font-weight: 600; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.v2 .rl2-kpi .val.ind { font-size: 13px; color: var(--txt-3); font-weight: 500; }
+.v2 .rl2-kpi .ant { font-size: 10px; color: var(--txt-3); margin-top: 4px; }
+.v2 .rl2-kpi .delta { margin-top: 6px; }
+
+/* seções e painéis */
+.v2 .rl2-sec { font-size: 13px; font-weight: 600; margin: 16px 0 10px; }
+.v2 .rl2-sec span { font-size: 11px; color: var(--txt-3); font-weight: 400; }
+.v2 .rl2-painel { padding: 15px 17px; border-radius: var(--r-card); margin-bottom: 12px; }
+.v2 .rl2-painel .tt { font-size: 12.5px; font-weight: 600; margin-bottom: 13px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.v2 .rl2-painel .tt span { font-size: 11px; color: var(--txt-3); font-weight: 400; }
+.v2 .rl2-g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.v2 .rl2-g3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; margin-bottom: 12px; }
+@media (max-width: 980px) { .v2 .rl2-g2 { grid-template-columns: 1fr; } }
+
+/* vazio compacto (zero ≠ indisponível) */
+.v2 .rl2-vazio { display: flex; gap: 10px; align-items: center; padding: 14px 4px; color: var(--txt-3); }
+.v2 .rl2-vazio .vt { font-size: 12px; font-weight: 600; color: var(--txt-2); }
+.v2 .rl2-vazio .vd { font-size: 11px; margin-top: 2px; line-height: 1.5; }
+
+/* funil (barras horizontais) */
+.v2 .rl2-funil { display: flex; flex-direction: column; gap: 8px; }
+.v2 .rl2-funil .fr { display: grid; grid-template-columns: 130px 1fr 44px; gap: 10px; align-items: center; }
+.v2 .rl2-funil .fn { font-size: 11.5px; color: var(--txt-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .rl2-funil .ft { height: 8px; border-radius: 99px; background: rgba(255, 255, 255, .06); overflow: hidden; }
+.v2 .rl2-funil .ft i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, rgba(255, 255, 255, .55), rgba(255, 255, 255, .25)); }
+.v2 .rl2-funil .fv { font-size: 11.5px; text-align: right; font-variant-numeric: tabular-nums; }
+
+/* donut */
+.v2 .rl2-donut { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+.v2 .rl2-donut .centro { position: relative; width: 132px; height: 132px; flex-shrink: 0; }
+.v2 .rl2-donut .centro .c {
+  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.v2 .rl2-donut .centro .c b { font-size: 18px; font-variant-numeric: tabular-nums; }
+.v2 .rl2-donut .centro .c i { font-style: normal; font-size: 9.5px; color: var(--txt-3); text-transform: uppercase; letter-spacing: .06em; }
+.v2 .rl2-donut .leg { display: flex; flex-direction: column; gap: 6px; min-width: 150px; }
+.v2 .rl2-donut .li { display: flex; align-items: center; gap: 7px; font-size: 11.5px; }
+.v2 .rl2-donut .sw { width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0; }
+.v2 .rl2-donut .ln { flex: 1; color: var(--txt-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .rl2-donut .lv { font-variant-numeric: tabular-nums; }
+.v2 .rl2-donut .lp { color: var(--txt-3); font-variant-numeric: tabular-nums; min-width: 34px; text-align: right; }
+
+/* gargalos */
+.v2 .rl2-gargs { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+.v2 .rl2-garg { padding: 12px 14px; border-radius: 11px; border: 1px solid var(--linha); background: rgba(255, 255, 255, .025); }
+.v2 .rl2-garg.al { border-color: rgba(217, 164, 74, .32); background: var(--ambar-bg); }
+.v2 .rl2-garg .t { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--txt-3); }
+.v2 .rl2-garg.al .t { color: var(--ambar); }
+.v2 .rl2-garg .v { font-size: 15px; font-weight: 600; margin-top: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .rl2-garg .s { font-size: 10.5px; color: var(--txt-3); margin-top: 2px; }
+
+/* tabela de relatório (busca + ordenação + paginação + CSV) */
+.v2 .rl2-tools { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.v2 .rl2-tools .busca { width: 220px; }
+.v2 .rl2-tools .busca .inp { height: 30px; font-size: 11.5px; }
+.v2 .rl2-scroll { overflow-x: auto; }
+.v2 .rl2-tab { width: 100%; border-collapse: collapse; font-size: 12px; }
+.v2 .rl2-tab thead th {
+  text-align: left; font-size: 10px; font-weight: 500; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--txt-3); padding: 7px 11px; border-bottom: 1px solid rgba(255, 255, 255, .08);
+  background: rgba(255, 255, 255, .02); white-space: nowrap; cursor: pointer; user-select: none;
+}
+.v2 .rl2-tab thead th .seta { opacity: .55; margin-left: 4px; font-size: 9px; }
+.v2 .rl2-tab tbody td { padding: 0 11px; height: 38px; border-bottom: 1px solid rgba(255, 255, 255, .045); vertical-align: middle; color: var(--txt-2); white-space: nowrap; }
+.v2 .rl2-tab tbody tr:last-child td { border-bottom: none; }
+.v2 .rl2-tab tbody tr { transition: background .16s; }
+.v2 .rl2-tab tbody tr:hover { background: rgba(255, 255, 255, .032); }
+.v2 .rl2-tab td.nome { color: var(--txt); font-weight: 500; }
+.v2 .rl2-tab th.d, .v2 .rl2-tab td.d { text-align: right; }
+.v2 .rl2-tab th.c, .v2 .rl2-tab td.c { text-align: center; }
+.v2 .rl2-tab td.vazia { text-align: center; color: var(--txt-3); padding: 16px 0; }
+.v2 .rl2-rodape { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 9px; margin-top: 2px; border-top: 1px solid var(--linha); font-size: 11.5px; color: var(--txt-2); flex-wrap: wrap; }
+.v2 .rl2-pag { display: flex; gap: 5px; align-items: center; }
+.v2 .rl2-pag button {
+  min-width: 26px; height: 26px; display: flex; align-items: center; justify-content: center;
+  border: 1px solid rgba(255, 255, 255, .11); border-radius: 6px; font-size: 11.5px; cursor: pointer;
+  color: var(--txt-2); background: none; font-family: var(--fonte);
+}
+.v2 .rl2-pag button:disabled { opacity: .4; cursor: default; }
+.v2 .rl2-perpage { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--txt-3); }
+.v2 .rl2-perpage select { width: auto; height: 26px; font-size: 11px; padding: 0 7px; }
+
+/* aviso de definição sob seção */
+.v2 .rl2-aviso { font-size: 10.5px; color: var(--txt-3); line-height: 1.5; margin: -4px 0 10px; }
+
+/* narrativa (frases determinísticas) */
+.v2 .rl2-narr { margin: 0; padding-left: 16px; display: flex; flex-direction: column; gap: 6px; font-size: 11.5px; color: var(--txt-2); line-height: 1.55; }
+
+/* estat compacta (1 item só não vira gráfico) */
+.v2 .rl2-stat { display: flex; align-items: baseline; gap: 9px; }
+.v2 .rl2-stat .v { font-size: 19px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.v2 .rl2-stat .l { font-size: 11.5px; color: var(--txt-3); }
