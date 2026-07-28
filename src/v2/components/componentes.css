@@ -274,6 +274,8 @@
 /* --- Barras de atividade (anatomia .barv do pg-relatorios) -- */
 .v2 .barras { display: flex; align-items: flex-end; gap: 14px; height: 120px; padding: 0 4px; }
 .v2 .bwrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; justify-content: flex-end; cursor: pointer; background: none; border: none; padding: 0; font-family: var(--fonte); }
+.v2 .bwrap:focus-visible { outline: none; }
+.v2 .bwrap:focus-visible .barv { box-shadow: 0 0 0 2px rgba(255, 255, 255, .35); }
 .v2 .bval { font-size: 10px; color: var(--txt-2); opacity: 0; animation: v2-entra .4s 1s forwards; }
 .v2 .barv {
   width: 100%; max-width: 34px; border-radius: 6px 6px 3px 3px;
@@ -330,6 +332,24 @@
 /* botão destrutivo (confirmações rubras) */
 .v2 .btn-perigo { background: var(--rubro-bg); border-color: rgba(229, 102, 92, .35); color: var(--rubro); }
 .v2 .btn-perigo:hover:not(:disabled) { background: rgba(229, 102, 92, .2); }
+
+/* drawer lateral direito (detalhes) — véu sutil, vidro em altura total */
+.v2 .veu-drawer {
+  position: fixed; inset: 0; z-index: 80;
+  background: rgba(6, 7, 9, .38);
+  animation: v2-veu-entra .2s var(--ease);
+}
+.v2 .drawer-v2 {
+  position: fixed; top: 0; right: 0; bottom: 0; z-index: 81;
+  max-width: 92vw; display: flex; flex-direction: column;
+  border-left: 1px solid var(--linha);
+  background: linear-gradient(180deg, rgba(20, 21, 25, .82), rgba(14, 15, 18, .78));
+  backdrop-filter: blur(22px) saturate(140%);
+  -webkit-backdrop-filter: blur(22px) saturate(140%);
+  box-shadow: -30px 0 80px rgba(0, 0, 0, .5);
+  animation: v2-drawer-entra .28s var(--ease);
+}
+@keyframes v2-drawer-entra { from { transform: translateX(24px); opacity: 0; } }
 
 /* aviso inline (retorno de mutações — substitui os toasts v1) */
 .v2 .aviso-inline {

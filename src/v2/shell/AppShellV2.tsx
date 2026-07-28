@@ -182,7 +182,7 @@ export default function AppShellV2() {
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
                 <circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" />
               </svg>
-              Buscar contatos, conversas, cobranças…<kbd>⌘K</kbd>
+              <span className="busca-texto">Buscar contatos, conversas, cobranças…</span><kbd>⌘K</kbd>
             </div>
             <div className="top-dir">
               <button type="button" className="ib" aria-label="Notificações">

@@ -36,18 +36,19 @@
 }
 .v2 .ag-pill.seq { color: var(--txt); border-color: rgba(255, 255, 255, .28); }
 
-/* painel lateral de detalhes */
-.v2 .ag-painel { position: sticky; top: 0; overflow: hidden; }
-.v2 .ag-painel .cab {
+/* detalhes no drawer lateral (QA: era painel flutuante sobre a tabela) */
+.v2 .drawer-v2 .cab {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 14px; border-bottom: 1px solid var(--linha);
-  font-size: 12.5px; font-weight: 600;
+  padding: 14px 16px; border-bottom: 1px solid var(--linha);
+  font-size: 13px; font-weight: 600; flex-shrink: 0;
 }
-.v2 .ag-painel .fechar-p {
+.v2 .drawer-v2 .fechar-p {
   background: none; border: none; color: var(--txt-3); cursor: pointer;
-  font-size: 15px; padding: 2px 4px; font-family: var(--fonte);
+  font-size: 16px; padding: 2px 5px; font-family: var(--fonte);
 }
-.v2 .ag-painel .corpo { padding: 12px 14px; max-height: calc(100dvh - 260px); overflow-y: auto; }
+.v2 .drawer-v2 .fechar-p:hover { color: var(--txt); }
+.v2 .drawer-v2 .corpo { padding: 13px 16px; flex: 1; min-height: 0; overflow-y: auto; }
+.v2 .drawer-v2 .ag-p-acoes { flex-shrink: 0; }
 .v2 .ag-p-cli { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .v2 .ag-p-cli .nm { font-size: 13px; font-weight: 600; }
 .v2 .ag-p-cli .tel { font-size: 11px; color: var(--txt-2); margin-top: 1px; }
@@ -88,6 +89,7 @@
 }
 .v2 .tl-item:last-child { border-bottom: none; }
 .v2 .tl-item:hover { background: rgba(255, 255, 255, .035); }
+.v2 .tl-item:focus-visible { outline: none; background: rgba(255, 255, 255, .05); box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .3); }
 .v2 .tl-item::before {
   content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px;
   border-radius: 0 3px 3px 0; background: #fff;

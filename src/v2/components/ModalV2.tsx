@@ -60,6 +60,50 @@ export function ModalV2({ aberto, aoFechar, titulo, children, rodape, largura = 
   );
 }
 
+type DrawerV2Props = {
+  aberto: boolean;
+  aoFechar: () => void;
+  children: ReactNode;
+  largura?: number;
+};
+
+/**
+ * Drawer lateral direito v2 — vidro em altura total, véu sutil atrás
+ * (clique fecha), Esc fecha, entrada deslizando da direita. Mesmo portal
+ * com classe `v2` na raiz (regra 10) do ModalV2. O conteúdo (cabeçalho
+ * com X, corpo, ações) é do chamador.
+ */
+export function DrawerV2({ aberto, aoFechar, children, largura = 380 }: DrawerV2Props) {
+  const aoFecharRef = useRef(aoFechar);
+  useEffect(() => { aoFecharRef.current = aoFechar; });
+
+  const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!aberto) return;
+    const el = criarRaizPortalV2(document) as HTMLDivElement;
+    setRaiz(el);
+    return () => { el.remove(); setRaiz(null); };
+  }, [aberto]);
+
+  useEffect(() => {
+    if (!aberto) return;
+    const aoTeclar = (e: KeyboardEvent) => { if (e.key === 'Escape') aoFecharRef.current(); };
+    document.addEventListener('keydown', aoTeclar);
+    return () => document.removeEventListener('keydown', aoTeclar);
+  }, [aberto]);
+
+  if (!aberto || !raiz) return null;
+  return createPortal(
+    <>
+      <div className="veu-drawer" onMouseDown={aoFechar} role="presentation" />
+      <aside className="drawer-v2" style={{ width: largura }} role="dialog" aria-modal="true">
+        {children}
+      </aside>
+    </>,
+    raiz,
+  );
+}
+
 type ConfirmDialogV2Props = {
   aberto: boolean;
   titulo: string;

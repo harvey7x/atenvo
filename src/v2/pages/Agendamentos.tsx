@@ -10,7 +10,7 @@ import {
 } from '@/data/whatsapp';
 import { rangePeriodo, agendaEditavel, agendaReagendavel, statusSequencia, type PeriodoAg } from '@/lib/agendamentoMensagem';
 import {
-  BadgeStatus, BotaoMini, BotaoPrimario, BotaoSec, CardCab, CardVidro, ConfirmDialogV2,
+  BadgeStatus, BotaoMini, BotaoPrimario, BotaoSec, CardCab, CardVidro, ConfirmDialogV2, DrawerV2,
   EstadoErro, EstadoVazio, Input, Kpi, ModalV2, Segmentado, Skeleton, TabelaPadrao, TrilhoItem,
   type Coluna, type TomStatus,
 } from '../components';
@@ -46,17 +46,31 @@ const TIPO_LABEL: Record<string, string> = { texto: 'Texto', imagem: 'Imagem', a
 const tipoLbl = (t: string) => TIPO_LABEL[t] ?? t;
 
 const fmtSP = (iso: string) => new Date(iso).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
-/** Relativo curto ("em 2h", "há 3d") + absoluto tabular na célula Quando. */
+/* Régua do tempo (QA): horizonte CURTO (< 48h) fala relativo primeiro
+   ("em 3h" / "há 45min"); horizonte LONGO (≥ 48h) fala a DATA primeiro e o
+   relativo humanizado vira a linha de apoio — dias até 30d, meses depois.
+   "em 156d" não existe mais. */
+const LIMIAR_RELATIVO_MS = 48 * 3_600_000;
+
 function relTempo(iso: string, agoraMs: number): string {
   const dif = new Date(iso).getTime() - agoraMs;
   const mag = Math.abs(dif);
-  const um = (n: number, u: string) => `${n}${u}`;
-  const txt = mag < 60_000 ? 'agora'
-    : mag < 3_600_000 ? um(Math.round(mag / 60_000), 'min')
-    : mag < 86_400_000 ? um(Math.round(mag / 3_600_000), 'h')
-    : um(Math.round(mag / 86_400_000), 'd');
-  if (txt === 'agora') return 'agora';
-  return dif > 0 ? `em ${txt}` : `há ${txt}`;
+  const pref = (t: string) => (dif > 0 ? `em ${t}` : `há ${t}`);
+  if (mag < 60_000) return 'agora';
+  if (mag < 3_600_000) return pref(`${Math.round(mag / 60_000)}min`);
+  if (mag < 86_400_000) return pref(`${Math.round(mag / 3_600_000)}h`);
+  const dias = Math.round(mag / 86_400_000);
+  if (dias <= 30) return pref(`${dias} dia${dias === 1 ? '' : 's'}`);
+  const meses = Math.round(dias / 30);
+  return pref(`${meses} ${meses === 1 ? 'mês' : 'meses'}`);
+}
+
+/** Célula Quando: {principal, apoio} conforme a régua do horizonte. */
+function quandoCelula(iso: string, agoraMs: number): { principal: string; apoio: string } {
+  const mag = Math.abs(new Date(iso).getTime() - agoraMs);
+  const abs = fmtSP(iso);
+  const rel = relTempo(iso, agoraMs);
+  return mag < LIMIAR_RELATIVO_MS ? { principal: rel, apoio: abs } : { principal: abs, apoio: rel };
 }
 
 /** Um agendamento operacional: mensagem avulsa OU uma sequência inteira (agrupada) — como no v1. */
@@ -372,7 +386,7 @@ export default function AgendamentosV2() {
     { chave: 'canal', titulo: 'Canal', render: (g) => g.nomeCanal ? <em className="ag-pill">{g.nomeCanal}</em> : '—' },
     { chave: 'tipo', titulo: 'Tipo', render: (g) => <em className={g.ehSequencia ? 'ag-pill seq num' : 'ag-pill'}>{g.ehSequencia ? `Sequência · ${g.count}` : tipoLbl(g.primeiro.tipo)}</em> },
     { chave: 'at', titulo: 'Atendente', render: (g) => nomePorId(g.criadoPor) ?? <span style={{ color: 'var(--txt-3)' }}>—</span> },
-    { chave: 'quando', titulo: 'Quando', dir: true, render: (g) => <div className="ag-quando"><div className="qdo-rel">{relTempo(g.primeiro.executarEm, agora)}</div><div className="qdo-abs num">{fmtSP(g.primeiro.executarEm)}</div></div> },
+    { chave: 'quando', titulo: 'Quando', dir: true, render: (g) => { const q = quandoCelula(g.primeiro.executarEm, agora); return <div className="ag-quando"><div className="qdo-rel num">{q.principal}</div><div className="qdo-abs num">{q.apoio}</div></div>; } },
     { chave: 'status', titulo: 'Status', render: (g) => { const st = stMeta(g.statusGeral); return <BadgeStatus tom={st.tom}>{st.label}</BadgeStatus>; } },
     { chave: 'tent', titulo: 'Tent.', dir: true, classe: 'num', render: (g) => g.tentativas },
   ];
@@ -462,7 +476,7 @@ export default function AgendamentosV2() {
             </div>
           )}
 
-          <div className={sel ? 'ag-main com-painel' : 'ag-main'}>
+          <div className="ag-main">
             {ehPainel ? (
               <div className="pc-coluna">
                 <div className="kpis sobe" style={{ marginBottom: 0, animationDelay: '.12s' }}>
@@ -548,7 +562,7 @@ export default function AgendamentosV2() {
                 </div>
               </div>
             ) : (
-            <CardVidro spot={!sel} sobe style={{ borderRadius: 12, animationDelay: '.12s' }}>
+            <CardVidro spot sobe style={{ borderRadius: 12, animationDelay: '.12s' }}>
               {filtrados.length === 0 ? (
                 grupos.length === 0 ? (
                   <EstadoVazio
@@ -591,7 +605,7 @@ export default function AgendamentosV2() {
               const podeEditar = !sel.ehSequencia && agendaEditavel(item.status);
               const podeReagendar = !sel.ehSequencia && agendaReagendavel(item.status);
               return (
-                <CardVidro className="ag-painel" aria-label="Detalhes do agendamento">
+                <DrawerV2 aberto aoFechar={() => setSelKey(null)}>
                   <div className="cab">
                     Detalhes do agendamento
                     <button type="button" className="fechar-p" aria-label="Fechar" onClick={() => setSelKey(null)}>×</button>
@@ -663,7 +677,7 @@ export default function AgendamentosV2() {
                       {podeCancelarSeq && <button type="button" className="p-btn btn-perigo btn-mini" onClick={() => pedirCancelarSequencia(sel)}>Cancelar pendentes</button>}
                     </div>
                   )}
-                </CardVidro>
+                </DrawerV2>
               );
             })()}
           </div>
