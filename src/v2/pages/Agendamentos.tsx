@@ -15,6 +15,7 @@ import {
   type Coluna, type TomStatus,
 } from '../components';
 import { AgendarMensagemModalV2, type AgendarSubmit, type CanalOpcao } from './AgendarMensagemModalV2';
+import { dataHoraSP as fmtSP, tempoCelula as quandoCelula } from '../lib/tempo';
 import './agendamentos.css';
 
 /* ------------------------------------------------------------------
@@ -44,34 +45,6 @@ const ST_META: Record<string, { label: string; tom: TomStatus }> = {
 const stMeta = (s: string) => ST_META[s] ?? { label: s, tom: 'neutro' as TomStatus };
 const TIPO_LABEL: Record<string, string> = { texto: 'Texto', imagem: 'Imagem', audio: 'Áudio', video: 'Vídeo', documento: 'Documento', texto_midia: 'Texto + mídia' };
 const tipoLbl = (t: string) => TIPO_LABEL[t] ?? t;
-
-const fmtSP = (iso: string) => new Date(iso).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
-/* Régua do tempo (QA): horizonte CURTO (< 48h) fala relativo primeiro
-   ("em 3h" / "há 45min"); horizonte LONGO (≥ 48h) fala a DATA primeiro e o
-   relativo humanizado vira a linha de apoio — dias até 30d, meses depois.
-   "em 156d" não existe mais. */
-const LIMIAR_RELATIVO_MS = 48 * 3_600_000;
-
-function relTempo(iso: string, agoraMs: number): string {
-  const dif = new Date(iso).getTime() - agoraMs;
-  const mag = Math.abs(dif);
-  const pref = (t: string) => (dif > 0 ? `em ${t}` : `há ${t}`);
-  if (mag < 60_000) return 'agora';
-  if (mag < 3_600_000) return pref(`${Math.round(mag / 60_000)}min`);
-  if (mag < 86_400_000) return pref(`${Math.round(mag / 3_600_000)}h`);
-  const dias = Math.round(mag / 86_400_000);
-  if (dias <= 30) return pref(`${dias} dia${dias === 1 ? '' : 's'}`);
-  const meses = Math.round(dias / 30);
-  return pref(`${meses} ${meses === 1 ? 'mês' : 'meses'}`);
-}
-
-/** Célula Quando: {principal, apoio} conforme a régua do horizonte. */
-function quandoCelula(iso: string, agoraMs: number): { principal: string; apoio: string } {
-  const mag = Math.abs(new Date(iso).getTime() - agoraMs);
-  const abs = fmtSP(iso);
-  const rel = relTempo(iso, agoraMs);
-  return mag < LIMIAR_RELATIVO_MS ? { principal: rel, apoio: abs } : { principal: abs, apoio: rel };
-}
 
 /** Um agendamento operacional: mensagem avulsa OU uma sequência inteira (agrupada) — como no v1. */
 interface Grupo {

@@ -35,6 +35,12 @@
    reporte: o que foi recriado, o que a página antiga tinha que o mockup não
    mostrava (e como você resolveu), e o que ficou pendente. Aguarde aprovação.
 
+## Adendo nº 2 — régua do tempo
+Tempo em célula/etiqueta usa `src/v2/lib/tempo.ts`: horizonte curto
+(< 48h) fala o relativo primeiro ("em 3h") com a data de apoio; horizonte
+longo fala a data primeiro (dd/mm/aa, hh:mm SP) com o relativo humanizado
+de apoio (dias até 30, meses depois). Sempre tabular-nums.
+
 ## Manual de extensão (páginas sem mockup)
 - Cabeçalho de página: título + subtítulo à esquerda, ações à direita
   (padrão .ph do mockup). Máximo um botão primário por tela.

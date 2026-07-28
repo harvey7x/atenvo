@@ -1,0 +1,90 @@
+/* ============================================================
+   Scripts — órfã (sem mockup). Manual de extensão: lista/gestão
+   (chips + tabela padrão) + detalhe em DrawerV2 + editor em
+   ModalV2 com preview em bolhas. Sem cor nova: canais como pills.
+   ============================================================ */
+
+/* barra de filtros: chips de categoria + canal + favoritos, busca à direita */
+.v2 .scr-filtros { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 13px; flex-wrap: wrap; }
+.v2 .scr-filtros .chips { margin-bottom: 0; }
+.v2 .scr-busca { margin-left: auto; width: 280px; flex-shrink: 0; }
+
+/* célula do script */
+.v2 .scr-titulo .nm { color: var(--txt); font-weight: 500; display: flex; align-items: center; gap: 6px; }
+.v2 .scr-titulo .ds { font-size: 10.5px; color: var(--txt-3); margin-top: 1px; }
+.v2 .scr-previa { display: block; max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--txt-2); }
+.v2 .scr-estrela { color: var(--ambar); display: inline-flex; }
+.v2 .scr-estrela svg { width: 12px; height: 12px; }
+
+/* estrela clicável na linha */
+.v2 .scr-fav {
+  background: none; border: none; cursor: pointer; padding: 3px;
+  color: var(--txt-3); display: inline-flex; border-radius: 6px;
+}
+.v2 .scr-fav.on { color: var(--ambar); }
+.v2 .scr-fav:hover { color: var(--txt); }
+.v2 .scr-fav.on:hover { color: var(--ambar); }
+.v2 .scr-fav svg { width: 14px; height: 14px; }
+.v2 .scr-fav:focus-visible { outline: none; box-shadow: 0 0 0 2px rgba(255, 255, 255, .35); }
+
+/* drawer de detalhe */
+.v2 .scr-det-acoes { display: flex; gap: 6px; flex-wrap: wrap; padding: 11px 16px; border-top: 1px solid var(--linha); flex-shrink: 0; }
+.v2 .scr-conteudo {
+  font-size: 12px; line-height: 1.55; white-space: pre-wrap; word-break: break-word;
+  border: 1px solid var(--linha); border-radius: 10px; padding: 10px 12px; color: var(--txt);
+}
+.v2 .scr-ponte {
+  display: flex; gap: 8px; align-items: flex-start; font-size: 11px; line-height: 1.5;
+  color: var(--verde); background: var(--verde-bg); border: 1px solid rgba(74, 190, 140, .26);
+  border-radius: 9px; padding: 7px 10px;
+}
+.v2 .scr-ponte.off { color: var(--txt-3); background: rgba(255, 255, 255, .03); border-color: var(--linha); }
+
+/* editor (builder) */
+.v2 .scr-builder { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 16px; }
+.v2 .scr-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.v2 .scr-etapa { border: 1px solid var(--linha); border-radius: 11px; padding: 10px 11px; }
+.v2 .scr-etapa-cab { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.v2 .scr-etapa-cab strong { font-size: 11.5px; font-weight: 600; }
+.v2 .scr-etapa-acoes { margin-left: auto; display: flex; gap: 3px; }
+.v2 .scr-etapa-acoes button {
+  width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
+  background: rgba(255, 255, 255, .04); border: 1px solid rgba(255, 255, 255, .1);
+  border-radius: 6px; color: var(--txt-2); cursor: pointer; font-size: 11px; font-family: var(--fonte);
+}
+.v2 .scr-etapa-acoes button:hover:not(:disabled) { color: var(--txt); background: rgba(255, 255, 255, .08); }
+.v2 .scr-etapa-acoes button:disabled { opacity: .35; cursor: default; }
+.v2 .scr-add-etapas { display: flex; gap: 6px; flex-wrap: wrap; }
+.v2 .scr-canais { display: flex; gap: 8px; }
+.v2 .scr-caracteres { font-size: 10px; color: var(--txt-3); text-align: right; margin-top: 4px; }
+
+/* chips de variáveis */
+.v2 .scr-vars { display: flex; gap: 5px; flex-wrap: wrap; }
+.v2 .scr-var {
+  font-family: ui-monospace, monospace; font-size: 10px; color: var(--txt-2);
+  background: rgba(255, 255, 255, .045); border: 1px solid rgba(255, 255, 255, .11);
+  border-radius: 6px; padding: 3px 7px; cursor: pointer;
+}
+.v2 .scr-var:hover { color: var(--txt); border-color: rgba(255, 255, 255, .28); }
+
+/* mídia na etapa */
+.v2 .scr-midia img, .v2 .scr-midia video { max-width: 100%; border-radius: 8px; display: block; margin-bottom: 8px; }
+.v2 .scr-midia audio { width: 100%; margin-bottom: 8px; }
+.v2 .scr-midia-meta { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--txt-2); margin-bottom: 8px; }
+.v2 .scr-midia-meta .nome { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--txt); }
+
+/* preview em bolhas (uma anatomia; Messenger é rótulo, não cor nova) */
+.v2 .scr-preview { border-left: 1px solid var(--linha); padding-left: 16px; display: flex; flex-direction: column; min-width: 0; }
+.v2 .scr-pv-cab { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.v2 .scr-pv-cab .caps { font-size: 9.5px; }
+.v2 .scr-chat { flex: 1; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; max-height: 380px; }
+.v2 .scr-chat .bolha {
+  align-self: flex-end; max-width: 92%; font-size: 12px; line-height: 1.45; padding: 8px 12px;
+  border-radius: 12px; border-bottom-right-radius: 4px;
+  background: rgba(255, 255, 255, .11); border: 1px solid rgba(255, 255, 255, .17);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1); word-break: break-word; white-space: pre-wrap;
+}
+.v2 .scr-chat .bolha .hh { font-size: 9.5px; margin-top: 4px; text-align: right; color: var(--txt-3); white-space: nowrap; }
+.v2 .scr-chat .bolha img, .v2 .scr-chat .bolha video { max-width: 100%; border-radius: 8px; display: block; }
+.v2 .scr-chat .vazio-pv { font-size: 11.5px; color: var(--txt-3); align-self: flex-end; }
+.v2 .scr-pv-canal { font-size: 10.5px; color: var(--txt-3); margin-top: 10px; text-align: right; }

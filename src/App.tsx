@@ -35,6 +35,7 @@ const RequireRoleV2 = lazy(() => import('@/v2/guards/RequireRoleV2'));
 const PlanoUsoV2 = lazy(() => import('@/v2/pages/PlanoUso'));
 const CobrancasV2 = lazy(() => import('@/v2/pages/Cobrancas'));
 const AgendamentosV2 = lazy(() => import('@/v2/pages/Agendamentos'));
+const ScriptsV2 = lazy(() => import('@/v2/pages/Scripts'));
 const RedefinirSenhaV2 = lazy(() => import('@/v2/pages/RedefinirSenha'));
 const DefinirSenhaV2 = lazy(() => import('@/v2/pages/DefinirSenha'));
 const AlterarSenhaV2 = lazy(() => import('@/v2/pages/AlterarSenha'));
@@ -224,7 +225,14 @@ const routes: RouteObject[] = [
                       ),
                     },
                     emConstrucao('contatos', 'Contatos', 'Todos os contatos da organização.'),
-                    emConstrucao('scripts', 'Scripts', 'Biblioteca de scripts e mídias.'),
+                    {
+                      path: 'scripts',
+                      element: (
+                        <Suspense fallback={null}>
+                          <ScriptsV2 />
+                        </Suspense>
+                      ),
+                    },
                     {
                       path: 'cobrancas',
                       element: (
