@@ -256,3 +256,54 @@
   .v2 .apres-bloco.on .eb i { animation: none; }
   .v2 .apres-prog i.atual::after { animation: none; transform: scaleX(1); }
 }
+
+/* ============================================================
+   v2.2 — CORTINA DE ENTRADA (exclusiva de Relatórios; Adendo
+   nº 5). Overlay na cor base sobre o palco; beats curtos;
+   dissolve com a luz subindo. Durações escalam com --fx.
+   ============================================================ */
+.v2 .rl2-raiz { position: relative; }
+.v2 .rl2-cortina {
+  position: absolute; inset: 0; z-index: 60; background: var(--base);
+  display: flex; align-items: center; justify-content: center; overflow: hidden;
+  min-height: calc(100vh - 120px);
+}
+.v2 .rl2-cortina.dissolve { animation: rl2-cortina-sai calc(.8s * var(--fx, 1)) var(--ease) forwards; }
+.v2 .rl2-cortina.pulo { animation: rl2-cortina-sai .28s var(--ease) forwards; }
+@keyframes rl2-cortina-sai { to { opacity: 0; visibility: hidden; } }
+.v2 .rl2-cortina.dissolve::after {
+  content: ''; position: absolute; inset: -30% 0; pointer-events: none;
+  background: radial-gradient(60% 40% at 50% 100%, rgba(255, 255, 255, .16), transparent 70%);
+  animation: rl2-luz-sobe calc(.8s * var(--fx, 1)) var(--ease) forwards;
+}
+@keyframes rl2-luz-sobe { from { transform: translateY(35%); opacity: 0; } 40% { opacity: 1; } to { transform: translateY(-45%); opacity: 0; } }
+
+.v2 .rl2-cortina-conteudo { text-align: center; padding: 0 24px; }
+.v2 .rl2-cortina-eyebrow {
+  font-size: 12px; font-weight: 600; text-transform: uppercase; color: var(--txt-3);
+  letter-spacing: .34em; opacity: 0;
+  animation: rl2-eyebrow calc(.9s * var(--fx, 1)) var(--ease) forwards;
+}
+@keyframes rl2-eyebrow { from { opacity: 0; letter-spacing: .12em; } to { opacity: 1; letter-spacing: .34em; } }
+.v2 .rl2-cortina-titulo {
+  margin-top: 14px; font-size: clamp(34px, 5vw, 52px); font-weight: 600; line-height: 1.1;
+  letter-spacing: -.01em;
+  background: linear-gradient(92deg, #FFF, #C9CDD4); -webkit-background-clip: text; background-clip: text; color: transparent;
+  opacity: 0; animation: rl2-titulo calc(1s * var(--fx, 1)) var(--ease) .15s forwards;
+}
+@keyframes rl2-titulo { from { opacity: 0; transform: translateY(10px); letter-spacing: -.045em; } to { opacity: 1; transform: none; letter-spacing: -.01em; } }
+
+.v2 .rl2-cortina-herois { display: flex; gap: 54px; justify-content: center; margin-top: 40px; flex-wrap: wrap; }
+.v2 .rl2-cortina-heroi { opacity: 0; animation: rl2-heroi calc(.6s * var(--fx, 1)) var(--ease) forwards; }
+.v2 .rl2-cortina-heroi:nth-child(2) { animation-delay: .12s; }
+.v2 .rl2-cortina-heroi:nth-child(3) { animation-delay: .24s; }
+@keyframes rl2-heroi { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+.v2 .rl2-cortina-heroi .hv {
+  font-size: clamp(30px, 3.6vw, 42px); font-weight: 600; letter-spacing: -.02em;
+  background: linear-gradient(92deg, #FFF, #C9CDD4); -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.v2 .rl2-cortina-heroi .hr { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--txt-3); margin-top: 6px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .v2 .rl2-cortina-eyebrow, .v2 .rl2-cortina-titulo, .v2 .rl2-cortina-heroi { animation: none; opacity: 1; transform: none; }
+}

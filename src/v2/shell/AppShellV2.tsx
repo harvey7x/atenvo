@@ -11,6 +11,7 @@ import { ICONES } from './icones';
 import { NotificacaoResposta, type DadosNotificacao } from './NotificacaoResposta';
 import { IntroEntrada } from './IntroEntrada';
 import { decidirIntroNaChegada } from './intro';
+import { pedirReplayCortina } from '../pages/relatoriosCortina';
 
 /* Navegação real do app (INVENTARIO.md + decisões aprovadas):
    Relacionamento fica fora (adiada); Facebook, Scripts e Maturação são
@@ -164,6 +165,9 @@ export default function AppShellV2() {
               </button>
               <button type="button" className="p-btn btn-sec btn-mini" onClick={replayIntro}>
                 Replay intro
+              </button>
+              <button type="button" className="p-btn btn-sec btn-mini" onClick={() => { pedirReplayCortina(); navigate('/v2/relatorios'); }}>
+                Replay cortina
               </button>
             </div>
           )}

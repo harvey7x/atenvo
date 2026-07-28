@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useOrg } from '@/context/OrgContext';
@@ -14,6 +14,8 @@ import {
   BotaoSec, CardVidro, Chip, EstadoVazio, Input, Segmentado,
 } from '../components';
 import RelatoriosApresentacao from './RelatoriosApresentacao';
+import CortinaRelatorios, { type HeroiCortina } from './CortinaRelatorios';
+import { decidirCortina, EVENTO_REPLAY_CORTINA } from './relatoriosCortina';
 import './relatorios.css';
 
 /* ------------------------------------------------------------------
@@ -577,6 +579,55 @@ export default function RelatoriosV2() {
   function limpar() { setF({ ...FILTROS_PADRAO, ...(ehAtendente && user ? { responsavel: user.id } : {}) }); }
 
   const [apresentar, setApresentar] = useState(false);
+
+  // v2.2 — cortina de entrada (exclusiva desta página; Adendo nº 5).
+  // Decisão na montagem, com cooldown por usuário/página; reduced-motion
+  // pula direto (o timestamp já foi registrado na decisão positiva).
+  const [cortina, setCortina] = useState(() => {
+    const roda = decidirCortina(user?.id ?? 'anon');
+    if (!roda) return false;
+    return !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  });
+  // agregados dos números-herói: MESMOS hooks/queryKeys da AbaResumo
+  // (cache compartilhado; enabled só enquanto o pano está fechado no real)
+  // replay de dev com a página já aberta (o botão do shell dispara o evento)
+  useEffect(() => {
+    const rodaDeNovo = () => setCortina(!window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    window.addEventListener(EVENTO_REPLAY_CORTINA, rodaDeNovo);
+    return () => window.removeEventListener(EVENTO_REPLAY_CORTINA, rodaDeNovo);
+  }, []);
+  const cortinaResumoQ = useResumo(f);
+  const cortinaCxQ = useConexoes(f, !demo && cortina);
+  const heroisCortina: HeroiCortina[] | null = useMemo(() => {
+    if (!cortina) return null;
+    if (demo) {
+      if (!seed) return null;
+      const pessoas = seed.conexoes.reduce((s, l) => s + l.pessoasQueChamaram, 0);
+      const clientes = seed.resumo.oportunidadesFechadas.atual;
+      return [
+        { rotulo: 'Receita recebida', valor: seed.resumo.receitaRecebida.atual, fmt: fmtBRL },
+        { rotulo: 'Clientes fechados', valor: clientes, fmt: fmtInt },
+        { rotulo: 'Taxa de conversão', valor: pessoas > 0 ? (clientes / pessoas) * 100 : 0, fmt: fmtPct },
+      ];
+    }
+    if (!cortinaResumoQ.data || !cortinaCxQ.data) return null; // herói só REAL — nunca placeholder
+    const pessoas = cortinaCxQ.data.reduce((s, l) => s + l.pessoasQueChamaram, 0);
+    const clientes = cortinaResumoQ.data.oportunidadesFechadas.atual;
+    return [
+      { rotulo: 'Receita recebida', valor: cortinaResumoQ.data.receitaRecebida.atual, fmt: fmtBRL },
+      { rotulo: 'Clientes fechados', valor: clientes, fmt: fmtInt },
+      { rotulo: 'Taxa de conversão', valor: pessoas > 0 ? (clientes / pessoas) * 100 : 0, fmt: fmtPct },
+    ];
+  }, [cortina, demo, seed, cortinaResumoQ.data, cortinaCxQ.data]);
+  const rotuloCortina = useMemo(() => {
+    if (f.preset === 'mes_atual' || f.preset === 'mes_anterior') {
+      const d = new Date(periodo.iniDate + 'T12:00:00');
+      const m = d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+      return m.charAt(0).toUpperCase() + m.slice(1);
+    }
+    if (f.preset === 'custom') return periodo.label;
+    return PRESETS.find((x) => x.id === f.preset)?.label ?? periodo.label;
+  }, [f.preset, periodo.iniDate, periodo.label]);
   const dadosApresDemo = useMemo(() => {
     if (!demo || !seed) return null;
     const soma = (k: keyof ConexaoLinha) => seed.conexoes.reduce((s, l) => s + ((l[k] as number) || 0), 0);
@@ -616,7 +667,8 @@ export default function RelatoriosV2() {
   ].join(' · ');
 
   return (
-    <>
+    <div className="rl2-raiz">
+      <div key={cortina ? 'sob-pano' : 'palco'}>
       <div className="ph sobe">
         <div>
           <h2>Relatórios</h2>
@@ -713,7 +765,16 @@ export default function RelatoriosV2() {
       {aba === 'atendimento' && <AbaAtendimento f={f} demo={demo} seed={seed} periodoLabel={periodo.label} orgNome={currentOrg.name} ehAtendente={ehAtendente} />}
       {aba === 'financeiro' && <AbaFinanceiro f={f} demo={demo} seed={seed} />}
       {aba === 'detalhamento' && <AbaDetalhamento f={f} demo={demo} seed={seed} periodoLabel={periodo.label} orgNome={currentOrg.name} ehAtendente={ehAtendente} onNav={navigate} />}
-    </>
+      </div>
+      {cortina && (
+        <CortinaRelatorios
+          periodoRotulo={rotuloCortina}
+          herois={heroisCortina}
+          erro={!demo && (cortinaResumoQ.isError || cortinaCxQ.isError)}
+          aoTerminar={() => setCortina(false)}
+        />
+      )}
+    </div>
   );
 }
 
