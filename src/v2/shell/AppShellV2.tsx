@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useOrg } from '@/context/OrgContext';
@@ -9,6 +9,7 @@ import './shell.css';
 import { instalarSpotlight } from '../lib/spotlight';
 import { ICONES } from './icones';
 import { NotificacaoResposta, type DadosNotificacao } from './NotificacaoResposta';
+import { useNotificacaoInbound } from '../hooks/useNotificacaoInbound';
 
 /* Navegação real do app (INVENTARIO.md + decisões aprovadas):
    Relacionamento fica fora (adiada); Facebook, Scripts e Maturação são
@@ -75,20 +76,28 @@ export default function AppShellV2() {
 
   useEffect(() => instalarSpotlight(), []);
 
-  const [notif, setNotif] = useState<DadosNotificacao | null>(null);
+  const [notif, setNotif] = useState<(DadosNotificacao & { conversaId?: string }) | null>(null);
   const [sinoOn, setSinoOn] = useState(false);
   const [badgePop, setBadgePop] = useState(0);
+  const seqRef = useRef(0);
   const fecharNotif = useCallback(() => setNotif(null), []);
 
+  // Fiação realtime (dívida da 1b, quitada na sessão do WhatsApp): o feed
+  // postgres_changes já usado pelo app alimenta o toast — só mensagem de
+  // cliente, nunca com a conversa aberta e focada; badge pulsa a cada inbound.
+  useNotificacaoInbound({
+    aoBadge: useCallback(() => { setBadgePop((n) => n + 1); setSinoOn(true); }, []),
+    aoNotificar: useCallback((d) => {
+      seqRef.current += 1;
+      setNotif({ ...d, seq: seqRef.current });
+    }, []),
+  });
 
-  // Botão interno de simulação (decisão aprovada, item 8): só o visual,
-  // disparado à mão — a fiação realtime entra na sessão do WhatsApp.
-  // seq nova a cada disparo: reinicia o timer e a barra de progresso.
+  // Botão de simulação (DEV): segue como fallback de demonstração do visual.
   function simularResposta() {
-    setBadgePop((n) => {
-      setNotif({ ...NOTIF_DEMO, seq: n + 1 });
-      return n + 1;
-    });
+    seqRef.current += 1;
+    setNotif({ ...NOTIF_DEMO, seq: seqRef.current });
+    setBadgePop((n) => n + 1);
     setSinoOn(true);
   }
 
@@ -187,8 +196,9 @@ export default function AppShellV2() {
             dados={notif}
             aoFechar={fecharNotif}
             aoVerConversa={() => {
+              const alvo = notif?.conversaId;
               fecharNotif();
-              navigate('/v2/whatsapp');
+              navigate(alvo ? `/v2/whatsapp?conversa=${encodeURIComponent(alvo)}` : '/v2/whatsapp');
             }}
           />
         </main>
