@@ -349,6 +349,19 @@
   box-shadow: -30px 0 80px rgba(0, 0, 0, .5);
   animation: v2-drawer-entra .28s var(--ease);
 }
+/* anatomia interna do drawer — cab/fechar/corpo (promovida de agendamentos.css:
+   pertence ao componente; page-scoped, o drawer abria cru em load direto de outra página) */
+.v2 .drawer-v2 .cab {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px; border-bottom: 1px solid var(--linha);
+  font-size: 13px; font-weight: 600; flex-shrink: 0;
+}
+.v2 .drawer-v2 .fechar-p {
+  background: none; border: none; color: var(--txt-3); cursor: pointer;
+  font-size: 16px; padding: 2px 5px; font-family: var(--fonte);
+}
+.v2 .drawer-v2 .fechar-p:hover { color: var(--txt); }
+.v2 .drawer-v2 .corpo { padding: 13px 16px; flex: 1; min-height: 0; overflow-y: auto; }
 @keyframes v2-drawer-entra { from { transform: translateX(24px); opacity: 0; } }
 
 /* aviso inline (retorno de mutações — substitui os toasts v1) */

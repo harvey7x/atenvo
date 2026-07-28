@@ -6,19 +6,20 @@ import {
   useScriptEtapaMutations, fetchEtapas, urlAssinadaAnexo, formatarTamanho, substituirVariaveis, SCRIPT_VARIAVEIS,
   type Script, type ScriptCategoria, type EtapaItem, type EtapaTipo,
 } from '@/data/scripts';
+import { useScriptsResumoEtapas, type ResumoEtapas } from '../hooks/scriptsResumo';
 import {
   BadgeStatus, BotaoMini, BotaoPrimario, BotaoSec, CardVidro, Chip, Chips, ConfirmDialogV2,
-  DrawerV2, EstadoErro, EstadoVazio, Input, LinhaToggle, ModalV2, Skeleton, TabelaPadrao,
-  type Coluna,
+  DrawerV2, EstadoErro, EstadoVazio, Input, LinhaToggle, ModalV2, Segmentado, Skeleton,
 } from '../components';
 import './scripts.css';
 
 /* ------------------------------------------------------------------
-   Scripts v2 — órfã (sem mockup), manual de extensão: lista/gestão
-   em chips + TabelaPadrao, detalhe em DrawerV2, editor em ModalV2.
-   Funcional de src/pages/Scripts.tsx (somente leitura). Os scripts
-   ativos alimentam as respostas rápidas do atendimento (WhatsApp/
-   Facebook) — a ponte fica visível no drawer e no subtítulo.
+   Scripts v2.1 — ARSENAL: o conteúdo é a interface. Galeria de cards
+   que mostram o script como bolha de mensagem (favoritos no topo,
+   seções por categoria); detalhe em DrawerV2 com a sequência inteira;
+   editor em ModalV2. Funcional de src/pages/Scripts.tsx (somente
+   leitura). Os scripts ativos alimentam as respostas rápidas do
+   atendimento — a ponte fica visível no drawer e no subtítulo.
    ------------------------------------------------------------------ */
 
 const TIPO_LABEL: Record<EtapaTipo, string> = { texto: 'Texto', imagem: 'Imagem', audio: 'Áudio', video: 'Vídeo', documento: 'Documento' };
@@ -42,6 +43,17 @@ const Estrela = ({ cheia }: { cheia: boolean }) => cheia
   ? <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="m12 2 2.9 6.3 6.8.7-5.1 4.6 1.4 6.7L12 17.8 6 21l1.4-6.7L2.3 9.7l6.8-.7z" /></svg>
   : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden><path d="m12 3 2.7 5.8 6.3.7-4.7 4.3 1.3 6.2L12 17.9 6.1 20l1.3-6.2-4.7-4.3 6.3-.7z" /></svg>;
 
+/** Realce tipográfico das {{variáveis}} — o v1 mostra o texto cru na lista,
+    então aqui só destacamos, sem substituir (substituição fica no preview). */
+function DestacaVars({ texto }: { texto: string }) {
+  return <>{texto.split(/(\{\{[^}]+\}\})/g).map((p, i) => /^\{\{[^}]+\}\}$/.test(p) ? <em className="var-hl" key={i}>{p}</em> : p)}</>;
+}
+function variaveisDe(textos: string[]): string[] {
+  const achadas = new Set<string>();
+  for (const t of textos) for (const m of t.matchAll(/\{\{[^}]+\}\}/g)) achadas.add(m[0]);
+  return Array.from(achadas);
+}
+
 type Step = EtapaItem & { previewUrl?: string };
 type Aviso = { tom: 'ok' | 'erro'; texto: string } | null;
 
@@ -64,11 +76,16 @@ function seedScripts(): { scripts: Script[]; etapas: Record<string, EtapaItem[]>
     mk(4, { titulo: 'Agradecimento pós-fechamento', categoriaId: 'cat-3', conteudo: 'Obrigado pela confiança, {{nome_cliente}}! A {{nome_empresa}} segue à disposição. Vou te acompanhando por aqui.', canais: ['whatsapp', 'facebook'] }),
     mk(5, { titulo: 'Retomada de conversa parada', categoriaId: null, conteudo: 'Oi, {{primeiro_nome_cliente}}! Passando para saber se ficou alguma dúvida da nossa última conversa.', tags: ['follow-up'] }),
     mk(6, { titulo: 'Mensagem fora do horário', categoriaId: 'cat-1', ativo: false, conteudo: 'Recebemos sua mensagem! Nosso atendimento é de segunda a sexta, das 9h às 18h — te respondemos no próximo horário.', canais: ['facebook'] }),
+    // script só-mídia (conteudo vazio no v1): o card do arsenal mostra tipo+nome, nunca "—"
+    mk(7, { titulo: 'Vídeo · como conferir descontos', categoriaId: 'cat-2', conteudo: '', tags: ['inss'] }),
   ];
   const etapas: Record<string, EtapaItem[]> = Object.fromEntries(scripts.map((s) => [s.id, [{ tipo: 'texto' as EtapaTipo, conteudo: s.conteudo }]]));
   etapas['scr-3'] = [
     { tipo: 'texto', conteudo: 'Segue o passo a passo para conferir os descontos no aplicativo Meu INSS. Qualquer dúvida me chama por aqui.' },
     { tipo: 'documento', conteudo: '', nome: 'passo-a-passo.pdf', tamanho: 182_000 },
+  ];
+  etapas['scr-7'] = [
+    { tipo: 'video', conteudo: '', nome: 'como-conferir-descontos.mp4', tamanho: 4_800_000 },
   ];
   return { scripts, etapas };
 }
@@ -80,6 +97,7 @@ export default function ScriptsV2() {
 
   const scriptsQ = useScripts();
   const catsQ = useScriptCategorias();
+  const resumoQ = useScriptsResumoEtapas();
   const mut = useScriptMutations();
   const catMut = useScriptCategoriaMutations();
   const etapaMut = useScriptEtapaMutations();
@@ -90,6 +108,18 @@ export default function ScriptsV2() {
   const cats: ScriptCategoria[] = demo ? demoCats : (catsQ.data ?? []);
   const carregando = !demo && scriptsQ.isLoading;
   const erro = !demo && scriptsQ.isError;
+
+  // resumo de etapas por script (cards): real via hook-espelho, demo derivado do seed
+  const resumo: Record<string, ResumoEtapas> = useMemo(() => {
+    if (!demo) return resumoQ.data ?? {};
+    const map: Record<string, ResumoEtapas> = {};
+    for (const [id, ets] of Object.entries(demoDados.etapas)) {
+      const m: ResumoEtapas = { total: ets.length, temMidia: ets.some((e) => e.tipo !== 'texto') };
+      if (ets[0]) m.primeira = { tipo: ets[0].tipo, nome: ets[0].nome ?? null };
+      map[id] = m;
+    }
+    return map;
+  }, [demo, demoDados.etapas, resumoQ.data]);
 
   // filtros — os mesmos do v1 (categoria, canal, favoritos, busca debounced 250ms)
   const [cat, setCat] = useState('all');
@@ -107,11 +137,17 @@ export default function ScriptsV2() {
     return true;
   }), [scripts, cat, favOnly, canalFiltro, busca]);
 
-  const canalContagem = useMemo(() => {
-    const c: Record<CanalFiltro, number> = { todos: scripts.length, whatsapp: 0, facebook: 0, ambos: 0 };
-    for (const s of scripts) c[classificaCanal(s.canais)]++;
-    return c;
-  }, [scripts]);
+  // galeria: favoritos no topo (atalho) + seções por categoria, "Sem categoria" ao final
+  const favoritos = useMemo(() => lista.filter((s) => s.favorito), [lista]);
+  const secoes = useMemo(() => {
+    const ordem: { id: string | null; nome: string }[] = [
+      ...cats.map((c) => ({ id: c.id as string | null, nome: c.nome })),
+      { id: null, nome: 'Sem categoria' },
+    ];
+    return ordem
+      .map((o) => ({ ...o, itens: lista.filter((s) => s.categoriaId === o.id) }))
+      .filter((o) => o.itens.length > 0);
+  }, [cats, lista]);
 
   function limpar() { setCat('all'); setCanalFiltro('todos'); setFavOnly(false); setBuscaRaw(''); setBusca(''); }
   const catName = (id: string | null) => cats.find((c) => c.id === id)?.nome ?? '';
@@ -245,6 +281,23 @@ export default function ScriptsV2() {
     } catch (e) { setAviso({ tom: 'erro', texto: (e as Error).message || 'Falha ao duplicar.' }); }
   }
 
+  /* ── drawer: sequência inteira do script aberto ───────────────────────── */
+  const [detEtapas, setDetEtapas] = useState<EtapaItem[] | null>(null);
+  useEffect(() => {
+    if (!detId) { setDetEtapas(null); return; }
+    let vivo = true;
+    setDetEtapas(null);
+    (demo ? Promise.resolve(demoDados.etapas[detId] ?? []) : fetchEtapas(detId))
+      .then((e) => { if (vivo) setDetEtapas(e); })
+      .catch(() => { if (vivo) setDetEtapas([]); });
+    return () => { vivo = false; };
+  }, [detId, demo, demoDados.etapas]);
+  const detVars = useMemo(() => {
+    if (!det) return [];
+    const textos = (detEtapas?.length ? detEtapas.map((e) => e.conteudo) : [det.conteudo]);
+    return variaveisDe(textos);
+  }, [det, detEtapas]);
+
   /* ── editor (builder) ─────────────────────────────────────────────────── */
   const [formAberto, setFormAberto] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -328,35 +381,54 @@ export default function ScriptsV2() {
   const mostrarTogglePreview = cfg.wa && cfg.fb;
   const canalPreview = mostrarTogglePreview ? previewCanal : (cfg.wa ? 'whatsapp' : 'facebook');
 
-  const COLUNAS: Coluna<Script>[] = [
-    {
-      chave: 'titulo', titulo: 'Script', render: (s) => (
-        <div className="scr-titulo">
-          <div className="nm">
-            {s.titulo || 'Sem título'}
-            {!s.ativo && <BadgeStatus tom="neutro">Inativo</BadgeStatus>}
-          </div>
-          {s.descricao && <div className="ds">{s.descricao}</div>}
+  /* ── card da galeria: o script como bolha de mensagem ─────────────────── */
+  function cartao(s: Script, compacto = false) {
+    const r = resumo[s.id];
+    return (
+      <CardVidro
+        key={s.id}
+        spot
+        className="ars-card"
+        role="button"
+        tabIndex={0}
+        aria-label={`Abrir script ${s.titulo || 'Sem título'}`}
+        onClick={() => setDetId(detId === s.id ? null : s.id)}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDetId(s.id); } }}
+      >
+        <div className="ars-card-cab">
+          <div className="nm">{s.titulo || 'Sem título'}</div>
+          <button
+            type="button"
+            className={s.favorito ? 'scr-fav on' : 'scr-fav'}
+            aria-label={s.favorito ? 'Remover dos favoritos' : 'Favoritar'}
+            aria-pressed={s.favorito}
+            onClick={(e) => { e.stopPropagation(); acoes.favoritar(s).catch((err) => setAviso({ tom: 'erro', texto: (err as Error).message || 'Falha.' })); }}
+          >
+            <Estrela cheia={s.favorito} />
+          </button>
         </div>
-      ),
-    },
-    { chave: 'previa', titulo: 'Prévia', render: (s) => <span className="scr-previa">{s.conteudo.replace(/\n+/g, ' ') || '—'}</span> },
-    { chave: 'canais', titulo: 'Canais', render: (s) => <CanalPills canais={s.canais} /> },
-    { chave: 'cat', titulo: 'Categoria', render: (s) => catName(s.categoriaId) || <span style={{ color: 'var(--txt-3)' }}>—</span> },
-    {
-      chave: 'fav', titulo: 'Favorito', render: (s) => (
-        <button
-          type="button"
-          className={s.favorito ? 'scr-fav on' : 'scr-fav'}
-          aria-label={s.favorito ? 'Remover dos favoritos' : 'Favoritar'}
-          aria-pressed={s.favorito}
-          onClick={() => acoes.favoritar(s).catch((e) => setAviso({ tom: 'erro', texto: (e as Error).message || 'Falha.' }))}
-        >
-          <Estrela cheia={s.favorito} />
-        </button>
-      ),
-    },
-  ];
+        {s.conteudo ? (
+          <div className="bolha-rec"><span className="clamp"><DestacaVars texto={s.conteudo} /></span></div>
+        ) : r?.temMidia && r.primeira ? (
+          <div className="bolha-rec bolha-anexo">
+            <span className="tip">{TIPO_LABEL[r.primeira.tipo]}</span>
+            <span className="arq">{r.primeira.nome ?? TIPO_LABEL[r.primeira.tipo].toLowerCase()}</span>
+          </div>
+        ) : (
+          <div className="bolha-rec" style={{ color: 'var(--txt-3)' }}>Sem conteúdo</div>
+        )}
+        <div className="ars-card-meta">
+          {r && r.total > 1 && <em className="ag-pill" style={{ fontStyle: 'normal' }}>Sequência · {r.total} passos</em>}
+          <CanalPills canais={s.canais} />
+          {compacto && catName(s.categoriaId) ? <em className="ag-pill" style={{ fontStyle: 'normal' }}>{catName(s.categoriaId)}</em> : null}
+          {!s.ativo && <BadgeStatus tom="neutro">Inativo</BadgeStatus>}
+          <span className="ars-copiar">
+            <BotaoMini onClick={(e) => { e.stopPropagation(); copiar(s); }}>Copiar</BotaoMini>
+          </span>
+        </div>
+      </CardVidro>
+    );
+  }
 
   return (
     <>
@@ -369,6 +441,7 @@ export default function ScriptsV2() {
           </p>
         </div>
         <div className="acoes">
+          <BotaoSec onClick={() => setCatsModal(true)}>Gerenciar categorias</BotaoSec>
           <BotaoPrimario onClick={abrirCriar}>＋ Novo script</BotaoPrimario>
         </div>
       </div>
@@ -385,16 +458,40 @@ export default function ScriptsV2() {
           <EstadoErro descricao="Erro ao carregar os scripts. Verifique a conexão." aoTentarDeNovo={() => scriptsQ.refetch()} />
         </CardVidro>
       ) : carregando ? (
-        <CardVidro style={{ borderRadius: 12, padding: '14px 16px' }}>
-          {[0, 1, 2, 3, 4].map((i) => (
-            <div key={i} style={{ display: 'flex', gap: 14, alignItems: 'center', padding: '9px 0' }}>
-              <Skeleton largura="24%" /><Skeleton largura="34%" /><Skeleton largura="14%" raio={99} /><Skeleton largura="10%" /><Skeleton largura={14} altura={14} raio={99} />
+        <div className="ars-grade" aria-hidden>
+          {[0, 1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="vidro ars-card" style={{ cursor: 'default' }}>
+              <Skeleton largura="58%" altura={13} />
+              <Skeleton altura={62} raio={12} />
+              <div style={{ display: 'flex', gap: 6 }}>
+                <Skeleton largura={72} altura={16} raio={99} />
+                <Skeleton largura={56} altura={16} raio={99} />
+              </div>
             </div>
           ))}
-        </CardVidro>
+        </div>
       ) : (
         <>
-          <div className="scr-filtros sobe" style={{ animationDelay: '.06s' }}>
+          <div className="ars-filtros sobe" style={{ animationDelay: '.06s' }}>
+            <div className="busca-scripts">
+              <Input placeholder="Buscar scripts…" value={buscaRaw} onChange={(e) => setBuscaRaw(e.target.value)} aria-label="Buscar scripts" />
+            </div>
+            <Segmentado<CanalFiltro>
+              rotulo="Filtro por canal"
+              valor={canalFiltro}
+              aoMudar={setCanalFiltro}
+              opcoes={[
+                { valor: 'todos', rotulo: 'Todos' },
+                { valor: 'whatsapp', rotulo: 'WhatsApp' },
+                { valor: 'facebook', rotulo: 'Facebook' },
+                { valor: 'ambos', rotulo: 'Ambos' },
+              ]}
+            />
+            <span className="fav-chip">
+              <Chip ativo={favOnly} onClick={() => setFavOnly((v) => !v)}>★ Favoritos</Chip>
+            </span>
+          </div>
+          <div className="ars-cats sobe" style={{ animationDelay: '.09s' }}>
             <Chips>
               <Chip ativo={cat === 'all'} onClick={() => setCat('all')}>Todas {scripts.length}</Chip>
               {cats.map((c) => (
@@ -402,22 +499,12 @@ export default function ScriptsV2() {
                   {c.nome} {scripts.filter((s) => s.categoriaId === c.id).length}
                 </Chip>
               ))}
-              <Chip limpar onClick={() => setCatsModal(true)}>Gerenciar</Chip>
             </Chips>
-            <Chips>
-              {([['todos', 'Todos'], ['whatsapp', 'WhatsApp'], ['facebook', 'Facebook'], ['ambos', 'Ambos']] as [CanalFiltro, string][]).map(([id, rotulo]) => (
-                <Chip key={id} ativo={canalFiltro === id} onClick={() => setCanalFiltro(id)}>{rotulo} {canalContagem[id]}</Chip>
-              ))}
-              <Chip ativo={favOnly} onClick={() => setFavOnly((v) => !v)}>★ Favoritos</Chip>
-            </Chips>
-            <div className="scr-busca">
-              <Input placeholder="Buscar scripts…" value={buscaRaw} onChange={(e) => setBuscaRaw(e.target.value)} aria-label="Buscar scripts" />
-            </div>
           </div>
 
-          <CardVidro spot sobe style={{ borderRadius: 12, animationDelay: '.12s' }}>
-            {lista.length === 0 ? (
-              scripts.length === 0 ? (
+          {lista.length === 0 ? (
+            <CardVidro sobe style={{ borderRadius: 12 }}>
+              {scripts.length === 0 ? (
                 <EstadoVazio
                   titulo="Nenhum script ainda"
                   descricao="Crie o primeiro script para reutilizar mensagens no atendimento."
@@ -429,21 +516,38 @@ export default function ScriptsV2() {
                   descricao="Ajuste a busca ou os filtros."
                   acao={{ rotulo: 'Limpar filtros', onClick: limpar }}
                 />
-              )
-            ) : (
-              <TabelaPadrao
-                colunas={COLUNAS}
-                linhas={lista}
-                chave={(s) => s.id}
-                aoClicarLinha={(s) => setDetId(detId === s.id ? null : s.id)}
-                rodape={{ texto: `${lista.length} ${lista.length === 1 ? 'script' : 'scripts'}` }}
-              />
-            )}
-          </CardVidro>
+              )}
+            </CardVidro>
+          ) : (
+            <div className="sobe" style={{ animationDelay: '.12s' }}>
+              {!favOnly && favoritos.length > 0 && (
+                <div className="ars-secao">
+                  <div className="ars-secao-cab">
+                    <span className="scr-estrela" aria-hidden><Estrela cheia /></span>
+                    <span className="caps">Favoritos</span>
+                    <span className="qtd num">{favoritos.length}</span>
+                  </div>
+                  <div className="ars-fav-strip">{favoritos.map((s) => cartao(s, true))}</div>
+                </div>
+              )}
+              {secoes.map((sec) => (
+                <div key={sec.id ?? 'sem'} className="ars-secao">
+                  <div className="ars-secao-cab">
+                    <span className="caps">{sec.nome}</span>
+                    <span className="qtd num">{sec.itens.length}</span>
+                  </div>
+                  <div className="ars-grade">{sec.itens.map((s) => cartao(s))}</div>
+                </div>
+              ))}
+              <p style={{ fontSize: 10.5, color: 'var(--txt-3)' }}>
+                {lista.length} {lista.length === 1 ? 'script' : 'scripts'}
+              </p>
+            </div>
+          )}
         </>
       )}
 
-      {/* ── drawer de detalhe ─────────────────────────────────────────────── */}
+      {/* ── drawer de detalhe: a sequência inteira ────────────────────────── */}
       {det && (
         <DrawerV2 aberto aoFechar={() => setDetId(null)}>
           <div className="cab">
@@ -469,10 +573,46 @@ export default function ScriptsV2() {
                 : <>Inativo — não aparece nas respostas rápidas do atendimento.</>}
             </div>
             <div>
-              <div className="caps" style={{ marginBottom: 6 }}>Conteúdo da primeira mensagem</div>
-              <div className="scr-conteudo">{det.conteudo || '—'}</div>
-              <p style={{ fontSize: 10.5, color: 'var(--txt-3)', marginTop: 6 }}>Use “Editar” para ver e alterar toda a sequência de mensagens.</p>
+              <div className="caps" style={{ marginBottom: 6 }}>
+                {detEtapas && detEtapas.length > 1 ? `Sequência · ${detEtapas.length} passos` : 'Mensagem'}
+              </div>
+              {detEtapas === null ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }} aria-hidden>
+                  <Skeleton altura={46} raio={12} />
+                  <Skeleton altura={46} largura="72%" raio={12} />
+                </div>
+              ) : (
+                <div className="ars-passos">
+                  {(detEtapas.length ? detEtapas : [{ tipo: 'texto' as EtapaTipo, conteudo: det.conteudo }]).map((et, i, arr) => (
+                    <div key={i} className="ars-passo">
+                      {arr.length > 1 && <span className="n num">{i + 1}</span>}
+                      <div className="bolha-rec">
+                        {et.tipo === 'texto' ? (
+                          et.conteudo ? <DestacaVars texto={et.conteudo} /> : <span style={{ color: 'var(--txt-3)' }}>—</span>
+                        ) : (
+                          <>
+                            <div className="bolha-anexo">
+                              <span className="tip">{TIPO_LABEL[et.tipo]}</span>
+                              <span className="arq">{et.nome ?? TIPO_LABEL[et.tipo].toLowerCase()}</span>
+                            </div>
+                            {et.tamanho ? <div style={{ fontSize: 10, color: 'var(--txt-3)', marginTop: 3 }} className="num">{formatarTamanho(et.tamanho)}</div> : null}
+                            {et.conteudo?.trim() ? <div style={{ marginTop: 4 }}><DestacaVars texto={et.conteudo} /></div> : null}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
+            {detVars.length > 0 && (
+              <div>
+                <div className="caps" style={{ marginBottom: 6 }}>Variáveis usadas</div>
+                <div className="scr-vars">
+                  {detVars.map((v) => <span key={v} className="scr-var leitura">{v}</span>)}
+                </div>
+              </div>
+            )}
           </div>
           <div className="scr-det-acoes">
             <BotaoMini onClick={() => abrirEditar(det)}>Editar</BotaoMini>

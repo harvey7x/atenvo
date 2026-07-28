@@ -36,18 +36,7 @@
 }
 .v2 .ag-pill.seq { color: var(--txt); border-color: rgba(255, 255, 255, .28); }
 
-/* detalhes no drawer lateral (QA: era painel flutuante sobre a tabela) */
-.v2 .drawer-v2 .cab {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 16px; border-bottom: 1px solid var(--linha);
-  font-size: 13px; font-weight: 600; flex-shrink: 0;
-}
-.v2 .drawer-v2 .fechar-p {
-  background: none; border: none; color: var(--txt-3); cursor: pointer;
-  font-size: 16px; padding: 2px 5px; font-family: var(--fonte);
-}
-.v2 .drawer-v2 .fechar-p:hover { color: var(--txt); }
-.v2 .drawer-v2 .corpo { padding: 13px 16px; flex: 1; min-height: 0; overflow-y: auto; }
+/* ações do drawer de agendamento (anatomia cab/corpo promovida a componentes.css) */
 .v2 .drawer-v2 .ag-p-acoes { flex-shrink: 0; }
 .v2 .ag-p-cli { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .v2 .ag-p-cli .nm { font-size: 13px; font-weight: 600; }

@@ -1,22 +1,65 @@
 /* ============================================================
-   Scripts — órfã (sem mockup). Manual de extensão: lista/gestão
-   (chips + tabela padrão) + detalhe em DrawerV2 + editor em
-   ModalV2 com preview em bolhas. Sem cor nova: canais como pills.
+   Scripts — ARSENAL (v2.1): o conteúdo é a interface. Galeria de
+   cards-bolha (anatomia .bolha/.rec do mockup) com faixa de
+   favoritos e seções por categoria. Editor/gestão inalterados.
    ============================================================ */
 
-/* barra de filtros: chips de categoria + canal + favoritos, busca à direita */
-.v2 .scr-filtros { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 13px; flex-wrap: wrap; }
-.v2 .scr-filtros .chips { margin-bottom: 0; }
-.v2 .scr-busca { margin-left: auto; width: 280px; flex-shrink: 0; }
+/* barra de filtros em grupos distintos: busca · canal · favoritos / categorias */
+.v2 .ars-filtros { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+.v2 .ars-filtros .busca-scripts { width: 280px; }
+.v2 .ars-filtros .fav-chip { margin-left: auto; }
+.v2 .ars-cats { margin-bottom: 16px; }
+.v2 .ars-cats .chips { margin-bottom: 0; }
 
-/* célula do script */
-.v2 .scr-titulo .nm { color: var(--txt); font-weight: 500; display: flex; align-items: center; gap: 6px; }
-.v2 .scr-titulo .ds { font-size: 10.5px; color: var(--txt-3); margin-top: 1px; }
-.v2 .scr-previa { display: block; max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--txt-2); }
-.v2 .scr-estrela { color: var(--ambar); display: inline-flex; }
-.v2 .scr-estrela svg { width: 12px; height: 12px; }
+/* seções */
+.v2 .ars-secao { margin-bottom: 18px; }
+.v2 .ars-secao-cab { display: flex; align-items: baseline; gap: 8px; margin-bottom: 9px; }
+.v2 .ars-secao-cab .caps { font-size: 10px; }
+.v2 .ars-secao-cab .qtd { font-size: 10.5px; color: var(--txt-3); }
 
-/* estrela clicável na linha */
+/* grades */
+.v2 .ars-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.v2 .ars-fav-strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+
+/* card do script */
+.v2 .ars-card { padding: 12px 13px; display: flex; flex-direction: column; gap: 8px; cursor: pointer; }
+.v2 .ars-card-cab { display: flex; align-items: flex-start; gap: 8px; }
+.v2 .ars-card-cab .nm { font-size: 12.5px; font-weight: 600; line-height: 1.3; flex: 1; min-width: 0; }
+.v2 .ars-card-meta { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.v2 .ars-card-meta .ag-pill { font-size: 9.5px; padding: 1.5px 7px; }
+
+/* bolha recebida (anatomia .rec do mockup) — o script como mensagem */
+.v2 .bolha-rec {
+  align-self: flex-start; max-width: 100%; font-size: 12px; line-height: 1.45;
+  padding: 8px 11px; border-radius: 12px; border-bottom-left-radius: 4px;
+  background: rgba(255, 255, 255, .055); border: 1px solid rgba(255, 255, 255, .09);
+  word-break: break-word; white-space: pre-wrap; color: var(--txt);
+}
+/* clamp num span interno: no próprio balão (com padding), a linha seguinte
+   vazaria cortada atrás do padding e o -webkit-box mataria o flex do anexo */
+.v2 .ars-card .bolha-rec .clamp {
+  display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical;
+  overflow: hidden; white-space: pre-line;
+}
+.v2 .ars-fav-strip .bolha-rec { font-size: 11.5px; }
+.v2 .ars-fav-strip .bolha-rec .clamp { -webkit-line-clamp: 2; }
+
+/* variáveis destacadas tipograficamente (o v1 não renderiza na lista) */
+.v2 .var-hl {
+  font-family: ui-monospace, monospace; font-style: normal; font-size: .92em;
+  color: var(--txt); background: rgba(255, 255, 255, .10);
+  border-radius: 4px; padding: 0 3px;
+}
+
+/* bolha de anexo (script só-mídia — nunca "—") */
+.v2 .bolha-anexo { display: flex; align-items: center; gap: 8px; white-space: nowrap; overflow: hidden; }
+.v2 .bolha-anexo .tip { font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--txt-2); flex-shrink: 0; }
+.v2 .bolha-anexo .arq { overflow: hidden; text-overflow: ellipsis; color: var(--txt); }
+
+/* rodapé do card: estrela + copiar no hover */
+.v2 .ars-card .rodo { display: flex; align-items: center; gap: 6px; margin-top: auto; }
+.v2 .ars-copiar { opacity: 0; transition: opacity .18s; margin-left: auto; }
+.v2 .ars-card:hover .ars-copiar, .v2 .ars-card:focus-within .ars-copiar { opacity: 1; }
 .v2 .scr-fav {
   background: none; border: none; cursor: pointer; padding: 3px;
   color: var(--txt-3); display: inline-flex; border-radius: 6px;
@@ -26,13 +69,19 @@
 .v2 .scr-fav.on:hover { color: var(--ambar); }
 .v2 .scr-fav svg { width: 14px; height: 14px; }
 .v2 .scr-fav:focus-visible { outline: none; box-shadow: 0 0 0 2px rgba(255, 255, 255, .35); }
+.v2 .scr-estrela { color: var(--ambar); display: inline-flex; }
+.v2 .scr-estrela svg { width: 12px; height: 12px; }
 
-/* drawer de detalhe */
-.v2 .scr-det-acoes { display: flex; gap: 6px; flex-wrap: wrap; padding: 11px 16px; border-top: 1px solid var(--linha); flex-shrink: 0; }
-.v2 .scr-conteudo {
-  font-size: 12px; line-height: 1.55; white-space: pre-wrap; word-break: break-word;
-  border: 1px solid var(--linha); border-radius: 10px; padding: 10px 12px; color: var(--txt);
+/* drawer de detalhe: passos numerados em bolhas */
+.v2 .ars-passos { display: flex; flex-direction: column; gap: 8px; }
+.v2 .ars-passo { display: flex; gap: 8px; align-items: flex-start; }
+.v2 .ars-passo .n {
+  flex-shrink: 0; width: 18px; height: 18px; border-radius: 50%; margin-top: 3px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9.5px; font-weight: 700; color: var(--txt-2);
+  background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .12);
 }
+.v2 .scr-det-acoes { display: flex; gap: 6px; flex-wrap: wrap; padding: 11px 16px; border-top: 1px solid var(--linha); flex-shrink: 0; }
 .v2 .scr-ponte {
   display: flex; gap: 8px; align-items: flex-start; font-size: 11px; line-height: 1.5;
   color: var(--verde); background: var(--verde-bg); border: 1px solid rgba(74, 190, 140, .26);
@@ -40,7 +89,7 @@
 }
 .v2 .scr-ponte.off { color: var(--txt-3); background: rgba(255, 255, 255, .03); border-color: var(--linha); }
 
-/* editor (builder) */
+/* editor (builder) — inalterado */
 .v2 .scr-builder { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 16px; }
 .v2 .scr-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .v2 .scr-etapa { border: 1px solid var(--linha); border-radius: 11px; padding: 10px 11px; }
@@ -57,8 +106,6 @@
 .v2 .scr-add-etapas { display: flex; gap: 6px; flex-wrap: wrap; }
 .v2 .scr-canais { display: flex; gap: 8px; }
 .v2 .scr-caracteres { font-size: 10px; color: var(--txt-3); text-align: right; margin-top: 4px; }
-
-/* chips de variáveis */
 .v2 .scr-vars { display: flex; gap: 5px; flex-wrap: wrap; }
 .v2 .scr-var {
   font-family: ui-monospace, monospace; font-size: 10px; color: var(--txt-2);
@@ -66,14 +113,14 @@
   border-radius: 6px; padding: 3px 7px; cursor: pointer;
 }
 .v2 .scr-var:hover { color: var(--txt); border-color: rgba(255, 255, 255, .28); }
-
-/* mídia na etapa */
+.v2 .scr-var.leitura { cursor: default; }
+.v2 .scr-var.leitura:hover { color: var(--txt-2); border-color: rgba(255, 255, 255, .11); }
 .v2 .scr-midia img, .v2 .scr-midia video { max-width: 100%; border-radius: 8px; display: block; margin-bottom: 8px; }
 .v2 .scr-midia audio { width: 100%; margin-bottom: 8px; }
 .v2 .scr-midia-meta { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--txt-2); margin-bottom: 8px; }
 .v2 .scr-midia-meta .nome { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--txt); }
 
-/* preview em bolhas (uma anatomia; Messenger é rótulo, não cor nova) */
+/* preview do builder */
 .v2 .scr-preview { border-left: 1px solid var(--linha); padding-left: 16px; display: flex; flex-direction: column; min-width: 0; }
 .v2 .scr-pv-cab { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .v2 .scr-pv-cab .caps { font-size: 9.5px; }
