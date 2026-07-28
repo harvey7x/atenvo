@@ -66,6 +66,7 @@ const IcTel = () => <Ic><path d="M5 4h4l2 5-2.5 1.5a12 12 0 0 0 5 5L15 13l5 2v4a
 const IcCopy = () => <Ic><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></Ic>;
 const IcReply = () => <Ic><path d="M9 14 4 9l5-5" /><path d="M4 9h11a5 5 0 0 1 5 5v6" /></Ic>;
 const IcPlay = () => <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M8 5.5v13l11-6.5z" /></svg>;
+const IcFoco = () => <Ic><path d="M4 9V5a1 1 0 0 1 1-1h4M15 4h4a1 1 0 0 1 1 1v4M20 15v4a1 1 0 0 1-1 1h-4M9 20H5a1 1 0 0 1-1-1v-4" /></Ic>;
 
 const ackOf = (status?: string): { s: string; cls: string; title: string } | null =>
   status === 'lida' ? { s: '✓✓', cls: 'lida', title: 'Lida' }
@@ -128,7 +129,8 @@ export default function WhatsAppV2() {
   const [filtroStatus, setFiltroStatus] = useState<string | null>(null);
   const [pop, setPop] = useState<Pop>(null);
   const [foco, setFoco] = useState(() => { try { return localStorage.getItem(FOCO_KEY) === '1'; } catch { return false; } });
-  const [ctxAberto, setCtxAberto] = useState(true);
+  const [ctxAberto, setCtxAberto] = useState(() => { try { return sessionStorage.getItem('atenvo-wa-ctx') !== '0'; } catch { return true; } });
+  useEffect(() => { try { sessionStorage.setItem('atenvo-wa-ctx', ctxAberto ? '1' : '0'); } catch { /* privado */ } }, [ctxAberto]);
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [novaConversa, setNovaConversa] = useState(false);
   const [transferirAberto, setTransferirAberto] = useState(false);
@@ -446,7 +448,7 @@ export default function WhatsAppV2() {
                     return (
                       <button
                         key={c.id} type="button" data-cid={c.id}
-                        className={'conv2' + (wait ? ` t-${wait.tier}` : '') + (c.id === currentId ? ' ativa' : '')}
+                        className={'conv2 spot' + (wait ? ` t-${wait.tier}` : '') + (c.id === currentId ? ' ativa' : '')}
                         title={`Atendente: ${c.respId ? nomePorId(c.respId) ?? 'Atendente' : 'Não atribuído'} · Canal: WhatsApp ${c.chip} · ${finalizado ? 'Finalizado' : c.status || 'Em atendimento'} · ${c.time}`}
                         onClick={() => inbox.selectContact(c.id)}
                       >
@@ -522,7 +524,7 @@ export default function WhatsAppV2() {
                   ? <BotaoMini title="Transferir atendimento" onClick={() => setTransferirAberto(true)}>Transferir</BotaoMini>
                   : <BotaoPrimario mini title="Assumir atendimento" disabled={inbox.atribuindo} onClick={inbox.assumir}>Assumir</BotaoPrimario>}
                 <BotaoMini title={current.arquivada ? 'Desarquivar conversa' : 'Arquivar conversa'} onClick={() => inbox.arquivar(!current.arquivada)}>{current.arquivada ? 'Desarquivar' : 'Arquivar'}</BotaoMini>
-                <button type="button" className={'ib2' + (foco ? ' on' : '')} title="Modo de foco (Esc para sair)" onClick={() => setFoco((f) => !f)} style={{ width: 26, height: 26 }}><IcFunil /></button>
+                <button type="button" className={'ib2' + (foco ? ' on' : '')} title="Modo de foco (Esc para sair)" onClick={() => setFoco((f) => !f)} style={{ width: 26, height: 26 }}><IcFoco /></button>
                 <button type="button" className="ib2" title="Ações" aria-label="Ações da conversa" style={{ width: 26, height: 26 }} onClick={(e) => abrirPop('acoes', e)}><IcDots /></button>
               </div>
             </div>
@@ -640,7 +642,7 @@ export default function WhatsAppV2() {
               {optout && (
                 <div className="wa-aviso bloq" title={optoutTexto}><b>Não incomodar</b> — este contato pediu para não receber mensagens</div>
               )}
-              {inbox.canalRestrito && inbox.canalSel && (
+              {inbox.canalRestrito && !inbox.canalIndisponivel && inbox.canalSel && (
                 <div className="wa-aviso bloq" title={`O número ${inbox.canalSel.alias} está com restrição no WhatsApp e está indisponível para envio. Selecione outro canal em "Responder por" para responder.`}>
                   <b>{inbox.canalSel.alias}</b> com restrição no WhatsApp — selecione outro canal
                 </div>
@@ -725,9 +727,10 @@ export default function WhatsAppV2() {
       {!ctxAberto && current.id && (
         <div className="wa-ctx-reabrir"><BotaoMini aria-label="Abrir painel de dados" onClick={() => setCtxAberto(true)}>Dados</BotaoMini></div>
       )}
-      {ctxAberto && current.id && (
-        <aside className="wa-ctx">
-          <div className="ctx-topo">
+      {current.id && (
+        <aside className={'wa-ctx' + (ctxAberto ? '' : ' recolhido')} aria-hidden={!ctxAberto} {...(!ctxAberto ? ({ inert: '' } as Record<string, string>) : {})}>
+         <div className="wa-ctx-inner">
+          <div className="ctx-topo spot">
             <div className="av2">{initials(nomeExibicao(current))}</div>
             <div className="n2">{nomeExibicao(current)}</div>
             <div className="t2 num">
@@ -744,7 +747,7 @@ export default function WhatsAppV2() {
           </div>
 
           {optout && (
-            <div className="ctx-b">
+            <div className="ctx-b spot">
               <div className="ctx-optout"><b>Não incomodar ativo.</b> Nenhuma mensagem (bot, régua ou agendamento) é enviada a este contato.</div>
             </div>
           )}
@@ -763,7 +766,7 @@ export default function WhatsAppV2() {
             </div>
           )}
 
-          <div className="ctx-b">
+          <div className="ctx-b spot">
             <div className="ctx-t">Status</div>
             <button type="button" className="ctx-status" onClick={(e) => abrirPop('status', e)}>
               <span className="dot" style={{ background: current.statusCor ?? 'var(--txt-3)' }} />
@@ -774,7 +777,7 @@ export default function WhatsAppV2() {
           <KanbanCtx contatoId={current.contatoId ?? null} demo={demo} etapa={current.etapa} etapaCor={current.etapaCor} origem={current.origin} respNome={current.respId ? nomePorId(current.respId) : undefined} lead={current} aoAvisar={aoAvisar} />
 
           {cobrancasCtx.length > 0 && (
-            <div className="ctx-b">
+            <div className="ctx-b spot">
               <div className="ctx-t">Cobranças <button type="button" className="lk" onClick={() => nav('/v2/cobrancas')}>ver</button></div>
               {cobrancasCtx.map((cb) => (
                 <div className="cx-l" key={cb.id}>
@@ -782,15 +785,16 @@ export default function WhatsAppV2() {
                     {cb.ciclosPagos}/{cb.ciclosTotais}
                     {cb.proximaCobranca ? ' · ' + cb.proximaCobranca.split('-').reverse().slice(0, 2).join('/') : ''}
                   </span>
-                  <span className="v" style={{ color: /atras|venc/i.test(cb.status) ? 'var(--rubro)' : /quitad|conclu/i.test(cb.status) ? 'var(--verde)' : 'var(--ambar)' }}>
-                    {/atras|venc/i.test(cb.status) ? 'Vencida' : /quitad|conclu/i.test(cb.status) ? 'Pago' : 'Pendente'}
-                  </span>
+                  {(() => {
+                    const venc = /atras|venc/i.test(cb.status), pago = /quitad|conclu/i.test(cb.status);
+                    return <span className={'st ' + (venc ? 's-er' : pago ? 's-ok' : 's-at')}><i />{venc ? 'Vencida' : pago ? 'Pago' : 'Pendente'}</span>;
+                  })()}
                 </div>
               ))}
             </div>
           )}
 
-          <div className="ctx-b">
+          <div className="ctx-b spot">
             <div className="ctx-t">Etiquetas <button type="button" className="lk" onClick={(e) => abrirPop('tags', e)}>+</button></div>
             <div className="ctx-tags">
               {current.tags.length === 0 && <span className="ctx-nota">Nenhuma etiqueta</span>}
@@ -806,7 +810,7 @@ export default function WhatsAppV2() {
             </div>
           </div>
 
-          <div className="ctx-b">
+          <div className="ctx-b spot">
             <div className="ctx-t">Responsável</div>
             <div className="cx-l">
               <span className="k">{current.respId ? (current.respId === user?.id ? 'Você' : nomePorId(current.respId) ?? 'Atendente') : 'Sem responsável'}</span>
@@ -819,7 +823,7 @@ export default function WhatsAppV2() {
           </div>
 
           {(atividadesQ.data ?? []).length > 0 && (
-            <div className="ctx-b">
+            <div className="ctx-b spot">
               <div className="ctx-t">Atividade do atendimento</div>
               <ul className="ativ-tl">
                 {(atividadesQ.data ?? []).map((a) => (
@@ -834,7 +838,7 @@ export default function WhatsAppV2() {
           )}
 
           {current.ultimoCanal?.alias && (
-            <div className="ctx-b">
+            <div className="ctx-b spot">
               <div className="ctx-t">Último canal utilizado</div>
               <div className="ctx-nota num">
                 {current.ultimoCanal.alias}
@@ -844,15 +848,16 @@ export default function WhatsAppV2() {
             </div>
           )}
 
-          <div className="ctx-b">
+          <div className="ctx-b spot">
             <div className="ctx-t">Nota interna</div>
             <div className="ctx-nota">{current.notes || 'Sem observações.'}</div>
           </div>
-          <div className="ctx-b">
+          <div className="ctx-b spot">
             <div className="ctx-t">Origem do lead</div>
             <div className="cx-l"><span className="k"><IcWa /></span><span className="v">{current.origin}</span></div>
             <div className="cx-l"><span className="k">Última interação</span><span className="v num">{current.lastInter || current.time}</span></div>
           </div>
+         </div>
         </aside>
       )}
 
@@ -997,6 +1002,7 @@ export default function WhatsAppV2() {
           })() : null}
           aoFechar={() => { setAgendarAberto(false); setAgEditId(null); }}
           aoSubmeter={async (v) => {
+            if (optout) { aoAvisar({ tom: 'erro', texto: optoutTexto }); return; }   // opt-out: revalidar no submit (pode ter bloqueado com o modal aberto)
             if (demo) { aoAvisar({ tom: 'ok', texto: 'Mensagem agendada — será enviada automaticamente no horário.' }); return; }
             if (agEditId) {
               await editarAgMut.mutateAsync({ id: agEditId, conversaId: current.id, canalId: v.canalId, texto: v.texto ?? '', executarEm: v.executarISO });
@@ -1015,6 +1021,8 @@ export default function WhatsAppV2() {
         onClose={() => setScriptSeq(null)}
         ctx={{ cliente: current.name, atendente: user?.name || 'Atendente', emailAtendente: user?.email ?? '', empresa: currentOrg.name, telefone: current.phone }}
         enviarEtapa={async (texto, retryMensagemId) => {
+          // opt-out INVIOLÁVEL também aqui: cada etapa revalida (o bloqueio pode chegar por realtime com o modal aberto)
+          if (optout) throw new Error(optoutTexto);
           if (demo) { aoAvisar({ tom: 'ok', texto: 'Mensagem enviada' }); return; }
           const id = await sendMut.mutateAsync({ conversaId: current.id, canalId: inbox.replyCanalId || current.canalId, assinaturaNome: assinaturaNome || undefined, text: texto, retryMensagemId });
           return id ?? undefined;
@@ -1077,20 +1085,26 @@ function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, optout,
           <div className="tt">{m.quoted.texto || (m.quoted.tipo === 'audio' ? 'Mensagem de voz' : m.quoted.tipo === 'imagem' ? 'Imagem' : m.quoted.tipo === 'video' ? 'Vídeo' : 'Documento')}</div>
         </div>
       )}
-      {m.tipo === 'imagem' && (url || demo) && (
-        <>
-          {url ? <img className="m-img" loading="lazy" src={url} alt="Imagem" title="Ampliar" onClick={() => aoLightbox(url)} /> : <div className="audio-ind">Imagem de demonstração</div>}
-          {m.text && <div className="m-cap"><WaTexto texto={m.text} /></div>}
-        </>
+      {m.tipo === 'imagem' && (
+        (url || demo)
+          ? <>
+              {url ? <img className="m-img" loading="lazy" src={url} alt="Imagem" title="Ampliar" onClick={() => aoLightbox(url)} /> : <div className="audio-ind">Imagem de demonstração</div>}
+              {m.text && <div className="m-cap"><WaTexto texto={m.text} /></div>}
+            </>
+          : <div className="audio-ind">Imagem indisponível</div>  /* v1: sem anexo/URL — nunca bolha vazia */
       )}
-      {m.tipo === 'video' && url && (
-        <>
-          <video className="m-video" src={url} controls preload="metadata" />
-          {m.text && <div className="m-cap"><WaTexto texto={m.text} /></div>}
-        </>
+      {m.tipo === 'video' && (
+        url
+          ? <>
+              <video className="m-video" src={url} controls preload="metadata" />
+              {m.text && <div className="m-cap"><WaTexto texto={m.text} /></div>}
+            </>
+          : <div className="audio-ind">{demo ? 'Vídeo de demonstração' : 'Vídeo indisponível'}</div>
       )}
       {m.tipo === 'audio' && (
-        m.midiaPendente
+        falhou
+          ? <div className="audio-ind">Áudio não enviado</div>  /* saída que falhou não vira player tocável (v1) */
+          : m.midiaPendente
           ? <div className="audio-ind">Áudio indisponível — <button type="button" className="lnk" onClick={() => aoRecarregarAudio(m)}>tentar carregar novamente</button></div>
           : <AudioBolha anexoPath={demo ? null : m.anexoPath ?? null} segundos={(m as WaMessage & { seconds?: number }).seconds ?? null} demo={demo} />
       )}
@@ -1220,7 +1234,7 @@ function KanbanCtx({ contatoId, demo, etapa, etapaCor, origem, respNome, lead, a
     ? (etapa ? { id: 'demo-opp', funilNome: 'Funil comercial', colunaNome: etapa, respNome: respNome ?? '', tipoServico: 'analise_inicial', tipoBeneficio: 'aposentadoria', valor: null } : null)
     : (oppsQ.data ?? []).find((o) => o.aberta) ?? null;
   return (
-    <div className="ctx-b">
+    <div className="ctx-b spot">
       <div className="ctx-t">Funil</div>
       {(!demo && oppsQ.isLoading) ? (
         <div className="ctx-nota">Carregando…</div>
@@ -1233,7 +1247,17 @@ function KanbanCtx({ contatoId, demo, etapa, etapaCor, origem, respNome, lead, a
           <div style={{ marginTop: 7 }}>
             <BotaoMini onClick={() => nav(demo ? '/v2/kanban' : `/v2/kanban?oportunidade=${encodeURIComponent(aberta.id)}`)}>Abrir no Kanban</BotaoMini>
           </div>
-          {!demo && (
+          {demo ? (
+            /* representação da ficha no demo — MESMAS classes fjb do componente real (aplica o override Platina) */
+            <div className="fjb" style={{ marginTop: 12 }}>
+              <div className="fjb-h">Ficha judicial</div>
+              <div className="fjb-card">
+                <span className="fjb-tag vazia">Nenhuma ficha</span>
+                <div className="fjb-info">Importe a consulta do Promosys/iCred e gere a ficha judicial.</div>
+                <div className="fjb-acts"><button type="button" className="fjb-btn primary">Criar ficha</button></div>
+              </div>
+            </div>
+          ) : (
             <div style={{ marginTop: 10 }}>
               <FichaJudicialBox contatoId={contatoId} oportunidadeId={aberta.id} conversaId={lead.id} canalId={lead.canalId ?? null} contatoAtual={{ nome: lead.name, telefone: lead.phone, email: lead.email }} />
             </div>

@@ -67,8 +67,8 @@
 .v2 .conv2 .h2 { font-size: 10px; color: var(--txt-3); }
 .v2 .conv2 .nl {
   display: inline-flex; min-width: 16px; height: 16px; align-items: center; justify-content: center;
-  border-radius: 99px; background: linear-gradient(180deg, #FFF, #D6DAE0); color: #101215;
-  font-size: 9.5px; font-weight: 700; padding: 0 4px;
+  border-radius: 99px; background: linear-gradient(180deg, #FFF, #D9DCE1); color: #101215;
+  font-size: 9.5px; font-weight: 700; padding: 0 5px;
 }
 .v2 .conv2 .cr { font-size: 9.5px; color: var(--ambar); font-weight: 600; }
 .v2 .conv2 .cr.g { color: var(--rubro); }
@@ -80,11 +80,11 @@
 
 /* ---------- conversa (flex) ---------- */
 .v2 .wa-conv { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.v2 .wa-ctopo { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--linha); flex-shrink: 0; flex-wrap: wrap; }
+.v2 .wa-ctopo { display: flex; align-items: center; gap: 10px; padding: 9px 14px; border-bottom: 1px solid var(--linha); background: rgba(255, 255, 255, .02); flex-shrink: 0; flex-wrap: wrap; }
 .v2 .wa-ctopo .av2 { width: 32px; height: 32px; font-size: 12px; }
 .v2 .wa-ctopo .idw { min-width: 0; }
 .v2 .wa-ctopo .nm { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.v2 .wa-ctopo .sb { font-size: 11px; color: var(--txt-2); margin-top: 1px; display: flex; gap: 5px; flex-wrap: wrap; align-items: center; }
+.v2 .wa-ctopo .sb { font-size: 10.5px; color: var(--txt-2); margin-top: 1px; display: flex; gap: 5px; flex-wrap: wrap; align-items: center; }
 .v2 .wa-ctopo .dir { margin-left: auto; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .v2 .janela { display: inline-flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 500; background: var(--verde-bg); color: var(--verde); border-radius: 99px; padding: 2.5px 8px; }
 .v2 .janela.fechada { background: var(--rubro-bg); color: var(--rubro); }
@@ -203,8 +203,11 @@
 .v2 .env-b svg { width: 15px; height: 15px; }
 
 /* ---------- contexto (266px) ---------- */
-.v2 .wa-ctx { width: 266px; flex-shrink: 0; border-left: 1px solid var(--linha); background: rgba(255, 255, 255, .015); overflow-y: auto; }
-.v2 .ctx-topo { padding: 14px; border-bottom: 1px solid var(--linha); text-align: center; }
+/* painel de contexto — recolhe/expande com transição suave (a conversa reflowa via flex) */
+.v2 .wa-ctx { width: 266px; flex-shrink: 0; border-left: 1px solid var(--linha); background: rgba(255, 255, 255, .015); overflow: hidden; transition: width .28s var(--ease), opacity .22s var(--ease); }
+.v2 .wa-ctx.recolhido { width: 0; opacity: 0; border-left-color: transparent; }
+.v2 .wa-ctx-inner { width: 266px; height: 100%; overflow-y: auto; }
+.v2 .ctx-topo { position: relative; padding: 14px; border-bottom: 1px solid var(--linha); text-align: center; }
 .v2 .ctx-topo .av2 { width: 44px; height: 44px; font-size: 15px; margin: 0 auto 8px; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-weight: 600; background: linear-gradient(150deg, #2B2E34, #17191D); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14), 0 0 0 1px rgba(255, 255, 255, .14); }
 .v2 .ctx-topo .n2 { font-size: 13px; font-weight: 600; }
 .v2 .ctx-topo .t2 { font-size: 11px; color: var(--txt-2); margin-top: 2px; display: inline-flex; gap: 5px; align-items: center; }
@@ -212,7 +215,11 @@
 .v2 .ctx-topo .t2 .cp svg { width: 11px; height: 11px; }
 .v2 .ctx-topo .bb { display: flex; gap: 7px; margin-top: 10px; }
 .v2 .ctx-topo .bb .p-btn { flex: 1; justify-content: center; }
-.v2 .ctx-b { padding: 11px 14px; border-bottom: 1px solid var(--linha); }
+.v2 .ctx-b { position: relative; padding: 11px 14px; border-bottom: 1px solid var(--linha); }
+/* spotlight (interação) nas superfícies do WhatsApp — mesmo glow do resto do sistema
+   (base.css .spot::after, .10×--fx), MAS sem o lift/sombra: cards de conversa e blocos
+   do ctx são superfícies de lista/painel, não "saltam". O glow segue o cursor (lib/spotlight). */
+.v2 .conv2.spot:hover, .v2 .ctx-topo.spot:hover, .v2 .ctx-b.spot:hover { transform: none; box-shadow: none; }
 .v2 .ctx-b:last-child { border-bottom: none; }
 .v2 .ctx-t { font-size: 9.5px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--txt-3); margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
 .v2 .ctx-t .lk { background: none; border: none; padding: 0; color: var(--txt-2); cursor: pointer; font-size: 9.5px; font-family: var(--fonte); text-transform: none; letter-spacing: 0; text-decoration: underline; }

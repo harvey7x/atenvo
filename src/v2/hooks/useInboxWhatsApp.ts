@@ -302,6 +302,7 @@ export function useInboxWhatsApp(opts: {
 
   /* mídia (upload ANTES do envio; sem bolha otimista — v1 L745-784) */
   const guardaMidia = () => {
+    if (WA_REAL && !currentId) throw new Error('Selecione uma conversa.');   // v1 L746/L758/L775
     if (optout) throw new Error('Contato marcado como não incomodar — mensagens bloqueadas.');
     if (!higieneBloqueia) return;
     // v1: motivo do bloqueio decide o texto (não o estado do dono)
@@ -318,7 +319,7 @@ export function useInboxWhatsApp(opts: {
   }, [currentId, replyCanalId, current.canalId, replyTo, higieneBloqueia, higiene.motivoBloqueio, optout]);
   const enviarAudio = useCallback(async (blob: Blob, mime: string, ext: string, diag?: Record<string, unknown>) => {
     guardaMidia();
-    if (!blob.size) throw new Error('Áudio vazio.');
+    if (!blob || !blob.size) throw new Error('Áudio vazio. Grave novamente.');   // tolera blob nulo (v1 L760)
     if (!WA_REAL) { aoAvisar({ tom: 'ok', texto: 'Mensagem enviada' }); return; }
     const file = new File([blob], `audio.${ext}`, { type: mime });
     const up = await subirMidiaWa(currentOrg.id, file);

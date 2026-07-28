@@ -41,6 +41,15 @@ function classesDeSeletores(css: string): string[][] {
   return listas;
 }
 
+/* Overrides INTENCIONAIS de componentes v1 reusados inteiros dentro do .v2
+   (contrato: não editar arquivos v1). A FichaJudicialBox/Modal (classes `fjb-*`)
+   é reusada em /v2/whatsapp e /v2/kanban; o CSS v1 pinta fundo claro/verde-cru,
+   então componentes.css re-declara `.v2 .fjb-*` na pele Platina (specificity
+   0,2,0 vence o 0,1,0 do v1). Isso torna os seletores v1 `.fjb-*` "satisfazíveis"
+   — de propósito e sob controle. Excluí-los do conjunto v2 evita falso-positivo
+   sem cegar o guard para colisões acidentais (fjb-* é exclusivo desse componente). */
+const OVERRIDE_V1_REUSADO = (c: string) => c.startsWith('fjb-');
+
 describe('colisões de CSS v1 × v2', () => {
   it('nenhum seletor do app antigo pode ser satisfeito pelo DOM v2', () => {
     const v2cls = new Set<string>();
@@ -48,6 +57,7 @@ describe('colisões de CSS v1 × v2', () => {
       for (const lista of classesDeSeletores(readFileSync(f, 'utf8'))) lista.forEach((c) => v2cls.add(c));
     }
     v2cls.delete('v2');
+    for (const c of [...v2cls]) if (OVERRIDE_V1_REUSADO(c)) v2cls.delete(c);
 
     const v1files = [
       ...csssEm(join(RAIZ, 'styles')),
