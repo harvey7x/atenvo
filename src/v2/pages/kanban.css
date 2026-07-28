@@ -58,8 +58,8 @@
 /* card .kc (mockup verbatim + conteúdo v1) */
 .v2 .kc {
   position: relative; background: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, .025));
-  border: 1px solid rgba(255, 255, 255, .1); border-radius: 11px; padding: 9px 10px 9px 12px;
-  margin-bottom: 8px; cursor: grab; transition: transform .2s var(--ease), box-shadow .2s, opacity .2s;
+  border: 1px solid rgba(255, 255, 255, .1); border-radius: 11px; padding: 7px 10px 7px 12px;
+  margin-bottom: 6px; cursor: grab; transition: transform .2s var(--ease), box-shadow .2s, opacity .2s;
 }
 .v2 .kc:hover { transform: translateY(-1px); }
 .v2 .kc::before { content: ""; position: absolute; left: 0; top: 9px; bottom: 9px; width: 3px; border-radius: 0 3px 3px 0; }
@@ -68,7 +68,7 @@
 .v2 .kc.drag { box-shadow: 0 18px 40px rgba(0, 0, 0, .55); transform: rotate(-1.6deg); border-color: rgba(255, 255, 255, .35); }
 .v2 .kc.moving { opacity: .55; cursor: default; }
 .v2 .kc.destaque { border-color: rgba(255, 255, 255, .45); box-shadow: 0 0 0 3px rgba(255, 255, 255, .12); }
-.v2 .fantasma { border: 1.5px dashed rgba(255, 255, 255, .18); border-radius: 11px; height: 66px; margin-bottom: 8px; }
+.v2 .fantasma { border: 1.5px dashed rgba(255, 255, 255, .18); border-radius: 11px; height: 52px; margin-bottom: 6px; }
 
 .v2 .kc .topo { display: flex; align-items: flex-start; gap: 6px; }
 .v2 .kc .n { font-size: 12px; font-weight: 500; line-height: 1.3; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
@@ -112,6 +112,41 @@
 .v2 .kc .ficha-tag.finalizada { background: var(--verde-bg); color: var(--verde); }
 .v2 .kc .ficha-tag.rascunho { background: rgba(255, 255, 255, .07); color: var(--txt-2); }
 .v2 .kc .t3 { margin-left: auto; font-size: 9.5px; color: var(--txt-3); flex-shrink: 0; }
+
+/* ---- v2.1: card em CAMADAS (compacto por padrão · secundário no hover · completo no detalhe) ---- */
+.v2 .kc .sub { margin-top: 3px; }
+.v2 .kc .kc-base { display: flex; align-items: center; gap: 6px; margin-top: 6px; min-height: 20px; }
+.v2 .kc .kc-base .v { font-size: 12.5px; font-weight: 600; margin-top: 0; }
+.v2 .kc .kc-base .v.v-sem { color: var(--txt-3); font-weight: 500; }
+.v2 .kc .kc-sinais { margin-left: auto; display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+.v2 .kc .kc-sinal { font-size: 9px; font-weight: 600; border-radius: 6px; padding: 2px 7px; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
+.v2 .kc .kc-sinal.parado { background: var(--rubro-bg); color: var(--rubro); }
+.v2 .kc .kc-sinal.novas { background: rgba(255, 255, 255, .1); color: var(--txt); }
+.v2 .kc .kc-sinal.ficha-rasc, .v2 .kc .kc-sinal.quente { background: var(--ambar-bg); color: var(--ambar); }
+.v2 .kc .kc-sinal.ficha-fim { background: var(--verde-bg); color: var(--verde); }
+.v2 .kc .kc-sinal.resp { background: none; padding: 0; }
+.v2 .kc .av-mini { width: 20px; height: 20px; border-radius: 50%; background: linear-gradient(150deg, #2B2E34, #17191D); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14), 0 0 0 1px rgba(255, 255, 255, .14); display: inline-flex; align-items: center; justify-content: center; font-size: 8.5px; font-weight: 700; color: var(--txt-2); font-style: normal; }
+.v2 .kc .chip.exc { border-color: rgba(217, 164, 74, .4); color: var(--ambar); }
+/* secundário — revelado no hover; reduced-motion desliga a transição (base.css). Aberto no drag/destaque. */
+.v2 .kc .kc-mais { overflow: hidden; max-height: 0; opacity: 0; transition: max-height .18s var(--ease), opacity .16s var(--ease); }
+.v2 .kc:hover .kc-mais, .v2 .kc.destaque .kc-mais { max-height: 160px; opacity: 1; }
+.v2 .kc.drag .kc-mais, .v2 .kc.moving .kc-mais { max-height: 0; opacity: 0; } /* durante drag o card fica compacto (não empurra a coluna) */
+.v2 .kc .kc-mais > :first-child { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255, 255, 255, .07); }
+
+/* ---- v2.1: faixa de resumo (placar) + filtro de origem ---- */
+.v2 .kb-resumo { flex-shrink: 0; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 0 0 10px; padding-bottom: 10px; border-bottom: 1px solid var(--linha); }
+.v2 .kb-placar { display: flex; align-items: stretch; gap: 8px; flex-wrap: wrap; }
+.v2 .kb-stat { display: flex; flex-direction: column; gap: 1px; padding-right: 14px; border-right: 1px solid rgba(255, 255, 255, .08); }
+.v2 .kb-stat:last-child { border-right: none; padding-right: 0; }
+.v2 .kb-stat b { font-size: 15px; font-weight: 600; line-height: 1.15; }
+.v2 .kb-stat i { font-size: 10px; font-style: normal; color: var(--txt-3); }
+.v2 .kb-stat.al b { color: var(--rubro); }
+.v2 .kb-filtro-origem { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.v2 .kb-fchip { font-size: 10.5px; font-weight: 500; color: var(--txt-2); background: rgba(255, 255, 255, .045); border: 1px solid rgba(255, 255, 255, .1); border-radius: 99px; padding: 3px 10px; cursor: pointer; font-family: var(--fonte); display: inline-flex; align-items: center; gap: 5px; }
+.v2 .kb-fchip:hover { color: var(--txt); background: rgba(255, 255, 255, .08); }
+.v2 .kb-fchip.on { background: rgba(255, 255, 255, .1); color: var(--txt); border-color: rgba(255, 255, 255, .25); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1); }
+.v2 .kb-fchip .c { font-size: 9px; color: var(--txt-3); }
+.v2 .kb-fchip.on .c { color: var(--txt-2); }
 .v2 .kc .t3.al { color: var(--rubro); font-weight: 600; }
 
 /* menu de contexto (card e coluna) */

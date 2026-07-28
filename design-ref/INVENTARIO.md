@@ -905,3 +905,16 @@ O redesign Platina virou as rotas OFICIAIS (fim do gate `import.meta.env.DEV` / 
 - **Ficha judicial**: comportamento inalterado (só a casca v2 já existente).
 - Smoke-test no build de produção (modo demo, seguro): login→shell→logout, WhatsApp leitura, cobrança criada, opt-out em WhatsApp+Contatos, 3 telas de manutenção, `/v1/*` acessível, 1366×768 sem cortes, reduced-motion, zero erros de console. Kanban renderiza com colunas+cards arrastáveis (DnD rAF não simulável no pane oculto).
 - **AVISO ao dono (config manual no Supabase, fora do código)**: allowlist de Redirect URLs (Auth → URL Configuration) — Site URL `https://atenvo-cs4.pages.dev` + `/definir-senha`, `/definir-senha?ativar=1`, `/definir-senha**` (convite) e `/redefinir-senha` (recuperação, AuthContext usa origin). Paths idênticos aos do v1 — se já estavam na allowlist, nada muda. Deploy no CF Pages é MANUAL, disparado pelo dono; NÃO feito nesta sessão, nada empurrado.
+
+---
+
+## Kanban v2.1 — painel legível (2026-07-28, commit "v2: kanban — painel legivel")
+
+DECISÃO DE PRODUTO (precedente Agendamentos/Scripts/Relatórios): enriquecimento de apresentação além da recriação, aprovado pelo dono. Regra absoluta: só agregação client-side do já carregado; zero query/métrica/mutação nova; drag/ações/deep-link/estados intactos. Motivo: 315 leads, 270 numa coluna → densidade sem hierarquia perde o operador. Só a APRESENTAÇÃO muda.
+
+- **Card em camadas**: compacto por padrão (nome + benefício/serviço + valor + UM sinal crítico por regra — parado Xd rubro > N novas > Ficha pendente > Lead quente > Ficha ✓ > avatar do responsável). Secundário (instituição, tags, SLAs, footer) em `.kc-mais` revelado no hover (max-height; reduced-motion desliga; colapsa no `.drag`/`.moving` p/ não empurrar a coluna) e completo no DetalheModalV2 ao clicar.
+- **Origem → filtro**: chip de canal saiu do card (ruído repetido) → `.kb-fchip` no topo (Todas/<origem> N); no card só como exceção ao `origemDominante`. Contagem N sobre TODOS os leads (= o que o filtro revela; inclui fechados nas colunas terminais).
+- **Ordenação por urgência** (client-side, declarada): estagnação (`diasParado`, `LIMIAR_PARADO_DIAS=7`) → severidade SLA → prioridade → `ordem` manual (tiebreak; não quebra reorder).
+- **Placar** `.kb-resumo`: leads ativos · R$ em potencial · N parados +7d (rubro) · N ficha pendente. ACOMPANHA o filtro de origem (`abertosNoRecorte`) — coerente com o board recortado.
+- Seed demo: 2 leads `canalNome:'ANDRIUS'` (dominante LUIZA) só p/ exercitar filtro/exceção.
+- Auditoria adversarial (3 lentes + refutação): 2 corrigidos (placar deriva do recorte; contagem do chip = leads revelados). TDZ pego (`origemDe` antes da declaração) → reordenado. Refutados: reflow-no-hover (design declarado), âmbar-na-exceção (atenção intencional).

@@ -179,10 +179,10 @@ function seedKb(): SeedKb {
     leadDemo({ id: 'kl-1', nome: 'Ivone F. Cardoso', colunaId: 'kc-1', contatoId: 'kct-1', conversaOrigemId: 'kcv-1', respNome: 'Juliana', respId: 'u-mock', valorDescontoMensal: 130, tipoServico: 'cancelamento', statusCancelamento: 'nao_iniciado', instituicao: 'Banco Pan', criadoEm: iso(agora - 2 * h), atualizadoEm: iso(agora - 2 * h), movimentadoEm: iso(agora - 2 * h), contatoEtiquetas: ['Idoso'] }),
     leadDemo({ id: 'kl-2', nome: 'Sebastião R. Nunes', colunaId: 'kc-1', contatoId: 'kct-2', valor: 1300, atualizadoEm: iso(agora - 5 * h), movimentadoEm: iso(agora - 5 * h) }),
     leadDemo({ id: 'kl-3', nome: 'Maria Aparecida Souza', colunaId: 'kc-2', contatoId: 'kct-3', conversaOrigemId: 'kcv-3', respNome: 'Juliana', respId: 'u-mock', tipoServico: 'cancelamento_ressarcimento', statusCancelamento: 'em_analise', statusRessarcimento: 'em_analise', valorRessarcimentoEstimado: 4800, instituicao: 'BMG', numeroBeneficio: '123.456.789-0', etiquetas: ['Urgente'], atualizadoEm: iso(agora - 12 * 60_000), movimentadoEm: iso(agora - 12 * 60_000), prioridade: 'alta' }),
-    leadDemo({ id: 'kl-4', nome: 'Terezinha M. Alves', colunaId: 'kc-2', contatoId: 'kct-4', respNome: 'Matheus', valor: 1300, atualizadoEm: iso(agora - 3 * h), movimentadoEm: iso(agora - 3 * h) }),
+    leadDemo({ id: 'kl-4', nome: 'Terezinha M. Alves', colunaId: 'kc-2', contatoId: 'kct-4', respNome: 'Matheus', canalNome: 'ANDRIUS', valor: 1300, atualizadoEm: iso(agora - 3 * h), movimentadoEm: iso(agora - 3 * h) }),
     leadDemo({ id: 'kl-5', nome: 'Antônio Pereira Lima', colunaId: 'kc-3', contatoId: 'kct-5', respNome: 'Juliana', respId: 'u-mock', tipoServico: 'ressarcimento', statusRessarcimento: 'solicitado', valorRessarcimentoEstimado: 6200, instituicao: 'Banco Pan', atualizadoEm: iso(agora - 24 * h), movimentadoEm: iso(agora - 24 * h) }),
     leadDemo({ id: 'kl-6', nome: 'José Carlos Ferreira', colunaId: 'kc-3', contatoId: 'kct-6', respNome: 'Matheus', valor: 1300, tipoBeneficio: 'pensao_por_morte', atualizadoEm: iso(agora - 9 * 24 * h), movimentadoEm: iso(agora - 9 * 24 * h) }),
-    leadDemo({ id: 'kl-7', nome: 'Neusa B. Martins', colunaId: 'kc-4', contatoId: 'kct-7', respNome: 'Juliana', respId: 'u-mock', valorDescontoMensal: 96.4, tipoServico: 'cancelamento', statusCancelamento: 'solicitado', tipoDesconto: 'mensalidade associativa', dataInicioDesconto: '2024-03-01', atualizadoEm: iso(agora - 2 * 24 * h), movimentadoEm: iso(agora - 2 * 24 * h) }),
+    leadDemo({ id: 'kl-7', nome: 'Neusa B. Martins', colunaId: 'kc-4', contatoId: 'kct-7', respNome: 'Juliana', respId: 'u-mock', canalNome: 'ANDRIUS', valorDescontoMensal: 96.4, tipoServico: 'cancelamento', statusCancelamento: 'solicitado', tipoDesconto: 'mensalidade associativa', dataInicioDesconto: '2024-03-01', atualizadoEm: iso(agora - 2 * 24 * h), movimentadoEm: iso(agora - 2 * 24 * h) }),
     leadDemo({ id: 'kl-8', nome: 'Aparecida L. Rocha', colunaId: 'kc-5', contatoId: 'kct-8', respNome: 'Matheus', status: 'ganho', fechadoEm: iso(agora - 48 * h), valorRessarcimentoEstimado: 5100, tipoServico: 'ressarcimento', statusRessarcimento: 'pago', valorRessarcido: 5100, atualizadoEm: iso(agora - 48 * h), movimentadoEm: iso(agora - 48 * h) }),
     leadDemo({ id: 'kl-9', nome: 'Cleusa M. Barros', colunaId: 'kc-6', contatoId: 'kct-9', status: 'perdido', fechadoEm: iso(agora - 72 * h), motivoPerda: 'sem_interesse', valor: 1300, atualizadoEm: iso(agora - 72 * h), movimentadoEm: iso(agora - 72 * h) }),
   ];
@@ -271,6 +271,7 @@ export default function KanbanV2() {
 
   const [detId, setDetId] = useState<string | null>(null);
   const [destaque, setDestaque] = useState<string | null>(null);
+  const [filtroOrigem, setFiltroOrigem] = useState<string | null>(null); // v2.1: origem repetida vira filtro no topo
 
   /* ---------- dados (demo | real) ---------- */
   const colunasBase = demo ? seed.colunas : k.colunas;
@@ -303,7 +304,8 @@ export default function KanbanV2() {
     if (hay.includes(term)) return true;
     return termDig.length >= 3 && (l.telefone ?? '').replace(/\D/g, '').includes(termDig);
   };
-  const leadsVisiveis = useMemo(() => leads.filter(matchBusca), [leads, term, termDig]); // eslint-disable-line react-hooks/exhaustive-deps
+  const origemDe = (l: KLead) => l.canalNome || l.origem || 'Sem origem'; // v2.1: origem do card/filtro
+  const leadsVisiveis = useMemo(() => leads.filter((l) => matchBusca(l) && (!filtroOrigem || origemDe(l) === filtroOrigem)), [leads, term, termDig, filtroOrigem]); // eslint-disable-line react-hooks/exhaustive-deps
   // severidade máxima de SLA por lead, uma vez por render (386 cards no real: o sort não pode realocar por comparação)
   const SEV_PESO: Record<string, number> = { imediato: 5, critico: 4, vermelho: 3, amarelo: 2, leve: 1 };
   const sevPorLead = useMemo(() => {
@@ -314,8 +316,28 @@ export default function KanbanV2() {
   const semResultado = term !== '' && leadsVisiveis.length === 0 && leads.length > 0;
   const vazioFunil = leads.length === 0 && colunas.length > 0;
 
-  const abertos = leads.filter((l) => l.status === 'em_andamento');
-  const somaPotencial = abertos.reduce((s, l) => s + (valorRelevante(l).valor ?? 0), 0);
+  const abertos = useMemo(() => leads.filter((l) => l.status === 'em_andamento'), [leads]);
+  // O PLACAR acompanha o filtro de origem (o recorte que o chip ao lado aplica): mesmo conjunto
+  // ativo que o board mostra na faceta selecionada — sem filtro, é o funil inteiro.
+  const abertosNoRecorte = useMemo(() => abertos.filter((l) => !filtroOrigem || origemDe(l) === filtroOrigem), [abertos, filtroOrigem]); // eslint-disable-line react-hooks/exhaustive-deps
+  const somaPotencial = useMemo(() => abertosNoRecorte.reduce((s, l) => s + (valorRelevante(l).valor ?? 0), 0), [abertosNoRecorte]);
+
+  /* ---------- v2.1: agregação client-side (só apresentação; zero query/métrica/mutação nova) ----------
+     estaParado = MESMA regra do trilho rubro do card (LIMIAR_PARADO_DIAS sem trocar de coluna neutra). */
+  const estaParado = (l: KLead) => l.status === 'em_andamento'
+    && (colunas.find((c) => c.id === l.colunaId)?.resultado ?? 'neutro') === 'neutro'
+    && diasParado(l) >= LIMIAR_PARADO_DIAS;
+  const nParados = useMemo(() => abertosNoRecorte.filter(estaParado).length, [abertosNoRecorte, colunas]); // eslint-disable-line react-hooks/exhaustive-deps
+  const nFichaPend = useMemo(() => abertosNoRecorte.filter((l) => fichaStatusMap[l.id] === 'rascunho').length, [abertosNoRecorte, fichaStatusMap]);
+  // origem/canal repetido em ~todos os cards é ruído → vira FILTRO no topo; no card só quando é exceção.
+  // Conta sobre TODOS os leads (o filtro revela abertos E fechados nas colunas terminais) — o N do chip
+  // bate exatamente com o que ele revela ao clicar.
+  const origens = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const l of leads) m.set(origemDe(l), (m.get(origemDe(l)) ?? 0) + 1);
+    return [...m.entries()].map(([nome, n]) => ({ nome, n })).sort((a, b) => b.n - a.n);
+  }, [leads]); // eslint-disable-line react-hooks/exhaustive-deps
+  const origemDominante = origens.length ? origens[0].nome : null;
 
   /* reconciliação do otimista (v1): entrada some quando o servidor confirma */
   useEffect(() => {
@@ -687,11 +709,7 @@ export default function KanbanV2() {
       <div className="ph sobe">
         <div>
           <h2>Kanban</h2>
-          <p className="num">
-            {abertos.length} lead{abertos.length === 1 ? '' : 's'} ativo{abertos.length === 1 ? '' : 's'}
-            {somaPotencial > 0 ? ` · ${fmtBRL(somaPotencial)} em potencial` : ''}
-            {demo ? ' · modo demonstração (nada é gravado)' : ''}
-          </p>
+          <p>Funil comercial{demo ? ' · modo demonstração (nada é gravado)' : ''}</p>
         </div>
         <div className="acoes">
           <div className="kb-busca">
@@ -705,6 +723,28 @@ export default function KanbanV2() {
           <BotaoPrimario onClick={() => abrirNovoLead()}>＋ Novo lead</BotaoPrimario>
         </div>
       </div>
+
+      {/* v2.1 — faixa de resumo (placar) + filtro de origem. Só agregação client-side do já carregado. */}
+      {!vazioFunil && (
+        <div className="kb-resumo sobe">
+          <div className="kb-placar">
+            <span className="kb-stat"><b className="num">{abertosNoRecorte.length}</b><i>lead{abertosNoRecorte.length === 1 ? '' : 's'} ativo{abertosNoRecorte.length === 1 ? '' : 's'}</i></span>
+            {somaPotencial > 0 && <span className="kb-stat"><b className="num">{fmtBRL(somaPotencial)}</b><i>em potencial</i></span>}
+            <span className={'kb-stat' + (nParados > 0 ? ' al' : '')}><b className="num">{nParados}</b><i>parado{nParados === 1 ? '' : 's'} +{LIMIAR_PARADO_DIAS}d</i></span>
+            <span className="kb-stat"><b className="num">{nFichaPend}</b><i>ficha{nFichaPend === 1 ? '' : 's'} pendente{nFichaPend === 1 ? '' : 's'}</i></span>
+          </div>
+          {origens.length > 1 && (
+            <div className="kb-filtro-origem" role="group" aria-label="Filtrar por origem">
+              <button type="button" className={'kb-fchip' + (!filtroOrigem ? ' on' : '')} onClick={() => setFiltroOrigem(null)}>Todas</button>
+              {origens.slice(0, 6).map((o) => (
+                <button key={o.nome} type="button" className={'kb-fchip' + (filtroOrigem === o.nome ? ' on' : '')} title={`${o.n} lead(s) · ${o.nome}`} onClick={() => setFiltroOrigem((f) => (f === o.nome ? null : o.nome))}>
+                  {o.nome}<span className="c num">{o.n}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {aviso && (
         <div className={aviso.tom === 'erro' ? 'aviso-inline erro' : 'aviso-inline'} role="status" style={{ flexShrink: 0 }}>
@@ -785,6 +825,12 @@ export default function KanbanV2() {
                   {cardsCol
                     .slice()
                     .sort((a, b) => {
+                      // v2.1 — ordem inicial por URGÊNCIA (client-side): estagnação primeiro (mais
+                      // parado no topo, em rubro), depois severidade SLA, prioridade e por fim a ordem
+                      // manual (tiebreak — não quebra reorder dentro da coluna).
+                      const da = estaParado(a) ? diasParado(a) : 0;
+                      const db = estaParado(b) ? diasParado(b) : 0;
+                      if (da !== db) return db - da;
                       const sa = sevPorLead.get(a.id) ?? 0;
                       const sb = sevPorLead.get(b.id) ?? 0;
                       if (sa !== sb) return sb - sa;
@@ -796,6 +842,7 @@ export default function KanbanV2() {
                     .map((l) => (
                       <CardKc
                         key={l.id} l={l} colunas={colunas} colunaAtual={col.id} etiquetas={etiquetas}
+                        origemDominante={origemDominante}
                         naoLidas={naoLidasMap[l.contatoId ?? ''] ?? 0}
                         sla={(slaPorOpp.get(l.id) ?? []).filter((a) => !SLA_OCULTO_NO_CARD.has(a.tipo))}
                         fichaStatus={fichaStatusMap[l.id]}
@@ -1004,8 +1051,8 @@ function DetRow({ l, v }: { l: string; v: ReactNode }) {
    trocar de coluna, lead aberto em coluna neutra); .quente = alerta
    SLA de lead quente ativo.
    ================================================================ */
-function CardKc({ l, colunas, etiquetas, naoLidas, sla, fichaStatus, optout, moving, arrastando, destacado, menuAberto, colunaAtual, aoRef, aoClicar, aoMenu, aoEditar, aoMover, aoArquivar, aoDragStart, aoDragEnd }: {
-  l: KLead; colunaAtual: string; colunas: KColuna[]; etiquetas: Etiqueta[]; naoLidas: number;
+function CardKc({ l, colunas, etiquetas, origemDominante, naoLidas, sla, fichaStatus, optout, moving, arrastando, destacado, menuAberto, colunaAtual, aoRef, aoClicar, aoMenu, aoEditar, aoMover, aoArquivar, aoDragStart, aoDragEnd }: {
+  l: KLead; colunaAtual: string; colunas: KColuna[]; etiquetas: Etiqueta[]; origemDominante: string | null; naoLidas: number;
   sla: SlaAlerta[]; fichaStatus: string | undefined; optout: boolean; moving: boolean; arrastando: boolean;
   destacado: boolean; menuAberto: boolean;
   aoRef: (el: HTMLDivElement | null) => void; aoClicar: () => void; aoMenu: () => void;
@@ -1019,7 +1066,16 @@ function CardKc({ l, colunas, etiquetas, naoLidas, sla, fichaStatus, optout, mov
   const quente = sla.some((a) => a.tipo === 'lead_quente_aguardando');
   const servLbl = l.tipoServico !== 'analise_inicial' ? rotuloDe(TIPO_SERVICO, l.tipoServico) : '';
   const sub = [l.tipoBeneficio ? rotuloDe(TIPO_BENEFICIO, l.tipoBeneficio) : '', servLbl].filter(Boolean).join(' · ');
-  const chip = chipDe(l);
+  const origem = chipDe(l);
+  const origemExcecao = !!origem && origemDominante != null && origem !== origemDominante; // v2.1: origem só no card quando exceção
+  // SINAL CRÍTICO compacto — UM só, por regra (o mais informativo); o resto vai para o hover/detalhe.
+  const sinal = parado ? <span className="kc-sinal parado">parado {diasParado(l)}d</span>
+    : naoLidas > 0 ? <span className="kc-sinal novas" title={naoLidas + ' mensagem(ns) nova(s) do cliente'}>{Math.min(naoLidas, 99)} nova{naoLidas === 1 ? '' : 's'}</span>
+    : fichaStatus === 'rascunho' ? <span className="kc-sinal ficha-rasc">Ficha pendente</span>
+    : quente ? <span className="kc-sinal quente">Lead quente</span>
+    : fichaStatus === 'finalizada' ? <span className="kc-sinal ficha-fim">Ficha ✓</span>
+    : l.respNome ? <span className="kc-sinal resp" title={'Responsável · ' + l.respNome}><i className="av-mini">{initials(l.respNome)}</i></span>
+    : null;
 
   return (
     <div
@@ -1053,39 +1109,49 @@ function CardKc({ l, colunas, etiquetas, naoLidas, sla, fichaStatus, optout, mov
         </span>
       </div>
       {sub && <div className="sub" title={sub}>{sub}</div>}
-      {l.instituicao && <div className="inst" title={l.instituicao}>{l.instituicao}</div>}
-      {(chip || optout) && (
-        <div className="meta">
-          {chip && <span className="chip" title={chip}>{chip}</span>}
+
+      {/* linha-base COMPACTA (sempre visível): valor + o sinal mais crítico + flags críticas */}
+      <div className="kc-base">
+        {vr.valor != null
+          ? <span className="v num">{fmtBRL(vr.valor)}{vr.mensal && <span className="mes"> /mês</span>}</span>
+          : <span className="v v-sem">—</span>}
+        <span className="kc-sinais">
           {optout && <span className="optout" title="Contato marcado como não incomodar — mensagens bloqueadas.">Não incomodar</span>}
-        </div>
-      )}
-      {vr.valor != null && <div className="v num">{fmtBRL(vr.valor)}{vr.mensal && <span className="mes"> /mês</span>}</div>}
-      {tags.length > 0 && (
-        <div className="tags" title={tags.join(', ')}>
-          {tags.slice(0, 3).map((t) => {
-            const cor = corDaEtiqueta(t, etiquetas);
-            return <span key={t} className="tag" style={{ background: cor + '22', color: cor, borderColor: cor + '55' }}>{t}</span>;
-          })}
-          {tags.length > 3 && <span className="tag mais">+{tags.length - 3}</span>}
-        </div>
-      )}
-      {(sla.length > 0 || l.prioridade === 'alta') && (
-        <div className="slas">
-          {sla.map((a) => (
-            <span key={a.id} className={'sla-chip s-' + a.severidade} title={a.detalhe ?? a.titulo}>{slaChipTexto(a.tipo, l.movimentadoEm)}</span>
-          ))}
-          {l.prioridade === 'alta' && <span className="sla-chip prio" title="Prioridade alta">⭐ Prioridade alta</span>}
-        </div>
-      )}
-      <div className="r">
-        <span className="av3" title={l.nome}>
-          {initials(l.nome)}
-          {naoLidas > 0 && <i className="naolidas num" title={naoLidas + ' mensagem(ns) nova(s) do cliente'} aria-label={naoLidas + ' mensagens novas'}>{Math.min(naoLidas, 99)}</i>}
+          {origemExcecao && <span className="chip exc" title={'Origem: ' + origem}>{origem}</span>}
+          {sinal}
         </span>
-        <span className="resp" title={l.respNome || 'Não atribuído'}>{l.respNome || 'Não atribuído'}</span>
-        {fichaStatus && <span className={'ficha-tag ' + fichaStatus}>{fichaStatus === 'finalizada' ? 'Ficha finalizada' : 'Ficha em rascunho'}</span>}
-        <span className={'t3 num' + (parado ? ' al' : '')}>{parado ? `parado ${diasParado(l)}d` : haDe(l.atualizadoEm || l.criadoEm)}</span>
+      </div>
+
+      {/* DETALHE SECUNDÁRIO — revelado no HOVER do card (e completo no detalhe ao clicar) */}
+      <div className="kc-mais">
+        {l.instituicao && <div className="inst" title={l.instituicao}>{l.instituicao}</div>}
+        {(origem && !origemExcecao) || tags.length > 0 ? (
+          <div className="tags" title={tags.join(', ')}>
+            {origem && !origemExcecao && <span className="chip" title={'Origem: ' + origem}>{origem}</span>}
+            {tags.slice(0, 3).map((t) => {
+              const cor = corDaEtiqueta(t, etiquetas);
+              return <span key={t} className="tag" style={{ background: cor + '22', color: cor, borderColor: cor + '55' }}>{t}</span>;
+            })}
+            {tags.length > 3 && <span className="tag mais">+{tags.length - 3}</span>}
+          </div>
+        ) : null}
+        {(sla.length > 0 || l.prioridade === 'alta') && (
+          <div className="slas">
+            {sla.map((a) => (
+              <span key={a.id} className={'sla-chip s-' + a.severidade} title={a.detalhe ?? a.titulo}>{slaChipTexto(a.tipo, l.movimentadoEm)}</span>
+            ))}
+            {l.prioridade === 'alta' && <span className="sla-chip prio" title="Prioridade alta">⭐ Prioridade alta</span>}
+          </div>
+        )}
+        <div className="r">
+          <span className="av3" title={l.nome}>
+            {initials(l.nome)}
+            {naoLidas > 0 && <i className="naolidas num" title={naoLidas + ' mensagem(ns) nova(s) do cliente'} aria-label={naoLidas + ' mensagens novas'}>{Math.min(naoLidas, 99)}</i>}
+          </span>
+          <span className="resp" title={l.respNome || 'Não atribuído'}>{l.respNome || 'Não atribuído'}</span>
+          {fichaStatus && <span className={'ficha-tag ' + fichaStatus}>{fichaStatus === 'finalizada' ? 'Ficha finalizada' : 'Ficha em rascunho'}</span>}
+          <span className={'t3 num' + (parado ? ' al' : '')}>{parado ? `parado ${diasParado(l)}d` : haDe(l.atualizadoEm || l.criadoEm)}</span>
+        </div>
       </div>
     </div>
   );
