@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useOrg } from '@/context/OrgContext';
@@ -7,6 +8,7 @@ import '../tokens.css';
 import '../base.css';
 import './shell.css';
 import { instalarSpotlight } from '../lib/spotlight';
+import { criarRaizPortalV2 } from '../components/portal';
 import { ICONES } from './icones';
 import { NotificacaoResposta, type DadosNotificacao } from './NotificacaoResposta';
 import { useNotificacaoInbound } from '../hooks/useNotificacaoInbound';
@@ -80,8 +82,18 @@ export default function AppShellV2() {
   const [sinoOn, setSinoOn] = useState(false);
   const [badgePop, setBadgePop] = useState(0);
   const [menuUsuario, setMenuUsuario] = useState(false);
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number }>({ top: 60, right: 20 });
   const seqRef = useRef(0);
+  const avatarRef = useRef<HTMLButtonElement>(null);
   const fecharNotif = useCallback(() => setNotif(null), []);
+  // raiz de portal (regra 10): o menu monta no body, fora do stacking context da topbar
+  // (que tem backdrop-filter) — senão o conteúdo do palco pinta por cima dele. Shell monta 1×.
+  const raizMenu = useMemo(() => criarRaizPortalV2(document) as unknown as HTMLElement, []);
+  const abrirMenuUsuario = useCallback(() => {
+    const r = avatarRef.current?.getBoundingClientRect();
+    if (r) setMenuPos({ top: Math.round(r.bottom + 8), right: Math.round(window.innerWidth - r.right) });
+    setMenuUsuario((v) => !v);
+  }, []);
   // sino: o v1 abre a "Central de atendimento" (SLA) — não portada ao v2. Fallback declarado
   // no reporte: leva ao Inbox (onde os inbounds notificados vivem) e marca o pulso como visto.
   const abrirNotificacoes = useCallback(() => { setSinoOn(false); setBadgePop(0); navigate('/v2/whatsapp'); }, [navigate]);
@@ -192,23 +204,24 @@ export default function AppShellV2() {
                 <span className={sinoOn ? 'pt on' : 'pt'} aria-hidden />
               </button>
               <div className="top-usuario">
-                <button type="button" className="avatar avatar-btn" aria-label="Menu do usuário" aria-haspopup="menu"
+                <button ref={avatarRef} type="button" className="avatar avatar-btn" aria-label="Menu do usuário" aria-haspopup="menu"
                   aria-expanded={menuUsuario} title={nome} style={{ width: 33, height: 33 }}
-                  onClick={() => setMenuUsuario((v) => !v)}>{iniciaisDe(nome)}</button>
-                {menuUsuario && (
-                  <>
-                    <div className="um-backdrop" onClick={() => setMenuUsuario(false)} aria-hidden />
-                    <div className="usuario-menu" role="menu" aria-label="Menu do usuário">
-                      <div className="um-head">
-                        <div className="um-nome">{nome}</div>
-                        <div className="um-cargo">{papel}</div>
-                      </div>
-                      <button type="button" role="menuitem" className="um-item" onClick={() => { setMenuUsuario(false); navigate('/v2/configuracoes'); }}>Configurações</button>
-                      <button type="button" role="menuitem" className="um-item perigo" onClick={sair}>Sair</button>
-                    </div>
-                  </>
-                )}
+                  onClick={abrirMenuUsuario}>{iniciaisDe(nome)}</button>
               </div>
+              {menuUsuario && createPortal(
+                <>
+                  <div className="um-backdrop" onClick={() => setMenuUsuario(false)} aria-hidden />
+                  <div className="usuario-menu" role="menu" aria-label="Menu do usuário" style={{ top: menuPos.top, right: menuPos.right }}>
+                    <div className="um-head">
+                      <div className="um-nome">{nome}</div>
+                      <div className="um-cargo">{papel}</div>
+                    </div>
+                    <button type="button" role="menuitem" className="um-item" onClick={() => { setMenuUsuario(false); navigate('/v2/configuracoes'); }}>Configurações</button>
+                    <button type="button" role="menuitem" className="um-item perigo" onClick={sair}>Sair</button>
+                  </div>
+                </>,
+                raizMenu,
+              )}
             </div>
           </div>
 

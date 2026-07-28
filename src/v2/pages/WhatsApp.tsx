@@ -512,7 +512,7 @@ export default function WhatsAppV2() {
       {/* ===================== CONVERSA ===================== */}
       <section className="wa-conv">
         {aviso && (
-          <div className={aviso.tom === 'erro' ? 'aviso-inline erro' : 'aviso-inline'} role="status" style={{ margin: '8px 14px 0', flexShrink: 0 }}>
+          <div className={aviso.tom === 'erro' ? 'aviso-inline erro' : 'aviso-inline'} role="status">
             {aviso.texto}
             <button type="button" onClick={() => setAviso(null)} aria-label="Fechar aviso">×</button>
           </div>

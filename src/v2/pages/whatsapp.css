@@ -83,7 +83,15 @@
 .v2 .wa-skel .row { display: flex; gap: 10px; align-items: center; }
 
 /* ---------- conversa (flex) ---------- */
-.v2 .wa-conv { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.v2 .wa-conv { flex: 1; min-width: 0; display: flex; flex-direction: column; position: relative; }
+/* aviso da conversa: banner FLUTUANTE (não empurra o cabeçalho/mensagens) e OPACO
+   (#17191D, nada transparece), com acento semântico verde/rubro herdado do .aviso-inline. */
+.v2 .wa-conv > .aviso-inline {
+  position: absolute; top: 62px; left: 50%; transform: translateX(-50%); z-index: 30;
+  margin: 0; max-width: min(600px, calc(100% - 32px)); width: max-content;
+  background: #17191D; box-shadow: 0 14px 34px rgba(0, 0, 0, .5);
+  animation: v2-modal-entra .18s var(--ease);
+}
 .v2 .wa-ctopo { display: flex; align-items: center; gap: 10px; padding: 9px 14px; border-bottom: 1px solid var(--linha); background: rgba(255, 255, 255, .02); flex-shrink: 0; flex-wrap: wrap; }
 .v2 .wa-ctopo .av2 { width: 32px; height: 32px; font-size: 12px; }
 .v2 .wa-ctopo .idw { min-width: 0; }
