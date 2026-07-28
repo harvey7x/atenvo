@@ -1,0 +1,200 @@
+/* ============================================================
+   Maturação de Números — órfã (manual de extensão, admin-only).
+   Linha vertical de operação: banner de modo → placar do pool →
+   cards de chip → estratégia → sementes → conteúdo → config.
+   Seções em painéis de vidro; cards de chip com fundo sólido
+   leve (regra 8: sem backdrop-filter dentro de grades).
+   ============================================================ */
+
+/* banner de modo — a informação mais importante da tela */
+.v2 .mat2-modo {
+  display: flex; align-items: center; gap: 13px; padding: 13px 16px;
+  border-radius: 12px; margin-bottom: 12px; border: 1px solid;
+}
+.v2 .mat2-modo.dry { background: var(--ambar-bg); border-color: rgba(217, 164, 74, .3); }
+.v2 .mat2-modo.ativo { background: var(--verde-bg); border-color: rgba(74, 190, 140, .3); }
+.v2 .mat2-modo .ic { flex-shrink: 0; display: flex; }
+.v2 .mat2-modo.dry .ic { color: var(--ambar); }
+.v2 .mat2-modo.ativo .ic { color: var(--verde); }
+.v2 .mat2-modo .ic svg { width: 20px; height: 20px; }
+.v2 .mat2-modo .tx { flex: 1; min-width: 0; }
+.v2 .mat2-modo .tx strong { display: block; font-size: 12.5px; letter-spacing: .02em; }
+.v2 .mat2-modo.dry .tx strong { color: var(--ambar); }
+.v2 .mat2-modo.ativo .tx strong { color: var(--verde); }
+.v2 .mat2-modo .tx span { display: block; font-size: 11.5px; color: var(--txt-2); margin-top: 2px; line-height: 1.5; }
+
+/* placar do pool: KPIs + anel da média */
+.v2 .mat2-media { display: flex; align-items: center; gap: 14px; padding: 14px 16px; }
+.v2 .mat2-ring {
+  width: 64px; height: 64px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; position: relative;
+  background:
+    radial-gradient(closest-side, var(--base) 78%, transparent 79%),
+    conic-gradient(var(--cor-ring, #fff) calc(var(--p) * 1%), rgba(255, 255, 255, .09) 0);
+}
+.v2 .mat2-ring b { font-size: 17px; font-variant-numeric: tabular-nums; }
+.v2 .mat2-ring i { font-style: normal; font-size: 9px; color: var(--txt-3); margin-left: 1px; }
+.v2 .sc-saudavel { --cor-ring: var(--verde); }
+.v2 .sc-atencao { --cor-ring: var(--ambar); }
+.v2 .sc-risco { --cor-ring: var(--rubro); }
+.v2 .mat2-media .tx strong { display: block; font-size: 12.5px; }
+.v2 .mat2-media .tx span { display: block; font-size: 11.5px; color: var(--txt-2); line-height: 1.55; margin-top: 3px; max-width: 640px; }
+
+/* seções */
+.v2 .mat2-sec { padding: 16px 18px; border-radius: var(--r-card); margin-bottom: 12px; }
+.v2 .mat2-sec-h { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
+.v2 .mat2-sec-h .tit { flex: 1; min-width: 0; }
+.v2 .mat2-sec-h h2 { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 7px; }
+.v2 .mat2-sec-h h2 svg { width: 14px; height: 14px; color: var(--txt-2); }
+.v2 .mat2-sec-h p { font-size: 11.5px; color: var(--txt-2); line-height: 1.55; margin-top: 4px; max-width: 760px; }
+
+/* grade de chips */
+.v2 .mat2-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+.v2 .mtc {
+  border: 1px solid var(--linha); border-radius: 12px; padding: 12px 13px;
+  background: rgba(255, 255, 255, .025);
+  display: flex; flex-direction: column; gap: 10px;
+}
+.v2 .mtc.s-vermelho { border-color: rgba(229, 102, 92, .38); }
+.v2 .mtc.s-amarelo { border-color: rgba(217, 164, 74, .32); }
+.v2 .mtc-h { display: flex; align-items: flex-start; gap: 9px; }
+.v2 .mtc-sem { width: 9px; height: 9px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; background: var(--txt-3); }
+.v2 .s-verde .mtc-sem { background: var(--verde); box-shadow: 0 0 8px rgba(74, 190, 140, .6); }
+.v2 .s-amarelo .mtc-sem { background: var(--ambar); box-shadow: 0 0 8px rgba(217, 164, 74, .6); }
+.v2 .s-vermelho .mtc-sem { background: var(--rubro); box-shadow: 0 0 8px rgba(229, 102, 92, .6); }
+.v2 .mtc-id { flex: 1; min-width: 0; }
+.v2 .mtc-id b { display: block; font-size: 12.5px; }
+.v2 .mtc-id i { display: block; font-style: normal; font-size: 11px; color: var(--txt-3); font-variant-numeric: tabular-nums; }
+.v2 .mtc-badges { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; flex-shrink: 0; }
+
+/* score do chip */
+.v2 .mtc-score { display: flex; align-items: center; gap: 11px; }
+.v2 .mtc-score .mat2-ring { width: 52px; height: 52px; }
+.v2 .mtc-score .mat2-ring b { font-size: 14px; }
+.v2 .mtc-score-tx { display: flex; flex-direction: column; }
+.v2 .mtc-score-tx .l { font-size: 10px; letter-spacing: .07em; text-transform: uppercase; color: var(--txt-3); }
+.v2 .mtc-score-tx .c { font-size: 12.5px; font-weight: 600; }
+.v2 .sc-saudavel .mtc-score-tx .c { color: var(--verde); }
+.v2 .sc-atencao .mtc-score-tx .c { color: var(--ambar); }
+.v2 .sc-risco .mtc-score-tx .c { color: var(--rubro); }
+
+/* rampa */
+.v2 .mtc-ramp-l { display: flex; justify-content: space-between; font-size: 11px; color: var(--txt-2); margin-bottom: 4px; }
+.v2 .mtc-ramp-l b { color: var(--txt); font-variant-numeric: tabular-nums; }
+.v2 .mtc-bar { height: 5px; border-radius: 99px; background: rgba(255, 255, 255, .07); overflow: hidden; }
+.v2 .mtc-bar i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, #FFF, #C9CDD4); }
+.v2 .mtc-ramp-s { display: block; font-size: 10.5px; color: var(--txt-3); margin-top: 4px; }
+
+/* KPIs 7d */
+.v2 .mtc-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.v2 .mtc-kpi {
+  text-align: center; padding: 6px 2px; border-radius: 9px;
+  background: rgba(255, 255, 255, .03); border: 1px solid var(--linha);
+}
+.v2 .mtc-kpi b { display: block; font-size: 14px; font-variant-numeric: tabular-nums; }
+.v2 .mtc-kpi i { display: block; font-style: normal; font-size: 9.5px; color: var(--txt-3); margin-top: 1px; }
+.v2 .mtc-kpi.ok b { color: var(--verde); }
+.v2 .mtc-kpi.bad b { color: var(--rubro); }
+.v2 .mtc-obs { font-size: 10.5px; color: var(--txt-3); line-height: 1.5; }
+
+/* checkbox perfil pronto */
+.v2 .mtc-check {
+  display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--txt-2);
+  cursor: pointer; padding: 7px 9px; border-radius: 9px;
+  background: rgba(255, 255, 255, .03); border: 1px solid var(--linha);
+}
+.v2 .mtc-check.on { color: var(--verde); border-color: rgba(74, 190, 140, .28); background: var(--verde-bg); }
+.v2 .mtc-check input { accent-color: #fff; }
+
+/* ações do card */
+.v2 .mtc-acts { display: flex; gap: 6px; align-items: center; margin-top: auto; }
+.v2 .mtc-acts .sp { flex: 1; }
+.v2 .mtc-hint { font-size: 10.5px; color: var(--ambar); line-height: 1.5; }
+
+/* listas (sementes/conteúdo) */
+.v2 .mat2-linha { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--linha); }
+.v2 .mat2-linha:first-child { border-top: none; }
+.v2 .mat2-linha .tx { flex: 1; min-width: 0; }
+.v2 .mat2-linha .tx b { display: block; font-size: 12px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .mat2-linha .tx i { display: block; font-style: normal; font-size: 10.5px; color: var(--txt-3); margin-top: 1px; }
+.v2 .mat2-vazio-linha { font-size: 11.5px; color: var(--txt-3); padding: 10px 0; }
+
+/* formulários das seções */
+.v2 .mat2-form { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-top: 12px; }
+.v2 .mat2-form .campo { margin-bottom: 0; flex: 1; min-width: 160px; }
+.v2 .mat2-form .campo.curta { flex: 0 0 150px; }
+.v2 .mat2-form .campo.larga { flex: 2; min-width: 220px; }
+
+/* estratégia — presets */
+.v2 .mat2-perfis { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+.v2 .mat2-perfil {
+  text-align: left; padding: 12px 13px; border-radius: 11px; cursor: pointer;
+  background: rgba(255, 255, 255, .025); border: 1px solid var(--linha);
+  color: var(--txt); font-family: var(--fonte);
+  display: flex; flex-direction: column; gap: 5px;
+  transition: border-color .18s, background .18s;
+}
+.v2 .mat2-perfil:hover:not(:disabled) { background: rgba(255, 255, 255, .05); border-color: rgba(255, 255, 255, .2); }
+.v2 .mat2-perfil:disabled { opacity: .6; cursor: default; }
+.v2 .mat2-perfil.sel { border-color: rgba(255, 255, 255, .55); background: rgba(255, 255, 255, .06); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12); }
+.v2 .mat2-perfil .ph2 { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.v2 .mat2-perfil .ph2 b { font-size: 12.5px; }
+.v2 .mat2-perfil .on2 { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 600; color: var(--verde); }
+.v2 .mat2-perfil .on2 svg { width: 11px; height: 11px; }
+.v2 .mat2-perfil .vol { font-size: 11px; color: var(--txt-2); font-variant-numeric: tabular-nums; }
+.v2 .mat2-perfil .dur { font-size: 10.5px; color: var(--txt-3); }
+.v2 .mat2-risco {
+  align-self: flex-start; font-size: 9.5px; font-weight: 600; letter-spacing: .04em;
+  border-radius: 99px; padding: 2px 8px; margin-top: 2px;
+}
+.v2 .mat2-risco.r-alto { color: var(--rubro); background: var(--rubro-bg); }
+.v2 .mat2-risco.r-medio { color: var(--ambar); background: var(--ambar-bg); }
+.v2 .mat2-risco.r-recomendado { color: var(--verde); background: var(--verde-bg); }
+.v2 .mat2-risco.r-baixo { color: var(--txt-2); background: rgba(255, 255, 255, .06); }
+.v2 .mat2-custom {
+  font-size: 10.5px; font-weight: 600; color: var(--ambar);
+  border: 1px solid rgba(217, 164, 74, .35); background: var(--ambar-bg);
+  border-radius: 99px; padding: 3px 10px; flex-shrink: 0;
+}
+.v2 .mat2-nota {
+  display: flex; gap: 9px; align-items: flex-start; margin-top: 12px;
+  font-size: 11.5px; color: var(--txt-2); line-height: 1.55;
+  background: rgba(255, 255, 255, .03); border: 1px solid var(--linha);
+  border-radius: 10px; padding: 9px 11px;
+}
+.v2 .mat2-nota svg { width: 14px; height: 14px; flex-shrink: 0; margin-top: 1px; color: var(--txt-3); }
+
+/* configuração */
+.v2 .mat2-cfg { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.v2 .mat2-cfg .campo { margin-bottom: 0; }
+.v2 .mat2-cfg .campo em { display: block; font-style: normal; font-size: 10.5px; color: var(--txt-3); margin-top: 4px; line-height: 1.45; }
+.v2 .mat2-cfg .campo em.bad { color: var(--rubro); }
+.v2 .mat2-cfg .larga { grid-column: 1 / -1; }
+.v2 .mat2-range { display: flex; align-items: center; gap: 10px; height: 36px; }
+.v2 .mat2-range input[type='range'] { flex: 1; accent-color: #fff; }
+.v2 .mat2-range b { font-size: 12.5px; font-variant-numeric: tabular-nums; min-width: 38px; text-align: right; }
+.v2 .mat2-cfg-acts { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 14px; }
+.v2 .mat2-cfg-nota { font-size: 10.5px; color: var(--txt-3); }
+
+/* QR */
+.v2 .mat2-qr { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
+.v2 .mat2-qr .lead { font-size: 11.5px; color: var(--txt-2); line-height: 1.55; }
+.v2 .mat2-qr-box {
+  width: 216px; height: 216px; border-radius: 14px; background: #fff;
+  display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 10px;
+}
+.v2 .mat2-qr-box img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.v2 .mat2-qr-box span { color: #55585e; font-size: 11.5px; }
+.v2 .mat2-qr-meta { font-size: 11px; color: var(--txt-3); font-variant-numeric: tabular-nums; }
+.v2 .mat2-qr-ok { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; padding: 8px 0; }
+.v2 .mat2-qr-ok .ic {
+  width: 46px; height: 46px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  color: var(--verde); background: var(--verde-bg); border: 1px solid rgba(74, 190, 140, .3);
+}
+.v2 .mat2-qr-ok .ic svg { width: 22px; height: 22px; }
+.v2 .mat2-qr-ok h3 { font-size: 13.5px; font-weight: 600; }
+.v2 .mat2-qr-ok p { font-size: 11.5px; color: var(--txt-2); line-height: 1.55; max-width: 330px; }
+.v2 .mat2-modal-sub { font-size: 10.5px; font-weight: 400; color: var(--txt-3); margin-top: 2px; }
+
+/* dias da semana (config) */
+.v2 .mat2-dias { display: flex; gap: 6px; flex-wrap: wrap; }

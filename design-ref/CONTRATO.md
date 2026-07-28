@@ -45,6 +45,11 @@ de apoio (dias até 30, meses depois). Sempre tabular-nums.
 Âmbar em estrela de favorito é uso declarado (convenção universal de
 favorito), não status semântico. Sempre via token `--ambar`, nunca hex solto.
 
+## Adendo nº 4 — rótulos do ConfirmDialogV2
+"Voltar" (cancelar) e "Aguarde…" (busy) são o padrão v2 declarado dos
+diálogos de confirmação — evitam o ambíguo "Cancelar" em diálogos cuja
+própria ação confirmada é cancelar algo.
+
 ## Manual de extensão (páginas sem mockup)
 - Cabeçalho de página: título + subtítulo à esquerda, ações à direita
   (padrão .ph do mockup). Máximo um botão primário por tela.

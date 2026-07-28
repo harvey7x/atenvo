@@ -37,6 +37,7 @@ const CobrancasV2 = lazy(() => import('@/v2/pages/Cobrancas'));
 const AgendamentosV2 = lazy(() => import('@/v2/pages/Agendamentos'));
 const ScriptsV2 = lazy(() => import('@/v2/pages/Scripts'));
 const ConfiguracoesV2 = lazy(() => import('@/v2/pages/Configuracoes'));
+const MaturacaoV2 = lazy(() => import('@/v2/pages/Maturacao'));
 const RedefinirSenhaV2 = lazy(() => import('@/v2/pages/RedefinirSenha'));
 const DefinirSenhaV2 = lazy(() => import('@/v2/pages/DefinirSenha'));
 const AlterarSenhaV2 = lazy(() => import('@/v2/pages/AlterarSenha'));
@@ -250,7 +251,7 @@ const routes: RouteObject[] = [
                       element: (
                         <Suspense fallback={null}>
                           <RequireRoleV2 role="admin">
-                            <EmConstrucaoV2 titulo="Maturação" subtitulo="Aquecimento de chips — isolado do atendimento." />
+                            <MaturacaoV2 />
                           </RequireRoleV2>
                         </Suspense>
                       ),
