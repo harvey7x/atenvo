@@ -29,11 +29,7 @@
 .v2 .ag-quando .qdo-rel { color: var(--txt); font-weight: 500; }
 .v2 .ag-quando .qdo-abs { font-size: 10.5px; color: var(--txt-3); margin-top: 1px; }
 .v2 .ag-previa { display: block; max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.v2 .ag-pill {
-  display: inline-flex; font-size: 10.5px; font-weight: 500; font-style: normal;
-  background: rgba(255, 255, 255, .05); border: 1px solid rgba(255, 255, 255, .11);
-  border-radius: 99px; padding: 2px 9px; color: var(--txt-2);
-}
+/* .ag-pill promovida a componentes.css (compartilhada por Agendamentos/Cobranças/Scripts/Configurações) */
 .v2 .ag-pill.seq { color: var(--txt); border-color: rgba(255, 255, 255, .28); }
 
 /* ações do drawer de agendamento (anatomia cab/corpo promovida a componentes.css) */

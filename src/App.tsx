@@ -36,6 +36,7 @@ const PlanoUsoV2 = lazy(() => import('@/v2/pages/PlanoUso'));
 const CobrancasV2 = lazy(() => import('@/v2/pages/Cobrancas'));
 const AgendamentosV2 = lazy(() => import('@/v2/pages/Agendamentos'));
 const ScriptsV2 = lazy(() => import('@/v2/pages/Scripts'));
+const ConfiguracoesV2 = lazy(() => import('@/v2/pages/Configuracoes'));
 const RedefinirSenhaV2 = lazy(() => import('@/v2/pages/RedefinirSenha'));
 const DefinirSenhaV2 = lazy(() => import('@/v2/pages/DefinirSenha'));
 const AlterarSenhaV2 = lazy(() => import('@/v2/pages/AlterarSenha'));
@@ -254,7 +255,14 @@ const routes: RouteObject[] = [
                         </Suspense>
                       ),
                     },
-                    emConstrucao('configuracoes', 'Configurações', 'Perfil, equipe e comportamento do sistema.'),
+                    {
+                      path: 'configuracoes',
+                      element: (
+                        <Suspense fallback={null}>
+                          <ConfiguracoesV2 />
+                        </Suspense>
+                      ),
+                    },
                     {
                       path: 'plano-uso',
                       element: (

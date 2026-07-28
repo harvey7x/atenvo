@@ -41,6 +41,10 @@ Tempo em célula/etiqueta usa `src/v2/lib/tempo.ts`: horizonte curto
 longo fala a data primeiro (dd/mm/aa, hh:mm SP) com o relativo humanizado
 de apoio (dias até 30, meses depois). Sempre tabular-nums.
 
+## Adendo nº 3 — usos declarados de cor
+Âmbar em estrela de favorito é uso declarado (convenção universal de
+favorito), não status semântico. Sempre via token `--ambar`, nunca hex solto.
+
 ## Manual de extensão (páginas sem mockup)
 - Cabeçalho de página: título + subtítulo à esquerda, ações à direita
   (padrão .ph do mockup). Máximo um botão primário por tela.

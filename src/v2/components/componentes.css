@@ -385,3 +385,15 @@
 .v2 .estado .t { font-size: 12.5px; font-weight: 500; color: var(--txt); }
 .v2 .estado .s { font-size: 11.5px; color: var(--txt-2); max-width: 300px; line-height: 1.5; }
 .v2 .estado .acao { margin-top: 10px; }
+
+/* ── utilitários compartilhados promovidos de páginas (anatomia de componente
+   nunca em CSS de página: em build code-split o CSS da outra página não carrega) ── */
+.v2 .ag-pill {
+  display: inline-flex; font-size: 10.5px; font-weight: 500; font-style: normal;
+  background: rgba(255, 255, 255, .05); border: 1px solid rgba(255, 255, 255, .11);
+  border-radius: 99px; padding: 2px 9px; color: var(--txt-2);
+}
+.v2 .form-grid { display: flex; flex-direction: column; gap: 12px; }
+.v2 .form-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.v2 .form-grid textarea.inp, .v2 .form-2col textarea.inp { height: auto; padding: 8px 11px; resize: vertical; font-family: var(--fonte); }
+.v2 .form-grid select.inp, .v2 .form-2col select.inp { appearance: none; }
