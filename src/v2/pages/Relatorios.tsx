@@ -13,6 +13,7 @@ import {
 import {
   BotaoSec, CardVidro, Chip, EstadoVazio, Input, Segmentado,
 } from '../components';
+import RelatoriosApresentacao from './RelatoriosApresentacao';
 import './relatorios.css';
 
 /* ------------------------------------------------------------------
@@ -575,6 +576,31 @@ export default function RelatoriosV2() {
   function atualizar() { qc.invalidateQueries({ predicate: (qq) => String(qq.queryKey[0]).startsWith('rel-') }); setAviso('Dados atualizados'); }
   function limpar() { setF({ ...FILTROS_PADRAO, ...(ehAtendente && user ? { responsavel: user.id } : {}) }); }
 
+  const [apresentar, setApresentar] = useState(false);
+  const dadosApresDemo = useMemo(() => {
+    if (!demo || !seed) return null;
+    const soma = (k: keyof ConexaoLinha) => seed.conexoes.reduce((s, l) => s + ((l[k] as number) || 0), 0);
+    const pessoas = soma('pessoasQueChamaram');
+    const clientes = seed.resumo.oportunidadesFechadas.atual;
+    return {
+      pessoas, clientes,
+      conversao: pessoas > 0 ? (clientes / pessoas) * 100 : null,
+      receita: seed.resumo.receitaRecebida.atual,
+      semResposta: seed.atendimento.semResposta,
+      primeiraRespostaMin: seed.atendimento.primeiraRespostaMin,
+      funil: [
+        { r: 'Pessoas que chamaram', v: pessoas },
+        { r: 'Conversas atendidas', v: soma('conversasAtendidas') },
+        { r: 'Oportunidades', v: soma('oportunidades') },
+        { r: 'Qualificados', v: soma('qualificados') },
+        { r: 'Clientes fechados', v: soma('fechados') },
+      ],
+      competidores: seed.equipe.filter((l) => l.id !== 'nao'),
+      melhor: melhorConexao(seed.conexoes),
+      inadimplencia: { taxa: seed.financeiro.inadimplencia, parcelas: seed.financeiro.vencTotalQtd },
+    };
+  }, [demo, seed]);
+
   const chips: { k: keyof RelFiltros; lbl: string; val: string }[] = [];
   if (f.canal) chips.push({ k: 'canal', lbl: 'Canal', val: canalNome(f.canal) });
   if (f.origem) chips.push({ k: 'origem', lbl: 'Origem', val: f.origem });
@@ -596,7 +622,21 @@ export default function RelatoriosV2() {
           <h2>Relatórios</h2>
           <p>{escopo}{demo ? ' · modo demonstração' : ''}</p>
         </div>
+        <div className="acoes">
+          <BotaoSec onClick={() => setApresentar(true)}>Apresentar</BotaoSec>
+        </div>
       </div>
+
+      {apresentar && (
+        <RelatoriosApresentacao
+          f={f}
+          demo={demo}
+          dadosDemo={dadosApresDemo}
+          orgNome={currentOrg.name}
+          periodoLabel={periodo.label}
+          aoFechar={() => setApresentar(false)}
+        />
+      )}
 
       {aviso && (
         <div className="aviso-inline" role="status">{aviso}<button type="button" onClick={() => setAviso(null)} aria-label="Fechar aviso">×</button></div>

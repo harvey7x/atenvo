@@ -177,3 +177,82 @@
 /* sparkline (mini barras dentro de KPI — só onde a série diária existe) */
 .v2 .rl2-spark { display: flex; align-items: flex-end; gap: 2px; height: 22px; margin-top: 7px; }
 .v2 .rl2-spark i { flex: 1; border-radius: 2px 2px 1px 1px; background: linear-gradient(180deg, rgba(255, 255, 255, .45), rgba(255, 255, 255, .12)); min-height: 2px; }
+
+/* ============================================================
+   v2.1 — MODO APRESENTAÇÃO (takeover fullscreen; o cinema é um
+   modo, a página de trabalho continua dado-calmo). --fx forçado
+   a 1 dentro do modo; reduced-motion = navegação manual estática.
+   ============================================================ */
+.v2 .apres {
+  position: fixed; inset: 0; z-index: 300; background: var(--base);
+  display: flex; flex-direction: column; overflow: hidden; cursor: pointer;
+  --fx: 1;
+}
+.v2 .apres-prog { position: absolute; top: 0; left: 0; right: 0; height: 3px; display: flex; gap: 4px; padding: 0 4px; z-index: 5; }
+.v2 .apres-prog i { flex: 1; border-radius: 99px; background: rgba(255, 255, 255, .12); overflow: hidden; position: relative; }
+.v2 .apres-prog i.feito::after, .v2 .apres-prog i.atual::after {
+  content: ''; position: absolute; inset: 0; border-radius: 99px;
+  background: linear-gradient(90deg, #FFF, #D6DAE0);
+}
+.v2 .apres-prog i.atual::after { transform-origin: left; animation: apres-prog var(--apres-dur, 8s) linear forwards; }
+@keyframes apres-prog { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+.v2 .apres-sair {
+  position: absolute; top: 14px; right: 16px; z-index: 6;
+  background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .14);
+  color: var(--txt-2); border-radius: 8px; padding: 5px 12px; font-size: 11px; cursor: pointer; font-family: var(--fonte);
+}
+.v2 .apres-sair:hover { color: var(--txt); background: rgba(255, 255, 255, .1); }
+.v2 .apres-dica { position: absolute; bottom: 14px; left: 0; right: 0; text-align: center; font-size: 10.5px; color: var(--txt-3); z-index: 5; }
+
+.v2 .apres-palco { flex: 1; display: flex; align-items: center; justify-content: center; padding: 48px 56px; position: relative; z-index: 2; }
+.v2 .apres-slide { width: 100%; max-width: 1040px; }
+.v2 .apres-eyebrow { font-size: 12px; letter-spacing: .22em; text-transform: uppercase; color: var(--txt-3); margin-bottom: 14px; }
+.v2 .apres-display {
+  font-size: 46px; font-weight: 600; letter-spacing: -.02em; line-height: 1.12;
+  background: linear-gradient(92deg, #FFF, #C9CDD4); -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.v2 .apres-sub { font-size: 15px; color: var(--txt-2); margin-top: 14px; }
+
+.v2 .apres-bloco { opacity: 0; transform: translateY(14px); }
+.v2 .apres-bloco.on { animation: apres-entra .7s var(--ease) forwards; }
+@keyframes apres-entra { to { opacity: 1; transform: none; } }
+
+.v2 .apres-nums { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 18px; margin-top: 8px; }
+.v2 .apres-num .r { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--txt-3); }
+.v2 .apres-num .v { font-size: 52px; font-weight: 600; letter-spacing: -.02em; font-variant-numeric: tabular-nums; margin-top: 6px; }
+.v2 .apres-num .s { font-size: 12px; color: var(--txt-2); margin-top: 4px; }
+
+.v2 .apres-funil { display: flex; flex-direction: column; gap: 14px; margin-top: 10px; }
+.v2 .apres-funil .et { display: grid; grid-template-columns: 250px 1fr 90px; gap: 16px; align-items: center; }
+.v2 .apres-funil .en { font-size: 15px; color: var(--txt-2); }
+.v2 .apres-funil .eb { height: 26px; border-radius: 8px; background: rgba(255, 255, 255, .05); overflow: hidden; }
+.v2 .apres-funil .eb i { display: block; height: 100%; border-radius: 8px; background: linear-gradient(90deg, rgba(255, 255, 255, .8), rgba(255, 255, 255, .28)); transform-origin: left; }
+.v2 .apres-bloco.on .eb i { animation: apres-cresce .9s var(--ease) both; }
+@keyframes apres-cresce { from { transform: scaleX(0); } }
+.v2 .apres-funil .ev { font-size: 20px; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+
+.v2 .apres-podio { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; margin-top: 10px; }
+.v2 .apres-pod { padding: 22px 24px; border-radius: 16px; border: 1px solid var(--linha); background: rgba(255, 255, 255, .03); }
+.v2 .apres-pod.ouro {
+  border-color: rgba(255, 255, 255, .6);
+  background: linear-gradient(180deg, rgba(255, 255, 255, .12), rgba(255, 255, 255, .03));
+  box-shadow: 0 0 44px rgba(255, 255, 255, .13), inset 0 1px 0 rgba(255, 255, 255, .25);
+}
+.v2 .apres-pod .pos { font-size: 11px; font-weight: 700; letter-spacing: .1em; color: var(--txt-3); }
+.v2 .apres-pod.ouro .pos { color: #101215; background: linear-gradient(180deg, #FFF, #D6DAE0); border-radius: 99px; padding: 3px 11px; display: inline-block; }
+.v2 .apres-pod .nm { font-size: 20px; font-weight: 600; margin-top: 10px; }
+.v2 .apres-pod .mv { font-size: 34px; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 4px; }
+.v2 .apres-pod .ml { font-size: 11.5px; color: var(--txt-3); margin-top: 2px; }
+
+.v2 .apres-ins { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 10px; }
+.v2 .apres-in { padding: 20px 22px; border-radius: 14px; border: 1px solid var(--linha); background: rgba(255, 255, 255, .03); }
+.v2 .apres-in .t { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--txt-3); }
+.v2 .apres-in .v { font-size: 26px; font-weight: 600; margin-top: 8px; font-variant-numeric: tabular-nums; }
+.v2 .apres-in .f { font-size: 13px; color: var(--txt-2); margin-top: 6px; line-height: 1.55; }
+
+@media (prefers-reduced-motion: reduce) {
+  .v2 .apres-bloco, .v2 .apres-bloco.on { opacity: 1; transform: none; animation: none; }
+  .v2 .apres-bloco.on .eb i { animation: none; }
+  .v2 .apres-prog i.atual::after { animation: none; transform: scaleX(1); }
+}
