@@ -189,33 +189,6 @@
 }
 .v2 .notif.show .prog { animation: v2-esvazia 9s linear forwards; }
 
-/* --- intro de entrada ("o sistema acorda") ------------------ */
-.v2 .intro-entrada {
-  position: absolute; inset: 0; z-index: 100; background: var(--base);
-  display: flex; align-items: center; justify-content: center;
-}
-.v2 .intro-entrada .intro-luz {
-  position: absolute; inset: 0; pointer-events: none;
-  opacity: calc(.6 * var(--fx));
-  background: radial-gradient(46% 40% at 50% 42%, rgba(255, 255, 255, .07) 0%, transparent 70%);
-}
-.v2 .intro-miolo { position: relative; text-align: center; padding: 0 24px; }
-.v2 .intro-eyebrow {
-  display: block; margin-bottom: 13px; opacity: 0; transform: translateY(6px);
-  animation: v2-intro-surge .7s .1s var(--ease) forwards;
-}
-.v2 .intro-saudacao {
-  opacity: 0; letter-spacing: -.045em; transform: translateY(8px);
-  animation: v2-intro-abre .8s .15s var(--ease) forwards;
-}
-@keyframes v2-intro-surge { to { opacity: 1; transform: none; } }
-@keyframes v2-intro-abre { to { opacity: 1; letter-spacing: -.02em; transform: none; } }
-.v2 .intro-entrada.abrindo, .v2 .intro-entrada.pulando { pointer-events: none; }
-.v2 .intro-entrada.abrindo { animation: v2-intro-fecha .8s var(--ease) forwards; }
-.v2 .intro-entrada.pulando { animation: v2-intro-fecha .2s var(--ease) forwards; }
-.v2 .intro-entrada.abrindo .intro-miolo { animation: v2-intro-dissolve .5s var(--ease) forwards; }
-@keyframes v2-intro-fecha { to { opacity: 0; } }
-@keyframes v2-intro-dissolve { to { opacity: 0; transform: translateY(-6px); filter: blur(3px); } }
 
 /* ferramentas de dev na sidebar (só import.meta.env.DEV) */
 .v2 .dev-ferramentas {

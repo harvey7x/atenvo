@@ -8,7 +8,6 @@ import '../components/componentes.css';
 import './login.css';
 
 import { DESTINO_PADRAO_V2 as DESTINO_PADRAO } from '../destino';
-import { marcarIntroEntrada } from '../shell/intro';
 
 interface LocState { from?: { pathname: string }; aviso?: string }
 
@@ -73,8 +72,6 @@ export default function LoginV2() {
       });
       return;
     }
-    // ÚNICA origem da intro de entrada: o sucesso do signIn (nunca refresh/navegação)
-    marcarIntroEntrada();
     const to = (location.state as LocState | null)?.from?.pathname ?? DESTINO_PADRAO;
     navigate(to, { replace: true });
   }

@@ -50,14 +50,9 @@ favorito), não status semântico. Sempre via token `--ambar`, nunca hex solto.
 diálogos de confirmação — evitam o ambíguo "Cancelar" em diálogos cuja
 própria ação confirmada é cancelar algo.
 
-## Adendo nº 5 — cortina de entrada
-A cortina de entrada (abertura cinematográfica curta na chegada) é
-EXCLUSIVA da página de Relatórios — a página-palco. Nenhuma outra
-página ganha cortina; as demais mantêm apenas a cascata pg-entra.
-Travas na família da IntroEntrada: cooldown próprio por usuário
-(CORTINA_RELATORIOS_HORAS), pulo por clique/tecla, reduced-motion pula
-registrando o timestamp, mascaramento de carga com timeout — ninguém
-fica preso atrás do pano. O Modo Apresentação é cerimônia distinta.
+## Adendo nº 5 — sem cerimônias de entrada
+Sem cerimônias de entrada; páginas abrem direto com a cascata pg-entra.
+O Modo Apresentação de Relatórios é a única cerimônia, sempre opt-in.
 
 ## Manual de extensão (páginas sem mockup)
 - Cabeçalho de página: título + subtítulo à esquerda, ações à direita

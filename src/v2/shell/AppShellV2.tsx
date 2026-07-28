@@ -9,8 +9,6 @@ import './shell.css';
 import { instalarSpotlight } from '../lib/spotlight';
 import { ICONES } from './icones';
 import { NotificacaoResposta, type DadosNotificacao } from './NotificacaoResposta';
-import { IntroEntrada } from './IntroEntrada';
-import { decidirIntroNaChegada } from './intro';
 
 /* Navegação real do app (INVENTARIO.md + decisões aprovadas):
    Relacionamento fica fora (adiada); Facebook, Scripts e Maturação são
@@ -82,22 +80,6 @@ export default function AppShellV2() {
   const [badgePop, setBadgePop] = useState(0);
   const fecharNotif = useCallback(() => setNotif(null), []);
 
-  // Intro "o sistema acorda": decidida ANTES do primeiro paint (sem flash).
-  // Chegada = signIn (sempre) OU boot autenticado fora do cooldown (intro.ts);
-  // navegação interna nunca re-decide. reduced-motion pula a exibição, mas o
-  // timestamp já foi registrado na decisão (lógica uniforme). geracaoPagina
-  // re-dispara a cascata da página quando o overlay abre.
-  const [intro, setIntro] = useState(
-    () => decidirIntroNaChegada(user?.id ?? 'anon') && !window.matchMedia('(prefers-reduced-motion: reduce)').matches,
-  );
-  const [contadorIntro, setContadorIntro] = useState(0);
-  const [geracaoPagina, setGeracaoPagina] = useState(0);
-  const abrirIntro = useCallback(() => setGeracaoPagina((g) => g + 1), []);
-  const terminarIntro = useCallback(() => setIntro(false), []);
-  function replayIntro() {
-    setContadorIntro((n) => n + 1);
-    setIntro(true);
-  }
 
   // Botão interno de simulação (decisão aprovada, item 8): só o visual,
   // disparado à mão — a fiação realtime entra na sessão do WhatsApp.
@@ -162,9 +144,6 @@ export default function AppShellV2() {
               <button type="button" className="p-btn btn-sec btn-mini" onClick={simularResposta}>
                 Simular resposta
               </button>
-              <button type="button" className="p-btn btn-sec btn-mini" onClick={replayIntro}>
-                Replay intro
-              </button>
             </div>
           )}
           <div className="rodape-sb">
@@ -198,7 +177,7 @@ export default function AppShellV2() {
           <div className="palco">
             {/* key por caminho + geração: re-executa a entrada (pg-entra + cascata)
                 a cada troca de rota e quando a intro abre o palco */}
-            <div className="pagina pg-entra" key={`${location.pathname}#${geracaoPagina}`}>
+            <div className="pagina pg-entra" key={location.pathname}>
               <Outlet />
             </div>
           </div>
@@ -214,14 +193,6 @@ export default function AppShellV2() {
         </main>
       </div>
 
-      {intro && (
-        <IntroEntrada
-          key={contadorIntro}
-          nome={nome === 'Equipe' ? '' : nome.split(/\s+/)[0]}
-          aoAbrir={abrirIntro}
-          aoTerminar={terminarIntro}
-        />
-      )}
     </div>
   );
 }
