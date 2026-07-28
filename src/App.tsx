@@ -40,6 +40,7 @@ const ConfiguracoesV2 = lazy(() => import('@/v2/pages/Configuracoes'));
 const MaturacaoV2 = lazy(() => import('@/v2/pages/Maturacao'));
 const ContatosV2 = lazy(() => import('@/v2/pages/Contatos'));
 const RelatoriosV2 = lazy(() => import('@/v2/pages/Relatorios'));
+const ManutencaoV2 = lazy(() => import('@/v2/pages/Manutencao'));
 const RedefinirSenhaV2 = lazy(() => import('@/v2/pages/RedefinirSenha'));
 const DefinirSenhaV2 = lazy(() => import('@/v2/pages/DefinirSenha'));
 const AlterarSenhaV2 = lazy(() => import('@/v2/pages/AlterarSenha'));
@@ -216,9 +217,31 @@ const routes: RouteObject[] = [
                     </Suspense>
                   ),
                   children: [
-                    emConstrucao('dashboard', 'Dashboard', 'Sua operação, em ordem.'),
+                    {
+                      path: 'dashboard',
+                      element: (
+                        <Suspense fallback={null}>
+                          <ManutencaoV2 area="Dashboard" />
+                        </Suspense>
+                      ),
+                    },
                     emConstrucao('whatsapp', 'WhatsApp', 'Caixa de atendimento do WhatsApp.'),
-                    emConstrucao('facebook', 'Facebook', 'Caixa de atendimento do Messenger e Facebook.'),
+                    {
+                      path: 'facebook',
+                      element: (
+                        <Suspense fallback={null}>
+                          <ManutencaoV2 area="Facebook" />
+                        </Suspense>
+                      ),
+                    },
+                    {
+                      path: 'relacionamento',
+                      element: (
+                        <Suspense fallback={null}>
+                          <ManutencaoV2 area="Relacionamento" />
+                        </Suspense>
+                      ),
+                    },
                     emConstrucao('kanban', 'Kanban', 'Funil comercial em colunas.'),
                     {
                       path: 'agendamentos',
