@@ -1,0 +1,58 @@
+/* ============================================================
+   Contatos — página NOVA (pg-contatos): filtros em chips +
+   TabelaPadrao com bulk platina + paginação client-side; FICHA
+   do contato em DrawerV2 com a anatomia do painel de contexto
+   do WhatsApp (ctx-topo/ctx-b/ctx-t do mockup).
+   ============================================================ */
+
+.v2 .cnt-filtros { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.v2 .cnt-filtros .chips { margin-bottom: 0; }
+.v2 .cnt-busca { width: 250px; }
+.v2 .cnt-sel { width: auto; height: 30px; font-size: 11.5px; padding: 0 9px; }
+
+.v2 .cnt-nome { min-width: 0; }
+.v2 .cnt-nome .nm { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--txt); }
+.v2 .cnt-nome .em { display: block; font-size: 10.5px; color: var(--txt-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+
+/* ficha (drawer) — anatomia ctx do mockup */
+.v2 .fx-topo { padding: 16px; border-bottom: 1px solid var(--linha); text-align: center; flex-shrink: 0; }
+.v2 .fx-topo .av2 {
+  width: 46px; height: 46px; border-radius: 50%; margin: 0 auto 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; font-weight: 600; color: #101215;
+  background: linear-gradient(180deg, #FFF, #D6DAE0);
+}
+.v2 .fx-topo .n2 { font-size: 13.5px; font-weight: 600; }
+.v2 .fx-topo .t2 { font-size: 11px; color: var(--txt-2); margin-top: 2px; }
+.v2 .fx-topo .bb { display: flex; gap: 7px; margin-top: 11px; }
+.v2 .fx-topo .bb > * { flex: 1; justify-content: center; }
+
+.v2 .fx-b { padding: 11px 16px; border-bottom: 1px solid var(--linha); }
+.v2 .fx-b:last-child { border-bottom: none; }
+.v2 .fx-t {
+  font-size: 9.5px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--txt-3); margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between;
+}
+.v2 .fx-kv { display: flex; justify-content: space-between; gap: 10px; font-size: 11.5px; padding: 3px 0; }
+.v2 .fx-kv .k { color: var(--txt-3); flex-shrink: 0; }
+.v2 .fx-kv .v { color: var(--txt); text-align: right; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+.v2 .fx-linha { display: flex; align-items: center; gap: 9px; padding: 6px 0; font-size: 11.5px; }
+.v2 .fx-linha .tx { flex: 1; min-width: 0; }
+.v2 .fx-linha .tx b { display: block; font-weight: 500; color: var(--txt); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .fx-linha .tx i { display: block; font-style: normal; font-size: 10.5px; color: var(--txt-3); margin-top: 1px; }
+.v2 .fx-vazio { font-size: 11px; color: var(--txt-3); padding: 4px 0; }
+
+/* opt-out: cidadão de primeira classe */
+.v2 .fx-optout {
+  display: flex; gap: 9px; align-items: flex-start; font-size: 11.5px; line-height: 1.5;
+  color: var(--rubro); background: var(--rubro-bg); border: 1px solid rgba(229, 102, 92, .32);
+  border-radius: 10px; padding: 9px 11px;
+}
+.v2 .fx-optout .tx { flex: 1; }
+.v2 .fx-optin { display: flex; align-items: center; justify-content: space-between; gap: 9px; font-size: 11.5px; color: var(--txt-2); }
+.v2 .fx-hint { font-size: 10.5px; color: var(--ambar); margin-top: 6px; line-height: 1.5; }
+
+.v2 .fx-tags { display: flex; gap: 5px; flex-wrap: wrap; }
+.v2 .fx-obs { font-size: 11.5px; color: var(--txt-2); line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
+.v2 .fx-acoes { display: flex; gap: 6px; flex-wrap: wrap; padding: 11px 16px; border-top: 1px solid var(--linha); flex-shrink: 0; }

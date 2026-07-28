@@ -38,6 +38,7 @@ const AgendamentosV2 = lazy(() => import('@/v2/pages/Agendamentos'));
 const ScriptsV2 = lazy(() => import('@/v2/pages/Scripts'));
 const ConfiguracoesV2 = lazy(() => import('@/v2/pages/Configuracoes'));
 const MaturacaoV2 = lazy(() => import('@/v2/pages/Maturacao'));
+const ContatosV2 = lazy(() => import('@/v2/pages/Contatos'));
 const RedefinirSenhaV2 = lazy(() => import('@/v2/pages/RedefinirSenha'));
 const DefinirSenhaV2 = lazy(() => import('@/v2/pages/DefinirSenha'));
 const AlterarSenhaV2 = lazy(() => import('@/v2/pages/AlterarSenha'));
@@ -226,7 +227,14 @@ const routes: RouteObject[] = [
                         </Suspense>
                       ),
                     },
-                    emConstrucao('contatos', 'Contatos', 'Todos os contatos da organização.'),
+                    {
+                      path: 'contatos',
+                      element: (
+                        <Suspense fallback={null}>
+                          <ContatosV2 />
+                        </Suspense>
+                      ),
+                    },
                     {
                       path: 'scripts',
                       element: (
