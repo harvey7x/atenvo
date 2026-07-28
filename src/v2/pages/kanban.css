@@ -150,11 +150,14 @@
 .v2 .kc .t3.al { color: var(--rubro); font-weight: 600; }
 
 /* menu de contexto (card e coluna) */
+/* dropdown "⋮" — em PORTAL (.v2 portal-v2), posição fixa vinda do rect do botão; sólido, acima de tudo */
 .v2 .kb-menu {
-  position: absolute; z-index: 30; top: 100%; right: 0; margin-top: 4px; min-width: 168px;
+  position: fixed; z-index: 95; min-width: 168px; max-height: 320px; overflow-y: auto;
   background: #17191D; border: 1px solid rgba(255, 255, 255, .12); border-radius: 10px;
   box-shadow: 0 14px 34px rgba(0, 0, 0, .5); padding: 4px; font-size: 12px;
+  animation: v2-modal-entra .16s var(--ease);
 }
+.v2 .mbtn.on { background: rgba(255, 255, 255, .1); color: var(--txt); }
 .v2 .kb-menu-wrap { position: relative; }
 .v2 .kb-menu .it { display: flex; align-items: center; gap: 7px; width: 100%; text-align: left; background: none; border: none; color: var(--txt); font-family: var(--fonte); font-size: 12px; border-radius: 7px; padding: 6px 9px; cursor: pointer; }
 .v2 .kb-menu .it:hover { background: rgba(255, 255, 255, .07); }

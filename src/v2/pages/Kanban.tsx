@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { CLASSE_RAIZ_PORTAL, criarRaizPortalV2 } from '../components/portal';
 import { useOrg } from '@/context/OrgContext';
 import {
   KANBAN_REAL, useKanban, useOportunidadesAbertasDeContatos, useConversasDoContato,
@@ -233,7 +235,17 @@ export default function KanbanV2() {
 
   const [aviso, setAviso] = useState<Aviso>(null);
   const [search, setSearch] = useState('');
-  const [menu, setMenu] = useState<{ kind: 'card' | 'col'; id: string } | null>(null);
+  const [menu, setMenu] = useState<{ kind: 'card' | 'col'; id: string; top: number; right: number } | null>(null);
+  // raiz de portal (regra 10): o menu "⋮" monta no body, fora do overflow da coluna e do stacking
+  // context do card (:hover cria transform) — senão fica clipado/atrás dos cards. Reusa 1 nó por sessão.
+  const raizMenu = useMemo(() => {
+    const sel = '.' + CLASSE_RAIZ_PORTAL.split(' ').join('.') + '[data-kb-menu]';
+    let el = document.querySelector(sel) as HTMLElement | null;
+    if (!el) { el = criarRaizPortalV2(document) as unknown as HTMLElement; el.setAttribute('data-kb-menu', '1'); }
+    return el;
+  }, []);
+  // helper de posição: menu fixo, alinhado abaixo/à direita do botão "⋮"
+  const posMenu = (btn: HTMLElement) => { const r = btn.getBoundingClientRect(); return { top: Math.round(r.bottom + 4), right: Math.round(window.innerWidth - r.right) }; };
   const [optim, setOptim] = useState<Record<string, string>>({});
   const [ordemOtim, setOrdemOtim] = useState<string[] | null>(null);
   const [hover, setHover] = useState<string | null>(null);
@@ -357,10 +369,11 @@ export default function KanbanV2() {
     if (ids.join(',') === ordemOtim.join(',') || ids.length !== ordemOtim.length || ids.some((id) => !ordemOtim.includes(id))) setOrdemOtim(null);
   }, [colunasBase, ordemOtim]);
 
-  /* menu fecha em qualquer clique global (v1) */
+  /* menu fecha em qualquer clique global (v1); o clique DENTRO do dropdown portado não fecha
+     (ele bubbla nativamente até o document — o stopPropagation do React não o barra no portal). */
   useEffect(() => {
     if (!menu) return;
-    const f = () => setMenu(null);
+    const f = (e: MouseEvent) => { if (!(e.target as HTMLElement).closest('.kb-menu')) setMenu(null); };
     document.addEventListener('click', f);
     return () => document.removeEventListener('click', f);
   }, [menu]);
@@ -797,15 +810,9 @@ export default function KanbanV2() {
                   {soma > 0 && <span className="s2 num">{somaCompacta(soma)}</span>}
                   {podeConfig && (
                     <span className="kb-menu-wrap">
-                      <button type="button" className="mbtn" aria-label={'Ações da coluna ' + col.nome} onClick={(e) => { e.stopPropagation(); setMenu(menu?.kind === 'col' && menu.id === col.id ? null : { kind: 'col', id: col.id }); }}>
+                      <button type="button" className="mbtn" aria-label={'Ações da coluna ' + col.nome} onClick={(e) => { e.stopPropagation(); setMenu(menu?.kind === 'col' && menu.id === col.id ? null : { kind: 'col', id: col.id, ...posMenu(e.currentTarget) }); }}>
                         <IcPontos />
                       </button>
-                      {menu?.kind === 'col' && menu.id === col.id && (
-                        <div className="kb-menu" role="menu" onClick={(e) => e.stopPropagation()}>
-                          <button type="button" className="it" onClick={() => { setMenu(null); abrirEditarColuna(col); }}>Renomear / cor</button>
-                          {!col.entrada && <button type="button" className="it perigo" onClick={() => { setMenu(null); pedirExcluirColuna(col); }}>Excluir</button>}
-                        </div>
-                      )}
                     </span>
                   )}
                 </div>
@@ -841,7 +848,7 @@ export default function KanbanV2() {
                     })
                     .map((l) => (
                       <CardKc
-                        key={l.id} l={l} colunas={colunas} colunaAtual={col.id} etiquetas={etiquetas}
+                        key={l.id} l={l} colunas={colunas} etiquetas={etiquetas}
                         origemDominante={origemDominante}
                         naoLidas={naoLidasMap[l.contatoId ?? ''] ?? 0}
                         sla={(slaPorOpp.get(l.id) ?? []).filter((a) => !SLA_OCULTO_NO_CARD.has(a.tipo))}
@@ -853,10 +860,7 @@ export default function KanbanV2() {
                         menuAberto={menu?.kind === 'card' && menu.id === l.id}
                         aoRef={(el) => { cardRefs.current[l.id] = el; }}
                         aoClicar={() => setDetId(l.id)}
-                        aoMenu={() => setMenu(menu?.kind === 'card' && menu.id === l.id ? null : { kind: 'card', id: l.id })}
-                        aoEditar={() => { setMenu(null); abrirEditarLead(l); }}
-                        aoMover={(cid) => { setMenu(null); mover(l.id, cid); }}
-                        aoArquivar={() => { setMenu(null); arquivar(l); }}
+                        aoMenu={(btn) => setMenu(menu?.kind === 'card' && menu.id === l.id ? null : { kind: 'card', id: l.id, ...posMenu(btn) })}
                         aoDragStart={(e) => {
                           if (optim[l.id]) { e.preventDefault(); return; }
                           dragId.current = l.id;
@@ -880,6 +884,40 @@ export default function KanbanV2() {
           )}
         </div>
       </div>
+
+      {/* dropdown "⋮" (card ou coluna) em PORTAL — fora do overflow da coluna e do stacking do card;
+          superfície sólida #17191D (kanban.css .kb-menu), z-index acima de tudo. Posição = rect do botão. */}
+      {menu && raizMenu && createPortal(
+        <div className="kb-menu" role="menu" style={{ top: menu.top, right: menu.right }} onClick={(e) => e.stopPropagation()}>
+          {menu.kind === 'card' && (() => {
+            const ml = leads.find((x) => x.id === menu.id);
+            if (!ml) return null;
+            return (
+              <>
+                <button type="button" className="it" onClick={() => { setMenu(null); abrirEditarLead(ml); }}>Editar</button>
+                <div className="sep">Mover para</div>
+                {colunas.filter((c) => c.id !== colunaDoLead(ml)).map((c) => (
+                  <button key={c.id} type="button" className="it" onClick={() => { setMenu(null); mover(ml.id, c.id); }}>
+                    <span className="pt" style={{ background: c.cor }} />{c.nome}
+                  </button>
+                ))}
+                <button type="button" className="it perigo" onClick={() => { setMenu(null); arquivar(ml); }}>Arquivar</button>
+              </>
+            );
+          })()}
+          {menu.kind === 'col' && (() => {
+            const mc = colunas.find((c) => c.id === menu.id);
+            if (!mc) return null;
+            return (
+              <>
+                <button type="button" className="it" onClick={() => { setMenu(null); abrirEditarColuna(mc); }}>Renomear / cor</button>
+                {!mc.entrada && <button type="button" className="it perigo" onClick={() => { setMenu(null); pedirExcluirColuna(mc); }}>Excluir</button>}
+              </>
+            );
+          })()}
+        </div>,
+        raizMenu,
+      )}
 
       {/* ---------- modal coluna (criar/editar) ---------- */}
       <ModalV2
@@ -1051,12 +1089,11 @@ function DetRow({ l, v }: { l: string; v: ReactNode }) {
    trocar de coluna, lead aberto em coluna neutra); .quente = alerta
    SLA de lead quente ativo.
    ================================================================ */
-function CardKc({ l, colunas, etiquetas, origemDominante, naoLidas, sla, fichaStatus, optout, moving, arrastando, destacado, menuAberto, colunaAtual, aoRef, aoClicar, aoMenu, aoEditar, aoMover, aoArquivar, aoDragStart, aoDragEnd }: {
-  l: KLead; colunaAtual: string; colunas: KColuna[]; etiquetas: Etiqueta[]; origemDominante: string | null; naoLidas: number;
+function CardKc({ l, colunas, etiquetas, origemDominante, naoLidas, sla, fichaStatus, optout, moving, arrastando, destacado, menuAberto, aoRef, aoClicar, aoMenu, aoDragStart, aoDragEnd }: {
+  l: KLead; colunas: KColuna[]; etiquetas: Etiqueta[]; origemDominante: string | null; naoLidas: number;
   sla: SlaAlerta[]; fichaStatus: string | undefined; optout: boolean; moving: boolean; arrastando: boolean;
   destacado: boolean; menuAberto: boolean;
-  aoRef: (el: HTMLDivElement | null) => void; aoClicar: () => void; aoMenu: () => void;
-  aoEditar: () => void; aoMover: (colId: string) => void; aoArquivar: () => void;
+  aoRef: (el: HTMLDivElement | null) => void; aoClicar: () => void; aoMenu: (btn: HTMLElement) => void;
   aoDragStart: (e: DragEvent) => void; aoDragEnd: () => void;
 }) {
   const vr = valorRelevante(l);
@@ -1091,21 +1128,10 @@ function CardKc({ l, colunas, etiquetas, origemDominante, naoLidas, sla, fichaSt
         {l.status === 'ganho' && <span className="flag ganho" title="Fechado como ganho">Ganho</span>}
         {l.status === 'perdido' && <span className="flag perdido" title={'Perdido' + (l.motivoPerda ? ' · ' + rotuloMotivoPerda(l.motivoPerda) : '')}>Perdido</span>}
         <span className="kb-menu-wrap">
-          <button type="button" className="mbtn" aria-label={'Ações do lead ' + l.nome} onClick={(e) => { e.stopPropagation(); aoMenu(); }}>
+          <button type="button" className={'mbtn' + (menuAberto ? ' on' : '')} aria-label={'Ações do lead ' + l.nome} aria-expanded={menuAberto} onClick={(e) => { e.stopPropagation(); aoMenu(e.currentTarget); }}>
             <IcPontos />
           </button>
-          {menuAberto && (
-            <div className="kb-menu" role="menu" onClick={(e) => e.stopPropagation()}>
-              <button type="button" className="it" onClick={aoEditar}>Editar</button>
-              <div className="sep">Mover para</div>
-              {colunas.filter((c) => c.id !== colunaAtual).map((c) => (
-                <button key={c.id} type="button" className="it" onClick={() => aoMover(c.id)}>
-                  <span className="pt" style={{ background: c.cor }} />{c.nome}
-                </button>
-              ))}
-              <button type="button" className="it perigo" onClick={aoArquivar}>Arquivar</button>
-            </div>
-          )}
+          {/* o dropdown do card é renderizado em PORTAL no nível da página (fora do overflow da coluna) */}
         </span>
       </div>
       {sub && <div className="sub" title={sub}>{sub}</div>}
