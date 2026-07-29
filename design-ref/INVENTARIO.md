@@ -918,3 +918,15 @@ DECISÃO DE PRODUTO (precedente Agendamentos/Scripts/Relatórios): enriqueciment
 - **Placar** `.kb-resumo`: leads ativos · R$ em potencial · N parados +7d (rubro) · N ficha pendente. ACOMPANHA o filtro de origem (`abertosNoRecorte`) — coerente com o board recortado.
 - Seed demo: 2 leads `canalNome:'ANDRIUS'` (dominante LUIZA) só p/ exercitar filtro/exceção.
 - Auditoria adversarial (3 lentes + refutação): 2 corrigidos (placar deriva do recorte; contagem do chip = leads revelados). TDZ pego (`origemDe` antes da declaração) → reordenado. Refutados: reflow-no-hover (design declarado), âmbar-na-exceção (atenção intencional).
+
+---
+
+## Kanban v2.2 — organização estrutural (2026-07-28, commit "v2: kanban — organizacao estrutural")
+
+DECISÃO DE PRODUTO (mesmo precedente painel-vivo): enriquecimento de apresentação. Regra absoluta: zero query/métrica/mutação nova; drag/ações/ficha/opt-out/deep-link/filtros/placar da v2.1 intactos. Motivo: uma coluna com 270 cards é uma pilha, não uma organização — falta agrupamento/colapso/densidade.
+
+- **Seções por faixa de urgência dentro da coluna** (client-side dos timestamps já carregados). Colunas neutras: `faixaAtivaDe(diasParado)` → "Parados +14d" (≥14), "7–14 dias" (7–13), "Recentes (<7d)" (<7). Colunas de desfecho (`resultado!='neutro'`): `faixaFechoDe(fechadoEm)` → "Últimos 7 dias"/"Este mês"/"Antes" (urgência não faz sentido em lead encerrado). Cabeçalho leve (sticky, rótulo + contagem, chevron; rubro só na faixa "Parados"). Colapsável; estado por seção em `secToggle` (sessionStorage `atenvo-kb-sec`). **Padrão:** "Parados"/"7–14"/"Últimos 7"/"Este mês" abertas; "Recentes"/"Antes" colapsadas (reduzem ruído do que não pede ação) — MAS nunca colapsa a ÚNICA seção da coluna (`padrao = f.padraoAberta || grupos.length===1`), p/ não esvaziar o board.
+- **Coluna recolhível** a faixa fina (`kb-col.recolhida` = `<button>` 46px, nome vertical + contagem + cor; reexpande no clique). NÃO aceita drop de card (declarado). Estado em `colsRecolhidas` (sessionStorage `atenvo-kb-cols`).
+- **Modo denso** (toggle Confortável/Denso, sessionStorage `atenvo-kb-denso`): `.kb-cols.denso` encolhe o card (~75→48px: padding menor, nome 1 linha, `.sub` oculto, valor condensado). Hover/detalhe seguem disponíveis.
+- Sort de urgência extraído p/ `sortUrgencia`; `cardsCol` ordenado 1× e agrupado por faixa. Seed demo: Ivone→20d (Parados), Sebastião→10d (7–14) p/ exercitar as faixas.
+- Limiares DECLARADOS: seção "Parados" ≥14d (distinto do sinal do card / placar "parados +7d", que usam LIMIAR_PARADO_DIAS=7); desfecho 7/30d.

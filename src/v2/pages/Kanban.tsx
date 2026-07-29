@@ -113,6 +113,30 @@ const diasParado = (l: KLead) => {
 const somaCompacta = (v: number) =>
   v >= 1000 ? `R$ ${(v / 1000).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}k` : fmtBRL(v);
 
+/* ---------- v2.2: SEÇÕES por faixa de urgência dentro da coluna (só apresentação) ----------
+   Colunas neutras: faixa por estagnação (diasParado). Colunas de desfecho (ganho/perdido):
+   faixa por recência do FECHAMENTO — "urgência" não faz sentido num lead já encerrado.
+   Limiares DECLARADOS. `padraoAberta:false` = colapsada por padrão (reduz ruído do que não pede ação). */
+const FAIXA_PARADO_DIAS = 14; // seção "Parados" (distinto do sinal do card, LIMIAR_PARADO_DIAS=7)
+interface Faixa { key: string; rotulo: string; padraoAberta: boolean }
+const FAIXAS_ATIVAS: Faixa[] = [
+  { key: 'parados', rotulo: 'Parados +14d', padraoAberta: true },   // exige ação → sempre aberta
+  { key: 'semana', rotulo: '7–14 dias', padraoAberta: true },        // envelhecendo → aberta
+  { key: 'recentes', rotulo: 'Recentes (<7d)', padraoAberta: false }, // recém-tocados → colapsada (menos ruído)
+];
+const FAIXAS_FECHO: Faixa[] = [
+  { key: 'f7', rotulo: 'Últimos 7 dias', padraoAberta: true },
+  { key: 'f30', rotulo: 'Este mês', padraoAberta: true },
+  { key: 'fant', rotulo: 'Antes', padraoAberta: false },             // histórico antigo → colapsada
+];
+const diasDesde = (iso: string | null | undefined) => {
+  if (!iso) return 999999;
+  const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
+  return Number.isFinite(d) && d > 0 ? d : 0;
+};
+const faixaAtivaDe = (l: KLead) => { const d = diasParado(l); return d >= FAIXA_PARADO_DIAS ? 'parados' : d >= LIMIAR_PARADO_DIAS ? 'semana' : 'recentes'; };
+const faixaFechoDe = (l: KLead) => { const d = diasDesde(l.fechadoEm || l.atualizadoEm); return d <= 7 ? 'f7' : d <= 30 ? 'f30' : 'fant'; };
+
 interface LeadForm {
   colunaId: string; contatoId: string; conversaOrigemId: string; canalOrigemId: string;
   canalTipo: string; canalNome: string; canalNumero: string;
@@ -138,6 +162,7 @@ const IcBusca = () => <Ic><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.
 const IcMais = () => <Ic><path d="M12 5v14M5 12h14" /></Ic>;
 const IcPontos = () => <Ic><circle cx="12" cy="5" r="1.4" fill="currentColor" stroke="none" /><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none" /><circle cx="12" cy="19" r="1.4" fill="currentColor" stroke="none" /></Ic>;
 const IcKb = () => <Ic><rect x="3" y="4" width="5" height="16" rx="1.4" /><rect x="10" y="4" width="5" height="10" rx="1.4" /><rect x="17" y="4" width="5" height="13" rx="1.4" /></Ic>;
+const IcColapsar = () => <Ic><path d="M13 5l-6 7 6 7M20 5l-6 7 6 7" /></Ic>; // « recolher coluna
 
 type Aviso = { tom: 'ok' | 'erro'; texto: string } | null;
 
@@ -178,8 +203,8 @@ function seedKb(): SeedKb {
     { id: 'kc-6', nome: 'Perdido', cor: '#e11d48', ordem: 5, entrada: false, resultado: 'perdido', encerra: true },
   ];
   const leads: KLead[] = [
-    leadDemo({ id: 'kl-1', nome: 'Ivone F. Cardoso', colunaId: 'kc-1', contatoId: 'kct-1', conversaOrigemId: 'kcv-1', respNome: 'Juliana', respId: 'u-mock', valorDescontoMensal: 130, tipoServico: 'cancelamento', statusCancelamento: 'nao_iniciado', instituicao: 'Banco Pan', criadoEm: iso(agora - 2 * h), atualizadoEm: iso(agora - 2 * h), movimentadoEm: iso(agora - 2 * h), contatoEtiquetas: ['Idoso'] }),
-    leadDemo({ id: 'kl-2', nome: 'Sebastião R. Nunes', colunaId: 'kc-1', contatoId: 'kct-2', valor: 1300, atualizadoEm: iso(agora - 5 * h), movimentadoEm: iso(agora - 5 * h) }),
+    leadDemo({ id: 'kl-1', nome: 'Ivone F. Cardoso', colunaId: 'kc-1', contatoId: 'kct-1', conversaOrigemId: 'kcv-1', respNome: 'Juliana', respId: 'u-mock', valorDescontoMensal: 130, tipoServico: 'cancelamento', statusCancelamento: 'nao_iniciado', instituicao: 'Banco Pan', criadoEm: iso(agora - 22 * 24 * h), atualizadoEm: iso(agora - 20 * 24 * h), movimentadoEm: iso(agora - 20 * 24 * h), contatoEtiquetas: ['Idoso'] }),
+    leadDemo({ id: 'kl-2', nome: 'Sebastião R. Nunes', colunaId: 'kc-1', contatoId: 'kct-2', valor: 1300, criadoEm: iso(agora - 11 * 24 * h), atualizadoEm: iso(agora - 10 * 24 * h), movimentadoEm: iso(agora - 10 * 24 * h) }),
     leadDemo({ id: 'kl-3', nome: 'Maria Aparecida Souza', colunaId: 'kc-2', contatoId: 'kct-3', conversaOrigemId: 'kcv-3', respNome: 'Juliana', respId: 'u-mock', tipoServico: 'cancelamento_ressarcimento', statusCancelamento: 'em_analise', statusRessarcimento: 'em_analise', valorRessarcimentoEstimado: 4800, instituicao: 'BMG', numeroBeneficio: '123.456.789-0', etiquetas: ['Urgente'], atualizadoEm: iso(agora - 12 * 60_000), movimentadoEm: iso(agora - 12 * 60_000), prioridade: 'alta' }),
     leadDemo({ id: 'kl-4', nome: 'Terezinha M. Alves', colunaId: 'kc-2', contatoId: 'kct-4', respNome: 'Matheus', canalNome: 'ANDRIUS', valor: 1300, atualizadoEm: iso(agora - 3 * h), movimentadoEm: iso(agora - 3 * h) }),
     leadDemo({ id: 'kl-5', nome: 'Antônio Pereira Lima', colunaId: 'kc-3', contatoId: 'kct-5', respNome: 'Juliana', respId: 'u-mock', tipoServico: 'ressarcimento', statusRessarcimento: 'solicitado', valorRessarcimentoEstimado: 6200, instituicao: 'Banco Pan', atualizadoEm: iso(agora - 24 * h), movimentadoEm: iso(agora - 24 * h) }),
@@ -284,6 +309,16 @@ export default function KanbanV2() {
   const [detId, setDetId] = useState<string | null>(null);
   const [destaque, setDestaque] = useState<string | null>(null);
   const [filtroOrigem, setFiltroOrigem] = useState<string | null>(null); // v2.1: origem repetida vira filtro no topo
+  // v2.2 — organização estrutural (só apresentação; estado persistido na sessão)
+  const [denso, setDenso] = useState(() => { try { return sessionStorage.getItem('atenvo-kb-denso') === '1'; } catch { return false; } });
+  const [secToggle, setSecToggle] = useState<Record<string, boolean>>(() => { try { return JSON.parse(sessionStorage.getItem('atenvo-kb-sec') || '{}'); } catch { return {}; } });
+  const [colsRecolhidas, setColsRecolhidas] = useState<Record<string, boolean>>(() => { try { return JSON.parse(sessionStorage.getItem('atenvo-kb-cols') || '{}'); } catch { return {}; } });
+  useEffect(() => { try { sessionStorage.setItem('atenvo-kb-denso', denso ? '1' : '0'); } catch { /* privado */ } }, [denso]);
+  useEffect(() => { try { sessionStorage.setItem('atenvo-kb-sec', JSON.stringify(secToggle)); } catch { /* privado */ } }, [secToggle]);
+  useEffect(() => { try { sessionStorage.setItem('atenvo-kb-cols', JSON.stringify(colsRecolhidas)); } catch { /* privado */ } }, [colsRecolhidas]);
+  const secAberta = (colId: string, f: Faixa, padrao: boolean) => secToggle[colId + '::' + f.key] ?? padrao;
+  const toggleSec = (colId: string, f: Faixa, padrao: boolean) => setSecToggle((m) => ({ ...m, [colId + '::' + f.key]: !(m[colId + '::' + f.key] ?? padrao) }));
+  const toggleCol = (colId: string) => setColsRecolhidas((m) => ({ ...m, [colId]: !m[colId] }));
 
   /* ---------- dados (demo | real) ---------- */
   const colunasBase = demo ? seed.colunas : k.colunas;
@@ -350,6 +385,19 @@ export default function KanbanV2() {
     return [...m.entries()].map(([nome, n]) => ({ nome, n })).sort((a, b) => b.n - a.n);
   }, [leads]); // eslint-disable-line react-hooks/exhaustive-deps
   const origemDominante = origens.length ? origens[0].nome : null;
+  // v2.1 — ordem por URGÊNCIA (estagnação → SLA → prioridade → ordem manual). Extraída p/ reuso nas seções.
+  const sortUrgencia = (a: KLead, b: KLead) => {
+    const da = estaParado(a) ? diasParado(a) : 0;
+    const db = estaParado(b) ? diasParado(b) : 0;
+    if (da !== db) return db - da;
+    const sa = sevPorLead.get(a.id) ?? 0;
+    const sb = sevPorLead.get(b.id) ?? 0;
+    if (sa !== sb) return sb - sa;
+    const pa = a.prioridade === 'alta' ? 1 : 0;
+    const pb = b.prioridade === 'alta' ? 1 : 0;
+    if (pa !== pb) return pb - pa;
+    return a.ordem - b.ordem;
+  };
 
   /* reconciliação do otimista (v1): entrada some quando o servidor confirma */
   useEffect(() => {
@@ -387,9 +435,16 @@ export default function KanbanV2() {
       limpar();
       return;
     }
-    if (!leads.some((l) => l.id === oid)) return; // ainda não carregado: tenta de novo quando k.leads chegar
+    const alvo = leads.find((l) => l.id === oid);
+    if (!alvo) return; // ainda não carregado: tenta de novo quando k.leads chegar
     setDetId(oid);
     setDestaque(oid);
+    // v2.2: o card-alvo pode estar numa SEÇÃO colapsada (ex.: 'recentes' nasce fechada) → sem ref, o scroll
+    // e o destaque viram no-op. Abre a faixa do alvo ANTES de rolar, p/ o card montar e registrar a ref.
+    const colAlvo = colunaDoLead(alvo);
+    const desfAlvo = (colunas.find((c) => c.id === colAlvo)?.resultado ?? 'neutro') !== 'neutro';
+    const faixaAlvo = desfAlvo ? faixaFechoDe(alvo) : faixaAtivaDe(alvo);
+    setSecToggle((m) => ({ ...m, [colAlvo + '::' + faixaAlvo]: true }));
     const t1 = window.setTimeout(() => cardRefs.current[oid]?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 60);
     const t2 = window.setTimeout(() => setDestaque(null), 2600);
     limpar();
@@ -746,16 +801,23 @@ export default function KanbanV2() {
             <span className={'kb-stat' + (nParados > 0 ? ' al' : '')}><b className="num">{nParados}</b><i>parado{nParados === 1 ? '' : 's'} +{LIMIAR_PARADO_DIAS}d</i></span>
             <span className="kb-stat"><b className="num">{nFichaPend}</b><i>ficha{nFichaPend === 1 ? '' : 's'} pendente{nFichaPend === 1 ? '' : 's'}</i></span>
           </div>
-          {origens.length > 1 && (
-            <div className="kb-filtro-origem" role="group" aria-label="Filtrar por origem">
-              <button type="button" className={'kb-fchip' + (!filtroOrigem ? ' on' : '')} onClick={() => setFiltroOrigem(null)}>Todas</button>
-              {origens.slice(0, 6).map((o) => (
-                <button key={o.nome} type="button" className={'kb-fchip' + (filtroOrigem === o.nome ? ' on' : '')} title={`${o.n} lead(s) · ${o.nome}`} onClick={() => setFiltroOrigem((f) => (f === o.nome ? null : o.nome))}>
-                  {o.nome}<span className="c num">{o.n}</span>
-                </button>
-              ))}
+          <div className="kb-resumo-dir">
+            {/* v2.2 — alternador de densidade (persistido na sessão) */}
+            <div className="kb-densidade" role="group" aria-label="Densidade do board">
+              <button type="button" className={'kb-fchip' + (!denso ? ' on' : '')} aria-pressed={!denso} onClick={() => setDenso(false)}>Confortável</button>
+              <button type="button" className={'kb-fchip' + (denso ? ' on' : '')} aria-pressed={denso} onClick={() => setDenso(true)}>Denso</button>
             </div>
-          )}
+            {origens.length > 1 && (
+              <div className="kb-filtro-origem" role="group" aria-label="Filtrar por origem">
+                <button type="button" className={'kb-fchip' + (!filtroOrigem ? ' on' : '')} onClick={() => setFiltroOrigem(null)}>Todas</button>
+                {origens.slice(0, 6).map((o) => (
+                  <button key={o.nome} type="button" className={'kb-fchip' + (filtroOrigem === o.nome ? ' on' : '')} title={`${o.n} lead(s) · ${o.nome}`} onClick={() => setFiltroOrigem((f) => (f === o.nome ? null : o.nome))}>
+                    {o.nome}<span className="c num">{o.n}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -779,16 +841,48 @@ export default function KanbanV2() {
         className="kb-scroll" ref={boardRef}
         onDragOver={(e) => { ptr.current = { x: e.clientX, y: e.clientY }; if (dragId.current) iniciarAutoScroll(); }}
       >
-        <div className="kb-cols">
+        <div className={'kb-cols' + (denso ? ' denso' : '')}>
           {colunas.map((col, i) => {
-            const cardsCol = leadsVisiveis.filter((l) => colunaDoLead(l) === col.id);
+            const cardsCol = leadsVisiveis.filter((l) => colunaDoLead(l) === col.id).slice().sort(sortUrgencia);
             const todosCol = leads.filter((l) => colunaDoLead(l) === col.id);
             const soma = todosCol.reduce((s, l) => s + (valorRelevante(l).valor ?? 0), 0);
+            const atraso = `${0.08 + Math.min(i, 5) * 0.07}s`;
+            // v2.2 — coluna RECOLHIDA: faixa fina (nome + contagem + cor); NÃO aceita drop de card (declarado).
+            if (colsRecolhidas[col.id]) {
+              return (
+                <button key={col.id} type="button" className="kb-col recolhida sobe" style={{ animationDelay: atraso }}
+                  title={`Expandir ${col.nome} · ${todosCol.length} lead(s)`} onClick={() => toggleCol(col.id)}>
+                  <span className="pt2" style={{ background: col.cor }} />
+                  <span className="kb-strip-n">{col.nome}</span>
+                  <span className="kb-strip-q num">{todosCol.length}</span>
+                </button>
+              );
+            }
+            // v2.2 — SEÇÕES por faixa de urgência (colunas de desfecho → por recência do fechamento)
+            const desfecho = (col.resultado ?? 'neutro') !== 'neutro';
+            const faixas = desfecho ? FAIXAS_FECHO : FAIXAS_ATIVAS;
+            const faixaDe = desfecho ? faixaFechoDe : faixaAtivaDe;
+            const grupos = faixas.map((f) => ({ f, cards: cardsCol.filter((l) => faixaDe(l) === f.key) })).filter((g) => g.cards.length > 0);
+            const renderCard = (l: KLead) => (
+              <CardKc
+                key={l.id} l={l} colunas={colunas} etiquetas={etiquetas} origemDominante={origemDominante}
+                naoLidas={naoLidasMap[l.contatoId ?? ''] ?? 0}
+                sla={(slaPorOpp.get(l.id) ?? []).filter((a) => !SLA_OCULTO_NO_CARD.has(a.tipo))}
+                fichaStatus={fichaStatusMap[l.id]} optout={!!l.contatoId && bloqueados.has(l.contatoId)}
+                moving={optim[l.id] !== undefined} arrastando={dragando === l.id} destacado={destaque === l.id}
+                menuAberto={menu?.kind === 'card' && menu.id === l.id}
+                aoRef={(el) => { cardRefs.current[l.id] = el; }}
+                aoClicar={() => setDetId(l.id)}
+                aoMenu={(btn) => setMenu(menu?.kind === 'card' && menu.id === l.id ? null : { kind: 'card', id: l.id, ...posMenu(btn) })}
+                aoDragStart={(e) => { if (optim[l.id]) { e.preventDefault(); return; } dragId.current = l.id; setDragando(l.id); try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', l.id); } catch { /* ok */ } }}
+                aoDragEnd={() => { pararAutoScroll(); dragId.current = null; setDragando(null); setHover(null); }}
+              />
+            );
             return (
               <div
                 key={col.id}
                 className={'kb-col sobe' + (hoverCol === col.id ? ' col-drop' : '') + (colArrastando === col.id ? ' arrastando' : '')}
-                style={{ animationDelay: `${0.08 + Math.min(i, 5) * 0.07}s` }}
+                style={{ animationDelay: atraso }}
                 onDragOver={(e) => { if (dragColId.current && dragColId.current !== col.id) { e.preventDefault(); setHoverCol(col.id); } }}
                 onDrop={(e) => { if (dragColId.current) { e.preventDefault(); e.stopPropagation(); soltarColuna(col.id); } }}
               >
@@ -803,6 +897,7 @@ export default function KanbanV2() {
                   }}
                   onDragEnd={() => { dragColId.current = null; setColArrastando(null); setHoverCol(null); }}
                 >
+                  <button type="button" className="kb-col-toggle" aria-label={'Recolher coluna ' + col.nome} title="Recolher coluna" onClick={(e) => { e.stopPropagation(); toggleCol(col.id); }}><IcColapsar /></button>
                   <span className="pt2" style={{ background: col.cor }} />
                   <span className="n" title={col.nome}>{col.nome}</span>
                   {col.entrada && <span className="tag-entrada" title="Coluna de entrada — recebe novos leads dos canais">entrada</span>}
@@ -829,47 +924,28 @@ export default function KanbanV2() {
                     if (id) mover(id, col.id);
                   }}
                 >
-                  {cardsCol
-                    .slice()
-                    .sort((a, b) => {
-                      // v2.1 — ordem inicial por URGÊNCIA (client-side): estagnação primeiro (mais
-                      // parado no topo, em rubro), depois severidade SLA, prioridade e por fim a ordem
-                      // manual (tiebreak — não quebra reorder dentro da coluna).
-                      const da = estaParado(a) ? diasParado(a) : 0;
-                      const db = estaParado(b) ? diasParado(b) : 0;
-                      if (da !== db) return db - da;
-                      const sa = sevPorLead.get(a.id) ?? 0;
-                      const sb = sevPorLead.get(b.id) ?? 0;
-                      if (sa !== sb) return sb - sa;
-                      const pa = a.prioridade === 'alta' ? 1 : 0;
-                      const pb = b.prioridade === 'alta' ? 1 : 0;
-                      if (pa !== pb) return pb - pa;
-                      return a.ordem - b.ordem;
-                    })
-                    .map((l) => (
-                      <CardKc
-                        key={l.id} l={l} colunas={colunas} etiquetas={etiquetas}
-                        origemDominante={origemDominante}
-                        naoLidas={naoLidasMap[l.contatoId ?? ''] ?? 0}
-                        sla={(slaPorOpp.get(l.id) ?? []).filter((a) => !SLA_OCULTO_NO_CARD.has(a.tipo))}
-                        fichaStatus={fichaStatusMap[l.id]}
-                        optout={!!l.contatoId && bloqueados.has(l.contatoId)}
-                        moving={optim[l.id] !== undefined}
-                        arrastando={dragando === l.id}
-                        destacado={destaque === l.id}
-                        menuAberto={menu?.kind === 'card' && menu.id === l.id}
-                        aoRef={(el) => { cardRefs.current[l.id] = el; }}
-                        aoClicar={() => setDetId(l.id)}
-                        aoMenu={(btn) => setMenu(menu?.kind === 'card' && menu.id === l.id ? null : { kind: 'card', id: l.id, ...posMenu(btn) })}
-                        aoDragStart={(e) => {
-                          if (optim[l.id]) { e.preventDefault(); return; }
-                          dragId.current = l.id;
-                          setDragando(l.id);
-                          try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', l.id); } catch { /* ok */ }
-                        }}
-                        aoDragEnd={() => { pararAutoScroll(); dragId.current = null; setDragando(null); setHover(null); }}
-                      />
-                    ))}
+                  {grupos.map((g) => {
+                    // seção ÚNICA: nunca colapsa (senão a coluna fica vazia com contagem N>0). Força aberta
+                    // INDEPENDENTE do estado salvo — o guard não pode ser só o default de secAberta.
+                    const unica = grupos.length === 1;
+                    const padrao = g.f.padraoAberta || unica;
+                    const aberta = unica ? true : secAberta(col.id, g.f, padrao);
+                    return (
+                      <div className="kb-secao" key={g.f.key}>
+                        <button
+                          type="button"
+                          className={'kb-faixa-h kb-f-' + g.f.key + (aberta ? '' : ' fechada') + (unica ? ' estatica' : '')}
+                          aria-expanded={aberta} disabled={unica}
+                          onClick={unica ? undefined : () => toggleSec(col.id, g.f, padrao)}
+                        >
+                          {!unica && <span className="chev" aria-hidden>{aberta ? '▾' : '▸'}</span>}
+                          <span className="lbl">{g.f.rotulo}</span>
+                          <span className="q num">{g.cards.length}</span>
+                        </button>
+                        {aberta && g.cards.map(renderCard)}
+                      </div>
+                    );
+                  })}
                   {hover === col.id && dragando && <div className="fantasma" aria-hidden />}
                   {cardsCol.length === 0 && hover !== col.id && <div className="kb-vazia">Sem leads</div>}
                   <button type="button" className="kb-add" onClick={() => abrirNovoLead(col.id)}><IcMais />Adicionar lead</button>
