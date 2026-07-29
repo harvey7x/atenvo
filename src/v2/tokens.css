@@ -90,17 +90,17 @@ html[data-demo] .v2 { --fx: 1; }
   --txt: #191C22;
   --txt-2: #565D68;
   --txt-3: #868D98;
-  --verde: #1E9E68;               /* semânticos escurecidos: cor clara some sobre branco */
-  --verde-bg: rgba(30, 158, 104, .13);
-  --ambar: #B4770E;
-  --ambar-bg: rgba(180, 119, 14, .14);
-  --rubro: #CE3B2C;
-  --rubro-bg: rgba(206, 59, 44, .11);
+  --verde: #3E8E6B;               /* semânticos com peso p/ ler no branco, mas RECUADOS — */
+  --verde-bg: rgba(62, 142, 107, .14);   /* sofisticados, não tinta primária/alerta de trânsito */
+  --ambar: #9E7A2E;
+  --ambar-bg: rgba(158, 122, 46, .15);
+  --rubro: #B24A3C;
+  --rubro-bg: rgba(178, 74, 60, .13);
   --tint: 22, 25, 31;             /* tinta = grafite: superfícies em alpha viram escuras */
-  --platina-a: #3C424B;           /* assinatura: platina FECHADA (grafite metálico) */
-  --platina-b: #23272E;
-  --platina-txt: #F4F5F7;         /* texto claro sobre o botão escuro */
-  --platina-txt-rgb: 244, 245, 247;
+  --platina-a: #E4E8ED;           /* assinatura: platina LUMINOSA — prata escovada (o primo claro */
+  --platina-b: #BAC1CC;           /* do botão do dark), NÃO preto. Gradiente claro→médio metálico. */
+  --platina-txt: #23272E;         /* texto escuro sobre o metal claro (o sheen branco atravessa no hover) */
+  --platina-txt-rgb: 35, 39, 46;
   --display-a: #2A2F37;           /* saudação: cinza-metal com brilho (gradiente escuro) */
   --display-b: #5B6473;
   --sombra-1: 0 1px 2px rgba(22, 25, 31, .05), 0 6px 20px rgba(22, 25, 31, .07);
