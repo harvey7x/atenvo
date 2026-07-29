@@ -12,6 +12,19 @@ import { criarRaizPortalV2 } from '../components/portal';
 import { ICONES } from './icones';
 import { NotificacaoResposta, type DadosNotificacao } from './NotificacaoResposta';
 import { useNotificacaoInbound } from '../hooks/useNotificacaoInbound';
+import { aplicarTema, lerTema, salvarTema, type Tema } from '../lib/tema';
+
+/* ícones sol/lua do alternador de tema (traço fino, como o resto do chrome v2) */
+const IconeSol = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
+    <circle cx="12" cy="12" r="4.2" /><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19" />
+  </svg>
+);
+const IconeLua = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <path d="M20 14.5A8 8 0 019.5 4 7 7 0 1020 14.5z" />
+  </svg>
+);
 
 /* Navegação real do app (INVENTARIO.md + decisões aprovadas):
    Relacionamento fica fora (adiada); Facebook, Scripts e Maturação são
@@ -83,6 +96,15 @@ export default function AppShellV2() {
   const [badgePop, setBadgePop] = useState(0);
   const [menuUsuario, setMenuUsuario] = useState(false);
   const [menuPos, setMenuPos] = useState<{ top: number; right: number }>({ top: 60, right: 20 });
+
+  // Tema dual: escolha explícita do usuário, persistida por usuário; padrão dark.
+  const escopoTema = user?.id ?? undefined;
+  const [tema, setTema] = useState<Tema>(() => lerTema(escopoTema));
+  useEffect(() => { setTema(lerTema(escopoTema)); }, [escopoTema]); // recarrega a preferência quando o usuário resolve
+  useEffect(() => { aplicarTema(tema); }, [tema]);
+  const alternarTema = useCallback(() => {
+    setTema((t) => { const novo: Tema = t === 'dark' ? 'light' : 'dark'; salvarTema(novo, escopoTema); return novo; });
+  }, [escopoTema]);
   const seqRef = useRef(0);
   const avatarRef = useRef<HTMLButtonElement>(null);
   const fecharNotif = useCallback(() => setNotif(null), []);
@@ -197,6 +219,14 @@ export default function AppShellV2() {
               <span className="busca-texto">Buscar contatos, conversas, cobranças…</span><kbd>⌘K</kbd>
             </div>
             <div className="top-dir">
+              <button
+                type="button" className="ib"
+                aria-label={tema === 'dark' ? 'Mudar para o tema claro' : 'Mudar para o tema escuro'}
+                title={tema === 'dark' ? 'Tema claro' : 'Tema escuro'}
+                onClick={alternarTema}
+              >
+                {tema === 'dark' ? <IconeSol /> : <IconeLua />}
+              </button>
               <button type="button" className="ib" aria-label="Notificações" title="Notificações — abrir o Inbox" onClick={abrirNotificacoes}>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
                   <path d="M18 9a6 6 0 10-12 0c0 6-2.5 7-2.5 7h17S18 15 18 9zM10 20a2.2 2.2 0 004 0" />

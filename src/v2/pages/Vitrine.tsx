@@ -4,6 +4,7 @@ import '../tokens.css';
 import '../base.css';
 import './Vitrine.css';
 import { instalarSpotlight } from '../lib/spotlight';
+import { aplicarTema, lerTema, salvarTema, type Tema } from '../lib/tema';
 import {
   BadgeStatus,
   BotaoMini,
@@ -67,6 +68,8 @@ function Secao({ rotulo, children }: { rotulo: string; children: React.ReactNode
 export default function Vitrine() {
   useEffect(() => instalarSpotlight(), []);
 
+  const [tema, setTema] = useState<Tema>(() => lerTema('vitrine'));
+  useEffect(() => { aplicarTema(tema); }, [tema]);
   const [fx, setFx] = useState<'1' | '0.5'>('1');
   const [selecionadas, setSelecionadas] = useState<ReadonlySet<string>>(new Set(['1', '2']));
   const [pagina, setPagina] = useState(1);
@@ -105,6 +108,15 @@ export default function Vitrine() {
             </p>
           </div>
           <div className="acoes">
+            <span className="caps" style={{ letterSpacing: '.1em' }}>tema</span>
+            <Segmentado
+              opcoes={[
+                { valor: 'dark', rotulo: 'Escuro' },
+                { valor: 'light', rotulo: 'Claro' },
+              ]}
+              valor={tema}
+              aoMudar={(t) => { setTema(t); salvarTema(t, 'vitrine'); }}
+            />
             <span className="caps" style={{ letterSpacing: '.1em' }}>--fx</span>
             <Segmentado
               opcoes={[

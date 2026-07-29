@@ -8,6 +8,13 @@
    Escopo: os tokens vivem em `.v2` (não em :root) para não
    interferir no app antigo. Qualquer subárvore v2 — inclusive
    portais de modal — precisa da classe `v2` no elemento raiz.
+
+   TEMA DUAL (Adendo nº 6): o bloco `.v2` abaixo é o tema DARK e o
+   PADRÃO — sem `data-tema` na raiz, é o que renderiza (produção no
+   ar, zero risco de flash). O tema LIGHT é uma camada de OVERRIDE
+   em `:root[data-tema="light"] .v2` no fim do arquivo; ninguém vê a
+   tela mudar sozinha ao atualizar. Não é dark invertido — ver as 4
+   regras de tradução no bloco light e no CONTRATO.
    ============================================================ */
 .v2 {
   --base: #0A0B0D;
@@ -32,6 +39,27 @@
      momentos de display usam .p-display (base.css). */
   --ease: cubic-bezier(.2, .8, .2, 1);
 
+  /* ---- Tokens do tema dual (Adendo nº 6). No DARK carregam os valores atuais
+     (byte a byte); o override light no fim do arquivo dá o par claro. ---- */
+  /* Canal de tinta: superfícies/linhas/hovers em alpha consomem rgba(var(--tint), α).
+     Branco no dark, grafite no light → a mesma opacidade inverte a luminância. */
+  --tint: 255, 255, 255;
+  /* Assinatura platina (botão primário, seleção, toggle). No dark é prata claro; no
+     light vira grafite fechado com texto claro — a assinatura sobrevive ao branco. */
+  --platina-a: #FFFFFF;
+  --platina-b: #D6DAE0;
+  --platina-txt: #101215;
+  --platina-txt-rgb: 16, 18, 21;
+  /* Display (saudações/auth): gradiente de texto. No light vira cinza-metal com brilho. */
+  --display-a: #FFFFFF;
+  --display-b: #C9CDD4;
+  /* Sombra: no dark a elevação é borda+alpha (sombra ~nula); no light é box-shadow real. */
+  --sombra-1: 0 0 0 0 rgba(0, 0, 0, 0);
+  --sombra-2: 0 16px 36px rgba(0, 0, 0, .5);
+  /* Multiplicadores de ambiente: luz em deriva e grão — ligados no dark, apagados no light. */
+  --luz-op: 1;
+  --grao-op: 1;
+
   /* Dial de intensidade dos efeitos (contrato, item 6):
      1 = demo, 0.5 = operação. As opacidades da luz ambiente,
      do grão e dos glows multiplicam por ele. Produção = 0.5;
@@ -39,3 +67,55 @@
   --fx: 0.5;
 }
 html[data-demo] .v2 { --fx: 1; }
+
+/* ============================================================
+   TEMA LIGHT — camada de override (Adendo nº 6).
+   Mesma identidade Platina, só a luminância muda. NÃO é dark
+   invertido; as 4 regras de tradução:
+   1) sombra REAL volta a existir (--sombra-1/2);
+   2) grão + luz ambiente somem (--grao-op/--luz-op = 0);
+   3) semânticos reganham peso (verde/âmbar/rubro escurecidos/saturados);
+   4) a ASSINATURA sobrevive: platina vira grafite (--platina-*),
+      display vira cinza-metal com brilho (--display-*).
+   `data-tema` fica na RAIZ (html) — vale para o app, para portais
+   e para a Vitrine (todos descendem de :root). Ausência = dark.
+   ============================================================ */
+:root[data-tema="light"] .v2 {
+  --base: #F4F5F7;
+  --vidro-a: #FFFFFF;             /* vidro = carta branca elevada (não branco-alpha) */
+  --vidro-b: #FBFCFD;
+  --fio-a: rgba(22, 25, 31, .12); /* o "fio" de luz do dark vira hairline escuro sutil */
+  --fio-b: rgba(22, 25, 31, .045);
+  --linha: rgba(22, 25, 31, .10);
+  --txt: #191C22;
+  --txt-2: #565D68;
+  --txt-3: #868D98;
+  --verde: #1E9E68;               /* semânticos escurecidos: cor clara some sobre branco */
+  --verde-bg: rgba(30, 158, 104, .13);
+  --ambar: #B4770E;
+  --ambar-bg: rgba(180, 119, 14, .14);
+  --rubro: #CE3B2C;
+  --rubro-bg: rgba(206, 59, 44, .11);
+  --tint: 22, 25, 31;             /* tinta = grafite: superfícies em alpha viram escuras */
+  --platina-a: #3C424B;           /* assinatura: platina FECHADA (grafite metálico) */
+  --platina-b: #23272E;
+  --platina-txt: #F4F5F7;         /* texto claro sobre o botão escuro */
+  --platina-txt-rgb: 244, 245, 247;
+  --display-a: #2A2F37;           /* saudação: cinza-metal com brilho (gradiente escuro) */
+  --display-b: #5B6473;
+  --sombra-1: 0 1px 2px rgba(22, 25, 31, .05), 0 6px 20px rgba(22, 25, 31, .07);
+  --sombra-2: 0 12px 30px rgba(22, 25, 31, .14);
+  --luz-op: 0;
+  --grao-op: 0;
+  /* chrome dos componentes v1 reusados (base declarada em componentes.css — TESTE 3
+     do colisoesCss exige a base em `.v2`; aqui só o par claro). --ink/--muted/--err/
+     --green seguem sozinhos: são var(--txt*)/var(--rubro)/var(--verde), já traduzidos. */
+  --surface: #FFFFFF;
+  --surface-2: rgba(22, 25, 31, .04);
+  --accent: #3C424B;
+  --line-2: rgba(22, 25, 31, .09);
+  --hover: rgba(22, 25, 31, .05);
+  --ring: rgba(22, 25, 31, .16);
+  --backdrop: rgba(20, 22, 28, .34);
+  --shadow-pop: 0 24px 60px rgba(22, 25, 31, .18);
+}

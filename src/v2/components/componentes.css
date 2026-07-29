@@ -13,17 +13,17 @@
   transition: transform .2s var(--ease), box-shadow .2s, background .2s;
 }
 .v2 .p-btn:disabled { opacity: .5; cursor: default; }
-.v2 .btn-sec { background: rgba(255, 255, 255, .05); border-color: rgba(255, 255, 255, .12); }
-.v2 .btn-sec:hover:not(:disabled) { background: rgba(255, 255, 255, .085); }
+.v2 .btn-sec { background: rgba(var(--tint), .05); border-color: rgba(var(--tint), .12); }
+.v2 .btn-sec:hover:not(:disabled) { background: rgba(var(--tint), .085); }
 .v2 .btn-pri {
-  position: relative; overflow: hidden; color: #101215; font-weight: 600;
-  background: linear-gradient(180deg, #FFF, #D6DAE0);
-  box-shadow: 0 10px 26px rgba(255, 255, 255, calc(.10 * var(--fx))), inset 0 1px 0 #fff;
+  position: relative; overflow: hidden; color: var(--platina-txt); font-weight: 600;
+  background: linear-gradient(180deg, var(--platina-a), var(--platina-b));
+  box-shadow: 0 10px 26px rgba(var(--tint), calc(.10 * var(--fx))), inset 0 1px 0 #fff;
 }
 .v2 .btn-pri:hover:not(:disabled) { transform: translateY(-1px); }
 .v2 .btn-pri::after {
   content: ""; position: absolute; top: 0; bottom: 0; left: -70%; width: 45%;
-  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .85), transparent);
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .85), transparent); /* sheen SEMPRE claro (brilho sobre o metal, nos 2 temas) */
   transform: skewX(-18deg); transition: left .55s var(--ease);
 }
 .v2 .btn-pri:hover:not(:disabled)::after { left: 120%; }
@@ -41,7 +41,7 @@
 }
 .v2 .card-cab a {
   font-size: 12px; font-weight: 500; color: var(--txt); text-decoration: none;
-  border-bottom: 1px solid rgba(255, 255, 255, .22); padding-bottom: 1px; cursor: pointer;
+  border-bottom: 1px solid rgba(var(--tint), .22); padding-bottom: 1px; cursor: pointer;
 }
 
 /* --- KPI (contador + sparkline) ----------------------------- */
@@ -56,7 +56,7 @@
 }
 .v2 .d-ok { background: var(--verde-bg); color: var(--verde); }
 .v2 .d-at { background: var(--ambar-bg); color: var(--ambar); }
-.v2 .d-ne { background: rgba(255, 255, 255, .055); color: var(--txt-2); }
+.v2 .d-ne { background: rgba(var(--tint), .055); color: var(--txt-2); }
 .v2 .d-er { background: var(--rubro-bg); color: var(--rubro); }
 .v2 .spark { display: block; width: 100%; height: 30px; margin-top: 9px; }
 .v2 .spark path {
@@ -80,24 +80,24 @@
 .v2 .s-at i { background: var(--ambar); }
 .v2 .s-er { background: var(--rubro-bg); color: var(--rubro); }
 .v2 .s-er i { background: var(--rubro); box-shadow: 0 0 8px rgba(229, 102, 92, calc(.6 * var(--fx))); }
-.v2 .s-ne { background: rgba(255, 255, 255, .05); color: var(--txt-2); border: 1px solid rgba(255, 255, 255, .1); }
+.v2 .s-ne { background: rgba(var(--tint), .05); color: var(--txt-2); border: 1px solid rgba(var(--tint), .1); }
 .v2 .s-ne i { background: var(--txt-3); }
 
 /* --- Item com trilho colorido (.li) ------------------------- */
 .v2 .li {
   position: relative; display: flex; gap: 12px; padding: 10.5px 16px 10.5px 19px;
-  border-bottom: 1px solid rgba(255, 255, 255, .05); cursor: pointer;
+  border-bottom: 1px solid rgba(var(--tint), .05); cursor: pointer;
   transition: background .18s;
 }
 .v2 .li:last-child { border-bottom: none; }
-.v2 .li:hover { background: rgba(255, 255, 255, .035); }
+.v2 .li:hover { background: rgba(var(--tint), .035); }
 .v2 .li::before {
   content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px;
   border-radius: 0 3px 3px 0;
 }
 .v2 .li.crit::before { background: var(--rubro); box-shadow: 0 0 12px rgba(229, 102, 92, calc(.65 * var(--fx))); }
 .v2 .li.aten::before { background: var(--ambar); box-shadow: 0 0 10px rgba(217, 164, 74, calc(.45 * var(--fx))); }
-.v2 .li.info::before { background: #fff; box-shadow: 0 0 10px rgba(255, 255, 255, calc(.4 * var(--fx))); }
+.v2 .li.info::before { background: #fff; box-shadow: 0 0 10px rgba(var(--tint), calc(.4 * var(--fx))); }
 .v2 .li .t { font-size: 12.5px; font-weight: 500; }
 .v2 .li .s { font-size: 11.5px; color: var(--txt-2); margin-top: 2px; }
 .v2 .li .h { margin-left: auto; font-size: 11px; color: var(--txt-3); white-space: nowrap; padding-top: 2px; }
@@ -107,16 +107,16 @@
 .v2 thead th {
   text-align: left; font-size: 10.5px; font-weight: 500; letter-spacing: .05em;
   text-transform: uppercase; color: var(--txt-3); padding: 8px 15px;
-  border-bottom: 1px solid rgba(255, 255, 255, .08); background: rgba(255, 255, 255, .02);
+  border-bottom: 1px solid rgba(var(--tint), .08); background: rgba(var(--tint), .02);
 }
 .v2 tbody td {
-  padding: 0 15px; height: 40px; border-bottom: 1px solid rgba(255, 255, 255, .045);
+  padding: 0 15px; height: 40px; border-bottom: 1px solid rgba(var(--tint), .045);
   vertical-align: middle; color: var(--txt-2);
 }
 .v2 tbody tr:last-child td { border-bottom: none; }
 .v2 tbody tr { transition: background .16s; }
-.v2 tbody tr:hover { background: rgba(255, 255, 255, .032); }
-.v2 tbody tr.sel { background: rgba(255, 255, 255, .05); }
+.v2 tbody tr:hover { background: rgba(var(--tint), .032); }
+.v2 tbody tr.sel { background: rgba(var(--tint), .05); }
 .v2 td.d, .v2 th.d { text-align: right; }
 .v2 td.nome { color: var(--txt); font-weight: 500; }
 .v2 .val-t { font-weight: 600; color: var(--txt); }
@@ -124,11 +124,11 @@
 
 /* checkbox */
 .v2 .cbx {
-  width: 14px; height: 14px; border: 1.5px solid rgba(255, 255, 255, .28);
+  width: 14px; height: 14px; border: 1.5px solid rgba(var(--tint), .28);
   border-radius: 4px; display: inline-block; vertical-align: -2px; cursor: pointer;
   background: none; padding: 0;
 }
-.v2 .cbx.on { background: #fff; border-color: #fff; position: relative; }
+.v2 .cbx.on { background: var(--platina-a); border-color: var(--platina-a); position: relative; }
 .v2 .cbx.on::after {
   content: ""; position: absolute; left: 4px; top: 1px; width: 4px; height: 8px;
   border: solid #0E0F12; border-width: 0 2px 2px 0; transform: rotate(45deg);
@@ -158,7 +158,7 @@
 /* mesmos valores do .pag span do mockup — aqui em <button> (e a reticência em <span>) */
 .v2 .pag button, .v2 .pag span {
   min-width: 26px; height: 26px; display: flex; align-items: center; justify-content: center;
-  border: 1px solid rgba(255, 255, 255, .11); border-radius: 6px; font-size: 11.5px;
+  border: 1px solid rgba(var(--tint), .11); border-radius: 6px; font-size: 11.5px;
   cursor: pointer; color: var(--txt-2); background: none; font-family: var(--fonte); padding: 0;
 }
 .v2 .pag span { border-color: transparent; cursor: default; }
@@ -167,24 +167,24 @@
   background: linear-gradient(180deg, #FFF, #DDE0E5); border-color: transparent;
   color: #101215; font-weight: 600;
 }
-.v2 .pag button:focus-visible { outline: none; box-shadow: 0 0 0 2px rgba(255, 255, 255, .35); }
+.v2 .pag button:focus-visible { outline: none; box-shadow: 0 0 0 2px rgba(var(--tint), .35); }
 
 /* --- Chips de filtro ---------------------------------------- */
 .v2 .chips { display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 13px; }
 .v2 .chip {
   display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 500;
-  background: rgba(255, 255, 255, .045); border: 1px solid rgba(255, 255, 255, .11);
+  background: rgba(var(--tint), .045); border: 1px solid rgba(var(--tint), .11);
   color: var(--txt-2); border-radius: 8px; padding: 5px 11px; cursor: pointer;
   font-family: var(--fonte);
 }
-.v2 .chip.on { background: rgba(255, 255, 255, .10); border-color: rgba(255, 255, 255, .28); color: var(--txt); }
+.v2 .chip.on { background: rgba(var(--tint), .10); border-color: rgba(var(--tint), .28); color: var(--txt); }
 .v2 .chip .x { opacity: .6; }
 .v2 .chip.limpar { border-style: dashed; opacity: .7; }
 
 /* --- Controle segmentado ------------------------------------ */
 .v2 .segm {
-  display: inline-flex; background: rgba(255, 255, 255, .04);
-  border: 1px solid rgba(255, 255, 255, .09); border-radius: var(--r-ctl);
+  display: inline-flex; background: rgba(var(--tint), .04);
+  border: 1px solid rgba(var(--tint), .09); border-radius: var(--r-ctl);
   padding: 3px; gap: 2px;
 }
 /* mesmos valores do .segm span do mockup — aqui em <button> operável */
@@ -194,24 +194,24 @@
   border-radius: 6px; cursor: pointer; white-space: nowrap;
 }
 .v2 .segm button.on {
-  background: rgba(255, 255, 255, .10); color: var(--txt);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1);
+  background: rgba(var(--tint), .10); color: var(--txt);
+  box-shadow: inset 0 1px 0 rgba(var(--tint), .1);
 }
 .v2 .segm button:focus-visible {
-  outline: none; box-shadow: 0 0 0 2px rgba(255, 255, 255, .35);
+  outline: none; box-shadow: 0 0 0 2px rgba(var(--tint), .35);
 }
 
 /* --- Campo / Input ------------------------------------------ */
 .v2 .campo label { display: block; font-size: 12px; font-weight: 500; margin-bottom: 5px; }
 .v2 .inp {
-  width: 100%; height: 36px; background: rgba(255, 255, 255, .045);
-  border: 1px solid rgba(255, 255, 255, .13); border-radius: var(--r-ctl);
+  width: 100%; height: 36px; background: rgba(var(--tint), .045);
+  border: 1px solid rgba(var(--tint), .13); border-radius: var(--r-ctl);
   padding: 0 11px; font-family: var(--fonte); font-size: 13px; color: var(--txt);
 }
 .v2 .inp::placeholder { color: var(--txt-3); }
 .v2 .inp:focus {
-  outline: none; border-color: rgba(255, 255, 255, .5);
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, .07);
+  outline: none; border-color: rgba(var(--tint), .5);
+  box-shadow: 0 0 0 3px rgba(var(--tint), .07);
 }
 
 /* estado inválido + dica do campo (contrato, item 7 — o mockup não
@@ -229,22 +229,22 @@
   background: none; border: none; color: var(--txt-3); cursor: pointer; padding: 0;
 }
 .v2 .controle .olho:hover { color: var(--txt-2); }
-.v2 .controle .olho:focus-visible { outline: none; box-shadow: 0 0 0 2px rgba(255, 255, 255, .35); border-radius: 7px; }
+.v2 .controle .olho:focus-visible { outline: none; box-shadow: 0 0 0 2px rgba(var(--tint), .35); border-radius: 7px; }
 
 /* --- Toggle ------------------------------------------------- */
 .v2 .tgl {
   width: 36px; height: 20px; border-radius: 99px;
-  background: linear-gradient(180deg, #FFF, #D6DAE0);
+  background: linear-gradient(180deg, var(--platina-a), var(--platina-b));
   position: relative; cursor: pointer; flex-shrink: 0; border: none; padding: 0;
 }
 .v2 .tgl::after {
   content: ""; position: absolute; top: 2px; right: 2px; width: 16px; height: 16px;
-  border-radius: 50%; background: #101215;
+  border-radius: 50%; background: var(--platina-txt);
 }
-.v2 .tgl.off { background: rgba(255, 255, 255, .12); }
-.v2 .tgl.off::after { right: auto; left: 2px; background: #9BA1AB; }
+.v2 .tgl.off { background: rgba(var(--tint), .12); }
+.v2 .tgl.off::after { right: auto; left: 2px; background: var(--txt-2); }
 .v2 .tgl:disabled { opacity: .5; cursor: default; }
-.v2 .tgl:focus-visible { outline: none; box-shadow: 0 0 0 2px rgba(255, 255, 255, .35); }
+.v2 .tgl:focus-visible { outline: none; box-shadow: 0 0 0 2px rgba(var(--tint), .35); }
 .v2 .tgl-l { display: flex; align-items: center; gap: 11px; padding: 7px 0; font-size: 12.5px; }
 .v2 .tgl-l .d { color: var(--txt-3); font-size: 11px; margin-top: 1px; }
 
@@ -275,17 +275,17 @@
 .v2 .barras { display: flex; align-items: flex-end; gap: 14px; height: 120px; padding: 0 4px; }
 .v2 .bwrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; justify-content: flex-end; cursor: pointer; background: none; border: none; padding: 0; font-family: var(--fonte); }
 .v2 .bwrap:focus-visible { outline: none; }
-.v2 .bwrap:focus-visible .barv { box-shadow: 0 0 0 2px rgba(255, 255, 255, .35); }
+.v2 .bwrap:focus-visible .barv { box-shadow: 0 0 0 2px rgba(var(--tint), .35); }
 .v2 .bval { font-size: 10px; color: var(--txt-2); opacity: 0; animation: v2-entra .4s 1s forwards; }
 .v2 .barv {
   width: 100%; max-width: 34px; border-radius: 6px 6px 3px 3px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, .55), rgba(255, 255, 255, .12));
+  background: linear-gradient(180deg, rgba(var(--tint), .55), rgba(var(--tint), .12));
   transform: scaleY(0); transform-origin: bottom;
   animation: v2-cresce .7s var(--ease) forwards;
 }
 .v2 .barv.hoje2 {
-  background: linear-gradient(180deg, #FFF, rgba(255, 255, 255, .35));
-  box-shadow: 0 0 18px rgba(255, 255, 255, calc(.25 * var(--fx)));
+  background: linear-gradient(180deg, #FFF, rgba(var(--tint), .35));
+  box-shadow: 0 0 18px rgba(var(--tint), calc(.25 * var(--fx)));
 }
 @keyframes v2-cresce { to { transform: scaleY(1); } }
 .v2 .blab { font-size: 10px; color: var(--txt-3); }
@@ -294,12 +294,12 @@
 /* --- Skeleton (carregando: vidro com shimmer sutil) --------- */
 .v2 .skel {
   position: relative; overflow: hidden; border-radius: 8px;
-  background: rgba(255, 255, 255, .05);
+  background: rgba(var(--tint), .05);
 }
 .v2 .skel::after {
   content: ""; position: absolute; inset: 0; transform: translateX(-100%);
   background: linear-gradient(90deg, transparent,
-    rgba(255, 255, 255, calc(.07 * var(--fx))), transparent);
+    rgba(var(--tint), calc(.07 * var(--fx))), transparent);
   animation: v2-shimmer 1.8s ease-in-out infinite;
 }
 @keyframes v2-shimmer { to { transform: translateX(100%); } }
@@ -307,7 +307,7 @@
 /* --- Modal v2 (regra 10: portal com classe v2 na raiz) ------ */
 .v2 .veu {
   position: fixed; inset: 0; z-index: 90;
-  background: rgba(6, 7, 9, .62);
+  background: var(--backdrop); /* dark: rgba(6,7,9,.62) · light: scrim mais claro */
   display: flex; align-items: center; justify-content: center; padding: 24px;
   animation: v2-veu-entra .18s var(--ease);
 }
@@ -390,7 +390,7 @@
    nunca em CSS de página: em build code-split o CSS da outra página não carrega) ── */
 .v2 .ag-pill {
   display: inline-flex; font-size: 10.5px; font-weight: 500; font-style: normal;
-  background: rgba(255, 255, 255, .05); border: 1px solid rgba(255, 255, 255, .11);
+  background: rgba(var(--tint), .05); border: 1px solid rgba(var(--tint), .11);
   border-radius: 99px; padding: 2px 9px; color: var(--txt-2);
 }
 .v2 .form-grid { display: flex; flex-direction: column; gap: 12px; }
@@ -414,8 +414,8 @@
 .v2 .arec-panel {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   padding: 6px 10px; max-width: 100%;
-  background: rgba(255, 255, 255, .04);
-  border: 1px solid rgba(255, 255, 255, .10);
+  background: rgba(var(--tint), .04);
+  border: 1px solid rgba(var(--tint), .10);
   border-radius: 10px; font-family: var(--fonte);
 }
 .v2 .arec-info { font-size: 12px; color: var(--txt-2); display: inline-flex; align-items: center; gap: 6px; }
@@ -426,7 +426,7 @@
 .v2 .arec-timer { font-variant-numeric: tabular-nums; font-size: 12.5px; color: var(--txt); min-width: 58px; }
 .v2 .arec-meter {
   display: inline-block; width: 70px; height: 2px; flex: 0 0 auto;
-  background: rgba(255, 255, 255, .12); border-radius: 2px; overflow: hidden;
+  background: rgba(var(--tint), .12); border-radius: 2px; overflow: hidden;
 }
 .v2 .arec-meter-bar { display: block; height: 100%; width: 0%; background: var(--verde); }
 .v2 .arec-select { width: auto; height: 26px; max-width: 150px; font-size: 11.5px; padding: 0 8px; border-radius: 8px; }
@@ -437,7 +437,7 @@
 .v2 .arec-spin { width: 8px; height: 8px; border-radius: 50%; background: var(--ambar); display: inline-block; flex: 0 0 auto; }
 /* botão fantasma do gravador (Cancelar/Regravar/Apagar/Descartar) */
 .v2 .p-btn.arec-ghost { color: var(--txt-2); }
-.v2 .p-btn.arec-ghost:hover:not(:disabled) { color: var(--txt); background: rgba(255, 255, 255, .06); }
+.v2 .p-btn.arec-ghost:hover:not(:disabled) { color: var(--txt); background: rgba(var(--tint), .06); }
 
 /* --- Ficha judicial (FichaJudicialBox/Modal v1) na pele Platina ---
    O componente v1 é reusado inteiro (contrato: não editar v1); estas
@@ -445,25 +445,25 @@
    escuro. "Criar ficha"/"Criar nova versão" são AÇÃO → botão platina
    (verde fica só na tag de status 'finalizada', Adendo nº 3). */
 .v2 .fjb-h { color: var(--txt-3); }
-.v2 .fjb-card { background: rgba(255, 255, 255, .04); border: 1px solid rgba(255, 255, 255, .09); border-radius: 10px; }
+.v2 .fjb-card { background: rgba(var(--tint), .04); border: 1px solid rgba(var(--tint), .09); border-radius: 10px; }
 .v2 .fjb-l { color: var(--txt-3); }
 .v2 .fjb-v { color: var(--txt); }
 .v2 .fjb-info { color: var(--txt-2); }
 .v2 .fjb-tag.rascunho { background: var(--ambar-bg); color: var(--ambar); }
 .v2 .fjb-tag.finalizada { background: var(--verde-bg); color: var(--verde); }
-.v2 .fjb-tag.vazia { background: rgba(255, 255, 255, .06); color: var(--txt-3); }
+.v2 .fjb-tag.vazia { background: rgba(var(--tint), .06); color: var(--txt-3); }
 /* .fjb-btn: o reset .v2 * zera height/padding do botão v1 → restaura o tamanho do BotaoPrimario.
    O .primary é o platina completo (gradiente prata + sheen no hover), irmão do .btn-pri. */
-.v2 .fjb-btn { height: 34px; padding: 0 14px; border: 1px solid rgba(255, 255, 255, .12); background: rgba(255, 255, 255, .05); color: var(--txt); }
-.v2 .fjb-btn:hover:not(:disabled) { background: rgba(255, 255, 255, .085); }
+.v2 .fjb-btn { height: 34px; padding: 0 14px; border: 1px solid rgba(var(--tint), .12); background: rgba(var(--tint), .05); color: var(--txt); }
+.v2 .fjb-btn:hover:not(:disabled) { background: rgba(var(--tint), .085); }
 .v2 .fjb-btn.primary {
-  position: relative; overflow: hidden; border: 0; color: #101215; font-weight: 600;
-  background: linear-gradient(180deg, #FFF, #D6DAE0);
-  box-shadow: 0 10px 26px rgba(255, 255, 255, calc(.10 * var(--fx))), inset 0 1px 0 #fff;
+  position: relative; overflow: hidden; border: 0; color: var(--platina-txt); font-weight: 600;
+  background: linear-gradient(180deg, var(--platina-a), var(--platina-b));
+  box-shadow: 0 10px 26px rgba(var(--tint), calc(.10 * var(--fx))), inset 0 1px 0 #fff;
 }
 .v2 .fjb-btn.primary::after {
   content: ""; position: absolute; top: 0; bottom: 0; left: -70%; width: 45%;
-  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .85), transparent);
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .85), transparent); /* sheen SEMPRE claro (brilho sobre o metal, nos 2 temas) */
   transform: skewX(-18deg); transition: left .55s var(--ease);
 }
 .v2 .fjb-btn.primary:hover:not(:disabled) { transform: translateY(-1px); }
@@ -483,15 +483,15 @@
 .v2 {
   --backdrop: rgba(6, 7, 9, .62);
   --surface: #17191D;
-  --surface-2: rgba(255, 255, 255, .045);
+  --surface-2: rgba(var(--tint), .045);
   --ink: var(--txt);
   --ink-2: var(--txt-2);
   --muted: var(--txt-3);
   --line: var(--linha);
-  --line-2: rgba(255, 255, 255, .1);
-  --hover: rgba(255, 255, 255, .06);
+  --line-2: rgba(var(--tint), .1);
+  --hover: rgba(var(--tint), .06);
   --accent: #C9CED6;
-  --ring: rgba(255, 255, 255, .12);
+  --ring: rgba(var(--tint), .12);
   --err: var(--rubro);
   --green: var(--verde);
   --green-ink: var(--verde);
@@ -501,11 +501,11 @@
 .v2 .atv-modal { position: relative; background: linear-gradient(180deg, var(--vidro-a), var(--vidro-b)); backdrop-filter: blur(18px) saturate(140%); -webkit-backdrop-filter: blur(18px) saturate(140%); }
 .v2 .atv-modal::before {
   content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none;
-  background: linear-gradient(180deg, var(--fio-a), var(--fio-b) 36%, rgba(255, 255, 255, .02) 75%, rgba(255, 255, 255, .07));
+  background: linear-gradient(180deg, var(--fio-a), var(--fio-b) 36%, rgba(var(--tint), .02) 75%, rgba(var(--tint), .07));
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
 }
-.v2 .atv-btn.primary { background: linear-gradient(180deg, #FFF, #D6DAE0); border: 0; color: #101215; font-weight: 600; box-shadow: inset 0 1px 0 #fff; }
-.v2 .atv-btn.primary:hover:not(:disabled) { background: linear-gradient(180deg, #FFF, #D6DAE0); filter: none; transform: translateY(-1px); }
+.v2 .atv-btn.primary { background: linear-gradient(180deg, var(--platina-a), var(--platina-b)); border: 0; color: var(--platina-txt); font-weight: 600; box-shadow: inset 0 1px 0 #fff; }
+.v2 .atv-btn.primary:hover:not(:disabled) { background: linear-gradient(180deg, var(--platina-a), var(--platina-b)); filter: none; transform: translateY(-1px); }
 .v2 .atv-btn.danger { background: var(--rubro-bg); border-color: rgba(229, 102, 92, .35); color: var(--rubro); }
 .v2 .atv-btn.danger:hover:not(:disabled) { background: rgba(229, 102, 92, .2); filter: none; }
 /* textos de contraste da ficha (hex escuros do v1 → tokens Platina, legíveis no escuro) */

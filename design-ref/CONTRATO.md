@@ -54,6 +54,38 @@ própria ação confirmada é cancelar algo.
 Sem cerimônias de entrada; páginas abrem direto com a cascata pg-entra.
 O Modo Apresentação de Relatórios é a única cerimônia, sempre opt-in.
 
+## Adendo nº 6 — Tema dual (dark/light)
+O sistema tem dois temas de PRIMEIRA CLASSE. Filosofia: **mesma identidade
+Platina, mesma serifa de saudação, mesma assinatura — só a luminância muda**
+(Linear/Supabase, não dark invertido às pressas). As duas telas, lado a lado,
+têm de se ler como o MESMO produto.
+
+**Arquitetura:** todo valor de cor/alpha/sombra é um TOKEN (`src/v2/tokens.css`).
+O bloco `.v2` é o tema DARK e o padrão (ausência de `data-tema` = dark, sem flash
+em produção). O tema LIGHT é a camada `:root[data-tema="light"] .v2`. `data-tema`
+fica na RAIZ (`<html>`) — vale para app, portais e Vitrine. Nenhum componente
+consome valor literal de luminância: sempre a variável.
+
+**As 4 regras de tradução dark→light (não é inversão preguiçosa):**
+1. **Sombra real volta a existir.** No dark a elevação é borda+alpha (sombra
+   nula); no light é `box-shadow` suave de verdade (`--sombra-1/2`).
+2. **Grão e luz ambiente somem** (`--grao-op`/`--luz-op` = 0 no light) — o
+   ruído e a aurora do dark sujam o branco.
+3. **Semânticos reganham peso.** Cor clara some sobre fundo claro: no light o
+   verde/âmbar/rubro são escurecidos e saturados.
+4. **A assinatura sobrevive.** O gradiente platina sobre branco quase some —
+   no light ele vira grafite fechado com brilho (`--platina-*`); a serifa/display
+   da saudação vira cinza-metal com brilho (`--display-*`).
+
+**Decisão registrada:** sem "seguir o sistema" por enquanto — só a escolha
+EXPLÍCITA do usuário, persistida por usuário; padrão dark (ninguém vê a tela
+mudar sozinha ao atualizar). Alternador no AppShell (sol/lua) e na Vitrine.
+
+**Regra permanente:** TODA tela nova ou editada daqui pra frente deve funcionar
+nos DOIS modos — **validação lado a lado obrigatória** antes do commit. A Vitrine
+(`/v2/vitrine`) é o campo de aprovação da tradução de cada componente antes de
+tocar nas páginas.
+
 ## Manual de extensão (páginas sem mockup)
 - Cabeçalho de página: título + subtítulo à esquerda, ações à direita
   (padrão .ph do mockup). Máximo um botão primário por tela.

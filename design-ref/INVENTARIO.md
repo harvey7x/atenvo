@@ -930,3 +930,16 @@ DECISÃO DE PRODUTO (mesmo precedente painel-vivo): enriquecimento de apresenta�
 - **Modo denso** (toggle Confortável/Denso, sessionStorage `atenvo-kb-denso`): `.kb-cols.denso` encolhe o card (~75→48px: padding menor, nome 1 linha, `.sub` oculto, valor condensado). Hover/detalhe seguem disponíveis.
 - Sort de urgência extraído p/ `sortUrgencia`; `cardsCol` ordenado 1× e agrupado por faixa. Seed demo: Ivone→20d (Parados), Sebastião→10d (7–14) p/ exercitar as faixas.
 - Limiares DECLARADOS: seção "Parados" ≥14d (distinto do sinal do card / placar "parados +7d", que usam LIMIAR_PARADO_DIAS=7); desfecho 7/30d.
+
+---
+
+## Tema dual — fundação (branch tema/dual, commit "v2: fundacao tema dual")
+
+Adendo nº 6 do CONTRATO. DARK = padrão e base (bloco `.v2`, ausência de data-tema = dark, sem flash em produção). LIGHT = camada `:root[data-tema="light"] .v2`. `data-tema` na RAIZ (<html>) → vale p/ app, portais e Vitrine. Nada de dark invertido.
+
+- **Novos tokens** (tokens.css): `--tint` (canal de tinta: branco no dark, grafite no light — superfícies/linhas em alpha viram `rgba(var(--tint),α)`), `--platina-a/b/txt(-rgb)` (assinatura: prata→grafite fechado c/ texto claro), `--display-a/b` (saudação: cinza-metal com brilho), `--sombra-1/2` (sombra REAL no light; nula no dark), `--luz-op`/`--grao-op` (0 no light → aurora e grão somem). Pares light de todos os tokens existentes + chrome v1 (--surface/--accent/--backdrop/…).
+- **base.css**: `.luz`/`.grao` multiplicam por --luz-op/--grao-op; `.vidro` ganha `box-shadow: var(--sombra-1)`; `.vidro::before` e `.spot::after` usam `rgba(var(--tint),…)`; `.spot:hover` → `var(--sombra-2)`; `.p-display` → `var(--display-a/b)`.
+- **componentes.css** (camada de componentes, não página): swap dark-idêntico `rgba(255,255,255,α)`→`rgba(var(--tint),α)` + família platina (btn-pri/tgl/fjb/atv/cbx) → `--platina-*`. Sheen do botão fica SEMPRE claro (brilho sobre o metal). Dark byte-idêntico.
+- **lib/tema.ts**: ler/aplicar/salvar; padrão dark; persistência por usuário (`atenvo-tema[:escopo]`); SEM "seguir o sistema" (decisão). Alternador sol/lua no AppShell + segmentado Escuro/Claro na Vitrine (`/v2/vitrine`, standalone).
+- **4 regras de tradução** (CONTRATO): sombra real volta · grão/luz somem · semânticos escurecidos (verde #1E9E68, âmbar #B4770E, rubro #CE3B2C) · assinatura sobrevive (platina→grafite, display→cinza-metal). Validação lado a lado obrigatória p/ toda tela nova/editada.
+- **Dívida (aprovação futura na Vitrine)**: componentes de "superfície invertida" ainda literais no light — `bulk` (barra de seleção), `pag.on` (paginação ativa), `barv` (barras de relatório), checkmark do checkbox. E o CSS das PÁGINAS (whatsapp.css/kanban.css/etc.) não foi traduzido — páginas seguem dark até suas sessões.

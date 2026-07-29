@@ -41,6 +41,7 @@ const IntegracoesV2 = lazy(() => import('@/v2/pages/Integracoes'));
 const KanbanV2 = lazy(() => import('@/v2/pages/Kanban'));
 const WhatsAppV2 = lazy(() => import('@/v2/pages/WhatsApp'));
 const ManutencaoV2 = lazy(() => import('@/v2/pages/Manutencao'));
+const VitrineV2 = lazy(() => import('@/v2/pages/Vitrine'));
 const RedefinirSenhaV2 = lazy(() => import('@/v2/pages/RedefinirSenha'));
 const DefinirSenhaV2 = lazy(() => import('@/v2/pages/DefinirSenha'));
 const AlterarSenhaV2 = lazy(() => import('@/v2/pages/AlterarSenha'));
@@ -123,6 +124,9 @@ const routes: RouteObject[] = [
       },
     ],
   },
+
+  // Vitrine dos componentes (aprovação da tradução dark/light) — standalone, sem shell
+  { path: '/v2/vitrine', element: <Lz><VitrineV2 /></Lz> },
 
   // compat de bookmarks do preview antigo
   { path: '/v2/*', element: <RedirDeV2 /> },

@@ -30,7 +30,7 @@
 /* --- luz ambiente (deriva lenta) ---------------------------- */
 .v2 .luz {
   position: absolute; inset: 0; pointer-events: none;
-  opacity: var(--fx);
+  opacity: calc(var(--fx) * var(--luz-op)); /* --luz-op: 0 no light → a aurora some */
   background:
     radial-gradient(46% 58% at 14% 6%, rgba(255, 255, 255, .085) 0%, transparent 70%),
     radial-gradient(50% 62% at 86% 10%, rgba(255, 255, 255, .05) 0%, transparent 70%),
@@ -52,7 +52,7 @@
 /* --- grão (ruído SVG, blend overlay) ------------------------ */
 .v2 .grao {
   position: absolute; inset: 0; pointer-events: none;
-  opacity: calc(.05 * var(--fx)); mix-blend-mode: overlay;
+  opacity: calc(.05 * var(--fx) * var(--grao-op)); mix-blend-mode: overlay; /* --grao-op: 0 no light → grão some */
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='180' height='180' filter='url(%23g)'/></svg>");
 }
 
@@ -65,11 +65,12 @@
   backdrop-filter: blur(18px) saturate(140%);
   -webkit-backdrop-filter: blur(18px) saturate(140%);
   border-radius: var(--r-card);
+  box-shadow: var(--sombra-1); /* dark: nula (elevação por alpha) · light: sombra real */
 }
 .v2 .vidro::before {
   content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px;
   background: linear-gradient(180deg, var(--fio-a), var(--fio-b) 36%,
-    rgba(255, 255, 255, .02) 75%, rgba(255, 255, 255, .07));
+    rgba(var(--tint), .02) 75%, rgba(var(--tint), .07));
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor; mask-composite: exclude;
   pointer-events: none;
@@ -82,10 +83,10 @@
   content: ""; position: absolute; inset: 0; border-radius: inherit; opacity: 0;
   transition: opacity .3s var(--ease); pointer-events: none;
   background: radial-gradient(260px circle at var(--mx, 50%) var(--my, 40%),
-    rgba(255, 255, 255, calc(.10 * var(--fx))), transparent 62%);
+    rgba(var(--tint), calc(.10 * var(--fx))), transparent 62%);
 }
 .v2 .spot:hover::after { opacity: 1; }
-.v2 .spot:hover { transform: translateY(-2px); box-shadow: 0 16px 36px rgba(0, 0, 0, .5); }
+.v2 .spot:hover { transform: translateY(-2px); box-shadow: var(--sombra-2); }
 
 /* --- entrada de página (fade + slide de 8px, .32s) ----------
    Equivalente ao .pagina.ativa do mockup: aplique .pg-entra na
@@ -123,7 +124,7 @@
    vem de peso e luz, não de outra fonte. */
 .v2 .p-display {
   font-weight: 600; font-size: 30px; letter-spacing: -.02em; line-height: 1.12;
-  background: linear-gradient(92deg, #FFFFFF, #C9CDD4);
+  background: linear-gradient(92deg, var(--display-a), var(--display-b)); /* light: cinza-metal com brilho */
   -webkit-background-clip: text; background-clip: text;
   color: transparent; -webkit-text-fill-color: transparent;
 }
