@@ -80,6 +80,8 @@
   border-radius: 0 3px 3px 0; background: #fff;
   box-shadow: 0 0 10px rgba(var(--tint), calc(.4 * var(--fx)));
 }
+/* tema light: o trilho branco some sobre o branco → tinta cinza sutil, sem glow. Só no light. */
+:root[data-tema="light"] .v2 .tl-item::before { background: rgba(var(--tint), .25); box-shadow: none; }
 .v2 .tl-hora { width: 42px; flex-shrink: 0; font-size: 12.5px; font-weight: 600; color: var(--txt); padding-top: 1px; }
 .v2 .tl-corpo { min-width: 0; flex: 1; }
 .v2 .tl-corpo .t { display: block; font-size: 12.5px; font-weight: 500; color: var(--txt); }

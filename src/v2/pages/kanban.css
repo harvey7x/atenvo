@@ -121,6 +121,11 @@
 .v2 .kc .kc-sinais { margin-left: auto; display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
 .v2 .kc .kc-sinal { font-size: 9px; font-weight: 600; border-radius: 6px; padding: 2px 7px; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
 .v2 .kc .kc-sinal.parado { background: var(--rubro-bg); color: var(--rubro); }
+/* tema light: o badge de estagnação é ALERTA (lead parado) — firma o rubro
+   (fundo mais saturado/opaco + borda + texto mais escuro) sem gritar. Só no light. */
+:root[data-tema="light"] .v2 .kc .kc-sinal.parado {
+  background: rgba(198, 58, 46, .15); border: 1px solid rgba(198, 58, 46, .34); color: #A63324;
+}
 .v2 .kc .kc-sinal.novas { background: rgba(var(--tint), .1); color: var(--txt); }
 .v2 .kc .kc-sinal.ficha-rasc, .v2 .kc .kc-sinal.quente { background: var(--ambar-bg); color: var(--ambar); }
 .v2 .kc .kc-sinal.ficha-fim { background: var(--verde-bg); color: var(--verde); }
