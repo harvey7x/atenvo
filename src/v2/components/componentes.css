@@ -564,3 +564,6 @@
 :root[data-tema="light"] .v2 .pag button.on {
   background: linear-gradient(180deg, var(--platina-a), var(--platina-b)); color: var(--platina-txt);
 }
+/* DrawerV2 (Contatos e futuras): vidro escuro → vidro claro com sombra suave no light */
+:root[data-tema="light"] .v2 .veu-drawer { background: var(--backdrop); }
+:root[data-tema="light"] .v2 .drawer-v2 { background: linear-gradient(180deg, rgba(255, 255, 255, .94), rgba(250, 251, 252, .9)); box-shadow: -30px 0 80px rgba(22, 25, 31, .16); }

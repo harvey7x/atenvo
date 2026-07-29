@@ -19,8 +19,8 @@
 .v2 .fx-topo .av2 {
   width: 46px; height: 46px; border-radius: 50%; margin: 0 auto 8px;
   display: flex; align-items: center; justify-content: center;
-  font-size: 15px; font-weight: 600; color: #101215;
-  background: linear-gradient(180deg, #FFF, #D6DAE0);
+  font-size: 15px; font-weight: 600; color: var(--platina-txt);
+  background: linear-gradient(180deg, var(--platina-a), var(--platina-b));
 }
 .v2 .fx-topo .n2 { font-size: 13.5px; font-weight: 600; }
 .v2 .fx-topo .t2 { font-size: 11px; color: var(--txt-2); margin-top: 2px; }
