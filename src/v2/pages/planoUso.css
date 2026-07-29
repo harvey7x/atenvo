@@ -22,10 +22,10 @@
 .v2 .medidor .l { display: flex; justify-content: space-between; font-size: 11.5px; margin-bottom: 6px; }
 .v2 .medidor .l b { font-weight: 500; color: var(--txt); }
 .v2 .medidor .l span { color: var(--txt-2); }
-.v2 .trilho2 { height: 5px; border-radius: 99px; background: rgba(255, 255, 255, .08); overflow: hidden; }
+.v2 .trilho2 { height: 5px; border-radius: 99px; background: rgba(var(--tint), .08); overflow: hidden; }
 .v2 .fill {
   height: 100%; border-radius: 99px; width: 0;
-  background: linear-gradient(90deg, rgba(255, 255, 255, .9), rgba(255, 255, 255, .45));
+  background: linear-gradient(90deg, rgba(var(--tint), .9), rgba(var(--tint), .45));
   transition: width 1s .3s var(--ease);
 }
 .v2 .fill.alto { background: linear-gradient(90deg, var(--ambar), rgba(217, 164, 74, .55)); }
@@ -38,8 +38,8 @@
 .v2 .p-addon .l1 { display: flex; align-items: center; gap: 11px; }
 .v2 .p-addon .ic {
   width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center;
-  justify-content: center; background: rgba(255, 255, 255, .07);
-  border: 1px solid rgba(255, 255, 255, .12); color: var(--txt); flex-shrink: 0;
+  justify-content: center; background: rgba(var(--tint), .07);
+  border: 1px solid rgba(var(--tint), .12); color: var(--txt); flex-shrink: 0;
 }
 .v2 .p-addon .ic svg { width: 17px; height: 17px; }
 .v2 .p-addon .nm { font-size: 13px; font-weight: 600; }
@@ -47,15 +47,15 @@
 .v2 .p-addon .ds { font-size: 11.5px; color: var(--txt-2); line-height: 1.5; flex: 1; }
 .v2 .p-addon .rodo { display: flex; align-items: center; justify-content: space-between; margin-top: 2px; }
 .v2 .p-stepper {
-  display: inline-flex; align-items: center; background: rgba(255, 255, 255, .04);
-  border: 1px solid rgba(255, 255, 255, .09); border-radius: var(--r-ctl); padding: 3px; gap: 2px;
+  display: inline-flex; align-items: center; background: rgba(var(--tint), .04);
+  border: 1px solid rgba(var(--tint), .09); border-radius: var(--r-ctl); padding: 3px; gap: 2px;
 }
 .v2 .p-stepper button {
   width: 26px; height: 26px; display: flex; align-items: center; justify-content: center;
   background: none; border: none; border-radius: 6px; color: var(--txt-2);
   font-family: var(--fonte); font-size: 14px; cursor: pointer;
 }
-.v2 .p-stepper button:hover:not(:disabled) { background: rgba(255, 255, 255, .08); color: var(--txt); }
+.v2 .p-stepper button:hover:not(:disabled) { background: rgba(var(--tint), .08); color: var(--txt); }
 .v2 .p-stepper button:disabled { opacity: .4; cursor: default; }
 .v2 .p-stepper .q { min-width: 26px; text-align: center; font-size: 12.5px; font-weight: 600; }
 .v2 .p-addon .sub { text-align: right; }
