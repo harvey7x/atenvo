@@ -30,7 +30,7 @@
   display: flex; align-items: center; justify-content: center; position: relative;
   background:
     radial-gradient(closest-side, var(--base) 78%, transparent 79%),
-    conic-gradient(var(--cor-ring, #fff) calc(var(--p) * 1%), rgba(255, 255, 255, .09) 0);
+    conic-gradient(var(--cor-ring, #fff) calc(var(--p) * 1%), rgba(var(--tint), .09) 0);
 }
 .v2 .mat2-ring b { font-size: 17px; font-variant-numeric: tabular-nums; }
 .v2 .mat2-ring i { font-style: normal; font-size: 9px; color: var(--txt-3); margin-left: 1px; }
@@ -52,7 +52,7 @@
 .v2 .mat2-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
 .v2 .mtc {
   border: 1px solid var(--linha); border-radius: 12px; padding: 12px 13px;
-  background: rgba(255, 255, 255, .025);
+  background: rgba(var(--tint), .025);
   display: flex; flex-direction: column; gap: 10px;
 }
 .v2 .mtc.s-vermelho { border-color: rgba(229, 102, 92, .38); }
@@ -81,7 +81,7 @@
 /* rampa */
 .v2 .mtc-ramp-l { display: flex; justify-content: space-between; font-size: 11px; color: var(--txt-2); margin-bottom: 4px; }
 .v2 .mtc-ramp-l b { color: var(--txt); font-variant-numeric: tabular-nums; }
-.v2 .mtc-bar { height: 5px; border-radius: 99px; background: rgba(255, 255, 255, .07); overflow: hidden; }
+.v2 .mtc-bar { height: 5px; border-radius: 99px; background: rgba(var(--tint), .07); overflow: hidden; }
 .v2 .mtc-bar i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, #FFF, #C9CDD4); }
 .v2 .mtc-ramp-s { display: block; font-size: 10.5px; color: var(--txt-3); margin-top: 4px; }
 
@@ -89,7 +89,7 @@
 .v2 .mtc-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .v2 .mtc-kpi {
   text-align: center; padding: 6px 2px; border-radius: 9px;
-  background: rgba(255, 255, 255, .03); border: 1px solid var(--linha);
+  background: rgba(var(--tint), .03); border: 1px solid var(--linha);
 }
 .v2 .mtc-kpi b { display: block; font-size: 14px; font-variant-numeric: tabular-nums; }
 .v2 .mtc-kpi i { display: block; font-style: normal; font-size: 9.5px; color: var(--txt-3); margin-top: 1px; }
@@ -101,7 +101,7 @@
 .v2 .mtc-check {
   display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--txt-2);
   cursor: pointer; padding: 7px 9px; border-radius: 9px;
-  background: rgba(255, 255, 255, .03); border: 1px solid var(--linha);
+  background: rgba(var(--tint), .03); border: 1px solid var(--linha);
 }
 .v2 .mtc-check.on { color: var(--verde); border-color: rgba(74, 190, 140, .28); background: var(--verde-bg); }
 .v2 .mtc-check input { accent-color: #fff; }
@@ -129,14 +129,14 @@
 .v2 .mat2-perfis { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
 .v2 .mat2-perfil {
   text-align: left; padding: 12px 13px; border-radius: 11px; cursor: pointer;
-  background: rgba(255, 255, 255, .025); border: 1px solid var(--linha);
+  background: rgba(var(--tint), .025); border: 1px solid var(--linha);
   color: var(--txt); font-family: var(--fonte);
   display: flex; flex-direction: column; gap: 5px;
   transition: border-color .18s, background .18s;
 }
-.v2 .mat2-perfil:hover:not(:disabled) { background: rgba(255, 255, 255, .05); border-color: rgba(255, 255, 255, .2); }
+.v2 .mat2-perfil:hover:not(:disabled) { background: rgba(var(--tint), .05); border-color: rgba(var(--tint), .2); }
 .v2 .mat2-perfil:disabled { opacity: .6; cursor: default; }
-.v2 .mat2-perfil.sel { border-color: rgba(255, 255, 255, .55); background: rgba(255, 255, 255, .06); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12); }
+.v2 .mat2-perfil.sel { border-color: rgba(var(--tint), .55); background: rgba(var(--tint), .06); box-shadow: inset 0 1px 0 rgba(var(--tint), .12); }
 .v2 .mat2-perfil .ph2 { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .v2 .mat2-perfil .ph2 b { font-size: 12.5px; }
 .v2 .mat2-perfil .on2 { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 600; color: var(--verde); }
@@ -150,7 +150,7 @@
 .v2 .mat2-risco.r-alto { color: var(--rubro); background: var(--rubro-bg); }
 .v2 .mat2-risco.r-medio { color: var(--ambar); background: var(--ambar-bg); }
 .v2 .mat2-risco.r-recomendado { color: var(--verde); background: var(--verde-bg); }
-.v2 .mat2-risco.r-baixo { color: var(--txt-2); background: rgba(255, 255, 255, .06); }
+.v2 .mat2-risco.r-baixo { color: var(--txt-2); background: rgba(var(--tint), .06); }
 .v2 .mat2-custom {
   font-size: 10.5px; font-weight: 600; color: var(--ambar);
   border: 1px solid rgba(217, 164, 74, .35); background: var(--ambar-bg);
@@ -159,7 +159,7 @@
 .v2 .mat2-nota {
   display: flex; gap: 9px; align-items: flex-start; margin-top: 12px;
   font-size: 11.5px; color: var(--txt-2); line-height: 1.55;
-  background: rgba(255, 255, 255, .03); border: 1px solid var(--linha);
+  background: rgba(var(--tint), .03); border: 1px solid var(--linha);
   border-radius: 10px; padding: 9px 11px;
 }
 .v2 .mat2-nota svg { width: 14px; height: 14px; flex-shrink: 0; margin-top: 1px; color: var(--txt-3); }
@@ -198,3 +198,9 @@
 
 /* dias da semana (config) */
 .v2 .mat2-dias { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* TEMA LIGHT — Maturação (Adendo nº 6): barra de progresso metal-clara e
+   accents brancos ganham par escuro no claro. Dark inalterado. */
+:root[data-tema="light"] .v2 .mtc-bar i { background: linear-gradient(90deg, rgba(var(--tint), .75), rgba(var(--tint), .4)); }
+:root[data-tema="light"] .v2 .mtc-check input,
+:root[data-tema="light"] .v2 .mat2-range input[type='range'] { accent-color: var(--accent); }
