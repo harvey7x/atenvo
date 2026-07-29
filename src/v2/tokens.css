@@ -129,7 +129,6 @@ html[data-demo] .v2 { --fx: 1; }
    (0,4,0) vence o override light de `.v2` (0,3,0), e os tokens re-fixados
    descem por herança para toda a subárvore da página.
    ============================================================ */
-:root[data-tema="light"] .v2 .wa-pg,
 :root[data-tema="light"] .v2 .kb-pg {
   --base: #0A0B0D;
   --vidro-a: rgba(255, 255, 255, .055); --vidro-b: rgba(255, 255, 255, .02);

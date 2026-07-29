@@ -528,7 +528,7 @@ export default function WhatsAppV2() {
           <>
             <div className="wa-ctopo">
               <button type="button" className="ib2 wa-ftopo-solto" style={{ display: 'none' }} aria-hidden />
-              <span className="av2 conv2-av" style={{ display: 'flex', width: 32, height: 32, borderRadius: '50%', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 12, background: 'linear-gradient(150deg,#2B2E34,#17191D)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,.14), 0 0 0 1px rgba(255,255,255,.14)' }}>{initials(nomeExibicao(current))}</span>
+              <span className="av2 conv2-av" style={{ display: 'flex', width: 32, height: 32, borderRadius: '50%', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 12 }}>{initials(nomeExibicao(current))}</span>
               <div className="idw">
                 <div className="nm">{nomeExibicao(current)}</div>
                 <div className="sb num">
@@ -1428,7 +1428,7 @@ function TransferirModal({ usuarios, atualId, atualNome, meuId, busy, aoFechar, 
         {filtrados.map((u) => (
           <button
             key={u.id} type="button" disabled={u.id === atualId}
-            style={{ display: 'flex', gap: 8, alignItems: 'center', textAlign: 'left', background: sel === u.id ? 'rgba(255,255,255,.08)' : 'none', border: '1px solid ' + (sel === u.id ? 'rgba(255,255,255,.25)' : 'transparent'), borderRadius: 8, padding: '6px 9px', color: 'var(--txt)', fontFamily: 'var(--fonte)', fontSize: 12.5, cursor: u.id === atualId ? 'default' : 'pointer', opacity: u.id === atualId ? .55 : 1 }}
+            style={{ display: 'flex', gap: 8, alignItems: 'center', textAlign: 'left', background: sel === u.id ? 'rgba(var(--tint),.08)' : 'none', border: '1px solid ' + (sel === u.id ? 'rgba(var(--tint),.25)' : 'transparent'), borderRadius: 8, padding: '6px 9px', color: 'var(--txt)', fontFamily: 'var(--fonte)', fontSize: 12.5, cursor: u.id === atualId ? 'default' : 'pointer', opacity: u.id === atualId ? .55 : 1 }}
             onClick={() => setSel(u.id)}
           >
             {u.nome}{u.id === meuId ? ' (você)' : ''}{u.id === atualId ? ' · atual' : ''}
