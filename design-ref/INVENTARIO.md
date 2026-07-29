@@ -943,3 +943,21 @@ Adendo nº 6 do CONTRATO. DARK = padrão e base (bloco `.v2`, ausência de data-
 - **lib/tema.ts**: ler/aplicar/salvar; padrão dark; persistência por usuário (`atenvo-tema[:escopo]`); SEM "seguir o sistema" (decisão). Alternador sol/lua no AppShell + segmentado Escuro/Claro na Vitrine (`/v2/vitrine`, standalone).
 - **4 regras de tradução** (CONTRATO): sombra real volta · grão/luz somem · semânticos RECUADOS p/ o nível dos badges (verde #3E8E6B, âmbar #9E7A2E, rubro #B24A3C — não alerta de trânsito) · assinatura sobrevive (platina→PRATA ESCOVADA #E4E8ED→#BAC1CC c/ texto escuro — NÃO preto; display→cinza-metal). Validação lado a lado obrigatória p/ toda tela nova/editada.
 - **Dívida (aprovação futura na Vitrine)**: componentes de "superfície invertida" ainda literais no light — `bulk` (barra de seleção), `pag.on` (paginação ativa), `barv` (barras de relatório), checkmark do checkbox. E o CSS das PÁGINAS (whatsapp.css/kanban.css/etc.) não foi traduzido — páginas seguem dark até suas sessões.
+
+---
+
+## Tema light — piloto Cobranças (commit "v2: light — cobrancas + ajuste secundario")
+
+PADRÃO de tradução para as outras 15 páginas (dark byte-idêntico; light só):
+1. **Superfícies neutras**: `rgba(255,255,255,α)` → `rgba(var(--tint),α)` no CSS da página (blanket; dark inalterado pois --tint=255,255,255 no dark).
+2. **Superfícies invertidas** (dark-solid: dropdowns #16181c, barras metal claro): manter literal no dark + `:root[data-tema="light"] .v2 <sel> { ... }` com o par claro. Ex.: `.combo-pop`→branco+sombra; `.bulk`→metal escuro+texto claro; `.pag button.on`→prata platina.
+3. **Modais/vidro**: herdam sozinhos — `.p-modal.vidro` vira vidro claro + `--sombra-1` real, véu `.veu`=`var(--backdrop)` suave, primário prata, secundário fantasma.
+4. **On-metal** (sheen do botão, `inset 0 1px 0 #fff`): permanecem claros nos 2 temas.
+
+**Correções de fundação juntas** (componentes.css, valem global): botão `.btn-sec` no light = fantasma branco discreto (`rgba(255,255,255,.55)`+borda+`--txt-2`); `.tgl` LIGADO no light = metal escuro `#444A53→#2B3038` + botão branco (a prata ficava pálida).
+
+**SHELL traduzido** (shell.css, chrome — 1× serve todas): sidebar/topbar vidro claro; `.marca` logo→grafite; `.item.on` texto+trilho→--txt/--accent; `.avatar`/`.p-av`→prata; `.usuario-menu`→branco+sombra; dots (`.ib .pt`/`.mini`)→accent.
+
+**Como validar logado no demo sem digitar senha**: `localStorage['atenvo-mock-session'] = JSON` de um SessionUser (id/email/name/deveTrocarSenha) → reload → AuthContext restaura a sessão mock (OrgContext resolve a org demo sozinho). Tema por usuário em `atenvo-tema:{userId}`.
+
+**Pendente**: DrawerV2 + badge opt-out (Contatos), toast `.notif`, demais páginas.

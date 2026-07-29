@@ -33,12 +33,12 @@
   width: 29px; height: 29px; flex-shrink: 0; border-radius: 9px;
   background: linear-gradient(180deg, #FFF, #C9CDD4); color: #0E0F12;
   display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px;
-  box-shadow: 0 6px 18px rgba(255, 255, 255, calc(.12 * var(--fx))), inset 0 1px 0 #fff;
+  box-shadow: 0 6px 18px rgba(var(--tint), calc(.12 * var(--fx))), inset 0 1px 0 #fff;
 }
 .v2 .p-logo .word { font-weight: 600; font-size: 15px; letter-spacing: .02em; }
 .v2 .tenant {
   margin: 11px 2px 0; display: flex; align-items: center; justify-content: space-between;
-  background: rgba(255, 255, 255, .05); border: 1px solid rgba(255, 255, 255, .09);
+  background: rgba(var(--tint), .05); border: 1px solid rgba(var(--tint), .09);
   border-radius: 9px; padding: 6px 10px; font-size: 12px; color: var(--txt-2);
   cursor: pointer; opacity: 0; transition: opacity .22s .07s;
 }
@@ -54,24 +54,24 @@
   width: 100%; border: none; background: none; font-family: var(--fonte); text-align: left;
 }
 .v2 .item svg { width: 17px; height: 17px; flex-shrink: 0; }
-.v2 .item:hover { color: var(--txt); background: rgba(255, 255, 255, .055); }
-.v2 .item.on { color: #fff; background: rgba(255, 255, 255, .075); font-weight: 500; }
+.v2 .item:hover { color: var(--txt); background: rgba(var(--tint), .055); }
+.v2 .item.on { color: #fff; background: rgba(var(--tint), .075); font-weight: 500; }
 .v2 .item.on::before {
   content: ""; position: absolute; left: -11px; top: 7px; bottom: 7px; width: 3px;
   border-radius: 0 3px 3px 0; background: #fff;
-  box-shadow: 0 0 14px rgba(255, 255, 255, calc(.55 * var(--fx)));
+  box-shadow: 0 0 14px rgba(var(--tint), calc(.55 * var(--fx)));
 }
-.v2 .item:focus-visible { outline: none; box-shadow: 0 0 0 2px rgba(255, 255, 255, .35); }
+.v2 .item:focus-visible { outline: none; box-shadow: 0 0 0 2px rgba(var(--tint), .35); }
 .v2 .mini {
   position: absolute; top: 6px; left: 31px; width: 7px; height: 7px; border-radius: 50%;
   transition: opacity .18s; border: 1.5px solid #101114;
 }
-.v2 .mini.claro { background: #fff; box-shadow: 0 0 8px rgba(255, 255, 255, calc(.7 * var(--fx))); }
+.v2 .mini.claro { background: #fff; box-shadow: 0 0 8px rgba(var(--tint), calc(.7 * var(--fx))); }
 .v2 .mini.rubro { background: var(--rubro); box-shadow: 0 0 8px rgba(229, 102, 92, calc(.7 * var(--fx))); }
 .v2 .p-sidebar:hover .mini, .v2 .p-sidebar:focus-within .mini { opacity: 0; }
 .v2 .badge-n {
   margin-left: auto; font-size: 10.5px; font-weight: 600; border-radius: 99px; padding: 1px 7px;
-  background: rgba(255, 255, 255, .10); color: var(--txt); border: 1px solid rgba(255, 255, 255, .14);
+  background: rgba(var(--tint), .10); color: var(--txt); border: 1px solid rgba(var(--tint), .14);
 }
 .v2 .badge-n.rubro { background: var(--rubro-bg); color: var(--rubro); border-color: rgba(229, 102, 92, .3); }
 .v2 .canal {
@@ -93,7 +93,7 @@
   width: 29px; height: 29px; flex-shrink: 0; border-radius: 50%; display: flex; align-items: center;
   justify-content: center; font-size: 12px; font-weight: 600; color: var(--txt);
   background: linear-gradient(150deg, #2B2E34, #17191D);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .16), 0 0 0 1.5px rgba(255, 255, 255, .20);
+  box-shadow: inset 0 1px 0 rgba(var(--tint), .16), 0 0 0 1.5px rgba(var(--tint), .20);
 }
 .v2 .rodape-sb .nome { font-size: 12.5px; font-weight: 500; line-height: 1.2; white-space: nowrap; }
 .v2 .rodape-sb .cargo { font-size: 10.5px; color: var(--txt-3); }
@@ -103,50 +103,50 @@
 .v2 .p-topbar {
   height: 54px; flex-shrink: 0; display: flex; align-items: center; gap: 14px; padding: 0 22px;
   border-bottom: 1px solid var(--linha);
-  background: linear-gradient(180deg, rgba(255, 255, 255, .03), rgba(255, 255, 255, .008));
+  background: linear-gradient(180deg, rgba(var(--tint), .03), rgba(var(--tint), .008));
   backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
 }
 .v2 .busca {
   display: flex; align-items: center; gap: 9px; width: 320px; height: 33px;
   font-size: 13px; color: var(--txt-3); white-space: nowrap; overflow: hidden;
-  background: rgba(255, 255, 255, .045); border: 1px solid rgba(255, 255, 255, .10);
+  background: rgba(var(--tint), .045); border: 1px solid rgba(var(--tint), .10);
   border-radius: var(--r-ctl); padding: 0 12px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06); cursor: text;
+  box-shadow: inset 0 1px 0 rgba(var(--tint), .06); cursor: text;
 }
 .v2 .busca svg { flex-shrink: 0; }
 .v2 .busca .busca-texto { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .v2 .busca kbd { flex-shrink: 0; }
 .v2 .busca kbd {
   margin-left: auto; font-size: 10.5px; color: var(--txt-3); font-family: var(--fonte);
-  background: rgba(255, 255, 255, .05); border: 1px solid rgba(255, 255, 255, .10);
+  background: rgba(var(--tint), .05); border: 1px solid rgba(var(--tint), .10);
   border-radius: 5px; padding: 1px 6px;
 }
 .v2 .top-dir { margin-left: auto; display: flex; align-items: center; gap: 10px; }
 .v2 .ib {
   position: relative; width: 33px; height: 33px; border-radius: var(--r-ctl); color: var(--txt-2);
-  background: rgba(255, 255, 255, .045); border: 1px solid rgba(255, 255, 255, .10);
+  background: rgba(var(--tint), .045); border: 1px solid rgba(var(--tint), .10);
   display: flex; align-items: center; justify-content: center; cursor: pointer;
   font-family: var(--fonte); padding: 0;
 }
 .v2 .ib .pt {
   position: absolute; top: 7px; right: 8px; width: 7px; height: 7px; border-radius: 50%;
   background: #fff; border: 1.5px solid #121316;
-  box-shadow: 0 0 8px rgba(255, 255, 255, calc(.8 * var(--fx)));
+  box-shadow: 0 0 8px rgba(var(--tint), calc(.8 * var(--fx)));
   opacity: 0; transform: scale(.4); transition: .3s var(--ease);
 }
 .v2 .ib .pt.on { opacity: 1; transform: none; }
-.v2 .ib:hover { color: var(--txt); background: rgba(255, 255, 255, .08); }
+.v2 .ib:hover { color: var(--txt); background: rgba(var(--tint), .08); }
 
 /* --- menu do usuário (avatar da topbar) --------------------- */
 .v2 .top-usuario { position: relative; display: flex; }
 .v2 .avatar-btn { cursor: pointer; border: 0; padding: 0; font-family: var(--fonte); transition: box-shadow .2s var(--ease); }
-.v2 .avatar-btn:hover { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .16), 0 0 0 1.5px rgba(255, 255, 255, .34); }
+.v2 .avatar-btn:hover { box-shadow: inset 0 1px 0 rgba(var(--tint), .16), 0 0 0 1.5px rgba(var(--tint), .34); }
 .v2 .um-backdrop { position: fixed; inset: 0; z-index: 94; }
 /* portado ao body (fora do stacking context da topbar) e SÓLIDO opaco (#17191D, padrão .wa-pop):
    nada do palco/cabeçalho transparece nem pinta por cima. top/right vêm do rect do avatar (JS). */
 .v2 .usuario-menu {
   position: fixed; z-index: 95; min-width: 194px;
-  background: #17191D; border: 1px solid rgba(255, 255, 255, .12); border-radius: var(--r-card); padding: 6px;
+  background: #17191D; border: 1px solid rgba(var(--tint), .12); border-radius: var(--r-card); padding: 6px;
   box-shadow: 0 18px 44px rgba(0, 0, 0, .6); animation: v2-modal-entra .18s var(--ease);
 }
 .v2 .um-head { padding: 7px 9px 9px; border-bottom: 1px solid var(--linha); margin-bottom: 5px; }
@@ -156,7 +156,7 @@
   display: block; width: 100%; text-align: left; padding: 8px 9px; border: 0; border-radius: 8px;
   background: none; color: var(--txt-2); font-size: 12.5px; font-family: var(--fonte); cursor: pointer;
 }
-.v2 .um-item:hover { background: rgba(255, 255, 255, .06); color: var(--txt); }
+.v2 .um-item:hover { background: rgba(var(--tint), .06); color: var(--txt); }
 .v2 .um-item.perigo { color: var(--rubro); }
 .v2 .um-item.perigo:hover { background: var(--rubro-bg); }
 
@@ -180,7 +180,7 @@
   width: 37px; height: 37px; flex-shrink: 0; border-radius: 50%; position: relative;
   display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600;
   background: linear-gradient(150deg, #2E3138, #191B1F);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14), 0 0 0 1.5px rgba(255, 255, 255, .16);
+  box-shadow: inset 0 1px 0 rgba(var(--tint), .14), 0 0 0 1.5px rgba(var(--tint), .16);
 }
 .v2 .notif .p-av i {
   position: absolute; bottom: -1px; right: -1px; width: 10px; height: 10px; border-radius: 50%;
@@ -201,7 +201,7 @@
   padding: 5.5px 11px; cursor: pointer; border: 1px solid transparent;
 }
 .v2 .bm.claro { background: linear-gradient(180deg, #FFF, #D9DCE1); color: #101215; box-shadow: inset 0 1px 0 #fff; }
-.v2 .bm.fant { background: transparent; border-color: rgba(255, 255, 255, .14); color: var(--txt-2); }
+.v2 .bm.fant { background: transparent; border-color: rgba(var(--tint), .14); color: var(--txt-2); }
 .v2 .notif .fechar {
   position: absolute; top: 8px; right: 11px; color: var(--txt-3); cursor: pointer;
   font-size: 15px; padding: 3px; background: none; border: none; font-family: var(--fonte);
@@ -209,7 +209,7 @@
 .v2 .notif .prog {
   position: absolute; left: 0; bottom: 0; height: 2px; width: 100%;
   transform-origin: left; transform: scaleX(0);
-  background: linear-gradient(90deg, rgba(255, 255, 255, .55), rgba(255, 255, 255, .12));
+  background: linear-gradient(90deg, rgba(var(--tint), .55), rgba(var(--tint), .12));
 }
 .v2 .notif.show .prog { animation: v2-esvazia 9s linear forwards; }
 
@@ -225,3 +225,30 @@
 @keyframes v2-esvazia { from { transform: scaleX(1); } to { transform: scaleX(0); } }
 @keyframes v2-pop { 0% { transform: scale(1); } 45% { transform: scale(1.4); } 100% { transform: scale(1); } }
 .v2 .pop { animation: v2-pop .5s var(--ease); }
+
+/* ============================================================
+   TEMA LIGHT — chrome do shell (Adendo nº 6). Superfícies ESCURAS
+   invertidas (sidebar, logo, avatar, menu, dots) ganham par claro;
+   o resto herdou o canal --tint no swap acima. Dark não muda.
+   ============================================================ */
+:root[data-tema="light"] .v2 .p-sidebar {
+  background: linear-gradient(180deg, rgba(255, 255, 255, .92), rgba(247, 248, 250, .86));
+}
+:root[data-tema="light"] .v2 .p-sidebar:hover,
+:root[data-tema="light"] .v2 .p-sidebar:focus-within { box-shadow: 30px 0 80px rgba(22, 25, 31, .14); }
+/* logo: metal claro do dark → grafite no claro (a marca sobrevive sobre a sidebar clara) */
+:root[data-tema="light"] .v2 .p-logo .marca { background: linear-gradient(180deg, #3C424B, #23272E); color: #F4F5F7; }
+/* item ativo: texto e trilho brancos → tinta/accent escuros no claro */
+:root[data-tema="light"] .v2 .item.on { color: var(--txt); }
+:root[data-tema="light"] .v2 .item.on::before { background: var(--accent); box-shadow: none; }
+/* avatares: gradiente escuro → prata clara (iniciais escuras legíveis) */
+:root[data-tema="light"] .v2 .avatar,
+:root[data-tema="light"] .v2 .notif .p-av { background: linear-gradient(150deg, #E4E8ED, #C2C8D1); }
+/* menu do usuário: superfície sólida escura → branca com sombra real */
+:root[data-tema="light"] .v2 .usuario-menu { background: #FFFFFF; box-shadow: 0 18px 44px rgba(22, 25, 31, .18); }
+/* dots (pulso do sino, minis da sidebar recolhida): branco → accent, borda clara */
+:root[data-tema="light"] .v2 .ib .pt { background: var(--accent); border-color: #F4F5F7; }
+:root[data-tema="light"] .v2 .mini { border-color: #EEF0F3; }
+:root[data-tema="light"] .v2 .mini.claro { background: var(--accent); }
+/* ação clara do toast: metal → prata platina */
+:root[data-tema="light"] .v2 .bm.claro { background: linear-gradient(180deg, var(--platina-a), var(--platina-b)); color: var(--platina-txt); }

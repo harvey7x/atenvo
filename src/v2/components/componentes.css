@@ -537,3 +537,30 @@
 .v2 .fjb-card { padding: 11px; }
 .v2 .fjb-tag { padding: 1px 7px; }
 .v2 .fjb-acts { margin-top: 2px; }
+
+/* ============================================================
+   Ajustes do TEMA LIGHT — overrides de componente (Adendo nº 6).
+   Scoped em :root[data-tema="light"]; o DARK não é tocado.
+   ============================================================ */
+/* Botão secundário: no light é CLARO e DISCRETO (fantasma) — deixa o platina
+   primário ser o ÚNICO destaque da tela ("no máx. um platina por tela"). */
+:root[data-tema="light"] .v2 .btn-sec {
+  background: rgba(255, 255, 255, .55); border-color: rgba(22, 25, 31, .12); color: var(--txt-2);
+}
+:root[data-tema="light"] .v2 .btn-sec:hover:not(:disabled) {
+  background: #FFFFFF; border-color: rgba(22, 25, 31, .2); color: var(--txt);
+}
+/* Toggle LIGADO: a prata do platina fica pálida sobre branco → damos definição
+   com metal ESCURO (o primo escuro do botão prata) + botão branco. Off segue claro. */
+:root[data-tema="light"] .v2 .tgl:not(.off) { background: linear-gradient(180deg, #444A53, #2B3038); }
+:root[data-tema="light"] .v2 .tgl:not(.off)::after { background: #FFFFFF; }
+/* Superfícies INVERTIDAS (metal claro no dark → precisam de par no light, senão
+   somem no branco). Viram metal ESCURO definido, destacando-se sobre o fundo claro. */
+:root[data-tema="light"] .v2 .bulk { background: linear-gradient(180deg, #3F454E, #2B3038); color: #F4F5F7; }
+:root[data-tema="light"] .v2 .bulk button { background: rgba(255, 255, 255, .12); border-color: rgba(255, 255, 255, .22); color: #F4F5F7; }
+:root[data-tema="light"] .v2 .bulk button:hover { background: rgba(255, 255, 255, .18); }
+:root[data-tema="light"] .v2 .bulk .cbx { border-color: rgba(255, 255, 255, .55); }
+/* paginação ativa: metal claro do dark → prata platina no light (irmã do botão primário) */
+:root[data-tema="light"] .v2 .pag button.on {
+  background: linear-gradient(180deg, var(--platina-a), var(--platina-b)); color: var(--platina-txt);
+}
