@@ -83,7 +83,7 @@
   content: ""; position: absolute; inset: 0; border-radius: inherit; opacity: 0;
   transition: opacity .3s var(--ease); pointer-events: none;
   background: radial-gradient(260px circle at var(--mx, 50%) var(--my, 40%),
-    rgba(var(--tint), calc(.10 * var(--fx))), transparent 62%);
+    rgba(var(--tint), calc(var(--spot-glow, .10) * var(--fx))), transparent 62%);
 }
 .v2 .spot:hover::after { opacity: 1; }
 .v2 .spot:hover { transform: translateY(-2px); box-shadow: var(--sombra-2); }

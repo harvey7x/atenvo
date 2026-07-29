@@ -101,10 +101,11 @@ html[data-demo] .v2 { --fx: 1; }
   --platina-b: #BAC1CC;           /* do botão do dark), NÃO preto. Gradiente claro→médio metálico. */
   --platina-txt: #23272E;         /* texto escuro sobre o metal claro (o sheen branco atravessa no hover) */
   --platina-txt-rgb: 35, 39, 46;
-  --display-a: #2A2F37;           /* saudação: cinza-metal com brilho (gradiente escuro) */
-  --display-b: #5B6473;
-  --sombra-1: 0 1px 2px rgba(22, 25, 31, .05), 0 6px 20px rgba(22, 25, 31, .07);
-  --sombra-2: 0 12px 30px rgba(22, 25, 31, .14);
+  --display-a: #1C2128;           /* saudação: cinza-metal FECHADO — sólido e legível no off-white */
+  --display-b: #384049;
+  --sombra-1: 0 1px 2px rgba(22, 25, 31, .04), 0 2px 6px rgba(22, 25, 31, .045); /* elevação sutil (Linear/Notion) */
+  --sombra-2: 0 4px 12px rgba(22, 25, 31, .08);
+  --spot-glow: .02;               /* hover quase imperceptível no claro (dark = .10) */
   --luz-op: 0;
   --grao-op: 0;
   /* chrome dos componentes v1 reusados (base declarada em componentes.css — TESTE 3
@@ -118,4 +119,34 @@ html[data-demo] .v2 { --fx: 1; }
   --ring: rgba(22, 25, 31, .16);
   --backdrop: rgba(20, 22, 28, .34);
   --shadow-pop: 0 24px 60px rgba(22, 25, 31, .18);
+}
+
+/* ============================================================
+   Páginas AINDA NÃO TRADUZIDAS (WhatsApp, Kanban): no tema light elas
+   re-fixam o DARK no próprio contêiner — dark inteiro é melhor que
+   meio-traduzido (avatares/dados escuros sobre branco). Temporário:
+   remover quando cada uma tiver sua sessão de tradução. A especificidade
+   (0,4,0) vence o override light de `.v2` (0,3,0), e os tokens re-fixados
+   descem por herança para toda a subárvore da página.
+   ============================================================ */
+:root[data-tema="light"] .v2 .wa-pg,
+:root[data-tema="light"] .v2 .kb-pg {
+  --base: #0A0B0D;
+  --vidro-a: rgba(255, 255, 255, .055); --vidro-b: rgba(255, 255, 255, .02);
+  --fio-a: rgba(255, 255, 255, .28); --fio-b: rgba(255, 255, 255, .05);
+  --linha: rgba(255, 255, 255, .065);
+  --txt: #F4F5F7; --txt-2: #9BA1AB; --txt-3: #5E646E;
+  --verde: #4ABE8C; --verde-bg: rgba(74, 190, 140, .12);
+  --ambar: #D9A44A; --ambar-bg: rgba(217, 164, 74, .12);
+  --rubro: #E5665C; --rubro-bg: rgba(229, 102, 92, .13);
+  --tint: 255, 255, 255;
+  --platina-a: #FFFFFF; --platina-b: #D6DAE0; --platina-txt: #101215; --platina-txt-rgb: 16, 18, 21;
+  --display-a: #FFFFFF; --display-b: #C9CDD4;
+  --sombra-1: 0 0 0 0 rgba(0, 0, 0, 0); --sombra-2: 0 16px 36px rgba(0, 0, 0, .5);
+  --spot-glow: .10;
+  --surface: #17191D; --surface-2: rgba(255, 255, 255, .045); --accent: #C9CED6;
+  --line-2: rgba(255, 255, 255, .1); --hover: rgba(255, 255, 255, .06);
+  --ring: rgba(255, 255, 255, .12); --backdrop: rgba(6, 7, 9, .62);
+  --shadow-pop: 0 24px 60px rgba(0, 0, 0, .5);
+  background: var(--base);
 }
