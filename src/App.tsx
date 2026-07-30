@@ -34,7 +34,6 @@ const CobrancasV2 = lazy(() => import('@/v2/pages/Cobrancas'));
 const AgendamentosV2 = lazy(() => import('@/v2/pages/Agendamentos'));
 const ScriptsV2 = lazy(() => import('@/v2/pages/Scripts'));
 const ConfiguracoesV2 = lazy(() => import('@/v2/pages/Configuracoes'));
-const MaturacaoV2 = lazy(() => import('@/v2/pages/Maturacao'));
 const ContatosV2 = lazy(() => import('@/v2/pages/Contatos'));
 const RelatoriosV2 = lazy(() => import('@/v2/pages/Relatorios'));
 const IntegracoesV2 = lazy(() => import('@/v2/pages/Integracoes'));
@@ -82,8 +81,9 @@ const routes: RouteObject[] = [
           { path: 'cobrancas', element: <Lz><CobrancasV2 /></Lz> },
           { path: 'relatorios', element: <Lz><RelatoriosV2 /></Lz> },
           { path: 'integracoes', element: <Lz><IntegracoesV2 /></Lz> },
-          // paridade: admin-only por URL, não só no menu
-          { path: 'maturacao', element: <Lz><RequireRoleV2 role="admin"><MaturacaoV2 /></RequireRoleV2></Lz> },
+          // Maturação DESCONTINUADA (Evolution restrito pela Meta): rota → placeholder "descontinuada".
+          // Página Maturacao.tsx preservada (não deletada), só fora do menu/rota — reversível.
+          { path: 'maturacao', element: <Lz><ManutencaoV2 area="Maturação" descontinuada /></Lz> },
           { path: 'configuracoes', element: <Lz><ConfiguracoesV2 /></Lz> },
           { path: 'plano-uso', element: <Lz><RequireRoleV2 role="admin"><PlanoUsoV2 /></RequireRoleV2></Lz> },
         ],
