@@ -37,7 +37,10 @@
 .v2 .wa-aba.on { background: rgba(var(--tint), .1); color: var(--txt); box-shadow: inset 0 1px 0 rgba(var(--tint), .1); }
 .v2 .wa-aba .n { color: var(--txt-3); font-size: 9.5px; }
 
-.v2 .wa-lista { flex: 1; min-height: 0; overflow-y: auto; }
+/* overflow-x: hidden é explícito de propósito: com só overflow-y:auto, o
+   overflow-x fica 'visible' que a spec usa como 'auto' → a fila ganhava scroll/
+   arrasto lateral no sub-pixel. touch-action: pan-y trava o gesto horizontal no toque. */
+.v2 .wa-lista { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; touch-action: pan-y; }
 .v2 .conv2 {
   position: relative; display: flex; gap: 10px; padding: 10.5px 13px 10.5px 16px; width: 100%; text-align: left;
   border: none; background: none; font-family: var(--fonte); color: var(--txt);
