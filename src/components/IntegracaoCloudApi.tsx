@@ -357,7 +357,7 @@ export function IntegracaoCloudApi({ podeConfig }: Props) {
               onClick={async () => {
                 try {
                   const r = await tplAcoes.sincronizar.mutateAsync();
-                  toast(`Sincronizado: ${r.importados} novo(s), ${r.atualizados} atualizado(s).${r.erros.length ? ` ${r.erros.length} com erro.` : ''}`);
+                  toast(`Sincronizado: ${r.importados} novo(s), ${r.atualizados} atualizado(s).${r.ignorados?.length ? ` ${r.ignorados.length} de outra conta (mantidos como estavam).` : ''}${r.erros.length ? ` ${r.erros.length} com erro.` : ''}`);
                 } catch (e) { toast((e as Error).message); }
               }}>
               {tplAcoes.sincronizar.isPending ? 'Sincronizando…' : 'Sincronizar com a Meta'}

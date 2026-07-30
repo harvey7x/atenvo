@@ -1,0 +1,38 @@
+/* Coexistência — rota escondida /coexistencia (manual de extensão: só layout;
+   cor/tipo herdam dos tokens e da família de componentes). */
+
+.v2 .coex-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+.v2 .coex-card { padding: 16px; }
+.v2 .coex-largo { grid-column: 1 / -1; }
+
+.v2 .coex-texto { font-size: 12.5px; color: var(--txt-2); line-height: 1.55; }
+.v2 .coex-texto strong { color: var(--txt); font-weight: 600; }
+
+.v2 .coex-acoes { display: flex; align-items: center; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+.v2 .coex-status { font-size: 12px; color: var(--txt-2); }
+
+.v2 .coex-ids { display: grid; gap: 8px; margin-top: 4px; }
+.v2 .coex-id { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.v2 .coex-id-rotulo {
+  font-size: 11px; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--txt-2); min-width: 120px;
+}
+.v2 .coex-id-valor {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px; color: var(--txt);
+}
+.v2 .coex-quebra { word-break: break-all; }
+.v2 .coex-erro { font-size: 12.5px; color: var(--rubro); margin-top: 6px; }
+.v2 .coex-code { display: grid; gap: 4px; margin-top: 12px; }
+
+.v2 .coex-log {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px; line-height: 1.5; color: var(--txt-2);
+  max-height: 320px; overflow: auto; white-space: pre-wrap; word-break: break-word;
+  margin-top: 4px;
+}

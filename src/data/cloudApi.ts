@@ -185,7 +185,7 @@ export function useTemplateAcoes() {
     onSuccess: recarregar,
   });
   const sincronizar = useMutation({
-    mutationFn: () => invoke<{ ok: boolean; importados: number; atualizados: number; erros: string[] }>(
+    mutationFn: () => invoke<{ ok: boolean; importados: number; atualizados: number; ignorados?: string[]; erros: string[] }>(
       'cloud-manage', { action: 'templates_sync', organizacao_id: currentOrg.id }),
     onSuccess: recarregar,
   });

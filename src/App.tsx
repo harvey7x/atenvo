@@ -42,6 +42,7 @@ const WhatsAppV2 = lazy(() => import('@/v2/pages/WhatsApp'));
 const ManutencaoV2 = lazy(() => import('@/v2/pages/Manutencao'));
 const VitrineV2 = lazy(() => import('@/v2/pages/Vitrine'));
 const RedefinirSenhaV2 = lazy(() => import('@/v2/pages/RedefinirSenha'));
+const CoexistenciaV2 = lazy(() => import('@/v2/pages/Coexistencia'));
 const DefinirSenhaV2 = lazy(() => import('@/v2/pages/DefinirSenha'));
 const AlterarSenhaV2 = lazy(() => import('@/v2/pages/AlterarSenha'));
 
@@ -86,6 +87,8 @@ const routes: RouteObject[] = [
           { path: 'maturacao', element: <Lz><ManutencaoV2 area="Maturação" descontinuada /></Lz> },
           { path: 'configuracoes', element: <Lz><ConfiguracoesV2 /></Lz> },
           { path: 'plano-uso', element: <Lz><RequireRoleV2 role="admin"><PlanoUsoV2 /></RequireRoleV2></Lz> },
+          // Coexistência (Embedded Signup da Meta): rota escondida, sem link no menu.
+          { path: 'coexistencia', element: <Lz><RequireRoleV2 role="admin"><CoexistenciaV2 /></RequireRoleV2></Lz> },
         ],
       },
     ],
