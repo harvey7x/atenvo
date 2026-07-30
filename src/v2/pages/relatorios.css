@@ -67,7 +67,7 @@
 /* gargalos */
 .v2 .rl2-gargs { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
 .v2 .rl2-garg { padding: 12px 14px; border-radius: 11px; border: 1px solid var(--linha); background: rgba(var(--tint), .025); }
-.v2 .rl2-garg.al { border-color: rgba(217, 164, 74, .32); background: var(--ambar-bg); }
+.v2 .rl2-garg.al { border-color: rgba(var(--ambar-rgb), .32); background: var(--ambar-bg); }
 .v2 .rl2-garg .t { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--txt-3); }
 .v2 .rl2-garg.al .t { color: var(--ambar); }
 .v2 .rl2-garg .v { font-size: 15px; font-weight: 600; margin-top: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -159,7 +159,7 @@
 .v2 .rl2-pod.ouro {
   border-color: rgba(var(--tint), .55);
   background: linear-gradient(180deg, rgba(var(--tint), .10), rgba(var(--tint), .03));
-  box-shadow: 0 0 26px rgba(var(--tint), .10), inset 0 1px 0 rgba(var(--tint), .2);
+  box-shadow: 0 0 26px rgba(var(--tint), calc(.10 * var(--fx))), inset 0 1px 0 rgba(var(--tint), .2);
 }
 .v2 .rl2-pod .pos { font-size: 10px; font-weight: 700; letter-spacing: .08em; color: var(--txt-3); }
 .v2 .rl2-pod.ouro .pos { color: var(--platina-txt); background: linear-gradient(180deg, var(--platina-a), var(--platina-b)); border-radius: 99px; padding: 2px 8px; display: inline-block; }

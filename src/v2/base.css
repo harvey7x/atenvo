@@ -106,9 +106,9 @@
 
 /* pulso do canal (única cor viva permitida fora da semântica) */
 @keyframes v2-pulsa {
-  0%   { box-shadow: 0 0 0 0 rgba(74, 190, 140, calc(.45 * var(--fx))); }
-  70%  { box-shadow: 0 0 0 7px rgba(74, 190, 140, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(74, 190, 140, 0); }
+  0%   { box-shadow: 0 0 0 0 rgba(var(--verde-rgb), calc(.45 * var(--fx))); }
+  70%  { box-shadow: 0 0 0 7px rgba(var(--verde-rgb), 0); }
+  100% { box-shadow: 0 0 0 0 rgba(var(--verde-rgb), 0); }
 }
 
 /* --- cabeçalho de página (.ph — manual de extensão) --------- */

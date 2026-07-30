@@ -61,13 +61,15 @@ export function DefsSpark() {
   return (
     <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden focusable="false">
       <defs>
+        {/* cores via style (não atributo): var() só resolve em contexto CSS — no light a
+            sparkline vira tinta grafite em vez de branco invisível (auditoria). */}
         <linearGradient id="gPrata" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stopColor="#FFF" stopOpacity=".9" />
-          <stop offset="1" stopColor="#9BA1AB" stopOpacity=".55" />
+          <stop offset="0" style={{ stopColor: 'rgb(var(--tint))' }} stopOpacity=".9" />
+          <stop offset="1" style={{ stopColor: 'var(--txt-2)' }} stopOpacity=".55" />
         </linearGradient>
         <linearGradient id="gPrataArea" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#FFF" stopOpacity=".14" />
-          <stop offset="1" stopColor="#FFF" stopOpacity="0" />
+          <stop offset="0" style={{ stopColor: 'rgb(var(--tint))' }} stopOpacity=".14" />
+          <stop offset="1" style={{ stopColor: 'rgb(var(--tint))' }} stopOpacity="0" />
         </linearGradient>
       </defs>
     </svg>

@@ -37,7 +37,7 @@
 .v2 .card-cab h3 { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
 .v2 .cont {
   background: var(--rubro-bg); color: var(--rubro); font-size: 10.5px; font-weight: 600;
-  border-radius: 99px; padding: 1px 8px; border: 1px solid rgba(229, 102, 92, .26);
+  border-radius: 99px; padding: 1px 8px; border: 1px solid rgba(var(--rubro-rgb), .26);
 }
 .v2 .card-cab a {
   font-size: 12px; font-weight: 500; color: var(--txt); text-decoration: none;
@@ -79,7 +79,7 @@
 .v2 .s-at { background: var(--ambar-bg); color: var(--ambar); }
 .v2 .s-at i { background: var(--ambar); }
 .v2 .s-er { background: var(--rubro-bg); color: var(--rubro); }
-.v2 .s-er i { background: var(--rubro); box-shadow: 0 0 8px rgba(229, 102, 92, calc(.6 * var(--fx))); }
+.v2 .s-er i { background: var(--rubro); box-shadow: 0 0 8px rgba(var(--rubro-rgb), calc(.6 * var(--fx))); }
 .v2 .s-ne { background: rgba(var(--tint), .05); color: var(--txt-2); border: 1px solid rgba(var(--tint), .1); }
 .v2 .s-ne i { background: var(--txt-3); }
 
@@ -95,9 +95,9 @@
   content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px;
   border-radius: 0 3px 3px 0;
 }
-.v2 .li.crit::before { background: var(--rubro); box-shadow: 0 0 12px rgba(229, 102, 92, calc(.65 * var(--fx))); }
-.v2 .li.aten::before { background: var(--ambar); box-shadow: 0 0 10px rgba(217, 164, 74, calc(.45 * var(--fx))); }
-.v2 .li.info::before { background: #fff; box-shadow: 0 0 10px rgba(var(--tint), calc(.4 * var(--fx))); }
+.v2 .li.crit::before { background: var(--rubro); box-shadow: 0 0 12px rgba(var(--rubro-rgb), calc(.65 * var(--fx))); }
+.v2 .li.aten::before { background: var(--ambar); box-shadow: 0 0 10px rgba(var(--ambar-rgb), calc(.45 * var(--fx))); }
+.v2 .li.info::before { background: rgb(var(--tint)); box-shadow: 0 0 10px rgba(var(--tint), calc(.4 * var(--fx))); }
 .v2 .li .t { font-size: 12.5px; font-weight: 500; }
 .v2 .li .s { font-size: 11.5px; color: var(--txt-2); margin-top: 2px; }
 .v2 .li .h { margin-left: auto; font-size: 11px; color: var(--txt-3); white-space: nowrap; padding-top: 2px; }
@@ -131,7 +131,7 @@
 .v2 .cbx.on { background: var(--platina-a); border-color: var(--platina-a); position: relative; }
 .v2 .cbx.on::after {
   content: ""; position: absolute; left: 4px; top: 1px; width: 4px; height: 8px;
-  border: solid #0E0F12; border-width: 0 2px 2px 0; transform: rotate(45deg);
+  border: solid var(--platina-txt); border-width: 0 2px 2px 0; transform: rotate(45deg);
 }
 
 /* barra de seleção (bulk) platina */
@@ -216,8 +216,8 @@
 
 /* estado inválido + dica do campo (contrato, item 7 — o mockup não
    desenha erro de campo; segue a semântica rubro dos padrões dele) */
-.v2 .campo.invalida .inp { border-color: rgba(229, 102, 92, .55); }
-.v2 .campo.invalida .inp:focus { box-shadow: 0 0 0 3px rgba(229, 102, 92, .10); }
+.v2 .campo.invalida .inp { border-color: rgba(var(--rubro-rgb), .55); }
+.v2 .campo.invalida .inp:focus { box-shadow: 0 0 0 3px rgba(var(--rubro-rgb), .10); }
 .v2 .campo .hint { display: block; font-size: 11px; color: var(--rubro); margin-top: 5px; min-height: 14px; }
 
 /* input com botão embutido (ex.: olho da senha) */
@@ -261,9 +261,9 @@
 .v2 .status-bar .seg i.ambar { background: var(--ambar); }
 .v2 .status-bar .seg i.rubro { background: var(--rubro); }
 .v2 .status-bar .seg i.neutro { background: var(--txt-3); }
-.v2 .status-bar .seg i.verde.brilho { box-shadow: 0 0 8px rgba(74, 190, 140, calc(.6 * var(--fx))); }
-.v2 .status-bar .seg i.ambar.brilho { box-shadow: 0 0 8px rgba(217, 164, 74, calc(.5 * var(--fx))); }
-.v2 .status-bar .seg i.rubro.brilho { box-shadow: 0 0 8px rgba(229, 102, 92, calc(.6 * var(--fx))); }
+.v2 .status-bar .seg i.verde.brilho { box-shadow: 0 0 8px rgba(var(--verde-rgb), calc(.6 * var(--fx))); }
+.v2 .status-bar .seg i.ambar.brilho { box-shadow: 0 0 8px rgba(var(--ambar-rgb), calc(.5 * var(--fx))); }
+.v2 .status-bar .seg i.rubro.brilho { box-shadow: 0 0 8px rgba(var(--rubro-rgb), calc(.6 * var(--fx))); }
 .v2 .status-bar .fim { margin-left: auto; letter-spacing: .14em; font-size: 9.5px; }
 
 /* divisor interno de painel (mockup .cfg-div) */
@@ -330,8 +330,8 @@
 }
 .v2 .p-modal-msg { font-size: 12.5px; color: var(--txt-2); line-height: 1.55; }
 /* botão destrutivo (confirmações rubras) */
-.v2 .btn-perigo { background: var(--rubro-bg); border-color: rgba(229, 102, 92, .35); color: var(--rubro); }
-.v2 .btn-perigo:hover:not(:disabled) { background: rgba(229, 102, 92, .2); }
+.v2 .btn-perigo { background: var(--rubro-bg); border-color: rgba(var(--rubro-rgb), .35); color: var(--rubro); }
+.v2 .btn-perigo:hover:not(:disabled) { background: rgba(var(--rubro-rgb), .2); }
 
 /* drawer lateral direito (detalhes) — véu sutil, vidro em altura total */
 .v2 .veu-drawer {
@@ -368,9 +368,9 @@
 .v2 .aviso-inline {
   display: flex; align-items: flex-start; gap: 8px; font-size: 11.5px; line-height: 1.45;
   border-radius: 9px; padding: 8px 11px; margin-bottom: 12px;
-  background: var(--verde-bg); color: var(--verde); border: 1px solid rgba(74, 190, 140, .26);
+  background: var(--verde-bg); color: var(--verde); border: 1px solid rgba(var(--verde-rgb), .26);
 }
-.v2 .aviso-inline.erro { background: var(--rubro-bg); color: var(--rubro); border-color: rgba(229, 102, 92, .26); }
+.v2 .aviso-inline.erro { background: var(--rubro-bg); color: var(--rubro); border-color: rgba(var(--rubro-rgb), .26); }
 .v2 .aviso-inline button {
   margin-left: auto; background: none; border: none; color: inherit; cursor: pointer;
   font-size: 13px; padding: 0 2px; opacity: .7; font-family: var(--fonte);
@@ -506,8 +506,8 @@
 }
 .v2 .atv-btn.primary { background: linear-gradient(180deg, var(--platina-a), var(--platina-b)); border: 0; color: var(--platina-txt); font-weight: 600; box-shadow: inset 0 1px 0 #fff; }
 .v2 .atv-btn.primary:hover:not(:disabled) { background: linear-gradient(180deg, var(--platina-a), var(--platina-b)); filter: none; transform: translateY(-1px); }
-.v2 .atv-btn.danger { background: var(--rubro-bg); border-color: rgba(229, 102, 92, .35); color: var(--rubro); }
-.v2 .atv-btn.danger:hover:not(:disabled) { background: rgba(229, 102, 92, .2); filter: none; }
+.v2 .atv-btn.danger { background: var(--rubro-bg); border-color: rgba(var(--rubro-rgb), .35); color: var(--rubro); }
+.v2 .atv-btn.danger:hover:not(:disabled) { background: rgba(var(--rubro-rgb), .2); filter: none; }
 /* textos de contraste da ficha (hex escuros do v1 → tokens Platina, legíveis no escuro) */
 .v2 .fj-ind.ok { color: var(--verde); }
 .v2 .fj-ind.warn { color: var(--ambar); }
@@ -569,3 +569,33 @@
 :root[data-tema="light"] .v2 .drawer-v2 { background: linear-gradient(180deg, rgba(255, 255, 255, .94), rgba(250, 251, 252, .9)); box-shadow: -30px 0 80px rgba(22, 25, 31, .16); }
 /* barra "hoje" dos gráficos (Relatórios): topo branco → barra escura definida no light */
 :root[data-tema="light"] .v2 .barv.hoje2 { background: linear-gradient(180deg, rgba(var(--tint), .8), rgba(var(--tint), .45)); box-shadow: none; }
+
+/* ============================================================
+   Classes COMPARTILHADAS entre rotas lazy (auditoria 2026-07): viviam em CSS de
+   página (combo-* em cobrancas.css, agc-pick em agendamentos.css) e eram consumidas
+   por OUTRA rota — em load direto com code-split renderizavam cruas. Promovidas
+   para cá; superfície/sombra via tokens (--surface/--shadow-pop), temadas sozinhas.
+   ============================================================ */
+/* dropdown do picker de contato (Cobranças + modal de Agendamentos) */
+.v2 .combo-pop {
+  position: absolute; top: calc(100% + 5px); left: 0; right: 0; z-index: 5;
+  background: var(--surface); border: 1px solid rgba(var(--tint), .13); border-radius: 10px;
+  max-height: 220px; overflow-y: auto; box-shadow: var(--shadow-pop);
+}
+.v2 .combo-info { padding: 11px 12px; font-size: 11.5px; color: var(--txt-2); }
+.v2 .combo-item {
+  display: block; width: 100%; text-align: left; background: none; border: none;
+  padding: 8px 12px; cursor: pointer; font-family: var(--fonte);
+  border-bottom: 1px solid rgba(var(--tint), .05);
+}
+.v2 .combo-item:last-child { border-bottom: none; }
+.v2 .combo-item:hover { background: rgba(var(--tint), .05); }
+.v2 .combo-item .nm { font-size: 12.5px; font-weight: 500; color: var(--txt); }
+.v2 .combo-item .meta { font-size: 11px; color: var(--txt-2); margin-top: 1px; }
+/* botão de escolher mídia (Agendamentos + builder de Scripts) */
+.v2 .agc-pick {
+  background: rgba(var(--tint), .04); border: 1px solid rgba(var(--tint), .12);
+  border-radius: 9px; color: var(--txt-2); font-family: var(--fonte); font-size: 12px;
+  padding: 9px; cursor: pointer; width: 100%;
+}
+.v2 .agc-pick:hover:not(:disabled) { color: var(--txt); }

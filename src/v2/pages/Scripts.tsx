@@ -879,7 +879,7 @@ function CategoriasModal({ cats, contagem, aoCriar, aoRenomear, aoPedirExcluir, 
         <div>
           {cats.length === 0 && <div style={{ fontSize: 11.5, color: 'var(--txt-3)' }}>Nenhuma categoria ainda.</div>}
           {cats.map((c) => (
-            <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', borderBottom: '1px solid rgba(255,255,255,.05)' }}>
+            <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', borderBottom: '1px solid var(--linha)' }}>
               {editandoId === c.id ? (
                 <>
                   <Input value={editandoNome} disabled={busy} onChange={(e) => { setEditandoNome(e.target.value); setErr(null); }}

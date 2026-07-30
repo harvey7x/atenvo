@@ -185,7 +185,7 @@ export default function PlanoUsoV2() {
           <div className="sobe" style={{ marginTop: 22, animationDelay: '.16s' }}>
             <span className="caps" style={{ display: 'block', marginBottom: 12 }}>Contratar adicionais</span>
             {aviso && (
-              <div className="aviso-plano" role="status">
+              <div className="aviso-inline" role="status">
                 {aviso}
                 <button type="button" onClick={() => setAviso(null)} aria-label="Fechar aviso">×</button>
               </div>

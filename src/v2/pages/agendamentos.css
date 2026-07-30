@@ -8,12 +8,10 @@
 /* topo: segmentado + ações */
 .v2 .ag-topo { display: flex; align-items: center; gap: 12px; margin-bottom: 13px; flex-wrap: wrap; }
 .v2 .ag-topo .acoes { margin-left: auto; }
-.v2 .ag-sel {
-  height: 33px; background: rgba(var(--tint), .045); border: 1px solid rgba(var(--tint), .13);
-  border-radius: var(--r-ctl); padding: 0 9px; font-family: var(--fonte); font-size: 12px;
-  color: var(--txt); appearance: auto;
-}
-.v2 .ag-sel:focus { outline: none; border-color: rgba(var(--tint), .5); }
+/* selects dos filtros usam o .inp compartilhado (auditoria: .ag-sel duplicava o .inp
+   com métricas divergentes — dois selects diferentes na mesma tela). Só a largura
+   é ajustada aqui: .inp é width:100%, filtro inline é auto. */
+.v2 select.inp.ag-sel-inline { width: auto; appearance: auto; }
 
 /* filtros recolhíveis */
 .v2 .ag-filtros { display: flex; gap: 9px; align-items: center; margin-bottom: 13px; flex-wrap: wrap; }
@@ -117,7 +115,7 @@
 .v2 .agc-resumo { font-size: 11.5px; color: var(--txt-2); }
 .v2 .agc-aviso {
   font-size: 11.5px; line-height: 1.45; border-radius: 9px; padding: 7px 10px;
-  background: var(--ambar-bg); color: var(--ambar); border: 1px solid rgba(217, 164, 74, .26);
+  background: var(--ambar-bg); color: var(--ambar); border: 1px solid rgba(var(--ambar-rgb), .26);
 }
 .v2 .agc-file {
   display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--txt-2);
@@ -125,12 +123,7 @@
 }
 .v2 .agc-file .nome { color: var(--txt); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .v2 .agc-file .p-btn { margin-left: auto; }
-.v2 .agc-pick {
-  background: rgba(var(--tint), .04); border: 1px solid rgba(var(--tint), .12);
-  border-radius: 9px; color: var(--txt-2); font-family: var(--fonte); font-size: 12px;
-  padding: 9px; cursor: pointer; width: 100%;
-}
-.v2 .agc-pick:hover:not(:disabled) { color: var(--txt); }
+/* .agc-pick promovida a componentes.css (Scripts também a consome; cross-rota lazy). */
 
 /* preview em bolhas (anatomia .bolha/.env2 do mockup) */
 .v2 .agc-preview { border-left: 1px solid var(--linha); padding-left: 16px; display: flex; flex-direction: column; min-width: 0; }

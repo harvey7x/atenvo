@@ -28,7 +28,7 @@ import { useInboxWhatsApp, type AvisoInbox } from '../hooks/useInboxWhatsApp';
 import { AudioRecorderV2 } from '../components/AudioRecorderV2';
 import { AgendarMensagemModalV2 } from './AgendarMensagemModalV2';
 import { CLASSE_RAIZ_PORTAL } from '../components/portal';
-import { BotaoMini, BotaoPrimario, BotaoSec, ConfirmDialogV2, ModalV2, Skeleton } from '../components';
+import { BotaoMini, BotaoPrimario, BotaoSec, ConfirmDialogV2, EstadoErro, ModalV2, Skeleton } from '../components';
 import { seedWa } from './whatsappSeed';
 import './whatsapp.css';
 
@@ -141,6 +141,7 @@ export default function WhatsAppV2() {
   const [transferirAberto, setTransferirAberto] = useState(false);
   const [vincAberto, setVincAberto] = useState(false);
   const [fecharConfirm, setFecharConfirm] = useState(false);
+  const [cancelarAgId, setCancelarAgId] = useState<string | null>(null); // auditoria: era window.confirm nativo
   const [verErro, setVerErro] = useState<string | null>(null);
   const [removerAlvo, setRemoverAlvo] = useState<WaMessage | null>(null);
   const [imgModal, setImgModal] = useState(false);
@@ -460,7 +461,10 @@ export default function WhatsAppV2() {
             </div>
           </div>
           <div className="wa-lista">
-            {WA_REAL && inbox.live.isLoading && contacts.length === 0 ? (
+            {WA_REAL && inbox.live.isError && contacts.length === 0 ? (
+              /* contrato item 7: erro desenhado com "Tentar de novo" (auditoria) */
+              <EstadoErro descricao="Erro ao carregar as conversas." aoTentarDeNovo={() => void inbox.live.refetch()} />
+            ) : WA_REAL && inbox.live.isLoading && contacts.length === 0 ? (
               <div className="wa-skel" aria-busy aria-label="Carregando conversas">
                 {[0, 1, 2, 3, 4, 5].map((i) => (
                   <div className="row" key={i}>
@@ -502,7 +506,7 @@ export default function WhatsAppV2() {
                           <span className="chips">
                             {(() => { const cor = corDaSituacao(c, sit.texto); return <span className={'cchip etapa sit-' + sit.variante} title="Situação no funil" style={cor ? { background: cor + '26', color: cor } : undefined}>{sit.texto}</span>; })()}
                             {alertas.length > 0 && <span className="cchip alerta" title={alertas.join(' · ')}>⚠{alertas.length > 1 ? ' ' + alertas.length : ''}</span>}
-                            {c.contatoId && bloqueados.has(c.contatoId) && <span className="cchip alerta" style={{ color: 'var(--rubro)', borderColor: 'rgba(229,102,92,.4)' }} title={optoutTexto}>Não incomodar</span>}
+                            {c.contatoId && bloqueados.has(c.contatoId) && <span className="cchip alerta" style={{ color: 'var(--rubro)', borderColor: 'rgba(var(--rubro-rgb),.4)' }} title={optoutTexto}>Não incomodar</span>}
                             {/* "Finalizado" só quando a situação NÃO já é terminal (ganho/perdido/cancelado) — evita verde ao lado de PERDIDO (Adendo 3) */}
                             {finalizado && !['ganho', 'perdido', 'cancelado'].includes(sit.variante) && <span className="cchip fim">Finalizado</span>}
                           </span>
@@ -561,7 +565,7 @@ export default function WhatsAppV2() {
               <div className="dir">
                 {inbox.donoEfetivo
                   ? <BotaoMini title="Transferir atendimento" onClick={() => setTransferirAberto(true)}>Transferir</BotaoMini>
-                  : <BotaoPrimario mini title="Assumir atendimento" disabled={inbox.atribuindo} onClick={inbox.assumir}>Assumir</BotaoPrimario>}
+                  : <BotaoSec mini title="Assumir atendimento" disabled={inbox.atribuindo} onClick={inbox.assumir}>Assumir</BotaoSec>}
                 <BotaoMini title={current.arquivada ? 'Desarquivar conversa' : 'Arquivar conversa'} onClick={() => inbox.arquivar(!current.arquivada)}>{current.arquivada ? 'Desarquivar' : 'Arquivar'}</BotaoMini>
                 {!ctxAberto && <BotaoMini title="Abrir painel de dados do contato" onClick={() => setCtxAberto(true)}>Dados</BotaoMini>}
                 <button type="button" className={'ib2' + (foco ? ' on' : '')} title="Modo de foco (Esc para sair)" onClick={() => setFoco((f) => !f)} style={{ width: 26, height: 26 }}><IcFoco /></button>
@@ -727,14 +731,7 @@ export default function WhatsAppV2() {
                   {a.status === 'agendada' && (
                     <>
                       <button type="button" className="lnk" onClick={() => { setAgEditId(a.id); setAgendarAberto(true); }}>Editar</button>
-                      <button
-                        type="button" className="lnk"
-                        onClick={async () => {
-                          if (!window.confirm('Cancelar este agendamento? A mensagem não será enviada.')) return;
-                          try { await cancelarAgMut.mutateAsync({ id: a.id, conversaId: current.id }); aoAvisar({ tom: 'ok', texto: 'Agendamento cancelado.' }); }
-                          catch (e) { aoAvisar({ tom: 'erro', texto: (e as Error)?.message || 'Falha ao cancelar.' }); }
-                        }}
-                      >
+                      <button type="button" className="lnk" onClick={() => setCancelarAgId(a.id)}>
                         Cancelar
                       </button>
                     </>
@@ -1053,6 +1050,21 @@ export default function WhatsAppV2() {
         aoConfirmar={async () => { if (removerAlvo) { await inbox.removerFalha(removerAlvo); setRemoverAlvo(null); } }}
         aoCancelar={() => setRemoverAlvo(null)}
       />
+      <ConfirmDialogV2
+        aberto={!!cancelarAgId}
+        titulo="Cancelar agendamento?"
+        mensagem="A mensagem não será enviada."
+        rotuloConfirmar="Cancelar agendamento"
+        destrutivo
+        carregando={cancelarAgMut.isPending}
+        aoConfirmar={async () => {
+          if (!cancelarAgId || !current) return;
+          try { await cancelarAgMut.mutateAsync({ id: cancelarAgId, conversaId: current.id }); aoAvisar({ tom: 'ok', texto: 'Agendamento cancelado.' }); }
+          catch (e) { aoAvisar({ tom: 'erro', texto: (e as Error)?.message || 'Falha ao cancelar.' }); }
+          setCancelarAgId(null);
+        }}
+        aoCancelar={() => setCancelarAgId(null)}
+      />
       <MediaComposer
         open={imgModal} tipo="imagem" previewCard
         onClose={() => setImgModal(false)}
@@ -1127,7 +1139,7 @@ export default function WhatsAppV2() {
       />
       {lightbox && (
         <div className="veu" role="dialog" aria-modal onMouseDown={(e) => { if (e.target === e.currentTarget) setLightbox(null); }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 96 }}>
-          <button type="button" aria-label="Fechar" onClick={() => setLightbox(null)} style={{ position: 'fixed', top: 14, right: 18, fontSize: 22, background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}>×</button>
+          <button type="button" aria-label="Fechar" onClick={() => setLightbox(null)} style={{ position: 'fixed', top: 14, right: 18, fontSize: 22, background: 'none', border: 'none', color: 'var(--txt)', cursor: 'pointer' }}>×</button>
           <img src={lightbox} alt="Imagem ampliada" style={{ maxWidth: '86vw', maxHeight: '86vh', borderRadius: 10 }} />
         </div>
       )}
@@ -1357,7 +1369,7 @@ function KanbanCtx({ contatoId, demo, etapa, etapaCor, origem, respNome, lead, a
               <div className="fjb-card">
                 <span className="fjb-tag vazia">Nenhuma ficha</span>
                 <div className="fjb-info">Importe a consulta do Promosys/iCred e gere a ficha judicial.</div>
-                <div className="fjb-acts"><button type="button" className="fjb-btn primary" onClick={() => aoAvisar({ tom: 'ok', texto: 'Modo demonstração: a ficha real (importar, revisar, finalizar) abre no ambiente com backend.' })}>Criar ficha</button></div>
+                <div className="fjb-acts"><button type="button" className="fjb-btn" onClick={() => aoAvisar({ tom: 'ok', texto: 'Modo demonstração: a ficha real (importar, revisar, finalizar) abre no ambiente com backend.' })}>Criar ficha</button></div>
               </div>
             </div>
           ) : (

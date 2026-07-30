@@ -13,7 +13,7 @@
   display: flex; align-items: center; justify-content: center; padding: 24px;
 }
 .v2 .luz2 {
-  position: absolute; inset: 0; pointer-events: none; opacity: var(--fx);
+  position: absolute; inset: 0; pointer-events: none; opacity: calc(var(--fx) * var(--luz-op));
   background:
     radial-gradient(50% 60% at 30% 10%, rgba(var(--tint), .09) 0%, transparent 70%),
     radial-gradient(56% 66% at 78% 92%, rgba(var(--tint), .045) 0%, transparent 72%);
@@ -66,17 +66,17 @@
   border-radius: 9px; padding: 8px 11px; margin-bottom: 13px;
 }
 .v2 .lg-banner.show { display: flex; }
-.v2 .lg-banner.erro { background: var(--rubro-bg); color: var(--rubro); border: 1px solid rgba(229, 102, 92, .26); }
-.v2 .lg-banner.aviso { background: var(--verde-bg); color: var(--verde); border: 1px solid rgba(74, 190, 140, .26); }
+.v2 .lg-banner.erro { background: var(--rubro-bg); color: var(--rubro); border: 1px solid rgba(var(--rubro-rgb), .26); }
+.v2 .lg-banner.aviso { background: var(--verde-bg); color: var(--verde); border: 1px solid rgba(var(--verde-rgb), .26); }
 
 /* lista de variáveis ausentes (ErroConfiguracao) */
 .v2 .lg-vars { list-style: none; margin: 0 0 14px; display: flex; flex-direction: column; gap: 7px; }
 .v2 .lg-vars code {
   font-family: ui-monospace, monospace; font-size: 11px; color: var(--rubro);
-  background: var(--rubro-bg); border: 1px solid rgba(229, 102, 92, .26);
+  background: var(--rubro-bg); border: 1px solid rgba(var(--rubro-rgb), .26);
   border-radius: 6px; padding: 3px 8px;
 }
-.v2 .lg-card code.ok { color: var(--verde); background: var(--verde-bg); border-color: rgba(74, 190, 140, .26); }
+.v2 .lg-card code.ok { color: var(--verde); background: var(--verde-bg); border-color: rgba(var(--verde-rgb), .26); }
 
 /* TEMA LIGHT — Login (Adendo nº 6): a marca prata clara vira grafite no claro
    (o display .p-display já foi corrigido na base). Dark inalterado. */

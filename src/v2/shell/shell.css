@@ -67,16 +67,16 @@
   transition: opacity .18s; border: 1.5px solid #101114;
 }
 .v2 .mini.claro { background: #fff; box-shadow: 0 0 8px rgba(var(--tint), calc(.7 * var(--fx))); }
-.v2 .mini.rubro { background: var(--rubro); box-shadow: 0 0 8px rgba(229, 102, 92, calc(.7 * var(--fx))); }
+.v2 .mini.rubro { background: var(--rubro); box-shadow: 0 0 8px rgba(var(--rubro-rgb), calc(.7 * var(--fx))); }
 .v2 .p-sidebar:hover .mini, .v2 .p-sidebar:focus-within .mini { opacity: 0; }
 .v2 .badge-n {
   margin-left: auto; font-size: 10.5px; font-weight: 600; border-radius: 99px; padding: 1px 7px;
   background: rgba(var(--tint), .10); color: var(--txt); border: 1px solid rgba(var(--tint), .14);
 }
-.v2 .badge-n.rubro { background: var(--rubro-bg); color: var(--rubro); border-color: rgba(229, 102, 92, .3); }
+.v2 .badge-n.rubro { background: var(--rubro-bg); color: var(--rubro); border-color: rgba(var(--rubro-rgb), .3); }
 .v2 .canal {
   margin: 9px 2px 0; display: flex; align-items: center; gap: 9px; font-size: 10.5px;
-  color: var(--verde); background: var(--verde-bg); border: 1px solid rgba(74, 190, 140, .2);
+  color: var(--verde); background: var(--verde-bg); border: 1px solid rgba(var(--verde-rgb), .2);
   border-radius: 8px; padding: 6px 10px; opacity: 0; transition: opacity .22s .07s;
 }
 .v2 .p-sidebar:hover .canal, .v2 .p-sidebar:focus-within .canal { opacity: 1; }
@@ -146,8 +146,8 @@
    nada do palco/cabeçalho transparece nem pinta por cima. top/right vêm do rect do avatar (JS). */
 .v2 .usuario-menu {
   position: fixed; z-index: 95; min-width: 194px;
-  background: #17191D; border: 1px solid rgba(var(--tint), .12); border-radius: var(--r-card); padding: 6px;
-  box-shadow: 0 18px 44px rgba(0, 0, 0, .6); animation: v2-modal-entra .18s var(--ease);
+  background: var(--surface); border: 1px solid rgba(var(--tint), .12); border-radius: var(--r-card); padding: 6px;
+  box-shadow: var(--shadow-pop); animation: v2-modal-entra .18s var(--ease);
 }
 .v2 .um-head { padding: 7px 9px 9px; border-bottom: 1px solid var(--linha); margin-bottom: 5px; }
 .v2 .um-nome { font-size: 12.5px; font-weight: 600; color: var(--txt); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -184,7 +184,7 @@
 }
 .v2 .notif .p-av i {
   position: absolute; bottom: -1px; right: -1px; width: 10px; height: 10px; border-radius: 50%;
-  background: var(--verde); border: 2px solid #16181C;
+  background: var(--verde); border: 2px solid var(--surface);
 }
 .v2 .notif .quem { font-size: 12.5px; font-weight: 600; }
 .v2 .notif .qdo { margin-left: auto; font-size: 10px; color: var(--txt-3); }
@@ -245,7 +245,7 @@
 :root[data-tema="light"] .v2 .avatar,
 :root[data-tema="light"] .v2 .notif .p-av { background: linear-gradient(150deg, #E4E8ED, #C2C8D1); }
 /* menu do usuário: superfície sólida escura → branca com sombra real */
-:root[data-tema="light"] .v2 .usuario-menu { background: #FFFFFF; box-shadow: 0 18px 44px rgba(22, 25, 31, .18); }
+/* (par light do .usuario-menu herdado dos tokens --surface/--shadow-pop) */
 /* dots (pulso do sino, minis da sidebar recolhida): branco → accent, borda clara */
 :root[data-tema="light"] .v2 .ib .pt { background: var(--accent); border-color: #F4F5F7; }
 :root[data-tema="light"] .v2 .mini { border-color: #EEF0F3; }

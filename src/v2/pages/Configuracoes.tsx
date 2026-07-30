@@ -439,7 +439,8 @@ function PainelConta({ anima, demo, seed, setSeed, aoAvisar, podeGerenciar }: {
           </div>
           {podeGerenciar && (
             <div className="cfa-rodape">
-              <BotaoPrimario disabled={orgBusy || !orgDado} onClick={salvarEmpresa}>{orgBusy ? 'Salvando…' : 'Salvar alterações'}</BotaoPrimario>
+              {/* BotaoSec de propósito (auditoria/CONTRATO: máx 1 primário por tela — o do Perfil acima) */}
+              <BotaoSec disabled={orgBusy || !orgDado} onClick={salvarEmpresa}>{orgBusy ? 'Salvando…' : 'Salvar alterações'}</BotaoSec>
             </div>
           )}
         </>
@@ -1103,7 +1104,8 @@ function PainelStatusEtiquetas({ anima, canManage, section, aoAvisar }: { anima:
               <option value="">Selecione…</option>
               {statuses.filter((x) => x.id !== del.s.id).map((x) => <option key={x.id} value={x.id}>{x.nome}</option>)}
             </select>
-            <BotaoPrimario mini onClick={confirmDeleteStatus}>Excluir e reatribuir</BotaoPrimario>
+            {/* destrutivo = btn-perigo (auditoria: primário platina não sinaliza perigo) */}
+            <button type="button" className="p-btn btn-perigo btn-mini" onClick={confirmDeleteStatus}>Excluir e reatribuir</button>
             <BotaoMini onClick={() => setDel(null)}>Cancelar</BotaoMini>
           </div>
         )}

@@ -84,7 +84,7 @@
 .v2 .scr-det-acoes { display: flex; gap: 6px; flex-wrap: wrap; padding: 11px 16px; border-top: 1px solid var(--linha); flex-shrink: 0; }
 .v2 .scr-ponte {
   display: flex; gap: 8px; align-items: flex-start; font-size: 11px; line-height: 1.5;
-  color: var(--verde); background: var(--verde-bg); border: 1px solid rgba(74, 190, 140, .26);
+  color: var(--verde); background: var(--verde-bg); border: 1px solid rgba(var(--verde-rgb), .26);
   border-radius: 9px; padding: 7px 10px;
 }
 .v2 .scr-ponte.off { color: var(--txt-3); background: rgba(var(--tint), .03); border-color: var(--linha); }

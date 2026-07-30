@@ -28,7 +28,7 @@
   background: linear-gradient(90deg, rgba(var(--tint), .9), rgba(var(--tint), .45));
   transition: width 1s .3s var(--ease);
 }
-.v2 .fill.alto { background: linear-gradient(90deg, var(--ambar), rgba(217, 164, 74, .55)); }
+.v2 .fill.alto { background: linear-gradient(90deg, var(--ambar), rgba(var(--ambar-rgb), .55)); }
 .v2 .medidor .nota-m { font-size: 10.5px; color: var(--txt-3); margin-top: 5px; }
 .v2 .medidor .nota-m .lim { color: var(--ambar); font-weight: 600; }
 
@@ -62,12 +62,8 @@
 .v2 .p-addon .sub .sl { font-size: 9.5px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--txt-3); }
 .v2 .p-addon .sub .sv { font-size: 14px; font-weight: 600; margin-top: 1px; }
 
-/* aviso inline (substitui o toast v1 da contratação) */
-.v2 .aviso-plano {
-  display: flex; align-items: flex-start; gap: 8px; font-size: 11.5px; line-height: 1.45;
-  border-radius: 9px; padding: 8px 11px; margin-bottom: 12px;
-  background: var(--verde-bg); color: var(--verde); border: 1px solid rgba(74, 190, 140, .26);
-}
+/* (o aviso da contratação usa o .aviso-inline compartilhado — a duplicata local
+   .aviso-plano foi removida na auditoria 2026-07) */
 .v2 .aviso-plano button {
   margin-left: auto; background: none; border: none; color: inherit; cursor: pointer;
   font-size: 13px; padding: 0 2px; opacity: .7; font-family: var(--fonte);

@@ -407,7 +407,7 @@ export default function AgendamentosV2() {
               valor={aba}
               aoMudar={(v) => { setAba(v); setSelKey(null); }}
             />
-            <select className="ag-sel" value={fPeriodo} onChange={(e) => setFPeriodo(e.target.value as PeriodoAg)} aria-label="Período">
+            <select className="inp ag-sel-inline" value={fPeriodo} onChange={(e) => setFPeriodo(e.target.value as PeriodoAg)} aria-label="Período">
               <option value="todas">Todo o período</option>
               <option value="hoje">Hoje</option>
               <option value="amanha">Amanhã</option>
@@ -424,15 +424,15 @@ export default function AgendamentosV2() {
               <div className="busca-inp">
                 <Input placeholder="Buscar por cliente, telefone ou conteúdo…" value={fBusca} onChange={(e) => setFBusca(e.target.value)} aria-label="Buscar agendamentos" />
               </div>
-              <select className="ag-sel" value={fCanal} onChange={(e) => setFCanal(e.target.value)} aria-label="Canal">
+              <select className="inp ag-sel-inline" value={fCanal} onChange={(e) => setFCanal(e.target.value)} aria-label="Canal">
                 <option value="">Todos os canais</option>
                 {canais.map((c) => <option key={c.id} value={c.id}>{c.alias}</option>)}
               </select>
-              <select className="ag-sel" value={fCriador} onChange={(e) => setFCriador(e.target.value)} aria-label="Atendente">
+              <select className="inp ag-sel-inline" value={fCriador} onChange={(e) => setFCriador(e.target.value)} aria-label="Atendente">
                 <option value="">Todos os atendentes</option>
                 {orgUsuarios.map((u) => <option key={u.id} value={u.id}>{u.nome}</option>)}
               </select>
-              <select className="ag-sel" value={fTipo} onChange={(e) => setFTipo(e.target.value)} aria-label="Tipo">
+              <select className="inp ag-sel-inline" value={fTipo} onChange={(e) => setFTipo(e.target.value)} aria-label="Tipo">
                 <option value="">Todos os tipos</option>
                 <option value="texto">Texto</option>
                 <option value="imagem">Imagem</option>

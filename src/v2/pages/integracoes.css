@@ -55,11 +55,11 @@
   border: 1px solid rgba(var(--tint), .1); color: var(--txt-2); cursor: default;
 }
 .v2 .intg-chip i { width: 6px; height: 6px; border-radius: 50%; display: block; background: var(--txt-3); }
-.v2 .intg-chip.t-ok { background: var(--verde-bg); border-color: rgba(74, 190, 140, .3); color: var(--verde); }
+.v2 .intg-chip.t-ok { background: var(--verde-bg); border-color: rgba(var(--verde-rgb), .3); color: var(--verde); }
 .v2 .intg-chip.t-ok i { background: var(--verde); }
-.v2 .intg-chip.t-at { background: var(--ambar-bg); border-color: rgba(217, 164, 74, .3); color: var(--ambar); }
+.v2 .intg-chip.t-at { background: var(--ambar-bg); border-color: rgba(var(--ambar-rgb), .3); color: var(--ambar); }
 .v2 .intg-chip.t-at i { background: var(--ambar); }
-.v2 .intg-chip.t-er { background: var(--rubro-bg); border-color: rgba(229, 102, 92, .3); color: var(--rubro); }
+.v2 .intg-chip.t-er { background: var(--rubro-bg); border-color: rgba(var(--rubro-rgb), .3); color: var(--rubro); }
 .v2 .intg-chip.t-er i { background: var(--rubro); }
 
 /* alerta único do canal (o mais grave vence) */
@@ -132,7 +132,7 @@
 .v2 .intg-conectado { text-align: center; padding: 10px 0 4px; }
 .v2 .intg-conectado .circ {
   width: 52px; height: 52px; border-radius: 50%; margin: 0 auto 12px;
-  background: var(--verde-bg); border: 1px solid rgba(74, 190, 140, .4);
+  background: var(--verde-bg); border: 1px solid rgba(var(--verde-rgb), .4);
   display: flex; align-items: center; justify-content: center; color: var(--verde);
 }
 .v2 .intg-conectado .circ svg { width: 24px; height: 24px; }

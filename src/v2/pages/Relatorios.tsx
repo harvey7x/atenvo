@@ -11,7 +11,7 @@ import {
   exportarCSV, spHoje, kpi, melhorConexao,
 } from '@/data/relatorios';
 import {
-  BotaoSec, CardVidro, Chip, EstadoVazio, Input, Segmentado,
+  BotaoSec, CardVidro, Chip, EstadoErro, EstadoVazio, Input, Segmentado, SkeletonTexto,
 } from '../components';
 import RelatoriosApresentacao from './RelatoriosApresentacao';
 import './relatorios.css';
@@ -117,9 +117,11 @@ function FunilV2({ stages }: { stages: { nome: string; total: number }[] }) {
     </div>
   );
 }
-/** Donut: tons de branco (cor só como semântica — sem paleta arbitrária). */
-const DONUT_TONS = ['rgba(255,255,255,.85)', 'rgba(255,255,255,.45)', 'rgba(255,255,255,.22)', 'rgba(255,255,255,.12)', 'rgba(255,255,255,.07)'];
-const STATUS_COR: Record<string, string> = { ganho: 'var(--verde)', perdido: 'var(--rubro)', em_andamento: 'rgba(255,255,255,.55)', cancelado: 'rgba(255,255,255,.18)' };
+/** Donut: tons de TINTA (canal --tint: branco no dark, grafite no light — auditoria:
+    literais brancos deixavam o donut ilegível no tema claro). var() só resolve em
+    contexto CSS, por isso os segmentos recebem a cor via style, não via atributo. */
+const DONUT_TONS = ['rgba(var(--tint),.85)', 'rgba(var(--tint),.45)', 'rgba(var(--tint),.22)', 'rgba(var(--tint),.12)', 'rgba(var(--tint),.07)'];
+const STATUS_COR: Record<string, string> = { ganho: 'var(--verde)', perdido: 'var(--rubro)', em_andamento: 'rgba(var(--tint),.55)', cancelado: 'rgba(var(--tint),.18)' };
 function DonutV2({ data, semantico }: { data: { label: string; v: number; chave?: string }[]; semantico?: boolean }) {
   const total = data.reduce((s, d) => s + d.v, 0);
   const size = 132, r = size / 2 - 10, C = 2 * Math.PI * r, cx = size / 2, cy = size / 2;
@@ -131,7 +133,7 @@ function DonutV2({ data, semantico }: { data: { label: string; v: number; chave?
         <svg viewBox={`0 0 ${size} ${size}`} width="132" height="132">
           {data.map((d, i) => {
             const len = total ? (d.v / total) * C : 0;
-            const seg = <circle key={i} cx={cx} cy={cy} r={r} fill="none" stroke={cor(d, i)} strokeWidth="14" strokeDasharray={`${len.toFixed(1)} ${(C - len).toFixed(1)}`} strokeDashoffset={(-off).toFixed(1)} transform={`rotate(-90 ${cx} ${cy})`} />;
+            const seg = <circle key={i} cx={cx} cy={cy} r={r} fill="none" style={{ stroke: cor(d, i) }} strokeWidth="14" strokeDasharray={`${len.toFixed(1)} ${(C - len).toFixed(1)}`} strokeDashoffset={(-off).toFixed(1)} transform={`rotate(-90 ${cx} ${cy})`} />;
             off += len;
             return seg;
           })}
@@ -156,10 +158,11 @@ function DonutV2({ data, semantico }: { data: { label: string; v: number; chave?
 function Painel({ title, sub, children, sobe, atraso }: { title: string; sub?: string; children: ReactNode; sobe?: boolean; atraso?: number }) {
   return <CardVidro spot sobe={sobe} atraso={atraso} className="rl2-painel"><div className="tt">{title}{sub && <span>{sub}</span>}</div>{children}</CardVidro>;
 }
-function Estado({ q, demo, children }: { q: { isLoading: boolean; isError: boolean; error?: unknown }; demo: boolean; children: ReactNode }) {
+/* contrato item 7: loading = skeleton, erro = EstadoErro com "Tentar de novo" (auditoria). */
+function Estado({ q, demo, children }: { q: { isLoading: boolean; isError: boolean; error?: unknown; refetch?: () => void }; demo: boolean; children: ReactNode }) {
   if (demo) return <>{children}</>;
-  if (q.isLoading) return <div className="rl2-vazio"><span aria-hidden>◌</span><div><div className="vt">Carregando dados…</div></div></div>;
-  if (q.isError) return <div className="aviso-inline erro" role="alert">Erro ao carregar: {(q.error as Error)?.message || 'falha'}</div>;
+  if (q.isLoading) return <div aria-busy aria-label="Carregando dados"><SkeletonTexto linhas={3} /></div>;
+  if (q.isError) return <EstadoErro descricao={(q.error as Error)?.message || 'Erro ao carregar os dados.'} aoTentarDeNovo={() => q.refetch?.()} />;
   return <>{children}</>;
 }
 

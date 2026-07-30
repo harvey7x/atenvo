@@ -22,7 +22,7 @@ import { initials } from '@/lib/avatar';
 import { FichaJudicialBox } from '@/components/FichaJudicialBox';
 import { RelacionamentoContatoBox } from '@/components/RelacionamentoContatoBox';
 import { useBloqueiosOrg } from '../hooks/bloqueiosOrg';
-import { BotaoPrimario, BotaoSec, ModalV2 } from '../components';
+import { BotaoPrimario, BotaoSec, CardVidro, EstadoErro, ModalV2, Skeleton } from '../components';
 import './kanban.css';
 
 /* ------------------------------------------------------------------
@@ -743,16 +743,27 @@ export default function KanbanV2() {
 
   const detLead = detId ? leads.find((l) => l.id === detId) ?? null : null;
 
-  /* ---------- estados de página ---------- */
+  /* ---------- estados de página (contrato item 7: skeleton em vidro + EstadoErro) ---------- */
   if (!demo && k.loading) {
-    return <div className="kb-pg"><div className="kb-info">Carregando funil…</div></div>;
+    return (
+      <div className="kb-pg">
+        <div className="kb-skel" aria-busy aria-label="Carregando funil">
+          {[0, 1, 2].map((i) => (
+            <CardVidro key={i} className="kb-skel-col">
+              <Skeleton largura="55%" />
+              <Skeleton largura="100%" altura={64} raio={12} />
+              <Skeleton largura="100%" altura={64} raio={12} />
+            </CardVidro>
+          ))}
+        </div>
+      </div>
+    );
   }
   if (!demo && k.isError) {
     return (
       <div className="kb-pg">
-        <div className="kb-info erro" role="alert">
-          Não foi possível carregar o Kanban. Tente atualizar a página.
-          <button type="button" className="link" onClick={() => k.refetch()}>Atualizar</button>
+        <div className="kb-estado">
+          <EstadoErro descricao="Não foi possível carregar o Kanban." aoTentarDeNovo={() => k.refetch()} />
         </div>
       </div>
     );

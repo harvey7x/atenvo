@@ -32,6 +32,11 @@
   --ambar-bg: rgba(217, 164, 74, .12);
   --rubro: #E5665C;
   --rubro-bg: rgba(229, 102, 92, .13);
+  /* Triplets RGB dos semânticos p/ bordas/glows em alpha (rgba(var(--verde-rgb), α)).
+     Auditoria 2026-07: bordas semânticas cravavam o RGB dark e vazavam no light. */
+  --verde-rgb: 74, 190, 140;
+  --ambar-rgb: 217, 164, 74;
+  --rubro-rgb: 229, 102, 92;
   --r-card: 16px;
   --r-ctl: 9px;
   --fonte: 'Instrument Sans Variable', 'Instrument Sans', system-ui, sans-serif;
@@ -96,6 +101,9 @@ html[data-demo] .v2 { --fx: 1; }
   --ambar-bg: rgba(158, 122, 46, .15);
   --rubro: #B24A3C;
   --rubro-bg: rgba(178, 74, 60, .13);
+  --verde-rgb: 62, 142, 107;
+  --ambar-rgb: 158, 122, 46;
+  --rubro-rgb: 178, 74, 60;
   --tint: 22, 25, 31;             /* tinta = grafite: superfícies em alpha viram escuras */
   --platina-a: #E4E8ED;           /* assinatura: platina LUMINOSA — prata escovada (o primo claro */
   --platina-b: #BAC1CC;           /* do botão do dark), NÃO preto. Gradiente claro→médio metálico. */

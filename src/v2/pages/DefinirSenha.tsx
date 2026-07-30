@@ -83,7 +83,7 @@ export default function DefinirSenhaV2() {
             </button>
             <div style={{ marginTop: 12, display: 'flex', gap: 9, justifyContent: 'center' }}>
               <BotaoSec mini disabled={busy} onClick={concluirAtivacao}>Tentar novamente</BotaoSec>
-              <Link to="/login" style={{ alignSelf: 'center', fontSize: 11.5, color: 'var(--txt-2)', borderBottom: '1px solid rgba(255,255,255,.2)', textDecoration: 'none' }}>
+              <Link to="/login" style={{ alignSelf: 'center', fontSize: 11.5, color: 'var(--txt-2)', borderBottom: '1px solid rgba(var(--tint), .2)', textDecoration: 'none' }}>
                 Ir para o login
               </Link>
             </div>
