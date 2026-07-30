@@ -19,9 +19,10 @@ import { PALETA_CORES, podeGerenciarAtendimento, type StatusDef } from '@/types/
 import { resetDemonstracao, solicitarTrocaEmail } from '../services/conta';
 import { criarRaizPortalV2 } from '../components/portal';
 import { tempoCelula } from '../lib/tempo';
+import { lerModoPerf, salvarModoPerf, type ModoPerf } from '../lib/perf';
 import {
   BadgeStatus, BotaoMini, BotaoPrimario, BotaoSec, CardVidro, Chip, Chips, ConfirmDialogV2,
-  EstadoErro, Input, LinhaToggle, ModalV2, Skeleton, TabelaPadrao, type Coluna, type TomStatus,
+  EstadoErro, Input, LinhaToggle, ModalV2, Segmentado, Skeleton, TabelaPadrao, type Coluna, type TomStatus,
 } from '../components';
 import './configuracoes.css';
 
@@ -1298,10 +1299,40 @@ function PainelPrefs({ anima, demo, seed, setSeed, aoAvisar }: {
             </div>
           </div>
           <div className="cfg-div" />
+          {/* Modo de Performance — preferência POR DISPOSITIVO (localStorage,
+              lib/perf.ts), não entra nas Prefs da conta: quem engasga é a
+              máquina. Manual vence a auto-detecção; aplica na hora, sem reload. */}
+          <div className="cfa-perf">
+            <div className="tx">
+              <div className="t">Modo de Performance</div>
+              <div className="d">Modo Leve desativa efeitos visuais pesados para rodar mais fluido em computadores mais antigos. Salvo neste computador.</div>
+            </div>
+            <PerfSegmentado />
+          </div>
+          <div className="cfg-div" />
           <LinhaToggle ligado={!!p.mostrar_dicas} aoMudar={(v) => persist({ mostrar_dicas: v })} titulo="Mostrar dicas e tutoriais" descricao="Sugestões contextuais pela interface." />
           <LinhaToggle ligado={!!p.sons} aoMudar={(v) => persist({ sons: v })} titulo="Reproduzir sons" descricao="Efeitos sonoros em ações e alertas (respeita o som de notificação)." />
         </>
       )}
     </CardVidro>
+  );
+}
+
+/* Automático / Leve / Completo — estado próprio (não passa pelo persist das
+   Prefs: vive no localStorage do dispositivo). salvarModoPerf re-resolve e
+   re-aplica [data-perf] na raiz imediatamente, sem reload. */
+function PerfSegmentado() {
+  const [modo, setModo] = useState<ModoPerf>(() => lerModoPerf());
+  return (
+    <Segmentado
+      rotulo="Modo de Performance"
+      valor={modo}
+      aoMudar={(v) => { setModo(v); salvarModoPerf(v); }}
+      opcoes={[
+        { valor: 'auto', rotulo: 'Automático' },
+        { valor: 'lite', rotulo: 'Leve' },
+        { valor: 'full', rotulo: 'Completo' },
+      ]}
+    />
   );
 }

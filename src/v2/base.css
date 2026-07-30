@@ -62,8 +62,8 @@
 .v2 .vidro {
   position: relative;
   background: linear-gradient(180deg, var(--vidro-a), var(--vidro-b));
-  backdrop-filter: blur(18px) saturate(140%);
-  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  backdrop-filter: var(--desfoque-vidro);
+  -webkit-backdrop-filter: var(--desfoque-vidro);
   border-radius: var(--r-card);
   box-shadow: var(--sombra-1); /* dark: nula (elevação por alpha) · light: sombra real */
 }
@@ -149,3 +149,28 @@
   .v2 .barv { transform: scaleY(1); }
   .v2 .bval { opacity: 1; }
 }
+
+/* ============================================================
+   MODO LEVE — ambiente e movimento ([data-perf="lite"], ver
+   tokens.css e lib/perf.ts). O grão (blend overlay caro) e a luz
+   (conic-gradient + filter blur(100px) animado) somem por inteiro;
+   o glow do spotlight (gradiente repintado a cada mousemove) sai,
+   o lift do hover fica. O bloco de movimento é o ESPELHO do
+   reduced-motion acima, com as mesmas compensações — manter os
+   dois em sincronia. Paridade funcional: nada além de peso visual.
+   ============================================================ */
+:root[data-perf="lite"] .v2 .grao,
+:root[data-perf="lite"] .v2 .luz { display: none; }
+:root[data-perf="lite"] .v2 .spot::after { display: none; }
+:root[data-perf="lite"] .v2 *,
+:root[data-perf="lite"] .v2 *::before,
+:root[data-perf="lite"] .v2 *::after {
+  animation: none !important;
+  transition: none !important;
+}
+:root[data-perf="lite"] .v2 .sobe { opacity: 1; transform: none; }
+:root[data-perf="lite"] .v2 .spark path { stroke-dashoffset: 0; }
+:root[data-perf="lite"] .v2 .spark polygon { opacity: 1; }
+:root[data-perf="lite"] .v2 .skel::after { display: none; }
+:root[data-perf="lite"] .v2 .barv { transform: scaleY(1); }
+:root[data-perf="lite"] .v2 .bval { opacity: 1; }

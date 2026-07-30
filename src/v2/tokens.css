@@ -70,6 +70,15 @@
      do grão e dos glows multiplicam por ele. Produção = 0.5;
      o modo demonstração (main.tsx marca html[data-demo]) sobe para 1. */
   --fx: 0.5;
+
+  /* ---- Modo de Performance: desfoque governado por token ----
+     Todo backdrop-filter do v2 consome um destes (vidro = cards,
+     chrome = sidebar/drawer, topbar). O Completo carrega os valores
+     de sempre; o Leve zera para `none` — blur(0) ainda cria backdrop
+     root e custa GPU, `none` desliga de verdade. */
+  --desfoque-vidro: blur(18px) saturate(140%);
+  --desfoque-chrome: blur(22px) saturate(140%);
+  --desfoque-topbar: blur(16px);
 }
 html[data-demo] .v2 { --fx: 1; }
 
@@ -127,4 +136,34 @@ html[data-demo] .v2 { --fx: 1; }
   --ring: rgba(22, 25, 31, .16);
   --backdrop: rgba(20, 22, 28, .34);
   --shadow-pop: 0 24px 60px rgba(22, 25, 31, .18);
+}
+
+/* ============================================================
+   MODO LEVE — camada do Modo de Performance ([data-perf="lite"]
+   na raiz <html>, resolvida por src/v2/lib/perf.ts: manual vence,
+   'auto' detecta a máquina). ADITIVA: o Completo acima não muda um
+   byte; paridade funcional total, só o peso visual cai. Ataca o
+   diagnóstico das GPUs integradas antigas:
+   1) backdrop-filter → none (recomputo por frame era o vilão);
+   2) superfícies de vidro com alpha → cor SÓLIDA equivalente
+      (o alpha achatado sobre o --base #0A0B0D);
+   3) grão/luz ambiente → display:none (base.css);
+   4) movimento → instantâneo (base.css, espelho do reduced-motion).
+   ============================================================ */
+:root[data-perf="lite"] .v2 {
+  --desfoque-vidro: none;
+  --desfoque-chrome: none;
+  --desfoque-topbar: none;
+  /* vidro chapado: rgba(255,255,255,.055/.02) sobre #0A0B0D — cada
+     token vira a cor opaca equivalente (opaco é barato; caro era o
+     alpha recomposto sobre o blur a cada frame) */
+  --vidro-a: #17181A;
+  --vidro-b: #0F1012;
+}
+/* o light já tem vidro sólido (carta branca elevada) — repõe o par
+   claro, senão o bloco acima (mais tarde no arquivo, mesma
+   especificidade) atropelaria a carta do light */
+:root[data-perf="lite"][data-tema="light"] .v2 {
+  --vidro-a: #FFFFFF;
+  --vidro-b: #FBFCFD;
 }

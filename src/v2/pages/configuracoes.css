@@ -186,6 +186,16 @@
 /* dias de atendimento */
 .v2 .cfa-dias { display: flex; gap: 6px; flex-wrap: wrap; }
 
+/* Modo de Performance (aba Preferências): texto à esquerda, segmentado à
+   direita — anatomia das linhas .tgl-l, com o controle .segm no lugar do toggle */
+.v2 .cfa-perf { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 7px 0; }
+.v2 .cfa-perf .tx { min-width: 0; }
+.v2 .cfa-perf .t { font-size: 12.5px; }
+.v2 .cfa-perf .d { font-size: 11px; color: var(--txt-3); margin-top: 1px; max-width: 54ch; }
+@media (max-width: 900px) {
+  .v2 .cfa-perf { flex-direction: column; align-items: flex-start; gap: 9px; }
+}
+
 /* responsivo: nav vira linha acima do painel */
 @media (max-width: 900px) {
   .v2 .cfg { grid-template-columns: 1fr; }

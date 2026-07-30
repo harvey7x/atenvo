@@ -107,6 +107,29 @@ export default function AppShellV2() {
   }, [escopoTema]);
   const seqRef = useRef(0);
   const avatarRef = useRef<HTMLButtonElement>(null);
+  const sidebarRef = useRef<HTMLElement>(null);
+  const fundoRef = useRef<HTMLDivElement>(null);
+  // will-change com disciplina (Modo de Performance): promove camada SÓ enquanto
+  // a transição de abrir/fechar roda (clip-path no host, transform no fundo) e
+  // remove ao terminar — camada permanente custa memória de GPU justo nas
+  // máquinas fracas. (No Modo Leve transition:none → nunca liga, e está certo.)
+  useEffect(() => {
+    const instala = (el: HTMLElement | null, prop: string) => {
+      if (!el) return () => {};
+      const liga = (e: TransitionEvent) => { if (e.target === el && e.propertyName === prop) el.style.willChange = prop; };
+      const desliga = (e: TransitionEvent) => { if (e.target === el && e.propertyName === prop) el.style.willChange = ''; };
+      el.addEventListener('transitionrun', liga);
+      el.addEventListener('transitionend', desliga);
+      el.addEventListener('transitioncancel', desliga);
+      return () => {
+        el.removeEventListener('transitionrun', liga);
+        el.removeEventListener('transitionend', desliga);
+        el.removeEventListener('transitioncancel', desliga);
+      };
+    };
+    const desinstalar = [instala(sidebarRef.current, 'clip-path'), instala(fundoRef.current, 'transform')];
+    return () => { desinstalar.forEach((d) => d()); };
+  }, []);
   const fecharNotif = useCallback(() => setNotif(null), []);
   // raiz de portal (regra 10): o menu monta no body, fora do stacking context da topbar
   // (que tem backdrop-filter) — senão o conteúdo do palco pinta por cima dele. Shell monta 1×.
@@ -157,7 +180,7 @@ export default function AppShellV2() {
       <div className="luz" />
       <div className="grao" />
       <div className="p-app">
-        <aside className="p-sidebar">
+        <aside className="p-sidebar" ref={sidebarRef}>
           <div className="p-logo">
             <div className="marca">A</div>
             <span className="word lab">atenvo</span>
@@ -210,6 +233,12 @@ export default function AppShellV2() {
             </div>
           </div>
         </aside>
+        {/* fundo (vidro+fio) e sombra da expansão: irmãos do aside — fora do
+            clip-path (que criaria um backdrop root sem blur), pintando abaixo
+            dele. A sidebar anima só clip-path/transform/opacity, nunca width
+            (shell.css). */}
+        <div className="sb-fundo" aria-hidden ref={fundoRef} />
+        <div className="sb-sombra" aria-hidden />
 
         <main className="principal">
           <div className="p-topbar">

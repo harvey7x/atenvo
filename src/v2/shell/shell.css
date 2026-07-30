@@ -10,19 +10,58 @@
 .v2.app-v2 { position: relative; height: 100dvh; overflow: hidden; }
 .v2 .p-app { position: relative; z-index: 1; height: 100%; padding-left: 64px; }
 
-/* --- sidebar (rail 64 → 242 no hover, em overlay) ----------- */
+/* --- sidebar (rail 64 → 242 no hover, em overlay) -----------
+   Recriada SEM animação de layout (o `width` 64→242 reflowava a
+   subárvore inteira por frame — diagnóstico do Modo de Performance):
+   o host tem largura FIXA de 242px e revela/esconde via clip-path
+   (que também define a área de hover/clique — recolhida, só o rail
+   de 64px responde); o fundo (vidro+fio) é um filho que desliza em
+   transform; a sombra é um irmão que faz fade em opacity. Três
+   propriedades compositáveis, zero reflow. will-change entra por JS
+   só durante a transição (AppShellV2). */
 .v2 .p-sidebar {
-  position: absolute; left: 0; top: 0; bottom: 0; width: 64px; z-index: 30;
+  position: absolute; left: 0; top: 0; bottom: 0; width: 242px; z-index: 30;
   display: flex; flex-direction: column; padding: 13px 11px 10px; overflow: hidden;
+  clip-path: inset(0 178px 0 0);
+  transition: clip-path .36s var(--ease);
+}
+.v2 .p-sidebar:hover, .v2 .p-sidebar:focus-within { clip-path: inset(0 0 0 0); }
+/* recolhida, o conteúdo assume o content box do rail original (42px = 64 −
+   2×11 de padding): a pill do item ativo e os hairlines de grupo/rodapé
+   terminam arredondados em x=53 com respiro do fio, como no rail antigo, em
+   vez de serem fatiados retos pelo clip em x=64. É um salto discreto de
+   layout no instante do hover (sem transition de width) — nada anima layout
+   por frame. */
+.v2 .p-sidebar:not(:hover):not(:focus-within) > * { width: 42px; }
+/* fundo: carrega vidro, gradiente e o fio direito — o fio viaja com o
+   transform (borda no host seria clipada quando recolhida). É IRMÃO do
+   aside, não filho: o clip-path do host cria um backdrop root novo, e um
+   backdrop-filter lá dentro deixaria de amostrar a página (vidro sem
+   blur). Fora do clip, pintando logo abaixo (z 29 < 30), o blur enxerga
+   o palco como o vidro original. */
+.v2 .sb-fundo {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 242px; z-index: 29;
+  pointer-events: none;
   border-right: 1px solid var(--linha);
   background: linear-gradient(180deg, rgba(20, 21, 25, .74), rgba(14, 15, 18, .68));
-  backdrop-filter: blur(22px) saturate(140%);
-  -webkit-backdrop-filter: blur(22px) saturate(140%);
-  transition: width .36s var(--ease), box-shadow .36s var(--ease);
+  backdrop-filter: var(--desfoque-chrome);
+  -webkit-backdrop-filter: var(--desfoque-chrome);
+  transform: translateX(-178px);
+  transition: transform .36s var(--ease);
 }
-.v2 .p-sidebar:hover, .v2 .p-sidebar:focus-within {
-  width: 242px; box-shadow: 30px 0 80px rgba(0, 0, 0, .55);
+.v2 .p-sidebar:hover ~ .sb-fundo, .v2 .p-sidebar:focus-within ~ .sb-fundo { transform: translateX(0); }
+/* sombra da expansão: também irmã, sob o vidro (box-shadow no host seria
+   clipado); viaja em lockstep com o fundo (mesmo translateX — a sombra
+   acompanha a aresta visível, não fica fantasma em x=242) e faz fade em
+   opacity no lugar de animar box-shadow (paint) */
+.v2 .sb-sombra {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 242px; z-index: 28;
+  pointer-events: none; opacity: 0;
+  box-shadow: 30px 0 80px rgba(0, 0, 0, .55);
+  transform: translateX(-178px);
+  transition: opacity .36s var(--ease), transform .36s var(--ease);
 }
+.v2 .p-sidebar:hover ~ .sb-sombra, .v2 .p-sidebar:focus-within ~ .sb-sombra { opacity: 1; transform: translateX(0); }
 .v2 .lab {
   opacity: 0; transform: translateX(-8px); white-space: nowrap;
   transition: opacity .22s .07s, transform .3s .07s var(--ease);
@@ -104,7 +143,7 @@
   height: 54px; flex-shrink: 0; display: flex; align-items: center; gap: 14px; padding: 0 22px;
   border-bottom: 1px solid var(--linha);
   background: linear-gradient(180deg, rgba(var(--tint), .03), rgba(var(--tint), .008));
-  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: var(--desfoque-topbar); -webkit-backdrop-filter: var(--desfoque-topbar);
 }
 .v2 .busca {
   display: flex; align-items: center; gap: 9px; width: 320px; height: 33px;
@@ -231,11 +270,10 @@
    invertidas (sidebar, logo, avatar, menu, dots) ganham par claro;
    o resto herdou o canal --tint no swap acima. Dark não muda.
    ============================================================ */
-:root[data-tema="light"] .v2 .p-sidebar {
+:root[data-tema="light"] .v2 .sb-fundo {
   background: linear-gradient(180deg, rgba(255, 255, 255, .92), rgba(247, 248, 250, .86));
 }
-:root[data-tema="light"] .v2 .p-sidebar:hover,
-:root[data-tema="light"] .v2 .p-sidebar:focus-within { box-shadow: 30px 0 80px rgba(22, 25, 31, .14); }
+:root[data-tema="light"] .v2 .sb-sombra { box-shadow: 30px 0 80px rgba(22, 25, 31, .14); }
 /* logo: metal claro do dark → grafite no claro (a marca sobrevive sobre a sidebar clara) */
 :root[data-tema="light"] .v2 .p-logo .marca { background: linear-gradient(180deg, #3C424B, #23272E); color: #F4F5F7; }
 /* item ativo: texto e trilho brancos → tinta/accent escuros no claro */
@@ -252,3 +290,16 @@
 :root[data-tema="light"] .v2 .mini.claro { background: var(--accent); }
 /* ação clara do toast: metal → prata platina */
 :root[data-tema="light"] .v2 .bm.claro { background: linear-gradient(180deg, var(--platina-a), var(--platina-b)); color: var(--platina-txt); }
+
+/* ============================================================
+   MODO LEVE — chrome do shell ([data-perf="lite"], ver tokens.css
+   e lib/perf.ts). O desfoque já morre pelos tokens --desfoque-*;
+   aqui os gradientes com alpha da sidebar e da topbar viram os
+   equivalentes OPACOS (o alpha achatado sobre o --base de cada
+   tema) — sem transparência não há recomposição por frame.
+   Dark e light têm cada um seu par; o Completo não muda.
+   ============================================================ */
+:root[data-perf="lite"] .v2 .sb-fundo { background: linear-gradient(180deg, #111216, #0D0E10); }
+:root[data-perf="lite"] .v2 .p-topbar { background: linear-gradient(180deg, #111214, #0C0D0F); }
+:root[data-perf="lite"][data-tema="light"] .v2 .sb-fundo { background: linear-gradient(180deg, #FEFEFE, #F7F8FA); }
+:root[data-perf="lite"][data-tema="light"] .v2 .p-topbar { background: linear-gradient(180deg, #EDEEF0, #F2F3F5); }

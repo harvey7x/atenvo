@@ -256,3 +256,11 @@
   .v2 .apres-bloco.on .eb i { animation: none; }
   .v2 .apres-prog i.atual::after { animation: none; transform: scaleX(1); }
 }
+
+/* MODO LEVE ([data-perf="lite"], ver tokens.css/lib/perf.ts): animation:none
+   global do lite (base.css) mataria a apres-entra com fill forwards e os
+   blocos ficariam presos em opacity:0 — espelho das compensações do bloco
+   reduced-motion acima (manter os dois em sincronia). */
+:root[data-perf="lite"] .v2 .apres-bloco,
+:root[data-perf="lite"] .v2 .apres-bloco.on { opacity: 1; transform: none; }
+:root[data-perf="lite"] .v2 .apres-prog i.atual::after { transform: scaleX(1); }

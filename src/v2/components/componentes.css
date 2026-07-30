@@ -344,8 +344,8 @@
   max-width: 92vw; display: flex; flex-direction: column;
   border-left: 1px solid var(--linha);
   background: linear-gradient(180deg, rgba(20, 21, 25, .82), rgba(14, 15, 18, .78));
-  backdrop-filter: blur(22px) saturate(140%);
-  -webkit-backdrop-filter: blur(22px) saturate(140%);
+  backdrop-filter: var(--desfoque-chrome);
+  -webkit-backdrop-filter: var(--desfoque-chrome);
   box-shadow: -30px 0 80px rgba(0, 0, 0, .5);
   animation: v2-drawer-entra .28s var(--ease);
 }
@@ -498,7 +498,7 @@
   --shadow-pop: 0 24px 60px rgba(0, 0, 0, .5);
 }
 /* pele de vidro no card do modal (fio de luz no topo, como a família Platina) */
-.v2 .atv-modal { position: relative; background: linear-gradient(180deg, var(--vidro-a), var(--vidro-b)); backdrop-filter: blur(18px) saturate(140%); -webkit-backdrop-filter: blur(18px) saturate(140%); }
+.v2 .atv-modal { position: relative; background: linear-gradient(180deg, var(--vidro-a), var(--vidro-b)); backdrop-filter: var(--desfoque-vidro); -webkit-backdrop-filter: var(--desfoque-vidro); }
 .v2 .atv-modal::before {
   content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none;
   background: linear-gradient(180deg, var(--fio-a), var(--fio-b) 36%, rgba(var(--tint), .02) 75%, rgba(var(--tint), .07));
@@ -599,3 +599,13 @@
   padding: 9px; cursor: pointer; width: 100%;
 }
 .v2 .agc-pick:hover:not(:disabled) { color: var(--txt); }
+
+/* ============================================================
+   MODO LEVE — componentes ([data-perf="lite"], ver tokens.css e
+   lib/perf.ts). O desfoque já morre pelos tokens --desfoque-*;
+   aqui o gradiente com alpha do drawer vira o equivalente OPACO
+   (achatado sobre o --base de cada tema). O véu (.veu-drawer) é
+   scrim de camada única e barato — fica. O Completo não muda.
+   ============================================================ */
+:root[data-perf="lite"] .v2 .drawer-v2 { background: linear-gradient(180deg, #121317, #0D0E11); }
+:root[data-perf="lite"][data-tema="light"] .v2 .drawer-v2 { background: linear-gradient(180deg, #FEFEFE, #F9FAFC); }
