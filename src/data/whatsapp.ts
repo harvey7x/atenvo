@@ -339,7 +339,16 @@ export function useWaConversations() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'contatos', filter: `organizacao_id=eq.${orgId}` }, () => {
         invalidarListaEmBreve();
       })
-      .subscribe();
+      // GOTCHA: se QUALQUER tabela pedida estiver fora da publication supabase_realtime, o
+      // Realtime rejeita o pedido de postgres_changes INTEIRO (as 3 tabelas) — e o aviso chega
+      // como evento 'system' com o channel ainda reportando SUBSCRIBED. Foi exatamente assim que
+      // o inbox ficou sem realtime nenhum (contatos fora da publication) sem nenhum erro visível.
+      .on('system', {}, (msg: { status?: string; message?: string }) => {
+        if (msg?.status === 'error') console.error('[wa] realtime postgres_changes recusado:', msg?.message);
+      })
+      .subscribe((status, err) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') console.error('[wa] realtime indisponível:', err?.message ?? status);
+      });
     return () => { if (timer) clearTimeout(timer); supabase!.removeChannel(ch); };
   }, [orgId, qc]);
 
@@ -356,6 +365,12 @@ export function useWaMensagens(conversaId: string | null | undefined) {
   return useQuery({
     queryKey: ['wa-msgs', conversaId ?? ''],
     enabled: WA_REAL && !!conversaId,
+    // BACKSTOP: o frescor vem do realtime (invalidação em useWaConversations), mas a conversa
+    // ABERTA não pode congelar se o realtime cair — a lista tem o backstop de 30s e devolve o
+    // histórico VELHO à conversa aberta (reconciliarLista), então sem isto a mensagem nova só
+    // aparecia ao trocar de conversa. É UMA conversa por consulta: barato.
+    refetchInterval: 15_000,
+    refetchOnWindowFocus: true,
     queryFn: async (): Promise<WaMessage[]> => {
       const { data, error } = await supabase!
         .from('mensagens')

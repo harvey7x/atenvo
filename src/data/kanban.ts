@@ -301,6 +301,11 @@ export function useKanban() {
       .channel(`kanban-${org}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'oportunidades', filter: `organizacao_id=eq.${org}` }, () => qc.invalidateQueries({ queryKey: ['kanban-leads', org] }))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'funil_colunas', filter: `organizacao_id=eq.${org}` }, () => qc.invalidateQueries({ queryKey: ['kanban-colunas', org] }))
+      // tabela fora da publication supabase_realtime derruba o pedido INTEIRO e o erro só chega
+      // aqui (channel segue SUBSCRIBED) — sem este log o Kanban fica sem realtime em silêncio.
+      .on('system', {}, (msg: { status?: string; message?: string }) => {
+        if (msg?.status === 'error') console.error('[kanban] realtime postgres_changes recusado:', msg?.message);
+      })
       .subscribe();
     return () => { supabase!.removeChannel(ch); };
   }, [org, qc]);
