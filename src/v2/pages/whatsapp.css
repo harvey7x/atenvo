@@ -119,21 +119,19 @@
 .v2 .wa-banner .acts { margin-left: auto; display: flex; gap: 6px; flex-shrink: 0; }
 
 /* ============================================================
-   Fundo da conversa — DUAS texturas para o dono comparar.
-   >>> TROCA (o único ponto): a linha `background-image` da regra .wa-msgs abaixo.
-       Versão 1 (grão/ruído):   background-image: var(--wa-conv-grao);
-       Versão 2 (formas):       background-image: var(--wa-conv-formas);
-       Liso (sem textura):      background-image: none;
-   Cada token tem par DARK (aqui) e LIGHT (bloco de tema). As bolhas são opacas
-   (var(--base) + wash) e cobrem a textura — texto 100% legível nos dois casos.
-   V1 = grão fino orgânico (feTurbulence, mais visível que antes, calibrado por tema).
-   V2 = formas abstratas PRÓPRIAS variadas e espaçadas (círculos/arcos/linhas/pontos
-        de tamanhos diferentes), distribuídas de forma orgânica — não é grade, não
-        são os doodles da Meta. */
+   Fundo da conversa — GRÃO FINO definitivo (textura de superfície premium).
+   Não é padrão de formas: é ruído feTurbulence denso e homogêneo, como filme
+   fotográfico/papel texturizado. Tile 240px (sem repetição visível), stitchTiles
+   (sem emenda), baseFrequency alta + 4 octaves = grão fino sem "manchas".
+   O alpha vai BAKED no feColorMatrix (opacity no elemento apagaria as mensagens):
+   DARK aqui = grão claro, slope 0.10 (~0.05 percebido — perceptível, discreto);
+   par LIGHT (grão escuro, mais fraco) no bloco de tema no fim do arquivo.
+   >>> Alternar/reverter: troque a linha `background-image` entre
+       var(--wa-conv-textura) (grão) e `none` (liso).
+   Bolhas são opacas (var(--base) + wash) e cobrem a textura — texto 100% legível. */
 .v2 .wa-msgs { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 13px 16px; display: flex; flex-direction: column; gap: 8px; background-color: var(--base);
-  --wa-conv-grao: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='3' stitchTiles='stitch'/><feColorMatrix type='matrix' values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.13 0'/></filter><rect width='140' height='140' filter='url(%23g)'/></svg>");
-  --wa-conv-formas: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><g fill='none' stroke='rgba(255,255,255,0.06)' stroke-width='1.3'><circle cx='46' cy='60' r='18'/><circle cx='130' cy='40' r='8'/><circle cx='250' cy='84' r='26'/><circle cx='210' cy='180' r='12'/><circle cx='70' cy='210' r='15'/><circle cx='160' cy='250' r='9'/><path d='M20 130 q26 -20 52 -4'/><path d='M170 120 a24 24 0 0 1 34 10'/><path d='M96 150 q20 16 44 4'/><path d='M250 220 q-18 18 -44 10'/><line x1='120' y1='190' x2='138' y2='214'/><line x1='40' y1='250' x2='58' y2='270'/><line x1='270' y1='40' x2='286' y2='56'/></g><g fill='rgba(255,255,255,0.075)'><circle cx='100' cy='90' r='2'/><circle cx='190' cy='60' r='1.5'/><circle cx='60' cy='150' r='2.5'/><circle cx='230' cy='140' r='1.8'/><circle cx='150' cy='200' r='2'/><circle cx='280' cy='190' r='1.5'/><circle cx='110' cy='270' r='2'/></g></svg>");
-  background-image: var(--wa-conv-grao); }
+  --wa-conv-textura: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/><feColorMatrix type='matrix' values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.10 0'/></filter><rect width='240' height='240' filter='url(%23g)'/></svg>");
+  background-image: var(--wa-conv-textura); }
 .v2 .dia { align-self: center; font-size: 10px; font-weight: 500; color: var(--txt-2); background: rgba(var(--tint), .05); border: 1px solid rgba(var(--tint), .09); border-radius: 99px; padding: 2.5px 11px; }
 .v2 .bolha { position: relative; max-width: 64%; font-size: 12.5px; line-height: 1.45; padding: 8px 12px; border-radius: 12px; }
 .v2 .bolha .hh { font-size: 9.5px; margin-top: 4px; text-align: right; color: var(--txt-3); display: flex; gap: 5px; justify-content: flex-end; align-items: center; }
@@ -319,11 +317,10 @@
 /* banner flutuante e popover: sombra dramática → suave no claro */
 :root[data-tema="light"] .v2 .wa-conv > .aviso-inline { box-shadow: var(--sombra-2); }
 :root[data-tema="light"] .v2 .wa-pop { box-shadow: var(--shadow-pop); }
-/* fundo da conversa (light): pares CLAROS das duas texturas — grafite sobre o claro,
-   calibrado à parte (o olho pega escuro-sobre-claro mais fácil, então alpha menor que
-   o dark). Só redefine os tokens; qual está ativo é decidido na regra dark (o
-   background-image de lá vale para os dois temas via var). */
+/* fundo da conversa (light): par claro do grão — mesmo ruído, mas ESCURO (grafite)
+   sobre o claro e mais fraco (slope 0.075 ≈ 0.037 percebido): escuro-sobre-claro o
+   olho pega mais fácil, então o alpha do dark não serve. Só redefine o token; a
+   linha ativa (background-image) mora na regra dark e vale para os dois temas. */
 :root[data-tema="light"] .v2 .wa-msgs {
-  --wa-conv-grao: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='3' stitchTiles='stitch'/><feColorMatrix type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.09 0'/></filter><rect width='140' height='140' filter='url(%23g)'/></svg>");
-  --wa-conv-formas: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><g fill='none' stroke='rgba(22,25,31,0.07)' stroke-width='1.3'><circle cx='46' cy='60' r='18'/><circle cx='130' cy='40' r='8'/><circle cx='250' cy='84' r='26'/><circle cx='210' cy='180' r='12'/><circle cx='70' cy='210' r='15'/><circle cx='160' cy='250' r='9'/><path d='M20 130 q26 -20 52 -4'/><path d='M170 120 a24 24 0 0 1 34 10'/><path d='M96 150 q20 16 44 4'/><path d='M250 220 q-18 18 -44 10'/><line x1='120' y1='190' x2='138' y2='214'/><line x1='40' y1='250' x2='58' y2='270'/><line x1='270' y1='40' x2='286' y2='56'/></g><g fill='rgba(22,25,31,0.09)'><circle cx='100' cy='90' r='2'/><circle cx='190' cy='60' r='1.5'/><circle cx='60' cy='150' r='2.5'/><circle cx='230' cy='140' r='1.8'/><circle cx='150' cy='200' r='2'/><circle cx='280' cy='190' r='1.5'/><circle cx='110' cy='270' r='2'/></g></svg>");
+  --wa-conv-textura: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/><feColorMatrix type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.075 0'/></filter><rect width='240' height='240' filter='url(%23g)'/></svg>");
 }
