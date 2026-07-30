@@ -122,7 +122,7 @@ interface Faixa { key: string; rotulo: string; padraoAberta: boolean }
 const FAIXAS_ATIVAS: Faixa[] = [
   { key: 'parados', rotulo: 'Parados +14d', padraoAberta: true },   // exige ação → sempre aberta
   { key: 'semana', rotulo: '7–14 dias', padraoAberta: true },        // envelhecendo → aberta
-  { key: 'recentes', rotulo: 'Recentes (<7d)', padraoAberta: false }, // recém-tocados → colapsada (menos ruído)
+  { key: 'recentes', rotulo: 'Recentes (<7d)', padraoAberta: true },  // ABERTA: lead novo/recém-movido cai aqui — fechada, o card "some"
 ];
 const FAIXAS_FECHO: Faixa[] = [
   { key: 'f7', rotulo: 'Últimos 7 dias', padraoAberta: true },
@@ -473,8 +473,11 @@ export default function KanbanV2() {
     });
   };
   const moverOportunidade = async (p: { id: string; colunaId: string; atualizadoEmEsperado: string; motivoPerda?: string; motivoPerdaDesc?: string; motivoReabertura?: string }) => {
-    if (demo) { demoMover(p.id, p.colunaId, p); return; }
-    await k.moverOportunidade(p);
+    if (demo) demoMover(p.id, p.colunaId, p);
+    else await k.moverOportunidade(p);
+    // lead movido cai na faixa "recente" do destino — abre a seção p/ o card não sumir após o drop
+    const desfAlvo = (colunas.find((c) => c.id === p.colunaId)?.resultado ?? 'neutro') !== 'neutro';
+    setSecToggle((m) => ({ ...m, [p.colunaId + '::' + (desfAlvo ? 'f7' : 'recentes')]: true }));
   };
 
   const abrirNovaColuna = () => { setColForm({ nome: '', cor: PALETTE[0] }); setColErr(null); setColModal({ id: null }); };
