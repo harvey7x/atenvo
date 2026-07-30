@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { WA_REAL, mascararNumero, urlAssinadaMidiaWa, urlDownloadMidiaWa, waRecarregarAudio, waValidarNumero, waVincularNumero, useWaAtividades, useMensagensAgendadas, useAgendarSequencia, useEditarAgendamento, useCancelarAgendamento, normalizeWaPhone } from '@/data/whatsapp';
+import { nomeArquivoMidia, rotuloBaixarMidia } from '@/data/midiaNome';
 import type { WaContact, WaMessage } from '@/data/whatsappDemo';
 import { useStatusDefs, useEtiquetas, useOrgUsuarios, useAssinaturaPref, useAtendimentoActions } from '@/data/atendimento';
 import { useScripts, useScriptEtapaCounts, useScriptCategorias, traduzErroEnvio, aguardarConfirmacaoEnvio, type Script } from '@/data/scripts';
@@ -63,6 +64,7 @@ const IcFunil = () => <Ic><path d="M3 5h18l-7 8v5l-4 2v-7z" /></Ic>;
 const IcDots = () => <Ic fill><circle cx="12" cy="5" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="12" cy="19" r="1.5" /></Ic>;
 const IcImg = () => <Ic><rect x="3" y="4" width="18" height="16" rx="2.5" /><circle cx="9" cy="10" r="1.6" /><path d="m5 18 5-5 3 3 3-3 3 3" /></Ic>;
 const IcDoc = () => <Ic><path d="M13 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9z" /><path d="M13 3v6h6" /></Ic>;
+const IcDownload = () => <Ic><path d="M12 3v12" /><path d="m7 11 5 5 5-5" /><path d="M5 21h14" /></Ic>;
 const IcClock = () => <Ic><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></Ic>;
 const IcSend = () => <Ic><path d="M4 12l16-8-6 16-2.5-6.5z" /></Ic>;
 const IcTel = () => <Ic><path d="M5 4h4l2 5-2.5 1.5a12 12 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2" /></Ic>;
@@ -1251,6 +1253,24 @@ function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, optout,
   const ack = m.dir === 'out' ? ackOf(m.status) : null;
   const falhou = m.dir === 'out' && m.status === 'falhou';   // só saída falha (v1); inbound nunca é "não enviado"
 
+  // Baixar a mídia recebida/enviada com o nome/extensão corretos (URL assinada curta com Content-Disposition).
+  // Ícone sobreposto à imagem/vídeo (canto inf. direito) e ao lado do player de áudio — reusa a lógica do v1.
+  async function baixarMidia() {
+    if (demo || !m.anexoPath) return;
+    const nome = nomeArquivoMidia(m);
+    try {
+      const u = await urlDownloadMidiaWa(m.anexoPath, nome);
+      const a = document.createElement('a');
+      a.href = u; a.download = nome; a.rel = 'noopener';
+      document.body.appendChild(a); a.click(); a.remove();
+    } catch { /* falha silenciosa: bucket privado pode negar; o usuário pode tentar de novo */ }
+  }
+  const btnBaixar = (!demo && m.anexoPath && !falhou) ? (
+    <button type="button" className="midia-dl" title={rotuloBaixarMidia(m.tipo)} aria-label={rotuloBaixarMidia(m.tipo)} onClick={baixarMidia}>
+      <IcDownload />
+    </button>
+  ) : null;
+
   const falhaActs = falhou && (
     <div className="msg-falha-acts">
       <button type="button" className="lnk" onClick={() => aoVerErro(m)}>Ver erro</button>·
@@ -1276,7 +1296,7 @@ function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, optout,
       {m.tipo === 'imagem' && (
         (url || demo)
           ? <>
-              {url ? <img className="m-img" loading="lazy" src={url} alt="Imagem" title="Ampliar" onClick={() => aoLightbox(url)} /> : <div className="audio-ind">Imagem de demonstração</div>}
+              {url ? <div className="m-media"><img className="m-img" loading="lazy" src={url} alt="Imagem" title="Ampliar" onClick={() => aoLightbox(url)} />{btnBaixar}</div> : <div className="audio-ind">Imagem de demonstração</div>}
               {m.text && <div className="m-cap"><WaTexto texto={m.text} /></div>}
             </>
           : carregandoMidia ? <div className="audio-ind">Carregando imagem…</div>
@@ -1285,7 +1305,7 @@ function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, optout,
       {m.tipo === 'video' && (
         url
           ? <>
-              <video className="m-video" src={url} controls preload="metadata" />
+              <div className="m-media"><video className="m-video" src={url} controls preload="metadata" />{btnBaixar}</div>
               {m.text && <div className="m-cap"><WaTexto texto={m.text} /></div>}
             </>
           : demo ? <div className="audio-ind">Vídeo de demonstração</div>
@@ -1297,7 +1317,7 @@ function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, optout,
           ? <div className="audio-ind">Áudio não enviado</div>  /* saída que falhou não vira player tocável (v1) */
           : m.midiaPendente
           ? <div className="audio-ind">Áudio indisponível — <button type="button" className="lnk" onClick={() => aoRecarregarAudio(m)}>tentar carregar novamente</button></div>
-          : <AudioBolha anexoPath={demo ? null : m.anexoPath ?? null} segundos={(m as WaMessage & { seconds?: number }).seconds ?? null} demo={demo} />
+          : <AudioBolha anexoPath={demo ? null : m.anexoPath ?? null} segundos={(m as WaMessage & { seconds?: number }).seconds ?? null} demo={demo} acaoNode={btnBaixar} />
       )}
       {m.tipo === 'documento' && (
         <div className="doc2">
@@ -1307,7 +1327,7 @@ function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, optout,
             <span className="mt num">{(m.nome?.split('.').pop() || '').toUpperCase() || 'Arquivo'}{m.tamanho ? ' · ' + fmtTam(m.tamanho) : ''}</span>
             {!demo && m.anexoPath && (
               <span className="acts">
-                <button type="button" className="lnk" onClick={async () => { const u = await urlDownloadMidiaWa(m.anexoPath!, m.nome || 'documento'); window.location.assign(u); }}>Baixar</button>
+                <button type="button" className="lnk" onClick={async () => { const u = await urlDownloadMidiaWa(m.anexoPath!, nomeArquivoMidia(m)); window.location.assign(u); }}>Baixar</button>
                 <button type="button" className="lnk" title="Abrir em nova aba" onClick={async () => { const u = await urlAssinadaMidiaWa(m.anexoPath!); window.open(u, '_blank', 'noopener'); }}>Abrir</button>
               </span>
             )}
@@ -1350,7 +1370,7 @@ function WaTexto({ texto }: { texto: string }) {
 
 /** Player de áudio na pele do mockup (.audio2). A URL assinada é resolvida SÓ no play (v1: preload none),
     para não emitir uma rajada de signed-URLs por abertura de conversa. */
-function AudioBolha({ anexoPath, segundos, demo }: { anexoPath: string | null; segundos: number | null; demo: boolean }) {
+function AudioBolha({ anexoPath, segundos, demo, acaoNode }: { anexoPath: string | null; segundos: number | null; demo: boolean; acaoNode?: ReactNode }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [tocando, setTocando] = useState(false);
   const [carregando, setCarregando] = useState(false);
@@ -1401,6 +1421,7 @@ function AudioBolha({ anexoPath, segundos, demo }: { anexoPath: string | null; s
         setRate(nx);
         if (audioRef.current) audioRef.current.playbackRate = nx;
       }}>{rate}x</button>
+      {acaoNode}
     </div>
   );
 }

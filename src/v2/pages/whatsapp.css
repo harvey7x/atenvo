@@ -196,9 +196,19 @@
 .v2 .audio-ind .lnk { background: none; border: none; padding: 0; color: var(--txt-2); text-decoration: underline; cursor: pointer; font-size: 11px; font-family: var(--fonte); }
 
 /* mídia */
+.v2 .bolha .m-media { position: relative; display: inline-block; line-height: 0; }
 .v2 .bolha .m-img { max-width: 260px; max-height: 240px; border-radius: 9px; display: block; cursor: pointer; }
 .v2 .bolha .m-video { max-width: 280px; border-radius: 9px; display: block; }
 .v2 .bolha .m-cap { margin-top: 5px; }
+/* botão de baixar mídia — sobreposto (imagem/vídeo) ou inline (áudio) */
+.v2 .midia-dl { position: absolute; right: 6px; bottom: 6px; width: 28px; height: 28px; border-radius: 50%; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; background: rgba(10, 12, 15, .62); color: #fff; opacity: 0; transition: opacity .15s ease, background .15s ease; }
+.v2 .bolha .m-media:hover .midia-dl, .v2 .midia-dl:focus-visible { opacity: 1; }
+.v2 .midia-dl:hover { background: rgba(10, 12, 15, .82); }
+.v2 .midia-dl svg { width: 14px; height: 14px; }
+.v2 .audio2 .midia-dl { position: static; opacity: 1; width: 24px; height: 24px; background: rgba(var(--tint), .1); color: var(--txt-2); flex-shrink: 0; }
+.v2 .audio2 .midia-dl:hover { background: rgba(var(--tint), .18); color: var(--txt-1); }
+.v2 .audio2 .midia-dl svg { width: 12px; height: 12px; }
+@media (hover: none) { .v2 .bolha .m-media .midia-dl { opacity: 1; } }
 .v2 .doc2 { display: flex; align-items: center; gap: 9px; min-width: 200px; }
 .v2 .doc2 .ic { width: 32px; height: 32px; border-radius: 8px; background: rgba(var(--tint), .08); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .v2 .doc2 .ic svg { width: 15px; height: 15px; color: var(--txt-2); }
