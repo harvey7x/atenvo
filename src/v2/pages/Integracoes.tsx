@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useOrg } from '@/context/OrgContext';
 import {
@@ -10,7 +10,6 @@ import {
 } from '@/data/whatsapp';
 import { FB_REAL, useFbStatus, fbAuthStart, fbPages, fbConnect, fbDisconnect, type FbPaginaStatus } from '@/data/facebook';
 import { useCloudDiagnostico, useWaTemplates, type CloudDiagnostico, type WaTemplate } from '@/data/cloudApi';
-import { usePainelMaturacao } from '@/data/maturacao';
 import { useOrgUsuarios } from '@/data/atendimento';
 import {
   BadgeStatus, BotaoMini, BotaoPrimario, BotaoSec, CardVidro, ConfirmDialogV2, EstadoErro,
@@ -23,7 +22,7 @@ import './integracoes.css';
    a realidade vence a ficção: canais REAIS com transporte real).
    Funcional de src/pages/Integracoes.tsx (somente leitura): QR,
    limite, saúde, diagnóstico, origem comercial, Facebook, card da
-   Cloud API e PONTE com /v2/maturacao. Mutações reais existem em
+   Cloud API. Mutações reais existem em
    paridade, mas só são exercitadas no demo (:5176) — no ambiente
    real a operação está viva no canal oficial.
    ------------------------------------------------------------------ */
@@ -34,7 +33,6 @@ const Ic = ({ children }: { children: ReactNode }) => (
 );
 const IcWa = () => <Ic><path d="M21 11.5a8.4 8.4 0 01-9 8.4 8.9 8.9 0 01-3.8-.8L3 20l1-4.9a8.3 8.3 0 01-1-4A8.4 8.4 0 0112 3a8.4 8.4 0 019 8.5z" /></Ic>;
 const IcFb = () => <Ic><path d="M14 8h3V5h-3a4 4 0 00-4 4v2H7v3h3v7h3v-7h3l1-3h-4V9a1 1 0 011-1z" /></Ic>;
-const IcSeed = () => <Ic><path d="M12 21c0-6 3-10 8-11 0 6-3 10-8 11z" /><path d="M12 21C7 20 4 16 4 10c5 1 8 5 8 11z" /></Ic>;
 const IcCheck = () => <Ic><path d="M5 13l4 4L19 7" /></Ic>;
 const IcPulso = () => <Ic><path d="M3 12h4l2-6 4 12 2-6h6" /></Ic>;
 
@@ -111,7 +109,6 @@ interface SeedInt {
   fb: FbPaginaStatus[];
   cloud: CloudDiagnostico;
   templates: WaTemplate[];
-  mat: { conectados: number; total: number };
 }
 function canalDemo(n: Partial<WaCanal> & { id: string; alias: string }): WaCanal {
   return {
@@ -211,7 +208,6 @@ function seedInt(): SeedInt {
       { id: 'tp-2', nome: 'rmkt_retomada_d3', idioma: 'pt_BR', categoria: 'MARKETING', corpo: '{{1}}, ainda dá tempo de resolver o que você veio buscar. Quer que eu te chame por aqui?', variaveis: [{ pos: 1, rotulo: 'nome', exemplo: 'Maria' }], status: 'aprovado', statusMotivo: null, usarEmRemarketing: true, wabaId: '2210433378', metaTemplateId: 'mt-2', sincronizadoEm: iso(agora - 90 * h), atualizadoEm: iso(agora - 90 * h), toque: 3 },
       { id: 'tp-3', nome: 'rmkt_encerramento_d15', idioma: 'pt_BR', categoria: 'MARKETING', corpo: 'Vou encerrar por aqui, {{1}}. Se precisar, é só chamar de novo — a porta fica aberta.', variaveis: [{ pos: 1, rotulo: 'nome', exemplo: 'Maria' }], status: 'pendente', statusMotivo: null, usarEmRemarketing: false, wabaId: '2210433378', metaTemplateId: null, sincronizadoEm: null, atualizadoEm: iso(agora - 20 * h), toque: null },
     ],
-    mat: { conectados: 3, total: 4 },
   };
 }
 /** QR de demonstração: padrão xadrez em SVG (nenhuma sessão real envolvida). */
@@ -231,15 +227,12 @@ function qrDemo(): string {
 
 export default function IntegracoesV2() {
   const { currentOrg } = useOrg();
-  const nav = useNavigate();
   const qc = useQueryClient();
   const [params, setParams] = useSearchParams();
   const demo = !WA_REAL;
   const [seed, setSeed] = useState<SeedInt>(seedInt);
 
   const podeConfig = currentOrg.role === 'admin' || currentOrg.role === 'gestor';
-  // paridade v1: as RPCs de maturação validam _eh_admin_org — gestor tomaria "sem acesso"
-  const podeMaturacao = currentOrg.role === 'admin';
 
   const canaisQ = useWaCanais();
   const limiteQ = useWaLimite();
@@ -249,7 +242,6 @@ export default function IntegracoesV2() {
   const fbQ = useFbStatus();
   const cloudQ = useCloudDiagnostico(podeConfig);   // diagnóstico só com podeConfig (evita 403)
   const templatesQ = useWaTemplates();               // templates são leitura de todos (v1)
-  const matQ = usePainelMaturacao();
 
   const [aviso, setAviso] = useState<Aviso>(null);
   const [waFiltro, setWaFiltro] = useState<'ativos' | 'desconectados' | 'todos'>('ativos');
@@ -290,9 +282,6 @@ export default function IntegracoesV2() {
   const cloud = demo ? seed.cloud : cloudQ.data;
   const cloudFaltaSecret = !!cloud && (!cloud.secrets.META_WHATSAPP_TOKEN || !cloud.secrets.META_WA_APP_SECRET || !cloud.secrets.META_WA_VERIFY_TOKEN);
   const templates = demo ? seed.templates : (templatesQ.data ?? []);
-  const matChips = matQ.data ?? [];
-  const matConectados = demo ? seed.mat.conectados : matChips.filter((c) => c.status_integracao === 'conectado').length;
-  const matTotal = demo ? seed.mat.total : matChips.length;
 
   const carregando = !demo && (canaisQ.isLoading || limiteQ.isLoading);
 
@@ -307,8 +296,6 @@ export default function IntegracoesV2() {
     qc.invalidateQueries({ queryKey: ['wa-conversas', currentOrg.id] });
     qc.invalidateQueries({ queryKey: ['fb-status', currentOrg.id] });
     qc.invalidateQueries({ queryKey: ['fb-conversas', currentOrg.id] });
-    // o Atualizar único do header cobre também a ponte de maturação (matRefresh da v1)
-    qc.invalidateQueries({ queryKey: ['mat-painel', currentOrg.id] });
   };
 
   /* ---------- retorno do OAuth da Meta (?fb=connect&code= | ?fb=error&motivo=) ---------- */
@@ -488,13 +475,6 @@ export default function IntegracoesV2() {
           }}
         />
         <Kpi rotulo="Facebook conectados" valor={fbConectadas} sobe atraso={0.15} />
-        {podeMaturacao && (
-          <Kpi
-            rotulo="Em maturação (fora do atendimento)" valor={matConectados} sobe atraso={0.2}
-            sufixo={` conectado${matConectados === 1 ? '' : 's'}`}
-            delta={{ tom: 'neutro', texto: `${matTotal} número${matTotal === 1 ? '' : 's'} no pool · não consome o limite do plano` }}
-          />
-        )}
       </div>
 
       {/* ---------- WhatsApp (Evolution / QR) ---------- */}
@@ -773,40 +753,6 @@ export default function IntegracoesV2() {
               <BotaoSec mini disabled={fbBusy || !!fbSel} onClick={fbIniciar}>
                 {fbBusy ? 'Conectando…' : 'Conectar com Facebook'}
               </BotaoSec>
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* ---------- Maturação (ponte para /v2/maturacao) ---------- */}
-      <section className="intg-sec" id="maturacao">
-        <div className="intg-sec-head sobe" style={{ animationDelay: '.32s' }}>
-          <div>
-            <h3><IcSeed /> Maturação de Números</h3>
-            <p>Chips novos ganhando reputação antes de entrar em operação. Nada aqui se mistura com o atendimento.</p>
-          </div>
-        </div>
-        <div className="vidro spot sobe int-card" style={{ animationDelay: '.36s' }}>
-          <div className="int-l1">
-            <div className="int-ic"><IcSeed /></div>
-            <div className="tx">
-              <div className="int-n"><span>Pool de aquecimento</span></div>
-              <div className="int-s">Conecte e gerencie os números em maturação. A rampa e a saúde ficam na página Maturação.</div>
-            </div>
-            <BadgeStatus tom="neutro">Fora do atendimento</BadgeStatus>
-          </div>
-          <div className="intg-nota">
-            <b>Números em aquecimento.</b> Ficam totalmente separados do atendimento — não aparecem no Inbox,
-            não recebem conversas de clientes e não consomem o limite do seu plano.
-          </div>
-          {!podeMaturacao ? (
-            <div className="int-s">Somente administradores da organização gerenciam os números em maturação.</div>
-          ) : (
-            <div className="int-l2">
-              <span className="int-s num">
-                {matConectados} conectado{matConectados === 1 ? '' : 's'} · {matTotal} número{matTotal === 1 ? '' : 's'} no pool
-              </span>
-              <BotaoSec mini onClick={() => nav('/maturacao')}>Abrir Maturação</BotaoSec>
             </div>
           )}
         </div>
