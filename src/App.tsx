@@ -1,4 +1,6 @@
-import { lazy, Suspense, type ReactNode } from 'react';
+import { Suspense, type ReactNode } from 'react';
+// lazy com auto-recarga: chunk que sumiu após deploy novo força 1 reload (recargaChunk.ts)
+import { lazyComRecarga as lazy } from '@/lib/recargaChunk';
 import { createBrowserRouter, createHashRouter, RouterProvider, Navigate, useParams, type RouteObject } from 'react-router-dom';
 // v1 — preservado APENAS em /v1/* como fallback técnico (sem link na interface). Nada é deletado.
 import { AppShell } from '@/components/AppShell';

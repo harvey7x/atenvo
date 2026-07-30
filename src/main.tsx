@@ -10,6 +10,15 @@ import { ToastProvider } from '@/hooks/useToast';
 import { ConfigError } from '@/pages/ConfigError';
 import { isMisconfigured, isDemoMode } from '@/lib/supabase';
 import { resolverEAplicarPerf } from './v2/lib/perf';
+import { tentarRecarga } from '@/lib/recargaChunk';
+
+// Deploy novo invalida os chunks antigos; se o preload de uma dependência falhar,
+// recarrega a página (1x/min — guarda em recargaChunk.ts) para buscar o index novo.
+if (typeof window !== 'undefined') {
+  window.addEventListener('vite:preloadError', (evento) => {
+    if (tentarRecarga()) evento.preventDefault();
+  });
+}
 
 // Intensidade dos efeitos (contrato item 6): produção = --fx 0.5 (padrão em tokens.css);
 // só o modo demonstração sobe para 1 via html[data-demo]. O corte torna 0.5 o default real.
