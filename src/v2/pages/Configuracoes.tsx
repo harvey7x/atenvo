@@ -19,7 +19,7 @@ import { PALETA_CORES, podeGerenciarAtendimento, type StatusDef } from '@/types/
 import { resetDemonstracao, solicitarTrocaEmail } from '../services/conta';
 import { criarRaizPortalV2 } from '../components/portal';
 import { tempoCelula } from '../lib/tempo';
-import { lerModoPerf, salvarModoPerf, type ModoPerf } from '../lib/perf';
+import { assinarModoPerf, lerModoPerf, salvarModoPerf, type ModoPerf } from '../lib/perf';
 import {
   BadgeStatus, BotaoMini, BotaoPrimario, BotaoSec, CardVidro, Chip, Chips, ConfirmDialogV2,
   EstadoErro, Input, LinhaToggle, ModalV2, Segmentado, Skeleton, TabelaPadrao, type Coluna, type TomStatus,
@@ -1320,9 +1320,11 @@ function PainelPrefs({ anima, demo, seed, setSeed, aoAvisar }: {
 
 /* Automático / Leve / Completo — estado próprio (não passa pelo persist das
    Prefs: vive no localStorage do dispositivo). salvarModoPerf re-resolve e
-   re-aplica [data-perf] na raiz imediatamente, sem reload. */
+   re-aplica [data-perf] na raiz imediatamente, sem reload; a assinatura
+   mantém o controle em sincronia com o alternador da topbar. */
 function PerfSegmentado() {
   const [modo, setModo] = useState<ModoPerf>(() => lerModoPerf());
+  useEffect(() => assinarModoPerf(setModo), []);
   return (
     <Segmentado
       rotulo="Modo de Performance"

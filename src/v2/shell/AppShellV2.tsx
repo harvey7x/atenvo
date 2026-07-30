@@ -13,8 +13,15 @@ import { ICONES } from './icones';
 import { NotificacaoResposta, type DadosNotificacao } from './NotificacaoResposta';
 import { useNotificacaoInbound } from '../hooks/useNotificacaoInbound';
 import { aplicarTema, lerTema, salvarTema, type Tema } from '../lib/tema';
+import { assinarModoPerf, lerModoPerf, salvarModoPerf, type ModoPerf } from '../lib/perf';
 
 /* ícones sol/lua do alternador de tema (traço fino, como o resto do chrome v2) */
+const ROTULO_PERF: Record<ModoPerf, string> = { auto: 'Automático', lite: 'Leve', full: 'Completo' };
+const IconeRaio = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden>
+    <path d="M13 2L3 14h9l-1 8 10-12h-9z" />
+  </svg>
+);
 const IconeSol = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
     <circle cx="12" cy="12" r="4.2" /><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19" />
@@ -105,6 +112,15 @@ export default function AppShellV2() {
   const alternarTema = useCallback(() => {
     setTema((t) => { const novo: Tema = t === 'dark' ? 'light' : 'dark'; salvarTema(novo, escopoTema); return novo; });
   }, [escopoTema]);
+  // Modo de Performance na topbar (par do alternador de tema): o clique cicla
+  // Automático → Leve → Completo; o estado vem da assinatura (a mesma que
+  // mantém o Segmentado de Configurações em sincronia). Dot = Leve fixado.
+  const [modoPerf, setModoPerf] = useState<ModoPerf>(() => lerModoPerf());
+  useEffect(() => assinarModoPerf(setModoPerf), []);
+  const alternarPerf = useCallback(() => {
+    const ordem: ModoPerf[] = ['auto', 'lite', 'full'];
+    salvarModoPerf(ordem[(ordem.indexOf(modoPerf) + 1) % ordem.length]);
+  }, [modoPerf]);
   const seqRef = useRef(0);
   const avatarRef = useRef<HTMLButtonElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
@@ -249,6 +265,15 @@ export default function AppShellV2() {
               <span className="busca-texto">Buscar contatos, conversas, cobranças…</span><kbd>⌘K</kbd>
             </div>
             <div className="top-dir">
+              <button
+                type="button" className="ib"
+                aria-label={`Modo de Performance: ${ROTULO_PERF[modoPerf]} — clique para alternar`}
+                title={`Modo de Performance: ${ROTULO_PERF[modoPerf]}`}
+                onClick={alternarPerf}
+              >
+                <IconeRaio />
+                <span className={modoPerf === 'lite' ? 'pt on' : 'pt'} aria-hidden />
+              </button>
               <button
                 type="button" className="ib"
                 aria-label={tema === 'dark' ? 'Mudar para o tema claro' : 'Mudar para o tema escuro'}

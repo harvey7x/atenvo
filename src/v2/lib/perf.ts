@@ -124,6 +124,15 @@ export function resolverEAplicarPerf(modo: ModoPerf = lerModoPerf()): void {
   void detectPerfTier().then((tier) => { if (g === geracao) aplicarPerfTier(tier); });
 }
 
+/* assinantes de mudança de MODO — o alternador da topbar e o Segmentado de
+   Configurações refletem um ao outro sem acoplamento (ambos assinam) */
+type OuvinteModo = (modo: ModoPerf) => void;
+const ouvintes = new Set<OuvinteModo>();
+export function assinarModoPerf(cb: OuvinteModo): () => void {
+  ouvintes.add(cb);
+  return () => { ouvintes.delete(cb); };
+}
+
 export function salvarModoPerf(modo: ModoPerf): void {
   try {
     localStorage.setItem(CHAVE_PERF, modo);
@@ -131,4 +140,5 @@ export function salvarModoPerf(modo: ModoPerf): void {
     /* storage indisponível: aplica sem persistir (o modo segue por parâmetro) */
   }
   resolverEAplicarPerf(modo);
+  ouvintes.forEach((cb) => cb(modo));
 }
