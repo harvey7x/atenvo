@@ -44,6 +44,8 @@ import './whatsapp.css';
    ------------------------------------------------------------------ */
 
 const FOCO_KEY = 'atenvo-wa-foco';
+const ABA_KEY = 'atenvo-wa-aba';
+const GRUPOS_KEY = 'atenvo-wa-grupos-fechados';
 const TABS = [
   ['todos', 'Todos'], ['meus', 'Meus'], ['naoatrib', 'Não atribuídos'],
   ['naolidas', 'Não lidas'], ['pendentes', 'Pendentes'], ['arquivadas', 'Arquivadas'],
@@ -128,10 +130,27 @@ export default function WhatsAppV2() {
 
   /* ---------- UI ---------- */
   const [draft, setDraft] = useState('');
-  const [tab, setTab] = useState<TabId>('todos');
+  // lembra a última aba usada (quem trabalha pelo "Meus" reabre no "Meus")
+  const [tab, setTab] = useState<TabId>(() => {
+    try { const t = localStorage.getItem(ABA_KEY); return TABS.some(([id]) => id === t) ? (t as TabId) : 'todos'; } catch { return 'todos'; }
+  });
+  // persiste APENAS na escolha do usuário — a troca programática do deep-link não apaga a preferência
+  const mudarAba = (t: TabId) => { setTab(t); try { localStorage.setItem(ABA_KEY, t); } catch { /* privado */ } };
+  // grupos recolhidos na fila (por respId; '' = Não atribuídos), lembrados entre sessões
+  const [gruposFechados, setGruposFechados] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem(GRUPOS_KEY) ?? '[]') as string[]); } catch { return new Set(); }
+  });
+  // persistência dentro da AÇÃO (não em effect): o expandir-tudo do deep-link fica só na sessão
+  const alternarGrupo = (k: string) => setGruposFechados((cur) => {
+    const s = new Set(cur);
+    if (s.has(k)) s.delete(k); else s.add(k);
+    try { localStorage.setItem(GRUPOS_KEY, JSON.stringify([...s])); } catch { /* privado */ }
+    return s;
+  });
   const [search, setSearch] = useState('');
   const [filtroCanal, setFiltroCanal] = useState<string | null>(null);
   const [filtroStatus, setFiltroStatus] = useState<string | null>(null);
+  const [filtroTransporte, setFiltroTransporte] = useState<string | null>(null);
   const [pop, setPop] = useState<Pop>(null);
   const [foco, setFoco] = useState(() => { try { return localStorage.getItem(FOCO_KEY) === '1'; } catch { return false; } });
   const [ctxAberto, setCtxAberto] = useState(() => { try { return sessionStorage.getItem('atenvo-wa-ctx') !== '0'; } catch { return true; } });
@@ -203,6 +222,16 @@ export default function WhatsAppV2() {
   }, [scripts, scriptCategorias]);
   const bloqueados = inbox.bloqueados;
   const canalEhCloud = inbox.canalSel?.transporte === 'cloud_api';
+  // canal oficial (Cloud API/Meta) × número conectado por QR (Evolution) — sinalização na fila,
+  // no topo da conversa, no "Responder por:" e no filtro de números. Transporte DESCONHECIDO
+  // (demo, canais ainda carregando, canal removido fora de realCanais) fica neutro: não se
+  // afirma "não oficial" sobre canal que não foi consultado.
+  const canalPorId = useMemo(() => new Map(inbox.realCanais.map((c) => [c.id, c])), [inbox.realCanais]);
+  const transporteDe = (id: string | null | undefined) => (id ? canalPorId.get(id)?.transporte ?? null : null);
+  const tituloCanal = (nome: string | null | undefined, transporte: string | null) =>
+    transporte === 'cloud_api' ? `${nome ?? 'WhatsApp'} — OFICIAL (API do WhatsApp/Meta)`
+    : transporte ? `${nome ?? 'WhatsApp'} — número conectado por QR (não oficial)`
+    : nome ?? 'WhatsApp';
   const janelaQ = useJanelaCanal(WA_REAL && canalEhCloud ? inbox.canalSel?.id ?? null : null, WA_REAL ? current.contatoId ?? null : null, canalEhCloud);
   const agendadasQ = useMensagensAgendadas(WA_REAL ? currentId || null : null);
   const agendarSeqMut = useAgendarSequencia();
@@ -241,7 +270,8 @@ export default function WhatsAppV2() {
   useEffect(() => {
     if (!conversaParam) return;
     inbox.selecionarPorDeepLink(conversaParam);
-    setTab('todos'); setFiltroCanal(null); setFiltroStatus(null); setSearch('');
+    setTab('todos'); setFiltroCanal(null); setFiltroStatus(null); setFiltroTransporte(null); setSearch('');
+    setGruposFechados(new Set()); // expande tudo: o card alvo pode estar num grupo recolhido
     const t = window.setTimeout(() => {
       document.querySelector(`[data-cid="${CSS.escape(conversaParam)}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
       // só limpa o parâmetro DEPOIS de rolar: apagá-lo muda conversaParam→null, o que
@@ -259,6 +289,11 @@ export default function WhatsAppV2() {
   const passaBase = (c: WaContact) =>
     (!filtroCanal || c.canalId === filtroCanal) &&
     (!filtroStatus || c.statusId === filtroStatus) &&
+    // "QR (não oficial)" = tudo que NÃO é o canal oficial (inclui canal removido/histórico,
+    // cujo transporte é desconhecido) — sem terceiro balde invisível entre as duas opções
+    (!filtroTransporte || (filtroTransporte === 'cloud_api'
+      ? transporteDe(c.canalId) === 'cloud_api'
+      : transporteDe(c.canalId) !== 'cloud_api')) &&
     (!term || c.name.toLowerCase().includes(term) || c.last.toLowerCase().includes(term) || (c.phone ?? '').toLowerCase().includes(term));
   const passaTab = (c: WaContact, t: TabId) =>
     t === 'arquivadas' ? !!c.arquivada
@@ -275,22 +310,30 @@ export default function WhatsAppV2() {
     for (const [t] of TABS) n[t] = base.filter((c) => passaTab(c, t)).length;
     return n;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contacts, filtroCanal, filtroStatus, term, user?.id]);
+  }, [contacts, filtroCanal, filtroStatus, filtroTransporte, canalPorId, term, user?.id]);
   const visiveis = useMemo(() => {
     const lista = contacts.filter((c) => passaBase(c) && passaTab(c, tab));
     return lista.sort((a, b) => (a.fixada === b.fixada ? (b.lastAtMs ?? 0) - (a.lastAtMs ?? 0) : a.fixada ? -1 : 1));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contacts, tab, filtroCanal, filtroStatus, term, user?.id]);
-  /* agrupamento por responsável — Não atribuídos primeiro, nomes alfabéticos (v1 L1105-1120) */
+  }, [contacts, tab, filtroCanal, filtroStatus, filtroTransporte, canalPorId, term, user?.id]);
+  /* agrupamento por responsável — VOCÊ primeiro (seus clientes sempre visíveis no Todos),
+     depois Não atribuídos, depois os demais atendentes em ordem alfabética */
   const grupos = useMemo(() => {
     const m = new Map<string, WaContact[]>();
     for (const c of visiveis) {
       const k = responsavelEfetivo(c) ?? '';
       m.set(k, [...(m.get(k) ?? []), c]);
     }
-    return [...m.entries()].sort((a, b) => (a[0] === '' ? -1 : b[0] === '' ? 1 : (nomePorId(a[0]) ?? '').localeCompare(nomePorId(b[0]) ?? '', 'pt-BR')));
+    const uid = user?.id;
+    // na aba "Não atribuídos" a fila sem dono continua PRIMEIRO (propósito da aba);
+    // nas demais, Você abre a lista
+    const rank = (k: string) =>
+      tab === 'naoatrib' ? (k === '' ? 0 : 1)
+      : uid && k === uid ? 0 : k === '' ? 1 : 2;
+    return [...m.entries()].sort((a, b) =>
+      rank(a[0]) - rank(b[0]) || (nomePorId(a[0]) ?? '').localeCompare(nomePorId(b[0]) ?? '', 'pt-BR'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visiveis, usuarios]);
+  }, [visiveis, usuarios, user?.id, tab]);
 
   /* ---------- envio / composer ---------- */
   const optoutTexto = 'Contato marcado como não incomodar — mensagens bloqueadas.';
@@ -439,7 +482,7 @@ export default function WhatsAppV2() {
             <div className="l1">
               <h3>Conversas</h3>
               <div className="bts">
-                <button type="button" className={'ib2' + (filtroCanal || filtroStatus ? ' on' : '')} title={filtroCanal || filtroStatus ? 'Filtros ativos' : 'Filtros'} onClick={(e) => abrirPop('filtro', e)}><IcFunil /></button>
+                <button type="button" className={'ib2' + (filtroCanal || filtroStatus || filtroTransporte ? ' on' : '')} title={filtroCanal || filtroStatus || filtroTransporte ? 'Filtros ativos' : 'Filtros'} onClick={(e) => abrirPop('filtro', e)}><IcFunil /></button>
                 <button type="button" className="ib2" title="Nova conversa" aria-label="Nova conversa" onClick={() => setNovaConversa(true)}><IcMais /></button>
               </div>
             </div>
@@ -453,7 +496,7 @@ export default function WhatsAppV2() {
                   key={id} type="button" role="tab" aria-selected={tab === id}
                   className={'wa-aba' + (tab === id ? ' on' : '')}
                   title={id === 'pendentes' ? 'Pendentes inclui mensagens não lidas e clientes aguardando resposta.' : undefined}
-                  onClick={() => setTab(id)}
+                  onClick={() => mudarAba(id)}
                 >
                   {rot}{(tabCounts[id] ?? 0) > 0 && <span className="n num">{tabCounts[id]}</span>}
                 </button>
@@ -476,25 +519,46 @@ export default function WhatsAppV2() {
             ) : visiveis.length === 0 ? (
               <div className="wa-vazio">Nenhuma conversa nesta aba.</div>
             ) : (
-              grupos.map(([respId, lista]) => (
+              grupos.map(([respId, lista]) => {
+                // busca ativa ignora o recolhimento: resultado escondido confunde
+                const fechado = gruposFechados.has(respId) && !buscaAtiva;
+                // grupo fechado não pode esconder urgência: soma de não lidas + ⚠ de espera estourada
+                const naoLidasGrupo = fechado ? lista.reduce((s, c) => s + (c.unread ?? 0), 0) : 0;
+                const atrasoGrupo = fechado && lista.some((c) => {
+                  const w = tierEspera(c.aguardando ? c.aguardandoDesde : null, relogioMs);
+                  return !!w && (w.tier === 'vermelho' || w.tier === 'critico');
+                });
+                return (
                 <div key={respId || '(fila)'}>
-                  <div className="wa-grupo">
-                    {respId ? <>Atendimento distribuído para <b>{respId === user?.id ? 'Você' : nomePorId(respId) ?? 'Atendente'}</b></> : 'Não atribuídos'}
-                  </div>
-                  {lista.map((c) => {
+                  <button
+                    type="button" className={'wa-grupo' + (fechado ? ' fech' : '')} aria-expanded={!fechado}
+                    title={buscaAtiva ? 'Limpe a busca para recolher grupos' : fechado ? 'Mostrar as conversas deste grupo' : 'Recolher este grupo'}
+                    onClick={() => { if (!buscaAtiva) alternarGrupo(respId); }}
+                  >
+                    <span className="seta" aria-hidden>▾</span>
+                    <span className="rot">
+                      {respId ? <>Atendimento distribuído para <b>{respId === user?.id ? 'Você' : nomePorId(respId) ?? 'Atendente'}</b></> : 'Não atribuídos'}
+                    </span>
+                    <span className="num qt">{lista.length}</span>
+                    {atrasoGrupo && <span className="galer" title="Há conversas aguardando resposta há tempo demais neste grupo">⚠</span>}
+                    {naoLidasGrupo > 0 && <span className="gnl num" title={`${naoLidasGrupo} não lidas neste grupo`}>{naoLidasGrupo > 99 ? '99+' : naoLidasGrupo}</span>}
+                  </button>
+                  {!fechado && lista.map((c) => {
                     const wait = tierEspera(c.aguardando ? c.aguardandoDesde : null, relogioMs);
                     const atrasado = wait && (wait.tier === 'critico' || wait.tier === 'vermelho');
                     const alertas = alertasDe(c);
                     const finalizado = c.status === 'Resolvida' || c.status === 'Fechada';
                     const sit = situacaoDe(c);
+                    const transporte = transporteDe(c.canalId);
+                    const oficial = transporte === 'cloud_api';
                     return (
                       <button
                         key={c.id} type="button" data-cid={c.id}
                         className={'conv2 spot' + (wait ? ` t-${wait.tier}` : '') + (c.id === currentId ? ' ativa' : '')}
-                        title={`Atendente: ${c.respId ? nomePorId(c.respId) ?? 'Atendente' : 'Não atribuído'} · Canal: WhatsApp ${c.chip} · ${finalizado ? 'Finalizado' : c.status || 'Em atendimento'} · ${c.time}`}
+                        title={`Atendente: ${c.respId ? nomePorId(c.respId) ?? 'Atendente' : 'Não atribuído'} · Canal: ${tituloCanal(c.chip, transporte)} · ${finalizado ? 'Finalizado' : c.status || 'Em atendimento'} · ${c.time}`}
                         onClick={() => inbox.selectContact(c.id)}
                       >
-                        <span className="av2">{initials(nomeExibicao(c))}{c.canalAtual && <span className="sig">{c.canalAtual.slice(0, 2)}</span>}</span>
+                        <span className="av2">{initials(nomeExibicao(c))}{c.canalAtual && <span className={'sig' + (oficial ? ' of' : '')} title={tituloCanal(c.canalAtual, transporte)}>{oficial ? '✓ ' : ''}{c.canalAtual.slice(0, 2)}</span>}</span>
                         <span className="tx">
                           <span className="n">
                             {c.fixada && <span className="fl" title="Fixada">📌</span>}
@@ -520,7 +584,8 @@ export default function WhatsAppV2() {
                     );
                   })}
                 </div>
-              ))
+                );
+              })
             )}
           </div>
         </aside>
@@ -552,8 +617,8 @@ export default function WhatsAppV2() {
                   {current.phone ? mascararNumero(current.phone) : 'sem número'}
                   {(() => { const sit = situacaoDe(current); const cor = corDaSituacao(current, sit.texto); return <span className={'wa-hchip etapa sit-' + sit.variante} title="Situação no funil" style={cor ? { background: cor + '26', color: cor } : undefined}>{sit.texto}</span>; })()}
                   {inbox.canalSel
-                    ? <span className="wa-hchip" title={`Respondendo por ${inbox.canalSel.alias}${inbox.canalSel.numero ? ' · ' + mascararNumero(inbox.canalSel.numero) : ''}`}>{inbox.canalSel.alias}</span>
-                    : current.chip && <span className="wa-hchip" title="Canal atual do atendimento">{current.chip}</span>}
+                    ? <span className={'wa-hchip' + (canalEhCloud ? ' of' : '')} title={`Respondendo por ${inbox.canalSel.alias}${inbox.canalSel.numero ? ' · ' + mascararNumero(inbox.canalSel.numero) : ''} · ${canalEhCloud ? 'OFICIAL (API do WhatsApp/Meta)' : 'número conectado por QR (não oficial)'}`}>{canalEhCloud ? '✓ ' : ''}{inbox.canalSel.alias}</span>
+                    : current.chip && (() => { const t = transporteDe(current.canalId); return <span className={'wa-hchip' + (t === 'cloud_api' ? ' of' : '')} title={tituloCanal(current.chip, t)}>{t === 'cloud_api' ? '✓ ' : ''}{current.chip}</span>; })()}
                   {WA_REAL && canalEhCloud && janelaQ.data && (
                     <span className={'janela' + (janelaQ.data.aberta ? '' : ' fechada')} title={janelaQ.data.aberta ? 'Dentro das 24 horas: dá para responder com texto livre por este número.' : 'Passaram 24 horas desde a última mensagem do cliente PARA ESTE número. Só um modelo aprovado pela Meta pode sair daqui.'}>
                       {rotuloJanela(janelaQ.data)}
@@ -671,10 +736,10 @@ export default function WhatsAppV2() {
                     <button
                       key={c.id} type="button"
                       className={'wa-chipbtn' + (inbox.replyCanalId === c.id ? ' on' : '') + (c.status !== 'conectado' ? ' off' : '')}
-                      title={c.status !== 'conectado' ? `Indisponível (${c.status})` : undefined}
+                      title={c.status !== 'conectado' ? `Indisponível (${c.status})` : tituloCanal(c.alias, c.transporte)}
                       onClick={() => inbox.onReplyCanal(c.id)}
                     >
-                      {c.alias}
+                      {c.alias}<span className={'oftag' + (c.transporte === 'cloud_api' ? '' : ' qr')}>{c.transporte === 'cloud_api' ? '✓ Oficial' : 'QR'}</span>
                     </button>
                   ))
                 )}
@@ -913,8 +978,19 @@ export default function WhatsAppV2() {
               <div className="ph2">Filtrar por número</div>
               <button type="button" className="it" onClick={() => { setFiltroCanal(null); setPop(null); }}>Todos os números {!filtroCanal && <span className="ck">✓</span>}</button>
               {inbox.realCanais.map((c) => (
-                <button key={c.id} type="button" className="it" onClick={() => { setFiltroCanal(c.id); setPop(null); }}>{c.alias} {filtroCanal === c.id && <span className="ck">✓</span>}</button>
+                <button key={c.id} type="button" className="it" title={tituloCanal(c.alias, c.transporte)} onClick={() => { setFiltroCanal(c.id); setPop(null); }}>
+                  {c.alias}<span className={'oftag' + (c.transporte === 'cloud_api' ? '' : ' qr')}>{c.transporte === 'cloud_api' ? '✓ Oficial' : 'QR'}</span> {filtroCanal === c.id && <span className="ck">✓</span>}
+                </button>
               ))}
+              {/* "|| filtroTransporte": se os canais sumirem com o filtro ativo, o controle de limpar continua acessível */}
+              {(inbox.realCanais.length > 0 || filtroTransporte) && (
+                <>
+                  <div className="ph2">Conexão do número</div>
+                  <button type="button" className="it" onClick={() => { setFiltroTransporte(null); setPop(null); }}>Todas as conexões {!filtroTransporte && <span className="ck">✓</span>}</button>
+                  <button type="button" className="it" title="Conversas do canal oficial (API do WhatsApp/Meta)" onClick={() => { setFiltroTransporte('cloud_api'); setPop(null); }}>Oficial (API do WhatsApp) {filtroTransporte === 'cloud_api' && <span className="ck">✓</span>}</button>
+                  <button type="button" className="it" title="Tudo que não é o canal oficial: números conectados por QR e canais já removidos" onClick={() => { setFiltroTransporte('evolution'); setPop(null); }}>QR (não oficial) {filtroTransporte === 'evolution' && <span className="ck">✓</span>}</button>
+                </>
+              )}
               <div className="ph2">Status</div>
               <button type="button" className="it" onClick={() => { setFiltroStatus(null); setPop(null); }}>Todos os status {!filtroStatus && <span className="ck">✓</span>}</button>
               {statusAtivos.map((s) => (

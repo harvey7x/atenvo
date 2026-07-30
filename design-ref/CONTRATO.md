@@ -44,6 +44,9 @@ de apoio (dias até 30, meses depois). Sempre tabular-nums.
 ## Adendo nº 3 — usos declarados de cor
 Âmbar em estrela de favorito é uso declarado (convenção universal de
 favorito), não status semântico. Sempre via token `--ambar`, nunca hex solto.
+Verde no selo de canal OFICIAL do WhatsApp (`.sig.of`/`.wa-hchip.of`/`.oftag`)
+é uso declarado (convenção de selo verificado, distingue Cloud API de número
+QR), não status semântico. Sempre via `--verde`/`--verde-rgb`.
 
 ## Adendo nº 4 — rótulos do ConfirmDialogV2
 "Voltar" (cancelar) e "Aguarde…" (busy) são o padrão v2 declarado dos

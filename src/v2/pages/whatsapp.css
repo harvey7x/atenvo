@@ -62,6 +62,11 @@
 /* avatar do cabeçalho da conversa (era style inline no TSX → não temava): agora via classe */
 .v2 .conv2-av { background: linear-gradient(150deg, #2B2E34, var(--surface)); box-shadow: inset 0 1px 0 rgba(var(--tint), .14), 0 0 0 1px rgba(var(--tint), .14); }
 .v2 .conv2 .av2 .sig { position: absolute; bottom: -3px; right: -3px; font-size: 8px; font-weight: 700; background: var(--surface); border: 1px solid rgba(var(--tint), .18); border-radius: 5px; padding: 0 3px; color: var(--txt-2); }
+/* canal OFICIAL (Cloud API/Meta) em verde com ✓ — distingue do número conectado por QR (Evolution) */
+.v2 .conv2 .av2 .sig.of { color: var(--verde); border-color: rgba(var(--verde-rgb), .55); }
+.v2 .wa-hchip.of { color: var(--verde); border-color: rgba(var(--verde-rgb), .4); }
+.v2 .oftag { font-size: 8px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--verde); border: 1px solid rgba(var(--verde-rgb), .4); border-radius: 4px; padding: 0 4px; margin-left: 5px; white-space: nowrap; }
+.v2 .oftag.qr { color: var(--txt-3); border-color: rgba(var(--tint), .18); }
 .v2 .conv2 .tx { min-width: 0; flex: 1; }
 .v2 .conv2 .n { font-size: 12.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; gap: 4px; align-items: center; }
 .v2 .conv2 .n .fl { font-size: 10px; flex-shrink: 0; }
@@ -81,8 +86,27 @@
 .v2 .conv2 .cr { font-size: 9.5px; color: var(--txt-3); font-weight: 600; }
 .v2 .conv2.t-ambar .cr { color: var(--ambar); }
 .v2 .conv2.t-vermelho .cr, .v2 .conv2.t-critico .cr, .v2 .conv2 .cr.g { color: var(--rubro); }
-.v2 .wa-grupo { font-size: 9.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--txt-3); padding: 8px 14px 4px; border-bottom: 1px solid rgba(var(--tint), .045); }
+/* cabeçalho de grupo: botão recolhível e FIXO no scroll da fila (sticky). Fundo compõe o
+   tint da .wa-fila sobre --base — sem backdrop-filter (gotcha do modo performance). */
+.v2 .wa-grupo {
+  display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; cursor: pointer;
+  font-family: var(--fonte); font-size: 9.5px; font-weight: 600; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--txt-3); padding: 8px 14px 6px;
+  border: none; border-bottom: 1px solid rgba(var(--tint), .045);
+  position: sticky; top: 0; z-index: 2;
+  background: linear-gradient(rgba(var(--tint), .015), rgba(var(--tint), .015)), var(--base);
+}
+.v2 .wa-grupo:hover { color: var(--txt-2); }
 .v2 .wa-grupo b { color: var(--txt-2); }
+/* rótulo com flex:1 empurra contador/badges pra direita; nome longo quebra DENTRO do rótulo
+   (min-width:0) em vez de estourar a fila de 296px */
+.v2 .wa-grupo .rot { flex: 1; min-width: 0; overflow-wrap: break-word; }
+.v2 .wa-grupo .qt { color: var(--txt-3); flex-shrink: 0; }
+.v2 .wa-grupo .seta { font-size: 8px; color: var(--txt-3); transition: transform .15s ease; flex-shrink: 0; }
+.v2 .wa-grupo.fech .seta { transform: rotate(-90deg); }
+/* urgência do grupo recolhido: pill de não lidas (mesma linguagem do card) + ⚠ de espera estourada */
+.v2 .wa-grupo .gnl { display: inline-flex; min-width: 15px; height: 15px; align-items: center; justify-content: center; border-radius: 99px; background: linear-gradient(180deg, #FFF, #D9DCE1); color: #101215; font-size: 9px; font-weight: 700; padding: 0 4px; flex-shrink: 0; }
+.v2 .wa-grupo .galer { color: var(--ambar); font-size: 9px; flex-shrink: 0; }
 .v2 .wa-vazio { padding: 22px 16px; font-size: 12px; color: var(--txt-3); text-align: center; }
 .v2 .wa-skel { padding: 8px 14px; display: flex; flex-direction: column; gap: 14px; }
 .v2 .wa-skel .row { display: flex; gap: 10px; align-items: center; }
@@ -329,6 +353,8 @@
 :root[data-tema="light"] .v2 .conv2.ativa::before { background: var(--accent); box-shadow: none; }
 /* badge de não-lidas: metal claro → grafite definido com número claro */
 :root[data-tema="light"] .v2 .conv2 .nl { background: var(--accent); color: #F4F5F7; }
+
+:root[data-tema="light"] .v2 .wa-grupo .gnl { background: var(--accent); color: #F4F5F7; }
 /* play do áudio: metal → prata platina */
 :root[data-tema="light"] .v2 .audio2 .play { background: linear-gradient(180deg, var(--platina-a), var(--platina-b)); color: var(--platina-txt); }
 /* banner flutuante e popover: sombra dramática → suave no claro */
