@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { transcodificarParaOggOpus } from '../lib/oggOpus';
 import './componentes.css';
 
 /* Pele Platina do gravador de áudio do composer.
@@ -202,11 +203,26 @@ export function AudioRecorderV2({ disabled, onEnviar, permitirArquivo, rotuloEnv
     const blob = blobRef.current; if (!blob) return;
     if (!info || info.verificando || !info.sinal) { setErro('Nenhum som foi detectado. Verifique o microfone selecionado.'); return; }
     enviandoRef.current = true;
-    const mime = baseMime(mimeRef.current || blob.type || 'audio/webm');
-    const ext = EXT[mime] ?? 'm4a';
+    let envioBlob = blob;
+    let mime = baseMime(mimeRef.current || blob.type || 'audio/webm');
+    let ext = EXT[mime] ?? 'm4a';
     setEstado('sending'); setErro(null);
+    // GRAVAÇÃO vira ogg/opus DE VERDADE antes do envio: no WhatsApp oficial (Cloud API) só esse
+    // codec entrega — m4a/mp4 é aceito no upload e falha assíncrono ("Media upload error").
+    // Arquivo anexado segue como está (mídia comum, por design). Se a conversão falhar,
+    // cai no comportamento antigo (registrado no diag) em vez de bloquear o envio.
+    const diag = { ...(diagRef.current ?? {}) };
+    if (diag.origem !== 'arquivo_anexado' && mime !== 'audio/ogg') {
+      try {
+        const ogg = await transcodificarParaOggOpus(blob);
+        diag.transcode = { de: mime, para: 'audio/ogg', bytes_antes: blob.size, bytes_depois: ogg.size };
+        envioBlob = ogg; mime = 'audio/ogg'; ext = 'ogg';
+      } catch (e) {
+        diag.transcode_erro = String((e as Error)?.message ?? e);
+      }
+    }
     try {
-      await onEnviar(blob, mime, ext, diagRef.current ?? undefined); // upload + envio + confirmação real (lança em falha)
+      await onEnviar(envioBlob, mime, ext, diag); // upload + envio + confirmação real (lança em falha)
       blobRef.current = null; limparPreview(); setSeg(0); setInfo(null); setEstado('idle');
     } catch (e) {
       setEstado('error'); setErro((e as Error).message || 'Falha ao enviar o áudio.'); // preserva o blob p/ retry
