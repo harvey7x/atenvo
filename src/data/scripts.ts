@@ -367,7 +367,7 @@ export async function fetchEtapasTextoResolvidas(scriptId: string, ctx: VarCtx, 
 }
 
 export interface EtapaEnvio { posicao: number; tipo: EtapaTipo; texto: string; faltando: string[]; etapaId?: string; nome?: string | null; mime?: string | null; tamanho?: number | null; storagePath?: string | null; }
-const MIDIA_ENVIAVEL: EtapaTipo[] = ['imagem', 'audio']; // tipos de mídia suportados no envio (Facebook)
+const MIDIA_ENVIAVEL: EtapaTipo[] = ['imagem', 'audio', 'video', 'documento']; // mídia suportada no envio (WhatsApp e Facebook)
 /** Etapas para envio na conversa: texto sempre; mídia suportada quando `incluirMidia` (canal que suporta). */
 export async function fetchEtapasParaEnvio(scriptId: string, ctx: VarCtx, opts: { incluirMidia?: boolean; fallbackConteudo?: string } = {}): Promise<EtapaEnvio[]> {
   const etapas = await fetchEtapas(scriptId);

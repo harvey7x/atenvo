@@ -4,7 +4,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { WA_REAL, mascararNumero, urlAssinadaMidiaWa, urlDownloadMidiaWa, waRecarregarAudio, waValidarNumero, waVincularNumero, useWaAtividades, useMensagensAgendadas, useAgendarSequencia, useEditarAgendamento, useCancelarAgendamento, normalizeWaPhone } from '@/data/whatsapp';
 import type { WaContact, WaMessage } from '@/data/whatsappDemo';
 import { useStatusDefs, useEtiquetas, useOrgUsuarios, useAssinaturaPref, useAtendimentoActions } from '@/data/atendimento';
-import { useScripts, useScriptEtapaCounts, traduzErroEnvio, aguardarConfirmacaoEnvio, type Script } from '@/data/scripts';
+import { useScripts, useScriptEtapaCounts, useScriptCategorias, traduzErroEnvio, aguardarConfirmacaoEnvio, type Script } from '@/data/scripts';
+import { useScriptsResumoEtapas } from '../hooks/scriptsResumo';
 import { useJanelaCanal, rotuloJanela } from '@/data/cloudApi';
 import { useSlaAlertas } from '@/data/sla';
 import { indexPorChave, tipoLabel, tempoRelativo } from '@/data/slaView';
@@ -105,7 +106,7 @@ const corDaSituacao = (c: WaContact, texto: string): string | null => {
 const mmss = (s: number | null | undefined) => (s == null ? '' : `${Math.floor(s / 60)}:${('0' + Math.floor(s % 60)).slice(-2)}`);
 const ONDA = [6, 11, 15, 9, 13, 17, 11, 7, 14, 10, 16, 8, 12, 6, 10, 15];
 
-type Pop = { kind: 'filtro' | 'acoes' | 'status' | 'tags'; x: number; y: number } | null;
+type Pop = { kind: 'filtro' | 'acoes' | 'status' | 'tags' | 'scripts'; x: number; y: number; acima?: boolean } | null;
 
 export default function WhatsAppV2() {
   const nav = useNavigate();
@@ -187,6 +188,18 @@ export default function WhatsAppV2() {
   ]), []);
   const scripts = WA_REAL ? (scriptsQ.data ?? []) : scriptsDemo;
   const etapaCounts = useScriptEtapaCounts().data ?? {};
+  const scriptCategorias = useScriptCategorias().data ?? [];
+  const scriptsResumo = useScriptsResumoEtapas().data ?? {};
+  // Todos os scripts do canal, agrupados por categoria (ordem da categoria; "Sem categoria" por
+  // último) — alimenta o seletor compacto do composer sem tirar o atendente da conversa.
+  const scriptsPorCategoria = useMemo(() => {
+    const cats = [...scriptCategorias].sort((a, b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome));
+    const idsValidos = new Set(cats.map((c) => c.id));
+    const grupos = cats.map((c) => ({ id: c.id, nome: c.nome, itens: scripts.filter((s) => s.categoriaId === c.id) }));
+    const soltos = scripts.filter((s) => !s.categoriaId || !idsValidos.has(s.categoriaId));
+    if (soltos.length) grupos.push({ id: '__sem__', nome: 'Sem categoria', itens: soltos });
+    return grupos.filter((g) => g.itens.length > 0);
+  }, [scripts, scriptCategorias]);
   const bloqueados = inbox.bloqueados;
   const canalEhCloud = inbox.canalSel?.transporte === 'cloud_api';
   const janelaQ = useJanelaCanal(WA_REAL && canalEhCloud ? inbox.canalSel?.id ?? null : null, WA_REAL ? current.contatoId ?? null : null, canalEhCloud);
@@ -629,7 +642,15 @@ export default function WhatsAppV2() {
                       {s.favorito ? '★ ' : ''}{s.titulo}
                     </button>
                   ))}
-                  <button type="button" className="rapida" onClick={() => nav('/scripts')} title="Abrir o arsenal de scripts">Todos os scripts…</button>
+                  <button
+                    type="button" className={'rapida rapida-todos' + (pop?.kind === 'scripts' ? ' on' : '')}
+                    title="Ver todos os scripts, por categoria, sem sair da conversa"
+                    onClick={(e) => {
+                      const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                      const x = Math.min(r.left, window.innerWidth - 320);
+                      setPop((p) => (p?.kind === 'scripts' ? null : { kind: 'scripts', x, y: r.top - 6, acima: true }));
+                    }}
+                  >Todos ▾</button>
                 </div>
               )}
 
@@ -889,7 +910,7 @@ export default function WhatsAppV2() {
 
       {/* ===================== POPOVERS (portal) ===================== */}
       {pop && createPortal(
-        <div className="wa-pop" style={{ left: pop.x, top: pop.y }} role={pop.kind === 'acoes' ? 'menu' : undefined}>
+        <div className={'wa-pop' + (pop.kind === 'scripts' ? ' wa-pop-scripts' : '')} style={pop.acima ? { left: pop.x, bottom: window.innerHeight - pop.y } : { left: pop.x, top: pop.y }} role={pop.kind === 'acoes' ? 'menu' : undefined}>
           {pop.kind === 'filtro' && (
             <>
               <div className="ph2">Filtrar por número</div>
@@ -929,6 +950,32 @@ export default function WhatsAppV2() {
                 </button>
               ))}
               {podeGerenciar && <button type="button" className="lk" onClick={() => { setPop(null); nav('/configuracoes?tab=atendimento&section=status'); }}>Gerenciar status…</button>}
+            </>
+          )}
+          {pop.kind === 'scripts' && (
+            <>
+              {scriptsPorCategoria.length === 0 && <div className="vazio">Nenhum script para WhatsApp. Crie no arsenal.</div>}
+              {scriptsPorCategoria.map((g) => (
+                <div key={g.id} className="scr-grupo">
+                  <div className="ph2">{g.nome}</div>
+                  {g.itens.map((s) => {
+                    const r = scriptsResumo[s.id];
+                    const total = r?.total ?? etapaCounts[s.id] ?? (s.conteudo.trim() ? 1 : 0);
+                    const temMidia = r?.temMidia ?? false;
+                    return (
+                      <button
+                        key={s.id} type="button" className="it scr-it"
+                        onClick={() => { setPop(null); if (optout) { aoAvisar({ tom: 'erro', texto: optoutTexto }); return; } setScriptSeq(s); }}
+                      >
+                        <span className="scr-nome">{s.favorito ? '★ ' : ''}{s.titulo}</span>
+                        {temMidia && <span className="scr-tag">mídia</span>}
+                        <span className="scr-cnt">{total} msg{total === 1 ? '' : 's'}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
+              <button type="button" className="lk" onClick={() => { setPop(null); nav('/scripts'); }}>Gerenciar no arsenal…</button>
             </>
           )}
           {pop.kind === 'tags' && (
@@ -1043,9 +1090,26 @@ export default function WhatsAppV2() {
       )}
       <ScriptSequenceModal
         open={!!scriptSeq} script={scriptSeq}
-        canal="whatsapp" conversaId={current.id}
+        canal="whatsapp" conversaId={current.id} incluirMidia
         onClose={() => setScriptSeq(null)}
         ctx={{ cliente: current.name, atendente: user?.name || 'Atendente', emailAtendente: user?.email ?? '', empresa: currentOrg.name, telefone: current.phone }}
+        enviarMidia={async (m) => {
+          // Mesmas travas do composer (o estado pode mudar por realtime com o modal aberto).
+          if (inbox.canalRestrito) throw new Error('O número deste canal está com restrição no WhatsApp e está indisponível para envio. Selecione outro canal.');
+          if (inbox.canalIndisponivel) throw new Error('Este número está desconectado. Reconecte em Integrações para enviar.');
+          if (inbox.semDestino) throw new Error('Vincule um número confirmado para responder.');
+          if (optout) throw new Error(optoutTexto);
+          if (inbox.higieneBloqueia) throw new Error(textoBloqueio(inbox.higiene) ?? 'Atendimento sem responsável ou com cadastro incompleto — assuma e complete o nome para enviar.');
+          if (!m.storagePath) throw new Error('Mídia do script sem arquivo. Reenvie o anexo no arsenal de Scripts.');
+          if (demo) { aoAvisar({ tom: 'ok', texto: 'Mídia enviada' }); return; }
+          // A mídia do script já vive no bucket privado (script-midia); envia pelo mesmo caminho do compositor.
+          const id = await sendMut.mutateAsync({
+            conversaId: current.id, canalId: inbox.replyCanalId || current.canalId,
+            midiaPath: m.storagePath, midiaTipo: m.tipo, midiaMime: m.mime ?? undefined, midiaNome: m.nome ?? undefined, midiaTamanho: m.tamanho ?? undefined,
+            text: m.texto || undefined,
+          });
+          if (id) await aguardarConfirmacaoEnvio(id); // sucesso = confirmação REAL do provedor (igual ao texto)
+        }}
         enviarEtapa={async (texto, retryMensagemId) => {
           // TODAS as travas do composer valem também aqui — o caminho de script não pode furar
           // o que sendMsg bloqueia (o estado pode mudar por realtime com o modal aberto). Espelha

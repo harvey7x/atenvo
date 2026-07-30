@@ -8,7 +8,7 @@ import { removerMensagemFalha } from '@/data/whatsapp';
 type Status = 'pendente' | 'enviando' | 'ok' | 'falha';
 type Confirmado = 'enviada' | 'entregue' | 'lida';
 interface Item { posicao: number; tipo: EtapaTipo; texto: string; faltando: string[]; etapaId?: string; nome?: string | null; mime?: string | null; tamanho?: number | null; storagePath?: string | null; previewUrl?: string; removida?: boolean; mensagemId?: string }
-export interface MidiaEtapa { etapaId: string; tipo: EtapaTipo; texto: string; nome?: string | null; mime?: string | null; tamanho?: number | null }
+export interface MidiaEtapa { etapaId: string; tipo: EtapaTipo; texto: string; nome?: string | null; mime?: string | null; tamanho?: number | null; storagePath?: string | null }
 
 interface Props {
   open: boolean;
@@ -128,7 +128,7 @@ export function ScriptSequenceModal({ open, onClose, script, canal, ctx, convers
       try {
         if (it.tipo !== 'texto') {
           if (!enviarMidia || !it.etapaId) throw new Error('Envio de mídia indisponível neste canal.');
-          await enviarMidia({ etapaId: it.etapaId, tipo: it.tipo, texto: it.texto, nome: it.nome, mime: it.mime, tamanho: it.tamanho });
+          await enviarMidia({ etapaId: it.etapaId, tipo: it.tipo, texto: it.texto, nome: it.nome, mime: it.mime, tamanho: it.tamanho, storagePath: it.storagePath });
           conf[i] = 'enviada';
         } else {
           // retry reaproveita a MESMA mensagem falhada (it.mensagemId) -> sem duplicar no banco
@@ -204,12 +204,12 @@ export function ScriptSequenceModal({ open, onClose, script, canal, ctx, convers
           return (
             <div key={i} style={{ border: '1px solid ' + borda, borderRadius: 10, padding: 10, background: 'var(--surface)', opacity: it.removida ? 0.6 : 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                <strong style={{ fontSize: 13 }}>Mensagem {it.posicao}{it.tipo === 'imagem' ? ' · Imagem' : it.tipo === 'audio' ? ' · Áudio' : ''}</strong>
+                <strong style={{ fontSize: 13 }}>Mensagem {it.posicao}{it.tipo === 'imagem' ? ' · Imagem' : it.tipo === 'audio' ? ' · Áudio' : it.tipo === 'video' ? ' · Vídeo' : it.tipo === 'documento' ? ' · Documento' : ''}</strong>
                 {it.removida ? <span style={{ fontSize: 12, color: 'var(--muted)' }}>Removida deste envio</span> : chip(i)}
               </div>
 
               {it.tipo !== 'texto' && !it.removida && (() => {
-                const rotulo = it.tipo === 'audio' ? 'áudio' : 'imagem';
+                const rotulo = it.tipo === 'audio' ? 'áudio' : it.tipo === 'video' ? 'vídeo' : it.tipo === 'documento' ? 'documento' : 'imagem';
                 const info = (
                   <div style={{ flex: 1, minWidth: 0, fontSize: 12, color: 'var(--ink-2)' }}>
                     <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.nome ?? rotulo}</div>
@@ -217,14 +217,29 @@ export function ScriptSequenceModal({ open, onClose, script, canal, ctx, convers
                     <button type="button" className="atv-btn" style={{ marginTop: 6 }} disabled={enviando || status[i] === 'ok'} onClick={() => removerImagem(i)}>Remover {rotulo} deste envio</button>
                   </div>
                 );
-                return it.tipo === 'imagem' ? (
+                if (it.tipo === 'imagem') return (
                   <div style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
                     {it.previewUrl
                       ? <img src={it.previewUrl} alt={it.nome ?? ''} style={{ width: 96, height: 96, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--line-2)' }} />
                       : <div style={{ width: 96, height: 96, borderRadius: 8, border: '1px solid var(--line-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontSize: 11 }}>sem prévia</div>}
                     {info}
                   </div>
-                ) : (
+                );
+                if (it.tipo === 'video') return (
+                  <div style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
+                    {it.previewUrl
+                      ? <video controls src={it.previewUrl} style={{ width: 140, maxHeight: 120, borderRadius: 8, border: '1px solid var(--line-2)', background: '#000' }} />
+                      : <div style={{ width: 140, height: 96, borderRadius: 8, border: '1px solid var(--line-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontSize: 11 }}>sem prévia</div>}
+                    {info}
+                  </div>
+                );
+                if (it.tipo === 'documento') return (
+                  <div style={{ display: 'flex', gap: 10, marginBottom: 8, alignItems: 'center' }}>
+                    <div style={{ width: 56, height: 56, borderRadius: 8, border: '1px solid var(--line-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontSize: 11, fontWeight: 700, flex: 'none' }}>DOC</div>
+                    {info}
+                  </div>
+                );
+                return (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
                     {it.previewUrl
                       ? <audio controls src={it.previewUrl} style={{ width: '100%', height: 40 }} />
@@ -234,17 +249,17 @@ export function ScriptSequenceModal({ open, onClose, script, canal, ctx, convers
                 );
               })()}
               {it.tipo !== 'texto' && it.removida && (
-                <button type="button" className="atv-btn" style={{ marginBottom: 6 }} disabled={enviando} onClick={() => restaurarImagem(i)}>Restaurar {it.tipo === 'audio' ? 'áudio' : 'imagem'}</button>
+                <button type="button" className="atv-btn" style={{ marginBottom: 6 }} disabled={enviando} onClick={() => restaurarImagem(i)}>Restaurar {it.tipo === 'audio' ? 'áudio' : it.tipo === 'video' ? 'vídeo' : it.tipo === 'documento' ? 'documento' : 'imagem'}</button>
               )}
 
               {!it.removida && falta && it.faltando.length > 0 && (
-                <div style={{ fontSize: 12, color: 'var(--err)', marginBottom: 6 }}>Dados ausentes: {it.faltando.join(', ')}. Edite {it.tipo === 'imagem' ? 'a legenda' : 'a mensagem'} (apenas para este envio) ou remova.</div>
+                <div style={{ fontSize: 12, color: 'var(--err)', marginBottom: 6 }}>Dados ausentes: {it.faltando.join(', ')}. Edite {it.tipo !== 'texto' ? 'a legenda' : 'a mensagem'} (apenas para este envio) ou remova.</div>
               )}
               {status[i] === 'falha' && erros[i] && <div style={{ fontSize: 12, color: 'var(--err)', marginBottom: 6 }}>{erros[i]}</div>}
 
               {!it.removida && (
                 <textarea ref={(el) => { taRefs.current[i] = el; }} className="atv-textarea" value={it.texto} disabled={enviando || status[i] === 'ok'}
-                  placeholder={it.tipo === 'imagem' ? 'Legenda (opcional). Use {{nome_cliente}}…' : 'Mensagem'}
+                  placeholder={it.tipo !== 'texto' ? 'Legenda (opcional). Use {{nome_cliente}}…' : 'Mensagem'}
                   style={falta ? { borderColor: 'var(--err)' } : undefined}
                   onChange={(e) => editar(i, e.target.value)} />
               )}
