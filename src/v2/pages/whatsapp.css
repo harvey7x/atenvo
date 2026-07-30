@@ -257,6 +257,7 @@
 .v2 .wa-aviso b { font-weight: 600; }
 .v2 .wa-aviso .lnk { background: none; border: none; padding: 0; text-decoration: underline; cursor: pointer; font-size: 11px; font-family: var(--fonte); color: inherit; margin-left: auto; }
 .v2 .ag-mini { font-size: 10.5px; color: var(--txt-2); display: flex; gap: 6px; align-items: center; padding: 3px 0; flex-wrap: wrap; }
+.v2 .ag-mini svg { width: 13px; height: 13px; flex: none; }
 .v2 .ag-mini .err { color: var(--rubro); }
 .v2 .ag-mini .lnk { background: none; border: none; padding: 0; color: var(--txt-2); text-decoration: underline; cursor: pointer; font-size: 10.5px; font-family: var(--fonte); }
 .v2 .reply-box { display: flex; gap: 8px; align-items: flex-start; background: rgba(var(--tint), .04); border-left: 2px solid rgba(var(--tint), .3); border-radius: 8px; padding: 6px 9px; margin-bottom: 7px; font-size: 11px; }
