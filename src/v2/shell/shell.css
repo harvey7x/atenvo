@@ -280,17 +280,24 @@
 :root[data-tema="light"] .v2 .item.on { color: var(--txt); }
 :root[data-tema="light"] .v2 .item.on::before { background: var(--accent); box-shadow: none; }
 /* avatares: gradiente escuro → prata clara (iniciais escuras legíveis) */
-:root[data-tema="light"] .v2 .avatar,
-:root[data-tema="light"] .v2 .notif .p-av { background: linear-gradient(150deg, #E4E8ED, #C2C8D1); }
-/* toast PREMIUM no light: vidro translúcido de verdade (pedido do dono — o vidro
-   global do light é carta branca sólida; aqui, e só aqui, o toast flutua com o
-   blur que o .vidro já carrega, agora visível pela translucidez). */
+:root[data-tema="light"] .v2 .avatar { background: linear-gradient(150deg, #E4E8ED, #C2C8D1); }
+/* toast PREMIUM no light: VIDRO ESCURO fosco (pedido do dono — "o mesmo formato do
+   dark"). Vidro branco sobre app branco lê como cartão sólido; a ilha invertida é
+   deliberada: os tokens de tinta/texto/fio são RE-PINADOS dentro do toast para a
+   pele do dark, e o fundo escuro translúcido revela o blur do .vidro. O avatar
+   .p-av mantém o gradiente escuro base (foi tirado da regra prata acima). */
 :root[data-tema="light"] .v2 .notif.vidro {
-  background: linear-gradient(180deg, rgba(255, 255, 255, .78), rgba(250, 251, 253, .62));
-  box-shadow: var(--sombra-2);
+  --tint: 255, 255, 255;
+  --txt: #F4F5F7; --txt-2: #9BA1AB; --txt-3: #868D98;
+  --surface: #17191D; --verde: #4ABE8C;
+  --fio-a: rgba(255, 255, 255, .28); --fio-b: rgba(255, 255, 255, .05);
+  background: linear-gradient(180deg, rgba(30, 33, 40, .72), rgba(14, 16, 20, .82));
+  box-shadow: 0 18px 44px rgba(22, 25, 31, .30);
 }
-/* modo Leve: sem blur, translúcido vira mingau — o toast volta à carta sólida */
-:root[data-perf="lite"][data-tema="light"] .v2 .notif.vidro { background: linear-gradient(180deg, #FFFFFF, #FBFCFD); box-shadow: var(--sombra-2); }
+/* o metal do "Responder" dentro do vidro escuro volta ao branco-metal do dark */
+:root[data-tema="light"] .v2 .notif .bm.claro { background: linear-gradient(180deg, #FFF, #D9DCE1); color: #101215; }
+/* modo Leve: sem blur → mesmo vidro escuro, OPACO (sem recomposição por frame) */
+:root[data-perf="lite"][data-tema="light"] .v2 .notif.vidro { background: linear-gradient(180deg, #22252B, #131519); }
 /* menu do usuário: superfície sólida escura → branca com sombra real */
 /* (par light do .usuario-menu herdado dos tokens --surface/--shadow-pop) */
 /* dots (pulso do sino, minis da sidebar recolhida): branco → accent, borda clara */
