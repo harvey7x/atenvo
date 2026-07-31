@@ -264,8 +264,9 @@ export function useWaConversations() {
     enabled: WA_REAL,
     // PERF: o realtime (abaixo) é a fonte de frescor; este intervalo é só BACKSTOP, como o
     // comentário sempre disse. Antes eram 6s — e como o fetch levava ~3,8s, a requisição mal
-    // terminava antes da próxima começar. 30s + refetch ao focar a aba mantém a inbox fresca.
-    refetchInterval: 30_000,
+    // terminava antes da próxima começar. 60s + refetch ao focar a aba mantém a inbox fresca
+    // (o realtime cobre o tempo-real; este é só a rede de segurança se o canal cair).
+    refetchInterval: 60_000,
     refetchOnWindowFocus: true,
     queryFn: async (): Promise<WaContact[]> => {
       const { data, error } = await supabase!
