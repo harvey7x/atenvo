@@ -17,6 +17,8 @@ export interface WaMessage {
   erro?: string;
   /** tipo da mensagem: texto | imagem | audio | video | documento. */
   tipo?: string;
+  /** cartão de contato compartilhado (metadados.contato) — o v2 desenha o cartão. */
+  contato?: { nome: string; telefone: string } | null;
   /** caminho do anexo no bucket privado (mídia); a URL assinada é gerada sob demanda. */
   anexoPath?: string;
   /** metadados de mídia para renderização. */

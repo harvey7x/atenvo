@@ -58,23 +58,23 @@ export function useEtiquetas() {
   });
 }
 
-export interface OrgUsuario { id: string; nome: string; papel: string }
+export interface OrgUsuario { id: string; nome: string; papel: string; telefone?: string | null }
 /** Usuários ativos da organização (para o seletor de Responsável). */
 export function useOrgUsuarios() {
   const { currentOrg } = useOrg();
   return useQuery({
     queryKey: ['org-usuarios', currentOrg.id],
     queryFn: async (): Promise<OrgUsuario[]> => {
-      if (!WA_REAL || !supabase) return [{ id: 'u-mock', nome: 'Atendente', papel: 'admin' }];
+      if (!WA_REAL || !supabase) return [{ id: 'u-mock', nome: 'Atendente', papel: 'admin', telefone: '5551999990000' }];
       const { data, error } = await supabase
         .from('organizacao_usuarios')
-        .select('papel, usuarios(id, nome)')
+        .select('papel, usuarios(id, nome, telefone)')
         .eq('organizacao_id', currentOrg.id).eq('status', 'ativo');
       if (error) throw new Error(error.message);
-      type Row = { papel: string; usuarios: { id: string; nome: string } | { id: string; nome: string }[] | null };
-      return ((data as unknown as Row[]) ?? []).map((r) => {
+      type Row = { papel: string; usuarios: { id: string; nome: string; telefone?: string | null } | { id: string; nome: string; telefone?: string | null }[] | null };
+      return ((data as unknown as Row[]) ?? []).map((r): OrgUsuario | null => {
         const u = Array.isArray(r.usuarios) ? r.usuarios[0] : r.usuarios;
-        return u ? { id: u.id, nome: u.nome, papel: r.papel } : null;
+        return u ? { id: u.id, nome: u.nome, papel: r.papel, telefone: u.telefone ?? null } : null;
       }).filter((x): x is OrgUsuario => x !== null).sort((a, b) => a.nome.localeCompare(b.nome));
     },
   });

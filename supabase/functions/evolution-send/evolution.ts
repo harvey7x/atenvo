@@ -29,4 +29,7 @@ export const evolution = {
   // `audio` é uma URL temporária (a Evolution baixa o arquivo).
   sendWhatsAppAudio: (instanceName: string, number: string, audio: string, quoted?: unknown) =>
     call(`/message/sendWhatsAppAudio/${instanceName}`, 'POST', { number, audio, encoding: true, ...(quoted ? { quoted } : {}) }) as Promise<{ key?: { id?: string } }>,
+  // Cartão de contato (vCard). Shape Evolution v2: contact[] com fullName/wuid (dígitos)/phoneNumber (+E164).
+  sendContact: (instanceName: string, number: string, contact: Array<{ fullName: string; wuid: string; phoneNumber: string }>) =>
+    call(`/message/sendContact/${instanceName}`, 'POST', { number, contact }) as Promise<{ key?: { id?: string } }>,
 };

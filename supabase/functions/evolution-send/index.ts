@@ -118,7 +118,7 @@ Deno.serve(async (req) => {
     }
     if (!user && !serviceMode) return json({ error: 'Não autenticado.' }, 401);
 
-    const { action, conversa_id, text, canal_id, assinatura_nome, retry_mensagem_id, midia_path, midia_tipo, midia_mime, midia_nome, midia_tamanho, vinc_numero, vinc_jid, audio_diag, origem_audio, ator_id, agendamento_id, reply_to_id, reply_to_id_ext, reply_to_from_me, reply_preview } = await req.json().catch(() => ({}));
+    const { action, conversa_id, text, canal_id, assinatura_nome, retry_mensagem_id, midia_path, midia_tipo, midia_mime, midia_nome, midia_tamanho, vinc_numero, vinc_jid, audio_diag, origem_audio, ator_id, agendamento_id, reply_to_id, reply_to_id_ext, reply_to_from_me, reply_preview, contato_nome, contato_telefone } = await req.json().catch(() => ({}));
     // Resposta a uma mensagem específica (quoted reply). `respostaCols` grava o link local
     // (respondida_a_id); o objeto `quoted` (montado após resolver o destino) vai à Evolution.
     const respostaCols: Record<string, unknown> = (typeof reply_to_id === 'string' && reply_to_id) ? { respondida_a_id: reply_to_id } : {};
@@ -127,8 +127,14 @@ Deno.serve(async (req) => {
     // NUNCA usar user.id direto nos INSERTs — no modo service user é null e estouraria APÓS o envio.
     const autorId: string | null = user?.id ?? (typeof ator_id === 'string' ? ator_id : null);
     const temTexto = !!text?.toString().trim();
+    // Cartão de contato (vCard): nome + telefone com DDI+DDD. Validação dura aqui — o
+    // provider recusaria depois com erro obscuro.
+    const contatoNome = (contato_nome ?? '').toString().trim().slice(0, 120);
+    const contatoTel = digits(contato_telefone) ?? '';
+    const temContato = !!contatoNome && contatoTel.length >= 10;
+    if ((contato_nome || contato_telefone) && !temContato) return json({ error: 'Para compartilhar um contato informe o nome e o número com DDI + DDD (ex.: 5551999990000).' }, 422);
     if (!conversa_id) return json({ error: 'conversa_id é obrigatório.' }, 400);
-    if (!action && (!temTexto && !midia_path && !retry_mensagem_id)) return json({ error: 'conversa_id e conteúdo (texto ou mídia) são obrigatórios.' }, 400);
+    if (!action && (!temTexto && !midia_path && !retry_mensagem_id && !temContato)) return json({ error: 'conversa_id e conteúdo (texto ou mídia) são obrigatórios.' }, 400);
     const corr = (globalThis.crypto?.randomUUID?.() ?? String(Date.now())).slice(0, 8);
 
     // Guard de troca de senha obrigatória (só no fluxo de usuário; o cron não tem usuário).
@@ -311,6 +317,66 @@ Deno.serve(async (req) => {
     const quoted = (typeof reply_to_id_ext === 'string' && reply_to_id_ext)
       ? { key: { id: reply_to_id_ext, remoteJid: `${alvo}@s.whatsapp.net`, fromMe: !!reply_to_from_me }, message: { conversation: (replyPrev?.texto ?? '').toString().slice(0, 300) } }
       : undefined;
+
+    // ===== CARTÃO DE CONTATO (vCard) — o atendente compartilha um contato na conversa. =====
+    // Sem migration (precedente do quoted): persiste como tipo 'texto' com metadados.contato —
+    // o v2 desenha o cartão; v1/relatórios/preview leem o texto "📇 Nome · +55…". O retry de um
+    // cartão falhado re-roteia para cá (metadados.contato), nunca sai como texto cru.
+    const retryContato = retryMsg ? ((retryMsg.metadados ?? {}) as { contato?: { nome?: string; telefone?: string } }).contato : undefined;
+    if (temContato || (retryContato?.nome && retryContato?.telefone)) {
+      const nomeCt = temContato ? contatoNome : String(retryContato!.nome).slice(0, 120);
+      const telCt = temContato ? contatoTel : (digits(retryContato!.telefone) ?? '');
+      if (!nomeCt || telCt.length < 10) return json({ error: 'Contato inválido para reenvio.' }, 422);
+      const conteudoCartao = `📇 ${nomeCt} · +${telCt}`;
+      const metaContato = { contato: { nome: nomeCt, telefone: telCt }, ...(agendamento_id ? { agendamento_id } : {}) };
+      const nowIso = new Date().toISOString();
+      let sent: { key?: { id?: string } };
+      try {
+        sent = await tx.sendContact(alvo, nomeCt, telCt);
+      } catch (err) {
+        const emsg = (err as Error).message || 'Falha ao enviar o contato.';
+        console.error(`[send] corr=${corr} CONTATO erro provider:`, emsg);
+        if (retryMsg) await admin.from('mensagens').update({ status: 'falhou', erro_envio: emsg.slice(0, 200) }).eq('id', retryMsg.id);
+        else await admin.from('mensagens').insert({
+          conversa_id, organizacao_id: conv.organizacao_id, direcao: 'saida', tipo: 'texto',
+          conteudo: conteudoCartao, origem: 'atenvo', autor_id: autorId,
+          status: 'falhou', erro_envio: emsg.slice(0, 200), metadados: metaContato,
+        });
+        return json({ error: 'O WhatsApp não confirmou o envio do contato. Tente novamente.' }, 502);
+      }
+      const idExternoCt = sent?.key?.id ?? null;
+      if (!idExternoCt) {
+        if (retryMsg) await admin.from('mensagens').update({ status: 'falhou', erro_envio: 'sem_id_externo' }).eq('id', retryMsg.id);
+        else await admin.from('mensagens').insert({
+          conversa_id, organizacao_id: conv.organizacao_id, direcao: 'saida', tipo: 'texto',
+          conteudo: conteudoCartao, origem: 'atenvo', autor_id: autorId,
+          status: 'falhou', erro_envio: 'sem_id_externo', metadados: metaContato,
+        });
+        console.log(`[send] corr=${corr} CONTATO sem id_externo -> falhou`);
+        return json({ error: 'O envio do contato não foi confirmado.' }, 502);
+      }
+      let msgCt;
+      if (retryMsg) {
+        const { data } = await admin.from('mensagens').update({
+          status: 'enviada', id_externo: idExternoCt, erro_envio: null, enviada_em: nowIso,
+        }).eq('id', retryMsg.id).select('id, conteudo, enviada_em, direcao, status').single();
+        msgCt = data;
+      } else {
+        const { data } = await admin.from('mensagens').insert({
+          conversa_id, organizacao_id: conv.organizacao_id, direcao: 'saida', tipo: 'texto',
+          conteudo: conteudoCartao, origem: 'atenvo', autor_id: autorId,
+          id_externo: idExternoCt, status: 'enviada', enviada_em: nowIso, metadados: metaContato,
+        }).select('id, conteudo, enviada_em, direcao, status').single();
+        msgCt = data;
+      }
+      await admin.from('conversas').update({
+        ultima_interacao_em: nowIso,
+        ultimo_canal_id: canal.id, ultimo_numero: canal.numero_conectado ?? null,
+        ultimo_provider: canal.provider ?? 'whatsapp', ultima_msg_canal_em: nowIso,
+      }).eq('id', conversa_id);
+      console.log(`[send] corr=${corr} CONTATO ok id=${String(idExternoCt).slice(0, 12)}`);
+      return json({ ok: true, mensagem: msgCt });
+    }
 
     // ===== MÍDIA (IMAGEM, ÁUDIO e DOCUMENTO). Retry herda o tipo/arquivo da mensagem original. =====
     const ehMidiaRetry = !!retryMsg && !!retryMsg.tipo && retryMsg.tipo !== 'texto';

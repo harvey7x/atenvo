@@ -30,6 +30,8 @@ export interface Enviador {
   /** Fora da janela de 24h a Meta SÓ aceita template. Na Evolution isso não existe — lá qualquer
    *  texto sai a qualquer hora — então o adaptador Evolution lança em vez de fingir que enviou. */
   sendTemplate(numero: string, tpl: TemplateEnvio): Promise<Enviado>;
+  /** Cartão de contato (vCard) — o cliente recebe como contato nativo do WhatsApp. */
+  sendContact(numero: string, nome: string, telefone: string): Promise<Enviado>;
 }
 
 export function ehCloudApi(canal: CanalEnvio): boolean {
@@ -129,6 +131,19 @@ function enviadorCloud(phoneNumberId: string): Enviador {
         type: 'audio', audio: fonte, ...contextoDe(quoted),
       }));
     },
+    async sendContact(numero, nome, telefone) {
+      guard();
+      // Cloud API: type 'contacts'. wa_id faz o cartão chegar com botão "Conversar" quando o
+      // número tem WhatsApp; phone em +E164 é o que aparece para salvar na agenda.
+      return comoEvolution(await graph(`${phoneNumberId}/messages`, {
+        messaging_product: 'whatsapp', recipient_type: 'individual', to: numero,
+        type: 'contacts',
+        contacts: [{
+          name: { formatted_name: nome, first_name: nome.split(' ')[0] || nome },
+          phones: [{ phone: `+${telefone}`, type: 'CELL', wa_id: telefone }],
+        }],
+      }));
+    },
     async sendTemplate(numero, tpl) {
       guard();
       // O `components` só vai quando há variável: template sem {{n}} recebendo um BODY com
@@ -154,6 +169,8 @@ function enviadorEvolution(instancia: string): Enviador {
     sendMedia: (numero, mediatype, mimetype, media, fileName, caption, quoted) =>
       evolution.sendMedia(instancia, numero, mediatype, mimetype, media, fileName ?? '', caption, quoted),
     sendWhatsAppAudio: (numero, audio, quoted) => evolution.sendWhatsAppAudio(instancia, numero, audio, quoted),
+    sendContact: (numero, nome, telefone) =>
+      evolution.sendContact(instancia, numero, [{ fullName: nome, wuid: telefone, phoneNumber: `+${telefone}` }]),
     // Não existe template no Baileys. Lançar é melhor que enviar o corpo como texto solto: o
     // template tem cara de mensagem aprovada e mandá-lo cru mudaria o que o cliente lê.
     sendTemplate: () => { throw new Error('Template só existe na API oficial (Cloud API).'); },

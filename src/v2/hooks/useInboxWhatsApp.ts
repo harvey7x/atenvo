@@ -344,6 +344,20 @@ export function useInboxWhatsApp(opts: {
     setReplyTo(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentId, replyCanalId, current.canalId, currentOrg.id, replyTo, higieneBloqueia, higiene.motivoBloqueio, optout]);
+  /** Cartão de contato (vCard): o cliente recebe como contato nativo. Mesmos guards da mídia;
+   *  otimista na bolha (texto fallback "📇 …" + metadados de cartão) e envio nativo no backend. */
+  const enviarContato = useCallback(async (nome: string, telefone: string) => {
+    guardaMidia();
+    const tel = telefone.replace(/\D+/g, '');
+    if (!nome.trim() || tel.length < 10) throw new Error('Informe o nome e o número com DDI + DDD.');
+    const now = new Date();
+    const hh = ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
+    const cid = novoCid(now.getTime());
+    setContacts((cur) => aplicarEnvioOtimista(cur, currentId, { dir: 'out', text: `📇 ${nome.trim()} · +${tel}`, time: hh, status: 'pendente', cid, contato: { nome: nome.trim(), telefone: tel } }, `📇 ${nome.trim()}`));
+    if (!WA_REAL) { aoAvisar({ tom: 'ok', texto: 'Contato compartilhado' }); return; }
+    await sendMut.mutateAsync({ conversaId: currentId, canalId: replyCanalId || current.canalId, contato: { nome: nome.trim(), telefone: tel } });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentId, replyCanalId, current.canalId, higieneBloqueia, higiene.motivoBloqueio, optout]);
 
   /* ---------- atribuição (v1 L806-867) — otimista com rollback ---------- */
   const [atribuindo, setAtribuindo] = useState(false);
@@ -444,7 +458,7 @@ export function useInboxWhatsApp(opts: {
     higiene, higieneBloqueia, decNome, donoEfetivo, bloquearPorHigiene, adiarNome, nomeNaoInformado, adiando: adiarMut.isPending,
     replyTo, setReplyTo,
     sendMsg, retryMsg, removerFalha, retryId, removendoId,
-    enviarImagem, enviarVideo, enviarAudio, enviarDocumento,
+    enviarImagem, enviarVideo, enviarAudio, enviarDocumento, enviarContato,
     atribuindo, assumir, devolver, transferir,
     marcarLida, arquivar, aplicarEdicaoLocal, iniciarNovaConversa,
   };

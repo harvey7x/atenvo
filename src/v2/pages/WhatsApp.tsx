@@ -68,6 +68,7 @@ const IcDoc = () => <Ic><path d="M13 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0
 const IcDownload = () => <Ic><path d="M12 3v12" /><path d="m7 11 5 5 5-5" /><path d="M5 21h14" /></Ic>;
 const IcClock = () => <Ic><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></Ic>;
 const IcSend = () => <Ic><path d="M4 12l16-8-6 16-2.5-6.5z" /></Ic>;
+const IcContato = () => <Ic><circle cx="10" cy="8" r="3.2" /><path d="M4.5 19.5c.7-3 2.8-4.6 5.5-4.6s4.8 1.6 5.5 4.6" /><path d="M17.5 7.5h4.5" /><path d="M19.75 5.25v4.5" /></Ic>;
 const IcTel = () => <Ic><path d="M5 4h4l2 5-2.5 1.5a12 12 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2" /></Ic>;
 const IcCopy = () => <Ic><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></Ic>;
 const IcReply = () => <Ic><path d="M9 14 4 9l5-5" /><path d="M4 9h11a5 5 0 0 1 5 5v6" /></Ic>;
@@ -169,6 +170,7 @@ export default function WhatsAppV2() {
   const [imgModal, setImgModal] = useState(false);
   const [videoModal, setVideoModal] = useState(false);
   const [docModal, setDocModal] = useState(false);
+  const [ctModal, setCtModal] = useState(false);
   const [agendarAberto, setAgendarAberto] = useState(false);
   const [agEditId, setAgEditId] = useState<string | null>(null);
   const [scriptSeq, setScriptSeq] = useState<Script | null>(null);
@@ -829,6 +831,7 @@ export default function WhatsAppV2() {
                   <button type="button" className="tool" title="Enviar vídeo" disabled={midiaDisabled} onClick={() => setVideoModal(true)}><IcVideo /></button>
                   <AudioRecorderV2 disabled={midiaDisabled} onEnviar={inbox.enviarAudio} permitirArquivo />
                   <button type="button" className="tool" title="Enviar documento" disabled={midiaDisabled} onClick={() => setDocModal(true)}><IcDoc /></button>
+                  <button type="button" className="tool" title="Compartilhar contato" disabled={midiaDisabled} onClick={() => setCtModal(true)}><IcContato /></button>
                   <button type="button" className="tool" title="Agendar mensagem" disabled={agendarDisabled} onClick={() => { setAgEditId(null); setAgendarAberto(true); }}><IcClock /></button>
                 </div>
                 <button type="button" className="env-b" title="Enviar" disabled={sendDisabled} onClick={enviar}><IcSend /></button>
@@ -1161,6 +1164,20 @@ export default function WhatsAppV2() {
         onClose={() => setDocModal(false)}
         enviar={async (file, caption) => { await inbox.enviarDocumento(file, caption); setDocModal(false); }}
       />
+      {ctModal && (
+        <CompartilharContatoModal
+          equipe={(usuariosQ.data ?? []).filter((u) => !!(u.telefone ?? '').replace(/\D+/g, '')).map((u) => ({ nome: u.nome, telefone: (u.telefone ?? '').replace(/\D+/g, '') }))}
+          conversas={contacts
+            .filter((c) => !!c.phone && c.id !== currentId)
+            .map((c) => ({ nome: nomeExibicao(c), telefone: (c.phone ?? '').replace(/\D+/g, '') }))
+            .filter((c, i, arr) => c.telefone.length >= 10 && arr.findIndex((x) => x.telefone === c.telefone) === i)}
+          aoFechar={() => setCtModal(false)}
+          aoEnviar={async (nome, telefone) => {
+            try { await inbox.enviarContato(nome, telefone); setCtModal(false); if (!demo) aoAvisar({ tom: 'ok', texto: 'Contato compartilhado.' }); }
+            catch (e) { aoAvisar({ tom: 'erro', texto: (e as Error)?.message || 'Falha ao compartilhar o contato.' }); }
+          }}
+        />
+      )}
       {agendarAberto && (
         <AgendarMensagemModalV2
           aberto modo={agEditId ? 'editar' : 'criar'} demo={demo}
@@ -1345,7 +1362,17 @@ function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, optout,
       {m.pdf && (
         <div className="doc2"><span className="ic"><IcDoc /></span><span className="inf"><span className="nm">{m.pdf.name}</span><span className="mt">{m.pdf.meta}</span></span></div>
       )}
-      {(m.tipo === 'texto' || (!m.tipo && m.text)) && m.text && <WaTexto texto={m.text} />}
+      {/* cartão de contato compartilhado: desenha o cartão (o texto "📇 …" é só fallback) */}
+      {m.contato && (
+        <div className="ct-card">
+          <span className="ct-av" aria-hidden>{initials(m.contato.nome)}</span>
+          <span className="ct-inf">
+            <span className="ct-nm">{m.contato.nome}</span>
+            <span className="ct-tel num">+{m.contato.telefone}</span>
+          </span>
+        </div>
+      )}
+      {(m.tipo === 'texto' || (!m.tipo && m.text)) && m.text && !m.contato && <WaTexto texto={m.text} />}
       {m.transcricao && <div className="transc">“{m.transcricao}”</div>}
       {falhaActs}
       <div className="hh num">
@@ -1681,6 +1708,79 @@ function VincularModal({ telInicial, conversaId, canalId, demo, aoFechar, aoVinc
           <button type="button" className="kb-link" onClick={() => setValidado(null)}>Corrigir número</button>
         </p>
       )}
+    </ModalV2>
+  );
+}
+
+/* ================================================================
+   Compartilhar contato (vCard) — picker do composer. Fontes: EQUIPE
+   (usuarios.telefone, preenchido em Configurações › Perfil), CONVERSAS
+   já carregadas no inbox, e número avulso digitado na hora. O envio é
+   nativo nos dois transportes (Evolution sendContact / Cloud contacts).
+   ================================================================ */
+function CompartilharContatoModal({ equipe, conversas, aoFechar, aoEnviar }: {
+  equipe: { nome: string; telefone: string }[];
+  conversas: { nome: string; telefone: string }[];
+  aoFechar: () => void;
+  aoEnviar: (nome: string, telefone: string) => Promise<void>;
+}) {
+  const [busca, setBusca] = useState('');
+  const [nomeAvulso, setNomeAvulso] = useState('');
+  const [telAvulso, setTelAvulso] = useState('');
+  const [busy, setBusy] = useState(false);
+  const q = busca.trim().toLowerCase();
+  const filtra = (l: { nome: string; telefone: string }[]) =>
+    q ? l.filter((x) => x.nome.toLowerCase().includes(q) || (q.replace(/\D+/g, '') && x.telefone.includes(q.replace(/\D+/g, '')))) : l;
+  const eq = filtra(equipe);
+  const cv = filtra(conversas).slice(0, 30);
+  const telAvulsoDig = telAvulso.replace(/\D+/g, '');
+  const avulsoOk = nomeAvulso.trim().length > 1 && telAvulsoDig.length >= 10;
+  const enviar = async (nome: string, telefone: string) => {
+    if (busy) return;
+    setBusy(true);
+    try { await aoEnviar(nome, telefone); } finally { setBusy(false); }
+  };
+  return (
+    <ModalV2
+      aberto
+      aoFechar={() => { if (!busy) aoFechar(); }}
+      titulo="Compartilhar contato"
+      largura={460}
+      rodape={<>
+        <BotaoSec mini disabled={busy} onClick={aoFechar}>Voltar</BotaoSec>
+        <BotaoPrimario mini disabled={!avulsoOk || busy} onClick={() => enviar(nomeAvulso.trim(), telAvulsoDig)}>
+          {busy ? 'Enviando…' : 'Enviar contato'}
+        </BotaoPrimario>
+      </>}
+    >
+      <p className="p-modal-msg">O cliente recebe como cartão de contato nativo do WhatsApp, pronto para salvar.</p>
+      <input className="inp" placeholder="Buscar por nome ou número…" value={busca} onChange={(e) => setBusca(e.target.value)} />
+      <div className="ctp-lista">
+        {eq.length > 0 && <div className="ctp-sec">Equipe</div>}
+        {eq.map((u) => (
+          <div className="ctp-item" key={'e' + u.telefone}>
+            <span className="ct-av" aria-hidden>{initials(u.nome)}</span>
+            <span className="ct-inf"><span className="ct-nm">{u.nome}</span><span className="ct-tel num">+{u.telefone}</span></span>
+            <BotaoMini disabled={busy} onClick={() => enviar(u.nome, u.telefone)}>Enviar</BotaoMini>
+          </div>
+        ))}
+        {equipe.length === 0 && (
+          <div className="ctp-vazio">Nenhum atendente com telefone cadastrado — cada um pode preencher o seu em Configurações › Perfil.</div>
+        )}
+        {cv.length > 0 && <div className="ctp-sec">Conversas</div>}
+        {cv.map((c) => (
+          <div className="ctp-item" key={'c' + c.telefone}>
+            <span className="ct-av" aria-hidden>{initials(c.nome)}</span>
+            <span className="ct-inf"><span className="ct-nm">{c.nome}</span><span className="ct-tel num">+{c.telefone}</span></span>
+            <BotaoMini disabled={busy} onClick={() => enviar(c.nome, c.telefone)}>Enviar</BotaoMini>
+          </div>
+        ))}
+      </div>
+      <div className="ctp-sec">Ou digite um contato</div>
+      <div className="ctp-avulso">
+        <input className="inp" placeholder="Nome" value={nomeAvulso} maxLength={120} onChange={(e) => setNomeAvulso(e.target.value)} />
+        <input className="inp num" placeholder="DDI + DDD + número (ex.: 5551999990000)" value={telAvulso} onChange={(e) => setTelAvulso(e.target.value)} />
+      </div>
     </ModalV2>
   );
 }

@@ -91,7 +91,7 @@ const STATUS_LABEL: Record<string, string> = {
   aberta: 'Aberta', em_atendimento: 'Em atendimento', pendente: 'Pendente', resolvida: 'Resolvida', fechada: 'Fechada',
 };
 
-interface DbMsg { id: string; direcao: string; conteudo: string | null; tipo: string; enviada_em: string | null; recebida_em: string | null; criado_em: string | null; origem: string | null; status: string | null; erro_envio: string | null; id_externo?: string | null; respondida_a_id?: string | null; metadados: { anexo_path?: string; mime?: string; tamanho?: number; nome?: string; midia_pendente?: boolean; seconds?: number | null; ptt?: boolean; quoted?: { remetente?: string; tipo?: string; texto?: string } } | null; }
+interface DbMsg { id: string; direcao: string; conteudo: string | null; tipo: string; enviada_em: string | null; recebida_em: string | null; criado_em: string | null; origem: string | null; status: string | null; erro_envio: string | null; id_externo?: string | null; respondida_a_id?: string | null; metadados: { anexo_path?: string; mime?: string; tamanho?: number; nome?: string; midia_pendente?: boolean; seconds?: number | null; ptt?: boolean; quoted?: { remetente?: string; tipo?: string; texto?: string }; contato?: { nome?: string; telefone?: string } } | null; }
 const TIPOS_MIDIA = ['imagem', 'audio', 'video', 'documento'];
 interface DbConv {
   id: string; status: string; status_id: string | null; nao_lidas: number | null; ultima_interacao_em: string | null; criado_em: string | null;
@@ -140,6 +140,10 @@ export function mapMensagens(rows: DbMsg[]): WaMessage[] {
       idExterno: m.id_externo ?? undefined,
       respondidaAId: m.respondida_a_id ?? undefined,
       quoted: m.metadados?.quoted && (m.metadados.quoted.texto || m.metadados.quoted.tipo) ? m.metadados.quoted : undefined,
+      // cartão de contato compartilhado: o v2 desenha o cartão; o conteudo textual é o fallback
+      contato: (m.metadados?.contato?.nome && m.metadados?.contato?.telefone)
+        ? { nome: String(m.metadados.contato.nome), telefone: String(m.metadados.contato.telefone) }
+        : undefined,
     } as WaMessage));
 }
 
@@ -391,9 +395,10 @@ export function useSendWaMessage() {
     // #4 assinatura aplicada no backend (evolution-send): passamos só o nome resolvido.
     // canalId = canal escolhido em "Responder por". O backend nunca confia em org vinda do cliente.
     // Retorna o id INTERNO da mensagem (para confirmação real do provedor). NÃO é garantia de entrega.
-    mutationFn: async (input: { conversaId: string; text?: string; canalId?: string | null; assinaturaNome?: string; retryMensagemId?: string; midiaPath?: string; midiaTipo?: string; midiaMime?: string; midiaNome?: string; midiaTamanho?: number; audioDiag?: Record<string, unknown>; origemAudio?: string; replyTo?: { id: string; idExt?: string; fromMe?: boolean; preview?: { remetente?: string; tipo?: string; texto?: string } } }) => {
+    mutationFn: async (input: { conversaId: string; text?: string; canalId?: string | null; assinaturaNome?: string; retryMensagemId?: string; midiaPath?: string; midiaTipo?: string; midiaMime?: string; midiaNome?: string; midiaTamanho?: number; audioDiag?: Record<string, unknown>; origemAudio?: string; replyTo?: { id: string; idExt?: string; fromMe?: boolean; preview?: { remetente?: string; tipo?: string; texto?: string } }; contato?: { nome: string; telefone: string } }) => {
       const r = await invoke<{ ok: boolean; mensagem?: { id?: string } }>('evolution-send', {
         conversa_id: input.conversaId,
+        ...(input.contato ? { contato_nome: input.contato.nome, contato_telefone: input.contato.telefone } : {}),
         ...(input.text ? { text: input.text } : {}),
         ...(input.canalId ? { canal_id: input.canalId } : {}),
         ...(input.assinaturaNome ? { assinatura_nome: input.assinaturaNome } : {}),
