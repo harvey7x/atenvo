@@ -381,6 +381,13 @@ export function useKanban() {
     const { error } = await supabase!.from('oportunidades').update(patch).eq('id', input.id).eq('organizacao_id', org);
     if (error) throw new Error(error.message);
     invalida();
+    // Trocar o responsável no card volta para contatos.responsavel_id (trigger reverso) e
+    // re-espalha para conversa/ficha/cobrança/agenda. Invalida as telas que não ouvem o Kanban.
+    if (input.responsavelId !== undefined) {
+      qc.invalidateQueries({ queryKey: ['contatos', org] });
+      qc.invalidateQueries({ queryKey: ['opp-do-contato', org] });
+      qc.invalidateQueries({ queryKey: ['wa-conversas', org] });
+    }
   }
   /** Reordena as colunas do funil. Recebe os ids na ORDEM DESEJADA e delega para a RPC
    *  reordenar_colunas_funil, que renumera tudo numa transação só — N updates soltos deixariam o

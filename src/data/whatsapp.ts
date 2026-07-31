@@ -424,10 +424,12 @@ export function useAtribuirAtendimento() {
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ['wa-conversas', currentOrg.id] });
       qc.invalidateQueries({ queryKey: ['wa-atividades'] });
-      // Responsável é sincronizado no backend (trigger) para conversas + oportunidades.
-      // Invalida o Kanban para o card refletir o novo responsável imediatamente.
+      // Responsável é sincronizado no backend (trigger) para conversas + oportunidades +
+      // ficha do contato + cobranças + agendamentos. Invalida cada superfície para refletir
+      // o novo dono imediatamente (a página Contatos não tem realtime próprio).
       qc.invalidateQueries({ queryKey: ['kanban-leads', currentOrg.id] });
       qc.invalidateQueries({ queryKey: ['opp-do-contato', currentOrg.id] });
+      qc.invalidateQueries({ queryKey: ['contatos', currentOrg.id] });
     },
   });
 }
