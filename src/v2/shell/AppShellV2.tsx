@@ -98,6 +98,18 @@ export default function AppShellV2() {
 
   useEffect(() => instalarSpotlight(), []);
 
+  /* Trava o scroll da JANELA sob o shell (bug do dono: deep-links conversa↔kanban
+     disparavam scrollIntoView que rolava o body — topbar sumia, o toast de
+     notificação aparecia cortado e sobrava faixa branca embaixo). O app é um
+     layout fixo de 100vh; a janela nunca deve rolar. */
+  useEffect(() => {
+    const html = document.documentElement, body = document.body;
+    const prev = [html.style.overflow, body.style.overflow] as const;
+    html.style.overflow = 'hidden'; body.style.overflow = 'hidden';
+    window.scrollTo(0, 0);
+    return () => { html.style.overflow = prev[0]; body.style.overflow = prev[1]; };
+  }, []);
+
   const [notif, setNotif] = useState<(DadosNotificacao & { conversaId?: string }) | null>(null);
   const [sinoOn, setSinoOn] = useState(false);
   const [badgePop, setBadgePop] = useState(0);
