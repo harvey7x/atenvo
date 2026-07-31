@@ -63,6 +63,7 @@ const IcMais = () => <Ic><path d="M12 5v14M5 12h14" /></Ic>;
 const IcFunil = () => <Ic><path d="M3 5h18l-7 8v5l-4 2v-7z" /></Ic>;
 const IcDots = () => <Ic fill><circle cx="12" cy="5" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="12" cy="19" r="1.5" /></Ic>;
 const IcImg = () => <Ic><rect x="3" y="4" width="18" height="16" rx="2.5" /><circle cx="9" cy="10" r="1.6" /><path d="m5 18 5-5 3 3 3-3 3 3" /></Ic>;
+const IcVideo = () => <Ic><rect x="3" y="6" width="13" height="12" rx="2.5" /><path d="m16 10 5-3v10l-5-3z" /></Ic>;
 const IcDoc = () => <Ic><path d="M13 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9z" /><path d="M13 3v6h6" /></Ic>;
 const IcDownload = () => <Ic><path d="M12 3v12" /><path d="m7 11 5 5 5-5" /><path d="M5 21h14" /></Ic>;
 const IcClock = () => <Ic><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></Ic>;
@@ -166,6 +167,7 @@ export default function WhatsAppV2() {
   const [verErro, setVerErro] = useState<string | null>(null);
   const [removerAlvo, setRemoverAlvo] = useState<WaMessage | null>(null);
   const [imgModal, setImgModal] = useState(false);
+  const [videoModal, setVideoModal] = useState(false);
   const [docModal, setDocModal] = useState(false);
   const [agendarAberto, setAgendarAberto] = useState(false);
   const [agEditId, setAgEditId] = useState<string | null>(null);
@@ -824,6 +826,7 @@ export default function WhatsAppV2() {
                 />
                 <div className="tools">
                   <button type="button" className="tool" title="Enviar imagem" disabled={midiaDisabled} onClick={() => setImgModal(true)}><IcImg /></button>
+                  <button type="button" className="tool" title="Enviar vídeo" disabled={midiaDisabled} onClick={() => setVideoModal(true)}><IcVideo /></button>
                   <AudioRecorderV2 disabled={midiaDisabled} onEnviar={inbox.enviarAudio} permitirArquivo />
                   <button type="button" className="tool" title="Enviar documento" disabled={midiaDisabled} onClick={() => setDocModal(true)}><IcDoc /></button>
                   <button type="button" className="tool" title="Agendar mensagem" disabled={agendarDisabled} onClick={() => { setAgEditId(null); setAgendarAberto(true); }}><IcClock /></button>
@@ -1147,6 +1150,11 @@ export default function WhatsAppV2() {
         open={imgModal} tipo="imagem" previewCard
         onClose={() => setImgModal(false)}
         enviar={async (file, caption) => { await inbox.enviarImagem(file, caption); setImgModal(false); }}
+      />
+      <MediaComposer
+        open={videoModal} tipo="video"
+        onClose={() => setVideoModal(false)}
+        enviar={async (file, caption) => { await inbox.enviarVideo(file, caption); setVideoModal(false); }}
       />
       <MediaComposer
         open={docModal} tipo="documento"

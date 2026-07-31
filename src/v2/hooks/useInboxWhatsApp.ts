@@ -317,6 +317,14 @@ export function useInboxWhatsApp(opts: {
     setReplyTo(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentId, replyCanalId, current.canalId, currentOrg.id, replyTo, higieneBloqueia, higiene.motivoBloqueio, optout]);
+  const enviarVideo = useCallback(async (file: File, caption: string) => {
+    guardaMidia();
+    if (!WA_REAL) { aoAvisar({ tom: 'ok', texto: 'Mensagem enviada' }); return; }
+    const up = await subirMidiaWa(currentOrg.id, file);
+    await sendMut.mutateAsync({ conversaId: currentId, canalId: replyCanalId || current.canalId, midiaPath: up.path, midiaTipo: 'video', midiaMime: up.mime, midiaNome: up.nome, midiaTamanho: up.tamanho, text: caption || undefined, replyTo: replyPayload() });
+    setReplyTo(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentId, replyCanalId, current.canalId, currentOrg.id, replyTo, higieneBloqueia, higiene.motivoBloqueio, optout]);
   const enviarAudio = useCallback(async (blob: Blob, mime: string, ext: string, diag?: Record<string, unknown>) => {
     guardaMidia();
     if (!blob || !blob.size) throw new Error('Áudio vazio. Grave novamente.');   // tolera blob nulo (v1 L760)
@@ -436,7 +444,7 @@ export function useInboxWhatsApp(opts: {
     higiene, higieneBloqueia, decNome, donoEfetivo, bloquearPorHigiene, adiarNome, nomeNaoInformado, adiando: adiarMut.isPending,
     replyTo, setReplyTo,
     sendMsg, retryMsg, removerFalha, retryId, removendoId,
-    enviarImagem, enviarAudio, enviarDocumento,
+    enviarImagem, enviarVideo, enviarAudio, enviarDocumento,
     atribuindo, assumir, devolver, transferir,
     marcarLida, arquivar, aplicarEdicaoLocal, iniciarNovaConversa,
   };
