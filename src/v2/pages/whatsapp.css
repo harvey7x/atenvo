@@ -197,7 +197,7 @@
 
 /* mídia */
 .v2 .bolha .m-media { position: relative; display: inline-block; line-height: 0; }
-.v2 .bolha .m-img { max-width: 260px; max-height: 240px; border-radius: 9px; display: block; cursor: pointer; }
+.v2 .bolha .m-img { display: block; width: 240px; max-width: 100%; max-height: 300px; object-fit: cover; object-position: center; border-radius: 10px; cursor: pointer; }
 .v2 .bolha .m-video { max-width: 280px; border-radius: 9px; display: block; }
 .v2 .bolha .m-cap { margin-top: 5px; }
 /* botão de baixar mídia — sobreposto (imagem/vídeo) ou inline (áudio) */
