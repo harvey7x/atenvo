@@ -282,6 +282,15 @@
 /* avatares: gradiente escuro → prata clara (iniciais escuras legíveis) */
 :root[data-tema="light"] .v2 .avatar,
 :root[data-tema="light"] .v2 .notif .p-av { background: linear-gradient(150deg, #E4E8ED, #C2C8D1); }
+/* toast PREMIUM no light: vidro translúcido de verdade (pedido do dono — o vidro
+   global do light é carta branca sólida; aqui, e só aqui, o toast flutua com o
+   blur que o .vidro já carrega, agora visível pela translucidez). */
+:root[data-tema="light"] .v2 .notif.vidro {
+  background: linear-gradient(180deg, rgba(255, 255, 255, .78), rgba(250, 251, 253, .62));
+  box-shadow: var(--sombra-2);
+}
+/* modo Leve: sem blur, translúcido vira mingau — o toast volta à carta sólida */
+:root[data-perf="lite"][data-tema="light"] .v2 .notif.vidro { background: linear-gradient(180deg, #FFFFFF, #FBFCFD); box-shadow: var(--sombra-2); }
 /* menu do usuário: superfície sólida escura → branca com sombra real */
 /* (par light do .usuario-menu herdado dos tokens --surface/--shadow-pop) */
 /* dots (pulso do sino, minis da sidebar recolhida): branco → accent, borda clara */
