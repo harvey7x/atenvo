@@ -162,8 +162,6 @@ export function Disparo() {
   const [previa, setPrevia] = useState<ResultadoProcessar | null>(null);
   const [confDisparo, setConfDisparo] = useState(false);
   const [confEncerrar, setConfEncerrar] = useState(false);
-  // Modo teste: ignora a janela seg–sáb 09–18 SÓ para lote ≤ 3 (o servidor impõe o cap).
-  const [modoTeste, setModoTeste] = useState(false);
   const [resultado, setResultado] = useState<ResultadoProcessar | null>(null);
   const [criandoCampanha, setCriandoCampanha] = useState(false);
 
@@ -197,17 +195,16 @@ export function Disparo() {
     } catch (e) { erro((e as Error).message); }
   };
 
-  const loteEfetivo = modoTeste ? Math.min(lote, 3) : lote;
   const simular = async () => {
     if (!campanha) return;
-    try { setPrevia(await processar.mutateAsync({ campanha_id: campanha.id, lote: loteEfetivo, dry_run: true })); }
+    try { setPrevia(await processar.mutateAsync({ campanha_id: campanha.id, lote, dry_run: true })); }
     catch (e) { erro((e as Error).message); }
   };
   const disparar = async () => {
     if (!campanha) return;
     setConfDisparo(false);
     try {
-      const r = await processar.mutateAsync({ campanha_id: campanha.id, lote: loteEfetivo, dry_run: false, forcar_janela: modoTeste });
+      const r = await processar.mutateAsync({ campanha_id: campanha.id, lote, dry_run: false });
       setResultado(r);
       ok(`Lote concluído: ${r.enviados ?? 0} enviados · ${r.falhas ?? 0} falhas · ${r.optouts ?? 0} opt-out. Restam ${r.restante_teto ?? '—'} no teto de 24h.`);
     } catch (e) { erro((e as Error).message); }
@@ -510,10 +507,6 @@ export function Disparo() {
                     </BotaoPrimario>
                   </div>
                 </div>
-                <label className="dsp-modoteste">
-                  <input type="checkbox" checked={modoTeste} onChange={(e) => setModoTeste(e.target.checked)} />
-                  <span>Modo teste: ignora a janela de horário — <strong>máx. 3 mensagens</strong> (o servidor recusa mais). Envio real em volume: só seg–sáb, 09h–18h.</span>
-                </label>
                 {resultado && !resultado.dry_run && (
                   <p className="dsp-resultado num" role="status">
                     Último lote: {resultado.enviados ?? 0} enviados · {resultado.falhas ?? 0} falhas · {resultado.optouts ?? 0} opt-out
@@ -589,8 +582,8 @@ export function Disparo() {
       />
       <ConfirmDialogV2
         aberto={confDisparo}
-        titulo={`Disparar ${Math.min(loteEfetivo, porStatus.pendente)} mensagens agora?`}
-        mensagem={`Template real pelo canal ${canalCloud?.nome_interno ?? 'Cloud API'} para os ${Math.min(loteEfetivo, porStatus.pendente)} primeiros pendentes.${modoTeste ? ' MODO TESTE (fora da janela, máx. 3).' : ''} Custa dinheiro e não tem desfazer.`}
+        titulo={`Disparar ${Math.min(lote, porStatus.pendente)} mensagens agora?`}
+        mensagem={`Template real pelo canal ${canalCloud?.nome_interno ?? 'Cloud API'} para os ${Math.min(lote, porStatus.pendente)} primeiros pendentes. Custa dinheiro e não tem desfazer.`}
         rotuloConfirmar="Disparar"
         destrutivo
         carregando={processar.isPending}
