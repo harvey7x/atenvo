@@ -8,7 +8,7 @@
 //  * opt-out re-checado POR ALVO no momento do envio (wa_optout, qualquer canal do contato).
 //  * 131050 no envio → registra wa_optout e marca o alvo 'optout' (estado, não retry).
 //  * jitter 1,5–3s entre envios — nunca rajada.
-//  * horário: seg–sáb 09–18 SP (mesma janela do remarketing); fora disso só dry_run.
+//  * SEM janela de horário (decisão do dono 2026-08-02): dispara em qualquer dia/hora.
 //
 // AUTH: JWT de usuário (a tela chama via supabase.functions.invoke) + vínculo ATIVO na org da
 // campanha. Criar campanha/alvos já exigiu admin|supervisor na RPC; aqui basta ser membro.
@@ -23,13 +23,6 @@ const LOTE_MAX = 50;
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, 'Content-Type': 'application/json' } });
 const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-function agoraSP(): { weekday: string; hour: number } {
-  const p = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', weekday: 'short', hour: '2-digit', hour12: false }).formatToParts(new Date());
-  const get = (t: string) => p.find((x) => x.type === t)?.value ?? '';
-  return { weekday: get('weekday'), hour: Number(get('hour')) };
-}
-const dentroDaJanela = (s: { weekday: string; hour: number }) => s.weekday !== 'Sun' && s.hour >= 9 && s.hour < 18;
 
 function codigoMeta(msg: string): number | undefined {
   const m = (msg || '').match(/\b(13\d{4})\b/);
@@ -74,10 +67,6 @@ Deno.serve(async (req) => {
     const campanhaId = String(body.campanha_id ?? '');
     const dryRun = body.dry_run !== false;                       // default SEMPRE simular
     const lote = Math.min(Math.max(Number(body.lote) || 10, 1), LOTE_MAX);
-    // MODO TESTE: ignora SÓ a janela de horário, e SÓ para lote ≤ 3 (micro-teste no
-    // próprio número fora do comercial). Para lote real o cap anula o flag — a janela
-    // seg–sáb 09–18 continua mandando. Teto/opt-out/template valem igual no teste.
-    const forcarJanela = body.forcar_janela === true && lote <= 3;
     if (!campanhaId) return json({ error: 'campanha_id é obrigatório.' }, 400);
 
     const { data: camp } = await admin.from('disparo_campanhas')
@@ -102,11 +91,8 @@ Deno.serve(async (req) => {
       .eq('id', camp.template_id).maybeSingle();
     if (!tpl || !tpl.ativo || tpl.status !== 'aprovado') return json({ error: 'Template não está aprovado/ativo.', code: 'template_nao_aprovado' }, 409);
 
-    // janela horária: envio real só seg–sáb 09–18 SP (simulação passa sempre)
-    const sp = agoraSP();
-    if (!dryRun && !dentroDaJanela(sp) && !forcarJanela) {
-      return json({ error: 'Fora da janela de envio (seg–sáb, 09h–18h de Brasília). Para micro-teste, use o modo teste (máx. 3).', code: 'fora_horario' }, 409);
-    }
+    // Sem janela de horário: decisão do dono (2026-08-02) — o disparo sai a qualquer
+    // hora/dia. O ritmo é controlado pelo lote na tela + teto móvel de 24h abaixo.
 
     // ---- TETO MÓVEL 24h do canal: alvos enviados (todas as campanhas do canal) + remarketing ----
     const desde = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
@@ -202,7 +188,7 @@ Deno.serve(async (req) => {
       await admin.from('audit_log').insert({
         usuario_id: user.id, acao: 'disparo_processar', entidade: 'disparo_campanhas', entidade_id: camp.id,
         organizacao_id: camp.organizacao_id,
-        dados_depois: { dry_run: dryRun, lote, enviados, falhas, optouts, teto_24h: camp.teto_24h, usados_antes: usados, ...(forcarJanela ? { forcar_janela: true } : {}) },
+        dados_depois: { dry_run: dryRun, lote, enviados, falhas, optouts, teto_24h: camp.teto_24h, usados_antes: usados },
       });
     } catch { /* audit best-effort */ }
 
