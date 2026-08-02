@@ -47,6 +47,7 @@ const GRUPOS: { rotulo: string; itens: ItemNav[] }[] = [
       { slug: 'facebook', rotulo: 'Facebook' },
       { slug: 'kanban', rotulo: 'Kanban' },
       { slug: 'agendamentos', rotulo: 'Agendamentos' },
+      { slug: 'disparo', rotulo: 'Disparo' },
     ],
   },
   {

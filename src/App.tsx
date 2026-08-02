@@ -37,6 +37,7 @@ const AgendamentosV2 = lazy(() => import('@/v2/pages/Agendamentos'));
 const ScriptsV2 = lazy(() => import('@/v2/pages/Scripts'));
 const ConfiguracoesV2 = lazy(() => import('@/v2/pages/Configuracoes'));
 const ContatosV2 = lazy(() => import('@/v2/pages/Contatos'));
+const DisparoV2 = lazy(() => import('@/v2/pages/Disparo'));
 const RelatoriosV2 = lazy(() => import('@/v2/pages/Relatorios'));
 const IntegracoesV2 = lazy(() => import('@/v2/pages/Integracoes'));
 const KanbanV2 = lazy(() => import('@/v2/pages/Kanban'));
@@ -79,6 +80,7 @@ const routes: RouteObject[] = [
           { path: 'relacionamento', element: <Lz><ManutencaoV2 area="Relacionamento" /></Lz> },
           { path: 'kanban', element: <Lz><KanbanV2 /></Lz> },
           { path: 'agendamentos', element: <Lz><AgendamentosV2 /></Lz> },
+          { path: 'disparo', element: <Lz><DisparoV2 /></Lz> },
           { path: 'contatos', element: <Lz><ContatosV2 /></Lz> },
           { path: 'scripts', element: <Lz><ScriptsV2 /></Lz> },
           { path: 'cobrancas', element: <Lz><CobrancasV2 /></Lz> },

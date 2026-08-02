@@ -1,0 +1,175 @@
+/* Camada de dados do DISPARO EM MASSA por template (Cloud API) — Fase 1: disparo único.
+ *
+ * Tudo sob demanda (só a página /disparo usa). O envio real é da edge function
+ * `disparo-processar`, SEMPRE com dry_run explícito — o default do backend é simular.
+ * Regras de negócio moram no banco (RPCs disparo_* / wa_optout_*): aqui é só transporte. */
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { useOrg } from '@/context/OrgContext';
+
+const REAL = isSupabaseConfigured && !!supabase;
+
+async function rpc<T>(fn: string, args: Record<string, unknown>): Promise<T> {
+  const { data, error } = await supabase!.rpc(fn, args);
+  if (error) throw new Error(error.message);
+  return data as T;
+}
+
+/* ===================== tipos ===================== */
+
+export interface Elegivel {
+  contato_id: string; nome: string; telefone: string;
+  /** Nome da coluna do Kanban onde o contato está (qualquer etapa aberta do funil). */
+  etapa: string; etapa_ordem: number;
+  ultima_msg_em: string | null; optout: boolean;
+}
+export interface Campanha {
+  id: string; organizacao_id: string; canal_id: string; template_id: string;
+  nome: string; status: 'ativa' | 'concluida' | 'cancelada'; teto_24h: number; criado_em: string;
+}
+export interface Alvo {
+  id: string; campanha_id: string; contato_id: string; telefone: string | null;
+  status: 'pendente' | 'enviado' | 'falhou' | 'optout' | 'pulado';
+  erro: string | null; wamid: string | null; enviado_em: string | null;
+  contatos?: { nome: string } | null;
+}
+export interface OptoutRow {
+  contato_id: string; nome: string; telefone: string | null;
+  motivo: string; detalhe: string | null; criado_em: string;
+}
+export interface ResultadoProcessar {
+  ok: boolean; dry_run: boolean; processados: number;
+  enviados?: number; falhas?: number; optouts?: number; restante_teto?: number;
+  mensagem?: string; error?: string;
+  resultados?: Array<{ contato?: string; telefone?: string; status: string; texto?: string; erro?: string | null }>;
+}
+
+/* ===================== público elegível ===================== */
+
+export function useDisparoElegiveis() {
+  const { currentOrg } = useOrg();
+  return useQuery({
+    queryKey: ['disparo-elegiveis', currentOrg.id],
+    enabled: REAL,
+    staleTime: 30_000,
+    queryFn: () => rpc<Elegivel[]>('disparo_elegiveis', { p_org: currentOrg.id }),
+  });
+}
+
+/* ===================== campanhas ===================== */
+
+export function useCampanhas() {
+  const { currentOrg } = useOrg();
+  return useQuery({
+    queryKey: ['disparo-campanhas', currentOrg.id],
+    enabled: REAL,
+    queryFn: async () => {
+      const { data, error } = await supabase!
+        .from('disparo_campanhas')
+        .select('id, organizacao_id, canal_id, template_id, nome, status, teto_24h, criado_em')
+        .eq('organizacao_id', currentOrg.id)
+        .order('criado_em', { ascending: false });
+      if (error) throw new Error(error.message);
+      return (data ?? []) as Campanha[];
+    },
+  });
+}
+
+export function useCriarCampanha() {
+  const { currentOrg } = useOrg();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (p: { nome: string; template_id: string; canal_id: string; teto?: number }) =>
+      rpc<string>('disparo_criar_campanha', {
+        p_org: currentOrg.id, p_nome: p.nome, p_template: p.template_id, p_canal: p.canal_id, p_teto: p.teto ?? 200,
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['disparo-campanhas'] }),
+  });
+}
+
+export function useAddAlvos() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (p: { campanha_id: string; contatos: string[] }) =>
+      rpc<{ pendentes: number; optout: number; sem_whatsapp: number; ja_existiam: number }>(
+        'disparo_add_alvos', { p_campanha: p.campanha_id, p_contatos: p.contatos },
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['disparo-alvos'] }),
+  });
+}
+
+export function useAlvos(campanhaId: string | null) {
+  return useQuery({
+    queryKey: ['disparo-alvos', campanhaId],
+    enabled: REAL && !!campanhaId,
+    refetchInterval: 8000,
+    queryFn: async () => {
+      const { data, error } = await supabase!
+        .from('disparo_alvos')
+        .select('id, campanha_id, contato_id, telefone, status, erro, wamid, enviado_em, contatos(nome)')
+        .eq('campanha_id', campanhaId!)
+        .order('criado_em', { ascending: true });
+      if (error) throw new Error(error.message);
+      return (data ?? []) as unknown as Alvo[];
+    },
+  });
+}
+
+/** Simular/processar um lote. dry_run OBRIGATÓRIO e explícito na chamada — sem default esperto aqui. */
+export function useProcessarLote() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (p: { campanha_id: string; lote: number; dry_run: boolean }) => {
+      const { data, error } = await supabase!.functions.invoke('disparo-processar', {
+        body: { campanha_id: p.campanha_id, lote: p.lote, dry_run: p.dry_run },
+      });
+      if (error) {
+        let msg = error.message;
+        const ctx = (error as { context?: Response }).context;
+        if (ctx && typeof ctx.json === 'function') {
+          try { const b = await ctx.clone().json() as { error?: string }; if (b?.error) msg = b.error; } catch { /* mantém msg */ }
+        }
+        throw new Error(msg);
+      }
+      return data as ResultadoProcessar;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['disparo-alvos'] });
+      qc.invalidateQueries({ queryKey: ['disparo-campanhas'] });
+    },
+  });
+}
+
+/* ===================== opt-out (aba Excluídos + marcação manual) ===================== */
+
+export function useOptoutLista() {
+  const { currentOrg } = useOrg();
+  return useQuery({
+    queryKey: ['wa-optout-lista', currentOrg.id],
+    enabled: REAL,
+    queryFn: () => rpc<OptoutRow[]>('wa_optout_lista', { p_org: currentOrg.id }),
+  });
+}
+
+export function useOptoutManual() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (p: { contato_id: string; detalhe?: string }) =>
+      rpc<void>('wa_optout_manual', { p_contato: p.contato_id, p_detalhe: p.detalhe ?? null }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['wa-optout-lista'] });
+      qc.invalidateQueries({ queryKey: ['disparo-elegiveis'] });
+    },
+  });
+}
+
+export function useOptoutRemover() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (contatoId: string) => rpc<void>('wa_optout_manual_remover', { p_contato: contatoId }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['wa-optout-lista'] });
+      qc.invalidateQueries({ queryKey: ['disparo-elegiveis'] });
+    },
+  });
+}

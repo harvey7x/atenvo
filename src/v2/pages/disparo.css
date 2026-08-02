@@ -1,0 +1,44 @@
+/* ============================================================
+   Disparo — campanha de template (Cloud API). Anatomia padrão
+   das páginas de gestão: cabeçalho + chips de aba, filtros,
+   TabelaPadrao com bulk platina; KPIs no painel da campanha.
+   ============================================================ */
+
+.v2 .pg-disparo .dsp-cab { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.v2 .pg-disparo .dsp-cab h1 { font-size: 17px; font-weight: 650; }
+.v2 .pg-disparo .dsp-cab .sub { font-size: 11px; color: var(--txt-3); margin-top: 3px; }
+.v2 .pg-disparo .dsp-cab .chips { margin-bottom: 0; }
+
+.v2 .dsp-aviso { border-radius: 9px; padding: 8px 12px; font-size: 11.5px; margin-bottom: 12px; border: 1px solid var(--linha); }
+.v2 .dsp-aviso.ok { color: var(--ok, #3fbf7f); }
+.v2 .dsp-aviso.erro { color: var(--erro, #e5646e); }
+
+.v2 .dsp-filtros { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.v2 .dsp-filtros .chips { margin-bottom: 0; }
+.v2 .dsp-busca { width: 250px; }
+
+.v2 .dsp-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
+
+.v2 .dsp-painel { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.v2 .dsp-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.v2 .dsp-info strong { font-size: 13px; }
+.v2 .dsp-info span { font-size: 11px; color: var(--txt-3); }
+.v2 .dsp-acoes { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.v2 .dsp-lote { font-size: 11.5px; color: var(--txt-2); }
+.v2 .dsp-lote-inp { width: 64px; height: 30px; text-align: right; }
+.v2 .dsp-resultado { margin-top: 10px; font-size: 11.5px; color: var(--txt-2); border-top: 1px solid var(--linha); padding-top: 9px; }
+
+.v2 .dsp-form { display: flex; flex-direction: column; gap: 12px; }
+.v2 .dsp-campo { display: flex; flex-direction: column; gap: 5px; font-size: 11px; color: var(--txt-2); }
+.v2 .dsp-nota { font-size: 11px; color: var(--txt-3); line-height: 1.5; }
+
+.v2 .dsp-previa { display: flex; flex-direction: column; gap: 10px; max-height: 55vh; overflow-y: auto; }
+.v2 .dsp-previa-item { border: 1px solid var(--linha); border-radius: 9px; padding: 9px 11px; }
+.v2 .dsp-previa-cab { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 11.5px; }
+.v2 .dsp-previa-cab span { color: var(--txt-3); font-size: 10.5px; }
+.v2 .dsp-previa-txt { margin-top: 6px; font-size: 11.5px; color: var(--txt-2); white-space: pre-wrap; line-height: 1.5; }
+
+@media (max-width: 760px) {
+  .v2 .dsp-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .v2 .dsp-busca { width: 100%; }
+}
