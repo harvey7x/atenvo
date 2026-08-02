@@ -496,6 +496,14 @@ Deno.serve(async (req) => {
             await db.rpc('garantir_oportunidade_lead_novo', { p_contato: contatoId, p_conversa: conversaId, p_canal: canal.id, p_origem: 'WhatsApp' });
           } catch (_k) { /* Kanban nunca interrompe a ingestão */ }
 
+          // ---- OPT-OUT COMERCIAL: "SAIR"/frase explícita de descadastro grava wa_optout SEMPRE,
+          //      mesmo sem cadência de remarketing (bot_remarketing_inbound retorna cedo sem fila e
+          //      nunca persistia o pedido). Bloqueia só marketing/disparo — atendimento segue normal. ----
+          if (inboundNovo && inboundMsgId && texto) {
+            try { await db.rpc('wa_optout_inbound', { p_conversa: conversaId, p_texto: texto }); }
+            catch { /* best-effort: opt-out nunca quebra a ingestão */ }
+          }
+
           // ---- REMARKETING: se o lead estava numa cadência, re-roteia a opp ANTES do dispatch.
           //      Respondeu → opp volta pra LEAD NOVO (entrada), senão bot_pode_atuar bloquearia
           //      justamente o lead que respondeu; opt-out → PERDIDO e NÃO dispara o bot.
