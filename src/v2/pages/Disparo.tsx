@@ -94,9 +94,12 @@ export function Disparo() {
   /* ================= etapa 1: público ================= */
   const [busca, setBusca] = useState('');
   const [etapasSel, setEtapasSel] = useState<ReadonlySet<string>>(new Set());
-  // Filtro de gênero (régua conservadora pelo primeiro nome — mesma do bot). 'all' = sem filtro.
-  // Para template com "o senhor"/"a senhora": os INCERTOS ficam fora do filtro de propósito.
-  const [genero, setGenero] = useState<'all' | Genero>('all');
+  // Gênero multi (régua conservadora pelo primeiro nome — mesma do bot): marca/desmarca
+  // homem/mulher/incerto; vazio = todos. "Ambos" = homem+mulher marcados.
+  const [generoSel, setGeneroSel] = useState<ReadonlySet<Genero>>(new Set());
+  // "Quero N pessoas" dentro dos filtros: N + critério (mais recentes | aleatório).
+  const [qtd, setQtd] = useState(50);
+  const [modoQtd, setModoQtd] = useState<'recentes' | 'aleatorio'>('recentes');
   const [sel, setSel] = useState<ReadonlySet<string>>(new Set());
   const [confOptout, setConfOptout] = useState<Elegivel | null>(null);
 
@@ -119,9 +122,9 @@ export function Disparo() {
     const q = busca.trim().toLowerCase();
     return elegiveis.filter((e) =>
       (etapasSel.size === 0 || etapasSel.has(e.etapa)) &&
-      (genero === 'all' || generoDe.get(e.contato_id) === genero) &&
+      (generoSel.size === 0 || generoSel.has(generoDe.get(e.contato_id) ?? 'ambiguo')) &&
       (!q || e.nome.toLowerCase().includes(q) || (e.telefone ?? '').includes(q)));
-  }, [elegiveis, busca, etapasSel, genero, generoDe]);
+  }, [elegiveis, busca, etapasSel, generoSel, generoDe]);
   const selecionaveis = useMemo(() => listaPublico.filter((e) => !e.optout), [listaPublico]);
   const porContato = useMemo(() => new Map(elegiveis.map((e) => [e.contato_id, e])), [elegiveis]);
   const selecionados = useMemo(
@@ -132,6 +135,23 @@ export function Disparo() {
   const alternarEtapaKanban = (nome: string) => setEtapasSel((s) => {
     const n = new Set(s); if (n.has(nome)) n.delete(nome); else n.add(nome); return n;
   });
+  const alternarGenero = (g: Genero) => setGeneroSel((s) => {
+    const n = new Set(s); if (n.has(g)) n.delete(g); else n.add(g); return n;
+  });
+  /** "Quero N": marca N pessoas DENTRO do filtro atual — mais recentes (ordem de última
+   *  mensagem) ou sorteio (Fisher–Yates). Substitui a seleção anterior, nunca soma. */
+  const selecionarN = () => {
+    const pool = [...selecionaveis];
+    if (modoQtd === 'recentes') {
+      pool.sort((a, b) => new Date(b.ultima_msg_em ?? 0).getTime() - new Date(a.ultima_msg_em ?? 0).getTime());
+    } else {
+      for (let i = pool.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [pool[i], pool[j]] = [pool[j], pool[i]];
+      }
+    }
+    setSel(new Set(pool.slice(0, qtd).map((e) => e.contato_id)));
+  };
   const alternarPessoa = (e: Elegivel) => {
     if (e.optout) return;
     setSel((s) => { const n = new Set(s); if (n.has(e.contato_id)) n.delete(e.contato_id); else n.add(e.contato_id); return n; });
@@ -348,25 +368,51 @@ export function Disparo() {
           {/* ================= 1 · PÚBLICO ================= */}
           {etapa === 1 && (
             <>
-              <div className="dsp-filtros sobe" style={{ animationDelay: '.05s' }}>
-                <div className="dsp-busca">
-                  <Input placeholder="Buscar por nome ou telefone…" value={busca} onChange={(e) => setBusca(e.target.value)} aria-label="Buscar no público elegível" />
+              <CardVidro spot sobe className="dsp-fpainel" style={{ borderRadius: 12, padding: '12px 16px', animationDelay: '.05s' }}>
+                <div className="dsp-fgrupo">
+                  <span className="dsp-flabel">Etapa do Kanban</span>
+                  <Chips>
+                    <Chip ativo={etapasSel.size === 0} onClick={() => setEtapasSel(new Set())}>Todas {elegiveis.length}</Chip>
+                    {etapasKanban.map((et) => (
+                      <Chip key={et.nome} ativo={etapasSel.has(et.nome)} onClick={() => alternarEtapaKanban(et.nome)}>{et.nome} {et.total}</Chip>
+                    ))}
+                  </Chips>
                 </div>
-                <Chips>
-                  <Chip ativo={etapasSel.size === 0} onClick={() => setEtapasSel(new Set())}>Todas {elegiveis.length}</Chip>
-                  {etapasKanban.map((et) => (
-                    <Chip key={et.nome} ativo={etapasSel.has(et.nome)} onClick={() => alternarEtapaKanban(et.nome)}>{et.nome} {et.total}</Chip>
-                  ))}
-                </Chips>
-                <Chips>
-                  <Chip ativo={genero === 'homem'} onClick={() => setGenero(genero === 'homem' ? 'all' : 'homem')}>♂ Homens {porGenero.homem}</Chip>
-                  <Chip ativo={genero === 'mulher'} onClick={() => setGenero(genero === 'mulher' ? 'all' : 'mulher')}>♀ Mulheres {porGenero.mulher}</Chip>
-                  <Chip ativo={genero === 'ambiguo'} onClick={() => setGenero(genero === 'ambiguo' ? 'all' : 'ambiguo')}>? Incertos {porGenero.ambiguo}</Chip>
-                </Chips>
-                <BotaoSec onClick={() => setSel(todosFiltradosMarcados ? new Set() : new Set(selecionaveis.map((e) => e.contato_id)))}>
-                  {todosFiltradosMarcados ? 'Desmarcar todos' : `Selecionar ${selecionaveis.length} visíveis`}
-                </BotaoSec>
-              </div>
+                <div className="dsp-fgrupo">
+                  <span className="dsp-flabel">Gênero (pelo primeiro nome)</span>
+                  <Chips>
+                    <Chip ativo={generoSel.size === 0} onClick={() => setGeneroSel(new Set())}>Todos</Chip>
+                    <Chip ativo={generoSel.has('homem')} onClick={() => alternarGenero('homem')}>♂ Homens {porGenero.homem}</Chip>
+                    <Chip ativo={generoSel.has('mulher')} onClick={() => alternarGenero('mulher')}>♀ Mulheres {porGenero.mulher}</Chip>
+                    <Chip ativo={generoSel.has('ambiguo')} onClick={() => alternarGenero('ambiguo')}>? Incertos {porGenero.ambiguo}</Chip>
+                  </Chips>
+                </div>
+                <div className="dsp-fgrupo">
+                  <span className="dsp-flabel">Busca</span>
+                  <div className="dsp-busca">
+                    <Input placeholder="Nome ou telefone…" value={busca} onChange={(e) => setBusca(e.target.value)} aria-label="Buscar no público elegível" />
+                  </div>
+                </div>
+                <div className="dsp-fgrupo dsp-fqtd">
+                  <span className="dsp-flabel">Selecionar dentro do filtro ({selecionaveis.length} disponíveis)</span>
+                  <div className="dsp-fqtd-linha">
+                    <span className="num">Quero</span>
+                    <input
+                      className="inp dsp-lote-inp num" type="number" min={1} max={999}
+                      value={qtd} onChange={(e) => setQtd(Math.min(999, Math.max(1, Number(e.target.value) || 1)))}
+                      aria-label="Quantidade de pessoas"
+                    />
+                    <select className="inp dsp-fsel" value={modoQtd} onChange={(e) => setModoQtd(e.target.value as 'recentes' | 'aleatorio')} aria-label="Critério de seleção">
+                      <option value="recentes">mais recentes</option>
+                      <option value="aleatorio">aleatórios</option>
+                    </select>
+                    <BotaoSec onClick={selecionarN}>Selecionar {Math.min(qtd, selecionaveis.length)}</BotaoSec>
+                    <BotaoSec onClick={() => setSel(todosFiltradosMarcados ? new Set() : new Set(selecionaveis.map((e) => e.contato_id)))}>
+                      {todosFiltradosMarcados ? 'Desmarcar todos' : `Todos os ${selecionaveis.length}`}
+                    </BotaoSec>
+                  </div>
+                </div>
+              </CardVidro>
               {listaPublico.length === 0 ? (
                 <CardVidro spot style={{ borderRadius: 12 }}>
                   <EstadoVazio titulo="Ninguém neste filtro" descricao="O público vem do Kanban: coluna REMARKETING + Lead Novo com conversa real (a pessoa respondeu)." />
