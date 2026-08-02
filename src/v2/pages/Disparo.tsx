@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   useDisparoElegiveis, useCampanhas, useCriarCampanha, useCancelarCampanha, useAddAlvos, useAlvos,
   useProcessarLote, useOptoutLista, useOptoutManual, useOptoutRemover,
-  preencherTemplate, primeiroNomeApresentavel,
+  preencherTemplate, primeiroNomeApresentavel, inferirGenero, type Genero,
   type Elegivel, type Campanha, type Alvo, type OptoutRow, type ResultadoProcessar,
 } from '@/data/disparo';
 import { useWaTemplates, useCloudDiagnostico, type WaTemplate } from '@/data/cloudApi';
@@ -94,6 +94,9 @@ export function Disparo() {
   /* ================= etapa 1: público ================= */
   const [busca, setBusca] = useState('');
   const [etapasSel, setEtapasSel] = useState<ReadonlySet<string>>(new Set());
+  // Filtro de gênero (régua conservadora pelo primeiro nome — mesma do bot). 'all' = sem filtro.
+  // Para template com "o senhor"/"a senhora": os INCERTOS ficam fora do filtro de propósito.
+  const [genero, setGenero] = useState<'all' | Genero>('all');
   const [sel, setSel] = useState<ReadonlySet<string>>(new Set());
   const [confOptout, setConfOptout] = useState<Elegivel | null>(null);
 
@@ -106,12 +109,19 @@ export function Disparo() {
     }
     return [...m.entries()].sort((a, b) => a[1].ordem - b[1].ordem).map(([nome, v]) => ({ nome, total: v.total }));
   }, [elegiveis]);
+  const generoDe = useMemo(() => new Map(elegiveis.map((e) => [e.contato_id, inferirGenero(e.nome)])), [elegiveis]);
+  const porGenero = useMemo(() => {
+    const c = { homem: 0, mulher: 0, ambiguo: 0 };
+    for (const g of generoDe.values()) c[g] += 1;
+    return c;
+  }, [generoDe]);
   const listaPublico = useMemo(() => {
     const q = busca.trim().toLowerCase();
     return elegiveis.filter((e) =>
       (etapasSel.size === 0 || etapasSel.has(e.etapa)) &&
+      (genero === 'all' || generoDe.get(e.contato_id) === genero) &&
       (!q || e.nome.toLowerCase().includes(q) || (e.telefone ?? '').includes(q)));
-  }, [elegiveis, busca, etapasSel]);
+  }, [elegiveis, busca, etapasSel, genero, generoDe]);
   const selecionaveis = useMemo(() => listaPublico.filter((e) => !e.optout), [listaPublico]);
   const porContato = useMemo(() => new Map(elegiveis.map((e) => [e.contato_id, e])), [elegiveis]);
   const selecionados = useMemo(
@@ -347,6 +357,11 @@ export function Disparo() {
                   {etapasKanban.map((et) => (
                     <Chip key={et.nome} ativo={etapasSel.has(et.nome)} onClick={() => alternarEtapaKanban(et.nome)}>{et.nome} {et.total}</Chip>
                   ))}
+                </Chips>
+                <Chips>
+                  <Chip ativo={genero === 'homem'} onClick={() => setGenero(genero === 'homem' ? 'all' : 'homem')}>♂ Homens {porGenero.homem}</Chip>
+                  <Chip ativo={genero === 'mulher'} onClick={() => setGenero(genero === 'mulher' ? 'all' : 'mulher')}>♀ Mulheres {porGenero.mulher}</Chip>
+                  <Chip ativo={genero === 'ambiguo'} onClick={() => setGenero(genero === 'ambiguo' ? 'all' : 'ambiguo')}>? Incertos {porGenero.ambiguo}</Chip>
                 </Chips>
                 <BotaoSec onClick={() => setSel(todosFiltradosMarcados ? new Set() : new Set(selecionaveis.map((e) => e.contato_id)))}>
                   {todosFiltradosMarcados ? 'Desmarcar todos' : `Selecionar ${selecionaveis.length} visíveis`}

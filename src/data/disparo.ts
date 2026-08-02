@@ -30,6 +30,28 @@ export interface Elegivel {
  * disparo-processar decide o valor das variáveis no envio; aqui replicamos a regra
  * para a prévia do card ser fiel ao que sai: variável de nome → primeiro nome
  * APRESENTÁVEL (nome numérico/curto vira 'cliente'); as demais → exemplo. */
+/* ---------- gênero pelo primeiro nome (PORT da régua do bot — fluxo_botoes.ts) ----------
+ * CONSERVADORA: na dúvida devolve 'ambiguo' (nunca chuta). Usada no filtro do disparo
+ * para templates com tratamento marcado ("o senhor"). Manter em sincronia com o bot. */
+const gNorm = (s: string) => s.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+const G_UNISSEX = new Set(['alex', 'ariel', 'cris', 'darci', 'dari', 'eli', 'remy', 'nikki', 'sasha', 'lea']);
+const G_FEM = new Set(['raquel', 'isabel', 'ester', 'esther', 'ines', 'beatriz', 'mercedes', 'ruth', 'carmem', 'carmen', 'noemi', 'miriam', 'conceicao', 'assuncao', 'encarnacao',
+  'simone', 'ivone', 'ivete', 'eliane', 'viviane', 'rosane', 'cristiane', 'adriane', 'luciane', 'josiane', 'daiane', 'isabelle', 'gabrielle', 'elizabeth', 'edith', 'agnes', 'doris', 'lais', 'pilar']);
+const G_MASC = new Set(['jose', 'luiz', 'luis', 'andre', 'felipe', 'henrique', 'jorge', 'vicente', 'davi', 'moises', 'israel', 'gabriel', 'rafael', 'daniel', 'manuel', 'joel', 'ismael', 'nicola', 'luca',
+  'matheus', 'mateus', 'lucas', 'marcos', 'carlos', 'miguel', 'samuel', 'gael', 'heitor', 'arthur', 'anderson', 'wilson', 'edson', 'nelson', 'robson', 'emerson', 'everton', 'kevin', 'alan', 'cristian', 'raul', 'joaquim', 'benjamin']);
+const G_MASC_TERMINA_A = new Set(['nicola', 'luca', 'juca', 'sena']);
+export type Genero = 'homem' | 'mulher' | 'ambiguo';
+export function inferirGenero(nomeCompleto: string): Genero {
+  const p = gNorm((nomeCompleto || '').trim().split(/\s+/)[0] ?? '');
+  if (p.length < 2) return 'ambiguo';
+  if (G_UNISSEX.has(p)) return 'ambiguo';
+  if (G_FEM.has(p)) return 'mulher';
+  if (G_MASC.has(p)) return 'homem';
+  if (p.endsWith('a') && !G_MASC_TERMINA_A.has(p)) return 'mulher';
+  if (p.endsWith('o')) return 'homem';
+  return 'ambiguo';
+}
+
 export function primeiroNomeApresentavel(nome: string): string {
   const p = (nome ?? '').trim().split(/\s+/)[0] ?? '';
   return (/^[+\d()\-.]*$/.test(p) || p.length < 2) ? '' : p;
