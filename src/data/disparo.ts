@@ -174,9 +174,10 @@ export function useAlvos(campanhaId: string | null) {
 export function useProcessarLote() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (p: { campanha_id: string; lote: number; dry_run: boolean }) => {
+    mutationFn: async (p: { campanha_id: string; lote: number; dry_run: boolean; forcar_janela?: boolean }) => {
       const { data, error } = await supabase!.functions.invoke('disparo-processar', {
-        body: { campanha_id: p.campanha_id, lote: p.lote, dry_run: p.dry_run },
+        // forcar_janela: modo teste — o servidor só aceita com lote ≤ 3 (micro-teste fora do horário)
+        body: { campanha_id: p.campanha_id, lote: p.lote, dry_run: p.dry_run, ...(p.forcar_janela ? { forcar_janela: true } : {}) },
       });
       if (error) {
         let msg = error.message;
