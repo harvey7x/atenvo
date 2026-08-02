@@ -74,6 +74,10 @@ Deno.serve(async (req) => {
     const campanhaId = String(body.campanha_id ?? '');
     const dryRun = body.dry_run !== false;                       // default SEMPRE simular
     const lote = Math.min(Math.max(Number(body.lote) || 10, 1), LOTE_MAX);
+    // MODO TESTE: ignora SÓ a janela de horário, e SÓ para lote ≤ 3 (micro-teste no
+    // próprio número fora do comercial). Para lote real o cap anula o flag — a janela
+    // seg–sáb 09–18 continua mandando. Teto/opt-out/template valem igual no teste.
+    const forcarJanela = body.forcar_janela === true && lote <= 3;
     if (!campanhaId) return json({ error: 'campanha_id é obrigatório.' }, 400);
 
     const { data: camp } = await admin.from('disparo_campanhas')
@@ -100,7 +104,9 @@ Deno.serve(async (req) => {
 
     // janela horária: envio real só seg–sáb 09–18 SP (simulação passa sempre)
     const sp = agoraSP();
-    if (!dryRun && !dentroDaJanela(sp)) return json({ error: 'Fora da janela de envio (seg–sáb, 09h–18h de Brasília).', code: 'fora_horario' }, 409);
+    if (!dryRun && !dentroDaJanela(sp) && !forcarJanela) {
+      return json({ error: 'Fora da janela de envio (seg–sáb, 09h–18h de Brasília). Para micro-teste, use o modo teste (máx. 3).', code: 'fora_horario' }, 409);
+    }
 
     // ---- TETO MÓVEL 24h do canal: alvos enviados (todas as campanhas do canal) + remarketing ----
     const desde = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
@@ -196,7 +202,7 @@ Deno.serve(async (req) => {
       await admin.from('audit_log').insert({
         usuario_id: user.id, acao: 'disparo_processar', entidade: 'disparo_campanhas', entidade_id: camp.id,
         organizacao_id: camp.organizacao_id,
-        dados_depois: { dry_run: dryRun, lote, enviados, falhas, optouts, teto_24h: camp.teto_24h, usados_antes: usados },
+        dados_depois: { dry_run: dryRun, lote, enviados, falhas, optouts, teto_24h: camp.teto_24h, usados_antes: usados, ...(forcarJanela ? { forcar_janela: true } : {}) },
       });
     } catch { /* audit best-effort */ }
 
