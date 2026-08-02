@@ -410,8 +410,8 @@ export function Disparo() {
                       />
                       <span className="num">pessoas,</span>
                       <select className="inp dsp-fsel" value={modoQtd} onChange={(e) => setModoQtd(e.target.value as 'recentes' | 'aleatorio')} aria-label="Critério de seleção">
-                        <option value="recentes">as mais recentes</option>
-                        <option value="aleatorio">sorteadas</option>
+                        <option value="recentes">recentes</option>
+                        <option value="aleatorio">aleatórios</option>
                       </select>
                       <BotaoSec onClick={selecionarN}>Selecionar {Math.min(qtd, selecionaveis.length)}</BotaoSec>
                       <BotaoSec onClick={() => setSel(todosFiltradosMarcados ? new Set() : new Set(selecionaveis.map((e) => e.contato_id)))}>

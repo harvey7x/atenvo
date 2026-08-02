@@ -51,7 +51,8 @@
 .v2 .dsp-fsel { width: auto; height: 30px; font-size: 11.5px; padding: 0 9px; }
 /* contador em destaque: o "quantos cabem no filtro" é a resposta que guia o bloco 2 */
 .v2 .dsp-fdisp { display: flex; align-items: center; gap: 9px; text-align: left; }
-.v2 .dsp-fdisp strong { font-size: 26px; font-weight: 650; line-height: 1; }
+/* mesmo desenho de número dos KPIs da casa (25px/600/tracking apertado + tabular) */
+.v2 .dsp-fdisp strong { font-size: 25px; font-weight: 600; letter-spacing: -.025em; line-height: 1; }
 .v2 .dsp-fdisp span { font-size: 10px; color: var(--txt-3); line-height: 1.35; }
 
 /* ---- grid de cards de pessoa ---- */
