@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
-  useDisparoElegiveis, useCampanhas, useCriarCampanha, useAddAlvos, useAlvos,
+  useDisparoElegiveis, useCampanhas, useCriarCampanha, useCancelarCampanha, useAddAlvos, useAlvos,
   useProcessarLote, useOptoutLista, useOptoutManual, useOptoutRemover,
+  preencherTemplate, primeiroNomeApresentavel,
   type Elegivel, type Campanha, type Alvo, type OptoutRow, type ResultadoProcessar,
 } from '@/data/disparo';
-import { useWaTemplates, useCloudDiagnostico } from '@/data/cloudApi';
+import { useWaTemplates, useCloudDiagnostico, type WaTemplate } from '@/data/cloudApi';
 import { formatarNumero } from '@/data/maturacao';
 import { tempoRelativo } from '../lib/tempo';
 import {
@@ -15,15 +16,18 @@ import {
 import './disparo.css';
 
 /* ------------------------------------------------------------------
-   Disparo v2 — campanha de template pela Cloud API (Fase 1: tiro único).
-   Fluxo: Público elegível (Kanban: REMARKETING + LEAD NOVO com conversa
-   real) → seleciona → adiciona à campanha → Simular (dry-run SEMPRE
-   disponível) → Disparar lote ("Enviar agora: X", teto 24h no servidor).
-   Aba Excluídos = wa_optout em 1ª classe: marcar manual + desfazer.
-   Nada aqui envia sem confirmação explícita; o default do backend é simular.
+   Disparo v2 (redesign) — cara de CAMPANHA, não lista de contatos.
+   Fluxo em etapas: 1 Público → 2 Template → 3 Revisar → 4 Disparar,
+   com resumo fixo no topo e cards por pessoa (prévia do {{1}} já
+   preenchido, serviço de interesse, canal de origem).
+   A mecânica é a MESMA da v1 (RPCs + disparo-processar intocados):
+   dry-run por default, teto 24h no servidor, opt-out re-checado.
    ------------------------------------------------------------------ */
 
-type AbaId = 'publico' | 'campanha' | 'excluidos';
+type AbaId = 'campanha' | 'excluidos';
+type Etapa = 1 | 2 | 3 | 4;
+const ROTULO_ETAPA: Record<Etapa, string> = { 1: 'Público', 2: 'Template', 3: 'Revisar', 4: 'Disparar' };
+
 const ST_ALVO: Record<Alvo['status'], { rotulo: string; tom: TomStatus }> = {
   pendente: { rotulo: 'Pendente', tom: 'neutro' },
   enviado: { rotulo: 'Enviado', tom: 'ok' },
@@ -41,10 +45,15 @@ const fmtTel = (t: string | null) => {
   const d = (t ?? '').replace(/\D/g, '');
   return /^\d{12,13}$/.test(d) ? formatarNumero(d) : (t || '—');
 };
+const iniciais = (n: string) => {
+  const p = (n || '').trim().split(/\s+/);
+  return ((p[0]?.[0] || '') + (p[1]?.[0] || '')).toUpperCase() || '?';
+};
 
 export function Disparo() {
   const agoraMs = Date.now();
-  const [aba, setAba] = useState<AbaId>('publico');
+  const [aba, setAba] = useState<AbaId>('campanha');
+  const [etapa, setEtapa] = useState<Etapa>(1);
   const [aviso, setAviso] = useState<{ tom: 'ok' | 'erro'; texto: string } | null>(null);
 
   /* ---------- dados ---------- */
@@ -63,9 +72,17 @@ export function Disparo() {
     () => (tplQ.data ?? []).filter((t) => t.status === 'aprovado'),
     [tplQ.data],
   );
+  const canalCloud = (diagQ.data?.canais ?? []).find((c) => c.status_integracao === 'conectado') ?? null;
+
+  /* campanha ativa já em andamento → entra direto no acompanhamento */
+  const [pulouParaAtiva, setPulouParaAtiva] = useState(false);
+  useEffect(() => {
+    if (campanha && !pulouParaAtiva) { setEtapa(4); setPulouParaAtiva(true); }
+  }, [campanha, pulouParaAtiva]);
 
   /* ---------- mutações ---------- */
   const criar = useCriarCampanha();
+  const cancelar = useCancelarCampanha();
   const addAlvos = useAddAlvos();
   const processar = useProcessarLote();
   const optManual = useOptoutManual();
@@ -74,17 +91,14 @@ export function Disparo() {
   const ok = (texto: string) => { setAviso({ tom: 'ok', texto }); setTimeout(() => setAviso(null), 6000); };
   const erro = (texto: string) => setAviso({ tom: 'erro', texto });
 
-  /* ================================================================
-     ABA PÚBLICO — lista elegível com seleção e ações em lote
-     ================================================================ */
+  /* ================= etapa 1: público ================= */
   const [busca, setBusca] = useState('');
-  // Etapas do Kanban marcadas (multi-seleção; vazio = todas). Somam na contagem do rodapé.
   const [etapasSel, setEtapasSel] = useState<ReadonlySet<string>>(new Set());
   const [sel, setSel] = useState<ReadonlySet<string>>(new Set());
-  const [confOptout, setConfOptout] = useState<string[] | null>(null);
+  const [confOptout, setConfOptout] = useState<Elegivel | null>(null);
 
   const elegiveis = elegQ.data ?? [];
-  const etapas = useMemo(() => {
+  const etapasKanban = useMemo(() => {
     const m = new Map<string, { ordem: number; total: number }>();
     for (const e of elegiveis) {
       const cur = m.get(e.etapa) ?? { ordem: e.etapa_ordem, total: 0 };
@@ -92,57 +106,55 @@ export function Disparo() {
     }
     return [...m.entries()].sort((a, b) => a[1].ordem - b[1].ordem).map(([nome, v]) => ({ nome, total: v.total }));
   }, [elegiveis]);
-  const alternarEtapa = (nome: string) => setEtapasSel((s) => {
-    const n = new Set(s); if (n.has(nome)) n.delete(nome); else n.add(nome); return n;
-  });
   const listaPublico = useMemo(() => {
     const q = busca.trim().toLowerCase();
     return elegiveis.filter((e) =>
       (etapasSel.size === 0 || etapasSel.has(e.etapa)) &&
       (!q || e.nome.toLowerCase().includes(q) || (e.telefone ?? '').includes(q)));
   }, [elegiveis, busca, etapasSel]);
+  const selecionaveis = useMemo(() => listaPublico.filter((e) => !e.optout), [listaPublico]);
+  const porContato = useMemo(() => new Map(elegiveis.map((e) => [e.contato_id, e])), [elegiveis]);
+  const selecionados = useMemo(
+    () => [...sel].map((id) => porContato.get(id)).filter(Boolean) as Elegivel[],
+    [sel, porContato],
+  );
 
-  const alternarSel = (id: string) => setSel((s) => {
-    const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n;
+  const alternarEtapaKanban = (nome: string) => setEtapasSel((s) => {
+    const n = new Set(s); if (n.has(nome)) n.delete(nome); else n.add(nome); return n;
   });
-  const selecionarVisiveis = () => setSel(new Set(listaPublico.filter((e) => !e.optout).map((e) => e.contato_id)));
-
-  const adicionarSelecionados = async (ids: string[]) => {
-    if (!campanha) { setAba('campanha'); erro('Crie a campanha primeiro (aba Campanha).'); return; }
-    try {
-      const r = await addAlvos.mutateAsync({ campanha_id: campanha.id, contatos: ids });
-      setSel(new Set());
-      ok(`Adicionados: ${r.pendentes} pendentes · ${r.optout} em opt-out · ${r.sem_whatsapp} sem WhatsApp · ${r.ja_existiam} já estavam.`);
-      setAba('campanha');
-    } catch (e) { erro((e as Error).message); }
+  const alternarPessoa = (e: Elegivel) => {
+    if (e.optout) return;
+    setSel((s) => { const n = new Set(s); if (n.has(e.contato_id)) n.delete(e.contato_id); else n.add(e.contato_id); return n; });
   };
+  const todosFiltradosMarcados = selecionaveis.length > 0 && selecionaveis.every((e) => sel.has(e.contato_id));
 
-  const COLS_PUBLICO: Coluna<Elegivel>[] = [
-    { chave: 'nome', titulo: 'Contato', classe: 'nome', render: (e) => e.nome || '—' },
-    { chave: 'tel', titulo: 'WhatsApp', classe: 'num', render: (e) => fmtTel(e.telefone) },
-    {
-      chave: 'etapa', titulo: 'Etapa',
-      render: (e) => <BadgeStatus tom={e.etapa === 'REMARKETING' ? 'atencao' : 'neutro'}>{e.etapa}</BadgeStatus>,
-    },
-    { chave: 'ult', titulo: 'Última mensagem', dir: true, classe: 'num', render: (e) => (e.ultima_msg_em ? tempoRelativo(e.ultima_msg_em, agoraMs) : '—') },
-    {
-      chave: 'st', titulo: 'Status',
-      render: (e) => (e.optout ? <BadgeStatus tom="erro">Opt-out</BadgeStatus> : <BadgeStatus tom="ok">Elegível</BadgeStatus>),
-    },
-  ];
+  /* ================= etapa 2: template ================= */
+  const [templateId, setTemplateId] = useState('');
+  const template: WaTemplate | null = useMemo(
+    () => (tplQ.data ?? []).find((t) => t.id === templateId) ?? null,
+    [tplQ.data, templateId],
+  );
+  /* campanha ativa → o template é o dela (trava a escolha) */
+  const templateDaCampanha: WaTemplate | null = useMemo(
+    () => (campanha ? (tplQ.data ?? []).find((t) => t.id === campanha.template_id) ?? null : null),
+    [campanha, tplQ.data],
+  );
+  const tplEfetivo = campanha ? templateDaCampanha : template;
 
-  /* ================================================================
-     ABA CAMPANHA — criar, simular, disparar lote, acompanhar alvos
-     ================================================================ */
-  const [novaAberta, setNovaAberta] = useState(false);
-  const [nvNome, setNvNome] = useState('');
-  const [nvTemplate, setNvTemplate] = useState('');
+  /* ================= etapa 3: revisar ================= */
+  const semNome = useMemo(
+    () => selecionados.filter((e) => !primeiroNomeApresentavel(e.nome)).length,
+    [selecionados],
+  );
+
+  /* ================= etapa 4: disparar ================= */
   const [lote, setLote] = useState(12);
   const [previa, setPrevia] = useState<ResultadoProcessar | null>(null);
   const [confDisparo, setConfDisparo] = useState(false);
+  const [confEncerrar, setConfEncerrar] = useState(false);
   const [resultado, setResultado] = useState<ResultadoProcessar | null>(null);
+  const [criandoCampanha, setCriandoCampanha] = useState(false);
 
-  const canalCloud = (diagQ.data?.canais ?? []).find((c) => c.status_integracao === 'conectado') ?? null;
   const alvos = alvosQ.data ?? [];
   const porStatus = useMemo(() => {
     const c: Record<string, number> = { pendente: 0, enviado: 0, falhou: 0, optout: 0, pulado: 0 };
@@ -150,24 +162,34 @@ export function Disparo() {
     return c;
   }, [alvos]);
 
-  const criarCampanha = async () => {
+  const criarCampanhaComPublico = async () => {
     if (!canalCloud) { erro('Nenhum canal Cloud API conectado.'); return; }
-    if (!nvTemplate) { erro('Escolha um template aprovado.'); return; }
+    if (!template) { erro('Escolha o template na etapa 2.'); return; }
+    if (!selecionados.length) { erro('Selecione o público na etapa 1.'); return; }
+    setCriandoCampanha(true);
     try {
-      await criar.mutateAsync({ nome: nvNome || 'Retomada', template_id: nvTemplate, canal_id: canalCloud.id });
-      setNovaAberta(false); setNvNome(''); setNvTemplate('');
-      ok('Campanha criada. Agora selecione o público e adicione à campanha.');
+      const nome = `${template.nome} · ${new Date().toLocaleDateString('pt-BR')}`;
+      const id = await criar.mutateAsync({ nome, template_id: template.id, canal_id: canalCloud.id });
+      const r = await addAlvos.mutateAsync({ campanha_id: id, contatos: selecionados.map((e) => e.contato_id) });
+      setSel(new Set());
+      ok(`Campanha criada: ${r.pendentes} na fila · ${r.optout} em opt-out · ${r.sem_whatsapp} sem WhatsApp.`);
+    } catch (e) { erro((e as Error).message); } finally { setCriandoCampanha(false); }
+  };
+
+  const adicionarMaisNaCampanha = async () => {
+    if (!campanha || !selecionados.length) return;
+    try {
+      const r = await addAlvos.mutateAsync({ campanha_id: campanha.id, contatos: selecionados.map((e) => e.contato_id) });
+      setSel(new Set()); setEtapa(4);
+      ok(`Adicionados: ${r.pendentes} novos · ${r.ja_existiam} já estavam na campanha.`);
     } catch (e) { erro((e as Error).message); }
   };
 
   const simular = async () => {
     if (!campanha) return;
-    try {
-      const r = await processar.mutateAsync({ campanha_id: campanha.id, lote, dry_run: true });
-      setPrevia(r);
-    } catch (e) { erro((e as Error).message); }
+    try { setPrevia(await processar.mutateAsync({ campanha_id: campanha.id, lote, dry_run: true })); }
+    catch (e) { erro((e as Error).message); }
   };
-
   const disparar = async () => {
     if (!campanha) return;
     setConfDisparo(false);
@@ -178,20 +200,7 @@ export function Disparo() {
     } catch (e) { erro((e as Error).message); }
   };
 
-  const COLS_ALVOS: Coluna<Alvo>[] = [
-    { chave: 'nome', titulo: 'Contato', classe: 'nome', render: (a) => a.contatos?.nome ?? '—' },
-    { chave: 'tel', titulo: 'WhatsApp', classe: 'num', render: (a) => fmtTel(a.telefone) },
-    {
-      chave: 'st', titulo: 'Status',
-      render: (a) => <BadgeStatus tom={ST_ALVO[a.status].tom}>{ST_ALVO[a.status].rotulo}</BadgeStatus>,
-    },
-    { chave: 'quando', titulo: 'Enviado', dir: true, classe: 'num', render: (a) => (a.enviado_em ? tempoRelativo(a.enviado_em, agoraMs) : '—') },
-    { chave: 'erro', titulo: 'Detalhe', render: (a) => a.erro ?? '' },
-  ];
-
-  /* ================================================================
-     ABA EXCLUÍDOS — wa_optout com desfazer
-     ================================================================ */
+  /* ================= aba excluídos ================= */
   const [confDesfazer, setConfDesfazer] = useState<OptoutRow | null>(null);
   const COLS_OPTOUT: Coluna<OptoutRow>[] = [
     { chave: 'nome', titulo: 'Contato', classe: 'nome', render: (o) => o.nome || '—' },
@@ -202,22 +211,80 @@ export function Disparo() {
     { chave: 'acoes', titulo: '', dir: true, render: (o) => <BotaoMini onClick={() => setConfDesfazer(o)}>Desfazer</BotaoMini> },
   ];
 
-  /* ================================================================ */
+  /* ================= render ================= */
   const carregando = elegQ.isLoading || campQ.isLoading;
+  const podeIr = (alvo: Etapa): boolean => {
+    if (campanha) return true;                             // acompanhamento livre
+    if (alvo >= 2 && selecionados.length === 0) return false;
+    if (alvo >= 3 && !template) return false;
+    return true;
+  };
+  const irPara = (alvo: Etapa) => { if (podeIr(alvo)) setEtapa(alvo); };
+
+  const previewGrande = (tpl: WaTemplate | null, nomeExemplo?: string) => (
+    <div className="dsp-bolha" aria-label="Prévia da mensagem">
+      {tpl
+        ? <p>{preencherTemplate(tpl.corpo, tpl.variaveis, nomeExemplo ?? (selecionados[0]?.nome ?? ''))}</p>
+        : <p className="dsp-nota">Escolha um template aprovado para ver a mensagem.</p>}
+    </div>
+  );
+
+  const cardPessoa = (e: Elegivel, opts?: { comPrevia?: boolean }) => {
+    const marcado = sel.has(e.contato_id);
+    const previa = opts?.comPrevia && tplEfetivo
+      ? preencherTemplate(tplEfetivo.corpo, tplEfetivo.variaveis, e.nome)
+      : null;
+    return (
+      <button
+        type="button"
+        key={e.contato_id}
+        className={['dsp-card', marcado ? 'on' : '', e.optout ? 'off' : ''].filter(Boolean).join(' ')}
+        onClick={() => alternarPessoa(e)}
+        aria-pressed={marcado}
+        disabled={e.optout}
+      >
+        <div className="dsp-card-cab">
+          <span className="dsp-av" aria-hidden>{iniciais(e.nome)}</span>
+          <span className="dsp-card-id">
+            <strong>{e.nome || '—'}</strong>
+            <span className="num">{fmtTel(e.telefone)}</span>
+          </span>
+          <span className={marcado ? 'dsp-tick on' : 'dsp-tick'} aria-hidden>✓</span>
+        </div>
+        <div className="dsp-card-tags">
+          <BadgeStatus tom={e.etapa === 'REMARKETING' ? 'atencao' : 'neutro'}>{e.etapa}</BadgeStatus>
+          {e.tipo_servico && <BadgeStatus tom="neutro">{e.tipo_servico}</BadgeStatus>}
+          {e.optout && <BadgeStatus tom="erro">Opt-out</BadgeStatus>}
+        </div>
+        <div className="dsp-card-meta num">
+          {e.ultima_msg_em ? `falou ${tempoRelativo(e.ultima_msg_em, agoraMs)}` : 'sem mensagem'}
+          {e.canal_origem ? ` · via ${e.canal_origem}` : ''}
+        </div>
+        {previa && <p className="dsp-card-previa">{previa}</p>}
+        {!e.optout && (
+          <span
+            role="button"
+            tabIndex={0}
+            className="dsp-card-opt"
+            onClick={(ev) => { ev.stopPropagation(); setConfOptout(e); }}
+            onKeyDown={(ev) => { if (ev.key === 'Enter') { ev.stopPropagation(); setConfOptout(e); } }}
+          >
+            marcar opt-out
+          </span>
+        )}
+      </button>
+    );
+  };
 
   return (
     <div className="pg-disparo">
       <header className="dsp-cab sobe">
         <div>
           <h1>Disparo</h1>
-          <p className="sub">
-            Campanha de template aprovado pelo canal oficial · opt-out respeitado sempre ·
-            teto {campanha?.teto_24h ?? 200}/24h no servidor
-          </p>
+          <p className="sub">Campanha de template aprovado pelo canal oficial · opt-out respeitado sempre · teto {campanha?.teto_24h ?? 200}/24h no servidor</p>
         </div>
         <Chips>
-          <Chip ativo={aba === 'publico'} onClick={() => setAba('publico')}>Público {elegiveis.filter((e) => !e.optout).length}</Chip>
-          <Chip ativo={aba === 'campanha'} onClick={() => setAba('campanha')}>Campanha {alvos.length ? `· ${porStatus.pendente} pend.` : ''}</Chip>
+          <Chip ativo={aba === 'campanha'} onClick={() => setAba('campanha')}>Campanha</Chip>
           <Chip ativo={aba === 'excluidos'} onClick={() => setAba('excluidos')}>Excluídos {optQ.data?.length ?? 0}</Chip>
         </Chips>
       </header>
@@ -226,85 +293,186 @@ export function Disparo() {
 
       {carregando ? (
         <CardVidro style={{ borderRadius: 12, padding: 16 }}><SkeletonTexto linhas={6} /></CardVidro>
+      ) : aba === 'excluidos' ? (
+        <CardVidro spot sobe style={{ borderRadius: 12 }}>
+          {(optQ.data ?? []).length === 0 ? (
+            <EstadoVazio titulo="Ninguém em opt-out" descricao="Quem responder SAIR (ou for marcado manualmente) aparece aqui e nunca mais recebe disparo." />
+          ) : (
+            <TabelaPadrao colunas={COLS_OPTOUT} linhas={optQ.data ?? []} chave={(o) => o.contato_id} rodape={{ texto: `${optQ.data?.length ?? 0} contatos fora de qualquer disparo` }} />
+          )}
+        </CardVidro>
       ) : (
         <>
-          {/* ---------------- PÚBLICO ---------------- */}
-          {aba === 'publico' && (
+          {/* -------- resumo da campanha (sempre visível) -------- */}
+          <CardVidro spot sobe className="dsp-resumo" style={{ borderRadius: 12, padding: '12px 16px' }}>
+            <div className="dsp-resumo-linha">
+              <span><strong className="num">{campanha ? alvos.length : selecionados.length}</strong> {campanha ? 'na campanha' : 'selecionados'}</span>
+              <span aria-hidden>·</span>
+              <span>template <strong>{tplEfetivo?.nome ?? '—'}</strong></span>
+              <span aria-hidden>·</span>
+              <span>lote de <strong className="num">{lote}</strong></span>
+              <span aria-hidden>·</span>
+              <span>canal <strong>{canalCloud?.nome_interno ?? '—'}</strong></span>
+              {campanha && (
+                <>
+                  <span aria-hidden>·</span>
+                  <BadgeStatus tom="ok">campanha ativa</BadgeStatus>
+                </>
+              )}
+            </div>
+            <nav className="dsp-passos" aria-label="Etapas do disparo">
+              {([1, 2, 3, 4] as Etapa[]).map((n) => (
+                <button
+                  type="button"
+                  key={n}
+                  className={['dsp-passo', etapa === n ? 'on' : '', !podeIr(n) ? 'trava' : ''].filter(Boolean).join(' ')}
+                  onClick={() => irPara(n)}
+                  disabled={!podeIr(n)}
+                >
+                  <span className="num">{n}</span> {ROTULO_ETAPA[n]}
+                </button>
+              ))}
+            </nav>
+          </CardVidro>
+
+          {/* ================= 1 · PÚBLICO ================= */}
+          {etapa === 1 && (
             <>
-              <div className="dsp-filtros sobe" style={{ animationDelay: '.06s' }}>
+              <div className="dsp-filtros sobe" style={{ animationDelay: '.05s' }}>
                 <div className="dsp-busca">
                   <Input placeholder="Buscar por nome ou telefone…" value={busca} onChange={(e) => setBusca(e.target.value)} aria-label="Buscar no público elegível" />
                 </div>
                 <Chips>
                   <Chip ativo={etapasSel.size === 0} onClick={() => setEtapasSel(new Set())}>Todas {elegiveis.length}</Chip>
-                  {etapas.map((et) => (
-                    <Chip key={et.nome} ativo={etapasSel.has(et.nome)} onClick={() => alternarEtapa(et.nome)}>
-                      {et.nome} {et.total}
-                    </Chip>
+                  {etapasKanban.map((et) => (
+                    <Chip key={et.nome} ativo={etapasSel.has(et.nome)} onClick={() => alternarEtapaKanban(et.nome)}>{et.nome} {et.total}</Chip>
                   ))}
                 </Chips>
-                <BotaoSec onClick={selecionarVisiveis}>Selecionar visíveis</BotaoSec>
+                <BotaoSec onClick={() => setSel(todosFiltradosMarcados ? new Set() : new Set(selecionaveis.map((e) => e.contato_id)))}>
+                  {todosFiltradosMarcados ? 'Desmarcar todos' : `Selecionar ${selecionaveis.length} visíveis`}
+                </BotaoSec>
               </div>
-
-              <CardVidro spot sobe style={{ borderRadius: 12, animationDelay: '.12s' }}>
-                {listaPublico.length === 0 ? (
-                  <EstadoVazio titulo="Ninguém neste filtro" descricao="O público elegível vem do Kanban: coluna REMARKETING + LEAD NOVO com conversa real (a pessoa respondeu)." />
-                ) : (
-                  <TabelaPadrao
-                    colunas={COLS_PUBLICO}
-                    linhas={listaPublico}
-                    chave={(e) => e.contato_id}
-                    selecao={{
-                      selecionadas: sel,
-                      aoAlternar: alternarSel,
-                      aoLimpar: () => setSel(new Set()),
-                      acoes: [
-                        { rotulo: campanha ? 'Adicionar à campanha' : 'Criar campanha…', onClick: (ids) => (campanha ? void adicionarSelecionados(ids) : (setAba('campanha'), setNovaAberta(true))) },
-                        { rotulo: 'Marcar opt-out', onClick: (ids) => setConfOptout(ids) },
-                      ],
-                      rotuloContagem: (n) => `${n} selecionado${n === 1 ? '' : 's'}`,
-                    }}
-                    rodape={{
-                      texto: `${listaPublico.length} elegíveis${etapasSel.size ? ` em ${etapasSel.size} etapa${etapasSel.size > 1 ? 's' : ''}` : ''} · ${elegiveis.filter((e) => e.optout).length} em opt-out ficam fora automaticamente`,
-                    }}
-                  />
-                )}
-              </CardVidro>
+              {listaPublico.length === 0 ? (
+                <CardVidro spot style={{ borderRadius: 12 }}>
+                  <EstadoVazio titulo="Ninguém neste filtro" descricao="O público vem do Kanban: coluna REMARKETING + Lead Novo com conversa real (a pessoa respondeu)." />
+                </CardVidro>
+              ) : (
+                <div className="dsp-grid sobe" style={{ animationDelay: '.1s' }}>
+                  {listaPublico.map((e) => cardPessoa(e))}
+                </div>
+              )}
+              <div className="dsp-rodape-etapa">
+                <span className="num">{selecionados.length} selecionado{selecionados.length === 1 ? '' : 's'}</span>
+                <BotaoPrimario onClick={() => irPara(2)} disabled={!selecionados.length && !campanha}>
+                  {campanha ? 'Continuar' : 'Escolher template →'}
+                </BotaoPrimario>
+              </div>
             </>
           )}
 
-          {/* ---------------- CAMPANHA ---------------- */}
-          {aba === 'campanha' && !campanha && (
-            <CardVidro spot sobe style={{ borderRadius: 12 }}>
-              <EstadoVazio
-                titulo="Nenhuma campanha ativa"
-                descricao={templatesAprovados.length
-                  ? 'Crie a campanha, escolha o template aprovado e depois adicione o público.'
-                  : 'Nenhum template APROVADO ainda. Sincronize os modelos na página Integrações quando a Meta aprovar.'}
-                acao={templatesAprovados.length ? { rotulo: 'Nova campanha', onClick: () => setNovaAberta(true) } : undefined}
-              />
-            </CardVidro>
+          {/* ================= 2 · TEMPLATE ================= */}
+          {etapa === 2 && (
+            <div className="dsp-duas sobe">
+              <CardVidro spot style={{ borderRadius: 12, padding: 16 }}>
+                <h2 className="dsp-h2">Template aprovado</h2>
+                {campanha ? (
+                  <p className="dsp-nota">A campanha ativa usa <strong>{templateDaCampanha?.nome ?? '—'}</strong>. Para trocar de template, conclua ou cancele a campanha atual.</p>
+                ) : templatesAprovados.length === 0 ? (
+                  <EstadoVazio titulo="Nenhum template aprovado" descricao="Quando a Meta aprovar, sincronize em Integrações → Modelos e ele aparece aqui." />
+                ) : (
+                  <div className="dsp-tpl-lista">
+                    {templatesAprovados.map((t) => (
+                      <button
+                        type="button"
+                        key={t.id}
+                        className={templateId === t.id ? 'dsp-tpl on' : 'dsp-tpl'}
+                        onClick={() => setTemplateId(t.id)}
+                        aria-pressed={templateId === t.id}
+                      >
+                        <strong>{t.nome}</strong>
+                        <span className="num">{t.idioma} · {t.categoria}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </CardVidro>
+              <CardVidro spot style={{ borderRadius: 12, padding: 16 }}>
+                <h2 className="dsp-h2">Como o cliente recebe</h2>
+                {previewGrande(tplEfetivo)}
+                {tplEfetivo && (tplEfetivo.variaveis?.length ?? 0) > 0 && (
+                  <p className="dsp-nota">A variável de nome é preenchida por pessoa; quem não tem nome cadastrado recebe “cliente”.</p>
+                )}
+                <div className="dsp-rodape-etapa">
+                  <BotaoSec onClick={() => setEtapa(1)}>← Público</BotaoSec>
+                  <BotaoPrimario onClick={() => irPara(3)} disabled={!tplEfetivo}>Revisar →</BotaoPrimario>
+                </div>
+              </CardVidro>
+            </div>
           )}
 
-          {aba === 'campanha' && campanha && (
+          {/* ================= 3 · REVISAR ================= */}
+          {etapa === 3 && (
             <>
-              <div className="dsp-kpis sobe" style={{ animationDelay: '.06s' }}>
+              <div className="dsp-kpis sobe">
+                <Kpi rotulo="Vão receber" valor={selecionados.length} />
+                <Kpi rotulo="Com nome" valor={selecionados.length - semNome} />
+                <Kpi rotulo="Sairá “cliente”" valor={semNome} />
+                <Kpi rotulo="Teto 24h" valor={campanha?.teto_24h ?? 200} />
+              </div>
+              <div className="dsp-duas sobe" style={{ animationDelay: '.05s' }}>
+                <CardVidro spot style={{ borderRadius: 12, padding: 16 }}>
+                  <h2 className="dsp-h2">A mensagem</h2>
+                  {previewGrande(tplEfetivo)}
+                  {semNome > 0 && (
+                    <p className="dsp-nota">⚠ {semNome} contato{semNome === 1 ? '' : 's'} sem nome cadastrado sai{semNome === 1 ? '' : 'em'} como “Olá, cliente”. Dá pra renomear na página Contatos antes de disparar.</p>
+                  )}
+                  <div className="dsp-rodape-etapa">
+                    <BotaoSec onClick={() => setEtapa(2)}>← Template</BotaoSec>
+                    {campanha ? (
+                      <BotaoPrimario onClick={() => void adicionarMaisNaCampanha()} disabled={!selecionados.length || addAlvos.isPending}>
+                        {addAlvos.isPending ? 'Adicionando…' : `Adicionar ${selecionados.length} à campanha →`}
+                      </BotaoPrimario>
+                    ) : (
+                      <BotaoPrimario onClick={async () => { await criarCampanhaComPublico(); setEtapa(4); }} disabled={criandoCampanha || !selecionados.length}>
+                        {criandoCampanha ? 'Criando…' : `Criar campanha com ${selecionados.length} →`}
+                      </BotaoPrimario>
+                    )}
+                  </div>
+                </CardVidro>
+                <div>
+                  <h2 className="dsp-h2 dsp-h2-solta">Como fica pra cada um</h2>
+                  <div className="dsp-grid dsp-grid-revisao">
+                    {selecionados.slice(0, 30).map((e) => cardPessoa(e, { comPrevia: true }))}
+                  </div>
+                  {selecionados.length > 30 && <p className="dsp-nota">…e mais {selecionados.length - 30} (mostrando os 30 primeiros).</p>}
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* ================= 4 · DISPARAR ================= */}
+          {etapa === 4 && !campanha && (
+            <CardVidro spot sobe style={{ borderRadius: 12 }}>
+              <EstadoVazio titulo="Nenhuma campanha ativa" descricao="Monte o público (etapa 1), escolha o template (2) e crie a campanha na revisão (3)." acao={{ rotulo: 'Começar pelo público', onClick: () => setEtapa(1) }} />
+            </CardVidro>
+          )}
+          {etapa === 4 && campanha && (
+            <>
+              <div className="dsp-kpis sobe">
                 <Kpi rotulo="Pendentes" valor={porStatus.pendente} />
                 <Kpi rotulo="Enviados" valor={porStatus.enviado} />
                 <Kpi rotulo="Falhas" valor={porStatus.falhou} />
-                <Kpi rotulo="Opt-out" valor={porStatus.optout + porStatus.pulado} />
+                <Kpi rotulo="Opt-out / pulados" valor={porStatus.optout + porStatus.pulado} />
               </div>
-
-              <CardVidro spot sobe style={{ borderRadius: 12, padding: 16, animationDelay: '.1s' }}>
+              <CardVidro spot sobe style={{ borderRadius: 12, padding: 16, animationDelay: '.05s' }}>
                 <div className="dsp-painel">
                   <div className="dsp-info">
                     <strong>{campanha.nome}</strong>
-                    <span className="num">
-                      template {(tplQ.data ?? []).find((t) => t.id === campanha.template_id)?.nome ?? '—'} ·
-                      canal {canalCloud?.nome_interno ?? '—'} · teto {campanha.teto_24h}/24h
-                    </span>
+                    <span className="num">canal {canalCloud?.nome_interno ?? '—'} · teto {campanha.teto_24h}/24h · quem já recebeu nunca recebe de novo</span>
                   </div>
                   <div className="dsp-acoes">
+                    <BotaoSec onClick={() => setConfEncerrar(true)}>Encerrar</BotaoSec>
+                    <BotaoSec onClick={() => setEtapa(1)}>+ pessoas</BotaoSec>
                     <label className="dsp-lote num" htmlFor="dsp-lote-inp">Enviar agora:</label>
                     <input
                       id="dsp-lote-inp" className="inp dsp-lote-inp num" type="number" min={1} max={50}
@@ -326,60 +494,33 @@ export function Disparo() {
                   </p>
                 )}
               </CardVidro>
-
-              <CardVidro spot sobe style={{ borderRadius: 12, animationDelay: '.14s' }}>
-                {alvos.length === 0 ? (
-                  <EstadoVazio titulo="Campanha sem alvos" descricao="Volte à aba Público, selecione os contatos e use “Adicionar à campanha”." acao={{ rotulo: 'Ir para o público', onClick: () => setAba('publico') }} />
-                ) : (
-                  <TabelaPadrao colunas={COLS_ALVOS} linhas={alvos} chave={(a) => a.id} rodape={{ texto: `${alvos.length} alvos` }} />
-                )}
-              </CardVidro>
-            </>
-          )}
-
-          {/* ---------------- EXCLUÍDOS ---------------- */}
-          {aba === 'excluidos' && (
-            <CardVidro spot sobe style={{ borderRadius: 12 }}>
-              {(optQ.data ?? []).length === 0 ? (
-                <EstadoVazio titulo="Ninguém em opt-out" descricao="Quem responder SAIR (ou for marcado manualmente) aparece aqui e nunca mais recebe disparo." />
+              {alvos.length === 0 ? (
+                <CardVidro spot sobe style={{ borderRadius: 12, animationDelay: '.1s' }}>
+                  <EstadoVazio titulo="Campanha sem alvos" descricao="Volte ao público e adicione as pessoas." acao={{ rotulo: 'Ir para o público', onClick: () => setEtapa(1) }} />
+                </CardVidro>
               ) : (
-                <TabelaPadrao colunas={COLS_OPTOUT} linhas={optQ.data ?? []} chave={(o) => o.contato_id} rodape={{ texto: `${optQ.data?.length ?? 0} contatos fora de qualquer disparo` }} />
+                <div className="dsp-grid sobe" style={{ animationDelay: '.1s' }}>
+                  {alvos.map((a) => (
+                    <div key={a.id} className="dsp-card dsp-card-alvo">
+                      <div className="dsp-card-cab">
+                        <span className="dsp-av" aria-hidden>{iniciais(a.contatos?.nome ?? '')}</span>
+                        <span className="dsp-card-id">
+                          <strong>{a.contatos?.nome ?? '—'}</strong>
+                          <span className="num">{fmtTel(a.telefone)}</span>
+                        </span>
+                        <BadgeStatus tom={ST_ALVO[a.status].tom}>{ST_ALVO[a.status].rotulo}</BadgeStatus>
+                      </div>
+                      <div className="dsp-card-meta num">
+                        {a.enviado_em ? `enviado ${tempoRelativo(a.enviado_em, agoraMs)}` : (a.erro ?? 'aguardando lote')}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
-            </CardVidro>
+            </>
           )}
         </>
       )}
-
-      {/* ---------- modal: nova campanha ---------- */}
-      <ModalV2
-        aberto={novaAberta}
-        aoFechar={() => setNovaAberta(false)}
-        titulo="Nova campanha de disparo"
-        rodape={(
-          <>
-            <BotaoSec onClick={() => setNovaAberta(false)}>Cancelar</BotaoSec>
-            <BotaoPrimario onClick={() => void criarCampanha()} disabled={criar.isPending}>{criar.isPending ? 'Criando…' : 'Criar campanha'}</BotaoPrimario>
-          </>
-        )}
-      >
-        <div className="dsp-form">
-          <label className="dsp-campo">
-            <span>Nome</span>
-            <Input value={nvNome} onChange={(e) => setNvNome(e.target.value)} placeholder="Retomada agosto" />
-          </label>
-          <label className="dsp-campo">
-            <span>Template (só aprovados)</span>
-            <select className="inp" value={nvTemplate} onChange={(e) => setNvTemplate(e.target.value)} aria-label="Template aprovado">
-              <option value="">Escolher…</option>
-              {templatesAprovados.map((t) => <option key={t.id} value={t.id}>{t.nome} · {t.idioma}</option>)}
-            </select>
-          </label>
-          <p className="dsp-nota">
-            Canal: <strong>{canalCloud?.nome_interno ?? 'nenhum Cloud API conectado'}</strong> · teto fixo de 200/24h
-            (o servidor conta as últimas 24h e recusa passar disso, some com o remarketing automático).
-          </p>
-        </div>
-      </ModalV2>
 
       {/* ---------- modal: prévia da simulação ---------- */}
       <ModalV2
@@ -405,6 +546,21 @@ export function Disparo() {
 
       {/* ---------- confirmações ---------- */}
       <ConfirmDialogV2
+        aberto={confEncerrar}
+        titulo={`Encerrar a campanha "${campanha?.nome ?? ''}"?`}
+        mensagem={`${porStatus.pendente} pendente${porStatus.pendente === 1 ? '' : 's'} deixa${porStatus.pendente === 1 ? '' : 'm'} de ser enviados. O histórico fica guardado e você pode criar outra campanha em seguida.`}
+        rotuloConfirmar="Encerrar campanha"
+        destrutivo
+        carregando={cancelar.isPending}
+        aoConfirmar={async () => {
+          const c = campanha; setConfEncerrar(false);
+          if (!c) return;
+          try { await cancelar.mutateAsync(c.id); setEtapa(1); ok(`Campanha "${c.nome}" encerrada.`); }
+          catch (e) { erro((e as Error).message); }
+        }}
+        aoCancelar={() => setConfEncerrar(false)}
+      />
+      <ConfirmDialogV2
         aberto={confDisparo}
         titulo={`Disparar ${Math.min(lote, porStatus.pendente)} mensagens agora?`}
         mensagem={`Template real pelo canal ${canalCloud?.nome_interno ?? 'Cloud API'} para os ${Math.min(lote, porStatus.pendente)} primeiros pendentes. Custa dinheiro e não tem desfazer.`}
@@ -416,17 +572,17 @@ export function Disparo() {
       />
       <ConfirmDialogV2
         aberto={!!confOptout}
-        titulo={`Marcar ${confOptout?.length ?? 0} contato(s) como opt-out?`}
-        mensagem="Eles saem de qualquer disparo e remarketing (o atendimento normal continua). Dá para desfazer na aba Excluídos."
+        titulo={`Marcar ${confOptout?.nome ?? ''} como opt-out?`}
+        mensagem="Sai de qualquer disparo e remarketing (o atendimento normal continua). Dá para desfazer na aba Excluídos."
         rotuloConfirmar="Marcar opt-out"
         carregando={optManual.isPending}
         aoConfirmar={async () => {
-          const ids = confOptout ?? [];
-          setConfOptout(null);
+          const alvo = confOptout; setConfOptout(null);
+          if (!alvo) return;
           try {
-            for (const id of ids) await optManual.mutateAsync({ contato_id: id, detalhe: 'via painel (Disparo)' });
-            setSel(new Set());
-            ok(`${ids.length} contato(s) marcados como opt-out.`);
+            await optManual.mutateAsync({ contato_id: alvo.contato_id, detalhe: 'via painel (Disparo)' });
+            setSel((s) => { const n = new Set(s); n.delete(alvo.contato_id); return n; });
+            ok(`${alvo.nome} marcado como opt-out.`);
           } catch (e) { erro((e as Error).message); }
         }}
         aoCancelar={() => setConfOptout(null)}

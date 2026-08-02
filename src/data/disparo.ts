@@ -19,9 +19,34 @@ async function rpc<T>(fn: string, args: Record<string, unknown>): Promise<T> {
 
 export interface Elegivel {
   contato_id: string; nome: string; telefone: string;
-  /** Nome da coluna do Kanban onde o contato está (qualquer etapa aberta do funil). */
+  /** Nome da coluna do Kanban onde o contato está (topo do funil: entrada + REMARKETING). */
   etapa: string; etapa_ordem: number;
+  /** Contexto do lead para o card (vêm da oportunidade mais recente). */
+  tipo_servico: string | null; canal_origem: string | null;
   ultima_msg_em: string | null; optout: boolean;
+}
+
+/* ---------- prévia da mensagem por pessoa (ESPELHO da lógica do motor) ----------
+ * disparo-processar decide o valor das variáveis no envio; aqui replicamos a regra
+ * para a prévia do card ser fiel ao que sai: variável de nome → primeiro nome
+ * APRESENTÁVEL (nome numérico/curto vira 'cliente'); as demais → exemplo. */
+export function primeiroNomeApresentavel(nome: string): string {
+  const p = (nome ?? '').trim().split(/\s+/)[0] ?? '';
+  return (/^[+\d()\-.]*$/.test(p) || p.length < 2) ? '' : p;
+}
+export function preencherTemplate(
+  corpo: string,
+  variaveis: Array<{ rotulo?: string; exemplo?: string }> | null | undefined,
+  nomeContato: string,
+): string {
+  const primeiro = primeiroNomeApresentavel(nomeContato);
+  const defs = Array.isArray(variaveis) ? variaveis : [];
+  const vars = defs.map((d) => {
+    const rotulo = String(d?.rotulo ?? '').toLowerCase();
+    if (/nome|primeiro|cliente/.test(rotulo)) return primeiro || 'cliente';
+    return String(d?.exemplo ?? '').trim() || 'cliente';
+  });
+  return (corpo ?? '').replace(/\{\{\s*(\d+)\s*\}\}/g, (_m, n) => vars[Number(n) - 1] ?? '');
 }
 export interface Campanha {
   id: string; organizacao_id: string; canal_id: string; template_id: string;
@@ -83,6 +108,14 @@ export function useCriarCampanha() {
       rpc<string>('disparo_criar_campanha', {
         p_org: currentOrg.id, p_nome: p.nome, p_template: p.template_id, p_canal: p.canal_id, p_teto: p.teto ?? 200,
       }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['disparo-campanhas'] }),
+  });
+}
+
+export function useCancelarCampanha() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (campanhaId: string) => rpc<void>('disparo_cancelar_campanha', { p_campanha: campanhaId }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['disparo-campanhas'] }),
   });
 }
