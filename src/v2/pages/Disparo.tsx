@@ -368,48 +368,60 @@ export function Disparo() {
           {/* ================= 1 · PÚBLICO ================= */}
           {etapa === 1 && (
             <>
-              <CardVidro spot sobe className="dsp-fpainel" style={{ borderRadius: 12, padding: '12px 16px', animationDelay: '.05s' }}>
-                <div className="dsp-fgrupo">
-                  <span className="dsp-flabel">Etapa do Kanban</span>
-                  <Chips>
-                    <Chip ativo={etapasSel.size === 0} onClick={() => setEtapasSel(new Set())}>Todas {elegiveis.length}</Chip>
-                    {etapasKanban.map((et) => (
-                      <Chip key={et.nome} ativo={etapasSel.has(et.nome)} onClick={() => alternarEtapaKanban(et.nome)}>{et.nome} {et.total}</Chip>
-                    ))}
-                  </Chips>
-                </div>
-                <div className="dsp-fgrupo">
-                  <span className="dsp-flabel">Gênero (pelo primeiro nome)</span>
-                  <Chips>
-                    <Chip ativo={generoSel.size === 0} onClick={() => setGeneroSel(new Set())}>Todos</Chip>
-                    <Chip ativo={generoSel.has('homem')} onClick={() => alternarGenero('homem')}>♂ Homens {porGenero.homem}</Chip>
-                    <Chip ativo={generoSel.has('mulher')} onClick={() => alternarGenero('mulher')}>♀ Mulheres {porGenero.mulher}</Chip>
-                    <Chip ativo={generoSel.has('ambiguo')} onClick={() => alternarGenero('ambiguo')}>? Incertos {porGenero.ambiguo}</Chip>
-                  </Chips>
-                </div>
-                <div className="dsp-fgrupo">
-                  <span className="dsp-flabel">Busca</span>
-                  <div className="dsp-busca">
-                    <Input placeholder="Nome ou telefone…" value={busca} onChange={(e) => setBusca(e.target.value)} aria-label="Buscar no público elegível" />
+              <CardVidro spot sobe className="dsp-fpainel" style={{ borderRadius: 12, padding: '14px 16px', animationDelay: '.05s' }}>
+                {/* BLOCO 1 — filtros: define QUEM é o público */}
+                <div className="dsp-fbloco">
+                  <div className="dsp-fgrupo">
+                    <span className="dsp-flabel">Etapa do Kanban</span>
+                    <Chips>
+                      <Chip ativo={etapasSel.size === 0} onClick={() => setEtapasSel(new Set())}>Todas {elegiveis.length}</Chip>
+                      {etapasKanban.map((et) => (
+                        <Chip key={et.nome} ativo={etapasSel.has(et.nome)} onClick={() => alternarEtapaKanban(et.nome)}>{et.nome} {et.total}</Chip>
+                      ))}
+                    </Chips>
+                  </div>
+                  <div className="dsp-fgrupo">
+                    <span className="dsp-flabel">Gênero (pelo primeiro nome)</span>
+                    <Chips>
+                      <Chip ativo={generoSel.size === 0} onClick={() => setGeneroSel(new Set())}>Todos</Chip>
+                      <Chip ativo={generoSel.has('homem')} onClick={() => alternarGenero('homem')}>♂ Homens {porGenero.homem}</Chip>
+                      <Chip ativo={generoSel.has('mulher')} onClick={() => alternarGenero('mulher')}>♀ Mulheres {porGenero.mulher}</Chip>
+                      <Chip ativo={generoSel.has('ambiguo')} onClick={() => alternarGenero('ambiguo')}>? Incertos {porGenero.ambiguo}</Chip>
+                    </Chips>
+                  </div>
+                  <div className="dsp-fgrupo">
+                    <span className="dsp-flabel">Busca</span>
+                    <div className="dsp-busca">
+                      <Input placeholder="Nome ou telefone…" value={busca} onChange={(e) => setBusca(e.target.value)} aria-label="Buscar no público elegível" />
+                    </div>
                   </div>
                 </div>
-                <div className="dsp-fgrupo dsp-fqtd">
-                  <span className="dsp-flabel">Selecionar dentro do filtro ({selecionaveis.length} disponíveis)</span>
-                  <div className="dsp-fqtd-linha">
-                    <span className="num">Quero</span>
-                    <input
-                      className="inp dsp-lote-inp num" type="number" min={1} max={999}
-                      value={qtd} onChange={(e) => setQtd(Math.min(999, Math.max(1, Number(e.target.value) || 1)))}
-                      aria-label="Quantidade de pessoas"
-                    />
-                    <select className="inp dsp-fsel" value={modoQtd} onChange={(e) => setModoQtd(e.target.value as 'recentes' | 'aleatorio')} aria-label="Critério de seleção">
-                      <option value="recentes">mais recentes</option>
-                      <option value="aleatorio">aleatórios</option>
-                    </select>
-                    <BotaoSec onClick={selecionarN}>Selecionar {Math.min(qtd, selecionaveis.length)}</BotaoSec>
-                    <BotaoSec onClick={() => setSel(todosFiltradosMarcados ? new Set() : new Set(selecionaveis.map((e) => e.contato_id)))}>
-                      {todosFiltradosMarcados ? 'Desmarcar todos' : `Todos os ${selecionaveis.length}`}
-                    </BotaoSec>
+
+                {/* BLOCO 2 — quantidade: QUANTOS desse público */}
+                <div className="dsp-fbloco dsp-fbloco-qtd">
+                  <div className="dsp-fgrupo">
+                    <span className="dsp-flabel">Quantidade</span>
+                    <div className="dsp-fqtd-linha">
+                      <span className="num">Quero</span>
+                      <input
+                        className="inp dsp-lote-inp num" type="number" min={1} max={999}
+                        value={qtd} onChange={(e) => setQtd(Math.min(999, Math.max(1, Number(e.target.value) || 1)))}
+                        aria-label="Quantidade de pessoas"
+                      />
+                      <span className="num">pessoas,</span>
+                      <select className="inp dsp-fsel" value={modoQtd} onChange={(e) => setModoQtd(e.target.value as 'recentes' | 'aleatorio')} aria-label="Critério de seleção">
+                        <option value="recentes">as mais recentes</option>
+                        <option value="aleatorio">sorteadas</option>
+                      </select>
+                      <BotaoSec onClick={selecionarN}>Selecionar {Math.min(qtd, selecionaveis.length)}</BotaoSec>
+                      <BotaoSec onClick={() => setSel(todosFiltradosMarcados ? new Set() : new Set(selecionaveis.map((e) => e.contato_id)))}>
+                        {todosFiltradosMarcados ? 'Desmarcar todos' : `Todos os ${selecionaveis.length}`}
+                      </BotaoSec>
+                    </div>
+                  </div>
+                  <div className="dsp-fdisp" aria-live="polite">
+                    <strong className="num">{selecionaveis.length}</strong>
+                    <span>disponíveis<br />neste filtro</span>
                   </div>
                 </div>
               </CardVidro>
