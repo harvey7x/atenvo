@@ -361,10 +361,15 @@ export function Disparo() {
                   {listaPublico.map((e) => cardPessoa(e))}
                 </div>
               )}
-              <div className="dsp-rodape-etapa">
+              <div className="dsp-rodape-etapa dsp-flutua">
                 <span className="num">{selecionados.length} selecionado{selecionados.length === 1 ? '' : 's'}</span>
-                <BotaoPrimario onClick={() => irPara(2)} disabled={!selecionados.length && !campanha}>
-                  {campanha ? 'Continuar' : 'Escolher template →'}
+                <BotaoPrimario
+                  onClick={() => irPara(campanha ? (selecionados.length ? 3 : 4) : 2)}
+                  disabled={!selecionados.length && !campanha}
+                >
+                  {campanha
+                    ? (selecionados.length ? `Adicionar ${selecionados.length} à campanha →` : 'Ir para o disparo →')
+                    : `Avançar (${selecionados.length} selecionado${selecionados.length === 1 ? '' : 's'}) →`}
                 </BotaoPrimario>
               </div>
             </>
