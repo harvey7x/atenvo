@@ -24,6 +24,15 @@ export interface Elegivel {
   /** Contexto do lead para o card (vêm da oportunidade mais recente). */
   tipo_servico: string | null; canal_origem: string | null;
   ultima_msg_em: string | null; optout: boolean;
+  /** Já recebeu um disparo antes (status='enviado' em qualquer campanha da org). */
+  ja_recebeu: boolean; ultimo_disparo_em: string | null; ultima_campanha: string | null;
+}
+
+/** Pessoa que JÁ recebeu um disparo (visão por contato, aba "Já contatados"). */
+export interface Contatado {
+  contato_id: string; nome: string; telefone: string | null;
+  total_disparos: number; ultimo_em: string | null;
+  ultima_campanha: string | null; optout: boolean;
 }
 
 /* ---------- prévia da mensagem por pessoa (ESPELHO da lógica do motor) ----------
@@ -100,6 +109,17 @@ export function useDisparoElegiveis() {
     enabled: REAL,
     staleTime: 30_000,
     queryFn: () => rpc<Elegivel[]>('disparo_elegiveis', { p_org: currentOrg.id }),
+  });
+}
+
+/** Quem já recebeu disparo (por pessoa) — alimenta a aba "Já contatados" e o re-disparo. */
+export function useDisparoContatados() {
+  const { currentOrg } = useOrg();
+  return useQuery({
+    queryKey: ['disparo-contatados', currentOrg.id],
+    enabled: REAL,
+    staleTime: 30_000,
+    queryFn: () => rpc<Contatado[]>('disparo_contatados', { p_org: currentOrg.id }),
   });
 }
 
@@ -191,6 +211,9 @@ export function useProcessarLote() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['disparo-alvos'] });
       qc.invalidateQueries({ queryKey: ['disparo-campanhas'] });
+      // envio real muda quem "já recebeu": recarrega elegíveis (badge/filtro) e contatados.
+      qc.invalidateQueries({ queryKey: ['disparo-elegiveis'] });
+      qc.invalidateQueries({ queryKey: ['disparo-contatados'] });
     },
   });
 }

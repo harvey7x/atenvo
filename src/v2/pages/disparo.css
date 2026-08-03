@@ -137,6 +137,17 @@
   box-shadow: var(--sombra-2);
 }
 
+/* ---- aba "Já contatados" ---- */
+.v2 .dsp-cont-barra {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  flex-wrap: wrap; padding: 12px 16px; border-bottom: 1px solid var(--linha);
+  font-size: 11.5px; color: var(--txt-2);
+}
+.v2 .dsp-cont-barra strong { color: var(--txt); font-size: 14px; }
+.v2 .dsp-cont-acoes { display: flex; align-items: center; gap: 8px; }
+.v2 .dsp-check { width: 15px; height: 15px; accent-color: var(--acento); cursor: pointer; }
+.v2 .dsp-check:disabled { cursor: not-allowed; opacity: .4; }
+
 /* ---- modal de simulação ---- */
 .v2 .dsp-previa { display: flex; flex-direction: column; gap: 10px; max-height: 55vh; overflow-y: auto; }
 .v2 .dsp-previa-item { border: 1px solid var(--linha); border-radius: 9px; padding: 9px 11px; }

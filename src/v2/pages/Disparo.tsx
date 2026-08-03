@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  useDisparoElegiveis, useCampanhas, useCriarCampanha, useCancelarCampanha, useAddAlvos, useAlvos,
+  useDisparoElegiveis, useDisparoContatados, useCampanhas, useCriarCampanha, useCancelarCampanha, useAddAlvos, useAlvos,
   useProcessarLote, useOptoutLista, useOptoutManual, useOptoutRemover,
   preencherTemplate, primeiroNomeApresentavel, inferirGenero, type Genero,
-  type Elegivel, type Campanha, type Alvo, type OptoutRow, type ResultadoProcessar,
+  type Elegivel, type Contatado, type Campanha, type Alvo, type OptoutRow, type ResultadoProcessar,
 } from '@/data/disparo';
 import { useWaTemplates, useCloudDiagnostico, type WaTemplate } from '@/data/cloudApi';
 import { formatarNumero } from '@/data/maturacao';
@@ -24,8 +24,19 @@ import './disparo.css';
    dry-run por default, teto 24h no servidor, opt-out re-checado.
    ------------------------------------------------------------------ */
 
-type AbaId = 'campanha' | 'excluidos';
+type AbaId = 'campanha' | 'contatados' | 'excluidos';
 type Etapa = 1 | 2 | 3 | 4;
+
+/* Contatado (já recebeu) → forma de Elegível, para caber no mesmo fluxo de seleção
+   e nos cards. Não precisa estar no topo do funil: o disparo_add_alvos re-valida
+   opt-out e WhatsApp no servidor. */
+const contatadoParaElegivel = (c: Contatado): Elegivel => ({
+  contato_id: c.contato_id, nome: c.nome, telefone: c.telefone ?? '',
+  etapa: 'Já contatado', etapa_ordem: 999,
+  tipo_servico: null, canal_origem: c.ultima_campanha,
+  ultima_msg_em: c.ultimo_em, optout: c.optout,
+  ja_recebeu: true, ultimo_disparo_em: c.ultimo_em, ultima_campanha: c.ultima_campanha,
+});
 const ROTULO_ETAPA: Record<Etapa, string> = { 1: 'Público', 2: 'Template', 3: 'Revisar', 4: 'Disparar' };
 
 const ST_ALVO: Record<Alvo['status'], { rotulo: string; tom: TomStatus }> = {
@@ -58,6 +69,7 @@ export function Disparo() {
 
   /* ---------- dados ---------- */
   const elegQ = useDisparoElegiveis();
+  const contQ = useDisparoContatados();
   const campQ = useCampanhas();
   const tplQ = useWaTemplates();
   const diagQ = useCloudDiagnostico();
@@ -100,10 +112,13 @@ export function Disparo() {
   // "Quero N pessoas" dentro dos filtros: N + critério (mais recentes | aleatório).
   const [qtd, setQtd] = useState(50);
   const [modoQtd, setModoQtd] = useState<'recentes' | 'aleatorio'>('recentes');
+  // Protege a base: por padrão o público novo NÃO inclui quem já recebeu um disparo.
+  const [excluirJaRecebeu, setExcluirJaRecebeu] = useState(true);
   const [sel, setSel] = useState<ReadonlySet<string>>(new Set());
   const [confOptout, setConfOptout] = useState<Elegivel | null>(null);
 
   const elegiveis = elegQ.data ?? [];
+  const contatados = contQ.data ?? [];
   const etapasKanban = useMemo(() => {
     const m = new Map<string, { ordem: number; total: number }>();
     for (const e of elegiveis) {
@@ -118,15 +133,26 @@ export function Disparo() {
     for (const g of generoDe.values()) c[g] += 1;
     return c;
   }, [generoDe]);
+  const jaRecebeuNoFiltro = useMemo(
+    () => elegiveis.filter((e) => e.ja_recebeu).length,
+    [elegiveis],
+  );
   const listaPublico = useMemo(() => {
     const q = busca.trim().toLowerCase();
     return elegiveis.filter((e) =>
       (etapasSel.size === 0 || etapasSel.has(e.etapa)) &&
       (generoSel.size === 0 || generoSel.has(generoDe.get(e.contato_id) ?? 'ambiguo')) &&
+      (!excluirJaRecebeu || !e.ja_recebeu) &&
       (!q || e.nome.toLowerCase().includes(q) || (e.telefone ?? '').includes(q)));
-  }, [elegiveis, busca, etapasSel, generoSel, generoDe]);
+  }, [elegiveis, busca, etapasSel, generoSel, generoDe, excluirJaRecebeu]);
   const selecionaveis = useMemo(() => listaPublico.filter((e) => !e.optout), [listaPublico]);
-  const porContato = useMemo(() => new Map(elegiveis.map((e) => [e.contato_id, e])), [elegiveis]);
+  // pool de resolução da seleção: elegíveis + contatados (para o re-disparo caber no fluxo).
+  const porContato = useMemo(() => {
+    const m = new Map<string, Elegivel>();
+    for (const e of elegiveis) m.set(e.contato_id, e);
+    for (const c of contatados) if (!m.has(c.contato_id)) m.set(c.contato_id, contatadoParaElegivel(c));
+    return m;
+  }, [elegiveis, contatados]);
   const selecionados = useMemo(
     () => [...sel].map((id) => porContato.get(id)).filter(Boolean) as Elegivel[],
     [sel, porContato],
@@ -155,6 +181,10 @@ export function Disparo() {
   const alternarPessoa = (e: Elegivel) => {
     if (e.optout) return;
     setSel((s) => { const n = new Set(s); if (n.has(e.contato_id)) n.delete(e.contato_id); else n.add(e.contato_id); return n; });
+  };
+  const alternarContato = (id: string, optout: boolean) => {
+    if (optout) return;
+    setSel((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   };
   const todosFiltradosMarcados = selecionaveis.length > 0 && selecionaveis.every((e) => sel.has(e.contato_id));
 
@@ -241,6 +271,23 @@ export function Disparo() {
     { chave: 'acoes', titulo: '', dir: true, render: (o) => <BotaoMini onClick={() => setConfDesfazer(o)}>Desfazer</BotaoMini> },
   ];
 
+  /* ================= aba já contatados ================= */
+  const selCont = useMemo(() => contatados.filter((c) => !c.optout), [contatados]);
+  const todosContMarcados = selCont.length > 0 && selCont.every((c) => sel.has(c.contato_id));
+  const COLS_CONT: Coluna<Contatado>[] = [
+    { chave: 'sel', titulo: '', render: (c) => (
+      <input type="checkbox" className="dsp-check" checked={sel.has(c.contato_id)} disabled={c.optout}
+        onChange={() => alternarContato(c.contato_id, c.optout)} aria-label={`Selecionar ${c.nome}`} />
+    ) },
+    { chave: 'nome', titulo: 'Contato', classe: 'nome', render: (c) => c.nome || '—' },
+    { chave: 'tel', titulo: 'WhatsApp', classe: 'num', render: (c) => fmtTel(c.telefone) },
+    { chave: 'total', titulo: 'Disparos', dir: true, classe: 'num', render: (c) => c.total_disparos },
+    { chave: 'ult', titulo: 'Último', dir: true, classe: 'num', render: (c) => (c.ultimo_em ? tempoRelativo(c.ultimo_em, agoraMs) : '—') },
+    { chave: 'camp', titulo: 'Última campanha', render: (c) => c.ultima_campanha ?? '—' },
+    { chave: 'st', titulo: '', dir: true, render: (c) => (c.optout ? <BadgeStatus tom="erro">Opt-out</BadgeStatus> : null) },
+  ];
+  const reDisparar = () => { setAba('campanha'); irPara(campanha ? 3 : 2); };
+
   /* ================= render ================= */
   const carregando = elegQ.isLoading || campQ.isLoading;
   const podeIr = (alvo: Etapa): boolean => {
@@ -284,6 +331,7 @@ export function Disparo() {
         <div className="dsp-card-tags">
           <BadgeStatus tom={e.etapa === 'REMARKETING' ? 'atencao' : 'neutro'}>{e.etapa}</BadgeStatus>
           {e.tipo_servico && <BadgeStatus tom="neutro">{e.tipo_servico}</BadgeStatus>}
+          {e.ja_recebeu && <BadgeStatus tom="atencao">já recebeu</BadgeStatus>}
           {e.optout && <BadgeStatus tom="erro">Opt-out</BadgeStatus>}
         </div>
         <div className="dsp-card-meta num">
@@ -315,6 +363,7 @@ export function Disparo() {
         </div>
         <Chips>
           <Chip ativo={aba === 'campanha'} onClick={() => setAba('campanha')}>Campanha</Chip>
+          <Chip ativo={aba === 'contatados'} onClick={() => setAba('contatados')}>Já contatados {contatados.length}</Chip>
           <Chip ativo={aba === 'excluidos'} onClick={() => setAba('excluidos')}>Excluídos {optQ.data?.length ?? 0}</Chip>
         </Chips>
       </header>
@@ -323,6 +372,29 @@ export function Disparo() {
 
       {carregando ? (
         <CardVidro style={{ borderRadius: 12, padding: 16 }}><SkeletonTexto linhas={6} /></CardVidro>
+      ) : aba === 'contatados' ? (
+        <CardVidro spot sobe style={{ borderRadius: 12 }}>
+          {contQ.isLoading ? (
+            <div style={{ padding: 16 }}><SkeletonTexto linhas={6} /></div>
+          ) : contatados.length === 0 ? (
+            <EstadoVazio titulo="Ninguém recebeu disparo ainda" descricao="Assim que uma campanha enviar, quem receber aparece aqui — para você disparar de novo para os mesmos depois, sem repetir sem querer." />
+          ) : (
+            <>
+              <div className="dsp-cont-barra">
+                <span className="num"><strong>{contatados.length}</strong> já receberam · {selecionados.length} selecionado{selecionados.length === 1 ? '' : 's'}</span>
+                <div className="dsp-cont-acoes">
+                  <BotaoSec onClick={() => setSel(todosContMarcados ? new Set() : new Set(selCont.map((c) => c.contato_id)))}>
+                    {todosContMarcados ? 'Desmarcar todos' : `Selecionar os ${selCont.length}`}
+                  </BotaoSec>
+                  <BotaoPrimario disabled={!selecionados.length} onClick={reDisparar}>
+                    Disparar de novo{selecionados.length ? ` (${selecionados.length})` : ''} →
+                  </BotaoPrimario>
+                </div>
+              </div>
+              <TabelaPadrao colunas={COLS_CONT} linhas={contatados} chave={(c) => c.contato_id} rodape={{ texto: `${contatados.length} contatos já disparados · opt-out é barrado no envio` }} />
+            </>
+          )}
+        </CardVidro>
       ) : aba === 'excluidos' ? (
         <CardVidro spot sobe style={{ borderRadius: 12 }}>
           {(optQ.data ?? []).length === 0 ? (
@@ -394,6 +466,13 @@ export function Disparo() {
                     <div className="dsp-busca">
                       <Input placeholder="Nome ou telefone…" value={busca} onChange={(e) => setBusca(e.target.value)} aria-label="Buscar no público elegível" />
                     </div>
+                  </div>
+                  <div className="dsp-fgrupo">
+                    <span className="dsp-flabel">Já contatados</span>
+                    <Chips>
+                      <Chip ativo={excluirJaRecebeu} onClick={() => setExcluirJaRecebeu(true)}>Esconder quem já recebeu {jaRecebeuNoFiltro > 0 ? `(${jaRecebeuNoFiltro})` : ''}</Chip>
+                      <Chip ativo={!excluirJaRecebeu} onClick={() => setExcluirJaRecebeu(false)}>Mostrar todos</Chip>
+                    </Chips>
                   </div>
                 </div>
 
