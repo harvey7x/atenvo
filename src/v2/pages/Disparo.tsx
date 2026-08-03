@@ -3,7 +3,7 @@ import {
   useDisparoElegiveis, useDisparoContatados, useCampanhas, useCriarCampanha, useCancelarCampanha, useAddAlvos, useAlvos,
   useProcessarLote, useOptoutLista, useOptoutManual, useOptoutRemover,
   preencherTemplate, primeiroNomeApresentavel, inferirGenero, type Genero,
-  type Elegivel, type Contatado, type Campanha, type Alvo, type OptoutRow, type ResultadoProcessar,
+  type Elegivel, type Contatado, type Campanha, type OptoutRow, type ResultadoProcessar,
 } from '@/data/disparo';
 import { useWaTemplates, useCloudDiagnostico, type WaTemplate } from '@/data/cloudApi';
 import { formatarNumero } from '@/data/maturacao';
@@ -39,13 +39,16 @@ const contatadoParaElegivel = (c: Contatado): Elegivel => ({
 });
 const ROTULO_ETAPA: Record<Etapa, string> = { 1: 'Público', 2: 'Template', 3: 'Revisar', 4: 'Disparar' };
 
-const ST_ALVO: Record<Alvo['status'], { rotulo: string; tom: TomStatus }> = {
+const ST_ALVO: Record<string, { rotulo: string; tom: TomStatus }> = {
   pendente: { rotulo: 'Pendente', tom: 'neutro' },
   enviado: { rotulo: 'Enviado', tom: 'ok' },
+  respondido: { rotulo: 'Respondeu', tom: 'ok' },   // recebeu E respondeu (marcado pelo webhook)
   falhou: { rotulo: 'Falhou', tom: 'erro' },
   optout: { rotulo: 'Opt-out', tom: 'atencao' },
   pulado: { rotulo: 'Pulado', tom: 'neutro' },
 };
+/** NUNCA quebra a tela: status desconhecido (novo no backend) vira um selo neutro. */
+const stAlvo = (s: string) => ST_ALVO[s] ?? { rotulo: s || '—', tom: 'neutro' as TomStatus };
 const MOTIVO_ROTULO: Record<string, string> = {
   sair_texto: 'Respondeu SAIR',
   erro_131050: 'Bloqueou na Meta',
@@ -218,7 +221,7 @@ export function Disparo() {
 
   const alvos = alvosQ.data ?? [];
   const porStatus = useMemo(() => {
-    const c: Record<string, number> = { pendente: 0, enviado: 0, falhou: 0, optout: 0, pulado: 0 };
+    const c: Record<string, number> = { pendente: 0, enviado: 0, respondido: 0, falhou: 0, optout: 0, pulado: 0 };
     for (const a of alvos) c[a.status] = (c[a.status] ?? 0) + 1;
     return c;
   }, [alvos]);
@@ -619,9 +622,9 @@ export function Disparo() {
             <>
               <div className="dsp-kpis sobe">
                 <Kpi rotulo="Pendentes" valor={porStatus.pendente} />
-                <Kpi rotulo="Enviados" valor={porStatus.enviado} />
-                <Kpi rotulo="Falhas" valor={porStatus.falhou} />
-                <Kpi rotulo="Opt-out / pulados" valor={porStatus.optout + porStatus.pulado} />
+                <Kpi rotulo="Enviados" valor={porStatus.enviado + porStatus.respondido} />
+                <Kpi rotulo="Responderam" valor={porStatus.respondido} />
+                <Kpi rotulo="Falhas / opt-out" valor={porStatus.falhou + porStatus.optout + porStatus.pulado} />
               </div>
               <CardVidro spot sobe style={{ borderRadius: 12, padding: 16, animationDelay: '.05s' }}>
                 <div className="dsp-painel">
@@ -667,7 +670,7 @@ export function Disparo() {
                           <strong>{a.contatos?.nome ?? '—'}</strong>
                           <span className="num">{fmtTel(a.telefone)}</span>
                         </span>
-                        <BadgeStatus tom={ST_ALVO[a.status].tom}>{ST_ALVO[a.status].rotulo}</BadgeStatus>
+                        <BadgeStatus tom={stAlvo(a.status).tom}>{stAlvo(a.status).rotulo}</BadgeStatus>
                       </div>
                       <div className="dsp-card-meta num">
                         {a.enviado_em ? `enviado ${tempoRelativo(a.enviado_em, agoraMs)}` : (a.erro ?? 'aguardando lote')}

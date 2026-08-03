@@ -85,7 +85,7 @@ export interface Campanha {
 }
 export interface Alvo {
   id: string; campanha_id: string; contato_id: string; telefone: string | null;
-  status: 'pendente' | 'enviado' | 'falhou' | 'optout' | 'pulado';
+  status: 'pendente' | 'enviado' | 'respondido' | 'falhou' | 'optout' | 'pulado';
   erro: string | null; wamid: string | null; enviado_em: string | null;
   contatos?: { nome: string } | null;
 }
