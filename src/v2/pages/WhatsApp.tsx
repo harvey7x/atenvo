@@ -10,7 +10,7 @@ import { useScriptsResumoEtapas } from '../hooks/scriptsResumo';
 import { useJanelaCanal, rotuloJanela } from '@/data/cloudApi';
 import { useSlaAlertas } from '@/data/sla';
 import { indexPorChave, tipoLabel, tempoRelativo } from '@/data/slaView';
-import { useOportunidadesDoContato, useFunisDaOrg, chamarGarantirEntrada } from '@/data/kanban';
+import { useOportunidadesDoContato, useFunisDaOrg, chamarGarantirEntrada, useColunasFunil, useMoverOportunidade, classificarMovimento, MOTIVOS_PERDA, traduzErroKanban } from '@/data/kanban';
 import { useChecklist } from '@/data/checklist';
 import { useCobrancas } from '@/data/cobrancas';
 import { corDaEtiqueta, podeGerenciarAtendimento, type AssinaturaModo } from '@/types/atendimento';
@@ -1476,13 +1476,46 @@ function KanbanCtx({ contatoId, demo, etapa, etapaCor, origem, respNome, lead, a
   const nav = useNavigate();
   const oppsQ = useOportunidadesDoContato(!demo ? contatoId : null);
   const funisQ = useFunisDaOrg();
+  const abertaReal = demo ? null : (oppsQ.data ?? []).find((o) => o.aberta) ?? null;
+  const colunasQ = useColunasFunil(abertaReal?.funilId ?? null);
+  const mover = useMoverOportunidade();
   const [addAberto, setAddAberto] = useState(false);
   const [funilSel, setFunilSel] = useState('');
   const [addBusy, setAddBusy] = useState(false);
+  const [movBusy, setMovBusy] = useState(false);
+  const [pendCol, setPendCol] = useState<string | null>(null);        // coluna alvo enquanto salva (feedback imediato)
+  const [motivoModal, setMotivoModal] = useState<null | { destinoId: string; tipo: 'perdido' | 'reabertura' }>(null);
+  const [motivoSel, setMotivoSel] = useState('sem_interesse');
+  const [motivoTxt, setMotivoTxt] = useState('');
+  useEffect(() => { setPendCol(null); setMotivoModal(null); }, [contatoId]); // troca de conversa não herda estado de mover
   if (!contatoId) return null;
+  const colunas = colunasQ.data ?? [];
   const aberta = demo
-    ? (etapa ? { id: 'demo-opp', funilNome: 'Funil comercial', colunaNome: etapa, respNome: respNome ?? '', tipoServico: 'analise_inicial', tipoBeneficio: 'aposentadoria', valor: null } : null)
-    : (oppsQ.data ?? []).find((o) => o.aberta) ?? null;
+    ? (etapa ? { id: 'demo-opp', funilNome: 'Funil comercial', colunaId: null as string | null, colunaNome: etapa, respNome: respNome ?? '', tipoServico: 'analise_inicial', tipoBeneficio: 'aposentadoria', valor: null, atualizadoEm: '' } : null)
+    : abertaReal;
+  const colAtual = colunas.find((c) => c.id === aberta?.colunaId) ?? null;
+  function aoTrocarColuna(destinoId: string) {
+    if (!aberta || !destinoId || destinoId === aberta.colunaId) return;
+    const destino = colunas.find((c) => c.id === destinoId);
+    if (!destino) return;
+    const origem = colunas.find((c) => c.id === aberta.colunaId);
+    const tipo = classificarMovimento(origem?.resultado ?? 'neutro', destino.resultado);
+    if (tipo === 'perdido') { setMotivoSel('sem_interesse'); setMotivoTxt(''); setMotivoModal({ destinoId, tipo: 'perdido' }); return; }
+    if (tipo === 'reabertura') { setMotivoTxt(''); setMotivoModal({ destinoId, tipo: 'reabertura' }); return; }
+    void executarMover(destinoId, {});                                 // neutro/ganho: move direto
+  }
+  async function executarMover(destinoId: string, motivos: { motivoPerda?: string | null; motivoPerdaDesc?: string | null; motivoReabertura?: string | null }) {
+    if (!aberta?.id || !aberta.atualizadoEm) return;
+    setMovBusy(true); setPendCol(destinoId);
+    try {
+      await mover({ id: aberta.id, colunaId: destinoId, atualizadoEmEsperado: aberta.atualizadoEm, ...motivos });
+      aoAvisar({ tom: 'ok', texto: `Movido para ${colunas.find((c) => c.id === destinoId)?.nome ?? 'nova etapa'}.` });
+      setMotivoModal(null);
+    } catch (e) {
+      aoAvisar({ tom: 'erro', texto: traduzErroKanban((e as Error)?.message || '') });
+      setPendCol(null);                                                 // reverte o select ao valor real
+    } finally { setMovBusy(false); }
+  }
   return (
     <div className="ctx-b spot">
       <div className="ctx-t">Funil</div>
@@ -1490,7 +1523,21 @@ function KanbanCtx({ contatoId, demo, etapa, etapaCor, origem, respNome, lead, a
         <div className="ctx-nota">Carregando…</div>
       ) : aberta ? (
         <>
-          <div className="cx-l"><span className="k">Etapa</span><span className="v" style={etapaCor ? { color: etapaCor } : undefined}>{aberta.colunaNome ?? etapa ?? '—'}</span></div>
+          <div className="cx-l"><span className="k">Etapa</span>
+            {demo ? (
+              <span className="v" style={etapaCor ? { color: etapaCor } : undefined}>{aberta.colunaNome ?? etapa ?? '—'}</span>
+            ) : (
+              <span className="cx-mov">
+                <span className="cx-dot" style={{ background: colAtual?.cor ?? etapaCor ?? 'var(--txt-3)' }} />
+                <select className="cx-sel" aria-label="Mover etapa do card"
+                  disabled={movBusy || colunasQ.isLoading || colunas.length === 0}
+                  value={pendCol ?? aberta.colunaId ?? ''} onChange={(e) => aoTrocarColuna(e.target.value)}>
+                  {colunas.length === 0 && <option value="">{colunasQ.isLoading ? 'Carregando…' : '—'}</option>}
+                  {colunas.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                </select>
+              </span>
+            )}
+          </div>
           <div className="cx-l"><span className="k">Funil</span><span className="v">{aberta.funilNome ?? '—'}</span></div>
           <div className="cx-l"><span className="k">Responsável</span><span className="v">{aberta.respNome || 'Não atribuído'}</span></div>
           <div className="cx-l"><span className="k">Origem</span><span className="v">{origem}</span></div>
@@ -1552,6 +1599,41 @@ function KanbanCtx({ contatoId, demo, etapa, etapaCor, origem, respNome, lead, a
               {(funisQ.data ?? []).map((f) => <option key={f.id} value={f.id}>{f.nome}{f.padrao ? ' (padrão)' : ''}</option>)}
             </select>
           </div>
+        )}
+      </ModalV2>
+      <ModalV2
+        aberto={!!motivoModal}
+        aoFechar={() => { if (!movBusy) setMotivoModal(null); }}
+        largura={400}
+        titulo={motivoModal?.tipo === 'perdido' ? 'Motivo da perda' : 'Reabrir oportunidade'}
+        rodape={
+          <>
+            <BotaoSec disabled={movBusy} onClick={() => setMotivoModal(null)}>Cancelar</BotaoSec>
+            <BotaoPrimario
+              disabled={movBusy || !motivoModal || (motivoModal.tipo === 'perdido' ? (motivoSel === 'outro' && !motivoTxt.trim()) : !motivoTxt.trim())}
+              onClick={() => {
+                if (!motivoModal) return;
+                if (motivoModal.tipo === 'perdido') void executarMover(motivoModal.destinoId, { motivoPerda: motivoSel, motivoPerdaDesc: motivoSel === 'outro' ? motivoTxt.trim() : null });
+                else void executarMover(motivoModal.destinoId, { motivoReabertura: motivoTxt.trim() });
+              }}>{movBusy ? 'Movendo…' : 'Confirmar'}</BotaoPrimario>
+          </>
+        }
+      >
+        {motivoModal?.tipo === 'perdido' ? (
+          <>
+            <div className="campo"><label>Motivo da perda</label>
+              <select className="inp" value={motivoSel} onChange={(e) => setMotivoSel(e.target.value)}>
+                {MOTIVOS_PERDA.map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              </select>
+            </div>
+            {motivoSel === 'outro' && (
+              <div className="campo" style={{ marginTop: 10 }}><label>Descreva</label>
+                <textarea className="inp" rows={2} value={motivoTxt} onChange={(e) => setMotivoTxt(e.target.value)} /></div>
+            )}
+          </>
+        ) : (
+          <div className="campo"><label>Motivo da reabertura</label>
+            <textarea className="inp" rows={2} value={motivoTxt} onChange={(e) => setMotivoTxt(e.target.value)} placeholder="Por que está reabrindo esta oportunidade?" /></div>
         )}
       </ModalV2>
     </div>

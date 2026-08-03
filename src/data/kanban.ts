@@ -215,7 +215,7 @@ export function useFunisDaOrg() {
 }
 
 export interface OppDoContato {
-  id: string; status: string; aberta: boolean; funilId: string | null; funilNome: string; colunaNome: string; respNome: string;
+  id: string; status: string; aberta: boolean; funilId: string | null; funilNome: string; colunaId: string | null; colunaNome: string; respNome: string;
   tipoServico: string; tipoBeneficio: string | null; valor: number | null; valorDescontoMensal: number | null;
   valorRessarcimentoEstimado: number | null; valorRessarcido: number | null; origem: string; criadoEm: string; atualizadoEm: string;
 }
@@ -227,7 +227,7 @@ export function useOportunidadesDoContato(contatoId: string | null) {
     queryKey: ['opp-do-contato', org, contatoId], enabled: KANBAN_REAL && !!contatoId,
     queryFn: async (): Promise<OppDoContato[]> => {
       const { data, error } = await supabase!.from('oportunidades')
-        .select('id, status, funil_id, tipo_servico, tipo_beneficio, valor_estimado, valor_desconto_mensal, valor_ressarcimento_estimado, valor_ressarcido, origem, criado_em, atualizado_em, funis(nome), funil_colunas(nome), responsavel:usuarios!oportunidades_responsavel_id_fkey(nome)')
+        .select('id, status, funil_id, coluna_id, tipo_servico, tipo_beneficio, valor_estimado, valor_desconto_mensal, valor_ressarcimento_estimado, valor_ressarcido, origem, criado_em, atualizado_em, funis(nome), funil_colunas(nome), responsavel:usuarios!oportunidades_responsavel_id_fkey(nome)')
         .eq('organizacao_id', org).eq('contato_id', contatoId!).order('criado_em', { ascending: false });
       if (error) throw new Error(error.message);
       return (((data as unknown[]) ?? []) as Record<string, unknown>[]).map((r) => {
@@ -237,7 +237,7 @@ export function useOportunidadesDoContato(contatoId: string | null) {
         const status = r.status as string;
         return {
           id: r.id as string, status, aberta: status === 'em_andamento', funilId: (r.funil_id as string) ?? null,
-          funilNome: fn?.nome || '', colunaNome: cl?.nome || '', respNome: rp?.nome || '',
+          funilNome: fn?.nome || '', colunaId: (r.coluna_id as string) ?? null, colunaNome: cl?.nome || '', respNome: rp?.nome || '',
           tipoServico: (r.tipo_servico as string) || 'analise_inicial', tipoBeneficio: (r.tipo_beneficio as string) ?? null,
           valor: (r.valor_estimado as number) ?? null, valorDescontoMensal: (r.valor_desconto_mensal as number) ?? null,
           valorRessarcimentoEstimado: (r.valor_ressarcimento_estimado as number) ?? null, valorRessarcido: (r.valor_ressarcido as number) ?? null,
@@ -246,6 +246,53 @@ export function useOportunidadesDoContato(contatoId: string | null) {
       });
     },
   });
+}
+
+/** Colunas de UM funil específico (mesma queryKey do Kanban → cache compartilhado).
+ *  Usado fora do quadro (ex.: mover o card direto do painel do WhatsApp). */
+export function useColunasFunil(funilId: string | null) {
+  const { currentOrg } = useOrg();
+  const org = currentOrg.id;
+  return useQuery({
+    queryKey: ['kanban-colunas', org, funilId], enabled: KANBAN_REAL && !!funilId, refetchInterval: 8000,
+    queryFn: async (): Promise<KColuna[]> => {
+      const { data, error } = await supabase!.from('funil_colunas').select('id, nome, cor, ordem, entrada, resultado, encerra_oportunidade').eq('organizacao_id', org).eq('funil_id', funilId!).eq('arquivada', false).order('ordem', { ascending: true });
+      if (error) throw new Error(error.message);
+      type CRow = { id: string; nome: string; cor: string; ordem: number; entrada: boolean; resultado: string | null; encerra_oportunidade: boolean | null };
+      return ((data as CRow[]) ?? []).map((c) => ({ id: c.id, nome: c.nome, cor: c.cor, ordem: c.ordem, entrada: c.entrada, resultado: (c.resultado as ColResultado) ?? 'neutro', encerra: Boolean(c.encerra_oportunidade) }));
+    },
+  });
+}
+
+export interface MoverOppInput { id: string; colunaId: string; atualizadoEmEsperado: string; motivoPerda?: string | null; motivoPerdaDesc?: string | null; motivoReabertura?: string | null }
+/** Move uma oportunidade de coluna FORA do quadro (painel WA/FB), com o MESMO contrato do Kanban:
+ *  controle otimista (atualizado_em esperado), motivos exigidos pelo trigger e distinção conflito×permissão.
+ *  Independe do funil carregado no quadro — resolve a ordem no fundo da coluna destino via consulta própria.
+ *  O banco continua sendo a fonte de status/fechado_em/snapshot/histórico (trigger opp_sync_fechamento). */
+export function useMoverOportunidade() {
+  const { currentOrg } = useOrg();
+  const org = currentOrg.id;
+  const qc = useQueryClient();
+  return async function mover(input: MoverOppInput): Promise<void> {
+    const { data: ult } = await supabase!.from('oportunidades').select('ordem').eq('organizacao_id', org).eq('coluna_id', input.colunaId).order('ordem', { ascending: false }).limit(1).maybeSingle();
+    const ordem = (ult && typeof (ult as { ordem: number }).ordem === 'number' ? (ult as { ordem: number }).ordem : 0) + 1;
+    const patch: Record<string, unknown> = { coluna_id: input.colunaId, ordem };
+    if (input.motivoPerda !== undefined) patch.motivo_perda = input.motivoPerda ?? null;
+    if (input.motivoPerdaDesc !== undefined) patch.motivo_perda_desc = input.motivoPerdaDesc ?? null;
+    if (input.motivoReabertura !== undefined) patch.motivo_reabertura = input.motivoReabertura ?? null;
+    const { data, error } = await supabase!.from('oportunidades').update(patch)
+      .eq('id', input.id).eq('organizacao_id', org).eq('atualizado_em', input.atualizadoEmEsperado).select('id');
+    if (error) throw new Error(error.message);                 // erro do trigger (motivo_*) / permissão
+    if (!data || (data as unknown[]).length === 0) {
+      const { data: existe } = await supabase!.from('oportunidades').select('id').eq('id', input.id).eq('organizacao_id', org).maybeSingle();
+      throw new Error(existe ? 'conflito_otimista' : 'sem_permissao');
+    }
+    // re-espalha para as views que dependem da opp (painel WA, Kanban, contatos)
+    qc.invalidateQueries({ queryKey: ['opp-do-contato', org] });
+    qc.invalidateQueries({ queryKey: ['opp-abertas', org] });
+    qc.invalidateQueries({ queryKey: ['kanban-leads', org] });
+    qc.invalidateQueries({ queryKey: ['wa-conversas', org] });
+  };
 }
 
 /** Chama a RPC idempotente (membro autenticado). Org/coluna de entrada derivadas no banco. */

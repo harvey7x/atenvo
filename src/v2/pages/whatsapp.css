@@ -329,6 +329,13 @@
 .v2 .cx-l { display: flex; justify-content: space-between; font-size: 11.5px; padding: 3px 0; align-items: center; gap: 8px; }
 .v2 .cx-l .k { color: var(--txt-2); flex-shrink: 0; }
 .v2 .cx-l .v { font-weight: 500; text-align: right; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* etapa editável (mover o card sem sair da conversa) */
+.v2 .cx-l .cx-mov { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 66%; }
+.v2 .cx-l .cx-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.v2 .cx-sel { min-width: 0; max-width: 100%; font-family: var(--fonte); font-size: 11.5px; font-weight: 500; color: var(--txt); background: none; border: 1px solid rgba(var(--tint), .16); border-radius: 7px; padding: 2px 22px 2px 7px; cursor: pointer; appearance: none; -webkit-appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--txt-3) 50%), linear-gradient(135deg, var(--txt-3) 50%, transparent 50%); background-position: right 9px center, right 5px center; background-size: 4px 4px, 4px 4px; background-repeat: no-repeat; }
+.v2 .cx-sel:hover:not(:disabled) { border-color: rgba(var(--tint), .32); }
+.v2 .cx-sel:disabled { opacity: .55; cursor: default; }
+.v2 .cx-sel option { color: var(--txt); background: var(--surface); }
 .v2 .ctx-nota { font-size: 11.5px; color: var(--txt-2); line-height: 1.5; }
 .v2 .ctx-tags { display: flex; gap: 5px; flex-wrap: wrap; }
 .v2 .ctx-tag { font-size: 10px; border-radius: 99px; padding: 2px 8px; border: 1px solid; display: inline-flex; gap: 4px; align-items: center; }
