@@ -326,6 +326,8 @@ export default function WhatsAppV2() {
   /* agrupamento por responsável — VOCÊ primeiro (seus clientes sempre visíveis no Todos),
      depois Não atribuídos, depois os demais atendentes em ordem alfabética */
   const grupos = useMemo(() => {
+    // "Todos" é a visão geral: lista ÚNICA, sem dividir por atendente (pedido do dono)
+    if (tab === 'todos') return [['', visiveis]] as [string, WaContact[]][];
     const m = new Map<string, WaContact[]>();
     for (const c of visiveis) {
       const k = responsavelEfetivo(c) ?? '';
@@ -527,8 +529,9 @@ export default function WhatsAppV2() {
               <div className="wa-vazio">Nenhuma conversa nesta aba.</div>
             ) : (
               grupos.map(([respId, lista]) => {
+                // "Todos" é lista única (sem cabeçalho) — nunca recolhe
                 // busca ativa ignora o recolhimento: resultado escondido confunde
-                const fechado = gruposFechados.has(respId) && !buscaAtiva;
+                const fechado = tab !== 'todos' && gruposFechados.has(respId) && !buscaAtiva;
                 // grupo fechado não pode esconder urgência: soma de não lidas + ⚠ de espera estourada
                 const naoLidasGrupo = fechado ? lista.reduce((s, c) => s + (c.unread ?? 0), 0) : 0;
                 const atrasoGrupo = fechado && lista.some((c) => {
@@ -537,6 +540,7 @@ export default function WhatsAppV2() {
                 });
                 return (
                 <div key={respId || '(fila)'}>
+                  {tab !== 'todos' && (
                   <button
                     type="button" className={'wa-grupo' + (fechado ? ' fech' : '')} aria-expanded={!fechado}
                     title={buscaAtiva ? 'Limpe a busca para recolher grupos' : fechado ? 'Mostrar as conversas deste grupo' : 'Recolher este grupo'}
@@ -550,6 +554,7 @@ export default function WhatsAppV2() {
                     {atrasoGrupo && <span className="galer" title="Há conversas aguardando resposta há tempo demais neste grupo">⚠</span>}
                     {naoLidasGrupo > 0 && <span className="gnl num" title={`${naoLidasGrupo} não lidas neste grupo`}>{naoLidasGrupo > 99 ? '99+' : naoLidasGrupo}</span>}
                   </button>
+                  )}
                   {!fechado && lista.map((c) => {
                     const wait = tierEspera(c.aguardando ? c.aguardandoDesde : null, relogioMs);
                     const atrasado = wait && (wait.tier === 'critico' || wait.tier === 'vermelho');
