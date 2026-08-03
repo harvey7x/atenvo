@@ -2,6 +2,7 @@
    Padrão da casa (sla.ts): react-query + RPCs/selects com RLS; REMARKETING_REAL
    segue o mesmo gate do resto (Supabase configurado). Sem backend, a página
    roda em modo demonstração com seeds locais (nada é gravado). */
+import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { useOrg } from '@/context/OrgContext';
@@ -28,6 +29,7 @@ export interface RmktLead {
 }
 export interface RmktTarefa {
   id: string; remarketingId: string; conversaId: string | null;
+  tipo: 'acao' | 'acompanhamento';
   contatoNome: string; etapa: RmktEtapa | null;
   responsavelId: string | null; responsavelNome: string | null;
   titulo: string; instrucoes: string | null; sugestaoMensagem: string | null;
@@ -42,6 +44,7 @@ export interface RmktDashboard {
   por_etapa: Record<string, number>;
   por_atendente: { id: string; nome: string; n: number }[];
   sem_responsavel: number; ativos: number;
+  recuperados_hoje: number;
   recuperados_30d: number; perdidos_30d: number;
   taxa_recuperacao: number | null;
   tempo_medio_recuperacao_h: number | null; tempo_medio_sem_resposta_h: number | null;
@@ -54,7 +57,7 @@ const hAtras = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString()
 export const DEMO_DASH: RmktDashboard = {
   por_etapa: { remarketing_1: 2, pendencia: 3, recuperacao_1: 1, recuperacao_2: 1, recuperacao_3: 0 },
   por_atendente: [{ id: 'u-mock', nome: 'Atendente', n: 4 }, { id: 'u-2', nome: 'Juliana', n: 3 }],
-  sem_responsavel: 2, ativos: 7, recuperados_30d: 9, perdidos_30d: 3, taxa_recuperacao: 75,
+  sem_responsavel: 2, ativos: 7, recuperados_hoje: 2, recuperados_30d: 9, perdidos_30d: 3, taxa_recuperacao: 75,
   tempo_medio_recuperacao_h: 26.4, tempo_medio_sem_resposta_h: 41.2, tarefas_pendentes: 5, tarefas_vencidas: 2,
 };
 const demoLead = (n: Partial<RmktLead> & { id: string; contatoNome: string; etapa: RmktEtapa }): RmktLead => ({
@@ -72,10 +75,14 @@ export const DEMO_LEADS: RmktLead[] = [
   demoLead({ id: 'r5', contatoNome: 'Cleusa M. Barros', etapa: 'pendencia', origemFluxo: 'fluxo2_abandono_atendimento', tentativas: 1, instituicao: 'Facta', ultimaEntradaEm: hAtras(60) }),
 ];
 export const DEMO_TAREFAS: RmktTarefa[] = [
-  { id: 't1', remarketingId: 'r1', conversaId: 'c1', contatoNome: 'Maria Aparecida Souza', etapa: 'remarketing_1', responsavelId: null, responsavelNome: null, titulo: 'Recuperar lead — Remarketing 1', instrucoes: 'Envie uma mensagem personalizada, mande um áudio e tente recuperar o cliente.', sugestaoMensagem: null, venceEm: hAtras(-40), criadoEm: hAtras(1) },
-  { id: 't2', remarketingId: 'r2', conversaId: 'c2', contatoNome: 'José Carlos Ferreira', etapa: 'pendencia', responsavelId: 'u-mock', responsavelNome: 'Atendente', titulo: 'Retomar atendimento pendente', instrucoes: 'Cliente demonstrou interesse e parou de responder.', sugestaoMensagem: 'Olá, tudo bem? Vi que sua análise ficou pendente. Falta muito pouco para concluirmos seu atendimento. Podemos finalizar agora?', venceEm: hAtras(-20), criadoEm: hAtras(4) },
-  { id: 't3', remarketingId: 'r3', conversaId: 'c3', contatoNome: 'Sebastião R. Nunes', etapa: 'recuperacao_1', responsavelId: 'u-2', responsavelNome: 'Juliana', titulo: 'Recuperação (1ª tentativa): ligar + WhatsApp + áudio', instrucoes: 'Faça uma ligação, envie WhatsApp e mande um áudio.', sugestaoMensagem: null, venceEm: hAtras(2), criadoEm: hAtras(26) },
+  { id: 't1', remarketingId: 'r1', conversaId: 'c1', tipo: 'acao', contatoNome: 'Maria Aparecida Souza', etapa: 'remarketing_1', responsavelId: null, responsavelNome: null, titulo: 'Recuperar lead — Remarketing 1', instrucoes: 'Envie uma mensagem personalizada, mande um áudio e tente recuperar o cliente.', sugestaoMensagem: null, venceEm: hAtras(6), criadoEm: hAtras(8) },
+  { id: 't2', remarketingId: 'r2', conversaId: 'c2', tipo: 'acao', contatoNome: 'José Carlos Ferreira', etapa: 'pendencia', responsavelId: 'u-mock', responsavelNome: 'Atendente', titulo: 'Retomar atendimento pendente', instrucoes: 'Cliente demonstrou interesse e parou de responder.', sugestaoMensagem: 'Olá, tudo bem? Vi que sua análise ficou pendente. Falta muito pouco para concluirmos seu atendimento. Podemos finalizar agora?', venceEm: hAtras(-5), criadoEm: hAtras(4) },
+  { id: 't3', remarketingId: 'r3', conversaId: 'c3', tipo: 'acao', contatoNome: 'Sebastião R. Nunes', etapa: 'recuperacao_1', responsavelId: 'u-2', responsavelNome: 'Juliana', titulo: 'Recuperação (1ª tentativa): ligar + WhatsApp + áudio', instrucoes: 'Faça uma ligação, envie WhatsApp e mande um áudio.', sugestaoMensagem: null, venceEm: hAtras(-30), criadoEm: hAtras(26) },
 ];
+DEMO_TAREFAS.push(
+  { id: 't4', remarketingId: 'r4', conversaId: 'c4', tipo: 'acompanhamento', contatoNome: 'Terezinha M. Alves', etapa: 'recuperacao_2', responsavelId: 'u-mock', responsavelNome: 'Atendente', titulo: 'Aguardar resposta do cliente', instrucoes: 'Se não responder até o prazo, o sistema escala sozinho.', sugestaoMensagem: null, venceEm: hAtras(-26), criadoEm: hAtras(20) },
+  { id: 't5', remarketingId: 'r5', conversaId: 'c5', tipo: 'acao', contatoNome: 'Cleusa M. Barros', etapa: 'pendencia', responsavelId: null, responsavelNome: null, titulo: 'Retomar atendimento pendente', instrucoes: 'Retome com a mensagem sugerida.', sugestaoMensagem: 'Olá, tudo bem? Vi que sua análise ficou pendente. Podemos finalizar agora?', venceEm: hAtras(-80), criadoEm: hAtras(10) },
+);
 export const DEMO_EVENTOS: RmktEvento[] = [
   { id: 'e1', tipo: 'entrou_remarketing_1', detalhe: { etapa: 'remarketing_1' }, usuarioId: null, criadoEm: hAtras(72) },
   { id: 'e2', tipo: 'tarefa_concluida', detalhe: { titulo: 'Recuperar lead — Remarketing 1' }, usuarioId: 'u-mock', criadoEm: hAtras(70) },
@@ -144,7 +151,7 @@ export function useRemarketingLeads(status: 'ativo' | 'encerrados') {
 }
 
 interface DbTarefa {
-  id: string; remarketing_id: string; conversa_id: string | null; responsavel_id: string | null;
+  id: string; remarketing_id: string; conversa_id: string | null; responsavel_id: string | null; tipo: 'acao' | 'acompanhamento';
   titulo: string; instrucoes: string | null; sugestao_mensagem: string | null; vence_em: string | null; criado_em: string;
   contatos: { nome: string | null } | null;
   usuarios: { nome: string | null } | null;
@@ -159,13 +166,13 @@ export function useRemarketingTarefas() {
       if (!REMARKETING_REAL) return DEMO_TAREFAS;
       const { data, error } = await supabase!
         .from('remarketing_tarefas')
-        .select('id, remarketing_id, conversa_id, responsavel_id, titulo, instrucoes, sugestao_mensagem, vence_em, criado_em, contatos(nome), usuarios(nome), remarketing_leads(etapa)')
+        .select('id, remarketing_id, conversa_id, responsavel_id, tipo, titulo, instrucoes, sugestao_mensagem, vence_em, criado_em, contatos(nome), usuarios(nome), remarketing_leads(etapa)')
         .eq('organizacao_id', currentOrg.id)
         .eq('status', 'pendente')
         .order('vence_em', { ascending: true, nullsFirst: false });
       if (error) throw new Error(error.message);
       return ((data as unknown as DbTarefa[]) ?? []).map((t) => ({
-        id: t.id, remarketingId: t.remarketing_id, conversaId: t.conversa_id,
+        id: t.id, remarketingId: t.remarketing_id, conversaId: t.conversa_id, tipo: t.tipo ?? 'acao',
         contatoNome: t.contatos?.nome || 'Contato', etapa: t.remarketing_leads?.etapa ?? null,
         responsavelId: t.responsavel_id, responsavelNome: t.usuarios?.nome ?? null,
         titulo: t.titulo, instrucoes: t.instrucoes, sugestaoMensagem: t.sugestao_mensagem,
@@ -263,6 +270,66 @@ export function useNotificacoes() {
         .map((n) => ({ id: n.id, tipo: n.tipo, titulo: n.titulo, corpo: n.corpo, rota: n.rota, lidaEm: n.lida_em, criadoEm: n.criado_em }));
     },
   });
+}
+
+/* ---------- ações rápidas da fila (F2.5 operacional) ---------- */
+function useAcaoRmkt<TArgs>(fn: (args: TArgs) => Promise<void>) {
+  const { currentOrg } = useOrg();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['rmkt-tarefas', currentOrg.id] });
+      qc.invalidateQueries({ queryKey: ['rmkt-leads', currentOrg.id, 'ativo'] });
+      qc.invalidateQueries({ queryKey: ['rmkt-leads', currentOrg.id, 'encerrados'] });
+      qc.invalidateQueries({ queryKey: ['rmkt-dash', currentOrg.id] });
+    },
+  });
+}
+export function useTransferirLead() {
+  return useAcaoRmkt(async (a: { leadId: string; usuarioId: string }) => {
+    if (!REMARKETING_REAL) return;
+    const { error } = await supabase!.rpc('remarketing_transferir', { p_lead: a.leadId, p_usuario: a.usuarioId });
+    if (error) throw new Error(error.message);
+  });
+}
+export function useReagendarTarefa() {
+  return useAcaoRmkt(async (a: { tarefaId: string; quando: string }) => {
+    if (!REMARKETING_REAL) return;
+    const { error } = await supabase!.rpc('remarketing_reagendar', { p_tarefa: a.tarefaId, p_quando: a.quando });
+    if (error) throw new Error(error.message);
+  });
+}
+export function useRegistrarAcao() {
+  return useAcaoRmkt(async (a: { leadId: string; acao: 'ligacao' | 'audio' | 'whatsapp' }) => {
+    if (!REMARKETING_REAL) return;
+    const { error } = await supabase!.rpc('remarketing_registrar_acao', { p_lead: a.leadId, p_acao: a.acao });
+    if (error) throw new Error(error.message);
+  });
+}
+
+/* ---------- realtime: a fila atualiza sem F5 ----------
+   Tabelas já na publication (F1/F2.5). Canal único por org, montado UMA vez
+   pela página (mesma cautela do sla.ts: nunca .on depois de subscribe). */
+export function useRemarketingRealtime() {
+  const { currentOrg } = useOrg();
+  const qc = useQueryClient();
+  useEffect(() => {
+    if (!REMARKETING_REAL || !currentOrg.id) return;
+    const inval = () => {
+      qc.invalidateQueries({ queryKey: ['rmkt-tarefas', currentOrg.id] });
+      qc.invalidateQueries({ queryKey: ['rmkt-leads', currentOrg.id, 'ativo'] });
+      qc.invalidateQueries({ queryKey: ['rmkt-dash', currentOrg.id] });
+      qc.invalidateQueries({ queryKey: ['notificacoes', currentOrg.id] });
+    };
+    const ch = supabase!
+      .channel(`rmkt-${currentOrg.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'remarketing_leads', filter: `organizacao_id=eq.${currentOrg.id}` }, inval)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'remarketing_tarefas', filter: `organizacao_id=eq.${currentOrg.id}` }, inval)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notificacoes', filter: `organizacao_id=eq.${currentOrg.id}` }, inval)
+      .subscribe();
+    return () => { supabase!.removeChannel(ch); };
+  }, [currentOrg.id, qc]);
 }
 
 export function useMarcarNotificacao() {

@@ -1,62 +1,121 @@
 /* ============================================================
-   Central de Remarketing — tudo em tokens (--tint/semânticos);
-   dark é o padrão e o light herda pelo swap (Adendo nº 6).
-   DADO É CALMO: listas sem efeito além de hover.
+   Central de Remarketing — FILA OPERACIONAL (CRM, não BI).
+   Tudo em tokens; cores de urgência/etapa via semânticos
+   (--rubro/--ambar/--verde e alphas de --tint). DADO É CALMO.
    ============================================================ */
 
-/* avatar próprio (não depende do CSS lazy de outra rota) */
+/* avatar próprio (não depende de CSS lazy de outra rota) */
 .v2 .rmk-av {
-  width: 20px; height: 20px; flex-shrink: 0; border-radius: 50%; display: inline-flex;
-  align-items: center; justify-content: center; font-size: 8.5px; font-weight: 600; color: var(--txt);
+  width: 24px; height: 24px; flex-shrink: 0; border-radius: 50%; display: inline-flex;
+  align-items: center; justify-content: center; font-size: 9px; font-weight: 600; color: var(--txt);
   background: rgba(var(--tint), .08); box-shadow: 0 0 0 1px rgba(var(--tint), .14);
 }
 .v2 .rmk-av.g { width: 38px; height: 38px; font-size: 13px; }
-.v2 .rmk-ct { display: inline-flex; align-items: center; gap: 8px; }
-.v2 .rmk-fila { color: var(--txt-3); font-size: 11.5px; }
-
-/* aviso de motor desligado: âmbar informativo */
 .v2 .rmk-inerte { background: var(--ambar-bg); color: var(--ambar); border: 1px solid rgba(var(--ambar-rgb), .26); }
-
-/* resumo: por etapa + por atendente */
-.v2 .rmk-resumo { display: grid; grid-template-columns: 1.4fr 1fr; gap: 12px; margin-top: 12px; }
-.v2 .rmk-res-card .tt { font-size: 12px; font-weight: 600; margin-bottom: 9px; }
-.v2 .rmk-etapas { display: flex; gap: 8px; flex-wrap: wrap; }
-.v2 .rmk-et {
-  flex: 1; min-width: 96px; display: flex; flex-direction: column; gap: 2px; align-items: flex-start;
-  background: rgba(var(--tint), .04); border: 1px solid rgba(var(--tint), .1); border-radius: 10px;
-  padding: 8px 10px; cursor: pointer; font-family: var(--fonte); color: var(--txt-2); text-align: left;
-}
-.v2 .rmk-et:hover { background: rgba(var(--tint), .07); color: var(--txt); }
-.v2 .rmk-et.on { border-color: rgba(var(--tint), .4); color: var(--txt); background: rgba(var(--tint), .08); }
-.v2 .rmk-et b { font-size: 17px; color: var(--txt); }
-.v2 .rmk-et span { font-size: 10.5px; }
-.v2 .rmk-atds { display: flex; gap: 6px; flex-wrap: wrap; }
-.v2 .rmk-atd {
-  display: inline-flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--txt-2);
-  background: rgba(var(--tint), .04); border: 1px solid rgba(var(--tint), .1); border-radius: 99px;
-  padding: 4px 10px 4px 5px; cursor: pointer; font-family: var(--fonte);
-}
-.v2 .rmk-atd:hover { color: var(--txt); background: rgba(var(--tint), .07); }
-.v2 .rmk-atd.on { border-color: rgba(var(--tint), .4); color: var(--txt); }
-.v2 .rmk-atd b { color: var(--txt); }
 .v2 .rmk-mudo { font-size: 11.5px; color: var(--txt-3); padding: 6px 0; }
 
-/* seções */
-.v2 .rmk-sec { margin-top: 18px; }
-.v2 .rmk-sec-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
-.v2 .rmk-sec-head h3 { font-size: 14px; font-weight: 600; }
-.v2 .rmk-sec-head p { font-size: 11.5px; color: var(--txt-3); margin-top: 2px; }
-.v2 .rmk-filtros { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.v2 .rmk-sel { width: auto; height: 32px; font-size: 12px; }
-.v2 .rmk-filtros .campo, .v2 .rmk-filtros input { width: 210px; }
+/* ---------- indicadores: linha fina, sem cards ---------- */
+.v2 .rmq-stats {
+  display: flex; gap: 22px; flex-wrap: wrap; align-items: baseline;
+  padding: 9px 14px; margin-top: 6px; border: 1px solid var(--linha); border-radius: 11px;
+  background: rgba(var(--tint), .02); font-size: 11.5px; color: var(--txt-2);
+}
+.v2 .rmq-stat b { font-size: 15px; color: var(--txt); margin-right: 5px; }
+.v2 .rmq-stat.urg b { color: var(--rubro); }
+.v2 .rmq-stat.ok b { color: var(--verde); }
 
-/* trabalhar agora */
-.v2 .rmk-tarefas { display: flex; flex-direction: column; gap: 2px; }
-.v2 .rmk-tarefa { padding-right: 6px; }
-.v2 .rmk-t-acts { display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+/* ---------- filtros ---------- */
+.v2 .rmq-filtros { display: flex; gap: 7px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+.v2 .rmq-sel { width: auto; height: 31px; font-size: 11.5px; padding: 0 8px; }
+.v2 .rmq-filtros input[type="text"], .v2 .rmq-filtros .inp[placeholder] { width: 190px; height: 31px; font-size: 12px; }
+.v2 .rmq-aba {
+  margin-left: auto; background: none; border: 1px solid rgba(var(--tint), .12); border-radius: 8px;
+  color: var(--txt-2); font-size: 11px; padding: 6px 10px; cursor: pointer; font-family: var(--fonte);
+}
+.v2 .rmq-aba:hover, .v2 .rmq-aba.on { color: var(--txt); background: rgba(var(--tint), .05); }
 
-/* skeleton wrapper */
-.v2 .rmk-skel { display: flex; flex-direction: column; gap: 10px; }
+/* ---------- A FILA ---------- */
+.v2 .rmq-fila { margin-top: 12px; display: flex; flex-direction: column; gap: 14px; }
+.v2 .rmq-gh {
+  display: flex; align-items: center; gap: 7px; font-size: 10.5px; font-weight: 700;
+  letter-spacing: .08em; text-transform: uppercase; color: var(--txt-3); padding: 0 2px 6px;
+}
+.v2 .rmq-gh b { color: var(--txt-2); }
+.v2 .u-vencida > .rmq-gh { color: var(--rubro); }
+.v2 .u-hoje > .rmq-gh, .v2 .u-amanha > .rmq-gh { color: var(--ambar); }
+.v2 .u-ok > .rmq-gh { color: var(--verde); }
+
+/* linha: grid denso, faixa de urgência à esquerda, hover sutil */
+.v2 .rmq-row {
+  position: relative; display: grid; align-items: center; gap: 12px; cursor: pointer;
+  grid-template-columns: minmax(170px, 1.25fr) minmax(70px, .55fr) 112px minmax(90px, .7fr) 62px minmax(190px, 1.5fr) 118px auto;
+  padding: 8px 12px 8px 16px; border: 1px solid rgba(var(--tint), .07); border-radius: 11px;
+  background: rgba(var(--tint), .022); margin-bottom: 5px; transition: background .15s;
+}
+.v2 .rmq-row:hover { background: rgba(var(--tint), .05); }
+.v2 .rmq-row::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 0 3px 3px 0; }
+.v2 .rmq-row.u-vencida::before { background: var(--rubro); box-shadow: 0 0 10px rgba(var(--rubro-rgb), calc(.6 * var(--fx))); }
+.v2 .rmq-row.u-hoje::before { background: var(--ambar); box-shadow: 0 0 8px rgba(var(--ambar-rgb), calc(.45 * var(--fx))); }
+.v2 .rmq-row.u-amanha::before { background: rgba(var(--ambar-rgb), .55); }
+.v2 .rmq-row.u-semana::before { background: rgba(var(--tint), .22); }
+.v2 .rmq-row.u-ok::before { background: var(--verde); opacity: .55; }
+
+.v2 .rmq-quem { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.v2 .rmq-quem .tx { min-width: 0; display: flex; flex-direction: column; }
+.v2 .rmq-quem .nm { font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2 .rmq-quem .tel { font-size: 10.5px; color: var(--txt-3); }
+.v2 .rmq-fin { font-size: 11.5px; color: var(--txt-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2 .rmq-resp { font-size: 11.5px; color: var(--txt-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2 .rmq-resp i { color: var(--txt-3); font-style: normal; }
+.v2 .rmq-dias { font-size: 11.5px; color: var(--txt-2); text-align: right; }
+.v2 .rmq-acao { font-size: 12px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2 .rmq-acao i { font-style: normal; color: var(--txt-3); font-size: 10px; margin-left: 7px; }
+
+/* etapa: cada uma com a sua cor (derivada dos semânticos) */
+.v2 .rmq-etapa {
+  font-size: 9.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+  border-radius: 6px; padding: 3px 7px; text-align: center; white-space: nowrap;
+  color: var(--txt-2); border: 1px solid rgba(var(--tint), .14);
+}
+.v2 .rmq-etapa.e-remarketing_1 { color: var(--ambar); border-color: rgba(var(--ambar-rgb), .4); background: rgba(var(--ambar-rgb), .08); }
+.v2 .rmq-etapa.e-pendencia { color: var(--ambar); border-color: rgba(var(--ambar-rgb), .55); background: rgba(var(--ambar-rgb), .14); }
+.v2 .rmq-etapa.e-recuperacao_1 { color: var(--rubro); border-color: rgba(var(--rubro-rgb), .35); background: rgba(var(--rubro-rgb), .07); }
+.v2 .rmq-etapa.e-recuperacao_2 { color: var(--rubro); border-color: rgba(var(--rubro-rgb), .5); background: rgba(var(--rubro-rgb), .12); }
+.v2 .rmq-etapa.e-recuperacao_3 { color: var(--rubro); border-color: rgba(var(--rubro-rgb), .65); background: rgba(var(--rubro-rgb), .18); }
+
+/* prazo: chip colorido visível de longe */
+.v2 .rmq-prazo {
+  font-size: 10.5px; font-weight: 600; border-radius: 99px; padding: 3px 9px; text-align: center; white-space: nowrap;
+  color: var(--txt-2); background: rgba(var(--tint), .06);
+}
+.v2 .rmq-prazo.u-vencida { color: var(--rubro); background: var(--rubro-bg); }
+.v2 .rmq-prazo.u-hoje { color: var(--ambar); background: var(--ambar-bg); }
+.v2 .rmq-prazo.u-amanha { color: var(--ambar); background: rgba(var(--ambar-rgb), .07); }
+.v2 .rmq-prazo.u-ok { color: var(--verde); background: var(--verde-bg); }
+
+/* ações rápidas: icon-buttons */
+.v2 .rmq-acts { display: flex; gap: 4px; align-items: center; }
+.v2 .rmq-acts .qa {
+  width: 27px; height: 27px; border-radius: 8px; border: 1px solid rgba(var(--tint), .12);
+  background: rgba(var(--tint), .05); color: var(--txt-2); cursor: pointer; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center; padding: 0; font-family: var(--fonte);
+}
+.v2 .rmq-acts .qa:hover:not(:disabled) { color: var(--txt); background: rgba(var(--tint), .1); }
+.v2 .rmq-acts .qa:disabled { opacity: .5; cursor: default; }
+.v2 .rmq-acts .qa svg { width: 13px; height: 13px; }
+.v2 .rmq-acts .qa.go { color: var(--verde); border-color: rgba(var(--verde-rgb), .4); }
+.v2 .rmq-acts .qa.go:hover:not(:disabled) { background: var(--verde-bg); }
+
+.v2 .rmq-skel { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+
+/* transferir */
+.v2 .rmq-transf { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; max-height: 260px; overflow-y: auto; }
+.v2 .rmq-transf-item {
+  display: flex; align-items: center; gap: 9px; font-size: 12.5px; color: var(--txt); text-align: left;
+  background: rgba(var(--tint), .04); border: 1px solid rgba(var(--tint), .1); border-radius: 9px;
+  padding: 8px 10px; cursor: pointer; font-family: var(--fonte);
+}
+.v2 .rmq-transf-item:hover:not(:disabled) { background: rgba(var(--tint), .08); }
 
 /* drawer do lead */
 .v2 .rmk-det { display: flex; flex-direction: column; gap: 12px; height: 100%; overflow-y: auto; padding: 16px; }
@@ -85,8 +144,10 @@
 }
 .v2 .rmk-cfg-item .acts { margin-left: auto; display: flex; gap: 4px; }
 .v2 .rmk-cfg-ativo { display: flex; align-items: flex-start; gap: 8px; font-size: 12px; color: var(--txt-2); cursor: pointer; }
-.v2 .rmk-cfg-ativo input { margin-top: 2px; accent-color: var(--accent, #C9CED6); }
+.v2 .rmk-cfg-ativo input { margin-top: 2px; }
 
-@media (max-width: 1100px) {
-  .v2 .rmk-resumo { grid-template-columns: 1fr; }
+/* telas menores: some financeira/dias e mantém o essencial */
+@media (max-width: 1240px) {
+  .v2 .rmq-row { grid-template-columns: minmax(160px, 1.3fr) 108px minmax(80px, .7fr) minmax(160px, 1.3fr) 110px auto; }
+  .v2 .rmq-fin, .v2 .rmq-dias { display: none; }
 }

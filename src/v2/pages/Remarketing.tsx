@@ -1,40 +1,47 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   REMARKETING_REAL, ETAPA_LABEL, STATUS_LABEL,
   useRemarketingDashboard, useRemarketingLeads, useRemarketingTarefas, useRemarketingEventos,
   useConcluirTarefa, useRemarketingConfig, useSalvarRemarketingConfig,
+  useTransferirLead, useReagendarTarefa, useRegistrarAcao, useRemarketingRealtime,
   type RmktLead, type RmktTarefa, type RmktConfig,
 } from '@/data/remarketing';
 import { useOrgUsuarios } from '@/data/atendimento';
 import { useOrg } from '@/context/OrgContext';
 import {
-  BadgeStatus, BotaoMini, BotaoPrimario, BotaoSec, CardVidro, Chip, Chips, DrawerV2,
-  EstadoErro, EstadoVazio, Input, Kpi, ModalV2, Skeleton, TabelaPadrao, TrilhoItem,
-  type Coluna, type TomStatus, type TomTrilho,
+  BotaoMini, BotaoPrimario, BotaoSec, CardVidro, DrawerV2,
+  EstadoErro, EstadoVazio, Input, ModalV2, Skeleton, TrilhoItem,
+  type TomTrilho,
 } from '../components';
 import { tempoRelativo, dataHoraSP } from '../lib/tempo';
 import { initials } from '@/lib/avatar';
 import './remarketing.css';
 
 /* ------------------------------------------------------------------
-   Central de Remarketing (F2) — manual de extensão do CONTRATO:
-   cabeçalho .ph + KPIs em vidro (máx 4) + fila "trabalhar agora" +
-   tabela padrão com filtros em chips + drawer de detalhe (padrão
-   Contatos). Motor (F1) segue inerte até a F3 — a página avisa.
+   Central de Remarketing — FILA OPERACIONAL (refação a pedido do dono):
+   não é BI. Uma linha fina de indicadores e o resto da tela é a fila,
+   agrupada por URGÊNCIA (vencidas → hoje → amanhã → semana → em dia),
+   nunca por nome, com as ações inline. Realtime: sem F5.
    ------------------------------------------------------------------ */
 
-const ETAPA_TOM: Record<string, TomStatus> = {
-  remarketing_1: 'atencao', pendencia: 'atencao',
-  recuperacao_1: 'erro', recuperacao_2: 'erro', recuperacao_3: 'erro',
+type Urgencia = 'vencida' | 'hoje' | 'amanha' | 'semana' | 'ok';
+const URG_ORDEM: Urgencia[] = ['vencida', 'hoje', 'amanha', 'semana', 'ok'];
+const URG_LABEL: Record<Urgencia, string> = {
+  vencida: 'Vencidas', hoje: 'Vencem hoje', amanha: 'Vencem amanhã', semana: 'Esta semana', ok: 'Em dia',
 };
+
 const EVENTO_LABEL: Record<string, string> = {
   entrou_remarketing_1: 'Entrou no Remarketing 1',
   entrou_pendencia: 'Entrou em Pendência',
   escalado: 'Escalou de etapa',
   transferido: 'Transferido de atendente',
   tarefa_criada: 'Tarefa criada',
-  tarefa_concluida: 'Tentativa registrada (tarefa concluída)',
+  tarefa_concluida: 'Tentativa registrada',
+  ligacao_realizada: 'Ligação realizada',
+  audio_enviado: 'Áudio enviado',
+  whatsapp_enviado: 'WhatsApp enviado',
+  reagendado: 'Prazo reagendado',
   respondeu: 'Cliente respondeu',
   recuperado: 'Recuperado',
   perdido: 'Perdido',
@@ -43,14 +50,39 @@ const EVENTO_TOM: Record<string, TomTrilho> = {
   recuperado: 'info', respondeu: 'info', perdido: 'crit', transferido: 'aten', escalado: 'aten',
 };
 
-const horasSem = (iso: string | null, agora: number) => (iso ? Math.floor((agora - new Date(iso).getTime()) / 3_600_000) : null);
-const diasSem = (iso: string | null, agora: number) => { const h = horasSem(iso, agora); return h === null ? null : Math.floor(h / 24); };
+const spDia = (iso: string) => new Date(iso).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+function urgenciaDe(venceEm: string | null, agora: number): Urgencia {
+  if (!venceEm) return 'ok';
+  const t = new Date(venceEm).getTime();
+  if (t <= agora) return 'vencida';
+  const hoje = spDia(new Date(agora).toISOString());
+  if (spDia(venceEm) === hoje) return 'hoje';
+  if (spDia(venceEm) === spDia(new Date(agora + 86_400_000).toISOString())) return 'amanha';
+  if (t <= agora + 7 * 86_400_000) return 'semana';
+  return 'ok';
+}
+const diasSem = (iso: string | null, agora: number) => (iso ? Math.floor((agora - new Date(iso).getTime()) / 86_400_000) : null);
+
+/* ícones locais (padrão das páginas v2) */
+const Ic = ({ children }: { children: ReactNode }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>{children}</svg>
+);
+const IcChat = () => <Ic><path d="M4 5h16v11h-10l-4 4v-4H4z" /></Ic>;
+const IcTel = () => <Ic><path d="M5 4c-.8 5.5 3.7 11.5 9.5 13.5l2.3-2.8-3.2-1.9-1.5 1.4c-1.8-1-3.4-2.7-4.3-4.5l1.5-1.4L7.4 4z" /></Ic>;
+const IcMic = () => <Ic><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></Ic>;
+const IcMsg = () => <Ic><path d="M4 6h16v12H4z" /><path d="m4 7 8 6 8-6" /></Ic>;
+const IcSwap = () => <Ic><path d="M7 4v12M7 4 4 7M7 4l3 3" /><path d="M17 20V8m0 12 3-3m-3 3-3-3" /></Ic>;
+const IcClock = () => <Ic><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></Ic>;
+const IcCheck = () => <Ic><path d="m5 13 4 4L19 7" /></Ic>;
+
+interface ItemFila { lead: RmktLead; tarefa: RmktTarefa | null; urg: Urgencia }
 
 export default function RemarketingV2() {
   const nav = useNavigate();
   const { currentOrg } = useOrg();
   const agora = Date.now();
   const podeConfig = currentOrg.role === 'admin' || currentOrg.role === 'gestor';
+  useRemarketingRealtime();
 
   const dashQ = useRemarketingDashboard();
   const [aba, setAba] = useState<'ativo' | 'encerrados'>('ativo');
@@ -58,79 +90,89 @@ export default function RemarketingV2() {
   const tarefasQ = useRemarketingTarefas();
   const configQ = useRemarketingConfig();
   const usuariosQ = useOrgUsuarios();
-  const concluir = useConcluirTarefa();
 
-  const [fEtapa, setFEtapa] = useState<string>('todas');
-  const [fResp, setFResp] = useState<string>('todos');
-  const [fFin, setFFin] = useState<string>('todas');
-  const [fDias, setFDias] = useState<string>('todos');
+  const concluir = useConcluirTarefa();
+  const transferir = useTransferirLead();
+  const reagendar = useReagendarTarefa();
+  const registrar = useRegistrarAcao();
+
+  const [fResp, setFResp] = useState('todos');
+  const [fFin, setFFin] = useState('todas');
+  const [fEtapa, setFEtapa] = useState('todas');
+  const [fUrg, setFUrg] = useState<'todas' | Urgencia>('todas');
+  const [fDias, setFDias] = useState('todos');
   const [busca, setBusca] = useState('');
   const [detId, setDetId] = useState<string | null>(null);
   const [cfgAberta, setCfgAberta] = useState(false);
+  const [transfDe, setTransfDe] = useState<ItemFila | null>(null);
+  const [reagDe, setReagDe] = useState<ItemFila | null>(null);
   const [aviso, setAviso] = useState<{ tom: 'ok' | 'erro'; texto: string } | null>(null);
 
   const dash = dashQ.data;
   const leads = leadsQ.data ?? [];
   const tarefas = tarefasQ.data ?? [];
 
+  const tarefaPorLead = useMemo(() => new Map(tarefas.map((t) => [t.remarketingId, t])), [tarefas]);
   const financeiras = useMemo(() => [...new Set(leads.map((l) => l.instituicao).filter((x): x is string => !!x))].sort(), [leads]);
+  const origens = useMemo(() => [...new Set(leads.map((l) => l.origem).filter((x): x is string => !!x))].sort(), [leads]);
+  const [fOrigem, setFOrigem] = useState('todas');
 
-  const visiveis = useMemo(() => leads.filter((l) => {
-    if (fEtapa !== 'todas' && l.etapa !== fEtapa) return false;
-    if (fResp === 'fila' && l.responsavelId) return false;
-    if (fResp !== 'todos' && fResp !== 'fila' && l.responsavelId !== fResp) return false;
-    if (fFin !== 'todas' && (l.instituicao ?? '') !== fFin) return false;
-    if (fDias !== 'todos') {
-      const d = diasSem(l.ultimaEntradaEm, agora) ?? 999;
-      if (fDias === '2' && d < 2) return false;
-      if (fDias === '5' && d < 5) return false;
-      if (fDias === '10' && d < 10) return false;
-    }
-    if (busca.trim()) {
-      const q = busca.trim().toLowerCase();
-      if (!l.contatoNome.toLowerCase().includes(q) && !(l.contatoTelefone ?? '').includes(q.replace(/\D+/g, '') || '—')) return false;
-    }
-    return true;
-  }), [leads, fEtapa, fResp, fFin, fDias, busca, agora]);
+  const fila = useMemo<ItemFila[]>(() => {
+    const itens = leads.map((lead) => {
+      const tarefa = tarefaPorLead.get(lead.id) ?? null;
+      return { lead, tarefa, urg: urgenciaDe(tarefa?.venceEm ?? lead.proximaAcaoEm, agora) };
+    }).filter(({ lead, tarefa }) => {
+      if (fResp === 'fila' && lead.responsavelId) return false;
+      if (fResp !== 'todos' && fResp !== 'fila' && lead.responsavelId !== fResp) return false;
+      if (fFin !== 'todas' && (lead.instituicao ?? '') !== fFin) return false;
+      if (fEtapa !== 'todas' && lead.etapa !== fEtapa) return false;
+      if (fOrigem !== 'todas' && (lead.origem ?? '') !== fOrigem) return false;
+      if (fDias !== 'todos') {
+        const d = diasSem(lead.ultimaEntradaEm, agora) ?? 999;
+        if (d < Number(fDias)) return false;
+      }
+      if (busca.trim()) {
+        const q = busca.trim().toLowerCase();
+        const dig = q.replace(/\D+/g, '');
+        if (!lead.contatoNome.toLowerCase().includes(q) && !(dig && (lead.contatoTelefone ?? '').includes(dig))) return false;
+      }
+      if (fUrg !== 'todas') {
+        const u = urgenciaDe(tarefa?.venceEm ?? lead.proximaAcaoEm, agora);
+        if (u !== fUrg) return false;
+      }
+      return true;
+    });
+    // NUNCA por nome: urgência primeiro, prazo mais apertado primeiro dentro do grupo
+    return itens.sort((a, b) => {
+      const ua = URG_ORDEM.indexOf(a.urg) - URG_ORDEM.indexOf(b.urg);
+      if (ua !== 0) return ua;
+      const ta = a.tarefa?.venceEm ? new Date(a.tarefa.venceEm).getTime() : Infinity;
+      const tb = b.tarefa?.venceEm ? new Date(b.tarefa.venceEm).getTime() : Infinity;
+      return ta - tb;
+    });
+  }, [leads, tarefaPorLead, fResp, fFin, fEtapa, fOrigem, fDias, fUrg, busca, agora]);
+
+  const grupos = useMemo(() => {
+    if (aba === 'encerrados') return fila.length ? ([['ok', fila]] as const) : ([] as const);
+    const g = new Map<Urgencia, ItemFila[]>();
+    for (const it of fila) { const arr = g.get(it.urg) ?? []; arr.push(it); g.set(it.urg, arr); }
+    return URG_ORDEM.filter((u) => g.has(u)).map((u) => [u, g.get(u)!] as const);
+  }, [fila, aba]);
 
   const detLead = detId ? leads.find((l) => l.id === detId) ?? null : null;
 
-  const copiar = async (texto: string) => {
-    try { await navigator.clipboard.writeText(texto); setAviso({ tom: 'ok', texto: 'Mensagem copiada.' }); }
-    catch { setAviso({ tom: 'erro', texto: 'Não foi possível copiar.' }); }
+  const acao = (fn: () => void, okMsg: string) => {
+    if (!REMARKETING_REAL) { setAviso({ tom: 'ok', texto: `Modo demonstração: ${okMsg.toLowerCase()}` }); return; }
+    fn();
   };
-  const concluirTarefa = (t: RmktTarefa) => {
-    if (!REMARKETING_REAL) { setAviso({ tom: 'ok', texto: 'Modo demonstração: tarefa concluída.' }); return; }
-    concluir.mutate(t.id, {
-      onSuccess: () => setAviso({ tom: 'ok', texto: 'Tentativa registrada — tarefa concluída.' }),
-      onError: (e) => setAviso({ tom: 'erro', texto: (e as Error)?.message || 'Falha ao concluir.' }),
-    });
-  };
-
-  const colunas: Coluna<RmktLead>[] = [
-    { chave: 'contato', titulo: 'Contato', classe: 'nome', render: (l) => (
-      <span className="rmk-ct"><span className="rmk-av" aria-hidden>{initials(l.contatoNome)}</span>{l.contatoNome}</span>) },
-    { chave: 'etapa', titulo: 'Etapa', render: (l) => (
-      aba === 'ativo'
-        ? <BadgeStatus tom={ETAPA_TOM[l.etapa] ?? 'neutro'}>{ETAPA_LABEL[l.etapa] ?? l.etapa}</BadgeStatus>
-        : <BadgeStatus tom={l.status === 'recuperado' ? 'ok' : 'erro'}>{STATUS_LABEL[l.status] ?? l.status}</BadgeStatus>) },
-    { chave: 'resp', titulo: 'Responsável', render: (l) => l.responsavelNome ?? <span className="rmk-fila">na fila</span> },
-    { chave: 'tent', titulo: 'Tentativas', dir: true, classe: 'num', render: (l) => l.tentativas },
-    { chave: 'silencio', titulo: 'Sem resposta', dir: true, classe: 'num', render: (l) => {
-      const d = diasSem(l.ultimaEntradaEm, agora);
-      return d === null ? '—' : d === 0 ? 'hoje' : `${d} d`;
-    } },
-    { chave: 'prox', titulo: 'Próxima ação', render: (l) => l.status !== 'ativo' ? '—' : (l.proximaAcao ?? '—') },
-    { chave: 'quando', titulo: 'Quando', dir: true, classe: 'num', render: (l) =>
-      l.status !== 'ativo' ? (l.encerradoEm ? tempoRelativo(l.encerradoEm, agora) : '—') : (l.proximaAcaoEm ? tempoRelativo(l.proximaAcaoEm, agora) : '—') },
-  ];
+  const aoErro = (e: unknown) => setAviso({ tom: 'erro', texto: (e as Error)?.message || 'Falha na ação.' });
 
   return (
     <>
       <div className="ph sobe">
         <div>
           <h2>Central de Remarketing</h2>
-          <p>Nenhum lead esquecido: etapas, tarefas e transferências automáticas.{REMARKETING_REAL ? '' : ' · modo demonstração (nada é gravado)'}</p>
+          <p>Fila operacional — quem contatar agora, com prazo e próxima ação.{REMARKETING_REAL ? '' : ' · modo demonstração (nada é gravado)'}</p>
         </div>
         <div className="acoes">
           {podeConfig && <BotaoSec onClick={() => setCfgAberta(true)}>Configurar</BotaoSec>}
@@ -143,137 +185,151 @@ export default function RemarketingV2() {
           <button type="button" onClick={() => setAviso(null)} aria-label="Fechar aviso">×</button>
         </div>
       )}
-
       {configQ.data && !configQ.data.ativo && (
         <div className="aviso-inline rmk-inerte" role="status">
-          O motor está <b>desligado</b> — nenhuma etapa muda sozinha ainda. Configure a fila e os prazos; a ativação acontece na fase 3, acompanhada.
+          Motor <b>desligado</b> — nenhuma etapa muda sozinha ainda. A ativação é a fase 3, acompanhada.
         </div>
       )}
 
-      {/* ---------- KPIs (máx 4, manual) ---------- */}
-      <div className="kpis">
-        <Kpi rotulo="Leads em remarketing" valor={dash?.ativos ?? 0} sobe atraso={0.05}
-          delta={{ tom: (dash?.tarefas_vencidas ?? 0) > 0 ? 'atencao' : 'neutro', texto: `${dash?.tarefas_pendentes ?? 0} tarefas pendentes${(dash?.tarefas_vencidas ?? 0) > 0 ? ` · ${dash?.tarefas_vencidas} vencidas` : ''}` }} />
-        <Kpi rotulo="Recuperados (30 d)" valor={dash?.recuperados_30d ?? 0} sobe atraso={0.1}
-          delta={{ tom: 'neutro', texto: dash?.taxa_recuperacao != null ? `taxa de recuperação ${dash.taxa_recuperacao}%` : 'sem fechados no período' }} />
-        <Kpi rotulo="Perdidos (30 d)" valor={dash?.perdidos_30d ?? 0} sobe atraso={0.15} />
-        <Kpi rotulo="Tempo até recuperar" valor={Math.round(dash?.tempo_medio_recuperacao_h ?? 0)} sufixo=" h" sobe atraso={0.2}
-          delta={{ tom: 'neutro', texto: dash?.tempo_medio_sem_resposta_h != null ? `média sem resposta ${Math.round(dash.tempo_medio_sem_resposta_h)} h` : '—' }} />
+      {/* ---------- indicadores: UMA linha fina, sem cards ---------- */}
+      <div className="rmq-stats sobe" role="group" aria-label="Indicadores">
+        <span className="rmq-stat"><b className="num">{dash?.tarefas_pendentes ?? 0}</b> aguardando ação</span>
+        <span className={'rmq-stat' + ((dash?.tarefas_vencidas ?? 0) > 0 ? ' urg' : '')}><b className="num">{dash?.tarefas_vencidas ?? 0}</b> vencidas</span>
+        <span className="rmq-stat ok"><b className="num">{dash?.recuperados_hoje ?? 0}</b> recuperados hoje</span>
+        <span className="rmq-stat"><b className="num">{dash?.taxa_recuperacao != null ? `${dash.taxa_recuperacao}%` : '—'}</b> taxa de recuperação (30 d)</span>
       </div>
 
-      {/* ---------- por etapa + por atendente ---------- */}
-      <div className="rmk-resumo">
-        <CardVidro sobe atraso={0.22} className="rmk-res-card">
-          <div className="tt">Por etapa</div>
-          <div className="rmk-etapas">
-            {(['remarketing_1', 'pendencia', 'recuperacao_1', 'recuperacao_2', 'recuperacao_3'] as const).map((e) => (
-              <button key={e} type="button" className={'rmk-et' + (fEtapa === e ? ' on' : '')} onClick={() => setFEtapa(fEtapa === e ? 'todas' : e)}>
-                <b className="num">{dash?.por_etapa?.[e] ?? 0}</b>
-                <span>{ETAPA_LABEL[e]}</span>
-              </button>
-            ))}
-          </div>
-        </CardVidro>
-        <CardVidro sobe atraso={0.26} className="rmk-res-card">
-          <div className="tt">Por atendente</div>
-          {(dash?.por_atendente?.length ?? 0) === 0 && (dash?.sem_responsavel ?? 0) === 0
-            ? <div className="rmk-mudo">Nenhum lead ativo distribuído.</div>
-            : (
-              <div className="rmk-atds">
-                {(dash?.por_atendente ?? []).map((a) => (
-                  <button key={a.id} type="button" className={'rmk-atd' + (fResp === a.id ? ' on' : '')} onClick={() => setFResp(fResp === a.id ? 'todos' : a.id)}>
-                    <span className="rmk-av" aria-hidden>{initials(a.nome)}</span>{a.nome}<b className="num">{a.n}</b>
-                  </button>
-                ))}
-                {(dash?.sem_responsavel ?? 0) > 0 && (
-                  <button type="button" className={'rmk-atd' + (fResp === 'fila' ? ' on' : '')} onClick={() => setFResp(fResp === 'fila' ? 'todos' : 'fila')}>
-                    <span className="rmk-av" aria-hidden>—</span>na fila<b className="num">{dash?.sem_responsavel}</b>
-                  </button>
-                )}
-              </div>
-            )}
-        </CardVidro>
+      {/* ---------- filtros rápidos ---------- */}
+      <div className="rmq-filtros sobe" style={{ animationDelay: '.08s' }}>
+        <select className="inp rmq-sel" value={fResp} onChange={(e) => setFResp(e.target.value)} aria-label="Responsável">
+          <option value="todos">Responsável: todos</option>
+          <option value="fila">Na fila (sem dono)</option>
+          {(usuariosQ.data ?? []).map((u) => <option key={u.id} value={u.id}>{u.nome}</option>)}
+        </select>
+        <select className="inp rmq-sel" value={fEtapa} onChange={(e) => setFEtapa(e.target.value)} aria-label="Etapa">
+          <option value="todas">Etapa: todas</option>
+          {Object.entries(ETAPA_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+        </select>
+        <select className="inp rmq-sel" value={fFin} onChange={(e) => setFFin(e.target.value)} aria-label="Financeira">
+          <option value="todas">Financeira: todas</option>
+          {financeiras.map((f) => <option key={f} value={f}>{f}</option>)}
+        </select>
+        <select className="inp rmq-sel" value={fUrg} onChange={(e) => setFUrg(e.target.value as 'todas' | Urgencia)} aria-label="Urgência">
+          <option value="todas">Urgência: todas</option>
+          {URG_ORDEM.map((u) => <option key={u} value={u}>{URG_LABEL[u]}</option>)}
+        </select>
+        <select className="inp rmq-sel" value={fDias} onChange={(e) => setFDias(e.target.value)} aria-label="Dias sem resposta">
+          <option value="todos">Sem resposta: qualquer</option>
+          <option value="2">2+ dias</option><option value="5">5+ dias</option><option value="10">10+ dias</option>
+        </select>
+        {origens.length > 1 && (
+          <select className="inp rmq-sel" value={fOrigem} onChange={(e) => setFOrigem(e.target.value)} aria-label="Origem">
+            <option value="todas">Origem: todas</option>
+            {origens.map((o) => <option key={o} value={o}>{o}</option>)}
+          </select>
+        )}
+        <Input placeholder="Nome ou telefone…" value={busca} onChange={(e) => setBusca(e.target.value)} />
+        <button type="button" className={'rmq-aba' + (aba === 'encerrados' ? ' on' : '')} onClick={() => setAba(aba === 'ativo' ? 'encerrados' : 'ativo')}>
+          {aba === 'ativo' ? 'Ver encerrados' : '← Voltar à fila'}
+        </button>
       </div>
 
-      {/* ---------- trabalhar agora ---------- */}
-      <section className="rmk-sec">
-        <div className="rmk-sec-head sobe" style={{ animationDelay: '.28s' }}>
-          <div>
-            <h3>Trabalhar agora</h3>
-            <p>Tarefas pendentes, vencidas primeiro. Concluir = registrar a tentativa.</p>
-          </div>
+      {/* ---------- A FILA ---------- */}
+      {leadsQ.isError ? (
+        <CardVidro sobe><EstadoErro descricao="Erro ao carregar a fila." aoTentarDeNovo={() => leadsQ.refetch()} /></CardVidro>
+      ) : leadsQ.isLoading ? (
+        <div className="rmq-skel" aria-hidden><Skeleton largura="100%" altura={46} /><Skeleton largura="100%" altura={46} /><Skeleton largura="100%" altura={46} /><Skeleton largura="100%" altura={46} /></div>
+      ) : fila.length === 0 ? (
+        <CardVidro sobe><EstadoVazio titulo={aba === 'ativo' ? 'Fila limpa' : 'Nada encerrado ainda'} descricao={aba === 'ativo' ? 'Nenhum lead aguardando ação com esses filtros. Com o motor ligado, leads parados entram sozinhos.' : 'Recuperados e perdidos aparecem aqui.'} /></CardVidro>
+      ) : (
+        <div className="rmq-fila sobe" style={{ animationDelay: '.12s' }}>
+          {grupos.map(([urg, itens]) => (
+            <section key={urg} className={'rmq-grupo u-' + urg}>
+              <header className="rmq-gh">
+                {aba === 'encerrados' ? 'Encerrados' : <>{urg === 'vencida' && <span aria-hidden>🔥</span>} {URG_LABEL[urg]}</>} <b className="num">{itens.length}</b>
+              </header>
+              {itens.map(({ lead, tarefa, urg: u }) => {
+                const d = diasSem(lead.ultimaEntradaEm, agora);
+                const vence = tarefa?.venceEm ?? lead.proximaAcaoEm;
+                return (
+                  <div key={lead.id} className={'rmq-row u-' + u} role="button" tabIndex={0}
+                    onClick={() => setDetId(lead.id)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') setDetId(lead.id); }}>
+                    <span className="rmq-quem">
+                      <span className="rmk-av" aria-hidden>{initials(lead.contatoNome)}</span>
+                      <span className="tx">
+                        <span className="nm">{lead.contatoNome}</span>
+                        <span className="tel num">{lead.contatoTelefone ? '+' + lead.contatoTelefone : 'sem número'}</span>
+                      </span>
+                    </span>
+                    <span className="rmq-fin">{lead.instituicao ?? '—'}</span>
+                    <span className={'rmq-etapa e-' + lead.etapa}>{aba === 'ativo' ? (ETAPA_LABEL[lead.etapa] ?? lead.etapa) : (STATUS_LABEL[lead.status] ?? lead.status)}</span>
+                    <span className="rmq-resp">{lead.responsavelNome ?? <i>na fila</i>}</span>
+                    <span className="rmq-dias num" title="Dias sem resposta do cliente">{d === null ? '—' : d === 0 ? 'hoje' : `${d} d`}</span>
+                    <span className="rmq-acao" title={tarefa?.instrucoes ?? undefined}>
+                      {tarefa?.titulo ?? lead.proximaAcao ?? '—'}
+                      <i className="num">{lead.tentativas} tent.</i>
+                    </span>
+                    <span className={'rmq-prazo u-' + u}>{vence ? (u === 'vencida' ? 'venceu ' + tempoRelativo(vence, agora) : tempoRelativo(vence, agora)) : '—'}</span>
+                    <span className="rmq-acts" onClick={(e) => e.stopPropagation()}>
+                      {lead.conversaId && <button type="button" className="qa" title="Abrir conversa" onClick={() => nav('/whatsapp?conversa=' + lead.conversaId)}><IcChat /></button>}
+                      <button type="button" className="qa" title="Registrar ligação" onClick={() => acao(() => registrar.mutate({ leadId: lead.id, acao: 'ligacao' }, { onSuccess: () => setAviso({ tom: 'ok', texto: 'Ligação registrada.' }), onError: aoErro }), 'Ligação registrada')}><IcTel /></button>
+                      <button type="button" className="qa" title="Registrar áudio enviado" onClick={() => acao(() => registrar.mutate({ leadId: lead.id, acao: 'audio' }, { onSuccess: () => setAviso({ tom: 'ok', texto: 'Áudio registrado.' }), onError: aoErro }), 'Áudio registrado')}><IcMic /></button>
+                      <button type="button" className="qa" title={tarefa?.sugestaoMensagem ? 'Copiar mensagem sugerida' : 'Registrar WhatsApp enviado'}
+                        onClick={async () => {
+                          if (tarefa?.sugestaoMensagem) { try { await navigator.clipboard.writeText(tarefa.sugestaoMensagem); setAviso({ tom: 'ok', texto: 'Mensagem copiada.' }); } catch { setAviso({ tom: 'erro', texto: 'Não foi possível copiar.' }); } }
+                          else acao(() => registrar.mutate({ leadId: lead.id, acao: 'whatsapp' }, { onSuccess: () => setAviso({ tom: 'ok', texto: 'WhatsApp registrado.' }), onError: aoErro }), 'WhatsApp registrado');
+                        }}><IcMsg /></button>
+                      <button type="button" className="qa" title="Transferir" onClick={() => setTransfDe({ lead, tarefa, urg: u })}><IcSwap /></button>
+                      {tarefa && <button type="button" className="qa" title="Reagendar prazo" onClick={() => setReagDe({ lead, tarefa, urg: u })}><IcClock /></button>}
+                      {tarefa && (
+                        <button type="button" className="qa go" title="Concluir tarefa (registra a tentativa)"
+                          disabled={concluir.isPending}
+                          onClick={() => acao(() => concluir.mutate(tarefa.id, { onSuccess: () => setAviso({ tom: 'ok', texto: 'Tentativa registrada — próxima tarefa criada.' }), onError: aoErro }), 'Tarefa concluída')}>
+                          <IcCheck />
+                        </button>
+                      )}
+                    </span>
+                  </div>
+                );
+              })}
+            </section>
+          ))}
         </div>
-        {tarefasQ.isError ? (
-          <CardVidro sobe><EstadoErro descricao="Erro ao carregar as tarefas." aoTentarDeNovo={() => tarefasQ.refetch()} /></CardVidro>
-        ) : tarefasQ.isLoading ? (
-          <CardVidro className="rmk-skel" aria-hidden><Skeleton largura="45%" /><Skeleton largura="90%" altura={18} /><Skeleton largura="85%" altura={18} /></CardVidro>
-        ) : tarefas.length === 0 ? (
-          <CardVidro sobe><EstadoVazio titulo="Nenhuma tarefa pendente" descricao="Quando o motor identificar leads parados, as tarefas aparecem aqui com a próxima ação pronta." /></CardVidro>
-        ) : (
-          <CardVidro sobe atraso={0.3} className="rmk-tarefas">
-            {tarefas.map((t) => {
-              const vencida = !!t.venceEm && new Date(t.venceEm).getTime() < agora;
-              return (
-                <TrilhoItem key={t.id} tom={vencida ? 'crit' : 'aten'} className="rmk-tarefa"
-                  titulo={<>{t.contatoNome} <BadgeStatus tom={ETAPA_TOM[t.etapa ?? ''] ?? 'neutro'}>{ETAPA_LABEL[t.etapa ?? ''] ?? '—'}</BadgeStatus></>}
-                  sub={<>
-                    {t.titulo}{t.responsavelNome ? <> · com <b>{t.responsavelNome}</b></> : ' · na fila da equipe'}
-                    {t.venceEm && <> · {vencida ? 'venceu' : 'vence'} {tempoRelativo(t.venceEm, agora)}</>}
-                  </>}
-                  direita={<span className="rmk-t-acts">
-                    {t.sugestaoMensagem && <BotaoMini onClick={() => copiar(t.sugestaoMensagem!)}>Copiar mensagem</BotaoMini>}
-                    {t.conversaId && <BotaoMini onClick={() => nav('/whatsapp?conversa=' + t.conversaId)}>Abrir conversa</BotaoMini>}
-                    <BotaoSec mini disabled={concluir.isPending} onClick={() => concluirTarefa(t)}>Concluir</BotaoSec>
-                  </span>}
-                />
-              );
-            })}
-          </CardVidro>
-        )}
-      </section>
-
-      {/* ---------- leads ---------- */}
-      <section className="rmk-sec">
-        <div className="rmk-sec-head sobe" style={{ animationDelay: '.32s' }}>
-          <div>
-            <h3>Leads</h3>
-            <p>Todos com etapa, responsável e próxima ação definida.</p>
-          </div>
-          <div className="rmk-filtros">
-            <Chips>
-              <Chip ativo={aba === 'ativo'} onClick={() => setAba('ativo')}>Ativos</Chip>
-              <Chip ativo={aba === 'encerrados'} onClick={() => setAba('encerrados')}>Recuperados & perdidos</Chip>
-            </Chips>
-            <select className="inp rmk-sel" value={fFin} onChange={(e) => setFFin(e.target.value)} aria-label="Financeira">
-              <option value="todas">Financeira: todas</option>
-              {financeiras.map((f) => <option key={f} value={f}>{f}</option>)}
-            </select>
-            <select className="inp rmk-sel" value={fDias} onChange={(e) => setFDias(e.target.value)} aria-label="Dias sem resposta">
-              <option value="todos">Sem resposta: qualquer</option>
-              <option value="2">2+ dias</option>
-              <option value="5">5+ dias</option>
-              <option value="10">10+ dias</option>
-            </select>
-            <Input placeholder="Buscar por nome ou número…" value={busca} onChange={(e) => setBusca(e.target.value)} />
-          </div>
-        </div>
-        {leadsQ.isError ? (
-          <CardVidro sobe><EstadoErro descricao="Erro ao carregar os leads." aoTentarDeNovo={() => leadsQ.refetch()} /></CardVidro>
-        ) : leadsQ.isLoading ? (
-          <CardVidro className="rmk-skel" aria-hidden><Skeleton largura="100%" altura={38} /><Skeleton largura="100%" altura={38} /><Skeleton largura="100%" altura={38} /></CardVidro>
-        ) : visiveis.length === 0 ? (
-          <CardVidro sobe><EstadoVazio titulo={aba === 'ativo' ? 'Nenhum lead em remarketing' : 'Nada encerrado ainda'} descricao={aba === 'ativo' ? 'Com o motor ligado, leads sem resposta entram aqui sozinhos — com tarefa e prazo.' : 'Recuperados e perdidos dos últimos períodos aparecem aqui.'} /></CardVidro>
-        ) : (
-          <div className="sobe" style={{ animationDelay: '.34s' }}>
-            <TabelaPadrao colunas={colunas} linhas={visiveis} chave={(l) => l.id} aoClicarLinha={(l) => setDetId(l.id)} />
-          </div>
-        )}
-      </section>
+      )}
 
       {/* ---------- drawer do lead ---------- */}
       <DrawerV2 aberto={!!detLead} aoFechar={() => setDetId(null)} largura={420}>
         {detLead && <LeadDetalhe lead={detLead} aoFechar={() => setDetId(null)} aoAbrirConversa={(c) => nav('/whatsapp?conversa=' + c)} agora={agora} />}
       </DrawerV2>
+
+      {/* ---------- transferir ---------- */}
+      {transfDe && (
+        <ModalV2 aberto aoFechar={() => setTransfDe(null)} titulo={'Transferir ' + transfDe.lead.contatoNome} largura={400}>
+          <p className="p-modal-msg">O novo responsável recebe a tarefa pendente e uma notificação. A conversa, o Kanban e o restante seguem juntos.</p>
+          <div className="rmq-transf">
+            {(usuariosQ.data ?? []).filter((u) => u.id !== transfDe.lead.responsavelId).map((u) => (
+              <button key={u.id} type="button" className="rmq-transf-item" disabled={transferir.isPending}
+                onClick={() => acao(() => transferir.mutate({ leadId: transfDe.lead.id, usuarioId: u.id }, {
+                  onSuccess: () => { setTransfDe(null); setAviso({ tom: 'ok', texto: `Transferido para ${u.nome}.` }); }, onError: aoErro,
+                }), `Transferido para ${u.nome}`)}>
+                <span className="rmk-av" aria-hidden>{initials(u.nome)}</span>{u.nome}
+              </button>
+            ))}
+          </div>
+        </ModalV2>
+      )}
+
+      {/* ---------- reagendar ---------- */}
+      {reagDe?.tarefa && (
+        <ReagendarModal
+          tarefa={reagDe.tarefa}
+          aoFechar={() => setReagDe(null)}
+          aoConfirmar={(quandoISO) => acao(() => reagendar.mutate({ tarefaId: reagDe.tarefa!.id, quando: quandoISO }, {
+            onSuccess: () => { setReagDe(null); setAviso({ tom: 'ok', texto: 'Prazo reagendado.' }); }, onError: aoErro,
+          }), 'Prazo reagendado')}
+        />
+      )}
 
       {/* ---------- config ---------- */}
       {cfgAberta && configQ.data && (
@@ -289,6 +345,23 @@ export default function RemarketingV2() {
   );
 }
 
+/* ================= reagendar ================= */
+function ReagendarModal({ tarefa, aoFechar, aoConfirmar }: { tarefa: RmktTarefa; aoFechar: () => void; aoConfirmar: (iso: string) => void }) {
+  const base = tarefa.venceEm ? new Date(tarefa.venceEm) : new Date(Date.now() + 86_400_000);
+  const local = new Date(base.getTime() - base.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+  const [quando, setQuando] = useState(local);
+  return (
+    <ModalV2 aberto aoFechar={aoFechar} titulo="Reagendar prazo" largura={380}
+      rodape={<>
+        <BotaoSec mini onClick={aoFechar}>Voltar</BotaoSec>
+        <BotaoPrimario mini disabled={!quando} onClick={() => aoConfirmar(new Date(quando).toISOString())}>Reagendar</BotaoPrimario>
+      </>}>
+      <p className="p-modal-msg">{tarefa.titulo} — {tarefa.contatoNome}</p>
+      <input className="inp" type="datetime-local" value={quando} onChange={(e) => setQuando(e.target.value)} aria-label="Novo prazo" />
+    </ModalV2>
+  );
+}
+
 /* ================= detalhe do lead (drawer) ================= */
 function LeadDetalhe({ lead, aoFechar, aoAbrirConversa, agora }: { lead: RmktLead; aoFechar: () => void; aoAbrirConversa: (conversaId: string) => void; agora: number }) {
   const eventosQ = useRemarketingEventos(lead.id);
@@ -299,14 +372,12 @@ function LeadDetalhe({ lead, aoFechar, aoAbrirConversa, agora }: { lead: RmktLea
         <span className="rmk-av g" aria-hidden>{initials(lead.contatoNome)}</span>
         <div className="tx">
           <div className="nm">{lead.contatoNome}</div>
-          <div className="sb num">{lead.contatoTelefone ? '+' + lead.contatoTelefone : 'sem número'}{lead.instituicao ? ` · ${lead.instituicao}` : ''}</div>
+          <div className="sb num">{lead.contatoTelefone ? '+' + lead.contatoTelefone : 'sem número'}{lead.instituicao ? ` · ${lead.instituicao}` : ''}{lead.origem ? ` · ${lead.origem}` : ''}</div>
         </div>
         <button type="button" className="fechar" onClick={aoFechar} aria-label="Fechar">×</button>
       </div>
       <div className="rmk-det-linha">
-        <BadgeStatus tom={lead.status !== 'ativo' ? (lead.status === 'recuperado' ? 'ok' : 'erro') : (ETAPA_TOM[lead.etapa] ?? 'neutro')}>
-          {lead.status !== 'ativo' ? (STATUS_LABEL[lead.status] ?? lead.status) : (ETAPA_LABEL[lead.etapa] ?? lead.etapa)}
-        </BadgeStatus>
+        <span className={'rmq-etapa e-' + lead.etapa}>{lead.status !== 'ativo' ? (STATUS_LABEL[lead.status] ?? lead.status) : (ETAPA_LABEL[lead.etapa] ?? lead.etapa)}</span>
         <span className="num">{lead.tentativas} tentativa{lead.tentativas === 1 ? '' : 's'}</span>
         {d !== null && <span className="num">{d === 0 ? 'respondeu hoje' : `${d} d sem resposta`}</span>}
       </div>
@@ -314,6 +385,7 @@ function LeadDetalhe({ lead, aoFechar, aoAbrirConversa, agora }: { lead: RmktLea
         <div className="rmk-det-prox">
           <div className="k">Próxima ação</div>
           <div className="v">{lead.proximaAcao ?? '—'}</div>
+          {lead.proximaAcaoEm && <div className="s num">prazo {tempoRelativo(lead.proximaAcaoEm, agora)}</div>}
           {lead.responsavelNome && <div className="s">com <b>{lead.responsavelNome}</b></div>}
         </div>
       )}
@@ -322,7 +394,7 @@ function LeadDetalhe({ lead, aoFechar, aoAbrirConversa, agora }: { lead: RmktLea
       </div>
       <div className="rmk-det-tl-t">Linha do tempo</div>
       {eventosQ.isLoading ? (
-        <div className="rmk-skel"><Skeleton largura="90%" /><Skeleton largura="75%" /></div>
+        <div className="rmq-skel"><Skeleton largura="90%" /><Skeleton largura="75%" /></div>
       ) : (eventosQ.data ?? []).length === 0 ? (
         <div className="rmk-mudo">Sem eventos ainda.</div>
       ) : (
@@ -330,7 +402,7 @@ function LeadDetalhe({ lead, aoFechar, aoAbrirConversa, agora }: { lead: RmktLea
           {(eventosQ.data ?? []).map((e) => (
             <TrilhoItem key={e.id} tom={EVENTO_TOM[e.tipo] ?? 'info'}
               titulo={EVENTO_LABEL[e.tipo] ?? e.tipo}
-              sub={typeof e.detalhe?.de === 'string' && typeof e.detalhe?.para === 'string' ? `${ETAPA_LABEL[e.detalhe.de as string] ?? e.detalhe.de} → ${ETAPA_LABEL[e.detalhe.para as string] ?? e.detalhe.para}` : (typeof e.detalhe?.titulo === 'string' ? String(e.detalhe.titulo) : undefined)}
+              sub={typeof e.detalhe?.de === 'string' && typeof e.detalhe?.para === 'string' ? `${ETAPA_LABEL[e.detalhe.de as string] ?? e.detalhe.de} → ${ETAPA_LABEL[e.detalhe.para as string] ?? e.detalhe.para}` : (typeof e.detalhe?.titulo === 'string' ? String(e.detalhe.titulo) : (typeof e.detalhe?.para_nome === 'string' ? `para ${e.detalhe.para_nome}` : undefined))}
               direita={<span className="h num" title={dataHoraSP(e.criadoEm)}>{tempoRelativo(e.criadoEm, Date.now())}</span>}
             />
           ))}
@@ -387,17 +459,16 @@ function ConfigModal({ inicial, usuarios, demo, aoFechar, aoSalvo }: {
         ))}
       </div>
       {disponiveis.length > 0 && (
-        <select className="inp rmk-sel" value="" onChange={(e) => { if (e.target.value) setFila((f) => [...f, e.target.value]); }} aria-label="Adicionar atendente à fila">
+        <select className="inp rmq-sel" value="" onChange={(e) => { if (e.target.value) setFila((f) => [...f, e.target.value]); }} aria-label="Adicionar atendente à fila">
           <option value="">＋ Adicionar atendente à fila…</option>
           {disponiveis.map((u) => <option key={u.id} value={u.id}>{u.nome}</option>)}
         </select>
       )}
       <div className="rmk-cfg-t">Motor</div>
       <label className="rmk-cfg-ativo">
-        <input type="checkbox" className="cbx-nativo" checked={ativo} onChange={(e) => setAtivo(e.target.checked)} />
+        <input type="checkbox" checked={ativo} onChange={(e) => setAtivo(e.target.checked)} />
         <span>Deixar o motor <b>armado</b> (as automações só rodam quando o agendador for ligado, na fase 3 — acompanhada).</span>
       </label>
     </ModalV2>
   );
 }
-
