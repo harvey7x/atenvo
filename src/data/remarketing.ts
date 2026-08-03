@@ -26,6 +26,8 @@ export interface RmktLead {
   contatoId: string; contatoNome: string; contatoTelefone: string | null;
   ultimaEntradaEm: string | null;                  // p/ "dias sem resposta"
   instituicao: string | null; origem: string | null;
+  score: number | null;                            // F0: score materializado no banco (fonte da verdade)
+  scoreFatores: { motivo: string; pts: number }[] | null;
 }
 export interface RmktTarefa {
   id: string; remarketingId: string; conversaId: string | null;
@@ -65,7 +67,7 @@ const demoLead = (n: Partial<RmktLead> & { id: string; contatoNome: string; etap
   proximaAcao: 'Contato imediato: mensagem personalizada + áudio', proximaAcaoEm: hAtras(1),
   entrouEtapaEm: hAtras(3), criadoEm: hAtras(3), encerradoEm: null, conversaId: 'c1', oportunidadeId: 'o' + n.id,
   contatoId: 'ct' + n.id, contatoTelefone: '5551999990000', ultimaEntradaEm: hAtras(30),
-  instituicao: null, origem: 'WhatsApp', ...n,
+  instituicao: null, origem: 'WhatsApp', score: null, scoreFatores: null, ...n,
 });
 export const DEMO_LEADS: RmktLead[] = [
   demoLead({ id: 'r1', contatoNome: 'Maria Aparecida Souza', etapa: 'remarketing_1', conversaId: 'c1', ultimaEntradaEm: hAtras(1) }),
@@ -119,6 +121,8 @@ interface DbLead {
   usuarios: { nome: string | null } | null;
   conversas: { ultima_entrada_em: string | null } | null;
   oportunidades: { instituicao: string | null; origem: string | null } | null;
+  score: number | null;
+  score_fatores: { motivo: string; pts: number }[] | null;
 }
 export function useRemarketingLeads(status: 'ativo' | 'encerrados') {
   const { currentOrg } = useOrg();
@@ -129,7 +133,7 @@ export function useRemarketingLeads(status: 'ativo' | 'encerrados') {
       if (!REMARKETING_REAL) return status === 'ativo' ? DEMO_LEADS : [];
       let q = supabase!
         .from('remarketing_leads')
-        .select('id, etapa, origem_fluxo, status, tentativas, responsavel_id, proxima_acao, proxima_acao_em, entrou_etapa_em, criado_em, encerrado_em, conversa_id, oportunidade_id, contato_id, contatos(nome, telefone), usuarios(nome), conversas(ultima_entrada_em), oportunidades(instituicao, origem)')
+        .select('id, etapa, origem_fluxo, status, tentativas, responsavel_id, proxima_acao, proxima_acao_em, entrou_etapa_em, criado_em, encerrado_em, conversa_id, oportunidade_id, contato_id, score, score_fatores, contatos(nome, telefone), usuarios(nome), conversas(ultima_entrada_em), oportunidades(instituicao, origem)')
         .eq('organizacao_id', currentOrg.id)
         .order('entrou_etapa_em', { ascending: false })
         .limit(400);
@@ -145,6 +149,7 @@ export function useRemarketingLeads(status: 'ativo' | 'encerrados') {
         contatoId: r.contato_id, contatoNome: r.contatos?.nome || 'Contato', contatoTelefone: r.contatos?.telefone ?? null,
         ultimaEntradaEm: r.conversas?.ultima_entrada_em ?? null,
         instituicao: r.oportunidades?.instituicao ?? null, origem: r.oportunidades?.origem ?? null,
+        score: r.score ?? null, scoreFatores: r.score_fatores ?? null,
       }));
     },
   });
@@ -355,7 +360,7 @@ export interface RmktSinais {
   docsRecebidos: number;
   ultimaSaidaStatus: string | null; ultimaSaidaEm: string | null; ultimaEntradaEm: string | null;
   ligacoes: number; audiosReg: number; whatsappsReg: number;
-  contratos: number; benefTotal: number;
+  contratos: number; benefTotal: number; cpfPreenchido: boolean;
 }
 const mapSinais = (r: Record<string, unknown>): RmktSinais => ({
   leadId: String(r.lead_id), conversaId: (r.conversa_id as string) ?? null,
@@ -365,14 +370,14 @@ const mapSinais = (r: Record<string, unknown>): RmktSinais => ({
   ultimaSaidaStatus: (r.ultima_saida_status as string) ?? null,
   ultimaSaidaEm: (r.ultima_saida_em as string) ?? null, ultimaEntradaEm: (r.ultima_entrada_em as string) ?? null,
   ligacoes: Number(r.ligacoes) || 0, audiosReg: Number(r.audios_reg) || 0, whatsappsReg: Number(r.whatsapps_reg) || 0,
-  contratos: Number(r.contratos) || 0, benefTotal: Number(r.benef_total) || 0,
+  contratos: Number(r.contratos) || 0, benefTotal: Number(r.benef_total) || 0, cpfPreenchido: !!r.cpf_preenchido,
 });
 export const DEMO_SINAIS: RmktSinais[] = [
-  { leadId: 'r1', conversaId: 'c1', saidasTexto: 3, saidasAudio: 1, entradasAudio: 1, entradasTotal: 12, docsRecebidos: 0, ultimaSaidaStatus: 'lida', ultimaSaidaEm: hAtras(2), ultimaEntradaEm: hAtras(1), ligacoes: 0, audiosReg: 1, whatsappsReg: 2, contratos: 2, benefTotal: 4180 },
-  { leadId: 'r2', conversaId: 'c2', saidasTexto: 5, saidasAudio: 0, entradasAudio: 3, entradasTotal: 9, docsRecebidos: 0, ultimaSaidaStatus: 'entregue', ultimaSaidaEm: hAtras(50), ultimaEntradaEm: hAtras(52), ligacoes: 1, audiosReg: 0, whatsappsReg: 3, contratos: 1, benefTotal: 1890 },
-  { leadId: 'r3', conversaId: 'c3', saidasTexto: 4, saidasAudio: 2, entradasAudio: 0, entradasTotal: 5, docsRecebidos: 0, ultimaSaidaStatus: 'falhou', ultimaSaidaEm: hAtras(94), ultimaEntradaEm: hAtras(96), ligacoes: 1, audiosReg: 2, whatsappsReg: 1, contratos: 1, benefTotal: 2412 },
-  { leadId: 'r4', conversaId: 'c4', saidasTexto: 6, saidasAudio: 1, entradasAudio: 1, entradasTotal: 8, docsRecebidos: 2, ultimaSaidaStatus: 'lida', ultimaSaidaEm: hAtras(148), ultimaEntradaEm: hAtras(150), ligacoes: 1, audiosReg: 1, whatsappsReg: 4, contratos: 3, benefTotal: 6240 },
-  { leadId: 'r5', conversaId: 'c5', saidasTexto: 6, saidasAudio: 0, entradasAudio: 0, entradasTotal: 4, docsRecebidos: 0, ultimaSaidaStatus: 'lida', ultimaSaidaEm: hAtras(58), ultimaEntradaEm: hAtras(60), ligacoes: 0, audiosReg: 0, whatsappsReg: 6, contratos: 0, benefTotal: 0 },
+  { leadId: 'r1', conversaId: 'c1', saidasTexto: 3, saidasAudio: 1, entradasAudio: 1, entradasTotal: 12, docsRecebidos: 0, ultimaSaidaStatus: 'lida', ultimaSaidaEm: hAtras(2), ultimaEntradaEm: hAtras(1), ligacoes: 0, audiosReg: 1, whatsappsReg: 2, contratos: 2, benefTotal: 4180, cpfPreenchido: true },
+  { leadId: 'r2', conversaId: 'c2', saidasTexto: 5, saidasAudio: 0, entradasAudio: 3, entradasTotal: 9, docsRecebidos: 0, ultimaSaidaStatus: 'entregue', ultimaSaidaEm: hAtras(50), ultimaEntradaEm: hAtras(52), ligacoes: 1, audiosReg: 0, whatsappsReg: 3, contratos: 1, benefTotal: 1890, cpfPreenchido: true },
+  { leadId: 'r3', conversaId: 'c3', saidasTexto: 4, saidasAudio: 2, entradasAudio: 0, entradasTotal: 5, docsRecebidos: 0, ultimaSaidaStatus: 'falhou', ultimaSaidaEm: hAtras(94), ultimaEntradaEm: hAtras(96), ligacoes: 1, audiosReg: 2, whatsappsReg: 1, contratos: 1, benefTotal: 2412, cpfPreenchido: false },
+  { leadId: 'r4', conversaId: 'c4', saidasTexto: 6, saidasAudio: 1, entradasAudio: 1, entradasTotal: 8, docsRecebidos: 2, ultimaSaidaStatus: 'lida', ultimaSaidaEm: hAtras(148), ultimaEntradaEm: hAtras(150), ligacoes: 1, audiosReg: 1, whatsappsReg: 4, contratos: 3, benefTotal: 6240, cpfPreenchido: true },
+  { leadId: 'r5', conversaId: 'c5', saidasTexto: 6, saidasAudio: 0, entradasAudio: 0, entradasTotal: 4, docsRecebidos: 0, ultimaSaidaStatus: 'lida', ultimaSaidaEm: hAtras(58), ultimaEntradaEm: hAtras(60), ligacoes: 0, audiosReg: 0, whatsappsReg: 6, contratos: 0, benefTotal: 0, cpfPreenchido: false },
 ];
 export function useFilaSinais() {
   const { currentOrg } = useOrg();

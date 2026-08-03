@@ -76,6 +76,12 @@ function useAgora(intervalMs = 60_000) {
    porque a chance de recuperar despenca com o esfriamento. Sinais reais
    (documento, "leu e sumiu") entram quando existem. */
 interface Fator { pts: number; motivo: string }
+function motivoTopo(fatores: Fator[]): string {
+  return fatores.filter((x) => x.pts > 0).sort((a, b) => b.pts - a.pts)[0]?.motivo ?? 'sem urgência';
+}
+/* Fallback client-side (modo demonstração). Espelha fn_remarketing_score do banco:
+   ENGAGEMENT (soma de fatores) × FIT (multiplicador pela carteira). Em produção o
+   score vem materializado do servidor (lead.score) — esta função é o preview. */
 function scoreFatores(lead: RmktLead, tarefa: RmktTarefa | null, sinais: RmktSinais | undefined, agora: number): { score: number; motivo: string; fatores: Fator[] } {
   const f: Fator[] = [];
   const vence = tarefa?.venceEm ?? lead.proximaAcaoEm;
@@ -87,18 +93,27 @@ function scoreFatores(lead: RmktLead, tarefa: RmktTarefa | null, sinais: RmktSin
   }
   const idadeMin = minutosDesde(lead.criadoEm, agora);
   if (idadeMin !== null && idadeMin <= 10) f.push({ pts: 45, motivo: 'lead novíssimo (<10 min)' });
+  if (sinais?.cpfPreenchido) f.push({ pts: 40, motivo: 'CPF preenchido no bot' });
   const respMin = minutosDesde(lead.ultimaEntradaEm, agora);
-  if (respMin !== null && respMin <= 60) f.push({ pts: 35, motivo: 'respondeu há pouco' });
-  else if (respMin !== null && respMin <= 1_440) f.push({ pts: 18, motivo: 'respondeu nas últimas 24 h' });
+  let respondeuRecente = false;
+  if (respMin !== null && respMin <= 60) { f.push({ pts: 35, motivo: 'respondeu há pouco' }); respondeuRecente = true; }
+  else if (respMin !== null && respMin <= 1_440) { f.push({ pts: 18, motivo: 'respondeu nas últimas 24 h' }); respondeuRecente = true; }
+  if (sinais?.docsRecebidos) f.push({ pts: 30, motivo: 'enviou documento' });
   f.push({ pts: (3 - Math.min(lead.tentativas, 3)) * 6, motivo: 'poucas tentativas' });
   if (lead.etapa === 'recuperacao_3') f.push({ pts: 15, motivo: 'última chance antes de perder' });
   else if (lead.etapa === 'recuperacao_2') f.push({ pts: 10, motivo: 'recuperação avançada' });
-  if (sinais?.docsRecebidos) f.push({ pts: 12, motivo: 'enviou documento' });
   const dias = diasSem(lead.ultimaEntradaEm, agora);
-  if (dias !== null && dias > 5) f.push({ pts: -Math.min(dias, 20), motivo: 'abandono antigo' });
-  const score = Math.max(0, Math.min(100, f.reduce((s, x) => s + x.pts, 0)));
-  const top = f.filter((x) => x.pts > 0).sort((a, b) => b.pts - a.pts)[0];
-  return { score, motivo: top?.motivo ?? 'sem urgência', fatores: f };
+  if (dias !== null && dias > 5) f.push({ pts: -Math.min(dias, 25), motivo: 'abandono antigo' });
+  if (lead.tentativas >= 2 && (!lead.ultimaEntradaEm || new Date(lead.ultimaEntradaEm) <= new Date(lead.entrouEtapaEm)))
+    f.push({ pts: -Math.min(lead.tentativas * 4, 20), motivo: 'cutucadas ignoradas' });
+  const eng = Math.max(0, Math.min(100, f.reduce((s, x) => s + x.pts, 0)));
+  let fit = 1.0;
+  if ((sinais?.benefTotal ?? 0) >= 5000) fit += 0.15; else if ((sinais?.benefTotal ?? 0) >= 3000) fit += 0.08;
+  if ((sinais?.contratos ?? 0) >= 2) fit += 0.05;
+  fit = Math.max(0.90, Math.min(1.25, fit));
+  let score = Math.round(Math.max(0, Math.min(100, eng * fit)));
+  if ((respondeuRecente || (sinais?.docsRecebidos ?? 0) > 0) && score < 30) score = 30;
+  return { score, motivo: motivoTopo(f), fatores: f };
 }
 const corScore = (s: number): 's1' | 's2' | 's3' => (s >= 70 ? 's1' : s >= 40 ? 's2' : 's3');
 const emojiScore = (s: number) => (s >= 70 ? '🔥' : s >= 40 ? '🟠' : '🟢');
@@ -218,7 +233,11 @@ export default function RemarketingV2() {
   const itens = useMemo<ItemFila[]>(() => leads.map((lead) => {
     const tarefa = tarefaPorLead.get(lead.id) ?? null;
     const sinais = sinaisPorLead.get(lead.id);
-    const { score, motivo, fatores } = scoreFatores(lead, tarefa, sinais, agora);
+    // fonte da verdade = score materializado no banco (F0); fallback client no demo.
+    const calc = scoreFatores(lead, tarefa, sinais, agora);
+    const score = lead.score ?? calc.score;
+    const fatores = lead.scoreFatores ?? calc.fatores;
+    const motivo = lead.score != null ? motivoTopo(fatores) : calc.motivo;
     return { lead, tarefa, urg: urgenciaDe(tarefa?.venceEm ?? lead.proximaAcaoEm, agora), score, tier: corScore(score), motivo, fatores, sinais };
   }), [leads, tarefaPorLead, sinaisPorLead, agora]);
 
