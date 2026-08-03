@@ -308,6 +308,44 @@ export function useRegistrarAcao() {
   });
 }
 
+export function useMudarEtapa() {
+  return useAcaoRmkt(async (a: { leadId: string; etapa: RmktEtapa }) => {
+    if (!REMARKETING_REAL) return;
+    const { error } = await supabase!.rpc('remarketing_mudar_etapa', { p_lead: a.leadId, p_etapa: a.etapa });
+    if (error) throw new Error(error.message);
+  });
+}
+export function useObservacao() {
+  return useAcaoRmkt(async (a: { leadId: string; texto: string }) => {
+    if (!REMARKETING_REAL) return;
+    const { error } = await supabase!.rpc('remarketing_observacao', { p_lead: a.leadId, p_texto: a.texto });
+    if (error) throw new Error(error.message);
+  });
+}
+
+export interface RmktProdutividade {
+  id: string; nome: string; tarefas: number; vencidas: number; concluidas_hoje: number;
+  recuperados_30d: number; tempo_medio_conclusao_h: number | null; tempo_medio_recuperacao_h: number | null;
+}
+export const DEMO_PROD: RmktProdutividade[] = [
+  { id: 'u-mock', nome: 'Atendente', tarefas: 3, vencidas: 2, concluidas_hoje: 5, recuperados_30d: 6, tempo_medio_conclusao_h: 3.2, tempo_medio_recuperacao_h: 22.5 },
+  { id: 'u-2', nome: 'Juliana', tarefas: 2, vencidas: 1, concluidas_hoje: 3, recuperados_30d: 3, tempo_medio_conclusao_h: 5.1, tempo_medio_recuperacao_h: 30.0 },
+];
+export function useProdutividade(habilitado: boolean) {
+  const { currentOrg } = useOrg();
+  return useQuery({
+    queryKey: ['rmkt-prod', currentOrg.id],
+    enabled: habilitado,
+    staleTime: 30_000,
+    queryFn: async (): Promise<RmktProdutividade[]> => {
+      if (!REMARKETING_REAL) return DEMO_PROD;
+      const { data, error } = await supabase!.rpc('remarketing_produtividade', { p_org: currentOrg.id });
+      if (error) throw new Error(error.message);
+      return (data ?? []) as RmktProdutividade[];
+    },
+  });
+}
+
 /* ---------- realtime: a fila atualiza sem F5 ----------
    Tabelas já na publication (F1/F2.5). Canal único por org, montado UMA vez
    pela página (mesma cautela do sla.ts: nunca .on depois de subscribe). */

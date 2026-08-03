@@ -14,6 +14,62 @@
 .v2 .rmk-inerte { background: var(--ambar-bg); color: var(--ambar); border: 1px solid rgba(var(--ambar-rgb), .26); }
 .v2 .rmk-mudo { font-size: 11.5px; color: var(--txt-3); padding: 6px 0; }
 
+/* ---------- TRABALHAR AGORA: a caixa que comanda o dia ---------- */
+.v2 .rmn-agora { margin-top: 10px; padding: 13px 15px 9px; border-radius: var(--r-card); }
+.v2 .rmn-cab { display: flex; align-items: baseline; gap: 10px; margin-bottom: 9px; }
+.v2 .rmn-cab h3 { font-size: 14px; font-weight: 700; }
+.v2 .rmn-cab span { font-size: 11px; color: var(--txt-3); }
+.v2 .rmn-limpa { font-size: 12.5px; color: var(--txt-2); padding: 6px 0 10px; }
+.v2 .rmn-item {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) 118px auto; gap: 12px; align-items: center;
+  padding: 8px 10px; border-radius: 10px; margin-bottom: 4px;
+  border: 1px solid rgba(var(--tint), .07); background: rgba(var(--tint), .025);
+}
+.v2 .rmn-item.primeira { border-color: rgba(var(--tint), .22); background: rgba(var(--tint), .05); box-shadow: inset 0 1px 0 rgba(var(--tint), .1); }
+.v2 .rmn-item.u-vencida { border-left: 3px solid var(--rubro); }
+.v2 .rmn-item.u-hoje { border-left: 3px solid var(--ambar); }
+.v2 .rmn-frase { min-width: 0; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2 .rmn-frase b { font-weight: 600; }
+.v2 .rmn-frase > span[aria-hidden] { margin-right: 4px; }
+.v2 .rmn-motivo { font-style: normal; font-size: 10.5px; color: var(--txt-3); margin-left: 9px; }
+.v2 .rmn-acts { display: inline-flex; gap: 6px; }
+
+/* selo de prioridade (score multi-fator) — visível de longe */
+.v2 .pbadge {
+  flex-shrink: 0; font-size: 8.5px; font-weight: 800; letter-spacing: .04em; border-radius: 6px;
+  padding: 2.5px 5px; color: var(--txt-3); border: 1px solid rgba(var(--tint), .16);
+}
+.v2 .pbadge.p1 { color: var(--rubro); border-color: rgba(var(--rubro-rgb), .55); background: rgba(var(--rubro-rgb), .12); }
+.v2 .pbadge.p2 { color: var(--ambar); border-color: rgba(var(--ambar-rgb), .5); background: rgba(var(--ambar-rgb), .1); }
+
+/* ---------- painel lateral (HubSpot-like) ---------- */
+.v2 .rmp-dados { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 12px; background: rgba(var(--tint), .03); border: 1px solid rgba(var(--tint), .08); border-radius: 10px; padding: 10px 12px; }
+.v2 .rmp-dados > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.v2 .rmp-dados .k { font-size: 9px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--txt-3); }
+.v2 .rmp-dados .v { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .rmp-dados .rmq-etapa { justify-self: start; width: fit-content; }
+.v2 .rmp-acts { display: flex; gap: 6px; flex-wrap: wrap; }
+.v2 .rmp-obs { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.v2 .rmp-obs textarea { width: 100%; height: auto; padding: 8px 10px; resize: vertical; font-size: 12px; line-height: 1.4; }
+.v2 .rmp-tl { display: flex; flex-direction: column; }
+.v2 .rmp-ev { display: flex; gap: 9px; align-items: flex-start; padding: 6px 2px; border-bottom: 1px solid rgba(var(--tint), .05); }
+.v2 .rmp-ev:last-child { border-bottom: none; }
+.v2 .rmp-ev .pt { width: 7px; height: 7px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; background: rgba(var(--tint), .3); }
+.v2 .rmp-ev.crit .pt { background: var(--rubro); box-shadow: 0 0 8px rgba(var(--rubro-rgb), calc(.5 * var(--fx))); }
+.v2 .rmp-ev.ok .pt { background: var(--verde); }
+.v2 .rmp-ev .tx { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 1px; }
+.v2 .rmp-ev .t { font-size: 12px; font-weight: 500; }
+.v2 .rmp-ev .s { font-size: 11px; color: var(--txt-3); }
+.v2 .rmp-ev .h { font-size: 9.5px; color: var(--txt-3); flex-shrink: 0; margin-top: 2px; }
+
+/* ---------- equipe (produtividade) ---------- */
+.v2 .rme-tab { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; }
+.v2 .rme-linha { display: grid; grid-template-columns: minmax(120px, 1.4fr) repeat(6, minmax(52px, .7fr)); gap: 8px; align-items: center; padding: 7px 9px; border-radius: 8px; font-size: 12px; }
+.v2 .rme-linha:not(.cab):hover { background: rgba(var(--tint), .04); }
+.v2 .rme-linha.cab { font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--txt-3); }
+.v2 .rme-nome { display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .rme-urg { color: var(--rubro); font-weight: 700; }
+
 /* ---------- indicadores: linha fina, sem cards ---------- */
 .v2 .rmq-stats {
   display: flex; gap: 22px; flex-wrap: wrap; align-items: baseline;
