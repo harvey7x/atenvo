@@ -41,6 +41,7 @@ const DisparoV2 = lazy(() => import('@/v2/pages/Disparo'));
 const RelatoriosV2 = lazy(() => import('@/v2/pages/Relatorios'));
 const IntegracoesV2 = lazy(() => import('@/v2/pages/Integracoes'));
 const KanbanV2 = lazy(() => import('@/v2/pages/Kanban'));
+const RemarketingV2 = lazy(() => import('@/v2/pages/Remarketing'));
 const WhatsAppV2 = lazy(() => import('@/v2/pages/WhatsApp'));
 const ManutencaoV2 = lazy(() => import('@/v2/pages/Manutencao'));
 const VitrineV2 = lazy(() => import('@/v2/pages/Vitrine'));
@@ -79,6 +80,7 @@ const routes: RouteObject[] = [
           { path: 'facebook', element: <Lz><ManutencaoV2 area="Facebook" /></Lz> },
           { path: 'relacionamento', element: <Lz><ManutencaoV2 area="Relacionamento" /></Lz> },
           { path: 'kanban', element: <Lz><KanbanV2 /></Lz> },
+          { path: 'remarketing', element: <Lz><RemarketingV2 /></Lz> },
           { path: 'agendamentos', element: <Lz><AgendamentosV2 /></Lz> },
           { path: 'disparo', element: <Lz><DisparoV2 /></Lz> },
           { path: 'contatos', element: <Lz><ContatosV2 /></Lz> },

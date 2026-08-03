@@ -14,6 +14,8 @@ import { NotificacaoResposta, type DadosNotificacao } from './NotificacaoRespost
 import { useNotificacaoInbound } from '../hooks/useNotificacaoInbound';
 import { aplicarTema, lerTema, salvarTema, type Tema } from '../lib/tema';
 import { assinarModoPerf, lerModoPerf, salvarModoPerf, type ModoPerf } from '../lib/perf';
+import { useNotificacoes, useMarcarNotificacao } from '@/data/remarketing';
+import { tempoRelativo } from '../lib/tempo';
 
 /* ícones sol/lua do alternador de tema (traço fino, como o resto do chrome v2) */
 const ROTULO_PERF: Record<ModoPerf, string> = { auto: 'Automático', lite: 'Leve', full: 'Completo' };
@@ -46,6 +48,7 @@ const GRUPOS: { rotulo: string; itens: ItemNav[] }[] = [
       { slug: 'whatsapp', rotulo: 'WhatsApp' },
       { slug: 'facebook', rotulo: 'Facebook' },
       { slug: 'kanban', rotulo: 'Kanban' },
+      { slug: 'remarketing', rotulo: 'Remarketing' },
       { slug: 'agendamentos', rotulo: 'Agendamentos' },
       { slug: 'disparo', rotulo: 'Disparo' },
     ],
@@ -168,9 +171,20 @@ export default function AppShellV2() {
     if (r) setMenuPos({ top: Math.round(r.bottom + 8), right: Math.round(window.innerWidth - r.right) });
     setMenuUsuario((v) => !v);
   }, []);
-  // sino: o v1 abre a "Central de atendimento" (SLA) — não portada ao v2. Fallback declarado
-  // no reporte: leva ao Inbox (onde os inbounds notificados vivem) e marca o pulso como visto.
-  const abrirNotificacoes = useCallback(() => { setSinoOn(false); setBadgePop(0); navigate('/whatsapp'); }, [navigate]);
+  // sino: central de notificações PERSISTIDA (tabela notificacoes, F2 do remarketing).
+  // O clique abre o painel; o pulso/contador de inbound segue sendo zerado aqui.
+  const [painelNotif, setPainelNotif] = useState(false);
+  const [notifPos, setNotifPos] = useState<{ top: number; right: number }>({ top: 60, right: 60 });
+  const sinoRef = useRef<HTMLButtonElement>(null);
+  const notifsQ = useNotificacoes();
+  const marcarNotif = useMarcarNotificacao();
+  const naoLidas = (notifsQ.data ?? []).filter((n) => !n.lidaEm).length;
+  const abrirNotificacoes = useCallback(() => {
+    const r = sinoRef.current?.getBoundingClientRect();
+    if (r) setNotifPos({ top: Math.round(r.bottom + 8), right: Math.round(window.innerWidth - r.right) });
+    setSinoOn(false); setBadgePop(0); setPainelNotif((v) => !v);
+  }, []);
+  useEffect(() => { setPainelNotif(false); }, [location.pathname]);
   // avatar: menu de usuário real — Configurações (rota v2) + Sair (signOut do v1, como a Topbar antiga).
   const sair = useCallback(async () => { setMenuUsuario(false); await signOut(); navigate('/login', { replace: true }); }, [signOut, navigate]);
   // fecha o menu ao trocar de rota
@@ -295,12 +309,39 @@ export default function AppShellV2() {
               >
                 {tema === 'dark' ? <IconeSol /> : <IconeLua />}
               </button>
-              <button type="button" className="ib" aria-label="Notificações" title="Notificações — abrir o Inbox" onClick={abrirNotificacoes}>
+              <button ref={sinoRef} type="button" className="ib" aria-label="Notificações" title="Notificações" aria-haspopup="menu" aria-expanded={painelNotif} onClick={abrirNotificacoes}>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
                   <path d="M18 9a6 6 0 10-12 0c0 6-2.5 7-2.5 7h17S18 15 18 9zM10 20a2.2 2.2 0 004 0" />
                 </svg>
-                <span className={sinoOn ? 'pt on' : 'pt'} aria-hidden />
+                <span className={sinoOn || naoLidas > 0 ? 'pt on' : 'pt'} aria-hidden />
               </button>
+              {painelNotif && createPortal(
+                <>
+                  <div className="um-backdrop" onClick={() => setPainelNotif(false)} aria-hidden />
+                  <div className="usuario-menu notif-panel" role="menu" aria-label="Notificações" style={{ top: notifPos.top, right: notifPos.right }}>
+                    <div className="np-head">
+                      <b>Notificações</b>
+                      {naoLidas > 0 && (
+                        <button type="button" className="np-todas" onClick={() => marcarNotif.mutate({ todas: true })}>Marcar todas como lidas</button>
+                      )}
+                    </div>
+                    {(notifsQ.data ?? []).length === 0 ? (
+                      <div className="np-vazio">Nenhuma notificação ainda. Quando a Central de Remarketing identificar algo, aparece aqui.</div>
+                    ) : (notifsQ.data ?? []).slice(0, 20).map((n) => (
+                      <button key={n.id} type="button" role="menuitem" className={'np-item' + (n.lidaEm ? '' : ' nova')}
+                        onClick={() => { setPainelNotif(false); if (!n.lidaEm) marcarNotif.mutate({ id: n.id }); if (n.rota) navigate(n.rota); }}>
+                        <span className="np-dot" aria-hidden />
+                        <span className="np-tx">
+                          <span className="np-t">{n.titulo}</span>
+                          {n.corpo && <span className="np-c">{n.corpo}</span>}
+                        </span>
+                        <span className="np-h num">{tempoRelativo(n.criadoEm, Date.now())}</span>
+                      </button>
+                    ))}
+                  </div>
+                </>,
+                raizMenu,
+              )}
               <div className="top-usuario">
                 <button ref={avatarRef} type="button" className="avatar avatar-btn" aria-label="Menu do usuário" aria-haspopup="menu"
                   aria-expanded={menuUsuario} title={nome} style={{ width: 33, height: 33 }}

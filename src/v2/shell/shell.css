@@ -183,6 +183,25 @@
 .v2 .um-backdrop { position: fixed; inset: 0; z-index: 94; }
 /* portado ao body (fora do stacking context da topbar) e SÓLIDO opaco (#17191D, padrão .wa-pop):
    nada do palco/cabeçalho transparece nem pinta por cima. top/right vêm do rect do avatar (JS). */
+/* painel de notificações (herda a pele do .usuario-menu) */
+.v2 .notif-panel { width: 340px; max-height: 420px; overflow-y: auto; }
+.v2 .np-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px 6px; font-size: 12px; }
+.v2 .np-todas { background: none; border: none; color: var(--txt-3); font-size: 10.5px; cursor: pointer; font-family: var(--fonte); text-decoration: underline; }
+.v2 .np-todas:hover { color: var(--txt); }
+.v2 .np-vazio { padding: 14px 10px 12px; font-size: 11.5px; color: var(--txt-3); }
+.v2 .np-item {
+  display: flex; align-items: flex-start; gap: 8px; width: 100%; text-align: left; cursor: pointer;
+  background: none; border: none; border-radius: 9px; padding: 8px 10px; font-family: var(--fonte); color: var(--txt-2);
+}
+.v2 .np-item:hover { background: rgba(var(--tint), .05); }
+.v2 .np-dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; background: transparent; }
+.v2 .np-item.nova .np-dot { background: var(--verde); box-shadow: 0 0 8px rgba(var(--verde-rgb), calc(.5 * var(--fx))); }
+.v2 .np-item.nova .np-t { color: var(--txt); }
+.v2 .np-tx { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 1px; }
+.v2 .np-t { font-size: 12px; font-weight: 600; }
+.v2 .np-c { font-size: 11px; color: var(--txt-3); }
+.v2 .np-h { font-size: 9.5px; color: var(--txt-3); flex-shrink: 0; margin-top: 2px; }
+
 .v2 .usuario-menu {
   position: fixed; z-index: 95; min-width: 194px;
   background: var(--surface); border: 1px solid rgba(var(--tint), .12); border-radius: var(--r-card); padding: 6px;

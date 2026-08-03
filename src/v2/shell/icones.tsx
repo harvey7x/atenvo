@@ -49,6 +49,10 @@ export const ICONES: Record<string, ReactNode> = {
   maturacao: (
     <Ic><path d="M12 21v-8" /><path d="M12 13c0-4 3-6.5 7.5-6.5 0 4.5-3 6.5-7.5 6.5z" /><path d="M12 13c0-4-3-6.5-7.5-6.5 0 4.5 3 6.5 7.5 6.5z" /></Ic>
   ),
+  // Central de Remarketing: alvo com seta de retorno (recuperar quem escapou)
+  remarketing: (
+    <Ic><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="3.2" /><path d="M21.5 2.5 15 9" /><path d="M15.5 4.5 15 9l4.5-.5" /></Ic>
+  ),
   configuracoes: (
     <Ic><circle cx="12" cy="12" r="3.2" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2" /></Ic>
   ),
