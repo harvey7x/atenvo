@@ -68,11 +68,11 @@ const demoLead = (n: Partial<RmktLead> & { id: string; contatoNome: string; etap
   instituicao: null, origem: 'WhatsApp', ...n,
 });
 export const DEMO_LEADS: RmktLead[] = [
-  demoLead({ id: 'r1', contatoNome: 'Maria Aparecida Souza', etapa: 'remarketing_1', ultimaEntradaEm: hAtras(1) }),
-  demoLead({ id: 'r2', contatoNome: 'José Carlos Ferreira', etapa: 'pendencia', origemFluxo: 'fluxo2_abandono_atendimento', responsavelId: 'u-mock', responsavelNome: 'Atendente', tentativas: 1, instituicao: 'BMG', ultimaEntradaEm: hAtras(52) }),
-  demoLead({ id: 'r3', contatoNome: 'Sebastião R. Nunes', etapa: 'recuperacao_1', responsavelId: 'u-2', responsavelNome: 'Juliana', tentativas: 2, instituicao: 'Agibank', ultimaEntradaEm: hAtras(96) }),
-  demoLead({ id: 'r4', contatoNome: 'Terezinha M. Alves', etapa: 'recuperacao_2', responsavelId: 'u-mock', responsavelNome: 'Atendente', tentativas: 3, ultimaEntradaEm: hAtras(150) }),
-  demoLead({ id: 'r5', contatoNome: 'Cleusa M. Barros', etapa: 'pendencia', origemFluxo: 'fluxo2_abandono_atendimento', tentativas: 1, instituicao: 'Facta', ultimaEntradaEm: hAtras(60) }),
+  demoLead({ id: 'r1', contatoNome: 'Maria Aparecida Souza', etapa: 'remarketing_1', conversaId: 'c1', ultimaEntradaEm: hAtras(1) }),
+  demoLead({ id: 'r2', contatoNome: 'José Carlos Ferreira', etapa: 'pendencia', origemFluxo: 'fluxo2_abandono_atendimento', responsavelId: 'u-mock', responsavelNome: 'Atendente', tentativas: 1, instituicao: 'BMG', conversaId: 'c2', ultimaEntradaEm: hAtras(52) }),
+  demoLead({ id: 'r3', contatoNome: 'Sebastião R. Nunes', etapa: 'recuperacao_1', responsavelId: 'u-2', responsavelNome: 'Juliana', tentativas: 2, instituicao: 'Agibank', conversaId: 'c3', ultimaEntradaEm: hAtras(96) }),
+  demoLead({ id: 'r4', contatoNome: 'Terezinha M. Alves', etapa: 'recuperacao_2', responsavelId: 'u-mock', responsavelNome: 'Atendente', tentativas: 3, conversaId: 'c4', ultimaEntradaEm: hAtras(150) }),
+  demoLead({ id: 'r5', contatoNome: 'Cleusa M. Barros', etapa: 'pendencia', origemFluxo: 'fluxo2_abandono_atendimento', tentativas: 1, instituicao: 'Facta', conversaId: 'c5', ultimaEntradaEm: hAtras(60) }),
 ];
 export const DEMO_TAREFAS: RmktTarefa[] = [
   { id: 't1', remarketingId: 'r1', conversaId: 'c1', tipo: 'acao', contatoNome: 'Maria Aparecida Souza', etapa: 'remarketing_1', responsavelId: null, responsavelNome: null, titulo: 'Recuperar lead — Remarketing 1', instrucoes: 'Envie uma mensagem personalizada, mande um áudio e tente recuperar o cliente.', sugestaoMensagem: null, venceEm: hAtras(6), criadoEm: hAtras(8) },
@@ -346,6 +346,89 @@ export function useProdutividade(habilitado: boolean) {
   });
 }
 
+/* ---------- SINAIS reais da fila + resumo p/ a IA (Central de Operações) ----------
+   Leem dados que já existem (mensagens/eventos/fichas/conversas). RPCs read-only
+   member-gated; motor segue inerte. Hoje devolvem vazio (0 leads ativos) e acendem na F3. */
+export interface RmktSinais {
+  leadId: string; conversaId: string | null;
+  saidasTexto: number; saidasAudio: number; entradasAudio: number; entradasTotal: number;
+  docsRecebidos: number;
+  ultimaSaidaStatus: string | null; ultimaSaidaEm: string | null; ultimaEntradaEm: string | null;
+  ligacoes: number; audiosReg: number; whatsappsReg: number;
+  contratos: number; benefTotal: number;
+}
+const mapSinais = (r: Record<string, unknown>): RmktSinais => ({
+  leadId: String(r.lead_id), conversaId: (r.conversa_id as string) ?? null,
+  saidasTexto: Number(r.saidas_texto) || 0, saidasAudio: Number(r.saidas_audio) || 0,
+  entradasAudio: Number(r.entradas_audio) || 0, entradasTotal: Number(r.entradas_total) || 0,
+  docsRecebidos: Number(r.docs_recebidos) || 0,
+  ultimaSaidaStatus: (r.ultima_saida_status as string) ?? null,
+  ultimaSaidaEm: (r.ultima_saida_em as string) ?? null, ultimaEntradaEm: (r.ultima_entrada_em as string) ?? null,
+  ligacoes: Number(r.ligacoes) || 0, audiosReg: Number(r.audios_reg) || 0, whatsappsReg: Number(r.whatsapps_reg) || 0,
+  contratos: Number(r.contratos) || 0, benefTotal: Number(r.benef_total) || 0,
+});
+export const DEMO_SINAIS: RmktSinais[] = [
+  { leadId: 'r1', conversaId: 'c1', saidasTexto: 3, saidasAudio: 1, entradasAudio: 1, entradasTotal: 12, docsRecebidos: 0, ultimaSaidaStatus: 'lida', ultimaSaidaEm: hAtras(2), ultimaEntradaEm: hAtras(1), ligacoes: 0, audiosReg: 1, whatsappsReg: 2, contratos: 2, benefTotal: 4180 },
+  { leadId: 'r2', conversaId: 'c2', saidasTexto: 5, saidasAudio: 0, entradasAudio: 3, entradasTotal: 9, docsRecebidos: 0, ultimaSaidaStatus: 'entregue', ultimaSaidaEm: hAtras(50), ultimaEntradaEm: hAtras(52), ligacoes: 1, audiosReg: 0, whatsappsReg: 3, contratos: 1, benefTotal: 1890 },
+  { leadId: 'r3', conversaId: 'c3', saidasTexto: 4, saidasAudio: 2, entradasAudio: 0, entradasTotal: 5, docsRecebidos: 0, ultimaSaidaStatus: 'falhou', ultimaSaidaEm: hAtras(94), ultimaEntradaEm: hAtras(96), ligacoes: 1, audiosReg: 2, whatsappsReg: 1, contratos: 1, benefTotal: 2412 },
+  { leadId: 'r4', conversaId: 'c4', saidasTexto: 6, saidasAudio: 1, entradasAudio: 1, entradasTotal: 8, docsRecebidos: 2, ultimaSaidaStatus: 'lida', ultimaSaidaEm: hAtras(148), ultimaEntradaEm: hAtras(150), ligacoes: 1, audiosReg: 1, whatsappsReg: 4, contratos: 3, benefTotal: 6240 },
+  { leadId: 'r5', conversaId: 'c5', saidasTexto: 6, saidasAudio: 0, entradasAudio: 0, entradasTotal: 4, docsRecebidos: 0, ultimaSaidaStatus: 'lida', ultimaSaidaEm: hAtras(58), ultimaEntradaEm: hAtras(60), ligacoes: 0, audiosReg: 0, whatsappsReg: 6, contratos: 0, benefTotal: 0 },
+];
+export function useFilaSinais() {
+  const { currentOrg } = useOrg();
+  return useQuery({
+    queryKey: ['rmkt-sinais', currentOrg.id],
+    staleTime: 30_000, refetchInterval: 90_000,
+    queryFn: async (): Promise<RmktSinais[]> => {
+      if (!REMARKETING_REAL) return DEMO_SINAIS;
+      const { data, error } = await supabase!.rpc('remarketing_fila_sinais', { p_org: currentOrg.id });
+      if (error) throw new Error(error.message);
+      return ((data ?? []) as Record<string, unknown>[]).map(mapSinais);
+    },
+  });
+}
+
+export interface RmktResumo {
+  entradasTotal: number; saidasTotal: number; entradasAudio: number; saidasTexto: number; saidasAudio: number;
+  docsRecebidos: number; ultimaEntradaEm: string | null; ultimaSaidaEm: string | null;
+  modaHora: number | null; modaHoraQtd: number;
+  ultimaSaidaStatus: string | null; erroEnvio: string | null;
+  lidasPosEntrada: number; naoLidas: number; ultimaEntradaTipo: string | null;
+  telefonesExtras: string[]; contratosLista: { banco: string | null; tipo: string | null; valor: number | null }[];
+}
+const mapResumo = (r: Record<string, unknown>): RmktResumo => ({
+  entradasTotal: Number(r.entradas_total) || 0, saidasTotal: Number(r.saidas_total) || 0,
+  entradasAudio: Number(r.entradas_audio) || 0, saidasTexto: Number(r.saidas_texto) || 0, saidasAudio: Number(r.saidas_audio) || 0,
+  docsRecebidos: Number(r.docs_recebidos) || 0,
+  ultimaEntradaEm: (r.ultima_entrada_em as string) ?? null, ultimaSaidaEm: (r.ultima_saida_em as string) ?? null,
+  modaHora: r.moda_hora != null ? Number(r.moda_hora) : null, modaHoraQtd: Number(r.moda_hora_qtd) || 0,
+  ultimaSaidaStatus: (r.ultima_saida_status as string) ?? null, erroEnvio: (r.erro_envio as string) ?? null,
+  lidasPosEntrada: Number(r.lidas_pos_entrada) || 0, naoLidas: Number(r.nao_lidas) || 0,
+  ultimaEntradaTipo: (r.ultima_entrada_tipo as string) ?? null,
+  telefonesExtras: Array.isArray(r.telefones_extras) ? (r.telefones_extras as string[]) : [],
+  contratosLista: Array.isArray(r.contratos_lista) ? (r.contratos_lista as { banco: string | null; tipo: string | null; valor: number | null }[]) : [],
+});
+const DEMO_RESUMO: Record<string, RmktResumo> = {
+  c1: { entradasTotal: 12, saidasTotal: 6, entradasAudio: 1, saidasTexto: 3, saidasAudio: 1, docsRecebidos: 0, ultimaEntradaEm: hAtras(1), ultimaSaidaEm: hAtras(2), modaHora: 14, modaHoraQtd: 7, ultimaSaidaStatus: 'lida', erroEnvio: null, lidasPosEntrada: 0, naoLidas: 1, ultimaEntradaTipo: 'texto', telefonesExtras: [], contratosLista: [{ banco: 'BMG', tipo: 'aposentadoria', valor: 2412 }, { banco: 'Agibank', tipo: 'aposentadoria', valor: 1768 }] },
+  c2: { entradasTotal: 9, saidasTotal: 5, entradasAudio: 3, saidasTexto: 5, saidasAudio: 0, docsRecebidos: 0, ultimaEntradaEm: hAtras(52), ultimaSaidaEm: hAtras(50), modaHora: 9, modaHoraQtd: 5, ultimaSaidaStatus: 'entregue', erroEnvio: null, lidasPosEntrada: 0, naoLidas: 0, ultimaEntradaTipo: 'audio', telefonesExtras: [], contratosLista: [{ banco: 'BMG', tipo: 'pensao_por_morte', valor: 1890 }] },
+  c3: { entradasTotal: 5, saidasTotal: 6, entradasAudio: 0, saidasTexto: 4, saidasAudio: 2, docsRecebidos: 0, ultimaEntradaEm: hAtras(96), ultimaSaidaEm: hAtras(94), modaHora: 16, modaHoraQtd: 3, ultimaSaidaStatus: 'falhou', erroEnvio: 'número inexistente no WhatsApp', lidasPosEntrada: 0, naoLidas: 0, ultimaEntradaTipo: 'texto', telefonesExtras: ['5551988887766'], contratosLista: [{ banco: 'Agibank', tipo: 'aposentadoria', valor: 2412 }] },
+  c4: { entradasTotal: 8, saidasTotal: 7, entradasAudio: 1, saidasTexto: 6, saidasAudio: 1, docsRecebidos: 2, ultimaEntradaEm: hAtras(150), ultimaSaidaEm: hAtras(148), modaHora: 11, modaHoraQtd: 4, ultimaSaidaStatus: 'lida', erroEnvio: null, lidasPosEntrada: 1, naoLidas: 0, ultimaEntradaTipo: 'documento', telefonesExtras: [], contratosLista: [{ banco: 'Facta', tipo: 'aposentadoria', valor: 2960 }, { banco: 'BMG', tipo: 'aposentadoria', valor: 1980 }, { banco: 'Mercantil', tipo: 'bpc_loas', valor: 1300 }] },
+  c5: { entradasTotal: 4, saidasTotal: 6, entradasAudio: 0, saidasTexto: 6, saidasAudio: 0, docsRecebidos: 0, ultimaEntradaEm: hAtras(60), ultimaSaidaEm: hAtras(58), modaHora: 20, modaHoraQtd: 3, ultimaSaidaStatus: 'lida', erroEnvio: null, lidasPosEntrada: 3, naoLidas: 0, ultimaEntradaTipo: 'texto', telefonesExtras: [], contratosLista: [] },
+};
+export function useConversaResumo(conversaId: string | null, contatoId: string | null, habilitado: boolean) {
+  return useQuery({
+    queryKey: ['rmkt-resumo', conversaId],
+    enabled: habilitado && !!conversaId,
+    staleTime: 30_000,
+    queryFn: async (): Promise<RmktResumo | null> => {
+      if (!REMARKETING_REAL) return (conversaId && DEMO_RESUMO[conversaId]) || null;
+      const { data, error } = await supabase!.rpc('remarketing_conversa_resumo', { p_conversa: conversaId, p_contato: contatoId });
+      if (error) throw new Error(error.message);
+      return data ? mapResumo(data as Record<string, unknown>) : null;
+    },
+  });
+}
+
 /* ---------- realtime: a fila atualiza sem F5 ----------
    Tabelas já na publication (F1/F2.5). Canal único por org, montado UMA vez
    pela página (mesma cautela do sla.ts: nunca .on depois de subscribe). */
@@ -358,6 +441,7 @@ export function useRemarketingRealtime() {
       qc.invalidateQueries({ queryKey: ['rmkt-tarefas', currentOrg.id] });
       qc.invalidateQueries({ queryKey: ['rmkt-leads', currentOrg.id, 'ativo'] });
       qc.invalidateQueries({ queryKey: ['rmkt-dash', currentOrg.id] });
+      qc.invalidateQueries({ queryKey: ['rmkt-sinais', currentOrg.id] });
       qc.invalidateQueries({ queryKey: ['notificacoes', currentOrg.id] });
     };
     const ch = supabase!
