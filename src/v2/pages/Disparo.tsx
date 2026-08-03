@@ -112,8 +112,9 @@ export function Disparo() {
   // "Quero N pessoas" dentro dos filtros: N + critério (mais recentes | aleatório).
   const [qtd, setQtd] = useState(50);
   const [modoQtd, setModoQtd] = useState<'recentes' | 'aleatorio'>('recentes');
-  // Protege a base: por padrão o público novo NÃO inclui quem já recebeu um disparo.
-  const [excluirJaRecebeu, setExcluirJaRecebeu] = useState(true);
+  // Protege a base: por padrão o público novo esconde quem já recebeu um disparo.
+  // 'todos' mostra tudo; 'so' isola só quem já recebeu (re-disparo direto no Público).
+  const [modoJaRecebeu, setModoJaRecebeu] = useState<'esconder' | 'todos' | 'so'>('esconder');
   const [sel, setSel] = useState<ReadonlySet<string>>(new Set());
   const [confOptout, setConfOptout] = useState<Elegivel | null>(null);
 
@@ -142,9 +143,9 @@ export function Disparo() {
     return elegiveis.filter((e) =>
       (etapasSel.size === 0 || etapasSel.has(e.etapa)) &&
       (generoSel.size === 0 || generoSel.has(generoDe.get(e.contato_id) ?? 'ambiguo')) &&
-      (!excluirJaRecebeu || !e.ja_recebeu) &&
+      (modoJaRecebeu === 'todos' || (modoJaRecebeu === 'so' ? e.ja_recebeu : !e.ja_recebeu)) &&
       (!q || e.nome.toLowerCase().includes(q) || (e.telefone ?? '').includes(q)));
-  }, [elegiveis, busca, etapasSel, generoSel, generoDe, excluirJaRecebeu]);
+  }, [elegiveis, busca, etapasSel, generoSel, generoDe, modoJaRecebeu]);
   const selecionaveis = useMemo(() => listaPublico.filter((e) => !e.optout), [listaPublico]);
   // pool de resolução da seleção: elegíveis + contatados (para o re-disparo caber no fluxo).
   const porContato = useMemo(() => {
@@ -470,8 +471,9 @@ export function Disparo() {
                   <div className="dsp-fgrupo">
                     <span className="dsp-flabel">Já contatados</span>
                     <Chips>
-                      <Chip ativo={excluirJaRecebeu} onClick={() => setExcluirJaRecebeu(true)}>Esconder quem já recebeu {jaRecebeuNoFiltro > 0 ? `(${jaRecebeuNoFiltro})` : ''}</Chip>
-                      <Chip ativo={!excluirJaRecebeu} onClick={() => setExcluirJaRecebeu(false)}>Mostrar todos</Chip>
+                      <Chip ativo={modoJaRecebeu === 'esconder'} onClick={() => setModoJaRecebeu('esconder')}>Esconder quem já recebeu {jaRecebeuNoFiltro > 0 ? `(${jaRecebeuNoFiltro})` : ''}</Chip>
+                      <Chip ativo={modoJaRecebeu === 'todos'} onClick={() => setModoJaRecebeu('todos')}>Mostrar todos</Chip>
+                      <Chip ativo={modoJaRecebeu === 'so'} onClick={() => setModoJaRecebeu('so')}>Só quem já recebeu {jaRecebeuNoFiltro > 0 ? `(${jaRecebeuNoFiltro})` : ''}</Chip>
                     </Chips>
                   </div>
                 </div>
