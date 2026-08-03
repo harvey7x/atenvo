@@ -11,6 +11,7 @@ import { useJanelaCanal, rotuloJanela } from '@/data/cloudApi';
 import { useSlaAlertas } from '@/data/sla';
 import { indexPorChave, tipoLabel, tempoRelativo } from '@/data/slaView';
 import { useOportunidadesDoContato, useFunisDaOrg, chamarGarantirEntrada } from '@/data/kanban';
+import { useChecklist } from '@/data/checklist';
 import { useCobrancas } from '@/data/cobrancas';
 import { corDaEtiqueta, podeGerenciarAtendimento, type AssinaturaModo } from '@/types/atendimento';
 import { textoBloqueio, analisarNome, conversaAtiva } from '@/lib/higieneConversa';
@@ -893,6 +894,8 @@ export default function WhatsAppV2() {
 
           <KanbanCtx contatoId={current.contatoId ?? null} demo={demo} etapa={current.etapa} etapaCor={current.etapaCor} origem={current.origin} respNome={current.respId ? nomePorId(current.respId) : undefined} lead={current} aoAvisar={aoAvisar} />
 
+          <ChecklistDocsCtx contatoId={current.contatoId ?? null} demo={demo} />
+
           {cobrancasCtx.length > 0 && (
             <div className="ctx-b spot">
               <div className="ctx-t">Cobranças <button type="button" className="lk" onClick={() => nav('/cobrancas')}>ver</button></div>
@@ -1551,6 +1554,50 @@ function KanbanCtx({ contatoId, demo, etapa, etapaCor, origem, respNome, lead, a
           </div>
         )}
       </ModalV2>
+    </div>
+  );
+}
+
+/* ================================================================
+   Contexto: checklist de documentos do card (oportunidade aberta).
+   Resolve a opp pelo contato (mesma query do KanbanCtx — react-query
+   deduplica). Só aparece quando há oportunidade aberta e fora do demo.
+   feito_em/feito_por são carimbados por trigger; o front só grava `feito`.
+   ================================================================ */
+function ChecklistDocsCtx({ contatoId, demo }: { contatoId: string | null; demo: boolean }) {
+  const oppsQ = useOportunidadesDoContato(!demo ? contatoId : null);
+  const opp = demo ? null : (oppsQ.data ?? []).find((o) => o.aberta) ?? null;
+  const chk = useChecklist(opp?.id ?? null);
+  if (!contatoId || demo || !opp) return null;
+  return (
+    <div className="ctx-b spot">
+      <div className="ctx-t">Documentos
+        <span className="chk-cnt">{chk.loading ? '' : `${chk.obrFeitos}/${chk.obrTotal} · ${chk.pct}%`}</span>
+      </div>
+      <div className="chk-bar" role="progressbar" aria-valuenow={chk.pct} aria-valuemin={0} aria-valuemax={100}>
+        <i className={chk.pct >= 100 ? 'cheio' : undefined} style={{ width: `${chk.pct}%` }} />
+      </div>
+      {chk.loading ? (
+        <div className="ctx-nota">Carregando…</div>
+      ) : (
+        chk.secoes.map((s) => {
+          const itens = chk.itens.filter((i) => i.secao === s.key);
+          if (!itens.length) return null;
+          return (
+            <div className="chk-sec" key={s.key}>
+              <div className="chk-sh">{s.titulo}</div>
+              {itens.map((it) => (
+                <label className={'chk-it' + (it.feito ? ' on' : '')} key={it.slug}>
+                  <input type="checkbox" checked={it.feito}
+                    onChange={(e) => chk.toggle(it.slug, e.target.checked)} />
+                  <span className="chk-lb">{it.rotulo}</span>
+                  {!it.obrigatorio && <span className="chk-opt">opcional</span>}
+                </label>
+              ))}
+            </div>
+          );
+        })
+      )}
     </div>
   );
 }

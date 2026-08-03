@@ -344,6 +344,20 @@
 .v2 .ctx-edit .campo label { font-size: 10.5px; }
 .v2 .ctx-edit .inp { font-size: 12px; }
 
+/* ---------- checklist de documentos (card) ---------- */
+.v2 .chk-cnt { font-size: 9.5px; font-weight: 600; letter-spacing: 0; color: var(--txt-2); font-variant-numeric: tabular-nums; }
+.v2 .chk-bar { height: 4px; border-radius: 99px; background: rgba(var(--tint), .1); overflow: hidden; margin-bottom: 10px; }
+.v2 .chk-bar i { display: block; height: 100%; border-radius: 99px; background: var(--verde); transition: width .25s var(--ease); }
+.v2 .chk-bar i.cheio { box-shadow: 0 0 6px rgba(var(--verde-rgb), .5); }
+.v2 .chk-sec { margin-top: 9px; }
+.v2 .chk-sec:first-of-type { margin-top: 0; }
+.v2 .chk-sh { font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--txt-3); margin-bottom: 3px; }
+.v2 .chk-it { display: flex; align-items: center; gap: 8px; padding: 3.5px 0; font-size: 11.5px; color: var(--txt-2); cursor: pointer; line-height: 1.35; }
+.v2 .chk-it input { width: 14px; height: 14px; flex-shrink: 0; accent-color: var(--verde); cursor: pointer; margin: 0; }
+.v2 .chk-it .chk-lb { min-width: 0; }
+.v2 .chk-it.on .chk-lb { color: var(--txt); text-decoration: line-through; text-decoration-color: rgba(var(--tint), .25); }
+.v2 .chk-it .chk-opt { margin-left: auto; flex-shrink: 0; font-size: 8.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--txt-3); border: 1px solid rgba(var(--tint), .18); border-radius: 4px; padding: 0 4px; }
+
 /* popover genérico da página (portais via criarRaizPortalV2) */
 .v2 .wa-pop { position: fixed; z-index: 95; min-width: 190px; max-width: 280px; max-height: 320px; overflow-y: auto; background: var(--surface); border: 1px solid rgba(var(--tint), .12); border-radius: 10px; box-shadow: var(--shadow-pop); padding: 4px; font-size: 12px; }
 .v2 .wa-pop .ph2 { font-size: 9.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--txt-3); padding: 6px 9px 3px; }
