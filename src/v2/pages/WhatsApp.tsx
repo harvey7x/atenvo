@@ -156,6 +156,7 @@ export default function WhatsAppV2() {
   const [filtroCanal, setFiltroCanal] = useState<string | null>(null);
   const [filtroStatus, setFiltroStatus] = useState<string | null>(null);
   const [filtroTransporte, setFiltroTransporte] = useState<string | null>(null);
+  const [filtroEtapa, setFiltroEtapa] = useState<string | null>(null);
   const [pop, setPop] = useState<Pop>(null);
   const [foco, setFoco] = useState(() => { try { return localStorage.getItem(FOCO_KEY) === '1'; } catch { return false; } });
   const [ctxAberto, setCtxAberto] = useState(() => { try { return sessionStorage.getItem('atenvo-wa-ctx') !== '0'; } catch { return true; } });
@@ -296,6 +297,7 @@ export default function WhatsAppV2() {
   const passaBase = (c: WaContact) =>
     (!filtroCanal || c.canalId === filtroCanal) &&
     (!filtroStatus || c.statusId === filtroStatus) &&
+    (!filtroEtapa || c.etapa === filtroEtapa) &&
     // "QR (não oficial)" = tudo que NÃO é o canal oficial (inclui canal removido/histórico,
     // cujo transporte é desconhecido) — sem terceiro balde invisível entre as duas opções
     (!filtroTransporte || (filtroTransporte === 'cloud_api'
@@ -317,7 +319,7 @@ export default function WhatsAppV2() {
     for (const [t] of TABS) n[t] = base.filter((c) => passaTab(c, t)).length;
     return n;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contacts, filtroCanal, filtroStatus, filtroTransporte, canalPorId, term, user?.id]);
+  }, [contacts, filtroCanal, filtroStatus, filtroTransporte, filtroEtapa, canalPorId, term, user?.id]);
   const visiveis = useMemo(() => {
     const lista = contacts.filter((c) => passaBase(c) && passaTab(c, tab));
     return lista.sort((a, b) => (a.fixada === b.fixada ? (b.lastAtMs ?? 0) - (a.lastAtMs ?? 0) : a.fixada ? -1 : 1));
@@ -447,6 +449,15 @@ export default function WhatsAppV2() {
   };
 
   const statusAtivos = statusQ.data?.filter((s) => s.ativo) ?? [];
+  // Etapas do Kanban presentes na fila atual (nome + cor), para filtrar a lista por etapa.
+  const etapasFiltro = useMemo(() => {
+    const m = new Map<string, string | null>();
+    for (const c of contacts) {
+      const nome = (c.etapa ?? '').trim();
+      if (nome && !m.has(nome)) m.set(nome, c.etapaCor ?? null);
+    }
+    return [...m.entries()].map(([nome, cor]) => ({ nome, cor })).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  }, [contacts]);
   const statusFechada = statusQ.data?.find((s) => (s.slug ?? s.nome).toLowerCase() === 'fechada');
   const aplicarStatus = async (id: string) => {
     const st = statusAtivos.find((s) => s.id === id);
@@ -491,7 +502,7 @@ export default function WhatsAppV2() {
             <div className="l1">
               <h3>Conversas</h3>
               <div className="bts">
-                <button type="button" className={'ib2' + (filtroCanal || filtroStatus || filtroTransporte ? ' on' : '')} title={filtroCanal || filtroStatus || filtroTransporte ? 'Filtros ativos' : 'Filtros'} onClick={(e) => abrirPop('filtro', e)}><IcFunil /></button>
+                <button type="button" className={'ib2' + (filtroCanal || filtroStatus || filtroTransporte || filtroEtapa ? ' on' : '')} title={filtroCanal || filtroStatus || filtroTransporte || filtroEtapa ? 'Filtros ativos' : 'Filtros'} onClick={(e) => abrirPop('filtro', e)}><IcFunil /></button>
                 <button type="button" className="ib2" title="Nova conversa" aria-label="Nova conversa" onClick={() => setNovaConversa(true)}><IcMais /></button>
               </div>
             </div>
@@ -1014,6 +1025,17 @@ export default function WhatsAppV2() {
                   <span className="dot" style={{ background: s.cor }} />{s.nome} {filtroStatus === s.id && <span className="ck">✓</span>}
                 </button>
               ))}
+              {etapasFiltro.length > 0 && (
+                <>
+                  <div className="ph2">Etapa do Kanban</div>
+                  <button type="button" className="it" onClick={() => { setFiltroEtapa(null); setPop(null); }}>Todas as etapas {!filtroEtapa && <span className="ck">✓</span>}</button>
+                  {etapasFiltro.map((e) => (
+                    <button key={e.nome} type="button" className="it" title="Filtrar pela etapa do funil" onClick={() => { setFiltroEtapa(e.nome); setPop(null); }}>
+                      <span className="dot" style={{ background: e.cor ?? 'var(--txt-3)' }} />{e.nome} {filtroEtapa === e.nome && <span className="ck">✓</span>}
+                    </button>
+                  ))}
+                </>
+              )}
             </>
           )}
           {pop.kind === 'acoes' && (
