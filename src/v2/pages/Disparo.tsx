@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import {
   useDisparoElegiveis, useDisparoContatados, useCampanhas, useCampanhasResumo, useCriarCampanha, useCancelarCampanha,
-  useTrocarTemplate, useAddAlvos, useAlvos,
+  useTrocarTemplate, useAddAlvos, useAlvos, useCampanhaResultado,
   useProcessarLote, useOptoutLista, useOptoutManual, useOptoutRemover,
   preencherTemplate, primeiroNomeApresentavel, inferirGenero, type Genero,
   type Elegivel, type Contatado, type Campanha, type CampanhaResumo, type OptoutRow, type ResultadoProcessar,
@@ -95,6 +95,7 @@ export function Disparo() {
     [campQ.data, campanhaSelId],
   );
   const alvosQ = useAlvos(campanha?.id ?? null);
+  const resultadoQ = useCampanhaResultado(campanha?.id ?? null);
   const templatesTodos = useMemo(() => tplQ.data ?? [], [tplQ.data]);
   const canalCloud = (diagQ.data?.canais ?? []).find((c) => c.status_integracao === 'conectado') ?? null;
 
@@ -708,6 +709,16 @@ export function Disparo() {
                 <Kpi rotulo="Responderam" valor={porStatus.respondido} />
                 <Kpi rotulo="Falhas / opt-out" valor={porStatus.falhou + porStatus.optout + porStatus.pulado} />
               </div>
+              {/* resultado da campanha: sinais reais depois do disparo (respondeu / Murillo chip / fechou) */}
+              <CardVidro spot sobe style={{ borderRadius: 12, padding: 16, animationDelay: '.03s' }}>
+                <h2 className="dsp-h2">Resultado desta campanha</h2>
+                <div className="dsp-kpis" style={{ marginTop: 8 }}>
+                  <Kpi rotulo="Responderam" valor={resultadoQ.data?.responderam ?? 0} />
+                  <Kpi rotulo="Chamaram no Murillo chip" valor={resultadoQ.data?.chamaram_murillo ?? 0} />
+                  <Kpi rotulo="Fecharam" valor={resultadoQ.data?.fecharam ?? 0} />
+                </div>
+                <p className="dsp-nota">Conta o que aconteceu <strong>depois</strong> do disparo de cada pessoa: resposta ao template, mensagem para o Murillo chip, e oportunidade ganha.</p>
+              </CardVidro>
               <CardVidro spot sobe style={{ borderRadius: 12, padding: 16, animationDelay: '.05s' }}>
                 <div className="dsp-painel">
                   <div className="dsp-info">
