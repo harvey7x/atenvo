@@ -570,7 +570,9 @@ async function tratarComBotoes(p: {
     toqueId = ((m?.metadados ?? {}) as Record<string, unknown>).payload_id as string | undefined ?? null;
   }
   const ehAudio = inboundTipo === 'audio';
-  const r = proximoPasso(passoAtual, { texto: inboundText || '', ehAudio, toqueId }, tentativas, dq);
+  // __canal_transporte: hint transiente pro motor decidir o FECHO (Cloud → cartão Murillo; Evolution/LUIZA
+  // → sem cartão, atendido no próprio número). NÃO é persistido (só entra no dados de leitura do motor).
+  const r = proximoPasso(passoAtual, { texto: inboundText || '', ehAudio, toqueId }, tentativas, { ...dq, __canal_transporte: canal?.transporte });
   await logFluxo('entrada_recebida', { passo_atual: passoAtual, toque_id: toqueId, texto: inboundText || null, eh_audio: ehAudio, tentativas_antes: tentativas, decisao: r.acao });
 
   if (r.acao === 'nada') {

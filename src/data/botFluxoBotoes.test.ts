@@ -105,6 +105,16 @@ describe('fluxo_botoes — abertura de crédito, nome e handoff', () => {
     expect(fecho('fazer_emprestimo')).toContain('realizar o seu empréstimo');
   });
 
+  it('LUIZA (Evolution): CPF fecha SEM cartão do Murillo, atendido no próprio número', () => {
+    const r = proximoPasso('ask_cpf', digitou('52998224725'), 0, { nome_completo: 'João Pedro', servico_interesse: 'fazer_emprestimo', __canal_transporte: 'evolution' });
+    if (r.acao !== 'enviar') throw new Error('esperava enviar');
+    expect(r.passoNovo).toBe('fim');
+    expect(r.telas.some((t) => t.tipo === 'contato')).toBe(false);                 // SEM cartão
+    expect(r.telas.some((t) => t.tipo === 'texto' && /por aqui/.test(t.corpo))).toBe(true);
+    expect(r.acoes?.finalizar).toEqual({ preferencia: 'atendimento_luiza', genero: 'homem' });
+    expect(r.acoes?.salvarCpf?.digits).toBe('52998224725');
+  });
+
   it('gênero do handoff sai do nome salvo (homem → rodízio meninas no runner)', () => {
     const r = proximoPasso('ask_cpf', digitou('52998224725'), 0, { nome_completo: 'João Pedro' });
     expect((r as { acoes?: { finalizar?: { genero?: string } } }).acoes?.finalizar?.genero).toBe('homem');

@@ -41,7 +41,7 @@ export interface Acoes {
   salvarQualificacao?: Record<string, unknown>;
   /** FECHO: sinaliza ao bot-runner pra rotear/atribuir o consultor. O gênero é decidido aqui (puro,
    *  pelo nome); quem resolve o consultor + rodízio + atribuição + pausa (handoff) é o bot-runner. */
-  finalizar?: { preferencia: 'mensagem' | 'ligacao' | 'presencial' | 'contato_murillo'; genero: 'homem' | 'mulher' | 'ambiguo' };
+  finalizar?: { preferencia: 'mensagem' | 'ligacao' | 'presencial' | 'contato_murillo' | 'atendimento_luiza'; genero: 'homem' | 'mulher' | 'ambiguo' };
   /** SUPORTE: encerra o mini-fluxo de suporte -> o bot-runner pausa + precisa_humano (rótulo
    *  suporte_cliente) SEM re-rotear (mantém o responsavel_id atual = o dono do contato). */
   finalizarSuporte?: boolean;
@@ -185,12 +185,27 @@ export function proximoPasso(passoAtual: string | null, entrada: Entrada, tentat
     return { acao: 'enviar', telas: [T('Sem problema! Um de nossos atendentes vai te ajudar com isso pessoalmente. 🙏')], passoNovo: 'ask_nome', tentativas: n, encerra: false, escalarHumano: true };
   }
 
-  // CPF: valida SÓ 11 dígitos (não checa DV, conforme combinado). Ao validar, FECHA o fluxo entregando o
-  // cartão do atendente (5329) + dispara a distribuição (finalizar, roteada por gênero pelo nome já salvo).
+  // CPF: valida SÓ 11 dígitos (não checa DV, conforme combinado). Ao validar, FECHA o fluxo + dispara a
+  // distribuição (finalizar, roteada por gênero pelo nome já salvo). O FECHO muda pelo canal:
+  //  - Cloud/1390: entrega o cartão do atendente (chip Murillo 5329) — atendimento em OUTRO número.
+  //  - Evolution/LUIZA: o cliente já está no número que atende → SEM cartão, "seguimos por aqui".
+  // O canal chega via dados.__canal_transporte (injetado pelo bot-runner; transiente, não persistido).
   if (passoAtual === 'ask_cpf') {
     const digits = entrada.ehAudio ? '' : entrada.texto.replace(/\D/g, '');
     if (digits.length === 11) {
       const genero = inferirGenero(String(dados.nome_completo ?? ''));
+      const cpf = { digits, mascarado: mascararCpf(digits) };
+      if (String(dados.__canal_transporte ?? '') === 'evolution') {
+        return {
+          acao: 'enviar',
+          telas: [
+            T('Perfeito! ✅'),
+            T(`Um dos nossos consultores já vai continuar o seu atendimento por aqui, para ${fechoServico(dados)}. É só aguardar. 🙂`),
+          ],
+          passoNovo: 'fim', tentativas: 0, encerra: true,
+          acoes: { salvarCpf: cpf, finalizar: { preferencia: 'atendimento_luiza', genero } },
+        };
+      }
       return {
         acao: 'enviar',
         telas: [
@@ -200,7 +215,7 @@ export function proximoPasso(passoAtual: string | null, entrada: Entrada, tentat
           { tipo: 'contato', nome: '', telefone: CARD_MURILLO },   // nome preenchido pelo bot-runner (genérico "CAF Atendimento")
         ],
         passoNovo: 'fim', tentativas: 0, encerra: true,
-        acoes: { salvarCpf: { digits, mascarado: mascararCpf(digits) }, finalizar: { preferencia: 'contato_murillo', genero } },
+        acoes: { salvarCpf: cpf, finalizar: { preferencia: 'contato_murillo', genero } },
       };
     }
     // SAIU DO TRILHO (texto errado, número incompleto ou áudio): 1ª re-pede, 2ª escala pra humano.
