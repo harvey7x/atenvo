@@ -83,6 +83,16 @@ export interface Campanha {
   id: string; organizacao_id: string; canal_id: string; template_id: string;
   nome: string; status: 'ativa' | 'concluida' | 'cancelada'; teto_24h: number; criado_em: string;
 }
+/** Uma campanha com seus contadores, para a LISTA de campanhas (aba Campanha). */
+export interface CampanhaResumo {
+  id: string; nome: string; status: 'ativa' | 'concluida' | 'cancelada';
+  template_id: string | null; template_nome: string | null;
+  canal_id: string | null; canal_nome: string | null;
+  teto_24h: number; criado_em: string;
+  total: number; pendentes: number; enviados: number; respondidos: number;
+  falhas: number; optout: number; pulados: number;
+  ultimo_envio: string | null;
+}
 export interface Alvo {
   id: string; campanha_id: string; contato_id: string; telefone: string | null;
   status: 'pendente' | 'enviado' | 'respondido' | 'falhou' | 'optout' | 'pulado';
@@ -138,6 +148,31 @@ export function useCampanhas() {
         .order('criado_em', { ascending: false });
       if (error) throw new Error(error.message);
       return (data ?? []) as Campanha[];
+    },
+  });
+}
+
+/** Lista TODAS as campanhas da org com contadores (nova aba "lista de campanhas"). */
+export function useCampanhasResumo() {
+  const { currentOrg } = useOrg();
+  return useQuery({
+    queryKey: ['disparo-campanhas-resumo', currentOrg.id],
+    enabled: REAL,
+    staleTime: 15_000,
+    refetchInterval: 15_000,
+    queryFn: () => rpc<CampanhaResumo[]>('disparo_campanhas_resumo', { p_org: currentOrg.id }),
+  });
+}
+
+/** Troca o template de uma campanha (só template aprovado; admin|supervisor no back). */
+export function useTrocarTemplate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (p: { campanha_id: string; template_id: string }) =>
+      rpc<void>('disparo_trocar_template', { p_campanha: p.campanha_id, p_template: p.template_id }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['disparo-campanhas'] });
+      qc.invalidateQueries({ queryKey: ['disparo-campanhas-resumo'] });
     },
   });
 }

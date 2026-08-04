@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
-  useDisparoElegiveis, useDisparoContatados, useCampanhas, useCriarCampanha, useCancelarCampanha, useAddAlvos, useAlvos,
+  useDisparoElegiveis, useDisparoContatados, useCampanhas, useCampanhasResumo, useCriarCampanha, useCancelarCampanha,
+  useTrocarTemplate, useAddAlvos, useAlvos,
   useProcessarLote, useOptoutLista, useOptoutManual, useOptoutRemover,
   preencherTemplate, primeiroNomeApresentavel, inferirGenero, type Genero,
-  type Elegivel, type Contatado, type Campanha, type OptoutRow, type ResultadoProcessar,
+  type Elegivel, type Contatado, type Campanha, type CampanhaResumo, type OptoutRow, type ResultadoProcessar,
 } from '@/data/disparo';
 import { useWaTemplates, useCloudDiagnostico, type WaTemplate } from '@/data/cloudApi';
 import { formatarNumero } from '@/data/maturacao';
@@ -49,6 +50,11 @@ const ST_ALVO: Record<string, { rotulo: string; tom: TomStatus }> = {
 };
 /** NUNCA quebra a tela: status desconhecido (novo no backend) vira um selo neutro. */
 const stAlvo = (s: string) => ST_ALVO[s] ?? { rotulo: s || '—', tom: 'neutro' as TomStatus };
+const ST_CAMP: Record<string, { rotulo: string; tom: TomStatus }> = {
+  ativa: { rotulo: 'Ativa', tom: 'ok' },
+  concluida: { rotulo: 'Concluída', tom: 'neutro' },
+  cancelada: { rotulo: 'Cancelada', tom: 'atencao' },
+};
 const MOTIVO_ROTULO: Record<string, string> = {
   sair_texto: 'Respondeu SAIR',
   erro_131050: 'Bloqueou na Meta',
@@ -69,35 +75,38 @@ export function Disparo() {
   const [aba, setAba] = useState<AbaId>('campanha');
   const [etapa, setEtapa] = useState<Etapa>(1);
   const [aviso, setAviso] = useState<{ tom: 'ok' | 'erro'; texto: string } | null>(null);
+  // Redesign multi-campanha: qual campanha está ABERTA (null = mostra a LISTA),
+  // e se estamos no fluxo de "nova campanha" (público → template → revisar → criar).
+  const [campanhaSelId, setCampanhaSelId] = useState<string | null>(null);
+  const [modoCriar, setModoCriar] = useState(false);
 
   /* ---------- dados ---------- */
   const elegQ = useDisparoElegiveis();
   const contQ = useDisparoContatados();
   const campQ = useCampanhas();
+  const campResumoQ = useCampanhasResumo();
   const tplQ = useWaTemplates();
   const diagQ = useCloudDiagnostico();
   const optQ = useOptoutLista();
 
+  // A campanha ABERTA (qualquer status), não mais "a única ativa".
   const campanha: Campanha | null = useMemo(
-    () => (campQ.data ?? []).find((c) => c.status === 'ativa') ?? null,
-    [campQ.data],
+    () => (campQ.data ?? []).find((c) => c.id === campanhaSelId) ?? null,
+    [campQ.data, campanhaSelId],
   );
   const alvosQ = useAlvos(campanha?.id ?? null);
-  const templatesAprovados = useMemo(
-    () => (tplQ.data ?? []).filter((t) => t.status === 'aprovado'),
-    [tplQ.data],
-  );
+  const templatesTodos = useMemo(() => tplQ.data ?? [], [tplQ.data]);
   const canalCloud = (diagQ.data?.canais ?? []).find((c) => c.status_integracao === 'conectado') ?? null;
 
-  /* campanha ativa já em andamento → entra direto no acompanhamento */
-  const [pulouParaAtiva, setPulouParaAtiva] = useState(false);
-  useEffect(() => {
-    if (campanha && !pulouParaAtiva) { setEtapa(4); setPulouParaAtiva(true); }
-  }, [campanha, pulouParaAtiva]);
+  /* navegação entre LISTA de campanhas ↔ campanha aberta ↔ criar nova */
+  const abrirCampanha = (id: string) => { setCampanhaSelId(id); setModoCriar(false); setSel(new Set()); setEtapa(4); setAba('campanha'); };
+  const novaCampanha = () => { setCampanhaSelId(null); setModoCriar(true); setSel(new Set()); setTemplateId(''); setEtapa(1); setAba('campanha'); };
+  const voltarLista = () => { setCampanhaSelId(null); setModoCriar(false); setSel(new Set()); setTemplateId(''); setEtapa(1); };
 
   /* ---------- mutações ---------- */
   const criar = useCriarCampanha();
   const cancelar = useCancelarCampanha();
+  const trocar = useTrocarTemplate();
   const addAlvos = useAddAlvos();
   const processar = useProcessarLote();
   const optManual = useOptoutManual();
@@ -220,6 +229,7 @@ export function Disparo() {
   const [confEncerrar, setConfEncerrar] = useState(false);
   const [resultado, setResultado] = useState<ResultadoProcessar | null>(null);
   const [criandoCampanha, setCriandoCampanha] = useState(false);
+  const [nomeNovaCampanha, setNomeNovaCampanha] = useState('');
 
   const alvos = alvosQ.data ?? [];
   const porStatus = useMemo(() => {
@@ -234,12 +244,23 @@ export function Disparo() {
     if (!selecionados.length) { erro('Selecione o público na etapa 1.'); return; }
     setCriandoCampanha(true);
     try {
-      const nome = `${template.nome} · ${new Date().toLocaleDateString('pt-BR')}`;
+      const nome = nomeNovaCampanha.trim() || `${template.nome} · ${new Date().toLocaleDateString('pt-BR')}`;
       const id = await criar.mutateAsync({ nome, template_id: template.id, canal_id: canalCloud.id });
       const r = await addAlvos.mutateAsync({ campanha_id: id, contatos: selecionados.map((e) => e.contato_id) });
-      setSel(new Set());
-      ok(`Campanha criada: ${r.pendentes} na fila · ${r.optout} em opt-out · ${r.sem_whatsapp} sem WhatsApp.`);
+      setSel(new Set()); setNomeNovaCampanha('');
+      // abre a campanha recém-criada no acompanhamento
+      setCampanhaSelId(id); setModoCriar(false); setEtapa(4);
+      ok(`Campanha "${nome}" criada: ${r.pendentes} na fila · ${r.optout} em opt-out · ${r.sem_whatsapp} sem WhatsApp.`);
     } catch (e) { erro((e as Error).message); } finally { setCriandoCampanha(false); }
+  };
+
+  /** Troca o template da campanha ABERTA (só aprovado; back valida permissão). */
+  const trocarTemplateCampanha = async (templateIdNovo: string) => {
+    if (!campanha) return;
+    try {
+      await trocar.mutateAsync({ campanha_id: campanha.id, template_id: templateIdNovo });
+      ok('Template da campanha trocado.');
+    } catch (e) { erro((e as Error).message); }
   };
 
   const adicionarMaisNaCampanha = async () => {
@@ -292,7 +313,9 @@ export function Disparo() {
     { chave: 'camp', titulo: 'Última campanha', render: (c) => c.ultima_campanha ?? '—' },
     { chave: 'st', titulo: '', dir: true, render: (c) => (c.optout ? <BadgeStatus tom="erro">Opt-out</BadgeStatus> : null) },
   ];
-  const reDisparar = () => { setAba('campanha'); irPara(campanha ? 3 : 2); };
+  // "Disparar de novo" (aba Já contatados): abre o fluxo de NOVA campanha já com os
+  // selecionados no público (mantém `sel`), pra escolher template e criar campanha à parte.
+  const reDisparar = () => { setCampanhaSelId(null); setModoCriar(true); setAba('campanha'); setEtapa(selecionados.length ? 2 : 1); };
 
   /* ================= render ================= */
   const carregando = elegQ.isLoading || campQ.isLoading;
@@ -409,8 +432,46 @@ export function Disparo() {
             <TabelaPadrao colunas={COLS_OPTOUT} linhas={optQ.data ?? []} chave={(o) => o.contato_id} rodape={{ texto: `${optQ.data?.length ?? 0} contatos fora de qualquer disparo` }} />
           )}
         </CardVidro>
+      ) : campanhaSelId === null && !modoCriar ? (
+        /* ===== LISTA DE CAMPANHAS ===== */
+        <CardVidro spot sobe style={{ borderRadius: 12, padding: 16 }}>
+          <div className="dsp-cont-barra">
+            <span className="num"><strong>{(campResumoQ.data ?? []).length}</strong> campanha{(campResumoQ.data ?? []).length === 1 ? '' : 's'}</span>
+            <BotaoPrimario onClick={novaCampanha}>+ Nova campanha</BotaoPrimario>
+          </div>
+          {campResumoQ.isLoading ? (
+            <SkeletonTexto linhas={6} />
+          ) : (campResumoQ.data ?? []).length === 0 ? (
+            <EstadoVazio titulo="Nenhuma campanha ainda" descricao="Crie a primeira: escolha o público, o template e dispare em lotes." acao={{ rotulo: 'Nova campanha', onClick: novaCampanha }} />
+          ) : (
+            <div className="dsp-camp-lista">
+              {(campResumoQ.data ?? []).map((c: CampanhaResumo) => (
+                <button type="button" key={c.id} className="dsp-camp-item" onClick={() => abrirCampanha(c.id)}>
+                  <div className="dsp-camp-topo">
+                    <strong>{c.nome}</strong>
+                    <BadgeStatus tom={ST_CAMP[c.status]?.tom ?? 'neutro'}>{ST_CAMP[c.status]?.rotulo ?? c.status}</BadgeStatus>
+                  </div>
+                  <div className="dsp-camp-meta num">
+                    template <strong>{c.template_nome ?? '—'}</strong> · canal {c.canal_nome ?? '—'} · criada {tempoRelativo(c.criado_em, agoraMs)}
+                  </div>
+                  <div className="dsp-camp-nums">
+                    <span><strong className="num">{c.total}</strong> alvos</span>
+                    <span><strong className="num">{c.enviados}</strong> enviados</span>
+                    <span><strong className="num">{c.respondidos}</strong> responderam</span>
+                    <span><strong className="num">{c.pendentes}</strong> pendentes</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </CardVidro>
       ) : (
         <>
+          {/* voltar para a lista de campanhas */}
+          <div className="dsp-voltar">
+            <BotaoSec onClick={voltarLista}>← Campanhas</BotaoSec>
+            <span className="dsp-voltar-nome">{campanha ? campanha.nome : 'Nova campanha'}</span>
+          </div>
           {/* -------- resumo da campanha (sempre visível) -------- */}
           <CardVidro spot sobe className="dsp-resumo" style={{ borderRadius: 12, padding: '12px 16px' }}>
             <div className="dsp-resumo-linha">
@@ -539,25 +600,32 @@ export function Disparo() {
           {etapa === 2 && (
             <div className="dsp-duas sobe">
               <CardVidro spot style={{ borderRadius: 12, padding: 16 }}>
-                <h2 className="dsp-h2">Template aprovado</h2>
-                {campanha ? (
-                  <p className="dsp-nota">A campanha ativa usa <strong>{templateDaCampanha?.nome ?? '—'}</strong>. Para trocar de template, conclua ou cancele a campanha atual.</p>
-                ) : templatesAprovados.length === 0 ? (
-                  <EstadoVazio titulo="Nenhum template aprovado" descricao="Quando a Meta aprovar, sincronize em Integrações → Modelos e ele aparece aqui." />
+                <h2 className="dsp-h2">Template {campanha ? 'da campanha' : 'do disparo'}</h2>
+                {campanha && (
+                  <p className="dsp-nota">Clique em outro template aprovado para <strong>trocar</strong> o desta campanha.</p>
+                )}
+                {templatesTodos.length === 0 ? (
+                  <EstadoVazio titulo="Nenhum template" descricao="Sincronize em Integrações → Modelos e eles aparecem aqui." />
                 ) : (
                   <div className="dsp-tpl-lista">
-                    {templatesAprovados.map((t) => (
-                      <button
-                        type="button"
-                        key={t.id}
-                        className={templateId === t.id ? 'dsp-tpl on' : 'dsp-tpl'}
-                        onClick={() => setTemplateId(t.id)}
-                        aria-pressed={templateId === t.id}
-                      >
-                        <strong>{t.nome}</strong>
-                        <span className="num">{t.idioma} · {t.categoria}</span>
-                      </button>
-                    ))}
+                    {templatesTodos.map((t) => {
+                      const aprovado = t.status === 'aprovado';
+                      const selecionado = (campanha ? campanha.template_id : templateId) === t.id;
+                      return (
+                        <button
+                          type="button"
+                          key={t.id}
+                          className={['dsp-tpl', selecionado ? 'on' : '', !aprovado ? 'off' : ''].filter(Boolean).join(' ')}
+                          onClick={() => { if (!aprovado) return; if (campanha) void trocarTemplateCampanha(t.id); else setTemplateId(t.id); }}
+                          aria-pressed={selecionado}
+                          disabled={!aprovado || (!!campanha && trocar.isPending)}
+                          title={aprovado ? '' : 'Ainda não aprovado na Meta — não pode enviar'}
+                        >
+                          <strong>{t.nome}</strong>
+                          <span className="num">{t.idioma} · {t.categoria}{aprovado ? '' : ' · pendente na Meta'}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </CardVidro>
@@ -591,6 +659,17 @@ export function Disparo() {
                   {semNome > 0 && (
                     <p className="dsp-nota">⚠ {semNome} contato{semNome === 1 ? '' : 's'} sem nome cadastrado sai{semNome === 1 ? '' : 'em'} como “Olá, cliente”. Dá pra renomear na página Contatos antes de disparar.</p>
                   )}
+                  {!campanha && (
+                    <div className="dsp-fgrupo" style={{ marginTop: 12 }}>
+                      <span className="dsp-flabel">Nome da campanha</span>
+                      <Input
+                        placeholder={template ? `${template.nome} · ${new Date().toLocaleDateString('pt-BR')}` : 'Ex.: Campanha 1'}
+                        value={nomeNovaCampanha}
+                        onChange={(e) => setNomeNovaCampanha(e.target.value)}
+                        aria-label="Nome da campanha"
+                      />
+                    </div>
+                  )}
                   <div className="dsp-rodape-etapa">
                     <BotaoSec onClick={() => setEtapa(2)}>← Template</BotaoSec>
                     {campanha ? (
@@ -598,7 +677,7 @@ export function Disparo() {
                         {addAlvos.isPending ? 'Adicionando…' : `Adicionar ${selecionados.length} à campanha →`}
                       </BotaoPrimario>
                     ) : (
-                      <BotaoPrimario onClick={async () => { await criarCampanhaComPublico(); setEtapa(4); }} disabled={criandoCampanha || !selecionados.length}>
+                      <BotaoPrimario onClick={() => void criarCampanhaComPublico()} disabled={criandoCampanha || !selecionados.length}>
                         {criandoCampanha ? 'Criando…' : `Criar campanha com ${selecionados.length} →`}
                       </BotaoPrimario>
                     )}

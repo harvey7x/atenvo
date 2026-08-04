@@ -106,8 +106,27 @@
   padding: 10px 12px; border-radius: 10px; border: 1px solid var(--linha); background: transparent; cursor: pointer;
 }
 .v2 .dsp-tpl.on { border-color: rgba(var(--tint), .2); background: rgba(var(--tint), .06); }
+.v2 .dsp-tpl.off { opacity: .5; cursor: not-allowed; }
 .v2 .dsp-tpl strong { font-size: 12px; }
 .v2 .dsp-tpl .num { font-size: 10.5px; color: var(--txt-3); }
+
+/* ----- lista de campanhas (redesign multi-campanha) ----- */
+.v2 .dsp-camp-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; margin-top: 12px; }
+.v2 .dsp-camp-item {
+  display: flex; flex-direction: column; gap: 8px; text-align: left; font: inherit; color: var(--txt);
+  padding: 13px 15px; border-radius: 12px; border: 1px solid var(--linha); background: transparent; cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.v2 .dsp-camp-item:hover { border-color: rgba(var(--tint), .35); background: rgba(var(--tint), .04); }
+.v2 .dsp-camp-topo { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.v2 .dsp-camp-topo strong { font-size: 13.5px; }
+.v2 .dsp-camp-meta { font-size: 10.5px; color: var(--txt-3); }
+.v2 .dsp-camp-nums { display: flex; flex-wrap: wrap; gap: 12px; font-size: 11px; color: var(--txt-2); }
+.v2 .dsp-camp-nums strong { color: var(--txt); font-size: 13px; }
+
+/* ----- voltar para a lista ----- */
+.v2 .dsp-voltar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.v2 .dsp-voltar-nome { font-size: 13px; font-weight: 600; color: var(--txt); }
 .v2 .dsp-bolha {
   border: 1px solid var(--linha); border-radius: 14px 14px 14px 4px;
   padding: 13px 15px; font-size: 13px; line-height: 1.55; color: var(--txt);
