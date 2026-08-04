@@ -159,7 +159,14 @@ Deno.serve(async (req) => {
         await admin.from('disparo_alvos').update({ status: 'falhou', erro: erro ?? 'desconhecido' }).eq('id', alvo.id);
         falhas++; resultados.push({ contato: contato?.nome, status: 'falhou', erro });
       } else {
-        await admin.from('disparo_alvos').update({ status: 'enviado', wamid, erro: null, enviado_em: new Date().toISOString() }).eq('id', alvo.id);
+        const agoraEnvio = new Date().toISOString();
+        await admin.from('disparo_alvos').update({ status: 'enviado', wamid, erro: null, enviado_em: agoraEnvio }).eq('id', alvo.id);
+        // LOG append-only de envios (Fase 2b): imune ao re-arme da campanha; alimenta o resultado.
+        const { error: eLog } = await admin.from('disparo_envios').insert({
+          organizacao_id: camp.organizacao_id, campanha_id: camp.id, contato_id: alvo.contato_id,
+          template_id: tpl.id, wamid, enviado_em: agoraEnvio,
+        });
+        if (eLog) console.error('disparo_envios insert falhou', eLog.message);
         enviados++; resultados.push({ contato: contato?.nome, status: 'enviado', wamid });
         // OUTBOX: registra na conversa mais recente do contato — o que o cliente leu tem que existir no painel
         const { data: conv } = await admin.from('conversas').select('id')
