@@ -114,7 +114,7 @@ export function Disparo() {
   const [generoSel, setGeneroSel] = useState<ReadonlySet<Genero>>(new Set());
   // "Quero N pessoas" dentro dos filtros: N + critério (mais recentes | aleatório).
   const [qtd, setQtd] = useState(50);
-  const [modoQtd, setModoQtd] = useState<'recentes' | 'aleatorio'>('recentes');
+  const [modoQtd, setModoQtd] = useState<'recentes' | 'antigos' | 'aleatorio'>('recentes');
   // Protege a base: por padrão o público novo esconde quem já recebeu um disparo.
   // 'todos' mostra tudo; 'so' isola só quem já recebeu (re-disparo direto no Público).
   const [modoJaRecebeu, setModoJaRecebeu] = useState<'esconder' | 'todos' | 'so'>('esconder');
@@ -168,12 +168,14 @@ export function Disparo() {
   const alternarGenero = (g: Genero) => setGeneroSel((s) => {
     const n = new Set(s); if (n.has(g)) n.delete(g); else n.add(g); return n;
   });
-  /** "Quero N": marca N pessoas DENTRO do filtro atual — mais recentes (ordem de última
-   *  mensagem) ou sorteio (Fisher–Yates). Substitui a seleção anterior, nunca soma. */
+  /** "Quero N": marca N pessoas DENTRO do filtro atual — mais recentes ou mais antigos
+   *  (ordem de última mensagem) ou sorteio (Fisher–Yates). Substitui a seleção, nunca soma. */
   const selecionarN = () => {
     const pool = [...selecionaveis];
     if (modoQtd === 'recentes') {
       pool.sort((a, b) => new Date(b.ultima_msg_em ?? 0).getTime() - new Date(a.ultima_msg_em ?? 0).getTime());
+    } else if (modoQtd === 'antigos') {
+      pool.sort((a, b) => new Date(a.ultima_msg_em ?? 0).getTime() - new Date(b.ultima_msg_em ?? 0).getTime());
     } else {
       for (let i = pool.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -493,8 +495,9 @@ export function Disparo() {
                         aria-label="Quantidade de pessoas"
                       />
                       <span className="num">pessoas,</span>
-                      <select className="inp dsp-fsel" value={modoQtd} onChange={(e) => setModoQtd(e.target.value as 'recentes' | 'aleatorio')} aria-label="Critério de seleção">
+                      <select className="inp dsp-fsel" value={modoQtd} onChange={(e) => setModoQtd(e.target.value as 'recentes' | 'antigos' | 'aleatorio')} aria-label="Critério de seleção">
                         <option value="recentes">recentes</option>
+                        <option value="antigos">antigos</option>
                         <option value="aleatorio">aleatórios</option>
                       </select>
                       <BotaoSec onClick={selecionarN}>Selecionar {Math.min(qtd, selecionaveis.length)}</BotaoSec>
