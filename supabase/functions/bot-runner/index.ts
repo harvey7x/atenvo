@@ -757,7 +757,7 @@ async function tratarComBotoes(p: {
   //      'tentativas' é o contador do passo — zera sozinho quando o passoNovo é diferente. ----
   // ultimas_opcoes: ids das opções da tela recém-mostrada (canal por texto: "1"/"2" viram a opção certa
   // no próximo turno). Sempre gravado (mesmo []) pra não sobrar lista velha de uma tela anterior.
-  await admin.rpc('bot_avancar_etapa', { p_conversa: conversaId, p_etapa: estado.etapa, p_dados: { passo_botoes: r.passoNovo, tentativas: r.tentativas, ultimas_opcoes: opcoesDaTela(r.telas), ...(r.acoes?.salvarQualificacao ?? {}), ...finalizarDados }, p_reprompts: 0, p_inbound_msg: inboundMsgId });
+  await admin.rpc('bot_avancar_etapa', { p_conversa: conversaId, p_etapa: estado.etapa, p_dados: { passo_botoes: r.passoNovo, tentativas: r.tentativas, ultimas_opcoes: opcoesDaTela(r.telas), ...(ehAberturaInicial ? { abertura_em: new Date().toISOString() } : {}), ...(r.acoes?.salvarQualificacao ?? {}), ...finalizarDados }, p_reprompts: 0, p_inbound_msg: inboundMsgId });
 
   await logRunner('fluxo_botoes', r.passoNovo, { dry_run: dryRunEfetivo, baloes: r.telas.length, enviados, erro, tentativas: r.tentativas, escalou: !!r.escalarHumano, encerra: r.encerra });
   return json({ ok: true, fluxo: 'botoes', dry_run: dryRunEfetivo, passo_novo: r.passoNovo, baloes: r.telas.length, enviados, erro, tentativas: r.tentativas, escalou: !!r.escalarHumano });
