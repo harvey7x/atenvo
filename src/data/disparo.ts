@@ -193,6 +193,20 @@ export function useTrocarTemplate() {
   });
 }
 
+/** Re-armar a campanha: reenvio dos NÃO-engajados (enviado/falhou/pulado → pendente);
+ *  preserva quem respondeu e quem está em opt-out. Reativa a campanha. */
+export function useRearmar() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (campanhaId: string) => rpc<{ rearmados: number }>('disparo_rearmar', { p_campanha: campanhaId }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['disparo-alvos'] });
+      qc.invalidateQueries({ queryKey: ['disparo-campanhas'] });
+      qc.invalidateQueries({ queryKey: ['disparo-campanhas-resumo'] });
+    },
+  });
+}
+
 export function useCriarCampanha() {
   const { currentOrg } = useOrg();
   const qc = useQueryClient();

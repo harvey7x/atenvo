@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import {
   useDisparoElegiveis, useDisparoContatados, useCampanhas, useCampanhasResumo, useCriarCampanha, useCancelarCampanha,
-  useTrocarTemplate, useAddAlvos, useAlvos, useCampanhaResultado,
+  useTrocarTemplate, useRearmar, useAddAlvos, useAlvos, useCampanhaResultado,
   useProcessarLote, useOptoutLista, useOptoutManual, useOptoutRemover,
   preencherTemplate, primeiroNomeApresentavel, inferirGenero, type Genero,
   type Elegivel, type Contatado, type Campanha, type CampanhaResumo, type OptoutRow, type ResultadoProcessar,
@@ -108,6 +108,7 @@ export function Disparo() {
   const criar = useCriarCampanha();
   const cancelar = useCancelarCampanha();
   const trocar = useTrocarTemplate();
+  const rearmar = useRearmar();
   const addAlvos = useAddAlvos();
   const processar = useProcessarLote();
   const optManual = useOptoutManual();
@@ -228,6 +229,7 @@ export function Disparo() {
   const [previa, setPrevia] = useState<ResultadoProcessar | null>(null);
   const [confDisparo, setConfDisparo] = useState(false);
   const [confEncerrar, setConfEncerrar] = useState(false);
+  const [confRearmar, setConfRearmar] = useState(false);
   const [resultado, setResultado] = useState<ResultadoProcessar | null>(null);
   const [criandoCampanha, setCriandoCampanha] = useState(false);
   const [nomeNovaCampanha, setNomeNovaCampanha] = useState('');
@@ -728,6 +730,11 @@ export function Disparo() {
                   <div className="dsp-acoes">
                     <BotaoSec onClick={() => setConfEncerrar(true)}>Encerrar</BotaoSec>
                     <BotaoSec onClick={() => setEtapa(1)}>+ pessoas</BotaoSec>
+                    {(porStatus.enviado + porStatus.falhou + porStatus.pulado) > 0 && (
+                      <BotaoSec onClick={() => setConfRearmar(true)} disabled={rearmar.isPending}>
+                        {rearmar.isPending ? 'Re-armando…' : 'Disparar de novo'}
+                      </BotaoSec>
+                    )}
                     <label className="dsp-lote num" htmlFor="dsp-lote-inp">Enviar agora:</label>
                     <input
                       id="dsp-lote-inp" className="inp dsp-lote-inp num" type="number" min={1} max={50}
@@ -814,6 +821,20 @@ export function Disparo() {
           catch (e) { erro((e as Error).message); }
         }}
         aoCancelar={() => setConfEncerrar(false)}
+      />
+      <ConfirmDialogV2
+        aberto={confRearmar}
+        titulo={`Disparar de novo "${campanha?.nome ?? ''}"?`}
+        mensagem={`${porStatus.enviado + porStatus.falhou + porStatus.pulado} pessoa${(porStatus.enviado + porStatus.falhou + porStatus.pulado) === 1 ? '' : 's'} volta${(porStatus.enviado + porStatus.falhou + porStatus.pulado) === 1 ? '' : 'm'} para a fila de envio. Quem já respondeu (${porStatus.respondido}) e quem está em opt-out NÃO são reenviados. Troque o template no passo 2 antes, se quiser. Nada sai até você disparar o lote.`}
+        rotuloConfirmar="Disparar de novo"
+        carregando={rearmar.isPending}
+        aoConfirmar={async () => {
+          const c = campanha; setConfRearmar(false);
+          if (!c) return;
+          try { const r = await rearmar.mutateAsync(c.id); setEtapa(4); ok(`${r.rearmados} de volta na fila. Escolha o lote e dispare quando quiser.`); }
+          catch (e) { erro((e as Error).message); }
+        }}
+        aoCancelar={() => setConfRearmar(false)}
       />
       <ConfirmDialogV2
         aberto={confDisparo}
