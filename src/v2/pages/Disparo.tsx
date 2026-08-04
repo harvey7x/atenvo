@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
 import {
   useDisparoElegiveis, useDisparoContatados, useCampanhas, useCampanhasResumo, useCriarCampanha, useCancelarCampanha,
-  useTrocarTemplate, useRearmar, useAddAlvos, useAlvos, useCampanhaResultado,
+  useTrocarTemplate, useRearmar, useAddAlvos, useAlvos, useCampanhaResultado, useCampanhaPessoas, useExcluirCampanha,
   useProcessarLote, useOptoutLista, useOptoutManual, useOptoutRemover,
   preencherTemplate, primeiroNomeApresentavel, inferirGenero, type Genero,
-  type Elegivel, type Contatado, type Campanha, type CampanhaResumo, type OptoutRow, type ResultadoProcessar,
+  type Elegivel, type Contatado, type Campanha, type CampanhaResumo, type CampanhaPessoa, type OptoutRow, type ResultadoProcessar,
 } from '@/data/disparo';
 import { useWaTemplates, useCloudDiagnostico, type WaTemplate } from '@/data/cloudApi';
 import { formatarNumero } from '@/data/maturacao';
@@ -96,6 +96,7 @@ export function Disparo() {
   );
   const alvosQ = useAlvos(campanha?.id ?? null);
   const resultadoQ = useCampanhaResultado(campanha?.id ?? null);
+  const pessoasQ = useCampanhaPessoas(campanha?.id ?? null);
   const templatesTodos = useMemo(() => tplQ.data ?? [], [tplQ.data]);
   const canalCloud = (diagQ.data?.canais ?? []).find((c) => c.status_integracao === 'conectado') ?? null;
 
@@ -109,6 +110,7 @@ export function Disparo() {
   const cancelar = useCancelarCampanha();
   const trocar = useTrocarTemplate();
   const rearmar = useRearmar();
+  const excluir = useExcluirCampanha();
   const addAlvos = useAddAlvos();
   const processar = useProcessarLote();
   const optManual = useOptoutManual();
@@ -230,6 +232,15 @@ export function Disparo() {
   const [confDisparo, setConfDisparo] = useState(false);
   const [confEncerrar, setConfEncerrar] = useState(false);
   const [confRearmar, setConfRearmar] = useState(false);
+  const [confExcluir, setConfExcluir] = useState<CampanhaResumo | null>(null);
+  const [filtroRel, setFiltroRel] = useState<'todos' | 'pendentes' | 'responderam' | 'fecharam'>('todos');
+  const pessoasFiltradas = useMemo(() => {
+    const ps = pessoasQ.data ?? [];
+    if (filtroRel === 'pendentes') return ps.filter((p) => p.status === 'pendente');
+    if (filtroRel === 'responderam') return ps.filter((p) => p.status === 'respondido');
+    if (filtroRel === 'fecharam') return ps.filter((p) => p.fechou);
+    return ps;
+  }, [pessoasQ.data, filtroRel]);
   const [resultado, setResultado] = useState<ResultadoProcessar | null>(null);
   const [criandoCampanha, setCriandoCampanha] = useState(false);
   const [nomeNovaCampanha, setNomeNovaCampanha] = useState('');
@@ -449,21 +460,24 @@ export function Disparo() {
           ) : (
             <div className="dsp-camp-lista">
               {(campResumoQ.data ?? []).map((c: CampanhaResumo) => (
-                <button type="button" key={c.id} className="dsp-camp-item" onClick={() => abrirCampanha(c.id)}>
-                  <div className="dsp-camp-topo">
-                    <strong>{c.nome}</strong>
-                    <BadgeStatus tom={ST_CAMP[c.status]?.tom ?? 'neutro'}>{ST_CAMP[c.status]?.rotulo ?? c.status}</BadgeStatus>
-                  </div>
-                  <div className="dsp-camp-meta num">
-                    template <strong>{c.template_nome ?? '—'}</strong> · canal {c.canal_nome ?? '—'} · criada {tempoRelativo(c.criado_em, agoraMs)}
-                  </div>
-                  <div className="dsp-camp-nums">
-                    <span><strong className="num">{c.total}</strong> alvos</span>
-                    <span><strong className="num">{c.enviados}</strong> enviados</span>
-                    <span><strong className="num">{c.respondidos}</strong> responderam</span>
-                    <span><strong className="num">{c.pendentes}</strong> pendentes</span>
-                  </div>
-                </button>
+                <div className="dsp-camp-wrap" key={c.id}>
+                  <button type="button" className="dsp-camp-item" onClick={() => abrirCampanha(c.id)}>
+                    <div className="dsp-camp-topo">
+                      <strong>{c.nome}</strong>
+                      <BadgeStatus tom={ST_CAMP[c.status]?.tom ?? 'neutro'}>{ST_CAMP[c.status]?.rotulo ?? c.status}</BadgeStatus>
+                    </div>
+                    <div className="dsp-camp-meta num">
+                      template <strong>{c.template_nome ?? '—'}</strong> · canal {c.canal_nome ?? '—'} · criada {tempoRelativo(c.criado_em, agoraMs)}
+                    </div>
+                    <div className="dsp-camp-nums">
+                      <span><strong className="num">{c.total}</strong> alvos</span>
+                      <span><strong className="num">{c.enviados}</strong> enviados</span>
+                      <span><strong className="num">{c.respondidos}</strong> responderam</span>
+                      <span><strong className="num">{c.pendentes}</strong> pendentes</span>
+                    </div>
+                  </button>
+                  <button type="button" className="dsp-camp-x" title="Excluir campanha" aria-label={`Excluir campanha ${c.nome}`} onClick={() => setConfExcluir(c)}>×</button>
+                </div>
               ))}
             </div>
           )}
@@ -761,23 +775,49 @@ export function Disparo() {
                   <EstadoVazio titulo="Campanha sem alvos" descricao="Volte ao público e adicione as pessoas." acao={{ rotulo: 'Ir para o público', onClick: () => setEtapa(1) }} />
                 </CardVidro>
               ) : (
-                <div className="dsp-grid sobe" style={{ animationDelay: '.1s' }}>
-                  {alvos.map((a) => (
-                    <div key={a.id} className="dsp-card dsp-card-alvo">
-                      <div className="dsp-card-cab">
-                        <span className="dsp-av" aria-hidden>{iniciais(a.contatos?.nome ?? '')}</span>
-                        <span className="dsp-card-id">
-                          <strong>{a.contatos?.nome ?? '—'}</strong>
-                          <span className="num">{fmtTel(a.telefone)}</span>
-                        </span>
-                        <BadgeStatus tom={stAlvo(a.status).tom}>{stAlvo(a.status).rotulo}</BadgeStatus>
-                      </div>
-                      <div className="dsp-card-meta num">
-                        {a.enviado_em ? `enviado ${tempoRelativo(a.enviado_em, agoraMs)}` : (a.erro ?? 'aguardando lote')}
-                      </div>
+                <>
+                  <div className="dsp-fgrupo sobe" style={{ animationDelay: '.08s' }}>
+                    <span className="dsp-flabel">Relatório · situação no Kanban e atendente</span>
+                    <Chips>
+                      <Chip ativo={filtroRel === 'todos'} onClick={() => setFiltroRel('todos')}>Todos {pessoasQ.data?.length ?? alvos.length}</Chip>
+                      <Chip ativo={filtroRel === 'pendentes'} onClick={() => setFiltroRel('pendentes')}>Pendentes {porStatus.pendente}</Chip>
+                      <Chip ativo={filtroRel === 'responderam'} onClick={() => setFiltroRel('responderam')}>Responderam {porStatus.respondido}</Chip>
+                      <Chip ativo={filtroRel === 'fecharam'} onClick={() => setFiltroRel('fecharam')}>Fecharam {(pessoasQ.data ?? []).filter((p) => p.fechou).length}</Chip>
+                    </Chips>
+                  </div>
+                  {pessoasQ.isLoading ? (
+                    <CardVidro spot sobe style={{ borderRadius: 12 }}><SkeletonTexto linhas={5} /></CardVidro>
+                  ) : pessoasFiltradas.length === 0 ? (
+                    <CardVidro spot sobe style={{ borderRadius: 12 }}>
+                      <EstadoVazio titulo="Ninguém neste filtro" descricao="Troque o filtro acima para ver as outras pessoas da campanha." />
+                    </CardVidro>
+                  ) : (
+                    <div className="dsp-grid sobe" style={{ animationDelay: '.1s' }}>
+                      {pessoasFiltradas.map((p: CampanhaPessoa) => (
+                        <div key={p.contato_id} className="dsp-card dsp-card-alvo">
+                          <div className="dsp-card-cab">
+                            <span className="dsp-av" aria-hidden>{iniciais(p.nome ?? '')}</span>
+                            <span className="dsp-card-id">
+                              <strong>{p.nome || '—'}</strong>
+                              <span className="num">{fmtTel(p.telefone)}</span>
+                            </span>
+                            <BadgeStatus tom={stAlvo(p.status).tom}>{stAlvo(p.status).rotulo}</BadgeStatus>
+                          </div>
+                          <div className="dsp-card-tags">
+                            {p.fechou && <BadgeStatus tom="ok">Fechou ✓</BadgeStatus>}
+                            {p.etapa_kanban && <BadgeStatus tom="neutro">{p.etapa_kanban}</BadgeStatus>}
+                            {p.atendente
+                              ? <BadgeStatus tom="neutro">👤 {p.atendente}</BadgeStatus>
+                              : <BadgeStatus tom="atencao">sem atendente</BadgeStatus>}
+                          </div>
+                          <div className="dsp-card-meta num">
+                            {p.enviado_em ? `enviado ${tempoRelativo(p.enviado_em, agoraMs)}` : 'aguardando lote'}
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  )}
+                </>
               )}
             </>
           )}
@@ -835,6 +875,21 @@ export function Disparo() {
           catch (e) { erro((e as Error).message); }
         }}
         aoCancelar={() => setConfRearmar(false)}
+      />
+      <ConfirmDialogV2
+        aberto={!!confExcluir}
+        titulo={`Excluir a campanha "${confExcluir?.nome ?? ''}"?`}
+        mensagem={`${confExcluir && confExcluir.enviados > 0 ? `Atenção: essa campanha tem ${confExcluir.enviados} envio(s) — o histórico e os resultados dela serão apagados. ` : ''}A campanha e todos os alvos somem da lista. Não dá pra desfazer.`}
+        rotuloConfirmar="Excluir campanha"
+        destrutivo
+        carregando={excluir.isPending}
+        aoConfirmar={async () => {
+          const c = confExcluir; setConfExcluir(null);
+          if (!c) return;
+          try { await excluir.mutateAsync(c.id); ok(`Campanha "${c.nome}" excluída.`); }
+          catch (e) { erro((e as Error).message); }
+        }}
+        aoCancelar={() => setConfExcluir(null)}
       />
       <ConfirmDialogV2
         aberto={confDisparo}

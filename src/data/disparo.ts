@@ -193,6 +193,35 @@ export function useTrocarTemplate() {
   });
 }
 
+/** Uma pessoa da campanha, com situação no Kanban e atendente (relatório completo). */
+export interface CampanhaPessoa {
+  contato_id: string; nome: string; telefone: string | null;
+  status: 'pendente' | 'enviado' | 'respondido' | 'falhou' | 'optout' | 'pulado';
+  enviado_em: string | null;
+  etapa_kanban: string | null; atendente: string | null; fechou: boolean;
+}
+export function useCampanhaPessoas(campanhaId: string | null) {
+  return useQuery({
+    queryKey: ['disparo-campanha-pessoas', campanhaId],
+    enabled: REAL && !!campanhaId,
+    refetchInterval: 8000,
+    queryFn: () => rpc<CampanhaPessoa[]>('disparo_campanha_pessoas', { p_campanha: campanhaId }),
+  });
+}
+
+/** Exclui a campanha (alvos e log caem por cascade). admin|supervisor no back. */
+export function useExcluirCampanha() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (campanhaId: string) => rpc<void>('disparo_excluir_campanha', { p_campanha: campanhaId }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['disparo-campanhas'] });
+      qc.invalidateQueries({ queryKey: ['disparo-campanhas-resumo'] });
+      qc.invalidateQueries({ queryKey: ['disparo-contatados'] });
+    },
+  });
+}
+
 /** Re-armar a campanha: reenvio dos NÃO-engajados (enviado/falhou/pulado → pendente);
  *  preserva quem respondeu e quem está em opt-out. Reativa a campanha. */
 export function useRearmar() {
