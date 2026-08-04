@@ -459,6 +459,10 @@ verify_jwt = false
 # reenvia a abertura nova pros leads mid-fluxo do 1390 com janela de 24h aberta.
 [functions.credito-reengajar]
 verify_jwt = false
+# credito-painel: endpoint READ-ONLY (secret credito_painel), sem JWT. Devolve métricas do fluxo pra
+# routine de monitoramento (fn_credito_painel). Não escreve nada.
+[functions.credito-painel]
+verify_jwt = false
 # wa-graph-debug: ferramenta de admin da Cloud API (gated por x-admin-secret == bot_runner).
 [functions.wa-graph-debug]
 verify_jwt = false
