@@ -448,6 +448,16 @@ verify_jwt = false
 verify_jwt = false
 [functions.bot-remarketing]
 verify_jwt = false
+# janela-guardia: cron secret-gated (x-bot-secret == webhook_config.janela_guardia), sem JWT.
+[functions.janela-guardia]
+verify_jwt = false
+# credito-nudge: cron secret-gated (x-bot-secret == webhook_config.credito_nudge), sem JWT. INERTE por
+# CREDITO_NUDGE_ATIVO=nao (default) — cutuca o lead de crédito que recebeu o cartão do Murillo e sumiu.
+[functions.credito-nudge]
+verify_jwt = false
+# wa-graph-debug: ferramenta de admin da Cloud API (gated por x-admin-secret == bot_runner).
+[functions.wa-graph-debug]
+verify_jwt = false
 # mensagens-agendadas-processar: cron secret-gated (x-agendamento-secret), sem JWT.
 [functions.mensagens-agendadas-processar]
 verify_jwt = false
