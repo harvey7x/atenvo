@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
 import {
   useDisparoElegiveis, useDisparoContatados, useCampanhas, useCampanhasResumo, useCriarCampanha, useCancelarCampanha,
-  useTrocarTemplate, useRearmar, useAddAlvos, useAlvos, useCampanhaResultado, useCampanhaPessoas, useExcluirCampanha,
+  useTrocarTemplate, useRearmar, useAddAlvos, useAlvos, useCampanhaResultado, useCampanhaPessoas, useCampanhaAtendentes, useExcluirCampanha,
   useProcessarLote, useOptoutLista, useOptoutManual, useOptoutRemover,
   preencherTemplate, primeiroNomeApresentavel, inferirGenero, type Genero,
-  type Elegivel, type Contatado, type Campanha, type CampanhaResumo, type CampanhaPessoa, type OptoutRow, type ResultadoProcessar,
+  type Elegivel, type Contatado, type Campanha, type CampanhaResumo, type CampanhaPessoa, type CampanhaAtendente, type OptoutRow, type ResultadoProcessar,
 } from '@/data/disparo';
 import { useWaTemplates, useCloudDiagnostico, type WaTemplate } from '@/data/cloudApi';
 import { formatarNumero } from '@/data/maturacao';
@@ -111,6 +111,9 @@ export function Disparo() {
   const alvosQ = useAlvos(campanha?.id ?? null);
   const resultadoQ = useCampanhaResultado(campanha?.id ?? null);
   const pessoasQ = useCampanhaPessoas(campanha?.id ?? null);
+  const [horasParado, setHorasParado] = useState(1);
+  const atendentesQ = useCampanhaAtendentes(campanha?.id ?? null, horasParado);
+  const [ordAt, setOrdAt] = useState<{ campo: 'atendente' | 'atribuidos' | 'responderam' | 'avancaram_murillo' | 'fecharam' | 'taxa' | 'sla_time_seg' | 'parados'; asc: boolean }>({ campo: 'taxa', asc: false });
   const templatesTodos = useMemo(() => tplQ.data ?? [], [tplQ.data]);
   const canalCloud = (diagQ.data?.canais ?? []).find((c) => c.status_integracao === 'conectado') ?? null;
 
@@ -320,6 +323,43 @@ export function Disparo() {
     { chave: 'atendente', titulo: cabOrd('atendente', 'Atendente'), render: (p) => p.atendente ? p.atendente : <span className="dsp-sem-at">sem atendente</span> },
     { chave: 'fechou', titulo: cabOrd('fechou', 'Fechou'), render: (p) => p.fechou ? <BadgeStatus tom="ok">Fechou ✓</BadgeStatus> : '—' },
     { chave: 'enviado', titulo: cabOrd('enviado_em', 'Enviado'), dir: true, classe: 'num', render: (p) => (p.enviado_em ? tempoRelativo(p.enviado_em, agoraMs) : '—') },
+  ];
+  // ----- relatório de atendentes (Fase B): ordenação + colunas -----
+  const taxaFech = (a: CampanhaAtendente) => (a.atribuidos > 0 ? a.fecharam / a.atribuidos : 0);
+  const atendentesOrdenados = useMemo(() => {
+    const arr = [...(atendentesQ.data ?? [])];
+    const { campo, asc } = ordAt;
+    const val = (x: CampanhaAtendente): string | number | null =>
+      campo === 'taxa' ? taxaFech(x) : campo === 'atendente' ? x.atendente : x[campo];
+    arr.sort((a, b) => {
+      const va = val(a), vb = val(b);
+      if (va == null && vb == null) return 0;
+      if (va == null) return 1;   // sem dado (ex.: SLA de "sem atendente") sempre no fim
+      if (vb == null) return -1;
+      const c = typeof va === 'number' && typeof vb === 'number'
+        ? va - vb : String(va).localeCompare(String(vb), 'pt', { numeric: true });
+      return asc ? c : -c;
+    });
+    return arr;
+  }, [atendentesQ.data, ordAt]);
+  const cabOrdAt = (campo: typeof ordAt.campo, label: string) => (
+    <button type="button" className="dsp-th" onClick={() => setOrdAt((o) => ({ campo, asc: o.campo === campo ? !o.asc : (campo === 'atendente') }))}>
+      {label}<span className="dsp-th-arr" aria-hidden>{ordAt.campo === campo ? (ordAt.asc ? '↑' : '↓') : '↕'}</span>
+    </button>
+  );
+  const pctBadge = (n: number, base: number) => {
+    const p = pct(n, base);
+    return <><strong className="num">{n}</strong> <span className="dsp-th-arr num">{p}%</span></>;
+  };
+  const colsAtendentes: Coluna<CampanhaAtendente>[] = [
+    { chave: 'at', titulo: cabOrdAt('atendente', 'Atendente'), classe: 'nome', render: (a) => a.atendente_id ? a.atendente : <span className="dsp-sem-at">Sem atendente</span> },
+    { chave: 'atr', titulo: cabOrdAt('atribuidos', 'Leads'), dir: true, classe: 'num', render: (a) => a.atribuidos },
+    { chave: 'resp', titulo: cabOrdAt('responderam', 'Responderam'), dir: true, classe: 'num', render: (a) => pctBadge(a.responderam, a.atribuidos) },
+    { chave: 'avc', titulo: cabOrdAt('avancaram_murillo', 'Avançaram/Murillo'), dir: true, classe: 'num', render: (a) => pctBadge(a.avancaram_murillo, a.atribuidos) },
+    { chave: 'fec', titulo: cabOrdAt('fecharam', 'Fecharam'), dir: true, classe: 'num', render: (a) => <strong className="num">{a.fecharam}</strong> },
+    { chave: 'tx', titulo: cabOrdAt('taxa', 'Taxa fech.'), dir: true, classe: 'num', render: (a) => <strong className="num">{pct(a.fecharam, a.atribuidos)}%</strong> },
+    { chave: 'sla', titulo: cabOrdAt('sla_time_seg', 'Resp. atendente'), dir: true, classe: 'num', render: (a) => fmtDur(a.sla_time_seg) },
+    { chave: 'par', titulo: cabOrdAt('parados', 'Parados'), dir: true, classe: 'num', render: (a) => a.parados > 0 ? <span className="dsp-sem-at">{a.parados}</span> : '0' },
   ];
   const [resultado, setResultado] = useState<ResultadoProcessar | null>(null);
   const [criandoCampanha, setCriandoCampanha] = useState(false);
@@ -890,6 +930,29 @@ export function Disparo() {
                 </div>
                 <p className="dsp-nota">Cada etapa mostra <strong>% sobre os enviados</strong> e a <strong>conversão da etapa anterior</strong> (onde o funil vaza). Conta o que aconteceu depois do disparo: resposta ao template, mensagem ao Murillo chip e oportunidade ganha.</p>
               </CardVidro>
+              {/* ===== relatório de atendentes (Fase B) ===== */}
+              <div className="dsp-rel-cab sobe" style={{ animationDelay: '.04s' }}>
+                <h2 className="dsp-h2" style={{ margin: 0 }}>Relatório de atendentes</h2>
+                <label className="dsp-lote num" htmlFor="dsp-parado-h">
+                  Parados: sem resposta há &gt;
+                  <input id="dsp-parado-h" className="inp dsp-lote-inp num" type="number" min={1} max={72}
+                    value={horasParado} onChange={(e) => setHorasParado(Math.min(72, Math.max(1, Number(e.target.value) || 1)))}
+                    aria-label="Limiar de horas para lead parado" />
+                  h
+                </label>
+              </div>
+              {atendentesQ.isLoading ? (
+                <CardVidro spot sobe style={{ borderRadius: 12 }}><SkeletonTexto linhas={4} /></CardVidro>
+              ) : (
+                <CardVidro spot sobe className="dsp-rel-tab" style={{ borderRadius: 12 }}>
+                  <TabelaPadrao
+                    colunas={colsAtendentes}
+                    linhas={atendentesOrdenados}
+                    chave={(a) => a.atendente_id ?? 'sem'}
+                    rodape={{ texto: `Taxa fech. = fechou/leads · "Resp. atendente" = tempo do TIME (inbound do lead → 1ª resposta do atendente) · "Parados" = respondeu e sem resposta do atendente há >${horasParado}h` }}
+                  />
+                </CardVidro>
+              )}
               <CardVidro spot sobe style={{ borderRadius: 12, padding: 16, animationDelay: '.05s' }}>
                 <div className="dsp-painel">
                   <div className="dsp-info">

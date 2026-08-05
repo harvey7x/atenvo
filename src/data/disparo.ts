@@ -198,6 +198,24 @@ export function useTrocarTemplate() {
   });
 }
 
+/** Uma linha do relatório de atendentes da campanha (Fase B). Unidade = pessoa. */
+export interface CampanhaAtendente {
+  atendente_id: string | null; atendente: string;
+  atribuidos: number; responderam: number; avancaram_murillo: number; fecharam: number;
+  /** SLA DO TIME: tempo médio da 1ª resposta outbound do atendente (≠ tempo do lead). */
+  sla_time_seg: number | null;
+  /** Respondeu e ainda sem 1ª resposta do atendente há > limiar. */
+  parados: number;
+}
+export function useCampanhaAtendentes(campanhaId: string | null, horasParado: number) {
+  return useQuery({
+    queryKey: ['disparo-campanha-atendentes', campanhaId, horasParado],
+    enabled: REAL && !!campanhaId,
+    staleTime: 30_000,
+    queryFn: () => rpc<CampanhaAtendente[]>('disparo_campanha_atendentes', { p_campanha: campanhaId, p_horas_parado: horasParado }),
+  });
+}
+
 /** Uma pessoa da campanha, com situação no Kanban e atendente (relatório completo). */
 export interface CampanhaPessoa {
   contato_id: string; nome: string; telefone: string | null;
