@@ -23,8 +23,9 @@
 // v25: FIAÇÃO DO ÁUDIO — no dispatch ao bot-runner, áudio INBOUND curto (≤MAX_AUDIO_SEG/≤MAX_AUDIO_TRANSC,
 //      envs) passa o base64 já baixado (getBase64FromMediaMessage) + mime real (ogg, sem codecs) p/ transcrição.
 //      Áudio longo/grande NÃO manda base64 → runner cai no aviso+pausa. Só !fromMe (nunca transcreve saída).
-// v24 (B3.3): dispatch fire-and-forget ao bot-runner em inbound NOVO de cliente (texto/áudio), dry_run:true
-//      FIXO (nunca envia). Gates de negócio são do runner; não bloqueia nem quebra o webhook.
+// v24 (B3.3): dispatch fire-and-forget ao bot-runner em inbound NOVO de cliente (texto/áudio). dry_run
+//      vem da flag EVO_BOT_DRY_RUN (default 'sim'=simula; go-live da campanha por TEXTO/LUIZA sem redeploy).
+//      Gates de negócio são do runner; não bloqueia nem quebra o webhook.
 // v23: ao reconectar (connection.update=open) limpa alerta_silenciado do canal ("silenciar até reconexão").
 // v22: mensagens do health check (prefixo "Teste automático Atenvo") são ignoradas (ignorado_motivo=
 //      health_check) — não criam contato/conversa/lead nem poluem o inbox/relatórios.
@@ -117,6 +118,12 @@ const EVO_BASE = (Deno.env.get('EVOLUTION_API_URL') ?? '').replace(/\/+$/, '');
 const EVO_KEY = Deno.env.get('EVOLUTION_API_KEY') ?? '';
 // B3.3: base das Edge Functions (para o dispatch fire-and-forget ao bot-runner).
 const FUNCTIONS_BASE = (Deno.env.get('SUPABASE_URL') ?? '').replace(/\/+$/, '') + '/functions/v1';
+// dry_run do dispatch ao bot, LIDO DE FLAG (espelha CLOUD_BOT_DRY_RUN do cloud-webhook). Default
+// SEGURO = simular: só o valor explícito 'nao' manda de verdade; unset ou qualquer outra coisa
+// mantém a simulação. É o lever de GO-LIVE da campanha por TEXTO (ex.: LUIZA) — trocado sem redeploy.
+// Mesmo 'nao', o envio real ainda respeita os gates do runner (master/canal habilitado/humano) e a
+// allowlist por número (CLOUD_BOT_ENVIO_REAL_ALLOWLIST) do fluxo por botões: rollout controlável.
+const EVO_BOT_DRY_RUN = (Deno.env.get('EVO_BOT_DRY_RUN') ?? 'sim').toLowerCase() !== 'nao';
 // desembrulha mensagens encapsuladas (ephemeral, viewOnce, documentWithCaption).
 function unwrapMsg(m: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
   if (!m) return m;
@@ -141,7 +148,9 @@ function extFromMime(mime: string): string {
 function sanitizeNome(n: unknown): string | null {
   const s = typeof n === 'string' ? n.trim() : '';
   if (!s) return null;
-  return s.replace(/[/\\]+/g, '_').replace(/[^\w.\- ()]+/g, '_').slice(0, 120) || null; // anti path-traversal
+  // Mantém acento/Unicode/emoji (á, ç, ã… não são \w em JS — a regex antiga virava "_").
+  // Remove só o perigoso/ruído: controle, separadores de caminho e < > (anti path-traversal).
+  return s.replace(/[/\\<>]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120) || null; // mantem acento/emoji; tira so / \ < >
 }
 function numOrNull(v: unknown): number | null { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : null; }
 // extensão segura por nome de arquivo (se houver) OU por MIME.
@@ -198,52 +207,11 @@ async function baixarMidia(instance: string, dataMsg: Record<string, unknown>): 
   return { bytes, mime: (j.mimetype ?? '').split(';')[0].trim() || 'audio/ogg', b64 };
 }
 
-// ---- Teste de entrega AO CONECTAR (diagnóstico técnico, NÃO é bot) ----
-// Em connection.update=open, envia UM texto ao número interno autorizado e registra em
-// canal_health_runs (tipo 'entrega_conexao', aguardando_ack). O ACK REAL chega por messages.update e
-// fecha o run (DELIVERY_ACK/READ -> entregue; ERROR -> erro real). O texto casa com o filtro de
-// health_check (linha ~264), então NÃO vira lead/conversa. NUNCA altera envio_restrito.
-const TESTE_CONEXAO_DESTINO = '5551998872825';                                   // número interno autorizado
-const TESTE_CONEXAO_TEXTO = 'Teste de entrega Atenvo: canal conectado com sucesso.';
-
-async function testeEntregaAoConectar(admin: ReturnType<typeof adminClient>, canalId: string, orgId: string) {
-  try {
-    if (!EVO_BASE || !EVO_KEY) return;
-    // Re-lê o canal APÓS a consolidação: conflito/removido/sem-instância abortam o teste.
-    const { data: c } = await admin.from('canais')
-      .select('tipo, status_integracao, conflito_com, numero_conectado, instancia_externa')
-      .eq('id', canalId).maybeSingle();
-    if (!c || c.tipo !== 'whatsapp') return;
-    if (c.status_integracao !== 'conectado') return;              // conflito vira 'atencao' -> não envia
-    if (c.conflito_com) return;                                    // canal em conflito -> não envia
-    const inst = c.instancia_externa as string | null;
-    if (!inst) return;                                             // sem instância válida
-    if (digits((c.numero_conectado as string) ?? '') === TESTE_CONEXAO_DESTINO) return; // nunca self-send
-    const t0 = Date.now();
-    let ok = false, msgId: string | null = null, erro: string | null = null, http = 0;
-    try {
-      const res = await fetch(`${EVO_BASE}/message/sendText/${inst}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': EVO_KEY },
-        body: JSON.stringify({ number: TESTE_CONEXAO_DESTINO, text: TESTE_CONEXAO_TEXTO }),
-      });
-      http = res.status;
-      const b = await res.json().catch(() => null) as { key?: { id?: string } } | null;
-      msgId = b?.key?.id ?? null;
-      ok = res.ok && !!msgId;
-      if (!ok) erro = `send HTTP ${res.status}`;
-    } catch (e) { erro = (e as Error).message; }
-    await admin.from('canal_health_runs').insert({
-      organizacao_id: orgId, canal_id: canalId, executado_em: new Date().toISOString(),
-      tipo: 'entrega_conexao',
-      sucesso: false,                                              // só vira true no ACK REAL de entrega
-      status_resultado: ok ? 'aguardando_ack' : String(http || 'erro'),
-      erro, erro_tipo: ok ? null : 'infra',
-      message_id: msgId, instancia_externa: inst, target_phone: TESTE_CONEXAO_DESTINO,
-      latencia_ms: Date.now() - t0,
-      dados: { aguardando_ack: ok, origem: 'connection.update:open' },
-    });
-  } catch { /* diagnóstico NUNCA pode quebrar o webhook */ }
-}
+// v30: REMOVIDO o "teste de entrega ao conectar". O envio programático ~9s após o QR restringia
+// chip novo/frio (número frio + primeiro tráfego automático = gatilho do antispam da Meta). NÃO há
+// mais envio automático ao conectar um canal Evolution. Ficam por compatibilidade: o filtro de inbound
+// (~L319, regex "teste de entrega/automático atenvo") — pois o health-check periódico ainda usa esse
+// texto — e o matcher de ACK que trata 'entrega_conexao' (fecha runs históricos).
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -296,8 +264,7 @@ Deno.serve(async (req) => {
         // Auto-cura de canal DUPLICADO do mesmo número (reconexão que criou canal novo em vez de reusar o
         // histórico): reabsorve no canal histórico, preservando conversas/histórico. Idempotente (best-effort).
         if (numero) { try { await admin.rpc('wa_consolidar_canal_por_numero', { p_org: canal.organizacao_id, p_canal_ativo: canal.id }); } catch { /* não quebra o webhook */ } }
-        // Teste de entrega técnico ao conectar (após a consolidação, p/ não disparar em canal conflitado).
-        await testeEntregaAoConectar(admin, canal.id as string, orgId);
+        // v30: sem envio automático ao conectar — o teste-de-entrega foi removido (restringia chip frio).
       } else if (state === 'close') { await admin.from('canais').update({ status_integracao: 'desconectado' }).eq('id', canal.id); }
       await finish('processado'); return json({ ok: true });
     }
@@ -498,6 +465,14 @@ Deno.serve(async (req) => {
         catch { /* janela nunca interrompe a ingestão */ }
       }
 
+      // ---- OPT-OUT COMERCIAL: "SAIR"/frase explícita de descadastro grava wa_optout SEMPRE,
+      //      mesmo sem cadência de remarketing (bot_remarketing_inbound retorna cedo sem fila e
+      //      nunca persistia o pedido). Bloqueia só marketing/disparo — atendimento segue normal. ----
+      if (inboundNovo && inboundMsgId && conteudoMsg) {
+        try { await admin.rpc('wa_optout_inbound', { p_conversa: conversaId, p_texto: conteudoMsg }); }
+        catch { /* best-effort: opt-out nunca quebra a ingestão */ }
+      }
+
       // ---- REMARKETING: se o lead estava numa cadência, re-roteia a opp ANTES do dispatch ao runner.
       //      respondeu → opp volta pra LEAD NOVO (entrada), senão bot_pode_atuar bloquearia o lead que respondeu;
       //      opt-out → PERDIDO + NÃO dispara o bot. AWAITED de propósito: o move de coluna precisa commitar
@@ -522,7 +497,7 @@ Deno.serve(async (req) => {
             await fetch(`${FUNCTIONS_BASE}/bot-runner`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'x-bot-secret': bs.secret as string },
-              body: JSON.stringify({ conversa_id: conversaId, inbound_msg_id: inboundMsgId, inbound_text: conteudoMsg ?? '', inbound_tipo: tipoMsg, dry_run: true, ...(audioB64 ? { inbound_audio_b64: audioB64, inbound_audio_mime: audioMime } : {}) }),
+              body: JSON.stringify({ conversa_id: conversaId, inbound_msg_id: inboundMsgId, inbound_text: conteudoMsg ?? '', inbound_tipo: tipoMsg, dry_run: EVO_BOT_DRY_RUN, ...(audioB64 ? { inbound_audio_b64: audioB64, inbound_audio_mime: audioMime } : {}) }),
             });
           } catch { /* fire-and-forget: erro do runner nunca afeta o webhook */ }
         })();

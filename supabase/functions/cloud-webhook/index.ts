@@ -27,6 +27,7 @@
 //    é contada contra o NÚMERO REMETENTE, não contra a conversa (que é única por contato).
 //  * change.field='user_preferences' (stop/resume de marketing) vira wa_optout — NÃO é mensagem.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
+import { enviadorDe } from '../evolution-send/transporte.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -40,6 +41,21 @@ const BOT_DISPATCH = (Deno.env.get('CLOUD_BOT_DISPATCH') ?? 'nao').toLowerCase()
 // o bot ENVIA. Para o cliente receber, as duas + os gates do runner (master/canal/humano) têm que ceder.
 const BOT_DRY_RUN = (Deno.env.get('CLOUD_BOT_DRY_RUN') ?? 'sim').toLowerCase() !== 'nao';
 const FUNCTIONS_BASE = (Deno.env.get('SUPABASE_URL') ?? '').replace(/\/+$/, '') + '/functions/v1';
+
+// ---- RESPOSTA A DISPARO (fluxo à parte do atendimento inicial) ----
+// Quem RECEBEU o disparo de remarketing e responde (≠ SAIR) NÃO entra no botoes_v1: recebe uma
+// mensagem de transição + o vCard do chip HUMANO (5329, sem API) e o alvo vira 'respondido'.
+// INERTE por default (DISPARO_RESP_ATIVO != 'sim' → o responder cai no atendimento normal), para
+// que só o deploy nunca mude o comportamento do disparo — o dono liga conscientemente por env, sem
+// redeploy. Texto/nome/número do cartão são afináveis por env. Cloud-only (o disparo é sempre Cloud API).
+const DISPARO_RESP_ATIVO = (Deno.env.get('DISPARO_RESP_ATIVO') ?? 'nao').toLowerCase() === 'sim';
+const DISPARO_RESP_TEXTO = Deno.env.get('DISPARO_RESP_TEXTO') ??
+  'Que bom que você respondeu! 🙌\n\nPara dar continuidade ao seu atendimento, é só falar com a gente no contato abaixo 👇\n\nToque no cartão e envie uma mensagem: um dos nossos *especialistas de continuidade* vai te atender pessoalmente por lá e acompanhar o seu caso do começo ao fim.\n\nJá estamos te esperando! 💚';
+const DISPARO_VCARD_NOME = Deno.env.get('DISPARO_VCARD_NOME') ?? 'CAF Assessoria';
+const DISPARO_VCARD_NUMERO = (Deno.env.get('DISPARO_VCARD_NUMERO') ?? '555191035329').replace(/\D/g, '');
+// Recência: só alvos enviados nos últimos N dias re-roteiam — evita que um alvo antigo (campanha de
+// meses atrás, nunca respondido) sequestre um lead NOVO do anúncio que por acaso é o mesmo contato.
+const DISPARO_RESP_JANELA_DIAS = Number(Deno.env.get('DISPARO_RESP_JANELA_DIAS') ?? '14');
 
 // ---- mídia: mesmos tetos da Evolution (envs compartilhadas de propósito: um número só para afinar) ----
 const GRAPH_V = () => Deno.env.get('META_GRAPH_VERSION') || 'v21.0';
@@ -95,7 +111,7 @@ function extFor(mime: string, nome: string | null): string {
 function sanitizeNome(n: unknown): string | null {
   const s = typeof n === 'string' ? n.trim() : '';
   if (!s) return null;
-  return s.replace(/[/\\]+/g, '_').replace(/[^\w.\- ()]+/g, '_').slice(0, 120) || null; // anti path-traversal
+  return s.replace(/[/\\<>]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120) || null; // mantem acento/emoji; tira so / \ < >
 }
 /** bytes -> base64 em blocos. String.fromCharCode(...bytes) estoura a pilha em arquivo de MBs. */
 function paraBase64(bytes: Uint8Array): string {
@@ -520,12 +536,69 @@ Deno.serve(async (req) => {
             } catch { /* best-effort: remarketing nunca quebra o webhook */ }
           }
 
+          // ---- RESPOSTA A DISPARO: intercepta ANTES do bot. Quem RECEBEU o disparo e respondeu
+          //      (≠ SAIR) sai do atendimento inicial e recebe transição + vCard do chip humano.
+          //      O CLAIM atômico no alvo (enviado→respondido, com janela de recência) garante que
+          //      isso rode uma vez só E distingue do lead novo do anúncio, que NUNCA teve alvo.
+          //      INERTE por default (DISPARO_RESP_ATIVO). Best-effort — nunca quebra a ingestão. ----
+          let ehRespostaDisparo = false;
+          if (DISPARO_RESP_ATIVO && inboundNovo && inboundMsgId && rmktDesfecho !== 'optout' && (tipo === 'texto' || tipo === 'audio')) {
+            try {
+              // SAIR pode ter sido gravado agora mesmo (wa_optout_inbound acima): quem pediu descadastro NÃO é tratado.
+              const { data: optNow } = await db.from('wa_optout').select('contato_id').eq('contato_id', contatoId).limit(1);
+              if (!optNow?.length) {
+                const desde = new Date(Date.now() - DISPARO_RESP_JANELA_DIAS * 864e5).toISOString();
+                const { data: alvo } = await db.from('disparo_alvos')
+                  .update({ status: 'respondido' })
+                  .eq('contato_id', contatoId).eq('status', 'enviado').gte('enviado_em', desde)
+                  .select('id').limit(1);
+                ehRespostaDisparo = Array.isArray(alvo) && alvo.length > 0;
+              }
+            } catch { /* best-effort: detecção nunca quebra a ingestão */ }
+          }
+
+          // ---- ENTREGA DA RESPOSTA A DISPARO: transição + vCard do 5329 pelo MESMO 1390 (Cloud API).
+          //      Fire-and-forget; cada envio é best-effort e grava outbox no padrão do bot (autor_id
+          //      null, origem 'bot') pra o painel refletir o que o cliente viu. O 5329 é só o DESTINO
+          //      do cartão (número humano) — nada é enviado programaticamente por ele. ----
+          if (ehRespostaDisparo) {
+            const entrega = (async () => {
+              try {
+                const tx = enviadorDe({ transporte: 'cloud_api', cloud_phone_number_id: phoneNumberId });
+                try {
+                  const r1 = await tx.sendText(numero!, DISPARO_RESP_TEXTO);
+                  if (r1?.key?.id) {
+                    await db.from('mensagens').insert({
+                      organizacao_id: orgId, conversa_id: conversaId, direcao: 'saida', tipo: 'texto',
+                      conteudo: DISPARO_RESP_TEXTO, autor_id: null, origem: 'bot', status: 'enviada', id_externo: r1.key.id,
+                      metadados: { fluxo: 'resposta_disparo', etapa: 'transicao', transporte: 'cloud_api' },
+                    });
+                  }
+                } catch { /* transição best-effort */ }
+                try {
+                  const r2 = await tx.sendContato(numero!, DISPARO_VCARD_NOME, DISPARO_VCARD_NUMERO);
+                  if (r2?.key?.id) {
+                    await db.from('mensagens').insert({
+                      organizacao_id: orgId, conversa_id: conversaId, direcao: 'saida', tipo: 'texto',
+                      conteudo: `📇 ${DISPARO_VCARD_NOME} (${DISPARO_VCARD_NUMERO})`, autor_id: null, origem: 'bot',
+                      status: 'enviada', id_externo: r2.key.id,
+                      metadados: { fluxo: 'resposta_disparo', etapa: 'vcard', contato_nome: DISPARO_VCARD_NOME, contato_telefone: DISPARO_VCARD_NUMERO, transporte: 'cloud_api' },
+                    });
+                  }
+                } catch { /* vCard best-effort */ }
+                await db.from('conversas').update({ ultima_interacao_em: new Date().toISOString() }).eq('id', conversaId);
+              } catch { /* fire-and-forget: entrega nunca afeta o webhook */ }
+            })();
+            try { (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime?.waitUntil?.(entrega); } catch { /* sem waitUntil: segue fire-and-forget */ }
+          }
+
           // ---- BLOCO 1: dispatch fire-and-forget ao bot-runner (só inbound NOVO, texto/áudio) ----
           // dry_run vem da flag BOT_DRY_RUN (default 'sim' = simula/loga, nada chega a cliente). Os
           // gates de negócio (master, bot_pode_atuar, humano/responsável, precisa_humano, idempotência,
           // lock, saúde do canal) são do RUNNER, que é agnóstico de transporte — por isso este bloco é
           // o mesmo da Evolution, palavra por palavra, trocando só a origem do áudio.
-          if (BOT_DISPATCH && inboundNovo && inboundMsgId && rmktDesfecho !== 'optout' && (tipo === 'texto' || tipo === 'audio')) {
+          // `!ehRespostaDisparo`: quem foi re-roteado ao chip humano NÃO cai no botoes_v1.
+          if (BOT_DISPATCH && !ehRespostaDisparo && inboundNovo && inboundMsgId && rmktDesfecho !== 'optout' && (tipo === 'texto' || tipo === 'audio')) {
             const dispatch = (async () => {
               try {
                 const { data: bs } = await db.from('webhook_config').select('secret').eq('chave', 'bot_runner').maybeSingle();
