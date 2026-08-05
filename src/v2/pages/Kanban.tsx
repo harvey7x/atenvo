@@ -117,11 +117,12 @@ const somaCompacta = (v: number) =>
    Colunas neutras: faixa por estagnação (diasParado). Colunas de desfecho (ganho/perdido):
    faixa por recência do FECHAMENTO — "urgência" não faz sentido num lead já encerrado.
    Limiares DECLARADOS. `padraoAberta:false` = colapsada por padrão (reduz ruído do que não pede ação). */
-const FAIXA_PARADO_DIAS = 14; // seção "Parados" (distinto do sinal do card, LIMIAR_PARADO_DIAS=7)
+// UMA janela só de estagnação em toda a tela: >7d (igual ao KPI do topo, LIMIAR_PARADO_DIAS).
+// Antes as seções usavam 14d e o topo 7d — duas réguas na mesma tela (decisão do dono: 7d).
+const FAIXA_PARADO_DIAS = LIMIAR_PARADO_DIAS; // 7
 interface Faixa { key: string; rotulo: string; padraoAberta: boolean }
 const FAIXAS_ATIVAS: Faixa[] = [
-  { key: 'parados', rotulo: 'Parados +14d', padraoAberta: true },   // exige ação → sempre aberta
-  { key: 'semana', rotulo: '7–14 dias', padraoAberta: true },        // envelhecendo → aberta
+  { key: 'parados', rotulo: 'Parados +7d', padraoAberta: true },      // exige ação → sempre aberta
   { key: 'recentes', rotulo: 'Recentes (<7d)', padraoAberta: true },  // ABERTA: lead novo/recém-movido cai aqui — fechada, o card "some"
 ];
 const FAIXAS_FECHO: Faixa[] = [
@@ -134,7 +135,7 @@ const diasDesde = (iso: string | null | undefined) => {
   const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
   return Number.isFinite(d) && d > 0 ? d : 0;
 };
-const faixaAtivaDe = (l: KLead) => { const d = diasParado(l); return d >= FAIXA_PARADO_DIAS ? 'parados' : d >= LIMIAR_PARADO_DIAS ? 'semana' : 'recentes'; };
+const faixaAtivaDe = (l: KLead) => (diasParado(l) >= FAIXA_PARADO_DIAS ? 'parados' : 'recentes');
 const faixaFechoDe = (l: KLead) => { const d = diasDesde(l.fechadoEm || l.atualizadoEm); return d <= 7 ? 'f7' : d <= 30 ? 'f30' : 'fant'; };
 
 interface LeadForm {
@@ -377,13 +378,13 @@ export default function KanbanV2() {
   const nParados = useMemo(() => abertosNoRecorte.filter(estaParado).length, [abertosNoRecorte, colunas]); // eslint-disable-line react-hooks/exhaustive-deps
   const nFichaPend = useMemo(() => abertosNoRecorte.filter((l) => fichaStatusMap[l.id] === 'rascunho').length, [abertosNoRecorte, fichaStatusMap]);
   // origem/canal repetido em ~todos os cards é ruído → vira FILTRO no topo; no card só quando é exceção.
-  // Conta sobre TODOS os leads (o filtro revela abertos E fechados nas colunas terminais) — o N do chip
-  // bate exatamente com o que ele revela ao clicar.
+  // Conta 1 origem por LEAD ATIVO (em_andamento) — mesma base do "leads ativos", então os chips
+  // SOMAM ~401 (decisão do dono). Antes contava sobre todos os status e somava ~524.
   const origens = useMemo(() => {
     const m = new Map<string, number>();
-    for (const l of leads) m.set(origemDe(l), (m.get(origemDe(l)) ?? 0) + 1);
+    for (const l of abertos) m.set(origemDe(l), (m.get(origemDe(l)) ?? 0) + 1);
     return [...m.entries()].map(([nome, n]) => ({ nome, n })).sort((a, b) => b.n - a.n);
-  }, [leads]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [abertos]); // eslint-disable-line react-hooks/exhaustive-deps
   const origemDominante = origens.length ? origens[0].nome : null;
   // v2.1 — ordem por URGÊNCIA (estagnação → SLA → prioridade → ordem manual). Extraída p/ reuso nas seções.
   const sortUrgencia = (a: KLead, b: KLead) => {
@@ -791,7 +792,7 @@ export default function KanbanV2() {
       <div className="ph sobe">
         <div>
           <h2>Kanban</h2>
-          <p>Funil comercial{demo ? ' · modo demonstração (nada é gravado)' : ''}</p>
+          <p>Funil comercial · cada card = 1 oportunidade em andamento{demo ? ' · modo demonstração (nada é gravado)' : ''}</p>
         </div>
         <div className="acoes">
           <div className="kb-busca">
@@ -810,9 +811,9 @@ export default function KanbanV2() {
       {!vazioFunil && (
         <div className="kb-resumo sobe">
           <div className="kb-placar">
-            <span className="kb-stat"><b className="num">{abertosNoRecorte.length}</b><i>lead{abertosNoRecorte.length === 1 ? '' : 's'} ativo{abertosNoRecorte.length === 1 ? '' : 's'}</i></span>
+            <span className="kb-stat" title="Oportunidades em andamento (1 card = 1 oportunidade). No Disparo o número é menor porque lá conta CONTATOS distintos com WhatsApp e conversa real."><b className="num">{abertosNoRecorte.length}</b><i>lead{abertosNoRecorte.length === 1 ? '' : 's'} ativo{abertosNoRecorte.length === 1 ? '' : 's'}</i></span>
             {somaPotencial > 0 && <span className="kb-stat"><b className="num">{fmtBRL(somaPotencial)}</b><i>em potencial</i></span>}
-            <span className={'kb-stat' + (nParados > 0 ? ' al' : '')}><b className="num">{nParados}</b><i>parado{nParados === 1 ? '' : 's'} +{LIMIAR_PARADO_DIAS}d</i></span>
+            <span className={'kb-stat' + (nParados > 0 ? ' al' : '')} title="Leads ativos sem trocar de coluna há mais de 7 dias — a mesma janela das seções 'Parados +7d' nas colunas."><b className="num">{nParados}</b><i>parado{nParados === 1 ? '' : 's'} +{LIMIAR_PARADO_DIAS}d</i></span>
             <span className="kb-stat"><b className="num">{nFichaPend}</b><i>ficha{nFichaPend === 1 ? '' : 's'} pendente{nFichaPend === 1 ? '' : 's'}</i></span>
           </div>
           <div className="kb-resumo-dir">
@@ -822,10 +823,10 @@ export default function KanbanV2() {
               <button type="button" className={'kb-fchip' + (denso ? ' on' : '')} aria-pressed={denso} onClick={() => setDenso(true)}>Denso</button>
             </div>
             {origens.length > 1 && (
-              <div className="kb-filtro-origem" role="group" aria-label="Filtrar por origem">
+              <div className="kb-filtro-origem" role="group" aria-label="Filtrar por canal de origem (leads ativos)">
                 <button type="button" className={'kb-fchip' + (!filtroOrigem ? ' on' : '')} onClick={() => setFiltroOrigem(null)}>Todas</button>
                 {origens.slice(0, 6).map((o) => (
-                  <button key={o.nome} type="button" className={'kb-fchip' + (filtroOrigem === o.nome ? ' on' : '')} title={`${o.n} lead(s) · ${o.nome}`} onClick={() => setFiltroOrigem((f) => (f === o.nome ? null : o.nome))}>
+                  <button key={o.nome} type="button" className={'kb-fchip' + (filtroOrigem === o.nome ? ' on' : '')} title={`${o.n} lead(s) ativo(s) · canal ${o.nome}`} onClick={() => setFiltroOrigem((f) => (f === o.nome ? null : o.nome))}>
                     {o.nome}<span className="c num">{o.n}</span>
                   </button>
                 ))}
