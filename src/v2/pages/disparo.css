@@ -197,6 +197,11 @@
 .v2 .dsp-tl-txt strong { font-size: 13px; color: var(--txt); font-weight: 600; }
 .v2 .dsp-tl-det { color: var(--txt-2); font-weight: 400; }
 .v2 .dsp-tl-quando { font-size: 11px; color: var(--txt-3); }
+
+/* ----- remarketing por filtro: quebra-cabeça de custo/confirmação (Fase D) ----- */
+.v2 .dsp-puzzle { display: flex; flex-direction: column; gap: 5px; margin: 12px 0; padding: 13px 15px; border: 1px solid var(--linha); border-radius: 12px; background: rgba(var(--tint), .03); font-size: 13px; color: var(--txt-2); }
+.v2 .dsp-puzzle strong { color: var(--txt); font-size: 15px; }
+.v2 .dsp-aviso-inline { color: #b45309; font-weight: 600; }
 .v2 .dsp-bolha {
   border: 1px solid var(--linha); border-radius: 14px 14px 14px 4px;
   padding: 13px 15px; font-size: 13px; line-height: 1.55; color: var(--txt);

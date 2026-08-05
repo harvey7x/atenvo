@@ -2,9 +2,9 @@ import { useMemo, useState } from 'react';
 import {
   useDisparoElegiveis, useDisparoContatados, useCampanhas, useCampanhasResumo, useCriarCampanha, useCancelarCampanha,
   useTrocarTemplate, useRearmar, useAddAlvos, useAlvos, useCampanhaResultado, useCampanhaPessoas, useCampanhaAtendentes, useContatoTimeline, useExcluirCampanha,
-  useProcessarLote, useOptoutLista, useOptoutManual, useOptoutRemover,
+  useRemarketingFiltro, useProcessarLote, useOptoutLista, useOptoutManual, useOptoutRemover,
   preencherTemplate, primeiroNomeApresentavel, inferirGenero, type Genero,
-  type Elegivel, type Contatado, type Campanha, type CampanhaResumo, type CampanhaPessoa, type CampanhaAtendente, type TimelineEvento, type OptoutRow, type ResultadoProcessar,
+  type Elegivel, type Contatado, type Campanha, type CampanhaResumo, type CampanhaPessoa, type CampanhaAtendente, type TimelineEvento, type RemarketingPrevia, type OptoutRow, type ResultadoProcessar,
 } from '@/data/disparo';
 import { useWaTemplates, useCloudDiagnostico, type WaTemplate } from '@/data/cloudApi';
 import { formatarNumero } from '@/data/maturacao';
@@ -165,6 +165,7 @@ export function Disparo() {
   const trocar = useTrocarTemplate();
   const rearmar = useRearmar();
   const excluir = useExcluirCampanha();
+  const remarketing = useRemarketingFiltro();
   const addAlvos = useAddAlvos();
   const processar = useProcessarLote();
   const optManual = useOptoutManual();
@@ -287,6 +288,10 @@ export function Disparo() {
   const [confEncerrar, setConfEncerrar] = useState(false);
   const [confRearmar, setConfRearmar] = useState(false);
   const [confExcluir, setConfExcluir] = useState<CampanhaResumo | null>(null);
+  const [remarketAberto, setRemarketAberto] = useState(false);
+  const [rmTemplate, setRmTemplate] = useState('');
+  const [rmNome, setRmNome] = useState('');
+  const [rmPrevia, setRmPrevia] = useState<RemarketingPrevia | null>(null);
   const [filtros, setFiltros] = useState<FiltrosPessoas>(FILTROS0);
   const setF = (patch: Partial<FiltrosPessoas>) => setFiltros((f) => ({ ...f, ...patch }));
   const [timelineContato, setTimelineContato] = useState<CampanhaPessoa | null>(null);
@@ -411,6 +416,24 @@ export function Disparo() {
     { chave: 'sla', titulo: cabOrdAt('sla_time_seg', 'Resp. atendente'), dir: true, classe: 'num', render: (a) => fmtDur(a.sla_time_seg) },
     { chave: 'par', titulo: cabOrdAt('parados', 'Parados'), dir: true, classe: 'num', render: (a) => a.parados > 0 ? <span className="dsp-sem-at">{a.parados}</span> : '0' },
   ];
+  // ----- Fase D: remarketing por filtro (a seleção filtrada É o alvo) -----
+  const alvoRemarketing = () => pessoasFiltradas.map((p) => p.contato_id);
+  const canalEhTrafego = /91781390$/.test((canalCloud?.numero_conectado ?? '').replace(/\D/g, ''));
+  const abrirRemarketing = () => { setRmTemplate(''); setRmNome(''); setRmPrevia(null); setRemarketAberto(true); };
+  const rodarPreviaRm = async (tplId: string) => {
+    if (!campanha || !tplId) { setRmPrevia(null); return; }
+    try { setRmPrevia(await remarketing.mutateAsync({ origem: campanha.id, template_id: tplId, contatos: alvoRemarketing(), dry_run: true })); }
+    catch (e) { erro((e as Error).message); setRmPrevia(null); }
+  };
+  const criarRemarketing = async () => {
+    if (!campanha || !rmTemplate) return;
+    try {
+      const r = await remarketing.mutateAsync({ origem: campanha.id, template_id: rmTemplate, contatos: alvoRemarketing(), dry_run: false, nome: rmNome || undefined });
+      setRemarketAberto(false); setRmPrevia(null); setRmTemplate(''); setRmNome('');
+      ok(`Campanha de remarketing criada: ${r.armados} na fila. Nada saiu ainda — use "Disparar lote" pra enviar.`);
+      if (r.campanha_id) abrirCampanha(r.campanha_id);
+    } catch (e) { erro((e as Error).message); }
+  };
   const [resultado, setResultado] = useState<ResultadoProcessar | null>(null);
   const [criandoCampanha, setCriandoCampanha] = useState(false);
   const [nomeNovaCampanha, setNomeNovaCampanha] = useState('');
@@ -1091,6 +1114,7 @@ export function Disparo() {
                       {filtrosAtivos(filtros) && <BotaoSec onClick={() => setFiltros(FILTROS0)}>Limpar</BotaoSec>}
                       <span className="dsp-filtros-cont num">{pessoasFiltradas.length} de {pessoasQ.data?.length ?? 0}</span>
                       <BotaoSec onClick={exportarCSV} disabled={!pessoasOrdenadas.length}>↓ Exportar CSV</BotaoSec>
+                      <BotaoPrimario onClick={abrirRemarketing} disabled={!pessoasFiltradas.length}>Remarketing ({pessoasFiltradas.length}) →</BotaoPrimario>
                     </div>
                   </div>
                   {pessoasQ.isLoading ? (
@@ -1118,6 +1142,41 @@ export function Disparo() {
       )}
 
       {/* ---------- modal: prévia da simulação ---------- */}
+      <ModalV2
+        aberto={remarketAberto}
+        aoFechar={() => setRemarketAberto(false)}
+        titulo={`Remarketing — ${pessoasFiltradas.length} do filtro`}
+        largura={560}
+        rodape={<>
+          <BotaoSec onClick={() => void rodarPreviaRm(rmTemplate)} disabled={!rmTemplate || remarketing.isPending}>Simular</BotaoSec>
+          <BotaoPrimario onClick={() => void criarRemarketing()} disabled={!rmTemplate || !rmPrevia || (rmPrevia?.alvo ?? 0) === 0 || remarketing.isPending}>
+            {remarketing.isPending ? 'Criando…' : `Criar campanha (${rmPrevia?.alvo ?? 0})`}
+          </BotaoPrimario>
+        </>}
+      >
+        <div className="dsp-fgrupo">
+          <span className="dsp-flabel">Template do remarketing (aprovado)</span>
+          <select className="inp dsp-fsel" value={rmTemplate} onChange={(e) => { setRmTemplate(e.target.value); void rodarPreviaRm(e.target.value); }} aria-label="Template do remarketing">
+            <option value="">Escolha um template…</option>
+            {templatesTodos.filter((t) => t.status === 'aprovado').map((t) => <option key={t.id} value={t.id}>{t.nome}</option>)}
+          </select>
+        </div>
+        <div className="dsp-fgrupo" style={{ marginTop: 10 }}>
+          <span className="dsp-flabel">Nome da campanha (opcional)</span>
+          <Input placeholder="Remarketing · hoje" value={rmNome} onChange={(e) => setRmNome(e.target.value)} aria-label="Nome da campanha de remarketing" />
+        </div>
+        <p className="dsp-nota" style={{ marginTop: 10 }}>Canal: <strong>{canalCloud?.nome_interno ?? '—'}</strong>{canalEhTrafego && <span className="dsp-aviso-inline"> ⚠ é o número do tráfego do anúncio (1390) — remarketing por aqui já derrubou/baniu chip.</span>}</p>
+        {rmPrevia && (
+          <div className="dsp-puzzle">
+            <div><strong className="num">{rmPrevia.alvo}</strong> vão receber</div>
+            <div>− <strong className="num">{rmPrevia.removidos_optout}</strong> removidos (opt-out)</div>
+            <div>− <strong className="num">{rmPrevia.removidos_ja_template}</strong> removidos (já receberam este template)</div>
+            <div>custo estimado <strong className="num">{fmtBRL(rmPrevia.custo_estimado)}</strong> · {rmPrevia.alvo}×R$0,35</div>
+            <div>teto 24h: resta <strong className="num">{rmPrevia.teto_restante}</strong> de {rmPrevia.teto}{rmPrevia.alvo > rmPrevia.teto_restante && <span className="dsp-aviso-inline"> — não cabe tudo hoje; sai {rmPrevia.teto_restante} e o resto amanhã</span>}</div>
+          </div>
+        )}
+        <p className="dsp-nota">Isso <strong>cria a campanha</strong> com os elegíveis na fila — <strong>nada é enviado</strong>. O envio real é no “Disparar lote” da campanha, respeitando teto e opt-out.</p>
+      </ModalV2>
       <ModalV2
         aberto={!!timelineContato}
         aoFechar={() => setTimelineContato(null)}
@@ -1215,7 +1274,7 @@ export function Disparo() {
       <ConfirmDialogV2
         aberto={confDisparo}
         titulo={`Disparar ${Math.min(lote, porStatus.pendente)} mensagens agora?`}
-        mensagem={`Template real pelo canal ${canalCloud?.nome_interno ?? 'Cloud API'} para os ${Math.min(lote, porStatus.pendente)} primeiros pendentes. Custa dinheiro e não tem desfazer.`}
+        mensagem={`Template real pelo canal ${canalCloud?.nome_interno ?? 'Cloud API'} para os ${Math.min(lote, porStatus.pendente)} primeiros pendentes · custo ≈ ${fmtBRL(Math.min(lote, porStatus.pendente) * CUSTO_MSG)}. Opt-out e quem já recebeu este template são barrados no envio. Custa dinheiro e não tem desfazer.`}
         rotuloConfirmar="Disparar"
         destrutivo
         carregando={processar.isPending}

@@ -243,6 +243,28 @@ export function useContatoTimeline(campanhaId: string | null, contatoId: string 
   });
 }
 
+/** Prévia/execução do remarketing por filtro (Fase D). dry_run só conta; senão cria campanha. */
+export interface RemarketingPrevia {
+  campanha_id: string | null; alvo: number; removidos_optout: number; removidos_ja_template: number;
+  teto: number; teto_restante: number; armados: number; custo_estimado: number;
+}
+export function useRemarketingFiltro() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (p: { origem: string; template_id: string; contatos: string[]; dry_run: boolean; canal_id?: string | null; nome?: string }) =>
+      rpc<RemarketingPrevia>('disparo_remarketing_filtro', {
+        p_campanha_origem: p.origem, p_template: p.template_id, p_contatos: p.contatos,
+        p_dry_run: p.dry_run, p_canal: p.canal_id ?? null, p_nome: p.nome ?? null,
+      }),
+    onSuccess: (_d, v) => {
+      if (!v.dry_run) {
+        qc.invalidateQueries({ queryKey: ['disparo-campanhas'] });
+        qc.invalidateQueries({ queryKey: ['disparo-campanhas-resumo'] });
+      }
+    },
+  });
+}
+
 /** Exclui a campanha (alvos e log caem por cascade). admin|supervisor no back. */
 export function useExcluirCampanha() {
   const qc = useQueryClient();
