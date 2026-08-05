@@ -90,7 +90,7 @@ export interface CampanhaResumo {
   canal_id: string | null; canal_nome: string | null;
   teto_24h: number; criado_em: string;
   total: number; pendentes: number; enviados: number; respondidos: number;
-  falhas: number; optout: number; pulados: number;
+  falhas: number; optout: number; pulados: number; fecharam: number;
   ultimo_envio: string | null;
 }
 export interface Alvo {

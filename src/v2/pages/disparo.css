@@ -137,6 +137,40 @@
 /* ----- voltar para a lista ----- */
 .v2 .dsp-voltar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
 .v2 .dsp-voltar-nome { font-size: 13px; font-weight: 600; color: var(--txt); }
+
+/* ----- visão geral (topo da lista) ----- */
+.v2 .dsp-visao { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--linha); }
+.v2 .dsp-visao-item { display: flex; flex-direction: column; gap: 2px; }
+.v2 .dsp-visao-n { font-size: 22px; font-weight: 700; color: var(--txt); line-height: 1.1; }
+.v2 .dsp-visao-r { font-size: 11px; color: var(--txt-3); }
+
+/* ----- funil de conversão ----- */
+.v2 .dsp-funil { display: flex; flex-direction: column; gap: 9px; margin-top: 10px; }
+.v2 .dsp-funil-linha { display: grid; grid-template-columns: 190px 1fr auto; align-items: center; gap: 12px; }
+.v2 .dsp-funil-rot { font-size: 12px; color: var(--txt-2); }
+.v2 .dsp-funil-barra { height: 22px; border-radius: 6px; background: rgba(var(--tint), .05); overflow: hidden; }
+.v2 .dsp-funil-fill { height: 100%; border-radius: 6px; transition: width .5s ease; min-width: 2px; }
+.v2 .dsp-funil-fill.env { background: rgba(var(--tint), .55); }
+.v2 .dsp-funil-fill.resp { background: #3b82f6; }
+.v2 .dsp-funil-fill.mur { background: #f59e0b; }
+.v2 .dsp-funil-fill.fech { background: #16a34a; }
+.v2 .dsp-funil-val { display: flex; align-items: baseline; gap: 6px; min-width: 76px; justify-content: flex-end; }
+.v2 .dsp-funil-val strong { font-size: 14px; color: var(--txt); }
+.v2 .dsp-funil-pct { font-size: 11px; color: var(--txt-3); }
+@media (max-width: 560px) { .v2 .dsp-funil-linha { grid-template-columns: 110px 1fr auto; gap: 8px; } .v2 .dsp-funil-rot { font-size: 10.5px; } }
+
+/* ----- barra de progresso do envio ----- */
+.v2 .dsp-prog { position: relative; height: 24px; border-radius: 7px; background: rgba(var(--tint), .06); overflow: hidden; margin-top: 12px; }
+.v2 .dsp-prog-fill { height: 100%; background: rgba(var(--tint), .4); border-radius: 7px; transition: width .5s ease; }
+.v2 .dsp-prog-lbl { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--txt); }
+
+/* ----- cabeçalho do relatório + tabela ordenável ----- */
+.v2 .dsp-rel-cab { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 4px 0 10px; }
+.v2 .dsp-rel-tab { padding: 6px 10px; }
+.v2 .dsp-th { display: inline-flex; align-items: center; gap: 4px; font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-transform: inherit; letter-spacing: inherit; }
+.v2 .dsp-th:hover { color: var(--txt); }
+.v2 .dsp-th-arr { font-size: 10px; opacity: .55; }
+.v2 .dsp-sem-at { color: #b45309; font-size: 11px; }
 .v2 .dsp-bolha {
   border: 1px solid var(--linha); border-radius: 14px 14px 14px 4px;
   padding: 13px 15px; font-size: 13px; line-height: 1.55; color: var(--txt);

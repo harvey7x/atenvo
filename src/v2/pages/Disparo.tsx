@@ -69,6 +69,8 @@ const iniciais = (n: string) => {
   const p = (n || '').trim().split(/\s+/);
   return ((p[0]?.[0] || '') + (p[1]?.[0] || '')).toUpperCase() || '?';
 };
+/** Percentual inteiro de n sobre a base (0 se base vazia). */
+const pct = (n: number, base: number) => (base > 0 ? Math.round((n / base) * 100) : 0);
 
 export function Disparo() {
   const agoraMs = Date.now();
@@ -241,6 +243,63 @@ export function Disparo() {
     if (filtroRel === 'fecharam') return ps.filter((p) => p.fechou);
     return ps;
   }, [pessoasQ.data, filtroRel]);
+  // Ordenação do relatório (tabela): campo + direção.
+  const [ordRel, setOrdRel] = useState<{ campo: 'nome' | 'status' | 'etapa_kanban' | 'atendente' | 'fechou' | 'enviado_em'; asc: boolean }>({ campo: 'enviado_em', asc: false });
+  const ordenarPor = (campo: typeof ordRel.campo) => setOrdRel((o) => ({ campo, asc: o.campo === campo ? !o.asc : true }));
+  const pessoasOrdenadas = useMemo(() => {
+    const arr = [...pessoasFiltradas];
+    const { campo, asc } = ordRel;
+    const chave = (p: CampanhaPessoa): string | number =>
+      campo === 'fechou' ? (p.fechou ? 1 : 0)
+      : campo === 'enviado_em' ? (p.enviado_em ?? '')
+      : (p[campo] ?? '') as string;
+    arr.sort((a, b) => {
+      const va = chave(a), vb = chave(b);
+      const cmp = typeof va === 'number' && typeof vb === 'number'
+        ? va - vb
+        : String(va).localeCompare(String(vb), 'pt', { numeric: true, sensitivity: 'base' });
+      return asc ? cmp : -cmp;
+    });
+    return arr;
+  }, [pessoasFiltradas, ordRel]);
+  // Visão geral (agregado de todas as campanhas) para o topo da lista.
+  const visaoGeral = useMemo(() => {
+    const cs = campResumoQ.data ?? [];
+    const enviados = cs.reduce((s, c) => s + c.enviados, 0);
+    const respondidos = cs.reduce((s, c) => s + c.respondidos, 0);
+    const fecharam = cs.reduce((s, c) => s + c.fecharam, 0);
+    return { campanhas: cs.length, enviados, respondidos, fecharam };
+  }, [campResumoQ.data]);
+  // Exporta o relatório da campanha aberta em CSV (abre no Excel/Sheets).
+  const exportarCSV = () => {
+    const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const head = ['Nome', 'WhatsApp', 'Status', 'Etapa Kanban', 'Atendente', 'Fechou', 'Enviado em'];
+    const linhas = pessoasOrdenadas.map((p) => [
+      p.nome, p.telefone ?? '', stAlvo(p.status).rotulo, p.etapa_kanban ?? '',
+      p.atendente ?? '', p.fechou ? 'Sim' : 'Não', p.enviado_em ?? '',
+    ].map(esc).join(','));
+    const csv = '﻿' + [head.map(esc).join(','), ...linhas].join('\r\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `campanha-${(campanha?.nome ?? 'disparo').replace(/[^\w.-]+/g, '_')}.csv`;
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  };
+  // Cabeçalho de coluna clicável (ordena o relatório).
+  const cabOrd = (campo: typeof ordRel.campo, label: string) => (
+    <button type="button" className="dsp-th" onClick={() => ordenarPor(campo)}>
+      {label}<span className="dsp-th-arr" aria-hidden>{ordRel.campo === campo ? (ordRel.asc ? '↑' : '↓') : '↕'}</span>
+    </button>
+  );
+  const colsRelatorio: Coluna<CampanhaPessoa>[] = [
+    { chave: 'nome', titulo: cabOrd('nome', 'Nome'), classe: 'nome', render: (p) => p.nome || '—' },
+    { chave: 'tel', titulo: 'WhatsApp', classe: 'num', render: (p) => fmtTel(p.telefone) },
+    { chave: 'status', titulo: cabOrd('status', 'Disparo'), render: (p) => <BadgeStatus tom={stAlvo(p.status).tom}>{stAlvo(p.status).rotulo}</BadgeStatus> },
+    { chave: 'etapa', titulo: cabOrd('etapa_kanban', 'Kanban'), render: (p) => p.etapa_kanban ? <BadgeStatus tom="neutro">{p.etapa_kanban}</BadgeStatus> : '—' },
+    { chave: 'atendente', titulo: cabOrd('atendente', 'Atendente'), render: (p) => p.atendente ? p.atendente : <span className="dsp-sem-at">sem atendente</span> },
+    { chave: 'fechou', titulo: cabOrd('fechou', 'Fechou'), render: (p) => p.fechou ? <BadgeStatus tom="ok">Fechou ✓</BadgeStatus> : '—' },
+    { chave: 'enviado', titulo: cabOrd('enviado_em', 'Enviado'), dir: true, classe: 'num', render: (p) => (p.enviado_em ? tempoRelativo(p.enviado_em, agoraMs) : '—') },
+  ];
   const [resultado, setResultado] = useState<ResultadoProcessar | null>(null);
   const [criandoCampanha, setCriandoCampanha] = useState(false);
   const [nomeNovaCampanha, setNomeNovaCampanha] = useState('');
@@ -449,6 +508,26 @@ export function Disparo() {
       ) : campanhaSelId === null && !modoCriar ? (
         /* ===== LISTA DE CAMPANHAS ===== */
         <CardVidro spot sobe style={{ borderRadius: 12, padding: 16 }}>
+          {visaoGeral.enviados > 0 && (
+            <div className="dsp-visao">
+              <div className="dsp-visao-item">
+                <span className="dsp-visao-n num">{visaoGeral.enviados.toLocaleString('pt-BR')}</span>
+                <span className="dsp-visao-r">enviados no total</span>
+              </div>
+              <div className="dsp-visao-item">
+                <span className="dsp-visao-n num">{pct(visaoGeral.respondidos, visaoGeral.enviados)}%</span>
+                <span className="dsp-visao-r">taxa de resposta · {visaoGeral.respondidos}</span>
+              </div>
+              <div className="dsp-visao-item">
+                <span className="dsp-visao-n num">{pct(visaoGeral.fecharam, visaoGeral.enviados)}%</span>
+                <span className="dsp-visao-r">taxa de fechamento · {visaoGeral.fecharam}</span>
+              </div>
+              <div className="dsp-visao-item">
+                <span className="dsp-visao-n num">{visaoGeral.campanhas}</span>
+                <span className="dsp-visao-r">campanhas</span>
+              </div>
+            </div>
+          )}
           <div className="dsp-cont-barra">
             <span className="num"><strong>{(campResumoQ.data ?? []).length}</strong> campanha{(campResumoQ.data ?? []).length === 1 ? '' : 's'}</span>
             <BotaoPrimario onClick={novaCampanha}>+ Nova campanha</BotaoPrimario>
@@ -472,7 +551,8 @@ export function Disparo() {
                     <div className="dsp-camp-nums">
                       <span><strong className="num">{c.total}</strong> alvos</span>
                       <span><strong className="num">{c.enviados}</strong> enviados</span>
-                      <span><strong className="num">{c.respondidos}</strong> responderam</span>
+                      <span><strong className="num">{c.respondidos}</strong> resp · {pct(c.respondidos, c.enviados)}%</span>
+                      <span><strong className="num">{c.fecharam}</strong> fech · {pct(c.fecharam, c.enviados)}%</span>
                       <span><strong className="num">{c.pendentes}</strong> pendentes</span>
                     </div>
                   </button>
@@ -725,15 +805,28 @@ export function Disparo() {
                 <Kpi rotulo="Responderam" valor={porStatus.respondido} />
                 <Kpi rotulo="Falhas / opt-out" valor={porStatus.falhou + porStatus.optout + porStatus.pulado} />
               </div>
-              {/* resultado da campanha: sinais reais depois do disparo (respondeu / Murillo chip / fechou) */}
+              {/* funil de conversão: sinais reais depois do disparo, com taxa sobre os enviados */}
               <CardVidro spot sobe style={{ borderRadius: 12, padding: 16, animationDelay: '.03s' }}>
-                <h2 className="dsp-h2">Resultado desta campanha</h2>
-                <div className="dsp-kpis" style={{ marginTop: 8 }}>
-                  <Kpi rotulo="Responderam" valor={resultadoQ.data?.responderam ?? 0} />
-                  <Kpi rotulo="Chamaram no Murillo chip" valor={resultadoQ.data?.chamaram_murillo ?? 0} />
-                  <Kpi rotulo="Fecharam" valor={resultadoQ.data?.fecharam ?? 0} />
+                <h2 className="dsp-h2">Funil de conversão</h2>
+                <div className="dsp-funil">
+                  {([
+                    { rot: 'Enviados', n: resultadoQ.data?.enviados ?? (porStatus.enviado + porStatus.respondido), cls: 'env' },
+                    { rot: 'Responderam', n: resultadoQ.data?.responderam ?? porStatus.respondido, cls: 'resp' },
+                    { rot: 'Chamaram no Murillo chip', n: resultadoQ.data?.chamaram_murillo ?? 0, cls: 'mur' },
+                    { rot: 'Fecharam', n: resultadoQ.data?.fecharam ?? 0, cls: 'fech' },
+                  ]).map((s, i) => {
+                    const base = resultadoQ.data?.enviados ?? (porStatus.enviado + porStatus.respondido);
+                    const p = i === 0 ? (base > 0 ? 100 : 0) : pct(s.n, base);
+                    return (
+                      <div className="dsp-funil-linha" key={s.rot}>
+                        <span className="dsp-funil-rot">{s.rot}</span>
+                        <div className="dsp-funil-barra"><div className={`dsp-funil-fill ${s.cls}`} style={{ width: `${Math.max(p, 1.5)}%` }} /></div>
+                        <span className="dsp-funil-val"><strong className="num">{s.n}</strong><span className="num dsp-funil-pct">{p}%</span></span>
+                      </div>
+                    );
+                  })}
                 </div>
-                <p className="dsp-nota">Conta o que aconteceu <strong>depois</strong> do disparo de cada pessoa: resposta ao template, mensagem para o Murillo chip, e oportunidade ganha.</p>
+                <p className="dsp-nota">% sobre os <strong>enviados</strong>. Conta o que aconteceu depois do disparo de cada pessoa: resposta ao template, mensagem ao Murillo chip e oportunidade ganha.</p>
               </CardVidro>
               <CardVidro spot sobe style={{ borderRadius: 12, padding: 16, animationDelay: '.05s' }}>
                 <div className="dsp-painel">
@@ -763,6 +856,10 @@ export function Disparo() {
                     </BotaoPrimario>
                   </div>
                 </div>
+                <div className="dsp-prog" role="progressbar" aria-valuenow={pct(porStatus.enviado + porStatus.respondido, alvos.length)} aria-valuemin={0} aria-valuemax={100}>
+                  <div className="dsp-prog-fill" style={{ width: `${pct(porStatus.enviado + porStatus.respondido, alvos.length)}%` }} />
+                  <span className="dsp-prog-lbl num">{porStatus.enviado + porStatus.respondido}/{alvos.length} enviados · {pct(porStatus.enviado + porStatus.respondido, alvos.length)}%</span>
+                </div>
                 {resultado && !resultado.dry_run && (
                   <p className="dsp-resultado num" role="status">
                     Último lote: {resultado.enviados ?? 0} enviados · {resultado.falhas ?? 0} falhas · {resultado.optouts ?? 0} opt-out
@@ -776,46 +873,30 @@ export function Disparo() {
                 </CardVidro>
               ) : (
                 <>
-                  <div className="dsp-fgrupo sobe" style={{ animationDelay: '.08s' }}>
-                    <span className="dsp-flabel">Relatório · situação no Kanban e atendente</span>
+                  <div className="dsp-rel-cab sobe" style={{ animationDelay: '.08s' }}>
                     <Chips>
                       <Chip ativo={filtroRel === 'todos'} onClick={() => setFiltroRel('todos')}>Todos {pessoasQ.data?.length ?? alvos.length}</Chip>
                       <Chip ativo={filtroRel === 'pendentes'} onClick={() => setFiltroRel('pendentes')}>Pendentes {porStatus.pendente}</Chip>
                       <Chip ativo={filtroRel === 'responderam'} onClick={() => setFiltroRel('responderam')}>Responderam {porStatus.respondido}</Chip>
                       <Chip ativo={filtroRel === 'fecharam'} onClick={() => setFiltroRel('fecharam')}>Fecharam {(pessoasQ.data ?? []).filter((p) => p.fechou).length}</Chip>
                     </Chips>
+                    <BotaoSec onClick={exportarCSV} disabled={!pessoasOrdenadas.length}>↓ Exportar CSV</BotaoSec>
                   </div>
                   {pessoasQ.isLoading ? (
                     <CardVidro spot sobe style={{ borderRadius: 12 }}><SkeletonTexto linhas={5} /></CardVidro>
-                  ) : pessoasFiltradas.length === 0 ? (
+                  ) : pessoasOrdenadas.length === 0 ? (
                     <CardVidro spot sobe style={{ borderRadius: 12 }}>
                       <EstadoVazio titulo="Ninguém neste filtro" descricao="Troque o filtro acima para ver as outras pessoas da campanha." />
                     </CardVidro>
                   ) : (
-                    <div className="dsp-grid sobe" style={{ animationDelay: '.1s' }}>
-                      {pessoasFiltradas.map((p: CampanhaPessoa) => (
-                        <div key={p.contato_id} className="dsp-card dsp-card-alvo">
-                          <div className="dsp-card-cab">
-                            <span className="dsp-av" aria-hidden>{iniciais(p.nome ?? '')}</span>
-                            <span className="dsp-card-id">
-                              <strong>{p.nome || '—'}</strong>
-                              <span className="num">{fmtTel(p.telefone)}</span>
-                            </span>
-                            <BadgeStatus tom={stAlvo(p.status).tom}>{stAlvo(p.status).rotulo}</BadgeStatus>
-                          </div>
-                          <div className="dsp-card-tags">
-                            {p.fechou && <BadgeStatus tom="ok">Fechou ✓</BadgeStatus>}
-                            {p.etapa_kanban && <BadgeStatus tom="neutro">{p.etapa_kanban}</BadgeStatus>}
-                            {p.atendente
-                              ? <BadgeStatus tom="neutro">👤 {p.atendente}</BadgeStatus>
-                              : <BadgeStatus tom="atencao">sem atendente</BadgeStatus>}
-                          </div>
-                          <div className="dsp-card-meta num">
-                            {p.enviado_em ? `enviado ${tempoRelativo(p.enviado_em, agoraMs)}` : 'aguardando lote'}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                    <CardVidro spot sobe className="dsp-rel-tab" style={{ borderRadius: 12, animationDelay: '.1s' }}>
+                      <TabelaPadrao
+                        colunas={colsRelatorio}
+                        linhas={pessoasOrdenadas}
+                        chave={(p) => p.contato_id}
+                        rodape={{ texto: `${pessoasOrdenadas.length} pessoa${pessoasOrdenadas.length === 1 ? '' : 's'} · ${(pessoasQ.data ?? []).filter((p) => p.fechou).length} fecharam · opt-out barrado no envio` }}
+                      />
+                    </CardVidro>
                   )}
                 </>
               )}
