@@ -21,15 +21,24 @@ export interface CanalEnvio {
 }
 export interface Enviado { key?: { id?: string } }
 /** Template aprovado da Cloud API. `variaveis` preenche {{1}},{{2}}… do BODY, na ordem. */
-export interface TemplateEnvio { nome: string; idioma: string; variaveis?: string[] }
+export interface TemplateEnvio { nome: string; idioma: string; variaveis?: string[]; headerImagem?: string | null }
+/** Mensagem interativa (Cloud API): botões de resposta e lista. Só existe na API oficial. */
+export interface BotaoReply { id: string; titulo: string }
+export interface ItemLista { id: string; titulo: string; descricao?: string }
+export interface SecaoLista { titulo?: string; itens: ItemLista[] }
 export interface Enviador {
   ehCloud: boolean;
   sendText(numero: string, texto: string, quoted?: unknown): Promise<Enviado>;
   sendMedia(numero: string, mediatype: string, mimetype: string, media: string, fileName?: string, caption?: string, quoted?: unknown): Promise<Enviado>;
-  sendWhatsAppAudio(numero: string, audio: string, quoted?: unknown): Promise<Enviado>;
+  sendWhatsAppAudio(numero: string, audio: string, quoted?: unknown, mime?: string): Promise<Enviado>;
   /** Fora da janela de 24h a Meta SÓ aceita template. Na Evolution isso não existe — lá qualquer
    *  texto sai a qualquer hora — então o adaptador Evolution lança em vez de fingir que enviou. */
   sendTemplate(numero: string, tpl: TemplateEnvio): Promise<Enviado>;
+  /** Botões de resposta (máx 3) e lista interativa — SÓ Cloud API. O adaptador Evolution lança. */
+  sendBotoes(numero: string, corpo: string, botoes: BotaoReply[], quoted?: unknown): Promise<Enviado>;
+  sendLista(numero: string, corpo: string, tituloBotao: string, secoes: SecaoLista[], quoted?: unknown): Promise<Enviado>;
+  /** Cartão de contato (vCard) — SÓ Cloud API (mensagem `contacts`). O adaptador Evolution lança. */
+  sendContato(numero: string, nome: string, telefone: string, quoted?: unknown): Promise<Enviado>;
 }
 
 export function ehCloudApi(canal: CanalEnvio): boolean {
@@ -86,6 +95,48 @@ async function uploadMedia(phoneNumberId: string, b64: string, mime: string, nom
   } finally { clearTimeout(t); }
 }
 
+/** Detecta o container REAL de áudio pelos magic bytes — NÃO confia no rótulo do navegador (o
+ *  Safari rotula a gravação como audio/mp4, o Chrome varia). Decodifica só o começo (48 bytes
+ *  bastam). Devolve token normalizado ('ogg'|'webm'|'m4a'|'mp3'|'wav') ou '' se não reconhecer. */
+function sniffAudioContainer(b64: string): string {
+  let head: Uint8Array;
+  try {
+    const bin = atob(b64.slice(0, 64));                       // 64 chars b64 (múltiplo de 4) => 48 bytes
+    head = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+  } catch { return ''; }
+  if (head.length < 4) return '';
+  if (head[0] === 0x1a && head[1] === 0x45 && head[2] === 0xdf && head[3] === 0xa3) return 'webm'; // EBML (webm/mkv)
+  const asc = String.fromCharCode(...head.slice(0, 16));
+  if (asc.startsWith('OggS')) return 'ogg';                   // Ogg (opus) => a Cloud renderiza como NOTA DE VOZ
+  if (asc.slice(4, 8) === 'ftyp') return 'm4a';               // ISO-BMFF (mp4/m4a — Safari/Mac)
+  if (asc.startsWith('RIFF')) return 'wav';
+  if (asc.startsWith('ID3')) return 'mp3';
+  if (head[0] === 0xff && (head[1] & 0xe0) === 0xe0) return 'mp3'; // frame sync MPEG (mp3 sem ID3)
+  return '';
+}
+
+const AUDIO_FMT: Record<string, { mime: string; ext: string }> = {
+  ogg:  { mime: 'audio/ogg',  ext: 'ogg' },
+  webm: { mime: 'audio/webm', ext: 'webm' },
+  m4a:  { mime: 'audio/mp4',  ext: 'm4a' },
+  mp3:  { mime: 'audio/mpeg', ext: 'mp3' },
+  aac:  { mime: 'audio/aac',  ext: 'aac' },
+  wav:  { mime: 'audio/wav',  ext: 'wav' },
+};
+
+/** Fallback quando não dá pra sniffar (fonte é URL) ou o container não foi reconhecido:
+ *  usa o rótulo declarado. Sem pista alguma, assume ogg (gravação típica do Chrome). */
+function fmtDoRotulo(mime: string): string {
+  const m = (mime || '').toLowerCase();
+  if (m.includes('ogg')) return 'ogg';
+  if (m.includes('webm')) return 'webm';
+  if (m.includes('mp4') || m.includes('m4a')) return 'm4a';
+  if (m.includes('mpeg') || m.includes('mp3')) return 'mp3';
+  if (m.includes('aac')) return 'aac';
+  if (m.includes('wav')) return 'wav';
+  return 'ogg';
+}
+
 // A Cloud API responde { messages: [{ id: 'wamid...' }] }. Normalizamos para a forma da Evolution
 // para que o critério de aceite do index.ts (sem id => falha) valha igual nos dois transportes.
 const comoEvolution = (j: Record<string, any>): Enviado => ({ key: { id: j?.messages?.[0]?.id ?? undefined } });
@@ -118,12 +169,19 @@ function enviadorCloud(phoneNumberId: string): Enviador {
         type: mediatype, [mediatype]: obj, ...contextoDe(quoted),
       }));
     },
-    async sendWhatsAppAudio(numero, audio, quoted) {
+    async sendWhatsAppAudio(numero, audio, quoted, mime) {
       guard();
-      // Nota de voz: a Cloud API não tem endpoint de PTT — ela renderiza como voz quando o
-      // arquivo é ogg/opus, que é exatamente o que o painel grava no Chrome.
+      // FORMATO POR MAGIC BYTES: escolhemos o formato de upload pelos BYTES REAIS, não pelo rótulo do
+      // navegador (que mente — Safari grava e rotula como audio/mp4). ogg/opus => a Cloud renderiza
+      // NOTA DE VOZ (PTT); demais containers sobem com o mime real e vão como ÁUDIO COMUM.
+      // ATENÇÃO: a Cloud NÃO transcodifica. Um mp4 do Safari continua mp4 e pode ser recusado no
+      // processamento da Meta ("Media upload error" ASSÍNCRONO, via webhook) — a etiqueta certa evita
+      // rótulo trocado, mas não conserta um codec que a Meta não sabe processar. Isso é transcode.
       const ehUrl = /^https?:\/\//i.test(audio);
-      const fonte = ehUrl ? { link: audio } : { id: await uploadMedia(phoneNumberId, audio, 'audio/ogg', 'voz.ogg') };
+      const fmt = (!ehUrl && sniffAudioContainer(audio)) || fmtDoRotulo(mime || '');
+      const { mime: mimeReal, ext } = AUDIO_FMT[fmt] ?? AUDIO_FMT.ogg;
+      const nome = fmt === 'ogg' ? 'voz.ogg' : `audio.${ext}`;   // ogg mantém o nome que já vinha entregando
+      const fonte = ehUrl ? { link: audio } : { id: await uploadMedia(phoneNumberId, audio, mimeReal, nome) };
       return comoEvolution(await graph(`${phoneNumberId}/messages`, {
         messaging_product: 'whatsapp', recipient_type: 'individual', to: numero,
         type: 'audio', audio: fonte, ...contextoDe(quoted),
@@ -134,14 +192,66 @@ function enviadorCloud(phoneNumberId: string): Enviador {
       // O `components` só vai quando há variável: template sem {{n}} recebendo um BODY com
       // parameters vazio é recusado pela Meta (132000, "number of parameters does not match").
       const params = (tpl.variaveis ?? []).map((v) => ({ type: 'text', text: String(v ?? '') }));
+      const components: Array<Record<string, unknown>> = [];
+      // Template com cabeçalho de IMAGEM exige o componente `header` no envio; sem ele a Meta
+      // recusa com #132012 ("expected IMAGE, received UNKNOWN"). Só entra quando há imagem.
+      if (tpl.headerImagem) components.push({ type: 'header', parameters: [{ type: 'image', image: { link: tpl.headerImagem } }] });
+      if (params.length) components.push({ type: 'body', parameters: params });
       return comoEvolution(await graph(`${phoneNumberId}/messages`, {
         messaging_product: 'whatsapp', recipient_type: 'individual', to: numero,
         type: 'template',
         template: {
           name: tpl.nome,
           language: { code: tpl.idioma || 'pt_BR' },
-          ...(params.length ? { components: [{ type: 'body', parameters: params }] } : {}),
+          ...(components.length ? { components } : {}),
         },
+      }));
+    },
+    async sendBotoes(numero, corpo, botoes, quoted) {
+      guard();
+      // Limites da Meta: máx 3 botões, título <=20 chars, id <=256. Cortamos para não ser recusado.
+      return comoEvolution(await graph(`${phoneNumberId}/messages`, {
+        messaging_product: 'whatsapp', recipient_type: 'individual', to: numero,
+        type: 'interactive',
+        interactive: {
+          type: 'button',
+          body: { text: corpo },
+          action: { buttons: botoes.slice(0, 3).map((b) => ({ type: 'reply', reply: { id: String(b.id).slice(0, 256), title: b.titulo.slice(0, 20) } })) },
+        },
+        ...contextoDe(quoted),
+      }));
+    },
+    async sendLista(numero, corpo, tituloBotao, secoes, quoted) {
+      guard();
+      // Limites da Meta: botão <=20; título de seção <=24; linha título <=24, descrição <=72; 10 linhas.
+      return comoEvolution(await graph(`${phoneNumberId}/messages`, {
+        messaging_product: 'whatsapp', recipient_type: 'individual', to: numero,
+        type: 'interactive',
+        interactive: {
+          type: 'list',
+          body: { text: corpo },
+          action: {
+            button: tituloBotao.slice(0, 20),
+            sections: secoes.map((s) => ({
+              ...(s.titulo ? { title: s.titulo.slice(0, 24) } : {}),
+              rows: s.itens.slice(0, 10).map((it) => ({ id: String(it.id).slice(0, 200), title: it.titulo.slice(0, 24), ...(it.descricao ? { description: it.descricao.slice(0, 72) } : {}) })),
+            })),
+          },
+        },
+        ...contextoDe(quoted),
+      }));
+    },
+    async sendContato(numero, nome, telefone, quoted) {
+      guard();
+      // Cartão de contato (vCard) via mensagem `contacts`. `phone` = texto exibido (E.164 legível).
+      // `wa_id` = só dígitos, com país 55, SEM + e sem espaços — é o que faz o WhatsApp reconhecer a
+      // conta e mostrar "Conversar" (sem ele, aparece "Convidar para o WhatsApp").
+      const waId = telefone.replace(/\D/g, '');
+      return comoEvolution(await graph(`${phoneNumberId}/messages`, {
+        messaging_product: 'whatsapp', recipient_type: 'individual', to: numero,
+        type: 'contacts',
+        contacts: [{ name: { formatted_name: nome, first_name: nome }, phones: [{ phone: telefone, type: 'WORK', wa_id: waId }] }],
+        ...contextoDe(quoted),
       }));
     },
   };
@@ -153,10 +263,14 @@ function enviadorEvolution(instancia: string): Enviador {
     sendText: (numero, texto, quoted) => evolution.sendText(instancia, numero, texto, quoted),
     sendMedia: (numero, mediatype, mimetype, media, fileName, caption, quoted) =>
       evolution.sendMedia(instancia, numero, mediatype, mimetype, media, fileName ?? '', caption, quoted),
-    sendWhatsAppAudio: (numero, audio, quoted) => evolution.sendWhatsAppAudio(instancia, numero, audio, quoted),
+    sendWhatsAppAudio: (numero, audio, quoted, _mime) => evolution.sendWhatsAppAudio(instancia, numero, audio, quoted),   // Evolution transcodifica (encoding:true) — ignora o mime
     // Não existe template no Baileys. Lançar é melhor que enviar o corpo como texto solto: o
     // template tem cara de mensagem aprovada e mandá-lo cru mudaria o que o cliente lê.
     sendTemplate: () => { throw new Error('Template só existe na API oficial (Cloud API).'); },
+    // Botões/lista interativos são recursos da Cloud API — o Baileys não tem equivalente fiel.
+    sendBotoes: () => { throw new Error('Botões interativos só existem na API oficial (Cloud API).'); },
+    sendLista: () => { throw new Error('Lista interativa só existe na API oficial (Cloud API).'); },
+    sendContato: () => { throw new Error('Cartão de contato só existe na API oficial (Cloud API).'); },
   };
 }
 

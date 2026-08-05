@@ -87,7 +87,7 @@ Deno.serve(async (req) => {
     if (canal.envio_restrito) return json({ error: 'Canal com restrição de envio no WhatsApp.', code: 'canal_restrito' }, 409);
 
     const { data: tpl } = await admin.from('wa_templates')
-      .select('id, nome, idioma, corpo, variaveis, status, ativo')
+      .select('id, nome, idioma, corpo, variaveis, status, ativo, metadados')
       .eq('id', camp.template_id).maybeSingle();
     if (!tpl || !tpl.ativo || tpl.status !== 'aprovado') return json({ error: 'Template não está aprovado/ativo.', code: 'template_nao_aprovado' }, 409);
 
@@ -154,7 +154,8 @@ Deno.serve(async (req) => {
 
       let wamid: string | null = null; let erro: string | null = null;
       try {
-        const r = await tx.sendTemplate(destino, { nome: tpl.nome, idioma: tpl.idioma, variaveis: vars });
+        const headerImagem = (tpl.metadados as { header_imagem?: string | null } | null)?.header_imagem ?? null;
+        const r = await tx.sendTemplate(destino, { nome: tpl.nome, idioma: tpl.idioma, variaveis: vars, headerImagem });
         wamid = r?.key?.id ?? null;
         if (!wamid) erro = 'sem_id_externo';
       } catch (e) { erro = ((e as Error)?.message ?? 'erro_cloud').slice(0, 300); }
