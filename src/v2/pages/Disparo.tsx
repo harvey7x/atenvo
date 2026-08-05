@@ -71,6 +71,18 @@ const iniciais = (n: string) => {
 };
 /** Percentual inteiro de n sobre a base (0 se base vazia). */
 const pct = (n: number, base: number) => (base > 0 ? Math.round((n / base) * 100) : 0);
+/** Custo por mensagem de template pago (Meta) — R$ aproximado. */
+const CUSTO_MSG = 0.35;
+const fmtBRL = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+/** Duração amigável a partir de segundos: 45s · 12min · 1h 29min. */
+const fmtDur = (seg: number | null | undefined) => {
+  if (seg == null) return '—';
+  if (seg < 60) return `${Math.round(seg)}s`;
+  const min = Math.round(seg / 60);
+  if (min < 60) return `${min}min`;
+  const h = Math.floor(min / 60), m = min % 60;
+  return m ? `${h}h ${m}min` : `${h}h`;
+};
 
 export function Disparo() {
   const agoraMs = Date.now();
@@ -278,6 +290,7 @@ export function Disparo() {
     const fecharam = cs.reduce((s, c) => s + c.fecharam, 0);
     return { campanhas: cs.length, enviados, respondidos, fecharam };
   }, [campResumoQ.data]);
+  // Métricas do dashboard da campanha aberta (custo, CAC, SLA) — base = enviados do log.
   // Exporta o relatório da campanha aberta em CSV (abre no Excel/Sheets).
   const exportarCSV = () => {
     const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
@@ -318,6 +331,21 @@ export function Disparo() {
     for (const a of alvos) c[a.status] = (c[a.status] ?? 0) + 1;
     return c;
   }, [alvos]);
+  // Métricas do dashboard da campanha aberta (custo, CAC, SLA) — base = enviados do log.
+  const dash = useMemo(() => {
+    const r = resultadoQ.data;
+    const enviados = r?.enviados ?? (porStatus.enviado + porStatus.respondido);
+    const responderam = r?.responderam ?? porStatus.respondido;
+    const murillo = r?.chamaram_murillo ?? 0;
+    const fecharam = r?.fecharam ?? 0;
+    const custo = enviados * CUSTO_MSG;
+    return {
+      enviados, responderam, murillo, fecharam, custo,
+      cac: fecharam > 0 ? custo / fecharam : null,
+      custoResp: responderam > 0 ? custo / responderam : null,
+      sla: r?.tempo_1a_resposta_seg ?? null,
+    };
+  }, [resultadoQ.data, porStatus]);
 
   const criarCampanhaComPublico = async () => {
     if (!canalCloud) { erro('Nenhum canal Cloud API conectado.'); return; }
@@ -808,33 +836,54 @@ export function Disparo() {
           {etapa === 4 && campanha && (
             <>
               <div className="dsp-kpis sobe">
-                <Kpi rotulo="Pendentes" valor={porStatus.pendente} />
                 <Kpi rotulo="Enviados" valor={porStatus.enviado + porStatus.respondido} />
-                <Kpi rotulo="Responderam" valor={porStatus.respondido} />
-                <Kpi rotulo="Falhas / opt-out" valor={porStatus.falhou + porStatus.optout + porStatus.pulado} />
+                <Kpi rotulo="Pendentes" valor={porStatus.pendente} />
+                <Kpi rotulo="Falhas técnicas" valor={porStatus.falhou + porStatus.pulado} />
+                <Kpi rotulo="Opt-outs" valor={porStatus.optout} />
+              </div>
+              <div className="dsp-metricas sobe" style={{ animationDelay: '.02s' }}>
+                <div className="dsp-metrica">
+                  <span className="dsp-metrica-n num">{fmtBRL(dash.custo)}</span>
+                  <span className="dsp-metrica-r">custo · {dash.enviados}×R$0,35</span>
+                </div>
+                <div className="dsp-metrica">
+                  <span className="dsp-metrica-n num">{dash.cac != null ? fmtBRL(dash.cac) : '—'}</span>
+                  <span className="dsp-metrica-r">CAC · custo por fechamento</span>
+                </div>
+                <div className="dsp-metrica">
+                  <span className="dsp-metrica-n num">{dash.custoResp != null ? fmtBRL(dash.custoResp) : '—'}</span>
+                  <span className="dsp-metrica-r">custo por resposta</span>
+                </div>
+                <div className="dsp-metrica">
+                  <span className="dsp-metrica-n num">{fmtDur(dash.sla)}</span>
+                  <span className="dsp-metrica-r">tempo médio até 1ª resposta</span>
+                </div>
               </div>
               {/* funil de conversão: sinais reais depois do disparo, com taxa sobre os enviados */}
               <CardVidro spot sobe style={{ borderRadius: 12, padding: 16, animationDelay: '.03s' }}>
                 <h2 className="dsp-h2">Funil de conversão</h2>
                 <div className="dsp-funil">
                   {([
-                    { rot: 'Enviados', n: resultadoQ.data?.enviados ?? (porStatus.enviado + porStatus.respondido), cls: 'env' },
-                    { rot: 'Responderam', n: resultadoQ.data?.responderam ?? porStatus.respondido, cls: 'resp' },
-                    { rot: 'Chamaram no Murillo chip', n: resultadoQ.data?.chamaram_murillo ?? 0, cls: 'mur' },
-                    { rot: 'Fecharam', n: resultadoQ.data?.fecharam ?? 0, cls: 'fech' },
+                    { rot: 'Enviados', n: dash.enviados, prev: null as number | null, prevRot: '', cls: 'env' },
+                    { rot: 'Responderam', n: dash.responderam, prev: dash.enviados, prevRot: 'dos enviados', cls: 'resp' },
+                    { rot: 'Chamaram no Murillo chip', n: dash.murillo, prev: dash.responderam, prevRot: 'de quem respondeu', cls: 'mur' },
+                    { rot: 'Fecharam', n: dash.fecharam, prev: dash.murillo, prevRot: 'de quem chamou', cls: 'fech' },
                   ]).map((s, i) => {
-                    const base = resultadoQ.data?.enviados ?? (porStatus.enviado + porStatus.respondido);
-                    const p = i === 0 ? (base > 0 ? 100 : 0) : pct(s.n, base);
+                    const pEnv = i === 0 ? (dash.enviados > 0 ? 100 : 0) : pct(s.n, dash.enviados);
                     return (
                       <div className="dsp-funil-linha" key={s.rot}>
                         <span className="dsp-funil-rot">{s.rot}</span>
-                        <div className="dsp-funil-barra"><div className={`dsp-funil-fill ${s.cls}`} style={{ width: `${Math.max(p, 1.5)}%` }} /></div>
-                        <span className="dsp-funil-val"><strong className="num">{s.n}</strong><span className="num dsp-funil-pct">{p}%</span></span>
+                        <div className="dsp-funil-barra"><div className={`dsp-funil-fill ${s.cls}`} style={{ width: `${Math.max(pEnv, 1.5)}%` }} /></div>
+                        <span className="dsp-funil-val">
+                          <strong className="num">{s.n}</strong>
+                          <span className="num dsp-funil-pct">{pEnv}% envio</span>
+                          {s.prev != null && <span className="num dsp-funil-step">{pct(s.n, s.prev)}% {s.prevRot}</span>}
+                        </span>
                       </div>
                     );
                   })}
                 </div>
-                <p className="dsp-nota">% sobre os <strong>enviados</strong>. Conta o que aconteceu depois do disparo de cada pessoa: resposta ao template, mensagem ao Murillo chip e oportunidade ganha.</p>
+                <p className="dsp-nota">Cada etapa mostra <strong>% sobre os enviados</strong> e a <strong>conversão da etapa anterior</strong> (onde o funil vaza). Conta o que aconteceu depois do disparo: resposta ao template, mensagem ao Murillo chip e oportunidade ganha.</p>
               </CardVidro>
               <CardVidro spot sobe style={{ borderRadius: 12, padding: 16, animationDelay: '.05s' }}>
                 <div className="dsp-painel">
