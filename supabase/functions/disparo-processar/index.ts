@@ -132,6 +132,14 @@ Deno.serve(async (req) => {
         if (!dryRun) await admin.from('disparo_alvos').update({ status: 'optout', erro: 'opt-out no momento do envio' }).eq('id', alvo.id).eq('status', 'pendente');
         optouts++; resultados.push({ contato: contato?.nome, status: 'optout' }); continue;
       }
+      // DEDUP (pessoa, template): ninguém recebe o MESMO template 2x — checado no log de envios.
+      // Roda no dry_run também, pra o Simular mostrar exatamente quem seria removido.
+      const { data: jaTpl } = await admin.from('disparo_envios').select('id')
+        .eq('contato_id', alvo.contato_id).eq('template_id', tpl.id).limit(1);
+      if (jaTpl?.length) {
+        if (!dryRun) await admin.from('disparo_alvos').update({ status: 'pulado', erro: 'ja_recebeu_template' }).eq('id', alvo.id).eq('status', 'pendente');
+        falhas++; resultados.push({ contato: contato?.nome, status: 'pulado', erro: 'ja_recebeu_template' }); continue;
+      }
       if (!destino || destino === numeroCanal) {
         if (!dryRun) await admin.from('disparo_alvos').update({ status: 'pulado', erro: !destino ? 'sem_telefone' : 'autoenvio' }).eq('id', alvo.id).eq('status', 'pendente');
         falhas++; resultados.push({ contato: contato?.nome, status: 'pulado' }); continue;
