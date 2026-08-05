@@ -178,6 +178,25 @@
 .v2 .dsp-th:hover { color: var(--txt); }
 .v2 .dsp-th-arr { font-size: 10px; opacity: .55; }
 .v2 .dsp-sem-at { color: #b45309; font-size: 11px; }
+
+/* ----- matriz de filtros combináveis (Fase C) ----- */
+.v2 .dsp-filtros { display: flex; flex-direction: column; gap: 10px; margin: 4px 0 10px; }
+.v2 .dsp-filtros-linha { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+.v2 .dsp-fchip { display: flex; align-items: center; gap: 7px; }
+.v2 .dsp-fchip .dsp-flabel { white-space: nowrap; }
+.v2 .dsp-fdate { width: 132px; }
+.v2 .dsp-filtros-cont { color: var(--txt-3); font-size: 11px; margin-left: auto; }
+
+/* ----- timeline por contato ----- */
+.v2 .dsp-tl { list-style: none; margin: 0; padding: 4px 0 0; display: flex; flex-direction: column; }
+.v2 .dsp-tl-item { display: flex; gap: 12px; padding: 0 0 4px; position: relative; }
+.v2 .dsp-tl-item::before { content: ''; position: absolute; left: 13px; top: 26px; bottom: -4px; width: 2px; background: var(--linha); }
+.v2 .dsp-tl-item:last-child::before { display: none; }
+.v2 .dsp-tl-ic { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 14px; background: rgba(var(--tint), .07); border: 1px solid var(--linha); z-index: 1; }
+.v2 .dsp-tl-txt { display: flex; flex-direction: column; gap: 1px; padding-bottom: 10px; }
+.v2 .dsp-tl-txt strong { font-size: 13px; color: var(--txt); font-weight: 600; }
+.v2 .dsp-tl-det { color: var(--txt-2); font-weight: 400; }
+.v2 .dsp-tl-quando { font-size: 11px; color: var(--txt-3); }
 .v2 .dsp-bolha {
   border: 1px solid var(--linha); border-radius: 14px 14px 14px 4px;
   padding: 13px 15px; font-size: 13px; line-height: 1.55; color: var(--txt);

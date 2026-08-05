@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
 import {
   useDisparoElegiveis, useDisparoContatados, useCampanhas, useCampanhasResumo, useCriarCampanha, useCancelarCampanha,
-  useTrocarTemplate, useRearmar, useAddAlvos, useAlvos, useCampanhaResultado, useCampanhaPessoas, useCampanhaAtendentes, useExcluirCampanha,
+  useTrocarTemplate, useRearmar, useAddAlvos, useAlvos, useCampanhaResultado, useCampanhaPessoas, useCampanhaAtendentes, useContatoTimeline, useExcluirCampanha,
   useProcessarLote, useOptoutLista, useOptoutManual, useOptoutRemover,
   preencherTemplate, primeiroNomeApresentavel, inferirGenero, type Genero,
-  type Elegivel, type Contatado, type Campanha, type CampanhaResumo, type CampanhaPessoa, type CampanhaAtendente, type OptoutRow, type ResultadoProcessar,
+  type Elegivel, type Contatado, type Campanha, type CampanhaResumo, type CampanhaPessoa, type CampanhaAtendente, type TimelineEvento, type OptoutRow, type ResultadoProcessar,
 } from '@/data/disparo';
 import { useWaTemplates, useCloudDiagnostico, type WaTemplate } from '@/data/cloudApi';
 import { formatarNumero } from '@/data/maturacao';
@@ -27,6 +27,34 @@ import './disparo.css';
 
 type AbaId = 'campanha' | 'contatados' | 'excluidos';
 type Etapa = 1 | 2 | 3 | 4;
+
+/* Filtros combináveis (E) do relatório de pessoas (Fase C). É a MESMA seleção que a
+   Fase D reusa como alvo de remarketing — por isso é estado estruturado, não descartável.
+   "resposta=sim" usa status='respondido' (mesmo critério da Fase B, os 77). */
+type FiltrosPessoas = {
+  disparo: 'todos' | 'pendente' | 'enviado' | 'falha';
+  resposta: 'todos' | 'sim' | 'nao';
+  murillo: 'todos' | 'sim' | 'nao';
+  fechou: 'todos' | 'sim' | 'nao';
+  etapa: string; atendente: string; template: string; de: string; ate: string;
+};
+const FILTROS0: FiltrosPessoas = { disparo: 'todos', resposta: 'todos', murillo: 'todos', fechou: 'todos', etapa: '', atendente: '', template: '', de: '', ate: '' };
+const filtrosAtivos = (f: FiltrosPessoas) =>
+  f.disparo !== 'todos' || f.resposta !== 'todos' || f.murillo !== 'todos' || f.fechou !== 'todos'
+  || f.etapa !== '' || f.atendente !== '' || f.template !== '' || f.de !== '' || f.ate !== '';
+const passaFiltro = (p: CampanhaPessoa, f: FiltrosPessoas) =>
+  (f.disparo === 'todos'
+    || (f.disparo === 'pendente' && p.status === 'pendente')
+    || (f.disparo === 'enviado' && (p.status === 'enviado' || p.status === 'respondido'))
+    || (f.disparo === 'falha' && (p.status === 'falhou' || p.status === 'pulado' || p.status === 'optout')))
+  && (f.resposta === 'todos' || (f.resposta === 'sim') === (p.status === 'respondido'))
+  && (f.murillo === 'todos' || (f.murillo === 'sim') === p.chamou_murillo)
+  && (f.fechou === 'todos' || (f.fechou === 'sim') === p.fechou)
+  && (f.etapa === '' || p.etapa_kanban === f.etapa)
+  && (f.atendente === '' || (f.atendente === 'sem' ? !p.atendente_id : p.atendente_id === f.atendente))
+  && (f.template === '' || p.template_nome === f.template)
+  && (f.de === '' || (!!p.enviado_em && p.enviado_em >= f.de))
+  && (f.ate === '' || (!!p.enviado_em && p.enviado_em <= `${f.ate}T23:59:59`));
 
 /* Contatado (já recebeu) → forma de Elegível, para caber no mesmo fluxo de seleção
    e nos cards. Não precisa estar no topo do funil: o disparo_add_alvos re-valida
@@ -55,6 +83,15 @@ const ST_CAMP: Record<string, { rotulo: string; tom: TomStatus }> = {
   concluida: { rotulo: 'Concluída', tom: 'neutro' },
   cancelada: { rotulo: 'Cancelada', tom: 'atencao' },
 };
+/** Meta dos eventos da timeline por contato (Fase C). */
+const EV_TL: Record<string, { rot: string; ic: string; tom: TomStatus }> = {
+  enviado: { rot: 'Disparo enviado', ic: '📤', tom: 'neutro' },
+  respondeu: { rot: 'Respondeu', ic: '💬', tom: 'ok' },
+  murillo: { rot: 'Chamou o Murillo chip', ic: '📞', tom: 'atencao' },
+  etapa: { rot: 'Avançou no Kanban', ic: '➡️', tom: 'neutro' },
+  fechou: { rot: 'Fechou (ganho)', ic: '✅', tom: 'ok' },
+};
+const fmtQuando = (iso: string) => new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 const MOTIVO_ROTULO: Record<string, string> = {
   sair_texto: 'Respondeu SAIR',
   erro_131050: 'Bloqueou na Meta',
@@ -250,22 +287,31 @@ export function Disparo() {
   const [confEncerrar, setConfEncerrar] = useState(false);
   const [confRearmar, setConfRearmar] = useState(false);
   const [confExcluir, setConfExcluir] = useState<CampanhaResumo | null>(null);
-  const [filtroRel, setFiltroRel] = useState<'todos' | 'pendentes' | 'responderam' | 'fecharam'>('todos');
-  const pessoasFiltradas = useMemo(() => {
-    const ps = pessoasQ.data ?? [];
-    if (filtroRel === 'pendentes') return ps.filter((p) => p.status === 'pendente');
-    if (filtroRel === 'responderam') return ps.filter((p) => p.status === 'respondido');
-    if (filtroRel === 'fecharam') return ps.filter((p) => p.fechou);
-    return ps;
-  }, [pessoasQ.data, filtroRel]);
+  const [filtros, setFiltros] = useState<FiltrosPessoas>(FILTROS0);
+  const setF = (patch: Partial<FiltrosPessoas>) => setFiltros((f) => ({ ...f, ...patch }));
+  const [timelineContato, setTimelineContato] = useState<CampanhaPessoa | null>(null);
+  const pessoasFiltradas = useMemo(
+    () => (pessoasQ.data ?? []).filter((p) => passaFiltro(p, filtros)),
+    [pessoasQ.data, filtros],
+  );
+  // opções dos seletores (só o que existe na campanha)
+  const etapasOpts = useMemo(() => [...new Set((pessoasQ.data ?? []).map((p) => p.etapa_kanban).filter(Boolean))] as string[], [pessoasQ.data]);
+  const templatesOpts = useMemo(() => [...new Set((pessoasQ.data ?? []).map((p) => p.template_nome).filter(Boolean))] as string[], [pessoasQ.data]);
+  const atendentesOpts = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const p of pessoasQ.data ?? []) if (p.atendente_id && p.atendente) m.set(p.atendente_id, p.atendente);
+    return [...m.entries()];
+  }, [pessoasQ.data]);
+  const timelineQ = useContatoTimeline(campanha?.id ?? null, timelineContato?.contato_id ?? null);
   // Ordenação do relatório (tabela): campo + direção.
-  const [ordRel, setOrdRel] = useState<{ campo: 'nome' | 'status' | 'etapa_kanban' | 'atendente' | 'fechou' | 'enviado_em'; asc: boolean }>({ campo: 'enviado_em', asc: false });
+  const [ordRel, setOrdRel] = useState<{ campo: 'nome' | 'status' | 'etapa_kanban' | 'atendente' | 'fechou' | 'chamou_murillo' | 'template_nome' | 'enviado_em'; asc: boolean }>({ campo: 'enviado_em', asc: false });
   const ordenarPor = (campo: typeof ordRel.campo) => setOrdRel((o) => ({ campo, asc: o.campo === campo ? !o.asc : true }));
   const pessoasOrdenadas = useMemo(() => {
     const arr = [...pessoasFiltradas];
     const { campo, asc } = ordRel;
     const chave = (p: CampanhaPessoa): string | number =>
       campo === 'fechou' ? (p.fechou ? 1 : 0)
+      : campo === 'chamou_murillo' ? (p.chamou_murillo ? 1 : 0)
       : campo === 'enviado_em' ? (p.enviado_em ?? '')
       : (p[campo] ?? '') as string;
     arr.sort((a, b) => {
@@ -297,10 +343,11 @@ export function Disparo() {
   // Exporta o relatório da campanha aberta em CSV (abre no Excel/Sheets).
   const exportarCSV = () => {
     const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-    const head = ['Nome', 'WhatsApp', 'Status', 'Etapa Kanban', 'Atendente', 'Fechou', 'Enviado em'];
+    const head = ['Nome', 'WhatsApp', 'Status', 'Respondeu', 'Chamou Murillo', 'Etapa Kanban', 'Atendente', 'Fechou', 'Template', 'Enviado em'];
     const linhas = pessoasOrdenadas.map((p) => [
-      p.nome, p.telefone ?? '', stAlvo(p.status).rotulo, p.etapa_kanban ?? '',
-      p.atendente ?? '', p.fechou ? 'Sim' : 'Não', p.enviado_em ?? '',
+      p.nome, p.telefone ?? '', stAlvo(p.status).rotulo, p.status === 'respondido' ? 'Sim' : 'Não',
+      p.chamou_murillo ? 'Sim' : 'Não', p.etapa_kanban ?? '', p.atendente ?? '',
+      p.fechou ? 'Sim' : 'Não', p.template_nome ?? '', p.enviado_em ?? '',
     ].map(esc).join(','));
     const csv = '﻿' + [head.map(esc).join(','), ...linhas].join('\r\n');
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
@@ -321,7 +368,10 @@ export function Disparo() {
     { chave: 'status', titulo: cabOrd('status', 'Disparo'), render: (p) => <BadgeStatus tom={stAlvo(p.status).tom}>{stAlvo(p.status).rotulo}</BadgeStatus> },
     { chave: 'etapa', titulo: cabOrd('etapa_kanban', 'Kanban'), render: (p) => p.etapa_kanban ? <BadgeStatus tom="neutro">{p.etapa_kanban}</BadgeStatus> : '—' },
     { chave: 'atendente', titulo: cabOrd('atendente', 'Atendente'), render: (p) => p.atendente ? p.atendente : <span className="dsp-sem-at">sem atendente</span> },
+    { chave: 'resp', titulo: cabOrd('status', 'Respondeu'), render: (p) => p.status === 'respondido' ? <BadgeStatus tom="ok">Sim</BadgeStatus> : '—' },
+    { chave: 'mur', titulo: cabOrd('chamou_murillo', 'Murillo'), render: (p) => p.chamou_murillo ? <BadgeStatus tom="atencao">Chamou</BadgeStatus> : '—' },
     { chave: 'fechou', titulo: cabOrd('fechou', 'Fechou'), render: (p) => p.fechou ? <BadgeStatus tom="ok">Fechou ✓</BadgeStatus> : '—' },
+    { chave: 'tpl', titulo: cabOrd('template_nome', 'Template'), classe: 'num', render: (p) => p.template_nome ?? '—' },
     { chave: 'enviado', titulo: cabOrd('enviado_em', 'Enviado'), dir: true, classe: 'num', render: (p) => (p.enviado_em ? tempoRelativo(p.enviado_em, agoraMs) : '—') },
   ];
   // ----- relatório de atendentes (Fase B): ordenação + colunas -----
@@ -998,14 +1048,50 @@ export function Disparo() {
                 </CardVidro>
               ) : (
                 <>
-                  <div className="dsp-rel-cab sobe" style={{ animationDelay: '.08s' }}>
-                    <Chips>
-                      <Chip ativo={filtroRel === 'todos'} onClick={() => setFiltroRel('todos')}>Todos {pessoasQ.data?.length ?? alvos.length}</Chip>
-                      <Chip ativo={filtroRel === 'pendentes'} onClick={() => setFiltroRel('pendentes')}>Pendentes {porStatus.pendente}</Chip>
-                      <Chip ativo={filtroRel === 'responderam'} onClick={() => setFiltroRel('responderam')}>Responderam {porStatus.respondido}</Chip>
-                      <Chip ativo={filtroRel === 'fecharam'} onClick={() => setFiltroRel('fecharam')}>Fecharam {(pessoasQ.data ?? []).filter((p) => p.fechou).length}</Chip>
-                    </Chips>
-                    <BotaoSec onClick={exportarCSV} disabled={!pessoasOrdenadas.length}>↓ Exportar CSV</BotaoSec>
+                  <div className="dsp-filtros sobe" style={{ animationDelay: '.08s' }}>
+                    <div className="dsp-filtros-linha">
+                      <div className="dsp-fchip"><span className="dsp-flabel">Disparo</span><Chips>
+                        <Chip ativo={filtros.disparo === 'todos'} onClick={() => setF({ disparo: 'todos' })}>Todos</Chip>
+                        <Chip ativo={filtros.disparo === 'pendente'} onClick={() => setF({ disparo: 'pendente' })}>Pendente</Chip>
+                        <Chip ativo={filtros.disparo === 'enviado'} onClick={() => setF({ disparo: 'enviado' })}>Enviado</Chip>
+                        <Chip ativo={filtros.disparo === 'falha'} onClick={() => setF({ disparo: 'falha' })}>Falha</Chip>
+                      </Chips></div>
+                      <div className="dsp-fchip"><span className="dsp-flabel">Resposta</span><Chips>
+                        <Chip ativo={filtros.resposta === 'todos'} onClick={() => setF({ resposta: 'todos' })}>Todos</Chip>
+                        <Chip ativo={filtros.resposta === 'sim'} onClick={() => setF({ resposta: 'sim' })}>Respondeu</Chip>
+                        <Chip ativo={filtros.resposta === 'nao'} onClick={() => setF({ resposta: 'nao' })}>Não resp.</Chip>
+                      </Chips></div>
+                      <div className="dsp-fchip"><span className="dsp-flabel">Murillo</span><Chips>
+                        <Chip ativo={filtros.murillo === 'todos'} onClick={() => setF({ murillo: 'todos' })}>Todos</Chip>
+                        <Chip ativo={filtros.murillo === 'sim'} onClick={() => setF({ murillo: 'sim' })}>Chamou</Chip>
+                        <Chip ativo={filtros.murillo === 'nao'} onClick={() => setF({ murillo: 'nao' })}>Não</Chip>
+                      </Chips></div>
+                      <div className="dsp-fchip"><span className="dsp-flabel">Fechou</span><Chips>
+                        <Chip ativo={filtros.fechou === 'todos'} onClick={() => setF({ fechou: 'todos' })}>Todos</Chip>
+                        <Chip ativo={filtros.fechou === 'sim'} onClick={() => setF({ fechou: 'sim' })}>Sim</Chip>
+                        <Chip ativo={filtros.fechou === 'nao'} onClick={() => setF({ fechou: 'nao' })}>Não</Chip>
+                      </Chips></div>
+                    </div>
+                    <div className="dsp-filtros-linha">
+                      <select className="inp dsp-fsel" value={filtros.etapa} onChange={(e) => setF({ etapa: e.target.value })} aria-label="Etapa do Kanban">
+                        <option value="">Kanban: todas</option>
+                        {etapasOpts.map((et) => <option key={et} value={et}>{et}</option>)}
+                      </select>
+                      <select className="inp dsp-fsel" value={filtros.atendente} onChange={(e) => setF({ atendente: e.target.value })} aria-label="Atendente">
+                        <option value="">Atendente: todos</option>
+                        <option value="sem">Sem atendente</option>
+                        {atendentesOpts.map(([id, nome]) => <option key={id} value={id}>{nome}</option>)}
+                      </select>
+                      <select className="inp dsp-fsel" value={filtros.template} onChange={(e) => setF({ template: e.target.value })} aria-label="Template recebido">
+                        <option value="">Template: todos</option>
+                        {templatesOpts.map((t) => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                      <label className="dsp-lote num">De <input className="inp dsp-fdate num" type="date" value={filtros.de} onChange={(e) => setF({ de: e.target.value })} aria-label="Enviado de" /></label>
+                      <label className="dsp-lote num">até <input className="inp dsp-fdate num" type="date" value={filtros.ate} onChange={(e) => setF({ ate: e.target.value })} aria-label="Enviado até" /></label>
+                      {filtrosAtivos(filtros) && <BotaoSec onClick={() => setFiltros(FILTROS0)}>Limpar</BotaoSec>}
+                      <span className="dsp-filtros-cont num">{pessoasFiltradas.length} de {pessoasQ.data?.length ?? 0}</span>
+                      <BotaoSec onClick={exportarCSV} disabled={!pessoasOrdenadas.length}>↓ Exportar CSV</BotaoSec>
+                    </div>
                   </div>
                   {pessoasQ.isLoading ? (
                     <CardVidro spot sobe style={{ borderRadius: 12 }}><SkeletonTexto linhas={5} /></CardVidro>
@@ -1019,7 +1105,8 @@ export function Disparo() {
                         colunas={colsRelatorio}
                         linhas={pessoasOrdenadas}
                         chave={(p) => p.contato_id}
-                        rodape={{ texto: `${pessoasOrdenadas.length} pessoa${pessoasOrdenadas.length === 1 ? '' : 's'} · ${(pessoasQ.data ?? []).filter((p) => p.fechou).length} fecharam · opt-out barrado no envio` }}
+                        aoClicarLinha={(p) => setTimelineContato(p)}
+                        rodape={{ texto: `${pessoasOrdenadas.length} pessoa${pessoasOrdenadas.length === 1 ? '' : 's'} · clique numa linha pra ver a jornada · opt-out barrado no envio` }}
                       />
                     </CardVidro>
                   )}
@@ -1031,6 +1118,34 @@ export function Disparo() {
       )}
 
       {/* ---------- modal: prévia da simulação ---------- */}
+      <ModalV2
+        aberto={!!timelineContato}
+        aoFechar={() => setTimelineContato(null)}
+        titulo={`Jornada — ${timelineContato?.nome ?? ''}`}
+        largura={520}
+        rodape={<BotaoSec onClick={() => setTimelineContato(null)}>Fechar</BotaoSec>}
+      >
+        {timelineQ.isLoading ? (
+          <SkeletonTexto linhas={5} />
+        ) : (timelineQ.data ?? []).length === 0 ? (
+          <EstadoVazio titulo="Sem eventos ainda" descricao="Assim que a pessoa receber o disparo e reagir, a jornada aparece aqui." />
+        ) : (
+          <ol className="dsp-tl">
+            {(timelineQ.data ?? []).map((e: TimelineEvento, i) => {
+              const m = EV_TL[e.tipo] ?? { rot: e.tipo, ic: '•', tom: 'neutro' as TomStatus };
+              return (
+                <li key={i} className="dsp-tl-item">
+                  <span className="dsp-tl-ic" aria-hidden>{m.ic}</span>
+                  <div className="dsp-tl-txt">
+                    <strong>{m.rot}{e.detalhe ? <span className="dsp-tl-det"> · {e.detalhe}</span> : null}</strong>
+                    <span className="num dsp-tl-quando">{fmtQuando(e.quando)}</span>
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+        )}
+      </ModalV2>
       <ModalV2
         aberto={!!previa}
         aoFechar={() => setPrevia(null)}

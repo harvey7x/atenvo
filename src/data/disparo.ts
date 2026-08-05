@@ -221,7 +221,8 @@ export interface CampanhaPessoa {
   contato_id: string; nome: string; telefone: string | null;
   status: 'pendente' | 'enviado' | 'respondido' | 'falhou' | 'optout' | 'pulado';
   enviado_em: string | null;
-  etapa_kanban: string | null; atendente: string | null; fechou: boolean;
+  etapa_kanban: string | null; atendente: string | null; atendente_id: string | null;
+  fechou: boolean; chamou_murillo: boolean; template_nome: string | null;
 }
 export function useCampanhaPessoas(campanhaId: string | null) {
   return useQuery({
@@ -229,6 +230,16 @@ export function useCampanhaPessoas(campanhaId: string | null) {
     enabled: REAL && !!campanhaId,
     refetchInterval: 8000,
     queryFn: () => rpc<CampanhaPessoa[]>('disparo_campanha_pessoas', { p_campanha: campanhaId }),
+  });
+}
+
+/** Um evento da jornada de um contato (timeline) — fontes já existentes. */
+export interface TimelineEvento { tipo: 'enviado' | 'respondeu' | 'murillo' | 'etapa' | 'fechou'; quando: string; detalhe: string | null; }
+export function useContatoTimeline(campanhaId: string | null, contatoId: string | null) {
+  return useQuery({
+    queryKey: ['disparo-contato-timeline', campanhaId, contatoId],
+    enabled: REAL && !!campanhaId && !!contatoId,
+    queryFn: () => rpc<TimelineEvento[]>('disparo_contato_timeline', { p_campanha: campanhaId, p_contato: contatoId }),
   });
 }
 
