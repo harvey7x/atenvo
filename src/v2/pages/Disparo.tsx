@@ -262,6 +262,14 @@ export function Disparo() {
     });
     return arr;
   }, [pessoasFiltradas, ordRel]);
+  // Quem pode ser re-armado no "Disparar de novo": só quem AINDA está em Lead Novo
+  // (coluna de entrada) e não respondeu — espelha a regra do disparo_rearmar no banco.
+  const reArmaveis = useMemo(
+    () => (pessoasQ.data ?? []).filter(
+      (p) => (p.status === 'enviado' || p.status === 'falhou' || p.status === 'pulado') && p.etapa_kanban === 'Lead Novo',
+    ).length,
+    [pessoasQ.data],
+  );
   // Visão geral (agregado de todas as campanhas) para o topo da lista.
   const visaoGeral = useMemo(() => {
     const cs = campResumoQ.data ?? [];
@@ -837,9 +845,9 @@ export function Disparo() {
                   <div className="dsp-acoes">
                     <BotaoSec onClick={() => setConfEncerrar(true)}>Encerrar</BotaoSec>
                     <BotaoSec onClick={() => setEtapa(1)}>+ pessoas</BotaoSec>
-                    {(porStatus.enviado + porStatus.falhou + porStatus.pulado) > 0 && (
+                    {reArmaveis > 0 && (
                       <BotaoSec onClick={() => setConfRearmar(true)} disabled={rearmar.isPending}>
-                        {rearmar.isPending ? 'Re-armando…' : 'Disparar de novo'}
+                        {rearmar.isPending ? 'Re-armando…' : `Disparar de novo (${reArmaveis})`}
                       </BotaoSec>
                     )}
                     <label className="dsp-lote num" htmlFor="dsp-lote-inp">Enviar agora:</label>
@@ -946,7 +954,7 @@ export function Disparo() {
       <ConfirmDialogV2
         aberto={confRearmar}
         titulo={`Disparar de novo "${campanha?.nome ?? ''}"?`}
-        mensagem={`${porStatus.enviado + porStatus.falhou + porStatus.pulado} pessoa${(porStatus.enviado + porStatus.falhou + porStatus.pulado) === 1 ? '' : 's'} volta${(porStatus.enviado + porStatus.falhou + porStatus.pulado) === 1 ? '' : 'm'} para a fila de envio. Quem já respondeu (${porStatus.respondido}) e quem está em opt-out NÃO são reenviados. Troque o template no passo 2 antes, se quiser. Nada sai até você disparar o lote.`}
+        mensagem={`Só quem AINDA está em Lead Novo e não respondeu volta para a fila: ${reArmaveis} pessoa${reArmaveis === 1 ? '' : 's'}. Quem já respondeu (${porStatus.respondido}), quem avançou no funil (Reunião, Documentos, Fechado…) e quem está em opt-out NÃO são reenviados. Troque o template no passo 2 antes, se quiser. Nada sai até você disparar o lote.`}
         rotuloConfirmar="Disparar de novo"
         carregando={rearmar.isPending}
         aoConfirmar={async () => {
