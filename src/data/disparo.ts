@@ -166,7 +166,11 @@ export function useCampanhasResumo() {
 
 /** Resultado acumulado de UMA campanha (respondeu / chamou Murillo chip / fechou). */
 export interface CampanhaResultado {
-  enviados: number; responderam: number; chamaram_murillo: number; fecharam: number;
+  /** Pessoas distintas alcançadas (base do funil/taxas). */
+  enviados: number;
+  /** Total de mensagens enviadas (linhas do log — base do CUSTO; cresce a cada reenvio). */
+  mensagens: number;
+  responderam: number; chamaram_murillo: number; fecharam: number;
   tempo_1a_resposta_seg: number | null;
 }
 export function useCampanhaResultado(campanhaId: string | null) {
@@ -176,7 +180,7 @@ export function useCampanhaResultado(campanhaId: string | null) {
     staleTime: 30_000,
     queryFn: async () => {
       const rows = await rpc<CampanhaResultado[]>('disparo_campanha_resultado', { p_campanha: campanhaId });
-      return rows[0] ?? { enviados: 0, responderam: 0, chamaram_murillo: 0, fecharam: 0, tempo_1a_resposta_seg: null };
+      return rows[0] ?? { enviados: 0, mensagens: 0, responderam: 0, chamaram_murillo: 0, fecharam: 0, tempo_1a_resposta_seg: null };
     },
   });
 }

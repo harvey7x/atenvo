@@ -331,21 +331,23 @@ export function Disparo() {
     for (const a of alvos) c[a.status] = (c[a.status] ?? 0) + 1;
     return c;
   }, [alvos]);
-  // Métricas do dashboard da campanha aberta (custo, CAC, SLA) — base = enviados do log.
+  // Métricas do dashboard — BASE ÚNICA no log disparo_envios (imune ao re-arme):
+  // enviados = pessoas alcançadas (funil/taxas); mensagens = total de envios (CUSTO).
   const dash = useMemo(() => {
     const r = resultadoQ.data;
-    const enviados = r?.enviados ?? (porStatus.enviado + porStatus.respondido);
-    const responderam = r?.responderam ?? porStatus.respondido;
+    const enviados = r?.enviados ?? 0;
+    const mensagens = r?.mensagens ?? 0;
+    const responderam = r?.responderam ?? 0;
     const murillo = r?.chamaram_murillo ?? 0;
     const fecharam = r?.fecharam ?? 0;
-    const custo = enviados * CUSTO_MSG;
+    const custo = mensagens * CUSTO_MSG;
     return {
-      enviados, responderam, murillo, fecharam, custo,
+      enviados, mensagens, responderam, murillo, fecharam, custo,
       cac: fecharam > 0 ? custo / fecharam : null,
       custoResp: responderam > 0 ? custo / responderam : null,
       sla: r?.tempo_1a_resposta_seg ?? null,
     };
-  }, [resultadoQ.data, porStatus]);
+  }, [resultadoQ.data]);
 
   const criarCampanhaComPublico = async () => {
     if (!canalCloud) { erro('Nenhum canal Cloud API conectado.'); return; }
@@ -836,15 +838,18 @@ export function Disparo() {
           {etapa === 4 && campanha && (
             <>
               <div className="dsp-kpis sobe">
-                <Kpi rotulo="Enviados" valor={porStatus.enviado + porStatus.respondido} />
-                <Kpi rotulo="Pendentes" valor={porStatus.pendente} />
+                <Kpi rotulo="Enviados (pessoas)" valor={dash.enviados} />
+                <Kpi rotulo="Na fila" valor={porStatus.pendente} />
                 <Kpi rotulo="Falhas técnicas" valor={porStatus.falhou + porStatus.pulado} />
                 <Kpi rotulo="Opt-outs" valor={porStatus.optout} />
               </div>
+              <p className="dsp-nota" style={{ margin: '2px 2px 0' }}>
+                <strong>Enviados</strong> = pessoas que já receberam ao menos 1 mensagem (histórico). <strong>Na fila</strong> = pendentes pra enviar/reenviar agora. Custo usa o total de <strong>mensagens</strong> enviadas ({dash.mensagens}).
+              </p>
               <div className="dsp-metricas sobe" style={{ animationDelay: '.02s' }}>
                 <div className="dsp-metrica">
                   <span className="dsp-metrica-n num">{fmtBRL(dash.custo)}</span>
-                  <span className="dsp-metrica-r">custo · {dash.enviados}×R$0,35</span>
+                  <span className="dsp-metrica-r">custo · {dash.mensagens}×R$0,35</span>
                 </div>
                 <div className="dsp-metrica">
                   <span className="dsp-metrica-n num">{dash.cac != null ? fmtBRL(dash.cac) : '—'}</span>
@@ -913,9 +918,9 @@ export function Disparo() {
                     </BotaoPrimario>
                   </div>
                 </div>
-                <div className="dsp-prog" role="progressbar" aria-valuenow={pct(porStatus.enviado + porStatus.respondido, alvos.length)} aria-valuemin={0} aria-valuemax={100}>
-                  <div className="dsp-prog-fill" style={{ width: `${pct(porStatus.enviado + porStatus.respondido, alvos.length)}%` }} />
-                  <span className="dsp-prog-lbl num">{porStatus.enviado + porStatus.respondido}/{alvos.length} enviados · {pct(porStatus.enviado + porStatus.respondido, alvos.length)}%</span>
+                <div className="dsp-prog" role="progressbar" aria-valuenow={pct(alvos.length - porStatus.pendente, alvos.length)} aria-valuemin={0} aria-valuemax={100}>
+                  <div className="dsp-prog-fill" style={{ width: `${pct(alvos.length - porStatus.pendente, alvos.length)}%` }} />
+                  <span className="dsp-prog-lbl num">{porStatus.pendente} na fila de {alvos.length} · {pct(alvos.length - porStatus.pendente, alvos.length)}% processado</span>
                 </div>
                 {resultado && !resultado.dry_run && (
                   <p className="dsp-resultado num" role="status">
