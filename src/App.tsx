@@ -42,7 +42,11 @@ const RelatoriosV2 = lazy(() => import('@/v2/pages/Relatorios'));
 const IntegracoesV2 = lazy(() => import('@/v2/pages/Integracoes'));
 const KanbanV2 = lazy(() => import('@/v2/pages/Kanban'));
 const RemarketingV2 = lazy(() => import('@/v2/pages/Remarketing'));
-const WhatsAppV2 = lazy(() => import('@/v2/pages/WhatsApp'));
+// /whatsapp passa por um gate de viewport: celular → chat mobile (/m); desktop → inbox intocado.
+const GateWhatsApp = lazy(() => import('@/v2/mobile/GateWhatsApp'));
+const MobileShell = lazy(() => import('@/v2/mobile/MobileShell'));
+const ListaConversasMobile = lazy(() => import('@/v2/mobile/ListaConversasMobile'));
+const ConversaMobile = lazy(() => import('@/v2/mobile/ConversaMobile'));
 const ManutencaoV2 = lazy(() => import('@/v2/pages/Manutencao'));
 const VitrineV2 = lazy(() => import('@/v2/pages/Vitrine'));
 const RedefinirSenhaV2 = lazy(() => import('@/v2/pages/RedefinirSenha'));
@@ -70,13 +74,23 @@ const routes: RouteObject[] = [
     children: [
       // troca de senha obrigatória: fora do shell (sem navegação); o guard força vir para cá.
       { path: 'alterar-senha', element: <Lz><AlterarSenhaV2 /></Lz> },
+      // chat MOBILE (/m): fora do shell (sem sidebar/topbar); layout route mantém o inbox
+      // montado (realtime + otimista sobrevivem à navegação lista ↔ conversa).
+      {
+        path: 'm',
+        element: <Lz><MobileShell /></Lz>,
+        children: [
+          { index: true, element: <Lz><ListaConversasMobile /></Lz> },
+          { path: ':conversaId', element: <Lz><ConversaMobile /></Lz> },
+        ],
+      },
       {
         element: <Lz><AppShellV2 /></Lz>,
         children: [
           // Home: entra pelo WhatsApp (entrada do v1) até o Dashboard existir.
           { index: true, element: <Navigate to="/whatsapp" replace /> },
           { path: 'dashboard', element: <Lz><ManutencaoV2 area="Dashboard" /></Lz> },
-          { path: 'whatsapp', element: <Lz><WhatsAppV2 /></Lz> },
+          { path: 'whatsapp', element: <Lz><GateWhatsApp /></Lz> },
           { path: 'facebook', element: <Lz><ManutencaoV2 area="Facebook" /></Lz> },
           { path: 'relacionamento', element: <Lz><ManutencaoV2 area="Relacionamento" /></Lz> },
           { path: 'kanban', element: <Lz><KanbanV2 /></Lz> },
