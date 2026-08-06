@@ -171,9 +171,13 @@ describe('colisões de CSS v1 × v2', () => {
     const waTsx = join(paginasDir, 'WhatsApp.tsx');
     const waCss = join(paginasDir, 'whatsapp.css');
 
-    // classes sempre carregadas no .v2: components/ (importado por Botao/Campo/AudioRecorderV2…)
+    // classes sempre carregadas no .v2: tudo fora de pages/ — tokens.css/base.css
+    // (importados pelo AppShellV2 em toda rota) e components/ (Botao/Campo/AudioRecorderV2…).
+    // Sem base.css aqui, um utilitário global (ex. .num) citado em seletor composto de
+    // outra página vira falso-positivo.
     const compartilhadas = new Set<string>();
-    for (const f of csssEm(join(RAIZ, 'v2', 'components'))) {
+    for (const f of csssEm(join(RAIZ, 'v2'))) {
+      if (f.startsWith(paginasDir)) continue;
       for (const lista of classesDeSeletores(readFileSync(f, 'utf8'))) lista.forEach((c) => compartilhadas.add(c));
     }
     // classes do próprio whatsapp.css (seguras) e das OUTRAS páginas (perigosas se usadas no WA)
