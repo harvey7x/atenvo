@@ -166,6 +166,7 @@ export default function WhatsAppV2() {
   const [transferirAberto, setTransferirAberto] = useState(false);
   const [vincAberto, setVincAberto] = useState(false);
   const [fecharConfirm, setFecharConfirm] = useState(false);
+  const [devolverConfirm, setDevolverConfirm] = useState(false);
   const [cancelarAgId, setCancelarAgId] = useState<string | null>(null); // auditoria: era window.confirm nativo
   const [verErro, setVerErro] = useState<string | null>(null);
   const [removerAlvo, setRemoverAlvo] = useState<WaMessage | null>(null);
@@ -952,7 +953,11 @@ export default function WhatsAppV2() {
               <span className="k">{current.respId ? (current.respId === user?.id ? 'Você' : nomePorId(current.respId) ?? 'Atendente') : 'Sem responsável'}</span>
               <span className="v">
                 {inbox.donoEfetivo
-                  ? <button type="button" className="lk" style={{ background: 'none', border: 'none', color: 'var(--txt-2)', textDecoration: 'underline', cursor: 'pointer', fontSize: 10.5, fontFamily: 'var(--fonte)' }} onClick={inbox.devolver}>Devolver para a fila</button>
+                  /* devolver: só o próprio dono — ou admin/gestor, e sempre com confirmação (um clique
+                     solto aqui derrubava o responsável de outra pessoa em silêncio) */
+                  ? ((inbox.donoEfetivo === user?.id || currentOrg.role !== 'atendente')
+                    ? <button type="button" className="lk" style={{ background: 'none', border: 'none', color: 'var(--txt-2)', textDecoration: 'underline', cursor: 'pointer', fontSize: 10.5, fontFamily: 'var(--fonte)' }} onClick={() => setDevolverConfirm(true)}>Devolver para a fila</button>
+                    : null)
                   : <button type="button" className="lk" style={{ background: 'none', border: 'none', color: 'var(--txt-2)', textDecoration: 'underline', cursor: 'pointer', fontSize: 10.5, fontFamily: 'var(--fonte)' }} onClick={inbox.assumir}>{inbox.atribuindo ? 'Assumindo…' : 'Assumir atendimento'}</button>}
               </span>
             </div>
@@ -1145,6 +1150,16 @@ export default function WhatsAppV2() {
         rotuloConfirmar="Fechar conversa"
         aoConfirmar={() => { setFecharConfirm(false); if (statusFechada) aplicarStatus(statusFechada.id); }}
         aoCancelar={() => setFecharConfirm(false)}
+      />
+      <ConfirmDialogV2
+        aberto={devolverConfirm}
+        titulo="Devolver para a fila"
+        mensagem={inbox.donoEfetivo === user?.id
+          ? 'Você deixará de ser o responsável e a conversa ficará na fila até alguém assumir de novo.'
+          : `${nomePorId(inbox.donoEfetivo ?? '') ?? 'O atendente'} deixará de ser o responsável e a conversa ficará na fila até alguém assumir de novo.`}
+        rotuloConfirmar="Devolver"
+        aoConfirmar={() => { setDevolverConfirm(false); void inbox.devolver(); }}
+        aoCancelar={() => setDevolverConfirm(false)}
       />
       <ConfirmDialogV2
         aberto={verErro !== null}
