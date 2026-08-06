@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { WA_REAL, mascararNumero, urlAssinadaMidiaWa, urlDownloadMidiaWa, waRecarregarAudio, waValidarNumero, waVincularNumero, useWaAtividades, useMensagensAgendadas, useAgendarSequencia, useEditarAgendamento, useCancelarAgendamento, normalizeWaPhone } from '@/data/whatsapp';
-import { nomeArquivoMidia, rotuloBaixarMidia } from '@/data/midiaNome';
+import { WA_REAL, mascararNumero, waRecarregarAudio, waValidarNumero, waVincularNumero, useWaAtividades, useMensagensAgendadas, useAgendarSequencia, useEditarAgendamento, useCancelarAgendamento, normalizeWaPhone } from '@/data/whatsapp';
 import type { WaContact, WaMessage } from '@/data/whatsappDemo';
 import { useStatusDefs, useEtiquetas, useOrgUsuarios, useAssinaturaPref, useAtendimentoActions } from '@/data/atendimento';
 import { useScripts, useScriptEtapaCounts, useScriptCategorias, traduzErroEnvio, aguardarConfirmacaoEnvio, type Script } from '@/data/scripts';
@@ -15,9 +14,8 @@ import { useChecklist } from '@/data/checklist';
 import { useCobrancas } from '@/data/cobrancas';
 import { corDaEtiqueta, podeGerenciarAtendimento, type AssinaturaModo } from '@/types/atendimento';
 import { textoBloqueio, analisarNome, conversaAtiva } from '@/lib/higieneConversa';
-import { responsavelEfetivo, situacaoDaConversa, type ConversaEtiquetaInput } from '@/lib/conversaEtiquetas';
+import { responsavelEfetivo } from '@/lib/conversaEtiquetas';
 import { construirItensConversa } from '@/lib/dataConversa';
-import { formatarNomeCliente } from '@/lib/nomeCliente';
 import { canalValidoParaEnvio } from '@/lib/agendamentoMensagem';
 import { initials } from '@/lib/avatar';
 import { useAuth } from '@/context/AuthContext';
@@ -31,6 +29,8 @@ import { AudioRecorderV2 } from '../components/AudioRecorderV2';
 import { AgendarMensagemModalV2 } from './AgendarMensagemModalV2';
 import { CLASSE_RAIZ_PORTAL } from '../components/portal';
 import { BotaoMini, BotaoPrimario, BotaoSec, ConfirmDialogV2, EstadoErro, ModalV2, Skeleton } from '../components';
+import { Bolha, Ic, IcDoc } from '../components/BolhaWa';
+import { corDaSituacao, nomeExibicao, situacaoDe, tierEspera } from '../lib/waUi';
 import { seedWa } from './whatsappSeed';
 import './whatsapp.css';
 
@@ -55,9 +55,6 @@ const TABS = [
 type TabId = typeof TABS[number][0];
 const ASSINA_OPCOES = [['sem', 'Sem assinatura'], ['atendente', 'Nome do atendente'], ['empresa', 'Nome da empresa'], ['personalizado', 'Nome personalizado']] as const;
 
-const Ic = ({ children, fill }: { children: ReactNode; fill?: boolean }) => (
-  <svg viewBox="0 0 24 24" fill={fill ? 'currentColor' : 'none'} stroke={fill ? 'none' : 'currentColor'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>{children}</svg>
-);
 const IcWa = () => <Ic><path d="M21 11.5a8.4 8.4 0 01-9 8.4 8.9 8.9 0 01-3.8-.8L3 20l1-4.9a8.3 8.3 0 01-1-4A8.4 8.4 0 0112 3a8.4 8.4 0 019 8.5z" /></Ic>;
 const IcBusca = () => <Ic><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></Ic>;
 const IcMais = () => <Ic><path d="M12 5v14M5 12h14" /></Ic>;
@@ -65,53 +62,11 @@ const IcFunil = () => <Ic><path d="M3 5h18l-7 8v5l-4 2v-7z" /></Ic>;
 const IcDots = () => <Ic fill><circle cx="12" cy="5" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="12" cy="19" r="1.5" /></Ic>;
 const IcImg = () => <Ic><rect x="3" y="4" width="18" height="16" rx="2.5" /><circle cx="9" cy="10" r="1.6" /><path d="m5 18 5-5 3 3 3-3 3 3" /></Ic>;
 const IcVideo = () => <Ic><rect x="3" y="6" width="13" height="12" rx="2.5" /><path d="m16 10 5-3v10l-5-3z" /></Ic>;
-const IcDoc = () => <Ic><path d="M13 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9z" /><path d="M13 3v6h6" /></Ic>;
-const IcDownload = () => <Ic><path d="M12 3v12" /><path d="m7 11 5 5 5-5" /><path d="M5 21h14" /></Ic>;
 const IcClock = () => <Ic><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></Ic>;
 const IcSend = () => <Ic><path d="M4 12l16-8-6 16-2.5-6.5z" /></Ic>;
 const IcContato = () => <Ic><circle cx="10" cy="8" r="3.2" /><path d="M4.5 19.5c.7-3 2.8-4.6 5.5-4.6s4.8 1.6 5.5 4.6" /><path d="M17.5 7.5h4.5" /><path d="M19.75 5.25v4.5" /></Ic>;
-const IcTel = () => <Ic><path d="M5 4h4l2 5-2.5 1.5a12 12 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2" /></Ic>;
 const IcCopy = () => <Ic><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></Ic>;
-const IcReply = () => <Ic><path d="M9 14 4 9l5-5" /><path d="M4 9h11a5 5 0 0 1 5 5v6" /></Ic>;
-const IcPlay = () => <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M8 5.5v13l11-6.5z" /></svg>;
 const IcFoco = () => <Ic><path d="M4 9V5a1 1 0 0 1 1-1h4M15 4h4a1 1 0 0 1 1 1v4M20 15v4a1 1 0 0 1-1 1h-4M9 20H5a1 1 0 0 1-1-1v-4" /></Ic>;
-
-const ackOf = (status?: string): { s: string; cls: string; title: string } | null =>
-  status === 'lida' ? { s: '✓✓', cls: 'lida', title: 'Lida' }
-  : status === 'entregue' ? { s: '✓✓', cls: 'entregue', title: 'Entregue' }
-  : status === 'enviada' ? { s: '✓', cls: 'enviada', title: 'Enviada' }
-  : status === 'pendente' ? { s: '🕗', cls: 'pendente', title: 'Pendente' }
-  : status === 'falhou' ? { s: '!', cls: 'falhou', title: 'Falhou' }
-  : null;
-
-/** Tamanho de arquivo adaptativo B/KB/MB (paridade v1 L136): evita '0.0 MB' para poucos KB. */
-const fmtTam = (b?: number | null): string =>
-  !b ? '' : b < 1024 ? b + ' B' : b < 1_048_576 ? (b / 1024).toFixed(0) + ' KB' : (b / 1_048_576).toFixed(1) + ' MB';
-
-/** Tiers da barra lateral de espera (v1 L75-89): <30min neutro · 30min–2h âmbar · 2–24h vermelho · ≥24h crítico. */
-function tierEspera(aguardandoDesde: string | null | undefined, agoraMs: number): { tier: string; label: string } | null {
-  if (!aguardandoDesde) return null;
-  const min = Math.floor((agoraMs - new Date(aguardandoDesde).getTime()) / 60_000);
-  if (!Number.isFinite(min) || min < 0) return null;
-  const label = min < 1 ? 'Aguardando agora' : min < 60 ? `Aguardando há ${min} min` : min < 1440 ? `Aguardando há ${Math.floor(min / 60)} h` : `Aguardando há ${Math.floor(min / 1440)} d`;
-  const tier = min < 30 ? 'neutro' : min < 120 ? 'ambar' : min < 1440 ? 'vermelho' : 'critico';
-  return { tier, label };
-}
-const nomeVazio = (n: string | undefined) => !n?.trim() || /^[\d\s()+\-]+$/.test(n ?? '');
-const nomeExibicao = (c: WaContact) => (nomeVazio(c.name) ? (c.phone ? mascararNumero(c.phone) : 'Cliente sem nome') : formatarNomeCliente(c.name));
-/** Situação derivada (v1: sempre há um chip — LEAD NOVO / EM ATENDIMENTO / AGUARDANDO / FECHADO / etapa). */
-const entradaEtiqueta = (c: WaContact): ConversaEtiquetaInput => ({
-  atendenteId: c.atendenteId, respId: c.respId, oppRespId: c.oppRespId, etapa: c.etapa, etapaEntrada: c.etapaEntrada,
-  oppStatus: c.oppStatus ?? undefined, aguardando: c.aguardando, canalAtual: c.canalAtual,
-});
-const situacaoDe = (c: WaContact) => situacaoDaConversa(entradaEtiqueta(c));
-/** Cor da coluna do Kanban só quando o texto exibido É o nome da etapa avançada (v1 corDaEtapa). */
-const corDaSituacao = (c: WaContact, texto: string): string | null => {
-  const nomeCol = (c.etapa ?? '').trim().toLocaleUpperCase('pt-BR');
-  return c.etapaCor && nomeCol && texto === nomeCol ? c.etapaCor : null;
-};
-const mmss = (s: number | null | undefined) => (s == null ? '' : `${Math.floor(s / 60)}:${('0' + Math.floor(s % 60)).slice(-2)}`);
-const ONDA = [6, 11, 15, 9, 13, 17, 11, 7, 14, 10, 16, 8, 12, 6, 10, 15];
 
 type Pop = { kind: 'filtro' | 'acoes' | 'status' | 'tags' | 'scripts'; x: number; y: number; acima?: boolean } | null;
 
@@ -1291,217 +1246,6 @@ export default function WhatsAppV2() {
           <img src={lightbox} alt="Imagem ampliada" style={{ maxWidth: '86vw', maxHeight: '86vh', borderRadius: 10 }} />
         </div>
       )}
-    </div>
-  );
-}
-
-/* ================================================================
-   Bolha de mensagem — .rec/.env2 do mockup com o conteúdo da v1:
-   selo do bot (origemBot → "◈ Matheo"), áudio com onda + .transc,
-   imagem/vídeo/documento, quoted, ticks, falha, responder.
-   ================================================================ */
-function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, optout, aoResponder, aoVerErro, aoRetry, aoRemover, aoLightbox, aoRecarregarAudio }: {
-  m: WaMessage; demo: boolean; nomeCliente: string; retryId: string | null; removendoId: string | null; semDestino: boolean; optout: boolean;
-  aoResponder: (m: WaMessage) => void; aoVerErro: (m: WaMessage) => void; aoRetry: (m: WaMessage) => void;
-  aoRemover: (m: WaMessage) => void; aoLightbox: (url: string) => void; aoRecarregarAudio: (m: WaMessage) => void;
-}) {
-  const [url, setUrl] = useState<string | null>(null);
-  const [urlErro, setUrlErro] = useState(false);
-  // v1: imagem/vídeo resolvem a URL assinada eager; ÁUDIO só no play (AudioBolha) — não emitir N signed-URLs por abertura de conversa
-  const precisaUrl = !demo && !!m.anexoPath && ['imagem', 'video'].includes(m.tipo ?? '');
-  useEffect(() => {
-    let vivo = true;
-    setUrl(null); setUrlErro(false);
-    if (precisaUrl && m.anexoPath) {
-      urlAssinadaMidiaWa(m.anexoPath).then((u) => { if (vivo) setUrl(u); }).catch(() => { if (vivo) setUrlErro(true); });
-    }
-    return () => { vivo = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [m.anexoPath]);
-  // enquanto a URL assinada não resolveu (anexo presente) é CARREGANDO, não "indisponível" (v1 não pisca)
-  const carregandoMidia = precisaUrl && !url && !urlErro;
-  const ack = m.dir === 'out' ? ackOf(m.status) : null;
-  const falhou = m.dir === 'out' && m.status === 'falhou';   // só saída falha (v1); inbound nunca é "não enviado"
-
-  // Baixar a mídia recebida/enviada com o nome/extensão corretos (URL assinada curta com Content-Disposition).
-  // Ícone sobreposto à imagem/vídeo (canto inf. direito) e ao lado do player de áudio — reusa a lógica do v1.
-  async function baixarMidia() {
-    if (demo || !m.anexoPath) return;
-    const nome = nomeArquivoMidia(m);
-    try {
-      const u = await urlDownloadMidiaWa(m.anexoPath, nome);
-      const a = document.createElement('a');
-      a.href = u; a.download = nome; a.rel = 'noopener';
-      document.body.appendChild(a); a.click(); a.remove();
-    } catch { /* falha silenciosa: bucket privado pode negar; o usuário pode tentar de novo */ }
-  }
-  const btnBaixar = (!demo && m.anexoPath && !falhou) ? (
-    <button type="button" className="midia-dl" title={rotuloBaixarMidia(m.tipo)} aria-label={rotuloBaixarMidia(m.tipo)} onClick={baixarMidia}>
-      <IcDownload />
-    </button>
-  ) : null;
-
-  const falhaActs = falhou && (
-    <div className="msg-falha-acts">
-      <button type="button" className="lnk" onClick={() => aoVerErro(m)}>Ver erro</button>·
-      <button type="button" className="lnk" disabled={!m.id || retryId === m.id || semDestino || optout} title={semDestino ? 'Vincule um número confirmado para responder.' : undefined} onClick={() => aoRetry(m)}>
-        {retryId === m.id ? 'Reenviando…' : 'Tentar novamente'}
-      </button>·
-      <button type="button" className="lnk" disabled={!m.id || removendoId === m.id} onClick={() => aoRemover(m)}>{removendoId === m.id ? 'Removendo…' : 'Remover'}</button>
-    </div>
-  );
-
-  return (
-    <div className={'bolha ' + (m.dir === 'out' ? 'env2' : 'rec') + (falhou ? ' falha' : '')}>
-      {m.id && !semDestino && (
-        <button type="button" className="resp-btn" title="Responder" aria-label="Responder" onClick={() => aoResponder(m)}><IcReply /></button>
-      )}
-      {m.origemBot && <div className="bt-tag">◈ Matheo</div>}
-      {m.quoted && (
-        <div className="mq">
-          <div className="rem">{m.quoted.remetente || (m.dir === 'out' ? 'Você' : nomeCliente)}</div>
-          <div className="tt">{m.quoted.texto || (m.quoted.tipo === 'audio' ? 'Mensagem de voz' : m.quoted.tipo === 'imagem' ? 'Imagem' : m.quoted.tipo === 'video' ? 'Vídeo' : 'Documento')}</div>
-        </div>
-      )}
-      {m.tipo === 'imagem' && (
-        (url || demo)
-          ? <>
-              {url ? <div className="m-media"><img className="m-img" loading="lazy" src={url} alt="Imagem" title="Ampliar" onClick={() => aoLightbox(url)} />{btnBaixar}</div> : <div className="audio-ind">Imagem de demonstração</div>}
-              {m.text && <div className="m-cap"><WaTexto texto={m.text} /></div>}
-            </>
-          : carregandoMidia ? <div className="audio-ind">Carregando imagem…</div>
-          : <div className="audio-ind">Imagem indisponível</div>  /* só quando anexo ausente ou URL falhou — nunca durante a carga */
-      )}
-      {m.tipo === 'video' && (
-        url
-          ? <>
-              <div className="m-media"><video className="m-video" src={url} controls preload="metadata" />{btnBaixar}</div>
-              {m.text && <div className="m-cap"><WaTexto texto={m.text} /></div>}
-            </>
-          : demo ? <div className="audio-ind">Vídeo de demonstração</div>
-          : carregandoMidia ? <div className="audio-ind">Carregando vídeo…</div>
-          : <div className="audio-ind">Vídeo indisponível</div>
-      )}
-      {m.tipo === 'audio' && (
-        falhou
-          ? <div className="audio-ind">Áudio não enviado</div>  /* saída que falhou não vira player tocável (v1) */
-          : m.midiaPendente
-          ? <div className="audio-ind">Áudio indisponível — <button type="button" className="lnk" onClick={() => aoRecarregarAudio(m)}>tentar carregar novamente</button></div>
-          : <AudioBolha anexoPath={demo ? null : m.anexoPath ?? null} segundos={(m as WaMessage & { seconds?: number }).seconds ?? null} demo={demo} acaoNode={btnBaixar} />
-      )}
-      {m.tipo === 'documento' && (
-        <div className="doc2">
-          <span className="ic"><IcDoc /></span>
-          <span className="inf">
-            <span className="nm">{m.nome || 'documento'}</span>
-            <span className="mt num">{(m.nome?.split('.').pop() || '').toUpperCase() || 'Arquivo'}{m.tamanho ? ' · ' + fmtTam(m.tamanho) : ''}</span>
-            {!demo && m.anexoPath && (
-              <span className="acts">
-                <button type="button" className="lnk" onClick={async () => { const u = await urlDownloadMidiaWa(m.anexoPath!, nomeArquivoMidia(m)); window.location.assign(u); }}>Baixar</button>
-                <button type="button" className="lnk" title="Abrir em nova aba" onClick={async () => { const u = await urlAssinadaMidiaWa(m.anexoPath!); window.open(u, '_blank', 'noopener'); }}>Abrir</button>
-              </span>
-            )}
-          </span>
-        </div>
-      )}
-      {m.pdf && (
-        <div className="doc2"><span className="ic"><IcDoc /></span><span className="inf"><span className="nm">{m.pdf.name}</span><span className="mt">{m.pdf.meta}</span></span></div>
-      )}
-      {/* cartão de contato compartilhado: desenha o cartão (o texto "📇 …" é só fallback) */}
-      {m.contato && (
-        <div className="ct-card">
-          <span className="ct-av" aria-hidden>{initials(m.contato.nome)}</span>
-          <span className="ct-inf">
-            <span className="ct-nm">{m.contato.nome}</span>
-            <span className="ct-tel num">+{m.contato.telefone}</span>
-          </span>
-        </div>
-      )}
-      {(m.tipo === 'texto' || (!m.tipo && m.text)) && m.text && !m.contato && <WaTexto texto={m.text} />}
-      {m.transcricao && <div className="transc">“{m.transcricao}”</div>}
-      {falhaActs}
-      <div className="hh num">
-        {m.viaTelefone && <span className="fone-tag" title="Enviada pelo celular"><IcTel />Enviada pelo celular</span>}
-        {m.time}
-        {ack && <span className={'tick ' + ack.cls} title={ack.cls === 'falhou' ? traduzErroEnvio(m.erro ?? '') : ack.title}>{ack.s}</span>}
-      </div>
-    </div>
-  );
-}
-
-/** *negrito* + links, sem HTML bruto (equivalente ao WhatsAppText do v1). */
-function WaTexto({ texto }: { texto: string }) {
-  const partes = useMemo(() => {
-    const out: ReactNode[] = [];
-    const re = /(\*[^*\s][^*]*[^*\s]\*|\*[^*\s]\*|https?:\/\/\S+|www\.\S+)/g;
-    let i = 0, k = 0, m: RegExpExecArray | null;
-    while ((m = re.exec(texto))) {
-      if (m.index > i) out.push(texto.slice(i, m.index));
-      const t = m[0];
-      if (t.startsWith('*')) out.push(<strong key={k++}>{t.slice(1, -1)}</strong>);
-      else out.push(<a key={k++} className="wa-link" href={t.startsWith('www.') ? 'https://' + t : t} target="_blank" rel="noopener noreferrer nofollow">{t}</a>);
-      i = m.index + t.length;
-    }
-    if (i < texto.length) out.push(texto.slice(i));
-    return out;
-  }, [texto]);
-  return <span className="wa-fmt">{partes}</span>;
-}
-
-/** Player de áudio na pele do mockup (.audio2). A URL assinada é resolvida SÓ no play (v1: preload none),
-    para não emitir uma rajada de signed-URLs por abertura de conversa. */
-function AudioBolha({ anexoPath, segundos, demo, acaoNode }: { anexoPath: string | null; segundos: number | null; demo: boolean; acaoNode?: ReactNode }) {
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [tocando, setTocando] = useState(false);
-  const [carregando, setCarregando] = useState(false);
-  const [pos, setPos] = useState(0);
-  const [durS, setDurS] = useState(segundos ?? 0);
-  const [rate, setRate] = useState(1);
-  useEffect(() => () => { audioRef.current?.pause(); }, []);
-  const montarAudio = (src: string) => {
-    const a = new Audio(src);
-    a.addEventListener('timeupdate', () => setPos(a.currentTime));
-    a.addEventListener('loadedmetadata', () => { if (Number.isFinite(a.duration)) setDurS(a.duration); });
-    a.addEventListener('ended', () => { setTocando(false); setPos(0); });
-    audioRef.current = a;
-    return a;
-  };
-  const toggle = async () => {
-    if (tocando) { audioRef.current?.pause(); setTocando(false); return; }
-    let a = audioRef.current;
-    if (!a) {
-      if (demo || !anexoPath) return;                    // demo: sem áudio real
-      setCarregando(true);
-      try { a = montarAudio(await urlAssinadaMidiaWa(anexoPath)); }   // signed-URL SÓ agora
-      catch { setCarregando(false); return; }
-      setCarregando(false);
-    }
-    a.playbackRate = rate;
-    a.play().catch(() => setTocando(false));
-    setTocando(true);
-  };
-  const prog = durS > 0 ? pos / durS : 0;
-  return (
-    <div className="audio2">
-      <button type="button" className="play" title={demo ? 'Áudio de demonstração' : carregando ? 'Carregando…' : tocando ? 'Pausar' : 'Reproduzir'} onClick={toggle} disabled={demo || carregando}>
-        {tocando ? <svg viewBox="0 0 24 24" fill="currentColor" width="10" height="10" aria-hidden><path d="M7 5h3v14H7zM14 5h3v14h-3z" /></svg> : <IcPlay />}
-      </button>
-      <div className="onda" onClick={(e) => {
-        if (!audioRef.current || durS <= 0) return;
-        const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-        const p = (e.clientX - r.left) / r.width;
-        audioRef.current.currentTime = p * durS;
-        setPos(p * durS);
-      }}>
-        {ONDA.map((h, i) => <i key={i} className={i / ONDA.length <= prog && prog > 0 ? 'done' : ''} style={{ height: h }} />)}
-      </div>
-      <span className="dur num">{tocando || pos > 0 ? mmss(pos) + ' / ' : ''}{mmss(durS) || '·'}</span>
-      <button type="button" className="rate num" title="Velocidade" onClick={() => {
-        const nx = rate === 1 ? 1.5 : rate === 1.5 ? 2 : 1;
-        setRate(nx);
-        if (audioRef.current) audioRef.current.playbackRate = nx;
-      }}>{rate}x</button>
-      {acaoNode}
     </div>
   );
 }
