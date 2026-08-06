@@ -1868,11 +1868,18 @@ function VincularModal({ telInicial, conversaId, canalId, demo, aoFechar, aoVinc
   );
 }
 
+/* Cartão PADRÃO do atendimento — é o único que a casa compartilha hoje. Mesmo nome/número
+   que o bot do fluxo de crédito manda (bot-runner CARD_ATENDIMENTO_NOME / CARD_MURILLO):
+   o cliente vê o MESMO contato, venha do bot ou do atendente. Mudar aqui e lá junto. */
+const CONTATO_PADRAO = { nome: 'CAF Atendimento', telefone: '555191035329' };
+
 /* ================================================================
-   Compartilhar contato (vCard) — picker do composer. Fontes: EQUIPE
-   (usuarios.telefone, preenchido em Configurações › Perfil), CONVERSAS
-   já carregadas no inbox, e número avulso digitado na hora. O envio é
-   nativo nos dois transportes (Evolution sendContact / Cloud contacts).
+   Compartilhar contato (vCard) — picker do composer. O cartão PADRÃO
+   fica fixo no topo e é o que o botão principal envia (1 clique, sem
+   busca). Demais fontes: EQUIPE (usuarios.telefone, preenchido em
+   Configurações › Perfil), CONVERSAS já carregadas no inbox, e número
+   avulso digitado na hora. O envio é nativo nos dois transportes
+   (Evolution sendContact / Cloud contacts).
    ================================================================ */
 function CompartilharContatoModal({ equipe, conversas, aoFechar, aoEnviar }: {
   equipe: { nome: string; telefone: string }[];
@@ -1887,10 +1894,13 @@ function CompartilharContatoModal({ equipe, conversas, aoFechar, aoEnviar }: {
   const q = busca.trim().toLowerCase();
   const filtra = (l: { nome: string; telefone: string }[]) =>
     q ? l.filter((x) => x.nome.toLowerCase().includes(q) || (q.replace(/\D+/g, '') && x.telefone.includes(q.replace(/\D+/g, '')))) : l;
-  const eq = filtra(equipe);
-  const cv = filtra(conversas).slice(0, 30);
+  // O padrão nunca é filtrado pela busca (é o atalho da casa) e some das outras listas p/ não duplicar.
+  const semPadrao = (l: { nome: string; telefone: string }[]) => l.filter((x) => x.telefone !== CONTATO_PADRAO.telefone);
+  const eq = filtra(semPadrao(equipe));
+  const cv = filtra(semPadrao(conversas)).slice(0, 30);
   const telAvulsoDig = telAvulso.replace(/\D+/g, '');
   const avulsoOk = nomeAvulso.trim().length > 1 && telAvulsoDig.length >= 10;
+  const avulsoTocado = nomeAvulso.trim().length > 0 || telAvulsoDig.length > 0;
   const enviar = async (nome: string, telefone: string) => {
     if (busy) return;
     setBusy(true);
@@ -1904,12 +1914,25 @@ function CompartilharContatoModal({ equipe, conversas, aoFechar, aoEnviar }: {
       largura={460}
       rodape={<>
         <BotaoSec mini disabled={busy} onClick={aoFechar}>Voltar</BotaoSec>
-        <BotaoPrimario mini disabled={!avulsoOk || busy} onClick={() => enviar(nomeAvulso.trim(), telAvulsoDig)}>
-          {busy ? 'Enviando…' : 'Enviar contato'}
+        {/* Botão principal = cartão PADRÃO enquanto ninguém digitar um contato avulso. Se o
+            atendente começou a digitar, ele fica travado até o avulso estar completo — nunca
+            envia o padrão "por engano" no lugar do que a pessoa estava escrevendo. */}
+        <BotaoPrimario mini disabled={busy || (avulsoTocado && !avulsoOk)}
+          onClick={() => (avulsoOk ? enviar(nomeAvulso.trim(), telAvulsoDig) : enviar(CONTATO_PADRAO.nome, CONTATO_PADRAO.telefone))}>
+          {busy ? 'Enviando…' : avulsoOk ? 'Enviar contato' : `Enviar ${CONTATO_PADRAO.nome}`}
         </BotaoPrimario>
       </>}
     >
       <p className="p-modal-msg">O cliente recebe como cartão de contato nativo do WhatsApp, pronto para salvar.</p>
+      <div className="ctp-sec">Padrão do atendimento</div>
+      <div className="ctp-item ctp-padrao">
+        <span className="ct-av" aria-hidden>{initials(CONTATO_PADRAO.nome)}</span>
+        <span className="ct-inf">
+          <span className="ct-nm">{CONTATO_PADRAO.nome}</span>
+          <span className="ct-tel num">+{CONTATO_PADRAO.telefone}</span>
+        </span>
+        <BotaoMini disabled={busy} onClick={() => enviar(CONTATO_PADRAO.nome, CONTATO_PADRAO.telefone)}>Enviar</BotaoMini>
+      </div>
       <input className="inp" placeholder="Buscar por nome ou número…" value={busca} onChange={(e) => setBusca(e.target.value)} />
       <div className="ctp-lista">
         {eq.length > 0 && <div className="ctp-sec">Equipe</div>}

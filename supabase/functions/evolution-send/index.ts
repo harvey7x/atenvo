@@ -332,7 +332,7 @@ Deno.serve(async (req) => {
       const nowIso = new Date().toISOString();
       let sent: { key?: { id?: string } };
       try {
-        sent = await tx.sendContact(alvo, nomeCt, telCt);
+        sent = await tx.sendContato(alvo, nomeCt, telCt, quoted);
       } catch (err) {
         const emsg = (err as Error).message || 'Falha ao enviar o contato.';
         console.error(`[send] corr=${corr} CONTATO erro provider:`, emsg);
@@ -340,9 +340,9 @@ Deno.serve(async (req) => {
         else await admin.from('mensagens').insert({
           conversa_id, organizacao_id: conv.organizacao_id, direcao: 'saida', tipo: 'texto',
           conteudo: conteudoCartao, origem: 'atenvo', autor_id: autorId,
-          status: 'falhou', erro_envio: emsg.slice(0, 200), metadados: metaContato,
+          status: 'falhou', erro_envio: emsg.slice(0, 200), metadados: metaContato, ...respostaCols,
         });
-        return json({ error: 'O WhatsApp não confirmou o envio do contato. Tente novamente.' }, 502);
+        return json({ error: emsg.slice(0, 200) || 'O WhatsApp não confirmou o envio do contato. Tente novamente.' }, 502);
       }
       const idExternoCt = sent?.key?.id ?? null;
       if (!idExternoCt) {
@@ -350,7 +350,7 @@ Deno.serve(async (req) => {
         else await admin.from('mensagens').insert({
           conversa_id, organizacao_id: conv.organizacao_id, direcao: 'saida', tipo: 'texto',
           conteudo: conteudoCartao, origem: 'atenvo', autor_id: autorId,
-          status: 'falhou', erro_envio: 'sem_id_externo', metadados: metaContato,
+          status: 'falhou', erro_envio: 'sem_id_externo', metadados: metaContato, ...respostaCols,
         });
         console.log(`[send] corr=${corr} CONTATO sem id_externo -> falhou`);
         return json({ error: 'O envio do contato não foi confirmado.' }, 502);
@@ -365,7 +365,7 @@ Deno.serve(async (req) => {
         const { data } = await admin.from('mensagens').insert({
           conversa_id, organizacao_id: conv.organizacao_id, direcao: 'saida', tipo: 'texto',
           conteudo: conteudoCartao, origem: 'atenvo', autor_id: autorId,
-          id_externo: idExternoCt, status: 'enviada', enviada_em: nowIso, metadados: metaContato,
+          id_externo: idExternoCt, status: 'enviada', enviada_em: nowIso, metadados: metaContato, ...respostaCols,
         }).select('id, conteudo, enviada_em, direcao, status').single();
         msgCt = data;
       }
@@ -422,7 +422,7 @@ Deno.serve(async (req) => {
           try { console.log(JSON.stringify({ stage: 'audio_send', corr, origem_audio: gravacaoPainel ? 'gravacao_painel' : 'arquivo_anexado', container_real: containerReal(bytes), mime_declarado: mime, bytes: bytes.length, endpoint: usaPtt ? 'sendWhatsAppAudio(ptt)' : 'sendMedia(file)' })); } catch { /* ignore */ }
           if (usaPtt) {
             try {
-              sent = await tx.sendWhatsAppAudio(alvo, b64, quoted);            // voz/PTT (encoding:true -> ogg/opus)
+              sent = await tx.sendWhatsAppAudio(alvo, b64, quoted, mime);      // Cloud: mime real (ogg=PTT, resto=áudio comum); Evolution: transcodifica
             } catch (e) {
               const em = String((e as Error)?.message ?? '').toLowerCase();
               // NUNCA envia gravação como arquivo comum silenciosamente: erro claro (Safari/mp4 recusado etc.).
