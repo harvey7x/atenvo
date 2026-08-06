@@ -8,7 +8,12 @@
    ============================================================ */
 
 .v2.m-app {
+  /* cascata de altura: 100vh = fallback p/ iOS < 15.4 (sem dvh o app cresceria e o
+     composer cairia FORA da tela); 100dvh = navegadores atuais; --m-alt = altura
+     REAL visível espelhada do visualViewport (teclado do iOS, ver MobileShell). */
+  height: 100vh;
   height: 100dvh;
+  height: var(--m-alt, 100dvh);
   display: flex;
   flex-direction: column;
   overflow: hidden;

@@ -29,6 +29,28 @@ export default function MobileShell() {
   // fora do AppShellV2 ninguém aplica o tema salvo do usuário — sem isto o mobile fica sempre dark
   useEffect(() => { aplicarTema(lerTema(user?.id)); }, [user?.id]);
 
+  // iOS/Safari: o teclado NÃO encolhe o layout viewport (interactive-widget é
+  // Chromium-only) — espelha a altura REAL visível (visualViewport) em --m-alt e
+  // desfaz o "pan" automático do WebKit, para o composer ficar acima do teclado.
+  // No Chrome/Android o viewport já encolhe sozinho e --m-alt ≈ 100dvh (inócuo).
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const raiz = document.documentElement;
+    const aplica = () => {
+      raiz.style.setProperty('--m-alt', vv.height + 'px');
+      window.scrollTo(0, 0);
+    };
+    aplica();
+    vv.addEventListener('resize', aplica);
+    vv.addEventListener('scroll', aplica);
+    return () => {
+      vv.removeEventListener('resize', aplica);
+      vv.removeEventListener('scroll', aplica);
+      raiz.style.removeProperty('--m-alt');
+    };
+  }, []);
+
   const [aviso, setAviso] = useState<AvisoInbox | null>(null);
   const avisoTimer = useRef(0);
   const aoAvisar = useCallback((a: AvisoInbox) => {

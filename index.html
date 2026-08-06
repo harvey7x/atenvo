@@ -9,6 +9,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
     <meta name="theme-color" content="#0A0B0D" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <!-- iPhone: "Adicionar à Tela de Início" abre em tela cheia mesmo em iOS antigo
+         (que ignora o display do manifest); status bar translúcida sobre o fundo escuro. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Atenvo" />
     <title>Atenvo — Plataforma de Atendimento e Gestão</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
