@@ -11,12 +11,32 @@ import { ConfigError } from '@/pages/ConfigError';
 import { isMisconfigured, isDemoMode } from '@/lib/supabase';
 import { resolverEAplicarPerf } from './v2/lib/perf';
 import { tentarRecarga } from '@/lib/recargaChunk';
+import { registerSW } from 'virtual:pwa-register';
 
 // Deploy novo invalida os chunks antigos; se o preload de uma dependência falhar,
 // recarrega a página (1x/min — guarda em recargaChunk.ts) para buscar o index novo.
+// NÃO remover: é a 2ª metade do mecanismo de atualização do PWA (SW novo purga o
+// precache antigo → chunk velho 404 → este guard recarrega e pega o index novo).
 if (typeof window !== 'undefined') {
   window.addEventListener('vite:preloadError', (evento) => {
     if (tentarRecarga()) evento.preventDefault();
+  });
+}
+
+// PWA: service worker com atualização automática (skipWaiting+clientsClaim no build).
+// Abas de atendimento ficam abertas o dia todo — checa update de hora em hora.
+if ('serviceWorker' in navigator) {
+  registerSW({
+    immediate: true,
+    // SEM reload forçado no update: sem este callback, o client do plugin executa
+    // window.location.reload() em TODAS as abas abertas assim que o SW novo ativa —
+    // rascunho digitado, conversa aberta e filtros iriam embora a cada deploy.
+    // O SW novo já assumiu o controle; a página troca de versão na próxima
+    // navegação/reabertura, e o guard vite:preloadError cobre chunk velho que 404e.
+    onNeedReload() { /* deliberadamente vazio */ },
+    onRegisteredSW(_url, reg) {
+      if (reg) setInterval(() => { reg.update().catch(() => { /* offline: tenta na próxima */ }); }, 60 * 60 * 1000);
+    },
   });
 }
 

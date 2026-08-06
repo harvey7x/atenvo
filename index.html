@@ -3,7 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover: habilita env(safe-area-inset-*) no app instalado (standalone);
+         interactive-widget=resizes-content: o teclado do Android ENCOLHE o viewport em vez
+         de cobrir o campo de digitação (Chrome ≥108). Desktop ignora os dois. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
+    <meta name="theme-color" content="#0A0B0D" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <title>Atenvo — Plataforma de Atendimento e Gestão</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
