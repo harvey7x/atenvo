@@ -918,9 +918,8 @@ export default function WhatsAppV2() {
           )}
 
           <div className="ctx-b spot">
-            <div className="ctx-t">Etiquetas <button type="button" className="lk" onClick={(e) => abrirPop('tags', e)}>+</button></div>
+            <div className="ctx-t">Etiquetas</div>
             <div className="ctx-tags">
-              {current.tags.length === 0 && <span className="ctx-nota">Nenhuma etiqueta</span>}
               {current.tags.map((t) => {
                 const cor = corDaEtiqueta(t, etiquetasQ.data);
                 return (
@@ -930,6 +929,9 @@ export default function WhatsAppV2() {
                   </span>
                 );
               })}
+              <button type="button" className="etq-add" onClick={(e) => abrirPop('tags', e)}>
+                ＋ {current.tags.length === 0 ? 'Adicionar etiqueta' : 'Etiqueta'}
+              </button>
             </div>
           </div>
 
