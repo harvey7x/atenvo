@@ -299,6 +299,104 @@
 }
 
 /* ============================================================
+   v3 — REDESENHO: painel de KPIs, barra de ordenação/Foco, cabeçalho
+   de coluna em 2 leituras, card compacto com criticidade em camadas,
+   drawer de detalhe. Só apresentação — lógica intacta.
+   ============================================================ */
+
+/* ---- Painel de KPIs (saúde do funil) ---- */
+.v2 .kb-kpis { flex-shrink: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 9px; margin: 0 0 11px; }
+.v2 .kb-kpi {
+  position: relative; overflow: hidden; text-align: left; font-family: var(--fonte);
+  background: rgba(var(--tint), .025); border: 1px solid rgba(var(--tint), .07);
+  border-radius: 13px; padding: 11px 13px;
+}
+.v2 .kb-kpi::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--kpi-ac, transparent); }
+.v2 .kb-kpi .lab { font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--txt-3); display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2 .kb-kpi .lab .cdot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.v2 .kb-kpi .val { font-size: 25px; font-weight: 700; letter-spacing: -.02em; line-height: 1.05; margin-top: 7px; }
+.v2 .kb-kpi .meta { font-size: 10.5px; color: var(--txt-3); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2 .kb-kpi.crit { --kpi-ac: var(--rubro); } .v2 .kb-kpi.crit .val, .v2 .kb-kpi.crit .meta { color: var(--rubro); }
+.v2 .kb-kpi.warn { --kpi-ac: var(--ambar); }
+.v2 .kb-kpi.good { --kpi-ac: var(--verde); } .v2 .kb-kpi.good .val { color: var(--verde); }
+/* KPI "Parados" é acionável — clicar liga o Foco */
+.v2 .kb-kpi.acao { cursor: pointer; transition: transform .15s var(--ease), border-color .15s, background .15s; }
+.v2 .kb-kpi.acao:hover { transform: translateY(-1px); border-color: rgba(var(--rubro-rgb), .35); }
+.v2 .kb-kpi.acao.on { border-color: rgba(var(--rubro-rgb), .5); background: var(--rubro-bg); box-shadow: inset 0 0 0 1px rgba(var(--rubro-rgb), .18); }
+
+/* ---- barra de ordenação + Foco + origem ---- */
+.v2 .kb-barra { flex-shrink: 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 11px; padding-bottom: 11px; border-bottom: 1px solid var(--linha); }
+.v2 .kb-ord { display: inline-flex; align-items: center; gap: 5px; }
+.v2 .kb-ord-l { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--txt-3); margin-right: 2px; }
+.v2 .kb-fchip.foco { border-color: rgba(var(--rubro-rgb), .22); color: var(--rubro); }
+.v2 .kb-fchip.foco:hover { background: var(--rubro-bg); }
+.v2 .kb-fchip.foco.on { background: var(--rubro-bg); border-color: rgba(var(--rubro-rgb), .5); color: var(--rubro); box-shadow: inset 0 1px 0 rgba(var(--rubro-rgb), .1); }
+.v2 .kb-barra .kb-filtro-origem { margin-left: auto; }
+
+/* ---- cabeçalho de coluna: 2ª leitura (parados · recentes · gargalo · R$) ---- */
+.v2 .kb-subcab { display: flex; align-items: center; gap: 6px; padding: 0 5px 8px; font-size: 10.5px; flex-shrink: 0; min-height: 14px; }
+.v2 .kb-subcab .par { color: var(--ambar); font-weight: 600; }
+.v2 .kb-subcab .par.zero { color: var(--txt-3); font-weight: 500; }
+.v2 .kb-subcab .rec { color: var(--txt-3); }
+.v2 .kb-subcab .glr { margin-left: auto; font-size: 9px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--ambar); background: var(--ambar-bg); border: 1px solid rgba(var(--ambar-rgb), .3); border-radius: 5px; padding: 1px 6px; }
+.v2 .kb-subcab .soma { margin-left: auto; font-weight: 500; color: var(--txt-2); }
+.v2 .kb-subcab .glr + .soma { margin-left: 8px; }
+.v2 .kb-col.gargalo { border-color: rgba(var(--ambar-rgb), .28); }
+
+/* ---- CARD v3 compacto ---- */
+.v2 .kc { padding: 8px 10px 8px 13px; margin-bottom: 7px; }
+.v2 .kc::before { background: transparent; }
+.v2 .kc.warm::before { background: var(--ambar); box-shadow: none; }
+.v2 .kc.hot::before { background: var(--rubro); box-shadow: 0 0 10px rgba(var(--rubro-rgb), calc(.6 * var(--fx))); }
+.v2 .kc:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0, 0, 0, .28); border-color: rgba(var(--tint), .16); }
+.v2 .kc-r1 { display: flex; align-items: center; gap: 6px; }
+.v2 .kc-nm { font-size: 12.5px; font-weight: 600; line-height: 1.3; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .kc-flag { font-size: 8.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; border-radius: 5px; padding: 1px 5px; flex-shrink: 0; }
+.v2 .kc-flag.ganho { background: var(--verde-bg); color: var(--verde); }
+.v2 .kc-flag.perdido { background: var(--rubro-bg); color: var(--rubro); }
+.v2 .kc-r2 { display: flex; align-items: center; gap: 7px; margin-top: 8px; }
+.v2 .kc-av {
+  width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0; font-size: 8px; font-weight: 700; font-style: normal;
+  display: flex; align-items: center; justify-content: center; color: var(--txt-2);
+  background: linear-gradient(150deg, #2B2E34, var(--surface)); box-shadow: inset 0 0 0 1px rgba(var(--tint), .14);
+}
+.v2 .kc-resp { font-size: 10.5px; color: var(--txt-3); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .kc-resp.none { color: var(--ambar); }
+.v2 .kc-time { margin-left: auto; flex-shrink: 0; font-size: 10.5px; color: var(--txt-3); }
+.v2 .kc-time.warm { color: var(--ambar); font-weight: 600; }
+.v2 .kc-time.hot { color: var(--rubro); font-weight: 700; }
+.v2 .kc-badge { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; margin-top: 8px; font-size: 9px; font-weight: 600; border-radius: 6px; padding: 2px 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2 .kc-badge.blk { background: var(--rubro-bg); color: var(--rubro); }
+.v2 .kc-badge.msg { background: rgba(var(--tint), .1); color: var(--txt); }
+.v2 .kc-badge.ficha { background: var(--ambar-bg); color: var(--ambar); }
+.v2 .kc-badge.ok { background: var(--verde-bg); color: var(--verde); }
+/* peek do hover reusa a máquina .kc-mais (max-height/opacity já definidas acima) */
+.v2 .kc-peek { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.v2 .kc-peek .v { font-size: 12px; font-weight: 600; }
+.v2 .kc-peek .v .mes { font-size: 9.5px; font-weight: 400; color: var(--txt-3); }
+.v2 .kc-peek .sb, .v2 .kc-peek .in { font-size: 10px; color: var(--txt-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.v2 .kc-peek .in { color: var(--txt-3); }
+
+/* ---- drawer de detalhe: herói + rodapé fixo ---- */
+.v2 .drawer-v2 .kd-hero { display: flex; align-items: flex-start; gap: 12px; padding-bottom: 14px; margin-bottom: 4px; border-bottom: 1px solid var(--linha); }
+.v2 .drawer-v2 .kd-hero-av {
+  width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0; font-size: 13px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; color: var(--txt-2);
+  background: linear-gradient(150deg, #2B2E34, var(--surface)); box-shadow: inset 0 0 0 1px rgba(var(--tint), .16);
+}
+.v2 .drawer-v2 .kd-hero-tx { min-width: 0; flex: 1; }
+.v2 .drawer-v2 .kd-hero-nm { font-size: 16px; font-weight: 680; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; }
+.v2 .drawer-v2 .kd-hero-sub { font-size: 11.5px; color: var(--txt-3); margin-top: 2px; }
+.v2 .drawer-v2 .kd-hero-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 9px; }
+.v2 .drawer-v2 .kd-etapa { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--txt-2); background: rgba(var(--tint), .05); border: 1px solid rgba(var(--tint), .09); border-radius: 7px; padding: 3px 9px; }
+.v2 .drawer-v2 .kd-etapa .pt { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.v2 .drawer-v2 .kd-flag { font-size: 9px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; border-radius: 5px; padding: 2px 7px; }
+.v2 .drawer-v2 .kd-flag.ganho { background: var(--verde-bg); color: var(--verde); }
+.v2 .drawer-v2 .kd-flag.perdido { background: var(--rubro-bg); color: var(--rubro); }
+.v2 .drawer-v2 .kd-flag.parado { background: var(--rubro-bg); color: var(--rubro); }
+.v2 .drawer-v2 .kd-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--linha); flex-shrink: 0; }
+
+/* ============================================================
    TEMA LIGHT — Kanban (Adendo nº 6). Superfícies invertidas ganham par
    claro; o resto herdou --tint/--surface. Dark inalterado.
    ============================================================ */
@@ -310,3 +408,12 @@
 :root[data-tema="light"] .v2 .kc.drag { box-shadow: var(--sombra-2); }
 /* menu ⋮ e faixa sticky: sombra dramática → suave */
 :root[data-tema="light"] .v2 .kb-menu { box-shadow: var(--shadow-pop); }
+
+/* v3 — pares claros: avatares prata, KPIs em carta branca, hover do card suave */
+:root[data-tema="light"] .v2 .kc-av,
+:root[data-tema="light"] .v2 .drawer-v2 .kd-hero-av { background: linear-gradient(150deg, #E9ECF0, #C2C8D1); color: #3A3F47; }
+:root[data-tema="light"] .v2 .kb-kpi { background: #FFFFFF; box-shadow: var(--sombra-1); border-color: var(--linha); }
+:root[data-tema="light"] .v2 .kb-kpi.acao.on { background: var(--rubro-bg); }
+:root[data-tema="light"] .v2 .kc:hover { box-shadow: var(--sombra-2); }
+/* o badge de estagnação no light firma o rubro (mesma regra do antigo kc-sinal.parado) */
+:root[data-tema="light"] .v2 .kc-badge.blk { background: rgba(178, 74, 60, .13); border: 1px solid rgba(178, 74, 60, .3); }
