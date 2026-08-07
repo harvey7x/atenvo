@@ -46,7 +46,7 @@ export interface KLead {
   conversaOrigemId: string | null; canalOrigemId: string | null;
   nome: string; telefone: string; email: string;
   respId: string | null; respNome: string; valor: number | null; origem: string; etiquetas: string[];
-  observacoes: string; ordem: number; criadoEm: string; atualizadoEm: string;
+  observacoes: string; lembrete: string | null; ordem: number; criadoEm: string; atualizadoEm: string;
   // SLA (S4.3): tempo de entrada/última movimentação de coluna + prioridade
   entradaEm: string; movimentadoEm: string; prioridade: string | null;
   // fechamento (Etapa 2A): status do funil + snapshot
@@ -63,7 +63,7 @@ interface DbLead {
   id: string; coluna_id: string | null; contato_id: string | null; conversa_origem_id: string | null; canal_origem_id: string | null;
   contato_nome: string | null; titulo: string | null;
   telefone: string | null; responsavel_id: string | null; valor_estimado: number | null; origem: string | null;
-  etiquetas: string[] | null; observacoes: string | null; ordem: number; criado_em: string; atualizado_em: string;
+  etiquetas: string[] | null; observacoes: string | null; lembrete: string | null; ordem: number; criado_em: string; atualizado_em: string;
   entrada_em: string; movimentado_em: string; prioridade: string | null;
   status: string; fechado_em: string | null; motivo_perda: string | null; responsavel_no_fechamento_id: string | null;
   tipo_beneficio: string | null; tipo_servico: string; status_cancelamento: string; status_ressarcimento: string;
@@ -87,7 +87,7 @@ function mapLead(l: DbLead): KLead {
     telefone: l.telefone || ct?.telefone || '', email: ct?.email || '',
     respId: l.responsavel_id, respNome: rp?.nome || '',
     valor: l.valor_estimado, origem: l.origem || '', etiquetas: l.etiquetas ?? [],
-    observacoes: l.observacoes || '', ordem: l.ordem, criadoEm: l.criado_em, atualizadoEm: l.atualizado_em,
+    observacoes: l.observacoes || '', lembrete: l.lembrete ?? null, ordem: l.ordem, criadoEm: l.criado_em, atualizadoEm: l.atualizado_em,
     entradaEm: l.entrada_em, movimentadoEm: l.movimentado_em, prioridade: l.prioridade ?? null,
     status: l.status || 'em_andamento', fechadoEm: l.fechado_em, motivoPerda: l.motivo_perda, respNoFechamentoId: l.responsavel_no_fechamento_id,
     tipoBeneficio: l.tipo_beneficio, tipoServico: l.tipo_servico || 'analise_inicial',
@@ -191,7 +191,7 @@ export function useOportunidadesAbertasDeContatos(ids: string[]) {
 
 interface OppCampos {
   nome: string; telefone?: string | null; responsavelId?: string | null; valor?: number | null; origem?: string | null;
-  etiquetas?: string[]; observacoes?: string | null; colunaId?: string; conversaOrigemId?: string | null; canalOrigemId?: string | null;
+  etiquetas?: string[]; observacoes?: string | null; lembrete?: string | null; colunaId?: string; conversaOrigemId?: string | null; canalOrigemId?: string | null;
   tipoBeneficio?: string | null; tipoServico?: string; statusCancelamento?: string; statusRessarcimento?: string;
   numeroBeneficio?: string | null; instituicao?: string | null; tipoDesconto?: string | null; dataInicioDesconto?: string | null;
   valorDescontoMensal?: number | null; valorRessarcimentoEstimado?: number | null; valorRessarcido?: number | null;
@@ -334,7 +334,7 @@ export function useKanban() {
     queryKey: ['kanban-leads', org, funilId], enabled: KANBAN_REAL && !!funilId, refetchInterval: 8000,
     queryFn: async (): Promise<KLead[]> => {
       const { data, error } = await supabase!.from('oportunidades')
-        .select('id, coluna_id, contato_id, conversa_origem_id, canal_origem_id, contato_nome, titulo, telefone, responsavel_id, valor_estimado, origem, etiquetas, observacoes, ordem, criado_em, atualizado_em, entrada_em, movimentado_em, prioridade, status, fechado_em, motivo_perda, responsavel_no_fechamento_id, tipo_beneficio, tipo_servico, status_cancelamento, status_ressarcimento, numero_beneficio, instituicao, tipo_desconto, data_inicio_desconto, valor_desconto_mensal, valor_ressarcimento_estimado, valor_ressarcido, contatos(nome, telefone, email, etiquetas), responsavel:usuarios!oportunidades_responsavel_id_fkey(nome), canal_origem:canais(tipo, nome_interno, numero_conectado)')
+        .select('id, coluna_id, contato_id, conversa_origem_id, canal_origem_id, contato_nome, titulo, telefone, responsavel_id, valor_estimado, origem, etiquetas, observacoes, lembrete, ordem, criado_em, atualizado_em, entrada_em, movimentado_em, prioridade, status, fechado_em, motivo_perda, responsavel_no_fechamento_id, tipo_beneficio, tipo_servico, status_cancelamento, status_ressarcimento, numero_beneficio, instituicao, tipo_desconto, data_inicio_desconto, valor_desconto_mensal, valor_ressarcimento_estimado, valor_ressarcido, contatos(nome, telefone, email, etiquetas), responsavel:usuarios!oportunidades_responsavel_id_fkey(nome), canal_origem:canais(tipo, nome_interno, numero_conectado)')
         .eq('organizacao_id', org).eq('funil_id', funilId!).in('status', ['em_andamento', 'ganho', 'perdido'])
         .order('ordem', { ascending: true }).order('criado_em', { ascending: true });
       if (error) throw new Error(error.message);
@@ -394,7 +394,7 @@ export function useKanban() {
       conversa_origem_id: input.conversaOrigemId ?? null, canal_origem_id: input.canalOrigemId ?? null,
       telefone: input.telefone || null, responsavel_id: input.responsavelId ?? null,
       valor_estimado: input.valor ?? null, origem: input.origem || null,
-      etiquetas: input.etiquetas ?? [], observacoes: input.observacoes || null, ordem,
+      etiquetas: input.etiquetas ?? [], observacoes: input.observacoes || null, lembrete: input.lembrete || null, ordem,
       tipo_beneficio: input.tipoBeneficio ?? null, tipo_servico: input.tipoServico ?? 'analise_inicial',
       status_cancelamento: input.statusCancelamento ?? 'nao_se_aplica', status_ressarcimento: input.statusRessarcimento ?? 'nao_se_aplica',
       numero_beneficio: input.numeroBeneficio ?? null, instituicao: input.instituicao ?? null,
@@ -413,6 +413,7 @@ export function useKanban() {
     if (input.origem !== undefined) patch.origem = input.origem;
     if (input.etiquetas !== undefined) patch.etiquetas = input.etiquetas;
     if (input.observacoes !== undefined) patch.observacoes = input.observacoes;
+    if (input.lembrete !== undefined) patch.lembrete = input.lembrete || null;
     if (input.colunaId !== undefined) patch.coluna_id = input.colunaId;
     if (input.tipoBeneficio !== undefined) patch.tipo_beneficio = input.tipoBeneficio;
     if (input.tipoServico !== undefined) patch.tipo_servico = input.tipoServico;

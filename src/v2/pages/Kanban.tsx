@@ -90,9 +90,9 @@ const diasParado = (l: KLead) => {
   return Number.isFinite(d) && d > 0 ? d : 0;
 };
 
-/** Soma compacta do cabeçalho da coluna (mockup: "R$ 11,7k"). */
-const somaCompacta = (v: number) =>
-  v >= 1000 ? `R$ ${(v / 1000).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}k` : fmtBRL(v);
+/* Sem cobranças no board (decisão 2026-08): nenhuma soma R$ no kanban —
+   valores do caso continuam existindo no modal/drawer, mas o funil é gestão
+   de atendimento, não de receita. */
 
 /* ---------- v3: recência p/ o cabeçalho (recentes/fechados) — client-side, só apresentação ----------
    UMA janela só de estagnação em toda a tela: >7d (LIMIAR_PARADO_DIAS, decisão do dono). */
@@ -104,8 +104,8 @@ const diasDesde = (iso: string | null | undefined) => {
 /** Limiar do lead REALMENTE crítico (trilho/badge rubro): com 51% do funil parado +7d,
     só +30d (ou SLA vermelho) merece o alarme forte — senão o vermelho vira ruído. */
 const LIMIAR_CRITICO_DIAS = 30;
-type SortModo = 'urgencia' | 'valor' | 'recencia';
-const ROTULO_SORT: Record<SortModo, string> = { urgencia: 'Urgência', valor: 'Valor', recencia: 'Recentes' };
+type SortModo = 'urgencia' | 'recencia' | 'lembrete';
+const ROTULO_SORT: Record<SortModo, string> = { urgencia: 'Urgência', recencia: 'Recentes', lembrete: 'Lembretes' };
 
 interface LeadForm {
   colunaId: string; contatoId: string; conversaOrigemId: string; canalOrigemId: string;
@@ -114,7 +114,7 @@ interface LeadForm {
   tipoBeneficio: string; tipoServico: string; statusCancelamento: string; statusRessarcimento: string;
   numeroBeneficio: string; instituicao: string; tipoDesconto: string; dataInicioDesconto: string;
   valorDescontoMensal: string; valorRessarcimentoEstimado: string; valorRessarcido: string; valorEstimado: string;
-  etiquetas: string[]; observacoes: string;
+  etiquetas: string[]; observacoes: string; lembrete: string;
 }
 const FORM0: LeadForm = {
   colunaId: '', contatoId: '', conversaOrigemId: '', canalOrigemId: '', canalTipo: '', canalNome: '', canalNumero: '',
@@ -122,7 +122,7 @@ const FORM0: LeadForm = {
   tipoBeneficio: '', tipoServico: 'analise_inicial', statusCancelamento: 'nao_se_aplica', statusRessarcimento: 'nao_se_aplica',
   numeroBeneficio: '', instituicao: '', tipoDesconto: '', dataInicioDesconto: '',
   valorDescontoMensal: '', valorRessarcimentoEstimado: '', valorRessarcido: '', valorEstimado: '',
-  etiquetas: [], observacoes: '',
+  etiquetas: [], observacoes: '', lembrete: '',
 };
 
 const Ic = ({ children }: { children: ReactNode }) => (
@@ -133,6 +133,7 @@ const IcMais = () => <Ic><path d="M12 5v14M5 12h14" /></Ic>;
 const IcPontos = () => <Ic><circle cx="12" cy="5" r="1.4" fill="currentColor" stroke="none" /><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none" /><circle cx="12" cy="19" r="1.4" fill="currentColor" stroke="none" /></Ic>;
 const IcKb = () => <Ic><rect x="3" y="4" width="5" height="16" rx="1.4" /><rect x="10" y="4" width="5" height="10" rx="1.4" /><rect x="17" y="4" width="5" height="13" rx="1.4" /></Ic>;
 const IcColapsar = () => <Ic><path d="M13 5l-6 7 6 7M20 5l-6 7 6 7" /></Ic>; // « recolher coluna
+const IcSino = () => <Ic><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></Ic>; // lembrete no card
 
 type Aviso = { tom: 'ok' | 'erro'; texto: string } | null;
 
@@ -151,7 +152,7 @@ function leadDemo(n: Partial<KLead> & { id: string; nome: string; colunaId: stri
   const agora = new Date().toISOString();
   return {
     contatoId: null, conversaOrigemId: null, canalOrigemId: null, telefone: '', email: '',
-    respId: null, respNome: '', valor: null, origem: 'WhatsApp', etiquetas: [], observacoes: '', ordem: 0,
+    respId: null, respNome: '', valor: null, origem: 'WhatsApp', etiquetas: [], observacoes: '', lembrete: null, ordem: 0,
     criadoEm: agora, atualizadoEm: agora, entradaEm: agora, movimentadoEm: agora, prioridade: null,
     status: 'em_andamento', fechadoEm: null, motivoPerda: null, respNoFechamentoId: null,
     tipoBeneficio: 'aposentadoria', tipoServico: 'analise_inicial', statusCancelamento: 'nao_se_aplica',
@@ -173,7 +174,7 @@ function seedKb(): SeedKb {
     { id: 'kc-6', nome: 'Perdido', cor: '#e11d48', ordem: 5, entrada: false, resultado: 'perdido', encerra: true },
   ];
   const leads: KLead[] = [
-    leadDemo({ id: 'kl-1', nome: 'Ivone F. Cardoso', colunaId: 'kc-1', contatoId: 'kct-1', conversaOrigemId: 'kcv-1', respNome: 'Juliana', respId: 'u-mock', valorDescontoMensal: 130, tipoServico: 'cancelamento', statusCancelamento: 'nao_iniciado', instituicao: 'Banco Pan', criadoEm: iso(agora - 22 * 24 * h), atualizadoEm: iso(agora - 20 * 24 * h), movimentadoEm: iso(agora - 20 * 24 * h), contatoEtiquetas: ['Idoso'] }),
+    leadDemo({ id: 'kl-1', nome: 'Ivone F. Cardoso', colunaId: 'kc-1', contatoId: 'kct-1', conversaOrigemId: 'kcv-1', respNome: 'Juliana', respId: 'u-mock', valorDescontoMensal: 130, tipoServico: 'cancelamento', statusCancelamento: 'nao_iniciado', instituicao: 'Banco Pan', criadoEm: iso(agora - 22 * 24 * h), atualizadoEm: iso(agora - 20 * 24 * h), movimentadoEm: iso(agora - 20 * 24 * h), contatoEtiquetas: ['Idoso'], lembrete: 'Ligar após as 15h' }),
     leadDemo({ id: 'kl-2', nome: 'Sebastião R. Nunes', colunaId: 'kc-1', contatoId: 'kct-2', valor: 1300, criadoEm: iso(agora - 11 * 24 * h), atualizadoEm: iso(agora - 10 * 24 * h), movimentadoEm: iso(agora - 10 * 24 * h) }),
     leadDemo({ id: 'kl-3', nome: 'Maria Aparecida Souza', colunaId: 'kc-2', contatoId: 'kct-3', conversaOrigemId: 'kcv-3', respNome: 'Juliana', respId: 'u-mock', tipoServico: 'cancelamento_ressarcimento', statusCancelamento: 'em_analise', statusRessarcimento: 'em_analise', valorRessarcimentoEstimado: 4800, instituicao: 'BMG', numeroBeneficio: '123.456.789-0', etiquetas: ['Urgente'], atualizadoEm: iso(agora - 12 * 60_000), movimentadoEm: iso(agora - 12 * 60_000), prioridade: 'alta' }),
     leadDemo({ id: 'kl-4', nome: 'Terezinha M. Alves', colunaId: 'kc-2', contatoId: 'kct-4', respNome: 'Matheus', canalNome: 'ANDRIUS', valor: 1300, atualizadoEm: iso(agora - 3 * h), movimentadoEm: iso(agora - 3 * h) }),
@@ -280,7 +281,7 @@ export default function KanbanV2() {
   const [destaque, setDestaque] = useState<string | null>(null);
   const [filtroOrigem, setFiltroOrigem] = useState<string | null>(null); // v2.1: origem repetida vira filtro no topo
   // v3 — ordenação inteligente (persistida) + Foco (filtro opcional, NÃO ocupa espaço vertical) + recolher coluna.
-  const [sortModo, setSortModo] = useState<SortModo>(() => { try { const s = sessionStorage.getItem('atenvo-kb-sort'); return s === 'valor' || s === 'recencia' ? s : 'urgencia'; } catch { return 'urgencia'; } });
+  const [sortModo, setSortModo] = useState<SortModo>(() => { try { const s = sessionStorage.getItem('atenvo-kb-sort'); return s === 'lembrete' || s === 'recencia' ? s : 'urgencia'; } catch { return 'urgencia'; } });
   const [foco, setFoco] = useState(false); // some por padrão (Kanban é o protagonista) — liga sob demanda
   const [equipe, setEquipe] = useState(false); // painel "Carga por responsável" — opt-in, não ocupa espaço quando off
   const [filtroResp, setFiltroResp] = useState<string | null>(null); // filtra o board por atendente (chave = respId ou '__none__')
@@ -315,7 +316,7 @@ export default function KanbanV2() {
     const hay = [
       l.nome, l.telefone, l.email, l.instituicao, l.numeroBeneficio,
       rotuloDe(TIPO_BENEFICIO, l.tipoBeneficio), rotuloDe(TIPO_SERVICO, l.tipoServico),
-      l.respNome, l.canalNome, ...l.etiquetas, ...l.contatoEtiquetas,
+      l.respNome, l.canalNome, l.lembrete, ...l.etiquetas, ...l.contatoEtiquetas,
     ].filter(Boolean).join(' ').toLowerCase();
     if (hay.includes(term)) return true;
     return termDig.length >= 3 && (l.telefone ?? '').replace(/\D/g, '').includes(termDig);
@@ -338,7 +339,6 @@ export default function KanbanV2() {
   // O PLACAR acompanha o filtro de origem (o recorte que o chip ao lado aplica): mesmo conjunto
   // ativo que o board mostra na faceta selecionada — sem filtro, é o funil inteiro.
   const abertosNoRecorte = useMemo(() => abertos.filter((l) => !filtroOrigem || origemDe(l) === filtroOrigem), [abertos, filtroOrigem]); // eslint-disable-line react-hooks/exhaustive-deps
-  const somaPotencial = useMemo(() => abertosNoRecorte.reduce((s, l) => s + (valorRelevante(l).valor ?? 0), 0), [abertosNoRecorte]);
 
   /* ---------- v2.1: agregação client-side (só apresentação; zero query/métrica/mutação nova) ----------
      estaParado = MESMA regra do trilho rubro do card (LIMIAR_PARADO_DIAS sem trocar de coluna neutra). */
@@ -369,9 +369,9 @@ export default function KanbanV2() {
     return a.ordem - b.ordem;
   };
   // v3 — lentes de ordenação (o operador escolhe; padrão = urgência). Só apresentação.
-  const cmpValor = (a: KLead, b: KLead) => (valorRelevante(b).valor ?? 0) - (valorRelevante(a).valor ?? 0) || a.ordem - b.ordem;
   const cmpRecencia = (a: KLead, b: KLead) => new Date(b.atualizadoEm || b.criadoEm).getTime() - new Date(a.atualizadoEm || a.criadoEm).getTime();
-  const comparador = sortModo === 'valor' ? cmpValor : sortModo === 'recencia' ? cmpRecencia : sortUrgencia;
+  const cmpLembrete = (a: KLead, b: KLead) => ((b.lembrete ? 1 : 0) - (a.lembrete ? 1 : 0)) || sortUrgencia(a, b);
+  const comparador = sortModo === 'lembrete' ? cmpLembrete : sortModo === 'recencia' ? cmpRecencia : sortUrgencia;
   // v3 — Foco: o lead que EXIGE ação agora (parado crítico +30d, SLA vermelho/lead quente, ou parado sem dono).
   const ehCritico = (l: KLead) => l.status === 'em_andamento' && (
     (estaParado(l) && diasParado(l) >= LIMIAR_CRITICO_DIAS)
@@ -681,7 +681,7 @@ export default function KanbanV2() {
       tipoDesconto: l.tipoDesconto ?? '', dataInicioDesconto: l.dataInicioDesconto ?? '',
       valorDescontoMensal: brlInput(l.valorDescontoMensal), valorRessarcimentoEstimado: brlInput(l.valorRessarcimentoEstimado),
       valorRessarcido: brlInput(l.valorRessarcido), valorEstimado: brlInput(l.valor),
-      etiquetas: l.etiquetas, observacoes: l.observacoes,
+      etiquetas: l.etiquetas, observacoes: l.observacoes, lembrete: l.lembrete ?? '',
     });
     setSelContato(null); setSemVinculo(false); setLeadErr(null);
     setLeadModal({ modo: 'editar', lead: l });
@@ -716,7 +716,7 @@ export default function KanbanV2() {
       instituicao: lf.instituicao.trim() || null, tipoDesconto: lf.tipoDesconto.trim() || null,
       dataInicioDesconto: lf.dataInicioDesconto || null,
       valorDescontoMensal: vals[0].v, valorRessarcimentoEstimado: vals[1].v, valorRessarcido: vals[2].v, valor: vals[3].v,
-      observacoes: lf.observacoes || null,
+      observacoes: lf.observacoes || null, lembrete: lf.lembrete.trim() || null,
     };
     try {
       if (!editar) {
@@ -728,7 +728,7 @@ export default function KanbanV2() {
               id: `kld-${demoSeq.current}`, nome: comum.nome, colunaId: lf.colunaId, contatoId: selContato?.id ?? null,
               telefone: comum.telefone ?? '', email: lf.email, respId: lf.respId || null,
               respNome: usuarios.find((u) => u.id === lf.respId)?.nome ?? '', origem: lf.origem,
-              etiquetas: lf.etiquetas, observacoes: lf.observacoes, tipoBeneficio: lf.tipoBeneficio || null,
+              etiquetas: lf.etiquetas, observacoes: lf.observacoes, lembrete: lf.lembrete.trim() || null, tipoBeneficio: lf.tipoBeneficio || null,
               tipoServico: lf.tipoServico, statusCancelamento: lf.statusCancelamento, statusRessarcimento: lf.statusRessarcimento,
               numeroBeneficio: comum.numeroBeneficio, instituicao: comum.instituicao, tipoDesconto: comum.tipoDesconto,
               dataInicioDesconto: comum.dataInicioDesconto, valorDescontoMensal: vals[0].v, valorRessarcimentoEstimado: vals[1].v,
@@ -753,7 +753,7 @@ export default function KanbanV2() {
         const patchDemo: Partial<KLead> = {
           nome: comum.nome, telefone: comum.telefone ?? '', respId: lf.respId || null,
           respNome: usuarios.find((u) => u.id === lf.respId)?.nome ?? '', origem: lf.origem, etiquetas: lf.etiquetas,
-          observacoes: lf.observacoes, tipoBeneficio: lf.tipoBeneficio || null, tipoServico: lf.tipoServico,
+          observacoes: lf.observacoes, lembrete: lf.lembrete.trim() || null, tipoBeneficio: lf.tipoBeneficio || null, tipoServico: lf.tipoServico,
           statusCancelamento: lf.statusCancelamento, statusRessarcimento: lf.statusRessarcimento,
           numeroBeneficio: comum.numeroBeneficio, instituicao: comum.instituicao, tipoDesconto: comum.tipoDesconto,
           dataInicioDesconto: comum.dataInicioDesconto, valorDescontoMensal: vals[0].v,
@@ -846,7 +846,7 @@ export default function KanbanV2() {
           <div className="kb-kpis sobe" role="group" aria-label="Indicadores do funil">
             <div className="kb-kpi" title="Oportunidades em andamento (1 card = 1 oportunidade). No Disparo o número é menor porque lá conta CONTATOS distintos com WhatsApp e conversa real.">
               <div className="lab">Leads ativos</div><div className="val num">{abertosNoRecorte.length}</div>
-              <div className="meta">{somaPotencial > 0 ? fmtBRL(somaPotencial) + ' em potencial' : 'no funil'}</div>
+              <div className="meta">no funil</div>
             </div>
             <button type="button" className={'kb-kpi crit acao' + (foco ? ' on' : '')} aria-pressed={foco}
               title={gargaloTop ? `Etapa mais travada: ${gargaloTop.col.nome} (${gargaloTop.n} parados). Clique para focar só no que exige ação agora.` : 'Leads sem trocar de coluna há mais de 7 dias. Clique para focar só no que exige ação agora.'}
@@ -874,7 +874,7 @@ export default function KanbanV2() {
           <div className="kb-barra sobe">
             <div className="kb-ord" role="group" aria-label="Ordenar os cards">
               <span className="kb-ord-l">Ordenar</span>
-              {(['urgencia', 'valor', 'recencia'] as SortModo[]).map((m) => (
+              {(['urgencia', 'recencia', 'lembrete'] as SortModo[]).map((m) => (
                 <button key={m} type="button" className={'kb-fchip' + (sortModo === m ? ' on' : '')} aria-pressed={sortModo === m} onClick={() => setSortModo(m)}>{ROTULO_SORT[m]}</button>
               ))}
             </div>
@@ -951,7 +951,6 @@ export default function KanbanV2() {
             const desfecho = (col.resultado ?? 'neutro') !== 'neutro';
             const cardsCol = leadsVisiveis.filter((l) => colunaDoLead(l) === col.id && (!foco || ehCritico(l))).slice().sort(comparador);
             const todosCol = leads.filter((l) => colunaDoLead(l) === col.id);
-            const soma = todosCol.reduce((s, l) => s + (valorRelevante(l).valor ?? 0), 0);
             const atraso = `${0.08 + Math.min(i, 5) * 0.07}s`;
             // v3 — leituras do cabeçalho: neutras → parados(>7d) · recentes(<7d); desfecho → recência do fechamento.
             const nParadosCol = desfecho ? 0 : todosCol.filter((l) => l.status === 'em_andamento' && diasParado(l) >= LIMIAR_PARADO_DIAS).length;
@@ -973,7 +972,7 @@ export default function KanbanV2() {
             }
             const renderCard = (l: KLead) => (
               <CardKc
-                key={l.id} l={l} colunas={colunas}
+                key={l.id} l={l} colunas={colunas} etiquetasCat={etiquetas}
                 naoLidas={naoLidasMap[l.contatoId ?? ''] ?? 0}
                 sla={(slaPorOpp.get(l.id) ?? []).filter((a) => !SLA_OCULTO_NO_CARD.has(a.tipo))}
                 fichaStatus={fichaStatusMap[l.id]} optout={!!l.contatoId && bloqueados.has(l.contatoId)}
@@ -1018,7 +1017,7 @@ export default function KanbanV2() {
                     </span>
                   )}
                 </div>
-                {/* v3 — segunda linha do cabeçalho: parados · recentes (+ gargalo, + soma R$) numa leitura calma */}
+                {/* v3 — segunda linha do cabeçalho: parados · recentes (+ gargalo) numa leitura calma */}
                 <div className="kb-subcab">
                   {desfecho
                     ? <span className="rec">{nRecentesCol} nos últimos 7 dias</span>
@@ -1029,7 +1028,6 @@ export default function KanbanV2() {
                       </>
                     )}
                   {gargalo && <span className="glr" title={`${nParadosCol} leads travados +${LIMIAR_PARADO_DIAS}d nesta etapa — gargalo do funil`}>Gargalo · {nParadosCol}</span>}
-                  {soma > 0 && <span className="soma num">{somaCompacta(soma)}</span>}
                 </div>
                 <div
                   className="kb-corpo"
@@ -1267,14 +1265,13 @@ function DetRow({ l, v }: { l: string; v: ReactNode }) {
    vs .hot (+30d ou SLA vermelho, trilho/tempo rubro) — com 51% do
    funil parado, só o .hot ganha o alarme forte para o vermelho valer.
    ================================================================ */
-function CardKc({ l, colunas, naoLidas, sla, fichaStatus, optout, moving, arrastando, destacado, menuAberto, aoRef, aoClicar, aoMenu, aoDragStart, aoDragEnd }: {
-  l: KLead; colunas: KColuna[]; naoLidas: number;
+function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, fichaStatus, optout, moving, arrastando, destacado, menuAberto, aoRef, aoClicar, aoMenu, aoDragStart, aoDragEnd }: {
+  l: KLead; colunas: KColuna[]; etiquetasCat: Etiqueta[]; naoLidas: number;
   sla: SlaAlerta[]; fichaStatus: string | undefined; optout: boolean; moving: boolean; arrastando: boolean;
   destacado: boolean; menuAberto: boolean;
   aoRef: (el: HTMLDivElement | null) => void; aoClicar: () => void; aoMenu: (btn: HTMLElement) => void;
   aoDragStart: (e: DragEvent) => void; aoDragEnd: () => void;
 }) {
-  const vr = valorRelevante(l);
   const colAtual = colunas.find((c) => c.id === l.colunaId);
   const dp = diasParado(l);
   const paradoAtivo = l.status === 'em_andamento' && (colAtual?.resultado ?? 'neutro') === 'neutro' && dp >= LIMIAR_PARADO_DIAS;
@@ -1294,6 +1291,9 @@ function CardKc({ l, colunas, naoLidas, sla, fichaStatus, optout, moving, arrast
     : hot && paradoAtivo ? { cls: 'hot', txt: 'Retomar contato' }
     : fichaStatus === 'finalizada' ? { cls: 'ok', txt: 'Ficha ✓' }
     : null;
+  // Etiquetas do lead + do contato, sem repetição, SEMPRE visíveis (pedido do dono:
+  // "colocar etiquetas e que fique aparecendo no kanban, como lembrete"). Máx. 2 + contador.
+  const todasEtiquetas = Array.from(new Set([...l.etiquetas, ...l.contatoEtiquetas]));
 
   return (
     <div
@@ -1316,6 +1316,20 @@ function CardKc({ l, colunas, naoLidas, sla, fichaStatus, optout, moving, arrast
         </span>
       </div>
 
+      {todasEtiquetas.length > 0 && (
+        <div className="kc-etqs">
+          {todasEtiquetas.slice(0, 2).map((t) => {
+            const cor = corDaEtiqueta(t, etiquetasCat);
+            return <span key={t} className="kc-etq" title={t}><i style={{ background: cor }} />{t}</span>;
+          })}
+          {todasEtiquetas.length > 2 && <span className="kc-etq mais" title={todasEtiquetas.slice(2).join(' · ')}>+{todasEtiquetas.length - 2}</span>}
+        </div>
+      )}
+
+      {l.lembrete && (
+        <div className="kc-lem" title={'Lembrete: ' + l.lembrete}><IcSino /><span>{l.lembrete}</span></div>
+      )}
+
       <div className="kc-r2">
         <span className="kc-av" title={l.respNome ? 'Responsável · ' + l.respNome : 'Sem responsável'}>{l.respNome ? initials(l.respNome) : '·'}</span>
         <span className={'kc-resp' + (l.respNome ? '' : ' none')} title={l.respNome || 'Não atribuído'}>{l.respNome || 'Não atribuído'}</span>
@@ -1327,10 +1341,9 @@ function CardKc({ l, colunas, naoLidas, sla, fichaStatus, optout, moving, arrast
       {badge && <span className={'kc-badge ' + badge.cls} title={badge.txt}>{badge.txt}</span>}
 
       {/* peek no HOVER — contexto rápido sem abrir nada (o detalhe completo vive no drawer ao clicar) */}
-      {(vr.valor != null || sub || l.instituicao) && (
+      {(sub || l.instituicao) && (
         <div className="kc-mais">
           <div className="kc-peek">
-            {vr.valor != null && <span className="v num">{fmtBRL(vr.valor)}{vr.mensal && <span className="mes"> /mês</span>}</span>}
             {sub && <span className="sb" title={sub}>{sub}</span>}
             {l.instituicao && <span className="in" title={l.instituicao}>{l.instituicao}</span>}
           </div>
@@ -1762,6 +1775,13 @@ function LeadModalV2({ demo, modo, lead, lf, setLf, selContato, setSelContato, s
               </div>
             </div>
             <div className="campo">
+              <label>Lembrete no card <span className="kb-hint">· nota curta fixada no card do kanban</span></label>
+              <input
+                className="inp" maxLength={140} value={lf.lembrete} onChange={set('lembrete')}
+                placeholder="Ex.: ligar depois das 14h · falta RG e comprovante · retornar segunda"
+              />
+            </div>
+            <div className="campo">
               <label>Resumo do caso</label>
               <textarea
                 className="inp" rows={3} value={lf.observacoes} onChange={set('observacoes')}
@@ -1852,6 +1872,7 @@ function DetalheModalV2({ demo, l, colunas, eventosDemo, fichaDemoStatus, aoFech
 
       <div className="kb-sec-h">Organização</div>
       <DetRow l="Etapa" v={colNome(l.colunaId)} />
+      <DetRow l="Lembrete no card" v={l.lembrete ? <span className="kd-lem"><IcSino />{l.lembrete}</span> : null} />
       {l.contatoEtiquetas.length > 0 && (
         <DetRow l="Etiquetas do cliente" v={<span className="kb-tags" style={{ justifyContent: 'flex-end' }}>{l.contatoEtiquetas.map((t) => { const cor = corDaEtiqueta(t, etiquetasCat); return <span key={t} className="kb-tag-ro" style={{ background: cor + '22', color: cor, borderColor: cor + '55' }}>{t}</span>; })}</span>} />
       )}

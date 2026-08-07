@@ -372,6 +372,34 @@
 .v2 .kc-badge.ficha { background: var(--ambar-bg); color: var(--ambar); }
 .v2 .kc-badge.ok { background: var(--verde-bg); color: var(--verde); }
 
+/* ---- etiquetas SEMPRE visíveis no card (pedido do dono, 2026-08): pill neutra
+   com dot na cor da etiqueta — a cor carrega o significado sem pintar o card ---- */
+.v2 .kc-etqs { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-top: 7px; }
+.v2 .kc-etq {
+  display: inline-flex; align-items: center; gap: 5px; max-width: 128px;
+  font-size: 9.5px; font-weight: 500; color: var(--txt-2);
+  border: 1px solid rgba(var(--tint), .13); border-radius: 99px; padding: 1.5px 8px 1.5px 6px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.v2 .kc-etq i { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.v2 .kc-etq.mais { color: var(--txt-3); padding: 1.5px 7px; }
+
+/* ---- lembrete fixado no card: o único "post-it" do card — âmbar de pendência,
+   1 linha (reticências; completo no title/drawer). DADO É CALMO: sem glow ---- */
+.v2 .kc-lem {
+  display: flex; align-items: flex-start; gap: 5px; margin-top: 7px;
+  font-size: 10px; font-weight: 500; line-height: 1.35; color: var(--ambar);
+  background: var(--ambar-bg); border-radius: 6px; padding: 3px 8px;
+}
+.v2 .kc-lem svg { width: 10px; height: 10px; flex-shrink: 0; margin-top: 1.5px; }
+.v2 .kc-lem span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* modo denso: etiquetas/lembrete continuam (são o motivo do recurso), só mais justos */
+.v2 .kb-cols.denso .kc-etqs { margin-top: 5px; }
+.v2 .kb-cols.denso .kc-lem { margin-top: 5px; padding: 2px 7px; }
+/* lembrete no drawer de detalhe */
+.v2 .kd-lem { display: inline-flex; align-items: center; gap: 6px; color: var(--ambar); }
+.v2 .kd-lem svg { width: 12px; height: 12px; flex-shrink: 0; }
+
 /* ---- F2: painel Carga por responsável (opt-in) ---- */
 .v2 .kb-carga { flex-shrink: 0; display: flex; align-items: stretch; gap: 8px; flex-wrap: wrap; margin: 0 0 11px; padding-bottom: 11px; border-bottom: 1px solid var(--linha); }
 .v2 .kb-carga-todos { align-self: center; font-size: 10.5px; font-family: var(--fonte); color: var(--txt-2); background: none; border: 1px solid rgba(var(--tint), .12); border-radius: 99px; padding: 5px 11px; cursor: pointer; }
