@@ -58,6 +58,24 @@ function fmtDataHora(iso: string | null): string {
   return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 const canalLabel = (t: string | null) => (t === 'whatsapp' ? 'WhatsApp' : t === 'facebook' ? 'Facebook' : t || 'Canal');
+/** Polish 2026-08 — nome ALL CAPS do banco vira Title Case SÓ no render (dado intacto). */
+const MINUSCULAS_NOME = new Set(['da', 'de', 'do', 'das', 'dos', 'e']);
+function nomeExibicao(nome: string): string {
+  const t = nome.trim();
+  if (!t || t !== t.toLocaleUpperCase('pt-BR') || !/[A-ZÀ-Ü]/.test(t)) return nome;
+  return t.toLocaleLowerCase('pt-BR').split(/\s+/).map((p, i) =>
+    (i > 0 && MINUSCULAS_NOME.has(p)) ? p : p.charAt(0).toLocaleUpperCase('pt-BR') + p.slice(1)
+  ).join(' ');
+}
+/** Lead sem nome (título só dígitos) → telefone legível como título + sufixo "· sem nome". */
+function tituloTelefone(nome: string): string | null {
+  const d = nome.replace(/[\s()+.-]/g, '');
+  if (!/^\d{8,15}$/.test(d)) return null;
+  const n = d.length >= 12 && d.startsWith('55') ? d.slice(2) : d;
+  if (n.length === 11) return `(${n.slice(0, 2)}) ${n.slice(2, 7)}-${n.slice(7)}`;
+  if (n.length === 10) return `(${n.slice(0, 2)}) ${n.slice(2, 6)}-${n.slice(6)}`;
+  return nome;
+}
 const maskNum = (n: string | null) => {
   const d = (n ?? '').replace(/\D/g, '');
   return d.length > 4 ? '•••• ' + d.slice(-4) : d;
@@ -403,17 +421,8 @@ export default function KanbanV2() {
   }, [paradosPorColuna, ativosPorColuna, colunas]);
   const colGanho = useMemo(() => colunas.find((c) => c.resultado === 'ganho') ?? null, [colunas]);
   const nFechados = useMemo(() => (colGanho ? leads.filter((l) => l.status === 'ganho' && (!filtroOrigem || origemDe(l) === filtroOrigem)).length : 0), [leads, colGanho, filtroOrigem]); // eslint-disable-line react-hooks/exhaustive-deps
-  const kpisEtapa = useMemo(() => {
-    const neutras = colunas.filter((c) => c.resultado === 'neutro' && !c.entrada);
-    const pega = (re: RegExp) => neutras.find((c) => re.test(c.nome));
-    const escolhidas: KColuna[] = [];
-    const push = (c: KColuna | undefined) => { if (c && !escolhidas.includes(c)) escolhidas.push(c); };
-    push(pega(/reuni|call|meeting|agenda/i));
-    push(pega(/contrat|assin|proposta/i));
-    // completa até 2 com as colunas neutras mais próximas do fecho (maior ordem)
-    for (const c of [...neutras].sort((a, b) => b.ordem - a.ordem)) { if (escolhidas.length >= 2) break; push(c); }
-    return escolhidas.sort((a, b) => a.ordem - b.ordem).slice(0, 2).map((c) => ({ col: c, n: ativosPorColuna.get(c.id) ?? 0 }));
-  }, [colunas, ativosPorColuna]);
+  // KPIs "na etapa" removidos (polish 2026-08): duplicavam o header das colunas
+  // sem dizer QUAL etapa — leitura ambígua. A contagem por etapa vive no board.
 
   /* ---------- v3 F2: CARGA POR RESPONSÁVEL — quem está sobrecarregado num relance (client-side).
      ativos / parados / críticos por atendente; clicar filtra o board (filtroResp). */
@@ -858,12 +867,6 @@ export default function KanbanV2() {
               <div className="lab">Pendentes</div><div className="val num">{nFichaPend}</div>
               <div className="meta">ficha{nFichaPend === 1 ? '' : 's'} em rascunho</div>
             </div>
-            {kpisEtapa.map(({ col, n }) => (
-              <div key={col.id} className="kb-kpi" title={`${n} lead(s) ativo(s) na etapa ${col.nome}`}>
-                <div className="lab"><span className="cdot" style={{ background: col.cor }} />{col.nome}</div>
-                <div className="val num">{n}</div><div className="meta">na etapa</div>
-              </div>
-            ))}
             {colGanho && (
               <div className="kb-kpi good" title={`Oportunidades fechadas como ganho${filtroOrigem ? ' · ' + filtroOrigem : ''}`}>
                 <div className="lab">{colGanho.nome}</div><div className="val num">{nFechados}</div><div className="meta">ganhos</div>
@@ -1294,6 +1297,9 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, fichaStatus, optout, 
   // Etiquetas do lead + do contato, sem repetição, SEMPRE visíveis (pedido do dono:
   // "colocar etiquetas e que fique aparecendo no kanban, como lembrete"). Máx. 2 + contador.
   const todasEtiquetas = Array.from(new Set([...l.etiquetas, ...l.contatoEtiquetas]));
+  // Polish: telefone cru como título vira número legível + "· sem nome"; ALL CAPS vira Title Case.
+  const fone = tituloTelefone(l.nome);
+  const nomeCard = fone ?? nomeExibicao(l.nome);
 
   return (
     <div
@@ -1305,7 +1311,7 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, fichaStatus, optout, 
       onDragEnd={aoDragEnd}
     >
       <div className="kc-r1">
-        <span className="kc-nm" title={l.nome}>{l.nome}</span>
+        <span className="kc-nm" title={l.nome}>{fone ? <span className="num">{fone}</span> : nomeCard}{fone && <i className="kc-semnome">· sem nome</i>}</span>
         {l.status === 'ganho' && <span className="kc-flag ganho" title="Fechado como ganho">Ganho</span>}
         {l.status === 'perdido' && <span className="kc-flag perdido" title={'Perdido' + (l.motivoPerda ? ' · ' + rotuloMotivoPerda(l.motivoPerda) : '')}>Perdido</span>}
         <span className="kb-menu-wrap">
@@ -1828,7 +1834,7 @@ function DetalheModalV2({ demo, l, colunas, eventosDemo, fichaDemoStatus, aoFech
         <div className="kd-hero">
           <span className="kd-hero-av">{initials(l.nome)}</span>
           <div className="kd-hero-tx">
-            <div className="kd-hero-nm" title={l.nome}>{l.nome}</div>
+            <div className="kd-hero-nm" title={l.nome}>{tituloTelefone(l.nome) ?? nomeExibicao(l.nome)}{tituloTelefone(l.nome) && <i className="kc-semnome">· sem nome</i>}</div>
             <div className="kd-hero-sub">{[l.tipoBeneficio ? rotuloDe(TIPO_BENEFICIO, l.tipoBeneficio) : 'Benefício não informado', rotuloDe(TIPO_SERVICO, l.tipoServico)].join(' · ')}</div>
             <div className="kd-hero-meta">
               {etapaCol && <span className="kd-etapa"><span className="pt" style={{ background: etapaCol.cor }} />{etapaCol.nome}</span>}

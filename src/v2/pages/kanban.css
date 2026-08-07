@@ -304,25 +304,30 @@
    drawer de detalhe. Só apresentação — lógica intacta.
    ============================================================ */
 
-/* ---- Painel de KPIs (saúde do funil) ---- */
-.v2 .kb-kpis { flex-shrink: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 9px; margin: 0 0 11px; }
-.v2 .kb-kpi {
-  position: relative; overflow: hidden; text-align: left; font-family: var(--fonte);
+/* ---- Painel de KPIs (saúde do funil) — polish 2026-08: STRIP de 1 linha.
+   Os caixões de 25px roubavam ~200px do board; agora a mesma leitura vive numa
+   faixa única (label micro + valor inline + meta ao lado), estilo placar. ---- */
+.v2 .kb-kpis {
+  flex-shrink: 0; display: flex; align-items: stretch; margin: 0 0 11px;
   background: rgba(var(--tint), .025); border: 1px solid rgba(var(--tint), .07);
-  border-radius: 13px; padding: 11px 13px;
+  border-radius: 12px; overflow-x: auto;
 }
-.v2 .kb-kpi::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--kpi-ac, transparent); }
-.v2 .kb-kpi .lab { font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--txt-3); display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2 .kb-kpi {
+  position: relative; flex: 1; min-width: 148px; text-align: left; font-family: var(--fonte);
+  background: none; border: none; border-right: 1px solid rgba(var(--tint), .07);
+  border-radius: 0; padding: 9px 14px 10px;
+}
+.v2 .kb-kpi:last-child { border-right: none; }
+.v2 .kb-kpi .lab { font-size: 9px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--txt-3); display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .v2 .kb-kpi .lab .cdot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
-.v2 .kb-kpi .val { font-size: 25px; font-weight: 700; letter-spacing: -.02em; line-height: 1.05; margin-top: 7px; }
-.v2 .kb-kpi .meta { font-size: 10.5px; color: var(--txt-3); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.v2 .kb-kpi.crit { --kpi-ac: var(--rubro); } .v2 .kb-kpi.crit .val, .v2 .kb-kpi.crit .meta { color: var(--rubro); }
-.v2 .kb-kpi.warn { --kpi-ac: var(--ambar); }
-.v2 .kb-kpi.good { --kpi-ac: var(--verde); } .v2 .kb-kpi.good .val { color: var(--verde); }
+.v2 .kb-kpi .val { display: inline-block; font-size: 16.5px; font-weight: 700; letter-spacing: -.01em; line-height: 1.15; margin-top: 3px; }
+.v2 .kb-kpi .meta { display: inline; font-size: 10.5px; color: var(--txt-3); margin-left: 6px; white-space: nowrap; }
+.v2 .kb-kpi.crit .val, .v2 .kb-kpi.crit .meta { color: var(--rubro); }
+.v2 .kb-kpi.good .val { color: var(--verde); }
 /* KPI "Parados" é acionável — clicar liga o Foco */
-.v2 .kb-kpi.acao { cursor: pointer; transition: transform .15s var(--ease), border-color .15s, background .15s; }
-.v2 .kb-kpi.acao:hover { transform: translateY(-1px); border-color: rgba(var(--rubro-rgb), .35); }
-.v2 .kb-kpi.acao.on { border-color: rgba(var(--rubro-rgb), .5); background: var(--rubro-bg); box-shadow: inset 0 0 0 1px rgba(var(--rubro-rgb), .18); }
+.v2 .kb-kpi.acao { cursor: pointer; transition: background .15s var(--ease), box-shadow .15s; }
+.v2 .kb-kpi.acao:hover { background: rgba(var(--rubro-rgb), .06); }
+.v2 .kb-kpi.acao.on { background: var(--rubro-bg); box-shadow: inset 0 0 0 1px rgba(var(--rubro-rgb), .22); }
 
 /* ---- barra de ordenação + Foco + origem ---- */
 .v2 .kb-barra { flex-shrink: 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 11px; padding-bottom: 11px; border-bottom: 1px solid var(--linha); }
@@ -399,6 +404,8 @@
 /* lembrete no drawer de detalhe */
 .v2 .kd-lem { display: inline-flex; align-items: center; gap: 6px; color: var(--ambar); }
 .v2 .kd-lem svg { width: 12px; height: 12px; flex-shrink: 0; }
+/* sufixo de lead sem nome (título = telefone formatado) */
+.v2 .kc-semnome { font-style: normal; font-weight: 400; font-size: 10px; color: var(--txt-3); margin-left: 5px; }
 
 /* ---- F2: painel Carga por responsável (opt-in) ---- */
 .v2 .kb-carga { flex-shrink: 0; display: flex; align-items: stretch; gap: 8px; flex-wrap: wrap; margin: 0 0 11px; padding-bottom: 11px; border-bottom: 1px solid var(--linha); }
@@ -469,7 +476,8 @@
 /* v3 — pares claros: avatares prata, KPIs em carta branca, hover do card suave */
 :root[data-tema="light"] .v2 .kc-av,
 :root[data-tema="light"] .v2 .drawer-v2 .kd-hero-av { background: linear-gradient(150deg, #E9ECF0, #C2C8D1); color: #3A3F47; }
-:root[data-tema="light"] .v2 .kb-kpi { background: #FFFFFF; box-shadow: var(--sombra-1); border-color: var(--linha); }
+:root[data-tema="light"] .v2 .kb-kpis { background: #FFFFFF; box-shadow: var(--sombra-1); border-color: var(--linha); }
+:root[data-tema="light"] .v2 .kb-kpi { border-right-color: var(--linha); }
 :root[data-tema="light"] .v2 .kb-kpi.acao.on { background: var(--rubro-bg); }
 :root[data-tema="light"] .v2 .kc:hover { box-shadow: var(--sombra-2); }
 /* o badge de estagnação no light firma o rubro (mesma regra do antigo kc-sinal.parado) */
