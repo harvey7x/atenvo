@@ -225,6 +225,25 @@ export function useAtendimentoActions() {
     invalContatos();
   }
 
+  /** Espelha UMA etiqueta da conversa no CONTATO (ponte com o Kanban: o card lê
+      etiquetas do contato). Lê o array atual e faz união/remoção — nunca sobrescreve
+      etiquetas aplicadas em outras telas (Contatos, modal do lead). */
+  async function espelharEtiquetaContato(contatoId: string, nome: string, aplicar: boolean) {
+    if (!WA_REAL || !supabase) return;
+    const { data, error: errLe } = await supabase.from('contatos').select('etiquetas').eq('id', contatoId).eq('organizacao_id', org).maybeSingle();
+    if (errLe) throw new Error(errLe.message);
+    const atuais: string[] = data?.etiquetas ?? [];
+    if (aplicar && atuais.includes(nome)) return;
+    if (!aplicar && !atuais.includes(nome)) return;
+    const novas = aplicar ? [...atuais, nome] : atuais.filter((t) => t !== nome);
+    const { error } = await supabase.from('contatos').update({ etiquetas: novas }).eq('id', contatoId).eq('organizacao_id', org);
+    if (error) throw new Error(error.message);
+    invalContatos();
+    // board reflete sem esperar o poll de 8s — chaves reais são 'kanban-leads'/'kanban-naolidas'
+    // (prefixo ['kanban'] NÃO casa: react-query compara o 1º elemento por igualdade)
+    qc.invalidateQueries({ queryKey: ['kanban-leads', org] });
+  }
+
   /* ---------- CONTATO (edição pelo painel Dados do cliente) ---------- */
   async function atualizarContato(contatoId: string, patch: { nome?: string; email?: string | null; observacoes?: string | null; responsavel_id?: string | null }) {
     if (!WA_REAL || !supabase) { invalConv(); invalContatos(); return; }
@@ -245,7 +264,7 @@ export function useAtendimentoActions() {
 
   return {
     criarStatus, atualizarStatus, definirStatusPadrao, reordenarStatus, excluirStatus, contarConversasComStatus, definirStatusConversa,
-    criarEtiqueta, atualizarEtiqueta, excluirEtiqueta, definirEtiquetasConversa, definirEtiquetasContato,
+    criarEtiqueta, atualizarEtiqueta, excluirEtiqueta, definirEtiquetasConversa, definirEtiquetasContato, espelharEtiquetaContato,
     atualizarContato,
     salvarAssinatura,
   };

@@ -34,6 +34,9 @@ import { corDaSituacao, nomeExibicao, situacaoDe, tierEspera } from '../lib/waUi
 import { seedWa } from './whatsappSeed';
 import './whatsapp.css';
 
+/** Cores de etiqueta na criação inline (rotação simples — mesma família da paleta de colunas). */
+const CORES_ETQ = ['#3b82f6', '#19C37D', '#f59e0b', '#8b5cf6', '#0891b2', '#e11d48', '#d97706', '#64748b'];
+
 /* ------------------------------------------------------------------
    WhatsApp v2 — inbox de atendimento (anatomia pg-wa: fila 296px ·
    conversa · contexto 266px). A máquina vive em useInboxWhatsApp
@@ -118,6 +121,7 @@ export default function WhatsAppV2() {
   useEffect(() => { try { sessionStorage.setItem('atenvo-wa-ctx', ctxAberto ? '1' : '0'); } catch { /* privado */ } }, [ctxAberto]);
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [novaConversa, setNovaConversa] = useState(false);
+  const [novaEtq, setNovaEtq] = useState('');
   const [transferirAberto, setTransferirAberto] = useState(false);
   const [vincAberto, setVincAberto] = useState(false);
   const [fecharConfirm, setFecharConfirm] = useState(false);
@@ -422,10 +426,32 @@ export default function WhatsAppV2() {
     try { await acoes.definirStatusConversa(current.id, id); } catch { aoAvisar({ tom: 'erro', texto: 'Falha ao alterar status' }); }
   };
   const alternarEtiqueta = async (nome: string) => {
-    const novas = current.tags.includes(nome) ? current.tags.filter((t) => t !== nome) : [...current.tags, nome];
+    const aplicar = !current.tags.includes(nome);
+    const novas = aplicar ? [...current.tags, nome] : current.tags.filter((t) => t !== nome);
     inbox.setContacts((cur) => cur.map((c) => (c.id === current.id ? { ...c, tags: novas } : c)));
     if (!WA_REAL) return;
-    try { await acoes.definirEtiquetasConversa(current.id, novas); } catch { aoAvisar({ tom: 'erro', texto: 'Falha ao salvar etiquetas' }); }
+    try {
+      await acoes.definirEtiquetasConversa(current.id, novas);
+      // ponte com o Kanban: espelha no CONTATO — o card do funil lê etiquetas do contato
+      if (current.contatoId) await acoes.espelharEtiquetaContato(current.contatoId, nome, aplicar);
+    } catch { aoAvisar({ tom: 'erro', texto: 'Falha ao salvar etiquetas' }); }
+  };
+  /** Criação inline no popover (pedido do dono: sem passar pela Configurações).
+      Nome já existente (case-insensitive) só aplica — não duplica o catálogo. */
+  const criarEtiquetaInline = async () => {
+    const nome = novaEtq.trim();
+    if (!nome) return;
+    const lista = etiquetasQ.data ?? [];
+    const existente = lista.find((t) => t.nome.toLocaleLowerCase('pt-BR') === nome.toLocaleLowerCase('pt-BR'));
+    try {
+      if (!existente) await acoes.criarEtiqueta(nome, CORES_ETQ[lista.length % CORES_ETQ.length], null);
+      const alvo = existente?.nome ?? nome;
+      if (!current.tags.includes(alvo)) await alternarEtiqueta(alvo);
+      setNovaEtq('');
+      aoAvisar({ tom: 'ok', texto: existente ? `Etiqueta "${alvo}" aplicada` : `Etiqueta "${alvo}" criada e aplicada` });
+    } catch (e) {
+      aoAvisar({ tom: 'erro', texto: 'Falha na etiqueta: ' + ((e as Error)?.message ?? '') });
+    }
   };
 
   /* cobranças do contexto (agregação client-side — precedente Contatos) */
@@ -552,6 +578,8 @@ export default function WhatsAppV2() {
                             {c.contatoId && bloqueados.has(c.contatoId) && <span className="cchip alerta" style={{ color: 'var(--rubro)', borderColor: 'rgba(var(--rubro-rgb),.4)' }} title={optoutTexto}>Não incomodar</span>}
                             {/* "Finalizado" só quando a situação NÃO já é terminal (ganho/perdido/cancelado) — evita verde ao lado de PERDIDO (Adendo 3) */}
                             {finalizado && !['ganho', 'perdido', 'cancelado'].includes(sit.variante) && <span className="cchip fim">Finalizado</span>}
+                            {c.tags.slice(0, 2).map((t) => { const cor = corDaEtiqueta(t, etiquetasQ.data); return <span key={t} className="cchip etq" style={{ color: cor, borderColor: cor + '55' }} title={'Etiqueta: ' + t}><i style={{ background: cor }} />{t}</span>; })}
+                            {c.tags.length > 2 && <span className="cchip etq" title={c.tags.slice(2).join(' · ')}>+{c.tags.length - 2}</span>}
                           </span>
                         </span>
                         <span className="m">
@@ -604,6 +632,8 @@ export default function WhatsAppV2() {
                     </span>
                   )}
                   <span className="wa-hchip" title="Atendente responsável">{current.respId ? nomePorId(current.respId) ?? 'Atendente' : 'Não atribuído'}</span>
+                  {current.tags.slice(0, 3).map((t) => { const cor = corDaEtiqueta(t, etiquetasQ.data); return <span key={t} className="wa-hetq" title={'Etiqueta: ' + t}><i style={{ background: cor }} />{t}</span>; })}
+                  {current.tags.length > 3 && <span className="wa-hetq" title={current.tags.slice(3).join(' · ')}>+{current.tags.length - 3}</span>}
                 </div>
               </div>
               <div className="dir">
@@ -1053,12 +1083,22 @@ export default function WhatsAppV2() {
           {pop.kind === 'tags' && (
             <>
               <div className="ph2">Etiquetas</div>
-              {(etiquetasQ.data ?? []).filter((t) => t.ativo).length === 0 && <div className="vazio">{podeGerenciar ? 'Nenhuma etiqueta. Crie em Configurações.' : 'Peça a um gestor.'}</div>}
+              {(etiquetasQ.data ?? []).filter((t) => t.ativo).length === 0 && <div className="vazio">{podeGerenciar ? 'Nenhuma etiqueta ainda — crie abaixo.' : 'Peça a um gestor.'}</div>}
               {(etiquetasQ.data ?? []).filter((t) => t.ativo).map((t) => (
                 <button key={t.nome} type="button" className="it" onClick={() => alternarEtiqueta(t.nome)}>
                   <span className="dot" style={{ background: t.cor }} />{t.nome} {current.tags.includes(t.nome) && <span className="ck">✓</span>}
                 </button>
               ))}
+              {podeGerenciar && (
+                <div className="etq-nova">
+                  <input
+                    value={novaEtq} maxLength={40} placeholder="Nova etiqueta…" autoComplete="off"
+                    onChange={(e) => setNovaEtq(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void criarEtiquetaInline(); } }}
+                  />
+                  <button type="button" disabled={!novaEtq.trim()} onClick={() => void criarEtiquetaInline()}>Criar e aplicar</button>
+                </div>
+              )}
               {podeGerenciar && <button type="button" className="lk" onClick={() => { setPop(null); nav('/configuracoes?tab=atendimento&section=etiquetas'); }}>Gerenciar etiquetas…</button>}
             </>
           )}
