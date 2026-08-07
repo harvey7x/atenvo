@@ -132,6 +132,20 @@
 .v2 .wa-hchip { font-size: 9px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; border-radius: 5px; padding: 1.5px 6px; color: var(--txt-2); border: 1px solid rgba(var(--tint), .13); max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .v2 .wa-hchip.etapa { border-color: transparent; }
 
+/* etapa do Kanban no cabeçalho — select compacto no lugar do chip de situação */
+.v2 .wa-hmov { display: inline-flex; align-items: center; gap: 5px; min-width: 0; }
+.v2 .wa-hmov .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.v2 .wa-hsel {
+  min-width: 0; max-width: 150px; font-family: var(--fonte); font-size: 10.5px; font-weight: 600; color: var(--txt);
+  background: none; border: 1px solid rgba(var(--tint), .16); border-radius: 6px; padding: 1px 18px 1px 6px; cursor: pointer;
+  appearance: none; -webkit-appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--txt-3) 50%), linear-gradient(135deg, var(--txt-3) 50%, transparent 50%);
+  background-position: right 8px center, right 4px center; background-size: 4px 4px, 4px 4px; background-repeat: no-repeat;
+}
+.v2 .wa-hsel:hover:not(:disabled) { border-color: rgba(var(--tint), .32); }
+.v2 .wa-hsel:disabled { opacity: .55; cursor: default; }
+.v2 .wa-hsel option { color: var(--txt); background: var(--surface); }
+
 /* banners de higiene / opt-out */
 .v2 .wa-banner {
   display: flex; align-items: center; gap: 9px; padding: 7px 14px; font-size: 11.5px; color: var(--txt-2);

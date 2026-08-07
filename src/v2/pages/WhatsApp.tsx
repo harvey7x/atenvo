@@ -594,7 +594,7 @@ export default function WhatsAppV2() {
                 <div className="nm">{nomeExibicao(current)}</div>
                 <div className="sb num">
                   {current.phone ? mascararNumero(current.phone) : 'sem número'}
-                  {(() => { const sit = situacaoDe(current); const cor = corDaSituacao(current, sit.texto); return <span className={'wa-hchip etapa sit-' + sit.variante} title="Situação no funil" style={cor ? { background: cor + '26', color: cor } : undefined}>{sit.texto}</span>; })()}
+                  <EtapaTopoSel lead={current} demo={demo} aoAvisar={aoAvisar} />
                   {inbox.canalSel
                     ? <span className={'wa-hchip' + (canalEhCloud ? ' of' : '')} title={`Respondendo por ${inbox.canalSel.alias}${inbox.canalSel.numero ? ' · ' + mascararNumero(inbox.canalSel.numero) : ''} · ${canalEhCloud ? 'OFICIAL (API do WhatsApp/Meta)' : 'número conectado por QR (não oficial)'}`}>{canalEhCloud ? '✓ ' : ''}{inbox.canalSel.alias}</span>
                     : current.chip && (() => { const t = transporteDe(current.canalId); return <span className={'wa-hchip' + (t === 'cloud_api' ? ' of' : '')} title={tituloCanal(current.chip, t)}>{t === 'cloud_api' ? '✓ ' : ''}{current.chip}</span>; })()}
@@ -864,7 +864,7 @@ export default function WhatsAppV2() {
             </button>
           </div>
 
-          <KanbanCtx contatoId={current.contatoId ?? null} demo={demo} etapa={current.etapa} etapaCor={current.etapaCor} origem={current.origin} respNome={current.respId ? nomePorId(current.respId) : undefined} lead={current} aoAvisar={aoAvisar} />
+          <KanbanCtx contatoId={current.contatoId ?? null} demo={demo} etapa={current.etapa} origem={current.origin} respNome={current.respId ? nomePorId(current.respId) : undefined} lead={current} aoAvisar={aoAvisar} />
 
           <ChecklistDocsCtx contatoId={current.contatoId ?? null} demo={demo} />
 
@@ -1251,35 +1251,28 @@ export default function WhatsAppV2() {
 }
 
 /* ================================================================
-   Contexto: bloco Funil/Kanban — "Abrir no Kanban" via deep-link
-   /v2/kanban?oportunidade= (KanbanContatoBox v1 recriado; hooks reais
-   reusados; ficha judicial reusada inteira no real).
+   Cabeçalho: seletor de etapa do Kanban (movido do painel de dados).
+   Mesmos hooks do KanbanCtx — react-query deduplica. Sem oportunidade
+   aberta (ou no demo), cai no chip estático de situação.
    ================================================================ */
-function KanbanCtx({ contatoId, demo, etapa, etapaCor, origem, respNome, lead, aoAvisar }: {
-  contatoId: string | null; demo: boolean; etapa?: string | null; etapaCor?: string | null;
-  origem: string; respNome?: string; lead: WaContact; aoAvisar: (a: AvisoInbox) => void;
-}) {
-  const nav = useNavigate();
+function EtapaTopoSel({ lead, demo, aoAvisar }: { lead: WaContact; demo: boolean; aoAvisar: (a: AvisoInbox) => void }) {
+  const contatoId = lead.contatoId ?? null;
   const oppsQ = useOportunidadesDoContato(!demo ? contatoId : null);
-  const funisQ = useFunisDaOrg();
-  const abertaReal = demo ? null : (oppsQ.data ?? []).find((o) => o.aberta) ?? null;
-  const colunasQ = useColunasFunil(abertaReal?.funilId ?? null);
+  const aberta = demo ? null : (oppsQ.data ?? []).find((o) => o.aberta) ?? null;
+  const colunasQ = useColunasFunil(aberta?.funilId ?? null);
   const mover = useMoverOportunidade();
-  const [addAberto, setAddAberto] = useState(false);
-  const [funilSel, setFunilSel] = useState('');
-  const [addBusy, setAddBusy] = useState(false);
   const [movBusy, setMovBusy] = useState(false);
   const [pendCol, setPendCol] = useState<string | null>(null);        // coluna alvo enquanto salva (feedback imediato)
   const [motivoModal, setMotivoModal] = useState<null | { destinoId: string; tipo: 'perdido' | 'reabertura' }>(null);
   const [motivoSel, setMotivoSel] = useState('sem_interesse');
   const [motivoTxt, setMotivoTxt] = useState('');
   useEffect(() => { setPendCol(null); setMotivoModal(null); }, [contatoId]); // troca de conversa não herda estado de mover
-  if (!contatoId) return null;
   const colunas = colunasQ.data ?? [];
-  const aberta = demo
-    ? (etapa ? { id: 'demo-opp', funilNome: 'Funil comercial', colunaId: null as string | null, colunaNome: etapa, respNome: respNome ?? '', tipoServico: 'analise_inicial', tipoBeneficio: 'aposentadoria', valor: null, atualizadoEm: '' } : null)
-    : abertaReal;
   const colAtual = colunas.find((c) => c.id === aberta?.colunaId) ?? null;
+  if (!aberta) {
+    const sit = situacaoDe(lead); const cor = corDaSituacao(lead, sit.texto);
+    return <span className={'wa-hchip etapa sit-' + sit.variante} title="Situação no funil" style={cor ? { background: cor + '26', color: cor } : undefined}>{sit.texto}</span>;
+  }
   function aoTrocarColuna(destinoId: string) {
     if (!aberta || !destinoId || destinoId === aberta.colunaId) return;
     const destino = colunas.find((c) => c.id === destinoId);
@@ -1303,27 +1296,82 @@ function KanbanCtx({ contatoId, demo, etapa, etapaCor, origem, respNome, lead, a
     } finally { setMovBusy(false); }
   }
   return (
+    <>
+      <span className="wa-hmov" title="Etapa no funil — mover o card">
+        <span className="dot" style={{ background: colAtual?.cor ?? lead.etapaCor ?? 'var(--txt-3)' }} />
+        <select className="wa-hsel" aria-label="Mover etapa do card"
+          disabled={movBusy || colunasQ.isLoading || colunas.length === 0}
+          value={pendCol ?? aberta.colunaId ?? ''} onChange={(e) => aoTrocarColuna(e.target.value)}>
+          {colunas.length === 0 && <option value={aberta.colunaId ?? ''}>{aberta.colunaNome || (colunasQ.isLoading ? 'Carregando…' : '—')}</option>}
+          {colunas.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+        </select>
+      </span>
+      <ModalV2
+        aberto={!!motivoModal}
+        aoFechar={() => { if (!movBusy) setMotivoModal(null); }}
+        largura={400}
+        titulo={motivoModal?.tipo === 'perdido' ? 'Motivo da perda' : 'Reabrir oportunidade'}
+        rodape={
+          <>
+            <BotaoSec disabled={movBusy} onClick={() => setMotivoModal(null)}>Cancelar</BotaoSec>
+            <BotaoPrimario
+              disabled={movBusy || !motivoModal || (motivoModal.tipo === 'perdido' ? (motivoSel === 'outro' && !motivoTxt.trim()) : !motivoTxt.trim())}
+              onClick={() => {
+                if (!motivoModal) return;
+                if (motivoModal.tipo === 'perdido') void executarMover(motivoModal.destinoId, { motivoPerda: motivoSel, motivoPerdaDesc: motivoSel === 'outro' ? motivoTxt.trim() : null });
+                else void executarMover(motivoModal.destinoId, { motivoReabertura: motivoTxt.trim() });
+              }}>{movBusy ? 'Movendo…' : 'Confirmar'}</BotaoPrimario>
+          </>
+        }
+      >
+        {motivoModal?.tipo === 'perdido' ? (
+          <>
+            <div className="campo"><label>Motivo da perda</label>
+              <select className="inp" value={motivoSel} onChange={(e) => setMotivoSel(e.target.value)}>
+                {MOTIVOS_PERDA.map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              </select>
+            </div>
+            {motivoSel === 'outro' && (
+              <div className="campo" style={{ marginTop: 10 }}><label>Descreva</label>
+                <textarea className="inp" rows={2} value={motivoTxt} onChange={(e) => setMotivoTxt(e.target.value)} /></div>
+            )}
+          </>
+        ) : (
+          <div className="campo"><label>Motivo da reabertura</label>
+            <textarea className="inp" rows={2} value={motivoTxt} onChange={(e) => setMotivoTxt(e.target.value)} placeholder="Por que está reabrindo esta oportunidade?" /></div>
+        )}
+      </ModalV2>
+    </>
+  );
+}
+
+/* ================================================================
+   Contexto: bloco Funil/Kanban — "Abrir no Kanban" via deep-link
+   /v2/kanban?oportunidade= (KanbanContatoBox v1 recriado; hooks reais
+   reusados; ficha judicial reusada inteira no real).
+   ================================================================ */
+function KanbanCtx({ contatoId, demo, etapa, origem, respNome, lead, aoAvisar }: {
+  contatoId: string | null; demo: boolean; etapa?: string | null;
+  origem: string; respNome?: string; lead: WaContact; aoAvisar: (a: AvisoInbox) => void;
+}) {
+  const nav = useNavigate();
+  const oppsQ = useOportunidadesDoContato(!demo ? contatoId : null);
+  const funisQ = useFunisDaOrg();
+  const abertaReal = demo ? null : (oppsQ.data ?? []).find((o) => o.aberta) ?? null;
+  const [addAberto, setAddAberto] = useState(false);
+  const [funilSel, setFunilSel] = useState('');
+  const [addBusy, setAddBusy] = useState(false);
+  if (!contatoId) return null;
+  const aberta = demo
+    ? (etapa ? { id: 'demo-opp', funilNome: 'Funil comercial', colunaId: null as string | null, colunaNome: etapa, respNome: respNome ?? '', tipoServico: 'analise_inicial', tipoBeneficio: 'aposentadoria', valor: null, atualizadoEm: '' } : null)
+    : abertaReal;
+  return (
     <div className="ctx-b spot">
       <div className="ctx-t">Funil</div>
       {(!demo && oppsQ.isLoading) ? (
         <div className="ctx-nota">Carregando…</div>
       ) : aberta ? (
         <>
-          <div className="cx-l"><span className="k">Etapa</span>
-            {demo ? (
-              <span className="v" style={etapaCor ? { color: etapaCor } : undefined}>{aberta.colunaNome ?? etapa ?? '—'}</span>
-            ) : (
-              <span className="cx-mov">
-                <span className="cx-dot" style={{ background: colAtual?.cor ?? etapaCor ?? 'var(--txt-3)' }} />
-                <select className="cx-sel" aria-label="Mover etapa do card"
-                  disabled={movBusy || colunasQ.isLoading || colunas.length === 0}
-                  value={pendCol ?? aberta.colunaId ?? ''} onChange={(e) => aoTrocarColuna(e.target.value)}>
-                  {colunas.length === 0 && <option value="">{colunasQ.isLoading ? 'Carregando…' : '—'}</option>}
-                  {colunas.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
-                </select>
-              </span>
-            )}
-          </div>
           <div className="cx-l"><span className="k">Funil</span><span className="v">{aberta.funilNome ?? '—'}</span></div>
           <div className="cx-l"><span className="k">Responsável</span><span className="v">{aberta.respNome || 'Não atribuído'}</span></div>
           <div className="cx-l"><span className="k">Origem</span><span className="v">{origem}</span></div>
@@ -1385,41 +1433,6 @@ function KanbanCtx({ contatoId, demo, etapa, etapaCor, origem, respNome, lead, a
               {(funisQ.data ?? []).map((f) => <option key={f.id} value={f.id}>{f.nome}{f.padrao ? ' (padrão)' : ''}</option>)}
             </select>
           </div>
-        )}
-      </ModalV2>
-      <ModalV2
-        aberto={!!motivoModal}
-        aoFechar={() => { if (!movBusy) setMotivoModal(null); }}
-        largura={400}
-        titulo={motivoModal?.tipo === 'perdido' ? 'Motivo da perda' : 'Reabrir oportunidade'}
-        rodape={
-          <>
-            <BotaoSec disabled={movBusy} onClick={() => setMotivoModal(null)}>Cancelar</BotaoSec>
-            <BotaoPrimario
-              disabled={movBusy || !motivoModal || (motivoModal.tipo === 'perdido' ? (motivoSel === 'outro' && !motivoTxt.trim()) : !motivoTxt.trim())}
-              onClick={() => {
-                if (!motivoModal) return;
-                if (motivoModal.tipo === 'perdido') void executarMover(motivoModal.destinoId, { motivoPerda: motivoSel, motivoPerdaDesc: motivoSel === 'outro' ? motivoTxt.trim() : null });
-                else void executarMover(motivoModal.destinoId, { motivoReabertura: motivoTxt.trim() });
-              }}>{movBusy ? 'Movendo…' : 'Confirmar'}</BotaoPrimario>
-          </>
-        }
-      >
-        {motivoModal?.tipo === 'perdido' ? (
-          <>
-            <div className="campo"><label>Motivo da perda</label>
-              <select className="inp" value={motivoSel} onChange={(e) => setMotivoSel(e.target.value)}>
-                {MOTIVOS_PERDA.map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-              </select>
-            </div>
-            {motivoSel === 'outro' && (
-              <div className="campo" style={{ marginTop: 10 }}><label>Descreva</label>
-                <textarea className="inp" rows={2} value={motivoTxt} onChange={(e) => setMotivoTxt(e.target.value)} /></div>
-            )}
-          </>
-        ) : (
-          <div className="campo"><label>Motivo da reabertura</label>
-            <textarea className="inp" rows={2} value={motivoTxt} onChange={(e) => setMotivoTxt(e.target.value)} placeholder="Por que está reabrindo esta oportunidade?" /></div>
         )}
       </ModalV2>
     </div>
