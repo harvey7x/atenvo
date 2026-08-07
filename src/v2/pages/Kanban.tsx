@@ -282,6 +282,8 @@ export default function KanbanV2() {
   // v3 — ordenação inteligente (persistida) + Foco (filtro opcional, NÃO ocupa espaço vertical) + recolher coluna.
   const [sortModo, setSortModo] = useState<SortModo>(() => { try { const s = sessionStorage.getItem('atenvo-kb-sort'); return s === 'valor' || s === 'recencia' ? s : 'urgencia'; } catch { return 'urgencia'; } });
   const [foco, setFoco] = useState(false); // some por padrão (Kanban é o protagonista) — liga sob demanda
+  const [equipe, setEquipe] = useState(false); // painel "Carga por responsável" — opt-in, não ocupa espaço quando off
+  const [filtroResp, setFiltroResp] = useState<string | null>(null); // filtra o board por atendente (chave = respId ou '__none__')
   const [colsRecolhidas, setColsRecolhidas] = useState<Record<string, boolean>>(() => { try { return JSON.parse(sessionStorage.getItem('atenvo-kb-cols') || '{}'); } catch { return {}; } });
   useEffect(() => { try { sessionStorage.setItem('atenvo-kb-sort', sortModo); } catch { /* privado */ } }, [sortModo]);
   useEffect(() => { try { sessionStorage.setItem('atenvo-kb-cols', JSON.stringify(colsRecolhidas)); } catch { /* privado */ } }, [colsRecolhidas]);
@@ -319,7 +321,9 @@ export default function KanbanV2() {
     return termDig.length >= 3 && (l.telefone ?? '').replace(/\D/g, '').includes(termDig);
   };
   const origemDe = (l: KLead) => l.canalNome || l.origem || 'Sem origem'; // v2.1: origem do card/filtro
-  const leadsVisiveis = useMemo(() => leads.filter((l) => matchBusca(l) && (!filtroOrigem || origemDe(l) === filtroOrigem)), [leads, term, termDig, filtroOrigem]); // eslint-disable-line react-hooks/exhaustive-deps
+  // v3 F2 — chave estável do responsável (id em prod; nome como reserva; '__none__' = sem dono).
+  const respKeyDe = (l: KLead) => l.respId || (l.respNome ? 'n:' + l.respNome : '__none__');
+  const leadsVisiveis = useMemo(() => leads.filter((l) => matchBusca(l) && (!filtroOrigem || origemDe(l) === filtroOrigem) && (!filtroResp || respKeyDe(l) === filtroResp)), [leads, term, termDig, filtroOrigem, filtroResp]); // eslint-disable-line react-hooks/exhaustive-deps
   // severidade máxima de SLA por lead, uma vez por render (386 cards no real: o sort não pode realocar por comparação)
   const SEV_PESO: Record<string, number> = { imediato: 5, critico: 4, vermelho: 3, amarelo: 2, leve: 1 };
   const sevPorLead = useMemo(() => {
@@ -396,6 +400,27 @@ export default function KanbanV2() {
     for (const c of [...neutras].sort((a, b) => b.ordem - a.ordem)) { if (escolhidas.length >= 2) break; push(c); }
     return escolhidas.sort((a, b) => a.ordem - b.ordem).slice(0, 2).map((c) => ({ col: c, n: ativosPorColuna.get(c.id) ?? 0 }));
   }, [colunas, ativosPorColuna]);
+
+  /* ---------- v3 F2: CARGA POR RESPONSÁVEL — quem está sobrecarregado num relance (client-side).
+     ativos / parados / críticos por atendente; clicar filtra o board (filtroResp). */
+  const cargaPorResp = useMemo(() => {
+    const m = new Map<string, { key: string; nome: string; ativos: number; parados: number; criticos: number }>();
+    for (const l of abertos) {
+      const key = respKeyDe(l);
+      const nome = l.respNome || 'Não atribuído';
+      const e = m.get(key) ?? { key, nome, ativos: 0, parados: 0, criticos: 0 };
+      e.ativos += 1;
+      if (estaParado(l)) e.parados += 1;
+      if (ehCritico(l)) e.criticos += 1;
+      m.set(key, e);
+    }
+    // sem dono por último; o resto por carga (críticos, depois parados, depois ativos)
+    return [...m.values()].sort((a, b) => {
+      if ((a.key === '__none__') !== (b.key === '__none__')) return a.key === '__none__' ? 1 : -1;
+      return b.criticos - a.criticos || b.parados - a.parados || b.ativos - a.ativos;
+    });
+  }, [abertos, colunas, sevPorLead, slaPorOpp]); // eslint-disable-line react-hooks/exhaustive-deps
+  const cargaMax = useMemo(() => Math.max(1, ...cargaPorResp.map((c) => c.ativos)), [cargaPorResp]);
 
   /* reconciliação do otimista (v1): entrada some quando o servidor confirma */
   useEffect(() => {
@@ -843,6 +868,12 @@ export default function KanbanV2() {
               title="Mostra só os leads que exigem ação agora — sem esconder o board" onClick={() => setFoco((f) => !f)}>
               ◆ Foco{foco ? ' ativo' : ''}
             </button>
+            {cargaPorResp.length > 1 && (
+              <button type="button" className={'kb-fchip' + (equipe ? ' on' : '')} aria-pressed={equipe}
+                title="Carga por responsável — quem está sobrecarregado" onClick={() => { if (equipe) setFiltroResp(null); setEquipe((e) => !e); }}>
+                Equipe
+              </button>
+            )}
             {origens.length > 1 && (
               <div className="kb-filtro-origem" role="group" aria-label="Filtrar por canal de origem (leads ativos)">
                 <button type="button" className={'kb-fchip' + (!filtroOrigem ? ' on' : '')} onClick={() => setFiltroOrigem(null)}>Todas</button>
@@ -854,6 +885,30 @@ export default function KanbanV2() {
               </div>
             )}
           </div>
+
+          {/* v3 F2 — Carga por responsável (opt-in): quem está sobrecarregado; clicar filtra o board */}
+          {equipe && cargaPorResp.length > 1 && (
+            <div className="kb-carga sobe" role="group" aria-label="Carga por responsável">
+              {filtroResp && <button type="button" className="kb-carga-todos" onClick={() => setFiltroResp(null)}>Ver todos</button>}
+              {cargaPorResp.map((c) => (
+                <button key={c.key} type="button"
+                  className={'kb-carga-c' + (filtroResp === c.key ? ' on' : '') + (c.key === '__none__' ? ' semdono' : '')}
+                  title={`${c.nome}: ${c.ativos} ativo(s), ${c.parados} parado(s), ${c.criticos} crítico(s) · clique para filtrar`}
+                  onClick={() => setFiltroResp((f) => (f === c.key ? null : c.key))}>
+                  <span className="kb-carga-av">{c.key === '__none__' ? '·' : initials(c.nome)}</span>
+                  <span className="tx">
+                    <span className="nm">{c.nome}</span>
+                    <span className="mt">
+                      <b className="num">{c.ativos}</b> ativos
+                      {c.parados > 0 && <span className="par num"> · {c.parados} parados</span>}
+                      {c.criticos > 0 && <span className="cri num"> · {c.criticos} crít.</span>}
+                    </span>
+                    <span className="bar"><i style={{ width: Math.round((c.ativos / cargaMax) * 100) + '%' }} /></span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
         </>
       )}
 
@@ -1216,11 +1271,13 @@ function CardKc({ l, colunas, naoLidas, sla, fichaStatus, optout, moving, arrast
   const tier = hot ? ' hot' : warm ? ' warm' : '';
   const servLbl = l.tipoServico !== 'analise_inicial' ? rotuloDe(TIPO_SERVICO, l.tipoServico) : '';
   const sub = [l.tipoBeneficio ? rotuloDe(TIPO_BENEFICIO, l.tipoBeneficio) : '', servLbl].filter(Boolean).join(' · ');
-  // UM indicador discreto de próximo passo (o mais informativo). A estagnação já vive no "parado Xd" ao lado.
+  // v3 F2 — PRÓXIMO PASSO: 1 badge que diz o que FAZER (não só o que é). "Sem responsável" já vive
+  // em âmbar na linha do atendente; a estagnação, no "parado Xd" ao lado — o badge não os repete.
   const badge = optout ? { cls: 'blk', txt: 'Não incomodar' }
-    : naoLidas > 0 ? { cls: 'msg', txt: `${Math.min(naoLidas, 99)} nova${naoLidas === 1 ? '' : 's'}` }
-    : fichaStatus === 'rascunho' ? { cls: 'ficha', txt: 'Ficha pendente' }
-    : quente ? { cls: 'ficha', txt: 'Lead quente' }
+    : naoLidas > 0 ? { cls: 'msg', txt: `Responder · ${Math.min(naoLidas, 99)}` }
+    : quente ? { cls: 'hot', txt: 'Responder agora' }
+    : fichaStatus === 'rascunho' ? { cls: 'ficha', txt: 'Finalizar ficha' }
+    : hot && paradoAtivo ? { cls: 'hot', txt: 'Retomar contato' }
     : fichaStatus === 'finalizada' ? { cls: 'ok', txt: 'Ficha ✓' }
     : null;
 

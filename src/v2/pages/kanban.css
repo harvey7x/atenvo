@@ -367,9 +367,38 @@
 .v2 .kc-time.hot { color: var(--rubro); font-weight: 700; }
 .v2 .kc-badge { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; margin-top: 8px; font-size: 9px; font-weight: 600; border-radius: 6px; padding: 2px 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .v2 .kc-badge.blk { background: var(--rubro-bg); color: var(--rubro); }
+.v2 .kc-badge.hot { background: var(--rubro-bg); color: var(--rubro); }
 .v2 .kc-badge.msg { background: rgba(var(--tint), .1); color: var(--txt); }
 .v2 .kc-badge.ficha { background: var(--ambar-bg); color: var(--ambar); }
 .v2 .kc-badge.ok { background: var(--verde-bg); color: var(--verde); }
+
+/* ---- F2: painel Carga por responsável (opt-in) ---- */
+.v2 .kb-carga { flex-shrink: 0; display: flex; align-items: stretch; gap: 8px; flex-wrap: wrap; margin: 0 0 11px; padding-bottom: 11px; border-bottom: 1px solid var(--linha); }
+.v2 .kb-carga-todos { align-self: center; font-size: 10.5px; font-family: var(--fonte); color: var(--txt-2); background: none; border: 1px solid rgba(var(--tint), .12); border-radius: 99px; padding: 5px 11px; cursor: pointer; }
+.v2 .kb-carga-todos:hover { color: var(--txt); background: rgba(var(--tint), .06); }
+.v2 .kb-carga-c {
+  display: flex; align-items: center; gap: 9px; text-align: left; font-family: var(--fonte); cursor: pointer;
+  min-width: 168px; background: rgba(var(--tint), .025); border: 1px solid rgba(var(--tint), .08);
+  border-radius: 11px; padding: 8px 12px 8px 9px; transition: transform .14s var(--ease), border-color .14s, background .14s;
+}
+.v2 .kb-carga-c:hover { transform: translateY(-1px); border-color: rgba(var(--tint), .2); }
+.v2 .kb-carga-c.on { border-color: rgba(var(--tint), .32); background: rgba(var(--tint), .07); box-shadow: inset 0 1px 0 rgba(var(--tint), .1); }
+.v2 .kb-carga-c .kb-carga-av {
+  width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0; font-size: 9.5px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; color: var(--txt-2);
+  background: linear-gradient(150deg, #2B2E34, var(--surface)); box-shadow: inset 0 0 0 1px rgba(var(--tint), .16);
+}
+.v2 .kb-carga-c.semdono .kb-carga-av { background: rgba(var(--ambar-rgb), .12); color: var(--ambar); box-shadow: inset 0 0 0 1px rgba(var(--ambar-rgb), .3); }
+.v2 .kb-carga-c .tx { min-width: 0; display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.v2 .kb-carga-c .nm { font-size: 11.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2 .kb-carga-c .mt { font-size: 10px; color: var(--txt-3); white-space: nowrap; }
+.v2 .kb-carga-c .mt b { color: var(--txt-2); font-weight: 700; }
+.v2 .kb-carga-c .mt .par { color: var(--ambar); }
+.v2 .kb-carga-c .mt .cri { color: var(--rubro); font-weight: 600; }
+.v2 .kb-carga-c .bar { display: block; height: 3px; border-radius: 99px; background: rgba(var(--tint), .1); overflow: hidden; margin-top: 3px; }
+.v2 .kb-carga-c .bar i { display: block; height: 100%; border-radius: 99px; background: rgba(var(--tint), .4); }
+:root[data-tema="light"] .v2 .kb-carga-c { background: #FFFFFF; box-shadow: var(--sombra-1); border-color: var(--linha); }
+:root[data-tema="light"] .v2 .kb-carga-c .kb-carga-av { background: linear-gradient(150deg, #E9ECF0, #C2C8D1); color: #3A3F47; }
 /* peek do hover reusa a máquina .kc-mais (max-height/opacity já definidas acima) */
 .v2 .kc-peek { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .v2 .kc-peek .v { font-size: 12px; font-weight: 600; }
