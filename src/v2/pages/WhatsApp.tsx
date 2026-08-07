@@ -594,7 +594,7 @@ export default function WhatsAppV2() {
                 <div className="nm">{nomeExibicao(current)}</div>
                 <div className="sb num">
                   {current.phone ? mascararNumero(current.phone) : 'sem número'}
-                  <EtapaTopoSel lead={current} demo={demo} aoAvisar={aoAvisar} />
+                  <SituacaoChipTopo lead={current} demo={demo} />
                   {inbox.canalSel
                     ? <span className={'wa-hchip' + (canalEhCloud ? ' of' : '')} title={`Respondendo por ${inbox.canalSel.alias}${inbox.canalSel.numero ? ' · ' + mascararNumero(inbox.canalSel.numero) : ''} · ${canalEhCloud ? 'OFICIAL (API do WhatsApp/Meta)' : 'número conectado por QR (não oficial)'}`}>{canalEhCloud ? '✓ ' : ''}{inbox.canalSel.alias}</span>
                     : current.chip && (() => { const t = transporteDe(current.canalId); return <span className={'wa-hchip' + (t === 'cloud_api' ? ' of' : '')} title={tituloCanal(current.chip, t)}>{t === 'cloud_api' ? '✓ ' : ''}{current.chip}</span>; })()}
@@ -607,6 +607,7 @@ export default function WhatsAppV2() {
                 </div>
               </div>
               <div className="dir">
+                <EtapaTopoSel lead={current} demo={demo} aoAvisar={aoAvisar} />
                 {inbox.donoEfetivo
                   ? <BotaoMini title="Transferir atendimento" onClick={() => setTransferirAberto(true)}>Transferir</BotaoMini>
                   : <BotaoSec mini title="Assumir atendimento" disabled={inbox.atribuindo} onClick={inbox.assumir}>Assumir</BotaoSec>}
@@ -1251,9 +1252,24 @@ export default function WhatsAppV2() {
 }
 
 /* ================================================================
-   Cabeçalho: seletor de etapa do Kanban (movido do painel de dados).
-   Mesmos hooks do KanbanCtx — react-query deduplica. Sem oportunidade
-   aberta (ou no demo), cai no chip estático de situação.
+   Cabeçalho: situação do funil no subtítulo — chip estático apenas
+   quando NÃO há card aberto (com card, o botão-seletor de etapa ao
+   lado de Transferir assume o lugar). Mesma query do EtapaTopoSel —
+   react-query deduplica.
+   ================================================================ */
+function SituacaoChipTopo({ lead, demo }: { lead: WaContact; demo: boolean }) {
+  const oppsQ = useOportunidadesDoContato(!demo ? (lead.contatoId ?? null) : null);
+  if (!demo && (oppsQ.isLoading || (oppsQ.data ?? []).some((o) => o.aberta))) return null;
+  const sit = situacaoDe(lead); const cor = corDaSituacao(lead, sit.texto);
+  return <span className={'wa-hchip etapa sit-' + sit.variante} title="Situação no funil" style={cor ? { background: cor + '26', color: cor } : undefined}>{sit.texto}</span>;
+}
+
+/* ================================================================
+   Cabeçalho: seletor de etapa do Kanban (movido do painel de dados)
+   ao lado de Transferir/Arquivar — MESMO formato dos BotaoMini
+   (.p-btn.btn-sec.btn-mini herda hover e os 2 temas), com dot na cor
+   da coluna e o <select> nativo invisível por cima. Só aparece com
+   oportunidade aberta; mesmos hooks do KanbanCtx (deduplicados).
    ================================================================ */
 function EtapaTopoSel({ lead, demo, aoAvisar }: { lead: WaContact; demo: boolean; aoAvisar: (a: AvisoInbox) => void }) {
   const contatoId = lead.contatoId ?? null;
@@ -1269,10 +1285,7 @@ function EtapaTopoSel({ lead, demo, aoAvisar }: { lead: WaContact; demo: boolean
   useEffect(() => { setPendCol(null); setMotivoModal(null); }, [contatoId]); // troca de conversa não herda estado de mover
   const colunas = colunasQ.data ?? [];
   const colAtual = colunas.find((c) => c.id === aberta?.colunaId) ?? null;
-  if (!aberta) {
-    const sit = situacaoDe(lead); const cor = corDaSituacao(lead, sit.texto);
-    return <span className={'wa-hchip etapa sit-' + sit.variante} title="Situação no funil" style={cor ? { background: cor + '26', color: cor } : undefined}>{sit.texto}</span>;
-  }
+  if (!aberta) return null;
   function aoTrocarColuna(destinoId: string) {
     if (!aberta || !destinoId || destinoId === aberta.colunaId) return;
     const destino = colunas.find((c) => c.id === destinoId);
@@ -1295,14 +1308,16 @@ function EtapaTopoSel({ lead, demo, aoAvisar }: { lead: WaContact; demo: boolean
       setPendCol(null);                                                 // reverte o select ao valor real
     } finally { setMovBusy(false); }
   }
+  const nomeVisivel = (pendCol ? colunas.find((c) => c.id === pendCol)?.nome : null) ?? colAtual?.nome ?? aberta.colunaNome ?? '—';
   return (
     <>
-      <span className="wa-hmov" title="Etapa no funil — mover o card">
+      <span className={'p-btn btn-sec btn-mini wa-hetapa' + (movBusy ? ' off' : '')} title={`Etapa no funil: ${nomeVisivel} — clique para mover o card`}>
         <span className="dot" style={{ background: colAtual?.cor ?? lead.etapaCor ?? 'var(--txt-3)' }} />
-        <select className="wa-hsel" aria-label="Mover etapa do card"
+        <span className="tx">{nomeVisivel}</span>
+        <select aria-label="Mover etapa do card"
           disabled={movBusy || colunasQ.isLoading || colunas.length === 0}
           value={pendCol ?? aberta.colunaId ?? ''} onChange={(e) => aoTrocarColuna(e.target.value)}>
-          {colunas.length === 0 && <option value={aberta.colunaId ?? ''}>{aberta.colunaNome || (colunasQ.isLoading ? 'Carregando…' : '—')}</option>}
+          {colunas.length === 0 && <option value={aberta.colunaId ?? ''}>{aberta.colunaNome || '—'}</option>}
           {colunas.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
         </select>
       </span>
