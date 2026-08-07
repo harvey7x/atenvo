@@ -387,6 +387,20 @@ export default function KanbanV2() {
     for (const l of abertosNoRecorte) { const cid = colunaDoLead(l); if (cid) m.set(cid, (m.get(cid) ?? 0) + 1); }
     return m;
   }, [abertosNoRecorte]); // eslint-disable-line react-hooks/exhaustive-deps
+  // v3 F3 — parados por coluna → a etapa que mais trava (mesmo limiar do selo "Gargalo": ≥5 e >40% da etapa).
+  const paradosPorColuna = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const l of abertosNoRecorte) if (estaParado(l)) { const cid = colunaDoLead(l); if (cid) m.set(cid, (m.get(cid) ?? 0) + 1); }
+    return m;
+  }, [abertosNoRecorte, colunas]); // eslint-disable-line react-hooks/exhaustive-deps
+  const gargaloTop = useMemo(() => {
+    let best: { col: KColuna; n: number } | null = null;
+    for (const [cid, n] of paradosPorColuna) {
+      const total = ativosPorColuna.get(cid) ?? n;
+      if (n >= 5 && n / total > 0.4 && (!best || n > best.n)) { const col = colunas.find((c) => c.id === cid); if (col) best = { col, n }; }
+    }
+    return best;
+  }, [paradosPorColuna, ativosPorColuna, colunas]);
   const colGanho = useMemo(() => colunas.find((c) => c.resultado === 'ganho') ?? null, [colunas]);
   const nFechados = useMemo(() => (colGanho ? leads.filter((l) => l.status === 'ganho' && (!filtroOrigem || origemDe(l) === filtroOrigem)).length : 0), [leads, colGanho, filtroOrigem]); // eslint-disable-line react-hooks/exhaustive-deps
   const kpisEtapa = useMemo(() => {
@@ -835,10 +849,10 @@ export default function KanbanV2() {
               <div className="meta">{somaPotencial > 0 ? fmtBRL(somaPotencial) + ' em potencial' : 'no funil'}</div>
             </div>
             <button type="button" className={'kb-kpi crit acao' + (foco ? ' on' : '')} aria-pressed={foco}
-              title="Leads sem trocar de coluna há mais de 7 dias. Clique para focar só no que exige ação agora."
+              title={gargaloTop ? `Etapa mais travada: ${gargaloTop.col.nome} (${gargaloTop.n} parados). Clique para focar só no que exige ação agora.` : 'Leads sem trocar de coluna há mais de 7 dias. Clique para focar só no que exige ação agora.'}
               onClick={() => setFoco((f) => !f)}>
               <div className="lab">Parados +{LIMIAR_PARADO_DIAS}d</div><div className="val num">{nParados}</div>
-              <div className="meta">{abertosNoRecorte.length > 0 ? Math.round((nParados / abertosNoRecorte.length) * 100) + '% — ' : ''}{foco ? 'focando' : 'ver só estes'}</div>
+              <div className="meta">{abertosNoRecorte.length > 0 ? Math.round((nParados / abertosNoRecorte.length) * 100) + '%' : ''}{foco ? ' — focando' : gargaloTop ? ' · trava em ' + gargaloTop.col.nome : nParados > 0 ? ' — ver só estes' : ''}</div>
             </button>
             <div className="kb-kpi warn" title="Fichas judiciais em rascunho, ainda não finalizadas.">
               <div className="lab">Pendentes</div><div className="val num">{nFichaPend}</div>
@@ -1014,7 +1028,7 @@ export default function KanbanV2() {
                         <span className="rec">· {nRecentesCol} recente{nRecentesCol === 1 ? '' : 's'}</span>
                       </>
                     )}
-                  {gargalo && <span className="glr" title="Muitos leads travados nesta etapa — possível gargalo do funil">Gargalo</span>}
+                  {gargalo && <span className="glr" title={`${nParadosCol} leads travados +${LIMIAR_PARADO_DIAS}d nesta etapa — gargalo do funil`}>Gargalo · {nParadosCol}</span>}
                   {soma > 0 && <span className="soma num">{somaCompacta(soma)}</span>}
                 </div>
                 <div
