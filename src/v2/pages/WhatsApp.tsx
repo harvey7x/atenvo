@@ -24,6 +24,8 @@ import { MediaComposer } from '@/components/MediaComposer';
 import { ScriptSequenceModal } from '@/components/ScriptSequenceModal';
 import { FichaJudicialBox } from '@/components/FichaJudicialBox';
 import { useSendWaMessage } from '@/data/whatsapp';
+import { mensagemAssumir, useAlertasLeadQuente } from '@/data/alertasLeadQuente';
+import { AlertaLeadQuenteModal } from '../components/AlertaLeadQuenteModal';
 import { useInboxWhatsApp, type AvisoInbox } from '../hooks/useInboxWhatsApp';
 import { AudioRecorderV2 } from '../components/AudioRecorderV2';
 import { AgendarMensagemModalV2 } from './AgendarMensagemModalV2';
@@ -90,6 +92,23 @@ export default function WhatsAppV2() {
   const inbox = useInboxWhatsApp({ aoAvisar, seedDemo: useMemo(() => seedWa(), []), bloqueadosDemo: useMemo(() => new Set(['wa-cleusa-ct']), []) });
   const { demo, contacts, current, currentId, relogioMs } = inbox;
   const sendMut = useSendWaMessage();
+
+  // LEAD QUENTE: fila de alertas de abandono do bot (Realtime). Um modal por vez,
+  // mais antigo primeiro; assumir = claim atômico no banco -> abre a conversa e
+  // envia a mensagem fixa pelo transporte do canal da conversa (evolution-send).
+  const alertasLq = useAlertasLeadQuente();
+  const alertaLq = demo ? null : alertasLq.fila[0] ?? null;
+  const assumirLeadQuente = async () => {
+    if (!alertaLq) return { ok: false as const, motivo: 'erro' as const };
+    const r = await alertasLq.assumir(alertaLq.id);
+    if (r.ok) {
+      inbox.selecionarPorDeepLink(r.conversaId);
+      const primeiro = (user?.name ?? '').trim().split(/\s+/)[0] ?? '';
+      sendMut.mutate({ conversaId: r.conversaId, text: mensagemAssumir(primeiro) });
+      void alertasLq.recarregar();
+    }
+    return r;
+  };
 
   /* ---------- UI ---------- */
   const [draft, setDraft] = useState('');
@@ -1119,6 +1138,14 @@ export default function WhatsAppV2() {
             if (ok) { setNovaConversa(false); window.setTimeout(() => textareaRef.current?.focus(), 60); }
             return ok;
           }}
+        />
+      )}
+      {alertaLq && (
+        <AlertaLeadQuenteModal
+          key={alertaLq.id}
+          alerta={alertaLq}
+          aoAssumir={assumirLeadQuente}
+          aoDispensar={() => void alertasLq.dispensar(alertaLq.id)}
         />
       )}
       {transferirAberto && (
