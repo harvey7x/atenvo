@@ -619,15 +619,26 @@ async function tratarComBotoes(p: {
   //      mulher -> Matheus; homem -> rodízio Giovana/Juliana; ambíguo -> sem consultor (humano decide,
   //      cartão sai como "CAF – Assessoria"). A ATRIBUIÇÃO no banco acontece depois do envio. ----
   let consultorFinal: { id: string; nome: string; chave: string; cartao: string } | null = null;
+  let conversaJaTemDono = false;
   let finalizarDados: Record<string, unknown> = {};
   if (r.acoes?.finalizar) {
     const g = r.acoes.finalizar.genero;
-    // Distribuição: mulher -> Matheus; homem -> rodízio Giovana/Juliana; ambíguo -> rodízio entre os
-    // TRÊS (ninguém sem dono). O consultor vira o responsavel_id (interno); o cliente NÃO o vê.
-    if (g === 'mulher') consultorFinal = CONSULTORES.matheus;
-    else if (g === 'homem') consultorFinal = await proximoConsultorHomem(admin);
-    else consultorFinal = await proximoConsultorTres(admin);
-    const roteamento = consultorFinal ? 'auto' : 'indefinido';
+    // Distribuição: decidida no BANCO (RPC bot_rotear_consultor): mulher -> Matheus; homem ->
+    // Giovana/Juliana alternando; ambíguo -> menor placar. Placar é DO DIA (fuso SP), com teto
+    // de +3 sobre quem tem menos e trava de nunca sobrescrever atendente já definido.
+    // Fallback = régua local antiga (all-time), pro fecho nunca ficar sem dono se a RPC cair.
+    try {
+      const { data, error } = await admin.rpc('bot_rotear_consultor', { p_conversa: conversaId, p_genero: g });
+      if (error) throw error;
+      const rot = Array.isArray(data) ? data[0] : data;
+      if (rot?.ja_tinha_atendente) conversaJaTemDono = true;
+      else consultorFinal = (CONSULTORES as Record<string, typeof CONSULTORES.matheus>)[rot?.consultor_chave ?? ''] ?? null;
+    } catch {
+      if (g === 'mulher') consultorFinal = CONSULTORES.matheus;
+      else if (g === 'homem') consultorFinal = await proximoConsultorHomem(admin);
+      else consultorFinal = await proximoConsultorTres(admin);
+    }
+    const roteamento = conversaJaTemDono ? 'ja_tinha_dono' : (consultorFinal ? 'auto' : 'indefinido');
     // Cartão: NOME genérico fixo (o número é sempre o do Murillo, vem da tela do motor). A distribuição
     // interna fica só no responsavel_id — não aparece no vCard. (Fallback p/ preferências antigas.)
     const nomeCartao = r.acoes.finalizar.preferencia === 'contato_murillo' ? CARD_ATENDIMENTO_NOME : (consultorFinal?.cartao ?? 'CAF – Assessoria');
@@ -743,6 +754,9 @@ async function tratarComBotoes(p: {
   if (r.acoes?.finalizar) {
     if (consultorFinal) {
       try { await admin.from('contatos').update({ responsavel_id: consultorFinal.id }).eq('id', conv.contato_id); } catch { /* best-effort */ }
+      try { await admin.rpc('bot_pausar', { p_conversa: conversaId, p_motivo: 'humano_assumiu' }); } catch { /* best-effort */ }
+    } else if (conversaJaTemDono) {
+      // conversa já tem atendente humano: NÃO mexe na atribuição; só pausa o bot (fluxo acabou).
       try { await admin.rpc('bot_pausar', { p_conversa: conversaId, p_motivo: 'humano_assumiu' }); } catch { /* best-effort */ }
     } else {
       try {
