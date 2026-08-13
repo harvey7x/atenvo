@@ -70,8 +70,13 @@ export function useAlertasLeadQuente() {
       .select('id, conversa_id, passo, abandonado_em, contatos(nome, telefone)')
       .eq('organizacao_id', orgId)
       .eq('status', 'pendente')
-      .order('criado_em', { ascending: true });
-    if (!error) setFila(((data ?? []) as unknown as LinhaAlerta[]).map(mapAlerta));
+      // abandono mais ANTIGO primeiro (mais urgente) — criado_em empata quando o vigia
+      // cria vários no mesmo tick do cron.
+      .order('abandonado_em', { ascending: true });
+    // NUNCA engolir o erro: foi um 403 silencioso (grant ausente) que segurou o modal
+    // por um dia inteiro. Loga e mantém a fila anterior; o tick de 60s tenta de novo.
+    if (error) { console.error('[alerta-lq] busca falhou:', error.message); return; }
+    setFila(((data ?? []) as unknown as LinhaAlerta[]).map(mapAlerta));
   }, [orgId]);
 
   useEffect(() => {

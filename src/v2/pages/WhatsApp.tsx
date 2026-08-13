@@ -1144,6 +1144,7 @@ export default function WhatsAppV2() {
         <AlertaLeadQuenteModal
           key={alertaLq.id}
           alerta={alertaLq}
+          qtdFila={Math.max(0, alertasLq.fila.length - 1)}
           aoAssumir={assumirLeadQuente}
           aoDispensar={() => void alertasLq.dispensar(alertaLq.id)}
         />

@@ -35,14 +35,19 @@ function tocarSino() {
   } catch { /* autoplay bloqueado sem gesto — o modal visual continua */ }
 }
 
-function cronometro(desdeIso: string, agoraMs: number): string {
+function cronometro(desdeIso: string, agoraMs: number): { rotulo: string; minutos: number } {
   const s = Math.max(0, Math.floor((agoraMs - new Date(desdeIso).getTime()) / 1000));
   const mm = Math.floor(s / 60); const ss = s % 60;
-  return `${mm}:${String(ss).padStart(2, '0')}`;
+  return { rotulo: `${mm}:${String(ss).padStart(2, '0')}`, minutos: mm };
 }
 
-export function AlertaLeadQuenteModal({ alerta, aoAssumir, aoDispensar }: {
+/** Cronômetro fica "quente" (rubro) depois deste tanto de minutos de abandono. */
+const MIN_CRONOMETRO_QUENTE = 15;
+
+export function AlertaLeadQuenteModal({ alerta, qtdFila = 0, aoAssumir, aoDispensar }: {
   alerta: AlertaLeadQuente;
+  /** quantos alertas ALÉM deste aguardam na fila (mostra "+N na fila") */
+  qtdFila?: number;
   aoAssumir: () => Promise<ResultadoAssumir>;
   aoDispensar: () => void;
 }) {
@@ -82,28 +87,34 @@ export function AlertaLeadQuenteModal({ alerta, aoAssumir, aoDispensar }: {
   };
 
   if (!raiz) return null;
+  const cron = cronometro(alerta.abandonadoEm, agora);
+  const quente = cron.minutos >= MIN_CRONOMETRO_QUENTE;
   return createPortal(
     <div className="veu" style={{ zIndex: 300 }}>
       <div className="p-modal vidro" role="alertdialog" aria-label="Lead quente abandonou o fluxo"
            style={{ width: 460, padding: 0, overflow: 'hidden' }}>
-        {/* faixa de urgência */}
+        {/* faixa de urgência — tokens do sistema (rubro) p/ funcionar nos DOIS temas */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: 10, padding: '13px 18px',
-          background: 'linear-gradient(90deg, rgba(255,107,92,.14), transparent 70%)',
+          background: 'linear-gradient(90deg, rgba(var(--rubro-rgb), .13), transparent 70%)',
           borderBottom: '1px solid var(--linha)',
         }}>
           <span aria-hidden style={{
-            width: 9, height: 9, borderRadius: '50%', background: '#ff6b5c',
-            boxShadow: '0 0 0 0 rgba(255,107,92,.5)', animation: 'alq-pulso 1.6s ease-out infinite',
+            width: 9, height: 9, borderRadius: '50%', background: 'var(--rubro)',
+            boxShadow: '0 0 0 0 rgba(var(--rubro-rgb), .5)', animation: 'alq-pulso 1.6s ease-out infinite',
           }} />
-          <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: '#ff8a7a' }}>
-            Lead quente — abandonou o fluxo
+          <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--rubro)' }}>
+            Lead quente
           </div>
+          {qtdFila > 0 && (
+            <span style={{ fontSize: 11.5, color: 'var(--txt-3)', fontWeight: 600 }}>+{qtdFila} na fila</span>
+          )}
+          {/* cronômetro grande desde o abandono; esquenta (rubro) após 15 min */}
           <div style={{
-            marginLeft: 'auto', fontVariantNumeric: 'tabular-nums', fontSize: 20, fontWeight: 700,
-            color: 'var(--txt)',
+            marginLeft: 'auto', fontVariantNumeric: 'tabular-nums', fontSize: 22, fontWeight: 700,
+            color: quente ? 'var(--rubro)' : 'var(--txt)', transition: 'color .4s',
           }}>
-            {cronometro(alerta.abandonadoEm, agora)}
+            {cron.rotulo}
           </div>
         </div>
 
@@ -143,7 +154,7 @@ export function AlertaLeadQuenteModal({ alerta, aoAssumir, aoDispensar }: {
           )}
         </div>
       </div>
-      <style>{'@keyframes alq-pulso { 0% { box-shadow: 0 0 0 0 rgba(255,107,92,.5); } 70% { box-shadow: 0 0 0 9px rgba(255,107,92,0); } 100% { box-shadow: 0 0 0 0 rgba(255,107,92,0); } }'}</style>
+      <style>{'@keyframes alq-pulso { 0% { box-shadow: 0 0 0 0 rgba(var(--rubro-rgb),.5); } 70% { box-shadow: 0 0 0 9px rgba(var(--rubro-rgb),0); } 100% { box-shadow: 0 0 0 0 rgba(var(--rubro-rgb),0); } }'}</style>
     </div>,
     raiz,
   );
