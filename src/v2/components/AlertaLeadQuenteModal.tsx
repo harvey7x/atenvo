@@ -41,8 +41,27 @@ function cronometro(desdeIso: string, agoraMs: number): { rotulo: string; minuto
   return { rotulo: `${mm}:${String(ss).padStart(2, '0')}`, minutos: mm };
 }
 
-/** Cronômetro fica "quente" (rubro) depois deste tanto de minutos de abandono. */
+/** Cronômetro fica "quente" (rubro) depois deste tanto de minutos de espera. */
 const MIN_CRONOMETRO_QUENTE = 15;
+
+/* Textos por tipo de alerta: abandono (sumiu no meio) × concluído (entregou o
+   CPF e está aguardando — o mais quente dos dois). Mesma pele, urgência igual. */
+function textosDoTipo(a: AlertaLeadQuente) {
+  if (a.tipo === 'concluido') {
+    return {
+      selo: 'Aguardando ligação',
+      rot: 'Situação',
+      passo: 'Concluiu a qualificação e enviou o CPF',
+      frase: 'Está esperando o consultor agora. Ligar em minutos fecha o negócio.',
+    };
+  }
+  return {
+    selo: 'Lead quente',
+    rot: 'Onde parou',
+    passo: rotuloPasso(a.passo),
+    frase: 'Estava conversando com o bot e sumiu. Ligar agora dobra a chance de fechar.',
+  };
+}
 
 export function AlertaLeadQuenteModal({ alerta, qtdFila = 0, aoAssumir, aoDispensar }: {
   alerta: AlertaLeadQuente;
@@ -89,12 +108,13 @@ export function AlertaLeadQuenteModal({ alerta, qtdFila = 0, aoAssumir, aoDispen
   if (!raiz) return null;
   const cron = cronometro(alerta.abandonadoEm, agora);
   const quente = cron.minutos >= MIN_CRONOMETRO_QUENTE;
+  const txt = textosDoTipo(alerta);
 
   return createPortal(
     <div className="alq-veu">
-      <div className="alq-cartao" role="alertdialog" aria-label="Lead quente abandonou o fluxo">
+      <div className="alq-cartao" role="alertdialog" aria-label="Lead quente aguardando atendimento">
         <div className="alq-topo">
-          <span className="alq-selo"><span className="alq-dot" aria-hidden /> Lead quente</span>
+          <span className="alq-selo"><span className="alq-dot" aria-hidden /> {txt.selo}</span>
           {qtdFila > 0 && <span className="alq-fila">+{qtdFila} na fila</span>}
           <div className={'alq-cron' + (quente ? ' quente' : '')}>{cron.rotulo}</div>
         </div>
@@ -102,9 +122,9 @@ export function AlertaLeadQuenteModal({ alerta, qtdFila = 0, aoAssumir, aoDispen
           <div className="alq-nome">{alerta.contatoNome}</div>
           {alerta.contatoTelefone && <div className="alq-fone">{alerta.contatoTelefone}</div>}
           <div className="alq-info">
-            <span className="alq-rot">Onde parou</span>
-            <span className="alq-passo">{rotuloPasso(alerta.passo)}</span>
-            <span className="alq-frase">Estava conversando com o bot e sumiu. Ligar agora dobra a chance de fechar.</span>
+            <span className="alq-rot">{txt.rot}</span>
+            <span className="alq-passo">{txt.passo}</span>
+            <span className="alq-frase">{txt.frase}</span>
           </div>
         </div>
         <div className="alq-acoes">

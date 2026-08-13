@@ -18,7 +18,9 @@ export interface AlertaLeadQuente {
   contatoNome: string;
   contatoTelefone: string | null;
   passo: string | null;
-  abandonadoEm: string;   // última mensagem do cliente — base do cronômetro
+  abandonadoEm: string;   // base do cronômetro: abandono OU conclusão, conforme o tipo
+  /** 'abandono' = sumiu no meio do fluxo · 'concluido' = entregou o CPF e está aguardando */
+  tipo: 'abandono' | 'concluido';
 }
 
 export type ResultadoAssumir =
@@ -29,12 +31,14 @@ export type ResultadoAssumir =
 
 interface LinhaAlerta {
   id: string; conversa_id: string; passo: string | null; abandonado_em: string;
+  tipo: string | null;
   contatos: { nome: string | null; telefone: string | null } | null;
 }
 
 function mapAlerta(l: LinhaAlerta): AlertaLeadQuente {
   return {
     id: l.id, conversaId: l.conversa_id, passo: l.passo, abandonadoEm: l.abandonado_em,
+    tipo: l.tipo === 'concluido' ? 'concluido' : 'abandono',
     contatoNome: (l.contatos?.nome ?? '').trim() || 'Lead sem nome',
     contatoTelefone: l.contatos?.telefone ?? null,
   };
@@ -67,7 +71,7 @@ export function useAlertasLeadQuente() {
     if (!WA_REAL || !supabase || !orgId) return;
     const { data, error } = await supabase
       .from('alertas_lead_quente')
-      .select('id, conversa_id, passo, abandonado_em, contatos(nome, telefone)')
+      .select('id, conversa_id, passo, abandonado_em, tipo, contatos(nome, telefone)')
       .eq('organizacao_id', orgId)
       .eq('status', 'pendente')
       // abandono mais ANTIGO primeiro (mais urgente) — criado_em empata quando o vigia
