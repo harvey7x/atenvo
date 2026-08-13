@@ -1,0 +1,108 @@
+/* ============================================================
+   Alerta de LEAD QUENTE — pele visual definitiva ("Vidro e
+   profundidade", escolhida pelo dono 2026-08-13 entre 3 direções).
+   Glass da família Platina: gradiente vidro-a/b + desfoque por
+   token, fio de luz hairline no contorno (mask), reflexo discreto
+   no topo (só dark — --luz-op zera no claro), faixa rubra no
+   cabeçalho e cronômetro tabular em chip. 100% tokens (tokens.css);
+   efeitos multiplicam --fx; reduced-motion e modo Leve respeitados.
+   ============================================================ */
+
+.v2 .alq-veu {
+  position: fixed; inset: 0; z-index: 300;
+  background: var(--backdrop);
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+  animation: alq-veu-entra .18s var(--ease);
+}
+@keyframes alq-veu-entra { from { opacity: 0; } }
+
+.v2 .alq-cartao {
+  position: relative; overflow: hidden;
+  width: 460px; max-width: calc(100vw - 48px);
+  font-family: var(--fonte); color: var(--txt);
+  border-radius: var(--r-card);
+  background: linear-gradient(180deg, var(--vidro-a), var(--vidro-b));
+  backdrop-filter: var(--desfoque-vidro);
+  -webkit-backdrop-filter: var(--desfoque-vidro);
+  box-shadow: var(--sombra-1), 0 32px 90px rgba(0, 0, 0, calc(.55 * var(--luz-op)));
+  animation: alq-entra .24s var(--ease);
+}
+@keyframes alq-entra { from { opacity: 0; transform: translateY(8px) scale(.97); } }
+
+/* fio de luz da família Platina (hairline em gradiente, via mask) */
+.v2 .alq-cartao::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px;
+  background: linear-gradient(180deg, var(--fio-a), var(--fio-b) 36%,
+    rgba(var(--tint), .02) 75%, rgba(var(--tint), .07));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  pointer-events: none;
+}
+/* reflexo discreto no topo (só no dark — --luz-op zera no claro) */
+.v2 .alq-cartao::after {
+  content: ""; position: absolute; inset: 0 0 auto 0; height: 56px; border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255, 255, 255, calc(.07 * var(--luz-op))), transparent);
+  pointer-events: none;
+}
+
+/* ---- cabeçalho: selo + fila + cronômetro em chip ---- */
+.v2 .alq-topo {
+  display: flex; align-items: center; gap: 10px; padding: 15px 20px;
+  background: linear-gradient(90deg, var(--rubro-bg), transparent 65%);
+  border-bottom: 1px solid var(--linha);
+}
+.v2 .alq-selo {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 10.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--rubro);
+}
+.v2 .alq-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--rubro);
+  box-shadow: 0 0 0 0 rgba(var(--rubro-rgb), .45);
+  animation: alq-pulso 1.8s var(--ease) infinite;
+}
+@keyframes alq-pulso {
+  0% { box-shadow: 0 0 0 0 rgba(var(--rubro-rgb), .45); }
+  70% { box-shadow: 0 0 0 8px rgba(var(--rubro-rgb), 0); }
+  100% { box-shadow: 0 0 0 0 rgba(var(--rubro-rgb), 0); }
+}
+.v2 .alq-fila { font-size: 11px; font-weight: 600; color: var(--txt-3); letter-spacing: .02em; }
+.v2 .alq-cron {
+  margin-left: auto; font-size: 22px; padding: 3px 12px;
+  font-variant-numeric: tabular-nums; font-weight: 650; color: var(--txt);
+  background: rgba(var(--tint), .05); border: 1px solid var(--linha); border-radius: var(--r-ctl);
+  transition: color .6s var(--ease);
+}
+.v2 .alq-cron.quente { color: var(--rubro); }
+
+/* ---- corpo ---- */
+.v2 .alq-meio { padding: 18px 20px 4px; position: relative; }
+.v2 .alq-nome { font-size: 19px; font-weight: 650; letter-spacing: -.012em; line-height: 1.22; }
+.v2 .alq-fone { font-size: 13.5px; margin-top: 3px; font-variant-numeric: tabular-nums; color: var(--txt-2); }
+.v2 .alq-info { margin-top: 12px; display: grid; gap: 4px; }
+.v2 .alq-rot { font-size: 10.5px; font-weight: 650; letter-spacing: .1em; text-transform: uppercase; color: var(--txt-3); }
+.v2 .alq-passo { font-size: 13px; color: var(--txt); }
+.v2 .alq-frase { font-size: 12.5px; color: var(--txt-3); line-height: 1.45; }
+
+/* ---- ações ---- */
+.v2 .alq-acoes { display: flex; align-items: center; gap: 12px; padding: 16px 20px 18px; }
+.v2 .alq-acoes .p-btn { flex: 1; justify-content: center; font-size: 13.5px; padding: 10px 16px; }
+.v2 .alq-perdido { font-size: 13.5px; color: var(--txt-2); padding: 4px 0; }
+.v2 .alq-perdido strong { color: var(--txt); font-weight: 650; }
+.v2 .alq-dispensar {
+  background: none; border: none; cursor: pointer; padding: 8px 10px;
+  font-family: var(--fonte); font-size: 12.5px; color: var(--txt-3);
+  border-radius: var(--r-ctl);
+  transition: color .2s, background .2s, transform .15s var(--ease);
+}
+.v2 .alq-dispensar:hover:not(:disabled) { color: var(--txt-2); background: rgba(var(--tint), .05); }
+.v2 .alq-cartao .p-btn:active:not(:disabled),
+.v2 .alq-dispensar:active:not(:disabled) { transform: scale(.98); }
+
+/* ---- movimento: reduced-motion / modo leve ---- */
+@media (prefers-reduced-motion: reduce) {
+  .v2 .alq-veu, .v2 .alq-cartao { animation: none; }
+  .v2 .alq-dot { animation: none; }
+  .v2 .alq-cron { transition: none; }
+}
+:root[data-perf="lite"] .v2 .alq-dot { animation: none; }

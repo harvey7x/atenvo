@@ -4,15 +4,15 @@ import { criarRaizPortalV2 } from './portal';
 import { BotaoPrimario } from './Botao';
 import { rotuloPasso, type AlertaLeadQuente, type ResultadoAssumir } from '@/data/alertasLeadQuente';
 import './componentes.css';
+import './alertaLeadQuente.css';
 
 /* ------------------------------------------------------------------
    Modal central de LEAD QUENTE (abandono do fluxo do bot).
-   NÃO usa ModalV2 de propósito: aquele autofoca o primeiro botão e
-   fecha no Esc/véu — aqui NADA pode roubar o foco do teclado de quem
-   digita em outra conversa (sem autofocus, sem focus trap, sem Esc,
-   véu não fecha; só os dois botões agem). Som sintetizado via
-   WebAudio (sem asset); cronômetro corre desde o abandono real
-   (última mensagem do cliente), não desde a criação do alerta.
+   COMPORTAMENTO validado em produção 2026-08-13 — congelado: sem
+   autofocus, sem focus trap, sem Esc, véu não fecha; som WebAudio;
+   cronômetro desde o abandono real. Pele visual definitiva "Vidro e
+   profundidade" (escolha do dono entre 3 direções) — estilos em
+   alertaLeadQuente.css, 100% tokens Platina.
    ------------------------------------------------------------------ */
 
 function tocarSino() {
@@ -89,72 +89,39 @@ export function AlertaLeadQuenteModal({ alerta, qtdFila = 0, aoAssumir, aoDispen
   if (!raiz) return null;
   const cron = cronometro(alerta.abandonadoEm, agora);
   const quente = cron.minutos >= MIN_CRONOMETRO_QUENTE;
+
   return createPortal(
-    <div className="veu" style={{ zIndex: 300 }}>
-      <div className="p-modal vidro" role="alertdialog" aria-label="Lead quente abandonou o fluxo"
-           style={{ width: 460, padding: 0, overflow: 'hidden' }}>
-        {/* faixa de urgência — tokens do sistema (rubro) p/ funcionar nos DOIS temas */}
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 10, padding: '13px 18px',
-          background: 'linear-gradient(90deg, rgba(var(--rubro-rgb), .13), transparent 70%)',
-          borderBottom: '1px solid var(--linha)',
-        }}>
-          <span aria-hidden style={{
-            width: 9, height: 9, borderRadius: '50%', background: 'var(--rubro)',
-            boxShadow: '0 0 0 0 rgba(var(--rubro-rgb), .5)', animation: 'alq-pulso 1.6s ease-out infinite',
-          }} />
-          <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--rubro)' }}>
-            Lead quente
-          </div>
-          {qtdFila > 0 && (
-            <span style={{ fontSize: 11.5, color: 'var(--txt-3)', fontWeight: 600 }}>+{qtdFila} na fila</span>
-          )}
-          {/* cronômetro grande desde o abandono; esquenta (rubro) após 15 min */}
-          <div style={{
-            marginLeft: 'auto', fontVariantNumeric: 'tabular-nums', fontSize: 22, fontWeight: 700,
-            color: quente ? 'var(--rubro)' : 'var(--txt)', transition: 'color .4s',
-          }}>
-            {cron.rotulo}
+    <div className="alq-veu">
+      <div className="alq-cartao" role="alertdialog" aria-label="Lead quente abandonou o fluxo">
+        <div className="alq-topo">
+          <span className="alq-selo"><span className="alq-dot" aria-hidden /> Lead quente</span>
+          {qtdFila > 0 && <span className="alq-fila">+{qtdFila} na fila</span>}
+          <div className={'alq-cron' + (quente ? ' quente' : '')}>{cron.rotulo}</div>
+        </div>
+        <div className="alq-meio">
+          <div className="alq-nome">{alerta.contatoNome}</div>
+          {alerta.contatoTelefone && <div className="alq-fone">{alerta.contatoTelefone}</div>}
+          <div className="alq-info">
+            <span className="alq-rot">Onde parou</span>
+            <span className="alq-passo">{rotuloPasso(alerta.passo)}</span>
+            <span className="alq-frase">Estava conversando com o bot e sumiu. Ligar agora dobra a chance de fechar.</span>
           </div>
         </div>
-
-        <div style={{ padding: '16px 18px 6px' }}>
-          <div style={{ fontSize: 19, fontWeight: 700, color: 'var(--txt)', lineHeight: 1.25 }}>{alerta.contatoNome}</div>
-          {alerta.contatoTelefone && (
-            <div style={{ marginTop: 3, fontSize: 14, color: 'var(--txt-2)', fontVariantNumeric: 'tabular-nums' }}>
-              {alerta.contatoTelefone}
-            </div>
-          )}
-          <div style={{ marginTop: 10, fontSize: 13, color: 'var(--txt-2)' }}>
-            <span style={{ color: 'var(--txt-3)' }}>Onde parou: </span>{rotuloPasso(alerta.passo)}
-          </div>
-          <div style={{ marginTop: 6, fontSize: 12.5, color: 'var(--txt-3)' }}>
-            Estava conversando com o bot e sumiu. Ligar agora dobra a chance de fechar.
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px 16px' }}>
+        <div className="alq-acoes">
           {fase === 'perdido' ? (
-            <div style={{ fontSize: 13.5, color: 'var(--txt-2)', padding: '8px 0' }}>
-              Já assumido por <strong style={{ color: 'var(--txt)' }}>{porNome}</strong>.
-            </div>
+            <div className="alq-perdido">Já assumido por <strong>{porNome}</strong>.</div>
           ) : (
             <>
-              <BotaoPrimario onClick={() => void assumir()} disabled={fase === 'assumindo'} style={{ flex: 1 }}>
+              <BotaoPrimario onClick={() => void assumir()} disabled={fase === 'assumindo'}>
                 {fase === 'assumindo' ? 'Assumindo…' : 'Assumir cliente'}
               </BotaoPrimario>
-              {/* dispensar DISCRETO (decisão do dono: cancela pra equipe toda) */}
-              <button type="button" onClick={aoDispensar} disabled={fase === 'assumindo'} style={{
-                background: 'none', border: 'none', cursor: 'pointer', fontSize: 12.5,
-                color: 'var(--txt-3)', textDecoration: 'underline', textUnderlineOffset: 3, padding: '6px 2px',
-              }}>
+              <button type="button" className="alq-dispensar" onClick={aoDispensar} disabled={fase === 'assumindo'}>
                 dispensar
               </button>
             </>
           )}
         </div>
       </div>
-      <style>{'@keyframes alq-pulso { 0% { box-shadow: 0 0 0 0 rgba(var(--rubro-rgb),.5); } 70% { box-shadow: 0 0 0 9px rgba(var(--rubro-rgb),0); } 100% { box-shadow: 0 0 0 0 rgba(var(--rubro-rgb),0); } }'}</style>
     </div>,
     raiz,
   );
