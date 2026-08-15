@@ -5,7 +5,7 @@ import { useOrg } from '@/context/OrgContext';
 import {
   WA_REAL, useWaCanais, useWaLimite, useWaHealth, useEntregaAutoResumo, useRodarTesteEntrega,
   useFontesAquisicao, waCreateInstance, waReconnect, waQr, waStatus, waRemove, waOcultar,
-  waUpdateComercial, mascararNumero,
+  waUpdateComercial, waRenomearCanal, mascararNumero,
   type WaCanal, type WaLimite, type WaHealthCanal, type EntregaAutoResumo, type ComercialInput,
 } from '@/data/whatsapp';
 import { FB_REAL, useFbStatus, fbAuthStart, fbPages, fbConnect, fbDisconnect, type FbPaginaStatus } from '@/data/facebook';
@@ -35,6 +35,8 @@ const IcWa = () => <Ic><path d="M21 11.5a8.4 8.4 0 01-9 8.4 8.9 8.9 0 01-3.8-.8L
 const IcFb = () => <Ic><path d="M14 8h3V5h-3a4 4 0 00-4 4v2H7v3h3v7h3v-7h3l1-3h-4V9a1 1 0 011-1z" /></Ic>;
 const IcCheck = () => <Ic><path d="M5 13l4 4L19 7" /></Ic>;
 const IcPulso = () => <Ic><path d="M3 12h4l2-6 4 12 2-6h6" /></Ic>;
+const IcLapis = () => <Ic><path d="M4 20h4l10-10a2.1 2.1 0 00-3-3L5 17v3z" /></Ic>;
+const IcX = () => <Ic><path d="M6 6l12 12M18 6L6 18" /></Ic>;
 
 /* ---------- constantes (verbatim da v1) ---------- */
 const ORIGEM_TIPOS: Record<string, string> = {
@@ -361,6 +363,26 @@ export default function IntegracoesV2() {
     } finally { setFbBusy(false); }
   };
 
+  /* ---------- renomear conexão (inline, no próprio card) ----------
+     Usa a RPC dedicada: renomear NÃO pode encostar na origem comercial
+     (origem/gestor/fonte alimentam a linhagem do lead nos relatórios). */
+  const renomear = async (canalId: string, nome: string, aplicarDemo: () => void) => {
+    try {
+      if (demo) aplicarDemo();
+      else {
+        await waRenomearCanal(canalId, nome);
+        qc.invalidateQueries({ queryKey: ['wa-canais', currentOrg.id] });
+        qc.invalidateQueries({ queryKey: ['cloud-diagnostico', currentOrg.id] });
+        qc.invalidateQueries({ predicate: (q) => String(q.queryKey[0] ?? '').startsWith('rel-') });
+      }
+      setAviso({ tom: 'ok', texto: `Conexão renomeada para "${nome}".` });
+    } catch (e) {
+      const m = msgOu(e, 'Falha ao renomear.');
+      setAviso({ tom: 'erro', texto: m.includes('sem_permissao') ? 'Sem permissão. Apenas admin/supervisor renomeia conexões.' : m });
+      throw e;   // mantém o campo aberto para o usuário corrigir
+    }
+  };
+
   /* ---------- remoção / desconexão (WA e FB) ---------- */
   const confirmarRemocao = async () => {
     if (!remocao) return;
@@ -528,6 +550,9 @@ export default function IntegracoesV2() {
                 aoDiagnostico={() => setDiag(c.id)}
                 aoTeste={() => rodarTesteAgora(c)}
                 aoConfig={() => setConfig(c)}
+                aoRenomear={(nome) => renomear(c.id, nome, () => setSeed((s) => ({
+                  ...s, canais: s.canais.map((k) => (k.id === c.id ? { ...k, alias: nome } : k)),
+                })))}
                 aoReconectar={() => setReconectar({ id: c.id, alias: c.alias })}
                 aoDesconectar={() => setRemocao({ tipo: 'whatsapp', id: c.id, nome: c.alias + (c.numero ? ' · ' + mascararNumero(c.numero) : ''), modo: 'desconectar' })}
                 aoRemover={() => setRemocao({ tipo: 'whatsapp', id: c.id, nome: c.alias + (c.numero ? ' · ' + mascararNumero(c.numero) : ''), modo: 'ocultar' })}
@@ -620,7 +645,14 @@ export default function IntegracoesV2() {
                       <div className="intg-linha" key={k.id}>
                         <div className="tx">
                           <div className="nm">
-                            {k.nome_interno ?? 'Número oficial'}
+                            <NomeEditavel
+                              nome={k.nome_interno ?? 'Número oficial'}
+                              podeEditar={podeConfig}
+                              titulo="Renomear número oficial"
+                              aoSalvar={(nome) => renomear(k.id, nome, () => setSeed((s) => ({
+                                ...s, cloud: { ...s.cloud, canais: s.cloud.canais.map((x) => (x.id === k.id ? { ...x, nome_interno: nome } : x)) },
+                              })))}
+                            />
                             <BadgeStatus tom={k.papel === 'disparo' ? 'atencao' : 'ok'}>
                               {k.papel === 'disparo' ? 'Disparo' : k.papel === 'ambos' ? 'Ambos' : 'Atendimento'}
                             </BadgeStatus>
@@ -850,13 +882,63 @@ export default function IntegracoesV2() {
 }
 
 /* ================================================================
+   Nome da conexão editável no lugar em que ele é lido: clicar troca
+   o rótulo por um campo (Enter salva, Esc cancela). Renomeia e só —
+   a origem comercial fica intocada (RPC renomear_canal).
+   ================================================================ */
+function NomeEditavel({ nome, podeEditar, titulo = 'Renomear conexão', aoSalvar }: {
+  nome: string; podeEditar: boolean; titulo?: string; aoSalvar: (novo: string) => Promise<void>;
+}) {
+  const [editando, setEditando] = useState(false);
+  const [valor, setValor] = useState(nome);
+  const [salvando, setSalvando] = useState(false);
+  const inpRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { if (editando) inpRef.current?.select(); }, [editando]);
+
+  if (!podeEditar) return <span>{nome}</span>;
+
+  if (!editando) {
+    return (
+      <button type="button" className="intg-nome" title={titulo} onClick={() => { setValor(nome); setEditando(true); }}>
+        <span>{nome}</span><IcLapis />
+      </button>
+    );
+  }
+
+  const confirmar = async () => {
+    const novo = valor.trim();
+    if (!novo || novo === nome) { setEditando(false); return; }
+    setSalvando(true);
+    try { await aoSalvar(novo); setEditando(false); } catch { /* o aviso vem do pai; o campo continua aberto */ }
+    setSalvando(false);
+  };
+
+  return (
+    <span className="intg-nome-ed">
+      <input
+        ref={inpRef} className="intg-nome-inp" value={valor} maxLength={60} disabled={salvando}
+        aria-label={titulo} autoFocus
+        onChange={(e) => setValor(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') { e.preventDefault(); confirmar(); }
+          if (e.key === 'Escape') { e.preventDefault(); setEditando(false); }
+        }}
+      />
+      <button type="button" className="intg-nome-ok" title="Salvar (Enter)" disabled={salvando} onClick={confirmar}><IcCheck /></button>
+      <button type="button" className="intg-nome-x" title="Cancelar (Esc)" disabled={salvando} onClick={() => setEditando(false)}><IcX /></button>
+    </span>
+  );
+}
+
+/* ================================================================
    Card de canal WhatsApp (Evolution) — chips Sessão/Entrega/Auto
    + alerta único em cascata (o mais grave vence), como na v1.
    ================================================================ */
-function CanalCard({ canal: c, h, ea, canais, podeConfig, testando, atraso, ehAtivo, aoDiagnostico, aoTeste, aoConfig, aoReconectar, aoDesconectar, aoRemover }: {
+function CanalCard({ canal: c, h, ea, canais, podeConfig, testando, atraso, ehAtivo, aoDiagnostico, aoTeste, aoConfig, aoRenomear, aoReconectar, aoDesconectar, aoRemover }: {
   canal: WaCanal; h: WaHealthCanal | undefined; ea: EntregaAutoResumo | undefined; canais: WaCanal[];
   podeConfig: boolean; testando: boolean; atraso: number; ehAtivo: boolean;
-  aoDiagnostico: () => void; aoTeste: () => void; aoConfig: () => void;
+  aoDiagnostico: () => void; aoTeste: () => void; aoConfig: () => void; aoRenomear: (nome: string) => Promise<void>;
   aoReconectar: () => void; aoDesconectar: () => void; aoRemover: () => void;
 }) {
   const st = WA_ST[c.status] ?? { t: c.status, tom: 'neutro' as TomStatus };
@@ -906,7 +988,7 @@ function CanalCard({ canal: c, h, ea, canais, podeConfig, testando, atraso, ehAt
         <div className="int-ic"><IcWa /></div>
         <div className="tx">
           <div className="int-n">
-            <span>{c.alias}</span>
+            <NomeEditavel nome={c.alias} podeEditar={podeConfig} aoSalvar={aoRenomear} />
             <span className="intg-transp">Evolution · QR</span>
           </div>
           <div className="int-s num">{c.numero ? mascararNumero(c.numero) : 'Número não identificado'}</div>

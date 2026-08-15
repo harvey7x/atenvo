@@ -687,6 +687,14 @@ export async function waUpdateComercial(canalId: string, c: ComercialInput): Pro
   if (error) throw new Error(error.message);
 }
 
+/** Renomeia a conexão (apelido interno) sem tocar na origem comercial.
+ *  Existe separado de `waUpdateComercial` de propósito: aquele grava os seis campos de uma
+ *  vez e apagaria origem/gestor/fonte de canais que a tela não carrega inteiros (Cloud API). */
+export async function waRenomearCanal(canalId: string, nome: string): Promise<void> {
+  const { error } = await supabase!.rpc('renomear_canal', { p_canal: canalId, p_nome: nome.trim() });
+  if (error) throw new Error(error.message);
+}
+
 /** Máscara amigável de número conectado (mostra DDI/DDD e os 4 últimos dígitos). */
 export function mascararNumero(numero: string | null | undefined): string {
   const d = (numero ?? '').replace(/\D/g, '');

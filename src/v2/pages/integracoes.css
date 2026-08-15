@@ -40,6 +40,35 @@
 .v2 .mono b { color: var(--txt); font-weight: 500; cursor: pointer; flex-shrink: 0; }
 .v2 .mono b:hover { text-decoration: underline; }
 
+/* nome da conexão editável no próprio card (lápis só no hover/foco) */
+.v2 .intg-nome {
+  display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%;
+  font: inherit; color: inherit; text-align: left; cursor: text;
+  background: none; border: 0; border-radius: 6px; padding: 2px 5px; margin: -2px 0 -2px -5px;
+  transition: background .15s;
+}
+.v2 .intg-nome > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .intg-nome svg { width: 12px; height: 12px; flex-shrink: 0; color: var(--txt-3); opacity: 0; transition: opacity .15s; }
+.v2 .intg-nome:hover { background: rgba(var(--tint), .07); }
+.v2 .intg-nome:hover svg, .v2 .intg-nome:focus-visible svg { opacity: 1; }
+
+.v2 .intg-nome-ed { display: inline-flex; align-items: center; gap: 5px; min-width: 0; }
+.v2 .intg-nome-inp {
+  font: inherit; font-weight: 600; color: var(--txt); width: 16ch; max-width: 100%;
+  padding: 2px 7px; border-radius: 6px;
+  background: rgba(var(--tint), .07); border: 1px solid rgba(var(--tint), .2);
+}
+.v2 .intg-nome-inp:focus { outline: none; border-color: rgba(var(--tint), .38); }
+.v2 .intg-nome-ok, .v2 .intg-nome-x {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 22px; height: 22px; border-radius: 6px; cursor: pointer;
+  background: rgba(var(--tint), .05); border: 1px solid rgba(var(--tint), .12); color: var(--txt-2);
+}
+.v2 .intg-nome-ok svg, .v2 .intg-nome-x svg { width: 12px; height: 12px; }
+.v2 .intg-nome-ok:hover { color: var(--verde); border-color: rgba(var(--verde-rgb), .35); }
+.v2 .intg-nome-x:hover { color: var(--rubro); border-color: rgba(var(--rubro-rgb), .35); }
+.v2 .intg-nome-ok[disabled], .v2 .intg-nome-x[disabled] { opacity: .5; cursor: default; }
+
 /* etiqueta de transporte no título do card */
 .v2 .intg-transp {
   font-size: 9.5px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
