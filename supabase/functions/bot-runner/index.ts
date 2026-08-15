@@ -22,6 +22,9 @@ import { saidaSuja } from './guardrail.ts';
 import { enviadorDe } from '../evolution-send/transporte.ts';
 // Motor determinístico por BOTÕES (sem IA). Puro; o bot-runner é quem envia/persiste.
 import { proximoPasso, proximoPassoSuporte, chaveTel, deveHandoff48h, telaComoTexto, opcoesDaTela } from './fluxo_botoes.ts';
+// Motor determinístico do fluxo de VÍDEO (VSL juros abusivos) — alcançável só pelos números de
+// TESTE (bot_canal_config.fluxo_slug_teste + numeros_teste). Puro; quem envia/agenda é o runner.
+import { proximoPassoVideo, montarCopyVideo, mensagensResultado, type CopyVideo } from './fluxo_video.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -85,7 +88,7 @@ Deno.serve(async (req) => {
     const { data: canal } = await admin.from('canais')
       .select('id, nome_interno, instancia_externa, origem_tipo, transporte, cloud_phone_number_id').eq('id', conv.canal_id).maybeSingle();
     const { data: cfg } = await admin.from('bot_canal_config')
-      .select('mensagens, intervalo_min_ms, intervalo_max_ms, fluxo_slug').eq('canal_id', conv.canal_id).maybeSingle();
+      .select('mensagens, intervalo_min_ms, intervalo_max_ms, fluxo_slug, fluxo_slug_teste, numeros_teste').eq('canal_id', conv.canal_id).maybeSingle();
     const { data: cfgOrg } = await admin.from('bot_config')
       .select('intervalo_min_ms, intervalo_max_ms').eq('organizacao_id', conv.organizacao_id).maybeSingle();
 
@@ -95,6 +98,26 @@ Deno.serve(async (req) => {
     const canalNome = canal?.nome_interno ?? '—';
     const origem = canal?.origem_tipo ?? 'WhatsApp';
     const dados = (estado.dados_qualificacao ?? {}) as Record<string, unknown>;
+
+    // ---- MODO TESTE POR NÚMERO: numeros_teste não-vazio E o telefone do contato batendo
+    //      (chave canônica chaveTel — cobre o 9º dígito oscilante) -> ESTA conversa roda o
+    //      fluxo_slug_teste. Sem match, fluxoEfetivo === fluxo_slug: produção intocada por
+    //      construção. O telefone vem da MESMA fonte do envio (contato_identidades, principal
+    //      primeiro) — o número que casa é o número que receberia a mensagem.
+    let fluxoEfetivo = cfg?.fluxo_slug ?? '';
+    let ehNumeroTeste = false;
+    const numerosTeste = ((cfg?.numeros_teste ?? []) as string[]).filter(Boolean);
+    if (numerosTeste.length && cfg?.fluxo_slug_teste) {
+      const { data: identT } = await admin.from('contato_identidades')
+        .select('valor_normalizado').eq('contato_id', conv.contato_id).eq('tipo', 'whatsapp')
+        .not('valor_normalizado', 'is', null).order('principal', { ascending: false }).limit(1).maybeSingle();
+      const telContato = identT?.valor_normalizado ?? '';
+      if (telContato && numerosTeste.some((n) => chaveTel(n) === chaveTel(telContato))) {
+        fluxoEfetivo = cfg.fluxo_slug_teste as string;
+        ehNumeroTeste = true;
+        await logRunner('fluxo_teste_ativo', fluxoEfetivo, { dry_run: dryRun });
+      }
+    }
 
     // ---- humano ativo vs cliente dormente ----
     // humanoRespondeu = ALGUÉM humano já enviou nesta conversa (painel ou celular). temDono = o CONTATO
@@ -118,7 +141,7 @@ Deno.serve(async (req) => {
     // Respeita os mesmos freios do fluxo de botões (BOT_BOTOES_ATIVO + dry_run/allowlist no envio).
     // !estado.pausado: se a conversa está pausada (ex.: acabou de completar a qualificação = handoff),
     // NÃO abre suporte — cai pro humano em silêncio. Evita "Oi de novo?" logo após o fecho.
-    if (temDono && !estado.pausado && BOTOES_ATIVO && (cfg?.fluxo_slug ?? '').startsWith('botoes')) {
+    if (temDono && !estado.pausado && BOTOES_ATIVO && fluxoEfetivo.startsWith('botoes')) {
       return await tratarSuporte({
         admin, conversaId, conv, canal, estado, responsavelId,
         inboundText: body.inbound_text ?? '', inboundTipo: body.inbound_tipo ?? 'texto',
@@ -133,7 +156,7 @@ Deno.serve(async (req) => {
       // LACUNA DAS 48h: lead que abandonou o fluxo por botões (tem passo) e voltou depois da trava
       // 'conversa_antiga' NÃO fica mudo -> cai pra humano (handoff) + 1 balão tranquilizador.
       // (Completado/atribuído retorna 'bot_pausado'/'ja_tem_responsavel', não 'conversa_antiga'.)
-      if (BOTOES_ATIVO && (cfg?.fluxo_slug ?? '').startsWith('botoes') && deveHandoff48h(eleg?.motivo, dados.passo_botoes as string | undefined)) {
+      if (BOTOES_ATIVO && fluxoEfetivo.startsWith('botoes') && deveHandoff48h(eleg?.motivo, dados.passo_botoes as string | undefined)) {
         return await tratarLeadRetornou48h({ admin, conversaId, conv, canal, dryRun, logRunner });
       }
       await logRunner('bot_ignorado', eleg?.motivo ?? 'inelegivel'); return json({ ok: true, skipped: 'inelegivel', elegibilidade: eleg });
@@ -144,7 +167,7 @@ Deno.serve(async (req) => {
     // transcrição de áudio, nem a geração). A IA continua no código para os outros canais.
     // Reversível: muda o fluxo_slug do canal (config) ou desliga BOT_BOTOES_ATIVO (env).
     // dry_run continua valendo (o motor simula em vez de enviar).
-    if (BOTOES_ATIVO && (cfg?.fluxo_slug ?? '').startsWith('botoes')) {
+    if (BOTOES_ATIVO && fluxoEfetivo.startsWith('botoes')) {
       // GATE DE ANÚNCIO: o fluxo de crédito é SÓ pra quem chegou do tráfego de anúncio (1º inbound com
       // `referral` de Click-to-WhatsApp, gravado pelo webhook em mensagens.metadados.referral). Lead novo
       // SEM referral não engata (humano atende). Só gateia na ENTRADA (sem passo salvo) — quem já está no
@@ -164,6 +187,32 @@ Deno.serve(async (req) => {
       }
       return await tratarComBotoes({
         admin, conversaId, conv, canal, estado,
+        inboundText: body.inbound_text ?? '', inboundTipo: body.inbound_tipo ?? 'texto',
+        inboundMsgId: body.inbound_msg_id ?? null, dryRun, logRunner,
+      });
+    }
+
+    // ---- DESVIO: fluxo de VÍDEO (caf_video_juros_v1) — hoje só alcançável pelos números de
+    //      TESTE (fluxo_slug_teste + numeros_teste; desligar = limpar a config, sem redeploy).
+    //      SEM IA e SEM guardrail: a copy é FIXA e aprovada pelo dono — cita "tem direito de
+    //      receber valores", que o saidaSuja barraria (afirma_direito); guardrail é trava de
+    //      SAÍDA DE IA, não de copy estática. Numa futura promoção a fluxo_slug normal, o gate
+    //      de anúncio (referral) vale como no fluxo de botões — número de teste passa direto. ----
+    if (fluxoEfetivo === 'caf_video_juros_v1') {
+      const SO_ANUNCIO = (Deno.env.get('CREDITO_SO_ANUNCIO') ?? 'sim').toLowerCase() !== 'nao';
+      const dqV = (estado.dados_qualificacao ?? {}) as Record<string, unknown>;
+      if (!ehNumeroTeste && SO_ANUNCIO && canal?.transporte === 'cloud_api' && !dqV.passo_video) {
+        const { data: inbs } = await admin.from('mensagens').select('metadados').eq('conversa_id', conversaId).eq('direcao', 'entrada').limit(50);
+        const veioDeAnuncio = (inbs ?? []).some((m: any) => m?.metadados?.referral);
+        if (!veioDeAnuncio) {
+          await logRunner('fluxo_video', 'nao_engatou_sem_referral', { dry_run: dryRun });
+          return json({ ok: true, fluxo: 'video', skipped: 'sem_referral_anuncio', conversa_id: conversaId });
+        }
+      }
+      return await tratarComVideo({
+        admin, conversaId, conv, canal, estado,
+        copyVideo: montarCopyVideo(((cfg?.mensagens ?? {}) as Record<string, unknown>).caf_video_juros_v1),
+        min, max,
         inboundText: body.inbound_text ?? '', inboundTipo: body.inbound_tipo ?? 'texto',
         inboundMsgId: body.inbound_msg_id ?? null, dryRun, logRunner,
       });
@@ -893,4 +942,175 @@ async function tratarComIA(p: {
 
   await logRunner('bot_respondeu', 'ia', { mensagens: baloes.length, enviados_reais: enviados, dificil });
   return json({ ok: true, dry_run: dryRun, etapa_nova: 'ia', mensagens: baloes, enviados_reais: enviados, lead_quente_motivos: motivosLQ });
+}
+
+// ======== FLUXO DE VÍDEO (caf_video_juros_v1): VSL de juros + SIM/NÃO + nome + CPF ========
+// Espelha a estrutura do tratarComBotoes: o motor puro (fluxo_video.ts) decide; aqui envia
+// (Cloud API por LINK público), persiste, aplica ações e avança o passo em
+// dados_qualificacao.passo_video. O RESULTADO não sai daqui: entra na fila bot_mensagens_saida
+// com status 'agendada' (+8 min) e o worker bot-fila-processar entrega re-checando as guardas
+// (pausa/atendente respondeu/opt-out) na hora do envio.
+const VIDEO_RESULTADO_ATRASO_MS = 8 * 60 * 1000;
+
+// Etiqueta no padrão do painel: garante a linha no catálogo (etiquetas) e faz append do NOME
+// nos arrays de contatos/conversas sem duplicar. Tudo best-effort — etiqueta nunca trava o fluxo.
+async function aplicarEtiquetaBot(admin: any, orgId: string, nome: string, contatoId: string, conversaId: string | null): Promise<void> {
+  try {
+    const { data: ex } = await admin.from('etiquetas').select('id').eq('organizacao_id', orgId).eq('nome', nome).maybeSingle();
+    if (!ex?.id) {
+      const { data: maxRow } = await admin.from('etiquetas').select('ordem').eq('organizacao_id', orgId).order('ordem', { ascending: false }).limit(1).maybeSingle();
+      await admin.from('etiquetas').insert({ organizacao_id: orgId, nome, cor: '#7c6df2', descricao: 'Aplicada pelo bot (fluxo de vídeo)', ordem: ((maxRow?.ordem as number) ?? 0) + 1, ativo: true });
+    }
+  } catch { /* catálogo é cosmético; o nome no array vale sozinho */ }
+  try {
+    const { data: ct } = await admin.from('contatos').select('etiquetas').eq('id', contatoId).maybeSingle();
+    const atuais = (ct?.etiquetas ?? []) as string[];
+    if (!atuais.includes(nome)) await admin.from('contatos').update({ etiquetas: [...atuais, nome] }).eq('id', contatoId);
+  } catch { /* best-effort */ }
+  if (conversaId) {
+    try {
+      const { data: cv } = await admin.from('conversas').select('etiquetas').eq('id', conversaId).maybeSingle();
+      const atuais = (cv?.etiquetas ?? []) as string[];
+      if (!atuais.includes(nome)) await admin.from('conversas').update({ etiquetas: [...atuais, nome] }).eq('id', conversaId);
+    } catch { /* best-effort */ }
+  }
+}
+
+async function tratarComVideo(p: {
+  admin: any; conversaId: string; conv: any; canal: any; estado: any; copyVideo: CopyVideo;
+  min: number; max: number; inboundText: string; inboundTipo: string; inboundMsgId: string | null;
+  dryRun: boolean; logRunner: (o: string, m?: string | null, e?: Record<string, unknown>) => Promise<void>;
+}): Promise<Response> {
+  const { admin, conversaId, conv, canal, estado, copyVideo, min, max, inboundText, inboundTipo, inboundMsgId, dryRun, logRunner } = p;
+  const logFluxo = async (evento: string, extra: Record<string, unknown> = {}) => {
+    try {
+      await admin.from('audit_log').insert({
+        usuario_id: null, acao: 'fluxo_video', entidade: 'conversas', entidade_id: conversaId,
+        dados_depois: { evento, dry_run: dryRun, ...extra }, organizacao_id: conv.organizacao_id,
+      });
+    } catch { /* log best-effort: nunca quebra o fluxo */ }
+  };
+
+  const dq = (estado.dados_qualificacao ?? {}) as Record<string, unknown>;
+  const passoAtual = (dq.passo_video as string | undefined) ?? null;
+  const tentativas = Number(dq.tentativas_video ?? 0) || 0;
+  const desvios = Number(dq.desvios_midia ?? 0) || 0;
+  const ehAudio = inboundTipo !== 'texto';   // o webhook só despacha texto|audio; não-texto = fora do trilho
+
+  const r = proximoPassoVideo(passoAtual, { texto: inboundText || '', ehAudio }, tentativas, desvios, dq, copyVideo);
+  await logFluxo('entrada_recebida', { passo_atual: passoAtual, texto: inboundText || null, eh_audio: ehAudio, tentativas_antes: tentativas, desvios_antes: desvios, decisao: r.acao });
+
+  if (r.acao === 'nada') {
+    await logRunner('fluxo_video', r.motivo, { dry_run: dryRun });
+    return json({ ok: true, fluxo: 'video', dry_run: dryRun, skipped: r.motivo, passo_atual: passoAtual });
+  }
+
+  // ---- AÇÕES de estado (rodam também em dry_run: o fluxo AVANÇA; só o envio é simulado) ----
+  if (r.acoes?.salvarNome) {
+    try { await admin.rpc('bot_coletar_nome', { p_conversa: conversaId, p_nome: r.acoes.salvarNome }); } catch { /* best-effort */ }
+    await logFluxo('salvou_nome', { primeiro: r.acoes.salvarNome.split(/\s+/)[0] ?? '' });
+  }
+  if (r.acoes?.salvarCpf) {
+    try { await admin.rpc('bot_registrar_cpf', { p_conversa: conversaId, p_cpf_digits: r.acoes.salvarCpf.digits, p_cpf_mascarado: r.acoes.salvarCpf.mascarado }); } catch { /* best-effort */ }
+    await logFluxo('salvou_cpf', { cpf_mascarado: r.acoes.salvarCpf.mascarado });   // nunca o CPF cru
+  }
+  if (r.acoes?.registrarRecusa) {
+    await aplicarEtiquetaBot(admin, conv.organizacao_id, 'remarketing-bot', conv.contato_id, conversaId);
+    // "estado concluído motivo recusou": marca concluido_em; a etapa NÃO vira 'concluido', então
+    // o trigger de qualificado não dispara e um SIM depois reentra (limparRecusa).
+    try { await admin.from('bot_conversa_estado').update({ concluido_em: new Date().toISOString() }).eq('conversa_id', conversaId); } catch { /* best-effort */ }
+    await logFluxo('recusou');
+  }
+  if (r.acoes?.limparRecusa) {
+    try { await admin.from('bot_conversa_estado').update({ concluido_em: null }).eq('conversa_id', conversaId); } catch { /* best-effort */ }
+    await logFluxo('reentrou_apos_recusa');
+  }
+
+  // ---- destino + dry_run/allowlist: MESMA régua do fluxo de botões (resolverEnvio) ----
+  const { destino, dryRunEfetivo } = await resolverEnvio(admin, conv, dryRun);
+  let enviados = 0; let erro: string | null = null;
+  if (dryRunEfetivo || !destino) {
+    if (!destino) erro = 'sem_destino';
+    for (let i = 0; i < r.telas.length; i++) await logFluxo('mostrar_tela_simulada', { ordem: i, passo_novo: r.passoNovo, tela: r.telas[i], motivo: erro });
+  } else if (((canal?.transporte ?? 'evolution') === 'cloud_api' && !canal?.cloud_phone_number_id)
+          || ((canal?.transporte ?? 'evolution') === 'evolution' && !canal?.instancia_externa)
+          || ((canal?.transporte ?? 'evolution') !== 'cloud_api' && (canal?.transporte ?? 'evolution') !== 'evolution')) {
+    erro = 'transporte_nao_suportado'; await logFluxo('tela_falhou', { erro });
+  } else {
+    const tx = enviadorDe(canal);
+    for (let i = 0; i < r.telas.length; i++) {
+      // respiro entre balões: padrão do bot_config (1800–3500ms), como o fluxo por copy
+      if (i > 0) await sleep(min + Math.round(Math.random() * Math.max(0, max - min)));
+      const tela = r.telas[i];
+      try {
+        let sent: { key?: { id?: string } };
+        if (tela.tipo === 'video') {
+          // Cloud API: type video { link, caption } — a Meta baixa a URL pública do Storage.
+          sent = await tx.sendMedia(destino!, 'video', 'video/mp4', tela.url, 'vsl-juros-30s.mp4', tela.caption);
+        } else {
+          sent = await tx.sendText(destino!, tela.corpo);
+        }
+        const idExterno = sent?.key?.id ?? null;
+        if (!idExterno) throw new Error('sem_id_retorno');
+        await admin.from('mensagens').insert({
+          organizacao_id: conv.organizacao_id, conversa_id: conv.id, direcao: 'saida',
+          tipo: tela.tipo === 'video' ? 'video' : 'texto',
+          conteudo: tela.tipo === 'video' ? tela.caption : tela.corpo,
+          autor_id: null, origem: 'bot', status: 'enviada', id_externo: idExterno,
+          metadados: { fluxo: 'video_juros', etapa: r.passoNovo, ...(tela.tipo === 'video' ? { media_url: tela.url } : {}) },
+        });
+        enviados++;
+        await logFluxo('tela_enviada', { ordem: i, tipo: tela.tipo, id_externo: idExterno });
+      } catch (e) {
+        erro = String((e as Error)?.message ?? 'falha_envio').slice(0, 300);
+        await logFluxo('tela_falhou', { ordem: i, tipo: tela.tipo, erro });
+        // MÍDIA NUNCA TRAVA O FUNIL: vídeo falhou → loga e SEGUE pro próximo balão (a pergunta
+        // SIM/NÃO sai mesmo assim). Falha de TEXTO interrompe o burst (padrão do fluxo de botões).
+        if (tela.tipo !== 'video') break;
+      }
+    }
+  }
+
+  // ---- agenda o RESULTADO (+8 min): 3 linhas na fila. Real -> 'agendada' (o worker entrega e
+  //      conclui); dry_run -> 'simulada' (nada é entregue depois; o estado ainda avança). Texto
+  //      final já interpolado — o nome é conhecido aqui, o worker não interpola. ----
+  if (r.acoes?.agendarResultado) {
+    const nomeConhecido = String(dq.nome_completo ?? r.acoes?.salvarNome ?? '');
+    const textos = mensagensResultado(copyVideo, nomeConhecido);
+    const enviarApos = new Date(Date.now() + VIDEO_RESULTADO_ATRASO_MS).toISOString();
+    const linhas = textos.map((texto, i) => ({
+      organizacao_id: conv.organizacao_id, conversa_id: conversaId, canal_id: conv.canal_id,
+      etapa: 'resultado', ordem: i + 1, texto, tipo: 'texto',
+      enviar_apos: enviarApos, status: dryRunEfetivo ? 'simulada' : 'agendada',
+    }));
+    const { error: eAg } = await admin.from('bot_mensagens_saida').upsert(linhas, { onConflict: 'conversa_id,etapa,ordem', ignoreDuplicates: true });
+    if (eAg) await logFluxo('agendar_resultado_falhou', { erro: String(eAg.message ?? '').slice(0, 200) });
+    else await logFluxo('resultado_agendado', { enviar_apos: enviarApos, baloes: textos.length, simulado: dryRunEfetivo });
+  }
+
+  // ---- 2ª falha (SIM/NÃO, nome, CPF ou 2º desvio de áudio): pausa + precisa_humano.
+  //      bot_pausar com motivo próprio NÃO limpa precisa_humano (só 'humano_assumiu' limpa). ----
+  if (r.acoes?.escalarHumano) {
+    try { await admin.rpc('bot_pausar', { p_conversa: conversaId, p_motivo: `fluxo_video_${r.acoes.escalarHumano}` }); } catch { /* best-effort */ }
+    try {
+      await admin.from('conversas').update({ precisa_humano: true, precisa_humano_motivo: r.acoes.escalarHumano, precisa_humano_em: new Date().toISOString() }).eq('id', conversaId);
+    } catch { /* best-effort */ }
+    await logFluxo('sinalizou_humano', { passo: r.passoNovo, motivo: r.acoes.escalarHumano });
+  }
+
+  // ---- avança o passo. p_etapa mantém o valor atual (o passo real vive em passo_video, como o
+  //      fluxo de botões faz com passo_botoes); tentativas/desvios acumulam nos campos próprios. ----
+  await admin.rpc('bot_avancar_etapa', {
+    p_conversa: conversaId, p_etapa: estado.etapa,
+    p_dados: {
+      passo_video: r.passoNovo, tentativas_video: r.tentativas, desvios_midia: r.desvios,
+      ...(passoAtual == null ? { video_abertura_em: new Date().toISOString() } : {}),
+      ...(r.acoes?.registrarRecusa ? { video_concluido: 'recusou', video_recusado_em: new Date().toISOString() } : {}),
+      ...(r.acoes?.limparRecusa ? { video_concluido: null } : {}),
+    },
+    p_reprompts: 0, p_inbound_msg: inboundMsgId,
+  });
+
+  await logRunner('fluxo_video', r.passoNovo, { dry_run: dryRunEfetivo, baloes: r.telas.length, enviados, erro, tentativas: r.tentativas, desvios: r.desvios, escalou: !!r.acoes?.escalarHumano });
+  return json({ ok: true, fluxo: 'video', dry_run: dryRunEfetivo, passo_novo: r.passoNovo, baloes: r.telas.length, enviados, erro, tentativas: r.tentativas, desvios: r.desvios });
 }

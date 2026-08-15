@@ -469,6 +469,10 @@ verify_jwt = false
 # mensagens-agendadas-processar: cron secret-gated (x-agendamento-secret), sem JWT.
 [functions.mensagens-agendadas-processar]
 verify_jwt = false
+# bot-fila-processar: cron secret-gated (x-bot-secret == webhook_config.bot_fila), sem JWT.
+# Worker das mensagens DIFERIDAS do bot (status 'agendada' — ex.: resultado do fluxo de vídeo).
+[functions.bot-fila-processar]
+verify_jwt = false
 # evolution-send: tem DOIS caminhos de auth internos — JWT de usuário (envio manual, idêntico
 # ao de sempre) e modo service por x-agendamento-secret (processador de agendadas). Por isso o
 # gateway NÃO pode pré-exigir JWT (senão o cron é rejeitado antes de rodar). A validação continua
