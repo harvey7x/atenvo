@@ -48,7 +48,6 @@ const GRUPOS: { rotulo: string; itens: ItemNav[] }[] = [
       { slug: 'whatsapp', rotulo: 'WhatsApp' },
       { slug: 'facebook', rotulo: 'Facebook' },
       { slug: 'kanban', rotulo: 'Kanban' },
-      { slug: 'remarketing', rotulo: 'Remarketing' },
       { slug: 'agendamentos', rotulo: 'Agendamentos' },
       { slug: 'disparo', rotulo: 'Disparo' },
     ],
@@ -369,7 +368,7 @@ export default function AppShellV2() {
                 a cada troca de rota e quando a intro abre o palco */}
             {/* páginas cheias (kanban, inbox) gerenciam a própria altura — shell.css .pagina.cheia.
                 Rotas OFICIAIS estão na RAIZ desde o CORTE (/whatsapp, /kanban) — não mais em /v2/*. */}
-            <div className={/^\/(kanban|whatsapp|remarketing)(\/|$)/.test(location.pathname) ? 'pagina pg-entra cheia' : 'pagina pg-entra'} key={location.pathname}>
+            <div className={/^\/(kanban|whatsapp)(\/|$)/.test(location.pathname) ? 'pagina pg-entra cheia' : 'pagina pg-entra'} key={location.pathname}>
               <Outlet />
             </div>
           </div>
