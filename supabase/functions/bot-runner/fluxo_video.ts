@@ -39,31 +39,27 @@ export interface CopyVideo {
   handoff_humano: string;
 }
 
+// COPY ENXUTA (pedido do dono 2026-08-15, após o 1º teste real): a abordagem inicial vira SÓ
+// 2 balões — a saudação vai NA LEGENDA do vídeo, e a pergunta + SIM/NÃO viram um balão só.
+// Nada de encher o cliente de mensagem: funil inteiro caiu de 11 pra 7 balões no caminho feliz.
 export const DEFAULT_COPY_VIDEO: CopyVideo = {
-  abertura: ['Olá! 👋 Seja bem-vindo(a) à *CAF – Central de Assessoria Financeira*.'],
+  abertura: [],
   video_url: '',
-  video_caption: '▶️ Assista, leva só 30 segundos: nosso advogado explica como funcionam os juros abusivos em empréstimos — e quando você tem direito de receber valores de volta. 😊',
-  pergunta_analise: [
-    'Quer fazer uma *análise gratuita* pra descobrir se você paga juros abusivos e tem valores a recuperar?',
-    'Responda *SIM* ou *NÃO*',
-  ],
-  recusa: 'Sem problema! 😊 Se mudar de ideia, é só mandar um *SIM* aqui a qualquer momento. A análise é gratuita e fica à sua disposição.',
-  reprompt_sim_nao: 'Pode me responder com *SIM* ou *NÃO* pra eu seguir com a sua análise? 😊',
-  pede_nome: 'Ótima decisão! 👏 Pra iniciar sua análise, me informe seu *nome completo*:',
+  video_caption: 'Olá! 👋 Aqui é da *CAF – Assessoria Financeira*. Assista (30s): nosso advogado explica os *juros abusivos* em empréstimos — e quando você tem valores a recuperar.',
+  pergunta_analise: ['Quer uma *análise gratuita* do seu caso? Responda *SIM* ou *NÃO* 😊'],
+  recusa: 'Sem problema! 😊 Se mudar de ideia, é só mandar um *SIM* aqui — a análise é gratuita.',
+  reprompt_sim_nao: 'Só me confirma com *SIM* ou *NÃO* pra eu seguir 😊',
+  pede_nome: 'Ótima decisão! 👏 Me informe seu *nome completo*:',
   reprompt_nome: 'Pode me enviar seu *nome completo*? (nome e sobrenome) 🙂',
-  pede_cpf: [
-    'Poderia me informar seu *CPF*?',
-    '🔒 Seus dados são usados somente para a consulta, com total sigilo. *Nunca pedimos senhas, códigos ou qualquer pagamento.* A análise é 100% gratuita.',
-  ],
-  reprompt_cpf: 'Ops, esse CPF parece incompleto. Me envia de novo, por favor 😊',
-  ack_cpf: '✅ Recebido, {primeiro_nome}! Sua análise foi iniciada. Em alguns minutos retorno aqui com uma atualização. ⏳',
+  pede_cpf: ['Agora seu *CPF*, por favor. 🔒 Usado só para a consulta — *nunca pedimos senhas nem pagamento*. É 100% gratuito.'],
+  reprompt_cpf: 'Ops, esse CPF parece incompleto. Me envia de novo? 😊',
+  ack_cpf: '✅ Recebido, {primeiro_nome}! Sua análise foi iniciada — te retorno aqui em alguns minutos. ⏳',
   resultado: [
-    '{primeiro_nome}, atualização da sua análise 📋',
-    'Seu CPF entrou na fila da nossa equipe jurídica. E um dado importante: *a grande maioria dos contratos que analisamos tem juros acima do limite legal*.',
-    'Ou seja, a chance de recuperar valores no seu caso é real. Um dos nossos atendentes te chama *ainda hoje* aqui no WhatsApp com o resultado. Fique de olho! 📲',
+    '{primeiro_nome}, atualização da sua análise 📋 Seu CPF entrou na fila da equipe jurídica — e *a maioria dos contratos que analisamos tem juros acima do limite legal*.',
+    'A chance de recuperar valores é real. Um atendente te chama *ainda hoje* aqui no WhatsApp com o resultado 📲',
   ],
-  audio_desvio: 'Recebi seu áudio! Pra agilizar sua análise, me manda por escrito, por favor 😊',
-  handoff_humano: 'Sem problema! Um de nossos atendentes vai te ajudar com isso pessoalmente. 🙏',
+  audio_desvio: 'Recebi seu áudio! Me manda por escrito, por favor? 😊',
+  handoff_humano: 'Sem problema! Um atendente vai te ajudar pessoalmente. 🙏',
 };
 
 /** Config parcial do jsonb → copy completa (chave ausente cai no default; formato dos fluxos
@@ -141,11 +137,14 @@ export type ResultadoVideo =
 
 const T = (corpo: string): TelaVideo => ({ tipo: 'texto', corpo });
 
-/** Balões da abertura: texto(s) + vídeo (se houver URL) + pergunta SIM/NÃO no MESMO burst. */
+/** Balões da abertura: texto(s) opcionais + vídeo (saudação na LEGENDA) + pergunta SIM/NÃO no
+ *  MESMO burst. Sem video_url, a legenda sai como TEXTO — a saudação nunca some do funil. */
 function telasAbertura(copy: CopyVideo): TelaVideo[] {
   return [
     ...copy.abertura.map(T),
-    ...(copy.video_url ? [{ tipo: 'video', url: copy.video_url, caption: copy.video_caption } as TelaVideo] : []),
+    ...(copy.video_url
+      ? [{ tipo: 'video', url: copy.video_url, caption: copy.video_caption } as TelaVideo]
+      : (copy.video_caption ? [T(copy.video_caption)] : [])),
     ...copy.pergunta_analise.map(T),
   ];
 }
