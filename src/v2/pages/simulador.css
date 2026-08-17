@@ -77,21 +77,8 @@
 .v2 .sim-res b { color: var(--txt); font-weight: 600; }
 .v2 .sim-res .pendente { color: var(--txt-3); }
 
-/* --- consolidado (card sticky ao final) ---------------------
-   Fundo SÓLIDO de propósito: flutua sobre conteúdo rolando — blur
-   aqui seria backdrop recomputado por frame (orçamento, item 8).
-   Dark: o vidro achatado do Modo Leve (alpha sobre --base); light:
-   a carta branca (--vidro-a já é sólida). Nada transparece. */
-.v2 .sim-consol {
-  position: sticky; bottom: 8px; z-index: 6;
-  padding: 15px 18px 13px;
-  backdrop-filter: none; -webkit-backdrop-filter: none;
-  background-color: var(--base);
-  background-image: linear-gradient(180deg, rgba(var(--tint), .055), rgba(var(--tint), .02));
-  box-shadow: var(--sombra-2);
-}
-:root[data-tema="light"] .v2 .sim-consol { background-color: var(--vidro-a); background-image: none; }
-
+/* --- consolidado (último bloco, fluxo normal) --------------- */
+.v2 .sim-consol { padding: 15px 18px 13px; }
 .v2 .sim-consol-grade { display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 20px; align-items: start; }
 .v2 .sim-total-num { font-size: 26px; margin-top: 7px; }
 .v2 .sim-breakdown { font-size: 12px; color: var(--txt-2); margin-top: 7px; }
@@ -100,7 +87,37 @@
 .v2 .sim-consol-acoes .p-btn { width: 100%; justify-content: center; }
 .v2 .sim-consol-acoes .campo { margin-bottom: 2px; }
 
+/* --- barra fixa compacta de total ---------------------------
+   Fundo SÓLIDO, sem blur (backdrop sobre conteúdo rolando estoura o
+   orçamento do item 8; sólido vale nos dois temas e no Modo Leve):
+   dark = vidro achatado sobre --base (a conta do Leve); light = a
+   carta branca (--vidro-a já é sólida). Some quando o card
+   consolidado entra em vista (IntersectionObserver na página; no
+   Leve a transition global já é none → esconde direto).
+   left: 64px = rail fixo da sidebar (.p-app, shell.css). */
+.v2 .sim-barra-espaco { height: 56px; }
+.v2 .sim-barra-total {
+  position: fixed; left: 64px; right: 0; bottom: 0; z-index: 30;
+  height: 56px; padding: 0 24px;
+  display: flex; align-items: center; gap: 12px;
+  background-color: var(--base);
+  background-image: linear-gradient(180deg, rgba(var(--tint), .055), rgba(var(--tint), .02));
+  border-top: 1px solid var(--linha);
+  transition: transform .18s var(--ease), opacity .18s var(--ease);
+}
+:root[data-tema="light"] .v2 .sim-barra-total { background-color: var(--vidro-a); background-image: none; }
+.v2 .sim-barra-total.oculta { transform: translateY(100%); opacity: 0; pointer-events: none; }
+.v2 .sbt-valor { font-size: 15px; font-weight: 600; letter-spacing: -.01em; }
+.v2 .sbt-ver {
+  margin-left: auto; background: none; border: none; cursor: pointer;
+  font-family: var(--fonte); font-size: 12px; font-weight: 500; color: var(--txt-2);
+  padding: 6px 8px; border-radius: 7px;
+}
+.v2 .sbt-ver:hover { color: var(--txt); background: rgba(var(--tint), .06); }
+.v2 .sbt-ver:focus-visible { outline: none; box-shadow: 0 0 0 2px rgba(var(--tint), .35); }
+
 @media (max-width: 900px) {
   .v2 .sim-consol-grade { grid-template-columns: 1fr; gap: 12px; }
   .v2 .sim-linha-acoes { margin-left: 0; }
+  .v2 .sim-barra-total { padding: 0 16px; }
 }

@@ -69,6 +69,14 @@ export const taxaBR = (v: number): string => fmtTaxa.format(v);
 export const mesAnoBR = (c: { mes: number; ano: number }): string =>
   `${String(c.mes).padStart(2, '0')}/${c.ano}`;
 
+/** Faixa "R$ A a R$ B" (mensagem) ou "R$ A – R$ B" (resumo/UI). Extremos que
+    arredondam IGUAL colapsam para "R$ A" — única alteração de molde autorizada
+    pelo dono (2026-08-17): nunca sai "R$ X a R$ X". */
+export const faixaBR = (min: number, max: number, sep: 'a' | '–' = '–'): string =>
+  Math.round(min) === Math.round(max)
+    ? `R$ ${numeroBR(max)}`
+    : `R$ ${numeroBR(min)} ${sep} R$ ${numeroBR(max)}`;
+
 /** "1.234,56" | "1234,56" | "400" | "1,85" → número (null se não parseável). */
 export function parseValorBR(bruto: string): number | null {
   const s = bruto.trim().replace(/\s/g, '').replace(/^R\$/, '');
@@ -148,13 +156,13 @@ export function mensagemCliente(d: DadosSimulacao): string {
     const bancos = [...new Set(emps.map((e) => e.banco))].join(', ');
     const min = emps.reduce((s, e) => s + e.totalMin, 0);
     const max = emps.reduce((s, e) => s + e.totalMax, 0);
-    linhas.push(`- Empréstimos (${emps.length} contrato(s) — ${bancos}): R$ ${numeroBR(min)} a R$ ${numeroBR(max)}`);
+    linhas.push(`- Empréstimos (${emps.length} contrato(s) — ${bancos}): ${faixaBR(min, max, 'a')}`);
   }
   for (const c of d.cartoes) {
     linhas.push(`- Cartão ${c.tipo} (${c.banco}): R$ ${numeroBR(c.total)} já descontados — a ação busca a devolução em dobro: R$ ${numeroBR(c.totalEmDobro)}`);
   }
   linhas.push('');
-  linhas.push(`*Total estimado: R$ ${numeroBR(totalMin)} a R$ ${numeroBR(totalMax)}*`);
+  linhas.push(`*Total estimado: ${faixaBR(totalMin, totalMax, 'a')}*`);
   linhas.push('');
   linhas.push('_Os valores não incluem correção monetária e juros, que podem aumentar o total._');
   linhas.push('');
@@ -176,10 +184,8 @@ export function resumoInterno(d: DadosSimulacao, data: string): string {
       const taxa = e.modo === 'media'
         ? `média ${taxaBR(e.taxaMin)}–${taxaBR(e.taxaMax)}%`
         : `exata ${taxaBR(e.taxaMin)}%`;
-      const valor = e.modo === 'media'
-        ? `${numeroBR(e.totalMin)} – R$ ${numeroBR(e.totalMax)}`
-        : numeroBR(e.totalMax);
-      linhas.push(`- ${e.banco} | parcela R$ ${valorBR(e.parcela)} | ${e.prazo}x | taxa ${taxa} → R$ ${valor}`);
+      const valor = e.modo === 'media' ? faixaBR(e.totalMin, e.totalMax) : `R$ ${numeroBR(e.totalMax)}`;
+      linhas.push(`- ${e.banco} | parcela R$ ${valorBR(e.parcela)} | ${e.prazo}x | taxa ${taxa} → ${valor}`);
     }
   }
   if (d.cartoes.length > 0) {
@@ -189,6 +195,6 @@ export function resumoInterno(d: DadosSimulacao, data: string): string {
     }
   }
   const { totalMin, totalMax } = totaisSimulacao(d);
-  linhas.push(`TOTAL: R$ ${numeroBR(totalMin)} – R$ ${numeroBR(totalMax)}`);
+  linhas.push(`TOTAL: ${faixaBR(totalMin, totalMax)}`);
   return linhas.join('\n');
 }

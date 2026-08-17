@@ -8,7 +8,7 @@ import {
   type BancoSimulador, type BancoSimuladorId,
 } from '@/config/simuladorBancos';
 import {
-  calcularCartao, calcularContrato, mensagemCliente, mesAnoBR, numeroBR, parseInteiro,
+  calcularCartao, calcularContrato, faixaBR, mensagemCliente, mesAnoBR, numeroBR, parseInteiro,
   parseValorBR, resumoInterno, taxaBR, totaisSimulacao, valorBR, type DadosSimulacao,
 } from '@/lib/simulador';
 import './simulador.css';
@@ -232,8 +232,26 @@ export default function Simulador() {
   const nCart = dados.cartoes.length;
   const temAlgo = dados.emprestimos.length + nCart > 0;
   const temValor = tot.totalMax > 0;
-  const faixa = (min: number, max: number) =>
-    Math.round(min) === Math.round(max) ? `R$ ${numeroBR(max)}` : `R$ ${numeroBR(min)} – R$ ${numeroBR(max)}`;
+
+  /* barra fixa compacta: cobre o total enquanto o card consolidado está fora
+     de vista; o IntersectionObserver desconta a própria altura da barra no
+     rootMargin ("visível" = card aparecendo ACIMA dela). */
+  const consolRef = useRef<HTMLDivElement | null>(null);
+  const [consolVisivel, setConsolVisivel] = useState(true);
+  useEffect(() => {
+    const el = consolRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(
+      ([ent]) => setConsolVisivel(ent.isIntersecting),
+      { rootMargin: '0px 0px -56px 0px' },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  const verResumo = () => consolRef.current?.scrollIntoView({
+    behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+    block: 'nearest',
+  });
 
   /* cópia (clipboard + retorno no próprio botão, padrão Coexistência) */
   type Copia = 'cliente' | 'interno';
@@ -378,9 +396,9 @@ export default function Simulador() {
                     <BadgeStatus tom="neutro">taxa dentro da referência — sem indébito</BadgeStatus>
                   ) : (
                     <>
-                      <span>Recuperação estimada: <b className="num">{faixa(c.totalMin, c.totalMax)}</b></span>
+                      <span>Recuperação estimada: <b className="num">{faixaBR(c.totalMin, c.totalMax)}</b></span>
                       {c.temJa && (
-                        <span>· Já descontado indevidamente: <b className="num">{faixa(c.jaMin, c.jaMax)}</b></span>
+                        <span>· Já descontado indevidamente: <b className="num">{faixaBR(c.jaMin, c.jaMax)}</b></span>
                       )}
                     </>
                   )}
@@ -457,12 +475,14 @@ export default function Simulador() {
           })}
         </CardVidro>
 
-        {/* ---- Bloco 3 — Resultado consolidado (sticky) ---- */}
+        {/* ---- Bloco 3 — Resultado consolidado (fluxo normal; wrapper = alvo
+             do observer e do "Ver resumo" da barra fixa) ---- */}
+        <div ref={consolRef}>
         <CardVidro sobe atraso={0.18} className="sim-consol">
           <div className="sim-consol-grade">
             <div>
               <div className="caps">Total estimado a recuperar</div>
-              <div className="p-display num sim-total-num">{temValor ? faixa(tot.totalMin, tot.totalMax) : '—'}</div>
+              <div className="p-display num sim-total-num">{temValor ? faixaBR(tot.totalMin, tot.totalMax) : '—'}</div>
               <div className="sim-breakdown num">
                 {temAlgo
                   ? [
@@ -492,7 +512,21 @@ export default function Simulador() {
             </div>
           </div>
         </CardVidro>
+        </div>
+
+        {/* folga do fim da página: nenhuma linha fica atrás da barra fixa */}
+        {temValor && <div className="sim-barra-espaco" aria-hidden />}
       </div>
+
+      {temValor && (
+        <div className={consolVisivel ? 'sim-barra-total oculta' : 'sim-barra-total'} aria-hidden={consolVisivel}>
+          <span className="caps">Total estimado</span>
+          <span className="sbt-valor num">{faixaBR(tot.totalMin, tot.totalMax)}</span>
+          <button type="button" className="sbt-ver" onClick={verResumo} tabIndex={consolVisivel ? -1 : 0}>
+            Ver resumo
+          </button>
+        </div>
+      )}
     </>
   );
 }

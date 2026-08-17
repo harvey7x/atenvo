@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  calcularContrato, calcularCartao, parseValorBR, parseInteiro,
+  calcularContrato, calcularCartao, parseValorBR, parseInteiro, faixaBR,
   mensagemCliente, resumoInterno, totaisSimulacao,
   type DadosSimulacao,
 } from './simulador';
@@ -99,7 +99,7 @@ Importante: estes valores são uma estimativa e dependem da análise dos contrat
     expect(msg.startsWith('*Simulação de valores*\n')).toBe(true);
     expect(msg).not.toContain('- Empréstimos');
     expect(msg).toContain('- Cartão RMC (BMG):');
-    expect(msg).toContain('*Total estimado: R$ 14.040 a R$ 14.040*');
+    expect(msg).toContain('*Total estimado: R$ 14.040*'); // min == max colapsa (alteração autorizada)
   });
 
   it('empréstimo "dentro da referência" (total 0) fica fora da contagem e dos bancos', () => {
@@ -150,7 +150,54 @@ TOTAL: R$ 34.040 – R$ 49.040`);
 Taxa de referência: 2% a.m.
 [EMPRÉSTIMOS]
 - FACTA | parcela R$ 250,50 | 72x | taxa exata 12% → R$ 15.000
-TOTAL: R$ 15.000 – R$ 15.000`);
+TOTAL: R$ 15.000`);
+  });
+});
+
+/* Colapso de faixa (única alteração de molde autorizada, 2026-08-17):
+   onde sairia "R$ X a R$ X" / "R$ X – R$ X" com X idêntico, sai "R$ X". */
+describe('faixaBR() — colapso quando os extremos arredondam igual', () => {
+  it('iguais colapsam; diferentes mantêm a faixa nos dois separadores', () => {
+    expect(faixaBR(27007, 27007, 'a')).toBe('R$ 27.007');
+    expect(faixaBR(20000, 35000, 'a')).toBe('R$ 20.000 a R$ 35.000');
+    expect(faixaBR(20000, 35000)).toBe('R$ 20.000 – R$ 35.000');
+    expect(faixaBR(100.2, 99.8)).toBe('R$ 100'); // arredondam para o mesmo inteiro
+  });
+});
+
+describe('moldes com só taxa exata — colapso byte a byte', () => {
+  const DADOS_EXATA: DadosSimulacao = {
+    nome: 'João Batista',
+    taxaReferencia: 1.85,
+    emprestimos: [{
+      banco: 'AGIBANK', parcela: 400, prazo: 84, modo: 'exata',
+      taxaMin: 12, taxaMax: 12, totalMin: 27007, totalMax: 27007,
+    }],
+    cartoes: [],
+  };
+
+  it('mensagem p/ cliente sem "R$ X a R$ X"', () => {
+    expect(mensagemCliente(DADOS_EXATA)).toBe(
+`*Simulação de valores — João Batista*
+
+Com base nas informações dos seus descontos, fizemos o recálculo pela taxa de referência do Banco Central. A estimativa de valores a recuperar é:
+
+- Empréstimos (1 contrato(s) — AGIBANK): R$ 27.007
+
+*Total estimado: R$ 27.007*
+
+_Os valores não incluem correção monetária e juros, que podem aumentar o total._
+
+Importante: estes valores são uma estimativa e dependem da análise dos contratos e da decisão da Justiça. O processo é conduzido pelo escritório do Dr. Rafael Ribeiro de Menezes (OAB/RS 91.310).`);
+  });
+
+  it('resumo interno sem "R$ X – R$ X"', () => {
+    expect(resumoInterno(DADOS_EXATA, '17/08/2026')).toBe(
+`SIMULAÇÃO 17/08/2026 — João Batista
+Taxa de referência: 1,85% a.m.
+[EMPRÉSTIMOS]
+- AGIBANK | parcela R$ 400 | 84x | taxa exata 12% → R$ 27.007
+TOTAL: R$ 27.007`);
   });
 });
 
