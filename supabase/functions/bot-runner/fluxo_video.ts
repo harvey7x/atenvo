@@ -46,7 +46,7 @@ export interface CopyVideo {
 export const DEFAULT_COPY_VIDEO: CopyVideo = {
   abertura: ['Olá! Seja bem-vindo(a) à CAF! 👋'],
   video_url: '',
-  video_caption: 'Assista esse video, leva apenas segundos.',
+  video_caption: 'Assista esse video, leva apenas 30 segundos.',
   pergunta_analise: [
     'Gostaria de fazer *análise gratuita* pra descobrir se você paga juros abusivos e recuperar valores?',
     'Responda *SIM* ou *NÃO* 😊',
