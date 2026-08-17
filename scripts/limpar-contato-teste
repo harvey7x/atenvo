@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# limpar-contato-teste — reseta o NÚMERO DE TESTE para o próximo inbound nascer 100% virgem.
+#
+# Chama a RPC public.limpar_contato_teste(p_sufixo) (migration 20260817000200), que localiza
+# o(s) contato(s) pelo sufixo do telefone (cobre o 9º dígito oscilante), roda a limpeza
+# completa em transação e devolve contagens antes/depois. Preserva audit_log e
+# whatsapp_webhook_events. Aborta se o sufixo casar mais de 2 contatos.
+#
+# Uso (na raiz do repo):
+#   scripts/limpar-contato-teste 98872825
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+SUFIXO="${1:?uso: scripts/limpar-contato-teste <sufixo-do-telefone>  (ex.: 98872825, mínimo 8 dígitos)}"
+REF="afmzuoavvnpfossiiypz"
+
+# service key via CLI logado (nunca fica em arquivo nem aparece no terminal)
+KEY=$(./node_modules/.bin/supabase projects api-keys --project-ref "$REF" -o json \
+  | python3 -c "import sys,json;print(next(k['api_key'] for k in json.load(sys.stdin) if k.get('name')=='service_role'))")
+
+curl -sf -X POST "https://${REF}.supabase.co/rest/v1/rpc/limpar_contato_teste" \
+  -H "apikey: ${KEY}" -H "Authorization: Bearer ${KEY}" -H "Content-Type: application/json" \
+  -d "{\"p_sufixo\":\"${SUFIXO}\"}" | python3 -m json.tool

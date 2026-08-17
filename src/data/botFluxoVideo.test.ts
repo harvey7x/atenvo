@@ -94,21 +94,23 @@ describe('matching do número de teste — chaveTel cobre o 9º dígito oscilant
 });
 
 describe('máquina de passos — abertura, SIM/NÃO, nome, CPF, resultado', () => {
-  it('abertura ENXUTA: 2 balões — vídeo com a saudação NA legenda + pergunta com SIM/NÃO junto', () => {
+  it('abertura LITERAL: 4 saídas na ordem — boas-vindas, VÍDEO (2ª saída, caption curta), pergunta, SIM/NÃO', () => {
     const r = proximoPassoVideo(null, digitou('oi'), 0, 0, {}, COPY);
     if (r.acao !== 'enviar') throw new Error('esperava enviar');
-    expect(r.telas).toHaveLength(2);
-    expect(r.telas[0]).toEqual({ tipo: 'video', url: COPY.video_url, caption: COPY.video_caption });
-    expect(r.telas[0].tipo === 'video' && /Olá!/.test(r.telas[0].caption)).toBe(true);   // saudação vive na legenda
-    expect(r.telas[1].tipo === 'texto' && r.telas[1].corpo.includes('Responda *SIM* ou *NÃO*')).toBe(true);
+    expect(r.telas).toHaveLength(4);
+    expect(r.telas[0]).toEqual({ tipo: 'texto', corpo: 'Olá! 👋 Seja bem-vindo(a) à *CAF – Central de Assessoria Financeira*.' });
+    expect(r.telas[1]).toEqual({ tipo: 'video', url: COPY.video_url, caption: 'Assista, leva só 30 segundos' });
+    expect(r.telas[2]).toEqual({ tipo: 'texto', corpo: 'Quer fazer uma *análise gratuita* pra descobrir se você paga juros abusivos e tem valores a recuperar?' });
+    expect(r.telas[3]).toEqual({ tipo: 'texto', corpo: 'Responda *SIM* ou *NÃO* 😊' });
     expect(r.passoNovo).toBe('aguardando_sim_nao');
   });
 
-  it('sem video_url, a legenda (com a saudação) sai como TEXTO — o funil não abre sem se apresentar', () => {
+  it('sem video_url, a caption sai como TEXTO na mesma posição (2ª saída) — estrutura preservada', () => {
     const r = proximoPassoVideo(null, digitou('oi'), 0, 0, {}, DEFAULT_COPY_VIDEO);
     if (r.acao !== 'enviar') throw new Error('esperava enviar');
-    expect(r.telas).toHaveLength(2);
-    expect(r.telas[0]).toEqual({ tipo: 'texto', corpo: DEFAULT_COPY_VIDEO.video_caption });
+    expect(r.telas).toHaveLength(4);
+    expect(r.telas[0]).toEqual({ tipo: 'texto', corpo: DEFAULT_COPY_VIDEO.abertura[0] });
+    expect(r.telas[1]).toEqual({ tipo: 'texto', corpo: DEFAULT_COPY_VIDEO.video_caption });
     expect(r.telas.every((t) => t.tipo === 'texto')).toBe(true);
   });
 
@@ -147,13 +149,14 @@ describe('máquina de passos — abertura, SIM/NÃO, nome, CPF, resultado', () =
     expect(r2.acoes?.escalarHumano).toBe('bot_nao_entendeu');
   });
 
-  it('nome válido → salva e pede o CPF (1 balão, com a promessa de sigilo embutida)', () => {
+  it('nome válido → salva e pede o CPF (2 balões: pedido + promessa de sigilo)', () => {
     const r = proximoPassoVideo('aguardando_nome', digitou('José da Silva'), 0, 0, {}, COPY);
     if (r.acao !== 'enviar') throw new Error('esperava enviar');
     expect(r.acoes?.salvarNome).toBe('José da Silva');
     expect(r.telas).toEqual(COPY.pede_cpf.map((c) => ({ tipo: 'texto', corpo: c })));
-    expect(r.telas).toHaveLength(1);
-    expect(r.telas[0].tipo === 'texto' && /nunca pedimos senhas/.test(r.telas[0].corpo)).toBe(true);
+    expect(r.telas).toHaveLength(2);
+    expect(r.telas[0]).toEqual({ tipo: 'texto', corpo: 'Poderia me informar seu *CPF*?' });
+    expect(r.telas[1].tipo === 'texto' && /Nunca pedimos senhas/.test(r.telas[1].corpo)).toBe(true);
     expect(r.passoNovo).toBe('aguardando_cpf');
   });
 
@@ -170,7 +173,7 @@ describe('máquina de passos — abertura, SIM/NÃO, nome, CPF, resultado', () =
     const dados = { nome_completo: 'José da Silva' };
     const r = proximoPassoVideo('aguardando_cpf', digitou('meu cpf é 529.982.247-25'), 0, 0, dados, COPY);
     if (r.acao !== 'enviar') throw new Error('esperava enviar');
-    expect(r.telas).toEqual([{ tipo: 'texto', corpo: '✅ Recebido, José! Sua análise foi iniciada — te retorno aqui em alguns minutos. ⏳' }]);
+    expect(r.telas).toEqual([{ tipo: 'texto', corpo: '✅ Recebido, José! Sua análise foi iniciada. Em alguns minutos retorno aqui com uma atualização. ⏳' }]);
     expect(r.acoes?.salvarCpf).toEqual({ digits: CPF_OK, mascarado: '***.***.***-25' });
     expect(r.acoes?.agendarResultado).toBe(true);
     expect(r.passoNovo).toBe('aguardando_resultado');
@@ -179,7 +182,7 @@ describe('máquina de passos — abertura, SIM/NÃO, nome, CPF, resultado', () =
   it('CPF inválido: 1º reprompt (copy exata), 2ª falha escala (cpf_invalido)', () => {
     const r1 = proximoPassoVideo('aguardando_cpf', digitou('1234'), 0, 0, {}, COPY);
     if (r1.acao !== 'enviar') throw new Error('esperava enviar');
-    expect(r1.telas).toEqual([{ tipo: 'texto', corpo: 'Ops, esse CPF parece incompleto. Me envia de novo? 😊' }]);
+    expect(r1.telas).toEqual([{ tipo: 'texto', corpo: 'Ops, esse CPF parece incompleto. Me envia de novo, por favor 😊' }]);
     const r2 = proximoPassoVideo('aguardando_cpf', digitou('52998224724'), 1, 0, {}, COPY);
     if (r2.acao !== 'enviar') throw new Error('esperava enviar');
     expect(r2.acoes?.escalarHumano).toBe('cpf_invalido');
@@ -203,12 +206,12 @@ describe('máquina de passos — abertura, SIM/NÃO, nome, CPF, resultado', () =
     expect(proximoPassoVideo('fim', digitou('oi'), 0, 0, {}, COPY)).toEqual({ acao: 'nada', motivo: 'fluxo_encerrado' });
   });
 
-  it('mensagensResultado: 2 balões com {primeiro_nome} interpolado (texto final vai pra fila)', () => {
+  it('mensagensResultado: 3 balões com {primeiro_nome} interpolado (texto final vai pra fila)', () => {
     const baloes = mensagensResultado(COPY, 'José da Silva');
-    expect(baloes).toHaveLength(2);
-    expect(baloes[0].startsWith('José, atualização da sua análise 📋')).toBe(true);
-    expect(baloes[0]).toContain('juros acima do limite legal');
-    expect(baloes[1]).toContain('ainda hoje');
+    expect(baloes).toHaveLength(3);
+    expect(baloes[0]).toBe('José, atualização da sua análise 📋');
+    expect(baloes[1]).toContain('a grande maioria dos contratos que analisamos tem juros acima do limite legal');
+    expect(baloes[2]).toContain('ainda hoje');
   });
 
   it('montarCopyVideo: jsonb parcial sobrepõe o default; chave ausente cai no default', () => {
