@@ -114,10 +114,13 @@ describe('máquina de passos — abertura, SIM/NÃO, nome, CPF, resultado', () =
     expect(r.telas.every((t) => t.tipo === 'texto')).toBe(true);
   });
 
-  it('SIM → pede o nome', () => {
+  it('SIM → pede o nome (2 balões: celebração + pedido, sem negrito)', () => {
     const r = proximoPassoVideo('aguardando_sim_nao', digitou('SIM'), 0, 0, {}, COPY);
     if (r.acao !== 'enviar') throw new Error('esperava enviar');
-    expect(r.telas).toEqual([{ tipo: 'texto', corpo: COPY.pede_nome }]);
+    expect(r.telas).toEqual([
+      { tipo: 'texto', corpo: 'Ótima decisão! 👏' },
+      { tipo: 'texto', corpo: 'Para iniciarmos sua análise, me informe seu nome completo:' },
+    ]);
     expect(r.passoNovo).toBe('aguardando_nome');
   });
 
@@ -169,11 +172,14 @@ describe('máquina de passos — abertura, SIM/NÃO, nome, CPF, resultado', () =
     expect(r2.acoes?.escalarHumano).toBe('bot_nao_entendeu');
   });
 
-  it('CPF válido → ack interpolado + salvarCpf + agendarResultado', () => {
+  it('CPF válido → ack interpolado em 2 balões + salvarCpf + agendarResultado', () => {
     const dados = { nome_completo: 'José da Silva' };
     const r = proximoPassoVideo('aguardando_cpf', digitou('meu cpf é 529.982.247-25'), 0, 0, dados, COPY);
     if (r.acao !== 'enviar') throw new Error('esperava enviar');
-    expect(r.telas).toEqual([{ tipo: 'texto', corpo: '✅ Recebido, José! Sua análise foi iniciada. Em alguns minutos retorno aqui com uma atualização. ⏳' }]);
+    expect(r.telas).toEqual([
+      { tipo: 'texto', corpo: '✅ Recebido, José!' },
+      { tipo: 'texto', corpo: 'Sua análise foi iniciada. Em alguns minutos retorno aqui com uma atualização.' },
+    ]);
     expect(r.acoes?.salvarCpf).toEqual({ digits: CPF_OK, mascarado: '***.***.***-25' });
     expect(r.acoes?.agendarResultado).toBe(true);
     expect(r.passoNovo).toBe('aguardando_resultado');
@@ -218,7 +224,13 @@ describe('máquina de passos — abertura, SIM/NÃO, nome, CPF, resultado', () =
     const c = montarCopyVideo({ video_url: 'https://x.test/v.mp4', recusa: 'outra copy' });
     expect(c.video_url).toBe('https://x.test/v.mp4');
     expect(c.recusa).toBe('outra copy');
-    expect(c.ack_cpf).toBe(DEFAULT_COPY_VIDEO.ack_cpf);
+    expect(c.ack_cpf).toEqual(DEFAULT_COPY_VIDEO.ack_cpf);
     expect(montarCopyVideo(undefined)).toEqual(DEFAULT_COPY_VIDEO);
+  });
+
+  it('montarCopyVideo: pede_nome/ack_cpf antigos como STRING viram lista de 1 (jsonb velho não quebra)', () => {
+    const c = montarCopyVideo({ pede_nome: 'texto antigo único', ack_cpf: 'ack antigo {primeiro_nome}' });
+    expect(c.pede_nome).toEqual(['texto antigo único']);
+    expect(c.ack_cpf).toEqual(['ack antigo {primeiro_nome}']);
   });
 });

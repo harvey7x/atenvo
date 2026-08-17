@@ -29,11 +29,11 @@ export interface CopyVideo {
   pergunta_analise: string[];  // logo após o vídeo, no MESMO burst
   recusa: string;
   reprompt_sim_nao: string;
-  pede_nome: string;
+  pede_nome: string[];
   reprompt_nome: string;
   pede_cpf: string[];
   reprompt_cpf: string;
-  ack_cpf: string;             // {primeiro_nome}
+  ack_cpf: string[];           // {primeiro_nome}
   resultado: string[];         // 3 balões diferidos (+8 min) — {primeiro_nome}
   audio_desvio: string;
   handoff_humano: string;
@@ -53,14 +53,22 @@ export const DEFAULT_COPY_VIDEO: CopyVideo = {
   ],
   recusa: 'Sem problema! 😊 Se mudar de ideia, é só mandar um *SIM* aqui a qualquer momento. A análise é gratuita e fica à sua disposição.',
   reprompt_sim_nao: 'Pode me responder com *SIM* ou *NÃO* pra eu seguir com a sua análise? 😊',
-  pede_nome: 'Ótima decisão! 👏 Pra iniciar sua análise, me informe seu *nome completo*:',
+  pede_nome: [
+    'Ótima decisão! 👏',
+    'Para iniciarmos sua análise, me informe seu nome completo:',
+  ],
   reprompt_nome: 'Pode me enviar seu *nome completo*? (nome e sobrenome) 🙂',
+  // mensagem de segurança ENCURTADA a pedido do dono (2026-08-16, "fica muito longa no celular"):
+  // corte puro da frase original — caiu "com total sigilo" e "A análise é 100% gratuita."
   pede_cpf: [
     'Poderia me informar seu *CPF*?',
-    '🔒 Seus dados são usados somente para a consulta, com total sigilo. *Nunca pedimos senhas, códigos ou qualquer pagamento.* A análise é 100% gratuita.',
+    '🔒 Seus dados são usados somente para a consulta. *Nunca pedimos senhas, códigos ou qualquer pagamento.*',
   ],
   reprompt_cpf: 'Ops, esse CPF parece incompleto. Me envia de novo, por favor 😊',
-  ack_cpf: '✅ Recebido, {primeiro_nome}! Sua análise foi iniciada. Em alguns minutos retorno aqui com uma atualização. ⏳',
+  ack_cpf: [
+    '✅ Recebido, {primeiro_nome}!',
+    'Sua análise foi iniciada. Em alguns minutos retorno aqui com uma atualização.',
+  ],
   resultado: [
     '{primeiro_nome}, atualização da sua análise 📋',
     'Seu CPF entrou na fila da nossa equipe jurídica. E um dado importante: *a grande maioria dos contratos que analisamos tem juros acima do limite legal*.',
@@ -71,10 +79,16 @@ export const DEFAULT_COPY_VIDEO: CopyVideo = {
 };
 
 /** Config parcial do jsonb → copy completa (chave ausente cai no default; formato dos fluxos
- *  existentes: cada etapa é uma chave, balões em array, {primeiro_nome} como placeholder). */
+ *  existentes: cada etapa é uma chave, balões em array, {primeiro_nome} como placeholder).
+ *  pede_nome/ack_cpf viraram LISTA (2 balões, 2026-08-16): string antiga ainda é aceita e vira
+ *  lista de 1 — deploy e jsonb nunca precisam trocar em sincronia perfeita. */
 export function montarCopyVideo(cfg: unknown): CopyVideo {
-  const c = (cfg && typeof cfg === 'object' ? cfg : {}) as Partial<CopyVideo>;
-  return { ...DEFAULT_COPY_VIDEO, ...Object.fromEntries(Object.entries(c).filter(([, v]) => v != null)) } as CopyVideo;
+  const c = (cfg && typeof cfg === 'object' ? cfg : {}) as Record<string, unknown>;
+  const m = { ...DEFAULT_COPY_VIDEO, ...Object.fromEntries(Object.entries(c).filter(([, v]) => v != null)) } as CopyVideo;
+  for (const k of ['pede_nome', 'ack_cpf'] as const) {
+    if (typeof (m[k] as unknown) === 'string') m[k] = [m[k] as unknown as string];
+  }
+  return m;
 }
 
 // ---- SIM/NÃO (case/acento-insensitive) ----
@@ -188,7 +202,7 @@ export function proximoPassoVideo(
   if (passoAtual === 'recusado') {
     if (!entrada.ehAudio && parseSimNao(entrada.texto) === 'sim') {
       return {
-        acao: 'enviar', telas: [T(copy.pede_nome)], passoNovo: 'aguardando_nome', tentativas: 0, desvios,
+        acao: 'enviar', telas: copy.pede_nome.map(T), passoNovo: 'aguardando_nome', tentativas: 0, desvios,
         acoes: { limparRecusa: true },
       };
     }
@@ -209,7 +223,7 @@ export function proximoPassoVideo(
 
   if (passoAtual === 'aguardando_sim_nao') {
     const r = parseSimNao(entrada.texto);
-    if (r === 'sim') return { acao: 'enviar', telas: [T(copy.pede_nome)], passoNovo: 'aguardando_nome', tentativas: 0, desvios };
+    if (r === 'sim') return { acao: 'enviar', telas: copy.pede_nome.map(T), passoNovo: 'aguardando_nome', tentativas: 0, desvios };
     if (r === 'nao') {
       return {
         acao: 'enviar', telas: [T(copy.recusa)], passoNovo: 'recusado', tentativas: 0, desvios,
@@ -244,7 +258,7 @@ export function proximoPassoVideo(
     const cpf = extrairCpfDeTexto(entrada.texto);
     if (cpf.valido) {
       return {
-        acao: 'enviar', telas: [T(interp(copy.ack_cpf))], passoNovo: 'aguardando_resultado', tentativas: 0, desvios,
+        acao: 'enviar', telas: copy.ack_cpf.map((s) => T(interp(s))), passoNovo: 'aguardando_resultado', tentativas: 0, desvios,
         acoes: { salvarCpf: { digits: cpf.digits, mascarado: cpf.mascarado }, agendarResultado: true },
       };
     }
