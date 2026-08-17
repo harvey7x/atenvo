@@ -209,6 +209,18 @@ Deno.serve(async (req) => {
           return json({ ok: true, fluxo: 'video', skipped: 'sem_referral_anuncio', conversa_id: conversaId });
         }
       }
+      // MIGRAÇÃO DE FLUXO: lead que já estava NO MEIO do fluxo por botões quando o canal trocou
+      // de fluxo_slug TERMINA o trilho antigo — mandar a abertura do vídeo pra quem ia responder
+      // o CPF seria recomeçar do zero na cara do cliente. Quem nunca entrou (sem passo_botoes)
+      // ou já terminou ('fim') segue no vídeo normalmente.
+      if (BOTOES_ATIVO && !!dqV.passo_botoes && dqV.passo_botoes !== 'fim' && !dqV.passo_video) {
+        await logRunner('fluxo_video', 'continua_no_botoes_meio_do_fluxo', { dry_run: dryRun });
+        return await tratarComBotoes({
+          admin, conversaId, conv, canal, estado,
+          inboundText: body.inbound_text ?? '', inboundTipo: body.inbound_tipo ?? 'texto',
+          inboundMsgId: body.inbound_msg_id ?? null, dryRun, logRunner,
+        });
+      }
       return await tratarComVideo({
         admin, conversaId, conv, canal, estado,
         copyVideo: montarCopyVideo(((cfg?.mensagens ?? {}) as Record<string, unknown>).caf_video_juros_v1),
