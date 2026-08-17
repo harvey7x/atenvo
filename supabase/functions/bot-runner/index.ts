@@ -21,7 +21,7 @@ import { saidaSuja } from './guardrail.ts';
 // Importar (não copiar) garante UMA implementação de envio Cloud API, sem duas divergindo no tempo.
 import { enviadorDe } from '../evolution-send/transporte.ts';
 // Motor determinístico por BOTÕES (sem IA). Puro; o bot-runner é quem envia/persiste.
-import { proximoPasso, proximoPassoSuporte, chaveTel, deveHandoff48h, telaComoTexto, opcoesDaTela } from './fluxo_botoes.ts';
+import { proximoPasso, proximoPassoSuporte, chaveTel, deveHandoff48h, telaComoTexto, opcoesDaTela, inferirGenero } from './fluxo_botoes.ts';
 // Motor determinístico do fluxo de VÍDEO (VSL juros abusivos) — alcançável só pelos números de
 // TESTE (bot_canal_config.fluxo_slug_teste + numeros_teste). Puro; quem envia e fecha é o runner.
 import { proximoPassoVideo, montarCopyVideo, type CopyVideo } from './fluxo_video.ts';
@@ -1081,9 +1081,10 @@ async function tratarComVideo(p: {
     }
   }
 
-  // ---- FECHO (CPF válido): qualifica a oportunidade + chama o humano — TUDO agora, junto do
+  // ---- FECHO (CPF válido): qualifica a oportunidade + DISTRIBUI o lead — TUDO agora, junto do
   //      ack (era o fecho do worker quando existia o 'resultado' diferido; a mecânica é a mesma).
   //      Roda também em dry_run: é decisão de estado, não mensagem ao cliente. ----
+  let dadosFecho: Record<string, unknown> = {};
   if (r.acoes?.concluirAnalise) {
     // 1) alerta pros atendentes (tipo 'concluido' = "aguardando ligação"; passo ack_cpf).
     try {
@@ -1096,12 +1097,45 @@ async function tratarComVideo(p: {
     // 2) etiqueta no contato
     await aplicarEtiquetaBot(admin, conv.organizacao_id, 'bot-video-v1', conv.contato_id, null);
 
-    // 3) o painel acende "precisa de humano" com o motivo combinado
+    // 3) DISTRIBUIÇÃO ("distribua os leads", dono 2026-08-16): MESMO roteamento do fluxo de
+    //    botões — RPC bot_rotear_consultor (placar do dia: mulher→Matheus, homem→Giovana/Juliana,
+    //    incerto→menor placar; teto +3; trava de dono). Fallback = régua local all-time, pro
+    //    fecho nunca ficar sem dono se a RPC cair. Atribuído/já tinha dono → bot_pausar
+    //    'humano_assumiu' (o dono assume; limpa precisa_humano — o alerta 'concluido' segue
+    //    aceso até alguém responder). Só se TUDO falhar cai no precisa_humano de equipe.
+    const generoLead = inferirGenero(String(dq.nome_completo ?? r.acoes?.salvarNome ?? ''));
+    let consultorFinal: { id: string; nome: string; chave: string; cartao: string } | null = null;
+    let jaTinhaDono = false;
     try {
-      await admin.from('conversas').update({
-        precisa_humano: true, precisa_humano_motivo: 'analise_pronta_contatar_hoje', precisa_humano_em: new Date().toISOString(),
-      }).eq('id', conversaId);
-    } catch { /* best-effort */ }
+      const { data, error } = await admin.rpc('bot_rotear_consultor', { p_conversa: conversaId, p_genero: generoLead });
+      if (error) throw error;
+      const rot = Array.isArray(data) ? data[0] : data;
+      if (rot?.ja_tinha_atendente) jaTinhaDono = true;
+      else consultorFinal = (CONSULTORES as Record<string, typeof CONSULTORES.matheus>)[rot?.consultor_chave ?? ''] ?? null;
+    } catch {
+      if (generoLead === 'mulher') consultorFinal = CONSULTORES.matheus;
+      else if (generoLead === 'homem') consultorFinal = await proximoConsultorHomem(admin);
+      else consultorFinal = await proximoConsultorTres(admin);
+    }
+    if (consultorFinal) {
+      // o trigger trg_sync_responsavel_cliente propaga pro conversas.atendente_id + oportunidades
+      try { await admin.from('contatos').update({ responsavel_id: consultorFinal.id }).eq('id', conv.contato_id); } catch { /* best-effort */ }
+      try { await admin.rpc('bot_pausar', { p_conversa: conversaId, p_motivo: 'humano_assumiu' }); } catch { /* best-effort */ }
+      dadosFecho = { genero: generoLead, consultor_roteado: consultorFinal.chave, roteamento: 'auto' };
+      await logFluxo('roteou_consultor', { genero: generoLead, consultor: consultorFinal.chave });
+    } else if (jaTinhaDono) {
+      try { await admin.rpc('bot_pausar', { p_conversa: conversaId, p_motivo: 'humano_assumiu' }); } catch { /* best-effort */ }
+      dadosFecho = { genero: generoLead, roteamento: 'ja_tinha_dono' };
+      await logFluxo('roteou_consultor', { genero: generoLead, ja_tinha_dono: true });
+    } else {
+      try {
+        await admin.from('conversas').update({
+          precisa_humano: true, precisa_humano_motivo: 'analise_pronta_contatar_hoje', precisa_humano_em: new Date().toISOString(),
+        }).eq('id', conversaId);
+      } catch { /* best-effort */ }
+      dadosFecho = { genero: generoLead, roteamento: 'indefinido' };
+      await logFluxo('roteamento_indefinido', { genero: generoLead });
+    }
 
     // 4) move a opp pra coluna papel='qualificado' + evento 'qualificado' (padrão da casa).
     //    estado.oportunidade_id foi setado pelo bot_coletar_nome na etapa do nome.
@@ -1159,6 +1193,7 @@ async function tratarComVideo(p: {
       ...(passoAtual == null ? { video_abertura_em: new Date().toISOString() } : {}),
       ...(r.acoes?.registrarRecusa ? { video_concluido: 'recusou', video_recusado_em: new Date().toISOString() } : {}),
       ...(r.acoes?.limparRecusa ? { video_concluido: null } : {}),
+      ...dadosFecho,
     },
     p_reprompts: 0, p_inbound_msg: inboundMsgId,
   });
