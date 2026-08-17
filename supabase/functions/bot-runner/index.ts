@@ -23,8 +23,8 @@ import { enviadorDe } from '../evolution-send/transporte.ts';
 // Motor determinístico por BOTÕES (sem IA). Puro; o bot-runner é quem envia/persiste.
 import { proximoPasso, proximoPassoSuporte, chaveTel, deveHandoff48h, telaComoTexto, opcoesDaTela } from './fluxo_botoes.ts';
 // Motor determinístico do fluxo de VÍDEO (VSL juros abusivos) — alcançável só pelos números de
-// TESTE (bot_canal_config.fluxo_slug_teste + numeros_teste). Puro; quem envia/agenda é o runner.
-import { proximoPassoVideo, montarCopyVideo, mensagensResultado, type CopyVideo } from './fluxo_video.ts';
+// TESTE (bot_canal_config.fluxo_slug_teste + numeros_teste). Puro; quem envia e fecha é o runner.
+import { proximoPassoVideo, montarCopyVideo, type CopyVideo } from './fluxo_video.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -946,11 +946,9 @@ async function tratarComIA(p: {
 
 // ======== FLUXO DE VÍDEO (caf_video_juros_v1): VSL de juros + SIM/NÃO + nome + CPF ========
 // Espelha a estrutura do tratarComBotoes: o motor puro (fluxo_video.ts) decide; aqui envia
-// (Cloud API por LINK público), persiste, aplica ações e avança o passo em
-// dados_qualificacao.passo_video. O RESULTADO não sai daqui: entra na fila bot_mensagens_saida
-// com status 'agendada' (+8 min) e o worker bot-fila-processar entrega re-checando as guardas
-// (pausa/atendente respondeu/opt-out) na hora do envio.
-const VIDEO_RESULTADO_ATRASO_MS = 8 * 60 * 1000;
+// (Cloud API por LINK público ou Evolution), persiste, aplica ações e avança o passo em
+// dados_qualificacao.passo_video. O FECHO acontece na hora do CPF (a etapa 'resultado' diferida
+// foi removida a pedido do dono 2026-08-16 — depois do ack quem continua são os atendentes).
 
 // Etiqueta no padrão do painel: garante a linha no catálogo (etiquetas) e faz append do NOME
 // nos arrays de contatos/conversas sem duplicar. Tudo best-effort — etiqueta nunca trava o fluxo.
@@ -1071,21 +1069,62 @@ async function tratarComVideo(p: {
     }
   }
 
-  // ---- agenda o RESULTADO (+8 min): 3 linhas na fila. Real -> 'agendada' (o worker entrega e
-  //      conclui); dry_run -> 'simulada' (nada é entregue depois; o estado ainda avança). Texto
-  //      final já interpolado — o nome é conhecido aqui, o worker não interpola. ----
-  if (r.acoes?.agendarResultado) {
-    const nomeConhecido = String(dq.nome_completo ?? r.acoes?.salvarNome ?? '');
-    const textos = mensagensResultado(copyVideo, nomeConhecido);
-    const enviarApos = new Date(Date.now() + VIDEO_RESULTADO_ATRASO_MS).toISOString();
-    const linhas = textos.map((texto, i) => ({
-      organizacao_id: conv.organizacao_id, conversa_id: conversaId, canal_id: conv.canal_id,
-      etapa: 'resultado', ordem: i + 1, texto, tipo: 'texto',
-      enviar_apos: enviarApos, status: dryRunEfetivo ? 'simulada' : 'agendada',
-    }));
-    const { error: eAg } = await admin.from('bot_mensagens_saida').upsert(linhas, { onConflict: 'conversa_id,etapa,ordem', ignoreDuplicates: true });
-    if (eAg) await logFluxo('agendar_resultado_falhou', { erro: String(eAg.message ?? '').slice(0, 200) });
-    else await logFluxo('resultado_agendado', { enviar_apos: enviarApos, baloes: textos.length, simulado: dryRunEfetivo });
+  // ---- FECHO (CPF válido): qualifica a oportunidade + chama o humano — TUDO agora, junto do
+  //      ack (era o fecho do worker quando existia o 'resultado' diferido; a mecânica é a mesma).
+  //      Roda também em dry_run: é decisão de estado, não mensagem ao cliente. ----
+  if (r.acoes?.concluirAnalise) {
+    // 1) alerta pros atendentes (tipo 'concluido' = "aguardando ligação"; passo ack_cpf).
+    try {
+      await admin.from('alertas_lead_quente').upsert({
+        organizacao_id: conv.organizacao_id, conversa_id: conversaId, contato_id: conv.contato_id,
+        passo: 'ack_cpf', abandonado_em: new Date().toISOString(), tipo: 'concluido',
+      }, { onConflict: 'conversa_id,tipo', ignoreDuplicates: true });
+    } catch (e) { await logFluxo('alerta_falhou', { erro: String((e as Error)?.message ?? '').slice(0, 200) }); }
+
+    // 2) etiqueta no contato
+    await aplicarEtiquetaBot(admin, conv.organizacao_id, 'bot-video-v1', conv.contato_id, null);
+
+    // 3) o painel acende "precisa de humano" com o motivo combinado
+    try {
+      await admin.from('conversas').update({
+        precisa_humano: true, precisa_humano_motivo: 'analise_pronta_contatar_hoje', precisa_humano_em: new Date().toISOString(),
+      }).eq('id', conversaId);
+    } catch { /* best-effort */ }
+
+    // 4) move a opp pra coluna papel='qualificado' + evento 'qualificado' (padrão da casa).
+    //    estado.oportunidade_id foi setado pelo bot_coletar_nome na etapa do nome.
+    try {
+      let oppId = (estado.oportunidade_id as string | null) ?? null;
+      if (!oppId) {
+        const { data: o } = await admin.from('oportunidades').select('id')
+          .eq('organizacao_id', conv.organizacao_id).eq('contato_id', conv.contato_id).eq('status', 'em_andamento')
+          .order('criado_em', { ascending: false }).limit(1).maybeSingle();
+        oppId = o?.id ?? null;
+      }
+      if (oppId) {
+        const { data: opp } = await admin.from('oportunidades').select('id, funil_id, coluna_id, status').eq('id', oppId).maybeSingle();
+        if (opp?.status === 'em_andamento') {
+          const { data: colQ } = await admin.from('funil_colunas').select('id')
+            .eq('funil_id', opp.funil_id).eq('papel', 'qualificado').eq('arquivada', false).limit(1).maybeSingle();
+          if (colQ?.id && colQ.id !== opp.coluna_id) {
+            await admin.from('oportunidades').update({ coluna_id: colQ.id }).eq('id', oppId).eq('status', 'em_andamento');
+            await admin.from('oportunidade_eventos').insert({
+              organizacao_id: conv.organizacao_id, oportunidade_id: oppId, evento: 'qualificado',
+              coluna_anterior_id: opp.coluna_id, coluna_nova_id: colQ.id, executado_por: null,
+            });
+            await logFluxo('opp_qualificada', { oportunidade_id: oppId, coluna_anterior: opp.coluna_id, coluna_nova: colQ.id });
+          }
+        }
+      } else {
+        await logFluxo('opp_nao_encontrada');
+      }
+    } catch (e) { await logFluxo('opp_qualificar_falhou', { erro: String((e as Error)?.message ?? '').slice(0, 200) }); }
+
+    // 5) estado concluído (o trigger trg_opp_move_qualificado vira no-op — a coluna já mudou —
+    //    e fica de rede de segurança se o move explícito falhar). O avanço de etapa acontece no
+    //    bot_avancar_etapa logo abaixo (p_etapa 'concluido').
+    try { await admin.from('bot_conversa_estado').update({ concluido_em: new Date().toISOString() }).eq('conversa_id', conversaId); } catch { /* best-effort */ }
+    await logFluxo('analise_concluida', { dry_run: dryRunEfetivo });
   }
 
   // ---- 2ª falha (SIM/NÃO, nome, CPF ou 2º desvio de áudio): pausa + precisa_humano.
@@ -1099,9 +1138,10 @@ async function tratarComVideo(p: {
   }
 
   // ---- avança o passo. p_etapa mantém o valor atual (o passo real vive em passo_video, como o
-  //      fluxo de botões faz com passo_botoes); tentativas/desvios acumulam nos campos próprios. ----
+  //      fluxo de botões faz com passo_botoes) — EXCETO no fecho, que grava 'concluido' (dispara
+  //      o trigger de qualificado como rede de segurança); tentativas/desvios nos campos próprios. ----
   await admin.rpc('bot_avancar_etapa', {
-    p_conversa: conversaId, p_etapa: estado.etapa,
+    p_conversa: conversaId, p_etapa: r.acoes?.concluirAnalise ? 'concluido' : estado.etapa,
     p_dados: {
       passo_video: r.passoNovo, tentativas_video: r.tentativas, desvios_midia: r.desvios,
       ...(passoAtual == null ? { video_abertura_em: new Date().toISOString() } : {}),

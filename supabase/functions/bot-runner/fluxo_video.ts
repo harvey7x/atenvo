@@ -1,12 +1,12 @@
-// fluxo_video.ts — MOTOR do fluxo caf_video_juros_v1 (VSL de juros abusivos, canal OFICIAL).
+// fluxo_video.ts — MOTOR do fluxo caf_video_juros_v1 (VSL de juros abusivos).
 // Determinístico, SEM IA. Puro (sem Deno/DB) — compartilhado com os testes vitest, igual ao
-// fluxo.ts/fluxo_botoes.ts. Quem envia/persiste/agenda é o bot-runner; quem entrega o RESULTADO
-// diferido (8 min) é o worker bot-fila-processar.
+// fluxo.ts/fluxo_botoes.ts. Quem envia/persiste e executa o fecho é o bot-runner.
 //
 // TRILHO: abertura (texto + VÍDEO com legenda) → pergunta SIM/NÃO → nome → CPF (com DV) →
-// ack + agenda 'resultado' (3 balões, +8 min na fila) → fecho no worker (Lead Qualificado +
-// etiqueta + precisa_humano + alerta). NÃO → recusa educada + etiqueta remarketing-bot; um SIM
-// depois reentra em pede_nome.
+// ack + FECHO IMEDIATO (Lead Qualificado + etiqueta + precisa_humano + alerta) — o bot encerra
+// aí e os ATENDENTES continuam a conversa (a etapa 'resultado' diferida de 8 min foi removida a
+// pedido do dono 2026-08-16). NÃO → recusa educada + etiqueta remarketing-bot; um SIM depois
+// reentra em pede_nome.
 //
 // SEM guardrail (saidaSuja) DE PROPÓSITO: a copy é FIXA e aprovada pelo dono — e cita "tem
 // direito de receber valores" na legenda do vídeo, que o saidaSuja barraria (afirma_direito).
@@ -33,8 +33,7 @@ export interface CopyVideo {
   reprompt_nome: string;
   pede_cpf: string[];
   reprompt_cpf: string;
-  ack_cpf: string[];           // {primeiro_nome}
-  resultado: string[];         // 3 balões diferidos (+8 min) — {primeiro_nome}
+  ack_cpf: string[];           // {primeiro_nome} — última fala do bot; o atendente continua
   audio_desvio: string;
   handoff_humano: string;
 }
@@ -69,11 +68,8 @@ export const DEFAULT_COPY_VIDEO: CopyVideo = {
     '✅ Recebido, {primeiro_nome}!',
     'Sua análise foi iniciada. Em alguns minutos retorno aqui com uma atualização.',
   ],
-  resultado: [
-    '{primeiro_nome}, atualização da sua análise 📋',
-    'Seu CPF entrou na fila da nossa equipe jurídica. E um dado importante: *a grande maioria dos contratos que analisamos tem juros acima do limite legal*.',
-    'Ou seja, a chance de recuperar valores no seu caso é real. Um dos nossos atendentes te chama *ainda hoje* aqui no WhatsApp com o resultado. Fique de olho! 📲',
-  ],
+  // (a etapa 'resultado' diferida foi REMOVIDA a pedido do dono 2026-08-16 — depois do ack,
+  // quem continua a conversa são os atendentes; a qualificação acontece na hora do CPF)
   audio_desvio: 'Recebi seu áudio! Pra agilizar sua análise, me manda por escrito, por favor 😊',
   handoff_humano: 'Sem problema! Um de nossos atendentes vai te ajudar com isso pessoalmente. 🙏',
 };
@@ -147,8 +143,9 @@ export interface AcoesVideo {
   registrarRecusa?: boolean;
   /** SIM depois da recusa: limpa a conclusão anterior (reentrou no funil). */
   limparRecusa?: boolean;
-  /** CPF válido: agenda os 3 balões de 'resultado' na fila (+8 min, status agendada). */
-  agendarResultado?: boolean;
+  /** CPF válido: fecho imediato — opp → Lead Qualificado + etiqueta + precisa_humano + alerta.
+   *  O bot encerra no ack; o atendente continua a conversa (sem etapa diferida). */
+  concluirAnalise?: boolean;
   /** 2ª falha: pausa o bot + conversas.precisa_humano com este motivo. */
   escalarHumano?: 'bot_nao_entendeu' | 'cpf_invalido';
 }
@@ -193,8 +190,8 @@ export function proximoPassoVideo(
   // fluxo já encerrado pelo worker; nada a fazer.
   if (passoAtual === 'fim') return { acao: 'nada', motivo: 'fluxo_encerrado' };
 
-  // aguardando o RESULTADO diferido: fica quieto (o worker entrega em ~8 min; o atendente
-  // é acionado na sequência — responder aqui atropelaria a entrega).
+  // passo LEGADO (existia quando o 'resultado' diferido estava no ar): conversa antiga parada
+  // aqui fica em silêncio — o atendente é quem continua.
   if (passoAtual === 'aguardando_resultado') return { acao: 'nada', motivo: 'aguardando_resultado' };
 
   // recusou antes: SÓ um SIM reengata (reentra em pede_nome); o resto fica em silêncio
@@ -258,8 +255,8 @@ export function proximoPassoVideo(
     const cpf = extrairCpfDeTexto(entrada.texto);
     if (cpf.valido) {
       return {
-        acao: 'enviar', telas: copy.ack_cpf.map((s) => T(interp(s))), passoNovo: 'aguardando_resultado', tentativas: 0, desvios,
-        acoes: { salvarCpf: { digits: cpf.digits, mascarado: cpf.mascarado }, agendarResultado: true },
+        acao: 'enviar', telas: copy.ack_cpf.map((s) => T(interp(s))), passoNovo: 'fim', tentativas: 0, desvios,
+        acoes: { salvarCpf: { digits: cpf.digits, mascarado: cpf.mascarado }, concluirAnalise: true },
       };
     }
     const n = tentativas + 1;
@@ -273,9 +270,3 @@ export function proximoPassoVideo(
   return { acao: 'nada', motivo: `passo_desconhecido:${passoAtual}` };
 }
 
-/** Balões do RESULTADO já interpolados — é o TEXTO FINAL que vai pra fila (o worker não
- *  interpola; o nome já é conhecido no agendamento). */
-export function mensagensResultado(copy: CopyVideo, nomeCompleto: string): string[] {
-  const primeiro = primeiroNome(nomeCompleto ?? '') || 'tudo bem';
-  return copy.resultado.map((s) => s.replace(/\{primeiro_nome\}/g, primeiro));
-}

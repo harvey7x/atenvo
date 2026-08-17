@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  parseSimNao, extrairCpfDeTexto, validarNomeVideo, proximoPassoVideo, mensagensResultado,
+  parseSimNao, extrairCpfDeTexto, validarNomeVideo, proximoPassoVideo,
   montarCopyVideo, DEFAULT_COPY_VIDEO, type CopyVideo, type EntradaVideo,
 } from '../../supabase/functions/bot-runner/fluxo_video';
 import { chaveTel } from '../../supabase/functions/bot-runner/fluxo_botoes';
@@ -172,7 +172,7 @@ describe('máquina de passos — abertura, SIM/NÃO, nome, CPF, resultado', () =
     expect(r2.acoes?.escalarHumano).toBe('bot_nao_entendeu');
   });
 
-  it('CPF válido → ack interpolado em 2 balões + salvarCpf + agendarResultado', () => {
+  it('CPF válido → ack interpolado em 2 balões + salvarCpf + FECHO imediato (concluirAnalise) e fim', () => {
     const dados = { nome_completo: 'José da Silva' };
     const r = proximoPassoVideo('aguardando_cpf', digitou('meu cpf é 529.982.247-25'), 0, 0, dados, COPY);
     if (r.acao !== 'enviar') throw new Error('esperava enviar');
@@ -181,8 +181,8 @@ describe('máquina de passos — abertura, SIM/NÃO, nome, CPF, resultado', () =
       { tipo: 'texto', corpo: 'Sua análise foi iniciada. Em alguns minutos retorno aqui com uma atualização.' },
     ]);
     expect(r.acoes?.salvarCpf).toEqual({ digits: CPF_OK, mascarado: '***.***.***-25' });
-    expect(r.acoes?.agendarResultado).toBe(true);
-    expect(r.passoNovo).toBe('aguardando_resultado');
+    expect(r.acoes?.concluirAnalise).toBe(true);
+    expect(r.passoNovo).toBe('fim');   // o bot encerra no ack; atendentes continuam
   });
 
   it('CPF inválido: 1º reprompt (copy exata), 2ª falha escala (cpf_invalido)', () => {
@@ -207,17 +207,9 @@ describe('máquina de passos — abertura, SIM/NÃO, nome, CPF, resultado', () =
     expect(r2.telas).toEqual([{ tipo: 'texto', corpo: COPY.handoff_humano }]);
   });
 
-  it('aguardando o resultado diferido e fluxo encerrado: silêncio', () => {
+  it('fluxo encerrado (e o passo legado aguardando_resultado): silêncio', () => {
     expect(proximoPassoVideo('aguardando_resultado', digitou('e aí?'), 0, 0, {}, COPY)).toEqual({ acao: 'nada', motivo: 'aguardando_resultado' });
     expect(proximoPassoVideo('fim', digitou('oi'), 0, 0, {}, COPY)).toEqual({ acao: 'nada', motivo: 'fluxo_encerrado' });
-  });
-
-  it('mensagensResultado: 3 balões com {primeiro_nome} interpolado (texto final vai pra fila)', () => {
-    const baloes = mensagensResultado(COPY, 'José da Silva');
-    expect(baloes).toHaveLength(3);
-    expect(baloes[0]).toBe('José, atualização da sua análise 📋');
-    expect(baloes[1]).toContain('a grande maioria dos contratos que analisamos tem juros acima do limite legal');
-    expect(baloes[2]).toContain('ainda hoje');
   });
 
   it('montarCopyVideo: jsonb parcial sobrepõe o default; chave ausente cai no default', () => {
