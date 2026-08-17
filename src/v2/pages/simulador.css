@@ -1,0 +1,106 @@
+/* ============================================================
+   Simulador de Valores — ferramenta interna dos atendentes
+   (empréstimos com juros abusivos + cartões RMC/RCC). Sem mockup:
+   manual de extensão (.ph, cards de vidro, .campo/.inp, semânticos).
+   DADO É CALMO: formulário sem efeito interno além de hover.
+   Prefixo .sim- em tudo (global.css do v1 carrega junto — zero colisão).
+   ============================================================ */
+
+.v2 .sim-col { display: flex; flex-direction: column; gap: 12px; }
+
+/* --- Ajustes (colapsável discreto no topo) ------------------ */
+.v2 .sim-ajustes { padding: 12px 16px; display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.v2 .sim-ajustes .campo { width: 190px; }
+.v2 .sim-ajustes .nota { font-size: 11px; color: var(--txt-3); line-height: 1.55; max-width: 52ch; padding-top: 21px; }
+
+/* --- blocos ------------------------------------------------- */
+.v2 .sim-bloco { padding: 14px 16px 13px; }
+
+/* barra de adição rápida (empréstimos) */
+.v2 .sim-add {
+  display: flex; align-items: flex-start; gap: 10px; flex-wrap: wrap;
+  padding: 10px 12px; margin-bottom: 12px;
+  border: 1px dashed rgba(var(--tint), .16); border-radius: 12px;
+}
+.v2 .sim-add .sim-add-btn { align-self: flex-start; margin-top: 21px; } /* alinha com os inputs (label 12px + 5px) */
+
+/* larguras dos campos (linhas e barra) */
+.v2 .sim-c-tipo  { width: 84px; }
+.v2 .sim-c-banco { width: 150px; }
+.v2 .sim-c-valor { width: 130px; }
+.v2 .sim-c-prazo { width: 112px; }
+.v2 .sim-c-pagas { width: 118px; }
+.v2 .sim-c-taxa  { width: 112px; }
+.v2 .sim-c-qtd   { width: 106px; }
+
+/* stepper de quantidade (1–20) */
+.v2 .sim-step { display: flex; }
+.v2 .sim-step button {
+  width: 28px; height: 36px; flex-shrink: 0; cursor: pointer;
+  background: rgba(var(--tint), .05); border: 1px solid rgba(var(--tint), .13);
+  color: var(--txt-2); font-size: 14px; font-family: var(--fonte); line-height: 1;
+}
+.v2 .sim-step button:hover { background: rgba(var(--tint), .085); color: var(--txt); }
+.v2 .sim-step button:focus-visible { outline: none; box-shadow: 0 0 0 2px rgba(var(--tint), .35); position: relative; }
+.v2 .sim-step button:first-child { border-radius: var(--r-ctl) 0 0 var(--r-ctl); border-right: none; }
+.v2 .sim-step button:last-child { border-radius: 0 var(--r-ctl) var(--r-ctl) 0; border-left: none; }
+.v2 .sim-step .inp { width: 50px; border-radius: 0; text-align: center; }
+
+/* --- linha de contrato / cartão ----------------------------- */
+.v2 .sim-linha { border: 1px solid var(--linha); border-radius: 12px; padding: 11px 12px 10px; }
+.v2 .sim-linha + .sim-linha { margin-top: 10px; }
+.v2 .sim-campos { display: flex; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
+.v2 .sim-campos select.inp { appearance: auto; }
+.v2 .sim-linha-acoes { margin-left: auto; display: flex; gap: 7px; padding-top: 21px; }
+
+/* segmentado do modo de taxa acompanha a altura dos inputs */
+.v2 .sim-modo .segm { height: 36px; align-items: center; }
+
+/* mês/ano (início e fim do cartão) */
+.v2 .sim-ma { display: flex; gap: 6px; }
+.v2 .sim-ma select.inp { width: 62px; }
+.v2 .sim-ma input.inp { width: 70px; }
+
+/* checkbox "ainda descontando" alinhado à linha dos inputs */
+.v2 .sim-ainda {
+  display: flex; align-items: center; gap: 8px; height: 36px; margin-top: 21px;
+  font-size: 12.5px; color: var(--txt-2); cursor: pointer; user-select: none; white-space: nowrap;
+}
+.v2 .sim-ainda:hover { color: var(--txt); }
+
+/* resultado inline da linha */
+.v2 .sim-res {
+  margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--linha);
+  font-size: 12px; color: var(--txt-2); line-height: 1.5;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.v2 .sim-res b { color: var(--txt); font-weight: 600; }
+.v2 .sim-res .pendente { color: var(--txt-3); }
+
+/* --- consolidado (card sticky ao final) ---------------------
+   Fundo SÓLIDO de propósito: flutua sobre conteúdo rolando — blur
+   aqui seria backdrop recomputado por frame (orçamento, item 8).
+   Dark: o vidro achatado do Modo Leve (alpha sobre --base); light:
+   a carta branca (--vidro-a já é sólida). Nada transparece. */
+.v2 .sim-consol {
+  position: sticky; bottom: 8px; z-index: 6;
+  padding: 15px 18px 13px;
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+  background-color: var(--base);
+  background-image: linear-gradient(180deg, rgba(var(--tint), .055), rgba(var(--tint), .02));
+  box-shadow: var(--sombra-2);
+}
+:root[data-tema="light"] .v2 .sim-consol { background-color: var(--vidro-a); background-image: none; }
+
+.v2 .sim-consol-grade { display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 20px; align-items: start; }
+.v2 .sim-total-num { font-size: 26px; margin-top: 7px; }
+.v2 .sim-breakdown { font-size: 12px; color: var(--txt-2); margin-top: 7px; }
+.v2 .sim-notas { margin-top: 10px; font-size: 10.5px; color: var(--txt-3); line-height: 1.65; }
+.v2 .sim-consol-acoes { display: flex; flex-direction: column; gap: 8px; }
+.v2 .sim-consol-acoes .p-btn { width: 100%; justify-content: center; }
+.v2 .sim-consol-acoes .campo { margin-bottom: 2px; }
+
+@media (max-width: 900px) {
+  .v2 .sim-consol-grade { grid-template-columns: 1fr; gap: 12px; }
+  .v2 .sim-linha-acoes { margin-left: 0; }
+}

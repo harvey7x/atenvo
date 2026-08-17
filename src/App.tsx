@@ -35,6 +35,7 @@ const PlanoUsoV2 = lazy(() => import('@/v2/pages/PlanoUso'));
 const CobrancasV2 = lazy(() => import('@/v2/pages/Cobrancas'));
 const AgendamentosV2 = lazy(() => import('@/v2/pages/Agendamentos'));
 const ScriptsV2 = lazy(() => import('@/v2/pages/Scripts'));
+const SimuladorV2 = lazy(() => import('@/v2/pages/Simulador'));
 const DashboardV2 = lazy(() => import('@/v2/pages/Dashboard'));
 const ConfiguracoesV2 = lazy(() => import('@/v2/pages/Configuracoes'));
 const ContatosV2 = lazy(() => import('@/v2/pages/Contatos'));
@@ -101,6 +102,7 @@ const routes: RouteObject[] = [
           { path: 'disparo', element: <Lz><DisparoV2 /></Lz> },
           { path: 'contatos', element: <Lz><ContatosV2 /></Lz> },
           { path: 'scripts', element: <Lz><ScriptsV2 /></Lz> },
+          { path: 'simulador', element: <Lz><SimuladorV2 /></Lz> },
           { path: 'cobrancas', element: <Lz><CobrancasV2 /></Lz> },
           { path: 'relatorios', element: <Lz><RelatoriosV2 /></Lz> },
           { path: 'integracoes', element: <Lz><IntegracoesV2 /></Lz> },

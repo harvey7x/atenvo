@@ -53,6 +53,10 @@ export const ICONES: Record<string, ReactNode> = {
   remarketing: (
     <Ic><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="3.2" /><path d="M21.5 2.5 15 9" /><path d="M15.5 4.5 15 9l4.5-.5" /></Ic>
   ),
+  // Simulador de Valores: calculadora (corpo + visor + teclas em pontos)
+  simulador: (
+    <Ic><rect x="5" y="3" width="14" height="18" rx="2.2" /><path d="M8.5 7.5h7" /><path strokeLinecap="round" d="M8.5 12h.01M12 12h.01M15.5 12h.01M8.5 15h.01M12 15h.01M15.5 15h.01M8.5 18h.01M12 18h.01M15.5 18h.01" /></Ic>
+  ),
   configuracoes: (
     <Ic><circle cx="12" cy="12" r="3.2" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2" /></Ic>
   ),
