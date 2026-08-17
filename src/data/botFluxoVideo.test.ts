@@ -98,9 +98,9 @@ describe('máquina de passos — abertura, SIM/NÃO, nome, CPF, resultado', () =
     const r = proximoPassoVideo(null, digitou('oi'), 0, 0, {}, COPY);
     if (r.acao !== 'enviar') throw new Error('esperava enviar');
     expect(r.telas).toHaveLength(4);
-    expect(r.telas[0]).toEqual({ tipo: 'texto', corpo: 'Olá! 👋 Seja bem-vindo(a) à *CAF – Central de Assessoria Financeira*.' });
-    expect(r.telas[1]).toEqual({ tipo: 'video', url: COPY.video_url, caption: 'Assista, leva só 30 segundos' });
-    expect(r.telas[2]).toEqual({ tipo: 'texto', corpo: 'Quer fazer uma *análise gratuita* pra descobrir se você paga juros abusivos e tem valores a recuperar?' });
+    expect(r.telas[0]).toEqual({ tipo: 'texto', corpo: 'Olá! Seja bem-vindo(a) à CAF! 👋' });
+    expect(r.telas[1]).toEqual({ tipo: 'video', url: COPY.video_url, caption: 'Assista esse video, leva apenas segundos.' });
+    expect(r.telas[2]).toEqual({ tipo: 'texto', corpo: 'Gostaria de fazer *análise gratuita* pra descobrir se você paga juros abusivos e recuperar valores?' });
     expect(r.telas[3]).toEqual({ tipo: 'texto', corpo: 'Responda *SIM* ou *NÃO* 😊' });
     expect(r.passoNovo).toBe('aguardando_sim_nao');
   });

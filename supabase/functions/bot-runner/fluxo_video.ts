@@ -44,11 +44,11 @@ export interface CopyVideo {
 // Uma ideia por bolha. Estrutura da abertura: TEXTO de boas-vindas → VÍDEO (caption curta)
 // → pergunta → "Responda SIM ou NÃO" — exatamente 4 saídas, intervalo padrão entre elas.
 export const DEFAULT_COPY_VIDEO: CopyVideo = {
-  abertura: ['Olá! 👋 Seja bem-vindo(a) à *CAF – Central de Assessoria Financeira*.'],
+  abertura: ['Olá! Seja bem-vindo(a) à CAF! 👋'],
   video_url: '',
-  video_caption: 'Assista, leva só 30 segundos',
+  video_caption: 'Assista esse video, leva apenas segundos.',
   pergunta_analise: [
-    'Quer fazer uma *análise gratuita* pra descobrir se você paga juros abusivos e tem valores a recuperar?',
+    'Gostaria de fazer *análise gratuita* pra descobrir se você paga juros abusivos e recuperar valores?',
     'Responda *SIM* ou *NÃO* 😊',
   ],
   recusa: 'Sem problema! 😊 Se mudar de ideia, é só mandar um *SIM* aqui a qualquer momento. A análise é gratuita e fica à sua disposição.',
