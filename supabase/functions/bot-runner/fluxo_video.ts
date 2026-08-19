@@ -1,8 +1,14 @@
-// fluxo_video.ts — MOTOR do fluxo caf_video_juros_v1 (VSL de juros abusivos).
-// Determinístico, SEM IA. Puro (sem Deno/DB) — compartilhado com os testes vitest, igual ao
-// fluxo.ts/fluxo_botoes.ts. Quem envia/persiste e executa o fecho é o bot-runner.
+// fluxo_video.ts — MOTOR dos fluxos de MÍDIA + SIM/NÃO + nome + CPF. Determinístico, SEM IA.
+// Puro (sem Deno/DB) — compartilhado com os testes vitest, igual ao fluxo.ts/fluxo_botoes.ts.
+// Quem envia/persiste e executa o fecho é o bot-runner.
 //
-// TRILHO: abertura (texto + VÍDEO com legenda) → pergunta SIM/NÃO → nome → CPF (com DV) →
+// SERVE HOJE DOIS FLUXOS — mesmo trilho, copy e mídia diferentes (o nome do arquivo é
+// histórico: nasceu só para o vídeo):
+//   * caf_video_juros_v1 — VSL de juros abusivos (VÍDEO na abertura); copy em DEFAULT_COPY_VIDEO.
+//   * caf_emprestimo_v1  — campanha de empréstimo (IMAGEM na abertura); copy em fluxo_emprestimo.ts.
+// Um motor só de propósito: correção de parser/trilho vale para os dois, sem gêmeo divergindo.
+//
+// TRILHO: abertura (texto + MÍDIA com legenda) → pergunta SIM/NÃO → nome → CPF (com DV) →
 // ack + FECHO IMEDIATO (Lead Qualificado + etiqueta + precisa_humano + alerta) — o bot encerra
 // aí e os ATENDENTES continuam a conversa (a etapa 'resultado' diferida de 8 min foi removida a
 // pedido do dono 2026-08-16). NÃO → recusa educada + etiqueta remarketing-bot; um SIM depois
@@ -13,20 +19,23 @@
 // O guardrail existe para SAÍDA DE IA e para o fluxo de crédito; aqui não há texto gerado.
 import { validarCpfDigits, mascararCpf, primeiroNome } from './fluxo.ts';
 
-/** Um balão do fluxo: texto puro ou o vídeo (Cloud API baixa a URL pública sozinha). */
+/** Um balão do fluxo: texto puro ou a mídia da abertura — vídeo ou imagem (o transporte baixa
+ *  a URL pública sozinho, tanto na Cloud API quanto na Evolution). */
 export type TelaVideo =
   | { tipo: 'texto'; corpo: string }
-  | { tipo: 'video'; url: string; caption: string };
+  | { tipo: 'video'; url: string; caption: string }
+  | { tipo: 'imagem'; url: string; caption: string };
 
 export interface EntradaVideo { texto: string; ehAudio: boolean }
 
 /** Copy do fluxo — vem de bot_canal_config.mensagens.caf_video_juros_v1 (jsonb), com este
  *  default como rede de segurança (mesmo papel do DEFAULT_COPY do fluxo.ts). */
 export interface CopyVideo {
-  abertura: string[];          // balões de texto ANTES do vídeo
-  video_url: string;           // URL pública do Storage (bucket bot-midia). Vazia = pula o vídeo.
-  video_caption: string;       // legenda do vídeo
-  pergunta_analise: string[];  // logo após o vídeo, no MESMO burst
+  abertura: string[];          // balões de texto ANTES da mídia
+  midia_tipo: 'video' | 'imagem';  // o que sai na abertura (default 'video')
+  midia_url: string;           // URL pública do Storage (bucket bot-midia). Vazia = pula a mídia.
+  midia_caption: string;       // legenda da mídia
+  pergunta_analise: string[];  // logo após a mídia, no MESMO burst
   recusa: string;
   reprompt_sim_nao: string;
   pede_nome: string[];
@@ -44,8 +53,9 @@ export interface CopyVideo {
 // → pergunta → "Responda SIM ou NÃO" — exatamente 4 saídas, intervalo padrão entre elas.
 export const DEFAULT_COPY_VIDEO: CopyVideo = {
   abertura: ['Olá! Seja bem-vindo(a) à CAF! 👋'],
-  video_url: '',
-  video_caption: 'Assista esse video, leva apenas 30 segundos.',
+  midia_tipo: 'video',
+  midia_url: '',
+  midia_caption: 'Assista esse video, leva apenas 30 segundos.',
   pergunta_analise: [
     'Gostaria de fazer *análise gratuita* pra descobrir se você paga juros abusivos e recuperar valores?',
     'Responda *SIM* ou *NÃO* 😊',
@@ -74,13 +84,21 @@ export const DEFAULT_COPY_VIDEO: CopyVideo = {
   handoff_humano: 'Sem problema! Um de nossos atendentes vai te ajudar com isso pessoalmente. 🙏',
 };
 
-/** Config parcial do jsonb → copy completa (chave ausente cai no default; formato dos fluxos
+/** Config parcial do jsonb → copy completa (chave ausente cai no `base`; formato dos fluxos
  *  existentes: cada etapa é uma chave, balões em array, {primeiro_nome} como placeholder).
+ *  `base` troca o default por fluxo (vídeo × empréstimo) — o merge é o mesmo.
  *  pede_nome/ack_cpf viraram LISTA (2 balões, 2026-08-16): string antiga ainda é aceita e vira
- *  lista de 1 — deploy e jsonb nunca precisam trocar em sincronia perfeita. */
-export function montarCopyVideo(cfg: unknown): CopyVideo {
+ *  lista de 1 — deploy e jsonb nunca precisam trocar em sincronia perfeita.
+ *  COMPAT: o jsonb VIVO do fluxo de vídeo tem video_url/video_caption (nomes antigos, de quando
+ *  o motor só mandava vídeo). São aceitos como apelido de midia_url/midia_caption — produção não
+ *  precisa de UPDATE nenhum para continuar funcionando. */
+export function montarCopyVideo(cfg: unknown, base: CopyVideo = DEFAULT_COPY_VIDEO): CopyVideo {
   const c = (cfg && typeof cfg === 'object' ? cfg : {}) as Record<string, unknown>;
-  const m = { ...DEFAULT_COPY_VIDEO, ...Object.fromEntries(Object.entries(c).filter(([, v]) => v != null)) } as CopyVideo;
+  const preenchidas = Object.fromEntries(Object.entries(c).filter(([, v]) => v != null));
+  const m = { ...base, ...preenchidas } as CopyVideo & { video_url?: string; video_caption?: string };
+  // a chave NOVA ganha quando as duas vierem no mesmo jsonb (a legada nunca sobrescreve)
+  if (typeof m.video_url === 'string') { if (!('midia_url' in preenchidas)) m.midia_url = m.video_url; delete m.video_url; }
+  if (typeof m.video_caption === 'string') { if (!('midia_caption' in preenchidas)) m.midia_caption = m.video_caption; delete m.video_caption; }
   for (const k of ['pede_nome', 'ack_cpf'] as const) {
     if (typeof (m[k] as unknown) === 'string') m[k] = [m[k] as unknown as string];
   }
@@ -156,14 +174,16 @@ export type ResultadoVideo =
 
 const T = (corpo: string): TelaVideo => ({ tipo: 'texto', corpo });
 
-/** Balões da abertura: texto(s) opcionais + vídeo (saudação na LEGENDA) + pergunta SIM/NÃO no
- *  MESMO burst. Sem video_url, a legenda sai como TEXTO — a saudação nunca some do funil. */
+/** Balões da abertura: texto(s) opcionais + a MÍDIA (vídeo ou imagem, com a legenda) + pergunta
+ *  SIM/NÃO no MESMO burst. Sem midia_url, a legenda sai como TEXTO na mesma posição — a saudação
+ *  nunca some do funil por causa de um arquivo que não subiu. */
 function telasAbertura(copy: CopyVideo): TelaVideo[] {
+  const tipoMidia = copy.midia_tipo === 'imagem' ? 'imagem' : 'video';
   return [
     ...copy.abertura.map(T),
-    ...(copy.video_url
-      ? [{ tipo: 'video', url: copy.video_url, caption: copy.video_caption } as TelaVideo]
-      : (copy.video_caption ? [T(copy.video_caption)] : [])),
+    ...(copy.midia_url
+      ? [{ tipo: tipoMidia, url: copy.midia_url, caption: copy.midia_caption } as TelaVideo]
+      : (copy.midia_caption ? [T(copy.midia_caption)] : [])),
     ...copy.pergunta_analise.map(T),
   ];
 }

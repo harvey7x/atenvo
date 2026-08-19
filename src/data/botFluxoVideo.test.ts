@@ -10,7 +10,7 @@ const digitou = (texto: string): EntradaVideo => ({ texto, ehAudio: false });
 const audio = (): EntradaVideo => ({ texto: '', ehAudio: true });
 
 // Copy de teste = default + vídeo apontando pra uma URL (no ar a URL vem do jsonb do canal)
-const COPY: CopyVideo = { ...DEFAULT_COPY_VIDEO, video_url: 'https://exemplo.test/vsl.mp4' };
+const COPY: CopyVideo = { ...DEFAULT_COPY_VIDEO, midia_url: 'https://exemplo.test/vsl.mp4' };
 
 // CPF VÁLIDO clássico de teste (DV confere): 529.982.247-25
 const CPF_OK = '52998224725';
@@ -99,18 +99,18 @@ describe('máquina de passos — abertura, SIM/NÃO, nome, CPF, resultado', () =
     if (r.acao !== 'enviar') throw new Error('esperava enviar');
     expect(r.telas).toHaveLength(4);
     expect(r.telas[0]).toEqual({ tipo: 'texto', corpo: 'Olá! Seja bem-vindo(a) à CAF! 👋' });
-    expect(r.telas[1]).toEqual({ tipo: 'video', url: COPY.video_url, caption: 'Assista esse video, leva apenas 30 segundos.' });
+    expect(r.telas[1]).toEqual({ tipo: 'video', url: COPY.midia_url, caption: 'Assista esse video, leva apenas 30 segundos.' });
     expect(r.telas[2]).toEqual({ tipo: 'texto', corpo: 'Gostaria de fazer *análise gratuita* pra descobrir se você paga juros abusivos e recuperar valores?' });
     expect(r.telas[3]).toEqual({ tipo: 'texto', corpo: 'Responda *SIM* ou *NÃO* 😊' });
     expect(r.passoNovo).toBe('aguardando_sim_nao');
   });
 
-  it('sem video_url, a caption sai como TEXTO na mesma posição (2ª saída) — estrutura preservada', () => {
+  it('sem midia_url, a caption sai como TEXTO na mesma posição (2ª saída) — estrutura preservada', () => {
     const r = proximoPassoVideo(null, digitou('oi'), 0, 0, {}, DEFAULT_COPY_VIDEO);
     if (r.acao !== 'enviar') throw new Error('esperava enviar');
     expect(r.telas).toHaveLength(4);
     expect(r.telas[0]).toEqual({ tipo: 'texto', corpo: DEFAULT_COPY_VIDEO.abertura[0] });
-    expect(r.telas[1]).toEqual({ tipo: 'texto', corpo: DEFAULT_COPY_VIDEO.video_caption });
+    expect(r.telas[1]).toEqual({ tipo: 'texto', corpo: DEFAULT_COPY_VIDEO.midia_caption });
     expect(r.telas.every((t) => t.tipo === 'texto')).toBe(true);
   });
 
@@ -213,8 +213,10 @@ describe('máquina de passos — abertura, SIM/NÃO, nome, CPF, resultado', () =
   });
 
   it('montarCopyVideo: jsonb parcial sobrepõe o default; chave ausente cai no default', () => {
+    // video_url/video_caption = chaves LEGADAS do jsonb vivo (aceitas como apelido de midia_*)
     const c = montarCopyVideo({ video_url: 'https://x.test/v.mp4', recusa: 'outra copy' });
-    expect(c.video_url).toBe('https://x.test/v.mp4');
+    expect(c.midia_url).toBe('https://x.test/v.mp4');
+    expect((c as unknown as Record<string, unknown>).video_url).toBeUndefined();
     expect(c.recusa).toBe('outra copy');
     expect(c.ack_cpf).toEqual(DEFAULT_COPY_VIDEO.ack_cpf);
     expect(montarCopyVideo(undefined)).toEqual(DEFAULT_COPY_VIDEO);

@@ -22,9 +22,11 @@ import { saidaSuja } from './guardrail.ts';
 import { enviadorDe } from '../evolution-send/transporte.ts';
 // Motor determinístico por BOTÕES (sem IA). Puro; o bot-runner é quem envia/persiste.
 import { proximoPasso, proximoPassoSuporte, chaveTel, deveHandoff48h, telaComoTexto, opcoesDaTela, inferirGenero } from './fluxo_botoes.ts';
-// Motor determinístico do fluxo de VÍDEO (VSL juros abusivos) — alcançável só pelos números de
-// TESTE (bot_canal_config.fluxo_slug_teste + numeros_teste). Puro; quem envia e fecha é o runner.
+// Motor determinístico dos fluxos de MÍDIA (abertura com vídeo/imagem → SIM/NÃO → nome → CPF).
+// Puro; quem envia e fecha é o runner. Serve DOIS fluxos, roteados por fluxo_slug (PERFIS_MIDIA):
+// caf_video_juros_v1 (VSL de juros, vídeo) e caf_emprestimo_v1 (campanha de empréstimo, imagem).
 import { proximoPassoVideo, montarCopyVideo, type CopyVideo } from './fluxo_video.ts';
+import { montarCopyEmprestimo } from './fluxo_emprestimo.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -33,6 +35,33 @@ const IA_ATIVA = (Deno.env.get('IA_ATIVA') ?? 'sim').toLowerCase() === 'sim';
 // Fluxo por BOTÕES (determinístico). Roteado por canal via bot_canal_config.fluxo_slug começando
 // com 'botoes'. Freio de emergência global: BOT_BOTOES_ATIVO='nao'. Reversível sem redeploy.
 const BOTOES_ATIVO = (Deno.env.get('BOT_BOTOES_ATIVO') ?? 'sim').toLowerCase() !== 'nao';
+
+// ---- FLUXOS DE MÍDIA: um motor (fluxo_video.ts), um PERFIL por slug. Tudo que difere entre
+//      eles mora aqui — copy, arquivo enviado, etiqueta e os campos de estado. `prefixo` gera os
+//      campos em dados_qualificacao (passo_<prefixo>, tentativas_<prefixo>, <prefixo>_abertura_em,
+//      <prefixo>_concluido, <prefixo>_recusado_em) — com 'video' dá exatamente os nomes que já
+//      estão gravados em produção, então nada de migração de dados. Fluxo novo = uma linha aqui.
+interface PerfilMidia {
+  prefixo: string;                         // namespace dos campos de estado e dos contadores
+  etiqueta: string;                        // etiqueta aplicada no contato quando o lead fecha
+  fluxoMeta: string;                       // mensagens.metadados.fluxo (rastreio no inbox)
+  midiaNome: string;                       // fileName enviado ao transporte
+  midiaMime: string;                       // mimetype declarado no envio
+  logAcao: string;                         // audit_log.acao dos eventos deste fluxo
+  montarCopy: (cfg: unknown) => CopyVideo;  // jsonb do canal -> copy completa (default por fluxo)
+}
+const PERFIS_MIDIA: Record<string, PerfilMidia> = {
+  caf_video_juros_v1: {
+    prefixo: 'video', etiqueta: 'bot-video-v1', fluxoMeta: 'video_juros',
+    midiaNome: 'vsl-juros-30s.mp4', midiaMime: 'video/mp4', logAcao: 'fluxo_video',
+    montarCopy: (cfg) => montarCopyVideo(cfg),
+  },
+  caf_emprestimo_v1: {
+    prefixo: 'emprestimo', etiqueta: 'bot-emprestimo-v1', fluxoMeta: 'emprestimo',
+    midiaNome: 'emprestimo-negativados.png', midiaMime: 'image/png', logAcao: 'fluxo_emprestimo',
+    montarCopy: (cfg) => montarCopyEmprestimo(cfg),
+  },
+};
 
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'content-type, x-bot-secret', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, 'Content-Type': 'application/json' } });
@@ -119,6 +148,17 @@ Deno.serve(async (req) => {
       }
     }
 
+    // ---- CANAL SEM FLUXO DE PRODUÇÃO: fluxo_slug vazio = bot MUDO para todo mundo. É assim que
+    //      um canal roda em MODO TESTE EXCLUSIVO: bot_enabled=true + fluxo_slug='' +
+    //      fluxo_slug_teste/numeros_teste. Quem está na allowlist já teve fluxoEfetivo trocado
+    //      acima; qualquer outro lead sai por aqui sem receber nada. Sem esta trava, um canal
+    //      ligado sem slug cairia no fluxo por IA — mensagem automática para lead real, que é
+    //      exatamente o que o modo teste existe para evitar. ----
+    if (!fluxoEfetivo) {
+      await logRunner('bot_ignorado', 'sem_fluxo_configurado', { dry_run: dryRun });
+      return json({ ok: true, skipped: 'sem_fluxo_configurado', conversa_id: conversaId });
+    }
+
     // ---- humano ativo vs cliente dormente ----
     // humanoRespondeu = ALGUÉM humano já enviou nesta conversa (painel ou celular). temDono = o CONTATO
     // já tem responsável. A distinção é o que separa "atendimento ao vivo" (fica quieto) de "cliente
@@ -192,29 +232,31 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ---- DESVIO: fluxo de VÍDEO (caf_video_juros_v1) — hoje só alcançável pelos números de
-    //      TESTE (fluxo_slug_teste + numeros_teste; desligar = limpar a config, sem redeploy).
-    //      SEM IA e SEM guardrail: a copy é FIXA e aprovada pelo dono — cita "tem direito de
-    //      receber valores", que o saidaSuja barraria (afirma_direito); guardrail é trava de
-    //      SAÍDA DE IA, não de copy estática. Numa futura promoção a fluxo_slug normal, o gate
-    //      de anúncio (referral) vale como no fluxo de botões — número de teste passa direto. ----
-    if (fluxoEfetivo === 'caf_video_juros_v1') {
+    // ---- DESVIO: fluxos de MÍDIA (caf_video_juros_v1, caf_emprestimo_v1) — roteados por
+    //      fluxo_slug via PERFIS_MIDIA. SEM IA e SEM guardrail: a copy é FIXA e aprovada pelo dono
+    //      — a do vídeo cita "tem direito de receber valores", que o saidaSuja barraria
+    //      (afirma_direito); guardrail é trava de SAÍDA DE IA, não de copy estática. ----
+    const perfilMidia = PERFIS_MIDIA[fluxoEfetivo];
+    if (perfilMidia) {
       const SO_ANUNCIO = (Deno.env.get('CREDITO_SO_ANUNCIO') ?? 'sim').toLowerCase() !== 'nao';
       const dqV = (estado.dados_qualificacao ?? {}) as Record<string, unknown>;
-      if (!ehNumeroTeste && SO_ANUNCIO && canal?.transporte === 'cloud_api' && !dqV.passo_video) {
+      const passoMidia = dqV[`passo_${perfilMidia.prefixo}`];
+      // GATE DE ANÚNCIO (só Cloud API, onde o referral de Click-to-WhatsApp existe): lead novo que
+      // não veio do anúncio não engata — humano atende. Número de teste passa direto.
+      if (!ehNumeroTeste && SO_ANUNCIO && canal?.transporte === 'cloud_api' && !passoMidia) {
         const { data: inbs } = await admin.from('mensagens').select('metadados').eq('conversa_id', conversaId).eq('direcao', 'entrada').limit(50);
         const veioDeAnuncio = (inbs ?? []).some((m: any) => m?.metadados?.referral);
         if (!veioDeAnuncio) {
-          await logRunner('fluxo_video', 'nao_engatou_sem_referral', { dry_run: dryRun });
-          return json({ ok: true, fluxo: 'video', skipped: 'sem_referral_anuncio', conversa_id: conversaId });
+          await logRunner(perfilMidia.logAcao, 'nao_engatou_sem_referral', { dry_run: dryRun });
+          return json({ ok: true, fluxo: perfilMidia.prefixo, skipped: 'sem_referral_anuncio', conversa_id: conversaId });
         }
       }
       // MIGRAÇÃO DE FLUXO: lead que já estava NO MEIO do fluxo por botões quando o canal trocou
-      // de fluxo_slug TERMINA o trilho antigo — mandar a abertura do vídeo pra quem ia responder
-      // o CPF seria recomeçar do zero na cara do cliente. Quem nunca entrou (sem passo_botoes)
-      // ou já terminou ('fim') segue no vídeo normalmente.
-      if (BOTOES_ATIVO && !!dqV.passo_botoes && dqV.passo_botoes !== 'fim' && !dqV.passo_video) {
-        await logRunner('fluxo_video', 'continua_no_botoes_meio_do_fluxo', { dry_run: dryRun });
+      // de fluxo_slug TERMINA o trilho antigo — mandar a abertura nova pra quem ia responder o CPF
+      // seria recomeçar do zero na cara do cliente. Quem nunca entrou (sem passo_botoes) ou já
+      // terminou ('fim') segue no fluxo de mídia normalmente.
+      if (BOTOES_ATIVO && !!dqV.passo_botoes && dqV.passo_botoes !== 'fim' && !passoMidia) {
+        await logRunner(perfilMidia.logAcao, 'continua_no_botoes_meio_do_fluxo', { dry_run: dryRun });
         return await tratarComBotoes({
           admin, conversaId, conv, canal, estado,
           inboundText: body.inbound_text ?? '', inboundTipo: body.inbound_tipo ?? 'texto',
@@ -222,8 +264,8 @@ Deno.serve(async (req) => {
         });
       }
       return await tratarComVideo({
-        admin, conversaId, conv, canal, estado,
-        copyVideo: montarCopyVideo(((cfg?.mensagens ?? {}) as Record<string, unknown>).caf_video_juros_v1),
+        admin, conversaId, conv, canal, estado, perfil: perfilMidia,
+        copyVideo: perfilMidia.montarCopy(((cfg?.mensagens ?? {}) as Record<string, unknown>)[fluxoEfetivo]),
         min, max,
         inboundText: body.inbound_text ?? '', inboundTipo: body.inbound_tipo ?? 'texto',
         inboundMsgId: body.inbound_msg_id ?? null, dryRun, logRunner,
@@ -956,11 +998,12 @@ async function tratarComIA(p: {
   return json({ ok: true, dry_run: dryRun, etapa_nova: 'ia', mensagens: baloes, enviados_reais: enviados, lead_quente_motivos: motivosLQ });
 }
 
-// ======== FLUXO DE VÍDEO (caf_video_juros_v1): VSL de juros + SIM/NÃO + nome + CPF ========
+// ======== FLUXOS DE MÍDIA (vídeo de juros / imagem de empréstimo): mídia + SIM/NÃO + nome + CPF ========
 // Espelha a estrutura do tratarComBotoes: o motor puro (fluxo_video.ts) decide; aqui envia
 // (Cloud API por LINK público ou Evolution), persiste, aplica ações e avança o passo em
-// dados_qualificacao.passo_video. O FECHO acontece na hora do CPF (a etapa 'resultado' diferida
-// foi removida a pedido do dono 2026-08-16 — depois do ack quem continua são os atendentes).
+// dados_qualificacao.passo_<prefixo do perfil>. O FECHO acontece na hora do CPF (a etapa
+// 'resultado' diferida foi removida a pedido do dono 2026-08-16 — depois do ack quem continua
+// são os atendentes). O que difere entre os dois fluxos vive todo em PERFIS_MIDIA.
 
 // Etiqueta no padrão do painel: garante a linha no catálogo (etiquetas) e faz append do NOME
 // nos arrays de contatos/conversas sem duplicar. Tudo best-effort — etiqueta nunca trava o fluxo.
@@ -969,7 +1012,7 @@ async function aplicarEtiquetaBot(admin: any, orgId: string, nome: string, conta
     const { data: ex } = await admin.from('etiquetas').select('id').eq('organizacao_id', orgId).eq('nome', nome).maybeSingle();
     if (!ex?.id) {
       const { data: maxRow } = await admin.from('etiquetas').select('ordem').eq('organizacao_id', orgId).order('ordem', { ascending: false }).limit(1).maybeSingle();
-      await admin.from('etiquetas').insert({ organizacao_id: orgId, nome, cor: '#7c6df2', descricao: 'Aplicada pelo bot (fluxo de vídeo)', ordem: ((maxRow?.ordem as number) ?? 0) + 1, ativo: true });
+      await admin.from('etiquetas').insert({ organizacao_id: orgId, nome, cor: '#7c6df2', descricao: 'Aplicada pelo bot', ordem: ((maxRow?.ordem as number) ?? 0) + 1, ativo: true });
     }
   } catch { /* catálogo é cosmético; o nome no array vale sozinho */ }
   try {
@@ -988,22 +1031,26 @@ async function aplicarEtiquetaBot(admin: any, orgId: string, nome: string, conta
 
 async function tratarComVideo(p: {
   admin: any; conversaId: string; conv: any; canal: any; estado: any; copyVideo: CopyVideo;
+  perfil: PerfilMidia;
   min: number; max: number; inboundText: string; inboundTipo: string; inboundMsgId: string | null;
   dryRun: boolean; logRunner: (o: string, m?: string | null, e?: Record<string, unknown>) => Promise<void>;
 }): Promise<Response> {
-  const { admin, conversaId, conv, canal, estado, copyVideo, min, max, inboundText, inboundTipo, inboundMsgId, dryRun, logRunner } = p;
+  const { admin, conversaId, conv, canal, estado, copyVideo, perfil, min, max, inboundText, inboundTipo, inboundMsgId, dryRun, logRunner } = p;
+  // campos de estado deste fluxo (com prefixo 'video' são os mesmos nomes de sempre)
+  const campoPasso = `passo_${perfil.prefixo}`;
+  const campoTentativas = `tentativas_${perfil.prefixo}`;
   const logFluxo = async (evento: string, extra: Record<string, unknown> = {}) => {
     try {
       await admin.from('audit_log').insert({
-        usuario_id: null, acao: 'fluxo_video', entidade: 'conversas', entidade_id: conversaId,
+        usuario_id: null, acao: perfil.logAcao, entidade: 'conversas', entidade_id: conversaId,
         dados_depois: { evento, dry_run: dryRun, ...extra }, organizacao_id: conv.organizacao_id,
       });
     } catch { /* log best-effort: nunca quebra o fluxo */ }
   };
 
   const dq = (estado.dados_qualificacao ?? {}) as Record<string, unknown>;
-  const passoAtual = (dq.passo_video as string | undefined) ?? null;
-  const tentativas = Number(dq.tentativas_video ?? 0) || 0;
+  const passoAtual = (dq[campoPasso] as string | undefined) ?? null;
+  const tentativas = Number(dq[campoTentativas] ?? 0) || 0;
   const desvios = Number(dq.desvios_midia ?? 0) || 0;
   const ehAudio = inboundTipo !== 'texto';   // o webhook só despacha texto|audio; não-texto = fora do trilho
 
@@ -1011,8 +1058,8 @@ async function tratarComVideo(p: {
   await logFluxo('entrada_recebida', { passo_atual: passoAtual, texto: inboundText || null, eh_audio: ehAudio, tentativas_antes: tentativas, desvios_antes: desvios, decisao: r.acao });
 
   if (r.acao === 'nada') {
-    await logRunner('fluxo_video', r.motivo, { dry_run: dryRun });
-    return json({ ok: true, fluxo: 'video', dry_run: dryRun, skipped: r.motivo, passo_atual: passoAtual });
+    await logRunner(perfil.logAcao, r.motivo, { dry_run: dryRun });
+    return json({ ok: true, fluxo: perfil.prefixo, dry_run: dryRun, skipped: r.motivo, passo_atual: passoAtual });
   }
 
   // ---- AÇÕES de estado (rodam também em dry_run: o fluxo AVANÇA; só o envio é simulado) ----
@@ -1054,9 +1101,12 @@ async function tratarComVideo(p: {
       const tela = r.telas[i];
       try {
         let sent: { key?: { id?: string } };
-        if (tela.tipo === 'video') {
-          // Cloud API: type video { link, caption } — a Meta baixa a URL pública do Storage.
-          sent = await tx.sendMedia(destino!, 'video', 'video/mp4', tela.url, 'vsl-juros-30s.mp4', tela.caption);
+        const ehMidia = tela.tipo === 'video' || tela.tipo === 'imagem';
+        if (ehMidia) {
+          // por LINK público do Storage: Cloud API manda type video/image { link, caption } e a
+          // Meta baixa sozinha; a Evolution faz o mesmo com mediatype video|image.
+          const mediatype = tela.tipo === 'imagem' ? 'image' : 'video';
+          sent = await tx.sendMedia(destino!, mediatype, perfil.midiaMime, tela.url, perfil.midiaNome, tela.caption);
         } else {
           sent = await tx.sendText(destino!, tela.corpo);
         }
@@ -1064,19 +1114,20 @@ async function tratarComVideo(p: {
         if (!idExterno) throw new Error('sem_id_retorno');
         await admin.from('mensagens').insert({
           organizacao_id: conv.organizacao_id, conversa_id: conv.id, direcao: 'saida',
-          tipo: tela.tipo === 'video' ? 'video' : 'texto',
-          conteudo: tela.tipo === 'video' ? tela.caption : tela.corpo,
+          tipo: ehMidia ? tela.tipo : 'texto',
+          conteudo: ehMidia ? tela.caption : tela.corpo,
           autor_id: null, origem: 'bot', status: 'enviada', id_externo: idExterno,
-          metadados: { fluxo: 'video_juros', etapa: r.passoNovo, ...(tela.tipo === 'video' ? { media_url: tela.url } : {}) },
+          metadados: { fluxo: perfil.fluxoMeta, etapa: r.passoNovo, ...(ehMidia ? { media_url: tela.url } : {}) },
         });
         enviados++;
         await logFluxo('tela_enviada', { ordem: i, tipo: tela.tipo, id_externo: idExterno });
       } catch (e) {
         erro = String((e as Error)?.message ?? 'falha_envio').slice(0, 300);
         await logFluxo('tela_falhou', { ordem: i, tipo: tela.tipo, erro });
-        // MÍDIA NUNCA TRAVA O FUNIL: vídeo falhou → loga e SEGUE pro próximo balão (a pergunta
-        // SIM/NÃO sai mesmo assim). Falha de TEXTO interrompe o burst (padrão do fluxo de botões).
-        if (tela.tipo !== 'video') break;
+        // MÍDIA NUNCA TRAVA O FUNIL: vídeo/imagem falhou → loga e SEGUE pro próximo balão (a
+        // pergunta SIM/NÃO sai mesmo assim). Falha de TEXTO interrompe o burst (padrão do fluxo
+        // de botões). Vale a legenda: quem não viu a imagem ainda recebe o resto do trilho.
+        if (tela.tipo !== 'video' && tela.tipo !== 'imagem') break;
       }
     }
   }
@@ -1094,8 +1145,8 @@ async function tratarComVideo(p: {
       }, { onConflict: 'conversa_id,tipo', ignoreDuplicates: true });
     } catch (e) { await logFluxo('alerta_falhou', { erro: String((e as Error)?.message ?? '').slice(0, 200) }); }
 
-    // 2) etiqueta no contato
-    await aplicarEtiquetaBot(admin, conv.organizacao_id, 'bot-video-v1', conv.contato_id, null);
+    // 2) etiqueta no contato (por fluxo: bot-video-v1 / bot-emprestimo-v1)
+    await aplicarEtiquetaBot(admin, conv.organizacao_id, perfil.etiqueta, conv.contato_id, null);
 
     // 3) DISTRIBUIÇÃO ("distribua os leads", dono 2026-08-16): MESMO roteamento do fluxo de
     //    botões — RPC bot_rotear_consultor (placar do dia: mulher→Matheus, homem→Giovana/Juliana,
@@ -1176,28 +1227,28 @@ async function tratarComVideo(p: {
   // ---- 2ª falha (SIM/NÃO, nome, CPF ou 2º desvio de áudio): pausa + precisa_humano.
   //      bot_pausar com motivo próprio NÃO limpa precisa_humano (só 'humano_assumiu' limpa). ----
   if (r.acoes?.escalarHumano) {
-    try { await admin.rpc('bot_pausar', { p_conversa: conversaId, p_motivo: `fluxo_video_${r.acoes.escalarHumano}` }); } catch { /* best-effort */ }
+    try { await admin.rpc('bot_pausar', { p_conversa: conversaId, p_motivo: `${perfil.logAcao}_${r.acoes.escalarHumano}` }); } catch { /* best-effort */ }
     try {
       await admin.from('conversas').update({ precisa_humano: true, precisa_humano_motivo: r.acoes.escalarHumano, precisa_humano_em: new Date().toISOString() }).eq('id', conversaId);
     } catch { /* best-effort */ }
     await logFluxo('sinalizou_humano', { passo: r.passoNovo, motivo: r.acoes.escalarHumano });
   }
 
-  // ---- avança o passo. p_etapa mantém o valor atual (o passo real vive em passo_video, como o
-  //      fluxo de botões faz com passo_botoes) — EXCETO no fecho, que grava 'concluido' (dispara
+  // ---- avança o passo. p_etapa mantém o valor atual (o passo real vive em passo_<prefixo>, como
+  //      o fluxo de botões faz com passo_botoes) — EXCETO no fecho, que grava 'concluido' (dispara
   //      o trigger de qualificado como rede de segurança); tentativas/desvios nos campos próprios. ----
   await admin.rpc('bot_avancar_etapa', {
     p_conversa: conversaId, p_etapa: r.acoes?.concluirAnalise ? 'concluido' : estado.etapa,
     p_dados: {
-      passo_video: r.passoNovo, tentativas_video: r.tentativas, desvios_midia: r.desvios,
-      ...(passoAtual == null ? { video_abertura_em: new Date().toISOString() } : {}),
-      ...(r.acoes?.registrarRecusa ? { video_concluido: 'recusou', video_recusado_em: new Date().toISOString() } : {}),
-      ...(r.acoes?.limparRecusa ? { video_concluido: null } : {}),
+      [campoPasso]: r.passoNovo, [campoTentativas]: r.tentativas, desvios_midia: r.desvios,
+      ...(passoAtual == null ? { [`${perfil.prefixo}_abertura_em`]: new Date().toISOString() } : {}),
+      ...(r.acoes?.registrarRecusa ? { [`${perfil.prefixo}_concluido`]: 'recusou', [`${perfil.prefixo}_recusado_em`]: new Date().toISOString() } : {}),
+      ...(r.acoes?.limparRecusa ? { [`${perfil.prefixo}_concluido`]: null } : {}),
       ...dadosFecho,
     },
     p_reprompts: 0, p_inbound_msg: inboundMsgId,
   });
 
-  await logRunner('fluxo_video', r.passoNovo, { dry_run: dryRunEfetivo, baloes: r.telas.length, enviados, erro, tentativas: r.tentativas, desvios: r.desvios, escalou: !!r.acoes?.escalarHumano });
-  return json({ ok: true, fluxo: 'video', dry_run: dryRunEfetivo, passo_novo: r.passoNovo, baloes: r.telas.length, enviados, erro, tentativas: r.tentativas, desvios: r.desvios });
+  await logRunner(perfil.logAcao, r.passoNovo, { dry_run: dryRunEfetivo, baloes: r.telas.length, enviados, erro, tentativas: r.tentativas, desvios: r.desvios, escalou: !!r.acoes?.escalarHumano });
+  return json({ ok: true, fluxo: perfil.prefixo, dry_run: dryRunEfetivo, passo_novo: r.passoNovo, baloes: r.telas.length, enviados, erro, tentativas: r.tentativas, desvios: r.desvios });
 }
