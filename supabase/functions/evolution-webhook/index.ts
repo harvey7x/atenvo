@@ -1,4 +1,18 @@
 // evolution-webhook — eventos da Evolution. Sem JWT. Secret via webhook_config (constante).
+// v32: LID RESOLVIDO DEPOIS re-chama o bot. Inbound que chega só com @lid cria o contato SEM
+//      número, então o bot-runner sai na hora com 'sem_destino_envio' e o lead fica mudo. O PN
+//      costuma aparecer num evento seguinte (auto-recuperação #7, ~1-2 min depois), mas esse
+//      evento não é inbound novo — ninguém redisparava o runner e o lead ficava esperando para
+//      sempre (2 casos em 2 dias na CAMPANHA DE EMPRÉSTIMO; um deles pago, veio de anúncio).
+//      Agora, ao gravar o PN recuperado, o webhook re-chama o bot-runner com o ÚLTIMO inbound de
+//      TEXTO da conversa (≤1h). Idempotência e TODOS os gates seguem no runner — se um humano já
+//      assumiu, ele continua calado.
+// v31: CANAL PRESO — um canal com canais.prende_conversa (hoje o MURILLO CHIP) prende a conversa
+//      quando o cliente fala nele. Presa, a conversa NÃO é mais roubada por entrada de outro
+//      número: o "última entrada manda" da v27 vale só entre canais que não prendem. Soltar é
+//      ato humano (resposta pelo celular de outro número aqui; envio do painel no evolution-send).
+//      Motivo: o fluxo de crédito entrega o cliente pro chip de propósito, e uma mensagem dele no
+//      OFICIAL 37s depois devolvia o atendimento pro oficial — dois atendentes na mesma pessoa.
 // v30: NONO DÍGITO — a resolução do contato deixa de ser por igualdade exata de valor_normalizado
 //      e passa pela RPC wa_resolver_contato_por_numero (chave canônica = DDD + últimos 8). A
 //      Evolution entrega o mesmo cliente ora como 55+DDD+8 ora como 55+DDD+9, e o casamento exato
@@ -240,7 +254,7 @@ Deno.serve(async (req) => {
     const fromMe = typeof key.fromMe === 'boolean' ? (key.fromMe as boolean) : null;
     const provMsgId = (key.id as string) ?? null;
 
-    const { data: canal } = await admin.from('canais').select('id, organizacao_id, numero_conectado, provider, status_integracao, entrega_status, entrega_erros_recentes').eq('instancia_externa', instanceName).maybeSingle();
+    const { data: canal } = await admin.from('canais').select('id, organizacao_id, numero_conectado, provider, status_integracao, entrega_status, entrega_erros_recentes, prende_conversa').eq('instancia_externa', instanceName).maybeSingle();
 
     const { data: track } = await admin.from('whatsapp_webhook_events').insert({
       organizacao_id: canal?.organizacao_id ?? null, canal_id: canal?.id ?? null, instance_name: instanceName, instance_id: instanceId,
@@ -325,11 +339,13 @@ Deno.serve(async (req) => {
       // #7 AUTO-RECUPERAÇÃO de PN vindo de evento REAL: garante a identidade WhatsApp (PN) do contato — vale
       // para contato novo E para contato LID-only que passe a receber um PN. Idempotente; NÃO sobrescreve um
       // PN confirmado DIFERENTE já existente (conflito -> mantém o existente, não cria duplicado).
+      let pnRecuperadoAgora = false;   // v32: virou true quando ESTE evento deu número a um contato que não tinha
       if (phone) {
         const { data: jaWa } = await admin.from('contato_identidades').select('valor_normalizado').eq('contato_id', contatoId).eq('tipo', 'whatsapp');
         const temEste = (jaWa ?? []).some((r) => r.valor_normalizado === phone);
         const temOutro = (jaWa ?? []).some((r) => r.valor_normalizado !== phone);
         if (!temEste && !temOutro) {
+          pnRecuperadoAgora = !contatoCriadoAgora;   // contato NOVO já nasce com o dispatch normal deste evento
           await admin.from('contato_identidades').insert({ contato_id: contatoId, organizacao_id: orgId, tipo: 'whatsapp', provedor: 'evolution', valor: phoneJid ?? phone, valor_normalizado: phone, principal: true, metadados: { origem: 'webhook' } });
           // resolve identidade: grava telefone/estado e corrige o nome se estava como "Identidade protegida" (nunca sobrescreve nome real).
           await admin.from('contatos').update({ telefone: phone, identidade_tipo: 'telefone', identidade_resolvida_em: agoraIso, identidade_fonte: 'webhook_pn' }).eq('id', contatoId).is('telefone', null);
@@ -352,18 +368,23 @@ Deno.serve(async (req) => {
       // Preferimos a conversa NÃO arquivada; uma arquivada (ex.: secundarizada) só é reusada se for a
       // ÚNICA — aí o fluxo de reabertura abaixo a traz de volta (cliente voltou a falar).
       let conversaId: string | null = null;
+      let canalPresoId: string | null = null;
       const { data: conv } = await admin.from('conversas')
-        .select('id')
+        .select('id, canal_preso_id')
         .eq('organizacao_id', orgId).eq('contato_id', contatoId)
         .neq('status', 'fechada')
         .order('arquivada_em', { ascending: true, nullsFirst: true })     // não-arquivada primeiro
         .order('ultima_interacao_em', { ascending: false, nullsFirst: false })
         .limit(1).maybeSingle();
-      if (conv) conversaId = conv.id;
+      if (conv) { conversaId = conv.id; canalPresoId = (conv.canal_preso_id as string | null) ?? null; }
       else {
         // conversa nova: canal_id = canal ATUAL; canal_origem_id = canal de AQUISIÇÃO (imutável).
+        // v31: se o canal prende, ela já nasce presa nele.
         const { data: nc, error: e2 } = await admin.from('conversas')
-          .insert({ organizacao_id: orgId, contato_id: contatoId, canal_id: canal.id, canal_origem_id: canal.id, status: 'aberta' })
+          .insert({
+            organizacao_id: orgId, contato_id: contatoId, canal_id: canal.id, canal_origem_id: canal.id, status: 'aberta',
+            ...(canal.prende_conversa ? { canal_preso_id: canal.id, canal_preso_em: new Date().toISOString() } : {}),
+          })
           .select('id').single();
         if (e2 || !nc) { await finish('erro', { erro: `conversas:${e2?.code ?? ''}:${(e2?.message ?? 'sem retorno').slice(0,180)}` }); return json({ ok: true }); }
         conversaId = nc.id;
@@ -418,7 +439,16 @@ Deno.serve(async (req) => {
         }, { onConflict: 'id_externo', ignoreDuplicates: true });
         if (msgErr) { await finish('erro', { erro: `mensagens_out:${msgErr.code ?? ''}:${(msgErr.message ?? '').slice(0,180)}` }); return json({ ok: true }); }
         // v27: saída pelo celular também move o CANAL ATUAL (atendente passou a falar por outro número).
-        await admin.from('conversas').update({ ultima_interacao_em: nowIso, canal_id: canal.id, ultimo_canal_id: canal.id, ultimo_numero: canal.numero_conectado ?? null, ultimo_provider: canal.provider ?? 'whatsapp', ultima_msg_canal_em: nowIso }).eq('id', conversaId);
+        // v31: e é o ato humano que PRENDE (canal que prende) ou SOLTA (qualquer outro número —
+        //      alguém do time trouxe o atendimento de volta). Bot e cron nunca caem aqui: este
+        //      ramo é mensagem digitada no celular, e o que a Atenvo mandou já saiu em fromMe_atenvo.
+        await admin.from('conversas').update({
+          ultima_interacao_em: nowIso, canal_id: canal.id, ultimo_canal_id: canal.id,
+          ultimo_numero: canal.numero_conectado ?? null, ultimo_provider: canal.provider ?? 'whatsapp',
+          ultima_msg_canal_em: nowIso,
+          canal_preso_id: canal.prende_conversa ? canal.id : null,
+          canal_preso_em: canal.prende_conversa ? nowIso : null,
+        }).eq('id', conversaId);
         await finish('processado', { ignorado_motivo: `fromMe_telefone${tipoMsg !== 'texto' ? '_' + tipoMsg : ''}` }); return json({ ok: true });
       }
 
@@ -434,12 +464,18 @@ Deno.serve(async (req) => {
       // v27: CANAL ATUAL do atendimento = o número por onde o cliente acabou de falar. canal_id passa a
       // ser "canal atual" (card + continuidade); ultimo_canal_* alimenta o "Responder por".
       // A AQUISIÇÃO fica congelada em canal_origem_id (nunca é tocada aqui).
-      const canalPatch = {
+      // v31: canal que PRENDE marca a conversa nele; canal que não prende RESPEITA um preso
+      // vigente — a conversa não muda de número só porque o cliente também escreveu no oficial.
+      // A mensagem entra igual (não lida, desarquiva, bot): o que não anda é o canal.
+      const presoPorOutro = !canal.prende_conversa && !!canalPresoId && canalPresoId !== canal.id;
+      if (presoPorOutro) console.log(`[webhook] conversa ${conversaId} presa em ${canalPresoId} — entrada por ${canal.id} não move o canal`);
+      const canalPatch = presoPorOutro ? {} : {
         canal_id: canal.id,
         ultimo_canal_id: canal.id,
         ultimo_numero: canal.numero_conectado ?? null,
         ultimo_provider: canal.provider ?? 'whatsapp',
         ultima_msg_canal_em: nowEntradaIso,
+        ...(canal.prende_conversa ? { canal_preso_id: canal.id, canal_preso_em: nowEntradaIso } : {}),
       };
       if (inboundNovo) {
         // não lida operacional++ (nunca conta fromMe — este é o ramo de ENTRADA) e REABRE conversa arquivada.
@@ -489,7 +525,8 @@ Deno.serve(async (req) => {
       // dry_run:true FIXO → o bot só simula/loga; jamais envia a cliente. Os gates de negócio (master,
       // bot_pode_atuar, humano/responsável, precisa_humano, idempotência, lock, saúde do canal) são do
       // RUNNER (fonte de verdade). Aqui só o filtro básico. Nunca bloqueia nem quebra o webhook.
-      if (inboundNovo && inboundMsgId && rmktDesfecho !== 'optout' && (tipoMsg === 'texto' || tipoMsg === 'audio')) {
+      const houveDispatchNormal = inboundNovo && !!inboundMsgId && rmktDesfecho !== 'optout' && (tipoMsg === 'texto' || tipoMsg === 'audio');
+      if (houveDispatchNormal) {
         const dispatch = (async () => {
           try {
             const { data: bs } = await admin.from('webhook_config').select('secret').eq('chave', 'bot_runner').maybeSingle();
@@ -502,6 +539,35 @@ Deno.serve(async (req) => {
           } catch { /* fire-and-forget: erro do runner nunca afeta o webhook */ }
         })();
         try { (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime?.waitUntil?.(dispatch); } catch { /* sem waitUntil: segue fire-and-forget */ }
+      }
+
+      // ---- v32: LID RESOLVIDO DEPOIS -> re-dispatch ao bot-runner ----
+      // O inbound que abriu a conversa chegou só com @lid: o contato nasceu sem número, o runner
+      // saiu com 'sem_destino_envio' e o bot ficou mudo. Este evento acabou de gravar o PN (bloco
+      // #7 acima) e NÃO é um inbound novo de texto — sem isto aqui, o lead só voltaria a existir
+      // para o bot se ELE mandasse outra mensagem. Reenvia o ÚLTIMO inbound de TEXTO da conversa
+      // (janela de 1h: cobre o caso real, de minutos, sem ressuscitar conversa velha).
+      // Só quando o dispatch normal NÃO rodou neste evento — senão o runner receberia dois.
+      // Idempotência (ultimo_inbound_msg_id), lock e gates continuam no RUNNER: se um humano
+      // assumiu nesse meio tempo, ele responde 'ja_tem_atendente' e não atropela ninguém.
+      if (pnRecuperadoAgora && conversaId && !houveDispatchNormal) {
+        const redispatch = (async () => {
+          try {
+            const desde = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+            const { data: ult } = await admin.from('mensagens')
+              .select('id, conteudo').eq('conversa_id', conversaId).eq('direcao', 'entrada').eq('tipo', 'texto')
+              .gte('criado_em', desde).order('criado_em', { ascending: false }).limit(1).maybeSingle();
+            if (!ult?.id) return;
+            const { data: bs } = await admin.from('webhook_config').select('secret').eq('chave', 'bot_runner').maybeSingle();
+            if (!bs?.secret) return;
+            await fetch(`${FUNCTIONS_BASE}/bot-runner`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'x-bot-secret': bs.secret as string },
+              body: JSON.stringify({ conversa_id: conversaId, inbound_msg_id: ult.id, inbound_text: ult.conteudo ?? '', inbound_tipo: 'texto', dry_run: EVO_BOT_DRY_RUN }),
+            });
+          } catch { /* fire-and-forget: erro nunca afeta o webhook */ }
+        })();
+        try { (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime?.waitUntil?.(redispatch); } catch { /* sem waitUntil */ }
       }
 
       // Auto-entrada no Kanban: TODO inbound de contato garante LEAD NOVO (não só recém-criado —
