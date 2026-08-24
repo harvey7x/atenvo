@@ -254,7 +254,13 @@ export default function DashboardV2() {
 
   /* eixos e grades saem do token — traduzem sozinhos no tema claro */
   const eixo = { fontSize: 10.5, fill: p.txt3 };
-  const anima = !p.lite; // Modo Leve: gráfico entra pronto, sem animação
+  /* Barra NUNCA anima (CONTRATO item 6, "DADO É CALMO" — o Relatórios já
+     desenha as barras dele com animation:none). Além da regra, a animação do
+     Recharts roda em requestAnimationFrame: em aba de segundo plano o rAF
+     congela e o gráfico fica VAZIO até a aba ganhar foco. Medido em produção
+     em 24/08. Sem animação, a barra nasce na altura certa em qualquer aba. */
+  const anima = false;
+  void p.lite; // o Modo Leve segue governando blur/grão pelos tokens
 
   if (!DASH_REAL) {
     return (
