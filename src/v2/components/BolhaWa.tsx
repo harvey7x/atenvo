@@ -32,19 +32,21 @@ export function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, 
   aoResponder: (m: WaMessage) => void; aoVerErro: (m: WaMessage) => void; aoRetry: (m: WaMessage) => void;
   aoRemover: (m: WaMessage) => void; aoLightbox: (url: string) => void; aoRecarregarAudio: (m: WaMessage) => void;
 }) {
-  const [url, setUrl] = useState<string | null>(null);
+  const [urlAssinada, setUrlAssinada] = useState<string | null>(null);
   const [urlErro, setUrlErro] = useState(false);
+  // bolha otimista carrega a mídia LOCAL (objectURL) — renderiza na hora, sem URL assinada
   // v1: imagem/vídeo resolvem a URL assinada eager; ÁUDIO só no play (AudioBolha) — não emitir N signed-URLs por abertura de conversa
-  const precisaUrl = !demo && !!m.anexoPath && ['imagem', 'video'].includes(m.tipo ?? '');
+  const precisaUrl = !demo && !m.localUrl && !!m.anexoPath && ['imagem', 'video'].includes(m.tipo ?? '');
   useEffect(() => {
     let vivo = true;
-    setUrl(null); setUrlErro(false);
+    setUrlAssinada(null); setUrlErro(false);
     if (precisaUrl && m.anexoPath) {
-      urlAssinadaMidiaWa(m.anexoPath).then((u) => { if (vivo) setUrl(u); }).catch(() => { if (vivo) setUrlErro(true); });
+      urlAssinadaMidiaWa(m.anexoPath).then((u) => { if (vivo) setUrlAssinada(u); }).catch(() => { if (vivo) setUrlErro(true); });
     }
     return () => { vivo = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [m.anexoPath]);
+  }, [m.anexoPath, precisaUrl]);
+  const url = m.localUrl ?? urlAssinada;
   // enquanto a URL assinada não resolveu (anexo presente) é CARREGANDO, não "indisponível" (v1 não pisca)
   const carregandoMidia = precisaUrl && !url && !urlErro;
   const ack = m.dir === 'out' ? ackOf(m.status) : null;
@@ -114,7 +116,7 @@ export function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, 
           ? <div className="audio-ind">Áudio não enviado</div>  /* saída que falhou não vira player tocável (v1) */
           : m.midiaPendente
           ? <div className="audio-ind">Áudio indisponível — <button type="button" className="lnk" onClick={() => aoRecarregarAudio(m)}>tentar carregar novamente</button></div>
-          : <AudioBolha anexoPath={demo ? null : m.anexoPath ?? null} segundos={(m as WaMessage & { seconds?: number }).seconds ?? null} demo={demo} acaoNode={btnBaixar} />
+          : <AudioBolha anexoPath={demo ? null : m.anexoPath ?? null} localUrl={m.localUrl ?? null} segundos={(m as WaMessage & { seconds?: number }).seconds ?? null} demo={demo} acaoNode={btnBaixar} />
       )}
       {m.tipo === 'documento' && (
         <div className="doc2">
@@ -176,8 +178,9 @@ export function WaTexto({ texto }: { texto: string }) {
 }
 
 /** Player de áudio na pele do mockup (.audio2). A URL assinada é resolvida SÓ no play (v1: preload none),
-    para não emitir uma rajada de signed-URLs por abertura de conversa. */
-export function AudioBolha({ anexoPath, segundos, demo, acaoNode }: { anexoPath: string | null; segundos: number | null; demo: boolean; acaoNode?: ReactNode }) {
+    para não emitir uma rajada de signed-URLs por abertura de conversa. Bolha otimista
+    (recém-gravado) toca direto do objectURL local, sem assinada. */
+export function AudioBolha({ anexoPath, localUrl, segundos, demo, acaoNode }: { anexoPath: string | null; localUrl?: string | null; segundos: number | null; demo: boolean; acaoNode?: ReactNode }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [tocando, setTocando] = useState(false);
   const [carregando, setCarregando] = useState(false);
@@ -197,11 +200,14 @@ export function AudioBolha({ anexoPath, segundos, demo, acaoNode }: { anexoPath:
     if (tocando) { audioRef.current?.pause(); setTocando(false); return; }
     let a = audioRef.current;
     if (!a) {
-      if (demo || !anexoPath) return;                    // demo: sem áudio real
-      setCarregando(true);
-      try { a = montarAudio(await urlAssinadaMidiaWa(anexoPath)); }   // signed-URL SÓ agora
-      catch { setCarregando(false); return; }
-      setCarregando(false);
+      if (localUrl) a = montarAudio(localUrl);           // bolha otimista: toca o blob local
+      else if (demo || !anexoPath) return;               // demo: sem áudio real
+      else {
+        setCarregando(true);
+        try { a = montarAudio(await urlAssinadaMidiaWa(anexoPath)); }   // signed-URL SÓ agora
+        catch { setCarregando(false); return; }
+        setCarregando(false);
+      }
     }
     a.playbackRate = rate;
     a.play().catch(() => setTocando(false));

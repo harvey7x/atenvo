@@ -13,18 +13,22 @@ import { useBloqueiosOrg } from './bloqueiosOrg';
 import { useAuth } from '@/context/AuthContext';
 import { useOrg } from '@/context/OrgContext';
 import {
-  aplicarEnvioOtimista, aplicarFalha, aplicarRetry, canalAutomatico, hidratarHistorico,
-  montarCorpoAssinado, novoCid, patchConversa, reconciliarLista, removerMensagemLocal, selecaoValida,
+  aplicarEnvioOtimista, aplicarFalha, aplicarRetry, canalAutomatico, hidratarHistorico, marcarIdReal,
+  montarCorpoAssinado, novoCid, patchBolha, patchConversa, reconciliarLista, removerMensagemLocal, selecaoValida,
 } from './inboxWhatsApp';
+import { previewUltimaMensagem } from '@/lib/conversaEtiquetas';
 
 /* ------------------------------------------------------------------
    useInboxWhatsApp — a máquina do inbox extraída de src/pages/
-   WhatsApp.tsx (as ~600 linhas inline), comportamento 100% IDÊNTICO:
-   mesmo timing (timeout 25s, scroll 220ms, coalesce fica no data
-   layer), mesma ordem de reconciliação (lista substitui tudo e devolve
-   o histórico completo à conversa aberta; histórico substitui inteiro;
-   bolha otimista morre por substituição, nunca duplica) e mesmo retry
-   (retry_mensagem_id na MESMA bolha, sem assinatura e sem timeout).
+   WhatsApp.tsx (as ~600 linhas inline). Timing preservado (timeout
+   25s, scroll 220ms, coalesce no data layer); retry idem (retry_
+   mensagem_id na MESMA bolha, sem assinatura e sem timeout).
+   Reconciliação: lista substitui e devolve o histórico completo à
+   conversa aberta, MAS bolhas otimistas PENDENTES sobrevivem até a
+   linha real do servidor cobri-las (id devolvido pelo envio, anexo ou
+   conteúdo idêntico na janela) — a mensagem recém-enviada não pisca e
+   jamais duplica. Mídia também é otimista: bolha imediata com preview
+   local (objectURL) enquanto upload+envio correm por trás.
    A página v2 cuida só de UI (draft, popovers, modais, foco, painéis).
    Demo (WA_REAL=false): seed em memória + ações locais.
    ------------------------------------------------------------------ */
@@ -78,12 +82,13 @@ export function useInboxWhatsApp(opts: {
   historicoRef.current = msgsQ.data;
 
   /* reconciliação da LISTA (v1 L251-260) — dep SÓ em live.data; a conversa
-     aberta recebe de volta o histórico completo via refs (sem loop) */
+     aberta recebe de volta o histórico completo via refs (sem loop); bolhas
+     pendentes do estado atual sobrevivem (por isso o updater com `cur`) */
   useEffect(() => {
     if (!WA_REAL || !live.data) return;
     const abertaId = currentIdRef.current;
     const hist = historicoRef.current;
-    setContacts(reconciliarLista(live.data, abertaId, hist));
+    setContacts((cur) => reconciliarLista(cur, live.data!, abertaId, hist));
     setCurrentId((id) => selecaoValida(id, live.data!));
   }, [live.data]);
 
@@ -250,7 +255,7 @@ export function useInboxWhatsApp(opts: {
     const cid = novoCid(now.getTime());
     const replyEnvio = replyTo ? { id: replyTo.id, idExt: replyTo.idExt, fromMe: replyTo.fromMe, preview: { remetente: replyTo.remetente, tipo: replyTo.tipo, texto: replyTo.texto } } : undefined;
     const quotedBolha = replyTo ? { remetente: replyTo.remetente, tipo: replyTo.tipo, texto: replyTo.texto } : undefined;
-    setContacts((cur) => aplicarEnvioOtimista(cur, currentId, { dir: 'out', text: corpo, time: hh, status: 'pendente', cid, quoted: quotedBolha }, v));
+    setContacts((cur) => aplicarEnvioOtimista(cur, currentId, { dir: 'out', text: corpo, time: hh, tsISO: now.toISOString(), status: 'pendente', cid, quoted: quotedBolha }, v));
     aoAceitar();                                               // limpa o draft na página
     if (!WA_REAL) { aoAvisar({ tom: 'ok', texto: 'Mensagem enviada' }); setReplyTo(null); return; }
     enviandoRef.current = true;
@@ -261,7 +266,7 @@ export function useInboxWhatsApp(opts: {
       { conversaId: currentId, text: v, canalId: replyCanalId || current.canalId, assinaturaNome: assinaturaNome || undefined, replyTo: replyEnvio },
       {
         onError: (e) => { window.clearTimeout(to); const msg = (e as Error)?.message || 'Falha no envio.'; marcarFalha(msg); aoAvisar({ tom: 'erro', texto: msg }); },
-        onSuccess: () => { window.clearTimeout(to); setReplyTo(null); },
+        onSuccess: (idReal) => { window.clearTimeout(to); setReplyTo(null); if (idReal) setContacts((cur) => marcarIdReal(cur, convAlvo, cid, idReal)); },
         onSettled: () => { enviandoRef.current = false; },
       },
     );
@@ -300,7 +305,10 @@ export function useInboxWhatsApp(opts: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentId, removendoId]);
 
-  /* mídia (upload ANTES do envio; sem bolha otimista — v1 L745-784) */
+  /* mídia — ciclo OTIMISTA: bolha imediata com preview local (objectURL) e o
+     upload+envio correndo por trás. As guardas continuam lançando SÍNCRONO
+     (o modal aberto mostra o erro); passou nelas, a função resolve na hora
+     (o modal fecha) e falha posterior vira bolha 'falhou' + aviso. */
   const guardaMidia = () => {
     if (WA_REAL && !currentId) throw new Error('Selecione uma conversa.');   // v1 L746/L758/L775
     if (optout) throw new Error('Contato marcado como não incomodar — mensagens bloqueadas.');
@@ -309,41 +317,61 @@ export function useInboxWhatsApp(opts: {
     throw new Error(higiene.motivoBloqueio === 'dono' ? 'Assuma o atendimento para responder.' : 'Preencha o nome completo do cliente para responder.');
   };
   const replyPayload = () => (replyTo ? { id: replyTo.id, idExt: replyTo.idExt, fromMe: replyTo.fromMe, preview: { remetente: replyTo.remetente, tipo: replyTo.tipo, texto: replyTo.texto } } : undefined);
+  const dispararMidia = useCallback((tipo: 'imagem' | 'video' | 'audio' | 'documento', file: File, caption: string, extra?: { audioDiag?: Record<string, unknown>; origemAudio?: string }) => {
+    guardaMidia();
+    const convAlvo = currentId;
+    const canalAlvo = replyCanalId || current.canalId;
+    const replyEnvio = replyPayload();
+    const quotedBolha = replyTo ? { remetente: replyTo.remetente, tipo: replyTo.tipo, texto: replyTo.texto } : undefined;
+    const now = new Date();
+    const hh = ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
+    const cid = novoCid(now.getTime());
+    const localUrl = URL.createObjectURL(file);
+    const bolha: WaMessage = { dir: 'out', tipo, text: caption || '', time: hh, tsISO: now.toISOString(), status: 'pendente', cid, localUrl, nome: file.name, tamanho: file.size, mime: file.type, quoted: quotedBolha };
+    setContacts((cur) => aplicarEnvioOtimista(cur, convAlvo, bolha, previewUltimaMensagem({ tipo, texto: caption || null })));
+    setReplyTo(null);
+    const marcarFalha = (erro: string) => setContacts((cur) => aplicarFalha(cur, convAlvo, cid, erro));
+    // o upload acontece antes do envio: janela maior que os 25s do texto
+    const to = window.setTimeout(() => marcarFalha('Sem confirmação do envio da mídia a tempo. Tente novamente.'), 120_000);
+    void (async () => {
+      try {
+        const up = await subirMidiaWa(currentOrg.id, file);
+        // anexoPath na bolha: o path é único por upload — a reconciliação mata a
+        // bolha pelo path assim que a linha real chegar, sem depender do id.
+        setContacts((cur) => patchBolha(cur, convAlvo, cid, { anexoPath: up.path }));
+        const idReal = await sendMut.mutateAsync({ conversaId: convAlvo, canalId: canalAlvo, midiaPath: up.path, midiaTipo: tipo, midiaMime: up.mime, midiaNome: up.nome, midiaTamanho: up.tamanho, text: caption || undefined, replyTo: replyEnvio, ...(extra ?? {}) });
+        if (idReal) setContacts((cur) => marcarIdReal(cur, convAlvo, cid, idReal));
+      } catch (e) {
+        const msg = (e as Error)?.message || 'Falha no envio da mídia.';
+        marcarFalha(msg);
+        aoAvisar({ tom: 'erro', texto: msg });
+      } finally { window.clearTimeout(to); }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentId, replyCanalId, current.canalId, currentOrg.id, replyTo, higieneBloqueia, higiene.motivoBloqueio, optout]);
   const enviarImagem = useCallback(async (file: File, caption: string) => {
-    guardaMidia();
-    if (!WA_REAL) { aoAvisar({ tom: 'ok', texto: 'Mensagem enviada' }); return; }
-    const up = await subirMidiaWa(currentOrg.id, file);
-    await sendMut.mutateAsync({ conversaId: currentId, canalId: replyCanalId || current.canalId, midiaPath: up.path, midiaTipo: 'imagem', midiaMime: up.mime, midiaNome: up.nome, midiaTamanho: up.tamanho, text: caption || undefined, replyTo: replyPayload() });
-    setReplyTo(null);
+    if (!WA_REAL) { guardaMidia(); aoAvisar({ tom: 'ok', texto: 'Mensagem enviada' }); return; }
+    dispararMidia('imagem', file, caption);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentId, replyCanalId, current.canalId, currentOrg.id, replyTo, higieneBloqueia, higiene.motivoBloqueio, optout]);
+  }, [dispararMidia]);
   const enviarVideo = useCallback(async (file: File, caption: string) => {
-    guardaMidia();
-    if (!WA_REAL) { aoAvisar({ tom: 'ok', texto: 'Mensagem enviada' }); return; }
-    const up = await subirMidiaWa(currentOrg.id, file);
-    await sendMut.mutateAsync({ conversaId: currentId, canalId: replyCanalId || current.canalId, midiaPath: up.path, midiaTipo: 'video', midiaMime: up.mime, midiaNome: up.nome, midiaTamanho: up.tamanho, text: caption || undefined, replyTo: replyPayload() });
-    setReplyTo(null);
+    if (!WA_REAL) { guardaMidia(); aoAvisar({ tom: 'ok', texto: 'Mensagem enviada' }); return; }
+    dispararMidia('video', file, caption);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentId, replyCanalId, current.canalId, currentOrg.id, replyTo, higieneBloqueia, higiene.motivoBloqueio, optout]);
+  }, [dispararMidia]);
   const enviarAudio = useCallback(async (blob: Blob, mime: string, ext: string, diag?: Record<string, unknown>) => {
-    guardaMidia();
     if (!blob || !blob.size) throw new Error('Áudio vazio. Grave novamente.');   // tolera blob nulo (v1 L760)
-    if (!WA_REAL) { aoAvisar({ tom: 'ok', texto: 'Mensagem enviada' }); return; }
+    if (!WA_REAL) { guardaMidia(); aoAvisar({ tom: 'ok', texto: 'Mensagem enviada' }); return; }
     const file = new File([blob], `audio.${ext}`, { type: mime });
-    const up = await subirMidiaWa(currentOrg.id, file);
     const origemAudio = diag?.origem === 'arquivo_anexado' ? 'arquivo_anexado' : 'gravacao_painel';
-    await sendMut.mutateAsync({ conversaId: currentId, canalId: replyCanalId || current.canalId, midiaPath: up.path, midiaTipo: 'audio', midiaMime: up.mime, midiaNome: up.nome, midiaTamanho: up.tamanho, audioDiag: diag, origemAudio, replyTo: replyPayload() });
-    setReplyTo(null);
+    dispararMidia('audio', file, '', { audioDiag: diag, origemAudio });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentId, replyCanalId, current.canalId, currentOrg.id, replyTo, higieneBloqueia, higiene.motivoBloqueio, optout]);
+  }, [dispararMidia]);
   const enviarDocumento = useCallback(async (file: File, caption: string) => {
-    guardaMidia();
-    if (!WA_REAL) { aoAvisar({ tom: 'ok', texto: 'Mensagem enviada' }); return; }
-    const up = await subirMidiaWa(currentOrg.id, file);
-    await sendMut.mutateAsync({ conversaId: currentId, canalId: replyCanalId || current.canalId, midiaPath: up.path, midiaTipo: 'documento', midiaMime: up.mime, midiaNome: up.nome, midiaTamanho: up.tamanho, text: caption || undefined, replyTo: replyPayload() });
-    setReplyTo(null);
+    if (!WA_REAL) { guardaMidia(); aoAvisar({ tom: 'ok', texto: 'Mensagem enviada' }); return; }
+    dispararMidia('documento', file, caption);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentId, replyCanalId, current.canalId, currentOrg.id, replyTo, higieneBloqueia, higiene.motivoBloqueio, optout]);
+  }, [dispararMidia]);
   /** Cartão de contato (vCard): o cliente recebe como contato nativo. Mesmos guards da mídia;
    *  otimista na bolha (texto fallback "📇 …" + metadados de cartão) e envio nativo no backend. */
   const enviarContato = useCallback(async (nome: string, telefone: string) => {

@@ -11,6 +11,12 @@ export interface WaMessage {
   id?: string;
   /** id de cliente da bolha otimista (sem linha no banco ainda) — p/ reconciliar/timeout sem id real. */
   cid?: string;
+  /** id REAL da linha no banco, gravado na bolha otimista quando o envio confirma —
+   *  a reconciliação mata a bolha assim que o histórico do servidor contém este id. */
+  idReal?: string;
+  /** URL local (objectURL) da mídia recém-anexada — a bolha otimista renderiza daqui
+   *  enquanto o upload/envio acontece, sem esperar URL assinada do bucket. */
+  localUrl?: string;
   /** mídia recebida mas ainda não baixada (download falhou) — UI mostra "indisponível" + recarregar. */
   midiaPendente?: boolean;
   /** motivo sanitizado da falha (quando status = falhou). */

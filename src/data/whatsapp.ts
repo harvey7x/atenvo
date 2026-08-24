@@ -5,6 +5,7 @@ import { DEMO_MODE, acaoSimulada } from '@/lib/demo';
 import { useOrg } from '@/context/OrgContext';
 import type { WaContact, WaMessage, WaUltimoCanal } from '@/data/whatsappDemo';
 import { previewUltimaMensagem, type OppStatus } from '@/lib/conversaEtiquetas';
+import { patchListaConversa, patchListaMensagem, removerDoHistorico, upsertHistorico, type RowConversa } from '@/data/whatsappRealtime';
 type EtapaVariante = 'ganho' | 'perdido' | 'neutro';
 
 export const WA_REAL = isSupabaseConfigured && !!supabase;
@@ -273,6 +274,7 @@ export function useWaConversations() {
     refetchInterval: 60_000,
     refetchOnWindowFocus: true,
     queryFn: async (): Promise<WaContact[]> => {
+      const etapasPromise = etapasPorContato(orgId);   // dispara junto; espera depois do fetch principal
       const { data, error } = await supabase!
         .from('conversas')
         // canais!conversas_canal_id_fkey: desambigua o embed (há 2 FKs p/ canais: canal_id e ultimo_canal_id).
@@ -292,11 +294,12 @@ export function useWaConversations() {
         .order('criado_em', { referencedTable: 'mensagens', ascending: false })
         .limit(10, { referencedTable: 'mensagens' })
         .order('ultima_interacao_em', { ascending: false });
-      if (error) throw new Error(error.message);
-      const arr = ((data as unknown as DbConv[]) ?? []).map(mapConversa);
       // Etapa do Kanban por contato (etiqueta [CONTRATOS]). Query separada e BEST-EFFORT:
       // se falhar (grant/RLS), a lista continua funcionando — só fica sem a etiqueta de etapa.
-      const etapas = await etapasPorContato(orgId);
+      // Em PARALELO com o fetch principal: eram 2 roundtrips sequenciais no caminho crítico da lista.
+      const etapas = await etapasPromise;
+      if (error) throw new Error(error.message);
+      const arr = ((data as unknown as DbConv[]) ?? []).map(mapConversa);
       for (const c of arr) {
         const e = c.contatoId ? etapas.get(c.contatoId) : null;
         if (!e) continue;
@@ -331,13 +334,37 @@ export function useWaConversations() {
     };
     // prefixo ['wa-msgs'] atinge só as queries de histórico; a da lista é ['wa-conversas', orgId].
     const invalidarHistorico = () => qc.invalidateQueries({ queryKey: ['wa-msgs'] });
+    // LATÊNCIA: o payload do realtime JÁ TRAZ a linha — aplicamos direto nos caches (histórico da
+    // conversa + card da lista) e a tela reflete em milissegundos, sem esperar o roundtrip do
+    // refetch (a lista custa segundos). As invalidações abaixo continuam como backstop: o fetch
+    // completo logo atrás corrige qualquer divergência destes patches parciais.
+    const aplicarEventoMensagem = (evt: string, novo: Record<string, unknown>, velho: Record<string, unknown>) => {
+      try {
+        if (evt === 'DELETE') {
+          const id = velho?.id as string | undefined;
+          if (id) qc.setQueriesData<WaMessage[]>({ queryKey: ['wa-msgs'] }, (old) => (old ? removerDoHistorico(old, id) : old));
+          return;
+        }
+        const convId = novo?.conversa_id as string | undefined;
+        if (!convId) return;
+        const [m] = mapMensagens([novo as unknown as DbMsg]);
+        if (!m) return;                                     // filtrada (sem conteúdo e sem mídia)
+        qc.setQueryData<WaMessage[]>(['wa-msgs', convId], (old) => (old ? upsertHistorico(old, m) : undefined));
+        qc.setQueryData<WaContact[]>(['wa-conversas', orgId], (old) => (old ? patchListaMensagem(old, convId, m, evt === 'INSERT') : undefined));
+      } catch { /* patch é atalho best-effort; o refetch logo atrás garante o estado certo */ }
+    };
     const ch = supabase!
       .channel(`wa-${orgId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'mensagens', filter: `organizacao_id=eq.${orgId}` }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'mensagens', filter: `organizacao_id=eq.${orgId}` }, (payload) => {
+        aplicarEventoMensagem(payload.eventType, payload.new as Record<string, unknown>, payload.old as Record<string, unknown>);
         invalidarHistorico();
         invalidarListaEmBreve();
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversas', filter: `organizacao_id=eq.${orgId}` }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversas', filter: `organizacao_id=eq.${orgId}` }, (payload) => {
+        if (payload.eventType === 'UPDATE') {
+          try { qc.setQueryData<WaContact[]>(['wa-conversas', orgId], (old) => (old ? patchListaConversa(old, payload.new as RowConversa) : undefined)); }
+          catch { /* backstop abaixo */ }
+        }
         invalidarListaEmBreve();
       })
       // responsável (assumir/transferir) vive em contatos.responsavel_id → refaz a lista em tempo real
