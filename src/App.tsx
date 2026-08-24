@@ -35,6 +35,7 @@ const PlanoUsoV2 = lazy(() => import('@/v2/pages/PlanoUso'));
 const CobrancasV2 = lazy(() => import('@/v2/pages/Cobrancas'));
 const AgendamentosV2 = lazy(() => import('@/v2/pages/Agendamentos'));
 const ScriptsV2 = lazy(() => import('@/v2/pages/Scripts'));
+const DashboardV2 = lazy(() => import('@/v2/pages/Dashboard'));
 const ConfiguracoesV2 = lazy(() => import('@/v2/pages/Configuracoes'));
 const ContatosV2 = lazy(() => import('@/v2/pages/Contatos'));
 const DisparoV2 = lazy(() => import('@/v2/pages/Disparo'));
@@ -86,9 +87,9 @@ const routes: RouteObject[] = [
       {
         element: <Lz><AppShellV2 /></Lz>,
         children: [
-          // Home: entra pelo WhatsApp (entrada do v1) até o Dashboard existir.
+          // Home: entra pelo WhatsApp (entrada do v1) — decisão de escopo do dono.
           { index: true, element: <Navigate to="/whatsapp" replace /> },
-          { path: 'dashboard', element: <Lz><ManutencaoV2 area="Dashboard" /></Lz> },
+          { path: 'dashboard', element: <Lz><DashboardV2 /></Lz> },
           { path: 'whatsapp', element: <Lz><GateWhatsApp /></Lz> },
           { path: 'facebook', element: <Lz><ManutencaoV2 area="Facebook" /></Lz> },
           { path: 'relacionamento', element: <Lz><ManutencaoV2 area="Relacionamento" /></Lz> },

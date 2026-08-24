@@ -1,0 +1,154 @@
+/* ============================================================
+   Dashboard operacional — anatomia do manual de extensão:
+   cabeçalho .ph, filtros em chips, cards de vidro, tabela caps.
+   Base MONOCROMÁTICA: todo preenchimento sai de rgba(var(--tint))
+   — branco no dark, grafite no light, sem uma cor sequer hardcoded.
+   Cor só como semântica: verde = ganho, rubro = perda/delta ruim.
+   Dado é calmo: nenhum efeito interno além do hover.
+   ============================================================ */
+
+.v2 .db-pg { padding-bottom: 8px; }
+
+/* --- filtros de período --- */
+.v2 .db-filtros { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.v2 .db-datas { display: flex; align-items: center; gap: 7px; color: var(--txt-3); font-size: 11.5px; }
+.v2 .db-datas .inp { width: 138px; height: 30px; font-size: 11.5px; }
+.v2 .db-comp { font-size: 11px; color: var(--txt-3); margin-left: auto; font-variant-numeric: tabular-nums; }
+
+/* --- KPIs (Instrument Sans 600 no número, tabular) --- */
+.v2 .db-kpis {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+  gap: 10px; margin-bottom: 12px;
+}
+.v2 .db-kpi { padding: 13px 15px; border-radius: var(--r-card); }
+.v2 .db-kpi .rot {
+  font-size: 10.5px; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--txt-3); margin-bottom: 7px; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.v2 .db-kpi .val { font-size: 22px; font-weight: 600; letter-spacing: -.02em; line-height: 1.15; }
+.v2 .db-kpi .val.ind { font-size: 13px; font-weight: 500; color: var(--txt-3); padding: 4px 0; }
+.v2 .db-kpi .delta { margin-top: 7px; }
+.v2 .db-kpi .ant { font-size: 10px; color: var(--txt-3); margin-top: 5px; }
+
+/* --- painéis --- */
+.v2 .db-painel { padding: 15px 17px; border-radius: var(--r-card); margin-bottom: 12px; }
+.v2 .db-painel .tt {
+  font-size: 12.5px; font-weight: 600; margin-bottom: 13px;
+  display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+}
+.v2 .db-painel .tt span { font-size: 11px; color: var(--txt-3); font-weight: 400; }
+
+.v2 .db-g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.v2 .db-g3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+@media (max-width: 1100px) { .v2 .db-g3 { grid-template-columns: 1fr; } }
+@media (max-width: 980px) { .v2 .db-g2 { grid-template-columns: 1fr; } }
+
+/* --- vazio compacto (zero ≠ erro) --- */
+.v2 .db-vazio { display: flex; align-items: center; gap: 8px; padding: 16px 2px; color: var(--txt-3); font-size: 11.5px; }
+
+/* --- barras horizontais (funil, motivos, bancos) --- */
+.v2 .db-barh { display: flex; flex-direction: column; gap: 9px; }
+.v2 .db-barh .lin { display: grid; grid-template-columns: minmax(84px, 130px) 1fr 46px; gap: 10px; align-items: center; }
+.v2 .db-barh .rot {
+  font-size: 11.5px; color: var(--txt-2);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.v2 .db-barh .trilho { height: 8px; border-radius: 99px; background: rgba(var(--tint), .06); overflow: hidden; }
+.v2 .db-barh .trilho i {
+  display: block; height: 100%; border-radius: 99px;
+  background: linear-gradient(90deg, rgba(var(--tint), .55), rgba(var(--tint), .25));
+}
+/* semânticos: só ganho e perda REAL ganham cor. Descarte é saída sem
+   fracasso (o lead nunca foi ganhável) — fica monocromático de propósito. */
+.v2 .db-barh .trilho i.f-ganho { background: linear-gradient(90deg, rgba(var(--verde-rgb), .95), rgba(var(--verde-rgb), .45)); }
+.v2 .db-barh .trilho i.f-perdido { background: linear-gradient(90deg, rgba(var(--rubro-rgb), .95), rgba(var(--rubro-rgb), .45)); }
+.v2 .db-barh .trilho i.f-descarte { background: linear-gradient(90deg, rgba(var(--tint), .38), rgba(var(--tint), .2)); }
+.v2 .db-barh .v { font-size: 11.5px; text-align: right; font-variant-numeric: tabular-nums; color: var(--txt); }
+
+/* barra empilhada: a coluna terminal negativa é balde único, então mostra
+   os dois pesos lado a lado em vez de fingir que é tudo perda */
+.v2 .db-barh .trilho .pilha { display: flex; height: 100%; border-radius: 99px; overflow: hidden; }
+.v2 .db-barh .trilho .pilha i { width: auto; flex-basis: 0; border-radius: 0; }
+
+/* etiqueta de grupo ao lado do rótulo (descarte) */
+.v2 .db-tag {
+  font-size: 9px; font-weight: 500; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--txt-3); background: rgba(var(--tint), .07); border-radius: 5px;
+  padding: 1px 5px; margin-left: 6px; vertical-align: middle;
+}
+
+/* legenda do funil */
+.v2 .db-legenda { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 12px; font-size: 10.5px; color: var(--txt-3); }
+.v2 .db-legenda span { display: inline-flex; align-items: center; gap: 5px; }
+.v2 .db-legenda .sw { width: 9px; height: 9px; border-radius: 3px; display: inline-block; }
+.v2 .db-legenda .sw.f-ganho { background: rgba(var(--verde-rgb), .8); }
+.v2 .db-legenda .sw.f-perdido { background: rgba(var(--rubro-rgb), .8); }
+.v2 .db-legenda .sw.f-descarte { background: rgba(var(--tint), .3); }
+
+/* --- origem de tráfego (fonte → canais) --- */
+.v2 .db-origem { display: flex; flex-direction: column; gap: 4px; }
+.v2 .db-origem .cab {
+  width: 100%; background: none; border: 0; padding: 5px 4px; cursor: pointer; text-align: left;
+  display: grid; grid-template-columns: 14px minmax(84px, 128px) 1fr 46px; gap: 8px; align-items: center;
+  border-radius: 8px; transition: background .16s var(--ease); color: inherit; font: inherit;
+}
+.v2 .db-origem .cab:hover { background: rgba(var(--tint), .04); }
+.v2 .db-origem .cab .seta { font-size: 9px; color: var(--txt-3); }
+.v2 .db-origem .cab .rot {
+  font-size: 11.5px; color: var(--txt-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.v2 .db-origem .grp.on .cab .rot { color: var(--txt); }
+.v2 .db-origem .trilho { height: 8px; border-radius: 99px; background: rgba(var(--tint), .06); overflow: hidden; }
+.v2 .db-origem .trilho i {
+  display: block; height: 100%; border-radius: 99px;
+  background: linear-gradient(90deg, rgba(var(--tint), .55), rgba(var(--tint), .25));
+}
+.v2 .db-origem .v { font-size: 11.5px; text-align: right; font-variant-numeric: tabular-nums; color: var(--txt); }
+.v2 .db-origem .canais {
+  display: flex; flex-direction: column; gap: 7px;
+  padding: 7px 4px 9px 26px; margin-left: 6px; border-left: 1px solid var(--linha);
+}
+.v2 .db-origem .canais .lin { display: grid; grid-template-columns: minmax(74px, 118px) 1fr 46px; gap: 8px; align-items: center; }
+.v2 .db-origem .canais .rot { font-size: 11px; color: var(--txt-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .db-origem .canais .trilho { height: 6px; }
+.v2 .db-origem .canais .trilho i { background: linear-gradient(90deg, rgba(var(--tint), .34), rgba(var(--tint), .16)); }
+.v2 .db-origem .canais .v { font-size: 11px; color: var(--txt-2); }
+
+/* --- tabela de atendentes (caps, mesma anatomia das tabelas v2) --- */
+.v2 .db-scroll { overflow-x: auto; }
+.v2 .db-tab { width: 100%; border-collapse: collapse; font-size: 12px; }
+.v2 .db-tab thead th {
+  text-align: left; font-size: 10px; font-weight: 500; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--txt-3); padding: 7px 11px; white-space: nowrap;
+  border-bottom: 1px solid rgba(var(--tint), .08); background: rgba(var(--tint), .02);
+}
+.v2 .db-tab thead th.n { text-align: right; }
+.v2 .db-tab tbody td {
+  padding: 0 11px; height: 38px; vertical-align: middle; white-space: nowrap;
+  color: var(--txt-2); border-bottom: 1px solid rgba(var(--tint), .045);
+}
+.v2 .db-tab tbody td.n { text-align: right; }
+.v2 .db-tab tbody td.nm { color: var(--txt); font-weight: 500; }
+.v2 .db-tab tbody td.ok { color: var(--verde); }
+.v2 .db-tab tbody td.er { color: var(--rubro); }
+.v2 .db-tab tbody tr:last-child td { border-bottom: none; }
+.v2 .db-tab tbody tr { transition: background .16s var(--ease); }
+.v2 .db-tab tbody tr:hover td { background: rgba(var(--tint), .028); }
+
+.v2 .db-nota { font-size: 10.5px; color: var(--txt-3); line-height: 1.55; margin-top: 11px; max-width: 78ch; }
+
+/* --- tooltip dos gráficos (vidro Platina no lugar do branco do Recharts) --- */
+.v2 .db-tip {
+  background: var(--vidro-a); border: 1px solid var(--linha); border-radius: 10px;
+  padding: 7px 10px; box-shadow: var(--sombra-2); pointer-events: none;
+}
+.v2 .db-tip .tl { font-size: 10px; color: var(--txt-3); text-transform: uppercase; letter-spacing: .05em; }
+.v2 .db-tip .tv { font-size: 13px; font-weight: 600; color: var(--txt); margin-top: 3px; }
+
+/* o Recharts injeta seu próprio foco/outline no wrapper — some com ele */
+.v2 .db-pg .recharts-wrapper:focus,
+.v2 .db-pg .recharts-surface:focus { outline: none; }
+
+/* --- MODO LEVE: sem sombra pesada no tooltip (blur/grão já saem por token) --- */
+:root[data-perf="lite"] .v2 .db-tip { box-shadow: none; background: var(--base); }
