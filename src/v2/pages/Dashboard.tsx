@@ -170,7 +170,8 @@ function BarrasH({ itens }: { itens: { rot: string; v: number; tag?: string }[] 
       {itens.map((i) => (
         <div className="lin" key={i.rot}>
           <span className="rot" title={i.rot}>
-            {i.rot}{i.tag && <b className="db-tag">{i.tag}</b>}
+            <span className="tx">{i.rot}</span>
+            {i.tag && <b className="db-tag">{i.tag}</b>}
           </span>
           <div className="trilho">
             <i style={{ width: `${Math.max(2, (i.v / max) * 100)}%` }} />
@@ -467,7 +468,9 @@ export default function DashboardV2() {
               ) : (
                 <div style={{ height: 168 }}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={d.picos_hora} margin={{ top: 4, right: 2, left: -26, bottom: 0 }}>
+                    {/* left quase zero: margem negativa come a largura reservada do
+                        YAxis e decepa o rótulo (120 aparecia como "0"). */}
+                    <BarChart data={d.picos_hora} margin={{ top: 4, right: 2, left: -6, bottom: 0 }}>
                       <XAxis dataKey="hora" tick={eixo} tickLine={false} axisLine={{ stroke: tinta(p, 0.09) }}
                         interval={3} tickFormatter={(h) => `${h}h`} />
                       <YAxis tick={eixo} tickLine={false} axisLine={false} allowDecimals={false} width={42} />
