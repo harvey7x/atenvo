@@ -331,6 +331,14 @@ async function processarSessao(admin: Admin, sessao: Sessao, canal: Record<strin
       await evento(admin, sessao, 'sem_api_key', {});
       return;
     }
+    // QUOTA do Google esgotada (429 "check your plan and billing"): não é defeito nosso nem do
+    // cliente — resolve com o tempo (reset diário) ou upgrade de tier da chave. Espera 10min sem
+    // queimar o contador de falhas técnicas.
+    if (msg.includes('gemini 429')) {
+      await admin.from('ia_sessoes').update({ processar_apos: new Date(Date.now() + 10 * 60_000).toISOString() }).eq('id', sessao.id).eq('status', 'ativa');
+      await evento(admin, sessao, 'quota_gemini', {});
+      return;
+    }
     // FALHA TÉCNICA (modelo/API/interna): NÃO fala com o cliente, NÃO conta tentativas_erro.
     if (!(e instanceof FalhaTecnica)) await evento(admin, sessao, 'erro_turno', { erro: msg });
     // dados FRESCOS: o turno pode ter gravado estado no meio (ex.: analise_concluida) — mesclar
@@ -1235,7 +1243,7 @@ async function geminiSessao(ctx: Ctx, finalidade: string, p: {
   } catch (e) {
     const msg = String((e as Error)?.message ?? '');
     if (msg.includes('sem_api_key')) throw e;
-    await evento(ctx.admin, ctx.sessao, 'gemini_erro', { canal_id: ctx.sessao.canal_id, finalidade, erro: msg.slice(0, 240) });
+    await evento(ctx.admin, ctx.sessao, 'gemini_erro', { canal_id: ctx.sessao.canal_id, finalidade, erro: msg.slice(0, 450) });
     throw new FalhaTecnica(`${finalidade}: ${msg.slice(0, 200)}`);
   }
 }
