@@ -14,7 +14,7 @@ import {
 } from '@/data/kanban';
 import { useBuscaContatos, type ContatoRow } from '@/data/contatos';
 import { useEtiquetas, useOrgUsuarios } from '@/data/atendimento';
-import { useFichasStatusDeOportunidades } from '@/data/fichaJudicial';
+import { useFichasStatusDeOportunidades, fichaDemoDaOportunidade } from '@/data/fichaJudicial';
 import { useSlaAlertas } from '@/data/sla';
 import { indexPorChave, type SlaAlerta, type SlaTipo } from '@/data/slaView';
 import { corDaEtiqueta, type Etiqueta } from '@/types/atendimento';
@@ -1915,7 +1915,7 @@ function DetalheModalV2({ demo, l, colunas, eventosDemo, fichaDemoStatus, aoFech
       <DetRow l="Atualizado em" v={fmtDataHora(l.atualizadoEm)} />
 
       <div className="kd-ficha">
-        {demo ? (
+        {demo && !fichaDemoDaOportunidade(l.id) ? (
           <div className="fjb">
             <div className="fjb-h">Ficha judicial</div>
             {fichaDemoStatus ? (

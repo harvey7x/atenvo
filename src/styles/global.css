@@ -257,6 +257,8 @@ select.ctrl{cursor:pointer;appearance:none;background-image:url("data:image/svg+
 .toast{background:var(--ink);color:#fff;font-size:13px;font-weight:500;padding:10px 16px;border-radius:10px;box-shadow:var(--shadow-pop);display:flex;align-items:center;gap:9px;opacity:0;transform:translateY(8px);transition:opacity .2s,transform .2s}
 [data-theme="dark"] .toast{background:#22324a;border:1px solid var(--line-2)}
 .toast.show{opacity:1;transform:none}.toast svg{width:16px;height:16px;color:var(--accent)}
+/* link de acao no toast (ex.: "Abrir planilha") — herda o branco do pill, sublinhado */
+.toast a{color:inherit;font-weight:600;text-decoration:underline;text-underline-offset:2px;white-space:nowrap}
 
 .center-screen{min-height:100dvh;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:14px}
 

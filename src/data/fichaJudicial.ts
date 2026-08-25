@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured, isDemoMode } from '@/lib/supabase';
+import { DEMO_MODE, acaoSimulada } from '@/lib/demo';
 import { useOrg } from '@/context/OrgContext';
 
 export const FICHA_REAL = isSupabaseConfigured && !!supabase;
@@ -40,6 +41,9 @@ export interface FichaJudicial {
   bancoCodigo: string; bancoNome: string; valorBeneficio: number | null; dataConsulta: string | null;
   revisoes: FichaRevisao[]; parserVersion: string;
   criadoEm: string; atualizadoEm: string; finalizadaEm: string | null;
+  senhaInss: string;
+  /** Carimbo do envio à planilha CONTROLE CLIENTES AGENDADOS (edge function enviar-planilha). */
+  planilhaEnviadaEm: string | null; planilhaLinha: number | null;
 }
 
 /** Campos de snapshot/edição (camelCase). Vínculos só na criação. */
@@ -49,6 +53,7 @@ export interface FichaSnapshot {
   beneficioNumero?: string; especieCodigo?: string; especieDescricao?: string; tipoBeneficio?: FichaTipoBeneficio | null;
   bancoCodigo?: string; bancoNome?: string; valorBeneficio?: number | null; dataConsulta?: string | null;
   textoOriginal?: string; textoFicha?: string; revisoes?: FichaRevisao[]; parserVersion?: string;
+  senhaInss?: string;
 }
 
 export interface FichaVinculos {
@@ -79,10 +84,12 @@ function mapFicha(r: Record<string, unknown>): FichaJudicial {
     bancoCodigo: (r.banco_codigo as string) || '', bancoNome: (r.banco_nome as string) || '', valorBeneficio: (r.valor_beneficio as number) ?? null,
     dataConsulta: (r.data_consulta as string) ?? null, revisoes, parserVersion: (r.parser_version as string) || '',
     criadoEm: (r.criado_em as string) || '', atualizadoEm: (r.atualizado_em as string) || '', finalizadaEm: (r.finalizada_em as string) ?? null,
+    senhaInss: (r.senha_inss as string) || '',
+    planilhaEnviadaEm: (r.planilha_enviada_em as string) ?? null, planilhaLinha: (r.planilha_linha as number) ?? null,
   };
 }
 
-const SELECT = 'id, organizacao_id, contato_id, oportunidade_id, conversa_id, canal_id, responsavel_id, criado_por, versao, ficha_anterior_id, status, texto_original, texto_ficha, nome, cpf, cidade, uf, telefone, email, rg, estado_civil, nascimento, idade_informada, beneficio_numero, especie_codigo, especie_descricao, tipo_beneficio, banco_codigo, banco_nome, valor_beneficio, data_consulta, revisoes, parser_version, criado_em, atualizado_em, finalizada_em, responsavel:usuarios!fk_ficha_resp(nome), criador:usuarios!fk_ficha_criadopor(nome)';
+const SELECT = 'id, organizacao_id, contato_id, oportunidade_id, conversa_id, canal_id, responsavel_id, criado_por, versao, ficha_anterior_id, status, texto_original, texto_ficha, nome, cpf, cidade, uf, telefone, email, rg, estado_civil, nascimento, idade_informada, beneficio_numero, especie_codigo, especie_descricao, tipo_beneficio, banco_codigo, banco_nome, valor_beneficio, data_consulta, revisoes, parser_version, criado_em, atualizado_em, finalizada_em, senha_inss, planilha_enviada_em, planilha_linha, responsavel:usuarios!fk_ficha_resp(nome), criador:usuarios!fk_ficha_criadopor(nome)';
 
 function snapshotParaDb(s: FichaSnapshot): Record<string, unknown> {
   const p: Record<string, unknown> = {};
@@ -108,7 +115,32 @@ function snapshotParaDb(s: FichaSnapshot): Record<string, unknown> {
   if (s.textoFicha !== undefined) p.texto_ficha = s.textoFicha || null;
   if (s.revisoes !== undefined) p.revisoes = s.revisoes;
   if (s.parserVersion !== undefined) p.parser_version = s.parserVersion || null;
+  if (s.senhaInss !== undefined) p.senha_inss = s.senhaInss || null;
   return p;
+}
+
+/* ---------- modo demonstração (porto demo, sem backend): ficha seed em memória ----------
+   Espelha o seed do Kanban v2 (kl-5 = ficha finalizada). Permite demonstrar a ficha e o
+   envio à planilha sem Supabase; o envio real é bloqueado fora daqui (DEMO_MODE/backend). */
+const FICHA_DEMO_KL5: FichaJudicial = {
+  id: 'kf-demo-5', organizacaoId: 'org_demo', contatoId: 'kct-5', oportunidadeId: 'kl-5',
+  conversaId: null, canalId: null, responsavelId: 'u-mock', responsavelNome: 'Juliana',
+  criadoPor: 'u-mock', criadoPorNome: 'Juliana', versao: 1, fichaAnteriorId: null,
+  status: 'finalizada', textoOriginal: '', textoFicha: 'FICHA JUDICIAL — DEMONSTRAÇÃO',
+  nome: 'ANTÔNIO PEREIRA LIMA', cpf: '00312345678', cidade: 'Porto Alegre', uf: 'RS',
+  telefone: '5551999884477', email: '', rg: '1098765432', estadoCivil: 'Casado',
+  nascimento: '1957-03-14', idadeInformada: 69,
+  beneficioNumero: '178.456.789-0', especieCodigo: '42', especieDescricao: 'Aposentadoria por tempo de contribuição',
+  tipoBeneficio: 'aposentadoria', bancoCodigo: '623', bancoNome: 'Banco Pan', valorBeneficio: 2412.35,
+  dataConsulta: '2026-08-21', revisoes: [], parserVersion: 'demo',
+  criadoEm: '2026-08-21T14:00:00Z', atualizadoEm: '2026-08-21T14:40:00Z', finalizadaEm: '2026-08-21T14:40:00Z',
+  senhaInss: 'Demo!2026', planilhaEnviadaEm: null, planilhaLinha: null,
+};
+const DEMO_FICHAS: Record<string, FichaJudicial> = { 'kl-5': FICHA_DEMO_KL5 };
+
+/** Ficha seed do modo demonstração para a oportunidade (null fora do demo). */
+export function fichaDemoDaOportunidade(oportunidadeId: string | null | undefined): FichaJudicial | null {
+  return (isDemoMode && oportunidadeId && DEMO_FICHAS[oportunidadeId]) || null;
 }
 
 export function useFichasDaOportunidade(oportunidadeId: string | null) {
@@ -116,8 +148,9 @@ export function useFichasDaOportunidade(oportunidadeId: string | null) {
   const org = currentOrg.id;
   return useQuery({
     queryKey: ['fichas-oportunidade', org, oportunidadeId],
-    enabled: FICHA_REAL && !!oportunidadeId,
+    enabled: (FICHA_REAL || isDemoMode) && !!oportunidadeId,
     queryFn: async (): Promise<FichaJudicial[]> => {
+      if (!FICHA_REAL) { const f = DEMO_FICHAS[oportunidadeId!]; return f ? [f] : []; }
       const { data, error } = await supabase!.from('fichas_judiciais').select(SELECT)
         .eq('organizacao_id', org).eq('oportunidade_id', oportunidadeId!).order('versao', { ascending: false });
       if (error) throw new Error(error.message);
@@ -190,6 +223,63 @@ export function useCriarFichaJudicial() {
   });
 }
 
+/* ---------- envio à planilha CONTROLE CLIENTES AGENDADOS ---------- */
+
+export interface EnvioPlanilha {
+  ficha: FichaJudicial;
+  cliente: string; cpf: string; senhaInss: string; numero: string; trafego: string; responsavel: string;
+}
+export interface EnvioPlanilhaResultado { acao: 'criado' | 'atualizado'; linha: number | null; aviso?: string }
+
+/** Chama a edge function enviar-planilha e atualiza o estado local da ficha
+ *  (carimbo planilha_enviada_em/planilha_linha) sem exigir recarregar. */
+export function useEnviarFichaPlanilha() {
+  const qc = useQueryClient();
+  const { currentOrg } = useOrg();
+  return useMutation({
+    mutationFn: async (p: EnvioPlanilha): Promise<EnvioPlanilhaResultado> => {
+      if (!FICHA_REAL) {
+        // porto demo (sem backend): simula a ponte e carimba o seed em memória
+        await new Promise((r) => setTimeout(r, 700));
+        const seed = p.ficha.oportunidadeId ? DEMO_FICHAS[p.ficha.oportunidadeId] : null;
+        const acao = seed?.planilhaEnviadaEm ? 'atualizado' as const : 'criado' as const;
+        if (seed && p.ficha.oportunidadeId) {
+          DEMO_FICHAS[p.ficha.oportunidadeId] = { ...seed, senhaInss: p.senhaInss || seed.senhaInss, planilhaEnviadaEm: new Date().toISOString(), planilhaLinha: 402 };
+        }
+        return { acao, linha: 402 };
+      }
+      if (DEMO_MODE) throw acaoSimulada(); // site demo: planilha real nunca é tocada
+      const { data, error } = await supabase!.functions.invoke('enviar-planilha', {
+        body: {
+          ficha_id: p.ficha.id, cliente: p.cliente, cpf: p.cpf, senha_inss: p.senhaInss,
+          numero: p.numero, trafego: p.trafego, responsavel: p.responsavel,
+        },
+      });
+      if (error) {
+        let msg = error.message;
+        // supabase-js não parseia o corpo em respostas non-2xx; lê o erro real do Response.
+        const ctx = (error as { context?: Response }).context;
+        if (ctx && typeof ctx.json === 'function') {
+          try { const b = await ctx.clone().json() as { erro?: string; error?: string }; msg = b?.erro || b?.error || msg; } catch { /* mantém msg */ }
+        }
+        throw new Error(msg);
+      }
+      const r = data as { ok?: boolean; acao?: string; linha?: number | null; erro?: string; aviso?: string } | null;
+      if (!r?.ok) throw new Error(r?.erro || 'Falha ao enviar à planilha.');
+      return { acao: r.acao === 'atualizado' ? 'atualizado' : 'criado', linha: r.linha ?? null, aviso: r.aviso };
+    },
+    onSuccess: (res, p) => {
+      // atualização local imediata (o botão vira "Atualizar na planilha" sem recarregar)
+      const patch = (f: FichaJudicial): FichaJudicial => f.id !== p.ficha.id ? f
+        : { ...f, senhaInss: p.senhaInss || f.senhaInss, planilhaEnviadaEm: new Date().toISOString(), planilhaLinha: res.linha };
+      qc.setQueryData<FichaJudicial[]>(['fichas-oportunidade', currentOrg.id, p.ficha.oportunidadeId], (fs) => fs?.map(patch));
+      qc.setQueryData<FichaJudicial | null>(['ficha', currentOrg.id, p.ficha.id], (f) => (f ? patch(f) : f));
+      qc.invalidateQueries({ queryKey: ['fichas-oportunidade', currentOrg.id, p.ficha.oportunidadeId] });
+      qc.invalidateQueries({ queryKey: ['ficha', currentOrg.id, p.ficha.id] });
+    },
+  });
+}
+
 export function useAtualizarFichaJudicial() {
   const invalidar = useInvalidar();
   return useMutation({
@@ -234,6 +324,7 @@ export function useCriarNovaVersaoFicha() {
           tipoBeneficio: anterior.tipoBeneficio, bancoCodigo: anterior.bancoCodigo, bancoNome: anterior.bancoNome,
           valorBeneficio: anterior.valorBeneficio, dataConsulta: anterior.dataConsulta, textoOriginal: anterior.textoOriginal,
           textoFicha: anterior.textoFicha, revisoes: anterior.revisoes, parserVersion: anterior.parserVersion,
+          senhaInss: anterior.senhaInss,
         }),
       };
       const { data, error } = await supabase!.from('fichas_judiciais').insert(payload).select(SELECT).single();

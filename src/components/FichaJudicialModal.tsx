@@ -39,16 +39,18 @@ interface Props {
 // IDADE não é campo de formulário: é sempre calculada (nascimento × data da ficha).
 type Form = {
   nome: string; cpf: string; cidade: string; uf: string; telefone: string; email: string; rg: string; estadoCivil: string;
+  senhaInss: string;
   nascimento: string;
   beneficioNumero: string; especieCodigo: string; especieDescricao: string; tipoBeneficio: '' | FichaTipoBeneficio;
   bancoCodigo: string; bancoNome: string; valorBeneficio: string; dataConsulta: string;
   responsavelId: string;
 };
-const FORM0: Form = { nome: '', cpf: '', cidade: '', uf: '', telefone: '', email: '', rg: '', estadoCivil: '', nascimento: '', beneficioNumero: '', especieCodigo: '', especieDescricao: '', tipoBeneficio: '', bancoCodigo: '', bancoNome: '', valorBeneficio: '', dataConsulta: '', responsavelId: '' };
+const FORM0: Form = { nome: '', cpf: '', cidade: '', uf: '', telefone: '', email: '', rg: '', estadoCivil: '', senhaInss: '', nascimento: '', beneficioNumero: '', especieCodigo: '', especieDescricao: '', tipoBeneficio: '', bancoCodigo: '', bancoNome: '', valorBeneficio: '', dataConsulta: '', responsavelId: '' };
 
 function fichaParaForm(f: FichaJudicial): Form {
   return {
     nome: f.nome, cpf: f.cpf, cidade: f.cidade, uf: f.uf, telefone: f.telefone, email: f.email, rg: f.rg, estadoCivil: f.estadoCivil,
+    senhaInss: f.senhaInss,
     nascimento: isoParaInput(f.nascimento),
     beneficioNumero: f.beneficioNumero, especieCodigo: f.especieCodigo, especieDescricao: f.especieDescricao, tipoBeneficio: f.tipoBeneficio ?? '',
     bancoCodigo: f.bancoCodigo, bancoNome: f.bancoNome, valorBeneficio: f.valorBeneficio != null ? String(f.valorBeneficio).replace('.', ',') : '',
@@ -111,7 +113,7 @@ export function FichaJudicialModal({ open, onClose, vinculos, fichaInicial, modo
     setTextoOriginal(r.textoSanitizado);
     const novo: Form = {
       ...FORM0,
-      rg: form.rg, estadoCivil: form.estadoCivil,               // manuais: preservados
+      rg: form.rg, estadoCivil: form.estadoCivil, senhaInss: form.senhaInss, // manuais: preservados
       responsavelId: form.responsavelId || (responsavelSugerido?.id ?? ''),
     };
     novo.nome = (r.nome ?? '').toUpperCase(); novo.cpf = r.cpf ?? ''; novo.cidade = r.cidade ?? ''; novo.uf = r.uf ?? '';
@@ -189,6 +191,7 @@ export function FichaJudicialModal({ open, onClose, vinculos, fichaInicial, modo
   function montarSnapshot(): FichaSnapshot {
     return {
       nome: form.nome, cpf: form.cpf, cidade: form.cidade, uf: form.uf, telefone: somenteDigitos(form.telefone), email: form.email, rg: form.rg, estadoCivil: form.estadoCivil,
+      senhaInss: form.senhaInss,
       nascimento: form.nascimento || null, idadeInformada: idadeCalc ?? null,
       beneficioNumero: form.beneficioNumero, especieCodigo: form.especieCodigo, especieDescricao: form.especieDescricao, tipoBeneficio: form.tipoBeneficio || null,
       bancoCodigo: form.bancoCodigo, bancoNome: form.bancoNome, valorBeneficio: parseMoedaBRL(form.valorBeneficio) ?? null, dataConsulta: form.dataConsulta || null,
@@ -350,6 +353,7 @@ export function FichaJudicialModal({ open, onClose, vinculos, fichaInicial, modo
               {campo('UF', <input className="atv-input" maxLength={2} value={form.uf} onChange={(e) => setF({ uf: e.target.value.toUpperCase() })} disabled={readOnly} />, ind('uf'))}
               {campo('Telefone', <input className="atv-input" value={form.telefone} onChange={(e) => setF({ telefone: e.target.value })} disabled={readOnly} title="Vem do contato/conversa do Atenvo — o número do Promosys nunca é usado" />, form.telefone.trim() ? <span className="fj-ind ok">Do contato</span> : <span className="fj-ind warn">Sem telefone</span>)}
               {campo('E-mail', <input className="atv-input" value={form.email} onChange={(e) => setF({ email: e.target.value })} disabled={readOnly} />, ind('email'))}
+              {campo('Senha Meu INSS', <input className="atv-input" value={form.senhaInss} onChange={(e) => setF({ senhaInss: e.target.value })} disabled={readOnly} autoComplete="off" />)}
               {campo('RG', <input className="atv-input" value={form.rg} onChange={(e) => setF({ rg: e.target.value })} disabled={readOnly} />)}
               {campo('Estado civil', <input className="atv-input" value={form.estadoCivil} onChange={(e) => setF({ estadoCivil: e.target.value })} disabled={readOnly} />)}
             </div>

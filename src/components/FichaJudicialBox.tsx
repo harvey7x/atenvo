@@ -4,6 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/useToast';
 import { useFichasDaOportunidade, useCriarNovaVersaoFicha, type FichaJudicial } from '@/data/fichaJudicial';
 import { FichaJudicialModal } from '@/components/FichaJudicialModal';
+import { EnviarPlanilhaModal } from '@/components/EnviarPlanilhaModal';
 import './FichaJudicialModal.css';
 
 const fmtBRL = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
@@ -26,6 +27,7 @@ export function FichaJudicialBox({ contatoId, oportunidadeId, conversaId, canalI
   const fichasQ = useFichasDaOportunidade(oportunidadeId);
   const novaVersao = useCriarNovaVersaoFicha();
   const [modal, setModal] = useState<{ modo: 'novo' | 'continuar' | 'visualizar'; ficha: FichaJudicial | null } | null>(null);
+  const [planilhaDe, setPlanilhaDe] = useState<string | null>(null); // id da ficha no modal de envio à planilha
 
   if (!contatoId) {
     return <div className="fjb"><div className="fjb-h">Ficha judicial</div><div className="fjb-info">Vincule um contato à oportunidade para gerar a ficha.</div></div>;
@@ -34,6 +36,7 @@ export function FichaJudicialBox({ contatoId, oportunidadeId, conversaId, canalI
   const fichas = fichasQ.data ?? [];
   const rascunho = fichas.find((f) => f.status === 'rascunho') ?? null;
   const finalizada = fichas.find((f) => f.status === 'finalizada') ?? null;
+  const fichaPlanilha = planilhaDe ? fichas.find((f) => f.id === planilhaDe) ?? null : null;
 
   const vinculos = { organizacaoId: currentOrg.id, contatoId, oportunidadeId, conversaId: conversaId ?? null, canalId: canalId ?? null };
 
@@ -66,14 +69,17 @@ export function FichaJudicialBox({ contatoId, oportunidadeId, conversaId, canalI
         </div>
       ) : rascunho ? (
         <div className="fjb-card">
-          <div><span className="fjb-tag rascunho">Rascunho · v{rascunho.versao}</span></div>
+          <div><span className="fjb-tag rascunho">Rascunho · v{rascunho.versao}</span>{rascunho.planilhaEnviadaEm && <span className="fjb-planilha">Na planilha · linha {rascunho.planilhaLinha ?? '—'}</span>}</div>
           <div className="fjb-row"><span className="fjb-l">Atualizada</span><span className="fjb-v">{dataBR(rascunho.atualizadoEm) || '—'}</span></div>
           <div className="fjb-row"><span className="fjb-l">Gerente</span><span className="fjb-v">{rascunho.responsavelNome || 'Não atribuído'}</span></div>
-          <div className="fjb-acts"><button className="fjb-btn primary" onClick={() => setModal({ modo: 'continuar', ficha: rascunho })}>Continuar ficha</button></div>
+          <div className="fjb-acts">
+            <button className="fjb-btn" onClick={() => setPlanilhaDe(rascunho.id)}>{rascunho.planilhaEnviadaEm ? 'Atualizar na planilha' : 'Enviar pra planilha'}</button>
+            <button className="fjb-btn primary" onClick={() => setModal({ modo: 'continuar', ficha: rascunho })}>Continuar ficha</button>
+          </div>
         </div>
       ) : finalizada ? (
         <div className="fjb-card">
-          <div><span className="fjb-tag finalizada">Finalizada · v{finalizada.versao}</span></div>
+          <div><span className="fjb-tag finalizada">Finalizada · v{finalizada.versao}</span>{finalizada.planilhaEnviadaEm && <span className="fjb-planilha">Na planilha · linha {finalizada.planilhaLinha ?? '—'}</span>}</div>
           <div className="fjb-row"><span className="fjb-l">Data</span><span className="fjb-v">{dataBR(finalizada.dataConsulta) || dataBR(finalizada.finalizadaEm) || '—'}</span></div>
           {finalizada.beneficioNumero && <div className="fjb-row"><span className="fjb-l">Benefício</span><span className="fjb-v">{finalizada.beneficioNumero}</span></div>}
           {(finalizada.especieCodigo || finalizada.especieDescricao) && <div className="fjb-row"><span className="fjb-l">Espécie</span><span className="fjb-v">{[finalizada.especieCodigo, finalizada.especieDescricao].filter(Boolean).join(' - ')}</span></div>}
@@ -83,6 +89,7 @@ export function FichaJudicialBox({ contatoId, oportunidadeId, conversaId, canalI
           <div className="fjb-acts">
             <button className="fjb-btn" onClick={() => setModal({ modo: 'visualizar', ficha: finalizada })}>Visualizar</button>
             <button className="fjb-btn" onClick={() => copiar(finalizada)}>Copiar</button>
+            <button className="fjb-btn" onClick={() => setPlanilhaDe(finalizada.id)}>{finalizada.planilhaEnviadaEm ? 'Atualizar na planilha' : 'Enviar pra planilha'}</button>
             <button className="fjb-btn primary" onClick={() => criarNova(finalizada)} disabled={novaVersao.isPending}>Criar nova versão</button>
           </div>
         </div>
@@ -107,6 +114,10 @@ export function FichaJudicialBox({ contatoId, oportunidadeId, conversaId, canalI
           contatoAtual={contatoAtual}
           oportunidadeAtual={oportunidadeAtual}
         />
+      )}
+
+      {fichaPlanilha && (
+        <EnviarPlanilhaModal open onClose={() => setPlanilhaDe(null)} ficha={fichaPlanilha} />
       )}
     </div>
   );
