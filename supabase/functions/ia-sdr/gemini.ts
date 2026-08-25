@@ -68,13 +68,13 @@ export async function chamarGeminiJson(modelo: string, p: {
     throw new Error(ctrl.signal.aborted ? 'timeout_gemini' : `fetch failed: ${String((e as Error)?.message ?? '').slice(0, 120)}`);
   } finally { clearTimeout(t); }
   if (!res.ok && res.status === 400 && tentaSemPensar) {
-    const corpo = await res.text();
-    if (/thinking|thought/i.test(corpo)) {
-      // modelo não aceita thinkingConfig: desliga pra sempre nesta instância e refaz UMA vez
-      thinkingConfigSuportado = false;
-      return chamarGeminiJson(modelo, { ...p, semPensar: false });
-    }
-    throw new Error(`gemini 400: ${corpo.slice(0, 500)}`);
+    // 400 com thinkingConfig no request: o corpo costuma ser GENÉRICO ("invalid argument", sem
+    // citar thinking) — foi o que derrubou a extração no teste de 25/08. Refaz SEMPRE sem o
+    // thinkingConfig; se aí funcionar, o campo era o problema e fica desligado pra sempre.
+    await res.text().catch(() => '');   // drena o body
+    const semThinking = await chamarGeminiJson(modelo, { ...p, semPensar: false });
+    thinkingConfigSuportado = false;
+    return semThinking;
   }
   if (!res.ok) throw new Error(`gemini ${res.status}: ${(await res.text()).slice(0, 500)}`);
   const data = await res.json();

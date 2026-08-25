@@ -128,6 +128,8 @@ Deno.serve(async (req) => {
 
     // ---- diag de deploy: valida o modelo efetivo com uma chamada mínima (sem tocar em sessão) ----
     if (body.diag === 'gemini') return await diagGemini(admin, body.canal_id ?? null);
+    // diag do CAMINHO DE EXTRAÇÃO (schema do lote + imagem + semPensar) — o que 400ou em 25/08
+    if (body.diag === 'extracao') return await diagExtracao(admin, body.canal_id ?? null);
 
     const inicio = Date.now();
     const dono = crypto.randomUUID();   // identidade desta invocação p/ a lease de canal
@@ -213,6 +215,26 @@ async function diagGemini(admin: Admin, canalId: string | null): Promise<Respons
     return json({ ok: true, modelo: modeloUsado, atualizado_de: atualizadoDe ?? null, tokens: [r.tokensIn, r.tokensOut], resposta: r.json });
   } catch (e) {
     return json({ ok: false, modelo_tentado: modelos.chat, erro: String((e as Error)?.message ?? '').slice(0, 400) });
+  }
+}
+
+async function diagExtracao(admin: Admin, canalId: string | null): Promise<Response> {
+  const q = admin.from('bot_canal_config').select('canal_id, ia_config').eq('ia_enabled', true);
+  const { data: cfgs } = canalId ? await q.eq('canal_id', canalId) : await q.limit(1);
+  const cfg = cfgs?.[0];
+  if (!cfg) return json({ ok: false, erro: 'nenhum canal com ia_enabled' });
+  const modelos = resolverModelos((cfg.ia_config ?? {}) as Record<string, unknown>);
+  // PNG 1x1 — o teste é do REQUEST (schema+imagem+thinkingConfig), não da leitura em si
+  const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  try {
+    const { r, modeloUsado } = await chamarComRecuperacao(admin, cfg.canal_id, modelos, 'chat', {
+      system: PROMPT_LOTE_COLETA,
+      partes: [{ inline_data: { mime_type: 'image/png', data: png } }, { text: 'É 1 imagem de teste. Extraia no JSON pedido.' }],
+      schema: SCHEMA_LOTE_COLETA, temperatura: 0, maxTokens: 4096, semPensar: true,
+    });
+    return json({ ok: true, modelo: modeloUsado, tokens: [r.tokensIn, r.tokensOut], resposta: r.json });
+  } catch (e) {
+    return json({ ok: false, modelo_tentado: modelos.chat, erro: String((e as Error)?.message ?? '').slice(0, 500) });
   }
 }
 
@@ -316,7 +338,29 @@ async function processarSessao(admin: Admin, sessao: Sessao, canal: Record<strin
     const { data: freshRow } = await admin.from('ia_sessoes').select('dados').eq('id', sessao.id).maybeSingle();
     const dadosAtuais = ((freshRow?.dados ?? sessao.dados ?? {}) as Record<string, unknown>);
     const falhas = (Number((dadosAtuais as { falhas_tecnicas?: number }).falhas_tecnicas) || 0) + 1;
-    if (falhas >= MAX_FALHAS_TECNICAS) {
+    const ehExtracao = /^(extracao|analise_|storage_)/.test(msg);
+    if (falhas >= MAX_FALHAS_TECNICAS && ehExtracao) {
+      // Só a LEITURA DE ARQUIVO está quebrada — o chat continua falando (foi o caso de 25/08:
+      // 400 na extração emudeceu a conversa inteira e o "Por que?" do cliente ficou sem resposta).
+      // Handoff SUAVE: alerta o humano, PULA os arquivos envenenados (senão o turno re-falha pra
+      // sempre) e a IA segue conversando normalmente.
+      const { data: ult } = await admin.from('mensagens').select('id, criado_em')
+        .eq('conversa_id', sessao.conversa_id).eq('direcao', 'entrada')
+        .order('criado_em', { ascending: false }).limit(1).maybeSingle();
+      await criarNotaInterna(admin, sessao,
+        `🤖 IA SDR — a LEITURA de arquivos falhou tecnicamente ${MAX_FALHAS_TECNICAS}x seguidas (erro de API — NÃO é culpa do cliente): um colega precisa conferir os documentos que ele mandou. A IA segue conversando normalmente. Detalhe dos erros: ia_eventos (gemini_erro).`);
+      try {
+        await admin.from('conversas').update({ precisa_humano: true, precisa_humano_motivo: 'falha_leitura_docs', precisa_humano_em: new Date().toISOString() }).eq('id', sessao.conversa_id);
+      } catch { /* nota interna já registra */ }
+      await admin.from('ia_sessoes').update({
+        dados: {
+          ...dadosAtuais, falhas_tecnicas: 0, aguardando_humano: 'falha_leitura_docs',
+          ...(ult ? { processado_ate: ult.criado_em, msgs_vistas: [ult.id] } : {}),
+        },
+        processar_apos: null, atualizado_em: new Date().toISOString(),
+      }).eq('id', sessao.id).eq('status', 'ativa');
+      await evento(admin, sessao, 'chamou_humano', { motivo: 'falha_leitura_docs' });
+    } else if (falhas >= MAX_FALHAS_TECNICAS) {
       await fazerHandoff(admin, sessao, canal, 'falha_tecnica', [MSG_HANDOFF_FINAL],
         `🤖 IA SDR — atendimento entregue ao humano por FALHA TÉCNICA repetida do sistema (modelo/API), na etapa ${sessao.etapa}.\nNÃO foi confusão do cliente — ele estava respondendo normalmente. Últimos erros em ia_eventos (tipo gemini_erro/erro_turno).`);
     } else {
