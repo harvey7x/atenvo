@@ -1448,9 +1448,18 @@ function KanbanCtx({ contatoId, demo, etapa, origem, respNome, lead, aoAvisar }:
   const [funilSel, setFunilSel] = useState('');
   const [addBusy, setAddBusy] = useState(false);
   if (!contatoId) return null;
-  const aberta = demo
-    ? (etapa ? { id: 'demo-opp', funilNome: 'Funil comercial', colunaId: null as string | null, colunaNome: etapa, respNome: respNome ?? '', tipoServico: 'analise_inicial', tipoBeneficio: 'aposentadoria', valor: null, atualizadoEm: '' } : null)
-    : abertaReal;
+  const oppDemo = demo && etapa
+    ? { id: 'demo-opp', funilNome: 'Funil comercial', colunaId: null as string | null, colunaNome: etapa, respNome: respNome ?? '', tipoServico: 'analise_inicial', tipoBeneficio: 'aposentadoria', valor: null, atualizadoEm: '', status: lead.oppStatus === 'ganho' || lead.oppStatus === 'perdido' || lead.oppStatus === 'cancelado' ? lead.oppStatus : 'em_andamento' }
+    : null;
+  const aberta = demo ? (oppDemo?.status === 'em_andamento' ? oppDemo : null) : abertaReal;
+  // Cliente FECHADO não some do painel: sem oportunidade aberta, a fechada mais
+  // recente vira o contexto — é justamente no fecho que a ficha vai pra planilha.
+  const fechada = demo
+    ? (oppDemo && oppDemo.status !== 'em_andamento' ? oppDemo : null)
+    : (abertaReal ? null
+      : (oppsQ.data ?? []).filter((o) => o.status === 'ganho' || o.status === 'perdido' || o.status === 'cancelado')
+        .sort((a, b) => (b.atualizadoEm || '').localeCompare(a.atualizadoEm || ''))[0] ?? null);
+  const opp = aberta ?? fechada;
   // demo com ficha seed (ex.: Antônio, kct-5): renderiza a FichaJudicialBox real —
   // inclui o envio à planilha simulado — no lugar do cartão-placeholder.
   const fichaDemo = demo ? fichaDemoDoContato(contatoId) : null;
@@ -1459,13 +1468,15 @@ function KanbanCtx({ contatoId, demo, etapa, origem, respNome, lead, aoAvisar }:
       <div className="ctx-t">Funil</div>
       {(!demo && oppsQ.isLoading) ? (
         <div className="ctx-nota">Carregando…</div>
-      ) : aberta ? (
+      ) : opp ? (
         <>
-          <div className="cx-l"><span className="k">Funil</span><span className="v">{aberta.funilNome ?? '—'}</span></div>
-          <div className="cx-l"><span className="k">Responsável</span><span className="v">{aberta.respNome || 'Não atribuído'}</span></div>
+          {fechada && <div className="cx-l"><span className="k">Situação</span><span className="v">Fechada · {(fechada.status || '').toUpperCase()}</span></div>}
+          <div className="cx-l"><span className="k">Funil</span><span className="v">{opp.funilNome ?? '—'}</span></div>
+          <div className="cx-l"><span className="k">Responsável</span><span className="v">{opp.respNome || 'Não atribuído'}</span></div>
           <div className="cx-l"><span className="k">Origem</span><span className="v">{origem}</span></div>
-          <div style={{ marginTop: 7 }}>
-            <BotaoMini onClick={() => nav(demo ? '/kanban' : `/kanban?oportunidade=${encodeURIComponent(aberta.id)}`)}>Abrir no Kanban</BotaoMini>
+          <div style={{ marginTop: 7, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <BotaoMini onClick={() => nav(demo ? '/kanban' : `/kanban?oportunidade=${encodeURIComponent(opp.id)}`)}>Abrir no Kanban</BotaoMini>
+            {fechada && <BotaoMini onClick={() => { setFunilSel(funisQ.data?.find((f) => f.padrao)?.id ?? funisQ.data?.[0]?.id ?? ''); setAddAberto(true); }}>Adicionar ao Kanban</BotaoMini>}
           </div>
           {demo && !fichaDemo ? (
             /* representação da ficha no demo — MESMAS classes fjb do componente real (aplica o override Platina) */
@@ -1479,13 +1490,13 @@ function KanbanCtx({ contatoId, demo, etapa, origem, respNome, lead, aoAvisar }:
             </div>
           ) : (
             <div style={{ marginTop: 10 }}>
-              <FichaJudicialBox contatoId={contatoId} oportunidadeId={fichaDemo?.oportunidadeId ?? aberta.id} conversaId={lead.id} canalId={lead.canalId ?? null} contatoAtual={{ nome: lead.name, telefone: lead.phone, email: lead.email }} />
+              <FichaJudicialBox contatoId={contatoId} oportunidadeId={fichaDemo?.oportunidadeId ?? opp.id} conversaId={lead.id} canalId={lead.canalId ?? null} contatoAtual={{ nome: lead.name, telefone: lead.phone, email: lead.email }} />
             </div>
           )}
         </>
       ) : (
         <>
-          <div className="ctx-nota">Sem oportunidade aberta.</div>
+          <div className="ctx-nota">Sem oportunidade no Kanban.</div>
           <div style={{ marginTop: 7 }}><BotaoMini onClick={() => { setFunilSel(funisQ.data?.find((f) => f.padrao)?.id ?? funisQ.data?.[0]?.id ?? ''); setAddAberto(true); }}>Adicionar ao Kanban</BotaoMini></div>
         </>
       )}
