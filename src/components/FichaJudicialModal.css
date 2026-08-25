@@ -76,14 +76,28 @@
 .fj-combo-tag { font-size: 9.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--line-2); border-radius: 999px; padding: 1px 7px; }
 .fj-combo-vazio { font-size: 12px; color: var(--muted); padding: 7px 10px; }
 
-/* ===== Cor da linha na planilha (EnviarPlanilhaModal): verde/âmbar/rubro semânticos ===== */
-.fj-cores { display: flex; align-items: center; gap: 8px; min-height: 36px; }
-.fj-cor { width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--line-2); cursor: pointer; padding: 0; display: inline-flex; align-items: center; justify-content: center; color: #fff; }
-.fj-cor svg { width: 13px; height: 13px; }
-.fj-cor.verde { background: var(--verde, #19c37d); }
-.fj-cor.amarelo { background: var(--ambar, #d97706); }
-.fj-cor.vermelho { background: var(--rubro, #dc2626); }
-.fj-cor:hover:not(:disabled) { transform: translateY(-1px); }
-.fj-cor.sel { box-shadow: 0 0 0 3px var(--ring, rgba(0,0,0,.12)); }
-.fj-cor:disabled { opacity: .55; cursor: default; }
-.fj-cor-rotulo { font-size: 12px; color: var(--muted); }
+/* ===== Cor da linha na planilha (EnviarPlanilhaModal) =====
+   As bolas usam as cores REAIS da planilha (paleta viva padrão do Sheets) e a
+   pré-visualização imita a célula do CLIENTE como ela fica de verdade — clara de
+   propósito nos dois temas, porque retrata a planilha, não a UI. */
+.fj-cores { display: flex; flex-direction: column; gap: 10px; }
+.fj-cor-opcoes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.fj-cor-op { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 38px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--line-2); background: transparent; color: var(--ink); font-family: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; min-width: 0; transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease, background-color .16s ease; }
+.fj-cor-op:hover:not(:disabled) { transform: translateY(-1px); background: var(--hover); }
+.fj-cor-op:focus-visible { outline: 2px solid var(--ring, rgba(25,195,125,.5)); outline-offset: 2px; }
+.fj-cor-op:disabled { opacity: .55; cursor: default; }
+.fj-cor-op.verde { --fj-hex: #00ff00; }
+.fj-cor-op.amarelo { --fj-hex: #ffff00; }
+.fj-cor-op.vermelho { --fj-hex: #ff0000; }
+.fj-cor-op.vermelho .fj-cor-bola { color: #fff; }
+.fj-cor-op.sel { border-color: color-mix(in srgb, var(--fj-hex, #9aa3b2) 55%, var(--line-2)); background: color-mix(in srgb, var(--fj-hex, #9aa3b2) 9%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--fj-hex, #9aa3b2) 40%, transparent), 0 8px 18px -8px color-mix(in srgb, var(--fj-hex, #000) 50%, transparent); }
+.fj-cor-bola { position: relative; width: 18px; height: 18px; border-radius: 50%; flex: none; display: inline-flex; align-items: center; justify-content: center; overflow: hidden; color: rgba(0, 0, 0, .7); background: radial-gradient(130% 130% at 32% 24%, rgba(255, 255, 255, .92), rgba(255, 255, 255, 0) 46%), var(--fj-hex, #fff); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .2), inset 0 -4px 6px rgba(0, 0, 0, .16), 0 1px 2px rgba(0, 0, 0, .25); }
+.fj-cor-bola svg { width: 11px; height: 11px; position: relative; }
+.fj-cor-risco { position: absolute; inset: 0; margin: auto; width: 140%; height: 1.5px; background: #e05d5d; transform: rotate(-45deg); }
+.fj-cor-nome { line-height: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fj-cor-preview { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.fj-cor-celula { display: inline-flex; align-items: stretch; max-width: 100%; width: fit-content; border: 1px solid #c6cdd9; border-radius: 7px; overflow: hidden; background: #fff; box-shadow: 0 1px 3px rgba(15, 23, 42, .14); }
+.fj-cor-celula .num { display: flex; align-items: center; padding: 6px 9px; font-size: 11px; font-weight: 600; color: #5f6368; background: #f1f3f4; border-right: 1px solid #c6cdd9; font-variant-numeric: tabular-nums; }
+.fj-cor-celula .nome { padding: 6px 12px; font-size: 12px; font-weight: 500; color: #202124; background: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: background-color .18s ease; }
+.fj-cor-hint { font-size: 11.5px; color: var(--muted); }
+@media (max-width: 560px) { .fj-cor-opcoes { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

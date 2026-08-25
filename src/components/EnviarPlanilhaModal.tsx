@@ -16,6 +16,15 @@ const PLANILHA_VIEW_URL = 'https://docs.google.com/spreadsheets/d/1Obi1VmELX6bJJ
 const somenteDigitos = (s: string) => s.replace(/\D+/g, '');
 const primeiroNomeMaiusculo = (nome?: string) => ((nome ?? '').trim().split(/\s+/)[0] ?? '').toUpperCase();
 
+/* Cores VIVAS da paleta padrão do Sheets — exatamente as que a equipe pinta na coluna
+   CLIENTE (e as mesmas do Apps Script da ponte). Mudar aqui = mudar lá também. */
+const CORES_LINHA: { valor: CorPlanilha; rotulo: string; hex: string | null }[] = [
+  { valor: '', rotulo: 'Sem cor', hex: null },
+  { valor: 'verde', rotulo: 'Verde', hex: '#00ff00' },
+  { valor: 'amarelo', rotulo: 'Amarelo', hex: '#ffff00' },
+  { valor: 'vermelho', rotulo: 'Vermelho', hex: '#ff0000' },
+];
+
 interface Props {
   open: boolean;
   onClose: () => void;
@@ -61,6 +70,7 @@ export function EnviarPlanilhaModal({ open, onClose, ficha, canalId }: Props) {
   const [cor, setCor] = useState<CorPlanilha>('');
   const [erro, setErro] = useState<string | null>(null);
   const busy = enviar.isPending;
+  const corHex = CORES_LINHA.find((o) => o.valor === cor)?.hex ?? null;
 
   // pré-preenche o Tráfego pelo canal assim que a consulta resolve — mas nunca por
   // cima de algo que o atendente já digitou ou escolheu (tocado).
@@ -135,27 +145,47 @@ export function EnviarPlanilhaModal({ open, onClose, ficha, canalId }: Props) {
             veioDoCanal ? <span className="fj-ind ok">Canal: {canalQ.data?.nomeInterno}</span> : undefined,
           )}
           {campo('Responsável', <input className="atv-input" value={responsavel} onChange={(e) => setResponsavel(e.target.value)} disabled={busy} />)}
-          {campo('Cor na planilha', (
+          <div className="fj-field full">
+            <label className="fj-label">Cor na planilha</label>
             <div className="fj-cores" role="radiogroup" aria-label="Cor da linha na planilha">
-              {(['verde', 'amarelo', 'vermelho'] as const).map((c) => (
-                <button
-                  type="button"
-                  key={c}
-                  className={'fj-cor ' + c + (cor === c ? ' sel' : '')}
-                  role="radio"
-                  aria-checked={cor === c}
-                  title={c.charAt(0).toUpperCase() + c.slice(1)}
-                  onClick={() => setCor((atual) => (atual === c ? '' : c))}
-                  disabled={busy}
-                >
-                  {cor === c && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>}
-                </button>
-              ))}
-              <span className="fj-cor-rotulo">{cor ? cor.charAt(0).toUpperCase() + cor.slice(1) : 'Não altera a cor da linha'}</span>
+              <div className="fj-cor-opcoes">
+                {CORES_LINHA.map((o) => (
+                  <button
+                    type="button"
+                    key={o.rotulo}
+                    className={'fj-cor-op' + (o.valor ? ' ' + o.valor : ' neutra') + (cor === o.valor ? ' sel' : '')}
+                    role="radio"
+                    aria-checked={cor === o.valor}
+                    onClick={() => setCor(o.valor)}
+                    disabled={busy}
+                  >
+                    <span className="fj-cor-bola" aria-hidden="true">
+                      {o.valor === '' ? (
+                        <span className="fj-cor-risco" />
+                      ) : cor === o.valor ? (
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>
+                      ) : null}
+                    </span>
+                    <span className="fj-cor-nome">{o.rotulo}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="fj-cor-preview">
+                <div className="fj-cor-celula" aria-hidden="true">
+                  <span className="num">{ficha.planilhaLinha ?? '+'}</span>
+                  <span className="nome" style={corHex ? { background: corHex } : undefined}>
+                    {(cliente.trim() || 'NOME DO CLIENTE').toUpperCase()}
+                  </span>
+                </div>
+                <span className="fj-cor-hint">
+                  {corHex
+                    ? 'É assim que a célula do cliente vai ficar na planilha.'
+                    : 'Sem cor selecionada — a pintura atual da planilha não muda.'}
+                </span>
+              </div>
             </div>
-          ))}
+          </div>
         </div>
-        {jaEnviada && <div className="fj-obs">Na planilha · linha {ficha.planilhaLinha ?? '—'}</div>}
         {erro && <div className="fj-erro">{erro}</div>}
       </div>
     </Modal>
