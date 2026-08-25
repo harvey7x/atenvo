@@ -98,6 +98,14 @@ Deno.serve(async (req) => {
       try { await admin.from('audit_log').insert({ usuario_id: null, acao: 'bot_runner', entidade: 'conversas', entidade_id: conversaId, dados_depois: { outcome, motivo: motivo ?? null, dry_run: dryRun, ...extra }, organizacao_id: conv.organizacao_id }); } catch { /* log best-effort */ }
     };
 
+    // ---- IA SDR: conversa com ia_sessao (ativa/pausada/handoff/concluída) NÃO é do bot ----
+    // A IA responde pelo worker ia-sdr (cron); pausada/handoff/concluída = humano no comando.
+    // Só 'encerrada' devolve a conversa ao comportamento normal (o fluxo já está em 'fim' e o
+    // motor responde 'fluxo_encerrado' sozinho). Guarda cedo: nada de trabalho nem envio aqui.
+    const { data: sessaoIa } = await admin.from('ia_sessoes')
+      .select('id, status').eq('conversa_id', conversaId).neq('status', 'encerrada').maybeSingle();
+    if (sessaoIa) { await logRunner('bot_ignorado', `ia_sessao_${sessaoIa.status}`); return json({ ok: true, skipped: 'ia_sessao', ia_status: sessaoIa.status }); }
+
     // ---- guardas (antes de qualquer trabalho) ----
     if (estado.pausado) { await logRunner('bot_ignorado', 'ja_pausado'); return json({ ok: true, skipped: 'ja_pausado', motivo: estado.motivo_pausa }); }
     // idempotência: mesmo inbound já processado nesta conversa
@@ -1029,6 +1037,48 @@ async function aplicarEtiquetaBot(admin: any, orgId: string, nome: string, conta
   }
 }
 
+// ======== IA SDR (Fase 1) ========
+// No FECHO do fluxo de mídia, canal com bot_canal_config.ia_enabled=true entrega o lead pra IA
+// SDR (edge ia-sdr, cron 1min) em vez de acionar o alerta "aguardando ligação". Em ia_modo_teste,
+// SÓ cria sessão se o telefone do contato casar com bot_canal_config.numeros_teste por SUFIXO de
+// 8 dígitos (o 9º dígito do Brasil oscila; sufixo-8 casa com e sem ele). Falha aqui NUNCA quebra
+// o fecho: sem sessão => comportamento atual 100% preservado.
+async function criarSessaoIaSdr(
+  admin: any, conversaId: string, conv: any, estado: any, telefone: string | null,
+  logFluxo: (e: string, x?: Record<string, unknown>) => Promise<void>,
+): Promise<boolean> {
+  try {
+    const { data: cfgIa } = await admin.from('bot_canal_config')
+      .select('ia_enabled, ia_modo_teste, numeros_teste').eq('canal_id', conv.canal_id).maybeSingle();
+    if (!cfgIa?.ia_enabled) return false;
+    if (cfgIa.ia_modo_teste) {
+      const suf = (n: string) => n.replace(/\D/g, '').slice(-8);
+      const lista = ((cfgIa.numeros_teste ?? []) as string[]).filter(Boolean);
+      if (!telefone || !lista.some((n) => suf(n).length === 8 && suf(n) === suf(telefone))) return false;
+    }
+    const { data: sess, error } = await admin.from('ia_sessoes').upsert({
+      organizacao_id: conv.organizacao_id, canal_id: conv.canal_id, conversa_id: conversaId,
+      contato_id: conv.contato_id, oportunidade_id: estado?.oportunidade_id ?? null,
+      etapa: 'qualificacao_inss', status: 'ativa', processar_apos: new Date().toISOString(),
+    }, { onConflict: 'conversa_id', ignoreDuplicates: true }).select('id').maybeSingle();
+    if (error) { await logFluxo('ia_sessao_falhou', { erro: String(error.message ?? '').slice(0, 200) }); return false; }
+    const sessaoId = sess?.id ?? null;   // null = já existia sessão desta conversa (conflito): IA segue dona
+    if (sessaoId) {
+      try {
+        await admin.from('ia_eventos').insert({
+          sessao_id: sessaoId, conversa_id: conversaId, organizacao_id: conv.organizacao_id,
+          tipo: 'sessao_criada', detalhe: { canal_id: conv.canal_id },
+        });
+      } catch { /* auditoria best-effort */ }
+    }
+    await logFluxo('ia_sessao_criada', { sessao_id: sessaoId, ja_existia: !sessaoId });
+    return true;
+  } catch (e) {
+    await logFluxo('ia_sessao_falhou', { erro: String((e as Error)?.message ?? '').slice(0, 200) });
+    return false;
+  }
+}
+
 async function tratarComVideo(p: {
   admin: any; conversaId: string; conv: any; canal: any; estado: any; copyVideo: CopyVideo;
   perfil: PerfilMidia;
@@ -1137,13 +1187,23 @@ async function tratarComVideo(p: {
   //      Roda também em dry_run: é decisão de estado, não mensagem ao cliente. ----
   let dadosFecho: Record<string, unknown> = {};
   if (r.acoes?.concluirAnalise) {
+    // ---- IA SDR (Fase 1): canal com bot_canal_config.ia_enabled entrega o PÓS-FECHO pra IA.
+    //      A sessão nasce aqui (etapa qualificacao_inss) e o worker ia-sdr assume a conversa no
+    //      próximo minuto. Com IA assumindo: SEM alerta "aguardando ligação" (o time ligaria no
+    //      meio da coleta) e SEM precisa_humano no roteamento indefinido — todo o resto do fecho
+    //      (etiqueta, roteamento/distribuição, opp qualificada, estado concluído) segue IGUAL.
+    //      Só em envio REAL (dry_run simulado não põe IA falando com gente de verdade). ----
+    const iaAssumiu = !dryRunEfetivo && await criarSessaoIaSdr(admin, conversaId, conv, estado, destino, logFluxo);
+
     // 1) alerta pros atendentes (tipo 'concluido' = "aguardando ligação"; passo ack_cpf).
+    if (!iaAssumiu) {
     try {
       await admin.from('alertas_lead_quente').upsert({
         organizacao_id: conv.organizacao_id, conversa_id: conversaId, contato_id: conv.contato_id,
         passo: 'ack_cpf', abandonado_em: new Date().toISOString(), tipo: 'concluido',
       }, { onConflict: 'conversa_id,tipo', ignoreDuplicates: true });
     } catch (e) { await logFluxo('alerta_falhou', { erro: String((e as Error)?.message ?? '').slice(0, 200) }); }
+    }
 
     // 2) etiqueta no contato (por fluxo: bot-video-v1 / bot-emprestimo-v1)
     await aplicarEtiquetaBot(admin, conv.organizacao_id, perfil.etiqueta, conv.contato_id, null);
@@ -1179,11 +1239,15 @@ async function tratarComVideo(p: {
       dadosFecho = { genero: generoLead, roteamento: 'ja_tinha_dono' };
       await logFluxo('roteou_consultor', { genero: generoLead, ja_tinha_dono: true });
     } else {
-      try {
-        await admin.from('conversas').update({
-          precisa_humano: true, precisa_humano_motivo: 'analise_pronta_contatar_hoje', precisa_humano_em: new Date().toISOString(),
-        }).eq('id', conversaId);
-      } catch { /* best-effort */ }
+      // com IA assumindo, precisa_humano fica APAGADO (o worker ia-sdr não atua em conversa
+      // marcada pra humano); o lead sem dono é coberto pelo cron distribuir-leads-sem-dono.
+      if (!iaAssumiu) {
+        try {
+          await admin.from('conversas').update({
+            precisa_humano: true, precisa_humano_motivo: 'analise_pronta_contatar_hoje', precisa_humano_em: new Date().toISOString(),
+          }).eq('id', conversaId);
+        } catch { /* best-effort */ }
+      }
       dadosFecho = { genero: generoLead, roteamento: 'indefinido' };
       await logFluxo('roteamento_indefinido', { genero: generoLead });
     }
