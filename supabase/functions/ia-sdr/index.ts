@@ -34,7 +34,7 @@ import {
 import { saidaProibida, perguntaDeValores } from './guardrail.ts';
 import {
   PERSONA, INSTRUCAO_ETAPA, EXTRAS_ETAPA, esquemaChat, SCHEMA_REESCRITA,
-  SCHEMA_LOTE_COLETA, PROMPT_LOTE_COLETA, notaAcompanhamento,
+  SCHEMA_LOTE_COLETA, PROMPT_LOTE_COLETA, notaAcompanhamento, instrucaoNudge,
   SCHEMA_EXTRATO, PROMPT_EXTRATO, SCHEMA_ANALISE_CONSIGNADO, PROMPT_ANALISE_CONSIGNADO,
   MSG_HANDOFF_FINAL,
 } from './prompts.ts';
@@ -53,6 +53,10 @@ const ORCAMENTO_MS = 100_000;
 const DEBOUNCE_MS = 8_000;                      // espelha o trigger (fase 1.1: 15s → 8s)
 const REAGENDA_FALHA_MS = 90_000;
 const MAX_FALHAS_TECNICAS = 5;
+// follow-up de reengajamento (escada de 3 toques, pesquisa 25/08): 1º = timing por tipo de etapa
+// (resposta simples 15min; foto 45min; tarefa pela metade 20min; Meu INSS 60min); 2º = ~3h depois
+// mudando o ângulo; 3º = manhã seguinte, porta aberta. Depois: episódio encerrado.
+const NUDGE_MAX = 3;
 
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'content-type, x-ia-secret', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, 'Content-Type': 'application/json' } });
@@ -124,10 +128,21 @@ Deno.serve(async (req) => {
     const { data: wc } = await admin.from('webhook_config').select('secret').eq('chave', 'ia_sdr').maybeSingle();
     if (!wc?.secret || !seguroIgual(secretHeader, wc.secret as string)) return json({ error: 'unauthorized' }, 401);
 
-    const body = await req.json().catch(() => ({})) as { diag?: string; canal_id?: string };
+    const body = await req.json().catch(() => ({})) as { diag?: string; canal_id?: string; modelo?: string };
 
-    // ---- diag de deploy: valida o modelo efetivo com uma chamada mínima (sem tocar em sessão) ----
-    if (body.diag === 'gemini') return await diagGemini(admin, body.canal_id ?? null);
+    // ---- diag de deploy: valida o modelo efetivo (ou um `modelo` explícito) com uma chamada mínima ----
+    if (body.diag === 'gemini') return await diagGemini(admin, body.canal_id ?? null, body.modelo ?? null);
+    // ---- diag: lista os modelos que ESTA chave enxerga (ModelService.ListModels) ----
+    if (body.diag === 'gemini_modelos') {
+      const key = Deno.env.get('GEMINI_API_KEY');
+      if (!key) return json({ ok: false, erro: 'sem_api_key' });
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key=${key}`);
+      const data = await res.json().catch(() => ({}));
+      const modelos = ((data?.models ?? []) as Array<{ name?: string; supportedGenerationMethods?: string[] }>)
+        .filter((m) => (m.supportedGenerationMethods ?? []).includes('generateContent'))
+        .map((m) => String(m.name ?? '').replace(/^models\//, ''));
+      return json({ ok: res.ok, status: res.status, modelos });
+    }
     // diag do CAMINHO DE EXTRAÇÃO (schema do lote + imagem + semPensar) — o que 400ou em 25/08
     if (body.diag === 'extracao') return await diagExtracao(admin, body.canal_id ?? null);
 
@@ -199,12 +214,13 @@ async function chamarComRecuperacao(admin: Admin, canalId: string, modelos: Mode
   }
 }
 
-async function diagGemini(admin: Admin, canalId: string | null): Promise<Response> {
+async function diagGemini(admin: Admin, canalId: string | null, modeloForcado: string | null): Promise<Response> {
   const q = admin.from('bot_canal_config').select('canal_id, ia_config').eq('ia_enabled', true);
   const { data: cfgs } = canalId ? await q.eq('canal_id', canalId) : await q.limit(1);
   const cfg = cfgs?.[0];
   if (!cfg) return json({ ok: false, erro: 'nenhum canal com ia_enabled' });
   const modelos = resolverModelos((cfg.ia_config ?? {}) as Record<string, unknown>);
+  if (modeloForcado) { modelos.chat = modeloForcado; modelos.docs = modeloForcado; }
   try {
     const { r, modeloUsado, atualizadoDe } = await chamarComRecuperacao(admin, cfg.canal_id, modelos, 'chat', {
       system: 'Responda exatamente o JSON pedido.',
@@ -429,7 +445,12 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
   const novas = fetched.filter((m) => !vistas.has(m.id));
   const houveMais = fetched.length >= 25;   // estourou o limit: reagenda já em vez de dormir
 
-  if (!novas.length && dados.abertura_enviada) { await limparAgenda(admin, sessao.id, claimAte); return; }
+  // acordou SEM mensagem nova: ou é hora de NUDGE (lead esfriou no meio do funil) ou volta a dormir
+  const nudgeN = Number(dados.nudge_n ?? 0) || 0;
+  const ehNudge = !novas.length && dados.abertura_enviada === true
+    && !dados.aguardando_humano && sessao.etapa !== 'conclusao'
+    && nudgeN < NUDGE_MAX && dados.nudge_alvo === processadoAte;
+  if (!novas.length && dados.abertura_enviada && !ehNudge) { await limparAgenda(admin, sessao.id, claimAte); return; }
 
   // histórico (~30 mensagens, ordem cronológica) + conjunto de saídas p/ o dedup duro
   const { data: histRaw } = await admin.from('mensagens')
@@ -465,7 +486,16 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
 
   // ---- roda a etapa (etapas antigas de coleta viraram o checklist dinâmico) ----
   let t: Turno;
-  switch (sessao.etapa) {
+  if (ehNudge) {
+    // TURNO DE RETOMADA: o cliente ficou mudo — puxa de volta com leveza, contextual à etapa
+    const mesesN = mesesComprovante();
+    const varsNudge: Record<string, string> = (sessao.etapa === 'coleta_docs' || ['docs_pessoais', 'comprovante_residencia', 'declarante'].includes(sessao.etapa))
+      ? { CHECKLIST: checklistTexto(checklistDe(ctx.docs, ctx.dados, null), ctx.docs, `do mês atual ou do passado (${mesesN[0].rotulo} ou ${mesesN[1].rotulo})`) }
+      : {};
+    const r = await conversar(ctx, { vars: varsNudge, instrucaoExtra: instrucaoNudge(nudgeN + 1) });
+    t = { bolhas: r.mensagens, dadosPatch: { nudge_n: nudgeN + 1 } };
+    await evento(admin, sessao, 'nudge_enviado', { n: nudgeN + 1, etapa: sessao.etapa });
+  } else switch (sessao.etapa) {
     case 'qualificacao_inss': t = await etapaQualificacao(ctx); break;
     case 'coleta_docs':
     case 'docs_pessoais':
@@ -558,7 +588,9 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
   const corteVistas = Date.parse(ultimaNova) - 5_000;
   const msgsVistas = fetched.filter((m) => Date.parse(m.criado_em) > corteVistas).map((m) => m.id).slice(-40);
   const patch: Record<string, unknown> = {
-    dados: { ...dados, ...(t.dadosPatch ?? {}), processado_ate: ultimaNova, msgs_vistas: msgsVistas, abertura_enviada: true, falhas_tecnicas: 0 },
+    // nudge_alvo/nudge_n: mensagem nova do cliente zera o ciclo de retomada; turno de nudge
+    // incrementa via t.dadosPatch (que entra por cima)
+    dados: { ...dados, nudge_alvo: ultimaNova, ...(novas.length ? { nudge_n: 0 } : {}), ...(t.dadosPatch ?? {}), processado_ate: ultimaNova, msgs_vistas: msgsVistas, abertura_enviada: true, falhas_tecnicas: 0 },
     docs: { ...ctx.docs, ...(t.docsPatch ?? {}) },
     atualizado_em: new Date().toISOString(),
   };
@@ -603,7 +635,22 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
       // estourou o limit de novas: tem mensagem esperando — próximo turno JÁ, sem dormir
       await admin.from('ia_sessoes').update({ processar_apos: new Date().toISOString() }).eq('id', sessao.id).eq('status', 'ativa');
     } else {
-      await limparAgenda(admin, sessao.id, claimAte);
+      // agenda a RETOMADA se o lead esfriar (escada: 1º por tipo de etapa, 2º ~3h, 3º manhã
+      // seguinte; depois o episódio encerra). Sem retomada quando: colega já chamado,
+      // pós-conclusão, ou teto de toques atingido.
+      const dadosFinais = patch.dados as Record<string, unknown>;
+      const etapaFinal = (patch.etapa as string) ?? sessao.etapa;
+      const nFinal = Number(dadosFinais.nudge_n ?? 0) || 0;
+      if (!dadosFinais.aguardando_humano && etapaFinal !== 'conclusao' && nFinal < NUDGE_MAX) {
+        let quando: string;
+        if (nFinal === 0) quando = ajustarJanelaNudge(Date.now() + delayNudge1Ms(etapaFinal, patch.docs as Record<string, unknown>) + rand(0, 5 * 60_000));
+        else if (nFinal === 1) quando = ajustarJanelaNudge(Date.now() + 3 * 3_600_000 + rand(0, 20 * 60_000));
+        else quando = proximaManhaNudge();
+        await agendarProximo(admin, sessao.id, claimAte, quando);
+      } else {
+        if (ehNudge && nFinal >= NUDGE_MAX) await evento(admin, sessao, 'nudges_esgotados', { etapa: etapaFinal });
+        await limparAgenda(admin, sessao.id, claimAte);
+      }
     }
   }
 }
@@ -624,28 +671,30 @@ async function etapaQualificacao(ctx: Ctx): Promise<Turno> {
   return { bolhas: r.mensagens, incrementaErro: !abertura, __perguntouValores: r.perguntouValores };
 }
 
-// ---- coleta por CHECKLIST DINÂMICO: identidade F/V + comprovante + e-mail (+ declarante) ----
-interface Checklist { identidadeOk: boolean; comprovanteOk: boolean; emailOk: boolean; declaranteNecessario: boolean; declaranteOk: boolean; completo: boolean }
-function checklistDe(ctx: Ctx, emailNovo: string | null): Checklist {
-  const identidadeOk = !!ctx.docs.doc_pessoal;
-  const comprovanteOk = !!ctx.docs.comprovante;
-  const declaranteNecessario = ctx.dados.declarante_necessario === true;
-  const declaranteOk = !!ctx.docs.declarante_doc;
-  const emailOk = !!(ctx.dados.email || emailNovo);
-  return {
-    identidadeOk, comprovanteOk, emailOk, declaranteNecessario, declaranteOk,
-    completo: identidadeOk && comprovanteOk && emailOk && (!declaranteNecessario || declaranteOk),
-  };
+// ---- coleta por CHECKLIST DINÂMICO: identidade FRENTE+VERSO + comprovante + e-mail ----
+// VALIDAÇÃO LEVE (regra do dono, fase 1.3): só confirmamos O QUE o documento é — nunca DE QUEM é.
+// Nome/CPF extraídos vão pra observação interna; nenhuma comparação bloqueia o cliente.
+interface Checklist { identidadeOk: boolean; comprovanteOk: boolean; emailOk: boolean; completo: boolean }
+function checklistDe(docs: Record<string, unknown>, dados: Record<string, unknown>, emailNovo: string | null): Checklist {
+  const dp = (docs.doc_pessoal ?? {}) as Record<string, unknown>;
+  const identidadeOk = dp.frente === true && dp.verso === true;
+  const comprovanteOk = !!docs.comprovante;
+  const emailOk = !!(dados.email || emailNovo);
+  return { identidadeOk, comprovanteOk, emailOk, completo: identidadeOk && comprovanteOk && emailOk };
 }
-function checklistTexto(c: Checklist, titular: string, meses: string): string {
-  const linha = (ok: boolean, s: string) => `${ok ? '✔ já recebido' : '✖ FALTA'} — ${s}`;
-  const linhas = [
-    linha(c.identidadeOk, 'documento de identidade (RG ou CNH, frente e verso)'),
+function checklistTexto(c: Checklist, docs: Record<string, unknown>, meses: string): string {
+  const dp = (docs.doc_pessoal ?? {}) as Record<string, unknown>;
+  let linhaId: string;
+  if (c.identidadeOk) linhaId = '✔ já recebido — identidade (frente e verso)';
+  else if (dp.frente === true) linhaId = '✖ FALTA só o VERSO da identidade (a frente já chegou ✓)';
+  else if (dp.verso === true) linhaId = '✖ FALTA só a FRENTE da identidade (o verso já chegou ✓)';
+  else linhaId = '✖ FALTA — documento de identidade (RG ou CNH, frente e verso)';
+  const linha = (ok: boolean, sTxt: string) => `${ok ? '✔ já recebido' : '✖ FALTA'} — ${sTxt}`;
+  return [
+    linhaId,
     linha(c.comprovanteOk, `comprovante de residência (${meses})`),
     linha(c.emailOk, 'e-mail do cliente'),
-  ];
-  if (c.declaranteNecessario) linhas.push(linha(c.declaranteOk, `RG/CNH de ${titular} como declarante (a conta de residência está no nome dele/dela)`));
-  return linhas.join('\n');
+  ].join('\n');
 }
 
 async function etapaColetaDocs(ctx: Ctx): Promise<Turno> {
@@ -656,10 +705,6 @@ async function etapaColetaDocs(ctx: Ctx): Promise<Turno> {
   const docsPatch: Record<string, unknown> = {};
   const tent = { ...((ctx.dados.tentativas_item as Record<string, number>) ?? {}) };
   const marcaTentativa = (item: string): number => { tent[item] = (tent[item] ?? 0) + 1; return tent[item]; };
-  // leitura patch-sobre-base: `??` não serve aqui — o reset grava null/false no patch e precisa
-  // VENCER o valor antigo de ctx.dados (null ?? antigo devolveria o antigo)
-  const declPrecisaAtual = () => ('declarante_necessario' in dadosPatch) ? dadosPatch.declarante_necessario === true : ctx.dados.declarante_necessario === true;
-  const titularAtual = () => String((('titular_comprovante' in dadosPatch) ? dadosPatch.titular_comprovante : ctx.dados.titular_comprovante) ?? '');
   const aguardando = !!ctx.dados.aguardando_humano;
 
   // e-mail pode chegar escrito no texto (áudio soletrado fica com o modelo via dados_extraidos)
@@ -669,85 +714,56 @@ async function etapaColetaDocs(ctx: Ctx): Promise<Turno> {
     if (e) { emailNovo = e; break; }
   }
 
-  // ---- valida os arquivos do turno: UMA chamada com TODAS as imagens (frente+verso do mesmo
-  //      documento se COMPLEMENTAM — avaliá-los isolados foi o bug que derrubou o 1º teste) ----
   let idRuim = false, compRuim = false, retomar = false;
   if (ctx.pendentes) notas.push('→ um arquivo do cliente NÃO chegou direito no sistema; peça para reenviar essa foto/arquivo.');
   if (ctx.arquivos.length) {
     const lote = await extrairLoteColeta(ctx);
     if (lote.grandes) notas.push('→ um arquivo veio pesado demais e não abriu; peça como foto normal, tirada da galeria.');
     for (const ident of lote.identidades) {
-      const antesId = !!(ctx.docs.doc_pessoal ?? docsPatch.doc_pessoal);
-      const declPrecisa = declPrecisaAtual();
-      const declOk = !!(ctx.docs.declarante_doc ?? docsPatch.declarante_doc);
-      const nomeDoc = String(ident.nome_completo ?? '');
-      if (ident.dados_completos === true && nomeDoc) {
-        const titular = titularAtual();
-        const lados = [ident.frente_presente ? 'frente' : null, ident.verso_presente ? 'verso' : null].filter(Boolean).join(' e ') || 'foto';
-        const bateLead = nomesBatem(nomeDoc, String(ctx.dados.nome_confirmado ?? '') || ctx.contatoNome) && cpfsCompativeis(String(ident.cpf ?? ''), ctx.contatoCpf);
-        if (!antesId && bateLead) {
-          docsPatch.doc_pessoal = { tipo: ident.tipo_documento, nome: nomeDoc, cpf_mascarado: mascararCpf(String(ident.cpf ?? '')), validado_em: new Date().toISOString() };
-          dadosPatch.nome_confirmado = nomeDoc;
-          retomar = true;
-          notas.push(`→ identidade (${String(ident.tipo_documento).toUpperCase()}, ${lados}) de ${nomeDoc}: validada ✓ registre o elogio à foto.`);
-        } else if (declPrecisa && !declOk && titular && nomesBatem(nomeDoc, titular)) {
-          const decl = { nome: nomeDoc, cpf: somenteDigitos(String(ident.cpf ?? '')) || null, tipo_documento: ident.tipo_documento, validado_em: new Date().toISOString() };
-          docsPatch.declarante_doc = decl;
-          dadosPatch.declarante = decl;
-          retomar = true;
-          notas.push(`→ documento do DECLARANTE (${nomeDoc}) recebido e validado ✓.`);
-        } else if (antesId && !declPrecisa) {
-          notas.push('→ chegou outra foto de identidade, mas essa parte já estava completa — só agradeça.');
-        } else {
-          const alvo = (!antesId) ? 'identidade' : 'declarante';
-          const n = marcaTentativa(`divergente_${alvo}`);
-          if (n >= 2 && !aguardando) return await chamarHumanoColeta(ctx, 'doc_divergente', dadosPatch, docsPatch, tent);
-          notas.push(`→ o documento veio no nome de ${nomeDoc}, que NÃO confere com o esperado (${alvo === 'identidade' ? 'o titular do benefício' : `o declarante ${titular}`}). Peça para conferir e mandar o documento certo.`);
-        }
-      } else {
+      const ehIdentidade = ident.tipo_documento === 'rg' || ident.tipo_documento === 'cnh';
+      const legivel = ident.dados_completos === true && ehIdentidade;
+      if (!legivel) {
         idRuim = true;
-        notas.push(`→ a(s) foto(s) da identidade não deram para ler${ident.problema ? ` — ${String(ident.problema)}` : ''}. Oriente de um jeito NOVO (mais luz, apoiar o documento na mesa, um lado por vez, mandar pela galeria) — sem culpar a pessoa.`);
+        notas.push(`→ a(s) foto(s) da identidade não deram para confirmar${ident.problema ? ` — ${String(ident.problema)}` : ''}. Oriente de um jeito NOVO (mais luz, apoiar o documento na mesa, um lado por vez, mandar pela galeria) — sem culpar a pessoa.`);
+        continue;
       }
+      // acumula os LADOS entre turnos: frente agora, verso depois — tudo soma no mesmo item
+      const antes = { ...((ctx.docs.doc_pessoal ?? {}) as Record<string, unknown>), ...((docsPatch.doc_pessoal ?? {}) as Record<string, unknown>) };
+      const frente = antes.frente === true || ident.frente_presente === true;
+      const verso = antes.verso === true || ident.verso_presente === true;
+      docsPatch.doc_pessoal = {
+        tipo: ident.tipo_documento ?? antes.tipo,
+        nome: String(ident.nome_completo ?? antes.nome ?? '') || undefined,
+        cpf_mascarado: ident.cpf ? mascararCpf(String(ident.cpf)) : antes.cpf_mascarado,
+        frente, verso, atualizado_em: new Date().toISOString(),
+      };
+      retomar = true;
+      const lados = [ident.frente_presente ? 'frente' : null, ident.verso_presente ? 'verso' : null].filter(Boolean).join(' e ') || 'foto';
+      if (frente && verso) notas.push(`→ identidade (${String(ident.tipo_documento).toUpperCase()}, ${lados}) confirmada ✓ — item COMPLETO (frente e verso ok).`);
+      else notas.push(`→ chegou a ${lados} da identidade ✓ (confirmada). Ainda falta ${frente ? 'o VERSO' : 'a FRENTE'} — peça só esse lado.`);
     }
     const comp = lote.comprovante;
     if (comp?.presente === true) {
-      if (comp.dados_completos === true && comp.nome_titular) {
-        const mesOk = meses.some((m) => Number(comp.mes_referencia) === m.mes && Number(comp.ano) === m.ano);
+      const reconhecivel = comp.dados_completos === true || !!comp.tipo_conta || !!comp.nome_titular;
+      if (reconhecivel) {
+        const temMes = Number(comp.mes_referencia) >= 1 && Number(comp.mes_referencia) <= 12 && Number(comp.ano) > 2000;
+        const mesOk = temMes ? meses.some((m) => Number(comp.mes_referencia) === m.mes && Number(comp.ano) === m.ano) : true; // mês ilegível: aceita (validação leve)
         if (!mesOk) {
           const n = marcaTentativa('comprovante_fora_janela');
           if (n >= 3 && !aguardando) return await chamarHumanoColeta(ctx, 'comprovante_fora_janela', dadosPatch, docsPatch, tent);
-          notas.push(`→ o comprovante veio de outra data — só vale conta de ${meses[0].rotulo} ou ${meses[1].rotulo}. Peça uma mais recente.`);
+          notas.push(`→ o comprovante é válido mas de outra data — só vale conta de ${meses[0].rotulo} ou ${meses[1].rotulo}. Peça uma mais recente.`);
         } else {
-          const titular = String(comp.nome_titular);
-          const nomeLead = String(dadosPatch.nome_confirmado ?? ctx.dados.nome_confirmado ?? '') || ctx.contatoNome;
-          const doProprio = nomesBatem(titular, nomeLead);
-          const atual = (docsPatch.comprovante ?? ctx.docs.comprovante) as Record<string, unknown> | undefined;
-          const jaTemProprio = !!atual && nomesBatem(String(atual.titular ?? ''), nomeLead);
-          if (jaTemProprio && !doProprio) {
-            notas.push(`→ chegou outra conta (no nome de ${titular}), mas o comprovante do próprio cliente já estava registrado — só agradeça.`);
-          } else {
-            docsPatch.comprovante = { tipo_conta: comp.tipo_conta, titular, mes: comp.mes_referencia, ano: comp.ano, validado_em: new Date().toISOString() };
-            retomar = true;
-            if (doProprio) {
-              dadosPatch.declarante_necessario = false;
-              dadosPatch.titular_comprovante = null;
-              notas.push(`→ comprovante de residência (${String(comp.tipo_conta ?? 'conta')}) no nome do cliente, dentro do prazo ✓ registrado.`);
-            } else {
-              dadosPatch.declarante_necessario = true;
-              dadosPatch.titular_comprovante = titular;
-              notas.push(`→ comprovante válido, MAS está no nome de ${titular}. Explique com naturalidade que precisamos também do RG ou CNH dessa pessoa, como declarante.`);
-            }
-          }
+          docsPatch.comprovante = { tipo_conta: comp.tipo_conta, mes: temMes ? comp.mes_referencia : null, ano: temMes ? comp.ano : null, validado_em: new Date().toISOString() };
+          retomar = true;
+          notas.push(`→ comprovante de residência (${String(comp.tipo_conta ?? 'conta')}${temMes ? `, ${comp.mes_referencia}/${comp.ano}` : ', mês não deu para ler — aceito assim mesmo'}) confirmado ✓ registrado.`);
         }
       } else {
         compRuim = true;
-        notas.push(`→ o comprovante não deu para ler${comp.problema ? ` — ${String(comp.problema)}` : ''}. Peça outra foto, com a conta inteira aparecendo.`);
+        notas.push(`→ o comprovante não deu para confirmar${comp.problema ? ` — ${String(comp.problema)}` : ''}. Peça outra foto, com a conta inteira aparecendo.`);
       }
     }
     if (Number(lote.outros ?? 0) > 0) notas.push(`→ ${lote.outros} arquivo(s) não parecem ser identidade nem comprovante — pergunte com jeitinho o que era e reforce o que precisa agora.`);
 
-    // tentativas: UMA por item POR TURNO (nunca por arquivo). 3 rodadas ruins do MESMO item →
-    // chama um colega (e a IA segue atendendo — handoff suave).
     if (idRuim) {
       const n = marcaTentativa('ilegivel_identidade');
       if (n >= 3 && !aguardando) return await chamarHumanoColeta(ctx, 'foto_ilegivel', dadosPatch, docsPatch, tent);
@@ -760,12 +776,12 @@ async function etapaColetaDocs(ctx: Ctx): Promise<Turno> {
   if (emailNovo) notas.push(`→ e-mail recebido no texto: ${emailNovo} ✓ (confirme com a pessoa).`);
 
   // ---- monta o contexto do checklist e conversa ----
-  const cl = checklistDe({ ...ctx, docs: { ...ctx.docs, ...docsPatch }, dados: { ...ctx.dados, ...dadosPatch } } as Ctx, emailNovo);
-  const titular = titularAtual() || 'a pessoa da conta';
+  const docsMerged = { ...ctx.docs, ...docsPatch };
+  const cl = checklistDe(docsMerged, { ...ctx.dados, ...dadosPatch }, emailNovo);
   const r = await conversar(ctx, {
     etapa: 'coleta_docs',
     vars: {
-      CHECKLIST: checklistTexto(cl, titular, mesesTxt),
+      CHECKLIST: checklistTexto(cl, docsMerged, mesesTxt),
       RESULTADO_ARQUIVOS: notas.length ? `O QUE ACONTECEU NESTE TURNO (traduza para conversa natural — não copie literalmente):\n${notas.join('\n')}` : '',
       MESES_ACEITOS: mesesTxt,
     },
@@ -779,7 +795,7 @@ async function etapaColetaDocs(ctx: Ctx): Promise<Turno> {
     try { await ctx.admin.from('contatos').update({ email: emailFinal }).eq('id', ctx.sessao.contato_id); } catch { /* best-effort */ }
   }
 
-  const clFinal = checklistDe({ ...ctx, docs: { ...ctx.docs, ...docsPatch }, dados: { ...ctx.dados, ...dadosPatch } } as Ctx, emailFinal);
+  const clFinal = checklistDe(docsMerged, { ...ctx.dados, ...dadosPatch }, emailFinal);
   dadosPatch.tentativas_item = tent;
 
   // checklist FECHOU: a pergunta do gov.br sai NESTE turno, determinística (2ª chamada) —
@@ -806,11 +822,9 @@ async function etapaColetaDocs(ctx: Ctx): Promise<Turno> {
 /** Chama um colega (handoff SUAVE) reconhecendo o que já deu certo — a IA segue atendendo. */
 async function chamarHumanoColeta(ctx: Ctx, motivo: string, dadosPatch: Record<string, unknown>, docsPatch: Record<string, unknown>, tent: Record<string, number>): Promise<Turno> {
   const bolhas = await gerarDespedida(ctx,
-    motivo === 'foto_ilegivel'
-      ? 'As fotos de um documento não estão saindo legíveis mesmo depois de algumas tentativas. Sem culpar ninguém: reconheça o esforço (e o que JÁ deu certo, se houver), avise que você chamou um colega do time para ajudar com essa parte, e diga que enquanto isso você segue aqui — se a pessoa quiser tentar mais uma foto, você confere na hora.'
-      : motivo === 'comprovante_fora_janela'
-        ? 'O comprovante segue fora do período aceito. Com carinho: avise que chamou um colega para ajudar a resolver essa parte, e que você continua aqui enquanto ele não chega.'
-        : 'O documento enviado não confere com o esperado. Sem constranger a pessoa: avise que chamou um colega para conferir isso com ela, e que você segue à disposição aqui.');
+    motivo === 'comprovante_fora_janela'
+      ? 'O comprovante segue fora do período aceito. Com carinho: avise que chamou um colega para ajudar a resolver essa parte, e que você continua aqui enquanto ele não chega.'
+      : 'As fotos de um documento não estão saindo legíveis mesmo depois de algumas tentativas. Sem culpar ninguém: reconheça o esforço (e o que JÁ deu certo, se houver), avise que você chamou um colega do time para ajudar com essa parte, e diga que enquanto isso você segue aqui — se a pessoa quiser tentar mais uma foto, você confere na hora.');
   return { bolhas, chamarHumano: motivo, dadosPatch: { ...dadosPatch, tentativas_item: tent }, docsPatch };
 }
 
@@ -1472,6 +1486,43 @@ async function evento(admin: Admin, sessao: Sessao, tipo: string, detalhe: Recor
 async function limparAgenda(admin: Admin, sessaoId: string, claimAte: string): Promise<void> {
   await admin.from('ia_sessoes').update({ processar_apos: null, atualizado_em: new Date().toISOString() })
     .eq('id', sessaoId).eq('processar_apos', claimAte).eq('status', 'ativa');
+}
+
+/** Agenda o próximo acorde (retomada) — mesma guarda do limparAgenda contra o trigger. */
+async function agendarProximo(admin: Admin, sessaoId: string, claimAte: string, quandoIso: string): Promise<void> {
+  await admin.from('ia_sessoes').update({ processar_apos: quandoIso, atualizado_em: new Date().toISOString() })
+    .eq('id', sessaoId).eq('processar_apos', claimAte).eq('status', 'ativa');
+}
+
+// 1º toque: quanto esperar depende do que foi pedido (tarefa física demora mais que "sim/não")
+function delayNudge1Ms(etapa: string, docs: Record<string, unknown>): number {
+  if (etapa === 'extratos' || etapa === 'video_meuinss') return 60 * 60_000;
+  if (etapa === 'coleta_docs' || etapa === 'docs_pessoais' || etapa === 'comprovante_residencia' || etapa === 'declarante') {
+    const dp = (docs.doc_pessoal ?? {}) as Record<string, unknown>;
+    const parcial = (dp.frente === true) !== (dp.verso === true);   // metade da tarefa: toque mais cedo
+    return (parcial ? 20 : 45) * 60_000;
+  }
+  return 15 * 60_000;   // qualificação/triagem: resposta simples
+}
+// janela de TOQUE (mais conservadora que a de atendimento): 09:00–19:30 SP; fora dela → 09h+
+function ajustarJanelaNudge(alvoMs: number): string {
+  const sp = spWallClock(new Date(alvoMs));
+  const min = sp.getUTCHours() * 60 + sp.getUTCMinutes();
+  let ano = sp.getUTCFullYear(), mes = sp.getUTCMonth() + 1, dia = sp.getUTCDate();
+  if (min >= 9 * 60 && min < 19 * 60 + 30) return new Date(alvoMs).toISOString();
+  if (min >= 19 * 60 + 30) {
+    const amanha = new Date(Date.UTC(ano, mes - 1, dia) + 86_400_000);
+    ano = amanha.getUTCFullYear(); mes = amanha.getUTCMonth() + 1; dia = amanha.getUTCDate();
+  }
+  const base = spParaUtc(ano, mes, dia, 9, 0);
+  return new Date(base.getTime() + rand(0, 30 * 60_000)).toISOString();
+}
+// 3º toque: manhã seguinte, 09:00–10:30 SP
+function proximaManhaNudge(): string {
+  const sp = spWallClock();
+  const amanha = new Date(Date.UTC(sp.getUTCFullYear(), sp.getUTCMonth(), sp.getUTCDate()) + 86_400_000);
+  const base = spParaUtc(amanha.getUTCFullYear(), amanha.getUTCMonth() + 1, amanha.getUTCDate(), 9, 0);
+  return new Date(base.getTime() + rand(0, 90 * 60_000)).toISOString();
 }
 
 function dentroDaJanela(iaConfig: Record<string, unknown>): boolean {
