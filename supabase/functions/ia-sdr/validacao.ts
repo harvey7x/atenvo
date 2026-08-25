@@ -170,6 +170,20 @@ export function formatarFaltas(faltando: Janela[]): string {
   return `${partes.slice(0, -1).join('; ')} e ${partes[partes.length - 1]}`;
 }
 
+// ---------- e-mail ----------
+const RE_EMAIL = /^[a-z0-9](?:[a-z0-9._%+-]{0,63})@[a-z0-9](?:[a-z0-9.-]{0,253})\.[a-z]{2,24}$/i;
+
+/** E-mail com formato válido? (normaliza espaços e caixa antes de checar) */
+export function emailValido(s: string): boolean {
+  return RE_EMAIL.test((s ?? '').trim().toLowerCase());
+}
+
+/** Acha um e-mail dentro de texto livre (o cliente costuma mandar solto ou no meio da frase). */
+export function extrairEmail(texto: string): string | null {
+  const m = /[a-z0-9][a-z0-9._%+-]*@[a-z0-9][a-z0-9.-]*\.[a-z]{2,24}/i.exec((texto ?? '').toLowerCase());
+  return m && emailValido(m[0]) ? m[0] : null;
+}
+
 // ---------- bancos-alvo nos históricos de créditos ----------
 const BANCOS_ALVO = ['agibank', 'bmg', 'mercantil', 'crefisa'];
 /** Detecta banco-alvo num nome de banco pagador/OP vindo do extrato. */

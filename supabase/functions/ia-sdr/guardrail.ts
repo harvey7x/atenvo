@@ -37,9 +37,9 @@ export function saidaProibida(txt: string): string | null {
   return null;
 }
 
-/** Resposta única e segura quando o guardrail barra (ou quando o cliente pergunta de valores). */
-export const RESPOSTA_SEGURA =
-  'Sobre valores e condições, quem vai trazer todos os detalhes é o nosso especialista, na análise final. Vamos só terminar essa parte dos documentos, tá bom? 😊';
+// Fase 1.1: NÃO existe mais "resposta segura" estática — violação do guardrail pede REESCRITA ao
+// modelo (1x); se persistir, a bolha é descartada. Frases fixas no caminho de conversa são
+// proibidas (a única permitida é MSG_HANDOFF_FINAL, em prompts.ts).
 
 /** O cliente está perguntando de valores/condições? (gatilho do contador de insistência) */
 export function perguntaDeValores(txtCliente: string): boolean {

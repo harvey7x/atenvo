@@ -1,5 +1,26 @@
 # IA SDR (Gemini) — Fase 1
 
+> **FASE 1.1 (25/08, mesma noite)** — correção crítica + humanização, após o 1º teste real:
+>
+> 1. **Modelo**: o `gemini-2.5-flash` retornou 404 p/ contas novas ("use models/gemini-3.6-flash") —
+>    NENHUMA chamada funcionou no teste; tudo que saiu era fallback estático. Default agora é
+>    `gemini-3.6-flash` + **auto-recuperação**: 404 com sugestão no corpo → tenta na hora, cacheia em
+>    `ia_config.modelo_efetivo` (e `modelo_efetivo_docs`), evento `modelo_atualizado`. Env novo
+>    `GEMINI_MODEL_DOCS` (só a análise do consignado).
+> 2. **Falha técnica NUNCA vira conversa**: retry 2s→8s; persistiu → NADA sai ao cliente, reagenda
+>    +90s (`gemini_erro`); `tentativas_erro` do cliente não conta; 5 falhas técnicas seguidas →
+>    handoff `falha_tecnica` com nota dizendo que foi o sistema. **Zero frases estáticas** no caminho
+>    de conversa (única permitida: `MSG_HANDOFF_FINAL`, quando o modelo está fora do ar). **Dedup
+>    duro**: nunca repetir uma saída já existente na conversa (colidiu → reescrita → descarta).
+> 3. **Latência 15–35s**: cron a cada **15 segundos** (jobid 23), debounce 8s (migração
+>    `20260825182744`), sem delay-base — só presence 2–6s + jitter 1.5–3s.
+> 4. **De fluxo para IA**: contexto completo em toda chamada (~30 msgs, dados coletados — nome/CPF
+>    do fluxo NUNCA são pedidos de novo, checklist); coleta por **checklist dinâmico** (identidade
+>    F/V + comprovante mês atual/anterior + **e-mail** → `contatos.email`), itens em qualquer ordem;
+>    persona consultor(a) de crédito; transição pós-qualificação por DIREÇÃO (pré-avaliação feita →
+>    "confirmar quais valores podem ser liberados" é o teto); etapas gov.br→extratos→análise
+>    inalteradas na lógica. Diag de deploy: `POST {"diag":"gemini"}` com o `x-ia-secret`.
+
 A IA assume o atendimento no canal **EMPRÉSTIMO** (`canais.id = c3e8311c-d574-4283-9bbb-f4adcf050f02`,
 Evolution, 555191953964) **depois** que o fluxo determinístico `caf_emprestimo_v1` completa (fecho no
 CPF). Ela qualifica INSS, coleta e valida documentos com visão (RG/CNH, comprovante, extratos do

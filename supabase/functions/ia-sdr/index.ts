@@ -1,48 +1,58 @@
-// ia-sdr — worker da IA SDR (Gemini) do canal EMPRÉSTIMO. Cron a cada 1 minuto.
+// ia-sdr — worker da IA SDR (Gemini) do canal EMPRÉSTIMO. Cron a cada 15 segundos.
 //
 // A IA assume DEPOIS que o fluxo determinístico caf_emprestimo_v1 completa (o bot-runner cria a
 // ia_sessao no fecho, gated por bot_canal_config.ia_enabled + ia_modo_teste/numeros_teste).
-// Ela qualifica INSS, coleta e valida documentos com visão (RG/CNH, comprovante, extratos do
-// Meu INSS), entende áudio nativo e entrega o lead pronto pro atendente humano.
 //
-// DESENHO (decisões amarradas no README.md desta pasta):
-//  * Envio SEMPRE via fila bot_mensagens_saida, drenada EM PROCESSO (mesmo padrão do bot-runner):
-//    o cron bot-fila-processar só toca status 'agendada' e o bot_pausar cancela pendentes — por
-//    isso a IA enfileira 'pendente' e drena ela mesma, com presence "digitando" + jitter.
-//  * Serial POR CANAL via lease ia_canal_lock (proteção do chip Evolution) + lock por conversa
-//    reusando bot_claim_conversa (lease TTL — advisory lock puro não sobrevive ao PostgREST).
-//  * Debounce de 15s re-agendável: o trigger trg_ia_sessao_mensagem empurra processar_apos a cada
-//    inbound; cliente que manda 3 áudios seguidos é processado UMA vez, com tudo junto.
-//  * Janela 07:30–21:30 (America/Sao_Paulo): fora dela nada sai; reagenda pra próxima 07:30 + jitter.
-//  * Humano mandou mensagem => o trigger pausa a sessão sozinho; aqui só re-checamos antes do envio.
-//  * Guardrail PÓS-Gemini em TODA mensagem ao cliente (guardrail.ts) — violou => resposta segura.
-//  * Sem GEMINI_API_KEY: sessões são adiadas com evento 'sem_api_key' — nunca crash, nunca silêncio.
+// FASE 1.1 — de FLUXO para IA:
+//  * A etapa define o OBJETIVO; o MODELO conduz (contexto completo: ~30 mensagens do histórico,
+//    dados já coletados — nome/CPF do fluxo NUNCA são pedidos de novo —, checklist do que falta
+//    e o resultado das validações de arquivo do turno). Coleta por CHECKLIST DINÂMICO
+//    (identidade F/V + comprovante + e-mail, em qualquer ordem), não por etapas rígidas.
+//  * FALHA TÉCNICA NUNCA VIRA CONVERSA: retry 2s→8s; persistiu → nada sai ao cliente, reagenda
+//    +90s, loga gemini_erro; tentativas_erro (do cliente) NÃO conta. 5 falhas técnicas seguidas →
+//    handoff 'falha_tecnica' com nota explicando que foi sistema. Única mensagem não-gerada
+//    permitida: MSG_HANDOFF_FINAL (modelo fora do ar).
+//  * Modelo: default gemini-3.6-flash + auto-recuperação de 404 com sugestão no corpo (cacheia em
+//    ia_config.modelo_efetivo[_docs], evento modelo_atualizado). GEMINI_MODEL_DOCS só p/ a análise
+//    do consignado.
+//  * Latência alvo 15–35s/turno: cron 15s + debounce 8s + sem delay-base — o único tempo humano é
+//    presence composing proporcional (2–6s) + jitter 1.5–3s entre bolhas.
+//  * Dedup duro: nenhuma mensagem idêntica a uma saída já existente na conversa (colidiu → pede
+//    reescrita ao modelo; persistiu → descarta a bolha).
+//  * Proteções do chip intactas: serial por canal, máx 3 bolhas, janela 07:30–21:30 SP, limite
+//    diário, guardrail pós-Gemini em tudo que sai.
 //
-// Auth: x-ia-secret == webhook_config.ia_sdr (padrão dos crons). Deploy com verify_jwt=false.
+// Auth: x-ia-secret == webhook_config.ia_sdr. Deploy com verify_jwt=false.
+// Diag de deploy: POST {"diag":"gemini"} (com o secret) → valida o modelo com uma chamada mínima.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { enviadorDe } from '../evolution-send/transporte.ts';
 import { sendPresenceComposing } from './evolution.ts';
-import { chamarGeminiJson, comRetry, temChaveGemini, modeloGemini, type ParteGemini } from './gemini.ts';
-import { saidaProibida, perguntaDeValores, RESPOSTA_SEGURA } from './guardrail.ts';
 import {
-  PERSONA, INSTRUCAO_ETAPA, EXTRAS_ETAPA, esquemaChat,
-  SCHEMA_DOC_PESSOAL, SCHEMA_COMPROVANTE, SCHEMA_EXTRATO, PROMPT_EXTRATO,
-  SCHEMA_ANALISE_CONSIGNADO, PROMPT_ANALISE_CONSIGNADO,
-  PASSO_A_PASSO_MEUINSS, CAPTION_VIDEO_MEUINSS, INSTRUCAO_DOCS_MEUINSS,
-  FALLBACK_HANDOFF, FALLBACK_CONCLUSAO,
+  chamarGeminiJson, comRetry, temChaveGemini, ehErro404Modelo, parseSugestaoModelo,
+  MODELO_DEFAULT, modeloEnvChat, modeloEnvDocs, type ParteGemini, type ResultadoGemini,
+} from './gemini.ts';
+import { saidaProibida, perguntaDeValores } from './guardrail.ts';
+import {
+  PERSONA, INSTRUCAO_ETAPA, EXTRAS_ETAPA, esquemaChat, SCHEMA_REESCRITA,
+  SCHEMA_ARQUIVO_COLETA, PROMPT_ARQUIVO_COLETA,
+  SCHEMA_EXTRATO, PROMPT_EXTRATO, SCHEMA_ANALISE_CONSIGNADO, PROMPT_ANALISE_CONSIGNADO,
+  MSG_HANDOFF_FINAL,
 } from './prompts.ts';
 import {
-  nomesBatem, cpfsCompativeis, somenteDigitos, mesesComprovante,
+  nomesBatem, cpfsCompativeis, somenteDigitos, mesesComprovante, emailValido, extrairEmail,
   competParaIdx, ultimoMesFechadoIdx, calcularCobertura, formatarFaltas, bancoAlvoDe,
   spWallClock, spParaUtc, type Janela,
 } from './validacao.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const BUCKET_MIDIA = 'script-midia';            // anexo_path dos inbounds mora aqui (prefixo {org}/wa-midia/)
+const BUCKET_MIDIA = 'script-midia';            // anexo_path dos inbounds (prefixo {org}/wa-midia/)
 const MAX_ARQUIVO = 15 * 1024 * 1024;           // >15MB: pedir reenvio menor
 const MAX_SESSOES_POR_CANAL = 6;
-const ORCAMENTO_MS = 100_000;                   // teto de parede por invocação (cron cobre o resto)
+const ORCAMENTO_MS = 100_000;
+const DEBOUNCE_MS = 8_000;                      // espelha o trigger (fase 1.1: 15s → 8s)
+const REAGENDA_FALHA_MS = 90_000;
+const MAX_FALHAS_TECNICAS = 5;
 
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'content-type, x-ia-secret', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, 'Content-Type': 'application/json' } });
@@ -54,12 +64,14 @@ function seguroIgual(a: string, b: string): boolean {
   let d = 0; for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i);
   return d === 0;
 }
-
 function paraBase64(bytes: Uint8Array): string {
   let bin = ''; const CH = 0x8000;
   for (let i = 0; i < bytes.length; i += CH) bin += String.fromCharCode(...bytes.subarray(i, i + CH));
   return btoa(bin);
 }
+
+/** Falha de infraestrutura (API/parse/timeout) — NUNCA vira mensagem ao cliente. */
+class FalhaTecnica extends Error {}
 
 // deno-lint-ignore no-explicit-any
 type Admin = any;
@@ -72,22 +84,32 @@ interface Sessao {
   status: string; criado_em: string;
 }
 interface MsgNova { id: string; tipo: string; conteudo: string | null; criado_em: string; metadados: Record<string, unknown> | null }
+interface Modelos { chat: string; docs: string }
 
-// resultado de um turno da máquina de estados
 interface Turno {
-  bolhas: string[];                               // texto ao cliente (passa no guardrail)
+  bolhas: string[];
   video?: { url: string; caption: string };
   etapaNova?: string;
   statusNovo?: 'handoff' | 'concluida' | 'encerrada';
-  motivoHumano?: string;                          // conversas.precisa_humano_motivo (handoff/conclusão)
+  motivoHumano?: string;
   notaInterna?: string;
   dadosPatch?: Record<string, unknown>;
   docsPatch?: Record<string, unknown>;
   coberturaNova?: Record<string, unknown>;
-  etiquetaOpp?: string;                           // ex.: 'nao_elegivel'
-  resetErros?: boolean;                           // progresso real => zera tentativas_erro
-  incrementaErro?: boolean;
-  __perguntouValores?: boolean;                   // passagem interna chat->turno
+  etiquetaOpp?: string;
+  incrementaErro?: boolean;                     // "não entendi o cliente" (2x seguidas → handoff)
+  resetErros?: boolean;
+  __perguntouValores?: boolean;
+}
+
+interface Ctx {
+  admin: Admin; sessao: Sessao; canal: Record<string, unknown>; iaConfig: Record<string, unknown>;
+  modelos: Modelos;
+  conversa: Record<string, unknown>; destino: string; transcript: string;
+  saidasAnteriores: Set<string>;
+  contatoNome: string; contatoCpf: string;
+  dados: Record<string, unknown>; docs: Record<string, unknown>; cobertura: Record<string, unknown>;
+  novas: MsgNova[]; textos: string[]; arquivos: MsgNova[]; audios: MsgNova[]; pendentes: number;
 }
 
 Deno.serve(async (req) => {
@@ -99,7 +121,13 @@ Deno.serve(async (req) => {
     const { data: wc } = await admin.from('webhook_config').select('secret').eq('chave', 'ia_sdr').maybeSingle();
     if (!wc?.secret || !seguroIgual(secretHeader, wc.secret as string)) return json({ error: 'unauthorized' }, 401);
 
+    const body = await req.json().catch(() => ({})) as { diag?: string; canal_id?: string };
+
+    // ---- diag de deploy: valida o modelo efetivo com uma chamada mínima (sem tocar em sessão) ----
+    if (body.diag === 'gemini') return await diagGemini(admin, body.canal_id ?? null);
+
     const inicio = Date.now();
+    const dono = crypto.randomUUID();   // identidade desta invocação p/ a lease de canal
     const { data: cfgs } = await admin.from('bot_canal_config')
       .select('canal_id, ia_enabled, ia_modo_teste, ia_config, organizacao_id')
       .eq('ia_enabled', true);
@@ -112,7 +140,7 @@ Deno.serve(async (req) => {
         .select('id, nome_interno, transporte, instancia_externa, cloud_phone_number_id, numero_conectado')
         .eq('id', cfg.canal_id).maybeSingle();
       if (!canal) continue;
-      resultados.push(await processarCanal(admin, canal, cfg.ia_config ?? {}, inicio));
+      resultados.push(await processarCanal(admin, canal, (cfg.ia_config ?? {}) as Record<string, unknown>, inicio, dono));
     }
     return json({ ok: true, canais: cfgs.length, resultados });
   } catch (e) {
@@ -120,23 +148,90 @@ Deno.serve(async (req) => {
   }
 });
 
-// ======== canal: lease serial + janela + limite diário + sessões devidas ========
-async function processarCanal(admin: Admin, canal: Record<string, unknown>, iaConfig: Record<string, unknown>, inicio: number): Promise<Record<string, unknown>> {
+// ======== modelo: resolução + auto-recuperação de 404 (rename do Google) ========
+// Precedência: ENV explícito > cache da auto-recuperação > default. O env na frente é o que
+// permite ao dono FORÇAR um modelo mesmo depois de um 404 ter cacheado modelo_efetivo.
+function resolverModelos(iaConfig: Record<string, unknown>): Modelos {
+  const chat = modeloEnvChat() || String(iaConfig.modelo_efetivo ?? '') || MODELO_DEFAULT;
+  const docs = modeloEnvDocs() || String(iaConfig.modelo_efetivo_docs ?? '') || chat;
+  return { chat, docs };
+}
+
+async function persistirModeloEfetivo(admin: Admin, canalId: string, chave: 'modelo_efetivo' | 'modelo_efetivo_docs', valor: string): Promise<void> {
+  try {
+    const { data } = await admin.from('bot_canal_config').select('ia_config').eq('canal_id', canalId).maybeSingle();
+    await admin.from('bot_canal_config')
+      .update({ ia_config: { ...((data?.ia_config as Record<string, unknown>) ?? {}), [chave]: valor } })
+      .eq('canal_id', canalId);
+  } catch { /* cache é best-effort; o env/default segue valendo */ }
+}
+
+interface ChamadaOk { r: ResultadoGemini; modeloUsado: string; atualizadoDe?: string }
+
+/** Chama o Gemini já com retry/backoff; num 404 de modelo com sugestão, troca na hora e cacheia. */
+async function chamarComRecuperacao(admin: Admin, canalId: string, modelos: Modelos, tipo: 'chat' | 'docs', p: {
+  system: string; partes: ParteGemini[]; schema: Record<string, unknown>; temperatura?: number; maxTokens?: number;
+}): Promise<ChamadaOk> {
+  const modelo = tipo === 'docs' ? modelos.docs : modelos.chat;
+  try {
+    return { r: await comRetry(() => chamarGeminiJson(modelo, p)), modeloUsado: modelo };
+  } catch (e) {
+    const msg = String((e as Error)?.message ?? '');
+    if (!ehErro404Modelo(msg)) throw e;
+    const sugestao = parseSugestaoModelo(msg, modelo);
+    if (!sugestao) throw e;
+    const r2 = await comRetry(() => chamarGeminiJson(sugestao, p));   // funcionou => o rename é real
+    if (tipo === 'docs') {
+      modelos.docs = sugestao;
+      await persistirModeloEfetivo(admin, canalId, 'modelo_efetivo_docs', sugestao);
+    } else {
+      // docs que só herdava do chat acompanha em memória (na próxima run herda do cache)
+      if (modelos.docs === modelo) modelos.docs = sugestao;
+      modelos.chat = sugestao;
+      await persistirModeloEfetivo(admin, canalId, 'modelo_efetivo', sugestao);
+    }
+    return { r: r2, modeloUsado: sugestao, atualizadoDe: modelo };
+  }
+}
+
+async function diagGemini(admin: Admin, canalId: string | null): Promise<Response> {
+  const q = admin.from('bot_canal_config').select('canal_id, ia_config').eq('ia_enabled', true);
+  const { data: cfgs } = canalId ? await q.eq('canal_id', canalId) : await q.limit(1);
+  const cfg = cfgs?.[0];
+  if (!cfg) return json({ ok: false, erro: 'nenhum canal com ia_enabled' });
+  const modelos = resolverModelos((cfg.ia_config ?? {}) as Record<string, unknown>);
+  try {
+    const { r, modeloUsado, atualizadoDe } = await chamarComRecuperacao(admin, cfg.canal_id, modelos, 'chat', {
+      system: 'Responda exatamente o JSON pedido.',
+      partes: [{ text: 'Responda com ok=true.' }],
+      schema: { type: 'object', properties: { ok: { type: 'boolean' } }, required: ['ok'] },
+      temperatura: 0, maxTokens: 1024,
+    });
+    return json({ ok: true, modelo: modeloUsado, atualizado_de: atualizadoDe ?? null, tokens: [r.tokensIn, r.tokensOut], resposta: r.json });
+  } catch (e) {
+    return json({ ok: false, modelo_tentado: modelos.chat, erro: String((e as Error)?.message ?? '').slice(0, 400) });
+  }
+}
+
+// ======== canal: peek → lease serial → janela → limite diário → sessões ========
+async function processarCanal(admin: Admin, canal: Record<string, unknown>, iaConfig: Record<string, unknown>, inicio: number, dono: string): Promise<Record<string, unknown>> {
   const canalId = canal.id as string;
-  const { data: lock } = await admin.rpc('ia_canal_lock', { p_canal: canalId, p_ttl_seg: 240 });
+  const agoraIso = new Date().toISOString();
+  const corteDebounce = new Date(Date.now() - DEBOUNCE_MS).toISOString();
+
+  // peek ANTES do lock: o cron roda a cada 15s — sem sessão devida, nem toca na lease
+  const { data: due } = await admin.from('ia_sessoes').select('*')
+    .eq('status', 'ativa').eq('canal_id', canalId)
+    .not('processar_apos', 'is', null).lte('processar_apos', agoraIso)
+    .order('processar_apos', { ascending: true }).limit(MAX_SESSOES_POR_CANAL);
+  const sessoes = ((due ?? []) as Sessao[])
+    .filter((s) => !s.ultima_msg_cliente_em || s.ultima_msg_cliente_em <= corteDebounce);
+  if (!sessoes.length) return { canal: canalId, processadas: 0 };
+
+  const { data: lock } = await admin.rpc('ia_canal_lock', { p_canal: canalId, p_dono: dono, p_ttl_seg: 240 });
   if (!lock) return { canal: canalId, skipped: 'lock_canal' };
   try {
-    const agoraIso = new Date().toISOString();
-    const corte15s = new Date(Date.now() - 15_000).toISOString();
-    const { data: due } = await admin.from('ia_sessoes').select('*')
-      .eq('status', 'ativa').eq('canal_id', canalId)
-      .not('processar_apos', 'is', null).lte('processar_apos', agoraIso)
-      .order('processar_apos', { ascending: true }).limit(MAX_SESSOES_POR_CANAL);
-    const sessoes = ((due ?? []) as Sessao[])
-      .filter((s) => !s.ultima_msg_cliente_em || s.ultima_msg_cliente_em <= corte15s);
-    if (!sessoes.length) return { canal: canalId, processadas: 0 };
-
-    // ---- janela de operação (SP). Fora dela: nada sai; reagenda pra próxima 07:30 + jitter 0–45min ----
+    // ---- janela de operação (SP): fora dela nada sai; reagenda pra próxima abertura + jitter ----
     if (!dentroDaJanela(iaConfig)) {
       for (const s of sessoes) {
         const alvo = proximaAbertura(iaConfig);
@@ -172,47 +267,59 @@ async function processarCanal(admin: Admin, canal: Record<string, unknown>, iaCo
     }
 
     // ---- processa SERIAL (nunca duas conversas do mesmo chip ao mesmo tempo) ----
+    const modelos = resolverModelos(iaConfig);
     let processadas = 0;
     for (const s of sessoes) {
       if (Date.now() - inicio > ORCAMENTO_MS) break;
-      await processarSessao(admin, s, canal, iaConfig);
+      await processarSessao(admin, s, canal, iaConfig, modelos);
       processadas++;
-      await admin.rpc('ia_canal_lock', { p_canal: canalId, p_ttl_seg: 240 });  // renova a lease
+      await admin.rpc('ia_canal_lock', { p_canal: canalId, p_dono: dono, p_ttl_seg: 240 });  // renova (mesmo dono)
     }
     return { canal: canalId, processadas };
   } finally {
-    try { await admin.rpc('ia_canal_unlock', { p_canal: canalId }); } catch { /* lease expira sozinha */ }
+    try { await admin.rpc('ia_canal_unlock', { p_canal: canalId, p_dono: dono }); } catch { /* lease expira sozinha */ }
   }
 }
 
-// ======== sessão: claim + lock de conversa + turno ========
-async function processarSessao(admin: Admin, sessao: Sessao, canal: Record<string, unknown>, iaConfig: Record<string, unknown>): Promise<void> {
-  // claim atômico (CAS em processar_apos): outra invocação não pega a mesma sessão
-  const claimAte = new Date(Date.now() + 5 * 60_000).toISOString();
+// ======== sessão: claim + lock de conversa + turno; FALHA TÉCNICA nunca vira conversa ========
+async function processarSessao(admin: Admin, sessao: Sessao, canal: Record<string, unknown>, iaConfig: Record<string, unknown>, modelos: Modelos): Promise<void> {
+  // claim de 10min: um turno com vários arquivos + retries do Gemini (45s de teto por chamada)
+  // pode passar de 5 — o claim tem que sobreviver ao pior turno realista
+  const claimAte = new Date(Date.now() + 10 * 60_000).toISOString();
   const { data: claimed } = await admin.from('ia_sessoes')
     .update({ processar_apos: claimAte, atualizado_em: new Date().toISOString() })
     .eq('id', sessao.id).eq('status', 'ativa').lte('processar_apos', new Date().toISOString())
     .select('id');
   if (!claimed?.length) return;
 
-  const { data: lockConv } = await admin.rpc('bot_claim_conversa', { p_conversa: sessao.conversa_id, p_ttl_seg: 240 });
+  const { data: lockConv } = await admin.rpc('bot_claim_conversa', { p_conversa: sessao.conversa_id, p_ttl_seg: 600 });
   if (!lockConv) {
-    await admin.from('ia_sessoes').update({ processar_apos: new Date(Date.now() + 2 * 60_000).toISOString() }).eq('id', sessao.id).eq('status', 'ativa');
+    await admin.from('ia_sessoes').update({ processar_apos: new Date(Date.now() + 60_000).toISOString() }).eq('id', sessao.id).eq('status', 'ativa');
     return;
   }
   try {
-    await turno(admin, sessao, canal, iaConfig, claimAte);
+    await turno(admin, sessao, canal, iaConfig, modelos, claimAte);
   } catch (e) {
     const msg = String((e as Error)?.message ?? 'erro').slice(0, 300);
-    await evento(admin, sessao, 'erro_turno', { erro: msg });
-    const erros = (sessao.tentativas_erro ?? 0) + 1;
-    if (erros >= 3) {
-      await fazerHandoff(admin, sessao, canal, 'erro_interno', [FALLBACK_HANDOFF],
-        `IA SDR: falha interna repetida (${msg}). Sessão entregue ao humano na etapa ${sessao.etapa}.`);
+    if (msg.includes('sem_api_key')) {
+      await admin.from('ia_sessoes').update({ processar_apos: new Date(Date.now() + 30 * 60_000).toISOString() }).eq('id', sessao.id).eq('status', 'ativa');
+      await evento(admin, sessao, 'sem_api_key', {});
+      return;
+    }
+    // FALHA TÉCNICA (modelo/API/interna): NÃO fala com o cliente, NÃO conta tentativas_erro.
+    if (!(e instanceof FalhaTecnica)) await evento(admin, sessao, 'erro_turno', { erro: msg });
+    // dados FRESCOS: o turno pode ter gravado estado no meio (ex.: analise_concluida) — mesclar
+    // por cima da linha stale apagaria essa marca e a retomada refaria trabalho caro.
+    const { data: freshRow } = await admin.from('ia_sessoes').select('dados').eq('id', sessao.id).maybeSingle();
+    const dadosAtuais = ((freshRow?.dados ?? sessao.dados ?? {}) as Record<string, unknown>);
+    const falhas = (Number((dadosAtuais as { falhas_tecnicas?: number }).falhas_tecnicas) || 0) + 1;
+    if (falhas >= MAX_FALHAS_TECNICAS) {
+      await fazerHandoff(admin, sessao, canal, 'falha_tecnica', [MSG_HANDOFF_FINAL],
+        `🤖 IA SDR — atendimento entregue ao humano por FALHA TÉCNICA repetida do sistema (modelo/API), na etapa ${sessao.etapa}.\nNÃO foi confusão do cliente — ele estava respondendo normalmente. Últimos erros em ia_eventos (tipo gemini_erro/erro_turno).`);
     } else {
       await admin.from('ia_sessoes').update({
-        tentativas_erro: erros,
-        processar_apos: new Date(Date.now() + 3 * 60_000).toISOString(),
+        dados: { ...dadosAtuais, falhas_tecnicas: falhas },
+        processar_apos: new Date(Date.now() + REAGENDA_FALHA_MS).toISOString(),
         atualizado_em: new Date().toISOString(),
       }).eq('id', sessao.id).eq('status', 'ativa');
     }
@@ -221,8 +328,8 @@ async function processarSessao(admin: Admin, sessao: Sessao, canal: Record<strin
   }
 }
 
-// ======== o TURNO: lê o que chegou, roda a etapa, envia, persiste ========
-async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown>, iaConfig: Record<string, unknown>, claimAte: string): Promise<void> {
+// ======== o TURNO ========
+async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown>, iaConfig: Record<string, unknown>, modelos: Modelos, claimAte: string): Promise<void> {
   const { data: conversa } = await admin.from('conversas')
     .select('id, organizacao_id, contato_id, precisa_humano').eq('id', sessao.conversa_id).maybeSingle();
   if (!conversa) { await encerrarSessao(admin, sessao, 'conversa_inexistente'); return; }
@@ -238,7 +345,7 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
     return;
   }
 
-  const { data: contato } = await admin.from('contatos').select('nome, cpf').eq('id', sessao.contato_id).maybeSingle();
+  const { data: contato } = await admin.from('contatos').select('nome, cpf, email').eq('id', sessao.contato_id).maybeSingle();
   const { data: ident } = await admin.from('contato_identidades')
     .select('valor_normalizado').eq('contato_id', sessao.contato_id).eq('tipo', 'whatsapp')
     .not('valor_normalizado', 'is', null).order('principal', { ascending: false }).limit(1).maybeSingle();
@@ -251,33 +358,43 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
 
   const dados = (sessao.dados ?? {}) as Record<string, unknown>;
   const processadoAte = (dados.processado_ate as string) ?? sessao.criado_em;
+  // JANELA DE SOBREPOSIÇÃO (5s) + ids já vistos: criado_em é o início da transação — com o
+  // webhook baixando mídia em paralelo, uma mensagem pode COMMITAR depois de outra de timestamp
+  // maior. Watermark seco pularia essa mensagem para sempre; a sobreposição + msgs_vistas não.
+  const corteSobrepos = new Date(Date.parse(processadoAte) - 5_000).toISOString();
+  const vistas = new Set<string>(Array.isArray(dados.msgs_vistas) ? (dados.msgs_vistas as string[]) : []);
   const { data: novasRaw } = await admin.from('mensagens')
     .select('id, tipo, conteudo, criado_em, metadados')
     .eq('conversa_id', sessao.conversa_id).eq('direcao', 'entrada')
-    .gt('criado_em', processadoAte).order('criado_em', { ascending: true }).limit(20);
-  const novas = (novasRaw ?? []) as MsgNova[];
+    .gt('criado_em', corteSobrepos).order('criado_em', { ascending: true }).limit(25);
+  const fetched = (novasRaw ?? []) as MsgNova[];
+  const novas = fetched.filter((m) => !vistas.has(m.id));
+  const houveMais = fetched.length >= 25;   // estourou o limit: reagenda já em vez de dormir
 
-  if (!novas.length && dados.abertura_enviada) {
-    // acordou sem nada novo (claim antigo/reagendamento): volta a dormir até a próxima entrada
-    await limparAgenda(admin, sessao.id, claimAte);
-    return;
-  }
+  if (!novas.length && dados.abertura_enviada) { await limparAgenda(admin, sessao.id, claimAte); return; }
 
-  // histórico recente (contexto do chat): últimas 25 mensagens, viradas pra ordem cronológica
+  // histórico (~30 mensagens, ordem cronológica) + conjunto de saídas p/ o dedup duro
   const { data: histRaw } = await admin.from('mensagens')
     .select('direcao, tipo, conteudo, origem')
-    .eq('conversa_id', sessao.conversa_id).order('criado_em', { ascending: false }).limit(25);
-  const transcript = ((histRaw ?? []) as Array<{ direcao: string; tipo: string; conteudo: string | null; origem: string | null }>)
-    .reverse()
+    .eq('conversa_id', sessao.conversa_id).order('criado_em', { ascending: false }).limit(30);
+  const hist = ((histRaw ?? []) as Array<{ direcao: string; tipo: string; conteudo: string | null; origem: string | null }>).reverse();
+  const transcript = hist
     .filter((m) => m.tipo !== 'nota_interna' && m.tipo !== 'sistema')
     .map((m) => {
-      const quem = m.direcao === 'entrada' ? '[cliente]' : '[atendente]';
+      const quem = m.direcao === 'entrada' ? '[cliente]' : (m.origem === 'bot' ? '[você]' : '[atendente humano]');
       if (m.tipo === 'texto' && m.conteudo) return `${quem} ${m.conteudo}`;
-      return `${quem} (${m.tipo}${m.conteudo ? `: ${m.conteudo.slice(0, 60)}` : ''})`;
+      return `${quem} (${m.tipo}${m.conteudo ? `: ${m.conteudo.slice(0, 80)}` : ''})`;
     }).join('\n');
+  // só o que o CLIENTE recebeu conta no dedup — nota_interna/sistema aqui vazaria conteúdo
+  // interno pro prompt de reescrita e bloquearia frases que nunca foram ditas a ele
+  const { data: saidasRaw } = await admin.from('mensagens')
+    .select('conteudo').eq('conversa_id', sessao.conversa_id).eq('direcao', 'saida')
+    .in('tipo', ['texto', 'video'])
+    .not('conteudo', 'is', null).order('criado_em', { ascending: false }).limit(200);
+  const saidasAnteriores = new Set(((saidasRaw ?? []) as Array<{ conteudo: string }>).map((m) => normalizarSaida(m.conteudo)));
 
   const ctx: Ctx = {
-    admin, sessao, canal, iaConfig, conversa, destino, transcript,
+    admin, sessao, canal, iaConfig, modelos, conversa, destino, transcript, saidasAnteriores,
     contatoNome: (contato?.nome as string) ?? '', contatoCpf: (contato?.cpf as string) ?? '',
     dados, docs: (sessao.docs ?? {}) as Record<string, unknown>,
     cobertura: (sessao.cobertura_extratos ?? {}) as Record<string, unknown>,
@@ -288,62 +405,96 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
     pendentes: novas.filter((m) => (m.metadados as Record<string, unknown>)?.midia_pendente).length,
   };
 
-  // ---- roda a etapa ----
+  // ---- roda a etapa (etapas antigas de coleta viraram o checklist dinâmico) ----
   let t: Turno;
   switch (sessao.etapa) {
     case 'qualificacao_inss': t = await etapaQualificacao(ctx); break;
-    case 'docs_pessoais': t = await etapaDocsPessoais(ctx); break;
-    case 'comprovante_residencia': t = await etapaComprovante(ctx); break;
-    case 'declarante': t = await etapaDeclarante(ctx); break;
+    case 'coleta_docs':
+    case 'docs_pessoais':
+    case 'comprovante_residencia':
+    case 'declarante': t = await etapaColetaDocs(ctx); break;
     case 'triagem_govbr': t = await etapaTriagem(ctx); break;
+    case 'video_meuinss':
     case 'extratos': t = await etapaExtratos(ctx); break;
     default:
       await evento(admin, sessao, 'etapa_desconhecida', { etapa: sessao.etapa });
-      t = { bolhas: [], incrementaErro: true };
+      throw new FalhaTecnica(`etapa_desconhecida:${sessao.etapa}`);
   }
 
-  // ---- insistência em valores: resposta segura; 2ª vez => handoff ----
+  // ---- insistência em valores: 1ª vez o próprio modelo responde com a régua; 2ª => handoff ----
   const perguntouValores = ctx.textos.some((x) => perguntaDeValores(x)) || t.__perguntouValores === true;
   if (perguntouValores && !t.statusNovo) {
     const n = (Number(dados.perguntas_valores ?? 0) || 0) + 1;
     t.dadosPatch = { ...(t.dadosPatch ?? {}), perguntas_valores: n };
     if (n >= 2) {
-      t = {
-        ...t, statusNovo: 'handoff', motivoHumano: 'quer_falar_valores',
-        bolhas: ['Entendo perfeitamente! Vou passar o senhor para o nosso especialista, que é quem pode conversar sobre valores. Ele já vai falar com o senhor por aqui. 🙏'],
-        notaInterna: t.notaInterna ?? notaContexto(ctx, 'quer_falar_valores'),
-        dadosPatch: t.dadosPatch,
-      };
-    } else if (!t.etapaNova) {
-      t.bolhas = [RESPOSTA_SEGURA];
-    } else {
-      t.bolhas = [RESPOSTA_SEGURA, ...t.bolhas].slice(0, 3);
+      const bolhas = await gerarDespedida(ctx,
+        'A pessoa insiste em saber valores/condições. Explique com todo o respeito que essa conversa é com o especialista, que você vai passar o atendimento agora para ele confirmar tudo, e que ele fala com ela aqui mesmo.');
+      t = { ...t, bolhas, video: undefined, etapaNova: undefined, statusNovo: 'handoff', motivoHumano: 'quer_falar_valores', notaInterna: t.notaInterna ?? notaContexto(ctx, 'quer_falar_valores') };
     }
   }
 
-  // ---- guardrail PÓS-Gemini em tudo que vai ao cliente ----
-  const bolhasLimpa: string[] = [];
-  for (const b of t.bolhas) {
-    const v = saidaProibida(b);
-    if (v) {
-      await evento(admin, sessao, 'guardrail_bloqueou', { violacao: v, texto: b.slice(0, 180) });
-      if (!bolhasLimpa.includes(RESPOSTA_SEGURA)) bolhasLimpa.push(RESPOSTA_SEGURA);
-    } else bolhasLimpa.push(b);
+  // ---- confusão REAL do cliente acumulada (2ª vez seguida): vira handoff educado JÁ —
+  //      substituindo a re-pergunta do modelo (mandar as duas seria contraditório) ----
+  const errosProspectivos = t.incrementaErro ? (sessao.tentativas_erro ?? 0) + 1 : (t.resetErros ? 0 : (sessao.tentativas_erro ?? 0));
+  if (!t.statusNovo && errosProspectivos >= 2) {
+    const bolhasHandoff = await gerarDespedida(ctx,
+      'Vocês não estão conseguindo se entender por aqui. Sem culpar a pessoa, diga com carinho que um colega do time vai continuar com ela nesta conversa para ajudar melhor.');
+    t = { ...t, bolhas: bolhasHandoff, video: undefined, etapaNova: undefined, statusNovo: 'handoff', motivoHumano: 'nao_entendeu', notaInterna: t.notaInterna ?? notaContexto(ctx, 'nao_entendeu') };
+  }
+
+  // ---- guardrail pós-Gemini: violou → pede REESCRITA (1x); persistiu → descarta a bolha ----
+  let bolhas = [...t.bolhas];
+  const violacoes = bolhas.map((b) => saidaProibida(b));
+  if (violacoes.some(Boolean)) {
+    for (let i = 0; i < bolhas.length; i++) {
+      if (violacoes[i]) await evento(admin, sessao, 'guardrail_bloqueou', { violacao: violacoes[i], texto: bolhas[i].slice(0, 180) });
+    }
+    const reescritas = await reescrever(ctx, bolhas,
+      `Sua resposta violou uma regra dura (${violacoes.filter(Boolean).join(', ')}): é PROIBIDO citar valores, taxas, juros, percentuais, margem, prazos, nomes de banco ou "aprovado/reprovado". Reescreva mantendo o sentido, sem nada disso.`);
+    bolhas = (reescritas ?? bolhas).filter((b) => !saidaProibida(b));
+  }
+
+  // ---- dedup duro: nunca repetir uma saída já existente na conversa ----
+  bolhas = await deduplicar(ctx, bolhas);
+
+  // ---- filtro FINAL de segurança: a reescrita do dedup também é geração — nada proibido passa ----
+  {
+    const finais: string[] = [];
+    for (const b of bolhas) {
+      const v = saidaProibida(b);
+      if (v) { await evento(admin, sessao, 'guardrail_bloqueou', { violacao: v, texto: b.slice(0, 180), pos_dedup: true }); continue; }
+      finais.push(b);
+    }
+    bolhas = finais;
+  }
+
+  // ---- a LEGENDA do vídeo é texto do modelo: passa pelas mesmas travas (violou/repetiu → sem legenda) ----
+  if (t.video?.caption) {
+    const v = saidaProibida(t.video.caption);
+    const dup = ctx.saidasAnteriores.has(normalizarSaida(t.video.caption));
+    if (v || dup) {
+      await evento(admin, sessao, v ? 'guardrail_bloqueou' : 'dedup_descartou', { texto: t.video.caption.slice(0, 120), ...(v ? { violacao: v } : {}), legenda_video: true });
+      t.video = { ...t.video, caption: '' };
+    }
+  }
+
+  if (!bolhas.length && !t.video && t.bolhas.length) {
+    // tinha resposta e tudo caiu (guardrail/dedup): melhor silêncio + nova chance que repetição
+    await evento(admin, sessao, 'saida_descartada', { motivo: 'guardrail_ou_dedup', originais: t.bolhas.length });
   }
 
   // ---- humano entrou enquanto processávamos? (o trigger já pausou) => não envia nada ----
   const { data: fresca } = await admin.from('ia_sessoes').select('status').eq('id', sessao.id).maybeSingle();
   if (fresca?.status !== 'ativa') { await evento(admin, sessao, 'abortado_status', { status: fresca?.status ?? null }); return; }
 
-  // ---- envia (fila bot_mensagens_saida drenada em processo, presence + jitter) ----
-  if (bolhasLimpa.length || t.video) {
-    await enviarBolhas(admin, ctx, bolhasLimpa.slice(0, 3), t.video ?? null);
-  }
+  if (bolhas.length || t.video) await enviarBolhas(admin, ctx, bolhas.slice(0, 3), t.video ?? null);
 
-  // ---- persiste o desfecho do turno ----
+  // ---- persiste o desfecho do turno (sucesso => zera falhas técnicas consecutivas) ----
   const ultimaNova = novas.length ? novas[novas.length - 1].criado_em : processadoAte;
+  const corteVistas = Date.parse(ultimaNova) - 5_000;
+  const msgsVistas = fetched.filter((m) => Date.parse(m.criado_em) > corteVistas).map((m) => m.id).slice(-40);
   const patch: Record<string, unknown> = {
-    dados: { ...dados, ...(t.dadosPatch ?? {}), processado_ate: ultimaNova, abertura_enviada: true },
+    dados: { ...dados, ...(t.dadosPatch ?? {}), processado_ate: ultimaNova, msgs_vistas: msgsVistas, abertura_enviada: true, falhas_tecnicas: 0 },
     docs: { ...ctx.docs, ...(t.docsPatch ?? {}) },
     atualizado_em: new Date().toISOString(),
   };
@@ -370,178 +521,238 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
     await evento(admin, sessao, 'encerrada', { motivo: t.etiquetaOpp ?? null });
   }
 
-  // erro de entendimento acumulado => handoff educado (regra dura da etapa 6)
-  const errosDepois = (patch.tentativas_erro as number | undefined) ?? sessao.tentativas_erro ?? 0;
-  if (!t.statusNovo && errosDepois >= 2) {
-    await fazerHandoff(admin, sessao, canal, 'nao_entendeu', [FALLBACK_HANDOFF], notaContexto(ctx, 'nao_entendeu'), patch);
-    return;
+  const { error: ePatch } = await admin.from('ia_sessoes').update(patch).eq('id', sessao.id);
+  if (ePatch) {
+    // patch perdido = máquina de estados quebrada em silêncio; vira falha técnica VISÍVEL
+    await evento(admin, sessao, 'erro_escrita', { onde: 'patch_turno', erro: String(ePatch.message ?? '').slice(0, 200) });
+    throw new FalhaTecnica('patch_turno_falhou');
   }
-
-  await admin.from('ia_sessoes').update(patch).eq('id', sessao.id);
-  if (!t.statusNovo) await limparAgenda(admin, sessao.id, claimAte);
-}
-
-interface Ctx {
-  admin: Admin; sessao: Sessao; canal: Record<string, unknown>; iaConfig: Record<string, unknown>;
-  conversa: Record<string, unknown>; destino: string; transcript: string;
-  contatoNome: string; contatoCpf: string;
-  dados: Record<string, unknown>; docs: Record<string, unknown>; cobertura: Record<string, unknown>;
-  novas: MsgNova[]; textos: string[]; arquivos: MsgNova[]; audios: MsgNova[]; pendentes: number;
+  if (!t.statusNovo) {
+    if (houveMais) {
+      // estourou o limit de novas: tem mensagem esperando — próximo turno JÁ, sem dormir
+      await admin.from('ia_sessoes').update({ processar_apos: new Date().toISOString() }).eq('id', sessao.id).eq('status', 'ativa');
+    } else {
+      await limparAgenda(admin, sessao.id, claimAte);
+    }
+  }
 }
 
 // ======== etapas ========
 async function etapaQualificacao(ctx: Ctx): Promise<Turno> {
-  if (!ctx.dados.abertura_enviada && !ctx.textos.length && !ctx.audios.length) {
-    const r = await conversar(ctx, 'Abra a conversa desta etapa agora: cumprimente rapidamente e faça a pergunta do benefício do INSS.', [
-      'O senhor é aposentado, pensionista ou recebe algum benefício do INSS?',
-    ]);
-    return { bolhas: r.mensagens, resetErros: true };
+  const abertura = !ctx.dados.abertura_enviada && !ctx.textos.length && !ctx.audios.length && !ctx.arquivos.length;
+  const r = await conversar(ctx, {
+    instrucaoExtra: abertura ? 'Este é o SEU primeiro contato (abertura da etapa): cumprimente de leve e faça a pergunta do benefício.' : '',
+  });
+  const recebe = String(r.dados.recebe_inss ?? (abertura ? 'incerto' : 'incerto'));
+  if (!abertura && recebe === 'sim') {
+    return { bolhas: r.mensagens, etapaNova: 'coleta_docs', resetErros: true, __perguntouValores: r.perguntouValores };
   }
-  const r = await conversar(ctx, '', ['Só pra eu confirmar: o senhor recebe aposentadoria, pensão ou algum outro benefício do INSS?']);
-  const recebe = String(r.dados.recebe_inss ?? 'incerto');
-  if (recebe === 'sim') return { bolhas: r.mensagens, etapaNova: 'docs_pessoais', resetErros: true, __perguntouValores: r.perguntouValores };
-  if (recebe === 'nao') {
-    return {
-      bolhas: r.mensagens.length ? r.mensagens : ['Entendi! Nesse caso a nossa análise não se aplica, mas agradeço demais o contato. Qualquer coisa, estamos por aqui. 🙏'],
-      statusNovo: 'encerrada', etiquetaOpp: 'nao_elegivel', __perguntouValores: r.perguntouValores,
-    };
+  if (!abertura && recebe === 'nao') {
+    return { bolhas: r.mensagens, statusNovo: 'encerrada', etiquetaOpp: 'nao_elegivel', __perguntouValores: r.perguntouValores };
   }
-  return { bolhas: r.mensagens, incrementaErro: true, __perguntouValores: r.perguntouValores };
+  return { bolhas: r.mensagens, incrementaErro: !abertura, __perguntouValores: r.perguntouValores };
 }
 
-const PROMPT_DOC_PESSOAL = `Você é um extrator de dados de documento de identidade brasileiro (RG ou CNH). Analise a imagem/arquivo anexo e devolva o JSON pedido. "legivel"=false quando não dá para ler o nome com segurança (foto tremida, cortada, escura).`;
-
-async function etapaDocsPessoais(ctx: Ctx): Promise<Turno> {
-  if (!ctx.arquivos.length) {
-    if (ctx.pendentes) return { bolhas: ['Parece que o arquivo não chegou direitinho aqui. 😔 O senhor pode mandar a foto de novo, por favor?'] };
-    const r = await conversar(ctx, '', ['Quando puder, me manda a foto do RG ou da CNH do senhor, frente e verso, bem legível. 😊']);
-    return { bolhas: r.mensagens, __perguntouValores: r.perguntouValores };
-  }
-  const exts = await extrairDeArquivos(ctx, PROMPT_DOC_PESSOAL, SCHEMA_DOC_PESSOAL);
-  if (exts.grandes) return { bolhas: ['O arquivo veio muito pesado e não consegui abrir. 😔 Pode mandar como foto normal, tirada da galeria mesmo?'] };
-  const ok = exts.itens.find((d) => d.legivel && d.tipo_documento !== 'outro' && d.nome_completo && d.confianca !== 'baixa');
-  const tent = (Number(ctx.dados.tentativas_etapa ?? 0) || 0) + 1;
-  if (!ok) {
-    if (tent > 2) return { bolhas: [FALLBACK_HANDOFF], statusNovo: 'handoff', motivoHumano: 'foto_ilegivel' };
-    return { bolhas: ['A foto chegou, mas não consegui ler direitinho. 😅 Pode tirar outra, num lugar mais claro e com o documento inteiro aparecendo?'], dadosPatch: { tentativas_etapa: tent } };
-  }
-  const nomeDoc = String(ok.nome_completo);
-  const bateNome = nomesBatem(nomeDoc, ctx.contatoNome) || nomesBatem(nomeDoc, String(ctx.dados.nome_confirmado ?? ''));
-  const bateCpf = cpfsCompativeis(String(ok.cpf ?? ''), ctx.contatoCpf);
-  if (!bateNome || !bateCpf) {
-    if (tent > 2) return { bolhas: [FALLBACK_HANDOFF], statusNovo: 'handoff', motivoHumano: 'doc_divergente' };
-    return {
-      bolhas: [`Esse documento parece estar no nome de ${primeiroNome(nomeDoc)}. Eu preciso do documento do próprio titular do benefício. O senhor pode conferir e me mandar de novo?`],
-      dadosPatch: { tentativas_etapa: tent },
-    };
-  }
-  const meses = mesesComprovante();
-  const r = await conversar(ctx,
-    `O documento (${String(ok.tipo_documento).toUpperCase()}) foi recebido e validado com sucesso. Agradeça e peça agora o comprovante de residência: uma conta (luz, água, telefone) no nome do cliente, de ${meses[0].rotulo} ou ${meses[1].rotulo}. Foto ou PDF.`,
-    ['Documento recebido, muito obrigada! 🙌', `Agora preciso de um comprovante de residência no nome do senhor: pode ser conta de luz, água ou telefone, de ${meses[0].rotulo} ou ${meses[1].rotulo}.`]);
+// ---- coleta por CHECKLIST DINÂMICO: identidade F/V + comprovante + e-mail (+ declarante) ----
+interface Checklist { identidadeOk: boolean; comprovanteOk: boolean; emailOk: boolean; declaranteNecessario: boolean; declaranteOk: boolean; completo: boolean }
+function checklistDe(ctx: Ctx, emailNovo: string | null): Checklist {
+  const identidadeOk = !!ctx.docs.doc_pessoal;
+  const comprovanteOk = !!ctx.docs.comprovante;
+  const declaranteNecessario = ctx.dados.declarante_necessario === true;
+  const declaranteOk = !!ctx.docs.declarante_doc;
+  const emailOk = !!(ctx.dados.email || emailNovo);
   return {
-    bolhas: r.mensagens, etapaNova: 'comprovante_residencia', resetErros: true,
-    dadosPatch: { nome_confirmado: nomeDoc },
-    docsPatch: { doc_pessoal: { tipo: ok.tipo_documento, nome: nomeDoc, cpf_mascarado: mascararCpf(String(ok.cpf ?? '')), anexos: ctx.arquivos.map((a) => (a.metadados as Record<string, unknown>)?.anexo_path), validado_em: new Date().toISOString() } },
+    identidadeOk, comprovanteOk, emailOk, declaranteNecessario, declaranteOk,
+    completo: identidadeOk && comprovanteOk && emailOk && (!declaranteNecessario || declaranteOk),
+  };
+}
+function checklistTexto(c: Checklist, titular: string, meses: string): string {
+  const linha = (ok: boolean, s: string) => `${ok ? '✔ já recebido' : '✖ FALTA'} — ${s}`;
+  const linhas = [
+    linha(c.identidadeOk, 'documento de identidade (RG ou CNH, frente e verso)'),
+    linha(c.comprovanteOk, `comprovante de residência (${meses})`),
+    linha(c.emailOk, 'e-mail do cliente'),
+  ];
+  if (c.declaranteNecessario) linhas.push(linha(c.declaranteOk, `RG/CNH de ${titular} como declarante (a conta de residência está no nome dele/dela)`));
+  return linhas.join('\n');
+}
+
+async function etapaColetaDocs(ctx: Ctx): Promise<Turno> {
+  const meses = mesesComprovante();
+  const mesesTxt = `do mês atual ou do passado (${meses[0].rotulo} ou ${meses[1].rotulo})`;
+  const notas: string[] = [];
+  const dadosPatch: Record<string, unknown> = {};
+  const docsPatch: Record<string, unknown> = {};
+  const tent = { ...((ctx.dados.tentativas_item as Record<string, number>) ?? {}) };
+  const marcaTentativa = (item: string): number => { tent[item] = (tent[item] ?? 0) + 1; return tent[item]; };
+  // leitura patch-sobre-base: `??` não serve aqui — o reset grava null/false no patch e precisa
+  // VENCER o valor antigo de ctx.dados (null ?? antigo devolveria o antigo)
+  const declPrecisaAtual = () => ('declarante_necessario' in dadosPatch) ? dadosPatch.declarante_necessario === true : ctx.dados.declarante_necessario === true;
+  const titularAtual = () => String((('titular_comprovante' in dadosPatch) ? dadosPatch.titular_comprovante : ctx.dados.titular_comprovante) ?? '');
+
+  // e-mail pode chegar escrito no texto (áudio soletrado fica com o modelo via dados_extraidos)
+  let emailNovo: string | null = null;
+  for (const txt of ctx.textos) {
+    const e = extrairEmail(txt);
+    if (e) { emailNovo = e; break; }
+  }
+
+  // ---- valida os arquivos do turno ----
+  if (ctx.pendentes) notas.push('→ um arquivo do cliente NÃO chegou direito no sistema; peça para reenviar essa foto/arquivo.');
+  if (ctx.arquivos.length) {
+    const exts = await extrairDeArquivos(ctx, PROMPT_ARQUIVO_COLETA, SCHEMA_ARQUIVO_COLETA);
+    if (exts.grandes) notas.push('→ um arquivo veio pesado demais e não abriu; peça como foto normal, tirada da galeria.');
+    // comprovante ANTES das identidades: se comprovante em nome de terceiro + RG do terceiro
+    // chegam JUNTOS, a necessidade de declarante precisa existir antes de validar o RG dele
+    exts.itens.sort((a, b) =>
+      (a.tipo_arquivo === 'comprovante_residencia' ? 0 : 1) - (b.tipo_arquivo === 'comprovante_residencia' ? 0 : 1));
+    for (const d of exts.itens) {
+      const legivel = d.legivel === true && d.confianca !== 'baixa';
+      const antesId = !!(ctx.docs.doc_pessoal ?? docsPatch.doc_pessoal);
+      const declPrecisa = declPrecisaAtual();
+      const declOk = !!(ctx.docs.declarante_doc ?? docsPatch.declarante_doc);
+      if (d.tipo_arquivo === 'identidade' && legivel && d.nome_completo) {
+        const nomeDoc = String(d.nome_completo);
+        const titular = titularAtual();
+        const bateLead = nomesBatem(nomeDoc, String(ctx.dados.nome_confirmado ?? '') || ctx.contatoNome) && cpfsCompativeis(String(d.cpf ?? ''), ctx.contatoCpf);
+        if (!antesId && bateLead) {
+          docsPatch.doc_pessoal = { tipo: d.tipo_documento, nome: nomeDoc, cpf_mascarado: mascararCpf(String(d.cpf ?? '')), anexo: d.__anexo, validado_em: new Date().toISOString() };
+          dadosPatch.nome_confirmado = nomeDoc;
+          notas.push(`→ identidade (${String(d.tipo_documento).toUpperCase()}) de ${nomeDoc}: legível e o nome confere ✓ registrada.`);
+        } else if (declPrecisa && !declOk && titular && nomesBatem(nomeDoc, titular)) {
+          const decl = { nome: nomeDoc, cpf: somenteDigitos(String(d.cpf ?? '')) || null, tipo_documento: d.tipo_documento, validado_em: new Date().toISOString() };
+          docsPatch.declarante_doc = { ...decl, anexo: d.__anexo };
+          dadosPatch.declarante = decl;
+          notas.push(`→ documento do DECLARANTE (${nomeDoc}) recebido e validado ✓.`);
+        } else if (antesId && !declPrecisa) {
+          notas.push('→ chegou outra foto de identidade, mas essa parte já estava completa — só agradeça.');
+        } else {
+          const alvo = (!antesId) ? 'identidade' : 'declarante';
+          const n = marcaTentativa(`divergente_${alvo}`);
+          if (n >= 2) return await handoffColeta(ctx, 'doc_divergente', dadosPatch, docsPatch, tent);
+          notas.push(`→ o documento veio no nome de ${nomeDoc}, que NÃO confere com o esperado (${alvo === 'identidade' ? 'o titular do benefício' : `o declarante ${String(ctx.dados.titular_comprovante ?? '')}`}). Peça para conferir e mandar o documento certo.`);
+        }
+      } else if (d.tipo_arquivo === 'comprovante_residencia' && legivel && d.nome_titular) {
+        const mesOk = meses.some((m) => Number(d.mes_referencia) === m.mes && Number(d.ano) === m.ano);
+        if (!mesOk) {
+          const n = marcaTentativa('comprovante');
+          if (n >= 2) return await handoffColeta(ctx, 'comprovante_fora_janela', dadosPatch, docsPatch, tent);
+          notas.push(`→ o comprovante veio de outra data — só vale conta de ${meses[0].rotulo} ou ${meses[1].rotulo}. Peça uma mais recente.`);
+        } else {
+          const titular = String(d.nome_titular);
+          const nomeLead = String(ctx.dados.nome_confirmado ?? '') || ctx.contatoNome;
+          const doProprio = nomesBatem(titular, nomeLead);
+          const atual = (docsPatch.comprovante ?? ctx.docs.comprovante) as Record<string, unknown> | undefined;
+          const jaTemProprio = !!atual && nomesBatem(String(atual.titular ?? ''), nomeLead);
+          if (jaTemProprio && !doProprio) {
+            // comprovante do PRÓPRIO cliente já registrado: conta de terceiro que chega depois
+            // não regride o checklist nem cria exigência de declarante
+            notas.push(`→ chegou outra conta (no nome de ${titular}), mas o comprovante do próprio cliente já estava registrado — só agradeça.`);
+          } else {
+            docsPatch.comprovante = { tipo_conta: d.tipo_conta, titular, mes: d.mes_referencia, ano: d.ano, anexo: d.__anexo, validado_em: new Date().toISOString() };
+            if (doProprio) {
+              // vigente voltou a ser do próprio cliente: DESFAZ a exigência de declarante
+              dadosPatch.declarante_necessario = false;
+              dadosPatch.titular_comprovante = null;
+              notas.push(`→ comprovante de residência (${String(d.tipo_conta ?? 'conta')}) no nome do cliente, dentro do prazo ✓ registrado.`);
+            } else {
+              dadosPatch.declarante_necessario = true;
+              dadosPatch.titular_comprovante = titular;
+              notas.push(`→ comprovante válido, MAS está no nome de ${titular}. Explique com naturalidade que precisamos também do RG ou CNH dessa pessoa, como declarante.`);
+            }
+          }
+        }
+      } else {
+        // ilegível ou não identificado — atribui ao item que ainda falta
+        const alvo = !antesId ? 'identidade' : (!(ctx.docs.comprovante ?? docsPatch.comprovante) ? 'comprovante' : (declPrecisa && !declOk ? 'declarante' : 'outro'));
+        const n = marcaTentativa(`ilegivel_${alvo}`);
+        if (n >= 2) return await handoffColeta(ctx, 'foto_ilegivel', dadosPatch, docsPatch, tent);
+        notas.push('→ chegou um arquivo que não deu para ler direito (foto tremida/cortada/escura ou documento inesperado). Peça outra foto, com boa luz e o documento inteiro.');
+      }
+    }
+  }
+  if (emailNovo) notas.push(`→ e-mail recebido no texto: ${emailNovo} ✓ (confirme com a pessoa).`);
+
+  // ---- monta o contexto do checklist e conversa ----
+  const cl = checklistDe({ ...ctx, docs: { ...ctx.docs, ...docsPatch }, dados: { ...ctx.dados, ...dadosPatch } } as Ctx, emailNovo);
+  const titular = titularAtual() || 'a pessoa da conta';
+  const r = await conversar(ctx, {
+    etapa: 'coleta_docs',
+    vars: {
+      CHECKLIST: checklistTexto(cl, titular, mesesTxt),
+      RESULTADO_ARQUIVOS: notas.length ? `O QUE ACONTECEU NESTE TURNO (traduza para conversa natural — não copie literalmente):\n${notas.join('\n')}` : '',
+      MESES_ACEITOS: mesesTxt,
+    },
+  });
+
+  // e-mail vindo do modelo (áudio soletrado): valida formato antes de aceitar
+  const emailModelo = String(r.dados.email ?? '').trim().toLowerCase();
+  const emailFinal = emailNovo ?? (emailValido(emailModelo) ? emailModelo : null);
+  if (emailFinal && emailFinal !== ctx.dados.email) {
+    dadosPatch.email = emailFinal;
+    try { await ctx.admin.from('contatos').update({ email: emailFinal }).eq('id', ctx.sessao.contato_id); } catch { /* best-effort */ }
+  }
+
+  const clFinal = checklistDe({ ...ctx, docs: { ...ctx.docs, ...docsPatch }, dados: { ...ctx.dados, ...dadosPatch } } as Ctx, emailFinal);
+  dadosPatch.tentativas_item = tent;
+
+  // checklist FECHOU: a pergunta do gov.br sai NESTE turno, determinística (2ª chamada) —
+  // depender do modelo emendar sozinho podia deixar a conversa parada esperando o cliente
+  let bolhas = r.mensagens;
+  if (clFinal.completo) {
+    const abertura = await conversar(ctx, {
+      etapa: 'triagem_govbr',
+      instrucaoExtra: 'O checklist da documentação acabou de fechar. Este turno é a ABERTURA da etapa: em 1 bolha curta, faça a pergunta do gov.br/Meu INSS (só perguntar SE tem a senha e usa o app).',
+    });
+    // a PERGUNTA entra garantida (por último): o agradecimento cede espaço se precisar
+    bolhas = [...bolhas.slice(0, 2), abertura.mensagens[0]].filter(Boolean);
+  }
+  return {
+    bolhas,
+    etapaNova: clFinal.completo ? 'triagem_govbr' : (ctx.sessao.etapa !== 'coleta_docs' ? 'coleta_docs' : undefined),
+    resetErros: true,
+    dadosPatch, docsPatch,
+    __perguntouValores: r.perguntouValores,
   };
 }
 
-const PROMPT_COMPROVANTE = `Você é um extrator de dados de comprovante de residência brasileiro (conta de luz, água, telefone, internet, gás etc.). Analise o arquivo anexo e devolva o JSON pedido. mes_referencia/ano = mês de REFERÊNCIA da conta (ou do vencimento, se não houver referência).`;
-
-async function etapaComprovante(ctx: Ctx): Promise<Turno> {
-  const meses = mesesComprovante();
-  if (!ctx.arquivos.length) {
-    if (ctx.pendentes) return { bolhas: ['O arquivo não chegou direitinho aqui. 😔 Pode mandar de novo, por favor?'] };
-    const r = await conversarComVars(ctx, { MESES_ACEITOS: `de ${meses[0].rotulo} ou ${meses[1].rotulo}` }, '',
-      [`Quando puder, me manda o comprovante de residência no nome do senhor (conta de luz, água ou telefone), de ${meses[0].rotulo} ou ${meses[1].rotulo}. 😊`]);
-    return { bolhas: r.mensagens, __perguntouValores: r.perguntouValores };
-  }
-  const exts = await extrairDeArquivos(ctx, PROMPT_COMPROVANTE, SCHEMA_COMPROVANTE);
-  if (exts.grandes) return { bolhas: ['O arquivo veio muito pesado e não consegui abrir. 😔 Pode mandar como foto normal?'] };
-  const ok = exts.itens.find((d) => d.legivel && d.nome_titular);
-  const tent = (Number(ctx.dados.tentativas_etapa ?? 0) || 0) + 1;
-  if (!ok) {
-    if (tent > 2) return { bolhas: [FALLBACK_HANDOFF], statusNovo: 'handoff', motivoHumano: 'comprovante_ilegivel' };
-    return { bolhas: ['Não consegui ler o comprovante direitinho. 😅 Pode tirar outra foto, com a parte de cima da conta aparecendo inteira?'], dadosPatch: { tentativas_etapa: tent } };
-  }
-  const mesOk = meses.some((m) => Number(ok.mes_referencia) === m.mes && Number(ok.ano) === m.ano);
-  if (!mesOk) {
-    if (tent > 2) return { bolhas: [FALLBACK_HANDOFF], statusNovo: 'handoff', motivoHumano: 'comprovante_fora_janela' };
-    return {
-      bolhas: [`Essa conta é de uma data mais antiga. Eu preciso de uma conta de ${meses[0].rotulo} ou de ${meses[1].rotulo}. O senhor tem uma mais recente aí?`],
-      dadosPatch: { tentativas_etapa: tent },
-    };
-  }
-  const titular = String(ok.nome_titular);
-  const nomeLead = String(ctx.dados.nome_confirmado ?? ctx.contatoNome);
-  const docBase = { tipo_conta: ok.tipo_conta, titular, mes: ok.mes_referencia, ano: ok.ano, anexos: ctx.arquivos.map((a) => (a.metadados as Record<string, unknown>)?.anexo_path), validado_em: new Date().toISOString() };
-  if (!nomesBatem(titular, nomeLead)) {
-    const r = await conversarComVars(ctx, { TITULAR: titular },
-      `O comprovante veio no nome de outra pessoa (${titular}). Explique com naturalidade que, como a conta está no nome dela, precisamos também do RG ou CNH dessa pessoa (o declarante), frente e verso, foto legível.`,
-      [`Vi aqui que a conta está no nome de ${primeiroNome(titular)}. Sem problema nenhum! 😊`, `Nesse caso, eu só preciso também do RG ou da CNH de ${primeiroNome(titular)}, frente e verso, pra constar como declarante. Pode me mandar a foto?`]);
-    return { bolhas: r.mensagens, etapaNova: 'declarante', resetErros: true, dadosPatch: { titular_comprovante: titular }, docsPatch: { comprovante: docBase } };
-  }
-  const r = await conversar(ctx,
-    'O comprovante foi recebido e validado. Agradeça e pergunte se o cliente tem a senha do gov.br e costuma usar o aplicativo Meu INSS (apenas pergunte SE tem — nunca peça a senha).',
-    ['Comprovante recebido, obrigada! 🙌', 'Me diz uma coisa: o senhor tem a senha do gov.br e costuma usar o aplicativo Meu INSS?']);
-  return { bolhas: r.mensagens, etapaNova: 'triagem_govbr', resetErros: true, docsPatch: { comprovante: docBase } };
-}
-
-async function etapaDeclarante(ctx: Ctx): Promise<Turno> {
-  const titular = String(ctx.dados.titular_comprovante ?? '');
-  if (!ctx.arquivos.length) {
-    if (ctx.pendentes) return { bolhas: ['O arquivo não chegou direitinho aqui. 😔 Pode mandar de novo, por favor?'] };
-    const r = await conversarComVars(ctx, { TITULAR: titular }, '',
-      [`Quando puder, me manda a foto do RG ou da CNH de ${primeiroNome(titular)} (frente e verso, bem legível), pra constar como declarante. 😊`]);
-    return { bolhas: r.mensagens, __perguntouValores: r.perguntouValores };
-  }
-  const exts = await extrairDeArquivos(ctx, PROMPT_DOC_PESSOAL, SCHEMA_DOC_PESSOAL);
-  if (exts.grandes) return { bolhas: ['O arquivo veio muito pesado e não consegui abrir. 😔 Pode mandar como foto normal?'] };
-  const ok = exts.itens.find((d) => d.legivel && d.tipo_documento !== 'outro' && d.nome_completo && d.confianca !== 'baixa');
-  const tent = (Number(ctx.dados.tentativas_etapa ?? 0) || 0) + 1;
-  if (!ok) {
-    if (tent > 2) return { bolhas: [FALLBACK_HANDOFF], statusNovo: 'handoff', motivoHumano: 'foto_ilegivel' };
-    return { bolhas: ['Não consegui ler direitinho. 😅 Pode tirar outra foto do documento, num lugar mais claro?'], dadosPatch: { tentativas_etapa: tent } };
-  }
-  const nomeDoc = String(ok.nome_completo);
-  if (!nomesBatem(nomeDoc, titular)) {
-    if (tent > 2) return { bolhas: [FALLBACK_HANDOFF], statusNovo: 'handoff', motivoHumano: 'declarante_divergente' };
-    return {
-      bolhas: [`Esse documento parece não ser de ${primeiroNome(titular)}, que é quem está na conta. Pode conferir e me mandar o documento dela(e)?`],
-      dadosPatch: { tentativas_etapa: tent },
-    };
-  }
-  const declarante = { nome: nomeDoc, cpf: somenteDigitos(String(ok.cpf ?? '')) || null, tipo_documento: ok.tipo_documento, validado_em: new Date().toISOString() };
-  const r = await conversar(ctx,
-    'O documento do declarante foi validado. Agradeça e pergunte se o cliente tem a senha do gov.br e costuma usar o aplicativo Meu INSS (apenas pergunte SE tem — nunca peça a senha).',
-    ['Recebido, obrigada! 🙌', 'Me diz uma coisa: o senhor tem a senha do gov.br e costuma usar o aplicativo Meu INSS?']);
-  return {
-    bolhas: r.mensagens, etapaNova: 'triagem_govbr', resetErros: true,
-    dadosPatch: { declarante },
-    docsPatch: { declarante_doc: { ...declarante, anexos: ctx.arquivos.map((a) => (a.metadados as Record<string, unknown>)?.anexo_path) } },
-  };
+async function handoffColeta(ctx: Ctx, motivo: string, dadosPatch: Record<string, unknown>, docsPatch: Record<string, unknown>, tent: Record<string, number>): Promise<Turno> {
+  const bolhas = await gerarDespedida(ctx,
+    motivo === 'foto_ilegivel'
+      ? 'As fotos do documento não estão saindo legíveis, e insistir cansaria a pessoa. Sem culpar ninguém, diga que um colega do time vai ajudar com esse documento pessoalmente, aqui na conversa.'
+      : motivo === 'comprovante_fora_janela'
+        ? 'O comprovante de residência não está no período aceito e já foi pedido de novo. Diga com carinho que um colega do time vai ajudar a resolver essa parte aqui na conversa.'
+        : 'O documento enviado não confere com o esperado. Sem constranger a pessoa, diga que um colega do time vai conferir isso com ela pessoalmente, aqui na conversa.');
+  return { bolhas, statusNovo: 'handoff', motivoHumano: motivo, dadosPatch: { ...dadosPatch, tentativas_item: tent }, docsPatch };
 }
 
 async function etapaTriagem(ctx: Ctx): Promise<Turno> {
-  const r = await conversar(ctx, '', ['O senhor tem a senha do gov.br e costuma usar o aplicativo Meu INSS?']);
+  const r = await conversar(ctx, {});
   const tem = String(r.dados.tem_govbr ?? 'incerto');
   if (tem === 'sim') {
+    // turno de instruções do Meu INSS (gerado pelo modelo; vídeo entra se configurado)
     const videoPath = String((ctx.iaConfig as { video_meuinss_path?: string }).video_meuinss_path ?? '').trim();
-    if (videoPath) {
+    const temVideo = !!videoPath;
+    const inst = await conversar(ctx, {
+      etapa: 'video_meuinss',
+      vars: {
+        TEM_VIDEO: temVideo
+          ? '- Um VÍDEO com o passo a passo vai junto da sua resposta: a sua PRIMEIRA bolha vira a legenda dele (curta); use as outras para listar os dois documentos.'
+          : '- NÃO há vídeo: o passo a passo vai em texto — no máximo 2 bolhas para ele, mais 1 para os documentos.',
+      },
+    });
+    if (temVideo) {
       const url = /^https?:\/\//i.test(videoPath) ? videoPath
         : `${SUPABASE_URL}/storage/v1/object/public/bot-midia/${videoPath.replace(/^\/+/, '')}`;
       return {
-        bolhas: [INSTRUCAO_DOCS_MEUINSS], video: { url, caption: CAPTION_VIDEO_MEUINSS },
-        etapaNova: 'extratos', resetErros: true, __perguntouValores: r.perguntouValores,
+        bolhas: inst.mensagens.slice(1), video: { url, caption: inst.mensagens[0] ?? '' },
+        etapaNova: 'extratos', resetErros: true, __perguntouValores: r.perguntouValores || inst.perguntouValores,
       };
     }
-    return { bolhas: [...PASSO_A_PASSO_MEUINSS], etapaNova: 'extratos', resetErros: true, __perguntouValores: r.perguntouValores };
+    return { bolhas: inst.mensagens, etapaNova: 'extratos', resetErros: true, __perguntouValores: r.perguntouValores || inst.perguntouValores };
   }
   if (tem === 'nao' || tem === 'nao_sabe') {
-    return {
-      bolhas: r.mensagens.length ? r.mensagens : ['Sem problema nenhum, o senhor não se preocupe! 🙏 Um atendente da nossa equipe vai falar com o senhor aqui mesmo e baixar os documentos junto com o senhor, passo a passo.'],
-      statusNovo: 'handoff', motivoHumano: 'sem_acesso_govbr', __perguntouValores: r.perguntouValores,
-    };
+    return { bolhas: r.mensagens, statusNovo: 'handoff', motivoHumano: 'sem_acesso_govbr', __perguntouValores: r.perguntouValores };
   }
   return { bolhas: r.mensagens, incrementaErro: true, __perguntouValores: r.perguntouValores };
 }
@@ -556,149 +767,172 @@ async function etapaExtratos(ctx: Ctx): Promise<Turno> {
   const alvoFim = ultimoMesFechadoIdx();
   const antes = calcularCobertura(janelasRaw, alvoFim);
   let progresso = false;
+  const notas: string[] = [];
 
+  // retomada pós-falha: análise já feita, só faltou a mensagem final
+  if (ctx.dados.analise_concluida === true && consignado) {
+    return await concluirSessao(ctx, montarCoberturaJson(calcularCobertura(janelasRaw, alvoFim), bancosAlvo, rubrica217, cpfExtratos), consignado);
+  }
+
+  if (ctx.pendentes) notas.push('→ um arquivo NÃO chegou direito no sistema; peça para reenviar.');
   if (ctx.arquivos.length) {
     const exts = await extrairDeArquivos(ctx, PROMPT_EXTRATO, SCHEMA_EXTRATO);
-    if (exts.grandes) return { bolhas: ['Um dos arquivos veio muito pesado e não consegui abrir. 😔 Pode baixar de novo no aplicativo e me mandar o arquivo direto?'] };
-    for (let i = 0; i < exts.itens.length; i++) {
-      const d = exts.itens[i];
-      const anexo = (ctx.arquivos[i]?.metadados as Record<string, unknown>)?.anexo_path as string | undefined;
+    if (exts.grandes) notas.push('→ um arquivo veio pesado demais; peça para baixar de novo no app e mandar o arquivo direto.');
+    for (const d of exts.itens) {
       const cpfArq = somenteDigitos(String(d.cpf ?? ''));
       if (cpfArq.length === 11) {
         if ((cpfExtratos && cpfArq !== cpfExtratos) || !cpfsCompativeis(cpfArq, ctx.contatoCpf)) {
+          const bolhas = await gerarDespedida(ctx,
+            'Você notou uma diferença de dados entre os documentos e, para não ter erro, vai pedir a ajuda de um colega do time, que continua com a pessoa aqui na conversa. Não a constranja.');
           return {
-            bolhas: ['Percebi uma diferença nos documentos e, pra não ter erro, vou pedir ajuda de um atendente da equipe, tá bom? Ele já vai falar com o senhor. 🙏'],
-            statusNovo: 'handoff', motivoHumano: 'cpf_divergente',
+            bolhas, statusNovo: 'handoff', motivoHumano: 'cpf_divergente',
             notaInterna: notaContexto(ctx, `cpf_divergente: extrato ${mascararCpf(cpfArq)} x cadastro ${mascararCpf(ctx.contatoCpf)}`),
           };
         }
         cpfExtratos = cpfExtratos || cpfArq;
       }
       if (d.tipo === 'historico_emprestimo_consignado') {
-        consignado = { anexo_path: anexo, mime: (ctx.arquivos[i]?.metadados as Record<string, unknown>)?.mime, nbs: d.nbs ?? [], recebido_em: new Date().toISOString() };
-        progresso = true;
+        if (!consignado) progresso = true;   // REENVIO do mesmo doc não conta como progresso
+        consignado = { anexo_path: d.__anexo, mime: d.__mime, nbs: d.nbs ?? [], recebido_em: new Date().toISOString() };
+        notas.push('→ chegou o Histórico de Empréstimo Consignado ✓.');
       } else if (d.tipo === 'historico_creditos') {
         const ini = competParaIdx(String(d.compet_inicial ?? ''));
         const fim = competParaIdx(String(d.compet_final ?? ''));
-        if (ini != null && fim != null) { janelasRaw.push({ ini, fim }); progresso = true; }
+        // progresso de créditos = COBERTURA cresceu (medido depois do loop) — arquivo repetido
+        // de janela já coberta não desarma o caminho do auxílio humano
+        if (ini != null && fim != null) { janelasRaw.push({ ini, fim }); notas.push('→ chegou um Histórico de Créditos ✓ (período registrado).'); }
+        else notas.push('→ chegou um Histórico de Créditos mas não deu para ler o período; peça para baixar e mandar de novo.');
         for (const b of (d.bancos_pagadores ?? []) as string[]) {
           const alvo = bancoAlvoDe(b);
           if (alvo) bancosAlvo.add(alvo);
         }
         if (d.tem_rubrica_217 === true) rubrica217 = true;
+      } else {
+        notas.push('→ chegou um arquivo que não parece ser dos documentos do Meu INSS; explique com jeitinho qual documento precisa.');
       }
     }
   }
 
   const depois = calcularCobertura(janelasRaw, alvoFim);
   if (depois.mesesCobertos > antes.mesesCobertos) progresso = true;
-  const coberturaNova: Record<string, unknown> = {
-    alvo_ini: depois.alvoIni, alvo_fim: depois.alvoFim,
-    janelas: depois.janelas, faltando: depois.faltando,
-    meses_cobertos: depois.mesesCobertos, completo: depois.completo,
-    bancos_alvo: [...bancosAlvo], rubrica_217: rubrica217, cpf: cpfExtratos || undefined,
-    atualizado_em: new Date().toISOString(),
-  };
+  const coberturaNova = montarCoberturaJson(depois, bancosAlvo, rubrica217, cpfExtratos);
 
-  // tudo em mãos => análise final (interna) + conclusão
   if (depois.completo && consignado?.anexo_path) {
-    return await analiseFinal(ctx, consignado, coberturaNova);
+    return await concluirSessao(ctx, coberturaNova, consignado);
   }
 
-  // cliente com dificuldade (texto/áudio) ou 2 rodadas sem progresso => caminho ESPERADO: humano ajuda
-  if (!ctx.arquivos.length && (ctx.textos.length || ctx.audios.length)) {
-    const faltaTxt = montarFaltaTexto(depois, !!consignado);
-    const r = await conversarComVars(ctx, { FALTA: faltaTxt }, '', [`Estou por aqui! ${faltaTxt}`]);
-    if (r.dados.cliente_com_dificuldade === true || r.acao === 'handoff') {
-      return {
-        bolhas: ['Essa parte do aplicativo dá um trabalhinho mesmo! 😊 O senhor não se preocupe: um atendente da nossa equipe vai te ajudar pessoalmente com esses documentos, aqui mesmo. Já já ele fala com o senhor. 🙏'],
-        statusNovo: 'handoff', motivoHumano: 'auxilio_extratos', coberturaNova,
-      };
-    }
-    return { bolhas: r.mensagens, coberturaNova, __perguntouValores: r.perguntouValores };
-  }
-
-  const rodadas = progresso ? 0 : (Number(ctx.dados.rodadas_sem_progresso ?? 0) || 0) + 1;
+  // ---- rodadas sem progresso: caminho ESPERADO da maioria é o humano ajudar ----
+  const rodadas = progresso ? 0 : (ctx.arquivos.length ? (Number(ctx.dados.rodadas_sem_progresso ?? 0) || 0) + 1 : (Number(ctx.dados.rodadas_sem_progresso ?? 0) || 0));
   if (rodadas >= 2) {
-    return {
-      bolhas: ['Essa parte do aplicativo dá um trabalhinho mesmo! 😊 O senhor não se preocupe: um atendente da nossa equipe vai te ajudar pessoalmente com esses documentos, aqui mesmo. Já já ele fala com o senhor. 🙏'],
-      statusNovo: 'handoff', motivoHumano: 'auxilio_extratos', coberturaNova,
-      dadosPatch: { rodadas_sem_progresso: rodadas },
-    };
+    const bolhas = await gerarDespedida(ctx,
+      'A pessoa está tentando mas os arquivos não estão vindo certos — essa parte do aplicativo dá trabalho mesmo. Acolha (sem culpar ninguém) e diga que um colega do time vai ajudar pessoalmente com esses documentos, aqui na conversa. É o caminho normal.');
+    return { bolhas, statusNovo: 'handoff', motivoHumano: 'auxilio_extratos', coberturaNova, dadosPatch: { rodadas_sem_progresso: rodadas } };
   }
 
-  // resposta com PRECISÃO do que falta (montada em código, nunca pelo modelo)
-  const bolhas: string[] = [];
-  if (progresso) bolhas.push('Recebi, muito obrigada! 🙌');
-  bolhas.push(montarFaltaTexto(depois, !!consignado));
+  const falta = montarFaltaTexto(depois, !!consignado);
+  const r = await conversar(ctx, {
+    etapa: 'extratos',
+    vars: {
+      FALTA: falta.frase,
+      RESULTADO_ARQUIVOS: notas.length ? `O QUE ACONTECEU NESTE TURNO (traduza para conversa natural):\n${notas.join('\n')}` : '',
+    },
+  });
+  if (r.dados.cliente_com_dificuldade === true || r.acao === 'handoff') {
+    return { bolhas: r.mensagens, statusNovo: 'handoff', motivoHumano: 'auxilio_extratos', coberturaNova, dadosPatch: { rodadas_sem_progresso: rodadas } };
+  }
+  // precisão obrigatória: os períodos citados têm que ser EXATAMENTE os calculados
+  let bolhas = r.mensagens;
+  if (falta.rotulos.length && ctx.arquivos.length) {
+    const contem = (msgs: string[]) => falta.rotulos.every((rot) => msgs.join(' ').toLowerCase().includes(rot));
+    if (!contem(bolhas)) {
+      const r2 = await reescrever(ctx, bolhas,
+        `A resposta PRECISA citar exatamente o que falta, com estes períodos literais: "${falta.frase}". Reescreva incluindo isso, no seu tom natural.`);
+      if (r2 && contem(r2)) bolhas = r2;
+      else await evento(ctx.admin, ctx.sessao, 'falta_impreciso', { esperado: falta.frase });
+    }
+  }
+  return { bolhas, coberturaNova, resetErros: progresso, dadosPatch: { rodadas_sem_progresso: rodadas }, docsPatch: consignado ? { consignado } : undefined, __perguntouValores: r.perguntouValores };
+}
+
+function montarCoberturaJson(c: ReturnType<typeof calcularCobertura>, bancosAlvo: Set<string>, rubrica217: boolean, cpf: string): Record<string, unknown> {
   return {
-    bolhas: bolhas.slice(0, 3), coberturaNova, resetErros: progresso,
-    dadosPatch: { rodadas_sem_progresso: rodadas },
-    docsPatch: consignado ? { consignado } : undefined,
+    alvo_ini: c.alvoIni, alvo_fim: c.alvoFim, janelas: c.janelas, faltando: c.faltando,
+    meses_cobertos: c.mesesCobertos, completo: c.completo,
+    bancos_alvo: [...bancosAlvo], rubrica_217: rubrica217, cpf: cpf || undefined,
+    atualizado_em: new Date().toISOString(),
   };
 }
 
-function montarFaltaTexto(cob: ReturnType<typeof calcularCobertura>, temConsignado: boolean): string {
+function montarFaltaTexto(cob: ReturnType<typeof calcularCobertura>, temConsignado: boolean): { frase: string; rotulos: string[] } {
   const partes: string[] = [];
-  if (!temConsignado) partes.push('falta o *Histórico de Empréstimo Consignado* (aquele arquivo único)');
+  const rotulos: string[] = [];
+  if (!temConsignado) partes.push('falta o Histórico de Empréstimo Consignado (o arquivo único)');
   if (!cob.completo) {
-    const faltas = formatarFaltas(cob.faltando);
-    partes.push(cob.mesesCobertos === 0
-      ? 'faltam os *Históricos de Créditos* (ano a ano, começando do mais recente)'
-      : `dos Históricos de Créditos, só falta o período de ${faltas}`);
+    if (cob.mesesCobertos === 0) partes.push('faltam os Históricos de Créditos (ano a ano, do mais recente para trás)');
+    else {
+      const faltas = formatarFaltas(cob.faltando);
+      partes.push(`dos Históricos de Créditos falta exatamente o período de ${faltas}`);
+      // só os 3 primeiros rótulos entram na verificação de precisão (frase longa não precisa inteira)
+      for (const j of cob.faltando.slice(0, 3)) {
+        rotulos.push(...formatarFaltas([j]).toLowerCase().split(' a '));
+      }
+    }
   }
-  if (!partes.length) return 'Recebi tudo certinho! 🙌';
-  return `Pra fechar, ${partes.join(' e ')}. Pode mandar aqui que eu confiro na hora. 😊`;
+  if (!partes.length) return { frase: 'não falta nada — checklist completo', rotulos: [] };
+  return { frase: partes.join('; e '), rotulos: rotulos.slice(0, 3) };
 }
 
 // ======== análise final (interna — nada disso vai ao cliente) ========
-async function analiseFinal(ctx: Ctx, consignado: Record<string, unknown>, coberturaNova: Record<string, unknown>): Promise<Turno> {
-  const arq = await baixarAnexo(ctx.admin, String(consignado.anexo_path), String(consignado.mime ?? 'application/pdf'));
-  let analise: Record<string, unknown> = {};
-  if (arq) {
-    const r = await geminiComEvento(ctx, 'analise_consignado', {
-      system: PROMPT_ANALISE_CONSIGNADO,
-      partes: [{ inline_data: { mime_type: arq.mime, data: arq.b64 } }, { text: 'Extraia os dados no JSON pedido.' }],
-      schema: SCHEMA_ANALISE_CONSIGNADO, temperatura: 0, maxTokens: 8192,
-    });
-    if (r) analise = r.json;
-  }
-  const cartoes = Array.isArray(analise.cartoes) ? (analise.cartoes as Array<Record<string, unknown>>) : [];
-  const bancosAlvo = (coberturaNova.bancos_alvo as string[]) ?? [];
-  const rubrica217 = coberturaNova.rubrica_217 === true;
-  const cartaoAtivo = cartoes.length > 0;
-  // rubrica 217 ("EMPRESTIMO SOBRE A RMC") é rastro direto de RMC — conta como cartão pro flag
-  const potencial = cartaoAtivo || rubrica217 || bancosAlvo.length > 0;
+async function concluirSessao(ctx: Ctx, coberturaNova: Record<string, unknown>, consignado: Record<string, unknown>): Promise<Turno> {
+  if (ctx.dados.analise_concluida !== true) {
+    const arq = await baixarAnexo(ctx.admin, String(consignado.anexo_path), String(consignado.mime ?? 'application/pdf'));
+    if ('erro' in arq && arq.erro === 'download') throw new FalhaTecnica('storage_consignado');
+    let analise: Record<string, unknown> = {};
+    if (!('erro' in arq)) {
+      analise = await geminiSessao(ctx, 'analise_consignado', {
+        system: PROMPT_ANALISE_CONSIGNADO,
+        partes: [{ inline_data: { mime_type: arq.mime, data: arq.b64 } }, { text: 'Extraia os dados no JSON pedido.' }],
+        schema: SCHEMA_ANALISE_CONSIGNADO, temperatura: 0, maxTokens: 8192,
+      }, 'docs');
+    }
+    const cartoes = Array.isArray(analise.cartoes) ? (analise.cartoes as Array<Record<string, unknown>>) : [];
+    const bancosAlvo = (coberturaNova.bancos_alvo as string[]) ?? [];
+    const rubrica217 = coberturaNova.rubrica_217 === true;
+    // rubrica 217 ("EMPRESTIMO SOBRE A RMC") é rastro direto de RMC — conta pro flag
+    const potencial = cartoes.length > 0 || rubrica217 || bancosAlvo.length > 0;
 
-  const analiseCompleta = {
-    ...analise,
-    bancos_alvo: bancosAlvo, rubrica_217: rubrica217,
-    cobertura: { meses: coberturaNova.meses_cobertos, alvo_ini: coberturaNova.alvo_ini, alvo_fim: coberturaNova.alvo_fim },
-    nbs_consignado: consignado.nbs ?? [],
-    gerado_em: new Date().toISOString(), modelo: modeloGemini(),
-  };
+    const analiseCompleta = {
+      ...analise,
+      bancos_alvo: bancosAlvo, rubrica_217: rubrica217,
+      cobertura: { meses: coberturaNova.meses_cobertos, alvo_ini: coberturaNova.alvo_ini, alvo_fim: coberturaNova.alvo_fim },
+      nbs_consignado: consignado.nbs ?? [],
+      gerado_em: new Date().toISOString(), modelo: ctx.modelos.docs,
+    };
 
-  // grava na oportunidade (metadados.analise_extratos + potencial_tese_juros)
-  let oppId = ctx.sessao.oportunidade_id;
-  if (!oppId) {
-    const { data: o } = await ctx.admin.from('oportunidades').select('id')
-      .eq('organizacao_id', ctx.sessao.organizacao_id).eq('contato_id', ctx.sessao.contato_id).eq('status', 'em_andamento')
-      .order('criado_em', { ascending: false }).limit(1).maybeSingle();
-    oppId = o?.id ?? null;
+    let oppId = ctx.sessao.oportunidade_id;
+    if (!oppId) {
+      const { data: o } = await ctx.admin.from('oportunidades').select('id')
+        .eq('organizacao_id', ctx.sessao.organizacao_id).eq('contato_id', ctx.sessao.contato_id).eq('status', 'em_andamento')
+        .order('criado_em', { ascending: false }).limit(1).maybeSingle();
+      oppId = o?.id ?? null;
+    }
+    if (oppId) {
+      const { data: opp } = await ctx.admin.from('oportunidades').select('metadados').eq('id', oppId).maybeSingle();
+      await ctx.admin.from('oportunidades').update({
+        metadados: { ...((opp?.metadados as Record<string, unknown>) ?? {}), analise_extratos: analiseCompleta, potencial_tese_juros: potencial },
+      }).eq('id', oppId);
+    }
+    await criarNotaInterna(ctx.admin, ctx.sessao, notaAnalise(ctx, analiseCompleta, potencial));
+    await evento(ctx.admin, ctx.sessao, 'analise_final', { oportunidade_id: oppId, potencial_tese_juros: potencial, bancos_alvo: bancosAlvo, cartoes: cartoes.length });
+    // marca ANTES da mensagem final: se a geração falhar, a retomada pula direto pra conclusão
+    ctx.dados.analise_concluida = true;
+    await ctx.admin.from('ia_sessoes').update({ dados: { ...ctx.dados }, cobertura_extratos: coberturaNova, docs: { ...ctx.docs, consignado } }).eq('id', ctx.sessao.id);
   }
-  if (oppId) {
-    const { data: opp } = await ctx.admin.from('oportunidades').select('metadados').eq('id', oppId).maybeSingle();
-    await ctx.admin.from('oportunidades').update({
-      metadados: { ...((opp?.metadados as Record<string, unknown>) ?? {}), analise_extratos: analiseCompleta, potencial_tese_juros: potencial },
-    }).eq('id', oppId);
-  }
-  await evento(ctx.admin, ctx.sessao, 'analise_final', { oportunidade_id: oppId, potencial_tese_juros: potencial, bancos_alvo: bancosAlvo, cartoes: cartoes.length });
 
+  const r = await conversar(ctx, { etapa: 'conclusao' });
   return {
-    bolhas: [FALLBACK_CONCLUSAO],
-    statusNovo: 'concluida', motivoHumano: 'docs_completos_fechar',
+    bolhas: r.mensagens, statusNovo: 'concluida', motivoHumano: 'docs_completos_fechar',
     coberturaNova, docsPatch: { consignado },
-    notaInterna: notaAnalise(ctx, analiseCompleta, potencial),
   };
 }
 
@@ -722,150 +956,217 @@ function notaAnalise(ctx: Ctx, a: Record<string, unknown>, potencial: boolean): 
   linhas.push(`• Cobertura: ${(a.cobertura as Record<string, unknown>)?.meses ?? '?'} de 120 meses`);
   linhas.push(`➡️ potencial_tese_juros: ${potencial ? 'SIM' : 'não'}`);
   if (ctx.dados.declarante) linhas.push(`• Declarante: ${(ctx.dados.declarante as Record<string, unknown>)?.nome ?? '?'}`);
+  if (ctx.dados.email) linhas.push(`• E-mail do cliente: ${ctx.dados.email}`);
   return linhas.join('\n');
 }
 function fmtNum(v: unknown): string { return typeof v === 'number' && Number.isFinite(v) ? v.toFixed(2) : '?'; }
 
-// ======== conversa (chat com persona + instrução da etapa) ========
+// ======== conversa (persona + objetivo da etapa + contexto completo) ========
 interface RespostaChat { mensagens: string[]; acao: string; dados: Record<string, unknown>; perguntouValores: boolean }
 
-async function conversar(ctx: Ctx, instrucaoExtra: string, fallback: string[]): Promise<RespostaChat> {
-  return conversarComVars(ctx, {}, instrucaoExtra, fallback);
-}
-
-async function conversarComVars(ctx: Ctx, vars: Record<string, string>, instrucaoExtra: string, fallback: string[]): Promise<RespostaChat> {
-  let instrucao = INSTRUCAO_ETAPA[ctx.sessao.etapa] ?? '';
+async function conversar(ctx: Ctx, opts: { etapa?: string; instrucaoExtra?: string; vars?: Record<string, string> }): Promise<RespostaChat> {
+  const etapa = opts.etapa ?? (ctx.sessao.etapa in INSTRUCAO_ETAPA ? ctx.sessao.etapa : 'coleta_docs');
+  let instrucao = INSTRUCAO_ETAPA[etapa] ?? '';
   const meses = mesesComprovante();
   const defaults: Record<string, string> = {
-    MESES_ACEITOS: `de ${meses[0].rotulo} ou ${meses[1].rotulo}`,
+    MESES_ACEITOS: `do mês atual ou do passado (${meses[0].rotulo} ou ${meses[1].rotulo})`,
     TITULAR: String(ctx.dados.titular_comprovante ?? 'a pessoa da conta'),
-    FALTA: '',
+    CHECKLIST: '', RESULTADO_ARQUIVOS: '', FALTA: '', TEM_VIDEO: '',
   };
-  for (const [k, v] of Object.entries({ ...defaults, ...vars })) {
+  for (const [k, v] of Object.entries({ ...defaults, ...(opts.vars ?? {}) })) {
     instrucao = instrucao.replaceAll(`{${k}}`, v);
   }
-  const system = `${PERSONA}\n\n${instrucao}${instrucaoExtra ? `\n\nINSTRUÇÃO DESTE TURNO: ${instrucaoExtra}` : ''}`;
+  const system = `${PERSONA}\n\n${instrucao}${opts.instrucaoExtra ? `\n\nNOTA DESTE TURNO: ${opts.instrucaoExtra}` : ''}`;
 
-  const partes: ParteGemini[] = [{ text: montarContexto(ctx) }];
-  for (const a of ctx.audios.slice(0, 3)) {
+  // áudios ANTES do contexto (com teto agregado): o texto do contexto precisa dizer a VERDADE
+  // sobre o que está anexado — dizer "ouça o áudio" com o anexo ausente faz o modelo alucinar.
+  const audioPartes: ParteGemini[] = [];
+  const carregados = new Set<string>();
+  const falhados = new Set<string>();
+  let bytesInline = 0;
+  for (const a of ctx.audios) {
+    if (audioPartes.length >= 3) { falhados.add(a.id); continue; }
     const meta = (a.metadados ?? {}) as Record<string, unknown>;
     const arq = await baixarAnexo(ctx.admin, String(meta.anexo_path), String(meta.mime ?? 'audio/ogg'));
-    if (arq) partes.push({ inline_data: { mime_type: arq.mime, data: arq.b64 } });
+    if ('erro' in arq) { falhados.add(a.id); await evento(ctx.admin, ctx.sessao, 'audio_nao_carregou', { anexo: meta.anexo_path, motivo: arq.erro }); continue; }
+    const bytes = Math.ceil(arq.b64.length * 3 / 4);
+    if (bytesInline + bytes > 10 * 1024 * 1024) { falhados.add(a.id); continue; }   // teto do REQUEST do Gemini
+    bytesInline += bytes;
+    carregados.add(a.id);
+    audioPartes.push({ inline_data: { mime_type: arq.mime, data: arq.b64 } });
   }
-  partes.push({ text: 'Responda no JSON pedido (mensagens curtas e calorosas; uma pergunta por vez).' });
+  const partes: ParteGemini[] = [{ text: montarContexto(ctx, { carregados, falhados }) }, ...audioPartes];
+  partes.push({ text: 'Responda no JSON pedido (bolhas curtas e humanas; uma pergunta por vez; nunca repita frase já usada na conversa).' });
 
-  const r = await geminiComEvento(ctx, `chat_${ctx.sessao.etapa}`, {
-    system, partes, schema: esquemaChat(EXTRAS_ETAPA[ctx.sessao.etapa] ?? {}), temperatura: 0.5, maxTokens: 1024,
+  const j = await geminiSessao(ctx, `chat_${etapa}`, {
+    system, partes, schema: esquemaChat(EXTRAS_ETAPA[etapa] ?? {}), temperatura: 0.7, maxTokens: 3072,
   });
-  if (!r) return { mensagens: fallback, acao: 'perguntar', dados: {}, perguntouValores: false };
-  const j = r.json as { mensagens?: unknown; acao?: unknown; dados_extraidos?: unknown; perguntou_valores?: unknown };
-  const mensagens = (Array.isArray(j.mensagens) ? j.mensagens : []).map((m) => String(m)).filter(Boolean).slice(0, 3);
+  const jj = j as { mensagens?: unknown; acao?: unknown; dados_extraidos?: unknown; perguntou_valores?: unknown };
+  const mensagens = (Array.isArray(jj.mensagens) ? jj.mensagens : []).map((m) => String(m).trim()).filter(Boolean).slice(0, 3);
+  if (!mensagens.length) throw new FalhaTecnica('resposta_vazia');
   return {
-    mensagens: mensagens.length ? mensagens : fallback,
-    acao: String(j.acao ?? 'perguntar'),
-    dados: (j.dados_extraidos && typeof j.dados_extraidos === 'object') ? j.dados_extraidos as Record<string, unknown> : {},
-    perguntouValores: j.perguntou_valores === true,
+    mensagens,
+    acao: String(jj.acao ?? 'perguntar'),
+    dados: (jj.dados_extraidos && typeof jj.dados_extraidos === 'object') ? jj.dados_extraidos as Record<string, unknown> : {},
+    perguntouValores: jj.perguntou_valores === true,
   };
 }
 
-function montarContexto(ctx: Ctx): string {
+/** Despedida de handoff GERADA (contextual). Modelo fora do ar → a única estática permitida. */
+async function gerarDespedida(ctx: Ctx, direcao: string): Promise<string[]> {
+  try {
+    const j = await geminiSessao(ctx, 'despedida', {
+      system: `${PERSONA}\n\nOBJETIVO DESTE TURNO: encerrar a SUA parte da conversa. ${direcao} No máximo 2 bolhas curtas e calorosas.`,
+      partes: [{ text: montarContexto(ctx) }, { text: 'Responda no JSON pedido.' }],
+      schema: esquemaChat({}), temperatura: 0.7, maxTokens: 1536,
+    });
+    const msgs = (Array.isArray((j as { mensagens?: unknown }).mensagens) ? (j as { mensagens: unknown[] }).mensagens : [])
+      .map((m) => String(m).trim()).filter(Boolean).slice(0, 2);
+    if (msgs.length) return msgs;
+  } catch { /* cai na única mensagem estática permitida */ }
+  return [MSG_HANDOFF_FINAL];
+}
+
+/** Reescrita (guardrail/dedup). Falhou tecnicamente → null (o chamador descarta as bolhas). */
+async function reescrever(ctx: Ctx, bolhas: string[], motivo: string): Promise<string[] | null> {
+  try {
+    const j = await geminiSessao(ctx, 'reescrita', {
+      system: `${PERSONA}\n\nTAREFA: reescrever as mensagens abaixo mantendo o sentido e o tom. ${motivo}`,
+      partes: [{ text: `MENSAGENS A REESCREVER:\n${bolhas.map((b, i) => `${i + 1}. ${b}`).join('\n')}\n\nFRASES QUE VOCÊ JÁ USOU NESTA CONVERSA (não repita nenhuma):\n${[...ctx.saidasAnteriores].slice(0, 40).map((s) => `- ${s}`).join('\n')}` }],
+      schema: SCHEMA_REESCRITA, temperatura: 0.8, maxTokens: 2048,
+    });
+    const msgs = (Array.isArray((j as { mensagens?: unknown }).mensagens) ? (j as { mensagens: unknown[] }).mensagens : [])
+      .map((m) => String(m).trim()).filter(Boolean).slice(0, 3);
+    return msgs.length ? msgs : null;
+  } catch { return null; }
+}
+
+function normalizarSaida(s: string): string { return (s ?? '').replace(/\s+/g, ' ').trim().toLowerCase(); }
+
+/** Dedup duro: colidiu com saída já existente (ou com bolha deste mesmo turno) → reescreve 1x → persistiu → descarta. */
+async function deduplicar(ctx: Ctx, bolhas: string[]): Promise<string[]> {
+  const vistas = new Set<string>();
+  const colide = (b: string) => ctx.saidasAnteriores.has(normalizarSaida(b)) || vistas.has(normalizarSaida(b));
+  let houveColisao = false;
+  for (const b of bolhas) { if (colide(b)) { houveColisao = true; } vistas.add(normalizarSaida(b)); }
+  if (!houveColisao) return bolhas;
+  const reescritas = await reescrever(ctx, bolhas, 'Uma ou mais dessas mensagens são IDÊNTICAS a algo que você já mandou nesta conversa. Reformule com outras palavras — nunca repita frase já usada.');
+  const finais: string[] = [];
+  const vistas2 = new Set<string>();
+  for (const b of (reescritas ?? bolhas)) {
+    const n = normalizarSaida(b);
+    if (ctx.saidasAnteriores.has(n) || vistas2.has(n)) { await evento(ctx.admin, ctx.sessao, 'dedup_descartou', { texto: b.slice(0, 120) }); continue; }
+    vistas2.add(n); finais.push(b);
+  }
+  return finais;
+}
+
+function montarContexto(ctx: Ctx, audios?: { carregados: Set<string>; falhados: Set<string> }): string {
   const linhas: string[] = [];
-  linhas.push(`DADOS DO ATENDIMENTO (não repita à toa; use para não perguntar o que já sabe):`);
-  linhas.push(`- Nome no cadastro: ${ctx.contatoNome || '(desconhecido)'}`);
-  if (ctx.dados.nome_confirmado) linhas.push(`- Nome confirmado no documento: ${ctx.dados.nome_confirmado}`);
+  linhas.push('DADOS JÁ COLETADOS (NUNCA peça de novo o que está aqui):');
+  linhas.push(`- Nome: ${String(ctx.dados.nome_confirmado ?? '') || ctx.contatoNome || '(desconhecido)'}`);
+  linhas.push(`- CPF: ${ctx.contatoCpf ? 'já informado no início ✓' : '(não veio)'}`);
+  if (ctx.dados.email) linhas.push(`- E-mail: ${ctx.dados.email} ✓`);
   if (ctx.dados.titular_comprovante) linhas.push(`- Titular do comprovante: ${ctx.dados.titular_comprovante}`);
-  linhas.push(`- Documentos já recebidos: ${['doc_pessoal', 'comprovante', 'declarante_doc', 'consignado'].filter((k) => ctx.docs[k]).join(', ') || 'nenhum'}`);
+  const docsOk = ['doc_pessoal', 'comprovante', 'declarante_doc', 'consignado'].filter((k) => ctx.docs[k]);
+  linhas.push(`- Documentos já validados: ${docsOk.length ? docsOk.join(', ') : 'nenhum ainda'}`);
   linhas.push('');
-  linhas.push('HISTÓRICO RECENTE DA CONVERSA:');
+  linhas.push('HISTÓRICO DA CONVERSA (o que está como [você] foi VOCÊ que mandou — não repita):');
   linhas.push(ctx.transcript || '(vazio)');
   linhas.push('');
-  if (ctx.textos.length || ctx.audios.length || ctx.arquivos.length) {
+  if (ctx.novas.length) {
     linhas.push('NOVAS MENSAGENS DO CLIENTE (responda a elas):');
     for (const m of ctx.novas) {
       if (m.tipo === 'texto' && m.conteudo) linhas.push(`- "${m.conteudo}"`);
-      else if (m.tipo === 'audio') linhas.push('- [áudio do cliente — anexo nesta chamada]');
-      else linhas.push(`- [cliente enviou ${m.tipo}]`);
+      else if (m.tipo === 'audio') {
+        if (audios?.carregados.has(m.id)) linhas.push('- [áudio do cliente — anexado nesta chamada; ouça e responda ao que ele disse]');
+        else if (audios?.falhados.has(m.id)) linhas.push('- [áudio do cliente que NÃO carregou no sistema — diga com jeito que não conseguiu ouvir esse áudio e peça para mandar de novo ou escrever]');
+        else linhas.push('- [áudio do cliente]');
+      } else linhas.push(`- [cliente enviou ${m.tipo}]`);
     }
   } else {
-    linhas.push('(não há mensagem nova do cliente neste turno — é a abertura da etapa)');
+    linhas.push('(não há mensagem nova do cliente — este turno é a SUA abertura da etapa)');
   }
   return linhas.join('\n');
 }
 
+// ======== Gemini com evento de custo/auditoria (lança FalhaTecnica; nunca conversa) ========
+async function geminiSessao(ctx: Ctx, finalidade: string, p: {
+  system: string; partes: ParteGemini[]; schema: Record<string, unknown>; temperatura: number; maxTokens: number;
+}, tipo: 'chat' | 'docs' = 'chat'): Promise<Record<string, unknown>> {
+  try {
+    const { r, modeloUsado, atualizadoDe } = await chamarComRecuperacao(ctx.admin, ctx.sessao.canal_id, ctx.modelos, tipo, p);
+    if (atualizadoDe) await evento(ctx.admin, ctx.sessao, 'modelo_atualizado', { de: atualizadoDe, para: modeloUsado, tipo });
+    await evento(ctx.admin, ctx.sessao, 'gemini_call', { canal_id: ctx.sessao.canal_id, finalidade, modelo: modeloUsado }, r.tokensIn, r.tokensOut);
+    return r.json;
+  } catch (e) {
+    const msg = String((e as Error)?.message ?? '');
+    if (msg.includes('sem_api_key')) throw e;
+    await evento(ctx.admin, ctx.sessao, 'gemini_erro', { canal_id: ctx.sessao.canal_id, finalidade, erro: msg.slice(0, 240) });
+    throw new FalhaTecnica(`${finalidade}: ${msg.slice(0, 200)}`);
+  }
+}
+
 // ======== extração de documentos (visão, temperatura 0) ========
-interface ExtracaoDocs { itens: Array<Record<string, unknown>>; grandes: boolean }
+interface ExtracaoDocs { itens: Array<Record<string, unknown> & { __anexo?: string; __mime?: string }>; grandes: boolean }
 
 async function extrairDeArquivos(ctx: Ctx, prompt: string, schema: Record<string, unknown>): Promise<ExtracaoDocs> {
-  const itens: Array<Record<string, unknown>> = [];
+  const itens: ExtracaoDocs['itens'] = [];
   let grandes = false;
   for (const m of ctx.arquivos.slice(0, 8)) {
     const meta = (m.metadados ?? {}) as Record<string, unknown>;
     const tamanho = Number(meta.tamanho ?? 0) || 0;
     if (tamanho > MAX_ARQUIVO) { grandes = true; await evento(ctx.admin, ctx.sessao, 'midia_grande', { tamanho, anexo: meta.anexo_path }); continue; }
     const arq = await baixarAnexo(ctx.admin, String(meta.anexo_path), String(meta.mime ?? 'application/octet-stream'));
-    if (!arq) { itens.push({ legivel: false, tipo: 'outro', tipo_documento: 'outro' }); continue; }
-    const r = await geminiComEvento(ctx, 'extracao_doc', {
+    if ('erro' in arq) {
+      if (arq.erro === 'grande') { grandes = true; await evento(ctx.admin, ctx.sessao, 'midia_grande', { tamanho, anexo: meta.anexo_path }); continue; }
+      // Storage falhou (não é culpa do cliente): NUNCA vira "foto ilegível" — é falha técnica,
+      // reagenda e tenta de novo; a tentativa de ilegível do item fica intocada.
+      await evento(ctx.admin, ctx.sessao, 'storage_falhou', { anexo: meta.anexo_path });
+      throw new FalhaTecnica(`storage_download:${String(meta.anexo_path ?? '').slice(0, 80)}`);
+    }
+    const j = await geminiSessao(ctx, 'extracao_doc', {
       system: prompt,
       partes: [{ inline_data: { mime_type: arq.mime, data: arq.b64 } }, { text: 'Extraia os dados no JSON pedido.' }],
-      schema, temperatura: 0, maxTokens: 2048,
+      schema, temperatura: 0, maxTokens: 4096,
     });
-    itens.push(r ? r.json : { legivel: false, tipo: 'outro', tipo_documento: 'outro' });
+    itens.push({ ...(j as Record<string, unknown>), __anexo: String(meta.anexo_path ?? ''), __mime: String(meta.mime ?? '') });
   }
   return { itens, grandes };
 }
 
-async function baixarAnexo(admin: Admin, path: string, mime: string): Promise<{ b64: string; mime: string } | null> {
+// 'grande' é condição PERMANENTE (pedir reenvio menor); 'download' é transitória (falha técnica).
+type Anexo = { b64: string; mime: string } | { erro: 'grande' | 'download' };
+async function baixarAnexo(admin: Admin, path: string, mime: string): Promise<Anexo> {
   try {
-    if (!path) return null;
+    if (!path) return { erro: 'download' };
     const { data, error } = await admin.storage.from(BUCKET_MIDIA).download(path);
-    if (error || !data) return null;
+    if (error || !data) return { erro: 'download' };
     const bytes = new Uint8Array(await data.arrayBuffer());
-    if (!bytes.length || bytes.length > MAX_ARQUIVO) return null;
+    if (!bytes.length) return { erro: 'download' };
+    if (bytes.length > MAX_ARQUIVO) return { erro: 'grande' };
     return { b64: paraBase64(bytes), mime: mime || 'application/octet-stream' };
-  } catch { return null; }
+  } catch { return { erro: 'download' }; }
 }
 
-// ======== Gemini com evento de custo/auditoria (1 retry de parse; falha => null) ========
-async function geminiComEvento(ctx: Ctx, finalidade: string, p: {
-  system: string; partes: ParteGemini[]; schema: Record<string, unknown>; temperatura: number; maxTokens: number;
-}): Promise<{ json: Record<string, unknown> } | null> {
-  for (let tentativa = 1; tentativa <= 2; tentativa++) {
-    try {
-      const r = await comRetry(() => chamarGeminiJson(p), 2);
-      await evento(ctx.admin, ctx.sessao, 'gemini_call', { canal_id: ctx.sessao.canal_id, finalidade, tentativa }, r.tokensIn, r.tokensOut);
-      return { json: r.json };
-    } catch (e) {
-      const msg = String((e as Error)?.message ?? '');
-      if (msg.includes('sem_api_key')) throw e;
-      await evento(ctx.admin, ctx.sessao, 'gemini_erro', { canal_id: ctx.sessao.canal_id, finalidade, tentativa, erro: msg.slice(0, 200) });
-      if (!msg.includes('parse_falhou') || tentativa === 2) return null;
-    }
-  }
-  return null;
-}
-
-// ======== envio: fila bot_mensagens_saida + drain em processo (presence + jitter) ========
+// ======== envio: fila bot_mensagens_saida + drain em processo (presence 2–6s + jitter 1.5–3s) ========
 async function enviarBolhas(admin: Admin, ctx: Ctx, bolhas: string[], video: { url: string; caption: string } | null): Promise<void> {
   const sessao = ctx.sessao;
   const canal = ctx.canal;
-  // delay base humano: 8–20s + proporcional ao volume recebido (texto e áudio)
-  const charsIn = ctx.textos.join(' ').length;
-  const baseMs = rand(8_000, 20_000) + Math.min(15_000, charsIn * 25 + ctx.audios.length * 4_000);
   const tag = `ia_${sessao.etapa}_${Date.now().toString(36)}`;
 
-  // monta as linhas da fila (vídeo entra na posição 0 quando existir)
+  // Fase 1.1: SEM delay-base — o tempo humano é o presence proporcional + jitter entre bolhas
+  const presenceDur = (texto: string) => Math.min(6_000, Math.max(2_000, texto.length * 50));
   const linhas: Array<{ ordem: number; tipo: string; texto: string; media_url: string | null; media_caption: string | null; enviar_apos: string }> = [];
-  let cursor = Date.now() + baseMs;
+  let cursor = Date.now();
   let ordem = 0;
   if (video) {
-    linhas.push({ ordem: ordem++, tipo: 'video', texto: video.caption, media_url: video.url, media_caption: video.caption, enviar_apos: new Date(cursor).toISOString() });
-    cursor += rand(2_000, 6_000);
+    linhas.push({ ordem: ordem++, tipo: 'video', texto: video.caption || '🎬', media_url: video.url, media_caption: video.caption || null, enviar_apos: new Date(cursor).toISOString() });
+    cursor += rand(1_500, 3_000);
   }
   for (const b of bolhas) {
-    // presence proporcional (2–8s) entra ANTES da bolha, no drain; o jitter 2–6s fica no escalonamento
-    cursor += Math.min(8_000, Math.max(2_000, b.length * 60));
     linhas.push({ ordem: ordem++, tipo: 'texto', texto: b, media_url: null, media_caption: null, enviar_apos: new Date(cursor).toISOString() });
-    cursor += rand(2_000, 6_000);
+    cursor += presenceDur(b) + rand(1_500, 3_000);
   }
   if (!linhas.length) return;
 
@@ -874,13 +1175,16 @@ async function enviarBolhas(admin: Admin, ctx: Ctx, bolhas: string[], video: { u
     etapa: tag, ordem: l.ordem, texto: l.texto, tipo: l.tipo, media_url: l.media_url, media_caption: l.media_caption,
     enviar_apos: l.enviar_apos, status: 'pendente',
   }))).select('id, ordem, tipo, texto, media_url, media_caption, enviar_apos');
-  if (error || !rows?.length) { await evento(admin, sessao, 'enfileirar_falhou', { erro: error?.message?.slice(0, 200) }); return; }
+  if (error || !rows?.length) {
+    await evento(admin, sessao, 'enfileirar_falhou', { erro: error?.message?.slice(0, 200) });
+    throw new FalhaTecnica('enfileirar_falhou');   // nada saiu: o turno NÃO pode "avançar mudo"
+  }
 
   const tx = enviadorDe(canal as { transporte?: string; instancia_externa?: string; cloud_phone_number_id?: string });
   const instancia = String(canal.instancia_externa ?? '');
   const ordenadas = [...rows].sort((a: { ordem: number }, b: { ordem: number }) => a.ordem - b.ordem);
   for (const row of ordenadas) {
-    // re-checa a sessão a cada bolha: humano pode ter entrado no meio do burst
+    // re-checa a cada bolha: humano pode ter entrado no meio do burst (o trigger pausa a sessão)
     const { data: st } = await admin.from('ia_sessoes').select('status').eq('id', sessao.id).maybeSingle();
     const statusOk = st?.status === 'ativa' || ['handoff', 'concluida', 'encerrada'].includes(st?.status ?? '');
     if (!statusOk) {
@@ -890,7 +1194,7 @@ async function enviarBolhas(admin: Admin, ctx: Ctx, bolhas: string[], video: { u
     await sleep(new Date(row.enviar_apos).getTime() - Date.now());
     try {
       if (row.tipo === 'texto') {
-        const dur = Math.min(8_000, Math.max(2_000, row.texto.length * 60));
+        const dur = presenceDur(row.texto);
         await sendPresenceComposing(instancia, ctx.destino, dur);
         await sleep(dur);
       }
@@ -906,18 +1210,27 @@ async function enviarBolhas(admin: Admin, ctx: Ctx, bolhas: string[], video: { u
         metadados: { fluxo: 'ia_sdr', etapa: sessao.etapa, sessao_id: sessao.id, ...(row.media_url ? { media_url: row.media_url } : {}) },
       }).select('id').maybeSingle();
       await admin.rpc('bot_registrar_envio', { p_saida: row.id, p_status: 'enviada', p_mensagem: msg?.id ?? null, p_id_externo: idExterno });
+      ctx.saidasAnteriores.add(normalizarSaida(row.texto));
     } catch (e) {
+      // FALHA DE TRANSPORTE (chip caiu, Evolution fora): sequência quebrada não continua pela
+      // metade — cancela o resto e vira FALHA TÉCNICA: o turno NÃO persiste (nada de etapa
+      // avançando com o cliente sem receber nada); reagenda +90s e o retry REGERA a resposta
+      // (o dedup impede repetição literal do que já saiu).
       const erro = String((e as Error)?.message ?? 'falha_envio').slice(0, 300);
       await admin.rpc('bot_registrar_envio', { p_saida: row.id, p_status: 'falhou', p_erro: erro });
+      const restantes = ordenadas.slice(ordenadas.indexOf(row) + 1);
+      for (const r of restantes) {
+        try { await admin.rpc('bot_registrar_envio', { p_saida: r.id, p_status: 'cancelada', p_erro: 'bolha_anterior_falhou' }); } catch { /* best-effort */ }
+      }
       await evento(admin, sessao, 'envio_falhou', { ordem: row.ordem, erro });
-      break;   // sequência quebrada não continua pela metade
+      throw new FalhaTecnica(`envio_falhou:${erro.slice(0, 120)}`);
     }
   }
 }
 
 // ======== desfechos ========
 async function fazerHandoff(admin: Admin, sessao: Sessao, canal: Record<string, unknown>, motivo: string, bolhasFallback: string[], nota: string, patchExtra?: Record<string, unknown>): Promise<void> {
-  // bolhas do handoff (quando o turno não mandou nada, garante 1 balão educado)
+  // balão direto SÓ no caminho de falha técnica (modelo fora do ar → MSG_HANDOFF_FINAL)
   if (bolhasFallback.length) {
     try {
       const { data: ident } = await admin.from('contato_identidades')
@@ -938,10 +1251,21 @@ async function fazerHandoff(admin: Admin, sessao: Sessao, canal: Record<string, 
     } catch { /* handoff nunca falha por causa do balão */ }
   }
   await criarNotaInterna(admin, sessao, nota);
-  await admin.from('conversas').update({
+  const { error: eConv } = await admin.from('conversas').update({
     precisa_humano: true, precisa_humano_motivo: motivo, precisa_humano_em: new Date().toISOString(),
   }).eq('id', sessao.conversa_id);
-  await admin.from('ia_sessoes').update({ ...(patchExtra ?? {}), status: 'handoff', atualizado_em: new Date().toISOString() }).eq('id', sessao.id);
+  if (eConv) await evento(admin, sessao, 'erro_escrita', { onde: 'handoff_precisa_humano', erro: String(eConv.message ?? '').slice(0, 200) });
+  const { error: eSess } = await admin.from('ia_sessoes')
+    .update({ ...(patchExtra ?? {}), status: 'handoff', atualizado_em: new Date().toISOString() }).eq('id', sessao.id);
+  if (eSess) {
+    // status perdido deixaria a sessão 'ativa' repetindo handoffs — reagenda e tenta de novo
+    await evento(admin, sessao, 'erro_escrita', { onde: 'handoff_status', erro: String(eSess.message ?? '').slice(0, 200) });
+    try {
+      await admin.from('ia_sessoes').update({ processar_apos: new Date(Date.now() + REAGENDA_FALHA_MS).toISOString() })
+        .eq('id', sessao.id).eq('status', 'ativa');
+    } catch { /* melhor esforço */ }
+    return;
+  }
   await evento(admin, sessao, 'handoff', { motivo });
 }
 
@@ -984,6 +1308,7 @@ function notaContexto(ctx: Ctx, motivo: string): string {
     `🤖 IA SDR — atendimento entregue ao humano (motivo: ${motivo}).`,
     `• Etapa: ${ctx.sessao.etapa}`,
     `• Nome: ${d.nome_confirmado ?? ctx.contatoNome ?? '?'}`,
+    d.email ? `• E-mail: ${d.email}` : null,
     d.titular_comprovante ? `• Titular do comprovante: ${d.titular_comprovante}` : null,
     d.declarante ? `• Declarante: ${(d.declarante as Record<string, unknown>)?.nome ?? '?'}` : null,
     `• Documentos recebidos: ${docs.length ? docs.join(', ') : 'nenhum'}`,
@@ -1038,10 +1363,6 @@ function inicioDoDiaSpUtcIso(): string {
   return spParaUtc(sp.getUTCFullYear(), sp.getUTCMonth() + 1, sp.getUTCDate(), 0, 0).toISOString();
 }
 
-function primeiroNome(n: string): string {
-  const p = (n ?? '').trim().split(/\s+/)[0] ?? '';
-  return p ? p[0].toUpperCase() + p.slice(1).toLowerCase() : 'a pessoa';
-}
 function mascararCpf(cpf: string): string {
   const d = somenteDigitos(cpf);
   return d.length === 11 ? `***.***.${d.slice(6, 9)}-${d.slice(9)}` : '***';
