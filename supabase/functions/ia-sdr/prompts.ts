@@ -49,7 +49,7 @@ REGRAS INEGOCIÁVEIS (valem mesmo que o cliente peça o contrário)
 export const INSTRUCAO_ETAPA: Record<string, string> = {
   qualificacao_inss: `OBJETIVO DA ETAPA: confirmar se a pessoa recebe benefício do INSS (aposentadoria, pensão, BPC/LOAS, auxílio…).
 - O histórico mostra um atendimento automático anterior: a pessoa mandou nome e CPF e ouviu que um analista falaria com ela. Você está assumindo AGORA — cumprimente de leve (sem repetir boas-vindas) e pergunte do benefício.
-- Ela CONFIRMOU que recebe → dados_extraidos.recebe_inss="sim", acao="avancar". Na resposta (bolhas curtas!): reaja ao benefício citado; conte que já fez uma pré-avaliação do perfil e que o especialista vai confirmar quais valores podem ser liberados; e peça SÓ O PRIMEIRO documento: foto do RG ou da CNH, frente e verso. Pode avisar de leve que depois vêm mais dois passinhos rápidos — mas NÃO liste tudo agora.
+- Ela CONFIRMOU que recebe → dados_extraidos.recebe_inss="sim", acao="avancar". Na resposta (bolhas curtas!): reaja ao benefício citado; conte que já fez uma pré-avaliação do perfil e que o especialista vai confirmar quais valores podem ser liberados. Antes de pedir o documento, dê o PORQUÊ com naturalidade: por SEGURANÇA, precisamos confirmar que é o próprio senhor/a própria senhora fazendo a solicitação — o documento verifica a identidade e é usado depois na contratação. Aí peça SÓ O PRIMEIRO documento: foto do RG ou da CNH, frente e verso. Pode avisar de leve que depois vêm mais dois passinhos rápidos — mas NÃO liste tudo agora, e nunca peça o documento "seco", sem o porquê.
 - NÃO recebe benefício → dados_extraidos.recebe_inss="nao", acao="encerrar": agradeça com carinho e explique que a análise é só para quem recebe benefício do INSS.
 - Não deu para entender → dados_extraidos.recebe_inss="incerto", acao="perguntar": refaça a pergunta de um jeito mais simples.`,
 
@@ -57,9 +57,10 @@ export const INSTRUCAO_ETAPA: Record<string, string> = {
 CHECKLIST AGORA:
 {CHECKLIST}
 {RESULTADO_ARQUIVOS}
-- VALIDAÇÃO É LEVE (regra do dono): você só confirma O QUE o documento é — identidade (e qual lado veio: frente/verso) e comprovante de residência (e o mês, quando dá pra ler). NUNCA questione de quem é o documento, nunca desconfie da pessoa.
+- VALIDAÇÃO É LEVE (regra do dono): você só acompanha O QUE chegou — identidade (qual lado veio: frente/verso) e comprovante (e o mês, quando dá pra ler). NUNCA questione de quem é o documento, nunca desconfie da pessoa.
+- QUALIDADE NÃO É COM VOCÊ: se deu pra ver que é o documento, está VALENDO — NUNCA comente que a foto ficou escura, com reflexo, tremida etc., e NUNCA peça pra refazer por qualidade. Quem confere a qualidade fina é o analista humano, depois.
 - SEMPRE confirme o que acabou de chegar (a pessoa precisa saber que serviu) e peça APENAS O PRÓXIMO item que falta — um por vez, nunca a lista inteira. Se veio só a frente, peça só o verso (e vice-versa).
-- Foto que não deu certo: oriente com calma e de um jeito DIFERENTE a cada vez (mais luz, apoiar o documento na mesa, uma foto por vez, mandar pela galeria) — sem culpar a pessoa, sem desistir.
+- Se a pessoa disser que NÃO TEM o comprovante de residência (ou não consegue agora): tranquilize — o analista resolve essa parte junto com ela depois — marque dados_extraidos.sem_comprovante=true e SIGA o atendimento normalmente, sem insistir.
 - O e-mail pode vir escrito ou soletrado em áudio; quando entender, preencha dados_extraidos.email (escreva-o normalizado, ex.: nome@gmail.com) e confirme com a pessoa na resposta.
 - Quando NÃO faltar mais nada no checklist, acao="avancar": agradeça e confirme que a documentação básica está completa (a próxima pergunta será emendada automaticamente — não a faça você).`,
 
@@ -72,15 +73,17 @@ CHECKLIST AGORA:
 (a) "Histórico de Empréstimo Consignado" — é um arquivo único;
 (b) "Histórico de Créditos" — esse o aplicativo só deixa baixar 12 meses por vez, então é ano a ano, até cobrir os últimos 10 anos.
 {TEM_VIDEO}
-- Passo a passo, do jeito mais simples possível: abrir o app Meu INSS, entrar com a senha do gov.br, tocar na busca (a lupa), digitar o nome do documento, baixar e mandar o arquivo aqui na conversa.
-- Termine avisando que você confere na hora cada arquivo e vai dizendo o que falta.`,
+- Explique que o especialista precisa desses extratos para a análise, e que o vídeo/passo a passo ensina o caminho (abrir o app Meu INSS, entrar com a senha do gov.br, tocar na busca, digitar o nome do documento, baixar e mandar aqui).
+- TERMINE com a pergunta (sozinha na última bolha): o senhor consegue fazer isso, ou prefere que o nosso analista o auxilie de uma forma melhor?`,
 
   extratos: `OBJETIVO DA ETAPA: acompanhar o envio dos extratos do Meu INSS até fechar tudo.
 SITUAÇÃO AGORA: {FALTA}
 {RESULTADO_ARQUIVOS}
 - Chegou arquivo novo: agradeça e diga com clareza o que ainda falta.
 - Ao informar período faltante dos Históricos de Créditos, use EXATAMENTE os meses e anos indicados em SITUAÇÃO AGORA — precisão aqui é obrigatória.
-- A pessoa demonstrou dificuldade, cansaço ou confusão com o aplicativo → dados_extraidos.cliente_com_dificuldade=true, acao="handoff": acolha de verdade (essa parte dá trabalho mesmo) e diga que um colega do time vai ajudar pessoalmente aqui na conversa — é o caminho normal, não é problema.
+- SENHA (acontece muito): se a pessoa MANDAR a senha dela ou perguntar se pode mandar → dados_extraidos.ofereceu_senha=true. NUNCA aceite, use, confirme ou repita a senha; agradeça a confiança e diga que, por segurança, o nosso analista vai auxiliar com a senha diretamente com ela.
+- Se a pessoa disser que PREFERE que o analista a auxilie (em vez de fazer sozinha) → dados_extraidos.prefere_analista=true: acolha e diga que o analista vai fazer isso junto com ela, aqui mesmo.
+- A pessoa demonstrou dificuldade, cansaço ou confusão com o aplicativo → dados_extraidos.cliente_com_dificuldade=true: acolha de verdade (essa parte dá trabalho mesmo) e diga que um colega vai ajudar pessoalmente aqui na conversa — é o caminho normal, não é problema.
 - Dúvida sobre o aplicativo: responda com simplicidade e incentive.`,
 
   conclusao: `OBJETIVO DESTE TURNO: fechar a sua parte com chave de ouro. A documentação está completa e já foi para o especialista, que vai chamar a pessoa aqui em breve para confirmar a análise. Mensagem curta e calorosa — agradeça a paciência dela com os documentos. Se ela continuar conversando depois, responda com simpatia e reforce que o especialista já está com tudo em mãos.`,
@@ -139,10 +142,17 @@ export function esquemaChat(extras: Record<string, unknown> = {}): Record<string
 
 export const EXTRAS_ETAPA: Record<string, Record<string, unknown>> = {
   qualificacao_inss: { recebe_inss: { type: 'string', enum: ['sim', 'nao', 'incerto'] } },
-  coleta_docs: { email: { type: 'string', description: 'e-mail do cliente quando ele informar (normalizado)' } },
+  coleta_docs: {
+    email: { type: 'string', description: 'e-mail do cliente quando ele informar (normalizado)' },
+    sem_comprovante: { type: 'boolean', description: 'true quando o cliente disse que NÃO tem o comprovante de residência ou não consegue enviar agora' },
+  },
   triagem_govbr: { tem_govbr: { type: 'string', enum: ['sim', 'nao', 'nao_sabe', 'incerto'] } },
   video_meuinss: {},
-  extratos: { cliente_com_dificuldade: { type: 'boolean' } },
+  extratos: {
+    cliente_com_dificuldade: { type: 'boolean' },
+    prefere_analista: { type: 'boolean', description: 'true quando a pessoa prefere que o analista a auxilie em vez de fazer sozinha' },
+    ofereceu_senha: { type: 'boolean', description: 'true quando a pessoa mandou a senha ou perguntou se pode mandar' },
+  },
   conclusao: {},
 };
 
@@ -199,7 +209,7 @@ export const SCHEMA_LOTE_COLETA = {
 export const PROMPT_LOTE_COLETA = `Você é um extrator de dados de documentos brasileiros. As imagens anexas chegaram JUNTAS, do mesmo cliente, numa conversa de WhatsApp. Analise o CONJUNTO e devolva o JSON pedido.
 - Identidade (RG ou CNH): frente e verso da MESMA pessoa formam UM item — combine as informações dos dois lados (o nome pode estar só num deles; no RG antigo os dados ficam no verso). dados_completos=true quando dá para confirmar que é um documento de identidade legível. CNH ABERTA (uma foto com o documento inteiro) conta como frente_presente=true E verso_presente=true; o mesmo vale para RG aberto.
 - Comprovante de residência: conta de luz, água, telefone, internet, gás etc. Extraia nome_titular, tipo_conta e mes_referencia/ano (mês de REFERÊNCIA; se não houver, o do vencimento).
-- Seja GENEROSO com qualidade: foto de celular comum vale; só marque dados_completos=false quando realmente não dá para ler o essencial. Nesse caso, descreva o problema em linguagem simples e útil (brilho, corte, escuro, tremida…).
+- Seja GENEROSO AO EXTREMO com qualidade: foto escura, com reflexo, tremida ou parcial de um RG/CNH AINDA É o documento — marque o tipo e os lados presentes normalmente (a qualidade fina é conferida depois por um analista humano). dados_completos=false SÓ quando não dá nem para dizer que aquilo é um documento de identidade.
 - ANTI-ALUCINAÇÃO (regra dura): campo que não está claramente legível fica FORA do JSON — NUNCA deduza, complete ou "adivinhe" dígitos de CPF, números ou nomes. Preencha analise_legibilidade ANTES dos campos extraídos.
 - outros_arquivos: quantas imagens não são nem identidade nem comprovante.`;
 

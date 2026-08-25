@@ -690,9 +690,13 @@ function checklistTexto(c: Checklist, docs: Record<string, unknown>, meses: stri
   else if (dp.verso === true) linhaId = '✖ FALTA só a FRENTE da identidade (o verso já chegou ✓)';
   else linhaId = '✖ FALTA — documento de identidade (RG ou CNH, frente e verso)';
   const linha = (ok: boolean, sTxt: string) => `${ok ? '✔ já recebido' : '✖ FALTA'} — ${sTxt}`;
+  const comp = (docs.comprovante ?? {}) as Record<string, unknown>;
+  const linhaComp = comp.pendente_analista === true
+    ? '✔ comprovante de residência: o cliente não tem agora — FICA COM O ANALISTA depois (não peça mais)'
+    : linha(c.comprovanteOk, `comprovante de residência (${meses})`);
   return [
     linhaId,
-    linha(c.comprovanteOk, `comprovante de residência (${meses})`),
+    linhaComp,
     linha(c.emailOk, 'e-mail do cliente'),
   ].join('\n');
 }
@@ -714,19 +718,19 @@ async function etapaColetaDocs(ctx: Ctx): Promise<Turno> {
     if (e) { emailNovo = e; break; }
   }
 
-  let idRuim = false, compRuim = false, retomar = false;
+  let retomar = false;
   if (ctx.pendentes) notas.push('→ um arquivo do cliente NÃO chegou direito no sistema; peça para reenviar essa foto/arquivo.');
   if (ctx.arquivos.length) {
     const lote = await extrairLoteColeta(ctx);
     if (lote.grandes) notas.push('→ um arquivo veio pesado demais e não abriu; peça como foto normal, tirada da galeria.');
     for (const ident of lote.identidades) {
       const ehIdentidade = ident.tipo_documento === 'rg' || ident.tipo_documento === 'cnh';
-      const legivel = ident.dados_completos === true && ehIdentidade;
-      if (!legivel) {
-        idRuim = true;
-        notas.push(`→ a(s) foto(s) da identidade não deram para confirmar${ident.problema ? ` — ${String(ident.problema)}` : ''}. Oriente de um jeito NOVO (mais luz, apoiar o documento na mesa, um lado por vez, mandar pela galeria) — sem culpar a pessoa.`);
+      if (!ehIdentidade) {
+        notas.push('→ chegou um arquivo que não parece ser RG/CNH — pergunte com jeitinho o que era e reforce o que precisa agora (SEM falar de qualidade de foto).');
         continue;
       }
+      // QUALIDADE NÃO É GATE (regra do dono): veio o documento, está valendo — o analista humano
+      // confere a qualidade depois. Aqui só rastreamos frente/verso e o nome quando legível.
       // acumula os LADOS entre turnos: frente agora, verso depois — tudo soma no mesmo item
       const antes = { ...((ctx.docs.doc_pessoal ?? {}) as Record<string, unknown>), ...((docsPatch.doc_pessoal ?? {}) as Record<string, unknown>) };
       const frente = antes.frente === true || ident.frente_presente === true;
@@ -744,34 +748,20 @@ async function etapaColetaDocs(ctx: Ctx): Promise<Turno> {
     }
     const comp = lote.comprovante;
     if (comp?.presente === true) {
-      const reconhecivel = comp.dados_completos === true || !!comp.tipo_conta || !!comp.nome_titular;
-      if (reconhecivel) {
-        const temMes = Number(comp.mes_referencia) >= 1 && Number(comp.mes_referencia) <= 12 && Number(comp.ano) > 2000;
-        const mesOk = temMes ? meses.some((m) => Number(comp.mes_referencia) === m.mes && Number(comp.ano) === m.ano) : true; // mês ilegível: aceita (validação leve)
-        if (!mesOk) {
-          const n = marcaTentativa('comprovante_fora_janela');
-          if (n >= 3 && !aguardando) return await chamarHumanoColeta(ctx, 'comprovante_fora_janela', dadosPatch, docsPatch, tent);
-          notas.push(`→ o comprovante é válido mas de outra data — só vale conta de ${meses[0].rotulo} ou ${meses[1].rotulo}. Peça uma mais recente.`);
-        } else {
-          docsPatch.comprovante = { tipo_conta: comp.tipo_conta, mes: temMes ? comp.mes_referencia : null, ano: temMes ? comp.ano : null, validado_em: new Date().toISOString() };
-          retomar = true;
-          notas.push(`→ comprovante de residência (${String(comp.tipo_conta ?? 'conta')}${temMes ? `, ${comp.mes_referencia}/${comp.ano}` : ', mês não deu para ler — aceito assim mesmo'}) confirmado ✓ registrado.`);
-        }
+      // presente = aceito (qualidade é do analista); só o MÊS claramente antigo pede um mais recente
+      const temMes = Number(comp.mes_referencia) >= 1 && Number(comp.mes_referencia) <= 12 && Number(comp.ano) > 2000;
+      const mesOk = temMes ? meses.some((m) => Number(comp.mes_referencia) === m.mes && Number(comp.ano) === m.ano) : true; // mês ilegível: aceita
+      if (!mesOk) {
+        const n = marcaTentativa('comprovante_fora_janela');
+        if (n >= 3 && !aguardando) return await chamarHumanoColeta(ctx, 'comprovante_fora_janela', dadosPatch, docsPatch, tent);
+        notas.push(`→ o comprovante é válido mas de outra data — só vale conta de ${meses[0].rotulo} ou ${meses[1].rotulo}. Peça uma mais recente.`);
       } else {
-        compRuim = true;
-        notas.push(`→ o comprovante não deu para confirmar${comp.problema ? ` — ${String(comp.problema)}` : ''}. Peça outra foto, com a conta inteira aparecendo.`);
+        docsPatch.comprovante = { tipo_conta: comp.tipo_conta, mes: temMes ? comp.mes_referencia : null, ano: temMes ? comp.ano : null, validado_em: new Date().toISOString() };
+        retomar = true;
+        notas.push(`→ comprovante de residência (${String(comp.tipo_conta ?? 'conta')}${temMes ? `, ${comp.mes_referencia}/${comp.ano}` : ', mês não deu para ler — aceito assim mesmo'}) confirmado ✓ registrado.`);
       }
     }
     if (Number(lote.outros ?? 0) > 0) notas.push(`→ ${lote.outros} arquivo(s) não parecem ser identidade nem comprovante — pergunte com jeitinho o que era e reforce o que precisa agora.`);
-
-    if (idRuim) {
-      const n = marcaTentativa('ilegivel_identidade');
-      if (n >= 3 && !aguardando) return await chamarHumanoColeta(ctx, 'foto_ilegivel', dadosPatch, docsPatch, tent);
-    }
-    if (compRuim) {
-      const n = marcaTentativa('ilegivel_comprovante');
-      if (n >= 3 && !aguardando) return await chamarHumanoColeta(ctx, 'foto_ilegivel', dadosPatch, docsPatch, tent);
-    }
   }
   if (emailNovo) notas.push(`→ e-mail recebido no texto: ${emailNovo} ✓ (confirme com a pessoa).`);
 
@@ -795,7 +785,13 @@ async function etapaColetaDocs(ctx: Ctx): Promise<Turno> {
     try { await ctx.admin.from('contatos').update({ email: emailFinal }).eq('id', ctx.sessao.contato_id); } catch { /* best-effort */ }
   }
 
-  const clFinal = checklistDe(docsMerged, { ...ctx.dados, ...dadosPatch }, emailFinal);
+  // cliente disse que NÃO TEM comprovante: fica registrado pro ANALISTA e o atendimento SEGUE
+  if (r.dados.sem_comprovante === true && !(ctx.docs.comprovante ?? docsPatch.comprovante)) {
+    docsPatch.comprovante = { pendente_analista: true, motivo: 'cliente_sem_comprovante', em: new Date().toISOString() };
+    await evento(ctx.admin, ctx.sessao, 'comprovante_pendente_analista', {});
+  }
+
+  const clFinal = checklistDe({ ...ctx.docs, ...docsPatch }, { ...ctx.dados, ...dadosPatch }, emailFinal);
   dadosPatch.tentativas_item = tent;
 
   // checklist FECHOU: a pergunta do gov.br sai NESTE turno, determinística (2ª chamada) —
@@ -989,7 +985,15 @@ async function etapaExtratos(ctx: Ctx): Promise<Turno> {
       RESULTADO_ARQUIVOS: notas.length ? `O QUE ACONTECEU NESTE TURNO (traduza para conversa natural):\n${notas.join('\n')}` : '',
     },
   });
-  if (r.dados.cliente_com_dificuldade === true || r.acao === 'handoff') {
+  if (r.dados.ofereceu_senha === true) {
+    // nota SEM as mensagens do cliente (a senha não pode parar nem na nota interna)
+    return {
+      bolhas: r.mensagens, chamarHumano: 'auxilio_senha', coberturaNova,
+      dadosPatch: { rodadas_sem_progresso: rodadas },
+      notaInterna: `🤖 IA SDR — o cliente quis compartilhar a senha do gov.br (NÃO registramos a senha). Analista: auxiliar com o acesso e baixar os extratos junto com ele. Etapa: extratos.`,
+    };
+  }
+  if (r.dados.prefere_analista === true || r.dados.cliente_com_dificuldade === true || r.acao === 'handoff') {
     return { bolhas: r.mensagens, chamarHumano: 'auxilio_extratos', coberturaNova, dadosPatch: { rodadas_sem_progresso: rodadas } };
   }
   // precisão obrigatória: os períodos citados têm que ser EXATAMENTE os calculados
@@ -1111,6 +1115,7 @@ function notaAnalise(ctx: Ctx, a: Record<string, unknown>, potencial: boolean): 
   linhas.push(`➡️ potencial_tese_juros: ${potencial ? 'SIM' : 'não'}`);
   if (ctx.dados.declarante) linhas.push(`• Declarante: ${(ctx.dados.declarante as Record<string, unknown>)?.nome ?? '?'}`);
   if (ctx.dados.email) linhas.push(`• E-mail do cliente: ${ctx.dados.email}`);
+  if ((ctx.docs.comprovante as Record<string, unknown> | undefined)?.pendente_analista === true) linhas.push('• ⚠️ Comprovante de residência: o cliente NÃO tinha — resolver com ele.');
   return linhas.join('\n');
 }
 function fmtNum(v: unknown): string { return typeof v === 'number' && Number.isFinite(v) ? v.toFixed(2) : '?'; }
@@ -1467,6 +1472,7 @@ function notaContexto(ctx: Ctx, motivo: string): string {
     d.titular_comprovante ? `• Titular do comprovante: ${d.titular_comprovante}` : null,
     d.declarante ? `• Declarante: ${(d.declarante as Record<string, unknown>)?.nome ?? '?'}` : null,
     `• Documentos recebidos: ${docs.length ? docs.join(', ') : 'nenhum'}`,
+    (ctx.docs.comprovante as Record<string, unknown> | undefined)?.pendente_analista === true ? '• ⚠️ Comprovante: o cliente NÃO tinha — resolver com ele.' : null,
     cob.meses_cobertos != null ? `• Extratos: ${cob.meses_cobertos} de 120 meses cobertos${cob.completo ? ' (completo)' : ''}` : null,
     `• Últimas mensagens do cliente: ${ctx.textos.slice(-2).map((t) => `"${t.slice(0, 80)}"`).join(' | ') || '(mídia/áudio)'}`,
   ].filter(Boolean).join('\n');
