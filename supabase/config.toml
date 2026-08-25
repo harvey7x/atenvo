@@ -473,6 +473,14 @@ verify_jwt = false
 # Worker das mensagens DIFERIDAS do bot (status 'agendada' — ex.: resultado do fluxo de vídeo).
 [functions.bot-fila-processar]
 verify_jwt = false
+# relatorio-diario-trafego: cron 00:30 BRT secret-gated (x-relatorio-secret == webhook_config
+# .relatorio_trafego), sem JWT. Manda o fechamento do dia anterior no grupo interno via Evolution.
+[functions.relatorio-diario-trafego]
+verify_jwt = false
+# ia-sdr: worker da IA SDR (Gemini), cron 1min secret-gated (x-ia-secret == webhook_config.ia_sdr),
+# sem JWT. Deploy SEMPRE com o nome, senão volta a verify_jwt=true e o cron quebra.
+[functions.ia-sdr]
+verify_jwt = false
 # evolution-send: tem DOIS caminhos de auth internos — JWT de usuário (envio manual, idêntico
 # ao de sempre) e modo service por x-agendamento-secret (processador de agendadas). Por isso o
 # gateway NÃO pode pré-exigir JWT (senão o cron é rejeitado antes de rodar). A validação continua
