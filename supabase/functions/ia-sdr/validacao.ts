@@ -66,10 +66,25 @@ export function nomesBatem(a: string, b: string): boolean {
 
 export function somenteDigitos(s: string): string { return (s ?? '').replace(/\D/g, ''); }
 
-/** CPFs iguais? Compara os 11 dígitos; vazio de um lado = "não dá pra comparar" (true = não bloqueia). */
+/** Dígitos verificadores do CPF (módulo 11). Extração com checksum errado = leitura ruim/alucinada. */
+export function cpfValido(cpf: string): boolean {
+  const d = somenteDigitos(cpf);
+  if (d.length !== 11 || /^(\d)\1{10}$/.test(d)) return false;
+  for (const n of [9, 10]) {
+    let soma = 0;
+    for (let i = 0; i < n; i++) soma += Number(d[i]) * (n + 1 - i);
+    const dv = ((soma * 10) % 11) % 10;
+    if (dv !== Number(d[n])) return false;
+  }
+  return true;
+}
+
+/** CPFs iguais? Compara os 11 dígitos; lado ausente OU com checksum inválido (leitura ruim do
+ *  OCR — nunca aceitar dígito adivinhado) = "não dá pra comparar" (true = não bloqueia). */
 export function cpfsCompativeis(a?: string | null, b?: string | null): boolean {
   const da = somenteDigitos(a ?? ''), db = somenteDigitos(b ?? '');
   if (da.length !== 11 || db.length !== 11) return true;
+  if (!cpfValido(da) || !cpfValido(db)) return true;
   return da === db;
 }
 

@@ -1,5 +1,26 @@
 # IA SDR (Gemini) — Fase 1
 
+> **FASE 1.2 (25/08, à noite) — "SDR profissional"**, após o 2º teste real + pesquisa aprofundada
+> (workflow de 4 frentes: conversa SDR, UX de coleta, visão/Gemini, persona):
+>
+> 1. **Extração em LOTE**: todas as imagens do turno numa chamada só — frente+verso do MESMO
+>    documento se COMPLEMENTAM (avaliá-los isolados foi o bug do teste: cada lado "ruim" contava
+>    1 tentativa → 2 no mesmo turno → handoff imediato). Tentativa agora é POR TURNO e por item;
+>    3 rodadas ruins → chama humano. Evento `extracao_resultado` (flags, sem PII) dá visibilidade.
+> 2. **HANDOFF SUAVE** ("a IA só para quando o atendente assume"): chamar humano NÃO silencia a
+>    IA — `precisa_humano` + nota + `dados.aguardando_humano`, sessão segue ativa em modo
+>    acompanhamento (continua coletando!); o trigger pausa na 1ª mensagem humana. Problema
+>    resolvido (doc validado, cobertura cresceu, achou a senha gov.br) → `retomou` e o alerta sai.
+>    Conclusão idem (etapa `conclusao` responde até o especialista chegar). Único handoff duro:
+>    `falha_tecnica`.
+> 3. **Estilo pesquisado** na persona: bolha ≤ ~200 chars, pergunta SOZINHA na última bolha, UM
+>    pedido por vez (a transição pede SÓ a identidade), reconhecimento específico por item, foto
+>    ruim = culpa da foto + 1 dica nova, frases-de-robô proibidas, ≤1 emoji, zero abreviação.
+> 4. **Visão**: `thinkingBudget: 0` adaptativo nas extrações (400 → desliga e refaz), campo
+>    `analise_legibilidade` primeiro no schema, anti-alucinação (campo ilegível fica fora; CPF
+>    validado por dígito verificador — checksum ruim = não-lido, nunca bloqueia match).
+> 5. **Vídeo do Meu INSS** no ar: `bot-midia/meu-inss-passo-a-passo.mp4` + `ia_config` apontando.
+
 > **FASE 1.1 (25/08, mesma noite)** — correção crítica + humanização, após o 1º teste real:
 >
 > 1. **Modelo**: o `gemini-2.5-flash` retornou 404 p/ contas novas ("use models/gemini-3.6-flash") —

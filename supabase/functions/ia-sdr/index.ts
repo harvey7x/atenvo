@@ -34,7 +34,7 @@ import {
 import { saidaProibida, perguntaDeValores } from './guardrail.ts';
 import {
   PERSONA, INSTRUCAO_ETAPA, EXTRAS_ETAPA, esquemaChat, SCHEMA_REESCRITA,
-  SCHEMA_ARQUIVO_COLETA, PROMPT_ARQUIVO_COLETA,
+  SCHEMA_LOTE_COLETA, PROMPT_LOTE_COLETA, notaAcompanhamento,
   SCHEMA_EXTRATO, PROMPT_EXTRATO, SCHEMA_ANALISE_CONSIGNADO, PROMPT_ANALISE_CONSIGNADO,
   MSG_HANDOFF_FINAL,
 } from './prompts.ts';
@@ -90,14 +90,17 @@ interface Turno {
   bolhas: string[];
   video?: { url: string; caption: string };
   etapaNova?: string;
-  statusNovo?: 'handoff' | 'concluida' | 'encerrada';
-  motivoHumano?: string;
+  statusNovo?: 'encerrada';                     // só o encerramento (não elegível) muda status aqui
+  // HANDOFF SUAVE ("a IA só para quando o atendente assume"): chama o humano (precisa_humano +
+  // nota) mas a sessão SEGUE ativa em modo acompanhamento — o trigger pausa quando o humano falar.
+  chamarHumano?: string;                        // motivo (foto_ilegivel, auxilio_extratos, …)
+  retomar?: boolean;                            // progresso real → limpa o acompanhamento/alerta
   notaInterna?: string;
   dadosPatch?: Record<string, unknown>;
   docsPatch?: Record<string, unknown>;
   coberturaNova?: Record<string, unknown>;
   etiquetaOpp?: string;
-  incrementaErro?: boolean;                     // "não entendi o cliente" (2x seguidas → handoff)
+  incrementaErro?: boolean;                     // "não entendi o cliente" (2x seguidas → chama humano)
   resetErros?: boolean;
   __perguntouValores?: boolean;
 }
@@ -170,7 +173,7 @@ interface ChamadaOk { r: ResultadoGemini; modeloUsado: string; atualizadoDe?: st
 
 /** Chama o Gemini já com retry/backoff; num 404 de modelo com sugestão, troca na hora e cacheia. */
 async function chamarComRecuperacao(admin: Admin, canalId: string, modelos: Modelos, tipo: 'chat' | 'docs', p: {
-  system: string; partes: ParteGemini[]; schema: Record<string, unknown>; temperatura?: number; maxTokens?: number;
+  system: string; partes: ParteGemini[]; schema: Record<string, unknown>; temperatura?: number; maxTokens?: number; semPensar?: boolean;
 }): Promise<ChamadaOk> {
   const modelo = tipo === 'docs' ? modelos.docs : modelos.chat;
   try {
@@ -333,7 +336,10 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
   const { data: conversa } = await admin.from('conversas')
     .select('id, organizacao_id, contato_id, precisa_humano').eq('id', sessao.conversa_id).maybeSingle();
   if (!conversa) { await encerrarSessao(admin, sessao, 'conversa_inexistente'); return; }
-  if (conversa.precisa_humano) {
+  // precisa_humano ligado POR NÓS (handoff suave) não silencia a IA — ela segue atendendo em
+  // modo acompanhamento até o humano assumir de fato (aí o trigger pausa). Só um precisa_humano
+  // EXTERNO (outro mecanismo do sistema) pausa aqui.
+  if (conversa.precisa_humano && !(sessao.dados as Record<string, unknown>)?.aguardando_humano) {
     await admin.from('ia_sessoes').update({ status: 'pausada', atualizado_em: new Date().toISOString() }).eq('id', sessao.id).eq('status', 'ativa');
     await evento(admin, sessao, 'pausada_precisa_humano', {});
     return;
@@ -416,30 +422,36 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
     case 'triagem_govbr': t = await etapaTriagem(ctx); break;
     case 'video_meuinss':
     case 'extratos': t = await etapaExtratos(ctx); break;
+    case 'conclusao': {
+      // pós-conclusão: o especialista foi alertado; a IA responde com simpatia até ele assumir
+      const r = await conversar(ctx, { etapa: 'conclusao' });
+      t = { bolhas: r.mensagens, resetErros: true, __perguntouValores: r.perguntouValores };
+      break;
+    }
     default:
       await evento(admin, sessao, 'etapa_desconhecida', { etapa: sessao.etapa });
       throw new FalhaTecnica(`etapa_desconhecida:${sessao.etapa}`);
   }
 
-  // ---- insistência em valores: 1ª vez o próprio modelo responde com a régua; 2ª => handoff ----
+  // ---- insistência em valores: 1ª vez o modelo responde com a régua; 2ª => chama o especialista
+  //      (a IA segue atendendo — handoff suave) ----
   const perguntouValores = ctx.textos.some((x) => perguntaDeValores(x)) || t.__perguntouValores === true;
   if (perguntouValores && !t.statusNovo) {
     const n = (Number(dados.perguntas_valores ?? 0) || 0) + 1;
     t.dadosPatch = { ...(t.dadosPatch ?? {}), perguntas_valores: n };
-    if (n >= 2) {
+    if (n >= 2 && !dados.aguardando_humano) {
       const bolhas = await gerarDespedida(ctx,
-        'A pessoa insiste em saber valores/condições. Explique com todo o respeito que essa conversa é com o especialista, que você vai passar o atendimento agora para ele confirmar tudo, e que ele fala com ela aqui mesmo.');
-      t = { ...t, bolhas, video: undefined, etapaNova: undefined, statusNovo: 'handoff', motivoHumano: 'quer_falar_valores', notaInterna: t.notaInterna ?? notaContexto(ctx, 'quer_falar_valores') };
+        'A pessoa insiste em saber valores/condições. Avise com todo o respeito que você chamou o especialista — quem pode falar de valores — para assumir aqui, e que enquanto isso você segue à disposição para adiantar o restante.');
+      t = { ...t, bolhas, video: undefined, chamarHumano: 'quer_falar_valores', notaInterna: t.notaInterna ?? notaContexto(ctx, 'quer_falar_valores') };
     }
   }
 
-  // ---- confusão REAL do cliente acumulada (2ª vez seguida): vira handoff educado JÁ —
-  //      substituindo a re-pergunta do modelo (mandar as duas seria contraditório) ----
+  // ---- confusão REAL do cliente acumulada (2ª vez seguida): chama um colega, SEM emudecer ----
   const errosProspectivos = t.incrementaErro ? (sessao.tentativas_erro ?? 0) + 1 : (t.resetErros ? 0 : (sessao.tentativas_erro ?? 0));
-  if (!t.statusNovo && errosProspectivos >= 2) {
-    const bolhasHandoff = await gerarDespedida(ctx,
-      'Vocês não estão conseguindo se entender por aqui. Sem culpar a pessoa, diga com carinho que um colega do time vai continuar com ela nesta conversa para ajudar melhor.');
-    t = { ...t, bolhas: bolhasHandoff, video: undefined, etapaNova: undefined, statusNovo: 'handoff', motivoHumano: 'nao_entendeu', notaInterna: t.notaInterna ?? notaContexto(ctx, 'nao_entendeu') };
+  if (!t.statusNovo && !t.chamarHumano && errosProspectivos >= 2 && !dados.aguardando_humano) {
+    const bolhasAviso = await gerarDespedida(ctx,
+      'Vocês não estão conseguindo se entender por aqui. Sem culpar a pessoa, avise com carinho que você chamou um colega do time para ajudar nesta conversa — e que enquanto isso você continua aqui com ela.');
+    t = { ...t, bolhas: bolhasAviso, video: undefined, chamarHumano: 'nao_entendeu', notaInterna: t.notaInterna ?? notaContexto(ctx, 'nao_entendeu') };
   }
 
   // ---- guardrail pós-Gemini: violou → pede REESCRITA (1x); persistiu → descarta a bolha ----
@@ -503,17 +515,24 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
   if (t.resetErros) patch.tentativas_erro = 0;
   else if (t.incrementaErro) patch.tentativas_erro = (sessao.tentativas_erro ?? 0) + 1;
 
-  if (t.statusNovo === 'handoff') {
-    await fazerHandoff(admin, sessao, canal, t.motivoHumano ?? 'handoff', [], t.notaInterna ?? notaContexto(ctx, t.motivoHumano ?? 'handoff'), patch);
-    return;
-  }
-  if (t.statusNovo === 'concluida') {
-    patch.status = 'concluida';
-    await admin.from('conversas').update({
-      precisa_humano: true, precisa_humano_motivo: t.motivoHumano ?? 'docs_completos_fechar', precisa_humano_em: new Date().toISOString(),
+  // ---- HANDOFF SUAVE: chama o humano (alerta + nota) mas a IA SEGUE ativa em acompanhamento —
+  //      ela só emudece quando o atendente assumir de fato (o trigger pausa na 1ª msg humana) ----
+  if (t.chamarHumano && !dados.aguardando_humano) {
+    await criarNotaInterna(admin, sessao, t.notaInterna ?? notaContexto(ctx, t.chamarHumano));
+    const { error: eConv } = await admin.from('conversas').update({
+      precisa_humano: true, precisa_humano_motivo: t.chamarHumano, precisa_humano_em: new Date().toISOString(),
     }).eq('id', sessao.conversa_id);
-    if (t.notaInterna) await criarNotaInterna(admin, sessao, t.notaInterna);
-    await evento(admin, sessao, 'concluida', {});
+    if (eConv) await evento(admin, sessao, 'erro_escrita', { onde: 'chamou_humano', erro: String(eConv.message ?? '').slice(0, 200) });
+    (patch.dados as Record<string, unknown>).aguardando_humano = t.chamarHumano;
+    await evento(admin, sessao, 'chamou_humano', { motivo: t.chamarHumano });
+  }
+  // ---- retomada: o problema que motivou o chamado se resolveu → IA volta ao normal, alerta sai ----
+  if (t.retomar && dados.aguardando_humano) {
+    (patch.dados as Record<string, unknown>).aguardando_humano = null;
+    try {
+      await admin.from('conversas').update({ precisa_humano: false, precisa_humano_motivo: null, precisa_humano_em: null }).eq('id', sessao.conversa_id);
+    } catch { /* alerta a mais é melhor que alerta a menos */ }
+    await evento(admin, sessao, 'retomou', { motivo_anterior: dados.aguardando_humano });
   }
   if (t.statusNovo === 'encerrada') {
     patch.status = 'encerrada';
@@ -589,6 +608,7 @@ async function etapaColetaDocs(ctx: Ctx): Promise<Turno> {
   // VENCER o valor antigo de ctx.dados (null ?? antigo devolveria o antigo)
   const declPrecisaAtual = () => ('declarante_necessario' in dadosPatch) ? dadosPatch.declarante_necessario === true : ctx.dados.declarante_necessario === true;
   const titularAtual = () => String((('titular_comprovante' in dadosPatch) ? dadosPatch.titular_comprovante : ctx.dados.titular_comprovante) ?? '');
+  const aguardando = !!ctx.dados.aguardando_humano;
 
   // e-mail pode chegar escrito no texto (áudio soletrado fica com o modelo via dados_extraidos)
   let emailNovo: string | null = null;
@@ -597,64 +617,69 @@ async function etapaColetaDocs(ctx: Ctx): Promise<Turno> {
     if (e) { emailNovo = e; break; }
   }
 
-  // ---- valida os arquivos do turno ----
+  // ---- valida os arquivos do turno: UMA chamada com TODAS as imagens (frente+verso do mesmo
+  //      documento se COMPLEMENTAM — avaliá-los isolados foi o bug que derrubou o 1º teste) ----
+  let idRuim = false, compRuim = false, retomar = false;
   if (ctx.pendentes) notas.push('→ um arquivo do cliente NÃO chegou direito no sistema; peça para reenviar essa foto/arquivo.');
   if (ctx.arquivos.length) {
-    const exts = await extrairDeArquivos(ctx, PROMPT_ARQUIVO_COLETA, SCHEMA_ARQUIVO_COLETA);
-    if (exts.grandes) notas.push('→ um arquivo veio pesado demais e não abriu; peça como foto normal, tirada da galeria.');
-    // comprovante ANTES das identidades: se comprovante em nome de terceiro + RG do terceiro
-    // chegam JUNTOS, a necessidade de declarante precisa existir antes de validar o RG dele
-    exts.itens.sort((a, b) =>
-      (a.tipo_arquivo === 'comprovante_residencia' ? 0 : 1) - (b.tipo_arquivo === 'comprovante_residencia' ? 0 : 1));
-    for (const d of exts.itens) {
-      const legivel = d.legivel === true && d.confianca !== 'baixa';
+    const lote = await extrairLoteColeta(ctx);
+    if (lote.grandes) notas.push('→ um arquivo veio pesado demais e não abriu; peça como foto normal, tirada da galeria.');
+    for (const ident of lote.identidades) {
       const antesId = !!(ctx.docs.doc_pessoal ?? docsPatch.doc_pessoal);
       const declPrecisa = declPrecisaAtual();
       const declOk = !!(ctx.docs.declarante_doc ?? docsPatch.declarante_doc);
-      if (d.tipo_arquivo === 'identidade' && legivel && d.nome_completo) {
-        const nomeDoc = String(d.nome_completo);
+      const nomeDoc = String(ident.nome_completo ?? '');
+      if (ident.dados_completos === true && nomeDoc) {
         const titular = titularAtual();
-        const bateLead = nomesBatem(nomeDoc, String(ctx.dados.nome_confirmado ?? '') || ctx.contatoNome) && cpfsCompativeis(String(d.cpf ?? ''), ctx.contatoCpf);
+        const lados = [ident.frente_presente ? 'frente' : null, ident.verso_presente ? 'verso' : null].filter(Boolean).join(' e ') || 'foto';
+        const bateLead = nomesBatem(nomeDoc, String(ctx.dados.nome_confirmado ?? '') || ctx.contatoNome) && cpfsCompativeis(String(ident.cpf ?? ''), ctx.contatoCpf);
         if (!antesId && bateLead) {
-          docsPatch.doc_pessoal = { tipo: d.tipo_documento, nome: nomeDoc, cpf_mascarado: mascararCpf(String(d.cpf ?? '')), anexo: d.__anexo, validado_em: new Date().toISOString() };
+          docsPatch.doc_pessoal = { tipo: ident.tipo_documento, nome: nomeDoc, cpf_mascarado: mascararCpf(String(ident.cpf ?? '')), validado_em: new Date().toISOString() };
           dadosPatch.nome_confirmado = nomeDoc;
-          notas.push(`→ identidade (${String(d.tipo_documento).toUpperCase()}) de ${nomeDoc}: legível e o nome confere ✓ registrada.`);
+          retomar = true;
+          notas.push(`→ identidade (${String(ident.tipo_documento).toUpperCase()}, ${lados}) de ${nomeDoc}: validada ✓ registre o elogio à foto.`);
         } else if (declPrecisa && !declOk && titular && nomesBatem(nomeDoc, titular)) {
-          const decl = { nome: nomeDoc, cpf: somenteDigitos(String(d.cpf ?? '')) || null, tipo_documento: d.tipo_documento, validado_em: new Date().toISOString() };
-          docsPatch.declarante_doc = { ...decl, anexo: d.__anexo };
+          const decl = { nome: nomeDoc, cpf: somenteDigitos(String(ident.cpf ?? '')) || null, tipo_documento: ident.tipo_documento, validado_em: new Date().toISOString() };
+          docsPatch.declarante_doc = decl;
           dadosPatch.declarante = decl;
+          retomar = true;
           notas.push(`→ documento do DECLARANTE (${nomeDoc}) recebido e validado ✓.`);
         } else if (antesId && !declPrecisa) {
           notas.push('→ chegou outra foto de identidade, mas essa parte já estava completa — só agradeça.');
         } else {
           const alvo = (!antesId) ? 'identidade' : 'declarante';
           const n = marcaTentativa(`divergente_${alvo}`);
-          if (n >= 2) return await handoffColeta(ctx, 'doc_divergente', dadosPatch, docsPatch, tent);
-          notas.push(`→ o documento veio no nome de ${nomeDoc}, que NÃO confere com o esperado (${alvo === 'identidade' ? 'o titular do benefício' : `o declarante ${String(ctx.dados.titular_comprovante ?? '')}`}). Peça para conferir e mandar o documento certo.`);
+          if (n >= 2 && !aguardando) return await chamarHumanoColeta(ctx, 'doc_divergente', dadosPatch, docsPatch, tent);
+          notas.push(`→ o documento veio no nome de ${nomeDoc}, que NÃO confere com o esperado (${alvo === 'identidade' ? 'o titular do benefício' : `o declarante ${titular}`}). Peça para conferir e mandar o documento certo.`);
         }
-      } else if (d.tipo_arquivo === 'comprovante_residencia' && legivel && d.nome_titular) {
-        const mesOk = meses.some((m) => Number(d.mes_referencia) === m.mes && Number(d.ano) === m.ano);
+      } else {
+        idRuim = true;
+        notas.push(`→ a(s) foto(s) da identidade não deram para ler${ident.problema ? ` — ${String(ident.problema)}` : ''}. Oriente de um jeito NOVO (mais luz, apoiar o documento na mesa, um lado por vez, mandar pela galeria) — sem culpar a pessoa.`);
+      }
+    }
+    const comp = lote.comprovante;
+    if (comp?.presente === true) {
+      if (comp.dados_completos === true && comp.nome_titular) {
+        const mesOk = meses.some((m) => Number(comp.mes_referencia) === m.mes && Number(comp.ano) === m.ano);
         if (!mesOk) {
-          const n = marcaTentativa('comprovante');
-          if (n >= 2) return await handoffColeta(ctx, 'comprovante_fora_janela', dadosPatch, docsPatch, tent);
+          const n = marcaTentativa('comprovante_fora_janela');
+          if (n >= 3 && !aguardando) return await chamarHumanoColeta(ctx, 'comprovante_fora_janela', dadosPatch, docsPatch, tent);
           notas.push(`→ o comprovante veio de outra data — só vale conta de ${meses[0].rotulo} ou ${meses[1].rotulo}. Peça uma mais recente.`);
         } else {
-          const titular = String(d.nome_titular);
-          const nomeLead = String(ctx.dados.nome_confirmado ?? '') || ctx.contatoNome;
+          const titular = String(comp.nome_titular);
+          const nomeLead = String(dadosPatch.nome_confirmado ?? ctx.dados.nome_confirmado ?? '') || ctx.contatoNome;
           const doProprio = nomesBatem(titular, nomeLead);
           const atual = (docsPatch.comprovante ?? ctx.docs.comprovante) as Record<string, unknown> | undefined;
           const jaTemProprio = !!atual && nomesBatem(String(atual.titular ?? ''), nomeLead);
           if (jaTemProprio && !doProprio) {
-            // comprovante do PRÓPRIO cliente já registrado: conta de terceiro que chega depois
-            // não regride o checklist nem cria exigência de declarante
             notas.push(`→ chegou outra conta (no nome de ${titular}), mas o comprovante do próprio cliente já estava registrado — só agradeça.`);
           } else {
-            docsPatch.comprovante = { tipo_conta: d.tipo_conta, titular, mes: d.mes_referencia, ano: d.ano, anexo: d.__anexo, validado_em: new Date().toISOString() };
+            docsPatch.comprovante = { tipo_conta: comp.tipo_conta, titular, mes: comp.mes_referencia, ano: comp.ano, validado_em: new Date().toISOString() };
+            retomar = true;
             if (doProprio) {
-              // vigente voltou a ser do próprio cliente: DESFAZ a exigência de declarante
               dadosPatch.declarante_necessario = false;
               dadosPatch.titular_comprovante = null;
-              notas.push(`→ comprovante de residência (${String(d.tipo_conta ?? 'conta')}) no nome do cliente, dentro do prazo ✓ registrado.`);
+              notas.push(`→ comprovante de residência (${String(comp.tipo_conta ?? 'conta')}) no nome do cliente, dentro do prazo ✓ registrado.`);
             } else {
               dadosPatch.declarante_necessario = true;
               dadosPatch.titular_comprovante = titular;
@@ -663,12 +688,21 @@ async function etapaColetaDocs(ctx: Ctx): Promise<Turno> {
           }
         }
       } else {
-        // ilegível ou não identificado — atribui ao item que ainda falta
-        const alvo = !antesId ? 'identidade' : (!(ctx.docs.comprovante ?? docsPatch.comprovante) ? 'comprovante' : (declPrecisa && !declOk ? 'declarante' : 'outro'));
-        const n = marcaTentativa(`ilegivel_${alvo}`);
-        if (n >= 2) return await handoffColeta(ctx, 'foto_ilegivel', dadosPatch, docsPatch, tent);
-        notas.push('→ chegou um arquivo que não deu para ler direito (foto tremida/cortada/escura ou documento inesperado). Peça outra foto, com boa luz e o documento inteiro.');
+        compRuim = true;
+        notas.push(`→ o comprovante não deu para ler${comp.problema ? ` — ${String(comp.problema)}` : ''}. Peça outra foto, com a conta inteira aparecendo.`);
       }
+    }
+    if (Number(lote.outros ?? 0) > 0) notas.push(`→ ${lote.outros} arquivo(s) não parecem ser identidade nem comprovante — pergunte com jeitinho o que era e reforce o que precisa agora.`);
+
+    // tentativas: UMA por item POR TURNO (nunca por arquivo). 3 rodadas ruins do MESMO item →
+    // chama um colega (e a IA segue atendendo — handoff suave).
+    if (idRuim) {
+      const n = marcaTentativa('ilegivel_identidade');
+      if (n >= 3 && !aguardando) return await chamarHumanoColeta(ctx, 'foto_ilegivel', dadosPatch, docsPatch, tent);
+    }
+    if (compRuim) {
+      const n = marcaTentativa('ilegivel_comprovante');
+      if (n >= 3 && !aguardando) return await chamarHumanoColeta(ctx, 'foto_ilegivel', dadosPatch, docsPatch, tent);
     }
   }
   if (emailNovo) notas.push(`→ e-mail recebido no texto: ${emailNovo} ✓ (confirme com a pessoa).`);
@@ -711,24 +745,74 @@ async function etapaColetaDocs(ctx: Ctx): Promise<Turno> {
     bolhas,
     etapaNova: clFinal.completo ? 'triagem_govbr' : (ctx.sessao.etapa !== 'coleta_docs' ? 'coleta_docs' : undefined),
     resetErros: true,
+    retomar,
     dadosPatch, docsPatch,
     __perguntouValores: r.perguntouValores,
   };
 }
 
-async function handoffColeta(ctx: Ctx, motivo: string, dadosPatch: Record<string, unknown>, docsPatch: Record<string, unknown>, tent: Record<string, number>): Promise<Turno> {
+/** Chama um colega (handoff SUAVE) reconhecendo o que já deu certo — a IA segue atendendo. */
+async function chamarHumanoColeta(ctx: Ctx, motivo: string, dadosPatch: Record<string, unknown>, docsPatch: Record<string, unknown>, tent: Record<string, number>): Promise<Turno> {
   const bolhas = await gerarDespedida(ctx,
     motivo === 'foto_ilegivel'
-      ? 'As fotos do documento não estão saindo legíveis, e insistir cansaria a pessoa. Sem culpar ninguém, diga que um colega do time vai ajudar com esse documento pessoalmente, aqui na conversa.'
+      ? 'As fotos de um documento não estão saindo legíveis mesmo depois de algumas tentativas. Sem culpar ninguém: reconheça o esforço (e o que JÁ deu certo, se houver), avise que você chamou um colega do time para ajudar com essa parte, e diga que enquanto isso você segue aqui — se a pessoa quiser tentar mais uma foto, você confere na hora.'
       : motivo === 'comprovante_fora_janela'
-        ? 'O comprovante de residência não está no período aceito e já foi pedido de novo. Diga com carinho que um colega do time vai ajudar a resolver essa parte aqui na conversa.'
-        : 'O documento enviado não confere com o esperado. Sem constranger a pessoa, diga que um colega do time vai conferir isso com ela pessoalmente, aqui na conversa.');
-  return { bolhas, statusNovo: 'handoff', motivoHumano: motivo, dadosPatch: { ...dadosPatch, tentativas_item: tent }, docsPatch };
+        ? 'O comprovante segue fora do período aceito. Com carinho: avise que chamou um colega para ajudar a resolver essa parte, e que você continua aqui enquanto ele não chega.'
+        : 'O documento enviado não confere com o esperado. Sem constranger a pessoa: avise que chamou um colega para conferir isso com ela, e que você segue à disposição aqui.');
+  return { bolhas, chamarHumano: motivo, dadosPatch: { ...dadosPatch, tentativas_item: tent }, docsPatch };
+}
+
+// ---- extração em LOTE da coleta: todas as imagens do turno numa chamada só ----
+interface LoteColeta {
+  identidades: Array<Record<string, unknown>>;
+  comprovante: Record<string, unknown> | null;
+  outros: number;
+  grandes: boolean;
+}
+async function extrairLoteColeta(ctx: Ctx): Promise<LoteColeta> {
+  const partes: ParteGemini[] = [];
+  let grandes = false;
+  let bytesInline = 0;
+  let anexadas = 0;
+  for (const m of ctx.arquivos.slice(0, 6)) {
+    const meta = (m.metadados ?? {}) as Record<string, unknown>;
+    const tamanho = Number(meta.tamanho ?? 0) || 0;
+    if (tamanho > MAX_ARQUIVO) { grandes = true; await evento(ctx.admin, ctx.sessao, 'midia_grande', { tamanho, anexo: meta.anexo_path }); continue; }
+    const arq = await baixarAnexo(ctx.admin, String(meta.anexo_path), String(meta.mime ?? 'application/octet-stream'));
+    if ('erro' in arq) {
+      if (arq.erro === 'grande') { grandes = true; await evento(ctx.admin, ctx.sessao, 'midia_grande', { tamanho, anexo: meta.anexo_path }); continue; }
+      await evento(ctx.admin, ctx.sessao, 'storage_falhou', { anexo: meta.anexo_path });
+      throw new FalhaTecnica(`storage_download:${String(meta.anexo_path ?? '').slice(0, 80)}`);
+    }
+    const bytes = Math.ceil(arq.b64.length * 3 / 4);
+    if (bytesInline + bytes > 10 * 1024 * 1024) { grandes = true; continue; }
+    bytesInline += bytes;
+    anexadas++;
+    partes.push({ inline_data: { mime_type: arq.mime, data: arq.b64 } });
+  }
+  if (!partes.length) return { identidades: [], comprovante: null, outros: 0, grandes };
+  partes.push({ text: `São ${anexadas} imagem(ns) do mesmo cliente, enviadas juntas. Extraia no JSON pedido.` });
+  const j = await geminiSessao(ctx, 'extracao_lote', {
+    system: PROMPT_LOTE_COLETA, partes, schema: SCHEMA_LOTE_COLETA, temperatura: 0, maxTokens: 4096, semPensar: true,
+  });
+  const identidades = Array.isArray((j as { identidades?: unknown }).identidades) ? (j as { identidades: Array<Record<string, unknown>> }).identidades : [];
+  const comprovante = ((j as { comprovante?: unknown }).comprovante && typeof (j as { comprovante?: unknown }).comprovante === 'object')
+    ? (j as { comprovante: Record<string, unknown> }).comprovante : null;
+  const outros = Number((j as { outros_arquivos?: unknown }).outros_arquivos ?? 0) || 0;
+  // observabilidade SEM PII: só flags — foi exatamente a falta disso que escondeu o bug do 1º teste
+  await evento(ctx.admin, ctx.sessao, 'extracao_resultado', {
+    imagens: anexadas,
+    identidades: identidades.map((i) => ({ tipo: i.tipo_documento, ok: i.dados_completos === true, frente: i.frente_presente === true, verso: i.verso_presente === true, problema: i.problema ?? null })),
+    comprovante: comprovante ? { presente: comprovante.presente === true, ok: comprovante.dados_completos === true, problema: comprovante.problema ?? null } : null,
+    outros,
+  });
+  return { identidades, comprovante, outros, grandes };
 }
 
 async function etapaTriagem(ctx: Ctx): Promise<Turno> {
   const r = await conversar(ctx, {});
   const tem = String(r.dados.tem_govbr ?? 'incerto');
+  const retomar = tem === 'sim' && ctx.dados.aguardando_humano === 'sem_acesso_govbr';
   if (tem === 'sim') {
     // turno de instruções do Meu INSS (gerado pelo modelo; vídeo entra se configurado)
     const videoPath = String((ctx.iaConfig as { video_meuinss_path?: string }).video_meuinss_path ?? '').trim();
@@ -746,13 +830,15 @@ async function etapaTriagem(ctx: Ctx): Promise<Turno> {
         : `${SUPABASE_URL}/storage/v1/object/public/bot-midia/${videoPath.replace(/^\/+/, '')}`;
       return {
         bolhas: inst.mensagens.slice(1), video: { url, caption: inst.mensagens[0] ?? '' },
-        etapaNova: 'extratos', resetErros: true, __perguntouValores: r.perguntouValores || inst.perguntouValores,
+        etapaNova: 'extratos', resetErros: true, retomar, __perguntouValores: r.perguntouValores || inst.perguntouValores,
       };
     }
-    return { bolhas: inst.mensagens, etapaNova: 'extratos', resetErros: true, __perguntouValores: r.perguntouValores || inst.perguntouValores };
+    return { bolhas: inst.mensagens, etapaNova: 'extratos', resetErros: true, retomar, __perguntouValores: r.perguntouValores || inst.perguntouValores };
   }
   if (tem === 'nao' || tem === 'nao_sabe') {
-    return { bolhas: r.mensagens, statusNovo: 'handoff', motivoHumano: 'sem_acesso_govbr', __perguntouValores: r.perguntouValores };
+    // suave: chama o colega (que vai baixar os docs junto) mas a IA segue atendendo; se a pessoa
+    // aparecer depois com a senha ("achei!"), o tem_govbr='sim' acima RETOMA sozinho
+    return { bolhas: r.mensagens, chamarHumano: 'sem_acesso_govbr', __perguntouValores: r.perguntouValores };
   }
   return { bolhas: r.mensagens, incrementaErro: true, __perguntouValores: r.perguntouValores };
 }
@@ -785,7 +871,7 @@ async function etapaExtratos(ctx: Ctx): Promise<Turno> {
           const bolhas = await gerarDespedida(ctx,
             'Você notou uma diferença de dados entre os documentos e, para não ter erro, vai pedir a ajuda de um colega do time, que continua com a pessoa aqui na conversa. Não a constranja.');
           return {
-            bolhas, statusNovo: 'handoff', motivoHumano: 'cpf_divergente',
+            bolhas, chamarHumano: 'cpf_divergente',
             notaInterna: notaContexto(ctx, `cpf_divergente: extrato ${mascararCpf(cpfArq)} x cadastro ${mascararCpf(ctx.contatoCpf)}`),
           };
         }
@@ -826,7 +912,7 @@ async function etapaExtratos(ctx: Ctx): Promise<Turno> {
   if (rodadas >= 2) {
     const bolhas = await gerarDespedida(ctx,
       'A pessoa está tentando mas os arquivos não estão vindo certos — essa parte do aplicativo dá trabalho mesmo. Acolha (sem culpar ninguém) e diga que um colega do time vai ajudar pessoalmente com esses documentos, aqui na conversa. É o caminho normal.');
-    return { bolhas, statusNovo: 'handoff', motivoHumano: 'auxilio_extratos', coberturaNova, dadosPatch: { rodadas_sem_progresso: rodadas } };
+    return { bolhas, chamarHumano: 'auxilio_extratos', coberturaNova, dadosPatch: { rodadas_sem_progresso: rodadas } };
   }
 
   const falta = montarFaltaTexto(depois, !!consignado);
@@ -838,7 +924,7 @@ async function etapaExtratos(ctx: Ctx): Promise<Turno> {
     },
   });
   if (r.dados.cliente_com_dificuldade === true || r.acao === 'handoff') {
-    return { bolhas: r.mensagens, statusNovo: 'handoff', motivoHumano: 'auxilio_extratos', coberturaNova, dadosPatch: { rodadas_sem_progresso: rodadas } };
+    return { bolhas: r.mensagens, chamarHumano: 'auxilio_extratos', coberturaNova, dadosPatch: { rodadas_sem_progresso: rodadas } };
   }
   // precisão obrigatória: os períodos citados têm que ser EXATAMENTE os calculados
   let bolhas = r.mensagens;
@@ -851,7 +937,7 @@ async function etapaExtratos(ctx: Ctx): Promise<Turno> {
       else await evento(ctx.admin, ctx.sessao, 'falta_impreciso', { esperado: falta.frase });
     }
   }
-  return { bolhas, coberturaNova, resetErros: progresso, dadosPatch: { rodadas_sem_progresso: rodadas }, docsPatch: consignado ? { consignado } : undefined, __perguntouValores: r.perguntouValores };
+  return { bolhas, coberturaNova, resetErros: progresso, retomar: progresso, dadosPatch: { rodadas_sem_progresso: rodadas }, docsPatch: consignado ? { consignado } : undefined, __perguntouValores: r.perguntouValores };
 }
 
 function montarCoberturaJson(c: ReturnType<typeof calcularCobertura>, bancosAlvo: Set<string>, rubrica217: boolean, cpf: string): Record<string, unknown> {
@@ -892,7 +978,7 @@ async function concluirSessao(ctx: Ctx, coberturaNova: Record<string, unknown>, 
       analise = await geminiSessao(ctx, 'analise_consignado', {
         system: PROMPT_ANALISE_CONSIGNADO,
         partes: [{ inline_data: { mime_type: arq.mime, data: arq.b64 } }, { text: 'Extraia os dados no JSON pedido.' }],
-        schema: SCHEMA_ANALISE_CONSIGNADO, temperatura: 0, maxTokens: 8192,
+        schema: SCHEMA_ANALISE_CONSIGNADO, temperatura: 0, maxTokens: 8192, semPensar: true,
       }, 'docs');
     }
     const cartoes = Array.isArray(analise.cartoes) ? (analise.cartoes as Array<Record<string, unknown>>) : [];
@@ -931,7 +1017,9 @@ async function concluirSessao(ctx: Ctx, coberturaNova: Record<string, unknown>, 
 
   const r = await conversar(ctx, { etapa: 'conclusao' });
   return {
-    bolhas: r.mensagens, statusNovo: 'concluida', motivoHumano: 'docs_completos_fechar',
+    // conclusão SUAVE: especialista alertado, mas a IA segue na conversa (etapa 'conclusao')
+    // respondendo com simpatia até o humano assumir — aí o trigger pausa.
+    bolhas: r.mensagens, etapaNova: 'conclusao', chamarHumano: 'docs_completos_fechar',
     coberturaNova, docsPatch: { consignado },
   };
 }
@@ -976,7 +1064,8 @@ async function conversar(ctx: Ctx, opts: { etapa?: string; instrucaoExtra?: stri
   for (const [k, v] of Object.entries({ ...defaults, ...(opts.vars ?? {}) })) {
     instrucao = instrucao.replaceAll(`{${k}}`, v);
   }
-  const system = `${PERSONA}\n\n${instrucao}${opts.instrucaoExtra ? `\n\nNOTA DESTE TURNO: ${opts.instrucaoExtra}` : ''}`;
+  const acomp = ctx.dados.aguardando_humano ? `\n\n${notaAcompanhamento(String(ctx.dados.aguardando_humano))}` : '';
+  const system = `${PERSONA}\n\n${instrucao}${acomp}${opts.instrucaoExtra ? `\n\nNOTA DESTE TURNO: ${opts.instrucaoExtra}` : ''}`;
 
   // áudios ANTES do contexto (com teto agregado): o texto do contexto precisa dizer a VERDADE
   // sobre o que está anexado — dizer "ouça o áudio" com o anexo ausente faz o modelo alucinar.
@@ -1092,7 +1181,7 @@ function montarContexto(ctx: Ctx, audios?: { carregados: Set<string>; falhados: 
 
 // ======== Gemini com evento de custo/auditoria (lança FalhaTecnica; nunca conversa) ========
 async function geminiSessao(ctx: Ctx, finalidade: string, p: {
-  system: string; partes: ParteGemini[]; schema: Record<string, unknown>; temperatura: number; maxTokens: number;
+  system: string; partes: ParteGemini[]; schema: Record<string, unknown>; temperatura: number; maxTokens: number; semPensar?: boolean;
 }, tipo: 'chat' | 'docs' = 'chat'): Promise<Record<string, unknown>> {
   try {
     const { r, modeloUsado, atualizadoDe } = await chamarComRecuperacao(ctx.admin, ctx.sessao.canal_id, ctx.modelos, tipo, p);
@@ -1128,7 +1217,7 @@ async function extrairDeArquivos(ctx: Ctx, prompt: string, schema: Record<string
     const j = await geminiSessao(ctx, 'extracao_doc', {
       system: prompt,
       partes: [{ inline_data: { mime_type: arq.mime, data: arq.b64 } }, { text: 'Extraia os dados no JSON pedido.' }],
-      schema, temperatura: 0, maxTokens: 4096,
+      schema, temperatura: 0, maxTokens: 4096, semPensar: true,
     });
     itens.push({ ...(j as Record<string, unknown>), __anexo: String(meta.anexo_path ?? ''), __mime: String(meta.mime ?? '') });
   }

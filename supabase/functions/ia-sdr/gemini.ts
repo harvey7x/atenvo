@@ -26,15 +26,21 @@ export interface ResultadoGemini { json: Record<string, unknown>; tokensIn: numb
 // sem timeout, um socket morto furava o claim de 5min da sessão e as leases de canal.
 const TIMEOUT_MS = 45_000;
 
+// Extrações (visão) rodam com thinking DESLIGADO quando a API aceita (latência e custo);
+// se o modelo rejeitar thinkingConfig (400), lembramos e nunca mais mandamos.
+let thinkingConfigSuportado = true;
+
 export async function chamarGeminiJson(modelo: string, p: {
   system: string;
   partes: ParteGemini[];
   schema: Record<string, unknown>;
   temperatura?: number;
   maxTokens?: number;
+  semPensar?: boolean;                          // extração: thinkingBudget 0 (adaptativo)
 }): Promise<ResultadoGemini> {
   const key = env('GEMINI_API_KEY');
   if (!key) throw new Error('sem_api_key');
+  const tentaSemPensar = p.semPensar === true && thinkingConfigSuportado;
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
   let res: Response;
@@ -52,6 +58,7 @@ export async function chamarGeminiJson(modelo: string, p: {
             responseSchema: p.schema,
             temperature: p.temperatura ?? 0.4,
             maxOutputTokens: p.maxTokens ?? 2048,
+            ...(tentaSemPensar ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
           },
         }),
         signal: ctrl.signal,
@@ -60,6 +67,15 @@ export async function chamarGeminiJson(modelo: string, p: {
   } catch (e) {
     throw new Error(ctrl.signal.aborted ? 'timeout_gemini' : `fetch failed: ${String((e as Error)?.message ?? '').slice(0, 120)}`);
   } finally { clearTimeout(t); }
+  if (!res.ok && res.status === 400 && tentaSemPensar) {
+    const corpo = await res.text();
+    if (/thinking|thought/i.test(corpo)) {
+      // modelo não aceita thinkingConfig: desliga pra sempre nesta instância e refaz UMA vez
+      thinkingConfigSuportado = false;
+      return chamarGeminiJson(modelo, { ...p, semPensar: false });
+    }
+    throw new Error(`gemini 400: ${corpo.slice(0, 500)}`);
+  }
   if (!res.ok) throw new Error(`gemini ${res.status}: ${(await res.text()).slice(0, 500)}`);
   const data = await res.json();
   // bloqueio/corte explícito NÃO é "JSON inválido": nomeia o motivo (safety, MAX_TOKENS…)
