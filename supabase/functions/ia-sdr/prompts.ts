@@ -206,9 +206,9 @@ export const SCHEMA_LOTE_COLETA = {
   required: ['identidades', 'comprovante'],
 };
 
-export const PROMPT_LOTE_COLETA = `Você é um extrator de dados de documentos brasileiros. As imagens anexas chegaram JUNTAS, do mesmo cliente, numa conversa de WhatsApp. Analise o CONJUNTO e devolva o JSON pedido.
+export const PROMPT_LOTE_COLETA = `Você é um extrator de dados de documentos brasileiros. Os arquivos anexos (fotos e/ou PDFs) chegaram JUNTOS, do mesmo cliente, numa conversa de WhatsApp. Analise o CONJUNTO e devolva o JSON pedido.
 - Identidade (RG ou CNH): frente e verso da MESMA pessoa formam UM item — combine as informações dos dois lados (o nome pode estar só num deles; no RG antigo os dados ficam no verso). dados_completos=true quando dá para confirmar que é um documento de identidade legível. CNH ABERTA (uma foto com o documento inteiro) conta como frente_presente=true E verso_presente=true; o mesmo vale para RG aberto.
-- Comprovante de residência: conta de luz, água, telefone, internet, gás etc. Extraia nome_titular, tipo_conta e mes_referencia/ano (mês de REFERÊNCIA; se não houver, o do vencimento).
+- Comprovante de residência: conta de luz, água, telefone, internet, gás etc. — vale FOTO ou PDF (conta digital baixada do app/site é comum). Extraia nome_titular, tipo_conta e mes_referencia/ano (mês de REFERÊNCIA; se não houver, o do vencimento).
 - Seja GENEROSO AO EXTREMO com qualidade: foto escura, com reflexo, tremida ou parcial de um RG/CNH AINDA É o documento — marque o tipo e os lados presentes normalmente (a qualidade fina é conferida depois por um analista humano). dados_completos=false SÓ quando não dá nem para dizer que aquilo é um documento de identidade.
 - ANTI-ALUCINAÇÃO (regra dura): campo que não está claramente legível fica FORA do JSON — NUNCA deduza, complete ou "adivinhe" dígitos de CPF, números ou nomes. Preencha analise_legibilidade ANTES dos campos extraídos.
 - outros_arquivos: quantas imagens não são nem identidade nem comprovante.`;
