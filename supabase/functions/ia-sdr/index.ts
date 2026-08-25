@@ -106,6 +106,7 @@ interface Turno {
   etiquetaOpp?: string;
   incrementaErro?: boolean;                     // "não entendi o cliente" (2x seguidas → chama humano)
   resetErros?: boolean;
+  reagendarMs?: number;                         // handler pede outro turno em breve (ex.: abertura que falhou na verificação)
   __perguntouValores?: boolean;
 }
 
@@ -445,12 +446,14 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
   const novas = fetched.filter((m) => !vistas.has(m.id));
   const houveMais = fetched.length >= 25;   // estourou o limit: reagenda já em vez de dormir
 
-  // acordou SEM mensagem nova: ou é hora de NUDGE (lead esfriou no meio do funil) ou volta a dormir
+  // acordou SEM mensagem nova: transição pendente re-tenta a etapa; senão é hora de NUDGE
+  // (lead esfriou) ou volta a dormir
+  const transPendente = dados.transicao_pendente === true;
   const nudgeN = Number(dados.nudge_n ?? 0) || 0;
-  const ehNudge = !novas.length && dados.abertura_enviada === true
+  const ehNudge = !novas.length && dados.abertura_enviada === true && !transPendente
     && !dados.aguardando_humano && sessao.etapa !== 'conclusao'
     && nudgeN < NUDGE_MAX && dados.nudge_alvo === processadoAte;
-  if (!novas.length && dados.abertura_enviada && !ehNudge) { await limparAgenda(admin, sessao.id, claimAte); return; }
+  if (!novas.length && dados.abertura_enviada && !ehNudge && !transPendente) { await limparAgenda(admin, sessao.id, claimAte); return; }
 
   // histórico (~30 mensagens, ordem cronológica) + conjunto de saídas p/ o dedup duro
   const { data: histRaw } = await admin.from('mensagens')
@@ -634,6 +637,9 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
     if (houveMais) {
       // estourou o limit de novas: tem mensagem esperando — próximo turno JÁ, sem dormir
       await admin.from('ia_sessoes').update({ processar_apos: new Date().toISOString() }).eq('id', sessao.id).eq('status', 'ativa');
+    } else if (t.reagendarMs) {
+      // o handler pediu outro turno em breve (ex.: abertura da triagem reprovou na verificação)
+      await agendarProximo(admin, sessao.id, claimAte, new Date(Date.now() + t.reagendarMs).toISOString());
     } else {
       // agenda a RETOMADA se o lead esfriar (escada: 1º por tipo de etapa, 2º ~3h, 3º manhã
       // seguinte; depois o episódio encerra). Sem retomada quando: colega já chamado,
@@ -702,6 +708,13 @@ function checklistTexto(c: Checklist, docs: Record<string, unknown>, meses: stri
 }
 
 async function etapaColetaDocs(ctx: Ctx): Promise<Turno> {
+  // turno de RE-TENTATIVA da transição (a abertura do gov.br reprovou na verificação e nada de
+  // novo chegou): só a pergunta importa — nada de novo ack pra não soar repetitivo
+  if (ctx.dados.transicao_pendente === true && !ctx.novas.length) {
+    const pergunta = await aberturaTriagemVerificada(ctx);
+    if (pergunta) return { bolhas: [pergunta], etapaNova: 'triagem_govbr', dadosPatch: { transicao_pendente: null }, resetErros: true };
+    return { bolhas: [], reagendarMs: 120_000, dadosPatch: { transicao_pendente: true } };
+  }
   const meses = mesesComprovante();
   const mesesTxt = `do mês atual ou do passado (${meses[0].rotulo} ou ${meses[1].rotulo})`;
   const notas: string[] = [];
@@ -795,24 +808,46 @@ async function etapaColetaDocs(ctx: Ctx): Promise<Turno> {
   dadosPatch.tentativas_item = tent;
 
   // checklist FECHOU: a pergunta do gov.br sai NESTE turno, determinística (2ª chamada) —
-  // depender do modelo emendar sozinho podia deixar a conversa parada esperando o cliente
+  // e agora com verificação de CONTEÚDO: no teste de 25/08 o modelo ignorou a instrução e
+  // devolveu "E-mail salvo!" no lugar da pergunta; chamada garantida ≠ pergunta garantida.
   let bolhas = r.mensagens;
+  let perguntaOk = false;
   if (clFinal.completo) {
-    const abertura = await conversar(ctx, {
-      etapa: 'triagem_govbr',
-      instrucaoExtra: 'O checklist da documentação acabou de fechar. Este turno é a ABERTURA da etapa: em 1 bolha curta, faça a pergunta do gov.br/Meu INSS (só perguntar SE tem a senha e usa o app).',
-    });
-    // a PERGUNTA entra garantida (por último): o agradecimento cede espaço se precisar
-    bolhas = [...bolhas.slice(0, 2), abertura.mensagens[0]].filter(Boolean);
+    const pergunta = await aberturaTriagemVerificada(ctx);
+    if (pergunta) {
+      // a PERGUNTA entra garantida (por último): o agradecimento cede espaço se precisar
+      bolhas = [...bolhas.slice(0, 2), pergunta].filter(Boolean);
+      perguntaOk = true;
+    }
   }
+  if (clFinal.completo) dadosPatch.transicao_pendente = perguntaOk ? null : true;
   return {
     bolhas,
-    etapaNova: clFinal.completo ? 'triagem_govbr' : (ctx.sessao.etapa !== 'coleta_docs' ? 'coleta_docs' : undefined),
+    // sem pergunta verificada NÃO transiciona mudo: fica em coleta e tenta de novo em ~60s
+    etapaNova: clFinal.completo && perguntaOk ? 'triagem_govbr' : (ctx.sessao.etapa !== 'coleta_docs' ? 'coleta_docs' : undefined),
+    reagendarMs: clFinal.completo && !perguntaOk ? 60_000 : undefined,
     resetErros: true,
     retomar,
     dadosPatch, docsPatch,
     __perguntouValores: r.perguntouValores,
   };
+}
+
+/** Gera a pergunta de abertura do gov.br e VERIFICA que ela é mesmo a pergunta (2 tentativas). */
+async function aberturaTriagemVerificada(ctx: Ctx): Promise<string | null> {
+  const valida = (s: string) => /gov\.?\s?br|meu\s?inss/i.test(s) && /\?/.test(s);
+  for (let tentativa = 1; tentativa <= 2; tentativa++) {
+    const abertura = await conversar(ctx, {
+      etapa: 'triagem_govbr',
+      instrucaoExtra: tentativa === 1
+        ? 'O checklist da documentação acabou de fechar. Este turno é a ABERTURA da etapa: sua resposta deve ser APENAS a pergunta do gov.br, em 1 bolha curta — pergunte se a pessoa TEM a senha do gov.br e costuma usar o aplicativo Meu INSS. Nada de confirmar e-mail ou documento aqui.'
+        : 'ATENÇÃO: responda SOMENTE com a pergunta, em uma única bolha, citando "gov.br" e "Meu INSS": pergunte se a pessoa tem a senha do gov.br e usa o aplicativo Meu INSS. Nenhum outro conteúdo.',
+    });
+    const candidata = abertura.mensagens.find(valida) ?? null;
+    if (candidata) return candidata;
+    await evento(ctx.admin, ctx.sessao, 'abertura_triagem_invalida', { tentativa, veio: abertura.mensagens[0]?.slice(0, 100) });
+  }
+  return null;
 }
 
 /** Chama um colega (handoff SUAVE) reconhecendo o que já deu certo — a IA segue atendendo. */
