@@ -50,7 +50,9 @@ export function seedWa(): WaContact[] {
     },
     {
       ...base,
-      id: 'wa-antonio', name: 'Antônio Pereira Lima', phone: '5551987770002', contatoId: 'wa-antonio-ct',
+      /* contatoId kct-5 = mesmo cliente do seed do Kanban (lead kl-5) e da ficha judicial
+         demo — o painel da conversa mostra a ficha real com o envio à planilha simulado. */
+      id: 'wa-antonio', name: 'Antônio Pereira Lima', phone: '5551987770002', contatoId: 'kct-5',
       time: '13:47', unread: 0, lastAtMs: agora - 33 * min, aguardando: true, aguardandoDesde: iso(agora - 33 * min),
       etapa: 'Qualificado', etapaCor: '#8b5cf6', respId: 'u-mock',
       last: 'Matheo: Perfeito, seu Antônio…', lastInter: 'há 33 min',

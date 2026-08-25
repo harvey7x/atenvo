@@ -23,6 +23,7 @@ import { useOrg } from '@/context/OrgContext';
 import { MediaComposer } from '@/components/MediaComposer';
 import { ScriptSequenceModal } from '@/components/ScriptSequenceModal';
 import { FichaJudicialBox } from '@/components/FichaJudicialBox';
+import { fichaDemoDoContato } from '@/data/fichaJudicial';
 import { useSendWaMessage } from '@/data/whatsapp';
 import { mensagemAssumir, useAlertasLeadQuente } from '@/data/alertasLeadQuente';
 import { AlertaLeadQuenteModal } from '../components/AlertaLeadQuenteModal';
@@ -1450,6 +1451,9 @@ function KanbanCtx({ contatoId, demo, etapa, origem, respNome, lead, aoAvisar }:
   const aberta = demo
     ? (etapa ? { id: 'demo-opp', funilNome: 'Funil comercial', colunaId: null as string | null, colunaNome: etapa, respNome: respNome ?? '', tipoServico: 'analise_inicial', tipoBeneficio: 'aposentadoria', valor: null, atualizadoEm: '' } : null)
     : abertaReal;
+  // demo com ficha seed (ex.: Antônio, kct-5): renderiza a FichaJudicialBox real —
+  // inclui o envio à planilha simulado — no lugar do cartão-placeholder.
+  const fichaDemo = demo ? fichaDemoDoContato(contatoId) : null;
   return (
     <div className="ctx-b spot">
       <div className="ctx-t">Funil</div>
@@ -1463,7 +1467,7 @@ function KanbanCtx({ contatoId, demo, etapa, origem, respNome, lead, aoAvisar }:
           <div style={{ marginTop: 7 }}>
             <BotaoMini onClick={() => nav(demo ? '/kanban' : `/kanban?oportunidade=${encodeURIComponent(aberta.id)}`)}>Abrir no Kanban</BotaoMini>
           </div>
-          {demo ? (
+          {demo && !fichaDemo ? (
             /* representação da ficha no demo — MESMAS classes fjb do componente real (aplica o override Platina) */
             <div className="fjb" style={{ marginTop: 12 }}>
               <div className="fjb-h">Ficha judicial</div>
@@ -1475,7 +1479,7 @@ function KanbanCtx({ contatoId, demo, etapa, origem, respNome, lead, aoAvisar }:
             </div>
           ) : (
             <div style={{ marginTop: 10 }}>
-              <FichaJudicialBox contatoId={contatoId} oportunidadeId={aberta.id} conversaId={lead.id} canalId={lead.canalId ?? null} contatoAtual={{ nome: lead.name, telefone: lead.phone, email: lead.email }} />
+              <FichaJudicialBox contatoId={contatoId} oportunidadeId={fichaDemo?.oportunidadeId ?? aberta.id} conversaId={lead.id} canalId={lead.canalId ?? null} contatoAtual={{ nome: lead.name, telefone: lead.phone, email: lead.email }} />
             </div>
           )}
         </>

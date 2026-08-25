@@ -143,6 +143,12 @@ export function fichaDemoDaOportunidade(oportunidadeId: string | null | undefine
   return (isDemoMode && oportunidadeId && DEMO_FICHAS[oportunidadeId]) || null;
 }
 
+/** Ficha seed do demo pelo CONTATO (aba WhatsApp: a conversa conhece o contato, não a opp). */
+export function fichaDemoDoContato(contatoId: string | null | undefined): FichaJudicial | null {
+  if (!isDemoMode || !contatoId) return null;
+  return Object.values(DEMO_FICHAS).find((f) => f.contatoId === contatoId) ?? null;
+}
+
 export function useFichasDaOportunidade(oportunidadeId: string | null) {
   const { currentOrg } = useOrg();
   const org = currentOrg.id;
