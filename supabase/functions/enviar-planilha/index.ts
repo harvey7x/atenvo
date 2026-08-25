@@ -8,7 +8,7 @@
 // URL do Web App e token vêm SÓ do env (PLANILHA_WEBAPP_URL / PLANILHA_TOKEN).
 import { corsHeaders, json } from './cors.ts';
 import { adminClient, getUser } from './client.ts';
-import { normalizaCpfPlanilha, normalizaTelefonePlanilha } from './normaliza.ts';
+import { normalizaCpfPlanilha, normalizaTelefonePlanilha, normalizaCorPlanilha } from './normaliza.ts';
 
 interface RespostaPonte { ok?: boolean; acao?: string; linha?: number; erro?: string }
 
@@ -31,6 +31,7 @@ Deno.serve(async (req) => {
     const cpf = normalizaCpfPlanilha(String(body?.cpf ?? ''));
     if (!cpf) return json({ ok: false, erro: 'CPF precisa ter 11 dígitos para ir à planilha.' }, 400);
     const numero = normalizaTelefonePlanilha(String(body?.numero ?? ''));
+    const cor = normalizaCorPlanilha(body?.cor); // '' = ponte não mexe na cor da linha
 
     // multi-tenant: a ficha precisa pertencer à organização do usuário autenticado
     const admin = adminClient();
@@ -52,7 +53,7 @@ Deno.serve(async (req) => {
       const r = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, cliente, cpf, senha_inss, numero, trafego, responsavel }),
+        body: JSON.stringify({ token, cliente, cpf, senha_inss, numero, trafego, responsavel, cor }),
       });
       ponte = JSON.parse(await r.text()) as RespostaPonte;
     } catch {

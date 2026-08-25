@@ -1,5 +1,15 @@
 import { assertEquals } from 'jsr:@std/assert';
-import { normalizaCpfPlanilha, normalizaTelefonePlanilha } from './normaliza.ts';
+import { normalizaCpfPlanilha, normalizaTelefonePlanilha, normalizaCorPlanilha } from './normaliza.ts';
+
+Deno.test('cor: só verde/amarelo/vermelho passam; resto vira vazio', () => {
+  assertEquals(normalizaCorPlanilha('verde'), 'verde');
+  assertEquals(normalizaCorPlanilha(' Amarelo '), 'amarelo');
+  assertEquals(normalizaCorPlanilha('VERMELHO'), 'vermelho');
+  assertEquals(normalizaCorPlanilha('azul'), '');
+  assertEquals(normalizaCorPlanilha(''), '');
+  assertEquals(normalizaCorPlanilha(null), '');
+  assertEquals(normalizaCorPlanilha(42), '');
+});
 
 Deno.test('CPF: 11 dígitos formata preservando zeros à esquerda', () => {
   assertEquals(normalizaCpfPlanilha('00280057030'), '002.800.570-30');

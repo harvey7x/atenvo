@@ -256,9 +256,12 @@ export function useCriarFichaJudicial() {
 
 /* ---------- envio à planilha CONTROLE CLIENTES AGENDADOS ---------- */
 
+export type CorPlanilha = '' | 'verde' | 'amarelo' | 'vermelho';
 export interface EnvioPlanilha {
   ficha: FichaJudicial;
   cliente: string; cpf: string; senhaInss: string; numero: string; trafego: string; responsavel: string;
+  /** cor da linha na planilha ('' = não mexe na cor). */
+  cor: CorPlanilha;
 }
 export interface EnvioPlanilhaResultado { acao: 'criado' | 'atualizado'; linha: number | null; aviso?: string }
 
@@ -283,7 +286,7 @@ export function useEnviarFichaPlanilha() {
       const { data, error } = await supabase!.functions.invoke('enviar-planilha', {
         body: {
           ficha_id: p.ficha.id, cliente: p.cliente, cpf: p.cpf, senha_inss: p.senhaInss,
-          numero: p.numero, trafego: p.trafego, responsavel: p.responsavel,
+          numero: p.numero, trafego: p.trafego, responsavel: p.responsavel, cor: p.cor,
         },
       });
       if (error) {

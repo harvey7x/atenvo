@@ -4,7 +4,7 @@ import { Modal } from '@/components/Modal';
 import { criarRaizPortalV2 } from '@/v2/components/portal';
 import { useToast } from '@/hooks/useToast';
 import { useAuth } from '@/context/AuthContext';
-import { useEnviarFichaPlanilha, useCanalPlanilha, type FichaJudicial } from '@/data/fichaJudicial';
+import { useEnviarFichaPlanilha, useCanalPlanilha, type FichaJudicial, type CorPlanilha } from '@/data/fichaJudicial';
 import { TRAFEGO_OPCOES, trafegoDoCanal, semAcento } from '@/lib/planilhaTrafego';
 import './FichaJudicialModal.css';
 
@@ -58,6 +58,7 @@ export function EnviarPlanilhaModal({ open, onClose, ficha, canalId }: Props) {
   const [numero, setNumero] = useState(ficha.telefone);
   const [trafego, setTrafego] = useState('');
   const [responsavel, setResponsavel] = useState(primeiroNomeMaiusculo(user?.name));
+  const [cor, setCor] = useState<CorPlanilha>('');
   const [erro, setErro] = useState<string | null>(null);
   const busy = enviar.isPending;
 
@@ -77,7 +78,7 @@ export function EnviarPlanilhaModal({ open, onClose, ficha, canalId }: Props) {
     try {
       const res = await enviar.mutateAsync({
         ficha, cliente: cliente.trim(), cpf, senhaInss: senhaInss.trim(),
-        numero, trafego: trafego.trim(), responsavel: responsavel.trim(),
+        numero, trafego: trafego.trim(), responsavel: responsavel.trim(), cor,
       });
       const linha = res.linha != null ? String(res.linha) : '—';
       toast(
@@ -134,6 +135,25 @@ export function EnviarPlanilhaModal({ open, onClose, ficha, canalId }: Props) {
             veioDoCanal ? <span className="fj-ind ok">Canal: {canalQ.data?.nomeInterno}</span> : undefined,
           )}
           {campo('Responsável', <input className="atv-input" value={responsavel} onChange={(e) => setResponsavel(e.target.value)} disabled={busy} />)}
+          {campo('Cor na planilha', (
+            <div className="fj-cores" role="radiogroup" aria-label="Cor da linha na planilha">
+              {(['verde', 'amarelo', 'vermelho'] as const).map((c) => (
+                <button
+                  type="button"
+                  key={c}
+                  className={'fj-cor ' + c + (cor === c ? ' sel' : '')}
+                  role="radio"
+                  aria-checked={cor === c}
+                  title={c.charAt(0).toUpperCase() + c.slice(1)}
+                  onClick={() => setCor((atual) => (atual === c ? '' : c))}
+                  disabled={busy}
+                >
+                  {cor === c && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>}
+                </button>
+              ))}
+              <span className="fj-cor-rotulo">{cor ? cor.charAt(0).toUpperCase() + cor.slice(1) : 'Não altera a cor da linha'}</span>
+            </div>
+          ))}
         </div>
         {jaEnviada && <div className="fj-obs">Na planilha · linha {ficha.planilhaLinha ?? '—'}</div>}
         {erro && <div className="fj-erro">{erro}</div>}

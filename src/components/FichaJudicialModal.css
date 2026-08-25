@@ -75,3 +75,15 @@
 .fj-combo-op .ck { color: var(--green-ink, #0e9d63); font-weight: 700; }
 .fj-combo-tag { font-size: 9.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--line-2); border-radius: 999px; padding: 1px 7px; }
 .fj-combo-vazio { font-size: 12px; color: var(--muted); padding: 7px 10px; }
+
+/* ===== Cor da linha na planilha (EnviarPlanilhaModal): verde/âmbar/rubro semânticos ===== */
+.fj-cores { display: flex; align-items: center; gap: 8px; min-height: 36px; }
+.fj-cor { width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--line-2); cursor: pointer; padding: 0; display: inline-flex; align-items: center; justify-content: center; color: #fff; }
+.fj-cor svg { width: 13px; height: 13px; }
+.fj-cor.verde { background: var(--verde, #19c37d); }
+.fj-cor.amarelo { background: var(--ambar, #d97706); }
+.fj-cor.vermelho { background: var(--rubro, #dc2626); }
+.fj-cor:hover:not(:disabled) { transform: translateY(-1px); }
+.fj-cor.sel { box-shadow: 0 0 0 3px var(--ring, rgba(0,0,0,.12)); }
+.fj-cor:disabled { opacity: .55; cursor: default; }
+.fj-cor-rotulo { font-size: 12px; color: var(--muted); }

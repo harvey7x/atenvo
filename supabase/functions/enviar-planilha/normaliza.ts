@@ -10,6 +10,13 @@ export function normalizaCpfPlanilha(bruto: string): string | null {
   return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
 }
 
+/** Cor da linha na planilha: só os três valores combinados com a equipe.
+ *  Qualquer outra coisa vira '' (a ponte não mexe na cor). */
+export function normalizaCorPlanilha(bruto: unknown): '' | 'verde' | 'amarelo' | 'vermelho' {
+  const c = String(bruto ?? '').trim().toLowerCase();
+  return c === 'verde' || c === 'amarelo' || c === 'vermelho' ? c : '';
+}
+
 /** Tira o 55 do país (se presente) e formata (DD) 9XXXX-XXXX / (DD) XXXX-XXXX.
  *  Fora do padrão (sem DDD, dígitos demais/de menos) devolve só os dígitos, sem inventar. */
 export function normalizaTelefonePlanilha(bruto: string): string {
