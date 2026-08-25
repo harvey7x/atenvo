@@ -59,3 +59,19 @@
 .fj-alertas { display: flex; flex-direction: column; gap: 4px; border: 1px solid rgba(217,119,6,.35); background: rgba(217,119,6,.07); border-radius: 10px; padding: 10px; }
 .fj-alerta { font-size: 12.5px; color: #b45309; font-weight: 600; }
 .fj-obs { font-size: 12px; color: var(--ink-2, var(--muted)); line-height: 1.5; }
+
+/* ===== Combobox do Tráfego (EnviarPlanilhaModal): seletor nos tokens do tema ===== */
+.fj-combo { position: relative; }
+.fj-combo input.atv-input { width: 100%; padding-right: 34px; }
+.fj-combo-seta { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); cursor: pointer; }
+.fj-combo-seta:hover:not(:disabled) { background: var(--hover); color: var(--ink); }
+.fj-combo-seta:disabled { opacity: .5; cursor: default; }
+.fj-combo-seta svg { width: 14px; height: 14px; transition: transform .15s ease; }
+.fj-combo-seta.aberta svg { transform: rotate(180deg); }
+/* a lista abre em portal fixed (o modal tem overflow hidden) — z acima do overlay (1000) */
+.fj-combo-pop { position: fixed; z-index: 1200; background: var(--surface); border: 1px solid var(--line-2); border-radius: 10px; box-shadow: var(--shadow-pop); padding: 4px; max-height: 224px; overflow-y: auto; display: flex; flex-direction: column; gap: 1px; }
+.fj-combo-op { display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 0; background: transparent; color: var(--ink); font-family: inherit; font-size: 12.5px; font-weight: 500; text-align: left; padding: 7px 10px; border-radius: 7px; cursor: pointer; }
+.fj-combo-op:hover, .fj-combo-op.ativo { background: var(--hover); }
+.fj-combo-op .ck { color: var(--green-ink, #0e9d63); font-weight: 700; }
+.fj-combo-tag { font-size: 9.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--line-2); border-radius: 999px; padding: 1px 7px; }
+.fj-combo-vazio { font-size: 12px; color: var(--muted); padding: 7px 10px; }

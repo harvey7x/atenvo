@@ -149,6 +149,31 @@ export function fichaDemoDoContato(contatoId: string | null | undefined): FichaJ
   return Object.values(DEMO_FICHAS).find((f) => f.contatoId === contatoId) ?? null;
 }
 
+/* canal seed do demo — permite mostrar a sugestão de Tráfego pelo chip sem backend */
+const DEMO_CANAIS: Record<string, CanalPlanilha> = {
+  'wa-canal-luiza': { nomeInterno: 'LUIZA', fonteNome: 'Tráfego 1' },
+};
+
+export interface CanalPlanilha { nomeInterno: string; fonteNome: string | null }
+
+/** Canal (nome interno + fonte de aquisição) para sugerir o Tráfego da planilha. */
+export function useCanalPlanilha(canalId: string | null | undefined) {
+  return useQuery({
+    queryKey: ['canal-planilha', canalId],
+    enabled: (FICHA_REAL || isDemoMode) && !!canalId,
+    staleTime: 5 * 60_000,
+    queryFn: async (): Promise<CanalPlanilha | null> => {
+      if (!FICHA_REAL) return DEMO_CANAIS[canalId!] ?? null;
+      const { data, error } = await supabase!.from('canais')
+        .select('nome_interno, fonte:fontes_aquisicao(nome)').eq('id', canalId!).maybeSingle();
+      if (error) throw new Error(error.message);
+      if (!data) return null;
+      const fonte = one(data.fonte as { nome: string } | { nome: string }[] | null);
+      return { nomeInterno: (data.nome_interno as string) || '', fonteNome: fonte?.nome ?? null };
+    },
+  });
+}
+
 export function useFichasDaOportunidade(oportunidadeId: string | null) {
   const { currentOrg } = useOrg();
   const org = currentOrg.id;

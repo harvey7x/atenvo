@@ -117,7 +117,7 @@ export function FichaJudicialBox({ contatoId, oportunidadeId, conversaId, canalI
       )}
 
       {fichaPlanilha && (
-        <EnviarPlanilhaModal open onClose={() => setPlanilhaDe(null)} ficha={fichaPlanilha} />
+        <EnviarPlanilhaModal open onClose={() => setPlanilhaDe(null)} ficha={fichaPlanilha} canalId={canalId ?? fichaPlanilha.canalId} />
       )}
     </div>
   );

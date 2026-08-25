@@ -1,18 +1,17 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Modal } from '@/components/Modal';
 import { criarRaizPortalV2 } from '@/v2/components/portal';
 import { useToast } from '@/hooks/useToast';
 import { useAuth } from '@/context/AuthContext';
-import { useEnviarFichaPlanilha, type FichaJudicial } from '@/data/fichaJudicial';
+import { useEnviarFichaPlanilha, useCanalPlanilha, type FichaJudicial } from '@/data/fichaJudicial';
+import { TRAFEGO_OPCOES, trafegoDoCanal, semAcento } from '@/lib/planilhaTrafego';
 import './FichaJudicialModal.css';
 
 /* Link de LEITURA da planilha CONTROLE CLIENTES AGENDADOS (aba CLIENTES EM ANDAMENTO),
    usado só no toast "Abrir planilha". A escrita passa exclusivamente pela edge function
    enviar-planilha (URL do Web App e token ficam em secrets, nunca no código). */
 const PLANILHA_VIEW_URL = 'https://docs.google.com/spreadsheets/d/1Obi1VmELX6bJJafYRdTvKcYomBrJbjKzoPs5o5W7kWQ/edit?gid=2039002047';
-
-const TRAFEGO_OPCOES = ['CAMPANHA', 'DISPARO', 'INDICAÇÃO', 'PRESENCIAL', 'RMKT CREFISA', 'RMKT BRUNO', 'ANDRIUS', 'SIMONE'];
 
 const somenteDigitos = (s: string) => s.replace(/\D+/g, '');
 const primeiroNomeMaiusculo = (nome?: string) => ((nome ?? '').trim().split(/\s+/)[0] ?? '').toUpperCase();
@@ -21,14 +20,22 @@ interface Props {
   open: boolean;
   onClose: () => void;
   ficha: FichaJudicial;
+  /** canal ATUAL do atendimento (o número em que o cliente fala) — sugere o Tráfego. */
+  canalId?: string | null;
 }
 
 /** Conferência antes de enviar a ficha à planilha da equipe. Campos editáveis;
  *  a ponte deduplica pelo CPF (atualiza a linha existente ou cria no fim). */
-export function EnviarPlanilhaModal({ open, onClose, ficha }: Props) {
+export function EnviarPlanilhaModal({ open, onClose, ficha, canalId }: Props) {
   const { toast } = useToast();
   const { user } = useAuth();
   const enviar = useEnviarFichaPlanilha();
+  // canal do atendimento (o número integrado em que o cliente fala) → sugestão de Tráfego
+  const canalQ = useCanalPlanilha(canalId ?? ficha.canalId);
+  const sugerido = useMemo(
+    () => trafegoDoCanal(canalQ.data?.nomeInterno, canalQ.data?.fonteNome),
+    [canalQ.data],
+  );
 
   // Portal para o body: dentro do DrawerV2 o backdrop-filter cria containing block
   // e prende o overlay fixed (modal clipado na coluna do drawer). No subtree .v2 a
@@ -53,6 +60,14 @@ export function EnviarPlanilhaModal({ open, onClose, ficha }: Props) {
   const [responsavel, setResponsavel] = useState(primeiroNomeMaiusculo(user?.name));
   const [erro, setErro] = useState<string | null>(null);
   const busy = enviar.isPending;
+
+  // pré-preenche o Tráfego pelo canal assim que a consulta resolve — mas nunca por
+  // cima de algo que o atendente já digitou ou escolheu (tocado).
+  const trafegoTocado = useRef(false);
+  useEffect(() => {
+    if (sugerido && !trafegoTocado.current) setTrafego(sugerido);
+  }, [sugerido]);
+  const veioDoCanal = !!sugerido && trafego === sugerido;
 
   async function confirmar() {
     if (busy) return;
@@ -107,14 +122,17 @@ export function EnviarPlanilhaModal({ open, onClose, ficha }: Props) {
           {campo('CPF', <input className="atv-input" value={cpf} onChange={(e) => setCpf(e.target.value)} disabled={busy} />)}
           {campo('Senha Meu INSS', <input className="atv-input" value={senhaInss} onChange={(e) => setSenhaInss(e.target.value)} disabled={busy} autoComplete="off" />)}
           {campo('Número', <input className="atv-input" value={numero} onChange={(e) => setNumero(e.target.value)} disabled={busy} />)}
-          {campo('Tráfego', (
-            <>
-              <input className="atv-input" list="planilha-trafego-opcoes" value={trafego} onChange={(e) => setTrafego(e.target.value)} placeholder="Selecione ou digite…" disabled={busy} />
-              <datalist id="planilha-trafego-opcoes">
-                {TRAFEGO_OPCOES.map((o) => <option key={o} value={o} />)}
-              </datalist>
-            </>
-          ))}
+          {campo(
+            'Tráfego',
+            <ComboTrafego
+              valor={trafego}
+              aoMudar={(v) => { trafegoTocado.current = true; setTrafego(v); }}
+              sugerido={sugerido}
+              raiz={raiz}
+              disabled={busy}
+            />,
+            veioDoCanal ? <span className="fj-ind ok">Canal: {canalQ.data?.nomeInterno}</span> : undefined,
+          )}
           {campo('Responsável', <input className="atv-input" value={responsavel} onChange={(e) => setResponsavel(e.target.value)} disabled={busy} />)}
         </div>
         {jaEnviada && <div className="fj-obs">Na planilha · linha {ficha.planilhaLinha ?? '—'}</div>}
@@ -126,6 +144,116 @@ export function EnviarPlanilhaModal({ open, onClose, ficha }: Props) {
   return <><span ref={ancora} style={{ display: 'none' }} />{raiz && createPortal(modal, raiz)}</>;
 }
 
-function campo(label: string, input: React.ReactNode) {
-  return <div className="fj-field"><label className="fj-label">{label}</label>{input}</div>;
+function campo(label: string, input: React.ReactNode, indicador?: React.ReactNode) {
+  return <div className="fj-field"><label className="fj-label">{label} {indicador}</label>{input}</div>;
+}
+
+/* Combobox do Tráfego — seletor Platina com valor livre: dropdown estilizado nos
+   tokens do tema (no lugar do datalist nativo), teclado (↑ ↓ Enter Esc) e a opção
+   sugerida pelo canal marcada. A lista abre em portal `position:fixed` (medida do
+   campo) porque o .atv-modal tem overflow hidden e clipparia um dropdown absoluto. */
+function ComboTrafego({ valor, aoMudar, sugerido, raiz, disabled }: {
+  valor: string; aoMudar: (v: string) => void; sugerido: string;
+  raiz: HTMLElement | null; disabled?: boolean;
+}) {
+  const caixaRef = useRef<HTMLDivElement>(null);
+  const popRef = useRef<HTMLDivElement>(null);
+  const [pop, setPop] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [ativo, setAtivo] = useState(-1);
+  const aberto = !!pop;
+
+  const alvo = semAcento(valor.trim().toUpperCase());
+  const ehOpcao = TRAFEGO_OPCOES.some((o) => semAcento(o) === alvo);
+  // digitou texto parcial → filtra; campo vazio ou valor já é uma opção → lista completa
+  const visiveis = !alvo || ehOpcao ? TRAFEGO_OPCOES : TRAFEGO_OPCOES.filter((o) => semAcento(o).includes(alvo));
+
+  function abrir() {
+    const r = caixaRef.current?.getBoundingClientRect();
+    if (!r) return;
+    setPop({ top: r.bottom + 4, left: r.left, width: r.width });
+    setAtivo(-1);
+  }
+  const fechar = () => { setPop(null); setAtivo(-1); };
+  const escolher = (o: string) => { aoMudar(o); fechar(); };
+
+  // fecha ao clicar fora (campo e lista vivem em subtrees diferentes por causa do portal)
+  useEffect(() => {
+    if (!aberto) return;
+    const aoMouseDown = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (!caixaRef.current?.contains(t) && !popRef.current?.contains(t)) fechar();
+    };
+    const aoRolar = () => fechar();
+    document.addEventListener('mousedown', aoMouseDown);
+    window.addEventListener('scroll', aoRolar, true);
+    window.addEventListener('resize', aoRolar);
+    return () => {
+      document.removeEventListener('mousedown', aoMouseDown);
+      window.removeEventListener('scroll', aoRolar, true);
+      window.removeEventListener('resize', aoRolar);
+    };
+  }, [aberto]);
+
+  function aoTeclar(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (!aberto) abrir();
+      else setAtivo((i) => Math.min(visiveis.length - 1, i + 1));
+    } else if (e.key === 'ArrowUp') {
+      if (aberto) { e.preventDefault(); setAtivo((i) => Math.max(0, i - 1)); }
+    } else if (e.key === 'Enter') {
+      if (aberto && ativo >= 0 && visiveis[ativo]) { e.preventDefault(); escolher(visiveis[ativo]); }
+      else if (aberto) fechar();
+    } else if (e.key === 'Escape') {
+      // fecha SÓ a lista — sem propagar, senão o Esc fecharia o modal junto
+      if (aberto) { e.stopPropagation(); fechar(); }
+    }
+  }
+
+  return (
+    <div className="fj-combo" ref={caixaRef}>
+      <input
+        className="atv-input"
+        value={valor}
+        onChange={(e) => { aoMudar(e.target.value); if (!aberto) abrir(); else setAtivo(-1); }}
+        onClick={() => { if (!aberto) abrir(); }}
+        onKeyDown={aoTeclar}
+        placeholder="Selecione ou digite…"
+        disabled={disabled}
+        role="combobox"
+        aria-expanded={aberto}
+        aria-autocomplete="list"
+      />
+      <button
+        type="button"
+        className={'fj-combo-seta' + (aberto ? ' aberta' : '')}
+        onMouseDown={(e) => { e.preventDefault(); if (aberto) fechar(); else abrir(); }}
+        aria-label={aberto ? 'Fechar opções de tráfego' : 'Abrir opções de tráfego'}
+        tabIndex={-1}
+        disabled={disabled}
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
+      </button>
+      {pop && raiz && createPortal(
+        <div className="fj-combo-pop" ref={popRef} role="listbox" style={{ top: pop.top, left: pop.left, width: pop.width }}>
+          {visiveis.map((o, i) => (
+            <button
+              type="button"
+              key={o}
+              className={'fj-combo-op' + (i === ativo ? ' ativo' : '')}
+              role="option"
+              aria-selected={o === valor}
+              onMouseDown={(e) => { e.preventDefault(); escolher(o); }}
+              onMouseEnter={() => setAtivo(i)}
+            >
+              <span>{o}</span>
+              {o === valor ? <span className="ck">✓</span> : o === sugerido ? <span className="fj-combo-tag">canal</span> : null}
+            </button>
+          ))}
+          {visiveis.length === 0 && <div className="fj-combo-vazio">Sem opção correspondente — o texto digitado vale como valor livre.</div>}
+        </div>,
+        raiz,
+      )}
+    </div>
+  );
 }
