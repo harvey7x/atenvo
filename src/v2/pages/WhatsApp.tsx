@@ -677,7 +677,7 @@ export default function WhatsAppV2() {
                 {current.id && (iaEstado?.existe || iaAtiva) && (
                   <BotaoMini className={iaAtiva ? 'ia-on' : ''} disabled={iaToggle.isPending}
                     title={iaAtiva ? ('IA atendendo' + (iaEstado?.etapa ? ' (' + iaEstado.etapa + ')' : '') + ' — clique para desligar e assumir') : (iaEstado?.aguardando_humano ? 'IA aguardando você assumir — clique para reativar a IA' : 'Ligar a IA nesta conversa')}
-                    onClick={alternarIa}>{iaAtiva ? '🤖 IA ligada' : '🤖 IA desligada'}</BotaoMini>
+                    onClick={alternarIa}>{iaAtiva ? 'IA ligada' : 'IA desligada'}</BotaoMini>
                 )}
                 {!ctxAberto && <BotaoMini title="Abrir painel de dados do contato" onClick={() => setCtxAberto(true)}>Dados</BotaoMini>}
                 <button type="button" className={'ib2' + (foco ? ' on' : '')} title="Modo de foco (Esc para sair)" onClick={() => setFoco((f) => !f)} style={{ width: 26, height: 26 }}><IcFoco /></button>
