@@ -362,7 +362,19 @@ async function processarSessao(admin: Admin, sessao: Sessao, canal: Record<strin
     .select('id');
   if (!claimed?.length) return;
 
-  const { data: lockConv } = await admin.rpc('bot_claim_conversa', { p_conversa: sessao.conversa_id, p_ttl_seg: 600 });
+  let lockConv = (await admin.rpc('bot_claim_conversa', { p_conversa: sessao.conversa_id, p_ttl_seg: 600 })).data;
+  if (!lockConv) {
+    // Conversa que NUNCA passou pelo fluxo do bot não tem linha em bot_conversa_estado — e
+    // bot_claim_conversa faz um UPDATE que casa 0 linhas, retornando false. Sem isto a sessão fica
+    // PRESA pra sempre (reagenda +60s sem enviar). Acontece com sessão criada direto (retomada
+    // manual, continuidade da Juliana). Garante a linha e tenta o lock de novo; só se AÍ falhar é
+    // lock legítimo de outro processo → reagenda.
+    await admin.from('bot_conversa_estado').upsert(
+      { conversa_id: sessao.conversa_id, organizacao_id: sessao.organizacao_id, canal_id: sessao.canal_id, contato_id: sessao.contato_id, pausado: false },
+      { onConflict: 'conversa_id', ignoreDuplicates: true },
+    );
+    lockConv = (await admin.rpc('bot_claim_conversa', { p_conversa: sessao.conversa_id, p_ttl_seg: 600 })).data;
+  }
   if (!lockConv) {
     await admin.from('ia_sessoes').update({ processar_apos: new Date(Date.now() + 60_000).toISOString() }).eq('id', sessao.id).eq('status', 'ativa');
     return;
