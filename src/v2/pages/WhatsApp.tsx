@@ -211,6 +211,10 @@ export default function WhatsAppV2() {
   }, [scripts, scriptCategorias]);
   const bloqueados = inbox.bloqueados;
   const canalEhCloud = inbox.canalSel?.transporte === 'cloud_api';
+  // Conversa PRESA neste canal (conversas.canal_preso_id): o cliente foi entregue a este número
+  // e mensagem dele em OUTRO número não move mais o atendimento. Sem o selo o atendente não tem
+  // como saber por que o oficial parou de assumir a conversa.
+  const presoNoSel = WA_REAL && !!current.canalPresoId && current.canalPresoId === inbox.canalSel?.id;
   // canal oficial (Cloud API/Meta) × número conectado por QR (Evolution) — sinalização na fila,
   // no topo da conversa, no "Responder por:" e no filtro de números. Transporte DESCONHECIDO
   // (demo, canais ainda carregando, canal removido fora de realCanais) fica neutro: não se
@@ -273,7 +277,21 @@ export default function WhatsAppV2() {
     setTab('todos'); setFiltroCanal(null); setFiltroStatus(null); setFiltroTransporte(null); setSearch('');
     setGruposFechados(new Set()); // expande tudo: o card alvo pode estar num grupo recolhido
     const t = window.setTimeout(() => {
-      document.querySelector(`[data-cid="${CSS.escape(conversaParam)}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      // rolar SÓ o container da lista — nunca scrollIntoView(): ele rola todos os
+      // ancestrais scrolláveis pra centralizar o card, inclusive o shell .app-v2.
+      // O shell é overflow:hidden (sem barra), mas ainda aceita scroll PROGRAMÁTICO;
+      // scrollIntoView o empurrava ~68px e o topbar sumia sem como voltar (tela "bugada"
+      // ao abrir conversa pelo Kanban). Ver [[rota-fullbleed-altura]].
+      const alvo = document.querySelector(`[data-cid="${CSS.escape(conversaParam)}"]`);
+      const lista = alvo?.closest('.wa-lista');
+      if (alvo && lista) {
+        const ar = alvo.getBoundingClientRect(), lr = lista.getBoundingClientRect();
+        const delta = (ar.top - lr.top) - (lista.clientHeight - ar.height) / 2;
+        lista.scrollTo({ top: lista.scrollTop + delta, behavior: 'smooth' });
+      }
+      // guarda: se algum caminho já deixou o shell deslocado, devolve ao topo
+      const shell = document.querySelector('.app-v2');
+      if (shell && shell.scrollTop !== 0) shell.scrollTop = 0;
       // só limpa o parâmetro DEPOIS de rolar: apagá-lo muda conversaParam→null, o que
       // dispara o cleanup deste effect (clearTimeout). Se limpássemos antes, o timer
       // morreria antes dos 220ms e a rolagem nunca ocorreria (regressão vs v1).
@@ -656,7 +674,7 @@ export default function WhatsAppV2() {
                   {current.phone ? mascararNumero(current.phone) : 'sem número'}
                   <SituacaoChipTopo lead={current} demo={demo} />
                   {inbox.canalSel
-                    ? <span className={'wa-hchip' + (canalEhCloud ? ' of' : '')} title={`Respondendo por ${inbox.canalSel.alias}${inbox.canalSel.numero ? ' · ' + mascararNumero(inbox.canalSel.numero) : ''} · ${canalEhCloud ? 'OFICIAL (API do WhatsApp/Meta)' : 'número conectado por QR (não oficial)'}`}>{canalEhCloud ? '✓ ' : ''}{inbox.canalSel.alias}</span>
+                    ? <span className={'wa-hchip' + (canalEhCloud ? ' of' : '')} title={`Respondendo por ${inbox.canalSel.alias}${inbox.canalSel.numero ? ' · ' + mascararNumero(inbox.canalSel.numero) : ''} · ${canalEhCloud ? 'OFICIAL (API do WhatsApp/Meta)' : 'número conectado por QR (não oficial)'}${presoNoSel ? `\n\n📌 Atendimento preso neste número: mensagem do cliente em outro número NÃO traz a conversa de volta. Para soltar, responda por outro número aqui pelo painel.` : ''}`}>{canalEhCloud ? '✓ ' : ''}{inbox.canalSel.alias}{presoNoSel ? ' 📌' : ''}</span>
                     : current.chip && (() => { const t = transporteDe(current.canalId); return <span className={'wa-hchip' + (t === 'cloud_api' ? ' of' : '')} title={tituloCanal(current.chip, t)}>{t === 'cloud_api' ? '✓ ' : ''}{current.chip}</span>; })()}
                   {WA_REAL && canalEhCloud && janelaQ.data && (
                     <span className={'janela' + (janelaQ.data.aberta ? '' : ' fechada')} title={janelaQ.data.aberta ? 'Dentro das 24 horas: dá para responder com texto livre por este número.' : 'Passaram 24 horas desde a última mensagem do cliente PARA ESTE número. Só um modelo aprovado pela Meta pode sair daqui.'}>
@@ -1466,7 +1484,7 @@ function KanbanCtx({ contatoId, demo, etapa, origem, respNome, lead, aoAvisar }:
   const [addBusy, setAddBusy] = useState(false);
   if (!contatoId) return null;
   const oppDemo = demo && etapa
-    ? { id: 'demo-opp', funilNome: 'Funil comercial', colunaId: null as string | null, colunaNome: etapa, respNome: respNome ?? '', tipoServico: 'analise_inicial', tipoBeneficio: 'aposentadoria', valor: null, atualizadoEm: '', status: lead.oppStatus === 'ganho' || lead.oppStatus === 'perdido' || lead.oppStatus === 'cancelado' ? lead.oppStatus : 'em_andamento' }
+    ? { id: 'demo-opp', funilNome: 'Funil comercial', colunaId: null as string | null, colunaNome: etapa, respId: lead.respId ?? null, respNome: respNome ?? '', tipoServico: 'analise_inicial', tipoBeneficio: 'aposentadoria', valor: null, atualizadoEm: '', status: lead.oppStatus === 'ganho' || lead.oppStatus === 'perdido' || lead.oppStatus === 'cancelado' ? lead.oppStatus : 'em_andamento' }
     : null;
   const aberta = demo ? (oppDemo?.status === 'em_andamento' ? oppDemo : null) : abertaReal;
   // Cliente FECHADO não some do painel: sem oportunidade aberta, a fechada mais
@@ -1507,7 +1525,7 @@ function KanbanCtx({ contatoId, demo, etapa, origem, respNome, lead, aoAvisar }:
             </div>
           ) : (
             <div style={{ marginTop: 10 }}>
-              <FichaJudicialBox contatoId={contatoId} oportunidadeId={fichaDemo?.oportunidadeId ?? opp.id} conversaId={lead.id} canalId={lead.canalId ?? null} contatoAtual={{ nome: lead.name, telefone: lead.phone, email: lead.email }} />
+              <FichaJudicialBox contatoId={contatoId} oportunidadeId={fichaDemo?.oportunidadeId ?? opp.id} conversaId={lead.id} canalId={lead.canalId ?? null} responsavelSugerido={{ id: opp.respId ?? lead.respId ?? undefined, nome: opp.respNome || respNome }} contatoAtual={{ nome: lead.name, telefone: lead.phone, email: lead.email }} />
             </div>
           )}
         </>

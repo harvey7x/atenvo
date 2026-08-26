@@ -63,7 +63,7 @@ export function KanbanContatoBox({ contatoId, conversaId, canalId, canalTipo, co
           <button type="button" className="kcb-btn" onClick={() => navigate(`/kanban?oportunidade=${aberta.id}`)}>Ver no Kanban</button>
           <div className="kcb-ficha">
             <FichaJudicialBox contatoId={contatoId} oportunidadeId={aberta.id} conversaId={conversaId ?? null} canalId={canalId ?? null}
-              responsavelSugerido={{ nome: aberta.respNome }} contatoAtual={{ telefone: contatoTelefone ?? '' }} oportunidadeAtual={{ tipoBeneficio: aberta.tipoBeneficio }} />
+              responsavelSugerido={{ id: aberta.respId ?? undefined, nome: aberta.respNome }} contatoAtual={{ telefone: contatoTelefone ?? '' }} oportunidadeAtual={{ tipoBeneficio: aberta.tipoBeneficio }} />
           </div>
         </div>
       ) : (

@@ -54,7 +54,7 @@ function seedExtras(): ExtrasDemo {
   const iso = (t: number) => new Date(t).toISOString();
   const opp = (n: Partial<OppDoContato>): OppDoContato => ({
     id: 'op-' + Math.random().toString(36).slice(2), status: 'em_andamento', aberta: true, funilId: 'f1',
-    funilNome: 'Funil comercial', colunaId: null, colunaNome: 'Documentação', respNome: 'Henrique', tipoServico: 'Revisão de contrato',
+    funilNome: 'Funil comercial', colunaId: null, colunaNome: 'Documentação', respId: null, respNome: 'Henrique', tipoServico: 'Revisão de contrato',
     tipoBeneficio: null, valor: null, valorDescontoMensal: null, valorRessarcimentoEstimado: null, valorRessarcido: null,
     origem: 'whatsapp', criadoEm: iso(agora - 96 * h), atualizadoEm: iso(agora - 5 * h), ...n,
   });

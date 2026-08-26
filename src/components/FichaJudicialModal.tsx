@@ -78,7 +78,7 @@ export function FichaJudicialModal({ open, onClose, vinculos, fichaInicial, modo
   const [etapa, setEtapa] = useState<'importar' | 'revisar' | 'previa'>(fichaInicial ? (readOnly ? 'previa' : 'revisar') : 'importar');
   const [textoConsulta, setTextoConsulta] = useState(fichaInicial?.textoOriginal ?? '');
   const [textoOriginal, setTextoOriginal] = useState(fichaInicial?.textoOriginal ?? '');
-  const [form, setForm] = useState<Form>(fichaInicial ? fichaParaForm(fichaInicial) : { ...FORM0, dataConsulta: hojeISO(), responsavelId: responsavelSugerido?.id ?? '', telefone: normalizaTelefone(contatoAtual?.telefone ?? '') });
+  const [form, setForm] = useState<Form>(fichaInicial ? { ...fichaParaForm(fichaInicial), responsavelId: fichaInicial.responsavelId || responsavelSugerido?.id || '' } : { ...FORM0, dataConsulta: hojeISO(), responsavelId: responsavelSugerido?.id ?? '', telefone: normalizaTelefone(contatoAtual?.telefone ?? '') });
   const [revisoes, setRevisoes] = useState<FichaRevisao[]>(fichaInicial?.revisoes ?? []);
   const [telImportado, setTelImportado] = useState(''); // telefone vindo do parser (só p/ divergência)
   const [origem, setOrigem] = useState<Record<string, CampoOrigem | 'manual'>>({});
