@@ -37,7 +37,7 @@ import {
   PERSONA, INSTRUCAO_ETAPA, EXTRAS_ETAPA, esquemaChat, SCHEMA_REESCRITA,
   SCHEMA_LOTE_COLETA, PROMPT_LOTE_COLETA, notaAcompanhamento, instrucaoNudge,
   SCHEMA_EXTRATO, PROMPT_EXTRATO, SCHEMA_ANALISE_CONSIGNADO, PROMPT_ANALISE_CONSIGNADO,
-  MSG_HANDOFF_FINAL,
+  MSG_HANDOFF_FINAL, INSTRUCAO_RETORNO_FECHADO, INSTRUCAO_RETORNO_REQUALIFICA,
 } from './prompts.ts';
 import {
   nomesBatem, cpfsCompativeis, somenteDigitos, mesesComprovante, emailValido, extrairEmail,
@@ -492,7 +492,7 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
   const transPendente = dados.transicao_pendente === true;
   const nudgeN = Number(dados.nudge_n ?? 0) || 0;
   const ehNudge = !novas.length && dados.abertura_enviada === true && !transPendente
-    && !dados.aguardando_humano && sessao.etapa !== 'conclusao'
+    && !dados.aguardando_humano && sessao.etapa !== 'conclusao' && sessao.etapa !== 'retorno'
     && nudgeN < NUDGE_MAX && dados.nudge_alvo === processadoAte
     // retomada FRIA (o cliente nunca respondeu à retomada) não ganha escada: a abertura JÁ é o toque
     && (dados.retomada !== true || dados.teve_inbound === true);
@@ -572,6 +572,7 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
     case 'triagem_govbr': t = await etapaTriagem(ctx); break;
     case 'video_meuinss':
     case 'extratos': t = await etapaExtratos(ctx); break;
+    case 'retorno': t = await etapaRetorno(ctx); break;
     case 'conclusao': {
       // pós-conclusão: o especialista foi alertado; a IA responde com simpatia até ele assumir
       const r = await conversar(ctx, { etapa: 'conclusao' });
@@ -718,7 +719,7 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
       const dadosFinais = patch.dados as Record<string, unknown>;
       const etapaFinal = (patch.etapa as string) ?? sessao.etapa;
       const nFinal = Number(dadosFinais.nudge_n ?? 0) || 0;
-      if (!dadosFinais.aguardando_humano && etapaFinal !== 'conclusao' && nFinal < NUDGE_MAX
+      if (!dadosFinais.aguardando_humano && etapaFinal !== 'conclusao' && etapaFinal !== 'retorno' && nFinal < NUDGE_MAX
           && (dadosFinais.retomada !== true || dadosFinais.teve_inbound === true)) {
         let quando: string;
         if (nFinal === 0) quando = ajustarJanelaNudge(Date.now() + delayNudge1Ms(etapaFinal, patch.docs as Record<string, unknown>) + rand(0, 5 * 60_000));
@@ -759,6 +760,63 @@ async function etapaQualificacao(ctx: Ctx): Promise<Turno> {
     return { bolhas: r.mensagens, statusNovo: 'encerrada', etiquetaOpp: 'nao_elegivel', __perguntouValores: r.perguntouValores };
   }
   return { bolhas: r.mensagens, incrementaErro: !abertura, __perguntouValores: r.perguntouValores };
+}
+
+// ---- RETORNO: lead que já conversou antes e voltou a chamar ----
+// O trigger fn_ia_sessao_mensagem detecta o retorno e injeta em dados: retorno_fechado (a
+// oportunidade já está ganha/perdida/cancelada) e retorno_opp_status. Dois modos:
+//  • FECHADO  → avisa (uma vez) que o caso já foi finalizado e passa pro humano dar uma olhada.
+//  • ABERTO   → requalifica com firmeza cordial: interesse? → docs em mãos? → Meu INSS? → horário?
+//               com as três respostas, entrega ao analista com o resumo.
+function temResposta(v: unknown): boolean {
+  const s = String(v ?? '');
+  return s !== '' && s !== 'nao_mencionou';
+}
+async function etapaRetorno(ctx: Ctx): Promise<Turno> {
+  const d = ctx.dados;
+  const carimbo = { retorno_ts: new Date().toISOString() };   // cooldown: o trigger não reabre <20h
+
+  if (d.retorno_fechado === true) {
+    const r = await conversar(ctx, { vars: { MODO_RETORNO: INSTRUCAO_RETORNO_FECHADO } });
+    return {
+      bolhas: r.mensagens, chamarHumano: 'retorno_caso_fechado', statusNovo: 'encerrada',
+      dadosPatch: carimbo, __perguntouValores: r.perguntouValores,
+      notaInterna: `🤖 IA SDR — retorno de lead com atendimento JÁ FINALIZADO (oportunidade ${String(d.retorno_opp_status ?? '?')}). Avisei com cordialidade que o caso já foi finalizado e deixei pra vocês darem uma olhada, caso ela queira algo novo.`,
+    };
+  }
+
+  // modo ABERTO — requalificação firme (acumula as respostas entre turnos)
+  const r = await conversar(ctx, { vars: { MODO_RETORNO: INSTRUCAO_RETORNO_REQUALIFICA } });
+  const ex = r.dados;
+  const interesse = String(ex.interesse ?? '');
+  const docs = temResposta(ex.tem_documentos) ? String(ex.tem_documentos) : (d.retorno_docs as string | undefined);
+  const meuinss = temResposta(ex.tem_meuinss) ? String(ex.tem_meuinss) : (d.retorno_meuinss as string | undefined);
+  const horario = String(ex.horario_preferido ?? '').trim() || (d.retorno_horario as string | undefined);
+  const patch: Record<string, unknown> = { retorno_docs: docs ?? null, retorno_meuinss: meuinss ?? null, retorno_horario: horario ?? null, abertura_enviada: true };
+
+  if (interesse === 'nao' || r.acao === 'encerrar') {
+    return { bolhas: r.mensagens, statusNovo: 'encerrada', dadosPatch: { ...patch, ...carimbo }, __perguntouValores: r.perguntouValores };
+  }
+  // as três respostas na mão (ou o modelo declarou pronto) → entrega ao analista
+  const pronto = r.acao === 'avancar' || (!!docs && !!meuinss && !!horario);
+  if (pronto) {
+    return {
+      bolhas: r.mensagens, chamarHumano: 'retorno_requalificado', statusNovo: 'encerrada',
+      dadosPatch: { ...patch, ...carimbo }, __perguntouValores: r.perguntouValores,
+      notaInterna: notaRetornoRequalificado(ctx, docs, meuinss, horario),
+    };
+  }
+  return { bolhas: r.mensagens, dadosPatch: patch, __perguntouValores: r.perguntouValores };
+}
+function notaRetornoRequalificado(ctx: Ctx, docs?: string, meuinss?: string, horario?: string): string {
+  return [
+    '🤖 IA SDR — lead RETOMADO (já tinha chamado antes e não deu continuidade). Requalifiquei e ele confirmou interesse. Combinei que o analista faz contato.',
+    `• Nome: ${ctx.dados.nome_confirmado ?? ctx.contatoNome ?? '?'}`,
+    ctx.contatoCpf ? `• CPF: ${ctx.contatoCpf}` : null,
+    `• Documentos básicos (identidade + comprovante) em mãos: ${docs ?? 'não informado'}`,
+    `• Acesso ao Meu INSS (senha gov.br): ${meuinss ?? 'não informado'}`,
+    `• Melhor horário p/ contato: ${horario ?? 'não informado'}`,
+  ].filter(Boolean).join('\n');
 }
 
 // ---- coleta por CHECKLIST DINÂMICO: identidade FRENTE+VERSO + comprovante + e-mail ----

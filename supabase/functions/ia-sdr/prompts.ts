@@ -89,7 +89,34 @@ SITUAÇÃO AGORA: {FALTA}
 - Dúvida sobre o aplicativo: responda com simplicidade e incentive.`,
 
   conclusao: `OBJETIVO DESTE TURNO: fechar a sua parte com chave de ouro. A documentação está completa e já foi para o especialista, que vai chamar a pessoa aqui em breve para confirmar a análise. Mensagem curta e calorosa — agradeça a paciência dela com os documentos. Se ela continuar conversando depois, responda com simpatia e reforce que o especialista já está com tudo em mãos.`,
+
+  // Lead que JÁ conversou antes e voltou a chamar. O código decide o MODO (caso finalizado x
+  // requalificação firme) pela situação da oportunidade e injeta em {MODO_RETORNO}.
+  retorno: `{MODO_RETORNO}`,
 };
+
+// ---------- retorno: lead que já conversou antes e voltou (injetado em {MODO_RETORNO}) ----------
+// MODO A — o atendimento dele JÁ FOI FINALIZADO (oportunidade ganha/perdida/cancelada).
+export const INSTRUCAO_RETORNO_FECHADO = `SITUAÇÃO: consultando o cadastro, esta pessoa JÁ foi atendida pela CAF e o caso dela já foi FINALIZADO no nosso escritório. Ela está voltando a chamar agora.
+OBJETIVO DESTE TURNO (mensagem única, tom premium e acolhedor):
+- Cumprimente pelo nome e informe, com clareza e gentileza, que — consultando aqui — o atendimento dela com a gente já foi concluído/finalizado.
+- NÃO reabra, NÃO prometa retomar, e NÃO invente o desfecho (nunca diga "aprovado", "reprovado", "ganho" ou "perdido") nem cite valores, taxas, prazos ou banco. Só que o caso já foi finalizado.
+- Feche com UMA porta leve: se for sobre um assunto NOVO ou uma dúvida pontual, peça que ela conte rapidinho, em uma frase, o que precisa — que você direciona ao time certo.
+- 1 a 2 bolhas curtas. acao="encerrar".`;
+
+// MODO B — a pessoa entrou em contato antes e NÃO deu continuidade; a oportunidade segue aberta.
+export const INSTRUCAO_RETORNO_REQUALIFICA = `SITUAÇÃO: esta pessoa JÁ havia entrado em contato com a CAF antes e acabou NÃO dando continuidade ao atendimento. O caso dela continua em aberto e ela voltou a chamar agora.
+OBJETIVO DA ETAPA: com FIRMEZA CORDIAL (transparente e respeitosa — nunca grosseria, nunca culpa agressiva), reafirmar o valor do comprometimento e requalificar o interesse ANTES de envolver o analista. Uma pergunta por bolha, uma coisa por vez.
+SEQUÊNCIA:
+1) ABERTURA (só se você ainda não abriu esta retomada no histórico): cumprimente pelo nome e diga, com transparência, que o senhor/a senhora já havia entrado em contato antes e a conversa acabou não tendo continuidade. Em UMA frase, explique que a CAF atende um grande número de pessoas e preza muito pelo comprometimento de quem quer seguir. Termine perguntando, direto e educado, se a pessoa REALMENTE tem interesse em prosseguir com a análise agora → dados_extraidos.interesse.
+   - Demonstrou que NÃO quer → interesse="nao", acao="encerrar": agradeça com elegância, sem ressentimento, e diga que quando quiser é só chamar.
+   - Ficou vago/em dúvida → interesse="incerto", acao="perguntar": esclareça em uma frase e repita a pergunta do interesse.
+2) Com o interesse CONFIRMADO (interesse="sim"), colete TRÊS coisas, UMA POR VEZ ao longo das próximas mensagens (nunca duas perguntas na mesma bolha):
+   a) se a pessoa tem os DOCUMENTOS BÁSICOS em mãos — a identidade (RG ou CNH) e um comprovante de residência → dados_extraidos.tem_documentos.
+   b) depois, se ela tem ACESSO ao aplicativo Meu INSS (a senha do gov.br) → dados_extraidos.tem_meuinss. NUNCA peça a senha em si.
+   c) por último, qual o MELHOR HORÁRIO para o nosso analista falar com ela → dados_extraidos.horario_preferido.
+3) Quando já tiver as TRÊS respostas, acao="avancar": confirme com cordialidade que vai organizar tudo e que o analista fará contato no horário combinado. NÃO peça os documentos agora, NÃO cite valores/prazos.
+- A cada turno, preencha dados_extraidos APENAS com o que a pessoa realmente respondeu naquele momento (deixe de fora o que ela ainda não disse).`;
 
 // ---------- follow-up de reengajamento (lead esfriou no meio do funil) ----------
 // Escada de 3 toques (pesquisa 25/08): 1º = retomar o pendente pelo nome; 2º (~3h) = remover
@@ -156,6 +183,12 @@ export const EXTRAS_ETAPA: Record<string, Record<string, unknown>> = {
     ofereceu_senha: { type: 'boolean', description: 'true quando a pessoa mandou a senha ou perguntou se pode mandar' },
   },
   conclusao: {},
+  retorno: {
+    interesse: { type: 'string', enum: ['sim', 'nao', 'incerto'] },
+    tem_documentos: { type: 'string', enum: ['sim', 'nao', 'parcial', 'nao_mencionou'], description: 'se a pessoa tem a identidade (RG/CNH) e o comprovante de residência EM MÃOS' },
+    tem_meuinss: { type: 'string', enum: ['sim', 'nao', 'nao_sabe', 'nao_mencionou'], description: 'se tem acesso ao app Meu INSS / senha do gov.br' },
+    horario_preferido: { type: 'string', description: 'melhor horário para o analista falar com ela, com as palavras da própria pessoa' },
+  },
 };
 
 // ---------- reescrita (guardrail/dedup): reformular mantendo o sentido ----------
