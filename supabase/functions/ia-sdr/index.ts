@@ -29,7 +29,7 @@ import { enviadorDe } from '../evolution-send/transporte.ts';
 import { sendPresenceComposing } from './evolution.ts';
 import {
   chamarGeminiJson, comRetry, temChaveGemini, ehErro404Modelo, parseSugestaoModelo,
-  MODELO_DEFAULT, modeloEnvChat, modeloEnvDocs, type ParteGemini, type ResultadoGemini,
+  MODELO_DEFAULT, modeloEnvChat, modeloEnvDocs, modeloEnvPro, type ParteGemini, type ResultadoGemini,
 } from './gemini.ts';
 import { saidaProibida, perguntaDeValores } from './guardrail.ts';
 import {
@@ -88,7 +88,7 @@ interface Sessao {
   status: string; criado_em: string;
 }
 interface MsgNova { id: string; tipo: string; conteudo: string | null; criado_em: string; metadados: Record<string, unknown> | null }
-interface Modelos { chat: string; docs: string }
+interface Modelos { chat: string; docs: string; pro: string }
 
 interface Turno {
   bolhas: string[];
@@ -176,10 +176,12 @@ Deno.serve(async (req) => {
 function resolverModelos(iaConfig: Record<string, unknown>): Modelos {
   const chat = modeloEnvChat() || String(iaConfig.modelo_efetivo ?? '') || MODELO_DEFAULT;
   const docs = modeloEnvDocs() || String(iaConfig.modelo_efetivo_docs ?? '') || chat;
-  return { chat, docs };
+  // modelo FORTE p/ turnos complexos (objeção, dúvida, áudio) — roteador em conversar()
+  const pro = modeloEnvPro() || String(iaConfig.modelo_efetivo_pro ?? '') || 'gemini-pro-latest';
+  return { chat, docs, pro };
 }
 
-async function persistirModeloEfetivo(admin: Admin, canalId: string, chave: 'modelo_efetivo' | 'modelo_efetivo_docs', valor: string): Promise<void> {
+async function persistirModeloEfetivo(admin: Admin, canalId: string, chave: 'modelo_efetivo' | 'modelo_efetivo_docs' | 'modelo_efetivo_pro', valor: string): Promise<void> {
   try {
     const { data } = await admin.from('bot_canal_config').select('ia_config').eq('canal_id', canalId).maybeSingle();
     await admin.from('bot_canal_config')
@@ -191,10 +193,10 @@ async function persistirModeloEfetivo(admin: Admin, canalId: string, chave: 'mod
 interface ChamadaOk { r: ResultadoGemini; modeloUsado: string; atualizadoDe?: string }
 
 /** Chama o Gemini já com retry/backoff; num 404 de modelo com sugestão, troca na hora e cacheia. */
-async function chamarComRecuperacao(admin: Admin, canalId: string, modelos: Modelos, tipo: 'chat' | 'docs', p: {
+async function chamarComRecuperacao(admin: Admin, canalId: string, modelos: Modelos, tipo: 'chat' | 'docs' | 'pro', p: {
   system: string; partes: ParteGemini[]; schema: Record<string, unknown>; temperatura?: number; maxTokens?: number; semPensar?: boolean;
 }): Promise<ChamadaOk> {
-  const modelo = tipo === 'docs' ? modelos.docs : modelos.chat;
+  const modelo = tipo === 'docs' ? modelos.docs : tipo === 'pro' ? modelos.pro : modelos.chat;
   try {
     return { r: await comRetry(() => chamarGeminiJson(modelo, p)), modeloUsado: modelo };
   } catch (e) {
@@ -206,6 +208,9 @@ async function chamarComRecuperacao(admin: Admin, canalId: string, modelos: Mode
     if (tipo === 'docs') {
       modelos.docs = sugestao;
       await persistirModeloEfetivo(admin, canalId, 'modelo_efetivo_docs', sugestao);
+    } else if (tipo === 'pro') {
+      modelos.pro = sugestao;
+      await persistirModeloEfetivo(admin, canalId, 'modelo_efetivo_pro', sugestao);
     } else {
       // docs que só herdava do chat acompanha em memória (na próxima run herda do cache)
       if (modelos.docs === modelo) modelos.docs = sugestao;
@@ -1241,9 +1246,11 @@ async function conversar(ctx: Ctx, opts: { etapa?: string; instrucaoExtra?: stri
   const partes: ParteGemini[] = [{ text: montarContexto(ctx, { carregados, falhados }) }, ...audioPartes];
   partes.push({ text: 'Responda no JSON pedido (bolhas curtas e humanas; uma pergunta por vez; nunca repita frase já usada na conversa).' });
 
+  // ROTEADOR: turno complexo (objeção, dúvida, áudio, cliente confuso) sobe pro modelo forte
+  const tier = pareceComplexo(ctx) ? 'pro' : 'chat';
   const j = await geminiSessao(ctx, `chat_${etapa}`, {
     system, partes, schema: esquemaChat(EXTRAS_ETAPA[etapa] ?? {}), temperatura: 0.7, maxTokens: 3072,
-  });
+  }, tier);
   const jj = j as { mensagens?: unknown; acao?: unknown; dados_extraidos?: unknown; perguntou_valores?: unknown };
   const mensagens = (Array.isArray(jj.mensagens) ? jj.mensagens : []).map((m) => String(m).trim()).filter(Boolean).slice(0, 3);
   if (!mensagens.length) throw new FalhaTecnica('resposta_vazia');
@@ -1307,6 +1314,18 @@ async function deduplicar(ctx: Ctx, bolhas: string[]): Promise<string[]> {
   return finais;
 }
 
+// Turno COMPLEXO merece o modelo forte: objeção/desconfiança, pergunta, mensagem longa, áudio
+// (nuance de fala) ou cliente que já tropeçou. Abertura e respostas curtas ("sim") vão no flash.
+function pareceComplexo(ctx: Ctx): boolean {
+  if (ctx.audios.length) return true;
+  const t = ctx.textos.join(' ').toLowerCase();
+  if (/golpe|n[ãa]o confio|desconfi|fraude|medo|receio|\bcaro\b|por ?qu[êe]|como assim|processo|reclama|den[úu]nci|cancelar|n[ãa]o quero|garant|verdade|engan|mentira|confi[áa]vel|advogad|meu filho|minha filha|marido|esposa|quanto|valor|receber|\bjuros\b|\btaxa\b|d[úu]vida|n[ãa]o entend|explica/i.test(t)) return true;
+  if (t.includes('?')) return true;
+  if (t.length > 140) return true;
+  if ((Number(ctx.sessao.tentativas_erro) || 0) >= 1) return true;
+  return false;
+}
+
 function montarContexto(ctx: Ctx, audios?: { carregados: Set<string>; falhados: Set<string> }): string {
   const linhas: string[] = [];
   linhas.push('DADOS JÁ COLETADOS (NUNCA peça de novo o que está aqui):');
@@ -1339,7 +1358,7 @@ function montarContexto(ctx: Ctx, audios?: { carregados: Set<string>; falhados: 
 // ======== Gemini com evento de custo/auditoria (lança FalhaTecnica; nunca conversa) ========
 async function geminiSessao(ctx: Ctx, finalidade: string, p: {
   system: string; partes: ParteGemini[]; schema: Record<string, unknown>; temperatura: number; maxTokens: number; semPensar?: boolean;
-}, tipo: 'chat' | 'docs' = 'chat'): Promise<Record<string, unknown>> {
+}, tipo: 'chat' | 'docs' | 'pro' = 'chat'): Promise<Record<string, unknown>> {
   // turno longo não pode deixar a lease do canal expirar (o serial por chip é sagrado)
   try { await ctx.admin.rpc('ia_canal_lock', { p_canal: ctx.sessao.canal_id, p_dono: ctx.dono, p_ttl_seg: 240 }); } catch { /* melhor esforço */ }
   try {

@@ -17,6 +17,7 @@ const env = (k: string): string => ((globalThis as any).Deno?.env?.get(k) ?? '')
 export const MODELO_DEFAULT = 'gemini-3.6-flash';
 export const modeloEnvChat = (): string => (env('GEMINI_MODEL') || '').trim();
 export const modeloEnvDocs = (): string => (env('GEMINI_MODEL_DOCS') || '').trim();
+export const modeloEnvPro = (): string => (env('GEMINI_MODEL_PRO') || '').trim();
 export const temChaveGemini = (): boolean => !!env('GEMINI_API_KEY');
 
 export interface ParteGemini { text?: string; inline_data?: { mime_type: string; data: string } }
