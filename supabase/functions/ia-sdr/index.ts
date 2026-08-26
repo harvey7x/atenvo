@@ -664,8 +664,15 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
 // ======== etapas ========
 async function etapaQualificacao(ctx: Ctx): Promise<Turno> {
   const abertura = !ctx.dados.abertura_enviada && !ctx.textos.length && !ctx.audios.length && !ctx.arquivos.length;
+  // RETOMADA (backfill de leads parados): a pessoa completou o fluxo há dias e ninguém deu
+  // continuidade — a abertura reconhece a demora com leveza e retoma com energia.
+  const ehRetomada = ctx.dados.retomada === true;
+  const dias = Number(ctx.dados.retomada_dias ?? 0) || 0;
+  const instrAbertura = ehRetomada
+    ? `Esta é uma RETOMADA: a pessoa fez a solicitação ${dias <= 1 ? 'há pouco tempo' : `há ${dias} dias`} e a nossa equipe demorou a dar continuidade. Abra pedindo desculpa LEVE pela demora (uma meia frase, sem drama), diga que a pré-avaliação dela está pronta, e faça a pergunta do benefício para continuar. Reidentifique-se ("aqui é do atendimento da CAF").`
+    : 'Este é o SEU primeiro contato (abertura da etapa): cumprimente de leve e faça a pergunta do benefício.';
   const r = await conversar(ctx, {
-    instrucaoExtra: abertura ? 'Este é o SEU primeiro contato (abertura da etapa): cumprimente de leve e faça a pergunta do benefício.' : '',
+    instrucaoExtra: abertura ? instrAbertura : '',
   });
   const recebe = String(r.dados.recebe_inss ?? (abertura ? 'incerto' : 'incerto'));
   if (!abertura && recebe === 'sim') {
