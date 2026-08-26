@@ -781,55 +781,27 @@ async function etapaQualificacao(ctx: Ctx): Promise<Turno> {
 //  • FECHADO  → avisa (uma vez) que o caso já foi finalizado e passa pro humano dar uma olhada.
 //  • ABERTO   → requalifica com firmeza cordial: interesse? → docs em mãos? → Meu INSS? → horário?
 //               com as três respostas, entrega ao analista com o resumo.
-function temResposta(v: unknown): boolean {
-  const s = String(v ?? '');
-  return s !== '' && s !== 'nao_mencionou';
-}
+// Os dois casos são uma ABORDAGEM ÚNICA que já ENTREGA pro atendente (o humano segue a conversa):
+//  • FECHADO → avisa que o atendimento já foi finalizado e pergunta com o que pode ajudar.
+//  • PENDENTE → lembra que já conversaram e o caso ficou pendente, pede continuidade, e avisa que
+//    vai chamar um atendente com PRIORIDADE, contando com a colaboração da pessoa.
 async function etapaRetorno(ctx: Ctx): Promise<Turno> {
   const d = ctx.dados;
   const carimbo = { retorno_ts: new Date().toISOString() };   // cooldown: o trigger não reabre <20h
-
-  if (d.retorno_fechado === true) {
-    const r = await conversar(ctx, { vars: { MODO_RETORNO: INSTRUCAO_RETORNO_FECHADO } });
-    return {
-      bolhas: r.mensagens, chamarHumano: 'retorno_caso_fechado', statusNovo: 'encerrada',
-      dadosPatch: carimbo, __perguntouValores: r.perguntouValores,
-      notaInterna: `🤖 IA SDR — retorno de lead com atendimento JÁ FINALIZADO (oportunidade ${String(d.retorno_opp_status ?? '?')}). Avisei com cordialidade que o caso já foi finalizado e deixei pra vocês darem uma olhada, caso ela queira algo novo.`,
-    };
-  }
-
-  // modo ABERTO — requalificação firme (acumula as respostas entre turnos)
-  const r = await conversar(ctx, { vars: { MODO_RETORNO: INSTRUCAO_RETORNO_REQUALIFICA } });
-  const ex = r.dados;
-  const interesse = String(ex.interesse ?? '');
-  const docs = temResposta(ex.tem_documentos) ? String(ex.tem_documentos) : (d.retorno_docs as string | undefined);
-  const meuinss = temResposta(ex.tem_meuinss) ? String(ex.tem_meuinss) : (d.retorno_meuinss as string | undefined);
-  const horario = String(ex.horario_preferido ?? '').trim() || (d.retorno_horario as string | undefined);
-  const patch: Record<string, unknown> = { retorno_docs: docs ?? null, retorno_meuinss: meuinss ?? null, retorno_horario: horario ?? null, abertura_enviada: true };
-
-  if (interesse === 'nao' || r.acao === 'encerrar') {
-    return { bolhas: r.mensagens, statusNovo: 'encerrada', dadosPatch: { ...patch, ...carimbo }, __perguntouValores: r.perguntouValores };
-  }
-  // as três respostas na mão (ou o modelo declarou pronto) → entrega ao analista
-  const pronto = r.acao === 'avancar' || (!!docs && !!meuinss && !!horario);
-  if (pronto) {
-    return {
-      bolhas: r.mensagens, chamarHumano: 'retorno_requalificado', statusNovo: 'encerrada',
-      dadosPatch: { ...patch, ...carimbo }, __perguntouValores: r.perguntouValores,
-      notaInterna: notaRetornoRequalificado(ctx, docs, meuinss, horario),
-    };
-  }
-  return { bolhas: r.mensagens, dadosPatch: patch, __perguntouValores: r.perguntouValores };
-}
-function notaRetornoRequalificado(ctx: Ctx, docs?: string, meuinss?: string, horario?: string): string {
-  return [
-    '🤖 IA SDR — lead RETOMADO (já tinha chamado antes e não deu continuidade). Requalifiquei e ele confirmou interesse. Combinei que o analista faz contato.',
-    `• Nome: ${ctx.dados.nome_confirmado ?? ctx.contatoNome ?? '?'}`,
-    ctx.contatoCpf ? `• CPF: ${ctx.contatoCpf}` : null,
-    `• Documentos básicos (identidade + comprovante) em mãos: ${docs ?? 'não informado'}`,
-    `• Acesso ao Meu INSS (senha gov.br): ${meuinss ?? 'não informado'}`,
-    `• Melhor horário p/ contato: ${horario ?? 'não informado'}`,
-  ].filter(Boolean).join('\n');
+  const fechado = d.retorno_fechado === true;
+  const r = await conversar(ctx, {
+    vars: { MODO_RETORNO: fechado ? INSTRUCAO_RETORNO_FECHADO : INSTRUCAO_RETORNO_REQUALIFICA },
+  });
+  return {
+    bolhas: r.mensagens,
+    chamarHumano: fechado ? 'retorno_caso_fechado' : 'retorno_pendente_prioridade',
+    statusNovo: 'encerrada',
+    dadosPatch: carimbo,
+    __perguntouValores: r.perguntouValores,
+    notaInterna: fechado
+      ? `🤖 IA SDR — lead com atendimento JÁ FINALIZADO (oportunidade ${String(d.retorno_opp_status ?? '?')}) voltou PELO ANÚNCIO. Avisei que o caso já foi finalizado e perguntei com o que podemos ajudar. Assumir e ver o que a pessoa precisa agora.`
+      : `🤖 IA SDR — lead RETOMADO PELO ANÚNCIO (já tínhamos conversado; o caso ficou PENDENTE). Reabri, pedi continuidade e avisei que vamos dar PRIORIDADE. Assumir com prioridade — contamos com a colaboração da pessoa.`,
+  };
 }
 
 // ---- coleta por CHECKLIST DINÂMICO: identidade FRENTE+VERSO + comprovante + e-mail ----
