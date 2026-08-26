@@ -1,0 +1,9 @@
+-- Retomada v3 (anti-ban + janela da manhã) e toggle IA por conversa.
+-- Espelha o aplicado via apply_migration ia_sdr_retomar_leads_antiban_manha + ia_conversa_toggle.
+-- ia_sdr_retomar_leads: agenda aberturas na janela (base 08:00 SP se fora de hora), espaçadas
+--   p_espaco_min (default 6, ~10/h) + jitter 0-120s; mantém gates da v2 (recusa modo teste,
+--   só opp em_andamento, limpa precisa_humano). Assinatura ganha p_hora_inicio (default 8).
+-- ia_conversa_toggle(conversa, ativar) + ia_conversa_estado(conversa): liga/desliga a IA no
+--   cabecalho do inbox (authenticated + is_member); desativar=pausada+desativado_manual,
+--   ativar=ativa+processar_apos now, cria sessao se nao existir.
+-- Definicoes completas: ver as funcoes vivas (mesmas assinaturas).

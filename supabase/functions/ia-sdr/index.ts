@@ -279,18 +279,10 @@ async function processarCanal(admin: Admin, canal: Record<string, unknown>, iaCo
   const { data: lock } = await admin.rpc('ia_canal_lock', { p_canal: canalId, p_dono: dono, p_ttl_seg: 240 });
   if (!lock) return { canal: canalId, skipped: 'lock_canal' };
   try {
-    // ---- janela de operação (SP): fora dela nada sai; reagenda pra próxima abertura + jitter ----
-    if (!dentroDaJanela(iaConfig)) {
-      // base ÚNICA + offset ordinal: sem isso, um lote escalonado colapsaria numa rajada de manhã
-      const base = Date.parse(proximaAbertura(iaConfig));
-      for (let i = 0; i < sessoes.length; i++) {
-        const s = sessoes[i];
-        const alvo = new Date(base + i * 3 * 60_000).toISOString();
-        await admin.from('ia_sessoes').update({ processar_apos: alvo, atualizado_em: new Date().toISOString() }).eq('id', s.id).eq('status', 'ativa');
-        await evento(admin, s, 'fora_janela', { reagendado_para: alvo });
-      }
-      return { canal: canalId, reagendadas_fora_janela: sessoes.length };
-    }
+    // A JANELA (07:30–21:30 SP) NÃO é mais bloqueio de canal. Regra do dono: LEAD VIVO que chamou
+    // é atendido a QUALQUER HORA (responder é reativo, sem risco de ban). Só o contato PROATIVO
+    // (nudge e abertura de RETOMADA) respeita a janela — o gate mora no turno(), por sessão,
+    // porque só lá se sabe se há mensagem nova do cliente.
 
     // ---- sem chave: adia com evento, nunca crash (setar a secret resolve sozinho) ----
     if (!temChaveGemini()) {
@@ -474,6 +466,17 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
     // retomada FRIA (o cliente nunca respondeu à retomada) não ganha escada: a abertura JÁ é o toque
     && (dados.retomada !== true || dados.teve_inbound === true);
   if (!novas.length && dados.abertura_enviada && !ehNudge && !transPendente) { await limparAgenda(admin, sessao.id, claimAte); return; }
+
+  // ---- ANTI-BAN / horário do CONTATO PROATIVO: nudge OU abertura de RETOMADA fora da janela
+  //      (07:30–21:30 SP) NÃO sai agora — reagenda pra próxima abertura. Lead VIVO (novas.length)
+  //      e abertura de lead NOVO (sem retomada) passam a qualquer hora: responder é reativo. ----
+  const ehAberturaRetomada = dados.retomada === true && !dados.abertura_enviada && !novas.length;
+  if ((ehNudge || ehAberturaRetomada) && !dentroDaJanela(iaConfig)) {
+    const alvo = proximaAbertura(iaConfig);
+    await admin.from('ia_sessoes').update({ processar_apos: alvo, atualizado_em: new Date().toISOString() }).eq('id', sessao.id).eq('status', 'ativa');
+    await evento(admin, sessao, 'fora_janela', { reagendado_para: alvo, motivo: ehNudge ? 'nudge' : 'abertura_retomada' });
+    return;
+  }
 
   // histórico (~30 mensagens, ordem cronológica) + conjunto de saídas p/ o dedup duro
   const { data: histRaw } = await admin.from('mensagens')
