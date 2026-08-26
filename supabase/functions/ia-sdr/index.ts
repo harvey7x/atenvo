@@ -107,12 +107,13 @@ interface Turno {
   incrementaErro?: boolean;                     // "não entendi o cliente" (2x seguidas → chama humano)
   resetErros?: boolean;
   reagendarMs?: number;                         // handler pede outro turno em breve (ex.: abertura que falhou na verificação)
+  naoAvancarAlem?: string;                      // watermark não passa deste criado_em (arquivos excedentes ficam pro próximo turno)
   __perguntouValores?: boolean;
 }
 
 interface Ctx {
   admin: Admin; sessao: Sessao; canal: Record<string, unknown>; iaConfig: Record<string, unknown>;
-  modelos: Modelos;
+  modelos: Modelos; dono: string;
   conversa: Record<string, unknown>; destino: string; transcript: string;
   saidasAnteriores: Set<string>;
   contatoNome: string; contatoCpf: string;
@@ -275,8 +276,11 @@ async function processarCanal(admin: Admin, canal: Record<string, unknown>, iaCo
   try {
     // ---- janela de operação (SP): fora dela nada sai; reagenda pra próxima abertura + jitter ----
     if (!dentroDaJanela(iaConfig)) {
-      for (const s of sessoes) {
-        const alvo = proximaAbertura(iaConfig);
+      // base ÚNICA + offset ordinal: sem isso, um lote escalonado colapsaria numa rajada de manhã
+      const base = Date.parse(proximaAbertura(iaConfig));
+      for (let i = 0; i < sessoes.length; i++) {
+        const s = sessoes[i];
+        const alvo = new Date(base + i * 3 * 60_000).toISOString();
         await admin.from('ia_sessoes').update({ processar_apos: alvo, atualizado_em: new Date().toISOString() }).eq('id', s.id).eq('status', 'ativa');
         await evento(admin, s, 'fora_janela', { reagendado_para: alvo });
       }
@@ -312,8 +316,9 @@ async function processarCanal(admin: Admin, canal: Record<string, unknown>, iaCo
     const modelos = resolverModelos(iaConfig);
     let processadas = 0;
     for (const s of sessoes) {
-      if (Date.now() - inicio > ORCAMENTO_MS) break;
-      await processarSessao(admin, s, canal, iaConfig, modelos);
+      // admissão com FOLGA: turno no pior caso é longo — não admitir nova sessão perto do teto
+      if (Date.now() - inicio > 60_000) break;
+      await processarSessao(admin, s, canal, iaConfig, modelos, dono);
       processadas++;
       await admin.rpc('ia_canal_lock', { p_canal: canalId, p_dono: dono, p_ttl_seg: 240 });  // renova (mesmo dono)
     }
@@ -324,7 +329,7 @@ async function processarCanal(admin: Admin, canal: Record<string, unknown>, iaCo
 }
 
 // ======== sessão: claim + lock de conversa + turno; FALHA TÉCNICA nunca vira conversa ========
-async function processarSessao(admin: Admin, sessao: Sessao, canal: Record<string, unknown>, iaConfig: Record<string, unknown>, modelos: Modelos): Promise<void> {
+async function processarSessao(admin: Admin, sessao: Sessao, canal: Record<string, unknown>, iaConfig: Record<string, unknown>, modelos: Modelos, dono: string): Promise<void> {
   // claim de 10min: um turno com vários arquivos + retries do Gemini (45s de teto por chamada)
   // pode passar de 5 — o claim tem que sobreviver ao pior turno realista
   const claimAte = new Date(Date.now() + 10 * 60_000).toISOString();
@@ -340,7 +345,7 @@ async function processarSessao(admin: Admin, sessao: Sessao, canal: Record<strin
     return;
   }
   try {
-    await turno(admin, sessao, canal, iaConfig, modelos, claimAte);
+    await turno(admin, sessao, canal, iaConfig, modelos, claimAte, dono);
   } catch (e) {
     const msg = String((e as Error)?.message ?? 'erro').slice(0, 300);
     if (msg.includes('sem_api_key')) {
@@ -354,6 +359,14 @@ async function processarSessao(admin: Admin, sessao: Sessao, canal: Record<strin
     if (msg.includes('gemini 429')) {
       await admin.from('ia_sessoes').update({ processar_apos: new Date(Date.now() + 10 * 60_000).toISOString() }).eq('id', sessao.id).eq('status', 'ativa');
       await evento(admin, sessao, 'quota_gemini', {});
+      // quota presa há ~2h não pode ser silêncio eterno: entrega ao humano com o motivo real
+      const { count: quotas2h } = await admin.from('ia_eventos').select('id', { count: 'exact', head: true })
+        .eq('sessao_id', sessao.id).eq('tipo', 'quota_gemini')
+        .gte('criado_em', new Date(Date.now() - 2 * 3_600_000).toISOString());
+      if ((quotas2h ?? 0) >= 10) {
+        await fazerHandoff(admin, sessao, canal, 'falha_tecnica', [MSG_HANDOFF_FINAL],
+          '🤖 IA SDR — cota da API do Gemini esgotada há ~2h (plano/billing da chave). NÃO foi o cliente. Atendimento entregue ao humano; ver ia_eventos tipo quota_gemini.');
+      }
       return;
     }
     // FALHA TÉCNICA (modelo/API/interna): NÃO fala com o cliente, NÃO conta tentativas_erro.
@@ -401,7 +414,7 @@ async function processarSessao(admin: Admin, sessao: Sessao, canal: Record<strin
 }
 
 // ======== o TURNO ========
-async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown>, iaConfig: Record<string, unknown>, modelos: Modelos, claimAte: string): Promise<void> {
+async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown>, iaConfig: Record<string, unknown>, modelos: Modelos, claimAte: string, dono: string): Promise<void> {
   const { data: conversa } = await admin.from('conversas')
     .select('id, organizacao_id, contato_id, precisa_humano').eq('id', sessao.conversa_id).maybeSingle();
   if (!conversa) { await encerrarSessao(admin, sessao, 'conversa_inexistente'); return; }
@@ -452,7 +465,9 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
   const nudgeN = Number(dados.nudge_n ?? 0) || 0;
   const ehNudge = !novas.length && dados.abertura_enviada === true && !transPendente
     && !dados.aguardando_humano && sessao.etapa !== 'conclusao'
-    && nudgeN < NUDGE_MAX && dados.nudge_alvo === processadoAte;
+    && nudgeN < NUDGE_MAX && dados.nudge_alvo === processadoAte
+    // retomada FRIA (o cliente nunca respondeu à retomada) não ganha escada: a abertura JÁ é o toque
+    && (dados.retomada !== true || dados.teve_inbound === true);
   if (!novas.length && dados.abertura_enviada && !ehNudge && !transPendente) { await limparAgenda(admin, sessao.id, claimAte); return; }
 
   // histórico (~30 mensagens, ordem cronológica) + conjunto de saídas p/ o dedup duro
@@ -464,8 +479,8 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
     .filter((m) => m.tipo !== 'nota_interna' && m.tipo !== 'sistema')
     .map((m) => {
       const quem = m.direcao === 'entrada' ? '[cliente]' : (m.origem === 'bot' ? '[você]' : '[atendente humano]');
-      if (m.tipo === 'texto' && m.conteudo) return `${quem} ${m.conteudo}`;
-      return `${quem} (${m.tipo}${m.conteudo ? `: ${m.conteudo.slice(0, 80)}` : ''})`;
+      if (m.tipo === 'texto' && m.conteudo) return `${quem} ${limparLinha(m.conteudo)}`;
+      return `${quem} (${m.tipo}${m.conteudo ? `: ${limparLinha(m.conteudo).slice(0, 80)}` : ''})`;
     }).join('\n');
   // só o que o CLIENTE recebeu conta no dedup — nota_interna/sistema aqui vazaria conteúdo
   // interno pro prompt de reescrita e bloquearia frases que nunca foram ditas a ele
@@ -476,7 +491,7 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
   const saidasAnteriores = new Set(((saidasRaw ?? []) as Array<{ conteudo: string }>).map((m) => normalizarSaida(m.conteudo)));
 
   const ctx: Ctx = {
-    admin, sessao, canal, iaConfig, modelos, conversa, destino, transcript, saidasAnteriores,
+    admin, sessao, canal, iaConfig, modelos, dono, conversa, destino, transcript, saidasAnteriores,
     contatoNome: (contato?.nome as string) ?? '', contatoCpf: (contato?.cpf as string) ?? '',
     dados, docs: (sessao.docs ?? {}) as Record<string, unknown>,
     cobertura: (sessao.cobertura_extratos ?? {}) as Record<string, unknown>,
@@ -490,6 +505,14 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
   // ---- roda a etapa (etapas antigas de coleta viraram o checklist dinâmico) ----
   let t: Turno;
   if (ehNudge) {
+    // orçamento de nudge POR CANAL (proteção do chip): máx 6/h — excedeu, reagenda com jitter
+    const { count: nudgesHora } = await admin.from('ia_eventos').select('id', { count: 'exact', head: true })
+      .eq('tipo', 'nudge_enviado').gte('criado_em', new Date(Date.now() - 3_600_000).toISOString())
+      .contains('detalhe', { canal_id: sessao.canal_id });
+    if ((nudgesHora ?? 0) >= 6) {
+      await agendarProximo(admin, sessao.id, claimAte, new Date(Date.now() + rand(30, 60) * 60_000).toISOString());
+      return;
+    }
     // TURNO DE RETOMADA: o cliente ficou mudo — puxa de volta com leveza, contextual à etapa
     const mesesN = mesesComprovante();
     const varsNudge: Record<string, string> = (sessao.etapa === 'coleta_docs' || ['docs_pessoais', 'comprovante_residencia', 'declarante'].includes(sessao.etapa))
@@ -497,9 +520,12 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
       : {};
     const r = await conversar(ctx, { vars: varsNudge, instrucaoExtra: instrucaoNudge(nudgeN + 1) });
     t = { bolhas: r.mensagens, dadosPatch: { nudge_n: nudgeN + 1 } };
-    await evento(admin, sessao, 'nudge_enviado', { n: nudgeN + 1, etapa: sessao.etapa });
+    await evento(admin, sessao, 'nudge_enviado', { n: nudgeN + 1, etapa: sessao.etapa, canal_id: sessao.canal_id });
   } else switch (sessao.etapa) {
-    case 'qualificacao_inss': t = await etapaQualificacao(ctx); break;
+    case 'qualificacao_inss':
+      // foto/pdf mandado JÁ na qualificação (antes de a IA pedir): trata como coleta p/ creditar
+      t = ctx.arquivos.length ? await etapaColetaDocs(ctx) : await etapaQualificacao(ctx);
+      break;
     case 'coleta_docs':
     case 'docs_pessoais':
     case 'comprovante_residencia':
@@ -527,7 +553,8 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
     if (n >= 2 && !dados.aguardando_humano) {
       const bolhas = await gerarDespedida(ctx,
         'A pessoa insiste em saber valores/condições. Avise com todo o respeito que você chamou o especialista — quem pode falar de valores — para assumir aqui, e que enquanto isso você segue à disposição para adiantar o restante.');
-      t = { ...t, bolhas, video: undefined, chamarHumano: 'quer_falar_valores', notaInterna: t.notaInterna ?? notaContexto(ctx, 'quer_falar_valores') };
+      t = { ...t, bolhas, video: undefined, etapaNova: undefined, chamarHumano: 'quer_falar_valores', notaInterna: t.notaInterna ?? notaContexto(ctx, 'quer_falar_valores'),
+        dadosPatch: { ...(t.dadosPatch ?? {}), ...((t.dadosPatch as Record<string, unknown> | undefined)?.transicao_pendente === null ? { transicao_pendente: true } : {}) } };
     }
   }
 
@@ -536,7 +563,8 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
   if (!t.statusNovo && !t.chamarHumano && errosProspectivos >= 2 && !dados.aguardando_humano) {
     const bolhasAviso = await gerarDespedida(ctx,
       'Vocês não estão conseguindo se entender por aqui. Sem culpar a pessoa, avise com carinho que você chamou um colega do time para ajudar nesta conversa — e que enquanto isso você continua aqui com ela.');
-    t = { ...t, bolhas: bolhasAviso, video: undefined, chamarHumano: 'nao_entendeu', notaInterna: t.notaInterna ?? notaContexto(ctx, 'nao_entendeu') };
+    t = { ...t, bolhas: bolhasAviso, video: undefined, etapaNova: undefined, chamarHumano: 'nao_entendeu', notaInterna: t.notaInterna ?? notaContexto(ctx, 'nao_entendeu'),
+      dadosPatch: { ...(t.dadosPatch ?? {}), ...((t.dadosPatch as Record<string, unknown> | undefined)?.transicao_pendente === null ? { transicao_pendente: true } : {}) } };
   }
 
   // ---- guardrail pós-Gemini: violou → pede REESCRITA (1x); persistiu → descarta a bolha ----
@@ -587,13 +615,14 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
   if (bolhas.length || t.video) await enviarBolhas(admin, ctx, bolhas.slice(0, 3), t.video ?? null);
 
   // ---- persiste o desfecho do turno (sucesso => zera falhas técnicas consecutivas) ----
-  const ultimaNova = novas.length ? novas[novas.length - 1].criado_em : processadoAte;
+  let ultimaNova = novas.length ? novas[novas.length - 1].criado_em : processadoAte;
+  if (t.naoAvancarAlem && t.naoAvancarAlem < ultimaNova) ultimaNova = t.naoAvancarAlem;
   const corteVistas = Date.parse(ultimaNova) - 5_000;
-  const msgsVistas = fetched.filter((m) => Date.parse(m.criado_em) > corteVistas).map((m) => m.id).slice(-40);
+  const msgsVistas = fetched.filter((m) => Date.parse(m.criado_em) > corteVistas && m.criado_em <= ultimaNova).map((m) => m.id).slice(-40);
   const patch: Record<string, unknown> = {
     // nudge_alvo/nudge_n: mensagem nova do cliente zera o ciclo de retomada; turno de nudge
     // incrementa via t.dadosPatch (que entra por cima)
-    dados: { ...dados, nudge_alvo: ultimaNova, ...(novas.length ? { nudge_n: 0 } : {}), ...(t.dadosPatch ?? {}), processado_ate: ultimaNova, msgs_vistas: msgsVistas, abertura_enviada: true, falhas_tecnicas: 0 },
+    dados: { ...dados, nudge_alvo: ultimaNova, ...(novas.length ? { nudge_n: 0, teve_inbound: true } : {}), ...(t.dadosPatch ?? {}), processado_ate: ultimaNova, msgs_vistas: msgsVistas, abertura_enviada: true, falhas_tecnicas: 0 },
     docs: { ...ctx.docs, ...(t.docsPatch ?? {}) },
     atualizado_em: new Date().toISOString(),
   };
@@ -613,8 +642,11 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
     (patch.dados as Record<string, unknown>).aguardando_humano = t.chamarHumano;
     await evento(admin, sessao, 'chamou_humano', { motivo: t.chamarHumano });
   }
-  // ---- retomada: o problema que motivou o chamado se resolveu → IA volta ao normal, alerta sai ----
-  if (t.retomar && dados.aguardando_humano) {
+  // ---- retomada: o problema que motivou o chamado se resolveu → IA volta ao normal, alerta sai.
+  //      SÓ para motivos que progresso de documento resolve — valores/senha/CPF divergente são
+  //      assunto do humano e o alerta NÃO pode ser apagado por uma foto boa ----
+  const MOTIVOS_RETOMAVEIS = ['foto_ilegivel', 'comprovante_fora_janela', 'auxilio_extratos', 'sem_acesso_govbr', 'doc_divergente', 'nao_entendeu', 'transicao_falhou'];
+  if (t.retomar && dados.aguardando_humano && MOTIVOS_RETOMAVEIS.includes(String(dados.aguardando_humano))) {
     (patch.dados as Record<string, unknown>).aguardando_humano = null;
     try {
       await admin.from('conversas').update({ precisa_humano: false, precisa_humano_motivo: null, precisa_humano_em: null }).eq('id', sessao.conversa_id);
@@ -647,7 +679,8 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
       const dadosFinais = patch.dados as Record<string, unknown>;
       const etapaFinal = (patch.etapa as string) ?? sessao.etapa;
       const nFinal = Number(dadosFinais.nudge_n ?? 0) || 0;
-      if (!dadosFinais.aguardando_humano && etapaFinal !== 'conclusao' && nFinal < NUDGE_MAX) {
+      if (!dadosFinais.aguardando_humano && etapaFinal !== 'conclusao' && nFinal < NUDGE_MAX
+          && (dadosFinais.retomada !== true || dadosFinais.teve_inbound === true)) {
         let quando: string;
         if (nFinal === 0) quando = ajustarJanelaNudge(Date.now() + delayNudge1Ms(etapaFinal, patch.docs as Record<string, unknown>) + rand(0, 5 * 60_000));
         else if (nFinal === 1) quando = ajustarJanelaNudge(Date.now() + 3 * 3_600_000 + rand(0, 20 * 60_000));
@@ -669,7 +702,7 @@ async function etapaQualificacao(ctx: Ctx): Promise<Turno> {
   const ehRetomada = ctx.dados.retomada === true;
   const dias = Number(ctx.dados.retomada_dias ?? 0) || 0;
   const instrAbertura = ehRetomada
-    ? `Esta é uma RETOMADA: a pessoa fez a solicitação ${dias <= 1 ? 'há pouco tempo' : `há ${dias} dias`} e a nossa equipe demorou a dar continuidade. Abra pedindo desculpa LEVE pela demora (uma meia frase, sem drama), diga que a pré-avaliação dela está pronta, e faça a pergunta do benefício para continuar. Reidentifique-se ("aqui é do atendimento da CAF").`
+    ? `Esta é uma RETOMADA: a pessoa fez a solicitação ${dias <= 1 ? 'há pouco tempo' : `há ${dias} dias`} e a nossa equipe demorou a dar continuidade. Abra pedindo desculpa LEVE pela demora (uma meia frase, sem drama), diga que está retomando a solicitação dela para dar continuidade, e faça a pergunta do benefício. Reidentifique-se ("aqui é do atendimento da CAF").`
     : 'Este é o SEU primeiro contato (abertura da etapa): cumprimente de leve e faça a pergunta do benefício.';
   const r = await conversar(ctx, {
     instrucaoExtra: abertura ? instrAbertura : '',
@@ -719,8 +752,10 @@ async function etapaColetaDocs(ctx: Ctx): Promise<Turno> {
   // novo chegou): só a pergunta importa — nada de novo ack pra não soar repetitivo
   if (ctx.dados.transicao_pendente === true && !ctx.novas.length) {
     const pergunta = await aberturaTriagemVerificada(ctx);
-    if (pergunta) return { bolhas: [pergunta], etapaNova: 'triagem_govbr', dadosPatch: { transicao_pendente: null }, resetErros: true };
-    return { bolhas: [], reagendarMs: 120_000, dadosPatch: { transicao_pendente: true } };
+    if (pergunta) return { bolhas: [pergunta], etapaNova: 'triagem_govbr', dadosPatch: { transicao_pendente: null, transicao_tentativas: 0 }, resetErros: true };
+    const tt = (Number(ctx.dados.transicao_tentativas ?? 0) || 0) + 1;
+    if (tt >= 3) return { bolhas: [MSG_HANDOFF_FINAL], chamarHumano: 'transicao_falhou', dadosPatch: { transicao_pendente: null } };
+    return { bolhas: [], reagendarMs: 120_000, dadosPatch: { transicao_pendente: true, transicao_tentativas: tt } };
   }
   const meses = mesesComprovante();
   const mesesTxt = `do mês atual ou do passado (${meses[0].rotulo} ou ${meses[1].rotulo})`;
@@ -730,6 +765,7 @@ async function etapaColetaDocs(ctx: Ctx): Promise<Turno> {
   const tent = { ...((ctx.dados.tentativas_item as Record<string, number>) ?? {}) };
   const marcaTentativa = (item: string): number => { tent[item] = (tent[item] ?? 0) + 1; return tent[item]; };
   const aguardando = !!ctx.dados.aguardando_humano;
+  let extraTurno: { naoAvancarAlem?: string; reagendarMs?: number } = {};
 
   // e-mail pode chegar escrito no texto (áudio soletrado fica com o modelo via dados_extraidos)
   let emailNovo: string | null = null;
@@ -743,6 +779,7 @@ async function etapaColetaDocs(ctx: Ctx): Promise<Turno> {
   if (ctx.arquivos.length) {
     const lote = await extrairLoteColeta(ctx);
     if (lote.grandes) notas.push('→ um arquivo veio pesado demais e não abriu; peça como foto normal, tirada da galeria.');
+    if (lote.excedeu && lote.corte) { extraTurno = { naoAvancarAlem: lote.corte, reagendarMs: 2_000 }; await evento(ctx.admin, ctx.sessao, 'arquivos_excedentes', { total: ctx.arquivos.length }); }
     for (const ident of lote.identidades) {
       const ehIdentidade = ident.tipo_documento === 'rg' || ident.tipo_documento === 'cnh';
       if (!ehIdentidade) {
@@ -832,7 +869,8 @@ async function etapaColetaDocs(ctx: Ctx): Promise<Turno> {
     bolhas,
     // sem pergunta verificada NÃO transiciona mudo: fica em coleta e tenta de novo em ~60s
     etapaNova: clFinal.completo && perguntaOk ? 'triagem_govbr' : (ctx.sessao.etapa !== 'coleta_docs' ? 'coleta_docs' : undefined),
-    reagendarMs: clFinal.completo && !perguntaOk ? 60_000 : undefined,
+    reagendarMs: extraTurno.reagendarMs ?? (clFinal.completo && !perguntaOk ? 60_000 : undefined),
+    naoAvancarAlem: extraTurno.naoAvancarAlem,
     resetErros: true,
     retomar,
     dadosPatch, docsPatch,
@@ -872,12 +910,15 @@ interface LoteColeta {
   comprovante: Record<string, unknown> | null;
   outros: number;
   grandes: boolean;
+  excedeu?: boolean;
+  corte?: string;
 }
 async function extrairLoteColeta(ctx: Ctx): Promise<LoteColeta> {
   const partes: ParteGemini[] = [];
   let grandes = false;
   let bytesInline = 0;
   let anexadas = 0;
+  const excedeu6 = ctx.arquivos.length > 6;
   for (const m of ctx.arquivos.slice(0, 6)) {
     const meta = (m.metadados ?? {}) as Record<string, unknown>;
     const tamanho = Number(meta.tamanho ?? 0) || 0;
@@ -894,7 +935,7 @@ async function extrairLoteColeta(ctx: Ctx): Promise<LoteColeta> {
     anexadas++;
     partes.push({ inline_data: { mime_type: arq.mime, data: arq.b64 } });
   }
-  if (!partes.length) return { identidades: [], comprovante: null, outros: 0, grandes };
+  if (!partes.length) return { identidades: [], comprovante: null, outros: 0, grandes, excedeu: excedeu6, corte: ctx.arquivos[5]?.criado_em };
   partes.push({ text: `São ${anexadas} imagem(ns) do mesmo cliente, enviadas juntas. Extraia no JSON pedido.` });
   const j = await geminiSessao(ctx, 'extracao_lote', {
     system: PROMPT_LOTE_COLETA, partes, schema: SCHEMA_LOTE_COLETA, temperatura: 0, maxTokens: 4096, semPensar: true,
@@ -910,7 +951,7 @@ async function extrairLoteColeta(ctx: Ctx): Promise<LoteColeta> {
     comprovante: comprovante ? { presente: comprovante.presente === true, ok: comprovante.dados_completos === true, problema: comprovante.problema ?? null } : null,
     outros,
   });
-  return { identidades, comprovante, outros, grandes };
+  return { identidades, comprovante, outros, grandes, excedeu: excedeu6, corte: ctx.arquivos[5]?.criado_em };
 }
 
 async function etapaTriagem(ctx: Ctx): Promise<Turno> {
@@ -1244,6 +1285,9 @@ async function reescrever(ctx: Ctx, bolhas: string[], motivo: string): Promise<s
 }
 
 function normalizarSaida(s: string): string { return (s ?? '').replace(/\s+/g, ' ').trim().toLowerCase(); }
+// achata quebras de linha do texto do cliente: sem isso, uma mensagem multilinha poderia forjar
+// uma linha "[atendente humano] ..." no transcript e enganar o modelo (injection de papéis)
+function limparLinha(s: string): string { return (s ?? '').replace(/[\r\n]+/g, ' ⏎ ').replace(/\[(cliente|você|voce|atendente[^\]]*)\]/gi, '($1)'); }
 
 /** Dedup duro: colidiu com saída já existente (ou com bolha deste mesmo turno) → reescreve 1x → persistiu → descarta. */
 async function deduplicar(ctx: Ctx, bolhas: string[]): Promise<string[]> {
@@ -1279,7 +1323,7 @@ function montarContexto(ctx: Ctx, audios?: { carregados: Set<string>; falhados: 
   if (ctx.novas.length) {
     linhas.push('NOVAS MENSAGENS DO CLIENTE (responda a elas):');
     for (const m of ctx.novas) {
-      if (m.tipo === 'texto' && m.conteudo) linhas.push(`- "${m.conteudo}"`);
+      if (m.tipo === 'texto' && m.conteudo) linhas.push(`- "${limparLinha(m.conteudo)}"`);
       else if (m.tipo === 'audio') {
         if (audios?.carregados.has(m.id)) linhas.push('- [áudio do cliente — anexado nesta chamada; ouça e responda ao que ele disse]');
         else if (audios?.falhados.has(m.id)) linhas.push('- [áudio do cliente que NÃO carregou no sistema — diga com jeito que não conseguiu ouvir esse áudio e peça para mandar de novo ou escrever]');
@@ -1296,6 +1340,8 @@ function montarContexto(ctx: Ctx, audios?: { carregados: Set<string>; falhados: 
 async function geminiSessao(ctx: Ctx, finalidade: string, p: {
   system: string; partes: ParteGemini[]; schema: Record<string, unknown>; temperatura: number; maxTokens: number; semPensar?: boolean;
 }, tipo: 'chat' | 'docs' = 'chat'): Promise<Record<string, unknown>> {
+  // turno longo não pode deixar a lease do canal expirar (o serial por chip é sagrado)
+  try { await ctx.admin.rpc('ia_canal_lock', { p_canal: ctx.sessao.canal_id, p_dono: ctx.dono, p_ttl_seg: 240 }); } catch { /* melhor esforço */ }
   try {
     const { r, modeloUsado, atualizadoDe } = await chamarComRecuperacao(ctx.admin, ctx.sessao.canal_id, ctx.modelos, tipo, p);
     if (atualizadoDe) await evento(ctx.admin, ctx.sessao, 'modelo_atualizado', { de: atualizadoDe, para: modeloUsado, tipo });
@@ -1385,6 +1431,7 @@ async function enviarBolhas(admin: Admin, ctx: Ctx, bolhas: string[], video: { u
   const tx = enviadorDe(canal as { transporte?: string; instancia_externa?: string; cloud_phone_number_id?: string });
   const instancia = String(canal.instancia_externa ?? '');
   const ordenadas = [...rows].sort((a: { ordem: number }, b: { ordem: number }) => a.ordem - b.ordem);
+  const enviadosWamid: string[] = [];   // p/ reconciliar a corrida com o echo fromMe do webhook
   for (const row of ordenadas) {
     // re-checa a cada bolha: humano pode ter entrado no meio do burst (o trigger pausa a sessão)
     const { data: st } = await admin.from('ia_sessoes').select('status').eq('id', sessao.id).maybeSingle();
@@ -1413,6 +1460,7 @@ async function enviarBolhas(admin: Admin, ctx: Ctx, bolhas: string[], video: { u
       }).select('id').maybeSingle();
       await admin.rpc('bot_registrar_envio', { p_saida: row.id, p_status: 'enviada', p_mensagem: msg?.id ?? null, p_id_externo: idExterno });
       ctx.saidasAnteriores.add(normalizarSaida(row.texto));
+      enviadosWamid.push(idExterno);
     } catch (e) {
       // FALHA DE TRANSPORTE (chip caiu, Evolution fora): sequência quebrada não continua pela
       // metade — cancela o resto e vira FALHA TÉCNICA: o turno NÃO persiste (nada de etapa
@@ -1426,6 +1474,25 @@ async function enviarBolhas(admin: Admin, ctx: Ctx, bolhas: string[], video: { u
       }
       await evento(admin, sessao, 'envio_falhou', { ordem: row.ordem, erro });
       throw new FalhaTecnica(`envio_falhou:${erro.slice(0, 120)}`);
+    }
+  }
+
+  // ---- RECONCILIAÇÃO da corrida com o webhook: o fromMe da PRÓPRIA mensagem da IA pode chegar
+  //      antes do nosso insert e o webhook grava origem='telefone', o que faz o trigger PAUSAR a
+  //      sessão com a nossa própria bolha. Se a sessão ficou 'pausada' e NÃO há mensagem humana de
+  //      verdade (só os nossos echos), despausa. ----
+  if (enviadosWamid.length) {
+    const { data: st } = await admin.from('ia_sessoes').select('status, dados').eq('id', sessao.id).maybeSingle();
+    if (st?.status === 'pausada') {
+      const { data: humanas } = await admin.from('mensagens')
+        .select('id_externo, autor_id, origem, id').eq('conversa_id', sessao.conversa_id).eq('direcao', 'saida')
+        .not('tipo', 'in', '(sistema,nota_interna)').gte('criado_em', new Date(Date.now() - 5 * 60_000).toISOString());
+      const humanoReal = (humanas ?? []).some((m: { id_externo: string | null; autor_id: string | null; origem: string | null }) =>
+        (m.autor_id != null) || (m.origem === 'telefone' && !enviadosWamid.includes(m.id_externo ?? '')));
+      if (!humanoReal) {
+        await admin.from('ia_sessoes').update({ status: 'ativa', atualizado_em: new Date().toISOString() }).eq('id', sessao.id).eq('status', 'pausada');
+        await evento(admin, sessao, 'despausa_echo_fromme', { wamids: enviadosWamid.length });
+      }
     }
   }
 }
@@ -1502,10 +1569,19 @@ async function etiquetarOportunidade(admin: Admin, sessao: Sessao, etiqueta: str
   } catch { /* best-effort */ }
 }
 
+// texto do cliente pode CONTER a senha do gov.br (ele digita achando que ajuda). NUNCA entra
+// numa nota interna — redige qualquer trecho que cheire a senha/credencial.
+function pareceSenha(t: string): boolean {
+  return /senha|gov\.?\s?br|c[oó]digo|\b\d{4,}\b/i.test(t ?? '');
+}
 function notaContexto(ctx: Ctx, motivo: string): string {
   const d = ctx.dados;
   const docs = ['doc_pessoal', 'comprovante', 'declarante_doc', 'consignado'].filter((k) => ctx.docs[k]);
   const cob = ctx.cobertura;
+  const ultimas = ctx.textos.slice(-2).filter((t) => !pareceSenha(t));
+  const linhaUltimas = ultimas.length
+    ? `• Últimas mensagens do cliente: ${ultimas.map((t) => `"${t.slice(0, 80)}"`).join(' | ')}`
+    : '• Últimas mensagens do cliente: (omitidas — possível dado sensível/senha ou mídia/áudio)';
   return [
     `🤖 IA SDR — atendimento entregue ao humano (motivo: ${motivo}).`,
     `• Etapa: ${ctx.sessao.etapa}`,
@@ -1516,7 +1592,7 @@ function notaContexto(ctx: Ctx, motivo: string): string {
     `• Documentos recebidos: ${docs.length ? docs.join(', ') : 'nenhum'}`,
     (ctx.docs.comprovante as Record<string, unknown> | undefined)?.pendente_analista === true ? '• ⚠️ Comprovante: o cliente NÃO tinha — resolver com ele.' : null,
     cob.meses_cobertos != null ? `• Extratos: ${cob.meses_cobertos} de 120 meses cobertos${cob.completo ? ' (completo)' : ''}` : null,
-    `• Últimas mensagens do cliente: ${ctx.textos.slice(-2).map((t) => `"${t.slice(0, 80)}"`).join(' | ') || '(mídia/áudio)'}`,
+    linhaUltimas,
   ].filter(Boolean).join('\n');
 }
 

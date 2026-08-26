@@ -21,6 +21,12 @@ const REGRAS: Array<{ nome: string; re: RegExp }> = [
   { nome: 'juros', re: /\bjuros\b/i },
   { nome: 'margem', re: /\bmargem\b|\bmargens\b/i },
   { nome: 'aprovacao', re: /\baprovad[oa]s?\b|\breprovad[oa]s?\b/i },
+  // valor por extenso ("mil reais", "quinhentos reais", "5 mil reais") — falso-positivo só custa
+  // 1 reescrita, então barramos "reais" em qualquer forma (direção segura p/ compliance)
+  { nome: 'valor_extenso', re: /\breais\b|\bconto[s]?\b|\bpila[s]?\b/i },
+  // promessa de liberação / prazo ("cai amanhã", "libera hoje", "está garantido")
+  { nome: 'liberacao', re: /\b(cai|sai|libera(d[oa]s?)?|deposita(d[oa]s?)?)\s+(em|at[ée]|hoje|amanh[ãa]|na\s+conta)\b/i },
+  { nome: 'garantia', re: /\bgarantid[oa]s?\b/i },
 ];
 
 /** Devolve o NOME da primeira violação (ou null se a saída está limpa). */
