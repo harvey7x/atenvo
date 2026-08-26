@@ -609,3 +609,7 @@
    ============================================================ */
 :root[data-perf="lite"] .v2 .drawer-v2 { background: linear-gradient(180deg, #121317, #0D0E11); }
 :root[data-perf="lite"][data-tema="light"] .v2 .drawer-v2 { background: linear-gradient(180deg, #FEFEFE, #F9FAFC); }
+
+/* toggle da IA no cabeçalho: verde quando ligada */
+.v2 .p-btn.ia-on{ background: #1f9d55; border-color: #1f9d55; color: #fff; }
+.v2 .p-btn.ia-on:hover:not(:disabled){ background: #199150; }

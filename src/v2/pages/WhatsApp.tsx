@@ -25,6 +25,7 @@ import { ScriptSequenceModal } from '@/components/ScriptSequenceModal';
 import { FichaJudicialBox } from '@/components/FichaJudicialBox';
 import { fichaDemoDoContato } from '@/data/fichaJudicial';
 import { useSendWaMessage } from '@/data/whatsapp';
+import { useIaEstadoConversa, useIaToggle } from '@/data/whatsapp';
 import { mensagemAssumir, useAlertasLeadQuente } from '@/data/alertasLeadQuente';
 import { AlertaLeadQuenteModal } from '../components/AlertaLeadQuenteModal';
 import { useInboxWhatsApp, type AvisoInbox } from '../hooks/useInboxWhatsApp';
@@ -222,6 +223,17 @@ export default function WhatsAppV2() {
     : nome ?? 'WhatsApp';
   const janelaQ = useJanelaCanal(WA_REAL && canalEhCloud ? inbox.canalSel?.id ?? null : null, WA_REAL ? current.contatoId ?? null : null, canalEhCloud);
   const agendadasQ = useMensagensAgendadas(WA_REAL ? currentId || null : null);
+  const iaEstadoQ = useIaEstadoConversa(WA_REAL ? currentId || null : null);
+  const iaEstado = iaEstadoQ.data;
+  const iaToggle = useIaToggle();
+  const iaAtiva = !!iaEstado?.existe && iaEstado.status === 'ativa' && !iaEstado.desativado_manual;
+  async function alternarIa() {
+    if (!currentId || iaToggle.isPending) return;
+    try {
+      await iaToggle.mutateAsync({ conversaId: currentId, ativar: !iaAtiva });
+      aoAvisar({ tom: 'ok', texto: iaAtiva ? 'IA desativada nesta conversa' : 'IA ativada nesta conversa' });
+    } catch (e) { aoAvisar({ tom: 'erro', texto: (e as Error).message || 'Falha ao alternar a IA' }); }
+  }
   const agendarSeqMut = useAgendarSequencia();
   const editarAgMut = useEditarAgendamento();
   const cancelarAgMut = useCancelarAgendamento();
@@ -662,6 +674,11 @@ export default function WhatsAppV2() {
                   ? <BotaoMini title="Transferir atendimento" onClick={() => setTransferirAberto(true)}>Transferir</BotaoMini>
                   : <BotaoSec mini title="Assumir atendimento" disabled={inbox.atribuindo} onClick={inbox.assumir}>Assumir</BotaoSec>}
                 <BotaoMini title={current.arquivada ? 'Desarquivar conversa' : 'Arquivar conversa'} onClick={() => inbox.arquivar(!current.arquivada)}>{current.arquivada ? 'Desarquivar' : 'Arquivar'}</BotaoMini>
+                {current.id && (iaEstado?.existe || iaAtiva) && (
+                  <BotaoMini className={iaAtiva ? 'ia-on' : ''} disabled={iaToggle.isPending}
+                    title={iaAtiva ? ('IA atendendo' + (iaEstado?.etapa ? ' (' + iaEstado.etapa + ')' : '') + ' — clique para desligar e assumir') : (iaEstado?.aguardando_humano ? 'IA aguardando você assumir — clique para reativar a IA' : 'Ligar a IA nesta conversa')}
+                    onClick={alternarIa}>{iaAtiva ? '🤖 IA ligada' : '🤖 IA desligada'}</BotaoMini>
+                )}
                 {!ctxAberto && <BotaoMini title="Abrir painel de dados do contato" onClick={() => setCtxAberto(true)}>Dados</BotaoMini>}
                 <button type="button" className={'ib2' + (foco ? ' on' : '')} title="Modo de foco (Esc para sair)" onClick={() => setFoco((f) => !f)} style={{ width: 26, height: 26 }}><IcFoco /></button>
                 <button type="button" className="ib2" title="Ações" aria-label="Ações da conversa" style={{ width: 26, height: 26 }} onClick={(e) => abrirPop('acoes', e)}><IcDots /></button>
