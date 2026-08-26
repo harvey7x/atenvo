@@ -34,7 +34,7 @@ export interface FichaFmtDados {
 }
 
 export interface FichaFmtOpcoes {
-  /** Inclui a senha do INSS na linha "INSS:" (só na cópia; nunca é salva). */
+  /** Inclui a senha do Meu INSS na linha "INSS:" (vem do campo salvo da ficha). */
   incluirSenha?: boolean;
   senha?: string;
 }

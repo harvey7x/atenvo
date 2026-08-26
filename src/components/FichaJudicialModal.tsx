@@ -84,17 +84,15 @@ export function FichaJudicialModal({ open, onClose, vinculos, fichaInicial, modo
   const [origem, setOrigem] = useState<Record<string, CampoOrigem | 'manual'>>({});
   // último parse do bloco colado — base da conferência anti-contaminação
   const [parse, setParse] = useState<FichaJudicialParseResult | null>(null);
-  // senha temporária — somente no estado local; nunca persistida
-  const [senhaInssTemporaria, setSenha] = useState('');
+  // controla só a visibilidade da senha na tela; a senha em si é o campo salvo form.senhaInss
   const [mostrarSenha, setMostrarSenha] = useState(false);
-  const [incluirSenhaAoCopiar, setIncluirSenha] = useState(false);
   const [atualizarContatoChk, setAtualizarContato] = useState(false);
   const [atualizarOportunidadeChk, setAtualizarOportunidade] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // limpa a senha ao fechar
-  useEffect(() => { if (!open) { setSenha(''); setMostrarSenha(false); setIncluirSenha(false); } }, [open]);
+  // ao fechar, volta a senha para o modo oculto (o valor em si é persistido no campo salvo)
+  useEffect(() => { if (!open) setMostrarSenha(false); }, [open]);
 
   const setF = (patch: Partial<Form>, manual = true) => {
     setForm((f) => ({ ...f, ...patch }));
@@ -159,7 +157,8 @@ export function FichaJudicialModal({ open, onClose, vinculos, fichaInicial, modo
     telefone: formataTelefoneBR(form.telefone), estadoCivil: form.estadoCivil, email: form.email, dataConsulta: form.dataConsulta || undefined, revisoes,
   }), [form, revisoes, usuarios, responsavelSugerido, idadeCalc]);
 
-  const previa = useMemo(() => formatarFichaJudicial(dadosFmt, { incluirSenha: false }), [dadosFmt]);
+  // A senha do Meu INSS (campo salvo) SEMPRE sai na ficha — na prévia e na cópia.
+  const previa = useMemo(() => formatarFichaJudicial(dadosFmt, { incluirSenha: true, senha: form.senhaInss }), [dadosFmt, form.senhaInss]);
 
   // Alerta de telefone: o Promosys NUNCA alimenta a ficha. Se trouxe número diferente do contato, avisa
   // que foi ignorado; se o contato não tem número no Atenvo, avisa que a ficha ficará sem telefone.
@@ -268,7 +267,6 @@ export function FichaJudicialModal({ open, onClose, vinculos, fichaInicial, modo
       if (!id) { const f = await criar.mutateAsync({ vinculos, snapshot, criadoPor: user!.id }); id = f.id; setFichaId(id); }
       await finalizar.mutateAsync({ id: id!, snapshot, responsavelId: form.responsavelId || null });
       await aplicarConflitos();
-      setSenha('');
       toast('Ficha finalizada');
       onClose();
     } catch (e) { setErro(traduz((e as Error).message)); }
@@ -277,7 +275,7 @@ export function FichaJudicialModal({ open, onClose, vinculos, fichaInicial, modo
 
   async function copiar() {
     if (bancoPagadorPendente()) { setErro('Revisar banco de recebimento. PAN/FACTA não devem ser usados como banco pagador do benefício.'); setEtapa('revisar'); return; }
-    const texto = formatarFichaJudicial(dadosFmt, { incluirSenha: incluirSenhaAoCopiar, senha: senhaInssTemporaria });
+    const texto = formatarFichaJudicial(dadosFmt, { incluirSenha: true, senha: form.senhaInss });
     try {
       if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(texto);
       else { const ta = document.createElement('textarea'); ta.value = texto; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); }
@@ -353,7 +351,7 @@ export function FichaJudicialModal({ open, onClose, vinculos, fichaInicial, modo
               {campo('UF', <input className="atv-input" maxLength={2} value={form.uf} onChange={(e) => setF({ uf: e.target.value.toUpperCase() })} disabled={readOnly} />, ind('uf'))}
               {campo('Telefone', <input className="atv-input" value={form.telefone} onChange={(e) => setF({ telefone: e.target.value })} disabled={readOnly} title="Vem do contato/conversa do Atenvo — o número do Promosys nunca é usado" />, form.telefone.trim() ? <span className="fj-ind ok">Do contato</span> : <span className="fj-ind warn">Sem telefone</span>)}
               {campo('E-mail', <input className="atv-input" value={form.email} onChange={(e) => setF({ email: e.target.value })} disabled={readOnly} />, ind('email'))}
-              {campo('Senha Meu INSS', <input className="atv-input" value={form.senhaInss} onChange={(e) => setF({ senhaInss: e.target.value })} disabled={readOnly} autoComplete="off" />)}
+              {campo('Senha Meu INSS', <div className="fj-senha"><input className="atv-input" type={mostrarSenha ? 'text' : 'password'} value={form.senhaInss} onChange={(e) => setF({ senhaInss: e.target.value })} disabled={readOnly} autoComplete="off" placeholder="Aparece na ficha ao copiar" /><button type="button" className="fj-eye" onClick={() => setMostrarSenha((s) => !s)}>{mostrarSenha ? 'Ocultar' : 'Mostrar'}</button></div>, <span className="fj-ind ok">Sai na ficha</span>)}
               {campo('RG', <input className="atv-input" value={form.rg} onChange={(e) => setF({ rg: e.target.value })} disabled={readOnly} />)}
               {campo('Estado civil', <input className="atv-input" value={form.estadoCivil} onChange={(e) => setF({ estadoCivil: e.target.value })} disabled={readOnly} />)}
             </div>
@@ -392,11 +390,6 @@ export function FichaJudicialModal({ open, onClose, vinculos, fichaInicial, modo
               {!readOnly && <button className="atv-btn fj-addrev" onClick={() => setRevisoes((rs) => [...rs, { tipo: 'outro', origem: 'manual' }])}>+ Adicionar revisão</button>}
             </div>
 
-            <div className="fj-sec">Dados complementares</div>
-            <div className="fj-grid">
-              {campo('INSS — senha (temporária)', <div className="fj-senha"><input className="atv-input" type={mostrarSenha ? 'text' : 'password'} value={senhaInssTemporaria} onChange={(e) => setSenha(e.target.value)} placeholder="Não é salva" disabled={readOnly} /><button type="button" className="fj-eye" onClick={() => setMostrarSenha((s) => !s)}>{mostrarSenha ? 'Ocultar' : 'Mostrar'}</button></div>, <span className="fj-ind man">Só nesta sessão</span>)}
-            </div>
-
             {conflitos.length > 0 && !readOnly && (
               <div className="fj-conflitos">
                 <div className="fj-sec">Divergências com o cadastro</div>
@@ -414,8 +407,8 @@ export function FichaJudicialModal({ open, onClose, vinculos, fichaInicial, modo
               <div className="fj-alertas">{alertas.map((m, i) => <div className="fj-alerta" key={i}>{m}</div>)}</div>
             )}
             <pre className="fj-doc">{previa}</pre>
-            {!readOnly && (
-              <label className="fj-chk fj-copychk"><input type="checkbox" checked={incluirSenhaAoCopiar} onChange={(e) => setIncluirSenha(e.target.checked)} disabled={!senhaInssTemporaria} /> Incluir senha do INSS nesta cópia</label>
+            {form.senhaInss.trim() && (
+              <div className="fj-obs fj-copychk">🔒 A senha do Meu INSS entra na linha “INSS:” ao copiar.</div>
             )}
           </div>
         )}
