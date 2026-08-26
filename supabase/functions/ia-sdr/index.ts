@@ -708,6 +708,14 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
     await evento(admin, sessao, 'erro_escrita', { onde: 'patch_turno', erro: String(ePatch.message ?? '').slice(0, 200) });
     throw new FalhaTecnica('patch_turno_falhou');
   }
+
+  // chegou DOCUMENTAÇÃO neste turno → move o card do Kanban para "Documentos" (forward-only,
+  // idempotente; a RPC não puxa quem já está em Assinar/Fechado nem mexe em opp fechada).
+  if (t.docsPatch && docRecebidoNoTurno(t.docsPatch)) {
+    try { await admin.rpc('oportunidade_mover_documentos', { p_conversa: sessao.conversa_id }); }
+    catch (e) { await evento(admin, sessao, 'kanban_mover_falhou', { erro: String((e as Error)?.message ?? '').slice(0, 160) }); }
+  }
+
   if (!t.statusNovo) {
     if (houveMais) {
       // estourou o limit de novas: tem mensagem esperando — próximo turno JÁ, sem dormir
@@ -832,6 +840,17 @@ function checklistTexto(c: Checklist, docs: Record<string, unknown>, meses: stri
     linhaComp,
     linha(c.emailOk, 'e-mail do cliente'),
   ].join('\n');
+}
+
+// documentação REAL chegou no turno? (identidade frente/verso, comprovante válido, ou extrato do
+// Meu INSS) — o "não tenho comprovante" (pendente_analista) NÃO conta como documento recebido.
+function docRecebidoNoTurno(dp: Record<string, unknown>): boolean {
+  const doc = dp.doc_pessoal as Record<string, unknown> | undefined;
+  if (doc && (doc.frente === true || doc.verso === true)) return true;
+  const comp = dp.comprovante as Record<string, unknown> | undefined;
+  if (comp && comp.pendente_analista !== true) return true;
+  if (dp.consignado) return true;
+  return false;
 }
 
 async function etapaColetaDocs(ctx: Ctx): Promise<Turno> {
