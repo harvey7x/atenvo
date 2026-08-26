@@ -502,7 +502,10 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
   //      (07:30–21:30 SP) NÃO sai agora — reagenda pra próxima abertura. Lead VIVO (novas.length)
   //      e abertura de lead NOVO (sem retomada) passam a qualquer hora: responder é reativo. ----
   const ehAberturaRetomada = dados.retomada === true && !dados.abertura_enviada && !novas.length;
-  if ((ehNudge || ehAberturaRetomada) && !dentroDaJanela(iaConfig)) {
+  // exceção pontual autorizada pelo dono: um lote com abertura_especial pode sair fora da janela
+  // (é envio único e aprovado, com espaçamento anti-ban preservado no processar_apos de cada sessão).
+  const bypassJanela = typeof dados.abertura_especial === 'string' && !!dados.abertura_especial && !dados.abertura_enviada;
+  if ((ehNudge || ehAberturaRetomada) && !bypassJanela && !dentroDaJanela(iaConfig)) {
     const alvo = proximaAbertura(iaConfig);
     await admin.from('ia_sessoes').update({ processar_apos: alvo, atualizado_em: new Date().toISOString() }).eq('id', sessao.id).eq('status', 'ativa');
     await evento(admin, sessao, 'fora_janela', { reagendado_para: alvo, motivo: ehNudge ? 'nudge' : 'abertura_retomada' });
@@ -742,7 +745,17 @@ async function etapaQualificacao(ctx: Ctx): Promise<Turno> {
   const ehRetomada = ctx.dados.retomada === true;
   const ehAbandono = ctx.dados.retomada_abandono === true;
   const dias = Number(ctx.dados.retomada_dias ?? 0) || 0;
-  const instrAbertura = ehAbandono
+  // ABERTURA ESPECIAL (exceção pontual autorizada pelo dono, por sessão): quando dados.abertura_especial
+  // traz um roteiro de abertura, ele SUBSTITUI o texto de retomada/abandono só neste 1º toque. É
+  // efêmero — some do dados assim que a abertura é enviada; nenhum lead futuro herda isso.
+  const aberturaEspecial = typeof ctx.dados.abertura_especial === 'string' && ctx.dados.abertura_especial.trim()
+    ? String(ctx.dados.abertura_especial) : '';
+  // o roteiro especial deste lote entra no 1º toque MESMO se o cliente escreveu antes do slot agendado
+  // (o dono quer que a desculpa ABRA o atendimento) — a extração de recebe_inss segue no `abertura` estrito.
+  const injetarAbertura = abertura || (!!aberturaEspecial && !ctx.dados.abertura_enviada);
+  const instrAbertura = aberturaEspecial
+    ? aberturaEspecial
+    : ehAbandono
     // ABANDONO: começou a conversa (veio de um anúncio) mas não terminou. NÃO presuma "solicitação
     // pronta" — a pessoa não concluiu nada. Abra leve, sem cobrança, retomando de onde parou.
     ? `Esta pessoa começou uma conversa com a CAF sobre empréstimo/análise ${dias <= 1 ? 'há pouco' : `há ${dias} dias`} mas não chegou a terminar. Reabra com muita leveza, SEM cobrar e SEM dizer que ela "solicitou" ou que "está pronto": apenas retome com simpatia, reidentifique-se ("aqui é do atendimento da CAF"), diga que ficou de ajudar a pessoa e faça a pergunta do benefício do INSS para dar continuidade, se ela quiser. Se a pessoa demonstrar que não tem interesse, encerre com educação (dados_extraidos.recebe_inss="nao").`
@@ -750,7 +763,7 @@ async function etapaQualificacao(ctx: Ctx): Promise<Turno> {
     ? `Esta é uma RETOMADA: a pessoa fez a solicitação ${dias <= 1 ? 'há pouco tempo' : `há ${dias} dias`} e a nossa equipe demorou a dar continuidade. Abra pedindo desculpa LEVE pela demora (uma meia frase, sem drama), diga que está retomando a solicitação dela para dar continuidade, e faça a pergunta do benefício. Reidentifique-se ("aqui é do atendimento da CAF").`
     : 'Este é o SEU primeiro contato (abertura da etapa): cumprimente de leve e faça a pergunta do benefício.';
   const r = await conversar(ctx, {
-    instrucaoExtra: abertura ? instrAbertura : '',
+    instrucaoExtra: injetarAbertura ? instrAbertura : '',
   });
   const recebe = String(r.dados.recebe_inss ?? (abertura ? 'incerto' : 'incerto'));
   if (!abertura && recebe === 'sim') {
@@ -759,7 +772,7 @@ async function etapaQualificacao(ctx: Ctx): Promise<Turno> {
   if (!abertura && recebe === 'nao') {
     return { bolhas: r.mensagens, statusNovo: 'encerrada', etiquetaOpp: 'nao_elegivel', __perguntouValores: r.perguntouValores };
   }
-  return { bolhas: r.mensagens, incrementaErro: !abertura, __perguntouValores: r.perguntouValores };
+  return { bolhas: r.mensagens, incrementaErro: !abertura, ...(aberturaEspecial ? { dadosPatch: { abertura_especial: null } } : {}), __perguntouValores: r.perguntouValores };
 }
 
 // ---- RETORNO: lead que já conversou antes e voltou a chamar ----
