@@ -26,9 +26,10 @@
 // Diag de deploy: POST {"diag":"gemini"} (com o secret) → valida o modelo com uma chamada mínima.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { enviadorDe } from '../evolution-send/transporte.ts';
+import { inferirGenero } from '../bot-runner/fluxo_botoes.ts';   // gênero p/ tratamento consistente
 import { sendPresenceComposing } from './evolution.ts';
 import {
-  chamarGeminiJson, comRetry, temChaveGemini, ehErro404Modelo, parseSugestaoModelo,
+  chamarGeminiJson, comRetry, temChaveGemini, ehErro404Modelo, parseSugestaoModelo, ehSobrecarga,
   MODELO_DEFAULT, modeloEnvChat, modeloEnvDocs, modeloEnvPro, type ParteGemini, type ResultadoGemini,
 } from './gemini.ts';
 import { saidaProibida, perguntaDeValores } from './guardrail.ts';
@@ -57,6 +58,8 @@ const MAX_FALHAS_TECNICAS = 5;
 // (resposta simples 15min; foto 45min; tarefa pela metade 20min; Meu INSS 60min); 2º = ~3h depois
 // mudando o ângulo; 3º = manhã seguinte, porta aberta. Depois: episódio encerrado.
 const NUDGE_MAX = 3;
+// Cadeia de fallback quando o modelo do turno está sobrecarregado (503) — capacidade diferente.
+const FALLBACK_MODELOS = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-flash-latest'];
 
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'content-type, x-ia-secret', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, 'Content-Type': 'application/json' } });
@@ -201,6 +204,19 @@ async function chamarComRecuperacao(admin: Admin, canalId: string, modelos: Mode
     return { r: await comRetry(() => chamarGeminiJson(modelo, p)), modeloUsado: modelo };
   } catch (e) {
     const msg = String((e as Error)?.message ?? '');
+    // SOBRECARGA do modelo (503 "high demand" / 429 / 5xx): tenta a CADEIA DE FALLBACK — modelos
+    // de capacidade diferente. Um pico no 3.7-flash não trava a conversa se o 3.6/3.5 respondem.
+    // (Foi o que emperrou a Roseli: 3.7-flash 503 a madrugada toda → 5 falhas → handoff.)
+    if (ehSobrecarga(msg)) {
+      for (const alt of FALLBACK_MODELOS) {
+        if (alt === modelo) continue;
+        try {
+          const rAlt = await chamarGeminiJson(alt, p);   // uma tentativa por fallback já basta
+          return { r: rAlt, modeloUsado: alt, atualizadoDe: modelo };
+        } catch (e2) { if (!ehSobrecarga(String((e2 as Error)?.message ?? ''))) throw e2; }
+      }
+      throw new Error(`sobrecarga_transitoria: ${msg.slice(0, 120)}`);   // todos sobrecarregados
+    }
     if (!ehErro404Modelo(msg)) throw e;
     const sugestao = parseSugestaoModelo(msg, modelo);
     if (!sugestao) throw e;
@@ -353,16 +369,21 @@ async function processarSessao(admin: Admin, sessao: Sessao, canal: Record<strin
     // QUOTA do Google esgotada (429 "check your plan and billing"): não é defeito nosso nem do
     // cliente — resolve com o tempo (reset diário) ou upgrade de tier da chave. Espera 10min sem
     // queimar o contador de falhas técnicas.
-    if (msg.includes('gemini 429')) {
-      await admin.from('ia_sessoes').update({ processar_apos: new Date(Date.now() + 10 * 60_000).toISOString() }).eq('id', sessao.id).eq('status', 'ativa');
-      await evento(admin, sessao, 'quota_gemini', {});
-      // quota presa há ~2h não pode ser silêncio eterno: entrega ao humano com o motivo real
-      const { count: quotas2h } = await admin.from('ia_eventos').select('id', { count: 'exact', head: true })
-        .eq('sessao_id', sessao.id).eq('tipo', 'quota_gemini')
-        .gte('criado_em', new Date(Date.now() - 2 * 3_600_000).toISOString());
-      if ((quotas2h ?? 0) >= 10) {
+    // SOBRECARGA transitória (503 "high demand" / 5xx / todos os modelos sobrecarregados / 429):
+    // capacidade do Google, resolve em minutos. NUNCA vira falha técnica (foi o que travou a
+    // Roseli). Espera curto (2min) e reprocessa; só vira handoff se persistir ~1h (raro).
+    if (msg.includes('gemini 429') || msg.includes('sobrecarga_transitoria') || ehSobrecarga(msg)) {
+      const ehQuota = msg.includes('gemini 429') && /quota|billing|plan/.test(msg);
+      const esperaMs = ehQuota ? 10 * 60_000 : 2 * 60_000;
+      await admin.from('ia_sessoes').update({ processar_apos: new Date(Date.now() + esperaMs).toISOString() }).eq('id', sessao.id).eq('status', 'ativa');
+      await evento(admin, sessao, ehQuota ? 'quota_gemini' : 'sobrecarga_transitoria', { erro: msg.slice(0, 120) });
+      // preso há ~1h não pode ser silêncio eterno: entrega ao humano com o motivo real
+      const { count: presos1h } = await admin.from('ia_eventos').select('id', { count: 'exact', head: true })
+        .eq('sessao_id', sessao.id).in('tipo', ['quota_gemini', 'sobrecarga_transitoria'])
+        .gte('criado_em', new Date(Date.now() - 3_600_000).toISOString());
+      if ((presos1h ?? 0) >= 20) {
         await fazerHandoff(admin, sessao, canal, 'falha_tecnica', [MSG_HANDOFF_FINAL],
-          '🤖 IA SDR — cota da API do Gemini esgotada há ~2h (plano/billing da chave). NÃO foi o cliente. Atendimento entregue ao humano; ver ia_eventos tipo quota_gemini.');
+          '🤖 IA SDR — a API do Gemini ficou sobrecarregada/sem cota por ~1h. NÃO foi o cliente. Atendimento entregue ao humano; ver ia_eventos (quota_gemini/sobrecarga_transitoria).');
       }
       return;
     }
@@ -1336,8 +1357,17 @@ function pareceComplexo(ctx: Ctx): boolean {
 
 function montarContexto(ctx: Ctx, audios?: { carregados: Set<string>; falhados: Set<string> }): string {
   const linhas: string[] = [];
+  // TRATAMENTO consistente (bug da Roseli: "dona Roseli" + "o senhor" na mesma conversa). Gênero
+  // inferido do nome trava o pronome — o modelo NÃO pode alternar.
+  const nomeGen = String(ctx.dados.nome_confirmado ?? '') || ctx.contatoNome || '';
+  const gen = inferirGenero(nomeGen);
+  const trat = gen === 'mulher' ? 'a pessoa é MULHER — trate SEMPRE por "a senhora" (nunca "o senhor")'
+    : gen === 'homem' ? 'a pessoa é HOMEM — trate SEMPRE por "o senhor" (nunca "a senhora")'
+    : 'gênero incerto pelo nome — escolha "o senhor" OU "a senhora" e NUNCA alterne durante a conversa';
+  linhas.push(`TRATAMENTO: ${trat}.`);
+  linhas.push('');
   linhas.push('DADOS JÁ COLETADOS (NUNCA peça de novo o que está aqui):');
-  linhas.push(`- Nome: ${String(ctx.dados.nome_confirmado ?? '') || ctx.contatoNome || '(desconhecido)'}`);
+  linhas.push(`- Nome: ${nomeGen || '(desconhecido)'}`);
   linhas.push(`- CPF: ${ctx.contatoCpf ? 'já informado no início ✓' : '(não veio)'}`);
   if (ctx.dados.email) linhas.push(`- E-mail: ${ctx.dados.email} ✓`);
   if (ctx.dados.titular_comprovante) linhas.push(`- Titular do comprovante: ${ctx.dados.titular_comprovante}`);

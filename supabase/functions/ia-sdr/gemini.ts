@@ -103,6 +103,14 @@ export function ehErro404Modelo(msg: string): boolean {
   return /gemini 404/.test(msg) && /model/i.test(msg);
 }
 
+/** Sobrecarga TRANSITÓRIA do modelo: 503 "high demand", 429, ou 5xx / overloaded / unavailable.
+ *  Resolve sozinho em minutos — merece fallback de modelo + espera, NUNCA vira falha técnica. */
+export function ehSobrecarga(msg: string): boolean {
+  const m = (msg ?? '').toLowerCase();
+  if (/gemini (429|500|502|503|504)/.test(m)) return true;
+  return /unavailable|overloaded|high demand|sobrecarga_transitoria|timeout_gemini/.test(m);
+}
+
 /** Extrai o modelo SUGERIDO no corpo do 404 ("use models/<nome>") — o primeiro diferente do atual. */
 export function parseSugestaoModelo(msg: string, atual: string): string | null {
   const nomes = [...msg.matchAll(/models\/([a-zA-Z0-9._-]+)/g)].map((m) => m[1]);
