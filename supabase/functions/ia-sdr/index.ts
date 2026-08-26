@@ -71,6 +71,16 @@ function seguroIgual(a: string, b: string): boolean {
   let d = 0; for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i);
   return d === 0;
 }
+// A CAF é marca premium: ZERO emoji nas mensagens ao cliente. O prompt já proíbe, mas o modelo
+// pode escorregar — este filtro é a garantia dura, aplicado em TODA bolha antes de enviar.
+function removerEmoji(t: string): string {
+  return (t ?? '')
+    .replace(/[\p{Extended_Pictographic}\u{200D}\u{20E3}\u{FE0F}\u{FE0E}]/gu, '')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\s+([,.!?;:])/g, '$1')
+    .trim();
+}
+
 function paraBase64(bytes: Uint8Array): string {
   let bin = ''; const CH = 0x8000;
   for (let i = 0; i < bytes.length; i += CH) bin += String.fromCharCode(...bytes.subarray(i, i + CH));
@@ -1455,10 +1465,14 @@ async function baixarAnexo(admin: Admin, path: string, mime: string): Promise<An
 }
 
 // ======== envio: fila bot_mensagens_saida + drain em processo (presence 2–6s + jitter 1.5–3s) ========
-async function enviarBolhas(admin: Admin, ctx: Ctx, bolhas: string[], video: { url: string; caption: string } | null): Promise<void> {
+async function enviarBolhas(admin: Admin, ctx: Ctx, bolhasRaw: string[], videoRaw: { url: string; caption: string } | null): Promise<void> {
   const sessao = ctx.sessao;
   const canal = ctx.canal;
   const tag = `ia_${sessao.etapa}_${Date.now().toString(36)}`;
+
+  // GARANTIA premium: nenhum emoji chega ao cliente (o prompt proíbe; aqui é a trava de código)
+  const bolhas = bolhasRaw.map(removerEmoji).filter(Boolean);
+  const video = videoRaw ? { ...videoRaw, caption: removerEmoji(videoRaw.caption) } : null;
 
   // Fase 1.1: SEM delay-base — o tempo humano é o presence proporcional + jitter entre bolhas
   const presenceDur = (texto: string) => Math.min(6_000, Math.max(2_000, texto.length * 50));
@@ -1466,7 +1480,7 @@ async function enviarBolhas(admin: Admin, ctx: Ctx, bolhas: string[], video: { u
   let cursor = Date.now();
   let ordem = 0;
   if (video) {
-    linhas.push({ ordem: ordem++, tipo: 'video', texto: video.caption || '🎬', media_url: video.url, media_caption: video.caption || null, enviar_apos: new Date(cursor).toISOString() });
+    linhas.push({ ordem: ordem++, tipo: 'video', texto: video.caption || 'Segue o vídeo com o passo a passo.', media_url: video.url, media_caption: video.caption || null, enviar_apos: new Date(cursor).toISOString() });
     cursor += rand(1_500, 3_000);
   }
   for (const b of bolhas) {
@@ -1565,7 +1579,7 @@ async function fazerHandoff(admin: Admin, sessao: Sessao, canal: Record<string, 
       const destino = ident?.valor_normalizado ?? null;
       if (destino) {
         const tx = enviadorDe(canal as { transporte?: string; instancia_externa?: string });
-        const sent = await tx.sendText(destino, bolhasFallback[0]);
+        const sent = await tx.sendText(destino, removerEmoji(bolhasFallback[0]));
         if (sent?.key?.id) {
           await admin.from('mensagens').insert({
             organizacao_id: sessao.organizacao_id, conversa_id: sessao.conversa_id, direcao: 'saida', tipo: 'texto',
