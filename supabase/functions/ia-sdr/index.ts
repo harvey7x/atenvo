@@ -708,8 +708,13 @@ async function etapaQualificacao(ctx: Ctx): Promise<Turno> {
   // RETOMADA (backfill de leads parados): a pessoa completou o fluxo há dias e ninguém deu
   // continuidade — a abertura reconhece a demora com leveza e retoma com energia.
   const ehRetomada = ctx.dados.retomada === true;
+  const ehAbandono = ctx.dados.retomada_abandono === true;
   const dias = Number(ctx.dados.retomada_dias ?? 0) || 0;
-  const instrAbertura = ehRetomada
+  const instrAbertura = ehAbandono
+    // ABANDONO: começou a conversa (veio de um anúncio) mas não terminou. NÃO presuma "solicitação
+    // pronta" — a pessoa não concluiu nada. Abra leve, sem cobrança, retomando de onde parou.
+    ? `Esta pessoa começou uma conversa com a CAF sobre empréstimo/análise ${dias <= 1 ? 'há pouco' : `há ${dias} dias`} mas não chegou a terminar. Reabra com muita leveza, SEM cobrar e SEM dizer que ela "solicitou" ou que "está pronto": apenas retome com simpatia, reidentifique-se ("aqui é do atendimento da CAF"), diga que ficou de ajudar a pessoa e faça a pergunta do benefício do INSS para dar continuidade, se ela quiser. Se a pessoa demonstrar que não tem interesse, encerre com educação (dados_extraidos.recebe_inss="nao").`
+    : ehRetomada
     ? `Esta é uma RETOMADA: a pessoa fez a solicitação ${dias <= 1 ? 'há pouco tempo' : `há ${dias} dias`} e a nossa equipe demorou a dar continuidade. Abra pedindo desculpa LEVE pela demora (uma meia frase, sem drama), diga que está retomando a solicitação dela para dar continuidade, e faça a pergunta do benefício. Reidentifique-se ("aqui é do atendimento da CAF").`
     : 'Este é o SEU primeiro contato (abertura da etapa): cumprimente de leve e faça a pergunta do benefício.';
   const r = await conversar(ctx, {
