@@ -41,9 +41,11 @@ export function FichaJudicialBox({ contatoId, oportunidadeId, conversaId, canalI
   const vinculos = { organizacaoId: currentOrg.id, contatoId, oportunidadeId, conversaId: conversaId ?? null, canalId: canalId ?? null };
 
   async function copiar(f: FichaJudicial) {
+    // A senha do Meu INSS não é gravada no texto_ficha; injeta na linha "INSS:" ao copiar.
+    const texto = f.senhaInss ? f.textoFicha.replace(/^INSS:.*$/m, `INSS: ${f.senhaInss}`) : f.textoFicha;
     try {
-      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(f.textoFicha);
-      else { const ta = document.createElement('textarea'); ta.value = f.textoFicha; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); }
+      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(texto);
+      else { const ta = document.createElement('textarea'); ta.value = texto; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); }
       toast('Ficha copiada para a área de transferência.');
     } catch { toast('Não foi possível copiar.', 'warn'); }
   }
