@@ -17,6 +17,7 @@ import { analisarNome, conversaAtiva, decidirDono, decidirNome, estadoHigiene, t
 import { construirItensConversa } from '@/lib/dataConversa';
 import { canalValidoParaEnvio } from '@/lib/agendamentoMensagem';
 import { useAgendarSequencia, useMensagensAgendadas, useEditarAgendamento, useCancelarAgendamento, type MensagemAgendada } from '@/data/whatsapp';
+import { useIaEstadoConversa, useIaToggle } from '@/data/whatsapp';
 import { useJanelaCanal, rotuloJanela } from '@/data/cloudApi';
 import { AgendarMensagemModal, type AgendarSubmit } from '@/components/AgendarMensagemModal';
 import { HIGIENE_CORTE_ISO, HIGIENE_DIAS_ADAPTACAO } from '@/config/higiene';
@@ -446,6 +447,18 @@ export function WhatsApp() {
   const editarMut = useEditarAgendamento();
   const cancelarMut = useCancelarAgendamento();
   const agendadasQ = useMensagensAgendadas(current.id || null);
+  const iaEstadoQ = useIaEstadoConversa(current.id || null);
+  const iaEstado = iaEstadoQ.data;
+  const iaToggle = useIaToggle();
+  // IA "no comando" = tem sessão, ativa e não desligada manualmente
+  const iaAtiva = !!iaEstado?.existe && iaEstado.status === 'ativa' && !iaEstado.desativado_manual;
+  async function alternarIa() {
+    if (!current.id || iaToggle.isPending) return;
+    try {
+      await iaToggle.mutateAsync({ conversaId: current.id, ativar: !iaAtiva });
+      toast(iaAtiva ? 'IA desativada nesta conversa' : 'IA ativada nesta conversa', 'ok');
+    } catch (e) { toast((e as Error).message || 'Falha ao alternar a IA', 'warn'); }
+  }
   const agendadas = agendadasQ.data ?? [];
   // canais válidos para envio (conectado, ativo, não restrito/conflito/removido)
   const canaisAgendaveis = realCanais.filter((c) => canalValidoParaEnvio({
@@ -1191,6 +1204,15 @@ export function WhatsApp() {
                       title={current.arquivada ? 'Desarquivar conversa' : 'Arquivar conversa'}
                       onClick={() => arquivarConversa(!current.arquivada)}>
                 <IcArchive /><span>{current.arquivada ? 'Desarquivar' : 'Arquivar'}</span>
+              </button>
+            )}
+            {current.id && (iaEstado?.existe || iaAtiva) && (
+              <button className={'ch-resp-btn ch-ia' + (iaAtiva ? ' on' : '')} disabled={iaToggle.isPending}
+                      title={iaAtiva
+                        ? `IA atendendo${iaEstado?.etapa ? ` (etapa: ${iaEstado.etapa})` : ''} — clique para o humano assumir`
+                        : (iaEstado?.aguardando_humano ? 'IA aguardando você assumir — clique para reativar a IA' : 'Ativar a IA nesta conversa')}
+                      onClick={alternarIa}>
+                <span aria-hidden>🤖</span><span>{iaAtiva ? 'IA ligada' : 'IA desligada'}</span>
               </button>
             )}
             <button className={'icon-btn' + (foco ? ' on' : '')} title="Modo de foco (Esc para sair)" onClick={() => setFoco((v) => !v)}><IcFocus /></button>

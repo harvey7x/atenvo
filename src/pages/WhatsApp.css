@@ -503,6 +503,10 @@
 .wa-app .ch-resp-btn.primary{background:var(--green);border-color:var(--green);color:#fff}
 .wa-app .ch-resp-btn:disabled{opacity:.6;cursor:default}
 .wa-app .ch-resp-btn svg{width:15px;height:15px;flex:none}
+/* toggle da IA: verde quando ligada, neutro quando desligada */
+.wa-app .ch-resp-btn.ch-ia.on{background:var(--green);border-color:var(--green);color:#fff}
+.wa-app .ch-resp-btn.ch-ia:not(.on){opacity:.85}
+.wa-app .ch-resp-btn.ch-ia:not(.on):hover:not(:disabled){opacity:1}
 @media (max-width:1280px){ .wa-app .ch-resp-btn span{display:none} .wa-app .ch-resp-btn{padding:8px} }
 
 /* modal de transferência */
