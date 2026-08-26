@@ -415,6 +415,32 @@ export function useWaMensagens(conversaId: string | null | undefined) {
   });
 }
 
+// ---- IA SDR: estado e liga/desliga por conversa (botão no cabeçalho do inbox) ----
+export interface IaEstadoConversa { existe: boolean; status?: string; etapa?: string; desativado_manual?: boolean; aguardando_humano?: string | null }
+export function useIaEstadoConversa(conversaId: string | null | undefined) {
+  return useQuery({
+    queryKey: ['ia-estado', conversaId ?? ''],
+    enabled: WA_REAL && !!conversaId,
+    refetchInterval: 20_000,   // a IA muda de estado sozinha (pausa/handoff) — mantém o botão fresco
+    queryFn: async (): Promise<IaEstadoConversa> => {
+      const { data, error } = await supabase!.rpc('ia_conversa_estado', { p_conversa: conversaId! });
+      if (error) throw new Error(error.message);
+      return (data as IaEstadoConversa) ?? { existe: false };
+    },
+  });
+}
+export function useIaToggle() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ conversaId, ativar }: { conversaId: string; ativar: boolean }) => {
+      const { data, error } = await supabase!.rpc('ia_conversa_toggle', { p_conversa: conversaId, p_ativar: ativar });
+      if (error) throw new Error(error.message);
+      return data as { ok: boolean; ia: string };
+    },
+    onSettled: (_d, _e, v) => { qc.invalidateQueries({ queryKey: ['ia-estado', v.conversaId] }); },
+  });
+}
+
 export function useSendWaMessage() {
   const { currentOrg } = useOrg();
   const qc = useQueryClient();
