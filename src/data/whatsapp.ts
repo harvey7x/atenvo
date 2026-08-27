@@ -97,6 +97,7 @@ const TIPOS_MIDIA = ['imagem', 'audio', 'video', 'documento'];
 interface DbConv {
   id: string; status: string; status_id: string | null; nao_lidas: number | null; ultima_interacao_em: string | null; criado_em: string | null;
   precisa_humano: boolean | null;
+  precisa_humano_motivo: string | null; precisa_humano_em: string | null;
   atendente_id: string | null;
   etiquetas: string[] | null;
   ultimo_canal_id: string | null; ultimo_numero: string | null; ultimo_provider: string | null; ultima_msg_canal_em: string | null;
@@ -193,6 +194,9 @@ function mapConversa(c: DbConv): WaContact {
     semDestino: !temPn,
     arquivada: !!c.arquivada_em,
     precisaHumano: !!c.precisa_humano,
+    // por que a IA pediu humano e quando — vira o evento de handoff no fio da conversa
+    precisaHumanoMotivo: c.precisa_humano_motivo ?? null,
+    precisaHumanoEm: c.precisa_humano_em ?? null,
     fixada: !!c.fixada_em,
     silenciada: !!c.silenciada_ate && new Date(c.silenciada_ate).getTime() > Date.now(),
     criadaEm: c.criado_em ?? null,
@@ -306,7 +310,7 @@ export function useWaConversations() {
         // canais!conversas_canal_id_fkey: desambigua o embed (há 2 FKs p/ canais: canal_id e ultimo_canal_id).
         // NÃO embutimos conversa_status_def aqui: a cor/nome do status é resolvida no cliente via useStatusDefs
         // (mantém o inbox funcional mesmo que a tabela auxiliar fique inacessível por grant).
-        .select('id, status, status_id, nao_lidas, ultima_interacao_em, criado_em, precisa_humano, atendente_id, etiquetas, ultimo_canal_id, ultimo_numero, ultimo_provider, ultima_msg_canal_em, arquivada_em, fixada_em, silenciada_ate, ultima_lida_em, contatos!inner(id, nome, telefone, email, etiquetas, origem, observacoes, responsavel_id, contato_identidades(tipo)), canais!conversas_canal_id_fkey!inner(id, nome_interno, tipo), mensagens(id, direcao, conteudo, tipo, enviada_em, recebida_em, criado_em, origem, status, erro_envio, id_externo, respondida_a_id, metadados)')
+        .select('id, status, status_id, nao_lidas, ultima_interacao_em, criado_em, precisa_humano, precisa_humano_motivo, precisa_humano_em, atendente_id, etiquetas, ultimo_canal_id, ultimo_numero, ultimo_provider, ultima_msg_canal_em, arquivada_em, fixada_em, silenciada_ate, ultima_lida_em, contatos!inner(id, nome, telefone, email, etiquetas, origem, observacoes, responsavel_id, contato_identidades(tipo)), canais!conversas_canal_id_fkey!inner(id, nome_interno, tipo), mensagens(id, direcao, conteudo, tipo, enviada_em, recebida_em, criado_em, origem, status, erro_envio, id_externo, respondida_a_id, metadados)')
         .eq('organizacao_id', orgId)
         .eq('canais.tipo', 'whatsapp')
         // PERF: o embed de mensagens NÃO tinha limite — trazia TODAS as mensagens de TODAS as

@@ -79,6 +79,10 @@ export interface WaContact {
   semDestino?: boolean;
   /** SLA (S4.2): conversa marcada como "precisa de atendimento humano". */
   precisaHumano?: boolean;
+  /** Por que a IA pediu humano (conversas.precisa_humano_motivo — slug) e quando (…_em, ISO):
+   *  alimentam o evento de handoff no fio da conversa aberta. */
+  precisaHumanoMotivo?: string | null;
+  precisaHumanoEm?: string | null;
   /** IA/bot atendendo esta conversa AGORA (ia_sessoes.status='ativa' && !desativado_manual) —
    *  MESMA fórmula do botão do cabeçalho. Chega pela lista via fetch paralelo (padrão etapasPorContato). */
   iaAtiva?: boolean;
@@ -151,7 +155,7 @@ export const WA_CONTACTS: WaContact[] = [
   },
   {
     id: 'marina', name: 'Marina Lopes', phone: '(11) 99888-4455', chip: 'Chip 1', time: '09:15', unread: 2,
-    iaStatus: 'pausada', iaEtapa: 'extratos', iaAguardando: 'auxilio_extratos', precisaHumano: true,
+    iaStatus: 'pausada', iaEtapa: 'extratos', iaAguardando: 'auxilio_extratos', precisaHumano: true, precisaHumanoMotivo: 'auxilio_extratos',
     tabs: ['todos', 'meus', 'pendentes'], status: 'Em atendimento',
     last: 'Enviei os documentos solicitados conforme combinado.',
     email: 'marina.lopes@email.com', stage: 'Em análise', resp: 'Henrique', origin: 'WhatsApp — Chip 1',
@@ -175,7 +179,7 @@ export const WA_CONTACTS: WaContact[] = [
   },
   {
     id: 'juliana', name: 'Juliana M.', phone: '(11) 99222-1188', chip: 'Chip 3', time: 'Ontem', unread: 1,
-    iaStatus: 'handoff', iaEtapa: 'extratos', iaAguardando: 'sem_acesso_govbr', precisaHumano: true,
+    iaStatus: 'handoff', iaEtapa: 'extratos', iaAguardando: 'sem_acesso_govbr', precisaHumano: true, precisaHumanoMotivo: 'sem_acesso_govbr',
     tabs: ['todos', 'meus', 'pendentes'], status: 'Em atendimento',
     last: 'Preciso de uma atualização sobre meu processo.',
     email: 'juliana.m@email.com', stage: 'Em processo', resp: 'Henrique', origin: 'WhatsApp — Chip 3',

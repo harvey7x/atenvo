@@ -15,7 +15,7 @@ import { useCobrancas } from '@/data/cobrancas';
 import { corDaEtiqueta, podeGerenciarAtendimento, PALETA_CORES, type AssinaturaModo } from '@/types/atendimento';
 import { textoBloqueio, analisarNome, conversaAtiva } from '@/lib/higieneConversa';
 import { responsavelEfetivo } from '@/lib/conversaEtiquetas';
-import { construirItensConversa } from '@/lib/dataConversa';
+import { construirItensConversa, type ItemConversa } from '@/lib/dataConversa';
 import { canalValidoParaEnvio } from '@/lib/agendamentoMensagem';
 import { initials } from '@/lib/avatar';
 import { useAuth } from '@/context/AuthContext';
@@ -759,6 +759,33 @@ export default function WhatsAppV2() {
   // itens do fio memoizados: construirItensConversa formata Intl.DateTimeFormat por mensagem;
   // sem memo isso refazia a cada tecla do composer / tick de 60s. Só depende das mensagens.
   const itensConversa = useMemo(() => construirItensConversa(current.msgs, (m) => m.tsISO ?? null), [current.msgs]);
+  // ---- PEÇA 3: HANDOFF como EVENTO no fio ----
+  // "A IA pediu um humano" é o alerta operacional crítico — entra como DIVISOR no ponto
+  // certo do fluxo: antes da primeira mensagem após precisa_humano_em; sem timestamp (ou
+  // sendo o último evento), ao fim do fio. Item sintético só de exibição — nenhuma
+  // semântica muda. Fica de pé enquanto o pedido está de pé (conversas.precisa_humano OU
+  // sessão de IA em handoff/aguardando humano).
+  const handoffAtivo = !!current.id && (!!current.precisaHumano || iaBar?.status === 'handoff' || !!iaBar?.aguardando_humano);
+  const handoffMotivo = motivoHumanoLabel(current.precisaHumanoMotivo) ?? iaBarMotivo;
+  const handoffHora = current.precisaHumanoEm
+    ? new Date(current.precisaHumanoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' })
+    : null;
+  const itensFio = useMemo((): (ItemConversa<WaMessage> | { tipo: 'handoff'; chave: string })[] => {
+    if (!handoffAtivo) return itensConversa;
+    const ev = { tipo: 'handoff' as const, chave: 'handoff-' + current.id };
+    const em = current.precisaHumanoEm ? Date.parse(current.precisaHumanoEm) : NaN;
+    if (Number.isFinite(em)) {
+      const idx = itensConversa.findIndex((it) => {
+        if (it.tipo !== 'msg') return false;
+        const ts = it.msg.tsISO ? Date.parse(it.msg.tsISO) : NaN;
+        return Number.isFinite(ts) && ts >= em;
+      });
+      // insere ANTES da primeira mensagem posterior ao pedido (o separador de dia dela,
+      // se houver, fica acima — o handoff pertence àquele dia)
+      if (idx >= 0) return [...itensConversa.slice(0, idx), ev, ...itensConversa.slice(idx)];
+    }
+    return [...itensConversa, ev];
+  }, [itensConversa, handoffAtivo, current.id, current.precisaHumanoEm]);
 
   /* ---------- popovers em portal (regra 10) ---------- */
   const raizPop = useMemo(() => {
@@ -1167,8 +1194,18 @@ export default function WhatsAppV2() {
 
             {/* tom levíssimo enquanto a IA atende: o atendente está ASSISTINDO uma conversa automática */}
             <div className={'wa-msgs' + (iaBarAtiva ? ' ia-on' : '')} ref={msgsRef}>
-              {itensConversa.map((item, i) =>
-                item.tipo === 'sep' ? (
+              {itensFio.map((item, i) =>
+                item.tipo === 'handoff' ? (
+                  /* PEÇA 3 — o alerta salta no fio: âmbar semântico, sóbrio, no ponto do handoff */
+                  <div className="wa-handoff" key={item.chave} role="alert">
+                    <span className="ic" aria-hidden>⚠️</span>
+                    <span className="tt">
+                      <b>A IA pediu um humano</b>
+                      {handoffMotivo && <> — {handoffMotivo}</>}
+                      {handoffHora && <span className="hh num"> · {handoffHora}</span>}
+                    </span>
+                  </div>
+                ) : item.tipo === 'sep' ? (
                   <div className="dia" key={'sep-' + i}>{item.label}</div>
                 ) : (
                   <Bolha

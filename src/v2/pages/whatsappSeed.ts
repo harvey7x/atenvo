@@ -43,6 +43,7 @@ export function seedWa(): WaContact[] {
       id: 'wa-jose', name: 'José Carlos Ferreira', phone: '5551987770001', contatoId: 'wa-jose-ct',
       time: '14:02', unread: 1, lastAtMs: agora - 58 * min, aguardando: true, aguardandoDesde: iso(agora - 58 * min),
       etapa: 'EM ATENDIMENTO', respId: null, chip: 'LUIZA', iaStatus: 'pausada', iaEtapa: 'extratos', iaAguardando: 'auxilio_senha', precisaHumano: true,
+      precisaHumanoMotivo: 'auxilio_senha', precisaHumanoEm: iso(agora - 57 * min),
       last: 'Não consegui entrar no aplicativo…', lastInter: 'há 58 min', tags: ['Revisão de contrato'],
       msgs: [
         IN('Não consegui entrar no aplicativo do banco, moço.', '14:02', { tsISO: iso(agora - 58 * min), id: 'wj-1' }),
@@ -56,6 +57,7 @@ export function seedWa(): WaContact[] {
       id: 'wa-ivone', name: 'Ivone Castro dos Santos', phone: '5551987770009', contatoId: 'wa-ivone-ct',
       time: '14:22', unread: 0, lastAtMs: agora - 18 * min, respId: 'u-mock',
       etapa: 'EM ATENDIMENTO', iaStatus: 'handoff', iaEtapa: 'extratos', iaAguardando: 'sem_acesso_govbr', precisaHumano: true,
+      precisaHumanoMotivo: 'sem_acesso_govbr', precisaHumanoEm: iso(agora - 26 * min),
       last: 'Ah, que bom! Obrigada, meu filho', lastInter: 'há 18 min', tags: ['Revisão de contrato'],
       msgs: [
         IN('Boa tarde! Quero ver isso dos descontos no meu benefício', '13:50', { tsISO: iso(agora - 32 * min), id: 'wi-1' }),
