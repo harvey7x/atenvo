@@ -55,10 +55,12 @@ const DEBOUNCE_MS = 7_000;                      // espelha o trigger. 7s: agrupa
                                                // manda 2-3 seguidas) e responde tudo junto, sem duplicar turno.
 const REAGENDA_FALHA_MS = 90_000;
 const MAX_FALHAS_TECNICAS = 5;
-// follow-up de reengajamento (escada de 3 toques, pesquisa 25/08): 1º = timing por tipo de etapa
-// (resposta simples 15min; foto 45min; tarefa pela metade 20min; Meu INSS 60min); 2º = ~3h depois
-// mudando o ângulo; 3º = manhã seguinte, porta aberta. Depois: episódio encerrado.
-const NUDGE_MAX = 3;
+// follow-up de RECUPERAÇÃO (escada de 4 toques, estratégia do dono 27/08 — atrair com valor, depois
+// pressão): 1º = timing por tipo de etapa (resposta simples 15min; foto 45min; tarefa pela metade
+// 20min; Meu INSS 60min) — isca de valor + destrava o pendente; 2º = ~3h depois — as três frentes
+// (liberar valor / margem / juros); 3º = manhã seguinte — reforço (pronto, sem compromisso); 4º =
+// manhã seguinte+1 — fecho de pressão REAL (cancelar o atendimento). Depois: episódio encerrado.
+const NUDGE_MAX = 4;
 // Cadeia de fallback quando o modelo do turno está sobrecarregado (503) — capacidade diferente.
 const FALLBACK_MODELOS = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-flash-latest'];
 
@@ -748,9 +750,9 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
       // o handler pediu outro turno em breve (ex.: abertura da triagem reprovou na verificação)
       await agendarProximo(admin, sessao.id, claimAte, new Date(Date.now() + t.reagendarMs).toISOString());
     } else {
-      // agenda a RETOMADA se o lead esfriar (escada: 1º por tipo de etapa, 2º ~3h, 3º manhã
-      // seguinte; depois o episódio encerra). Sem retomada quando: colega já chamado,
-      // pós-conclusão, ou teto de toques atingido.
+      // agenda a RECUPERAÇÃO se o lead esfriar (escada de 4 toques: 1º por tipo de etapa, 2º ~3h,
+      // 3º e 4º em manhãs consecutivas — proximaManhaNudge recalcula no disparo; depois o episódio
+      // encerra). Sem retomada quando: colega já chamado, pós-conclusão, ou teto de toques atingido.
       const dadosFinais = patch.dados as Record<string, unknown>;
       const etapaFinal = (patch.etapa as string) ?? sessao.etapa;
       const nFinal = Number(dadosFinais.nudge_n ?? 0) || 0;
