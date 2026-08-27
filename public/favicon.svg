@@ -1,4 +1,29 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none">
-  <circle cx="17" cy="21" r="12.8" fill="none" stroke="#19c37d" stroke-width="3.7" stroke-linecap="round" stroke-dasharray="72 9" transform="rotate(-52 17 21)"/>
-  <polygon points="30.5,4 32.3,9.2 37.5,11 32.3,12.8 30.5,18 28.7,12.8 23.5,11 28.7,9.2" fill="#19c37d"/>
+<svg viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#08090D"/>
+      <stop offset=".52" stop-color="#0B1322"/>
+      <stop offset=".82" stop-color="#1E3E85"/>
+      <stop offset="1" stop-color="#3E7BF0"/>
+    </linearGradient>
+    <radialGradient id="glow" cx=".5" cy="1.05" r=".78">
+      <stop offset="0" stop-color="#66A3FF" stop-opacity=".8"/>
+      <stop offset=".55" stop-color="#3E7BF0" stop-opacity=".26"/>
+      <stop offset="1" stop-color="#3E7BF0" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="seta" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#B6C8EC"/>
+    </linearGradient>
+    <linearGradient id="dia" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#EAF1FF"/>
+      <stop offset="1" stop-color="#96B5EA"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="248" height="248" rx="58" fill="url(#bg)"/>
+  <rect x="4" y="4" width="248" height="248" rx="58" fill="url(#glow)"/>
+  <rect x="5.5" y="5.5" width="245" height="245" rx="56.5" fill="none" stroke="rgba(255,255,255,.13)" stroke-width="1.5"/>
+  <circle cx="128" cy="128" r="86" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="1.5"/>
+  <path d="M128 50 L196 196 L128 150 L60 196 Z" fill="url(#seta)"/>
+  <path d="M128 166 L154 188 L128 226 L102 188 Z" fill="url(#dia)"/>
 </svg>

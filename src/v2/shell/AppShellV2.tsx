@@ -8,6 +8,7 @@ import '../tokens.css';
 import '../base.css';
 import './shell.css';
 import '../skinAurora.css'; // TESTE (branch teste/skin-aurora-azul): fundo bokeh + azul secundário
+import { LogoAtenvo } from '../components/LogoAtenvo';
 import { instalarSpotlight } from '../lib/spotlight';
 import { criarRaizPortalV2 } from '../components/portal';
 import { ICONES } from './icones';
@@ -226,7 +227,7 @@ export default function AppShellV2() {
       <div className="p-app">
         <aside className="p-sidebar" ref={sidebarRef}>
           <div className="p-logo">
-            <div className="marca">A</div>
+            <LogoAtenvo className="marca" />
             <span className="word lab">atenvo</span>
           </div>
           <div className="tenant" title={org}>

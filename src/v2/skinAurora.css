@@ -21,13 +21,14 @@
 }
 
 /* --- 1. FUNDO BOKEH (fixo, atrás de tudo) -------------------
-   âmbar quente no canto inferior-direito (como a referência),
-   azul frio no topo-esquerdo, violeta e azul de apoio no meio. */
+   Família FRIA, coerente com a identidade azul (a marca tem bloom
+   azul): azul profundo no canto inferior-direito, azul frio no
+   topo-esquerdo, violeta e azul de apoio no meio. */
 :root:not([data-tema="light"]) .v2.app-v2 {
   background:
-    radial-gradient(52% 46% at 86% 94%, rgba(216, 148, 62, .16), transparent 68%),
-    radial-gradient(46% 42% at 6% 4%, rgba(var(--azul-rgb), .13), transparent 66%),
-    radial-gradient(38% 44% at 76% 10%, rgba(126, 96, 224, .08), transparent 70%),
+    radial-gradient(52% 46% at 86% 94%, rgba(58, 110, 232, .17), transparent 68%),
+    radial-gradient(46% 42% at 6% 4%, rgba(var(--azul-rgb), .12), transparent 66%),
+    radial-gradient(38% 44% at 76% 10%, rgba(126, 96, 224, .09), transparent 70%),
     radial-gradient(34% 38% at 36% 72%, rgba(var(--azul-rgb), .06), transparent 70%),
     var(--base);
 }

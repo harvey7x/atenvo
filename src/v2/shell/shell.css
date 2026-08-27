@@ -68,11 +68,11 @@
 }
 .v2 .p-sidebar:hover .lab, .v2 .p-sidebar:focus-within .lab { opacity: 1; transform: none; }
 .v2 .p-logo { display: flex; align-items: center; gap: 11px; padding: 2px 4px 0; height: 30px; }
+/* marca = SVG LogoAtenvo (o desenho traz o próprio fundo/raio; o CSS só dimensiona
+   e dá o glow azul da identidade) */
 .v2 .p-logo .marca {
-  width: 29px; height: 29px; flex-shrink: 0; border-radius: 9px;
-  background: linear-gradient(180deg, #FFF, #C9CDD4); color: #0E0F12;
-  display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px;
-  box-shadow: 0 6px 18px rgba(var(--tint), calc(.12 * var(--fx))), inset 0 1px 0 #fff;
+  width: 29px; height: 29px; flex-shrink: 0; display: block;
+  filter: drop-shadow(0 5px 14px rgba(62, 123, 240, calc(.4 * var(--fx))));
 }
 .v2 .p-logo .word { font-weight: 600; font-size: 15px; letter-spacing: .02em; }
 .v2 .tenant {
@@ -294,7 +294,7 @@
 }
 :root[data-tema="light"] .v2 .sb-sombra { box-shadow: 30px 0 80px rgba(22, 25, 31, .14); }
 /* logo: metal claro do dark → grafite no claro (a marca sobrevive sobre a sidebar clara) */
-:root[data-tema="light"] .v2 .p-logo .marca { background: linear-gradient(180deg, #3C424B, #23272E); color: #F4F5F7; }
+/* marca SVG: mesmo desenho nos dois temas (ícone escuro com glow lê bem no claro) */
 /* item ativo: texto e trilho brancos → tinta/accent escuros no claro */
 :root[data-tema="light"] .v2 .item.on { color: var(--txt); }
 :root[data-tema="light"] .v2 .item.on::before { background: var(--accent); box-shadow: none; }

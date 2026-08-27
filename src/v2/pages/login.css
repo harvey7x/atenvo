@@ -20,11 +20,10 @@
 }
 .v2 .lg-card { position: relative; width: 372px; padding: 30px 30px 24px; border-radius: 18px; }
 /* cabeçalho centrado (Adendo nº 1) */
+/* marca = SVG LogoAtenvo (desenho com fundo/raio próprios; aqui só tamanho + glow) */
 .v2 .lg-card .marca2 {
-  width: 42px; height: 42px; border-radius: 12px; margin: 0 auto 18px;
-  background: linear-gradient(180deg, #FFF, #C9CDD4); color: #0E0F12;
-  display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 19px;
-  box-shadow: 0 10px 30px rgba(var(--tint), calc(.14 * var(--fx))), inset 0 1px 0 #fff;
+  width: 42px; height: 42px; margin: 0 auto 18px; display: block;
+  filter: drop-shadow(0 8px 22px rgba(62, 123, 240, calc(.45 * var(--fx))));
 }
 .v2 .lg-card > .caps { display: block; text-align: center; }
 .v2 .lg-card h1 { margin: 9px 0 4px; font-size: 27px; text-align: center; }
@@ -80,4 +79,4 @@
 
 /* TEMA LIGHT — Login (Adendo nº 6): a marca prata clara vira grafite no claro
    (o display .p-display já foi corrigido na base). Dark inalterado. */
-:root[data-tema="light"] .v2 .lg-card .marca2 { background: linear-gradient(180deg, #3C424B, #23272E); color: #F4F5F7; }
+/* marca2 SVG: mesmo desenho nos dois temas */
