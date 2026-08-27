@@ -143,39 +143,29 @@ Logo depois desta mensagem, um atendente assume a conversa com prioridade.`;
 // Escada de 3 toques (pesquisa 25/08): 1º = retomar o pendente pelo nome; 2º (~3h) = remover
 // obstáculo mudando o ângulo; 3º (manhã seguinte) = porta aberta e encerra o episódio.
 const NUDGE_BASE = `REGRAS DO TOQUE (todas duras):
-- UMA bolha, no máximo ~200 caracteres. UM foco só, terminando com UMA pergunta fechada e fácil (sim/não) — nunca pergunta aberta ("como podemos prosseguir?").
-- Trate a pessoa pelo NOME e faça UMA referência a algo que ela mesma disse antes — golpista não conhece o histórico; é a sua prova de legitimidade. Se já passaram horas, reidentifique-se em meia frase ("Aqui é do atendimento da CAF").
-- Assuma sempre que a pessoa está OCUPADA, nunca que desistiu. Se ela mandou METADE de uma tarefa (ex.: só a frente do RG), agradeça o recebido e nomeie exatamente o que falta. Se combinou um horário, referencie o combinado com naturalidade.
-- LIMITES QUE NUNCA CAEM (mesmo atraindo com valor): nada de número/cifra, taxa, percentual específico, prazo de liberação, nome de banco/financeira, "aprovado/reprovado". Fale em "liberar um valor" SEM quantia.
-- PROIBIDO (mata a conversa ou soa golpe): culpar ("o senhor não respondeu", "ainda está aí?"), "?" solto, "só passando para lembrar", "estou no aguardo", urgência FALSA ("última chance", "só hoje", "promoção acaba"), pedir dado NOVO que ainda não foi pedido, mandar link. Na etapa dos extratos, se fizer sentido, lembre: a gente NUNCA pede a senha de ninguém.
+- UMA bolha, no máximo ~200 caracteres. UM pedido só, terminando com UMA pergunta fechada e fácil (sim/não) — nunca pergunta aberta ("como podemos prosseguir?").
+- Cite o item pendente pelo NOME exato ("o RG", "a conta de luz", "o extrato do Meu INSS") e faça UMA referência a algo que a própria pessoa disse antes — golpista não conhece o histórico; isso é sua prova de legitimidade.
+- Paciência explícita ("sem pressa", "no seu tempo"). Assuma sempre que a pessoa está OCUPADA, nunca que desistiu.
+- Se ela mandou METADE de uma tarefa (ex.: só a frente do RG), agradeça o recebido e nomeie exatamente o que falta.
+- Se ela tinha combinado um horário ("mando à tarde"), referencie o combinado com naturalidade.
+- Se já passaram horas desde a sua última mensagem, reidentifique-se em meia frase ("Aqui é do atendimento da CAF").
+- PROIBIDO (mata a conversa ou soa golpe): cobrar/culpar ("o senhor não respondeu", "ainda está aí?"), "?" solto, "só passando para lembrar", "estou no aguardo", urgência artificial ("última chance", "só hoje"), prometer valor para puxar resposta, pedir dado NOVO, mandar link. Na etapa dos extratos, se fizer sentido, lembre: a gente NUNCA pede a senha de ninguém.
 - Sem emoji neste toque (a CAF não usa emoji).`;
 
-// Estratégia de RECUPERAÇÃO (dono, 27/08): atrair o lead frio com VALOR (isca) nos toques 1-3 e, se
-// não voltar, fechar com PRESSÃO REAL (cancelar o atendimento) no 4º. A isca de valor SOBREPÕE, só
-// nestes toques, a regra geral da persona de "não citar valores / não prometer resultado".
-const OVERRIDE_VALOR = `EXCEÇÃO DESTE TOQUE (sobrepõe a regra geral da persona de não antecipar valores): aqui você RECUPERA um lead que esfriou. Você PODE, direto e confiante: (1) dizer que a análise do perfil dela mostra que dá pra liberar um valor pra ela; (2) citar as frentes da CAF como serviços — liberar um valor novo, aumentar a margem, reduzir os juros dos empréstimos que ela já tem. Continua PROIBIDO: número/cifra, taxa ou percentual específico, prazo, banco, "aprovado". É isca de valor, não cotação.`;
 export function instrucaoNudge(n: number): string {
   if (n <= 1) {
-    return `TURNO DE RECUPERAÇÃO — 1º toque (a pessoa esfriou; ATRAIA com valor, jamais cobre):
+    return `TURNO DE RETOMADA — 1º toque (a pessoa parou de responder):
 ${NUDGE_BASE}
-${OVERRIDE_VALOR}
-- Ângulo: abra com a NOTÍCIA BOA da análise (dá pra liberar um valor pra ela) e amarre o item pendente como o ÚLTIMO passo pra destravar isso ("pra fechar a conferência falta só o RG"). Feche perguntando se ela consegue mandar. O valor é a isca; o pedido vem leve, colado nele.`;
+- Ângulo deste toque: retomar o pendente pelo nome e FACILITAR ("conta de luz ou de água serve", "pode ser foto da galeria").`;
   }
   if (n === 2) {
-    return `TURNO DE RECUPERAÇÃO — 2º toque (siga atraindo; mude o ângulo, NUNCA repita o 1º toque):
+    return `TURNO DE RETOMADA — 2º toque (a pessoa segue quieta; mude o ângulo, NUNCA repita o 1º toque):
 ${NUDGE_BASE}
-${OVERRIDE_VALOR}
-- Ângulo: mostre o LEQUE do que a CAF pode fazer por ela, escolhendo pelo histórico o que faz sentido: liberar um valor novo, aumentar a margem, e reduzir os juros dos empréstimos que ela já tem. Posicione como algo feito PRA ELA. Feche perguntando se quer que você siga com a análise dela.`;
+- Ângulo deste toque: REMOVER OBSTÁCULO — ofereça um caminho mais fácil para o item pendente (ajuda passo a passo, ajuda de um familiar, ou um colega da equipe ligar para ajudar). É oferta de ajuda, não cobrança.`;
   }
-  if (n === 3) {
-    return `TURNO DE RECUPERAÇÃO — 3º toque (reforço de valor antes do fecho; mude o ângulo):
+  return `TURNO DE RETOMADA — 3º e ÚLTIMO toque (manhã seguinte; encerra o episódio com elegância):
 ${NUDGE_BASE}
-${OVERRIDE_VALOR}
-- Ângulo: diga que a análise dela já está PRONTA esperando, que é rápido e SEM COMPROMISSO nenhum — tira o peso e a desconfiança. Reforce o benefício mais forte pro caso dela. Feche perguntando se pode dar sequência.`;
-  }
-  return `TURNO DE RECUPERAÇÃO — 4º e ÚLTIMO toque (fecho de PRESSÃO honesto):
-${NUDGE_BASE}
-- Ângulo: como não houve retorno depois de tudo, diga com respeito que vai precisar ENCERRAR o atendimento dela e liberar a vaga na fila (é verdade — sem retorno, encerra de fato). Feche com a escolha binária: pode cancelar OU ela prefere seguir com a análise? É perda REAL, não ameaça vazia — sem drama, sem "última chance", sem repetir as ofertas.`;
+- Ângulo deste toque: PORTA ABERTA, sem pedido pesado — está tudo salvo até aqui, não tem pressa nenhuma, e quando a pessoa quiser continuar é só mandar um oi que você segue exatamente de onde pararam.`;
 }
 
 // Nota extra do modo ACOMPANHAMENTO: um colega humano já foi chamado, mas a IA NÃO emudece —
