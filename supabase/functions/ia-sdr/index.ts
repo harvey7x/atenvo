@@ -100,7 +100,7 @@ interface Sessao {
   tentativas_erro: number; ultima_msg_cliente_em: string | null; processar_apos: string | null;
   status: string; criado_em: string;
 }
-interface MsgNova { id: string; tipo: string; conteudo: string | null; criado_em: string; metadados: Record<string, unknown> | null }
+interface MsgNova { id: string; tipo: string; conteudo: string | null; criado_em: string; metadados: Record<string, unknown> | null; id_externo: string | null }
 interface Modelos { chat: string; docs: string; pro: string }
 
 interface Turno {
@@ -492,7 +492,7 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
   const corteSobrepos = new Date(Date.parse(processadoAte) - 5_000).toISOString();
   const vistas = new Set<string>(Array.isArray(dados.msgs_vistas) ? (dados.msgs_vistas as string[]) : []);
   const { data: novasRaw } = await admin.from('mensagens')
-    .select('id, tipo, conteudo, criado_em, metadados')
+    .select('id, tipo, conteudo, criado_em, metadados, id_externo')
     .eq('conversa_id', sessao.conversa_id).eq('direcao', 'entrada')
     .gt('criado_em', corteSobrepos).order('criado_em', { ascending: true }).limit(25);
   const fetched = (novasRaw ?? []) as MsgNova[];
@@ -1555,6 +1555,12 @@ async function enviarBolhas(admin: Admin, ctx: Ctx, bolhasRaw: string[], videoRa
   const bolhas = bolhasRaw.map(removerEmoji).filter(Boolean);
   const video = videoRaw ? { ...videoRaw, caption: removerEmoji(videoRaw.caption) } : null;
 
+  // RESPOSTA CITADA (o "balãozinho" do WhatsApp): o 1º balão responde CITANDO a última mensagem
+  // do cliente deste turno — deixa claro a que ele está respondendo. Só cita quando houve mensagem
+  // do cliente (abertura proativa/nudge não tem o que citar). id_externo = id da msg no WhatsApp.
+  const quoteId = [...ctx.novas].reverse().find((m) => m.id_externo)?.id_externo ?? null;
+  let jaCitou = false;
+
   // "digitando" proporcional + jitter entre bolhas — encurtado p/ resposta mais ágil (dono pediu velocidade)
   const presenceDur = (texto: string) => Math.min(3_000, Math.max(900, texto.length * 22));
   const linhas: Array<{ ordem: number; tipo: string; texto: string; media_url: string | null; media_caption: string | null; enviar_apos: string }> = [];
@@ -1599,9 +1605,12 @@ async function enviarBolhas(admin: Admin, ctx: Ctx, bolhasRaw: string[], videoRa
         await sendPresenceComposing(instancia, ctx.destino, dur);
         await sleep(dur);
       }
+      // cita a mensagem do cliente só no PRIMEIRO balão de texto do turno
+      const quotar = (row.tipo === 'texto' && !jaCitou && quoteId) ? { key: { id: quoteId } } : undefined;
+      if (quotar) jaCitou = true;
       const sent = (row.tipo === 'video' && row.media_url)
         ? await tx.sendMedia(ctx.destino, 'video', 'video/mp4', row.media_url, 'meu-inss.mp4', row.media_caption ?? undefined)
-        : await tx.sendText(ctx.destino, row.texto);
+        : await tx.sendText(ctx.destino, row.texto, quotar);
       const idExterno = sent?.key?.id ?? null;
       if (!idExterno) throw new Error('sem_id_retorno');
       const { data: msg } = await admin.from('mensagens').insert({
