@@ -25,7 +25,7 @@ export function seedWa(): WaContact[] {
       ...base,
       id: 'wa-maria', name: 'Maria Aparecida Souza', phone: '5551988124407', contatoId: 'wa-maria-ct',
       time: '14:38', unread: 2, lastAtMs: agora - 4 * min, aguardando: true, aguardandoDesde: iso(agora - 4 * min),
-      etapa: 'Documentação', etapaCor: '#f59e0b', respId: 'u-mock', iaAtiva: true, iaStatus: 'ativa', iaEtapa: 'docs',
+      etapa: 'Documentação', etapaCor: '#f59e0b', respId: 'u-mock', iaAtiva: true, iaStatus: 'ativa', iaEtapa: 'coleta_docs',
       last: 'Áudio · 0:34', lastInter: 'há 4 min', tags: ['Urgente'], notes: 'Prefere áudio. A filha ajuda com o celular — ligar depois das 18h.',
       msgs: [
         IN('Boa tarde! Vi o anúncio de vocês sobre desconto no benefício.', '14:31', { tsISO: iso(agora - 11 * min), id: 'wm-1' }),
@@ -58,7 +58,8 @@ export function seedWa(): WaContact[] {
          bolhas do bot (marca IA), o evento de handoff e a resposta humana. */
       id: 'wa-ivone', name: 'Ivone Castro dos Santos', phone: '5551987770009', contatoId: 'wa-ivone-ct',
       time: '14:22', unread: 0, lastAtMs: agora - 18 * min, respId: 'u-mock',
-      etapa: 'EM ATENDIMENTO', iaStatus: 'handoff', iaEtapa: 'extratos', iaAguardando: 'sem_acesso_govbr', precisaHumano: true,
+      /* triagem_govbr = etapa real do fluxo onde este handoff acontece (sem acesso ao gov.br) */
+      etapa: 'EM ATENDIMENTO', iaStatus: 'handoff', iaEtapa: 'triagem_govbr', iaAguardando: 'sem_acesso_govbr', precisaHumano: true,
       precisaHumanoMotivo: 'sem_acesso_govbr', precisaHumanoEm: iso(agora - 26 * min),
       last: 'Ah, que bom! Obrigada, meu filho', lastInter: 'há 18 min', tags: ['Revisão de contrato'],
       msgs: [
@@ -88,6 +89,8 @@ export function seedWa(): WaContact[] {
       ...base,
       id: 'wa-terezinha', name: 'Terezinha M. Alves', phone: '5551987770003', contatoId: 'wa-terezinha-ct',
       time: '11:20', unread: 0, lastAtMs: agora - 200 * min, respId: 'u-mock', chip: 'URA', canalAtual: 'URA',
+      /* sessão pausada SEM pendência = barra neutra "IA pausada" (bolinha neutra + Reativar ghost) */
+      iaStatus: 'pausada', iaEtapa: 'qualificacao_inss',
       last: 'Você: Combinado, te ligo amanhã.', lastInter: 'há 3 h',
       msgs: [
         IN('Pode me ligar amanhã de manhã?', '11:18', { tsISO: iso(agora - 202 * min), id: 'wt-1' }),

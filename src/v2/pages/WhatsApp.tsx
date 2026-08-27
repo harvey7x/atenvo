@@ -33,7 +33,7 @@ import { AudioRecorderV2 } from '../components/AudioRecorderV2';
 import { AgendarMensagemModalV2 } from './AgendarMensagemModalV2';
 import { CLASSE_RAIZ_PORTAL } from '../components/portal';
 import { BotaoMini, BotaoPrimario, BotaoSec, ConfirmDialogV2, EstadoErro, ModalV2, Skeleton } from '../components';
-import { Bolha, Ic, IcDoc } from '../components/BolhaWa';
+import { Bolha, Ic, IcBot, IcDoc } from '../components/BolhaWa';
 import { corDaSituacao, nomeExibicao, situacaoDe, tierEspera } from '../lib/waUi';
 import { seedWa } from './whatsappSeed';
 import './whatsapp.css';
@@ -416,6 +416,22 @@ function motivoHumanoLabel(slug: string | null | undefined): string | null {
   return M[slug] ?? slug.replace(/_/g, ' ');
 }
 
+/* Etapa do fluxo da IA (ia_sessoes.etapa) → rótulo humano. Valores REAIS em produção:
+   qualificacao_inss/extratos/coleta_docs/triagem_govbr/retorno (+docs_pessoais no fluxo).
+   Fallback prettify (underscores → espaço, caixa baixa): nenhum código cru na UI. */
+function etapaIaLabel(slug: string | null | undefined): string | null {
+  if (!slug) return null;
+  const M: Record<string, string> = {
+    qualificacao_inss: 'qualificando o benefício',
+    triagem_govbr: 'triagem do acesso gov.br',
+    extratos: 'coletando extratos',
+    coleta_docs: 'coletando documentos',
+    docs_pessoais: 'documentos pessoais',
+    retorno: 'retomando contato',
+  };
+  return M[slug] ?? slug.replace(/_/g, ' ').toLowerCase();
+}
+
 export default function WhatsAppV2() {
   const nav = useNavigate();
   const [params, setParams] = useSearchParams();
@@ -602,7 +618,7 @@ export default function WhatsAppV2() {
   const iaBarMotivo = iaAguardaVivo || iaBar?.status === 'handoff' ? motivoHumanoLabel(iaBar?.aguardando_humano) : null;
   // prioridade do sinal: handoff (rubro) > aguardando humano (âmbar) > atendendo (verde) > pausada/concluída/encerrada (neutro)
   const iaBarSinal = !current.id || !iaBar?.existe ? null
-    : iaBar.status === 'handoff' ? { cls: 'handoff', rotulo: 'Handoff — IA passou para a equipe' }
+    : iaBar.status === 'handoff' ? { cls: 'handoff', rotulo: 'IA pediu atendimento' }
     : iaAguardaVivo ? { cls: 'aguarda', rotulo: 'Aguardando humano' }
     : iaBarAtiva ? { cls: 'ok', rotulo: 'IA atendendo' }
     : iaBar.status === 'encerrada' ? { cls: 'neutro', rotulo: 'IA encerrada' }
@@ -1076,7 +1092,7 @@ export default function WhatsAppV2() {
                           <span className="p">{c.last || '—'}</span>
                           <span className="chips">
                             {(() => { const cor = corDaSituacao(c, sit.texto); return <span className={'cchip etapa sit-' + sit.variante} title="Situação no funil" style={cor ? { background: cor + '26', color: cor } : undefined}>{sit.texto}</span>; })()}
-                            {c.iaAtiva && <span className="cchip ia" title="A IA/bot está atendendo esta conversa agora">IA</span>}
+                            {c.iaAtiva && <span className="cchip ia" title="A IA/bot está atendendo esta conversa agora"><IcBot />IA</span>}
                             {alertas.length > 0 && <span className="cchip alerta" title={alertas.join(' · ')}>⚠{alertas.length > 1 ? ' ' + alertas.length : ''}</span>}
                             {c.contatoId && bloqueados.has(c.contatoId) && <span className="cchip alerta" style={{ color: 'var(--rubro)', borderColor: 'rgba(var(--rubro-rgb),.4)' }} title={optoutTexto}>Não incomodar</span>}
                             {/* "Finalizado" só quando a situação NÃO já é terminal (ganho/perdido/cancelado) — evita verde ao lado de PERDIDO (Adendo 3) */}
@@ -1164,19 +1180,29 @@ export default function WhatsAppV2() {
                 quando a IA está ativa: anti-colisão, pare o bot ANTES de digitar. */}
             {iaBarSinal && (
               <div className={'wa-iabar ' + iaBarSinal.cls} role="status">
-                <span className="glifo" aria-hidden>🤖</span>
+                <span className="glifo" aria-hidden><IcBot /></span>
+                <span className="dot" aria-hidden />
                 <b className="est">{iaBarSinal.rotulo}</b>
-                {iaBar?.etapa && <span className="etp" title={'Etapa atual do fluxo da IA: ' + iaBar.etapa}>{iaBar.etapa}</span>}
+                {iaBar?.etapa && <span className="etp" title={'Etapa atual do fluxo da IA: ' + iaBar.etapa}>· {etapaIaLabel(iaBar.etapa)}</span>}
                 {iaBarMotivo && <span className="mot" title="Por que a IA pediu um humano">· {iaBarMotivo}</span>}
                 <span className="acts">
                   {!inbox.donoEfetivo && (
                     <BotaoMini disabled={inbox.atribuindo} title="Grava você como responsável. NÃO pausa a IA sozinho — ela só para quando você manda mensagem ou quando é pausada." onClick={inbox.assumir}>Assumir</BotaoMini>
                   )}
-                  <BotaoMini className={iaBarAtiva ? 'pausar-on' : ''} disabled={iaToggle.isPending}
-                    title={iaBarAtiva ? 'Pare a IA antes de digitar — evita você e o bot responderem juntos em cima do cliente.' : 'Reativar a IA nesta conversa.'}
-                    onClick={() => { if (!WA_REAL) { aoAvisar({ tom: 'ok', texto: iaBarAtiva ? 'Demonstração: a IA seria pausada' : 'Demonstração: a IA seria reativada' }); return; } void alternarIa(); }}>
-                    {iaBarAtiva ? 'Pausar IA' : 'Reativar IA'}
-                  </BotaoMini>
+                  {/* anti-colisão: com a IA ativa, "Pausar IA" é A ação da barra → sólido (padrão
+                      dos primários mini dos painéis); reativar é secundário → ghost */}
+                  {iaBarAtiva ? (
+                    <BotaoPrimario mini disabled={iaToggle.isPending}
+                      title="Pare a IA antes de digitar — evita você e o bot responderem juntos em cima do cliente."
+                      onClick={() => { if (!WA_REAL) { aoAvisar({ tom: 'ok', texto: 'Demonstração: a IA seria pausada' }); return; } void alternarIa(); }}>
+                      Pausar IA
+                    </BotaoPrimario>
+                  ) : (
+                    <BotaoMini disabled={iaToggle.isPending} title="Reativar a IA nesta conversa."
+                      onClick={() => { if (!WA_REAL) { aoAvisar({ tom: 'ok', texto: 'Demonstração: a IA seria reativada' }); return; } void alternarIa(); }}>
+                      Reativar IA
+                    </BotaoMini>
+                  )}
                 </span>
               </div>
             )}
@@ -1210,17 +1236,20 @@ export default function WhatsAppV2() {
               </div>
             )}
 
-            {/* tom levíssimo enquanto a IA atende: o atendente está ASSISTINDO uma conversa automática */}
-            <div className={'wa-msgs' + (iaBarAtiva ? ' ia-on' : '')} ref={msgsRef}>
+            <div className="wa-msgs" ref={msgsRef}>
               {itensFio.map((item, i) =>
                 item.tipo === 'handoff' ? (
-                  /* PEÇA 3 — o alerta salta no fio: âmbar semântico, sóbrio, no ponto do handoff */
+                  /* PEÇA 3 — o alerta é perceptível sem gritar: hairline + glifo + bolinha âmbar
+                     (a única cor) + tinta levíssima, no ponto do handoff */
                   <div className="wa-handoff" key={item.chave} role="alert">
-                    <span className="ic" aria-hidden>⚠️</span>
+                    <span className="glifo" aria-hidden><IcBot /></span>
                     <span className="tt">
-                      <b>A IA pediu um humano</b>
-                      {handoffMotivo && <> — {handoffMotivo}</>}
-                      {handoffHora && <span className="hh num"> · {handoffHora}</span>}
+                      <span className="dot" aria-hidden />
+                      <span className="tx">
+                        <b>A IA pediu um humano</b>
+                        {handoffMotivo && <> — {handoffMotivo}</>}
+                        {handoffHora && <span className="hh num"> · {handoffHora}</span>}
+                      </span>
                     </span>
                   </div>
                 ) : item.tipo === 'sep' ? (

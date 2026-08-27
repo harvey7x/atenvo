@@ -169,7 +169,7 @@ export const WA_CONTACTS: WaContact[] = [
   },
   {
     id: 'carlos', name: 'Carlos Eduardo', phone: '(11) 99333-6677', chip: 'Chip 2', time: '08:47', unread: 1,
-    iaAtiva: true, iaStatus: 'ativa', iaEtapa: 'docs',
+    iaAtiva: true, iaStatus: 'ativa', iaEtapa: 'coleta_docs',
     tabs: ['todos', 'naoatrib', 'pendentes'], status: 'Pendente',
     last: 'Quais dados são necessários para iniciar a análise?',
     email: 'carlos.eduardo@email.com', stage: 'Novo lead', resp: 'Não atribuído', origin: 'WhatsApp — Chip 2',

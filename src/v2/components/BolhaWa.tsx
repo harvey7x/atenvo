@@ -21,6 +21,17 @@ const IcDownload = () => <Ic><path d="M12 3v12" /><path d="m7 11 5 5 5-5" /><pat
 const IcTel = () => <Ic><path d="M5 4h4l2 5-2.5 1.5a12 12 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2" /></Ic>;
 const IcReply = () => <Ic><path d="M9 14 4 9l5-5" /><path d="M4 9h11a5 5 0 0 1 5 5v6" /></Ic>;
 const IcPlay = () => <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M8 5.5v13l11-6.5z" /></svg>;
+/* Glifo ÚNICO de IA do app — monocromático em currentColor, usado em TODOS os pontos de IA
+   (barra de estado, label da mensagem, chip da lista, divisor de handoff): um desenho só = identidade. */
+export const IcBot = () => (
+  <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+    <rect x="5" y="8" width="14" height="11" rx="3" stroke="currentColor" strokeWidth="1.6" />
+    <circle cx="9.5" cy="13" r="1.3" fill="currentColor" />
+    <circle cx="14.5" cy="13" r="1.3" fill="currentColor" />
+    <path d="M12 8V4.6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    <circle cx="12" cy="4" r="1.5" fill="currentColor" />
+  </svg>
+);
 
 /* ================================================================
    Bolha de mensagem — .rec/.env2 do mockup com o conteúdo da v1:
@@ -85,10 +96,10 @@ export function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, 
       {m.id && !semDestino && (
         <button type="button" className="resp-btn" title="Responder" aria-label="Responder" onClick={() => aoResponder(m)}><IcReply /></button>
       )}
-      {/* marca de mensagem AUTOMÁTICA: no lugar da assinatura do atendente, etiqueta "IA" +
-          persona — rolando o fio fica óbvio o que foi o bot vs um humano. Acento na borda
-          da bolha via classe .bot (nunca preencher a bolha de cor). */}
-      {m.origemBot && <div className="bt-tag ia" title="Mensagem enviada automaticamente pela IA (Matheo). Mensagens sem esta marca foram escritas por uma pessoa."><span className="ia-mrc" aria-hidden>IA</span>Matheo</div>}
+      {/* marca de mensagem AUTOMÁTICA: linha enxuta [glifo] Matheo · IA no lugar da assinatura —
+          rolando o fio fica óbvio o que foi o bot vs um humano. Sem caixa; acento na borda da
+          bolha via classe .bot (nunca preencher a bolha de cor). */}
+      {m.origemBot && <div className="bt-tag ia" title="Mensagem enviada automaticamente pela IA (Matheo). Mensagens sem esta marca foram escritas por uma pessoa."><span className="glifo" aria-hidden><IcBot /></span>Matheo<span className="suf">· IA</span></div>}
       {m.quoted && (
         <div className="mq">
           <div className="rem">{m.quoted.remetente || (m.dir === 'out' ? 'Você' : nomeCliente)}</div>
