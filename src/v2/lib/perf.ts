@@ -4,7 +4,9 @@
    peso visual muda (ver as camadas MODO LEVE em tokens.css/base.css).
    Preferência POR DISPOSITIVO (localStorage sem escopo de usuário: quem
    engasga é a máquina, não a conta). A escolha MANUAL sempre vence a
-   auto-detecção; 'auto' (ou ausência) detecta uma vez na inicialização. */
+   auto-detecção; 'auto' detecta uma vez na inicialização. AUSÊNCIA de
+   preferência = LEVE (decisão do dono 27/08: o visual sólido do Leve é o
+   padrão estético do produto — Automático/Completo viram opt-in). */
 
 export type ModoPerf = 'auto' | 'lite' | 'full';
 export type PerfTier = 'lite' | 'full';
@@ -22,9 +24,11 @@ const ASSENTAMENTO_MS = 400;
 export function lerModoPerf(): ModoPerf {
   try {
     const v = localStorage.getItem(CHAVE_PERF);
-    return v === 'lite' || v === 'full' ? v : 'auto';
+    // 'auto' explícito (escolha manual no toggle) continua valendo; só a AUSÊNCIA cai no Leve
+    if (v === 'lite' || v === 'full' || v === 'auto') return v;
+    return 'lite';
   } catch {
-    return 'auto';
+    return 'lite';
   }
 }
 
