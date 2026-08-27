@@ -51,7 +51,7 @@ const BUCKET_MIDIA = 'script-midia';            // anexo_path dos inbounds (pref
 const MAX_ARQUIVO = 15 * 1024 * 1024;           // >15MB: pedir reenvio menor
 const MAX_SESSOES_POR_CANAL = 6;
 const ORCAMENTO_MS = 100_000;
-const DEBOUNCE_MS = 8_000;                      // espelha o trigger (fase 1.1: 15s → 8s)
+const DEBOUNCE_MS = 4_000;                      // espelha o trigger (fase 1.1: 15s → 8s → 4s p/ resposta mais rápida)
 const REAGENDA_FALHA_MS = 90_000;
 const MAX_FALHAS_TECNICAS = 5;
 // follow-up de reengajamento (escada de 3 toques, pesquisa 25/08): 1º = timing por tipo de etapa
@@ -830,7 +830,8 @@ async function etapaRetorno(ctx: Ctx): Promise<Turno> {
 interface Checklist { identidadeOk: boolean; comprovanteOk: boolean; emailOk: boolean; completo: boolean }
 function checklistDe(docs: Record<string, unknown>, dados: Record<string, unknown>, emailNovo: string | null): Checklist {
   const dp = (docs.doc_pessoal ?? {}) as Record<string, unknown>;
-  const identidadeOk = dp.frente === true && dp.verso === true;
+  // completo por CONTAGEM (2 fotos) ou pelos dois lados — nunca depende de acertar frente x verso
+  const identidadeOk = Number(dp.qtd_fotos ?? 0) >= 2 || (dp.frente === true && dp.verso === true);
   const comprovanteOk = !!docs.comprovante;
   const emailOk = !!(dados.email || emailNovo);
   return { identidadeOk, comprovanteOk, emailOk, completo: identidadeOk && comprovanteOk && emailOk };
@@ -838,9 +839,9 @@ function checklistDe(docs: Record<string, unknown>, dados: Record<string, unknow
 function checklistTexto(c: Checklist, docs: Record<string, unknown>, meses: string): string {
   const dp = (docs.doc_pessoal ?? {}) as Record<string, unknown>;
   let linhaId: string;
-  if (c.identidadeOk) linhaId = '✔ já recebido — identidade (frente e verso)';
-  else if (dp.frente === true) linhaId = '✖ FALTA só o VERSO da identidade (a frente já chegou ✓)';
-  else if (dp.verso === true) linhaId = '✖ FALTA só a FRENTE da identidade (o verso já chegou ✓)';
+  if (c.identidadeOk) linhaId = '✔ já recebido — identidade (documento completo, os dois lados)';
+  else if (Number(dp.qtd_fotos ?? 0) >= 1 || dp.frente === true || dp.verso === true)
+    linhaId = '✖ FALTA o OUTRO LADO da identidade — 1 lado já chegou ✓. Peça só o lado que falta, SEM cravar "frente" ou "verso" (a pessoa sabe qual falta); nunca re-peça um lado já enviado.';
   else linhaId = '✖ FALTA — documento de identidade (RG ou CNH, frente e verso)';
   const linha = (ok: boolean, sTxt: string) => `${ok ? '✔ já recebido' : '✖ FALTA'} — ${sTxt}`;
   const comp = (docs.comprovante ?? {}) as Record<string, unknown>;
@@ -908,18 +909,24 @@ async function etapaColetaDocs(ctx: Ctx): Promise<Turno> {
       // confere a qualidade depois. Aqui só rastreamos frente/verso e o nome quando legível.
       // acumula os LADOS entre turnos: frente agora, verso depois — tudo soma no mesmo item
       const antes = { ...((ctx.docs.doc_pessoal ?? {}) as Record<string, unknown>), ...((docsPatch.doc_pessoal ?? {}) as Record<string, unknown>) };
-      const frente = antes.frente === true || ident.frente_presente === true;
-      const verso = antes.verso === true || ident.verso_presente === true;
+      // O modelo de visão ERRA muito qual lado é (chuta frente/verso). Regra nova: CONTAR fotos —
+      // toda foto de identidade conta ≥1; 2 fotos = documento completo. Nunca re-pedir um lado que
+      // já pode ter vindo. Guardamos os flags só como pista, mas quem manda é a CONTAGEM.
+      const ladosAgora = (ident.frente_presente === true ? 1 : 0) + (ident.verso_presente === true ? 1 : 0);
+      const qtdFotos = Math.min(2, (Number(antes.qtd_fotos ?? 0) || 0) + Math.max(1, ladosAgora));
+      const frenteFlag = antes.frente === true || ident.frente_presente === true;
+      const versoFlag = antes.verso === true || ident.verso_presente === true;
+      const completo = qtdFotos >= 2 || (frenteFlag && versoFlag);
       docsPatch.doc_pessoal = {
         tipo: ident.tipo_documento ?? antes.tipo,
         nome: String(ident.nome_completo ?? antes.nome ?? '') || undefined,
         cpf_mascarado: ident.cpf ? mascararCpf(String(ident.cpf)) : antes.cpf_mascarado,
-        frente, verso, atualizado_em: new Date().toISOString(),
+        frente: completo ? true : frenteFlag, verso: completo ? true : versoFlag,
+        qtd_fotos: qtdFotos, atualizado_em: new Date().toISOString(),
       };
       retomar = true;
-      const lados = [ident.frente_presente ? 'frente' : null, ident.verso_presente ? 'verso' : null].filter(Boolean).join(' e ') || 'foto';
-      if (frente && verso) notas.push(`→ identidade (${String(ident.tipo_documento).toUpperCase()}, ${lados}) confirmada ✓ — item COMPLETO (frente e verso ok).`);
-      else notas.push(`→ chegou a ${lados} da identidade ✓ (confirmada). Ainda falta ${frente ? 'o VERSO' : 'a FRENTE'} — peça só esse lado.`);
+      if (completo) notas.push(`→ identidade (${String(ident.tipo_documento).toUpperCase()}) CONFIRMADA e COMPLETA ✓ — já chegaram os dois lados. NÃO peça mais nenhuma foto de identidade.`);
+      else notas.push(`→ chegou 1 foto da identidade ✓. Peça só o OUTRO LADO do documento, SEM dizer se é "frente" ou "verso" (a pessoa sabe qual falta) — evite re-pedir um lado que ela já mandou.`);
     }
     const comp = lote.comprovante;
     if (comp?.presente === true) {
@@ -1548,18 +1555,18 @@ async function enviarBolhas(admin: Admin, ctx: Ctx, bolhasRaw: string[], videoRa
   const bolhas = bolhasRaw.map(removerEmoji).filter(Boolean);
   const video = videoRaw ? { ...videoRaw, caption: removerEmoji(videoRaw.caption) } : null;
 
-  // Fase 1.1: SEM delay-base — o tempo humano é o presence proporcional + jitter entre bolhas
-  const presenceDur = (texto: string) => Math.min(6_000, Math.max(2_000, texto.length * 50));
+  // "digitando" proporcional + jitter entre bolhas — encurtado p/ resposta mais ágil (dono pediu velocidade)
+  const presenceDur = (texto: string) => Math.min(3_000, Math.max(900, texto.length * 22));
   const linhas: Array<{ ordem: number; tipo: string; texto: string; media_url: string | null; media_caption: string | null; enviar_apos: string }> = [];
   let cursor = Date.now();
   let ordem = 0;
   if (video) {
     linhas.push({ ordem: ordem++, tipo: 'video', texto: video.caption || 'Segue o vídeo com o passo a passo.', media_url: video.url, media_caption: video.caption || null, enviar_apos: new Date(cursor).toISOString() });
-    cursor += rand(1_500, 3_000);
+    cursor += rand(700, 1_500);
   }
   for (const b of bolhas) {
     linhas.push({ ordem: ordem++, tipo: 'texto', texto: b, media_url: null, media_caption: null, enviar_apos: new Date(cursor).toISOString() });
-    cursor += presenceDur(b) + rand(1_500, 3_000);
+    cursor += presenceDur(b) + rand(700, 1_500);
   }
   if (!linhas.length) return;
 
