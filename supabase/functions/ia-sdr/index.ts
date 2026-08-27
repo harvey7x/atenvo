@@ -711,7 +711,18 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
   }
   if (t.statusNovo === 'encerrada') {
     patch.status = 'encerrada';
-    if (t.etiquetaOpp) await etiquetarOportunidade(admin, sessao, t.etiquetaOpp);
+    if (t.etiquetaOpp === 'nao_elegivel') {
+      // não recebe benefício do INSS → move o card para "Não elegível" (descarte, motivo
+      // nao_elegivel) e arquiva a conversa (trigger). Não é perda real: retrabalha depois.
+      // Se a RPC falhar, ao menos aplica a etiqueta como antes.
+      try { await admin.rpc('oportunidade_nao_elegivel', { p_conversa: sessao.conversa_id }); }
+      catch (e) {
+        await evento(admin, sessao, 'kanban_nao_elegivel_falhou', { erro: String((e as Error)?.message ?? '').slice(0, 160) });
+        await etiquetarOportunidade(admin, sessao, t.etiquetaOpp);
+      }
+    } else if (t.etiquetaOpp) {
+      await etiquetarOportunidade(admin, sessao, t.etiquetaOpp);
+    }
     await evento(admin, sessao, 'encerrada', { motivo: t.etiquetaOpp ?? null });
   }
 
