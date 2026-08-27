@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { WA_REAL, mascararNumero, waRecarregarAudio, waValidarNumero, waVincularNumero, useWaAtividades, useMensagensAgendadas, useAgendarSequencia, useEditarAgendamento, useCancelarAgendamento, normalizeWaPhone } from '@/data/whatsapp';
@@ -12,7 +12,7 @@ import { indexPorChave, tipoLabel, tempoRelativo } from '@/data/slaView';
 import { useOportunidadesDoContato, useFunisDaOrg, chamarGarantirEntrada, useColunasFunil, useMoverOportunidade, classificarMovimento, MOTIVOS_PERDA, traduzErroKanban } from '@/data/kanban';
 import { useChecklist } from '@/data/checklist';
 import { useCobrancas } from '@/data/cobrancas';
-import { corDaEtiqueta, podeGerenciarAtendimento, type AssinaturaModo } from '@/types/atendimento';
+import { corDaEtiqueta, podeGerenciarAtendimento, PALETA_CORES, type AssinaturaModo } from '@/types/atendimento';
 import { textoBloqueio, analisarNome, conversaAtiva } from '@/lib/higieneConversa';
 import { responsavelEfetivo } from '@/lib/conversaEtiquetas';
 import { construirItensConversa } from '@/lib/dataConversa';
@@ -37,9 +37,6 @@ import { Bolha, Ic, IcDoc } from '../components/BolhaWa';
 import { corDaSituacao, nomeExibicao, situacaoDe, tierEspera } from '../lib/waUi';
 import { seedWa } from './whatsappSeed';
 import './whatsapp.css';
-
-/** Cores de etiqueta na criação inline (rotação simples — mesma família da paleta de colunas). */
-const CORES_ETQ = ['#3b82f6', '#19C37D', '#f59e0b', '#8b5cf6', '#0891b2', '#e11d48', '#d97706', '#64748b'];
 
 /* ------------------------------------------------------------------
    WhatsApp v2 — inbox de atendimento (anatomia pg-wa: fila 296px ·
@@ -75,7 +72,141 @@ const IcContato = () => <Ic><circle cx="10" cy="8" r="3.2" /><path d="M4.5 19.5c
 const IcCopy = () => <Ic><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></Ic>;
 const IcFoco = () => <Ic><path d="M4 9V5a1 1 0 0 1 1-1h4M15 4h4a1 1 0 0 1 1 1v4M20 15v4a1 1 0 0 1-1 1h-4M9 20H5a1 1 0 0 1-1-1v-4" /></Ic>;
 
-type Pop = { kind: 'filtro' | 'acoes' | 'status' | 'tags' | 'scripts'; x: number; y: number; acima?: boolean } | null;
+type Pop = { kind: 'filtro' | 'acoes' | 'status' | 'scripts'; x: number; y: number; acima?: boolean } | null;
+
+/* ==================================================================
+   Seletor de etiquetas do chat — glass, viewport-aware (flip + scroll
+   interno na lista; busca/criar e rodapé SEMPRE fixos, nunca cortam).
+   Caminho de dados INALTERADO: onToggle usa alternarEtiqueta (cache
+   text[] via definirEtiquetasConversa + espelho no contato); criar usa
+   criarEtiqueta atual. Nada de junção/RPC aqui.
+   ================================================================== */
+type EtiquetaSel = { id: string; nome: string; cor: string; ativo: boolean };
+function SeletorEtiquetas({
+  anchor, etiquetas, aplicadas, podeGerenciar, onToggle, onCriarEAplicar, onGerenciar, onClose,
+}: {
+  anchor: DOMRect;
+  etiquetas: EtiquetaSel[];
+  aplicadas: string[];
+  podeGerenciar: boolean;
+  onToggle: (nome: string) => void;
+  onCriarEAplicar: (nome: string, cor: string) => void;
+  onGerenciar: () => void;
+  onClose: () => void;
+}) {
+  const painelRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [busca, setBusca] = useState('');
+  const [hi, setHi] = useState(0);
+  const ativas = useMemo(() => etiquetas.filter((e) => e.ativo), [etiquetas]);
+  const q = busca.trim().toLocaleLowerCase('pt-BR');
+  const filtradas = useMemo(
+    () => (q ? ativas.filter((e) => e.nome.toLocaleLowerCase('pt-BR').includes(q)) : ativas),
+    [ativas, q],
+  );
+  const temExato = !!q && ativas.some((e) => e.nome.trim().toLocaleLowerCase('pt-BR') === q);
+  const podeCriar = podeGerenciar && !!busca.trim() && !temExato;
+  const [cor, setCor] = useState(() => PALETA_CORES[ativas.length % PALETA_CORES.length]);
+
+  // Posicionamento viewport-aware: abre pra baixo; se não couber, FLIPA pra cima.
+  // maxHeight limitado ao espaço disponível → a LISTA rola por dentro, header/rodapé ficam.
+  const [pos, setPos] = useState<React.CSSProperties>({ left: -9999, top: -9999, visibility: 'hidden' });
+  useLayoutEffect(() => {
+    const margem = 8, larg = 300, vw = window.innerWidth, vh = window.innerHeight;
+    const left = Math.max(margem, Math.min(anchor.left, vw - larg - margem));
+    const abaixo = vh - anchor.bottom - margem;
+    const acima = anchor.top - margem;
+    const flip = abaixo < 300 && acima > abaixo;
+    const maxH = Math.min(460, Math.max(200, flip ? acima : abaixo));
+    setPos(flip
+      ? { left, bottom: vh - anchor.top + 6, maxHeight: maxH }
+      : { left, top: anchor.bottom + 6, maxHeight: maxH });
+  }, [anchor]);
+
+  useEffect(() => { inputRef.current?.focus(); }, []);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } };
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as HTMLElement;
+      if (!painelRef.current?.contains(t) && !t.closest?.('.etq-add')) onClose();
+    };
+    const onResize = () => onClose();
+    document.addEventListener('keydown', onKey, true);
+    document.addEventListener('mousedown', onDown);
+    window.addEventListener('resize', onResize);
+    return () => {
+      document.removeEventListener('keydown', onKey, true);
+      document.removeEventListener('mousedown', onDown);
+      window.removeEventListener('resize', onResize);
+    };
+  }, [onClose]);
+  useEffect(() => { setHi(0); }, [q]);
+
+  const criar = () => { const nm = busca.trim(); if (!nm) return; onCriarEAplicar(nm, cor); setBusca(''); };
+  const onInputKey = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (filtradas.length > 0) onToggle(filtradas[Math.min(hi, filtradas.length - 1)].nome);
+      else if (podeCriar) criar();
+    } else if (e.key === 'ArrowDown') { e.preventDefault(); setHi((i) => Math.min(i + 1, filtradas.length - 1)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setHi((i) => Math.max(i - 1, 0)); }
+  };
+
+  return (
+    <div ref={painelRef} className="wa-etqpop" style={pos} role="dialog" aria-label="Etiquetas da conversa">
+      <div className="etqp-busca">
+        <IcBusca />
+        <input
+          ref={inputRef} value={busca} maxLength={40} autoComplete="off"
+          placeholder="Buscar ou criar etiqueta…" aria-label="Buscar ou criar etiqueta"
+          onChange={(e) => setBusca(e.target.value)} onKeyDown={onInputKey}
+        />
+      </div>
+
+      <div className="etqp-lista" role="listbox" aria-label="Etiquetas">
+        {filtradas.length === 0 && !podeCriar && (
+          <div className="etqp-vazio">{podeGerenciar ? 'Nenhuma etiqueta. Digite para criar.' : 'Nenhuma etiqueta. Peça a um gestor.'}</div>
+        )}
+        {filtradas.map((e, i) => {
+          const on = aplicadas.includes(e.nome);
+          return (
+            <button
+              key={e.id} type="button" role="option" aria-selected={on}
+              className={'etqp-it' + (i === hi ? ' hi' : '')}
+              onMouseEnter={() => setHi(i)} onClick={() => onToggle(e.nome)}
+            >
+              <span className="dot" style={{ background: e.cor }} />
+              <span className="nm">{e.nome}</span>
+              {on && <span className="ck">✓</span>}
+            </button>
+          );
+        })}
+      </div>
+
+      {podeCriar && (
+        <div className="etqp-criar">
+          <button type="button" className="etqp-criar-btn" onClick={criar}>
+            <span className="dot" style={{ background: cor }} />
+            <span className="nm">＋ Criar e aplicar <b>«{busca.trim()}»</b></span>
+          </button>
+          <div className="etqp-cores" role="group" aria-label="Cor da nova etiqueta">
+            {PALETA_CORES.map((c) => (
+              <button
+                key={c} type="button" aria-label={'Cor ' + c} title={c}
+                className={'sw' + (c.toLowerCase() === cor.toLowerCase() ? ' sel' : '')}
+                style={{ background: c }} onClick={() => setCor(c)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {podeGerenciar && (
+        <button type="button" className="etqp-lk" onClick={onGerenciar}>Gerenciar etiquetas…</button>
+      )}
+    </div>
+  );
+}
 
 export default function WhatsAppV2() {
   const nav = useNavigate();
@@ -137,12 +268,12 @@ export default function WhatsAppV2() {
   const [filtroTransporte, setFiltroTransporte] = useState<string | null>(null);
   const [filtroEtapa, setFiltroEtapa] = useState<string | null>(null);
   const [pop, setPop] = useState<Pop>(null);
+  const [etqPop, setEtqPop] = useState<DOMRect | null>(null); // seletor de etiquetas (portal próprio, viewport-aware)
   const [foco, setFoco] = useState(() => { try { return localStorage.getItem(FOCO_KEY) === '1'; } catch { return false; } });
   const [ctxAberto, setCtxAberto] = useState(() => { try { return sessionStorage.getItem('atenvo-wa-ctx') !== '0'; } catch { return true; } });
   useEffect(() => { try { sessionStorage.setItem('atenvo-wa-ctx', ctxAberto ? '1' : '0'); } catch { /* privado */ } }, [ctxAberto]);
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [novaConversa, setNovaConversa] = useState(false);
-  const [novaEtq, setNovaEtq] = useState('');
   const [transferirAberto, setTransferirAberto] = useState(false);
   const [vincAberto, setVincAberto] = useState(false);
   const [fecharConfirm, setFecharConfirm] = useState(false);
@@ -468,18 +599,18 @@ export default function WhatsAppV2() {
       if (current.contatoId) await acoes.espelharEtiquetaContato(current.contatoId, nome, aplicar);
     } catch { aoAvisar({ tom: 'erro', texto: 'Falha ao salvar etiquetas' }); }
   };
-  /** Criação inline no popover (pedido do dono: sem passar pela Configurações).
-      Nome já existente (case-insensitive) só aplica — não duplica o catálogo. */
-  const criarEtiquetaInline = async () => {
-    const nome = novaEtq.trim();
-    if (!nome) return;
+  /** Cria (se não existir, com a cor escolhida da PALETA_CORES) e aplica na conversa.
+      Nome já existente (case-insensitive) só aplica — não duplica o catálogo.
+      Caminho de escrita INALTERADO: criarEtiqueta + alternarEtiqueta (cache text[]). */
+  const criarEAplicarEtiqueta = async (nome: string, cor: string) => {
+    const nm = nome.trim();
+    if (!nm) return;
     const lista = etiquetasQ.data ?? [];
-    const existente = lista.find((t) => t.nome.toLocaleLowerCase('pt-BR') === nome.toLocaleLowerCase('pt-BR'));
+    const existente = lista.find((t) => t.nome.toLocaleLowerCase('pt-BR') === nm.toLocaleLowerCase('pt-BR'));
     try {
-      if (!existente) await acoes.criarEtiqueta(nome, CORES_ETQ[lista.length % CORES_ETQ.length], null);
-      const alvo = existente?.nome ?? nome;
+      if (!existente) await acoes.criarEtiqueta(nm, cor, null);
+      const alvo = existente?.nome ?? nm;
       if (!current.tags.includes(alvo)) await alternarEtiqueta(alvo);
-      setNovaEtq('');
       aoAvisar({ tom: 'ok', texto: existente ? `Etiqueta "${alvo}" aplicada` : `Etiqueta "${alvo}" criada e aplicada` });
     } catch (e) {
       aoAvisar({ tom: 'erro', texto: 'Falha na etiqueta: ' + ((e as Error)?.message ?? '') });
@@ -966,7 +1097,8 @@ export default function WhatsAppV2() {
                   </span>
                 );
               })}
-              <button type="button" className="etq-add" onClick={(e) => abrirPop('tags', e)}>
+              <button type="button" className="etq-add" aria-haspopup="dialog" aria-expanded={!!etqPop}
+                onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setEtqPop((cur) => (cur ? null : r)); }}>
                 ＋ {current.tags.length === 0 ? 'Adicionar etiqueta' : 'Etiqueta'}
               </button>
             </div>
@@ -1119,29 +1251,21 @@ export default function WhatsAppV2() {
               <button type="button" className="lk" onClick={() => { setPop(null); nav('/scripts'); }}>Gerenciar no arsenal…</button>
             </>
           )}
-          {pop.kind === 'tags' && (
-            <>
-              <div className="ph2">Etiquetas</div>
-              {(etiquetasQ.data ?? []).filter((t) => t.ativo).length === 0 && <div className="vazio">{podeGerenciar ? 'Nenhuma etiqueta ainda — crie abaixo.' : 'Peça a um gestor.'}</div>}
-              {(etiquetasQ.data ?? []).filter((t) => t.ativo).map((t) => (
-                <button key={t.nome} type="button" className="it" onClick={() => alternarEtiqueta(t.nome)}>
-                  <span className="dot" style={{ background: t.cor }} />{t.nome} {current.tags.includes(t.nome) && <span className="ck">✓</span>}
-                </button>
-              ))}
-              {podeGerenciar && (
-                <div className="etq-nova">
-                  <input
-                    value={novaEtq} maxLength={40} placeholder="Nova etiqueta…" autoComplete="off"
-                    onChange={(e) => setNovaEtq(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void criarEtiquetaInline(); } }}
-                  />
-                  <button type="button" disabled={!novaEtq.trim()} onClick={() => void criarEtiquetaInline()}>Criar e aplicar</button>
-                </div>
-              )}
-              {podeGerenciar && <button type="button" className="lk" onClick={() => { setPop(null); nav('/configuracoes?tab=atendimento&section=etiquetas'); }}>Gerenciar etiquetas…</button>}
-            </>
-          )}
         </div>,
+        raizPop,
+      )}
+
+      {etqPop && createPortal(
+        <SeletorEtiquetas
+          anchor={etqPop}
+          etiquetas={etiquetasQ.data ?? []}
+          aplicadas={current.tags}
+          podeGerenciar={podeGerenciar}
+          onToggle={(nome) => void alternarEtiqueta(nome)}
+          onCriarEAplicar={(nome, cor) => void criarEAplicarEtiqueta(nome, cor)}
+          onGerenciar={() => { setEtqPop(null); nav('/configuracoes?tab=atendimento&section=etiquetas'); }}
+          onClose={() => setEtqPop(null)}
+        />,
         raizPop,
       )}
 
