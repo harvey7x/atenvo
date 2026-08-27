@@ -51,7 +51,8 @@ const BUCKET_MIDIA = 'script-midia';            // anexo_path dos inbounds (pref
 const MAX_ARQUIVO = 15 * 1024 * 1024;           // >15MB: pedir reenvio menor
 const MAX_SESSOES_POR_CANAL = 6;
 const ORCAMENTO_MS = 100_000;
-const DEBOUNCE_MS = 4_000;                      // espelha o trigger (fase 1.1: 15s → 8s → 4s p/ resposta mais rápida)
+const DEBOUNCE_MS = 7_000;                      // espelha o trigger. 7s: agrupa msgs em rajada (o cliente
+                                               // manda 2-3 seguidas) e responde tudo junto, sem duplicar turno.
 const REAGENDA_FALHA_MS = 90_000;
 const MAX_FALHAS_TECNICAS = 5;
 // follow-up de reengajamento (escada de 3 toques, pesquisa 25/08): 1º = timing por tipo de etapa
