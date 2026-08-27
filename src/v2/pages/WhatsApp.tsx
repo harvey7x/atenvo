@@ -68,11 +68,12 @@ const IcImg = () => <Ic><rect x="3" y="4" width="18" height="16" rx="2.5" /><cir
 const IcVideo = () => <Ic><rect x="3" y="6" width="13" height="12" rx="2.5" /><path d="m16 10 5-3v10l-5-3z" /></Ic>;
 const IcClock = () => <Ic><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></Ic>;
 const IcSend = () => <Ic><path d="M4 12l16-8-6 16-2.5-6.5z" /></Ic>;
+const IcRaio = () => <Ic><path d="M13 2 4 14h7l-1 8 9-12h-7z" /></Ic>;
 const IcContato = () => <Ic><circle cx="10" cy="8" r="3.2" /><path d="M4.5 19.5c.7-3 2.8-4.6 5.5-4.6s4.8 1.6 5.5 4.6" /><path d="M17.5 7.5h4.5" /><path d="M19.75 5.25v4.5" /></Ic>;
 const IcCopy = () => <Ic><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></Ic>;
 const IcFoco = () => <Ic><path d="M4 9V5a1 1 0 0 1 1-1h4M15 4h4a1 1 0 0 1 1 1v4M20 15v4a1 1 0 0 1-1 1h-4M9 20H5a1 1 0 0 1-1-1v-4" /></Ic>;
 
-type Pop = { kind: 'filtro' | 'acoes' | 'status' | 'scripts'; x: number; y: number; acima?: boolean } | null;
+type Pop = { kind: 'filtro' | 'acoes' | 'status'; x: number; y: number; acima?: boolean } | null;
 
 /* ==================================================================
    Chip de etiqueta-CRUD — Platina estilo B, UNIFICADO entre a lista de
@@ -227,6 +228,151 @@ function SeletorEtiquetas({
   );
 }
 
+/* ==================================================================
+   Seletor de SCRIPTS do chat — mesmo vidro e posicionamento viewport-aware
+   do SeletorEtiquetas (flip pra cima quando não cabe; só a lista rola,
+   busca/rodapé fixos). Acesso rápido: um botão no lugar da tira horizontal.
+   Comportamento de clique INALTERADO: onSelecionar reusa o setScriptSeq do
+   composer (abre o ScriptSequenceModal — nunca envio cego, nunca insere
+   texto). Escopo por canal INALTERADO: recebe a mesma lista já filtrada
+   por useScripts('whatsapp'). Sem banco/RPC.
+   ================================================================== */
+type ScriptResumo = Record<string, { total?: number; temMidia?: boolean } | undefined>;
+function SeletorScripts({
+  anchor, scripts, categorias, resumo, etapaCounts, onSelecionar, onGerenciar, onClose,
+}: {
+  anchor: DOMRect;
+  scripts: Script[];
+  categorias: { id: string; nome: string; ordem: number }[];
+  resumo: ScriptResumo;
+  etapaCounts: Record<string, number>;
+  onSelecionar: (s: Script) => void;
+  onGerenciar: () => void;
+  onClose: () => void;
+}) {
+  const painelRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [busca, setBusca] = useState('');
+  const [hi, setHi] = useState(0);
+  const q = busca.trim().toLocaleLowerCase('pt-BR');
+
+  // FAVORITOS primeiro; depois por CATEGORIA (ordem da categoria); sem categoria → "Outros".
+  // Busca filtra por titulo E tags (o caminho mais rápido). Favorito não se repete nos grupos.
+  const grupos = useMemo(() => {
+    const casa = (s: Script) =>
+      !q ||
+      s.titulo.toLocaleLowerCase('pt-BR').includes(q) ||
+      (s.tags ?? []).some((t) => t.toLocaleLowerCase('pt-BR').includes(q));
+    const gs: { chave: string; rotulo: string; fav?: boolean; itens: Script[] }[] = [];
+    const favs = scripts.filter((s) => s.favorito && casa(s));
+    if (favs.length) gs.push({ chave: '__fav', rotulo: 'Favoritos', fav: true, itens: favs });
+    const restantes = scripts.filter((s) => !s.favorito);
+    const cats = [...categorias].sort((a, b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome));
+    const idsValidos = new Set(cats.map((c) => c.id));
+    for (const c of cats) {
+      const itens = restantes.filter((s) => s.categoriaId === c.id && casa(s));
+      if (itens.length) gs.push({ chave: c.id, rotulo: c.nome, itens });
+    }
+    const soltos = restantes.filter((s) => (!s.categoriaId || !idsValidos.has(s.categoriaId)) && casa(s));
+    if (soltos.length) gs.push({ chave: '__outros', rotulo: 'Outros', itens: soltos });
+    return gs;
+  }, [scripts, categorias, q]);
+
+  // lista achatada na ordem visual → teclado (setas/Enter) casa com o que se vê
+  const flat = useMemo(() => grupos.flatMap((g) => g.itens), [grupos]);
+
+  // Posicionamento viewport-aware — idêntico ao seletor de etiquetas: abre pra baixo,
+  // FLIPA pra cima se não couber; a LISTA rola por dentro, busca/rodapé ficam.
+  const [pos, setPos] = useState<React.CSSProperties>({ left: -9999, top: -9999, visibility: 'hidden' });
+  useLayoutEffect(() => {
+    const margem = 8, larg = 320, vw = window.innerWidth, vh = window.innerHeight;
+    const left = Math.max(margem, Math.min(anchor.left, vw - larg - margem));
+    const abaixo = vh - anchor.bottom - margem;
+    const acima = anchor.top - margem;
+    const flip = abaixo < 320 && acima > abaixo;
+    const maxH = Math.min(480, Math.max(220, flip ? acima : abaixo));
+    setPos(flip
+      ? { left, bottom: vh - anchor.top + 6, maxHeight: maxH }
+      : { left, top: anchor.bottom + 6, maxHeight: maxH });
+  }, [anchor]);
+
+  useEffect(() => { inputRef.current?.focus(); }, []);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } };
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as HTMLElement;
+      if (!painelRef.current?.contains(t) && !t.closest?.('.wa-scr-btn')) onClose();
+    };
+    const onResize = () => onClose();
+    document.addEventListener('keydown', onKey, true);
+    document.addEventListener('mousedown', onDown);
+    window.addEventListener('resize', onResize);
+    return () => {
+      document.removeEventListener('keydown', onKey, true);
+      document.removeEventListener('mousedown', onDown);
+      window.removeEventListener('resize', onResize);
+    };
+  }, [onClose]);
+  useEffect(() => { setHi(0); }, [q]);
+
+  const onInputKey = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const alvo = flat[Math.min(hi, flat.length - 1)];
+      if (alvo) onSelecionar(alvo);
+    } else if (e.key === 'ArrowDown') { e.preventDefault(); setHi((i) => Math.min(i + 1, flat.length - 1)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setHi((i) => Math.max(i - 1, 0)); }
+  };
+
+  let idx = -1; // índice global (achatado) para casar com o highlight do teclado
+  return (
+    <div ref={painelRef} className="wa-scrpop" style={pos} role="dialog" aria-label="Scripts">
+      <div className="etqp-busca">
+        <IcBusca />
+        <input
+          ref={inputRef} value={busca} maxLength={60} autoComplete="off"
+          placeholder="Buscar script por nome ou tag…" aria-label="Buscar script"
+          onChange={(e) => setBusca(e.target.value)} onKeyDown={onInputKey}
+        />
+      </div>
+
+      <div className="etqp-lista scrp-lista" role="listbox" aria-label="Scripts">
+        {flat.length === 0 && (
+          <div className="etqp-vazio">{scripts.length === 0 ? 'Nenhum script para WhatsApp. Crie no arsenal.' : 'Nenhum script encontrado.'}</div>
+        )}
+        {grupos.map((g) => (
+          <div key={g.chave} className="scrp-grupo">
+            <div className={'scrp-cab' + (g.fav ? ' fav' : '')}>{g.fav ? '★ ' : ''}{g.rotulo}</div>
+            {g.itens.map((s) => {
+              idx += 1;
+              const i = idx;
+              const r = resumo[s.id];
+              const total = r?.total ?? etapaCounts[s.id] ?? (s.conteudo.trim() ? 1 : 0);
+              const temMidia = r?.temMidia ?? false;
+              return (
+                <button
+                  key={s.id} type="button" role="option" aria-selected={i === hi}
+                  className={'etqp-it scrp-it' + (i === hi ? ' hi' : '')}
+                  onMouseEnter={() => setHi(i)} onClick={() => onSelecionar(s)}
+                >
+                  <span className="scrp-txt">
+                    <span className="scrp-nome">{s.favorito ? '★ ' : ''}{s.titulo}</span>
+                    {s.descricao && <span className="scrp-desc">{s.descricao}</span>}
+                  </span>
+                  {temMidia && <span className="scrp-tag">mídia</span>}
+                  <span className="scrp-cnt">{total} msg{total === 1 ? '' : 's'}</span>
+                </button>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+
+      <button type="button" className="etqp-lk" onClick={onGerenciar}>Gerenciar no arsenal…</button>
+    </div>
+  );
+}
+
 export default function WhatsAppV2() {
   const nav = useNavigate();
   const [params, setParams] = useSearchParams();
@@ -288,6 +434,8 @@ export default function WhatsAppV2() {
   const [filtroEtapa, setFiltroEtapa] = useState<string | null>(null);
   const [pop, setPop] = useState<Pop>(null);
   const [etqPop, setEtqPop] = useState<DOMRect | null>(null); // seletor de etiquetas (portal próprio, viewport-aware)
+  const [scrPop, setScrPop] = useState<DOMRect | null>(null); // seletor de scripts (mesmo tratamento glass)
+  const scrBtnRef = useRef<HTMLButtonElement>(null);
   const [foco, setFoco] = useState(() => { try { return localStorage.getItem(FOCO_KEY) === '1'; } catch { return false; } });
   const [ctxAberto, setCtxAberto] = useState(() => { try { return sessionStorage.getItem('atenvo-wa-ctx') !== '0'; } catch { return true; } });
   useEffect(() => { try { sessionStorage.setItem('atenvo-wa-ctx', ctxAberto ? '1' : '0'); } catch { /* privado */ } }, [ctxAberto]);
@@ -349,16 +497,8 @@ export default function WhatsAppV2() {
   const etapaCounts = useScriptEtapaCounts().data ?? {};
   const scriptCategorias = useScriptCategorias().data ?? [];
   const scriptsResumo = useScriptsResumoEtapas().data ?? {};
-  // Todos os scripts do canal, agrupados por categoria (ordem da categoria; "Sem categoria" por
-  // último) — alimenta o seletor compacto do composer sem tirar o atendente da conversa.
-  const scriptsPorCategoria = useMemo(() => {
-    const cats = [...scriptCategorias].sort((a, b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome));
-    const idsValidos = new Set(cats.map((c) => c.id));
-    const grupos = cats.map((c) => ({ id: c.id, nome: c.nome, itens: scripts.filter((s) => s.categoriaId === c.id) }));
-    const soltos = scripts.filter((s) => !s.categoriaId || !idsValidos.has(s.categoriaId));
-    if (soltos.length) grupos.push({ id: '__sem__', nome: 'Sem categoria', itens: soltos });
-    return grupos.filter((g) => g.itens.length > 0);
-  }, [scripts, scriptCategorias]);
+  // O agrupamento (favoritos → categorias → Outros) e a busca vivem no SeletorScripts;
+  // aqui basta a lista já filtrada por canal (useScripts('whatsapp')) e os satélites.
   const bloqueados = inbox.bloqueados;
   const canalEhCloud = inbox.canalSel?.transporte === 'cloud_api';
   // canal oficial (Cloud API/Meta) × número conectado por QR (Evolution) — sinalização na fila,
@@ -491,6 +631,15 @@ export default function WhatsAppV2() {
   /* ---------- envio / composer ---------- */
   const optoutTexto = 'Contato marcado como não incomodar — mensagens bloqueadas.';
   const composerBloqueado = inbox.canalIndisponivel || inbox.semDestino || inbox.canalRestrito || inbox.higieneBloqueia || optout;
+  // Acesso rápido aos scripts: abrir o painel glass ancorado no botão; selecionar reusa
+  // EXATAMENTE o caminho da tira antiga (setScriptSeq → ScriptSequenceModal), com a mesma
+  // trava de opt-out. Nada de envio cego nem inserção no composer.
+  const abrirScripts = () => { const r = scrBtnRef.current?.getBoundingClientRect(); if (r) setScrPop((p) => (p ? null : r)); };
+  const selecionarScript = (s: Script) => {
+    setScrPop(null);
+    if (optout) { aoAvisar({ tom: 'erro', texto: optoutTexto }); return; }
+    setScriptSeq(s);
+  };
   const placeholder = optout ? 'Envio bloqueado: contato pediu para não ser incomodado'
     : inbox.semDestino ? 'Vincule um número para responder'
     : inbox.canalIndisponivel ? 'Envio bloqueado: número desconectado'
@@ -896,27 +1045,19 @@ export default function WhatsAppV2() {
             </div>
 
             <div className="wa-composer">
-              {/* respostas rápidas — A PONTE: scripts reais; clique abre o fluxo de envio com confirmação (nunca envio cego) */}
+              {/* respostas rápidas — A PONTE: um BOTÃO abre o painel glass com TODOS os scripts
+                  (busca + favoritos + categorias); acaba o scroll horizontal. Clique num script
+                  reusa setScriptSeq → ScriptSequenceModal (confirmação, nunca envio cego). */}
               {scripts.length > 0 && (
-                <div className="rapidas" role="list" aria-label="Respostas rápidas (Scripts)">
-                  {scripts.slice(0, 8).map((s) => (
-                    <button
-                      key={s.id} type="button" className="rapida" role="listitem" disabled={composerBloqueado}
-                      title={(s.conteudo || '').slice(0, 120) + ` · ${etapaCounts[s.id] ?? 1} msg${(etapaCounts[s.id] ?? 1) === 1 ? '' : 's'}`}
-                      onClick={() => { if (optout) { aoAvisar({ tom: 'erro', texto: optoutTexto }); return; } setScriptSeq(s); }}
-                    >
-                      {s.favorito ? '★ ' : ''}{s.titulo}
-                    </button>
-                  ))}
+                <div className="rapidas" role="group" aria-label="Scripts">
                   <button
-                    type="button" className={'rapida rapida-todos' + (pop?.kind === 'scripts' ? ' on' : '')}
-                    title="Ver todos os scripts, por categoria, sem sair da conversa"
-                    onClick={(e) => {
-                      const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                      const x = Math.min(r.left, window.innerWidth - 320);
-                      setPop((p) => (p?.kind === 'scripts' ? null : { kind: 'scripts', x, y: r.top - 6, acima: true }));
-                    }}
-                  >Todos ▾</button>
+                    ref={scrBtnRef} type="button" className={'wa-scr-btn' + (scrPop ? ' on' : '')}
+                    disabled={composerBloqueado} aria-haspopup="dialog" aria-expanded={!!scrPop}
+                    title="Scripts — busca, favoritos e categorias (atalho: / com a mensagem vazia)"
+                    onClick={abrirScripts}
+                  >
+                    <IcRaio /> Scripts <span className="ct">{scripts.length}</span>
+                  </button>
                 </div>
               )}
 
@@ -1015,7 +1156,11 @@ export default function WhatsAppV2() {
                 <textarea
                   ref={textareaRef} rows={1} value={draft} placeholder={placeholder} disabled={composerBloqueado}
                   onChange={(e) => { setDraft(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'; }}
-                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviar(); } }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviar(); return; }
+                    // "/" com a mensagem vazia abre o painel de scripts (a via mais rápida do teclado)
+                    if (e.key === '/' && draft === '' && scripts.length > 0 && !composerBloqueado) { e.preventDefault(); abrirScripts(); }
+                  }}
                 />
                 <div className="tools">
                   <button type="button" className="tool" title="Enviar imagem" disabled={midiaDisabled} onClick={() => setImgModal(true)}><IcImg /></button>
@@ -1180,7 +1325,7 @@ export default function WhatsAppV2() {
 
       {/* ===================== POPOVERS (portal) ===================== */}
       {pop && createPortal(
-        <div className={'wa-pop' + (pop.kind === 'scripts' ? ' wa-pop-scripts' : '')} style={pop.acima ? { left: pop.x, bottom: window.innerHeight - pop.y } : { left: pop.x, top: pop.y }} role={pop.kind === 'acoes' ? 'menu' : undefined}>
+        <div className="wa-pop" style={pop.acima ? { left: pop.x, bottom: window.innerHeight - pop.y } : { left: pop.x, top: pop.y }} role={pop.kind === 'acoes' ? 'menu' : undefined}>
           {pop.kind === 'filtro' && (
             <>
               <div className="ph2">Filtrar por número</div>
@@ -1244,32 +1389,6 @@ export default function WhatsAppV2() {
               {podeGerenciar && <button type="button" className="lk" onClick={() => { setPop(null); nav('/configuracoes?tab=atendimento&section=status'); }}>Gerenciar status…</button>}
             </>
           )}
-          {pop.kind === 'scripts' && (
-            <>
-              {scriptsPorCategoria.length === 0 && <div className="vazio">Nenhum script para WhatsApp. Crie no arsenal.</div>}
-              {scriptsPorCategoria.map((g) => (
-                <div key={g.id} className="scr-grupo">
-                  <div className="ph2">{g.nome}</div>
-                  {g.itens.map((s) => {
-                    const r = scriptsResumo[s.id];
-                    const total = r?.total ?? etapaCounts[s.id] ?? (s.conteudo.trim() ? 1 : 0);
-                    const temMidia = r?.temMidia ?? false;
-                    return (
-                      <button
-                        key={s.id} type="button" className="it scr-it"
-                        onClick={() => { setPop(null); if (optout) { aoAvisar({ tom: 'erro', texto: optoutTexto }); return; } setScriptSeq(s); }}
-                      >
-                        <span className="scr-nome">{s.favorito ? '★ ' : ''}{s.titulo}</span>
-                        {temMidia && <span className="scr-tag">mídia</span>}
-                        <span className="scr-cnt">{total} msg{total === 1 ? '' : 's'}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              ))}
-              <button type="button" className="lk" onClick={() => { setPop(null); nav('/scripts'); }}>Gerenciar no arsenal…</button>
-            </>
-          )}
         </div>,
         raizPop,
       )}
@@ -1284,6 +1403,20 @@ export default function WhatsAppV2() {
           onCriarEAplicar={(nome, cor) => void criarEAplicarEtiqueta(nome, cor)}
           onGerenciar={() => { setEtqPop(null); nav('/configuracoes?tab=atendimento&section=etiquetas'); }}
           onClose={() => setEtqPop(null)}
+        />,
+        raizPop,
+      )}
+
+      {scrPop && createPortal(
+        <SeletorScripts
+          anchor={scrPop}
+          scripts={scripts}
+          categorias={scriptCategorias}
+          resumo={scriptsResumo}
+          etapaCounts={etapaCounts}
+          onSelecionar={selecionarScript}
+          onGerenciar={() => { setScrPop(null); nav('/scripts'); }}
+          onClose={() => setScrPop(null)}
         />,
         raizPop,
       )}
