@@ -110,6 +110,17 @@
 :root:not([data-tema="light"]) .v2 .audio-ind .lnk,
 :root:not([data-tema="light"]) .v2 .doc2 .acts .lnk { color: var(--azul); }
 
+/* barras de atividade (Agendamentos/Relatórios — anatomia .barv compartilhada):
+   série em azul, com o HOJE aceso; demais dias num azul recuado */
+:root:not([data-tema="light"]) .v2 .barv {
+  background: linear-gradient(180deg, rgba(var(--azul-rgb), .5), rgba(var(--azul-rgb), .12));
+}
+:root:not([data-tema="light"]) .v2 .barv.hoje2 {
+  background: linear-gradient(180deg, #8FBCFF, #3E7BF0);
+  box-shadow: 0 0 18px rgba(var(--azul-rgb), calc(.4 * var(--fx)));
+}
+:root:not([data-tema="light"]) .v2 .bwrap:focus-visible .barv { box-shadow: 0 0 0 2px rgba(var(--azul-rgb), .5); }
+
 /* caret e seleção de texto */
 :root:not([data-tema="light"]) .v2 textarea,
 :root:not([data-tema="light"]) .v2 input { caret-color: var(--azul); }
