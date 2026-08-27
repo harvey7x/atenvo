@@ -14,7 +14,7 @@ import {
 } from '@/data/kanban';
 import { useBuscaContatos, type ContatoRow } from '@/data/contatos';
 import { useEtiquetas, useOrgUsuarios } from '@/data/atendimento';
-import { useFichasStatusDeOportunidades, fichaDemoDaOportunidade } from '@/data/fichaJudicial';
+import { useFichasStatusDeOportunidades, fichaDemoDaOportunidade, type FichaBoardResumo } from '@/data/fichaJudicial';
 import { useSlaAlertas } from '@/data/sla';
 import { indexPorChave, type SlaAlerta, type SlaTipo } from '@/data/slaView';
 import { corDaEtiqueta, type Etiqueta } from '@/types/atendimento';
@@ -152,6 +152,7 @@ const IcPontos = () => <Ic><circle cx="12" cy="5" r="1.4" fill="currentColor" st
 const IcKb = () => <Ic><rect x="3" y="4" width="5" height="16" rx="1.4" /><rect x="10" y="4" width="5" height="10" rx="1.4" /><rect x="17" y="4" width="5" height="13" rx="1.4" /></Ic>;
 const IcColapsar = () => <Ic><path d="M13 5l-6 7 6 7M20 5l-6 7 6 7" /></Ic>; // « recolher coluna
 const IcSino = () => <Ic><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></Ic>; // lembrete no card
+const IcChat = () => <Ic><path d="M21 12a8 8 0 0 1-8 8H4l2.2-2.6A8 8 0 1 1 21 12z" /></Ic>; // atalho pro WhatsApp no card
 
 type Aviso = { tom: 'ok' | 'erro'; texto: string } | null;
 
@@ -162,6 +163,8 @@ interface SeedKb {
   naoLidas: Record<string, number>;
   sla: SlaAlerta[];
   fichaStatus: Record<string, string>;
+  /** DEMO dos bancos da ficha no card: banco do cliente (recebe) + bancos das REVs. */
+  fichaBancos: Record<string, { banco: string | null; revs: string[] }>;
   eventos: Record<string, OppEvento[]>;
   bloqueados: Set<string>;
   contatos: ContatoRow[];
@@ -215,6 +218,7 @@ function seedKb(): SeedKb {
       { id: 'ks-2', tipo: 'atendimento_sem_resposta', severidade: 'amarelo', titulo: 'Sem resposta', detalhe: 'Conversa sem resposta da equipe.', conversa_id: 'kcv-1', oportunidade_id: 'kl-1', contato_id: 'kct-1', responsavel_id: null, vence_em: null, criado_em: iso(agora - 2 * h) } as SlaAlerta,
     ],
     fichaStatus: { 'kl-5': 'finalizada', 'kl-3': 'rascunho' },
+    fichaBancos: { 'kl-5': { banco: 'AGIBANK', revs: ['BANRISUL', 'BMG'] }, 'kl-3': { banco: 'MERCANTIL', revs: ['PAN'] } },
     eventos: {
       'kl-8': [evento({ id: 'ke-1', evento: 'ganho', colunaAnteriorId: 'kc-4', colunaNovaId: 'kc-5', respNoFechamentoNome: 'Matheus', executadoPorNome: 'Matheus', criadoEm: iso(agora - 48 * h) })],
       'kl-9': [evento({ id: 'ke-2', evento: 'perdido', colunaAnteriorId: 'kc-2', colunaNovaId: 'kc-6', motivoPerda: 'sem_interesse', executadoPorNome: 'Juliana', criadoEm: iso(agora - 72 * h) })],
@@ -321,7 +325,14 @@ export default function KanbanV2() {
     [demo, seed.sla, slaQ.data],
   );
   const fichaStatusQ = useFichasStatusDeOportunidades(useMemo(() => leads.map((l) => l.id), [leads]));
-  const fichaStatusMap = demo ? seed.fichaStatus : (fichaStatusQ.data ?? {});
+  // resumo por lead (status + bancos da ficha); no demo, sintetiza dos seeds
+  const fichaResumoMap: Record<string, FichaBoardResumo> = useMemo(() => (demo
+    ? Object.fromEntries(Object.entries(seed.fichaStatus).map(([id, st]) => [id, {
+        status: st as FichaBoardResumo['status'],
+        bancoNome: seed.fichaBancos[id]?.banco ?? null,
+        revBancos: seed.fichaBancos[id]?.revs ?? [],
+      }]))
+    : (fichaStatusQ.data ?? {})), [demo, seed.fichaStatus, seed.fichaBancos, fichaStatusQ.data]);
   const bloqueados = demo ? seed.bloqueados : (bloqueiosQ.data ?? new Set<string>());
   const etiquetas = etiquetasQ.data ?? [];
   const usuarios = usuariosQ.data ?? [];
@@ -364,7 +375,7 @@ export default function KanbanV2() {
     && (colunas.find((c) => c.id === l.colunaId)?.resultado ?? 'neutro') === 'neutro'
     && diasParado(l) >= LIMIAR_PARADO_DIAS;
   const nParados = useMemo(() => abertosNoRecorte.filter(estaParado).length, [abertosNoRecorte, colunas]); // eslint-disable-line react-hooks/exhaustive-deps
-  const nFichaPend = useMemo(() => abertosNoRecorte.filter((l) => fichaStatusMap[l.id] === 'rascunho').length, [abertosNoRecorte, fichaStatusMap]);
+  const nFichaPend = useMemo(() => abertosNoRecorte.filter((l) => fichaResumoMap[l.id]?.status === 'rascunho').length, [abertosNoRecorte, fichaResumoMap]);
   // origem/canal repetido em ~todos os cards é ruído → vira FILTRO no topo; no card só quando é exceção.
   // Conta 1 origem por LEAD ATIVO (em_andamento) — mesma base do "leads ativos", então os chips
   // SOMAM ~401 (decisão do dono). Antes contava sobre todos os status e somava ~524.
@@ -978,7 +989,8 @@ export default function KanbanV2() {
                 key={l.id} l={l} colunas={colunas} etiquetasCat={etiquetas}
                 naoLidas={naoLidasMap[l.contatoId ?? ''] ?? 0}
                 sla={(slaPorOpp.get(l.id) ?? []).filter((a) => !SLA_OCULTO_NO_CARD.has(a.tipo))}
-                fichaStatus={fichaStatusMap[l.id]} optout={!!l.contatoId && bloqueados.has(l.contatoId)}
+                fichaInfo={fichaResumoMap[l.id]} optout={!!l.contatoId && bloqueados.has(l.contatoId)}
+                aoAbrirConversa={() => { if (l.conversaOrigemId) nav((l.canalTipo === 'facebook' ? '/facebook' : '/whatsapp') + `?conversa=${encodeURIComponent(l.conversaOrigemId)}`); }}
                 moving={optim[l.id] !== undefined} arrastando={dragando === l.id} destacado={destaque === l.id}
                 menuAberto={menu?.kind === 'card' && menu.id === l.id}
                 aoRef={(el) => { cardRefs.current[l.id] = el; }}
@@ -1268,13 +1280,14 @@ function DetRow({ l, v }: { l: string; v: ReactNode }) {
    vs .hot (+30d ou SLA vermelho, trilho/tempo rubro) — com 51% do
    funil parado, só o .hot ganha o alarme forte para o vermelho valer.
    ================================================================ */
-function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, fichaStatus, optout, moving, arrastando, destacado, menuAberto, aoRef, aoClicar, aoMenu, aoDragStart, aoDragEnd }: {
+function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, fichaInfo, optout, moving, arrastando, destacado, menuAberto, aoRef, aoClicar, aoMenu, aoDragStart, aoDragEnd, aoAbrirConversa }: {
   l: KLead; colunas: KColuna[]; etiquetasCat: Etiqueta[]; naoLidas: number;
-  sla: SlaAlerta[]; fichaStatus: string | undefined; optout: boolean; moving: boolean; arrastando: boolean;
+  sla: SlaAlerta[]; fichaInfo: FichaBoardResumo | undefined; optout: boolean; moving: boolean; arrastando: boolean;
   destacado: boolean; menuAberto: boolean;
   aoRef: (el: HTMLDivElement | null) => void; aoClicar: () => void; aoMenu: (btn: HTMLElement) => void;
-  aoDragStart: (e: DragEvent) => void; aoDragEnd: () => void;
+  aoDragStart: (e: DragEvent) => void; aoDragEnd: () => void; aoAbrirConversa: () => void;
 }) {
+  const fichaStatus = fichaInfo?.status;
   const colAtual = colunas.find((c) => c.id === l.colunaId);
   const dp = diasParado(l);
   const paradoAtivo = l.status === 'em_andamento' && (colAtual?.resultado ?? 'neutro') === 'neutro' && dp >= LIMIAR_PARADO_DIAS;
@@ -1322,6 +1335,19 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, fichaStatus, optout, 
         </span>
       </div>
 
+      {/* BANCOS DA FICHA (pedido do dono 27/08 — "muito importante"): o banco DO CLIENTE
+          (recebe o benefício) em destaque + os bancos das REVs recuados. Só aparece quando
+          a ficha marca banco. */}
+      {fichaInfo && (fichaInfo.bancoNome || fichaInfo.revBancos.length > 0) && (
+        <div className="kc-bancos" title={'Bancos da ficha' + (fichaInfo.bancoNome ? ` · recebe: ${fichaInfo.bancoNome}` : '') + (fichaInfo.revBancos.length ? ` · REV: ${fichaInfo.revBancos.join(', ')}` : '')}>
+          {fichaInfo.bancoNome && <span className="kc-banco prin">{fichaInfo.bancoNome}</span>}
+          {fichaInfo.revBancos.slice(0, 3).map((b) => <span key={b} className="kc-banco">{b}</span>)}
+          {fichaInfo.revBancos.length > 3 && <span className="kc-banco mais">+{fichaInfo.revBancos.length - 3}</span>}
+        </div>
+      )}
+      {/* RESERVADO — estado do BOT no card (pedido do dono 27/08): quando a opção nascer
+          no bot, entra aqui o chip "Bot ativo" (fonte provável: ia_sessoes da conversa). */}
+
       {todasEtiquetas.length > 0 && (
         <div className="kc-etqs">
           {todasEtiquetas.slice(0, 2).map((t) => {
@@ -1342,6 +1368,12 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, fichaStatus, optout, 
         <span className={'kc-time num' + (paradoAtivo ? (hot ? ' hot' : ' warm') : '')} title={paradoAtivo ? `Sem trocar de coluna há ${dp} dia(s)` : 'Última atualização'}>
           {paradoAtivo ? `parado ${dp}d` : haDe(l.atualizadoEm || l.criadoEm)}
         </span>
+        {l.conversaOrigemId && (
+          <button type="button" className="kc-wa" title="Abrir a conversa do cliente no WhatsApp" aria-label={'Abrir a conversa de ' + l.nome + ' no WhatsApp'}
+            onClick={(e) => { e.stopPropagation(); aoAbrirConversa(); }}>
+            <IcChat />
+          </button>
+        )}
       </div>
 
       {badge && <span className={'kc-badge ' + badge.cls} title={badge.txt}>{badge.txt}</span>}

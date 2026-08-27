@@ -379,6 +379,25 @@
 
 /* ---- etiquetas SEMPRE visíveis no card (pedido do dono, 2026-08): pill neutra
    com dot na cor da etiqueta — a cor carrega o significado sem pintar o card ---- */
+/* BANCOS DA FICHA no card (dono 27/08): o banco do CLIENTE (recebe) em destaque,
+   REVs recuadas — mesmo idioma dos chips, caixa alta compacta */
+.v2 .kc-bancos { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
+.v2 .kc-banco {
+  font-size: 8.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--txt-2); border: 1px solid rgba(var(--tint), .14); background: rgba(var(--tint), .05);
+  border-radius: 5px; padding: 1.5px 6px; white-space: nowrap;
+}
+.v2 .kc-banco.prin { color: var(--txt); border-color: rgba(var(--tint), .3); background: rgba(var(--tint), .12); }
+.v2 .kc-banco.mais { color: var(--txt-3); border-style: dashed; background: none; }
+/* atalho pro WhatsApp no rodapé do card */
+.v2 .kc-wa {
+  margin-left: 6px; width: 22px; height: 22px; border-radius: 7px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+  color: var(--txt-2); background: rgba(var(--tint), .06); border: 1px solid rgba(var(--tint), .12);
+}
+.v2 .kc-wa:hover { color: var(--txt); background: rgba(var(--tint), .12); }
+.v2 .kc-wa svg { width: 12px; height: 12px; }
+
 .v2 .kc-etqs { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-top: 7px; }
 .v2 .kc-etq {
   display: inline-flex; align-items: center; gap: 5px; max-width: 128px;
