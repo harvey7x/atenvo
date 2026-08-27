@@ -701,7 +701,7 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
   // ---- retomada: o problema que motivou o chamado se resolveu → IA volta ao normal, alerta sai.
   //      SÓ para motivos que progresso de documento resolve — valores/senha/CPF divergente são
   //      assunto do humano e o alerta NÃO pode ser apagado por uma foto boa ----
-  const MOTIVOS_RETOMAVEIS = ['foto_ilegivel', 'comprovante_fora_janela', 'auxilio_extratos', 'sem_acesso_govbr', 'doc_divergente', 'nao_entendeu', 'transicao_falhou'];
+  const MOTIVOS_RETOMAVEIS = ['foto_ilegivel', 'foto_nao_carregou', 'comprovante_fora_janela', 'auxilio_extratos', 'sem_acesso_govbr', 'doc_divergente', 'nao_entendeu', 'transicao_falhou'];
   if (t.retomar && dados.aguardando_humano && MOTIVOS_RETOMAVEIS.includes(String(dados.aguardando_humano))) {
     (patch.dados as Record<string, unknown>).aguardando_humano = null;
     try {
@@ -895,10 +895,20 @@ async function etapaColetaDocs(ctx: Ctx): Promise<Turno> {
   }
 
   let retomar = false;
-  if (ctx.pendentes) notas.push('→ um arquivo do cliente NÃO chegou direito no sistema; peça para reenviar essa foto/arquivo.');
+  // FOTO QUE NÃO CARREGOU/ABRIU: NÃO insistir infinito (dono: não prender a pessoa numa etapa). 1ª vez
+  // pede pra reenviar; na 2ª falha, passa pro humano — um colega olha a imagem e continua com a pessoa.
+  if (ctx.pendentes) {
+    const n = marcaTentativa('foto_falhou');
+    if (n >= 2 && !aguardando) return await chamarHumanoColeta(ctx, 'foto_nao_carregou', dadosPatch, docsPatch, tent);
+    notas.push('→ uma foto do cliente NÃO chegou direito no sistema; peça UMA vez pra reenviar (culpe o envio/o aplicativo, nunca a pessoa), com calma.');
+  }
   if (ctx.arquivos.length) {
     const lote = await extrairLoteColeta(ctx);
-    if (lote.grandes) notas.push('→ um arquivo veio pesado demais e não abriu; peça como foto normal, tirada da galeria.');
+    if (lote.grandes) {
+      const n = marcaTentativa('foto_falhou');
+      if (n >= 2 && !aguardando) return await chamarHumanoColeta(ctx, 'foto_nao_carregou', dadosPatch, docsPatch, tent);
+      notas.push('→ uma foto veio pesada demais e não abriu; peça UMA vez como foto normal da galeria.');
+    }
     if (lote.excedeu && lote.corte) { extraTurno = { naoAvancarAlem: lote.corte, reagendarMs: 2_000 }; await evento(ctx.admin, ctx.sessao, 'arquivos_excedentes', { total: ctx.arquivos.length }); }
     for (const ident of lote.identidades) {
       const ehIdentidade = ident.tipo_documento === 'rg' || ident.tipo_documento === 'cnh';
