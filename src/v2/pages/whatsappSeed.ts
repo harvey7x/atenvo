@@ -42,7 +42,9 @@ export function seedWa(): WaContact[] {
       ...base,
       id: 'wa-jose', name: 'José Carlos Ferreira', phone: '5551987770001', contatoId: 'wa-jose-ct',
       time: '14:02', unread: 1, lastAtMs: agora - 58 * min, aguardando: true, aguardandoDesde: iso(agora - 58 * min),
-      etapa: 'EM ATENDIMENTO', respId: null, chip: 'LUIZA', iaStatus: 'pausada', iaEtapa: 'extratos', iaAguardando: 'auxilio_senha', precisaHumano: true,
+      /* sessão AINDA ATIVA com aguardando_humano = o estado âmbar VIVO (a IA está de pé,
+         esperando um humano ajudar com a senha; se fosse 'pausada' o flag seria resto morto) */
+      etapa: 'EM ATENDIMENTO', respId: null, chip: 'LUIZA', iaAtiva: true, iaStatus: 'ativa', iaEtapa: 'extratos', iaAguardando: 'auxilio_senha', precisaHumano: true,
       precisaHumanoMotivo: 'auxilio_senha', precisaHumanoEm: iso(agora - 57 * min),
       last: 'Não consegui entrar no aplicativo…', lastInter: 'há 58 min', tags: ['Revisão de contrato'],
       msgs: [

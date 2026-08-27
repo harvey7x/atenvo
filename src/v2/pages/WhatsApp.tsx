@@ -15,7 +15,7 @@ import { useCobrancas } from '@/data/cobrancas';
 import { corDaEtiqueta, podeGerenciarAtendimento, PALETA_CORES, type AssinaturaModo } from '@/types/atendimento';
 import { textoBloqueio, analisarNome, conversaAtiva } from '@/lib/higieneConversa';
 import { responsavelEfetivo } from '@/lib/conversaEtiquetas';
-import { construirItensConversa, type ItemConversa } from '@/lib/dataConversa';
+import { chaveDiaSP, construirItensConversa, type ItemConversa } from '@/lib/dataConversa';
 import { canalValidoParaEnvio } from '@/lib/agendamentoMensagem';
 import { initials } from '@/lib/avatar';
 import { useAuth } from '@/context/AuthContext';
@@ -408,6 +408,10 @@ function motivoHumanoLabel(slug: string | null | undefined): string | null {
     retorno_pendente_prioridade: 'retorno pendente prioritário',
     audio_recebido_bot: 'cliente mandou áudio para o bot',
     cliente_qualificado_bot: 'cliente qualificado pelo bot',
+    docs_completos_fechar: 'documentos completos — fechar com o cliente',
+    analise_pronta_contatar_hoje: 'análise pronta — contatar hoje',
+    falha_leitura_docs: 'não conseguiu ler os documentos',
+    falha_tecnica: 'falha técnica da IA',
   };
   return M[slug] ?? slug.replace(/_/g, ' ');
 }
@@ -590,13 +594,19 @@ export default function WhatsAppV2() {
     ? iaEstado
     : (current.iaStatus ? { existe: true, status: current.iaStatus, etapa: current.iaEtapa ?? undefined, aguardando_humano: current.iaAguardando ?? null } : undefined);
   const iaBarAtiva = !!iaBar?.existe && iaBar.status === 'ativa' && !iaBar.desativado_manual;  // MESMA fórmula do botão do cabeçalho
-  const iaBarMotivo = motivoHumanoLabel(iaBar?.aguardando_humano);
-  // prioridade do sinal: handoff (rubro) > aguardando humano (âmbar) > atendendo (verde) > pausada/encerrada (neutro)
+  // aguardando_humano VIVO = sessão ainda 'ativa'/'handoff'. Depois que o humano assume e
+  // responde, a sessão vira 'pausada' mas o backend NÃO limpa o flag (só a retomada de
+  // motivos retomáveis ou o ia_conversa_toggle ao reativar limpam) — sem este corte a barra
+  // ficaria âmbar "Aguardando humano" para sempre em conversa já atendida.
+  const iaAguardaVivo = !!iaBar?.aguardando_humano && (iaBar.status === 'ativa' || iaBar.status === 'handoff');
+  const iaBarMotivo = iaAguardaVivo || iaBar?.status === 'handoff' ? motivoHumanoLabel(iaBar?.aguardando_humano) : null;
+  // prioridade do sinal: handoff (rubro) > aguardando humano (âmbar) > atendendo (verde) > pausada/concluída/encerrada (neutro)
   const iaBarSinal = !current.id || !iaBar?.existe ? null
     : iaBar.status === 'handoff' ? { cls: 'handoff', rotulo: 'Handoff — IA passou para a equipe' }
-    : iaBar.aguardando_humano ? { cls: 'aguarda', rotulo: 'Aguardando humano' }
+    : iaAguardaVivo ? { cls: 'aguarda', rotulo: 'Aguardando humano' }
     : iaBarAtiva ? { cls: 'ok', rotulo: 'IA atendendo' }
     : iaBar.status === 'encerrada' ? { cls: 'neutro', rotulo: 'IA encerrada' }
+    : iaBar.status === 'concluida' ? { cls: 'neutro', rotulo: 'IA concluída' }
     : { cls: 'neutro', rotulo: 'IA pausada' };
   const agendarSeqMut = useAgendarSequencia();
   const editarAgMut = useEditarAgendamento();
@@ -763,9 +773,10 @@ export default function WhatsAppV2() {
   // "A IA pediu um humano" é o alerta operacional crítico — entra como DIVISOR no ponto
   // certo do fluxo: antes da primeira mensagem após precisa_humano_em; sem timestamp (ou
   // sendo o último evento), ao fim do fio. Item sintético só de exibição — nenhuma
-  // semântica muda. Fica de pé enquanto o pedido está de pé (conversas.precisa_humano OU
-  // sessão de IA em handoff/aguardando humano).
-  const handoffAtivo = !!current.id && (!!current.precisaHumano || iaBar?.status === 'handoff' || !!iaBar?.aguardando_humano);
+  // semântica muda. Fica de pé enquanto o pedido está de pé: conversas.precisa_humano (que o
+  // backend LIMPA quando o humano assume/responde) ou sessão em handoff/aguardando VIVO —
+  // nunca pelo flag aguardando_humano sozinho, que sobrevive em sessão pausada (ver iaAguardaVivo).
+  const handoffAtivo = !!current.id && (!!current.precisaHumano || iaBar?.status === 'handoff' || iaAguardaVivo);
   const handoffMotivo = motivoHumanoLabel(current.precisaHumanoMotivo) ?? iaBarMotivo;
   const handoffHora = current.precisaHumanoEm
     ? new Date(current.precisaHumanoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' })
@@ -780,9 +791,16 @@ export default function WhatsAppV2() {
         const ts = it.msg.tsISO ? Date.parse(it.msg.tsISO) : NaN;
         return Number.isFinite(ts) && ts >= em;
       });
-      // insere ANTES da primeira mensagem posterior ao pedido (o separador de dia dela,
-      // se houver, fica acima — o handoff pertence àquele dia)
-      if (idx >= 0) return [...itensConversa.slice(0, idx), ev, ...itensConversa.slice(idx)];
+      // insere ANTES da primeira mensagem posterior ao pedido. Handoff de VÉSPERA (pedido
+      // num dia anterior ao da mensagem seguinte) entra ACIMA do separador de dia dela —
+      // senão "· 23:50" renderizado sob o rótulo "Hoje" leria como hora de hoje.
+      if (idx >= 0) {
+        const alvo = itensConversa[idx];
+        const antes = itensConversa[idx - 1];
+        const diaEv = chaveDiaSP(current.precisaHumanoEm);
+        const pos = antes?.tipo === 'sep' && alvo.tipo === 'msg' && !!diaEv && diaEv !== chaveDiaSP(alvo.msg.tsISO ?? null) ? idx - 1 : idx;
+        return [...itensConversa.slice(0, pos), ev, ...itensConversa.slice(pos)];
+      }
     }
     return [...itensConversa, ev];
   }, [itensConversa, handoffAtivo, current.id, current.precisaHumanoEm]);

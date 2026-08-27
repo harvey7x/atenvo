@@ -61,6 +61,8 @@ export interface RowConversa {
   fixada_em?: string | null;
   silenciada_ate?: string | null;
   precisa_humano?: boolean | null;
+  precisa_humano_motivo?: string | null;
+  precisa_humano_em?: string | null;
   atendente_id?: string | null;
   status_id?: string | null;
   etiquetas?: string[] | null;
@@ -88,6 +90,10 @@ export function patchListaConversa(lista: WaContact[], row: RowConversa): WaCont
     if (row.fixada_em !== undefined) p.fixada = !!row.fixada_em;
     if (row.silenciada_ate !== undefined) p.silenciada = !!row.silenciada_ate && new Date(row.silenciada_ate).getTime() > Date.now();
     if (row.precisa_humano !== undefined) p.precisaHumano = !!row.precisa_humano;
+    // motivo/quando do pedido de humano viajam JUNTO com o flag: sem eles o evento de
+    // handoff do fio montaria sem motivo/hora até o refetch coalescido corrigir
+    if (row.precisa_humano_motivo !== undefined) p.precisaHumanoMotivo = row.precisa_humano_motivo ?? null;
+    if (row.precisa_humano_em !== undefined) p.precisaHumanoEm = row.precisa_humano_em ?? null;
     if (row.atendente_id !== undefined) p.atendenteId = row.atendente_id ?? null;
     if (row.status_id !== undefined) p.statusId = row.status_id ?? null;
     if (row.etiquetas !== undefined && row.etiquetas !== null) p.tags = row.etiquetas;

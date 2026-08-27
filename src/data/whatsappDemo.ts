@@ -86,7 +86,7 @@ export interface WaContact {
   /** IA/bot atendendo esta conversa AGORA (ia_sessoes.status='ativa' && !desativado_manual) —
    *  MESMA fórmula do botão do cabeçalho. Chega pela lista via fetch paralelo (padrão etapasPorContato). */
   iaAtiva?: boolean;
-  /** status BRUTO da sessão de IA: 'ativa' | 'pausada' | 'handoff' | 'encerrada' (undefined/null = sem sessão). */
+  /** status BRUTO da sessão de IA: 'ativa' | 'pausada' | 'handoff' | 'concluida' | 'encerrada' (undefined/null = sem sessão). */
   iaStatus?: string | null;
   /** DEMO da barra de IA: etapa atual do fluxo (real vem do RPC ia_conversa_estado, não da lista). */
   iaEtapa?: string | null;
@@ -155,7 +155,7 @@ export const WA_CONTACTS: WaContact[] = [
   },
   {
     id: 'marina', name: 'Marina Lopes', phone: '(11) 99888-4455', chip: 'Chip 1', time: '09:15', unread: 2,
-    iaStatus: 'pausada', iaEtapa: 'extratos', iaAguardando: 'auxilio_extratos', precisaHumano: true, precisaHumanoMotivo: 'auxilio_extratos',
+    iaAtiva: true, iaStatus: 'ativa', iaEtapa: 'extratos', iaAguardando: 'auxilio_extratos', precisaHumano: true, precisaHumanoMotivo: 'auxilio_extratos',
     tabs: ['todos', 'meus', 'pendentes'], status: 'Em atendimento',
     last: 'Enviei os documentos solicitados conforme combinado.',
     email: 'marina.lopes@email.com', stage: 'Em análise', resp: 'Henrique', origin: 'WhatsApp — Chip 1',
