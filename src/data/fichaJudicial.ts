@@ -211,6 +211,8 @@ export interface FichaBoardResumo {
   status: FichaStatus;
   bancoNome: string | null;
   revBancos: string[];
+  /** tipo de benefício marcado NA FICHA — fallback do card quando a oportunidade não tem. */
+  tipoBeneficio: string | null;
 }
 export function useFichasStatusDeOportunidades(ids: string[]) {
   const { currentOrg } = useOrg();
@@ -220,15 +222,15 @@ export function useFichasStatusDeOportunidades(ids: string[]) {
     queryKey: ['fichas-status', org, chave],
     enabled: FICHA_REAL && ids.length > 0,
     queryFn: async (): Promise<Record<string, FichaBoardResumo>> => {
-      const { data, error } = await supabase!.from('fichas_judiciais').select('oportunidade_id, status, versao, banco_nome, revisoes')
+      const { data, error } = await supabase!.from('fichas_judiciais').select('oportunidade_id, status, versao, banco_nome, revisoes, tipo_beneficio')
         .eq('organizacao_id', org).in('oportunidade_id', [...new Set(ids)]).order('versao', { ascending: false });
       if (error) throw new Error(error.message);
       const map: Record<string, FichaBoardResumo> = {};
       for (const r0 of (data as unknown[]) ?? []) {
-        const r = r0 as { oportunidade_id: string; status: FichaStatus; banco_nome: string | null; revisoes: { bancoNome?: string; banco_nome?: string }[] | null };
+        const r = r0 as { oportunidade_id: string; status: FichaStatus; banco_nome: string | null; revisoes: { bancoNome?: string; banco_nome?: string }[] | null; tipo_beneficio: string | null };
         if (!r.oportunidade_id || map[r.oportunidade_id]) continue; // primeira = maior versão
         const revBancos = [...new Set((r.revisoes ?? []).map((v) => (v.bancoNome ?? v.banco_nome ?? '').trim()).filter(Boolean))];
-        map[r.oportunidade_id] = { status: r.status, bancoNome: r.banco_nome?.trim() || null, revBancos };
+        map[r.oportunidade_id] = { status: r.status, bancoNome: r.banco_nome?.trim() || null, revBancos, tipoBeneficio: r.tipo_beneficio || null };
       }
       return map;
     },

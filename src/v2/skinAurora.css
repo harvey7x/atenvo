@@ -108,6 +108,9 @@
 
 /* atalho WhatsApp do card do Kanban: hover na secundária */
 :root:not([data-tema="light"]) .v2 .kc-wa:hover { color: #fff; background: rgba(var(--azul-rgb), .18); border-color: rgba(var(--azul-rgb), .5); }
+/* card do Kanban flutuando (referência) + chip de benefício na secundária */
+:root:not([data-tema="light"]) .v2 .kc { box-shadow: 0 6px 18px rgba(2, 4, 10, .3); }
+:root:not([data-tema="light"]) .v2 .kc-tag.benef { color: #BCD4FF; border-color: rgba(var(--azul-rgb), .4); background: rgba(var(--azul-rgb), .14); }
 
 /* barras de atividade (Agendamentos/Relatórios — anatomia .barv compartilhada):
    série em azul, com o HOJE aceso; demais dias num azul recuado */
@@ -213,6 +216,8 @@
 
 /* atalho WhatsApp do card do Kanban */
 :root[data-tema="light"] .v2.app-v2 .kc-wa:hover { color: var(--azul); background: rgba(var(--azul-rgb), .12); border-color: rgba(var(--azul-rgb), .45); }
+:root[data-tema="light"] .v2.app-v2 .kc { box-shadow: 0 6px 16px rgba(22, 25, 31, .07); }
+:root[data-tema="light"] .v2.app-v2 .kc-tag.benef { color: var(--azul); border-color: rgba(var(--azul-rgb), .35); background: rgba(var(--azul-rgb), .1); }
 
 /* barras de atividade */
 :root[data-tema="light"] .v2.app-v2 .barv { background: linear-gradient(180deg, rgba(var(--azul-rgb), .4), rgba(var(--azul-rgb), .1)); }

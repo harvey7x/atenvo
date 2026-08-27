@@ -331,6 +331,7 @@ export default function KanbanV2() {
         status: st as FichaBoardResumo['status'],
         bancoNome: seed.fichaBancos[id]?.banco ?? null,
         revBancos: seed.fichaBancos[id]?.revs ?? [],
+        tipoBeneficio: null,
       }]))
     : (fichaStatusQ.data ?? {})), [demo, seed.fichaStatus, seed.fichaBancos, fichaStatusQ.data]);
   const bloqueados = demo ? seed.bloqueados : (bloqueiosQ.data ?? new Set<string>());
@@ -1010,6 +1011,8 @@ export default function KanbanV2() {
               >
                 <div
                   className="kb-cab"
+                  /* sublinhado na COR da coluna (anatomia da referência) — 2px de acento sob o cabeçalho */
+                  style={{ boxShadow: `inset 0 -2px 0 ${col.cor}59` }}
                   draggable={podeConfig && !col.entrada}
                   onDragStart={(e) => {
                     if (!podeConfig || col.entrada) { e.preventDefault(); return; }
@@ -1297,7 +1300,11 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, fichaInfo, optout, mo
   const warm = !hot && (paradoAtivo || quente);
   const tier = hot ? ' hot' : warm ? ' warm' : '';
   const servLbl = l.tipoServico !== 'analise_inicial' ? rotuloDe(TIPO_SERVICO, l.tipoServico) : '';
-  const sub = [l.tipoBeneficio ? rotuloDe(TIPO_BENEFICIO, l.tipoBeneficio) : '', servLbl].filter(Boolean).join(' · ');
+  // tipo de benefício: da oportunidade; sem ele, o da FICHA (pedido do dono 27/08)
+  const benefBruto = l.tipoBeneficio ?? (fichaInfo?.tipoBeneficio as KLead['tipoBeneficio'] | null);
+  const benefLbl = benefBruto ? rotuloDe(TIPO_BENEFICIO, benefBruto) : '';
+  const dataEntrada = (l.entradaEm || l.criadoEm || '').slice(0, 10);
+  const dataCurta = dataEntrada ? dataEntrada.split('-').reverse().slice(0, 2).join('/') : '';
   // v3 F2 — PRÓXIMO PASSO: 1 badge que diz o que FAZER (não só o que é). "Sem responsável" já vive
   // em âmbar na linha do atendente; a estagnação, no "parado Xd" ao lado — o badge não os repete.
   const badge = optout ? { cls: 'blk', txt: 'Não incomodar' }
@@ -1323,10 +1330,12 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, fichaInfo, optout, mo
       onDragStart={aoDragStart}
       onDragEnd={aoDragEnd}
     >
-      <div className="kc-r1">
-        <span className="kc-nm" title={l.nome}>{fone ? <span className="num">{fone}</span> : nomeCard}{fone && <i className="kc-semnome">· sem nome</i>}</span>
-        {l.status === 'ganho' && <span className="kc-flag ganho" title="Fechado como ganho">Ganho</span>}
-        {l.status === 'perdido' && <span className="kc-flag perdido" title={'Perdido' + (l.motivoPerda ? ' · ' + rotuloMotivoPerda(l.motivoPerda) : '')}>Perdido</span>}
+      {/* linha de CHIPS (anatomia da referência: tag + data): tipo de benefício (azul,
+          secundária), serviço quando não é análise inicial, e a data de ENTRADA no funil */}
+      <div className="kc-tags">
+        {benefLbl && <span className="kc-tag benef" title={'Tipo de benefício: ' + benefLbl}>{benefLbl}</span>}
+        {servLbl && <span className="kc-tag" title={'Serviço: ' + servLbl}>{servLbl}</span>}
+        {dataCurta && <span className="kc-tag data num" title={'No funil desde ' + dataEntrada.split('-').reverse().join('/')}>{dataCurta}</span>}
         <span className="kb-menu-wrap">
           <button type="button" className={'mbtn' + (menuAberto ? ' on' : '')} aria-label={'Ações do lead ' + l.nome} aria-expanded={menuAberto} onClick={(e) => { e.stopPropagation(); aoMenu(e.currentTarget); }}>
             <IcPontos />
@@ -1334,6 +1343,12 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, fichaInfo, optout, mo
           {/* o dropdown do card é renderizado em PORTAL no nível da página (fora do overflow da coluna) */}
         </span>
       </div>
+      <div className="kc-r1">
+        <span className="kc-nm" title={l.nome}>{fone ? <span className="num">{fone}</span> : nomeCard}{fone && <i className="kc-semnome">· sem nome</i>}</span>
+        {l.status === 'ganho' && <span className="kc-flag ganho" title="Fechado como ganho">Ganho</span>}
+        {l.status === 'perdido' && <span className="kc-flag perdido" title={'Perdido' + (l.motivoPerda ? ' · ' + rotuloMotivoPerda(l.motivoPerda) : '')}>Perdido</span>}
+      </div>
+      {l.instituicao && <div className="kc-desc" title={'Instituição: ' + l.instituicao}>{l.instituicao}</div>}
 
       {/* BANCOS DA FICHA (pedido do dono 27/08 — "muito importante"): o banco DO CLIENTE
           (recebe o benefício) em destaque + os bancos das REVs recuados. Só aparece quando
@@ -1377,16 +1392,8 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, fichaInfo, optout, mo
       </div>
 
       {badge && <span className={'kc-badge ' + badge.cls} title={badge.txt}>{badge.txt}</span>}
-
-      {/* peek no HOVER — contexto rápido sem abrir nada (o detalhe completo vive no drawer ao clicar) */}
-      {(sub || l.instituicao) && (
-        <div className="kc-mais">
-          <div className="kc-peek">
-            {sub && <span className="sb" title={sub}>{sub}</span>}
-            {l.instituicao && <span className="in" title={l.instituicao}>{l.instituicao}</span>}
-          </div>
-        </div>
-      )}
+      {/* o antigo peek de hover morreu: benefício/serviço viraram chips e a instituição
+          virou descrição — card COMPLETO à vista (referência do dono 27/08) */}
     </div>
   );
 }

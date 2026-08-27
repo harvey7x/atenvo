@@ -60,8 +60,8 @@
 /* card .kc (mockup verbatim + conteúdo v1) */
 .v2 .kc {
   position: relative; background: linear-gradient(180deg, rgba(var(--tint), .06), rgba(var(--tint), .025));
-  border: 1px solid rgba(var(--tint), .1); border-radius: 11px; padding: 7px 10px 7px 12px;
-  margin-bottom: 6px; cursor: grab; transition: transform .2s var(--ease), box-shadow .2s, opacity .2s;
+  border: 1px solid rgba(var(--tint), .1); border-radius: 12px; padding: 9px 11px 9px 13px;
+  margin-bottom: 7px; cursor: grab; transition: transform .2s var(--ease), box-shadow .2s, opacity .2s;
 }
 .v2 .kc:hover { transform: translateY(-1px); }
 .v2 .kc::before { content: ""; position: absolute; left: 0; top: 9px; bottom: 9px; width: 3px; border-radius: 0 3px 3px 0; }
@@ -379,6 +379,20 @@
 
 /* ---- etiquetas SEMPRE visíveis no card (pedido do dono, 2026-08): pill neutra
    com dot na cor da etiqueta — a cor carrega o significado sem pintar o card ---- */
+/* CARD v4 (anatomia da referência do dono 27/08): linha de chips no topo
+   (benefício em azul-secundária · serviço · data de entrada), título maior,
+   instituição como descrição muted — tudo à vista, sem peek de hover. */
+.v2 .kc-tags { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-bottom: 5px; }
+.v2 .kc-tag {
+  font-size: 9px; font-weight: 600; letter-spacing: .02em; white-space: nowrap;
+  color: var(--txt-2); border: 1px solid rgba(var(--tint), .13); background: rgba(var(--tint), .05);
+  border-radius: 5px; padding: 1.5px 7px; max-width: 130px; overflow: hidden; text-overflow: ellipsis;
+}
+.v2 .kc-tag.benef { color: var(--txt); border-color: rgba(var(--tint), .24); background: rgba(var(--tint), .1); }
+.v2 .kc-tag.data { color: var(--txt-3); background: none; }
+.v2 .kc-tags .kb-menu-wrap { margin-left: auto; }
+.v2 .kc-desc { font-size: 10.5px; color: var(--txt-3); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
 /* BANCOS DA FICHA no card (dono 27/08): o banco do CLIENTE (recebe) em destaque,
    REVs recuadas — mesmo idioma dos chips, caixa alta compacta */
 .v2 .kc-bancos { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
