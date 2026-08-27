@@ -1045,22 +1045,6 @@ export default function WhatsAppV2() {
             </div>
 
             <div className="wa-composer">
-              {/* respostas rápidas — A PONTE: um BOTÃO abre o painel glass com TODOS os scripts
-                  (busca + favoritos + categorias); acaba o scroll horizontal. Clique num script
-                  reusa setScriptSeq → ScriptSequenceModal (confirmação, nunca envio cego). */}
-              {scripts.length > 0 && (
-                <div className="rapidas" role="group" aria-label="Scripts">
-                  <button
-                    ref={scrBtnRef} type="button" className={'wa-scr-btn' + (scrPop ? ' on' : '')}
-                    disabled={composerBloqueado} aria-haspopup="dialog" aria-expanded={!!scrPop}
-                    title="Scripts — busca, favoritos e categorias (atalho: / com a mensagem vazia)"
-                    onClick={abrirScripts}
-                  >
-                    <IcRaio /> Scripts <span className="ct">{scripts.length}</span>
-                  </button>
-                </div>
-              )}
-
               <div className="wa-linha-resp">
                 Responder por:
                 {demo ? (
@@ -1165,7 +1149,19 @@ export default function WhatsAppV2() {
                 <div className="tools">
                   <button type="button" className="tool" title="Enviar imagem" disabled={midiaDisabled} onClick={() => setImgModal(true)}><IcImg /></button>
                   <button type="button" className="tool" title="Enviar vídeo" disabled={midiaDisabled} onClick={() => setVideoModal(true)}><IcVideo /></button>
-                  <AudioRecorderV2 disabled={midiaDisabled} onEnviar={inbox.enviarAudio} permitirArquivo />
+                  <AudioRecorderV2 disabled={midiaDisabled} onEnviar={inbox.enviarAudio} />
+                  {/* Scripts encaixado aqui, no lugar do antigo "Arquivo": um botão abre o painel glass
+                      (busca + favoritos + categorias). Clique reusa setScriptSeq → ScriptSequenceModal. */}
+                  {scripts.length > 0 && (
+                    <button
+                      ref={scrBtnRef} type="button" className={'wa-scr-btn' + (scrPop ? ' on' : '')}
+                      disabled={composerBloqueado} aria-haspopup="dialog" aria-expanded={!!scrPop}
+                      title="Scripts — busca, favoritos e categorias (atalho: / com a mensagem vazia)"
+                      onClick={abrirScripts}
+                    >
+                      <IcRaio /><span>Scripts</span><span className="ct">{scripts.length}</span>
+                    </button>
+                  )}
                   <button type="button" className="tool" title="Enviar documento" disabled={midiaDisabled} onClick={() => setDocModal(true)}><IcDoc /></button>
                   <button type="button" className="tool" title="Compartilhar contato" disabled={midiaDisabled} onClick={() => setCtModal(true)}><IcContato /></button>
                   <button type="button" className="tool" title="Agendar mensagem" disabled={agendarDisabled} onClick={() => { setAgEditId(null); setAgendarAberto(true); }}><IcClock /></button>

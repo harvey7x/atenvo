@@ -273,21 +273,21 @@
 
 /* composer */
 .v2 .wa-composer { padding: 9px 14px 12px; border-top: 1px solid var(--linha); background: rgba(var(--tint), .015); flex-shrink: 0; }
-/* acesso rápido aos scripts: UM botão no lugar da tira (fim do scroll horizontal) */
-.v2 .rapidas { display: flex; gap: 6px; margin-bottom: 8px; }
-.v2 .wa-scr-btn {
-  display: inline-flex; align-items: center; gap: 6px;
+/* acesso rápido aos scripts: um botão ENCAIXADO na barra de ferramentas do composer
+   (no lugar do antigo "Arquivo"); casa a altura dos .tool (30px) e leva ícone + rótulo + contagem. */
+.v2 .cmsg .tools .wa-scr-btn {
+  display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 9px;
   font-size: 11px; font-weight: 600; color: var(--txt); background: rgba(var(--tint), .09);
-  border: 1px solid rgba(var(--tint), .16); border-radius: 99px; padding: 4px 11px 4px 9px;
+  border: 1px solid rgba(var(--tint), .16); border-radius: 9px;
   cursor: pointer; font-family: var(--fonte); white-space: nowrap;
 }
-.v2 .wa-scr-btn svg { width: 13px; height: 13px; color: var(--tint-solid, var(--txt)); flex: none; }
-.v2 .wa-scr-btn .ct {
+.v2 .cmsg .tools .wa-scr-btn svg { width: 14px; height: 14px; color: var(--txt); flex: none; }
+.v2 .cmsg .tools .wa-scr-btn .ct {
   font-size: 9.5px; font-weight: 700; color: var(--txt-2);
-  background: rgba(var(--tint), .14); border-radius: 99px; padding: 0 5px; min-width: 15px; text-align: center;
+  background: rgba(var(--tint), .16); border-radius: 99px; padding: 0 5px; min-width: 15px; text-align: center;
 }
-.v2 .wa-scr-btn:hover:not(:disabled), .v2 .wa-scr-btn.on { border-color: rgba(var(--tint), .34); background: rgba(var(--tint), .15); }
-.v2 .wa-scr-btn:disabled { opacity: .5; cursor: default; }
+.v2 .cmsg .tools .wa-scr-btn:hover:not(:disabled), .v2 .cmsg .tools .wa-scr-btn.on { color: var(--txt); border-color: rgba(var(--tint), .34); background: rgba(var(--tint), .15); }
+.v2 .cmsg .tools .wa-scr-btn:disabled { opacity: .45; cursor: default; }
 
 /* painel de scripts: reusa o VIDRO e o layout do seletor de etiquetas (.wa-etqpop);
    só a lista rola, busca e rodapé fixos; viewport-aware no TSX. */
