@@ -289,6 +289,16 @@
 .v2 .cmsg .tools .wa-scr-btn:hover:not(:disabled), .v2 .cmsg .tools .wa-scr-btn.on { color: var(--txt); border-color: rgba(var(--tint), .34); background: rgba(var(--tint), .15); }
 .v2 .cmsg .tools .wa-scr-btn:disabled { opacity: .45; cursor: default; }
 
+/* Gravando/prevendo áudio: o recorder (.arec-panel) expande e precisa da fileira
+   inteira. Some com os outros botões (ícones + Scripts) e deixa o painel crescer —
+   sem isso o painel quebra em 2 linhas e sobrepõe (Finalizar/Cancelar duplicados). */
+.v2 .cmsg .tools:has(.arec-panel) { flex: 1 1 auto; min-width: 0; }
+.v2 .cmsg .tools:has(.arec-panel) > .tool,
+.v2 .cmsg .tools:has(.arec-panel) > .wa-scr-btn { display: none; }
+.v2 .cmsg .tools .arec-panel { flex: 1 1 auto; min-width: 0; }
+/* durante o áudio, a caixa de texto cede espaço pro recorder (prioridade da fileira) */
+.v2 .cmsg:has(.arec-panel) textarea { flex: 0 1 96px; min-width: 0; }
+
 /* painel de scripts: reusa o VIDRO e o layout do seletor de etiquetas (.wa-etqpop);
    só a lista rola, busca e rodapé fixos; viewport-aware no TSX. */
 .v2 .wa-scrpop {
