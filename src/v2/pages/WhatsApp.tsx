@@ -1548,7 +1548,7 @@ export default function WhatsAppV2() {
           initial={agEditId ? (() => {
             const a = (agendadasQ.data ?? []).find((x) => x.id === agEditId);
             return a ? { canalId: a.canalId, texto: a.texto ?? '', executarEm: a.executarEm, tipo: a.tipo, nomeArquivo: a.nomeArquivo ?? undefined } : null;
-          })() : null}
+          })() : { canalId: inbox.replyCanalId || current.canalId || undefined }}
           aoFechar={() => { setAgendarAberto(false); setAgEditId(null); }}
           aoSubmeter={async (v) => {
             if (optout) { aoAvisar({ tom: 'erro', texto: optoutTexto }); return; }   // opt-out: revalidar no submit (pode ter bloqueado com o modal aberto)
