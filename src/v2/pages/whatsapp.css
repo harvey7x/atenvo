@@ -450,10 +450,23 @@
 .v2 .etq-nova button { flex-shrink: 0; border: none; border-radius: 7px; background: rgba(var(--tint), .1); color: var(--txt); font-family: var(--fonte); font-size: 11px; font-weight: 600; padding: 0 10px; cursor: pointer; }
 .v2 .etq-nova button:disabled { opacity: .45; cursor: default; }
 .v2 .etq-nova button:hover:not(:disabled) { background: rgba(var(--tint), .16); }
-.v2 .wa-hetq { display: inline-flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 600; border: 1px solid rgba(var(--tint), .14); border-radius: 99px; padding: 1px 8px 1px 6px; color: var(--txt-2); max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.v2 .wa-hetq i { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
-.v2 .cchip.etq { display: inline-flex; align-items: center; gap: 4px; max-width: 110px; overflow: hidden; text-overflow: ellipsis; }
-.v2 .cchip.etq i { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+/* Chip de etiqueta-CRUD — Platina estilo B, UNIFICADO lista + header.
+   Superfície neutra elevada + texto neutro; só a bolinha carrega a cor. */
+.v2 .etqchip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 10px; font-weight: 600; line-height: 1;
+  color: var(--txt-2);
+  background: rgba(var(--tint), .06);
+  border: 1px solid var(--linha);
+  border-radius: 99px; padding: 3px 9px 3px 7px;
+  max-width: 150px; vertical-align: middle;
+}
+.v2 .etqchip > i { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.v2 .etqchip .etqchip-nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .etqchip.mais { color: var(--txt-3); }
+/* variante compacta pro item da lista de conversa (mais sóbria que o status) */
+.v2 .etqchip.sm { font-size: 9px; gap: 4px; padding: 1px 7px 1px 5px; max-width: 104px; border-radius: 6px; }
+.v2 .etqchip.sm > i { width: 6px; height: 6px; }
 /* botão de adicionar etiqueta na seção do painel (substitui o "+" microscópico do título) */
 .v2 .etq-add { display: inline-flex; align-items: center; gap: 4px; border: 1px dashed rgba(var(--tint), .22); background: none; border-radius: 99px; color: var(--txt-2); font-family: var(--fonte); font-size: 11px; font-weight: 500; padding: 3px 11px; cursor: pointer; }
 .v2 .etq-add:hover { color: var(--txt); border-color: rgba(var(--tint), .4); background: rgba(var(--tint), .05); }

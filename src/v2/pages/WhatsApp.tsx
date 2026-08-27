@@ -75,6 +75,25 @@ const IcFoco = () => <Ic><path d="M4 9V5a1 1 0 0 1 1-1h4M15 4h4a1 1 0 0 1 1 1v4M
 type Pop = { kind: 'filtro' | 'acoes' | 'status' | 'scripts'; x: number; y: number; acima?: boolean } | null;
 
 /* ==================================================================
+   Chip de etiqueta-CRUD — Platina estilo B, UNIFICADO entre a lista de
+   conversa e o header. Superfície neutra elevada + texto neutro; SÓ a
+   bolinha carrega a cor da etiqueta (nada de cor de marca no fundo/texto).
+   `size='sm'` para o item da lista (mais sóbrio), padrão para o header.
+   `mais` = pílula de excedente "+N" (sem bolinha). Cor resolvida fora,
+   pela via atual (corDaEtiqueta / useEtiquetas).
+   ================================================================== */
+function EtiquetaChip({ nome, cor, size, mais, title }: {
+  nome: string; cor?: string; size?: 'sm' | 'md'; mais?: boolean; title?: string;
+}) {
+  return (
+    <span className={'etqchip' + (size === 'sm' ? ' sm' : '') + (mais ? ' mais' : '')} title={title ?? ('Etiqueta: ' + nome)}>
+      {!mais && cor && <i style={{ background: cor }} />}
+      <span className="etqchip-nm">{nome}</span>
+    </span>
+  );
+}
+
+/* ==================================================================
    Seletor de etiquetas do chat — glass, viewport-aware (flip + scroll
    interno na lista; busca/criar e rodapé SEMPRE fixos, nunca cortam).
    Caminho de dados INALTERADO: onToggle usa alternarEtiqueta (cache
@@ -741,8 +760,8 @@ export default function WhatsAppV2() {
                             {c.contatoId && bloqueados.has(c.contatoId) && <span className="cchip alerta" style={{ color: 'var(--rubro)', borderColor: 'rgba(var(--rubro-rgb),.4)' }} title={optoutTexto}>Não incomodar</span>}
                             {/* "Finalizado" só quando a situação NÃO já é terminal (ganho/perdido/cancelado) — evita verde ao lado de PERDIDO (Adendo 3) */}
                             {finalizado && !['ganho', 'perdido', 'cancelado'].includes(sit.variante) && <span className="cchip fim">Finalizado</span>}
-                            {c.tags.slice(0, 2).map((t) => { const cor = corDaEtiqueta(t, etiquetasQ.data); return <span key={t} className="cchip etq" style={{ color: cor, borderColor: cor + '55' }} title={'Etiqueta: ' + t}><i style={{ background: cor }} />{t}</span>; })}
-                            {c.tags.length > 2 && <span className="cchip etq" title={c.tags.slice(2).join(' · ')}>+{c.tags.length - 2}</span>}
+                            {c.tags.slice(0, 2).map((t) => <EtiquetaChip key={t} size="sm" nome={t} cor={corDaEtiqueta(t, etiquetasQ.data)} title={'Etiqueta: ' + t} />)}
+                            {c.tags.length > 2 && <EtiquetaChip size="sm" mais nome={'+' + (c.tags.length - 2)} title={c.tags.slice(2).join(' · ')} />}
                           </span>
                         </span>
                         <span className="m">
@@ -795,8 +814,8 @@ export default function WhatsAppV2() {
                     </span>
                   )}
                   <span className="wa-hchip" title="Atendente responsável">{current.respId ? nomePorId(current.respId) ?? 'Atendente' : 'Não atribuído'}</span>
-                  {current.tags.slice(0, 3).map((t) => { const cor = corDaEtiqueta(t, etiquetasQ.data); return <span key={t} className="wa-hetq" title={'Etiqueta: ' + t}><i style={{ background: cor }} />{t}</span>; })}
-                  {current.tags.length > 3 && <span className="wa-hetq" title={current.tags.slice(3).join(' · ')}>+{current.tags.length - 3}</span>}
+                  {current.tags.slice(0, 3).map((t) => <EtiquetaChip key={t} nome={t} cor={corDaEtiqueta(t, etiquetasQ.data)} title={'Etiqueta: ' + t} />)}
+                  {current.tags.length > 3 && <EtiquetaChip mais nome={'+' + (current.tags.length - 3)} title={current.tags.slice(3).join(' · ')} />}
                 </div>
               </div>
               <div className="dir">
