@@ -1,0 +1,119 @@
+/* ============================================================
+   SKIN EXPERIMENTAL "AURORA" — branch teste/skin-aurora-azul.
+   Direção (referência bokeh do dono): fundo EMBAÇADO colorido
+   atrás do app — o preto chapado vira profundidade — + AZUL como
+   cor SECUNDÁRIA de interação (o Platina não tinha secundária;
+   os semânticos verde/âmbar/rubro seguem intactos).
+
+   Como funciona: o fundo é bokeh de GRADIENTES suaves (não foto),
+   então a translucidez das superfícies já entrega o "embaçado"
+   SEM backdrop-filter por elemento — lite-safe por construção.
+   Só o tema ESCURO: tudo aqui é guardado por
+   :root:not([data-tema="light"]) (o guarda também dá a
+   especificidade pra vencer o CSS lazy das páginas).
+   Reverter o teste = remover o import em AppShellV2.
+   ============================================================ */
+
+:root:not([data-tema="light"]) .v2 {
+  /* azul secundário do teste — interação/seleção */
+  --azul: #4C8DFF;
+  --azul-rgb: 76, 141, 255;
+}
+
+/* --- 1. FUNDO BOKEH (fixo, atrás de tudo) -------------------
+   âmbar quente no canto inferior-direito (como a referência),
+   azul frio no topo-esquerdo, violeta e azul de apoio no meio. */
+:root:not([data-tema="light"]) .v2.app-v2 {
+  background:
+    radial-gradient(52% 46% at 86% 94%, rgba(216, 148, 62, .16), transparent 68%),
+    radial-gradient(46% 42% at 6% 4%, rgba(var(--azul-rgb), .13), transparent 66%),
+    radial-gradient(38% 44% at 76% 10%, rgba(126, 96, 224, .08), transparent 70%),
+    radial-gradient(34% 38% at 36% 72%, rgba(var(--azul-rgb), .06), transparent 70%),
+    var(--base);
+}
+
+/* --- 2. SUPERFÍCIES REVELAM O FUNDO -------------------------
+   Os painéis do inbox já são tint-sobre-base (translúcidos); o
+   único pintor OPACO é o fio da conversa — vira véu escuro leve
+   e a tonalidade passa por trás das bolhas. */
+:root:not([data-tema="light"]) .v2 .wa-msgs {
+  background-color: rgba(8, 9, 12, .32);
+}
+
+/* bolhas: deixam de ser opacas — véu escuro translúcido + o wash
+   de tinta existente; o bokeh é suave, então o texto segue 100%
+   legível sem blur. Enviada um degrau mais presente que a recebida. */
+:root:not([data-tema="light"]) .v2 .bolha.rec { background-color: rgba(13, 15, 19, .56); }
+:root:not([data-tema="light"]) .v2 .bolha.env2 { background-color: rgba(15, 17, 22, .62); }
+
+/* --- 3. AZUL COMO SECUNDÁRIA DE INTERAÇÃO ------------------- */
+/* item ativo da navegação (pill azul, como a referência) */
+:root:not([data-tema="light"]) .v2 .item.on {
+  background: rgba(var(--azul-rgb), .16);
+  color: #fff;
+}
+:root:not([data-tema="light"]) .v2 .item.on::before { background: var(--azul); }
+
+/* ação primária: o metal platina vira azul (referência "Dispatch Now") */
+:root:not([data-tema="light"]) .v2 .btn-pri {
+  background: linear-gradient(180deg, #5FA0FF, #3372EC);
+  color: #fff;
+  box-shadow: 0 10px 26px rgba(var(--azul-rgb), calc(.32 * var(--fx))), inset 0 1px 0 rgba(255, 255, 255, .35);
+}
+
+/* aba ativa do inbox */
+:root:not([data-tema="light"]) .v2 .wa-aba.on {
+  background: rgba(var(--azul-rgb), .16);
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgba(var(--azul-rgb), .25);
+}
+
+/* --- 3b. AZUL: segunda leva de pontos de interação --------------
+   Regra do teste: azul marca INTERAÇÃO/SELEÇÃO/ATENÇÃO-neutra;
+   verde/âmbar/rubro seguem exclusivos de estado. */
+
+/* badge de não-lidas da lista (metal claro → azul: é "tem coisa nova", não status) */
+:root:not([data-tema="light"]) .v2 .conv2 .nl {
+  background: linear-gradient(180deg, #6BA6FF, #3B78EE);
+  color: #fff;
+}
+
+/* botão Enviar do composer (par do btn-pri) */
+:root:not([data-tema="light"]) .v2 .env-b {
+  background: linear-gradient(180deg, #5FA0FF, #3372EC);
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35);
+}
+
+/* toggle LIGADO (o padrão .tgl é o estado on; .off segue neutro) */
+:root:not([data-tema="light"]) .v2 .tgl {
+  background: linear-gradient(180deg, #5FA0FF, #3372EC);
+}
+:root:not([data-tema="light"]) .v2 .tgl::after { background: #fff; }
+:root:not([data-tema="light"]) .v2 .tgl.off { background: rgba(var(--tint), .12); }
+:root:not([data-tema="light"]) .v2 .tgl.off::after { background: var(--txt-2); }
+
+/* foco de input: o anel deixa de ser tinta e vira azul */
+:root:not([data-tema="light"]) .v2 .inp:focus {
+  border-color: rgba(var(--azul-rgb), .55);
+  box-shadow: 0 0 0 3px rgba(var(--azul-rgb), .12);
+}
+:root:not([data-tema="light"]) .v2 .campo.invalida .inp:focus { box-shadow: 0 0 0 3px rgba(var(--rubro-rgb), .10); } /* inválido segue rubro */
+
+/* chips/botões ativos do inbox: "Responder por" e ícones .on */
+:root:not([data-tema="light"]) .v2 .wa-chipbtn.on { background: rgba(var(--azul-rgb), .16); color: #fff; }
+:root:not([data-tema="light"]) .v2 .ib2.on { color: #fff; border-color: rgba(var(--azul-rgb), .5); background: rgba(var(--azul-rgb), .12); }
+:root:not([data-tema="light"]) .v2 .cmsg .tools .wa-scr-btn.on { color: #fff; border-color: rgba(var(--azul-rgb), .5); background: rgba(var(--azul-rgb), .16); }
+
+/* links de ação nas bolhas (falha segue rubro por semântica) */
+:root:not([data-tema="light"]) .v2 .audio-ind .lnk,
+:root:not([data-tema="light"]) .v2 .doc2 .acts .lnk { color: var(--azul); }
+
+/* caret e seleção de texto */
+:root:not([data-tema="light"]) .v2 textarea,
+:root:not([data-tema="light"]) .v2 input { caret-color: var(--azul); }
+:root:not([data-tema="light"]) .v2 ::selection { background: rgba(var(--azul-rgb), .3); }
+
+/* --- 4. LITE: sem transparência nas bolhas (voltam sólidas) --- */
+[data-perf="lite"]:not([data-tema="light"]) .v2 .bolha.rec,
+[data-perf="lite"]:not([data-tema="light"]) .v2 .bolha.env2 { background-color: var(--base); }

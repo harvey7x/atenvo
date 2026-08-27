@@ -7,6 +7,7 @@ import '../fontes';
 import '../tokens.css';
 import '../base.css';
 import './shell.css';
+import '../skinAurora.css'; // TESTE (branch teste/skin-aurora-azul): fundo bokeh + azul secundário
 import { instalarSpotlight } from '../lib/spotlight';
 import { criarRaizPortalV2 } from '../components/portal';
 import { ICONES } from './icones';
