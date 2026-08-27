@@ -280,7 +280,7 @@ async function diagExtracao(admin: Admin, canalId: string | null): Promise<Respo
     const { r, modeloUsado } = await chamarComRecuperacao(admin, cfg.canal_id, modelos, 'chat', {
       system: PROMPT_LOTE_COLETA,
       partes: [{ inline_data: { mime_type: 'image/png', data: png } }, { text: 'É 1 imagem de teste. Extraia no JSON pedido.' }],
-      schema: SCHEMA_LOTE_COLETA, temperatura: 0, maxTokens: 4096, semPensar: true,
+      schema: SCHEMA_LOTE_COLETA, temperatura: 0, maxTokens: 8192, semPensar: true,
     });
     return json({ ok: true, modelo: modeloUsado, tokens: [r.tokensIn, r.tokensOut], resposta: r.json });
   } catch (e) {
@@ -1064,7 +1064,7 @@ async function extrairLoteColeta(ctx: Ctx): Promise<LoteColeta> {
   if (!partes.length) return { identidades: [], comprovante: null, outros: 0, grandes, excedeu: excedeu6, corte: ctx.arquivos[5]?.criado_em };
   partes.push({ text: `São ${anexadas} imagem(ns) do mesmo cliente, enviadas juntas. Extraia no JSON pedido.` });
   const j = await geminiSessao(ctx, 'extracao_lote', {
-    system: PROMPT_LOTE_COLETA, partes, schema: SCHEMA_LOTE_COLETA, temperatura: 0, maxTokens: 4096, semPensar: true,
+    system: PROMPT_LOTE_COLETA, partes, schema: SCHEMA_LOTE_COLETA, temperatura: 0, maxTokens: 8192, semPensar: true,
   });
   const identidades = Array.isArray((j as { identidades?: unknown }).identidades) ? (j as { identidades: Array<Record<string, unknown>> }).identidades : [];
   const comprovante = ((j as { comprovante?: unknown }).comprovante && typeof (j as { comprovante?: unknown }).comprovante === 'object')
