@@ -57,6 +57,16 @@ const TABS = [
   ['naolidas', 'Não lidas'], ['pendentes', 'Pendentes'], ['arquivadas', 'Arquivadas'],
 ] as const;
 type TabId = typeof TABS[number][0];
+// Situação = baldes FIXOS de situacaoDaConversa (variante). 'etapa' fica DE FORA: as etapas
+// avançadas do Kanban têm faceta própria (Etapa do Kanban) — sem redundância.
+const SITUACAO_OPCOES: ReadonlyArray<readonly [string, string]> = [
+  ['lead', 'Lead novo'], ['atendimento', 'Em atendimento'], ['aguardando', 'Aguardando cliente'],
+  ['ganho', 'Fechado'], ['perdido', 'Perdido'], ['cancelado', 'Cancelado'],
+];
+const IA_OPCOES: ReadonlyArray<readonly [string, string]> = [
+  ['ativa', 'Com IA ativa'], ['pausada', 'IA pausada / handoff'], ['humano', 'Precisa de humano'],
+];
+const PERIODO_OPCOES: ReadonlyArray<readonly [string, string]> = [['hoje', 'Hoje'], ['7d', '7 dias'], ['30d', '30 dias']];
 const ASSINA_OPCOES = [['sem', 'Sem assinatura'], ['atendente', 'Nome do atendente'], ['empresa', 'Nome da empresa'], ['personalizado', 'Nome personalizado']] as const;
 
 const IcWa = () => <Ic><path d="M21 11.5a8.4 8.4 0 01-9 8.4 8.9 8.9 0 01-3.8-.8L3 20l1-4.9a8.3 8.3 0 01-1-4A8.4 8.4 0 0112 3a8.4 8.4 0 019 8.5z" /></Ic>;
@@ -428,10 +438,30 @@ export default function WhatsAppV2() {
     return s;
   });
   const [search, setSearch] = useState('');
-  const [filtroCanal, setFiltroCanal] = useState<string | null>(null);
-  const [filtroStatus, setFiltroStatus] = useState<string | null>(null);
-  const [filtroTransporte, setFiltroTransporte] = useState<string | null>(null);
-  const [filtroEtapa, setFiltroEtapa] = useState<string | null>(null);
+  // FILTRO COMPLETO (client-side, aplicado em passaBase sobre a lista JÁ em memória).
+  // Facetas combinam entre si com E; multi-seleção dentro de cada com OU. O grupo "Status"
+  // (status_id) foi APOSENTADO — a Situação agora vem de situacaoDaConversa (o chip da lista).
+  const [filtroCanais, setFiltroCanais] = useState<Set<string>>(new Set());        // conversas.canal_id (OU)
+  const [filtroTransporte, setFiltroTransporte] = useState<Set<string>>(new Set()); // 'cloud_api' | 'evolution'
+  const [filtroEtapas, setFiltroEtapas] = useState<Set<string>>(new Set());          // nome da coluna do Kanban (OU)
+  const [filtroEtiquetas, setFiltroEtiquetas] = useState<Set<string>>(new Set());    // etiquetas (cache text[]) (OU)
+  const [filtroAtendentes, setFiltroAtendentes] = useState<Set<string>>(new Set());  // respId; '' = Não atribuído (OU)
+  const [filtroIA, setFiltroIA] = useState<Set<string>>(new Set());                  // 'ativa' | 'pausada' | 'humano'
+  const [filtroSituacao, setFiltroSituacao] = useState<Set<string>>(new Set());      // variante de situacaoDaConversa (OU)
+  const [filtroNaoLidas, setFiltroNaoLidas] = useState(false);
+  const [filtroArquivadas, setFiltroArquivadas] = useState(false);
+  const [filtroPeriodo, setFiltroPeriodo] = useState<string | null>(null);           // 'hoje' | '7d' | '30d'
+  // alterna um valor num Set-state (imutável) — mantém o painel aberto (multi-seleção)
+  const alternarSet = (setter: React.Dispatch<React.SetStateAction<Set<string>>>, v: string) =>
+    setter((cur) => { const n = new Set(cur); if (n.has(v)) n.delete(v); else n.add(v); return n; });
+  const limparFiltros = () => {
+    setFiltroCanais(new Set()); setFiltroTransporte(new Set()); setFiltroEtapas(new Set());
+    setFiltroEtiquetas(new Set()); setFiltroAtendentes(new Set()); setFiltroIA(new Set());
+    setFiltroSituacao(new Set()); setFiltroNaoLidas(false); setFiltroArquivadas(false); setFiltroPeriodo(null);
+  };
+  const filtrosAtivos = filtroCanais.size > 0 || filtroTransporte.size > 0 || filtroEtapas.size > 0
+    || filtroEtiquetas.size > 0 || filtroAtendentes.size > 0 || filtroIA.size > 0 || filtroSituacao.size > 0
+    || filtroNaoLidas || filtroArquivadas || !!filtroPeriodo;
   const [pop, setPop] = useState<Pop>(null);
   const [etqPop, setEtqPop] = useState<DOMRect | null>(null); // seletor de etiquetas (portal próprio, viewport-aware)
   const [scrPop, setScrPop] = useState<DOMRect | null>(null); // seletor de scripts (mesmo tratamento glass)
@@ -560,7 +590,7 @@ export default function WhatsAppV2() {
   useEffect(() => {
     if (!conversaParam) return;
     inbox.selecionarPorDeepLink(conversaParam);
-    setTab('todos'); setFiltroCanal(null); setFiltroStatus(null); setFiltroTransporte(null); setSearch('');
+    setTab('todos'); limparFiltros(); setSearch(''); // revela o alvo: sem faceta ativa escondendo o card
     setGruposFechados(new Set()); // expande tudo: o card alvo pode estar num grupo recolhido
     const t = window.setTimeout(() => {
       document.querySelector(`[data-cid="${CSS.escape(conversaParam)}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
@@ -576,19 +606,40 @@ export default function WhatsAppV2() {
   /* ---------- fila: filtro/contadores/ordenação (v1 L287-334) ---------- */
   const buscaAtiva = search.trim().length > 0;
   const term = search.trim().toLowerCase();
+  // faixa de "última interação" (lastAtMs): hoje = desde a meia-noite local; 7d/30d = janela.
+  const dentroPeriodo = (ms: number | undefined | null): boolean => {
+    if (!filtroPeriodo) return true;
+    if (!ms) return false;
+    if (filtroPeriodo === 'hoje') { const d = new Date(relogioMs); d.setHours(0, 0, 0, 0); return ms >= d.getTime(); }
+    const dias = filtroPeriodo === '7d' ? 7 : 30;
+    return relogioMs - ms <= dias * 86_400_000;
+  };
+  // TODAS as facetas em passaBase (client-side, sobre a lista já carregada em memória).
+  // Multi dentro da faceta = OU; entre facetas = E. "QR (não oficial)" = tudo que NÃO é o oficial
+  // (inclui canal removido/histórico, transporte desconhecido). filtroTransporte com os 2 = sem efeito.
   const passaBase = (c: WaContact) =>
-    (!filtroCanal || c.canalId === filtroCanal) &&
-    (!filtroStatus || c.statusId === filtroStatus) &&
-    (!filtroEtapa || c.etapa === filtroEtapa) &&
-    // "QR (não oficial)" = tudo que NÃO é o canal oficial (inclui canal removido/histórico,
-    // cujo transporte é desconhecido) — sem terceiro balde invisível entre as duas opções
-    (!filtroTransporte || (filtroTransporte === 'cloud_api'
+    (filtroCanais.size === 0 || (!!c.canalId && filtroCanais.has(c.canalId))) &&
+    (filtroTransporte.size === 0 || filtroTransporte.size === 2 || (filtroTransporte.has('cloud_api')
       ? transporteDe(c.canalId) === 'cloud_api'
       : transporteDe(c.canalId) !== 'cloud_api')) &&
+    (filtroEtapas.size === 0 || (!!c.etapa && filtroEtapas.has(c.etapa))) &&
+    (filtroEtiquetas.size === 0 || c.tags.some((t) => filtroEtiquetas.has(t))) &&
+    (filtroAtendentes.size === 0 || filtroAtendentes.has(responsavelEfetivo(c) ?? '')) &&
+    (filtroIA.size === 0 || (
+      (filtroIA.has('ativa') && !!c.iaAtiva) ||
+      (filtroIA.has('pausada') && (c.iaStatus === 'pausada' || c.iaStatus === 'handoff')) ||
+      (filtroIA.has('humano') && !!c.precisaHumano)
+    )) &&
+    // Situação REUSA situacaoDaConversa (via situacaoDe) — a MESMA fonte do chip da lista (read-only).
+    (filtroSituacao.size === 0 || filtroSituacao.has(situacaoDe(c).variante)) &&
+    (!filtroNaoLidas || (c.unread ?? 0) > 0) &&
+    (!filtroArquivadas || !!c.arquivada) &&
+    dentroPeriodo(c.lastAtMs) &&
     (!term || c.name.toLowerCase().includes(term) || c.last.toLowerCase().includes(term) || (c.phone ?? '').toLowerCase().includes(term));
   const passaTab = (c: WaContact, t: TabId) =>
     t === 'arquivadas' ? !!c.arquivada
-    : (!c.arquivada || buscaAtiva) && (
+    // o toggle "Arquivadas" do painel revela arquivadas em qualquer aba (como a busca já faz)
+    : (!c.arquivada || buscaAtiva || filtroArquivadas) && (
       t === 'todos' ? true
       : t === 'meus' ? c.respId === user?.id
       : t === 'naoatrib' ? !c.respId
@@ -601,12 +652,12 @@ export default function WhatsAppV2() {
     for (const [t] of TABS) n[t] = base.filter((c) => passaTab(c, t)).length;
     return n;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contacts, filtroCanal, filtroStatus, filtroTransporte, filtroEtapa, canalPorId, term, user?.id]);
+  }, [contacts, filtroCanais, filtroTransporte, filtroEtapas, filtroEtiquetas, filtroAtendentes, filtroIA, filtroSituacao, filtroNaoLidas, filtroArquivadas, filtroPeriodo, canalPorId, term, user?.id]);
   const visiveis = useMemo(() => {
     const lista = contacts.filter((c) => passaBase(c) && passaTab(c, tab));
     return lista.sort((a, b) => (a.fixada === b.fixada ? (b.lastAtMs ?? 0) - (a.lastAtMs ?? 0) : a.fixada ? -1 : 1));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contacts, tab, filtroCanal, filtroStatus, filtroTransporte, canalPorId, term, user?.id]);
+  }, [contacts, tab, filtroCanais, filtroTransporte, filtroEtapas, filtroEtiquetas, filtroAtendentes, filtroIA, filtroSituacao, filtroNaoLidas, filtroArquivadas, filtroPeriodo, canalPorId, term, user?.id]);
   /* agrupamento por responsável — VOCÊ primeiro (seus clientes sempre visíveis no Todos),
      depois Não atribuídos, depois os demais atendentes em ordem alfabética */
   const grupos = useMemo(() => {
@@ -749,6 +800,25 @@ export default function WhatsAppV2() {
     }
     return [...m.entries()].map(([nome, cor]) => ({ nome, cor })).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
   }, [contacts]);
+  // RESUMO ATIVO: um chip removível por valor de faceta aplicado (+ "Limpar tudo" no painel).
+  const rotuloCanal = (id: string) => canalPorId.get(id)?.alias ?? 'Número removido';
+  const rotuloSituacao = (v: string) => SITUACAO_OPCOES.find(([k]) => k === v)?.[1] ?? v;
+  const rotuloIA = (v: string) => IA_OPCOES.find(([k]) => k === v)?.[1] ?? v;
+  const resumoFiltros = useMemo(() => {
+    const out: { key: string; label: string; remover: () => void }[] = [];
+    for (const id of filtroCanais) out.push({ key: 'canal:' + id, label: rotuloCanal(id), remover: () => alternarSet(setFiltroCanais, id) });
+    for (const t of filtroTransporte) out.push({ key: 'transp:' + t, label: t === 'cloud_api' ? 'Oficial' : 'QR', remover: () => alternarSet(setFiltroTransporte, t) });
+    for (const e of filtroEtapas) out.push({ key: 'etapa:' + e, label: e, remover: () => alternarSet(setFiltroEtapas, e) });
+    for (const et of filtroEtiquetas) out.push({ key: 'etq:' + et, label: et, remover: () => alternarSet(setFiltroEtiquetas, et) });
+    for (const a of filtroAtendentes) out.push({ key: 'at:' + a, label: a === '' ? 'Não atribuído' : (nomePorId(a) ?? 'Atendente'), remover: () => alternarSet(setFiltroAtendentes, a) });
+    for (const i of filtroIA) out.push({ key: 'ia:' + i, label: rotuloIA(i), remover: () => alternarSet(setFiltroIA, i) });
+    for (const s of filtroSituacao) out.push({ key: 'sit:' + s, label: rotuloSituacao(s), remover: () => alternarSet(setFiltroSituacao, s) });
+    if (filtroNaoLidas) out.push({ key: 'naolidas', label: 'Não lidas', remover: () => setFiltroNaoLidas(false) });
+    if (filtroArquivadas) out.push({ key: 'arquivadas', label: 'Arquivadas', remover: () => setFiltroArquivadas(false) });
+    if (filtroPeriodo) out.push({ key: 'periodo', label: PERIODO_OPCOES.find(([k]) => k === filtroPeriodo)?.[1] ?? filtroPeriodo, remover: () => setFiltroPeriodo(null) });
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtroCanais, filtroTransporte, filtroEtapas, filtroEtiquetas, filtroAtendentes, filtroIA, filtroSituacao, filtroNaoLidas, filtroArquivadas, filtroPeriodo, canalPorId, nomeMap]);
   const statusFechada = statusQ.data?.find((s) => (s.slug ?? s.nome).toLowerCase() === 'fechada');
   const aplicarStatus = async (id: string) => {
     const st = statusAtivos.find((s) => s.id === id);
@@ -815,7 +885,9 @@ export default function WhatsAppV2() {
             <div className="l1">
               <h3>Conversas</h3>
               <div className="bts">
-                <button type="button" className={'ib2' + (filtroCanal || filtroStatus || filtroTransporte || filtroEtapa ? ' on' : '')} title={filtroCanal || filtroStatus || filtroTransporte || filtroEtapa ? 'Filtros ativos' : 'Filtros'} onClick={(e) => abrirPop('filtro', e)}><IcFunil /></button>
+                <button type="button" className={'ib2' + (filtrosAtivos ? ' on' : '')} title={filtrosAtivos ? `Filtros ativos (${resumoFiltros.length})` : 'Filtros'} onClick={(e) => abrirPop('filtro', e)}>
+                  <IcFunil />{filtrosAtivos && <span className="fbadge num">{resumoFiltros.length}</span>}
+                </button>
                 <button type="button" className="ib2" title="Nova conversa" aria-label="Nova conversa" onClick={() => setNovaConversa(true)}><IcMais /></button>
               </div>
             </div>
@@ -835,6 +907,16 @@ export default function WhatsAppV2() {
                 </button>
               ))}
             </div>
+            {resumoFiltros.length > 0 && (
+              <div className="wa-fchips" role="list" aria-label="Filtros aplicados">
+                {resumoFiltros.map((f) => (
+                  <button key={f.key} type="button" role="listitem" className="wa-fchip" title={'Remover filtro: ' + f.label} onClick={f.remover}>
+                    <span className="tt">{f.label}</span><span className="x" aria-hidden>×</span>
+                  </button>
+                ))}
+                <button type="button" className="wa-fchip limpar" title="Remover todos os filtros" onClick={limparFiltros}>Limpar tudo</button>
+              </div>
+            )}
           </div>
           <div className="wa-lista">
             {WA_REAL && inbox.live.isError && contacts.length === 0 ? (
@@ -905,6 +987,7 @@ export default function WhatsAppV2() {
                           <span className="p">{c.last || '—'}</span>
                           <span className="chips">
                             {(() => { const cor = corDaSituacao(c, sit.texto); return <span className={'cchip etapa sit-' + sit.variante} title="Situação no funil" style={cor ? { background: cor + '26', color: cor } : undefined}>{sit.texto}</span>; })()}
+                            {c.iaAtiva && <span className="cchip ia" title="A IA/bot está atendendo esta conversa agora">IA</span>}
                             {alertas.length > 0 && <span className="cchip alerta" title={alertas.join(' · ')}>⚠{alertas.length > 1 ? ' ' + alertas.length : ''}</span>}
                             {c.contatoId && bloqueados.has(c.contatoId) && <span className="cchip alerta" style={{ color: 'var(--rubro)', borderColor: 'rgba(var(--rubro-rgb),.4)' }} title={optoutTexto}>Não incomodar</span>}
                             {/* "Finalizado" só quando a situação NÃO já é terminal (ganho/perdido/cancelado) — evita verde ao lado de PERDIDO (Adendo 3) */}
@@ -1321,43 +1404,129 @@ export default function WhatsAppV2() {
 
       {/* ===================== POPOVERS (portal) ===================== */}
       {pop && createPortal(
-        <div className="wa-pop" style={pop.acima ? { left: pop.x, bottom: window.innerHeight - pop.y } : { left: pop.x, top: pop.y }} role={pop.kind === 'acoes' ? 'menu' : undefined}>
+        <div className={'wa-pop' + (pop.kind === 'filtro' ? ' wa-filtro' : '')} style={pop.acima ? { left: pop.x, bottom: window.innerHeight - pop.y } : { left: pop.x, top: pop.y }} role={pop.kind === 'acoes' ? 'menu' : undefined}>
           {pop.kind === 'filtro' && (
             <>
-              <div className="ph2">Filtrar por número</div>
-              <button type="button" className="it" onClick={() => { setFiltroCanal(null); setPop(null); }}>Todos os números {!filtroCanal && <span className="ck">✓</span>}</button>
-              {inbox.realCanais.map((c) => (
-                <button key={c.id} type="button" className="it" title={tituloCanal(c.alias, c.transporte)} onClick={() => { setFiltroCanal(c.id); setPop(null); }}>
-                  {c.alias}<span className={'oftag' + (c.transporte === 'cloud_api' ? '' : ' qr')}>{c.transporte === 'cloud_api' ? '✓ Oficial' : 'QR'}</span> {filtroCanal === c.id && <span className="ck">✓</span>}
-                </button>
-              ))}
-              {/* "|| filtroTransporte": se os canais sumirem com o filtro ativo, o controle de limpar continua acessível */}
-              {(inbox.realCanais.length > 0 || filtroTransporte) && (
-                <>
-                  <div className="ph2">Conexão do número</div>
-                  <button type="button" className="it" onClick={() => { setFiltroTransporte(null); setPop(null); }}>Todas as conexões {!filtroTransporte && <span className="ck">✓</span>}</button>
-                  <button type="button" className="it" title="Conversas do canal oficial (API do WhatsApp/Meta)" onClick={() => { setFiltroTransporte('cloud_api'); setPop(null); }}>Oficial (API do WhatsApp) {filtroTransporte === 'cloud_api' && <span className="ck">✓</span>}</button>
-                  <button type="button" className="it" title="Tudo que não é o canal oficial: números conectados por QR e canais já removidos" onClick={() => { setFiltroTransporte('evolution'); setPop(null); }}>QR (não oficial) {filtroTransporte === 'evolution' && <span className="ck">✓</span>}</button>
-                </>
-              )}
-              <div className="ph2">Status</div>
-              <button type="button" className="it" onClick={() => { setFiltroStatus(null); setPop(null); }}>Todos os status {!filtroStatus && <span className="ck">✓</span>}</button>
-              {statusAtivos.map((s) => (
-                <button key={s.id} type="button" className="it" onClick={() => { setFiltroStatus(s.id); setPop(null); }}>
-                  <span className="dot" style={{ background: s.cor }} />{s.nome} {filtroStatus === s.id && <span className="ck">✓</span>}
-                </button>
-              ))}
-              {etapasFiltro.length > 0 && (
-                <>
-                  <div className="ph2">Etapa do Kanban</div>
-                  <button type="button" className="it" onClick={() => { setFiltroEtapa(null); setPop(null); }}>Todas as etapas {!filtroEtapa && <span className="ck">✓</span>}</button>
-                  {etapasFiltro.map((e) => (
-                    <button key={e.nome} type="button" className="it" title="Filtrar pela etapa do funil" onClick={() => { setFiltroEtapa(e.nome); setPop(null); }}>
-                      <span className="dot" style={{ background: e.cor ?? 'var(--txt-3)' }} />{e.nome} {filtroEtapa === e.nome && <span className="ck">✓</span>}
+              <div className="fp-cab">
+                <span className="fp-tit">Filtros</span>
+                <span className="fp-cont num" title="Conversas que casam com os filtros nesta aba">{visiveis.length}</span>
+              </div>
+              <div className="fp-body">
+                {/* 1. ETIQUETA (multi) */}
+                {(etiquetasQ.data ?? []).length > 0 && (
+                  <section className="fp-sec">
+                    <div className="fp-h">Etiqueta</div>
+                    <div className="fp-itens">
+                      {(etiquetasQ.data ?? []).map((e) => (
+                        <button key={e.nome} type="button" className={'fp-it' + (filtroEtiquetas.has(e.nome) ? ' sel' : '')} onClick={() => alternarSet(setFiltroEtiquetas, e.nome)}>
+                          <span className="dot" style={{ background: corDaEtiqueta(e.nome, etiquetasQ.data) ?? 'var(--txt-3)' }} /><span className="tt">{e.nome}</span>{filtroEtiquetas.has(e.nome) && <span className="ck">✓</span>}
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                )}
+                {/* 2. ATENDENTE (multi + Não atribuído) */}
+                <section className="fp-sec">
+                  <div className="fp-h">Atendente</div>
+                  <div className="fp-itens">
+                    <button type="button" className={'fp-it' + (filtroAtendentes.has('') ? ' sel' : '')} onClick={() => alternarSet(setFiltroAtendentes, '')}>
+                      <span className="tt">Não atribuído</span>{filtroAtendentes.has('') && <span className="ck">✓</span>}
                     </button>
-                  ))}
-                </>
-              )}
+                    {usuarios.map((u) => (
+                      <button key={u.id} type="button" className={'fp-it' + (filtroAtendentes.has(u.id) ? ' sel' : '')} onClick={() => alternarSet(setFiltroAtendentes, u.id)}>
+                        <span className="tt">{u.id === user?.id ? `${u.nome} (você)` : u.nome}</span>{filtroAtendentes.has(u.id) && <span className="ck">✓</span>}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+                {/* 3. IA / BOT */}
+                <section className="fp-sec">
+                  <div className="fp-h">IA / bot</div>
+                  <div className="fp-itens">
+                    {IA_OPCOES.map(([k, rot]) => (
+                      <button key={k} type="button" className={'fp-it' + (filtroIA.has(k) ? ' sel' : '')} onClick={() => alternarSet(setFiltroIA, k)}>
+                        <span className="tt">{rot}</span>{filtroIA.has(k) && <span className="ck">✓</span>}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+                {/* 4. SITUAÇÃO (multi) — reusa situacaoDaConversa; substitui o antigo grupo "Status" (status_id) */}
+                <section className="fp-sec">
+                  <div className="fp-h">Situação</div>
+                  <div className="fp-itens">
+                    {SITUACAO_OPCOES.map(([k, rot]) => (
+                      <button key={k} type="button" className={'fp-it sit-' + k + (filtroSituacao.has(k) ? ' sel' : '')} onClick={() => alternarSet(setFiltroSituacao, k)}>
+                        <span className="tt">{rot}</span>{filtroSituacao.has(k) && <span className="ck">✓</span>}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+                {/* 5. ETAPA DO KANBAN (multi) */}
+                {etapasFiltro.length > 0 && (
+                  <section className="fp-sec">
+                    <div className="fp-h">Etapa do Kanban</div>
+                    <div className="fp-itens">
+                      {etapasFiltro.map((e) => (
+                        <button key={e.nome} type="button" className={'fp-it' + (filtroEtapas.has(e.nome) ? ' sel' : '')} onClick={() => alternarSet(setFiltroEtapas, e.nome)}>
+                          <span className="dot" style={{ background: e.cor ?? 'var(--txt-3)' }} /><span className="tt">{e.nome}</span>{filtroEtapas.has(e.nome) && <span className="ck">✓</span>}
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                )}
+                {/* 6. CANAL / NÚMERO (multi) */}
+                {inbox.realCanais.length > 0 && (
+                  <section className="fp-sec">
+                    <div className="fp-h">Número</div>
+                    <div className="fp-itens">
+                      {inbox.realCanais.map((c) => (
+                        <button key={c.id} type="button" className={'fp-it' + (filtroCanais.has(c.id) ? ' sel' : '')} title={tituloCanal(c.alias, c.transporte)} onClick={() => alternarSet(setFiltroCanais, c.id)}>
+                          <span className="tt">{c.alias}</span><span className={'oftag' + (c.transporte === 'cloud_api' ? '' : ' qr')}>{c.transporte === 'cloud_api' ? '✓ Oficial' : 'QR'}</span>{filtroCanais.has(c.id) && <span className="ck">✓</span>}
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                )}
+                {/* 7. CONEXÃO */}
+                <section className="fp-sec">
+                  <div className="fp-h">Conexão</div>
+                  <div className="fp-itens">
+                    <button type="button" className={'fp-it' + (filtroTransporte.has('cloud_api') ? ' sel' : '')} title="Canal oficial (API do WhatsApp/Meta)" onClick={() => alternarSet(setFiltroTransporte, 'cloud_api')}>
+                      <span className="tt">Oficial (API do WhatsApp)</span>{filtroTransporte.has('cloud_api') && <span className="ck">✓</span>}
+                    </button>
+                    <button type="button" className={'fp-it' + (filtroTransporte.has('evolution') ? ' sel' : '')} title="Números conectados por QR e canais já removidos" onClick={() => alternarSet(setFiltroTransporte, 'evolution')}>
+                      <span className="tt">QR (não oficial)</span>{filtroTransporte.has('evolution') && <span className="ck">✓</span>}
+                    </button>
+                  </div>
+                </section>
+                {/* 8. NÃO LIDAS / ARQUIVADAS (toggles) */}
+                <section className="fp-sec">
+                  <div className="fp-h">Sinalização</div>
+                  <div className="fp-itens">
+                    <button type="button" className={'fp-it' + (filtroNaoLidas ? ' sel' : '')} onClick={() => setFiltroNaoLidas((v) => !v)}>
+                      <span className="tt">Só não lidas</span>{filtroNaoLidas && <span className="ck">✓</span>}
+                    </button>
+                    <button type="button" className={'fp-it' + (filtroArquivadas ? ' sel' : '')} onClick={() => setFiltroArquivadas((v) => !v)}>
+                      <span className="tt">Incluir arquivadas</span>{filtroArquivadas && <span className="ck">✓</span>}
+                    </button>
+                  </div>
+                </section>
+                {/* 9. PERÍODO (última interação, single) */}
+                <section className="fp-sec">
+                  <div className="fp-h">Última interação</div>
+                  <div className="fp-itens">
+                    {PERIODO_OPCOES.map(([k, rot]) => (
+                      <button key={k} type="button" className={'fp-it' + (filtroPeriodo === k ? ' sel' : '')} onClick={() => setFiltroPeriodo((v) => (v === k ? null : k))}>
+                        <span className="tt">{rot}</span>{filtroPeriodo === k && <span className="ck">✓</span>}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              </div>
+              <div className="fp-rod">
+                <button type="button" className="fp-limpar" disabled={!filtrosAtivos} onClick={limparFiltros}>Limpar tudo</button>
+                <button type="button" className="fp-ok" onClick={() => setPop(null)}>Concluir</button>
+              </div>
             </>
           )}
           {pop.kind === 'acoes' && (

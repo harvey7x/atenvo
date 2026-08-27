@@ -643,3 +643,82 @@
 :root[data-tema="light"] .v2 .wa-etqpop .etqp-criar,
 :root[data-tema="light"] .v2 .wa-etqpop .etqp-lk { border-color: rgba(0, 0, 0, .07); }
 :root[data-tema="light"] .v2 .wa-etqpop .etqp-it.hi, :root[data-tema="light"] .v2 .wa-etqpop .etqp-it:hover { background: rgba(0, 0, 0, .05); }
+
+/* ============================================================
+   FILTRO COMPLETO — badge de IA na lista + painel glass + resumo ativo.
+   Mesmo vidro dos seletores (wa-etqpop): blur+hairline+raio, degrade em
+   [data-perf="lite"] p/ sólido, e par no tema claro. Viewport-aware: só a
+   .fp-body rola; cabeçalho e rodapé ficam fixos; container limitado à tela.
+   ============================================================ */
+/* selo de IA no card (sóbrio, mesma família dos cchip) */
+.v2 .conv2 .cchip.ia { color: var(--accent); border-color: rgba(var(--tint), .5); background: rgba(var(--tint), .12); letter-spacing: .06em; }
+
+/* resumo ativo: chips removíveis sob as abas */
+.v2 .wa-fchips { display: flex; flex-wrap: wrap; gap: 5px; padding: 8px 2px 2px; }
+.v2 .wa-fchip { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; background: rgba(var(--tint), .1); border: 1px solid rgba(var(--tint), .18); color: var(--txt); font-family: var(--fonte); font-size: 10.5px; border-radius: 999px; padding: 2px 7px; cursor: pointer; }
+.v2 .wa-fchip:hover { background: rgba(var(--tint), .18); }
+.v2 .wa-fchip .tt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 118px; }
+.v2 .wa-fchip .x { color: var(--txt-3); font-size: 13px; line-height: 1; margin-top: -1px; }
+.v2 .wa-fchip.limpar { color: var(--txt-2); background: none; border-color: transparent; text-decoration: underline; }
+.v2 .wa-fchip.limpar:hover { color: var(--txt); background: none; }
+
+/* badge numérico no botão do funil */
+.v2 .ib2 { position: relative; }
+.v2 .ib2 .fbadge { position: absolute; top: -3px; right: -3px; min-width: 14px; height: 14px; padding: 0 3px; display: inline-flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; border-radius: 999px; background: var(--accent); color: #fff; }
+
+/* painel glass do filtro (estende .wa-pop) */
+.v2 .wa-pop.wa-filtro {
+  width: 288px; min-width: 288px; max-width: 288px;
+  max-height: calc(100vh - 130px); padding: 0; overflow: hidden;
+  display: flex; flex-direction: column;
+  border-radius: 14px; border: 1px solid rgba(255, 255, 255, .10);
+  background: rgba(10, 11, 13, .74);
+  -webkit-backdrop-filter: blur(20px) saturate(1.3); backdrop-filter: blur(20px) saturate(1.3);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .55), inset 0 1px 0 rgba(255, 255, 255, .06);
+}
+.v2 .wa-filtro .fp-cab { flex: none; display: flex; align-items: center; justify-content: space-between; padding: 11px 13px; border-bottom: 1px solid rgba(255, 255, 255, .08); }
+.v2 .wa-filtro .fp-tit { font-size: 12.5px; font-weight: 700; color: var(--txt); }
+.v2 .wa-filtro .fp-cont { font-size: 11px; font-weight: 700; color: var(--txt-2); background: rgba(var(--tint), .12); border-radius: 999px; padding: 1px 8px; }
+.v2 .wa-filtro .fp-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 4px 8px 8px; }
+.v2 .wa-filtro .fp-sec { padding: 7px 0 3px; }
+.v2 .wa-filtro .fp-sec + .fp-sec { border-top: 1px solid rgba(255, 255, 255, .05); }
+.v2 .wa-filtro .fp-h { font-size: 9.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--txt-3); padding: 3px 3px 6px; }
+.v2 .wa-filtro .fp-itens { display: flex; flex-wrap: wrap; gap: 5px; }
+.v2 .wa-filtro .fp-it {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(255, 255, 255, .04); border: 1px solid rgba(255, 255, 255, .08);
+  color: var(--txt-2); font-family: var(--fonte); font-size: 11.5px;
+  border-radius: 8px; padding: 5px 8px; cursor: pointer; max-width: 100%;
+}
+.v2 .wa-filtro .fp-it:hover { background: rgba(255, 255, 255, .08); color: var(--txt); }
+.v2 .wa-filtro .fp-it.sel { background: rgba(var(--tint), .16); border-color: rgba(var(--tint), .5); color: var(--txt); }
+.v2 .wa-filtro .fp-it .tt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 150px; }
+.v2 .wa-filtro .fp-it .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.v2 .wa-filtro .fp-it .ck { color: var(--verde); font-weight: 700; margin-left: 1px; }
+.v2 .wa-filtro .fp-it .oftag { font-size: 8.5px; font-weight: 700; letter-spacing: .03em; color: var(--txt-3); border: 1px solid rgba(var(--tint), .25); border-radius: 4px; padding: 0 3px; }
+.v2 .wa-filtro .fp-it .oftag.qr { color: var(--ambar); border-color: rgba(var(--ambar-rgb), .3); }
+/* dica de cor na Situação (mesma paleta do chip da lista) */
+.v2 .wa-filtro .fp-it.sit-ganho.sel { border-color: rgba(var(--verde-rgb), .5); }
+.v2 .wa-filtro .fp-it.sit-perdido.sel, .v2 .wa-filtro .fp-it.sit-cancelado.sel { border-color: rgba(var(--rubro-rgb), .5); }
+.v2 .wa-filtro .fp-it.sit-lead.sel, .v2 .wa-filtro .fp-it.sit-aguardando.sel { border-color: rgba(var(--ambar-rgb), .45); }
+.v2 .wa-filtro .fp-rod { flex: none; display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-top: 1px solid rgba(255, 255, 255, .08); }
+.v2 .wa-filtro .fp-limpar { flex: 1; background: none; border: none; color: var(--txt-2); font-family: var(--fonte); font-size: 11.5px; text-align: left; cursor: pointer; text-decoration: underline; padding: 4px 2px; }
+.v2 .wa-filtro .fp-limpar:disabled { color: var(--txt-3); opacity: .5; cursor: default; text-decoration: none; }
+.v2 .wa-filtro .fp-limpar:not(:disabled):hover { color: var(--txt); }
+.v2 .wa-filtro .fp-ok { background: rgba(var(--tint), .16); border: 1px solid rgba(var(--tint), .3); color: var(--txt); font-family: var(--fonte); font-size: 12px; font-weight: 600; border-radius: 8px; padding: 6px 14px; cursor: pointer; }
+.v2 .wa-filtro .fp-ok:hover { background: rgba(var(--tint), .26); }
+
+/* MODO LEVE: sem blur — sólido translúcido opaco (gotcha do modo performance) */
+:root[data-perf="lite"] .v2 .wa-pop.wa-filtro { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(20, 22, 26, .98); }
+
+/* TEMA CLARO */
+:root[data-tema="light"] .v2 .wa-pop.wa-filtro {
+  background: rgba(255, 255, 255, .82); border-color: rgba(0, 0, 0, .08);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .18), inset 0 1px 0 rgba(255, 255, 255, .6);
+}
+:root[data-tema="light"][data-perf="lite"] .v2 .wa-pop.wa-filtro { background: #fff; -webkit-backdrop-filter: none; backdrop-filter: none; }
+:root[data-tema="light"] .v2 .wa-filtro .fp-cab, :root[data-tema="light"] .v2 .wa-filtro .fp-rod { border-color: rgba(0, 0, 0, .08); }
+:root[data-tema="light"] .v2 .wa-filtro .fp-sec + .fp-sec { border-color: rgba(0, 0, 0, .06); }
+:root[data-tema="light"] .v2 .wa-filtro .fp-it { background: rgba(0, 0, 0, .03); border-color: rgba(0, 0, 0, .1); }
+:root[data-tema="light"] .v2 .wa-filtro .fp-it:hover { background: rgba(0, 0, 0, .06); }
+:root[data-tema="light"] .v2 .ib2 .fbadge { color: #F4F5F7; }

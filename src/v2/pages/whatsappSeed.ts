@@ -25,7 +25,7 @@ export function seedWa(): WaContact[] {
       ...base,
       id: 'wa-maria', name: 'Maria Aparecida Souza', phone: '5551988124407', contatoId: 'wa-maria-ct',
       time: '14:38', unread: 2, lastAtMs: agora - 4 * min, aguardando: true, aguardandoDesde: iso(agora - 4 * min),
-      etapa: 'Documentação', etapaCor: '#f59e0b', respId: 'u-mock',
+      etapa: 'Documentação', etapaCor: '#f59e0b', respId: 'u-mock', iaAtiva: true, iaStatus: 'ativa',
       last: 'Áudio · 0:34', lastInter: 'há 4 min', tags: ['Urgente'], notes: 'Prefere áudio. A filha ajuda com o celular — ligar depois das 18h.',
       msgs: [
         IN('Boa tarde! Vi o anúncio de vocês sobre desconto no benefício.', '14:31', { tsISO: iso(agora - 11 * min), id: 'wm-1' }),
@@ -42,8 +42,8 @@ export function seedWa(): WaContact[] {
       ...base,
       id: 'wa-jose', name: 'José Carlos Ferreira', phone: '5551987770001', contatoId: 'wa-jose-ct',
       time: '14:02', unread: 1, lastAtMs: agora - 58 * min, aguardando: true, aguardandoDesde: iso(agora - 58 * min),
-      etapa: 'EM ATENDIMENTO', respId: null, chip: 'LUIZA',
-      last: 'Não consegui entrar no aplicativo…', lastInter: 'há 58 min',
+      etapa: 'EM ATENDIMENTO', respId: null, chip: 'LUIZA', iaStatus: 'pausada', precisaHumano: true,
+      last: 'Não consegui entrar no aplicativo…', lastInter: 'há 58 min', tags: ['Revisão de contrato'],
       msgs: [
         IN('Não consegui entrar no aplicativo do banco, moço.', '14:02', { tsISO: iso(agora - 58 * min), id: 'wj-1' }),
       ],
@@ -55,7 +55,7 @@ export function seedWa(): WaContact[] {
          canalId aponta o canal seed LUIZA (fonte Tráfego) → sugestão de Tráfego CAMPANHA. */
       id: 'wa-antonio', name: 'Antônio Pereira Lima', phone: '5551987770002', contatoId: 'kct-5', canalId: 'wa-canal-luiza',
       time: '13:47', unread: 0, lastAtMs: agora - 33 * min, aguardando: true, aguardandoDesde: iso(agora - 33 * min),
-      etapa: 'Qualificado', etapaCor: '#8b5cf6', respId: 'u-mock',
+      etapa: 'Qualificado', etapaCor: '#8b5cf6', respId: 'u-mock', tags: ['Juros abusivos'],
       last: 'Matheo: Perfeito, seu Antônio…', lastInter: 'há 33 min',
       msgs: [
         IN('Recebi a carta do banco aqui', '13:40', { tsISO: iso(agora - 40 * min), id: 'wa-1' }),
