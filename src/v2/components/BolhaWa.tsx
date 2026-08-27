@@ -81,11 +81,14 @@ export function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, 
   );
 
   return (
-    <div className={'bolha ' + (m.dir === 'out' ? 'env2' : 'rec') + (falhou ? ' falha' : '')}>
+    <div className={'bolha ' + (m.dir === 'out' ? 'env2' : 'rec') + (falhou ? ' falha' : '') + (m.origemBot ? ' bot' : '')}>
       {m.id && !semDestino && (
         <button type="button" className="resp-btn" title="Responder" aria-label="Responder" onClick={() => aoResponder(m)}><IcReply /></button>
       )}
-      {m.origemBot && <div className="bt-tag">◈ Matheo</div>}
+      {/* marca de mensagem AUTOMÁTICA: no lugar da assinatura do atendente, etiqueta "IA" +
+          persona — rolando o fio fica óbvio o que foi o bot vs um humano. Acento na borda
+          da bolha via classe .bot (nunca preencher a bolha de cor). */}
+      {m.origemBot && <div className="bt-tag ia" title="Mensagem enviada automaticamente pela IA (Matheo). Mensagens sem esta marca foram escritas por uma pessoa."><span className="ia-mrc" aria-hidden>IA</span>Matheo</div>}
       {m.quoted && (
         <div className="mq">
           <div className="rem">{m.quoted.remetente || (m.dir === 'out' ? 'Você' : nomeCliente)}</div>
