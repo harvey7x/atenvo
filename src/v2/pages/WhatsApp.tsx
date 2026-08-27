@@ -25,7 +25,7 @@ import { ScriptSequenceModal } from '@/components/ScriptSequenceModal';
 import { FichaJudicialBox } from '@/components/FichaJudicialBox';
 import { fichaDemoDoContato } from '@/data/fichaJudicial';
 import { useSendWaMessage } from '@/data/whatsapp';
-import { useIaEstadoConversa, useIaToggle } from '@/data/whatsapp';
+import { useIaEstadoConversa, useIaToggle, type IaEstadoConversa } from '@/data/whatsapp';
 import { mensagemAssumir, useAlertasLeadQuente } from '@/data/alertasLeadQuente';
 import { AlertaLeadQuenteModal } from '../components/AlertaLeadQuenteModal';
 import { useInboxWhatsApp, type AvisoInbox } from '../hooks/useInboxWhatsApp';
@@ -383,6 +383,35 @@ function SeletorScripts({
   );
 }
 
+/* Motivo (slug) pelo qual a IA pediu um humano → frase curta em PT. Fonte real:
+   ia_conversa_estado.aguardando_humano (dados->>'aguardando_humano' da ia_sessoes) —
+   slugs do ia-sdr + escalas do bot v1. Slug desconhecido sai legível (underscores → espaço),
+   nunca some: o atendente precisa VER por que a IA parou. */
+function motivoHumanoLabel(slug: string | null | undefined): string | null {
+  if (!slug) return null;
+  const M: Record<string, string> = {
+    sem_acesso_govbr: 'cliente sem acesso ao gov.br',
+    auxilio_extratos: 'cliente precisa de ajuda com os extratos',
+    auxilio_senha: 'cliente precisa de ajuda com a senha',
+    cpf_divergente: 'CPF do documento diverge do cadastro',
+    foto_ilegivel: 'documento ilegível',
+    foto_nao_carregou: 'a foto não carregou',
+    doc_divergente: 'documento divergente',
+    declarante_divergente: 'declarante divergente',
+    comprovante_ilegivel: 'comprovante ilegível',
+    comprovante_fora_janela: 'comprovante fora da janela',
+    quer_falar_valores: 'cliente quer falar de valores',
+    nao_entendeu: 'a IA não entendeu o cliente',
+    transicao_falhou: 'a transição de fluxo falhou',
+    erro_interno: 'erro interno da IA',
+    retorno_caso_fechado: 'retorno de caso já fechado',
+    retorno_pendente_prioridade: 'retorno pendente prioritário',
+    audio_recebido_bot: 'cliente mandou áudio para o bot',
+    cliente_qualificado_bot: 'cliente qualificado pelo bot',
+  };
+  return M[slug] ?? slug.replace(/_/g, ' ');
+}
+
 export default function WhatsAppV2() {
   const nav = useNavigate();
   const [params, setParams] = useSearchParams();
@@ -554,6 +583,21 @@ export default function WhatsAppV2() {
       aoAvisar({ tom: 'ok', texto: iaAtiva ? 'IA desativada nesta conversa' : 'IA ativada nesta conversa' });
     } catch (e) { aoAvisar({ tom: 'erro', texto: (e as Error).message || 'Falha ao alternar a IA' }); }
   }
+  // ---- PEÇA 1: barra de estado da IA (o "modo IA" da conversa) ----
+  // REAL usa o RPC ia_conversa_estado (fresco, refetch 20s); DEMO sintetiza do seed da lista.
+  // Nada aqui muda semântica: só EXIBE o estado que o sistema já guarda e reusa ações existentes.
+  const iaBar: IaEstadoConversa | undefined = WA_REAL
+    ? iaEstado
+    : (current.iaStatus ? { existe: true, status: current.iaStatus, etapa: current.iaEtapa ?? undefined, aguardando_humano: current.iaAguardando ?? null } : undefined);
+  const iaBarAtiva = !!iaBar?.existe && iaBar.status === 'ativa' && !iaBar.desativado_manual;  // MESMA fórmula do botão do cabeçalho
+  const iaBarMotivo = motivoHumanoLabel(iaBar?.aguardando_humano);
+  // prioridade do sinal: handoff (rubro) > aguardando humano (âmbar) > atendendo (verde) > pausada/encerrada (neutro)
+  const iaBarSinal = !current.id || !iaBar?.existe ? null
+    : iaBar.status === 'handoff' ? { cls: 'handoff', rotulo: 'Handoff — IA passou para a equipe' }
+    : iaBar.aguardando_humano ? { cls: 'aguarda', rotulo: 'Aguardando humano' }
+    : iaBarAtiva ? { cls: 'ok', rotulo: 'IA atendendo' }
+    : iaBar.status === 'encerrada' ? { cls: 'neutro', rotulo: 'IA encerrada' }
+    : { cls: 'neutro', rotulo: 'IA pausada' };
   const agendarSeqMut = useAgendarSequencia();
   const editarAgMut = useEditarAgendamento();
   const cancelarAgMut = useCancelarAgendamento();
@@ -1067,6 +1111,31 @@ export default function WhatsAppV2() {
               </div>
             </div>
 
+            {/* PEÇA 1 — BARRA DE ESTADO DA IA: faixa fixa sob o cabeçalho, visível sempre que há
+                sessão de IA. Superfície SÓLIDA de propósito (faixa de estado, não overlay → sem
+                glass; lite-safe por construção). Cor SÓ no semântico do estado.
+                "Assumir" grava o responsável mas NÃO para o bot sozinho (ele só para quando o
+                atendente manda mensagem ou pausa a IA) — por isso "Pausar IA" fica destacado
+                quando a IA está ativa: anti-colisão, pare o bot ANTES de digitar. */}
+            {iaBarSinal && (
+              <div className={'wa-iabar ' + iaBarSinal.cls} role="status">
+                <span className="glifo" aria-hidden>🤖</span>
+                <b className="est">{iaBarSinal.rotulo}</b>
+                {iaBar?.etapa && <span className="etp" title={'Etapa atual do fluxo da IA: ' + iaBar.etapa}>{iaBar.etapa}</span>}
+                {iaBarMotivo && <span className="mot" title="Por que a IA pediu um humano">· {iaBarMotivo}</span>}
+                <span className="acts">
+                  {!inbox.donoEfetivo && (
+                    <BotaoMini disabled={inbox.atribuindo} title="Grava você como responsável. NÃO pausa a IA sozinho — ela só para quando você manda mensagem ou quando é pausada." onClick={inbox.assumir}>Assumir</BotaoMini>
+                  )}
+                  <BotaoMini className={iaBarAtiva ? 'pausar-on' : ''} disabled={iaToggle.isPending}
+                    title={iaBarAtiva ? 'Pare a IA antes de digitar — evita você e o bot responderem juntos em cima do cliente.' : 'Reativar a IA nesta conversa.'}
+                    onClick={() => { if (!WA_REAL) { aoAvisar({ tom: 'ok', texto: iaBarAtiva ? 'Demonstração: a IA seria pausada' : 'Demonstração: a IA seria reativada' }); return; } void alternarIa(); }}>
+                    {iaBarAtiva ? 'Pausar IA' : 'Reativar IA'}
+                  </BotaoMini>
+                </span>
+              </div>
+            )}
+
             {/* OPT-OUT inviolável — precedente Contatos */}
             {optout && (
               <div className="wa-banner bloq" role="alert">
@@ -1096,7 +1165,8 @@ export default function WhatsAppV2() {
               </div>
             )}
 
-            <div className="wa-msgs" ref={msgsRef}>
+            {/* tom levíssimo enquanto a IA atende: o atendente está ASSISTINDO uma conversa automática */}
+            <div className={'wa-msgs' + (iaBarAtiva ? ' ia-on' : '')} ref={msgsRef}>
               {itensConversa.map((item, i) =>
                 item.tipo === 'sep' ? (
                   <div className="dia" key={'sep-' + i}>{item.label}</div>

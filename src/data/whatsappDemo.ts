@@ -84,6 +84,10 @@ export interface WaContact {
   iaAtiva?: boolean;
   /** status BRUTO da sessão de IA: 'ativa' | 'pausada' | 'handoff' | 'encerrada' (undefined/null = sem sessão). */
   iaStatus?: string | null;
+  /** DEMO da barra de IA: etapa atual do fluxo (real vem do RPC ia_conversa_estado, não da lista). */
+  iaEtapa?: string | null;
+  /** DEMO da barra de IA: motivo (slug) pelo qual a IA pediu humano — espelha dados->>'aguardando_humano'. */
+  iaAguardando?: string | null;
   /** Inbox Etapa A: estado de arquivamento/fixação/silêncio da conversa. */
   arquivada?: boolean;
   fixada?: boolean;
@@ -147,6 +151,7 @@ export const WA_CONTACTS: WaContact[] = [
   },
   {
     id: 'marina', name: 'Marina Lopes', phone: '(11) 99888-4455', chip: 'Chip 1', time: '09:15', unread: 2,
+    iaStatus: 'pausada', iaEtapa: 'extratos', iaAguardando: 'auxilio_extratos', precisaHumano: true,
     tabs: ['todos', 'meus', 'pendentes'], status: 'Em atendimento',
     last: 'Enviei os documentos solicitados conforme combinado.',
     email: 'marina.lopes@email.com', stage: 'Em análise', resp: 'Henrique', origin: 'WhatsApp — Chip 1',
@@ -160,6 +165,7 @@ export const WA_CONTACTS: WaContact[] = [
   },
   {
     id: 'carlos', name: 'Carlos Eduardo', phone: '(11) 99333-6677', chip: 'Chip 2', time: '08:47', unread: 1,
+    iaAtiva: true, iaStatus: 'ativa', iaEtapa: 'docs',
     tabs: ['todos', 'naoatrib', 'pendentes'], status: 'Pendente',
     last: 'Quais dados são necessários para iniciar a análise?',
     email: 'carlos.eduardo@email.com', stage: 'Novo lead', resp: 'Não atribuído', origin: 'WhatsApp — Chip 2',
@@ -169,6 +175,7 @@ export const WA_CONTACTS: WaContact[] = [
   },
   {
     id: 'juliana', name: 'Juliana M.', phone: '(11) 99222-1188', chip: 'Chip 3', time: 'Ontem', unread: 1,
+    iaStatus: 'handoff', iaEtapa: 'extratos', iaAguardando: 'sem_acesso_govbr', precisaHumano: true,
     tabs: ['todos', 'meus', 'pendentes'], status: 'Em atendimento',
     last: 'Preciso de uma atualização sobre meu processo.',
     email: 'juliana.m@email.com', stage: 'Em processo', resp: 'Henrique', origin: 'WhatsApp — Chip 3',
@@ -178,6 +185,7 @@ export const WA_CONTACTS: WaContact[] = [
   },
   {
     id: 'rafael', name: 'Rafael Souza', phone: '(11) 99111-2200', chip: 'Chip 2', time: 'Ontem', unread: 2,
+    iaStatus: 'pausada',
     tabs: ['todos', 'naoatrib', 'pendentes'], status: 'Pendente',
     last: 'Ainda não entendi as opções, pode explicar?',
     email: 'rafael.souza@email.com', stage: 'Novo lead', resp: 'Não atribuído', origin: 'WhatsApp — Chip 2',

@@ -162,6 +162,35 @@
 .v2 .wa-banner .acts { margin-left: auto; display: flex; gap: 6px; flex-shrink: 0; }
 
 /* ============================================================
+   PEÇA 1 — BARRA DE ESTADO DA IA (o "modo IA" da conversa).
+   Faixa FIXA sob o cabeçalho, SÓLIDA de propósito: é superfície de estado,
+   não overlay → sem glass/backdrop-filter (lite-safe por construção).
+   Cor SÓ semântica: verde=atendendo · âmbar=aguardando humano · rubro=handoff
+   · neutro=pausada/encerrada. Acento na borda-guia esquerda, sem preencher. */
+.v2 .wa-iabar {
+  display: flex; align-items: center; gap: 8px; padding: 6px 14px; font-size: 11.5px; color: var(--txt-2);
+  background: rgba(var(--tint), .03); border-bottom: 1px solid var(--linha); flex-shrink: 0; flex-wrap: wrap;
+}
+.v2 .wa-iabar .glifo { font-size: 13px; line-height: 1; }
+.v2 .wa-iabar .est { font-weight: 700; letter-spacing: .01em; color: var(--txt); }
+.v2 .wa-iabar.ok { box-shadow: inset 2px 0 0 rgba(var(--verde-rgb), .65); }
+.v2 .wa-iabar.ok .est { color: var(--verde); }
+.v2 .wa-iabar.aguarda { box-shadow: inset 2px 0 0 rgba(var(--ambar-rgb), .75); background: var(--ambar-bg); }
+.v2 .wa-iabar.aguarda .est { color: var(--ambar); }
+.v2 .wa-iabar.handoff { box-shadow: inset 2px 0 0 rgba(var(--rubro-rgb), .8); background: var(--rubro-bg); }
+.v2 .wa-iabar.handoff .est { color: var(--rubro); }
+.v2 .wa-iabar.neutro { box-shadow: inset 2px 0 0 rgba(var(--tint), .2); }
+.v2 .wa-iabar .etp { font-size: 10px; color: var(--txt-3); border: 1px solid rgba(var(--tint), .12); border-radius: 99px; padding: 1.5px 8px; letter-spacing: .03em; }
+.v2 .wa-iabar .mot { font-size: 10.5px; color: var(--txt-2); }
+.v2 .wa-iabar .acts { margin-left: auto; display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+/* destaque anti-colisão: com a IA ativa, "Pausar IA" é A ação — o atendente deve
+   poder parar o bot antes de digitar (senão respondem os dois em cima do cliente) */
+.v2 .wa-iabar .acts .pausar-on { color: var(--ambar); border-color: rgba(var(--ambar-rgb), .5); background: var(--ambar-bg); font-weight: 600; }
+/* tom levíssimo no thread enquanto a IA atende — o atendente ASSISTE uma conversa
+   automática; anel interno sutil, sem blur (lite-safe) */
+.v2 .wa-msgs.ia-on { box-shadow: inset 0 0 0 1px rgba(var(--verde-rgb), .12), inset 0 12px 22px -18px rgba(var(--verde-rgb), .22); }
+
+/* ============================================================
    Fundo da conversa — WALLPAPER DE FIGURAS PROFISSIONAIS (estilo WhatsApp,
    desenho PRÓPRIO). Como o wallpaper do WhatsApp funciona — muitas figurinhas
    pequenas em traço fino, espalhadas de forma densa e uniforme com rotações
