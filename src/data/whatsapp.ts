@@ -258,6 +258,31 @@ async function etapasPorContato(orgId: string): Promise<Map<string, EtapaContato
   return map;
 }
 
+/* Estado da IA/bot por conversa (tabela ia_sessoes). Fetch SEPARADO e BEST-EFFORT, exatamente
+   como etapasPorContato: se falhar (grant/RLS) a lista segue funcionando, só sem o selo de IA.
+   conversa_id é UNIQUE em ia_sessoes (uma sessão por conversa), então não há desempate.
+   iaAtiva reproduz a MESMA fórmula do botão do cabeçalho (WhatsApp.tsx): existe && status='ativa'
+   && !desativado_manual. Expõe também o status bruto (ativa/pausada/handoff/encerrada) p/ o filtro. */
+interface IaEstadoLista { iaAtiva: boolean; iaStatus: string }
+async function iaSessoesPorConversa(orgId: string): Promise<Map<string, IaEstadoLista>> {
+  const map = new Map<string, IaEstadoLista>();
+  try {
+    const { data, error } = await supabase!
+      .from('ia_sessoes')
+      .select('conversa_id, status, dados')
+      .eq('organizacao_id', orgId);
+    if (error) return map;
+    type Row = { conversa_id: string | null; status: string | null; dados: { desativado_manual?: boolean } | null };
+    for (const r of ((data as unknown as Row[]) ?? [])) {
+      if (!r.conversa_id) continue;
+      const status = r.status ?? '';
+      const desativado = !!r.dados?.desativado_manual;
+      map.set(r.conversa_id, { iaAtiva: status === 'ativa' && !desativado, iaStatus: status });
+    }
+  } catch { /* sem estado de IA: a lista continua funcionando */ }
+  return map;
+}
+
 /* ===================== Hooks ===================== */
 export function useWaConversations() {
   const { currentOrg } = useOrg();
@@ -275,6 +300,7 @@ export function useWaConversations() {
     refetchOnWindowFocus: true,
     queryFn: async (): Promise<WaContact[]> => {
       const etapasPromise = etapasPorContato(orgId);   // dispara junto; espera depois do fetch principal
+      const iaPromise = iaSessoesPorConversa(orgId);   // idem: estado da IA/bot por conversa (fetch paralelo)
       const { data, error } = await supabase!
         .from('conversas')
         // canais!conversas_canal_id_fkey: desambigua o embed (há 2 FKs p/ canais: canal_id e ultimo_canal_id).
@@ -298,9 +324,12 @@ export function useWaConversations() {
       // se falhar (grant/RLS), a lista continua funcionando — só fica sem a etiqueta de etapa.
       // Em PARALELO com o fetch principal: eram 2 roundtrips sequenciais no caminho crítico da lista.
       const etapas = await etapasPromise;
+      const iaEstados = await iaPromise;   // etapa por CONTATO; IA por CONVERSA
       if (error) throw new Error(error.message);
       const arr = ((data as unknown as DbConv[]) ?? []).map(mapConversa);
       for (const c of arr) {
+        const ia = iaEstados.get(c.id);
+        if (ia) { c.iaAtiva = ia.iaAtiva; c.iaStatus = ia.iaStatus; }
         const e = c.contatoId ? etapas.get(c.contatoId) : null;
         if (!e) continue;
         c.etapa = e.etapa; c.etapaCor = e.cor; c.etapaEntrada = e.entrada; c.etapaResultado = e.resultado;

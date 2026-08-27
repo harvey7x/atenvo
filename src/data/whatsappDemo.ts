@@ -79,6 +79,11 @@ export interface WaContact {
   semDestino?: boolean;
   /** SLA (S4.2): conversa marcada como "precisa de atendimento humano". */
   precisaHumano?: boolean;
+  /** IA/bot atendendo esta conversa AGORA (ia_sessoes.status='ativa' && !desativado_manual) —
+   *  MESMA fórmula do botão do cabeçalho. Chega pela lista via fetch paralelo (padrão etapasPorContato). */
+  iaAtiva?: boolean;
+  /** status BRUTO da sessão de IA: 'ativa' | 'pausada' | 'handoff' | 'encerrada' (undefined/null = sem sessão). */
+  iaStatus?: string | null;
   /** Inbox Etapa A: estado de arquivamento/fixação/silêncio da conversa. */
   arquivada?: boolean;
   fixada?: boolean;
