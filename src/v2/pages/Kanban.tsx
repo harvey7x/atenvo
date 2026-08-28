@@ -1011,8 +1011,8 @@ export default function KanbanV2() {
               >
                 <div
                   className="kb-cab"
-                  /* sublinhado na COR da coluna (anatomia da referência) — 2px de acento sob o cabeçalho */
-                  style={{ boxShadow: `inset 0 -2px 0 ${col.cor}59` }}
+                  /* sublinhado na COR da coluna (anatomia da referência) — borda real de 2px */
+                  style={{ borderBottom: `2px solid ${col.cor}73` }}
                   draggable={podeConfig && !col.entrada}
                   onDragStart={(e) => {
                     if (!podeConfig || col.entrada) { e.preventDefault(); return; }
@@ -1023,7 +1023,7 @@ export default function KanbanV2() {
                   onDragEnd={() => { dragColId.current = null; setColArrastando(null); setHoverCol(null); }}
                 >
                   <button type="button" className="kb-col-toggle" aria-label={'Recolher coluna ' + col.nome} title="Recolher coluna" onClick={(e) => { e.stopPropagation(); toggleCol(col.id); }}><IcColapsar /></button>
-                  <span className="pt2" style={{ background: col.cor }} />
+                  {/* v5: o dot saiu do cabeçalho expandido — a cor da coluna vive no sublinhado (na recolhida o dot fica) */}
                   <span className="n" title={col.nome}>{col.nome}</span>
                   {col.entrada && <span className="tag-entrada" title="Coluna de entrada — recebe novos leads dos canais">entrada</span>}
                   <span className="q num">{todosCol.length}</span>
@@ -1303,8 +1303,23 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, fichaInfo, optout, mo
   // tipo de benefício: da oportunidade; sem ele, o da FICHA (pedido do dono 27/08)
   const benefBruto = l.tipoBeneficio ?? (fichaInfo?.tipoBeneficio as KLead['tipoBeneficio'] | null);
   const benefLbl = benefBruto ? rotuloDe(TIPO_BENEFICIO, benefBruto) : '';
-  const dataEntrada = (l.entradaEm || l.criadoEm || '').slice(0, 10);
-  const dataCurta = dataEntrada ? dataEntrada.split('-').reverse().slice(0, 2).join('/') : '';
+  // data no FUSO DE SP (slice do ISO daria o dia em UTC — à noite mostra amanhã)
+  const dtEntradaIso = l.entradaEm || l.criadoEm || '';
+  const dataCurta = dtEntradaIso ? new Date(dtEntradaIso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo' }) : '';
+  const dataFull = dtEntradaIso ? new Date(dtEntradaIso).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : '';
+  // v5 EDITORIAL: eyebrow tipográfico (benefício; sem ele, serviço) — chips morreram
+  const eyebrow = benefLbl || servLbl;
+  // meta corrida: instituição · serviço (se não coube no eyebrow) · recebe BANCO (+N nos title)
+  const metaPartes = [l.instituicao, benefLbl ? servLbl : '', fichaInfo?.bancoNome ? `recebe ${fichaInfo.bancoNome}` : ''].filter(Boolean) as string[];
+  const revN = fichaInfo?.revBancos.length ?? 0;
+  const metaTitle = [...metaPartes, revN ? `REV: ${fichaInfo!.revBancos.join(', ')}` : ''].filter(Boolean).join(' · ');
+  // valor relevante (existia só no drawer) — colapsa quando não há
+  const vr = valorRelevante(l);
+  // progresso HONESTO no funil: posição da coluna entre as neutras (ganho = cheio verde; perdido some)
+  const neutras = colunas.filter((c) => (c.resultado ?? 'neutro') === 'neutro');
+  const idxNeutra = neutras.findIndex((c) => c.id === l.colunaId);
+  const mostraProg = l.status === 'ganho' || (l.status === 'em_andamento' && idxNeutra >= 0 && neutras.length > 1);
+  const progPct = l.status === 'ganho' ? 100 : ((idxNeutra + 1) / Math.max(neutras.length, 1)) * 100;
   // v3 F2 — PRÓXIMO PASSO: 1 badge que diz o que FAZER (não só o que é). "Sem responsável" já vive
   // em âmbar na linha do atendente; a estagnação, no "parado Xd" ao lado — o badge não os repete.
   const badge = optout ? { cls: 'blk', txt: 'Não incomodar' }
@@ -1312,7 +1327,7 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, fichaInfo, optout, mo
     : quente ? { cls: 'hot', txt: 'Responder agora' }
     : fichaStatus === 'rascunho' ? { cls: 'ficha', txt: 'Finalizar ficha' }
     : hot && paradoAtivo ? { cls: 'hot', txt: 'Retomar contato' }
-    : fichaStatus === 'finalizada' ? { cls: 'ok', txt: 'Ficha ✓' }
+    // "Ficha ✓" saiu do card (v5): estado BOM não compete por atenção — vive no drawer
     : null;
   // Etiquetas do lead + do contato, sem repetição, SEMPRE visíveis (pedido do dono:
   // "colocar etiquetas e que fique aparecendo no kanban, como lembrete"). Máx. 2 + contador.
@@ -1324,62 +1339,73 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, fichaInfo, optout, mo
   return (
     <div
       ref={aoRef}
-      className={'kc' + tier + (arrastando ? ' drag' : '') + (moving ? ' moving' : '') + (destacado ? ' destaque' : '')}
+      className={'kc' + tier + (l.status === 'ganho' ? ' e-ganho' : '') + (arrastando ? ' drag' : '') + (moving ? ' moving' : '') + (destacado ? ' destaque' : '')}
       draggable={!moving}
       onClick={aoClicar}
       onDragStart={aoDragStart}
       onDragEnd={aoDragEnd}
     >
-      {/* linha de CHIPS (anatomia da referência: tag + data): tipo de benefício (azul,
-          secundária), serviço quando não é análise inicial, e a data de ENTRADA no funil */}
-      <div className="kc-tags">
-        {benefLbl && <span className="kc-tag benef" title={'Tipo de benefício: ' + benefLbl}>{benefLbl}</span>}
-        {servLbl && <span className="kc-tag" title={'Serviço: ' + servLbl}>{servLbl}</span>}
-        {dataCurta && <span className="kc-tag data num" title={'No funil desde ' + dataEntrada.split('-').reverse().join('/')}>{dataCurta}</span>}
-        <span className="kb-menu-wrap">
-          <button type="button" className={'mbtn' + (menuAberto ? ' on' : '')} aria-label={'Ações do lead ' + l.nome} aria-expanded={menuAberto} onClick={(e) => { e.stopPropagation(); aoMenu(e.currentTarget); }}>
-            <IcPontos />
-          </button>
-          {/* o dropdown do card é renderizado em PORTAL no nível da página (fora do overflow da coluna) */}
-        </span>
-      </div>
+      {/* ⋮ absoluto no canto — em repouso o card é só informação (aparece no hover) */}
+      <span className="kb-menu-wrap">
+        <button type="button" className={'mbtn' + (menuAberto ? ' on' : '')} aria-label={'Ações do lead ' + l.nome} aria-expanded={menuAberto} onClick={(e) => { e.stopPropagation(); aoMenu(e.currentTarget); }}>
+          <IcPontos />
+        </button>
+        {/* o dropdown do card é renderizado em PORTAL no nível da página (fora do overflow da coluna) */}
+      </span>
+
+      {/* L1 EYEBROW tipográfico: benefício (ou serviço) em micro-caps + data de entrada nua */}
+      {(eyebrow || dataCurta) && (
+        <div className="kc-eyebrow">
+          {eyebrow && <span className="kc-benef" title={benefLbl ? 'Tipo de benefício: ' + benefLbl : 'Serviço: ' + servLbl}>{eyebrow}</span>}
+          {dataCurta && <span className="kc-data num" title={'No funil desde ' + dataFull}>{dataCurta}</span>}
+        </div>
+      )}
+
+      {/* L2 TÍTULO — o único elemento forte do card */}
       <div className="kc-r1">
         <span className="kc-nm" title={l.nome}>{fone ? <span className="num">{fone}</span> : nomeCard}{fone && <i className="kc-semnome">· sem nome</i>}</span>
         {l.status === 'ganho' && <span className="kc-flag ganho" title="Fechado como ganho">Ganho</span>}
         {l.status === 'perdido' && <span className="kc-flag perdido" title={'Perdido' + (l.motivoPerda ? ' · ' + rotuloMotivoPerda(l.motivoPerda) : '')}>Perdido</span>}
       </div>
-      {l.instituicao && <div className="kc-desc" title={'Instituição: ' + l.instituicao}>{l.instituicao}</div>}
 
-      {/* BANCOS DA FICHA (pedido do dono 27/08 — "muito importante"): o banco DO CLIENTE
-          (recebe o benefício) em destaque + os bancos das REVs recuados. Só aparece quando
-          a ficha marca banco. */}
-      {fichaInfo && (fichaInfo.bancoNome || fichaInfo.revBancos.length > 0) && (
-        <div className="kc-bancos" title={'Bancos da ficha' + (fichaInfo.bancoNome ? ` · recebe: ${fichaInfo.bancoNome}` : '') + (fichaInfo.revBancos.length ? ` · REV: ${fichaInfo.revBancos.join(', ')}` : '')}>
-          {fichaInfo.bancoNome && <span className="kc-banco prin">{fichaInfo.bancoNome}</span>}
-          {fichaInfo.revBancos.slice(0, 3).map((b) => <span key={b} className="kc-banco">{b}</span>)}
-          {fichaInfo.revBancos.length > 3 && <span className="kc-banco mais">+{fichaInfo.revBancos.length - 3}</span>}
+      {/* L3 META corrida: instituição · serviço · recebe BANCO · +N bancos (REVs no title) */}
+      {(metaPartes.length > 0 || revN > 0) && (
+        <div className="kc-meta" title={metaTitle}>
+          {metaPartes.join(' · ')}
+          {revN > 0 && <span className="mais">{metaPartes.length ? ' · ' : ''}+{revN} banco{revN > 1 ? 's' : ''}</span>}
         </div>
       )}
-      {/* RESERVADO — estado do BOT no card (pedido do dono 27/08): quando a opção nascer
-          no bot, entra aqui o chip "Bot ativo" (fonte provável: ia_sessoes da conversa). */}
+      {/* RESERVADO — estado do BOT no card (dono 27/08): quando a opção nascer no bot,
+          entra aqui (fonte provável: ia_sessoes da conversa). */}
 
-      {todasEtiquetas.length > 0 && (
-        <div className="kc-etqs">
-          {todasEtiquetas.slice(0, 2).map((t) => {
-            const cor = corDaEtiqueta(t, etiquetasCat);
-            return <span key={t} className="kc-etq" title={t}><i style={{ background: cor }} />{t}</span>;
-          })}
-          {todasEtiquetas.length > 2 && <span className="kc-etq mais" title={todasEtiquetas.slice(2).join(' · ')}>+{todasEtiquetas.length - 2}</span>}
+      {/* L4 VALOR (dado que morria no drawer) — colapsa quando não há */}
+      {vr.valor != null && (
+        <div className="kc-valor num">{fmtBRL(vr.valor)}<span className="suf">{vr.mensal ? '/mês' : 'est.'}</span></div>
+      )}
+
+      {/* L5 PROGRESSO honesto do funil (etapa X de N) — o ÚNICO azul em repouso */}
+      {mostraProg && (
+        <div className="kc-prog" title={l.status === 'ganho' ? 'Fechado como ganho' : `Etapa ${idxNeutra + 1} de ${neutras.length} (${colAtual?.nome ?? ''})`}>
+          <span className="trilho"><span className="fill" style={{ width: progPct + '%' }} /></span>
+          <span className="frac num">{l.status === 'ganho' ? '✓' : `${idxNeutra + 1}/${neutras.length}`}</span>
         </div>
       )}
 
+      {/* L6 LEMBRETE — texto âmbar, sem caixa */}
       {l.lembrete && (
         <div className="kc-lem" title={'Lembrete: ' + l.lembrete}><IcSino /><span>{l.lembrete}</span></div>
       )}
 
-      <div className="kc-r2">
-        <span className="kc-av" title={l.respNome ? 'Responsável · ' + l.respNome : 'Sem responsável'}>{l.respNome ? initials(l.respNome) : '·'}</span>
+      {/* L7 RODAPÉ: gente + etiquetas (dots) + tempo + WhatsApp */}
+      <div className="kc-foot">
+        <span className={'kc-av' + (l.respNome ? '' : ' semdono')} title={l.respNome ? 'Responsável · ' + l.respNome : 'Sem responsável'}>{l.respNome ? initials(l.respNome) : '·'}</span>
         <span className={'kc-resp' + (l.respNome ? '' : ' none')} title={l.respNome || 'Não atribuído'}>{l.respNome || 'Não atribuído'}</span>
+        {todasEtiquetas.length > 0 && (
+          <span className="kc-etqdots" title={'Etiquetas: ' + todasEtiquetas.join(' · ')}>
+            {todasEtiquetas.slice(0, 3).map((t) => <i key={t} style={{ background: corDaEtiqueta(t, etiquetasCat) }} />)}
+            {todasEtiquetas.length > 3 && <span className="mais">+{todasEtiquetas.length - 3}</span>}
+          </span>
+        )}
         <span className={'kc-time num' + (paradoAtivo ? (hot ? ' hot' : ' warm') : '')} title={paradoAtivo ? `Sem trocar de coluna há ${dp} dia(s)` : 'Última atualização'}>
           {paradoAtivo ? `parado ${dp}d` : haDe(l.atualizadoEm || l.criadoEm)}
         </span>
@@ -1391,9 +1417,8 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, fichaInfo, optout, mo
         )}
       </div>
 
+      {/* L8 FAIXA DE AÇÃO full-width no pé — o call-to-action que o atendente varre */}
       {badge && <span className={'kc-badge ' + badge.cls} title={badge.txt}>{badge.txt}</span>}
-      {/* o antigo peek de hover morreu: benefício/serviço viraram chips e a instituição
-          virou descrição — card COMPLETO à vista (referência do dono 27/08) */}
     </div>
   );
 }
