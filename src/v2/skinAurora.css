@@ -161,6 +161,23 @@
   box-shadow: 0 4px 14px rgba(2, 4, 10, .35);
 }
 
+/* --- 6. JANELAS = VIDRO FUMÊ sempre (dono 27/08) ----------------
+   Modal e drawer mantêm o blur MESMO no modo Leve — é UMA superfície
+   por vez (custo pontual); o resto do Leve segue sólido. !important
+   de propósito: vence o kill de blur do lite e os overrides sólidos
+   do drawer em componentes.css, cuja ordem de import varia. */
+.v2 .p-modal.vidro,
+.v2 .drawer-v2 {
+  backdrop-filter: blur(26px) saturate(1.15) !important;
+  -webkit-backdrop-filter: blur(26px) saturate(1.15) !important;
+}
+:root:not([data-tema="light"]) .v2 .p-modal.vidro { background: linear-gradient(180deg, rgba(21, 25, 33, .55), rgba(10, 12, 17, .62)) !important; }
+:root[data-tema="light"] .v2 .p-modal.vidro { background: linear-gradient(180deg, rgba(255, 255, 255, .74), rgba(250, 251, 253, .68)) !important; }
+:root:not([data-tema="light"]) .v2 .drawer-v2 { background: linear-gradient(180deg, rgba(20, 22, 27, .78), rgba(13, 14, 18, .74)) !important; }
+:root[data-tema="light"] .v2 .drawer-v2 { background: linear-gradient(180deg, rgba(255, 255, 255, .88), rgba(250, 251, 252, .84)) !important; }
+/* véu mais leve: o app aparece FUMADO atrás da janela */
+:root:not([data-tema="light"]) .v2 .veu { background: rgba(5, 6, 9, .45); }
+
 /* --- 4. LITE: sem transparência nas bolhas (voltam sólidas) --- */
 [data-perf="lite"]:not([data-tema="light"]) .v2 .bolha.rec,
 [data-perf="lite"]:not([data-tema="light"]) .v2 .bolha.env2 { background-color: var(--base); }

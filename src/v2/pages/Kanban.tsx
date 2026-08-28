@@ -494,7 +494,6 @@ export default function KanbanV2() {
     .filter((c) => (c.resultado ?? 'neutro') === 'neutro')
     .map((c) => ({ id: c.id, nome: c.nome, cor: c.cor, n: ativosPorColuna.get(c.id) ?? 0 })), [colunas, ativosPorColuna]);
   const distTotal = Math.max(1, etapasDist.reduce((s, d) => s + d.n, 0));
-  const distMaior = etapasDist.reduce<typeof etapasDist[number] | null>((mx, d) => (d.n > (mx?.n ?? 0) ? d : mx), null);
 
   /* EXPORTAÇÃO CSV (dono 27/08): baixa exatamente o RECORTE atual — busca + canal +
      atendente + filtros avançados, o mesmo conjunto que o board mostra. CSV com BOM e
@@ -933,27 +932,19 @@ export default function KanbanV2() {
       {!vazioFunil && (
         <>
           <div className="kb-kpis sobe" role="group" aria-label="Indicadores do funil">
-            <div className="kb-kpi" title="Oportunidades em andamento (1 card = 1 oportunidade). No Disparo o número é menor porque lá conta CONTATOS distintos com WhatsApp e conversa real.">
+            {/* total + distribuição no MESMO card: barra nas cores das colunas sob o número
+                (detalhe por etapa no hover) — sem tile extra poluindo a faixa */}
+            <div className="kb-kpi" title={'Oportunidades em andamento (1 card = 1 oportunidade).' + (etapasDist.some((d) => d.n > 0) ? ' Distribuição: ' + etapasDist.filter((d) => d.n > 0).map((d) => `${d.nome} ${d.n}`).join(' · ') : '')}>
               <div className="lab">Leads ativos</div><div className="val num">{abertosNoRecorte.length}</div>
               <div className="meta">no funil</div>
-            </div>
-            {/* distribuição por ETAPA — a informação que faltava do lado do total (dono 27/08) */}
-            {etapasDist.some((d) => d.n > 0) && (
-              <div className="kb-kpi dist" title={'Distribuição por etapa: ' + etapasDist.map((d) => `${d.nome} ${d.n}`).join(' · ')}>
-                <div className="lab">Distribuição</div>
+              {etapasDist.some((d) => d.n > 0) && (
                 <div className="kb-dist" aria-hidden>
                   {etapasDist.filter((d) => d.n > 0).map((d) => (
                     <span key={d.id} style={{ width: `${(d.n / distTotal) * 100}%`, background: d.cor }} />
                   ))}
                 </div>
-                <div className="kb-dist-leg">
-                  {etapasDist.filter((d) => d.n > 0).slice(0, 3).map((d) => (
-                    <span key={d.id} className="li"><i style={{ background: d.cor }} />{d.nome} <b className="num">{d.n}</b></span>
-                  ))}
-                  {distMaior && etapasDist.filter((d) => d.n > 0).length > 3 && <span className="li mais">…</span>}
-                </div>
-              </div>
-            )}
+              )}
+            </div>
             <button type="button" className={'kb-kpi crit acao' + (foco ? ' on' : '')} aria-pressed={foco}
               title={gargaloTop ? `Etapa mais travada: ${gargaloTop.col.nome} (${gargaloTop.n} parados). Clique para focar só no que exige ação agora.` : 'Leads sem trocar de coluna há mais de 7 dias. Clique para focar só no que exige ação agora.'}
               onClick={() => setFoco((f) => !f)}>
