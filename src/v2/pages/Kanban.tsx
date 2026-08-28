@@ -1299,22 +1299,19 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, fichaInfo, optout, mo
   const hot = (paradoAtivo && dp >= LIMIAR_CRITICO_DIAS) || slaVermelho;
   const warm = !hot && (paradoAtivo || quente);
   const tier = hot ? ' hot' : warm ? ' warm' : '';
-  const servLbl = l.tipoServico !== 'analise_inicial' ? rotuloDe(TIPO_SERVICO, l.tipoServico) : '';
-  // tipo de benefício: da oportunidade; sem ele, o da FICHA (pedido do dono 27/08)
+  // tipo de benefício: da oportunidade; sem ele, o da FICHA (pedido do dono 27/08).
+  // v6: SERVIÇO saiu do card (dono: "cancelamento não fazemos mais, é só ressarcimento" —
+  // rótulo repetido em todo card é ruído); VALORES saíram ("não trabalhamos com isso").
   const benefBruto = l.tipoBeneficio ?? (fichaInfo?.tipoBeneficio as KLead['tipoBeneficio'] | null);
   const benefLbl = benefBruto ? rotuloDe(TIPO_BENEFICIO, benefBruto) : '';
   // data no FUSO DE SP (slice do ISO daria o dia em UTC — à noite mostra amanhã)
   const dtEntradaIso = l.entradaEm || l.criadoEm || '';
   const dataCurta = dtEntradaIso ? new Date(dtEntradaIso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo' }) : '';
   const dataFull = dtEntradaIso ? new Date(dtEntradaIso).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : '';
-  // v5 EDITORIAL: eyebrow tipográfico (benefício; sem ele, serviço) — chips morreram
-  const eyebrow = benefLbl || servLbl;
-  // meta corrida: instituição · serviço (se não coube no eyebrow) · recebe BANCO (+N nos title)
-  const metaPartes = [l.instituicao, benefLbl ? servLbl : '', fichaInfo?.bancoNome ? `recebe ${fichaInfo.bancoNome}` : ''].filter(Boolean) as string[];
+  // meta corrida: instituição · recebe BANCO (+N nos title)
+  const metaPartes = [l.instituicao, fichaInfo?.bancoNome ? `recebe ${fichaInfo.bancoNome}` : ''].filter(Boolean) as string[];
   const revN = fichaInfo?.revBancos.length ?? 0;
   const metaTitle = [...metaPartes, revN ? `REV: ${fichaInfo!.revBancos.join(', ')}` : ''].filter(Boolean).join(' · ');
-  // valor relevante (existia só no drawer) — colapsa quando não há
-  const vr = valorRelevante(l);
   // progresso HONESTO no funil: posição da coluna entre as neutras (ganho = cheio verde; perdido some)
   const neutras = colunas.filter((c) => (c.resultado ?? 'neutro') === 'neutro');
   const idxNeutra = neutras.findIndex((c) => c.id === l.colunaId);
@@ -1353,10 +1350,10 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, fichaInfo, optout, mo
         {/* o dropdown do card é renderizado em PORTAL no nível da página (fora do overflow da coluna) */}
       </span>
 
-      {/* L1 EYEBROW tipográfico: benefício (ou serviço) em micro-caps + data de entrada nua */}
-      {(eyebrow || dataCurta) && (
+      {/* L1: TAG de benefício colorida (a energia da referência) + data de entrada */}
+      {(benefLbl || dataCurta) && (
         <div className="kc-eyebrow">
-          {eyebrow && <span className="kc-benef" title={benefLbl ? 'Tipo de benefício: ' + benefLbl : 'Serviço: ' + servLbl}>{eyebrow}</span>}
+          {benefLbl && <span className="kc-benef" title={'Tipo de benefício: ' + benefLbl}>{benefLbl}</span>}
           {dataCurta && <span className="kc-data num" title={'No funil desde ' + dataFull}>{dataCurta}</span>}
         </div>
       )}
@@ -1378,12 +1375,7 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, fichaInfo, optout, mo
       {/* RESERVADO — estado do BOT no card (dono 27/08): quando a opção nascer no bot,
           entra aqui (fonte provável: ia_sessoes da conversa). */}
 
-      {/* L4 VALOR (dado que morria no drawer) — colapsa quando não há */}
-      {vr.valor != null && (
-        <div className="kc-valor num">{fmtBRL(vr.valor)}<span className="suf">{vr.mensal ? '/mês' : 'est.'}</span></div>
-      )}
-
-      {/* L5 PROGRESSO honesto do funil (etapa X de N) — o ÚNICO azul em repouso */}
+      {/* L5 PROGRESSO honesto do funil (etapa X de N) */}
       {mostraProg && (
         <div className="kc-prog" title={l.status === 'ganho' ? 'Fechado como ganho' : `Etapa ${idxNeutra + 1} de ${neutras.length} (${colAtual?.nome ?? ''})`}>
           <span className="trilho"><span className="fill" style={{ width: progPct + '%' }} /></span>
@@ -1396,16 +1388,21 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, fichaInfo, optout, mo
         <div className="kc-lem" title={'Lembrete: ' + l.lembrete}><IcSino /><span>{l.lembrete}</span></div>
       )}
 
-      {/* L7 RODAPÉ: gente + etiquetas (dots) + tempo + WhatsApp */}
+      {/* L6b ETIQUETAS coloridas — mesma linguagem da tag de benefício, na cor da etiqueta */}
+      {todasEtiquetas.length > 0 && (
+        <div className="kc-etqs">
+          {todasEtiquetas.slice(0, 2).map((t) => {
+            const cor = corDaEtiqueta(t, etiquetasCat);
+            return <span key={t} className="kc-etq" title={t} style={{ color: cor, background: cor + '24', borderColor: cor + '4D' }}>{t}</span>;
+          })}
+          {todasEtiquetas.length > 2 && <span className="kc-etq mais" title={todasEtiquetas.slice(2).join(' · ')}>+{todasEtiquetas.length - 2}</span>}
+        </div>
+      )}
+
+      {/* L7 RODAPÉ: gente + tempo + WhatsApp */}
       <div className="kc-foot">
         <span className={'kc-av' + (l.respNome ? '' : ' semdono')} title={l.respNome ? 'Responsável · ' + l.respNome : 'Sem responsável'}>{l.respNome ? initials(l.respNome) : '·'}</span>
         <span className={'kc-resp' + (l.respNome ? '' : ' none')} title={l.respNome || 'Não atribuído'}>{l.respNome || 'Não atribuído'}</span>
-        {todasEtiquetas.length > 0 && (
-          <span className="kc-etqdots" title={'Etiquetas: ' + todasEtiquetas.join(' · ')}>
-            {todasEtiquetas.slice(0, 3).map((t) => <i key={t} style={{ background: corDaEtiqueta(t, etiquetasCat) }} />)}
-            {todasEtiquetas.length > 3 && <span className="mais">+{todasEtiquetas.length - 3}</span>}
-          </span>
-        )}
         <span className={'kc-time num' + (paradoAtivo ? (hot ? ' hot' : ' warm') : '')} title={paradoAtivo ? `Sem trocar de coluna há ${dp} dia(s)` : 'Última atualização'}>
           {paradoAtivo ? `parado ${dp}d` : haDe(l.atualizadoEm || l.criadoEm)}
         </span>

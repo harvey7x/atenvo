@@ -362,7 +362,9 @@
    ============================================================ */
 .v2 .kc {
   padding: 12px 14px; margin-bottom: 8px; border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(2, 4, 10, .32), inset 0 1px 0 rgba(255, 255, 255, .05);
+  background: linear-gradient(180deg, rgba(var(--tint), .09), rgba(var(--tint), .045));
+  border: 1px solid rgba(var(--tint), .13);
+  box-shadow: 0 8px 24px rgba(2, 4, 10, .32), inset 0 1px 0 rgba(255, 255, 255, .06);
 }
 .v2 .kc::before { background: transparent; top: 10px; bottom: 10px; }
 .v2 .kc.warm::before { background: var(--ambar); box-shadow: none; }
@@ -374,9 +376,15 @@
 .v2 .kc > .kb-menu-wrap .mbtn { opacity: 0; transition: opacity .12s; }
 .v2 .kc:hover > .kb-menu-wrap .mbtn, .v2 .kc > .kb-menu-wrap .mbtn.on { opacity: 1; }
 
-/* L1 eyebrow */
-.v2 .kc-eyebrow { display: flex; align-items: baseline; gap: 6px; min-height: 12px; padding-right: 18px; }
-.v2 .kc-benef { font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--txt-3); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* L1: tag de benefício COLORIDA (energia da referência — o azul da casa) + data.
+   Uma linguagem só de tag no card: .kc-benef e .kc-etq têm a MESMA forma. */
+.v2 .kc-eyebrow { display: flex; align-items: center; gap: 6px; min-height: 16px; padding-right: 18px; }
+.v2 .kc-benef {
+  font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: #BCD4FF; background: rgba(var(--azul-rgb), .16); border: 1px solid rgba(var(--azul-rgb), .38);
+  border-radius: 6px; padding: 2px 8px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+:root[data-tema="light"] .v2 .kc-benef { color: var(--azul, #2A62C9); background: rgba(42, 98, 201, .1); border-color: rgba(42, 98, 201, .32); }
 .v2 .kc-data { margin-left: auto; flex-shrink: 0; font-size: 9.5px; color: var(--txt-3); }
 
 /* L2 título */
@@ -390,13 +398,9 @@
 .v2 .kc-meta { margin-top: 3px; font-size: 10.5px; line-height: 1.4; color: var(--txt-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .v2 .kc-meta .mais { color: var(--txt-3); }
 
-/* L4 valor */
-.v2 .kc-valor { margin-top: 10px; font-size: 12.5px; font-weight: 650; }
-.v2 .kc-valor .suf { font-size: 9.5px; font-weight: 400; color: var(--txt-3); margin-left: 3px; }
-
-/* L5 progresso honesto do funil — o único azul em repouso */
-.v2 .kc-prog { margin-top: 6px; display: flex; align-items: center; gap: 8px; }
-.v2 .kc-prog .trilho { flex: 1; height: 3px; border-radius: 99px; background: rgba(var(--tint), .08); overflow: hidden; }
+/* L5 progresso honesto do funil */
+.v2 .kc-prog { margin-top: 10px; display: flex; align-items: center; gap: 8px; }
+.v2 .kc-prog .trilho { flex: 1; height: 4px; border-radius: 99px; background: rgba(var(--tint), .09); overflow: hidden; }
 .v2 .kc-prog .fill { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, rgba(var(--azul-rgb), .55), var(--azul)); }
 .v2 .kc.e-ganho .kc-prog .fill { background: var(--verde); }
 .v2 .kc-prog .frac { flex-shrink: 0; font-size: 9.5px; color: var(--txt-3); }
@@ -416,9 +420,14 @@
 .v2 .kc-av.semdono { box-shadow: inset 0 0 0 1px rgba(var(--ambar-rgb), .45); color: var(--ambar); }
 .v2 .kc-resp { font-size: 10.5px; color: var(--txt-3); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .v2 .kc-resp.none { color: var(--ambar); }
-.v2 .kc-etqdots { display: inline-flex; align-items: center; gap: 3px; flex-shrink: 0; }
-.v2 .kc-etqdots i { width: 6px; height: 6px; border-radius: 50%; }
-.v2 .kc-etqdots .mais { font-size: 9px; color: var(--txt-3); }
+/* L6b etiquetas coloridas — mesma FORMA da tag de benefício, cor via inline (da etiqueta) */
+.v2 .kc-etqs { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-top: 8px; }
+.v2 .kc-etq {
+  font-size: 9.5px; font-weight: 650; max-width: 128px;
+  border: 1px solid transparent; border-radius: 6px; padding: 2px 8px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.v2 .kc-etq.mais { color: var(--txt-3); border-color: rgba(var(--tint), .14); }
 .v2 .kc-time { margin-left: auto; flex-shrink: 0; font-size: 10.5px; color: var(--txt-3); }
 .v2 .kc-time.warm { color: var(--ambar); font-weight: 600; }
 .v2 .kc-time.hot { color: var(--rubro); font-weight: 650; }
@@ -442,8 +451,7 @@
 
 /* modo denso: colapsa as linhas informativas, mantém título/rodapé/faixa */
 .v2 .kb-cols.denso .kc { padding: 6px 12px; margin-bottom: 4px; }
-.v2 .kb-cols.denso .kc-eyebrow, .v2 .kb-cols.denso .kc-meta, .v2 .kb-cols.denso .kc-prog, .v2 .kb-cols.denso .kc-lem { display: none; }
-.v2 .kb-cols.denso .kc-valor { margin-top: 4px; font-size: 11.5px; }
+.v2 .kb-cols.denso .kc-eyebrow, .v2 .kb-cols.denso .kc-meta, .v2 .kb-cols.denso .kc-prog, .v2 .kb-cols.denso .kc-lem, .v2 .kb-cols.denso .kc-etqs { display: none; }
 .v2 .kb-cols.denso .kc-badge { margin: 6px -12px -6px; }
 /* lembrete no drawer de detalhe */
 .v2 .kd-lem { display: inline-flex; align-items: center; gap: 6px; color: var(--ambar); }
