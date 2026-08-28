@@ -8,5 +8,8 @@ comment on column public.organizacoes.assinatura_marca is
 
 -- Seed: as duas organizações em produção são operação CAF (empresa-demo = CAF original;
 -- alfa = ambiente do programa alfa da própria CAF, hoje sem canais de WhatsApp).
+-- Fase 2.0.1: 'caf' incluído — o slug da CAF foi renomeado empresa-demo→caf em prod;
+-- sem ele, um replay local pós-rename viraria no-op silencioso. (Nota ao dono: a marca
+-- 'CAF' na org alfa parte da premissa de que alfa é operação da própria CAF — conferir.)
 update public.organizacoes set assinatura_marca = 'CAF'
- where slug in ('empresa-demo', 'alfa') and assinatura_marca is null;
+ where slug in ('empresa-demo', 'caf', 'alfa') and assinatura_marca is null;
