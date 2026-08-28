@@ -60,9 +60,9 @@
 
 /* aba ativa do inbox */
 :root:not([data-tema="light"]) .v2 .wa-aba.on {
-  background: rgba(var(--azul-rgb), .12);
+  background: rgba(var(--azul-rgb), .09);
   color: #fff;
-  box-shadow: inset 0 1px 0 rgba(var(--azul-rgb), .18);
+  box-shadow: inset 0 1px 0 rgba(var(--azul-rgb), .13);
 }
 
 /* --- 3b. AZUL: segunda leva de pontos de interação --------------
@@ -98,9 +98,9 @@
 :root:not([data-tema="light"]) .v2 .campo.invalida .inp:focus { box-shadow: 0 0 0 3px rgba(var(--rubro-rgb), .10); } /* inválido segue rubro */
 
 /* chips/botões ativos do inbox: "Responder por" e ícones .on */
-:root:not([data-tema="light"]) .v2 .wa-chipbtn.on { background: rgba(var(--azul-rgb), .12); color: #fff; }
-:root:not([data-tema="light"]) .v2 .ib2.on { color: #fff; border-color: rgba(var(--azul-rgb), .4); background: rgba(var(--azul-rgb), .09); }
-:root:not([data-tema="light"]) .v2 .cmsg .tools .wa-scr-btn.on { color: #fff; border-color: rgba(var(--azul-rgb), .4); background: rgba(var(--azul-rgb), .12); }
+:root:not([data-tema="light"]) .v2 .wa-chipbtn.on { background: rgba(var(--azul-rgb), .09); color: #fff; }
+:root:not([data-tema="light"]) .v2 .ib2.on { color: #fff; border-color: rgba(var(--azul-rgb), .32); background: rgba(var(--azul-rgb), .07); }
+:root:not([data-tema="light"]) .v2 .cmsg .tools .wa-scr-btn.on { color: #fff; border-color: rgba(var(--azul-rgb), .32); background: rgba(var(--azul-rgb), .09); }
 
 /* links de ação nas bolhas (falha segue rubro por semântica) */
 :root:not([data-tema="light"]) .v2 .audio-ind .lnk,
@@ -142,9 +142,9 @@
 :root:not([data-tema="light"]) .v2 .bolha.env2 {
   border-bottom-right-radius: 5px;
   background-color: rgba(14, 22, 40, .62);
-  /* dono 28/08: "um pouco forte" — gradiente/borda do acento mais recuados */
-  background-image: linear-gradient(180deg, rgba(var(--azul-rgb), .21), rgba(var(--azul-rgb), .07));
-  border-color: rgba(var(--azul-rgb), .25);
+  /* dono 28/08 ("um pouco forte", depois "menos no dark"): acento em sussurro */
+  background-image: linear-gradient(180deg, rgba(var(--azul-rgb), .15), rgba(var(--azul-rgb), .05));
+  border-color: rgba(var(--azul-rgb), .19);
   box-shadow: 0 10px 26px rgba(6, 16, 42, .5), inset 0 1px 0 rgba(255, 255, 255, .12);
 }
 /* bot: mantém o acento de identidade na borda-guia sobre o vidro azul */
