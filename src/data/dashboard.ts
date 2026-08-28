@@ -242,3 +242,160 @@ export function seedDashIa(): DashIa {
     msgsBot: 214, msgsHumano: 378, precisaHumanoAgora: 5,
   };
 }
+
+/* ====================== Drill-down (dono 28/08) ======================
+   "Apertar e ver": as conversas que a IA atendeu no período, o FIO de
+   uma conversa dentro do próprio dashboard, e as conversas de um
+   atendente. Tudo leitura leve, client-side, sob as RLS existentes. */
+
+export interface IaConversaResumo {
+  conversaId: string;
+  nome: string;
+  telefone: string | null;
+  msgsBot: number;
+  ultimaEm: string;
+  preview: string;
+}
+
+/** Conversas em que a IA FALOU no período (distinct de mensagens origem=bot). */
+export function useIaConversasPeriodo(periodo: Periodo) {
+  const { currentOrg } = useOrg();
+  const org = currentOrg.id;
+  return useQuery({
+    queryKey: ['dashboard-ia-conversas', org, periodo.iniISO, periodo.fimISO],
+    enabled: DASH_REAL && !!org,
+    staleTime: 60_000,
+    queryFn: async (): Promise<IaConversaResumo[]> => {
+      const { data: msgs, error } = await supabase!.from('mensagens')
+        .select('conversa_id, conteudo, criado_em')
+        .eq('organizacao_id', org).eq('origem', 'bot').eq('direcao', 'saida')
+        .gte('criado_em', periodo.iniISO).lt('criado_em', periodo.fimISO)
+        .order('criado_em', { ascending: false }).limit(600);
+      if (error) throw error;
+      const porConversa = new Map<string, { n: number; ultimaEm: string; preview: string }>();
+      for (const m of (msgs ?? []) as { conversa_id: string; conteudo: string | null; criado_em: string }[]) {
+        const e = porConversa.get(m.conversa_id);
+        if (e) e.n += 1;
+        else porConversa.set(m.conversa_id, { n: 1, ultimaEm: m.criado_em, preview: m.conteudo ?? '' });
+      }
+      const ids = [...porConversa.keys()].slice(0, 40);
+      if (ids.length === 0) return [];
+      const { data: convs, error: e2 } = await supabase!.from('conversas')
+        .select('id, contatos!inner(nome, telefone)').in('id', ids);
+      if (e2) throw e2;
+      const nomes = new Map((convs ?? []).map((c) => {
+        const r = c as unknown as { id: string; contatos: { nome: string; telefone: string | null } | { nome: string; telefone: string | null }[] };
+        const ct = Array.isArray(r.contatos) ? r.contatos[0] : r.contatos;
+        return [r.id, ct] as const;
+      }));
+      return ids.map((id) => {
+        const agg = porConversa.get(id)!;
+        const ct = nomes.get(id);
+        return { conversaId: id, nome: ct?.nome ?? 'Contato', telefone: ct?.telefone ?? null, msgsBot: agg.n, ultimaEm: agg.ultimaEm, preview: agg.preview };
+      }).sort((a, b) => b.ultimaEm.localeCompare(a.ultimaEm));
+    },
+  });
+}
+
+export interface MsgPreview { dir: 'in' | 'out'; bot: boolean; texto: string; quando: string; tipo: string | null }
+
+/** O FIO de uma conversa, leve, para leitura dentro do dashboard. */
+export function useConversaPreview(conversaId: string | null) {
+  const { currentOrg } = useOrg();
+  const org = currentOrg.id;
+  return useQuery({
+    queryKey: ['dashboard-conversa-preview', org, conversaId ?? ''],
+    enabled: DASH_REAL && !!org && !!conversaId,
+    staleTime: 30_000,
+    queryFn: async (): Promise<MsgPreview[]> => {
+      const { data, error } = await supabase!.from('mensagens')
+        .select('direcao, origem, conteudo, tipo, criado_em')
+        .eq('conversa_id', conversaId!)
+        .order('criado_em', { ascending: false }).limit(60);
+      if (error) throw error;
+      return ((data ?? []) as { direcao: string; origem: string | null; conteudo: string | null; tipo: string | null; criado_em: string }[])
+        .reverse()
+        .map((m) => ({
+          dir: m.direcao === 'saida' ? 'out' as const : 'in' as const,
+          bot: m.origem === 'bot',
+          texto: m.conteudo ?? (m.tipo && m.tipo !== 'texto' ? `[${m.tipo}]` : ''),
+          quando: m.criado_em,
+          tipo: m.tipo,
+        }))
+        .filter((m) => m.texto);
+    },
+  });
+}
+
+export interface AtendenteConversa { conversaId: string; nome: string; ultimaEm: string | null }
+
+/** Conversas recentes atribuídas a um atendente (mapeia o NOME do RPC → usuário). */
+export function useAtendenteConversas(atendenteId: string | null) {
+  const { currentOrg } = useOrg();
+  const org = currentOrg.id;
+  return useQuery({
+    queryKey: ['dashboard-atendente-conversas', org, atendenteId ?? ''],
+    enabled: DASH_REAL && !!org && !!atendenteId,
+    staleTime: 60_000,
+    queryFn: async (): Promise<AtendenteConversa[]> => {
+      const { data, error } = await supabase!.from('conversas')
+        .select('id, ultima_interacao_em, contatos!inner(nome)')
+        .eq('organizacao_id', org).eq('atendente_id', atendenteId!)
+        .order('ultima_interacao_em', { ascending: false }).limit(12);
+      if (error) throw error;
+      return ((data ?? []) as unknown as { id: string; ultima_interacao_em: string | null; contatos: { nome: string } | { nome: string }[] }[])
+        .map((c) => ({ conversaId: c.id, nome: (Array.isArray(c.contatos) ? c.contatos[0] : c.contatos)?.nome ?? 'Contato', ultimaEm: c.ultima_interacao_em }));
+    },
+  });
+}
+
+/* ---- seeds do drill-down (demo) ---- */
+export function seedIaConversas(): IaConversaResumo[] {
+  const agora = Date.now();
+  const iso = (min: number) => new Date(agora - min * 60_000).toISOString();
+  return [
+    { conversaId: 'ia-cv-1', nome: 'Rosana M. Ferreira', telefone: '5551987110022', msgsBot: 7, ultimaEm: iso(9), preview: 'Perfeito, dona Rosana! Recebi a foto do documento — vou conferir e já te retorno.' },
+    { conversaId: 'ia-cv-2', nome: 'Maria Aparecida Souza', telefone: '5551988124407', msgsBot: 5, ultimaEm: iso(24), preview: 'Boa tarde, dona Maria! Aqui é o Matheo, da CAF Assessoria. Posso conferir o seu benefício?' },
+    { conversaId: 'ia-cv-3', nome: 'José Carlos Ferreira', telefone: '5551987770001', msgsBot: 4, ultimaEm: iso(58), preview: 'Sem problema, seu José — vou te mandar o passo a passo do aplicativo.' },
+    { conversaId: 'ia-cv-4', nome: 'Ivone Castro dos Santos', telefone: '5551987770009', msgsBot: 6, ultimaEm: iso(96), preview: 'Entendi! Nesse caso vou pedir para uma pessoa da equipe te ajudar com o acesso, tá bom?' },
+  ];
+}
+
+export function seedConversaPreview(conversaId: string): MsgPreview[] {
+  const agora = Date.now();
+  const iso = (min: number) => new Date(agora - min * 60_000).toISOString();
+  const fios: Record<string, MsgPreview[]> = {
+    'ia-cv-1': [
+      { dir: 'in', bot: false, texto: 'Boa tarde, vi o anúncio sobre revisão de desconto', quando: iso(42), tipo: 'texto' },
+      { dir: 'out', bot: true, texto: 'Boa tarde, dona Rosana! Aqui é o Matheo, da CAF Assessoria. Muitos aposentados têm descontos que valem a pena verificar. Posso conferir o seu?', quando: iso(41), tipo: 'texto' },
+      { dir: 'in', bot: false, texto: 'Pode sim', quando: iso(38), tipo: 'texto' },
+      { dir: 'out', bot: true, texto: 'Ótimo! Para eu conferir, me manda uma foto do seu documento (RG ou CNH), pode ser?', quando: iso(37), tipo: 'texto' },
+      { dir: 'in', bot: false, texto: '[imagem]', quando: iso(12), tipo: 'imagem' },
+      { dir: 'out', bot: true, texto: 'Perfeito, dona Rosana! Recebi a foto do documento — vou conferir e já te retorno.', quando: iso(9), tipo: 'texto' },
+    ],
+    'ia-cv-4': [
+      { dir: 'in', bot: false, texto: 'Quero ver isso dos descontos no meu benefício', quando: iso(130), tipo: 'texto' },
+      { dir: 'out', bot: true, texto: 'Boa tarde, dona Ivone! Para eu conferir os descontos, a senhora tem acesso ao Meu INSS (gov.br)?', quando: iso(128), tipo: 'texto' },
+      { dir: 'in', bot: false, texto: 'Nunca usei isso de gov, meu filho. Não tenho senha não', quando: iso(120), tipo: 'texto' },
+      { dir: 'out', bot: true, texto: 'Entendi! Nesse caso vou pedir para uma pessoa da equipe te ajudar com o acesso, tá bom?', quando: iso(96), tipo: 'texto' },
+      { dir: 'out', bot: false, texto: 'Dona Ivone, aqui é o Henrique, da equipe. Vamos criar o acesso juntos, passo a passo.', quando: iso(80), tipo: 'texto' },
+    ],
+  };
+  return fios[conversaId] ?? [
+    { dir: 'in', bot: false, texto: 'Boa tarde! Vi o anúncio de vocês.', quando: iso(60), tipo: 'texto' },
+    { dir: 'out', bot: true, texto: 'Boa tarde! Aqui é o Matheo, da CAF Assessoria. Posso conferir o seu benefício?', quando: iso(58), tipo: 'texto' },
+    { dir: 'in', bot: false, texto: 'Pode sim, meu filho', quando: iso(50), tipo: 'texto' },
+    { dir: 'out', bot: true, texto: 'Perfeito! Me manda uma foto do seu documento (RG ou CNH), por favor.', quando: iso(49), tipo: 'texto' },
+  ];
+}
+
+export function seedAtendenteConversas(nome: string): AtendenteConversa[] {
+  const agora = Date.now();
+  const iso = (min: number) => new Date(agora - min * 60_000).toISOString();
+  const base: Record<string, string[]> = {
+    Juliana: ['Maria Aparecida Souza', 'Ivone F. Cardoso', 'Antônio Pereira Lima', 'Neusa B. Martins', 'Rosana M. Ferreira'],
+    Matheus: ['Terezinha M. Alves', 'José Carlos Ferreira', 'Aparecida L. Rocha', 'Sebastião R. Nunes'],
+    Henrique: ['Ivone Castro dos Santos', 'Camila Duarte', 'Roberto Lima'],
+  };
+  return (base[nome] ?? ['Cliente 1', 'Cliente 2']).map((n, i) => ({ conversaId: 'at-cv-' + i, nome: n, ultimaEm: iso(15 + i * 47) }));
+}

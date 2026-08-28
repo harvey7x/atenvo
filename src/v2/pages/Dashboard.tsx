@@ -1,14 +1,20 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Area, AreaChart, Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { useNavigate } from 'react-router-dom';
 import {
   DASH_REAL, PRESETS_DASH, agrupaPorFonte, periodoDash, useDashboardResumo,
   useDashboardIa, seedDashResumo, seedDashIa,
+  useIaConversasPeriodo, useConversaPreview, useAtendenteConversas,
+  seedIaConversas, seedConversaPreview, seedAtendenteConversas,
   type DashAtendente, type DashIa, type DashKpis, type DashLinhaFunil, type DashResumo, type PresetDash,
+  type IaConversaResumo,
 } from '@/data/dashboard';
 import { kpi, spHoje, addDias, type Kpi as KpiNum } from '@/data/relatorios';
 import { rotuloMotivoPerda } from '@/data/kanban';
+import { useOrgUsuarios } from '@/data/atendimento';
 import { initials } from '@/lib/avatar';
-import { CardVidro, Chip, Chips, EstadoErro, Input, Skeleton } from '../components';
+import { tempoRelativo } from '../lib/tempo';
+import { BotaoSec, CardVidro, Chip, Chips, DrawerV2, EstadoErro, Input, Skeleton } from '../components';
 import './dashboard.css';
 
 /* ------------------------------------------------------------------
@@ -256,6 +262,7 @@ function BarrasFunil({ linhas, p }: { linhas: DashLinhaFunil[]; p: Paleta }) {
 export default function DashboardV2() {
   const raiz = useRef<HTMLDivElement>(null);
   const p = usePaleta(raiz);
+  const navigate = useNavigate();
 
   const [preset, setPreset] = useState<PresetDash>('hoje'); // fim do dia: a foto de HOJE primeiro
   const [ini, setIni] = useState(() => addDias(spHoje(), -6));
@@ -301,6 +308,20 @@ export default function DashboardV2() {
 
   // atividade: no "Hoje" a série honesta é POR HORA; em períodos maiores, por dia
   const porHora = periodo.dias <= 1;
+
+  /* ---- DRILL-DOWN (dono 28/08: "apertar e ver") ---- */
+  const iaConvsQ = useIaConversasPeriodo(periodo);
+  const iaConvs: IaConversaResumo[] = DASH_REAL ? (iaConvsQ.data ?? []) : seedIaConversas();
+  const [conversaSel, setConversaSel] = useState<IaConversaResumo | null>(null);
+  const previewQ = useConversaPreview(DASH_REAL ? conversaSel?.conversaId ?? null : null);
+  const fio = conversaSel ? (DASH_REAL ? (previewQ.data ?? []) : seedConversaPreview(conversaSel.conversaId)) : [];
+
+  const [atendenteSel, setAtendenteSel] = useState<DashAtendente | null>(null);
+  const usuarios = useOrgUsuarios().data ?? [];
+  const atendenteSelId = atendenteSel ? (usuarios.find((u) => u.nome === atendenteSel.nome)?.id ?? null) : null;
+  const atConvsQ = useAtendenteConversas(DASH_REAL ? atendenteSelId : null);
+  const atConvs = atendenteSel ? (DASH_REAL ? (atConvsQ.data ?? []) : seedAtendenteConversas(atendenteSel.nome)) : [];
+  const totalConvsEquipe = Math.max(1, atendentes.reduce((s, a) => s + a.conversas_atribuidas, 0));
 
   const eixo = { fontSize: 10.5, fill: p.txt3 };
   const anima = false; // gráfico não anima (regra + rAF em aba de fundo)
@@ -430,7 +451,8 @@ export default function DashboardV2() {
             ) : (
               <div className="db-equipe">
                 {atendentes.map((a: DashAtendente, i) => (
-                  <div className="db-at" key={a.nome}>
+                  <button type="button" className="db-at clicavel" key={a.nome} onClick={() => setAtendenteSel(a)}
+                    title={'Abrir as métricas de ' + a.nome}>
                     <span className="av" aria-hidden>{initials(a.nome)}</span>
                     <span className="quem">
                       <span className="nm">{a.nome}{i === 0 && a.ganhos > 0 && <b className="top">top do período</b>}</span>
@@ -444,7 +466,8 @@ export default function DashboardV2() {
                       <b className="c ok num" title="Ganhos no período">{fmtInt(a.ganhos)}</b>
                       <b className="c er num" title="Perdidos no período">{fmtInt(a.perdidos)}</b>
                     </span>
-                  </div>
+                    <span className="seta" aria-hidden>›</span>
+                  </button>
                 ))}
                 <p className="db-nota">
                   Só entra o que o painel consegue atribuir: resposta pelo celular do consultor não tem
@@ -473,6 +496,31 @@ export default function DashboardV2() {
                 {ia.porEtapa.length === 0 ? <Vazio texto="Nenhuma sessão ativa." /> : (
                   <BarrasH cor={p.azul} itens={ia.porEtapa.map((e) => ({ chave: e.etapa, rot: etapaIa(e.etapa), v: e.qtd }))} />
                 )}
+              </div>
+            )}
+          </Secao>
+
+          {/* ===== conversas que a IA atendeu — CLICÁVEL: abre o fio aqui dentro ===== */}
+          <Secao className="db-span12" titulo="Conversas que a IA atendeu"
+            sub={`${fmtInt(iaConvs.length)} conversa${iaConvs.length === 1 ? '' : 's'} com resposta automática no período · clique para ler o fio`}
+            atraso={0.32}>
+            {DASH_REAL && iaConvsQ.isPending ? <Skeleton altura={140} raio={12} /> : iaConvs.length === 0 ? (
+              <Vazio texto="A IA não respondeu nenhuma conversa no período." />
+            ) : (
+              <div className="db-iaconvs">
+                {iaConvs.slice(0, 8).map((c) => (
+                  <button type="button" className="db-iaconv" key={c.conversaId} onClick={() => setConversaSel(c)}>
+                    <span className="av" aria-hidden>{initials(c.nome)}</span>
+                    <span className="quem">
+                      <span className="nm">{c.nome}</span>
+                      <span className="prev">“{c.preview}”</span>
+                    </span>
+                    <span className="meta">
+                      <b className="chip num" title="Mensagens enviadas pela IA nesta conversa">{fmtInt(c.msgsBot)} da IA</b>
+                      <span className="qdo num">{tempoRelativo(c.ultimaEm, Date.now())}</span>
+                    </span>
+                  </button>
+                ))}
               </div>
             )}
           </Secao>
@@ -556,6 +604,83 @@ export default function DashboardV2() {
           </Secao>
         </div>
       )}
+
+      {/* ===== DRAWER: o fio da conversa que a IA atendeu, aqui dentro ===== */}
+      <DrawerV2 aberto={!!conversaSel} aoFechar={() => setConversaSel(null)} largura={420}>
+        {conversaSel && (
+          <div className="db-drawer">
+            <div className="db-drawer-cab">
+              <span className="av" aria-hidden>{initials(conversaSel.nome)}</span>
+              <div className="quem">
+                <b>{conversaSel.nome}</b>
+                <span>{fmtInt(conversaSel.msgsBot)} resposta{conversaSel.msgsBot === 1 ? '' : 's'} da IA nesta conversa</span>
+              </div>
+              <button type="button" className="fechar" aria-label="Fechar" onClick={() => setConversaSel(null)}>×</button>
+            </div>
+            <div className="db-fio">
+              {DASH_REAL && previewQ.isPending ? <Skeleton altura={160} raio={12} /> : fio.length === 0 ? (
+                <Vazio texto="Sem mensagens legíveis nesta conversa." />
+              ) : fio.map((m, i) => (
+                <div key={i} className={'blh ' + (m.dir === 'out' ? (m.bot ? 'bot' : 'hum') : 'cli')}>
+                  {m.dir === 'out' && <span className="quem-msg">{m.bot ? 'IA · Matheo' : 'Equipe'}</span>}
+                  <span className="tx">{m.texto}</span>
+                  <span className="hh num">{new Date(m.quando).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' })}</span>
+                </div>
+              ))}
+            </div>
+            <div className="db-drawer-pe">
+              <BotaoSec onClick={() => navigate(`/whatsapp?conversa=${encodeURIComponent(conversaSel.conversaId)}`)}>Abrir no WhatsApp</BotaoSec>
+            </div>
+          </div>
+        )}
+      </DrawerV2>
+
+      {/* ===== DRAWER: métricas individuais do atendente ===== */}
+      <DrawerV2 aberto={!!atendenteSel} aoFechar={() => setAtendenteSel(null)} largura={420}>
+        {atendenteSel && (
+          <div className="db-drawer">
+            <div className="db-drawer-cab">
+              <span className="av" aria-hidden>{initials(atendenteSel.nome)}</span>
+              <div className="quem">
+                <b>{atendenteSel.nome}</b>
+                <span>métricas do período · {periodo.label}</span>
+              </div>
+              <button type="button" className="fechar" aria-label="Fechar" onClick={() => setAtendenteSel(null)}>×</button>
+            </div>
+            <div className="db-drawer-corpo">
+              <div className="db-share">
+                <div className="rot">Fatia do atendimento no período</div>
+                <b className="num">{Math.round((atendenteSel.conversas_atribuidas / totalConvsEquipe) * 100)}%</b>
+                <div className="trilho"><i style={{ width: `${Math.round((atendenteSel.conversas_atribuidas / totalConvsEquipe) * 100)}%` }} /></div>
+                <span className="sub num">{fmtInt(atendenteSel.conversas_atribuidas)} de {fmtInt(totalConvsEquipe)} conversas atribuídas</span>
+              </div>
+              <div className="db-stats">
+                <div className="st"><span>Conversas</span><b className="num">{fmtInt(atendenteSel.conversas_atribuidas)}</b></div>
+                <div className="st"><span>Mensagens</span><b className="num">{fmtInt(atendenteSel.msgs_enviadas)}</b></div>
+                <div className="st"><span>1ª resposta</span><b className="num">{fmtMin(atendenteSel.mediana_resposta_min)}</b></div>
+                <div className="st ok"><span>Ganhos</span><b className="num">{fmtInt(atendenteSel.ganhos)}</b></div>
+                <div className="st er"><span>Perdidos</span><b className="num">{fmtInt(atendenteSel.perdidos)}</b></div>
+                <div className="st"><span>Descartados</span><b className="num">{fmtInt(atendenteSel.descartados)}</b></div>
+              </div>
+              <div className="db-drawer-tt">Conversas recentes</div>
+              {DASH_REAL && atConvsQ.isPending ? <Skeleton altura={100} raio={10} /> : atConvs.length === 0 ? (
+                <Vazio texto={DASH_REAL && !atendenteSelId ? 'Não achei o usuário deste atendente para listar conversas.' : 'Nenhuma conversa atribuída.'} />
+              ) : (
+                <div className="db-atconvs">
+                  {atConvs.map((c) => (
+                    <button type="button" key={c.conversaId} className="lin"
+                      onClick={() => navigate(`/whatsapp?conversa=${encodeURIComponent(c.conversaId)}`)}>
+                      <span className="nm">{c.nome}</span>
+                      <span className="qdo num">{c.ultimaEm ? tempoRelativo(c.ultimaEm, Date.now()) : '—'}</span>
+                      <span className="ir" aria-hidden>›</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </DrawerV2>
     </div>
   );
 }
