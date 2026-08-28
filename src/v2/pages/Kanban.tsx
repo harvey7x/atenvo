@@ -307,6 +307,13 @@ export default function KanbanV2() {
   const [foco, setFoco] = useState(false); // some por padrão (Kanban é o protagonista) — liga sob demanda
   const [equipe, setEquipe] = useState(false); // painel "Carga por responsável" — opt-in, não ocupa espaço quando off
   const [filtroResp, setFiltroResp] = useState<string | null>(null); // filtra o board por atendente (chave = respId ou '__none__')
+  // FILTRO COMPLETO do board (dono 27/08): benefício, banco da ficha, período de entrada.
+  // Atendente e canal reusam filtroResp/filtroOrigem — o painel unifica tudo.
+  const [filtroBenef, setFiltroBenef] = useState<Set<string>>(new Set());
+  const [filtroBanco, setFiltroBanco] = useState<Set<string>>(new Set());
+  const [filtroDataDe, setFiltroDataDe] = useState('');
+  const [filtroDataAte, setFiltroDataAte] = useState('');
+  const [painelFiltros, setPainelFiltros] = useState(false);
   const [colsRecolhidas, setColsRecolhidas] = useState<Record<string, boolean>>(() => { try { return JSON.parse(sessionStorage.getItem('atenvo-kb-cols') || '{}'); } catch { return {}; } });
   useEffect(() => { try { sessionStorage.setItem('atenvo-kb-sort', sortModo); } catch { /* privado */ } }, [sortModo]);
   useEffect(() => { try { sessionStorage.setItem('atenvo-kb-cols', JSON.stringify(colsRecolhidas)); } catch { /* privado */ } }, [colsRecolhidas]);
@@ -354,7 +361,20 @@ export default function KanbanV2() {
   const origemDe = (l: KLead) => l.canalNome || l.origem || 'Sem origem'; // v2.1: origem do card/filtro
   // v3 F2 — chave estável do responsável (id em prod; nome como reserva; '__none__' = sem dono).
   const respKeyDe = (l: KLead) => l.respId || (l.respNome ? 'n:' + l.respNome : '__none__');
-  const leadsVisiveis = useMemo(() => leads.filter((l) => matchBusca(l) && (!filtroOrigem || origemDe(l) === filtroOrigem) && (!filtroResp || respKeyDe(l) === filtroResp)), [leads, term, termDig, filtroOrigem, filtroResp]); // eslint-disable-line react-hooks/exhaustive-deps
+  // dados dos filtros avançados: benefício (opp, fallback ficha), bancos (ficha) e dia de entrada
+  const benefDoLead = (l: KLead) => l.tipoBeneficio ?? (fichaResumoMap[l.id]?.tipoBeneficio as KLead['tipoBeneficio'] | null) ?? null;
+  const bancosDoLead = (l: KLead): string[] => { const f = fichaResumoMap[l.id]; return f ? ([f.bancoNome, ...f.revBancos].filter(Boolean) as string[]) : []; };
+  const diaEntradaDe = (l: KLead) => (l.entradaEm || l.criadoEm || '').slice(0, 10);
+  const passaAvancados = (l: KLead): boolean => {
+    if (filtroBenef.size > 0) { const b = benefDoLead(l); if (!b || !filtroBenef.has(b)) return false; }
+    if (filtroBanco.size > 0 && !bancosDoLead(l).some((b) => filtroBanco.has(b))) return false;
+    const d = diaEntradaDe(l);
+    if (filtroDataDe && (!d || d < filtroDataDe)) return false;
+    if (filtroDataAte && (!d || d > filtroDataAte)) return false;
+    return true;
+  };
+  const nFiltrosAtivos = (filtroBenef.size ? 1 : 0) + (filtroBanco.size ? 1 : 0) + ((filtroDataDe || filtroDataAte) ? 1 : 0) + (filtroResp ? 1 : 0) + (filtroOrigem ? 1 : 0);
+  const leadsVisiveis = useMemo(() => leads.filter((l) => matchBusca(l) && (!filtroOrigem || origemDe(l) === filtroOrigem) && (!filtroResp || respKeyDe(l) === filtroResp) && passaAvancados(l)), [leads, term, termDig, filtroOrigem, filtroResp, filtroBenef, filtroBanco, filtroDataDe, filtroDataAte, fichaResumoMap]); // eslint-disable-line react-hooks/exhaustive-deps
   // severidade máxima de SLA por lead, uma vez por render (386 cards no real: o sort não pode realocar por comparação)
   const SEV_PESO: Record<string, number> = { imediato: 5, critico: 4, vermelho: 3, amarelo: 2, leve: 1 };
   const sevPorLead = useMemo(() => {
@@ -368,7 +388,7 @@ export default function KanbanV2() {
   const abertos = useMemo(() => leads.filter((l) => l.status === 'em_andamento'), [leads]);
   // O PLACAR acompanha o filtro de origem (o recorte que o chip ao lado aplica): mesmo conjunto
   // ativo que o board mostra na faceta selecionada — sem filtro, é o funil inteiro.
-  const abertosNoRecorte = useMemo(() => abertos.filter((l) => !filtroOrigem || origemDe(l) === filtroOrigem), [abertos, filtroOrigem]); // eslint-disable-line react-hooks/exhaustive-deps
+  const abertosNoRecorte = useMemo(() => abertos.filter((l) => (!filtroOrigem || origemDe(l) === filtroOrigem) && passaAvancados(l)), [abertos, filtroOrigem, filtroBenef, filtroBanco, filtroDataDe, filtroDataAte, fichaResumoMap]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ---------- v2.1: agregação client-side (só apresentação; zero query/métrica/mutação nova) ----------
      estaParado = MESMA regra do trilho rubro do card (LIMIAR_PARADO_DIAS sem trocar de coluna neutra). */
@@ -456,6 +476,48 @@ export default function KanbanV2() {
     });
   }, [abertos, colunas, sevPorLead, slaPorOpp]); // eslint-disable-line react-hooks/exhaustive-deps
   const cargaMax = useMemo(() => Math.max(1, ...cargaPorResp.map((c) => c.ativos)), [cargaPorResp]);
+
+  // facetas do painel de filtros (contadas sobre os ATIVOS, mesmo recorte do board)
+  const benefOpcoes = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const l of abertos) { const b = benefDoLead(l); if (b) m.set(b, (m.get(b) ?? 0) + 1); }
+    return [...m.entries()].sort((a, b) => b[1] - a[1]);
+  }, [abertos, fichaResumoMap]); // eslint-disable-line react-hooks/exhaustive-deps
+  const bancoOpcoes = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const l of abertos) for (const b of bancosDoLead(l)) m.set(b, (m.get(b) ?? 0) + 1);
+    return [...m.entries()].sort((a, b) => b[1] - a[1]);
+  }, [abertos, fichaResumoMap]); // eslint-disable-line react-hooks/exhaustive-deps
+  const limparFiltros = () => { setFiltroBenef(new Set()); setFiltroBanco(new Set()); setFiltroDataDe(''); setFiltroDataAte(''); setFiltroResp(null); setFiltroOrigem(null); };
+
+  /* EXPORTAÇÃO CSV (dono 27/08): baixa exatamente o RECORTE atual — busca + canal +
+     atendente + filtros avançados, o mesmo conjunto que o board mostra. CSV com BOM e
+     ';' abre direto no Excel pt-BR — sem lib nova. */
+  const exportarCsv = () => {
+    const colNome = (id: string | null) => colunas.find((c) => c.id === id)?.nome ?? '';
+    const esc = (v: unknown) => { const s = String(v ?? ''); return /[";\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+    const cab = ['Nome', 'Telefone', 'Email', 'Coluna', 'Status', 'Benefício', 'Banco (recebe)', 'Bancos REV', 'Etiquetas', 'Responsável', 'Canal', 'Entrada no funil', 'Atualizado em', 'Lembrete', 'Instituição'];
+    const linhas = leadsVisiveis.map((l) => {
+      const f = fichaResumoMap[l.id];
+      const b = benefDoLead(l);
+      return [
+        l.nome, l.telefone, l.email, colNome(colunaDoLead(l)), l.status,
+        b ? rotuloDe(TIPO_BENEFICIO, b) : '',
+        f?.bancoNome ?? '', (f?.revBancos ?? []).join(', '),
+        [...new Set([...l.etiquetas, ...l.contatoEtiquetas])].join(', '),
+        l.respNome || 'Não atribuído', l.canalNome || l.origem || '',
+        diaEntradaDe(l), (l.atualizadoEm || '').slice(0, 10), l.lembrete ?? '', l.instituicao ?? '',
+      ].map(esc).join(';');
+    });
+    const csv = '\uFEFF' + cab.join(';') + '\n' + linhas.join('\n'); // BOM: Excel reconhece UTF-8
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `kanban-leads-${new Date().toISOString().slice(0, 10)}.csv`; a.rel = 'noopener';
+    document.body.appendChild(a); a.click(); a.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 4000);
+    setAviso({ tom: 'ok', texto: `${leadsVisiveis.length} lead(s) exportado(s) em CSV (recorte atual).` });
+  };
 
   /* reconciliação do otimista (v1): entrada some quando o servidor confirma */
   useEffect(() => {
@@ -913,6 +975,13 @@ export default function KanbanV2() {
                 ))}
               </div>
             )}
+            {/* FILTRO COMPLETO + EXPORTAÇÃO (dono 27/08) */}
+            <button type="button" className={'kb-fchip' + (nFiltrosAtivos > 0 ? ' on' : '')} title="Filtros completos: benefício, banco, atendente, canal e período" onClick={() => setPainelFiltros(true)}>
+              Filtros{nFiltrosAtivos > 0 && <span className="c num">{nFiltrosAtivos}</span>}
+            </button>
+            <button type="button" className="kb-fchip" title={`Baixar os ${leadsVisiveis.length} lead(s) do recorte atual em CSV (abre no Excel) — respeita busca e filtros`} onClick={exportarCsv}>
+              ⇩ Exportar
+            </button>
           </div>
 
           {/* v3 F2 — Carga por responsável (opt-in): quem está sobrecarregado; clicar filtra o board */}
@@ -1111,6 +1180,84 @@ export default function KanbanV2() {
       )}
 
       {/* ---------- modal coluna (criar/editar) ---------- */}
+      {/* FILTRO COMPLETO do board (dono 27/08): benefício · banco · atendente · canal · período.
+          Estado aplica AO VIVO; "Aplicar" só fecha. O Exportar CSV baixa este recorte. */}
+      <ModalV2
+        aberto={painelFiltros}
+        aoFechar={() => setPainelFiltros(false)}
+        largura={500}
+        titulo="Filtros do board"
+        rodape={
+          <>
+            <BotaoSec onClick={limparFiltros}>Limpar tudo</BotaoSec>
+            <BotaoSec onClick={() => { exportarCsv(); }}>⇩ Exportar CSV ({leadsVisiveis.length})</BotaoSec>
+            <BotaoPrimario onClick={() => setPainelFiltros(false)}>Aplicar</BotaoPrimario>
+          </>
+        }
+      >
+        <div className="kbf">
+          {benefOpcoes.length > 0 && (
+            <div className="kbf-sec">
+              <div className="kbf-t">Tipo de benefício</div>
+              <div className="kbf-chips">
+                {benefOpcoes.map(([b, n]) => (
+                  <button key={b} type="button" className={'kb-fchip' + (filtroBenef.has(b) ? ' on' : '')}
+                    onClick={() => setFiltroBenef((s) => { const x = new Set(s); if (x.has(b)) x.delete(b); else x.add(b); return x; })}>
+                    {rotuloDe(TIPO_BENEFICIO, b as KLead['tipoBeneficio'])}<span className="c num">{n}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="kbf-sec">
+            <div className="kbf-t">Banco (da ficha)</div>
+            {bancoOpcoes.length === 0 ? <div className="kbf-vazio">Nenhuma ficha com banco marcado neste funil.</div> : (
+              <div className="kbf-chips">
+                {bancoOpcoes.map(([b, n]) => (
+                  <button key={b} type="button" className={'kb-fchip' + (filtroBanco.has(b) ? ' on' : '')}
+                    onClick={() => setFiltroBanco((s) => { const x = new Set(s); if (x.has(b)) x.delete(b); else x.add(b); return x; })}>
+                    {b}<span className="c num">{n}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="kbf-sec">
+            <div className="kbf-t">Atendente</div>
+            <div className="kbf-chips">
+              <button type="button" className={'kb-fchip' + (!filtroResp ? ' on' : '')} onClick={() => setFiltroResp(null)}>Todos</button>
+              {cargaPorResp.map((c) => (
+                <button key={c.key} type="button" className={'kb-fchip' + (filtroResp === c.key ? ' on' : '')}
+                  onClick={() => setFiltroResp((f) => (f === c.key ? null : c.key))}>
+                  {c.nome}<span className="c num">{c.ativos}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          {origens.length > 1 && (
+            <div className="kbf-sec">
+              <div className="kbf-t">Canal de origem</div>
+              <div className="kbf-chips">
+                <button type="button" className={'kb-fchip' + (!filtroOrigem ? ' on' : '')} onClick={() => setFiltroOrigem(null)}>Todas</button>
+                {origens.map((o) => (
+                  <button key={o.nome} type="button" className={'kb-fchip' + (filtroOrigem === o.nome ? ' on' : '')} onClick={() => setFiltroOrigem((f) => (f === o.nome ? null : o.nome))}>
+                    {o.nome}<span className="c num">{o.n}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="kbf-sec">
+            <div className="kbf-t">Entrada no funil</div>
+            <div className="kbf-datas">
+              <label>De <input type="date" className="inp" value={filtroDataDe} onChange={(e) => setFiltroDataDe(e.target.value)} /></label>
+              <label>Até <input type="date" className="inp" value={filtroDataAte} onChange={(e) => setFiltroDataAte(e.target.value)} /></label>
+            </div>
+          </div>
+          <div className="kbf-resumo">{leadsVisiveis.length} lead(s) no recorte atual — o board e a exportação seguem estes filtros.</div>
+        </div>
+      </ModalV2>
+
       <ModalV2
         aberto={!!colModal}
         aoFechar={() => { if (!colBusy) setColModal(null); }}
@@ -1308,10 +1455,10 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, fichaInfo, optout, mo
   const dtEntradaIso = l.entradaEm || l.criadoEm || '';
   const dataCurta = dtEntradaIso ? new Date(dtEntradaIso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo' }) : '';
   const dataFull = dtEntradaIso ? new Date(dtEntradaIso).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : '';
-  // meta corrida: instituição · recebe BANCO (+N nos title)
-  const metaPartes = [l.instituicao, fichaInfo?.bancoNome ? `recebe ${fichaInfo.bancoNome}` : ''].filter(Boolean) as string[];
+  // meta corrida: só a instituição (bancos ganharam a própria fileira de destaque)
+  const metaPartes = [l.instituicao].filter(Boolean) as string[];
   const revN = fichaInfo?.revBancos.length ?? 0;
-  const metaTitle = [...metaPartes, revN ? `REV: ${fichaInfo!.revBancos.join(', ')}` : ''].filter(Boolean).join(' · ');
+  const metaTitle = metaPartes.join(' · ');
   // progresso HONESTO no funil: posição da coluna entre as neutras (ganho = cheio verde; perdido some)
   const neutras = colunas.filter((c) => (c.resultado ?? 'neutro') === 'neutro');
   const idxNeutra = neutras.findIndex((c) => c.id === l.colunaId);
@@ -1365,11 +1512,18 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, fichaInfo, optout, mo
         {l.status === 'perdido' && <span className="kc-flag perdido" title={'Perdido' + (l.motivoPerda ? ' · ' + rotuloMotivoPerda(l.motivoPerda) : '')}>Perdido</span>}
       </div>
 
-      {/* L3 META corrida: instituição · serviço · recebe BANCO · +N bancos (REVs no title) */}
-      {(metaPartes.length > 0 || revN > 0) && (
-        <div className="kc-meta" title={metaTitle}>
-          {metaPartes.join(' · ')}
-          {revN > 0 && <span className="mais">{metaPartes.length ? ' · ' : ''}+{revN} banco{revN > 1 ? 's' : ''}</span>}
+      {/* L3 META corrida: instituição */}
+      {metaPartes.length > 0 && (
+        <div className="kc-meta" title={metaTitle}>{metaPartes.join(' · ')}</div>
+      )}
+
+      {/* L3b BANCOS DA FICHA em DESTAQUE (dono: "muito importante"): o banco do cliente
+          (recebe) no chip mais forte do card (assinatura platina); REVs em contorno */}
+      {fichaInfo && (fichaInfo.bancoNome || revN > 0) && (
+        <div className="kc-bancos" title={'Bancos da ficha' + (fichaInfo.bancoNome ? ` · recebe: ${fichaInfo.bancoNome}` : '') + (revN ? ` · REV: ${fichaInfo.revBancos.join(', ')}` : '')}>
+          {fichaInfo.bancoNome && <span className="kc-banco prin">{fichaInfo.bancoNome}</span>}
+          {fichaInfo.revBancos.slice(0, 2).map((b) => <span key={b} className="kc-banco">{b}</span>)}
+          {revN > 2 && <span className="kc-banco mais">+{revN - 2}</span>}
         </div>
       )}
       {/* RESERVADO — estado do BOT no card (dono 27/08): quando a opção nascer no bot,

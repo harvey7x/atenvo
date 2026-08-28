@@ -420,6 +420,22 @@
 .v2 .kc-av.semdono { box-shadow: inset 0 0 0 1px rgba(var(--ambar-rgb), .45); color: var(--ambar); }
 .v2 .kc-resp { font-size: 10.5px; color: var(--txt-3); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .v2 .kc-resp.none { color: var(--ambar); }
+/* L3b BANCOS em destaque (dono: "muito importante"): recebe = o chip mais FORTE do
+   card (assinatura platina — prata no dark, grafite no claro); REVs em contorno.
+   Mesma forma dos outros tags: uma linguagem só. */
+.v2 .kc-bancos { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-top: 8px; }
+.v2 .kc-banco {
+  font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--txt-2); border: 1px solid rgba(var(--tint), .22); background: rgba(var(--tint), .06);
+  border-radius: 6px; padding: 2px 8px; white-space: nowrap;
+}
+.v2 .kc-banco.prin {
+  color: var(--platina-txt); border-color: transparent;
+  background: linear-gradient(180deg, var(--platina-a), var(--platina-b));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .5);
+}
+.v2 .kc-banco.mais { color: var(--txt-3); border-style: dashed; background: none; }
+
 /* L6b etiquetas coloridas — mesma FORMA da tag de benefício, cor via inline (da etiqueta) */
 .v2 .kc-etqs { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-top: 8px; }
 .v2 .kc-etq {
@@ -458,6 +474,17 @@
 .v2 .kd-lem svg { width: 12px; height: 12px; flex-shrink: 0; }
 /* sufixo de lead sem nome (título = telefone formatado) */
 .v2 .kc-semnome { font-style: normal; font-weight: 400; font-size: 10px; color: var(--txt-3); margin-left: 5px; }
+
+/* ---- FILTRO COMPLETO do board (painel) + exportação ---- */
+.v2 .kbf { display: flex; flex-direction: column; gap: 14px; }
+.v2 .kbf-sec .kbf-t { font-size: 10.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--txt-3); margin-bottom: 7px; }
+.v2 .kbf-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.v2 .kbf-vazio { font-size: 11.5px; color: var(--txt-3); }
+.v2 .kbf-datas { display: flex; gap: 10px; }
+.v2 .kbf-datas label { flex: 1; display: flex; flex-direction: column; gap: 5px; font-size: 11px; color: var(--txt-2); }
+.v2 .kbf-datas .inp { color-scheme: dark; }
+:root[data-tema="light"] .v2 .kbf-datas .inp { color-scheme: light; }
+.v2 .kbf-resumo { font-size: 11px; color: var(--txt-3); border-top: 1px solid var(--linha); padding-top: 10px; }
 
 /* ---- F2: painel Carga por responsável (opt-in) ---- */
 .v2 .kb-carga { flex-shrink: 0; display: flex; align-items: stretch; gap: 8px; flex-wrap: wrap; margin: 0 0 11px; padding-bottom: 11px; border-bottom: 1px solid var(--linha); }
