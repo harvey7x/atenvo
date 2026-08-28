@@ -37,42 +37,48 @@ const PADRAO: Record<Comportamento, StatusMes[]> = {
   inadimplente: ['paga', 'paga', 'nao_paga', 'nao_paga', 'nao_paga', 'prevista'],
 };
 
-type Semente = [nome: string, ciclo: string, atendente: string, mensalidade: number, comp: Comportamento, respAntes: boolean, respRemk: boolean, ultResp: string | null];
+/* pools de nomes (perfil INSS: idosos) + gerador determinístico (mulberry32),
+   pra ~600 clientes estáveis entre renders — simulação de escala real. */
+export const CICLO_DIA: Record<string, number> = { D01: 1, D02: 2, D03: 3, D04: 4, D05: 5, D25: 25, D26: 26, D28: 28, D29: 29 };
+const CICLOS_G = Object.keys(CICLO_DIA);
+const ATEND_G = ['Augusto', 'Eduardo', 'Junior', 'Garcia', 'Emillyn', 'Paty', 'Alexandra', 'Leandro'];
+const PRIMEIROS = ['Maria', 'José', 'Antônio', 'João', 'Francisco', 'Ana', 'Luiz', 'Paulo', 'Carlos', 'Manoel', 'Pedro', 'Francisca', 'Marcos', 'Raimundo', 'Sebastião', 'Antônia', 'Marcelo', 'Jorge', 'Márcia', 'Geraldo', 'Adriana', 'Sandra', 'Fernando', 'Rita', 'Rosa', 'Terezinha', 'Cleusa', 'Ivone', 'Nara', 'Rosana', 'Sônia', 'Vera', 'Cláudia', 'Marlene', 'Neusa', 'Osvaldo', 'Gilberto', 'Vanderlei', 'Ademar', 'Lourdes', 'Nelson', 'Cícero', 'Elza', 'Waldir'];
+const SOBRENOMES = ['Silva', 'Santos', 'Oliveira', 'Souza', 'Rodrigues', 'Ferreira', 'Alves', 'Pereira', 'Lima', 'Gomes', 'Costa', 'Ribeiro', 'Martins', 'Carvalho', 'Almeida', 'Lopes', 'Soares', 'Fernandes', 'Vieira', 'Barbosa', 'Rocha', 'Dias', 'Nunes', 'Moreira', 'Cardoso', 'Teixeira', 'Correia', 'Cavalcante', 'Machado', 'Freitas', 'Pinto', 'Monteiro', 'Mendes', 'Ramos', 'Araújo'];
 
-const SEMENTES: Semente[] = [
-  ['Maria Aparecida Souza', 'D01', 'Giovana', 108, 'em_dia', true, false, 'há 2 dias'],
-  ['João Batista Ferreira', 'D01', 'Giovana', 96, 'em_dia', true, false, 'há 5 dias'],
-  ['Cleusa M. Ribeiro', 'D01', 'Matheus', 120, 'faltou', false, false, 'há 12 dias'],
-  ['José Carlos Ferreira', 'D02', 'Matheus', 127, 'voltou', true, true, 'ontem'],
-  ['Terezinha M. Alves', 'D02', 'Giovana', 85, 'em_dia', true, false, 'há 3 dias'],
-  ['Antônio Pereira Lima', 'D03', 'Junior', 150, 'inadimplente', false, false, null],
-  ['Rosana M. Ferreira', 'D03', 'Junior', 92, 'voltou', true, true, 'há 1 dia'],
-  ['Sebastião R. Nunes', 'D25', 'Garcia', 65, 'em_dia', true, false, 'há 6 dias'],
-  ['Ivone F. Cardoso', 'D25', 'Garcia', 72, 'faltou', true, false, 'há 4 dias'],
-  ['Nara T. Rodrigues', 'D28', 'Junior', 90, 'inadimplente', false, true, 'há 20 dias'],
-  ['Carlos R. Machado', 'D02', 'Matheus', 110, 'em_dia', true, false, 'há 8 dias'],
-  ['Eva de Fátima Trindade', 'D01', 'Giovana', 88, 'voltou', false, true, 'há 2 dias'],
-  ['Gerson P. Evaristo', 'D03', 'Junior', 130, 'faltou', true, false, 'há 9 dias'],
-  ['Ana Paula da Silva', 'D25', 'Garcia', 78, 'em_dia', true, false, 'há 1 dia'],
-  ['Neuri Maia', 'D28', 'Matheus', 105, 'inadimplente', false, false, null],
-  ['Letícia F. da Silva', 'D02', 'Giovana', 99, 'voltou', true, true, 'há 3 dias'],
-];
+function mulberry32(a: number) {
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
 
 export function seedClientes(): ClienteAnalise[] {
-  return SEMENTES.map(([nome, ciclo, atendente, mens, comp, ra, rr, ur], i) => {
+  const rnd = mulberry32(20260828);
+  const pick = <T,>(a: T[]): T => a[Math.floor(rnd() * a.length)];
+  const out: ClienteAnalise[] = [];
+  for (let i = 0; i < 600; i++) {
+    const nome = `${pick(PRIMEIROS)} ${pick(SOBRENOMES)} ${pick(SOBRENOMES)}`;
+    const ciclo = pick(CICLOS_G);
+    const atendente = pick(ATEND_G);
+    const mensalidade = 50 + Math.round(rnd() * 20) * 5;   // 50..150, passo 5
+    const rc = rnd();
+    const comp: Comportamento = rc < 0.55 ? 'em_dia' : rc < 0.70 ? 'voltou' : rc < 0.88 ? 'faltou' : 'inadimplente';
     const meses = MESES.map((c, k) => ({ competencia: c, status: PADRAO[comp][k] }));
     const pagas = meses.filter((m) => m.status === 'paga').length;
+    const ra = rnd() < 0.7;
+    const rr = rnd() < 0.4;
     const engajamento: ClienteAnalise['engajamento'] = [
       { tipo: 'antes', enviada: true, respondeu: ra },
       { tipo: 'cobranca', enviada: true, respondeu: comp === 'em_dia' || comp === 'voltou' },
       { tipo: 'depois', enviada: comp !== 'em_dia', respondeu: comp === 'voltou' || comp === 'faltou' },
       { tipo: 'remarketing', enviada: comp === 'voltou' || comp === 'inadimplente', respondeu: rr },
     ];
-    return {
-      id: `cl-${i}`, nome, ciclo, atendente, mensalidade: mens, comportamento: comp,
-      meses, engajamento, faturamentoTotal: pagas * mens, ultimaResposta: ur,
-    };
-  });
+    const ur = comp === 'inadimplente' && rnd() < 0.5 ? null : `há ${1 + Math.floor(rnd() * 29)} dias`;
+    out.push({ id: `cl-${i}`, nome, ciclo, atendente, mensalidade, comportamento: comp, meses, engajamento, faturamentoTotal: pagas * mensalidade, ultimaResposta: ur });
+  }
+  return out;
 }
 
 export interface MetricaAtendente {

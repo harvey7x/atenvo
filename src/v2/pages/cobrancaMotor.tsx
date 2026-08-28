@@ -5,7 +5,7 @@ import {
   type Coluna, type TomStatus,
 } from '../components';
 import {
-  seedClientes, metricasPorAtendente, metricasPorCiclo, resumoCarteira,
+  seedClientes, metricasPorAtendente, metricasPorCiclo, resumoCarteira, CICLO_DIA,
   ROTULO_COMP, type ClienteAnalise, type Comportamento, type StatusMes, type TipoMsg,
 } from './cobrancaAnalytics';
 
@@ -34,73 +34,64 @@ function Barra({ v, max, tom = 'tint' }: { v: number; max: number; tom?: 'tint' 
 const fmtBRL = (v: number) => 'R$ ' + v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const diaBR = (n: number) => String(n).padStart(2, '0');
 
-/* =================== CICLOS =================== */
-
-type CicloDemo = { codigo: string; nome: string; dia: number; grupo: 'inicio_mes' | 'fim_mes'; clientes: { nome: string; valor: number; atendente: string; venc: number }[] };
-const CICLOS_DEMO: CicloDemo[] = [
-  { codigo: 'D01', nome: 'Dia 1', dia: 1, grupo: 'inicio_mes', clientes: [
-    { nome: 'Maria Aparecida Souza', valor: 108, atendente: 'Giovana', venc: 1 },
-    { nome: 'João Batista Ferreira', valor: 96, atendente: 'Giovana', venc: 1 },
-    { nome: 'Cleusa M. Ribeiro', valor: 120, atendente: 'Matheus', venc: 1 },
-  ] },
-  { codigo: 'D02', nome: 'Dia 2', dia: 2, grupo: 'inicio_mes', clientes: [
-    { nome: 'José Carlos Ferreira', valor: 127, atendente: 'Matheus', venc: 2 },
-    { nome: 'Terezinha M. Alves', valor: 85, atendente: 'Giovana', venc: 2 },
-  ] },
-  { codigo: 'D03', nome: 'Dia 3', dia: 3, grupo: 'inicio_mes', clientes: [
-    { nome: 'Antônio Pereira Lima', valor: 150, atendente: 'Junior', venc: 3 },
-  ] },
-  { codigo: 'D25', nome: 'Dia 25', dia: 25, grupo: 'fim_mes', clientes: [
-    { nome: 'Sebastião R. Nunes', valor: 65, atendente: 'Garcia', venc: 25 },
-    { nome: 'Ivone F. Cardoso', valor: 72, atendente: 'Garcia', venc: 27 },
-  ] },
-  { codigo: 'D28', nome: 'Dia 28', dia: 28, grupo: 'fim_mes', clientes: [
-    { nome: 'Nara T. Rodrigues', valor: 90, atendente: 'Junior', venc: 28 },
-  ] },
-];
+/* =================== CICLOS (derivado dos clientes) =================== */
 
 export function AbaCiclos({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (t: string) => void }) {
-  const [aberto, setAberto] = useState<string | null>('D01');
-  const totalClientes = CICLOS_DEMO.reduce((s, c) => s + c.clientes.length, 0);
-  const totalMes = CICLOS_DEMO.reduce((s, c) => s + c.clientes.reduce((a, cl) => a + cl.valor, 0), 0);
+  const ciclos = useMemo(() => {
+    const map = new Map<string, ClienteAnalise[]>();
+    for (const c of CLIENTES) { const a = map.get(c.ciclo) ?? []; a.push(c); map.set(c.ciclo, a); }
+    return [...map.entries()].map(([codigo, clientes]) => {
+      const dia = CICLO_DIA[codigo] ?? 1;
+      return {
+        codigo, dia, grupo: dia <= 5 ? 'inicio_mes' as const : 'fim_mes' as const,
+        clientes: [...clientes].sort((a, b) => b.mensalidade - a.mensalidade),
+        soma: clientes.reduce((s, c) => s + c.mensalidade, 0),
+      };
+    }).sort((a, b) => a.codigo.localeCompare(b.codigo));
+  }, []);
+  const [aberto, setAberto] = useState<string | null>(ciclos[0]?.codigo ?? null);
+  const totalMes = ciclos.reduce((s, c) => s + c.soma, 0);
+  const primeiroDia = Math.min(...ciclos.map((c) => c.dia));
+
   return (
     <>
       <div className="kpis sobe">
-        <Kpi rotulo="Ciclos de vencimento" valor={CICLOS_DEMO.length} />
-        <Kpi rotulo="Clientes nos ciclos" valor={totalClientes} />
+        <Kpi rotulo="Ciclos de vencimento" valor={ciclos.length} />
+        <Kpi rotulo="Clientes nos ciclos" valor={CLIENTES.length} formato="mil" />
         <Kpi rotulo="Recorrência/mês" valor={Math.trunc(totalMes)} formato="mil" prefixo="R$ " sufixo=",00" tomValor="ok" />
-        <Kpi rotulo="1º vencimento" valor={CICLOS_DEMO[0].dia} prefixo="Dia " />
+        <Kpi rotulo="1º vencimento" valor={primeiroDia} prefixo="Dia " />
       </div>
       <p className="cm-hint sobe" style={{ animationDelay: '.06s' }}>
         Cada ciclo é um grupo de clientes com o mesmo dia de vencimento (quando o benefício do INSS cai). Abra um ciclo para ver os clientes e enfileirar a cobrança do mês.
       </p>
       <div className="cm-ciclos sobe" style={{ animationDelay: '.12s' }}>
-        {CICLOS_DEMO.map((c) => {
+        {ciclos.map((c) => {
           const on = aberto === c.codigo;
-          const soma = c.clientes.reduce((s, cl) => s + cl.valor, 0);
+          const visiveis = c.clientes.slice(0, 10);
           return (
             <CardVidro spot key={c.codigo} className={on ? 'cm-ciclo on' : 'cm-ciclo'}>
               <button type="button" className="cm-ciclo-cab" onClick={() => setAberto(on ? null : c.codigo)} aria-expanded={on}>
                 <span className="cm-ciclo-cod">{c.codigo}</span>
                 <span className="cm-ciclo-nm">Vence dia {diaBR(c.dia)}<b>{c.grupo === 'inicio_mes' ? 'início do mês' : 'fim do mês'}</b></span>
-                <span className="cm-ciclo-n num">{c.clientes.length} cliente{c.clientes.length === 1 ? '' : 's'} · {fmtBRL(soma)}</span>
+                <span className="cm-ciclo-n num">{c.clientes.length} clientes · {fmtBRL(c.soma)}</span>
                 <span className="cm-ciclo-seta" aria-hidden>{on ? '▾' : '▸'}</span>
               </button>
               {on && (
                 <div className="cm-ciclo-corpo">
                   <table className="cm-tab">
-                    <thead><tr><th>Cliente</th><th className="d">Mensalidade</th><th>Vencimento</th><th>Atendente</th></tr></thead>
+                    <thead><tr><th>Cliente</th><th className="d">Mensalidade</th><th>Atendente</th><th>Comportamento</th></tr></thead>
                     <tbody>
-                      {c.clientes.map((cl) => (
-                        <tr key={cl.nome}>
+                      {visiveis.map((cl) => (
+                        <tr key={cl.id}>
                           <td>{cl.nome}</td>
-                          <td className="d num">{fmtBRL(cl.valor)}</td>
-                          <td className="num">dia {diaBR(cl.venc)}</td>
+                          <td className="d num">{fmtBRL(cl.mensalidade)}</td>
                           <td>{cl.atendente}</td>
+                          <td><BadgeStatus tom={compBadge[cl.comportamento]}>{ROTULO_COMP[cl.comportamento]}</BadgeStatus></td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
+                  {c.clientes.length > visiveis.length && <div className="cm-ciclo-mais num">+ {c.clientes.length - visiveis.length} clientes neste ciclo</div>}
                   {gestor && (
                     <div className="cm-ciclo-acao">
                       <BotaoSec mini onClick={() => aoAvisar(`Simulação: ${c.clientes.length} cobrança(s) do ciclo ${c.codigo} entrariam na fila em modo teste.`)}>
@@ -177,12 +168,11 @@ export function AbaRegua({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (t: 
 /* =================== NÚMEROS & ATENDENTES =================== */
 
 type NumDemo = { atendente: string; numero: string | null; status: 'conectado' | 'sincronizando' | 'desconectado'; clientes: number };
-const NUMS_DEMO: NumDemo[] = [
-  { atendente: 'Giovana', numero: '+55 51 98812-4407', status: 'conectado', clientes: 3 },
-  { atendente: 'Matheus', numero: '+55 51 99214-8830', status: 'conectado', clientes: 2 },
-  { atendente: 'Junior', numero: '+55 51 98120-7745', status: 'sincronizando', clientes: 2 },
-  { atendente: 'Garcia', numero: null, status: 'desconectado', clientes: 2 },
-];
+const NUMEROS: NumDemo[] = metricasPorAtendente(CLIENTES).map((m, i) => {
+  const tel = `+55 51 9${8000 + i * 137}-${(1000 + i * 411) % 10000}`.replace(/(\d{4})$/, (x) => x.padStart(4, '0'));
+  const status: NumDemo['status'] = i >= 7 ? 'desconectado' : i === 5 ? 'sincronizando' : 'conectado';
+  return { atendente: m.nome, numero: status === 'desconectado' ? null : tel, status, clientes: m.clientes };
+});
 const TOM_CONEXAO: Record<NumDemo['status'], TomStatus> = { conectado: 'ok', sincronizando: 'atencao', desconectado: 'erro' };
 const ROTULO_CONEXAO: Record<NumDemo['status'], string> = { conectado: 'Conectado', sincronizando: 'Conectando…', desconectado: 'Desconectado' };
 
@@ -194,7 +184,7 @@ export function AbaNumeros({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (t
         Cada atendente conecta o próprio número (leitura do QR code). Na hora do envio, a cobrança sai <b>pelo número do atendente daquele cliente</b> — o cliente recebe sempre de quem já fala com ele.
       </p>
       <div className="cm-nums sobe" style={{ animationDelay: '.08s' }}>
-        {NUMS_DEMO.map((n) => (
+        {NUMEROS.map((n) => (
           <CardVidro spot key={n.atendente} className="cm-num">
             <div className="cm-num-top">
               <span className="cm-num-av" aria-hidden>{n.atendente.slice(0, 2).toUpperCase()}</span>
@@ -443,12 +433,18 @@ export function AbaAtendentes() {
 export function AbaClientes() {
   const [seg, setSeg] = useState<'todos' | Comportamento | 'resp_remk'>('todos');
   const [sel, setSel] = useState<ClienteAnalise | null>(null);
+  const [pag, setPag] = useState(1);
   const lista = useMemo(() => CLIENTES.filter((c) => {
     if (seg === 'todos') return true;
     if (seg === 'resp_remk') return c.engajamento.some((e) => e.tipo === 'remarketing' && e.respondeu);
     return c.comportamento === seg;
   }), [seg]);
   const cont = (comp: Comportamento) => CLIENTES.filter((c) => c.comportamento === comp).length;
+  const POR_PAG = 12;
+  const totalPag = Math.max(1, Math.ceil(lista.length / POR_PAG));
+  const pagAtual = Math.min(pag, totalPag);
+  const linhasPag = lista.slice((pagAtual - 1) * POR_PAG, pagAtual * POR_PAG);
+  const trocarSeg = (s: typeof seg) => { setSeg(s); setPag(1); };
 
   const colunas: Coluna<ClienteAnalise>[] = [
     { chave: 'nome', titulo: 'Cliente', render: (c) => c.nome },
@@ -464,18 +460,19 @@ export function AbaClientes() {
       <p className="cm-hint sobe">Comportamento de pagamento e engajamento de cada cliente. Clique para ver a ficha completa.</p>
       <div className="cob-filtros sobe" style={{ animationDelay: '.06s' }}>
         <Chips>
-          <Chip ativo={seg === 'todos'} onClick={() => setSeg('todos')}>Todos ({CLIENTES.length})</Chip>
-          <Chip ativo={seg === 'em_dia'} onClick={() => setSeg('em_dia')}>Em dia ({cont('em_dia')})</Chip>
-          <Chip ativo={seg === 'voltou'} onClick={() => setSeg('voltou')}>Voltou a pagar ({cont('voltou')})</Chip>
-          <Chip ativo={seg === 'faltou'} onClick={() => setSeg('faltou')}>Faltou pagar ({cont('faltou')})</Chip>
-          <Chip ativo={seg === 'inadimplente'} onClick={() => setSeg('inadimplente')}>Inadimplente ({cont('inadimplente')})</Chip>
-          <Chip ativo={seg === 'resp_remk'} onClick={() => setSeg('resp_remk')}>Respondeu remarketing</Chip>
+          <Chip ativo={seg === 'todos'} onClick={() => trocarSeg('todos')}>Todos ({CLIENTES.length})</Chip>
+          <Chip ativo={seg === 'em_dia'} onClick={() => trocarSeg('em_dia')}>Em dia ({cont('em_dia')})</Chip>
+          <Chip ativo={seg === 'voltou'} onClick={() => trocarSeg('voltou')}>Voltou a pagar ({cont('voltou')})</Chip>
+          <Chip ativo={seg === 'faltou'} onClick={() => trocarSeg('faltou')}>Faltou pagar ({cont('faltou')})</Chip>
+          <Chip ativo={seg === 'inadimplente'} onClick={() => trocarSeg('inadimplente')}>Inadimplente ({cont('inadimplente')})</Chip>
+          <Chip ativo={seg === 'resp_remk'} onClick={() => trocarSeg('resp_remk')}>Respondeu remarketing</Chip>
         </Chips>
       </div>
       <CardVidro spot sobe style={{ borderRadius: 12, animationDelay: '.12s' }}>
         {lista.length === 0
           ? <EstadoVazio titulo="Nenhum cliente neste filtro" descricao="Troque o segmento acima." />
-          : <TabelaPadrao colunas={colunas} linhas={lista} chave={(c) => c.id} aoClicarLinha={(c) => setSel(c)} rodape={{ texto: `${lista.length} cliente${lista.length === 1 ? '' : 's'}` }} />}
+          : <TabelaPadrao colunas={colunas} linhas={linhasPag} chave={(c) => c.id} aoClicarLinha={(c) => setSel(c)}
+              rodape={{ texto: `${lista.length} cliente${lista.length === 1 ? '' : 's'}`, paginacao: { pagina: pagAtual, totalPaginas: totalPag, aoIr: setPag } }} />}
       </CardVidro>
 
       <DrawerV2 aberto={!!sel} aoFechar={() => setSel(null)} largura={460}>
