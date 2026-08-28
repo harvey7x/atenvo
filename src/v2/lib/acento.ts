@@ -1,4 +1,4 @@
-/* Acento do sistema (teste do dono 28/08): azul (padrão) ou verde.
+/* Acento do sistema (teste do dono 28/08): azul (padrão), verde ou dourado.
    Mesma mecânica do Modo de Performance: [data-acento] na RAIZ (<html>),
    preferência POR DISPOSITIVO em localStorage, aplicada em main.tsx antes
    do primeiro paint. AUSÊNCIA de atributo = azul (byte-idêntico ao que
@@ -7,13 +7,14 @@
    skinAurora.css (tokens --azul/--azul-rgb + gradientes hardcoded),
    kanban/dashboard/shell/login e as vars --lg-* da LogoAtenvo. */
 
-export type Acento = 'azul' | 'verde';
+export type Acento = 'azul' | 'verde' | 'dourado';
 
 export const CHAVE_ACENTO = 'atenvo-acento';
 
 export function lerAcento(): Acento {
   try {
-    return localStorage.getItem(CHAVE_ACENTO) === 'verde' ? 'verde' : 'azul';
+    const v = localStorage.getItem(CHAVE_ACENTO);
+    return v === 'verde' || v === 'dourado' ? v : 'azul';
   } catch {
     return 'azul';
   }
@@ -22,8 +23,8 @@ export function lerAcento(): Acento {
 /* azul = atributo AUSENTE de propósito: o CSS do azul é o caminho sem
    guarda nenhuma, então remover o atributo devolve produção exata */
 export function aplicarAcento(acento: Acento): void {
-  if (acento === 'verde') document.documentElement.setAttribute('data-acento', 'verde');
-  else document.documentElement.removeAttribute('data-acento');
+  if (acento === 'azul') document.documentElement.removeAttribute('data-acento');
+  else document.documentElement.setAttribute('data-acento', acento);
 }
 
 type OuvinteAcento = (acento: Acento) => void;

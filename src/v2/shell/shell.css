@@ -74,8 +74,9 @@
   width: 29px; height: 29px; flex-shrink: 0; display: block;
   filter: drop-shadow(0 5px 14px rgba(62, 123, 240, calc(.4 * var(--fx))));
 }
-/* acento verde: o glow da marca acompanha o bloom (skinAurora --lg-*) */
+/* acentos: o glow da marca acompanha o bloom (skinAurora --lg-*) */
 :root[data-acento="verde"] .v2 .p-logo .marca { filter: drop-shadow(0 5px 14px rgba(39, 183, 108, calc(.4 * var(--fx)))); }
+:root[data-acento="dourado"] .v2 .p-logo .marca { filter: drop-shadow(0 5px 14px rgba(209, 154, 46, calc(.4 * var(--fx)))); }
 .v2 .p-logo .word { font-weight: 600; font-size: 15px; letter-spacing: .02em; }
 .v2 .tenant {
   margin: 11px 2px 0; display: flex; align-items: center; justify-content: space-between;

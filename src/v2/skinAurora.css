@@ -336,3 +336,74 @@
   --lg-seta1: #E9F8F0; --lg-seta2: #AEE0C6;
   --lg-dia1: #F2FBF6;  --lg-dia2: #8FD4AE;
 }
+
+/* ============================================================
+   ACENTO DOURADO (teste do dono 28/08) — [data-acento="dourado"].
+   Mesma anatomia do bloco verde. Ouro CHAMPANHE vivo (#F0BC4E dark /
+   #B8860B light), deslocado do âmbar SEMÂNTICO #D9A44A/#9E7A2E por
+   brilho e saturação — âmbar avisa, dourado interage.
+   ============================================================ */
+:root[data-acento="dourado"]:not([data-tema="light"]) .v2 {
+  --azul: #F0BC4E;
+  --azul-rgb: 240, 188, 78;
+}
+:root[data-tema="light"][data-acento="dourado"] .v2 {
+  --azul: #B8860B;
+  --azul-rgb: 184, 134, 11;
+}
+
+/* bokeh dark: ponto profundo vira ouro velho; violeta fica (ouro+violeta
+   é par clássico de luxo) */
+:root[data-acento="dourado"]:not([data-tema="light"]) .v2.app-v2 {
+  background:
+    radial-gradient(52% 46% at 86% 94%, rgba(206, 148, 48, .14), transparent 68%),
+    radial-gradient(46% 42% at 6% 4%, rgba(var(--azul-rgb), .1), transparent 66%),
+    radial-gradient(38% 44% at 76% 10%, rgba(126, 96, 224, .09), transparent 70%),
+    radial-gradient(34% 38% at 36% 72%, rgba(var(--azul-rgb), .05), transparent 70%),
+    var(--base);
+}
+
+/* gradientes de ação dark (par do #5FA0FF→#3372EC); texto ESCURO sobre
+   ouro claro — branco não aguenta o contraste no topo do gradiente */
+:root[data-acento="dourado"]:not([data-tema="light"]) .v2 .btn-pri,
+:root[data-acento="dourado"]:not([data-tema="light"]) .v2 .env-b,
+:root[data-acento="dourado"]:not([data-tema="light"]) .v2 .tgl {
+  background: linear-gradient(180deg, #F7CE6B, #CE9430);
+}
+:root[data-acento="dourado"]:not([data-tema="light"]) .v2 .btn-pri,
+:root[data-acento="dourado"]:not([data-tema="light"]) .v2 .env-b { color: #241A05; }
+:root[data-acento="dourado"]:not([data-tema="light"]) .v2 .tgl.off { background: rgba(var(--tint), .12); }
+:root[data-acento="dourado"]:not([data-tema="light"]) .v2 .conv2 .nl { background: linear-gradient(180deg, #F9D478, #D29A35); color: #241A05; }
+:root[data-acento="dourado"]:not([data-tema="light"]) .v2 .barv.hoje2 { background: linear-gradient(180deg, #FFE49A, #DCA43C); }
+:root[data-acento="dourado"]:not([data-tema="light"]) .v2 .bolha .tick.lida { color: #F5CE74; }
+/* pill/aba ativas: texto âmbar-claro em vez do branco (o véu ouro é quente) */
+:root[data-acento="dourado"]:not([data-tema="light"]) .v2 .item.on,
+:root[data-acento="dourado"]:not([data-tema="light"]) .v2 .wa-aba.on { color: #FFE9B8; }
+
+/* bolha enviada: vidro âmbar-mata profundo */
+:root[data-acento="dourado"]:not([data-tema="light"]) .v2 .bolha.env2 {
+  background-color: rgba(38, 28, 10, .62);
+  box-shadow: 0 10px 26px rgba(26, 18, 4, .5), inset 0 1px 0 rgba(255, 255, 255, .12);
+}
+:root[data-acento="dourado"]:not([data-tema="light"]) .v2 .bolha.env2.bot {
+  box-shadow: inset 2.5px 0 0 rgba(255, 255, 255, .3), 0 10px 26px rgba(26, 18, 4, .5), inset 0 1px 0 rgba(255, 255, 255, .12);
+}
+
+/* par claro: bronze-ouro fundo o bastante pro branco */
+:root[data-tema="light"][data-acento="dourado"] .v2 .btn-pri,
+:root[data-tema="light"][data-acento="dourado"] .v2.app-v2 .env-b,
+:root[data-tema="light"][data-acento="dourado"] .v2.app-v2 .tgl,
+:root[data-tema="light"][data-acento="dourado"] .v2.app-v2 .conv2 .nl {
+  background: linear-gradient(180deg, #D2A02F, #A87818);
+}
+:root[data-tema="light"][data-acento="dourado"] .v2.app-v2 .tgl.off { background: rgba(22, 25, 31, .16); }
+:root[data-tema="light"][data-acento="dourado"] .v2.app-v2 .barv.hoje2 { background: linear-gradient(180deg, #DDB04A, #A87818); box-shadow: 0 4px 14px rgba(var(--azul-rgb), .3); }
+
+/* marca dourada (vars da LogoAtenvo; fora de .v2 — login também) */
+:root[data-acento="dourado"] {
+  --lg-bg3: #6B4A0E;   --lg-bg4: #D19A2E;
+  --lg-glow1: #FFD98A; --lg-glow2: #D19A2E;
+  --lg-rim1: #F2CE7E;  --lg-rim2: #F7D98E;  --lg-rim3: #FFE9B0;
+  --lg-seta1: #FBF4E4; --lg-seta2: #E6D2A2;
+  --lg-dia1: #FDF8EC;  --lg-dia2: #E0C387;
+}
