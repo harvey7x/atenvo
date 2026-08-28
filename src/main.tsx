@@ -37,8 +37,14 @@ if ('serviceWorker' in navigator) {
     // reload pega o index novo; o guard vite:preloadError segue cobrindo 404.
     onNeedReload() { sinalizarAtualizacao(); },
     onRegisteredSW(_url, reg) {
-      // 15 min (era 1h): o aviso de deploy deve chegar no mesmo turno de trabalho
-      if (reg) setInterval(() => { reg.update().catch(() => { /* offline: tenta na próxima */ }); }, 15 * 60 * 1000);
+      if (!reg) return;
+      // 5 min (era 15): o aviso de deploy deve chegar rápido — atendente rodou versão
+      // velha por horas sem saber (dono, 28/08). Check também na VOLTA DO FOCO (alt-tab
+      // é constante no atendimento), com folga de 60s pra não metralhar o servidor.
+      let ultimoCheck = Date.now();
+      const checar = () => { ultimoCheck = Date.now(); reg.update().catch(() => { /* offline: tenta na próxima */ }); };
+      setInterval(checar, 5 * 60 * 1000);
+      window.addEventListener('focus', () => { if (Date.now() - ultimoCheck > 60 * 1000) checar(); });
     },
   });
 }

@@ -8,16 +8,17 @@ import { assinarAtualizacao, haAtualizacao } from '../lib/atualizacao';
    (lib/atualizacao sinaliza via onNeedReload do main.tsx), esta pílula
    aparece fixa no rodapé. Recarregar é SEMPRE por clique — o reload
    automático foi suprimido de propósito (rascunho/conversa do atendente).
-   "Depois" some nesta sessão; o aviso volta no próximo deploy (ou no
-   próximo load, que já entra na versão nova e nem sinaliza).
+   SEM botão "Depois" (dono 28/08, 2ª rodada): o aviso NÃO PODE sumir
+   até a pessoa realmente atualizar — atendente rodando versão velha sem
+   saber foi exatamente o que motivou o pedido. Ele só sai da tela pelo
+   "Recarregar agora" (ou fechando a aba, que já volta na versão nova).
    ------------------------------------------------------------------ */
 
 export function AvisoAtualizacao() {
   const [ha, setHa] = useState(() => haAtualizacao());
-  const [dispensado, setDispensado] = useState(false);
   useEffect(() => assinarAtualizacao(setHa), []);
 
-  const visivel = ha && !dispensado;
+  const visivel = ha;
   const [raiz, setRaiz] = useState<HTMLElement | null>(null);
   useEffect(() => {
     if (!visivel) return;
@@ -33,9 +34,6 @@ export function AvisoAtualizacao() {
       <span className="au-txt">O Atenvo foi atualizado</span>
       <button type="button" className="au-btn" onClick={() => window.location.reload()}>
         Recarregar agora
-      </button>
-      <button type="button" className="au-depois" onClick={() => setDispensado(true)}>
-        Depois
       </button>
     </div>,
     raiz,

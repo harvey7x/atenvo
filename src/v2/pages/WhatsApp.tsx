@@ -1289,11 +1289,6 @@ export default function WhatsAppV2() {
                     </button>
                   ))
                 )}
-                {assinaturaNome && (
-                  <span className="wa-assina" title="Assinatura obrigatória: toda mensagem enviada pelo painel sai identificada assim para o cliente.">
-                    Assinando como: <span className="prev">*{assinaturaNome}:*</span>
-                  </span>
-                )}
               </div>
 
               {/* avisos do composer (cascata v1 + opt-out) */}

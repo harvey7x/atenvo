@@ -430,10 +430,8 @@
 .v2 .wa-chipbtn.on { background: rgba(var(--tint), .1); color: var(--txt); }
 .v2 .wa-chipbtn.off { opacity: .55; }
 .v2 .wa-chipbtn:hover { color: var(--txt); }
-.v2 .wa-assina { margin-left: auto; display: flex; align-items: center; gap: 5px; }
-.v2 .wa-assina select { font-size: 10px; height: 22px; padding: 0 6px; width: auto; }
-.v2 .wa-assina input { font-size: 10px; height: 22px; width: 120px; }
-.v2 .wa-assina .prev { font-size: 9.5px; color: var(--txt-3); font-style: italic; }
+/* wa-assina removido (dono 28/08): a assinatura é obrigatória e aplicada no backend —
+   o composer não mostra mais o carimbo (nem seletor: não existe opção). */
 .v2 .wa-aviso { display: flex; align-items: center; gap: 7px; font-size: 11px; padding: 5px 9px; border-radius: 8px; margin-bottom: 7px; }
 .v2 .wa-aviso.bloq { background: var(--rubro-bg); color: var(--rubro); }
 .v2 .wa-aviso.info { background: var(--ambar-bg); color: var(--ambar); }
