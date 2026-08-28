@@ -10,6 +10,7 @@ import { ToastProvider } from '@/hooks/useToast';
 import { ConfigError } from '@/pages/ConfigError';
 import { isMisconfigured, isDemoMode } from '@/lib/supabase';
 import { resolverEAplicarPerf } from './v2/lib/perf';
+import { aplicarAcento, lerAcento } from './v2/lib/acento';
 import { tentarRecarga } from '@/lib/recargaChunk';
 import { registerSW } from 'virtual:pwa-register';
 
@@ -48,6 +49,10 @@ if (typeof document !== 'undefined' && isDemoMode) document.documentElement.setA
 // máquina) e marca [data-perf] na raiz antes do primeiro paint — a sonda de FPS
 // refina o 'auto' logo depois. Roda uma vez por carga.
 if (typeof document !== 'undefined') resolverEAplicarPerf();
+
+// Acento do sistema (teste azul × verde): marca [data-acento] antes do primeiro
+// paint pelo mesmo motivo do perf — sem flash de acento errado.
+if (typeof document !== 'undefined') aplicarAcento(lerAcento());
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, retry: 1, refetchOnWindowFocus: false } },

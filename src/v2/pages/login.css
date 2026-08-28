@@ -25,6 +25,8 @@
   width: 42px; height: 42px; margin: 0 auto 18px; display: block;
   filter: drop-shadow(0 8px 22px rgba(62, 123, 240, calc(.45 * var(--fx))));
 }
+/* acento verde: glow da marca acompanha o bloom */
+:root[data-acento="verde"] .v2 .lg-card .marca2 { filter: drop-shadow(0 8px 22px rgba(39, 183, 108, calc(.45 * var(--fx)))); }
 .v2 .lg-card > .caps { display: block; text-align: center; }
 .v2 .lg-card h1 { margin: 9px 0 4px; font-size: 27px; text-align: center; }
 .v2 .lg-card .sub { font-size: 12.5px; color: var(--txt-2); margin-bottom: 20px; text-align: center; }

@@ -364,7 +364,9 @@
   color: #BCD4FF; background: rgba(var(--azul-rgb), .16); border: 1px solid rgba(var(--azul-rgb), .38);
   border-radius: 6px; padding: 2px 8px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-:root[data-tema="light"] .v2 .kc-benef { color: var(--azul, #2A62C9); background: rgba(42, 98, 201, .1); border-color: rgba(42, 98, 201, .32); }
+:root[data-tema="light"] .v2 .kc-benef { color: var(--azul, #2A62C9); background: rgba(var(--azul-rgb, 42, 98, 201), .1); border-color: rgba(var(--azul-rgb, 42, 98, 201), .32); }
+/* acento verde: só o texto pálido do chip dark é hardcoded (o resto flui do token) */
+:root[data-acento="verde"]:not([data-tema="light"]) .v2 .kc-benef { color: #BEF3D8; }
 .v2 .kc-data { margin-left: auto; flex-shrink: 0; font-size: 9.5px; color: var(--txt-3); }
 
 /* L2 título */

@@ -450,6 +450,11 @@
   box-shadow: 0 10px 26px rgba(6, 16, 42, .5), inset 0 1px 0 rgba(255, 255, 255, .12);
 }
 .v2 .db-fio .blh.hum { background: rgba(15, 17, 22, .62) linear-gradient(180deg, rgba(255, 255, 255, .1), rgba(255, 255, 255, .05)); border-color: rgba(255, 255, 255, .14); box-shadow: 0 10px 26px rgba(2, 4, 10, .45), inset 0 1px 0 rgba(255, 255, 255, .1); }
+/* acento verde: base navy da bolha do bot vira verde-mata (gradiente já flui do token) */
+:root[data-acento="verde"]:not([data-tema="light"]) .v2 .db-fio .blh.bot {
+  background: rgba(10, 32, 23, .62) linear-gradient(180deg, rgba(var(--azul-rgb, 59, 214, 137), .3), rgba(var(--azul-rgb, 59, 214, 137), .1));
+  box-shadow: 0 10px 26px rgba(4, 26, 16, .5), inset 0 1px 0 rgba(255, 255, 255, .12);
+}
 :root[data-tema="light"] .v2 .db-fio .blh.cli { background: rgba(255, 255, 255, .88); border-color: rgba(22, 25, 31, .09); box-shadow: 0 8px 22px rgba(22, 25, 31, .08), inset 0 1px 0 #fff; color: var(--txt); }
 :root[data-tema="light"] .v2 .db-fio .blh.bot { background: rgba(255, 255, 255, .82) linear-gradient(180deg, rgba(var(--azul-rgb, 42, 98, 201), .14), rgba(var(--azul-rgb, 42, 98, 201), .06)); border-color: rgba(var(--azul-rgb, 42, 98, 201), .28); box-shadow: 0 8px 22px rgba(var(--azul-rgb, 42, 98, 201), .14), inset 0 1px 0 rgba(255, 255, 255, .8); }
 :root[data-tema="light"] .v2 .db-fio .blh.hum { background: rgba(255, 255, 255, .85); border-color: rgba(22, 25, 31, .12); box-shadow: 0 8px 22px rgba(22, 25, 31, .08); }

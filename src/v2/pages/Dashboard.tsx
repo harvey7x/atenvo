@@ -93,7 +93,7 @@ function usePaleta(ref: React.RefObject<HTMLElement | null>): Paleta {
     };
     ler();
     const mo = new MutationObserver(ler);
-    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-tema', 'data-perf'] });
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-tema', 'data-perf', 'data-acento'] });
     return () => mo.disconnect();
   }, [ref]);
   return p;

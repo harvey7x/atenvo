@@ -16,6 +16,7 @@ import { NotificacaoResposta, type DadosNotificacao } from './NotificacaoRespost
 import { useNotificacaoInbound } from '../hooks/useNotificacaoInbound';
 import { aplicarTema, lerTema, salvarTema, type Tema } from '../lib/tema';
 import { assinarModoPerf, lerModoPerf, salvarModoPerf, type ModoPerf } from '../lib/perf';
+import { assinarAcento, lerAcento, salvarAcento, type Acento } from '../lib/acento';
 import { useNotificacoes, useMarcarNotificacao } from '@/data/remarketing';
 import { tempoRelativo } from '../lib/tempo';
 
@@ -24,6 +25,13 @@ const ROTULO_PERF: Record<ModoPerf, string> = { auto: 'Automático', lite: 'Leve
 const IconeRaio = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden>
     <path d="M13 2L3 14h9l-1 8 10-12h-9z" />
+  </svg>
+);
+/* gota de tinta — alternador do acento azul × verde (teste do dono 28/08) */
+const ROTULO_ACENTO: Record<Acento, string> = { azul: 'Azul', verde: 'Verde' };
+const IconeGota = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden>
+    <path d="M12 2.7S5.5 10 5.5 14.6a6.5 6.5 0 0013 0C18.5 10 12 2.7 12 2.7z" />
   </svg>
 );
 const IconeSol = () => (
@@ -135,6 +143,11 @@ export default function AppShellV2() {
   // mantém o Segmentado de Configurações em sincronia). Dot = Leve fixado.
   const [modoPerf, setModoPerf] = useState<ModoPerf>(() => lerModoPerf());
   useEffect(() => assinarModoPerf(setModoPerf), []);
+  const [acento, setAcento] = useState<Acento>(() => lerAcento());
+  useEffect(() => assinarAcento(setAcento), []);
+  const alternarAcento = useCallback(() => {
+    salvarAcento(acento === 'azul' ? 'verde' : 'azul');
+  }, [acento]);
   const alternarPerf = useCallback(() => {
     const ordem: ModoPerf[] = ['auto', 'lite', 'full'];
     salvarModoPerf(ordem[(ordem.indexOf(modoPerf) + 1) % ordem.length]);
@@ -302,6 +315,15 @@ export default function AppShellV2() {
               >
                 <IconeRaio />
                 <span className={modoPerf === 'lite' ? 'pt on' : 'pt'} aria-hidden />
+              </button>
+              <button
+                type="button" className="ib"
+                aria-label={`Acento do sistema: ${ROTULO_ACENTO[acento]} — clique para alternar`}
+                title={`Acento: ${ROTULO_ACENTO[acento]}`}
+                onClick={alternarAcento}
+              >
+                <IconeGota />
+                <span className={acento === 'verde' ? 'pt on' : 'pt'} aria-hidden />
               </button>
               <button
                 type="button" className="ib"

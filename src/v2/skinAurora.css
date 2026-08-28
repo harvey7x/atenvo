@@ -265,3 +265,74 @@
 /* lite no claro: bolhas sólidas */
 :root[data-tema="light"][data-perf="lite"] .v2.app-v2 .bolha.rec,
 :root[data-tema="light"][data-perf="lite"] .v2.app-v2 .bolha.env2 { background-color: #FFFFFF; }
+
+/* ============================================================
+   ACENTO VERDE (teste do dono 28/08) — ligado por [data-acento="verde"]
+   na raiz (alternador da gota na topbar; lib/acento.ts). Sem o atributo,
+   NADA aqui pinta: o azul de produção é o caminho sem guarda.
+   Estratégia: 90% do azul flui pelos tokens --azul/--azul-rgb (basta
+   redefinir); o resto são os gradientes hardcoded desta pele, que
+   ganham o par verde aqui, um a um. Paleta: verde VIVO (#3BD689 dark /
+   #1B9560 light) — deslocado do verde SEMÂNTICO #4ABE8C/#3E8E6B por
+   saturação e brilho, senão "onde estou" e "deu certo" viram a mesma voz.
+   ============================================================ */
+:root[data-acento="verde"]:not([data-tema="light"]) .v2 {
+  --azul: #3BD689;
+  --azul-rgb: 59, 214, 137;
+}
+:root[data-tema="light"][data-acento="verde"] .v2 {
+  --azul: #1B9560;
+  --azul-rgb: 27, 149, 96;
+}
+
+/* bokeh dark: o único ponto fora do token (azul profundo inf-dir) vira
+   verde profundo; o violeta fica — mint + violeta seguem par frio */
+:root[data-acento="verde"]:not([data-tema="light"]) .v2.app-v2 {
+  background:
+    radial-gradient(52% 46% at 86% 94%, rgba(30, 164, 95, .15), transparent 68%),
+    radial-gradient(46% 42% at 6% 4%, rgba(var(--azul-rgb), .11), transparent 66%),
+    radial-gradient(38% 44% at 76% 10%, rgba(126, 96, 224, .09), transparent 70%),
+    radial-gradient(34% 38% at 36% 72%, rgba(var(--azul-rgb), .06), transparent 70%),
+    var(--base);
+}
+
+/* gradientes de ação dark (par do #5FA0FF→#3372EC) */
+:root[data-acento="verde"]:not([data-tema="light"]) .v2 .btn-pri,
+:root[data-acento="verde"]:not([data-tema="light"]) .v2 .env-b,
+:root[data-acento="verde"]:not([data-tema="light"]) .v2 .tgl {
+  background: linear-gradient(180deg, #4ADE92, #1EA45F);
+}
+:root[data-acento="verde"]:not([data-tema="light"]) .v2 .tgl.off { background: rgba(var(--tint), .12); }
+:root[data-acento="verde"]:not([data-tema="light"]) .v2 .conv2 .nl { background: linear-gradient(180deg, #55E09A, #22A863); }
+:root[data-acento="verde"]:not([data-tema="light"]) .v2 .barv.hoje2 { background: linear-gradient(180deg, #8FEDBE, #27B76C); }
+:root[data-acento="verde"]:not([data-tema="light"]) .v2 .bolha .tick.lida { color: #5FE3A4; }
+
+/* bolha enviada: a base navy vira vidro verde-mata (o gradiente por cima
+   já segue o token); sombra projetada acompanha o matiz */
+:root[data-acento="verde"]:not([data-tema="light"]) .v2 .bolha.env2 {
+  background-color: rgba(10, 32, 23, .62);
+  box-shadow: 0 10px 26px rgba(4, 26, 16, .5), inset 0 1px 0 rgba(255, 255, 255, .12);
+}
+:root[data-acento="verde"]:not([data-tema="light"]) .v2 .bolha.env2.bot {
+  box-shadow: inset 2.5px 0 0 rgba(255, 255, 255, .3), 0 10px 26px rgba(4, 26, 16, .5), inset 0 1px 0 rgba(255, 255, 255, .12);
+}
+
+/* par claro (o bokeh light já é todo via token — segue sozinho) */
+:root[data-tema="light"][data-acento="verde"] .v2 .btn-pri,
+:root[data-tema="light"][data-acento="verde"] .v2.app-v2 .env-b,
+:root[data-tema="light"][data-acento="verde"] .v2.app-v2 .tgl,
+:root[data-tema="light"][data-acento="verde"] .v2.app-v2 .conv2 .nl {
+  background: linear-gradient(180deg, #2CAE71, #1B9560);
+}
+:root[data-tema="light"][data-acento="verde"] .v2.app-v2 .tgl.off { background: rgba(22, 25, 31, .16); }
+:root[data-tema="light"][data-acento="verde"] .v2.app-v2 .barv.hoje2 { background: linear-gradient(180deg, #4FC08B, #1B9560); box-shadow: 0 4px 14px rgba(var(--azul-rgb), .3); }
+
+/* marca: a LogoAtenvo lê estas vars (fallback = azul de produção);
+   fora de .v2 de propósito — a logo também vive no login */
+:root[data-acento="verde"] {
+  --lg-bg3: #10603D;   --lg-bg4: #27B76C;
+  --lg-glow1: #7FE6B4; --lg-glow2: #27B76C;
+  --lg-rim1: #7FDCAF;  --lg-rim2: #8FE8BD;  --lg-rim3: #AFF0D2;
+  --lg-seta1: #E9F8F0; --lg-seta2: #AEE0C6;
+  --lg-dia1: #F2FBF6;  --lg-dia2: #8FD4AE;
+}
