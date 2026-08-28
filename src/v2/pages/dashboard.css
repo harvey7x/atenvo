@@ -202,3 +202,121 @@
   color: var(--azul, var(--txt-2)); background: rgba(var(--azul-rgb, 76, 141, 255), .12);
   border: 1px solid rgba(var(--azul-rgb, 76, 141, 255), .32); border-radius: 5px; padding: 1px 6px;
 }
+
+/* ============================================================
+   RECONSTRUÇÃO 28/08 — BENTO GRID (anatomia da referência do dono):
+   heros com número grande + chip de variação + sparkline, donut da
+   IA com total no centro, equipe em lista com avatares e chips.
+   ============================================================ */
+.v2 .db-bento { display: grid; grid-template-columns: repeat(12, 1fr); gap: 12px; }
+.v2 .db-bento > * { grid-column: span 3; }
+.v2 .db-bento > .db-span4 { grid-column: span 4; }
+.v2 .db-bento > .db-span5 { grid-column: span 5; }
+.v2 .db-bento > .db-span6 { grid-column: span 6; }
+.v2 .db-bento > .db-span7 { grid-column: span 7; }
+.v2 .db-bento > .db-span8 { grid-column: span 8; }
+@media (max-width: 1100px) {
+  .v2 .db-bento > * { grid-column: span 6; }
+  .v2 .db-bento > .db-span4, .v2 .db-bento > .db-span5, .v2 .db-bento > .db-span6,
+  .v2 .db-bento > .db-span7, .v2 .db-bento > .db-span8 { grid-column: span 12; }
+}
+@media (max-width: 640px) { .v2 .db-bento > * { grid-column: span 12 !important; } }
+
+/* ---- HERO: número grande + chip de variação + sparkline ---- */
+.v2 .db-hero {
+  position: relative; overflow: hidden; padding: 15px 17px 17px; border-radius: var(--r-card); min-height: 118px;
+  box-shadow: 0 10px 26px rgba(2, 4, 10, .28), inset 0 1px 0 rgba(255, 255, 255, .05);
+}
+:root[data-tema="light"] .v2 .db-hero { box-shadow: var(--sombra-1); }
+.v2 .db-hero .rot { font-size: 9.5px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--txt-3); }
+.v2 .db-hero .val { font-size: 27px; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; margin-top: 8px; }
+.v2 .db-hero .pe { display: flex; align-items: center; gap: 8px; margin-top: 9px; min-height: 18px; position: relative; z-index: 1; }
+.v2 .db-hero .pe .sub { font-size: 11px; color: var(--txt-3); }
+.v2 .db-hero .spark { position: absolute; left: 0; right: 0; bottom: 0; height: 44px; opacity: .8; pointer-events: none; }
+
+/* chips de variação (fundo colorido — a energia da referência) */
+.v2 .db-delta {
+  display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 700;
+  border-radius: 99px; padding: 2px 8px; letter-spacing: .01em; white-space: nowrap;
+}
+.v2 .db-delta i { font-style: normal; font-weight: 500; opacity: .75; }
+.v2 .db-delta.ok { color: var(--verde); background: var(--verde-bg); border: 1px solid rgba(var(--verde-rgb), .28); }
+.v2 .db-delta.er { color: var(--rubro); background: var(--rubro-bg); border: 1px solid rgba(var(--rubro-rgb), .28); }
+.v2 .db-delta.ne { color: var(--txt-3); background: rgba(var(--tint), .06); border: 1px solid rgba(var(--tint), .12); }
+
+/* ---- cartão de seção ---- */
+.v2 .db-sec { padding: 15px 17px; border-radius: var(--r-card); }
+.v2 .db-sec-cab { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 13px; }
+.v2 .db-sec-cab .t { font-size: 13px; font-weight: 650; letter-spacing: .01em; }
+.v2 .db-sec-cab .s { font-size: 10.5px; color: var(--txt-3); margin-top: 2px; }
+.v2 .db-graf { height: 228px; }
+
+/* ---- donut da IA ---- */
+.v2 .db-donut-wrap { display: flex; flex-direction: column; gap: 12px; align-items: center; }
+.v2 .db-donut { position: relative; width: 168px; height: 168px; }
+.v2 .db-donut .centro {
+  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  pointer-events: none; text-align: center;
+}
+.v2 .db-donut .centro b { font-size: 27px; font-weight: 700; letter-spacing: -.02em; line-height: 1; }
+.v2 .db-donut .centro span { font-size: 9.5px; color: var(--txt-3); margin-top: 4px; letter-spacing: .05em; text-transform: uppercase; }
+.v2 .db-donut-leg { width: 100%; display: flex; flex-direction: column; gap: 7px; }
+.v2 .db-donut-leg .li { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--txt-2); }
+.v2 .db-donut-leg .li i { width: 8px; height: 8px; border-radius: 3px; flex-shrink: 0; }
+.v2 .db-donut-leg .li b { margin-left: auto; color: var(--txt); font-weight: 600; }
+.v2 .db-donut-leg .alerta {
+  margin-top: 4px; font-size: 10.5px; font-weight: 600; color: var(--ambar);
+  background: var(--ambar-bg); border: 1px solid rgba(var(--ambar-rgb), .28);
+  border-radius: 8px; padding: 6px 10px;
+}
+
+/* ---- equipe em lista ---- */
+.v2 .db-equipe { display: flex; flex-direction: column; gap: 4px; }
+.v2 .db-at {
+  display: flex; align-items: center; gap: 11px; padding: 9px 10px; border-radius: 11px;
+  border: 1px solid transparent; transition: background .14s, border-color .14s;
+}
+.v2 .db-at:hover { background: rgba(var(--tint), .04); border-color: rgba(var(--tint), .08); }
+.v2 .db-at .av {
+  width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0; font-size: 10.5px; font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center; color: var(--txt-2);
+  background: linear-gradient(150deg, #2B2E34, var(--surface)); box-shadow: inset 0 0 0 1px rgba(var(--tint), .16);
+}
+:root[data-tema="light"] .v2 .db-at .av { background: linear-gradient(150deg, #E8EAEE, #F6F7F9); }
+.v2 .db-at .quem { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.v2 .db-at .nm { font-size: 12.5px; font-weight: 600; display: flex; align-items: center; gap: 7px; }
+.v2 .db-at .nm .top {
+  font-size: 8px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--azul, var(--txt-2)); background: rgba(var(--azul-rgb, 76, 141, 255), .12);
+  border: 1px solid rgba(var(--azul-rgb, 76, 141, 255), .32); border-radius: 5px; padding: 1px 6px;
+}
+.v2 .db-at .sub { font-size: 10.5px; color: var(--txt-3); }
+.v2 .db-at .msgs { width: 148px; flex-shrink: 0; display: flex; flex-direction: column; gap: 4px; }
+.v2 .db-at .msgs .n { font-size: 10px; color: var(--txt-3); }
+.v2 .db-at .msgs .trilho { display: block; height: 5px; border-radius: 99px; background: rgba(var(--tint), .07); overflow: hidden; }
+.v2 .db-at .msgs .trilho em { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, rgba(var(--azul-rgb, 76, 141, 255), .5), var(--azul, #4C8DFF)); }
+.v2 .db-at .chips { display: flex; gap: 5px; flex-shrink: 0; }
+.v2 .db-at .chips .c { font-size: 11px; font-weight: 700; border-radius: 7px; padding: 3px 9px; }
+.v2 .db-at .chips .c.ok { color: var(--verde); background: var(--verde-bg); }
+.v2 .db-at .chips .c.er { color: var(--rubro); background: var(--rubro-bg); }
+
+/* ---- automação ---- */
+.v2 .db-auto { display: flex; flex-direction: column; gap: 10px; }
+.v2 .db-auto .pct { display: flex; align-items: baseline; gap: 10px; }
+.v2 .db-auto .pct b { font-size: 27px; font-weight: 700; letter-spacing: -.02em; color: var(--azul, var(--txt)); }
+.v2 .db-auto .pct span { font-size: 11px; color: var(--txt-3); }
+.v2 .db-auto .prop { height: 9px; border-radius: 99px; background: rgba(var(--tint), .1); overflow: hidden; }
+.v2 .db-auto .prop i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, rgba(var(--azul-rgb, 76, 141, 255), .55), var(--azul, #4C8DFF)); }
+.v2 .db-auto .leg { display: flex; gap: 14px; font-size: 10.5px; color: var(--txt-3); }
+.v2 .db-auto .leg b { color: var(--txt-2); margin-left: 3px; }
+.v2 .db-auto .leg .sw { display: inline-block; width: 8px; height: 8px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
+.v2 .db-auto .leg .sw.bot { background: var(--azul, #4C8DFF); }
+.v2 .db-auto .leg .sw.hum { background: rgba(var(--tint), .28); }
+.v2 .db-auto .tt2 { font-size: 10px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--txt-3); margin-top: 4px; }
+
+/* ---- banco em chip (assinatura prata, mesma língua do Kanban) ---- */
+.v2 .db-banco {
+  display: inline-block; font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--platina-txt); background: linear-gradient(180deg, var(--platina-a), var(--platina-b));
+  border-radius: 6px; padding: 2px 8px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .5);
+}

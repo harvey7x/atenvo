@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Area, AreaChart, Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import {
   DASH_REAL, PRESETS_DASH, agrupaPorFonte, periodoDash, useDashboardResumo,
   useDashboardIa, seedDashResumo, seedDashIa,
@@ -12,10 +12,11 @@ import { CardVidro, Chip, Chips, EstadoErro, Input, Skeleton } from '../componen
 import './dashboard.css';
 
 /* ------------------------------------------------------------------
-   Dashboard operacional — a foto do dia da operação em uma tela.
-   Uma RPC (dashboard_resumo) por período; trocar de chip = 1 request.
-   Padrões Platina: cabeçalho .ph, filtros em chips, cards de vidro,
-   base monocromática e cor só como semântica (ganho/perda e deltas).
+   Dashboard — RECONSTRUÍDO 28/08 na anatomia da referência do dono
+   (bento grid): heros com número grande + chip de variação, DONUT da
+   IA com o total no centro e legenda semântica, equipe em LISTA com
+   avatares e chips, atividade em área com gradiente azul. Uma RPC
+   (dashboard_resumo) + fatia IA client-side; trocar período = 1 req.
    ------------------------------------------------------------------ */
 
 /* ===== formatação PT-BR ===== */
@@ -41,11 +42,70 @@ const ETAPA_IA: Record<string, string> = {
 };
 const etapaIa = (s: string) => ETAPA_IA[s] ?? s.replace(/_/g, ' ');
 
-/* ===== contador ANIMADO (entrada dos KPIs) =====
-   rAF de ~550ms com ease-out; aba oculta ou mesmo valor → assenta direto
-   (o gráfico continua SEM animação — regra "dado é calmo" + bug do rAF
-   em aba de fundo medido em produção; animar o NÚMERO não sofre disso
-   porque o efeito cai no valor final ao desmontar/regravar). */
+/* ===== paleta dos gráficos (tokens resolvidos — Recharts não lê var()) ===== */
+interface Paleta {
+  txt: string; txt2: string; txt3: string;
+  verde: string; rubro: string; ambar: string; azul: string; tint: string;
+  lite: boolean;
+}
+const PALETA_DARK: Paleta = {
+  txt: '#F4F5F7', txt2: '#9BA1AB', txt3: '#5E646E',
+  verde: '#4ABE8C', rubro: '#E5665C', ambar: '#D9A44A', azul: '#4C8DFF',
+  tint: '255, 255, 255', lite: false,
+};
+
+function usePaleta(ref: React.RefObject<HTMLElement | null>): Paleta {
+  const [p, setP] = useState<Paleta>(PALETA_DARK);
+  useEffect(() => {
+    const ler = () => {
+      const el = ref.current;
+      if (!el) return;
+      const cs = getComputedStyle(el);
+      const v = (n: string, padrao: string) => cs.getPropertyValue(n).trim() || padrao;
+      setP({
+        txt: v('--txt', PALETA_DARK.txt),
+        txt2: v('--txt-2', PALETA_DARK.txt2),
+        txt3: v('--txt-3', PALETA_DARK.txt3),
+        verde: v('--verde', PALETA_DARK.verde),
+        rubro: v('--rubro', PALETA_DARK.rubro),
+        ambar: v('--ambar', PALETA_DARK.ambar),
+        azul: v('--azul', PALETA_DARK.azul),
+        tint: v('--tint', PALETA_DARK.tint),
+        lite: document.documentElement.getAttribute('data-perf') === 'lite',
+      });
+    };
+    ler();
+    const mo = new MutationObserver(ler);
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-tema', 'data-perf'] });
+    return () => mo.disconnect();
+  }, [ref]);
+  return p;
+}
+
+const tinta = (p: Paleta, a: number) => `rgba(${p.tint}, ${a})`;
+
+/* ===== tooltip único (vidro Platina, não o branco padrão do Recharts) =====
+   Com `content` customizado o Recharts NÃO aplica labelFormatter — o rótulo
+   é formatado aqui dentro (fmtLabel), senão chega cru ("2026-08-15"). */
+function TipPlatina({ active, payload, label, sufixo, fmt = fmtInt, fmtLabel }: {
+  active?: boolean; payload?: { value: number; payload?: Record<string, unknown> }[];
+  label?: string | number; sufixo?: string;
+  fmt?: (n: number) => string; fmtLabel?: (v: string | number) => string;
+}) {
+  if (!active || !payload?.length) return null;
+  const rotulo = label == null ? '' : fmtLabel ? fmtLabel(label) : String(label);
+  return (
+    <div className="db-tip">
+      <div className="tl">{rotulo}</div>
+      <div className="tv num">{fmt(payload[0].value)}{sufixo ? ` ${sufixo}` : ''}</div>
+    </div>
+  );
+}
+
+/* ===== contador ANIMADO dos números =====
+   rAF ~550ms ease-out; aba oculta ou valor igual assenta direto. Os GRÁFICOS
+   seguem sem animação ("dado é calmo" + bug do rAF em aba de fundo, medido
+   em produção 24/08) — o contador não sofre disso: cai no valor final. */
 function Contador({ valor, fmt }: { valor: number; fmt: (n: number) => string }) {
   const [v, setV] = useState(valor);
   const anterior = useRef<number | null>(null);
@@ -66,129 +126,71 @@ function Contador({ valor, fmt }: { valor: number; fmt: (n: number) => string })
   return <>{fmt(v)}</>;
 }
 
-/* ===== paleta dos gráficos =====
-   Recharts recebe `fill`/`stroke` como ATRIBUTO de SVG, e atributo não
-   resolve var(--token) — o mesmo motivo pelo qual as sparklines do Kpi
-   usam style. Então lemos os tokens JÁ RESOLVIDOS de um elemento dentro
-   de .v2 e repassamos cor concreta. Um MutationObserver na raiz relê
-   quando o tema (data-tema) ou o Modo de Performance (data-perf) muda,
-   para o gráfico traduzir junto com o resto da tela. */
-interface Paleta {
-  txt: string; txt2: string; txt3: string;
-  verde: string; rubro: string; azul: string; tint: string;
-  lite: boolean;
-}
-const PALETA_DARK: Paleta = {
-  txt: '#F4F5F7', txt2: '#9BA1AB', txt3: '#5E646E',
-  verde: '#4ABE8C', rubro: '#E5665C', azul: '#4C8DFF', tint: '255, 255, 255', lite: false,
-};
-
-function usePaleta(ref: React.RefObject<HTMLElement | null>): Paleta {
-  const [p, setP] = useState<Paleta>(PALETA_DARK);
-  useEffect(() => {
-    const ler = () => {
-      const el = ref.current;
-      if (!el) return;
-      const cs = getComputedStyle(el);
-      const v = (n: string, padrao: string) => cs.getPropertyValue(n).trim() || padrao;
-      setP({
-        txt: v('--txt', PALETA_DARK.txt),
-        txt2: v('--txt-2', PALETA_DARK.txt2),
-        txt3: v('--txt-3', PALETA_DARK.txt3),
-        verde: v('--verde', PALETA_DARK.verde),
-        rubro: v('--rubro', PALETA_DARK.rubro),
-        azul: v('--azul', PALETA_DARK.azul),
-        tint: v('--tint', PALETA_DARK.tint),
-        lite: document.documentElement.getAttribute('data-perf') === 'lite',
-      });
-    };
-    ler();
-    const mo = new MutationObserver(ler);
-    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-tema', 'data-perf'] });
-    return () => mo.disconnect();
-  }, [ref]);
-  return p;
-}
-
-const tinta = (p: Paleta, a: number) => `rgba(${p.tint}, ${a})`;
-
-/* ===== tooltip único (vidro Platina, não o branco padrão do Recharts) ===== */
-/* ATENÇÃO: com `content` customizado o Recharts NÃO aplica o labelFormatter
-   do <Tooltip> — ele só vale para o tooltip padrão. Por isso o rótulo é
-   formatado aqui dentro (fmtLabel), senão chega cru ("2026-08-15", "14"). */
-function TipPlatina({ active, payload, label, sufixo, fmt = fmtInt, fmtLabel }: {
-  active?: boolean; payload?: { value: number; payload?: Record<string, unknown> }[];
-  label?: string | number; sufixo?: string;
-  fmt?: (n: number) => string; fmtLabel?: (v: string | number) => string;
-}) {
-  if (!active || !payload?.length) return null;
-  const rotulo = label == null ? '' : fmtLabel ? fmtLabel(label) : String(label);
-  return (
-    <div className="db-tip">
-      <div className="tl">{rotulo}</div>
-      <div className="tv num">{fmt(payload[0].value)}{sufixo ? ` ${sufixo}` : ''}</div>
-    </div>
-  );
-}
-
-/* ===== KPI ===== */
-/* 'neutro' existe para o Descartado: mais descarte não é vitória nem derrota
-   — é filtro de perfil funcionando. Mostra a variação sem julgá-la. */
+/* ===== hero: número grande + chip de variação (anatomia da referência) ===== */
 type Sentido = 'maior' | 'menor' | 'neutro';
 
-function KpiCard({ rotulo, k, sentido, fmt, ajuda, sobe, atraso, indisponivel }: {
+function DeltaChip({ k, sentido }: { k: KpiNum | null; sentido: Sentido }) {
+  if (!k) return null;
+  const txt = k.deltaPct == null ? '—' : `${k.deltaPct > 0 ? '+' : ''}${k.deltaPct.toFixed(1)}%`;
+  if (k.deltaAbs === 0) return <span className="db-delta ne">estável</span>;
+  const seta = k.deltaAbs > 0 ? '▲' : '▼';
+  if (sentido === 'neutro') return <span className="db-delta ne">{seta} {txt}</span>;
+  const bom = sentido === 'maior' ? k.deltaAbs > 0 : k.deltaAbs < 0;
+  return <span className={'db-delta ' + (bom ? 'ok' : 'er')}>{seta} {txt} <i>vs anterior</i></span>;
+}
+
+function Hero({ rotulo, k, sentido, fmt, ajuda, sub, atraso, carregando, spark, corSpark }: {
   rotulo: string; k: KpiNum | null; sentido: Sentido; fmt: (n: number) => string;
-  ajuda: string; sobe?: boolean; atraso?: number; indisponivel?: string;
+  ajuda: string; sub?: ReactNode; atraso?: number; carregando?: boolean;
+  spark?: { v: number }[]; corSpark?: string;
 }) {
-  let delta: ReactNode = null;
-  if (k) {
-    const txt = k.deltaPct == null ? '—' : `${k.deltaPct > 0 ? '+' : ''}${k.deltaPct.toFixed(1)}%`;
-    if (k.deltaAbs === 0) {
-      delta = <span className="delta d-ne">— estável</span>;
-    } else if (sentido === 'neutro') {
-      delta = <span className="delta d-ne">{k.deltaAbs > 0 ? '▲' : '▼'} {txt}</span>;
-    } else {
-      // "melhor" depende do sentido: em tempo de resposta, cair é ganhar.
-      const bom = sentido === 'maior' ? k.deltaAbs > 0 : k.deltaAbs < 0;
-      delta = <span className={'delta ' + (bom ? 'd-ok' : 'd-er')}>{k.deltaAbs > 0 ? '▲' : '▼'} {txt}</span>;
-    }
-  }
   return (
-    <CardVidro spot sobe={sobe} atraso={atraso} className="db-kpi" title={ajuda}>
-      <div className="rot">{rotulo}</div>
-      {indisponivel ? (
+    <CardVidro spot sobe atraso={atraso} className="db-hero" title={ajuda}>
+      {carregando ? (
         <>
-          <div className="val ind">{indisponivel}</div>
-          <div className="ant">{ajuda}</div>
+          <Skeleton largura="46%" altura={9} />
+          <div style={{ marginTop: 14 }}><Skeleton largura="58%" altura={26} /></div>
+          <div style={{ marginTop: 12 }}><Skeleton largura="38%" altura={12} raio={99} /></div>
         </>
       ) : (
         <>
+          <div className="rot">{rotulo}</div>
           <div className="val num">{k ? <Contador valor={k.atual} fmt={fmt} /> : '—'}</div>
-          {delta}
-          <div className="ant num">Anterior: {k ? fmt(k.anterior) : '—'}</div>
+          <div className="pe">
+            <DeltaChip k={k} sentido={sentido} />
+            {sub && <span className="sub">{sub}</span>}
+          </div>
+          {spark && spark.length > 1 && corSpark && (
+            <div className="spark" aria-hidden>
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={spark} margin={{ top: 2, right: 0, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id={'g-' + rotulo} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={corSpark} stopOpacity={0.4} />
+                      <stop offset="100%" stopColor={corSpark} stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <Area dataKey="v" stroke={corSpark} strokeWidth={1.6} fill={`url(#g-${rotulo})`} isAnimationActive={false} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </>
       )}
     </CardVidro>
   );
 }
 
-function KpiSkeleton({ atraso }: { atraso: number }) {
-  return (
-    <CardVidro sobe atraso={atraso} className="db-kpi">
-      <Skeleton largura="52%" altura={9} />
-      <div style={{ marginTop: 12 }}><Skeleton largura="66%" altura={20} /></div>
-      <div style={{ marginTop: 10 }}><Skeleton largura="44%" altura={9} /></div>
-    </CardVidro>
-  );
-}
-
-/* ===== painel ===== */
-function Painel({ titulo, nota, children, sobe, atraso, className }: {
-  titulo: string; nota?: ReactNode; children: ReactNode; sobe?: boolean; atraso?: number; className?: string;
+/* ===== cartão de seção ===== */
+function Secao({ titulo, sub, acao, children, atraso, className }: {
+  titulo: string; sub?: ReactNode; acao?: ReactNode; children: ReactNode; atraso?: number; className?: string;
 }) {
   return (
-    <CardVidro sobe={sobe} atraso={atraso} className={'db-painel ' + (className ?? '')}>
-      <div className="tt">{titulo}{nota && <span>{nota}</span>}</div>
+    <CardVidro sobe atraso={atraso} className={'db-sec ' + (className ?? '')}>
+      <div className="db-sec-cab">
+        <div><div className="t">{titulo}</div>{sub && <div className="s">{sub}</div>}</div>
+        {acao}
+      </div>
       {children}
     </CardVidro>
   );
@@ -198,19 +200,19 @@ function Vazio({ texto }: { texto: string }) {
   return <div className="db-vazio"><span aria-hidden>◌</span> {texto}</div>;
 }
 
-/* ===== barras horizontais monocromáticas (motivos, bancos) ===== */
-function BarrasH({ itens }: { itens: { rot: string; v: number; tag?: string }[] }) {
+/* ===== barras horizontais (funil/origem/bancos/motivos) ===== */
+function BarrasH({ itens, cor }: { itens: { rot: ReactNode; chave: string; v: number; tag?: string; cor?: string }[]; cor?: string }) {
   const max = Math.max(1, ...itens.map((i) => i.v));
   return (
     <div className="db-barh">
       {itens.map((i) => (
-        <div className="lin" key={i.rot}>
-          <span className="rot" title={i.rot}>
+        <div className="lin" key={i.chave}>
+          <span className="rot" title={typeof i.rot === 'string' ? i.rot : i.chave}>
             <span className="tx">{i.rot}</span>
             {i.tag && <b className="db-tag">{i.tag}</b>}
           </span>
           <div className="trilho">
-            <i style={{ width: `${Math.max(2, (i.v / max) * 100)}%` }} />
+            <i style={{ width: `${Math.max(2, (i.v / max) * 100)}%`, background: i.cor ?? cor }} />
           </div>
           <span className="v num">{fmtInt(i.v)}</span>
         </div>
@@ -219,35 +221,25 @@ function BarrasH({ itens }: { itens: { rot: string; v: number; tag?: string }[] 
   );
 }
 
-/* ===== funil =====
-   A coluna terminal negativa do Kanban é balde único: TODO fechamento
-   negativo cai nela, seja quem nunca foi elegível ou quem escapou. Então
-   ela vira barra EMPILHADA — descarte em monocromático, perda em rubro. */
-function BarrasFunil({ linhas }: { linhas: DashLinhaFunil[] }) {
+/* ===== funil (ganho verde · perda rubro · descarte âmbar; resto azul-tint) ===== */
+function BarrasFunil({ linhas, p }: { linhas: DashLinhaFunil[]; p: Paleta }) {
   const max = Math.max(1, ...linhas.map((l) => l.qtd));
   return (
     <div className="db-barh">
       {linhas.map((l) => {
         const larg = Math.max(2, (l.qtd / max) * 100);
-        const parte = l.resultado === 'perdido' && l.qtd > 0;
+        const pilha = l.resultado === 'perdido' && l.qtd > 0;
         return (
           <div className="lin" key={l.coluna}>
-            <span className="rot" title={l.coluna}>{l.coluna}</span>
+            <span className="rot" title={l.coluna}><span className="tx">{l.coluna}</span></span>
             <div className="trilho">
-              {parte ? (
+              {pilha ? (
                 <div className="pilha" style={{ width: `${larg}%` }}>
-                  {l.qtd_descarte > 0 && (
-                    <i className="f-descarte" style={{ flexGrow: l.qtd_descarte }}
-                      title={`${fmtInt(l.qtd_descarte)} descartados — fora do perfil`} />
-                  )}
-                  {l.qtd_perda > 0 && (
-                    <i className="f-perdido" style={{ flexGrow: l.qtd_perda }}
-                      title={`${fmtInt(l.qtd_perda)} perdidos de verdade`} />
-                  )}
+                  {l.qtd_descarte > 0 && <i style={{ flexGrow: l.qtd_descarte, background: p.ambar }} title={`${fmtInt(l.qtd_descarte)} descartados — fora do perfil`} />}
+                  {l.qtd_perda > 0 && <i style={{ flexGrow: l.qtd_perda, background: p.rubro }} title={`${fmtInt(l.qtd_perda)} perdidos de verdade`} />}
                 </div>
               ) : (
-                <i className={l.resultado === 'ganho' ? 'f-ganho' : undefined}
-                  style={{ width: `${larg}%` }} />
+                <i style={{ width: `${larg}%`, background: l.resultado === 'ganho' ? p.verde : undefined }} />
               )}
             </div>
             <span className="v num">{fmtInt(l.qtd)}</span>
@@ -274,7 +266,7 @@ export default function DashboardV2() {
   const { data, isPending, isError, error, refetch, isFetching } = useDashboardResumo(periodo);
   const iaQ = useDashboardIa(periodo);
 
-  // demo: a tela vive com o seed (números coerentes) em vez do antigo "Sem conexão"
+  // demo: a tela vive com seeds coerentes (nada de "Sem conexão")
   const demoResumo = useMemo(() => (DASH_REAL ? null : seedDashResumo(periodo)), [periodo]);
   const d = DASH_REAL ? (data as DashResumo | undefined) : demoResumo ?? undefined;
   const ia: DashIa | undefined = DASH_REAL ? iaQ.data : seedDashIa();
@@ -292,302 +284,277 @@ export default function DashboardV2() {
     () => (d ? [...d.atendentes].sort((a, b) => b.ganhos - a.ganhos || b.msgs_enviadas - a.msgs_enviadas) : []),
     [d],
   );
+  const maxMsgsAt = Math.max(1, ...atendentes.map((a) => a.msgs_enviadas));
 
-  /* eixos e grades saem do token — traduzem sozinhos no tema claro */
+  // donut da IA (semântico): vivas em destaque, pausadas fecham o anel
+  const donutIa = useMemo(() => {
+    if (!ia) return [];
+    return [
+      { nome: 'Atendendo', v: ia.sessoesAtivas, cor: p.verde },
+      { nome: 'Aguardando humano', v: ia.aguardandoHumano, cor: p.ambar },
+      { nome: 'Handoff', v: ia.handoffs, cor: p.rubro },
+      { nome: 'Pausadas', v: ia.pausadas, cor: tinta(p, 0.18) },
+    ].filter((x) => x.v > 0);
+  }, [ia, p]);
+  const vivasIa = ia ? ia.sessoesAtivas + ia.handoffs : 0;
+  const pctBot = ia ? Math.round((ia.msgsBot / Math.max(1, ia.msgsBot + ia.msgsHumano)) * 100) : 0;
+
+  // atividade: no "Hoje" a série honesta é POR HORA; em períodos maiores, por dia
+  const porHora = periodo.dias <= 1;
+
   const eixo = { fontSize: 10.5, fill: p.txt3 };
-  /* Barra NUNCA anima (CONTRATO item 6, "DADO É CALMO" — o Relatórios já
-     desenha as barras dele com animation:none). Além da regra, a animação do
-     Recharts roda em requestAnimationFrame: em aba de segundo plano o rAF
-     congela e o gráfico fica VAZIO até a aba ganhar foco. Medido em produção
-     em 24/08. Sem animação, a barra nasce na altura certa em qualquer aba. */
-  const anima = false;
-  void p.lite; // o Modo Leve segue governando blur/grão pelos tokens
+  const anima = false; // gráfico não anima (regra + rAF em aba de fundo)
+  void p.lite;
 
   return (
     <div className="db-pg" ref={raiz}>
       <div className="ph">
         <div>
           <h2>Dashboard</h2>
-          <p>A foto da operação — {periodo.label}{isFetching && !carregando ? ' · atualizando…' : ''}{!DASH_REAL ? ' · modo demonstração (dados ilustrativos)' : ''}</p>
+          <p>Como foi {preset === 'hoje' ? 'o dia' : 'o período'} — {periodo.label}
+            {isFetching && !carregando ? ' · atualizando…' : ''}
+            {!DASH_REAL ? ' · modo demonstração (dados ilustrativos)' : ''}</p>
+        </div>
+        <div className="db-filtros">
+          <Chips>
+            {PRESETS_DASH.map((op) => (
+              <Chip key={op.id} ativo={preset === op.id} onClick={() => setPreset(op.id)}>{op.label}</Chip>
+            ))}
+          </Chips>
+          {preset === 'custom' && (
+            <div className="db-datas">
+              <Input type="date" value={ini} max={fim} onChange={(e) => setIni(e.target.value)} aria-label="Data inicial" />
+              <span aria-hidden>→</span>
+              <Input type="date" value={fim} min={ini} max={spHoje()} onChange={(e) => setFim(e.target.value)} aria-label="Data final" />
+            </div>
+          )}
         </div>
       </div>
 
-      {/* filtros de período */}
-      <div className="db-filtros">
-        <Chips>
-          {PRESETS_DASH.map((op) => (
-            <Chip key={op.id} ativo={preset === op.id} onClick={() => setPreset(op.id)}>{op.label}</Chip>
-          ))}
-        </Chips>
-        {preset === 'custom' && (
-          <div className="db-datas">
-            <Input type="date" value={ini} max={fim} onChange={(e) => setIni(e.target.value)} aria-label="Data inicial" />
-            <span aria-hidden>→</span>
-            <Input type="date" value={fim} min={ini} max={spHoje()} onChange={(e) => setFim(e.target.value)} aria-label="Data final" />
-          </div>
-        )}
-        <span className="db-comp">vs {periodo.prevLabel}</span>
-      </div>
-
-      {isError ? (
-        <CardVidro className="db-painel">
+      {DASH_REAL && isError ? (
+        <CardVidro className="db-sec">
           <EstadoErro
             descricao={(error as Error)?.message ?? 'Não foi possível carregar o período.'}
             aoTentarDeNovo={() => void refetch()}
           />
         </CardVidro>
       ) : (
-        <>
-          {/* ===== KPIs ===== */}
-          <div className="db-kpis">
-            {carregando ? (
-              Array.from({ length: 6 }, (_, i) => <KpiSkeleton key={i} atraso={i * 0.04} />)
-            ) : (
-              <>
-                <KpiCard rotulo="Novos leads" k={kp((k) => k.novos_leads)} sentido="maior" fmt={fmtInt}
-                  ajuda="Contatos criados no período (duplicatas mescladas não contam)." sobe atraso={0} />
-                <KpiCard rotulo="Conversas ativas" k={kp((k) => k.conversas_ativas)} sentido="maior" fmt={fmtInt}
-                  ajuda="Conversas com pelo menos uma mensagem no período." sobe atraso={0.04} />
-                <KpiCard rotulo="1ª resposta (mediana)" k={kp((k) => k.mediana_primeira_resposta_min)} sentido="menor" fmt={fmtMin}
-                  ajuda="Do primeiro “oi” do cliente até a primeira resposta humana — bot não conta. Mediana, não média."
-                  indisponivel={d && d.kpis.mediana_primeira_resposta_min == null ? 'Sem resposta' : undefined}
-                  sobe atraso={0.08} />
-                <KpiCard rotulo="Ganhos" k={kp((k) => k.ganhos_qtd)} sentido="maior" fmt={fmtInt}
-                  ajuda="Oportunidades fechadas como ganho no período." sobe atraso={0.12} />
-                <KpiCard rotulo="Valor ganho" k={kp((k) => k.ganhos_valor)} sentido="maior" fmt={fmtBRL}
-                  ajuda="Soma do ressarcido (ou do estimado, quando o ressarcido ainda não foi preenchido)."
-                  indisponivel={d && d.kpis.ganhos_valor === 0 && d.kpis.ganhos_qtd > 0 ? 'Sem valor' : undefined}
-                  sobe atraso={0.16} />
-                <KpiCard rotulo="Perdidos" k={kp((k) => k.perdidos_qtd)} sentido="menor" fmt={fmtInt}
-                  ajuda="Perda de verdade: era ganhável e escapou (sem interesse, dados inválidos, concorrente, não respondeu)."
-                  sobe atraso={0.2} />
-                <KpiCard rotulo="Descartados" k={kp((k) => k.descartados_qtd)} sentido="neutro" fmt={fmtInt}
-                  ajuda="Fora do perfil — quem já tem processo / não é elegível. Não conta como perda: nunca foi ganhável."
-                  sobe atraso={0.24} />
-              </>
-            )}
-          </div>
+        <div className="db-bento">
+          {/* ===== fileira HERO ===== */}
+          <Hero rotulo="Novos leads" k={kp((k) => k.novos_leads)} sentido="maior" fmt={fmtInt} atraso={0}
+            ajuda="Contatos criados no período (duplicatas mescladas não contam)." carregando={carregando}
+            spark={d?.leads_por_dia?.map((x) => ({ v: x.qtd }))} corSpark={p.azul} />
+          <Hero rotulo="Conversas ativas" k={kp((k) => k.conversas_ativas)} sentido="maior" fmt={fmtInt} atraso={0.05}
+            ajuda="Conversas com pelo menos uma mensagem no período." carregando={carregando} />
+          <Hero rotulo="Ganhos" k={kp((k) => k.ganhos_qtd)} sentido="maior" fmt={fmtInt} atraso={0.1}
+            ajuda="Oportunidades fechadas como ganho no período. O valor soma o ressarcido (ou o estimado)."
+            sub={d && d.kpis.ganhos_valor > 0 ? fmtBRL(d.kpis.ganhos_valor) : undefined} carregando={carregando} />
+          <Hero rotulo="1ª resposta" k={kp((k) => k.mediana_primeira_resposta_min)} sentido="menor" fmt={fmtMin} atraso={0.15}
+            ajuda="Do primeiro “oi” do cliente até a primeira resposta humana — bot não conta. Mediana, não média."
+            sub="mediana do período" carregando={carregando} />
 
-          {/* ===== leads por dia ===== */}
-          <Painel titulo="Leads por dia" nota={periodo.label} sobe atraso={0.24}>
-            {carregando ? <Skeleton altura={200} raio={12} /> : !d?.leads_por_dia?.length ? (
-              <Vazio texto="Nenhum lead no período." />
-            ) : (
-              <div style={{ height: 220 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={d.leads_por_dia} margin={{ top: 6, right: 4, left: -18, bottom: 0 }}>
-                    <XAxis dataKey="dia" tickFormatter={fmtDiaCurto} tick={eixo} tickLine={false}
-                      axisLine={{ stroke: tinta(p, 0.09) }} interval="preserveStartEnd" minTickGap={14} />
-                    <YAxis tick={eixo} tickLine={false} axisLine={false} allowDecimals={false} width={44} />
-                    <Tooltip cursor={{ fill: tinta(p, 0.05) }}
-                      content={<TipPlatina sufixo="leads" fmtLabel={(v) => fmtDiaCurto(String(v))} />} />
-                    <Bar dataKey="qtd" radius={[4, 4, 0, 0]} maxBarSize={38}
-                      fill={p.azul} fillOpacity={0.78} isAnimationActive={anima} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </Painel>
-
-          {/* ===== A IA hoje (dono 28/08: "informações sobre a IA") ===== */}
-          <Painel titulo="A IA da casa" nota="sessões agora · mensagens no período" sobe atraso={0.26}>
-            {DASH_REAL && iaQ.isPending ? <Skeleton altura={150} raio={12} /> : !ia ? (
-              <Vazio texto="Sem dados da IA." />
-            ) : (
-              <div className="db-ia">
-                <div className="db-ia-cards">
-                  <div className="db-ia-card" title="Sessões de IA com status ativo agora — o bot está conduzindo estas conversas.">
-                    <span className="dot ok" aria-hidden /><b className="num"><Contador valor={ia.sessoesAtivas} fmt={fmtInt} /></b><span className="rot">atendendo agora</span>
-                  </div>
-                  <div className="db-ia-card" title="Sessões vivas em que a IA pediu um humano e segue aguardando.">
-                    <span className="dot at" aria-hidden /><b className="num"><Contador valor={ia.aguardandoHumano} fmt={fmtInt} /></b><span className="rot">aguardando humano</span>
-                  </div>
-                  <div className="db-ia-card" title="Sessões em handoff — a IA passou o caso para a equipe.">
-                    <span className="dot er" aria-hidden /><b className="num"><Contador valor={ia.handoffs} fmt={fmtInt} /></b><span className="rot">handoffs</span>
-                  </div>
-                  <div className="db-ia-card" title="Conversas com pedido de humano em aberto AGORA (independe do período).">
-                    <span className="dot at" aria-hidden /><b className="num"><Contador valor={ia.precisaHumanoAgora} fmt={fmtInt} /></b><span className="rot">pedidos abertos</span>
-                  </div>
-                  <div className="db-ia-card" title="Sessões pausadas — um humano assumiu ou a IA foi desligada na conversa.">
-                    <span className="dot ne" aria-hidden /><b className="num"><Contador valor={ia.pausadas} fmt={fmtInt} /></b><span className="rot">pausadas</span>
-                  </div>
-                </div>
-                <div className="db-ia-split">
-                  <div className="db-ia-msgs" title={`No período: ${fmtInt(ia.msgsBot)} mensagens do bot · ${fmtInt(ia.msgsHumano)} da equipe`}>
-                    <div className="tt2">Quem falou no período</div>
-                    <div className="prop" aria-hidden>
-                      <i className="bot" style={{ width: `${(ia.msgsBot / Math.max(1, ia.msgsBot + ia.msgsHumano)) * 100}%` }} />
-                    </div>
-                    <div className="leg">
-                      <span><i className="sw bot" aria-hidden /> IA <b className="num">{fmtInt(ia.msgsBot)}</b></span>
-                      <span><i className="sw hum" aria-hidden /> equipe <b className="num">{fmtInt(ia.msgsHumano)}</b></span>
-                      <span className="pct num">{Math.round((ia.msgsBot / Math.max(1, ia.msgsBot + ia.msgsHumano)) * 100)}% automático</span>
-                    </div>
-                  </div>
-                  <div className="db-ia-etapas">
-                    <div className="tt2">Fluxo vivo por etapa</div>
-                    {ia.porEtapa.length === 0 ? <Vazio texto="Nenhuma sessão ativa." /> : (
-                      <BarrasH itens={ia.porEtapa.map((e) => ({ rot: etapaIa(e.etapa), v: e.qtd }))} />
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-          </Painel>
-
-          <div className="db-g2">
-            {/* ===== origem de tráfego ===== */}
-            <Painel titulo="Origem de tráfego" nota="clique para ver os canais" sobe atraso={0.28}>
-              {carregando ? <Skeleton altura={160} raio={12} /> : !origens.length ? (
-                <Vazio texto="Nenhum lead com origem no período." />
-              ) : (
-                <div className="db-origem">
-                  {origens.map((g) => {
-                    const max = Math.max(1, ...origens.map((x) => x.qtd));
-                    const aberta = fonteAberta === g.fonte;
-                    return (
-                      <div key={g.fonte} className={'grp' + (aberta ? ' on' : '')}>
-                        <button type="button" className="cab"
-                          onClick={() => setFonteAberta(aberta ? null : g.fonte)}
-                          aria-expanded={aberta}>
-                          <span className="seta" aria-hidden>{aberta ? '▾' : '▸'}</span>
-                          <span className="rot" title={g.fonte}>{g.fonte}</span>
-                          <div className="trilho"><i style={{ width: `${Math.max(2, (g.qtd / max) * 100)}%` }} /></div>
-                          <span className="v num">{fmtInt(g.qtd)}</span>
-                        </button>
-                        {aberta && (
-                          <div className="canais">
-                            {g.canais.map((c) => (
-                              <div className="lin" key={c.canal}>
-                                <span className="rot" title={c.canal}>{c.canal}</span>
-                                <div className="trilho"><i style={{ width: `${Math.max(2, (c.qtd / g.qtd) * 100)}%` }} /></div>
-                                <span className="v num">{fmtInt(c.qtd)}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </Painel>
-
-            {/* ===== funil ===== */}
-            <Painel titulo="Funil" nota="abertas agora · fechadas no período" sobe atraso={0.32}>
-              {carregando ? <Skeleton altura={160} raio={12} /> : !d?.funil?.length ? (
-                <Vazio texto="Nenhuma coluna de funil ativa." />
-              ) : (
-                <>
-                  <BarrasFunil linhas={d.funil} />
-                  {d.funil.some((f) => f.qtd_descarte > 0) && (
-                    <div className="db-legenda">
-                      <span><i className="sw f-ganho" aria-hidden /> ganho</span>
-                      <span><i className="sw f-descarte" aria-hidden /> descarte (fora do perfil)</span>
-                      <span><i className="sw f-perdido" aria-hidden /> perda real</span>
-                    </div>
-                  )}
-                </>
-              )}
-            </Painel>
-          </div>
-
-          {/* ===== atendentes ===== */}
-          <Painel titulo="Atendentes" nota="ordenado por ganhos" sobe atraso={0.36}>
-            {carregando ? <Skeleton altura={140} raio={12} /> : !atendentes.length ? (
-              <Vazio texto="Nenhum atendente ativo na organização." />
-            ) : (
-              <>
-                <div className="db-scroll">
-                  <table className="db-tab">
-                    <thead>
-                      <tr>
-                        <th>Atendente</th>
-                        <th className="n">Conversas</th>
-                        <th className="n">Mensagens</th>
-                        <th className="n">1ª resposta</th>
-                        <th className="n">Ganhos</th>
-                        <th className="n">Perdidos</th>
-                        <th className="n">Descartados</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {atendentes.map((a: DashAtendente, i) => (
-                        <tr key={a.nome}>
-                          <td className="nm">
-                            <span className="db-av" aria-hidden>{initials(a.nome)}</span>
-                            {a.nome}
-                            {i === 0 && a.ganhos > 0 && <b className="db-top" title="Mais ganhos no período">top do período</b>}
-                          </td>
-                          <td className="n num">{fmtInt(a.conversas_atribuidas)}</td>
-                          <td className="n num">{fmtInt(a.msgs_enviadas)}</td>
-                          <td className="n num">{fmtMin(a.mediana_resposta_min)}</td>
-                          <td className="n num ok">{fmtInt(a.ganhos)}</td>
-                          <td className="n num er">{fmtInt(a.perdidos)}</td>
-                          <td className="n num">{fmtInt(a.descartados)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <p className="db-nota">
-                  Só entra aqui o que o painel consegue atribuir: mensagem respondida do celular do
-                  consultor não tem autor no banco e fica de fora destas colunas — mas continua contando
-                  na 1ª resposta geral lá em cima.
-                </p>
-              </>
-            )}
-          </Painel>
-
-          {/* ===== linha final ===== */}
-          <div className="db-g3">
-            <Painel titulo="Horários de pico" nota="entradas por hora" sobe atraso={0.4}>
-              {carregando ? <Skeleton altura={150} raio={12} /> : !d?.picos_hora?.some((h) => h.qtd > 0) ? (
-                <Vazio texto="Nenhuma mensagem recebida no período." />
-              ) : (
-                <div style={{ height: 168 }}>
+          {/* ===== atividade (área azul com gradiente · por hora no Hoje) ===== */}
+          <Secao className="db-span8" titulo={porHora ? 'Atividade de hoje' : 'Leads por dia'}
+            sub={porHora ? 'mensagens recebidas por hora' : periodo.label} atraso={0.18}>
+            {carregando ? <Skeleton altura={210} raio={12} /> : porHora ? (
+              !d?.picos_hora?.some((h) => h.qtd > 0) ? <Vazio texto="Nenhuma mensagem recebida hoje." /> : (
+                <div className="db-graf">
                   <ResponsiveContainer width="100%" height="100%">
-                    {/* left quase zero: margem negativa come a largura reservada do
-                        YAxis e decepa o rótulo (120 aparecia como "0"). */}
-                    <BarChart data={d.picos_hora} margin={{ top: 4, right: 2, left: -6, bottom: 0 }}>
-                      <XAxis dataKey="hora" tick={eixo} tickLine={false} axisLine={{ stroke: tinta(p, 0.09) }}
-                        interval={3} tickFormatter={(h) => `${h}h`} />
-                      <YAxis tick={eixo} tickLine={false} axisLine={false} allowDecimals={false} width={42} />
-                      <Tooltip cursor={{ fill: tinta(p, 0.05) }}
-                        content={<TipPlatina sufixo="mensagens" fmtLabel={(v) => `${v}h`} />} />
-                      <Bar dataKey="qtd" radius={[3, 3, 0, 0]} fill={p.azul} fillOpacity={0.55} isAnimationActive={anima} />
+                    <BarChart data={d.picos_hora} margin={{ top: 6, right: 4, left: -8, bottom: 0 }}>
+                      <XAxis dataKey="hora" tick={eixo} tickLine={false} axisLine={{ stroke: tinta(p, 0.09) }} interval={2} tickFormatter={(h) => `${h}h`} />
+                      <YAxis tick={eixo} tickLine={false} axisLine={false} allowDecimals={false} width={38} />
+                      <Tooltip cursor={{ fill: tinta(p, 0.05) }} content={<TipPlatina sufixo="mensagens" fmtLabel={(v) => `${v}h`} />} />
+                      <Bar dataKey="qtd" radius={[4, 4, 0, 0]} maxBarSize={26} fill={p.azul} fillOpacity={0.75} isAnimationActive={anima} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
-              )}
-            </Painel>
+              )
+            ) : !d?.leads_por_dia?.length ? <Vazio texto="Nenhum lead no período." /> : (
+              <div className="db-graf">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={d.leads_por_dia} margin={{ top: 6, right: 4, left: -8, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="g-atividade" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={p.azul} stopOpacity={0.42} />
+                        <stop offset="100%" stopColor={p.azul} stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <XAxis dataKey="dia" tickFormatter={fmtDiaCurto} tick={eixo} tickLine={false}
+                      axisLine={{ stroke: tinta(p, 0.09) }} interval="preserveStartEnd" minTickGap={14} />
+                    <YAxis tick={eixo} tickLine={false} axisLine={false} allowDecimals={false} width={38} />
+                    <Tooltip cursor={{ stroke: tinta(p, 0.2) }} content={<TipPlatina sufixo="leads" fmtLabel={(v) => fmtDiaCurto(String(v))} />} />
+                    <Area dataKey="qtd" stroke={p.azul} strokeWidth={2.2} fill="url(#g-atividade)" isAnimationActive={anima} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </Secao>
 
-            <Painel titulo="Motivos de saída" nota="eventos do período" sobe atraso={0.44}>
-              {carregando ? <Skeleton altura={150} raio={12} /> : !d?.motivos_perda?.length ? (
-                <Vazio texto="Nenhuma saída registrada no período." />
-              ) : (
-                <>
-                  <BarrasH itens={d.motivos_perda.map((m) => ({
-                    rot: m.motivo === 'Sem motivo' ? 'Sem motivo' : rotuloMotivoPerda(m.motivo) || m.motivo,
-                    v: m.qtd,
-                    tag: m.grupo === 'descarte' ? 'descarte' : undefined,
-                  }))} />
-                  {/* evento ≠ estado: quem foi marcado perdido e depois reaberto
-                      aparece aqui, mas nos KPIs conta pelo que é HOJE. */}
-                  <p className="db-nota">Conta o que foi registrado no período. Uma oportunidade reaberta depois continua listada aqui, mas nos KPIs vale o estado atual.</p>
-                </>
-              )}
-            </Painel>
+          {/* ===== DONUT da IA (anatomia da referência: total no centro + legenda) ===== */}
+          <Secao className="db-span4" titulo="A IA da casa" sub="sessões agora" atraso={0.22}>
+            {DASH_REAL && iaQ.isPending ? <Skeleton altura={210} raio={12} /> : !ia ? <Vazio texto="Sem dados da IA." /> : (
+              <div className="db-donut-wrap">
+                <div className="db-donut">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={donutIa} dataKey="v" nameKey="nome" innerRadius="68%" outerRadius="94%"
+                        startAngle={90} endAngle={-270} stroke="none" isAnimationActive={anima} paddingAngle={2}>
+                        {donutIa.map((x) => <Cell key={x.nome} fill={x.cor} />)}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="centro">
+                    <b className="num"><Contador valor={vivasIa} fmt={fmtInt} /></b>
+                    <span>vivas agora</span>
+                  </div>
+                </div>
+                <div className="db-donut-leg">
+                  <div className="li"><i style={{ background: p.verde }} />Atendendo<b className="num">{fmtInt(ia.sessoesAtivas)}</b></div>
+                  <div className="li"><i style={{ background: p.ambar }} />Aguardando humano<b className="num">{fmtInt(ia.aguardandoHumano)}</b></div>
+                  <div className="li"><i style={{ background: p.rubro }} />Handoff<b className="num">{fmtInt(ia.handoffs)}</b></div>
+                  <div className="li"><i style={{ background: tinta(p, 0.25) }} />Pausadas<b className="num">{fmtInt(ia.pausadas)}</b></div>
+                  {ia.precisaHumanoAgora > 0 && (
+                    <div className="alerta" title="Conversas com pedido de humano em aberto agora — independe do período.">
+                      ⚠ {fmtInt(ia.precisaHumanoAgora)} pedido{ia.precisaHumanoAgora > 1 ? 's' : ''} de humano em aberto
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </Secao>
 
-            <Painel titulo="Bancos mais citados" nota="fichas do período" sobe atraso={0.48}>
-              {carregando ? <Skeleton altura={150} raio={12} /> : !d?.bancos?.length ? (
-                <Vazio texto="Nenhuma ficha judicial no período." />
-              ) : (
-                <BarrasH itens={d.bancos.map((b) => ({ rot: b.banco, v: b.qtd }))} />
-              )}
-            </Painel>
-          </div>
-        </>
+          {/* ===== equipe em LISTA (avatar + chips, como a referência) ===== */}
+          <Secao className="db-span7" titulo="Equipe" sub="ordenado por ganhos no período" atraso={0.26}>
+            {carregando ? <Skeleton altura={180} raio={12} /> : !atendentes.length ? (
+              <Vazio texto="Nenhum atendente ativo na organização." />
+            ) : (
+              <div className="db-equipe">
+                {atendentes.map((a: DashAtendente, i) => (
+                  <div className="db-at" key={a.nome}>
+                    <span className="av" aria-hidden>{initials(a.nome)}</span>
+                    <span className="quem">
+                      <span className="nm">{a.nome}{i === 0 && a.ganhos > 0 && <b className="top">top do período</b>}</span>
+                      <span className="sub num">{fmtInt(a.conversas_atribuidas)} conversas · 1ª resposta {fmtMin(a.mediana_resposta_min)}</span>
+                    </span>
+                    <span className="msgs">
+                      <span className="n num">{fmtInt(a.msgs_enviadas)} msgs</span>
+                      <i className="trilho"><em style={{ width: `${Math.max(3, (a.msgs_enviadas / maxMsgsAt) * 100)}%` }} /></i>
+                    </span>
+                    <span className="chips">
+                      <b className="c ok num" title="Ganhos no período">{fmtInt(a.ganhos)}</b>
+                      <b className="c er num" title="Perdidos no período">{fmtInt(a.perdidos)}</b>
+                    </span>
+                  </div>
+                ))}
+                <p className="db-nota">
+                  Só entra o que o painel consegue atribuir: resposta pelo celular do consultor não tem
+                  autor no banco — fica fora daqui, mas conta na 1ª resposta geral.
+                </p>
+              </div>
+            )}
+          </Secao>
+
+          {/* ===== automação do período ===== */}
+          <Secao className="db-span5" titulo="Automação" sub="quem falou no período" atraso={0.3}>
+            {DASH_REAL && iaQ.isPending ? <Skeleton altura={180} raio={12} /> : !ia ? <Vazio texto="Sem dados da IA." /> : (
+              <div className="db-auto">
+                <div className="pct">
+                  <b className="num"><Contador valor={pctBot} fmt={(n) => `${Math.round(n)}%`} /></b>
+                  <span>das mensagens enviadas saíram da IA</span>
+                </div>
+                <div className="prop" aria-hidden>
+                  <i style={{ width: `${pctBot}%` }} />
+                </div>
+                <div className="leg">
+                  <span><i className="sw bot" aria-hidden /> IA <b className="num">{fmtInt(ia.msgsBot)}</b></span>
+                  <span><i className="sw hum" aria-hidden /> equipe <b className="num">{fmtInt(ia.msgsHumano)}</b></span>
+                </div>
+                <div className="tt2">Fluxo vivo por etapa</div>
+                {ia.porEtapa.length === 0 ? <Vazio texto="Nenhuma sessão ativa." /> : (
+                  <BarrasH cor={p.azul} itens={ia.porEtapa.map((e) => ({ chave: e.etapa, rot: etapaIa(e.etapa), v: e.qtd }))} />
+                )}
+              </div>
+            )}
+          </Secao>
+
+          {/* ===== funil + origem ===== */}
+          <Secao className="db-span6" titulo="Funil" sub="abertas agora · fechadas no período" atraso={0.34}>
+            {carregando ? <Skeleton altura={160} raio={12} /> : !d?.funil?.length ? (
+              <Vazio texto="Nenhuma coluna de funil ativa." />
+            ) : (
+              <>
+                <BarrasFunil linhas={d.funil} p={p} />
+                {d.funil.some((f) => f.qtd_descarte > 0 || f.qtd_perda > 0) && (
+                  <div className="db-legenda">
+                    <span><i className="sw" style={{ background: p.verde }} aria-hidden /> ganho</span>
+                    <span><i className="sw" style={{ background: p.ambar }} aria-hidden /> descarte (fora do perfil)</span>
+                    <span><i className="sw" style={{ background: p.rubro }} aria-hidden /> perda real</span>
+                  </div>
+                )}
+              </>
+            )}
+          </Secao>
+
+          <Secao className="db-span6" titulo="Origem de tráfego" sub="clique para abrir os canais" atraso={0.38}>
+            {carregando ? <Skeleton altura={160} raio={12} /> : !origens.length ? (
+              <Vazio texto="Nenhum lead com origem no período." />
+            ) : (
+              <div className="db-origem">
+                {origens.map((g) => {
+                  const max = Math.max(1, ...origens.map((x) => x.qtd));
+                  const aberta = fonteAberta === g.fonte;
+                  return (
+                    <div key={g.fonte} className={'grp' + (aberta ? ' on' : '')}>
+                      <button type="button" className="cab" onClick={() => setFonteAberta(aberta ? null : g.fonte)} aria-expanded={aberta}>
+                        <span className="seta" aria-hidden>{aberta ? '▾' : '▸'}</span>
+                        <span className="rot" title={g.fonte}>{g.fonte}</span>
+                        <div className="trilho"><i style={{ width: `${Math.max(2, (g.qtd / max) * 100)}%`, background: p.azul, opacity: 0.75 }} /></div>
+                        <span className="v num">{fmtInt(g.qtd)}</span>
+                      </button>
+                      {aberta && (
+                        <div className="canais">
+                          {g.canais.map((c) => (
+                            <div className="lin" key={c.canal}>
+                              <span className="rot" title={c.canal}>{c.canal}</span>
+                              <div className="trilho"><i style={{ width: `${Math.max(2, (c.qtd / g.qtd) * 100)}%` }} /></div>
+                              <span className="v num">{fmtInt(c.qtd)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Secao>
+
+          {/* ===== bancos + motivos ===== */}
+          <Secao className="db-span6" titulo="Bancos das fichas" sub="mais citados no período" atraso={0.42}>
+            {carregando ? <Skeleton altura={150} raio={12} /> : !d?.bancos?.length ? (
+              <Vazio texto="Nenhuma ficha judicial no período." />
+            ) : (
+              <BarrasH itens={d.bancos.map((b) => ({ chave: b.banco, rot: <span className="db-banco">{b.banco}</span>, v: b.qtd }))} />
+            )}
+          </Secao>
+
+          <Secao className="db-span6" titulo="Motivos de saída" sub="eventos do período" atraso={0.46}>
+            {carregando ? <Skeleton altura={150} raio={12} /> : !d?.motivos_perda?.length ? (
+              <Vazio texto="Nenhuma saída registrada no período." />
+            ) : (
+              <>
+                <BarrasH itens={d.motivos_perda.map((m) => ({
+                  chave: m.motivo,
+                  rot: m.motivo === 'Sem motivo' ? 'Sem motivo' : rotuloMotivoPerda(m.motivo) || m.motivo,
+                  v: m.qtd,
+                  tag: m.grupo === 'descarte' ? 'descarte' : undefined,
+                  cor: m.grupo === 'descarte' ? p.ambar : undefined,
+                }))} />
+                <p className="db-nota">Conta o que foi registrado no período. Reaberto depois continua listado aqui; nos números de cima vale o estado atual.</p>
+              </>
+            )}
+          </Secao>
+        </div>
       )}
     </div>
   );
