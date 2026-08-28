@@ -48,6 +48,17 @@ const ETAPA_IA: Record<string, string> = {
 };
 const etapaIa = (s: string) => ETAPA_IA[s] ?? s.replace(/_/g, ' ');
 
+/* glifo único de IA (mesmo desenho do inbox/Kanban) — cópia mínima local */
+const IcBotMini = () => (
+  <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+    <rect x="5" y="8" width="14" height="11" rx="3" stroke="currentColor" strokeWidth="1.6" />
+    <circle cx="9.5" cy="13" r="1.3" fill="currentColor" />
+    <circle cx="14.5" cy="13" r="1.3" fill="currentColor" />
+    <path d="M12 8V4.6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    <circle cx="12" cy="4" r="1.5" fill="currentColor" />
+  </svg>
+);
+
 /* ===== paleta dos gráficos (tokens resolvidos — Recharts não lê var()) ===== */
 interface Paleta {
   txt: string; txt2: string; txt3: string;
@@ -622,7 +633,9 @@ export default function DashboardV2() {
                 <Vazio texto="Sem mensagens legíveis nesta conversa." />
               ) : fio.map((m, i) => (
                 <div key={i} className={'blh ' + (m.dir === 'out' ? (m.bot ? 'bot' : 'hum') : 'cli')}>
-                  {m.dir === 'out' && <span className="quem-msg">{m.bot ? 'IA · Matheo' : 'Equipe'}</span>}
+                  {m.dir === 'out' && (
+                    <span className="quem-msg">{m.bot ? <><IcBotMini />Matheo<span style={{ opacity: .6 }}>· IA</span></> : 'Equipe'}</span>
+                  )}
                   <span className="tx">{m.texto}</span>
                   <span className="hh num">{new Date(m.quando).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' })}</span>
                 </div>

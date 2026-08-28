@@ -407,3 +407,83 @@
 .v2 .db-atconvs .nm { flex: 1; min-width: 0; font-size: 12px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .v2 .db-atconvs .qdo { font-size: 10px; color: var(--txt-3); flex-shrink: 0; }
 .v2 .db-atconvs .ir { color: var(--txt-3); }
+
+/* ============================================================
+   Polimento 28/08 (2ª rodada): o gráfico PREENCHE o card (morre o
+   buraco), fio do drawer no VISUAL DO WHATSAPP (mesma receita de
+   bolha do inbox Aurora) e ANIMAÇÕES de entrada — CSS puro, "carga,
+   uma vez" (contrato): barras crescem, donut entra, chips pop.
+   ============================================================ */
+/* cards de seção viram coluna flex — o gráfico estica e ocupa tudo */
+.v2 .db-sec { display: flex; flex-direction: column; }
+.v2 .db-sec-cab { flex-shrink: 0; }
+.v2 .db-graf { flex: 1; min-height: 228px; }
+.v2 .db-donut-wrap { flex: 1; justify-content: center; }
+
+/* barras horizontais CRESCEM na entrada (escala X, uma vez, com cascata) */
+@keyframes db-cresceX { from { transform: scaleX(0); } }
+.v2 .db-barh .trilho i,
+.v2 .db-barh .trilho .pilha,
+.v2 .db-auto .prop i,
+.v2 .db-share .trilho i,
+.v2 .db-at .msgs .trilho em,
+.v2 .db-origem .trilho i { transform-origin: left; animation: db-cresceX .65s var(--ease) both; }
+.v2 .db-barh .lin:nth-child(2) .trilho i { animation-delay: .07s; }
+.v2 .db-barh .lin:nth-child(3) .trilho i { animation-delay: .14s; }
+.v2 .db-barh .lin:nth-child(4) .trilho i { animation-delay: .21s; }
+.v2 .db-barh .lin:nth-child(5) .trilho i { animation-delay: .28s; }
+.v2 .db-barh .lin:nth-child(6) .trilho i { animation-delay: .35s; }
+.v2 .db-barh .lin:nth-child(7) .trilho i { animation-delay: .42s; }
+.v2 .db-barh .lin:nth-child(n+8) .trilho i { animation-delay: .49s; }
+
+/* donut e chips de variação entram */
+@keyframes db-entraDonut { from { opacity: 0; transform: scale(.88) rotate(-8deg); } }
+.v2 .db-donut { animation: db-entraDonut .55s var(--ease) both .15s; }
+@keyframes db-pop { from { opacity: 0; transform: translateY(5px); } }
+.v2 .db-delta { animation: db-pop .45s var(--ease) both .4s; }
+.v2 .db-donut-leg .li { animation: db-pop .4s var(--ease) both; }
+.v2 .db-donut-leg .li:nth-child(2) { animation-delay: .08s; }
+.v2 .db-donut-leg .li:nth-child(3) { animation-delay: .16s; }
+.v2 .db-donut-leg .li:nth-child(4) { animation-delay: .24s; }
+.v2 .db-donut-leg .alerta { animation: db-pop .45s var(--ease) both .35s; }
+.v2 .db-iaconv { animation: db-pop .4s var(--ease) both; }
+.v2 .db-iaconvs .db-iaconv:nth-child(2) { animation-delay: .06s; }
+.v2 .db-iaconvs .db-iaconv:nth-child(3) { animation-delay: .12s; }
+.v2 .db-iaconvs .db-iaconv:nth-child(n+4) { animation-delay: .18s; }
+.v2 .db-at { animation: db-pop .4s var(--ease) both; }
+.v2 .db-equipe .db-at:nth-child(2) { animation-delay: .07s; }
+.v2 .db-equipe .db-at:nth-child(3) { animation-delay: .14s; }
+.v2 .db-equipe .db-at:nth-child(n+4) { animation-delay: .21s; }
+
+/* ---- FIO NO VISUAL DO WHATSAPP (mesma receita do inbox Aurora) ---- */
+.v2 .db-fio { background: rgba(8, 9, 12, .34); gap: 8px; }
+:root[data-tema="light"] .v2 .db-fio { background: rgba(244, 245, 247, .5); }
+.v2 .db-fio .blh {
+  max-width: 86%; border-radius: 16px; padding: 8px 12px; font-size: 12.5px; line-height: 1.45;
+  animation: db-pop .35s var(--ease) both;
+}
+.v2 .db-fio .blh:nth-child(2) { animation-delay: .05s; }
+.v2 .db-fio .blh:nth-child(3) { animation-delay: .1s; }
+.v2 .db-fio .blh:nth-child(4) { animation-delay: .15s; }
+.v2 .db-fio .blh:nth-child(n+5) { animation-delay: .2s; }
+.v2 .db-fio .blh.cli {
+  border-bottom-left-radius: 5px;
+  background: rgba(16, 18, 24, .6) linear-gradient(180deg, rgba(255, 255, 255, .085), rgba(255, 255, 255, .04));
+  border: 1px solid rgba(255, 255, 255, .1);
+  box-shadow: 0 10px 26px rgba(2, 4, 10, .45), inset 0 1px 0 rgba(255, 255, 255, .07);
+}
+.v2 .db-fio .blh.bot, .v2 .db-fio .blh.hum {
+  border-bottom-right-radius: 5px;
+  background: rgba(14, 22, 40, .62) linear-gradient(180deg, rgba(var(--azul-rgb, 76, 141, 255), .3), rgba(var(--azul-rgb, 76, 141, 255), .1));
+  border: 1px solid rgba(var(--azul-rgb, 76, 141, 255), .34);
+  box-shadow: 0 10px 26px rgba(6, 16, 42, .5), inset 0 1px 0 rgba(255, 255, 255, .12);
+}
+.v2 .db-fio .blh.hum { background: rgba(15, 17, 22, .62) linear-gradient(180deg, rgba(255, 255, 255, .1), rgba(255, 255, 255, .05)); border-color: rgba(255, 255, 255, .14); box-shadow: 0 10px 26px rgba(2, 4, 10, .45), inset 0 1px 0 rgba(255, 255, 255, .1); }
+:root[data-tema="light"] .v2 .db-fio .blh.cli { background: rgba(255, 255, 255, .88); border-color: rgba(22, 25, 31, .09); box-shadow: 0 8px 22px rgba(22, 25, 31, .08), inset 0 1px 0 #fff; color: var(--txt); }
+:root[data-tema="light"] .v2 .db-fio .blh.bot { background: rgba(255, 255, 255, .82) linear-gradient(180deg, rgba(var(--azul-rgb, 42, 98, 201), .14), rgba(var(--azul-rgb, 42, 98, 201), .06)); border-color: rgba(var(--azul-rgb, 42, 98, 201), .28); box-shadow: 0 8px 22px rgba(var(--azul-rgb, 42, 98, 201), .14), inset 0 1px 0 rgba(255, 255, 255, .8); }
+:root[data-tema="light"] .v2 .db-fio .blh.hum { background: rgba(255, 255, 255, .85); border-color: rgba(22, 25, 31, .12); box-shadow: 0 8px 22px rgba(22, 25, 31, .08); }
+.v2 .db-fio .blh .quem-msg { display: flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 600; letter-spacing: .01em; text-transform: none; color: var(--txt-2); margin-bottom: 4px; }
+.v2 .db-fio .blh .quem-msg svg { width: 13px; height: 13px; color: var(--txt-3); }
+.v2 .db-fio .blh .hh { font-size: 9.5px; color: var(--txt-3); }
+.v2 .db-fio .blh.bot .hh { color: rgba(255, 255, 255, .55); }
+:root[data-tema="light"] .v2 .db-fio .blh.bot .hh { color: rgba(25, 28, 34, .5); }
