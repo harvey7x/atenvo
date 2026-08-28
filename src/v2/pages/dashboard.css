@@ -86,35 +86,6 @@
 .v2 .db-legenda .sw.f-perdido { background: rgba(var(--rubro-rgb), .8); }
 .v2 .db-legenda .sw.f-descarte { background: rgba(var(--tint), .3); }
 
-/* --- origem de tráfego (fonte → canais) --- */
-.v2 .db-origem { display: flex; flex-direction: column; gap: 4px; }
-.v2 .db-origem .cab {
-  width: 100%; background: none; border: 0; padding: 5px 4px; cursor: pointer; text-align: left;
-  display: grid; grid-template-columns: 14px minmax(84px, 128px) 1fr 46px; gap: 8px; align-items: center;
-  border-radius: 8px; transition: background .16s var(--ease); color: inherit; font: inherit;
-}
-.v2 .db-origem .cab:hover { background: rgba(var(--tint), .04); }
-.v2 .db-origem .cab .seta { font-size: 9px; color: var(--txt-3); }
-.v2 .db-origem .cab .rot {
-  font-size: 11.5px; color: var(--txt-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.v2 .db-origem .grp.on .cab .rot { color: var(--txt); }
-.v2 .db-origem .trilho { height: 8px; border-radius: 99px; background: rgba(var(--tint), .06); overflow: hidden; }
-.v2 .db-origem .trilho i {
-  display: block; height: 100%; border-radius: 99px;
-  background: linear-gradient(90deg, rgba(var(--tint), .55), rgba(var(--tint), .25));
-}
-.v2 .db-origem .v { font-size: 11.5px; text-align: right; font-variant-numeric: tabular-nums; color: var(--txt); }
-.v2 .db-origem .canais {
-  display: flex; flex-direction: column; gap: 7px;
-  padding: 7px 4px 9px 26px; margin-left: 6px; border-left: 1px solid var(--linha);
-}
-.v2 .db-origem .canais .lin { display: grid; grid-template-columns: minmax(74px, 118px) 1fr 46px; gap: 8px; align-items: center; }
-.v2 .db-origem .canais .rot { font-size: 11px; color: var(--txt-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.v2 .db-origem .canais .trilho { height: 6px; }
-.v2 .db-origem .canais .trilho i { background: linear-gradient(90deg, rgba(var(--tint), .34), rgba(var(--tint), .16)); }
-.v2 .db-origem .canais .v { font-size: 11px; color: var(--txt-2); }
-
 /* --- tabela de atendentes (caps, mesma anatomia das tabelas v2) --- */
 .v2 .db-scroll { overflow-x: auto; }
 .v2 .db-tab { width: 100%; border-collapse: collapse; font-size: 12px; }
@@ -208,8 +179,8 @@
    heros com número grande + chip de variação + sparkline, donut da
    IA com total no centro, equipe em lista com avatares e chips.
    ============================================================ */
-.v2 .db-bento { display: grid; grid-template-columns: repeat(12, 1fr); gap: 12px; }
-.v2 .db-bento > * { grid-column: span 3; }
+.v2 .db-bento { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 12px; }
+.v2 .db-bento > * { grid-column: span 3; min-width: 0; }
 .v2 .db-bento > .db-span4 { grid-column: span 4; }
 .v2 .db-bento > .db-span5 { grid-column: span 5; }
 .v2 .db-bento > .db-span6 { grid-column: span 6; }
@@ -487,3 +458,11 @@
 .v2 .db-fio .blh .hh { font-size: 9.5px; color: var(--txt-3); }
 .v2 .db-fio .blh.bot .hh { color: rgba(255, 255, 255, .55); }
 :root[data-tema="light"] .v2 .db-fio .blh.bot .hh { color: rgba(25, 28, 34, .5); }
+
+/* fix prod 28/08: item de grid precisa de minmax(0,1fr) — prévias longas
+   REAIS estouravam a coluna e cortavam o card da direita */
+.v2 .db-iaconvs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.v2 .db-iaconv { min-width: 0; }
+
+/* origem dos leads: o nome da CONEXÃO é a informação — rótulo largo */
+.v2 .db-org .db-barh .lin { grid-template-columns: minmax(120px, 46%) 1fr 46px; }

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Area, AreaChart, Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useNavigate } from 'react-router-dom';
 import {
-  DASH_REAL, PRESETS_DASH, agrupaPorFonte, periodoDash, useDashboardResumo,
+  DASH_REAL, PRESETS_DASH, periodoDash, useDashboardResumo,
   useDashboardIa, seedDashResumo, seedDashIa,
   useIaConversasPeriodo, useConversaPreview, useAtendenteConversas,
   seedIaConversas, seedConversaPreview, seedAtendenteConversas,
@@ -278,7 +278,6 @@ export default function DashboardV2() {
   const [preset, setPreset] = useState<PresetDash>('hoje'); // fim do dia: a foto de HOJE primeiro
   const [ini, setIni] = useState(() => addDias(spHoje(), -6));
   const [fim, setFim] = useState(() => spHoje());
-  const [fonteAberta, setFonteAberta] = useState<string | null>(null);
 
   const periodo = useMemo(() => periodoDash(preset, ini, fim), [preset, ini, fim]);
   const { data, isPending, isError, error, refetch, isFetching } = useDashboardResumo(periodo);
@@ -297,7 +296,6 @@ export default function DashboardV2() {
     return kpi(a, b);
   };
 
-  const origens = useMemo(() => (d ? agrupaPorFonte(d.origem_trafego) : []), [d]);
   const atendentes = useMemo(
     () => (d ? [...d.atendentes].sort((a, b) => b.ganhos - a.ganhos || b.msgs_enviadas - a.msgs_enviadas) : []),
     [d],
@@ -554,36 +552,22 @@ export default function DashboardV2() {
             )}
           </Secao>
 
-          <Secao className="db-span6" titulo="Origem de tráfego" sub="clique para abrir os canais" atraso={0.38}>
-            {carregando ? <Skeleton altura={160} raio={12} /> : !origens.length ? (
+          {/* fix prod 28/08 (dono): origem = a CONEXÃO por onde o lead entrou, direto —
+              o agrupamento por "fonte" escondia o canal atrás de rótulos como "Tráfego 1" */}
+          <Secao className="db-span6" titulo="Origem dos leads" sub="por conexão de entrada" atraso={0.38}>
+            {carregando ? <Skeleton altura={160} raio={12} /> : !d?.origem_trafego?.length ? (
               <Vazio texto="Nenhum lead com origem no período." />
             ) : (
-              <div className="db-origem">
-                {origens.map((g) => {
-                  const max = Math.max(1, ...origens.map((x) => x.qtd));
-                  const aberta = fonteAberta === g.fonte;
-                  return (
-                    <div key={g.fonte} className={'grp' + (aberta ? ' on' : '')}>
-                      <button type="button" className="cab" onClick={() => setFonteAberta(aberta ? null : g.fonte)} aria-expanded={aberta}>
-                        <span className="seta" aria-hidden>{aberta ? '▾' : '▸'}</span>
-                        <span className="rot" title={g.fonte}>{g.fonte}</span>
-                        <div className="trilho"><i style={{ width: `${Math.max(2, (g.qtd / max) * 100)}%`, background: p.azul, opacity: 0.75 }} /></div>
-                        <span className="v num">{fmtInt(g.qtd)}</span>
-                      </button>
-                      {aberta && (
-                        <div className="canais">
-                          {g.canais.map((c) => (
-                            <div className="lin" key={c.canal}>
-                              <span className="rot" title={c.canal}>{c.canal}</span>
-                              <div className="trilho"><i style={{ width: `${Math.max(2, (c.qtd / g.qtd) * 100)}%` }} /></div>
-                              <span className="v num">{fmtInt(c.qtd)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+              <div className="db-org">
+                <BarrasH cor={p.azul} itens={[...d.origem_trafego]
+                  .sort((a, b) => b.qtd - a.qtd)
+                  .slice(0, 8)
+                  .map((o) => ({
+                    chave: o.fonte + '·' + o.canal,
+                    rot: o.canal,
+                    tag: o.fonte && o.fonte !== o.canal ? o.fonte : undefined,
+                    v: o.qtd,
+                  }))} />
               </div>
             )}
           </Secao>
