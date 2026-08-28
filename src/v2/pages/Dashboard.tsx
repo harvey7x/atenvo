@@ -2,11 +2,13 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import {
   DASH_REAL, PRESETS_DASH, agrupaPorFonte, periodoDash, useDashboardResumo,
-  type DashAtendente, type DashKpis, type DashLinhaFunil, type DashResumo, type PresetDash,
+  useDashboardIa, seedDashResumo, seedDashIa,
+  type DashAtendente, type DashIa, type DashKpis, type DashLinhaFunil, type DashResumo, type PresetDash,
 } from '@/data/dashboard';
 import { kpi, spHoje, addDias, type Kpi as KpiNum } from '@/data/relatorios';
 import { rotuloMotivoPerda } from '@/data/kanban';
-import { CardVidro, Chip, Chips, EstadoErro, EstadoVazio, Input, Skeleton } from '../components';
+import { initials } from '@/lib/avatar';
+import { CardVidro, Chip, Chips, EstadoErro, Input, Skeleton } from '../components';
 import './dashboard.css';
 
 /* ------------------------------------------------------------------
@@ -31,6 +33,39 @@ const fmtDiaCurto = (iso: string) => {
   return `${d}/${m}`;
 };
 
+/* etapa do fluxo da IA → rótulo humano (mesmo mapa do inbox; fallback prettify) */
+const ETAPA_IA: Record<string, string> = {
+  qualificacao_inss: 'qualificando o benefício', triagem_govbr: 'triagem do gov.br',
+  extratos: 'coletando extratos', coleta_docs: 'coletando documentos',
+  docs_pessoais: 'documentos pessoais', retorno: 'retomando contato', sem_etapa: 'sem etapa',
+};
+const etapaIa = (s: string) => ETAPA_IA[s] ?? s.replace(/_/g, ' ');
+
+/* ===== contador ANIMADO (entrada dos KPIs) =====
+   rAF de ~550ms com ease-out; aba oculta ou mesmo valor → assenta direto
+   (o gráfico continua SEM animação — regra "dado é calmo" + bug do rAF
+   em aba de fundo medido em produção; animar o NÚMERO não sofre disso
+   porque o efeito cai no valor final ao desmontar/regravar). */
+function Contador({ valor, fmt }: { valor: number; fmt: (n: number) => string }) {
+  const [v, setV] = useState(valor);
+  const anterior = useRef<number | null>(null);
+  useEffect(() => {
+    const de = anterior.current ?? 0;
+    anterior.current = valor;
+    if (de === valor || document.visibilityState === 'hidden') { setV(valor); return; }
+    const t0 = performance.now(); const dur = 550; let raf = 0;
+    const passo = (t: number) => {
+      const k = Math.min(1, (t - t0) / dur);
+      const e = 1 - Math.pow(1 - k, 3);
+      setV(de + (valor - de) * e);
+      if (k < 1) raf = requestAnimationFrame(passo); else setV(valor);
+    };
+    raf = requestAnimationFrame(passo);
+    return () => { cancelAnimationFrame(raf); setV(valor); };
+  }, [valor]);
+  return <>{fmt(v)}</>;
+}
+
 /* ===== paleta dos gráficos =====
    Recharts recebe `fill`/`stroke` como ATRIBUTO de SVG, e atributo não
    resolve var(--token) — o mesmo motivo pelo qual as sparklines do Kpi
@@ -40,12 +75,12 @@ const fmtDiaCurto = (iso: string) => {
    para o gráfico traduzir junto com o resto da tela. */
 interface Paleta {
   txt: string; txt2: string; txt3: string;
-  verde: string; rubro: string; tint: string;
+  verde: string; rubro: string; azul: string; tint: string;
   lite: boolean;
 }
 const PALETA_DARK: Paleta = {
   txt: '#F4F5F7', txt2: '#9BA1AB', txt3: '#5E646E',
-  verde: '#4ABE8C', rubro: '#E5665C', tint: '255, 255, 255', lite: false,
+  verde: '#4ABE8C', rubro: '#E5665C', azul: '#4C8DFF', tint: '255, 255, 255', lite: false,
 };
 
 function usePaleta(ref: React.RefObject<HTMLElement | null>): Paleta {
@@ -62,6 +97,7 @@ function usePaleta(ref: React.RefObject<HTMLElement | null>): Paleta {
         txt3: v('--txt-3', PALETA_DARK.txt3),
         verde: v('--verde', PALETA_DARK.verde),
         rubro: v('--rubro', PALETA_DARK.rubro),
+        azul: v('--azul', PALETA_DARK.azul),
         tint: v('--tint', PALETA_DARK.tint),
         lite: document.documentElement.getAttribute('data-perf') === 'lite',
       });
@@ -127,7 +163,7 @@ function KpiCard({ rotulo, k, sentido, fmt, ajuda, sobe, atraso, indisponivel }:
         </>
       ) : (
         <>
-          <div className="val num">{k ? fmt(k.atual) : '—'}</div>
+          <div className="val num">{k ? <Contador valor={k.atual} fmt={fmt} /> : '—'}</div>
           {delta}
           <div className="ant num">Anterior: {k ? fmt(k.anterior) : '—'}</div>
         </>
@@ -229,15 +265,19 @@ export default function DashboardV2() {
   const raiz = useRef<HTMLDivElement>(null);
   const p = usePaleta(raiz);
 
-  const [preset, setPreset] = useState<PresetDash>('7d');
+  const [preset, setPreset] = useState<PresetDash>('hoje'); // fim do dia: a foto de HOJE primeiro
   const [ini, setIni] = useState(() => addDias(spHoje(), -6));
   const [fim, setFim] = useState(() => spHoje());
   const [fonteAberta, setFonteAberta] = useState<string | null>(null);
 
   const periodo = useMemo(() => periodoDash(preset, ini, fim), [preset, ini, fim]);
   const { data, isPending, isError, error, refetch, isFetching } = useDashboardResumo(periodo);
+  const iaQ = useDashboardIa(periodo);
 
-  const d = data as DashResumo | undefined;
+  // demo: a tela vive com o seed (números coerentes) em vez do antigo "Sem conexão"
+  const demoResumo = useMemo(() => (DASH_REAL ? null : seedDashResumo(periodo)), [periodo]);
+  const d = DASH_REAL ? (data as DashResumo | undefined) : demoResumo ?? undefined;
+  const ia: DashIa | undefined = DASH_REAL ? iaQ.data : seedDashIa();
   const carregando = DASH_REAL && isPending;
 
   const kp = (sel: (k: DashKpis) => number | null): KpiNum | null => {
@@ -263,23 +303,12 @@ export default function DashboardV2() {
   const anima = false;
   void p.lite; // o Modo Leve segue governando blur/grão pelos tokens
 
-  if (!DASH_REAL) {
-    return (
-      <div className="db-pg" ref={raiz}>
-        <div className="ph"><div><h2>Dashboard</h2><p>A foto da operação no período.</p></div></div>
-        <CardVidro className="db-painel">
-          <EstadoVazio titulo="Sem conexão com os dados" descricao="O Dashboard lê direto do banco da organização." />
-        </CardVidro>
-      </div>
-    );
-  }
-
   return (
     <div className="db-pg" ref={raiz}>
       <div className="ph">
         <div>
           <h2>Dashboard</h2>
-          <p>A foto da operação — {periodo.label}{isFetching && !carregando ? ' · atualizando…' : ''}</p>
+          <p>A foto da operação — {periodo.label}{isFetching && !carregando ? ' · atualizando…' : ''}{!DASH_REAL ? ' · modo demonstração (dados ilustrativos)' : ''}</p>
         </div>
       </div>
 
@@ -353,9 +382,55 @@ export default function DashboardV2() {
                     <Tooltip cursor={{ fill: tinta(p, 0.05) }}
                       content={<TipPlatina sufixo="leads" fmtLabel={(v) => fmtDiaCurto(String(v))} />} />
                     <Bar dataKey="qtd" radius={[4, 4, 0, 0]} maxBarSize={38}
-                      fill={tinta(p, 0.5)} isAnimationActive={anima} />
+                      fill={p.azul} fillOpacity={0.78} isAnimationActive={anima} />
                   </BarChart>
                 </ResponsiveContainer>
+              </div>
+            )}
+          </Painel>
+
+          {/* ===== A IA hoje (dono 28/08: "informações sobre a IA") ===== */}
+          <Painel titulo="A IA da casa" nota="sessões agora · mensagens no período" sobe atraso={0.26}>
+            {DASH_REAL && iaQ.isPending ? <Skeleton altura={150} raio={12} /> : !ia ? (
+              <Vazio texto="Sem dados da IA." />
+            ) : (
+              <div className="db-ia">
+                <div className="db-ia-cards">
+                  <div className="db-ia-card" title="Sessões de IA com status ativo agora — o bot está conduzindo estas conversas.">
+                    <span className="dot ok" aria-hidden /><b className="num"><Contador valor={ia.sessoesAtivas} fmt={fmtInt} /></b><span className="rot">atendendo agora</span>
+                  </div>
+                  <div className="db-ia-card" title="Sessões vivas em que a IA pediu um humano e segue aguardando.">
+                    <span className="dot at" aria-hidden /><b className="num"><Contador valor={ia.aguardandoHumano} fmt={fmtInt} /></b><span className="rot">aguardando humano</span>
+                  </div>
+                  <div className="db-ia-card" title="Sessões em handoff — a IA passou o caso para a equipe.">
+                    <span className="dot er" aria-hidden /><b className="num"><Contador valor={ia.handoffs} fmt={fmtInt} /></b><span className="rot">handoffs</span>
+                  </div>
+                  <div className="db-ia-card" title="Conversas com pedido de humano em aberto AGORA (independe do período).">
+                    <span className="dot at" aria-hidden /><b className="num"><Contador valor={ia.precisaHumanoAgora} fmt={fmtInt} /></b><span className="rot">pedidos abertos</span>
+                  </div>
+                  <div className="db-ia-card" title="Sessões pausadas — um humano assumiu ou a IA foi desligada na conversa.">
+                    <span className="dot ne" aria-hidden /><b className="num"><Contador valor={ia.pausadas} fmt={fmtInt} /></b><span className="rot">pausadas</span>
+                  </div>
+                </div>
+                <div className="db-ia-split">
+                  <div className="db-ia-msgs" title={`No período: ${fmtInt(ia.msgsBot)} mensagens do bot · ${fmtInt(ia.msgsHumano)} da equipe`}>
+                    <div className="tt2">Quem falou no período</div>
+                    <div className="prop" aria-hidden>
+                      <i className="bot" style={{ width: `${(ia.msgsBot / Math.max(1, ia.msgsBot + ia.msgsHumano)) * 100}%` }} />
+                    </div>
+                    <div className="leg">
+                      <span><i className="sw bot" aria-hidden /> IA <b className="num">{fmtInt(ia.msgsBot)}</b></span>
+                      <span><i className="sw hum" aria-hidden /> equipe <b className="num">{fmtInt(ia.msgsHumano)}</b></span>
+                      <span className="pct num">{Math.round((ia.msgsBot / Math.max(1, ia.msgsBot + ia.msgsHumano)) * 100)}% automático</span>
+                    </div>
+                  </div>
+                  <div className="db-ia-etapas">
+                    <div className="tt2">Fluxo vivo por etapa</div>
+                    {ia.porEtapa.length === 0 ? <Vazio texto="Nenhuma sessão ativa." /> : (
+                      <BarrasH itens={ia.porEtapa.map((e) => ({ rot: etapaIa(e.etapa), v: e.qtd }))} />
+                    )}
+                  </div>
+                </div>
               </div>
             )}
           </Painel>
@@ -437,9 +512,13 @@ export default function DashboardV2() {
                       </tr>
                     </thead>
                     <tbody>
-                      {atendentes.map((a: DashAtendente) => (
+                      {atendentes.map((a: DashAtendente, i) => (
                         <tr key={a.nome}>
-                          <td className="nm">{a.nome}</td>
+                          <td className="nm">
+                            <span className="db-av" aria-hidden>{initials(a.nome)}</span>
+                            {a.nome}
+                            {i === 0 && a.ganhos > 0 && <b className="db-top" title="Mais ganhos no período">top do período</b>}
+                          </td>
                           <td className="n num">{fmtInt(a.conversas_atribuidas)}</td>
                           <td className="n num">{fmtInt(a.msgs_enviadas)}</td>
                           <td className="n num">{fmtMin(a.mediana_resposta_min)}</td>
@@ -476,7 +555,7 @@ export default function DashboardV2() {
                       <YAxis tick={eixo} tickLine={false} axisLine={false} allowDecimals={false} width={42} />
                       <Tooltip cursor={{ fill: tinta(p, 0.05) }}
                         content={<TipPlatina sufixo="mensagens" fmtLabel={(v) => `${v}h`} />} />
-                      <Bar dataKey="qtd" radius={[3, 3, 0, 0]} fill={tinta(p, 0.42)} isAnimationActive={anima} />
+                      <Bar dataKey="qtd" radius={[3, 3, 0, 0]} fill={p.azul} fillOpacity={0.55} isAnimationActive={anima} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>

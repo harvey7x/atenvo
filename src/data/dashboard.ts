@@ -117,3 +117,128 @@ export function useDashboardResumo(periodo: Periodo) {
     },
   });
 }
+
+/* ====================== Fatia IA (client-side) ======================
+   Lê direto do banco (RLS org + GRANT conferidos 28/08): ia_sessoes é
+   pequena (~centenas de linhas por org) e mensagens entram só como
+   COUNT head — quatro consultas leves em paralelo, cacheadas 60s. */
+export interface DashIa {
+  sessoesAtivas: number;
+  /** sessões VIVAS (ativa/handoff) com pedido de humano de pé. */
+  aguardandoHumano: number;
+  handoffs: number;
+  pausadas: number;
+  /** distribuição de etapa só do fluxo VIVO (ativa/handoff). */
+  porEtapa: { etapa: string; qtd: number }[];
+  msgsBot: number;
+  msgsHumano: number;
+  /** conversas com precisa_humano aberto AGORA (não é do período). */
+  precisaHumanoAgora: number;
+}
+
+export function useDashboardIa(periodo: Periodo) {
+  const { currentOrg } = useOrg();
+  const org = currentOrg.id;
+  return useQuery({
+    queryKey: ['dashboard-ia', org, periodo.iniISO, periodo.fimISO],
+    enabled: DASH_REAL && !!org,
+    staleTime: 60_000,
+    queryFn: async (): Promise<DashIa> => {
+      const sessQ = supabase!.from('ia_sessoes').select('status, etapa, dados').eq('organizacao_id', org);
+      const base = () => supabase!.from('mensagens').select('id', { count: 'exact', head: true })
+        .eq('organizacao_id', org).eq('direcao', 'saida')
+        .gte('criado_em', periodo.iniISO).lt('criado_em', periodo.fimISO);
+      // humano ≠ bot é por ORIGEM (regra da casa) — e origem NULA é humano do painel,
+      // então o "não-bot" precisa do or() (neq sozinho descartaria os NULL).
+      const botQ = base().eq('origem', 'bot');
+      const humQ = base().or('origem.is.null,origem.neq.bot');
+      const pedQ = supabase!.from('conversas').select('id', { count: 'exact', head: true })
+        .eq('organizacao_id', org).eq('precisa_humano', true);
+      const [sess, mb, mh, ped] = await Promise.all([sessQ, botQ, humQ, pedQ]);
+      if (sess.error) throw sess.error;
+      const rows = (sess.data ?? []) as { status: string; etapa: string | null; dados: { aguardando_humano?: string | null } | null }[];
+      const vivas = rows.filter((r) => r.status === 'ativa' || r.status === 'handoff');
+      const mapa = new Map<string, number>();
+      for (const r of vivas) { const e = r.etapa || 'sem_etapa'; mapa.set(e, (mapa.get(e) ?? 0) + 1); }
+      return {
+        sessoesAtivas: rows.filter((r) => r.status === 'ativa').length,
+        handoffs: rows.filter((r) => r.status === 'handoff').length,
+        pausadas: rows.filter((r) => r.status === 'pausada').length,
+        aguardandoHumano: vivas.filter((r) => !!r.dados?.aguardando_humano).length,
+        porEtapa: [...mapa.entries()].map(([etapa, qtd]) => ({ etapa, qtd })).sort((a, b) => b.qtd - a.qtd),
+        msgsBot: mb.count ?? 0,
+        msgsHumano: mh.count ?? 0,
+        precisaHumanoAgora: ped.count ?? 0,
+      };
+    },
+  });
+}
+
+/* ====================== Seeds do modo demonstração ======================
+   O demo deixava o Dashboard em "Sem conexão" — agora sintetiza a foto
+   completa (números coerentes entre si) para a tela viver sem backend. */
+export function seedDashResumo(p: Periodo): DashResumo {
+  const dias = Math.max(1, p.dias);
+  const serie = Array.from({ length: dias }, (_, i) => ({
+    dia: addDias(p.iniDate, i),
+    qtd: [6, 9, 4, 11, 8, 5, 7, 10, 6, 8][i % 10],
+  }));
+  const novos = serie.reduce((s, x) => s + x.qtd, 0);
+  return {
+    periodo: { inicio: p.iniISO, fim: p.fimISO },
+    motivos_descarte: ['nao_elegivel'],
+    kpis: {
+      novos_leads: novos, conversas_ativas: Math.round(novos * 2.1),
+      mediana_primeira_resposta_min: 12, ganhos_qtd: Math.max(1, Math.round(novos * 0.16)),
+      ganhos_valor: Math.max(1, Math.round(novos * 0.16)) * 1650,
+      perdidos_qtd: Math.round(novos * 0.11), descartados_qtd: Math.round(novos * 0.05),
+    },
+    kpis_anterior: {
+      novos_leads: Math.round(novos * 0.82), conversas_ativas: Math.round(novos * 1.8),
+      mediana_primeira_resposta_min: 17, ganhos_qtd: Math.max(1, Math.round(novos * 0.12)),
+      ganhos_valor: Math.max(1, Math.round(novos * 0.12)) * 1520,
+      perdidos_qtd: Math.round(novos * 0.13), descartados_qtd: Math.round(novos * 0.04),
+    },
+    leads_por_dia: serie,
+    origem_trafego: [
+      { fonte: 'Tráfego pago', canal: 'JUROS ABUSIVO (ANDRIUS)', qtd: Math.round(novos * 0.46) },
+      { fonte: 'Tráfego pago', canal: 'CAMPANHA DE EMPRÉSTIMO', qtd: Math.round(novos * 0.18) },
+      { fonte: 'Orgânico', canal: 'LUIZA', qtd: Math.round(novos * 0.27) },
+      { fonte: 'Indicação', canal: 'Atendimento Principal', qtd: Math.round(novos * 0.09) },
+    ],
+    funil: [
+      { coluna: 'Lead novo', ordem: 0, resultado: 'neutro', qtd: 14, qtd_perda: 0, qtd_descarte: 0 },
+      { coluna: 'Em atendimento', ordem: 1, resultado: 'neutro', qtd: 19, qtd_perda: 0, qtd_descarte: 0 },
+      { coluna: 'Documentação', ordem: 2, resultado: 'neutro', qtd: 11, qtd_perda: 0, qtd_descarte: 0 },
+      { coluna: 'Qualificado', ordem: 3, resultado: 'neutro', qtd: 7, qtd_perda: 0, qtd_descarte: 0 },
+      { coluna: 'Fechado', ordem: 4, resultado: 'ganho', qtd: Math.max(1, Math.round(novos * 0.16)), qtd_perda: 0, qtd_descarte: 0 },
+      { coluna: 'Não elegível', ordem: 5, resultado: 'perdido', qtd: Math.round(novos * 0.16), qtd_perda: Math.round(novos * 0.11), qtd_descarte: Math.round(novos * 0.05) },
+    ],
+    atendentes: [
+      { nome: 'Juliana', conversas_atribuidas: Math.round(novos * 0.9), msgs_enviadas: Math.round(novos * 6.2), mediana_resposta_min: 8, ganhos: Math.max(1, Math.round(novos * 0.09)), perdidos: Math.round(novos * 0.05), descartados: Math.round(novos * 0.02) },
+      { nome: 'Matheus', conversas_atribuidas: Math.round(novos * 0.7), msgs_enviadas: Math.round(novos * 4.8), mediana_resposta_min: 11, ganhos: Math.max(1, Math.round(novos * 0.05)), perdidos: Math.round(novos * 0.04), descartados: Math.round(novos * 0.02) },
+      { nome: 'Henrique', conversas_atribuidas: Math.round(novos * 0.5), msgs_enviadas: Math.round(novos * 3.1), mediana_resposta_min: 15, ganhos: Math.max(1, Math.round(novos * 0.02)), perdidos: Math.round(novos * 0.02), descartados: Math.round(novos * 0.01) },
+    ],
+    picos_hora: Array.from({ length: 24 }, (_, h) => ({ hora: h, qtd: [0, 0, 0, 0, 0, 0, 1, 2, 6, 11, 14, 12, 9, 10, 16, 18, 13, 9, 6, 4, 2, 1, 0, 0][h] })),
+    motivos_perda: [
+      { motivo: 'sem_interesse', qtd: Math.round(novos * 0.06), grupo: 'perda' },
+      { motivo: 'nao_respondeu', qtd: Math.round(novos * 0.04), grupo: 'perda' },
+      { motivo: 'nao_elegivel', qtd: Math.round(novos * 0.05), grupo: 'descarte' },
+    ],
+    bancos: [
+      { banco: 'MERCANTIL', qtd: 9 }, { banco: 'AGIBANK', qtd: 7 }, { banco: 'BMG', qtd: 6 },
+      { banco: 'PAN', qtd: 4 }, { banco: 'BANRISUL', qtd: 3 },
+    ],
+  };
+}
+
+export function seedDashIa(): DashIa {
+  return {
+    sessoesAtivas: 12, aguardandoHumano: 3, handoffs: 2, pausadas: 21,
+    porEtapa: [
+      { etapa: 'qualificacao_inss', qtd: 6 }, { etapa: 'extratos', qtd: 4 },
+      { etapa: 'coleta_docs', qtd: 3 }, { etapa: 'triagem_govbr', qtd: 1 },
+    ],
+    msgsBot: 214, msgsHumano: 378, precisaHumanoAgora: 5,
+  };
+}

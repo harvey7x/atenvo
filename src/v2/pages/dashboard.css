@@ -152,3 +152,53 @@
 
 /* --- MODO LEVE: sem sombra pesada no tooltip (blur/grão já saem por token) --- */
 :root[data-perf="lite"] .v2 .db-tip { box-shadow: none; background: var(--base); }
+
+/* ============================================================
+   Rebuild 28/08 (pegada Aurora): seção da IA, avatar/medalha na
+   equipe e KPIs em cartões elevados com contador animado.
+   ============================================================ */
+/* KPIs mais presentes (mesma elevação dos cards do Kanban) */
+.v2 .db-kpi { box-shadow: 0 8px 22px rgba(2, 4, 10, .26), inset 0 1px 0 rgba(255, 255, 255, .05); }
+:root[data-tema="light"] .v2 .db-kpi { box-shadow: var(--sombra-1); }
+.v2 .db-kpi .val { font-size: 20px; }
+
+/* ---- A IA da casa ---- */
+.v2 .db-ia { display: flex; flex-direction: column; gap: 14px; }
+.v2 .db-ia-cards { display: flex; gap: 10px; flex-wrap: wrap; }
+.v2 .db-ia-card {
+  flex: 1; min-width: 148px; display: flex; align-items: center; gap: 8px;
+  background: rgba(var(--tint), .04); border: 1px solid rgba(var(--tint), .08);
+  border-radius: 11px; padding: 10px 13px;
+}
+.v2 .db-ia-card .dot { width: 7px; height: 7px; border-radius: 99px; flex-shrink: 0; }
+.v2 .db-ia-card .dot.ok { background: var(--verde); }
+.v2 .db-ia-card .dot.at { background: var(--ambar); }
+.v2 .db-ia-card .dot.er { background: var(--rubro); }
+.v2 .db-ia-card .dot.ne { background: var(--txt-3); }
+.v2 .db-ia-card b { font-size: 17px; font-weight: 700; letter-spacing: -.01em; }
+.v2 .db-ia-card .rot { font-size: 10.5px; color: var(--txt-3); line-height: 1.2; }
+.v2 .db-ia-split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 900px) { .v2 .db-ia-split { grid-template-columns: 1fr; } }
+.v2 .db-ia .tt2 { font-size: 10px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--txt-3); margin-bottom: 8px; }
+.v2 .db-ia-msgs .prop { height: 8px; border-radius: 99px; background: rgba(var(--tint), .1); overflow: hidden; }
+.v2 .db-ia-msgs .prop .bot { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, rgba(var(--azul-rgb, 76, 141, 255), .55), var(--azul, #4C8DFF)); }
+.v2 .db-ia-msgs .leg { display: flex; align-items: center; gap: 14px; margin-top: 8px; font-size: 10.5px; color: var(--txt-3); }
+.v2 .db-ia-msgs .leg b { color: var(--txt-2); margin-left: 3px; }
+.v2 .db-ia-msgs .leg .sw { display: inline-block; width: 8px; height: 8px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
+.v2 .db-ia-msgs .leg .sw.bot { background: var(--azul, #4C8DFF); }
+.v2 .db-ia-msgs .leg .sw.hum { background: rgba(var(--tint), .28); }
+.v2 .db-ia-msgs .leg .pct { margin-left: auto; font-weight: 600; color: var(--txt-2); }
+
+/* ---- equipe: avatar + destaque ---- */
+.v2 .db-tab td.nm { display: flex; align-items: center; gap: 8px; }
+.v2 .db-av {
+  width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0; font-size: 8.5px; font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center; color: var(--txt-2);
+  background: linear-gradient(150deg, #2B2E34, var(--surface)); box-shadow: inset 0 0 0 1px rgba(var(--tint), .16);
+}
+:root[data-tema="light"] .v2 .db-av { background: linear-gradient(150deg, #E8EAEE, #F6F7F9); }
+.v2 .db-top {
+  font-size: 8.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--azul, var(--txt-2)); background: rgba(var(--azul-rgb, 76, 141, 255), .12);
+  border: 1px solid rgba(var(--azul-rgb, 76, 141, 255), .32); border-radius: 5px; padding: 1px 6px;
+}
