@@ -13,6 +13,9 @@ import { slugify, randomSuffix } from '@/lib/slug';
 import { resolverContextoInicial } from '@/lib/resolverContexto';
 
 const CUR_KEY = 'atenvo-current-org';
+/* Fase 2.0: org ativa POR USUÁRIO (padrão chaveTema) — a chave global antiga
+   vira fallback de leitura (migração suave: quem já tinha seleção não perde). */
+const chaveOrg = (escopo?: string): string => (escopo ? `${CUR_KEY}:${escopo}` : CUR_KEY);
 const MOCK_NOORG_KEY = 'atenvo-mock-no-org'; // somente para exercitar o onboarding em modo mock
 
 /** Papel do banco (user_role) -> papel do frontend (OrgRole). supervisor === gestor na UI. */
@@ -80,9 +83,21 @@ export function OrgProvider({ children }: { children: ReactNode }) {
   });
 
   const [currentId, setCurrentId] = useState<string>(() => {
-    try { const s = localStorage.getItem(CUR_KEY); if (s) return s; } catch { /* ignore */ }
+    try {
+      const porUsuario = user?.id ? localStorage.getItem(chaveOrg(user.id)) : null;
+      const s = porUsuario ?? localStorage.getItem(CUR_KEY);
+      if (s) return s;
+    } catch { /* ignore */ }
     return '';
   });
+  // auth resolve assíncrono: quando o usuário chega, relê a preferência DELE
+  useEffect(() => {
+    if (!user?.id) return;
+    try {
+      const s = localStorage.getItem(chaveOrg(user.id));
+      if (s) setCurrentId(s);
+    } catch { /* ignore */ }
+  }, [user?.id]);
   // Quando a lista chega/atualiza, garante uma selecao valida
   useEffect(() => {
     if (!orgs.length) return;
@@ -92,7 +107,7 @@ export function OrgProvider({ children }: { children: ReactNode }) {
   const setCurrentOrg = (id: string) => {
     if (!orgs.some((o) => o.id === id)) return;
     setCurrentId(id);
-    try { localStorage.setItem(CUR_KEY, id); } catch { /* ignore */ }
+    try { localStorage.setItem(chaveOrg(user?.id), id); } catch { /* ignore */ }
   };
 
   const loading = realEnabled && isLoading;

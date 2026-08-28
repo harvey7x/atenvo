@@ -110,7 +110,7 @@ const NOTIF_DEMO: DadosNotificacao = {
 /** Shell autenticado v2: sidebar em overlay (64→242 no hover), topbar e palco. */
 export default function AppShellV2() {
   const { user, signOut } = useAuth();
-  const { currentOrg } = useOrg();
+  const { currentOrg, orgs, setCurrentOrg } = useOrg();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -251,6 +251,24 @@ export default function AppShellV2() {
   const org = currentOrg?.name ?? 'Atenvo';
   const admin = !currentOrg || currentOrg.role === 'admin';
 
+  // Fase 2.0: troca de organização — só EXISTE para quem tem mais de um vínculo
+  // (uma org só = UI idêntica à de sempre, o .tenant segue decorativo)
+  const multiOrg = orgs.length > 1;
+  const [menuOrg, setMenuOrg] = useState(false);
+  const [orgMenuPos, setOrgMenuPos] = useState({ top: 0, left: 0 });
+  const tenantRef = useRef<HTMLButtonElement>(null);
+  const abrirMenuOrg = useCallback(() => {
+    const r = tenantRef.current?.getBoundingClientRect();
+    if (r) setOrgMenuPos({ top: r.bottom + 6, left: r.left });
+    // sempre TRUE (fechar é papel do backdrop/seleção): toggle com updater
+    // (v => !v) morre no StrictMode dev, que invoca o updater 2× — !!v = v
+    setMenuOrg(true);
+  }, []);
+  const trocarOrg = useCallback((id: string) => {
+    setCurrentOrg(id);
+    setMenuOrg(false);
+  }, [setCurrentOrg]);
+
   return (
     <div className="v2 app-v2">
       <div className="luz" />
@@ -261,13 +279,40 @@ export default function AppShellV2() {
             <LogoAtenvo className="marca" />
             <span className="word lab">atenvo</span>
           </div>
-          <div className="tenant" title={org}>
-            <b>{org}</b>
-            {/* currentColor (auditoria): o hex #9BA1AB era o --txt-2 do dark cravado — sumia a hierarquia no light */}
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: 'var(--txt-2)' }} aria-hidden>
-              <path d="M7 15l5 5 5-5M7 9l5-5 5 5" />
-            </svg>
-          </div>
+          {multiOrg ? (
+            <button ref={tenantRef} type="button" className="tenant trocavel" title={`Organização: ${org} — clique para trocar`}
+              aria-haspopup="menu" aria-expanded={menuOrg} onClick={abrirMenuOrg}>
+              <b>{org}</b>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: 'var(--txt-2)' }} aria-hidden>
+                <path d="M7 15l5 5 5-5M7 9l5-5 5 5" />
+              </svg>
+            </button>
+          ) : (
+            <div className="tenant" title={org}>
+              <b>{org}</b>
+              {/* currentColor (auditoria): o hex #9BA1AB era o --txt-2 do dark cravado — sumia a hierarquia no light */}
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: 'var(--txt-2)' }} aria-hidden>
+                <path d="M7 15l5 5 5-5M7 9l5-5 5 5" />
+              </svg>
+            </div>
+          )}
+          {menuOrg && createPortal(
+            <>
+              <div className="um-backdrop" onClick={() => setMenuOrg(false)} aria-hidden />
+              <div className="usuario-menu org-troca" role="menu" aria-label="Trocar organização" style={{ top: orgMenuPos.top, left: orgMenuPos.left }}>
+                <div className="um-head"><div className="um-cargo">Organização</div></div>
+                {orgs.map((o) => (
+                  <button key={o.id} type="button" role="menuitemradio" aria-checked={o.id === currentOrg?.id}
+                    className={o.id === currentOrg?.id ? 'um-item om-item on' : 'um-item om-item'}
+                    onClick={() => trocarOrg(o.id)}>
+                    <span className="om-dot" aria-hidden />
+                    <span className="om-nome">{o.name}</span>
+                  </button>
+                ))}
+              </div>
+            </>,
+            raizMenu,
+          )}
           <nav aria-label="Navegação principal">
             {GRUPOS.map((g) => {
               const itens = g.itens.filter((i) => admin || !i.admin);

@@ -72,7 +72,7 @@ export function useCobranca(id: string | null) {
     queryFn: async (): Promise<CobrancaDetalhe | null> => {
       const { data, error } = await supabase!.from('cobrancas')
         .select(SEL_COB + ', cobranca_pagamentos(*), cobranca_eventos(id, tipo, descricao, dados, criado_em, usuarios(nome))')
-        .eq('id', id!).maybeSingle();
+        .eq('id', id!).eq('organizacao_id', org).maybeSingle(); // Fase 2.0: escopo explícito
       if (error) throw new Error(error.message);
       if (!data) return null;
       const r = data as unknown as Record<string, unknown>;

@@ -491,12 +491,16 @@ export function useKanban() {
 export interface OppEvento { id: string; evento: string; colunaAnteriorId: string | null; colunaNovaId: string | null; motivoPerda: string | null; motivoReabertura: string | null; respNoFechamentoId: string | null; respNoFechamentoNome: string | null; executadoPor: string | null; executadoPorNome: string | null; criadoEm: string; }
 /** Histórico comercial (ganho/perdido/reaberto) de uma oportunidade — legível, sem IDs crus na UI. */
 export function useOportunidadeEventos(oppId: string | null) {
+  const { currentOrg } = useOrg();
+  const org = currentOrg.id;
   return useQuery({
-    queryKey: ['opp-eventos', oppId], enabled: KANBAN_REAL && !!oppId, staleTime: 30_000,
+    queryKey: ['opp-eventos', org, oppId], enabled: KANBAN_REAL && !!oppId, staleTime: 30_000,
     queryFn: async (): Promise<OppEvento[]> => {
       const { data, error } = await supabase!.from('oportunidade_eventos')
         .select('id, evento, coluna_anterior_id, coluna_nova_id, motivo_perda, motivo_reabertura, responsavel_no_fechamento_id, executado_por, criado_em, executor:usuarios!oportunidade_eventos_executado_por_fkey(nome), resp_fech:usuarios!oportunidade_eventos_resp_fech_fkey(nome)')
-        .eq('oportunidade_id', oppId!).order('criado_em', { ascending: false });
+        .eq('oportunidade_id', oppId!)
+        .eq('organizacao_id', org) // Fase 2.0: escopo explícito
+        .order('criado_em', { ascending: false });
       if (error) throw new Error(error.message);
       type Row = { id: string; evento: string; coluna_anterior_id: string | null; coluna_nova_id: string | null; motivo_perda: string | null; motivo_reabertura: string | null; responsavel_no_fechamento_id: string | null; executado_por: string | null; criado_em: string; executor: { nome: string } | { nome: string }[] | null; resp_fech: { nome: string } | { nome: string }[] | null };
       return ((data as unknown as Row[]) ?? []).map((r) => ({ id: r.id, evento: r.evento, colunaAnteriorId: r.coluna_anterior_id, colunaNovaId: r.coluna_nova_id, motivoPerda: r.motivo_perda, motivoReabertura: r.motivo_reabertura, respNoFechamentoId: r.responsavel_no_fechamento_id, respNoFechamentoNome: (Array.isArray(r.resp_fech) ? r.resp_fech[0]?.nome : r.resp_fech?.nome) ?? null, executadoPor: r.executado_por, executadoPorNome: (Array.isArray(r.executor) ? r.executor[0]?.nome : r.executor?.nome) ?? null, criadoEm: r.criado_em }));

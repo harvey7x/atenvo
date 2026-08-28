@@ -548,3 +548,20 @@
 @keyframes au-sobe { from { opacity: 0; transform: translate(-50%, 10px); } }
 @keyframes au-pulsa { 50% { opacity: .45; } }
 :root[data-perf="lite"] .v2 .au-dot { animation: none; }
+
+/* ============================================================
+   TROCA DE ORGANIZAÇÃO (Fase 2.0) — só existe para quem tem mais
+   de um vínculo; uma org = .tenant decorativo idêntico ao de sempre.
+   Menu herda a pele do .usuario-menu; seleção = texto + dot no
+   acento (zero emoji, zero badge).
+   ============================================================ */
+.v2 button.tenant.trocavel { font-family: var(--fonte); text-align: left; }
+.v2 .org-troca { min-width: 208px; } /* org-menu colidiria com o display:none do OrgSwitcher v1 em global.css */
+.v2 .om-item { display: flex; align-items: center; gap: 9px; }
+.v2 .om-item .om-dot {
+  width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+  background: rgba(var(--tint), .18);
+}
+.v2 .om-item.on { color: var(--txt); font-weight: 600; }
+.v2 .om-item.on .om-dot { background: var(--azul, var(--txt)); box-shadow: 0 0 8px rgba(var(--azul-rgb, 76, 141, 255), calc(.5 * var(--fx))); }
+.v2 .om-nome { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

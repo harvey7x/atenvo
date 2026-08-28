@@ -382,7 +382,7 @@ export function useWaConversations() {
         if (!convId) return;
         const [m] = mapMensagens([novo as unknown as DbMsg]);
         if (!m) return;                                     // filtrada (sem conteúdo e sem mídia)
-        qc.setQueryData<WaMessage[]>(['wa-msgs', convId], (old) => (old ? upsertHistorico(old, m) : undefined));
+        qc.setQueryData<WaMessage[]>(['wa-msgs', orgId, convId], (old) => (old ? upsertHistorico(old, m) : undefined));
         qc.setQueryData<WaContact[]>(['wa-conversas', orgId], (old) => (old ? patchListaMensagem(old, convId, m, evt === 'INSERT') : undefined));
       } catch { /* patch é atalho best-effort; o refetch logo atrás garante o estado certo */ }
     };
@@ -427,8 +427,10 @@ export function useWaConversations() {
  *  mídia (anexo/pendente), status/erro para "Ver erro" e retry, id_externo/respondida_a_id/quoted
  *  para a resposta citada e tsISO para o separador de dia continuam todos presentes. */
 export function useWaMensagens(conversaId: string | null | undefined) {
+  const { currentOrg } = useOrg();
+  const orgId = currentOrg.id;
   return useQuery({
-    queryKey: ['wa-msgs', conversaId ?? ''],
+    queryKey: ['wa-msgs', orgId, conversaId ?? ''],
     enabled: WA_REAL && !!conversaId,
     // BACKSTOP: o frescor vem do realtime (invalidação em useWaConversations), mas a conversa
     // ABERTA não pode congelar se o realtime cair — a lista tem o backstop de 30s e devolve o
@@ -441,6 +443,7 @@ export function useWaMensagens(conversaId: string | null | undefined) {
         .from('mensagens')
         .select('id, direcao, conteudo, tipo, enviada_em, recebida_em, criado_em, origem, status, erro_envio, id_externo, respondida_a_id, metadados')
         .eq('conversa_id', conversaId!)
+        .eq('organizacao_id', orgId) // Fase 2.0: escopo explícito — RLS vira cinto
         .order('criado_em', { ascending: true });
       if (error) throw new Error(error.message);
       return mapMensagens((data as unknown as DbMsg[]) ?? []);
@@ -474,20 +477,36 @@ export function useIaToggle() {
   });
 }
 
+/** Marca curta da org no carimbo de assinatura (organizacoes.assinatura_marca; ex.: "CAF").
+ *  A assinatura é OBRIGATÓRIA e aplicada no BACKEND — o front só espelha (bolha otimista/preview). */
+export function useAssinaturaMarca() {
+  const { currentOrg } = useOrg();
+  return useQuery({
+    queryKey: ['assinatura-marca', currentOrg.id],
+    enabled: WA_REAL,
+    staleTime: 60 * 60_000, // marca praticamente não muda
+    queryFn: async (): Promise<string | null> => {
+      const { data, error } = await supabase!.from('organizacoes').select('assinatura_marca').eq('id', currentOrg.id).maybeSingle();
+      if (error) throw new Error(error.message);
+      return (data?.assinatura_marca as string | null) ?? null;
+    },
+  });
+}
+
 export function useSendWaMessage() {
   const { currentOrg } = useOrg();
   const qc = useQueryClient();
   return useMutation({
-    // #4 assinatura aplicada no backend (evolution-send): passamos só o nome resolvido.
+    // Assinatura OBRIGATÓRIA aplicada no backend (evolution-send), resolvida lá pelo autor do
+    // JWT — o payload NÃO leva nome de assinatura (front velho em cache não fura o padrão).
     // canalId = canal escolhido em "Responder por". O backend nunca confia em org vinda do cliente.
     // Retorna o id INTERNO da mensagem (para confirmação real do provedor). NÃO é garantia de entrega.
-    mutationFn: async (input: { conversaId: string; text?: string; canalId?: string | null; assinaturaNome?: string; retryMensagemId?: string; midiaPath?: string; midiaTipo?: string; midiaMime?: string; midiaNome?: string; midiaTamanho?: number; audioDiag?: Record<string, unknown>; origemAudio?: string; replyTo?: { id: string; idExt?: string; fromMe?: boolean; preview?: { remetente?: string; tipo?: string; texto?: string } }; contato?: { nome: string; telefone: string } }) => {
+    mutationFn: async (input: { conversaId: string; text?: string; canalId?: string | null; retryMensagemId?: string; midiaPath?: string; midiaTipo?: string; midiaMime?: string; midiaNome?: string; midiaTamanho?: number; audioDiag?: Record<string, unknown>; origemAudio?: string; replyTo?: { id: string; idExt?: string; fromMe?: boolean; preview?: { remetente?: string; tipo?: string; texto?: string } }; contato?: { nome: string; telefone: string } }) => {
       const r = await invoke<{ ok: boolean; mensagem?: { id?: string } }>('evolution-send', {
         conversa_id: input.conversaId,
         ...(input.contato ? { contato_nome: input.contato.nome, contato_telefone: input.contato.telefone } : {}),
         ...(input.text ? { text: input.text } : {}),
         ...(input.canalId ? { canal_id: input.canalId } : {}),
-        ...(input.assinaturaNome ? { assinatura_nome: input.assinaturaNome } : {}),
         ...(input.retryMensagemId ? { retry_mensagem_id: input.retryMensagemId } : {}),
         ...(input.midiaPath ? { midia_path: input.midiaPath, midia_tipo: input.midiaTipo, midia_mime: input.midiaMime, midia_nome: input.midiaNome, midia_tamanho: input.midiaTamanho } : {}),
         ...(input.audioDiag ? { audio_diag: input.audioDiag } : {}),
@@ -529,13 +548,17 @@ export function useAtribuirAtendimento() {
 /** Colaboração Etapa 1: timeline de atividade da conversa (assumido/transferido/devolvido/…). Leitura RLS. */
 export interface WaAtividade { id: string; tipo: string; usuario: string | null; motivo: string | null; em: string; }
 export function useWaAtividades(conversaId: string | null) {
+  const { currentOrg } = useOrg();
+  const org = currentOrg.id;
   return useQuery({
-    queryKey: ['wa-atividades', conversaId],
+    queryKey: ['wa-atividades', org, conversaId],
     enabled: WA_REAL && !!conversaId,
     queryFn: async (): Promise<WaAtividade[]> => {
       const { data, error } = await supabase!.from('conversa_atividades')
         .select('id, tipo, motivo, criado_em, usuario:usuarios(nome)')
-        .eq('conversa_id', conversaId as string).order('criado_em', { ascending: false }).limit(50);
+        .eq('conversa_id', conversaId as string)
+        .eq('organizacao_id', org) // Fase 2.0: escopo explícito
+        .order('criado_em', { ascending: false }).limit(50);
       if (error) throw new Error(error.message);
       type Row = { id: string; tipo: string; motivo: string | null; criado_em: string; usuario: { nome: string } | { nome: string }[] | null };
       return ((data as Row[]) ?? []).map((r) => ({
@@ -954,8 +977,10 @@ export interface MensagemAgendada {
 
 /** Lista os agendamentos de uma conversa (leitura por RLS). */
 export function useMensagensAgendadas(conversaId: string | null | undefined) {
+  const { currentOrg } = useOrg();
+  const org = currentOrg.id;
   return useQuery({
-    queryKey: ['mensagens-agendadas', conversaId],
+    queryKey: ['mensagens-agendadas', org, conversaId],
     enabled: WA_REAL && !!conversaId,
     staleTime: 20_000,
     queryFn: async (): Promise<MensagemAgendada[]> => {
@@ -963,6 +988,7 @@ export function useMensagensAgendadas(conversaId: string | null | undefined) {
         .from('mensagens_agendadas')
         .select('id, conversa_id, canal_id, nome_canal_snapshot, tipo, texto, nome_arquivo, executar_em, status, tentativas, ultimo_erro, motivo_bloqueio, criado_por, criado_em, sequencia_id, ordem_na_sequencia')
         .eq('conversa_id', conversaId!)
+        .eq('organizacao_id', org) // Fase 2.0: escopo explícito
         .order('executar_em', { ascending: true });
       if (error) throw new Error(error.message);
       type Row = { id: string; conversa_id: string; canal_id: string; nome_canal_snapshot: string | null; tipo: string; texto: string | null; nome_arquivo: string | null; executar_em: string; status: string; tentativas: number; ultimo_erro: string | null; motivo_bloqueio: string | null; criado_por: string | null; criado_em: string; sequencia_id: string | null; ordem_na_sequencia: number | null };
