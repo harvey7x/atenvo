@@ -10,6 +10,8 @@ import { useCobrancas } from '@/data/cobrancas';
 import { useOportunidadesDoContato, type OppDoContato } from '@/data/kanban';
 import { useAtivacaoDoContato, useBloquear, useDesbloquear } from '@/data/relacionamento';
 import { useEtiquetas, useOrgUsuarios } from '@/data/atendimento';
+import { corDaEtiqueta } from '@/types/atendimento';
+import { initials } from '@/lib/avatar';
 import { formatarNumero } from '@/data/maturacao';
 import { useBloqueiosOrg } from '../hooks/bloqueiosOrg';
 import { tempoCelula, tempoRelativo } from '../lib/tempo';
@@ -221,21 +223,44 @@ export default function ContatosV2() {
   const clientes = contatos.filter((c) => c.st === 'Cliente').length;
   const carregando = contatosQ.isLoading;
 
+  // catálogo de etiquetas p/ cor dos chips na tabela (mesma língua do Kanban/WhatsApp)
+  const etiquetasCat = useEtiquetas().data ?? [];
   const COLUNAS: Coluna<ContatoRow>[] = [
     {
       chave: 'nome', titulo: 'Nome', render: (c) => (
-        <div className="cnt-nome">
-          <span className="nm">
-            {c.nome}
-            {bloqueados.has(c.id) && <BadgeStatus tom="erro">Não incomodar</BadgeStatus>}
+        <div className="cnt-nome com-av">
+          <span className="cnt-av" aria-hidden>{initials(c.nome)}</span>
+          <span className="cnt-nome-tx">
+            <span className="nm">
+              {c.nome}
+              {bloqueados.has(c.id) && <BadgeStatus tom="erro">Não incomodar</BadgeStatus>}
+            </span>
+            {c.email && <span className="em">{c.email}</span>}
           </span>
-          {c.email && <span className="em">{c.email}</span>}
         </div>
       ),
     },
-    { chave: 'tel', titulo: 'Telefone', render: (c) => <span className="num">{fmtTel(c.tel)}</span> },
+    { chave: 'tel', titulo: 'Telefone', render: (c) => <span className="num" style={{ whiteSpace: 'nowrap' }}>{fmtTel(c.tel)}</span> },
+    {
+      chave: 'tags', titulo: 'Etiquetas', render: (c) => c.tags.length === 0
+        ? <span style={{ color: 'var(--txt-3)' }}>—</span>
+        : (
+          <span className="cnt-etqs" title={c.tags.join(' · ')}>
+            {c.tags.slice(0, 2).map((t) => {
+              const cor = corDaEtiqueta(t, etiquetasCat);
+              return <em key={t} className="cnt-etq" style={{ color: cor, background: cor + '22', borderColor: cor + '4D' }}>{t}</em>;
+            })}
+            {c.tags.length > 2 && <em className="cnt-etq mais">+{c.tags.length - 2}</em>}
+          </span>
+        ),
+    },
     { chave: 'st', titulo: 'Status', render: (c) => <BadgeStatus tom={ST_TOM[c.st] ?? 'neutro'}>{c.st}</BadgeStatus> },
-    { chave: 'resp', titulo: 'Consultor', render: (c) => c.resp === '—' ? <span style={{ color: 'var(--txt-3)' }}>—</span> : c.resp },
+    { chave: 'org', titulo: 'Origem', render: (c) => c.org === '—' ? <span style={{ color: 'var(--txt-3)' }}>—</span> : <span className="cnt-org">{c.org}</span> },
+    {
+      chave: 'resp', titulo: 'Consultor', render: (c) => c.resp === '—' || !c.resp
+        ? <span style={{ color: 'var(--txt-3)' }}>—</span>
+        : <span className="cnt-resp"><span className="cnt-av mini" aria-hidden>{initials(c.resp)}</span>{c.resp}</span>,
+    },
     {
       chave: 'ult', titulo: 'Último contato', render: (c) => {
         if (!c.atualizadoEm) return <span className="num" style={{ color: 'var(--txt-3)' }}>{c.ult}</span>;
@@ -250,6 +275,14 @@ export default function ContatosV2() {
           : s === 'em_dia' ? <BadgeStatus tom="ok">Em dia</BadgeStatus>
           : <span style={{ color: 'var(--txt-3)' }}>—</span>;
       },
+    },
+    {
+      chave: 'acoes', titulo: '', render: (c) => (
+        <button type="button" className="cnt-wa" title="Abrir a conversa no WhatsApp" aria-label={'Abrir a conversa de ' + c.nome + ' no WhatsApp'}
+          onClick={(e) => { e.stopPropagation(); void abrirConversa(c); }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M21 12a8 8 0 0 1-8 8H4l2.2-2.6A8 8 0 1 1 21 12z" /></svg>
+        </button>
+      ),
     },
   ];
 

@@ -60,7 +60,7 @@ const GRUPOS: { rotulo: string; itens: ItemNav[] }[] = [
       { slug: 'scripts', rotulo: 'Scripts' },
       // Simulador fora do menu (pedido do dono 27/08) — rota segue viva por URL
       { slug: 'cobrancas', rotulo: 'Cobranças' },
-      { slug: 'relatorios', rotulo: 'Relatórios' },
+      // Relatórios fora do menu (pedido do dono 27/08) — rota segue viva por URL
     ],
   },
   {
