@@ -489,6 +489,12 @@ export default function KanbanV2() {
     return [...m.entries()].sort((a, b) => b[1] - a[1]);
   }, [abertos, fichaResumoMap]); // eslint-disable-line react-hooks/exhaustive-deps
   const limparFiltros = () => { setFiltroBenef(new Set()); setFiltroBanco(new Set()); setFiltroDataDe(''); setFiltroDataAte(''); setFiltroResp(null); setFiltroOrigem(null); };
+  // distribuição por etapa (KPI "Funil"): barra empilhada nas cores das colunas — complementa o "N no funil"
+  const etapasDist = useMemo(() => colunas
+    .filter((c) => (c.resultado ?? 'neutro') === 'neutro')
+    .map((c) => ({ id: c.id, nome: c.nome, cor: c.cor, n: ativosPorColuna.get(c.id) ?? 0 })), [colunas, ativosPorColuna]);
+  const distTotal = Math.max(1, etapasDist.reduce((s, d) => s + d.n, 0));
+  const distMaior = etapasDist.reduce<typeof etapasDist[number] | null>((mx, d) => (d.n > (mx?.n ?? 0) ? d : mx), null);
 
   /* EXPORTAÇÃO CSV (dono 27/08): baixa exatamente o RECORTE atual — busca + canal +
      atendente + filtros avançados, o mesmo conjunto que o board mostra. CSV com BOM e
@@ -931,6 +937,23 @@ export default function KanbanV2() {
               <div className="lab">Leads ativos</div><div className="val num">{abertosNoRecorte.length}</div>
               <div className="meta">no funil</div>
             </div>
+            {/* distribuição por ETAPA — a informação que faltava do lado do total (dono 27/08) */}
+            {etapasDist.some((d) => d.n > 0) && (
+              <div className="kb-kpi dist" title={'Distribuição por etapa: ' + etapasDist.map((d) => `${d.nome} ${d.n}`).join(' · ')}>
+                <div className="lab">Distribuição</div>
+                <div className="kb-dist" aria-hidden>
+                  {etapasDist.filter((d) => d.n > 0).map((d) => (
+                    <span key={d.id} style={{ width: `${(d.n / distTotal) * 100}%`, background: d.cor }} />
+                  ))}
+                </div>
+                <div className="kb-dist-leg">
+                  {etapasDist.filter((d) => d.n > 0).slice(0, 3).map((d) => (
+                    <span key={d.id} className="li"><i style={{ background: d.cor }} />{d.nome} <b className="num">{d.n}</b></span>
+                  ))}
+                  {distMaior && etapasDist.filter((d) => d.n > 0).length > 3 && <span className="li mais">…</span>}
+                </div>
+              </div>
+            )}
             <button type="button" className={'kb-kpi crit acao' + (foco ? ' on' : '')} aria-pressed={foco}
               title={gargaloTop ? `Etapa mais travada: ${gargaloTop.col.nome} (${gargaloTop.n} parados). Clique para focar só no que exige ação agora.` : 'Leads sem trocar de coluna há mais de 7 dias. Clique para focar só no que exige ação agora.'}
               onClick={() => setFoco((f) => !f)}>
@@ -1198,7 +1221,11 @@ export default function KanbanV2() {
         <div className="kbf">
           {benefOpcoes.length > 0 && (
             <div className="kbf-sec">
-              <div className="kbf-t">Tipo de benefício</div>
+              <div className="kbf-cab">
+                <span className="ic"><Ic><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><rect x="3" y="7" width="18" height="13" rx="2" /><path d="M3 12h18" /></Ic></span>
+                <span className="tt">Tipo de benefício</span>
+                {filtroBenef.size > 0 && <span className="sel num">{filtroBenef.size}</span>}
+              </div>
               <div className="kbf-chips">
                 {benefOpcoes.map(([b, n]) => (
                   <button key={b} type="button" className={'kb-fchip' + (filtroBenef.has(b) ? ' on' : '')}
@@ -1210,7 +1237,11 @@ export default function KanbanV2() {
             </div>
           )}
           <div className="kbf-sec">
-            <div className="kbf-t">Banco (da ficha)</div>
+            <div className="kbf-cab">
+              <span className="ic"><Ic><path d="M3 10l9-6 9 6" /><path d="M5 10v8M9.5 10v8M14.5 10v8M19 10v8" /><path d="M3 20h18" /></Ic></span>
+              <span className="tt">Banco (da ficha)</span>
+              {filtroBanco.size > 0 && <span className="sel num">{filtroBanco.size}</span>}
+            </div>
             {bancoOpcoes.length === 0 ? <div className="kbf-vazio">Nenhuma ficha com banco marcado neste funil.</div> : (
               <div className="kbf-chips">
                 {bancoOpcoes.map(([b, n]) => (
@@ -1223,7 +1254,11 @@ export default function KanbanV2() {
             )}
           </div>
           <div className="kbf-sec">
-            <div className="kbf-t">Atendente</div>
+            <div className="kbf-cab">
+              <span className="ic"><Ic><circle cx="12" cy="8" r="3.5" /><path d="M5 20a7 7 0 0 1 14 0" /></Ic></span>
+              <span className="tt">Atendente</span>
+              {filtroResp && <span className="sel num">1</span>}
+            </div>
             <div className="kbf-chips">
               <button type="button" className={'kb-fchip' + (!filtroResp ? ' on' : '')} onClick={() => setFiltroResp(null)}>Todos</button>
               {cargaPorResp.map((c) => (
@@ -1236,7 +1271,11 @@ export default function KanbanV2() {
           </div>
           {origens.length > 1 && (
             <div className="kbf-sec">
-              <div className="kbf-t">Canal de origem</div>
+              <div className="kbf-cab">
+                <span className="ic"><Ic><path d="M22 2 11 13" /><path d="M22 2 15 22l-4-9-9-4z" /></Ic></span>
+                <span className="tt">Canal de origem</span>
+                {filtroOrigem && <span className="sel num">1</span>}
+              </div>
               <div className="kbf-chips">
                 <button type="button" className={'kb-fchip' + (!filtroOrigem ? ' on' : '')} onClick={() => setFiltroOrigem(null)}>Todas</button>
                 {origens.map((o) => (
@@ -1248,13 +1287,17 @@ export default function KanbanV2() {
             </div>
           )}
           <div className="kbf-sec">
-            <div className="kbf-t">Entrada no funil</div>
+            <div className="kbf-cab">
+              <span className="ic"><Ic><rect x="4" y="6" width="16" height="14" rx="2" /><path d="M4 10h16M8 4v4M16 4v4" /></Ic></span>
+              <span className="tt">Entrada no funil</span>
+              {(filtroDataDe || filtroDataAte) && <span className="sel num">1</span>}
+            </div>
             <div className="kbf-datas">
               <label>De <input type="date" className="inp" value={filtroDataDe} onChange={(e) => setFiltroDataDe(e.target.value)} /></label>
               <label>Até <input type="date" className="inp" value={filtroDataAte} onChange={(e) => setFiltroDataAte(e.target.value)} /></label>
             </div>
           </div>
-          <div className="kbf-resumo">{leadsVisiveis.length} lead(s) no recorte atual — o board e a exportação seguem estes filtros.</div>
+          <div className="kbf-resumo"><b>{leadsVisiveis.length} lead(s)</b> no recorte atual — o board e a exportação seguem estes filtros.</div>
         </div>
       </ModalV2>
 
@@ -1459,11 +1502,16 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, fichaInfo, optout, mo
   const metaPartes = [l.instituicao].filter(Boolean) as string[];
   const revN = fichaInfo?.revBancos.length ?? 0;
   const metaTitle = metaPartes.join(' · ');
-  // progresso HONESTO no funil: posição da coluna entre as neutras (ganho = cheio verde; perdido some)
-  const neutras = colunas.filter((c) => (c.resultado ?? 'neutro') === 'neutro');
-  const idxNeutra = neutras.findIndex((c) => c.id === l.colunaId);
-  const mostraProg = l.status === 'ganho' || (l.status === 'em_andamento' && idxNeutra >= 0 && neutras.length > 1);
-  const progPct = l.status === 'ganho' ? 100 : ((idxNeutra + 1) / Math.max(neutras.length, 1)) * 100;
+  // progresso do funil DO JEITO DO DONO (27/08): TODAS as etapas contam menos Perdido
+  // (Lead novo, Qualificado, Documentação, Assinar, Fechado = 5). Entrada = 0/5; cada
+  // avanço de coluna sobe 1; chegou no Fechado/ganho = 5/5 cheio (verde).
+  const etapasFunil = colunas.filter((c) => (c.resultado ?? 'neutro') !== 'perdido');
+  const nEtapas = etapasFunil.length;
+  const idxEtapa = etapasFunil.findIndex((c) => c.id === l.colunaId);
+  const noGanho = l.status === 'ganho' || (colAtual ? (colAtual.resultado ?? 'neutro') === 'ganho' : false);
+  const mostraProg = l.status !== 'perdido' && nEtapas > 1 && (noGanho || idxEtapa >= 0);
+  const progVal = noGanho ? nEtapas : Math.max(0, idxEtapa);
+  const progPct = (progVal / Math.max(nEtapas, 1)) * 100;
   // v3 F2 — PRÓXIMO PASSO: 1 badge que diz o que FAZER (não só o que é). "Sem responsável" já vive
   // em âmbar na linha do atendente; a estagnação, no "parado Xd" ao lado — o badge não os repete.
   const badge = optout ? { cls: 'blk', txt: 'Não incomodar' }
@@ -1529,11 +1577,11 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, fichaInfo, optout, mo
       {/* RESERVADO — estado do BOT no card (dono 27/08): quando a opção nascer no bot,
           entra aqui (fonte provável: ia_sessoes da conversa). */}
 
-      {/* L5 PROGRESSO honesto do funil (etapa X de N) */}
+      {/* L5 PROGRESSO do funil: avançou X de N etapas (0/N na entrada; N/N no Fechado) */}
       {mostraProg && (
-        <div className="kc-prog" title={l.status === 'ganho' ? 'Fechado como ganho' : `Etapa ${idxNeutra + 1} de ${neutras.length} (${colAtual?.nome ?? ''})`}>
+        <div className="kc-prog" title={noGanho ? `Fechado — completou as ${nEtapas} etapas` : `Avançou ${progVal} de ${nEtapas} etapas · está em ${colAtual?.nome ?? ''}`}>
           <span className="trilho"><span className="fill" style={{ width: progPct + '%' }} /></span>
-          <span className="frac num">{l.status === 'ganho' ? '✓' : `${idxNeutra + 1}/${neutras.length}`}</span>
+          <span className="frac num">{progVal}/{nEtapas}</span>
         </div>
       )}
 

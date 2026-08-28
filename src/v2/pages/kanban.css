@@ -475,16 +475,37 @@
 /* sufixo de lead sem nome (título = telefone formatado) */
 .v2 .kc-semnome { font-style: normal; font-weight: 400; font-size: 10px; color: var(--txt-3); margin-left: 5px; }
 
-/* ---- FILTRO COMPLETO do board (painel) + exportação ---- */
-.v2 .kbf { display: flex; flex-direction: column; gap: 14px; }
-.v2 .kbf-sec .kbf-t { font-size: 10.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--txt-3); margin-bottom: 7px; }
-.v2 .kbf-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+/* ---- FILTRO COMPLETO do board (painel PREMIUM) + exportação ----
+   Cada faceta é um CARTÃO com cabeçalho (ícone + título + selecionados);
+   chips maiores que os do board; resumo do recorte fechando. */
+.v2 .kbf { display: flex; flex-direction: column; gap: 10px; }
+.v2 .kbf-sec {
+  background: rgba(var(--tint), .03); border: 1px solid rgba(var(--tint), .07);
+  border-radius: 12px; padding: 11px 13px 12px;
+}
+.v2 .kbf-cab { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; }
+.v2 .kbf-cab .ic { display: inline-flex; width: 22px; height: 22px; align-items: center; justify-content: center; border-radius: 7px; background: rgba(var(--tint), .07); border: 1px solid rgba(var(--tint), .1); color: var(--txt-2); flex-shrink: 0; }
+.v2 .kbf-cab .ic svg { width: 12px; height: 12px; }
+.v2 .kbf-cab .tt { font-size: 11px; font-weight: 650; letter-spacing: .05em; text-transform: uppercase; color: var(--txt-2); }
+.v2 .kbf-cab .sel { margin-left: auto; font-size: 10px; font-weight: 700; color: var(--azul, var(--txt)); background: rgba(var(--azul-rgb), .14); border: 1px solid rgba(var(--azul-rgb), .35); border-radius: 99px; padding: 0 7px; }
+.v2 .kbf-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.v2 .kbf .kb-fchip { font-size: 11px; padding: 4.5px 11px; border-radius: 8px; }
 .v2 .kbf-vazio { font-size: 11.5px; color: var(--txt-3); }
 .v2 .kbf-datas { display: flex; gap: 10px; }
-.v2 .kbf-datas label { flex: 1; display: flex; flex-direction: column; gap: 5px; font-size: 11px; color: var(--txt-2); }
+.v2 .kbf-datas label { flex: 1; display: flex; flex-direction: column; gap: 5px; font-size: 10.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--txt-3); }
 .v2 .kbf-datas .inp { color-scheme: dark; }
 :root[data-tema="light"] .v2 .kbf-datas .inp { color-scheme: light; }
-.v2 .kbf-resumo { font-size: 11px; color: var(--txt-3); border-top: 1px solid var(--linha); padding-top: 10px; }
+.v2 .kbf-resumo { font-size: 11.5px; color: var(--txt-2); background: rgba(var(--azul-rgb), .06); border: 1px solid rgba(var(--azul-rgb), .18); border-radius: 10px; padding: 9px 12px; }
+.v2 .kbf-resumo b { color: var(--txt); }
+
+/* KPI de DISTRIBUIÇÃO por etapa (barra empilhada nas cores das colunas) */
+.v2 .kb-kpi.dist { min-width: 200px; }
+.v2 .kb-dist { display: flex; height: 6px; border-radius: 99px; overflow: hidden; margin-top: 7px; background: rgba(var(--tint), .07); }
+.v2 .kb-dist span { display: block; height: 100%; min-width: 3px; }
+.v2 .kb-dist-leg { display: flex; align-items: center; gap: 9px; margin-top: 5px; overflow: hidden; }
+.v2 .kb-dist-leg .li { display: inline-flex; align-items: center; gap: 4px; font-size: 9.5px; color: var(--txt-3); white-space: nowrap; }
+.v2 .kb-dist-leg .li i { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.v2 .kb-dist-leg .li b { color: var(--txt-2); font-weight: 600; }
 
 /* ---- F2: painel Carga por responsável (opt-in) ---- */
 .v2 .kb-carga { flex-shrink: 0; display: flex; align-items: stretch; gap: 8px; flex-wrap: wrap; margin: 0 0 11px; padding-bottom: 11px; border-bottom: 1px solid var(--linha); }
