@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { WA_REAL, mascararNumero, waRecarregarAudio, waValidarNumero, waVincularNumero, useWaAtividades, useMensagensAgendadas, useAgendarSequencia, useEditarAgendamento, useCancelarAgendamento, normalizeWaPhone } from '@/data/whatsapp';
 import type { WaContact, WaMessage } from '@/data/whatsappDemo';
-import { useStatusDefs, useEtiquetas, useOrgUsuarios, useAssinaturaPref, useAtendimentoActions } from '@/data/atendimento';
+import { useStatusDefs, useEtiquetas, useOrgUsuarios, useAtendimentoActions } from '@/data/atendimento';
 import { useScripts, useScriptEtapaCounts, useScriptCategorias, traduzErroEnvio, aguardarConfirmacaoEnvio, type Script } from '@/data/scripts';
 import { useScriptsResumoEtapas } from '../hooks/scriptsResumo';
 import { useJanelaCanal, rotuloJanela } from '@/data/cloudApi';
@@ -12,7 +12,7 @@ import { indexPorChave, tipoLabel, tempoRelativo } from '@/data/slaView';
 import { useOportunidadesDoContato, useFunisDaOrg, chamarGarantirEntrada, useColunasFunil, useMoverOportunidade, classificarMovimento, MOTIVOS_PERDA, traduzErroKanban } from '@/data/kanban';
 import { useChecklist } from '@/data/checklist';
 import { useCobrancas } from '@/data/cobrancas';
-import { corDaEtiqueta, podeGerenciarAtendimento, PALETA_CORES, type AssinaturaModo } from '@/types/atendimento';
+import { corDaEtiqueta, podeGerenciarAtendimento, PALETA_CORES } from '@/types/atendimento';
 import { textoBloqueio, analisarNome, conversaAtiva } from '@/lib/higieneConversa';
 import { responsavelEfetivo } from '@/lib/conversaEtiquetas';
 import { chaveDiaSP, construirItensConversa, type ItemConversa } from '@/lib/dataConversa';
@@ -24,11 +24,12 @@ import { MediaComposer } from '@/components/MediaComposer';
 import { ScriptSequenceModal } from '@/components/ScriptSequenceModal';
 import { FichaJudicialBox } from '@/components/FichaJudicialBox';
 import { fichaDemoDoContato } from '@/data/fichaJudicial';
-import { useSendWaMessage } from '@/data/whatsapp';
+import { useSendWaMessage, useAssinaturaMarca } from '@/data/whatsapp';
 import { useIaEstadoConversa, useIaToggle, type IaEstadoConversa } from '@/data/whatsapp';
 import { mensagemAssumir, useAlertasLeadQuente } from '@/data/alertasLeadQuente';
 import { AlertaLeadQuenteModal } from '../components/AlertaLeadQuenteModal';
 import { useInboxWhatsApp, type AvisoInbox } from '../hooks/useInboxWhatsApp';
+import { assinaturaAtendente } from '../hooks/inboxWhatsApp';
 import { AudioRecorderV2 } from '../components/AudioRecorderV2';
 import { AgendarMensagemModalV2 } from './AgendarMensagemModalV2';
 import { CLASSE_RAIZ_PORTAL } from '../components/portal';
@@ -67,7 +68,6 @@ const IA_OPCOES: ReadonlyArray<readonly [string, string]> = [
   ['ativa', 'Com IA ativa'], ['pausada', 'IA pausada / handoff'], ['humano', 'Precisa de humano'],
 ];
 const PERIODO_OPCOES: ReadonlyArray<readonly [string, string]> = [['hoje', 'Hoje'], ['7d', '7 dias'], ['30d', '30 dias']];
-const ASSINA_OPCOES = [['sem', 'Sem assinatura'], ['atendente', 'Nome do atendente'], ['empresa', 'Nome da empresa'], ['personalizado', 'Nome personalizado']] as const;
 
 const IcWa = () => <Ic><path d="M21 11.5a8.4 8.4 0 01-9 8.4 8.9 8.9 0 01-3.8-.8L3 20l1-4.9a8.3 8.3 0 01-1-4A8.4 8.4 0 0112 3a8.4 8.4 0 019 8.5z" /></Ic>;
 const IcBusca = () => <Ic><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></Ic>;
@@ -563,7 +563,7 @@ export default function WhatsAppV2() {
   const statusQ = useStatusDefs();
   const etiquetasQ = useEtiquetas();
   const usuariosQ = useOrgUsuarios();
-  const assinaturaQ = useAssinaturaPref();
+  const assinaturaMarcaQ = useAssinaturaMarca();
   const acoes = useAtendimentoActions();
   const scriptsQ = useScripts('whatsapp');
   const scriptsDemo: Script[] = useMemo(() => (WA_REAL ? [] : [
@@ -637,23 +637,10 @@ export default function WhatsAppV2() {
   const nomeMap = useMemo(() => new Map(usuarios.map((u) => [u.id, u.nome])), [usuarios]);
   const nomePorId = (id: string) => nomeMap.get(id);
 
-  /* assinatura (v1: select inline; persistida em organizacao_usuarios) */
-  const [assinaMode, setAssinaMode] = useState<string>('sem');
-  const [assinaCustom, setAssinaCustom] = useState('');
-  useEffect(() => {
-    const p = assinaturaQ.data;
-    if (!p) return;
-    setAssinaMode(p.modo ?? 'sem');
-    setAssinaCustom(p.nome ?? '');
-  }, [assinaturaQ.data]);
-  const assinaturaNome = assinaMode === 'atendente' ? (user?.name || 'Atendente')
-    : assinaMode === 'empresa' ? currentOrg.name
-    : assinaMode === 'personalizado' ? assinaCustom.trim()
-    : '';
-  const persistAssinatura = (modo: string, nome: string) => {
-    if (!WA_REAL) return;
-    acoes.salvarAssinatura({ modo: modo as AssinaturaModo, nome }).catch(() => aoAvisar({ tom: 'erro', texto: 'Falha ao salvar assinatura' }));
-  };
+  /* assinatura OBRIGATÓRIA (28/08): carimbo fixo da casa `*👤 Nome | MARCA:*` — o backend
+     (evolution-send) resolve e aplica por conta própria; aqui só ESPELHAMOS o carimbo para a
+     bolha otimista, o preview do composer e o remetente do reply baterem com o que sai. */
+  const assinaturaNome = assinaturaAtendente(user?.name, assinaturaMarcaQ.data);
 
   /* ---------- deep-link ?conversa= (v1 L363-375) ---------- */
   const conversaParam = params.get('conversa');
@@ -1302,16 +1289,11 @@ export default function WhatsAppV2() {
                     </button>
                   ))
                 )}
-                <span className="wa-assina">
-                  Assinar como:
-                  <select className="inp" value={assinaMode} onChange={(e) => { setAssinaMode(e.target.value); persistAssinatura(e.target.value, assinaCustom); }}>
-                    {ASSINA_OPCOES.map(([v, r]) => <option key={v} value={v}>{r}</option>)}
-                  </select>
-                  {assinaMode === 'personalizado' && (
-                    <input className="inp" placeholder="Nome na assinatura" value={assinaCustom} onChange={(e) => setAssinaCustom(e.target.value)} onBlur={() => persistAssinatura(assinaMode, assinaCustom)} />
-                  )}
-                  {assinaturaNome && <span className="prev">*{assinaturaNome}:*</span>}
-                </span>
+                {assinaturaNome && (
+                  <span className="wa-assina" title="Assinatura obrigatória: toda mensagem enviada pelo painel sai identificada assim para o cliente.">
+                    Assinando como: <span className="prev">*{assinaturaNome}:*</span>
+                  </span>
+                )}
               </div>
 
               {/* avisos do composer (cascata v1 + opt-out) */}
@@ -1919,7 +1901,7 @@ export default function WhatsAppV2() {
           if (optout) throw new Error(optoutTexto);
           if (inbox.higieneBloqueia) throw new Error(textoBloqueio(inbox.higiene) ?? 'Atendimento sem responsável ou com cadastro incompleto — assuma e complete o nome para enviar.');
           if (demo) { aoAvisar({ tom: 'ok', texto: 'Mensagem enviada' }); return; }
-          const id = await sendMut.mutateAsync({ conversaId: current.id, canalId: inbox.replyCanalId || current.canalId, assinaturaNome: assinaturaNome || undefined, text: texto, retryMensagemId });
+          const id = await sendMut.mutateAsync({ conversaId: current.id, canalId: inbox.replyCanalId || current.canalId, text: texto, retryMensagemId });
           return id ?? undefined;
         }}
         confirmar={(id) => (demo ? Promise.resolve('enviada' as const) : aguardarConfirmacaoEnvio(id))}

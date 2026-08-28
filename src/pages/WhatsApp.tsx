@@ -707,7 +707,7 @@ export function WhatsApp() {
       // (onSettled da mutation) reconcilia para a linha real com id; este timeout cobre o caso de não-resposta.
       const to = setTimeout(() => marcarFalha('Sem confirmação de envio a tempo. Tente novamente.'), 25000);
       sendMut.mutate(
-        { conversaId: currentId, text: v, canalId: replyCanalId || current.canalId, assinaturaNome: assinaturaNome || undefined, replyTo: replyEnvio },
+        { conversaId: currentId, text: v, canalId: replyCanalId || current.canalId, replyTo: replyEnvio },
         {
           onError: (e) => { clearTimeout(to); marcarFalha((e as Error).message || 'Falha no envio.'); toast((e as Error).message || 'Falha ao enviar a mensagem', 'warn'); },
           onSuccess: () => { clearTimeout(to); setReplyTo(null); }, // resposta enviada → limpa o contexto
@@ -1751,7 +1751,7 @@ export function WhatsApp() {
         open={!!scriptSeq} onClose={() => setScriptSeq(null)} script={scriptSeq} canal="whatsapp"
         conversaId={currentId}
         ctx={{ cliente: current.name, atendente: (user?.name || '').trim() || 'Atendente', emailAtendente: user?.email, empresa: currentOrg.name, telefone: current.phone }}
-        enviarEtapa={async (texto, retryId) => await sendMut.mutateAsync({ conversaId: currentId, text: texto, canalId: replyCanalId || current.canalId, assinaturaNome: assinaturaNome || undefined, retryMensagemId: retryId }) ?? undefined}
+        enviarEtapa={async (texto, retryId) => await sendMut.mutateAsync({ conversaId: currentId, text: texto, canalId: replyCanalId || current.canalId, retryMensagemId: retryId }) ?? undefined}
         confirmar={(mensagemId) => aguardarConfirmacaoEnvio(mensagemId)}
       />
 

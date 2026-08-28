@@ -12,7 +12,17 @@ export function novoCid(agoraMs: number, aleatorio = Math.random()): string {
   return 'tmp_' + agoraMs.toString(36) + aleatorio.toString(36).slice(2, 7);
 }
 
-/** Corpo exibido na bolha local (v1 L682): assinatura `*Nome:*\n<texto>`; o servidor recebe o texto cru. */
+/** Carimbo OBRIGATÓRIO da casa (28/08): "👤 Nome | MARCA" (sem marca definida, só o nome).
+ *  O backend (evolution-send) resolve e aplica o MESMO carimbo por conta própria — este helper
+ *  existe para a bolha otimista e o preview do composer baterem com o que o cliente recebe. */
+export function assinaturaAtendente(nomeUsuario: string | null | undefined, marcaOrg?: string | null): string {
+  const nome = (nomeUsuario ?? '').trim();
+  if (!nome) return '';
+  const marca = (marcaOrg ?? '').trim();
+  return `👤 ${nome}${marca ? ` | ${marca}` : ''}`;
+}
+
+/** Corpo exibido na bolha local (v1 L682): carimbo `*<assinatura>:*\n<texto>`; o servidor recebe o texto cru e carimba sozinho. */
 export function montarCorpoAssinado(texto: string, assinaturaNome: string | null | undefined): string {
   return assinaturaNome ? `*${assinaturaNome}:*\n${texto}` : texto;
 }

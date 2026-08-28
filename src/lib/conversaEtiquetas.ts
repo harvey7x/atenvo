@@ -103,7 +103,9 @@ export interface PreviewMsgInput { tipo?: string | null; texto?: string | null; 
 /** Preview curto e limpo. Texto/legenda vence; sem texto, rótulo da mídia. */
 export function previewUltimaMensagem(m?: PreviewMsgInput | null): string {
   if (!m) return '';
-  const t = (m.texto ?? '').trim();
+  // O carimbo de assinatura (`*👤 Nome | MARCA:*`, obrigatório desde 28/08) é ruído no card da
+  // lista — o preview mostra o CONTEÚDO. Legenda que era SÓ o carimbo cai no rótulo por tipo.
+  const t = (m.texto ?? '').replace(/^\*👤 [^*\n]{1,80}:\*\s*/, '').trim();
   if (t) return t;                                     // texto ou legenda da mídia
   switch (m.tipo) {
     case 'audio':     return (m.ptt === false ? 'Áudio' : 'Mensagem de voz') + duracao(m.seconds);

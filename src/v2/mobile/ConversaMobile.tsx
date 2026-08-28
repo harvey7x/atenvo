@@ -1,8 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { WA_REAL, mascararNumero, waRecarregarAudio } from '@/data/whatsapp';
+import { WA_REAL, mascararNumero, waRecarregarAudio, useAssinaturaMarca } from '@/data/whatsapp';
+import { assinaturaAtendente } from '../hooks/inboxWhatsApp';
 import type { WaMessage } from '@/data/whatsappDemo';
-import { useAssinaturaPref } from '@/data/atendimento';
 import { traduzErroEnvio } from '@/data/scripts';
 import { textoBloqueio } from '@/lib/higieneConversa';
 import { construirItensConversa } from '@/lib/dataConversa';
@@ -64,15 +64,10 @@ export default function ConversaMobile() {
   // trocar de conversa zera o rascunho e a janela de render
   useEffect(() => { setDraft(''); setVerTodas(false); }, [conversaId]);
 
-  /* assinatura: leitura da preferência salva (edição do modo fica no desktop) */
-  const assinaturaQ = useAssinaturaPref();
-  const assinaturaNome = useMemo(() => {
-    const modo = assinaturaQ.data?.modo ?? 'sem';
-    return modo === 'atendente' ? (user?.name || 'Atendente')
-      : modo === 'empresa' ? currentOrg.name
-      : modo === 'personalizado' ? (assinaturaQ.data?.nome ?? '').trim()
-      : '';
-  }, [assinaturaQ.data, user?.name, currentOrg.name]);
+  /* assinatura OBRIGATÓRIA (28/08): carimbo fixo da casa — o backend aplica sozinho;
+     aqui só espelhamos para a bolha otimista e o remetente do reply. */
+  const assinaturaMarcaQ = useAssinaturaMarca();
+  const assinaturaNome = assinaturaAtendente(user?.name, assinaturaMarcaQ.data);
 
   const msgs = conv?.msgs ?? [];
   const recortadas = verTodas ? msgs : msgs.slice(-JANELA_MSGS);

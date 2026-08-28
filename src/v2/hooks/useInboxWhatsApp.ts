@@ -263,7 +263,7 @@ export function useInboxWhatsApp(opts: {
     const marcarFalha = (erro: string) => setContacts((cur) => aplicarFalha(cur, convAlvo, cid, erro));
     const to = window.setTimeout(() => marcarFalha('Sem confirmação de envio a tempo. Tente novamente.'), 25_000);
     sendMut.mutate(
-      { conversaId: currentId, text: v, canalId: replyCanalId || current.canalId, assinaturaNome: assinaturaNome || undefined, replyTo: replyEnvio },
+      { conversaId: currentId, text: v, canalId: replyCanalId || current.canalId, replyTo: replyEnvio },
       {
         onError: (e) => { window.clearTimeout(to); const msg = (e as Error)?.message || 'Falha no envio.'; marcarFalha(msg); aoAvisar({ tom: 'erro', texto: msg }); },
         onSuccess: (idReal) => { window.clearTimeout(to); setReplyTo(null); if (idReal) setContacts((cur) => marcarIdReal(cur, convAlvo, cid, idReal)); },
