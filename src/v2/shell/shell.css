@@ -349,12 +349,14 @@
   position: fixed; inset: 0; z-index: 1300;
   display: flex; align-items: center; justify-content: center;
   overflow-y: auto; padding: 40px 24px;
-  background: rgba(5, 6, 9, .55);
-  backdrop-filter: blur(34px) saturate(1.15) !important;
-  -webkit-backdrop-filter: blur(34px) saturate(1.15) !important;
+  /* véu mais fechado (dono 28/08: "reduzir os efeitos coloridos") — o bokeh
+     embaçado ainda respira atrás, sem virar banho de cor */
+  background: rgba(6, 7, 10, .72);
+  backdrop-filter: blur(34px) saturate(1.05) !important;
+  -webkit-backdrop-filter: blur(34px) saturate(1.05) !important;
   animation: it-fade .45s var(--ease);
 }
-:root[data-tema="light"] .v2 .intro-veu { background: rgba(242, 243, 246, .5); }
+:root[data-tema="light"] .v2 .intro-veu { background: rgba(242, 243, 246, .72); }
 
 .v2 .intro-palco { width: min(620px, 100%); margin: auto; text-align: center; }
 
@@ -373,13 +375,17 @@
 @media (prefers-reduced-motion: reduce) {
   .v2 .intro-veu, .v2 .intro-palco > * { animation: none; opacity: 1; }
 }
+/* MODO LEVE mata toda animação (base.css) — sem esta regra de estado final,
+   o opacity:0 de nascença ficava pra sempre e a intro sumia INTEIRA ao ligar
+   o Leve com ela aberta (bug do dono 28/08). Mesmo padrão do .sobe/.spark. */
+:root[data-perf="lite"] .v2 .intro-palco > * { opacity: 1; transform: none; }
 
 .v2 .it-marca {
   width: 64px; height: 64px; display: block; margin: 0 auto;
-  filter: drop-shadow(0 10px 26px rgba(62, 123, 240, calc(.4 * var(--fx))));
+  filter: drop-shadow(0 8px 20px rgba(62, 123, 240, calc(.25 * var(--fx))));
 }
-:root[data-acento="verde"] .v2 .it-marca { filter: drop-shadow(0 10px 26px rgba(39, 183, 108, calc(.4 * var(--fx)))); }
-:root[data-acento="dourado"] .v2 .it-marca { filter: drop-shadow(0 10px 26px rgba(209, 154, 46, calc(.4 * var(--fx)))); }
+:root[data-acento="verde"] .v2 .it-marca { filter: drop-shadow(0 8px 20px rgba(39, 183, 108, calc(.25 * var(--fx)))); }
+:root[data-acento="dourado"] .v2 .it-marca { filter: drop-shadow(0 8px 20px rgba(209, 154, 46, calc(.25 * var(--fx)))); }
 
 .v2 .it-eyebrow {
   margin-top: 22px; font-size: 10.5px; font-weight: 600;
@@ -392,9 +398,9 @@
 .v2 .it-stats { margin-top: 28px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .v2 .it-stat {
   display: flex; flex-direction: column; gap: 3px; padding: 18px 12px 15px; border-radius: 15px;
-  background: rgba(var(--azul-rgb, 76, 141, 255), .09);
-  border: 1px solid rgba(var(--azul-rgb, 76, 141, 255), .24);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06);
+  background: rgba(var(--azul-rgb, 76, 141, 255), .055);
+  border: 1px solid rgba(var(--azul-rgb, 76, 141, 255), .16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05);
 }
 .v2 .it-stat b { font-size: 32px; font-weight: 650; letter-spacing: -.02em; line-height: 1.05; color: var(--txt); font-variant-numeric: tabular-nums; }
 .v2 .it-stat span { font-size: 10.5px; color: var(--txt-2); line-height: 1.35; }
