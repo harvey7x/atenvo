@@ -113,15 +113,15 @@ describe('máquina do inbox — ciclo otimista de envio', () => {
     expect(montarCorpoAssinado('oi', null)).toBe('oi');
     expect(montarCorpoAssinado('oi', '')).toBe('oi');
   });
-  it('carimbo obrigatório da casa: 👤 Nome | MARCA (sem marca, só o nome; sem nome, vazio)', () => {
-    expect(assinaturaAtendente('Matheus', 'CAF')).toBe('👤 Matheus | CAF');
-    expect(assinaturaAtendente('Matheus', null)).toBe('👤 Matheus');
-    expect(assinaturaAtendente('  Matheus  ', ' CAF ')).toBe('👤 Matheus | CAF');
-    expect(assinaturaAtendente('', 'CAF')).toBe('');
-    expect(assinaturaAtendente(undefined, 'CAF')).toBe('');
+  it('carimbo obrigatório da casa: Nome – MARCA (sem marca, só o nome; sem nome, vazio)', () => {
+    expect(assinaturaAtendente('Matheus', 'Atendimento CAF')).toBe('Matheus – Atendimento CAF');
+    expect(assinaturaAtendente('Matheus', null)).toBe('Matheus');
+    expect(assinaturaAtendente('  Matheus  ', ' Atendimento CAF ')).toBe('Matheus – Atendimento CAF');
+    expect(assinaturaAtendente('', 'Atendimento CAF')).toBe('');
+    expect(assinaturaAtendente(undefined, 'Atendimento CAF')).toBe('');
     // ponta a ponta com a bolha otimista: mesmo corpo que o backend envia/grava
-    expect(montarCorpoAssinado('Olá, boa tarde!', assinaturaAtendente('Matheus', 'CAF')))
-      .toBe('*👤 Matheus | CAF:*\nOlá, boa tarde!');
+    expect(montarCorpoAssinado('Olá, boa tarde!', assinaturaAtendente('Matheus', 'Atendimento CAF')))
+      .toBe('*Matheus – Atendimento CAF:*\nOlá, boa tarde!');
   });
   it('envio otimista: append da bolha + card completo (last/time/posição/sai de aguardando), só na conversa alvo', () => {
     const cur = [conv({ id: 'a', msgs: [msg({ id: 'm1' })], last: 'antes', time: '09:00', lastAtMs: 1, aguardando: true, aguardandoDesde: '2026-08-24T09:00:00.000Z' }), conv({ id: 'b' })];

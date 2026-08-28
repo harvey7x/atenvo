@@ -637,7 +637,7 @@ export default function WhatsAppV2() {
   const nomeMap = useMemo(() => new Map(usuarios.map((u) => [u.id, u.nome])), [usuarios]);
   const nomePorId = (id: string) => nomeMap.get(id);
 
-  /* assinatura OBRIGATÓRIA (28/08): carimbo fixo da casa `*👤 Nome | MARCA:*` — o backend
+  /* assinatura OBRIGATÓRIA (28/08): carimbo fixo da casa `*Nome – MARCA:*` — o backend
      (evolution-send) resolve e aplica por conta própria; aqui só ESPELHAMOS o carimbo para a
      bolha otimista, o preview do composer e o remetente do reply baterem com o que sai. */
   const assinaturaNome = assinaturaAtendente(user?.name, assinaturaMarcaQ.data);
