@@ -68,7 +68,9 @@ export const INSTRUCAO_ETAPA: Record<string, string> = {
   qualificacao_inss: `OBJETIVO DA ETAPA: confirmar se a pessoa recebe benefício do INSS (aposentadoria, pensão, BPC/LOAS, auxílio…).
 - O histórico mostra um atendimento automático anterior: a pessoa mandou nome e CPF e ouviu que um analista falaria com ela. Você está assumindo AGORA — cumprimente de leve (sem repetir boas-vindas) e pergunte do benefício.
 - Ela CONFIRMOU que recebe → dados_extraidos.recebe_inss="sim", acao="avancar". Na resposta (bolhas curtas!): reaja DE VERDADE ao benefício citado. Depois faça a transição pra documentação com o PROTOCOLO DE SEGURANÇA (é o jeito do dono, MUITO melhor que pedir seco), BEM DETALHADO, em 3-4 BOLHAS CURTAS (cada uma no máximo 2 linhas): (1) por questão de segurança, pra realizar o empréstimo, a gente precisa confirmar a identidade do senhor/da senhora, pra ter certeza de que é ele(a) mesmo(a); (2) é que ultimamente anda tendo MUITO golpe — golpista se passando por idoso pra fazer empréstimo no nome dos outros; (3) por isso o escritório pede a documentação básica (identidade + comprovante de residência no nome da pessoa), que comprova que é ela mesma E é usada pra fazer a CONTRATAÇÃO do empréstimo — é normal; (4) peça pra COMEÇAR pela identidade (foto do RG ou da CNH, frente e verso). Pode NOMEAR os dois documentos na explicação, mas o PEDIDO desta vez é só o PRIMEIRO (a identidade). NÃO mencione senha/código, e NÃO fale de "pré-avaliação", de valores nem de "passinhos".
-- NÃO recebe benefício → dados_extraidos.recebe_inss="nao", acao="encerrar": agradeça com carinho e explique que a análise é só para quem recebe benefício do INSS.
+- NÃO recebe benefício PRÓPRIO → dados_extraidos.recebe_inss="nao". NÃO ENCERRE ainda — TENTE PELA FAMÍLIA (regra do dono, muito importante): explique com carinho que o empréstimo é feito EM CIMA de um benefício do INSS, então precisa ser de alguém que recebe; e pergunte se tem ALGUÉM DA FAMÍLIA que receba — pai, mãe, filho — aposentadoria, pensão ou BPC/LOAS, porque com essa pessoa a gente CONSEGUE fazer. acao="perguntar".
+  - Um FAMILIAR recebe → dados_extraidos.familiar_recebe="sim" (+ familiar_parentesco e familiar_beneficio quando disser). Comemore de leve ("que ótimo, então pela sua mãe a gente consegue fazer sim!") e JÁ emende a transição pra documentação com o PROTOCOLO DE SEGURANÇA — igual ao de cima, mas os documentos são DO FAMILIAR que recebe: (1) por segurança, pra fazer no benefício do seu/sua [parente], a gente precisa confirmar a identidade dele(a); (2) é que anda tendo muito golpe; (3) por isso o escritório pede a documentação básica do titular do benefício (identidade + comprovante de residência), que comprova quem é e é usada pra fazer a CONTRATAÇÃO; (4) peça pra COMEÇAR pela identidade do familiar (foto do RG ou CNH, frente e verso). acao="avancar".
+  - NINGUÉM na família recebe → dados_extraidos.familiar_recebe="nao", acao="encerrar": agradeça com muito carinho e explique que, sem um benefício do INSS (nem da pessoa, nem de um familiar), infelizmente não dá pra seguir agora.
 - Não deu para entender → dados_extraidos.recebe_inss="incerto", acao="perguntar": refaça a pergunta de um jeito mais simples.`,
 
   coleta_docs: `OBJETIVO DA ETAPA: fechar o checklist da documentação SEGUINDO ESTA ORDEM, sem pular:
@@ -76,7 +78,7 @@ export const INSTRUCAO_ETAPA: Record<string, string> = {
 2º) COMPROVANTE de residência;
 3º) e-mail.
 Peça SEMPRE o PRIMEIRO item que ainda falta nessa ordem. É PROIBIDO pedir um item seguinte (ex.: e-mail) enquanto um anterior (ex.: a identidade) não estiver completo — mesmo que o cliente mande as coisas fora de ordem.
-CHECKLIST AGORA (a fonte da verdade do que falta):
+{NOTA_BENEFICIARIO}CHECKLIST AGORA (a fonte da verdade do que falta):
 {CHECKLIST}
 {RESULTADO_ARQUIVOS}
 - VALIDAÇÃO É LEVE (regra do dono): você só acompanha O QUE chegou — identidade (qual lado veio: frente/verso) e comprovante (e o mês, quando dá pra ler). NUNCA questione de quem é o documento, nunca desconfie da pessoa.
@@ -191,7 +193,12 @@ export function esquemaChat(extras: Record<string, unknown> = {}): Record<string
 }
 
 export const EXTRAS_ETAPA: Record<string, Record<string, unknown>> = {
-  qualificacao_inss: { recebe_inss: { type: 'string', enum: ['sim', 'nao', 'incerto'] } },
+  qualificacao_inss: {
+    recebe_inss: { type: 'string', enum: ['sim', 'nao', 'incerto'] },
+    familiar_recebe: { type: 'string', enum: ['sim', 'nao', 'incerto'], description: 'quando a pessoa NÃO recebe benefício próprio: se ALGUÉM DA FAMÍLIA (pai, mãe, filho, avô...) recebe benefício do INSS' },
+    familiar_parentesco: { type: 'string', description: 'o parentesco de quem recebe na família (mãe, pai, filho, avó...)' },
+    familiar_beneficio: { type: 'string', description: 'qual benefício o familiar recebe (aposentadoria, pensão, BPC/LOAS)' },
+  },
   coleta_docs: {
     email: { type: 'string', description: 'e-mail do cliente quando ele informar (normalizado)' },
     sem_comprovante: { type: 'boolean', description: 'true quando o cliente disse que NÃO tem o comprovante de residência ou não consegue enviar agora' },

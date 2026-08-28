@@ -797,12 +797,32 @@ async function etapaQualificacao(ctx: Ctx): Promise<Turno> {
   const r = await conversar(ctx, {
     instrucaoExtra: injetarAbertura ? instrAbertura : '',
   });
-  const recebe = String(r.dados.recebe_inss ?? (abertura ? 'incerto' : 'incerto'));
+  const recebe = String(r.dados.recebe_inss ?? 'incerto');
+  const familiar = String(r.dados.familiar_recebe ?? 'incerto');
+  const limpaAbertura: Record<string, unknown> = aberturaEspecial ? { abertura_especial: null } : {};
   if (!abertura && recebe === 'sim') {
-    return { bolhas: r.mensagens, etapaNova: 'coleta_docs', resetErros: true, __perguntouValores: r.perguntouValores };
+    return { bolhas: r.mensagens, etapaNova: 'coleta_docs', resetErros: true, dadosPatch: { ...limpaAbertura, beneficiario: 'proprio' }, __perguntouValores: r.perguntouValores };
   }
   if (!abertura && recebe === 'nao') {
-    return { bolhas: r.mensagens, statusNovo: 'encerrada', etiquetaOpp: 'nao_elegivel', __perguntouValores: r.perguntouValores };
+    // NÃO recebe benefício PRÓPRIO → tenta salvar pela família (regra do dono 28/08): só é
+    // não elegível se NINGUÉM da família recebe. Se um familiar recebe, segue a coleta tratando
+    // o familiar como o beneficiário (os documentos são dele). Roteia por familiar_recebe E por
+    // acao (o modelo às vezes só seta a acao) e NUNCA encerra sem antes ter perguntado da família.
+    const jaPerguntouFamiliar = ctx.dados.perguntou_familiar === true;
+    const familiarRecebe = familiar === 'sim' || (familiar !== 'nao' && r.acao === 'avancar');
+    const familiarNao = familiar === 'nao' || (jaPerguntouFamiliar && r.acao === 'encerrar');
+    if (familiarRecebe) {
+      return { bolhas: r.mensagens, etapaNova: 'coleta_docs', resetErros: true,
+        dadosPatch: { ...limpaAbertura, beneficiario: 'familiar',
+          familiar_parentesco: r.dados.familiar_parentesco ?? null, familiar_beneficio: r.dados.familiar_beneficio ?? null },
+        __perguntouValores: r.perguntouValores };
+    }
+    if (familiarNao) {
+      return { bolhas: r.mensagens, statusNovo: 'encerrada', etiquetaOpp: 'nao_elegivel', dadosPatch: limpaAbertura, __perguntouValores: r.perguntouValores };
+    }
+    // está perguntando da família (1ª vez ou ainda sem resposta clara) → não conta como erro,
+    // marca a flag pra garantir que a pergunta da família aconteça antes de qualquer encerramento
+    return { bolhas: r.mensagens, incrementaErro: false, dadosPatch: { ...limpaAbertura, perguntou_familiar: true }, __perguntouValores: r.perguntouValores };
   }
   return { bolhas: r.mensagens, incrementaErro: !abertura, ...(aberturaEspecial ? { dadosPatch: { abertura_especial: null } } : {}), __perguntouValores: r.perguntouValores };
 }
@@ -1361,6 +1381,11 @@ async function conversar(ctx: Ctx, opts: { etapa?: string; instrucaoExtra?: stri
     MESES_ACEITOS: `do mês atual ou do passado (${meses[0].rotulo} ou ${meses[1].rotulo})`,
     TITULAR: String(ctx.dados.titular_comprovante ?? 'a pessoa da conta'),
     CHECKLIST: '', RESULTADO_ARQUIVOS: '', FALTA: '', TEM_VIDEO: '',
+    // beneficiário é um FAMILIAR (a pessoa não recebe, mas o pai/mãe/filho recebe): os documentos
+    // são DO FAMILIAR que recebe o benefício, não de quem está conversando.
+    NOTA_BENEFICIARIO: ctx.dados.beneficiario === 'familiar'
+      ? `IMPORTANTE — BENEFICIÁRIO É UM FAMILIAR: quem recebe o benefício do INSS é ${ctx.dados.familiar_parentesco ? `${ctx.dados.familiar_parentesco} da pessoa` : 'um familiar da pessoa'}, não quem você conversa. Os documentos (identidade e comprovante) são DESSE FAMILIAR. Fale com naturalidade ("a identidade do seu/sua ${ctx.dados.familiar_parentesco ?? 'familiar'}", "o comprovante dele(a)"). Nunca peça os documentos da pessoa com quem fala como se fossem do titular.\n`
+      : '',
   };
   for (const [k, v] of Object.entries({ ...defaults, ...(opts.vars ?? {}) })) {
     instrucao = instrucao.replaceAll(`{${k}}`, v);
