@@ -39,6 +39,11 @@ const IcSol = () => (
     <circle cx="12" cy="12" r="4.2" /><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19" />
   </svg>
 );
+const IcCheck = () => (
+  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <path d="M3.5 8.5l3 3L12.5 5" />
+  </svg>
+);
 
 /* contagem crescente com guarda de visibilidade (aba oculta congela o rAF —
    mesmo contrato do Contador do Dashboard: sem veredito, mostra o valor) */
@@ -121,15 +126,16 @@ export function IntroDia({ aberta, aoConcluir, nome, tema, aoMudarTema }: {
             <>
               <div className="it-stat">
                 <b><Contagem ate={brief.paraAtender} /></b>
-                <span>{plural(brief.paraAtender, 'cliente novo pra atender', 'clientes novos pra atender')}</span>
+                <span className="it-leg">{plural(brief.paraAtender, 'novo pra atender', 'novos pra atender')}</span>
               </div>
               <div className="it-stat">
                 <b><Contagem ate={brief.naoLidas} /></b>
-                <span>{plural(brief.naoLidas, 'conversa não lida', 'conversas não lidas')}</span>
+                <span className="it-leg">{plural(brief.naoLidas, 'conversa não lida', 'conversas não lidas')}</span>
               </div>
-              <div className="it-stat ok">
+              {/* fechados fala o ACENTO eleito (pedido do dono) — o único ponto de cor do briefing */}
+              <div className="it-stat destaque">
                 <b><Contagem ate={brief.fechadosSemana} /></b>
-                <span>{plural(brief.fechadosSemana, 'cliente fechado na semana', 'clientes fechados na semana')}</span>
+                <span className="it-tag">{plural(brief.fechadosSemana, 'fechado na semana', 'fechados na semana')}</span>
               </div>
             </>
           ) : (
@@ -137,58 +143,58 @@ export function IntroDia({ aberta, aoConcluir, nome, tema, aoMudarTema }: {
           )}
         </div>
 
-        <div className="it-sec">
-          <div className="it-rot">Selecione a cor de hoje</div>
-          <div className="it-cores" role="radiogroup" aria-label="Cor do sistema">
-            {CORES.map((c) => (
-              <button
-                key={c.valor}
-                type="button"
-                role="radio"
-                aria-checked={acento === c.valor}
-                className={acento === c.valor ? 'it-cor on' : 'it-cor'}
-                onClick={() => salvarAcento(c.valor)}
-              >
-                <span className="it-sw" style={{ background: c.cor }} aria-hidden />
-                {c.rotulo}
-              </button>
-            ))}
+        <div className="it-aparencia">
+          <div className="it-ap-rot">Aparência</div>
+          <div className="it-faixa">
+            <div className="it-celula">
+              <div className="it-cel-rot">Cor</div>
+              <div className="it-discos" role="radiogroup" aria-label="Cor do sistema">
+                {CORES.map((c) => (
+                  <button
+                    key={c.valor}
+                    type="button"
+                    role="radio"
+                    aria-checked={acento === c.valor}
+                    aria-label={c.rotulo}
+                    data-cor={c.valor}
+                    className={acento === c.valor ? 'it-disc on' : 'it-disc'}
+                    style={{ background: c.cor }}
+                    onClick={() => salvarAcento(c.valor)}
+                  >
+                    <IcCheck />
+                  </button>
+                ))}
+              </div>
+              <div className="it-cel-sub">{CORES.find((c) => c.valor === acento)?.rotulo}</div>
+            </div>
+            <div className="it-celula">
+              <div className="it-cel-rot">Tema</div>
+              {/* segmentado: a seleção É o polegar de platina — zero anel (pedido do dono) */}
+              <div className="it-seg" data-sel={tema} role="radiogroup" aria-label="Tema do sistema">
+                <span className="it-seg-thumb" aria-hidden />
+                <button type="button" role="radio" aria-checked={tema === 'dark'} className={tema === 'dark' ? 'it-seg-opt on' : 'it-seg-opt'} onClick={() => aoMudarTema('dark')}>
+                  <IcLua /> Escuro
+                </button>
+                <button type="button" role="radio" aria-checked={tema === 'light'} className={tema === 'light' ? 'it-seg-opt on' : 'it-seg-opt'} onClick={() => aoMudarTema('light')}>
+                  <IcSol /> Claro
+                </button>
+              </div>
+              <div className="it-cel-sub" />
+            </div>
+            <div className="it-celula">
+              <div className="it-cel-rot" id="it-rot-leve">Modo Leve</div>
+              <Toggle
+                ligado={modoPerf === 'lite'}
+                aoMudar={(v) => salvarModoPerf(v ? 'lite' : 'full')}
+                rotuladoPor="it-rot-leve"
+              />
+              <div className="it-cel-sub">mais rápido em qualquer máquina</div>
+            </div>
           </div>
-        </div>
-
-        <div className="it-sec">
-          <div className="it-rot">Escuro ou claro?</div>
-          <div className="it-cores it-temas" role="radiogroup" aria-label="Tema do sistema">
-            <button
-              type="button" role="radio" aria-checked={tema === 'dark'}
-              className={tema === 'dark' ? 'it-cor on' : 'it-cor'}
-              onClick={() => aoMudarTema('dark')}
-            >
-              <IcLua /> Escuro
-            </button>
-            <button
-              type="button" role="radio" aria-checked={tema === 'light'}
-              className={tema === 'light' ? 'it-cor on' : 'it-cor'}
-              onClick={() => aoMudarTema('light')}
-            >
-              <IcSol /> Claro
-            </button>
-          </div>
-        </div>
-
-        <div className="it-linha">
-          <div>
-            <div className="it-rot" id="it-rot-leve">Modo Leve</div>
-            <div className="it-sub2">visual sólido, mais rápido em qualquer máquina</div>
-          </div>
-          <Toggle
-            ligado={modoPerf === 'lite'}
-            aoMudar={(v) => salvarModoPerf(v ? 'lite' : 'full')}
-            rotuladoPor="it-rot-leve"
-          />
         </div>
 
         <BotaoPrimario className="it-cta" onClick={aoConcluir}>Começar o dia</BotaoPrimario>
+        <p className="it-nota">Você ajusta tudo depois em Configurações · Esc pula</p>
       </div>
     </div>,
     raiz,

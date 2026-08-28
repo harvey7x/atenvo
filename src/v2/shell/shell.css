@@ -340,17 +340,17 @@
 :root[data-perf="lite"][data-tema="light"] .v2 .p-topbar { background: linear-gradient(180deg, #EDEEF0, #F2F3F5); }
 
 /* ============================================================
-   INTRO DO DIA v2 (dono 28/08: "mais completo, mais profissional") —
-   takeover de tela cheia: o app fica EMBAÇADO atrás (vidro fumê
-   pesado, mesma exceção de blur das janelas — 1 superfície, 1×/dia)
-   e o conteúdo sobe em cascata. Números contam via <Contagem/>.
+   INTRO DO DIA v3 "EDITORIAL PLATINA" (painel de design 28/08) —
+   takeover de tela cheia, tipografia display como protagonista:
+   saudação e briefing no gradiente platina SEM caixas (hairlines),
+   cor viva só em 3 pontos (stat de fechados no ACENTO, discos, CTA),
+   controles numa única faixa "Aparência" (discos + segmentado com
+   polegar de platina — a seleção É o polegar, zero anel — + Leve).
    ============================================================ */
 .v2 .intro-veu {
   position: fixed; inset: 0; z-index: 1300;
   display: flex; align-items: center; justify-content: center;
   overflow-y: auto; padding: 40px 24px;
-  /* véu mais fechado (dono 28/08: "reduzir os efeitos coloridos") — o bokeh
-     embaçado ainda respira atrás, sem virar banho de cor */
   background: rgba(6, 7, 10, .72);
   backdrop-filter: blur(34px) saturate(1.05) !important;
   -webkit-backdrop-filter: blur(34px) saturate(1.05) !important;
@@ -358,9 +358,9 @@
 }
 :root[data-tema="light"] .v2 .intro-veu { background: rgba(242, 243, 246, .72); }
 
-.v2 .intro-palco { width: min(620px, 100%); margin: auto; text-align: center; }
+.v2 .intro-palco { width: min(660px, 100%); margin: auto; text-align: center; }
 
-/* cascata: cada bloco sobe com atraso próprio */
+/* cascata (8 filhos: marca, data, título, sub, stats, aparência, CTA, nota) */
 .v2 .intro-palco > * { opacity: 0; animation: it-sobe .6s var(--ease) forwards; }
 .v2 .intro-palco > *:nth-child(1) { animation-delay: .08s; }
 .v2 .intro-palco > *:nth-child(2) { animation-delay: .2s; }
@@ -370,82 +370,157 @@
 .v2 .intro-palco > *:nth-child(6) { animation-delay: .72s; }
 .v2 .intro-palco > *:nth-child(7) { animation-delay: .84s; }
 .v2 .intro-palco > *:nth-child(8) { animation-delay: .96s; }
-.v2 .intro-palco > *:nth-child(9) { animation-delay: 1.06s; }
 @keyframes it-sobe { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
 @keyframes it-fade { from { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
   .v2 .intro-veu, .v2 .intro-palco > * { animation: none; opacity: 1; }
 }
-/* MODO LEVE mata toda animação (base.css) — sem esta regra de estado final,
-   o opacity:0 de nascença ficava pra sempre e a intro sumia INTEIRA ao ligar
-   o Leve com ela aberta (bug do dono 28/08). Mesmo padrão do .sobe/.spark. */
+/* MODO LEVE mata toda animação (base.css) — estado final obrigatório, senão
+   o opacity:0 de nascença fica pra sempre (bug do dono 28/08) */
 :root[data-perf="lite"] .v2 .intro-palco > * { opacity: 1; transform: none; }
 
+/* marca: glow discreto que segue o acento pelo triplet */
 .v2 .it-marca {
-  width: 64px; height: 64px; display: block; margin: 0 auto;
-  filter: drop-shadow(0 8px 20px rgba(62, 123, 240, calc(.25 * var(--fx))));
+  width: 54px; height: 54px; display: block; margin: 0 auto;
+  filter: drop-shadow(0 8px 20px rgba(var(--azul-rgb, 76, 141, 255), calc(.16 * var(--fx))));
 }
-:root[data-acento="verde"] .v2 .it-marca { filter: drop-shadow(0 8px 20px rgba(39, 183, 108, calc(.25 * var(--fx)))); }
-:root[data-acento="dourado"] .v2 .it-marca { filter: drop-shadow(0 8px 20px rgba(209, 154, 46, calc(.25 * var(--fx)))); }
 
+/* data: eyebrow entre hairlines */
 .v2 .it-eyebrow {
-  margin-top: 22px; font-size: 10.5px; font-weight: 600;
-  letter-spacing: .16em; text-transform: uppercase; color: var(--txt-3);
+  margin-top: 22px; display: inline-flex; align-items: center; gap: 14px;
+  font-size: 11px; font-weight: 600; letter-spacing: .18em; text-transform: uppercase; color: var(--txt-3);
 }
-.v2 .it-titulo { margin: 10px 0 0; font-size: 36px; font-weight: 650; letter-spacing: -.02em; line-height: 1.12; color: var(--txt); }
-.v2 .it-sub { margin: 8px 0 0; font-size: 13.5px; color: var(--txt-2); }
+.v2 .it-eyebrow::before, .v2 .it-eyebrow::after { content: ''; width: 28px; height: 1px; }
+.v2 .it-eyebrow::before { background: linear-gradient(90deg, transparent, rgba(var(--tint), .28)); }
+.v2 .it-eyebrow::after { background: linear-gradient(90deg, rgba(var(--tint), .28), transparent); }
+.v2 .it-eyebrow::first-letter { text-transform: uppercase; }
 
-/* briefing: três números que contam */
-.v2 .it-stats { margin-top: 28px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-.v2 .it-stat {
-  display: flex; flex-direction: column; gap: 3px; padding: 18px 12px 15px; border-radius: 15px;
-  background: rgba(var(--azul-rgb, 76, 141, 255), .055);
-  border: 1px solid rgba(var(--azul-rgb, 76, 141, 255), .16);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05);
+/* título: momento de display no gradiente platina */
+.v2 .it-titulo {
+  margin: 12px 0 0; font-size: 42px; font-weight: 600; letter-spacing: -.025em; line-height: 1.08;
+  color: var(--txt);
+  background: linear-gradient(180deg, var(--display-a), var(--display-b));
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
 }
-.v2 .it-stat b { font-size: 32px; font-weight: 650; letter-spacing: -.02em; line-height: 1.05; color: var(--txt); font-variant-numeric: tabular-nums; }
-.v2 .it-stat span { font-size: 10.5px; color: var(--txt-2); line-height: 1.35; }
-/* fechados = sucesso: fala a semântica verde, em qualquer acento */
-.v2 .it-stat.ok { background: var(--verde-bg); border-color: rgba(var(--verde-rgb), .3); }
-.v2 .it-stat.ok b { color: var(--verde); }
+.v2 .it-sub { margin: 10px 0 0; font-size: 14px; font-weight: 500; color: var(--txt-2); }
+
+/* briefing: números display SEM caixas, hairlines verticais entre eles */
+.v2 .it-stats { margin-top: 38px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; }
+.v2 .it-stat { position: relative; padding: 2px 16px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.v2 .it-stat + .it-stat::before {
+  content: ''; position: absolute; left: 0; top: 14%; bottom: 16%; width: 1px;
+  background: linear-gradient(180deg, transparent, rgba(var(--tint), .16) 30%, rgba(var(--tint), .16) 70%, transparent);
+}
+.v2 .it-stat b {
+  font-size: 54px; font-weight: 600; letter-spacing: -.035em; line-height: 1; font-variant-numeric: tabular-nums;
+  background: linear-gradient(180deg, var(--display-a), var(--display-b));
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+}
+.v2 .it-leg {
+  font-size: 10px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--txt-3); line-height: 1.4; max-width: 160px;
+}
 .v2 .it-carregando { grid-column: 1 / -1; font-size: 12px; color: var(--txt-3); padding: 22px 0; }
 
-/* cor de hoje */
-.v2 .it-sec { margin-top: 26px; }
-.v2 .it-rot { font-size: 12.5px; font-weight: 600; color: var(--txt); }
-.v2 .it-sub2 { font-size: 11px; color: var(--txt-3); margin-top: 2px; }
-.v2 .it-cores { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; margin-top: 11px; }
-.v2 .it-cor {
-  display: flex; align-items: center; justify-content: center; gap: 9px; padding: 13px 8px;
-  border-radius: 12px; cursor: pointer; font-family: var(--fonte); font-size: 12.5px; font-weight: 600;
-  color: var(--txt-2); background: rgba(var(--tint), .05); border: 1px solid rgba(var(--tint), .11);
-  transition: background .15s, border-color .15s, color .15s, box-shadow .15s, transform .15s var(--ease);
+/* fechados fala o ACENTO eleito (dono 28/08) — o único número colorido */
+.v2 .it-stat.destaque b {
+  background: none; -webkit-text-fill-color: var(--azul, #4C8DFF); color: var(--azul, #4C8DFF);
+  text-shadow: 0 6px 28px rgba(var(--azul-rgb, 76, 141, 255), calc(.35 * var(--fx)));
 }
-.v2 .it-cor:hover { background: rgba(var(--tint), .08); color: var(--txt); transform: translateY(-1px); }
-.v2 .it-cor.on {
-  color: var(--txt);
-  background: rgba(var(--azul-rgb, 76, 141, 255), .13);
-  border-color: rgba(var(--azul-rgb, 76, 141, 255), .55);
-  box-shadow: 0 0 0 3px rgba(var(--azul-rgb, 76, 141, 255), .12);
+:root[data-tema="light"] .v2 .it-stat.destaque b { text-shadow: none; }
+.v2 .it-tag {
+  display: inline-flex; padding: 4px 10px; border-radius: 999px;
+  font-size: 9.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+  background: var(--azul, #4C8DFF); color: #fff;
+  box-shadow: 0 4px 14px rgba(var(--azul-rgb, 76, 141, 255), calc(.3 * var(--fx))), inset 0 1px 0 rgba(255, 255, 255, .28);
 }
-.v2 .it-sw { width: 15px; height: 15px; border-radius: 50%; flex-shrink: 0; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .3), 0 1px 5px rgba(2, 4, 10, .4); }
-/* tema: dois cartões, mesmos códigos do seletor de cor */
-.v2 .it-temas { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.v2 .it-cor svg { flex-shrink: 0; }
+:root[data-tema="light"] .v2 .it-tag { box-shadow: 0 2px 8px rgba(var(--azul-rgb, 42, 98, 201), .2), inset 0 1px 0 rgba(255, 255, 255, .28); }
+:root[data-acento="dourado"] .v2 .it-tag { color: #241A05; }
 
-/* modo Leve */
-.v2 .it-linha {
-  margin-top: 22px; padding-top: 17px; border-top: 1px solid var(--linha);
-  display: flex; align-items: center; justify-content: space-between; gap: 12px; text-align: left;
+/* faixa "Aparência" — a única moldura da tela */
+.v2 .it-aparencia { margin-top: 44px; }
+.v2 .it-ap-rot {
+  font-size: 9.5px; font-weight: 600; letter-spacing: .2em; text-transform: uppercase;
+  color: var(--txt-3); margin-bottom: 10px;
 }
+.v2 .it-faixa {
+  display: flex; align-items: stretch; padding: 14px 10px 15px; border-radius: 16px;
+  background: rgba(var(--tint), .045); border: 1px solid rgba(var(--tint), .1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06);
+}
+:root[data-tema="light"] .v2 .it-faixa {
+  background: var(--vidro-a); border-color: rgba(22, 25, 31, .08);
+  box-shadow: var(--sombra-1), inset 0 1px 0 rgba(255, 255, 255, .9);
+}
+.v2 .it-celula { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 9px; padding: 2px 18px; }
+.v2 .it-celula + .it-celula { border-left: 1px solid rgba(var(--tint), .08); }
+.v2 .it-cel-rot { font-size: 9.5px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--txt-3); }
+.v2 .it-cel-sub { font-size: 9.5px; color: var(--txt-3); min-height: 12px; line-height: 1.3; }
 
-.v2 .it-cta { margin-top: 28px; padding: 11px 30px; font-size: 13.5px; }
+/* cor: discos com check preenchido — seleção por peso, nunca por anel */
+.v2 .it-discos { display: flex; gap: 14px; }
+.v2 .it-disc {
+  width: 28px; height: 28px; border-radius: 50%; padding: 0; border: 0; cursor: pointer;
+  display: grid; place-items: center; color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), inset 0 -2px 4px rgba(0, 0, 0, .22), 0 2px 8px rgba(2, 4, 10, .35);
+  transition: transform .18s var(--ease), box-shadow .18s;
+}
+:root[data-tema="light"] .v2 .it-disc { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .5), inset 0 -2px 4px rgba(0, 0, 0, .15), 0 2px 6px rgba(22, 25, 31, .18); }
+.v2 .it-disc:hover { transform: translateY(-2px); }
+.v2 .it-disc svg { opacity: 0; transform: scale(.5); transition: opacity .15s, transform .18s var(--ease); }
+.v2 .it-disc.on {
+  transform: scale(1.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), inset 0 -2px 4px rgba(0, 0, 0, .22), 0 4px 14px rgba(var(--azul-rgb, 76, 141, 255), calc(.4 * var(--fx)));
+}
+:root[data-tema="light"] .v2 .it-disc.on { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .5), inset 0 -2px 4px rgba(0, 0, 0, .15), 0 3px 10px rgba(var(--azul-rgb, 42, 98, 201), .26); }
+.v2 .it-disc.on svg { opacity: 1; transform: scale(1); }
+.v2 .it-disc[data-cor="dourado"] { color: #241A05; }
+
+/* tema: segmentado com polegar de platina — a seleção É o polegar */
+.v2 .it-seg {
+  position: relative; display: grid; grid-template-columns: 1fr 1fr;
+  width: 184px; height: 32px; padding: 3px; border-radius: 999px;
+  background: rgba(var(--tint), .07);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, .28);
+}
+:root[data-tema="light"] .v2 .it-seg { box-shadow: inset 0 1px 3px rgba(22, 25, 31, .07); }
+.v2 .it-seg-thumb {
+  position: absolute; top: 3px; left: 3px; bottom: 3px; width: calc(50% - 3px);
+  border-radius: 999px; background: linear-gradient(180deg, var(--platina-a), var(--platina-b));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .65), 0 2px 8px rgba(2, 4, 10, .35);
+  transition: transform .28s var(--ease);
+}
+:root[data-tema="light"] .v2 .it-seg-thumb { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .85), 0 1px 5px rgba(22, 25, 31, .18); }
+.v2 .it-seg[data-sel="light"] .it-seg-thumb { transform: translateX(100%); }
+.v2 .it-seg-opt {
+  position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+  border: 0; background: none; padding: 0; cursor: pointer; border-radius: 999px;
+  font-family: var(--fonte); font-size: 12px; font-weight: 600; color: var(--txt-3); transition: color .2s;
+}
+.v2 .it-seg-opt:hover { color: var(--txt-2); }
+.v2 .it-seg-opt.on { color: var(--platina-txt); }
+.v2 .it-seg-opt svg { flex-shrink: 0; }
+
+/* CTA + nota */
+.v2 .it-cta { margin-top: 30px; padding: 12px 38px; font-size: 13.5px; }
+.v2 .it-nota { margin: 12px 0 0; font-size: 11px; color: var(--txt-3); }
+
+/* a11y: foco de teclado sem anel de mouse */
+.v2 .it-disc:focus-visible, .v2 .it-seg-opt:focus-visible { outline: 2px solid rgba(var(--tint), .4); outline-offset: 2px; }
 
 @media (max-width: 640px) {
-  .v2 .it-titulo { font-size: 28px; }
-  .v2 .it-stats { grid-template-columns: 1fr; }
-  .v2 .it-stat { flex-direction: row; align-items: baseline; justify-content: center; gap: 9px; padding: 13px 12px; }
+  .v2 .it-titulo { font-size: 30px; }
+  .v2 .it-stat { padding: 2px 8px; }
+  .v2 .it-stat b { font-size: 36px; }
+  .v2 .it-leg { font-size: 9px; }
+  .v2 .it-faixa { flex-direction: column; gap: 16px; }
+  .v2 .it-celula + .it-celula { border-left: 0; border-top: 1px solid rgba(var(--tint), .08); padding-top: 16px; width: 100%; }
 }
+
+/* MODO LEVE: estados novos são por classe — só corta as transições */
+:root[data-perf="lite"] .v2 .it-disc, :root[data-perf="lite"] .v2 .it-disc svg,
+:root[data-perf="lite"] .v2 .it-seg-thumb, :root[data-perf="lite"] .v2 .it-seg-opt { transition: none; }
+:root[data-perf="lite"] .v2 .it-stat.destaque b { text-shadow: none; }
 
 /* ============================================================
    AVISO DE ATUALIZAÇÃO — pílula fixa quando o SW do deploy novo ativa.
