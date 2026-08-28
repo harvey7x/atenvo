@@ -6,6 +6,7 @@ import { LogoAtenvo } from './LogoAtenvo';
 import { Toggle } from './Toggle';
 import { assinarAcento, lerAcento, salvarAcento, type Acento } from '../lib/acento';
 import { assinarModoPerf, lerModoPerf, salvarModoPerf, type ModoPerf } from '../lib/perf';
+import type { Tema } from '../lib/tema';
 import { saudacaoPorHora } from '../lib/introDia';
 import { BRIEF_REAL, seedBriefingDia, useBriefingDia, type BriefingDia } from '@/data/introDia';
 
@@ -26,6 +27,18 @@ const CORES: { valor: Acento; rotulo: string; cor: string }[] = [
 ];
 
 const plural = (n: number, um: string, muitos: string) => (n === 1 ? um : muitos);
+
+/* ícones mini do tema (traço fino, par dos da topbar) */
+const IcLua = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <path d="M20.5 14.5A8.5 8.5 0 1 1 9.5 3.5a7 7 0 0 0 11 11z" />
+  </svg>
+);
+const IcSol = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
+    <circle cx="12" cy="12" r="4.2" /><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19" />
+  </svg>
+);
 
 /* contagem crescente com guarda de visibilidade (aba oculta congela o rAF —
    mesmo contrato do Contador do Dashboard: sem veredito, mostra o valor) */
@@ -48,10 +61,14 @@ function Contagem({ ate }: { ate: number }) {
   return <>{v}</>;
 }
 
-export function IntroDia({ aberta, aoConcluir, nome }: {
+export function IntroDia({ aberta, aoConcluir, nome, tema, aoMudarTema }: {
   aberta: boolean;
   aoConcluir: () => void;
   nome: string;
+  /* tema é estado do SHELL (dono do sol/lua da topbar) — vem por props pra
+     não divergir; a intro só escolhe */
+  tema: Tema;
+  aoMudarTema: (novo: Tema) => void;
 }) {
   const [acento, setAcento] = useState<Acento>(() => lerAcento());
   useEffect(() => assinarAcento(setAcento), []);
@@ -136,6 +153,26 @@ export function IntroDia({ aberta, aoConcluir, nome }: {
                 {c.rotulo}
               </button>
             ))}
+          </div>
+        </div>
+
+        <div className="it-sec">
+          <div className="it-rot">Escuro ou claro?</div>
+          <div className="it-cores it-temas" role="radiogroup" aria-label="Tema do sistema">
+            <button
+              type="button" role="radio" aria-checked={tema === 'dark'}
+              className={tema === 'dark' ? 'it-cor on' : 'it-cor'}
+              onClick={() => aoMudarTema('dark')}
+            >
+              <IcLua /> Escuro
+            </button>
+            <button
+              type="button" role="radio" aria-checked={tema === 'light'}
+              className={tema === 'light' ? 'it-cor on' : 'it-cor'}
+              onClick={() => aoMudarTema('light')}
+            >
+              <IcSol /> Claro
+            </button>
           </div>
         </div>
 

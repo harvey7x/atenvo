@@ -148,9 +148,14 @@ export default function AppShellV2() {
     setIntroAberta(false);
   }, [user?.id]);
   useEffect(() => { aplicarTema(tema); }, [tema]);
-  const alternarTema = useCallback(() => {
-    setTema((t) => { const novo: Tema = t === 'dark' ? 'light' : 'dark'; salvarTema(novo, escopoTema); return novo; });
+  // valor explícito (a intro do dia escolhe direto); o toggle da topbar cicla por cima
+  const definirTema = useCallback((novo: Tema) => {
+    setTema(novo);
+    salvarTema(novo, escopoTema);
   }, [escopoTema]);
+  const alternarTema = useCallback(() => {
+    definirTema(tema === 'dark' ? 'light' : 'dark');
+  }, [definirTema, tema]);
   // Modo de Performance na topbar (par do alternador de tema): o clique cicla
   // Automático → Leve → Completo; o estado vem da assinatura (a mesma que
   // mantém o Segmentado de Configurações em sincronia). Dot = Leve fixado.
@@ -423,7 +428,7 @@ export default function AppShellV2() {
         </main>
 
         {/* portais soltos: intro do dia + aviso de deploy (dono 28/08) */}
-        <IntroDia aberta={introAberta} aoConcluir={concluirIntro} nome={nome} />
+        <IntroDia aberta={introAberta} aoConcluir={concluirIntro} nome={nome} tema={tema} aoMudarTema={definirTema} />
         <AvisoAtualizacao />
       </div>
 
