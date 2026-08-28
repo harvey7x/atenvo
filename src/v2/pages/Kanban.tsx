@@ -386,17 +386,14 @@ export default function KanbanV2() {
   const vazioFunil = leads.length === 0 && colunas.length > 0;
 
   const abertos = useMemo(() => leads.filter((l) => l.status === 'em_andamento'), [leads]);
-  // O PLACAR acompanha o filtro de origem (o recorte que o chip ao lado aplica): mesmo conjunto
-  // ativo que o board mostra na faceta selecionada — sem filtro, é o funil inteiro.
-  const abertosNoRecorte = useMemo(() => abertos.filter((l) => (!filtroOrigem || origemDe(l) === filtroOrigem) && passaAvancados(l)), [abertos, filtroOrigem, filtroBenef, filtroBanco, filtroDataDe, filtroDataAte, fichaResumoMap]); // eslint-disable-line react-hooks/exhaustive-deps
+  // (abertosNoRecorte saiu com os KPIs — quem precisa do recorte filtrado usa leadsVisiveis)
 
   /* ---------- v2.1: agregação client-side (só apresentação; zero query/métrica/mutação nova) ----------
      estaParado = MESMA regra do trilho rubro do card (LIMIAR_PARADO_DIAS sem trocar de coluna neutra). */
   const estaParado = (l: KLead) => l.status === 'em_andamento'
     && (colunas.find((c) => c.id === l.colunaId)?.resultado ?? 'neutro') === 'neutro'
     && diasParado(l) >= LIMIAR_PARADO_DIAS;
-  const nParados = useMemo(() => abertosNoRecorte.filter(estaParado).length, [abertosNoRecorte, colunas]); // eslint-disable-line react-hooks/exhaustive-deps
-  const nFichaPend = useMemo(() => abertosNoRecorte.filter((l) => fichaResumoMap[l.id]?.status === 'rascunho').length, [abertosNoRecorte, fichaResumoMap]);
+  // (KPIs removidos 27/08 — agregados que só alimentavam a faixa saíram junto)
   // origem/canal repetido em ~todos os cards é ruído → vira FILTRO no topo; no card só quando é exceção.
   // Conta 1 origem por LEAD ATIVO (em_andamento) — mesma base do "leads ativos", então os chips
   // SOMAM ~401 (decisão do dono). Antes contava sobre todos os status e somava ~524.
@@ -430,31 +427,9 @@ export default function KanbanV2() {
     || (estaParado(l) && !l.respId)
   );
 
-  /* ---------- v3: KPIs de etapa do funil (Reuniões/Contratos/Fechados) — client-side, zero query nova.
-     Robustos a renomear: casam por palavra-chave; se não casar, caem nas colunas neutras mais próximas do fecho. */
-  const ativosPorColuna = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const l of abertosNoRecorte) { const cid = colunaDoLead(l); if (cid) m.set(cid, (m.get(cid) ?? 0) + 1); }
-    return m;
-  }, [abertosNoRecorte]); // eslint-disable-line react-hooks/exhaustive-deps
-  // v3 F3 — parados por coluna → a etapa que mais trava (mesmo limiar do selo "Gargalo": ≥5 e >40% da etapa).
-  const paradosPorColuna = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const l of abertosNoRecorte) if (estaParado(l)) { const cid = colunaDoLead(l); if (cid) m.set(cid, (m.get(cid) ?? 0) + 1); }
-    return m;
-  }, [abertosNoRecorte, colunas]); // eslint-disable-line react-hooks/exhaustive-deps
-  const gargaloTop = useMemo(() => {
-    let best: { col: KColuna; n: number } | null = null;
-    for (const [cid, n] of paradosPorColuna) {
-      const total = ativosPorColuna.get(cid) ?? n;
-      if (n >= 5 && n / total > 0.4 && (!best || n > best.n)) { const col = colunas.find((c) => c.id === cid); if (col) best = { col, n }; }
-    }
-    return best;
-  }, [paradosPorColuna, ativosPorColuna, colunas]);
-  const colGanho = useMemo(() => colunas.find((c) => c.resultado === 'ganho') ?? null, [colunas]);
-  const nFechados = useMemo(() => (colGanho ? leads.filter((l) => l.status === 'ganho' && (!filtroOrigem || origemDe(l) === filtroOrigem)).length : 0), [leads, colGanho, filtroOrigem]); // eslint-disable-line react-hooks/exhaustive-deps
-  // KPIs "na etapa" removidos (polish 2026-08): duplicavam o header das colunas
-  // sem dizer QUAL etapa — leitura ambígua. A contagem por etapa vive no board.
+  // KPIs da faixa removidos por completo (dono 27/08: "deixa só o kanban") — os
+  // agregados que só os alimentavam (ativos/parados por coluna, gargalo, fechados)
+  // saíram junto; a leitura por etapa vive nos subcabeçalhos das colunas.
 
   /* ---------- v3 F2: CARGA POR RESPONSÁVEL — quem está sobrecarregado num relance (client-side).
      ativos / parados / críticos por atendente; clicar filtra o board (filtroResp). */
@@ -489,11 +464,6 @@ export default function KanbanV2() {
     return [...m.entries()].sort((a, b) => b[1] - a[1]);
   }, [abertos, fichaResumoMap]); // eslint-disable-line react-hooks/exhaustive-deps
   const limparFiltros = () => { setFiltroBenef(new Set()); setFiltroBanco(new Set()); setFiltroDataDe(''); setFiltroDataAte(''); setFiltroResp(null); setFiltroOrigem(null); };
-  // distribuição por etapa (KPI "Funil"): barra empilhada nas cores das colunas — complementa o "N no funil"
-  const etapasDist = useMemo(() => colunas
-    .filter((c) => (c.resultado ?? 'neutro') === 'neutro')
-    .map((c) => ({ id: c.id, nome: c.nome, cor: c.cor, n: ativosPorColuna.get(c.id) ?? 0 })), [colunas, ativosPorColuna]);
-  const distTotal = Math.max(1, etapasDist.reduce((s, d) => s + d.n, 0));
 
   /* EXPORTAÇÃO CSV (dono 27/08): baixa exatamente o RECORTE atual — busca + canal +
      atendente + filtros avançados, o mesmo conjunto que o board mostra. CSV com BOM e
@@ -928,39 +898,10 @@ export default function KanbanV2() {
         </div>
       </div>
 
-      {/* v3 — Painel de KPIs (saúde do funil) + barra de ordenação/Foco/origem. Só agregação client-side. */}
+      {/* KPIs REMOVIDOS a pedido do dono (27/08: "deixa só o kanban") — o board é a tela.
+          Distribuição/parados seguem visíveis nos subcabeçalhos das colunas e no Foco. */}
       {!vazioFunil && (
         <>
-          <div className="kb-kpis sobe" role="group" aria-label="Indicadores do funil">
-            {/* total + distribuição no MESMO card: barra nas cores das colunas sob o número
-                (detalhe por etapa no hover) — sem tile extra poluindo a faixa */}
-            <div className="kb-kpi" title={'Oportunidades em andamento (1 card = 1 oportunidade).' + (etapasDist.some((d) => d.n > 0) ? ' Distribuição: ' + etapasDist.filter((d) => d.n > 0).map((d) => `${d.nome} ${d.n}`).join(' · ') : '')}>
-              <div className="lab">Leads ativos</div><div className="val num">{abertosNoRecorte.length}</div>
-              <div className="meta">no funil</div>
-              {etapasDist.some((d) => d.n > 0) && (
-                <div className="kb-dist" aria-hidden>
-                  {etapasDist.filter((d) => d.n > 0).map((d) => (
-                    <span key={d.id} style={{ width: `${(d.n / distTotal) * 100}%`, background: d.cor }} />
-                  ))}
-                </div>
-              )}
-            </div>
-            <button type="button" className={'kb-kpi crit acao' + (foco ? ' on' : '')} aria-pressed={foco}
-              title={gargaloTop ? `Etapa mais travada: ${gargaloTop.col.nome} (${gargaloTop.n} parados). Clique para focar só no que exige ação agora.` : 'Leads sem trocar de coluna há mais de 7 dias. Clique para focar só no que exige ação agora.'}
-              onClick={() => setFoco((f) => !f)}>
-              <div className="lab">Parados +{LIMIAR_PARADO_DIAS}d</div><div className="val num">{nParados}</div>
-              <div className="meta">{abertosNoRecorte.length > 0 ? Math.round((nParados / abertosNoRecorte.length) * 100) + '%' : ''}{foco ? ' — focando' : gargaloTop ? ' · trava em ' + gargaloTop.col.nome : nParados > 0 ? ' — ver só estes' : ''}</div>
-            </button>
-            <div className="kb-kpi warn" title="Fichas judiciais em rascunho, ainda não finalizadas.">
-              <div className="lab">Pendentes</div><div className="val num">{nFichaPend}</div>
-              <div className="meta">ficha{nFichaPend === 1 ? '' : 's'} em rascunho</div>
-            </div>
-            {colGanho && (
-              <div className="kb-kpi good" title={`Oportunidades fechadas como ganho${filtroOrigem ? ' · ' + filtroOrigem : ''}`}>
-                <div className="lab">{colGanho.nome}</div><div className="val num">{nFechados}</div><div className="meta">ganhos</div>
-              </div>
-            )}
-          </div>
 
           <div className="kb-barra sobe">
             <div className="kb-ord" role="group" aria-label="Ordenar os cards">
