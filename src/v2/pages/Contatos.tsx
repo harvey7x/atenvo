@@ -8,7 +8,7 @@ import {
 import { WA_REAL, useAgendamentosOrg, conversaAtivaDoContato } from '@/data/whatsapp';
 import { useCobrancas } from '@/data/cobrancas';
 import { useOportunidadesDoContato, type OppDoContato } from '@/data/kanban';
-import { useAtivacaoDoContato, useBloquear, useDesbloquear } from '@/data/relacionamento';
+import { useAtivacaoDoContato } from '@/data/relacionamento';
 import { useEtiquetas, useOrgUsuarios } from '@/data/atendimento';
 import { corDaEtiqueta } from '@/types/atendimento';
 import { initials } from '@/lib/avatar';
@@ -89,10 +89,8 @@ export default function ContatosV2() {
   const cobrancasQ = useCobrancas();
   const agsQ = useAgendamentosOrg();
   const bloqueiosQ = useBloqueiosOrg();
-  const bloquear = useBloquear();
-  const desbloquear = useDesbloquear();
 
-  const [extras, setExtras] = useState<ExtrasDemo | null>(() => (demo ? seedExtras() : null));
+  const [extras] = useState<ExtrasDemo | null>(() => (demo ? seedExtras() : null));
   const [aviso, setAviso] = useState<Aviso>(null);
 
   const contatos = useMemo(() => contatosQ.data ?? [], [contatosQ.data]);
@@ -121,7 +119,6 @@ export default function ContatosV2() {
   const [origem, setOrigem] = useState('');
   const [consultor, setConsultor] = useState('');
   const [soVencidas, setSoVencidas] = useState(false);
-  const [soOptout, setSoOptout] = useState(false);
 
   const origens = useMemo(() => Array.from(new Set(contatos.map((c) => c.org).filter((o) => o && o !== '—'))).sort(), [contatos]);
   const consultores = useMemo(() => Array.from(new Set(contatos.map((c) => c.resp).filter((r) => r && r !== '—'))).sort(), [contatos]);
@@ -131,22 +128,21 @@ export default function ContatosV2() {
     if (origem && c.org !== origem) return false;
     if (consultor && c.resp !== consultor) return false;
     if (soVencidas && cobPorContato.get(c.id) !== 'vencida') return false;
-    if (soOptout && !bloqueados.has(c.id)) return false;
     if (busca) {
       const alvo = `${c.nome} ${c.email} ${c.tel}`.toLowerCase();
       if (!alvo.includes(busca)) return false;
     }
     return true;
-  }), [contatos, st, origem, consultor, soVencidas, soOptout, busca, cobPorContato, bloqueados]);
+  }), [contatos, st, origem, consultor, soVencidas, busca, cobPorContato, bloqueados]);
 
-  function limpar() { setBuscaRaw(''); setBusca(''); setSt('all'); setOrigem(''); setConsultor(''); setSoVencidas(false); setSoOptout(false); }
-  const filtrando = busca !== '' || st !== 'all' || origem !== '' || consultor !== '' || soVencidas || soOptout;
+  function limpar() { setBuscaRaw(''); setBusca(''); setSt('all'); setOrigem(''); setConsultor(''); setSoVencidas(false); }
+  const filtrando = busca !== '' || st !== 'all' || origem !== '' || consultor !== '' || soVencidas;
 
   /* ---- paginação client-side ---- */
   const [pagina, setPagina] = useState(1);
   const totalPaginas = Math.max(1, Math.ceil(lista.length / POR_PAGINA));
   const paginaVisivel = Math.min(pagina, totalPaginas);
-  useEffect(() => { setPagina(1); }, [busca, st, origem, consultor, soVencidas, soOptout]);
+  useEffect(() => { setPagina(1); }, [busca, st, origem, consultor, soVencidas]);
   const paginaLinhas = lista.slice((paginaVisivel - 1) * POR_PAGINA, paginaVisivel * POR_PAGINA);
 
   /* ---- seleção + bulk (Exportar CSV client-side — precedente Cobranças) ---- */
@@ -156,8 +152,8 @@ export default function ContatosV2() {
     const alvo = contatos.filter((c) => ids.includes(c.id));
     const esc = (v: string) => '"' + String(v ?? '').replace(/"/g, '""') + '"';
     const linhas = [
-      ['nome', 'telefone', 'email', 'cpf', 'origem', 'responsavel', 'status', 'etiquetas', 'nao_incomodar'].join(';'),
-      ...alvo.map((c) => [esc(c.nome), esc(c.tel), esc(c.email), esc(c.cpf ?? ''), esc(c.org), esc(c.resp), esc(c.st), esc(c.tags.join(', ')), bloqueados.has(c.id) ? 'sim' : 'nao'].join(';')),
+      ['nome', 'telefone', 'email', 'cpf', 'origem', 'responsavel', 'status', 'etiquetas'].join(';'),
+      ...alvo.map((c) => [esc(c.nome), esc(c.tel), esc(c.email), esc(c.cpf ?? ''), esc(c.org), esc(c.resp), esc(c.st), esc(c.tags.join(', '))].join(';')),
     ];
     const blob = new Blob(['﻿' + linhas.join('\n')], { type: 'text/csv;charset=utf-8' });
     const a = document.createElement('a');
@@ -202,23 +198,8 @@ export default function ContatosV2() {
     } catch (e) { setAviso({ tom: 'erro', texto: (e as Error).message || 'Falha ao localizar a conversa.' }); }
   }
 
-  async function alternarBloqueio(c: ContatoRow, bloquearAgora: boolean) {
-    try {
-      if (demo) {
-        setExtras((x) => {
-          if (!x) return x;
-          const n = new Set(x.bloqueados);
-          if (bloquearAgora) n.add(c.id); else n.delete(c.id);
-          return { ...x, bloqueados: n };
-        });
-      } else if (bloquearAgora) {
-        await bloquear.mutateAsync({ contatoId: c.id, motivo: 'optout manual' });
-      } else {
-        await desbloquear.mutateAsync(c.id);
-      }
-      setAviso({ tom: 'ok', texto: bloquearAgora ? 'Contato marcado como não incomodar. Nenhuma mensagem será enviada.' : 'Bloqueio removido. O contato volta a poder receber mensagens.' });
-    } catch (e) { setAviso({ tom: 'erro', texto: (e as Error).message || 'Falha na operação.' }); }
-  }
+  // OPÇÃO manual de 'não incomodar' removida (dono 27/08) — o opt-out AUTOMÁTICO
+  // (cliente manda SAIR) segue intacto no backend; a UI só EXIBE o estado.
 
   const clientes = contatos.filter((c) => c.st === 'Cliente').length;
   const carregando = contatosQ.isLoading;
@@ -349,7 +330,6 @@ export default function ContatosV2() {
               {consultores.map((r) => <option key={r} value={r}>{r}</option>)}
             </select>
             <Chip ativo={soVencidas} onClick={() => setSoVencidas((v) => !v)}>Cobrança vencida</Chip>
-            <Chip ativo={soOptout} onClick={() => setSoOptout((v) => !v)}>Não incomodar</Chip>
             {filtrando && <Chip limpar onClick={limpar}>Limpar</Chip>}
           </div>
 
@@ -394,7 +374,6 @@ export default function ContatosV2() {
           aoFechar={() => setDetId(null)}
           aoAbrirConversa={() => abrirConversa(det)}
           aoAgendar={() => navigate('/agendamentos')}
-          aoBloquear={(v) => alternarBloqueio(det, v)}
           aoEditar={() => setForm({ modo: 'editar', alvo: det })}
           aoExcluir={() => setExcluir(det)}
         />
@@ -434,11 +413,11 @@ export default function ContatosV2() {
 }
 
 /* ===================== ficha do contato (drawer) ===================== */
-function FichaContato({ contato, demo, extras, bloqueado, cobSituacao, agsOrg, aoFechar, aoAbrirConversa, aoAgendar, aoBloquear, aoEditar, aoExcluir }: {
+function FichaContato({ contato, demo, extras, bloqueado, cobSituacao, agsOrg, aoFechar, aoAbrirConversa, aoAgendar, aoEditar, aoExcluir }: {
   contato: ContatoRow; demo: boolean; extras: ExtrasDemo | null; bloqueado: boolean;
   cobSituacao: CobSituacao | undefined; agsOrg: { contatoId: string | null; texto: string | null; executarEm: string; status: string }[] | null;
   aoFechar: () => void; aoAbrirConversa: () => void; aoAgendar: () => void;
-  aoBloquear: (bloquear: boolean) => void; aoEditar: () => void; aoExcluir: () => void;
+  aoEditar: () => void; aoExcluir: () => void;
 }) {
   const navigate = useNavigate();
   const oppsQ = useOportunidadesDoContato(demo ? null : contato.id);
@@ -483,20 +462,15 @@ function FichaContato({ contato, demo, extras, bloqueado, cobSituacao, agsOrg, a
           {bloqueado && <div className="fx-hint">Mensagens bloqueadas: este contato pediu para não ser incomodado.</div>}
         </div>
 
-        {/* opt-out — cidadão de primeira classe */}
-        <div className="fx-b">
-          {bloqueado ? (
+        {/* opt-out: a OPÇÃO manual saiu (dono 27/08) — fica só o AVISO quando o
+            cliente pediu SAIR (bloqueio automático, inviolável no envio) */}
+        {bloqueado && (
+          <div className="fx-b">
             <div className="fx-optout">
-              <div className="tx"><b>Não incomodar ativo.</b> Nenhuma mensagem (bot, régua ou agendamento) é enviada a este contato.</div>
-              <BotaoMini onClick={() => aoBloquear(false)}>Remover</BotaoMini>
+              <div className="tx"><b>Não incomodar ativo.</b> Este contato pediu para não receber mensagens (SAIR) — nada é enviado (bot, régua ou agendamento).</div>
             </div>
-          ) : (
-            <div className="fx-optin">
-              <span>Mensagens permitidas para este contato.</span>
-              <BotaoMini onClick={() => aoBloquear(true)}>Marcar não incomodar</BotaoMini>
-            </div>
-          )}
-        </div>
+          </div>
+        )}
 
         <div className="fx-b">
           <div className="fx-t">Identidade</div>
