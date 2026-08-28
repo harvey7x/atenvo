@@ -15,6 +15,9 @@ import { ICONES } from './icones';
 import { NotificacaoResposta, type DadosNotificacao } from './NotificacaoResposta';
 import { useNotificacaoInbound } from '../hooks/useNotificacaoInbound';
 import { aplicarTema, lerTema, salvarTema, type Tema } from '../lib/tema';
+import { deveMostrarIntroDia, marcarIntroVista } from '../lib/introDia';
+import { IntroDia } from '../components/IntroDia';
+import { AvisoAtualizacao } from '../components/AvisoAtualizacao';
 import { assinarModoPerf, lerModoPerf, salvarModoPerf, type ModoPerf } from '../lib/perf';
 import { assinarAcento, lerAcento, salvarAcento, type Acento } from '../lib/acento';
 import { useNotificacoes, useMarcarNotificacao } from '@/data/remarketing';
@@ -135,6 +138,15 @@ export default function AppShellV2() {
   const escopoTema = user?.id ?? undefined;
   const [tema, setTema] = useState<Tema>(() => lerTema(escopoTema));
   useEffect(() => { setTema(lerTema(escopoTema)); }, [escopoTema]); // recarrega a preferência quando o usuário resolve
+
+  // Intro do dia: primeira entrada de cada dia (o auth resolve assíncrono —
+  // só decide quando o user existe; virou a data local = mostra de novo)
+  const [introAberta, setIntroAberta] = useState(false);
+  useEffect(() => { if (user?.id && deveMostrarIntroDia(user.id)) setIntroAberta(true); }, [user?.id]);
+  const concluirIntro = useCallback(() => {
+    marcarIntroVista(user?.id ?? undefined);
+    setIntroAberta(false);
+  }, [user?.id]);
   useEffect(() => { aplicarTema(tema); }, [tema]);
   const alternarTema = useCallback(() => {
     setTema((t) => { const novo: Tema = t === 'dark' ? 'light' : 'dark'; salvarTema(novo, escopoTema); return novo; });
@@ -409,6 +421,10 @@ export default function AppShellV2() {
             }}
           />
         </main>
+
+        {/* portais soltos: intro do dia + aviso de deploy (dono 28/08) */}
+        <IntroDia aberta={introAberta} aoConcluir={concluirIntro} nome={nome} />
+        <AvisoAtualizacao />
       </div>
 
     </div>

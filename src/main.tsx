@@ -11,6 +11,7 @@ import { ConfigError } from '@/pages/ConfigError';
 import { isMisconfigured, isDemoMode } from '@/lib/supabase';
 import { resolverEAplicarPerf } from './v2/lib/perf';
 import { aplicarAcento, lerAcento } from './v2/lib/acento';
+import { sinalizarAtualizacao } from './v2/lib/atualizacao';
 import { tentarRecarga } from '@/lib/recargaChunk';
 import { registerSW } from 'virtual:pwa-register';
 
@@ -29,14 +30,15 @@ if (typeof window !== 'undefined') {
 if ('serviceWorker' in navigator) {
   registerSW({
     immediate: true,
-    // SEM reload forçado no update: sem este callback, o client do plugin executa
-    // window.location.reload() em TODAS as abas abertas assim que o SW novo ativa —
-    // rascunho digitado, conversa aberta e filtros iriam embora a cada deploy.
-    // O SW novo já assumiu o controle; a página troca de versão na próxima
-    // navegação/reabertura, e o guard vite:preloadError cobre chunk velho que 404e.
-    onNeedReload() { /* deliberadamente vazio */ },
+    // SEM reload forçado no update (rascunho digitado, conversa aberta e filtros
+    // iriam embora a cada deploy). Em vez disso, sinaliza o aviso in-app
+    // (AvisoAtualizacao): o atendente recarrega POR CLIQUE. O SW novo já assumiu
+    // o controle quando este callback roda (skipWaiting+clientsClaim), então o
+    // reload pega o index novo; o guard vite:preloadError segue cobrindo 404.
+    onNeedReload() { sinalizarAtualizacao(); },
     onRegisteredSW(_url, reg) {
-      if (reg) setInterval(() => { reg.update().catch(() => { /* offline: tenta na próxima */ }); }, 60 * 60 * 1000);
+      // 15 min (era 1h): o aviso de deploy deve chegar no mesmo turno de trabalho
+      if (reg) setInterval(() => { reg.update().catch(() => { /* offline: tenta na próxima */ }); }, 15 * 60 * 1000);
     },
   });
 }

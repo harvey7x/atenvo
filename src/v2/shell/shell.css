@@ -338,3 +338,76 @@
 :root[data-perf="lite"] .v2 .p-topbar { background: linear-gradient(180deg, #111214, #0C0D0F); }
 :root[data-perf="lite"][data-tema="light"] .v2 .sb-fundo { background: linear-gradient(180deg, #FEFEFE, #F7F8FA); }
 :root[data-perf="lite"][data-tema="light"] .v2 .p-topbar { background: linear-gradient(180deg, #EDEEF0, #F2F3F5); }
+
+/* ============================================================
+   INTRO DO DIA (dono 28/08) — recepção na 1ª entrada de cada dia.
+   Vive num ModalV2 (vidro fumê); aqui só o corpo.
+   ============================================================ */
+.v2 .intro-dia { display: flex; flex-direction: column; gap: 18px; }
+.v2 .id-cab { display: flex; align-items: center; gap: 14px; }
+.v2 .id-marca { width: 48px; height: 48px; flex-shrink: 0; display: block; filter: drop-shadow(0 6px 16px rgba(62, 123, 240, calc(.35 * var(--fx)))); }
+:root[data-acento="verde"] .v2 .id-marca { filter: drop-shadow(0 6px 16px rgba(39, 183, 108, calc(.35 * var(--fx)))); }
+:root[data-acento="dourado"] .v2 .id-marca { filter: drop-shadow(0 6px 16px rgba(209, 154, 46, calc(.35 * var(--fx)))); }
+.v2 .id-ola { font-size: 20px; font-weight: 650; letter-spacing: -.015em; }
+.v2 .id-data { font-size: 11.5px; color: var(--txt-3); margin-top: 2px; }
+.v2 .id-data::first-letter { text-transform: uppercase; }
+
+/* briefing: dois números grandes no tom do acento */
+.v2 .id-brief { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.v2 .id-num {
+  display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border-radius: 12px;
+  background: rgba(var(--azul-rgb, 76, 141, 255), .08);
+  border: 1px solid rgba(var(--azul-rgb, 76, 141, 255), .22);
+}
+.v2 .id-num b { font-size: 26px; font-weight: 650; letter-spacing: -.02em; line-height: 1.1; color: var(--txt); font-variant-numeric: tabular-nums; }
+.v2 .id-num span { font-size: 11px; color: var(--txt-2); }
+.v2 .id-carregando { grid-column: 1 / -1; font-size: 11.5px; color: var(--txt-3); padding: 14px 2px; }
+
+/* seletor de cor */
+.v2 .id-rot { font-size: 12.5px; font-weight: 600; }
+.v2 .id-sub { font-size: 11px; color: var(--txt-3); margin-top: 2px; }
+.v2 .id-cores { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 9px; }
+.v2 .id-cor {
+  display: flex; align-items: center; justify-content: center; gap: 8px; padding: 11px 8px;
+  border-radius: 11px; cursor: pointer; font-family: var(--fonte); font-size: 12px; font-weight: 600;
+  color: var(--txt-2); background: rgba(var(--tint), .04); border: 1px solid rgba(var(--tint), .1);
+  transition: background .15s, border-color .15s, color .15s, box-shadow .15s;
+}
+.v2 .id-cor:hover { background: rgba(var(--tint), .07); color: var(--txt); }
+.v2 .id-cor.on {
+  color: var(--txt);
+  background: rgba(var(--azul-rgb, 76, 141, 255), .12);
+  border-color: rgba(var(--azul-rgb, 76, 141, 255), .55);
+  box-shadow: 0 0 0 3px rgba(var(--azul-rgb, 76, 141, 255), .1);
+}
+.v2 .id-sw { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .28), 0 1px 4px rgba(2, 4, 10, .35); }
+
+/* linha do modo Leve */
+.v2 .id-linha { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 15px; border-top: 1px solid var(--linha); }
+
+/* ============================================================
+   AVISO DE ATUALIZAÇÃO — pílula fixa quando o SW do deploy novo ativa.
+   Recarregar é por clique; tokens cuidam do par claro.
+   ============================================================ */
+.v2 .aviso-up {
+  position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 1400;
+  display: flex; align-items: center; gap: 12px; padding: 9px 10px 9px 16px; border-radius: 999px;
+  background: var(--vidro-a); border: 1px solid var(--linha); box-shadow: var(--sombra-2);
+  backdrop-filter: blur(18px) saturate(1.1); -webkit-backdrop-filter: blur(18px) saturate(1.1);
+  animation: au-sobe .32s var(--ease);
+}
+:root[data-perf="lite"] .v2 .aviso-up { backdrop-filter: none; -webkit-backdrop-filter: none; background: var(--base); }
+.v2 .au-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--azul, var(--txt)); box-shadow: 0 0 10px rgba(var(--azul-rgb, 76, 141, 255), .8); animation: au-pulsa 1.6s ease-in-out infinite; }
+.v2 .au-txt { font-size: 12.5px; font-weight: 600; color: var(--txt); white-space: nowrap; }
+.v2 .au-btn {
+  font-family: var(--fonte); font-size: 12px; font-weight: 650; cursor: pointer; white-space: nowrap;
+  padding: 6px 13px; border-radius: 999px; border: 1px solid transparent; color: #fff;
+  background: var(--azul, #4C8DFF);
+}
+:root[data-acento="dourado"]:not([data-tema="light"]) .v2 .au-btn { color: #241A05; }
+.v2 .au-btn:hover { filter: brightness(1.08); }
+.v2 .au-depois { font-family: var(--fonte); font-size: 11.5px; color: var(--txt-3); background: none; border: 0; cursor: pointer; padding: 6px 8px; }
+.v2 .au-depois:hover { color: var(--txt-2); }
+@keyframes au-sobe { from { opacity: 0; transform: translate(-50%, 10px); } }
+@keyframes au-pulsa { 50% { opacity: .45; } }
+:root[data-perf="lite"] .v2 .au-dot { animation: none; }
