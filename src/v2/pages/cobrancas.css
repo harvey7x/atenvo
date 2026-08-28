@@ -150,3 +150,73 @@
 .v2 .cm-simbanner:not(.on) { background: var(--rubro-bg); border-color: rgba(var(--rubro-rgb), .35); }
 .v2 .cm-simbanner b { display: block; font-size: 12.5px; color: var(--txt); }
 .v2 .cm-simbanner span { display: block; font-size: 11.5px; color: var(--txt-2); margin-top: 1px; }
+
+/* ---- inteligência de cobrança (Painel executivo · Atendentes · Clientes) ---- */
+.v2 .cm-bar { flex: 1; height: 7px; border-radius: 99px; background: rgba(var(--tint), .07); overflow: hidden; min-width: 40px; }
+.v2 .cm-bar i { display: block; height: 100%; border-radius: 99px; }
+.v2 .cm-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+@media (max-width: 900px) { .v2 .cm-grid2 { grid-template-columns: 1fr; } }
+.v2 .cm-analise { padding: 15px 17px !important; }
+.v2 .cm-an-tt { font-size: 12.5px; font-weight: 600; margin-bottom: 13px; }
+
+.v2 .cm-saude, .v2 .cm-ranklist { display: flex; flex-direction: column; gap: 10px; }
+.v2 .cm-saude-lin, .v2 .cm-rank { display: grid; grid-template-columns: 118px 1fr auto; align-items: center; gap: 11px; }
+.v2 .cm-saude-rot { font-size: 12px; color: var(--txt-2); }
+.v2 .cm-saude-n { font-size: 12px; color: var(--txt); text-align: right; min-width: 20px; }
+.v2 .cm-rank-nm { font-size: 12px; color: var(--txt-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2 .cm-rank-nm b { color: var(--azul, var(--txt)); font-weight: 700; }
+.v2 .cm-rank-v { font-size: 11.5px; color: var(--txt); text-align: right; white-space: nowrap; }
+
+/* colunas de faturamento por mês */
+.v2 .cm-colunas { display: flex; align-items: flex-end; gap: 10px; height: 132px; padding-top: 6px; }
+.v2 .cm-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 7px; height: 100%; }
+.v2 .cm-col-bar { flex: 1; width: 100%; max-width: 34px; display: flex; align-items: flex-end; }
+.v2 .cm-col-bar i { width: 100%; border-radius: 5px 5px 0 0; background: linear-gradient(180deg, rgba(var(--azul-rgb, 76, 141, 255), .7), rgba(var(--azul-rgb, 76, 141, 255), .28)); }
+.v2 .cm-col-lab { font-size: 10px; color: var(--txt-3); }
+
+/* engajamento */
+.v2 .cm-eng-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+@media (max-width: 760px) { .v2 .cm-eng-grid { grid-template-columns: repeat(2, 1fr); } }
+.v2 .cm-eng { padding: 14px 15px !important; display: flex; flex-direction: column; gap: 6px; }
+.v2 .cm-eng-tt { font-size: 11px; color: var(--txt-3); }
+.v2 .cm-eng-pct { font-size: 26px; font-weight: 650; letter-spacing: -.02em; line-height: 1; color: var(--txt); }
+.v2 .cm-eng-pct span { font-size: 14px; color: var(--txt-3); }
+.v2 .cm-eng-sub { font-size: 10.5px; color: var(--txt-3); }
+
+/* tabelas de atendente/cliente: célula com nome + avatar */
+.v2 .cm-at-nm { display: flex; align-items: center; gap: 9px; font-weight: 500; color: var(--txt); }
+.v2 .cm-at-fat { display: flex; align-items: center; gap: 9px; justify-content: flex-end; }
+.v2 .cm-at-fat span { white-space: nowrap; }
+
+/* drawer de drill-down (atendente/cliente) */
+.v2 .cm-drawer { display: flex; flex-direction: column; height: 100%; padding: 18px; overflow-y: auto; }
+.v2 .cm-dr-head { display: flex; align-items: center; gap: 12px; }
+.v2 .cm-num-av.lg { width: 42px; height: 42px; font-size: 13px; }
+.v2 .cm-dr-nm { font-size: 15px; font-weight: 650; color: var(--txt); }
+.v2 .cm-dr-sub { font-size: 11.5px; color: var(--txt-3); margin-top: 2px; }
+.v2 .cm-dr-x { margin-left: auto; align-self: flex-start; width: 28px; height: 28px; border-radius: 8px; border: 0; background: rgba(var(--tint), .06); color: var(--txt-2); font-size: 18px; cursor: pointer; }
+.v2 .cm-dr-x:hover { background: rgba(var(--tint), .1); color: var(--txt); }
+.v2 .cm-dr-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 16px 0 4px; }
+.v2 .cm-dr-stats > div { padding: 12px 13px; border-radius: 11px; background: rgba(var(--tint), .04); border: 1px solid rgba(var(--tint), .08); }
+.v2 .cm-dr-stats b { display: block; font-size: 18px; font-weight: 650; color: var(--txt); }
+.v2 .cm-dr-stats b.ok { color: var(--verde); }
+.v2 .cm-dr-stats span { font-size: 10.5px; color: var(--txt-3); }
+.v2 .cm-dr-badge { display: flex; align-items: center; gap: 10px; margin: 14px 0 2px; }
+.v2 .cm-dr-badge span { font-size: 11.5px; color: var(--txt-2); }
+.v2 .cm-dr-sec { font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--txt-3); margin: 18px 0 9px; }
+.v2 .cm-dr-clientes, .v2 .cm-eng-list { display: flex; flex-direction: column; gap: 7px; }
+.v2 .cm-dr-cli { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 11px; border-radius: 9px; background: rgba(var(--tint), .03); border: 1px solid rgba(var(--tint), .06); }
+.v2 .cm-dr-cli-nm { font-size: 12.5px; color: var(--txt); display: flex; flex-direction: column; }
+.v2 .cm-dr-cli-nm span { font-size: 10.5px; color: var(--txt-3); }
+
+/* histórico de pagamento (timeline vertical) */
+.v2 .cm-hist { display: flex; flex-direction: column; gap: 2px; }
+.v2 .cm-hist-mes { display: grid; grid-template-columns: 14px 70px auto; align-items: center; gap: 10px; padding: 6px 0; }
+.v2 .cm-hist-dot { width: 9px; height: 9px; border-radius: 50%; background: rgba(var(--tint), .25); }
+.v2 .cm-hist-mes.s-paga .cm-hist-dot { background: var(--verde); }
+.v2 .cm-hist-mes.s-atraso .cm-hist-dot { background: var(--ambar); }
+.v2 .cm-hist-mes.s-nao_paga .cm-hist-dot { background: var(--rubro); }
+.v2 .cm-hist-comp { font-size: 11.5px; color: var(--txt-2); }
+.v2 .cm-eng-lin { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 11px; border-radius: 9px; background: rgba(var(--tint), .03); border: 1px solid rgba(var(--tint), .06); }
+.v2 .cm-eng-rot { font-size: 12px; color: var(--txt-2); }
+.v2 .cm-sec-lista { margin: 20px 0 8px; }

@@ -1,9 +1,27 @@
 import { useMemo, useState } from 'react';
 import {
-  BadgeStatus, BotaoPrimario, BotaoSec, CardVidro, Chip, Chips,
+  BadgeStatus, BotaoPrimario, BotaoSec, CardVidro, Chip, Chips, DrawerV2,
   EstadoVazio, Input, Kpi, ModalV2, TabelaPadrao, Toggle,
   type Coluna, type TomStatus,
 } from '../components';
+import {
+  seedClientes, metricasPorAtendente, metricasPorCiclo, resumoCarteira,
+  ROTULO_COMP, type ClienteAnalise, type Comportamento, type StatusMes, type TipoMsg,
+} from './cobrancaAnalytics';
+
+const CLIENTES = seedClientes();
+const compBadge: Record<Comportamento, TomStatus> = { em_dia: 'ok', voltou: 'atencao', faltou: 'atencao', inadimplente: 'erro' };
+const mesLabel = (c: string) => c.split('-').reverse().join('/');
+const TOM_MES: Record<StatusMes, TomStatus> = { paga: 'ok', atraso: 'atencao', nao_paga: 'erro', prevista: 'neutro' };
+const ROTULO_MES: Record<StatusMes, string> = { paga: 'Paga', atraso: 'Atraso', nao_paga: 'Não paga', prevista: 'Prevista' };
+const ROTULO_TIPO_ENG: Record<TipoMsg, string> = { antes: 'Lembrete (antes)', cobranca: 'Cobrança', depois: 'Aviso de atraso', remarketing: 'Remarketing' };
+
+/** barra horizontal calma (dado é calmo — sem animação de dado) */
+function Barra({ v, max, tom = 'tint' }: { v: number; max: number; tom?: 'tint' | 'ok' | 'erro' | 'azul' }) {
+  const pct = Math.max(2, Math.round((v / Math.max(1, max)) * 100));
+  const cor = tom === 'ok' ? 'var(--verde)' : tom === 'erro' ? 'var(--rubro)' : tom === 'azul' ? 'var(--azul, var(--txt))' : 'rgba(var(--tint), .5)';
+  return <div className="cm-bar"><i style={{ width: pct + '%', background: cor }} /></div>;
+}
 
 /* ------------------------------------------------------------------
    Modo Cobrança — sub-abas do motor dedicado (Fase B, UI).
@@ -270,6 +288,230 @@ export function AbaEnvios({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (t:
           ? <EstadoVazio titulo="Nada na fila" descricao="Ajuste o filtro ou enfileire cobranças na aba Ciclos." />
           : <TabelaPadrao colunas={colunas} linhas={lista} chave={(f) => f.id} rodape={{ texto: `${lista.length} na fila` }} />}
       </CardVidro>
+    </>
+  );
+}
+
+/* =================== PAINEL EXECUTIVO (bloco de métricas) =================== */
+
+export function PainelResumo() {
+  const r = useMemo(() => resumoCarteira(CLIENTES), []);
+  const ciclos = useMemo(() => metricasPorCiclo(CLIENTES), []);
+  const atend = useMemo(() => metricasPorAtendente(CLIENTES), []);
+  const maxCiclo = Math.max(...ciclos.map((c) => c.faturamento));
+  const maxAt = Math.max(...atend.map((a) => a.faturamento));
+  const maxMes = Math.max(...r.faturamentoMensal.map((m) => m.valor));
+  const TOM_C: Record<Comportamento, 'ok' | 'erro' | 'tint'> = { em_dia: 'ok', voltou: 'ok', faltou: 'erro', inadimplente: 'erro' };
+  return (
+    <>
+      <div className="kpis sobe">
+        <Kpi rotulo="Faturamento recebido" valor={Math.trunc(r.faturamentoTotal)} formato="mil" prefixo="R$ " sufixo=",00" tomValor="ok" />
+        <Kpi rotulo="Recorrência/mês" valor={Math.trunc(r.recorrencia)} formato="mil" prefixo="R$ " sufixo=",00" />
+        <Kpi rotulo="Em atraso" valor={Math.trunc(r.emAtrasoValor)} formato="mil" prefixo="R$ " sufixo=",00" tomValor={r.emAtrasoValor > 0 ? 'erro' : undefined} />
+        <Kpi rotulo="Adimplência" valor={r.adimplencia} sufixo="%" tomValor="ok" />
+      </div>
+
+      <div className="cm-grid2 sobe" style={{ animationDelay: '.08s' }}>
+        <CardVidro spot className="cm-analise">
+          <div className="cm-an-tt">Saúde da carteira</div>
+          <div className="cm-saude">
+            {r.porComportamento.map((s) => (
+              <div className="cm-saude-lin" key={s.comp}>
+                <span className="cm-saude-rot">{ROTULO_COMP[s.comp]}</span>
+                <Barra v={s.n} max={CLIENTES.length} tom={TOM_C[s.comp]} />
+                <span className="cm-saude-n num">{s.n}</span>
+              </div>
+            ))}
+          </div>
+        </CardVidro>
+        <CardVidro spot className="cm-analise">
+          <div className="cm-an-tt">Faturamento por mês</div>
+          <div className="cm-colunas">
+            {r.faturamentoMensal.map((m) => (
+              <div className="cm-col" key={m.competencia}>
+                <div className="cm-col-bar"><i style={{ height: Math.max(4, Math.round((m.valor / maxMes) * 100)) + '%' }} /></div>
+                <div className="cm-col-lab num">{m.competencia.slice(5)}</div>
+              </div>
+            ))}
+          </div>
+        </CardVidro>
+      </div>
+
+      <div className="cm-grid2 sobe" style={{ animationDelay: '.14s' }}>
+        <CardVidro spot className="cm-analise">
+          <div className="cm-an-tt">Faturamento por ciclo</div>
+          <div className="cm-ranklist">
+            {ciclos.map((c) => (
+              <div className="cm-rank" key={c.codigo}>
+                <span className="cm-rank-nm"><b>{c.codigo}</b> · {c.clientes} cli.</span>
+                <Barra v={c.faturamento} max={maxCiclo} tom="azul" />
+                <span className="cm-rank-v num">{fmtBRL(c.faturamento)}</span>
+              </div>
+            ))}
+          </div>
+        </CardVidro>
+        <CardVidro spot className="cm-analise">
+          <div className="cm-an-tt">Faturamento por atendente</div>
+          <div className="cm-ranklist">
+            {atend.map((a) => (
+              <div className="cm-rank" key={a.nome}>
+                <span className="cm-rank-nm">{a.nome}</span>
+                <Barra v={a.faturamento} max={maxAt} tom="azul" />
+                <span className="cm-rank-v num">{fmtBRL(a.faturamento)}</span>
+              </div>
+            ))}
+          </div>
+        </CardVidro>
+      </div>
+
+      <div className="sobe" style={{ marginTop: 16, animationDelay: '.2s' }}>
+        <span className="caps" style={{ display: 'block', marginBottom: 10 }}>Engajamento das mensagens</span>
+        <div className="cm-eng-grid">
+          {r.respostaPorTipo.map((t) => {
+            const pct = t.enviadas ? Math.round((t.respostas / t.enviadas) * 100) : 0;
+            return (
+              <CardVidro spot className="cm-eng" key={t.tipo}>
+                <div className="cm-eng-tt">{ROTULO_TIPO_ENG[t.tipo]}</div>
+                <div className="cm-eng-pct num">{pct}<span>%</span></div>
+                <div className="cm-eng-sub num">{t.respostas} de {t.enviadas} responderam</div>
+                <Barra v={t.respostas} max={t.enviadas} tom={pct >= 50 ? 'ok' : 'tint'} />
+              </CardVidro>
+            );
+          })}
+        </div>
+      </div>
+    </>
+  );
+}
+
+/* =================== ATENDENTES (métricas + drill-down) =================== */
+
+export function AbaAtendentes() {
+  const metricas = useMemo(() => metricasPorAtendente(CLIENTES), []);
+  const [sel, setSel] = useState<string | null>(null);
+  const maxFat = Math.max(...metricas.map((m) => m.faturamento));
+  const clientesDo = (nome: string) => CLIENTES.filter((c) => c.atendente === nome);
+
+  const colunas: Coluna<typeof metricas[number]>[] = [
+    { chave: 'nome', titulo: 'Atendente', render: (m) => <div className="cm-at-nm"><span className="cm-num-av" aria-hidden>{m.nome.slice(0, 2).toUpperCase()}</span>{m.nome}</div> },
+    { chave: 'clientes', titulo: 'Carteira', classe: 'num', render: (m) => `${m.clientes} cli.` },
+    { chave: 'fat', titulo: 'Faturamento', dir: true, classe: 'num', render: (m) => <div className="cm-at-fat"><span>{fmtBRL(m.faturamento)}</span><Barra v={m.faturamento} max={maxFat} tom="azul" /></div> },
+    { chave: 'adimp', titulo: 'Adimplência', classe: 'num', render: (m) => <BadgeStatus tom={m.adimplencia >= 70 ? 'ok' : m.adimplencia >= 40 ? 'atencao' : 'erro'}>{m.adimplencia}%</BadgeStatus> },
+    { chave: 'resp', titulo: 'Resposta', classe: 'num', render: (m) => `${m.taxaResposta}%` },
+  ];
+
+  const atSel = metricas.find((m) => m.nome === sel);
+  return (
+    <>
+      <p className="cm-hint sobe">Faturamento, carteira e desempenho de cada atendente. Clique para ver os clientes dele.</p>
+      <CardVidro spot sobe style={{ borderRadius: 12, animationDelay: '.08s' }}>
+        <TabelaPadrao colunas={colunas} linhas={metricas} chave={(m) => m.nome} aoClicarLinha={(m) => setSel(m.nome)} rodape={{ texto: `${metricas.length} atendentes` }} />
+      </CardVidro>
+
+      <DrawerV2 aberto={!!atSel} aoFechar={() => setSel(null)} largura={440}>
+        {atSel && (
+          <div className="cm-drawer">
+            <div className="cm-dr-head">
+              <span className="cm-num-av lg" aria-hidden>{atSel.nome.slice(0, 2).toUpperCase()}</span>
+              <div><div className="cm-dr-nm">{atSel.nome}</div><div className="cm-dr-sub num">{atSel.clientes} clientes na carteira</div></div>
+              <button type="button" className="cm-dr-x" onClick={() => setSel(null)} aria-label="Fechar">×</button>
+            </div>
+            <div className="cm-dr-stats">
+              <div><b className="num">{fmtBRL(atSel.faturamento)}</b><span>Faturamento</span></div>
+              <div><b className="num">{fmtBRL(atSel.recorrencia)}</b><span>Recorrência/mês</span></div>
+              <div><b className="num ok">{atSel.adimplencia}%</b><span>Adimplência</span></div>
+              <div><b className="num">{atSel.taxaResposta}%</b><span>Resposta</span></div>
+            </div>
+            <div className="cm-dr-sec">Clientes</div>
+            <div className="cm-dr-clientes">
+              {clientesDo(atSel.nome).map((c) => (
+                <div className="cm-dr-cli" key={c.id}>
+                  <div className="cm-dr-cli-nm">{c.nome}<span className="num">{c.ciclo} · {fmtBRL(c.mensalidade)}/mês</span></div>
+                  <BadgeStatus tom={compBadge[c.comportamento]}>{ROTULO_COMP[c.comportamento]}</BadgeStatus>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </DrawerV2>
+    </>
+  );
+}
+
+/* =================== CLIENTES (análise + ficha) =================== */
+
+export function AbaClientes() {
+  const [seg, setSeg] = useState<'todos' | Comportamento | 'resp_remk'>('todos');
+  const [sel, setSel] = useState<ClienteAnalise | null>(null);
+  const lista = useMemo(() => CLIENTES.filter((c) => {
+    if (seg === 'todos') return true;
+    if (seg === 'resp_remk') return c.engajamento.some((e) => e.tipo === 'remarketing' && e.respondeu);
+    return c.comportamento === seg;
+  }), [seg]);
+  const cont = (comp: Comportamento) => CLIENTES.filter((c) => c.comportamento === comp).length;
+
+  const colunas: Coluna<ClienteAnalise>[] = [
+    { chave: 'nome', titulo: 'Cliente', render: (c) => c.nome },
+    { chave: 'ciclo', titulo: 'Ciclo', classe: 'num', render: (c) => c.ciclo },
+    { chave: 'at', titulo: 'Atendente', render: (c) => c.atendente },
+    { chave: 'mens', titulo: 'Mensalidade', dir: true, classe: 'num', render: (c) => fmtBRL(c.mensalidade) },
+    { chave: 'comp', titulo: 'Comportamento', render: (c) => <BadgeStatus tom={compBadge[c.comportamento]}>{ROTULO_COMP[c.comportamento]}</BadgeStatus> },
+    { chave: 'resp', titulo: 'Últ. resposta', classe: 'num', render: (c) => c.ultimaResposta ?? <span style={{ color: 'var(--txt-3)' }}>—</span> },
+  ];
+
+  return (
+    <>
+      <p className="cm-hint sobe">Comportamento de pagamento e engajamento de cada cliente. Clique para ver a ficha completa.</p>
+      <div className="cob-filtros sobe" style={{ animationDelay: '.06s' }}>
+        <Chips>
+          <Chip ativo={seg === 'todos'} onClick={() => setSeg('todos')}>Todos ({CLIENTES.length})</Chip>
+          <Chip ativo={seg === 'em_dia'} onClick={() => setSeg('em_dia')}>Em dia ({cont('em_dia')})</Chip>
+          <Chip ativo={seg === 'voltou'} onClick={() => setSeg('voltou')}>Voltou a pagar ({cont('voltou')})</Chip>
+          <Chip ativo={seg === 'faltou'} onClick={() => setSeg('faltou')}>Faltou pagar ({cont('faltou')})</Chip>
+          <Chip ativo={seg === 'inadimplente'} onClick={() => setSeg('inadimplente')}>Inadimplente ({cont('inadimplente')})</Chip>
+          <Chip ativo={seg === 'resp_remk'} onClick={() => setSeg('resp_remk')}>Respondeu remarketing</Chip>
+        </Chips>
+      </div>
+      <CardVidro spot sobe style={{ borderRadius: 12, animationDelay: '.12s' }}>
+        {lista.length === 0
+          ? <EstadoVazio titulo="Nenhum cliente neste filtro" descricao="Troque o segmento acima." />
+          : <TabelaPadrao colunas={colunas} linhas={lista} chave={(c) => c.id} aoClicarLinha={(c) => setSel(c)} rodape={{ texto: `${lista.length} cliente${lista.length === 1 ? '' : 's'}` }} />}
+      </CardVidro>
+
+      <DrawerV2 aberto={!!sel} aoFechar={() => setSel(null)} largura={460}>
+        {sel && (
+          <div className="cm-drawer">
+            <div className="cm-dr-head">
+              <span className="cm-num-av lg" aria-hidden>{sel.nome.slice(0, 2).toUpperCase()}</span>
+              <div><div className="cm-dr-nm">{sel.nome}</div><div className="cm-dr-sub num">{sel.ciclo} · {sel.atendente} · {fmtBRL(sel.mensalidade)}/mês</div></div>
+              <button type="button" className="cm-dr-x" onClick={() => setSel(null)} aria-label="Fechar">×</button>
+            </div>
+            <div className="cm-dr-badge"><BadgeStatus tom={compBadge[sel.comportamento]}>{ROTULO_COMP[sel.comportamento]}</BadgeStatus><span className="num">Faturamento total {fmtBRL(sel.faturamentoTotal)}</span></div>
+
+            <div className="cm-dr-sec">Histórico de pagamento</div>
+            <div className="cm-hist">
+              {sel.meses.map((m) => (
+                <div className={'cm-hist-mes s-' + m.status} key={m.competencia}>
+                  <span className="cm-hist-dot" aria-hidden />
+                  <span className="cm-hist-comp num">{mesLabel(m.competencia)}</span>
+                  <BadgeStatus tom={TOM_MES[m.status]}>{ROTULO_MES[m.status]}</BadgeStatus>
+                </div>
+              ))}
+            </div>
+
+            <div className="cm-dr-sec">Engajamento com as mensagens</div>
+            <div className="cm-eng-list">
+              {sel.engajamento.filter((e) => e.enviada).map((e) => (
+                <div className="cm-eng-lin" key={e.tipo}>
+                  <span className="cm-eng-rot">{ROTULO_TIPO_ENG[e.tipo]}</span>
+                  <BadgeStatus tom={e.respondeu ? 'ok' : 'neutro'}>{e.respondeu ? 'Respondeu' : 'Sem resposta'}</BadgeStatus>
+                </div>
+              ))}
+              {!sel.engajamento.some((e) => e.enviada) && <div className="cm-hint">Nenhuma mensagem enviada ainda.</div>}
+            </div>
+          </div>
+        )}
+      </DrawerV2>
     </>
   );
 }

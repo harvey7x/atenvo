@@ -14,15 +14,17 @@ import {
   ConfirmDialogV2, EstadoErro, EstadoVazio, Input, Kpi, ModalV2, Skeleton, TabelaPadrao,
   type Coluna, type TomStatus,
 } from '../components';
-import { AbaCiclos, AbaRegua, AbaNumeros, AbaEnvios } from './cobrancaMotor';
+import { AbaCiclos, AbaRegua, AbaNumeros, AbaEnvios, AbaAtendentes, AbaClientes, PainelResumo } from './cobrancaMotor';
 import './cobrancas.css';
 
-type AbaCobranca = 'painel' | 'ciclos' | 'regua' | 'numeros' | 'envios';
+type AbaCobranca = 'painel' | 'atendentes' | 'clientes' | 'ciclos' | 'regua' | 'numeros' | 'envios';
 const ABAS: { id: AbaCobranca; rotulo: string }[] = [
   { id: 'painel', rotulo: 'Painel' },
+  { id: 'atendentes', rotulo: 'Atendentes' },
+  { id: 'clientes', rotulo: 'Clientes' },
   { id: 'ciclos', rotulo: 'Ciclos' },
   { id: 'regua', rotulo: 'Régua de mensagens' },
-  { id: 'numeros', rotulo: 'Números & Atendentes' },
+  { id: 'numeros', rotulo: 'Números' },
   { id: 'envios', rotulo: 'Envios' },
 ];
 
@@ -304,6 +306,8 @@ export default function CobrancasV2() {
         </div>
       )}
 
+      {aba === 'atendentes' && <AbaAtendentes />}
+      {aba === 'clientes' && <AbaClientes />}
       {aba === 'ciclos' && <AbaCiclos gestor={gestor} aoAvisar={(t) => setAviso({ tom: 'ok', texto: t })} />}
       {aba === 'regua' && <AbaRegua gestor={gestor} aoAvisar={(t) => setAviso({ tom: 'ok', texto: t })} />}
       {aba === 'numeros' && <AbaNumeros gestor={gestor} aoAvisar={(t) => setAviso({ tom: 'ok', texto: t })} />}
@@ -317,12 +321,15 @@ export default function CobrancasV2() {
         <CarregandoCobrancas />
       ) : (
         <>
-          <div className="kpis sobe" style={{ animationDelay: '.06s' }}>
-            <Kpi rotulo="Previsto no mês" valor={kPrev?.int ?? 0} formato="mil" prefixo="R$ " sufixo={kPrev?.cent ?? ',00'} />
-            <Kpi rotulo="Recebido no mês" valor={kRec?.int ?? 0} formato="mil" prefixo="R$ " sufixo={kRec?.cent ?? ',00'} tomValor="ok" />
-            <Kpi rotulo="Em atraso" valor={kAtr?.int ?? 0} formato="mil" prefixo="R$ " sufixo={kAtr?.cent ?? ',00'} tomValor={kpi && kpi.emAtraso > 0 ? 'erro' : undefined} />
-            <Kpi rotulo="A receber" valor={kRcb?.int ?? 0} formato="mil" prefixo="R$ " sufixo={kRcb?.cent ?? ',00'} />
-          </div>
+          {demo ? <PainelResumo /> : (
+            <div className="kpis sobe" style={{ animationDelay: '.06s' }}>
+              <Kpi rotulo="Previsto no mês" valor={kPrev?.int ?? 0} formato="mil" prefixo="R$ " sufixo={kPrev?.cent ?? ',00'} />
+              <Kpi rotulo="Recebido no mês" valor={kRec?.int ?? 0} formato="mil" prefixo="R$ " sufixo={kRec?.cent ?? ',00'} tomValor="ok" />
+              <Kpi rotulo="Em atraso" valor={kAtr?.int ?? 0} formato="mil" prefixo="R$ " sufixo={kAtr?.cent ?? ',00'} tomValor={kpi && kpi.emAtraso > 0 ? 'erro' : undefined} />
+              <Kpi rotulo="A receber" valor={kRcb?.int ?? 0} formato="mil" prefixo="R$ " sufixo={kRcb?.cent ?? ',00'} />
+            </div>
+          )}
+          {demo && <div className="cm-sec-lista sobe" style={{ animationDelay: '.26s' }}><span className="caps">Cobranças ativas</span></div>}
 
           <div className="cob-filtros sobe" style={{ animationDelay: '.12s' }}>
             <Chips>
