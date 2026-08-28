@@ -14,7 +14,17 @@ import {
   ConfirmDialogV2, EstadoErro, EstadoVazio, Input, Kpi, ModalV2, Skeleton, TabelaPadrao,
   type Coluna, type TomStatus,
 } from '../components';
+import { AbaCiclos, AbaRegua, AbaNumeros, AbaEnvios } from './cobrancaMotor';
 import './cobrancas.css';
+
+type AbaCobranca = 'painel' | 'ciclos' | 'regua' | 'numeros' | 'envios';
+const ABAS: { id: AbaCobranca; rotulo: string }[] = [
+  { id: 'painel', rotulo: 'Painel' },
+  { id: 'ciclos', rotulo: 'Ciclos' },
+  { id: 'regua', rotulo: 'Régua de mensagens' },
+  { id: 'numeros', rotulo: 'Números & Atendentes' },
+  { id: 'envios', rotulo: 'Envios' },
+];
 
 /* ------------------------------------------------------------------
    Cobranças v2 — layout do pg-cobrancas; funcional de CobrancasApp
@@ -145,6 +155,7 @@ export default function CobrancasV2() {
   const alterarMut = useAlterarStatusParcela();
   const cancelarMut = useCancelarCobranca();
 
+  const [aba, setAba] = useState<AbaCobranca>('painel');
   const [busca, setBusca] = useState('');
   const [filtro, setFiltro] = useState<'todas' | 'ativa' | 'concluida' | 'cancelada'>('todas');
   const [pagina, setPagina] = useState(1);
@@ -273,8 +284,17 @@ export default function CobrancasV2() {
           <p>Cobranças que sua organização faz aos próprios clientes.{demo ? ' · modo demonstração (nada é gravado)' : ''}</p>
         </div>
         <div className="acoes">
-          {gestor && <BotaoPrimario onClick={() => setNovo(true)}>＋ Nova cobrança</BotaoPrimario>}
+          {gestor && aba === 'painel' && <BotaoPrimario onClick={() => setNovo(true)}>＋ Nova cobrança</BotaoPrimario>}
         </div>
+      </div>
+
+      <div className="cob-abas sobe" role="tablist" aria-label="Seções de cobrança" style={{ animationDelay: '.03s' }}>
+        {ABAS.map((a) => (
+          <button key={a.id} type="button" role="tab" aria-selected={aba === a.id}
+            className={aba === a.id ? 'cob-aba on' : 'cob-aba'} onClick={() => setAba(a.id)}>
+            {a.rotulo}
+          </button>
+        ))}
       </div>
 
       {aviso && (
@@ -284,7 +304,12 @@ export default function CobrancasV2() {
         </div>
       )}
 
-      {erro ? (
+      {aba === 'ciclos' && <AbaCiclos gestor={gestor} aoAvisar={(t) => setAviso({ tom: 'ok', texto: t })} />}
+      {aba === 'regua' && <AbaRegua gestor={gestor} aoAvisar={(t) => setAviso({ tom: 'ok', texto: t })} />}
+      {aba === 'numeros' && <AbaNumeros gestor={gestor} aoAvisar={(t) => setAviso({ tom: 'ok', texto: t })} />}
+      {aba === 'envios' && <AbaEnvios gestor={gestor} aoAvisar={(t) => setAviso({ tom: 'ok', texto: t })} />}
+
+      {aba === 'painel' && (erro ? (
         <CardVidro sobe>
           <EstadoErro descricao="Não conseguimos carregar as cobranças. Verifique a conexão." aoTentarDeNovo={() => cobQ.refetch()} />
         </CardVidro>
@@ -363,7 +388,7 @@ export default function CobrancasV2() {
             </div>
           )}
         </>
-      )}
+      ))}
 
       {novo && (
         <NovaCobrancaV2
