@@ -19,10 +19,13 @@ export const BRIEF_REAL = isSupabaseConfigured && !!supabase;
 export interface BriefingDia {
   paraAtender: number;
   naoLidas: number;
+  /** oportunidades status='ganho' fechadas nos últimos 7 dias — mesmo
+      predicado do ganhos_qtd da RPC dashboard_resumo */
+  fechadosSemana: number;
 }
 
 /** demo: números coerentes com o seed do inbox (Não atribuídos 2 · Não lidas 3) */
-export const seedBriefingDia = (): BriefingDia => ({ paraAtender: 2, naoLidas: 3 });
+export const seedBriefingDia = (): BriefingDia => ({ paraAtender: 2, naoLidas: 3, fechadosSemana: 5 });
 
 export function useBriefingDia(ativo: boolean) {
   const { currentOrg } = useOrg();
@@ -46,10 +49,22 @@ export function useBriefingDia(ativo: boolean) {
         .is('arquivada_em', null)
         .not('status', 'in', '("resolvida","fechada")')
         .gt('nao_lidas', 0);
-      const [semDono, naoLidas] = await Promise.all([semDonoQ, naoLidasQ]);
+      const seteDiasAtras = new Date(Date.now() - 7 * 86_400_000).toISOString();
+      const fechadosQ = supabase!
+        .from('oportunidades')
+        .select('id', { count: 'exact', head: true })
+        .eq('organizacao_id', org!)
+        .eq('status', 'ganho')
+        .gte('fechado_em', seteDiasAtras);
+      const [semDono, naoLidas, fechados] = await Promise.all([semDonoQ, naoLidasQ, fechadosQ]);
       if (semDono.error) throw semDono.error;
       if (naoLidas.error) throw naoLidas.error;
-      return { paraAtender: semDono.count ?? 0, naoLidas: naoLidas.count ?? 0 };
+      if (fechados.error) throw fechados.error;
+      return {
+        paraAtender: semDono.count ?? 0,
+        naoLidas: naoLidas.count ?? 0,
+        fechadosSemana: fechados.count ?? 0,
+      };
     },
   });
 }

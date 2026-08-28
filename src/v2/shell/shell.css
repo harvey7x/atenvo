@@ -340,50 +340,102 @@
 :root[data-perf="lite"][data-tema="light"] .v2 .p-topbar { background: linear-gradient(180deg, #EDEEF0, #F2F3F5); }
 
 /* ============================================================
-   INTRO DO DIA (dono 28/08) — recepção na 1ª entrada de cada dia.
-   Vive num ModalV2 (vidro fumê); aqui só o corpo.
+   INTRO DO DIA v2 (dono 28/08: "mais completo, mais profissional") —
+   takeover de tela cheia: o app fica EMBAÇADO atrás (vidro fumê
+   pesado, mesma exceção de blur das janelas — 1 superfície, 1×/dia)
+   e o conteúdo sobe em cascata. Números contam via <Contagem/>.
    ============================================================ */
-.v2 .intro-dia { display: flex; flex-direction: column; gap: 18px; }
-.v2 .id-cab { display: flex; align-items: center; gap: 14px; }
-.v2 .id-marca { width: 48px; height: 48px; flex-shrink: 0; display: block; filter: drop-shadow(0 6px 16px rgba(62, 123, 240, calc(.35 * var(--fx)))); }
-:root[data-acento="verde"] .v2 .id-marca { filter: drop-shadow(0 6px 16px rgba(39, 183, 108, calc(.35 * var(--fx)))); }
-:root[data-acento="dourado"] .v2 .id-marca { filter: drop-shadow(0 6px 16px rgba(209, 154, 46, calc(.35 * var(--fx)))); }
-.v2 .id-ola { font-size: 20px; font-weight: 650; letter-spacing: -.015em; }
-.v2 .id-data { font-size: 11.5px; color: var(--txt-3); margin-top: 2px; }
-.v2 .id-data::first-letter { text-transform: uppercase; }
-
-/* briefing: dois números grandes no tom do acento */
-.v2 .id-brief { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-.v2 .id-num {
-  display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border-radius: 12px;
-  background: rgba(var(--azul-rgb, 76, 141, 255), .08);
-  border: 1px solid rgba(var(--azul-rgb, 76, 141, 255), .22);
+.v2 .intro-veu {
+  position: fixed; inset: 0; z-index: 1300;
+  display: flex; align-items: center; justify-content: center;
+  overflow-y: auto; padding: 40px 24px;
+  background: rgba(5, 6, 9, .55);
+  backdrop-filter: blur(34px) saturate(1.15) !important;
+  -webkit-backdrop-filter: blur(34px) saturate(1.15) !important;
+  animation: it-fade .45s var(--ease);
 }
-.v2 .id-num b { font-size: 26px; font-weight: 650; letter-spacing: -.02em; line-height: 1.1; color: var(--txt); font-variant-numeric: tabular-nums; }
-.v2 .id-num span { font-size: 11px; color: var(--txt-2); }
-.v2 .id-carregando { grid-column: 1 / -1; font-size: 11.5px; color: var(--txt-3); padding: 14px 2px; }
+:root[data-tema="light"] .v2 .intro-veu { background: rgba(242, 243, 246, .5); }
 
-/* seletor de cor */
-.v2 .id-rot { font-size: 12.5px; font-weight: 600; }
-.v2 .id-sub { font-size: 11px; color: var(--txt-3); margin-top: 2px; }
-.v2 .id-cores { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 9px; }
-.v2 .id-cor {
-  display: flex; align-items: center; justify-content: center; gap: 8px; padding: 11px 8px;
-  border-radius: 11px; cursor: pointer; font-family: var(--fonte); font-size: 12px; font-weight: 600;
-  color: var(--txt-2); background: rgba(var(--tint), .04); border: 1px solid rgba(var(--tint), .1);
-  transition: background .15s, border-color .15s, color .15s, box-shadow .15s;
+.v2 .intro-palco { width: min(620px, 100%); margin: auto; text-align: center; }
+
+/* cascata: cada bloco sobe com atraso próprio */
+.v2 .intro-palco > * { opacity: 0; animation: it-sobe .6s var(--ease) forwards; }
+.v2 .intro-palco > *:nth-child(1) { animation-delay: .08s; }
+.v2 .intro-palco > *:nth-child(2) { animation-delay: .2s; }
+.v2 .intro-palco > *:nth-child(3) { animation-delay: .3s; }
+.v2 .intro-palco > *:nth-child(4) { animation-delay: .42s; }
+.v2 .intro-palco > *:nth-child(5) { animation-delay: .56s; }
+.v2 .intro-palco > *:nth-child(6) { animation-delay: .72s; }
+.v2 .intro-palco > *:nth-child(7) { animation-delay: .84s; }
+.v2 .intro-palco > *:nth-child(8) { animation-delay: .96s; }
+@keyframes it-sobe { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+@keyframes it-fade { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .v2 .intro-veu, .v2 .intro-palco > * { animation: none; opacity: 1; }
 }
-.v2 .id-cor:hover { background: rgba(var(--tint), .07); color: var(--txt); }
-.v2 .id-cor.on {
+
+.v2 .it-marca {
+  width: 64px; height: 64px; display: block; margin: 0 auto;
+  filter: drop-shadow(0 10px 26px rgba(62, 123, 240, calc(.4 * var(--fx))));
+}
+:root[data-acento="verde"] .v2 .it-marca { filter: drop-shadow(0 10px 26px rgba(39, 183, 108, calc(.4 * var(--fx)))); }
+:root[data-acento="dourado"] .v2 .it-marca { filter: drop-shadow(0 10px 26px rgba(209, 154, 46, calc(.4 * var(--fx)))); }
+
+.v2 .it-eyebrow {
+  margin-top: 22px; font-size: 10.5px; font-weight: 600;
+  letter-spacing: .16em; text-transform: uppercase; color: var(--txt-3);
+}
+.v2 .it-titulo { margin: 10px 0 0; font-size: 36px; font-weight: 650; letter-spacing: -.02em; line-height: 1.12; color: var(--txt); }
+.v2 .it-sub { margin: 8px 0 0; font-size: 13.5px; color: var(--txt-2); }
+
+/* briefing: três números que contam */
+.v2 .it-stats { margin-top: 28px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.v2 .it-stat {
+  display: flex; flex-direction: column; gap: 3px; padding: 18px 12px 15px; border-radius: 15px;
+  background: rgba(var(--azul-rgb, 76, 141, 255), .09);
+  border: 1px solid rgba(var(--azul-rgb, 76, 141, 255), .24);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06);
+}
+.v2 .it-stat b { font-size: 32px; font-weight: 650; letter-spacing: -.02em; line-height: 1.05; color: var(--txt); font-variant-numeric: tabular-nums; }
+.v2 .it-stat span { font-size: 10.5px; color: var(--txt-2); line-height: 1.35; }
+/* fechados = sucesso: fala a semântica verde, em qualquer acento */
+.v2 .it-stat.ok { background: var(--verde-bg); border-color: rgba(var(--verde-rgb), .3); }
+.v2 .it-stat.ok b { color: var(--verde); }
+.v2 .it-carregando { grid-column: 1 / -1; font-size: 12px; color: var(--txt-3); padding: 22px 0; }
+
+/* cor de hoje */
+.v2 .it-sec { margin-top: 26px; }
+.v2 .it-rot { font-size: 12.5px; font-weight: 600; color: var(--txt); }
+.v2 .it-sub2 { font-size: 11px; color: var(--txt-3); margin-top: 2px; }
+.v2 .it-cores { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; margin-top: 11px; }
+.v2 .it-cor {
+  display: flex; align-items: center; justify-content: center; gap: 9px; padding: 13px 8px;
+  border-radius: 12px; cursor: pointer; font-family: var(--fonte); font-size: 12.5px; font-weight: 600;
+  color: var(--txt-2); background: rgba(var(--tint), .05); border: 1px solid rgba(var(--tint), .11);
+  transition: background .15s, border-color .15s, color .15s, box-shadow .15s, transform .15s var(--ease);
+}
+.v2 .it-cor:hover { background: rgba(var(--tint), .08); color: var(--txt); transform: translateY(-1px); }
+.v2 .it-cor.on {
   color: var(--txt);
-  background: rgba(var(--azul-rgb, 76, 141, 255), .12);
+  background: rgba(var(--azul-rgb, 76, 141, 255), .13);
   border-color: rgba(var(--azul-rgb, 76, 141, 255), .55);
-  box-shadow: 0 0 0 3px rgba(var(--azul-rgb, 76, 141, 255), .1);
+  box-shadow: 0 0 0 3px rgba(var(--azul-rgb, 76, 141, 255), .12);
 }
-.v2 .id-sw { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .28), 0 1px 4px rgba(2, 4, 10, .35); }
+.v2 .it-sw { width: 15px; height: 15px; border-radius: 50%; flex-shrink: 0; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .3), 0 1px 5px rgba(2, 4, 10, .4); }
 
-/* linha do modo Leve */
-.v2 .id-linha { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 15px; border-top: 1px solid var(--linha); }
+/* modo Leve */
+.v2 .it-linha {
+  margin-top: 22px; padding-top: 17px; border-top: 1px solid var(--linha);
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; text-align: left;
+}
+
+.v2 .it-cta { margin-top: 28px; padding: 11px 30px; font-size: 13.5px; }
+
+@media (max-width: 640px) {
+  .v2 .it-titulo { font-size: 28px; }
+  .v2 .it-stats { grid-template-columns: 1fr; }
+  .v2 .it-stat { flex-direction: row; align-items: baseline; justify-content: center; gap: 9px; padding: 13px 12px; }
+}
 
 /* ============================================================
    AVISO DE ATUALIZAÇÃO — pílula fixa quando o SW do deploy novo ativa.
