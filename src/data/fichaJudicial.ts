@@ -204,6 +204,16 @@ export function useFichaJudicial(fichaId: string | null) {
 }
 
 /** Status mais recente da ficha por oportunidade (para indicador no card). */
+/** Resumo de ficha por oportunidade para o QUADRO do Kanban: status (badge do card)
+ *  + bancos — banco_nome (o banco DO CLIENTE, que recebe o benefício) e os bancos
+ *  das REVs (instituições acionadas). Mesma consulta única de antes, só mais larga. */
+export interface FichaBoardResumo {
+  status: FichaStatus;
+  bancoNome: string | null;
+  revBancos: string[];
+  /** tipo de benefício marcado NA FICHA — fallback do card quando a oportunidade não tem. */
+  tipoBeneficio: string | null;
+}
 export function useFichasStatusDeOportunidades(ids: string[]) {
   const { currentOrg } = useOrg();
   const org = currentOrg.id;
@@ -211,14 +221,16 @@ export function useFichasStatusDeOportunidades(ids: string[]) {
   return useQuery({
     queryKey: ['fichas-status', org, chave],
     enabled: FICHA_REAL && ids.length > 0,
-    queryFn: async (): Promise<Record<string, FichaStatus>> => {
-      const { data, error } = await supabase!.from('fichas_judiciais').select('oportunidade_id, status, versao')
+    queryFn: async (): Promise<Record<string, FichaBoardResumo>> => {
+      const { data, error } = await supabase!.from('fichas_judiciais').select('oportunidade_id, status, versao, banco_nome, revisoes, tipo_beneficio')
         .eq('organizacao_id', org).in('oportunidade_id', [...new Set(ids)]).order('versao', { ascending: false });
       if (error) throw new Error(error.message);
-      const map: Record<string, FichaStatus> = {};
+      const map: Record<string, FichaBoardResumo> = {};
       for (const r0 of (data as unknown[]) ?? []) {
-        const r = r0 as { oportunidade_id: string; status: FichaStatus };
-        if (r.oportunidade_id && !map[r.oportunidade_id]) map[r.oportunidade_id] = r.status; // primeira = maior versão
+        const r = r0 as { oportunidade_id: string; status: FichaStatus; banco_nome: string | null; revisoes: { bancoNome?: string; banco_nome?: string }[] | null; tipo_beneficio: string | null };
+        if (!r.oportunidade_id || map[r.oportunidade_id]) continue; // primeira = maior versão
+        const revBancos = [...new Set((r.revisoes ?? []).map((v) => (v.bancoNome ?? v.banco_nome ?? '').trim()).filter(Boolean))];
+        map[r.oportunidade_id] = { status: r.status, bancoNome: r.banco_nome?.trim() || null, revBancos, tipoBeneficio: r.tipo_beneficio || null };
       }
       return map;
     },

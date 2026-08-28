@@ -1,4 +1,43 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none">
-  <circle cx="17" cy="21" r="12.8" fill="none" stroke="#19c37d" stroke-width="3.7" stroke-linecap="round" stroke-dasharray="72 9" transform="rotate(-52 17 21)"/>
-  <polygon points="30.5,4 32.3,9.2 37.5,11 32.3,12.8 30.5,18 28.7,12.8 23.5,11 28.7,9.2" fill="#19c37d"/>
+<svg viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#07080C"/>
+      <stop offset=".5" stop-color="#0A101D"/>
+      <stop offset=".8" stop-color="#17337A"/>
+      <stop offset="1" stop-color="#3E7BF0"/>
+    </linearGradient>
+    <radialGradient id="glow" cx=".5" cy="1.08" r=".62">
+      <stop offset="0" stop-color="#7FB4FF" stop-opacity=".95"/>
+      <stop offset=".45" stop-color="#3E7BF0" stop-opacity=".42"/>
+      <stop offset="1" stop-color="#3E7BF0" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity=".18"/>
+      <stop offset=".55" stop-color="#7FA8FF" stop-opacity=".14"/>
+      <stop offset=".88" stop-color="#8FBCFF" stop-opacity=".75"/>
+      <stop offset="1" stop-color="#AFD2FF" stop-opacity=".95"/>
+    </linearGradient>
+    <linearGradient id="seta" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset=".55" stop-color="#E9EFFA"/>
+      <stop offset="1" stop-color="#AEC4EA"/>
+    </linearGradient>
+    <linearGradient id="dia" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F2F7FF"/>
+      <stop offset="1" stop-color="#8FB0E6"/>
+    </linearGradient>
+    <filter id="sombra" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="7" stdDeviation="9" flood-color="#04060D" flood-opacity=".6"/>
+    </filter>
+    <filter id="sombra2" x="-60%" y="-60%" width="220%" height="220%">
+      <feDropShadow dx="0" dy="5" stdDeviation="6" flood-color="#04060D" flood-opacity=".55"/>
+    </filter>
+  </defs>
+  <rect x="4" y="4" width="248" height="248" rx="58" fill="url(#bg)"/>
+  <rect x="4" y="4" width="248" height="248" rx="58" fill="url(#glow)"/>
+  <circle cx="128" cy="128" r="86" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="1.5"/>
+  <circle cx="128" cy="128" r="108" fill="none" stroke="rgba(255,255,255,.04)" stroke-width="1.5"/>
+  <path d="M128 50 L196 196 L128 150 L60 196 Z" fill="url(#seta)" filter="url(#sombra)"/>
+  <path d="M128 166 L154 188 L128 226 L102 188 Z" fill="url(#dia)" filter="url(#sombra2)"/>
+  <rect x="5.5" y="5.5" width="245" height="245" rx="56.5" fill="none" stroke="url(#rim)" stroke-width="2.5"/>
 </svg>

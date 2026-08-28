@@ -24,19 +24,24 @@
 
 /* board (mockup verbatim, adaptado): rolagem horizontal própria */
 .v2 .kb-scroll { flex: 1; min-height: 0; overflow-x: auto; overflow-y: hidden; }
-.v2 .kb-cols { display: flex; gap: 11px; height: 100%; min-width: min-content; }
+.v2 .kb-cols { display: flex; gap: 12px; height: 100%; min-width: min-content; }
+/* v5 COLUNA-VÉU: fundo escurecido translúcido — o bokeh da Aurora atravessa
+   (mesmo tratamento do fio do WhatsApp); no claro, véu grafite levíssimo */
 .v2 .kb-col {
   flex: 1; min-width: 216px; max-width: 300px; display: flex; flex-direction: column;
-  background: rgba(var(--tint), .022); border: 1px solid rgba(var(--tint), .055);
-  border-radius: 13px; padding: 10px 9px;
+  background: rgba(8, 9, 12, .3); border: 1px solid rgba(var(--tint), .06);
+  border-radius: 14px; padding: 12px 10px 10px;
 }
-.v2 .kb-col.col-drop { border-color: rgba(var(--tint), .3); background: rgba(var(--tint), .045); }
+:root[data-tema="light"] .v2 .kb-col { background: rgba(22, 25, 31, .035); }
+.v2 .kb-col.col-drop { border-color: rgba(var(--azul-rgb), .35); background: rgba(var(--azul-rgb), .05); }
 .v2 .kb-col.arrastando { opacity: .55; }
-.v2 .kb-cab { display: flex; align-items: center; gap: 6px; padding: 1px 4px 8px; flex-shrink: 0; }
+.v2 .kb-cab { display: flex; align-items: center; gap: 7px; padding: 0 4px 9px; flex-shrink: 0; }
 .v2 .kb-cab .pt2 { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
-.v2 .kb-cab .n { font-size: 11.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2 .kb-cab .n { font-size: 12px; font-weight: 650; letter-spacing: .01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .v2 .kb-cab .tag-entrada { font-size: 8.5px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--txt-3); border: 1px solid rgba(var(--tint), .14); border-radius: 4px; padding: 0 4px; flex-shrink: 0; }
-.v2 .kb-cab .q { font-size: 10.5px; color: var(--txt-3); flex-shrink: 0; }
+.v2 .kb-cab .q { font-size: 10px; font-weight: 600; color: var(--txt-2); background: rgba(var(--tint), .07); border-radius: 99px; padding: 1px 7px; flex-shrink: 0; }
+.v2 .kb-cab .kb-col-toggle, .v2 .kb-cab .mbtn { opacity: .55; transition: opacity .14s; }
+.v2 .kb-cab:hover .kb-col-toggle, .v2 .kb-cab:hover .mbtn { opacity: 1; }
 .v2 .kb-cab .s2 { margin-left: auto; font-size: 10.5px; font-weight: 500; color: var(--txt-2); flex-shrink: 0; }
 .v2 .kb-cab[draggable="true"] { cursor: grab; }
 .v2 .kb-cab .mbtn {
@@ -49,19 +54,19 @@
 .v2 .kb-corpo { flex: 1; min-height: 0; overflow-y: auto; padding: 1px 1px 2px; }
 .v2 .kb-vazia { font-size: 11px; color: var(--txt-3); text-align: center; padding: 14px 0 10px; }
 .v2 .kb-add {
-  width: 100%; border: 1px dashed rgba(var(--tint), .14); background: none; border-radius: 9px;
-  color: var(--txt-3); font-size: 11px; font-family: var(--fonte); padding: 6px; cursor: pointer;
+  width: 100%; height: 32px; border: 1px dashed rgba(var(--tint), .14); background: none; border-radius: 10px;
+  color: var(--txt-3); font-size: 11px; font-weight: 500; font-family: var(--fonte); cursor: pointer;
   display: flex; align-items: center; justify-content: center; gap: 5px;
 }
-.v2 .kb-add:hover { color: var(--txt); border-color: rgba(var(--tint), .28); }
+.v2 .kb-add:hover { color: var(--azul, var(--txt)); border-color: rgba(var(--azul-rgb), .4); }
 .v2 .kb-add svg { width: 12px; height: 12px; }
 .v2 .kb-col.ghost-col { background: none; border-style: dashed; justify-content: flex-start; }
 
 /* card .kc (mockup verbatim + conteúdo v1) */
 .v2 .kc {
   position: relative; background: linear-gradient(180deg, rgba(var(--tint), .06), rgba(var(--tint), .025));
-  border: 1px solid rgba(var(--tint), .1); border-radius: 11px; padding: 7px 10px 7px 12px;
-  margin-bottom: 6px; cursor: grab; transition: transform .2s var(--ease), box-shadow .2s, opacity .2s;
+  border: 1px solid rgba(var(--tint), .1); border-radius: 12px; padding: 9px 11px 9px 13px;
+  margin-bottom: 7px; cursor: grab; transition: transform .2s var(--ease), box-shadow .2s, opacity .2s;
 }
 .v2 .kc:hover { transform: translateY(-1px); }
 .v2 .kc::before { content: ""; position: absolute; left: 0; top: 9px; bottom: 9px; width: 3px; border-radius: 0 3px 3px 0; }
@@ -70,7 +75,7 @@
 .v2 .kc.drag { box-shadow: 0 18px 40px rgba(0, 0, 0, .55); transform: rotate(-1.6deg); border-color: rgba(var(--tint), .35); }
 .v2 .kc.moving { opacity: .55; cursor: default; }
 .v2 .kc.destaque { border-color: rgba(var(--tint), .45); box-shadow: 0 0 0 3px rgba(var(--tint), .12); }
-.v2 .fantasma { border: 1.5px dashed rgba(var(--tint), .18); border-radius: 11px; height: 52px; margin-bottom: 6px; }
+.v2 .fantasma { border: 1.5px dashed rgba(var(--azul-rgb), .3); border-radius: 12px; height: 64px; margin-bottom: 8px; }
 
 .v2 .kc .topo { display: flex; align-items: flex-start; gap: 6px; }
 /* nome SEMPRE em 1 linha (reticências; completo no title/detalhe) — card de altura uniforme */
@@ -307,27 +312,7 @@
 /* ---- Painel de KPIs (saúde do funil) — polish 2026-08: STRIP de 1 linha.
    Os caixões de 25px roubavam ~200px do board; agora a mesma leitura vive numa
    faixa única (label micro + valor inline + meta ao lado), estilo placar. ---- */
-.v2 .kb-kpis {
-  flex-shrink: 0; display: flex; align-items: stretch; margin: 0 0 11px;
-  background: rgba(var(--tint), .025); border: 1px solid rgba(var(--tint), .07);
-  border-radius: 12px; overflow-x: auto;
-}
-.v2 .kb-kpi {
-  position: relative; flex: 1; min-width: 148px; text-align: left; font-family: var(--fonte);
-  background: none; border: none; border-right: 1px solid rgba(var(--tint), .07);
-  border-radius: 0; padding: 9px 14px 10px;
-}
-.v2 .kb-kpi:last-child { border-right: none; }
-.v2 .kb-kpi .lab { font-size: 9px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--txt-3); display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.v2 .kb-kpi .lab .cdot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
-.v2 .kb-kpi .val { display: inline-block; font-size: 16.5px; font-weight: 700; letter-spacing: -.01em; line-height: 1.15; margin-top: 3px; }
-.v2 .kb-kpi .meta { display: inline; font-size: 10.5px; color: var(--txt-3); margin-left: 6px; white-space: nowrap; }
-.v2 .kb-kpi.crit .val, .v2 .kb-kpi.crit .meta { color: var(--rubro); }
-.v2 .kb-kpi.good .val { color: var(--verde); }
-/* KPI "Parados" é acionável — clicar liga o Foco */
-.v2 .kb-kpi.acao { cursor: pointer; transition: background .15s var(--ease), box-shadow .15s; }
-.v2 .kb-kpi.acao:hover { background: rgba(var(--rubro-rgb), .06); }
-.v2 .kb-kpi.acao.on { background: var(--rubro-bg); box-shadow: inset 0 0 0 1px rgba(var(--rubro-rgb), .22); }
+/* (faixa de KPIs removida a pedido do dono 27/08 — 'deixa só o kanban') */
 
 /* ---- barra de ordenação + Foco + origem ---- */
 .v2 .kb-barra { flex-shrink: 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 11px; padding-bottom: 11px; border-bottom: 1px solid var(--linha); }
@@ -348,64 +333,151 @@
 .v2 .kb-subcab .glr + .soma { margin-left: 8px; }
 .v2 .kb-col.gargalo { border-color: rgba(var(--ambar-rgb), .28); }
 
-/* ---- CARD v3 compacto ---- */
-.v2 .kc { padding: 8px 10px 8px 13px; margin-bottom: 7px; }
-.v2 .kc::before { background: transparent; }
+/* ============================================================
+   CARD v5 "EDITORIAL ELEVADO" (painel de design 27/08) — a hierarquia
+   sai dos chips e vai pra TIPOGRAFIA: eyebrow micro-caps, título único
+   forte, meta corrida, valor, barra honesta do funil (o ÚNICO azul em
+   repouso), rodapé com dots de etiqueta, faixa de ação no pé.
+   Respiro numa escala só: 12/10/8/6/5/3. Sem blur (lite-safe).
+   ============================================================ */
+.v2 .kc {
+  padding: 12px 14px; margin-bottom: 8px; border-radius: 12px;
+  background: linear-gradient(180deg, rgba(var(--tint), .09), rgba(var(--tint), .045));
+  border: 1px solid rgba(var(--tint), .13);
+  box-shadow: 0 8px 24px rgba(2, 4, 10, .32), inset 0 1px 0 rgba(255, 255, 255, .06);
+}
+.v2 .kc::before { background: transparent; top: 10px; bottom: 10px; }
 .v2 .kc.warm::before { background: var(--ambar); box-shadow: none; }
-.v2 .kc.hot::before { background: var(--rubro); box-shadow: 0 0 10px rgba(var(--rubro-rgb), calc(.6 * var(--fx))); }
-.v2 .kc:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0, 0, 0, .28); border-color: rgba(var(--tint), .16); }
-.v2 .kc-r1 { display: flex; align-items: center; gap: 6px; }
-.v2 .kc-nm { font-size: 12.5px; font-weight: 600; line-height: 1.3; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .kc.hot::before { background: var(--rubro); box-shadow: none; }   /* a calma não grita duas vezes */
+.v2 .kc:hover { transform: translateY(-2px); border-color: rgba(var(--azul-rgb), .28); box-shadow: 0 14px 32px rgba(2, 4, 10, .42), inset 0 1px 0 rgba(255, 255, 255, .07); }
+
+/* ⋮ hover-only, absoluto no canto */
+.v2 .kc > .kb-menu-wrap { position: absolute; top: 8px; right: 8px; }
+.v2 .kc > .kb-menu-wrap .mbtn { opacity: 0; transition: opacity .12s; }
+.v2 .kc:hover > .kb-menu-wrap .mbtn, .v2 .kc > .kb-menu-wrap .mbtn.on { opacity: 1; }
+
+/* L1: tag de benefício COLORIDA (energia da referência — o azul da casa) + data.
+   Uma linguagem só de tag no card: .kc-benef e .kc-etq têm a MESMA forma. */
+.v2 .kc-eyebrow { display: flex; align-items: center; gap: 6px; min-height: 16px; padding-right: 18px; }
+.v2 .kc-benef {
+  font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: #BCD4FF; background: rgba(var(--azul-rgb), .16); border: 1px solid rgba(var(--azul-rgb), .38);
+  border-radius: 6px; padding: 2px 8px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+:root[data-tema="light"] .v2 .kc-benef { color: var(--azul, #2A62C9); background: rgba(42, 98, 201, .1); border-color: rgba(42, 98, 201, .32); }
+.v2 .kc-data { margin-left: auto; flex-shrink: 0; font-size: 9.5px; color: var(--txt-3); }
+
+/* L2 título */
+.v2 .kc-r1 { display: flex; align-items: center; gap: 6px; margin-top: 5px; }
+.v2 .kc-nm { font-size: 13px; font-weight: 650; letter-spacing: -.01em; line-height: 1.3; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .v2 .kc-flag { font-size: 8.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; border-radius: 5px; padding: 1px 5px; flex-shrink: 0; }
 .v2 .kc-flag.ganho { background: var(--verde-bg); color: var(--verde); }
 .v2 .kc-flag.perdido { background: var(--rubro-bg); color: var(--rubro); }
-.v2 .kc-r2 { display: flex; align-items: center; gap: 7px; margin-top: 8px; }
+
+/* L3 meta corrida */
+.v2 .kc-meta { margin-top: 3px; font-size: 10.5px; line-height: 1.4; color: var(--txt-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .kc-meta .mais { color: var(--txt-3); }
+
+/* L5 progresso honesto do funil */
+.v2 .kc-prog { margin-top: 10px; display: flex; align-items: center; gap: 8px; }
+.v2 .kc-prog .trilho { flex: 1; height: 4px; border-radius: 99px; background: rgba(var(--tint), .09); overflow: hidden; }
+.v2 .kc-prog .fill { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, rgba(var(--azul-rgb), .55), var(--azul)); }
+.v2 .kc.e-ganho .kc-prog .fill { background: var(--verde); }
+.v2 .kc-prog .frac { flex-shrink: 0; font-size: 9.5px; color: var(--txt-3); }
+
+/* L6 lembrete — texto âmbar, sem caixa */
+.v2 .kc-lem { display: flex; align-items: center; gap: 5px; margin-top: 8px; font-size: 10.5px; font-weight: 500; color: var(--ambar); }
+.v2 .kc-lem svg { width: 10px; height: 10px; flex-shrink: 0; }
+.v2 .kc-lem span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* L7 rodapé */
+.v2 .kc-foot { display: flex; align-items: center; gap: 6px; margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(var(--tint), .06); }
 .v2 .kc-av {
-  width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0; font-size: 8px; font-weight: 700; font-style: normal;
+  width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0; font-size: 8.5px; font-weight: 700; font-style: normal;
   display: flex; align-items: center; justify-content: center; color: var(--txt-2);
   background: linear-gradient(150deg, #2B2E34, var(--surface)); box-shadow: inset 0 0 0 1px rgba(var(--tint), .14);
 }
+.v2 .kc-av.semdono { box-shadow: inset 0 0 0 1px rgba(var(--ambar-rgb), .45); color: var(--ambar); }
 .v2 .kc-resp { font-size: 10.5px; color: var(--txt-3); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .v2 .kc-resp.none { color: var(--ambar); }
-.v2 .kc-time { margin-left: auto; flex-shrink: 0; font-size: 10.5px; color: var(--txt-3); }
-.v2 .kc-time.warm { color: var(--ambar); font-weight: 600; }
-.v2 .kc-time.hot { color: var(--rubro); font-weight: 700; }
-.v2 .kc-badge { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; margin-top: 8px; font-size: 9px; font-weight: 600; border-radius: 6px; padding: 2px 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.v2 .kc-badge.blk { background: var(--rubro-bg); color: var(--rubro); }
-.v2 .kc-badge.hot { background: var(--rubro-bg); color: var(--rubro); }
-.v2 .kc-badge.msg { background: rgba(var(--tint), .1); color: var(--txt); }
-.v2 .kc-badge.ficha { background: var(--ambar-bg); color: var(--ambar); }
-.v2 .kc-badge.ok { background: var(--verde-bg); color: var(--verde); }
+/* L3b BANCOS em destaque (dono: "muito importante"): recebe = o chip mais FORTE do
+   card (assinatura platina — prata no dark, grafite no claro); REVs em contorno.
+   Mesma forma dos outros tags: uma linguagem só. */
+.v2 .kc-bancos { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-top: 8px; }
+.v2 .kc-banco {
+  font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--txt-2); border: 1px solid rgba(var(--tint), .22); background: rgba(var(--tint), .06);
+  border-radius: 6px; padding: 2px 8px; white-space: nowrap;
+}
+.v2 .kc-banco.prin {
+  color: var(--platina-txt); border-color: transparent;
+  background: linear-gradient(180deg, var(--platina-a), var(--platina-b));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .5);
+}
+.v2 .kc-banco.mais { color: var(--txt-3); border-style: dashed; background: none; }
 
-/* ---- etiquetas SEMPRE visíveis no card (pedido do dono, 2026-08): pill neutra
-   com dot na cor da etiqueta — a cor carrega o significado sem pintar o card ---- */
-.v2 .kc-etqs { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-top: 7px; }
+/* L6b etiquetas coloridas — mesma FORMA da tag de benefício, cor via inline (da etiqueta) */
+.v2 .kc-etqs { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-top: 8px; }
 .v2 .kc-etq {
-  display: inline-flex; align-items: center; gap: 5px; max-width: 128px;
-  font-size: 9.5px; font-weight: 500; color: var(--txt-2);
-  border: 1px solid rgba(var(--tint), .13); border-radius: 99px; padding: 1.5px 8px 1.5px 6px;
+  font-size: 9.5px; font-weight: 650; max-width: 128px;
+  border: 1px solid transparent; border-radius: 6px; padding: 2px 8px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.v2 .kc-etq i { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
-.v2 .kc-etq.mais { color: var(--txt-3); padding: 1.5px 7px; }
-
-/* ---- lembrete fixado no card: o único "post-it" do card — âmbar de pendência,
-   1 linha (reticências; completo no title/drawer). DADO É CALMO: sem glow ---- */
-.v2 .kc-lem {
-  display: flex; align-items: flex-start; gap: 5px; margin-top: 7px;
-  font-size: 10px; font-weight: 500; line-height: 1.35; color: var(--ambar);
-  background: var(--ambar-bg); border-radius: 6px; padding: 3px 8px;
+.v2 .kc-etq.mais { color: var(--txt-3); border-color: rgba(var(--tint), .14); }
+.v2 .kc-time { margin-left: auto; flex-shrink: 0; font-size: 10.5px; color: var(--txt-3); }
+.v2 .kc-time.warm { color: var(--ambar); font-weight: 600; }
+.v2 .kc-time.hot { color: var(--rubro); font-weight: 650; }
+.v2 .kc-wa {
+  margin-left: 2px; width: 20px; height: 20px; border-radius: 6px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+  color: var(--txt-3); background: none; border: none;
 }
-.v2 .kc-lem svg { width: 10px; height: 10px; flex-shrink: 0; margin-top: 1.5px; }
-.v2 .kc-lem span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* modo denso: etiquetas/lembrete continuam (são o motivo do recurso), só mais justos */
-.v2 .kb-cols.denso .kc-etqs { margin-top: 5px; }
-.v2 .kb-cols.denso .kc-lem { margin-top: 5px; padding: 2px 7px; }
+.v2 .kc-wa svg { width: 12px; height: 12px; }
+/* hover azul do .kc-wa vem da pele Aurora */
+
+/* L8 faixa de ação full-width no pé */
+.v2 .kc-badge {
+  display: flex; align-items: center; gap: 4px; margin: 10px -14px -12px;
+  border-radius: 0 0 12px 12px; padding: 5px 14px; font-size: 10px; font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.v2 .kc-badge.blk, .v2 .kc-badge.hot { background: var(--rubro-bg); color: var(--rubro); }
+.v2 .kc-badge.msg { background: rgba(var(--tint), .1); color: var(--txt); }
+.v2 .kc-badge.ficha { background: var(--ambar-bg); color: var(--ambar); }
+
+/* modo denso: colapsa as linhas informativas, mantém título/rodapé/faixa */
+.v2 .kb-cols.denso .kc { padding: 6px 12px; margin-bottom: 4px; }
+.v2 .kb-cols.denso .kc-eyebrow, .v2 .kb-cols.denso .kc-meta, .v2 .kb-cols.denso .kc-prog, .v2 .kb-cols.denso .kc-lem, .v2 .kb-cols.denso .kc-etqs { display: none; }
+.v2 .kb-cols.denso .kc-badge { margin: 6px -12px -6px; }
 /* lembrete no drawer de detalhe */
 .v2 .kd-lem { display: inline-flex; align-items: center; gap: 6px; color: var(--ambar); }
 .v2 .kd-lem svg { width: 12px; height: 12px; flex-shrink: 0; }
 /* sufixo de lead sem nome (título = telefone formatado) */
 .v2 .kc-semnome { font-style: normal; font-weight: 400; font-size: 10px; color: var(--txt-3); margin-left: 5px; }
+
+/* ---- FILTRO COMPLETO do board (painel PREMIUM) + exportação ----
+   Cada faceta é um CARTÃO com cabeçalho (ícone + título + selecionados);
+   chips maiores que os do board; resumo do recorte fechando. */
+.v2 .kbf { display: flex; flex-direction: column; gap: 10px; }
+.v2 .kbf-sec {
+  background: rgba(var(--tint), .03); border: 1px solid rgba(var(--tint), .07);
+  border-radius: 12px; padding: 11px 13px 12px;
+}
+.v2 .kbf-cab { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; }
+.v2 .kbf-cab .ic { display: inline-flex; width: 22px; height: 22px; align-items: center; justify-content: center; border-radius: 7px; background: rgba(var(--tint), .07); border: 1px solid rgba(var(--tint), .1); color: var(--txt-2); flex-shrink: 0; }
+.v2 .kbf-cab .ic svg { width: 12px; height: 12px; }
+.v2 .kbf-cab .tt { font-size: 11px; font-weight: 650; letter-spacing: .05em; text-transform: uppercase; color: var(--txt-2); }
+.v2 .kbf-cab .sel { margin-left: auto; font-size: 10px; font-weight: 700; color: var(--azul, var(--txt)); background: rgba(var(--azul-rgb), .14); border: 1px solid rgba(var(--azul-rgb), .35); border-radius: 99px; padding: 0 7px; }
+.v2 .kbf-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.v2 .kbf .kb-fchip { font-size: 11px; padding: 4.5px 11px; border-radius: 8px; }
+.v2 .kbf-vazio { font-size: 11.5px; color: var(--txt-3); }
+.v2 .kbf-datas { display: flex; gap: 10px; }
+.v2 .kbf-datas label { flex: 1; display: flex; flex-direction: column; gap: 5px; font-size: 10.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--txt-3); }
+.v2 .kbf-datas .inp { color-scheme: dark; }
+:root[data-tema="light"] .v2 .kbf-datas .inp { color-scheme: light; }
+.v2 .kbf-resumo { font-size: 11.5px; color: var(--txt-2); background: rgba(var(--azul-rgb), .06); border: 1px solid rgba(var(--azul-rgb), .18); border-radius: 10px; padding: 9px 12px; }
+.v2 .kbf-resumo b { color: var(--txt); }
+
 
 /* ---- F2: painel Carga por responsável (opt-in) ---- */
 .v2 .kb-carga { flex-shrink: 0; display: flex; align-items: stretch; gap: 8px; flex-wrap: wrap; margin: 0 0 11px; padding-bottom: 11px; border-bottom: 1px solid var(--linha); }
@@ -476,9 +548,6 @@
 /* v3 — pares claros: avatares prata, KPIs em carta branca, hover do card suave */
 :root[data-tema="light"] .v2 .kc-av,
 :root[data-tema="light"] .v2 .drawer-v2 .kd-hero-av { background: linear-gradient(150deg, #E9ECF0, #C2C8D1); color: #3A3F47; }
-:root[data-tema="light"] .v2 .kb-kpis { background: #FFFFFF; box-shadow: var(--sombra-1); border-color: var(--linha); }
-:root[data-tema="light"] .v2 .kb-kpi { border-right-color: var(--linha); }
-:root[data-tema="light"] .v2 .kb-kpi.acao.on { background: var(--rubro-bg); }
 :root[data-tema="light"] .v2 .kc:hover { box-shadow: var(--sombra-2); }
 /* o badge de estagnação no light firma o rubro (mesma regra do antigo kc-sinal.parado) */
 :root[data-tema="light"] .v2 .kc-badge.blk { background: rgba(178, 74, 60, .13); border: 1px solid rgba(178, 74, 60, .3); }

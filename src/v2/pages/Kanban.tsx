@@ -14,7 +14,7 @@ import {
 } from '@/data/kanban';
 import { useBuscaContatos, type ContatoRow } from '@/data/contatos';
 import { useEtiquetas, useOrgUsuarios } from '@/data/atendimento';
-import { useFichasStatusDeOportunidades, fichaDemoDaOportunidade } from '@/data/fichaJudicial';
+import { useFichasStatusDeOportunidades, fichaDemoDaOportunidade, type FichaBoardResumo } from '@/data/fichaJudicial';
 import { useSlaAlertas } from '@/data/sla';
 import { indexPorChave, type SlaAlerta, type SlaTipo } from '@/data/slaView';
 import { corDaEtiqueta, type Etiqueta } from '@/types/atendimento';
@@ -152,6 +152,7 @@ const IcPontos = () => <Ic><circle cx="12" cy="5" r="1.4" fill="currentColor" st
 const IcKb = () => <Ic><rect x="3" y="4" width="5" height="16" rx="1.4" /><rect x="10" y="4" width="5" height="10" rx="1.4" /><rect x="17" y="4" width="5" height="13" rx="1.4" /></Ic>;
 const IcColapsar = () => <Ic><path d="M13 5l-6 7 6 7M20 5l-6 7 6 7" /></Ic>; // « recolher coluna
 const IcSino = () => <Ic><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></Ic>; // lembrete no card
+const IcChat = () => <Ic><path d="M21 12a8 8 0 0 1-8 8H4l2.2-2.6A8 8 0 1 1 21 12z" /></Ic>; // atalho pro WhatsApp no card
 
 type Aviso = { tom: 'ok' | 'erro'; texto: string } | null;
 
@@ -162,6 +163,8 @@ interface SeedKb {
   naoLidas: Record<string, number>;
   sla: SlaAlerta[];
   fichaStatus: Record<string, string>;
+  /** DEMO dos bancos da ficha no card: banco do cliente (recebe) + bancos das REVs. */
+  fichaBancos: Record<string, { banco: string | null; revs: string[] }>;
   eventos: Record<string, OppEvento[]>;
   bloqueados: Set<string>;
   contatos: ContatoRow[];
@@ -215,6 +218,7 @@ function seedKb(): SeedKb {
       { id: 'ks-2', tipo: 'atendimento_sem_resposta', severidade: 'amarelo', titulo: 'Sem resposta', detalhe: 'Conversa sem resposta da equipe.', conversa_id: 'kcv-1', oportunidade_id: 'kl-1', contato_id: 'kct-1', responsavel_id: null, vence_em: null, criado_em: iso(agora - 2 * h) } as SlaAlerta,
     ],
     fichaStatus: { 'kl-5': 'finalizada', 'kl-3': 'rascunho' },
+    fichaBancos: { 'kl-5': { banco: 'AGIBANK', revs: ['BANRISUL', 'BMG'] }, 'kl-3': { banco: 'MERCANTIL', revs: ['PAN'] } },
     eventos: {
       'kl-8': [evento({ id: 'ke-1', evento: 'ganho', colunaAnteriorId: 'kc-4', colunaNovaId: 'kc-5', respNoFechamentoNome: 'Matheus', executadoPorNome: 'Matheus', criadoEm: iso(agora - 48 * h) })],
       'kl-9': [evento({ id: 'ke-2', evento: 'perdido', colunaAnteriorId: 'kc-2', colunaNovaId: 'kc-6', motivoPerda: 'sem_interesse', executadoPorNome: 'Juliana', criadoEm: iso(agora - 72 * h) })],
@@ -303,6 +307,13 @@ export default function KanbanV2() {
   const [foco, setFoco] = useState(false); // some por padrão (Kanban é o protagonista) — liga sob demanda
   const [equipe, setEquipe] = useState(false); // painel "Carga por responsável" — opt-in, não ocupa espaço quando off
   const [filtroResp, setFiltroResp] = useState<string | null>(null); // filtra o board por atendente (chave = respId ou '__none__')
+  // FILTRO COMPLETO do board (dono 27/08): benefício, banco da ficha, período de entrada.
+  // Atendente e canal reusam filtroResp/filtroOrigem — o painel unifica tudo.
+  const [filtroBenef, setFiltroBenef] = useState<Set<string>>(new Set());
+  const [filtroBanco, setFiltroBanco] = useState<Set<string>>(new Set());
+  const [filtroDataDe, setFiltroDataDe] = useState('');
+  const [filtroDataAte, setFiltroDataAte] = useState('');
+  const [painelFiltros, setPainelFiltros] = useState(false);
   const [colsRecolhidas, setColsRecolhidas] = useState<Record<string, boolean>>(() => { try { return JSON.parse(sessionStorage.getItem('atenvo-kb-cols') || '{}'); } catch { return {}; } });
   useEffect(() => { try { sessionStorage.setItem('atenvo-kb-sort', sortModo); } catch { /* privado */ } }, [sortModo]);
   useEffect(() => { try { sessionStorage.setItem('atenvo-kb-cols', JSON.stringify(colsRecolhidas)); } catch { /* privado */ } }, [colsRecolhidas]);
@@ -321,7 +332,15 @@ export default function KanbanV2() {
     [demo, seed.sla, slaQ.data],
   );
   const fichaStatusQ = useFichasStatusDeOportunidades(useMemo(() => leads.map((l) => l.id), [leads]));
-  const fichaStatusMap = demo ? seed.fichaStatus : (fichaStatusQ.data ?? {});
+  // resumo por lead (status + bancos da ficha); no demo, sintetiza dos seeds
+  const fichaResumoMap: Record<string, FichaBoardResumo> = useMemo(() => (demo
+    ? Object.fromEntries(Object.entries(seed.fichaStatus).map(([id, st]) => [id, {
+        status: st as FichaBoardResumo['status'],
+        bancoNome: seed.fichaBancos[id]?.banco ?? null,
+        revBancos: seed.fichaBancos[id]?.revs ?? [],
+        tipoBeneficio: null,
+      }]))
+    : (fichaStatusQ.data ?? {})), [demo, seed.fichaStatus, seed.fichaBancos, fichaStatusQ.data]);
   const bloqueados = demo ? seed.bloqueados : (bloqueiosQ.data ?? new Set<string>());
   const etiquetas = etiquetasQ.data ?? [];
   const usuarios = usuariosQ.data ?? [];
@@ -342,7 +361,20 @@ export default function KanbanV2() {
   const origemDe = (l: KLead) => l.canalNome || l.origem || 'Sem origem'; // v2.1: origem do card/filtro
   // v3 F2 — chave estável do responsável (id em prod; nome como reserva; '__none__' = sem dono).
   const respKeyDe = (l: KLead) => l.respId || (l.respNome ? 'n:' + l.respNome : '__none__');
-  const leadsVisiveis = useMemo(() => leads.filter((l) => matchBusca(l) && (!filtroOrigem || origemDe(l) === filtroOrigem) && (!filtroResp || respKeyDe(l) === filtroResp)), [leads, term, termDig, filtroOrigem, filtroResp]); // eslint-disable-line react-hooks/exhaustive-deps
+  // dados dos filtros avançados: benefício (opp, fallback ficha), bancos (ficha) e dia de entrada
+  const benefDoLead = (l: KLead) => l.tipoBeneficio ?? (fichaResumoMap[l.id]?.tipoBeneficio as KLead['tipoBeneficio'] | null) ?? null;
+  const bancosDoLead = (l: KLead): string[] => { const f = fichaResumoMap[l.id]; return f ? ([f.bancoNome, ...f.revBancos].filter(Boolean) as string[]) : []; };
+  const diaEntradaDe = (l: KLead) => (l.entradaEm || l.criadoEm || '').slice(0, 10);
+  const passaAvancados = (l: KLead): boolean => {
+    if (filtroBenef.size > 0) { const b = benefDoLead(l); if (!b || !filtroBenef.has(b)) return false; }
+    if (filtroBanco.size > 0 && !bancosDoLead(l).some((b) => filtroBanco.has(b))) return false;
+    const d = diaEntradaDe(l);
+    if (filtroDataDe && (!d || d < filtroDataDe)) return false;
+    if (filtroDataAte && (!d || d > filtroDataAte)) return false;
+    return true;
+  };
+  const nFiltrosAtivos = (filtroBenef.size ? 1 : 0) + (filtroBanco.size ? 1 : 0) + ((filtroDataDe || filtroDataAte) ? 1 : 0) + (filtroResp ? 1 : 0) + (filtroOrigem ? 1 : 0);
+  const leadsVisiveis = useMemo(() => leads.filter((l) => matchBusca(l) && (!filtroOrigem || origemDe(l) === filtroOrigem) && (!filtroResp || respKeyDe(l) === filtroResp) && passaAvancados(l)), [leads, term, termDig, filtroOrigem, filtroResp, filtroBenef, filtroBanco, filtroDataDe, filtroDataAte, fichaResumoMap]); // eslint-disable-line react-hooks/exhaustive-deps
   // severidade máxima de SLA por lead, uma vez por render (386 cards no real: o sort não pode realocar por comparação)
   const SEV_PESO: Record<string, number> = { imediato: 5, critico: 4, vermelho: 3, amarelo: 2, leve: 1 };
   const sevPorLead = useMemo(() => {
@@ -354,17 +386,14 @@ export default function KanbanV2() {
   const vazioFunil = leads.length === 0 && colunas.length > 0;
 
   const abertos = useMemo(() => leads.filter((l) => l.status === 'em_andamento'), [leads]);
-  // O PLACAR acompanha o filtro de origem (o recorte que o chip ao lado aplica): mesmo conjunto
-  // ativo que o board mostra na faceta selecionada — sem filtro, é o funil inteiro.
-  const abertosNoRecorte = useMemo(() => abertos.filter((l) => !filtroOrigem || origemDe(l) === filtroOrigem), [abertos, filtroOrigem]); // eslint-disable-line react-hooks/exhaustive-deps
+  // (abertosNoRecorte saiu com os KPIs — quem precisa do recorte filtrado usa leadsVisiveis)
 
   /* ---------- v2.1: agregação client-side (só apresentação; zero query/métrica/mutação nova) ----------
      estaParado = MESMA regra do trilho rubro do card (LIMIAR_PARADO_DIAS sem trocar de coluna neutra). */
   const estaParado = (l: KLead) => l.status === 'em_andamento'
     && (colunas.find((c) => c.id === l.colunaId)?.resultado ?? 'neutro') === 'neutro'
     && diasParado(l) >= LIMIAR_PARADO_DIAS;
-  const nParados = useMemo(() => abertosNoRecorte.filter(estaParado).length, [abertosNoRecorte, colunas]); // eslint-disable-line react-hooks/exhaustive-deps
-  const nFichaPend = useMemo(() => abertosNoRecorte.filter((l) => fichaStatusMap[l.id] === 'rascunho').length, [abertosNoRecorte, fichaStatusMap]);
+  // (KPIs removidos 27/08 — agregados que só alimentavam a faixa saíram junto)
   // origem/canal repetido em ~todos os cards é ruído → vira FILTRO no topo; no card só quando é exceção.
   // Conta 1 origem por LEAD ATIVO (em_andamento) — mesma base do "leads ativos", então os chips
   // SOMAM ~401 (decisão do dono). Antes contava sobre todos os status e somava ~524.
@@ -398,31 +427,9 @@ export default function KanbanV2() {
     || (estaParado(l) && !l.respId)
   );
 
-  /* ---------- v3: KPIs de etapa do funil (Reuniões/Contratos/Fechados) — client-side, zero query nova.
-     Robustos a renomear: casam por palavra-chave; se não casar, caem nas colunas neutras mais próximas do fecho. */
-  const ativosPorColuna = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const l of abertosNoRecorte) { const cid = colunaDoLead(l); if (cid) m.set(cid, (m.get(cid) ?? 0) + 1); }
-    return m;
-  }, [abertosNoRecorte]); // eslint-disable-line react-hooks/exhaustive-deps
-  // v3 F3 — parados por coluna → a etapa que mais trava (mesmo limiar do selo "Gargalo": ≥5 e >40% da etapa).
-  const paradosPorColuna = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const l of abertosNoRecorte) if (estaParado(l)) { const cid = colunaDoLead(l); if (cid) m.set(cid, (m.get(cid) ?? 0) + 1); }
-    return m;
-  }, [abertosNoRecorte, colunas]); // eslint-disable-line react-hooks/exhaustive-deps
-  const gargaloTop = useMemo(() => {
-    let best: { col: KColuna; n: number } | null = null;
-    for (const [cid, n] of paradosPorColuna) {
-      const total = ativosPorColuna.get(cid) ?? n;
-      if (n >= 5 && n / total > 0.4 && (!best || n > best.n)) { const col = colunas.find((c) => c.id === cid); if (col) best = { col, n }; }
-    }
-    return best;
-  }, [paradosPorColuna, ativosPorColuna, colunas]);
-  const colGanho = useMemo(() => colunas.find((c) => c.resultado === 'ganho') ?? null, [colunas]);
-  const nFechados = useMemo(() => (colGanho ? leads.filter((l) => l.status === 'ganho' && (!filtroOrigem || origemDe(l) === filtroOrigem)).length : 0), [leads, colGanho, filtroOrigem]); // eslint-disable-line react-hooks/exhaustive-deps
-  // KPIs "na etapa" removidos (polish 2026-08): duplicavam o header das colunas
-  // sem dizer QUAL etapa — leitura ambígua. A contagem por etapa vive no board.
+  // KPIs da faixa removidos por completo (dono 27/08: "deixa só o kanban") — os
+  // agregados que só os alimentavam (ativos/parados por coluna, gargalo, fechados)
+  // saíram junto; a leitura por etapa vive nos subcabeçalhos das colunas.
 
   /* ---------- v3 F2: CARGA POR RESPONSÁVEL — quem está sobrecarregado num relance (client-side).
      ativos / parados / críticos por atendente; clicar filtra o board (filtroResp). */
@@ -444,6 +451,48 @@ export default function KanbanV2() {
     });
   }, [abertos, colunas, sevPorLead, slaPorOpp]); // eslint-disable-line react-hooks/exhaustive-deps
   const cargaMax = useMemo(() => Math.max(1, ...cargaPorResp.map((c) => c.ativos)), [cargaPorResp]);
+
+  // facetas do painel de filtros (contadas sobre os ATIVOS, mesmo recorte do board)
+  const benefOpcoes = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const l of abertos) { const b = benefDoLead(l); if (b) m.set(b, (m.get(b) ?? 0) + 1); }
+    return [...m.entries()].sort((a, b) => b[1] - a[1]);
+  }, [abertos, fichaResumoMap]); // eslint-disable-line react-hooks/exhaustive-deps
+  const bancoOpcoes = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const l of abertos) for (const b of bancosDoLead(l)) m.set(b, (m.get(b) ?? 0) + 1);
+    return [...m.entries()].sort((a, b) => b[1] - a[1]);
+  }, [abertos, fichaResumoMap]); // eslint-disable-line react-hooks/exhaustive-deps
+  const limparFiltros = () => { setFiltroBenef(new Set()); setFiltroBanco(new Set()); setFiltroDataDe(''); setFiltroDataAte(''); setFiltroResp(null); setFiltroOrigem(null); };
+
+  /* EXPORTAÇÃO CSV (dono 27/08): baixa exatamente o RECORTE atual — busca + canal +
+     atendente + filtros avançados, o mesmo conjunto que o board mostra. CSV com BOM e
+     ';' abre direto no Excel pt-BR — sem lib nova. */
+  const exportarCsv = () => {
+    const colNome = (id: string | null) => colunas.find((c) => c.id === id)?.nome ?? '';
+    const esc = (v: unknown) => { const s = String(v ?? ''); return /[";\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+    const cab = ['Nome', 'Telefone', 'Email', 'Coluna', 'Status', 'Benefício', 'Banco (recebe)', 'Bancos REV', 'Etiquetas', 'Responsável', 'Canal', 'Entrada no funil', 'Atualizado em', 'Lembrete', 'Instituição'];
+    const linhas = leadsVisiveis.map((l) => {
+      const f = fichaResumoMap[l.id];
+      const b = benefDoLead(l);
+      return [
+        l.nome, l.telefone, l.email, colNome(colunaDoLead(l)), l.status,
+        b ? rotuloDe(TIPO_BENEFICIO, b) : '',
+        f?.bancoNome ?? '', (f?.revBancos ?? []).join(', '),
+        [...new Set([...l.etiquetas, ...l.contatoEtiquetas])].join(', '),
+        l.respNome || 'Não atribuído', l.canalNome || l.origem || '',
+        diaEntradaDe(l), (l.atualizadoEm || '').slice(0, 10), l.lembrete ?? '', l.instituicao ?? '',
+      ].map(esc).join(';');
+    });
+    const csv = '\uFEFF' + cab.join(';') + '\n' + linhas.join('\n'); // BOM: Excel reconhece UTF-8
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `kanban-leads-${new Date().toISOString().slice(0, 10)}.csv`; a.rel = 'noopener';
+    document.body.appendChild(a); a.click(); a.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 4000);
+    setAviso({ tom: 'ok', texto: `${leadsVisiveis.length} lead(s) exportado(s) em CSV (recorte atual).` });
+  };
 
   /* reconciliação do otimista (v1): entrada some quando o servidor confirma */
   useEffect(() => {
@@ -849,30 +898,10 @@ export default function KanbanV2() {
         </div>
       </div>
 
-      {/* v3 — Painel de KPIs (saúde do funil) + barra de ordenação/Foco/origem. Só agregação client-side. */}
+      {/* KPIs REMOVIDOS a pedido do dono (27/08: "deixa só o kanban") — o board é a tela.
+          Distribuição/parados seguem visíveis nos subcabeçalhos das colunas e no Foco. */}
       {!vazioFunil && (
         <>
-          <div className="kb-kpis sobe" role="group" aria-label="Indicadores do funil">
-            <div className="kb-kpi" title="Oportunidades em andamento (1 card = 1 oportunidade). No Disparo o número é menor porque lá conta CONTATOS distintos com WhatsApp e conversa real.">
-              <div className="lab">Leads ativos</div><div className="val num">{abertosNoRecorte.length}</div>
-              <div className="meta">no funil</div>
-            </div>
-            <button type="button" className={'kb-kpi crit acao' + (foco ? ' on' : '')} aria-pressed={foco}
-              title={gargaloTop ? `Etapa mais travada: ${gargaloTop.col.nome} (${gargaloTop.n} parados). Clique para focar só no que exige ação agora.` : 'Leads sem trocar de coluna há mais de 7 dias. Clique para focar só no que exige ação agora.'}
-              onClick={() => setFoco((f) => !f)}>
-              <div className="lab">Parados +{LIMIAR_PARADO_DIAS}d</div><div className="val num">{nParados}</div>
-              <div className="meta">{abertosNoRecorte.length > 0 ? Math.round((nParados / abertosNoRecorte.length) * 100) + '%' : ''}{foco ? ' — focando' : gargaloTop ? ' · trava em ' + gargaloTop.col.nome : nParados > 0 ? ' — ver só estes' : ''}</div>
-            </button>
-            <div className="kb-kpi warn" title="Fichas judiciais em rascunho, ainda não finalizadas.">
-              <div className="lab">Pendentes</div><div className="val num">{nFichaPend}</div>
-              <div className="meta">ficha{nFichaPend === 1 ? '' : 's'} em rascunho</div>
-            </div>
-            {colGanho && (
-              <div className="kb-kpi good" title={`Oportunidades fechadas como ganho${filtroOrigem ? ' · ' + filtroOrigem : ''}`}>
-                <div className="lab">{colGanho.nome}</div><div className="val num">{nFechados}</div><div className="meta">ganhos</div>
-              </div>
-            )}
-          </div>
 
           <div className="kb-barra sobe">
             <div className="kb-ord" role="group" aria-label="Ordenar os cards">
@@ -901,6 +930,13 @@ export default function KanbanV2() {
                 ))}
               </div>
             )}
+            {/* FILTRO COMPLETO + EXPORTAÇÃO (dono 27/08) */}
+            <button type="button" className={'kb-fchip' + (nFiltrosAtivos > 0 ? ' on' : '')} title="Filtros completos: benefício, banco, atendente, canal e período" onClick={() => setPainelFiltros(true)}>
+              Filtros{nFiltrosAtivos > 0 && <span className="c num">{nFiltrosAtivos}</span>}
+            </button>
+            <button type="button" className="kb-fchip" title={`Baixar os ${leadsVisiveis.length} lead(s) do recorte atual em CSV (abre no Excel) — respeita busca e filtros`} onClick={exportarCsv}>
+              ⇩ Exportar
+            </button>
           </div>
 
           {/* v3 F2 — Carga por responsável (opt-in): quem está sobrecarregado; clicar filtra o board */}
@@ -978,7 +1014,8 @@ export default function KanbanV2() {
                 key={l.id} l={l} colunas={colunas} etiquetasCat={etiquetas}
                 naoLidas={naoLidasMap[l.contatoId ?? ''] ?? 0}
                 sla={(slaPorOpp.get(l.id) ?? []).filter((a) => !SLA_OCULTO_NO_CARD.has(a.tipo))}
-                fichaStatus={fichaStatusMap[l.id]} optout={!!l.contatoId && bloqueados.has(l.contatoId)}
+                fichaInfo={fichaResumoMap[l.id]} optout={!!l.contatoId && bloqueados.has(l.contatoId)}
+                aoAbrirConversa={() => { if (l.conversaOrigemId) nav((l.canalTipo === 'facebook' ? '/facebook' : '/whatsapp') + `?conversa=${encodeURIComponent(l.conversaOrigemId)}`); }}
                 moving={optim[l.id] !== undefined} arrastando={dragando === l.id} destacado={destaque === l.id}
                 menuAberto={menu?.kind === 'card' && menu.id === l.id}
                 aoRef={(el) => { cardRefs.current[l.id] = el; }}
@@ -998,6 +1035,8 @@ export default function KanbanV2() {
               >
                 <div
                   className="kb-cab"
+                  /* sublinhado na COR da coluna (anatomia da referência) — borda real de 2px */
+                  style={{ borderBottom: `2px solid ${col.cor}73` }}
                   draggable={podeConfig && !col.entrada}
                   onDragStart={(e) => {
                     if (!podeConfig || col.entrada) { e.preventDefault(); return; }
@@ -1008,7 +1047,7 @@ export default function KanbanV2() {
                   onDragEnd={() => { dragColId.current = null; setColArrastando(null); setHoverCol(null); }}
                 >
                   <button type="button" className="kb-col-toggle" aria-label={'Recolher coluna ' + col.nome} title="Recolher coluna" onClick={(e) => { e.stopPropagation(); toggleCol(col.id); }}><IcColapsar /></button>
-                  <span className="pt2" style={{ background: col.cor }} />
+                  {/* v5: o dot saiu do cabeçalho expandido — a cor da coluna vive no sublinhado (na recolhida o dot fica) */}
                   <span className="n" title={col.nome}>{col.nome}</span>
                   {col.entrada && <span className="tag-entrada" title="Coluna de entrada — recebe novos leads dos canais">entrada</span>}
                   <span className="q num">{todosCol.length}</span>
@@ -1096,6 +1135,104 @@ export default function KanbanV2() {
       )}
 
       {/* ---------- modal coluna (criar/editar) ---------- */}
+      {/* FILTRO COMPLETO do board (dono 27/08): benefício · banco · atendente · canal · período.
+          Estado aplica AO VIVO; "Aplicar" só fecha. O Exportar CSV baixa este recorte. */}
+      <ModalV2
+        aberto={painelFiltros}
+        aoFechar={() => setPainelFiltros(false)}
+        largura={500}
+        titulo="Filtros do board"
+        rodape={
+          <>
+            <BotaoSec onClick={limparFiltros}>Limpar tudo</BotaoSec>
+            <BotaoSec onClick={() => { exportarCsv(); }}>⇩ Exportar CSV ({leadsVisiveis.length})</BotaoSec>
+            <BotaoPrimario onClick={() => setPainelFiltros(false)}>Aplicar</BotaoPrimario>
+          </>
+        }
+      >
+        <div className="kbf">
+          {benefOpcoes.length > 0 && (
+            <div className="kbf-sec">
+              <div className="kbf-cab">
+                <span className="ic"><Ic><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><rect x="3" y="7" width="18" height="13" rx="2" /><path d="M3 12h18" /></Ic></span>
+                <span className="tt">Tipo de benefício</span>
+                {filtroBenef.size > 0 && <span className="sel num">{filtroBenef.size}</span>}
+              </div>
+              <div className="kbf-chips">
+                {benefOpcoes.map(([b, n]) => (
+                  <button key={b} type="button" className={'kb-fchip' + (filtroBenef.has(b) ? ' on' : '')}
+                    onClick={() => setFiltroBenef((s) => { const x = new Set(s); if (x.has(b)) x.delete(b); else x.add(b); return x; })}>
+                    {rotuloDe(TIPO_BENEFICIO, b as KLead['tipoBeneficio'])}<span className="c num">{n}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="kbf-sec">
+            <div className="kbf-cab">
+              <span className="ic"><Ic><path d="M3 10l9-6 9 6" /><path d="M5 10v8M9.5 10v8M14.5 10v8M19 10v8" /><path d="M3 20h18" /></Ic></span>
+              <span className="tt">Banco (da ficha)</span>
+              {filtroBanco.size > 0 && <span className="sel num">{filtroBanco.size}</span>}
+            </div>
+            {bancoOpcoes.length === 0 ? <div className="kbf-vazio">Nenhuma ficha com banco marcado neste funil.</div> : (
+              <div className="kbf-chips">
+                {bancoOpcoes.map(([b, n]) => (
+                  <button key={b} type="button" className={'kb-fchip' + (filtroBanco.has(b) ? ' on' : '')}
+                    onClick={() => setFiltroBanco((s) => { const x = new Set(s); if (x.has(b)) x.delete(b); else x.add(b); return x; })}>
+                    {b}<span className="c num">{n}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="kbf-sec">
+            <div className="kbf-cab">
+              <span className="ic"><Ic><circle cx="12" cy="8" r="3.5" /><path d="M5 20a7 7 0 0 1 14 0" /></Ic></span>
+              <span className="tt">Atendente</span>
+              {filtroResp && <span className="sel num">1</span>}
+            </div>
+            <div className="kbf-chips">
+              <button type="button" className={'kb-fchip' + (!filtroResp ? ' on' : '')} onClick={() => setFiltroResp(null)}>Todos</button>
+              {cargaPorResp.map((c) => (
+                <button key={c.key} type="button" className={'kb-fchip' + (filtroResp === c.key ? ' on' : '')}
+                  onClick={() => setFiltroResp((f) => (f === c.key ? null : c.key))}>
+                  {c.nome}<span className="c num">{c.ativos}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          {origens.length > 1 && (
+            <div className="kbf-sec">
+              <div className="kbf-cab">
+                <span className="ic"><Ic><path d="M22 2 11 13" /><path d="M22 2 15 22l-4-9-9-4z" /></Ic></span>
+                <span className="tt">Canal de origem</span>
+                {filtroOrigem && <span className="sel num">1</span>}
+              </div>
+              <div className="kbf-chips">
+                <button type="button" className={'kb-fchip' + (!filtroOrigem ? ' on' : '')} onClick={() => setFiltroOrigem(null)}>Todas</button>
+                {origens.map((o) => (
+                  <button key={o.nome} type="button" className={'kb-fchip' + (filtroOrigem === o.nome ? ' on' : '')} onClick={() => setFiltroOrigem((f) => (f === o.nome ? null : o.nome))}>
+                    {o.nome}<span className="c num">{o.n}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="kbf-sec">
+            <div className="kbf-cab">
+              <span className="ic"><Ic><rect x="4" y="6" width="16" height="14" rx="2" /><path d="M4 10h16M8 4v4M16 4v4" /></Ic></span>
+              <span className="tt">Entrada no funil</span>
+              {(filtroDataDe || filtroDataAte) && <span className="sel num">1</span>}
+            </div>
+            <div className="kbf-datas">
+              <label>De <input type="date" className="inp" value={filtroDataDe} onChange={(e) => setFiltroDataDe(e.target.value)} /></label>
+              <label>Até <input type="date" className="inp" value={filtroDataAte} onChange={(e) => setFiltroDataAte(e.target.value)} /></label>
+            </div>
+          </div>
+          <div className="kbf-resumo"><b>{leadsVisiveis.length} lead(s)</b> no recorte atual — o board e a exportação seguem estes filtros.</div>
+        </div>
+      </ModalV2>
+
       <ModalV2
         aberto={!!colModal}
         aoFechar={() => { if (!colBusy) setColModal(null); }}
@@ -1268,13 +1405,14 @@ function DetRow({ l, v }: { l: string; v: ReactNode }) {
    vs .hot (+30d ou SLA vermelho, trilho/tempo rubro) — com 51% do
    funil parado, só o .hot ganha o alarme forte para o vermelho valer.
    ================================================================ */
-function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, fichaStatus, optout, moving, arrastando, destacado, menuAberto, aoRef, aoClicar, aoMenu, aoDragStart, aoDragEnd }: {
+function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, fichaInfo, optout, moving, arrastando, destacado, menuAberto, aoRef, aoClicar, aoMenu, aoDragStart, aoDragEnd, aoAbrirConversa }: {
   l: KLead; colunas: KColuna[]; etiquetasCat: Etiqueta[]; naoLidas: number;
-  sla: SlaAlerta[]; fichaStatus: string | undefined; optout: boolean; moving: boolean; arrastando: boolean;
+  sla: SlaAlerta[]; fichaInfo: FichaBoardResumo | undefined; optout: boolean; moving: boolean; arrastando: boolean;
   destacado: boolean; menuAberto: boolean;
   aoRef: (el: HTMLDivElement | null) => void; aoClicar: () => void; aoMenu: (btn: HTMLElement) => void;
-  aoDragStart: (e: DragEvent) => void; aoDragEnd: () => void;
+  aoDragStart: (e: DragEvent) => void; aoDragEnd: () => void; aoAbrirConversa: () => void;
 }) {
+  const fichaStatus = fichaInfo?.status;
   const colAtual = colunas.find((c) => c.id === l.colunaId);
   const dp = diasParado(l);
   const paradoAtivo = l.status === 'em_andamento' && (colAtual?.resultado ?? 'neutro') === 'neutro' && dp >= LIMIAR_PARADO_DIAS;
@@ -1283,8 +1421,29 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, fichaStatus, optout, 
   const hot = (paradoAtivo && dp >= LIMIAR_CRITICO_DIAS) || slaVermelho;
   const warm = !hot && (paradoAtivo || quente);
   const tier = hot ? ' hot' : warm ? ' warm' : '';
-  const servLbl = l.tipoServico !== 'analise_inicial' ? rotuloDe(TIPO_SERVICO, l.tipoServico) : '';
-  const sub = [l.tipoBeneficio ? rotuloDe(TIPO_BENEFICIO, l.tipoBeneficio) : '', servLbl].filter(Boolean).join(' · ');
+  // tipo de benefício: da oportunidade; sem ele, o da FICHA (pedido do dono 27/08).
+  // v6: SERVIÇO saiu do card (dono: "cancelamento não fazemos mais, é só ressarcimento" —
+  // rótulo repetido em todo card é ruído); VALORES saíram ("não trabalhamos com isso").
+  const benefBruto = l.tipoBeneficio ?? (fichaInfo?.tipoBeneficio as KLead['tipoBeneficio'] | null);
+  const benefLbl = benefBruto ? rotuloDe(TIPO_BENEFICIO, benefBruto) : '';
+  // data no FUSO DE SP (slice do ISO daria o dia em UTC — à noite mostra amanhã)
+  const dtEntradaIso = l.entradaEm || l.criadoEm || '';
+  const dataCurta = dtEntradaIso ? new Date(dtEntradaIso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo' }) : '';
+  const dataFull = dtEntradaIso ? new Date(dtEntradaIso).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : '';
+  // meta corrida: só a instituição (bancos ganharam a própria fileira de destaque)
+  const metaPartes = [l.instituicao].filter(Boolean) as string[];
+  const revN = fichaInfo?.revBancos.length ?? 0;
+  const metaTitle = metaPartes.join(' · ');
+  // progresso do funil DO JEITO DO DONO (27/08): TODAS as etapas contam menos Perdido
+  // (Lead novo, Qualificado, Documentação, Assinar, Fechado = 5). Entrada = 0/5; cada
+  // avanço de coluna sobe 1; chegou no Fechado/ganho = 5/5 cheio (verde).
+  const etapasFunil = colunas.filter((c) => (c.resultado ?? 'neutro') !== 'perdido');
+  const nEtapas = etapasFunil.length;
+  const idxEtapa = etapasFunil.findIndex((c) => c.id === l.colunaId);
+  const noGanho = l.status === 'ganho' || (colAtual ? (colAtual.resultado ?? 'neutro') === 'ganho' : false);
+  const mostraProg = l.status !== 'perdido' && nEtapas > 1 && (noGanho || idxEtapa >= 0);
+  const progVal = noGanho ? nEtapas : Math.max(0, idxEtapa);
+  const progPct = (progVal / Math.max(nEtapas, 1)) * 100;
   // v3 F2 — PRÓXIMO PASSO: 1 badge que diz o que FAZER (não só o que é). "Sem responsável" já vive
   // em âmbar na linha do atendente; a estagnação, no "parado Xd" ao lado — o badge não os repete.
   const badge = optout ? { cls: 'blk', txt: 'Não incomodar' }
@@ -1292,7 +1451,7 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, fichaStatus, optout, 
     : quente ? { cls: 'hot', txt: 'Responder agora' }
     : fichaStatus === 'rascunho' ? { cls: 'ficha', txt: 'Finalizar ficha' }
     : hot && paradoAtivo ? { cls: 'hot', txt: 'Retomar contato' }
-    : fichaStatus === 'finalizada' ? { cls: 'ok', txt: 'Ficha ✓' }
+    // "Ficha ✓" saiu do card (v5): estado BOM não compete por atenção — vive no drawer
     : null;
   // Etiquetas do lead + do contato, sem repetição, SEMPRE visíveis (pedido do dono:
   // "colocar etiquetas e que fique aparecendo no kanban, como lembrete"). Máx. 2 + contador.
@@ -1304,57 +1463,93 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, fichaStatus, optout, 
   return (
     <div
       ref={aoRef}
-      className={'kc' + tier + (arrastando ? ' drag' : '') + (moving ? ' moving' : '') + (destacado ? ' destaque' : '')}
+      className={'kc' + tier + (l.status === 'ganho' ? ' e-ganho' : '') + (arrastando ? ' drag' : '') + (moving ? ' moving' : '') + (destacado ? ' destaque' : '')}
       draggable={!moving}
       onClick={aoClicar}
       onDragStart={aoDragStart}
       onDragEnd={aoDragEnd}
     >
+      {/* ⋮ absoluto no canto — em repouso o card é só informação (aparece no hover) */}
+      <span className="kb-menu-wrap">
+        <button type="button" className={'mbtn' + (menuAberto ? ' on' : '')} aria-label={'Ações do lead ' + l.nome} aria-expanded={menuAberto} onClick={(e) => { e.stopPropagation(); aoMenu(e.currentTarget); }}>
+          <IcPontos />
+        </button>
+        {/* o dropdown do card é renderizado em PORTAL no nível da página (fora do overflow da coluna) */}
+      </span>
+
+      {/* L1: TAG de benefício colorida (a energia da referência) + data de entrada */}
+      {(benefLbl || dataCurta) && (
+        <div className="kc-eyebrow">
+          {benefLbl && <span className="kc-benef" title={'Tipo de benefício: ' + benefLbl}>{benefLbl}</span>}
+          {dataCurta && <span className="kc-data num" title={'No funil desde ' + dataFull}>{dataCurta}</span>}
+        </div>
+      )}
+
+      {/* L2 TÍTULO — o único elemento forte do card */}
       <div className="kc-r1">
         <span className="kc-nm" title={l.nome}>{fone ? <span className="num">{fone}</span> : nomeCard}{fone && <i className="kc-semnome">· sem nome</i>}</span>
         {l.status === 'ganho' && <span className="kc-flag ganho" title="Fechado como ganho">Ganho</span>}
         {l.status === 'perdido' && <span className="kc-flag perdido" title={'Perdido' + (l.motivoPerda ? ' · ' + rotuloMotivoPerda(l.motivoPerda) : '')}>Perdido</span>}
-        <span className="kb-menu-wrap">
-          <button type="button" className={'mbtn' + (menuAberto ? ' on' : '')} aria-label={'Ações do lead ' + l.nome} aria-expanded={menuAberto} onClick={(e) => { e.stopPropagation(); aoMenu(e.currentTarget); }}>
-            <IcPontos />
-          </button>
-          {/* o dropdown do card é renderizado em PORTAL no nível da página (fora do overflow da coluna) */}
-        </span>
       </div>
 
+      {/* L3 META corrida: instituição */}
+      {metaPartes.length > 0 && (
+        <div className="kc-meta" title={metaTitle}>{metaPartes.join(' · ')}</div>
+      )}
+
+      {/* L3b BANCOS DA FICHA em DESTAQUE (dono: "muito importante"): o banco do cliente
+          (recebe) no chip mais forte do card (assinatura platina); REVs em contorno */}
+      {fichaInfo && (fichaInfo.bancoNome || revN > 0) && (
+        <div className="kc-bancos" title={'Bancos da ficha' + (fichaInfo.bancoNome ? ` · recebe: ${fichaInfo.bancoNome}` : '') + (revN ? ` · REV: ${fichaInfo.revBancos.join(', ')}` : '')}>
+          {fichaInfo.bancoNome && <span className="kc-banco prin">{fichaInfo.bancoNome}</span>}
+          {fichaInfo.revBancos.slice(0, 2).map((b) => <span key={b} className="kc-banco">{b}</span>)}
+          {revN > 2 && <span className="kc-banco mais">+{revN - 2}</span>}
+        </div>
+      )}
+      {/* RESERVADO — estado do BOT no card (dono 27/08): quando a opção nascer no bot,
+          entra aqui (fonte provável: ia_sessoes da conversa). */}
+
+      {/* L5 PROGRESSO do funil: avançou X de N etapas (0/N na entrada; N/N no Fechado) */}
+      {mostraProg && (
+        <div className="kc-prog" title={noGanho ? `Fechado — completou as ${nEtapas} etapas` : `Avançou ${progVal} de ${nEtapas} etapas · está em ${colAtual?.nome ?? ''}`}>
+          <span className="trilho"><span className="fill" style={{ width: progPct + '%' }} /></span>
+          <span className="frac num">{progVal}/{nEtapas}</span>
+        </div>
+      )}
+
+      {/* L6 LEMBRETE — texto âmbar, sem caixa */}
+      {l.lembrete && (
+        <div className="kc-lem" title={'Lembrete: ' + l.lembrete}><IcSino /><span>{l.lembrete}</span></div>
+      )}
+
+      {/* L6b ETIQUETAS coloridas — mesma linguagem da tag de benefício, na cor da etiqueta */}
       {todasEtiquetas.length > 0 && (
         <div className="kc-etqs">
           {todasEtiquetas.slice(0, 2).map((t) => {
             const cor = corDaEtiqueta(t, etiquetasCat);
-            return <span key={t} className="kc-etq" title={t}><i style={{ background: cor }} />{t}</span>;
+            return <span key={t} className="kc-etq" title={t} style={{ color: cor, background: cor + '24', borderColor: cor + '4D' }}>{t}</span>;
           })}
           {todasEtiquetas.length > 2 && <span className="kc-etq mais" title={todasEtiquetas.slice(2).join(' · ')}>+{todasEtiquetas.length - 2}</span>}
         </div>
       )}
 
-      {l.lembrete && (
-        <div className="kc-lem" title={'Lembrete: ' + l.lembrete}><IcSino /><span>{l.lembrete}</span></div>
-      )}
-
-      <div className="kc-r2">
-        <span className="kc-av" title={l.respNome ? 'Responsável · ' + l.respNome : 'Sem responsável'}>{l.respNome ? initials(l.respNome) : '·'}</span>
+      {/* L7 RODAPÉ: gente + tempo + WhatsApp */}
+      <div className="kc-foot">
+        <span className={'kc-av' + (l.respNome ? '' : ' semdono')} title={l.respNome ? 'Responsável · ' + l.respNome : 'Sem responsável'}>{l.respNome ? initials(l.respNome) : '·'}</span>
         <span className={'kc-resp' + (l.respNome ? '' : ' none')} title={l.respNome || 'Não atribuído'}>{l.respNome || 'Não atribuído'}</span>
         <span className={'kc-time num' + (paradoAtivo ? (hot ? ' hot' : ' warm') : '')} title={paradoAtivo ? `Sem trocar de coluna há ${dp} dia(s)` : 'Última atualização'}>
           {paradoAtivo ? `parado ${dp}d` : haDe(l.atualizadoEm || l.criadoEm)}
         </span>
+        {l.conversaOrigemId && (
+          <button type="button" className="kc-wa" title="Abrir a conversa do cliente no WhatsApp" aria-label={'Abrir a conversa de ' + l.nome + ' no WhatsApp'}
+            onClick={(e) => { e.stopPropagation(); aoAbrirConversa(); }}>
+            <IcChat />
+          </button>
+        )}
       </div>
 
+      {/* L8 FAIXA DE AÇÃO full-width no pé — o call-to-action que o atendente varre */}
       {badge && <span className={'kc-badge ' + badge.cls} title={badge.txt}>{badge.txt}</span>}
-
-      {/* peek no HOVER — contexto rápido sem abrir nada (o detalhe completo vive no drawer ao clicar) */}
-      {(sub || l.instituicao) && (
-        <div className="kc-mais">
-          <div className="kc-peek">
-            {sub && <span className="sb" title={sub}>{sub}</span>}
-            {l.instituicao && <span className="in" title={l.instituicao}>{l.instituicao}</span>}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

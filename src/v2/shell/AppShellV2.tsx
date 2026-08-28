@@ -7,6 +7,8 @@ import '../fontes';
 import '../tokens.css';
 import '../base.css';
 import './shell.css';
+import '../skinAurora.css'; // TESTE (branch teste/skin-aurora-azul): fundo bokeh + azul secundário
+import { LogoAtenvo } from '../components/LogoAtenvo';
 import { instalarSpotlight } from '../lib/spotlight';
 import { criarRaizPortalV2 } from '../components/portal';
 import { ICONES } from './icones';
@@ -46,10 +48,9 @@ const GRUPOS: { rotulo: string; itens: ItemNav[] }[] = [
     itens: [
       { slug: 'dashboard', rotulo: 'Dashboard' },
       { slug: 'whatsapp', rotulo: 'WhatsApp' },
-      { slug: 'facebook', rotulo: 'Facebook' },
+      // Facebook e Disparo fora do menu (pedido do dono 27/08) — rotas seguem vivas por URL
       { slug: 'kanban', rotulo: 'Kanban' },
       { slug: 'agendamentos', rotulo: 'Agendamentos' },
-      { slug: 'disparo', rotulo: 'Disparo' },
     ],
   },
   {
@@ -57,9 +58,9 @@ const GRUPOS: { rotulo: string; itens: ItemNav[] }[] = [
     itens: [
       { slug: 'contatos', rotulo: 'Contatos' },
       { slug: 'scripts', rotulo: 'Scripts' },
-      { slug: 'simulador', rotulo: 'Simulador' },
+      // Simulador fora do menu (pedido do dono 27/08) — rota segue viva por URL
       { slug: 'cobrancas', rotulo: 'Cobranças' },
-      { slug: 'relatorios', rotulo: 'Relatórios' },
+      // Relatórios fora do menu (pedido do dono 27/08) — rota segue viva por URL
     ],
   },
   {
@@ -69,7 +70,8 @@ const GRUPOS: { rotulo: string; itens: ItemNav[] }[] = [
       // Maturação descontinuada (Evolution restrito pela Meta) — item removido do menu; rota → placeholder.
       // paridade: /configuracoes NÃO tem RequireRole no app antigo (as abas variam por papel)
       { slug: 'configuracoes', rotulo: 'Configurações' },
-      { slug: 'plano-uso', rotulo: 'Plano e uso', admin: true },
+      // Plano e uso fora do menu (pedido do dono 27/08) — rota segue viva por URL
+
     ],
   },
 ];
@@ -225,7 +227,7 @@ export default function AppShellV2() {
       <div className="p-app">
         <aside className="p-sidebar" ref={sidebarRef}>
           <div className="p-logo">
-            <div className="marca">A</div>
+            <LogoAtenvo className="marca" />
             <span className="word lab">atenvo</span>
           </div>
           <div className="tenant" title={org}>

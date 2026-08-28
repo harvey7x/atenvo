@@ -1,0 +1,267 @@
+/* ============================================================
+   SKIN EXPERIMENTAL "AURORA" — branch teste/skin-aurora-azul.
+   Direção (referência bokeh do dono): fundo EMBAÇADO colorido
+   atrás do app — o preto chapado vira profundidade — + AZUL como
+   cor SECUNDÁRIA de interação (o Platina não tinha secundária;
+   os semânticos verde/âmbar/rubro seguem intactos).
+
+   Como funciona: o fundo é bokeh de GRADIENTES suaves (não foto),
+   então a translucidez das superfícies já entrega o "embaçado"
+   SEM backdrop-filter por elemento — lite-safe por construção.
+   Só o tema ESCURO: tudo aqui é guardado por
+   :root:not([data-tema="light"]) (o guarda também dá a
+   especificidade pra vencer o CSS lazy das páginas).
+   Reverter o teste = remover o import em AppShellV2.
+   ============================================================ */
+
+:root:not([data-tema="light"]) .v2 {
+  /* azul secundário do teste — interação/seleção */
+  --azul: #4C8DFF;
+  --azul-rgb: 76, 141, 255;
+}
+
+/* --- 1. FUNDO BOKEH (fixo, atrás de tudo) -------------------
+   Família FRIA, coerente com a identidade azul (a marca tem bloom
+   azul): azul profundo no canto inferior-direito, azul frio no
+   topo-esquerdo, violeta e azul de apoio no meio. */
+:root:not([data-tema="light"]) .v2.app-v2 {
+  background:
+    radial-gradient(52% 46% at 86% 94%, rgba(58, 110, 232, .17), transparent 68%),
+    radial-gradient(46% 42% at 6% 4%, rgba(var(--azul-rgb), .12), transparent 66%),
+    radial-gradient(38% 44% at 76% 10%, rgba(126, 96, 224, .09), transparent 70%),
+    radial-gradient(34% 38% at 36% 72%, rgba(var(--azul-rgb), .06), transparent 70%),
+    var(--base);
+}
+
+/* --- 2. SUPERFÍCIES REVELAM O FUNDO -------------------------
+   Os painéis do inbox já são tint-sobre-base (translúcidos); o
+   único pintor OPACO é o fio da conversa — vira véu escuro leve
+   e a tonalidade passa por trás das bolhas. */
+:root:not([data-tema="light"]) .v2 .wa-msgs {
+  background-color: rgba(8, 9, 12, .32);
+}
+
+/* bolhas: tratamento completo na seção 5 (FIO PREMIUM) */
+
+/* --- 3. AZUL COMO SECUNDÁRIA DE INTERAÇÃO ------------------- */
+/* item ativo da navegação (pill azul, como a referência) */
+:root:not([data-tema="light"]) .v2 .item.on {
+  background: rgba(var(--azul-rgb), .16);
+  color: #fff;
+}
+:root:not([data-tema="light"]) .v2 .item.on::before { background: var(--azul); }
+
+/* ação primária: o metal platina vira azul (referência "Dispatch Now") */
+:root:not([data-tema="light"]) .v2 .btn-pri {
+  background: linear-gradient(180deg, #5FA0FF, #3372EC);
+  color: #fff;
+  box-shadow: 0 10px 26px rgba(var(--azul-rgb), calc(.32 * var(--fx))), inset 0 1px 0 rgba(255, 255, 255, .35);
+}
+
+/* aba ativa do inbox */
+:root:not([data-tema="light"]) .v2 .wa-aba.on {
+  background: rgba(var(--azul-rgb), .16);
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgba(var(--azul-rgb), .25);
+}
+
+/* --- 3b. AZUL: segunda leva de pontos de interação --------------
+   Regra do teste: azul marca INTERAÇÃO/SELEÇÃO/ATENÇÃO-neutra;
+   verde/âmbar/rubro seguem exclusivos de estado. */
+
+/* badge de não-lidas da lista (metal claro → azul: é "tem coisa nova", não status) */
+:root:not([data-tema="light"]) .v2 .conv2 .nl {
+  background: linear-gradient(180deg, #6BA6FF, #3B78EE);
+  color: #fff;
+}
+
+/* botão Enviar do composer (par do btn-pri) */
+:root:not([data-tema="light"]) .v2 .env-b {
+  background: linear-gradient(180deg, #5FA0FF, #3372EC);
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35);
+}
+
+/* toggle LIGADO (o padrão .tgl é o estado on; .off segue neutro) */
+:root:not([data-tema="light"]) .v2 .tgl {
+  background: linear-gradient(180deg, #5FA0FF, #3372EC);
+}
+:root:not([data-tema="light"]) .v2 .tgl::after { background: #fff; }
+:root:not([data-tema="light"]) .v2 .tgl.off { background: rgba(var(--tint), .12); }
+:root:not([data-tema="light"]) .v2 .tgl.off::after { background: var(--txt-2); }
+
+/* foco de input: o anel deixa de ser tinta e vira azul */
+:root:not([data-tema="light"]) .v2 .inp:focus {
+  border-color: rgba(var(--azul-rgb), .55);
+  box-shadow: 0 0 0 3px rgba(var(--azul-rgb), .12);
+}
+:root:not([data-tema="light"]) .v2 .campo.invalida .inp:focus { box-shadow: 0 0 0 3px rgba(var(--rubro-rgb), .10); } /* inválido segue rubro */
+
+/* chips/botões ativos do inbox: "Responder por" e ícones .on */
+:root:not([data-tema="light"]) .v2 .wa-chipbtn.on { background: rgba(var(--azul-rgb), .16); color: #fff; }
+:root:not([data-tema="light"]) .v2 .ib2.on { color: #fff; border-color: rgba(var(--azul-rgb), .5); background: rgba(var(--azul-rgb), .12); }
+:root:not([data-tema="light"]) .v2 .cmsg .tools .wa-scr-btn.on { color: #fff; border-color: rgba(var(--azul-rgb), .5); background: rgba(var(--azul-rgb), .16); }
+
+/* links de ação nas bolhas (falha segue rubro por semântica) */
+:root:not([data-tema="light"]) .v2 .audio-ind .lnk,
+:root:not([data-tema="light"]) .v2 .doc2 .acts .lnk { color: var(--azul); }
+
+/* atalho WhatsApp do card do Kanban: hover na secundária */
+:root:not([data-tema="light"]) .v2 .kc-wa:hover { color: #fff; background: rgba(var(--azul-rgb), .18); border-color: rgba(var(--azul-rgb), .5); }
+/* card v5: sombra/elevação vivem no kanban.css; aqui só os hovers azuis */
+
+/* barras de atividade (Agendamentos/Relatórios — anatomia .barv compartilhada):
+   série em azul, com o HOJE aceso; demais dias num azul recuado */
+:root:not([data-tema="light"]) .v2 .barv {
+  background: linear-gradient(180deg, rgba(var(--azul-rgb), .5), rgba(var(--azul-rgb), .12));
+}
+:root:not([data-tema="light"]) .v2 .barv.hoje2 {
+  background: linear-gradient(180deg, #8FBCFF, #3E7BF0);
+  box-shadow: 0 0 18px rgba(var(--azul-rgb), calc(.4 * var(--fx)));
+}
+:root:not([data-tema="light"]) .v2 .bwrap:focus-visible .barv { box-shadow: 0 0 0 2px rgba(var(--azul-rgb), .5); }
+
+/* caret e seleção de texto */
+:root:not([data-tema="light"]) .v2 textarea,
+:root:not([data-tema="light"]) .v2 input { caret-color: var(--azul); }
+:root:not([data-tema="light"]) .v2 ::selection { background: rgba(var(--azul-rgb), .3); }
+
+/* --- 5. FIO PREMIUM: bolhas com profundidade e identidade -------
+   Recebida = vidro neutro flutuando; ENVIADA = vidro AZUL profundo
+   (o que é da casa fala a cor da casa). Sombra projetada + brilho
+   interno no topo dão o volume; raio maior com canto-âncora dá a
+   geometria de messenger moderno. Só box-shadow — sem blur. */
+:root:not([data-tema="light"]) .v2 .bolha { border-radius: 16px; }
+:root:not([data-tema="light"]) .v2 .bolha.rec {
+  border-bottom-left-radius: 5px;
+  background-color: rgba(16, 18, 24, .6);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, .085), rgba(255, 255, 255, .04));
+  border-color: rgba(255, 255, 255, .1);
+  box-shadow: 0 10px 26px rgba(2, 4, 10, .45), inset 0 1px 0 rgba(255, 255, 255, .07);
+}
+:root:not([data-tema="light"]) .v2 .bolha.env2 {
+  border-bottom-right-radius: 5px;
+  background-color: rgba(14, 22, 40, .62);
+  background-image: linear-gradient(180deg, rgba(var(--azul-rgb), .3), rgba(var(--azul-rgb), .1));
+  border-color: rgba(var(--azul-rgb), .34);
+  box-shadow: 0 10px 26px rgba(6, 16, 42, .5), inset 0 1px 0 rgba(255, 255, 255, .12);
+}
+/* bot: mantém o acento de identidade na borda-guia sobre o vidro azul */
+:root:not([data-tema="light"]) .v2 .bolha.env2.bot {
+  box-shadow: inset 2.5px 0 0 rgba(255, 255, 255, .3), 0 10px 26px rgba(6, 16, 42, .5), inset 0 1px 0 rgba(255, 255, 255, .12);
+}
+/* horário/ticks legíveis sobre o azul */
+:root:not([data-tema="light"]) .v2 .bolha.env2 .hh { color: rgba(255, 255, 255, .62); }
+/* ticks de LEITURA azuis — a linguagem do WhatsApp que a equipe já fala */
+:root:not([data-tema="light"]) .v2 .bolha .tick.lida { color: #6FB0FF; }
+/* separador de dia: pílula de vidro mais presente */
+:root:not([data-tema="light"]) .v2 .dia {
+  background: rgba(255, 255, 255, .07);
+  border-color: rgba(255, 255, 255, .12);
+  box-shadow: 0 4px 14px rgba(2, 4, 10, .35);
+}
+
+/* --- 6. JANELAS = VIDRO FUMÊ sempre (dono 27/08) ----------------
+   Modal e drawer mantêm o blur MESMO no modo Leve — é UMA superfície
+   por vez (custo pontual); o resto do Leve segue sólido. !important
+   de propósito: vence o kill de blur do lite e os overrides sólidos
+   do drawer em componentes.css, cuja ordem de import varia. */
+.v2 .p-modal.vidro,
+.v2 .drawer-v2 {
+  backdrop-filter: blur(26px) saturate(1.15) !important;
+  -webkit-backdrop-filter: blur(26px) saturate(1.15) !important;
+}
+:root:not([data-tema="light"]) .v2 .p-modal.vidro { background: linear-gradient(180deg, rgba(21, 25, 33, .55), rgba(10, 12, 17, .62)) !important; }
+:root[data-tema="light"] .v2 .p-modal.vidro { background: linear-gradient(180deg, rgba(255, 255, 255, .74), rgba(250, 251, 253, .68)) !important; }
+:root:not([data-tema="light"]) .v2 .drawer-v2 { background: linear-gradient(180deg, rgba(20, 22, 27, .78), rgba(13, 14, 18, .74)) !important; }
+:root[data-tema="light"] .v2 .drawer-v2 { background: linear-gradient(180deg, rgba(255, 255, 255, .88), rgba(250, 251, 252, .84)) !important; }
+/* véu mais leve: o app aparece FUMADO atrás da janela */
+:root:not([data-tema="light"]) .v2 .veu { background: rgba(5, 6, 9, .45); }
+
+/* --- 4. LITE: sem transparência nas bolhas (voltam sólidas) --- */
+[data-perf="lite"]:not([data-tema="light"]) .v2 .bolha.rec,
+[data-perf="lite"]:not([data-tema="light"]) .v2 .bolha.env2 { background-color: var(--base); }
+
+/* ============================================================
+   PAR CLARO (first-class, não inversão): azul mais FUNDO para
+   aguentar o branco, bokeh vira lavagem pastel, bolha enviada em
+   azul-claro de messenger, cartas brancas flutuando com sombra
+   real. Seletores usam .v2.app-v2 para vencer os overrides light
+   das páginas (CSS lazy carrega depois da pele).
+   ============================================================ */
+:root[data-tema="light"] .v2 {
+  --azul: #2A62C9;
+  --azul-rgb: 42, 98, 201;
+}
+
+/* fundo: lavagem pastel sobre o off-white */
+:root[data-tema="light"] .v2.app-v2 {
+  background:
+    radial-gradient(52% 46% at 86% 94%, rgba(var(--azul-rgb), .1), transparent 68%),
+    radial-gradient(46% 42% at 6% 4%, rgba(var(--azul-rgb), .07), transparent 66%),
+    radial-gradient(38% 44% at 76% 10%, rgba(122, 92, 220, .05), transparent 70%),
+    var(--base);
+}
+:root[data-tema="light"] .v2.app-v2 .wa-msgs { background-color: rgba(244, 245, 247, .5); }
+
+/* azul de interação */
+:root[data-tema="light"] .v2.app-v2 .item.on { background: rgba(var(--azul-rgb), .1); color: var(--azul); }
+:root[data-tema="light"] .v2.app-v2 .item.on::before { background: var(--azul); }
+:root[data-tema="light"] .v2 .btn-pri {
+  background: linear-gradient(180deg, #3D7BE8, #2A62C9);
+  color: #fff;
+  box-shadow: 0 10px 26px rgba(var(--azul-rgb), .25), inset 0 1px 0 rgba(255, 255, 255, .35);
+}
+:root[data-tema="light"] .v2.app-v2 .wa-aba.on { background: rgba(var(--azul-rgb), .12); color: var(--azul); box-shadow: inset 0 1px 0 rgba(var(--azul-rgb), .18); }
+:root[data-tema="light"] .v2.app-v2 .conv2 .nl { background: linear-gradient(180deg, #3D7BE8, #2A62C9); color: #fff; }
+:root[data-tema="light"] .v2.app-v2 .env-b { background: linear-gradient(180deg, #3D7BE8, #2A62C9); color: #fff; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35); }
+:root[data-tema="light"] .v2.app-v2 .tgl { background: linear-gradient(180deg, #3D7BE8, #2A62C9); }
+:root[data-tema="light"] .v2.app-v2 .tgl::after { background: #fff; }
+:root[data-tema="light"] .v2.app-v2 .tgl.off { background: rgba(22, 25, 31, .16); }
+:root[data-tema="light"] .v2.app-v2 .tgl.off::after { background: #fff; }
+:root[data-tema="light"] .v2 .inp:focus { border-color: rgba(var(--azul-rgb), .55); box-shadow: 0 0 0 3px rgba(var(--azul-rgb), .1); }
+:root[data-tema="light"] .v2.app-v2 .wa-chipbtn.on { background: rgba(var(--azul-rgb), .12); color: var(--azul); }
+:root[data-tema="light"] .v2.app-v2 .ib2.on { color: var(--azul); border-color: rgba(var(--azul-rgb), .45); background: rgba(var(--azul-rgb), .1); }
+:root[data-tema="light"] .v2.app-v2 .cmsg .tools .wa-scr-btn.on { color: var(--azul); border-color: rgba(var(--azul-rgb), .45); background: rgba(var(--azul-rgb), .12); }
+:root[data-tema="light"] .v2.app-v2 .audio-ind .lnk,
+:root[data-tema="light"] .v2.app-v2 .doc2 .acts .lnk { color: var(--azul); }
+:root[data-tema="light"] .v2 textarea,
+:root[data-tema="light"] .v2 input { caret-color: var(--azul); }
+:root[data-tema="light"] .v2 ::selection { background: rgba(var(--azul-rgb), .22); }
+
+/* atalho WhatsApp do card do Kanban */
+:root[data-tema="light"] .v2.app-v2 .kc-wa:hover { color: var(--azul); background: rgba(var(--azul-rgb), .12); border-color: rgba(var(--azul-rgb), .45); }
+/* card v5 claro: carta branca flutuando (a elevação base vive no kanban.css) */
+:root[data-tema="light"] .v2.app-v2 .kc { background: #FFFFFF; border-color: var(--linha); box-shadow: 0 1px 2px rgba(22, 25, 31, .05), 0 8px 20px rgba(22, 25, 31, .07); }
+:root[data-tema="light"] .v2.app-v2 .kc:hover { box-shadow: 0 2px 4px rgba(22, 25, 31, .06), 0 14px 30px rgba(22, 25, 31, .1); }
+
+/* barras de atividade */
+:root[data-tema="light"] .v2.app-v2 .barv { background: linear-gradient(180deg, rgba(var(--azul-rgb), .4), rgba(var(--azul-rgb), .1)); }
+:root[data-tema="light"] .v2.app-v2 .barv.hoje2 { background: linear-gradient(180deg, #5B93E8, #2A62C9); box-shadow: 0 4px 14px rgba(var(--azul-rgb), .3); }
+:root[data-tema="light"] .v2.app-v2 .bwrap:focus-visible .barv { box-shadow: 0 0 0 2px rgba(var(--azul-rgb), .45); }
+
+/* fio premium no claro: cartas brancas flutuando · enviada azul-claro */
+:root[data-tema="light"] .v2.app-v2 .bolha { border-radius: 16px; }
+:root[data-tema="light"] .v2.app-v2 .bolha.rec {
+  border-bottom-left-radius: 5px;
+  background-color: rgba(255, 255, 255, .88);
+  background-image: none;
+  border-color: rgba(22, 25, 31, .09);
+  box-shadow: 0 8px 22px rgba(22, 25, 31, .08), inset 0 1px 0 #fff;
+}
+:root[data-tema="light"] .v2.app-v2 .bolha.env2 {
+  border-bottom-right-radius: 5px;
+  background-color: rgba(255, 255, 255, .82);
+  background-image: linear-gradient(180deg, rgba(var(--azul-rgb), .14), rgba(var(--azul-rgb), .06));
+  border-color: rgba(var(--azul-rgb), .28);
+  box-shadow: 0 8px 22px rgba(var(--azul-rgb), .14), inset 0 1px 0 rgba(255, 255, 255, .8);
+}
+:root[data-tema="light"] .v2.app-v2 .bolha.env2.bot {
+  box-shadow: inset 2.5px 0 0 rgba(var(--azul-rgb), .4), 0 8px 22px rgba(var(--azul-rgb), .14), inset 0 1px 0 rgba(255, 255, 255, .8);
+}
+:root[data-tema="light"] .v2.app-v2 .bolha .tick.lida { color: var(--azul); }
+:root[data-tema="light"] .v2.app-v2 .dia { background: rgba(255, 255, 255, .85); border-color: rgba(22, 25, 31, .1); box-shadow: 0 4px 14px rgba(22, 25, 31, .07); }
+
+/* lite no claro: bolhas sólidas */
+:root[data-tema="light"][data-perf="lite"] .v2.app-v2 .bolha.rec,
+:root[data-tema="light"][data-perf="lite"] .v2.app-v2 .bolha.env2 { background-color: #FFFFFF; }

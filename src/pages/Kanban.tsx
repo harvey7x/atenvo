@@ -544,7 +544,7 @@ export function Kanban() {
                               {l.prioridade === 'alta' && <span className="lc-sla-chip prio" title="Prioridade alta">⭐ Prioridade alta</span>}
                             </div>
                           ); })()}
-                          <div className="lc-foot">{IC.clock}{haDe(l.atualizadoEm || l.criadoEm)}{fichaStatusMap[l.id] && <span className={'lc-ficha-tag ' + fichaStatusMap[l.id]}>{fichaStatusMap[l.id] === 'finalizada' ? 'Ficha finalizada' : 'Ficha em rascunho'}</span>}</div>
+                          <div className="lc-foot">{IC.clock}{haDe(l.atualizadoEm || l.criadoEm)}{fichaStatusMap[l.id] && <span className={'lc-ficha-tag ' + fichaStatusMap[l.id].status}>{fichaStatusMap[l.id].status === 'finalizada' ? 'Ficha finalizada' : 'Ficha em rascunho'}</span>}</div>
                         </div>
                       );
                     })}

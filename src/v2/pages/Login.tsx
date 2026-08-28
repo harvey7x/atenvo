@@ -6,6 +6,7 @@ import '../tokens.css';
 import '../base.css';
 import '../components/componentes.css';
 import './login.css';
+import { LogoAtenvo } from '../components/LogoAtenvo';
 
 import { DESTINO_PADRAO_V2 as DESTINO_PADRAO } from '../destino';
 
@@ -97,7 +98,7 @@ export default function LoginV2() {
       <div className="luz2" />
       <div className="grao" />
       <div className="lg-card vidro pg-entra">
-        <div className="marca2">A</div>
+        <LogoAtenvo className="marca2" />
         <div className="caps">Bem-vindo ao Atenvo</div>
         <h1 className="p-display">Acesse sua operação.</h1>
         <div className="sub">Entre com suas credenciais para continuar.</div>
