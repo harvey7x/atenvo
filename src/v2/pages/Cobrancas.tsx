@@ -330,9 +330,7 @@ export default function CobrancasV2() {
       {aba === 'ciclos' && (demo ? <AbaCiclos gestor={gestor} aoAvisar={(t) => setAviso({ tom: 'ok', texto: t })} /> : (
         <CardVidro spot sobe style={{ borderRadius: 'var(--r-card)' }}><EstadoVazio titulo="Nenhum ciclo com clientes" descricao="Os ciclos ganham vida quando os clientes forem cadastrados — cada um entra na turma do seu dia de vencimento." /></CardVidro>
       ))}
-      {aba === 'regua' && (demo ? <AbaRegua gestor={gestor} aoAvisar={(t) => setAviso({ tom: 'ok', texto: t })} /> : (
-        <CardVidro spot sobe style={{ borderRadius: 'var(--r-card)' }}><EstadoVazio titulo="Régua de mensagens" descricao="O editor real — com várias mensagens por passo, áudio, imagem e documento — é o próximo passo da Fase C. Já dá para conectar os números na aba Números." /></CardVidro>
-      ))}
+      {aba === 'regua' && <AbaRegua demo={demo} gestor={gestor} aoAvisar={(t) => setAviso({ tom: 'ok', texto: t })} />}
       {aba === 'numeros' && <AbaNumeros demo={demo} gestor={gestor} aoAvisar={(t) => setAviso({ tom: 'ok', texto: t })} />}
       {aba === 'envios' && (demo ? <AbaEnvios gestor={gestor} aoAvisar={(t) => setAviso({ tom: 'ok', texto: t })} /> : (
         <CardVidro spot sobe style={{ borderRadius: 'var(--r-card)' }}><EstadoVazio titulo="Nenhum envio na fila" descricao="Com números conectados e a régua configurada, os envios aparecem aqui — sempre nascendo em simulação, antes de qualquer disparo real." /></CardVidro>

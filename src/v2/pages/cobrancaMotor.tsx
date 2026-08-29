@@ -12,6 +12,10 @@ import {
 import { useOrg } from '@/context/OrgContext';
 import { useOrgUsuarios } from '@/data/atendimento';
 import { useCobNumeros, cobWaConectar, cobWaStatus, cobWaDesconectar, type CobNumero } from '@/data/cobrancaWa';
+import {
+  useCobMensagens, useSalvarMensagem, useAlternarMensagem, uploadMidiaCobranca, ROTULO_TIPO_MSG,
+  type CobMensagem, type CobMsgItem, type TipoMensagem, type TipoItem,
+} from '@/data/cobrancaRegua';
 
 /** célula da grade de pagamentos (máquina de estados do legado Gestão Mensal) */
 function Celula({ raw }: { raw: string }) {
@@ -154,7 +158,168 @@ const MSGS_DEMO: MsgDemo[] = [
   { tipo: 'remarketing', nome: 'Retomada', offset: 7, corpo: 'Oi {nome}, faz alguns dias da última mensalidade. Quer que eu te ajude a regularizar? Podemos combinar da melhor forma pra você.' },
 ];
 
-export function AbaRegua({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (t: string) => void }) {
+export function AbaRegua({ demo, gestor, aoAvisar }: { demo: boolean; gestor: boolean; aoAvisar: (t: string) => void }) {
+  return demo ? <AbaReguaDemo gestor={gestor} aoAvisar={aoAvisar} /> : <AbaReguaReal gestor={gestor} aoAvisar={aoAvisar} />;
+}
+
+/* ---- REAL: mensagens são SEQUÊNCIAS de bolhas (texto/imagem/áudio/documento) ---- */
+const ORDEM_TIPOS: TipoMensagem[] = ['antes', 'cobranca', 'depois', 'remarketing'];
+const ROTULO_ITEM: Record<TipoItem, string> = { texto: 'Texto', imagem: 'Imagem', audio: 'Áudio', documento: 'Documento' };
+const ACCEPT_ITEM: Record<TipoItem, string> = { texto: '', imagem: 'image/*', audio: 'audio/*', documento: '.pdf,.doc,.docx,.xls,.xlsx' };
+
+type EdMsg = { id?: string; tipo: TipoMensagem; nome: string; itens: CobMsgItem[] };
+
+function AbaReguaReal({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (t: string) => void }) {
+  const { currentOrg } = useOrg();
+  const orgId = currentOrg?.id;
+  const { data: mensagens = [], isLoading } = useCobMensagens(orgId);
+  const salvar = useSalvarMensagem(orgId);
+  const alternar = useAlternarMensagem(orgId);
+  const [ed, setEd] = useState<EdMsg | null>(null);
+  const [upBusy, setUpBusy] = useState<number | null>(null);
+
+  const porTipo = useMemo(() => {
+    const m = new Map<TipoMensagem, CobMensagem[]>();
+    for (const t of ORDEM_TIPOS) m.set(t, []);
+    for (const msg of mensagens) m.get(msg.tipo)?.push(msg);
+    return m;
+  }, [mensagens]);
+
+  function mudarItem(k: number, patch: Partial<CobMsgItem>) {
+    setEd((e) => e && { ...e, itens: e.itens.map((it, i) => (i === k ? { ...it, ...patch } : it)) });
+  }
+  function moverItem(k: number, delta: number) {
+    setEd((e) => {
+      if (!e) return e;
+      const alvo = k + delta;
+      if (alvo < 0 || alvo >= e.itens.length) return e;
+      const itens = [...e.itens];
+      [itens[k], itens[alvo]] = [itens[alvo], itens[k]];
+      return { ...e, itens };
+    });
+  }
+  async function subirMidia(k: number, file: File) {
+    if (!orgId) return;
+    setUpBusy(k);
+    try {
+      const r = await uploadMidiaCobranca(orgId, file);
+      mudarItem(k, { midia_url: r.url, midia_nome: r.nome });
+    } catch (e) { aoAvisar((e as Error).message); }
+    finally { setUpBusy(null); }
+  }
+  async function confirmarSalvar() {
+    if (!ed) return;
+    if (!ed.nome.trim()) { aoAvisar('Dê um nome à mensagem.'); return; }
+    if (ed.itens.length === 0) { aoAvisar('Adicione ao menos uma bolha.'); return; }
+    for (const it of ed.itens) {
+      if (it.tipo === 'texto' && !(it.corpo ?? '').trim()) { aoAvisar('Toda bolha de texto precisa de conteúdo.'); return; }
+      if (it.tipo !== 'texto' && !it.midia_url) { aoAvisar(`Anexe o arquivo da bolha de ${ROTULO_ITEM[it.tipo].toLowerCase()}.`); return; }
+    }
+    try {
+      await salvar.mutateAsync({ id: ed.id, tipo: ed.tipo, nome: ed.nome.trim(), itens: ed.itens });
+      aoAvisar('Mensagem salva.');
+      setEd(null);
+    } catch (e) { aoAvisar(`Falha ao salvar: ${(e as Error).message}`); }
+  }
+
+  return (
+    <>
+      <p className="cm-hint sobe">
+        Cada mensagem é uma <b>sequência de bolhas</b> — texto, imagem, áudio ou documento, na ordem em que serão enviadas.
+        Variáveis nos textos: <code>{'{nome}'}</code> <code>{'{valor}'}</code> <code>{'{vencimento}'}</code> <code>{'{atendente}'}</code>.
+      </p>
+      {ORDEM_TIPOS.map((t, sec) => {
+        const lista = porTipo.get(t) ?? [];
+        return (
+          <CardVidro spot sobe key={t} style={{ borderRadius: 'var(--r-card)', marginBottom: 14, animationDelay: `${0.06 * (sec + 1)}s` }}>
+            <div className="card-cab">
+              <h3>{ROTULO_TIPO_MSG[t]}</h3>
+              {gestor && <BotaoSec mini onClick={() => setEd({ tipo: t, nome: '', itens: [{ ordem: 0, tipo: 'texto', corpo: '', midia_url: null, midia_nome: null }] })}>＋ Nova mensagem</BotaoSec>}
+            </div>
+            <div className="cm-msg-lista">
+              {isLoading && <div className="cm-hint">Carregando…</div>}
+              {!isLoading && lista.length === 0 && <div className="cm-hint">Nenhuma mensagem deste tipo ainda.</div>}
+              {lista.map((m) => (
+                <div className="cm-msg-lin" key={m.id}>
+                  <div className="cm-msg-info">
+                    <div className="cm-msg-nm">{m.nome}</div>
+                    <div className="cm-msg-meta num">
+                      {m.itens.length} bolha{m.itens.length === 1 ? '' : 's'} · {m.itens.map((i) => ROTULO_ITEM[i.tipo]).join(' → ') || '—'}
+                    </div>
+                  </div>
+                  {gestor && (
+                    <div className="cm-msg-acoes">
+                      <Toggle ligado={m.ativo} aoMudar={(v) => alternar.mutate({ id: m.id, ativo: v })} rotulo={m.ativo ? 'Mensagem ativa' : 'Mensagem inativa'} />
+                      <BotaoSec mini onClick={() => setEd({ id: m.id, tipo: m.tipo, nome: m.nome, itens: m.itens.map((i) => ({ ...i })) })}>Editar</BotaoSec>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </CardVidro>
+        );
+      })}
+
+      {ed && (
+        <ModalV2 aberto aoFechar={() => setEd(null)} largura={620}
+          titulo={<div>{ed.id ? 'Editar mensagem' : 'Nova mensagem'}<div className="mod-sub">{ROTULO_TIPO_MSG[ed.tipo]}</div></div>}
+          rodape={<><BotaoSec onClick={() => setEd(null)}>Cancelar</BotaoSec><BotaoPrimario onClick={confirmarSalvar} disabled={salvar.isPending || upBusy !== null}>{salvar.isPending ? 'Salvando…' : 'Salvar mensagem'}</BotaoPrimario></>}>
+          <div className="form-grid">
+            <div className="form-2col">
+              <div className="campo"><label>Nome da mensagem *</label><Input value={ed.nome} onChange={(e) => setEd({ ...ed, nome: e.target.value })} placeholder="Ex.: Lembrete 3 dias antes" /></div>
+              <div className="campo"><label>Tipo</label>
+                <select className="inp" value={ed.tipo} onChange={(e) => setEd({ ...ed, tipo: e.target.value as TipoMensagem })}>
+                  {ORDEM_TIPOS.map((t) => <option key={t} value={t}>{ROTULO_TIPO_MSG[t]}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div className="campo"><label>Sequência de bolhas (na ordem do envio)</label></div>
+            {ed.itens.map((it, k) => (
+              <div className="cm-ed-item" key={k}>
+                <div className="cm-ed-topo">
+                  <select className="inp cm-ed-tipo" value={it.tipo}
+                    onChange={(e) => mudarItem(k, { tipo: e.target.value as TipoItem, midia_url: null, midia_nome: null })}>
+                    {(Object.keys(ROTULO_ITEM) as TipoItem[]).map((t) => <option key={t} value={t}>{ROTULO_ITEM[t]}</option>)}
+                  </select>
+                  <span className="cm-ed-ord num">bolha {k + 1}</span>
+                  <div className="cm-ed-mov">
+                    <button type="button" className="cm-num-lnk" onClick={() => moverItem(k, -1)} disabled={k === 0} aria-label="Subir">↑</button>
+                    <button type="button" className="cm-num-lnk" onClick={() => moverItem(k, 1)} disabled={k === ed.itens.length - 1} aria-label="Descer">↓</button>
+                    <button type="button" className="cm-num-lnk perigo" onClick={() => setEd({ ...ed, itens: ed.itens.filter((_, i) => i !== k) })} aria-label="Remover">Remover</button>
+                  </div>
+                </div>
+                {it.tipo === 'texto' ? (
+                  <textarea className="inp" rows={3} value={it.corpo ?? ''} placeholder="Olá {nome}, sua mensalidade de {valor} vence em {vencimento}…"
+                    onChange={(e) => mudarItem(k, { corpo: e.target.value })} />
+                ) : (
+                  <div className="cm-ed-midia">
+                    {it.midia_url
+                      ? <span className="cm-ed-arq num" title={it.midia_nome ?? ''}>{it.midia_nome ?? 'arquivo'}</span>
+                      : <span className="cm-hint">Nenhum arquivo anexado.</span>}
+                    <label className="cm-cad-btn" style={{ cursor: 'pointer' }}>
+                      {upBusy === k ? 'Enviando…' : it.midia_url ? 'Trocar arquivo' : 'Anexar arquivo'}
+                      <input type="file" accept={ACCEPT_ITEM[it.tipo]} style={{ display: 'none' }} disabled={upBusy !== null}
+                        onChange={(e) => { const f = e.target.files?.[0]; if (f) subirMidia(k, f); e.target.value = ''; }} />
+                    </label>
+                    {it.tipo !== 'audio' && (
+                      <Input placeholder="Legenda (opcional)" value={it.corpo ?? ''} onChange={(e) => mudarItem(k, { corpo: e.target.value })} />
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+            <div>
+              <BotaoSec mini onClick={() => setEd({ ...ed, itens: [...ed.itens, { ordem: ed.itens.length, tipo: 'texto', corpo: '', midia_url: null, midia_nome: null }] })}>＋ Adicionar bolha</BotaoSec>
+            </div>
+          </div>
+        </ModalV2>
+      )}
+    </>
+  );
+}
+
+function AbaReguaDemo({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (t: string) => void }) {
   const [editar, setEditar] = useState<MsgDemo | null>(null);
   const passos = [...MSGS_DEMO].sort((a, b) => a.offset - b.offset);
   return (
