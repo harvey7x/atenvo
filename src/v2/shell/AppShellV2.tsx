@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
@@ -64,7 +64,7 @@ const GRUPOS: { rotulo: string; itens: ItemNav[] }[] = [
       { slug: 'contatos', rotulo: 'Contatos' },
       { slug: 'scripts', rotulo: 'Scripts' },
       // Simulador fora do menu (pedido do dono 27/08) — rota segue viva por URL
-      { slug: 'cobrancas', rotulo: 'Cobranças' },
+      // Cobranças SAIU daqui (29/08): virou um MÓDULO próprio no seletor do topo.
       // Relatórios fora do menu (pedido do dono 27/08) — rota segue viva por URL
     ],
   },
@@ -80,6 +80,42 @@ const GRUPOS: { rotulo: string; itens: ItemNav[] }[] = [
     ],
   },
 ];
+
+/* MÓDULOS do sistema (seletor do topo, 29/08): cada módulo troca o menu
+   inteiro da esquerda. Atendimento = a operação de sempre; Cobranças = as
+   seções do Modo Cobrança viram itens de menu. Novos módulos entram aqui. */
+type ModuloId = 'atendimento' | 'cobrancas';
+type Modulo = { id: ModuloId; rotulo: string; home: string; grupos: { rotulo: string; itens: ItemNav[] }[] };
+const COB_SECOES: ItemNav[] = [
+  { slug: 'cobrancas/painel', rotulo: 'Painel' },
+  { slug: 'cobrancas/atendentes', rotulo: 'Atendentes' },
+  { slug: 'cobrancas/clientes', rotulo: 'Clientes' },
+  { slug: 'cobrancas/ciclos', rotulo: 'Ciclos' },
+  { slug: 'cobrancas/regua', rotulo: 'Régua de mensagens' },
+  { slug: 'cobrancas/numeros', rotulo: 'Números' },
+  { slug: 'cobrancas/envios', rotulo: 'Envios' },
+];
+const MODULOS: Modulo[] = [
+  { id: 'atendimento', rotulo: 'Atendimento', home: '/whatsapp', grupos: GRUPOS },
+  { id: 'cobrancas', rotulo: 'Cobranças', home: '/cobrancas/painel', grupos: [{ rotulo: 'Cobranças', itens: COB_SECOES }] },
+];
+/* ícones das seções de cobrança (mesma família traço 1.7) */
+const IcC = (d: string) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><path d={d} /></svg>
+);
+const COB_ICONES: Record<string, ReactNode> = {
+  painel: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><path d="M4 20V10M10 20V4M16 20v-8M21 20H3" /></svg>,
+  atendentes: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><circle cx="9" cy="8" r="3.4" /><path d="M3.5 20c.6-3.4 2.8-5 5.5-5s4.9 1.6 5.5 5M16 4.6a3.4 3.4 0 010 6.8" /></svg>,
+  clientes: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><circle cx="12" cy="8" r="3.6" /><path d="M5 20c.7-4 3.4-6 7-6s6.3 2 7 6" /></svg>,
+  ciclos: IcC('M20 12a8 8 0 1 1-2.3-5.6M20 4v4h-4'),
+  regua: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.9 8.9 0 0 1-3.8-.8L3 20l1-4.9a8.3 8.3 0 0 1-1-4A8.4 8.4 0 0 1 12 3a8.4 8.4 0 0 1 9 8.5z" /></svg>,
+  numeros: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L20 13l-.5-.2 1 4.2A2 2 0 0 1 18.5 19 15 15 0 0 1 5 5.5 2 2 0 0 1 5 4z" /></svg>,
+  envios: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><path d="M21 3L10.5 13.5M21 3l-6.8 17.4a.35.35 0 0 1-.65.02L10.5 13.5 3.6 10.45a.35.35 0 0 1 .02-.65L21 3z" /></svg>,
+};
+function iconeDoItem(slug: string): ReactNode {
+  if (slug.startsWith('cobrancas/')) return COB_ICONES[slug.split('/')[1]] ?? ICONES.cobrancas;
+  return ICONES[slug];
+}
 
 const PAPEL_ROTULO: Record<string, string> = {
   admin: 'Administrador',
@@ -103,7 +139,7 @@ const NOTIF_DEMO: DadosNotificacao = {
 /** Shell autenticado v2: sidebar em overlay (64→242 no hover), topbar e palco. */
 export default function AppShellV2() {
   const { user, signOut } = useAuth();
-  const { currentOrg, orgs, setCurrentOrg } = useOrg();
+  const { currentOrg } = useOrg();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -239,8 +275,6 @@ export default function AppShellV2() {
   const admin = !currentOrg || currentOrg.role === 'admin';
 
   // Fase 2.0: troca de organização — só EXISTE para quem tem mais de um vínculo
-  // (uma org só = UI idêntica à de sempre, o .tenant segue decorativo)
-  const multiOrg = orgs.length > 1;
   const [menuOrg, setMenuOrg] = useState(false);
   const [orgMenuPos, setOrgMenuPos] = useState({ top: 0, left: 0 });
   const tenantRef = useRef<HTMLButtonElement>(null);
@@ -251,10 +285,15 @@ export default function AppShellV2() {
     // (v => !v) morre no StrictMode dev, que invoca o updater 2× — !!v = v
     setMenuOrg(true);
   }, []);
-  const trocarOrg = useCallback((id: string) => {
-    setCurrentOrg(id);
+
+  // MÓDULO ativo derivado da rota: /cobrancas* = Cobranças, senão Atendimento.
+  // Trocar de módulo navega pra home do módulo (o menu da esquerda se refaz).
+  const moduloAtivo: ModuloId = location.pathname.startsWith('/cobrancas') ? 'cobrancas' : 'atendimento';
+  const modulo = MODULOS.find((m) => m.id === moduloAtivo) ?? MODULOS[0];
+  const trocarModulo = useCallback((m: Modulo) => {
     setMenuOrg(false);
-  }, [setCurrentOrg]);
+    navigate(m.home);
+  }, [navigate]);
 
   return (
     <div className="v2 app-v2">
@@ -266,34 +305,28 @@ export default function AppShellV2() {
             <LogoAtenvo className="marca" />
             <span className="word lab">atenvo</span>
           </div>
-          {multiOrg ? (
-            <button ref={tenantRef} type="button" className="tenant trocavel" title={`Organização: ${org} — clique para trocar`}
-              aria-haspopup="menu" aria-expanded={menuOrg} onClick={abrirMenuOrg}>
-              <b>{org}</b>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: 'var(--txt-2)' }} aria-hidden>
-                <path d="M7 15l5 5 5-5M7 9l5-5 5 5" />
-              </svg>
-            </button>
-          ) : (
-            <div className="tenant" title={org}>
-              <b>{org}</b>
-              {/* currentColor (auditoria): o hex #9BA1AB era o --txt-2 do dark cravado — sumia a hierarquia no light */}
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: 'var(--txt-2)' }} aria-hidden>
-                <path d="M7 15l5 5 5-5M7 9l5-5 5 5" />
-              </svg>
-            </div>
-          )}
+          {/* SELETOR DE MÓDULO (29/08): troca o sistema inteiro de parte —
+              Atendimento ↔ Cobranças (e novos módulos no futuro). Ocupa o
+              lugar do antigo seletor de organização (single-tenant: a org é
+              fixa; seu nome vira o subtítulo). */}
+          <button ref={tenantRef} type="button" className="tenant trocavel modulo-sel" title={`Módulo: ${modulo.rotulo} — clique para trocar`}
+            aria-haspopup="menu" aria-expanded={menuOrg} onClick={abrirMenuOrg}>
+            <span className="modulo-txt"><b>{modulo.rotulo}</b><i className="modulo-org lab">{org}</i></span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: 'var(--txt-2)' }} aria-hidden>
+              <path d="M7 15l5 5 5-5M7 9l5-5 5 5" />
+            </svg>
+          </button>
           {menuOrg && createPortal(
             <>
               <div className="um-backdrop" onClick={() => setMenuOrg(false)} aria-hidden />
-              <div className="usuario-menu org-troca" role="menu" aria-label="Trocar organização" style={{ top: orgMenuPos.top, left: orgMenuPos.left }}>
-                <div className="um-head"><div className="um-cargo">Organização</div></div>
-                {orgs.map((o) => (
-                  <button key={o.id} type="button" role="menuitemradio" aria-checked={o.id === currentOrg?.id}
-                    className={o.id === currentOrg?.id ? 'um-item om-item on' : 'um-item om-item'}
-                    onClick={() => trocarOrg(o.id)}>
+              <div className="usuario-menu org-troca" role="menu" aria-label="Trocar de módulo" style={{ top: orgMenuPos.top, left: orgMenuPos.left }}>
+                <div className="um-head"><div className="um-cargo">Ir para</div></div>
+                {MODULOS.map((m) => (
+                  <button key={m.id} type="button" role="menuitemradio" aria-checked={m.id === moduloAtivo}
+                    className={m.id === moduloAtivo ? 'um-item om-item on' : 'um-item om-item'}
+                    onClick={() => trocarModulo(m)}>
                     <span className="om-dot" aria-hidden />
-                    <span className="om-nome">{o.name}</span>
+                    <span className="om-nome">{m.rotulo}</span>
                   </button>
                 ))}
               </div>
@@ -301,7 +334,7 @@ export default function AppShellV2() {
             raizMenu,
           )}
           <nav aria-label="Navegação principal">
-            {GRUPOS.map((g) => {
+            {modulo.grupos.map((g) => {
               const itens = g.itens.filter((i) => admin || !i.admin);
               if (!itens.length) return null;
               return (
@@ -314,7 +347,7 @@ export default function AppShellV2() {
                       className={({ isActive }) => (isActive ? 'item on' : 'item')}
                       title={i.rotulo}
                     >
-                      {ICONES[i.slug]}
+                      {iconeDoItem(i.slug)}
                       <span className="lab">{i.rotulo}</span>
                       {i.slug === 'whatsapp' && badgePop > 0 && (
                         <span key={badgePop} className="badge-n lab pop num">{badgePop}</span>

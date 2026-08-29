@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState, type ReactNode } from 'react';
+import { useParams } from 'react-router-dom';
 import { useOrg } from '@/context/OrgContext';
 import { useBuscaContatos, type ContatoRow } from '@/data/contatos';
 import { useOrgUsuarios } from '@/data/atendimento';
@@ -29,8 +30,8 @@ function proximaDataDoDia(dia: number): string {
   return new Date(y, m, Math.min(dia, last)).toISOString().slice(0, 10);
 }
 
-type AbaCobranca = 'painel' | 'atendentes' | 'clientes' | 'ciclos' | 'regua' | 'numeros' | 'envios';
-const ABAS: { id: AbaCobranca; rotulo: string }[] = [
+export type AbaCobranca = 'painel' | 'atendentes' | 'clientes' | 'ciclos' | 'regua' | 'numeros' | 'envios';
+export const ABAS: { id: AbaCobranca; rotulo: string }[] = [
   { id: 'painel', rotulo: 'Painel' },
   { id: 'atendentes', rotulo: 'Atendentes' },
   { id: 'clientes', rotulo: 'Clientes' },
@@ -171,7 +172,11 @@ export default function CobrancasV2() {
   const alterarMut = useAlterarStatusParcela();
   const cancelarMut = useCancelarCobranca();
 
-  const [aba, setAba] = useState<AbaCobranca>('painel');
+  // seção = módulo Cobranças no menu da esquerda (rota /cobrancas/:secao).
+  // As antigas abas viraram itens de menu; sem :secao cai em 'painel'.
+  const { secao } = useParams();
+  const aba: AbaCobranca = (ABAS.some((a) => a.id === secao) ? secao : 'painel') as AbaCobranca;
+  const abaAtual = ABAS.find((a) => a.id === aba);
   const [busca, setBusca] = useState('');
   const [filtro, setFiltro] = useState<'todas' | 'ativa' | 'concluida' | 'cancelada'>('todas');
   const [pagina, setPagina] = useState(1);
@@ -298,22 +303,14 @@ export default function CobrancasV2() {
     <>
       <div className="ph sobe">
         <div>
-          <h2>Cobranças</h2>
+          <div className="cob-migalha">Cobranças</div>
+          <h2>{abaAtual?.rotulo ?? 'Cobranças'}</h2>
           <p>Cobranças que sua organização faz aos próprios clientes.{demo ? ' · modo demonstração (nada é gravado)' : ''}</p>
         </div>
         <div className="acoes">
           {gestor && !demo && <BotaoSec onClick={() => setImportar(true)}>Importar planilha</BotaoSec>}
           {gestor && aba === 'painel' && <BotaoPrimario onClick={() => setNovo(true)}>＋ Nova cobrança</BotaoPrimario>}
         </div>
-      </div>
-
-      <div className="cob-abas sobe" role="tablist" aria-label="Seções de cobrança" style={{ animationDelay: '.03s' }}>
-        {ABAS.map((a) => (
-          <button key={a.id} type="button" role="tab" aria-selected={aba === a.id}
-            className={aba === a.id ? 'cob-aba on' : 'cob-aba'} onClick={() => setAba(a.id)}>
-            {a.rotulo}
-          </button>
-        ))}
       </div>
 
       {importar && !demo && (

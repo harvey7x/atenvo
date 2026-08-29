@@ -565,3 +565,10 @@
 .v2 .om-item.on { color: var(--txt); font-weight: 600; }
 .v2 .om-item.on .om-dot { background: var(--azul, var(--txt)); box-shadow: 0 0 8px rgba(var(--azul-rgb, 76, 141, 255), calc(.5 * var(--fx))); }
 .v2 .om-nome { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---- seletor de módulo (Atendimento ↔ Cobranças ↔ …), 29/08 ----
+   herda o visual do antigo .tenant; ganha subtítulo com o nome da org. */
+.v2 .tenant.modulo-sel { align-items: center; }
+.v2 .modulo-txt { display: flex; flex-direction: column; min-width: 0; line-height: 1.15; }
+.v2 .modulo-txt b { font-size: 13px; font-weight: 600; color: var(--txt); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2 .modulo-org { font-size: 10.5px; font-style: normal; color: var(--txt-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

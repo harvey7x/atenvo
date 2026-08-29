@@ -103,7 +103,8 @@ const routes: RouteObject[] = [
           { path: 'contatos', element: <Lz><ContatosV2 /></Lz> },
           { path: 'scripts', element: <Lz><ScriptsV2 /></Lz> },
           { path: 'simulador', element: <Lz><SimuladorV2 /></Lz> },
-          { path: 'cobrancas', element: <Lz><CobrancasV2 /></Lz> },
+          { path: 'cobrancas', element: <Navigate to="/cobrancas/painel" replace /> },
+          { path: 'cobrancas/:secao', element: <Lz><CobrancasV2 /></Lz> },
           { path: 'relatorios', element: <Lz><RelatoriosV2 /></Lz> },
           { path: 'integracoes', element: <Lz><IntegracoesV2 /></Lz> },
           // Maturação DESCONTINUADA (Evolution restrito pela Meta): rota → placeholder "descontinuada".
