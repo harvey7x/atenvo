@@ -448,6 +448,9 @@ verify_jwt = false
 verify_jwt = false
 [functions.bot-remarketing]
 verify_jwt = false
+# janela-guardia: cron secret-gated (x-bot-secret == webhook_config.janela_guardia), sem JWT.
+[functions.janela-guardia]
+verify_jwt = false
 # mensagens-agendadas-processar: cron secret-gated (x-agendamento-secret), sem JWT.
 [functions.mensagens-agendadas-processar]
 verify_jwt = false
@@ -471,3 +474,6 @@ verify_jwt = false
 # As demais (evolution-* e meta-auth-start, meta-pages, meta-manage,
 # meta-send-message) exigem o JWT do usuário (verify_jwt = true por padrão) —
 # chamadas só pelo app logado.
+
+[functions.cobranca-processar]
+verify_jwt = false

@@ -108,3 +108,47 @@ export function useAlternarMensagem(orgId?: string) {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['cob-mensagens', orgId] }); },
   });
 }
+
+/* ---- fila de envios (motor cobranca-processar; nasce em SIMULAÇÃO) ---- */
+export interface CobFilaItem {
+  id: string;
+  tipo: string | null;
+  status: string;
+  executar_em: string;
+  corpo_final: string | null;
+  ultimo_erro: string | null;
+  dry_run: boolean;
+  cliente: string;
+  mensagem: string | null;
+}
+export function useCobFila(orgId?: string) {
+  return useQuery({
+    queryKey: ['cob-fila', orgId],
+    enabled: !!orgId && !isDemoMode,
+    refetchInterval: 30_000,
+    queryFn: async () => {
+      const { data, error } = await supabase!
+        .from('cobranca_fila')
+        .select('id, tipo, status, executar_em, corpo_final, ultimo_erro, dry_run, contato:contatos(nome), mensagem:cobranca_mensagens(nome)')
+        .eq('organizacao_id', orgId!)
+        .order('executar_em', { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      return (data ?? []).map((r) => ({
+        id: r.id as string, tipo: r.tipo as string | null, status: r.status as string,
+        executar_em: r.executar_em as string, corpo_final: r.corpo_final as string | null,
+        ultimo_erro: r.ultimo_erro as string | null, dry_run: r.dry_run as boolean,
+        cliente: (r.contato as unknown as { nome: string | null } | null)?.nome ?? 'Cliente',
+        mensagem: (r.mensagem as unknown as { nome: string | null } | null)?.nome ?? null,
+      })) as CobFilaItem[];
+    },
+  });
+}
+/** dispara enfileirar+processar SÓ da org do gestor (tudo dry-run) */
+export async function rodarSimulacao(orgId: string): Promise<Record<string, unknown>> {
+  const { data, error } = await supabase!.functions.invoke('cobranca-processar', {
+    body: { acao: 'ciclo', organizacao_id: orgId },
+  });
+  if (error) throw new Error(error.message);
+  return data as Record<string, unknown>;
+}

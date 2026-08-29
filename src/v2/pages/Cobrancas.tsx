@@ -338,9 +338,7 @@ export default function CobrancasV2() {
       {aba === 'ciclos' && <AbaCiclos demo={demo} gestor={gestor} aoAvisar={(t) => setAviso({ tom: 'ok', texto: t })} />}
       {aba === 'regua' && <AbaRegua demo={demo} gestor={gestor} aoAvisar={(t) => setAviso({ tom: 'ok', texto: t })} />}
       {aba === 'numeros' && <AbaNumeros demo={demo} gestor={gestor} aoAvisar={(t) => setAviso({ tom: 'ok', texto: t })} />}
-      {aba === 'envios' && (demo ? <AbaEnvios gestor={gestor} aoAvisar={(t) => setAviso({ tom: 'ok', texto: t })} /> : (
-        <CardVidro spot sobe style={{ borderRadius: 'var(--r-card)' }}><EstadoVazio titulo="Nenhum envio na fila" descricao="Com números conectados e a régua configurada, os envios aparecem aqui — sempre nascendo em simulação, antes de qualquer disparo real." /></CardVidro>
-      ))}
+      {aba === 'envios' && <AbaEnvios demo={demo} gestor={gestor} aoAvisar={(t) => setAviso({ tom: 'ok', texto: t })} />}
 
       {aba === 'painel' && (erro ? (
         <CardVidro sobe>

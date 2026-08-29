@@ -14,6 +14,7 @@ import { useOrgUsuarios } from '@/data/atendimento';
 import { useCobNumeros, cobWaConectar, cobWaStatus, cobWaDesconectar, type CobNumero } from '@/data/cobrancaWa';
 import {
   useCobMensagens, useSalvarMensagem, useAlternarMensagem, uploadMidiaCobranca, ROTULO_TIPO_MSG,
+  useCobFila, rodarSimulacao, type CobFilaItem,
   type CobMensagem, type CobMsgItem, type TipoMensagem, type TipoItem,
 } from '@/data/cobrancaRegua';
 import { useCiclosReais, useCriarCiclo, useClientesCobranca, type ClienteCobranca } from '@/data/cobrancaCiclos';
@@ -645,7 +646,72 @@ const FILA_DEMO: FilaDemo[] = [
 const TOM_FILA: Record<string, TomStatus> = { pendente: 'neutro', processando: 'atencao', simulada: 'atencao', enviada: 'ok', falhou: 'erro', bloqueada_optout: 'erro', bloqueada_janela: 'erro', cancelada: 'neutro' };
 const ROTULO_FILA: Record<string, string> = { pendente: 'Na fila', processando: 'Processando', simulada: 'Simulada', enviada: 'Enviada', falhou: 'Falhou', bloqueada_optout: 'Optou por sair', bloqueada_janela: 'Fora da janela 24h', cancelada: 'Cancelada' };
 
-export function AbaEnvios({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (t: string) => void }) {
+export function AbaEnvios({ demo, gestor, aoAvisar }: { demo: boolean; gestor: boolean; aoAvisar: (t: string) => void }) {
+  return demo ? <AbaEnviosDemo gestor={gestor} aoAvisar={aoAvisar} /> : <AbaEnviosReal gestor={gestor} aoAvisar={aoAvisar} />;
+}
+
+
+function AbaEnviosReal({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (t: string) => void }) {
+  const { currentOrg } = useOrg();
+  const orgId = currentOrg?.id;
+  const { data: fila = [], isLoading, refetch } = useCobFila(orgId);
+  const [rodando, setRodando] = useState(false);
+  const cont = (st: string) => fila.filter((f) => f.status === st).length;
+
+  async function simular() {
+    if (!orgId || rodando) return;
+    setRodando(true);
+    try {
+      const r = await rodarSimulacao(orgId);
+      const enf = (r.enfileirar ?? {}) as Record<string, number>;
+      const proc = (r.processar ?? {}) as Record<string, number>;
+      aoAvisar(`Simulação: ${enf.criadas ?? 0} enfileirada(s), ${proc.simuladas ?? 0} simulada(s)` +
+        ((enf.sem_telefone ?? 0) > 0 ? `, ${enf.sem_telefone} sem número de cliente` : '') +
+        ((proc.fora_da_janela ?? 0) > 0 ? ' (fora da janela 8h–20h: processa no horário)' : '') + '.');
+      refetch();
+    } catch (e) { aoAvisar(`Falha na simulação: ${(e as Error).message}`); }
+    finally { setRodando(false); }
+  }
+
+  return (
+    <>
+      <div className="cm-simbanner sobe" role="status">
+        <div>
+          <b>Modo simulação — nada é enviado.</b>
+          <span> O motor roda todo dia às 6h e monta a fila pela cadência (lembrete 3 dias antes · cobrança no dia · atraso +2 · remarketing +7, às 9h). O envio real só liga com ordem explícita.</span>
+        </div>
+        {gestor && <BotaoSec mini onClick={simular} disabled={rodando}>{rodando ? 'Rodando…' : 'Rodar simulação agora'}</BotaoSec>}
+      </div>
+      <div className="kpis sobe" style={{ animationDelay: '.05s' }}>
+        <Kpi rotulo="Na fila (pendentes)" valor={cont('pendente')} />
+        <Kpi rotulo="Simuladas" valor={cont('simulada')} tomValor="ok" />
+        <Kpi rotulo="Bloqueadas (opt-out)" valor={cont('bloqueada_optout')} tomValor="erro" />
+        <Kpi rotulo="Sem número do atendente" valor={fila.filter((f) => f.ultimo_erro === 'sem_numero_atendente').length} />
+      </div>
+      {isLoading ? <div className="cm-hint">Carregando…</div> : fila.length === 0 ? (
+        <CardVidro spot sobe style={{ borderRadius: 'var(--r-card)' }}>
+          <EstadoVazio titulo="Fila vazia" descricao="Quando houver clientes em ciclos com mensagens ativas, os disparos do dia aparecem aqui (sempre nascendo em simulação)." />
+        </CardVidro>
+      ) : (
+        <CardVidro spot sobe style={{ borderRadius: 'var(--r-card)', animationDelay: '.1s' }}>
+          <TabelaPadrao
+            colunas={[
+              { chave: 'cli', titulo: 'Cliente', render: (x: CobFilaItem) => x.cliente },
+              { chave: 'tipo', titulo: 'Mensagem', render: (x: CobFilaItem) => x.mensagem ?? x.tipo ?? '—' },
+              { chave: 'quando', titulo: 'Quando', classe: 'num', render: (x: CobFilaItem) => new Date(x.executar_em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) },
+              { chave: 'st', titulo: 'Status', render: (x: CobFilaItem) => <BadgeStatus tom={TOM_FILA[x.status] ?? 'neutro'}>{ROTULO_FILA[x.status] ?? x.status}</BadgeStatus> },
+              { chave: 'obs', titulo: 'Observação', render: (x: CobFilaItem) => x.ultimo_erro === 'sem_numero_atendente' ? <span style={{ color: 'var(--ambar)', fontSize: 11.5 }}>⚠ atendente sem número</span> : (x.ultimo_erro ?? '') },
+            ] as Coluna<CobFilaItem>[]}
+            linhas={fila} chave={(x) => x.id}
+            rodape={{ texto: `${fila.length} disparo${fila.length === 1 ? '' : 's'} (últimos 200)` }}
+          />
+        </CardVidro>
+      )}
+    </>
+  );
+}
+
+function AbaEnviosDemo({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (t: string) => void }) {
   const [dryRun, setDryRun] = useState(true);
   const [filtro, setFiltro] = useState<'todos' | 'pendente' | 'enviada' | 'bloqueada'>('todos');
   const lista = useMemo(() => FILA_DEMO.filter((f) => {
