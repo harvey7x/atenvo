@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  BadgeStatus, BotaoPrimario, BotaoSec, CardVidro, Chip, Chips, DrawerV2,
+  AudioRecorderV2, BadgeStatus, BotaoPrimario, BotaoSec, CardVidro, Chip, Chips, DrawerV2,
   EstadoVazio, Input, Kpi, ModalV2, TabelaPadrao, Toggle,
   type Coluna, type TomStatus,
 } from '../components';
@@ -379,6 +379,20 @@ function AbaReguaReal({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (t: str
                 {it.tipo === 'texto' ? (
                   <textarea className="inp" rows={3} value={it.corpo ?? ''} placeholder="Olá {nome}, sua mensalidade de {valor} vence em {vencimento}…"
                     onChange={(e) => mudarItem(k, { corpo: e.target.value })} />
+                ) : it.tipo === 'audio' ? (
+                  <div className="cm-ed-midia cm-ed-audio">
+                    {it.midia_url
+                      ? <span className="cm-ed-arq num" title={it.midia_nome ?? ''}>✓ {it.midia_nome ?? 'áudio anexado'}</span>
+                      : <span className="cm-hint">Grave na hora ou anexe um áudio pronto (mp3/ogg):</span>}
+                    <AudioRecorderV2 permitirArquivo rotuloEnviar={it.midia_url ? 'Trocar áudio' : 'Usar este áudio'}
+                      onEnviar={async (blob, mime, ext) => {
+                        if (!orgId) return;
+                        const f = new File([blob], `audio-regua-${Date.now().toString(36)}.${ext}`, { type: mime });
+                        const r = await uploadMidiaCobranca(orgId, f);
+                        mudarItem(k, { midia_url: r.url, midia_nome: r.nome });
+                        aoAvisar('Áudio anexado à mensagem.');
+                      }} />
+                  </div>
                 ) : (
                   <div className="cm-ed-midia">
                     {it.midia_url
@@ -389,9 +403,7 @@ function AbaReguaReal({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (t: str
                       <input type="file" accept={ACCEPT_ITEM[it.tipo]} style={{ display: 'none' }} disabled={upBusy !== null}
                         onChange={(e) => { const f = e.target.files?.[0]; if (f) subirMidia(k, f); e.target.value = ''; }} />
                     </label>
-                    {it.tipo !== 'audio' && (
-                      <Input placeholder="Legenda (opcional)" value={it.corpo ?? ''} onChange={(e) => mudarItem(k, { corpo: e.target.value })} />
-                    )}
+                    <Input placeholder="Legenda (opcional)" value={it.corpo ?? ''} onChange={(e) => mudarItem(k, { corpo: e.target.value })} />
                   </div>
                 )}
               </div>

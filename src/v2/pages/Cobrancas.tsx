@@ -17,6 +17,7 @@ import {
 import { AbaCiclos, AbaRegua, AbaNumeros, AbaEnvios, AbaAtendentes, AbaClientes, PainelResumo } from './cobrancaMotor';
 import { CICLOS_LISTA } from './cobrancaAnalytics';
 import { useCiclosReais, diaDoCiclo, vincularCiclo, criarContatoCobranca } from '@/data/cobrancaCiclos';
+import { ImportarPlanilha } from './cobrancaImport';
 import './cobrancas.css';
 
 /** próxima ocorrência do dia de vencimento do ciclo (deriva a 1ª cobrança da turma) */
@@ -158,6 +159,8 @@ export default function CobrancasV2() {
   const { currentOrg } = useOrg();
   const gestor = currentOrg.role === 'admin' || currentOrg.role === 'gestor';
   const demo = !COB_REAL;
+  const [importar, setImportar] = useState(false);
+  const { data: ciclosImport = [] } = useCiclosReais(demo ? undefined : currentOrg?.id);
 
   // fontes reais (desabilitadas sem backend) + store demo em memória
   const cobQ = useCobrancas();
@@ -299,6 +302,7 @@ export default function CobrancasV2() {
           <p>Cobranças que sua organização faz aos próprios clientes.{demo ? ' · modo demonstração (nada é gravado)' : ''}</p>
         </div>
         <div className="acoes">
+          {gestor && !demo && <BotaoSec onClick={() => setImportar(true)}>Importar planilha</BotaoSec>}
           {gestor && aba === 'painel' && <BotaoPrimario onClick={() => setNovo(true)}>＋ Nova cobrança</BotaoPrimario>}
         </div>
       </div>
@@ -311,6 +315,12 @@ export default function CobrancasV2() {
           </button>
         ))}
       </div>
+
+      {importar && !demo && (
+        <ImportarPlanilha orgId={currentOrg.id} ciclos={ciclosImport}
+          aoFechar={() => setImportar(false)}
+          aoConcluir={(msg) => setAviso({ tom: 'ok', texto: msg })} />
+      )}
 
       {aviso && (
         <div className={aviso.tom === 'erro' ? 'aviso-inline erro' : 'aviso-inline'} role="status">
