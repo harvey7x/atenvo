@@ -14,6 +14,30 @@ export const ROTULO_COMP: Record<Comportamento, string> = {
   em_dia: 'Em dia', voltou: 'Voltou a pagar', faltou: 'Faltou pagar', inadimplente: 'Inadimplente',
 };
 
+/* Máquina de estados da célula de pagamento (spec Gestão Mensal §5):
+   precedência vazio/- → "não pagou" → data (com conversão em 30d) → número → texto. */
+export type EstadoCelula = 'desconto_ativo' | 'nao_pagou' | 'aguardando_entrada' | 'pago' | 'info';
+export function estadoCelula(raw: string): { estado: EstadoCelula; display: string; valor?: number; dataOrig?: string } {
+  const s = (raw ?? '').trim();
+  if (s === '' || s === '-') return { estado: 'desconto_ativo', display: '—' };
+  if (/n[ãa]o pagou/i.test(s)) return { estado: 'nao_pagou', display: 'NÃO PAGOU' };
+  const dm = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (dm) {
+    const dt = new Date(+dm[3], +dm[2] - 1, +dm[1]);
+    const limite = new Date(dt); limite.setDate(limite.getDate() + 30);
+    if (Date.now() > limite.getTime()) return { estado: 'nao_pagou', display: 'NÃO PAGOU', dataOrig: s };
+    return { estado: 'aguardando_entrada', display: s };
+  }
+  const num = Number(s.replace(',', '.'));
+  if (!Number.isNaN(num) && num > 0) return { estado: 'pago', display: 'R$ ' + num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), valor: num };
+  return { estado: 'info', display: s };
+}
+/** cabeçalho de datas (monthLabels) de um ciclo, do dia da âncora × meses. */
+export function cabecalhoCiclo(ciclo: string): string[] {
+  const dia = String(CICLO_DIA[ciclo] ?? 1).padStart(2, '0');
+  return MESES.map((c) => { const [y, m] = c.split('-'); return `${dia}/${m}/${y}`; });
+}
+
 export interface ClienteAnalise {
   id: string;
   nome: string;
@@ -22,6 +46,7 @@ export interface ClienteAnalise {
   mensalidade: number;
   comportamento: Comportamento;
   meses: { competencia: string; status: StatusMes }[];
+  celulas: string[];   // conteúdo bruto por mês (máquina de estados do legado Gestão Mensal)
   engajamento: { tipo: TipoMsg; enviada: boolean; respondeu: boolean }[];
   faturamentoTotal: number;   // soma paga histórica
   ultimaResposta: string | null;
@@ -76,7 +101,15 @@ export function seedClientes(): ClienteAnalise[] {
       { tipo: 'remarketing', enviada: comp === 'voltou' || comp === 'inadimplente', respondeu: rr },
     ];
     const ur = comp === 'inadimplente' && rnd() < 0.5 ? null : `há ${1 + Math.floor(rnd() * 29)} dias`;
-    out.push({ id: `cl-${i}`, nome, ciclo, atendente, mensalidade, comportamento: comp, meses, engajamento, faturamentoTotal: pagas * mensalidade, ultimaResposta: ur });
+    const dia2 = String(CICLO_DIA[ciclo] ?? 1).padStart(2, '0');
+    const celulas = meses.map((mm) => {
+      const [y, m] = mm.competencia.split('-');
+      if (mm.status === 'paga') return String(mensalidade);
+      if (mm.status === 'nao_paga') return 'NÃO PAGOU';
+      return `${dia2}/${m}/${y}`; // atraso (data antiga → 30d → NÃO PAGOU) · prevista (mês corrente → aguardando entrada)
+    });
+    if (i % 5 === 0) celulas[0] = '-'; // entrada tardia = desconto_ativo (—)
+    out.push({ id: `cl-${i}`, nome, ciclo, atendente, mensalidade, comportamento: comp, meses, celulas, engajamento, faturamentoTotal: pagas * mensalidade, ultimaResposta: ur });
   }
   return out;
 }

@@ -6,8 +6,19 @@ import {
 } from '../components';
 import {
   seedClientes, metricasPorAtendente, metricasPorCiclo, resumoCarteira, CICLO_DIA,
-  ROTULO_COMP, type ClienteAnalise, type Comportamento, type StatusMes, type TipoMsg,
+  estadoCelula, cabecalhoCiclo, ROTULO_COMP,
+  type ClienteAnalise, type Comportamento, type StatusMes, type TipoMsg,
 } from './cobrancaAnalytics';
+
+/** célula da grade de pagamentos (máquina de estados do legado Gestão Mensal) */
+function Celula({ raw }: { raw: string }) {
+  const e = estadoCelula(raw);
+  if (e.estado === 'pago') return <span className="gc gc-pago">{e.display}</span>;
+  if (e.estado === 'nao_pagou') return <span className="gc gc-naopagou">NÃO PAGOU{e.dataOrig && <i>{e.dataOrig}</i>}</span>;
+  if (e.estado === 'aguardando_entrada') return <span className="gc gc-aguardando">{e.display}</span>;
+  if (e.estado === 'info') return <span className="gc gc-info">{e.display}</span>;
+  return <span className="gc gc-vazio">—</span>;
+}
 
 const CLIENTES = seedClientes();
 const compBadge: Record<Comportamento, TomStatus> = { em_dia: 'ok', voltou: 'atencao', faltou: 'atencao', inadimplente: 'erro' };
@@ -34,7 +45,7 @@ function Barra({ v, max, tom = 'tint' }: { v: number; max: number; tom?: 'tint' 
 const fmtBRL = (v: number) => 'R$ ' + v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const diaBR = (n: number) => String(n).padStart(2, '0');
 
-/* =================== CICLOS (derivado dos clientes) =================== */
+/* =================== CICLOS — grade de pagamentos (Gestão Mensal) =================== */
 
 export function AbaCiclos({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (t: string) => void }) {
   const ciclos = useMemo(() => {
@@ -42,16 +53,19 @@ export function AbaCiclos({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (t:
     for (const c of CLIENTES) { const a = map.get(c.ciclo) ?? []; a.push(c); map.set(c.ciclo, a); }
     return [...map.entries()].map(([codigo, clientes]) => {
       const dia = CICLO_DIA[codigo] ?? 1;
+      const anomalias = clientes.reduce((s, cl) => s + cl.celulas.filter((r) => estadoCelula(r).estado === 'nao_pagou').length, 0);
       return {
         codigo, dia, grupo: dia <= 5 ? 'inicio_mes' as const : 'fim_mes' as const,
-        clientes: [...clientes].sort((a, b) => b.mensalidade - a.mensalidade),
+        clientes: [...clientes].sort((a, b) => a.nome.localeCompare(b.nome)),
+        cols: cabecalhoCiclo(codigo),
         soma: clientes.reduce((s, c) => s + c.mensalidade, 0),
+        recebido: clientes.reduce((s, c) => s + c.celulas.reduce((a, r) => a + (estadoCelula(r).valor ?? 0), 0), 0),
+        anomalias,
       };
     }).sort((a, b) => a.codigo.localeCompare(b.codigo));
   }, []);
   const [aberto, setAberto] = useState<string | null>(ciclos[0]?.codigo ?? null);
   const totalMes = ciclos.reduce((s, c) => s + c.soma, 0);
-  const primeiroDia = Math.min(...ciclos.map((c) => c.dia));
 
   return (
     <>
@@ -59,46 +73,56 @@ export function AbaCiclos({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (t:
         <Kpi rotulo="Ciclos de vencimento" valor={ciclos.length} />
         <Kpi rotulo="Clientes nos ciclos" valor={CLIENTES.length} formato="mil" />
         <Kpi rotulo="Recorrência/mês" valor={Math.trunc(totalMes)} formato="mil" prefixo="R$ " sufixo=",00" tomValor="ok" />
-        <Kpi rotulo="1º vencimento" valor={primeiroDia} prefixo="Dia " />
+        <Kpi rotulo="Anomalias (não pagou)" valor={ciclos.reduce((s, c) => s + c.anomalias, 0)} formato="mil" tomValor="erro" />
       </div>
       <p className="cm-hint sobe" style={{ animationDelay: '.06s' }}>
-        Cada ciclo é um grupo de clientes com o mesmo dia de vencimento (quando o benefício do INSS cai). Abra um ciclo para ver os clientes e enfileirar a cobrança do mês.
+        Cada ciclo é uma turma que vence no mesmo dia (quando o benefício do INSS cai). Abra um ciclo para a grade de pagamentos: cada célula é <b>—</b> (fora da régua), uma <b>data</b> (aguardando/entrada), <b>R$</b> (pago) ou <b>NÃO PAGOU</b>. Datas vencidas há mais de 30 dias viram NÃO PAGOU sozinhas.
       </p>
       <div className="cm-ciclos sobe" style={{ animationDelay: '.12s' }}>
         {ciclos.map((c) => {
           const on = aberto === c.codigo;
-          const visiveis = c.clientes.slice(0, 10);
+          const visiveis = c.clientes.slice(0, 40);
           return (
             <CardVidro spot key={c.codigo} className={on ? 'cm-ciclo on' : 'cm-ciclo'}>
               <button type="button" className="cm-ciclo-cab" onClick={() => setAberto(on ? null : c.codigo)} aria-expanded={on}>
                 <span className="cm-ciclo-cod">{c.codigo}</span>
                 <span className="cm-ciclo-nm">Vence dia {diaBR(c.dia)}<b>{c.grupo === 'inicio_mes' ? 'início do mês' : 'fim do mês'}</b></span>
-                <span className="cm-ciclo-n num">{c.clientes.length} clientes · {fmtBRL(c.soma)}</span>
+                <span className="cm-ciclo-tags">
+                  <span className="cm-ciclo-n num">{c.clientes.length} clientes</span>
+                  {c.anomalias > 0 && <BadgeStatus tom="erro">{c.anomalias} não pagou</BadgeStatus>}
+                </span>
                 <span className="cm-ciclo-seta" aria-hidden>{on ? '▾' : '▸'}</span>
               </button>
               {on && (
                 <div className="cm-ciclo-corpo">
-                  <table className="cm-tab">
-                    <thead><tr><th>Cliente</th><th className="d">Mensalidade</th><th>Atendente</th><th>Comportamento</th></tr></thead>
-                    <tbody>
-                      {visiveis.map((cl) => (
-                        <tr key={cl.id}>
-                          <td>{cl.nome}</td>
-                          <td className="d num">{fmtBRL(cl.mensalidade)}</td>
-                          <td>{cl.atendente}</td>
-                          <td><BadgeStatus tom={compBadge[cl.comportamento]}>{ROTULO_COMP[cl.comportamento]}</BadgeStatus></td>
+                  <div className="cm-grade-info num">
+                    Recebido acumulado <b>{fmtBRL(c.recebido)}</b> · Recorrência <b>{fmtBRL(c.soma)}/mês</b>
+                    {gestor && <button type="button" className="cm-num-lnk" onClick={() => aoAvisar('Simulação: + Novo Mês — o ciclo inteiro avança para o próximo vencimento.')}>+ Novo mês</button>}
+                  </div>
+                  <div className="cm-grade-wrap">
+                    <table className="cm-grade">
+                      <thead>
+                        <tr>
+                          <th className="cm-g-sticky">Cliente</th>
+                          {c.cols.map((col) => <th key={col} className="num">{col.slice(0, 5)}</th>)}
+                          <th className="d num">Total pago</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {visiveis.map((cl) => {
+                          const total = cl.celulas.reduce((s, r) => s + (estadoCelula(r).valor ?? 0), 0);
+                          return (
+                            <tr key={cl.id}>
+                              <td className="cm-g-sticky"><span className="cm-g-nm">{cl.nome}</span><span className="cm-g-at">{cl.atendente}</span></td>
+                              {cl.celulas.map((r, k) => <td key={k} className="cm-g-cel">{gestor ? <button type="button" className="cm-g-edit" onClick={() => aoAvisar('Simulação: duplo-clique edita a célula (—, data, valor ou NÃO PAGOU).')}><Celula raw={r} /></button> : <Celula raw={r} />}</td>)}
+                              <td className="d num cm-g-total">{fmtBRL(total)}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                   {c.clientes.length > visiveis.length && <div className="cm-ciclo-mais num">+ {c.clientes.length - visiveis.length} clientes neste ciclo</div>}
-                  {gestor && (
-                    <div className="cm-ciclo-acao">
-                      <BotaoSec mini onClick={() => aoAvisar(`Simulação: ${c.clientes.length} cobrança(s) do ciclo ${c.codigo} entrariam na fila em modo teste.`)}>
-                        Enfileirar cobrança do ciclo (simulação)
-                      </BotaoSec>
-                    </div>
-                  )}
                 </div>
               )}
             </CardVidro>
