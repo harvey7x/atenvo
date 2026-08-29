@@ -353,7 +353,7 @@ export default function CobrancasV2() {
             </div>
           </div>
 
-          <CardVidro spot sobe style={{ borderRadius: 12, animationDelay: '.18s' }}>
+          <CardVidro spot sobe style={{ borderRadius: 'var(--r-card)', animationDelay: '.18s' }}>
             {lista.length === 0 ? (
               cobrancas.length === 0 ? (
                 <EstadoVazio
@@ -441,7 +441,7 @@ function CarregandoCobrancas() {
           </CardVidro>
         ))}
       </div>
-      <CardVidro style={{ borderRadius: 12, padding: '14px 16px' }}>
+      <CardVidro style={{ borderRadius: 'var(--r-card)', padding: '14px 16px' }}>
         {[0, 1, 2, 3, 4].map((i) => (
           <div key={i} style={{ display: 'flex', gap: 14, alignItems: 'center', padding: '9px 0' }}>
             <Skeleton largura="28%" /><Skeleton largura="12%" /><Skeleton largura="14%" /><Skeleton largura="12%" /><Skeleton largura="10%" raio={99} />

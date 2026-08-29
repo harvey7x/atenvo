@@ -303,7 +303,7 @@ export function AbaEnvios({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (t:
         </Chips>
         {gestor && <BotaoSec mini onClick={() => aoAvisar(dryRun ? 'Simulação: a fila seria processada em modo teste — nada sai.' : 'Envio real exige confirmação (Fase C).')}>Processar fila agora</BotaoSec>}
       </div>
-      <CardVidro spot sobe style={{ borderRadius: 12, animationDelay: '.18s' }}>
+      <CardVidro spot sobe style={{ borderRadius: 'var(--r-card)', animationDelay: '.18s' }}>
         {lista.length === 0
           ? <EstadoVazio titulo="Nada na fila" descricao="Ajuste o filtro ou enfileire cobranças na aba Ciclos." />
           : <TabelaPadrao colunas={colunas} linhas={lista} chave={(f) => f.id} rodape={{ texto: `${lista.length} na fila` }} />}
@@ -424,7 +424,7 @@ export function AbaAtendentes() {
   return (
     <>
       <p className="cm-hint sobe">Faturamento, carteira e desempenho de cada atendente. Clique para ver os clientes dele.</p>
-      <CardVidro spot sobe style={{ borderRadius: 12, animationDelay: '.08s' }}>
+      <CardVidro spot sobe style={{ borderRadius: 'var(--r-card)', animationDelay: '.08s' }}>
         <TabelaPadrao colunas={colunas} linhas={metricas} chave={(m) => m.nome} aoClicarLinha={(m) => setSel(m.nome)} rodape={{ texto: `${metricas.length} atendentes` }} />
       </CardVidro>
 
@@ -512,7 +512,7 @@ export function AbaClientes() {
           <Chip ativo={seg === 'inadimplente'} onClick={() => trocarSeg('inadimplente')}>Inadimplente ({cont('inadimplente')})</Chip>
         </Chips>
       </div>
-      <CardVidro spot sobe style={{ borderRadius: 12, animationDelay: '.12s' }}>
+      <CardVidro spot sobe style={{ borderRadius: 'var(--r-card)', animationDelay: '.12s' }}>
         {lista.length === 0
           ? <EstadoVazio titulo="Nenhum cliente neste filtro" descricao="Troque o segmento acima." />
           : <TabelaPadrao colunas={colunas} linhas={linhasPag} chave={(c) => c.id} aoClicarLinha={(c) => setSel(c)}

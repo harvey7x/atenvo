@@ -15,7 +15,7 @@
 
 /* previsão de faturamento (6 meses) */
 .v2 .prev-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
-.v2 .prev-card { padding: 12px 13px; border-radius: 12px; }
+.v2 .prev-card { padding: 12px 13px; border-radius: var(--r-card); }
 .v2 .prev-mes { font-size: 10px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--txt-3); }
 .v2 .prev-val { font-size: 15px; font-weight: 600; margin-top: 5px; }
 .v2 .prev-sub { font-size: 10.5px; color: var(--txt-2); margin-top: 3px; line-height: 1.45; }
@@ -56,7 +56,7 @@
 .v2 .det-campo .l { display: block; font-size: 9.5px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--txt-3); }
 .v2 .det-campo .v { display: block; font-size: 12.5px; font-weight: 500; margin-top: 2px; }
 .v2 .det-sec { font-size: 9.5px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--txt-3); margin: 16px 0 8px; }
-.v2 .det-tabela { border: 1px solid var(--linha); border-radius: 10px; overflow: hidden; }
+.v2 .det-tabela { border: 1px solid var(--linha); border-radius: var(--r-card); overflow: hidden; }
 .v2 .det-tabela th, .v2 .det-tabela td { white-space: nowrap; }
 .v2 .acoes-parcela { display: flex; gap: 5px; justify-content: flex-end; }
 .v2 .eventos { display: flex; flex-direction: column; gap: 8px; }
@@ -197,7 +197,7 @@
 .v2 .cm-dr-x { margin-left: auto; align-self: flex-start; width: 28px; height: 28px; border-radius: 8px; border: 0; background: rgba(var(--tint), .06); color: var(--txt-2); font-size: 18px; cursor: pointer; }
 .v2 .cm-dr-x:hover { background: rgba(var(--tint), .1); color: var(--txt); }
 .v2 .cm-dr-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 16px 0 4px; }
-.v2 .cm-dr-stats > div { padding: 12px 13px; border-radius: 11px; background: rgba(var(--tint), .04); border: 1px solid rgba(var(--tint), .08); }
+.v2 .cm-dr-stats > div { padding: 12px 13px; border-radius: var(--r-card); background: rgba(var(--tint), .04); border: 1px solid rgba(var(--tint), .08); }
 .v2 .cm-dr-stats b { display: block; font-size: 18px; font-weight: 650; color: var(--txt); }
 .v2 .cm-dr-stats b.ok { color: var(--verde); }
 .v2 .cm-dr-stats span { font-size: 10.5px; color: var(--txt-3); }
@@ -205,7 +205,7 @@
 .v2 .cm-dr-badge span { font-size: 11.5px; color: var(--txt-2); }
 .v2 .cm-dr-sec { font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--txt-3); margin: 18px 0 9px; }
 .v2 .cm-dr-clientes, .v2 .cm-eng-list { display: flex; flex-direction: column; gap: 7px; }
-.v2 .cm-dr-cli { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 11px; border-radius: 9px; background: rgba(var(--tint), .03); border: 1px solid rgba(var(--tint), .06); }
+.v2 .cm-dr-cli { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 11px; border-radius: var(--r-ctl); background: rgba(var(--tint), .03); border: 1px solid rgba(var(--tint), .06); }
 .v2 .cm-dr-cli-nm { font-size: 12.5px; color: var(--txt); display: flex; flex-direction: column; }
 .v2 .cm-dr-cli-nm span { font-size: 10.5px; color: var(--txt-3); }
 
@@ -226,7 +226,7 @@
 .v2 .cm-grade-info { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--txt-3); padding: 8px 0 12px; }
 .v2 .cm-grade-info b { color: var(--txt-2); font-weight: 600; }
 .v2 .cm-grade-info .cm-num-lnk { margin-left: auto; }
-.v2 .cm-grade-wrap { overflow-x: auto; border: 1px solid var(--linha); border-radius: 10px; }
+.v2 .cm-grade-wrap { overflow-x: auto; border: 1px solid var(--linha); border-radius: var(--r-card); }
 .v2 .cm-grade { border-collapse: separate; border-spacing: 0; font-size: 12px; width: max-content; min-width: 100%; }
 .v2 .cm-grade thead th {
   position: sticky; top: 0; z-index: 2; background: var(--surface);
@@ -263,7 +263,7 @@
 .v2 .cm-g-alerta { margin-right: 5px; vertical-align: middle; }
 .v2 .cm-cad-btn { display: inline-flex; align-items: center; gap: 6px; font-family: var(--fonte); font-size: 11.5px; font-weight: 600; cursor: pointer; color: var(--ambar); background: rgba(var(--ambar-rgb), .1); border: 1px solid rgba(var(--ambar-rgb), .3); border-radius: 8px; padding: 4px 10px; }
 .v2 .cm-cad-btn:hover { background: rgba(var(--ambar-rgb), .16); }
-.v2 .cm-avisonum { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; cursor: pointer; font-family: var(--fonte); margin: 2px 0 12px; padding: 12px 15px; border-radius: 12px; background: rgba(var(--ambar-rgb), .09); border: 1px solid rgba(var(--ambar-rgb), .3); color: var(--txt-2); }
+.v2 .cm-avisonum { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; cursor: pointer; font-family: var(--fonte); margin: 2px 0 12px; padding: 12px 15px; border-radius: var(--r-card); background: rgba(var(--ambar-rgb), .09); border: 1px solid rgba(var(--ambar-rgb), .3); color: var(--txt-2); }
 .v2 .cm-avisonum:hover { background: rgba(var(--ambar-rgb), .14); }
 .v2 .cm-avisonum-ic { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 8px; background: rgba(var(--ambar-rgb), .18); color: var(--ambar); flex-shrink: 0; }
 .v2 .cm-avisonum span b { color: var(--txt); font-weight: 600; }
