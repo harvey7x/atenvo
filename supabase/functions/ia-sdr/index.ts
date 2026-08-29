@@ -55,10 +55,17 @@ const DEBOUNCE_MS = 7_000;                      // espelha o trigger. 7s: agrupa
                                                // manda 2-3 seguidas) e responde tudo junto, sem duplicar turno.
 const REAGENDA_FALHA_MS = 90_000;
 const MAX_FALHAS_TECNICAS = 5;
-// follow-up de reengajamento (escada de 3 toques, pesquisa 25/08): 1º = timing por tipo de etapa
+// follow-up de reengajamento (escada de toques, pesquisa 25/08): 1º = timing por tipo de etapa
 // (resposta simples 15min; foto 45min; tarefa pela metade 20min; Meu INSS 60min); 2º = ~3h depois
 // mudando o ângulo; 3º = manhã seguinte, porta aberta. Depois: episódio encerrado.
-const NUDGE_MAX = 3;
+// TETO DE NUDGES POR ETAPA (dono 28/08 — cortar mensagem/token onde não vale insistir): pergunta
+// simples de qualificação = 1 toque só (se não respondeu benefício/família, não adianta martelar);
+// coleta de documento vale perseguir (3); o resto fica no meio (2).
+function nudgeMaxPara(etapa: string): number {
+  if (etapa === 'qualificacao_inss') return 1;
+  if (['coleta_docs', 'docs_pessoais', 'comprovante_residencia', 'declarante'].includes(etapa)) return 3;
+  return 2;
+}
 // Cadeia de fallback quando o modelo do turno está sobrecarregado (503) — capacidade diferente.
 const FALLBACK_MODELOS = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-flash-latest'];
 
@@ -506,7 +513,7 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
   const nudgeN = Number(dados.nudge_n ?? 0) || 0;
   const ehNudge = !novas.length && dados.abertura_enviada === true && !transPendente
     && !dados.aguardando_humano && sessao.etapa !== 'conclusao' && sessao.etapa !== 'retorno'
-    && nudgeN < NUDGE_MAX && dados.nudge_alvo === processadoAte
+    && nudgeN < nudgeMaxPara(sessao.etapa) && dados.nudge_alvo === processadoAte
     // retomada FRIA (o cliente nunca respondeu à retomada) não ganha escada: a abertura JÁ é o toque
     && (dados.retomada !== true || dados.teve_inbound === true);
   if (!novas.length && dados.abertura_enviada && !ehNudge && !transPendente) { await limparAgenda(admin, sessao.id, claimAte); return; }
@@ -754,7 +761,7 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
       const dadosFinais = patch.dados as Record<string, unknown>;
       const etapaFinal = (patch.etapa as string) ?? sessao.etapa;
       const nFinal = Number(dadosFinais.nudge_n ?? 0) || 0;
-      if (!dadosFinais.aguardando_humano && etapaFinal !== 'conclusao' && etapaFinal !== 'retorno' && nFinal < NUDGE_MAX
+      if (!dadosFinais.aguardando_humano && etapaFinal !== 'conclusao' && etapaFinal !== 'retorno' && nFinal < nudgeMaxPara(etapaFinal)
           && (dadosFinais.retomada !== true || dadosFinais.teve_inbound === true)) {
         let quando: string;
         if (nFinal === 0) quando = ajustarJanelaNudge(Date.now() + delayNudge1Ms(etapaFinal, patch.docs as Record<string, unknown>) + rand(0, 5 * 60_000));
@@ -762,7 +769,7 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
         else quando = proximaManhaNudge();
         await agendarProximo(admin, sessao.id, claimAte, quando);
       } else {
-        if (ehNudge && nFinal >= NUDGE_MAX) await evento(admin, sessao, 'nudges_esgotados', { etapa: etapaFinal });
+        if (ehNudge && nFinal >= nudgeMaxPara(etapaFinal)) await evento(admin, sessao, 'nudges_esgotados', { etapa: etapaFinal });
         await limparAgenda(admin, sessao.id, claimAte);
       }
     }
