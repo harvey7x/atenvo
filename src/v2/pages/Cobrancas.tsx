@@ -16,6 +16,7 @@ import {
 } from '../components';
 import { AbaCiclos, AbaRegua, AbaNumeros, AbaEnvios, AbaAtendentes, AbaClientes, PainelResumo } from './cobrancaMotor';
 import { CICLOS_LISTA } from './cobrancaAnalytics';
+import { useCiclosReais, diaDoCiclo, vincularCiclo, criarContatoCobranca } from '@/data/cobrancaCiclos';
 import './cobrancas.css';
 
 /** próxima ocorrência do dia de vencimento do ciclo (deriva a 1ª cobrança da turma) */
@@ -201,7 +202,7 @@ export default function CobrancasV2() {
 
   /* ações unificadas: RPCs reais ou mutação do seed demo (mesmos fluxos de UI) */
   const acoes = {
-    async criar(args: { contatoId: string; contatoNome: string; contatoTelefone: string; valor: number; dataPrimeira: string; ciclos: number; responsavelId: string | null; responsavelNome: string; servico: string | null; observacoes: string | null }) {
+    async criar(args: { contatoId: string; contatoNome: string; contatoTelefone: string; valor: number; dataPrimeira: string; ciclos: number; responsavelId: string | null; responsavelNome: string; servico: string | null; observacoes: string | null; cicloId?: string | null }) {
       if (demo) {
         const id = `demo-${Date.now()}`;
         const parcelas = parcelasDemo(id, args.valor, args.ciclos, 0, args.dataPrimeira);
@@ -214,7 +215,9 @@ export default function CobrancasV2() {
         })]);
         return;
       }
-      await criarMut.mutateAsync({ contatoId: args.contatoId, valor: args.valor, dataPrimeira: args.dataPrimeira, ciclos: args.ciclos, responsavelId: args.responsavelId, servico: args.servico, observacoes: args.observacoes });
+      const novaId = await criarMut.mutateAsync({ contatoId: args.contatoId, valor: args.valor, dataPrimeira: args.dataPrimeira, ciclos: args.ciclos, responsavelId: args.responsavelId, servico: args.servico, observacoes: args.observacoes });
+      // amarra a cobrança à TURMA (regra do dono: cliente entra num ciclo)
+      if (args.cicloId) await vincularCiclo(novaId, args.cicloId);
     },
     async baixa(args: { parcelaId: string; cobrancaId: string; data: string; obs: string | null }) {
       if (demo) {
@@ -320,16 +323,9 @@ export default function CobrancasV2() {
           abas do motor, fora do demo, mostram o estado REAL da base — que foi
           ZERADA a pedido do dono (29/08, backup bkp_reset_*). O seed dos 600 só
           existe no modo demonstração. */}
-      {aba === 'atendentes' && (demo ? <AbaAtendentes /> : (
-        <CardVidro spot sobe style={{ borderRadius: 'var(--r-card)' }}><EstadoVazio titulo="Sem clientes na cobrança" descricao="A base foi zerada. Cadastre clientes para acompanhar as métricas por atendente." /></CardVidro>
-      ))}
-      {aba === 'clientes' && (demo ? <AbaClientes /> : (
-        <CardVidro spot sobe style={{ borderRadius: 'var(--r-card)' }}><EstadoVazio titulo="Nenhum cliente cadastrado" descricao="A base de cobrança está vazia. Cadastre o primeiro cliente com o número de WhatsApp e o ciclo dele."
-          acao={gestor ? { rotulo: '＋ Cadastrar cliente', onClick: () => setNovo(true) } : undefined} /></CardVidro>
-      ))}
-      {aba === 'ciclos' && (demo ? <AbaCiclos gestor={gestor} aoAvisar={(t) => setAviso({ tom: 'ok', texto: t })} /> : (
-        <CardVidro spot sobe style={{ borderRadius: 'var(--r-card)' }}><EstadoVazio titulo="Nenhum ciclo com clientes" descricao="Os ciclos ganham vida quando os clientes forem cadastrados — cada um entra na turma do seu dia de vencimento." /></CardVidro>
-      ))}
+      {aba === 'atendentes' && <AbaAtendentes demo={demo} />}
+      {aba === 'clientes' && <AbaClientes demo={demo} gestor={gestor} aoNovo={() => setNovo(true)} />}
+      {aba === 'ciclos' && <AbaCiclos demo={demo} gestor={gestor} aoAvisar={(t) => setAviso({ tom: 'ok', texto: t })} />}
       {aba === 'regua' && <AbaRegua demo={demo} gestor={gestor} aoAvisar={(t) => setAviso({ tom: 'ok', texto: t })} />}
       {aba === 'numeros' && <AbaNumeros demo={demo} gestor={gestor} aoAvisar={(t) => setAviso({ tom: 'ok', texto: t })} />}
       {aba === 'envios' && (demo ? <AbaEnvios gestor={gestor} aoAvisar={(t) => setAviso({ tom: 'ok', texto: t })} /> : (
@@ -469,12 +465,15 @@ function CarregandoCobrancas() {
 
 function NovaCobrancaV2({ demo, aoCriar, aoFechar, aoSucesso }: {
   demo: boolean;
-  aoCriar: (args: { contatoId: string; contatoNome: string; contatoTelefone: string; valor: number; dataPrimeira: string; ciclos: number; responsavelId: string | null; responsavelNome: string; servico: string | null; observacoes: string | null }) => Promise<void>;
+  aoCriar: (args: { contatoId: string; contatoNome: string; contatoTelefone: string; valor: number; dataPrimeira: string; ciclos: number; responsavelId: string | null; responsavelNome: string; servico: string | null; observacoes: string | null; cicloId?: string | null }) => Promise<void>;
   aoFechar: () => void;
   aoSucesso: () => void;
 }) {
   const { data: usuarios = [] } = useOrgUsuarios();
+  const { currentOrg } = useOrg();
+  const { data: ciclosReais = [] } = useCiclosReais(demo ? undefined : currentOrg?.id);
   const [contato, setContato] = useState<ContatoRow | null>(null);
+  const [nomeNovo, setNomeNovo] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
   const [cicloCod, setCicloCod] = useState('');
   const [respId, setRespId] = useState('');
@@ -485,22 +484,34 @@ function NovaCobrancaV2({ demo, aoCriar, aoFechar, aoSucesso }: {
   const [busy, setBusy] = useState(false);
 
   const v = parseMoedaBRL(valor);
-  const ciclo = CICLOS_LISTA.find((c) => c.codigo === cicloCod) ?? null;
+  // demo usa a lista ilustrativa; real usa as turmas criadas na aba Ciclos
+  const opcoesCiclo = demo
+    ? CICLOS_LISTA.map((c) => ({ codigo: c.codigo, dia: c.dia, id: null as string | null }))
+    : ciclosReais.map((c) => ({ codigo: c.codigo, dia: diaDoCiclo(c), id: c.id as string | null }));
+  const ciclo = opcoesCiclo.find((c) => c.codigo === cicloCod) ?? null;
   const primeira = ciclo ? proximaDataDoDia(ciclo.dia) : null;
 
   async function salvar() {
     if (busy) return;
-    if (!contato) { setErro('Selecione o cliente.'); return; }
-    if (!ciclo) { setErro('Escolha o ciclo em que o cliente vai entrar.'); return; }
+    const nomeCliente = contato?.nome || nomeNovo.trim();
+    if (!contato && !nomeNovo.trim()) { setErro('Selecione um contato ou digite o nome do cliente novo.'); return; }
+    if (!ciclo) { setErro(demo ? 'Escolha o ciclo em que o cliente vai entrar.' : opcoesCiclo.length === 0 ? 'Crie os ciclos primeiro (aba Ciclos).' : 'Escolha o ciclo em que o cliente vai entrar.'); return; }
     if (v == null || v <= 0) { setErro('Informe um valor mensal válido.'); return; }
+    if (!contato && !whatsapp.trim()) { setErro('Cliente novo precisa do número de WhatsApp.'); return; }
     setBusy(true); setErro(null);
     try {
+      // cliente novo (real): cria o contato com nome + WhatsApp antes da cobrança
+      let contatoId = contato?.id ?? '';
+      if (!contatoId) {
+        if (demo) contatoId = `demo-ct-${Date.now()}`;
+        else contatoId = await criarContatoCobranca(currentOrg!.id, nomeNovo, whatsapp);
+      }
       // o ciclo define o calendário; a 1ª cobrança é o próximo vencimento da turma
       await aoCriar({
-        contatoId: contato.id, contatoNome: contato.nome || 'Cliente', contatoTelefone: whatsapp.trim() || contato.tel || '',
+        contatoId, contatoNome: nomeCliente || 'Cliente', contatoTelefone: whatsapp.trim() || contato?.tel || '',
         valor: v, dataPrimeira: primeira!, ciclos: 6, responsavelId: respId || null,
         responsavelNome: usuarios.find((u) => u.id === respId)?.nome ?? '',
-        servico: servico || null, observacoes: obs || null,
+        servico: servico || null, observacoes: obs || null, cicloId: ciclo.id,
       });
       aoSucesso(); aoFechar();
     } catch (e) { setErro(traduz((e as Error).message)); }
@@ -535,7 +546,11 @@ function NovaCobrancaV2({ demo, aoCriar, aoFechar, aoSucesso }: {
           ) : demo ? (
             <Input placeholder="Nome do cliente (demonstração)" onChange={(e) => setContato({ id: `demo-ct-${Date.now()}`, nome: e.target.value, tel: '', email: '' } as ContatoRow)} />
           ) : (
-            <ContatoPickerV2 aoSelecionar={setContato} />
+            <>
+              <ContatoPickerV2 aoSelecionar={setContato} />
+              <div className="cm-hint" style={{ margin: '6px 0 4px' }}>— ou cadastre um cliente novo:</div>
+              <Input placeholder="Nome completo do cliente novo" value={nomeNovo} onChange={(e) => setNomeNovo(e.target.value)} disabled={busy} />
+            </>
           )}
         </div>
         <div className="form-2col">
@@ -550,7 +565,7 @@ function NovaCobrancaV2({ demo, aoCriar, aoFechar, aoSucesso }: {
             <label>Ciclo de cobrança *</label>
             <select className="inp" value={cicloCod} onChange={(e) => setCicloCod(e.target.value)} disabled={busy}>
               <option value="">Escolha o ciclo…</option>
-              {CICLOS_LISTA.map((c) => <option key={c.codigo} value={c.codigo}>{c.codigo} — vence dia {String(c.dia).padStart(2, '0')}</option>)}
+              {opcoesCiclo.map((c) => <option key={c.codigo} value={c.codigo}>{c.codigo} — vence dia {String(c.dia).padStart(2, '0')}</option>)}
             </select>
           </div>
           <div className="campo">

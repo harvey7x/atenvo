@@ -16,6 +16,7 @@ import {
   useCobMensagens, useSalvarMensagem, useAlternarMensagem, uploadMidiaCobranca, ROTULO_TIPO_MSG,
   type CobMensagem, type CobMsgItem, type TipoMensagem, type TipoItem,
 } from '@/data/cobrancaRegua';
+import { useCiclosReais, useCriarCiclo, useClientesCobranca, type ClienteCobranca } from '@/data/cobrancaCiclos';
 
 /** célula da grade de pagamentos (máquina de estados do legado Gestão Mensal) */
 function Celula({ raw }: { raw: string }) {
@@ -60,7 +61,93 @@ const diaBR = (n: number) => String(n).padStart(2, '0');
 
 /* =================== CICLOS — grade de pagamentos (Gestão Mensal) =================== */
 
-export function AbaCiclos({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (t: string) => void }) {
+export function AbaCiclos({ demo, gestor, aoAvisar }: { demo: boolean; gestor: boolean; aoAvisar: (t: string) => void }) {
+  return demo ? <AbaCiclosDemo gestor={gestor} aoAvisar={aoAvisar} /> : <AbaCiclosReal gestor={gestor} aoAvisar={aoAvisar} />;
+}
+
+const TOM_STATUS_COB: Record<string, TomStatus> = { ativo: 'ok', finalizado: 'neutro', cancelado: 'erro' };
+
+function AbaCiclosReal({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (t: string) => void }) {
+  const { currentOrg } = useOrg();
+  const orgId = currentOrg?.id;
+  const { data: ciclos = [], isLoading } = useCiclosReais(orgId);
+  const { data: clientes = [] } = useClientesCobranca(orgId);
+  const criar = useCriarCiclo(orgId);
+  const [novo, setNovo] = useState(false);
+  const [dia, setDia] = useState('');
+  const [aberto, setAberto] = useState<string | null>(null);
+  const nDia = Math.trunc(Number(dia) || 0);
+  const porCiclo = useMemo(() => {
+    const m = new Map<string, ClienteCobranca[]>();
+    for (const c of clientes) { if (!c.ciclo) continue; const a = m.get(c.ciclo) ?? []; a.push(c); m.set(c.ciclo, a); }
+    return m;
+  }, [clientes]);
+
+  async function salvarCiclo() {
+    try { await criar.mutateAsync(nDia); aoAvisar(`Ciclo D${String(nDia).padStart(2, '0')} criado.`); setNovo(false); setDia(''); }
+    catch (e) { aoAvisar((e as Error).message); }
+  }
+
+  return (
+    <>
+      <div className="cm-grade-info">
+        <p className="cm-hint" style={{ margin: 0 }}>Cada ciclo é a turma que vence no mesmo dia do mês. O cliente entra num ciclo no cadastro.</p>
+        {gestor && <button type="button" className="cm-num-lnk" style={{ marginLeft: 'auto' }} onClick={() => setNovo(true)}>＋ Criar ciclo</button>}
+      </div>
+      {isLoading ? <div className="cm-hint">Carregando…</div> : ciclos.length === 0 ? (
+        <CardVidro spot sobe style={{ borderRadius: 'var(--r-card)' }}>
+          <EstadoVazio titulo="Nenhum ciclo criado" descricao="Crie as turmas de vencimento (ex.: dia 01, dia 05, dia 25) — cada cliente entra numa delas no cadastro."
+            acao={gestor ? { rotulo: '＋ Criar o primeiro ciclo', onClick: () => setNovo(true) } : undefined} />
+        </CardVidro>
+      ) : (
+        <div className="cm-ciclos sobe">
+          {ciclos.map((c) => {
+            const on = aberto === c.id;
+            const lista = porCiclo.get(c.codigo) ?? [];
+            return (
+              <CardVidro spot key={c.id} className={on ? 'cm-ciclo on' : 'cm-ciclo'}>
+                <button type="button" className="cm-ciclo-cab" onClick={() => setAberto(on ? null : c.id)} aria-expanded={on}>
+                  <span className="cm-ciclo-cod">{c.codigo}</span>
+                  <span className="cm-ciclo-nm">{c.nome}<b>{c.grupo === 'inicio_mes' ? 'início do mês' : c.grupo === 'fim_mes' ? 'fim do mês' : 'meio do mês'}</b></span>
+                  <span className="cm-ciclo-tags"><span className="cm-ciclo-n num">{lista.length} cliente{lista.length === 1 ? '' : 's'}</span></span>
+                  <span className="cm-ciclo-seta" aria-hidden>{on ? '▾' : '▸'}</span>
+                </button>
+                {on && (
+                  <div className="cm-ciclo-corpo">
+                    {lista.length === 0 ? <div className="cm-hint">Nenhum cliente neste ciclo ainda.</div> : (
+                      <TabelaPadrao
+                        colunas={[
+                          { chave: 'nome', titulo: 'Cliente', render: (x: ClienteCobranca) => x.nome },
+                          { chave: 'tel', titulo: 'WhatsApp', render: (x: ClienteCobranca) => x.telefone ? <span className="num">{x.telefone}</span> : <span style={{ color: 'var(--ambar)' }}>⚠ sem número</span> },
+                          { chave: 'at', titulo: 'Atendente', render: (x: ClienteCobranca) => x.atendente ?? '—' },
+                          { chave: 'v', titulo: 'Mensalidade', dir: true, classe: 'num', render: (x: ClienteCobranca) => fmtBRL(x.valorMensal) },
+                        ] as Coluna<ClienteCobranca>[]}
+                        linhas={lista} chave={(x) => x.id}
+                      />
+                    )}
+                  </div>
+                )}
+              </CardVidro>
+            );
+          })}
+        </div>
+      )}
+
+      {novo && (
+        <ModalV2 aberto aoFechar={() => setNovo(false)} largura={380}
+          titulo={<div>Criar ciclo<div className="mod-sub">A turma de quem vence neste dia do mês.</div></div>}
+          rodape={<><BotaoSec onClick={() => setNovo(false)}>Cancelar</BotaoSec><BotaoPrimario onClick={salvarCiclo} disabled={criar.isPending || nDia < 1 || nDia > 31}>{criar.isPending ? 'Criando…' : 'Criar ciclo'}</BotaoPrimario></>}>
+          <div className="form-grid">
+            <div className="campo"><label>Dia do vencimento (1 a 31) *</label><Input inputMode="numeric" value={dia} onChange={(e) => setDia(e.target.value)} placeholder="Ex.: 5" /></div>
+            <p className="cm-hint">{nDia >= 1 && nDia <= 31 ? <>Será o ciclo <b>D{String(nDia).padStart(2, '0')}</b> — vence todo dia {String(nDia).padStart(2, '0')}.</> : 'Informe o dia em que o benefício desta turma cai.'}</p>
+          </div>
+        </ModalV2>
+      )}
+    </>
+  );
+}
+
+function AbaCiclosDemo({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (t: string) => void }) {
   const ciclos = useMemo(() => {
     const map = new Map<string, ClienteAnalise[]>();
     for (const c of CLIENTES) { const a = map.get(c.ciclo) ?? []; a.push(c); map.set(c.ciclo, a); }
@@ -691,7 +778,43 @@ export function PainelResumo() {
 
 /* =================== ATENDENTES (métricas + drill-down) =================== */
 
-export function AbaAtendentes() {
+export function AbaAtendentes({ demo }: { demo: boolean }) {
+  return demo ? <AbaAtendentesDemo /> : <AbaAtendentesReal />;
+}
+
+function AbaAtendentesReal() {
+  const { currentOrg } = useOrg();
+  const { data: clientes = [], isLoading } = useClientesCobranca(currentOrg?.id);
+  const linhas = useMemo(() => {
+    const m = new Map<string, { atendente: string; clientes: number; soma: number; semNumero: number }>();
+    for (const c of clientes) {
+      const k = c.atendente ?? 'Sem atendente';
+      const cur = m.get(k) ?? { atendente: k, clientes: 0, soma: 0, semNumero: 0 };
+      cur.clientes += 1; cur.soma += c.valorMensal; if (!c.telefone) cur.semNumero += 1;
+      m.set(k, cur);
+    }
+    return [...m.values()].sort((a, b) => b.soma - a.soma);
+  }, [clientes]);
+  if (isLoading) return <div className="cm-hint">Carregando…</div>;
+  if (linhas.length === 0) {
+    return <CardVidro spot sobe style={{ borderRadius: 'var(--r-card)' }}><EstadoVazio titulo="Sem clientes na cobrança" descricao="Cadastre clientes para acompanhar a carteira de cada atendente." /></CardVidro>;
+  }
+  return (
+    <CardVidro spot sobe style={{ borderRadius: 'var(--r-card)' }}>
+      <TabelaPadrao
+        colunas={[
+          { chave: 'at', titulo: 'Atendente', render: (x) => x.atendente },
+          { chave: 'cl', titulo: 'Clientes', dir: true, classe: 'num', render: (x) => String(x.clientes) },
+          { chave: 'soma', titulo: 'Recorrência/mês', dir: true, classe: 'num', render: (x) => fmtBRL(x.soma) },
+          { chave: 'sn', titulo: 'Sem número', dir: true, classe: 'num', render: (x) => x.semNumero > 0 ? <span style={{ color: 'var(--ambar)' }}>⚠ {x.semNumero}</span> : '0' },
+        ] as Coluna<{ atendente: string; clientes: number; soma: number; semNumero: number }>[]}
+        linhas={linhas} chave={(x) => x.atendente}
+      />
+    </CardVidro>
+  );
+}
+
+function AbaAtendentesDemo() {
   const metricas = useMemo(() => metricasPorAtendente(CLIENTES), []);
   const [sel, setSel] = useState<string | null>(null);
   const maxFat = Math.max(...metricas.map((m) => m.faturamento));
@@ -745,7 +868,50 @@ export function AbaAtendentes() {
 
 /* =================== CLIENTES (análise + ficha + nº WhatsApp) =================== */
 
-export function AbaClientes() {
+export function AbaClientes({ demo, gestor, aoNovo }: { demo: boolean; gestor: boolean; aoNovo: () => void }) {
+  return demo ? <AbaClientesDemo /> : <AbaClientesReal gestor={gestor} aoNovo={aoNovo} />;
+}
+
+function AbaClientesReal({ gestor, aoNovo }: { gestor: boolean; aoNovo: () => void }) {
+  const { currentOrg } = useOrg();
+  const { data: clientes = [], isLoading } = useClientesCobranca(currentOrg?.id);
+  const semNumero = clientes.filter((c) => !c.telefone).length;
+  if (isLoading) return <div className="cm-hint">Carregando…</div>;
+  if (clientes.length === 0) {
+    return (
+      <CardVidro spot sobe style={{ borderRadius: 'var(--r-card)' }}>
+        <EstadoVazio titulo="Nenhum cliente cadastrado" descricao="A base de cobrança está vazia. Cadastre o primeiro cliente com o número de WhatsApp e o ciclo dele."
+          acao={gestor ? { rotulo: '＋ Cadastrar cliente', onClick: aoNovo } : undefined} />
+      </CardVidro>
+    );
+  }
+  return (
+    <>
+      {semNumero > 0 && (
+        <div className="cm-avisonum sobe" role="status">
+          <span className="cm-avisonum-ic" aria-hidden><IcAtencao /></span>
+          <span><b>{semNumero} cliente{semNumero === 1 ? '' : 's'} sem número de WhatsApp.</b> Sem o número, a cobrança automática não chega a este cliente.</span>
+        </div>
+      )}
+      <CardVidro spot sobe style={{ borderRadius: 'var(--r-card)', animationDelay: '.06s' }}>
+        <TabelaPadrao
+          colunas={[
+            { chave: 'nome', titulo: 'Cliente', render: (x: ClienteCobranca) => <div className="cm-cli-nm">{!x.telefone && <span className="cm-cli-alerta" title="Sem número de WhatsApp"><IcAtencao /></span>}{x.nome}</div> },
+            { chave: 'tel', titulo: 'WhatsApp', render: (x: ClienteCobranca) => x.telefone ? <span className="num" style={{ color: 'var(--txt-2)' }}>{x.telefone}</span> : <span style={{ color: 'var(--ambar)', fontWeight: 600, fontSize: 11.5 }}>Cadastrar número</span> },
+            { chave: 'ciclo', titulo: 'Ciclo', classe: 'num', render: (x: ClienteCobranca) => x.ciclo ?? '—' },
+            { chave: 'at', titulo: 'Atendente', render: (x: ClienteCobranca) => x.atendente ?? '—' },
+            { chave: 'v', titulo: 'Mensalidade', dir: true, classe: 'num', render: (x: ClienteCobranca) => fmtBRL(x.valorMensal) },
+            { chave: 'st', titulo: 'Status', render: (x: ClienteCobranca) => <BadgeStatus tom={TOM_STATUS_COB[x.status] ?? 'neutro'}>{x.status === 'ativo' ? 'Ativo' : x.status === 'finalizado' ? 'Finalizado' : x.status}</BadgeStatus> },
+          ] as Coluna<ClienteCobranca>[]}
+          linhas={clientes} chave={(x) => x.id}
+          rodape={{ texto: `${clientes.length} cliente${clientes.length === 1 ? '' : 's'}` }}
+        />
+      </CardVidro>
+    </>
+  );
+}
+
+function AbaClientesDemo() {
   const [seg, setSeg] = useState<'todos' | Comportamento | 'resp_remk' | 'sem_num'>('todos');
   const [sel, setSel] = useState<ClienteAnalise | null>(null);
   const [cadastrar, setCadastrar] = useState<ClienteAnalise | null>(null);
