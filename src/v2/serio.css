@@ -113,3 +113,29 @@ html:root[data-visual="corp"] .v2 .chip { border-radius: 6px; }
 
 /* ---- KPI: número é dado — sem tinta gradiente, peso 600, tabular ---- */
 html:root[data-visual="corp"] .v2 .kpi .val { letter-spacing: -.01em; }
+
+/* ============================================================
+   ACENTO dirige a cor-ASSINATURA no Corporativo (dono 29/08):
+   elementos que usam --platina (play do áudio, "Continuar ficha",
+   "Responder" da notificação, toggles, checkbox, segmentado, etc.)
+   ficavam presos no azul mesmo com verde/dourado selecionado. Aqui o
+   acento repinta --platina; o AZUL (padrão) mantém o Carbon Blue.
+   var(--azul) resolve o valor do acento por tema (skinAurora define
+   --azul em dark e light). --platina-txt-rgb não é consumido no v2.
+   ============================================================ */
+html:root[data-visual="corp"][data-acento="verde"] .v2 {
+  --platina-a: var(--azul);
+  --platina-b: var(--azul);
+  --platina-txt: #FFFFFF;
+}
+html:root[data-visual="corp"][data-acento="dourado"] .v2 {
+  --platina-a: var(--azul);
+  --platina-b: var(--azul);
+  --platina-txt: #241A05;   /* texto escuro sobre o ouro (branco não aguenta) */
+}
+/* play do áudio: segue a assinatura nos DOIS temas (era prata no dark e
+   azul fixo no light — agora acompanha o acento como o resto) */
+html:root[data-visual="corp"] .v2 .audio2 .play {
+  background: var(--platina-a);
+  color: var(--platina-txt);
+}
