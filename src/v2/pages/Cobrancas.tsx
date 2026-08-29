@@ -316,6 +316,14 @@ export default function CobrancasV2() {
         </div>
       )}
 
+      {/* Fora do modo demo, as abas do motor ainda mostram o seed de revisão —
+          a faixa evita que a equipe confunda os clientes simulados com reais.
+          Some na Fase C, quando o motor liga nos dados de verdade. */}
+      {!demo && aba !== 'painel' && (
+        <div className="cm-aviso-sim">
+          Demonstração do Modo Cobrança — os clientes e números destas abas são <b>simulados</b> para revisão. A ligação com os dados reais é a próxima fase.
+        </div>
+      )}
       {aba === 'atendentes' && <AbaAtendentes />}
       {aba === 'clientes' && <AbaClientes />}
       {aba === 'ciclos' && <AbaCiclos gestor={gestor} aoAvisar={(t) => setAviso({ tom: 'ok', texto: t })} />}
