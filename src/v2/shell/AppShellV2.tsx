@@ -69,6 +69,12 @@ const GRUPOS: { rotulo: string; itens: ItemNav[] }[] = [
     ],
   },
   {
+    rotulo: 'Ferramentas',
+    itens: [
+      { slug: 'ferramentas/unificador', rotulo: 'Unificador de documentos' },
+    ],
+  },
+  {
     rotulo: 'Sistema',
     itens: [
       { slug: 'integracoes', rotulo: 'Integrações' },
@@ -84,7 +90,7 @@ const GRUPOS: { rotulo: string; itens: ItemNav[] }[] = [
 /* MÓDULOS do sistema (seletor do topo, 29/08): cada módulo troca o menu
    inteiro da esquerda. Atendimento = a operação de sempre; Cobranças = as
    seções do Modo Cobrança viram itens de menu. Novos módulos entram aqui. */
-type ModuloId = 'atendimento' | 'cobrancas' | 'ferramentas';
+type ModuloId = 'atendimento' | 'cobrancas';
 type Modulo = { id: ModuloId; rotulo: string; home: string; grupos: { rotulo: string; itens: ItemNav[] }[] };
 const COB_SECOES: ItemNav[] = [
   { slug: 'cobrancas/painel', rotulo: 'Painel' },
@@ -95,13 +101,9 @@ const COB_SECOES: ItemNav[] = [
   { slug: 'cobrancas/numeros', rotulo: 'Números' },
   { slug: 'cobrancas/envios', rotulo: 'Envios' },
 ];
-const FERRAMENTAS_SECOES: ItemNav[] = [
-  { slug: 'ferramentas/unificador', rotulo: 'Unificador de documentos' },
-];
 const MODULOS: Modulo[] = [
   { id: 'atendimento', rotulo: 'Atendimento', home: '/whatsapp', grupos: GRUPOS },
   { id: 'cobrancas', rotulo: 'Cobranças', home: '/cobrancas/painel', grupos: [{ rotulo: 'Cobranças', itens: COB_SECOES }] },
-  { id: 'ferramentas', rotulo: 'Ferramentas', home: '/ferramentas/unificador', grupos: [{ rotulo: 'Ferramentas', itens: FERRAMENTAS_SECOES }] },
 ];
 /* ícones das seções de cobrança (mesma família traço 1.7) */
 const IcC = (d: string) => (
@@ -296,8 +298,7 @@ export default function AppShellV2() {
 
   // MÓDULO ativo derivado da rota: /cobrancas* = Cobranças, senão Atendimento.
   // Trocar de módulo navega pra home do módulo (o menu da esquerda se refaz).
-  const moduloAtivo: ModuloId = location.pathname.startsWith('/cobrancas') ? 'cobrancas'
-    : location.pathname.startsWith('/ferramentas') ? 'ferramentas' : 'atendimento';
+  const moduloAtivo: ModuloId = location.pathname.startsWith('/cobrancas') ? 'cobrancas' : 'atendimento';
   const modulo = MODULOS.find((m) => m.id === moduloAtivo) ?? MODULOS[0];
   const trocarModulo = useCallback((m: Modulo) => {
     setMenuOrg(false);

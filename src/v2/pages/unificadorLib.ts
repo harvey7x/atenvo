@@ -21,7 +21,11 @@ export const BANCOS_ALVO = [
 ] as const;
 
 export interface BancoAchado { id: string; nome: string; ocorrencias: number; paginas: number[] }
-export interface ArquivoInfo { nome: string; paginas: number; bancos: string[]; textoLido: boolean }
+export interface ArquivoInfo {
+  nome: string; paginas: number; bancos: string[]; textoLido: boolean;
+  beneficiario: string | null; nb: string | null; cpf: string | null; especie: string | null;
+  consignadoMes: number | null; competenciaMes: string | null;
+}
 export interface ResultadoUnificacao {
   pdf: Blob;
   totalPaginas: number;
@@ -29,9 +33,44 @@ export interface ResultadoUnificacao {
   bancos: BancoAchado[];            // só os ENCONTRADOS
   ausentes: { id: string; nome: string }[];
   falhas: { nome: string; motivo: string }[];   // não puderam ser juntados
+  beneficiarios: number;            // NBs distintos
+  consignadoTotalMes: number;       // soma do consignado do mês mais recente de cada arquivo
 }
 
 const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase();
+
+const parseBRL = (v: string) => Number(v.replace(/\./g, '').replace(',', '.'));
+
+/* dados do beneficiário + consignado do MÊS MAIS RECENTE (do Histórico
+   de Créditos do INSS). NB/CPF/espécie são padrões estáveis; o nome é
+   saneado (corta rótulos vizinhos). O consignado é por competência —
+   somar todas as páginas inflaria (cada mês repete), então pega a
+   competência (AAAAMM) mais nova. */
+function extrairDados(paginas: string[]): Pick<ArquivoInfo, 'beneficiario' | 'nb' | 'cpf' | 'especie' | 'consignadoMes' | 'competenciaMes'> {
+  const full = paginas.join('\n');
+  const nb = full.match(/NB:\s*([\d.\-]{6,20})/)?.[1] ?? null;
+  const cpf = full.match(/CPF:\s*([\d.\-]{11,18})/)?.[1] ?? null;
+  const especie = full.match(/Esp[eé]cie:\s*(\d{1,3}\s*-\s*[A-ZÀ-Ú][A-ZÀ-Ú ]{5,60})/)?.[1]?.replace(/\s+/g, ' ').trim() ?? null;
+  let beneficiario: string | null = full.match(/Nome:\s*([A-ZÀ-Ú][A-ZÀ-Ú '.]{3,58})/)?.[1] ?? null;
+  if (beneficiario) {
+    beneficiario = beneficiario.split(/\bNOME DA\b|\bM[ÃA]E\b/i)[0].replace(/\s+/g, ' ').trim();
+    if (beneficiario.length < 5) beneficiario = null;
+  }
+  let melhorComp: string | null = null; let melhorValor: number | null = null;
+  for (const pg of paginas) {
+    const cm = pg.match(/(\d{2})\/(\d{4})\s+R\$/);
+    if (!cm) continue;
+    const cons = [...pg.matchAll(/CONSIGNACAO[^\n]*?R\$\s*([\d.]+,\d{2})/g)];
+    if (!cons.length) continue;
+    const chave = cm[2] + cm[1];              // AAAAMM
+    if (!melhorComp || chave > melhorComp) { melhorComp = chave; melhorValor = cons.reduce((a, m) => a + parseBRL(m[1]), 0); }
+  }
+  return {
+    beneficiario, nb, cpf, especie,
+    consignadoMes: melhorValor,
+    competenciaMes: melhorComp ? `${melhorComp.slice(4)}/${melhorComp.slice(0, 4)}` : null,
+  };
+}
 
 /** texto por página de um PDF (pdfjs) */
 async function textoPorPagina(bytes: Uint8Array): Promise<string[]> {
@@ -40,7 +79,12 @@ async function textoPorPagina(bytes: Uint8Array): Promise<string[]> {
   for (let p = 1; p <= doc.numPages; p++) {
     const page = await doc.getPage(p);
     const content = await page.getTextContent();
-    paginas.push((content.items as { str?: string }[]).map((i) => i.str ?? '').join(' '));
+    let t = '';
+    for (const it of content.items as { str?: string; hasEOL?: boolean }[]) {
+      t += it.str ?? '';
+      t += it.hasEOL ? '\n' : ' ';   // recupera as quebras de linha (separa nome × nome da mãe)
+    }
+    paginas.push(t);
   }
   await doc.cleanup();
   return paginas;
@@ -78,8 +122,10 @@ export async function unificar(files: File[]): Promise<ResultadoUnificacao> {
     // que o texto não foi lido (protegido, escaneado sem OCR, etc.).
     const bancosNoArquivo = new Set<string>();
     let textoLido = false;
+    let paginasTextoRef: string[] = [];
     try {
       const paginasTexto = await textoPorPagina(new Uint8Array(buf.slice(0)));
+      paginasTextoRef = paginasTexto;
       const totalChars = paginasTexto.reduce((n, t) => n + t.trim().length, 0);
       textoLido = totalChars > 20;   // texto real (não PDF escaneado/vazio)
       paginasTexto.forEach((txt, i) => {
@@ -98,7 +144,8 @@ export async function unificar(files: File[]): Promise<ResultadoUnificacao> {
       });
     } catch { textoLido = false; }
 
-    arquivos.push({ nome: f.name, paginas: idxs.length, bancos: [...bancosNoArquivo], textoLido });
+    const dados = extrairDados(paginasTextoRef);
+    arquivos.push({ nome: f.name, paginas: idxs.length, bancos: [...bancosNoArquivo], textoLido, ...dados });
     paginaGlobal += idxs.length;
   }
 
@@ -110,6 +157,8 @@ export async function unificar(files: File[]): Promise<ResultadoUnificacao> {
   const bancos: BancoAchado[] = BANCOS_ALVO
     .filter((b) => acc.has(b.id))
     .map((b) => ({ id: b.id, nome: b.nome, ocorrencias: acc.get(b.id)!.ocorrencias, paginas: [...acc.get(b.id)!.paginas].sort((x, y) => x - y) }));
+  const nbsDistintos = new Set(arquivos.map((a) => a.nb).filter(Boolean));
+  const consignadoTotalMes = arquivos.reduce((sum, a) => sum + (a.consignadoMes ?? 0), 0);
   const achadosIds = new Set(bancos.map((b) => b.id));
   const ausentes = BANCOS_ALVO.filter((b) => !achadosIds.has(b.id)).map((b) => ({ id: b.id, nome: b.nome }));
 
@@ -120,5 +169,7 @@ export async function unificar(files: File[]): Promise<ResultadoUnificacao> {
     bancos,
     ausentes,
     falhas,
+    beneficiarios: nbsDistintos.size || arquivos.length,
+    consignadoTotalMes,
   };
 }

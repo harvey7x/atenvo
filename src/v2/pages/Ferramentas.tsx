@@ -5,6 +5,7 @@ import { unificar, BANCOS_ALVO, type ResultadoUnificacao } from './unificadorLib
 import './ferramentas.css';
 
 const fmtKB = (b: number) => (b < 1024 * 1024 ? `${Math.round(b / 1024)} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`);
+const fmtBRL = (v: number) => 'R$ ' + v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 /* dispatcher do módulo Ferramentas (rota /ferramentas/:tool). Hoje só o
    unificador; novas ferramentas entram aqui + no menu do módulo. */
@@ -122,61 +123,77 @@ function UnificadorDocumentos() {
 
       {res && (
         <>
-          <CardVidro spot sobe style={{ borderRadius: 'var(--r-card)', marginTop: 14 }}>
-            <div className="card-cab">
-              <h3>Bancos encontrados nos históricos</h3>
-              <BotaoPrimario mini onClick={baixar}>Baixar PDF unificado</BotaoPrimario>
+          <div className="ferr-kpis sobe">
+            <div className="ferr-kpi"><span className="ferr-kpi-r">Arquivos</span><b className="num">{res.arquivos.length}</b></div>
+            <div className="ferr-kpi"><span className="ferr-kpi-r">Páginas</span><b className="num">{res.totalPaginas}</b></div>
+            <div className="ferr-kpi"><span className="ferr-kpi-r">Beneficiários</span><b className="num">{res.beneficiarios}</b></div>
+            <div className="ferr-kpi"><span className="ferr-kpi-r">Bancos encontrados</span><b className="num" style={{ color: res.bancos.length ? 'var(--verde)' : undefined }}>{res.bancos.length}</b></div>
+            <div className="ferr-kpi"><span className="ferr-kpi-r">Consignado no mês</span><b className="num">{fmtBRL(res.consignadoTotalMes)}</b></div>
+          </div>
+
+          {(res.falhas.length > 0 || res.arquivos.some((a) => !a.textoLido)) && (
+            <div className="ferr-avisos sobe">
+              {res.falhas.map((f) => <div key={f.nome} className="ferr-falhas"><span className="ferr-falha">✕ {f.nome} — {f.motivo}</span></div>)}
+              {res.arquivos.some((a) => !a.textoLido) && (
+                <div className="ferr-falhas aviso"><span>⚠ {res.arquivos.filter((a) => !a.textoLido).length} arquivo(s) sem texto legível (PDF escaneado/protegido) — a detecção pode estar incompleta.</span></div>
+              )}
             </div>
-            <div className="ferr-resumo num">{res.totalPaginas} páginas · {res.arquivos.length} arquivo{res.arquivos.length === 1 ? '' : 's'} unificado{res.arquivos.length === 1 ? '' : 's'}</div>
-            {res.falhas.length > 0 && (
-              <div className="ferr-falhas">
-                {res.falhas.length} arquivo{res.falhas.length === 1 ? '' : 's'} não pôde{res.falhas.length === 1 ? '' : 'ram'} ser unificado{res.falhas.length === 1 ? '' : 's'}:
-                {res.falhas.map((f) => <span key={f.nome} className="ferr-falha" title={f.motivo}>{f.nome} — {f.motivo}</span>)}
+          )}
+
+          <div className="ferr-grid sobe">
+            <CardVidro spot style={{ borderRadius: 'var(--r-card)' }}>
+              <div className="card-cab">
+                <h3>Bancos encontrados</h3>
+                <BotaoPrimario mini onClick={baixar}>Baixar PDF unificado</BotaoPrimario>
               </div>
-            )}
-            {res.arquivos.some((a) => !a.textoLido) && (
-              <div className="ferr-falhas aviso">
-                Atenção: {res.arquivos.filter((a) => !a.textoLido).length} arquivo(s) sem texto legível (PDF escaneado ou protegido) — a detecção de bancos pode estar incompleta.
-              </div>
-            )}
-            {res.bancos.length === 0 ? (
-              <div className="ferr-nada">Nenhum dos bancos monitorados foi encontrado nestes históricos.</div>
-            ) : (
-              <div className="ferr-bancos">
-                {res.bancos.map((b) => (
-                  <div className="ferr-banco on" key={b.id}>
-                    <span className="ferr-banco-dot" aria-hidden />
-                    <span className="ferr-banco-nm">{b.nome}</span>
-                    <span className="ferr-banco-meta num">{b.ocorrencias}× · pág. {b.paginas.slice(0, 6).join(', ')}{b.paginas.length > 6 ? '…' : ''}</span>
+              {res.bancos.length === 0 ? (
+                <div className="ferr-nada">Nenhum dos bancos monitorados foi encontrado nestes históricos.</div>
+              ) : (
+                <div className="ferr-bancos">
+                  {res.bancos.map((b) => (
+                    <div className="ferr-banco on" key={b.id}>
+                      <span className="ferr-banco-dot" aria-hidden />
+                      <span className="ferr-banco-nm">{b.nome}</span>
+                      <span className="ferr-banco-meta num">{b.ocorrencias}× · pág. {b.paginas.slice(0, 6).join(', ')}{b.paginas.length > 6 ? '…' : ''}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {res.ausentes.length > 0 && (
+                <div className="ferr-ausentes">
+                  Não encontrados: {res.ausentes.map((a) => <span key={a.id} className="ferr-ausente">{a.nome}</span>)}
+                </div>
+              )}
+            </CardVidro>
+
+            <CardVidro spot style={{ borderRadius: 'var(--r-card)' }}>
+              <div className="card-cab"><h3>Beneficiários</h3></div>
+              <div className="ferr-benefs">
+                {res.arquivos.map((a, i) => (
+                  <div className="ferr-benef" key={a.nome + i}>
+                    <div className="ferr-benef-top">
+                      <span className="ferr-benef-nm">{a.beneficiario ?? (a.nb ? `NB ${a.nb}` : a.nome)}</span>
+                      {!a.textoLido && <BadgeStatus tom="atencao">texto não lido</BadgeStatus>}
+                    </div>
+                    <div className="ferr-benef-meta num">
+                      {a.nb ? `NB ${a.nb}` : ''}{a.cpf ? `${a.nb ? ' · ' : ''}CPF ${a.cpf}` : ''}
+                    </div>
+                    {a.especie && <div className="ferr-benef-esp">{a.especie}</div>}
+                    <div className="ferr-benef-linha">
+                      <span>Consignado{a.competenciaMes ? ` (${a.competenciaMes})` : ''}</span>
+                      <b className="num">{a.consignadoMes != null ? fmtBRL(a.consignadoMes) : '—'}</b>
+                    </div>
+                    <div className="ferr-benef-bancos">
+                      {a.textoLido
+                        ? (a.bancos.length ? a.bancos.map((n) => <BadgeStatus key={n} tom="ok">{n}</BadgeStatus>) : <span className="ferr-kb">nenhum banco-alvo</span>)
+                        : <span className="ferr-kb">—</span>}
+                    </div>
+                    <div className="ferr-benef-pg num">{a.nome} · {a.paginas} pág.</div>
                   </div>
                 ))}
               </div>
-            )}
-            {res.ausentes.length > 0 && (
-              <div className="ferr-ausentes">
-                Não encontrados: {res.ausentes.map((a) => <span key={a.id} className="ferr-ausente">{a.nome}</span>)}
-              </div>
-            )}
-          </CardVidro>
-
-          <CardVidro spot sobe style={{ borderRadius: 'var(--r-card)', marginTop: 12 }}>
-            <div className="card-cab"><h3>Por arquivo</h3></div>
-            <div className="ferr-lista">
-              {res.arquivos.map((a, i) => (
-                <div className="ferr-item" key={a.nome + i}>
-                  <span className="ferr-ord num">{i + 1}</span>
-                  <span className="ferr-nm">{a.nome}<i className="ferr-nm-pg num">{a.paginas} pág.</i></span>
-                  <span className="ferr-item-bancos">
-                    {!a.textoLido
-                      ? <BadgeStatus tom="atencao">texto não lido</BadgeStatus>
-                      : a.bancos.length
-                        ? a.bancos.map((n) => <BadgeStatus key={n} tom="ok">{n}</BadgeStatus>)
-                        : <span className="ferr-kb">nenhum banco-alvo</span>}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </CardVidro>
+            </CardVidro>
+          </div>
         </>
       )}
 
