@@ -34,6 +34,12 @@ function Barra({ v, max, tom = 'tint' }: { v: number; max: number; tom?: 'tint' 
   return <div className="cm-bar"><i style={{ width: pct + '%', background: cor }} /></div>;
 }
 
+const IcAtencao = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <path d="M10.3 3.6 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.6a2 2 0 0 0-3.4 0z" /><path d="M12 9v4M12 17h.01" />
+  </svg>
+);
+
 /* ------------------------------------------------------------------
    Modo Cobrança — sub-abas do motor dedicado (Fase B, UI).
    Ciclos · Régua de mensagens · Números & Atendentes · Envios.
@@ -113,7 +119,7 @@ export function AbaCiclos({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (t:
                           const total = cl.celulas.reduce((s, r) => s + (estadoCelula(r).valor ?? 0), 0);
                           return (
                             <tr key={cl.id}>
-                              <td className="cm-g-sticky"><span className="cm-g-nm">{cl.nome}</span><span className="cm-g-at">{cl.atendente}</span></td>
+                              <td className="cm-g-sticky"><span className="cm-g-nm">{!cl.whatsapp && <span className="cm-g-alerta" title="Sem número de WhatsApp"><IcAtencao /></span>}{cl.nome}</span><span className="cm-g-at">{cl.atendente}</span></td>
                               {cl.celulas.map((r, k) => <td key={k} className="cm-g-cel">{gestor ? <button type="button" className="cm-g-edit" onClick={() => aoAvisar('Simulação: duplo-clique edita a célula (—, data, valor ou NÃO PAGOU).')}><Celula raw={r} /></button> : <Celula raw={r} />}</td>)}
                               <td className="d num cm-g-total">{fmtBRL(total)}</td>
                             </tr>
@@ -452,14 +458,17 @@ export function AbaAtendentes() {
   );
 }
 
-/* =================== CLIENTES (análise + ficha) =================== */
+/* =================== CLIENTES (análise + ficha + nº WhatsApp) =================== */
 
 export function AbaClientes() {
-  const [seg, setSeg] = useState<'todos' | Comportamento | 'resp_remk'>('todos');
+  const [seg, setSeg] = useState<'todos' | Comportamento | 'resp_remk' | 'sem_num'>('todos');
   const [sel, setSel] = useState<ClienteAnalise | null>(null);
+  const [cadastrar, setCadastrar] = useState<ClienteAnalise | null>(null);
   const [pag, setPag] = useState(1);
+  const semNumero = useMemo(() => CLIENTES.filter((c) => !c.whatsapp).length, []);
   const lista = useMemo(() => CLIENTES.filter((c) => {
     if (seg === 'todos') return true;
+    if (seg === 'sem_num') return !c.whatsapp;
     if (seg === 'resp_remk') return c.engajamento.some((e) => e.tipo === 'remarketing' && e.respondeu);
     return c.comportamento === seg;
   }), [seg]);
@@ -468,28 +477,39 @@ export function AbaClientes() {
   const totalPag = Math.max(1, Math.ceil(lista.length / POR_PAG));
   const pagAtual = Math.min(pag, totalPag);
   const linhasPag = lista.slice((pagAtual - 1) * POR_PAG, pagAtual * POR_PAG);
-  const trocarSeg = (s: typeof seg) => { setSeg(s); setPag(1); };
+  const trocarSeg = (x: typeof seg) => { setSeg(x); setPag(1); };
 
   const colunas: Coluna<ClienteAnalise>[] = [
-    { chave: 'nome', titulo: 'Cliente', render: (c) => c.nome },
+    { chave: 'nome', titulo: 'Cliente', render: (c) => (
+      <div className="cm-cli-nm">{!c.whatsapp && <span className="cm-cli-alerta" title="Sem número — cadastre para a cobrança automática" aria-label="Sem número"><IcAtencao /></span>}{c.nome}</div>
+    ) },
+    { chave: 'whats', titulo: 'WhatsApp', render: (c) => c.whatsapp
+      ? <span className="num" style={{ color: 'var(--txt-2)' }}>{c.whatsapp}</span>
+      : <button type="button" className="cm-cad-btn" onClick={(e) => { e.stopPropagation(); setCadastrar(c); }}><IcAtencao /> Cadastrar número</button> },
     { chave: 'ciclo', titulo: 'Ciclo', classe: 'num', render: (c) => c.ciclo },
     { chave: 'at', titulo: 'Atendente', render: (c) => c.atendente },
     { chave: 'mens', titulo: 'Mensalidade', dir: true, classe: 'num', render: (c) => fmtBRL(c.mensalidade) },
     { chave: 'comp', titulo: 'Comportamento', render: (c) => <BadgeStatus tom={compBadge[c.comportamento]}>{ROTULO_COMP[c.comportamento]}</BadgeStatus> },
-    { chave: 'resp', titulo: 'Últ. resposta', classe: 'num', render: (c) => c.ultimaResposta ?? <span style={{ color: 'var(--txt-3)' }}>—</span> },
   ];
 
   return (
     <>
       <p className="cm-hint sobe">Comportamento de pagamento e engajamento de cada cliente. Clique para ver a ficha completa.</p>
+      {semNumero > 0 && (
+        <button type="button" className="cm-avisonum sobe" style={{ animationDelay: '.04s' }} onClick={() => trocarSeg('sem_num')}>
+          <span className="cm-avisonum-ic" aria-hidden><IcAtencao /></span>
+          <span><b>{semNumero} cliente{semNumero === 1 ? '' : 's'} sem número de WhatsApp.</b> Cadastre o número para ativar a cobrança automática — sem ele, as mensagens não saem.</span>
+          <span className="cm-avisonum-cta">Ver e cadastrar →</span>
+        </button>
+      )}
       <div className="cob-filtros sobe" style={{ animationDelay: '.06s' }}>
         <Chips>
           <Chip ativo={seg === 'todos'} onClick={() => trocarSeg('todos')}>Todos ({CLIENTES.length})</Chip>
+          <Chip ativo={seg === 'sem_num'} onClick={() => trocarSeg('sem_num')}>⚠ Sem número ({semNumero})</Chip>
           <Chip ativo={seg === 'em_dia'} onClick={() => trocarSeg('em_dia')}>Em dia ({cont('em_dia')})</Chip>
           <Chip ativo={seg === 'voltou'} onClick={() => trocarSeg('voltou')}>Voltou a pagar ({cont('voltou')})</Chip>
           <Chip ativo={seg === 'faltou'} onClick={() => trocarSeg('faltou')}>Faltou pagar ({cont('faltou')})</Chip>
           <Chip ativo={seg === 'inadimplente'} onClick={() => trocarSeg('inadimplente')}>Inadimplente ({cont('inadimplente')})</Chip>
-          <Chip ativo={seg === 'resp_remk'} onClick={() => trocarSeg('resp_remk')}>Respondeu remarketing</Chip>
         </Chips>
       </div>
       <CardVidro spot sobe style={{ borderRadius: 12, animationDelay: '.12s' }}>
@@ -507,6 +527,17 @@ export function AbaClientes() {
               <div><div className="cm-dr-nm">{sel.nome}</div><div className="cm-dr-sub num">{sel.ciclo} · {sel.atendente} · {fmtBRL(sel.mensalidade)}/mês</div></div>
               <button type="button" className="cm-dr-x" onClick={() => setSel(null)} aria-label="Fechar">×</button>
             </div>
+
+            <div className={sel.whatsapp ? 'cm-dr-whats' : 'cm-dr-whats falta'}>
+              <div>
+                <div className="cm-dr-whats-rot">WhatsApp para cobrança</div>
+                {sel.whatsapp
+                  ? <div className="cm-dr-whats-num num">{sel.whatsapp}</div>
+                  : <div className="cm-dr-whats-sem"><IcAtencao /> Nenhum número cadastrado</div>}
+              </div>
+              <BotaoSec mini onClick={() => setCadastrar(sel)}>{sel.whatsapp ? 'Trocar' : 'Cadastrar número'}</BotaoSec>
+            </div>
+
             <div className="cm-dr-badge"><BadgeStatus tom={compBadge[sel.comportamento]}>{ROTULO_COMP[sel.comportamento]}</BadgeStatus><span className="num">Faturamento total {fmtBRL(sel.faturamentoTotal)}</span></div>
 
             <div className="cm-dr-sec">Histórico de pagamento</div>
@@ -533,6 +564,17 @@ export function AbaClientes() {
           </div>
         )}
       </DrawerV2>
+
+      {cadastrar && (
+        <ModalV2 aberto aoFechar={() => setCadastrar(null)} largura={420}
+          titulo={<div>Cadastrar WhatsApp<div className="mod-sub">{cadastrar.nome}</div></div>}
+          rodape={<><BotaoSec onClick={() => setCadastrar(null)}>Cancelar</BotaoSec><BotaoPrimario onClick={() => setCadastrar(null)}>Salvar número</BotaoPrimario></>}>
+          <div className="form-grid">
+            <div className="campo"><label>Número de WhatsApp</label><Input inputMode="tel" placeholder="(51) 90000-0000" defaultValue={cadastrar.whatsapp ?? ''} /></div>
+            <p className="cm-hint">É por esse número que o cliente vai receber as cobranças automáticas. (Demonstração — no ar, salva no cadastro do cliente.)</p>
+          </div>
+        </ModalV2>
+      )}
     </>
   );
 }

@@ -47,6 +47,7 @@ export interface ClienteAnalise {
   comportamento: Comportamento;
   meses: { competencia: string; status: StatusMes }[];
   celulas: string[];   // conteúdo bruto por mês (máquina de estados do legado Gestão Mensal)
+  whatsapp: string | null;  // número p/ cobrança automática (null = precisa cadastrar)
   engajamento: { tipo: TipoMsg; enviada: boolean; respondeu: boolean }[];
   faturamentoTotal: number;   // soma paga histórica
   ultimaResposta: string | null;
@@ -109,7 +110,9 @@ export function seedClientes(): ClienteAnalise[] {
       return `${dia2}/${m}/${y}`; // atraso (data antiga → 30d → NÃO PAGOU) · prevista (mês corrente → aguardando entrada)
     });
     if (i % 5 === 0) celulas[0] = '-'; // entrada tardia = desconto_ativo (—)
-    out.push({ id: `cl-${i}`, nome, ciclo, atendente, mensalidade, comportamento: comp, meses, celulas, engajamento, faturamentoTotal: pagas * mensalidade, ultimaResposta: ur });
+    // a base entra SEM número (importada); só parte já foi cadastrada
+    const whatsapp = rnd() < 0.4 ? `(51) 9${1000 + Math.floor(rnd() * 9000)}-${1000 + Math.floor(rnd() * 9000)}` : null;
+    out.push({ id: `cl-${i}`, nome, ciclo, atendente, mensalidade, comportamento: comp, meses, celulas, whatsapp, engajamento, faturamentoTotal: pagas * mensalidade, ultimaResposta: ur });
   }
   return out;
 }

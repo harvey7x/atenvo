@@ -256,3 +256,20 @@
 .v2 .gc-info { color: var(--txt-2); }
 .v2 .gc-naopagou { color: var(--rubro); font-weight: 700; font-size: 9.5px; letter-spacing: .03em; display: inline-flex; flex-direction: column; line-height: 1.2; }
 .v2 .gc-naopagou i { font-style: normal; font-weight: 400; font-size: 9px; color: var(--txt-3); }
+
+/* ---- alerta de número de WhatsApp faltando ---- */
+.v2 .cm-cli-nm { display: flex; align-items: center; gap: 7px; }
+.v2 .cm-cli-alerta, .v2 .cm-g-alerta { display: inline-flex; color: var(--ambar); flex-shrink: 0; }
+.v2 .cm-g-alerta { margin-right: 5px; vertical-align: middle; }
+.v2 .cm-cad-btn { display: inline-flex; align-items: center; gap: 6px; font-family: var(--fonte); font-size: 11.5px; font-weight: 600; cursor: pointer; color: var(--ambar); background: rgba(var(--ambar-rgb), .1); border: 1px solid rgba(var(--ambar-rgb), .3); border-radius: 8px; padding: 4px 10px; }
+.v2 .cm-cad-btn:hover { background: rgba(var(--ambar-rgb), .16); }
+.v2 .cm-avisonum { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; cursor: pointer; font-family: var(--fonte); margin: 2px 0 12px; padding: 12px 15px; border-radius: 12px; background: rgba(var(--ambar-rgb), .09); border: 1px solid rgba(var(--ambar-rgb), .3); color: var(--txt-2); }
+.v2 .cm-avisonum:hover { background: rgba(var(--ambar-rgb), .14); }
+.v2 .cm-avisonum-ic { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 8px; background: rgba(var(--ambar-rgb), .18); color: var(--ambar); flex-shrink: 0; }
+.v2 .cm-avisonum span b { color: var(--txt); font-weight: 600; }
+.v2 .cm-avisonum-cta { margin-left: auto; font-size: 12px; font-weight: 600; color: var(--ambar); white-space: nowrap; }
+.v2 .cm-dr-whats { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 16px 0 2px; padding: 12px 14px; border-radius: 11px; background: rgba(var(--tint), .04); border: 1px solid rgba(var(--tint), .08); }
+.v2 .cm-dr-whats.falta { background: rgba(var(--ambar-rgb), .08); border-color: rgba(var(--ambar-rgb), .28); }
+.v2 .cm-dr-whats-rot { font-size: 10.5px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--txt-3); }
+.v2 .cm-dr-whats-num { font-size: 14px; font-weight: 600; color: var(--txt); margin-top: 3px; }
+.v2 .cm-dr-whats-sem { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ambar); font-weight: 600; margin-top: 3px; }
