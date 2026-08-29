@@ -75,8 +75,6 @@ export function useSalvarMensagem(orgId?: string) {
         const { error } = await supabase!.from('cobranca_mensagens')
           .update({ tipo: args.tipo, nome: args.nome }).eq('id', msgId);
         if (error) throw error;
-        const { error: eDel } = await supabase!.from('cobranca_mensagem_itens').delete().eq('mensagem_id', msgId);
-        if (eDel) throw eDel;
       } else {
         const { data, error } = await supabase!.from('cobranca_mensagens')
           .insert({ organizacao_id: orgId, tipo: args.tipo, nome: args.nome, corpo: args.itens.find((i) => i.tipo === 'texto')?.corpo ?? '' })
@@ -84,14 +82,14 @@ export function useSalvarMensagem(orgId?: string) {
         if (error) throw error;
         msgId = data!.id as string;
       }
-      const linhas = args.itens.map((i, k) => ({
-        organizacao_id: orgId, mensagem_id: msgId!, ordem: k,
-        tipo: i.tipo, corpo: i.corpo || null, midia_url: i.midia_url, midia_nome: i.midia_nome,
-      }));
-      if (linhas.length) {
-        const { error } = await supabase!.from('cobranca_mensagem_itens').insert(linhas);
-        if (error) throw error;
-      }
+      // troca da sequência é ATÔMICA no banco (RPC transacional) — o
+      // delete+insert em 2 requests deixava mensagem ativa vazia se a
+      // rede caísse no meio (achado da revisão 29/08)
+      const { error: eItens } = await supabase!.rpc('cobranca_salvar_itens', {
+        p_mensagem: msgId,
+        p_itens: args.itens.map((i, k) => ({ ordem: k, tipo: i.tipo, corpo: i.corpo || null, midia_url: i.midia_url, midia_nome: i.midia_nome })),
+      });
+      if (eItens) throw new Error(eItens.message);
       return msgId!;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['cob-mensagens', orgId] }); },

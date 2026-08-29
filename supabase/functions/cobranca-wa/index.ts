@@ -133,6 +133,11 @@ Deno.serve(async (req) => {
           .update({ estado: 'conectado', telefone }).eq('id', num.id);
         return json({ connected: true, state, telefone });
       }
+      // sessão caiu depois de conectada → rebaixa (senão o card e o motor
+      // acham que o número está vivo pra sempre — achado da revisão 29/08)
+      if (num.estado === 'conectado') {
+        await admin.from('cobranca_numeros').update({ estado: 'desconectado' }).eq('id', num.id);
+      }
       return json({ connected: false, state });
     }
 

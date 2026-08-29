@@ -120,12 +120,23 @@ export function ImportarPlanilha({ orgId, ciclos, aoFechar, aoConcluir }: {
   async function efetivar() {
     if (!leitura || progresso) return;
     if (!ciclo) { setErro(`O ciclo ${codigoCiclo ?? '?'} não existe — crie na aba Ciclos antes de importar.`); return; }
-    const validas = leitura.linhas.filter((l) => l.mensalidade > 0);
+    // reimportação não pode duplicar a base (revisão 29/08): quem já tem
+    // cobrança não-cancelada com o MESMO nome é pulado
+    const { data: exist } = await supabase!
+      .from('cobrancas').select('contato:contatos(nome)')
+      .eq('organizacao_id', orgId).neq('status', 'cancelado');
+    const nomesExistentes = new Set((exist ?? [])
+      .map((r) => ((r.contato as unknown as { nome: string | null } | null)?.nome ?? '').trim().toUpperCase())
+      .filter(Boolean));
+    const jaExistem = leitura.linhas.filter((l) => nomesExistentes.has(l.nome.trim().toUpperCase())).length;
+    const validas = leitura.linhas.filter((l) => l.mensalidade > 0 && !nomesExistentes.has(l.nome.trim().toUpperCase()));
     setProgresso({ feito: 0, total: validas.length });
     const falhas: string[] = [];
     for (const [k, l] of validas.entries()) {
+      let contatoOrfao: string | null = null;
       try {
         const contatoId = await criarContatoCobranca(orgId, l.nome, '');
+        contatoOrfao = contatoId;
         const cobId = await criar.mutateAsync({
           contatoId, valor: l.mensalidade, dataPrimeira: proximaDataDoDia(leitura.dia!), ciclos: 6,
           responsavelId: null, servico: 'Mensalidade (importado)',
@@ -137,12 +148,18 @@ export function ImportarPlanilha({ orgId, ciclos, aoFechar, aoConcluir }: {
           parcela_texto_original: l.parcelaOriginal,
           flags_importacao: { origem: 'planilha_gestao_mensal', cpf_informado: !!l.cpf },
         }).eq('id', cobId);
-      } catch (e) { falhas.push(`${l.nome}: ${(e as Error).message}`); }
+        contatoOrfao = null; // cobrança criada — contato não é mais órfão
+      } catch (e) {
+        falhas.push(`${l.nome}: ${(e as Error).message}`);
+        // best-effort: não deixa contato órfão se a cobrança não nasceu
+        if (contatoOrfao) await supabase!.from('contatos').delete().eq('id', contatoOrfao).then(() => undefined, () => undefined);
+      }
       setProgresso({ feito: k + 1, total: validas.length });
     }
-    const puladas = leitura.linhas.length - validas.length;
+    const semValor = leitura.linhas.filter((l) => l.mensalidade <= 0).length;
     aoConcluir(`Importados ${validas.length - falhas.length} clientes no ciclo ${ciclo.codigo}.` +
-      (puladas ? ` ${puladas} sem mensalidade detectável ficaram de fora.` : '') +
+      (jaExistem ? ` ${jaExistem} já existiam (pulados).` : '') +
+      (semValor ? ` ${semValor} sem mensalidade detectável ficaram de fora.` : '') +
       (falhas.length ? ` ${falhas.length} falharam: ${falhas.slice(0, 3).join(' | ')}` : ''));
     aoFechar();
   }

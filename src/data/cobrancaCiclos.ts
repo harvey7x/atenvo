@@ -63,15 +63,19 @@ export function useCriarCiclo(orgId?: string) {
         .insert({ organizacao_id: orgId, codigo, nome: `Vence dia ${String(dia).padStart(2, '0')}`, grupo, ordem: dia })
         .select('id').single();
       if (error) throw new Error(/duplicate|unique/i.test(error.message) ? `O ciclo ${codigo} já existe.` : error.message);
-      // competências: mês corrente + 3 (o cron garantir_competencias_futuras estende o padrão)
+      // competências: mês corrente + 3 (o cron garantir_competencias_futuras
+      // estende o padrão). Datas montadas por STRING — toISOString() sobre
+      // meia-noite local escorregava um dia em fuso a leste de UTC (revisão 29/08).
       const hoje = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
       const comps = Array.from({ length: 4 }, (_, k) => {
-        const base = new Date(hoje.getFullYear(), hoje.getMonth() + k, 1);
-        const ultimo = new Date(base.getFullYear(), base.getMonth() + 1, 0).getDate();
-        const venc = new Date(base.getFullYear(), base.getMonth(), Math.min(dia, ultimo));
+        const mAbs = hoje.getMonth() + k;
+        const ano = hoje.getFullYear() + Math.floor(mAbs / 12);
+        const mes = (mAbs % 12) + 1;
+        const ultimo = new Date(ano, mes, 0).getDate();
         return {
           organizacao_id: orgId, ciclo_vencimento_id: data!.id as string,
-          competencia: base.toISOString().slice(0, 10), vencimento: venc.toISOString().slice(0, 10),
+          competencia: `${ano}-${pad(mes)}-01`, vencimento: `${ano}-${pad(mes)}-${pad(Math.min(dia, ultimo))}`,
         };
       });
       const { error: eComp } = await supabase!.from('ciclo_vencimento_competencias').insert(comps);

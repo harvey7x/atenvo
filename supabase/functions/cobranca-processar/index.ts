@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
     async function enfileirar(): Promise<Record<string, number>> {
       const hoje = hojeBRT();
       let qMsg = admin.from('cobranca_mensagens')
-        .select('id, organizacao_id, tipo, nome, ordem').eq('ativo', true).order('ordem');
+        .select('id, organizacao_id, tipo, nome, ordem').eq('ativo', true).order('ordem').order('criado_em');
       if (orgFiltro) qMsg = qMsg.eq('organizacao_id', orgFiltro);
       const { data: msgs } = await qMsg;
       // 1ª mensagem ativa por org×tipo (índice único da fila segura duplicidade por dia)
@@ -80,7 +80,7 @@ Deno.serve(async (req) => {
         const k = `${m.organizacao_id}:${m.tipo}`;
         if (!porOrgTipo.has(k)) porOrgTipo.set(k, m as { id: string; organizacao_id: string; tipo: string });
       }
-      let criadas = 0, semTelefone = 0, semAtendente = 0, duplicadas = 0;
+      let criadas = 0, semTelefone = 0, semAtendente = 0, duplicadas = 0, jaPagoOuSemParcela = 0;
       for (const msg of porOrgTipo.values()) {
         const alvo = somaDias(hoje, -(OFFSETS[msg.tipo] ?? 0)); // venc + offset = hoje
         const { data: comps } = await admin.from('ciclo_vencimento_competencias')
@@ -91,6 +91,16 @@ Deno.serve(async (req) => {
           .select('id, contato_id, responsavel_id, valor_mensal, contato:contatos(nome, telefone)')
           .eq('organizacao_id', msg.organizacao_id).eq('status', 'ativo').in('ciclo_vencimento_id', ciclos);
         if (!cobs?.length) continue;
+        // REGRA DE OURO (revisão 29/08): só cobra quem tem parcela ABERTA
+        // (prevista/nao_paga) na competência do alvo — quem pagou não recebe.
+        const alvoComp = alvo.slice(0, 7) + '-01';
+        const { data: pags } = await admin.from('cobranca_pagamentos')
+          .select('cobranca_id')
+          .eq('organizacao_id', msg.organizacao_id)
+          .eq('competencia', alvoComp)
+          .in('status', ['prevista', 'nao_paga'])
+          .in('cobranca_id', cobs.map((c) => c.id));
+        const emAberto = new Set((pags ?? []).map((pg) => pg.cobranca_id as string));
         // itens da mensagem → corpo_final (snapshot legível)
         const { data: itens } = await admin.from('cobranca_mensagem_itens')
           .select('ordem, tipo, corpo, midia_nome').eq('mensagem_id', msg.id).order('ordem');
@@ -104,6 +114,7 @@ Deno.serve(async (req) => {
         const nomeAt = new Map((us ?? []).map((u) => [u.id as string, u.nome as string]));
 
         for (const c of cobs) {
+          if (!emAberto.has(c.id as string)) { jaPagoOuSemParcela++; continue; }
           const ct = c.contato as unknown as { nome: string | null; telefone: string | null } | null;
           if (!ct?.telefone) { semTelefone++; continue; }
           const ctx = {
@@ -129,20 +140,31 @@ Deno.serve(async (req) => {
           else criadas++;
         }
       }
-      return { criadas, duplicadas, sem_telefone: semTelefone, sem_numero_atendente: semAtendente };
+      return { criadas, duplicadas, sem_telefone: semTelefone, sem_numero_atendente: semAtendente, ja_pago_ou_sem_parcela: jaPagoOuSemParcela };
     }
 
     // =================== PROCESSAR ===================
     async function processar(): Promise<Record<string, number>> {
       const h = agoraBRT().getUTCHours();
       if (h < 8 || h >= 20) return { fora_da_janela: 1, simuladas: 0 };
-      let q = admin.from('cobranca_fila').select('id, contato_id, dry_run')
+      // auto-cura: lote preso em 'processando' (função morreu no meio) volta pra fila após 15min
+      let rq = admin.from('cobranca_fila').update({ status: 'pendente' })
+        .eq('status', 'processando')
+        .lt('atualizado_em', new Date(Date.now() - 15 * 60_000).toISOString());
+      if (orgFiltro) rq = rq.eq('organizacao_id', orgFiltro);
+      await rq;
+      let q = admin.from('cobranca_fila').select('id')
         .eq('status', 'pendente').lte('executar_em', new Date().toISOString()).limit(200);
       if (orgFiltro) q = q.eq('organizacao_id', orgFiltro);
-      const { data: fila } = await q;
+      const { data: cand } = await q;
+      if (!cand?.length) return { simuladas: 0, bloqueadas_optout: 0, falhas: 0 };
+      // claim GUARDADO: só quem transiciona pendente→processando é processado
+      // (cron */10 e 'Rodar agora' concorrentes não pegam a mesma linha)
+      const { data: fila } = await admin.from('cobranca_fila')
+        .update({ status: 'processando' })
+        .in('id', cand.map((c) => c.id as string)).eq('status', 'pendente')
+        .select('id, contato_id, dry_run');
       if (!fila?.length) return { simuladas: 0, bloqueadas_optout: 0, falhas: 0 };
-      const ids = fila.map((f) => f.id as string);
-      await admin.from('cobranca_fila').update({ status: 'processando' }).in('id', ids);
       let simuladas = 0, bloqueadas = 0, falhas = 0;
       for (const f of fila) {
         // opt-out CONSERVADOR: se o contato pediu SAIR em qualquer canal, não cobra

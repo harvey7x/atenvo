@@ -11,7 +11,7 @@ import {
 } from './cobrancaAnalytics';
 import { useOrg } from '@/context/OrgContext';
 import { useOrgUsuarios } from '@/data/atendimento';
-import { useCobNumeros, cobWaConectar, cobWaStatus, cobWaDesconectar, type CobNumero } from '@/data/cobrancaWa';
+import { useCobNumeros, cobWaConectar, cobWaQr, cobWaStatus, cobWaDesconectar, type CobNumero } from '@/data/cobrancaWa';
 import {
   useCobMensagens, useSalvarMensagem, useAlternarMensagem, uploadMidiaCobranca, ROTULO_TIPO_MSG,
   useCobFila, rodarSimulacao, type CobFilaItem,
@@ -497,16 +497,24 @@ function AbaNumerosReal({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (t: s
   const qrRef = useRef(qr);
   qrRef.current = qr;
 
-  // enquanto o modal do QR está aberto, sonda a conexão a cada 3s
+  // enquanto o modal do QR está aberto: sonda a conexão a cada 3s e
+  // RENOVA o QR a cada ~45s (o código do WhatsApp expira — revisão 29/08)
   useEffect(() => {
     if (!qr || !orgId) return;
+    let tick = 0;
     const t = window.setInterval(async () => {
+      tick += 1;
       try {
         const st = await cobWaStatus(orgId, qr.numeroId);
         if (st.connected && qrRef.current) {
           setQr(null);
           aoAvisar(`WhatsApp conectado${st.telefone ? ` (${st.telefone})` : ''}. Este número atende SÓ a cobrança — não aparece no atendimento.`);
           refetch();
+          return;
+        }
+        if (tick % 15 === 0 && qrRef.current) {
+          const novo = await cobWaQr(orgId, qr.numeroId);
+          if (novo.qr_base64 && qrRef.current) setQr((v) => v && { ...v, img: novo.qr_base64 });
         }
       } catch { /* rede: tenta no próximo tick */ }
     }, 3000);
