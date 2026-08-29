@@ -1,23 +1,27 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { BadgeStatus, BotaoPrimario, BotaoSec, CardVidro, EstadoVazio } from '../components';
-import { unificar, BANCOS_ALVO, type ResultadoUnificacao } from './unificadorLib';
+import { unificar, BANCOS_ALVO, type ArquivoInfo, type ResultadoUnificacao } from './unificadorLib';
 import './ferramentas.css';
 
 const fmtKB = (b: number) => (b < 1024 * 1024 ? `${Math.round(b / 1024)} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`);
+const fmtBRL = (v: number) => 'R$ ' + v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 /* Ordem do download = ordem dos períodos (mais recente → mais antigo):
-   "historico-creditos.pdf" (sem número) primeiro, depois (1), (2), (3)…
-   O seletor do SO às vezes embaralha — aqui reordenamos sozinho. */
+   "historico-creditos.pdf" (sem número) primeiro, depois (1), (2), (3)… */
 const ordemBaixa = (nome: string): number => {
   const m = nome.match(/\((\d+)\)\s*\.[^.]+$/);
   return m ? Number(m[1]) : 0;
 };
 const ordenarFila = (arr: File[]): File[] =>
   [...arr].sort((a, b) => ordemBaixa(a.name) - ordemBaixa(b.name) || a.name.localeCompare(b.name, 'pt', { numeric: true }));
-const fmtBRL = (v: number) => 'R$ ' + v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const compKey = (c: string | null) => (c ? c.slice(3) + c.slice(0, 2) : ''); // "MM/YYYY" → "YYYYMM"
 
-/* dispatcher do módulo Ferramentas (rota /ferramentas/:tool). Hoje só o
-   unificador; novas ferramentas entram aqui + no menu do módulo. */
+interface GrupoBenef {
+  chave: string; nome: string | null; nb: string | null; cpf: string | null; especie: string | null;
+  arquivos: ArquivoInfo[]; bancos: string[]; consignado: number | null; competencia: string | null;
+}
+
+/* dispatcher do módulo Ferramentas (rota /ferramentas/:tool) */
 export default function FerramentasV2() {
   const { tool } = useParams();
   if (tool === 'unificador' || !tool) return <UnificadorDocumentos />;
@@ -56,6 +60,26 @@ function UnificadorDocumentos() {
     const c = [...p]; [c[i], c[j]] = [c[j], c[i]]; return c;
   });
 
+  // agrupa por beneficiário (NB): históricos são fatiados por período, o
+  // mesmo cliente vem em vários PDFs. Consignado do grupo = competência mais recente.
+  const grupos = useMemo<GrupoBenef[]>(() => {
+    if (!res) return [];
+    const m = new Map<string, GrupoBenef>();
+    for (const a of res.arquivos) {
+      const chave = a.nb || a.beneficiario || a.nome;
+      const g = m.get(chave) ?? { chave, nome: a.beneficiario, nb: a.nb, cpf: a.cpf, especie: a.especie, arquivos: [], bancos: [], consignado: null, competencia: null };
+      g.arquivos.push(a);
+      g.nome ||= a.beneficiario; g.cpf ||= a.cpf; g.especie ||= a.especie;
+      for (const b of a.bancos) if (!g.bancos.includes(b)) g.bancos.push(b);
+      if (a.consignadoMes != null && a.competenciaMes && compKey(a.competenciaMes) > compKey(g.competencia)) {
+        g.competencia = a.competenciaMes; g.consignado = a.consignadoMes;
+      }
+      m.set(chave, g);
+    }
+    return [...m.values()];
+  }, [res]);
+  const consignadoTotal = useMemo(() => grupos.reduce((s, g) => s + (g.consignado ?? 0), 0), [grupos]);
+
   async function processar() {
     if (!files.length || proc) return;
     setProc(true); setErro(null); setRes(null);
@@ -76,138 +100,158 @@ function UnificadorDocumentos() {
     document.body.appendChild(a); a.click(); a.remove();
   }
 
+  const semTexto = res ? res.arquivos.filter((a) => !a.textoLido).length : 0;
+
   return (
-    <div className="ferr-wrap">
+    <div className="ferr-wrap larga">
       <div className="ph sobe">
         <div>
           <div className="cob-migalha">Ferramentas</div>
           <h2>Unificador de documentos</h2>
-          <p>Junte vários Históricos de Créditos do INSS num PDF só. Ao unificar, o sistema aponta quais bancos aparecem. Os arquivos não saem do seu computador.</p>
+          <p>Junte vários Históricos de Créditos do INSS num PDF só. O sistema lê cada arquivo, aponta os bancos e resume por beneficiário. Nada sai do seu computador.</p>
         </div>
       </div>
 
-      <div
-        className={arrastando ? 'ferr-drop sobe on' : 'ferr-drop sobe'}
-        onDragOver={(e) => { e.preventDefault(); setArrastando(true); }}
-        onDragLeave={() => setArrastando(false)}
-        onDrop={(e) => { e.preventDefault(); setArrastando(false); adicionar(e.dataTransfer.files); }}
-        onClick={() => inputRef.current?.click()}
-        role="button" tabIndex={0}
-      >
-        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <path d="M12 16V4M8 8l4-4 4 4M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
-        </svg>
-        <div className="ferr-drop-t"><b>Arraste os PDFs aqui</b> ou clique para escolher</div>
-        <div className="ferr-drop-s">Vários Históricos de Créditos · só PDF</div>
-        <input ref={inputRef} type="file" accept="application/pdf,.pdf" multiple hidden
-          onChange={(e) => { if (e.target.files) adicionar(e.target.files); e.target.value = ''; }} />
-      </div>
-
-      {files.length > 0 && (
-        <CardVidro spot sobe style={{ borderRadius: 'var(--r-card)', marginTop: 14 }}>
-          <div className="card-cab"><h3>{files.length} arquivo{files.length === 1 ? '' : 's'} na fila</h3>
-            <BotaoSec mini onClick={() => { setFiles([]); setRes(null); }}>Limpar</BotaoSec>
+      <div className="ferr-layout sobe">
+        {/* ---- coluna de ENTRADA ---- */}
+        <div className="ferr-col-in">
+          <div
+            className={arrastando ? 'ferr-drop on' : 'ferr-drop'}
+            onDragOver={(e) => { e.preventDefault(); setArrastando(true); }}
+            onDragLeave={() => setArrastando(false)}
+            onDrop={(e) => { e.preventDefault(); setArrastando(false); adicionar(e.dataTransfer.files); }}
+            onClick={() => inputRef.current?.click()}
+            role="button" tabIndex={0}
+          >
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M12 16V4M8 8l4-4 4 4M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+            </svg>
+            <div className="ferr-drop-t"><b>Arraste os PDFs aqui</b> ou clique para escolher</div>
+            <div className="ferr-drop-s">Vários Históricos de Créditos · só PDF</div>
+            <input ref={inputRef} type="file" accept="application/pdf,.pdf" multiple hidden
+              onChange={(e) => { if (e.target.files) adicionar(e.target.files); e.target.value = ''; }} />
           </div>
-          <div className="ferr-ordhint">Ordenados do mais recente ao mais antigo (pela sequência de download). Use as setas para ajustar.</div>
-          <div className="ferr-lista">
-            {files.map((f, i) => (
-              <div className="ferr-item" key={f.name + f.size}>
-                <span className="ferr-ord num">{i + 1}</span>
-                <span className="ferr-nm">{f.name}</span>
-                <span className="ferr-kb num">{fmtKB(f.size)}</span>
-                <div className="ferr-acoes">
-                  <button type="button" className="cm-num-lnk" disabled={i === 0} onClick={() => mover(i, -1)} aria-label="Subir">↑</button>
-                  <button type="button" className="cm-num-lnk" disabled={i === files.length - 1} onClick={() => mover(i, 1)} aria-label="Descer">↓</button>
-                  <button type="button" className="cm-num-lnk perigo" onClick={() => remover(i)} aria-label="Remover">✕</button>
-                </div>
+
+          {files.length > 0 && (
+            <CardVidro spot style={{ borderRadius: 'var(--r-card)', marginTop: 12 }}>
+              <div className="card-cab"><h3>{files.length} arquivo{files.length === 1 ? '' : 's'} na fila</h3>
+                <BotaoSec mini onClick={() => { setFiles([]); setRes(null); }}>Limpar</BotaoSec>
               </div>
-            ))}
-          </div>
-          <div className="ferr-rodape">
-            <BotaoPrimario onClick={processar} disabled={proc}>{proc ? 'Unificando…' : 'Unificar documentos'}</BotaoPrimario>
-          </div>
-        </CardVidro>
-      )}
-
-      {erro && <div className="aviso-inline erro sobe" role="alert" style={{ marginTop: 12 }}>{erro}</div>}
-
-      {res && (
-        <>
-          <div className="ferr-kpis sobe">
-            <div className="ferr-kpi"><span className="ferr-kpi-r">Arquivos</span><b className="num">{res.arquivos.length}</b></div>
-            <div className="ferr-kpi"><span className="ferr-kpi-r">Páginas</span><b className="num">{res.totalPaginas}</b></div>
-            <div className="ferr-kpi"><span className="ferr-kpi-r">Beneficiários</span><b className="num">{res.beneficiarios}</b></div>
-            <div className="ferr-kpi"><span className="ferr-kpi-r">Bancos encontrados</span><b className="num" style={{ color: res.bancos.length ? 'var(--verde)' : undefined }}>{res.bancos.length}</b></div>
-            <div className="ferr-kpi"><span className="ferr-kpi-r">Consignado no mês</span><b className="num">{fmtBRL(res.consignadoTotalMes)}</b></div>
-          </div>
-
-          {(res.falhas.length > 0 || res.arquivos.some((a) => !a.textoLido)) && (
-            <div className="ferr-avisos sobe">
-              {res.falhas.map((f) => <div key={f.nome} className="ferr-falhas"><span className="ferr-falha">✕ {f.nome} — {f.motivo}</span></div>)}
-              {res.arquivos.some((a) => !a.textoLido) && (
-                <div className="ferr-falhas aviso"><span>⚠ {res.arquivos.filter((a) => !a.textoLido).length} arquivo(s) sem texto legível (PDF escaneado/protegido) — a detecção pode estar incompleta.</span></div>
-              )}
-            </div>
-          )}
-
-          <div className="ferr-grid sobe">
-            <CardVidro spot style={{ borderRadius: 'var(--r-card)' }}>
-              <div className="card-cab">
-                <h3>Bancos encontrados</h3>
-                <BotaoPrimario mini onClick={baixar}>Baixar PDF unificado</BotaoPrimario>
-              </div>
-              {res.bancos.length === 0 ? (
-                <div className="ferr-nada">Nenhum dos bancos monitorados foi encontrado nestes históricos.</div>
-              ) : (
-                <div className="ferr-bancos">
-                  {res.bancos.map((b) => (
-                    <div className="ferr-banco on" key={b.id}>
-                      <span className="ferr-banco-dot" aria-hidden />
-                      <span className="ferr-banco-nm">{b.nome}</span>
-                      <span className="ferr-banco-meta num">{b.ocorrencias}× · pág. {b.paginas.slice(0, 6).join(', ')}{b.paginas.length > 6 ? '…' : ''}</span>
+              <div className="ferr-ordhint">Ordenados do mais recente ao mais antigo (sequência de download). Setas ajustam.</div>
+              <div className="ferr-lista">
+                {files.map((f, i) => (
+                  <div className="ferr-item" key={f.name + f.size}>
+                    <span className="ferr-ord num">{i + 1}</span>
+                    <span className="ferr-nm">{f.name}<i className="ferr-nm-pg num">{fmtKB(f.size)}</i></span>
+                    <div className="ferr-acoes">
+                      <button type="button" className="cm-num-lnk" disabled={i === 0} onClick={() => mover(i, -1)} aria-label="Subir">↑</button>
+                      <button type="button" className="cm-num-lnk" disabled={i === files.length - 1} onClick={() => mover(i, 1)} aria-label="Descer">↓</button>
+                      <button type="button" className="cm-num-lnk perigo" onClick={() => remover(i)} aria-label="Remover">✕</button>
                     </div>
-                  ))}
-                </div>
-              )}
-              {res.ausentes.length > 0 && (
-                <div className="ferr-ausentes">
-                  Não encontrados: {res.ausentes.map((a) => <span key={a.id} className="ferr-ausente">{a.nome}</span>)}
-                </div>
-              )}
-            </CardVidro>
-
-            <CardVidro spot style={{ borderRadius: 'var(--r-card)' }}>
-              <div className="card-cab"><h3>Beneficiários</h3></div>
-              <div className="ferr-benefs">
-                {res.arquivos.map((a, i) => (
-                  <div className="ferr-benef" key={a.nome + i}>
-                    <div className="ferr-benef-top">
-                      <span className="ferr-benef-nm">{a.beneficiario ?? (a.nb ? `NB ${a.nb}` : a.nome)}</span>
-                      {!a.textoLido && <BadgeStatus tom="atencao">texto não lido</BadgeStatus>}
-                    </div>
-                    <div className="ferr-benef-meta num">
-                      {a.nb ? `NB ${a.nb}` : ''}{a.cpf ? `${a.nb ? ' · ' : ''}CPF ${a.cpf}` : ''}
-                    </div>
-                    {a.especie && <div className="ferr-benef-esp">{a.especie}</div>}
-                    <div className="ferr-benef-linha">
-                      <span>Consignado{a.competenciaMes ? ` (${a.competenciaMes})` : ''}</span>
-                      <b className="num">{a.consignadoMes != null ? fmtBRL(a.consignadoMes) : '—'}</b>
-                    </div>
-                    <div className="ferr-benef-bancos">
-                      {a.textoLido
-                        ? (a.bancos.length ? a.bancos.map((n) => <BadgeStatus key={n} tom="ok">{n}</BadgeStatus>) : <span className="ferr-kb">nenhum banco-alvo</span>)
-                        : <span className="ferr-kb">—</span>}
-                    </div>
-                    <div className="ferr-benef-pg num">{a.nome} · {a.paginas} pág.</div>
                   </div>
                 ))}
               </div>
+              <div className="ferr-rodape">
+                <BotaoPrimario onClick={processar} disabled={proc}>{proc ? 'Unificando…' : 'Unificar documentos'}</BotaoPrimario>
+              </div>
             </CardVidro>
-          </div>
-        </>
-      )}
+          )}
 
-      <p className="ferr-nota sobe">Bancos monitorados: {BANCOS_ALVO.map((b) => b.nome).join(' · ')}.</p>
+          <div className="ferr-monit">
+            <div className="ferr-monit-t">Bancos monitorados</div>
+            <div className="ferr-monit-chips">{BANCOS_ALVO.map((b) => <span key={b.id} className="ferr-monit-chip">{b.nome}</span>)}</div>
+          </div>
+        </div>
+
+        {/* ---- coluna de ANÁLISE ---- */}
+        <div className="ferr-col-out">
+          {erro && <div className="aviso-inline erro" role="alert">{erro}</div>}
+
+          {!res && !erro && (
+            <CardVidro spot style={{ borderRadius: 'var(--r-card)' }}>
+              <EstadoVazio
+                titulo={proc ? 'Lendo os documentos…' : 'A análise aparece aqui'}
+                descricao={proc ? 'Juntando os PDFs e detectando os bancos.' : 'Selecione os Históricos de Créditos à esquerda e clique em Unificar documentos. Vamos gerar o PDF único e o resumo por beneficiário.'}
+              />
+            </CardVidro>
+          )}
+
+          {res && (
+            <>
+              <div className="ferr-kpis">
+                <div className="ferr-kpi"><span className="ferr-kpi-r">Arquivos</span><b className="num">{res.arquivos.length}</b></div>
+                <div className="ferr-kpi"><span className="ferr-kpi-r">Páginas</span><b className="num">{res.totalPaginas}</b></div>
+                <div className="ferr-kpi"><span className="ferr-kpi-r">Beneficiários</span><b className="num">{grupos.length}</b></div>
+                <div className="ferr-kpi"><span className="ferr-kpi-r">Bancos encontrados</span><b className="num" style={{ color: res.bancos.length ? 'var(--verde)' : undefined }}>{res.bancos.length}</b></div>
+                <div className="ferr-kpi"><span className="ferr-kpi-r">Consignado no mês</span><b className="num">{fmtBRL(consignadoTotal)}</b></div>
+              </div>
+
+              {(res.falhas.length > 0 || semTexto > 0) && (
+                <div className="ferr-avisos">
+                  {res.falhas.map((f) => <div key={f.nome} className="ferr-falhas"><span className="ferr-falha">✕ {f.nome} — {f.motivo}</span></div>)}
+                  {semTexto > 0 && <div className="ferr-falhas aviso"><span>⚠ {semTexto} arquivo(s) sem texto legível (PDF escaneado/protegido) — a detecção pode estar incompleta.</span></div>}
+                </div>
+              )}
+
+              <CardVidro spot style={{ borderRadius: 'var(--r-card)', marginTop: 12 }}>
+                <div className="card-cab">
+                  <h3>Bancos encontrados</h3>
+                  <BotaoPrimario mini onClick={baixar}>Baixar PDF unificado</BotaoPrimario>
+                </div>
+                {res.bancos.length === 0 ? (
+                  <div className="ferr-nada">Nenhum dos bancos monitorados foi encontrado nestes históricos.</div>
+                ) : (
+                  <div className="ferr-bancos">
+                    {res.bancos.map((b) => (
+                      <div className="ferr-banco on" key={b.id}>
+                        <span className="ferr-banco-dot" aria-hidden />
+                        <span className="ferr-banco-nm">{b.nome}</span>
+                        <span className="ferr-banco-meta num">{b.ocorrencias}× · pág. {b.paginas.slice(0, 8).join(', ')}{b.paginas.length > 8 ? '…' : ''}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {res.ausentes.length > 0 && (
+                  <div className="ferr-ausentes">
+                    Não encontrados: {res.ausentes.map((a) => <span key={a.id} className="ferr-ausente">{a.nome}</span>)}
+                  </div>
+                )}
+              </CardVidro>
+
+              <CardVidro spot style={{ borderRadius: 'var(--r-card)', marginTop: 12 }}>
+                <div className="card-cab"><h3>Beneficiários</h3><span className="ferr-kb">{grupos.length} · {res.arquivos.length} histórico{res.arquivos.length === 1 ? '' : 's'}</span></div>
+                <div className="ferr-benefs">
+                  {grupos.map((g) => (
+                    <div className="ferr-benef" key={g.chave}>
+                      <div className="ferr-benef-top">
+                        <span className="ferr-benef-nm">{g.nome ?? (g.nb ? `NB ${g.nb}` : g.chave)}</span>
+                        {g.consignado != null && (
+                          <span className="ferr-benef-val"><i>Consignado{g.competencia ? ` ${g.competencia}` : ''}</i><b className="num">{fmtBRL(g.consignado)}</b></span>
+                        )}
+                      </div>
+                      <div className="ferr-benef-meta num">
+                        {g.nb ? `NB ${g.nb}` : ''}{g.cpf ? `${g.nb ? ' · ' : ''}CPF ${g.cpf}` : ''}
+                      </div>
+                      {g.especie && <div className="ferr-benef-esp">{g.especie}</div>}
+                      <div className="ferr-benef-bancos">
+                        {g.bancos.length ? g.bancos.map((n) => <BadgeStatus key={n} tom="ok">{n}</BadgeStatus>) : <span className="ferr-kb">nenhum banco-alvo</span>}
+                      </div>
+                      <div className="ferr-benef-hists">
+                        {g.arquivos.map((a, i) => (
+                          <div className="ferr-hist" key={a.nome + i}>
+                            <span className="ferr-hist-per num">{a.periodo ?? a.nome}</span>
+                            <span className="ferr-hist-meta num">{a.paginas} pág.{!a.textoLido ? ' · texto não lido' : ''}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardVidro>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

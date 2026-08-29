@@ -67,3 +67,27 @@
 
 /* nota da ordem automática da fila */
 .v2 .ferr-ordhint { padding: 0 16px 8px; font-size: 11px; color: var(--txt-3); }
+
+/* ===== layout de tela cheia (29/08): entrada à esquerda, análise à direita ===== */
+.v2 .ferr-wrap.larga { max-width: 1440px; }
+.v2 .ferr-layout { display: grid; grid-template-columns: 380px minmax(0, 1fr); gap: 16px; align-items: start; margin-top: 14px; }
+.v2 .ferr-col-in, .v2 .ferr-col-out { min-width: 0; display: flex; flex-direction: column; }
+@media (max-width: 1080px) { .v2 .ferr-layout { grid-template-columns: 1fr; } }
+
+/* KPIs preenchem a coluna da análise, com wrap gracioso */
+.v2 .ferr-kpis { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin-top: 0; }
+
+/* bancos monitorados (rodapé da coluna de entrada) */
+.v2 .ferr-monit { margin-top: 12px; padding: 12px 14px; border: 1px solid var(--linha); border-radius: var(--r-card); background: rgba(var(--tint), .02); }
+.v2 .ferr-monit-t { font-size: 10.5px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--txt-3); margin-bottom: 8px; }
+.v2 .ferr-monit-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.v2 .ferr-monit-chip { font-size: 11px; color: var(--txt-2); border: 1px solid var(--linha); border-radius: 6px; padding: 2px 8px; }
+
+/* card de beneficiário: valor à direita + históricos (períodos) */
+.v2 .ferr-benef-val { display: flex; flex-direction: column; align-items: flex-end; flex-shrink: 0; }
+.v2 .ferr-benef-val i { font-style: normal; font-size: 10px; color: var(--txt-3); }
+.v2 .ferr-benef-val b { font-size: 15px; font-weight: 600; color: var(--txt); }
+.v2 .ferr-benef-hists { display: flex; flex-direction: column; gap: 3px; margin-top: 6px; padding-top: 6px; border-top: 1px dashed rgba(var(--tint), .1); }
+.v2 .ferr-hist { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: 11.5px; }
+.v2 .ferr-hist-per { color: var(--txt-2); }
+.v2 .ferr-hist-meta { color: var(--txt-3); flex-shrink: 0; }

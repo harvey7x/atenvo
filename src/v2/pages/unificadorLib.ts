@@ -24,7 +24,7 @@ export interface BancoAchado { id: string; nome: string; ocorrencias: number; pa
 export interface ArquivoInfo {
   nome: string; paginas: number; bancos: string[]; textoLido: boolean;
   beneficiario: string | null; nb: string | null; cpf: string | null; especie: string | null;
-  consignadoMes: number | null; competenciaMes: string | null;
+  consignadoMes: number | null; competenciaMes: string | null; periodo: string | null;
 }
 export interface ResultadoUnificacao {
   pdf: Blob;
@@ -46,11 +46,14 @@ const parseBRL = (v: string) => Number(v.replace(/\./g, '').replace(',', '.'));
    saneado (corta rótulos vizinhos). O consignado é por competência —
    somar todas as páginas inflaria (cada mês repete), então pega a
    competência (AAAAMM) mais nova. */
-function extrairDados(paginas: string[]): Pick<ArquivoInfo, 'beneficiario' | 'nb' | 'cpf' | 'especie' | 'consignadoMes' | 'competenciaMes'> {
+function extrairDados(paginas: string[]): Pick<ArquivoInfo, 'beneficiario' | 'nb' | 'cpf' | 'especie' | 'consignadoMes' | 'competenciaMes' | 'periodo'> {
   const full = paginas.join('\n');
   const nb = full.match(/NB:\s*([\d.\-]{6,20})/)?.[1] ?? null;
   const cpf = full.match(/CPF:\s*([\d.\-]{11,18})/)?.[1] ?? null;
   const especie = full.match(/Esp[eé]cie:\s*(\d{1,3}\s*-\s*[A-ZÀ-Ú][A-ZÀ-Ú ]{5,60})/)?.[1]?.replace(/\s+/g, ' ').trim() ?? null;
+  const pIni = full.match(/Compet\.?\s*Inicial:\s*(\d{2}\/\d{4})/)?.[1] ?? null;
+  const pFim = full.match(/Compet\.?\s*Final:\s*(\d{2}\/\d{4})/)?.[1] ?? null;
+  const periodo = pIni && pFim ? `${pIni} – ${pFim}` : (pIni ?? pFim);
   let beneficiario: string | null = full.match(/Nome:\s*([A-ZÀ-Ú][A-ZÀ-Ú '.]{3,58})/)?.[1] ?? null;
   if (beneficiario) {
     beneficiario = beneficiario.split(/\bNOME DA\b|\bM[ÃA]E\b/i)[0].replace(/\s+/g, ' ').trim();
@@ -69,6 +72,7 @@ function extrairDados(paginas: string[]): Pick<ArquivoInfo, 'beneficiario' | 'nb
     beneficiario, nb, cpf, especie,
     consignadoMes: melhorValor,
     competenciaMes: melhorComp ? `${melhorComp.slice(4)}/${melhorComp.slice(0, 4)}` : null,
+    periodo,
   };
 }
 
