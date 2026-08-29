@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   BadgeStatus, BotaoPrimario, BotaoSec, CardVidro, Chip, Chips, DrawerV2,
   EstadoVazio, Input, Kpi, ModalV2, TabelaPadrao, Toggle,
@@ -9,6 +9,9 @@ import {
   estadoCelula, cabecalhoCiclo, ROTULO_COMP,
   type ClienteAnalise, type Comportamento, type StatusMes, type TipoMsg,
 } from './cobrancaAnalytics';
+import { useOrg } from '@/context/OrgContext';
+import { useOrgUsuarios } from '@/data/atendimento';
+import { useCobNumeros, cobWaConectar, cobWaStatus, cobWaDesconectar, type CobNumero } from '@/data/cobrancaWa';
 
 /** célula da grade de pagamentos (máquina de estados do legado Gestão Mensal) */
 function Celula({ raw }: { raw: string }) {
@@ -206,7 +209,124 @@ const NUMEROS: NumDemo[] = metricasPorAtendente(CLIENTES).map((m, i) => {
 const TOM_CONEXAO: Record<NumDemo['status'], TomStatus> = { conectado: 'ok', sincronizando: 'atencao', desconectado: 'erro' };
 const ROTULO_CONEXAO: Record<NumDemo['status'], string> = { conectado: 'Conectado', sincronizando: 'Conectando…', desconectado: 'Desconectado' };
 
-export function AbaNumeros({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (t: string) => void }) {
+export function AbaNumeros({ demo, gestor, aoAvisar }: { demo: boolean; gestor: boolean; aoAvisar: (t: string) => void }) {
+  return demo ? <AbaNumerosDemo gestor={gestor} aoAvisar={aoAvisar} /> : <AbaNumerosReal gestor={gestor} aoAvisar={aoAvisar} />;
+}
+
+/* ---- REAL: um número por atendente, instância isolada via cobranca-wa ---- */
+const ROTULO_ESTADO: Record<string, { rotulo: string; tom: TomStatus }> = {
+  conectado: { rotulo: 'Conectado', tom: 'ok' },
+  aguardando_qr: { rotulo: 'Aguardando QR', tom: 'atencao' },
+  desconectado: { rotulo: 'Sem número', tom: 'neutro' },
+};
+
+function AbaNumerosReal({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (t: string) => void }) {
+  const { currentOrg } = useOrg();
+  const orgId = currentOrg?.id;
+  const { data: usuarios = [] } = useOrgUsuarios();
+  const { data: numeros = [], refetch } = useCobNumeros(orgId);
+  const porAtendente = useMemo(() => new Map(numeros.map((n) => [n.atendente_id, n])), [numeros]);
+  const [qr, setQr] = useState<{ nome: string; numeroId: string; img: string | null } | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [desligar, setDesligar] = useState<{ numero: CobNumero; nome: string } | null>(null);
+  const qrRef = useRef(qr);
+  qrRef.current = qr;
+
+  // enquanto o modal do QR está aberto, sonda a conexão a cada 3s
+  useEffect(() => {
+    if (!qr || !orgId) return;
+    const t = window.setInterval(async () => {
+      try {
+        const st = await cobWaStatus(orgId, qr.numeroId);
+        if (st.connected && qrRef.current) {
+          setQr(null);
+          aoAvisar(`WhatsApp conectado${st.telefone ? ` (${st.telefone})` : ''}. Este número atende SÓ a cobrança — não aparece no atendimento.`);
+          refetch();
+        }
+      } catch { /* rede: tenta no próximo tick */ }
+    }, 3000);
+    return () => window.clearInterval(t);
+  }, [qr, orgId, aoAvisar, refetch]);
+
+  async function conectar(uId: string, nome: string) {
+    if (!orgId || busy) return;
+    setBusy(uId);
+    try {
+      const r = await cobWaConectar(orgId, uId);
+      setQr({ nome, numeroId: r.numero_id, img: r.qr_base64 });
+      refetch();
+    } catch (e) { aoAvisar(`Falha ao conectar: ${(e as Error).message}`); }
+    finally { setBusy(null); }
+  }
+
+  async function confirmarDesconexao() {
+    if (!orgId || !desligar) return;
+    const alvo = desligar; setDesligar(null);
+    try { await cobWaDesconectar(orgId, alvo.numero.id); aoAvisar('Número desconectado.'); refetch(); }
+    catch (e) { aoAvisar(`Falha ao desconectar: ${(e as Error).message}`); }
+  }
+
+  return (
+    <>
+      <p className="cm-hint sobe">
+        Cada atendente conecta o próprio número — a cobrança do cliente sai pelo número do atendente responsável.
+        Estes WhatsApps são <b>exclusivos da cobrança</b>: não aparecem no atendimento nem recebem conversas no inbox.
+      </p>
+      {usuarios.length === 0
+        ? <CardVidro spot sobe style={{ borderRadius: 'var(--r-card)' }}><EstadoVazio titulo="Nenhum atendente na equipe" descricao="Convide a equipe em Configurações para conectar números de cobrança." /></CardVidro>
+        : (
+          <div className="cm-nums sobe" style={{ animationDelay: '.08s' }}>
+            {usuarios.map((u) => {
+              const n = porAtendente.get(u.id);
+              const est = ROTULO_ESTADO[n?.estado ?? 'desconectado'];
+              return (
+                <CardVidro spot key={u.id} className="cm-num">
+                  <div className="cm-num-topo">
+                    <span className="cm-num-av" aria-hidden>{(u.nome || '?').slice(0, 2).toUpperCase()}</span>
+                    <div className="cm-num-id">
+                      <div className="cm-num-nm">{u.nome}</div>
+                      <div className="cm-num-tel num">{n?.telefone ?? 'Nenhum número conectado'}</div>
+                    </div>
+                    <BadgeStatus tom={est.tom}>{est.rotulo}</BadgeStatus>
+                  </div>
+                  {gestor && (
+                    <div className="cm-num-acoes">
+                      {n?.estado === 'conectado'
+                        ? <BotaoSec mini onClick={() => setDesligar({ numero: n, nome: u.nome })}>Desconectar</BotaoSec>
+                        : <BotaoPrimario mini onClick={() => conectar(u.id, u.nome)} disabled={busy === u.id}>{busy === u.id ? 'Gerando QR…' : n?.estado === 'aguardando_qr' ? 'Gerar novo QR' : 'Conectar WhatsApp'}</BotaoPrimario>}
+                    </div>
+                  )}
+                </CardVidro>
+              );
+            })}
+          </div>
+        )}
+
+      {qr && (
+        <ModalV2 aberto aoFechar={() => setQr(null)} largura={380}
+          titulo={<div>Conectar WhatsApp<div className="mod-sub">{qr.nome} — abra o WhatsApp no celular e leia o código.</div></div>}
+          rodape={<BotaoSec onClick={() => setQr(null)}>Fechar</BotaoSec>}>
+          <div className="cm-qr-wrap">
+            {qr.img
+              ? <img className="cm-qr-img" src={qr.img} alt="QR Code de conexão" />
+              : <div className="cm-hint">QR indisponível — feche e tente de novo.</div>}
+            <p className="cm-hint">Aguardando a leitura… esta janela fecha sozinha quando conectar. O número fica <b>exclusivo da cobrança</b>.</p>
+          </div>
+        </ModalV2>
+      )}
+
+      {desligar && (
+        <ModalV2 aberto aoFechar={() => setDesligar(null)} largura={400}
+          titulo={<div>Desconectar número<div className="mod-sub">{desligar.nome}{desligar.numero.telefone ? ` · ${desligar.numero.telefone}` : ''}</div></div>}
+          rodape={<><BotaoSec onClick={() => setDesligar(null)}>Cancelar</BotaoSec><BotaoPrimario onClick={confirmarDesconexao}>Desconectar</BotaoPrimario></>}>
+          <p className="cm-hint">A sessão no celular é encerrada e a cobrança para de sair por este número até reconectar.</p>
+        </ModalV2>
+      )}
+    </>
+  );
+}
+
+function AbaNumerosDemo({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (t: string) => void }) {
   const [qr, setQr] = useState<string | null>(null);
   return (
     <>

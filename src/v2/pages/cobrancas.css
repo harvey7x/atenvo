@@ -281,3 +281,9 @@
   padding: 10px 14px; margin: 2px 0 14px; background: rgba(var(--tint), .03);
 }
 .v2 .cm-aviso-sim b { color: var(--txt); font-weight: 600; }
+
+/* ---- QR real da conexão de cobrança (cobranca-wa) ---- */
+.v2 .cm-qr-wrap { display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; }
+.v2 .cm-qr-img { width: 220px; height: 220px; border-radius: 10px; background: #fff; padding: 8px; }
+.v2 .cm-num-acoes { display: flex; gap: 8px; margin-top: 12px; }
+.v2 .cm-num-id { min-width: 0; flex: 1; }

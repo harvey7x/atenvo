@@ -316,20 +316,27 @@ export default function CobrancasV2() {
         </div>
       )}
 
-      {/* Fora do modo demo, as abas do motor ainda mostram o seed de revisão —
-          a faixa evita que a equipe confunda os clientes simulados com reais.
-          Some na Fase C, quando o motor liga nos dados de verdade. */}
-      {!demo && aba !== 'painel' && (
-        <div className="cm-aviso-sim">
-          Demonstração do Modo Cobrança — os clientes e números destas abas são <b>simulados</b> para revisão. A ligação com os dados reais é a próxima fase.
-        </div>
-      )}
-      {aba === 'atendentes' && <AbaAtendentes />}
-      {aba === 'clientes' && <AbaClientes />}
-      {aba === 'ciclos' && <AbaCiclos gestor={gestor} aoAvisar={(t) => setAviso({ tom: 'ok', texto: t })} />}
-      {aba === 'regua' && <AbaRegua gestor={gestor} aoAvisar={(t) => setAviso({ tom: 'ok', texto: t })} />}
-      {aba === 'numeros' && <AbaNumeros gestor={gestor} aoAvisar={(t) => setAviso({ tom: 'ok', texto: t })} />}
-      {aba === 'envios' && <AbaEnvios gestor={gestor} aoAvisar={(t) => setAviso({ tom: 'ok', texto: t })} />}
+      {/* Fase C-alfa: NÚMEROS é real (conexão isolada via cobranca-wa); as demais
+          abas do motor, fora do demo, mostram o estado REAL da base — que foi
+          ZERADA a pedido do dono (29/08, backup bkp_reset_*). O seed dos 600 só
+          existe no modo demonstração. */}
+      {aba === 'atendentes' && (demo ? <AbaAtendentes /> : (
+        <CardVidro spot sobe style={{ borderRadius: 'var(--r-card)' }}><EstadoVazio titulo="Sem clientes na cobrança" descricao="A base foi zerada. Cadastre clientes para acompanhar as métricas por atendente." /></CardVidro>
+      ))}
+      {aba === 'clientes' && (demo ? <AbaClientes /> : (
+        <CardVidro spot sobe style={{ borderRadius: 'var(--r-card)' }}><EstadoVazio titulo="Nenhum cliente cadastrado" descricao="A base de cobrança está vazia. Cadastre o primeiro cliente com o número de WhatsApp e o ciclo dele."
+          acao={gestor ? { rotulo: '＋ Cadastrar cliente', onClick: () => setNovo(true) } : undefined} /></CardVidro>
+      ))}
+      {aba === 'ciclos' && (demo ? <AbaCiclos gestor={gestor} aoAvisar={(t) => setAviso({ tom: 'ok', texto: t })} /> : (
+        <CardVidro spot sobe style={{ borderRadius: 'var(--r-card)' }}><EstadoVazio titulo="Nenhum ciclo com clientes" descricao="Os ciclos ganham vida quando os clientes forem cadastrados — cada um entra na turma do seu dia de vencimento." /></CardVidro>
+      ))}
+      {aba === 'regua' && (demo ? <AbaRegua gestor={gestor} aoAvisar={(t) => setAviso({ tom: 'ok', texto: t })} /> : (
+        <CardVidro spot sobe style={{ borderRadius: 'var(--r-card)' }}><EstadoVazio titulo="Régua de mensagens" descricao="O editor real — com várias mensagens por passo, áudio, imagem e documento — é o próximo passo da Fase C. Já dá para conectar os números na aba Números." /></CardVidro>
+      ))}
+      {aba === 'numeros' && <AbaNumeros demo={demo} gestor={gestor} aoAvisar={(t) => setAviso({ tom: 'ok', texto: t })} />}
+      {aba === 'envios' && (demo ? <AbaEnvios gestor={gestor} aoAvisar={(t) => setAviso({ tom: 'ok', texto: t })} /> : (
+        <CardVidro spot sobe style={{ borderRadius: 'var(--r-card)' }}><EstadoVazio titulo="Nenhum envio na fila" descricao="Com números conectados e a régua configurada, os envios aparecem aqui — sempre nascendo em simulação, antes de qualquer disparo real." /></CardVidro>
+      ))}
 
       {aba === 'painel' && (erro ? (
         <CardVidro sobe>
