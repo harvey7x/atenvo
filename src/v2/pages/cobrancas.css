@@ -314,3 +314,8 @@
 /* cadência da mensagem (quando enviar) */
 .v2 .cm-cad-linha { display: flex; gap: 8px; align-items: center; }
 .v2 .cm-cad-linha .inp { flex: 1; }
+
+/* chave do envio real */
+.v2 .cm-simbanner-acoes { display: flex; gap: 8px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+.v2 .cm-simbanner.real { background: rgba(var(--rubro-rgb), .08); border-color: rgba(var(--rubro-rgb), .35); }
+.v2 .cm-simbanner.real b { color: var(--rubro); }

@@ -14,7 +14,7 @@ import { useOrgUsuarios } from '@/data/atendimento';
 import { useCobNumeros, cobWaConectar, cobWaQr, cobWaStatus, cobWaDesconectar, type CobNumero } from '@/data/cobrancaWa';
 import {
   useCobMensagens, useSalvarMensagem, useAlternarMensagem, uploadMidiaCobranca, ROTULO_TIPO_MSG, PADRAO_OFFSET,
-  useCobFila, rodarSimulacao, type CobFilaItem,
+  useCobFila, rodarSimulacao, useCobConfig, useSalvarCobConfig, converterPendentesHoje, type CobFilaItem,
   type CobMensagem, type CobMsgItem, type TipoMensagem, type TipoItem,
 } from '@/data/cobrancaRegua';
 import { useCiclosReais, useCriarCiclo, useClientesCobranca, type ClienteCobranca } from '@/data/cobrancaCiclos';
@@ -681,8 +681,27 @@ function AbaEnviosReal({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (t: st
   const { currentOrg } = useOrg();
   const orgId = currentOrg?.id;
   const { data: fila = [], isLoading, refetch } = useCobFila(orgId);
+  const { data: cfg } = useCobConfig(orgId);
+  const salvarCfg = useSalvarCobConfig(orgId);
+  const envioReal = cfg?.envioReal === true;
+  const [confirmaLigar, setConfirmaLigar] = useState(false);
   const [rodando, setRodando] = useState(false);
   const cont = (st: string) => fila.filter((f) => f.status === st).length;
+
+  async function ligarEnvioReal() {
+    setConfirmaLigar(false);
+    try { await salvarCfg.mutateAsync(true); aoAvisar('ENVIO REAL LIGADO — os próximos enfileiramentos disparam mensagens de verdade.'); }
+    catch (e) { aoAvisar(`Falha ao ligar: ${(e as Error).message}`); }
+  }
+  async function desligarEnvioReal() {
+    try { await salvarCfg.mutateAsync(false); aoAvisar('Envio real desligado — tudo volta a ser simulação.'); }
+    catch (e) { aoAvisar(`Falha ao desligar: ${(e as Error).message}`); }
+  }
+  async function aplicarHoje() {
+    if (!orgId) return;
+    try { const n = await converterPendentesHoje(orgId); aoAvisar(n > 0 ? `${n} disparo(s) pendente(s) de hoje convertidos para envio REAL.` : 'Nenhum pendente de hoje para converter.'); refetch(); }
+    catch (e) { aoAvisar(`Falha: ${(e as Error).message}`); }
+  }
 
   async function simular() {
     if (!orgId || rodando) return;
@@ -701,16 +720,34 @@ function AbaEnviosReal({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (t: st
 
   return (
     <>
-      <div className="cm-simbanner sobe" role="status">
+      <div className={envioReal ? 'cm-simbanner real sobe' : 'cm-simbanner sobe'} role="status">
         <div>
-          <b>Modo simulação — nada é enviado.</b>
-          <span> O motor roda todo dia às 6h e monta a fila pela cadência (lembrete 3 dias antes · cobrança no dia · atraso +2 · remarketing +7, às 9h). O envio real só liga com ordem explícita.</span>
+          <b>{envioReal ? 'ENVIO REAL LIGADO — as mensagens saem de verdade.' : 'Modo simulação — nada é enviado.'}</b>
+          <span> O motor roda todo dia de manhã e monta a fila pela cadência configurada na régua.{envioReal ? ' Os enfileiramentos novos disparam pelos números conectados dos atendentes.' : ' O envio real liga na chave ao lado — só com sua decisão.'}</span>
         </div>
-        {gestor && <BotaoSec mini onClick={simular} disabled={rodando}>{rodando ? 'Rodando…' : 'Rodar simulação agora'}</BotaoSec>}
+        <div className="cm-simbanner-acoes">
+          {gestor && <BotaoSec mini onClick={simular} disabled={rodando}>{rodando ? 'Rodando…' : envioReal ? 'Rodar agora' : 'Rodar simulação agora'}</BotaoSec>}
+          {gestor && envioReal && <BotaoSec mini onClick={aplicarHoje}>Aplicar aos pendentes de hoje</BotaoSec>}
+          {gestor && (envioReal
+            ? <BotaoSec mini onClick={desligarEnvioReal}>Desligar envio real</BotaoSec>
+            : <BotaoPrimario mini onClick={() => setConfirmaLigar(true)}>Ligar envio real</BotaoPrimario>)}
+        </div>
       </div>
+      {confirmaLigar && (
+        <ModalV2 aberto aoFechar={() => setConfirmaLigar(false)} largura={460}
+          titulo={<div>Ligar o envio real?<div className="mod-sub">Esta é a chave final do Modo Cobrança.</div></div>}
+          rodape={<><BotaoSec onClick={() => setConfirmaLigar(false)}>Cancelar</BotaoSec><BotaoPrimario onClick={ligarEnvioReal}>Sim, ligar envio real</BotaoPrimario></>}>
+          <p className="cm-hint" style={{ fontSize: 13 }}>
+            A partir do próximo enfileiramento, as mensagens da régua serão <b>enviadas de verdade</b> aos
+            clientes com parcela em aberto, pelo número do atendente responsável — com ritmo controlado
+            (pausas entre mensagens, no máximo ~150 envios/hora, janela 8h–20h). Quem pagou não recebe;
+            quem pediu SAIR não recebe; cliente sem número não recebe. Dá para desligar a qualquer momento.
+          </p>
+        </ModalV2>
+      )}
       <div className="kpis sobe" style={{ animationDelay: '.05s' }}>
         <Kpi rotulo="Na fila (pendentes)" valor={cont('pendente')} />
-        <Kpi rotulo="Simuladas" valor={cont('simulada')} tomValor="ok" />
+        <Kpi rotulo={envioReal ? 'Enviadas' : 'Simuladas'} valor={envioReal ? cont('enviada') : cont('simulada')} tomValor="ok" />
         <Kpi rotulo="Bloqueadas (opt-out)" valor={cont('bloqueada_optout')} tomValor="erro" />
         <Kpi rotulo="Sem número do atendente" valor={fila.filter((f) => f.ultimo_erro === 'sem_numero_atendente').length} />
       </div>

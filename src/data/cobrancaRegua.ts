@@ -157,3 +157,37 @@ export async function rodarSimulacao(orgId: string): Promise<Record<string, unkn
   if (error) throw new Error(error.message);
   return data as Record<string, unknown>;
 }
+
+/* ---- a CHAVE do envio real (cobranca_config; default = simulação) ---- */
+export function useCobConfig(orgId?: string) {
+  return useQuery({
+    queryKey: ['cob-config', orgId],
+    enabled: !!orgId && !isDemoMode,
+    queryFn: async () => {
+      const { data, error } = await supabase!
+        .from('cobranca_config').select('envio_real').eq('organizacao_id', orgId!).maybeSingle();
+      if (error) throw error;
+      return { envioReal: data?.envio_real === true };
+    },
+  });
+}
+export function useSalvarCobConfig(orgId?: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (envioReal: boolean) => {
+      const { error } = await supabase!
+        .from('cobranca_config')
+        .upsert({ organizacao_id: orgId!, envio_real: envioReal }, { onConflict: 'organizacao_id' });
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['cob-config', orgId] }); },
+  });
+}
+/** converte os pendentes de HOJE para envio real (exige a chave ligada) */
+export async function converterPendentesHoje(orgId: string): Promise<number> {
+  const { data, error } = await supabase!.functions.invoke('cobranca-processar', {
+    body: { acao: 'converter_hoje', organizacao_id: orgId },
+  });
+  if (error) throw new Error(error.message);
+  return Number((data as Record<string, unknown>)?.convertidas ?? 0);
+}
