@@ -66,6 +66,8 @@ const PADRAO: Record<Comportamento, StatusMes[]> = {
 /* pools de nomes (perfil INSS: idosos) + gerador determinístico (mulberry32),
    pra ~600 clientes estáveis entre renders — simulação de escala real. */
 export const CICLO_DIA: Record<string, number> = { D01: 1, D02: 2, D03: 3, D04: 4, D05: 5, D25: 25, D26: 26, D28: 28, D29: 29 };
+/** ciclos para o seletor de cadastro (código + dia de vencimento) */
+export const CICLOS_LISTA = Object.entries(CICLO_DIA).map(([codigo, dia]) => ({ codigo, dia })).sort((a, b) => a.codigo.localeCompare(b.codigo));
 const CICLOS_G = Object.keys(CICLO_DIA);
 const ATEND_G = ['Augusto', 'Eduardo', 'Junior', 'Garcia', 'Emillyn', 'Paty', 'Alexandra', 'Leandro'];
 const PRIMEIROS = ['Maria', 'José', 'Antônio', 'João', 'Francisco', 'Ana', 'Luiz', 'Paulo', 'Carlos', 'Manoel', 'Pedro', 'Francisca', 'Marcos', 'Raimundo', 'Sebastião', 'Antônia', 'Marcelo', 'Jorge', 'Márcia', 'Geraldo', 'Adriana', 'Sandra', 'Fernando', 'Rita', 'Rosa', 'Terezinha', 'Cleusa', 'Ivone', 'Nara', 'Rosana', 'Sônia', 'Vera', 'Cláudia', 'Marlene', 'Neusa', 'Osvaldo', 'Gilberto', 'Vanderlei', 'Ademar', 'Lourdes', 'Nelson', 'Cícero', 'Elza', 'Waldir'];

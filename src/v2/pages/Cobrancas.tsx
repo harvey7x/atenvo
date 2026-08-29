@@ -15,7 +15,17 @@ import {
   type Coluna, type TomStatus,
 } from '../components';
 import { AbaCiclos, AbaRegua, AbaNumeros, AbaEnvios, AbaAtendentes, AbaClientes, PainelResumo } from './cobrancaMotor';
+import { CICLOS_LISTA } from './cobrancaAnalytics';
 import './cobrancas.css';
+
+/** próxima ocorrência do dia de vencimento do ciclo (deriva a 1ª cobrança da turma) */
+function proximaDataDoDia(dia: number): string {
+  const h = new Date();
+  let y = h.getFullYear(), m = h.getMonth();
+  if (h.getDate() > dia) m += 1;
+  const last = new Date(y, m + 1, 0).getDate();
+  return new Date(y, m, Math.min(dia, last)).toISOString().slice(0, 10);
+}
 
 type AbaCobranca = 'painel' | 'atendentes' | 'clientes' | 'ciclos' | 'regua' | 'numeros' | 'envios';
 const ABAS: { id: AbaCobranca; rotulo: string }[] = [
@@ -452,39 +462,30 @@ function NovaCobrancaV2({ demo, aoCriar, aoFechar, aoSucesso }: {
 }) {
   const { data: usuarios = [] } = useOrgUsuarios();
   const [contato, setContato] = useState<ContatoRow | null>(null);
+  const [whatsapp, setWhatsapp] = useState('');
+  const [cicloCod, setCicloCod] = useState('');
   const [respId, setRespId] = useState('');
   const [valor, setValor] = useState('');
-  const [data, setData] = useState(hojeISO());
-  const [ciclos, setCiclos] = useState('6');
   const [servico, setServico] = useState('');
   const [obs, setObs] = useState('');
   const [erro, setErro] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const v = parseMoedaBRL(valor);
-  const nCiclos = Math.trunc(Number(ciclos) || 0);
-  const total = v != null && nCiclos > 0 ? v * nCiclos : null;
-  // última estimada com clamp de fim de mês — idêntico ao v1
-  const ultima = useMemo(() => {
-    if (!data || nCiclos < 1) return null;
-    const d = new Date(data + 'T00:00:00');
-    const dia = d.getDate();
-    const alvo = new Date(d.getFullYear(), d.getMonth() + (nCiclos - 1) + 1, 0);
-    const last = Math.min(dia, alvo.getDate());
-    return new Date(alvo.getFullYear(), alvo.getMonth(), last).toISOString().slice(0, 10);
-  }, [data, nCiclos]);
+  const ciclo = CICLOS_LISTA.find((c) => c.codigo === cicloCod) ?? null;
+  const primeira = ciclo ? proximaDataDoDia(ciclo.dia) : null;
 
   async function salvar() {
     if (busy) return;
     if (!contato) { setErro('Selecione o cliente.'); return; }
+    if (!ciclo) { setErro('Escolha o ciclo em que o cliente vai entrar.'); return; }
     if (v == null || v <= 0) { setErro('Informe um valor mensal válido.'); return; }
-    if (nCiclos < 1 || nCiclos > 60) { setErro('Quantidade de parcelas deve ser entre 1 e 60.'); return; }
-    if (!data) { setErro('Informe a data da primeira cobrança.'); return; }
     setBusy(true); setErro(null);
     try {
+      // o ciclo define o calendário; a 1ª cobrança é o próximo vencimento da turma
       await aoCriar({
-        contatoId: contato.id, contatoNome: contato.nome || 'Cliente', contatoTelefone: contato.tel || '',
-        valor: v, dataPrimeira: data, ciclos: nCiclos, responsavelId: respId || null,
+        contatoId: contato.id, contatoNome: contato.nome || 'Cliente', contatoTelefone: whatsapp.trim() || contato.tel || '',
+        valor: v, dataPrimeira: primeira!, ciclos: 6, responsavelId: respId || null,
         responsavelNome: usuarios.find((u) => u.id === respId)?.nome ?? '',
         servico: servico || null, observacoes: obs || null,
       });
@@ -499,11 +500,11 @@ function NovaCobrancaV2({ demo, aoCriar, aoFechar, aoSucesso }: {
       aoFechar={() => { if (!busy) aoFechar(); }}
       fecharNoVeu={!busy}
       largura={560}
-      titulo={<div>Nova cobrança<div className="mod-sub">Cobrança recorrente para um cliente do escritório.</div></div>}
+      titulo={<div>Novo cliente<div className="mod-sub">Cadastre o cliente, o número de WhatsApp e o ciclo de cobrança.</div></div>}
       rodape={
         <>
           <BotaoSec disabled={busy} onClick={aoFechar}>Cancelar</BotaoSec>
-          <BotaoPrimario disabled={busy} onClick={salvar}>{busy ? 'Criando…' : 'Criar cobrança'}</BotaoPrimario>
+          <BotaoPrimario disabled={busy} onClick={salvar}>{busy ? 'Salvando…' : 'Cadastrar cliente'}</BotaoPrimario>
         </>
       }
     >
@@ -525,11 +526,20 @@ function NovaCobrancaV2({ demo, aoCriar, aoFechar, aoSucesso }: {
           )}
         </div>
         <div className="form-2col">
+          <div className="campo">
+            <label>Número de WhatsApp *</label>
+            <Input inputMode="tel" placeholder="(51) 90000-0000" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} disabled={busy} />
+          </div>
           <div className="campo"><label>Valor mensal *</label><Input inputMode="decimal" placeholder="R$ 0,00" value={valor} onChange={(e) => setValor(e.target.value)} disabled={busy} /></div>
-          <div className="campo"><label>Qtd. de parcelas *</label><Input inputMode="numeric" value={ciclos} onChange={(e) => setCiclos(e.target.value)} disabled={busy} /></div>
         </div>
         <div className="form-2col">
-          <div className="campo"><label>Primeira cobrança *</label><Input type="date" value={data} onChange={(e) => setData(e.target.value)} disabled={busy} /></div>
+          <div className="campo">
+            <label>Ciclo de cobrança *</label>
+            <select className="inp" value={cicloCod} onChange={(e) => setCicloCod(e.target.value)} disabled={busy}>
+              <option value="">Escolha o ciclo…</option>
+              {CICLOS_LISTA.map((c) => <option key={c.codigo} value={c.codigo}>{c.codigo} — vence dia {String(c.dia).padStart(2, '0')}</option>)}
+            </select>
+          </div>
           <div className="campo">
             <label>Responsável</label>
             <select className="inp" value={respId} onChange={(e) => setRespId(e.target.value)} disabled={busy}>
@@ -538,15 +548,15 @@ function NovaCobrancaV2({ demo, aoCriar, aoFechar, aoSucesso }: {
             </select>
           </div>
         </div>
-        <div className="campo"><label>Descrição do serviço</label><Input placeholder="Ex.: Honorários, acordo…" value={servico} onChange={(e) => setServico(e.target.value)} disabled={busy} /></div>
+        <div className="campo"><label>Descrição do serviço</label><Input placeholder="Ex.: Cancelamento de desconto" value={servico} onChange={(e) => setServico(e.target.value)} disabled={busy} /></div>
         <div className="campo"><label>Observações</label><textarea className="inp" rows={2} value={obs} onChange={(e) => setObs(e.target.value)} disabled={busy} /></div>
         <div className="resumo-calc num">
-          <div><span>Parcela</span><strong>{v != null && v > 0 ? fmtBRL(v) : '—'}</strong></div>
-          <div><span>Parcelas</span><strong>{nCiclos > 0 ? nCiclos : '—'}</strong></div>
-          <div><span>Total</span><strong>{total != null ? fmtBRL(total) : '—'}</strong></div>
-          <div><span>Primeira</span><strong>{dataBR(data)}</strong></div>
-          <div><span>Última</span><strong>{dataBR(ultima)}</strong></div>
+          <div><span>Ciclo</span><strong>{ciclo ? ciclo.codigo : '—'}</strong></div>
+          <div><span>Vence</span><strong>{ciclo ? 'dia ' + String(ciclo.dia).padStart(2, '0') : '—'}</strong></div>
+          <div><span>Mensalidade</span><strong>{v != null && v > 0 ? fmtBRL(v) : '—'}</strong></div>
+          <div><span>1ª cobrança</span><strong>{primeira ? dataBR(primeira) : '—'}</strong></div>
         </div>
+        {!whatsapp.trim() && <div className="aviso-inline" role="status">Sem o número de WhatsApp, a cobrança automática não será enviada a este cliente.</div>}
         {erro && <div className="aviso-inline erro" role="alert">{erro}</div>}
       </div>
     </ModalV2>
