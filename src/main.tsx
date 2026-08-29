@@ -11,7 +11,7 @@ import { ConfigError } from '@/pages/ConfigError';
 import { isMisconfigured, isDemoMode } from '@/lib/supabase';
 import { resolverEAplicarPerf } from './v2/lib/perf';
 import { aplicarAcento, lerAcento } from './v2/lib/acento';
-import { aplicarVisual, lerVisual } from './v2/lib/visual';
+import './v2/serio.css'; // visual Corporativo FIXO (decisão do dono 29/08) — global: vale no login/mobile também
 import { sinalizarAtualizacao } from './v2/lib/atualizacao';
 import { tentarRecarga } from '@/lib/recargaChunk';
 import { registerSW } from 'virtual:pwa-register';
@@ -63,8 +63,10 @@ if (typeof document !== 'undefined') resolverEAplicarPerf();
 // paint pelo mesmo motivo do perf — sem flash de acento errado.
 if (typeof document !== 'undefined') aplicarAcento(lerAcento());
 
-// Visual (Platina × Corporativo): mesma regra — antes do primeiro paint.
-if (typeof document !== 'undefined') aplicarVisual(lerVisual());
+// Visual Corporativo FIXO (decisão do dono 29/08): o sistema roda sempre
+// no modo sério (serio.css) — sem alternador, sem preferência. O tema
+// escuro/claro continua livre; reverter = apagar esta linha.
+if (typeof document !== 'undefined') document.documentElement.setAttribute('data-visual', 'corp');
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, retry: 1, refetchOnWindowFocus: false } },

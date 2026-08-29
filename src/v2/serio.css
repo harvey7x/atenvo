@@ -1,7 +1,12 @@
 /* ============================================================
    MODO CORPORATIVO — [data-visual="corp"] na raiz (<html>).
-   Camada ADITIVA (mesma mecânica do Modo Leve/tema/acento): sem o
-   atributo, NADA muda — produção segue Platina byte a byte.
+   FIXO por decisão do dono (29/08): o atributo é cravado em main.tsx
+   no boot — o sistema roda SEMPRE neste visual (não há alternador).
+   Platina segue no repo apenas como camada-base; reverter = remover o
+   setAttribute do main.tsx. Seletores com prefixo html:root de
+   propósito: vencem o empate de especificidade com skinAurora/
+   perf-lite/light INDEPENDENTE da ordem de import (o arquivo é
+   importado no main.tsx, antes do grafo do shell).
 
    Fundamento: pesquisa 29/08 sobre linguagem enterprise (IBM Carbon,
    SAP Fiori Horizon, Salesforce Lightning, MS Fluent 2, Stripe/
@@ -19,7 +24,7 @@
 
 /* ---- tokens: corp DARK (Carbon g100: fundo escuro, camada CLAREIA
    um passo; par vidro-a==vidro-b achata o gradiente em chapa) ---- */
-:root[data-visual="corp"] .v2 {
+html:root[data-visual="corp"] .v2 {
   --base: #131417;
   --vidro-a: #1C1E22;
   --vidro-b: #1C1E22;
@@ -48,7 +53,7 @@
 
 /* ---- tokens: corp LIGHT (Fiori Morning Horizon: carta branca chapada
    sobre cinza frio; sombra de repouso NENHUMA — a borda separa) ---- */
-:root[data-visual="corp"][data-tema="light"] .v2 {
+html:root[data-visual="corp"][data-tema="light"] .v2 {
   --base: #F5F6F7;
   --vidro-a: #FFFFFF;
   --vidro-b: #FFFFFF;
@@ -67,39 +72,39 @@
 }
 
 /* ---- fundo: aurora/bokeh desligados — a página é uma cor ---- */
-:root[data-visual="corp"] .v2.app-v2 { background: var(--base); }
+html:root[data-visual="corp"] .v2.app-v2 { background: var(--base); }
 
 /* ---- ambiente: grão, luz em deriva e spotlight de hover somem ---- */
-:root[data-visual="corp"] .v2 .grao,
-:root[data-visual="corp"] .v2 .luz { display: none; }
-:root[data-visual="corp"] .v2 .spot::after { display: none; }
+html:root[data-visual="corp"] .v2 .grao,
+html:root[data-visual="corp"] .v2 .luz { display: none; }
+html:root[data-visual="corp"] .v2 .spot::after { display: none; }
 
 /* ---- movimento: coreografia de entrada sai; resposta a clique fica.
    (compensações espelham o Modo Leve — manter em sincronia) ---- */
-:root[data-visual="corp"] .v2 .sobe { animation: none; opacity: 1; transform: none; }
-:root[data-visual="corp"] .v2 .spark path { animation: none; stroke-dashoffset: 0; }
-:root[data-visual="corp"] .v2 .spark polygon { animation: none; opacity: 1; }
-:root[data-visual="corp"] .v2 .barv { transform: scaleY(1); transition: none; }
-:root[data-visual="corp"] .v2 .bval { opacity: 1; transition: none; }
-:root[data-visual="corp"] .v2 .skel::after { display: none; }
+html:root[data-visual="corp"] .v2 .sobe { animation: none; opacity: 1; transform: none; }
+html:root[data-visual="corp"] .v2 .spark path { animation: none; stroke-dashoffset: 0; }
+html:root[data-visual="corp"] .v2 .spark polygon { animation: none; opacity: 1; }
+html:root[data-visual="corp"] .v2 .barv { transform: scaleY(1); transition: none; }
+html:root[data-visual="corp"] .v2 .bval { opacity: 1; transition: none; }
+html:root[data-visual="corp"] .v2 .skel::after { display: none; }
 
 /* ---- botão primário: chapa azul, sem sheen varrendo, sem lift.
    Feedback enterprise é cromático (escurece), não espacial. ---- */
-:root[data-visual="corp"] .v2 .btn-pri {
+html:root[data-visual="corp"] .v2 .btn-pri {
   background: var(--platina-a);
   box-shadow: none;
 }
-:root[data-visual="corp"] .v2 .btn-pri::after { display: none; }
-:root[data-visual="corp"] .v2 .btn-pri:hover:not(:disabled) {
+html:root[data-visual="corp"] .v2 .btn-pri::after { display: none; }
+html:root[data-visual="corp"] .v2 .btn-pri:hover:not(:disabled) {
   transform: none;
   background: #0050E6;               /* Carbon Blue 60 hover */
 }
 
 /* ---- geometria: pílulas de dado viram retângulo suave (4px).
    Toggle/avatar/dot continuam redondos — são exceções legítimas. ---- */
-:root[data-visual="corp"] .v2 .st,
-:root[data-visual="corp"] .v2 .delta { border-radius: 4px; }
-:root[data-visual="corp"] .v2 .chip { border-radius: 6px; }
+html:root[data-visual="corp"] .v2 .st,
+html:root[data-visual="corp"] .v2 .delta { border-radius: 4px; }
+html:root[data-visual="corp"] .v2 .chip { border-radius: 6px; }
 
 /* ---- KPI: número é dado — sem tinta gradiente, peso 600, tabular ---- */
-:root[data-visual="corp"] .v2 .kpi .val { letter-spacing: -.01em; }
+html:root[data-visual="corp"] .v2 .kpi .val { letter-spacing: -.01em; }
