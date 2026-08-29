@@ -1370,6 +1370,33 @@ function notaAnalise(ctx: Ctx, a: Record<string, unknown>, potencial: boolean): 
 }
 function fmtNum(v: unknown): string { return typeof v === 'number' && Number.isFinite(v) ? v.toFixed(2) : '?'; }
 
+// ======== horário de atendimento (seg-sex 9h-19h SP) ========
+// Fora do horário a IA atende e coleta normal; só no FECHO (ou se o cliente cobrar) avisa que está
+// fora do expediente e QUANDO o atendente retorna (próxima abertura). `idx`: 0=Dom..6=Sáb.
+export function horarioFrase(idx: number, hora: number): { dentro: boolean; frase: string } {
+  const diaUtil = idx >= 1 && idx <= 5;
+  const dentro = diaUtil && hora >= 9 && hora < 19;
+  if (dentro) return { dentro: true, frase: '' };
+  let frase: string;
+  if (idx === 0 || idx === 6) frase = 'na segunda-feira, logo cedo, a partir das 9 horas'; // fim de semana
+  else if (hora < 9) frase = 'hoje mesmo, a partir das 9 horas';                            // dia útil, antes de abrir
+  else if (idx === 5) frase = 'na segunda-feira, logo cedo, a partir das 9 horas';          // sexta, depois de fechar
+  else frase = 'amanhã, logo cedo, a partir das 9 horas';                                   // seg-qui, depois de fechar
+  return { dentro: false, frase };
+}
+function statusHorario(): { dentro: boolean; frase: string } {
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Sao_Paulo', weekday: 'short', hour: '2-digit', hourCycle: 'h23' }).formatToParts(new Date());
+  const wd = parts.find((x) => x.type === 'weekday')?.value ?? 'Mon';
+  const hora = Number(parts.find((x) => x.type === 'hour')?.value ?? '12');
+  const idx = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(wd);
+  return horarioFrase(idx < 0 ? 1 : idx, Number.isFinite(hora) ? hora : 12);
+}
+function notaHorarioAtendimento(): string {
+  const st = statusHorario();
+  if (st.dentro) return '';
+  return `\n\nHORÁRIO DE ATENDIMENTO: agora estamos FORA do horário (o atendimento é de segunda a sexta, das 9h às 19h). Atenda a pessoa e colete tudo normalmente, sem pressa. Mas AO FECHAR a SUA parte (quando for passar o caso pro analista/colega) OU se a pessoa perguntar/cobrar quando vão falar com ela, avise com naturalidade e sem drama que neste momento já está fora do nosso horário e que um atendente entra em contato ${st.frase}. Diga isso UMA vez, só no fecho ou se ela cobrar — NUNCA no meio da coleta.`;
+}
+
 // ======== conversa (persona + objetivo da etapa + contexto completo) ========
 interface RespostaChat { mensagens: string[]; acao: string; dados: Record<string, unknown>; perguntouValores: boolean }
 
@@ -1391,7 +1418,7 @@ async function conversar(ctx: Ctx, opts: { etapa?: string; instrucaoExtra?: stri
     instrucao = instrucao.replaceAll(`{${k}}`, v);
   }
   const acomp = ctx.dados.aguardando_humano ? `\n\n${notaAcompanhamento(String(ctx.dados.aguardando_humano))}` : '';
-  const system = `${PERSONA}\n\n${instrucao}${acomp}${opts.instrucaoExtra ? `\n\nNOTA DESTE TURNO: ${opts.instrucaoExtra}` : ''}`;
+  const system = `${PERSONA}\n\n${instrucao}${acomp}${notaHorarioAtendimento()}${opts.instrucaoExtra ? `\n\nNOTA DESTE TURNO: ${opts.instrucaoExtra}` : ''}`;
 
   // áudios ANTES do contexto (com teto agregado): o texto do contexto precisa dizer a VERDADE
   // sobre o que está anexado — dizer "ouça o áudio" com o anexo ausente faz o modelo alucinar.
@@ -1433,7 +1460,7 @@ async function conversar(ctx: Ctx, opts: { etapa?: string; instrucaoExtra?: stri
 async function gerarDespedida(ctx: Ctx, direcao: string): Promise<string[]> {
   try {
     const j = await geminiSessao(ctx, 'despedida', {
-      system: `${PERSONA}\n\nOBJETIVO DESTE TURNO: encerrar a SUA parte da conversa. ${direcao} No máximo 2 bolhas curtas e calorosas.`,
+      system: `${PERSONA}${notaHorarioAtendimento()}\n\nOBJETIVO DESTE TURNO: encerrar a SUA parte da conversa. ${direcao} No máximo 2 bolhas curtas e calorosas.`,
       partes: [{ text: montarContexto(ctx) }, { text: 'Responda no JSON pedido.' }],
       schema: esquemaChat({}), temperatura: 0.7, maxTokens: 1536,
     });
