@@ -1,0 +1,39 @@
+/* Módulo Ferramentas — Unificador de documentos (29/08) */
+.v2 .ferr-wrap { max-width: 920px; }
+
+.v2 .ferr-drop {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  padding: 34px 20px; text-align: center; cursor: pointer; color: var(--txt-3);
+  border: 1.5px dashed var(--linha); border-radius: var(--r-card); background: rgba(var(--tint), .02);
+  transition: border-color .12s var(--ease), background .12s var(--ease), color .12s var(--ease);
+}
+.v2 .ferr-drop:hover, .v2 .ferr-drop.on {
+  border-color: rgba(var(--azul-rgb), .55); background: rgba(var(--azul-rgb), .05); color: var(--azul);
+}
+.v2 .ferr-drop-t { font-size: 13.5px; color: var(--txt-2); }
+.v2 .ferr-drop-t b { color: var(--txt); font-weight: 600; }
+.v2 .ferr-drop-s { font-size: 11.5px; color: var(--txt-3); }
+
+.v2 .ferr-lista { display: flex; flex-direction: column; }
+.v2 .ferr-item { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid rgba(var(--tint), .05); }
+.v2 .ferr-item:last-child { border-bottom: none; }
+.v2 .ferr-ord { width: 20px; height: 20px; flex-shrink: 0; display: grid; place-items: center; border-radius: 6px; background: rgba(var(--tint), .06); font-size: 11px; color: var(--txt-2); }
+.v2 .ferr-nm { flex: 1; min-width: 0; font-size: 12.5px; color: var(--txt); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .ferr-nm-pg { display: inline; font-style: normal; color: var(--txt-3); font-size: 11px; margin-left: 8px; }
+.v2 .ferr-kb { font-size: 11.5px; color: var(--txt-3); flex-shrink: 0; }
+.v2 .ferr-acoes { display: flex; gap: 8px; flex-shrink: 0; }
+.v2 .ferr-acoes .perigo { color: var(--rubro); }
+.v2 .ferr-item-bancos { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; flex-shrink: 0; max-width: 55%; }
+.v2 .ferr-rodape { display: flex; justify-content: flex-end; padding: 12px 16px; border-top: 1px solid var(--linha); }
+
+.v2 .ferr-resumo { font-size: 11.5px; color: var(--txt-3); padding: 0 16px 10px; }
+.v2 .ferr-bancos { display: flex; flex-direction: column; gap: 8px; padding: 0 16px 14px; }
+.v2 .ferr-banco { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(var(--verde-rgb), .3); background: var(--verde-bg); }
+.v2 .ferr-banco-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--verde); flex-shrink: 0; }
+.v2 .ferr-banco-nm { font-size: 13px; font-weight: 600; color: var(--txt); }
+.v2 .ferr-banco-meta { margin-left: auto; font-size: 11px; color: var(--txt-3); }
+.v2 .ferr-nada { padding: 0 16px 16px; font-size: 12.5px; color: var(--txt-2); }
+.v2 .ferr-ausentes { padding: 0 16px 14px; font-size: 11.5px; color: var(--txt-3); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.v2 .ferr-ausente { padding: 2px 8px; border-radius: 6px; border: 1px solid var(--linha); color: var(--txt-3); }
+
+.v2 .ferr-nota { margin-top: 16px; font-size: 11px; color: var(--txt-3); }
