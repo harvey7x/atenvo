@@ -5,6 +5,15 @@ import { unificar, BANCOS_ALVO, type ResultadoUnificacao } from './unificadorLib
 import './ferramentas.css';
 
 const fmtKB = (b: number) => (b < 1024 * 1024 ? `${Math.round(b / 1024)} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`);
+/* Ordem do download = ordem dos períodos (mais recente → mais antigo):
+   "historico-creditos.pdf" (sem número) primeiro, depois (1), (2), (3)…
+   O seletor do SO às vezes embaralha — aqui reordenamos sozinho. */
+const ordemBaixa = (nome: string): number => {
+  const m = nome.match(/\((\d+)\)\s*\.[^.]+$/);
+  return m ? Number(m[1]) : 0;
+};
+const ordenarFila = (arr: File[]): File[] =>
+  [...arr].sort((a, b) => ordemBaixa(a.name) - ordemBaixa(b.name) || a.name.localeCompare(b.name, 'pt', { numeric: true }));
 const fmtBRL = (v: number) => 'R$ ' + v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 /* dispatcher do módulo Ferramentas (rota /ferramentas/:tool). Hoje só o
@@ -37,7 +46,7 @@ function UnificadorDocumentos() {
     setErro(null); setRes(null);
     setFiles((prev) => {
       const nomes = new Set(prev.map((p) => p.name + p.size));
-      return [...prev, ...pdfs.filter((p) => !nomes.has(p.name + p.size))];
+      return ordenarFila([...prev, ...pdfs.filter((p) => !nomes.has(p.name + p.size))]);
     });
   }, []);
 
@@ -99,6 +108,7 @@ function UnificadorDocumentos() {
           <div className="card-cab"><h3>{files.length} arquivo{files.length === 1 ? '' : 's'} na fila</h3>
             <BotaoSec mini onClick={() => { setFiles([]); setRes(null); }}>Limpar</BotaoSec>
           </div>
+          <div className="ferr-ordhint">Ordenados do mais recente ao mais antigo (pela sequência de download). Use as setas para ajustar.</div>
           <div className="ferr-lista">
             {files.map((f, i) => (
               <div className="ferr-item" key={f.name + f.size}>

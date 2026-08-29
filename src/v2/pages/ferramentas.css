@@ -64,3 +64,6 @@
 .v2 .ferr-benef-linha b { font-size: 14px; font-weight: 600; color: var(--txt); }
 .v2 .ferr-benef-bancos { display: flex; gap: 6px; flex-wrap: wrap; }
 .v2 .ferr-benef-pg { font-size: 10.5px; color: var(--txt-3); }
+
+/* nota da ordem automática da fila */
+.v2 .ferr-ordhint { padding: 0 16px 8px; font-size: 11px; color: var(--txt-3); }
