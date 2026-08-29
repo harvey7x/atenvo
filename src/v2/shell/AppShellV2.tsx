@@ -8,6 +8,7 @@ import '../tokens.css';
 import '../base.css';
 import './shell.css';
 import '../skinAurora.css'; // TESTE (branch teste/skin-aurora-azul): fundo bokeh + azul secundário
+import '../serio.css'; // MODO CORPORATIVO ([data-visual="corp"]) — precisa vir DEPOIS da skin p/ vencer a cascata
 import { LogoAtenvo } from '../components/LogoAtenvo';
 import { instalarSpotlight } from '../lib/spotlight';
 import { criarRaizPortalV2 } from '../components/portal';
@@ -20,6 +21,7 @@ import { IntroDia } from '../components/IntroDia';
 import { AvisoAtualizacao } from '../components/AvisoAtualizacao';
 import { assinarModoPerf, lerModoPerf, salvarModoPerf, type ModoPerf } from '../lib/perf';
 import { assinarAcento, lerAcento, salvarAcento, type Acento } from '../lib/acento';
+import { assinarVisual, lerVisual, salvarVisual, type Visual } from '../lib/visual';
 import { useNotificacoes, useMarcarNotificacao } from '@/data/remarketing';
 import { tempoRelativo } from '../lib/tempo';
 
@@ -36,6 +38,13 @@ const ORDEM_ACENTO: Acento[] = ['azul', 'verde', 'dourado'];
 const IconeGota = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden>
     <path d="M12 2.7S5.5 10 5.5 14.6a6.5 6.5 0 0013 0C18.5 10 12 2.7 12 2.7z" />
+  </svg>
+);
+/* prédio — alternador do visual Platina ↔ Corporativo (versão sóbria, 29/08) */
+const ROTULO_VISUAL: Record<Visual, string> = { platina: 'Platina', corp: 'Corporativo' };
+const IconePredio = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden>
+    <path d="M4 21V5.5L12 3v18M12 21h8V9l-8-2.2M7 8.5h2M7 12h2M7 15.5h2M15 12h2M15 15.5h2" />
   </svg>
 );
 const IconeSol = () => (
@@ -170,6 +179,11 @@ export default function AppShellV2() {
     const ordem: ModoPerf[] = ['auto', 'lite', 'full'];
     salvarModoPerf(ordem[(ordem.indexOf(modoPerf) + 1) % ordem.length]);
   }, [modoPerf]);
+  const [visual, setVisual] = useState<Visual>(() => lerVisual());
+  useEffect(() => assinarVisual(setVisual), []);
+  const alternarVisual = useCallback(() => {
+    salvarVisual(visual === 'corp' ? 'platina' : 'corp');
+  }, [visual]);
   const seqRef = useRef(0);
   const avatarRef = useRef<HTMLButtonElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
@@ -370,6 +384,15 @@ export default function AppShellV2() {
               <span className="busca-texto">Buscar contatos, conversas, cobranças…</span><kbd>⌘K</kbd>
             </div>
             <div className="top-dir">
+              <button
+                type="button" className="ib"
+                aria-label={`Visual: ${ROTULO_VISUAL[visual]} — clique para alternar`}
+                title={`Visual: ${ROTULO_VISUAL[visual]}`}
+                onClick={alternarVisual}
+              >
+                <IconePredio />
+                <span className={visual === 'corp' ? 'pt on' : 'pt'} aria-hidden />
+              </button>
               <button
                 type="button" className="ib"
                 aria-label={`Modo de Performance: ${ROTULO_PERF[modoPerf]} — clique para alternar`}

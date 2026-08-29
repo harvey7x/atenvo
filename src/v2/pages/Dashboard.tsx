@@ -129,7 +129,8 @@ function Contador({ valor, fmt }: { valor: number; fmt: (n: number) => string })
   useEffect(() => {
     const de = anterior.current ?? 0;
     anterior.current = valor;
-    if (de === valor || document.visibilityState === 'hidden') { setV(valor); return; }
+    if (de === valor || document.visibilityState === 'hidden'
+      || document.documentElement.getAttribute('data-visual') === 'corp') { setV(valor); return; }
     const t0 = performance.now(); const dur = 550; let raf = 0;
     const passo = (t: number) => {
       const k = Math.min(1, (t - t0) / dur);

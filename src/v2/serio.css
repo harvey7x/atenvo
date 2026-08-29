@@ -1,0 +1,105 @@
+/* ============================================================
+   MODO CORPORATIVO — [data-visual="corp"] na raiz (<html>).
+   Camada ADITIVA (mesma mecânica do Modo Leve/tema/acento): sem o
+   atributo, NADA muda — produção segue Platina byte a byte.
+
+   Fundamento: pesquisa 29/08 sobre linguagem enterprise (IBM Carbon,
+   SAP Fiori Horizon, Salesforce Lightning, MS Fluent 2, Stripe/
+   Mercury/Ramp/Linear + NN/g). As regras convergem:
+   1) superfície OPACA e chapada; profundidade = hairline 1px, nunca
+      vidro/blur/glow (sombra só em overlay que flutua de verdade);
+   2) neutros quase acromáticos + UM azul interativo (Carbon Blue 60);
+      verde/âmbar/rubro só como status, nunca decoração;
+   3) raio 4-8px em dado/controle (pílula = consumidor);
+   4) movimento = resposta a interação, 70-240ms, easing produtivo;
+      ZERO coreografia de entrada, ZERO contador subindo (número de
+      cobrança é razão de livro-caixa, não aplauso);
+   5) hierarquia por PESO (400/600), não por tamanho/cor.
+   ============================================================ */
+
+/* ---- tokens: corp DARK (Carbon g100: fundo escuro, camada CLAREIA
+   um passo; par vidro-a==vidro-b achata o gradiente em chapa) ---- */
+:root[data-visual="corp"] .v2 {
+  --base: #131417;
+  --vidro-a: #1C1E22;
+  --vidro-b: #1C1E22;
+  --fio-a: rgba(255, 255, 255, .14);   /* fio premium vira hairline uniforme */
+  --fio-b: rgba(255, 255, 255, .14);
+  --linha: rgba(255, 255, 255, .10);
+  --r-card: 8px;
+  --r-ctl: 6px;
+  --fx: 0;                             /* mata todo glow multiplicado */
+  --luz-op: 0;
+  --grao-op: 0;
+  --desfoque-vidro: none;
+  --desfoque-chrome: none;
+  --desfoque-topbar: none;
+  --ease: cubic-bezier(.2, 0, .38, .9);      /* Carbon productive-standard */
+  --sombra-2: 0 8px 24px rgba(0, 0, 0, .45); /* só overlays reais */
+  /* botão primário: prata/gradiente → UM azul interativo, chapado */
+  --platina-a: #0F62FE;
+  --platina-b: #0F62FE;
+  --platina-txt: #FFFFFF;
+  --platina-txt-rgb: 255, 255, 255;
+  /* display/saudação sem gradiente de texto */
+  --display-a: #F4F5F7;
+  --display-b: #F4F5F7;
+}
+
+/* ---- tokens: corp LIGHT (Fiori Morning Horizon: carta branca chapada
+   sobre cinza frio; sombra de repouso NENHUMA — a borda separa) ---- */
+:root[data-visual="corp"][data-tema="light"] .v2 {
+  --base: #F5F6F7;
+  --vidro-a: #FFFFFF;
+  --vidro-b: #FFFFFF;
+  --fio-a: rgba(22, 25, 31, .16);
+  --fio-b: rgba(22, 25, 31, .16);
+  --linha: rgba(22, 25, 31, .12);
+  --spot-glow: 0;
+  --sombra-1: 0 0 0 0 rgba(0, 0, 0, 0);
+  --sombra-2: 0 0 0 1px rgba(34, 53, 72, .16), 0 10px 30px rgba(34, 53, 72, .18);
+  --platina-a: #0F62FE;
+  --platina-b: #0F62FE;
+  --platina-txt: #FFFFFF;
+  --platina-txt-rgb: 255, 255, 255;
+  --display-a: #191C22;
+  --display-b: #191C22;
+}
+
+/* ---- fundo: aurora/bokeh desligados — a página é uma cor ---- */
+:root[data-visual="corp"] .v2.app-v2 { background: var(--base); }
+
+/* ---- ambiente: grão, luz em deriva e spotlight de hover somem ---- */
+:root[data-visual="corp"] .v2 .grao,
+:root[data-visual="corp"] .v2 .luz { display: none; }
+:root[data-visual="corp"] .v2 .spot::after { display: none; }
+
+/* ---- movimento: coreografia de entrada sai; resposta a clique fica.
+   (compensações espelham o Modo Leve — manter em sincronia) ---- */
+:root[data-visual="corp"] .v2 .sobe { animation: none; opacity: 1; transform: none; }
+:root[data-visual="corp"] .v2 .spark path { animation: none; stroke-dashoffset: 0; }
+:root[data-visual="corp"] .v2 .spark polygon { animation: none; opacity: 1; }
+:root[data-visual="corp"] .v2 .barv { transform: scaleY(1); transition: none; }
+:root[data-visual="corp"] .v2 .bval { opacity: 1; transition: none; }
+:root[data-visual="corp"] .v2 .skel::after { display: none; }
+
+/* ---- botão primário: chapa azul, sem sheen varrendo, sem lift.
+   Feedback enterprise é cromático (escurece), não espacial. ---- */
+:root[data-visual="corp"] .v2 .btn-pri {
+  background: var(--platina-a);
+  box-shadow: none;
+}
+:root[data-visual="corp"] .v2 .btn-pri::after { display: none; }
+:root[data-visual="corp"] .v2 .btn-pri:hover:not(:disabled) {
+  transform: none;
+  background: #0050E6;               /* Carbon Blue 60 hover */
+}
+
+/* ---- geometria: pílulas de dado viram retângulo suave (4px).
+   Toggle/avatar/dot continuam redondos — são exceções legítimas. ---- */
+:root[data-visual="corp"] .v2 .st,
+:root[data-visual="corp"] .v2 .delta { border-radius: 4px; }
+:root[data-visual="corp"] .v2 .chip { border-radius: 6px; }
+
+/* ---- KPI: número é dado — sem tinta gradiente, peso 600, tabular ---- */
+:root[data-visual="corp"] .v2 .kpi .val { letter-spacing: -.01em; }

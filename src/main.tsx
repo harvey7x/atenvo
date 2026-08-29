@@ -11,6 +11,7 @@ import { ConfigError } from '@/pages/ConfigError';
 import { isMisconfigured, isDemoMode } from '@/lib/supabase';
 import { resolverEAplicarPerf } from './v2/lib/perf';
 import { aplicarAcento, lerAcento } from './v2/lib/acento';
+import { aplicarVisual, lerVisual } from './v2/lib/visual';
 import { sinalizarAtualizacao } from './v2/lib/atualizacao';
 import { tentarRecarga } from '@/lib/recargaChunk';
 import { registerSW } from 'virtual:pwa-register';
@@ -61,6 +62,9 @@ if (typeof document !== 'undefined') resolverEAplicarPerf();
 // Acento do sistema (teste azul × verde): marca [data-acento] antes do primeiro
 // paint pelo mesmo motivo do perf — sem flash de acento errado.
 if (typeof document !== 'undefined') aplicarAcento(lerAcento());
+
+// Visual (Platina × Corporativo): mesma regra — antes do primeiro paint.
+if (typeof document !== 'undefined') aplicarVisual(lerVisual());
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, retry: 1, refetchOnWindowFocus: false } },

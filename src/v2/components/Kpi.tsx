@@ -19,7 +19,10 @@ export function useContador(alvo: number, formato: FormatoContador = 'int'): str
   const exibido = useRef(0);
 
   useEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    // Corporativo cai na mesma via do reduced-motion: valor final direto
+    // (número é dado de livro-caixa; contador subindo lê como marketing).
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      || document.documentElement.getAttribute('data-visual') === 'corp') {
       exibido.current = alvo;
       setTexto(formata(alvo, formato));
       return;
