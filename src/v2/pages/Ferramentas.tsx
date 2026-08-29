@@ -127,7 +127,18 @@ function UnificadorDocumentos() {
               <h3>Bancos encontrados nos históricos</h3>
               <BotaoPrimario mini onClick={baixar}>Baixar PDF unificado</BotaoPrimario>
             </div>
-            <div className="ferr-resumo num">{res.totalPaginas} páginas · {res.arquivos.length} arquivo{res.arquivos.length === 1 ? '' : 's'}</div>
+            <div className="ferr-resumo num">{res.totalPaginas} páginas · {res.arquivos.length} arquivo{res.arquivos.length === 1 ? '' : 's'} unificado{res.arquivos.length === 1 ? '' : 's'}</div>
+            {res.falhas.length > 0 && (
+              <div className="ferr-falhas">
+                {res.falhas.length} arquivo{res.falhas.length === 1 ? '' : 's'} não pôde{res.falhas.length === 1 ? '' : 'ram'} ser unificado{res.falhas.length === 1 ? '' : 's'}:
+                {res.falhas.map((f) => <span key={f.nome} className="ferr-falha" title={f.motivo}>{f.nome} — {f.motivo}</span>)}
+              </div>
+            )}
+            {res.arquivos.some((a) => !a.textoLido) && (
+              <div className="ferr-falhas aviso">
+                Atenção: {res.arquivos.filter((a) => !a.textoLido).length} arquivo(s) sem texto legível (PDF escaneado ou protegido) — a detecção de bancos pode estar incompleta.
+              </div>
+            )}
             {res.bancos.length === 0 ? (
               <div className="ferr-nada">Nenhum dos bancos monitorados foi encontrado nestes históricos.</div>
             ) : (
@@ -156,9 +167,11 @@ function UnificadorDocumentos() {
                   <span className="ferr-ord num">{i + 1}</span>
                   <span className="ferr-nm">{a.nome}<i className="ferr-nm-pg num">{a.paginas} pág.</i></span>
                   <span className="ferr-item-bancos">
-                    {a.bancos.length
-                      ? a.bancos.map((n) => <BadgeStatus key={n} tom="ok">{n}</BadgeStatus>)
-                      : <span className="ferr-kb">nenhum banco-alvo</span>}
+                    {!a.textoLido
+                      ? <BadgeStatus tom="atencao">texto não lido</BadgeStatus>
+                      : a.bancos.length
+                        ? a.bancos.map((n) => <BadgeStatus key={n} tom="ok">{n}</BadgeStatus>)
+                        : <span className="ferr-kb">nenhum banco-alvo</span>}
                   </span>
                 </div>
               ))}

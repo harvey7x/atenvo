@@ -37,3 +37,8 @@
 .v2 .ferr-ausente { padding: 2px 8px; border-radius: 6px; border: 1px solid var(--linha); color: var(--txt-3); }
 
 .v2 .ferr-nota { margin-top: 16px; font-size: 11px; color: var(--txt-3); }
+
+/* avisos de arquivos problemáticos (protegido/escaneado/corrompido) */
+.v2 .ferr-falhas { display: flex; flex-direction: column; gap: 4px; padding: 0 16px 12px; font-size: 11.5px; color: var(--rubro); }
+.v2 .ferr-falhas.aviso { color: var(--ambar); }
+.v2 .ferr-falha { color: var(--txt-2); padding-left: 2px; }
