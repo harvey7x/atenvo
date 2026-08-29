@@ -71,8 +71,13 @@ html:root[data-visual="corp"][data-tema="light"] .v2 {
   --display-b: #191C22;
 }
 
-/* ---- fundo: aurora/bokeh desligados — a página é uma cor ---- */
-html:root[data-visual="corp"] .v2.app-v2 { background: var(--base); }
+/* ---- fundo: aurora/bokeh desligados — a página é uma cor.
+   !important de propósito (achado do dono 29/08): as variantes de
+   ACENTO da skin (:root[data-acento=verde/dourado]... .app-v2, spec
+   0,5,0) venciam esta regra (0,4,1) e os glows voltavam nos cantos ao
+   trocar a cor na gota. O corp é FIXO e é a palavra final sobre o
+   fundo — nenhuma skin/acento pode repintar brilho ambiente. ---- */
+html:root[data-visual="corp"] .v2.app-v2 { background: var(--base) !important; }
 
 /* ---- ambiente: grão, luz em deriva e spotlight de hover somem ---- */
 html:root[data-visual="corp"] .v2 .grao,
