@@ -13,7 +13,7 @@ import { useOrg } from '@/context/OrgContext';
 import { useOrgUsuarios } from '@/data/atendimento';
 import { useCobNumeros, cobWaConectar, cobWaQr, cobWaStatus, cobWaDesconectar, type CobNumero } from '@/data/cobrancaWa';
 import {
-  useCobMensagens, useSalvarMensagem, useAlternarMensagem, uploadMidiaCobranca, ROTULO_TIPO_MSG,
+  useCobMensagens, useSalvarMensagem, useAlternarMensagem, uploadMidiaCobranca, ROTULO_TIPO_MSG, PADRAO_OFFSET,
   useCobFila, rodarSimulacao, type CobFilaItem,
   type CobMensagem, type CobMsgItem, type TipoMensagem, type TipoItem,
 } from '@/data/cobrancaRegua';
@@ -255,7 +255,9 @@ const ORDEM_TIPOS: TipoMensagem[] = ['antes', 'cobranca', 'depois', 'remarketing
 const ROTULO_ITEM: Record<TipoItem, string> = { texto: 'Texto', imagem: 'Imagem', audio: 'Áudio', documento: 'Documento' };
 const ACCEPT_ITEM: Record<TipoItem, string> = { texto: '', imagem: 'image/*', audio: 'audio/*', documento: '.pdf,.doc,.docx,.xls,.xlsx' };
 
-type EdMsg = { id?: string; tipo: TipoMensagem; nome: string; itens: CobMsgItem[] };
+type EdMsg = { id?: string; tipo: TipoMensagem; nome: string; offsetDias: number; hora: string; itens: CobMsgItem[] };
+const cadenciaTxt = (off: number, hora: string) =>
+  (off < 0 ? `${Math.abs(off)} dia${Math.abs(off) === 1 ? '' : 's'} antes` : off === 0 ? 'no dia do vencimento' : `${off} dia${off === 1 ? '' : 's'} depois`) + ` às ${hora}`;
 
 function AbaReguaReal({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (t: string) => void }) {
   const { currentOrg } = useOrg();
@@ -304,7 +306,7 @@ function AbaReguaReal({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (t: str
       if (it.tipo !== 'texto' && !it.midia_url) { aoAvisar(`Anexe o arquivo da bolha de ${ROTULO_ITEM[it.tipo].toLowerCase()}.`); return; }
     }
     try {
-      await salvar.mutateAsync({ id: ed.id, tipo: ed.tipo, nome: ed.nome.trim(), itens: ed.itens });
+      await salvar.mutateAsync({ id: ed.id, tipo: ed.tipo, nome: ed.nome.trim(), offsetDias: ed.offsetDias, hora: ed.hora, itens: ed.itens });
       aoAvisar('Mensagem salva.');
       setEd(null);
     } catch (e) { aoAvisar(`Falha ao salvar: ${(e as Error).message}`); }
@@ -322,7 +324,7 @@ function AbaReguaReal({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (t: str
           <CardVidro spot sobe key={t} style={{ borderRadius: 'var(--r-card)', marginBottom: 14, animationDelay: `${0.06 * (sec + 1)}s` }}>
             <div className="card-cab">
               <h3>{ROTULO_TIPO_MSG[t]}</h3>
-              {gestor && <BotaoSec mini onClick={() => setEd({ tipo: t, nome: '', itens: [{ ordem: 0, tipo: 'texto', corpo: '', midia_url: null, midia_nome: null }] })}>＋ Nova mensagem</BotaoSec>}
+              {gestor && <BotaoSec mini onClick={() => setEd({ tipo: t, nome: '', offsetDias: PADRAO_OFFSET[t], hora: '09:00', itens: [{ ordem: 0, tipo: 'texto', corpo: '', midia_url: null, midia_nome: null }] })}>＋ Nova mensagem</BotaoSec>}
             </div>
             <div className="cm-msg-lista">
               {isLoading && <div className="cm-hint">Carregando…</div>}
@@ -332,13 +334,13 @@ function AbaReguaReal({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (t: str
                   <div className="cm-msg-info">
                     <div className="cm-msg-nm">{m.nome}</div>
                     <div className="cm-msg-meta num">
-                      {m.itens.length} bolha{m.itens.length === 1 ? '' : 's'} · {m.itens.map((i) => ROTULO_ITEM[i.tipo]).join(' → ') || '—'}
+                      {m.itens.length} bolha{m.itens.length === 1 ? '' : 's'} · {m.itens.map((i) => ROTULO_ITEM[i.tipo]).join(' → ') || '—'} · envia {cadenciaTxt(m.offsetDias ?? PADRAO_OFFSET[m.tipo], m.hora ?? '09:00')}
                     </div>
                   </div>
                   {gestor && (
                     <div className="cm-msg-acoes">
                       <Toggle ligado={m.ativo} aoMudar={(v) => alternar.mutate({ id: m.id, ativo: v })} rotulo={m.ativo ? 'Mensagem ativa' : 'Mensagem inativa'} />
-                      <BotaoSec mini onClick={() => setEd({ id: m.id, tipo: m.tipo, nome: m.nome, itens: m.itens.map((i) => ({ ...i })) })}>Editar</BotaoSec>
+                      <BotaoSec mini onClick={() => setEd({ id: m.id, tipo: m.tipo, nome: m.nome, offsetDias: m.offsetDias ?? PADRAO_OFFSET[m.tipo], hora: m.hora ?? '09:00', itens: m.itens.map((i) => ({ ...i })) })}>Editar</BotaoSec>
                     </div>
                   )}
                 </div>
@@ -356,12 +358,28 @@ function AbaReguaReal({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (t: str
             <div className="form-2col">
               <div className="campo"><label>Nome da mensagem *</label><Input value={ed.nome} onChange={(e) => setEd({ ...ed, nome: e.target.value })} placeholder="Ex.: Lembrete 3 dias antes" /></div>
               <div className="campo"><label>Tipo</label>
-                <select className="inp" value={ed.tipo} onChange={(e) => setEd({ ...ed, tipo: e.target.value as TipoMensagem })}>
+                <select className="inp" value={ed.tipo} onChange={(e) => { const t2 = e.target.value as TipoMensagem; setEd({ ...ed, tipo: t2, offsetDias: PADRAO_OFFSET[t2] }); }}>
                   {ORDEM_TIPOS.map((t) => <option key={t} value={t}>{ROTULO_TIPO_MSG[t]}</option>)}
                 </select>
               </div>
             </div>
 
+            <div className="form-2col">
+              <div className="campo">
+                <label>Quando enviar</label>
+                <div className="cm-cad-linha">
+                  <Input inputMode="numeric" style={{ width: 64 }} value={String(Math.abs(ed.offsetDias))}
+                    onChange={(e) => { const n = Math.max(0, Math.min(30, Math.trunc(Number(e.target.value) || 0))); setEd({ ...ed, offsetDias: ed.offsetDias < 0 ? -n : n }); }} />
+                  <select className="inp" value={ed.offsetDias < 0 ? 'antes' : ed.offsetDias === 0 ? 'no_dia' : 'depois'}
+                    onChange={(e) => { const d = e.target.value; const n = Math.abs(ed.offsetDias) || (d === 'no_dia' ? 0 : 1); setEd({ ...ed, offsetDias: d === 'antes' ? -n : d === 'no_dia' ? 0 : n }); }}>
+                    <option value="antes">dia(s) antes do vencimento</option>
+                    <option value="no_dia">no dia do vencimento</option>
+                    <option value="depois">dia(s) depois do vencimento</option>
+                  </select>
+                </div>
+              </div>
+              <div className="campo"><label>Horário (BRT)</label><Input type="time" value={ed.hora} onChange={(e) => setEd({ ...ed, hora: e.target.value || '09:00' })} /></div>
+            </div>
             <div className="campo"><label>Sequência de bolhas (na ordem do envio)</label></div>
             {ed.itens.map((it, k) => (
               <div className="cm-ed-item" key={k}>

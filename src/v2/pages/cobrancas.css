@@ -310,3 +310,7 @@
 .v2 .cm-imp-preview > div { display: flex; justify-content: space-between; font-size: 12px; color: var(--txt-2); }
 .v2 .cm-imp-preview strong { color: var(--txt); font-weight: 600; }
 .v2 .cm-ed-audio { flex-direction: column; align-items: flex-start; }
+
+/* cadência da mensagem (quando enviar) */
+.v2 .cm-cad-linha { display: flex; gap: 8px; align-items: center; }
+.v2 .cm-cad-linha .inp { flex: 1; }

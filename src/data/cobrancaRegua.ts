@@ -22,8 +22,13 @@ export interface CobMensagem {
   tipo: TipoMensagem;
   nome: string;
   ativo: boolean;
+  offsetDias: number | null;   // null = padrão do tipo
+  hora: string | null;         // 'HH:MM' BRT; null = 09:00
   itens: CobMsgItem[];
 }
+
+/** cadência padrão por tipo (motor usa o mesmo mapa) */
+export const PADRAO_OFFSET: Record<TipoMensagem, number> = { antes: -3, cobranca: 0, depois: 2, remarketing: 7 };
 
 export const ROTULO_TIPO_MSG: Record<TipoMensagem, string> = {
   antes: 'Lembrete (antes do vencimento)',
@@ -39,7 +44,7 @@ export function useCobMensagens(orgId?: string) {
     queryFn: async () => {
       const { data, error } = await supabase!
         .from('cobranca_mensagens')
-        .select('id, tipo, nome, ativo, cobranca_mensagem_itens(id, ordem, tipo, corpo, midia_url, midia_nome)')
+        .select('id, tipo, nome, ativo, offset_dias, hora, cobranca_mensagem_itens(id, ordem, tipo, corpo, midia_url, midia_nome)')
         .eq('organizacao_id', orgId!)
         .order('ordem', { ascending: true });
       if (error) throw error;
@@ -48,6 +53,8 @@ export function useCobMensagens(orgId?: string) {
         tipo: m.tipo as TipoMensagem,
         nome: m.nome as string,
         ativo: m.ativo as boolean,
+        offsetDias: (m.offset_dias as number | null) ?? null,
+        hora: m.hora ? String(m.hora).slice(0, 5) : null,
         itens: ((m.cobranca_mensagem_itens ?? []) as CobMsgItem[]).sort((a, b) => a.ordem - b.ordem),
       })) as CobMensagem[];
     },
@@ -68,16 +75,16 @@ export async function uploadMidiaCobranca(orgId: string, file: File): Promise<{ 
 export function useSalvarMensagem(orgId?: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (args: { id?: string; tipo: TipoMensagem; nome: string; itens: CobMsgItem[] }) => {
+    mutationFn: async (args: { id?: string; tipo: TipoMensagem; nome: string; offsetDias: number | null; hora: string | null; itens: CobMsgItem[] }) => {
       if (!orgId) throw new Error('Sem organização.');
       let msgId = args.id;
       if (msgId) {
         const { error } = await supabase!.from('cobranca_mensagens')
-          .update({ tipo: args.tipo, nome: args.nome }).eq('id', msgId);
+          .update({ tipo: args.tipo, nome: args.nome, offset_dias: args.offsetDias, hora: args.hora }).eq('id', msgId);
         if (error) throw error;
       } else {
         const { data, error } = await supabase!.from('cobranca_mensagens')
-          .insert({ organizacao_id: orgId, tipo: args.tipo, nome: args.nome, corpo: args.itens.find((i) => i.tipo === 'texto')?.corpo ?? '' })
+          .insert({ organizacao_id: orgId, tipo: args.tipo, nome: args.nome, offset_dias: args.offsetDias, hora: args.hora, corpo: args.itens.find((i) => i.tipo === 'texto')?.corpo ?? '' })
           .select('id').single();
         if (error) throw error;
         msgId = data!.id as string;

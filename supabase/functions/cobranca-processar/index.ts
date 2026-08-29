@@ -35,6 +35,16 @@ function somaDias(iso: string, dias: number): string {
 const brl = (v: number) => 'R$ ' + v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const dataBR = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
 
+/** executar_em UTC a partir da hora BRT configurada (padrão 09:00; trava 8h-20h BRT) */
+function horaExecUTC(diaISO: string, horaBRT: string | null): string {
+  const m = /^(\d{2}):(\d{2})/.exec(horaBRT ?? '');
+  let hh = m ? Number(m[1]) : 9;
+  const mm = m ? m[2] : '00';
+  if (hh < 8) hh = 8;
+  if (hh > 19) hh = 19;                     // janela de envio 8h-20h BRT
+  return `${diaISO}T${String(hh + 3).padStart(2, '0')}:${mm}:00Z`;
+}
+
 function render(tpl: string, ctx: Record<string, string>): string {
   return tpl.replace(/\{(nome|valor|vencimento|atendente)\}/g, (_, k) => ctx[k] ?? '');
 }
@@ -71,18 +81,20 @@ Deno.serve(async (req) => {
     async function enfileirar(): Promise<Record<string, number>> {
       const hoje = hojeBRT();
       let qMsg = admin.from('cobranca_mensagens')
-        .select('id, organizacao_id, tipo, nome, ordem').eq('ativo', true).order('ordem').order('criado_em');
+        .select('id, organizacao_id, tipo, nome, ordem, offset_dias, hora').eq('ativo', true).order('ordem').order('criado_em');
       if (orgFiltro) qMsg = qMsg.eq('organizacao_id', orgFiltro);
       const { data: msgs } = await qMsg;
       // 1ª mensagem ativa por org×tipo (índice único da fila segura duplicidade por dia)
-      const porOrgTipo = new Map<string, { id: string; organizacao_id: string; tipo: string }>();
+      type Msg = { id: string; organizacao_id: string; tipo: string; offset_dias: number | null; hora: string | null };
+      const porOrgTipo = new Map<string, Msg>();
       for (const m of msgs ?? []) {
         const k = `${m.organizacao_id}:${m.tipo}`;
-        if (!porOrgTipo.has(k)) porOrgTipo.set(k, m as { id: string; organizacao_id: string; tipo: string });
+        if (!porOrgTipo.has(k)) porOrgTipo.set(k, m as Msg);
       }
       let criadas = 0, semTelefone = 0, semAtendente = 0, duplicadas = 0, jaPagoOuSemParcela = 0;
       for (const msg of porOrgTipo.values()) {
-        const alvo = somaDias(hoje, -(OFFSETS[msg.tipo] ?? 0)); // venc + offset = hoje
+        const off = msg.offset_dias ?? OFFSETS[msg.tipo] ?? 0;        // cadência configurável por mensagem
+        const alvo = somaDias(hoje, -off); // venc + offset = hoje
         const { data: comps } = await admin.from('ciclo_vencimento_competencias')
           .select('ciclo_vencimento_id').eq('organizacao_id', msg.organizacao_id).eq('vencimento', alvo);
         const ciclos = [...new Set((comps ?? []).map((c) => c.ciclo_vencimento_id as string))];
@@ -131,7 +143,7 @@ Deno.serve(async (req) => {
           const { error } = await admin.from('cobranca_fila').insert({
             organizacao_id: msg.organizacao_id, cobranca_id: c.id, contato_id: c.contato_id,
             mensagem_id: msg.id, tipo: msg.tipo,
-            executar_em: `${hoje}T12:00:00Z`,                       // 09:00 BRT
+            executar_em: horaExecUTC(hoje, msg.hora),               // hora BRT da mensagem (padrão 09:00)
             status: 'pendente', dry_run: true,                      // SEMPRE nasce simulando
             corpo_final: corpo,
             ultimo_erro: temNumero ? null : 'sem_numero_atendente',
