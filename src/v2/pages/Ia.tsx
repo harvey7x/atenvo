@@ -357,6 +357,10 @@ export default function Ia() {
 
   const aoVincular = async (canal: CanalIa, marcado: boolean) => {
     if (!agente || vincular.isPending) return;
+    if (marcado && !agente.ativo) {
+      setAviso({ tom: 'erro', texto: 'Ative o atendente antes de ligá-lo num canal — vincular um atendente pausado deixa a IA sem responder nesse canal.' });
+      return;
+    }
     const novaLista = canais.filter((c) => (c.id === canal.id ? marcado : c.agenteId === agente.id)).map((c) => c.id);
     if (usarMock) {
       setMockCanais((xs) => xs.map((c) => c.id === canal.id ? { ...c, agenteId: marcado ? agente.id : null } : c));

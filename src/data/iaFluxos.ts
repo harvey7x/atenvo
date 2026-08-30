@@ -60,10 +60,17 @@ export function validarDado(dado: DadoColeta, txt: string): { ok: boolean; valor
       return { ok, valor: t };
     }
     case 'cpf': {
-      // acha a 1ª sequência de 11 dígitos no meio do texto (igual extrairCpfDeTexto do motor),
-      // valida DV e guarda MASCARADO (paridade com a fábrica — nada de CPF cru)
-      const m = t.replace(/[.\s-]/g, '').match(/\d{11}/);
-      const d = m ? m[0] : '';
+      // PARIDADE EXATA com extrairCpfDeTexto do motor: (1) se os dígitos TOTAIS somam 11 (cobre
+      // separador incomum tipo vírgula), usa-os; (2) senão a 1ª RUN de dígitos que normalize p/ 11.
+      const todos = t.replace(/\D/g, '');
+      let d = '';
+      if (todos.length === 11) d = todos;
+      else {
+        for (const run of (t.match(/\d[\d .\/-]*\d|\d/g) || [])) {
+          const dig = run.replace(/\D/g, '');
+          if (dig.length === 11) { d = dig; break; }
+        }
+      }
       const ok = !!d && cpfValido(d);
       return { ok, valor: ok ? `***.***.***-${d.slice(-2)}` : t };
     }

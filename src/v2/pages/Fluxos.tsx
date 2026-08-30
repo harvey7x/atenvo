@@ -139,6 +139,10 @@ export default function Fluxos() {
 
   const aoVincular = async (canal: CanalIa, marcado: boolean) => {
     if (!fluxo || vincular.isPending) return;
+    if (marcado && !fluxo.ativo) {
+      setAviso({ tom: 'erro', texto: 'Ative e salve o fluxo antes de ligá-lo num canal — vincular um rascunho deixa o bot MUDO nesse canal.' });
+      return;
+    }
     if (usarMock) {
       setMockCanais((xs) => xs.map((c) => c.id === canal.id ? { ...c, fluxoId: marcado ? fluxo.id : null } : c));
       return;
@@ -381,8 +385,8 @@ export default function Fluxos() {
               </div>
             ))}
             <div className="ia-hint">
-              O canal marcado passa a rodar ESTE fluxo com todo cliente novo (o fluxo precisa estar <b>ativo</b> e salvo).
-              Desmarcar devolve o canal ao comportamento de fábrica.
+              O canal marcado passa a rodar ESTE fluxo com todo cliente novo (o fluxo precisa estar <b>ativo</b> e salvo —
+              vincular um rascunho deixaria o canal mudo). Desmarcar devolve o canal ao comportamento de fábrica.
             </div>
           </CardVidro>
 
