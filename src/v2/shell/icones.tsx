@@ -57,6 +57,10 @@ export const ICONES: Record<string, ReactNode> = {
   simulador: (
     <Ic><rect x="5" y="3" width="14" height="18" rx="2.2" /><path d="M8.5 7.5h7" /><path strokeLinecap="round" d="M8.5 12h.01M12 12h.01M15.5 12h.01M8.5 15h.01M12 15h.01M15.5 15h.01M8.5 18h.01M12 18h.01M15.5 18h.01" /></Ic>
   ),
+  // Atendente de IA: faísca de 4 pontas + brilho menor (família traço 1.7)
+  ia: (
+    <Ic><path d="M11 4c.7 3.4 2.3 5 5.7 5.7-3.4.7-5 2.3-5.7 5.7-.7-3.4-2.3-5-5.7-5.7C8.7 9 10.3 7.4 11 4z" /><path d="M17.8 14.6c.4 1.8 1.2 2.6 3 3-1.8.4-2.6 1.2-3 3-.4-1.8-1.2-2.6-3-3 1.8-.4 2.6-1.2 3-3z" /></Ic>
+  ),
   configuracoes: (
     <Ic><circle cx="12" cy="12" r="3.2" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2" /></Ic>
   ),

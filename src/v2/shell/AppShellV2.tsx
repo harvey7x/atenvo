@@ -75,6 +75,14 @@ const GRUPOS: { rotulo: string; itens: ItemNav[] }[] = [
     ],
   },
   {
+    // IA configurável (Fase 1, 30/08): o cliente cria o próprio atendente de IA
+    // (provedor + chave própria + prompt). Chave é sensível → item só de admin.
+    rotulo: 'Inteligência',
+    itens: [
+      { slug: 'ia', rotulo: 'Atendente de IA', admin: true },
+    ],
+  },
+  {
     rotulo: 'Sistema',
     itens: [
       { slug: 'integracoes', rotulo: 'Integrações' },
