@@ -34,7 +34,6 @@ const RequireRoleV2 = lazy(() => import('@/v2/guards/RequireRoleV2'));
 const PlanoUsoV2 = lazy(() => import('@/v2/pages/PlanoUso'));
 const CobrancasV2 = lazy(() => import('@/v2/pages/Cobrancas'));
 const FerramentasV2 = lazy(() => import('@/v2/pages/Ferramentas'));
-const GestaoV2 = lazy(() => import('@/v2/pages/Gestao'));
 const AgendamentosV2 = lazy(() => import('@/v2/pages/Agendamentos'));
 const ScriptsV2 = lazy(() => import('@/v2/pages/Scripts'));
 const SimuladorV2 = lazy(() => import('@/v2/pages/Simulador'));
@@ -109,8 +108,6 @@ const routes: RouteObject[] = [
           { path: 'cobrancas/:secao', element: <Lz><CobrancasV2 /></Lz> },
           { path: 'ferramentas', element: <Navigate to="/ferramentas/unificador" replace /> },
           { path: 'ferramentas/:tool', element: <Lz><FerramentasV2 /></Lz> },
-          { path: 'gestao', element: <Navigate to="/gestao/visao" replace /> },
-          { path: 'gestao/:secao', element: <Lz><GestaoV2 /></Lz> },
           { path: 'relatorios', element: <Lz><RelatoriosV2 /></Lz> },
           { path: 'integracoes', element: <Lz><IntegracoesV2 /></Lz> },
           // Maturação DESCONTINUADA (Evolution restrito pela Meta): rota → placeholder "descontinuada".

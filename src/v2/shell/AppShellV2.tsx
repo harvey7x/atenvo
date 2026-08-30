@@ -90,7 +90,7 @@ const GRUPOS: { rotulo: string; itens: ItemNav[] }[] = [
 /* MÓDULOS do sistema (seletor do topo, 29/08): cada módulo troca o menu
    inteiro da esquerda. Atendimento = a operação de sempre; Cobranças = as
    seções do Modo Cobrança viram itens de menu. Novos módulos entram aqui. */
-type ModuloId = 'atendimento' | 'cobrancas' | 'gestao';
+type ModuloId = 'atendimento' | 'cobrancas';
 type Modulo = { id: ModuloId; rotulo: string; home: string; grupos: { rotulo: string; itens: ItemNav[] }[] };
 const COB_SECOES: ItemNav[] = [
   { slug: 'cobrancas/painel', rotulo: 'Painel' },
@@ -101,29 +101,14 @@ const COB_SECOES: ItemNav[] = [
   { slug: 'cobrancas/numeros', rotulo: 'Números' },
   { slug: 'cobrancas/envios', rotulo: 'Envios' },
 ];
-const GESTAO_SECOES: ItemNav[] = [
-  { slug: 'gestao/visao', rotulo: 'Visão geral' },
-  { slug: 'gestao/atendentes', rotulo: 'Atendentes' },
-  { slug: 'gestao/ia', rotulo: 'Inteligência (IA)' },
-  { slug: 'gestao/atendimentos', rotulo: 'Atendimentos' },
-  { slug: 'gestao/resultados', rotulo: 'Resultados' },
-];
 const MODULOS: Modulo[] = [
   { id: 'atendimento', rotulo: 'Atendimento', home: '/whatsapp', grupos: GRUPOS },
   { id: 'cobrancas', rotulo: 'Cobranças', home: '/cobrancas/painel', grupos: [{ rotulo: 'Cobranças', itens: COB_SECOES }] },
-  { id: 'gestao', rotulo: 'Gestão', home: '/gestao/visao', grupos: [{ rotulo: 'Gestão', itens: GESTAO_SECOES }] },
 ];
 /* ícones das seções de cobrança (mesma família traço 1.7) */
 const IcC = (d: string) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><path d={d} /></svg>
 );
-const GESTAO_ICONES: Record<string, ReactNode> = {
-  visao: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><rect x="3" y="3" width="7" height="9" rx="1.5" /><rect x="14" y="3" width="7" height="5" rx="1.5" /><rect x="14" y="12" width="7" height="9" rx="1.5" /><rect x="3" y="16" width="7" height="5" rx="1.5" /></svg>,
-  atendentes: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><circle cx="9" cy="8" r="3.4" /><path d="M3.5 20c.6-3.4 2.8-5 5.5-5s4.9 1.6 5.5 5M16 4.6a3.4 3.4 0 010 6.8" /></svg>,
-  ia: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><rect x="4" y="7" width="16" height="12" rx="3" /><path d="M12 7V4M9 12h.01M15 12h.01M9.5 15.5h5" /></svg>,
-  atendimentos: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.9 8.9 0 0 1-3.8-.8L3 20l1-4.9a8.3 8.3 0 0 1-1-4A8.4 8.4 0 0 1 12 3a8.4 8.4 0 0 1 9 8.5z" /></svg>,
-  resultados: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><path d="M4 20V10M10 20V4M16 20v-8M21 20H3" /></svg>,
-};
 const FERR_ICONES: Record<string, ReactNode> = {
   unificador: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><path d="M8 3H5a2 2 0 0 0-2 2v5M16 3h3a2 2 0 0 1 2 2v5M8 21H5a2 2 0 0 1-2-2v-5M16 21h3a2 2 0 0 0 2-2v-5M9 12h6M12 9v6" /></svg>,
 };
@@ -139,7 +124,6 @@ const COB_ICONES: Record<string, ReactNode> = {
 function iconeDoItem(slug: string): ReactNode {
   if (slug.startsWith('cobrancas/')) return COB_ICONES[slug.split('/')[1]] ?? ICONES.cobrancas;
   if (slug.startsWith('ferramentas/')) return FERR_ICONES[slug.split('/')[1]] ?? FERR_ICONES.unificador;
-  if (slug.startsWith('gestao/')) return GESTAO_ICONES[slug.split('/')[1]] ?? GESTAO_ICONES.visao;
   return ICONES[slug];
 }
 
@@ -314,8 +298,7 @@ export default function AppShellV2() {
 
   // MÓDULO ativo derivado da rota: /cobrancas* = Cobranças, senão Atendimento.
   // Trocar de módulo navega pra home do módulo (o menu da esquerda se refaz).
-  const moduloAtivo: ModuloId = location.pathname.startsWith('/cobrancas') ? 'cobrancas'
-    : location.pathname.startsWith('/gestao') ? 'gestao' : 'atendimento';
+  const moduloAtivo: ModuloId = location.pathname.startsWith('/cobrancas') ? 'cobrancas' : 'atendimento';
   const modulo = MODULOS.find((m) => m.id === moduloAtivo) ?? MODULOS[0];
   const trocarModulo = useCallback((m: Modulo) => {
     setMenuOrg(false);
