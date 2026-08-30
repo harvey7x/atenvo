@@ -407,13 +407,21 @@ async function processarSessao(admin: Admin, sessao: Sessao, canal: Record<strin
       const esperaMs = ehQuota ? 10 * 60_000 : 2 * 60_000;
       await admin.from('ia_sessoes').update({ processar_apos: new Date(Date.now() + esperaMs).toISOString() }).eq('id', sessao.id).eq('status', 'ativa');
       await evento(admin, sessao, ehQuota ? 'quota_gemini' : 'sobrecarga_transitoria', { erro: msg.slice(0, 120) });
-      // preso há ~1h não pode ser silêncio eterno: entrega ao humano com o motivo real
+      // preso há muito tempo não pode ser silêncio eterno: entrega ao humano com o motivo real.
+      // DOIS gatilhos (auditoria 30/08): (a) muitos eventos numa hora — pega sobrecarga rápida (2min);
+      // (b) por TEMPO preso — a QUOTA espaça 10min e NUNCA alcançaria 20/h (limiar inalcançável), então
+      // se o 1º evento preso da sessão já tem >= ~45min, faz o handoff igual.
       const { count: presos1h } = await admin.from('ia_eventos').select('id', { count: 'exact', head: true })
         .eq('sessao_id', sessao.id).in('tipo', ['quota_gemini', 'sobrecarga_transitoria'])
         .gte('criado_em', new Date(Date.now() - 3_600_000).toISOString());
-      if ((presos1h ?? 0) >= 20) {
+      const { data: primeiroPreso } = await admin.from('ia_eventos').select('criado_em')
+        .eq('sessao_id', sessao.id).in('tipo', ['quota_gemini', 'sobrecarga_transitoria'])
+        .gte('criado_em', new Date(Date.now() - 6 * 3_600_000).toISOString())
+        .order('criado_em', { ascending: true }).limit(1).maybeSingle();
+      const presoDesdeMs = primeiroPreso?.criado_em ? Date.now() - Date.parse(String(primeiroPreso.criado_em)) : 0;
+      if ((presos1h ?? 0) >= 20 || presoDesdeMs >= 45 * 60_000) {
         await fazerHandoff(admin, sessao, canal, 'falha_tecnica', [MSG_HANDOFF_FINAL],
-          '🤖 IA SDR — a API do Gemini ficou sobrecarregada/sem cota por ~1h. NÃO foi o cliente. Atendimento entregue ao humano; ver ia_eventos (quota_gemini/sobrecarga_transitoria).');
+          '🤖 IA SDR — a API do Gemini ficou sobrecarregada/sem cota por muito tempo. NÃO foi o cliente. Atendimento entregue ao humano; ver ia_eventos (quota_gemini/sobrecarga_transitoria).');
       }
       return;
     }
@@ -1548,7 +1556,16 @@ async function reescrever(ctx: Ctx, bolhas: string[], motivo: string): Promise<s
 function normalizarSaida(s: string): string { return (s ?? '').replace(/\s+/g, ' ').trim().toLowerCase(); }
 // achata quebras de linha do texto do cliente: sem isso, uma mensagem multilinha poderia forjar
 // uma linha "[atendente humano] ..." no transcript e enganar o modelo (injection de papéis)
-function limparLinha(s: string): string { return (s ?? '').replace(/[\r\n]+/g, ' ⏎ ').replace(/\[(cliente|você|voce|atendente[^\]]*)\]/gi, '($1)'); }
+// P1 (auditoria): a senha do gov.br digitada pelo cliente NÃO pode ir crua ao Gemini/Google. Scrub
+// CIRÚRGICO: redige só o VALOR após "senha é/senha:/código é/senha do gov.br é" — sem tocar em
+// "tenho a senha", "qual a senha?" ou e-mails (o modelo já é instruído a nunca usar a senha).
+function redigirCredencial(s: string): string {
+  return (s ?? '').replace(
+    /\b(senhas?|c[oó]digos?)\b\s*(do\s+gov(\.?\s?br)?\s*)?(é|eh|:|=|for|seria)\s*\S{2,40}/gi,
+    (_m, cue) => `${cue} [omitida — a IA nunca usa/pede senha]`,
+  );
+}
+function limparLinha(s: string): string { return redigirCredencial(s ?? '').replace(/[\r\n]+/g, ' ⏎ ').replace(/\[(cliente|você|voce|atendente[^\]]*)\]/gi, '($1)'); }
 
 /** Dedup duro: colidiu com saída já existente (ou com bolha deste mesmo turno) → reescreve 1x → persistiu → descarta. */
 async function deduplicar(ctx: Ctx, bolhas: string[]): Promise<string[]> {
