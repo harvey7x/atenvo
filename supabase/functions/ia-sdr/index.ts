@@ -259,17 +259,16 @@ async function configComAgente(admin: Admin, base: Record<string, unknown>, agen
 function resolverModelos(iaConfig: Record<string, unknown>): Modelos {
   // agente configurado entra entre o ENV (força do dono) e o cache da auto-recuperação;
   // se o modelo do agente já 404ou (modelo_404), sai da frente até o cliente trocar na UI
-  const m404 = String(iaConfig.modelo_404 ?? '');
-  const vivo = (m: unknown): string => { const v = String(m ?? ''); return v && v !== m404 ? v : ''; };
-  const agenteVivo = vivo(iaConfig.modelo_agente);
+  const vivo = (m: unknown, m404: unknown): string => { const v = String(m ?? ''); return v && v !== String(m404 ?? '') ? v : ''; };
+  const agenteVivo = vivo(iaConfig.modelo_agente, iaConfig.modelo_404);
   const chat = modeloEnvChat() || agenteVivo || String(iaConfig.modelo_efetivo ?? '') || MODELO_DEFAULT;
-  const docs = modeloEnvDocs() || vivo(iaConfig.modelo_agente_docs) || String(iaConfig.modelo_efetivo_docs ?? '') || chat;
+  const docs = modeloEnvDocs() || vivo(iaConfig.modelo_agente_docs, iaConfig.modelo_404_docs) || String(iaConfig.modelo_efetivo_docs ?? '') || chat;
   // modelo FORTE p/ turnos complexos (objeção, dúvida, áudio) — roteador em conversar()
-  const pro = modeloEnvPro() || vivo(iaConfig.modelo_agente_pro) || String(iaConfig.modelo_efetivo_pro ?? '') || 'gemini-pro-latest';
+  const pro = modeloEnvPro() || vivo(iaConfig.modelo_agente_pro, iaConfig.modelo_404_pro) || String(iaConfig.modelo_efetivo_pro ?? '') || 'gemini-pro-latest';
   return { chat, docs, pro };
 }
 
-async function persistirModeloEfetivo(admin: Admin, canalId: string, chave: 'modelo_efetivo' | 'modelo_efetivo_docs' | 'modelo_efetivo_pro' | 'modelo_404', valor: string): Promise<void> {
+async function persistirModeloEfetivo(admin: Admin, canalId: string, chave: 'modelo_efetivo' | 'modelo_efetivo_docs' | 'modelo_efetivo_pro' | 'modelo_404' | 'modelo_404_docs' | 'modelo_404_pro', valor: string): Promise<void> {
   try {
     const { data } = await admin.from('bot_canal_config').select('ia_config').eq('canal_id', canalId).maybeSingle();
     await admin.from('bot_canal_config')
@@ -309,11 +308,11 @@ async function chamarComRecuperacao(admin: Admin, canalId: string, modelos: Mode
     if (tipo === 'docs') {
       modelos.docs = sugestao;
       await persistirModeloEfetivo(admin, canalId, 'modelo_efetivo_docs', sugestao);
-      await persistirModeloEfetivo(admin, canalId, 'modelo_404', modelo);
+      await persistirModeloEfetivo(admin, canalId, 'modelo_404_docs', modelo);
     } else if (tipo === 'pro') {
       modelos.pro = sugestao;
       await persistirModeloEfetivo(admin, canalId, 'modelo_efetivo_pro', sugestao);
-      await persistirModeloEfetivo(admin, canalId, 'modelo_404', modelo);
+      await persistirModeloEfetivo(admin, canalId, 'modelo_404_pro', modelo);
     } else {
       // docs que só herdava do chat acompanha em memória (na próxima run herda do cache)
       if (modelos.docs === modelo) modelos.docs = sugestao;
@@ -733,14 +732,17 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
       bolhas = okTam;
     }
   }
-  const violacoes = bolhas.map((b) => saidaProibida(b) ?? proibidoExtra(b, ctx.iaConfig));
+  // P0 da revisão: o CHECK roda sempre sobre a versão SEM emoji (senão 'jur😀os' passa e o
+  // envio remonta 'juros' limpo). O texto ENVIADO pode manter emoji — só a checagem é stripped.
+  const violacoes = bolhas.map((b) => saidaProibida(removerEmoji(b)) ?? proibidoExtra(removerEmoji(b), ctx.iaConfig));
   if (violacoes.some(Boolean)) {
     for (let i = 0; i < bolhas.length; i++) {
       if (violacoes[i]) await evento(admin, sessao, 'guardrail_bloqueou', { violacao: violacoes[i], texto: bolhas[i].slice(0, 180) });
     }
+    const temasCliente = [...new Set(violacoes.filter(Boolean).filter((v) => v!.startsWith('tema_proibido:')).map((v) => v!.slice('tema_proibido:'.length)))];
     const reescritas = await reescrever(ctx, bolhas,
-      `Sua resposta violou uma regra dura (${violacoes.filter(Boolean).join(', ')}): é PROIBIDO citar valores, taxas, juros, percentuais, margem, prazos, nomes de banco ou "aprovado/reprovado". Reescreva mantendo o sentido, sem nada disso.`);
-    bolhas = (reescritas ?? bolhas).filter((b) => !saidaProibida(b) && !proibidoExtra(b, ctx.iaConfig));
+      `Sua resposta violou uma regra dura (${violacoes.filter(Boolean).join(', ')}): é PROIBIDO citar valores, taxas, juros, percentuais, margem, prazos, nomes de banco ou "aprovado/reprovado".${temasCliente.length ? ` Também é PROIBIDO mencionar: ${temasCliente.join(', ')}.` : ''} Reescreva mantendo o sentido, sem nada disso.`);
+    bolhas = (reescritas ?? bolhas).filter((b) => !saidaProibida(removerEmoji(b)) && !proibidoExtra(removerEmoji(b), ctx.iaConfig));
   }
 
   // ---- dedup duro: nunca repetir uma saída já existente na conversa ----
@@ -750,7 +752,7 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
   {
     const finais: string[] = [];
     for (const b of bolhas) {
-      const v = saidaProibida(b) ?? proibidoExtra(b, ctx.iaConfig);
+      const v = saidaProibida(removerEmoji(b)) ?? proibidoExtra(removerEmoji(b), ctx.iaConfig);
       if (v) { await evento(admin, sessao, 'guardrail_bloqueou', { violacao: v, texto: b.slice(0, 180), pos_dedup: true }); continue; }
       if (b.length > 600) { await evento(admin, sessao, 'bolha_gigante_descartada', { tam: b.length, pos_dedup: true }); continue; }
       finais.push(b);
@@ -762,7 +764,7 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
   //      tamanho → sem legenda). Faltava o limite de tamanho aqui (o dump poderia sair na legenda). ----
   if (t.video?.caption) {
     const cap = manterEmoji ? t.video.caption.trim() : removerEmoji(t.video.caption);
-    const v = saidaProibida(cap) ?? proibidoExtra(cap, ctx.iaConfig);
+    const v = saidaProibida(removerEmoji(cap)) ?? proibidoExtra(removerEmoji(cap), ctx.iaConfig);
     const dup = ctx.saidasAnteriores.has(normalizarSaida(cap));
     if (v || dup || cap.length > 600) {
       await evento(admin, sessao, cap.length > 600 ? 'bolha_gigante_descartada' : (v ? 'guardrail_bloqueou' : 'dedup_descartou'),
@@ -1567,16 +1569,28 @@ const personaDe = (c: Record<string, unknown>): string => String(c.persona_promp
 // conhecimento da empresa (campo separado do prompt): fatos que a IA pode usar ao responder
 const conhecimentoDe = (c: Record<string, unknown>): string => {
   const k = String(c.conhecimento ?? '').trim();
-  return k ? `\n\nINFORMAÇÕES DA EMPRESA (fatos que você conhece; use quando o cliente perguntar — sem despejar tudo de uma vez):\n${k}` : '';
+  return k ? `\n\nINFORMAÇÕES DA EMPRESA (fatos que você conhece; use quando o cliente perguntar):\n${k}\nREGRA: responda no máximo UM desses fatos por vez, em bolha curta — NUNCA copie a lista inteira.` : '';
 };
-// temas proibidos do cliente (além do guardrail de fábrica) — comparação sem acento/caixa
+// temas proibidos do cliente (além do guardrail de fábrica) — comparação sem acento/caixa,
+// com FRONTEIRA DE PALAVRA (senão 'juro' barraria 'conjuro') e stopwords rejeitadas (senão um
+// termo tipo 'com'/'não' casaria em toda frase e EMUDECERIA o canal inteiro — P1 da revisão)
 const _semAcento = (s: string): string => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+const STOP_PROIBIDOS = new Set([
+  'com', 'sem', 'nao', 'sim', 'que', 'por', 'para', 'uma', 'uns', 'umas', 'dos', 'das', 'ele', 'ela',
+  'eles', 'elas', 'voce', 'voces', 'isso', 'isto', 'aqui', 'mais', 'menos', 'muito', 'bem', 'mal',
+  'ate', 'tem', 'ter', 'ser', 'estar', 'foi', 'vai', 'hoje', 'amanha', 'tudo', 'nada', 'como', 'onde',
+]);
 function proibidoExtra(txt: string, c: Record<string, unknown>): string | null {
   const termos = Array.isArray(c.proibidos) ? (c.proibidos as string[]) : [];
   if (!termos.length) return null;
   const t = _semAcento(txt ?? '');
-  for (const termo of termos) {
-    if (termo && t.includes(_semAcento(String(termo)))) return `tema_proibido:${String(termo).slice(0, 30)}`;
+  for (const termoRaw of termos) {
+    const termo = _semAcento(String(termoRaw ?? '').trim());
+    if (termo.length < 3 || STOP_PROIBIDOS.has(termo)) continue;
+    const esc = termo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (new RegExp(`(^|[^\\p{L}\\p{N}])${esc}($|[^\\p{L}\\p{N}])`, 'u').test(t)) {
+      return `tema_proibido:${String(termoRaw).slice(0, 30)}`;
+    }
   }
   return null;
 }
@@ -1819,9 +1833,11 @@ async function enviarBolhas(admin: Admin, ctx: Ctx, bolhasRaw: string[], videoRa
   const canal = ctx.canal;
   const tag = `ia_${sessao.etapa}_${Date.now().toString(36)}`;
 
-  // GARANTIA premium: nenhum emoji chega ao cliente (o prompt proíbe; aqui é a trava de código)
-  const bolhas = bolhasRaw.map(removerEmoji).filter(Boolean);
-  const video = videoRaw ? { ...videoRaw, caption: removerEmoji(videoRaw.caption) } : null;
+  // GARANTIA de fábrica: nenhum emoji chega ao cliente — SALVO se o agente configurado ligou
+  // permitir_emojis (o guardrail já validou a versão SEM emoji lá atrás, então liberar aqui é seguro)
+  const manterEmojiEnvio = (ctx.iaConfig as { permitir_emojis?: boolean }).permitir_emojis === true;
+  const bolhas = (manterEmojiEnvio ? bolhasRaw.map((b) => (b ?? '').trim()) : bolhasRaw.map(removerEmoji)).filter(Boolean);
+  const video = videoRaw ? { ...videoRaw, caption: manterEmojiEnvio ? videoRaw.caption.trim() : removerEmoji(videoRaw.caption) } : null;
 
   // RESPOSTA CITADA (o "balãozinho" do WhatsApp): o 1º balão responde CITANDO a última mensagem
   // do cliente deste turno — deixa claro a que ele está respondendo. Só cita quando houve mensagem

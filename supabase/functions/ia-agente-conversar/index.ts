@@ -21,11 +21,29 @@ const SCHEMA = {
   required: ['mensagens'],
 } as Record<string, unknown>;
 
+/* mesmo strip do motor (ia-sdr): a CHECAGEM roda sempre na versão sem emoji */
+function removerEmoji(t: string): string {
+  return (t ?? '')
+    .replace(/[\p{Extended_Pictographic}\u{200D}\u{20E3}\u{FE0F}\u{FE0E}]/gu, '')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\s+([,.!?;:])/g, '$1')
+    .trim();
+}
 const _semAcento = (s: string): string => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const STOP_PROIBIDOS = new Set([
+  'com', 'sem', 'nao', 'sim', 'que', 'por', 'para', 'uma', 'uns', 'umas', 'dos', 'das', 'ele', 'ela',
+  'eles', 'elas', 'voce', 'voces', 'isso', 'isto', 'aqui', 'mais', 'menos', 'muito', 'bem', 'mal',
+  'ate', 'tem', 'ter', 'ser', 'estar', 'foi', 'vai', 'hoje', 'amanha', 'tudo', 'nada', 'como', 'onde',
+]);
 function proibidoExtra(txt: string, termos: string[]): string | null {
   const t = _semAcento(txt ?? '');
-  for (const termo of termos) {
-    if (termo && t.includes(_semAcento(termo))) return `tema_proibido:${termo.slice(0, 30)}`;
+  for (const termoRaw of termos) {
+    const termo = _semAcento(String(termoRaw ?? '').trim());
+    if (termo.length < 3 || STOP_PROIBIDOS.has(termo)) continue;
+    const esc = termo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (new RegExp(`(^|[^\\p{L}\\p{N}])${esc}($|[^\\p{L}\\p{N}])`, 'u').test(t)) {
+      return `tema_proibido:${termoRaw.slice(0, 30)}`;
+    }
   }
   return null;
 }
@@ -89,18 +107,28 @@ Deno.serve(async (req) => {
     const comp = (ag.comportamentos ?? {}) as Record<string, unknown>;
     const termos = (Array.isArray(comp.proibidos) ? comp.proibidos : [])
       .map((t: unknown) => String(t ?? '').trim()).filter((t: string) => t.length >= 3).slice(0, 40);
+    const permitirEmojis = comp.permitir_emojis === true;
     const cruas = (Array.isArray((r.json as { mensagens?: unknown }).mensagens) ? (r.json as { mensagens: unknown[] }).mensagens : [])
       .map((m) => String(m).trim()).filter(Boolean).slice(0, 3);
-    const mensagens = cruas.map((m) => {
-      const v = saidaProibida(m) ?? proibidoExtra(m, termos);
-      return v ? { texto: `🔒 Mensagem bloqueada pelo filtro de segurança (${v.split(':')[0].replaceAll('_', ' ')}).`, bloqueada: true } : { texto: m, bloqueada: false };
-    });
+    // PARIDADE com o canal: checagem sempre na versão SEM emoji; teto de tamanho (anti-dump);
+    // exibição sem emoji quando o agente não liberou — o teste mostra o que o WhatsApp receberia
+    const somaTotal = cruas.reduce((acc, m) => acc + m.length, 0);
+    const mensagens = (somaTotal > 1000
+      ? [{ texto: '🔒 Resposta descartada pelo filtro (longa demais — proteção contra vazamento). No canal, a IA tentaria de novo.', bloqueada: true }]
+      : cruas.map((m) => {
+          const limpa = removerEmoji(m);
+          if (limpa.length > 600) return { texto: '🔒 Bolha descartada pelo filtro (longa demais — proteção contra vazamento).', bloqueada: true };
+          const v = saidaProibida(limpa) ?? proibidoExtra(limpa, termos);
+          if (v) return { texto: `🔒 Mensagem bloqueada pelo filtro de segurança (${v.split(':')[0].replaceAll('_', ' ')}).`, bloqueada: true };
+          return { texto: permitirEmojis ? m : limpa, bloqueada: false };
+        }));
     if (!mensagens.length) return json({ ok: false, detalhe: 'O modelo não respondeu — tente de novo.' });
     return json({ ok: true, mensagens, modelo });
   } catch (e) {
     const msg = String((e as Error)?.message ?? '');
     if (msg.includes('sem_api_key')) return json({ ok: false, detalhe: 'Guarde a chave no cofre primeiro.' });
     if (msg.includes('abort')) return json({ ok: false, detalhe: 'O provedor demorou demais. Tente de novo.' });
-    return json({ ok: false, detalhe: `Falha no teste: ${msg.slice(0, 160)}` }, 500);
+    const seguro = msg.replace(/key=[^&\s)"']+/gi, 'key=***');
+    return json({ ok: false, detalhe: `Falha no teste: ${seguro.slice(0, 160)}` }, 500);
   }
 });
