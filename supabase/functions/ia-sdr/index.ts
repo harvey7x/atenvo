@@ -172,7 +172,7 @@ Deno.serve(async (req) => {
     const inicio = Date.now();
     const dono = crypto.randomUUID();   // identidade desta invocação p/ a lease de canal
     const { data: cfgs } = await admin.from('bot_canal_config')
-      .select('canal_id, ia_enabled, ia_modo_teste, ia_config, organizacao_id')
+      .select('canal_id, ia_enabled, ia_modo_teste, ia_config, organizacao_id, ia_agente_id')
       .eq('ia_enabled', true);
     if (!cfgs?.length) return json({ ok: true, canais: 0 });
 
@@ -183,7 +183,10 @@ Deno.serve(async (req) => {
         .select('id, nome_interno, transporte, instancia_externa, cloud_phone_number_id, numero_conectado')
         .eq('id', cfg.canal_id).maybeSingle();
       if (!canal) continue;
-      resultados.push(await processarCanal(admin, canal, (cfg.ia_config ?? {}) as Record<string, unknown>, inicio, dono));
+      const iaConfig = await configComAgente(admin, (cfg.ia_config ?? {}) as Record<string, unknown>,
+        (cfg as { ia_agente_id?: string | null }).ia_agente_id ?? null);
+      if (iaConfig === null) { resultados.push({ canal: cfg.canal_id, pausado: 'agente_inativo' }); continue; }
+      resultados.push(await processarCanal(admin, canal, iaConfig, inicio, dono));
     }
     return json({ ok: true, canais: cfgs.length, resultados });
   } catch (e) {
@@ -191,18 +194,68 @@ Deno.serve(async (req) => {
   }
 });
 
+// ======== IA configurável (Fase 1): agente do canal sobrepõe a config de fábrica ========
+// bot_canal_config.ia_agente_id → ia_agentes (persona/modelo/chave/comportamentos). Sem agente
+// (ou agente INATIVO, ou qualquer erro), devolve a config como veio — motor idêntico ao de sempre.
+async function configComAgente(admin: Admin, base: Record<string, unknown>, agenteId: string | null): Promise<Record<string, unknown> | null> {
+  if (!agenteId) return base;
+  try {
+    const { data: ag } = await admin.from('ia_agentes')
+      .select('provedor, modelo, persona_prompt, comportamentos, ativo')
+      .eq('id', agenteId).maybeSingle();
+    if (!ag) return base;                 // vínculo pendurado → fábrica
+    if (ag.ativo !== true) return null;   // agente DESLIGADO → canal pausado (não fábrica!)
+    const cfg: Record<string, unknown> = { ...base };
+    const comp = (ag.comportamentos ?? {}) as Record<string, unknown>;
+    const janela = (comp.janela ?? {}) as Record<string, unknown>;
+    // janela invertida (fim<=inicio) NUNCA entra: dentroDaJanela viraria insatisfazível e o
+    // nudge re-agendaria pra sempre em silêncio (achado P1 da revisão) — ignora e fica a fábrica
+    if (typeof janela.inicio === 'string' && janela.inicio && typeof janela.fim === 'string' && janela.fim
+        && parseHora(String(janela.fim), 0) > parseHora(String(janela.inicio), 0)) {
+      cfg.janela_inicio = janela.inicio;
+      cfg.janela_fim = janela.fim;
+    }
+    if (Number(comp.max_chamadas_dia)) cfg.max_chamadas_dia = Number(comp.max_chamadas_dia);
+    if (comp.horario && typeof comp.horario === 'object') cfg.horario = comp.horario;
+    if (comp.nudges_ativos === false) cfg.nudges_ativos = false;
+    const persona = String(ag.persona_prompt ?? '').trim();
+    if (persona) cfg.persona_prompt = persona;
+    // modelo + chave própria: por ora só no caminho Gemini (o motor fala a API dele de ponta a
+    // ponta — visão/áudio/schemas). OpenAI/Anthropic entram com o adaptador; a UI já avisa.
+    if (ag.provedor === 'gemini') {
+      let temChaveAgente = false;
+      try {
+        const { data: chave } = await admin.rpc('ia_agente_chave', { p_agente: agenteId });
+        if (typeof chave === 'string' && chave) { cfg.api_key = chave; temChaveAgente = true; }
+      } catch { /* leitura falhou — tratado abaixo */ }
+      if (temChaveAgente) {
+        if (String(ag.modelo ?? '').trim()) cfg.modelo_agente = String(ag.modelo).trim();
+      } else {
+        // sem chave própria legível: NÃO aplica o modelo do cliente (rodaria na conta da
+        // plataforma) — segue 100% fábrica e deixa rastro no log da function
+        console.error('[ia-configuravel] agente sem chave legível; canal segue na config de fábrica', agenteId);
+      }
+    }
+    return cfg;
+  } catch { return base; }
+}
+
 // ======== modelo: resolução + auto-recuperação de 404 (rename do Google) ========
 // Precedência: ENV explícito > cache da auto-recuperação > default. O env na frente é o que
 // permite ao dono FORÇAR um modelo mesmo depois de um 404 ter cacheado modelo_efetivo.
 function resolverModelos(iaConfig: Record<string, unknown>): Modelos {
-  const chat = modeloEnvChat() || String(iaConfig.modelo_efetivo ?? '') || MODELO_DEFAULT;
+  // agente configurado entra entre o ENV (força do dono) e o cache da auto-recuperação;
+  // se o modelo do agente já 404ou (modelo_404), sai da frente até o cliente trocar na UI
+  const agenteModelo = String(iaConfig.modelo_agente ?? '');
+  const agenteVivo = agenteModelo && agenteModelo !== String(iaConfig.modelo_404 ?? '') ? agenteModelo : '';
+  const chat = modeloEnvChat() || agenteVivo || String(iaConfig.modelo_efetivo ?? '') || MODELO_DEFAULT;
   const docs = modeloEnvDocs() || String(iaConfig.modelo_efetivo_docs ?? '') || chat;
   // modelo FORTE p/ turnos complexos (objeção, dúvida, áudio) — roteador em conversar()
   const pro = modeloEnvPro() || String(iaConfig.modelo_efetivo_pro ?? '') || 'gemini-pro-latest';
   return { chat, docs, pro };
 }
 
-async function persistirModeloEfetivo(admin: Admin, canalId: string, chave: 'modelo_efetivo' | 'modelo_efetivo_docs' | 'modelo_efetivo_pro', valor: string): Promise<void> {
+async function persistirModeloEfetivo(admin: Admin, canalId: string, chave: 'modelo_efetivo' | 'modelo_efetivo_docs' | 'modelo_efetivo_pro' | 'modelo_404', valor: string): Promise<void> {
   try {
     const { data } = await admin.from('bot_canal_config').select('ia_config').eq('canal_id', canalId).maybeSingle();
     await admin.from('bot_canal_config')
@@ -215,7 +268,7 @@ interface ChamadaOk { r: ResultadoGemini; modeloUsado: string; atualizadoDe?: st
 
 /** Chama o Gemini já com retry/backoff; num 404 de modelo com sugestão, troca na hora e cacheia. */
 async function chamarComRecuperacao(admin: Admin, canalId: string, modelos: Modelos, tipo: 'chat' | 'docs' | 'pro', p: {
-  system: string; partes: ParteGemini[]; schema: Record<string, unknown>; temperatura?: number; maxTokens?: number; semPensar?: boolean;
+  system: string; partes: ParteGemini[]; schema: Record<string, unknown>; temperatura?: number; maxTokens?: number; semPensar?: boolean; apiKey?: string;
 }): Promise<ChamadaOk> {
   const modelo = tipo === 'docs' ? modelos.docs : tipo === 'pro' ? modelos.pro : modelos.chat;
   try {
@@ -250,6 +303,7 @@ async function chamarComRecuperacao(admin: Admin, canalId: string, modelos: Mode
       if (modelos.docs === modelo) modelos.docs = sugestao;
       modelos.chat = sugestao;
       await persistirModeloEfetivo(admin, canalId, 'modelo_efetivo', sugestao);
+      await persistirModeloEfetivo(admin, canalId, 'modelo_404', modelo);   // agente com modelo morto sai da precedência
     }
     return { r: r2, modeloUsado: sugestao, atualizadoDe: modelo };
   }
@@ -319,7 +373,7 @@ async function processarCanal(admin: Admin, canal: Record<string, unknown>, iaCo
     // porque só lá se sabe se há mensagem nova do cliente.
 
     // ---- sem chave: adia com evento, nunca crash (setar a secret resolve sozinho) ----
-    if (!temChaveGemini()) {
+    if (!temChaveGemini() && !String((iaConfig as { api_key?: string }).api_key ?? '')) {
       for (const s of sessoes) {
         await admin.from('ia_sessoes').update({ processar_apos: new Date(Date.now() + 30 * 60_000).toISOString() }).eq('id', s.id).eq('status', 'ativa');
         await evento(admin, s, 'sem_api_key', {});
@@ -520,6 +574,7 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
   const transPendente = dados.transicao_pendente === true;
   const nudgeN = Number(dados.nudge_n ?? 0) || 0;
   const ehNudge = !novas.length && dados.abertura_enviada === true && !transPendente
+    && iaConfig.nudges_ativos !== false   // agente configurado pode desligar a escada de follow-up
     && !dados.aguardando_humano && sessao.etapa !== 'conclusao' && sessao.etapa !== 'retorno'
     && nudgeN < nudgeMaxPara(sessao.etapa) && dados.nudge_alvo === processadoAte
     // retomada FRIA (o cliente nunca respondeu à retomada) não ganha escada: a abertura JÁ é o toque
@@ -817,7 +872,8 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
       const dadosFinais = patch.dados as Record<string, unknown>;
       const etapaFinal = (patch.etapa as string) ?? sessao.etapa;
       const nFinal = Number(dadosFinais.nudge_n ?? 0) || 0;
-      if (!dadosFinais.aguardando_humano && etapaFinal !== 'conclusao' && etapaFinal !== 'retorno' && nFinal < nudgeMaxPara(etapaFinal)
+      if (iaConfig.nudges_ativos !== false
+          && !dadosFinais.aguardando_humano && etapaFinal !== 'conclusao' && etapaFinal !== 'retorno' && nFinal < nudgeMaxPara(etapaFinal)
           && (dadosFinais.retomada !== true || dadosFinais.teve_inbound === true)) {
         let quando: string;
         if (nFinal === 0) quando = ajustarJanelaNudge(Date.now() + delayNudge1Ms(etapaFinal, patch.docs as Record<string, unknown>) + rand(0, 5 * 60_000));
@@ -1441,29 +1497,56 @@ function fmtNum(v: unknown): string { return typeof v === 'number' && Number.isF
 // ======== horário de atendimento (seg-sex 9h-19h SP) ========
 // Fora do horário a IA atende e coleta normal; só no FECHO (ou se o cliente cobrar) avisa que está
 // fora do expediente e QUANDO o atendente retorna (próxima abertura). `idx`: 0=Dom..6=Sáb.
-export function horarioFrase(idx: number, hora: number): { dentro: boolean; frase: string } {
+// formatos de hora falados pela IA: 540→"9 horas"/"9h"; 510→"8h30" (minuto honesto)
+function fmtHoraLonga(min: number): string {
+  const h = Math.floor(min / 60), m = min % 60;
+  return m ? `${h}h${String(m).padStart(2, '0')}` : `${h} horas`;
+}
+function fmtHoraCurta(min: number): string {
+  const h = Math.floor(min / 60), m = min % 60;
+  return m ? `${h}h${String(m).padStart(2, '0')}` : `${h}h`;
+}
+export function horarioFrase(idx: number, minDia: number, iniMin = 9 * 60, fimMin = 19 * 60): { dentro: boolean; frase: string } {
   const diaUtil = idx >= 1 && idx <= 5;
-  const dentro = diaUtil && hora >= 9 && hora < 19;
+  const dentro = diaUtil && minDia >= iniMin && minDia < fimMin;
   if (dentro) return { dentro: true, frase: '' };
+  const abre = fmtHoraLonga(iniMin);
   let frase: string;
-  if (idx === 0 || idx === 6) frase = 'na segunda-feira, logo cedo, a partir das 9 horas'; // fim de semana
-  else if (hora < 9) frase = 'hoje mesmo, a partir das 9 horas';                            // dia útil, antes de abrir
-  else if (idx === 5) frase = 'na segunda-feira, logo cedo, a partir das 9 horas';          // sexta, depois de fechar
-  else frase = 'amanhã, logo cedo, a partir das 9 horas';                                   // seg-qui, depois de fechar
+  if (idx === 0 || idx === 6) frase = `na segunda-feira, logo cedo, a partir das ${abre}`; // fim de semana
+  else if (minDia < iniMin) frase = `hoje mesmo, a partir das ${abre}`;                    // dia útil, antes de abrir
+  else if (idx === 5) frase = `na segunda-feira, logo cedo, a partir das ${abre}`;         // sexta, depois de fechar
+  else frase = `amanhã, logo cedo, a partir das ${abre}`;                                  // seg-qui, depois de fechar
   return { dentro: false, frase };
 }
-function statusHorario(): { dentro: boolean; frase: string } {
-  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Sao_Paulo', weekday: 'short', hour: '2-digit', hourCycle: 'h23' }).formatToParts(new Date());
+// horário do agente configurado (IA configurável): {ativo, inicio 'HH:MM', fim 'HH:MM'};
+// ausente/torto = fábrica (seg-sex 9h-19h). Honesto ao MINUTO (08:30 é 08:30, não "8h").
+function minutosHorario(iaConfig: Record<string, unknown>): { iniMin: number; fimMin: number } {
+  const hor = (iaConfig.horario ?? {}) as Record<string, unknown>;
+  const iniMin = parseHora(String(hor.inicio ?? '09:00'), 9 * 60);
+  const fimMin = parseHora(String(hor.fim ?? '19:00'), 19 * 60);
+  return (fimMin > iniMin) ? { iniMin, fimMin } : { iniMin: 9 * 60, fimMin: 19 * 60 };   // config torta → fábrica
+}
+function statusHorario(iaConfig: Record<string, unknown>): { dentro: boolean; frase: string } {
+  const { iniMin, fimMin } = minutosHorario(iaConfig);
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Sao_Paulo', weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date());
   const wd = parts.find((x) => x.type === 'weekday')?.value ?? 'Mon';
   const hora = Number(parts.find((x) => x.type === 'hour')?.value ?? '12');
+  const minuto = Number(parts.find((x) => x.type === 'minute')?.value ?? '0');
   const idx = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(wd);
-  return horarioFrase(idx < 0 ? 1 : idx, Number.isFinite(hora) ? hora : 12);
+  const minDia = (Number.isFinite(hora) ? hora : 12) * 60 + (Number.isFinite(minuto) ? minuto : 0);
+  return horarioFrase(idx < 0 ? 1 : idx, minDia, iniMin, fimMin);
 }
-function notaHorarioAtendimento(): string {
-  const st = statusHorario();
+function notaHorarioAtendimento(iaConfig: Record<string, unknown>): string {
+  const hor = (iaConfig.horario ?? {}) as Record<string, unknown>;
+  if (hor.ativo === false) return '';   // agente 24/7: nunca fala de expediente
+  const { iniMin, fimMin } = minutosHorario(iaConfig);
+  const st = statusHorario(iaConfig);
   if (st.dentro) return '';
-  return `\n\nHORÁRIO DE ATENDIMENTO: agora estamos FORA do horário (o atendimento é de segunda a sexta, das 9h às 19h). Atenda a pessoa e colete tudo normalmente, sem pressa. Mas AO FECHAR a SUA parte (quando for passar o caso pro analista/colega) OU se a pessoa perguntar/cobrar quando vão falar com ela, avise com naturalidade e sem drama que neste momento já está fora do nosso horário e que um atendente entra em contato ${st.frase}. Diga isso UMA vez, só no fecho ou se ela cobrar — NUNCA no meio da coleta.`;
+  return `\n\nHORÁRIO DE ATENDIMENTO: agora estamos FORA do horário (o atendimento é de segunda a sexta, das ${fmtHoraCurta(iniMin)} às ${fmtHoraCurta(fimMin)}). Atenda a pessoa e colete tudo normalmente, sem pressa. Mas AO FECHAR a SUA parte (quando for passar o caso pro analista/colega) OU se a pessoa perguntar/cobrar quando vão falar com ela, avise com naturalidade e sem drama que neste momento já está fora do nosso horário e que um atendente entra em contato ${st.frase}. Diga isso UMA vez, só no fecho ou se ela cobrar — NUNCA no meio da coleta.`;
 }
+
+// persona do agente configurado (IA configurável); vazio/ausente = PERSONA de fábrica
+const personaDe = (c: Record<string, unknown>): string => String(c.persona_prompt ?? '').trim() || PERSONA;
 
 // ======== conversa (persona + objetivo da etapa + contexto completo) ========
 interface RespostaChat { mensagens: string[]; acao: string; dados: Record<string, unknown>; perguntouValores: boolean }
@@ -1486,7 +1569,7 @@ async function conversar(ctx: Ctx, opts: { etapa?: string; instrucaoExtra?: stri
     instrucao = instrucao.replaceAll(`{${k}}`, v);
   }
   const acomp = ctx.dados.aguardando_humano ? `\n\n${notaAcompanhamento(String(ctx.dados.aguardando_humano))}` : '';
-  const system = `${PERSONA}\n\n${instrucao}${acomp}${notaHorarioAtendimento()}${opts.instrucaoExtra ? `\n\nNOTA DESTE TURNO: ${opts.instrucaoExtra}` : ''}`;
+  const system = `${personaDe(ctx.iaConfig)}\n\n${instrucao}${acomp}${notaHorarioAtendimento(ctx.iaConfig)}${opts.instrucaoExtra ? `\n\nNOTA DESTE TURNO: ${opts.instrucaoExtra}` : ''}`;
 
   // áudios ANTES do contexto (com teto agregado): o texto do contexto precisa dizer a VERDADE
   // sobre o que está anexado — dizer "ouça o áudio" com o anexo ausente faz o modelo alucinar.
@@ -1528,7 +1611,7 @@ async function conversar(ctx: Ctx, opts: { etapa?: string; instrucaoExtra?: stri
 async function gerarDespedida(ctx: Ctx, direcao: string): Promise<string[]> {
   try {
     const j = await geminiSessao(ctx, 'despedida', {
-      system: `${PERSONA}${notaHorarioAtendimento()}\n\nOBJETIVO DESTE TURNO: encerrar a SUA parte da conversa. ${direcao} No máximo 2 bolhas curtas e calorosas.`,
+      system: `${personaDe(ctx.iaConfig)}${notaHorarioAtendimento(ctx.iaConfig)}\n\nOBJETIVO DESTE TURNO: encerrar a SUA parte da conversa. ${direcao} No máximo 2 bolhas curtas e calorosas.`,
       partes: [{ text: montarContexto(ctx) }, { text: 'Responda no JSON pedido.' }],
       schema: esquemaChat({}), temperatura: 0.7, maxTokens: 1536,
     });
@@ -1543,7 +1626,7 @@ async function gerarDespedida(ctx: Ctx, direcao: string): Promise<string[]> {
 async function reescrever(ctx: Ctx, bolhas: string[], motivo: string): Promise<string[] | null> {
   try {
     const j = await geminiSessao(ctx, 'reescrita', {
-      system: `${PERSONA}\n\nTAREFA: reescrever as mensagens abaixo mantendo o sentido e o tom. ${motivo}`,
+      system: `${personaDe(ctx.iaConfig)}\n\nTAREFA: reescrever as mensagens abaixo mantendo o sentido e o tom. ${motivo}`,
       partes: [{ text: `MENSAGENS A REESCREVER:\n${bolhas.map((b, i) => `${i + 1}. ${b}`).join('\n')}\n\nFRASES QUE VOCÊ JÁ USOU NESTA CONVERSA (não repita nenhuma):\n${[...ctx.saidasAnteriores].slice(0, 40).map((s) => `- ${s}`).join('\n')}` }],
       schema: SCHEMA_REESCRITA, temperatura: 0.8, maxTokens: 2048,
     });
@@ -1637,12 +1720,13 @@ function montarContexto(ctx: Ctx, audios?: { carregados: Set<string>; falhados: 
 
 // ======== Gemini com evento de custo/auditoria (lança FalhaTecnica; nunca conversa) ========
 async function geminiSessao(ctx: Ctx, finalidade: string, p: {
-  system: string; partes: ParteGemini[]; schema: Record<string, unknown>; temperatura: number; maxTokens: number; semPensar?: boolean;
+  system: string; partes: ParteGemini[]; schema: Record<string, unknown>; temperatura: number; maxTokens: number; semPensar?: boolean; apiKey?: string;
 }, tipo: 'chat' | 'docs' | 'pro' = 'chat'): Promise<Record<string, unknown>> {
   // turno longo não pode deixar a lease do canal expirar (o serial por chip é sagrado)
   try { await ctx.admin.rpc('ia_canal_lock', { p_canal: ctx.sessao.canal_id, p_dono: ctx.dono, p_ttl_seg: 240 }); } catch { /* melhor esforço */ }
   try {
-    const { r, modeloUsado, atualizadoDe } = await chamarComRecuperacao(ctx.admin, ctx.sessao.canal_id, ctx.modelos, tipo, p);
+    const chaveAgente = String((ctx.iaConfig as { api_key?: string }).api_key ?? '') || undefined;
+    const { r, modeloUsado, atualizadoDe } = await chamarComRecuperacao(ctx.admin, ctx.sessao.canal_id, ctx.modelos, tipo, { ...p, apiKey: p.apiKey ?? chaveAgente });
     if (atualizadoDe) await evento(ctx.admin, ctx.sessao, 'modelo_atualizado', { de: atualizadoDe, para: modeloUsado, tipo });
     await evento(ctx.admin, ctx.sessao, 'gemini_call', { canal_id: ctx.sessao.canal_id, finalidade, modelo: modeloUsado }, r.tokensIn, r.tokensOut);
     return r.json;
@@ -1977,9 +2061,14 @@ function proximaManhaNudge(): string {
   return new Date(base.getTime() + rand(0, 90 * 60_000)).toISOString();
 }
 
-function dentroDaJanela(iaConfig: Record<string, unknown>): boolean {
+function minutosJanela(iaConfig: Record<string, unknown>): { ini: number; fim: number } {
   const ini = parseHora(String((iaConfig as { janela_inicio?: string }).janela_inicio ?? '07:30'), 7 * 60 + 30);
   const fim = parseHora(String((iaConfig as { janela_fim?: string }).janela_fim ?? '21:30'), 21 * 60 + 30);
+  // janela invertida seria insatisfazível (nudge re-agendando pra sempre) → fábrica
+  return (fim > ini) ? { ini, fim } : { ini: 7 * 60 + 30, fim: 21 * 60 + 30 };
+}
+function dentroDaJanela(iaConfig: Record<string, unknown>): boolean {
+  const { ini, fim } = minutosJanela(iaConfig);
   const sp = spWallClock();
   const min = sp.getUTCHours() * 60 + sp.getUTCMinutes();
   return min >= ini && min <= fim;
@@ -1991,7 +2080,7 @@ function parseHora(s: string, fallback: number): number {
 }
 /** Próxima abertura da janela (hoje se ainda não abriu, senão amanhã) + jitter 0–45 min. */
 function proximaAbertura(iaConfig: Record<string, unknown>): string {
-  const ini = parseHora(String((iaConfig as { janela_inicio?: string }).janela_inicio ?? '07:30'), 7 * 60 + 30);
+  const { ini } = minutosJanela(iaConfig);
   const sp = spWallClock();
   const minAgora = sp.getUTCHours() * 60 + sp.getUTCMinutes();
   let ano = sp.getUTCFullYear(), mes = sp.getUTCMonth() + 1, dia = sp.getUTCDate();

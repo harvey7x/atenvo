@@ -38,8 +38,9 @@ export async function chamarGeminiJson(modelo: string, p: {
   temperatura?: number;
   maxTokens?: number;
   semPensar?: boolean;                          // extração: thinkingBudget 0 (adaptativo)
+  apiKey?: string;                              // chave PRÓPRIA do agente (IA configurável); vazio = env
 }): Promise<ResultadoGemini> {
-  const key = env('GEMINI_API_KEY');
+  const key = p.apiKey || env('GEMINI_API_KEY');
   if (!key) throw new Error('sem_api_key');
   const tentaSemPensar = p.semPensar === true && thinkingConfigSuportado;
   const ctrl = new AbortController();
