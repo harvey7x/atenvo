@@ -24,6 +24,16 @@ export interface ComportamentosIa {
   nudges_ativos?: boolean;
   /** teto de chamadas de IA por dia, por canal */
   max_chamadas_dia?: number;
+  /** temas que a IA nunca pode citar (além do filtro de fábrica) */
+  proibidos?: string[];
+  /** deixa a IA usar emojis (fábrica remove todos) */
+  permitir_emojis?: boolean;
+  /** mostra "digitando…" antes de cada bolha (fábrica: ligado) */
+  simular_digitacao?: boolean;
+  /** avançado: modelo dedicado pra leitura de documentos (visão) */
+  modelo_docs?: string;
+  /** avançado: modelo forte pra casos complexos (objeção, dúvida, áudio) */
+  modelo_pro?: string;
 }
 
 export interface AgenteIa {
@@ -32,6 +42,7 @@ export interface AgenteIa {
   provedor: ProvedorIa;
   modelo: string;
   personaPrompt: string;
+  conhecimento: string;
   comportamentos: ComportamentosIa;
   ativo: boolean;
   chaveDefinidaEm: string | null;
@@ -62,6 +73,7 @@ function mapAgente(r: Row): AgenteIa {
     provedor: ((r.provedor as string) || 'gemini') as ProvedorIa,
     modelo: (r.modelo as string) || '',
     personaPrompt: (r.persona_prompt as string) || '',
+    conhecimento: (r.conhecimento as string) || '',
     comportamentos: ((r.comportamentos as ComportamentosIa) || {}),
     ativo: !!r.ativo,
     chaveDefinidaEm: (r.chave_definida_em as string) || null,
@@ -77,7 +89,7 @@ export function useAgentesIa() {
     queryFn: async (): Promise<AgenteIa[]> => {
       const { data, error } = await supabase!
         .from('ia_agentes')
-        .select('id, nome, provedor, modelo, persona_prompt, comportamentos, ativo, chave_definida_em, criado_em')
+        .select('id, nome, provedor, modelo, persona_prompt, conhecimento, comportamentos, ativo, chave_definida_em, criado_em')
         .eq('organizacao_id', org!)
         .order('criado_em', { ascending: true });
       if (error) throw new Error(error.message);
@@ -137,7 +149,7 @@ export function useCriarAgente() {
 export function useSalvarAgente() {
   const qc = useQueryClient(); const { currentOrg } = useOrg();
   return useMutation({
-    mutationFn: async (p: { id: string; nome: string; provedor: ProvedorIa; modelo: string; personaPrompt: string; comportamentos: ComportamentosIa; ativo: boolean }) => {
+    mutationFn: async (p: { id: string; nome: string; provedor: ProvedorIa; modelo: string; personaPrompt: string; conhecimento: string; comportamentos: ComportamentosIa; ativo: boolean }) => {
       const { error } = await supabase!
         .from('ia_agentes')
         .update({
@@ -145,6 +157,7 @@ export function useSalvarAgente() {
           provedor: p.provedor,
           modelo: p.modelo.trim(),
           persona_prompt: p.personaPrompt,
+          conhecimento: p.conhecimento,
           comportamentos: p.comportamentos,
           ativo: p.ativo,
         })
@@ -248,6 +261,46 @@ export function useModoTeste() {
   });
 }
 
+/** Atividade real do agente (RPC soma os canais vinculados). */
+export interface MetricasIa { sessoesAtivas: number; chamadasHoje: number; nudgesHoje: number; handoffs7d: number; canais: number }
+export function useMetricasIa(agenteId: string | null, habilitado: boolean) {
+  return useQuery({
+    queryKey: ['ia-metricas', agenteId], enabled: IA_REAL && habilitado && !!agenteId,
+    refetchInterval: 60_000,
+    queryFn: async (): Promise<MetricasIa> => {
+      const { data, error } = await supabase!.rpc('ia_agente_metricas', { p_agente: agenteId! });
+      if (error) throw new Error(error.message);
+      const r = (data as Row) || {};
+      return {
+        sessoesAtivas: Number(r.sessoes_ativas) || 0,
+        chamadasHoje: Number(r.chamadas_hoje) || 0,
+        nudgesHoje: Number(r.nudges_hoje) || 0,
+        handoffs7d: Number(r.handoffs_7d) || 0,
+        canais: Number(r.canais) || 0,
+      };
+    },
+  });
+}
+
+/** Playground "Experimentar": conversa de teste com o atendente (edge, chave do cofre). */
+export interface BolhaPlayground { texto: string; bloqueada: boolean }
+export function useConversarPlayground() {
+  return useMutation({
+    mutationFn: async (p: { agenteId: string; mensagem: string; historico: { de: 'cliente' | 'ia'; texto: string }[] }): Promise<BolhaPlayground[]> => {
+      const { data, error } = await supabase!.functions.invoke('ia-agente-conversar', {
+        body: { agente_id: p.agenteId, mensagem: p.mensagem, historico: p.historico },
+      });
+      if (error) throw new Error(error.message);
+      const r = (data as Row) || {};
+      if (!r.ok) throw new Error((r.detalhe as string) || 'Falha no teste');
+      return (Array.isArray(r.mensagens) ? r.mensagens : []).map((m) => {
+        const b = m as Row;
+        return { texto: String(b.texto ?? ''), bloqueada: !!b.bloqueada };
+      });
+    },
+  });
+}
+
 /** Testa a chave/modelo salvos chamando o provedor de verdade (edge function). */
 export function useTestarConexao() {
   return useMutation({
@@ -270,7 +323,8 @@ export const MOCK_AGENTES: AgenteIa[] = [
     personaPrompt:
       'Você é a Sofia, atendente da empresa. Atende aposentados e pensionistas do INSS com cordialidade e frases curtas. ' +
       'Nunca fala de valores, taxas ou juros — isso é com o consultor humano. Seu objetivo é acolher, entender o caso e coletar os documentos.',
-    comportamentos: { horario: { ativo: true, inicio: '09:00', fim: '19:00' }, nudges_ativos: true, max_chamadas_dia: 500 },
+    conhecimento: 'Atendemos de segunda a sexta. Trabalhamos com revisão de descontos de aposentados e pensionistas. O escritório fica em São Paulo.',
+    comportamentos: { horario: { ativo: true, inicio: '09:00', fim: '19:00' }, nudges_ativos: true, max_chamadas_dia: 500, proibidos: ['concorrente X'], simular_digitacao: true },
     ativo: true,
     chaveDefinidaEm: '2026-08-29T14:00:00Z',
     criadoEm: '2026-08-20T12:00:00Z',

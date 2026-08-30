@@ -1,34 +1,39 @@
 /* ============================================================================
-   Atendente de IA — Fase 1 (IA configurável)
+   Atendente de IA — IA configurável (Fase 1 "completa")
 
-   O cliente cria e governa o próprio atendente: provedor + chave PRÓPRIA
-   (write-only → Vault), modelo, prompt (persona), comportamentos e canais.
-   Sem agente vinculado o motor segue no comportamento de fábrica; agente
-   DESATIVADO pausa a IA nos canais dele (nunca volta pra fábrica em silêncio).
+   O cliente cria e governa os próprios atendentes: provedor + chave PRÓPRIA
+   (write-only → Vault), modelo, prompt (persona), CONHECIMENTO da empresa,
+   temas proibidos, humanização (emojis/digitação/tom), comportamentos,
+   modelos avançados, canais — e EXPERIMENTA numa conversa de teste antes de
+   ligar no WhatsApp. Card de atividade mostra números reais do motor.
 
-   Fase 1 roda no GEMINI de ponta a ponta; ChatGPT/Claude aparecem no seletor
-   como "em breve" — prometer conversa neles antes do adaptador seria mentira
-   (achado P0 da revisão).
+   Regras duras (revisão adversarial):
+   - Sem agente vinculado o motor é byte-idêntico à fábrica; agente DESATIVADO
+     pausa a IA nos canais (nunca fábrica em silêncio).
+   - Fase 1 roda no GEMINI; ChatGPT/Claude = "em breve" (sem promessa falsa).
+   - Ativar exige chave no cofre; excluir DESLIGA a IA dos canais.
+   - Tudo que aparece aqui FUNCIONA no motor — nada decorativo.
 
-   Em modo demo (ou sem Supabase) tudo roda em estado local: dá pra clicar,
-   editar e ver o resultado, sem tocar serviço nenhum.
+   Em modo demo (ou sem Supabase) tudo roda em estado local, clicável.
    ============================================================================ */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import './ia.css';
 import {
   BadgeStatus, BotaoMini, BotaoPrimario, BotaoSec, Campo, CardVidro, CardCab,
-  Checkbox, ConfirmDialogV2, EstadoErro, EstadoVazio, LinhaToggle, Segmentado,
-  SkeletonTexto, Toggle, type OpcaoSegmentado,
+  Checkbox, Chip, Chips, ConfirmDialogV2, DrawerV2, EstadoErro, EstadoVazio,
+  LinhaToggle, Segmentado, SkeletonTexto, Toggle, type OpcaoSegmentado,
 } from '../components';
 import { DEMO_MODE } from '@/lib/demo';
 import {
   IA_REAL, MOCK_AGENTES, MOCK_CANAIS, MODELOS_SUGERIDOS,
-  useAgentesIa, useAtivarCanal, useCanaisIa, useCriarAgente, useExcluirAgente,
-  useModoTeste, useSalvarAgente, useSalvarChave, useTestarConexao, useVincularCanais,
-  type AgenteIa, type CanalIa, type ProvedorIa,
+  useAgentesIa, useAtivarCanal, useCanaisIa, useConversarPlayground, useCriarAgente,
+  useExcluirAgente, useMetricasIa, useModoTeste, useSalvarAgente, useSalvarChave,
+  useTestarConexao, useVincularCanais,
+  type AgenteIa, type BolhaPlayground, type CanalIa, type ProvedorIa,
 } from '@/data/ia';
 
 type Aviso = { tom: 'ok' | 'erro'; texto: string } | null;
+type MsgChat = { de: 'cliente' | 'ia'; texto: string; bloqueada?: boolean };
 
 const OPCOES_PROVEDOR: OpcaoSegmentado<ProvedorIa>[] = [
   { valor: 'gemini', rotulo: 'Gemini' },
@@ -41,6 +46,14 @@ const NOTA_PROVEDOR: Record<ProvedorIa, string> = {
   openai: 'Chega na próxima fase — por enquanto o atendente roda no Gemini.',
   anthropic: 'Chega na próxima fase — por enquanto o atendente roda no Gemini.',
 };
+
+/* presets de tom: INSEREM texto visível no prompt (transparente, sem mágica escondida) */
+const TONS: { rotulo: string; trecho: string }[] = [
+  { rotulo: 'Acolhedor', trecho: 'Tom de voz: acolhedor e paciente, como quem atende pessoas mais velhas. Frases curtas, sem pressa, sem jargão.' },
+  { rotulo: 'Profissional', trecho: 'Tom de voz: profissional e direto. Cordial, mas objetivo — respostas curtas que vão ao ponto.' },
+  { rotulo: 'Vendedor', trecho: 'Tom de voz: consultivo de vendas. Desperte interesse com perguntas, conduza para o próximo passo, sem pressionar.' },
+  { rotulo: 'Descontraído', trecho: 'Tom de voz: leve e descontraído, como uma conversa entre conhecidos. Natural, sem formalidade.' },
+];
 
 /** 'HH:MM' → minutos (pra validar ordem inicio/fim antes de salvar) */
 function minutosDe(hhmm: string, fallback: number): number {
@@ -60,7 +73,9 @@ export default function Ia() {
   const canais = usarMock ? mockCanais : (qCanais.data ?? []);
   const carregando = !usarMock && (qAgentes.isLoading || qCanais.isLoading);
   const erroCarga = !usarMock ? (qAgentes.error || qCanais.error) : null;
-  const agente = agentes[0] ?? null;
+
+  const [selId, setSelId] = useState<string | null>(null);
+  const agente = agentes.find((a) => a.id === selId) ?? agentes[0] ?? null;
 
   const criar = useCriarAgente();
   const salvar = useSalvarAgente();
@@ -70,12 +85,24 @@ export default function Ia() {
   const ativarCanal = useAtivarCanal();
   const modoTeste = useModoTeste();
   const testar = useTestarConexao();
+  const playground = useConversarPlayground();
+  const qMetricas = useMetricasIa(agente?.id ?? null, !usarMock);
+  const metricas = usarMock
+    ? { sessoesAtivas: 14, chamadasHoje: 128, nudgesHoje: 9, handoffs7d: 21, canais: 1 }
+    : qMetricas.data;
 
-  /* -------- formulário (espelha o agente carregado) -------- */
+  /* -------- formulário (espelha o agente selecionado) -------- */
   const [nome, setNome] = useState('');
   const [provedor, setProvedor] = useState<ProvedorIa>('gemini');
   const [modelo, setModelo] = useState('');
   const [prompt, setPrompt] = useState('');
+  const [conhecimento, setConhecimento] = useState('');
+  const [proibidos, setProibidos] = useState<string[]>([]);
+  const [proibidoInput, setProibidoInput] = useState('');
+  const [permitirEmojis, setPermitirEmojis] = useState(false);
+  const [simularDigitacao, setSimularDigitacao] = useState(true);
+  const [modeloDocs, setModeloDocs] = useState('');
+  const [modeloPro, setModeloPro] = useState('');
   const [ativo, setAtivo] = useState(false);
   const [horarioAtivo, setHorarioAtivo] = useState(true);
   const [horaInicio, setHoraInicio] = useState('09:00');
@@ -87,8 +114,12 @@ export default function Ia() {
   const [chave, setChave] = useState('');
   const [aviso, setAviso] = useState<Aviso>(null);
   const [confirmaExcluir, setConfirmaExcluir] = useState(false);
-  /* editor inline dos números de teste (um canal por vez) */
   const [editNums, setEditNums] = useState<{ canal: string; valor: string } | null>(null);
+  /* playground */
+  const [chatAberto, setChatAberto] = useState(false);
+  const [chatMsgs, setChatMsgs] = useState<MsgChat[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const chatFimRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!agente) return;
@@ -96,8 +127,14 @@ export default function Ia() {
     setProvedor(agente.provedor);
     setModelo(agente.modelo);
     setPrompt(agente.personaPrompt);
+    setConhecimento(agente.conhecimento);
     setAtivo(agente.ativo);
     const c = agente.comportamentos || {};
+    setProibidos(Array.isArray(c.proibidos) ? c.proibidos : []);
+    setPermitirEmojis(c.permitir_emojis === true);
+    setSimularDigitacao(c.simular_digitacao !== false);
+    setModeloDocs(c.modelo_docs || '');
+    setModeloPro(c.modelo_pro || '');
     setHorarioAtivo(c.horario?.ativo !== false);
     setHoraInicio(c.horario?.inicio || '09:00');
     setHoraFim(c.horario?.fim || '19:00');
@@ -108,7 +145,9 @@ export default function Ia() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agente?.id]);
 
-  /* preserva chaves do jsonb que a Fase 1 não expõe (ex.: horario.dias) */
+  useEffect(() => { chatFimRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chatMsgs]);
+
+  /* preserva chaves do jsonb que a UI não expõe (ex.: horario.dias reservado) */
   const comportamentosForm = useMemo(() => {
     const base = agente?.comportamentos ?? {};
     return {
@@ -117,8 +156,14 @@ export default function Ia() {
       janela: { ...(base.janela ?? {}), inicio: janelaInicio, fim: janelaFim },
       nudges_ativos: nudgesAtivos,
       max_chamadas_dia: Math.max(1, Number(maxDia) || 500),
+      proibidos,
+      permitir_emojis: permitirEmojis,
+      simular_digitacao: simularDigitacao,
+      modelo_docs: modeloDocs.trim(),
+      modelo_pro: modeloPro.trim(),
     };
-  }, [agente, horarioAtivo, horaInicio, horaFim, janelaInicio, janelaFim, nudgesAtivos, maxDia]);
+  }, [agente, horarioAtivo, horaInicio, horaFim, janelaInicio, janelaFim, nudgesAtivos, maxDia,
+      proibidos, permitirEmojis, simularDigitacao, modeloDocs, modeloPro]);
 
   const configNaoSalva = !!agente && (modelo.trim() !== agente.modelo || provedor !== agente.provedor);
 
@@ -135,14 +180,25 @@ export default function Ia() {
   const aoCriar = async () => {
     if (criar.isPending) return;
     if (usarMock) {
-      setMockAgentes([{
-        id: 'demo-novo', nome: 'Atendente de IA', provedor: 'gemini', modelo: 'gemini-3.6-flash',
-        personaPrompt: '', comportamentos: {}, ativo: false, chaveDefinidaEm: null, criadoEm: new Date().toISOString(),
-      }]);
+      const novo: AgenteIa = {
+        id: `demo-${Date.now()}`, nome: 'Novo atendente', provedor: 'gemini', modelo: 'gemini-3.6-flash',
+        personaPrompt: '', conhecimento: '', comportamentos: {}, ativo: false, chaveDefinidaEm: null,
+        criadoEm: new Date().toISOString(),
+      };
+      setMockAgentes((xs) => [...xs, novo]);
+      setSelId(novo.id);
       return;
     }
-    try { await criar.mutateAsync(); }
+    try { const id = await criar.mutateAsync(); setSelId(id); }
     catch (e) { setAviso({ tom: 'erro', texto: (e as Error).message }); }
+  };
+
+  const adicionarProibido = () => {
+    const t = proibidoInput.trim();
+    if (t.length < 3) { setAviso({ tom: 'erro', texto: 'Tema proibido precisa de pelo menos 3 letras.' }); return; }
+    if (proibidos.length >= 40) { setAviso({ tom: 'erro', texto: 'Máximo de 40 temas proibidos.' }); return; }
+    if (!proibidos.some((p) => p.toLowerCase() === t.toLowerCase())) setProibidos((xs) => [...xs, t]);
+    setProibidoInput('');
   };
 
   const aoSalvar = async () => {
@@ -165,13 +221,13 @@ export default function Ia() {
     }
     if (usarMock) {
       setMockAgentes((xs) => xs.map((a) => a.id === agente.id
-        ? { ...a, nome, provedor, modelo, personaPrompt: prompt, ativo, comportamentos: comportamentosForm }
+        ? { ...a, nome, provedor, modelo, personaPrompt: prompt, conhecimento, ativo, comportamentos: comportamentosForm }
         : a));
       setAviso({ tom: 'ok', texto: 'Atendente salvo (demonstração).' });
       return;
     }
     try {
-      await salvar.mutateAsync({ id: agente.id, nome, provedor, modelo, personaPrompt: prompt, comportamentos: comportamentosForm, ativo });
+      await salvar.mutateAsync({ id: agente.id, nome, provedor, modelo, personaPrompt: prompt, conhecimento, comportamentos: comportamentosForm, ativo });
       setAviso({ tom: 'ok', texto: 'Atendente salvo.' });
     } catch (e) { setAviso({ tom: 'erro', texto: (e as Error).message }); }
   };
@@ -243,15 +299,45 @@ export default function Ia() {
   const aoExcluir = async () => {
     if (!agente) return;
     if (usarMock) {
-      setMockAgentes([]);
+      setMockAgentes((xs) => xs.filter((a) => a.id !== agente.id));
       setMockCanais((xs) => xs.map((c) => c.agenteId === agente.id ? { ...c, agenteId: null, iaEnabled: false } : c));
       setConfirmaExcluir(false);
+      setSelId(null);
       return;
     }
     try {
       await excluir.mutateAsync(agente.id);
       setConfirmaExcluir(false);
+      setSelId(null);
     } catch (e) { setAviso({ tom: 'erro', texto: (e as Error).message }); setConfirmaExcluir(false); }
+  };
+
+  /* -------- playground -------- */
+  const podeExperimentar = !!agente && agente.provedor === 'gemini' && !!agente.chaveDefinidaEm;
+  const aoEnviarChat = async () => {
+    if (!agente || playground.isPending) return;
+    const texto = chatInput.trim();
+    if (!texto) return;
+    setChatInput('');
+    const historico = chatMsgs.map((m) => ({ de: m.de, texto: m.texto }));
+    setChatMsgs((xs) => [...xs, { de: 'cliente', texto }]);
+    if (usarMock) {
+      setTimeout(() => {
+        const proibiu = proibidos.some((p) => texto.toLowerCase().includes(p.toLowerCase()));
+        setChatMsgs((xs) => [...xs,
+          proibiu
+            ? { de: 'ia', texto: '🔒 Mensagem bloqueada pelo filtro de segurança (tema proibido).', bloqueada: true }
+            : { de: 'ia', texto: `Oi! Aqui é ${nome || 'o atendente'} 😊 Entendi: "${texto.slice(0, 60)}". Me conta um pouco mais pra eu te ajudar direitinho?` },
+        ]);
+      }, 700);
+      return;
+    }
+    try {
+      const bolhas = await playground.mutateAsync({ agenteId: agente.id, mensagem: texto, historico });
+      setChatMsgs((xs) => [...xs, ...bolhas.map((b: BolhaPlayground) => ({ de: 'ia' as const, texto: b.texto, bloqueada: b.bloqueada }))]);
+    } catch (e) {
+      setChatMsgs((xs) => [...xs, { de: 'ia', texto: `⚠️ ${(e as Error).message}`, bloqueada: true }]);
+    }
   };
 
   /* -------- render -------- */
@@ -260,8 +346,14 @@ export default function Ia() {
       <div className="ph sobe">
         <div>
           <h1>Atendente de IA</h1>
-          <p>Crie o cérebro do seu atendimento: provedor, chave própria, personalidade e comportamentos.</p>
+          <p>Crie o cérebro do seu atendimento: chave própria, personalidade, conhecimento e comportamentos.</p>
         </div>
+        {agente && (
+          <BotaoSec onClick={() => { setChatMsgs([]); setChatAberto(true); }} disabled={!podeExperimentar && !usarMock}
+            title={podeExperimentar || usarMock ? 'Conversar com o atendente' : 'Guarde a chave no cofre primeiro'}>
+            💬 Experimentar
+          </BotaoSec>
+        )}
       </div>
 
       {aviso && (
@@ -292,6 +384,35 @@ export default function Ia() {
         </CardVidro>
       ) : (
         <div className="ia-wrap">
+          {/* ------------------- Lista de atendentes ------------------- */}
+          <div className="ia-agentes-lista" role="tablist" aria-label="Atendentes de IA">
+            {agentes.map((a) => (
+              <button key={a.id} type="button" role="tab" aria-selected={a.id === agente.id}
+                className={a.id === agente.id ? 'ia-agente-card on' : 'ia-agente-card'}
+                onClick={() => setSelId(a.id)}>
+                <span className="ia-agente-nome">{a.nome}</span>
+                <span className="ia-agente-meta">
+                  {a.ativo ? <BadgeStatus tom="ok">ativo</BadgeStatus> : <BadgeStatus tom="neutro">pausado</BadgeStatus>}
+                  <span className="ia-hint">{canais.filter((c) => c.agenteId === a.id).length} canal(is)</span>
+                </span>
+              </button>
+            ))}
+            <button type="button" className="ia-agente-card ia-agente-novo" onClick={aoCriar} disabled={criar.isPending}>
+              + Novo atendente
+            </button>
+          </div>
+
+          {/* ------------------- Atividade ------------------- */}
+          <CardVidro sobe className="ia-card" atraso={0.03}>
+            <CardCab titulo="Atividade do atendente" direita={<span className="ia-hint">números do motor, ao vivo</span>} />
+            <div className="ia-stats num">
+              <div className="ia-stat"><b>{metricas?.sessoesAtivas ?? '—'}</b><span>conversas com a IA agora</span></div>
+              <div className="ia-stat"><b>{metricas?.chamadasHoje ?? '—'}</b><span>chamadas de IA hoje</span></div>
+              <div className="ia-stat"><b>{metricas?.nudgesHoje ?? '—'}</b><span>follow-ups hoje</span></div>
+              <div className="ia-stat"><b>{metricas?.handoffs7d ?? '—'}</b><span>passadas ao humano · 7d</span></div>
+            </div>
+          </CardVidro>
+
           {/* ------------------- Identidade ------------------- */}
           <CardVidro sobe className="ia-card" atraso={0.05}>
             <CardCab titulo="Identidade" direita={
@@ -319,7 +440,7 @@ export default function Ia() {
           </CardVidro>
 
           {/* ------------------- Chave ------------------- */}
-          <CardVidro sobe className="ia-card" atraso={0.1}>
+          <CardVidro sobe className="ia-card" atraso={0.08}>
             <CardCab titulo="Chave de API" direita={
               agente.chaveDefinidaEm
                 ? <BadgeStatus tom="ok">Configurada em {new Date(agente.chaveDefinidaEm).toLocaleDateString('pt-BR')}</BadgeStatus>
@@ -348,12 +469,20 @@ export default function Ia() {
           </CardVidro>
 
           {/* ------------------- Cérebro ------------------- */}
-          <CardVidro sobe className="ia-card" atraso={0.15}>
+          <CardVidro sobe className="ia-card" atraso={0.11}>
             <CardCab titulo="Personalidade e instruções" />
+            <div className="ia-tom-row" aria-label="Presets de tom de voz">
+              <span className="ia-hint">Tom de voz (insere no prompt):</span>
+              {TONS.map((t) => (
+                <BotaoMini key={t.rotulo} onClick={() => setPrompt((p) => (p ? `${p.trimEnd()}\n\n${t.trecho}` : t.trecho))}>
+                  {t.rotulo}
+                </BotaoMini>
+              ))}
+            </div>
             <Campo rotulo="Prompt do atendente (como ele deve pensar e falar)">
               {(id) => (
                 <textarea
-                  id={id} className="inp ia-prompt" rows={10}
+                  id={id} className="inp ia-prompt" rows={9}
                   value={prompt} onChange={(e) => setPrompt(e.target.value)}
                   placeholder={'Exemplo:\nVocê é a Sofia, atendente da nossa empresa. Atende clientes pelo WhatsApp com frases curtas e cordiais.\nSeu objetivo: entender o caso, coletar os documentos e encaminhar pro consultor.\nNunca prometa valores ou prazos — isso é com o time humano.'}
                 />
@@ -365,8 +494,66 @@ export default function Ia() {
             </div>
           </CardVidro>
 
-          {/* ------------------- Comportamentos ------------------- */}
+          {/* ------------------- Conhecimento ------------------- */}
+          <CardVidro sobe className="ia-card" atraso={0.14}>
+            <CardCab titulo="Conhecimento da empresa" direita={<span className="ia-hint num">{conhecimento.length}/8000</span>} />
+            <Campo rotulo="O que o atendente sabe (endereço, serviços, diferenciais, perguntas frequentes…)">
+              {(id) => (
+                <textarea
+                  id={id} className="inp ia-prompt ia-conhecimento" rows={7} maxLength={8000}
+                  value={conhecimento} onChange={(e) => setConhecimento(e.target.value)}
+                  placeholder={'Exemplo:\n• Atendemos de segunda a sexta, das 9h às 19h.\n• Trabalhamos com revisão de descontos do INSS.\n• O escritório fica na Av. Paulista, 1000 — São Paulo.\n• Não atendemos casos trabalhistas.'}
+                />
+              )}
+            </Campo>
+            <div className="ia-hint">
+              A IA usa esses fatos quando o cliente pergunta — sem despejar tudo de uma vez. Mantenha curto e factual.
+            </div>
+          </CardVidro>
+
+          {/* ------------------- Temas proibidos ------------------- */}
+          <CardVidro sobe className="ia-card" atraso={0.17}>
+            <CardCab titulo="Temas proibidos" contador={proibidos.length} />
+            <p className="ia-hint">
+              Além do filtro de fábrica (valores, taxas, juros, promessas), a IA <b>nunca</b> cita o que você listar
+              aqui — se o modelo tentar, a mensagem é reescrita ou descartada antes do envio.
+            </p>
+            <div className="ia-chave-row">
+              <input
+                className="inp" value={proibidoInput}
+                onChange={(e) => setProibidoInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); adicionarProibido(); } }}
+                placeholder="ex.: nome de um concorrente, desconto, política…"
+                aria-label="Novo tema proibido"
+              />
+              <BotaoSec onClick={adicionarProibido} disabled={!proibidoInput.trim()}>Adicionar</BotaoSec>
+            </div>
+            {proibidos.length > 0 && (
+              <Chips>
+                {proibidos.map((t) => (
+                  <Chip key={t} ativo removivel onClick={() => setProibidos((xs) => xs.filter((x) => x !== t))}>{t}</Chip>
+                ))}
+              </Chips>
+            )}
+          </CardVidro>
+
+          {/* ------------------- Humanização ------------------- */}
           <CardVidro sobe className="ia-card" atraso={0.2}>
+            <CardCab titulo="Humanização" />
+            <LinhaToggle
+              titulo={'Simular "digitando…"'}
+              descricao="Antes de cada mensagem, o cliente vê o atendente digitando por alguns segundos — como uma pessoa."
+              ligado={simularDigitacao} aoMudar={setSimularDigitacao} rotulo="Simular digitando"
+            />
+            <LinhaToggle
+              titulo="Permitir emojis"
+              descricao="De fábrica a IA não usa emojis (evita burlar o filtro). Ligue se quiser um tom mais leve."
+              ligado={permitirEmojis} aoMudar={setPermitirEmojis} rotulo="Permitir emojis"
+            />
+          </CardVidro>
+
+          {/* ------------------- Comportamentos ------------------- */}
+          <CardVidro sobe className="ia-card" atraso={0.23}>
             <CardCab titulo="Comportamentos" />
             <LinhaToggle
               titulo="Horário de atendimento"
@@ -394,8 +581,37 @@ export default function Ia() {
             </div>
           </CardVidro>
 
+          {/* ------------------- Avançado ------------------- */}
+          <CardVidro sobe className="ia-card" atraso={0.26}>
+            <CardCab titulo="Avançado — modelos por função" direita={<span className="ia-hint">opcional</span>} />
+            <p className="ia-hint">
+              Vazio = o motor decide (usa o modelo principal e sobe automático em casos complexos). Preencha só
+              se quiser forçar um modelo específico pra cada função.
+            </p>
+            <div className="ia-2col">
+              <Campo rotulo="Modelo pra ler documentos (visão)">
+                {(id) => (
+                  <>
+                    <input id={id} className="inp" list={`${id}-md`} value={modeloDocs}
+                      onChange={(e) => setModeloDocs(e.target.value)} placeholder="automático" />
+                    <datalist id={`${id}-md`}>{MODELOS_SUGERIDOS.gemini.map((m) => <option key={m} value={m} />)}</datalist>
+                  </>
+                )}
+              </Campo>
+              <Campo rotulo="Modelo forte pra casos complexos">
+                {(id) => (
+                  <>
+                    <input id={id} className="inp" list={`${id}-mp`} value={modeloPro}
+                      onChange={(e) => setModeloPro(e.target.value)} placeholder="automático" />
+                    <datalist id={`${id}-mp`}>{MODELOS_SUGERIDOS.gemini.map((m) => <option key={m} value={m} />)}</datalist>
+                  </>
+                )}
+              </Campo>
+            </div>
+          </CardVidro>
+
           {/* ------------------- Canais ------------------- */}
-          <CardVidro sobe className="ia-card" atraso={0.25}>
+          <CardVidro sobe className="ia-card" atraso={0.29}>
             <CardCab titulo="Canais de WhatsApp" contador={canais.length} />
             {canais.length === 0 ? (
               <p className="ia-hint">Nenhum canal de WhatsApp conectado ainda — conecte em Integrações.</p>
@@ -461,6 +677,41 @@ export default function Ia() {
           </div>
         </div>
       )}
+
+      {/* ------------------- Playground ------------------- */}
+      <DrawerV2 aberto={chatAberto} aoFechar={() => setChatAberto(false)} largura={420}>
+        <div className="ia-chat">
+          <div className="ia-chat-cab">
+            <div>
+              <div className="ia-canal-nome">Experimentar: {nome || 'Atendente'}</div>
+              <div className="ia-hint">Conversa de teste — roda na sua chave, nada vai pro WhatsApp nem fica salvo.</div>
+            </div>
+            <BotaoMini onClick={() => setChatMsgs([])}>Limpar</BotaoMini>
+          </div>
+          <div className="ia-chat-msgs" role="log" aria-live="polite">
+            {chatMsgs.length === 0 && (
+              <div className="ia-hint ia-chat-vazio">
+                Escreva como se fosse um cliente chegando no WhatsApp. Dica: pergunte algo do
+                "Conhecimento da empresa" ou tente um tema proibido pra ver o filtro agir.
+              </div>
+            )}
+            {chatMsgs.map((m, i) => (
+              <div key={i} className={`ia-bolha ${m.de === 'cliente' ? 'cli' : 'ia'}${m.bloqueada ? ' blq' : ''}`}>{m.texto}</div>
+            ))}
+            {playground.isPending && <div className="ia-bolha ia">digitando…</div>}
+            <div ref={chatFimRef} />
+          </div>
+          <div className="ia-chat-input">
+            <input
+              className="inp" value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); aoEnviarChat(); } }}
+              placeholder="Escreva como cliente…" aria-label="Mensagem de teste"
+            />
+            <BotaoPrimario mini onClick={aoEnviarChat} disabled={!chatInput.trim() || playground.isPending}>Enviar</BotaoPrimario>
+          </div>
+        </div>
+      </DrawerV2>
 
       <ConfirmDialogV2
         aberto={confirmaExcluir}

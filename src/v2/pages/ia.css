@@ -35,3 +35,41 @@
 
 .ia-nums-row { display: flex; gap: 10px; align-items: center; padding: 4px 2px 10px 30px; }
 .ia-nums-row .inp { flex: 1 1 auto; }
+
+/* ---- lista de atendentes ---- */
+.ia-agentes-lista { display: flex; gap: 10px; flex-wrap: wrap; }
+.ia-agente-card {
+  display: flex; flex-direction: column; gap: 6px; align-items: flex-start;
+  padding: 12px 16px; border-radius: 12px; border: 1px solid rgba(127,127,127,.22);
+  background: transparent; cursor: pointer; text-align: left; min-width: 170px;
+}
+.ia-agente-card.on { border-color: currentColor; }
+.ia-agente-nome { font-weight: 700; font-size: 13.5px; }
+.ia-agente-meta { display: flex; align-items: center; gap: 8px; }
+.ia-agente-novo { justify-content: center; align-items: center; opacity: .7; border-style: dashed; }
+
+/* ---- atividade ---- */
+.ia-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.ia-stat { display: flex; flex-direction: column; gap: 2px; }
+.ia-stat b { font-size: 24px; font-weight: 700; line-height: 1.1; }
+.ia-stat span { font-size: 11.5px; opacity: .65; }
+
+/* ---- tom de voz ---- */
+.ia-tom-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.ia-conhecimento { min-height: 140px; }
+
+/* ---- playground ---- */
+.ia-chat { display: flex; flex-direction: column; height: 100%; gap: 10px; padding: 14px; }
+.ia-chat-cab { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.ia-chat-msgs { flex: 1 1 auto; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 4px 2px; }
+.ia-chat-vazio { padding: 12px 6px; }
+.ia-bolha {
+  max-width: 85%; padding: 8px 12px; border-radius: 14px; font-size: 13px; line-height: 1.45;
+  border: 1px solid rgba(127,127,127,.18); white-space: pre-wrap; word-break: break-word;
+}
+.ia-bolha.cli { align-self: flex-end; border-bottom-right-radius: 4px; }
+.ia-bolha.ia { align-self: flex-start; border-bottom-left-radius: 4px; opacity: .92; }
+.ia-bolha.blq { opacity: .7; font-style: italic; }
+.ia-chat-input { display: flex; gap: 8px; align-items: center; }
+.ia-chat-input .inp { flex: 1 1 auto; }
