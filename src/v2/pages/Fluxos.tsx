@@ -22,6 +22,7 @@ import { useCanaisIa, MOCK_CANAIS, type CanalIa } from '@/data/ia';
 import {
   FLUXOS_REAL, MOCK_FLUXOS, ROTULO_DADO, ROTULO_PASSO,
   avancarSim, problemasDoFluxo, responderSim,
+  garantirIds,
   useCriarFluxo, useExcluirFluxo, useFluxos, useSalvarFluxo, useVincularFluxoCanal,
   type DadoColeta, type EstadoSim, type FluxoBot, type Passo,
 } from '@/data/iaFluxos';
@@ -31,13 +32,17 @@ type MsgSim = { de: 'cliente' | 'bot' | 'evento'; texto: string };
 
 const TIPOS_NOVOS: Passo['tipo'][] = ['mensagem', 'pergunta', 'coletar', 'acao', 'fim'];
 
+function novoId(): string {
+  return (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `p_${Math.random().toString(36).slice(2, 10)}`;
+}
 function passoNovo(tipo: Passo['tipo']): Passo {
+  const id = novoId();
   switch (tipo) {
-    case 'mensagem': return { tipo, baloes: [] };
-    case 'pergunta': return { tipo, baloes: [], opcoes: [{ rotulo: '', valor: '' }, { rotulo: '', valor: '' }], salvarEm: '', reprompt: '' };
-    case 'coletar': return { tipo, baloes: [], dado: 'nome', salvarEm: '', reprompt: '' };
-    case 'acao': return { tipo };
-    default: return { tipo: 'fim', baloes: [] };
+    case 'mensagem': return { id, tipo, baloes: [] };
+    case 'pergunta': return { id, tipo, baloes: [], opcoes: [{ rotulo: '', valor: '' }, { rotulo: '', valor: '' }], salvarEm: '', reprompt: '' };
+    case 'coletar': return { id, tipo, baloes: [], dado: 'nome', salvarEm: '', reprompt: '' };
+    case 'acao': return { id, tipo };
+    default: return { id, tipo: 'fim', baloes: [] };
   }
 }
 
@@ -79,7 +84,7 @@ export default function Fluxos() {
     setNome(fluxo.nome);
     setDescricao(fluxo.descricao);
     setAtivo(fluxo.ativo);
-    setPassos(JSON.parse(JSON.stringify(fluxo.passos)) as Passo[]);
+    setPassos(garantirIds(JSON.parse(JSON.stringify(fluxo.passos)) as Passo[]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fluxo?.id]);
 
@@ -231,6 +236,14 @@ export default function Fluxos() {
                 <input className="inp" value={o.rotulo}
                   onChange={(e) => mudarPasso(i, { ...p, opcoes: p.opcoes.map((x, xi) => xi === oi ? { ...x, rotulo: e.target.value } : x) })}
                   placeholder={oi === 0 ? 'ex.: Empréstimo' : 'ex.: Outro assunto'} aria-label={`Opção ${oi + 1}`} />
+                <select className="inp fx-irpara" value={o.irPara ?? ''} aria-label={`Opção ${oi + 1} vai para`}
+                  onChange={(e) => mudarPasso(i, { ...p, opcoes: p.opcoes.map((x, xi) => xi === oi ? { ...x, irPara: e.target.value || undefined } : x) })}>
+                  <option value="">→ próximo passo</option>
+                  {passos.map((pp, idx) => (idx !== i && pp.id)
+                    ? <option key={pp.id} value={pp.id}>{`→ passo ${idx + 1}: ${ROTULO_PASSO[pp.tipo]}`}</option>
+                    : null)}
+                  <option value="fim">→ encerrar o fluxo</option>
+                </select>
                 <BotaoMini className="btn-perigo" onClick={() => mudarPasso(i, { ...p, opcoes: p.opcoes.filter((_, xi) => xi !== oi) })}
                   disabled={p.opcoes.length <= 2} aria-label={`Remover opção ${oi + 1}`}>✕</BotaoMini>
               </div>

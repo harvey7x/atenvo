@@ -15,12 +15,20 @@ type Row = Record<string, unknown>;
 /* ---------------- contrato dos passos (espelhado no motor) ---------------- */
 export type DadoColeta = 'nome' | 'cpf' | 'telefone' | 'email' | 'texto';
 
-export type Passo =
+export interface OpcaoFluxo { rotulo: string; valor: string; irPara?: string }  // irPara = id de passo | 'fim' | vazio(próximo)
+export type Passo = { id?: string } & (
   | { tipo: 'mensagem'; baloes: string[] }
-  | { tipo: 'pergunta'; baloes: string[]; opcoes: { rotulo: string; valor: string }[]; salvarEm: string; reprompt: string }
+  | { tipo: 'pergunta'; baloes: string[]; opcoes: OpcaoFluxo[]; salvarEm: string; reprompt: string }
   | { tipo: 'coletar'; baloes: string[]; dado: DadoColeta; salvarEm: string; reprompt: string }
   | { tipo: 'acao'; etiqueta?: string; chamarHumano?: boolean; entregarIa?: boolean }
-  | { tipo: 'fim'; baloes?: string[] };
+  | { tipo: 'fim'; baloes?: string[] }
+);
+
+/** garante id estável em todo passo (backfill de fluxos antigos) */
+export function garantirIds(passos: Passo[]): Passo[] {
+  const gid = () => (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `p_${Math.random().toString(36).slice(2, 10)}`);
+  return passos.map((p) => (p.id ? p : { ...p, id: gid() }));
+}
 
 export interface FluxoBot {
   id: string;
@@ -89,27 +97,31 @@ export function validarDado(dado: DadoColeta, txt: string): { ok: boolean; valor
 
 const semAcento = (s: string) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 /** normaliza opções como o motor (fluxo_custom.opcoesDe): filtra rótulo vazio + deriva valor */
-export function normOpcoes(opcoes: { rotulo: string; valor: string }[]): { rotulo: string; valor: string }[] {
+export function normOpcoes(opcoes: OpcaoFluxo[]): OpcaoFluxo[] {
   return (opcoes ?? [])
-    .map((o) => ({ rotulo: (o.rotulo ?? '').trim(), valor: (o.valor ?? '').trim() }))
+    .map((o) => ({ rotulo: (o.rotulo ?? '').trim(), valor: (o.valor ?? '').trim(), ...(o.irPara ? { irPara: o.irPara } : {}) }))
     .filter((o) => o.rotulo)
     .map((o) => ({ ...o, valor: o.valor || semAcento(o.rotulo).replace(/\s+/g, '_') }));
 }
 
-/** resposta do cliente casa com alguma opção? (número, valor derivado ou rótulo — sem acento) */
-export function casarOpcao(opcoesBrutas: { rotulo: string; valor: string }[], txt: string): string | null {
+/** resposta do cliente casa com alguma opção? devolve a OPÇÃO casada (com irPara) ou null */
+export function casarOpcao(opcoesBrutas: OpcaoFluxo[], txt: string): OpcaoFluxo | null {
   const opcoes = normOpcoes(opcoesBrutas);
   const t = semAcento((txt || '').trim());
   if (!t) return null;
   const n = Number(t);
-  if (Number.isInteger(n) && n >= 1 && n <= opcoes.length) return opcoes[n - 1].valor;
+  if (Number.isInteger(n) && n >= 1 && n <= opcoes.length) return opcoes[n - 1];
   for (const o of opcoes) {
     const rot = semAcento(o.rotulo);
     if (t === o.valor.toLowerCase() || t === rot
         || (t.length >= 3 && rot.startsWith(t))
-        || (rot.length >= 3 && t.startsWith(rot))) return o.valor;
+        || (rot.length >= 3 && t.startsWith(rot))) return o;
   }
   return null;
+}
+function idxPorId(passos: Passo[], id: string): number {
+  if (!id) return -1;
+  return passos.findIndex((p) => p.id === id);
 }
 
 /* ---------------- simulador (interpretador puro, sem rede) ---------------- */
@@ -151,7 +163,7 @@ export function avancarSim(passos: Passo[], estado: EstadoSim): SaidaSim {
   return { baloes, eventos, estado: { ...e, encerrado: true }, aguardando: false };
 }
 
-/** processa a resposta do cliente no passo de espera atual */
+/** processa a resposta do cliente no passo de espera atual (ramificação + coleta) */
 export function responderSim(passos: Passo[], estado: EstadoSim, resposta: string): SaidaSim {
   const p = passos[estado.passo];
   let e = { ...estado, dados: { ...estado.dados } };
@@ -159,18 +171,29 @@ export function responderSim(passos: Passo[], estado: EstadoSim, resposta: strin
     return avancarSim(passos, e);
   }
   if (p.tipo === 'pergunta') {
-    const valor = casarOpcao(p.opcoes, resposta);
-    if (valor === null) {
+    const op = casarOpcao(p.opcoes, resposta);
+    if (op === null) {
       e.tentativas++;
       if (e.tentativas > MAX_TENTATIVAS) {
         return { baloes: [], eventos: ['🙋 não entendi 3x → atendente humano avisado'], estado: { ...e, encerrado: true }, aguardando: false };
       }
       return { baloes: [p.reprompt || 'Não entendi — responda com o número de uma das opções 🙂'], eventos: [], estado: e, aguardando: true };
     }
-    if (p.salvarEm) e.dados[p.salvarEm] = valor;
-    e = { ...e, passo: e.passo + 1, tentativas: 0 };
+    const eventos = [`💾 ${p.salvarEm || 'resposta'} = "${op.valor}"`];
+    if (p.salvarEm) e.dados[p.salvarEm] = op.valor;
+    // RAMIFICAÇÃO
+    if (op.irPara === 'fim') {
+      eventos.push('↪ opção encerra o fluxo');
+      return { baloes: [], eventos, estado: { ...e, passo: passos.length, tentativas: 0, encerrado: true }, aguardando: false };
+    }
+    let destino = e.passo + 1;
+    if (op.irPara) {
+      const idx = idxPorId(passos, op.irPara);
+      if (idx >= 0) { destino = idx; eventos.push(`↪ vai para o passo ${idx + 1}`); }
+    }
+    e = { ...e, passo: destino, tentativas: 0 };
     const seg = avancarSim(passos, e);
-    return { ...seg, eventos: [`💾 ${p.salvarEm || 'resposta'} = "${valor}"`, ...seg.eventos] };
+    return { ...seg, eventos: [...eventos, ...seg.eventos] };
   }
   const v = validarDado(p.dado, resposta);
   if (!v.ok) {
@@ -180,10 +203,14 @@ export function responderSim(passos: Passo[], estado: EstadoSim, resposta: strin
     }
     return { baloes: [p.reprompt || 'Não consegui validar — pode conferir e mandar de novo?'], eventos: [], estado: e, aguardando: true };
   }
-  e.dados[p.salvarEm || p.dado] = v.valor;
+  const chave = p.salvarEm || p.dado;
+  e.dados[chave] = v.valor;
+  const eventos = [`💾 ${chave} = "${v.valor}"`];
+  if (p.dado === 'nome' || p.dado === 'cpf') eventos.push(`📇 salvo na ficha do cliente (${p.dado === 'nome' ? 'nome + oportunidade' : 'CPF'})`);
+  else if (p.dado === 'telefone' || p.dado === 'email') eventos.push(`📇 salvo na oportunidade (${p.dado})`);
   e = { ...e, passo: e.passo + 1, tentativas: 0 };
   const seg = avancarSim(passos, e);
-  return { ...seg, eventos: [`💾 ${p.salvarEm || p.dado} = "${v.valor}"`, ...seg.eventos] };
+  return { ...seg, eventos: [...eventos, ...seg.eventos] };
 }
 
 /* ---------------- problemas do fluxo (validação do editor) ---------------- */
@@ -198,6 +225,11 @@ export function problemasDoFluxo(passos: Passo[]): string[] {
       const preenchidas = (p.opcoes ?? []).filter((o) => o.rotulo.trim()).length;
       if (preenchidas < 2) avisos.push(`${n} (Pergunta): precisa de pelo menos 2 opções.`);
       else if (preenchidas < (p.opcoes ?? []).length) avisos.push(`${n} (Pergunta): tem opção sem texto — apague ou preencha (bagunça a numeração).`);
+      for (const o of (p.opcoes ?? [])) {
+        if (o.irPara && o.irPara !== 'fim' && !passos.some((x) => x.id === o.irPara)) {
+          avisos.push(`${n} (Pergunta): a opção "${o.rotulo || '—'}" aponta pra um passo que não existe mais.`);
+        }
+      }
     }
     if (p.tipo === 'coletar' && !baloesDe(p).length) avisos.push(`${n} (Coletar): sem texto pedindo o dado.`);
     if (p.tipo === 'acao' && !p.etiqueta && !p.chamarHumano && !p.entregarIa) avisos.push(`${n} (Ação): nenhuma ação marcada.`);
