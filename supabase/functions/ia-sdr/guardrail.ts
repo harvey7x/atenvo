@@ -12,6 +12,7 @@ const BANCOS_DISTINTIVOS = [
   'agibank', 'bmg', 'crefisa', 'mercantil', 'facta', 'bradesco', 'itau', 'itaú', 'santander',
   'banrisul', 'daycoval', 'inbursa', 'sicoob', 'sicredi', 'safra', 'banco do brasil', 'c6',
   'ole consignado', 'olé consignado', 'banco pan', 'banco master', 'caixa economica', 'caixa econômica',
+  'nubank', 'cetelem', 'banco bv', 'digio', 'paraná banco', 'parana banco',
 ];
 
 const REGRAS: Array<{ nome: string; re: RegExp }> = [
@@ -21,6 +22,11 @@ const REGRAS: Array<{ nome: string; re: RegExp }> = [
   { nome: 'juros', re: /\bjuros\b/i },
   { nome: 'margem', re: /\bmargem\b|\bmargens\b/i },
   { nome: 'aprovacao', re: /\baprovad[oa]s?\b|\breprovad[oa]s?\b/i },
+  // aprovar/liberar CRÉDITO como promessa verbal (o adjetivo já é pego acima; a 'liberacao' pega o
+  // tempo — aqui o VERBO aprovar + liberar valor/crédito, que escapavam ("quando aprovarem", "liberar valor")
+  { nome: 'aprova_libera', re: /\baprov[ae]\w*\b|\blibera[rm]?\s+(um\s+)?(valor|cr[eé]dito|dinheiro|montante|empr[eé]stimo)\b/i },
+  // dinheiro NUMÉRICO cru (sem R$): 187,50 · 1.500,00 · "3 mil" · "2 milhões" — promessa de valor escapava
+  { nome: 'valor_numerico', re: /\b\d{1,3}(\.\d{3})*,\d{2}\b|\b\d+\s*mil\b|\bmilh(ão|ões|oes)\b/i },
   // valor por extenso ("mil reais", "quinhentos reais", "5 mil reais") — falso-positivo só custa
   // 1 reescrita, então barramos "reais" em qualquer forma (direção segura p/ compliance)
   { nome: 'valor_extenso', re: /\breais\b|\bconto[s]?\b|\bpila[s]?\b/i },

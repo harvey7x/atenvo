@@ -631,19 +631,27 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
   }
 
   // ---- guardrail pós-Gemini: violou → pede REESCRITA (1x); persistiu → descarta a bolha ----
-  let bolhas = [...t.bolhas];
+  // Tira EMOJI ANTES de tudo: senão "jur😀os" burla a fronteira de palavra do guardrail e é remontado
+  // limpo ("juros") só no envio. Aqui o guardrail e a guarda de tamanho já veem o texto final.
+  let bolhas = t.bolhas.map(removerEmoji).filter(Boolean);
 
-  // ---- guarda de TAMANHO (defesa contra vazamento de prompt): bolha absurdamente longa = geração
-  //      corrompida (o modelo despejou o prompt/raciocínio numa bolha só — aconteceu 1× com a Ana
-  //      Paula, 3223 chars). Bolha normal ~140, exceção do protocolo ~200 → >600 é SEMPRE defeito.
-  //      Descarta a bolha (nunca vai pro cliente). Se sobrar vazio, cai no silêncio+retry abaixo. ----
+  // ---- guarda de TAMANHO (defesa contra vazamento de prompt): o modelo pode despejar o prompt/
+  //      raciocínio (aconteceu com a Ana Paula, 3223 chars). Bolha normal ~140, exceção do protocolo
+  //      ~200. Corta por BOLHA (>600) E por AGREGADO (soma >1000 = dump FATIADO em várias bolhas
+  //      médias, que escapava do teto por bolha). Se sobrar vazio, cai no silêncio+retry abaixo. ----
   {
-    const okTam: string[] = [];
-    for (const b of bolhas) {
-      if (b.length > 600) { await evento(admin, sessao, 'bolha_gigante_descartada', { tam: b.length, amostra: b.slice(0, 120) }); continue; }
-      okTam.push(b);
+    const soma = bolhas.reduce((s, b) => s + b.length, 0);
+    if (soma > 1000) {
+      await evento(admin, sessao, 'bolha_gigante_descartada', { motivo: 'agregado', soma, n: bolhas.length });
+      bolhas = [];
+    } else {
+      const okTam: string[] = [];
+      for (const b of bolhas) {
+        if (b.length > 600) { await evento(admin, sessao, 'bolha_gigante_descartada', { tam: b.length, amostra: b.slice(0, 120) }); continue; }
+        okTam.push(b);
+      }
+      bolhas = okTam;
     }
-    bolhas = okTam;
   }
   const violacoes = bolhas.map((b) => saidaProibida(b));
   if (violacoes.some(Boolean)) {
@@ -670,13 +678,18 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
     bolhas = finais;
   }
 
-  // ---- a LEGENDA do vídeo é texto do modelo: passa pelas mesmas travas (violou/repetiu → sem legenda) ----
+  // ---- a LEGENDA do vídeo é texto do modelo: passa pelas MESMAS travas (emoji/violação/repetição/
+  //      tamanho → sem legenda). Faltava o limite de tamanho aqui (o dump poderia sair na legenda). ----
   if (t.video?.caption) {
-    const v = saidaProibida(t.video.caption);
-    const dup = ctx.saidasAnteriores.has(normalizarSaida(t.video.caption));
-    if (v || dup) {
-      await evento(admin, sessao, v ? 'guardrail_bloqueou' : 'dedup_descartou', { texto: t.video.caption.slice(0, 120), ...(v ? { violacao: v } : {}), legenda_video: true });
+    const cap = removerEmoji(t.video.caption);
+    const v = saidaProibida(cap);
+    const dup = ctx.saidasAnteriores.has(normalizarSaida(cap));
+    if (v || dup || cap.length > 600) {
+      await evento(admin, sessao, cap.length > 600 ? 'bolha_gigante_descartada' : (v ? 'guardrail_bloqueou' : 'dedup_descartou'),
+        { texto: cap.slice(0, 120), ...(v ? { violacao: v } : {}), legenda_video: true });
       t.video = { ...t.video, caption: '' };
+    } else {
+      t.video = { ...t.video, caption: cap };
     }
   }
 
@@ -841,9 +854,10 @@ async function etapaQualificacao(ctx: Ctx): Promise<Turno> {
     if (familiarNao) {
       return { bolhas: r.mensagens, statusNovo: 'encerrada', etiquetaOpp: 'nao_elegivel', dadosPatch: limpaAbertura, __perguntouValores: r.perguntouValores };
     }
-    // está perguntando da família (1ª vez ou ainda sem resposta clara) → não conta como erro,
-    // marca a flag pra garantir que a pergunta da família aconteça antes de qualquer encerramento
-    return { bolhas: r.mensagens, incrementaErro: false, dadosPatch: { ...limpaAbertura, perguntou_familiar: true }, __perguntouValores: r.perguntouValores };
+    // pergunta da família: a 1ª vez NÃO penaliza (marca a flag). Mas se JÁ perguntou e a pessoa segue
+    // sem responder claro (nem sim nem não), conta como confusão — a rede errosProspectivos>=2 escala
+    // pra humano em vez de re-perguntar da família pra sempre (evita o loop infinito).
+    return { bolhas: r.mensagens, incrementaErro: jaPerguntouFamiliar, dadosPatch: { ...limpaAbertura, perguntou_familiar: true }, __perguntouValores: r.perguntouValores };
   }
   return { bolhas: r.mensagens, incrementaErro: !abertura, ...(aberturaEspecial ? { dadosPatch: { abertura_especial: null } } : {}), __perguntouValores: r.perguntouValores };
 }
@@ -1197,10 +1211,14 @@ async function etapaExtratos(ctx: Ctx): Promise<Turno> {
   if (ctx.arquivos.length) {
     const exts = await extrairDeArquivos(ctx, PROMPT_EXTRATO, SCHEMA_EXTRATO);
     if (exts.grandes) notas.push('→ um arquivo veio pesado demais; peça para baixar de novo no app e mandar o arquivo direto.');
+    // BENEFICIÁRIO FAMILIAR: os extratos são do PARENTE, não do contato — comparar com o CPF do
+    // cadastro (do contato) geraria falso 'cpf_divergente' e derrubaria o fluxo. Nesse caso só
+    // exigimos consistência ENTRE os próprios extratos (todos do mesmo parente).
+    const ehFamiliar = ctx.dados.beneficiario === 'familiar';
     for (const d of exts.itens) {
       const cpfArq = somenteDigitos(String(d.cpf ?? ''));
       if (cpfArq.length === 11) {
-        if ((cpfExtratos && cpfArq !== cpfExtratos) || !cpfsCompativeis(cpfArq, ctx.contatoCpf)) {
+        if ((cpfExtratos && cpfArq !== cpfExtratos) || (!ehFamiliar && !cpfsCompativeis(cpfArq, ctx.contatoCpf))) {
           const bolhas = await gerarDespedida(ctx,
             'Você notou uma diferença de dados entre os documentos e, para não ter erro, vai pedir a ajuda de um colega do time, que continua com a pessoa aqui na conversa. Não a constranja.');
           return {
@@ -1841,7 +1859,10 @@ function notaContexto(ctx: Ctx, motivo: string): string {
   return [
     `🤖 IA SDR — atendimento entregue ao humano (motivo: ${motivo}).`,
     `• Etapa: ${ctx.sessao.etapa}`,
-    `• Nome: ${d.nome_confirmado ?? ctx.contatoNome ?? '?'}`,
+    `• Nome (contato): ${d.nome_confirmado ?? ctx.contatoNome ?? '?'}`,
+    d.beneficiario === 'familiar'
+      ? `• ⚠️ BENEFICIÁRIO É UM FAMILIAR${d.familiar_parentesco ? ` (${d.familiar_parentesco})` : ''}${d.familiar_beneficio ? `, benefício: ${d.familiar_beneficio}` : ''} — os DOCUMENTOS (identidade, comprovante, extratos) são DESSE FAMILIAR, não do contato acima.`
+      : null,
     d.email ? `• E-mail: ${d.email}` : null,
     d.titular_comprovante ? `• Titular do comprovante: ${d.titular_comprovante}` : null,
     d.declarante ? `• Declarante: ${(d.declarante as Record<string, unknown>)?.nome ?? '?'}` : null,
