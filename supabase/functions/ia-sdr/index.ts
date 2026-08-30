@@ -201,7 +201,7 @@ async function configComAgente(admin: Admin, base: Record<string, unknown>, agen
   if (!agenteId) return base;
   try {
     const { data: ag } = await admin.from('ia_agentes')
-      .select('provedor, modelo, persona_prompt, comportamentos, ativo')
+      .select('provedor, modelo, persona_prompt, conhecimento, comportamentos, ativo')
       .eq('id', agenteId).maybeSingle();
     if (!ag) return base;                 // vínculo pendurado → fábrica
     if (ag.ativo !== true) return null;   // agente DESLIGADO → canal pausado (não fábrica!)
@@ -220,6 +220,16 @@ async function configComAgente(admin: Admin, base: Record<string, unknown>, agen
     if (comp.nudges_ativos === false) cfg.nudges_ativos = false;
     const persona = String(ag.persona_prompt ?? '').trim();
     if (persona) cfg.persona_prompt = persona;
+    const conhecimento = String((ag as { conhecimento?: string }).conhecimento ?? '').trim();
+    if (conhecimento) cfg.conhecimento = conhecimento.slice(0, 8000);
+    // temas proibidos do CLIENTE (além do guardrail de fábrica): termos curtos demais viram
+    // bloqueio de tudo — só entra termo com 3+ chars, teto de 40 termos
+    if (Array.isArray(comp.proibidos)) {
+      const termos = comp.proibidos.map((t) => String(t ?? '').trim()).filter((t) => t.length >= 3).slice(0, 40);
+      if (termos.length) cfg.proibidos = termos;
+    }
+    if (comp.permitir_emojis === true) cfg.permitir_emojis = true;
+    if (comp.simular_digitacao === false) cfg.simular_digitacao = false;
     // modelo + chave própria: por ora só no caminho Gemini (o motor fala a API dele de ponta a
     // ponta — visão/áudio/schemas). OpenAI/Anthropic entram com o adaptador; a UI já avisa.
     if (ag.provedor === 'gemini') {
@@ -230,6 +240,9 @@ async function configComAgente(admin: Admin, base: Record<string, unknown>, agen
       } catch { /* leitura falhou — tratado abaixo */ }
       if (temChaveAgente) {
         if (String(ag.modelo ?? '').trim()) cfg.modelo_agente = String(ag.modelo).trim();
+        // avançado: modelos dedicados p/ documentos (visão) e casos complexos
+        if (String(comp.modelo_docs ?? '').trim()) cfg.modelo_agente_docs = String(comp.modelo_docs).trim();
+        if (String(comp.modelo_pro ?? '').trim()) cfg.modelo_agente_pro = String(comp.modelo_pro).trim();
       } else {
         // sem chave própria legível: NÃO aplica o modelo do cliente (rodaria na conta da
         // plataforma) — segue 100% fábrica e deixa rastro no log da function
@@ -246,12 +259,13 @@ async function configComAgente(admin: Admin, base: Record<string, unknown>, agen
 function resolverModelos(iaConfig: Record<string, unknown>): Modelos {
   // agente configurado entra entre o ENV (força do dono) e o cache da auto-recuperação;
   // se o modelo do agente já 404ou (modelo_404), sai da frente até o cliente trocar na UI
-  const agenteModelo = String(iaConfig.modelo_agente ?? '');
-  const agenteVivo = agenteModelo && agenteModelo !== String(iaConfig.modelo_404 ?? '') ? agenteModelo : '';
+  const m404 = String(iaConfig.modelo_404 ?? '');
+  const vivo = (m: unknown): string => { const v = String(m ?? ''); return v && v !== m404 ? v : ''; };
+  const agenteVivo = vivo(iaConfig.modelo_agente);
   const chat = modeloEnvChat() || agenteVivo || String(iaConfig.modelo_efetivo ?? '') || MODELO_DEFAULT;
-  const docs = modeloEnvDocs() || String(iaConfig.modelo_efetivo_docs ?? '') || chat;
+  const docs = modeloEnvDocs() || vivo(iaConfig.modelo_agente_docs) || String(iaConfig.modelo_efetivo_docs ?? '') || chat;
   // modelo FORTE p/ turnos complexos (objeção, dúvida, áudio) — roteador em conversar()
-  const pro = modeloEnvPro() || String(iaConfig.modelo_efetivo_pro ?? '') || 'gemini-pro-latest';
+  const pro = modeloEnvPro() || vivo(iaConfig.modelo_agente_pro) || String(iaConfig.modelo_efetivo_pro ?? '') || 'gemini-pro-latest';
   return { chat, docs, pro };
 }
 
@@ -295,9 +309,11 @@ async function chamarComRecuperacao(admin: Admin, canalId: string, modelos: Mode
     if (tipo === 'docs') {
       modelos.docs = sugestao;
       await persistirModeloEfetivo(admin, canalId, 'modelo_efetivo_docs', sugestao);
+      await persistirModeloEfetivo(admin, canalId, 'modelo_404', modelo);
     } else if (tipo === 'pro') {
       modelos.pro = sugestao;
       await persistirModeloEfetivo(admin, canalId, 'modelo_efetivo_pro', sugestao);
+      await persistirModeloEfetivo(admin, canalId, 'modelo_404', modelo);
     } else {
       // docs que só herdava do chat acompanha em memória (na próxima run herda do cache)
       if (modelos.docs === modelo) modelos.docs = sugestao;
@@ -696,7 +712,8 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
   // ---- guardrail pós-Gemini: violou → pede REESCRITA (1x); persistiu → descarta a bolha ----
   // Tira EMOJI ANTES de tudo: senão "jur😀os" burla a fronteira de palavra do guardrail e é remontado
   // limpo ("juros") só no envio. Aqui o guardrail e a guarda de tamanho já veem o texto final.
-  let bolhas = t.bolhas.map(removerEmoji).filter(Boolean);
+  const manterEmoji = (ctx.iaConfig as { permitir_emojis?: boolean }).permitir_emojis === true;
+  let bolhas = (manterEmoji ? t.bolhas.map((b) => (b ?? '').trim()) : t.bolhas.map(removerEmoji)).filter(Boolean);
 
   // ---- guarda de TAMANHO (defesa contra vazamento de prompt): o modelo pode despejar o prompt/
   //      raciocínio (aconteceu com a Ana Paula, 3223 chars). Bolha normal ~140, exceção do protocolo
@@ -716,14 +733,14 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
       bolhas = okTam;
     }
   }
-  const violacoes = bolhas.map((b) => saidaProibida(b));
+  const violacoes = bolhas.map((b) => saidaProibida(b) ?? proibidoExtra(b, ctx.iaConfig));
   if (violacoes.some(Boolean)) {
     for (let i = 0; i < bolhas.length; i++) {
       if (violacoes[i]) await evento(admin, sessao, 'guardrail_bloqueou', { violacao: violacoes[i], texto: bolhas[i].slice(0, 180) });
     }
     const reescritas = await reescrever(ctx, bolhas,
       `Sua resposta violou uma regra dura (${violacoes.filter(Boolean).join(', ')}): é PROIBIDO citar valores, taxas, juros, percentuais, margem, prazos, nomes de banco ou "aprovado/reprovado". Reescreva mantendo o sentido, sem nada disso.`);
-    bolhas = (reescritas ?? bolhas).filter((b) => !saidaProibida(b));
+    bolhas = (reescritas ?? bolhas).filter((b) => !saidaProibida(b) && !proibidoExtra(b, ctx.iaConfig));
   }
 
   // ---- dedup duro: nunca repetir uma saída já existente na conversa ----
@@ -733,7 +750,7 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
   {
     const finais: string[] = [];
     for (const b of bolhas) {
-      const v = saidaProibida(b);
+      const v = saidaProibida(b) ?? proibidoExtra(b, ctx.iaConfig);
       if (v) { await evento(admin, sessao, 'guardrail_bloqueou', { violacao: v, texto: b.slice(0, 180), pos_dedup: true }); continue; }
       if (b.length > 600) { await evento(admin, sessao, 'bolha_gigante_descartada', { tam: b.length, pos_dedup: true }); continue; }
       finais.push(b);
@@ -744,8 +761,8 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
   // ---- a LEGENDA do vídeo é texto do modelo: passa pelas MESMAS travas (emoji/violação/repetição/
   //      tamanho → sem legenda). Faltava o limite de tamanho aqui (o dump poderia sair na legenda). ----
   if (t.video?.caption) {
-    const cap = removerEmoji(t.video.caption);
-    const v = saidaProibida(cap);
+    const cap = manterEmoji ? t.video.caption.trim() : removerEmoji(t.video.caption);
+    const v = saidaProibida(cap) ?? proibidoExtra(cap, ctx.iaConfig);
     const dup = ctx.saidasAnteriores.has(normalizarSaida(cap));
     if (v || dup || cap.length > 600) {
       await evento(admin, sessao, cap.length > 600 ? 'bolha_gigante_descartada' : (v ? 'guardrail_bloqueou' : 'dedup_descartou'),
@@ -1547,6 +1564,22 @@ function notaHorarioAtendimento(iaConfig: Record<string, unknown>): string {
 
 // persona do agente configurado (IA configurável); vazio/ausente = PERSONA de fábrica
 const personaDe = (c: Record<string, unknown>): string => String(c.persona_prompt ?? '').trim() || PERSONA;
+// conhecimento da empresa (campo separado do prompt): fatos que a IA pode usar ao responder
+const conhecimentoDe = (c: Record<string, unknown>): string => {
+  const k = String(c.conhecimento ?? '').trim();
+  return k ? `\n\nINFORMAÇÕES DA EMPRESA (fatos que você conhece; use quando o cliente perguntar — sem despejar tudo de uma vez):\n${k}` : '';
+};
+// temas proibidos do cliente (além do guardrail de fábrica) — comparação sem acento/caixa
+const _semAcento = (s: string): string => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+function proibidoExtra(txt: string, c: Record<string, unknown>): string | null {
+  const termos = Array.isArray(c.proibidos) ? (c.proibidos as string[]) : [];
+  if (!termos.length) return null;
+  const t = _semAcento(txt ?? '');
+  for (const termo of termos) {
+    if (termo && t.includes(_semAcento(String(termo)))) return `tema_proibido:${String(termo).slice(0, 30)}`;
+  }
+  return null;
+}
 
 // ======== conversa (persona + objetivo da etapa + contexto completo) ========
 interface RespostaChat { mensagens: string[]; acao: string; dados: Record<string, unknown>; perguntouValores: boolean }
@@ -1569,7 +1602,7 @@ async function conversar(ctx: Ctx, opts: { etapa?: string; instrucaoExtra?: stri
     instrucao = instrucao.replaceAll(`{${k}}`, v);
   }
   const acomp = ctx.dados.aguardando_humano ? `\n\n${notaAcompanhamento(String(ctx.dados.aguardando_humano))}` : '';
-  const system = `${personaDe(ctx.iaConfig)}\n\n${instrucao}${acomp}${notaHorarioAtendimento(ctx.iaConfig)}${opts.instrucaoExtra ? `\n\nNOTA DESTE TURNO: ${opts.instrucaoExtra}` : ''}`;
+  const system = `${personaDe(ctx.iaConfig)}${conhecimentoDe(ctx.iaConfig)}\n\n${instrucao}${acomp}${notaHorarioAtendimento(ctx.iaConfig)}${opts.instrucaoExtra ? `\n\nNOTA DESTE TURNO: ${opts.instrucaoExtra}` : ''}`;
 
   // áudios ANTES do contexto (com teto agregado): o texto do contexto precisa dizer a VERDADE
   // sobre o que está anexado — dizer "ouça o áudio" com o anexo ausente faz o modelo alucinar.
@@ -1835,7 +1868,7 @@ async function enviarBolhas(admin: Admin, ctx: Ctx, bolhasRaw: string[], videoRa
     }
     await sleep(new Date(row.enviar_apos).getTime() - Date.now());
     try {
-      if (row.tipo === 'texto') {
+      if (row.tipo === 'texto' && (ctx.iaConfig as { simular_digitacao?: boolean }).simular_digitacao !== false) {
         const dur = presenceDur(row.texto);
         await sendPresenceComposing(instancia, ctx.destino, dur);
         await sleep(dur);
