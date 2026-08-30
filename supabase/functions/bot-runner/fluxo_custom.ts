@@ -80,7 +80,9 @@ export function validarDado(dado: DadoColeta, txt: string): { ok: boolean; valor
       return { ok: t.length >= 2 && /\p{L}/u.test(t), valor: t };
     case 'cpf': {
       const r = extrairCpfDeTexto(t);            // acha 11 dígitos no meio do texto + valida DV
-      return { ok: r.valido, valor: r.digits };
+      // guarda MASCARADO (paridade com a fábrica: bot_registrar_cpf só grava cpf_mascarado — não
+      // deixar CPF cru em dados_qualificacao). Inválido: devolve o que veio pro reprompt.
+      return { ok: r.valido, valor: r.valido ? `***.***.***-${r.digits.slice(-2)}` : r.digits };
     }
     case 'telefone': {
       const d = t.replace(/\D/g, '');

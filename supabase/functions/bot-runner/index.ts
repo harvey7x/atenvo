@@ -136,6 +136,7 @@ Deno.serve(async (req) => {
     const canalNome = canal?.nome_interno ?? '—';
     const origem = canal?.origem_tipo ?? 'WhatsApp';
     const dados = (estado.dados_qualificacao ?? {}) as Record<string, unknown>;
+    const iaFluxoId = (cfg as { ia_fluxo_id?: string | null } | null)?.ia_fluxo_id ?? null;
 
     // ---- MODO TESTE POR NÚMERO: numeros_teste não-vazio E o telefone do contato batendo
     //      (chave canônica chaveTel — cobre o 9º dígito oscilante) -> ESTA conversa roda o
@@ -163,7 +164,7 @@ Deno.serve(async (req) => {
     //      acima; qualquer outro lead sai por aqui sem receber nada. Sem esta trava, um canal
     //      ligado sem slug cairia no fluxo por IA — mensagem automática para lead real, que é
     //      exatamente o que o modo teste existe para evitar. ----
-    if (!fluxoEfetivo) {
+    if (!fluxoEfetivo && !iaFluxoId) {
       await logRunner('bot_ignorado', 'sem_fluxo_configurado', { dry_run: dryRun });
       return json({ ok: true, skipped: 'sem_fluxo_configurado', conversa_id: conversaId });
     }
@@ -209,6 +210,19 @@ Deno.serve(async (req) => {
         return await tratarLeadRetornou48h({ admin, conversaId, conv, canal, dryRun, logRunner });
       }
       await logRunner('bot_ignorado', eleg?.motivo ?? 'inelegivel'); return json({ ok: true, skipped: 'inelegivel', elegibilidade: eleg });
+    }
+
+    // ======== FLUXO CUSTOM (montado no painel — IA configurável): quando o canal está vinculado
+    //          a um ia_fluxo_id, o interpretador VENCE o slug de fábrica. Roda DEPOIS de todos os
+    //          gates (pausado/idempotência/humano/bot_pode_atuar) e ANTES de botões/mídia/IA — o
+    //          vínculo do painel é a intenção explícita mais nova. Sem ia_fluxo_id, nada abaixo muda.
+    //          (Áudio aqui ainda não é transcrito: vira resposta vazia → reprompt; transcrição = fase 2.)
+    if (iaFluxoId) {
+      return await tratarComFluxoCustom({
+        admin, conversaId, conv, canal, estado, fluxoId: iaFluxoId, min, max,
+        inboundText: body.inbound_text ?? '',
+        inboundMsgId: body.inbound_msg_id ?? null, dryRun, logRunner,
+      });
     }
 
     // ---- DESVIO: fluxo determinístico por BOTÕES (canais com fluxo_slug 'botoes*') ----
@@ -277,18 +291,6 @@ Deno.serve(async (req) => {
         copyVideo: perfilMidia.montarCopy(((cfg?.mensagens ?? {}) as Record<string, unknown>)[fluxoEfetivo]),
         min, max,
         inboundText: body.inbound_text ?? '', inboundTipo: body.inbound_tipo ?? 'texto',
-        inboundMsgId: body.inbound_msg_id ?? null, dryRun, logRunner,
-      });
-    }
-
-    // ======== FLUXO CUSTOM (montado no painel — IA configurável): canal apontando pra um
-    //          fluxo do banco roda o interpretador. Sem ia_fluxo_id, NADA abaixo muda.
-    //          (Áudio aqui vira resposta vazia → escada de reprompt; transcrição fica pra fase 2.)
-    const iaFluxoId = (cfg as { ia_fluxo_id?: string | null } | null)?.ia_fluxo_id ?? null;
-    if (iaFluxoId) {
-      return await tratarComFluxoCustom({
-        admin, conversaId, conv, canal, estado, fluxoId: iaFluxoId, min, max,
-        inboundText: body.inbound_text ?? '',
         inboundMsgId: body.inbound_msg_id ?? null, dryRun, logRunner,
       });
     }
@@ -1344,7 +1346,7 @@ async function tratarComFluxoCustom(p: {
 }) {
   const { admin, conversaId, conv, canal, estado, fluxoId, min, max, inboundMsgId, dryRun, logRunner } = p;
 
-  const { data: fluxo } = await admin.from('ia_fluxos').select('id, nome, passos, ativo').eq('id', fluxoId).maybeSingle();
+  const { data: fluxo } = await admin.from('ia_fluxos').select('id, nome, passos, ativo, atualizado_em').eq('id', fluxoId).maybeSingle();
   if (!fluxo || fluxo.ativo !== true) {
     // fluxo sumiu/desligado: bot MUDO neste canal (nunca cair no trilho de fábrica em silêncio)
     await logRunner('fluxo_custom', fluxo ? 'fluxo_inativo' : 'fluxo_sumiu', { fluxo_id: fluxoId });
@@ -1357,7 +1359,11 @@ async function tratarComFluxoCustom(p: {
   }
 
   const dq = (estado.dados_qualificacao ?? {}) as Record<string, unknown>;
-  const mesmoFluxo = dq.cf_fluxo === fluxoId;
+  const versao = String(fluxo.atualizado_em ?? '');
+  // "mesmo fluxo" exige mesmo id E mesma versão: se o admin editou o fluxo enquanto a conversa
+  // estava no meio, o índice de passo salvo pode apontar pra outro passo — mais seguro RECOMEÇAR
+  // (cf_passo é posicional; sem isso, coletaria o dado errado — P2 da revisão).
+  const mesmoFluxo = dq.cf_fluxo === fluxoId && dq.cf_versao === versao;
   if (mesmoFluxo && dq.cf_concluido === true) {
     // fluxo já terminou pra esta conversa: o bot cala e o humano segue
     await logRunner('fluxo_custom', 'pos_conclusao_silencio', { fluxo_id: fluxoId });
@@ -1370,7 +1376,7 @@ async function tratarComFluxoCustom(p: {
         tentativas: Number(dq.cf_tentativas ?? 0) || 0,
         concluido: false,
       }
-    : { passo: 0, dados: {}, tentativas: 0, concluido: false };   // 1ª vez (ou canal trocou de fluxo): recomeça
+    : { passo: 0, dados: {}, tentativas: 0, concluido: false };   // 1ª vez, canal trocou de fluxo ou fluxo editado: recomeça
 
   const t = mesmoFluxo ? responderCf(passos, cf, p.inboundText) : avancarCf(passos, cf);
 
@@ -1378,8 +1384,10 @@ async function tratarComFluxoCustom(p: {
     await admin.rpc('bot_avancar_etapa', {
       p_conversa: conversaId, p_etapa: estado.etapa,
       p_dados: {
-        cf_fluxo: fluxoId, cf_passo: t.estado.passo, cf_dados: t.estado.dados,
-        cf_tentativas: t.estado.tentativas, ...(t.estado.concluido ? { cf_concluido: true } : {}), ...extra,
+        cf_fluxo: fluxoId, cf_versao: versao, cf_passo: t.estado.passo, cf_dados: t.estado.dados,
+        // cf_concluido SEMPRE escrito (o merge do bot_avancar_etapa é raso; condicional deixaria
+        // o `true` de um fluxo ANTERIOR grudado no novo — P1 da revisão): true encerra, false reabre.
+        cf_tentativas: t.estado.tentativas, cf_concluido: t.estado.concluido, ...extra,
       },
       p_reprompts: 0, p_inbound_msg: inboundMsgId,
     });
@@ -1387,8 +1395,10 @@ async function tratarComFluxoCustom(p: {
 
   // ---- escada estourada (2 reprompts + 1): pausa + humano, sem balão extra ----
   if (t.escalarHumano) {
-    await admin.from('conversas').update({ precisa_humano: true, precisa_humano_motivo: 'fluxo_custom_nao_entendeu', precisa_humano_em: new Date().toISOString() }).eq('id', conversaId);
-    await admin.rpc('bot_pausar', { p_conversa: conversaId, p_motivo: 'fluxo_custom_escalou' });
+    if (!dryRun) {
+      await admin.from('conversas').update({ precisa_humano: true, precisa_humano_motivo: 'fluxo_custom_nao_entendeu', precisa_humano_em: new Date().toISOString() }).eq('id', conversaId);
+      await admin.rpc('bot_pausar', { p_conversa: conversaId, p_motivo: 'fluxo_custom_escalou' });
+    }
     await persistir();
     await logRunner('fluxo_custom', 'escalou_humano', { fluxo_id: fluxoId, passo: t.estado.passo });
     return json({ ok: true, fluxo: 'custom', escalou: true, conversa_id: conversaId });
@@ -1411,7 +1421,8 @@ async function tratarComFluxoCustom(p: {
   } else {
     const tx = enviadorDe(canal);
     for (let i = 0; i < t.baloes.length; i++) {
-      if (i > 0) await sleep(min + Math.random() * (max - min));
+      // teto de 1.8s por gap: MAX_BALOES_TURNO(6) × sleep + sends tem que caber no lease de 30s
+      if (i > 0) await sleep(Math.min(min + Math.random() * (max - min), 1800));
       try {
         const sent = await tx.sendText(destino, t.baloes[i]);
         const idExterno = sent?.key?.id ?? null;
@@ -1430,12 +1441,32 @@ async function tratarComFluxoCustom(p: {
     }
   }
 
-  // ---- ações (estado avança TAMBÉM em dry_run; só o envio é simulado — padrão da casa) ----
+  // ---- falha de envio REAL no meio dos balões: o cliente recebeu parte (ou nada) e o estado ia
+  //      avançar como se tivesse entregue tudo (P1). Em vez disso, chama humano e NÃO avança o passo
+  //      (persiste o estado ANTERIOR pra não coletar resposta de um balão que o cliente não viu). ----
+  if (erro && !dryRunEfetivo && destino && erro !== 'transporte_nao_suportado') {
+    await admin.from('conversas').update({ precisa_humano: true, precisa_humano_motivo: 'fluxo_custom_envio_falhou', precisa_humano_em: new Date().toISOString() }).eq('id', conversaId);
+    await admin.rpc('bot_pausar', { p_conversa: conversaId, p_motivo: 'fluxo_custom_envio_falhou' });
+    await admin.rpc('bot_avancar_etapa', {
+      p_conversa: conversaId, p_etapa: estado.etapa,
+      p_dados: { cf_fluxo: fluxoId, cf_versao: versao, cf_passo: cf.passo, cf_dados: cf.dados, cf_tentativas: cf.tentativas },
+      p_reprompts: 0, p_inbound_msg: inboundMsgId,
+    });
+    await logRunner('fluxo_custom', 'envio_falhou_handoff', { fluxo_id: fluxoId, enviados, erro });
+    return json({ ok: true, fluxo: 'custom', envio_falhou: true, enviados_reais: enviados, erro, conversa_id: conversaId });
+  }
+
+  // ---- ações: o cf-state avança em dry_run (padrão da casa), mas efeitos REAIS (etiqueta, handoff,
+  //      entrega pra IA) NÃO disparam em modo teste/dry — senão um teste marcaria/pausaria a conversa
+  //      de verdade (P2 da revisão). Em dry, apenas registra o que ACONTECERIA. ----
   let iaAssumiu = false;
   let pediuIa = false;
   let pediuHumano = false;
   for (const a of t.acoes) {
-    if (a.etiqueta) await aplicarEtiquetaBot(admin, conv.organizacao_id, a.etiqueta, conv.contato_id, conversaId);
+    if (a.etiqueta) {
+      if (dryRunEfetivo) await logRunner('fluxo_custom', 'etiqueta_simulada', { etiqueta: a.etiqueta });
+      else await aplicarEtiquetaBot(admin, conv.organizacao_id, a.etiqueta, conv.contato_id, conversaId);
+    }
     if (a.entregarIa) {
       pediuIa = true;
       if (!dryRunEfetivo && !iaAssumiu) {
@@ -1445,10 +1476,15 @@ async function tratarComFluxoCustom(p: {
     }
     if (a.chamarHumano) pediuHumano = true;
   }
-  // pediu IA e ela não assumiu (desligada/modo teste/dry): não deixa o lead no vácuo → humano
+  // pediu humano OU pediu IA e ela não assumiu (desligada/modo teste): não deixa o lead no vácuo →
+  // humano. Em dry/teste NÃO pausa a conversa de verdade — só registra.
   if ((pediuHumano || (pediuIa && !iaAssumiu)) && !iaAssumiu) {
-    await admin.from('conversas').update({ precisa_humano: true, precisa_humano_motivo: 'fluxo_custom', precisa_humano_em: new Date().toISOString() }).eq('id', conversaId);
-    await admin.rpc('bot_pausar', { p_conversa: conversaId, p_motivo: 'fluxo_custom_handoff' });
+    if (dryRunEfetivo) {
+      await logRunner('fluxo_custom', 'handoff_simulado', { motivo: pediuHumano ? 'chamar_humano' : 'ia_indisponivel' });
+    } else {
+      await admin.from('conversas').update({ precisa_humano: true, precisa_humano_motivo: 'fluxo_custom', precisa_humano_em: new Date().toISOString() }).eq('id', conversaId);
+      await admin.rpc('bot_pausar', { p_conversa: conversaId, p_motivo: 'fluxo_custom_handoff' });
+    }
   }
 
   await persistir();
