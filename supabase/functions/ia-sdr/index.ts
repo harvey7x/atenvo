@@ -1245,7 +1245,7 @@ async function extrairLoteColeta(ctx: Ctx): Promise<LoteColeta> {
   partes.push({ text: `São ${anexadas} imagem(ns) do mesmo cliente, enviadas juntas. Extraia no JSON pedido.` });
   const j = await geminiSessao(ctx, 'extracao_lote', {
     system: PROMPT_LOTE_COLETA, partes, schema: SCHEMA_LOTE_COLETA, temperatura: 0, maxTokens: 8192, semPensar: true,
-  });
+  }, 'docs');   // leitura de documento usa o modelo de DOCS (o campo 'modelo p/ documentos' do agente vale de verdade; sem docs próprio = chat, no-op)
   const identidades = Array.isArray((j as { identidades?: unknown }).identidades) ? (j as { identidades: Array<Record<string, unknown>> }).identidades : [];
   const comprovante = ((j as { comprovante?: unknown }).comprovante && typeof (j as { comprovante?: unknown }).comprovante === 'object')
     ? (j as { comprovante: Record<string, unknown> }).comprovante : null;
@@ -1807,7 +1807,7 @@ async function extrairDeArquivos(ctx: Ctx, prompt: string, schema: Record<string
       system: prompt,
       partes: [{ inline_data: { mime_type: arq.mime, data: arq.b64 } }, { text: 'Extraia os dados no JSON pedido.' }],
       schema, temperatura: 0, maxTokens: 4096, semPensar: true,
-    });
+    }, 'docs');
     itens.push({ ...(j as Record<string, unknown>), __anexo: String(meta.anexo_path ?? ''), __mime: String(meta.mime ?? '') });
   }
   return { itens, grandes };
