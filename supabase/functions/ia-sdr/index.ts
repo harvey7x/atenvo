@@ -704,6 +704,27 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
 
   if (bolhas.length || t.video) await enviarBolhas(admin, ctx, bolhas.slice(0, 3), t.video ?? null);
 
+  // ---- P0 (auditoria 30/08): NADA foi ao cliente mas HAVIA conteúdo (guardrail/dedup/tamanho zerou
+  //      tudo, ou bolha só-emoji virou vazio). Se avançássemos o watermark (processado_ate/msgs_vistas/
+  //      abertura_enviada) como no patch abaixo, a mensagem do cliente viraria "vista" e o lead ficaria
+  //      MUDO pra sempre, fora do radar da vigia (que só pega pausadas). Então: NÃO consome o watermark,
+  //      faz retry curto e LIMITADO e, se persistir, handoff suave (nunca silêncio eterno). ----
+  const enviou = bolhas.length > 0 || !!t.video;
+  const tinhaConteudo = t.bolhas.length > 0 || t.video != null;
+  if (!enviou && tinhaConteudo && !t.chamarHumano && !t.statusNovo) {
+    const nVazio = (Number(dados.turnos_vazios ?? 0) || 0) + 1;
+    if (nVazio >= 3) {
+      await criarNotaInterna(admin, sessao, notaContexto(ctx, 'saida_descartada_persistente'));
+      await admin.from('conversas').update({ precisa_humano: true, precisa_humano_motivo: 'saida_descartada_persistente', precisa_humano_em: new Date().toISOString() }).eq('id', sessao.conversa_id);
+      await admin.from('ia_sessoes').update({ dados: { ...dados, aguardando_humano: 'saida_descartada_persistente', turnos_vazios: 0 }, atualizado_em: new Date().toISOString() }).eq('id', sessao.id).eq('status', 'ativa');
+      await evento(admin, sessao, 'chamou_humano', { motivo: 'saida_descartada_persistente' });
+    } else {
+      await admin.from('ia_sessoes').update({ dados: { ...dados, turnos_vazios: nVazio }, processar_apos: new Date(Date.now() + 25_000).toISOString(), atualizado_em: new Date().toISOString() }).eq('id', sessao.id).eq('status', 'ativa');
+      await evento(admin, sessao, 'turno_vazio_retry', { n: nVazio });
+    }
+    return;
+  }
+
   // ---- persiste o desfecho do turno (sucesso => zera falhas técnicas consecutivas) ----
   let ultimaNova = novas.length ? novas[novas.length - 1].criado_em : processadoAte;
   if (t.naoAvancarAlem && t.naoAvancarAlem < ultimaNova) ultimaNova = t.naoAvancarAlem;
@@ -712,7 +733,7 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
   const patch: Record<string, unknown> = {
     // nudge_alvo/nudge_n: mensagem nova do cliente zera o ciclo de retomada; turno de nudge
     // incrementa via t.dadosPatch (que entra por cima)
-    dados: { ...dados, nudge_alvo: ultimaNova, ...(novas.length ? { nudge_n: 0, teve_inbound: true } : {}), ...(t.dadosPatch ?? {}), processado_ate: ultimaNova, msgs_vistas: msgsVistas, abertura_enviada: true, falhas_tecnicas: 0 },
+    dados: { ...dados, nudge_alvo: ultimaNova, ...(novas.length ? { nudge_n: 0, teve_inbound: true } : {}), ...(t.dadosPatch ?? {}), processado_ate: ultimaNova, msgs_vistas: msgsVistas, abertura_enviada: true, falhas_tecnicas: 0, turnos_vazios: 0 },
     docs: { ...ctx.docs, ...(t.docsPatch ?? {}) },
     atualizado_em: new Date().toISOString(),
   };
@@ -1721,9 +1742,22 @@ async function enviarBolhas(admin: Admin, ctx: Ctx, bolhasRaw: string[], videoRa
       // cita a mensagem do cliente só no PRIMEIRO balão de texto do turno
       const quotar = (row.tipo === 'texto' && !jaCitou && quoteId) ? { key: { id: quoteId } } : undefined;
       if (quotar) jaCitou = true;
-      const sent = (row.tipo === 'video' && row.media_url)
-        ? await tx.sendMedia(ctx.destino, 'video', 'video/mp4', row.media_url, 'meu-inss.mp4', row.media_caption ?? undefined)
-        : await tx.sendText(ctx.destino, row.texto, quotar);
+      let sent;
+      if (row.tipo === 'video' && row.media_url) {
+        sent = await tx.sendMedia(ctx.destino, 'video', 'video/mp4', row.media_url, 'meu-inss.mp4', row.media_caption ?? undefined);
+      } else {
+        try {
+          sent = await tx.sendText(ctx.destino, row.texto, quotar);
+        } catch (eQ) {
+          // P0 (auditoria): a CITAÇÃO (quoted) pode dar 400 determinístico (id não resolvido / shape v2)
+          // e derrubar a bolha, o que hoje REGERA o Gemini e deixa o idoso mudo (12 casos em prod, todos
+          // na bolha citada). Reenvia a MESMA bolha SEM citação antes de falhar — a citação é cosmética.
+          if (quotar) {
+            await evento(admin, sessao, 'quoted_falhou', { erro: String((eQ as Error)?.message ?? '').slice(0, 120) });
+            sent = await tx.sendText(ctx.destino, row.texto, undefined);
+          } else { throw eQ; }
+        }
+      }
       const idExterno = sent?.key?.id ?? null;
       if (!idExterno) throw new Error('sem_id_retorno');
       const { data: msg } = await admin.from('mensagens').insert({
