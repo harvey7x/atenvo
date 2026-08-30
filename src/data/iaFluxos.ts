@@ -60,8 +60,12 @@ export function validarDado(dado: DadoColeta, txt: string): { ok: boolean; valor
       return { ok, valor: t };
     }
     case 'cpf': {
-      const digitos = t.replace(/\D/g, '');
-      return { ok: cpfValido(digitos), valor: digitos };
+      // acha a 1ª sequência de 11 dígitos no meio do texto (igual extrairCpfDeTexto do motor),
+      // valida DV e guarda MASCARADO (paridade com a fábrica — nada de CPF cru)
+      const m = t.replace(/[.\s-]/g, '').match(/\d{11}/);
+      const d = m ? m[0] : '';
+      const ok = !!d && cpfValido(d);
+      return { ok, valor: ok ? `***.***.***-${d.slice(-2)}` : t };
     }
     case 'telefone': {
       const digitos = t.replace(/\D/g, '');
@@ -76,17 +80,25 @@ export function validarDado(dado: DadoColeta, txt: string): { ok: boolean; valor
   }
 }
 
-/** resposta do cliente casa com alguma opção? (número da opção, valor ou rótulo, sem acento) */
-export function casarOpcao(opcoes: { rotulo: string; valor: string }[], txt: string): string | null {
-  const t = (txt || '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+const semAcento = (s: string) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+/** normaliza opções como o motor (fluxo_custom.opcoesDe): filtra rótulo vazio + deriva valor */
+export function normOpcoes(opcoes: { rotulo: string; valor: string }[]): { rotulo: string; valor: string }[] {
+  return (opcoes ?? [])
+    .map((o) => ({ rotulo: (o.rotulo ?? '').trim(), valor: (o.valor ?? '').trim() }))
+    .filter((o) => o.rotulo)
+    .map((o) => ({ ...o, valor: o.valor || semAcento(o.rotulo).replace(/\s+/g, '_') }));
+}
+
+/** resposta do cliente casa com alguma opção? (número, valor derivado ou rótulo — sem acento) */
+export function casarOpcao(opcoesBrutas: { rotulo: string; valor: string }[], txt: string): string | null {
+  const opcoes = normOpcoes(opcoesBrutas);
+  const t = semAcento((txt || '').trim());
   if (!t) return null;
   const n = Number(t);
   if (Number.isInteger(n) && n >= 1 && n <= opcoes.length) return opcoes[n - 1].valor;
   for (const o of opcoes) {
-    const rot = o.rotulo.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-    const val = o.valor.toLowerCase();
-    // prefixo nos dois sentidos (mesma regra do motor): "empre" ⇄ "Empréstimo"
-    if (t === val || t === rot
+    const rot = semAcento(o.rotulo);
+    if (t === o.valor.toLowerCase() || t === rot
         || (t.length >= 3 && rot.startsWith(t))
         || (rot.length >= 3 && t.startsWith(rot))) return o.valor;
   }
@@ -104,7 +116,7 @@ function baloesDe(p: { baloes?: string[] } | undefined): string[] {
 }
 
 function textoPergunta(p: Extract<Passo, { tipo: 'pergunta' }>): string[] {
-  const menu = p.opcoes.map((o, i) => `${i + 1}. ${o.rotulo}`).join('\n');
+  const menu = normOpcoes(p.opcoes).map((o, i) => `${i + 1}. ${o.rotulo}`).join('\n');
   const base = baloesDe(p);
   return base.length ? [...base.slice(0, -1), `${base[base.length - 1]}\n\n${menu}`] : [menu];
 }
@@ -176,7 +188,9 @@ export function problemasDoFluxo(passos: Passo[]): string[] {
     if (p.tipo === 'mensagem' && !baloesDe(p).length) avisos.push(`${n} (Mensagem): sem texto.`);
     if (p.tipo === 'pergunta') {
       if (!baloesDe(p).length) avisos.push(`${n} (Pergunta): sem texto.`);
-      if ((p.opcoes ?? []).filter((o) => o.rotulo.trim()).length < 2) avisos.push(`${n} (Pergunta): precisa de pelo menos 2 opções.`);
+      const preenchidas = (p.opcoes ?? []).filter((o) => o.rotulo.trim()).length;
+      if (preenchidas < 2) avisos.push(`${n} (Pergunta): precisa de pelo menos 2 opções.`);
+      else if (preenchidas < (p.opcoes ?? []).length) avisos.push(`${n} (Pergunta): tem opção sem texto — apague ou preencha (bagunça a numeração).`);
     }
     if (p.tipo === 'coletar' && !baloesDe(p).length) avisos.push(`${n} (Coletar): sem texto pedindo o dado.`);
     if (p.tipo === 'acao' && !p.etiqueta && !p.chamarHumano && !p.entregarIa) avisos.push(`${n} (Ação): nenhuma ação marcada.`);
