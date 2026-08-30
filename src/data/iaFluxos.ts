@@ -155,7 +155,10 @@ export function avancarSim(passos: Passo[], estado: EstadoSim): SaidaSim {
       if (p.entregarIa) eventos.push('✨ conversa entregue pro Atendente de IA');
       e.passo++; continue;
     }
-    if (p.tipo === 'pergunta') { baloes.push(...textoPergunta(p)); return { baloes, eventos, estado: e, aguardando: true }; }
+    if (p.tipo === 'pergunta') {
+      if (normOpcoes(p.opcoes).length < 2) { e.passo++; continue; }   // pergunta torta: pula (igual ao motor)
+      baloes.push(...textoPergunta(p)); return { baloes, eventos, estado: e, aguardando: true };
+    }
     if (p.tipo === 'coletar') { baloes.push(...baloesDe(p)); return { baloes, eventos, estado: e, aguardando: true }; }
     if (p.tipo === 'fim') { baloes.push(...baloesDe(p)); e = { ...e, encerrado: true }; return { baloes, eventos, estado: e, aguardando: false }; }
     e.passo++;
@@ -206,8 +209,7 @@ export function responderSim(passos: Passo[], estado: EstadoSim, resposta: strin
   const chave = p.salvarEm || p.dado;
   e.dados[chave] = v.valor;
   const eventos = [`💾 ${chave} = "${v.valor}"`];
-  if (p.dado === 'nome' || p.dado === 'cpf') eventos.push(`📇 salvo na ficha do cliente (${p.dado === 'nome' ? 'nome + oportunidade' : 'CPF'})`);
-  else if (p.dado === 'telefone' || p.dado === 'email') eventos.push(`📇 salvo na oportunidade (${p.dado})`);
+  if (p.dado !== 'texto') eventos.push(`📇 salvo na ficha do cliente (${p.dado})`);
   e = { ...e, passo: e.passo + 1, tentativas: 0 };
   const seg = avancarSim(passos, e);
   return { ...seg, eventos: [...eventos, ...seg.eventos] };
@@ -216,6 +218,8 @@ export function responderSim(passos: Passo[], estado: EstadoSim, resposta: strin
 /* ---------------- problemas do fluxo (validação do editor) ---------------- */
 export function problemasDoFluxo(passos: Passo[]): string[] {
   const avisos: string[] = [];
+  // com ramificação, um 'fim' no meio é legítimo (um ramo encerra cedo; outros passos rodam por outro caminho)
+  const temRamificacao = passos.some((pp) => pp.tipo === 'pergunta' && (pp.opcoes ?? []).some((o) => o.irPara));
   if (!passos.length) avisos.push('O fluxo está vazio — adicione ao menos uma mensagem.');
   passos.forEach((p, i) => {
     const n = `Passo ${i + 1}`;
@@ -233,7 +237,7 @@ export function problemasDoFluxo(passos: Passo[]): string[] {
     }
     if (p.tipo === 'coletar' && !baloesDe(p).length) avisos.push(`${n} (Coletar): sem texto pedindo o dado.`);
     if (p.tipo === 'acao' && !p.etiqueta && !p.chamarHumano && !p.entregarIa) avisos.push(`${n} (Ação): nenhuma ação marcada.`);
-    if (p.tipo === 'fim' && i < passos.length - 1) avisos.push(`${n} (Fim): há passos depois do fim que nunca vão rodar.`);
+    if (p.tipo === 'fim' && i < passos.length - 1 && !temRamificacao) avisos.push(`${n} (Fim): há passos depois do fim que nunca vão rodar.`);
   });
   return avisos;
 }

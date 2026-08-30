@@ -88,10 +88,13 @@ export default function Fluxos() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fluxo?.id]);
 
+  // compara passos IGNORANDO só o `id` (o load faz backfill de id em fluxos antigos; sem isso
+  // todo fluxo legado abriria marcado como 'não salvo' — achado da revisão)
+  const semId = (ps: Passo[]) => JSON.stringify(ps.map((x) => ({ ...x, id: undefined })));
   const formSujo = useMemo(() => {
     if (!fluxo) return false;
     return nome !== fluxo.nome || descricao !== fluxo.descricao || ativo !== fluxo.ativo
-      || JSON.stringify(passos) !== JSON.stringify(fluxo.passos);
+      || semId(passos) !== semId(fluxo.passos);
   }, [fluxo, nome, descricao, ativo, passos]);
 
   const problemas = useMemo(() => problemasDoFluxo(passos), [passos]);
