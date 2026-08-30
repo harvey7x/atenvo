@@ -1406,6 +1406,26 @@ async function tratarComFluxoCustom(p: {
 
   // ---- envio (padrão suporte: allowlist/dry, texto puro — roda em Cloud E Evolution) ----
   const { destino, dryRunEfetivo } = await resolverEnvio(admin, conv, dryRun);
+
+  // ---- PERSISTÊNCIA NA FICHA (ANTES do envio: o dado que o cliente já mandou entra na ficha mesmo
+  //      se a mensagem de confirmação falhar). RPC GENÉRICA fluxo_persistir_dado — sem título INSS,
+  //      sem clobber de dado já preenchido, CPF cru só na coluna própria. Só em envio real. ----
+  if (t.coletou && !dryRunEfetivo) {
+    try {
+      const ehCpf = t.coletou.dado === 'cpf';
+      await admin.rpc('fluxo_persistir_dado', {
+        p_conversa: conversaId, p_dado: t.coletou.dado,
+        p_valor: ehCpf ? (t.coletou.digits ?? '') : t.coletou.valor,
+        p_valor_mascarado: ehCpf ? t.coletou.valor : null,
+      });
+      await logRunner('fluxo_custom', 'dado_persistido', { dado: t.coletou.dado, chave: t.coletou.chave });
+    } catch (e) {
+      // best-effort: falha aqui NUNCA trava o fluxo (o dado segue em cf_dados)
+      await logRunner('fluxo_custom', 'persistencia_falhou', { dado: t.coletou.dado, erro: String((e as Error)?.message ?? '').slice(0, 160) });
+    }
+  } else if (t.coletou && dryRunEfetivo) {
+    await logRunner('fluxo_custom', 'dado_persistido_simulado', { dado: t.coletou.dado });
+  }
   let enviados = 0; let erro: string | null = null;
   const transporte = (canal?.transporte ?? 'evolution') as string;
   if (dryRunEfetivo || !destino) {
@@ -1444,7 +1464,7 @@ async function tratarComFluxoCustom(p: {
   // ---- falha de envio REAL no meio dos balões: o cliente recebeu parte (ou nada) e o estado ia
   //      avançar como se tivesse entregue tudo (P1). Em vez disso, chama humano e NÃO avança o passo
   //      (persiste o estado ANTERIOR pra não coletar resposta de um balão que o cliente não viu). ----
-  if (erro && !dryRunEfetivo && destino && erro !== 'transporte_nao_suportado') {
+  if (erro && !dryRunEfetivo && destino) {
     await admin.from('conversas').update({ precisa_humano: true, precisa_humano_motivo: 'fluxo_custom_envio_falhou', precisa_humano_em: new Date().toISOString() }).eq('id', conversaId);
     await admin.rpc('bot_pausar', { p_conversa: conversaId, p_motivo: 'fluxo_custom_envio_falhou' });
     await admin.rpc('bot_avancar_etapa', {
@@ -1454,36 +1474,6 @@ async function tratarComFluxoCustom(p: {
     });
     await logRunner('fluxo_custom', 'envio_falhou_handoff', { fluxo_id: fluxoId, enviados, erro });
     return json({ ok: true, fluxo: 'custom', envio_falhou: true, enviados_reais: enviados, erro, conversa_id: conversaId });
-  }
-
-  // ---- PERSISTÊNCIA NA FICHA: dado coletado neste turno vai pro contato/oportunidade via as
-  //      MESMAS RPCs da casa (nome cria/atualiza a opp no Kanban; cpf grava completo em contatos.cpf,
-  //      mascarado no estado). Só em envio REAL (dry/teste não escreve na ficha de verdade). ----
-  if (t.coletou && !dryRunEfetivo) {
-    try {
-      if (t.coletou.dado === 'nome') {
-        await admin.rpc('bot_coletar_nome', { p_conversa: conversaId, p_nome: t.coletou.valor });
-      } else if (t.coletou.dado === 'cpf' && t.coletou.digits) {
-        await admin.rpc('bot_registrar_cpf', { p_conversa: conversaId, p_cpf_digits: t.coletou.digits, p_cpf_mascarado: t.coletou.valor });
-      } else if (t.coletou.dado === 'email' || t.coletou.dado === 'telefone') {
-        // e-mail/telefone: guarda na oportunidade (metadados) — não há RPC dedicada, e não
-        // sobrescreve o telefone canônico do contato (que vem do WhatsApp) sem confirmação humana
-        const est = await admin.from('bot_conversa_estado').select('oportunidade_id').eq('conversa_id', conversaId).maybeSingle();
-        const oppId = est.data?.oportunidade_id ?? null;
-        if (oppId) {
-          const opp = await admin.from('oportunidades').select('metadados').eq('id', oppId).maybeSingle();
-          await admin.from('oportunidades').update({
-            metadados: { ...((opp.data?.metadados as Record<string, unknown>) ?? {}), [`fluxo_${t.coletou.dado}`]: t.coletou.valor },
-          }).eq('id', oppId);
-        }
-      }
-      await logRunner('fluxo_custom', 'dado_persistido', { dado: t.coletou.dado, chave: t.coletou.chave });
-    } catch (e) {
-      // persistência é best-effort: uma falha aqui NUNCA trava o fluxo (o dado segue em cf_dados)
-      await logRunner('fluxo_custom', 'persistencia_falhou', { dado: t.coletou.dado, erro: String((e as Error)?.message ?? '').slice(0, 160) });
-    }
-  } else if (t.coletou && dryRunEfetivo) {
-    await logRunner('fluxo_custom', 'dado_persistido_simulado', { dado: t.coletou.dado });
   }
 
   // ---- ações: o cf-state avança em dry_run (padrão da casa), mas efeitos REAIS (etiqueta, handoff,
