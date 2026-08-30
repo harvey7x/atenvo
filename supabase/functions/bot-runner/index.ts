@@ -1456,6 +1456,36 @@ async function tratarComFluxoCustom(p: {
     return json({ ok: true, fluxo: 'custom', envio_falhou: true, enviados_reais: enviados, erro, conversa_id: conversaId });
   }
 
+  // ---- PERSISTÊNCIA NA FICHA: dado coletado neste turno vai pro contato/oportunidade via as
+  //      MESMAS RPCs da casa (nome cria/atualiza a opp no Kanban; cpf grava completo em contatos.cpf,
+  //      mascarado no estado). Só em envio REAL (dry/teste não escreve na ficha de verdade). ----
+  if (t.coletou && !dryRunEfetivo) {
+    try {
+      if (t.coletou.dado === 'nome') {
+        await admin.rpc('bot_coletar_nome', { p_conversa: conversaId, p_nome: t.coletou.valor });
+      } else if (t.coletou.dado === 'cpf' && t.coletou.digits) {
+        await admin.rpc('bot_registrar_cpf', { p_conversa: conversaId, p_cpf_digits: t.coletou.digits, p_cpf_mascarado: t.coletou.valor });
+      } else if (t.coletou.dado === 'email' || t.coletou.dado === 'telefone') {
+        // e-mail/telefone: guarda na oportunidade (metadados) — não há RPC dedicada, e não
+        // sobrescreve o telefone canônico do contato (que vem do WhatsApp) sem confirmação humana
+        const est = await admin.from('bot_conversa_estado').select('oportunidade_id').eq('conversa_id', conversaId).maybeSingle();
+        const oppId = est.data?.oportunidade_id ?? null;
+        if (oppId) {
+          const opp = await admin.from('oportunidades').select('metadados').eq('id', oppId).maybeSingle();
+          await admin.from('oportunidades').update({
+            metadados: { ...((opp.data?.metadados as Record<string, unknown>) ?? {}), [`fluxo_${t.coletou.dado}`]: t.coletou.valor },
+          }).eq('id', oppId);
+        }
+      }
+      await logRunner('fluxo_custom', 'dado_persistido', { dado: t.coletou.dado, chave: t.coletou.chave });
+    } catch (e) {
+      // persistência é best-effort: uma falha aqui NUNCA trava o fluxo (o dado segue em cf_dados)
+      await logRunner('fluxo_custom', 'persistencia_falhou', { dado: t.coletou.dado, erro: String((e as Error)?.message ?? '').slice(0, 160) });
+    }
+  } else if (t.coletou && dryRunEfetivo) {
+    await logRunner('fluxo_custom', 'dado_persistido_simulado', { dado: t.coletou.dado });
+  }
+
   // ---- ações: o cf-state avança em dry_run (padrão da casa), mas efeitos REAIS (etiqueta, handoff,
   //      entrega pra IA) NÃO disparam em modo teste/dry — senão um teste marcaria/pausaria a conversa
   //      de verdade (P2 da revisão). Em dry, apenas registra o que ACONTECERIA. ----

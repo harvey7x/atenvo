@@ -1,45 +1,46 @@
 // ============================================================================
-// FLUXO CUSTOM (IA configurável — Fase Fluxos): interpretador PURO dos fluxos
-// montados no painel (ia_fluxos.passos, jsonb). Sem Deno/DB aqui — o handler
-// tratarComFluxoCustom (index.ts) faz IO/envio/persistência.
+// FLUXO CUSTOM (IA configurável): interpretador PURO dos fluxos do painel
+// (ia_fluxos.passos, jsonb). Sem Deno/DB aqui — o handler tratarComFluxoCustom
+// (index.ts) faz IO/envio/persistência.
 //
 // CONTRATO ESPELHADO no front (src/data/iaFluxos.ts — simulador): mesma
-// validação, mesmo casamento de opção, mesma escada de tentativas. O que o
-// cliente vê no "Testar fluxo" é o que o canal executa.
+// validação, casamento de opção, escada de tentativas, RAMIFICAÇÃO e coleta.
 //
-// Passos:
-//   { tipo:'mensagem', baloes:[...] }
-//   { tipo:'pergunta', baloes:[...], opcoes:[{rotulo,valor}...], salvarEm, reprompt }
-//   { tipo:'coletar',  baloes:[...], dado:'nome'|'cpf'|'telefone'|'email'|'texto', salvarEm, reprompt }
-//   { tipo:'acao',     etiqueta?, chamarHumano?, entregarIa? }
-//   { tipo:'fim',      baloes?:[...] }
+// Passos (cada um tem `id` estável, gerado pelo editor):
+//   { id, tipo:'mensagem', baloes:[...] }
+//   { id, tipo:'pergunta', baloes:[...], opcoes:[{rotulo,valor,irPara?}...], salvarEm, reprompt }
+//   { id, tipo:'coletar',  baloes:[...], dado:'nome'|'cpf'|'telefone'|'email'|'texto', salvarEm, reprompt }
+//   { id, tipo:'acao',     etiqueta?, chamarHumano?, entregarIa? }
+//   { id, tipo:'fim',      baloes?:[...] }
+//
+// RAMIFICAÇÃO: cada opção da pergunta pode ter irPara = id de um passo (pula pra ele),
+// 'fim' (encerra) ou vazio (segue pro próximo). Referência por ID = estável a reordenação.
 // ============================================================================
 import { extrairCpfDeTexto } from './fluxo_video.ts';
 
 export type DadoColeta = 'nome' | 'cpf' | 'telefone' | 'email' | 'texto';
 
-export type PassoCustom =
-  | { tipo: 'mensagem'; baloes?: unknown }
-  | { tipo: 'pergunta'; baloes?: unknown; opcoes?: unknown; salvarEm?: unknown; reprompt?: unknown }
-  | { tipo: 'coletar'; baloes?: unknown; dado?: unknown; salvarEm?: unknown; reprompt?: unknown }
-  | { tipo: 'acao'; etiqueta?: unknown; chamarHumano?: unknown; entregarIa?: unknown }
-  | { tipo: 'fim'; baloes?: unknown };
+export type PassoCustom = {
+  id?: unknown; tipo?: unknown; baloes?: unknown; opcoes?: unknown; salvarEm?: unknown;
+  reprompt?: unknown; dado?: unknown; etiqueta?: unknown; chamarHumano?: unknown; entregarIa?: unknown;
+};
 
 export interface EstadoCf { passo: number; dados: Record<string, string>; tentativas: number; concluido: boolean }
-
 export interface AcaoCf { etiqueta?: string; chamarHumano?: boolean; entregarIa?: boolean }
+/** dado coletado NESTE turno (o handler persiste na ficha: nome/cpf via RPC da casa) */
+export interface ColetaCf { dado: DadoColeta; chave: string; valor: string; digits?: string }
 
 export interface TurnoCf {
   baloes: string[];
   acoes: AcaoCf[];
   estado: EstadoCf;
   aguardando: boolean;
-  /** estourou a escada de tentativas → o handler pausa e chama humano */
   escalarHumano: boolean;
+  coletou?: ColetaCf;
 }
 
-const MAX_TENTATIVAS = 2; // 2 reprompts; a 3ª falha escala pro humano (mesma régua do front)
-const MAX_BALOES_TURNO = 6; // lease do runner é 30s — teto duro de balões por turno
+const MAX_TENTATIVAS = 2;
+const MAX_BALOES_TURNO = 6;
 
 const semAcento = (s: string): string => (s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
@@ -47,42 +48,44 @@ function baloesDe(v: unknown): string[] {
   return (Array.isArray(v) ? v : []).map((b) => String(b ?? '').trim()).filter(Boolean).slice(0, MAX_BALOES_TURNO);
 }
 
-interface OpcaoNorm { rotulo: string; valor: string }
+interface OpcaoNorm { rotulo: string; valor: string; irPara?: string }
 function opcoesDe(v: unknown): OpcaoNorm[] {
   return (Array.isArray(v) ? v : [])
-    .map((o) => ({ rotulo: String((o as Record<string, unknown>)?.rotulo ?? '').trim(), valor: String((o as Record<string, unknown>)?.valor ?? '').trim() }))
+    .map((o) => {
+      const r = (o ?? {}) as Record<string, unknown>;
+      const rotulo = String(r.rotulo ?? '').trim();
+      const valor = String(r.valor ?? '').trim();
+      const irPara = String(r.irPara ?? '').trim();
+      return { rotulo, valor, ...(irPara ? { irPara } : {}) };
+    })
     .filter((o) => o.rotulo)
     .map((o) => ({ ...o, valor: o.valor || semAcento(o.rotulo).replace(/\s+/g, '_') }));
 }
 
-/** número da opção, valor exato, rótulo exato ou prefixo do rótulo (sem acento/caixa) */
-export function casarOpcao(opcoes: OpcaoNorm[], txt: string): string | null {
+/** devolve a OPÇÃO casada (com irPara) — número, valor, rótulo exato ou prefixo (nos dois sentidos) */
+export function casarOpcao(opcoes: OpcaoNorm[], txt: string): OpcaoNorm | null {
   const t = semAcento(String(txt ?? '').trim());
   if (!t) return null;
   const n = Number(t);
-  if (Number.isInteger(n) && n >= 1 && n <= opcoes.length) return opcoes[n - 1].valor;
+  if (Number.isInteger(n) && n >= 1 && n <= opcoes.length) return opcoes[n - 1];
   for (const o of opcoes) {
     const rot = semAcento(o.rotulo);
-    // casa exato, ou por prefixo NOS DOIS sentidos: "empre" → "Empréstimo" e
-    // "emprestimo consignado" → "Empréstimo" (mínimo 3 chars pra não casar por acidente)
     if (t === o.valor.toLowerCase() || t === rot
         || (t.length >= 3 && rot.startsWith(t))
-        || (rot.length >= 3 && t.startsWith(rot))) return o.valor;
+        || (rot.length >= 3 && t.startsWith(rot))) return o;
   }
   return null;
 }
 
-/** MESMAS regras do simulador do painel (parity é contrato) */
-export function validarDado(dado: DadoColeta, txt: string): { ok: boolean; valor: string } {
+/** validação (paridade com o simulador do painel). cpf: guarda mascarado, expõe digits pra ficha */
+export function validarDado(dado: DadoColeta, txt: string): { ok: boolean; valor: string; digits?: string } {
   const t = String(txt ?? '').trim();
   switch (dado) {
     case 'nome':
       return { ok: t.length >= 2 && /\p{L}/u.test(t), valor: t };
     case 'cpf': {
-      const r = extrairCpfDeTexto(t);            // acha 11 dígitos no meio do texto + valida DV
-      // guarda MASCARADO (paridade com a fábrica: bot_registrar_cpf só grava cpf_mascarado — não
-      // deixar CPF cru em dados_qualificacao). Inválido: devolve o que veio pro reprompt.
-      return { ok: r.valido, valor: r.valido ? `***.***.***-${r.digits.slice(-2)}` : r.digits };
+      const r = extrairCpfDeTexto(t);
+      return { ok: r.valido, valor: r.valido ? `***.***.***-${r.digits.slice(-2)}` : r.digits, digits: r.valido ? r.digits : undefined };
     }
     case 'telefone': {
       const d = t.replace(/\D/g, '');
@@ -101,28 +104,35 @@ function menuDaPergunta(baloes: string[], opcoes: OpcaoNorm[]): string[] {
   return [...baloes.slice(0, -1), `${baloes[baloes.length - 1]}\n\n${menu}`];
 }
 
+/** índice do passo por id (ramificação); -1 se não achar */
+function idxPorId(passos: PassoCustom[], id: string): number {
+  if (!id) return -1;
+  for (let i = 0; i < passos.length; i++) if (String((passos[i] as { id?: unknown }).id ?? '') === id) return i;
+  return -1;
+}
+
 /** avança do passo atual até o próximo ponto de espera (ou fim), acumulando balões/ações */
 export function avancarCf(passos: PassoCustom[], estadoIn: EstadoCf): TurnoCf {
   const baloes: string[] = [];
   const acoes: AcaoCf[] = [];
   let e: EstadoCf = { ...estadoIn, dados: { ...estadoIn.dados } };
   let guarda = 0;
-  while (e.passo < passos.length && guarda++ < 50) {
+  while (e.passo < passos.length && guarda++ < 60) {
     const p = passos[e.passo];
     if (!p || typeof p !== 'object') { e.passo++; continue; }
     if (p.tipo === 'mensagem') { baloes.push(...baloesDe(p.baloes)); e.passo++; continue; }
     if (p.tipo === 'acao') {
       const a: AcaoCf = {};
-      const et = String((p as { etiqueta?: unknown }).etiqueta ?? '').trim();
+      const et = String(p.etiqueta ?? '').trim();
       if (et) a.etiqueta = et.slice(0, 60);
-      if ((p as { chamarHumano?: unknown }).chamarHumano === true) a.chamarHumano = true;
-      if ((p as { entregarIa?: unknown }).entregarIa === true) a.entregarIa = true;
+      if (p.chamarHumano === true) a.chamarHumano = true;
+      if (p.entregarIa === true) a.entregarIa = true;
       if (Object.keys(a).length) acoes.push(a);
       e.passo++; continue;
     }
     if (p.tipo === 'pergunta') {
       const ops = opcoesDe(p.opcoes);
-      if (ops.length < 2) { e.passo++; continue; }   // pergunta torta: pula (o editor avisa)
+      if (ops.length < 2) { e.passo++; continue; }
       baloes.push(...menuDaPergunta(baloesDe(p.baloes), ops));
       return { baloes: baloes.slice(0, MAX_BALOES_TURNO), acoes, estado: e, aguardando: true, escalarHumano: false };
     }
@@ -139,7 +149,7 @@ export function avancarCf(passos: PassoCustom[], estadoIn: EstadoCf): TurnoCf {
   return { baloes: baloes.slice(0, MAX_BALOES_TURNO), acoes, estado: { ...e, concluido: true }, aguardando: false, escalarHumano: false };
 }
 
-/** processa a resposta do cliente no passo de espera atual e segue o trilho */
+/** processa a resposta do cliente no passo de espera atual e segue o trilho (ramificação/coleta) */
 export function responderCf(passos: PassoCustom[], estadoIn: EstadoCf, resposta: string): TurnoCf {
   const p = passos[estadoIn.passo];
   let e: EstadoCf = { ...estadoIn, dados: { ...estadoIn.dados } };
@@ -147,31 +157,34 @@ export function responderCf(passos: PassoCustom[], estadoIn: EstadoCf, resposta:
 
   if (p.tipo === 'pergunta') {
     const ops = opcoesDe(p.opcoes);
-    const valor = casarOpcao(ops, resposta);
-    if (valor === null) {
+    const op = casarOpcao(ops, resposta);
+    if (op === null) {
       e = { ...e, tentativas: e.tentativas + 1 };
-      if (e.tentativas > MAX_TENTATIVAS) {
-        return { baloes: [], acoes: [], estado: e, aguardando: false, escalarHumano: true };
-      }
-      const rp = String((p as { reprompt?: unknown }).reprompt ?? '').trim() || 'Não entendi — responda com o número de uma das opções 🙂';
+      if (e.tentativas > MAX_TENTATIVAS) return { baloes: [], acoes: [], estado: e, aguardando: false, escalarHumano: true };
+      const rp = String(p.reprompt ?? '').trim() || 'Não entendi — responda com o número de uma das opções 🙂';
       return { baloes: [rp], acoes: [], estado: e, aguardando: true, escalarHumano: false };
     }
-    const chave = String((p as { salvarEm?: unknown }).salvarEm ?? '').trim();
-    if (chave) e.dados[chave.slice(0, 40)] = valor;
-    return avancarCf(passos, { ...e, passo: e.passo + 1, tentativas: 0 });
+    const chave = String(p.salvarEm ?? '').trim();
+    if (chave) e.dados[chave.slice(0, 40)] = op.valor;
+    // RAMIFICAÇÃO: 'fim' encerra; id de passo pula pra ele; vazio/inválido segue pro próximo
+    if (op.irPara === 'fim') {
+      return { baloes: [], acoes: [], estado: { ...e, passo: passos.length, tentativas: 0, concluido: true }, aguardando: false, escalarHumano: false };
+    }
+    let destino = e.passo + 1;
+    if (op.irPara) { const idx = idxPorId(passos, op.irPara); if (idx >= 0) destino = idx; }
+    return avancarCf(passos, { ...e, passo: destino, tentativas: 0 });
   }
 
-  const dado = (['nome', 'cpf', 'telefone', 'email', 'texto'].includes(String((p as { dado?: unknown }).dado)) ? (p as { dado: DadoColeta }).dado : 'texto');
+  const dado = (['nome', 'cpf', 'telefone', 'email', 'texto'].includes(String(p.dado)) ? p.dado : 'texto') as DadoColeta;
   const v = validarDado(dado, resposta);
   if (!v.ok) {
     e = { ...e, tentativas: e.tentativas + 1 };
-    if (e.tentativas > MAX_TENTATIVAS) {
-      return { baloes: [], acoes: [], estado: e, aguardando: false, escalarHumano: true };
-    }
-    const rp = String((p as { reprompt?: unknown }).reprompt ?? '').trim() || 'Não consegui validar — pode conferir e mandar de novo?';
+    if (e.tentativas > MAX_TENTATIVAS) return { baloes: [], acoes: [], estado: e, aguardando: false, escalarHumano: true };
+    const rp = String(p.reprompt ?? '').trim() || 'Não consegui validar — pode conferir e mandar de novo?';
     return { baloes: [rp], acoes: [], estado: e, aguardando: true, escalarHumano: false };
   }
-  const chave = String((p as { salvarEm?: unknown }).salvarEm ?? '').trim() || dado;
-  e.dados[chave.slice(0, 40)] = v.valor;
-  return avancarCf(passos, { ...e, passo: e.passo + 1, tentativas: 0 });
+  const chave = (String(p.salvarEm ?? '').trim() || dado).slice(0, 40);
+  e.dados[chave] = v.valor;
+  const seg = avancarCf(passos, { ...e, passo: e.passo + 1, tentativas: 0 });
+  return { ...seg, coletou: { dado, chave, valor: v.valor, digits: v.digits } };
 }
