@@ -48,6 +48,13 @@ const NOTA_PROVEDOR: Record<ProvedorIa, string> = {
 };
 
 /* presets de tom: INSEREM texto visível no prompt (transparente, sem mágica escondida) */
+/* stopwords que emudeceriam a IA (mesma lista do motor) — rejeitadas na entrada */
+const STOP_PROIBIDOS_UI = new Set([
+  'com', 'sem', 'nao', 'não', 'sim', 'que', 'por', 'para', 'uma', 'uns', 'umas', 'dos', 'das', 'ele', 'ela',
+  'eles', 'elas', 'voce', 'você', 'voces', 'isso', 'isto', 'aqui', 'mais', 'menos', 'muito', 'bem', 'mal',
+  'ate', 'até', 'tem', 'ter', 'ser', 'estar', 'foi', 'vai', 'hoje', 'amanha', 'amanhã', 'tudo', 'nada', 'como', 'onde',
+]);
+
 const TONS: { rotulo: string; trecho: string }[] = [
   { rotulo: 'Acolhedor', trecho: 'Tom de voz: acolhedor e paciente, como quem atende pessoas mais velhas. Frases curtas, sem pressa, sem jargão.' },
   { rotulo: 'Profissional', trecho: 'Tom de voz: profissional e direto. Cordial, mas objetivo — respostas curtas que vão ao ponto.' },
@@ -114,12 +121,14 @@ export default function Ia() {
   const [chave, setChave] = useState('');
   const [aviso, setAviso] = useState<Aviso>(null);
   const [confirmaExcluir, setConfirmaExcluir] = useState(false);
+  const [confirmaTroca, setConfirmaTroca] = useState<{ id: string | null } | null>(null); // null = criar novo
   const [editNums, setEditNums] = useState<{ canal: string; valor: string } | null>(null);
   /* playground */
   const [chatAberto, setChatAberto] = useState(false);
   const [chatMsgs, setChatMsgs] = useState<MsgChat[]>([]);
   const [chatInput, setChatInput] = useState('');
   const chatFimRef = useRef<HTMLDivElement | null>(null);
+  const chatSessaoRef = useRef(0);
 
   useEffect(() => {
     if (!agente) return;
@@ -167,6 +176,33 @@ export default function Ia() {
 
   const configNaoSalva = !!agente && (modelo.trim() !== agente.modelo || provedor !== agente.provedor);
 
+  /* alguma edição não salva? (guarda contra perda silenciosa ao trocar de atendente) */
+  const formSujo = useMemo(() => {
+    if (!agente) return false;
+    const c = agente.comportamentos || {};
+    return nome !== agente.nome || provedor !== agente.provedor || modelo !== agente.modelo
+      || prompt !== agente.personaPrompt || conhecimento !== agente.conhecimento
+      || ativo !== agente.ativo
+      || JSON.stringify(proibidos) !== JSON.stringify(Array.isArray(c.proibidos) ? c.proibidos : [])
+      || permitirEmojis !== (c.permitir_emojis === true)
+      || simularDigitacao !== (c.simular_digitacao !== false)
+      || modeloDocs !== (c.modelo_docs || '') || modeloPro !== (c.modelo_pro || '')
+      || horarioAtivo !== (c.horario?.ativo !== false)
+      || horaInicio !== (c.horario?.inicio || '09:00') || horaFim !== (c.horario?.fim || '19:00')
+      || nudgesAtivos !== (c.nudges_ativos !== false)
+      || janelaInicio !== (c.janela?.inicio || '07:30') || janelaFim !== (c.janela?.fim || '21:30')
+      || maxDia !== String(c.max_chamadas_dia ?? 500)
+      || !!proibidoInput.trim();
+  }, [agente, nome, provedor, modelo, prompt, conhecimento, ativo, proibidos, permitirEmojis,
+      simularDigitacao, modeloDocs, modeloPro, horarioAtivo, horaInicio, horaFim, nudgesAtivos,
+      janelaInicio, janelaFim, maxDia, proibidoInput]);
+
+  const trocarPara = (id: string | null) => {
+    if (formSujo) { setConfirmaTroca({ id }); return; }
+    if (id === null) { aoCriar(); return; }
+    setSelId(id);
+  };
+
   /* -------- ações -------- */
   const aoTrocarProvedor = (v: ProvedorIa) => {
     if (v !== 'gemini') {
@@ -193,10 +229,16 @@ export default function Ia() {
     catch (e) { setAviso({ tom: 'erro', texto: (e as Error).message }); }
   };
 
+  const validarProibido = (t: string): string | null => {
+    if (t.length < 3) return 'Tema proibido precisa de pelo menos 3 letras.';
+    if (STOP_PROIBIDOS_UI.has(t.toLowerCase())) return `"${t}" é palavra comum demais — bloquearia toda frase e a IA ficaria muda.`;
+    if (proibidos.length >= 40) return 'Máximo de 40 temas proibidos.';
+    return null;
+  };
   const adicionarProibido = () => {
     const t = proibidoInput.trim();
-    if (t.length < 3) { setAviso({ tom: 'erro', texto: 'Tema proibido precisa de pelo menos 3 letras.' }); return; }
-    if (proibidos.length >= 40) { setAviso({ tom: 'erro', texto: 'Máximo de 40 temas proibidos.' }); return; }
+    const erro = validarProibido(t);
+    if (erro) { setAviso({ tom: 'erro', texto: erro }); return; }
     if (!proibidos.some((p) => p.toLowerCase() === t.toLowerCase())) setProibidos((xs) => [...xs, t]);
     setProibidoInput('');
   };
@@ -219,15 +261,26 @@ export default function Ia() {
       setAviso({ tom: 'erro', texto: 'Guarde a sua chave no cofre antes de ativar o atendente — sem ela, ele não tem como funcionar na sua conta.' });
       return;
     }
+    // termo digitado mas não confirmado no "Adicionar": entra junto no salvar (nada some em silêncio)
+    let proibidosFinais = proibidos;
+    const pendente = proibidoInput.trim();
+    if (pendente) {
+      const erroPend = validarProibido(pendente);
+      if (erroPend) { setAviso({ tom: 'erro', texto: `Tema proibido pendente: ${erroPend}` }); return; }
+      if (!proibidos.some((p) => p.toLowerCase() === pendente.toLowerCase())) proibidosFinais = [...proibidos, pendente];
+      setProibidos(proibidosFinais);
+      setProibidoInput('');
+    }
+    const comportamentosFinais = { ...comportamentosForm, proibidos: proibidosFinais };
     if (usarMock) {
       setMockAgentes((xs) => xs.map((a) => a.id === agente.id
-        ? { ...a, nome, provedor, modelo, personaPrompt: prompt, conhecimento, ativo, comportamentos: comportamentosForm }
+        ? { ...a, nome, provedor, modelo, personaPrompt: prompt, conhecimento, ativo, comportamentos: comportamentosFinais }
         : a));
       setAviso({ tom: 'ok', texto: 'Atendente salvo (demonstração).' });
       return;
     }
     try {
-      await salvar.mutateAsync({ id: agente.id, nome, provedor, modelo, personaPrompt: prompt, conhecimento, comportamentos: comportamentosForm, ativo });
+      await salvar.mutateAsync({ id: agente.id, nome, provedor, modelo, personaPrompt: prompt, conhecimento, comportamentos: comportamentosFinais, ativo });
       setAviso({ tom: 'ok', texto: 'Atendente salvo.' });
     } catch (e) { setAviso({ tom: 'erro', texto: (e as Error).message }); }
   };
@@ -319,10 +372,12 @@ export default function Ia() {
     const texto = chatInput.trim();
     if (!texto) return;
     setChatInput('');
-    const historico = chatMsgs.map((m) => ({ de: m.de, texto: m.texto }));
+    const historico = chatMsgs.filter((m) => !m.bloqueada).map((m) => ({ de: m.de, texto: m.texto }));
     setChatMsgs((xs) => [...xs, { de: 'cliente', texto }]);
     if (usarMock) {
+      const sessaoAtual = chatSessaoRef.current;
       setTimeout(() => {
+        if (chatSessaoRef.current !== sessaoAtual) return;   // limpou/fechou: resposta atrasada morre
         const proibiu = proibidos.some((p) => texto.toLowerCase().includes(p.toLowerCase()));
         setChatMsgs((xs) => [...xs,
           proibiu
@@ -349,7 +404,7 @@ export default function Ia() {
           <p>Crie o cérebro do seu atendimento: chave própria, personalidade, conhecimento e comportamentos.</p>
         </div>
         {agente && (
-          <BotaoSec onClick={() => { setChatMsgs([]); setChatAberto(true); }} disabled={!podeExperimentar && !usarMock}
+          <BotaoSec onClick={() => { chatSessaoRef.current++; setChatMsgs([]); setChatAberto(true); }} disabled={!podeExperimentar && !usarMock}
             title={podeExperimentar || usarMock ? 'Conversar com o atendente' : 'Guarde a chave no cofre primeiro'}>
             💬 Experimentar
           </BotaoSec>
@@ -389,7 +444,7 @@ export default function Ia() {
             {agentes.map((a) => (
               <button key={a.id} type="button" role="tab" aria-selected={a.id === agente.id}
                 className={a.id === agente.id ? 'ia-agente-card on' : 'ia-agente-card'}
-                onClick={() => setSelId(a.id)}>
+                onClick={() => trocarPara(a.id)}>
                 <span className="ia-agente-nome">{a.nome}</span>
                 <span className="ia-agente-meta">
                   {a.ativo ? <BadgeStatus tom="ok">ativo</BadgeStatus> : <BadgeStatus tom="neutro">pausado</BadgeStatus>}
@@ -397,7 +452,7 @@ export default function Ia() {
                 </span>
               </button>
             ))}
-            <button type="button" className="ia-agente-card ia-agente-novo" onClick={aoCriar} disabled={criar.isPending}>
+            <button type="button" className="ia-agente-card ia-agente-novo" onClick={() => trocarPara(null)} disabled={criar.isPending}>
               + Novo atendente
             </button>
           </div>
@@ -679,15 +734,18 @@ export default function Ia() {
       )}
 
       {/* ------------------- Playground ------------------- */}
-      <DrawerV2 aberto={chatAberto} aoFechar={() => setChatAberto(false)} largura={420}>
+      <DrawerV2 aberto={chatAberto} aoFechar={() => { chatSessaoRef.current++; setChatAberto(false); }} largura={420}>
         <div className="ia-chat">
           <div className="ia-chat-cab">
             <div>
               <div className="ia-canal-nome">Experimentar: {nome || 'Atendente'}</div>
               <div className="ia-hint">Conversa de teste — roda na sua chave, nada vai pro WhatsApp nem fica salvo.</div>
             </div>
-            <BotaoMini onClick={() => setChatMsgs([])}>Limpar</BotaoMini>
+            <BotaoMini onClick={() => { chatSessaoRef.current++; setChatMsgs([]); }}>Limpar</BotaoMini>
           </div>
+          {formSujo && (
+            <div className="ia-hint" role="status">⚠ Há mudanças não salvas — o teste usa a configuração <b>salva</b>. Salve antes pra testar o que está na tela.</div>
+          )}
           <div className="ia-chat-msgs" role="log" aria-live="polite">
             {chatMsgs.length === 0 && (
               <div className="ia-hint ia-chat-vazio">
@@ -703,7 +761,7 @@ export default function Ia() {
           </div>
           <div className="ia-chat-input">
             <input
-              className="inp" value={chatInput}
+              className="inp" value={chatInput} autoFocus
               onChange={(e) => setChatInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); aoEnviarChat(); } }}
               placeholder="Escreva como cliente…" aria-label="Mensagem de teste"
@@ -712,6 +770,21 @@ export default function Ia() {
           </div>
         </div>
       </DrawerV2>
+
+      <ConfirmDialogV2
+        aberto={!!confirmaTroca}
+        titulo="Descartar mudanças não salvas?"
+        mensagem="Você editou este atendente e não salvou. Trocar agora descarta essas mudanças."
+        rotuloConfirmar="Descartar e trocar"
+        destrutivo
+        aoConfirmar={() => {
+          const alvo = confirmaTroca;
+          setConfirmaTroca(null);
+          if (!alvo) return;
+          if (alvo.id === null) { aoCriar(); } else { setSelId(alvo.id); }
+        }}
+        aoCancelar={() => setConfirmaTroca(null)}
+      />
 
       <ConfirmDialogV2
         aberto={confirmaExcluir}

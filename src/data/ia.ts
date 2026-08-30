@@ -261,6 +261,18 @@ export function useModoTeste() {
   });
 }
 
+/** Erro de edge function: o corpo non-2xx carrega o `detalhe` real (padrão do repo). */
+async function detalheErroFn(error: unknown): Promise<string> {
+  const ctx = (error as { context?: Response }).context;
+  if (ctx && typeof ctx.json === 'function') {
+    try {
+      const j = await ctx.json() as Row;
+      if (j?.detalhe) return String(j.detalhe);
+    } catch { /* corpo não-JSON: cai na mensagem crua */ }
+  }
+  return (error as Error).message;
+}
+
 /** Atividade real do agente (RPC soma os canais vinculados). */
 export interface MetricasIa { sessoesAtivas: number; chamadasHoje: number; nudgesHoje: number; handoffs7d: number; canais: number }
 export function useMetricasIa(agenteId: string | null, habilitado: boolean) {
@@ -290,7 +302,7 @@ export function useConversarPlayground() {
       const { data, error } = await supabase!.functions.invoke('ia-agente-conversar', {
         body: { agente_id: p.agenteId, mensagem: p.mensagem, historico: p.historico },
       });
-      if (error) throw new Error(error.message);
+      if (error) throw new Error(await detalheErroFn(error));
       const r = (data as Row) || {};
       if (!r.ok) throw new Error((r.detalhe as string) || 'Falha no teste');
       return (Array.isArray(r.mensagens) ? r.mensagens : []).map((m) => {
@@ -306,7 +318,7 @@ export function useTestarConexao() {
   return useMutation({
     mutationFn: async (agenteId: string): Promise<{ ok: boolean; detalhe: string }> => {
       const { data, error } = await supabase!.functions.invoke('ia-agente-testar', { body: { agente_id: agenteId } });
-      if (error) throw new Error(error.message);
+      if (error) throw new Error(await detalheErroFn(error));
       const r = (data as Row) || {};
       return { ok: !!r.ok, detalhe: (r.detalhe as string) || (r.ok ? 'Conexão OK' : 'Falha na conexão') };
     },
