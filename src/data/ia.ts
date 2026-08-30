@@ -57,6 +57,7 @@ export interface CanalIa {
   iaModoTeste: boolean;
   numerosTeste: string[];
   agenteId: string | null;
+  fluxoId: string | null;
 }
 
 /** Catálogo de modelos por provedor (rótulo amigável + descrição pro seletor). */
@@ -117,7 +118,7 @@ export function useCanaisIa() {
     queryFn: async (): Promise<CanalIa[]> => {
       const { data, error } = await supabase!
         .from('canais')
-        .select('id, nome_interno, numero_conectado, bot_canal_config(ia_enabled, ia_modo_teste, ia_agente_id, numeros_teste)')
+        .select('id, nome_interno, numero_conectado, bot_canal_config(ia_enabled, ia_modo_teste, ia_agente_id, ia_fluxo_id, numeros_teste)')
         .eq('organizacao_id', org!)
         .eq('tipo', 'whatsapp')
         .neq('status_integracao', 'removido')
@@ -135,6 +136,7 @@ export function useCanaisIa() {
           iaModoTeste: cfg.ia_modo_teste !== false, // default do banco é true
           numerosTeste: Array.isArray(cfg.numeros_teste) ? (cfg.numeros_teste as string[]) : [],
           agenteId: (cfg.ia_agente_id as string) || null,
+          fluxoId: (cfg.ia_fluxo_id as string) || null,
         };
       });
     },
@@ -354,6 +356,6 @@ export const MOCK_AGENTES: AgenteIa[] = [
   },
 ];
 export const MOCK_CANAIS: CanalIa[] = [
-  { id: 'demo-c1', nome: 'Atendimento Principal', numero: '5511987650001', iaEnabled: true, iaModoTeste: false, numerosTeste: [], agenteId: 'demo-1' },
-  { id: 'demo-c2', nome: 'Campanha Tráfego', numero: '5511987650002', iaEnabled: false, iaModoTeste: true, numerosTeste: ['5511999990000'], agenteId: null },
+  { id: 'demo-c1', nome: 'Atendimento Principal', numero: '5511987650001', iaEnabled: true, iaModoTeste: false, numerosTeste: [], agenteId: 'demo-1', fluxoId: null },
+  { id: 'demo-c2', nome: 'Campanha Tráfego', numero: '5511987650002', iaEnabled: false, iaModoTeste: true, numerosTeste: ['5511999990000'], agenteId: null, fluxoId: 'demo-f1' },
 ];

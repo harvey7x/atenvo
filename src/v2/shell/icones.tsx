@@ -61,6 +61,10 @@ export const ICONES: Record<string, ReactNode> = {
   ia: (
     <Ic><path d="M11 4c.7 3.4 2.3 5 5.7 5.7-3.4.7-5 2.3-5.7 5.7-.7-3.4-2.3-5-5.7-5.7C8.7 9 10.3 7.4 11 4z" /><path d="M17.8 14.6c.4 1.8 1.2 2.6 3 3-1.8.4-2.6 1.2-3 3-.4-1.8-1.2-2.6-3-3 1.8-.4 2.6-1.2 3-3z" /></Ic>
   ),
+  // Fluxos do bot: nós ligados em sequência (trilho de passos)
+  fluxos: (
+    <Ic><circle cx="5" cy="6" r="2.4" /><circle cx="12" cy="12" r="2.4" /><circle cx="19" cy="18" r="2.4" /><path d="M6.8 7.6l3.4 2.8M13.8 13.6l3.4 2.8" /></Ic>
+  ),
   configuracoes: (
     <Ic><circle cx="12" cy="12" r="3.2" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2" /></Ic>
   ),

@@ -40,6 +40,7 @@ const SimuladorV2 = lazy(() => import('@/v2/pages/Simulador'));
 const DashboardV2 = lazy(() => import('@/v2/pages/Dashboard'));
 const ConfiguracoesV2 = lazy(() => import('@/v2/pages/Configuracoes'));
 const IaV2 = lazy(() => import('@/v2/pages/Ia'));
+const FluxosV2 = lazy(() => import('@/v2/pages/Fluxos'));
 const ContatosV2 = lazy(() => import('@/v2/pages/Contatos'));
 const DisparoV2 = lazy(() => import('@/v2/pages/Disparo'));
 const RelatoriosV2 = lazy(() => import('@/v2/pages/Relatorios'));
@@ -115,6 +116,7 @@ const routes: RouteObject[] = [
           // Página Maturacao.tsx preservada (não deletada), só fora do menu/rota — reversível.
           { path: 'maturacao', element: <Lz><ManutencaoV2 area="Maturação" descontinuada /></Lz> },
           { path: 'ia', element: <Lz><RequireRoleV2 role="admin"><IaV2 /></RequireRoleV2></Lz> },
+          { path: 'fluxos', element: <Lz><RequireRoleV2 role="admin"><FluxosV2 /></RequireRoleV2></Lz> },
           { path: 'configuracoes', element: <Lz><ConfiguracoesV2 /></Lz> },
           { path: 'plano-uso', element: <Lz><RequireRoleV2 role="admin"><PlanoUsoV2 /></RequireRoleV2></Lz> },
           // Coexistência (Embedded Signup da Meta): rota escondida, sem link no menu.

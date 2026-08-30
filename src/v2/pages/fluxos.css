@@ -1,0 +1,32 @@
+/* Fluxos do bot — editor de passos (herda .ia-* do ia.css e o Platina global) */
+
+.fx-passo {
+  border: 1px solid var(--linha); border-radius: 12px; padding: 12px 14px;
+  display: flex; flex-direction: column; gap: 10px;
+  background: rgba(var(--tint), .025);
+}
+.fx-passo-cab { display: flex; align-items: center; gap: 10px; }
+.fx-passo-num {
+  width: 22px; height: 22px; display: grid; place-items: center; flex: 0 0 auto;
+  border-radius: 50%; font-size: 11px; font-weight: 700;
+  background: rgba(var(--tint), .09); border: 1px solid rgba(var(--tint), .15);
+}
+.fx-passo-acoes { margin-left: auto; display: flex; gap: 6px; }
+
+.fx-baloes { min-height: 56px; resize: vertical; font-family: inherit; line-height: 1.5; }
+
+.fx-opcao { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+.fx-opcao .inp { flex: 1 1 auto; }
+
+.fx-toggles { display: flex; flex-direction: column; gap: 10px; }
+.fx-toggle-item { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+
+.fx-add { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 4px; }
+
+.fx-problemas { margin: 6px 0 0; padding-left: 18px; }
+.fx-problemas li { margin: 2px 0; }
+
+.fx-evento {
+  align-self: center; font-size: 11.5px; opacity: .7; text-align: center;
+  padding: 2px 10px; border-radius: 999px; background: rgba(var(--tint), .06);
+}

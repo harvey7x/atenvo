@@ -80,6 +80,7 @@ const GRUPOS: { rotulo: string; itens: ItemNav[] }[] = [
     rotulo: 'Inteligência',
     itens: [
       { slug: 'ia', rotulo: 'Atendente de IA', admin: true },
+      { slug: 'fluxos', rotulo: 'Fluxos do bot', admin: true },
     ],
   },
   {
