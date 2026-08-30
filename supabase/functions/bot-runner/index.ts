@@ -26,6 +26,7 @@ import { proximoPasso, proximoPassoSuporte, chaveTel, deveHandoff48h, telaComoTe
 // Puro; quem envia e fecha é o runner. Serve DOIS fluxos, roteados por fluxo_slug (PERFIS_MIDIA):
 // caf_video_juros_v1 (VSL de juros, vídeo) e caf_emprestimo_v1 (campanha de empréstimo, imagem).
 import { proximoPassoVideo, montarCopyVideo, type CopyVideo } from './fluxo_video.ts';
+import { avancarCf, responderCf, type EstadoCf, type PassoCustom } from './fluxo_custom.ts';
 import { montarCopyEmprestimo } from './fluxo_emprestimo.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
@@ -125,7 +126,7 @@ Deno.serve(async (req) => {
     const { data: canal } = await admin.from('canais')
       .select('id, nome_interno, instancia_externa, origem_tipo, transporte, cloud_phone_number_id').eq('id', conv.canal_id).maybeSingle();
     const { data: cfg } = await admin.from('bot_canal_config')
-      .select('mensagens, intervalo_min_ms, intervalo_max_ms, fluxo_slug, fluxo_slug_teste, numeros_teste').eq('canal_id', conv.canal_id).maybeSingle();
+      .select('mensagens, intervalo_min_ms, intervalo_max_ms, fluxo_slug, fluxo_slug_teste, numeros_teste, ia_fluxo_id').eq('canal_id', conv.canal_id).maybeSingle();
     const { data: cfgOrg } = await admin.from('bot_config')
       .select('intervalo_min_ms, intervalo_max_ms').eq('organizacao_id', conv.organizacao_id).maybeSingle();
 
@@ -276,6 +277,18 @@ Deno.serve(async (req) => {
         copyVideo: perfilMidia.montarCopy(((cfg?.mensagens ?? {}) as Record<string, unknown>)[fluxoEfetivo]),
         min, max,
         inboundText: body.inbound_text ?? '', inboundTipo: body.inbound_tipo ?? 'texto',
+        inboundMsgId: body.inbound_msg_id ?? null, dryRun, logRunner,
+      });
+    }
+
+    // ======== FLUXO CUSTOM (montado no painel — IA configurável): canal apontando pra um
+    //          fluxo do banco roda o interpretador. Sem ia_fluxo_id, NADA abaixo muda.
+    //          (Áudio aqui vira resposta vazia → escada de reprompt; transcrição fica pra fase 2.)
+    const iaFluxoId = (cfg as { ia_fluxo_id?: string | null } | null)?.ia_fluxo_id ?? null;
+    if (iaFluxoId) {
+      return await tratarComFluxoCustom({
+        admin, conversaId, conv, canal, estado, fluxoId: iaFluxoId, min, max,
+        inboundText: body.inbound_text ?? '',
         inboundMsgId: body.inbound_msg_id ?? null, dryRun, logRunner,
       });
     }
@@ -1315,4 +1328,136 @@ async function tratarComVideo(p: {
 
   await logRunner(perfil.logAcao, r.passoNovo, { dry_run: dryRunEfetivo, baloes: r.telas.length, enviados, erro, tentativas: r.tentativas, desvios: r.desvios, escalou: !!r.acoes?.escalarHumano });
   return json({ ok: true, fluxo: perfil.prefixo, dry_run: dryRunEfetivo, passo_novo: r.passoNovo, baloes: r.telas.length, enviados, erro, tentativas: r.tentativas, desvios: r.desvios });
+}
+
+
+// ======== FLUXO CUSTOM: executa o fluxo montado no painel (ia_fluxos, jsonb) ========
+// Lógica pura em fluxo_custom.ts (ESPELHO do simulador do painel). Aqui: IO/envio/persistência,
+// no MESMO padrão do fluxo de suporte — resolverEnvio (allowlist/dry), sendText balão a balão,
+// insert em mensagens, estado via bot_avancar_etapa com p_etapa ATUAL (o CHECK não aceita custom;
+// o passo real vive em dados_qualificacao.cf_*). Guardrail saidaSuja NÃO roda aqui de propósito:
+// a copy é ESTÁTICA e do dono do fluxo (mesma decisão dos fluxos de mídia) — não é texto gerado.
+async function tratarComFluxoCustom(p: {
+  admin: any; conversaId: string; conv: any; canal: any; estado: any; fluxoId: string;
+  min: number; max: number; inboundText: string; inboundMsgId: string | null; dryRun: boolean;
+  logRunner: (outcome: string, motivo?: string | null, extra?: Record<string, unknown>) => Promise<void>;
+}) {
+  const { admin, conversaId, conv, canal, estado, fluxoId, min, max, inboundMsgId, dryRun, logRunner } = p;
+
+  const { data: fluxo } = await admin.from('ia_fluxos').select('id, nome, passos, ativo').eq('id', fluxoId).maybeSingle();
+  if (!fluxo || fluxo.ativo !== true) {
+    // fluxo sumiu/desligado: bot MUDO neste canal (nunca cair no trilho de fábrica em silêncio)
+    await logRunner('fluxo_custom', fluxo ? 'fluxo_inativo' : 'fluxo_sumiu', { fluxo_id: fluxoId });
+    return json({ ok: true, fluxo: 'custom', skipped: fluxo ? 'fluxo_inativo' : 'fluxo_sumiu', conversa_id: conversaId });
+  }
+  const passos = (Array.isArray(fluxo.passos) ? fluxo.passos : []) as PassoCustom[];
+  if (!passos.length) {
+    await logRunner('fluxo_custom', 'fluxo_vazio', { fluxo_id: fluxoId });
+    return json({ ok: true, fluxo: 'custom', skipped: 'fluxo_vazio', conversa_id: conversaId });
+  }
+
+  const dq = (estado.dados_qualificacao ?? {}) as Record<string, unknown>;
+  const mesmoFluxo = dq.cf_fluxo === fluxoId;
+  if (mesmoFluxo && dq.cf_concluido === true) {
+    // fluxo já terminou pra esta conversa: o bot cala e o humano segue
+    await logRunner('fluxo_custom', 'pos_conclusao_silencio', { fluxo_id: fluxoId });
+    return json({ ok: true, fluxo: 'custom', skipped: 'pos_conclusao', conversa_id: conversaId });
+  }
+  const cf: EstadoCf = mesmoFluxo
+    ? {
+        passo: Number(dq.cf_passo ?? 0) || 0,
+        dados: ((dq.cf_dados ?? {}) as Record<string, string>),
+        tentativas: Number(dq.cf_tentativas ?? 0) || 0,
+        concluido: false,
+      }
+    : { passo: 0, dados: {}, tentativas: 0, concluido: false };   // 1ª vez (ou canal trocou de fluxo): recomeça
+
+  const t = mesmoFluxo ? responderCf(passos, cf, p.inboundText) : avancarCf(passos, cf);
+
+  const persistir = async (extra: Record<string, unknown> = {}) => {
+    await admin.rpc('bot_avancar_etapa', {
+      p_conversa: conversaId, p_etapa: estado.etapa,
+      p_dados: {
+        cf_fluxo: fluxoId, cf_passo: t.estado.passo, cf_dados: t.estado.dados,
+        cf_tentativas: t.estado.tentativas, ...(t.estado.concluido ? { cf_concluido: true } : {}), ...extra,
+      },
+      p_reprompts: 0, p_inbound_msg: inboundMsgId,
+    });
+  };
+
+  // ---- escada estourada (2 reprompts + 1): pausa + humano, sem balão extra ----
+  if (t.escalarHumano) {
+    await admin.from('conversas').update({ precisa_humano: true, precisa_humano_motivo: 'fluxo_custom_nao_entendeu', precisa_humano_em: new Date().toISOString() }).eq('id', conversaId);
+    await admin.rpc('bot_pausar', { p_conversa: conversaId, p_motivo: 'fluxo_custom_escalou' });
+    await persistir();
+    await logRunner('fluxo_custom', 'escalou_humano', { fluxo_id: fluxoId, passo: t.estado.passo });
+    return json({ ok: true, fluxo: 'custom', escalou: true, conversa_id: conversaId });
+  }
+
+  // ---- envio (padrão suporte: allowlist/dry, texto puro — roda em Cloud E Evolution) ----
+  const { destino, dryRunEfetivo } = await resolverEnvio(admin, conv, dryRun);
+  let enviados = 0; let erro: string | null = null;
+  const transporte = (canal?.transporte ?? 'evolution') as string;
+  if (dryRunEfetivo || !destino) {
+    if (!destino) erro = 'sem_destino';
+    for (let i = 0; i < t.baloes.length; i++) {
+      await logRunner('fluxo_custom', 'balao_simulado', { ordem: i, texto: t.baloes[i].slice(0, 140), motivo: erro });
+    }
+  } else if ((transporte === 'cloud_api' && !canal?.cloud_phone_number_id)
+          || (transporte === 'evolution' && !canal?.instancia_externa)
+          || (transporte !== 'cloud_api' && transporte !== 'evolution')) {
+    erro = 'transporte_nao_suportado';
+    await logRunner('fluxo_custom', 'balao_falhou', { erro });
+  } else {
+    const tx = enviadorDe(canal);
+    for (let i = 0; i < t.baloes.length; i++) {
+      if (i > 0) await sleep(min + Math.random() * (max - min));
+      try {
+        const sent = await tx.sendText(destino, t.baloes[i]);
+        const idExterno = sent?.key?.id ?? null;
+        if (!idExterno) throw new Error('sem_id_retorno');
+        await admin.from('mensagens').insert({
+          organizacao_id: conv.organizacao_id, conversa_id: conversaId, direcao: 'saida', tipo: 'texto',
+          conteudo: t.baloes[i], autor_id: null, origem: 'bot', status: 'enviada', id_externo: idExterno,
+          metadados: { fluxo: 'custom', fluxo_id: fluxoId, passo: t.estado.passo },
+        });
+        enviados++;
+      } catch (e) {
+        erro = String((e as Error)?.message ?? 'falha_envio').slice(0, 300);
+        await logRunner('fluxo_custom', 'balao_falhou', { ordem: i, erro });
+        break;   // texto: não derrama os próximos balões após falha (padrão da casa)
+      }
+    }
+  }
+
+  // ---- ações (estado avança TAMBÉM em dry_run; só o envio é simulado — padrão da casa) ----
+  let iaAssumiu = false;
+  let pediuIa = false;
+  let pediuHumano = false;
+  for (const a of t.acoes) {
+    if (a.etiqueta) await aplicarEtiquetaBot(admin, conv.organizacao_id, a.etiqueta, conv.contato_id, conversaId);
+    if (a.entregarIa) {
+      pediuIa = true;
+      if (!dryRunEfetivo && !iaAssumiu) {
+        iaAssumiu = await criarSessaoIaSdr(admin, conversaId, conv, estado, destino,
+          async (e: string, x?: Record<string, unknown>) => { await logRunner('fluxo_custom', e, x ?? {}); });
+      }
+    }
+    if (a.chamarHumano) pediuHumano = true;
+  }
+  // pediu IA e ela não assumiu (desligada/modo teste/dry): não deixa o lead no vácuo → humano
+  if ((pediuHumano || (pediuIa && !iaAssumiu)) && !iaAssumiu) {
+    await admin.from('conversas').update({ precisa_humano: true, precisa_humano_motivo: 'fluxo_custom', precisa_humano_em: new Date().toISOString() }).eq('id', conversaId);
+    await admin.rpc('bot_pausar', { p_conversa: conversaId, p_motivo: 'fluxo_custom_handoff' });
+  }
+
+  await persistir();
+  if (t.estado.concluido) {
+    try { await admin.from('bot_conversa_estado').update({ concluido_em: new Date().toISOString() }).eq('conversa_id', conversaId); } catch { /* best-effort */ }
+  }
+  await logRunner('fluxo_custom', t.estado.concluido ? 'concluido' : `passo_${t.estado.passo}`, {
+    fluxo_id: fluxoId, dry_run: dryRunEfetivo, baloes: t.baloes.length, enviados, erro,
+    ia_assumiu: iaAssumiu, aguardando: t.aguardando,
+  });
+  return json({ ok: true, fluxo: 'custom', dry_run: dryRunEfetivo, baloes: t.baloes.length, enviados_reais: enviados, erro, conversa_id: conversaId });
 }
