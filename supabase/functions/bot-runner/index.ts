@@ -1449,7 +1449,7 @@ async function tratarComFluxoCustom(p: {
     await admin.rpc('bot_pausar', { p_conversa: conversaId, p_motivo: 'fluxo_custom_envio_falhou' });
     await admin.rpc('bot_avancar_etapa', {
       p_conversa: conversaId, p_etapa: estado.etapa,
-      p_dados: { cf_fluxo: fluxoId, cf_versao: versao, cf_passo: cf.passo, cf_dados: cf.dados, cf_tentativas: cf.tentativas },
+      p_dados: { cf_fluxo: fluxoId, cf_versao: versao, cf_passo: cf.passo, cf_dados: cf.dados, cf_tentativas: cf.tentativas, cf_concluido: false },
       p_reprompts: 0, p_inbound_msg: inboundMsgId,
     });
     await logRunner('fluxo_custom', 'envio_falhou_handoff', { fluxo_id: fluxoId, enviados, erro });
