@@ -632,6 +632,19 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
 
   // ---- guardrail pós-Gemini: violou → pede REESCRITA (1x); persistiu → descarta a bolha ----
   let bolhas = [...t.bolhas];
+
+  // ---- guarda de TAMANHO (defesa contra vazamento de prompt): bolha absurdamente longa = geração
+  //      corrompida (o modelo despejou o prompt/raciocínio numa bolha só — aconteceu 1× com a Ana
+  //      Paula, 3223 chars). Bolha normal ~140, exceção do protocolo ~200 → >600 é SEMPRE defeito.
+  //      Descarta a bolha (nunca vai pro cliente). Se sobrar vazio, cai no silêncio+retry abaixo. ----
+  {
+    const okTam: string[] = [];
+    for (const b of bolhas) {
+      if (b.length > 600) { await evento(admin, sessao, 'bolha_gigante_descartada', { tam: b.length, amostra: b.slice(0, 120) }); continue; }
+      okTam.push(b);
+    }
+    bolhas = okTam;
+  }
   const violacoes = bolhas.map((b) => saidaProibida(b));
   if (violacoes.some(Boolean)) {
     for (let i = 0; i < bolhas.length; i++) {
@@ -651,6 +664,7 @@ async function turno(admin: Admin, sessao: Sessao, canal: Record<string, unknown
     for (const b of bolhas) {
       const v = saidaProibida(b);
       if (v) { await evento(admin, sessao, 'guardrail_bloqueou', { violacao: v, texto: b.slice(0, 180), pos_dedup: true }); continue; }
+      if (b.length > 600) { await evento(admin, sessao, 'bolha_gigante_descartada', { tam: b.length, pos_dedup: true }); continue; }
       finais.push(b);
     }
     bolhas = finais;
