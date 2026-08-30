@@ -25,7 +25,7 @@ import {
 } from '../components';
 import { DEMO_MODE } from '@/lib/demo';
 import {
-  IA_REAL, MOCK_AGENTES, MOCK_CANAIS, MODELOS_SUGERIDOS,
+  IA_REAL, MOCK_AGENTES, MOCK_CANAIS, MODELOS_INFO,
   useAgentesIa, useAtivarCanal, useCanaisIa, useConversarPlayground, useCriarAgente,
   useExcluirAgente, useMetricasIa, useModoTeste, useSalvarAgente, useSalvarChave,
   useTestarConexao, useVincularCanais,
@@ -61,6 +61,45 @@ const TONS: { rotulo: string; trecho: string }[] = [
   { rotulo: 'Vendedor', trecho: 'Tom de voz: consultivo de vendas. Desperte interesse com perguntas, conduza para o próximo passo, sem pressionar.' },
   { rotulo: 'Descontraído', trecho: 'Tom de voz: leve e descontraído, como uma conversa entre conhecidos. Natural, sem formalidade.' },
 ];
+
+/* Seletor de modelo: select com rótulos amigáveis + descrição, e "Outro" digitável
+   pra modelo fora do catálogo. Use com key={agente.id} pra resetar ao trocar de agente. */
+function SeletorModelo({ id, provedor, valor, aoMudar, vazioRotulo }: {
+  id?: string; provedor: ProvedorIa; valor: string; aoMudar: (v: string) => void;
+  /** quando definido, oferece a opção "" (ex.: 'Automático — o motor decide') */
+  vazioRotulo?: string;
+}) {
+  const opcoes = MODELOS_INFO[provedor];
+  const ehConhecido = valor === '' ? vazioRotulo !== undefined : opcoes.some((o) => o.valor === valor);
+  // começa em false: no 1º render o valor ainda não carregou do agente — se inicializasse
+  // por !ehConhecido, travaria em "Outro" pra sempre (o espelho do formulário chega depois)
+  const [outroForcado, setOutroForcado] = useState(false);
+  const mostrarOutro = outroForcado || !ehConhecido;
+  return (
+    <div className="ia-sel-modelo">
+      <select
+        id={id} className="inp" value={mostrarOutro ? '__outro' : valor}
+        onChange={(e) => {
+          const v = e.target.value;
+          if (v === '__outro') { setOutroForcado(true); aoMudar(''); }
+          else { setOutroForcado(false); aoMudar(v); }
+        }}
+      >
+        {vazioRotulo !== undefined && <option value="">{vazioRotulo}</option>}
+        {opcoes.map((o) => <option key={o.valor} value={o.valor}>{`${o.rotulo} — ${o.descricao}`}</option>)}
+        <option value="__outro">Outro modelo (digitar o nome)…</option>
+      </select>
+      {mostrarOutro && (
+        <input
+          className="inp" value={valor} onChange={(e) => aoMudar(e.target.value)}
+          placeholder={`nome exato na API (ex.: ${opcoes[0].valor})`}
+          autoFocus={outroForcado} aria-label="Nome do modelo personalizado"
+        />
+      )}
+      {!mostrarOutro && valor !== '' && <div className="ia-hint">nome na API: <code>{valor}</code></div>}
+    </div>
+  );
+}
 
 /** 'HH:MM' → minutos (pra validar ordem inicio/fim antes de salvar) */
 function minutosDe(hhmm: string, fallback: number): number {
@@ -476,15 +515,7 @@ export default function Ia() {
             <div className="ia-2col">
               <Campo rotulo="Nome do atendente" value={nome} onChange={(e) => setNome(e.target.value)} placeholder="ex.: Sofia" />
               <Campo rotulo="Modelo">
-                {(id) => (
-                  <>
-                    <input id={id} className="inp" list={`${id}-modelos`} value={modelo}
-                      onChange={(e) => setModelo(e.target.value)} placeholder={MODELOS_SUGERIDOS[provedor][0]} />
-                    <datalist id={`${id}-modelos`}>
-                      {MODELOS_SUGERIDOS[provedor].map((m) => <option key={m} value={m} />)}
-                    </datalist>
-                  </>
-                )}
+                {(id) => <SeletorModelo key={agente.id} id={id} provedor={provedor} valor={modelo} aoMudar={setModelo} />}
               </Campo>
             </div>
             <div className="campo">
@@ -646,20 +677,14 @@ export default function Ia() {
             <div className="ia-2col">
               <Campo rotulo="Modelo pra ler documentos (visão)">
                 {(id) => (
-                  <>
-                    <input id={id} className="inp" list={`${id}-md`} value={modeloDocs}
-                      onChange={(e) => setModeloDocs(e.target.value)} placeholder="automático" />
-                    <datalist id={`${id}-md`}>{MODELOS_SUGERIDOS.gemini.map((m) => <option key={m} value={m} />)}</datalist>
-                  </>
+                  <SeletorModelo key={`docs-${agente.id}`} id={id} provedor="gemini" valor={modeloDocs}
+                    aoMudar={setModeloDocs} vazioRotulo="Automático — o motor decide (recomendado)" />
                 )}
               </Campo>
               <Campo rotulo="Modelo forte pra casos complexos">
                 {(id) => (
-                  <>
-                    <input id={id} className="inp" list={`${id}-mp`} value={modeloPro}
-                      onChange={(e) => setModeloPro(e.target.value)} placeholder="automático" />
-                    <datalist id={`${id}-mp`}>{MODELOS_SUGERIDOS.gemini.map((m) => <option key={m} value={m} />)}</datalist>
-                  </>
+                  <SeletorModelo key={`pro-${agente.id}`} id={id} provedor="gemini" valor={modeloPro}
+                    aoMudar={setModeloPro} vazioRotulo="Automático — o motor decide (recomendado)" />
                 )}
               </Campo>
             </div>

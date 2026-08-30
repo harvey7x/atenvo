@@ -19,7 +19,7 @@
 
 .ia-canal {
   display: flex; align-items: center; gap: 12px;
-  padding: 10px 2px; border-bottom: 1px solid rgba(127, 127, 127, 0.14);
+  padding: 10px 2px; border-bottom: 1px solid var(--linha);
 }
 .ia-canal:last-of-type { border-bottom: 0; }
 .ia-canal-info { flex: 1 1 auto; min-width: 0; }
@@ -36,17 +36,32 @@
 .ia-nums-row { display: flex; gap: 10px; align-items: center; padding: 4px 2px 10px 30px; }
 .ia-nums-row .inp { flex: 1 1 auto; }
 
-/* ---- lista de atendentes ---- */
+/* ---- lista de atendentes (tokens da casa: botão cru herdaria preto do navegador) ---- */
 .ia-agentes-lista { display: flex; gap: 10px; flex-wrap: wrap; }
 .ia-agente-card {
   display: flex; flex-direction: column; gap: 6px; align-items: flex-start;
-  padding: 12px 16px; border-radius: 12px; border: 1px solid rgba(127,127,127,.22);
-  background: transparent; cursor: pointer; text-align: left; min-width: 170px;
+  padding: 12px 16px; border-radius: 12px;
+  background: rgba(var(--tint), .045); border: 1px solid rgba(var(--tint), .13);
+  color: var(--txt); font-family: var(--fonte); font-size: 12.5px;
+  cursor: pointer; text-align: left; min-width: 170px;
+  transition: background .15s ease, border-color .15s ease;
 }
-.ia-agente-card.on { border-color: currentColor; }
-.ia-agente-nome { font-weight: 700; font-size: 13.5px; }
+.ia-agente-card:hover { background: rgba(var(--tint), .08); }
+.ia-agente-card.on { background: rgba(var(--tint), .09); border-color: var(--azul); }
+.ia-agente-nome { font-weight: 700; font-size: 13.5px; color: var(--txt); }
 .ia-agente-meta { display: flex; align-items: center; gap: 8px; }
-.ia-agente-novo { justify-content: center; align-items: center; opacity: .7; border-style: dashed; }
+.ia-agente-novo {
+  justify-content: center; align-items: center; border-style: dashed;
+  color: var(--txt-2); background: transparent;
+}
+.ia-agente-novo:hover { color: var(--txt); }
+
+/* ---- seletor de modelo (select + "outro" digitável) ---- */
+.ia-sel-modelo { display: flex; flex-direction: column; gap: 8px; }
+.ia-sel-modelo code {
+  font-size: 11px; padding: 1px 6px; border-radius: 6px;
+  background: rgba(var(--tint), .07); border: 1px solid rgba(var(--tint), .12);
+}
 
 /* ---- atividade ---- */
 .ia-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
@@ -66,7 +81,7 @@
 .ia-chat-vazio { padding: 12px 6px; }
 .ia-bolha {
   max-width: 85%; padding: 8px 12px; border-radius: 14px; font-size: 13px; line-height: 1.45;
-  border: 1px solid rgba(127,127,127,.18); white-space: pre-wrap; word-break: break-word;
+  border: 1px solid rgba(var(--tint), .16); white-space: pre-wrap; word-break: break-word;
 }
 .ia-bolha.cli { align-self: flex-end; border-bottom-right-radius: 4px; }
 .ia-bolha.ia { align-self: flex-start; border-bottom-left-radius: 4px; opacity: .92; }

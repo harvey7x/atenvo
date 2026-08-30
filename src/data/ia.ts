@@ -59,11 +59,22 @@ export interface CanalIa {
   agenteId: string | null;
 }
 
-/** Modelos sugeridos por provedor (o campo é livre — isto é só datalist). */
-export const MODELOS_SUGERIDOS: Record<ProvedorIa, string[]> = {
-  gemini: ['gemini-3.6-flash', 'gemini-3.7-flash', 'gemini-pro-latest'],
-  openai: ['gpt-5.2', 'gpt-5-mini'],
-  anthropic: ['claude-sonnet-5', 'claude-haiku-4-5'],
+/** Catálogo de modelos por provedor (rótulo amigável + descrição pro seletor). */
+export interface OpcaoModelo { valor: string; rotulo: string; descricao: string }
+export const MODELOS_INFO: Record<ProvedorIa, OpcaoModelo[]> = {
+  gemini: [
+    { valor: 'gemini-3.6-flash', rotulo: 'Gemini 3.6 Flash', descricao: 'rápido e econômico · recomendado' },
+    { valor: 'gemini-3.7-flash', rotulo: 'Gemini 3.7 Flash', descricao: 'geração mais nova' },
+    { valor: 'gemini-pro-latest', rotulo: 'Gemini Pro', descricao: 'mais capaz · custo maior' },
+  ],
+  openai: [
+    { valor: 'gpt-5.2', rotulo: 'GPT-5.2', descricao: 'principal da OpenAI' },
+    { valor: 'gpt-5-mini', rotulo: 'GPT-5 mini', descricao: 'rápido e econômico' },
+  ],
+  anthropic: [
+    { valor: 'claude-sonnet-5', rotulo: 'Claude Sonnet 5', descricao: 'principal da Anthropic' },
+    { valor: 'claude-haiku-4-5', rotulo: 'Claude Haiku 4.5', descricao: 'rápido e econômico' },
+  ],
 };
 
 function mapAgente(r: Row): AgenteIa {
