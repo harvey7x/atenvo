@@ -18,7 +18,8 @@ export type DadoColeta = 'nome' | 'cpf' | 'telefone' | 'email' | 'texto';
 export interface OpcaoFluxo { rotulo: string; valor: string; irPara?: string }  // irPara = id de passo | 'fim' | vazio(próximo)
 export type Passo = { id?: string } & (
   | { tipo: 'mensagem'; baloes: string[] }
-  | { tipo: 'pergunta'; baloes: string[]; opcoes: OpcaoFluxo[]; salvarEm: string; reprompt: string }
+  | { tipo: 'midia'; midiaTipo: 'imagem' | 'video'; url: string; legenda: string }
+  | { tipo: 'pergunta'; baloes: string[]; opcoes: OpcaoFluxo[]; salvarEm: string; reprompt: string; semMenu?: boolean }
   | { tipo: 'coletar'; baloes: string[]; dado: DadoColeta; salvarEm: string; reprompt: string }
   | { tipo: 'acao'; etiqueta?: string; chamarHumano?: boolean; entregarIa?: boolean }
   | { tipo: 'fim'; baloes?: string[] }
@@ -40,7 +41,7 @@ export interface FluxoBot {
 }
 
 export const ROTULO_PASSO: Record<Passo['tipo'], string> = {
-  mensagem: 'Mensagem', pergunta: 'Pergunta com opções', coletar: 'Coletar dado', acao: 'Ação', fim: 'Fim do fluxo',
+  mensagem: 'Mensagem', midia: 'Mídia (imagem/vídeo)', pergunta: 'Pergunta com opções', coletar: 'Coletar dado', acao: 'Ação', fim: 'Fim do fluxo',
 };
 
 export const ROTULO_DADO: Record<DadoColeta, string> = {
@@ -135,29 +136,35 @@ function idxPorId(passos: Passo[], id: string): number {
 
 /* ---------------- simulador (interpretador puro, sem rede) ---------------- */
 export interface EstadoSim { passo: number; dados: Record<string, string>; tentativas: number; encerrado: boolean }
-export interface SaidaSim { baloes: string[]; eventos: string[]; estado: EstadoSim; aguardando: boolean }
+export type SaidaSimItem = { tipo: 'texto'; texto: string } | { tipo: 'midia'; midiaTipo: 'imagem' | 'video'; url: string; legenda: string };
+export interface SaidaSim { saidas: SaidaSimItem[]; baloes: string[]; eventos: string[]; estado: EstadoSim; aguardando: boolean }
 
-const MAX_TENTATIVAS = 2; // mesma régua do motor: estourou → chama humano
+const MAX_TENTATIVAS = 2; // mesma régua do motor
 
 function baloesDe(p: { baloes?: string[] } | undefined): string[] {
   return (p?.baloes ?? []).map((b) => String(b).trim()).filter(Boolean);
 }
-
-function textoPergunta(p: Extract<Passo, { tipo: 'pergunta' }>): string[] {
-  const menu = normOpcoes(p.opcoes).map((o, i) => `${i + 1}. ${o.rotulo}`).join('\n');
+function menuPergunta(p: Extract<Passo, { tipo: 'pergunta' }>): string[] {
   const base = baloesDe(p);
+  if (p.semMenu) return base;   // SIM/NÃO livre: sem "1. 2." (igual ao motor)
+  const menu = normOpcoes(p.opcoes).map((o, i) => `${i + 1}. ${o.rotulo}`).join('\n');
   return base.length ? [...base.slice(0, -1), `${base[base.length - 1]}\n\n${menu}`] : [menu];
 }
+const textosSim = (saidas: SaidaSimItem[]): string[] =>
+  saidas.filter((x): x is { tipo: 'texto'; texto: string } => x.tipo === 'texto').map((x) => x.texto);
+const mkSim = (saidas: SaidaSimItem[], eventos: string[], estado: EstadoSim, aguardando: boolean): SaidaSim =>
+  ({ saidas, baloes: textosSim(saidas), eventos, estado, aguardando });
 
 /** roda até o próximo ponto de espera (ou fim), a partir do passo atual */
 export function avancarSim(passos: Passo[], estado: EstadoSim): SaidaSim {
-  const baloes: string[] = [];
+  const saidas: SaidaSimItem[] = [];
   const eventos: string[] = [];
   let e = { ...estado, dados: { ...estado.dados } };
   while (e.passo < passos.length) {
     const p = passos[e.passo];
     if (!p) break;
-    if (p.tipo === 'mensagem') { baloes.push(...baloesDe(p)); e.passo++; continue; }
+    if (p.tipo === 'mensagem') { for (const b of baloesDe(p)) saidas.push({ tipo: 'texto', texto: b }); e.passo++; continue; }
+    if (p.tipo === 'midia') { const url = (p.url || '').trim(); if (url) saidas.push({ tipo: 'midia', midiaTipo: p.midiaTipo === 'video' ? 'video' : 'imagem', url, legenda: p.legenda || '' }); e.passo++; continue; }
     if (p.tipo === 'acao') {
       if (p.etiqueta) eventos.push(`🏷 etiqueta aplicada: "${p.etiqueta}"`);
       if (p.chamarHumano) eventos.push('🙋 atendente humano avisado (conversa marcada)');
@@ -165,44 +172,34 @@ export function avancarSim(passos: Passo[], estado: EstadoSim): SaidaSim {
       e.passo++; continue;
     }
     if (p.tipo === 'pergunta') {
-      if (normOpcoes(p.opcoes).length < 2) { e.passo++; continue; }   // pergunta torta: pula (igual ao motor)
-      baloes.push(...textoPergunta(p)); return { baloes, eventos, estado: e, aguardando: true };
+      if (normOpcoes(p.opcoes).length < 2) { e.passo++; continue; }
+      for (const b of menuPergunta(p)) saidas.push({ tipo: 'texto', texto: b });
+      return mkSim(saidas, eventos, e, true);
     }
-    if (p.tipo === 'coletar') { baloes.push(...baloesDe(p)); return { baloes, eventos, estado: e, aguardando: true }; }
-    if (p.tipo === 'fim') { baloes.push(...baloesDe(p)); e = { ...e, encerrado: true }; return { baloes, eventos, estado: e, aguardando: false }; }
+    if (p.tipo === 'coletar') { for (const b of baloesDe(p)) saidas.push({ tipo: 'texto', texto: b }); return mkSim(saidas, eventos, e, true); }
+    if (p.tipo === 'fim') { for (const b of baloesDe(p)) saidas.push({ tipo: 'texto', texto: b }); return mkSim(saidas, eventos, { ...e, encerrado: true }, false); }
     e.passo++;
   }
-  return { baloes, eventos, estado: { ...e, encerrado: true }, aguardando: false };
+  return mkSim(saidas, eventos, { ...e, encerrado: true }, false);
 }
 
 /** processa a resposta do cliente no passo de espera atual (ramificação + coleta) */
 export function responderSim(passos: Passo[], estado: EstadoSim, resposta: string): SaidaSim {
   const p = passos[estado.passo];
   let e = { ...estado, dados: { ...estado.dados } };
-  if (!p || (p.tipo !== 'pergunta' && p.tipo !== 'coletar')) {
-    return avancarSim(passos, e);
-  }
+  if (!p || (p.tipo !== 'pergunta' && p.tipo !== 'coletar')) return avancarSim(passos, e);
   if (p.tipo === 'pergunta') {
     const op = casarOpcao(p.opcoes, resposta);
     if (op === null) {
       e.tentativas++;
-      if (e.tentativas > MAX_TENTATIVAS) {
-        return { baloes: [], eventos: ['🙋 não entendi 3x → atendente humano avisado'], estado: { ...e, encerrado: true }, aguardando: false };
-      }
-      return { baloes: [p.reprompt || 'Não entendi — responda com o número de uma das opções 🙂'], eventos: [], estado: e, aguardando: true };
+      if (e.tentativas > MAX_TENTATIVAS) return mkSim([], ['🙋 não entendi 3x → atendente humano avisado'], { ...e, encerrado: true }, false);
+      return mkSim([{ tipo: 'texto', texto: p.reprompt || 'Não entendi — responda com uma das opções 🙂' }], [], e, true);
     }
     const eventos = [`💾 ${p.salvarEm || 'resposta'} = "${op.valor}"`];
     if (p.salvarEm) e.dados[p.salvarEm] = op.valor;
-    // RAMIFICAÇÃO
-    if (op.irPara === 'fim') {
-      eventos.push('↪ opção encerra o fluxo');
-      return { baloes: [], eventos, estado: { ...e, passo: passos.length, tentativas: 0, encerrado: true }, aguardando: false };
-    }
+    if (op.irPara === 'fim') { eventos.push('↪ opção encerra o fluxo'); return mkSim([], eventos, { ...e, passo: passos.length, tentativas: 0, encerrado: true }, false); }
     let destino = e.passo + 1;
-    if (op.irPara) {
-      const idx = idxPorId(passos, op.irPara);
-      if (idx >= 0) { destino = idx; eventos.push(`↪ vai para o passo ${idx + 1}`); }
-    }
+    if (op.irPara) { const idx = idxPorId(passos, op.irPara); if (idx >= 0) { destino = idx; eventos.push(`↪ vai para o passo ${idx + 1}`); } }
     e = { ...e, passo: destino, tentativas: 0 };
     const seg = avancarSim(passos, e);
     return { ...seg, eventos: [...eventos, ...seg.eventos] };
@@ -210,10 +207,8 @@ export function responderSim(passos: Passo[], estado: EstadoSim, resposta: strin
   const v = validarDado(p.dado, resposta);
   if (!v.ok) {
     e.tentativas++;
-    if (e.tentativas > MAX_TENTATIVAS) {
-      return { baloes: [], eventos: ['🙋 dado inválido 3x → atendente humano avisado'], estado: { ...e, encerrado: true }, aguardando: false };
-    }
-    return { baloes: [p.reprompt || 'Não consegui validar — pode conferir e mandar de novo?'], eventos: [], estado: e, aguardando: true };
+    if (e.tentativas > MAX_TENTATIVAS) return mkSim([], ['🙋 dado inválido 3x → atendente humano avisado'], { ...e, encerrado: true }, false);
+    return mkSim([{ tipo: 'texto', texto: p.reprompt || 'Não consegui validar — pode conferir e mandar de novo?' }], [], e, true);
   }
   const chave = p.salvarEm || p.dado;
   e.dados[chave] = v.valor;

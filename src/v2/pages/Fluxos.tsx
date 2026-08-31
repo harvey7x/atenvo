@@ -28,9 +28,9 @@ import {
 } from '@/data/iaFluxos';
 
 type Aviso = { tom: 'ok' | 'erro'; texto: string } | null;
-type MsgSim = { de: 'cliente' | 'bot' | 'evento'; texto: string };
+type MsgSim = { de: 'cliente' | 'bot' | 'evento'; texto: string } | { de: 'midia'; midiaTipo: 'imagem' | 'video'; url: string; legenda: string };
 
-const TIPOS_NOVOS: Passo['tipo'][] = ['mensagem', 'pergunta', 'coletar', 'acao', 'fim'];
+const TIPOS_NOVOS: Passo['tipo'][] = ['mensagem', 'midia', 'pergunta', 'coletar', 'acao', 'fim'];
 
 function novoId(): string {
   return (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `p_${Math.random().toString(36).slice(2, 10)}`;
@@ -40,6 +40,7 @@ function passoNovo(tipo: Passo['tipo']): Passo {
   switch (tipo) {
     case 'mensagem': return { id, tipo, baloes: [] };
     case 'pergunta': return { id, tipo, baloes: [], opcoes: [{ rotulo: '', valor: '' }, { rotulo: '', valor: '' }], salvarEm: '', reprompt: '' };
+    case 'midia': return { id, tipo, midiaTipo: 'imagem', url: '', legenda: '' };
     case 'coletar': return { id, tipo, baloes: [], dado: 'nome', salvarEm: '', reprompt: '' };
     case 'acao': return { id, tipo };
     default: return { id, tipo: 'fim', baloes: [] };
@@ -181,11 +182,14 @@ export default function Fluxos() {
   useEffect(() => { simFimRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [simMsgs]);
 
   const aplicarSaida = (r: ReturnType<typeof avancarSim>) => {
+    const daSaida = r.saidas.map((sd): MsgSim => sd.tipo === 'midia'
+      ? { de: 'midia', midiaTipo: sd.midiaTipo, url: sd.url, legenda: interpolar(sd.legenda, r.estado.dados) }
+      : { de: 'bot', texto: interpolar(sd.texto, r.estado.dados) });
     setSimMsgs((xs) => [
       ...xs,
-      ...r.baloes.map((b) => ({ de: 'bot' as const, texto: interpolar(b, r.estado.dados) })),
-      ...r.eventos.map((ev) => ({ de: 'evento' as const, texto: ev })),
-      ...(r.estado.encerrado && !r.eventos.length && !r.baloes.length ? [{ de: 'evento' as const, texto: '✔ fluxo encerrado' }] : []),
+      ...daSaida,
+      ...r.eventos.map((ev): MsgSim => ({ de: 'evento', texto: ev })),
+      ...(r.estado.encerrado && !r.eventos.length && !r.saidas.length ? [{ de: 'evento' as const, texto: '✔ fluxo encerrado' }] : []),
     ]);
     setSimEstado(r.estado);
   };
@@ -230,6 +234,24 @@ export default function Fluxos() {
         </Campo>
       )}
 
+      {p.tipo === 'midia' && (
+        <>
+          <div className="campo"><label>Tipo de mídia</label>
+            <select className="inp" value={p.midiaTipo}
+              onChange={(e) => mudarPasso(i, { ...p, midiaTipo: e.target.value as 'imagem' | 'video' })}>
+              <option value="imagem">Imagem</option>
+              <option value="video">Vídeo</option>
+            </select>
+          </div>
+          <Campo rotulo="URL da mídia (link público do arquivo)" value={p.url}
+            onChange={(e) => mudarPasso(i, { ...p, url: e.target.value })}
+            placeholder="https://…/storage/v1/object/public/bot-midia/arquivo.png" />
+          <Campo rotulo="Legenda (opcional — vai junto com a mídia)" value={p.legenda}
+            onChange={(e) => mudarPasso(i, { ...p, legenda: e.target.value })}
+            placeholder="Olá! Seja bem-vindo(a) à CAF!" />
+        </>
+      )}
+
       {p.tipo === 'pergunta' && (
         <>
           <div className="campo"><label>Opções (o cliente responde pelo número ou pelo nome)</label>
@@ -260,6 +282,10 @@ export default function Fluxos() {
               onChange={(e) => mudarPasso(i, { ...p, reprompt: e.target.value })}
               placeholder="Responda com o número de uma das opções 🙂" />
           </div>
+          <label className="fx-toggle-item">
+            <Toggle ligado={p.semMenu === true} aoMudar={(v: boolean) => mudarPasso(i, { ...p, semMenu: v })} rotulo="Sem menu numerado" />
+            <span>Sem menu numerado <span className="ia-hint">(o cliente responde livre, tipo "SIM"/"NÃO" — não aparece "1. 2.")</span></span>
+          </label>
         </>
       )}
 
@@ -429,7 +455,9 @@ export default function Fluxos() {
           <div className="ia-chat-msgs" role="log" aria-live="polite">
             {simMsgs.map((m, i) => m.de === 'evento'
               ? <div key={i} className="fx-evento">{m.texto}</div>
-              : <div key={i} className={`ia-bolha ${m.de === 'cliente' ? 'cli' : 'ia'}`}>{m.texto}</div>)}
+              : m.de === 'midia'
+                ? <div key={i} className="ia-bolha ia fx-midia-bolha">{m.midiaTipo === 'video' ? '🎬 vídeo' : '🖼 imagem'}{m.legenda ? ` — ${m.legenda}` : ''}</div>
+                : <div key={i} className={`ia-bolha ${m.de === 'cliente' ? 'cli' : 'ia'}`}>{m.texto}</div>)}
             <div ref={simFimRef} />
           </div>
           <div className="ia-chat-input">

@@ -33,3 +33,5 @@
 
 .fx-irpara { flex: 0 0 auto; max-width: 190px; font-size: 12px; padding: 6px 8px; }
 @media (max-width: 720px) { .fx-irpara { max-width: 100%; flex: 1 1 100%; } }
+
+.fx-midia-bolha { font-style: italic; opacity: .85; }
