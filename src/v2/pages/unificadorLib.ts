@@ -26,13 +26,9 @@ export interface ArquivoInfo {
   beneficiario: string | null; nb: string | null; cpf: string | null; especie: string | null;
   consignadoMes: number | null; competenciaMes: string | null; periodo: string | null;
 }
-/** 'historico' = Histórico de Créditos do INSS (extrai beneficiário/NB/CPF/consignado);
-    'bancos' = qualquer documento — só junta e identifica os bancos (sem assumir o formato) */
-export type ModoUnificacao = 'historico' | 'bancos';
-
 export interface ResultadoUnificacao {
   pdf: Blob;
-  modo: ModoUnificacao;
+  identificarBancos: boolean;       // liga a análise de bancos + beneficiário (só faz sentido em Histórico de Créditos)
   totalPaginas: number;
   arquivos: ArquivoInfo[];
   bancos: BancoAchado[];            // só os ENCONTRADOS
@@ -101,10 +97,10 @@ async function textoPorPagina(bytes: Uint8Array): Promise<string[]> {
 
 const DADOS_VAZIOS = { beneficiario: null, nb: null, cpf: null, especie: null, consignadoMes: null, competenciaMes: null, periodo: null };
 
-/** junta os PDFs na ORDEM recebida e identifica os bancos-alvo.
-    modo 'historico' extrai beneficiário/consignado (Histórico de Créditos);
-    modo 'bancos' pula a extração — serve pra QUALQUER documento. */
-export async function unificar(files: File[], modo: ModoUnificacao = 'historico'): Promise<ResultadoUnificacao> {
+/** junta os PDFs na ORDEM recebida. Por padrão só UNE (qualquer tipo de documento).
+    Com identificarBancos=true (ligar só quando forem Históricos de Créditos do INSS),
+    além de unir ele LÊ o texto pra detectar os bancos-alvo e extrair beneficiário/consignado. */
+export async function unificar(files: File[], identificarBancos = false): Promise<ResultadoUnificacao> {
   if (!files.length) throw new Error('Nenhum arquivo selecionado.');
   const merged = await PDFDocument.create();
   const arquivos: ArquivoInfo[] = [];
@@ -128,6 +124,13 @@ export async function unificar(files: File[], modo: ModoUnificacao = 'historico'
     } catch (e) {
       const msg = /encrypt|password/i.test((e as Error).message) ? 'PDF protegido por senha' : 'PDF inválido ou corrompido';
       falhas.push({ nome: f.name, motivo: msg });
+      continue;
+    }
+
+    // Sem "identificar bancos": só une (não lê o texto) — rápido e serve pra qualquer documento.
+    if (!identificarBancos) {
+      arquivos.push({ nome: f.name, paginas: idxs.length, bancos: [], textoLido: false, ...DADOS_VAZIOS });
+      paginaGlobal += idxs.length;
       continue;
     }
 
@@ -157,7 +160,7 @@ export async function unificar(files: File[], modo: ModoUnificacao = 'historico'
       });
     } catch { textoLido = false; }
 
-    const dados = modo === 'historico' ? extrairDados(paginasTextoRef) : DADOS_VAZIOS;
+    const dados = extrairDados(paginasTextoRef);
     arquivos.push({ nome: f.name, paginas: idxs.length, bancos: [...bancosNoArquivo], textoLido, ...dados });
     paginaGlobal += idxs.length;
   }
@@ -173,11 +176,11 @@ export async function unificar(files: File[], modo: ModoUnificacao = 'historico'
   const nbsDistintos = new Set(arquivos.map((a) => a.nb).filter(Boolean));
   const consignadoTotalMes = arquivos.reduce((sum, a) => sum + (a.consignadoMes ?? 0), 0);
   const achadosIds = new Set(bancos.map((b) => b.id));
-  const ausentes = BANCOS_ALVO.filter((b) => !achadosIds.has(b.id)).map((b) => ({ id: b.id, nome: b.nome }));
+  const ausentes = identificarBancos ? BANCOS_ALVO.filter((b) => !achadosIds.has(b.id)).map((b) => ({ id: b.id, nome: b.nome })) : [];
 
   return {
     pdf: new Blob([bytes as BlobPart], { type: 'application/pdf' }),
-    modo,
+    identificarBancos,
     totalPaginas: paginaGlobal,
     arquivos,
     bancos,

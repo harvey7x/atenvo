@@ -1,13 +1,8 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { BadgeStatus, BotaoPrimario, BotaoSec, CardVidro, EstadoVazio, Segmentado, type OpcaoSegmentado } from '../components';
-import { unificar, BANCOS_ALVO, type ArquivoInfo, type ResultadoUnificacao, type ModoUnificacao } from './unificadorLib';
+import { BadgeStatus, BotaoPrimario, BotaoSec, CardVidro, EstadoVazio, Toggle } from '../components';
+import { unificar, BANCOS_ALVO, type ArquivoInfo, type ResultadoUnificacao } from './unificadorLib';
 import './ferramentas.css';
-
-const OPCOES_MODO: OpcaoSegmentado<ModoUnificacao>[] = [
-  { valor: 'historico', rotulo: 'Histórico de Créditos' },
-  { valor: 'bancos', rotulo: 'Identificar bancos' },
-];
 
 const fmtKB = (b: number) => (b < 1024 * 1024 ? `${Math.round(b / 1024)} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`);
 const fmtBRL = (v: number) => 'R$ ' + v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -42,7 +37,7 @@ export default function FerramentasV2() {
 
 function UnificadorDocumentos() {
   const [files, setFiles] = useState<File[]>([]);
-  const [modo, setModo] = useState<ModoUnificacao>('historico');
+  const [identificarBancos, setIdentificarBancos] = useState(false);
   const [proc, setProc] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [res, setRes] = useState<ResultadoUnificacao | null>(null);
@@ -90,7 +85,7 @@ function UnificadorDocumentos() {
     if (!files.length || proc) return;
     setProc(true); setErro(null); setRes(null);
     try {
-      const r = await unificar(files, modo);
+      const r = await unificar(files, identificarBancos);
       if (urlRef.current) URL.revokeObjectURL(urlRef.current);
       urlRef.current = URL.createObjectURL(r.pdf);
       setRes(r);
@@ -102,13 +97,13 @@ function UnificadorDocumentos() {
     if (!res || !urlRef.current) return;
     const a = document.createElement('a');
     a.href = urlRef.current;
-    const base = res.modo === 'bancos' ? 'documentos-unificado' : 'historico-unificado';
+    const base = res.identificarBancos ? 'historico-unificado' : 'documentos-unificado';
     a.download = `${base}-${new Date().toISOString().slice(0, 10)}.pdf`;
     document.body.appendChild(a); a.click(); a.remove();
   }
 
-  const trocarModo = (m: ModoUnificacao) => { setModo(m); setRes(null); setErro(null); };
-  const ehBancos = res?.modo === 'bancos';
+  const trocarIdent = (v: boolean) => { setIdentificarBancos(v); setRes(null); setErro(null); };
+  const comBancos = res?.identificarBancos === true;   // resultado tem análise de bancos/beneficiário
 
   const semTexto = res ? res.arquivos.filter((a) => !a.textoLido).length : 0;
 
@@ -118,19 +113,15 @@ function UnificadorDocumentos() {
         <div>
           <div className="cob-migalha">Ferramentas</div>
           <h2>Unificador de documentos</h2>
-          <p>{modo === 'bancos'
-            ? 'Junte vários PDFs num arquivo só e veja quais bancos aparecem em cada documento — serve pra qualquer PDF, não precisa ser Histórico de Créditos. Nada sai do seu computador.'
-            : 'Junte vários Históricos de Créditos do INSS num PDF só. O sistema lê cada arquivo, aponta os bancos e resume por beneficiário. Nada sai do seu computador.'}</p>
+          <p>Junte vários PDFs de qualquer tipo num arquivo só. Nada sai do seu computador.</p>
         </div>
       </div>
 
       <div className="ferr-modo sobe">
-        <Segmentado opcoes={OPCOES_MODO} valor={modo} aoMudar={trocarModo} rotulo="Modo do unificador" />
-        <span className="ferr-modo-dica">
-          {modo === 'bancos'
-            ? 'Qualquer documento: só junta e identifica os bancos (sem beneficiário/consignado).'
-            : 'Histórico de Créditos do INSS: junta, identifica bancos e resume por beneficiário.'}
-        </span>
+        <label className="ferr-modo-toggle">
+          <Toggle ligado={identificarBancos} aoMudar={trocarIdent} rotulo="Identificar bancos" />
+          <span><b>Identificar bancos</b> <span className="ferr-modo-dica">— ligue quando forem Históricos de Créditos do INSS: além de unir, aponta os bancos e resume por beneficiário.</span></span>
+        </label>
       </div>
 
       <div className="ferr-layout sobe">
@@ -148,7 +139,7 @@ function UnificadorDocumentos() {
               <path d="M12 16V4M8 8l4-4 4 4M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
             </svg>
             <div className="ferr-drop-t"><b>Arraste os PDFs aqui</b> ou clique para escolher</div>
-            <div className="ferr-drop-s">{modo === 'bancos' ? 'Qualquer PDF · vários arquivos' : 'Vários Históricos de Créditos · só PDF'}</div>
+            <div className="ferr-drop-s">Qualquer PDF · vários arquivos</div>
             <input ref={inputRef} type="file" accept="application/pdf,.pdf" multiple hidden
               onChange={(e) => { if (e.target.files) adicionar(e.target.files); e.target.value = ''; }} />
           </div>
@@ -173,15 +164,17 @@ function UnificadorDocumentos() {
                 ))}
               </div>
               <div className="ferr-rodape">
-                <BotaoPrimario onClick={processar} disabled={proc}>{proc ? 'Processando…' : (modo === 'bancos' ? 'Identificar bancos' : 'Unificar documentos')}</BotaoPrimario>
+                <BotaoPrimario onClick={processar} disabled={proc}>{proc ? 'Processando…' : 'Unificar documentos'}</BotaoPrimario>
               </div>
             </CardVidro>
           )}
 
-          <div className="ferr-monit">
-            <div className="ferr-monit-t">Bancos monitorados</div>
-            <div className="ferr-monit-chips">{BANCOS_ALVO.map((b) => <span key={b.id} className="ferr-monit-chip">{b.nome}</span>)}</div>
-          </div>
+          {identificarBancos && (
+            <div className="ferr-monit">
+              <div className="ferr-monit-t">Bancos monitorados</div>
+              <div className="ferr-monit-chips">{BANCOS_ALVO.map((b) => <span key={b.id} className="ferr-monit-chip">{b.nome}</span>)}</div>
+            </div>
+          )}
         </div>
 
         {/* ---- coluna de ANÁLISE ---- */}
@@ -191,11 +184,11 @@ function UnificadorDocumentos() {
           {!res && !erro && (
             <CardVidro spot style={{ borderRadius: 'var(--r-card)' }}>
               <EstadoVazio
-                titulo={proc ? 'Lendo os documentos…' : 'A análise aparece aqui'}
-                descricao={proc ? 'Juntando os PDFs e identificando os bancos.'
-                  : modo === 'bancos'
-                    ? 'Selecione os PDFs à esquerda e clique em Identificar bancos. Vamos gerar o PDF único e apontar os bancos em cada documento.'
-                    : 'Selecione os Históricos de Créditos à esquerda e clique em Unificar documentos. Vamos gerar o PDF único e o resumo por beneficiário.'}
+                titulo={proc ? (identificarBancos ? 'Lendo os documentos…' : 'Unindo os PDFs…') : 'O resultado aparece aqui'}
+                descricao={proc ? (identificarBancos ? 'Juntando os PDFs e identificando os bancos.' : 'Juntando os PDFs num arquivo só.')
+                  : identificarBancos
+                    ? 'Selecione os Históricos de Créditos à esquerda e clique em Unificar documentos. Vamos gerar o PDF único, apontar os bancos e resumir por beneficiário.'
+                    : 'Selecione os PDFs à esquerda e clique em Unificar documentos. Vamos gerar um PDF único com todos eles.'}
               />
             </CardVidro>
           )}
@@ -205,25 +198,47 @@ function UnificadorDocumentos() {
               <div className="ferr-kpis">
                 <div className="ferr-kpi"><span className="ferr-kpi-r">Arquivos</span><b className="num">{res.arquivos.length}</b></div>
                 <div className="ferr-kpi"><span className="ferr-kpi-r">Páginas</span><b className="num">{res.totalPaginas}</b></div>
-                {!ehBancos && <div className="ferr-kpi"><span className="ferr-kpi-r">Beneficiários</span><b className="num">{grupos.length}</b></div>}
-                <div className="ferr-kpi"><span className="ferr-kpi-r">Bancos encontrados</span><b className="num" style={{ color: res.bancos.length ? 'var(--verde)' : undefined }}>{res.bancos.length}</b></div>
-                {!ehBancos && <div className="ferr-kpi"><span className="ferr-kpi-r">Consignado no mês</span><b className="num">{fmtBRL(consignadoTotal)}</b></div>}
+                {comBancos && <div className="ferr-kpi"><span className="ferr-kpi-r">Beneficiários</span><b className="num">{grupos.length}</b></div>}
+                {comBancos && <div className="ferr-kpi"><span className="ferr-kpi-r">Bancos encontrados</span><b className="num" style={{ color: res.bancos.length ? 'var(--verde)' : undefined }}>{res.bancos.length}</b></div>}
+                {comBancos && <div className="ferr-kpi"><span className="ferr-kpi-r">Consignado no mês</span><b className="num">{fmtBRL(consignadoTotal)}</b></div>}
               </div>
 
-              {(res.falhas.length > 0 || semTexto > 0) && (
+              {(res.falhas.length > 0 || (comBancos && semTexto > 0)) && (
                 <div className="ferr-avisos">
                   {res.falhas.map((f) => <div key={f.nome} className="ferr-falhas"><span className="ferr-falha">✕ {f.nome} — {f.motivo}</span></div>)}
-                  {semTexto > 0 && <div className="ferr-falhas aviso"><span>⚠ {semTexto} arquivo(s) sem texto legível (PDF escaneado/protegido) — a detecção pode estar incompleta.</span></div>}
+                  {comBancos && semTexto > 0 && <div className="ferr-falhas aviso"><span>⚠ {semTexto} arquivo(s) sem texto legível (PDF escaneado/protegido) — a detecção pode estar incompleta.</span></div>}
                 </div>
               )}
 
+              {/* modo simples (só unir): lista os documentos que entraram no PDF */}
+              {!comBancos && (
+                <CardVidro spot style={{ borderRadius: 'var(--r-card)', marginTop: 12 }}>
+                  <div className="card-cab">
+                    <h3>Documentos unidos</h3>
+                    <BotaoPrimario mini onClick={baixar}>Baixar PDF unificado</BotaoPrimario>
+                  </div>
+                  <div className="ferr-docs">
+                    {res.arquivos.map((a, i) => (
+                      <div className="ferr-doc" key={a.nome + i}>
+                        <div className="ferr-doc-top">
+                          <span className="ferr-doc-nm"><span className="ferr-doc-ord num">{i + 1}.</span> {a.nome}</span>
+                          <span className="ferr-doc-pg num">{a.paginas} pág.</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardVidro>
+              )}
+
+              {/* "Identificar bancos" ligado (Histórico de Créditos): bancos + resumo por beneficiário */}
+              {comBancos && (
               <CardVidro spot style={{ borderRadius: 'var(--r-card)', marginTop: 12 }}>
                 <div className="card-cab">
                   <h3>Bancos encontrados</h3>
                   <BotaoPrimario mini onClick={baixar}>Baixar PDF unificado</BotaoPrimario>
                 </div>
                 {res.bancos.length === 0 ? (
-                  <div className="ferr-nada">Nenhum dos bancos monitorados foi encontrado {ehBancos ? 'nestes documentos' : 'nestes históricos'}.</div>
+                  <div className="ferr-nada">Nenhum dos bancos monitorados foi encontrado nestes históricos.</div>
                 ) : (
                   <div className="ferr-bancos">
                     {res.bancos.map((b) => (
@@ -241,27 +256,9 @@ function UnificadorDocumentos() {
                   </div>
                 )}
               </CardVidro>
-
-              {ehBancos && (
-                <CardVidro spot style={{ borderRadius: 'var(--r-card)', marginTop: 12 }}>
-                  <div className="card-cab"><h3>Por documento</h3><span className="ferr-kb">{res.arquivos.length} arquivo{res.arquivos.length === 1 ? '' : 's'}</span></div>
-                  <div className="ferr-docs">
-                    {res.arquivos.map((a, i) => (
-                      <div className="ferr-doc" key={a.nome + i}>
-                        <div className="ferr-doc-top">
-                          <span className="ferr-doc-nm">{a.nome}</span>
-                          <span className="ferr-doc-pg num">{a.paginas} pág.{!a.textoLido ? ' · texto não lido' : ''}</span>
-                        </div>
-                        <div className="ferr-doc-bancos">
-                          {a.bancos.length ? a.bancos.map((n) => <BadgeStatus key={n} tom="ok">{n}</BadgeStatus>) : <span className="ferr-kb">nenhum banco monitorado</span>}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardVidro>
               )}
 
-              {!ehBancos && (
+              {comBancos && (
               <CardVidro spot style={{ borderRadius: 'var(--r-card)', marginTop: 12 }}>
                 <div className="card-cab"><h3>Beneficiários</h3><span className="ferr-kb">{grupos.length} · {res.arquivos.length} histórico{res.arquivos.length === 1 ? '' : 's'}</span></div>
                 <div className="ferr-benefs">
