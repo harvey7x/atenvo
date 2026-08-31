@@ -6,7 +6,7 @@
    recuperação — os toques saem aos poucos pelo número da conversa. Para
    sozinho quando o cliente responde. Painel de progresso no topo.
    ============================================================================ */
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import './ia.css';
 import './recuperacao.css';
 import {
@@ -21,8 +21,10 @@ import {
   RECUP_REAL, MOCK_SEQS, MOCK_LEADS, MOCK_DASH,
   useSequencias, useSalvarSequencia, useExcluirSequencia,
   useRecupLeads, useIniciarRecuperacao, usePararRecuperacao, useRecupDashboard, subirMidiaToque,
-  type Sequencia, type Toque, type RecupLead, type TipoToque,
+  usePrepararLote, usePlayRecuperacao,
+  type Sequencia, type Toque, type RecupLead, type TipoToque, type RotacaoItem,
 } from '@/data/recuperacao';
+import { useOrgUsuarios } from '@/data/atendimento';
 
 type Aviso = { tom: 'ok' | 'erro'; texto: string } | null;
 const OPCOES_ABA: OpcaoSegmentado<'leads' | 'seqs'>[] = [
@@ -53,7 +55,7 @@ export default function RecuperacaoV2() {
   const usarMock = DEMO_MODE || !RECUP_REAL;
   const { user } = useAuth();
   const { currentOrg } = useOrg();
-  const meId = user?.id ?? 'me';
+  const meId = usarMock ? 'me' : (user?.id ?? 'me');
 
   const [aba, setAba] = useState<'leads' | 'seqs'>('leads');
   const [aviso, setAviso] = useState<Aviso>(null);
@@ -97,22 +99,55 @@ export default function RecuperacaoV2() {
 function AbaLeads({ usarMock, meId, setAviso }: { usarMock: boolean; meId: string; setAviso: (a: Aviso) => void }) {
   const leadsQ = useRecupLeads();
   const seqsQ = useSequencias();
+  const equipeQ = useOrgUsuarios();
   const iniciar = useIniciarRecuperacao();
   const parar = usePararRecuperacao();
+  const prepararLote = usePrepararLote();
+  const play = usePlayRecuperacao();
   const leads = usarMock ? MOCK_LEADS : (leadsQ.data ?? []);
   const seqs = usarMock ? MOCK_SEQS : (seqsQ.data ?? []);
+  const equipe = usarMock
+    ? [{ id: 'me', nome: 'Matheus' }, { id: 'giovana', nome: 'Giovana' }, { id: 'juliana', nome: 'Juliana' }]
+    : (equipeQ.data ?? []).map((u) => ({ id: u.id, nome: u.nome }));
   const carregando = !usarMock && leadsQ.isLoading;
 
-  const [filtro, setFiltro] = useState<'meus' | 'todos'>('meus');
-  const [picker, setPicker] = useState<RecupLead | null>(null);   // lead escolhendo sequência
+  const [picker, setPicker] = useState<RecupLead | null>(null);   // ad-hoc: 1 lead escolhendo sequência
   const [confParar, setConfParar] = useState<RecupLead | null>(null);
+  const [prepararAberto, setPrepararAberto] = useState(false);
+  const [playAberto, setPlayAberto] = useState(false);
+  const [rotacao, setRotacao] = useState<Record<string, string>>({});   // atendente origem → responsável remarketing
 
-  const visiveis = useMemo(() => leads.filter((l) => filtro === 'todos' || l.responsavelId === meId), [leads, filtro, meId]);
+  const disponiveis = leads.filter((l) => !l.execucaoStatus);
+  const meusPreparados = leads.filter((l) => l.execucaoStatus === 'preparada' && l.remarketingId === meId);
+  const ativos = leads.filter((l) => l.execucaoStatus === 'ativa');
+  const grupos = useMemo(() => {
+    const m = new Map<string, { id: string; nome: string; qtd: number }>();
+    for (const l of disponiveis) {
+      if (!l.responsavelId) continue;   // rodízio é por atendente que tem dono
+      const g = m.get(l.responsavelId) ?? { id: l.responsavelId, nome: l.responsavelNome || 'Atendente', qtd: 0 };
+      g.qtd++; m.set(l.responsavelId, g);
+    }
+    return [...m.values()];
+  }, [disponiveis]);
 
+  const aoPreparar = async () => {
+    const rot: RotacaoItem[] = grupos.filter((g) => rotacao[g.id]).map((g) => ({ de: g.id, para: rotacao[g.id] }));
+    if (!rot.length) { setAviso({ tom: 'erro', texto: 'Escolha, pra ao menos um atendente, quem faz o remarketing.' }); return; }
+    setPrepararAberto(false);
+    if (usarMock) { setAviso({ tom: 'ok', texto: `${rot.length} grupo(s) preparado(s) (demonstração).` }); return; }
+    try { const n = await prepararLote.mutateAsync(rot); setAviso({ tom: 'ok', texto: `${n} lead(s) preparado(s) pro remarketing. Cada responsável dá Play nos seus.` }); }
+    catch (e) { setAviso({ tom: 'erro', texto: msgErro(e) }); }
+  };
+  const aoPlay = async (sequenciaId: string) => {
+    setPlayAberto(false);
+    if (usarMock) { setAviso({ tom: 'ok', texto: `Play! ${meusPreparados.length} lead(s) começaram (demonstração).` }); return; }
+    try { const r = await play.mutateAsync(sequenciaId); setAviso({ tom: 'ok', texto: `Play! ${r.iniciadas} lead(s) começaram${r.puladas ? `, ${r.puladas} pulado(s) (opt-out/sem canal)` : ''}. As mensagens saem espaçadas.` }); }
+    catch (e) { setAviso({ tom: 'erro', texto: msgErro(e) }); }
+  };
   const aoIniciar = async (lead: RecupLead, sequenciaId: string) => {
     setPicker(null);
     if (usarMock) { setAviso({ tom: 'ok', texto: `Recuperação iniciada para ${lead.contatoNome} (demonstração).` }); return; }
-    try { await iniciar.mutateAsync({ oportunidadeId: lead.oportunidadeId, sequenciaId }); setAviso({ tom: 'ok', texto: `Recuperação iniciada para ${lead.contatoNome}. Os toques vão saindo aos poucos.` }); }
+    try { await iniciar.mutateAsync({ oportunidadeId: lead.oportunidadeId, sequenciaId }); setAviso({ tom: 'ok', texto: `Recuperação iniciada para ${lead.contatoNome}.` }); }
     catch (e) { setAviso({ tom: 'erro', texto: msgErro(e) }); }
   };
   const aoParar = async (lead: RecupLead) => {
@@ -120,58 +155,108 @@ function AbaLeads({ usarMock, meId, setAviso }: { usarMock: boolean; meId: strin
     if (!lead.execucaoId) return;
     if (usarMock) { setAviso({ tom: 'ok', texto: 'Recuperação parada (demonstração).' }); return; }
     try { await parar.mutateAsync(lead.execucaoId); setAviso({ tom: 'ok', texto: 'Recuperação parada — toques pendentes cancelados.' }); }
-    catch (e) { setAviso({ tom: 'erro', texto: (e as Error).message }); }
+    catch (e) { setAviso({ tom: 'erro', texto: msgErro(e) }); }
   };
+
+  const linhaLead = (l: RecupLead, acao: 'iniciar' | 'parar' | 'nada', badge: ReactNode) => (
+    <div className="rec-lead" key={l.oportunidadeId}>
+      <div className="rec-lead-info">
+        <span className="rec-lead-nome">{l.contatoNome ?? 'Sem nome'}</span>
+        <span className="rec-lead-meta num">{fone(l.contatoTelefone)}{l.responsavelNome ? ` · atendeu: ${l.responsavelNome}` : ''}</span>
+      </div>
+      <div className="rec-lead-estado">{badge}</div>
+      <div className="rec-lead-acoes">
+        {acao === 'parar' && <BotaoMini className="btn-perigo" onClick={() => setConfParar(l)}>Parar</BotaoMini>}
+        {acao === 'iniciar' && <BotaoSec mini onClick={() => setPicker(l)} disabled={!seqs.length}>Iniciar</BotaoSec>}
+      </div>
+    </div>
+  );
+
+  if (carregando) return <CardVidro sobe className="ia-card"><SkeletonTexto linhas={5} /></CardVidro>;
+  if (!leads.length) return (
+    <CardVidro sobe className="ia-card">
+      <EstadoVazio icone="↻" titulo="Nenhum lead pra recuperar"
+        descricao="Arraste os leads sem resposta pra coluna Remarketing no Kanban pra eles aparecerem aqui." />
+    </CardVidro>
+  );
 
   return (
     <>
-      <div className="rec-filtro sobe">
-        <Segmentado opcoes={[{ valor: 'meus', rotulo: 'Meus' }, { valor: 'todos', rotulo: 'Todos' }]} valor={filtro} aoMudar={setFiltro} rotulo="Filtro" />
-        <span className="ia-hint">{visiveis.length} lead(s)</span>
+      {/* ações do lote */}
+      <div className="rec-lote-acoes sobe">
+        <BotaoSec onClick={() => setPrepararAberto(true)} disabled={!grupos.length}>Preparar lote (rodízio) · {disponiveis.length}</BotaoSec>
+        <BotaoPrimario onClick={() => setPlayAberto(true)} disabled={!meusPreparados.length || !seqs.length}>▶ Play · {meusPreparados.length} pra você</BotaoPrimario>
       </div>
 
-      {carregando ? (
-        <CardVidro sobe className="ia-card"><SkeletonTexto linhas={5} /></CardVidro>
-      ) : visiveis.length === 0 ? (
-        <CardVidro sobe className="ia-card">
-          <EstadoVazio icone="↻" titulo="Nenhum lead pra recuperar"
-            descricao="Arraste um lead pra coluna Remarketing no Kanban pra ele aparecer aqui." />
+      {meusPreparados.length > 0 && (
+        <CardVidro sobe className="ia-card" atraso={0.03}>
+          <CardCab titulo="Preparados pra você" contador={meusPreparados.length} direita={<BotaoSec mini onClick={() => setPlayAberto(true)} disabled={!seqs.length}>▶ Play</BotaoSec>} />
+          <div className="rec-leads">{meusPreparados.map((l) => linhaLead(l, 'parar', <BadgeStatus tom="neutro">preparado · aguardando play</BadgeStatus>))}</div>
         </CardVidro>
-      ) : (
-        <div className="rec-leads sobe">
-          {visiveis.map((l) => {
-            const ativa = l.execucaoStatus === 'ativa';
-            return (
-              <div className="rec-lead" key={l.oportunidadeId}>
-                <div className="rec-lead-info">
-                  <span className="rec-lead-nome">{l.contatoNome ?? 'Sem nome'}</span>
-                  <span className="rec-lead-meta num">{fone(l.contatoTelefone)}{l.responsavelNome ? ` · ${l.responsavelNome}` : ''}</span>
-                </div>
-                <div className="rec-lead-estado">
-                  {ativa
-                    ? <BadgeStatus tom="ok">em recuperação · {l.sequenciaNome ?? 'sequência'}</BadgeStatus>
-                    : <BadgeStatus tom="neutro">disponível</BadgeStatus>}
-                </div>
-                <div className="rec-lead-acoes">
-                  {ativa
-                    ? <BotaoMini className="btn-perigo" onClick={() => setConfParar(l)}>Parar</BotaoMini>
-                    : <BotaoSec mini onClick={() => setPicker(l)} disabled={!seqs.length}>Iniciar recuperação</BotaoSec>}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-      {!seqs.length && !carregando && (
-        <div className="ia-hint" style={{ marginTop: 8 }}>Crie uma sequência em <b>Minhas sequências</b> pra poder iniciar a recuperação.</div>
       )}
 
-      {/* picker de sequência */}
+      {ativos.length > 0 && (
+        <CardVidro sobe className="ia-card" atraso={0.06}>
+          <CardCab titulo="Em recuperação" contador={ativos.length} />
+          <div className="rec-leads">{ativos.map((l) => linhaLead(l, 'parar',
+            <BadgeStatus tom="ok">em recuperação{l.remarketingNome ? ` · ${l.remarketingNome}` : ''}</BadgeStatus>))}</div>
+        </CardVidro>
+      )}
+
+      <CardVidro sobe className="ia-card" atraso={0.09}>
+        <CardCab titulo="Disponíveis" contador={disponiveis.length} />
+        {disponiveis.length === 0
+          ? <p className="ia-hint">Todos os leads da coluna já estão preparados ou em recuperação.</p>
+          : <div className="rec-leads">{disponiveis.map((l) => linhaLead(l, 'iniciar', <BadgeStatus tom="neutro">disponível</BadgeStatus>))}</div>}
+        {!seqs.length && <p className="ia-hint">Crie uma sequência em <b>Minhas sequências</b> pra preparar/iniciar.</p>}
+      </CardVidro>
+
+      {/* preparar lote (rodízio) */}
+      <DrawerV2 aberto={prepararAberto} aoFechar={() => setPrepararAberto(false)} largura={440}>
+        <div className="rec-picker">
+          <div className="card-cab"><h3>Preparar lote (rodízio)</h3></div>
+          <p className="ia-hint">Pra cada atendente, escolha <b>quem faz o remarketing</b> dos leads dele. Os leads viram "preparados" pra essa pessoa dar Play.</p>
+          {grupos.length === 0 ? <div className="ia-hint">Nenhum lead disponível pra preparar.</div> : (
+            <div className="rec-rodizio">
+              {grupos.map((g) => (
+                <div className="rec-rodizio-linha" key={g.id}>
+                  <div className="rec-rodizio-de"><b>{g.nome}</b><span className="ia-hint">{g.qtd} lead(s)</span></div>
+                  <span className="rec-rodizio-seta">→</span>
+                  <select className="inp" value={rotacao[g.id] ?? ''} onChange={(e) => setRotacao((r) => ({ ...r, [g.id]: e.target.value }))} aria-label={`Quem faz o remarketing dos leads de ${g.nome}`}>
+                    <option value="">— quem faz o remarketing —</option>
+                    {equipe.filter((u) => u.id !== g.id).map((u) => <option key={u.id} value={u.id}>{u.nome}</option>)}
+                  </select>
+                </div>
+              ))}
+              <div className="ferr-rodape"><BotaoPrimario onClick={aoPreparar} disabled={prepararLote.isPending}>Preparar {disponiveis.length} lead(s)</BotaoPrimario></div>
+            </div>
+          )}
+        </div>
+      </DrawerV2>
+
+      {/* play: escolher script pros meus preparados */}
+      <DrawerV2 aberto={playAberto} aoFechar={() => setPlayAberto(false)} largura={380}>
+        <div className="rec-picker">
+          <div className="card-cab"><h3>▶ Play — dar play</h3></div>
+          <p className="ia-hint">Escolha o script pros seus <b>{meusPreparados.length}</b> lead(s) preparado(s). As mensagens saem espaçadas (anti-spam), pelo número da conversa.</p>
+          {seqs.length === 0 ? <div className="ia-hint">Você ainda não tem scripts.</div> : (
+            <div className="rec-picker-lista">
+              {seqs.map((s) => (
+                <button key={s.id} type="button" className="rec-picker-item" onClick={() => aoPlay(s.id)} disabled={play.isPending}>
+                  <b>{s.nome}</b><span>{s.toques.length} toque(s)</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </DrawerV2>
+
+      {/* ad-hoc: iniciar 1 lead */}
       <DrawerV2 aberto={!!picker} aoFechar={() => setPicker(null)} largura={380}>
         <div className="rec-picker">
-          <div className="card-cab"><h3>Escolha a sequência</h3></div>
-          <p className="ia-hint">Pra recuperar <b>{picker?.contatoNome}</b>. Os toques saem pelo número da conversa, aos poucos.</p>
-          {seqs.length === 0 ? <div className="ia-hint">Você ainda não tem sequências.</div> : (
+          <div className="card-cab"><h3>Escolha o script</h3></div>
+          <p className="ia-hint">Pra recuperar <b>{picker?.contatoNome}</b> agora. Os toques saem pelo número da conversa, aos poucos.</p>
+          {seqs.length === 0 ? <div className="ia-hint">Você ainda não tem scripts.</div> : (
             <div className="rec-picker-lista">
               {seqs.map((s) => (
                 <button key={s.id} type="button" className="rec-picker-item" onClick={() => picker && aoIniciar(picker, s.id)}>

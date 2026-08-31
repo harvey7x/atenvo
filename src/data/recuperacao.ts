@@ -26,7 +26,9 @@ export interface RecupLead {
   responsavelId: string | null; responsavelNome: string | null; colunaNome: string | null; criadoEm: string;
   execucaoId: string | null; execucaoStatus: string | null; sequenciaNome: string | null;
   toqueTotal: number | null; iniciadaEm: string | null;
+  remarketingId: string | null; remarketingNome: string | null;   // responsável de remarketing (rodízio)
 }
+export interface RotacaoItem { de: string; para: string }
 export interface RecupDashboard { na_coluna: number; em_recuperacao: number; recuperados: number; concluidas: number }
 
 type Row = Record<string, unknown>;
@@ -88,6 +90,7 @@ export function useRecupLeads() {
         execucaoId: (r.execucao_id as string) ?? null, execucaoStatus: (r.execucao_status as string) ?? null,
         sequenciaNome: (r.sequencia_nome as string) ?? null, toqueTotal: (r.toque_total as number) ?? null,
         iniciadaEm: (r.iniciada_em as string) ?? null,
+        remarketingId: (r.remarketing_id as string) ?? null, remarketingNome: (r.remarketing_nome as string) ?? null,
       }));
     },
   });
@@ -112,6 +115,30 @@ export function usePararRecuperacao() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['recup-leads', currentOrg?.id] }); qc.invalidateQueries({ queryKey: ['recup-dash', currentOrg?.id] }); },
   });
 }
+export function usePrepararLote() {
+  const qc = useQueryClient(); const { currentOrg } = useOrg();
+  return useMutation({
+    mutationFn: async (rotacao: RotacaoItem[]): Promise<number> => {
+      const { data, error } = await supabase!.rpc('recuperacao_preparar_lote', { p_rotacao: rotacao });
+      if (error) throw new Error(error.message);
+      return (data as number) ?? 0;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['recup-leads', currentOrg?.id] }); qc.invalidateQueries({ queryKey: ['recup-dash', currentOrg?.id] }); },
+  });
+}
+export function usePlayRecuperacao() {
+  const qc = useQueryClient(); const { currentOrg } = useOrg();
+  return useMutation({
+    mutationFn: async (sequenciaId: string): Promise<{ iniciadas: number; puladas: number }> => {
+      const { data, error } = await supabase!.rpc('recuperacao_play', { p_sequencia: sequenciaId });
+      if (error) throw new Error(error.message);
+      const d = (data as { iniciadas?: number; puladas?: number }) || {};
+      return { iniciadas: d.iniciadas ?? 0, puladas: d.puladas ?? 0 };
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['recup-leads', currentOrg?.id] }); qc.invalidateQueries({ queryKey: ['recup-dash', currentOrg?.id] }); },
+  });
+}
+
 export function useRecupDashboard() {
   const { currentOrg } = useOrg();
   const org = currentOrg?.id;
@@ -142,8 +169,9 @@ export const MOCK_SEQS: Sequencia[] = [
     ] },
 ];
 export const MOCK_LEADS: RecupLead[] = [
-  { oportunidadeId: 'opp-1', contatoId: 'c1', contatoNome: 'MARIA APARECIDA SOUZA', contatoTelefone: '5551999990001', responsavelId: 'me', responsavelNome: 'Giovana', colunaNome: 'Remarketing', criadoEm: '2026-08-30T12:00:00Z', execucaoId: null, execucaoStatus: null, sequenciaNome: null, toqueTotal: null, iniciadaEm: null },
-  { oportunidadeId: 'opp-2', contatoId: 'c2', contatoNome: 'JOSÉ CARLOS FERREIRA', contatoTelefone: '5551999990002', responsavelId: 'me', responsavelNome: 'Giovana', colunaNome: 'Remarketing', criadoEm: '2026-08-29T12:00:00Z', execucaoId: 'ex-1', execucaoStatus: 'ativa', sequenciaNome: 'Recuperação padrão', toqueTotal: 3, iniciadaEm: '2026-08-31T10:00:00Z' },
-  { oportunidadeId: 'opp-3', contatoId: 'c3', contatoNome: 'ANTÔNIO PEREIRA LIMA', contatoTelefone: '5551999990003', responsavelId: 'outro', responsavelNome: 'Juliana', colunaNome: 'Remarketing', criadoEm: '2026-08-28T12:00:00Z', execucaoId: null, execucaoStatus: null, sequenciaNome: null, toqueTotal: null, iniciadaEm: null },
+  { oportunidadeId: 'opp-1', contatoId: 'c1', contatoNome: 'MARIA APARECIDA SOUZA', contatoTelefone: '5551999990001', responsavelId: 'giovana', responsavelNome: 'Giovana', colunaNome: 'Remarketing', criadoEm: '2026-08-30T12:00:00Z', execucaoId: null, execucaoStatus: null, sequenciaNome: null, toqueTotal: null, iniciadaEm: null, remarketingId: null, remarketingNome: null },
+  { oportunidadeId: 'opp-2', contatoId: 'c2', contatoNome: 'JOSÉ CARLOS FERREIRA', contatoTelefone: '5551999990002', responsavelId: 'giovana', responsavelNome: 'Giovana', colunaNome: 'Remarketing', criadoEm: '2026-08-29T12:00:00Z', execucaoId: 'ex-1', execucaoStatus: 'ativa', sequenciaNome: 'Recuperação padrão', toqueTotal: 3, iniciadaEm: '2026-08-31T10:00:00Z', remarketingId: 'me', remarketingNome: 'Matheus' },
+  { oportunidadeId: 'opp-3', contatoId: 'c3', contatoNome: 'ANTÔNIO PEREIRA LIMA', contatoTelefone: '5551999990003', responsavelId: 'juliana', responsavelNome: 'Juliana', colunaNome: 'Remarketing', criadoEm: '2026-08-28T12:00:00Z', execucaoId: 'ex-2', execucaoStatus: 'preparada', sequenciaNome: null, toqueTotal: null, iniciadaEm: null, remarketingId: 'me', remarketingNome: 'Matheus' },
+  { oportunidadeId: 'opp-4', contatoId: 'c4', contatoNome: 'CLEUSA M. BARROS', contatoTelefone: '5551999990004', responsavelId: 'me', responsavelNome: 'Matheus', colunaNome: 'Remarketing', criadoEm: '2026-08-27T12:00:00Z', execucaoId: null, execucaoStatus: null, sequenciaNome: null, toqueTotal: null, iniciadaEm: null, remarketingId: null, remarketingNome: null },
 ];
 export const MOCK_DASH: RecupDashboard = { na_coluna: 3, em_recuperacao: 1, recuperados: 4, concluidas: 2 };

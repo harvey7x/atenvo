@@ -16,6 +16,17 @@
 .v2 .rec-filtro { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
 .v2 .rec-seq-topo { margin-top: 12px; }
 
+/* ações do lote (preparar rodízio + play) */
+.v2 .rec-lote-acoes { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+
+/* editor do rodízio */
+.v2 .rec-rodizio { display: flex; flex-direction: column; gap: 10px; }
+.v2 .rec-rodizio-linha { display: flex; align-items: center; gap: 10px; }
+.v2 .rec-rodizio-de { display: flex; flex-direction: column; gap: 1px; min-width: 96px; }
+.v2 .rec-rodizio-de b { font-size: 13px; }
+.v2 .rec-rodizio-seta { color: var(--txt-3); flex: 0 0 auto; }
+.v2 .rec-rodizio-linha select { flex: 1 1 auto; }
+
 /* lista de leads */
 .v2 .rec-leads { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
 .v2 .rec-lead {

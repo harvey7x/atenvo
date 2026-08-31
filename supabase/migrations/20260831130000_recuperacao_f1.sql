@@ -131,6 +131,7 @@ begin
   if v_canal.id is null then raise exception 'canal_invalido'; end if;
   if v_canal.ativo = false or v_canal.status_integracao::text <> 'conectado' then raise exception 'canal_desconectado'; end if;
   if v_canal.envio_restrito then raise exception 'canal_restrito'; end if;
+  if v_canal.conflito_com is not null then raise exception 'canal_em_conflito'; end if;
 
   select telefone into v_tel from public.contatos where id = v_contato;
   if v_tel is null or length(regexp_replace(v_tel,'\D','','g')) < 10 then raise exception 'contato_sem_telefone'; end if;
@@ -191,8 +192,9 @@ begin
   if v_org is null then raise exception 'execucao_nao_encontrada'; end if;
   if not (is_platform_admin() or exists (select 1 from public.organizacao_usuarios where organizacao_id=v_org and usuario_id=auth.uid() and status='ativo'))
     then raise exception 'sem_acesso'; end if;
+  -- compara como TEXTO (nunca ::uuid — chave estranha derrubaria o cron); cancela agendada E processando
   update public.mensagens_agendadas set status='cancelada', cancelada_em=now(), cancelada_por=auth.uid()
-   where (metadados->>'recuperacao_id')::uuid = p_execucao and status='agendada';
+   where metadados->>'recuperacao_id' = p_execucao::text and status in ('agendada','processando');
   update public.recuperacao_execucoes
      set status = case when p_motivo='recuperado' then 'recuperado' else 'parada' end, finalizada_em = now(), atualizada_em = now()
    where id = p_execucao;
@@ -213,12 +215,12 @@ begin
     ) into v_respondeu;
     if v_respondeu then
       update public.mensagens_agendadas set status='cancelada', cancelada_em=now()
-       where (metadados->>'recuperacao_id')::uuid = v_rec.id and status='agendada';
+       where metadados->>'recuperacao_id' = v_rec.id::text and status in ('agendada','processando');
       update public.recuperacao_execucoes set status='recuperado', finalizada_em=now(), atualizada_em=now() where id=v_rec.id;
       v_n := v_n + 1;
     else
       select count(*) into v_pend from public.mensagens_agendadas
-       where (metadados->>'recuperacao_id')::uuid = v_rec.id and status in ('agendada','processando');
+       where metadados->>'recuperacao_id' = v_rec.id::text and status in ('agendada','processando');
       if v_pend = 0 then
         update public.recuperacao_execucoes set status='concluida', finalizada_em=now(), atualizada_em=now() where id=v_rec.id;
       end if;
