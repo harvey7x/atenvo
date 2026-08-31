@@ -1380,7 +1380,11 @@ async function tratarComFluxoCustom(p: {
 
   const t = mesmoFluxo ? responderCf(passos, cf, p.inboundText) : avancarCf(passos, cf);
   // interpola {primeiro_nome}/{chave} nos balões usando o que já foi coletado (cf_dados do turno)
-  t.baloes = t.baloes.map((b) => interpolar(b, t.estado.dados));
+  // interpola {primeiro_nome}/{chave} nos textos E legendas de mídia (na ordem), com o que já foi coletado
+  t.saidas = t.saidas.map((sd) => sd.tipo === 'texto'
+    ? { tipo: 'texto' as const, texto: interpolar(sd.texto, t.estado.dados) }
+    : { ...sd, legenda: interpolar(sd.legenda, t.estado.dados) });
+  t.baloes = t.saidas.filter((sd) => sd.tipo === 'texto').map((sd) => (sd as { texto: string }).texto);
 
   const persistir = async (extra: Record<string, unknown> = {}) => {
     await admin.rpc('bot_avancar_etapa', {
@@ -1432,8 +1436,10 @@ async function tratarComFluxoCustom(p: {
   const transporte = (canal?.transporte ?? 'evolution') as string;
   if (dryRunEfetivo || !destino) {
     if (!destino) erro = 'sem_destino';
-    for (let i = 0; i < t.baloes.length; i++) {
-      await logRunner('fluxo_custom', 'balao_simulado', { ordem: i, texto: t.baloes[i].slice(0, 140), motivo: erro });
+    for (let i = 0; i < t.saidas.length; i++) {
+      const sd = t.saidas[i];
+      if (sd.tipo === 'midia') await logRunner('fluxo_custom', 'midia_simulada', { ordem: i, tipo: sd.midiaTipo, url: sd.url, motivo: erro });
+      else await logRunner('fluxo_custom', 'balao_simulado', { ordem: i, texto: sd.texto.slice(0, 140), motivo: erro });
     }
   } else if ((transporte === 'cloud_api' && !canal?.cloud_phone_number_id)
           || (transporte === 'evolution' && !canal?.instancia_externa)
@@ -1442,23 +1448,35 @@ async function tratarComFluxoCustom(p: {
     await logRunner('fluxo_custom', 'balao_falhou', { erro });
   } else {
     const tx = enviadorDe(canal);
-    for (let i = 0; i < t.baloes.length; i++) {
-      // teto de 1.8s por gap: MAX_BALOES_TURNO(6) × sleep + sends tem que caber no lease de 30s
+    for (let i = 0; i < t.saidas.length; i++) {
+      // teto de 1.8s por gap: itens × sleep + sends tem que caber no lease de 30s
       if (i > 0) await sleep(Math.min(min + Math.random() * (max - min), 1800));
+      const sd = t.saidas[i];
       try {
-        const sent = await tx.sendText(destino, t.baloes[i]);
+        let sent;
+        if (sd.tipo === 'midia') {
+          const mtype = sd.midiaTipo === 'video' ? 'video' : 'image';
+          const u = sd.url.toLowerCase();
+          const mime = sd.midiaTipo === 'video' ? 'video/mp4' : (u.endsWith('.png') ? 'image/png' : 'image/jpeg');
+          const fname = sd.url.split('/').pop() || (sd.midiaTipo === 'video' ? 'video.mp4' : 'imagem.jpg');
+          sent = await tx.sendMedia(destino, mtype, mime, sd.url, fname, sd.legenda || undefined);
+        } else {
+          sent = await tx.sendText(destino, sd.texto);
+        }
         const idExterno = sent?.key?.id ?? null;
         if (!idExterno) throw new Error('sem_id_retorno');
         await admin.from('mensagens').insert({
-          organizacao_id: conv.organizacao_id, conversa_id: conversaId, direcao: 'saida', tipo: 'texto',
-          conteudo: t.baloes[i], autor_id: null, origem: 'bot', status: 'enviada', id_externo: idExterno,
-          metadados: { fluxo: 'custom', fluxo_id: fluxoId, passo: t.estado.passo },
+          organizacao_id: conv.organizacao_id, conversa_id: conversaId, direcao: 'saida',
+          tipo: sd.tipo === 'midia' ? (sd.midiaTipo === 'video' ? 'video' : 'imagem') : 'texto',
+          conteudo: sd.tipo === 'midia' ? (sd.legenda || '') : sd.texto,
+          autor_id: null, origem: 'bot', status: 'enviada', id_externo: idExterno,
+          metadados: { fluxo: 'custom', fluxo_id: fluxoId, passo: t.estado.passo, ...(sd.tipo === 'midia' ? { media_url: sd.url, midia_tipo: sd.midiaTipo } : {}) },
         });
         enviados++;
       } catch (e) {
         erro = String((e as Error)?.message ?? 'falha_envio').slice(0, 300);
-        await logRunner('fluxo_custom', 'balao_falhou', { ordem: i, erro });
-        break;   // texto: não derrama os próximos balões após falha (padrão da casa)
+        await logRunner('fluxo_custom', 'envio_falhou', { ordem: i, tipo: sd.tipo, erro });
+        break;   // não derrama os próximos itens após falha
       }
     }
   }

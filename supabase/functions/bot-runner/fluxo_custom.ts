@@ -4,17 +4,19 @@
 // (index.ts) faz IO/envio/persistência.
 //
 // CONTRATO ESPELHADO no front (src/data/iaFluxos.ts — simulador): mesma
-// validação, casamento de opção, escada de tentativas, RAMIFICAÇÃO e coleta.
+// validação, casamento de opção, escada de tentativas, ramificação, coleta,
+// MÍDIA e variáveis {chave}.
 //
 // Passos (cada um tem `id` estável, gerado pelo editor):
 //   { id, tipo:'mensagem', baloes:[...] }
-//   { id, tipo:'pergunta', baloes:[...], opcoes:[{rotulo,valor,irPara?}...], salvarEm, reprompt }
+//   { id, tipo:'midia',    midiaTipo:'imagem'|'video', url, legenda }
+//   { id, tipo:'pergunta', baloes:[...], opcoes:[{rotulo,valor,irPara?}...], salvarEm, reprompt, semMenu? }
 //   { id, tipo:'coletar',  baloes:[...], dado:'nome'|'cpf'|'telefone'|'email'|'texto', salvarEm, reprompt }
 //   { id, tipo:'acao',     etiqueta?, chamarHumano?, entregarIa? }
 //   { id, tipo:'fim',      baloes?:[...] }
 //
-// RAMIFICAÇÃO: cada opção da pergunta pode ter irPara = id de um passo (pula pra ele),
-// 'fim' (encerra) ou vazio (segue pro próximo). Referência por ID = estável a reordenação.
+// A ORDEM texto↔mídia importa (ex.: saudação → vídeo → pergunta): por isso a
+// saída é uma lista ORDENADA `saidas`; `baloes` é só o texto (interpolação/coleta).
 // ============================================================================
 import { extrairCpfDeTexto } from './fluxo_video.ts';
 
@@ -23,15 +25,20 @@ export type DadoColeta = 'nome' | 'cpf' | 'telefone' | 'email' | 'texto';
 export type PassoCustom = {
   id?: unknown; tipo?: unknown; baloes?: unknown; opcoes?: unknown; salvarEm?: unknown;
   reprompt?: unknown; dado?: unknown; etiqueta?: unknown; chamarHumano?: unknown; entregarIa?: unknown;
+  midiaTipo?: unknown; url?: unknown; legenda?: unknown; semMenu?: unknown;
 };
+
+export type Saida =
+  | { tipo: 'texto'; texto: string }
+  | { tipo: 'midia'; midiaTipo: 'imagem' | 'video'; url: string; legenda: string };
 
 export interface EstadoCf { passo: number; dados: Record<string, string>; tentativas: number; concluido: boolean }
 export interface AcaoCf { etiqueta?: string; chamarHumano?: boolean; entregarIa?: boolean }
-/** dado coletado NESTE turno (o handler persiste na ficha: nome/cpf via RPC da casa) */
 export interface ColetaCf { dado: DadoColeta; chave: string; valor: string; digits?: string }
 
 export interface TurnoCf {
-  baloes: string[];
+  saidas: Saida[];
+  baloes: string[];          // só os textos (derivado de saidas) — interpolação/coleta usam
   acoes: AcaoCf[];
   estado: EstadoCf;
   aguardando: boolean;
@@ -40,7 +47,7 @@ export interface TurnoCf {
 }
 
 const MAX_TENTATIVAS = 2;
-const MAX_BALOES_TURNO = 6;
+const MAX_SAIDAS_TURNO = 8;   // teto de itens (texto+mídia) por turno — lease de 30s
 
 const semAcento = (s: string): string => (s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
@@ -55,8 +62,10 @@ export function interpolar(texto: string, dados: Record<string, string>): string
 }
 
 function baloesDe(v: unknown): string[] {
-  return (Array.isArray(v) ? v : []).map((b) => String(b ?? '').trim()).filter(Boolean).slice(0, MAX_BALOES_TURNO);
+  return (Array.isArray(v) ? v : []).map((b) => String(b ?? '').trim()).filter(Boolean);
 }
+const textosDe = (saidas: Saida[]): string[] =>
+  saidas.filter((s): s is { tipo: 'texto'; texto: string } => s.tipo === 'texto').map((s) => s.texto);
 
 interface OpcaoNorm { rotulo: string; valor: string; irPara?: string }
 function opcoesDe(v: unknown): OpcaoNorm[] {
@@ -108,29 +117,44 @@ export function validarDado(dado: DadoColeta, txt: string): { ok: boolean; valor
   }
 }
 
-function menuDaPergunta(baloes: string[], opcoes: OpcaoNorm[]): string[] {
+/** menu numerado (a menos que semMenu — o cliente responde SIM/opção no texto livre) */
+function menuDaPergunta(baloes: string[], opcoes: OpcaoNorm[], semMenu: boolean): string[] {
+  if (semMenu) return baloes;
   const menu = opcoes.map((o, i) => `${i + 1}. ${o.rotulo}`).join('\n');
   if (!baloes.length) return [menu];
   return [...baloes.slice(0, -1), `${baloes[baloes.length - 1]}\n\n${menu}`];
 }
 
-/** índice do passo por id (ramificação); -1 se não achar */
+function midiaDe(p: PassoCustom): Saida | null {
+  const url = String(p.url ?? '').trim();
+  if (!url) return null;
+  const midiaTipo: 'imagem' | 'video' = String(p.midiaTipo) === 'video' ? 'video' : 'imagem';
+  return { tipo: 'midia', midiaTipo, url, legenda: String(p.legenda ?? '') };
+}
+
 function idxPorId(passos: PassoCustom[], id: string): number {
   if (!id) return -1;
   for (let i = 0; i < passos.length; i++) if (String((passos[i] as { id?: unknown }).id ?? '') === id) return i;
   return -1;
 }
 
-/** avança do passo atual até o próximo ponto de espera (ou fim), acumulando balões/ações */
+/** empacota TurnoCf preenchendo baloes a partir de saidas */
+function turno(saidas: Saida[], acoes: AcaoCf[], estado: EstadoCf, aguardando: boolean, escalarHumano = false): TurnoCf {
+  const cortadas = saidas.slice(0, MAX_SAIDAS_TURNO);
+  return { saidas: cortadas, baloes: textosDe(cortadas), acoes, estado, aguardando, escalarHumano };
+}
+
+/** avança do passo atual até o próximo ponto de espera (ou fim), acumulando saídas/ações */
 export function avancarCf(passos: PassoCustom[], estadoIn: EstadoCf): TurnoCf {
-  const baloes: string[] = [];
+  const saidas: Saida[] = [];
   const acoes: AcaoCf[] = [];
   let e: EstadoCf = { ...estadoIn, dados: { ...estadoIn.dados } };
   let guarda = 0;
   while (e.passo < passos.length && guarda++ < 60) {
     const p = passos[e.passo];
     if (!p || typeof p !== 'object') { e.passo++; continue; }
-    if (p.tipo === 'mensagem') { baloes.push(...baloesDe(p.baloes)); e.passo++; continue; }
+    if (p.tipo === 'mensagem') { for (const b of baloesDe(p.baloes)) saidas.push({ tipo: 'texto', texto: b }); e.passo++; continue; }
+    if (p.tipo === 'midia') { const m = midiaDe(p); if (m) saidas.push(m); e.passo++; continue; }
     if (p.tipo === 'acao') {
       const a: AcaoCf = {};
       const et = String(p.etiqueta ?? '').trim();
@@ -143,23 +167,23 @@ export function avancarCf(passos: PassoCustom[], estadoIn: EstadoCf): TurnoCf {
     if (p.tipo === 'pergunta') {
       const ops = opcoesDe(p.opcoes);
       if (ops.length < 2) { e.passo++; continue; }
-      baloes.push(...menuDaPergunta(baloesDe(p.baloes), ops));
-      return { baloes: baloes.slice(0, MAX_BALOES_TURNO), acoes, estado: e, aguardando: true, escalarHumano: false };
+      for (const b of menuDaPergunta(baloesDe(p.baloes), ops, p.semMenu === true)) saidas.push({ tipo: 'texto', texto: b });
+      return turno(saidas, acoes, e, true);
     }
     if (p.tipo === 'coletar') {
-      baloes.push(...baloesDe(p.baloes));
-      return { baloes: baloes.slice(0, MAX_BALOES_TURNO), acoes, estado: e, aguardando: true, escalarHumano: false };
+      for (const b of baloesDe(p.baloes)) saidas.push({ tipo: 'texto', texto: b });
+      return turno(saidas, acoes, e, true);
     }
     if (p.tipo === 'fim') {
-      baloes.push(...baloesDe(p.baloes));
-      return { baloes: baloes.slice(0, MAX_BALOES_TURNO), acoes, estado: { ...e, concluido: true }, aguardando: false, escalarHumano: false };
+      for (const b of baloesDe(p.baloes)) saidas.push({ tipo: 'texto', texto: b });
+      return turno(saidas, acoes, { ...e, concluido: true }, false);
     }
     e.passo++;
   }
-  return { baloes: baloes.slice(0, MAX_BALOES_TURNO), acoes, estado: { ...e, concluido: true }, aguardando: false, escalarHumano: false };
+  return turno(saidas, acoes, { ...e, concluido: true }, false);
 }
 
-/** processa a resposta do cliente no passo de espera atual e segue o trilho (ramificação/coleta) */
+/** processa a resposta do cliente no passo de espera atual e segue o trilho */
 export function responderCf(passos: PassoCustom[], estadoIn: EstadoCf, resposta: string): TurnoCf {
   const p = passos[estadoIn.passo];
   let e: EstadoCf = { ...estadoIn, dados: { ...estadoIn.dados } };
@@ -170,15 +194,14 @@ export function responderCf(passos: PassoCustom[], estadoIn: EstadoCf, resposta:
     const op = casarOpcao(ops, resposta);
     if (op === null) {
       e = { ...e, tentativas: e.tentativas + 1 };
-      if (e.tentativas > MAX_TENTATIVAS) return { baloes: [], acoes: [], estado: e, aguardando: false, escalarHumano: true };
+      if (e.tentativas > MAX_TENTATIVAS) return turno([], [], e, false, true);
       const rp = String(p.reprompt ?? '').trim() || 'Não entendi — responda com o número de uma das opções 🙂';
-      return { baloes: [rp], acoes: [], estado: e, aguardando: true, escalarHumano: false };
+      return turno([{ tipo: 'texto', texto: rp }], [], e, true);
     }
     const chave = String(p.salvarEm ?? '').trim();
     if (chave) e.dados[chave.slice(0, 40)] = op.valor;
-    // RAMIFICAÇÃO: 'fim' encerra; id de passo pula pra ele; vazio/inválido segue pro próximo
     if (op.irPara === 'fim') {
-      return { baloes: [], acoes: [], estado: { ...e, passo: passos.length, tentativas: 0, concluido: true }, aguardando: false, escalarHumano: false };
+      return turno([], [], { ...e, passo: passos.length, tentativas: 0, concluido: true }, false);
     }
     let destino = e.passo + 1;
     if (op.irPara) { const idx = idxPorId(passos, op.irPara); if (idx >= 0) destino = idx; }
@@ -189,9 +212,9 @@ export function responderCf(passos: PassoCustom[], estadoIn: EstadoCf, resposta:
   const v = validarDado(dado, resposta);
   if (!v.ok) {
     e = { ...e, tentativas: e.tentativas + 1 };
-    if (e.tentativas > MAX_TENTATIVAS) return { baloes: [], acoes: [], estado: e, aguardando: false, escalarHumano: true };
+    if (e.tentativas > MAX_TENTATIVAS) return turno([], [], e, false, true);
     const rp = String(p.reprompt ?? '').trim() || 'Não consegui validar — pode conferir e mandar de novo?';
-    return { baloes: [rp], acoes: [], estado: e, aguardando: true, escalarHumano: false };
+    return turno([{ tipo: 'texto', texto: rp }], [], e, true);
   }
   const chave = (String(p.salvarEm ?? '').trim() || dado).slice(0, 40);
   e.dados[chave] = v.valor;
