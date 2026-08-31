@@ -134,5 +134,31 @@ begin
   return jsonb_build_object('iniciadas', v_ini, 'puladas', v_pul);
 end $fn$;
 
-revoke execute on function public.recuperacao_preparar_lote(jsonb), public.recuperacao_play(uuid) from public, anon;
-grant execute on function public.recuperacao_preparar_lote(jsonb), public.recuperacao_play(uuid) to authenticated;
+-- PREPARAR POR SELEÇÃO: atribui os leads SELECIONADOS (lista de opps) a um responsável
+-- de remarketing. É o caminho da UI (você seleciona os leads de um atendente e escolhe
+-- quem faz o remarketing). Pula leads fora da coluna / já em recuperação.
+create or replace function public.recuperacao_preparar_selecao(p_opps uuid[], p_para uuid)
+returns int language plpgsql security definer set search_path = public as $fn$
+declare v_org uuid; v_opp uuid; v_contato uuid; v_de uuid; v_n int := 0;
+begin
+  select organizacao_id into v_org from public.organizacao_usuarios where usuario_id = auth.uid() and status='ativo' limit 1;
+  if v_org is null then raise exception 'sem_organizacao'; end if;
+  if p_para is null then raise exception 'sem_responsavel'; end if;
+  if not exists (select 1 from public.organizacao_usuarios where organizacao_id=v_org and usuario_id=p_para and status='ativo') then raise exception 'responsavel_invalido'; end if;
+  if p_opps is null or array_length(p_opps,1) is null then return 0; end if;
+  foreach v_opp in array p_opps loop
+    select o.contato_id, o.responsavel_id into v_contato, v_de
+      from public.oportunidades o
+      join public.funil_colunas fc on fc.id = o.coluna_id and fc.nome ilike 'remarketing'
+     where o.id = v_opp and o.organizacao_id = v_org and o.status = 'em_andamento';
+    if v_contato is null then continue; end if;
+    if exists (select 1 from public.recuperacao_execucoes e where e.contato_id = v_contato and e.status in ('ativa','preparada')) then continue; end if;
+    insert into public.recuperacao_execucoes (organizacao_id, oportunidade_id, contato_id, responsavel_id, origem_responsavel_id, status, total_toques)
+      values (v_org, v_opp, v_contato, p_para, v_de, 'preparada', 0);
+    v_n := v_n + 1;
+  end loop;
+  return v_n;
+end $fn$;
+
+revoke execute on function public.recuperacao_preparar_lote(jsonb), public.recuperacao_play(uuid), public.recuperacao_preparar_selecao(uuid[], uuid) from public, anon;
+grant execute on function public.recuperacao_preparar_lote(jsonb), public.recuperacao_play(uuid), public.recuperacao_preparar_selecao(uuid[], uuid) to authenticated;

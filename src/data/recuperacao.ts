@@ -126,6 +126,17 @@ export function usePrepararLote() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['recup-leads', currentOrg?.id] }); qc.invalidateQueries({ queryKey: ['recup-dash', currentOrg?.id] }); },
   });
 }
+export function usePrepararSelecao() {
+  const qc = useQueryClient(); const { currentOrg } = useOrg();
+  return useMutation({
+    mutationFn: async (p: { opps: string[]; para: string }): Promise<number> => {
+      const { data, error } = await supabase!.rpc('recuperacao_preparar_selecao', { p_opps: p.opps, p_para: p.para });
+      if (error) throw new Error(error.message);
+      return (data as number) ?? 0;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['recup-leads', currentOrg?.id] }); qc.invalidateQueries({ queryKey: ['recup-dash', currentOrg?.id] }); },
+  });
+}
 export function usePlayRecuperacao() {
   const qc = useQueryClient(); const { currentOrg } = useOrg();
   return useMutation({

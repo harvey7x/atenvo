@@ -6,7 +6,7 @@
    recuperação — os toques saem aos poucos pelo número da conversa. Para
    sozinho quando o cliente responde. Painel de progresso no topo.
    ============================================================================ */
-import { useMemo, useRef, useState, type ReactNode } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import './ia.css';
 import './recuperacao.css';
 import {
@@ -20,11 +20,12 @@ import { useOrg } from '@/context/OrgContext';
 import {
   RECUP_REAL, MOCK_SEQS, MOCK_LEADS, MOCK_DASH,
   useSequencias, useSalvarSequencia, useExcluirSequencia,
-  useRecupLeads, useIniciarRecuperacao, usePararRecuperacao, useRecupDashboard, subirMidiaToque,
-  usePrepararLote, usePlayRecuperacao,
-  type Sequencia, type Toque, type RecupLead, type TipoToque, type RotacaoItem,
+  useRecupLeads, usePararRecuperacao, useRecupDashboard, subirMidiaToque,
+  usePrepararSelecao, usePlayRecuperacao,
+  type Sequencia, type Toque, type RecupLead, type TipoToque,
 } from '@/data/recuperacao';
 import { useOrgUsuarios } from '@/data/atendimento';
+import { Checkbox } from '../components';
 
 type Aviso = { tom: 'ok' | 'erro'; texto: string } | null;
 const OPCOES_ABA: OpcaoSegmentado<'leads' | 'seqs'>[] = [
@@ -100,9 +101,8 @@ function AbaLeads({ usarMock, meId, setAviso }: { usarMock: boolean; meId: strin
   const leadsQ = useRecupLeads();
   const seqsQ = useSequencias();
   const equipeQ = useOrgUsuarios();
-  const iniciar = useIniciarRecuperacao();
   const parar = usePararRecuperacao();
-  const prepararLote = usePrepararLote();
+  const prepararSel = usePrepararSelecao();
   const play = usePlayRecuperacao();
   const leads = usarMock ? MOCK_LEADS : (leadsQ.data ?? []);
   const seqs = usarMock ? MOCK_SEQS : (seqsQ.data ?? []);
@@ -111,31 +111,39 @@ function AbaLeads({ usarMock, meId, setAviso }: { usarMock: boolean; meId: strin
     : (equipeQ.data ?? []).map((u) => ({ id: u.id, nome: u.nome }));
   const carregando = !usarMock && leadsQ.isLoading;
 
-  const [picker, setPicker] = useState<RecupLead | null>(null);   // ad-hoc: 1 lead escolhendo sequência
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const [paraSel, setParaSel] = useState('');
   const [confParar, setConfParar] = useState<RecupLead | null>(null);
-  const [prepararAberto, setPrepararAberto] = useState(false);
   const [playAberto, setPlayAberto] = useState(false);
-  const [rotacao, setRotacao] = useState<Record<string, string>>({});   // atendente origem → responsável remarketing
 
-  const disponiveis = leads.filter((l) => !l.execucaoStatus);
   const meusPreparados = leads.filter((l) => l.execucaoStatus === 'preparada' && l.remarketingId === meId);
-  const ativos = leads.filter((l) => l.execucaoStatus === 'ativa');
+  // leads agrupados pelo atendente ORIGINAL (de quem é o lead)
   const grupos = useMemo(() => {
-    const m = new Map<string, { id: string; nome: string; qtd: number }>();
-    for (const l of disponiveis) {
-      if (!l.responsavelId) continue;   // rodízio é por atendente que tem dono
-      const g = m.get(l.responsavelId) ?? { id: l.responsavelId, nome: l.responsavelNome || 'Atendente', qtd: 0 };
-      g.qtd++; m.set(l.responsavelId, g);
+    const m = new Map<string, { id: string; nome: string; leads: RecupLead[] }>();
+    for (const l of leads) {
+      const id = l.responsavelId || '__none__';
+      const g = m.get(id) ?? { id, nome: l.responsavelNome || 'Sem responsável', leads: [] };
+      g.leads.push(l); m.set(id, g);
     }
-    return [...m.values()];
-  }, [disponiveis]);
+    return [...m.values()].sort((a, b) => a.nome.localeCompare(b.nome));
+  }, [leads]);
+  const dispDe = (leadsG: RecupLead[]) => leadsG.filter((l) => !l.execucaoStatus);
+
+  const toggle = (id: string) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const toggleGrupo = (leadsG: RecupLead[]) => setSel((s) => {
+    const n = new Set(s); const d = dispDe(leadsG);
+    const all = d.length > 0 && d.every((l) => n.has(l.oportunidadeId));
+    d.forEach((l) => (all ? n.delete(l.oportunidadeId) : n.add(l.oportunidadeId)));
+    return n;
+  });
+  const limpar = () => { setSel(new Set()); setParaSel(''); };
 
   const aoPreparar = async () => {
-    const rot: RotacaoItem[] = grupos.filter((g) => rotacao[g.id]).map((g) => ({ de: g.id, para: rotacao[g.id] }));
-    if (!rot.length) { setAviso({ tom: 'erro', texto: 'Escolha, pra ao menos um atendente, quem faz o remarketing.' }); return; }
-    setPrepararAberto(false);
-    if (usarMock) { setAviso({ tom: 'ok', texto: `${rot.length} grupo(s) preparado(s) (demonstração).` }); return; }
-    try { const n = await prepararLote.mutateAsync(rot); setAviso({ tom: 'ok', texto: `${n} lead(s) preparado(s) pro remarketing. Cada responsável dá Play nos seus.` }); }
+    if (!sel.size) { setAviso({ tom: 'erro', texto: 'Selecione ao menos um lead.' }); return; }
+    if (!paraSel) { setAviso({ tom: 'erro', texto: 'Escolha quem faz o remarketing.' }); return; }
+    const opps = [...sel]; const nomePara = equipe.find((u) => u.id === paraSel)?.nome ?? '';
+    if (usarMock) { setAviso({ tom: 'ok', texto: `${opps.length} lead(s) preparado(s) pra ${nomePara} (demonstração).` }); limpar(); return; }
+    try { const n = await prepararSel.mutateAsync({ opps, para: paraSel }); setAviso({ tom: 'ok', texto: `${n} lead(s) preparado(s) — ${nomePara} dá o Play nos dele.` }); limpar(); }
     catch (e) { setAviso({ tom: 'erro', texto: msgErro(e) }); }
   };
   const aoPlay = async (sequenciaId: string) => {
@@ -144,33 +152,13 @@ function AbaLeads({ usarMock, meId, setAviso }: { usarMock: boolean; meId: strin
     try { const r = await play.mutateAsync(sequenciaId); setAviso({ tom: 'ok', texto: `Play! ${r.iniciadas} lead(s) começaram${r.puladas ? `, ${r.puladas} pulado(s) (opt-out/sem canal)` : ''}. As mensagens saem espaçadas.` }); }
     catch (e) { setAviso({ tom: 'erro', texto: msgErro(e) }); }
   };
-  const aoIniciar = async (lead: RecupLead, sequenciaId: string) => {
-    setPicker(null);
-    if (usarMock) { setAviso({ tom: 'ok', texto: `Recuperação iniciada para ${lead.contatoNome} (demonstração).` }); return; }
-    try { await iniciar.mutateAsync({ oportunidadeId: lead.oportunidadeId, sequenciaId }); setAviso({ tom: 'ok', texto: `Recuperação iniciada para ${lead.contatoNome}.` }); }
-    catch (e) { setAviso({ tom: 'erro', texto: msgErro(e) }); }
-  };
   const aoParar = async (lead: RecupLead) => {
     setConfParar(null);
     if (!lead.execucaoId) return;
-    if (usarMock) { setAviso({ tom: 'ok', texto: 'Recuperação parada (demonstração).' }); return; }
-    try { await parar.mutateAsync(lead.execucaoId); setAviso({ tom: 'ok', texto: 'Recuperação parada — toques pendentes cancelados.' }); }
+    if (usarMock) { setAviso({ tom: 'ok', texto: 'Recuperação cancelada (demonstração).' }); return; }
+    try { await parar.mutateAsync(lead.execucaoId); setAviso({ tom: 'ok', texto: 'Cancelada — toques pendentes removidos.' }); }
     catch (e) { setAviso({ tom: 'erro', texto: msgErro(e) }); }
   };
-
-  const linhaLead = (l: RecupLead, acao: 'iniciar' | 'parar' | 'nada', badge: ReactNode) => (
-    <div className="rec-lead" key={l.oportunidadeId}>
-      <div className="rec-lead-info">
-        <span className="rec-lead-nome">{l.contatoNome ?? 'Sem nome'}</span>
-        <span className="rec-lead-meta num">{fone(l.contatoTelefone)}{l.responsavelNome ? ` · atendeu: ${l.responsavelNome}` : ''}</span>
-      </div>
-      <div className="rec-lead-estado">{badge}</div>
-      <div className="rec-lead-acoes">
-        {acao === 'parar' && <BotaoMini className="btn-perigo" onClick={() => setConfParar(l)}>Parar</BotaoMini>}
-        {acao === 'iniciar' && <BotaoSec mini onClick={() => setPicker(l)} disabled={!seqs.length}>Iniciar</BotaoSec>}
-      </div>
-    </div>
-  );
 
   if (carregando) return <CardVidro sobe className="ia-card"><SkeletonTexto linhas={5} /></CardVidro>;
   if (!leads.length) return (
@@ -182,57 +170,65 @@ function AbaLeads({ usarMock, meId, setAviso }: { usarMock: boolean; meId: strin
 
   return (
     <>
-      {/* ações do lote */}
-      <div className="rec-lote-acoes sobe">
-        <BotaoSec onClick={() => setPrepararAberto(true)} disabled={!grupos.length}>Preparar lote (rodízio) · {disponiveis.length}</BotaoSec>
-        <BotaoPrimario onClick={() => setPlayAberto(true)} disabled={!meusPreparados.length || !seqs.length}>▶ Play · {meusPreparados.length} pra você</BotaoPrimario>
-      </div>
-
-      {meusPreparados.length > 0 && (
-        <CardVidro sobe className="ia-card" atraso={0.03}>
-          <CardCab titulo="Preparados pra você" contador={meusPreparados.length} direita={<BotaoSec mini onClick={() => setPlayAberto(true)} disabled={!seqs.length}>▶ Play</BotaoSec>} />
-          <div className="rec-leads">{meusPreparados.map((l) => linhaLead(l, 'parar', <BadgeStatus tom="neutro">preparado · aguardando play</BadgeStatus>))}</div>
-        </CardVidro>
-      )}
-
-      {ativos.length > 0 && (
-        <CardVidro sobe className="ia-card" atraso={0.06}>
-          <CardCab titulo="Em recuperação" contador={ativos.length} />
-          <div className="rec-leads">{ativos.map((l) => linhaLead(l, 'parar',
-            <BadgeStatus tom="ok">em recuperação{l.remarketingNome ? ` · ${l.remarketingNome}` : ''}</BadgeStatus>))}</div>
-        </CardVidro>
-      )}
-
-      <CardVidro sobe className="ia-card" atraso={0.09}>
-        <CardCab titulo="Disponíveis" contador={disponiveis.length} />
-        {disponiveis.length === 0
-          ? <p className="ia-hint">Todos os leads da coluna já estão preparados ou em recuperação.</p>
-          : <div className="rec-leads">{disponiveis.map((l) => linhaLead(l, 'iniciar', <BadgeStatus tom="neutro">disponível</BadgeStatus>))}</div>}
-        {!seqs.length && <p className="ia-hint">Crie uma sequência em <b>Minhas sequências</b> pra preparar/iniciar.</p>}
-      </CardVidro>
-
-      {/* preparar lote (rodízio) */}
-      <DrawerV2 aberto={prepararAberto} aoFechar={() => setPrepararAberto(false)} largura={440}>
-        <div className="rec-picker">
-          <div className="card-cab"><h3>Preparar lote (rodízio)</h3></div>
-          <p className="ia-hint">Pra cada atendente, escolha <b>quem faz o remarketing</b> dos leads dele. Os leads viram "preparados" pra essa pessoa dar Play.</p>
-          {grupos.length === 0 ? <div className="ia-hint">Nenhum lead disponível pra preparar.</div> : (
-            <div className="rec-rodizio">
-              {grupos.map((g) => (
-                <div className="rec-rodizio-linha" key={g.id}>
-                  <div className="rec-rodizio-de"><b>{g.nome}</b><span className="ia-hint">{g.qtd} lead(s)</span></div>
-                  <span className="rec-rodizio-seta">→</span>
-                  <select className="inp" value={rotacao[g.id] ?? ''} onChange={(e) => setRotacao((r) => ({ ...r, [g.id]: e.target.value }))} aria-label={`Quem faz o remarketing dos leads de ${g.nome}`}>
-                    <option value="">— quem faz o remarketing —</option>
-                    {equipe.filter((u) => u.id !== g.id).map((u) => <option key={u.id} value={u.id}>{u.nome}</option>)}
-                  </select>
-                </div>
-              ))}
-              <div className="ferr-rodape"><BotaoPrimario onClick={aoPreparar} disabled={prepararLote.isPending}>Preparar {disponiveis.length} lead(s)</BotaoPrimario></div>
-            </div>
-          )}
+      {(meusPreparados.length > 0 || !seqs.length) && (
+        <div className="rec-lote-acoes sobe">
+          <BotaoPrimario onClick={() => setPlayAberto(true)} disabled={!meusPreparados.length || !seqs.length}>▶ Play · {meusPreparados.length} pra você</BotaoPrimario>
+          {!seqs.length && <span className="ia-hint">Crie um script em <b>Minhas sequências</b> pra dar Play.</span>}
         </div>
-      </DrawerV2>
+      )}
+
+      {/* barra de seleção → atribuir quem faz o remarketing */}
+      {sel.size > 0 && (
+        <div className="rec-selbar sobe">
+          <span className="rec-selbar-n"><b>{sel.size}</b> selecionado(s)</span>
+          <span className="rec-selbar-seta">→ remarketing com</span>
+          <select className="inp" value={paraSel} onChange={(e) => setParaSel(e.target.value)} aria-label="Quem faz o remarketing dos selecionados">
+            <option value="">— escolher pessoa —</option>
+            {equipe.map((u) => <option key={u.id} value={u.id}>{u.nome}</option>)}
+          </select>
+          <BotaoPrimario mini onClick={aoPreparar} disabled={prepararSel.isPending || !paraSel}>Preparar</BotaoPrimario>
+          <BotaoSec mini onClick={limpar}>Limpar</BotaoSec>
+        </div>
+      )}
+
+      {/* leads agrupados por atendente */}
+      {grupos.map((g, gi) => {
+        const disp = dispDe(g.leads);
+        const allSel = disp.length > 0 && disp.every((l) => sel.has(l.oportunidadeId));
+        return (
+          <CardVidro sobe className="ia-card" atraso={0.03 + gi * 0.03} key={g.id}>
+            <div className="rec-grupo-cab">
+              {disp.length > 0 && <Checkbox marcado={allSel} aoAlternar={() => toggleGrupo(g.leads)} rotulo={`Selecionar disponíveis de ${g.nome}`} />}
+              <h3>Leads de {g.nome}</h3>
+              <span className="ia-hint">{g.leads.length} lead(s){disp.length ? ` · ${disp.length} disponível(is)` : ''}</span>
+            </div>
+            <div className="rec-leads">
+              {g.leads.map((l) => {
+                const st = l.execucaoStatus;
+                return (
+                  <div className="rec-lead" key={l.oportunidadeId}>
+                    <div className="rec-lead-sel">
+                      {!st && <Checkbox marcado={sel.has(l.oportunidadeId)} aoAlternar={() => toggle(l.oportunidadeId)} rotulo={`Selecionar ${l.contatoNome}`} />}
+                    </div>
+                    <div className="rec-lead-info">
+                      <span className="rec-lead-nome">{l.contatoNome ?? 'Sem nome'}</span>
+                      <span className="rec-lead-meta num">{fone(l.contatoTelefone)}</span>
+                    </div>
+                    <div className="rec-lead-estado">
+                      {st === 'ativa' ? <BadgeStatus tom="ok">em recuperação{l.remarketingNome ? ` · ${l.remarketingNome}` : ''}</BadgeStatus>
+                        : st === 'preparada' ? <BadgeStatus tom="neutro">preparado → {l.remarketingNome ?? '—'}</BadgeStatus>
+                          : <BadgeStatus tom="neutro">disponível</BadgeStatus>}
+                    </div>
+                    <div className="rec-lead-acoes">
+                      {(st === 'ativa' || st === 'preparada') && <BotaoMini className="btn-perigo" onClick={() => setConfParar(l)}>{st === 'ativa' ? 'Parar' : 'Cancelar'}</BotaoMini>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardVidro>
+        );
+      })}
 
       {/* play: escolher script pros meus preparados */}
       <DrawerV2 aberto={playAberto} aoFechar={() => setPlayAberto(false)} largura={380}>
@@ -251,28 +247,13 @@ function AbaLeads({ usarMock, meId, setAviso }: { usarMock: boolean; meId: strin
         </div>
       </DrawerV2>
 
-      {/* ad-hoc: iniciar 1 lead */}
-      <DrawerV2 aberto={!!picker} aoFechar={() => setPicker(null)} largura={380}>
-        <div className="rec-picker">
-          <div className="card-cab"><h3>Escolha o script</h3></div>
-          <p className="ia-hint">Pra recuperar <b>{picker?.contatoNome}</b> agora. Os toques saem pelo número da conversa, aos poucos.</p>
-          {seqs.length === 0 ? <div className="ia-hint">Você ainda não tem scripts.</div> : (
-            <div className="rec-picker-lista">
-              {seqs.map((s) => (
-                <button key={s.id} type="button" className="rec-picker-item" onClick={() => picker && aoIniciar(picker, s.id)}>
-                  <b>{s.nome}</b><span>{s.toques.length} toque(s)</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </DrawerV2>
-
       <ConfirmDialogV2
         aberto={!!confParar}
-        titulo="Parar a recuperação?"
-        mensagem="Os toques que ainda não saíram são cancelados. O que já foi enviado permanece."
-        rotuloConfirmar="Parar"
+        titulo={confParar?.execucaoStatus === 'ativa' ? 'Parar a recuperação?' : 'Tirar da fila?'}
+        mensagem={confParar?.execucaoStatus === 'ativa'
+          ? 'Os toques que ainda não saíram são cancelados. O que já foi enviado permanece.'
+          : 'O lead sai da fila de remarketing e volta a ficar disponível.'}
+        rotuloConfirmar={confParar?.execucaoStatus === 'ativa' ? 'Parar' : 'Tirar'}
         destrutivo
         aoConfirmar={() => confParar && aoParar(confParar)}
         aoCancelar={() => setConfParar(null)}

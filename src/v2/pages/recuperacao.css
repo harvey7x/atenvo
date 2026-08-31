@@ -27,13 +27,27 @@
 .v2 .rec-rodizio-seta { color: var(--txt-3); flex: 0 0 auto; }
 .v2 .rec-rodizio-linha select { flex: 1 1 auto; }
 
+/* cabeçalho do grupo (por atendente) */
+.v2 .rec-grupo-cab { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.v2 .rec-grupo-cab h3 { margin: 0; font-size: 15px; }
+
+/* barra de seleção (atribuir remarketing) */
+.v2 .rec-selbar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 12px;
+  padding: 10px 14px; border-radius: 12px; border: 1px solid rgba(var(--tint), .35); background: rgba(var(--tint), .08);
+}
+.v2 .rec-selbar-n { font-size: 13px; }
+.v2 .rec-selbar-seta { font-size: 12px; color: var(--txt-2); }
+.v2 .rec-selbar select { flex: 0 1 200px; }
+
 /* lista de leads */
 .v2 .rec-leads { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
 .v2 .rec-lead {
-  display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 12px;
+  display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 12px;
   border: 1px solid var(--linha); border-radius: 12px; padding: 12px 14px; background: rgba(var(--tint), .02);
 }
-@media (max-width: 620px) { .v2 .rec-lead { grid-template-columns: 1fr auto; } .v2 .rec-lead-estado { grid-column: 1 / -1; } }
+.v2 .rec-lead-sel { display: flex; min-width: 20px; }
+@media (max-width: 620px) { .v2 .rec-lead { grid-template-columns: auto 1fr auto; } .v2 .rec-lead-estado { grid-column: 2 / -1; } }
 .v2 .rec-lead-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .v2 .rec-lead-nome { font-size: 13.5px; font-weight: 600; }
 .v2 .rec-lead-meta { font-size: 11.5px; color: var(--txt-3); }
