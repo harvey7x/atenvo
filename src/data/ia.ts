@@ -338,6 +338,76 @@ export function useTestarConexao() {
   });
 }
 
+/* ===================== exportar / importar atendente (.json) ===================== */
+export function exportarAgente(a: AgenteIa) {
+  // NUNCA exporta a chave (fica no cofre). O importador coloca a própria.
+  return { tipo: 'atendente-atenvo', versao: 1, nome: a.nome, provedor: a.provedor, modelo: a.modelo,
+    personaPrompt: a.personaPrompt, conhecimento: a.conhecimento, comportamentos: a.comportamentos };
+}
+const PROVEDORES_OK = new Set(['gemini', 'openai', 'anthropic']);
+const hhmm = (v: unknown): string | undefined => {
+  const s = String(v);
+  const m = /^(\d{2}):(\d{2})$/.exec(s);
+  if (!m) return undefined;
+  const h = Number(m[1]), min = Number(m[2]);
+  return h <= 23 && min <= 59 ? s : undefined;   // rejeita "99:99"/"40:70" do arquivo importado
+};
+const strOnly = (v: unknown, max: number): string => (typeof v === 'string' ? v : '').slice(0, max);
+/** reconstrói comportamentos só com chaves conhecidas e limites (arquivo importado = não confiável) */
+function sanearComportamentos(v: unknown): ComportamentosIa {
+  const c = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>;
+  const out: ComportamentosIa = {};
+  if (c.horario && typeof c.horario === 'object') {
+    const h = c.horario as Record<string, unknown>;
+    out.horario = { ativo: h.ativo === true, inicio: hhmm(h.inicio), fim: hhmm(h.fim) };
+  }
+  if (c.janela && typeof c.janela === 'object') {
+    const j = c.janela as Record<string, unknown>;
+    out.janela = { inicio: hhmm(j.inicio), fim: hhmm(j.fim) };
+  }
+  if (typeof c.nudges_ativos === 'boolean') out.nudges_ativos = c.nudges_ativos;
+  if (typeof c.max_chamadas_dia === 'number' && isFinite(c.max_chamadas_dia)) out.max_chamadas_dia = Math.max(0, Math.min(100000, Math.floor(c.max_chamadas_dia)));
+  if (Array.isArray(c.proibidos)) out.proibidos = c.proibidos.slice(0, 50).map((s) => strOnly(s, 80).trim()).filter(Boolean);
+  if (typeof c.permitir_emojis === 'boolean') out.permitir_emojis = c.permitir_emojis;
+  if (typeof c.simular_digitacao === 'boolean') out.simular_digitacao = c.simular_digitacao;
+  if (typeof c.modelo_docs === 'string' && c.modelo_docs) out.modelo_docs = c.modelo_docs.slice(0, 80);
+  if (typeof c.modelo_pro === 'string' && c.modelo_pro) out.modelo_pro = c.modelo_pro.slice(0, 80);
+  return out;
+}
+export function parseAgenteImportado(texto: string): {
+  nome: string; provedor: ProvedorIa; modelo: string; personaPrompt: string; conhecimento: string; comportamentos: ComportamentosIa;
+} {
+  let obj: Record<string, unknown>;
+  try { obj = JSON.parse(texto) as Record<string, unknown>; }
+  catch { throw new Error('Arquivo inválido: não parece um JSON de atendente.'); }
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) throw new Error('Arquivo inválido.');
+  if (obj.tipo && obj.tipo !== 'atendente-atenvo') throw new Error('Este arquivo é de outro tipo (talvez um Fluxo). Use "Importar" na área certa.');
+  if (obj.personaPrompt === undefined && obj.comportamentos === undefined) throw new Error('Este arquivo não parece um atendente (sem prompt/comportamentos).');
+  const provedor = (PROVEDORES_OK.has(obj.provedor as string) ? obj.provedor : 'gemini') as ProvedorIa;
+  return {
+    nome: strOnly(obj.nome, 120) || 'Atendente importado',
+    provedor,
+    modelo: strOnly(obj.modelo, 80),
+    personaPrompt: strOnly(obj.personaPrompt, 20000),
+    conhecimento: strOnly(obj.conhecimento, 8000),
+    comportamentos: sanearComportamentos(obj.comportamentos),
+  };
+}
+export function useImportarAgente() {
+  const qc = useQueryClient(); const { currentOrg } = useOrg();
+  return useMutation({
+    mutationFn: async (p: { nome: string; provedor: ProvedorIa; modelo: string; personaPrompt: string; conhecimento: string; comportamentos: ComportamentosIa }): Promise<string> => {
+      const { data, error } = await supabase!.from('ia_agentes')
+        .insert({ organizacao_id: currentOrg!.id, nome: p.nome, provedor: p.provedor, modelo: p.modelo,
+          persona_prompt: p.personaPrompt, conhecimento: p.conhecimento, comportamentos: p.comportamentos, ativo: false })
+        .select('id').single();
+      if (error) throw new Error(error.message);
+      return (data as Row).id as string;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['ia-agentes', currentOrg?.id] }),
+  });
+}
+
 /* ===================== Mock (modo demo / sem Supabase) ===================== */
 export const MOCK_AGENTES: AgenteIa[] = [
   {

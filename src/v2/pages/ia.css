@@ -12,6 +12,10 @@
 .ia-hint { font-size: 12px; line-height: 1.5; opacity: 0.68; }
 .ia-hint b { opacity: 1; }
 
+/* barra de ações do topo (exportar/importar/experimentar) — compartilhada com Fluxos */
+.fx-topo-acoes { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.fx-import-inp { display: none; }
+
 .ia-chave-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .ia-chave-row .inp { flex: 1 1 260px; }
 

@@ -44,8 +44,37 @@ export const ROTULO_PASSO: Record<Passo['tipo'], string> = {
   mensagem: 'Mensagem', midia: 'Mídia (imagem/vídeo)', pergunta: 'Pergunta com opções', coletar: 'Coletar dado', acao: 'Ação', fim: 'Fim do fluxo',
 };
 
+/** o que cada tipo de passo faz — mostrado no editor pra quem monta o fluxo do zero entender */
+export const DESCRICAO_PASSO: Record<Passo['tipo'], string> = {
+  mensagem: 'O bot manda um ou mais balões de texto e segue em frente — não espera resposta. Bom pra saudar e explicar.',
+  midia: 'Envia uma imagem ou um vídeo (ex.: o vídeo de boas-vindas da campanha) e segue em frente. Aceita uma legenda.',
+  pergunta: 'Faz uma pergunta e ESPERA a resposta do cliente. Cada opção pode seguir por um caminho diferente do fluxo.',
+  coletar: 'Pede um dado (nome, CPF, telefone, e-mail) e ESPERA. O bot valida e salva na ficha do cliente automaticamente.',
+  acao: 'Nos bastidores, sem falar nada: aplica uma etiqueta, chama um atendente humano ou entrega a conversa pro Atendente de IA.',
+  fim: 'Encerra o fluxo. O bot fica em silêncio nessa conversa e o atendimento segue com o seu time.',
+};
+
+/** sugestão de quando usar cada tipo — aparece no botão "adicionar passo" (title/tooltip) */
+export const DICA_PASSO: Record<Passo['tipo'], string> = {
+  mensagem: 'ex.: "Olá! Seja bem-vindo(a)."',
+  midia: 'ex.: foto do escritório ou vídeo de apresentação',
+  pergunta: 'ex.: "Qual assunto? 1) Empréstimo 2) Outro"',
+  coletar: 'ex.: pedir o nome ou o CPF',
+  acao: 'ex.: etiquetar e chamar um humano',
+  fim: 'encerra a conversa automática',
+};
+
 export const ROTULO_DADO: Record<DadoColeta, string> = {
   nome: 'Nome', cpf: 'CPF (com validação)', telefone: 'Telefone', email: 'E-mail', texto: 'Texto livre',
+};
+
+/** o que cada dado faz ao ser coletado — recomendação pro seletor de "Qual dado?" */
+export const DICA_DADO: Record<DadoColeta, string> = {
+  nome: 'Valida que tem ao menos 2 letras. Salva na ficha e habilita a variável {primeiro_nome}.',
+  cpf: 'Confere os 11 dígitos e o dígito verificador. Guarda o CPF na ficha (mascarado na conversa).',
+  telefone: 'Aceita 10 a 13 dígitos. Salva na ficha do cliente.',
+  email: 'Confere o formato (algo@algo.com). Salva na ficha do cliente.',
+  texto: 'Aceita qualquer texto. Fica guardado só na conversa (não vai pra ficha).',
 };
 
 /* ---------------- validações (MESMAS regras do motor) ---------------- */
@@ -140,6 +169,7 @@ export type SaidaSimItem = { tipo: 'texto'; texto: string } | { tipo: 'midia'; m
 export interface SaidaSim { saidas: SaidaSimItem[]; baloes: string[]; eventos: string[]; estado: EstadoSim; aguardando: boolean }
 
 const MAX_TENTATIVAS = 2; // mesma régua do motor
+const MAX_SAIDAS_SIM = 6; // mesmo teto de itens/turno do motor (fluxo_custom.ts)
 
 function baloesDe(p: { baloes?: string[] } | undefined): string[] {
   return (p?.baloes ?? []).map((b) => String(b).trim()).filter(Boolean);
@@ -152,8 +182,10 @@ function menuPergunta(p: Extract<Passo, { tipo: 'pergunta' }>): string[] {
 }
 const textosSim = (saidas: SaidaSimItem[]): string[] =>
   saidas.filter((x): x is { tipo: 'texto'; texto: string } => x.tipo === 'texto').map((x) => x.texto);
-const mkSim = (saidas: SaidaSimItem[], eventos: string[], estado: EstadoSim, aguardando: boolean): SaidaSim =>
-  ({ saidas, baloes: textosSim(saidas), eventos, estado, aguardando });
+const mkSim = (saidas: SaidaSimItem[], eventos: string[], estado: EstadoSim, aguardando: boolean): SaidaSim => {
+  const cortadas = saidas.slice(0, MAX_SAIDAS_SIM); // motor corta em MAX_SAIDAS_TURNO
+  return { saidas: cortadas, baloes: textosSim(cortadas), eventos, estado, aguardando };
+};
 
 /** roda até o próximo ponto de espera (ou fim), a partir do passo atual */
 export function avancarSim(passos: Passo[], estado: EstadoSim): SaidaSim {
@@ -193,7 +225,8 @@ export function responderSim(passos: Passo[], estado: EstadoSim, resposta: strin
     if (op === null) {
       e.tentativas++;
       if (e.tentativas > MAX_TENTATIVAS) return mkSim([], ['🙋 não entendi 3x → atendente humano avisado'], { ...e, encerrado: true }, false);
-      return mkSim([{ tipo: 'texto', texto: p.reprompt || 'Não entendi — responda com uma das opções 🙂' }], [], e, true);
+      const rpDefault = p.semMenu ? 'Não entendi — pode responder de novo? 🙂' : 'Não entendi — responda com o número de uma das opções 🙂';
+      return mkSim([{ tipo: 'texto', texto: (p.reprompt || '').trim() || rpDefault }], [], e, true);
     }
     const eventos = [`💾 ${p.salvarEm || 'resposta'} = "${op.valor}"`];
     if (p.salvarEm) e.dados[p.salvarEm] = op.valor;
@@ -208,7 +241,7 @@ export function responderSim(passos: Passo[], estado: EstadoSim, resposta: strin
   if (!v.ok) {
     e.tentativas++;
     if (e.tentativas > MAX_TENTATIVAS) return mkSim([], ['🙋 dado inválido 3x → atendente humano avisado'], { ...e, encerrado: true }, false);
-    return mkSim([{ tipo: 'texto', texto: p.reprompt || 'Não consegui validar — pode conferir e mandar de novo?' }], [], e, true);
+    return mkSim([{ tipo: 'texto', texto: (p.reprompt || '').trim() || 'Não consegui validar — pode conferir e mandar de novo?' }], [], e, true);
   }
   const chave = p.salvarEm || p.dado;
   e.dados[chave] = v.valor;
@@ -239,6 +272,7 @@ export function problemasDoFluxo(passos: Passo[]): string[] {
         }
       }
     }
+    if (p.tipo === 'midia' && !(p.url || '').trim()) avisos.push(`${n} (Mídia): sem link do arquivo — o cliente não recebe nada.`);
     if (p.tipo === 'coletar' && !baloesDe(p).length) avisos.push(`${n} (Coletar): sem texto pedindo o dado.`);
     if (p.tipo === 'acao' && !p.etiqueta && !p.chamarHumano && !p.entregarIa) avisos.push(`${n} (Ação): nenhuma ação marcada.`);
     if (p.tipo === 'fim' && i < passos.length - 1 && !temRamificacao) avisos.push(`${n} (Fim): há passos depois do fim que nunca vão rodar.`);
@@ -327,6 +361,100 @@ export function useVincularFluxoCanal() {
       if (error) throw new Error(error.message);
     },
     onSettled: () => qc.invalidateQueries({ queryKey: ['ia-canais', currentOrg?.id] }),
+  });
+}
+
+/* ---------------- exportar / importar (arquivo .json) ---------------- */
+export function exportarFluxo(f: FluxoBot) {
+  return { tipo: 'fluxo-atenvo', versao: 1, nome: f.nome, descricao: f.descricao, passos: f.passos };
+}
+const TIPOS_PASSO_OK = new Set(['mensagem', 'midia', 'pergunta', 'coletar', 'acao', 'fim']);
+// só aceita STRING (arquivo importado é não confiável): número/objeto/array viram '' e somem,
+// em vez de virar lixo tipo "[object Object]" no balão/legenda.
+const strCap = (v: unknown, max: number): string => (typeof v === 'string' ? v : '').slice(0, max);
+const baloesCap = (v: unknown): string[] =>
+  (Array.isArray(v) ? v : []).slice(0, 12).map((b) => strCap(b, 2000).trim()).filter(Boolean);
+
+/** reconstrói UM passo na forma canônica, só com campos conhecidos e limitados
+    (arquivo importado é fonte NÃO confiável — não guardamos chaves/valores extras) */
+function sanearPassoImportado(raw: Record<string, unknown>): Passo | null {
+  const tipo = raw.tipo as string;
+  const id = typeof raw.id === 'string' ? raw.id.slice(0, 64) : undefined;
+  const base = id ? { id } : {};
+  switch (tipo) {
+    case 'mensagem':
+      return { ...base, tipo: 'mensagem', baloes: baloesCap(raw.baloes) } as Passo;
+    case 'midia':
+      return {
+        ...base, tipo: 'midia',
+        midiaTipo: raw.midiaTipo === 'video' ? 'video' : 'imagem',
+        url: strCap(raw.url, 2000).trim(),
+        legenda: strCap(raw.legenda, 2000),
+      } as Passo;
+    case 'pergunta': {
+      const opcoes = (Array.isArray(raw.opcoes) ? raw.opcoes : []).slice(0, 12)
+        .map((o) => {
+          const r = (o ?? {}) as Record<string, unknown>;
+          const irPara = strCap(r.irPara, 64).trim();
+          return { rotulo: strCap(r.rotulo, 120), valor: strCap(r.valor, 60), ...(irPara ? { irPara } : {}) };
+        })
+        .filter((o) => o.rotulo.trim());
+      return {
+        ...base, tipo: 'pergunta', baloes: baloesCap(raw.baloes), opcoes,
+        salvarEm: strCap(raw.salvarEm, 40), reprompt: strCap(raw.reprompt, 500),
+        ...(raw.semMenu === true ? { semMenu: true } : {}),
+      } as Passo;
+    }
+    case 'coletar':
+      return {
+        ...base, tipo: 'coletar', baloes: baloesCap(raw.baloes),
+        dado: (['nome', 'cpf', 'telefone', 'email', 'texto'].includes(raw.dado as string) ? raw.dado : 'texto') as DadoColeta,
+        salvarEm: strCap(raw.salvarEm, 40), reprompt: strCap(raw.reprompt, 500),
+      } as Passo;
+    case 'acao':
+      return {
+        ...base, tipo: 'acao', etiqueta: strCap(raw.etiqueta, 60),
+        chamarHumano: raw.chamarHumano === true, entregarIa: raw.entregarIa === true,
+      } as Passo;
+    case 'fim':
+      return { ...base, tipo: 'fim', baloes: baloesCap(raw.baloes) } as Passo;
+    default:
+      return null;
+  }
+}
+
+/** valida + normaliza um arquivo de fluxo importado (lança Error com mensagem amigável) */
+export function parseFluxoImportado(texto: string): { nome: string; descricao: string; passos: Passo[] } {
+  let obj: Record<string, unknown>;
+  try { obj = JSON.parse(texto) as Record<string, unknown>; }
+  catch { throw new Error('Arquivo inválido: não parece um JSON de fluxo.'); }
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) throw new Error('Arquivo inválido.');
+  if (obj.tipo && obj.tipo !== 'fluxo-atenvo') throw new Error('Este arquivo é de outro tipo (talvez um Atendente). Use "Importar" na área certa.');
+  const passos = obj.passos;
+  if (!Array.isArray(passos)) throw new Error('Este arquivo não é um fluxo (não tem "passos").');
+  if (passos.length > 100) throw new Error('Fluxo grande demais (máximo 100 passos).');
+  const limpos = passos
+    .filter((p): p is Record<string, unknown> => !!p && typeof p === 'object' && TIPOS_PASSO_OK.has((p as Record<string, unknown>).tipo as string))
+    .map(sanearPassoImportado)
+    .filter((p): p is Passo => p !== null);
+  if (!limpos.length) throw new Error('O arquivo não tem passos válidos.');
+  return {
+    nome: strCap(obj.nome, 120) || 'Fluxo importado',
+    descricao: strCap(obj.descricao, 500),
+    passos: garantirIds(limpos),
+  };
+}
+export function useImportarFluxo() {
+  const qc = useQueryClient(); const { currentOrg } = useOrg();
+  return useMutation({
+    mutationFn: async (p: { nome: string; descricao: string; passos: Passo[] }): Promise<string> => {
+      const { data, error } = await supabase!.from('ia_fluxos')
+        .insert({ organizacao_id: currentOrg!.id, nome: p.nome, descricao: p.descricao, passos: p.passos, ativo: false })
+        .select('id').single();
+      if (error) throw new Error(error.message);
+      return (data as Row).id as string;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['ia-fluxos', currentOrg?.id] }),
   });
 }
 

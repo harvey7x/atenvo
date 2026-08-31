@@ -16,7 +16,7 @@
 
    Em modo demo (ou sem Supabase) tudo roda em estado local, clicável.
    ============================================================================ */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import './ia.css';
 import {
   BadgeStatus, BotaoMini, BotaoPrimario, BotaoSec, Campo, CardVidro, CardCab,
@@ -28,9 +28,10 @@ import {
   IA_REAL, MOCK_AGENTES, MOCK_CANAIS, MODELOS_INFO,
   useAgentesIa, useAtivarCanal, useCanaisIa, useConversarPlayground, useCriarAgente,
   useExcluirAgente, useMetricasIa, useModoTeste, useSalvarAgente, useSalvarChave,
-  useTestarConexao, useVincularCanais,
+  useTestarConexao, useVincularCanais, useImportarAgente, parseAgenteImportado,
   type AgenteIa, type BolhaPlayground, type CanalIa, type ProvedorIa,
 } from '@/data/ia';
+import { baixarJson, lerArquivoTexto, slugArquivo } from '@/v2/lib/arquivo';
 
 type Aviso = { tom: 'ok' | 'erro'; texto: string } | null;
 type MsgChat = { de: 'cliente' | 'ia'; texto: string; bloqueada?: boolean };
@@ -126,6 +127,8 @@ export default function Ia() {
   const criar = useCriarAgente();
   const salvar = useSalvarAgente();
   const excluir = useExcluirAgente();
+  const importarAgente = useImportarAgente();
+  const fileRef = useRef<HTMLInputElement | null>(null);
   const salvarChaveMut = useSalvarChave();
   const vincular = useVincularCanais();
   const ativarCanal = useAtivarCanal();
@@ -408,6 +411,48 @@ export default function Ia() {
     } catch (e) { setAviso({ tom: 'erro', texto: (e as Error).message }); setConfirmaExcluir(false); }
   };
 
+  /* -------- exportar / importar atendente (.json, SEM a chave) -------- */
+  const aoExportar = () => {
+    if (!agente) return;
+    // inclui um "tema proibido" digitado mas ainda não confirmado no "Adicionar" (nada some em silêncio,
+    // igual ao aoSalvar) — senão o termo no campo ficaria de fora do arquivo.
+    const pend = proibidoInput.trim();
+    const proibidosExport = (pend && !validarProibido(pend) && !proibidos.some((p) => p.toLowerCase() === pend.toLowerCase()))
+      ? [...proibidos, pend] : proibidos;
+    const dados = {
+      tipo: 'atendente-atenvo', versao: 1, nome, provedor, modelo,
+      personaPrompt: prompt, conhecimento, comportamentos: { ...comportamentosForm, proibidos: proibidosExport },
+    };
+    baixarJson(`atendente-${slugArquivo(nome || agente.nome)}`, dados);
+    setAviso({ tom: 'ok', texto: 'Arquivo do atendente baixado — SEM a chave (o cliente coloca a dele). Mande pra ele importar.' });
+  };
+
+  const aoEscolherArquivo = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    // edição não salva no atendente aberto: o import cria o rascunho mas NÃO troca a tela (senão as
+    // edições somem sem aviso); sem pendência, abre o importado.
+    const sujoAgora = formSujo;
+    try {
+      const dados = parseAgenteImportado(await lerArquivoTexto(file));
+      let novoId: string;
+      if (usarMock) {
+        const novo: AgenteIa = { id: `demo-${Date.now()}`, ...dados, ativo: false, chaveDefinidaEm: null, criadoEm: new Date().toISOString() };
+        setMockAgentes((xs) => [...xs, novo]);
+        novoId = novo.id;
+      } else {
+        novoId = await importarAgente.mutateAsync(dados);
+      }
+      if (!sujoAgora) setSelId(novoId);
+      setAviso({ tom: 'ok', texto: sujoAgora
+        ? `Atendente "${dados.nome}" importado como rascunho — está na lista (não troquei a tela pra não descartar suas edições não salvas).`
+        : `Atendente "${dados.nome}" importado como rascunho — guarde a sua chave no cofre e ative quando quiser.` });
+    } catch (err) {
+      setAviso({ tom: 'erro', texto: (err as Error).message });
+    }
+  };
+
   /* -------- playground -------- */
   const podeExperimentar = !!agente && agente.provedor === 'gemini' && !!agente.chaveDefinidaEm;
   const aoEnviarChat = async () => {
@@ -446,12 +491,20 @@ export default function Ia() {
           <h1>Atendente de IA</h1>
           <p>Crie o cérebro do seu atendimento: chave própria, personalidade, conhecimento e comportamentos.</p>
         </div>
-        {agente && (
-          <BotaoSec onClick={() => { chatSessaoRef.current++; setChatMsgs([]); setChatAberto(true); }} disabled={!podeExperimentar && !usarMock}
-            title={podeExperimentar || usarMock ? 'Conversar com o atendente' : 'Guarde a chave no cofre primeiro'}>
-            💬 Experimentar
+        <div className="fx-topo-acoes">
+          <input ref={fileRef} type="file" accept=".json,application/json" className="fx-import-inp"
+            onChange={aoEscolherArquivo} aria-hidden="true" tabIndex={-1} />
+          <BotaoSec onClick={() => fileRef.current?.click()} disabled={importarAgente.isPending}>
+            {importarAgente.isPending ? 'Importando…' : '↧ Importar atendente'}
           </BotaoSec>
-        )}
+          {agente && <BotaoSec onClick={aoExportar}>↥ Exportar</BotaoSec>}
+          {agente && (
+            <BotaoSec onClick={() => { chatSessaoRef.current++; setChatMsgs([]); setChatAberto(true); }} disabled={!podeExperimentar && !usarMock}
+              title={podeExperimentar || usarMock ? 'Conversar com o atendente' : 'Guarde a chave no cofre primeiro'}>
+              💬 Experimentar
+            </BotaoSec>
+          )}
+        </div>
       </div>
 
       {aviso && (

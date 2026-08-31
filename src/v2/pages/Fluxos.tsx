@@ -9,7 +9,7 @@
    Regras da casa: excluir fluxo DESLIGA o bot nos canais que o usavam;
    trocar de fluxo com edições não salvas pede confirmação.
    ============================================================================ */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import './ia.css';
 import './fluxos.css';
 import {
@@ -20,12 +20,13 @@ import {
 import { DEMO_MODE } from '@/lib/demo';
 import { useCanaisIa, MOCK_CANAIS, type CanalIa } from '@/data/ia';
 import {
-  FLUXOS_REAL, MOCK_FLUXOS, ROTULO_DADO, ROTULO_PASSO,
+  FLUXOS_REAL, MOCK_FLUXOS, ROTULO_DADO, ROTULO_PASSO, DESCRICAO_PASSO, DICA_PASSO, DICA_DADO,
   avancarSim, interpolar, problemasDoFluxo, responderSim,
-  garantirIds,
-  useCriarFluxo, useExcluirFluxo, useFluxos, useSalvarFluxo, useVincularFluxoCanal,
+  garantirIds, exportarFluxo, parseFluxoImportado,
+  useCriarFluxo, useExcluirFluxo, useFluxos, useSalvarFluxo, useVincularFluxoCanal, useImportarFluxo,
   type DadoColeta, type EstadoSim, type FluxoBot, type Passo,
 } from '@/data/iaFluxos';
+import { baixarJson, lerArquivoTexto, slugArquivo } from '@/v2/lib/arquivo';
 
 type Aviso = { tom: 'ok' | 'erro'; texto: string } | null;
 type MsgSim = { de: 'cliente' | 'bot' | 'evento'; texto: string } | { de: 'midia'; midiaTipo: 'imagem' | 'video'; url: string; legenda: string };
@@ -70,6 +71,8 @@ export default function Fluxos() {
   const salvar = useSalvarFluxo();
   const excluir = useExcluirFluxo();
   const vincular = useVincularFluxoCanal();
+  const importar = useImportarFluxo();
+  const fileRef = useRef<HTMLInputElement | null>(null);
 
   /* -------- formulário -------- */
   const [nome, setNome] = useState('');
@@ -173,6 +176,41 @@ export default function Fluxos() {
     catch (e) { setAviso({ tom: 'erro', texto: (e as Error).message }); setConfirmaExcluir(false); }
   };
 
+  /* -------- exportar / importar (arquivo .json) -------- */
+  const aoExportar = () => {
+    if (!fluxo) return;
+    // exporta o que está NA TELA (edições em aberto), pra bater com o que você vê
+    baixarJson(`fluxo-${slugArquivo(nome || fluxo.nome)}`, { ...exportarFluxo(fluxo), nome: nome || fluxo.nome, descricao, passos });
+    setAviso({ tom: 'ok', texto: 'Arquivo do fluxo baixado — mande pro cliente importar no sistema dele.' });
+  };
+
+  const aoEscolherArquivo = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // permite reimportar o mesmo arquivo
+    if (!file) return;
+    // se há edição não salva no fluxo aberto, o import NÃO rouba a tela (senão as edições somem em
+    // silêncio) — cria o rascunho e avisa que está na lista; sem edição pendente, abre o importado.
+    const sujoAgora = formSujo;
+    try {
+      const texto = await lerArquivoTexto(file);
+      const dados = parseFluxoImportado(texto);
+      let novoId: string;
+      if (usarMock) {
+        const novo: FluxoBot = { id: `demo-${Date.now()}`, ...dados, ativo: false, criadoEm: new Date().toISOString() };
+        setMockFluxos((xs) => [...xs, novo]);
+        novoId = novo.id;
+      } else {
+        novoId = await importar.mutateAsync(dados);
+      }
+      if (!sujoAgora) setSelId(novoId);
+      setAviso({ tom: 'ok', texto: sujoAgora
+        ? `Fluxo "${dados.nome}" importado como rascunho — está na lista (não troquei a tela pra não descartar suas edições não salvas).`
+        : `Fluxo "${dados.nome}" importado como rascunho — revise e ative quando quiser.` });
+    } catch (err) {
+      setAviso({ tom: 'erro', texto: (err as Error).message });
+    }
+  };
+
   /* -------- simulador (roda o que está NA TELA) -------- */
   const [simAberto, setSimAberto] = useState(false);
   const [simMsgs, setSimMsgs] = useState<MsgSim[]>([]);
@@ -211,7 +249,7 @@ export default function Fluxos() {
 
   /* -------- render dos passos -------- */
   const renderPasso = (p: Passo, i: number) => (
-    <div key={i} className="fx-passo">
+    <div key={p.id ?? i} className="fx-passo">
       <div className="fx-passo-cab">
         <span className="fx-passo-num num">{i + 1}</span>
         <b>{ROTULO_PASSO[p.tipo]}</b>
@@ -221,17 +259,21 @@ export default function Fluxos() {
           <BotaoMini className="btn-perigo" onClick={() => removerPasso(i)} aria-label="Remover passo">✕</BotaoMini>
         </span>
       </div>
+      <p className="fx-passo-desc">{DESCRICAO_PASSO[p.tipo]}</p>
 
       {(p.tipo === 'mensagem' || p.tipo === 'pergunta' || p.tipo === 'coletar' || p.tipo === 'fim') && (
-        <Campo rotulo={p.tipo === 'fim' ? 'Mensagem de despedida (opcional) — cada linha vira um balão' : 'Balões — cada linha vira um balão'}>
-          {(id) => (
-            <textarea id={id} className="inp fx-baloes" rows={2}
-              value={paraTexto(p.baloes)}
-              onChange={(e) => mudarPasso(i, { ...p, baloes: paraBaloes(e.target.value) } as Passo)}
-              placeholder={'Olá! 👋\nComo posso ajudar?'}
-            />
-          )}
-        </Campo>
+        <div className="campo">
+          <Campo rotulo={p.tipo === 'fim' ? 'Mensagem de despedida (opcional) — cada linha vira um balão' : 'Balões — cada linha vira um balão'}>
+            {(id) => (
+              <textarea id={id} className="inp fx-baloes" rows={2}
+                value={paraTexto(p.baloes)}
+                onChange={(e) => mudarPasso(i, { ...p, baloes: paraBaloes(e.target.value) } as Passo)}
+                placeholder={'Olá {primeiro_nome}! 👋\nComo posso ajudar?'}
+              />
+            )}
+          </Campo>
+          <p className="fx-campo-dica">Cada linha vira um balão separado (mensagens seguidas). Use <span className="fx-var">{'{primeiro_nome}'}</span> pra chamar o cliente pelo nome.</p>
+        </div>
       )}
 
       {p.tipo === 'midia' && (
@@ -274,13 +316,20 @@ export default function Fluxos() {
               </div>
             ))}
             <div><BotaoMini onClick={() => mudarPasso(i, { ...p, opcoes: [...p.opcoes, { rotulo: '', valor: '' }] })} disabled={p.opcoes.length >= 8}>+ opção</BotaoMini></div>
+            <p className="fx-campo-dica">O menu "1. 2. 3." é montado automático. Em <b>→ vai para</b> você escolhe o caminho de cada opção — dá pra pular passos ou encerrar. Deixe "→ próximo passo" pra seguir na ordem.</p>
           </div>
           <div className="ia-2col">
-            <Campo rotulo="Guardar a escolha como (ex.: interesse)" value={p.salvarEm}
-              onChange={(e) => mudarPasso(i, { ...p, salvarEm: e.target.value.replace(/\s+/g, '_').toLowerCase() })} />
-            <Campo rotulo="Se não entender (reprompt)" value={p.reprompt}
-              onChange={(e) => mudarPasso(i, { ...p, reprompt: e.target.value })}
-              placeholder="Responda com o número de uma das opções 🙂" />
+            <div className="campo">
+              <Campo rotulo="Guardar a escolha como (ex.: interesse)" value={p.salvarEm}
+                onChange={(e) => mudarPasso(i, { ...p, salvarEm: e.target.value.replace(/\s+/g, '_').toLowerCase() })} />
+              <p className="fx-campo-dica">Um apelido pra resposta. Vira a variável <span className="fx-var">{`{${p.salvarEm || 'interesse'}}`}</span> pros próximos balões.</p>
+            </div>
+            <div className="campo">
+              <Campo rotulo="Se não entender (reprompt)" value={p.reprompt}
+                onChange={(e) => mudarPasso(i, { ...p, reprompt: e.target.value })}
+                placeholder="Responda com o número de uma das opções 🙂" />
+              <p className="fx-campo-dica">O que o bot repete se a resposta não bater. Depois de 2 tentativas, ele chama um humano.</p>
+            </div>
           </div>
           <label className="fx-toggle-item">
             <Toggle ligado={p.semMenu === true} aoMudar={(v: boolean) => mudarPasso(i, { ...p, semMenu: v })} rotulo="Sem menu numerado" />
@@ -291,14 +340,17 @@ export default function Fluxos() {
 
       {p.tipo === 'coletar' && (
         <div className="ia-2col">
-          <Campo rotulo="Qual dado?">
-            {(id) => (
-              <select id={id} className="inp" value={p.dado}
-                onChange={(e) => mudarPasso(i, { ...p, dado: e.target.value as DadoColeta })}>
-                {(Object.keys(ROTULO_DADO) as DadoColeta[]).map((d) => <option key={d} value={d}>{ROTULO_DADO[d]}</option>)}
-              </select>
-            )}
-          </Campo>
+          <div className="campo">
+            <Campo rotulo="Qual dado?">
+              {(id) => (
+                <select id={id} className="inp" value={p.dado}
+                  onChange={(e) => mudarPasso(i, { ...p, dado: e.target.value as DadoColeta })}>
+                  {(Object.keys(ROTULO_DADO) as DadoColeta[]).map((d) => <option key={d} value={d}>{ROTULO_DADO[d]}</option>)}
+                </select>
+              )}
+            </Campo>
+            <p className="fx-campo-dica">{DICA_DADO[p.dado]}</p>
+          </div>
           <Campo rotulo="Guardar como (ex.: nome)" value={p.salvarEm}
             onChange={(e) => mudarPasso(i, { ...p, salvarEm: e.target.value.replace(/\s+/g, '_').toLowerCase() })} />
           <Campo rotulo="Se o dado não validar (reprompt)" value={p.reprompt}
@@ -337,7 +389,15 @@ export default function Fluxos() {
           <h1>Fluxos do bot</h1>
           <p>Monte a conversa automática do seu jeito: mensagens, perguntas, coleta de dados e ações.</p>
         </div>
-        {fluxo && <BotaoSec onClick={abrirSimulador}>▶ Testar fluxo</BotaoSec>}
+        <div className="fx-topo-acoes">
+          <input ref={fileRef} type="file" accept=".json,application/json" className="fx-import-inp"
+            onChange={aoEscolherArquivo} aria-hidden="true" tabIndex={-1} />
+          <BotaoSec onClick={() => fileRef.current?.click()} disabled={importar.isPending}>
+            {importar.isPending ? 'Importando…' : '↧ Importar fluxo'}
+          </BotaoSec>
+          {fluxo && passos.length > 0 && <BotaoSec onClick={aoExportar}>↥ Exportar</BotaoSec>}
+          {fluxo && <BotaoSec onClick={abrirSimulador}>▶ Testar fluxo</BotaoSec>}
+        </div>
       </div>
 
       {aviso && (
@@ -380,6 +440,47 @@ export default function Fluxos() {
             </button>
           </div>
 
+          {/* guia — pra quem monta um fluxo do zero entender cada peça */}
+          <CardVidro sobe className="ia-card" atraso={0.03}>
+            <details className="fx-guia">
+              <summary>Como montar um fluxo — guia rápido</summary>
+              <div className="fx-guia-corpo">
+                <p className="ia-hint" style={{ fontSize: 13, lineHeight: 1.55 }}>
+                  Um fluxo é a conversa que o bot segue com cada cliente novo. Ele roda os passos <b>de cima pra baixo</b>.
+                  A maioria só manda mensagem e continua; os passos <b>Pergunta</b> e <b>Coletar dado</b> <b>param e esperam</b> a
+                  resposta do cliente antes de seguir. Adicione passos abaixo, arraste com ↑ ↓ e teste em <b>▶ Testar fluxo</b>.
+                </p>
+
+                <div className="fx-guia-passos">
+                  {TIPOS_NOVOS.map((t) => (
+                    <div key={t} className="fx-guia-item">
+                      <b>{ROTULO_PASSO[t]}</b>
+                      <span>{DESCRICAO_PASSO[t]}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="fx-guia-vars">
+                  <b>Variáveis</b> — escreva entre chaves e o bot troca pelo dado real na hora:
+                  <div style={{ marginTop: 4 }}>
+                    <span className="fx-var">{'{primeiro_nome}'}</span> vira o 1º nome do cliente (depois que você coletar o nome).{' '}
+                    Qualquer dado que você guardar também vira variável — se salvou como <span className="fx-var">interesse</span>,
+                    use <span className="fx-var">{'{interesse}'}</span> num balão seguinte.
+                  </div>
+                </div>
+
+                <div>
+                  <b style={{ fontSize: 13 }}>Pra valer no WhatsApp</b>
+                  <ul className="fx-guia-regras">
+                    <li>Marque o fluxo como <b>ativo</b> e clique em <b>Salvar</b>.</li>
+                    <li>Ligue o fluxo num <b>canal</b> (lá embaixo). Só canal ligado roda o fluxo.</li>
+                    <li>Vender pra um cliente? <b>Exporte</b> o fluxo num arquivo e ele <b>importa</b> no sistema dele.</li>
+                  </ul>
+                </div>
+              </div>
+            </details>
+          </CardVidro>
+
           {/* identidade do fluxo */}
           <CardVidro sobe className="ia-card" atraso={0.05}>
             <CardCab titulo="Fluxo" direita={<Toggle ligado={ativo} aoMudar={setAtivo} rotulo="Fluxo ativo" />} />
@@ -406,7 +507,7 @@ export default function Fluxos() {
             {passos.map(renderPasso)}
             <div className="fx-add">
               <span className="ia-hint">Adicionar passo:</span>
-              {TIPOS_NOVOS.map((t) => <BotaoMini key={t} onClick={() => adicionarPasso(t)}>+ {ROTULO_PASSO[t]}</BotaoMini>)}
+              {TIPOS_NOVOS.map((t) => <BotaoMini key={t} title={DICA_PASSO[t]} onClick={() => adicionarPasso(t)}>+ {ROTULO_PASSO[t]}</BotaoMini>)}
             </div>
           </CardVidro>
 
