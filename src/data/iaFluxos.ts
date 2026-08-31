@@ -96,6 +96,15 @@ export function validarDado(dado: DadoColeta, txt: string): { ok: boolean; valor
 }
 
 const semAcento = (s: string) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
+/** interpola {chave} nos balões (paridade com o motor). {primeiro_nome}=1ª palavra do nome; var sem valor some. */
+export function interpolar(texto: string, dados: Record<string, string>): string {
+  return String(texto ?? '').replace(/\{([a-zA-Z_][a-zA-Z0-9_]*)\}/g, (_m, chave: string) => {
+    if (chave === 'primeiro_nome') { const n = String(dados['nome'] ?? '').trim(); return n ? n.split(/\s+/)[0] : ''; }
+    const v = dados[chave];
+    return (v === undefined || v === null) ? '' : String(v);
+  });
+}
 /** normaliza opções como o motor (fluxo_custom.opcoesDe): filtra rótulo vazio + deriva valor */
 export function normOpcoes(opcoes: OpcaoFluxo[]): OpcaoFluxo[] {
   return (opcoes ?? [])

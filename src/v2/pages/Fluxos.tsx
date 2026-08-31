@@ -21,7 +21,7 @@ import { DEMO_MODE } from '@/lib/demo';
 import { useCanaisIa, MOCK_CANAIS, type CanalIa } from '@/data/ia';
 import {
   FLUXOS_REAL, MOCK_FLUXOS, ROTULO_DADO, ROTULO_PASSO,
-  avancarSim, problemasDoFluxo, responderSim,
+  avancarSim, interpolar, problemasDoFluxo, responderSim,
   garantirIds,
   useCriarFluxo, useExcluirFluxo, useFluxos, useSalvarFluxo, useVincularFluxoCanal,
   type DadoColeta, type EstadoSim, type FluxoBot, type Passo,
@@ -183,7 +183,7 @@ export default function Fluxos() {
   const aplicarSaida = (r: ReturnType<typeof avancarSim>) => {
     setSimMsgs((xs) => [
       ...xs,
-      ...r.baloes.map((b) => ({ de: 'bot' as const, texto: b })),
+      ...r.baloes.map((b) => ({ de: 'bot' as const, texto: interpolar(b, r.estado.dados) })),
       ...r.eventos.map((ev) => ({ de: 'evento' as const, texto: ev })),
       ...(r.estado.encerrado && !r.eventos.length && !r.baloes.length ? [{ de: 'evento' as const, texto: '✔ fluxo encerrado' }] : []),
     ]);
