@@ -26,8 +26,13 @@ export interface ArquivoInfo {
   beneficiario: string | null; nb: string | null; cpf: string | null; especie: string | null;
   consignadoMes: number | null; competenciaMes: string | null; periodo: string | null;
 }
+/** 'historico' = Histórico de Créditos do INSS (extrai beneficiário/NB/CPF/consignado);
+    'bancos' = qualquer documento — só junta e identifica os bancos (sem assumir o formato) */
+export type ModoUnificacao = 'historico' | 'bancos';
+
 export interface ResultadoUnificacao {
   pdf: Blob;
+  modo: ModoUnificacao;
   totalPaginas: number;
   arquivos: ArquivoInfo[];
   bancos: BancoAchado[];            // só os ENCONTRADOS
@@ -94,8 +99,12 @@ async function textoPorPagina(bytes: Uint8Array): Promise<string[]> {
   return paginas;
 }
 
-/** junta os PDFs na ORDEM recebida e detecta os bancos-alvo */
-export async function unificar(files: File[]): Promise<ResultadoUnificacao> {
+const DADOS_VAZIOS = { beneficiario: null, nb: null, cpf: null, especie: null, consignadoMes: null, competenciaMes: null, periodo: null };
+
+/** junta os PDFs na ORDEM recebida e identifica os bancos-alvo.
+    modo 'historico' extrai beneficiário/consignado (Histórico de Créditos);
+    modo 'bancos' pula a extração — serve pra QUALQUER documento. */
+export async function unificar(files: File[], modo: ModoUnificacao = 'historico'): Promise<ResultadoUnificacao> {
   if (!files.length) throw new Error('Nenhum arquivo selecionado.');
   const merged = await PDFDocument.create();
   const arquivos: ArquivoInfo[] = [];
@@ -148,7 +157,7 @@ export async function unificar(files: File[]): Promise<ResultadoUnificacao> {
       });
     } catch { textoLido = false; }
 
-    const dados = extrairDados(paginasTextoRef);
+    const dados = modo === 'historico' ? extrairDados(paginasTextoRef) : DADOS_VAZIOS;
     arquivos.push({ nome: f.name, paginas: idxs.length, bancos: [...bancosNoArquivo], textoLido, ...dados });
     paginaGlobal += idxs.length;
   }
@@ -168,6 +177,7 @@ export async function unificar(files: File[]): Promise<ResultadoUnificacao> {
 
   return {
     pdf: new Blob([bytes as BlobPart], { type: 'application/pdf' }),
+    modo,
     totalPaginas: paginaGlobal,
     arquivos,
     bancos,
