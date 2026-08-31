@@ -1,0 +1,67 @@
+/* Recuperação — herda .ia-* do ia.css */
+
+.v2 .rec-pagina { max-width: 980px; }
+
+/* painel de progresso */
+.v2 .rec-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 4px; }
+@media (max-width: 720px) { .v2 .rec-kpis { grid-template-columns: repeat(2, 1fr); } }
+.v2 .rec-kpi {
+  border: 1px solid var(--linha); border-radius: 12px; padding: 12px 14px;
+  background: rgba(var(--tint), .025); display: flex; flex-direction: column; gap: 4px;
+}
+.v2 .rec-kpi span { font-size: 11.5px; color: var(--txt-2); }
+.v2 .rec-kpi b { font-size: 24px; font-weight: 700; }
+
+.v2 .rec-abas { margin-top: 14px; }
+.v2 .rec-filtro { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+.v2 .rec-seq-topo { margin-top: 12px; }
+
+/* lista de leads */
+.v2 .rec-leads { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.v2 .rec-lead {
+  display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 12px;
+  border: 1px solid var(--linha); border-radius: 12px; padding: 12px 14px; background: rgba(var(--tint), .02);
+}
+@media (max-width: 620px) { .v2 .rec-lead { grid-template-columns: 1fr auto; } .v2 .rec-lead-estado { grid-column: 1 / -1; } }
+.v2 .rec-lead-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.v2 .rec-lead-nome { font-size: 13.5px; font-weight: 600; }
+.v2 .rec-lead-meta { font-size: 11.5px; color: var(--txt-3); }
+
+/* sequências */
+.v2 .rec-seqs { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 12px; }
+@media (max-width: 620px) { .v2 .rec-seqs { grid-template-columns: 1fr; } }
+.v2 .rec-seq-card {
+  text-align: left; cursor: pointer; font: inherit; color: inherit;
+  border: 1px solid var(--linha); border-radius: 12px; padding: 14px; background: rgba(var(--tint), .02);
+  display: flex; flex-direction: column; gap: 4px; transition: border-color .14s;
+}
+.v2 .rec-seq-card:hover { border-color: rgba(var(--tint), .3); }
+.v2 .rec-seq-nome { font-size: 14px; font-weight: 650; }
+
+/* editor de toque */
+.v2 .rec-toque {
+  border: 1px solid var(--linha); border-radius: 12px; padding: 12px 14px; margin-top: 10px;
+  display: flex; flex-direction: column; gap: 10px; background: rgba(var(--tint), .025);
+}
+.v2 .rec-toque-cab { display: flex; align-items: center; gap: 10px; }
+.v2 .rec-toque-num {
+  width: 22px; height: 22px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 50%;
+  font-size: 11px; font-weight: 700; background: rgba(var(--tint), .09); border: 1px solid rgba(var(--tint), .15);
+}
+.v2 .rec-toque-acoes { margin-left: auto; display: flex; gap: 6px; }
+.v2 .rec-midia { display: flex; flex-direction: column; gap: 8px; }
+.v2 .rec-midia-ok { font-size: 13px; display: flex; align-items: center; gap: 8px; color: var(--txt); }
+.v2 .rec-toque-intervalo { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.v2 .rec-toque-intervalo label { font-size: 12px; color: var(--txt-2); }
+.v2 .rec-toque-intervalo select { max-width: 160px; }
+
+/* picker de sequência (drawer) */
+.v2 .rec-picker { display: flex; flex-direction: column; gap: 10px; padding: 4px; }
+.v2 .rec-picker-lista { display: flex; flex-direction: column; gap: 8px; }
+.v2 .rec-picker-item {
+  text-align: left; cursor: pointer; font: inherit; color: inherit;
+  border: 1px solid var(--linha); border-radius: 10px; padding: 12px; background: rgba(var(--tint), .02);
+  display: flex; flex-direction: column; gap: 2px; transition: border-color .14s;
+}
+.v2 .rec-picker-item:hover { border-color: rgba(var(--tint), .35); }
+.v2 .rec-picker-item span { font-size: 11.5px; color: var(--txt-3); }

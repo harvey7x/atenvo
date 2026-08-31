@@ -40,6 +40,7 @@ const SimuladorV2 = lazy(() => import('@/v2/pages/Simulador'));
 const DashboardV2 = lazy(() => import('@/v2/pages/Dashboard'));
 const ConfiguracoesV2 = lazy(() => import('@/v2/pages/Configuracoes'));
 const IaV2 = lazy(() => import('@/v2/pages/Ia'));
+const RecuperacaoV2 = lazy(() => import('@/v2/pages/Recuperacao'));
 const FluxosV2 = lazy(() => import('@/v2/pages/Fluxos'));
 const ContatosV2 = lazy(() => import('@/v2/pages/Contatos'));
 const DisparoV2 = lazy(() => import('@/v2/pages/Disparo'));
@@ -102,6 +103,7 @@ const routes: RouteObject[] = [
           // preservada (não deletada), só fora do menu/rota — reversível. Link antigo cai no WhatsApp.
           { path: 'remarketing', element: <Navigate to="/whatsapp" replace /> },
           { path: 'agendamentos', element: <Lz><AgendamentosV2 /></Lz> },
+          { path: 'recuperacao', element: <Lz><RecuperacaoV2 /></Lz> },
           { path: 'disparo', element: <Lz><DisparoV2 /></Lz> },
           { path: 'contatos', element: <Lz><ContatosV2 /></Lz> },
           { path: 'scripts', element: <Lz><ScriptsV2 /></Lz> },
