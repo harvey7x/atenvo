@@ -135,6 +135,16 @@ begin
   select telefone into v_tel from public.contatos where id = v_contato;
   if v_tel is null or length(regexp_replace(v_tel,'\D','','g')) < 10 then raise exception 'contato_sem_telefone'; end if;
 
+  -- NÃO manda pra quem pediu pra sair (opt-out por contato+canal) — o pipeline de
+  -- agendamento não checa; a recuperação é automática, então blinda aqui.
+  if public.wa_optout_ativo(v_contato, v_canal.id) then
+    raise exception 'contato_optout' using hint = 'esse cliente pediu pra nao receber (opt-out)';
+  end if;
+  -- já em recuperação? mensagem amigável (o índice único também barra)
+  if exists (select 1 from public.recuperacao_execucoes where contato_id = v_contato and status = 'ativa') then
+    raise exception 'ja_em_recuperacao' using hint = 'esse lead ja esta em recuperacao';
+  end if;
+
   insert into public.recuperacao_execucoes
     (organizacao_id, oportunidade_id, conversa_id, contato_id, canal_id, sequencia_id, sequencia_nome, responsavel_id,
      total_toques, status)

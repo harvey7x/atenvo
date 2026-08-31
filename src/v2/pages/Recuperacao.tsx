@@ -30,6 +30,22 @@ const OPCOES_ABA: OpcaoSegmentado<'leads' | 'seqs'>[] = [
   { valor: 'seqs', rotulo: 'Minhas sequências' },
 ];
 const fone = (t: string | null) => (t ? '+' + t.replace(/\D/g, '') : '—');
+/** traduz os erros crus das RPCs pra mensagem amigável */
+const ERROS_RECUP: Record<string, string> = {
+  contato_optout: 'Esse cliente pediu pra não receber mensagens (opt-out) — não dá pra iniciar.',
+  ja_em_recuperacao: 'Esse lead já está em recuperação.',
+  sem_conversa: 'Esse lead não tem conversa — não tem por onde mandar.',
+  canal_desconectado: 'O número da conversa está desconectado. Reconecte em Integrações.',
+  canal_restrito: 'O número da conversa está restrito pra envio.',
+  contato_sem_telefone: 'O contato não tem telefone válido.',
+  sequencia_vazia: 'A sequência não tem toques.',
+  sequencia_nao_encontrada: 'Sequência não encontrada.',
+};
+const msgErro = (e: unknown): string => {
+  const m = (e as Error)?.message || 'Falha ao iniciar.';
+  const chave = Object.keys(ERROS_RECUP).find((k) => m.includes(k));
+  return chave ? ERROS_RECUP[chave] : m;
+};
 const toqueNovo = (tipo: TipoToque): Toque => ({ tipo, texto: '', intervalo_horas: tipo === 'texto' ? 0 : 24 });
 const rotuloTipo: Record<TipoToque, string> = { texto: 'Texto', imagem: 'Imagem', audio: 'Áudio gravado' };
 
@@ -97,7 +113,7 @@ function AbaLeads({ usarMock, meId, setAviso }: { usarMock: boolean; meId: strin
     setPicker(null);
     if (usarMock) { setAviso({ tom: 'ok', texto: `Recuperação iniciada para ${lead.contatoNome} (demonstração).` }); return; }
     try { await iniciar.mutateAsync({ oportunidadeId: lead.oportunidadeId, sequenciaId }); setAviso({ tom: 'ok', texto: `Recuperação iniciada para ${lead.contatoNome}. Os toques vão saindo aos poucos.` }); }
-    catch (e) { setAviso({ tom: 'erro', texto: (e as Error).message }); }
+    catch (e) { setAviso({ tom: 'erro', texto: msgErro(e) }); }
   };
   const aoParar = async (lead: RecupLead) => {
     setConfParar(null);
