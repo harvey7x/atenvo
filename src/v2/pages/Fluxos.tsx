@@ -20,12 +20,13 @@ import {
 import { DEMO_MODE } from '@/lib/demo';
 import { useCanaisIa, MOCK_CANAIS, type CanalIa } from '@/data/ia';
 import {
-  FLUXOS_REAL, MOCK_FLUXOS, ROTULO_DADO, ROTULO_PASSO, DESCRICAO_PASSO, DICA_PASSO, DICA_DADO,
-  avancarSim, interpolar, problemasDoFluxo, responderSim,
-  garantirIds, exportarFluxo, parseFluxoImportado,
+  FLUXOS_REAL, MOCK_FLUXOS, ROTULO_DADO, ROTULO_PASSO, DESCRICAO_PASSO, DICA_PASSO, DICA_DADO, GATILHO_PADRAO,
+  avancarSim, interpolar, problemasDoFluxo, responderSim, descricaoGatilho,
+  garantirIds, exportarFluxo, parseFluxoImportado, useEtapasFluxo,
   useCriarFluxo, useExcluirFluxo, useFluxos, useSalvarFluxo, useVincularFluxoCanal, useImportarFluxo,
-  type DadoColeta, type EstadoSim, type FluxoBot, type Passo,
+  type DadoColeta, type EstadoSim, type FluxoBot, type Passo, type Gatilho, type RotulosSim,
 } from '@/data/iaFluxos';
+import { useEtiquetas } from '@/data/atendimento';
 import { baixarJson, lerArquivoTexto, slugArquivo } from '@/v2/lib/arquivo';
 
 type Aviso = { tom: 'ok' | 'erro'; texto: string } | null;
@@ -74,11 +75,23 @@ export default function Fluxos() {
   const importar = useImportarFluxo();
   const fileRef = useRef<HTMLInputElement | null>(null);
 
+  // catálogos pros pickers do passo Ação (etiqueta existente + etapa do Kanban)
+  const etiquetasQ = useEtiquetas();
+  const etapasQ = useEtapasFluxo();
+  const etiquetas = usarMock
+    ? [{ id: 'etq-demo-1', nome: 'Lead Qualificado', cor: '#16a34a' }, { id: 'etq-demo-2', nome: 'Sem interesse', cor: '#ef4444' }]
+    : (etiquetasQ.data ?? []);
+  const etapas = usarMock
+    ? [{ id: 'col-demo-1', nome: 'Qualificado', cor: '#2563eb' }, { id: 'col-demo-2', nome: 'Em negociação', cor: '#9333ea' }]
+    : (etapasQ.data ?? []);
+
   /* -------- formulário -------- */
   const [nome, setNome] = useState('');
   const [descricao, setDescricao] = useState('');
   const [ativo, setAtivo] = useState(false);
   const [passos, setPassos] = useState<Passo[]>([]);
+  const [gatilho, setGatilho] = useState<Gatilho>(GATILHO_PADRAO);
+  const [palavrasTexto, setPalavrasTexto] = useState('');   // buffer cru do input (preserva vírgulas ao digitar)
   const [aviso, setAviso] = useState<Aviso>(null);
   const [confirmaExcluir, setConfirmaExcluir] = useState(false);
   const [confirmaTroca, setConfirmaTroca] = useState<{ id: string | null } | null>(null);
@@ -88,6 +101,8 @@ export default function Fluxos() {
     setNome(fluxo.nome);
     setDescricao(fluxo.descricao);
     setAtivo(fluxo.ativo);
+    setGatilho(fluxo.gatilho ?? GATILHO_PADRAO);
+    setPalavrasTexto((fluxo.gatilho?.tipo === 'palavra_chave' ? (fluxo.gatilho.palavras ?? []) : []).join(', '));
     setPassos(garantirIds(JSON.parse(JSON.stringify(fluxo.passos)) as Passo[]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fluxo?.id]);
@@ -98,10 +113,15 @@ export default function Fluxos() {
   const formSujo = useMemo(() => {
     if (!fluxo) return false;
     return nome !== fluxo.nome || descricao !== fluxo.descricao || ativo !== fluxo.ativo
+      || JSON.stringify(gatilho) !== JSON.stringify(fluxo.gatilho ?? GATILHO_PADRAO)
       || semId(passos) !== semId(fluxo.passos);
-  }, [fluxo, nome, descricao, ativo, passos]);
+  }, [fluxo, nome, descricao, ativo, gatilho, passos]);
 
-  const problemas = useMemo(() => problemasDoFluxo(passos), [passos]);
+  const problemas = useMemo(() => problemasDoFluxo(passos, gatilho), [passos, gatilho]);
+  const rotulosSim = useMemo<RotulosSim>(() => ({
+    etiquetas: Object.fromEntries(etiquetas.map((e) => [e.id, e.nome])),
+    colunas: Object.fromEntries(etapas.map((c) => [c.id, c.nome])),
+  }), [etiquetas, etapas]);
 
   const trocarPara = (id: string | null) => {
     if (formSujo) { setConfirmaTroca({ id }); return; }
@@ -123,7 +143,7 @@ export default function Fluxos() {
   const aoCriar = async () => {
     if (criar.isPending) return;
     if (usarMock) {
-      const novo: FluxoBot = { id: `demo-${Date.now()}`, nome: 'Novo fluxo', descricao: '', passos: [], ativo: false, criadoEm: new Date().toISOString() };
+      const novo: FluxoBot = { id: `demo-${Date.now()}`, nome: 'Novo fluxo', descricao: '', passos: [], gatilho: GATILHO_PADRAO, ativo: false, criadoEm: new Date().toISOString() };
       setMockFluxos((xs) => [...xs, novo]);
       setSelId(novo.id);
       return;
@@ -139,12 +159,12 @@ export default function Fluxos() {
       return;
     }
     if (usarMock) {
-      setMockFluxos((xs) => xs.map((f) => f.id === fluxo.id ? { ...f, nome, descricao, ativo, passos: JSON.parse(JSON.stringify(passos)) } : f));
+      setMockFluxos((xs) => xs.map((f) => f.id === fluxo.id ? { ...f, nome, descricao, ativo, gatilho, passos: JSON.parse(JSON.stringify(passos)) } : f));
       setAviso({ tom: 'ok', texto: 'Fluxo salvo (demonstração).' });
       return;
     }
     try {
-      await salvar.mutateAsync({ id: fluxo.id, nome, descricao, passos, ativo });
+      await salvar.mutateAsync({ id: fluxo.id, nome, descricao, passos, gatilho, ativo });
       setAviso({ tom: 'ok', texto: 'Fluxo salvo.' });
     } catch (e) { setAviso({ tom: 'erro', texto: (e as Error).message }); }
   };
@@ -180,7 +200,7 @@ export default function Fluxos() {
   const aoExportar = () => {
     if (!fluxo) return;
     // exporta o que está NA TELA (edições em aberto), pra bater com o que você vê
-    baixarJson(`fluxo-${slugArquivo(nome || fluxo.nome)}`, { ...exportarFluxo(fluxo), nome: nome || fluxo.nome, descricao, passos });
+    baixarJson(`fluxo-${slugArquivo(nome || fluxo.nome)}`, { ...exportarFluxo(fluxo), nome: nome || fluxo.nome, descricao, gatilho, passos });
     setAviso({ tom: 'ok', texto: 'Arquivo do fluxo baixado — mande pro cliente importar no sistema dele.' });
   };
 
@@ -233,8 +253,11 @@ export default function Fluxos() {
   };
 
   const abrirSimulador = () => {
-    setSimMsgs([{ de: 'evento', texto: '▶ simulando o fluxo que está NA TELA (salve pra valer no canal)' }]);
-    const r = avancarSim(passos, { passo: 0, dados: {}, tentativas: 0, encerrado: false });
+    const abertura = gatilho.tipo === 'palavra_chave'
+      ? `▶ simulando (o gatilho por palavra-chave é ignorado aqui — testamos o fluxo já iniciado)`
+      : '▶ simulando o fluxo que está NA TELA (salve pra valer no canal)';
+    setSimMsgs([{ de: 'evento', texto: abertura }]);
+    const r = avancarSim(passos, { passo: 0, dados: {}, tentativas: 0, encerrado: false }, rotulosSim);
     setSimAberto(true);
     aplicarSaida(r);
   };
@@ -244,7 +267,7 @@ export default function Fluxos() {
     if (!t || simEstado.encerrado) return;
     setSimInput('');
     setSimMsgs((xs) => [...xs, { de: 'cliente', texto: t }]);
-    aplicarSaida(responderSim(passos, simEstado, t));
+    aplicarSaida(responderSim(passos, simEstado, t, rotulosSim));
   };
 
   /* -------- render dos passos -------- */
@@ -361,9 +384,40 @@ export default function Fluxos() {
 
       {p.tipo === 'acao' && (
         <>
-          <Campo rotulo="Aplicar etiqueta (vazio = não aplica)" value={p.etiqueta ?? ''}
-            onChange={(e) => mudarPasso(i, { ...p, etiqueta: e.target.value })}
-            placeholder="ex.: lead-qualificado" />
+          <div className="ia-2col">
+            <div className="campo">
+              <Campo rotulo="Aplicar etiqueta (opcional)">
+                {(id) => (
+                  <select id={id} className="inp" value={p.etiquetaId || ''}
+                    onChange={(e) => mudarPasso(i, { ...p, etiquetaId: e.target.value || undefined, etiqueta: undefined })}>
+                    <option value="">— não aplica —</option>
+                    {p.etiquetaId && !etiquetas.some((x) => x.id === p.etiquetaId) && (
+                      <option value={p.etiquetaId}>(etiqueta não encontrada — escolha outra)</option>
+                    )}
+                    {etiquetas.map((x) => <option key={x.id} value={x.id}>{x.nome}</option>)}
+                  </select>
+                )}
+              </Campo>
+              {p.etiqueta && !p.etiquetaId
+                ? <p className="fx-campo-dica">Etiqueta antiga por texto: "{p.etiqueta}" — escolha uma da lista pra atualizar.</p>
+                : !etiquetas.length && <p className="fx-campo-dica">Nenhuma etiqueta ainda — crie em Atendimento/Configurações.</p>}
+            </div>
+            <div className="campo">
+              <Campo rotulo="Mover pra etapa do Kanban (opcional)">
+                {(id) => (
+                  <select id={id} className="inp" value={p.moverEtapaId || ''}
+                    onChange={(e) => mudarPasso(i, { ...p, moverEtapaId: e.target.value || undefined })}>
+                    <option value="">— não move —</option>
+                    {p.moverEtapaId && !etapas.some((c) => c.id === p.moverEtapaId) && (
+                      <option value={p.moverEtapaId}>(etapa não encontrada — escolha outra)</option>
+                    )}
+                    {etapas.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                  </select>
+                )}
+              </Campo>
+              <p className="fx-campo-dica">Só etapas neutras (ganho/perdido pedem motivo, então ficam de fora).</p>
+            </div>
+          </div>
           <div className="fx-toggles">
             <label className="fx-toggle-item">
               <Toggle ligado={p.chamarHumano === true} aoMudar={(v: boolean) => mudarPasso(i, { ...p, chamarHumano: v })} rotulo="Chamar atendente humano" />
@@ -432,6 +486,7 @@ export default function Fluxos() {
                 <span className="ia-agente-meta">
                   {f.ativo ? <BadgeStatus tom="ok">ativo</BadgeStatus> : <BadgeStatus tom="neutro">rascunho</BadgeStatus>}
                   <span className="ia-hint">{f.passos.length} passo(s) · {canais.filter((c) => c.fluxoId === f.id).length} canal(is)</span>
+                  <span className="ia-hint">⚡ {descricaoGatilho(f.gatilho)}</span>
                 </span>
               </button>
             ))}
@@ -474,6 +529,8 @@ export default function Fluxos() {
                   <ul className="fx-guia-regras">
                     <li>Marque o fluxo como <b>ativo</b> e clique em <b>Salvar</b>.</li>
                     <li>Ligue o fluxo num <b>canal</b> (lá embaixo). Só canal ligado roda o fluxo.</li>
+                    <li>Em <b>"Quando o fluxo começa"</b> escolha se ele dispara em toda conversa ou só quando a mensagem tem uma <b>palavra-chave</b> (ex.: "juros").</li>
+                    <li>Um passo <b>Ação</b> pode aplicar uma <b>etiqueta</b> e <b>mover o lead</b> pra uma etapa do Kanban a partir da resposta.</li>
                     <li>Vender pra um cliente? <b>Exporte</b> o fluxo num arquivo e ele <b>importa</b> no sistema dele.</li>
                   </ul>
                 </div>
@@ -487,6 +544,25 @@ export default function Fluxos() {
             <div className="ia-2col">
               <Campo rotulo="Nome do fluxo" value={nome} onChange={(e) => setNome(e.target.value)} placeholder="ex.: Boas-vindas + qualificação" />
               <Campo rotulo="Descrição (pra sua equipe)" value={descricao} onChange={(e) => setDescricao(e.target.value)} placeholder="o que esse fluxo faz" />
+            </div>
+
+            {/* gatilho: quando o fluxo COMEÇA numa conversa */}
+            <div className="fx-gatilho">
+              <label className="fx-gatilho-titulo">Quando o fluxo começa</label>
+              <div className="fx-gatilho-tipos">
+                <button type="button" className={gatilho.tipo === 'sempre' ? 'fx-chip on' : 'fx-chip'}
+                  onClick={() => setGatilho({ tipo: 'sempre' })}>Toda conversa nova</button>
+                <button type="button" className={gatilho.tipo === 'palavra_chave' ? 'fx-chip on' : 'fx-chip'}
+                  onClick={() => setGatilho({ tipo: 'palavra_chave', palavras: palavrasTexto.split(',').map((s) => s.trim()).filter(Boolean) })}>Por palavra-chave</button>
+              </div>
+              {gatilho.tipo === 'palavra_chave' && (
+                <div className="campo">
+                  <Campo rotulo="Palavras que disparam (separe por vírgula)" value={palavrasTexto}
+                    onChange={(e) => { setPalavrasTexto(e.target.value); setGatilho({ tipo: 'palavra_chave', palavras: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) }); }}
+                    placeholder="ex.: juros, empréstimo, consignado" />
+                  <p className="fx-campo-dica">O fluxo só começa se a 1ª mensagem contém uma dessas palavras (ignora acento e maiúscula). Conversa já iniciada continua até o fim.</p>
+                </div>
+              )}
             </div>
           </CardVidro>
 

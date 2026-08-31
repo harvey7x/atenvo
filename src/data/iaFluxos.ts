@@ -21,9 +21,13 @@ export type Passo = { id?: string } & (
   | { tipo: 'midia'; midiaTipo: 'imagem' | 'video'; url: string; legenda: string }
   | { tipo: 'pergunta'; baloes: string[]; opcoes: OpcaoFluxo[]; salvarEm: string; reprompt: string; semMenu?: boolean }
   | { tipo: 'coletar'; baloes: string[]; dado: DadoColeta; salvarEm: string; reprompt: string }
-  | { tipo: 'acao'; etiqueta?: string; chamarHumano?: boolean; entregarIa?: boolean }
+  | { tipo: 'acao'; etiqueta?: string; etiquetaId?: string; moverEtapaId?: string; chamarHumano?: boolean; entregarIa?: boolean }
   | { tipo: 'fim'; baloes?: string[] }
 );
+
+/** GATILHO: quando o fluxo COMEÇA numa conversa (só o início; conversa em andamento continua) */
+export type Gatilho = { tipo: 'sempre' | 'palavra_chave'; palavras?: string[] };
+export const GATILHO_PADRAO: Gatilho = { tipo: 'sempre' };
 
 /** garante id estável em todo passo (backfill de fluxos antigos) */
 export function garantirIds(passos: Passo[]): Passo[] {
@@ -36,6 +40,7 @@ export interface FluxoBot {
   nome: string;
   descricao: string;
   passos: Passo[];
+  gatilho: Gatilho;
   ativo: boolean;
   criadoEm: string;
 }
@@ -50,7 +55,7 @@ export const DESCRICAO_PASSO: Record<Passo['tipo'], string> = {
   midia: 'Envia uma imagem ou um vídeo (ex.: o vídeo de boas-vindas da campanha) e segue em frente. Aceita uma legenda.',
   pergunta: 'Faz uma pergunta e ESPERA a resposta do cliente. Cada opção pode seguir por um caminho diferente do fluxo.',
   coletar: 'Pede um dado (nome, CPF, telefone, e-mail) e ESPERA. O bot valida e salva na ficha do cliente automaticamente.',
-  acao: 'Nos bastidores, sem falar nada: aplica uma etiqueta, chama um atendente humano ou entrega a conversa pro Atendente de IA.',
+  acao: 'Nos bastidores, sem falar nada: aplica uma etiqueta, move o lead pra uma etapa do Kanban, chama um atendente humano ou entrega pro Atendente de IA.',
   fim: 'Encerra o fluxo. O bot fica em silêncio nessa conversa e o atendimento segue com o seu time.',
 };
 
@@ -163,6 +168,22 @@ function idxPorId(passos: Passo[], id: string): number {
   return passos.findIndex((p) => p.id === id);
 }
 
+/** o fluxo COMEÇA nesta conversa? ESPELHO do motor (fluxo_custom.ts gatilhoBate).
+    'palavra_chave' vazio/tipo desconhecido => começa (fail-open, nunca deixa o canal mudo). */
+export function gatilhoBate(gatilho: Gatilho | undefined, texto: string): boolean {
+  if (!gatilho || gatilho.tipo !== 'palavra_chave') return true;
+  const palavras = (gatilho.palavras ?? []).map((w) => semAcento(String(w ?? '')).trim()).filter(Boolean);
+  if (!palavras.length) return true;
+  const t = semAcento(texto ?? '');
+  return palavras.some((w) => t.includes(w));
+}
+/** texto curto de como o fluxo é disparado (pra lista/topo) */
+export function descricaoGatilho(g: Gatilho | undefined): string {
+  if (!g || g.tipo === 'sempre') return 'Toda conversa nova';
+  const ps = (g.palavras ?? []).filter(Boolean);
+  return ps.length ? `Palavra-chave: ${ps.join(', ')}` : 'Palavra-chave (defina as palavras)';
+}
+
 /* ---------------- simulador (interpretador puro, sem rede) ---------------- */
 export interface EstadoSim { passo: number; dados: Record<string, string>; tentativas: number; encerrado: boolean }
 export type SaidaSimItem = { tipo: 'texto'; texto: string } | { tipo: 'midia'; midiaTipo: 'imagem' | 'video'; url: string; legenda: string };
@@ -187,8 +208,11 @@ const mkSim = (saidas: SaidaSimItem[], eventos: string[], estado: EstadoSim, agu
   return { saidas: cortadas, baloes: textosSim(cortadas), eventos, estado, aguardando };
 };
 
+/** nomes pra mostrar no simulador (etiqueta/coluna são id no passo; o painel resolve o nome) */
+export type RotulosSim = { etiquetas?: Record<string, string>; colunas?: Record<string, string> };
+
 /** roda até o próximo ponto de espera (ou fim), a partir do passo atual */
-export function avancarSim(passos: Passo[], estado: EstadoSim): SaidaSim {
+export function avancarSim(passos: Passo[], estado: EstadoSim, rotulos?: RotulosSim): SaidaSim {
   const saidas: SaidaSimItem[] = [];
   const eventos: string[] = [];
   let e = { ...estado, dados: { ...estado.dados } };
@@ -198,7 +222,9 @@ export function avancarSim(passos: Passo[], estado: EstadoSim): SaidaSim {
     if (p.tipo === 'mensagem') { for (const b of baloesDe(p)) saidas.push({ tipo: 'texto', texto: b }); e.passo++; continue; }
     if (p.tipo === 'midia') { const url = (p.url || '').trim(); if (url) saidas.push({ tipo: 'midia', midiaTipo: p.midiaTipo === 'video' ? 'video' : 'imagem', url, legenda: p.legenda || '' }); e.passo++; continue; }
     if (p.tipo === 'acao') {
-      if (p.etiqueta) eventos.push(`🏷 etiqueta aplicada: "${p.etiqueta}"`);
+      if (p.etiqueta) eventos.push(`🏷 etiqueta: "${p.etiqueta}"`);
+      if (p.etiquetaId) eventos.push(`🏷 etiqueta: ${rotulos?.etiquetas?.[p.etiquetaId] ?? '(selecionada)'}`);
+      if (p.moverEtapaId) eventos.push(`↗ move pra etapa: ${rotulos?.colunas?.[p.moverEtapaId] ?? '(selecionada)'}`);
       if (p.chamarHumano) eventos.push('🙋 atendente humano avisado (conversa marcada)');
       if (p.entregarIa) eventos.push('✨ conversa entregue pro Atendente de IA');
       e.passo++; continue;
@@ -216,10 +242,10 @@ export function avancarSim(passos: Passo[], estado: EstadoSim): SaidaSim {
 }
 
 /** processa a resposta do cliente no passo de espera atual (ramificação + coleta) */
-export function responderSim(passos: Passo[], estado: EstadoSim, resposta: string): SaidaSim {
+export function responderSim(passos: Passo[], estado: EstadoSim, resposta: string, rotulos?: RotulosSim): SaidaSim {
   const p = passos[estado.passo];
   let e = { ...estado, dados: { ...estado.dados } };
-  if (!p || (p.tipo !== 'pergunta' && p.tipo !== 'coletar')) return avancarSim(passos, e);
+  if (!p || (p.tipo !== 'pergunta' && p.tipo !== 'coletar')) return avancarSim(passos, e, rotulos);
   if (p.tipo === 'pergunta') {
     const op = casarOpcao(p.opcoes, resposta);
     if (op === null) {
@@ -234,7 +260,7 @@ export function responderSim(passos: Passo[], estado: EstadoSim, resposta: strin
     let destino = e.passo + 1;
     if (op.irPara) { const idx = idxPorId(passos, op.irPara); if (idx >= 0) { destino = idx; eventos.push(`↪ vai para o passo ${idx + 1}`); } }
     e = { ...e, passo: destino, tentativas: 0 };
-    const seg = avancarSim(passos, e);
+    const seg = avancarSim(passos, e, rotulos);
     return { ...seg, eventos: [...eventos, ...seg.eventos] };
   }
   const v = validarDado(p.dado, resposta);
@@ -248,15 +274,17 @@ export function responderSim(passos: Passo[], estado: EstadoSim, resposta: strin
   const eventos = [`💾 ${chave} = "${v.valor}"`];
   if (p.dado !== 'texto') eventos.push(`📇 salvo na ficha do cliente (${p.dado})`);
   e = { ...e, passo: e.passo + 1, tentativas: 0 };
-  const seg = avancarSim(passos, e);
+  const seg = avancarSim(passos, e, rotulos);
   return { ...seg, eventos: [...eventos, ...seg.eventos] };
 }
 
 /* ---------------- problemas do fluxo (validação do editor) ---------------- */
-export function problemasDoFluxo(passos: Passo[]): string[] {
+export function problemasDoFluxo(passos: Passo[], gatilho?: Gatilho): string[] {
   const avisos: string[] = [];
   // com ramificação, um 'fim' no meio é legítimo (um ramo encerra cedo; outros passos rodam por outro caminho)
   const temRamificacao = passos.some((pp) => pp.tipo === 'pergunta' && (pp.opcoes ?? []).some((o) => o.irPara));
+  if (gatilho?.tipo === 'palavra_chave' && !(gatilho.palavras ?? []).some((w) => w.trim()))
+    avisos.push('Gatilho: escolheu "palavra-chave" mas não definiu nenhuma palavra — o fluxo nunca dispararia (ou dispara sempre).');
   if (!passos.length) avisos.push('O fluxo está vazio — adicione ao menos uma mensagem.');
   passos.forEach((p, i) => {
     const n = `Passo ${i + 1}`;
@@ -274,19 +302,31 @@ export function problemasDoFluxo(passos: Passo[]): string[] {
     }
     if (p.tipo === 'midia' && !(p.url || '').trim()) avisos.push(`${n} (Mídia): sem link do arquivo — o cliente não recebe nada.`);
     if (p.tipo === 'coletar' && !baloesDe(p).length) avisos.push(`${n} (Coletar): sem texto pedindo o dado.`);
-    if (p.tipo === 'acao' && !p.etiqueta && !p.chamarHumano && !p.entregarIa) avisos.push(`${n} (Ação): nenhuma ação marcada.`);
+    if (p.tipo === 'acao' && !p.etiqueta && !p.etiquetaId && !p.moverEtapaId && !p.chamarHumano && !p.entregarIa) avisos.push(`${n} (Ação): nenhuma ação marcada.`);
     if (p.tipo === 'fim' && i < passos.length - 1 && !temRamificacao) avisos.push(`${n} (Fim): há passos depois do fim que nunca vão rodar.`);
   });
   return avisos;
 }
 
 /* ---------------- hooks ---------------- */
+/** normaliza o gatilho vindo do banco/arquivo pra forma canônica (nunca quebra) */
+export function lerGatilho(raw: unknown): Gatilho {
+  const g = (raw && typeof raw === 'object' ? raw : {}) as { tipo?: unknown; palavras?: unknown };
+  if (g.tipo === 'palavra_chave') {
+    const palavras = (Array.isArray(g.palavras) ? g.palavras : [])
+      .map((w) => String(w ?? '').trim()).filter(Boolean).slice(0, 20);
+    return { tipo: 'palavra_chave', palavras };
+  }
+  return { tipo: 'sempre' };
+}
+
 function mapFluxo(r: Row): FluxoBot {
   return {
     id: r.id as string,
     nome: (r.nome as string) || 'Fluxo',
     descricao: (r.descricao as string) || '',
     passos: (Array.isArray(r.passos) ? r.passos : []) as Passo[],
+    gatilho: lerGatilho(r.gatilho),
     ativo: !!r.ativo,
     criadoEm: (r.criado_em as string) || '',
   };
@@ -300,7 +340,7 @@ export function useFluxos() {
     queryFn: async (): Promise<FluxoBot[]> => {
       const { data, error } = await supabase!
         .from('ia_fluxos')
-        .select('id, nome, descricao, passos, ativo, criado_em')
+        .select('id, nome, descricao, passos, gatilho, ativo, criado_em')
         .eq('organizacao_id', org!)
         .order('criado_em', { ascending: true });
       if (error) throw new Error(error.message);
@@ -328,10 +368,10 @@ export function useCriarFluxo() {
 export function useSalvarFluxo() {
   const qc = useQueryClient(); const { currentOrg } = useOrg();
   return useMutation({
-    mutationFn: async (p: { id: string; nome: string; descricao: string; passos: Passo[]; ativo: boolean }) => {
+    mutationFn: async (p: { id: string; nome: string; descricao: string; passos: Passo[]; gatilho: Gatilho; ativo: boolean }) => {
       const { error } = await supabase!
         .from('ia_fluxos')
-        .update({ nome: p.nome.trim() || 'Fluxo', descricao: p.descricao, passos: p.passos, ativo: p.ativo })
+        .update({ nome: p.nome.trim() || 'Fluxo', descricao: p.descricao, passos: p.passos, gatilho: lerGatilho(p.gatilho), ativo: p.ativo })
         .eq('id', p.id);
       if (error) throw new Error(error.message);
     },
@@ -364,9 +404,30 @@ export function useVincularFluxoCanal() {
   });
 }
 
+/* ---------------- etapas do Kanban pro passo Ação (mover) ---------------- */
+export type EtapaFluxo = { id: string; nome: string; cor: string };
+/** colunas NEUTRAS do funil padrão da org (ganho/perdido exigem motivo → fora do fluxo) */
+export function useEtapasFluxo() {
+  const { currentOrg } = useOrg();
+  const org = currentOrg?.id;
+  return useQuery({
+    queryKey: ['ia-fluxo-etapas', org], enabled: FLUXOS_REAL && !!org,
+    queryFn: async (): Promise<EtapaFluxo[]> => {
+      const { data: funil } = await supabase!.from('funis')
+        .select('id').eq('organizacao_id', org!).eq('padrao', true).order('ordem', { ascending: true }).limit(1).maybeSingle();
+      const funilId = (funil as Row | null)?.id as string | undefined;
+      if (!funilId) return [];
+      const { data: cols } = await supabase!.from('funil_colunas')
+        .select('id, nome, cor, ordem, resultado').eq('organizacao_id', org!).eq('funil_id', funilId)
+        .eq('arquivada', false).eq('resultado', 'neutro').order('ordem', { ascending: true });
+      return ((cols as Row[]) || []).map((c) => ({ id: c.id as string, nome: (c.nome as string) || 'Etapa', cor: (c.cor as string) || '#64748b' }));
+    },
+  });
+}
+
 /* ---------------- exportar / importar (arquivo .json) ---------------- */
 export function exportarFluxo(f: FluxoBot) {
-  return { tipo: 'fluxo-atenvo', versao: 1, nome: f.nome, descricao: f.descricao, passos: f.passos };
+  return { tipo: 'fluxo-atenvo', versao: 1, nome: f.nome, descricao: f.descricao, gatilho: f.gatilho, passos: f.passos };
 }
 const TIPOS_PASSO_OK = new Set(['mensagem', 'midia', 'pergunta', 'coletar', 'acao', 'fim']);
 // só aceita STRING (arquivo importado é não confiável): número/objeto/array viram '' e somem,
@@ -414,6 +475,7 @@ function sanearPassoImportado(raw: Record<string, unknown>): Passo | null {
     case 'acao':
       return {
         ...base, tipo: 'acao', etiqueta: strCap(raw.etiqueta, 60),
+        etiquetaId: strCap(raw.etiquetaId, 64).trim(), moverEtapaId: strCap(raw.moverEtapaId, 64).trim(),
         chamarHumano: raw.chamarHumano === true, entregarIa: raw.entregarIa === true,
       } as Passo;
     case 'fim':
@@ -424,7 +486,7 @@ function sanearPassoImportado(raw: Record<string, unknown>): Passo | null {
 }
 
 /** valida + normaliza um arquivo de fluxo importado (lança Error com mensagem amigável) */
-export function parseFluxoImportado(texto: string): { nome: string; descricao: string; passos: Passo[] } {
+export function parseFluxoImportado(texto: string): { nome: string; descricao: string; passos: Passo[]; gatilho: Gatilho } {
   let obj: Record<string, unknown>;
   try { obj = JSON.parse(texto) as Record<string, unknown>; }
   catch { throw new Error('Arquivo inválido: não parece um JSON de fluxo.'); }
@@ -441,15 +503,16 @@ export function parseFluxoImportado(texto: string): { nome: string; descricao: s
   return {
     nome: strCap(obj.nome, 120) || 'Fluxo importado',
     descricao: strCap(obj.descricao, 500),
+    gatilho: lerGatilho(obj.gatilho),
     passos: garantirIds(limpos),
   };
 }
 export function useImportarFluxo() {
   const qc = useQueryClient(); const { currentOrg } = useOrg();
   return useMutation({
-    mutationFn: async (p: { nome: string; descricao: string; passos: Passo[] }): Promise<string> => {
+    mutationFn: async (p: { nome: string; descricao: string; passos: Passo[]; gatilho: Gatilho }): Promise<string> => {
       const { data, error } = await supabase!.from('ia_fluxos')
-        .insert({ organizacao_id: currentOrg!.id, nome: p.nome, descricao: p.descricao, passos: p.passos, ativo: false })
+        .insert({ organizacao_id: currentOrg!.id, nome: p.nome, descricao: p.descricao, passos: p.passos, gatilho: lerGatilho(p.gatilho), ativo: false })
         .select('id').single();
       if (error) throw new Error(error.message);
       return (data as Row).id as string;
@@ -464,6 +527,7 @@ export const MOCK_FLUXOS: FluxoBot[] = [
     id: 'demo-f1',
     nome: 'Boas-vindas + qualificação',
     descricao: 'Recebe o lead, entende o interesse e coleta nome e CPF antes de passar pro time.',
+    gatilho: { tipo: 'sempre' },
     ativo: true,
     criadoEm: '2026-08-25T12:00:00Z',
     passos: [
