@@ -73,6 +73,37 @@
 .v2 .ferr-modo-toggle { display: flex; align-items: center; gap: 10px; font-size: 13px; cursor: pointer; }
 .v2 .ferr-modo-dica { font-size: 12px; color: var(--txt-3); font-weight: 400; }
 
+/* ===== Conversor de arquivos ===== */
+.v2 .conv-tipos { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 14px; }
+@media (max-width: 1080px) { .v2 .conv-tipos { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 560px) { .v2 .conv-tipos { grid-template-columns: 1fr; } }
+.v2 .conv-tipo {
+  text-align: left; cursor: pointer; font: inherit; color: inherit;
+  border: 1px solid var(--linha); border-radius: 12px; padding: 12px 14px;
+  background: rgba(var(--tint), .02); display: flex; flex-direction: column; gap: 4px; transition: all .14s;
+}
+.v2 .conv-tipo:hover { border-color: rgba(var(--tint), .3); }
+.v2 .conv-tipo.on { border-color: rgba(var(--tint), .45); background: rgba(var(--tint), .1); }
+.v2 .conv-tipo b { font-size: 13.5px; }
+.v2 .conv-tipo span { font-size: 11.5px; color: var(--txt-2); line-height: 1.4; }
+
+.v2 .conv-ops { display: flex; flex-wrap: wrap; gap: 16px; padding: 14px 16px; }
+.v2 .conv-op { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--txt-2); }
+
+.v2 .conv-nota {
+  margin-top: 12px; padding: 11px 14px; border-radius: 10px; font-size: 12px; line-height: 1.5;
+  color: var(--txt-2); background: rgba(var(--tint), .04); border: 1px solid var(--linha);
+}
+.v2 .conv-nota b { color: var(--txt); }
+
+.v2 .conv-saidas { display: flex; flex-direction: column; }
+.v2 .conv-saida {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 10px 16px; border-bottom: 1px solid rgba(var(--tint), .06);
+}
+.v2 .conv-saida:last-child { border-bottom: none; }
+.v2 .conv-saida-nm { font-size: 13px; color: var(--txt); word-break: break-word; display: flex; flex-direction: column; gap: 2px; }
+
 /* lista "Documentos unidos" (modo simples) */
 .v2 .ferr-docs { display: flex; flex-direction: column; }
 .v2 .ferr-doc { padding: 11px 16px; border-bottom: 1px solid rgba(var(--tint), .06); display: flex; flex-direction: column; gap: 6px; }

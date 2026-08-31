@@ -2,6 +2,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { BadgeStatus, BotaoPrimario, BotaoSec, CardVidro, EstadoVazio, Toggle } from '../components';
 import { unificar, BANCOS_ALVO, type ArquivoInfo, type ResultadoUnificacao } from './unificadorLib';
+import { ConversorArquivos } from './Conversor';
 import './ferramentas.css';
 
 const fmtKB = (b: number) => (b < 1024 * 1024 ? `${Math.round(b / 1024)} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`);
@@ -25,6 +26,7 @@ interface GrupoBenef {
 export default function FerramentasV2() {
   const { tool } = useParams();
   if (tool === 'unificador' || !tool) return <UnificadorDocumentos />;
+  if (tool === 'conversor') return <ConversorArquivos />;
   return (
     <div className="ferr-wrap">
       <div className="ph sobe"><div className="cob-migalha">Ferramentas</div><h2>Ferramenta não encontrada</h2></div>
