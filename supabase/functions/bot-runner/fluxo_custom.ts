@@ -44,6 +44,16 @@ const MAX_BALOES_TURNO = 6;
 
 const semAcento = (s: string): string => (s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
+/** interpola {chave} nos balões a partir dos dados coletados. {primeiro_nome} = 1ª palavra do nome.
+    variável sem valor vira vazio (some da frase). Espelhado no simulador do painel. */
+export function interpolar(texto: string, dados: Record<string, string>): string {
+  return String(texto ?? '').replace(/\{([a-zA-Z_][a-zA-Z0-9_]*)\}/g, (_m, chave: string) => {
+    if (chave === 'primeiro_nome') { const n = String(dados['nome'] ?? '').trim(); return n ? n.split(/\s+/)[0] : ''; }
+    const v = dados[chave];
+    return (v === undefined || v === null) ? '' : String(v);
+  });
+}
+
 function baloesDe(v: unknown): string[] {
   return (Array.isArray(v) ? v : []).map((b) => String(b ?? '').trim()).filter(Boolean).slice(0, MAX_BALOES_TURNO);
 }

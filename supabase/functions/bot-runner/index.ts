@@ -26,7 +26,7 @@ import { proximoPasso, proximoPassoSuporte, chaveTel, deveHandoff48h, telaComoTe
 // Puro; quem envia e fecha é o runner. Serve DOIS fluxos, roteados por fluxo_slug (PERFIS_MIDIA):
 // caf_video_juros_v1 (VSL de juros, vídeo) e caf_emprestimo_v1 (campanha de empréstimo, imagem).
 import { proximoPassoVideo, montarCopyVideo, type CopyVideo } from './fluxo_video.ts';
-import { avancarCf, responderCf, type EstadoCf, type PassoCustom } from './fluxo_custom.ts';
+import { avancarCf, responderCf, interpolar, type EstadoCf, type PassoCustom } from './fluxo_custom.ts';
 import { montarCopyEmprestimo } from './fluxo_emprestimo.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
@@ -1379,6 +1379,8 @@ async function tratarComFluxoCustom(p: {
     : { passo: 0, dados: {}, tentativas: 0, concluido: false };   // 1ª vez, canal trocou de fluxo ou fluxo editado: recomeça
 
   const t = mesmoFluxo ? responderCf(passos, cf, p.inboundText) : avancarCf(passos, cf);
+  // interpola {primeiro_nome}/{chave} nos balões usando o que já foi coletado (cf_dados do turno)
+  t.baloes = t.baloes.map((b) => interpolar(b, t.estado.dados));
 
   const persistir = async (extra: Record<string, unknown> = {}) => {
     await admin.rpc('bot_avancar_etapa', {
