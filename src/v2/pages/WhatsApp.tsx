@@ -2061,10 +2061,9 @@ function KanbanCtx({ contatoId, demo, etapa, origem, respNome, lead, aoAvisar }:
       ) : opp ? (
         <>
           {ehGanho && (
-            <div style={{ margin: '2px 0 9px', padding: '7px 10px', borderRadius: 8, fontWeight: 700, fontSize: 12.5,
-              display: 'flex', alignItems: 'center', gap: 6,
-              background: 'rgba(34,197,94,.14)', color: 'var(--verde, #22c55e)', border: '1px solid rgba(34,197,94,.38)' }}>
-              ✓ Cliente FECHADO (ganho)
+            <div className="ctx-fechado">
+              <span className="ic" aria-hidden>✓</span>
+              <span className="tx"><b>Cliente fechado</b><small>Ganho · negócio concluído</small></span>
             </div>
           )}
           {fechada && !ehGanho && <div className="cx-l"><span className="k">Situação</span><span className="v">Fechada · {(fechada.status || '').toUpperCase()}</span></div>}
