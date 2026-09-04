@@ -305,9 +305,13 @@ export function useWaConversations() {
     enabled: WA_REAL,
     // PERF: o realtime (abaixo) é a fonte de frescor; este intervalo é só BACKSTOP, como o
     // comentário sempre disse. Antes eram 6s — e como o fetch levava ~3,8s, a requisição mal
-    // terminava antes da próxima começar. 60s + refetch ao focar a aba mantém a inbox fresca
-    // (o realtime cobre o tempo-real; este é só a rede de segurança se o canal cair).
-    refetchInterval: 60_000,
+    // terminava antes da próxima começar. O realtime cobre o tempo-real; este intervalo é só a
+    // rede de segurança se o canal cair. 2026-09-04: subido 60s→120s e com staleTime de 45s porque
+    // o inbox é a query MAIS PESADA do sistema (média ~400ms, picos de ~8s) e, multiplicada por
+    // várias abas + refetch ao focar, saturava o compute/conexões. O staleTime impede que cada
+    // troca de aba redispare a query pesada; o realtime aplica os deltas ao vivo mesmo assim.
+    refetchInterval: 120_000,
+    staleTime: 45_000,
     refetchOnWindowFocus: true,
     queryFn: async (): Promise<WaContact[]> => {
       const etapasPromise = etapasPorContato(orgId);   // dispara junto; espera depois do fetch principal
@@ -370,7 +374,10 @@ export function useWaConversations() {
     let timer: ReturnType<typeof setTimeout> | null = null;
     const invalidarListaEmBreve = () => {
       if (timer) clearTimeout(timer);
-      timer = setTimeout(() => { timer = null; qc.invalidateQueries({ queryKey: ['wa-conversas', orgId] }); }, 900);
+      // 2026-09-04: 900ms→4s. O patch por setQueryData (abaixo) já reflete o evento na hora, então
+      // este refetch completo é só reconciliação. Coalescer mais agressivamente corta as rajadas de
+      // ACK (cada status de saída era um refetch da query mais pesada do sistema) sem perder frescor.
+      timer = setTimeout(() => { timer = null; qc.invalidateQueries({ queryKey: ['wa-conversas', orgId] }); }, 4000);
     };
     // prefixo ['wa-msgs'] atinge só as queries de histórico; a da lista é ['wa-conversas', orgId].
     const invalidarHistorico = () => qc.invalidateQueries({ queryKey: ['wa-msgs'] });
