@@ -1919,7 +1919,9 @@ export default function WhatsAppV2() {
    ================================================================ */
 function SituacaoChipTopo({ lead, demo }: { lead: WaContact; demo: boolean }) {
   const oppsQ = useOportunidadesDoContato(!demo ? (lead.contatoId ?? null) : null);
-  if (!demo && (oppsQ.isLoading || (oppsQ.data ?? []).some((o) => o.aberta))) return null;
+  // Com QUALQUER oportunidade (aberta OU fechada), o seletor de etapa do cabeçalho (EtapaTopoSel)
+  // assume — inclusive para mover/reabrir um cliente fechado. O chip fica só p/ conversa sem opp.
+  if (!demo && (oppsQ.isLoading || (oppsQ.data ?? []).length > 0)) return null;
   const sit = situacaoDe(lead); const cor = corDaSituacao(lead, sit.texto);
   return <span className={'wa-hchip etapa sit-' + sit.variante} title="Situação no funil" style={cor ? { background: cor + '26', color: cor } : undefined}>{sit.texto}</span>;
 }
@@ -1934,8 +1936,14 @@ function SituacaoChipTopo({ lead, demo }: { lead: WaContact; demo: boolean }) {
 function EtapaTopoSel({ lead, demo, aoAvisar }: { lead: WaContact; demo: boolean; aoAvisar: (a: AvisoInbox) => void }) {
   const contatoId = lead.contatoId ?? null;
   const oppsQ = useOportunidadesDoContato(!demo ? contatoId : null);
-  const aberta = demo ? null : (oppsQ.data ?? []).find((o) => o.aberta) ?? null;
-  const colunasQ = useColunasFunil(aberta?.funilId ?? null);
+  const abertaReal = demo ? null : (oppsQ.data ?? []).find((o) => o.aberta) ?? null;
+  // Também permite MOVER/REABRIR um cliente já fechado: sem oportunidade aberta, opera sobre a
+  // terminal (ganho/perdido/cancelado) mais recente. Mover uma terminal para uma etapa neutra é
+  // a reabertura (pede motivo); o trigger opp_sync_fechamento reabre a oportunidade no banco.
+  const alvo = abertaReal ?? (demo ? null : (oppsQ.data ?? [])
+    .filter((o) => o.status === 'ganho' || o.status === 'perdido' || o.status === 'cancelado')
+    .sort((a, b) => (b.atualizadoEm || '').localeCompare(a.atualizadoEm || ''))[0] ?? null);
+  const colunasQ = useColunasFunil(alvo?.funilId ?? null);
   const mover = useMoverOportunidade();
   const [movBusy, setMovBusy] = useState(false);
   const [pendCol, setPendCol] = useState<string | null>(null);        // coluna alvo enquanto salva (feedback imediato)
@@ -1944,23 +1952,23 @@ function EtapaTopoSel({ lead, demo, aoAvisar }: { lead: WaContact; demo: boolean
   const [motivoTxt, setMotivoTxt] = useState('');
   useEffect(() => { setPendCol(null); setMotivoModal(null); }, [contatoId]); // troca de conversa não herda estado de mover
   const colunas = colunasQ.data ?? [];
-  const colAtual = colunas.find((c) => c.id === aberta?.colunaId) ?? null;
-  if (!aberta) return null;
+  const colAtual = colunas.find((c) => c.id === alvo?.colunaId) ?? null;
+  if (!alvo) return null;
   function aoTrocarColuna(destinoId: string) {
-    if (!aberta || !destinoId || destinoId === aberta.colunaId) return;
+    if (!alvo || !destinoId || destinoId === alvo.colunaId) return;
     const destino = colunas.find((c) => c.id === destinoId);
     if (!destino) return;
-    const origem = colunas.find((c) => c.id === aberta.colunaId);
+    const origem = colunas.find((c) => c.id === alvo.colunaId);
     const tipo = classificarMovimento(origem?.resultado ?? 'neutro', destino.resultado);
     if (tipo === 'perdido') { setMotivoSel('sem_interesse'); setMotivoTxt(''); setMotivoModal({ destinoId, tipo: 'perdido' }); return; }
     if (tipo === 'reabertura') { setMotivoTxt(''); setMotivoModal({ destinoId, tipo: 'reabertura' }); return; }
     void executarMover(destinoId, {});                                 // neutro/ganho: move direto
   }
   async function executarMover(destinoId: string, motivos: { motivoPerda?: string | null; motivoPerdaDesc?: string | null; motivoReabertura?: string | null }) {
-    if (!aberta?.id || !aberta.atualizadoEm) return;
+    if (!alvo?.id || !alvo.atualizadoEm) return;
     setMovBusy(true); setPendCol(destinoId);
     try {
-      await mover({ id: aberta.id, colunaId: destinoId, atualizadoEmEsperado: aberta.atualizadoEm, ...motivos });
+      await mover({ id: alvo.id, colunaId: destinoId, atualizadoEmEsperado: alvo.atualizadoEm, ...motivos });
       aoAvisar({ tom: 'ok', texto: `Movido para ${colunas.find((c) => c.id === destinoId)?.nome ?? 'nova etapa'}.` });
       setMotivoModal(null);
     } catch (e) {
@@ -1968,16 +1976,16 @@ function EtapaTopoSel({ lead, demo, aoAvisar }: { lead: WaContact; demo: boolean
       setPendCol(null);                                                 // reverte o select ao valor real
     } finally { setMovBusy(false); }
   }
-  const nomeVisivel = (pendCol ? colunas.find((c) => c.id === pendCol)?.nome : null) ?? colAtual?.nome ?? aberta.colunaNome ?? '—';
+  const nomeVisivel = (pendCol ? colunas.find((c) => c.id === pendCol)?.nome : null) ?? colAtual?.nome ?? alvo.colunaNome ?? '—';
   return (
     <>
-      <span className={'p-btn btn-sec btn-mini wa-hetapa' + (movBusy ? ' off' : '')} title={`Etapa no funil: ${nomeVisivel} — clique para mover o card`}>
+      <span className={'p-btn btn-sec btn-mini wa-hetapa' + (movBusy ? ' off' : '')} title={`Etapa no funil: ${nomeVisivel} — clique para mover${alvo.aberta ? ' o card' : ' ou reabrir o cliente'}`}>
         <span className="dot" style={{ background: colAtual?.cor ?? lead.etapaCor ?? 'var(--txt-3)' }} />
         <span className="tx">{nomeVisivel}</span>
         <select aria-label="Mover etapa do card"
           disabled={movBusy || colunasQ.isLoading || colunas.length === 0}
-          value={pendCol ?? aberta.colunaId ?? ''} onChange={(e) => aoTrocarColuna(e.target.value)}>
-          {colunas.length === 0 && <option value={aberta.colunaId ?? ''}>{aberta.colunaNome || '—'}</option>}
+          value={pendCol ?? alvo.colunaId ?? ''} onChange={(e) => aoTrocarColuna(e.target.value)}>
+          {colunas.length === 0 && <option value={alvo.colunaId ?? ''}>{alvo.colunaNome || '—'}</option>}
           {colunas.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
         </select>
       </span>
