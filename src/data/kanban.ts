@@ -215,7 +215,7 @@ export function useFunisDaOrg() {
 }
 
 export interface OppDoContato {
-  id: string; status: string; aberta: boolean; funilId: string | null; funilNome: string; colunaId: string | null; colunaNome: string; respId: string | null; respNome: string;
+  id: string; status: string; aberta: boolean; funilId: string | null; funilNome: string; colunaId: string | null; colunaNome: string; colunaCor: string | null; respId: string | null; respNome: string;
   tipoServico: string; tipoBeneficio: string | null; valor: number | null; valorDescontoMensal: number | null;
   valorRessarcimentoEstimado: number | null; valorRessarcido: number | null; origem: string; criadoEm: string; atualizadoEm: string;
 }
@@ -227,17 +227,17 @@ export function useOportunidadesDoContato(contatoId: string | null) {
     queryKey: ['opp-do-contato', org, contatoId], enabled: KANBAN_REAL && !!contatoId,
     queryFn: async (): Promise<OppDoContato[]> => {
       const { data, error } = await supabase!.from('oportunidades')
-        .select('id, status, funil_id, coluna_id, responsavel_id, tipo_servico, tipo_beneficio, valor_estimado, valor_desconto_mensal, valor_ressarcimento_estimado, valor_ressarcido, origem, criado_em, atualizado_em, funis(nome), funil_colunas(nome), responsavel:usuarios!oportunidades_responsavel_id_fkey(nome)')
+        .select('id, status, funil_id, coluna_id, responsavel_id, tipo_servico, tipo_beneficio, valor_estimado, valor_desconto_mensal, valor_ressarcimento_estimado, valor_ressarcido, origem, criado_em, atualizado_em, funis(nome), funil_colunas(nome, cor), responsavel:usuarios!oportunidades_responsavel_id_fkey(nome)')
         .eq('organizacao_id', org).eq('contato_id', contatoId!).order('criado_em', { ascending: false });
       if (error) throw new Error(error.message);
       return (((data as unknown[]) ?? []) as Record<string, unknown>[]).map((r) => {
         const fn = one(r.funis as { nome: string } | { nome: string }[] | null);
-        const cl = one(r.funil_colunas as { nome: string } | { nome: string }[] | null);
+        const cl = one(r.funil_colunas as { nome: string; cor?: string | null } | { nome: string; cor?: string | null }[] | null);
         const rp = one(r.responsavel as { nome: string } | { nome: string }[] | null);
         const status = r.status as string;
         return {
           id: r.id as string, status, aberta: status === 'em_andamento', funilId: (r.funil_id as string) ?? null,
-          funilNome: fn?.nome || '', colunaId: (r.coluna_id as string) ?? null, colunaNome: cl?.nome || '', respId: (r.responsavel_id as string) ?? null, respNome: rp?.nome || '',
+          funilNome: fn?.nome || '', colunaId: (r.coluna_id as string) ?? null, colunaNome: cl?.nome || '', colunaCor: cl?.cor ?? null, respId: (r.responsavel_id as string) ?? null, respNome: rp?.nome || '',
           tipoServico: (r.tipo_servico as string) || 'analise_inicial', tipoBeneficio: (r.tipo_beneficio as string) ?? null,
           valor: (r.valor_estimado as number) ?? null, valorDescontoMensal: (r.valor_desconto_mensal as number) ?? null,
           valorRessarcimentoEstimado: (r.valor_ressarcimento_estimado as number) ?? null, valorRessarcido: (r.valor_ressarcido as number) ?? null,

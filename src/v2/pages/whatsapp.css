@@ -540,22 +540,25 @@
 .v2 .conv2 .cchip.sit-perdido, .v2 .conv2 .cchip.sit-cancelado, .v2 .wa-hchip.sit-perdido, .v2 .wa-hchip.sit-cancelado { color: var(--rubro); border-color: rgba(var(--rubro-rgb), .35); }
 .v2 .conv2 .cchip.sit-lead, .v2 .wa-hchip.sit-lead { color: var(--ambar); border-color: rgba(var(--ambar-rgb), .3); }
 
-/* Badge "Cliente fechado (ganho)" no painel do contato — sinaliza forte, mas sóbrio e on-brand. */
-.v2 .ctx-fechado {
+/* Selo de situação do funil no painel do contato. A cor vem de --fase: semântica para os
+   terminais (ganho=verde, perdido=vermelho, cancelado=neutro) e a cor da própria coluna do
+   Kanban para as etapas ativas (Documentos, Remarketing, Lead qualificado, etc.). O color-mix
+   deriva o fundo/borda suaves a partir dessa cor, seja ela um token (var(--verde)) ou um hex. */
+.v2 .ctx-fase {
   display: flex; align-items: center; gap: 9px; width: 100%; box-sizing: border-box;
   margin: 1px 0 11px; padding: 9px 11px; border-radius: 11px;
-  background: linear-gradient(180deg, rgba(var(--verde-rgb), .12), rgba(var(--verde-rgb), .06));
-  border: 1px solid rgba(var(--verde-rgb), .28);
+  background: color-mix(in srgb, var(--fase) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--fase) 32%, transparent);
 }
-.v2 .ctx-fechado .ic {
+.v2 .ctx-fase .ic {
   width: 22px; height: 22px; flex-shrink: 0; border-radius: 50%;
   display: inline-flex; align-items: center; justify-content: center;
-  background: var(--verde); color: #fff; font-size: 12px; font-weight: 800; line-height: 1;
-  box-shadow: 0 0 0 3px rgba(var(--verde-rgb), .14);
+  background: var(--fase); color: #fff; font-size: 12px; font-weight: 800; line-height: 1;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--fase) 16%, transparent);
 }
-.v2 .ctx-fechado .tx { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.v2 .ctx-fechado .tx b { font-size: 12.5px; font-weight: 700; color: var(--verde); letter-spacing: .01em; }
-.v2 .ctx-fechado .tx small { font-size: 10px; font-weight: 500; color: var(--txt-2); letter-spacing: .02em; }
+.v2 .ctx-fase .tx { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.v2 .ctx-fase .tx b { font-size: 12.5px; font-weight: 700; color: var(--fase); letter-spacing: .01em; }
+.v2 .ctx-fase .tx small { font-size: 10px; font-weight: 500; color: var(--txt-2); letter-spacing: .02em; }
 
 @media (max-width: 1200px) {
   .v2 .wa-ctx { position: absolute; right: 0; top: 0; bottom: 0; z-index: 40; box-shadow: -18px 0 40px rgba(0, 0, 0, .45); background: var(--surface); }

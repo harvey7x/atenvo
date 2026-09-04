@@ -2038,7 +2038,7 @@ function KanbanCtx({ contatoId, demo, etapa, origem, respNome, lead, aoAvisar }:
   const [addBusy, setAddBusy] = useState(false);
   if (!contatoId) return null;
   const oppDemo = demo && etapa
-    ? { id: 'demo-opp', funilNome: 'Funil comercial', colunaId: null as string | null, colunaNome: etapa, respId: lead.respId ?? null, respNome: respNome ?? '', tipoServico: 'analise_inicial', tipoBeneficio: 'aposentadoria', valor: null, atualizadoEm: '', status: lead.oppStatus === 'ganho' || lead.oppStatus === 'perdido' || lead.oppStatus === 'cancelado' ? lead.oppStatus : 'em_andamento' }
+    ? { id: 'demo-opp', funilNome: 'Funil comercial', colunaId: null as string | null, colunaNome: etapa, colunaCor: lead.etapaCor ?? null, respId: lead.respId ?? null, respNome: respNome ?? '', tipoServico: 'analise_inicial', tipoBeneficio: 'aposentadoria', valor: null, atualizadoEm: '', status: lead.oppStatus === 'ganho' || lead.oppStatus === 'perdido' || lead.oppStatus === 'cancelado' ? lead.oppStatus : 'em_andamento' }
     : null;
   const aberta = demo ? (oppDemo?.status === 'em_andamento' ? oppDemo : null) : abertaReal;
   // Cliente FECHADO não some do painel: sem oportunidade aberta, a fechada mais
@@ -2060,13 +2060,24 @@ function KanbanCtx({ contatoId, demo, etapa, origem, respNome, lead, aoAvisar }:
         <div className="ctx-nota">Carregando…</div>
       ) : opp ? (
         <>
-          {ehGanho && (
-            <div className="ctx-fechado">
-              <span className="ic" aria-hidden>✓</span>
-              <span className="tx"><b>Cliente fechado</b><small>Ganho · negócio concluído</small></span>
-            </div>
-          )}
-          {fechada && !ehGanho && <div className="cx-l"><span className="k">Situação</span><span className="v">Fechada · {(fechada.status || '').toUpperCase()}</span></div>}
+          {(() => {
+            // Selo de situação para QUALQUER etapa do funil: terminais têm cor semântica
+            // (ganho=verde, perdido=vermelho, cancelado=neutro); etapas ativas usam a cor da
+            // própria coluna do Kanban (Documentos, Remarketing, Lead qualificado, etc.).
+            const st = opp.status;
+            const etapaNome = (opp.colunaNome || '').trim();
+            let fase: string, icon: string, titulo: string, sub: string;
+            if (st === 'ganho')          { fase = 'var(--verde)'; icon = '✓'; titulo = 'Cliente fechado'; sub = 'Ganho · negócio concluído'; }
+            else if (st === 'perdido')   { fase = 'var(--rubro)'; icon = '✕'; titulo = 'Cliente perdido'; sub = 'Oportunidade encerrada'; }
+            else if (st === 'cancelado') { fase = 'var(--txt-3)'; icon = '–'; titulo = 'Cancelado'; sub = 'Oportunidade cancelada'; }
+            else                         { fase = opp.colunaCor || '#6366f1'; icon = '●'; titulo = etapaNome || 'Em andamento'; sub = 'Etapa atual no funil'; }
+            return (
+              <div className="ctx-fase" style={{ ['--fase']: fase } as React.CSSProperties}>
+                <span className="ic" aria-hidden>{icon}</span>
+                <span className="tx"><b>{titulo}</b><small>{sub}</small></span>
+              </div>
+            );
+          })()}
           <div className="cx-l"><span className="k">Funil</span><span className="v">{opp.funilNome ?? '—'}</span></div>
           <div className="cx-l"><span className="k">Responsável</span><span className="v">{opp.respNome || 'Não atribuído'}</span></div>
           <div className="cx-l"><span className="k">Origem</span><span className="v">{origem}</span></div>
