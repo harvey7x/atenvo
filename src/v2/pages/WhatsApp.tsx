@@ -2049,6 +2049,7 @@ function KanbanCtx({ contatoId, demo, etapa, origem, respNome, lead, aoAvisar }:
       : (oppsQ.data ?? []).filter((o) => o.status === 'ganho' || o.status === 'perdido' || o.status === 'cancelado')
         .sort((a, b) => (b.atualizadoEm || '').localeCompare(a.atualizadoEm || ''))[0] ?? null);
   const opp = aberta ?? fechada;
+  const ehGanho = fechada?.status === 'ganho';   // cliente FECHADO (ganho): sinaliza forte e não deixa recriar
   // demo com ficha seed (ex.: Antônio, kct-5): renderiza a FichaJudicialBox real —
   // inclui o envio à planilha simulado — no lugar do cartão-placeholder.
   const fichaDemo = demo ? fichaDemoDoContato(contatoId) : null;
@@ -2059,13 +2060,21 @@ function KanbanCtx({ contatoId, demo, etapa, origem, respNome, lead, aoAvisar }:
         <div className="ctx-nota">Carregando…</div>
       ) : opp ? (
         <>
-          {fechada && <div className="cx-l"><span className="k">Situação</span><span className="v">Fechada · {(fechada.status || '').toUpperCase()}</span></div>}
+          {ehGanho && (
+            <div style={{ margin: '2px 0 9px', padding: '7px 10px', borderRadius: 8, fontWeight: 700, fontSize: 12.5,
+              display: 'flex', alignItems: 'center', gap: 6,
+              background: 'rgba(34,197,94,.14)', color: 'var(--verde, #22c55e)', border: '1px solid rgba(34,197,94,.38)' }}>
+              ✓ Cliente FECHADO (ganho)
+            </div>
+          )}
+          {fechada && !ehGanho && <div className="cx-l"><span className="k">Situação</span><span className="v">Fechada · {(fechada.status || '').toUpperCase()}</span></div>}
           <div className="cx-l"><span className="k">Funil</span><span className="v">{opp.funilNome ?? '—'}</span></div>
           <div className="cx-l"><span className="k">Responsável</span><span className="v">{opp.respNome || 'Não atribuído'}</span></div>
           <div className="cx-l"><span className="k">Origem</span><span className="v">{origem}</span></div>
           <div style={{ marginTop: 7, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             <BotaoMini onClick={() => nav(demo ? '/kanban' : `/kanban?oportunidade=${encodeURIComponent(opp.id)}`)}>Abrir no Kanban</BotaoMini>
-            {fechada && <BotaoMini onClick={() => { setFunilSel(funisQ.data?.find((f) => f.padrao)?.id ?? funisQ.data?.[0]?.id ?? ''); setAddAberto(true); }}>Adicionar ao Kanban</BotaoMini>}
+            {/* Perdido/cancelado podem reentrar (recuperação). GANHO não: recriar só erraria no banco. */}
+            {fechada && !ehGanho && <BotaoMini onClick={() => { setFunilSel(funisQ.data?.find((f) => f.padrao)?.id ?? funisQ.data?.[0]?.id ?? ''); setAddAberto(true); }}>Adicionar ao Kanban</BotaoMini>}
           </div>
           {demo && !fichaDemo ? (
             /* representação da ficha no demo — MESMAS classes fjb do componente real (aplica o override Platina) */
@@ -2104,7 +2113,12 @@ function KanbanCtx({ contatoId, demo, etapa, origem, respNome, lead, aoAvisar }:
                 await chamarGarantirEntrada({ contatoId, funilId: funilSel, origem: 'WhatsApp', conversaId: lead.id, canalId: lead.canalId ?? undefined });
                 aoAvisar({ tom: 'ok', texto: 'Adicionado ao Kanban' });
                 setAddAberto(false);
-              } catch (e) { aoAvisar({ tom: 'erro', texto: (e as Error)?.message || 'Falha ao adicionar.' }); }
+              } catch (e) {
+                const m = (e as Error)?.message || '';
+                aoAvisar({ tom: 'erro', texto: m.includes('cliente_ja_fechado_ganho')
+                  ? 'Este cliente já está FECHADO (ganho) — não dá para recriá-lo como lead novo. Reabra pelo Kanban se precisar.'
+                  : (m || 'Falha ao adicionar.') });
+              }
               finally { setAddBusy(false); }
             }}>{addBusy ? 'Adicionando…' : 'Adicionar'}</BotaoPrimario>
           </>

@@ -243,10 +243,17 @@ async function etapasPorContato(orgId: string): Promise<Map<string, EtapaContato
       const col = Array.isArray(r.funil_colunas) ? r.funil_colunas[0] : r.funil_colunas;
       if (!col?.nome) continue;
       const emAndamento = r.status === 'em_andamento';
+      const curGanho = r.status === 'ganho';
       const prev = map.get(cid);
-      // já ordenado por atualizado_em desc: o 1º visto é o mais recente.
-      // só substitui quando o anterior NÃO está em andamento e o atual está.
-      if (prev && !(emAndamento && !prev.emAndamento)) continue;
+      // Ordenado por atualizado_em desc: o 1º visto é o mais recente.
+      // Regra: um GANHO é "grudento" — cliente fechado (ganho) NUNCA perde o selo FECHADO no
+      // inbox por causa de uma oportunidade ativa/paralela. Fora isso, mantém-se o comportamento
+      // antigo (a etapa ATIVA vence uma anterior encerrada, para mostrar o estágio vivo).
+      if (prev) {
+        if (prev.status === 'ganho') continue;                          // ganho já registrado vence tudo
+        if (!curGanho && !(emAndamento && !prev.emAndamento)) continue; // não-ganho: regra antiga
+        // curGanho (com prev não-ganho) cai fora do continue e substitui abaixo
+      }
       const st = r.status;
       map.set(cid, {
         etapa: col.nome,
