@@ -669,8 +669,11 @@ export interface CanalEnvioSaude { estado: EnvioSaudeEstado; falhasConsecutivas:
 /** Classifica a saúde de ENVIO a partir dos status das últimas saídas (mais RECENTE primeiro).
  *  Pura e testável. Baseia-se na taxa REAL de falha — NÃO no state=open.
  *  - indisponivel: >=3 saídas mais recentes seguidas com falha (ex.: o "0/N" do incidente);
- *  - instavel: última saída falhou, ou >=40% de falha na janela (com algum sucesso);
- *  - ok: caso contrário. Um sucesso na frente derruba o alerta (volta a saudável só com evidência). */
+ *  - instavel: >=2 falhas seguidas na frente, ou >=40% de falha na janela (o que já exige 2 falhas);
+ *  - ok: caso contrário. Um sucesso na frente derruba o alerta (volta a saudável só com evidência).
+ *  UMA falha isolada NÃO acende o aviso: a taxa basal de falha do provider é ~0,2%, então o gatilho
+ *  antigo (consec>=1, total>=3) acendia "instável" toda semana com o envio saudável — e o atendente
+ *  passou a ignorar o aviso, que é justamente o que não pode acontecer quando o chip cair de verdade. */
 export function avaliarEnvioSaude(statusesRecentePrimeiro: string[]): CanalEnvioSaude {
   const total = statusesRecentePrimeiro.length;
   const falhas = statusesRecentePrimeiro.filter((s) => s === 'falhou').length;
@@ -678,11 +681,17 @@ export function avaliarEnvioSaude(statusesRecentePrimeiro: string[]): CanalEnvio
   for (const s of statusesRecentePrimeiro) { if (s === 'falhou') consec++; else break; }
   let estado: EnvioSaudeEstado = 'ok';
   if (consec >= 3) estado = 'indisponivel';
-  else if (consec >= 1 || (total >= 3 && falhas / total >= 0.4)) estado = 'instavel';
+  else if (consec >= 2 || (total >= 3 && falhas / total >= 0.4)) estado = 'instavel';
   return { estado, falhasConsecutivas: consec, total, falhas };
 }
 
-/** Saúde de envio do canal a partir da taxa real de falha das últimas saídas (janela de 2h, últimas 10). */
+/** Saúde de envio do canal a partir da taxa real de falha das últimas saídas (janela de 2h, últimas 10).
+ *  MEDE PELO CHIP QUE DESPACHOU (metadados.canal_envio_id, carimbado pela evolution-send), não por
+ *  `conversas.canal_id` — aquele é o canal de ORIGEM da conversa. A diferença não é acadêmica: em
+ *  08/09 o EMPRÉSTIMO apareceu "instável" porque os envios que PASSARAM por ele foram descartados
+ *  (as conversas tinham nascido em outro chip) e entraram no lugar 2 notas internas do IA SDR, que
+ *  nunca vão ao WhatsApp. Amostra de 4 com 2 falhas = 50%, e o aviso acendeu sozinho.
+ *  Só conta o que de fato saiu: id_externo preenchido (aceito pelo provider) ou status 'falhou'. */
 export function useWaCanalEnvioSaude(canalId: string | null | undefined) {
   return useQuery({
     queryKey: ['wa-canal-envio-saude', canalId],
@@ -692,15 +701,17 @@ export function useWaCanalEnvioSaude(canalId: string | null | undefined) {
       const desde = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
       const { data, error } = await supabase!
         .from('mensagens')
-        .select('status, conversas!inner(canal_id)')
-        .eq('conversas.canal_id', canalId!)
+        .select('status, id_externo')
+        .eq('metadados->>canal_envio_id', canalId!)
         .eq('direcao', 'saida')
         .gte('criado_em', desde)
         .order('criado_em', { ascending: false })
         .limit(10);
       if (error) throw new Error(error.message);
-      const rows = (data as unknown as { status: string }[]) ?? [];
-      return avaliarEnvioSaude(rows.map((r) => r.status));
+      const rows = (data as unknown as { status: string; id_externo: string | null }[]) ?? [];
+      // nota interna (sem id_externo e sem falha) nunca tocou o WhatsApp — não é evidência de saúde.
+      const reais = rows.filter((r) => r.status === 'falhou' || !!r.id_externo);
+      return avaliarEnvioSaude(reais.map((r) => r.status));
     },
   });
 }
