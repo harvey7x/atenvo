@@ -296,6 +296,7 @@ function TabelaTrafego({ atual, anterior }: { atual: DashTrafego[]; anterior: Da
           { rot: 'Sem benefício INSS', v: t.ne_sem_beneficio_inss },
           { rot: 'Muitos processos', v: t.ne_muitos_processos },
           { rot: 'Sem interesse', v: t.ne_sem_interesse },
+          { rot: 'Sem empréstimo em banco parceiro', v: t.ne_sem_emprestimo_banco },
           { rot: 'Sem categoria', v: t.ne_sem_categoria },
         ].filter((c) => c.v > 0);
         return (

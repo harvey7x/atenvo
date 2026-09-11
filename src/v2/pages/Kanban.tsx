@@ -7,7 +7,7 @@ import {
   KANBAN_REAL, useKanban, useOportunidadesAbertasDeContatos, useConversasDoContato,
   useNaoLidasPorContato, useOportunidadeEventos,
   classificarMovimento, traduzErroKanban, valorRelevante,
-  MOTIVOS_PERDA, MOTIVOS_NAO_ELEGIVEL, rotuloMotivoPerda, rotuloPerdaCompleto, rotuloDe,
+  MOTIVOS_NAO_ELEGIVEL, rotuloMotivoPerda, rotuloPerdaCompleto, rotuloDe,
   TIPO_BENEFICIO_OPCOES as TIPO_BENEFICIO, TIPO_SERVICO_OPCOES as TIPO_SERVICO,
   STATUS_CANCEL_OPCOES as ST_CANCEL, STATUS_RESS_OPCOES as ST_RESS,
   type KLead, type KColuna, type ColResultado, type MovimentoTipo, type OppAberta, type OppEvento,
@@ -279,9 +279,7 @@ export default function KanbanV2() {
 
   const [pend, setPend] = useState<{ lead: KLead; colDest: KColuna; tipo: MovimentoTipo } | null>(null);
   const [movBusy, setMovBusy] = useState(false);
-  const [motPerda, setMotPerda] = useState('');
-  const [motPerdaDesc, setMotPerdaDesc] = useState('');
-  const [motNE, setMotNE] = useState(''); // sub-motivo obrigatório quando motPerda === 'nao_elegivel'
+  const [motNE, setMotNE] = useState(''); // motivo do descarte ("Não elegível" é a única coluna perdida)
   const [motReab, setMotReab] = useState('');
   const [movErr, setMovErr] = useState<string | null>(null);
 
@@ -651,7 +649,7 @@ export default function KanbanV2() {
     const resOrig: ColResultado = colunas.find((c) => c.id === colunaDoLead(lead))?.resultado ?? 'neutro';
     const tipo = classificarMovimento(resOrig, colDest.resultado);
     if (tipo !== 'neutro') {
-      setMotPerda(''); setMotPerdaDesc(''); setMotNE(''); setMotReab(''); setMovErr(null);
+      setMotNE(''); setMotReab(''); setMovErr(null);
       setPend({ lead, colDest, tipo });
       return;
     }
@@ -668,9 +666,7 @@ export default function KanbanV2() {
 
   const confirmarMov = async () => {
     if (!pend || movBusy) return;
-    if (pend.tipo === 'perdido' && !motPerda) { setMovErr('Selecione o motivo da perda.'); return; }
-    if (pend.tipo === 'perdido' && motPerda === 'outro' && !motPerdaDesc.trim()) { setMovErr('Descreva o motivo da perda.'); return; }
-    if (pend.tipo === 'perdido' && motPerda === 'nao_elegivel' && !motNE) { setMovErr('Diga por que o cliente não é elegível.'); return; }
+    if (pend.tipo === 'perdido' && !motNE) { setMovErr('Diga por que o cliente não é elegível.'); return; }
     if (pend.tipo === 'reabertura' && !motReab.trim()) { setMovErr('Informe o motivo da reabertura.'); return; }
     setMovBusy(true);
     const atual = leads.find((l) => l.id === pend.lead.id)?.atualizadoEm ?? pend.lead.atualizadoEm;
@@ -678,9 +674,8 @@ export default function KanbanV2() {
     try {
       await moverOportunidade({
         id: pend.lead.id, colunaId: pend.colDest.id, atualizadoEmEsperado: atual,
-        motivoPerda: pend.tipo === 'perdido' ? motPerda : undefined,
-        motivoPerdaDesc: pend.tipo === 'perdido' && motPerda === 'outro' ? motPerdaDesc.trim() : undefined,
-        motivoNaoElegivel: pend.tipo === 'perdido' ? (motPerda === 'nao_elegivel' ? motNE : null) : undefined,
+        motivoPerda: pend.tipo === 'perdido' ? 'nao_elegivel' : undefined,
+        motivoNaoElegivel: pend.tipo === 'perdido' ? motNE : undefined,
         motivoReabertura: pend.tipo === 'reabertura' ? motReab.trim() : undefined,
       });
       setAviso({
@@ -824,7 +819,7 @@ export default function KanbanV2() {
           if (demo) aplicarDemo(patchDemo);
           else await k.editarLead({ id: el.id, ...comum });
           setLeadModal(null);
-          setMotPerda(''); setMotPerdaDesc(''); setMotNE(''); setMotReab(''); setMovErr(null);
+          setMotNE(''); setMotReab(''); setMovErr(null);
           setPend({ lead: el, colDest, tipo });
         } else {
           if (demo) aplicarDemo(patchDemo, lf.colunaId || undefined);
@@ -1335,27 +1330,12 @@ export default function KanbanV2() {
             {pend.tipo === 'perdido' && (
               <div className="form-grid" style={{ marginTop: 12 }}>
                 <div className="campo">
-                  <label>Motivo da perda *</label>
-                  <select className="inp" value={motPerda} onChange={(e) => { setMotPerda(e.target.value); setMovErr(null); }}>
+                  <label>Por que não é elegível? *</label>
+                  <select className="inp" value={motNE} onChange={(e) => { setMotNE(e.target.value); setMovErr(null); }}>
                     <option value="">Selecione…</option>
-                    {MOTIVOS_PERDA.map(([v, r]) => <option key={v} value={v}>{r}</option>)}
+                    {MOTIVOS_NAO_ELEGIVEL.map(([v, r]) => <option key={v} value={v}>{r}</option>)}
                   </select>
                 </div>
-                {motPerda === 'nao_elegivel' && (
-                  <div className="campo">
-                    <label>Por que não é elegível? *</label>
-                    <select className="inp" value={motNE} onChange={(e) => { setMotNE(e.target.value); setMovErr(null); }}>
-                      <option value="">Selecione…</option>
-                      {MOTIVOS_NAO_ELEGIVEL.map(([v, r]) => <option key={v} value={v}>{r}</option>)}
-                    </select>
-                  </div>
-                )}
-                {motPerda === 'outro' && (
-                  <div className="campo">
-                    <label>Descrição *</label>
-                    <textarea className="inp" rows={2} placeholder="Descreva o motivo" value={motPerdaDesc} onChange={(e) => { setMotPerdaDesc(e.target.value); setMovErr(null); }} />
-                  </div>
-                )}
               </div>
             )}
             {pend.tipo === 'reabertura' && (

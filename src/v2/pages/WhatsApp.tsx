@@ -9,7 +9,7 @@ import { useScriptsResumoEtapas } from '../hooks/scriptsResumo';
 import { useJanelaCanal, rotuloJanela } from '@/data/cloudApi';
 import { useSlaAlertas } from '@/data/sla';
 import { indexPorChave, tipoLabel, tempoRelativo } from '@/data/slaView';
-import { useOportunidadesDoContato, useFunisDaOrg, chamarGarantirEntrada, useColunasFunil, useMoverOportunidade, classificarMovimento, MOTIVOS_PERDA, MOTIVOS_NAO_ELEGIVEL, traduzErroKanban } from '@/data/kanban';
+import { useOportunidadesDoContato, useFunisDaOrg, chamarGarantirEntrada, useColunasFunil, useMoverOportunidade, classificarMovimento, MOTIVOS_NAO_ELEGIVEL, traduzErroKanban } from '@/data/kanban';
 import { useChecklist } from '@/data/checklist';
 import { useCobrancas } from '@/data/cobrancas';
 import { corDaEtiqueta, podeGerenciarAtendimento, PALETA_CORES } from '@/types/atendimento';
@@ -1948,8 +1948,7 @@ function EtapaTopoSel({ lead, demo, aoAvisar }: { lead: WaContact; demo: boolean
   const [movBusy, setMovBusy] = useState(false);
   const [pendCol, setPendCol] = useState<string | null>(null);        // coluna alvo enquanto salva (feedback imediato)
   const [motivoModal, setMotivoModal] = useState<null | { destinoId: string; tipo: 'perdido' | 'reabertura' }>(null);
-  const [motivoSel, setMotivoSel] = useState('sem_interesse');
-  const [motivoNE, setMotivoNE] = useState(''); // sub-motivo obrigatório quando motivoSel === 'nao_elegivel'
+  const [motivoNE, setMotivoNE] = useState(''); // motivo do descarte ("Não elegível" é a única coluna perdida)
   const [motivoTxt, setMotivoTxt] = useState('');
   useEffect(() => { setPendCol(null); setMotivoModal(null); }, [contatoId]); // troca de conversa não herda estado de mover
   const colunas = colunasQ.data ?? [];
@@ -1961,7 +1960,7 @@ function EtapaTopoSel({ lead, demo, aoAvisar }: { lead: WaContact; demo: boolean
     if (!destino) return;
     const origem = colunas.find((c) => c.id === alvo.colunaId);
     const tipo = classificarMovimento(origem?.resultado ?? 'neutro', destino.resultado);
-    if (tipo === 'perdido') { setMotivoSel('sem_interesse'); setMotivoNE(''); setMotivoTxt(''); setMotivoModal({ destinoId, tipo: 'perdido' }); return; }
+    if (tipo === 'perdido') { setMotivoNE(''); setMotivoTxt(''); setMotivoModal({ destinoId, tipo: 'perdido' }); return; }
     if (tipo === 'reabertura') { setMotivoTxt(''); setMotivoModal({ destinoId, tipo: 'reabertura' }); return; }
     void executarMover(destinoId, {});                                 // neutro/ganho: move direto
   }
@@ -1999,35 +1998,22 @@ function EtapaTopoSel({ lead, demo, aoAvisar }: { lead: WaContact; demo: boolean
           <>
             <BotaoSec disabled={movBusy} onClick={() => setMotivoModal(null)}>Cancelar</BotaoSec>
             <BotaoPrimario
-              disabled={movBusy || !motivoModal || (motivoModal.tipo === 'perdido' ? ((motivoSel === 'outro' && !motivoTxt.trim()) || (motivoSel === 'nao_elegivel' && !motivoNE)) : !motivoTxt.trim())}
+              disabled={movBusy || !motivoModal || (motivoModal.tipo === 'perdido' ? !motivoNE : !motivoTxt.trim())}
               onClick={() => {
                 if (!motivoModal) return;
-                if (motivoModal.tipo === 'perdido') void executarMover(motivoModal.destinoId, { motivoPerda: motivoSel, motivoPerdaDesc: motivoSel === 'outro' ? motivoTxt.trim() : null, motivoNaoElegivel: motivoSel === 'nao_elegivel' ? motivoNE : null });
+                if (motivoModal.tipo === 'perdido') void executarMover(motivoModal.destinoId, { motivoPerda: 'nao_elegivel', motivoNaoElegivel: motivoNE });
                 else void executarMover(motivoModal.destinoId, { motivoReabertura: motivoTxt.trim() });
               }}>{movBusy ? 'Movendo…' : 'Confirmar'}</BotaoPrimario>
           </>
         }
       >
         {motivoModal?.tipo === 'perdido' ? (
-          <>
-            <div className="campo"><label>Motivo da perda</label>
-              <select className="inp" value={motivoSel} onChange={(e) => setMotivoSel(e.target.value)}>
-                {MOTIVOS_PERDA.map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-              </select>
-            </div>
-            {motivoSel === 'nao_elegivel' && (
-              <div className="campo" style={{ marginTop: 10 }}><label>Por que não é elegível? *</label>
-                <select className="inp" value={motivoNE} onChange={(e) => setMotivoNE(e.target.value)}>
-                  <option value="">Selecione…</option>
-                  {MOTIVOS_NAO_ELEGIVEL.map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                </select>
-              </div>
-            )}
-            {motivoSel === 'outro' && (
-              <div className="campo" style={{ marginTop: 10 }}><label>Descreva</label>
-                <textarea className="inp" rows={2} value={motivoTxt} onChange={(e) => setMotivoTxt(e.target.value)} /></div>
-            )}
-          </>
+          <div className="campo"><label>Por que não é elegível? *</label>
+            <select className="inp" value={motivoNE} onChange={(e) => setMotivoNE(e.target.value)}>
+              <option value="">Selecione…</option>
+              {MOTIVOS_NAO_ELEGIVEL.map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            </select>
+          </div>
         ) : (
           <div className="campo"><label>Motivo da reabertura</label>
             <textarea className="inp" rows={2} value={motivoTxt} onChange={(e) => setMotivoTxt(e.target.value)} placeholder="Por que está reabrindo esta oportunidade?" /></div>
