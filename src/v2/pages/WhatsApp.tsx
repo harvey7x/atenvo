@@ -55,7 +55,7 @@ const ABA_KEY = 'atenvo-wa-aba';
 const GRUPOS_KEY = 'atenvo-wa-grupos-fechados';
 const TABS = [
   ['todos', 'Todos'], ['meus', 'Meus'], ['naoatrib', 'Não atribuídos'],
-  ['naolidas', 'Não lidas'], ['pendentes', 'Pendentes'], ['arquivadas', 'Arquivadas'],
+  ['naolidas', 'Não lidas'], ['pendentes', 'Pendentes'], ['fechados', 'Fechados'], ['arquivadas', 'Arquivadas'],
 ] as const;
 type TabId = typeof TABS[number][0];
 // Situação = baldes FIXOS de situacaoDaConversa (variante). 'etapa' fica DE FORA: as etapas
@@ -693,16 +693,22 @@ export default function WhatsAppV2() {
     (!filtroArquivadas || !!c.arquivada) &&
     dentroPeriodo(c.lastAtMs) &&
     (!term || c.name.toLowerCase().includes(term) || c.last.toLowerCase().includes(term) || (c.phone ?? '').toLowerCase().includes(term));
-  const passaTab = (c: WaContact, t: TabId) =>
-    t === 'arquivadas' ? !!c.arquivada
+  const passaTab = (c: WaContact, t: TabId) => {
+    if (t === 'arquivadas') return !!c.arquivada;
     // o toggle "Arquivadas" do painel revela arquivadas em qualquer aba (como a busca já faz)
-    : (!c.arquivada || buscaAtiva || filtroArquivadas) && (
-      t === 'todos' ? true
+    if (c.arquivada && !buscaAtiva && !filtroArquivadas) return false;
+    // cliente FECHADO (ganho) vive SÓ na aba "Fechados" — sai de TODAS as listas de
+    // atendimento, inclusive "Todos", pra não se misturar com quem ainda está sendo
+    // atendido (pedido do dono 11/09). Perdido/cancelado já arquivam sozinhos.
+    const fechado = situacaoDe(c).variante === 'ganho';
+    if (t === 'fechados') return fechado;
+    if (fechado) return false;
+    return t === 'todos' ? true
       : t === 'meus' ? c.respId === user?.id
       : t === 'naoatrib' ? !c.respId
       : t === 'naolidas' ? (c.unread ?? 0) > 0
-      : (c.unread ?? 0) > 0 || !!c.aguardando
-    );
+      : (c.unread ?? 0) > 0 || !!c.aguardando;
+  };
   const tabCounts = useMemo(() => {
     const base = contacts.filter(passaBase);
     const n: Record<string, number> = {};
