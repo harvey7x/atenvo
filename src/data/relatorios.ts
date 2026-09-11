@@ -6,11 +6,16 @@ export const REL_REAL = isSupabaseConfigured && !!supabase;
 const TZ = 'America/Sao_Paulo';
 
 /* ====================== Período (America/Sao_Paulo) ====================== */
-export type Preset = 'hoje' | 'ontem' | '7d' | '30d' | 'mes_atual' | 'mes_anterior' | 'custom';
+// 'mes_caf' = o mês COMERCIAL da casa: do dia 10 (00:00) ao dia 10 do mês seguinte
+// (fim exclusivo), navegável por offset de meses (RelFiltros.mesCaf; 0 = corrente).
+// O período anterior dele é o mês 10→10 EXATO anterior — não o deslocamento por
+// duração, que erraria 1 dia em meses de 31. Os presets civis (mes_atual/mes_anterior)
+// saíram da lista visível mas continuam válidos no tipo (estado antigo não quebra).
+export type Preset = 'hoje' | 'ontem' | '3d' | '7d' | '30d' | 'mes_caf' | 'mes_atual' | 'mes_anterior' | 'custom';
 export const PRESETS: { id: Preset; label: string }[] = [
   { id: 'hoje', label: 'Hoje' }, { id: 'ontem', label: 'Ontem' },
-  { id: '7d', label: 'Últimos 7 dias' }, { id: '30d', label: 'Últimos 30 dias' },
-  { id: 'mes_atual', label: 'Mês atual' }, { id: 'mes_anterior', label: 'Mês anterior' },
+  { id: '3d', label: 'Últimos 3 dias' }, { id: '7d', label: 'Últimos 7 dias' },
+  { id: '30d', label: 'Últimos 30 dias' }, { id: 'mes_caf', label: 'Nosso mês (10→10)' },
   { id: 'custom', label: 'Personalizado' },
 ];
 
@@ -18,6 +23,16 @@ export const PRESETS: { id: Preset; label: string }[] = [
 export function spHoje(): string { return new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()); }
 export function addDias(dateStr: string, n: number): string { const d = new Date(dateStr + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
 function primeiroDoMes(dateStr: string): string { return dateStr.slice(0, 8) + '01'; }
+/** Soma n meses mantendo o DIA 10 (dia 10 existe em todo mês — sem borda de 29/30/31). */
+function addMeses10(dateStr: string, n: number): string {
+  const [y, m] = dateStr.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1 + n, 10)).toISOString().slice(0, 10);
+}
+/** Dia 10 que ABRE o mês comercial (10→10) contendo `hoje`, deslocado `off` meses (off <= 0 = passado). */
+export function mesCafInicio(hoje: string, off = 0): string {
+  const abre10 = hoje.slice(8, 10) >= '10' ? hoje.slice(0, 7) + '-10' : addMeses10(hoje.slice(0, 7) + '-10', -1);
+  return addMeses10(abre10, off);
+}
 function instante(dateStr: string): string { return dateStr + 'T00:00:00-03:00'; } // SP = UTC-3 (sem DST)
 function difDias(aIso: string, bIso: string): number { return Math.round((new Date(bIso).getTime() - new Date(aIso).getTime()) / 86400000); }
 const fmtBR = (d: string) => d.split('-').reverse().join('/');
@@ -28,19 +43,22 @@ export interface Periodo {
   prevIniDate: string; prevIniISO: string;   // início do período anterior (fim = iniISO)
   dias: number; label: string; prevLabel: string;
 }
-export function resolvePeriodo(preset: Preset, ini?: string, fim?: string): Periodo {
+export function resolvePeriodo(preset: Preset, ini?: string, fim?: string, mesCaf = 0): Periodo {
   const hoje = spHoje();
   let di = hoje, df = addDias(hoje, 1); // df exclusivo
+  let prevIniOverride: string | null = null; // mes_caf: anterior = mês 10→10 exato (duração pode diferir)
   if (preset === 'hoje') { di = hoje; df = addDias(hoje, 1); }
   else if (preset === 'ontem') { di = addDias(hoje, -1); df = hoje; }
+  else if (preset === '3d') { di = addDias(hoje, -2); df = addDias(hoje, 1); }
   else if (preset === '7d') { di = addDias(hoje, -6); df = addDias(hoje, 1); }
   else if (preset === '30d') { di = addDias(hoje, -29); df = addDias(hoje, 1); }
+  else if (preset === 'mes_caf') { di = mesCafInicio(hoje, mesCaf); df = addMeses10(di, 1); prevIniOverride = addMeses10(di, -1); }
   else if (preset === 'mes_atual') { di = primeiroDoMes(hoje); df = addDias(hoje, 1); }
   else if (preset === 'mes_anterior') { const p = primeiroDoMes(hoje); di = primeiroDoMes(addDias(p, -1)); df = p; }
   else if (preset === 'custom' && ini && fim) { di = ini <= fim ? ini : fim; df = addDias(ini <= fim ? fim : ini, 1); }
   const iniISO = instante(di), fimISO = instante(df);
-  const dias = Math.max(1, difDias(iniISO, fimISO)); // período anterior tem a MESMA duração
-  const prevIniDate = addDias(di, -dias), prevIniISO = instante(prevIniDate);
+  const dias = Math.max(1, difDias(iniISO, fimISO)); // sem override, o período anterior tem a MESMA duração
+  const prevIniDate = prevIniOverride ?? addDias(di, -dias), prevIniISO = instante(prevIniDate);
   const ultimo = addDias(df, -1);
   const label = di === ultimo ? fmtBR(di) : `${fmtBR(di)} – ${fmtBR(ultimo)}`;
   const prevUlt = addDias(di, -1);
@@ -49,7 +67,7 @@ export function resolvePeriodo(preset: Preset, ini?: string, fim?: string): Peri
 }
 
 /* ====================== Filtros ====================== */
-export interface RelFiltros { preset: Preset; ini?: string; fim?: string; canal?: string; origem?: string; responsavel?: string; coluna?: string; status?: string; conexao?: string; }
+export interface RelFiltros { preset: Preset; ini?: string; fim?: string; mesCaf?: number; canal?: string; origem?: string; responsavel?: string; coluna?: string; status?: string; conexao?: string; }
 export const FILTROS_PADRAO: RelFiltros = { preset: '30d' };
 
 /* ====================== Funções puras (testáveis) ====================== */
@@ -139,7 +157,7 @@ function particao<T extends Row>(rows: T[], campo: string, p: Periodo): { atual:
   for (const r of rows) { const t = tms(r, campo); if (t >= ini) atual.push(r); else anterior.push(r); }
   return { atual, anterior };
 }
-const chaveFiltros = (f: RelFiltros) => JSON.stringify([f.preset, f.ini, f.fim, f.canal, f.origem, f.responsavel, f.coluna, f.status, f.conexao]);
+const chaveFiltros = (f: RelFiltros) => JSON.stringify([f.preset, f.ini, f.fim, f.mesCaf, f.canal, f.origem, f.responsavel, f.coluna, f.status, f.conexao]);
 /** chave de agrupamento por conexão de aquisição (id atual, snapshot p/ removida, ou 'sem'). */
 export function chaveConexao(canalOrigemId: string | null | undefined, snapshot: Record<string, unknown> | null | undefined): string {
   if (canalOrigemId) return canalOrigemId;
@@ -231,7 +249,7 @@ export interface ResumoData {
   economiaGerada: Kpi | null; economiaPreenchida: boolean;
 }
 export function useResumo(f: RelFiltros) {
-  const { currentOrg } = useOrg(); const org = currentOrg.id; const p = resolvePeriodo(f.preset, f.ini, f.fim);
+  const { currentOrg } = useOrg(); const org = currentOrg.id; const p = resolvePeriodo(f.preset, f.ini, f.fim, f.mesCaf);
   return useQuery({
     queryKey: ['rel-resumo', org, chaveFiltros(f)], enabled: REL_REAL, staleTime: 60_000,
     queryFn: async ({ signal }): Promise<ResumoData> => {
@@ -323,7 +341,7 @@ export function useResumo(f: RelFiltros) {
 export interface FunilColuna { id: string; nome: string; ordem: number; total: number }
 export interface ComercialData { leadsSerie: { label: string; v: number }[]; funil: FunilColuna[]; porStatus: { status: string; total: number }[]; taxaConversao: number; taxaFechamento: number; perdidos: number; paradasMais7d: number; totalOpp: number; }
 export function useComercial(f: RelFiltros, enabled: boolean) {
-  const { currentOrg } = useOrg(); const org = currentOrg.id; const p = resolvePeriodo(f.preset, f.ini, f.fim);
+  const { currentOrg } = useOrg(); const org = currentOrg.id; const p = resolvePeriodo(f.preset, f.ini, f.fim, f.mesCaf);
   return useQuery({
     queryKey: ['rel-comercial', org, chaveFiltros(f)], enabled: REL_REAL && enabled, staleTime: 60_000,
     queryFn: async ({ signal }): Promise<ComercialData> => {
@@ -363,7 +381,7 @@ export interface AtendimentoData {
   porCanal: { canal: string; total: number }[]; porHora: number[]; porDiaSemana: number[];
 }
 export function useAtendimento(f: RelFiltros, enabled: boolean) {
-  const { currentOrg } = useOrg(); const org = currentOrg.id; const p = resolvePeriodo(f.preset, f.ini, f.fim);
+  const { currentOrg } = useOrg(); const org = currentOrg.id; const p = resolvePeriodo(f.preset, f.ini, f.fim, f.mesCaf);
   return useQuery({
     queryKey: ['rel-atend', org, chaveFiltros(f)], enabled: REL_REAL && enabled, staleTime: 60_000,
     queryFn: async ({ signal }): Promise<AtendimentoData> => {
@@ -415,7 +433,7 @@ export interface LinhaComercial { id: string; nome: string; leads: number; oppAn
 export interface LinhaAtend { id: string; nome: string; conversasRespondidas: number; mensagensEnviadas: number; conversasSemResposta: number; }
 export interface EquipeData { comercial: LinhaComercial[]; atendimento: LinhaAtend[]; atendimentoAtribuivel: boolean; }
 export function useEquipe(f: RelFiltros, enabled: boolean) {
-  const { currentOrg } = useOrg(); const org = currentOrg.id; const p = resolvePeriodo(f.preset, f.ini, f.fim);
+  const { currentOrg } = useOrg(); const org = currentOrg.id; const p = resolvePeriodo(f.preset, f.ini, f.fim, f.mesCaf);
   return useQuery({
     queryKey: ['rel-equipe', org, chaveFiltros(f)], enabled: REL_REAL && enabled, staleTime: 60_000,
     queryFn: async ({ signal }): Promise<EquipeData> => {
@@ -549,7 +567,7 @@ export interface FinanceiroData extends FinAgg {
   previsao6m: { mes: string; previsto: number; recebido: number }[]; evolucao: { mes: string; recebido: number }[]; porServico: { nome: string; total: number }[];
 }
 export function useFinanceiro(f: RelFiltros, enabled: boolean) {
-  const { currentOrg } = useOrg(); const org = currentOrg.id; const p = resolvePeriodo(f.preset, f.ini, f.fim);
+  const { currentOrg } = useOrg(); const org = currentOrg.id; const p = resolvePeriodo(f.preset, f.ini, f.fim, f.mesCaf);
   return useQuery({
     queryKey: ['rel-fin', org, chaveFiltros(f)], enabled: REL_REAL && enabled, staleTime: 60_000,
     queryFn: async ({ signal }): Promise<FinanceiroData> => {
@@ -592,7 +610,7 @@ export function useFinanceiro(f: RelFiltros, enabled: boolean) {
 /** C: esta tabela conta OPORTUNIDADES por origem — nunca chamar de "leads" nem de "pessoas". */
 export interface LinhaOrigem { origem: string; oportunidades: number; ganhas: number; taxaConversao: number; }
 export function useOrigens(f: RelFiltros, enabled: boolean) {
-  const { currentOrg } = useOrg(); const org = currentOrg.id; const p = resolvePeriodo(f.preset, f.ini, f.fim);
+  const { currentOrg } = useOrg(); const org = currentOrg.id; const p = resolvePeriodo(f.preset, f.ini, f.fim, f.mesCaf);
   return useQuery({
     queryKey: ['rel-origens', org, chaveFiltros(f)], enabled: REL_REAL && enabled, staleTime: 60_000,
     queryFn: async ({ signal }): Promise<LinhaOrigem[]> => {
@@ -637,8 +655,10 @@ export interface ConexaoLinha extends ConexaoIdent {
   // Métricas separadas (Etapa 1): pessoas reais que chamaram vs contatos criados (podem incluir outbound-only/duplicados).
   pessoasQueChamaram: number; contatosCriados: number; conversasRecebidas: number; msgsInbound: number; msgsOutbound: number; difContatosPessoas: number;
   // fechados = CLIENTES distintos fechados no período (por fechado_em); negociosFechados = oportunidades ganhas (por fechado_em)
+  // perdidos = perda REAL (descarte fica fora — regra da casa); naoElegiveis = descarte, com os 3 motivos + sem categoria (histórico/bot)
   oportunidades: number; qualificados: number; fechados: number; negociosFechados: number; perdidos: number; qualifFechados: number;
-  taxaAtendimento: number; taxaQualificacao: number; taxaConversao: number; conversaoOportunidades: number; convQualificados: number;
+  naoElegiveis: number; neSemBeneficio: number; neMuitosProcessos: number; neSemInteresse: number; neSemCategoria: number;
+  taxaAtendimento: number; taxaQualificacao: number; taxaConversao: number; conversaoOportunidades: number; convQualificados: number; taxaNaoElegivel: number;
   primeiraRespostaMin: number | null; tempoAteFechamentoDias: number | null;
   receitaPrevista: number; receitaRecebida: number; valoresAtraso: number; economia: number; economiaPreenchida: boolean; clientesPagantes: number; ticketMedio: number;
 }
@@ -650,7 +670,7 @@ export interface ConexaoInput {
   contatosComInbound: Set<string>; // contatos com ≥1 mensagem direcao='entrada' no período
   firstIn: { conversa: string; chip: string; t: number }[]; firstResp: { conversa: string; chip: string; t: number }[];
   outbound: { chip: string }[]; // toda mensagem direcao='saida' no período (p/ contagem por chip)
-  opps: { chip: string; status: string; qualificada: boolean; tempoFechDias: number | null }[]; // oportunidades CRIADAS no período (criado_em)
+  opps: { chip: string; status: string; qualificada: boolean; tempoFechDias: number | null; motivoPerda: string | null; motivoNE: string | null }[]; // oportunidades CRIADAS no período (criado_em)
   fechamentos: { chip: string; contato: string }[]; // oportunidades GANHAS fechadas no período (fechado_em) — P2/P4. `contato` = PESSOA canônica (A), não contato_id.
   parcelas: { chip: string; contato: string; status: string; valor: number; valorPago: number | null; dataPrevista: string | null; dataPagamento: string | null }[];
   economiaPorChip: Record<string, { total: number; preenchida: boolean }>;
@@ -690,7 +710,14 @@ export function montaLinhasConexao(inp: ConexaoInput): ConexaoLinha[] {
     const ops = inp.opps.filter((o) => o.chip === chave);
     const oportunidades = ops.length;
     const oppsGanhasCriadas = ops.filter((o) => o.status === 'ganho').length; // p/ "Conversão de oportunidades" (detalhe)
-    const perdidos = ops.filter((o) => o.status === 'perdido').length;
+    // perda REAL × descarte (não elegível): mesma régua do Dashboard — descarte não é perda
+    const perdTotal = ops.filter((o) => o.status === 'perdido');
+    const naoEleg = perdTotal.filter((o) => o.motivoPerda === 'nao_elegivel');
+    const perdidos = perdTotal.length - naoEleg.length;
+    const neSemBeneficio = naoEleg.filter((o) => o.motivoNE === 'sem_beneficio_inss').length;
+    const neMuitosProcessos = naoEleg.filter((o) => o.motivoNE === 'muitos_processos').length;
+    const neSemInteresse = naoEleg.filter((o) => o.motivoNE === 'sem_interesse').length;
+    const neSemCategoria = naoEleg.length - neSemBeneficio - neMuitosProcessos - neSemInteresse;
     const qualificados = ops.filter((o) => o.qualificada).length;
     const qualifFechados = ops.filter((o) => o.qualificada && o.status === 'ganho').length;
     const tf = ops.map((o) => o.tempoFechDias).filter((v): v is number => v != null);
@@ -710,8 +737,9 @@ export function montaLinhasConexao(inp: ConexaoInput): ConexaoLinha[] {
       pessoasQueChamaram, contatosCriados: novos, conversasRecebidas, msgsInbound, msgsOutbound, difContatosPessoas: novos - pessoasQueChamaram,
       conversas, conversasAtendidas: atendidas, semResposta: semResp,
       oportunidades, qualificados, fechados, negociosFechados, perdidos, qualifFechados,
+      naoElegiveis: naoEleg.length, neSemBeneficio, neMuitosProcessos, neSemInteresse, neSemCategoria,
       // P3: taxa principal = clientes fechados ÷ pessoas que chamaram; conversão de oportunidades fica separada (detalhe)
-      taxaAtendimento: r1(atendidas, comEnt.length), taxaQualificacao: r1(qualificados, oportunidades), taxaConversao: r1(fechados, pessoasQueChamaram), conversaoOportunidades: r1(oppsGanhasCriadas, oportunidades), convQualificados: r1(qualifFechados, qualificados),
+      taxaAtendimento: r1(atendidas, comEnt.length), taxaQualificacao: r1(qualificados, oportunidades), taxaConversao: r1(fechados, pessoasQueChamaram), conversaoOportunidades: r1(oppsGanhasCriadas, oportunidades), convQualificados: r1(qualifFechados, qualificados), taxaNaoElegivel: r1(naoEleg.length, oportunidades),
       primeiraRespostaMin: prMin, tempoAteFechamentoDias: tf.length ? tf.reduce((a, b) => a + b, 0) / tf.length : null,
       receitaPrevista, receitaRecebida, valoresAtraso, economia: ec.total, economiaPreenchida: ec.preenchida,
       clientesPagantes: pagantes.size, ticketMedio: pagantes.size ? receitaRecebida / pagantes.size : 0,
@@ -726,7 +754,7 @@ export function melhorConexao(linhas: ConexaoLinha[]): ConexaoLinha | null {
 }
 
 export function useConexoes(f: RelFiltros, enabled: boolean) {
-  const { currentOrg } = useOrg(); const org = currentOrg.id; const p = resolvePeriodo(f.preset, f.ini, f.fim);
+  const { currentOrg } = useOrg(); const org = currentOrg.id; const p = resolvePeriodo(f.preset, f.ini, f.fim, f.mesCaf);
   return useQuery({
     queryKey: ['rel-conexoes', org, chaveFiltros(f)], enabled: REL_REAL && enabled, staleTime: 60_000,
     queryFn: async ({ signal }): Promise<ConexaoLinha[]> => {
@@ -735,7 +763,7 @@ export function useConexoes(f: RelFiltros, enabled: boolean) {
         // P1: TODAS as conversas da org (sem filtro de período) p/ mapear qualquer mensagem do período à sua conversa/contato
         fetchAll(() => supabase!.from('conversas').select('id, contato_id').eq('organizacao_id', org).abortSignal(signal!)).then(wrapRows),
         fetchAll(() => supabase!.from('mensagens').select('conversa_id, direcao, tipo, autor_id, criado_em, enviada_em, recebida_em').eq('organizacao_id', org).gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).abortSignal(signal!)).then(wrapRows),
-        fetchAll(() => supabase!.from('oportunidades').select('contato_id, status, coluna_id, criado_em, fechado_em').eq('organizacao_id', org).gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).abortSignal(signal!)).then(wrapRows),
+        fetchAll(() => supabase!.from('oportunidades').select('contato_id, status, coluna_id, criado_em, fechado_em, motivo_perda, motivo_nao_elegivel').eq('organizacao_id', org).gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).abortSignal(signal!)).then(wrapRows),
         // P2: oportunidades GANHAS fechadas no período (por fechado_em) → clientes/negócios fechados
         fetchAll(() => supabase!.from('oportunidades').select('contato_id, fechado_em, criado_em').eq('organizacao_id', org).eq('status', 'ganho').gte('fechado_em', p.iniISO).lt('fechado_em', p.fimISO).abortSignal(signal!)).then(wrapRows),
         fetchAll(() => supabase!.from('cobrancas').select('id, contato_id, status, valor_economizado').eq('organizacao_id', org).abortSignal(signal!)).then(wrapRows),
@@ -804,8 +832,8 @@ export function useConexoes(f: RelFiltros, enabled: boolean) {
         const col = r.coluna_id as string | null;
         const qualificada = r.status !== 'cancelado' && !!col && !entradaIds.has(col);
         const tempoFechDias = r.status === 'ganho' && r.fechado_em ? (new Date(r.fechado_em as string).getTime() - new Date(r.criado_em as string).getTime()) / 86400000 : null;
-        return { chip, status: r.status as string, qualificada, tempoFechDias };
-      }).filter(Boolean)) as { chip: string; status: string; qualificada: boolean; tempoFechDias: number | null }[];
+        return { chip, status: r.status as string, qualificada, tempoFechDias, motivoPerda: (r.motivo_perda as string) ?? null, motivoNE: (r.motivo_nao_elegivel as string) ?? null };
+      }).filter(Boolean)) as ConexaoInput['opps'];
       const cobChip = new Map<string, string>(); const economiaPorChip: Record<string, { total: number; preenchida: boolean }> = {};
       for (const r of (cb.data as Row[]) ?? []) { const chip = contatoChip.get(r.contato_id as string); if (!chip) continue; cobChip.set(r.id as string, chip); const cur = economiaPorChip[chip] || { total: 0, preenchida: false }; if (r.valor_economizado != null) { cur.preenchida = true; cur.total += num(r.valor_economizado); } economiaPorChip[chip] = cur; }
       const parcelas = ((pg.data as Row[]) ?? []).map((r) => { const chip = cobChip.get(r.cobranca_id as string); return chip ? { chip, contato: r.cobranca_id as string, status: r.status as string, valor: num(r.valor), valorPago: r.valor_pago == null ? null : num(r.valor_pago), dataPrevista: (r.data_prevista as string) ?? null, dataPagamento: (r.data_pagamento as string) ?? null } : null; }).filter(Boolean) as ConexaoInput['parcelas'];

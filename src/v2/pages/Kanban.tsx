@@ -7,7 +7,7 @@ import {
   KANBAN_REAL, useKanban, useOportunidadesAbertasDeContatos, useConversasDoContato,
   useNaoLidasPorContato, useOportunidadeEventos,
   classificarMovimento, traduzErroKanban, valorRelevante,
-  MOTIVOS_PERDA, rotuloMotivoPerda, rotuloDe,
+  MOTIVOS_PERDA, MOTIVOS_NAO_ELEGIVEL, rotuloMotivoPerda, rotuloPerdaCompleto, rotuloDe,
   TIPO_BENEFICIO_OPCOES as TIPO_BENEFICIO, TIPO_SERVICO_OPCOES as TIPO_SERVICO,
   STATUS_CANCEL_OPCOES as ST_CANCEL, STATUS_RESS_OPCOES as ST_RESS,
   type KLead, type KColuna, type ColResultado, type MovimentoTipo, type OppAberta, type OppEvento,
@@ -175,7 +175,7 @@ function leadDemo(n: Partial<KLead> & { id: string; nome: string; colunaId: stri
     contatoId: null, conversaOrigemId: null, canalOrigemId: null, telefone: '', email: '',
     respId: null, respNome: '', valor: null, origem: 'WhatsApp', etiquetas: [], observacoes: '', lembrete: null, ordem: 0,
     criadoEm: agora, atualizadoEm: agora, entradaEm: agora, movimentadoEm: agora, prioridade: null,
-    status: 'em_andamento', fechadoEm: null, motivoPerda: null, respNoFechamentoId: null,
+    status: 'em_andamento', fechadoEm: null, motivoPerda: null, motivoNaoElegivel: null, respNoFechamentoId: null,
     tipoBeneficio: 'aposentadoria', tipoServico: 'analise_inicial', statusCancelamento: 'nao_se_aplica',
     statusRessarcimento: 'nao_se_aplica', numeroBeneficio: null, instituicao: null, tipoDesconto: null,
     dataInicioDesconto: null, valorDescontoMensal: null, valorRessarcimentoEstimado: null, valorRessarcido: null,
@@ -281,6 +281,7 @@ export default function KanbanV2() {
   const [movBusy, setMovBusy] = useState(false);
   const [motPerda, setMotPerda] = useState('');
   const [motPerdaDesc, setMotPerdaDesc] = useState('');
+  const [motNE, setMotNE] = useState(''); // sub-motivo obrigatório quando motPerda === 'nao_elegivel'
   const [motReab, setMotReab] = useState('');
   const [movErr, setMovErr] = useState<string | null>(null);
 
@@ -565,7 +566,7 @@ export default function KanbanV2() {
       };
     });
   };
-  const moverOportunidade = async (p: { id: string; colunaId: string; atualizadoEmEsperado: string; motivoPerda?: string; motivoPerdaDesc?: string; motivoReabertura?: string }) => {
+  const moverOportunidade = async (p: { id: string; colunaId: string; atualizadoEmEsperado: string; motivoPerda?: string; motivoPerdaDesc?: string; motivoNaoElegivel?: string | null; motivoReabertura?: string }) => {
     if (demo) demoMover(p.id, p.colunaId, p);
     else await k.moverOportunidade(p);
     // se o destino estiver recolhido, expande p/ o card movido continuar visível após o drop
@@ -650,7 +651,7 @@ export default function KanbanV2() {
     const resOrig: ColResultado = colunas.find((c) => c.id === colunaDoLead(lead))?.resultado ?? 'neutro';
     const tipo = classificarMovimento(resOrig, colDest.resultado);
     if (tipo !== 'neutro') {
-      setMotPerda(''); setMotPerdaDesc(''); setMotReab(''); setMovErr(null);
+      setMotPerda(''); setMotPerdaDesc(''); setMotNE(''); setMotReab(''); setMovErr(null);
       setPend({ lead, colDest, tipo });
       return;
     }
@@ -669,6 +670,7 @@ export default function KanbanV2() {
     if (!pend || movBusy) return;
     if (pend.tipo === 'perdido' && !motPerda) { setMovErr('Selecione o motivo da perda.'); return; }
     if (pend.tipo === 'perdido' && motPerda === 'outro' && !motPerdaDesc.trim()) { setMovErr('Descreva o motivo da perda.'); return; }
+    if (pend.tipo === 'perdido' && motPerda === 'nao_elegivel' && !motNE) { setMovErr('Diga por que o cliente não é elegível.'); return; }
     if (pend.tipo === 'reabertura' && !motReab.trim()) { setMovErr('Informe o motivo da reabertura.'); return; }
     setMovBusy(true);
     const atual = leads.find((l) => l.id === pend.lead.id)?.atualizadoEm ?? pend.lead.atualizadoEm;
@@ -678,6 +680,7 @@ export default function KanbanV2() {
         id: pend.lead.id, colunaId: pend.colDest.id, atualizadoEmEsperado: atual,
         motivoPerda: pend.tipo === 'perdido' ? motPerda : undefined,
         motivoPerdaDesc: pend.tipo === 'perdido' && motPerda === 'outro' ? motPerdaDesc.trim() : undefined,
+        motivoNaoElegivel: pend.tipo === 'perdido' ? (motPerda === 'nao_elegivel' ? motNE : null) : undefined,
         motivoReabertura: pend.tipo === 'reabertura' ? motReab.trim() : undefined,
       });
       setAviso({
@@ -821,7 +824,7 @@ export default function KanbanV2() {
           if (demo) aplicarDemo(patchDemo);
           else await k.editarLead({ id: el.id, ...comum });
           setLeadModal(null);
-          setMotPerda(''); setMotPerdaDesc(''); setMotReab(''); setMovErr(null);
+          setMotPerda(''); setMotPerdaDesc(''); setMotNE(''); setMotReab(''); setMovErr(null);
           setPend({ lead: el, colDest, tipo });
         } else {
           if (demo) aplicarDemo(patchDemo, lf.colunaId || undefined);
@@ -1338,6 +1341,15 @@ export default function KanbanV2() {
                     {MOTIVOS_PERDA.map(([v, r]) => <option key={v} value={v}>{r}</option>)}
                   </select>
                 </div>
+                {motPerda === 'nao_elegivel' && (
+                  <div className="campo">
+                    <label>Por que não é elegível? *</label>
+                    <select className="inp" value={motNE} onChange={(e) => { setMotNE(e.target.value); setMovErr(null); }}>
+                      <option value="">Selecione…</option>
+                      {MOTIVOS_NAO_ELEGIVEL.map(([v, r]) => <option key={v} value={v}>{r}</option>)}
+                    </select>
+                  </div>
+                )}
                 {motPerda === 'outro' && (
                   <div className="campo">
                     <label>Descrição *</label>
@@ -1489,7 +1501,7 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, fichaInfo, optout, mo
       <div className="kc-r1">
         <span className="kc-nm" title={l.nome}>{fone ? <span className="num">{fone}</span> : nomeCard}{fone && <i className="kc-semnome">· sem nome</i>}</span>
         {l.status === 'ganho' && <span className="kc-flag ganho" title="Fechado como ganho">Ganho</span>}
-        {l.status === 'perdido' && <span className="kc-flag perdido" title={'Perdido' + (l.motivoPerda ? ' · ' + rotuloMotivoPerda(l.motivoPerda) : '')}>Perdido</span>}
+        {l.status === 'perdido' && <span className="kc-flag perdido" title={'Perdido' + (l.motivoPerda ? ' · ' + rotuloPerdaCompleto(l.motivoPerda, l.motivoNaoElegivel) : '')}>Perdido</span>}
       </div>
 
       {/* L3 META corrida: instituição */}

@@ -6,11 +6,11 @@ import {
   useDashboardIa, seedDashResumo, seedDashIa,
   useIaConversasPeriodo, useConversaPreview, useAtendenteConversas,
   seedIaConversas, seedConversaPreview, seedAtendenteConversas,
-  type DashAtendente, type DashIa, type DashKpis, type DashLinhaFunil, type DashResumo, type PresetDash,
+  type DashAtendente, type DashIa, type DashKpis, type DashLinhaFunil, type DashResumo, type DashTrafego, type PresetDash,
   type IaConversaResumo,
 } from '@/data/dashboard';
 import { kpi, spHoje, addDias, type Kpi as KpiNum } from '@/data/relatorios';
-import { rotuloMotivoPerda } from '@/data/kanban';
+import { rotuloMotivoPerda, rotuloMotivoNaoElegivel } from '@/data/kanban';
 import { useOrgUsuarios } from '@/data/atendimento';
 import { initials } from '@/lib/avatar';
 import { tempoRelativo } from '../lib/tempo';
@@ -268,6 +268,52 @@ function BarrasFunil({ linhas, p }: { linhas: DashLinhaFunil[]; p: Paleta }) {
   );
 }
 
+/* ===== tráfego: comparativo entre conexões de aquisição (dono 10/09) =====
+   Leads/atendidas contam pela CRIAÇÃO no período; ganhos/perdas/não elegíveis
+   pelo FECHAMENTO no período. "% das saídas" = não elegíveis ÷ (ganhos+perdas+
+   não elegíveis) — coorte consistente, sem misturar com a coorte de criação.
+   Deltas comparam com o período anterior, casando as linhas por canal. */
+function TabelaTrafego({ atual, anterior }: { atual: DashTrafego[]; anterior: DashTrafego[] }) {
+  const antPor = new Map(anterior.map((t) => [t.canal_id ?? t.canal, t]));
+  const linhas = atual.filter((t) => t.leads > 0 || t.atendidas > 0 || t.ganhos > 0 || t.perdas > 0 || t.descartes > 0);
+  if (linhas.length === 0) return <Vazio texto="Nenhum movimento de tráfego no período." />;
+  const delta = (a: number, b: number) => {
+    const dd = a - b;
+    if (dd === 0) return null;
+    return <em className="dlt">{dd > 0 ? `▲ +${fmtInt(dd)}` : `▼ −${fmtInt(-dd)}`}</em>;
+  };
+  return (
+    <div className="db-traf" role="table" aria-label="Comparativo de tráfego por conexão de aquisição">
+      <div className="db-traf-lin cab" role="row">
+        <span>Conexão</span><span>Leads</span><span>Atendidas</span><span>Ganhos</span><span>Perdas</span><span>Não elegíveis</span><span>Por que não elegível</span>
+      </div>
+      {linhas.map((t) => {
+        const ant = antPor.get(t.canal_id ?? t.canal);
+        const saidas = t.ganhos + t.perdas + t.descartes;
+        const pctAt = t.leads > 0 ? Math.round((t.atendidas / t.leads) * 100) : null;
+        const pctNe = saidas > 0 ? Math.round((t.descartes / saidas) * 100) : null;
+        const chips = [
+          { rot: 'Sem benefício INSS', v: t.ne_sem_beneficio_inss },
+          { rot: 'Muitos processos', v: t.ne_muitos_processos },
+          { rot: 'Sem interesse', v: t.ne_sem_interesse },
+          { rot: 'Sem categoria', v: t.ne_sem_categoria },
+        ].filter((c) => c.v > 0);
+        return (
+          <div className="db-traf-lin" role="row" key={t.canal_id ?? t.canal}>
+            <span className="nm" title={t.canal}>{t.canal}</span>
+            <span className="num">{fmtInt(t.leads)}{delta(t.leads, ant?.leads ?? 0)}</span>
+            <span className="num">{fmtInt(t.atendidas)}{pctAt != null && <i className="sub"> · {pctAt}%</i>}</span>
+            <span className="num ok">{fmtInt(t.ganhos)}{delta(t.ganhos, ant?.ganhos ?? 0)}</span>
+            <span className="num er">{fmtInt(t.perdas)}{delta(t.perdas, ant?.perdas ?? 0)}</span>
+            <span className="num am">{fmtInt(t.descartes)}{pctNe != null && <i className="sub"> · {pctNe}% das saídas</i>}{delta(t.descartes, ant?.descartes ?? 0)}</span>
+            <span className="mots">{chips.length === 0 ? <i className="sub">—</i> : chips.map((c) => <b key={c.rot} className="db-tag">{c.rot}: {fmtInt(c.v)}</b>)}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 /* ==================================================================
    Página
    ================================================================== */
@@ -276,11 +322,13 @@ export default function DashboardV2() {
   const p = usePaleta(raiz);
   const navigate = useNavigate();
 
-  const [preset, setPreset] = useState<PresetDash>('hoje'); // fim do dia: a foto de HOJE primeiro
+  const [preset, setPresetRaw] = useState<PresetDash>('hoje'); // fim do dia: a foto de HOJE primeiro
   const [ini, setIni] = useState(() => addDias(spHoje(), -6));
   const [fim, setFim] = useState(() => spHoje());
+  const [mesCaf, setMesCaf] = useState(0); // navegação do "Nosso mês" (10→10): 0 = corrente, -1 = anterior…
+  const setPreset = (p: PresetDash) => { setPresetRaw(p); if (p !== 'mes_caf') setMesCaf(0); };
 
-  const periodo = useMemo(() => periodoDash(preset, ini, fim), [preset, ini, fim]);
+  const periodo = useMemo(() => periodoDash(preset, ini, fim, mesCaf), [preset, ini, fim, mesCaf]);
   const { data, isPending, isError, error, refetch, isFetching } = useDashboardResumo(periodo);
   const iaQ = useDashboardIa(periodo);
 
@@ -342,7 +390,7 @@ export default function DashboardV2() {
       <div className="ph">
         <div>
           <h2>Dashboard</h2>
-          <p>Como foi {preset === 'hoje' ? 'o dia' : 'o período'} — {periodo.label}
+          <p>Como foi {preset === 'hoje' ? 'o dia' : preset === 'mes_caf' ? 'o nosso mês (10→10)' : 'o período'} — {periodo.label} · comparado a {periodo.prevLabel}
             {isFetching && !carregando ? ' · atualizando…' : ''}
             {!DASH_REAL ? ' · modo demonstração (dados ilustrativos)' : ''}</p>
         </div>
@@ -357,6 +405,13 @@ export default function DashboardV2() {
               <Input type="date" value={ini} max={fim} onChange={(e) => setIni(e.target.value)} aria-label="Data inicial" />
               <span aria-hidden>→</span>
               <Input type="date" value={fim} min={ini} max={spHoje()} onChange={(e) => setFim(e.target.value)} aria-label="Data final" />
+            </div>
+          )}
+          {preset === 'mes_caf' && (
+            <div className="db-datas db-mescaf">
+              <BotaoSec mini onClick={() => setMesCaf((m) => m - 1)}>‹</BotaoSec>
+              <span className="num" title="Mês comercial: do dia 10 ao dia 10 seguinte">{periodo.label}</span>
+              <BotaoSec mini disabled={mesCaf >= 0} onClick={() => setMesCaf((m) => Math.min(0, m + 1))}>›</BotaoSec>
             </div>
           )}
         </div>
@@ -573,6 +628,14 @@ export default function DashboardV2() {
             )}
           </Secao>
 
+          {/* ===== tráfego: comparativo entre conexões (dono 10/09) ===== */}
+          <Secao className="db-span12" titulo="Tráfego · comparativo entre conexões"
+            sub={<>atribuição pela conexão de <b>aquisição</b> do lead · {periodo.label} <i>vs</i> {periodo.prevLabel}</>} atraso={0.4}>
+            {carregando ? <Skeleton altura={150} raio={12} /> : (
+              <TabelaTrafego atual={d?.trafego ?? []} anterior={d?.trafego_anterior ?? []} />
+            )}
+          </Secao>
+
           {/* ===== bancos + motivos ===== */}
           <Secao className="db-span6" titulo="Bancos das fichas" sub="mais citados no período" atraso={0.42}>
             {carregando ? <Skeleton altura={150} raio={12} /> : !d?.bancos?.length ? (
@@ -594,6 +657,31 @@ export default function DashboardV2() {
                   tag: m.grupo === 'descarte' ? 'descarte' : undefined,
                   cor: m.grupo === 'descarte' ? p.ambar : undefined,
                 }))} />
+                {(() => {
+                  // detalhe pedido pelo dono 10/09: POR QUE cada não elegível saiu, com o delta vs período anterior
+                  const dm = d.descarte_motivos ?? [];
+                  const tot = dm.reduce((s, m) => s + m.qtd, 0);
+                  if (tot === 0) return null;
+                  const antDe = (mot: string) => (d.descarte_motivos_anterior ?? []).find((x) => x.motivo === mot)?.qtd ?? 0;
+                  const ordem = ['sem_beneficio_inss', 'muitos_processos', 'sem_interesse', 'sem_categoria'];
+                  const linhas = [...dm].sort((a, b) => ordem.indexOf(a.motivo) - ordem.indexOf(b.motivo));
+                  return (
+                    <div className="db-ne">
+                      <div className="tt">Não elegíveis por motivo <span className="num">· {fmtInt(tot)} no período</span></div>
+                      {linhas.map((m) => {
+                        const a = antDe(m.motivo); const dd = m.qtd - a;
+                        return (
+                          <div className="lin" key={m.motivo}>
+                            <span className="rot">{m.motivo === 'sem_categoria' ? 'Sem categoria (registro antigo / bot)' : rotuloMotivoNaoElegivel(m.motivo)}</span>
+                            <div className="trilho"><i style={{ width: `${Math.max(3, (m.qtd / Math.max(1, tot)) * 100)}%` }} /></div>
+                            <span className="v num">{fmtInt(m.qtd)}</span>
+                            <span className="dlt num">{dd === 0 ? '=' : dd > 0 ? `▲ +${fmtInt(dd)}` : `▼ −${fmtInt(-dd)}`} <i>vs {fmtInt(a)}</i></span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
                 <p className="db-nota">Conta o que foi registrado no período. Reaberto depois continua listado aqui; nos números de cima vale o estado atual.</p>
               </>
             )}

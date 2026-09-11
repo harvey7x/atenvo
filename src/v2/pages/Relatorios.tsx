@@ -480,6 +480,7 @@ function seedRel(): SeedRel {
     novosContatos: 0, leadsRecebidos: 0, leadsAnterior: 0, conversas: 0, conversasAtendidas: 0, semResposta: 0,
     pessoasQueChamaram: 0, contatosCriados: 0, conversasRecebidas: 0, msgsInbound: 0, msgsOutbound: 0,
     difContatosPessoas: 0, oportunidades: 0, qualificados: 0, fechados: 0, negociosFechados: 0, perdidos: 0,
+    naoElegiveis: 0, neSemBeneficio: 0, neMuitosProcessos: 0, neSemInteresse: 0, neSemCategoria: 0, taxaNaoElegivel: 0,
     qualifFechados: 0, taxaAtendimento: 0, taxaQualificacao: 0, taxaConversao: 0, conversaoOportunidades: 0,
     convQualificados: 0, primeiraRespostaMin: null, tempoAteFechamentoDias: null, receitaPrevista: 0,
     receitaRecebida: 0, valoresAtraso: 0, economia: 0, economiaPreenchida: false, clientesPagantes: 0, ticketMedio: 0, ...n,
@@ -541,8 +542,8 @@ function seedRel(): SeedRel {
       { origem: 'facebook', oportunidades: 2, ganhas: 0, taxaConversao: 0 },
     ],
     conexoes: [
-      conex({ chave: 'ch-1', nome: 'Atendimento Principal', numero: '+55 51 98888-0001', tipo: 'trafego', gestor: 'Henrique Prado', pessoasQueChamaram: 38, contatosCriados: 41, difContatosPessoas: 3, conversasRecebidas: 44, msgsInbound: 402, msgsOutbound: 361, conversasAtendidas: 40, semResposta: 4, oportunidades: 24, qualificados: 15, fechados: 6, negociosFechados: 7, perdidos: 4, taxaAtendimento: 90.9, taxaQualificacao: 62.5, taxaConversao: 15.8, conversaoOportunidades: 29.2, primeiraRespostaMin: 9, tempoAteFechamentoDias: 6.4, receitaPrevista: 12600, receitaRecebida: 9800, valoresAtraso: 1240, clientesPagantes: 14, ticketMedio: 700 }),
-      conex({ chave: 'ch-2', nome: 'Número de campanha', numero: '+55 51 97777-0002', tipo: 'campanha', gestor: '', pessoasQueChamaram: 17, contatosCriados: 19, difContatosPessoas: 2, conversasRecebidas: 21, msgsInbound: 168, msgsOutbound: 149, conversasAtendidas: 17, semResposta: 4, oportunidades: 11, qualificados: 5, fechados: 2, negociosFechados: 2, perdidos: 2, taxaAtendimento: 81, taxaQualificacao: 45.5, taxaConversao: 11.8, conversaoOportunidades: 18.2, primeiraRespostaMin: 21, tempoAteFechamentoDias: 9.1, receitaPrevista: 4300, receitaRecebida: 3350, valoresAtraso: 900, clientesPagantes: 5, ticketMedio: 670 }),
+      conex({ chave: 'ch-1', nome: 'Atendimento Principal', numero: '+55 51 98888-0001', tipo: 'trafego', gestor: 'Henrique Prado', pessoasQueChamaram: 38, contatosCriados: 41, difContatosPessoas: 3, conversasRecebidas: 44, msgsInbound: 402, msgsOutbound: 361, conversasAtendidas: 40, semResposta: 4, oportunidades: 24, qualificados: 15, fechados: 6, negociosFechados: 7, perdidos: 4, naoElegiveis: 3, neSemBeneficio: 2, neSemInteresse: 1, taxaNaoElegivel: 12.5, taxaAtendimento: 90.9, taxaQualificacao: 62.5, taxaConversao: 15.8, conversaoOportunidades: 29.2, primeiraRespostaMin: 9, tempoAteFechamentoDias: 6.4, receitaPrevista: 12600, receitaRecebida: 9800, valoresAtraso: 1240, clientesPagantes: 14, ticketMedio: 700 }),
+      conex({ chave: 'ch-2', nome: 'Número de campanha', numero: '+55 51 97777-0002', tipo: 'campanha', gestor: '', pessoasQueChamaram: 17, contatosCriados: 19, difContatosPessoas: 2, conversasRecebidas: 21, msgsInbound: 168, msgsOutbound: 149, conversasAtendidas: 17, semResposta: 4, oportunidades: 11, qualificados: 5, fechados: 2, negociosFechados: 2, perdidos: 2, naoElegiveis: 2, neMuitosProcessos: 1, neSemCategoria: 1, taxaNaoElegivel: 18.2, taxaAtendimento: 81, taxaQualificacao: 45.5, taxaConversao: 11.8, conversaoOportunidades: 18.2, primeiraRespostaMin: 21, tempoAteFechamentoDias: 9.1, receitaPrevista: 4300, receitaRecebida: 3350, valoresAtraso: 900, clientesPagantes: 5, ticketMedio: 670 }),
       conex({ chave: 'snap:1', nome: 'Número antigo', numero: '+55 51 96666-0009', removida: true, tipo: 'ura', pessoasQueChamaram: 3, contatosCriados: 4, difContatosPessoas: 1, conversasRecebidas: 4, msgsInbound: 22, msgsOutbound: 17, conversasAtendidas: 3, semResposta: 1, oportunidades: 2, qualificados: 1, fechados: 1, negociosFechados: 1, taxaAtendimento: 75, taxaQualificacao: 50, taxaConversao: 33.3, conversaoOportunidades: 50, primeiraRespostaMin: 34, receitaPrevista: 900, receitaRecebida: 1700, clientesPagantes: 2, ticketMedio: 850 }),
       conex({ chave: 'sem', nome: 'Sem origem', pessoasQueChamaram: 0, contatosCriados: 2, difContatosPessoas: 2 }),
     ],
@@ -571,10 +572,11 @@ export default function RelatoriosV2() {
   const [mais, setMais] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
 
-  const periodo = resolvePeriodo(f.preset, f.ini, f.fim);
+  const periodo = resolvePeriodo(f.preset, f.ini, f.fim, f.mesCaf);
   const opcoes = useRelatorioOpcoes();
   const setFiltro = (k: keyof RelFiltros, v: string) => setF((s) => ({ ...s, [k]: v || undefined }));
-  function setPreset(p: Preset) { if (p === 'custom') setF((s) => ({ ...s, preset: p, ini: custIni, fim: custFim })); else setF((s) => ({ ...s, preset: p, ini: undefined, fim: undefined })); }
+  function setPreset(p: Preset) { if (p === 'custom') setF((s) => ({ ...s, preset: p, ini: custIni, fim: custFim })); else setF((s) => ({ ...s, preset: p, ini: undefined, fim: undefined, mesCaf: p === 'mes_caf' ? 0 : undefined })); }
+  const navegaMesCaf = (passo: number) => setF((s) => ({ ...s, mesCaf: Math.min(0, (s.mesCaf ?? 0) + passo) }));
   function aplicarCustom(ini: string, fim: string) { setCustIni(ini); setCustFim(fim); setF((s) => ({ ...s, preset: 'custom', ini, fim })); }
   function atualizar() { qc.invalidateQueries({ predicate: (qq) => String(qq.queryKey[0]).startsWith('rel-') }); setAviso('Dados atualizados'); }
   function limpar() { setF({ ...FILTROS_PADRAO, ...(ehAtendente && user ? { responsavel: user.id } : {}) }); }
@@ -655,7 +657,14 @@ export default function RelatoriosV2() {
           aoMudar={setPreset}
           opcoes={PRESETS.map((p) => ({ valor: p.id, rotulo: p.label }))}
         />
-        {f.preset !== 'custom' && <span className="rl2-datas num">{periodo.label}</span>}
+        {f.preset === 'mes_caf' && (
+          <span className="rl2-datas">
+            <BotaoSec mini onClick={() => navegaMesCaf(-1)}>‹</BotaoSec>
+            <span className="num" title="Mês comercial: do dia 10 ao dia 10 seguinte">{periodo.label}</span>
+            <BotaoSec mini disabled={(f.mesCaf ?? 0) >= 0} onClick={() => navegaMesCaf(1)}>›</BotaoSec>
+          </span>
+        )}
+        {f.preset !== 'custom' && f.preset !== 'mes_caf' && <span className="rl2-datas num">{periodo.label}</span>}
         {f.preset === 'custom' && (
           <span className="rl2-datas">
             <input type="date" className="inp" value={custIni} max={custFim} onChange={(e) => aplicarCustom(e.target.value, custFim)} aria-label="Data inicial" />
@@ -875,6 +884,18 @@ function frasesConexoes(linhas: ConexaoLinha[]): string[] {
     const melhorQual = reais.slice().sort((a, b) => b.taxaQualificacao - a.taxaQualificacao)[0];
     if (melhorQual.chave !== maisVol.chave) out.push(`${maisVol.nome} trouxe o maior volume, mas ${melhorQual.nome} entregou a melhor qualificação (${fmtPct(melhorQual.taxaQualificacao)}).`);
   }
+  // descarte por tráfego (dono 10/09): quem mais trouxe lead fora do perfil, e por quê
+  const comBase = reais.filter((l) => l.oportunidades >= 5 && l.naoElegiveis > 0);
+  const maisNe = comBase.slice().sort((a, b) => b.taxaNaoElegivel - a.taxaNaoElegivel)[0];
+  if (maisNe) {
+    const partes = [
+      maisNe.neSemBeneficio > 0 ? `${fmtInt(maisNe.neSemBeneficio)} sem benefício do INSS` : '',
+      maisNe.neMuitosProcessos > 0 ? `${fmtInt(maisNe.neMuitosProcessos)} com muitos processos` : '',
+      maisNe.neSemInteresse > 0 ? `${fmtInt(maisNe.neSemInteresse)} sem interesse` : '',
+      maisNe.neSemCategoria > 0 ? `${fmtInt(maisNe.neSemCategoria)} sem categoria` : '',
+    ].filter(Boolean).join(', ');
+    out.push(`${maisNe.nome} é a conexão com mais lead fora do perfil: ${fmtInt(maisNe.naoElegiveis)} não elegíveis (${fmtPct(maisNe.taxaNaoElegivel)} das oportunidades do período)${partes ? ' — ' + partes : ''}.`);
+  }
   return out;
 }
 function SecaoConexoes({ f, demo, seed, periodoLabel, orgNome }: { f: RelFiltros; demo: boolean; seed: SeedRel | null; periodoLabel: string; orgNome: string }) {
@@ -918,7 +939,23 @@ function SecaoConexoes({ f, demo, seed, periodoLabel, orgNome }: { f: RelFiltros
               { key: 'qualificados', label: 'Qualific.', align: 'c' },
               { key: 'fechados', label: 'Clientes fechados', align: 'c' },
               { key: 'negociosFechados', label: 'Negócios fechados', align: 'c' },
-              { key: 'perdidos', label: 'Perdidos', align: 'c' },
+              { key: 'perdidos', label: 'Perdas reais', align: 'c' },
+              {
+                key: 'naoElegiveis', label: 'Não elegíveis', align: 'c',
+                fmt: (_v, r) => {
+                  const l = r as unknown as ConexaoLinha;
+                  if (!l.naoElegiveis) return '0';
+                  const det = [
+                    l.neSemBeneficio ? `${l.neSemBeneficio} sem benefício do INSS` : '',
+                    l.neMuitosProcessos ? `${l.neMuitosProcessos} com muitos processos` : '',
+                    l.neSemInteresse ? `${l.neSemInteresse} sem interesse` : '',
+                    l.neSemCategoria ? `${l.neSemCategoria} sem categoria (antigo/bot)` : '',
+                  ].filter(Boolean).join(' · ');
+                  return <span title={det || undefined}>{fmtInt(l.naoElegiveis)}</span>;
+                },
+                csv: (r) => String(r.naoElegiveis ?? 0),
+              },
+              { key: 'taxaNaoElegivel', label: 'Tx não eleg.', align: 'c', fmt: (v) => fmtPct(v as number), csv: (r) => (r.taxaNaoElegivel as number).toFixed(1) },
               { key: 'taxaAtendimento', label: 'Tx atend.', align: 'c', fmt: (v) => fmtPct(v as number), csv: (r) => (r.taxaAtendimento as number).toFixed(1) },
               { key: 'taxaQualificacao', label: 'Tx qualif.', align: 'c', fmt: (v) => fmtPct(v as number), csv: (r) => (r.taxaQualificacao as number).toFixed(1) },
               { key: 'taxaConversao', label: 'Tx conv. (cli/pess)', align: 'c', fmt: (v) => fmtPct(v as number), csv: (r) => (r.taxaConversao as number).toFixed(1) },

@@ -14,24 +14,24 @@ import { resolvePeriodo, spHoje, addDias, type Periodo, type Preset } from '@/da
 
 export const DASH_REAL = isSupabaseConfigured && !!supabase;
 
-export type PresetDash = 'hoje' | '7d' | '30d' | '90d' | 'custom';
+/** Janelas do dono (10/09): diário, 3 dias, 7 dias e o mês COMERCIAL da casa
+ *  (dia 10 → dia 10, navegável por ‹ › via mesCaf). Personalizado cobre o resto. */
+export type PresetDash = 'hoje' | '3d' | '7d' | 'mes_caf' | 'custom';
 
 export const PRESETS_DASH: { id: PresetDash; label: string }[] = [
   { id: 'hoje', label: 'Hoje' },
+  { id: '3d', label: '3 dias' },
   { id: '7d', label: '7 dias' },
-  { id: '30d', label: '30 dias' },
-  { id: '90d', label: '90 dias' },
+  { id: 'mes_caf', label: 'Nosso mês (10→10)' },
   { id: 'custom', label: 'Personalizado' },
 ];
 
-/** 90d não existe em PRESETS de Relatórios: monta via 'custom' sem tocar naquele módulo. */
-export function periodoDash(preset: PresetDash, ini?: string, fim?: string): Periodo {
-  if (preset === '90d') { const h = spHoje(); return resolvePeriodo('custom', addDias(h, -89), h); }
+export function periodoDash(preset: PresetDash, ini?: string, fim?: string, mesCaf = 0): Periodo {
   if (preset === 'custom') {
     const h = spHoje();
     return resolvePeriodo('custom', ini || addDias(h, -6), fim || h);
   }
-  return resolvePeriodo(preset as Preset);
+  return resolvePeriodo(preset as Preset, undefined, undefined, mesCaf);
 }
 
 /* ====================== Formato da RPC ====================== */
@@ -70,8 +70,23 @@ export interface DashAtendente {
 export type GrupoSaida = 'perda' | 'descarte';
 export interface DashMotivo { motivo: string; qtd: number; grupo: GrupoSaida }
 
+/** Sub-motivo do NÃO ELEGÍVEL ('sem_categoria' = histórico/bot sem registro). */
+export interface DashDescarteMotivo { motivo: string; qtd: number }
+
+/** Comparativo de tráfego por conexão de aquisição da OPORTUNIDADE (canal_origem_id —
+ *  linhagem correta; o canal da conversa mente quando o lead fecha em outro número).
+ *  leads/atendidas/em_andamento por criado_em; ganhos/perdas/descartes por fechado_em. */
+export interface DashTrafego {
+  canal_id: string | null; canal: string;
+  leads: number; atendidas: number; em_andamento: number;
+  ganhos: number; perdas: number; descartes: number;
+  ne_sem_beneficio_inss: number; ne_muitos_processos: number; ne_sem_interesse: number; ne_sem_categoria: number;
+}
+
 export interface DashResumo {
   periodo: { inicio: string; fim: string };
+  /** o período anterior que o banco realmente comparou (exato quando o front informa). */
+  periodo_anterior?: { inicio: string; fim: string };
   /** régua do descarte que o banco aplicou (public.dashboard_motivos_descarte). */
   motivos_descarte: string[];
   kpis: DashKpis;
@@ -82,6 +97,10 @@ export interface DashResumo {
   atendentes: DashAtendente[];
   picos_hora: { hora: number; qtd: number }[];
   motivos_perda: DashMotivo[];
+  descarte_motivos: DashDescarteMotivo[];
+  descarte_motivos_anterior: DashDescarteMotivo[];
+  trafego: DashTrafego[];
+  trafego_anterior: DashTrafego[];
   bancos: { banco: string; qtd: number }[];
 }
 
@@ -103,7 +122,7 @@ export function useDashboardResumo(periodo: Periodo) {
   const { currentOrg } = useOrg();
   const org = currentOrg.id;
   return useQuery({
-    queryKey: ['dashboard-resumo', org, periodo.iniISO, periodo.fimISO],
+    queryKey: ['dashboard-resumo', org, periodo.iniISO, periodo.fimISO, periodo.prevIniISO],
     enabled: DASH_REAL && !!org,
     staleTime: 60_000,
     queryFn: async (): Promise<DashResumo> => {
@@ -111,6 +130,9 @@ export function useDashboardResumo(periodo: Periodo) {
         p_inicio: periodo.iniISO,
         p_fim: periodo.fimISO,
         p_org: org,
+        // período anterior EXATO da matemática do front (mês 10→10 tem duração própria)
+        p_inicio_ant: periodo.prevIniISO,
+        p_fim_ant: periodo.iniISO,
       });
       if (error) throw error;
       return data as DashResumo;
@@ -186,6 +208,7 @@ export function seedDashResumo(p: Periodo): DashResumo {
   const novos = serie.reduce((s, x) => s + x.qtd, 0);
   return {
     periodo: { inicio: p.iniISO, fim: p.fimISO },
+    periodo_anterior: { inicio: p.prevIniISO, fim: p.iniISO },
     motivos_descarte: ['nao_elegivel'],
     kpis: {
       novos_leads: novos, conversas_ativas: Math.round(novos * 2.1),
@@ -224,6 +247,26 @@ export function seedDashResumo(p: Periodo): DashResumo {
       { motivo: 'sem_interesse', qtd: Math.round(novos * 0.06), grupo: 'perda' },
       { motivo: 'nao_respondeu', qtd: Math.round(novos * 0.04), grupo: 'perda' },
       { motivo: 'nao_elegivel', qtd: Math.round(novos * 0.05), grupo: 'descarte' },
+    ],
+    descarte_motivos: [
+      { motivo: 'sem_beneficio_inss', qtd: Math.max(1, Math.round(novos * 0.025)) },
+      { motivo: 'muitos_processos', qtd: Math.max(1, Math.round(novos * 0.015)) },
+      { motivo: 'sem_interesse', qtd: Math.max(1, Math.round(novos * 0.01)) },
+    ],
+    descarte_motivos_anterior: [
+      { motivo: 'sem_beneficio_inss', qtd: Math.max(1, Math.round(novos * 0.02)) },
+      { motivo: 'muitos_processos', qtd: Math.max(1, Math.round(novos * 0.012)) },
+      { motivo: 'sem_interesse', qtd: Math.max(1, Math.round(novos * 0.014)) },
+    ],
+    trafego: [
+      { canal_id: 'tr-1', canal: 'JUROS ABUSIVO (ANDRIUS)', leads: Math.round(novos * 0.46), atendidas: Math.round(novos * 0.41), em_andamento: Math.round(novos * 0.3), ganhos: Math.max(1, Math.round(novos * 0.08)), perdas: Math.round(novos * 0.05), descartes: Math.round(novos * 0.03), ne_sem_beneficio_inss: Math.round(novos * 0.015), ne_muitos_processos: Math.round(novos * 0.01), ne_sem_interesse: Math.round(novos * 0.005), ne_sem_categoria: 0 },
+      { canal_id: 'tr-2', canal: 'CAMPANHA DE EMPRÉSTIMO', leads: Math.round(novos * 0.34), atendidas: Math.round(novos * 0.22), em_andamento: Math.round(novos * 0.24), ganhos: Math.max(1, Math.round(novos * 0.05)), perdas: Math.round(novos * 0.04), descartes: Math.round(novos * 0.05), ne_sem_beneficio_inss: Math.round(novos * 0.03), ne_muitos_processos: Math.round(novos * 0.012), ne_sem_interesse: Math.round(novos * 0.008), ne_sem_categoria: 0 },
+      { canal_id: 'tr-3', canal: 'LUIZA', leads: Math.round(novos * 0.2), atendidas: Math.round(novos * 0.17), em_andamento: Math.round(novos * 0.13), ganhos: Math.max(1, Math.round(novos * 0.03)), perdas: Math.round(novos * 0.02), descartes: Math.round(novos * 0.01), ne_sem_beneficio_inss: Math.round(novos * 0.005), ne_muitos_processos: 0, ne_sem_interesse: Math.round(novos * 0.005), ne_sem_categoria: 0 },
+    ],
+    trafego_anterior: [
+      { canal_id: 'tr-1', canal: 'JUROS ABUSIVO (ANDRIUS)', leads: Math.round(novos * 0.38), atendidas: Math.round(novos * 0.32), em_andamento: Math.round(novos * 0.24), ganhos: Math.max(1, Math.round(novos * 0.06)), perdas: Math.round(novos * 0.05), descartes: Math.round(novos * 0.04), ne_sem_beneficio_inss: Math.round(novos * 0.02), ne_muitos_processos: Math.round(novos * 0.012), ne_sem_interesse: Math.round(novos * 0.008), ne_sem_categoria: 0 },
+      { canal_id: 'tr-2', canal: 'CAMPANHA DE EMPRÉSTIMO', leads: Math.round(novos * 0.3), atendidas: Math.round(novos * 0.19), em_andamento: Math.round(novos * 0.2), ganhos: Math.max(1, Math.round(novos * 0.04)), perdas: Math.round(novos * 0.05), descartes: Math.round(novos * 0.04), ne_sem_beneficio_inss: Math.round(novos * 0.025), ne_muitos_processos: Math.round(novos * 0.01), ne_sem_interesse: Math.round(novos * 0.005), ne_sem_categoria: 0 },
+      { canal_id: 'tr-3', canal: 'LUIZA', leads: Math.round(novos * 0.24), atendidas: Math.round(novos * 0.2), em_andamento: Math.round(novos * 0.15), ganhos: Math.max(1, Math.round(novos * 0.03)), perdas: Math.round(novos * 0.03), descartes: Math.round(novos * 0.012), ne_sem_beneficio_inss: Math.round(novos * 0.006), ne_muitos_processos: 0, ne_sem_interesse: Math.round(novos * 0.006), ne_sem_categoria: 0 },
     ],
     bancos: [
       { banco: 'MERCANTIL', qtd: 9 }, { banco: 'AGIBANK', qtd: 7 }, { banco: 'BMG', qtd: 6 },

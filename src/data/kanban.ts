@@ -24,6 +24,23 @@ export const MOTIVOS_PERDA: [string, string][] = [
 ];
 export const rotuloMotivoPerda = (v: string | null) => (v ? MOTIVOS_PERDA.find(([k]) => k === v)?.[1] ?? v : '');
 
+/** Sub-motivo OBRIGATÓRIO quando a perda é "Não elegível" (pedido do dono 10/09):
+ *  o relatório precisa dizer POR QUE o lead foi descartado. Valores casam com o
+ *  check do banco (oportunidades.motivo_nao_elegivel). */
+export const MOTIVOS_NAO_ELEGIVEL: [string, string][] = [
+  ['sem_beneficio_inss', 'Não recebe benefício do INSS'],
+  ['muitos_processos', 'Já tem muitos processos'],
+  ['sem_interesse', 'Cliente sem interesse'],
+];
+export const rotuloMotivoNaoElegivel = (v: string | null) =>
+  (v ? MOTIVOS_NAO_ELEGIVEL.find(([k]) => k === v)?.[1] ?? v : 'Sem categoria');
+/** Rótulo completo da saída: "Não elegível — Já tem muitos processos" (demais motivos ficam como são). */
+export function rotuloPerdaCompleto(motivoPerda: string | null, motivoNE: string | null): string {
+  if (!motivoPerda) return '';
+  if (motivoPerda !== 'nao_elegivel' || !motivoNE) return rotuloMotivoPerda(motivoPerda);
+  return `${rotuloMotivoPerda(motivoPerda)} — ${rotuloMotivoNaoElegivel(motivoNE)}`;
+}
+
 /** Traduz erros do trigger/RLS/lock em mensagens legíveis (nunca SQL bruto). */
 export function traduzErroKanban(msg: string): string {
   const m = (msg || '').toLowerCase();
@@ -50,7 +67,7 @@ export interface KLead {
   // SLA (S4.3): tempo de entrada/última movimentação de coluna + prioridade
   entradaEm: string; movimentadoEm: string; prioridade: string | null;
   // fechamento (Etapa 2A): status do funil + snapshot
-  status: string; fechadoEm: string | null; motivoPerda: string | null; respNoFechamentoId: string | null;
+  status: string; fechadoEm: string | null; motivoPerda: string | null; motivoNaoElegivel: string | null; respNoFechamentoId: string | null;
   // domínio previdenciário
   tipoBeneficio: string | null; tipoServico: string; statusCancelamento: string; statusRessarcimento: string;
   numeroBeneficio: string | null; instituicao: string | null; tipoDesconto: string | null; dataInicioDesconto: string | null;
@@ -65,7 +82,7 @@ interface DbLead {
   telefone: string | null; responsavel_id: string | null; valor_estimado: number | null; origem: string | null;
   etiquetas: string[] | null; observacoes: string | null; lembrete: string | null; ordem: number; criado_em: string; atualizado_em: string;
   entrada_em: string; movimentado_em: string; prioridade: string | null;
-  status: string; fechado_em: string | null; motivo_perda: string | null; responsavel_no_fechamento_id: string | null;
+  status: string; fechado_em: string | null; motivo_perda: string | null; motivo_nao_elegivel: string | null; responsavel_no_fechamento_id: string | null;
   tipo_beneficio: string | null; tipo_servico: string; status_cancelamento: string; status_ressarcimento: string;
   numero_beneficio: string | null; instituicao: string | null; tipo_desconto: string | null; data_inicio_desconto: string | null;
   valor_desconto_mensal: number | null; valor_ressarcimento_estimado: number | null; valor_ressarcido: number | null;
@@ -89,7 +106,7 @@ function mapLead(l: DbLead): KLead {
     valor: l.valor_estimado, origem: l.origem || '', etiquetas: l.etiquetas ?? [],
     observacoes: l.observacoes || '', lembrete: l.lembrete ?? null, ordem: l.ordem, criadoEm: l.criado_em, atualizadoEm: l.atualizado_em,
     entradaEm: l.entrada_em, movimentadoEm: l.movimentado_em, prioridade: l.prioridade ?? null,
-    status: l.status || 'em_andamento', fechadoEm: l.fechado_em, motivoPerda: l.motivo_perda, respNoFechamentoId: l.responsavel_no_fechamento_id,
+    status: l.status || 'em_andamento', fechadoEm: l.fechado_em, motivoPerda: l.motivo_perda, motivoNaoElegivel: l.motivo_nao_elegivel ?? null, respNoFechamentoId: l.responsavel_no_fechamento_id,
     tipoBeneficio: l.tipo_beneficio, tipoServico: l.tipo_servico || 'analise_inicial',
     statusCancelamento: l.status_cancelamento || 'nao_se_aplica', statusRessarcimento: l.status_ressarcimento || 'nao_se_aplica',
     numeroBeneficio: l.numero_beneficio, instituicao: l.instituicao, tipoDesconto: l.tipo_desconto, dataInicioDesconto: l.data_inicio_desconto,
@@ -264,7 +281,7 @@ export function useColunasFunil(funilId: string | null) {
   });
 }
 
-export interface MoverOppInput { id: string; colunaId: string; atualizadoEmEsperado: string; motivoPerda?: string | null; motivoPerdaDesc?: string | null; motivoReabertura?: string | null }
+export interface MoverOppInput { id: string; colunaId: string; atualizadoEmEsperado: string; motivoPerda?: string | null; motivoPerdaDesc?: string | null; motivoNaoElegivel?: string | null; motivoReabertura?: string | null }
 /** Move uma oportunidade de coluna FORA do quadro (painel WA/FB), com o MESMO contrato do Kanban:
  *  controle otimista (atualizado_em esperado), motivos exigidos pelo trigger e distinção conflito×permissão.
  *  Independe do funil carregado no quadro — resolve a ordem no fundo da coluna destino via consulta própria.
@@ -279,6 +296,7 @@ export function useMoverOportunidade() {
     const patch: Record<string, unknown> = { coluna_id: input.colunaId, ordem };
     if (input.motivoPerda !== undefined) patch.motivo_perda = input.motivoPerda ?? null;
     if (input.motivoPerdaDesc !== undefined) patch.motivo_perda_desc = input.motivoPerdaDesc ?? null;
+    if (input.motivoNaoElegivel !== undefined) patch.motivo_nao_elegivel = input.motivoNaoElegivel ?? null;
     if (input.motivoReabertura !== undefined) patch.motivo_reabertura = input.motivoReabertura ?? null;
     const { data, error } = await supabase!.from('oportunidades').update(patch)
       .eq('id', input.id).eq('organizacao_id', org).eq('atualizado_em', input.atualizadoEmEsperado).select('id');
@@ -334,7 +352,7 @@ export function useKanban() {
     queryKey: ['kanban-leads', org, funilId], enabled: KANBAN_REAL && !!funilId, refetchInterval: 8000,
     queryFn: async (): Promise<KLead[]> => {
       const { data, error } = await supabase!.from('oportunidades')
-        .select('id, coluna_id, contato_id, conversa_origem_id, canal_origem_id, contato_nome, titulo, telefone, responsavel_id, valor_estimado, origem, etiquetas, observacoes, lembrete, ordem, criado_em, atualizado_em, entrada_em, movimentado_em, prioridade, status, fechado_em, motivo_perda, responsavel_no_fechamento_id, tipo_beneficio, tipo_servico, status_cancelamento, status_ressarcimento, numero_beneficio, instituicao, tipo_desconto, data_inicio_desconto, valor_desconto_mensal, valor_ressarcimento_estimado, valor_ressarcido, contatos(nome, telefone, email, etiquetas), responsavel:usuarios!oportunidades_responsavel_id_fkey(nome), canal_origem:canais(tipo, nome_interno, numero_conectado)')
+        .select('id, coluna_id, contato_id, conversa_origem_id, canal_origem_id, contato_nome, titulo, telefone, responsavel_id, valor_estimado, origem, etiquetas, observacoes, lembrete, ordem, criado_em, atualizado_em, entrada_em, movimentado_em, prioridade, status, fechado_em, motivo_perda, motivo_nao_elegivel, responsavel_no_fechamento_id, tipo_beneficio, tipo_servico, status_cancelamento, status_ressarcimento, numero_beneficio, instituicao, tipo_desconto, data_inicio_desconto, valor_desconto_mensal, valor_ressarcimento_estimado, valor_ressarcido, contatos(nome, telefone, email, etiquetas), responsavel:usuarios!oportunidades_responsavel_id_fkey(nome), canal_origem:canais(tipo, nome_interno, numero_conectado)')
         .eq('organizacao_id', org).eq('funil_id', funilId!).in('status', ['em_andamento', 'ganho', 'perdido'])
         .order('ordem', { ascending: true }).order('criado_em', { ascending: true });
       if (error) throw new Error(error.message);
@@ -458,11 +476,12 @@ export function useKanban() {
   /** Move a oportunidade para outra coluna com CONTROLE OTIMISTA (atualizado_em esperado) e os motivos
    *  exigidos pelo trigger. Distingue conflito (linha mudou) de permissão (linha invisível/RLS). O banco
    *  é a fonte final de status/fechado_em/fechado_por/snapshot/histórico. Lança em erro (caller faz rollback). */
-  async function moverOportunidade(input: { id: string; colunaId: string; atualizadoEmEsperado: string; motivoPerda?: string | null; motivoPerdaDesc?: string | null; motivoReabertura?: string | null }) {
+  async function moverOportunidade(input: { id: string; colunaId: string; atualizadoEmEsperado: string; motivoPerda?: string | null; motivoPerdaDesc?: string | null; motivoNaoElegivel?: string | null; motivoReabertura?: string | null }) {
     const ordem = (leads.filter((l) => l.colunaId === input.colunaId).reduce((m, l) => Math.max(m, l.ordem), 0)) + 1;
     const patch: Record<string, unknown> = { coluna_id: input.colunaId, ordem };
     if (input.motivoPerda !== undefined) patch.motivo_perda = input.motivoPerda ?? null;
     if (input.motivoPerdaDesc !== undefined) patch.motivo_perda_desc = input.motivoPerdaDesc ?? null;
+    if (input.motivoNaoElegivel !== undefined) patch.motivo_nao_elegivel = input.motivoNaoElegivel ?? null;
     if (input.motivoReabertura !== undefined) patch.motivo_reabertura = input.motivoReabertura ?? null;
     const { data, error } = await supabase!.from('oportunidades')
       .update(patch)

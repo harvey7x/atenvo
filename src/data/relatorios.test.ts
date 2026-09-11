@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { kpi, agregaFinanceiro, tempoMedioPrimeiraResposta, conversao, passaOpp, resolvePeriodo, addDias, chaveConexao, chaveCanonicaTelefone, montaLinhasConexao, montaLinhasEquipe, melhorConexao, type ParcelaLite, type RelFiltros, type ConexaoInput, type EquipeData } from './relatorios';
+import { kpi, agregaFinanceiro, tempoMedioPrimeiraResposta, conversao, passaOpp, resolvePeriodo, addDias, chaveConexao, chaveCanonicaTelefone, mesCafInicio, montaLinhasConexao, montaLinhasEquipe, melhorConexao, type ParcelaLite, type RelFiltros, type ConexaoInput, type EquipeData } from './relatorios';
 
 const F = (extra: Partial<RelFiltros> = {}): RelFiltros => ({ preset: '30d', ...extra });
 
@@ -112,8 +112,12 @@ describe('montaLinhasConexao() — desempenho por chip', () => {
     firstResp: [{ conversa: 'c1a', chip: 'chip1', t: 1_600_000 }, { conversa: 'c2', chip: 'chip2', t: 2_200_000 }],
     outbound: [{ chip: 'chip1' }, { chip: 'chip1' }, { chip: 'chip1' }, { chip: 'chip2' }, { chip: 'chip2' }],
     opps: [
-      { chip: 'chip1', status: 'ganho', qualificada: true, tempoFechDias: 5 }, { chip: 'chip1', status: 'perdido', qualificada: true, tempoFechDias: null }, { chip: 'chip1', status: 'em_andamento', qualificada: false, tempoFechDias: null },
-      { chip: 'chip2', status: 'ganho', qualificada: true, tempoFechDias: 3 }, { chip: 'chip2', status: 'ganho', qualificada: true, tempoFechDias: 4 },
+      { chip: 'chip1', status: 'ganho', qualificada: true, tempoFechDias: 5, motivoPerda: null, motivoNE: null },
+      // o perdido do chip1 é DESCARTE (não elegível, sem benefício) — perda real fica zero
+      { chip: 'chip1', status: 'perdido', qualificada: true, tempoFechDias: null, motivoPerda: 'nao_elegivel', motivoNE: 'sem_beneficio_inss' },
+      { chip: 'chip1', status: 'em_andamento', qualificada: false, tempoFechDias: null, motivoPerda: null, motivoNE: null },
+      { chip: 'chip2', status: 'ganho', qualificada: true, tempoFechDias: 3, motivoPerda: null, motivoNE: null },
+      { chip: 'chip2', status: 'ganho', qualificada: true, tempoFechDias: 4, motivoPerda: null, motivoNE: null },
     ],
     // fechamentos (fechado_em): chip1 tem 3 negócios em 2 clientes distintos (k1 duas vezes); chip2 tem 1 negócio/1 cliente
     fechamentos: [
@@ -148,6 +152,12 @@ describe('montaLinhasConexao() — desempenho por chip', () => {
   it('lead sem canal agrupado em "sem" (não some)', () => { expect(linhas.find((l) => l.chave === 'sem')!.leadsRecebidos).toBe(1); });
   it('melhorConexao = chip com mais leads, ignorando "sem"', () => { expect(melhorConexao(linhas)?.chave).toBe('chip1'); });
   it('economia não preenchida não vira zero falso', () => { expect(c1.economiaPreenchida).toBe(false); });
+  it('descarte separado da perda real, com o porquê (dono 10/09)', () => {
+    expect(c1.naoElegiveis).toBe(1); expect(c1.perdidos).toBe(0); // não elegível NÃO conta como perda real
+    expect(c1.neSemBeneficio).toBe(1); expect(c1.neMuitosProcessos).toBe(0); expect(c1.neSemInteresse).toBe(0); expect(c1.neSemCategoria).toBe(0);
+    expect(c1.taxaNaoElegivel).toBeCloseTo(33.33, 1); // 1 descarte ÷ 3 oportunidades criadas
+    expect(c2.naoElegiveis).toBe(0); expect(c2.taxaNaoElegivel).toBe(0);
+  });
   it('pessoas que chamaram = contatos do chip com inbound, dedup canônica (aqui distintos)', () => {
     expect(c1.pessoasQueChamaram).toBe(3); expect(c2.pessoasQueChamaram).toBe(2);
     expect(c1.contatosCriados).toBe(3); expect(c1.difContatosPessoas).toBe(0);
@@ -242,6 +252,35 @@ describe('Pessoas que chamaram — regras de negócio (dedup/outbound/LID)', () 
     }));
     expect(linhas.find((l) => l.chave === 'A')!.pessoasQueChamaram).toBe(2);
     expect(linhas.find((l) => l.chave === 'B')!.pessoasQueChamaram).toBe(1);
+  });
+});
+
+describe('mês comercial 10→10 (mes_caf, dono 10/09)', () => {
+  it('dia >= 10 abre no dia 10 do próprio mês', () => {
+    expect(mesCafInicio('2026-09-10')).toBe('2026-09-10');
+    expect(mesCafInicio('2026-09-25')).toBe('2026-09-10');
+    expect(mesCafInicio('2026-12-31')).toBe('2026-12-10');
+  });
+  it('dia < 10 ainda pertence ao mês que abriu no dia 10 anterior', () => {
+    expect(mesCafInicio('2026-09-09')).toBe('2026-08-10');
+    expect(mesCafInicio('2026-01-05')).toBe('2025-12-10');
+  });
+  it('offset navega meses mantendo o dia 10 (sem borda de 28/30/31)', () => {
+    expect(mesCafInicio('2026-09-15', -1)).toBe('2026-08-10');
+    expect(mesCafInicio('2026-03-15', -3)).toBe('2025-12-10');
+    expect(mesCafInicio('2026-03-05', -1)).toBe('2026-01-10'); // corrente = 10/02; -1 = 10/01
+  });
+  it('resolvePeriodo(mes_caf): janela 10→10 com ANTERIOR contíguo exato (não deslocado por duração)', () => {
+    const p = resolvePeriodo('mes_caf');
+    expect(p.iniDate.slice(8)).toBe('10');
+    expect(p.fimDate.slice(8)).toBe('10');
+    expect(p.dias).toBeGreaterThanOrEqual(28);
+    expect(p.dias).toBeLessThanOrEqual(31);
+    expect(p.prevIniDate.slice(8)).toBe('10');           // anterior também abre num dia 10
+    expect(p.prevIniDate < p.iniDate).toBe(true);        // e termina exatamente onde o atual começa
+    const pAnt = resolvePeriodo('mes_caf', undefined, undefined, -1);
+    expect(pAnt.iniDate).toBe(p.prevIniDate);            // navegar -1 mês = exatamente o período anterior
+    expect(pAnt.fimDate).toBe(p.iniDate);
   });
 });
 
