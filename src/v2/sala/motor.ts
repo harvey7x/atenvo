@@ -489,9 +489,11 @@ export function criarMotor(svg: SVGSVGElement, opts: { modoReal?: boolean } = {}
     return null;
   }
   function setBadge(g: Element, txt: string, classe: string) {
-    const b = g.querySelector('.badge'); if (!b) return; b.setAttribute('class', 'badge ' + (classe || ''));
-    if (!txt) { b.setAttribute('opacity', '0'); return; }
-    b.setAttribute('opacity', '1'); (b.querySelector('text') as SVGTextElement).textContent = txt;
+    // visibilidade via classe .on (não via atributo opacity): o CSS controla o fade
+    // por distância/zoom sem reacender badges vazios.
+    const b = g.querySelector('.badge'); if (!b) return;
+    if (!txt) { b.setAttribute('class', 'badge ' + (classe || '')); (b.querySelector('text') as SVGTextElement).textContent = ''; return; }
+    b.setAttribute('class', 'badge on ' + (classe || '')); (b.querySelector('text') as SVGTextElement).textContent = txt;
     const w = Math.max(44, txt.length * 6.4 + 16); const r = b.querySelector('rect') as SVGRectElement; r.setAttribute('x', String(-w / 2)); r.setAttribute('width', String(w));
   }
   function removerCliente(id: string) { const c = clientes[id]; if (!c) return; cam.removerItem(c.it); delete clientes[id]; }

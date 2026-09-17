@@ -244,16 +244,21 @@
 @keyframes sala-onda { 0% { opacity: 0; } 30% { opacity: .9; } 100% { opacity: 0; } }
 @keyframes sala-anel { 0% { opacity: 0; transform: scale(.8); } 40% { opacity: .9; } 100% { opacity: 0; transform: scale(1.15); } }
 @keyframes sala-bloom { 0% { opacity: .45; } 40% { opacity: .95; } 100% { opacity: .45; } }
-.v2 .sala .palco-cena .badge rect { fill: rgba(12, 16, 24, .94); stroke: rgba(255, 255, 255, .16); }
-.v2 .sala .palco-cena .badge text { fill: #eceff4; font-size: 10.5px; font-weight: 500; }
-.v2 .sala .palco-cena .badge.rubro rect { stroke: var(--rubro); } .v2 .sala .palco-cena .badge.rubro text { fill: var(--rubro); }
-.v2 .sala .palco-cena .badge.ok rect { stroke: var(--verde); } .v2 .sala .palco-cena .badge.ok text { fill: var(--verde); }
-.v2 .sala .palco-cena .badge.triagem rect { stroke: var(--sala-triagem); } .v2 .sala .palco-cena .badge.triagem text { fill: var(--sala-triagem); }
-.v2 .sala .palco-cena .badge.ativo rect { stroke: var(--sala-ativo); } .v2 .sala .palco-cena .badge.ativo text { fill: var(--sala-ativo); }
-.v2 .sala .palco-cena .badge.arrasto rect { stroke: var(--ambar); } .v2 .sala .palco-cena .badge.arrasto text { fill: var(--ambar); }
-/* não-trabalhável: etiqueta mais VISÍVEL (fundo mais opaco + contorno âmbar + texto claro) */
-.v2 .sala .palco-cena .badge.ne rect { fill: rgba(24, 20, 12, .96); stroke: var(--ambar); stroke-width: 1.2; }
-.v2 .sala .palco-cena .badge.ne text { fill: #f2dfb2; font-weight: 600; }
+/* etiqueta de status do cliente (documentos, sem-resposta…): TRANSLÚCIDA — dá pra
+   ver a pessoa atrás. Fundo quase sem caixa + texto colorido com contorno fino, no
+   mesmo espírito dos nomes. Só aparece quando .on (o motor liga/desliga). */
+.v2 .sala .palco-cena .badge { opacity: 0; transition: opacity .3s ease; }
+.v2 .sala .palco-cena .badge.on { opacity: 1; }
+.v2 .sala .palco-cena .badge rect { fill: rgba(8, 11, 16, .24); stroke: none; }
+.v2 .sala .palco-cena .badge text { fill: rgba(228, 233, 242, .92); font-size: 9px; font-weight: 600; paint-order: stroke; stroke: rgba(4, 7, 12, .62); stroke-width: 1.9px; stroke-linejoin: round; }
+.v2 .sala .palco-cena .badge.rubro text { fill: #ff9d9d; }
+.v2 .sala .palco-cena .badge.ok text { fill: #93d7a9; }
+.v2 .sala .palco-cena .badge.triagem text { fill: #c6b8ec; }
+.v2 .sala .palco-cena .badge.ativo text { fill: #8fbde8; }
+.v2 .sala .palco-cena .badge.arrasto text { fill: #f0c674; }
+/* não-trabalhável: alerta — um respiro a mais de corpo, ainda translúcido */
+.v2 .sala .palco-cena .badge.ne rect { fill: rgba(30, 24, 12, .5); }
+.v2 .sala .palco-cena .badge.ne text { fill: #f5e3b8; font-weight: 700; }
 .v2 .sala .palco-cena .anel { transition: stroke .4s, opacity .4s; }
 .v2 .sala .palco-cena .nome-mesa { font-size: 11px; fill: var(--txt-2); pointer-events: none; }
 .v2 .sala .palco-cena .nome-mesa.livre { fill: var(--txt-3); font-style: italic; }
@@ -265,8 +270,13 @@
 /* sem caixa pesada: texto com contorno fino p/ ler sobre a cena sem poluir */
 .v2 .sala .palco-cena .nome-cli text { fill: rgba(236, 239, 244, .95); font-size: 7px; font-weight: 600; paint-order: stroke; stroke: rgba(6, 9, 14, .55); stroke-width: 1.6px; stroke-linejoin: round; }
 .v2 .sala .palco-cena .nome-cli text.l2 { fill: rgba(170, 179, 194, .9); font-weight: 500; }
-/* câmera afastada (muitos personagens): nomes quase somem; aparecem ao dar zoom */
+/* câmera afastada (muitos personagens): nomes e status de rotina quase somem — sem
+   embolação; aparecem ao dar zoom. Alertas (sem resposta / não-trabalhável) seguem
+   perceptíveis, pois é o que o SDR precisa enxergar de longe. */
 .v2 .sala .palco-cena svg.nomes-longe .nome-cli { opacity: .1; }
+.v2 .sala .palco-cena svg.nomes-longe .badge.on { opacity: .12; }
+.v2 .sala .palco-cena svg.nomes-longe .badge.on.rubro,
+.v2 .sala .palco-cena svg.nomes-longe .badge.on.ne { opacity: .5; }
 .v2 .sala .palco-cena .p:focus-visible, .v2 .sala .palco-cena [tabindex]:focus-visible { outline: 2px solid var(--sala-ativo); outline-offset: 2px; }
 
 /* ---------- Toast ---------- */
