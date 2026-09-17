@@ -1,0 +1,291 @@
+/* ============================================================
+   Sala SDR — layout (linguagem visual da Atenvo / .v2)
+   Palco esticado no topo + dashboard embaixo + drawer de detalhe.
+   ============================================================ */
+.v2 .sala {
+  /* Pele operacional (encoding de estado; escopada, documentada em SALA_SDR.md) */
+  --sala-triagem: #9a90bd; /* violeta DESSATURADO (mais sério que o lilás doce anterior) */
+  --sala-triagem-rgb: 154, 144, 189;
+  --sala-ativo: var(--azul, #4c8dff);
+  --sala-ativo-rgb: 76, 141, 255;
+  --sala-espera: #8a94a6; /* cinza FIXO (a cena é dark nos 2 temas; não pode herdar --txt-2 e sumir no claro) */
+  --sala-rubro: var(--rubro);
+  --sala-ok: var(--verde);
+  /* identidade dos SDRs — tons SÓBRIOS/profissionais (não cores de doce) */
+  --sdr-gi: #6d94b0;
+  --sdr-ju: #9a7f95;
+  --sdr-ma: #9c8b63;
+  /* ---- Cena: fundo/piso/paredes por TEMA (dark padrão; light = fundo claro) ---- */
+  --cena-bg: #0a0d13;
+  --cena-piso1: #141a24;
+  --cena-piso2: #161d28;
+  --cena-parede1: #1c222e;
+  --cena-parede2: #151a24;
+  --cena-parede-l1: #171d27;
+  --cena-parede-l2: #11151d;
+  --cena-linha: rgba(255, 255, 255, .045);
+  --cena-vinheta: rgba(0, 0, 0, .55);
+  --cena-txt: rgba(255, 255, 255, .5);
+  --cena-txt-soft: rgba(255, 255, 255, .28);
+  --cena-sombra: rgba(0, 0, 0, .26);      /* sombra de contato — some quase no claro */
+  --cena-sombra-parede: rgba(0, 0, 0, .28);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+}
+:root[data-tema="light"] .v2 .sala {
+  --sala-triagem: #6f57c9; --sala-triagem-rgb: 111, 87, 201;
+  /* tema claro: a cena também clareia (o "fundo branco" pedido pelo dono) */
+  --cena-bg: #eef1f5;
+  --cena-piso1: #dde2ea;
+  --cena-piso2: #e6eaf1;
+  --cena-parede1: #d9dee7;
+  --cena-parede2: #cbd2dd;
+  --cena-parede-l1: #d2d8e2;
+  --cena-parede-l2: #c2c9d5;
+  --cena-linha: rgba(20, 25, 35, .06);
+  --cena-vinheta: rgba(120, 132, 152, .14);
+  --cena-txt: rgba(34, 40, 52, .55);
+  --cena-txt-soft: rgba(34, 40, 52, .34);
+  --cena-sombra: rgba(90, 100, 120, .07);   /* no claro a sombra é leve, não um borrão preto */
+  --cena-sombra-parede: rgba(90, 100, 120, .06);
+}
+
+/* ---------- PALCO (largura total, topo) ---------- */
+.v2 .sala .sala-palco {
+  position: relative;
+  width: 100%;
+  height: clamp(380px, 56vh, 660px);
+  border-radius: var(--r-card);
+  overflow: hidden;
+  background: var(--cena-bg);
+  box-shadow: var(--sombra-1);
+  border: 1px solid var(--linha);
+}
+.v2 .sala .palco-cena { position: absolute; inset: 0; }
+.v2 .sala .palco-cena svg { display: block; width: 100%; height: 100%; }
+
+/* topo flutuante: command bar + HUD empilhados (o container deixa o clique passar; só os filhos capturam) */
+.v2 .sala .palco-top { position: absolute; left: 12px; right: 12px; top: 12px; z-index: 4; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+.v2 .sala .palco-top > * { pointer-events: auto; }
+.v2 .sala .palco-hud-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; pointer-events: none; }
+.v2 .sala .palco-hud-row > * { pointer-events: auto; }
+
+/* command bar de vidro flutuante */
+.v2 .sala .cmd {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 8px 12px; border-radius: 14px;
+}
+.v2 .sala .cmd-brand { display: flex; flex-direction: column; line-height: 1.05; margin-right: 4px; }
+.v2 .sala .cmd-titulo.p-display { font-size: 18px; }
+.v2 .sala .cmd-org { font-size: 10.5px; color: var(--txt-3); }
+.v2 .sala .cmd-relogio { font-size: 14px; color: var(--txt); font-weight: 600; }
+.v2 .sala .cmd-vivo { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--txt-2); }
+.v2 .sala .cmd-vivo i { width: 7px; height: 7px; border-radius: 50%; background: var(--verde); box-shadow: 0 0 0 3px rgba(var(--verde-rgb), .16); }
+.v2 .sala .cmd-semanas { display: flex; gap: 3px; padding: 3px; border-radius: var(--r-ctl); background: rgba(var(--tint), .05); border: 1px solid var(--linha); }
+.v2 .sala .cmd-semanas .sw { position: relative; padding: 5px 10px; border-radius: 7px; border: 0; background: none; cursor: pointer; font: inherit; font-size: 12px; color: var(--txt-2); transition: background .15s var(--ease), color .15s var(--ease); white-space: nowrap; }
+.v2 .sala .cmd-semanas .sw:hover { color: var(--txt); background: rgba(var(--tint), .05); }
+.v2 .sala .cmd-semanas .sw.on { background: rgba(var(--sala-ativo-rgb), .16); color: var(--txt); }
+.v2 .sala .cmd-semanas .sw-pend { position: absolute; top: -3px; right: -3px; min-width: 14px; height: 14px; padding: 0 3px; border-radius: 8px; background: var(--rubro); color: #fff; font-size: 9px; font-weight: 600; display: grid; place-items: center; line-height: 1; }
+.v2 .sala .cmd-semanas .sw.on .sw-pend { background: var(--sala-ativo); }
+.v2 .sala .cmd-controles { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+.v2 .sala .cmd-controles .p-btn.on { border-color: rgba(var(--sala-ativo-rgb), .5); color: var(--txt); background: rgba(var(--sala-ativo-rgb), .14); }
+
+/* HUD por zona */
+.v2 .sala .palco-hud { display: flex; gap: 8px; flex-wrap: wrap; align-content: flex-start; }
+/* chips sólidos (sem backdrop-filter: contrato proíbe blur sobre o <svg> animado) */
+.v2 .sala .chip-hud { padding: 5px 10px; border-radius: 999px; background: rgba(8, 11, 16, .84); border: 1px solid rgba(255, 255, 255, .13); font-size: 12px; color: #aab3c2; }
+.v2 .sala .chip-hud b { color: #eceff4; font-weight: 600; }
+.v2 .sala .chip-hud.tom-rubro { border-color: rgba(var(--rubro-rgb), .5); color: var(--rubro); }
+.v2 .sala .chip-hud.tom-rubro b { color: var(--rubro); }
+.v2 .sala .chip-hud.tom-triagem { border-color: rgba(var(--sala-triagem-rgb), .5); }
+.v2 .sala .chip-hud.tom-triagem b { color: var(--sala-triagem); }
+.v2 .sala .chip-hud.tom-ok b { color: var(--verde); }
+
+.v2 .sala .palco-congelado { flex: none; display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; background: rgba(8, 11, 16, .9); border: 1px solid rgba(var(--sala-ativo-rgb), .35); color: #aab3c2; font-size: 12.5px; }
+.v2 .sala .palco-congelado b { color: #eceff4; font-weight: 600; }
+.v2 .sala .palco-congelado .voltar-hj { border: 0; background: none; cursor: pointer; font: inherit; color: var(--sala-ativo); text-decoration: underline; text-underline-offset: 2px; }
+
+.v2 .sala .palco-rodape { position: absolute; left: 16px; right: 16px; bottom: 12px; z-index: 3; display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; pointer-events: none; }
+.v2 .sala .palco-legenda { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11px; color: #aab3c2; }
+.v2 .sala .palco-legenda b { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
+.v2 .sala .palco-feed { display: flex; flex-direction: column; gap: 4px; text-align: right; font-size: 11.5px; color: #8a94a6; max-width: 46%; }
+.v2 .sala .palco-feed .mf { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2 .sala .palco-feed .mf b { color: #6f7a8d; font-weight: 500; }
+.v2 .sala .palco-feed .mf.novo { color: #eceff4; }
+
+/* DRAWER de detalhe (sobre o palco; a sala segue viva atrás) */
+.v2 .sala .palco-scrim { position: absolute; inset: 0; z-index: 5; background: rgba(6, 9, 14, .34); backdrop-filter: var(--desfoque-topbar); -webkit-backdrop-filter: var(--desfoque-topbar); opacity: 0; pointer-events: none; transition: opacity .3s var(--ease); }
+.v2 .sala .palco-scrim.on { opacity: 1; pointer-events: auto; }
+.v2 .sala .sala-drawer {
+  position: absolute; top: 0; right: 0; bottom: 0; z-index: 6; width: min(440px, 92%);
+  background: linear-gradient(180deg, rgba(20, 23, 30, .96), rgba(14, 17, 23, .97));
+  backdrop-filter: var(--desfoque-chrome); -webkit-backdrop-filter: var(--desfoque-chrome);
+  border-left: 1px solid var(--fio-a); box-shadow: -30px 0 60px rgba(0, 0, 0, .45);
+  transform: translateX(100%); transition: transform .34s var(--ease);
+  display: flex; flex-direction: column;
+}
+:root[data-tema="light"] .v2 .sala .sala-drawer { background: linear-gradient(180deg, #fff, #fbfcfd); }
+.v2 .sala .sala-drawer.on { transform: translateX(0); }
+.v2 .sala .drawer-x { position: absolute; top: 12px; right: 12px; z-index: 2; width: 28px; height: 28px; border-radius: 8px; border: 1px solid var(--linha); background: rgba(var(--tint), .05); color: var(--txt-2); cursor: pointer; font-size: 13px; }
+.v2 .sala .drawer-x:hover { color: var(--txt); background: rgba(var(--tint), .09); }
+.v2 .sala .drawer-scroll { overflow: auto; padding: 18px 18px 20px; scrollbar-width: thin; scrollbar-color: rgba(var(--tint), .18) transparent; }
+
+.v2 .sala .sala-dash-skel { padding: 40px; text-align: center; color: var(--txt-3); font-size: 13px; }
+
+/* ---------- Painel do drawer (bot / SDR / conversa) ---------- */
+.v2 .sala .p-cab { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.v2 .sala .p-avatar { width: 46px; height: 46px; border-radius: 50%; background: rgba(var(--tint), .05); border: 2px solid var(--acento, var(--linha)); overflow: hidden; flex: none; }
+.v2 .sala .p-avatar svg { width: 100%; height: 100%; }
+.v2 .sala .p-nome { font-size: 17px; font-weight: 600; letter-spacing: -.01em; }
+.v2 .sala .p-nome.peq { font-size: 15px; }
+.v2 .sala .p-subt { color: var(--txt-3); font-size: 12px; margin-top: 2px; }
+.v2 .sala .p-estado { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--txt-2); padding: 4px 9px; border-radius: 999px; border: 1px solid var(--linha); background: rgba(var(--tint), .03); margin-top: 6px; }
+.v2 .sala .p-estado i { width: 8px; height: 8px; border-radius: 50%; }
+.v2 .sala .p-abas { display: flex; gap: 2px; margin: 12px 0 4px; padding: 3px; border-radius: var(--r-ctl); background: rgba(var(--tint), .04); border: 1px solid var(--linha); }
+.v2 .sala .p-abas button { flex: 1; border: 0; background: none; cursor: pointer; font: inherit; padding: 6px 8px; border-radius: 7px; font-size: 12.5px; color: var(--txt-2); }
+.v2 .sala .p-abas button.on { background: rgba(var(--tint), .08); color: var(--txt); }
+.v2 .sala .p-kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; margin: 10px 0 4px; }
+.v2 .sala .p-kpis.tres { grid-template-columns: 1fr 1fr 1fr; }
+.v2 .sala .p-kpi { padding: 10px 0; border-bottom: 1px solid var(--linha); }
+.v2 .sala .p-kpi .n { font-size: 22px; font-weight: 600; letter-spacing: -.02em; line-height: 1.1; }
+.v2 .sala .p-kpi .n small { font-size: 12px; color: var(--txt-3); font-weight: 500; }
+.v2 .sala .p-kpi .l { font-size: 12px; color: var(--txt-2); margin-top: 2px; }
+.v2 .sala .p-kpi.alerta .n { color: var(--rubro); }
+.v2 .sala .p-kpi.ok .n { color: var(--verde); }
+.v2 .sala .p-secao { font-size: 12px; color: var(--txt-3); margin: 16px 0 6px; display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.v2 .sala .p-secao span { text-align: right; }
+.v2 .sala .p-funil { display: grid; grid-template-columns: auto 1fr auto; gap: 6px 10px; align-items: center; font-size: 12.5px; }
+.v2 .sala .p-funil-l { display: contents; }
+.v2 .sala .p-funil .r { color: var(--txt-2); }
+.v2 .sala .p-funil .n { text-align: right; }
+.v2 .sala .p-funil .b { height: 8px; border-radius: 4px; background: rgba(var(--tint), .07); overflow: hidden; }
+.v2 .sala .p-funil .b i { display: block; height: 100%; background: rgba(var(--sala-ativo-rgb), .7); }
+.v2 .sala .p-funil .b i.ok { background: var(--verde); }
+.v2 .sala .p-funil .b i.rubro { background: var(--rubro); }
+.v2 .sala .p-funil .b i.triagem { background: var(--sala-triagem); }
+.v2 .sala .p-funil .b i.ativo { background: var(--sala-ativo); }
+.v2 .sala .p-lista { display: flex; flex-direction: column; }
+.v2 .sala .p-item { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 9px 6px; margin: 0 -6px; border: 0; background: none; cursor: pointer; font: inherit; text-align: left; width: calc(100% + 12px); border-radius: 10px; color: inherit; }
+.v2 .sala .p-item:hover { background: rgba(var(--tint), .05); }
+.v2 .sala .p-item.sel { background: rgba(var(--sala-ativo-rgb), .1); }
+.v2 .sala .p-item .pt { width: 8px; height: 8px; border-radius: 50%; }
+.v2 .sala .p-item .txt { min-width: 0; }
+.v2 .sala .p-item .nome { font-size: 13px; font-weight: 500; display: block; }
+.v2 .sala .p-item .desc { font-size: 12px; color: var(--txt-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; max-width: 230px; }
+.v2 .sala .p-item .lado { font-size: 12px; color: var(--txt-2); text-align: right; }
+.v2 .sala .p-item .lado.rubro { color: var(--rubro); }
+.v2 .sala .p-vazio { color: var(--txt-3); font-size: 13px; padding: 8px 0; }
+.v2 .sala .p-barra { height: 6px; border-radius: 3px; background: rgba(var(--tint), .07); overflow: hidden; margin-top: 2px; }
+.v2 .sala .p-barra i { display: block; height: 100%; border-radius: 3px; background: var(--sala-ativo); }
+.v2 .sala .p-horas { display: flex; gap: 3px; align-items: flex-end; height: 44px; margin-top: 6px; }
+.v2 .sala .p-horas i { flex: 1; background: rgba(var(--sala-ativo-rgb), .32); border-radius: 2px 2px 0 0; min-height: 2px; }
+.v2 .sala .p-horas i.agora { background: var(--sala-ativo); }
+.v2 .sala .p-horas-l { display: flex; justify-content: space-between; font-size: 11px; color: var(--txt-3); margin-top: 3px; }
+.v2 .sala .p-agora { margin: 12px 0 4px; padding: 12px 14px; border-radius: 12px; background: rgba(var(--tint), .035); border: 1px solid var(--linha); }
+.v2 .sala .p-agora .t { font-size: 12px; color: var(--txt-3); }
+.v2 .sala .p-agora .v { font-size: 14px; margin-top: 2px; }
+.v2 .sala .p-agora .v b { font-weight: 600; }
+.v2 .sala .p-agora.alerta { border-color: rgba(var(--rubro-rgb), .5); background: rgba(var(--rubro-rgb), .07); }
+.v2 .sala .p-ficha { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 12.5px; margin-top: 8px; }
+.v2 .sala .p-ficha .linha { display: contents; }
+.v2 .sala .p-ficha .k { color: var(--txt-3); }
+.v2 .sala .p-ficha .rubro { color: var(--rubro); }
+.v2 .sala .p-passos { display: flex; gap: 4px; margin: 8px 0 2px; }
+.v2 .sala .p-passos i { flex: 1; height: 5px; border-radius: 3px; background: rgba(var(--tint), .08); }
+.v2 .sala .p-passos i.feito { background: var(--sala-triagem); }
+.v2 .sala .p-chat { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.v2 .sala .bolha { max-width: 88%; padding: 8px 10px; border-radius: 12px; font-size: 13px; line-height: 1.35; }
+.v2 .sala .bolha.cliente { align-self: flex-start; background: rgba(var(--tint), .07); border-bottom-left-radius: 4px; }
+.v2 .sala .bolha.bot { align-self: flex-end; background: rgba(var(--sala-triagem-rgb), .14); border-bottom-right-radius: 4px; }
+.v2 .sala .bolha.atendente { align-self: flex-end; background: rgba(var(--sala-ativo-rgb), .16); border-bottom-right-radius: 4px; }
+.v2 .sala .bolha .q { display: block; font-size: 11px; color: var(--txt-3); margin-bottom: 2px; }
+.v2 .sala .p-acoes { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.v2 .sala .p-acoes .fantasma { border-color: transparent; color: var(--txt-2); }
+.v2 .sala .p-log { display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; }
+.v2 .sala .p-log div { display: grid; grid-template-columns: 38px 1fr; gap: 8px; }
+.v2 .sala .p-log .h { color: var(--txt-3); }
+
+/* ---------- SVG: animações da cena ---------- */
+.v2 .sala .palco-cena .p { cursor: pointer; }
+.v2 .sala .palco-cena .bracos .b1, .v2 .sala .palco-cena .bracos .b2, .v2 .sala .palco-cena .pernas > * { transform-box: fill-box; transform-origin: 50% 6%; }
+.v2 .sala .palco-cena .digitando .bracos .b1 { animation: sala-tecla .42s infinite alternate; }
+.v2 .sala .palco-cena .digitando .bracos .b2 { animation: sala-tecla .42s .2s infinite alternate; }
+.v2 .sala .palco-cena .ligando .bracos .b2 { transform: rotate(-125deg) translate(0, 3px); }
+.v2 .sala .palco-cena .andando .pernas > :first-child { animation: sala-passo .58s infinite alternate; }
+.v2 .sala .palco-cena .andando .pernas > :last-child { animation: sala-passo .58s .23s infinite alternate-reverse; }
+.v2 .sala .palco-cena .andando .bracos .b1 { animation: sala-passo .58s .23s infinite alternate-reverse; }
+.v2 .sala .palco-cena .andando .bracos .b2 { animation: sala-passo .58s infinite alternate; }
+.v2 .sala .palco-cena .digitando .tela-linhas rect { animation: sala-linha 1.1s infinite; }
+.v2 .sala .palco-cena .digitando .tela-linhas rect:nth-child(2) { animation-delay: .25s; }
+.v2 .sala .palco-cena .digitando .tela-linhas rect:nth-child(3) { animation-delay: .5s; }
+.v2 .sala .palco-cena .aura { opacity: 0; transition: opacity .4s; }
+.v2 .sala .palco-cena .digitando .aura { opacity: 1; animation: sala-aura 2.2s ease-in-out infinite; }
+.v2 .sala .palco-cena .poeira { animation: sala-drift 17s linear infinite; }
+.v2 .sala .palco-cena .led-cafe { animation: sala-led 2.6s ease-in-out infinite; }
+.v2 .sala .palco-cena #wall-borda.assinou { animation: sala-onda .78s var(--ease); }
+.v2 .sala .palco-cena #anel-assinatura.assinou { animation: sala-anel .78s var(--ease); }
+.v2 .sala .palco-cena .bloom-assina.assinou { animation: sala-bloom .78s var(--ease); }
+/* movimento contido/profissional: amplitudes menores, ritmo mais calmo */
+@keyframes sala-tecla { from { transform: rotate(-3.5deg) translateY(0); } to { transform: rotate(3.5deg) translateY(1px); } }
+@keyframes sala-passo { from { transform: rotate(-8deg); } to { transform: rotate(8deg); } }
+@keyframes sala-linha { 0%, 100% { opacity: .4; } 50% { opacity: .85; } }
+@keyframes sala-aura { 0%, 100% { opacity: .38; } 50% { opacity: .68; } }
+@keyframes sala-drift { from { transform: translateY(0); } to { transform: translateY(-14px); } }
+@keyframes sala-led { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }
+@keyframes sala-onda { 0% { opacity: 0; } 30% { opacity: .9; } 100% { opacity: 0; } }
+@keyframes sala-anel { 0% { opacity: 0; transform: scale(.8); } 40% { opacity: .9; } 100% { opacity: 0; transform: scale(1.15); } }
+@keyframes sala-bloom { 0% { opacity: .45; } 40% { opacity: .95; } 100% { opacity: .45; } }
+.v2 .sala .palco-cena .badge rect { fill: rgba(12, 16, 24, .94); stroke: rgba(255, 255, 255, .16); }
+.v2 .sala .palco-cena .badge text { fill: #eceff4; font-size: 10.5px; font-weight: 500; }
+.v2 .sala .palco-cena .badge.rubro rect { stroke: var(--rubro); } .v2 .sala .palco-cena .badge.rubro text { fill: var(--rubro); }
+.v2 .sala .palco-cena .badge.ok rect { stroke: var(--verde); } .v2 .sala .palco-cena .badge.ok text { fill: var(--verde); }
+.v2 .sala .palco-cena .badge.triagem rect { stroke: var(--sala-triagem); } .v2 .sala .palco-cena .badge.triagem text { fill: var(--sala-triagem); }
+.v2 .sala .palco-cena .badge.ativo rect { stroke: var(--sala-ativo); } .v2 .sala .palco-cena .badge.ativo text { fill: var(--sala-ativo); }
+.v2 .sala .palco-cena .badge.arrasto rect { stroke: var(--ambar); } .v2 .sala .palco-cena .badge.arrasto text { fill: var(--ambar); }
+/* não-trabalhável: etiqueta mais VISÍVEL (fundo mais opaco + contorno âmbar + texto claro) */
+.v2 .sala .palco-cena .badge.ne rect { fill: rgba(24, 20, 12, .96); stroke: var(--ambar); stroke-width: 1.2; }
+.v2 .sala .palco-cena .badge.ne text { fill: #f2dfb2; font-weight: 600; }
+.v2 .sala .palco-cena .anel { transition: stroke .4s, opacity .4s; }
+.v2 .sala .palco-cena .nome-mesa { font-size: 11px; fill: var(--txt-2); pointer-events: none; }
+.v2 .sala .palco-cena .nome-mesa.livre { fill: var(--txt-3); font-style: italic; }
+.v2 .sala .palco-cena .placa { font-size: 11px; fill: var(--txt-3); letter-spacing: .06em; }
+.v2 .sala .palco-cena .cliente { transition: opacity .5s; }
+/* nome do cliente sob o boneco (2 linhas: 1º nome + sobrenome) */
+.v2 .sala .palco-cena .nome-cli { pointer-events: none; }
+.v2 .sala .palco-cena .nome-cli rect { fill: rgba(8, 11, 16, .72); }
+.v2 .sala .palco-cena .nome-cli text { fill: #eceff4; font-size: 7px; font-weight: 600; }
+.v2 .sala .palco-cena .nome-cli text.l2 { fill: #aab3c2; font-weight: 500; }
+.v2 .sala .palco-cena .p:focus-visible, .v2 .sala .palco-cena [tabindex]:focus-visible { outline: 2px solid var(--sala-ativo); outline-offset: 2px; }
+
+/* ---------- Toast ---------- */
+/* toast sempre escuro → cor de texto/borda FIXAS (não herdar --txt, que fica escuro no light) */
+.v2.sala-toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%) translateY(20px); opacity: 0; pointer-events: none; z-index: 60; padding: 10px 14px; border-radius: 12px; background: rgba(15, 18, 24, .95); border: 1px solid rgba(255, 255, 255, .18); color: #f4f5f7; font-size: 13px; box-shadow: 0 20px 50px rgba(0, 0, 0, .4); transition: opacity .25s var(--ease), transform .25s var(--ease); max-width: 92vw; }
+.v2.sala-toast.on { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ---------- Responsivo ---------- */
+@media (max-width: 900px) {
+  .v2 .sala .sala-palco { height: clamp(320px, 44vh, 460px); }
+  .v2 .sala .cmd { gap: 8px; padding: 7px 10px; }
+  .v2 .sala .cmd-brand { display: none; }
+  .v2 .sala .palco-hud { top: 58px; max-width: 100%; }
+  .v2 .sala .palco-legenda { display: none; }
+  .v2 .sala .sala-drawer { width: 100%; top: auto; height: 74%; transform: translateY(100%); border-left: 0; border-top: 1px solid var(--fio-a); border-radius: 18px 18px 0 0; padding-bottom: env(safe-area-inset-bottom); }
+  .v2 .sala .sala-drawer.on { transform: translateY(0); }
+}
+
+/* ---------- Movimento desligado ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .v2 .sala .palco-cena .digitando .bracos .b1, .v2 .sala .palco-cena .digitando .bracos .b2, .v2 .sala .palco-cena .digitando .tela-linhas rect,
+  .v2 .sala .palco-cena .digitando .aura, .v2 .sala .palco-cena .andando .pernas > *, .v2 .sala .palco-cena .andando .bracos .b1, .v2 .sala .palco-cena .andando .bracos .b2,
+  .v2 .sala .palco-cena .poeira, .v2 .sala .palco-cena .led-cafe { animation: none; }
+}
+:root[data-perf="lite"] .v2 .sala .palco-cena .digitando .bracos .b1,
+:root[data-perf="lite"] .v2 .sala .palco-cena .digitando .bracos .b2,
+:root[data-perf="lite"] .v2 .sala .palco-cena .digitando .tela-linhas rect,
+:root[data-perf="lite"] .v2 .sala .palco-cena .andando .pernas > *,
+:root[data-perf="lite"] .v2 .sala .palco-cena .andando .bracos .b1,
+:root[data-perf="lite"] .v2 .sala .palco-cena .andando .bracos .b2,
+:root[data-perf="lite"] .v2 .sala .palco-cena .poeira,
+:root[data-perf="lite"] .v2 .sala .palco-cena .led-cafe { animation: none; }

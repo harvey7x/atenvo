@@ -13,6 +13,10 @@ function Ic({ children }: { children: ReactNode }) {
 }
 
 export const ICONES: Record<string, ReactNode> = {
+  // Sala SDR: planta baixa de escritório (mesas em volta de um corredor) — a "sala" vista de cima.
+  sala: (
+    <Ic><rect x="3" y="3" width="18" height="18" rx="2.5" /><rect x="6" y="6" width="4" height="3" rx="1" /><rect x="14" y="6" width="4" height="3" rx="1" /><rect x="6" y="15" width="4" height="3" rx="1" /><rect x="14" y="15" width="4" height="3" rx="1" /><path d="M12 9.5v5" /></Ic>
+  ),
   dashboard: (
     <Ic><rect x="3" y="3" width="7" height="9" rx="1.5" /><rect x="14" y="3" width="7" height="5" rx="1.5" /><rect x="14" y="12" width="7" height="9" rx="1.5" /><rect x="3" y="16" width="7" height="5" rx="1.5" /></Ic>
   ),

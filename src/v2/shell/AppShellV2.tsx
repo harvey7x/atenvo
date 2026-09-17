@@ -51,6 +51,7 @@ const GRUPOS: { rotulo: string; itens: ItemNav[] }[] = [
   {
     rotulo: 'Operação',
     itens: [
+      { slug: 'sala', rotulo: 'Sala SDR' },
       { slug: 'dashboard', rotulo: 'Dashboard' },
       { slug: 'whatsapp', rotulo: 'WhatsApp' },
       // Facebook e Disparo fora do menu (pedido do dono 27/08) — rotas seguem vivas por URL
@@ -113,7 +114,7 @@ const COB_SECOES: ItemNav[] = [
   { slug: 'cobrancas/envios', rotulo: 'Envios' },
 ];
 const MODULOS: Modulo[] = [
-  { id: 'atendimento', rotulo: 'Atendimento', home: '/whatsapp', grupos: GRUPOS },
+  { id: 'atendimento', rotulo: 'Atendimento', home: '/sala', grupos: GRUPOS },
   { id: 'cobrancas', rotulo: 'Cobranças', home: '/cobrancas/painel', grupos: [{ rotulo: 'Cobranças', itens: COB_SECOES }] },
 ];
 /* ícones das seções de cobrança (mesma família traço 1.7) */

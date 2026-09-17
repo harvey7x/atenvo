@@ -1,0 +1,72 @@
+/* ============================================================
+   Sala SDR — só o que é ESPECÍFICO do dashboard da sala.
+   Todo o resto (bento, .db-hero, .db-sec, .db-barh, .db-donut,
+   .db-tip, .db-delta, .db-vazio) vem de dashboard.css (importado),
+   pra ficar idêntico ao Dashboard da casa.
+   ============================================================ */
+.v2 .sala-dash-wrap { display: flex; flex-direction: column; gap: 10px; }
+.v2 .sala-dash-h { display: flex; align-items: baseline; gap: 10px; padding: 0 2px; }
+.v2 .sala-dash-h .sub { font-size: 12px; color: var(--txt-3); }
+.v2 .sala-dash-skel { padding: 40px; text-align: center; color: var(--txt-3); font-size: 13px; }
+
+/* flash do "Casos abertos" a cada assinatura */
+.v2 .sd-flash { animation: sd-flash-n .7s var(--ease); }
+@keyframes sd-flash-n { 0% { text-shadow: 0 0 0 rgba(var(--verde-rgb), 0); } 30% { text-shadow: 0 0 16px rgba(var(--verde-rgb), .7); } 100% { text-shadow: 0 0 0 rgba(var(--verde-rgb), 0); } }
+
+/* ---- Leaderboard (anatomia .db-at da casa + avatar/medalha/barra) ---- */
+.v2 .sd-lead { display: flex; flex-direction: column; gap: 4px; }
+.v2 .sd-at {
+  display: grid; grid-template-columns: 20px 30px minmax(120px, 1.5fr) minmax(120px, 1.1fr) 58px 64px minmax(90px, 1fr);
+  gap: 11px; align-items: center; padding: 8px 10px; border-radius: 11px;
+  border: 1px solid transparent; transition: background .15s var(--ease);
+}
+.v2 .sd-at:hover { background: rgba(var(--tint), .04); }
+.v2 .sd-at.lider { border-color: rgba(var(--verde-rgb), .3); background: rgba(var(--verde-rgb), .05); }
+.v2 .sd-at .pos { font-size: 14px; font-weight: 700; color: var(--txt-2); text-align: center; }
+/* avatar = INICIAIS num círculo (padrão do Dashboard da casa), não boneco — mais sóbrio */
+.v2 .sd-at .av { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 700; letter-spacing: .01em; color: var(--txt); border: 1.5px solid var(--sdr, var(--linha)); background: linear-gradient(150deg, #2b2e34, #17181a); box-shadow: inset 0 0 0 1px rgba(var(--tint), .1); }
+:root[data-tema="light"] .v2 .sd-at .av { background: linear-gradient(150deg, #e8eaee, #f6f7f9); }
+.v2 .sd-at .who { min-width: 0; }
+.v2 .sd-at .who .nome { font-size: 13px; font-weight: 600; }
+.v2 .sd-at .who .sub { font-size: 10.5px; color: var(--txt-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2 .sd-at .msgs { display: flex; flex-direction: column; gap: 1px; }
+.v2 .sd-spark { display: block; }
+.v2 .sd-at .msgs .lab { font-size: 9.5px; color: var(--txt-3); }
+.v2 .sd-at .mid { text-align: center; }
+.v2 .sd-at .mid b { display: block; font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.v2 .sd-at .mid span { font-size: 9px; color: var(--txt-3); }
+.v2 .sd-at .mid.er b { color: var(--rubro); }
+.v2 .sd-at .prod { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
+.v2 .sd-at .prod .pbar { height: 8px; border-radius: 99px; background: rgba(var(--tint), .08); overflow: hidden; }
+.v2 .sd-at .prod .pbar i { display: block; height: 100%; border-radius: 99px; background: var(--sdr); transition: width .4s var(--ease); }
+.v2 .sd-at .prod .c { font-size: 15px; font-weight: 700; border-radius: 7px; padding: 3px 9px; }
+.v2 .sd-at .prod .c.ok { color: var(--verde); background: var(--verde-bg); }
+
+/* ---- automação do bot (mini-kpis + barras) ---- */
+.v2 .sd-auto { display: flex; flex-direction: column; gap: 12px; }
+.v2 .sd-auto-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.v2 .sd-auto-kpis .k b { display: block; font-size: 20px; font-weight: 700; letter-spacing: -.02em; }
+.v2 .sd-auto-kpis .k b small { font-size: 11px; color: var(--txt-3); font-weight: 500; }
+.v2 .sd-auto-kpis .k span { font-size: 10px; color: var(--txt-3); }
+
+/* ---- mesas LED ---- */
+.v2 .sd-mesas { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 12px; }
+.v2 .sd-mesas .mesa-led { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--txt-2); }
+.v2 .sd-mesas .mesa-led i { width: 7px; height: 7px; border-radius: 50%; }
+
+/* ---- feed ---- */
+.v2 .sd-feed { display: flex; flex-direction: column; gap: 9px; }
+.v2 .sd-feed .ev { display: grid; grid-template-columns: 38px 1fr; gap: 8px; font-size: 12px; color: var(--txt-2); align-items: baseline; }
+.v2 .sd-feed .ev .h { color: var(--txt-3); }
+.v2 .sd-feed .ev.novo { color: var(--txt); }
+.v2 .sd-feed .ev.dest { padding-left: 6px; border-left: 2px solid var(--ambar); margin-left: -8px; }
+
+/* leaderboard/auto responsivos */
+@media (max-width: 1100px) {
+  .v2 .sd-at { grid-template-columns: 18px 28px minmax(90px, 1.4fr) 56px 64px minmax(80px, 1fr); }
+  .v2 .sd-at .msgs { display: none; }
+}
+@media (max-width: 640px) {
+  .v2 .sd-at { grid-template-columns: 16px 26px 1fr 60px; }
+  .v2 .sd-at .msgs, .v2 .sd-at .mid { display: none; }
+}

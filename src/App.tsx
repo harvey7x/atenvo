@@ -38,6 +38,7 @@ const AgendamentosV2 = lazy(() => import('@/v2/pages/Agendamentos'));
 const ScriptsV2 = lazy(() => import('@/v2/pages/Scripts'));
 const SimuladorV2 = lazy(() => import('@/v2/pages/Simulador'));
 const DashboardV2 = lazy(() => import('@/v2/pages/Dashboard'));
+const SalaSdrV2 = lazy(() => import('@/v2/pages/SalaSdr'));
 const ConfiguracoesV2 = lazy(() => import('@/v2/pages/Configuracoes'));
 const IaV2 = lazy(() => import('@/v2/pages/Ia'));
 const RecuperacaoV2 = lazy(() => import('@/v2/pages/Recuperacao'));
@@ -92,8 +93,10 @@ const routes: RouteObject[] = [
       {
         element: <Lz><AppShellV2 /></Lz>,
         children: [
-          // Home: entra pelo WhatsApp (entrada do v1) — decisão de escopo do dono.
-          { index: true, element: <Navigate to="/whatsapp" replace /> },
+          // Home: a Sala SDR é a visão INICIAL do painel (feat/sala-sdr). O dashboard
+          // antigo segue acessível em /dashboard e o inbox em /whatsapp — nada removido.
+          { index: true, element: <Navigate to="/sala" replace /> },
+          { path: 'sala', element: <Lz><SalaSdrV2 /></Lz> },
           { path: 'dashboard', element: <Lz><DashboardV2 /></Lz> },
           { path: 'whatsapp', element: <Lz><GateWhatsApp /></Lz> },
           { path: 'facebook', element: <Lz><ManutencaoV2 area="Facebook" /></Lz> },
