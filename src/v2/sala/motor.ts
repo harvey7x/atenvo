@@ -13,7 +13,8 @@
    ============================================================ */
 import { CONFIG, ATENDENTES, BOT } from './config';
 import { Camada, ZONAS, BALCAO, FILA, PORTA, HALL, PASSAGEM, ESPERA_SAIDA, SR_GATE, K1, K2, K3, RET_GATE, RET_IN, DOC_GATE, KS, iso, VB, type NomeZona } from './cena';
-import { lookCliente, bonecoSVG, type Look } from './boneco';
+import { lookCliente, type Look } from './boneco';
+import { bonecoPixelSVG } from './bonecoPixel';
 import type { EtapaLead, LeadView, SalaState } from './tipos';
 
 /* ---- tipos internos do lead simulado ---- */
@@ -526,7 +527,7 @@ export function criarMotor(svg: SVGSVGElement, opts: { modoReal?: boolean } = {}
         const n1 = partes[0], n2 = partes.slice(1).join(' ');
         const larg = Math.max(n1.length, n2.length) * 4.3 + 8;
         const nomeSVG = `<g class="nome-cli"><rect x="${(-larg / 2).toFixed(1)}" y="8" width="${larg.toFixed(1)}" height="${n2 ? 17 : 11}" rx="4"/><text x="0" y="15.4" text-anchor="middle">${n1}</text>${n2 ? `<text x="0" y="22.6" text-anchor="middle" class="l2">${n2}</text>` : ''}</g>`;
-        c.it.el.innerHTML = `<ellipse class="anel" cx="0" cy="1" rx="14" ry="5.5" fill="none" stroke="var(--sala-espera)" stroke-width="1.6" opacity=".9"/>` + bonecoSVG(L.look, pose, { telefone }) + nomeSVG + `<g class="badge" transform="translate(0,-92)" opacity="0"><rect x="-34" y="-9" width="68" height="18" rx="9"/><text text-anchor="middle" y="4"></text></g>`;
+        c.it.el.innerHTML = `<ellipse class="anel" cx="0" cy="1" rx="14" ry="5.5" fill="none" stroke="var(--sala-espera)" stroke-width="1.6" opacity=".9"/>` + bonecoPixelSVG(L.look, pose) + nomeSVG + `<g class="badge" transform="translate(0,-92)" opacity="0"><rect x="-34" y="-9" width="68" height="18" rx="9"/><text text-anchor="middle" y="4"></text></g>`;
       }
       const p = iso(L.pos[0], L.pos[1], 0);
       c.it.el.setAttribute('transform', `translate(${p.x.toFixed(1)},${p.y.toFixed(1)})`);

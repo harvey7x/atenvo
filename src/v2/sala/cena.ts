@@ -6,7 +6,7 @@
    Portado da demo; só as tintas de destaque viraram tokens da casa.
    ============================================================ */
 import { iso, pts, box, boxZ, flat, monitor, planta, poltrona, cadeiraVisita, bebedouro, mesaRedonda, luminaria, ripasEscovado, textoChao, defs, SK, VB, type Pt } from './iso';
-import { botSVG, bonecoSVG } from './boneco';
+import { bonecoPixelSVG, botPixelSVG } from './bonecoPixel';
 import { ATENDENTES, BOT } from './config';
 
 /* materiais neutros da sala (ilustração; assentam no --base #0A0B0D) */
@@ -272,7 +272,7 @@ function montarMoveis(cam: Camada): void {
   const A = (d: number, html: string, extra?: AddOpts) => cam.addItem(d, html, extra);
   // ---- RECEPÇÃO (banda fundo-esq) ----
   A(3.3 + 0.35 - 0.02, cadeira(3.3, 0.35));
-  const pb = iso(3.9, 0.9); A(3.9 + 0.9, botSVG() + badgeHTML, { id: 'p-bot', cls: 'p', attrs: { transform: `translate(${pb.x},${pb.y})`, 'data-id': 'bot', tabindex: '0', role: 'button', 'aria-label': BOT.nome } });
+  const pb = iso(3.9, 0.9); A(3.9 + 0.9, botPixelSVG() + badgeHTML, { id: 'p-bot', cls: 'p', attrs: { transform: `translate(${pb.x},${pb.y})`, 'data-id': 'bot', tabindex: '0', role: 'button', 'aria-label': BOT.nome } });
   A(3.9 + 1.75, mesa(1.2, 1.2, 5.2, 'Recepção') + boxZ(1.2, 1.98, 24, 5.2, 0.16, 12, '#f3f5f8', '#c5ccd7', '#d9dee7') + `<polygon points="${pts([iso(1.3, 2.1, 22), iso(6.3, 2.1, 22), iso(6.3, 2.1, 20), iso(1.3, 2.1, 20)])}" fill="rgba(var(--sala-ativo-rgb),.55)" filter="url(#blur)"/>` + monitor(1.7, 1.42, 28, 0.75, true) + monitor(2.9, 1.42, 28, 0.75) + monitor(4.1, 1.42, 28, 0.75, true) + monitor(5.25, 1.42, 28, 0.75, true) + flat(2.2, 1.78, 28.5, 0.55, 0.2, '#3a4356') + flat(3.45, 1.8, 28.5, 0.55, 0.2, '#3a4356') + flat(4.6, 1.78, 28.5, 0.55, 0.2, '#3a4356') + planta(1.45, 1.35, 0.4, 28, 1), { id: 'mesa-bot' });
   // divisória de vidro (recepção ↔ open-space), x=7.6, y0.6..6.4
   { const gx = 7.6, ya = 0.6, yb = 6.4, gz = 78;
@@ -284,7 +284,7 @@ function montarMoveis(cam: Camada): void {
   for (const a of ATENDENTES) {
     const { x, y } = a.desk; const pp = iso(x + 1, y - 0.35);
     A(x + 1 + y - 0.35 - 0.02, cadeira(x + 0.6, y - 0.8));
-    A(x + 1 + y - 0.35, bonecoSVG(a.look as never, 'sentado') + badgeHTML, { id: 'p-' + a.id, cls: 'p', attrs: { transform: `translate(${pp.x},${pp.y})`, 'data-id': a.id, tabindex: '0', role: 'button', 'aria-label': a.nome } });
+    A(x + 1 + y - 0.35, bonecoPixelSVG(a.look as never, 'sentado') + badgeHTML, { id: 'p-' + a.id, cls: 'p', attrs: { transform: `translate(${pp.x},${pp.y})`, 'data-id': a.id, tabindex: '0', role: 'button', 'aria-label': a.nome } });
     const occ = flat(x + 0.28, y + 0.1, 28.4, 1.5, 0.05, 'var(--sala-espera)', `id="occ-${a.id}"`);
     const plate = ripasEscovado(x + 0.42, y + 0.9, 4.5, 1.16, 3) + `<polygon points="${pts([iso(x + 0.42, y + 0.9, 7.2), iso(x + 1.58, y + 0.9, 7.2), iso(x + 1.58, y + 0.9, 7.6), iso(x + 0.42, y + 0.9, 7.6)])}" fill="${a.acento}"/>`;
     A(x + 1 + y + 0.45, mesa(x, y, 2, a.nome, 'dot-' + a.id) + occ + `<g id="mon-${a.id}">${monitor(x + 0.35, y + 0.18, 28, 0.78)}${monitor(x + 1.2, y + 0.18, 28, 0.55, true)}</g>` + acessorios(x, y, a.extra) + plate, { id: 'mesa-' + a.id });

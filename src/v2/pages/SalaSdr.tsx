@@ -14,7 +14,8 @@ import { Suspense, useCallback, useEffect, useReducer, useRef, useSyncExternalSt
 import { useOrg } from '@/context/OrgContext';
 import { useSalaReal, SALA_REAL } from '@/data/sala';
 import { lazyComRecarga as lazy } from '@/lib/recargaChunk';
-import { bonecoSVG, botSVG, type Look } from '../sala/boneco';
+import { type Look } from '../sala/boneco';
+import { bonecoPixelSVG, botPixelSVG } from '../sala/bonecoPixel';
 import { criarMotor, type MotorSala, type Snapshot, type DashboardView, type KpiView, type FunilLinha, type ItemLista, type ConversaView } from '../sala/motor';
 import '../tokens.css';
 import '../base.css';
@@ -289,7 +290,7 @@ function Conversa({ c }: { c: ConversaView }) {
 }
 
 function Avatar({ look, bot }: { look?: Look; bot?: boolean }) {
-  const inner = bot ? botSVG().replace(/<ellipse class="aura"[^>]*\/>/, '') : look ? bonecoSVG(look, 'pe') : '';
+  const inner = bot ? botPixelSVG() : look ? bonecoPixelSVG(look, 'pe') : '';
   return <svg viewBox="-17 -78 34 40" dangerouslySetInnerHTML={{ __html: inner }} />;
 }
 
