@@ -128,6 +128,8 @@ export interface MotorSala {
   snapshot(): Snapshot;
   estadoSala(): SalaState; // projeção do contrato (Fase 2 bridge, saída)
   aplicarReal(estado: SalaState): void; // Fase 2.0: ingere a foto real (entrada)
+  zoom(fator: number): void; // <1 aproxima, >1 afasta (centralizado)
+  resetZoom(): void; // volta pra sala inteira
   exportarCsv(): string; // relatório do dia (categoria + motivo + números) — CSV p/ Excel
   pausar(): void;
   alternarVelocidade(): void;
@@ -160,6 +162,7 @@ export function criarMotor(svg: SVGSVGElement, opts: { modoReal?: boolean } = {}
   const atd: Record<string, AtdSt> = {};
   for (const a of ATENDENTES) atd[a.id] = { digitandoAte: -1, digitandoLead: null, ligandoAte: -1, ligandoLead: null, atual: null, msgs: 0, primeiras: [], respostas: [], ligacoes: 0, recuperados: 0, qualificados: 0, producao: 0, perdidos: 0, recebidos: 0, maxEspera: 0, msgsPorFatia: {}, log: [] };
   const camera = { x: VB.x0, y: VB.y0, w: VB.w, h: VB.h, ax: VB.x0, ay: VB.y0, aw: VB.w, ah: VB.h };
+  let zoomUsuario = false; // true quando o usuário controla a câmera (roda/arrastar) — seleção não a move
   const clientes: Record<string, { it: ReturnType<Camada['addItem']>; pose: string | null; telefone: boolean | null }> = {};
   let assinouPulse = 0; // sobe a cada assinatura → flash do KPI, realce do leaderboard e onda verde no videowall
   let ultAssinou = 0;   // último valor visto por renderCena (dispara o pulso na cena)
@@ -632,6 +635,7 @@ export function criarMotor(svg: SVGSVGElement, opts: { modoReal?: boolean } = {}
 
   /* ---------- câmera / seleção ---------- */
   function focar(sel: Selecao) {
+    if (zoomUsuario) return; // usuário no controle manual — abrir/fechar detalhe não mexe o zoom
     if (sel === 'sala') { Object.assign(camera, { ax: VB.x0, ay: VB.y0, aw: VB.w, ah: VB.h }); if (reduz) Object.assign(camera, { x: VB.x0, y: VB.y0, w: VB.w, h: VB.h }); return; }
     const d = sel === 'bot' ? iso(4.0, 3.2, 30) : ((a) => iso(a.desk.x + 1.6, a.desk.y + 1.0, 30))(atdDe(sel));
     const w = sel === 'bot' ? 640 : 600, h = (w * VB.h) / VB.w;
@@ -1045,12 +1049,45 @@ export function criarMotor(svg: SVGSVGElement, opts: { modoReal?: boolean } = {}
   snapAtual = construirSnapshot();
   renderCena();
 
+  /* ---------- ZOOM + PAN do usuário (roda do mouse aproxima; arrastar move) ---------- */
+  const MINW = VB.w * 0.30, MAXW = VB.w; // aproxima até ~3.3× a sala inteira
+  let arrastando = false, dragMoved = false, apX = 0, apY = 0;
+  function clampCam() {
+    camera.aw = Math.max(MINW, Math.min(MAXW, camera.aw));
+    camera.ah = (camera.aw * VB.h) / VB.w;
+    const fx = camera.aw * 0.12, fy = camera.ah * 0.12;
+    camera.ax = Math.max(VB.x0 - fx, Math.min(VB.x0 + VB.w - camera.aw + fx, camera.ax));
+    camera.ay = Math.max(VB.y0 - fy, Math.min(VB.y0 + VB.h - camera.ah + fy, camera.ay));
+  }
+  function zoomEm(fator: number, fx: number, fy: number) {
+    const sx = camera.x + fx * camera.w, sy = camera.y + fy * camera.h; // ponto sob o cursor na visão atual
+    const novoW = Math.max(MINW, Math.min(MAXW, camera.aw * fator));
+    camera.ax = sx - fx * novoW; camera.ay = sy - fy * (novoW * VB.h) / VB.w; camera.aw = novoW;
+    zoomUsuario = novoW < MAXW - 1; // voltou pra sala inteira → sai do modo manual
+    clampCam();
+  }
+  const onWheel = (e: WheelEvent) => { e.preventDefault(); const r = svg.getBoundingClientRect(); zoomEm(Math.exp(e.deltaY * 0.0016), (e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height); };
+  const onDown = (e: PointerEvent) => { if (e.button !== 0) return; arrastando = true; dragMoved = false; apX = e.clientX; apY = e.clientY; };
+  const onMove = (e: PointerEvent) => {
+    if (!arrastando) return;
+    const dx = e.clientX - apX, dy = e.clientY - apY; apX = e.clientX; apY = e.clientY;
+    if (Math.abs(dx) + Math.abs(dy) > 3) dragMoved = true;
+    const r = svg.getBoundingClientRect();
+    camera.ax -= (dx / r.width) * camera.aw; camera.ay -= (dy / r.height) * camera.ah;
+    camera.x = camera.ax; camera.y = camera.ay; zoomUsuario = true; clampCam();
+  };
+  const onUp = () => { arrastando = false; };
+
   /* ---------- clique no chão / SDR / bot na cena ---------- */
-  const onClick = (e: Event) => { const g = (e.target as Element).closest('.p'); if (g && !g.classList.contains('cliente')) selecionar((g as HTMLElement).dataset.id as Selecao); else if (!g && S.selecao !== 'sala') selecionar('sala'); };
+  const onClick = (e: Event) => { if (dragMoved) { dragMoved = false; return; } const g = (e.target as Element).closest('.p'); if (g && !g.classList.contains('cliente')) selecionar((g as HTMLElement).dataset.id as Selecao); else if (!g && S.selecao !== 'sala') selecionar('sala'); };
   const onKey = (e: Event) => { const ev = e as KeyboardEvent; if (ev.key !== 'Enter' && ev.key !== ' ') return; const g = (ev.target as Element).closest('.p'); if (!g || g.classList.contains('cliente')) return; ev.preventDefault(); selecionar((g as HTMLElement).dataset.id as Selecao); };
-  const onEsc = (e: KeyboardEvent) => { if (e.key === 'Escape' && S.selecao !== 'sala') selecionar('sala'); };
+  const onEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') { if (zoomUsuario) { zoomUsuario = false; Object.assign(camera, { ax: VB.x0, ay: VB.y0, aw: VB.w, ah: VB.h }); } else if (S.selecao !== 'sala') selecionar('sala'); } };
   svg.addEventListener('click', onClick);
   svg.addEventListener('keydown', onKey);
+  svg.addEventListener('wheel', onWheel, { passive: false });
+  svg.addEventListener('pointerdown', onDown);
+  window.addEventListener('pointermove', onMove);
+  window.addEventListener('pointerup', onUp);
   document.addEventListener('keydown', onEsc);
 
   /* ---------- loop ---------- */
@@ -1072,6 +1109,8 @@ export function criarMotor(svg: SVGSVGElement, opts: { modoReal?: boolean } = {}
       return { semanaAtual: S.semana, leads: S.leads.map(proj), atendentes: ATENDENTES.map((a) => ({ id: a.id, nome: a.nome, online: true })) };
     },
     aplicarReal(estado) { aplicarReal(estado); },
+    zoom(fator) { zoomEm(fator, 0.5, 0.5); },
+    resetZoom() { zoomUsuario = false; Object.assign(camera, { ax: VB.x0, ay: VB.y0, aw: VB.w, ah: VB.h }); },
     exportarCsv() {
       const CAT: Record<string, string> = { chegando: 'Na fila', fila_bot: 'Na fila', no_bot: 'Em triagem', abandono: 'Sem resposta', ligacao: 'Em ligação', triado: 'Em atendimento', com_atendente: 'Em atendimento', documentacao: 'Documentação', assinatura: 'Aguardando assinatura', remarketing: 'Remarketing', concluido: 'Caso aberto', perdido: 'Perdido', nao_legivel: 'Não-trabalhável' };
       const cat = (L: Lead) => CAT[L.etapa] ?? L.etapa;
@@ -1115,6 +1154,7 @@ export function criarMotor(svg: SVGSVGElement, opts: { modoReal?: boolean } = {}
     destruir() {
       vivo = false; cancelAnimationFrame(raf); clearTimeout(pulseTimer);
       svg.removeEventListener('click', onClick); svg.removeEventListener('keydown', onKey); document.removeEventListener('keydown', onEsc);
+      svg.removeEventListener('wheel', onWheel); svg.removeEventListener('pointerdown', onDown); window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp);
       ouvintes.clear(); svg.innerHTML = '';
     },
   };

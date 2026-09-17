@@ -208,7 +208,14 @@
 .v2 .sala .p-log .h { color: var(--txt-3); }
 
 /* ---------- SVG: animações da cena ---------- */
+.v2 .sala .palco-cena svg { cursor: grab; touch-action: none; }
+.v2 .sala .palco-cena svg:active { cursor: grabbing; }
 .v2 .sala .palco-cena .p { cursor: pointer; }
+/* controles de zoom (canto inferior direito do palco) */
+.v2 .sala .palco-zoom { position: absolute; right: 14px; bottom: 54px; z-index: 6; display: flex; flex-direction: column; gap: 6px; }
+.v2 .sala .palco-zoom .pz { width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--fio-a); background: rgba(15, 18, 24, .72); backdrop-filter: blur(8px); color: #eceff4; font-size: 18px; font-weight: 600; line-height: 1; cursor: pointer; display: grid; place-items: center; transition: background .15s; }
+.v2 .sala .palco-zoom .pz:hover { background: rgba(34, 42, 56, .9); }
+.v2 .sala .palco-zoom .pz:active { transform: translateY(1px); }
 .v2 .sala .palco-cena .bracos .b1, .v2 .sala .palco-cena .bracos .b2, .v2 .sala .palco-cena .pernas > * { transform-box: fill-box; transform-origin: 50% 6%; }
 .v2 .sala .palco-cena .digitando .bracos .b1 { animation: sala-tecla .42s infinite alternate; }
 .v2 .sala .palco-cena .digitando .bracos .b2 { animation: sala-tecla .42s .2s infinite alternate; }

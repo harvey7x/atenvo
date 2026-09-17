@@ -136,6 +136,13 @@ export default function SalaSdr() {
           </div>
         </div>
 
+        {/* controles de zoom da cena (roda do mouse aproxima; arrastar move; Esc enquadra) */}
+        <div className="palco-zoom" role="group" aria-label="Zoom da sala">
+          <button type="button" className="pz" onClick={() => motor?.zoom(0.8)} aria-label="Aproximar" title="Aproximar (role o mouse na sala)">+</button>
+          <button type="button" className="pz" onClick={() => motor?.zoom(1.25)} aria-label="Afastar" title="Afastar">−</button>
+          <button type="button" className="pz" onClick={() => motor?.resetZoom()} aria-label="Ver sala inteira" title="Ver sala inteira">⤢</button>
+        </div>
+
         {/* DRAWER de detalhe (sobre o palco; a sala segue viva atrás) */}
         <div className={'palco-scrim' + (drawerAberto ? ' on' : '')} onClick={() => motor?.voltarSala()} aria-hidden />
         <aside className={'sala-drawer' + (drawerAberto ? ' on' : '')} role="dialog" aria-modal="false" aria-label="Detalhe">
