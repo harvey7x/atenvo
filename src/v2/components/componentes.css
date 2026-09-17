@@ -209,6 +209,11 @@
   padding: 0 11px; font-family: var(--fonte); font-size: 13px; color: var(--txt);
 }
 .v2 .inp::placeholder { color: var(--txt-3); }
+/* selects nativos: o popup de <option> é pintado pela UA. Sem color-scheme, no tema
+   escuro ele vinha branco-no-branco (só o hover azul lia — reclamação do dono 17/09).
+   Casa o esquema da UA com o tema pra o dropdown ficar legível nos dois. */
+.v2 select.inp { color-scheme: dark; }
+:root[data-tema="light"] .v2 select.inp { color-scheme: light; }
 .v2 .inp:focus {
   outline: none; border-color: rgba(var(--tint), .5);
   box-shadow: 0 0 0 3px rgba(var(--tint), .07);
