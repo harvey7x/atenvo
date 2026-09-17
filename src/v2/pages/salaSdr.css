@@ -260,10 +260,13 @@
 .v2 .sala .palco-cena .placa { font-size: 11px; fill: var(--txt-3); letter-spacing: .06em; }
 .v2 .sala .palco-cena .cliente { transition: opacity .5s; }
 /* nome do cliente sob o boneco (2 linhas: 1º nome + sobrenome) */
-.v2 .sala .palco-cena .nome-cli { pointer-events: none; }
-.v2 .sala .palco-cena .nome-cli rect { fill: rgba(8, 11, 16, .72); }
-.v2 .sala .palco-cena .nome-cli text { fill: #eceff4; font-size: 7px; font-weight: 600; }
-.v2 .sala .palco-cena .nome-cli text.l2 { fill: #aab3c2; font-weight: 500; }
+.v2 .sala .palco-cena .nome-cli { pointer-events: none; transition: opacity .3s ease; }
+.v2 .sala .palco-cena .nome-cli rect { fill: rgba(8, 11, 16, .2); }
+/* sem caixa pesada: texto com contorno fino p/ ler sobre a cena sem poluir */
+.v2 .sala .palco-cena .nome-cli text { fill: rgba(236, 239, 244, .95); font-size: 7px; font-weight: 600; paint-order: stroke; stroke: rgba(6, 9, 14, .55); stroke-width: 1.6px; stroke-linejoin: round; }
+.v2 .sala .palco-cena .nome-cli text.l2 { fill: rgba(170, 179, 194, .9); font-weight: 500; }
+/* câmera afastada (muitos personagens): nomes quase somem; aparecem ao dar zoom */
+.v2 .sala .palco-cena svg.nomes-longe .nome-cli { opacity: .1; }
 .v2 .sala .palco-cena .p:focus-visible, .v2 .sala .palco-cena [tabindex]:focus-visible { outline: 2px solid var(--sala-ativo); outline-offset: 2px; }
 
 /* ---------- Toast ---------- */

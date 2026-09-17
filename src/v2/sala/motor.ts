@@ -164,6 +164,7 @@ export function criarMotor(svg: SVGSVGElement, opts: { modoReal?: boolean } = {}
   for (const a of ATENDENTES) atd[a.id] = { digitandoAte: -1, digitandoLead: null, ligandoAte: -1, ligandoLead: null, atual: null, msgs: 0, primeiras: [], respostas: [], ligacoes: 0, recuperados: 0, qualificados: 0, producao: 0, perdidos: 0, recebidos: 0, maxEspera: 0, msgsPorFatia: {}, log: [] };
   const camera = { x: VB.x0, y: VB.y0, w: VB.w, h: VB.h, ax: VB.x0, ay: VB.y0, aw: VB.w, ah: VB.h };
   let zoomUsuario = false; // true quando o usuário controla a câmera (roda/arrastar) — seleção não a move
+  let nomesLonge = false;  // true quando a câmera está afastada → nomes somem (anti-poluição)
   const clientes: Record<string, { it: ReturnType<Camada['addItem']>; pose: string | null; telefone: boolean | null }> = {};
   let assinouPulse = 0; // sobe a cada assinatura → flash do KPI, realce do leaderboard e onda verde no videowall
   let ultAssinou = 0;   // último valor visto por renderCena (dispara o pulso na cena)
@@ -549,6 +550,7 @@ export function criarMotor(svg: SVGSVGElement, opts: { modoReal?: boolean } = {}
     const k = 1 - Math.pow(0.001, dt / 1000);
     camera.x += (camera.ax - camera.x) * k; camera.y += (camera.ay - camera.y) * k; camera.w += (camera.aw - camera.w) * k; camera.h += (camera.ah - camera.h) * k;
     svg.setAttribute('viewBox', `${camera.x.toFixed(1)} ${camera.y.toFixed(1)} ${camera.w.toFixed(1)} ${camera.h.toFixed(1)}`);
+    const lg = camera.w > VB.w * 0.55; if (lg !== nomesLonge) { nomesLonge = lg; svg.classList.toggle('nomes-longe', lg); }
   }
 
   /* ---------- estado dos SDRs + cena (chamado a cada mudança) ---------- */
