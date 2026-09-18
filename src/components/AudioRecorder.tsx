@@ -169,11 +169,11 @@ export function AudioRecorder({ disabled, onEnviar, permitirArquivo, rotuloEnvia
       blobRef.current = blob;
       // gravação VAZIA (0 bytes): o WebKit às vezes encerra sem nenhum dataavailable.
       // Falhar AQUI com orientação clara — deixar seguir viraria "Áudio vazio" só no envio.
-      if (!blob.size) {
+      if (blob.size < 1024) {
         pararMedidor(); pararTracks(); pararTimer();
         blobRef.current = null; limparPreview(); setSeg(0); setInfo(null);
         setEstado('error');
-        setErro('A gravação saiu vazia (0 KB). Toque em Tentar de novo — se repetir, feche apps que usem o microfone e recarregue a página.');
+        setErro('A gravação saiu vazia ou corrompida. Toque em Tentar de novo — se repetir, feche apps que usem o microfone e recarregue a página.');
         return;
       }
       // DIAGNÓSTICO temporário (sanitizado, sem conteúdo de áudio): metadados do Blob + níveis + track.
@@ -292,7 +292,10 @@ export function AudioRecorder({ disabled, onEnviar, permitirArquivo, rotuloEnvia
           <span className="rec-meta">{info ? `${info.dur ? mmss(info.dur) + ' · ' : ''}${baseMime(info.mime)} · ${(info.size / 1024).toFixed(0)} KB` : ''}</span>
           {info?.verificando && <span className="rec-meta">verificando o áudio…</span>}
           {info && !info.verificando && !info.sinal && <span className="rec-erro">Nenhum som no áudio gravado. Troque o microfone e regrave.</span>}
-          {info && !info.verificando && info.sinal && <span className="rec-sinal">✓ som no áudio</span>}
+          {/* ✓ só quando o RMS foi MEDIDO de verdade; sem verificação (decode falhou/iOS)
+              é aviso neutro — afirmar ✓ num arquivo não-verificável enganava o atendente */}
+          {info && !info.verificando && info.sinal && info.rms !== undefined && <span className="rec-sinal">✓ som no áudio</span>}
+          {info && !info.verificando && info.sinal && info.rms === undefined && <span className="rec-meta">não deu pra verificar o som — ouça o preview antes de enviar</span>}
           {seletorMic}
           <button type="button" className="rec-btn ghost" onClick={() => iniciar(deviceId || undefined)} title="Gravar novamente">Regravar</button>
           <button type="button" className="rec-btn ghost" onClick={cancelar} title="Apagar">Apagar</button>
