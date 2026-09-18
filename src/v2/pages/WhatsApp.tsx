@@ -67,6 +67,7 @@ const IcBusca = () => <Ic><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.
 const IcMais = () => <Ic><path d="M12 5v14M5 12h14" /></Ic>;
 const IcFunil = () => <Ic><path d="M3 5h18l-7 8v5l-4 2v-7z" /></Ic>;
 const IcDots = () => <Ic fill><circle cx="12" cy="5" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="12" cy="19" r="1.5" /></Ic>;
+const IcPin = () => <Ic><path d="M9 3h6l-1 6 3.5 3v2h-11v-2l3.5-3z" /><path d="M12 14v7" /></Ic>;
 const IcImg = () => <Ic><rect x="3" y="4" width="18" height="16" rx="2.5" /><circle cx="9" cy="10" r="1.6" /><path d="m5 18 5-5 3 3 3-3 3 3" /></Ic>;
 const IcVideo = () => <Ic><rect x="3" y="6" width="13" height="12" rx="2.5" /><path d="m16 10 5-3v10l-5-3z" /></Ic>;
 const IcClock = () => <Ic><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></Ic>;
@@ -1131,7 +1132,6 @@ export default function WhatsAppV2() {
                         <span className="av2">{initials(nomeExibicao(c))}{c.canalAtual && <span className={'sig' + (oficial ? ' of' : '')} title={tituloCanal(c.canalAtual, transporte)}>{oficial ? '✓ ' : ''}{c.canalAtual.slice(0, 2)}</span>}</span>
                         <span className="tx">
                           <span className="n">
-                            {c.fixada && <span className="fl" title="Fixada">📌</span>}
                             {c.silenciada && <span className="fl" title="Silenciada">🔕</span>}
                             {c.arquivada && <span className="fl" title="Arquivada">🗄️</span>}
                             {nomeExibicao(c)}
@@ -1153,6 +1153,13 @@ export default function WhatsAppV2() {
                           {(c.unread ?? 0) > 0 && <span className="nl num" title={`${c.unread} não lidas`}>{(c.unread ?? 0) > 99 ? '99+' : c.unread}</span>}
                           {wait && <span className={'cr num' + (atrasado ? ' g' : '')}>{wait.label.replace('Aguardando ', '').replace('há ', '')}</span>}
                         </span>
+                        <span
+                          role="button" tabIndex={-1}
+                          className={'wa-pin' + (c.fixada ? ' on' : '')}
+                          title={c.fixada ? 'Desafixar conversa' : 'Fixar conversa no topo'}
+                          aria-label={c.fixada ? 'Desafixar conversa' : 'Fixar conversa no topo'}
+                          onClick={(e) => { e.stopPropagation(); void inbox.fixar(!c.fixada, c.id); }}
+                        ><IcPin /></span>
                       </button>
                     );
                   })}

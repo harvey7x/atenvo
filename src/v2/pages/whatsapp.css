@@ -95,6 +95,14 @@
 .v2 .conv2 .tx { min-width: 0; flex: 1; }
 .v2 .conv2 .n { font-size: 12.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; gap: 4px; align-items: center; }
 .v2 .conv2 .n .fl { font-size: 10px; flex-shrink: 0; }
+/* Pin (fixar) por card — dono 18/09: sutil quando OFF, AZUL quando fixado. Sempre visível; realça no hover.
+   É a última coluna do card (depois de .m), centrada verticalmente. stopPropagation no TSX evita abrir a conversa. */
+.v2 .conv2 .wa-pin { align-self: center; flex-shrink: 0; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; border-radius: 6px; color: var(--txt-3); opacity: .22; cursor: pointer; transition: opacity .15s, color .15s, background .15s; }
+.v2 .conv2 .wa-pin svg { width: 15px; height: 15px; }
+.v2 .conv2:hover .wa-pin { opacity: .55; }
+.v2 .conv2 .wa-pin:hover { opacity: 1; color: var(--txt); background: rgba(var(--tint), .1); }
+.v2 .conv2 .wa-pin.on { opacity: 1; color: var(--azul); }
+.v2 .conv2 .wa-pin.on:hover { opacity: 1; color: var(--azul); background: rgba(var(--azul-rgb), .14); }
 .v2 .conv2 .p { font-size: 11.5px; color: var(--txt-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
 .v2 .conv2 .chips { display: flex; gap: 4px; margin-top: 3px; flex-wrap: wrap; }
 .v2 .conv2 .cchip { font-size: 8px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; border-radius: 4px; padding: 0 4px; color: var(--txt-3); border: 1px solid rgba(var(--tint), .12); max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

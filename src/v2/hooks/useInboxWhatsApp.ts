@@ -486,12 +486,15 @@ export function useInboxWhatsApp(opts: {
     catch (e) { aoAvisar({ tom: 'erro', texto: (e as Error)?.message || 'Falha ao arquivar.' }); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current.id]);
-  const fixar = useCallback(async (fix: boolean) => {
-    if (!current.id) return;
-    if (!WA_REAL) { setContacts((cur) => patchConversa(cur, current.id, { fixada: fix })); aoAvisar({ tom: 'ok', texto: fix ? 'Conversa fixada' : 'Conversa desafixada' }); return; }
-    setContacts((cur) => patchConversa(cur, current.id, { fixada: fix }));   // otimista
-    try { await waFixar(current.id, fix); await live.refetch(); aoAvisar({ tom: 'ok', texto: fix ? 'Conversa fixada no topo' : 'Conversa desafixada' }); }
-    catch (e) { setContacts((cur) => patchConversa(cur, current.id, { fixada: !fix })); aoAvisar({ tom: 'erro', texto: (e as Error)?.message || 'Falha ao fixar.' }); }
+  // fixar/desfixar QUALQUER conversa (por id) — o pin de cada card manda o próprio id; o menu ⋯ usa a atual.
+  // Otimista (o card já fica azul na hora); sem toast de sucesso (o estado azul é o feedback).
+  const fixar = useCallback(async (fix: boolean, conversaId?: string) => {
+    const id = conversaId ?? current.id;
+    if (!id) return;
+    if (!WA_REAL) { setContacts((cur) => patchConversa(cur, id, { fixada: fix })); return; }
+    setContacts((cur) => patchConversa(cur, id, { fixada: fix }));   // otimista
+    try { await waFixar(id, fix); await live.refetch(); }
+    catch (e) { setContacts((cur) => patchConversa(cur, id, { fixada: !fix })); aoAvisar({ tom: 'erro', texto: (e as Error)?.message || 'Falha ao fixar.' }); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current.id]);
   /** patch local otimista de edição (nome/email/observações/responsável) — o await fica na página (acoes.atualizarContato). */
