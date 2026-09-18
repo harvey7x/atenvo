@@ -30,7 +30,11 @@ const EXT: Record<string, string> = { 'audio/mp4': 'm4a', 'audio/webm': 'webm', 
 export function escolherMime(): string {
   const MR = (window as unknown as { MediaRecorder?: typeof MediaRecorder }).MediaRecorder;
   if (!MR) return '';
-  for (const c of CANDIDATOS) { try { if (MR.isTypeSupported(c)) return c; } catch { /* ignore */ } }
+  // iOS: contêiner 'audio/mp4' PURO primeiro — o isTypeSupported aceita a string
+  // com codecs, mas há versões do Safari que gravam VAZIO (0 bytes) com ela; o
+  // contêiner puro grava AAC do mesmo jeito e é o caminho estável no WebKit.
+  const ordem = ehIOS() ? ['audio/mp4', ...CANDIDATOS.filter((c) => c !== 'audio/mp4')] : CANDIDATOS;
+  for (const c of ordem) { try { if (MR.isTypeSupported(c)) return c; } catch { /* ignore */ } }
   return '';
 }
 const baseMime = (m: string) => (m.split(';')[0] || 'audio/webm');
@@ -180,6 +184,15 @@ export function AudioRecorderV2({ disabled, onEnviar, permitirArquivo, rotuloEnv
       const tipo = baseMime(mimeRef.current || rec.mimeType || 'audio/webm');
       const blob = new Blob(chunksRef.current, { type: tipo });
       blobRef.current = blob;
+      // gravação VAZIA (0 bytes): o WebKit às vezes encerra sem nenhum dataavailable.
+      // Falhar AQUI com orientação clara — deixar seguir viraria "Áudio vazio" só no envio.
+      if (!blob.size) {
+        pararMedidor(); pararTracks(); pararTimer();
+        blobRef.current = null; limparPreview(); setSeg(0); setInfo(null);
+        setEstado('error');
+        setErro('A gravação saiu vazia (0 KB). Toque em Tentar de novo — se repetir, feche apps que usem o microfone e recarregue a página.');
+        return;
+      }
       // DIAGNÓSTICO temporário (sanitizado, sem conteúdo de áudio): metadados do Blob + níveis + track.
       // observabilidade mínima: gravação pelo microfone → sempre voz/PTT (origem usada no roteamento do envio).
       diagRef.current = { correlation_id: correlationRef.current, origem: 'gravacao_painel', blob_mime: mimeRef.current || rec.mimeType || tipo, blob_size: blob.size };
@@ -190,7 +203,9 @@ export function AudioRecorderV2({ disabled, onEnviar, permitirArquivo, rotuloEnv
       void medirBlob(blob, tipo);                              // verdade absoluta: o arquivo gravado tem som?
     };
     rec.onerror = () => { pararMedidor(); pararTracks(); pararTimer(); setEstado('error'); setErro('Erro durante a gravação.'); };
-    try { rec.start(); } catch { pararTracks(); pararMedidor(); setEstado('error'); setErro('Não foi possível iniciar a gravação.'); return; }
+    // iOS: timeslice de 1s → ondataavailable periódico (o WebKit já PERDEU gravações
+    // inteiras quando tudo dependia do único evento final do stop)
+    try { if (ehIOS()) rec.start(1000); else rec.start(); } catch { pararTracks(); pararMedidor(); setEstado('error'); setErro('Não foi possível iniciar a gravação.'); return; }
     setSeg(0); setPicoVivo(0); setEstado('recording');
     timerRef.current = setInterval(() => { setPicoVivo(maxNivelRef.current); if (recRef.current?.state === 'recording') setSeg((s) => s + 1); }, 1000);
   }
@@ -199,7 +214,9 @@ export function AudioRecorderV2({ disabled, onEnviar, permitirArquivo, rotuloEnv
   function continuar() { if (recRef.current?.state === 'paused') { recRef.current.resume(); setEstado('recording'); } }
   function finalizar() {
     const rec = recRef.current; if (!rec || rec.state === 'inactive') return;
-    try { rec.requestData(); } catch { /* ignore */ }   // garante o último chunk antes do stop
+    // requestData é instável no WebKit (pode invalidar o buffer); no iOS o timeslice
+    // do start(1000) já garante os chunks — só o stop() entrega o final
+    if (!ehIOS()) { try { rec.requestData(); } catch { /* ignore */ } }   // garante o último chunk antes do stop
     rec.stop();                                          // onstop monta o Blob e só então encerra as tracks
   }
   function cancelar() {

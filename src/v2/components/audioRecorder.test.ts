@@ -47,9 +47,14 @@ describe('ehIOS (detecção que decide desligar o medidor)', () => {
 describe('escolherMime (formato de gravação por navegador)', () => {
   const comSuporte = (aceitos: (t: string) => boolean) =>
     vi.stubGlobal('window', { MediaRecorder: { isTypeSupported: aceitos } });
-  it('Safari/iOS (só audio/mp4) → grava AAC/MP4, o 1º candidato', () => {
+  it('desktop (mp4 suportado) → codecs explícito, o 1º candidato', () => {
     comSuporte((t) => t.startsWith('audio/mp4'));
     expect(escolherMime()).toBe('audio/mp4;codecs=mp4a.40.2');
+  });
+  it('iOS: contêiner audio/mp4 PURO vem primeiro (codecs explícito grava 0 bytes em versões do Safari)', () => {
+    vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15', platform: 'iPhone', maxTouchPoints: 5 });
+    vi.stubGlobal('window', { MediaRecorder: { isTypeSupported: (t: string) => t.startsWith('audio/mp4') } });
+    expect(escolherMime()).toBe('audio/mp4');
   });
   it('Chrome (webm/opus, sem mp4) → cai no webm/opus', () => {
     comSuporte((t) => t.startsWith('audio/webm'));
