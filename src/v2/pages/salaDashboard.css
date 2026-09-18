@@ -24,8 +24,8 @@
 .v2 .sd-at.lider { border-color: rgba(var(--verde-rgb), .3); background: rgba(var(--verde-rgb), .05); }
 .v2 .sd-at .pos { font-size: 14px; font-weight: 700; color: var(--txt-2); text-align: center; }
 /* avatar = INICIAIS num círculo (padrão do Dashboard da casa), não boneco — mais sóbrio */
-.v2 .sd-at .av { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 700; letter-spacing: .01em; color: var(--txt); border: 1.5px solid var(--sdr, var(--linha)); background: linear-gradient(150deg, #2b2e34, #17181a); box-shadow: inset 0 0 0 1px rgba(var(--tint), .1); }
-:root[data-tema="light"] .v2 .sd-at .av { background: linear-gradient(150deg, #e8eaee, #f6f7f9); }
+.v2 .sd-at .sd-av { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 700; letter-spacing: .01em; color: var(--txt); border: 1.5px solid var(--sdr, var(--linha)); background: linear-gradient(150deg, #2b2e34, #17181a); box-shadow: inset 0 0 0 1px rgba(var(--tint), .1); }
+:root[data-tema="light"] .v2 .sd-at .sd-av { background: linear-gradient(150deg, #e8eaee, #f6f7f9); }
 .v2 .sd-at .who { min-width: 0; }
 .v2 .sd-at .who .nome { font-size: 13px; font-weight: 600; }
 .v2 .sd-at .who .sub { font-size: 10.5px; color: var(--txt-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

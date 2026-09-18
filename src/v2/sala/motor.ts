@@ -491,9 +491,9 @@ export function criarMotor(svg: SVGSVGElement, opts: { modoReal?: boolean } = {}
   function setBadge(g: Element, txt: string, classe: string) {
     // visibilidade via classe .on (não via atributo opacity): o CSS controla o fade
     // por distância/zoom sem reacender badges vazios.
-    const b = g.querySelector('.badge'); if (!b) return;
-    if (!txt) { b.setAttribute('class', 'badge ' + (classe || '')); (b.querySelector('text') as SVGTextElement).textContent = ''; return; }
-    b.setAttribute('class', 'badge on ' + (classe || '')); (b.querySelector('text') as SVGTextElement).textContent = txt;
+    const b = g.querySelector('.sala-badge'); if (!b) return;
+    if (!txt) { b.setAttribute('class', 'sala-badge ' + (classe || '')); (b.querySelector('text') as SVGTextElement).textContent = ''; return; }
+    b.setAttribute('class', 'sala-badge on ' + (classe || '')); (b.querySelector('text') as SVGTextElement).textContent = txt;
     const w = Math.max(44, txt.length * 6.4 + 16); const r = b.querySelector('rect') as SVGRectElement; r.setAttribute('x', String(-w / 2)); r.setAttribute('width', String(w));
   }
   function removerCliente(id: string) { const c = clientes[id]; if (!c) return; cam.removerItem(c.it); delete clientes[id]; }
@@ -530,7 +530,7 @@ export function criarMotor(svg: SVGSVGElement, opts: { modoReal?: boolean } = {}
         const n1 = partes[0], n2 = partes.slice(1).join(' ');
         const larg = Math.max(n1.length, n2.length) * 4.3 + 8;
         const nomeSVG = `<g class="nome-cli"><rect x="${(-larg / 2).toFixed(1)}" y="8" width="${larg.toFixed(1)}" height="${n2 ? 17 : 11}" rx="4"/><text x="0" y="15.4" text-anchor="middle">${n1}</text>${n2 ? `<text x="0" y="22.6" text-anchor="middle" class="l2">${n2}</text>` : ''}</g>`;
-        c.it.el.innerHTML = `<ellipse class="anel" cx="0" cy="1" rx="14" ry="5.5" fill="none" stroke="var(--sala-espera)" stroke-width="1.6" opacity=".9"/>` + bonecoPixelSVG(L.look, pose) + nomeSVG + `<g class="badge" transform="translate(0,-92)" opacity="0"><rect x="-34" y="-9" width="68" height="18" rx="9"/><text text-anchor="middle" y="4"></text></g>`;
+        c.it.el.innerHTML = `<ellipse class="anel" cx="0" cy="1" rx="14" ry="5.5" fill="none" stroke="var(--sala-espera)" stroke-width="1.6" opacity=".9"/>` + bonecoPixelSVG(L.look, pose) + nomeSVG + `<g class="sala-badge" transform="translate(0,-92)" opacity="0"><rect x="-34" y="-9" width="68" height="18" rx="9"/><text text-anchor="middle" y="4"></text></g>`;
       }
       const p = iso(L.pos[0], L.pos[1], 0);
       c.it.el.setAttribute('transform', `translate(${p.x.toFixed(1)},${p.y.toFixed(1)})`);

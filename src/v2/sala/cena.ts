@@ -266,7 +266,7 @@ function letreiros(): string {
   return s;
 }
 
-const badgeHTML = `<g class="badge" transform="translate(0,-92)" opacity="0"><rect x="-34" y="-9" width="68" height="18" rx="9"/><text text-anchor="middle" y="4"></text></g>`;
+const badgeHTML = `<g class="sala-badge" transform="translate(0,-92)" opacity="0"><rect x="-34" y="-9" width="68" height="18" rx="9"/><text text-anchor="middle" y="4"></text></g>`;
 
 function montarMoveis(cam: Camada): void {
   const A = (d: number, html: string, extra?: AddOpts) => cam.addItem(d, html, extra);

@@ -105,7 +105,7 @@ function Leaderboard({ sdrs }: { sdrs: RankingSdr[] }) {
       {sdrs.map((s, i) => (
         <div className={`sd-at${i === 0 && s.producao > 0 ? ' lider' : ''}`} key={s.id} style={{ ['--sdr' as string]: s.cor }}>
           <div className="pos num">{medalha[i] ?? i + 1}</div>
-          <span className="av num">{iniciais(s.nome)}</span>
+          <span className="sd-av num">{iniciais(s.nome)}</span>
           <div className="who"><div className="nome">{s.nome}</div><div className="sub">{s.conversasAtivas} ativas · {s.recebidos} recebidos · {s.qualificados} qualif.</div></div>
           <div className="msgs"><MiniSpark pts={s.spark} cor="var(--txt-2)" /><span className="lab">{s.msgs} msgs</span></div>
           <div className="mid"><b className="num">{fmt(s.primeiraMedia)}</b><span>1ª resp.</span></div>
