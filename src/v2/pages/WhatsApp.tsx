@@ -496,14 +496,20 @@ export default function WhatsAppV2() {
   };
   const arrastoInicio = (e: React.PointerEvent<HTMLDivElement>) => {
     const el = abasRef.current; if (!el || e.button !== 0) return;
+    // NÃO capturar o ponteiro aqui: setPointerCapture no pointerdown faz o CLIQUE
+    // não chegar no botão da aba (o clique é engolido, nada seleciona). Só vira
+    // arrasto — e só aí captura — depois que o ponteiro anda além do limiar.
     arrastoRef.current = { ativo: true, x0: e.clientX, s0: el.scrollLeft, moveu: false };
-    el.classList.add('arrastando');
-    try { el.setPointerCapture(e.pointerId); } catch { /* noop */ }
   };
   const arrastoMove = (e: React.PointerEvent<HTMLDivElement>) => {
     const a = arrastoRef.current; const el = abasRef.current; if (!a.ativo || !el) return;
     const dx = e.clientX - a.x0;
-    if (Math.abs(dx) > 4) a.moveu = true;
+    if (!a.moveu && Math.abs(dx) < 6) return;
+    if (!a.moveu) {
+      a.moveu = true;
+      el.classList.add('arrastando');
+      try { el.setPointerCapture(e.pointerId); } catch { /* noop */ }
+    }
     el.scrollLeft = a.s0 - dx;
   };
   const arrastoFim = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -511,7 +517,7 @@ export default function WhatsAppV2() {
     if (!a.ativo) return;
     a.ativo = false;
     el?.classList.remove('arrastando');
-    try { el?.releasePointerCapture(e.pointerId); } catch { /* noop */ }
+    if (a.moveu) { try { el?.releasePointerCapture(e.pointerId); } catch { /* noop */ } }
   };
   useEffect(() => {
     abasRef.current?.querySelector<HTMLElement>('.wa-aba.on')?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
