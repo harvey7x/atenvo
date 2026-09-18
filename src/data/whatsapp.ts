@@ -490,6 +490,19 @@ export function useIaToggle() {
     onSettled: (_d, _e, v) => { qc.invalidateQueries({ queryKey: ['ia-estado', v.conversaId] }); },
   });
 }
+/** "Recomeçar atendimento": reativa a IA DO ZERO (etapa inicial, estado limpo) — RPC ia_conversa_recomecar.
+ *  Diferente do toggle (que só retoma): usado quando a pessoa volta a chamar e o atendente quer que a IA reinicie. */
+export function useIaRecomecar() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ conversaId }: { conversaId: string }) => {
+      const { data, error } = await supabase!.rpc('ia_conversa_recomecar', { p_conversa: conversaId });
+      if (error) throw new Error(error.message);
+      return data as { ok: boolean; ia: string };
+    },
+    onSettled: (_d, _e, v) => { qc.invalidateQueries({ queryKey: ['ia-estado', v.conversaId] }); },
+  });
+}
 
 /** Marca curta da org no carimbo de assinatura (organizacoes.assinatura_marca; ex.: "CAF").
  *  A assinatura é OBRIGATÓRIA e aplicada no BACKEND — o front só espelha (bolha otimista/preview). */

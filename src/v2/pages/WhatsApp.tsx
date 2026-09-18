@@ -25,7 +25,7 @@ import { ScriptSequenceModal } from '@/components/ScriptSequenceModal';
 import { FichaJudicialBox } from '@/components/FichaJudicialBox';
 import { fichaDemoDoContato } from '@/data/fichaJudicial';
 import { useSendWaMessage, useAssinaturaMarca } from '@/data/whatsapp';
-import { useIaEstadoConversa, useIaToggle, type IaEstadoConversa } from '@/data/whatsapp';
+import { useIaEstadoConversa, useIaToggle, useIaRecomecar, type IaEstadoConversa } from '@/data/whatsapp';
 import { mensagemAssumir, useAlertasLeadQuente } from '@/data/alertasLeadQuente';
 import { AlertaLeadQuenteModal } from '../components/AlertaLeadQuenteModal';
 import { useInboxWhatsApp, type AvisoInbox } from '../hooks/useInboxWhatsApp';
@@ -642,6 +642,7 @@ export default function WhatsAppV2() {
   const iaEstadoQ = useIaEstadoConversa(WA_REAL ? currentId || null : null);
   const iaEstado = iaEstadoQ.data;
   const iaToggle = useIaToggle();
+  const iaRecomecar = useIaRecomecar();
   const iaAtiva = !!iaEstado?.existe && iaEstado.status === 'ativa' && !iaEstado.desativado_manual;
   async function alternarIa() {
     if (!currentId || iaToggle.isPending) return;
@@ -649,6 +650,17 @@ export default function WhatsAppV2() {
       await iaToggle.mutateAsync({ conversaId: currentId, ativar: !iaAtiva });
       aoAvisar({ tom: 'ok', texto: iaAtiva ? 'IA desativada nesta conversa' : 'IA ativada nesta conversa' });
     } catch (e) { aoAvisar({ tom: 'erro', texto: (e as Error).message || 'Falha ao alternar a IA' }); }
+  }
+  // "Recomeçar atendimento": reativa a IA DO ZERO (reinicia pela pergunta do benefício). Diferente do
+  // toggle (que só retoma). Usado quando a pessoa volta a chamar e o atendente quer reiniciar o fluxo.
+  async function recomecarIa() {
+    if (!currentId || iaRecomecar.isPending) return;
+    if (!WA_REAL) { aoAvisar({ tom: 'ok', texto: 'Demonstração: a IA recomeçaria o atendimento do zero' }); return; }
+    if (!window.confirm('Recomeçar o atendimento da IA do zero?\n\nEla reinicia pela pergunta do benefício do INSS e limpa o que já tinha coletado nesta conversa.')) return;
+    try {
+      await iaRecomecar.mutateAsync({ conversaId: currentId });
+      aoAvisar({ tom: 'ok', texto: 'IA recomeçada — ela vai reabrir o atendimento em instantes.' });
+    } catch (e) { aoAvisar({ tom: 'erro', texto: (e as Error).message || 'Falha ao recomeçar a IA' }); }
   }
   // ---- PEÇA 1: barra de estado da IA (o "modo IA" da conversa) ----
   // REAL usa o RPC ia_conversa_estado (fresco, refetch 20s); DEMO sintetiza do seed da lista.
@@ -1715,6 +1727,9 @@ export default function WhatsAppV2() {
                 ? <button type="button" className="it" onClick={() => { setPop(null); inbox.marcarLida(true); }}>Marcar como lida</button>
                 : <button type="button" className="it" onClick={() => { setPop(null); inbox.marcarLida(false); }}>Marcar como não lida</button>}
               <button type="button" className="it" onClick={() => { setPop(null); inbox.arquivar(!current.arquivada); }}>{current.arquivada ? 'Desarquivar conversa' : 'Arquivar conversa'}</button>
+              {(iaEstado?.existe || iaAtiva) && (
+                <button type="button" className="it" disabled={iaRecomecar.isPending} onClick={() => { setPop(null); void recomecarIa(); }}>↻ Recomeçar atendimento (IA)</button>
+              )}
               {current.phone && <button type="button" className="it" onClick={() => { setPop(null); copiarTelefone(); }}>Copiar telefone</button>}
               {statusFechada && current.status !== statusFechada.nome && (
                 <button type="button" className="it" onClick={() => { setPop(null); setFecharConfirm(true); }}>Fechar conversa</button>
