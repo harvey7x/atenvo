@@ -747,14 +747,14 @@ export default function WhatsAppV2() {
     for (const [t] of TABS) n[t] = base.filter((c) => passaTab(c, t)).length;
     return n;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contacts, filtroCanais, filtroTransporte, filtroEtapas, filtroEtiquetas, filtroAtendentes, filtroIA, filtroSituacao, filtroNaoLidas, filtroArquivadas, filtroPeriodo, canalPorId, term, user?.id]);
+  }, [contacts, filtroCanais, filtroTransporte, filtroEtapas, filtroEtiquetas, filtroAtendentes, filtroIA, filtroSituacao, filtroNaoLidas, filtroArquivadas, filtroPeriodo, canalPorId, term, relogioMs, user?.id]);
   // contadores podem aparecer/sumir e mudar a largura do trilho → revê as setas
   useEffect(() => { atualizarSetas(); }, [tabCounts, atualizarSetas]);
   const visiveis = useMemo(() => {
     const lista = contacts.filter((c) => passaBase(c) && passaTab(c, tab));
     return lista.sort((a, b) => (a.fixada === b.fixada ? (b.lastAtMs ?? 0) - (a.lastAtMs ?? 0) : a.fixada ? -1 : 1));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contacts, tab, filtroCanais, filtroTransporte, filtroEtapas, filtroEtiquetas, filtroAtendentes, filtroIA, filtroSituacao, filtroNaoLidas, filtroArquivadas, filtroPeriodo, canalPorId, term, user?.id]);
+  }, [contacts, tab, filtroCanais, filtroTransporte, filtroEtapas, filtroEtiquetas, filtroAtendentes, filtroIA, filtroSituacao, filtroNaoLidas, filtroArquivadas, filtroPeriodo, canalPorId, term, relogioMs, user?.id]);
   /* agrupamento por responsável — VOCÊ primeiro (seus clientes sempre visíveis no Todos),
      depois Não atribuídos, depois os demais atendentes em ordem alfabética */
   const grupos = useMemo(() => {
@@ -1686,7 +1686,7 @@ export default function WhatsAppV2() {
                       <span className="tt">Só não lidas</span>{filtroNaoLidas && <span className="ck">✓</span>}
                     </button>
                     <button type="button" className={'fp-it' + (filtroArquivadas ? ' sel' : '')} onClick={() => setFiltroArquivadas((v) => !v)}>
-                      <span className="tt">Incluir arquivadas</span>{filtroArquivadas && <span className="ck">✓</span>}
+                      <span className="tt">Só arquivadas</span>{filtroArquivadas && <span className="ck">✓</span>}
                     </button>
                   </div>
                 </section>
