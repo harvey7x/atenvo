@@ -16,7 +16,7 @@ import { corDaEtiqueta, podeGerenciarAtendimento, PALETA_CORES } from '@/types/a
 import { textoBloqueio, analisarNome, conversaAtiva } from '@/lib/higieneConversa';
 import { responsavelEfetivo } from '@/lib/conversaEtiquetas';
 import { chaveDiaSP, construirItensConversa, type ItemConversa } from '@/lib/dataConversa';
-import { canalValidoParaEnvio } from '@/lib/agendamentoMensagem';
+import { canalValidoParaEnvio, itensParaRpc } from '@/lib/agendamentoMensagem';
 import { initials } from '@/lib/avatar';
 import { useAuth } from '@/context/AuthContext';
 import { useOrg } from '@/context/OrgContext';
@@ -36,6 +36,7 @@ import { CLASSE_RAIZ_PORTAL } from '../components/portal';
 import { BotaoMini, BotaoPrimario, BotaoSec, ConfirmDialogV2, EstadoErro, ModalV2, Skeleton } from '../components';
 import { Bolha, Ic, IcBot, IcDoc } from '../components/BolhaWa';
 import { corDaSituacao, nomeExibicao, situacaoDe, tierEspera } from '../lib/waUi';
+import { IA_OPCOES, PERIODO_OPCOES, SITUACAO_OPCOES, etapasDaLista, passaFiltroInbox, type FiltrosInbox } from '../lib/filtroInbox';
 import { seedWa } from './whatsappSeed';
 import './whatsapp.css';
 
@@ -58,16 +59,8 @@ const TABS = [
   ['naolidas', 'Não lidas'], ['pendentes', 'Pendentes'], ['fechados', 'Fechados'], ['perdidos', 'Perdidos'], ['arquivadas', 'Arquivadas'],
 ] as const;
 type TabId = typeof TABS[number][0];
-// Situação = baldes FIXOS de situacaoDaConversa (variante). 'etapa' fica DE FORA: as etapas
-// avançadas do Kanban têm faceta própria (Etapa do Kanban) — sem redundância.
-const SITUACAO_OPCOES: ReadonlyArray<readonly [string, string]> = [
-  ['lead', 'Lead novo'], ['atendimento', 'Em atendimento'], ['aguardando', 'Aguardando cliente'],
-  ['ganho', 'Fechado'], ['perdido', 'Perdido'], ['cancelado', 'Cancelado'],
-];
-const IA_OPCOES: ReadonlyArray<readonly [string, string]> = [
-  ['ativa', 'Com IA ativa'], ['pausada', 'IA pausada / handoff'], ['humano', 'Precisa de humano'],
-];
-const PERIODO_OPCOES: ReadonlyArray<readonly [string, string]> = [['hoje', 'Hoje'], ['7d', '7 dias'], ['30d', '30 dias']];
+// Situação/IA/Período + o PREDICADO dos filtros agora vivem em ../lib/filtroInbox —
+// regra compartilhada com o chat mobile (18/09): mudar lá muda as duas telas juntas.
 
 const IcWa = () => <Ic><path d="M21 11.5a8.4 8.4 0 01-9 8.4 8.9 8.9 0 01-3.8-.8L3 20l1-4.9a8.3 8.3 0 01-1-4A8.4 8.4 0 0112 3a8.4 8.4 0 019 8.5z" /></Ic>;
 const IcBusca = () => <Ic><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></Ic>;
@@ -718,35 +711,15 @@ export default function WhatsAppV2() {
   const buscaAtiva = search.trim().length > 0;
   const term = search.trim().toLowerCase();
   // faixa de "última interação" (lastAtMs): hoje = desde a meia-noite local; 7d/30d = janela.
-  const dentroPeriodo = (ms: number | undefined | null): boolean => {
-    if (!filtroPeriodo) return true;
-    if (!ms) return false;
-    if (filtroPeriodo === 'hoje') { const d = new Date(relogioMs); d.setHours(0, 0, 0, 0); return ms >= d.getTime(); }
-    const dias = filtroPeriodo === '7d' ? 7 : 30;
-    return relogioMs - ms <= dias * 86_400_000;
+  // TODAS as facetas em passaFiltroInbox (../lib/filtroInbox — regra COMPARTILHADA com o
+  // mobile; o corpo é o antigo passaBase, extraído verbatim). Client-side, sobre a lista
+  // já carregada em memória. Multi dentro da faceta = OU; entre facetas = E.
+  const filtros: FiltrosInbox = {
+    canais: filtroCanais, transporte: filtroTransporte, etapas: filtroEtapas, etiquetas: filtroEtiquetas,
+    atendentes: filtroAtendentes, ia: filtroIA, situacao: filtroSituacao,
+    naoLidas: filtroNaoLidas, arquivadas: filtroArquivadas, periodo: filtroPeriodo,
   };
-  // TODAS as facetas em passaBase (client-side, sobre a lista já carregada em memória).
-  // Multi dentro da faceta = OU; entre facetas = E. "QR (não oficial)" = tudo que NÃO é o oficial
-  // (inclui canal removido/histórico, transporte desconhecido). filtroTransporte com os 2 = sem efeito.
-  const passaBase = (c: WaContact) =>
-    (filtroCanais.size === 0 || (!!c.canalId && filtroCanais.has(c.canalId))) &&
-    (filtroTransporte.size === 0 || filtroTransporte.size === 2 || (filtroTransporte.has('cloud_api')
-      ? transporteDe(c.canalId) === 'cloud_api'
-      : transporteDe(c.canalId) !== 'cloud_api')) &&
-    (filtroEtapas.size === 0 || (!!c.etapa && filtroEtapas.has(c.etapa))) &&
-    (filtroEtiquetas.size === 0 || c.tags.some((t) => filtroEtiquetas.has(t))) &&
-    (filtroAtendentes.size === 0 || filtroAtendentes.has(responsavelEfetivo(c) ?? '')) &&
-    (filtroIA.size === 0 || (
-      (filtroIA.has('ativa') && !!c.iaAtiva) ||
-      (filtroIA.has('pausada') && (c.iaStatus === 'pausada' || c.iaStatus === 'handoff')) ||
-      (filtroIA.has('humano') && !!c.precisaHumano)
-    )) &&
-    // Situação REUSA situacaoDaConversa (via situacaoDe) — a MESMA fonte do chip da lista (read-only).
-    (filtroSituacao.size === 0 || filtroSituacao.has(situacaoDe(c).variante)) &&
-    (!filtroNaoLidas || (c.unread ?? 0) > 0) &&
-    (!filtroArquivadas || !!c.arquivada) &&
-    dentroPeriodo(c.lastAtMs) &&
-    (!term || c.name.toLowerCase().includes(term) || c.last.toLowerCase().includes(term) || (c.phone ?? '').toLowerCase().includes(term));
+  const passaBase = (c: WaContact) => passaFiltroInbox(c, filtros, { term, relogioMs, transporteDe });
   const passaTab = (c: WaContact, t: TabId) => {
     if (t === 'arquivadas') return !!c.arquivada;
     // cliente FECHADO (ganho) e PERDIDO (não elegível) vivem em abas próprias e saem
@@ -951,14 +924,7 @@ export default function WhatsAppV2() {
 
   const statusAtivos = statusQ.data?.filter((s) => s.ativo) ?? [];
   // Etapas do Kanban presentes na fila atual (nome + cor), para filtrar a lista por etapa.
-  const etapasFiltro = useMemo(() => {
-    const m = new Map<string, string | null>();
-    for (const c of contacts) {
-      const nome = (c.etapa ?? '').trim();
-      if (nome && !m.has(nome)) m.set(nome, c.etapaCor ?? null);
-    }
-    return [...m.entries()].map(([nome, cor]) => ({ nome, cor })).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
-  }, [contacts]);
+  const etapasFiltro = useMemo(() => etapasDaLista(contacts), [contacts]);
   // RESUMO ATIVO: um chip removível por valor de faceta aplicado (+ "Limpar tudo" no painel).
   const rotuloCanal = (id: string) => canalPorId.get(id)?.alias ?? 'Número removido';
   const rotuloSituacao = (v: string) => SITUACAO_OPCOES.find(([k]) => k === v)?.[1] ?? v;
@@ -1939,13 +1905,9 @@ export default function WhatsAppV2() {
               await editarAgMut.mutateAsync({ id: agEditId, conversaId: current.id, canalId: v.canalId, texto: v.texto ?? '', executarEm: v.executarISO });
               aoAvisar({ tom: 'ok', texto: 'Agendamento atualizado.' });
             } else {
-              // BUG consertado 18/09: a RPC lê campos PLANOS (storage_path/mime/...) — passar
-              // v.itens cru (midia ANINHADA) agendava mídia sem arquivo → midia_path_invalido.
-              // Mapa idêntico ao v1 (src/pages/WhatsApp.tsx L485-488).
-              const itens = (v.itens ?? []).map((it) => ({
-                tipo: it.tipo, texto: it.texto || null,
-                storage_path: it.midia?.path, mime: it.midia?.mime, nome: it.midia?.nome, tamanho: it.midia?.tamanho, origem_audio: it.midia?.origemAudio,
-              }));
+              // BUG consertado 18/09: a RPC lê campos PLANOS — v.itens cru (midia ANINHADA)
+              // agendava mídia sem arquivo (midia_path_invalido). Map na lib, testado.
+              const itens = itensParaRpc(v.itens);
               await agendarSeqMut.mutateAsync({ conversaId: current.id, canalId: v.canalId, executarEm: v.executarISO, itens });
               aoAvisar({ tom: 'ok', texto: itens.length > 1 ? `${itens.length} mensagens agendadas — serão enviadas no horário.` : 'Mensagem agendada — será enviada automaticamente no horário.' });
             }

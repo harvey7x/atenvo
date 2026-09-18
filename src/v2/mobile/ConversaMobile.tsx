@@ -8,7 +8,7 @@ import { assinaturaAtendente } from '../hooks/inboxWhatsApp';
 import type { WaMessage } from '@/data/whatsappDemo';
 import { traduzErroEnvio, useScripts, aguardarConfirmacaoEnvio, type Script } from '@/data/scripts';
 import { textoBloqueio } from '@/lib/higieneConversa';
-import { canalValidoParaEnvio } from '@/lib/agendamentoMensagem';
+import { canalValidoParaEnvio, itensParaRpc } from '@/lib/agendamentoMensagem';
 import { construirItensConversa } from '@/lib/dataConversa';
 import { initials } from '@/lib/avatar';
 import { useAuth } from '@/context/AuthContext';
@@ -417,11 +417,8 @@ export default function ConversaMobile() {
               await editarAgMut.mutateAsync({ id: agEditId, conversaId: conv.id, canalId: v.canalId, texto: v.texto ?? '', executarEm: v.executarISO });
               aoAvisar({ tom: 'ok', texto: 'Agendamento atualizado.' });
             } else {
-              // mapa PLANO do v1/desktop: a RPC lê storage_path/mime/... — nunca a `midia` aninhada
-              const itens = (v.itens ?? []).map((it) => ({
-                tipo: it.tipo, texto: it.texto || null,
-                storage_path: it.midia?.path, mime: it.midia?.mime, nome: it.midia?.nome, tamanho: it.midia?.tamanho, origem_audio: it.midia?.origemAudio,
-              }));
+              // mapa PLANO da RPC (storage_path na raiz, nunca `midia` aninhada) — lib testada
+              const itens = itensParaRpc(v.itens);
               await agendarSeqMut.mutateAsync({ conversaId: conv.id, canalId: v.canalId, executarEm: v.executarISO, itens });
               aoAvisar({ tom: 'ok', texto: itens.length > 1 ? `${itens.length} mensagens agendadas — serão enviadas no horário.` : 'Mensagem agendada — será enviada automaticamente no horário.' });
             }

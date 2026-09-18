@@ -520,7 +520,7 @@ export default function DashboardV2() {
                 {atendentes.map((a: DashAtendente, i) => (
                   <button type="button" className="db-at clicavel" key={a.nome} onClick={() => setAtendenteSel(a)}
                     title={'Abrir as métricas de ' + a.nome}>
-                    <span className="av" aria-hidden>{initials(a.nome)}</span>
+                    <span className="db-av" aria-hidden>{initials(a.nome)}</span>
                     <span className="quem">
                       <span className="nm">{a.nome}{i === 0 && a.ganhos > 0 && <b className="top">top do período</b>}</span>
                       <span className="sub num">{fmtInt(a.conversas_atribuidas)} conversas · 1ª resposta {fmtMin(a.mediana_resposta_min)}</span>
@@ -577,7 +577,7 @@ export default function DashboardV2() {
               <div className="db-iaconvs">
                 {iaConvs.slice(0, 8).map((c) => (
                   <button type="button" className="db-iaconv" key={c.conversaId} onClick={() => setConversaSel(c)}>
-                    <span className="av" aria-hidden>{initials(c.nome)}</span>
+                    <span className="db-av" aria-hidden>{initials(c.nome)}</span>
                     <span className="quem">
                       <span className="nm">{c.nome}</span>
                       <span className="prev">“{c.preview}”</span>
@@ -696,7 +696,7 @@ export default function DashboardV2() {
         {conversaSel && (
           <div className="db-drawer">
             <div className="db-drawer-cab">
-              <span className="av" aria-hidden>{initials(conversaSel.nome)}</span>
+              <span className="db-av" aria-hidden>{initials(conversaSel.nome)}</span>
               <div className="quem">
                 <b>{conversaSel.nome}</b>
                 <span>{fmtInt(conversaSel.msgsBot)} resposta{conversaSel.msgsBot === 1 ? '' : 's'} da IA nesta conversa</span>
@@ -728,7 +728,7 @@ export default function DashboardV2() {
         {atendenteSel && (
           <div className="db-drawer">
             <div className="db-drawer-cab">
-              <span className="av" aria-hidden>{initials(atendenteSel.nome)}</span>
+              <span className="db-av" aria-hidden>{initials(atendenteSel.nome)}</span>
               <div className="quem">
                 <b>{atendenteSel.nome}</b>
                 <span>métricas do período · {periodo.label}</span>

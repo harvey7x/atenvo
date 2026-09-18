@@ -49,6 +49,42 @@
   flex-shrink: 0;
 }
 .v2 .m-titulo { font-size: 17px; font-weight: 600; letter-spacing: -.01em; }
+.v2 .m-titulo-row { display: flex; align-items: center; gap: 8px; }
+.v2 .m-titulo-row .m-titulo { flex: 1; }
+.v2 .m-tema {
+  position: relative;
+  width: 36px; height: 36px; border-radius: 9px; cursor: pointer; flex-shrink: 0;
+  border: 1px solid rgba(var(--tint), .1); background: rgba(var(--tint), .04); color: var(--txt-2);
+  display: flex; align-items: center; justify-content: center;
+}
+.v2 .m-tema.on { color: var(--txt); border-color: rgba(var(--azul-rgb), .5); }
+.v2 .m-tema svg { width: 17px; height: 17px; }
+.v2 .m-fbadge {
+  position: absolute; top: -6px; right: -6px; min-width: 17px; height: 17px; padding: 0 4px;
+  border-radius: 99px; background: var(--azul); color: #fff; font-size: 10px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* ---------- sheet de filtros (mesmas facetas do desktop) ---------- */
+.v2 .m-sheet-acts { display: flex; align-items: center; gap: 10px; }
+.v2 .m-sheet-acts .lnk { background: none; border: none; padding: 0; color: var(--txt-2); text-decoration: underline; cursor: pointer; font-size: 12.5px; font-family: var(--fonte); }
+.v2 .m-f-corpo { gap: 13px; display: flex; flex-direction: column; padding-bottom: 4px; }
+.v2 .m-f-sec { display: flex; flex-direction: column; gap: 7px; }
+.v2 .m-f-tit { font-size: 10.5px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--txt-3); }
+.v2 .m-f-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+.v2 .m-f-it {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 34px; padding: 5px 11px; border-radius: 99px;
+  font-size: 12.5px; font-family: var(--fonte); color: var(--txt-2); cursor: pointer;
+  border: 1px solid rgba(var(--tint), .12); background: rgba(var(--tint), .04);
+}
+.v2 .m-f-it.on { color: var(--platina-txt); background: linear-gradient(180deg, var(--platina-a), var(--platina-b)); border-color: transparent; font-weight: 600; }
+.v2 .m-f-it .dot { width: 8px; height: 8px; border-radius: 99px; flex-shrink: 0; }
+.v2 .m-f-aplicar {
+  min-height: 44px; border-radius: 11px; border: none; cursor: pointer;
+  background: linear-gradient(180deg, var(--platina-a), var(--platina-b)); color: var(--platina-txt);
+  font-size: 14px; font-weight: 600; font-family: var(--fonte);
+}
 .v2 .m-busca {
   width: 100%;
   font-size: 16px;              /* ≥16px: o Android/iOS não força zoom no foco */

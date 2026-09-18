@@ -30,7 +30,8 @@ const MAX_MB: Record<'whatsapp' | 'facebook', Record<MediaTipo, number>> = {
   facebook: { imagem: 25, video: 25, documento: 25 },
 };
 const fmt = (b: number) => b < 1024 ? b + ' B' : b < 1048576 ? (b / 1024).toFixed(0) + ' KB' : (b / 1048576).toFixed(1) + ' MB';
-function validar(tipo: MediaTipo, f: File, perfil: 'whatsapp' | 'facebook'): string | null {
+/** Exportada para teste (mediaComposer.test.ts): a régua client TEM de espelhar o servidor. */
+export function validar(tipo: MediaTipo, f: File, perfil: 'whatsapp' | 'facebook'): string | null {
   const maxMb = MAX_MB[perfil][tipo];
   if (f.size > maxMb * 1024 * 1024) return `acima de ${maxMb} MB`;
   if (perfil === 'whatsapp' && tipo === 'imagem' && (f.type === 'image/heic' || f.type === 'image/heif')) return 'formato HEIC do iPhone não é aceito pelo WhatsApp — envie como JPEG';

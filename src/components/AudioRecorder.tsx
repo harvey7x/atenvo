@@ -28,6 +28,13 @@ function escolherMime(): string {
 const baseMime = (m: string) => (m.split(';')[0] || 'audio/webm');
 const mmss = (s: number) => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
 const SINAL_MIN = 0.03; // pico normalizado mínimo p/ considerar que houve som
+// iOS/iPadOS (WebKit): consumir a captura no Web Audio (mesmo via track CLONADA)
+// pode SILENCIAR a gravação do MediaRecorder — o inverso do bug do Chrome que o
+// clone resolve. Mesmo fix do AudioRecorderV2 (18/09): sem medidor no iOS, e a
+// checagem anti-mudo passa a ser SÓ a do ARQUIVO (medirBlob), a verdade final.
+const ehIOS = () =>
+  typeof navigator !== 'undefined' &&
+  (/iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
 
 // width/height explícitos: o dimensionamento por CSS só existe no escopo do compositor (.composer-bar);
 // reusado noutro lugar (ex.: modal de agendamento) o SVG renderizaria gigante sem estes atributos.
@@ -145,7 +152,7 @@ export function AudioRecorder({ disabled, onEnviar, permitirArquivo, rotuloEnvia
     if (!track || track.readyState !== 'live') { pararTracks(); setEstado('error'); setErro('Microfone sem faixa de áudio ativa.'); return; }
     setDeviceId(track.getSettings().deviceId ?? idDispositivo ?? '');
     void listarDispositivos();
-    montarMedidor(stream);
+    if (!ehIOS()) montarMedidor(stream);
     const mime = escolherMime(); mimeRef.current = mime;
     let rec: MediaRecorder;
     try { rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined); }
@@ -161,7 +168,7 @@ export function AudioRecorder({ disabled, onEnviar, permitirArquivo, rotuloEnvia
       diagRef.current = { correlation_id: correlationRef.current, origem: 'gravacao_painel', blob_mime: mimeRef.current || rec.mimeType || tipo, blob_size: blob.size };
       limparPreview(); setPreviewUrl(URL.createObjectURL(blob));
       pararMedidor(); pararTracks(); pararTimer();             // só encerra as tracks DEPOIS de montar o Blob
-      setInfo({ mime: tipo, size: blob.size, dur: 0, sinal: maxNivelRef.current >= SINAL_MIN, verificando: true });
+      setInfo({ mime: tipo, size: blob.size, dur: 0, sinal: ehIOS() ? true : maxNivelRef.current >= SINAL_MIN, verificando: true });
       setEstado('preview');
       void medirBlob(blob, tipo);                              // verdade absoluta: o arquivo gravado tem som?
     };
@@ -222,7 +229,7 @@ export function AudioRecorder({ disabled, onEnviar, permitirArquivo, rotuloEnvia
   }
 
   const nomeMic = (devices.find((d) => d.deviceId === deviceId)?.label || devices[0]?.label || '').slice(0, 30);
-  const semSinalVivo = (estado === 'recording' || estado === 'paused') && seg >= 2 && picoVivo < 0.02;
+  const semSinalVivo = !ehIOS() && (estado === 'recording' || estado === 'paused') && seg >= 2 && picoVivo < 0.02;
   const seletorMic = devices.length > 1 && (
     <select className="rec-select" value={deviceId} onChange={(e) => trocarDispositivo(e.target.value)} title="Microfone" disabled={estado === 'sending'}>
       {devices.map((d, i) => <option key={d.deviceId || i} value={d.deviceId}>{d.label || `Microfone ${i + 1}`}</option>)}
@@ -251,7 +258,7 @@ export function AudioRecorder({ disabled, onEnviar, permitirArquivo, rotuloEnvia
         <>
           <span className={'rec-dot' + (estado === 'recording' ? ' on' : '')} />
           <span className="rec-timer">{mmss(seg)}{estado === 'paused' ? ' (pausado)' : ''}</span>
-          <span className="rec-meter" title="Nível do microfone"><span ref={barRef} className="rec-meter-bar" /></span>
+          {!ehIOS() && <span className="rec-meter" title="Nível do microfone"><span ref={barRef} className="rec-meter-bar" /></span>}
           {semSinalVivo && <span className="rec-erro">Sem sinal — fale ou troque o microfone</span>}
           {seletorMic || (nomeMic && <span className="rec-meta" title={nomeMic}>{nomeMic}</span>)}
           {estado === 'recording'
