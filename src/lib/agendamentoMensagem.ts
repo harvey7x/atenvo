@@ -32,6 +32,17 @@ export function canalValidoParaEnvio(c: CanalAgendavel | null | undefined): Cana
   return { ok: true, motivo: null };
 }
 
+/** Blocos do modal de agendar → itens PLANOS da RPC agendar_sequencia.
+ *  A RPC lê storage_path/mime/nome/tamanho/origem_audio na RAIZ do item — passar a
+ *  `midia` ANINHADA agendava mídia sem arquivo (midia_path_invalido, bug 18/09).
+ *  Fonte única desktop+mobile; coberta por agendamentoMensagem.test.ts. */
+export function itensParaRpc(itens: Array<{ tipo: string; texto: string; midia?: { path: string; mime: string; nome: string; tamanho: number; origemAudio?: string } | null }> | undefined) {
+  return (itens ?? []).map((it) => ({
+    tipo: it.tipo, texto: it.texto || null,
+    storage_path: it.midia?.path, mime: it.midia?.mime, nome: it.midia?.nome, tamanho: it.midia?.tamanho, origem_audio: it.midia?.origemAudio,
+  }));
+}
+
 /** Rótulo curto do canal para o dropdown "Enviar por" (ex.: "ANDRIUS — conectado"). */
 export function rotuloCanal(c: CanalAgendavel): string {
   const v = canalValidoParaEnvio(c);

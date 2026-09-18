@@ -16,7 +16,7 @@ import { corDaEtiqueta, podeGerenciarAtendimento, PALETA_CORES } from '@/types/a
 import { textoBloqueio, analisarNome, conversaAtiva } from '@/lib/higieneConversa';
 import { responsavelEfetivo } from '@/lib/conversaEtiquetas';
 import { chaveDiaSP, construirItensConversa, type ItemConversa } from '@/lib/dataConversa';
-import { canalValidoParaEnvio } from '@/lib/agendamentoMensagem';
+import { canalValidoParaEnvio, itensParaRpc } from '@/lib/agendamentoMensagem';
 import { initials } from '@/lib/avatar';
 import { useAuth } from '@/context/AuthContext';
 import { useOrg } from '@/context/OrgContext';
@@ -36,6 +36,7 @@ import { CLASSE_RAIZ_PORTAL } from '../components/portal';
 import { BotaoMini, BotaoPrimario, BotaoSec, ConfirmDialogV2, EstadoErro, ModalV2, Skeleton } from '../components';
 import { Bolha, Ic, IcBot, IcDoc } from '../components/BolhaWa';
 import { corDaSituacao, nomeExibicao, situacaoDe, tierEspera } from '../lib/waUi';
+import { IA_OPCOES, PERIODO_OPCOES, SITUACAO_OPCOES, etapasDaLista, passaFiltroInbox, type FiltrosInbox } from '../lib/filtroInbox';
 import { seedWa } from './whatsappSeed';
 import './whatsapp.css';
 
@@ -55,19 +56,11 @@ const ABA_KEY = 'atenvo-wa-aba';
 const GRUPOS_KEY = 'atenvo-wa-grupos-fechados';
 const TABS = [
   ['todos', 'Todos'], ['meus', 'Meus'], ['naoatrib', 'Não atribuídos'],
-  ['naolidas', 'Não lidas'], ['pendentes', 'Pendentes'], ['fechados', 'Fechados'], ['arquivadas', 'Arquivadas'],
+  ['naolidas', 'Não lidas'], ['pendentes', 'Pendentes'], ['fechados', 'Fechados'], ['perdidos', 'Perdidos'], ['arquivadas', 'Arquivadas'],
 ] as const;
 type TabId = typeof TABS[number][0];
-// Situação = baldes FIXOS de situacaoDaConversa (variante). 'etapa' fica DE FORA: as etapas
-// avançadas do Kanban têm faceta própria (Etapa do Kanban) — sem redundância.
-const SITUACAO_OPCOES: ReadonlyArray<readonly [string, string]> = [
-  ['lead', 'Lead novo'], ['atendimento', 'Em atendimento'], ['aguardando', 'Aguardando cliente'],
-  ['ganho', 'Fechado'], ['perdido', 'Perdido'], ['cancelado', 'Cancelado'],
-];
-const IA_OPCOES: ReadonlyArray<readonly [string, string]> = [
-  ['ativa', 'Com IA ativa'], ['pausada', 'IA pausada / handoff'], ['humano', 'Precisa de humano'],
-];
-const PERIODO_OPCOES: ReadonlyArray<readonly [string, string]> = [['hoje', 'Hoje'], ['7d', '7 dias'], ['30d', '30 dias']];
+// Situação/IA/Período + o PREDICADO dos filtros agora vivem em ../lib/filtroInbox —
+// regra compartilhada com o chat mobile (18/09): mudar lá muda as duas telas juntas.
 
 const IcWa = () => <Ic><path d="M21 11.5a8.4 8.4 0 01-9 8.4 8.9 8.9 0 01-3.8-.8L3 20l1-4.9a8.3 8.3 0 01-1-4A8.4 8.4 0 0112 3a8.4 8.4 0 019 8.5z" /></Ic>;
 const IcBusca = () => <Ic><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></Ic>;
@@ -475,6 +468,60 @@ export default function WhatsAppV2() {
   });
   // persiste APENAS na escolha do usuário — a troca programática do deep-link não apaga a preferência
   const mudarAba = (t: TabId) => { setTab(t); try { localStorage.setItem(ABA_KEY, t); } catch { /* privado */ } };
+  // trilho segmentado: rola de lado com SETAS clicáveis + arrasto do mouse — quem
+  // não tem trackpad/gesto lateral (notebook fraco, mouse simples) não consegue
+  // rolar. A aba ativa sempre entra na vista (ex.: reabriu no "Arquivadas", ponta).
+  const abasRef = useRef<HTMLDivElement>(null);
+  const [setaEsq, setSetaEsq] = useState(false);
+  const [setaDir, setSetaDir] = useState(false);
+  const arrastoRef = useRef({ ativo: false, x0: 0, s0: 0, moveu: false });
+  const atualizarSetas = useCallback(() => {
+    const el = abasRef.current; if (!el) return;
+    const max = el.scrollWidth - el.clientWidth;
+    setSetaEsq(el.scrollLeft > 1);
+    setSetaDir(el.scrollLeft < max - 1);
+  }, []);
+  const rolarAbas = (dir: number) => {
+    const el = abasRef.current; if (!el) return;
+    // instantâneo de propósito: o smooth é cancelado quando a outra seta monta no
+    // meio da animação (re-render), parando o scroll pela metade. auto é confiável.
+    el.scrollBy({ left: dir * Math.max(130, el.clientWidth * 0.7), behavior: 'auto' });
+  };
+  const arrastoInicio = (e: React.PointerEvent<HTMLDivElement>) => {
+    const el = abasRef.current; if (!el || e.button !== 0) return;
+    // NÃO capturar o ponteiro aqui: setPointerCapture no pointerdown faz o CLIQUE
+    // não chegar no botão da aba (o clique é engolido, nada seleciona). Só vira
+    // arrasto — e só aí captura — depois que o ponteiro anda além do limiar.
+    arrastoRef.current = { ativo: true, x0: e.clientX, s0: el.scrollLeft, moveu: false };
+  };
+  const arrastoMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const a = arrastoRef.current; const el = abasRef.current; if (!a.ativo || !el) return;
+    const dx = e.clientX - a.x0;
+    if (!a.moveu && Math.abs(dx) < 6) return;
+    if (!a.moveu) {
+      a.moveu = true;
+      el.classList.add('arrastando');
+      try { el.setPointerCapture(e.pointerId); } catch { /* noop */ }
+    }
+    el.scrollLeft = a.s0 - dx;
+  };
+  const arrastoFim = (e: React.PointerEvent<HTMLDivElement>) => {
+    const a = arrastoRef.current; const el = abasRef.current;
+    if (!a.ativo) return;
+    a.ativo = false;
+    el?.classList.remove('arrastando');
+    if (a.moveu) { try { el?.releasePointerCapture(e.pointerId); } catch { /* noop */ } }
+  };
+  useEffect(() => {
+    abasRef.current?.querySelector<HTMLElement>('.wa-aba.on')?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+    atualizarSetas();
+  }, [tab, atualizarSetas]);
+  useEffect(() => {
+    const el = abasRef.current; if (!el) return;
+    const ro = new ResizeObserver(() => atualizarSetas());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [atualizarSetas]);
   // grupos recolhidos na fila (por respId; '' = Não atribuídos), lembrados entre sessões
   const [gruposFechados, setGruposFechados] = useState<Set<string>>(() => {
     try { return new Set(JSON.parse(localStorage.getItem(GRUPOS_KEY) ?? '[]') as string[]); } catch { return new Set(); }
@@ -664,45 +711,30 @@ export default function WhatsAppV2() {
   const buscaAtiva = search.trim().length > 0;
   const term = search.trim().toLowerCase();
   // faixa de "última interação" (lastAtMs): hoje = desde a meia-noite local; 7d/30d = janela.
-  const dentroPeriodo = (ms: number | undefined | null): boolean => {
-    if (!filtroPeriodo) return true;
-    if (!ms) return false;
-    if (filtroPeriodo === 'hoje') { const d = new Date(relogioMs); d.setHours(0, 0, 0, 0); return ms >= d.getTime(); }
-    const dias = filtroPeriodo === '7d' ? 7 : 30;
-    return relogioMs - ms <= dias * 86_400_000;
+  // TODAS as facetas em passaFiltroInbox (../lib/filtroInbox — regra COMPARTILHADA com o
+  // mobile; o corpo é o antigo passaBase, extraído verbatim). Client-side, sobre a lista
+  // já carregada em memória. Multi dentro da faceta = OU; entre facetas = E.
+  const filtros: FiltrosInbox = {
+    canais: filtroCanais, transporte: filtroTransporte, etapas: filtroEtapas, etiquetas: filtroEtiquetas,
+    atendentes: filtroAtendentes, ia: filtroIA, situacao: filtroSituacao,
+    naoLidas: filtroNaoLidas, arquivadas: filtroArquivadas, periodo: filtroPeriodo,
   };
-  // TODAS as facetas em passaBase (client-side, sobre a lista já carregada em memória).
-  // Multi dentro da faceta = OU; entre facetas = E. "QR (não oficial)" = tudo que NÃO é o oficial
-  // (inclui canal removido/histórico, transporte desconhecido). filtroTransporte com os 2 = sem efeito.
-  const passaBase = (c: WaContact) =>
-    (filtroCanais.size === 0 || (!!c.canalId && filtroCanais.has(c.canalId))) &&
-    (filtroTransporte.size === 0 || filtroTransporte.size === 2 || (filtroTransporte.has('cloud_api')
-      ? transporteDe(c.canalId) === 'cloud_api'
-      : transporteDe(c.canalId) !== 'cloud_api')) &&
-    (filtroEtapas.size === 0 || (!!c.etapa && filtroEtapas.has(c.etapa))) &&
-    (filtroEtiquetas.size === 0 || c.tags.some((t) => filtroEtiquetas.has(t))) &&
-    (filtroAtendentes.size === 0 || filtroAtendentes.has(responsavelEfetivo(c) ?? '')) &&
-    (filtroIA.size === 0 || (
-      (filtroIA.has('ativa') && !!c.iaAtiva) ||
-      (filtroIA.has('pausada') && (c.iaStatus === 'pausada' || c.iaStatus === 'handoff')) ||
-      (filtroIA.has('humano') && !!c.precisaHumano)
-    )) &&
-    // Situação REUSA situacaoDaConversa (via situacaoDe) — a MESMA fonte do chip da lista (read-only).
-    (filtroSituacao.size === 0 || filtroSituacao.has(situacaoDe(c).variante)) &&
-    (!filtroNaoLidas || (c.unread ?? 0) > 0) &&
-    (!filtroArquivadas || !!c.arquivada) &&
-    dentroPeriodo(c.lastAtMs) &&
-    (!term || c.name.toLowerCase().includes(term) || c.last.toLowerCase().includes(term) || (c.phone ?? '').toLowerCase().includes(term));
+  const passaBase = (c: WaContact) => passaFiltroInbox(c, filtros, { term, relogioMs, transporteDe });
   const passaTab = (c: WaContact, t: TabId) => {
     if (t === 'arquivadas') return !!c.arquivada;
+    // cliente FECHADO (ganho) e PERDIDO (não elegível) vivem em abas próprias e saem
+    // de TODAS as listas de atendimento, inclusive "Todos", pra não se misturar com
+    // quem ainda está em atendimento (pedido do dono: fechados 11/09, perdidos 17/09).
+    // Este corte vem ANTES do de arquivadas: o não elegível arquiva sozinho, mas se um
+    // inbound o desarquivar, ele continua morando SÓ em "Perdidos", nunca no ativo.
+    const variante = situacaoDe(c).variante;
+    const fechado = variante === 'ganho';
+    const perdido = variante === 'perdido';
+    if (t === 'fechados') return fechado;
+    if (t === 'perdidos') return perdido;
+    if (fechado || perdido) return false;
     // o toggle "Arquivadas" do painel revela arquivadas em qualquer aba (como a busca já faz)
     if (c.arquivada && !buscaAtiva && !filtroArquivadas) return false;
-    // cliente FECHADO (ganho) vive SÓ na aba "Fechados" — sai de TODAS as listas de
-    // atendimento, inclusive "Todos", pra não se misturar com quem ainda está sendo
-    // atendido (pedido do dono 11/09). Perdido/cancelado já arquivam sozinhos.
-    const fechado = situacaoDe(c).variante === 'ganho';
-    if (t === 'fechados') return fechado;
-    if (fechado) return false;
     return t === 'todos' ? true
       : t === 'meus' ? c.respId === user?.id
       : t === 'naoatrib' ? !c.respId
@@ -715,12 +747,14 @@ export default function WhatsAppV2() {
     for (const [t] of TABS) n[t] = base.filter((c) => passaTab(c, t)).length;
     return n;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contacts, filtroCanais, filtroTransporte, filtroEtapas, filtroEtiquetas, filtroAtendentes, filtroIA, filtroSituacao, filtroNaoLidas, filtroArquivadas, filtroPeriodo, canalPorId, term, user?.id]);
+  }, [contacts, filtroCanais, filtroTransporte, filtroEtapas, filtroEtiquetas, filtroAtendentes, filtroIA, filtroSituacao, filtroNaoLidas, filtroArquivadas, filtroPeriodo, canalPorId, term, relogioMs, user?.id]);
+  // contadores podem aparecer/sumir e mudar a largura do trilho → revê as setas
+  useEffect(() => { atualizarSetas(); }, [tabCounts, atualizarSetas]);
   const visiveis = useMemo(() => {
     const lista = contacts.filter((c) => passaBase(c) && passaTab(c, tab));
     return lista.sort((a, b) => (a.fixada === b.fixada ? (b.lastAtMs ?? 0) - (a.lastAtMs ?? 0) : a.fixada ? -1 : 1));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contacts, tab, filtroCanais, filtroTransporte, filtroEtapas, filtroEtiquetas, filtroAtendentes, filtroIA, filtroSituacao, filtroNaoLidas, filtroArquivadas, filtroPeriodo, canalPorId, term, user?.id]);
+  }, [contacts, tab, filtroCanais, filtroTransporte, filtroEtapas, filtroEtiquetas, filtroAtendentes, filtroIA, filtroSituacao, filtroNaoLidas, filtroArquivadas, filtroPeriodo, canalPorId, term, relogioMs, user?.id]);
   /* agrupamento por responsável — VOCÊ primeiro (seus clientes sempre visíveis no Todos),
      depois Não atribuídos, depois os demais atendentes em ordem alfabética */
   const grupos = useMemo(() => {
@@ -890,14 +924,7 @@ export default function WhatsAppV2() {
 
   const statusAtivos = statusQ.data?.filter((s) => s.ativo) ?? [];
   // Etapas do Kanban presentes na fila atual (nome + cor), para filtrar a lista por etapa.
-  const etapasFiltro = useMemo(() => {
-    const m = new Map<string, string | null>();
-    for (const c of contacts) {
-      const nome = (c.etapa ?? '').trim();
-      if (nome && !m.has(nome)) m.set(nome, c.etapaCor ?? null);
-    }
-    return [...m.entries()].map(([nome, cor]) => ({ nome, cor })).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
-  }, [contacts]);
+  const etapasFiltro = useMemo(() => etapasDaLista(contacts), [contacts]);
   // RESUMO ATIVO: um chip removível por valor de faceta aplicado (+ "Limpar tudo" no painel).
   const rotuloCanal = (id: string) => canalPorId.get(id)?.alias ?? 'Número removido';
   const rotuloSituacao = (v: string) => SITUACAO_OPCOES.find(([k]) => k === v)?.[1] ?? v;
@@ -993,17 +1020,32 @@ export default function WhatsAppV2() {
               <IcBusca />
               <input className="inp" placeholder="Buscar conversas..." value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
-            <div className="wa-abas" role="tablist">
-              {TABS.map(([id, rot]) => (
-                <button
-                  key={id} type="button" role="tab" aria-selected={tab === id}
-                  className={'wa-aba' + (tab === id ? ' on' : '')}
-                  title={id === 'pendentes' ? 'Pendentes inclui mensagens não lidas e clientes aguardando resposta.' : undefined}
-                  onClick={() => mudarAba(id)}
-                >
-                  {rot}{(tabCounts[id] ?? 0) > 0 && <span className="n num">{tabCounts[id]}</span>}
+            <div className="wa-abas-wrap">
+              {setaEsq && (
+                <button type="button" className="wa-abas-seta esq" aria-label="Rolar abas para a esquerda" onClick={() => rolarAbas(-1)}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M15 6l-6 6 6 6" /></svg>
                 </button>
-              ))}
+              )}
+              <div
+                className="wa-abas" role="tablist" ref={abasRef} onScroll={atualizarSetas}
+                onPointerDown={arrastoInicio} onPointerMove={arrastoMove} onPointerUp={arrastoFim} onPointerCancel={arrastoFim}
+              >
+                {TABS.map(([id, rot]) => (
+                  <button
+                    key={id} type="button" role="tab" aria-selected={tab === id}
+                    className={'wa-aba' + (tab === id ? ' on' : '')}
+                    title={id === 'pendentes' ? 'Pendentes inclui mensagens não lidas e clientes aguardando resposta.' : undefined}
+                    onClick={() => { if (arrastoRef.current.moveu) { arrastoRef.current.moveu = false; return; } mudarAba(id); }}
+                  >
+                    {rot}{(tabCounts[id] ?? 0) > 0 && <span className="n num">{tabCounts[id]}</span>}
+                  </button>
+                ))}
+              </div>
+              {setaDir && (
+                <button type="button" className="wa-abas-seta dir" aria-label="Rolar abas para a direita" onClick={() => rolarAbas(1)}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg>
+                </button>
+              )}
             </div>
             {resumoFiltros.length > 0 && (
               <div className="wa-fchips" role="list" aria-label="Filtros aplicados">
@@ -1644,7 +1686,7 @@ export default function WhatsAppV2() {
                       <span className="tt">Só não lidas</span>{filtroNaoLidas && <span className="ck">✓</span>}
                     </button>
                     <button type="button" className={'fp-it' + (filtroArquivadas ? ' sel' : '')} onClick={() => setFiltroArquivadas((v) => !v)}>
-                      <span className="tt">Incluir arquivadas</span>{filtroArquivadas && <span className="ck">✓</span>}
+                      <span className="tt">Só arquivadas</span>{filtroArquivadas && <span className="ck">✓</span>}
                     </button>
                   </div>
                 </section>
@@ -1858,15 +1900,19 @@ export default function WhatsAppV2() {
           aoFechar={() => { setAgendarAberto(false); setAgEditId(null); }}
           aoSubmeter={async (v) => {
             if (optout) { aoAvisar({ tom: 'erro', texto: optoutTexto }); return; }   // opt-out: revalidar no submit (pode ter bloqueado com o modal aberto)
-            if (demo) { aoAvisar({ tom: 'ok', texto: 'Mensagem agendada — será enviada automaticamente no horário.' }); return; }
+            if (demo) { aoAvisar({ tom: 'ok', texto: 'Mensagem agendada — será enviada automaticamente no horário.' }); setAgendarAberto(false); setAgEditId(null); return; }
             if (agEditId) {
               await editarAgMut.mutateAsync({ id: agEditId, conversaId: current.id, canalId: v.canalId, texto: v.texto ?? '', executarEm: v.executarISO });
               aoAvisar({ tom: 'ok', texto: 'Agendamento atualizado.' });
             } else {
-              const itens = v.itens ?? [];
+              // BUG consertado 18/09: a RPC lê campos PLANOS — v.itens cru (midia ANINHADA)
+              // agendava mídia sem arquivo (midia_path_invalido). Map na lib, testado.
+              const itens = itensParaRpc(v.itens);
               await agendarSeqMut.mutateAsync({ conversaId: current.id, canalId: v.canalId, executarEm: v.executarISO, itens });
               aoAvisar({ tom: 'ok', texto: itens.length > 1 ? `${itens.length} mensagens agendadas — serão enviadas no horário.` : 'Mensagem agendada — será enviada automaticamente no horário.' });
             }
+            // fechar no SUCESSO (o v1 fechava; aberto + lista stale convidava a agendar em dobro)
+            setAgendarAberto(false); setAgEditId(null);
           }}
         />
       )}
@@ -1875,36 +1921,10 @@ export default function WhatsAppV2() {
         canal="whatsapp" conversaId={current.id} incluirMidia
         onClose={() => setScriptSeq(null)}
         ctx={{ cliente: current.name, atendente: user?.name || 'Atendente', emailAtendente: user?.email ?? '', empresa: currentOrg.name, telefone: current.phone }}
-        enviarMidia={async (m) => {
-          // Mesmas travas do composer (o estado pode mudar por realtime com o modal aberto).
-          if (inbox.canalRestrito) throw new Error('O número deste canal está com restrição no WhatsApp e está indisponível para envio. Selecione outro canal.');
-          if (inbox.canalIndisponivel) throw new Error('Este número está desconectado. Reconecte em Integrações para enviar.');
-          if (inbox.semDestino) throw new Error('Vincule um número confirmado para responder.');
-          if (optout) throw new Error(optoutTexto);
-          if (inbox.higieneBloqueia) throw new Error(textoBloqueio(inbox.higiene) ?? 'Atendimento sem responsável ou com cadastro incompleto — assuma e complete o nome para enviar.');
-          if (!m.storagePath) throw new Error('Mídia do script sem arquivo. Reenvie o anexo no arsenal de Scripts.');
-          if (demo) { aoAvisar({ tom: 'ok', texto: 'Mídia enviada' }); return; }
-          // A mídia do script já vive no bucket privado (script-midia); envia pelo mesmo caminho do compositor.
-          const id = await sendMut.mutateAsync({
-            conversaId: current.id, canalId: inbox.replyCanalId || current.canalId,
-            midiaPath: m.storagePath, midiaTipo: m.tipo, midiaMime: m.mime ?? undefined, midiaNome: m.nome ?? undefined, midiaTamanho: m.tamanho ?? undefined,
-            text: m.texto || undefined,
-          });
-          if (id) await aguardarConfirmacaoEnvio(id); // sucesso = confirmação REAL do provedor (igual ao texto)
-        }}
-        enviarEtapa={async (texto, retryMensagemId) => {
-          // TODAS as travas do composer valem também aqui — o caminho de script não pode furar
-          // o que sendMsg bloqueia (o estado pode mudar por realtime com o modal aberto). Espelha
-          // as mesmas verificações/mensagens de useInboxWhatsApp.sendMsg, na mesma ordem.
-          if (inbox.canalRestrito) throw new Error('O número deste canal está com restrição no WhatsApp e está indisponível para envio. Selecione outro canal.');
-          if (inbox.canalIndisponivel) throw new Error('Este número está desconectado. Reconecte em Integrações para enviar.');
-          if (inbox.semDestino) throw new Error('Vincule um número confirmado para responder.');
-          if (optout) throw new Error(optoutTexto);
-          if (inbox.higieneBloqueia) throw new Error(textoBloqueio(inbox.higiene) ?? 'Atendimento sem responsável ou com cadastro incompleto — assuma e complete o nome para enviar.');
-          if (demo) { aoAvisar({ tom: 'ok', texto: 'Mensagem enviada' }); return; }
-          const id = await sendMut.mutateAsync({ conversaId: current.id, canalId: inbox.replyCanalId || current.canalId, text: texto, retryMensagemId });
-          return id ?? undefined;
-        }}
+        /* Travas + envio agora vivem no HOOK (scriptEnviar*): fonte única com o
+           mobile — mesmos textos, mesma ordem, re-checadas a cada etapa. */
+        enviarMidia={inbox.scriptEnviarMidia}
+        enviarEtapa={inbox.scriptEnviarEtapa}
         confirmar={(id) => (demo ? Promise.resolve('enviada' as const) : aguardarConfirmacaoEnvio(id))}
       />
       {lightbox && (

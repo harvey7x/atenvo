@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  itensParaRpc,
   canalValidoParaEnvio, rotuloCanal, podeAgendar, estaExpirada, proximoStatus,
   partesSP, defaultQuandoAgendar, montarInstanteSP, resumoEnvio, avisoJanelaLonga, agendaEditavel,
   agendaReagendavel, rangePeriodo, contarCards, atalhoAgendar,
@@ -298,5 +299,43 @@ describe('contarCards()', () => {
   });
   it('lista vazia → tudo zero', () => {
     expect(contarCards([], agora)).toEqual({ hoje: 0, prox7: 0, enviadas: 0, falhas: 0, bloqueadas: 0, canceladas: 0 });
+  });
+});
+
+/* Guarda do bug de 18/09: a RPC agendar_sequencia lê storage_path/mime/nome/
+   tamanho/origem_audio na RAIZ do item — passar a `midia` ANINHADA agendava
+   mídia sem arquivo (midia_path_invalido). Este bloco congela o contrato. */
+describe('itensParaRpc() — blocos do modal → itens planos da RPC', () => {
+  it('bloco de TEXTO vira item plano com texto e sem campos de mídia', () => {
+    const [item] = itensParaRpc([{ tipo: 'texto', texto: 'Bom dia!' }]);
+    expect(item).toEqual({ tipo: 'texto', texto: 'Bom dia!', storage_path: undefined, mime: undefined, nome: undefined, tamanho: undefined, origem_audio: undefined });
+  });
+
+  it('bloco de MÍDIA achata path/mime/nome/tamanho/origemAudio para a raiz — NUNCA aninhado', () => {
+    const [item] = itensParaRpc([{
+      tipo: 'audio', texto: '',
+      midia: { path: 'org/wa-midia/x.ogg', mime: 'audio/ogg', nome: 'x.ogg', tamanho: 1234, origemAudio: 'gravacao_painel' },
+    }]);
+    expect(item.storage_path).toBe('org/wa-midia/x.ogg');
+    expect(item.mime).toBe('audio/ogg');
+    expect(item.nome).toBe('x.ogg');
+    expect(item.tamanho).toBe(1234);
+    expect(item.origem_audio).toBe('gravacao_painel');
+    expect(item).not.toHaveProperty('midia');
+  });
+
+  it('texto vazio vira null (a RPC espera null, não string vazia)', () => {
+    const [item] = itensParaRpc([{ tipo: 'imagem', texto: '', midia: { path: 'p', mime: 'image/jpeg', nome: 'f.jpg', tamanho: 9 } }]);
+    expect(item.texto).toBeNull();
+  });
+
+  it('sequência preserva a ORDEM dos blocos e undefined vira lista vazia', () => {
+    const itens = itensParaRpc([
+      { tipo: 'texto', texto: '1º' },
+      { tipo: 'imagem', texto: 'legenda', midia: { path: 'p2', mime: 'image/png', nome: 'b.png', tamanho: 2 } },
+      { tipo: 'texto', texto: '3º' },
+    ]);
+    expect(itens.map((i) => i.texto)).toEqual(['1º', 'legenda', '3º']);
+    expect(itensParaRpc(undefined)).toEqual([]);
   });
 });

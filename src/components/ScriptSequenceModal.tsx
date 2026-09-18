@@ -55,6 +55,11 @@ export function ScriptSequenceModal({ open, onClose, script, canal, ctx, convers
   const [enviando, setEnviando] = useState(false);
   const [idxAtual, setIdxAtual] = useState(-1);
   const jaReg = useRef(false);
+  // No CELULAR o gesto de voltar desmonta a rota com o modal no meio do disparo — sem
+  // esta trava as etapas restantes continuariam sendo enviadas às cegas (sem UI, sem
+  // cancelar) e o atendente reenviaria achando que cancelou → duplicatas no cliente.
+  const vivoRef = useRef(true);
+  useEffect(() => { vivoRef.current = true; return () => { vivoRef.current = false; }; }, []);
 
   useEffect(() => {
     if (!open || !script) return;
@@ -123,6 +128,7 @@ export function ScriptSequenceModal({ open, onClose, script, canal, ctx, convers
       const it = itens[i];
       if (it.removida || st[i] === 'ok') continue;
       if (enviouNesteRun) await sleep(INTERVALO_SEQUENCIA_MS); // intervalo 1→2 e 2→3 (não antes da 1ª)
+      if (!vivoRef.current) return; // rota desmontada (voltar do celular): parar de enviar
       setIdxAtual(i);
       st[i] = 'enviando'; setStatus([...st]);
       try {

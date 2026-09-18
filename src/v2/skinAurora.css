@@ -60,9 +60,9 @@
 
 /* aba ativa do inbox */
 :root:not([data-tema="light"]) .v2 .wa-aba.on {
-  background: rgba(var(--azul-rgb), .09);
+  background: var(--azul);
   color: #fff;
-  box-shadow: inset 0 1px 0 rgba(var(--azul-rgb), .13);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .28);
 }
 
 /* --- 3b. AZUL: segunda leva de pontos de interação --------------
@@ -213,7 +213,7 @@
   color: #fff;
   box-shadow: 0 10px 26px rgba(var(--azul-rgb), .25), inset 0 1px 0 rgba(255, 255, 255, .35);
 }
-:root[data-tema="light"] .v2.app-v2 .wa-aba.on { background: rgba(var(--azul-rgb), .09); color: var(--azul); box-shadow: inset 0 1px 0 rgba(var(--azul-rgb), .13); }
+:root[data-tema="light"] .v2.app-v2 .wa-aba.on { background: var(--azul); color: #fff; box-shadow: 0 1px 2px rgba(var(--azul-rgb), .28); }
 :root[data-tema="light"] .v2.app-v2 .conv2 .nl { background: linear-gradient(180deg, #3D7BE8, #2A62C9); color: #fff; }
 :root[data-tema="light"] .v2.app-v2 .env-b { background: linear-gradient(180deg, #3D7BE8, #2A62C9); color: #fff; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35); }
 :root[data-tema="light"] .v2.app-v2 .tgl { background: linear-gradient(180deg, #3D7BE8, #2A62C9); }
@@ -377,9 +377,11 @@
 :root[data-acento="dourado"]:not([data-tema="light"]) .v2 .conv2 .nl { background: linear-gradient(180deg, #F9D478, #D29A35); color: #241A05; }
 :root[data-acento="dourado"]:not([data-tema="light"]) .v2 .barv.hoje2 { background: linear-gradient(180deg, #FFE49A, #DCA43C); }
 :root[data-acento="dourado"]:not([data-tema="light"]) .v2 .bolha .tick.lida { color: #F5CE74; }
-/* pill/aba ativas: texto âmbar-claro em vez do branco (o véu ouro é quente) */
-:root[data-acento="dourado"]:not([data-tema="light"]) .v2 .item.on,
-:root[data-acento="dourado"]:not([data-tema="light"]) .v2 .wa-aba.on { color: #FFE9B8; }
+/* pill ativa (.item): texto âmbar-claro em vez do branco (o véu ouro é quente) */
+:root[data-acento="dourado"]:not([data-tema="light"]) .v2 .item.on { color: #FFE9B8; }
+/* aba do inbox: pastilha ativa é ouro SÓLIDO — texto/contador escuros pra contraste */
+:root[data-acento="dourado"]:not([data-tema="light"]) .v2 .wa-aba.on { color: #2A1E00; }
+:root[data-acento="dourado"]:not([data-tema="light"]) .v2 .wa-aba.on .n { color: #2A1E00; background: rgba(0, 0, 0, .16); }
 
 /* bolha enviada: vidro âmbar-mata profundo */
 :root[data-acento="dourado"]:not([data-tema="light"]) .v2 .bolha.env2 {

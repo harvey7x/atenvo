@@ -32,6 +32,7 @@ export const MOTIVOS_NAO_ELEGIVEL: [string, string][] = [
   ['muitos_processos', 'Já tem muitos processos'],
   ['sem_interesse', 'Cliente sem interesse'],
   ['sem_emprestimo_banco', 'Sem empréstimo em banco parceiro'],
+  ['nao_mora_rs', 'Não mora no RS'],
 ];
 export const rotuloMotivoNaoElegivel = (v: string | null) =>
   (v ? MOTIVOS_NAO_ELEGIVEL.find(([k]) => k === v)?.[1] ?? v : 'Sem categoria');

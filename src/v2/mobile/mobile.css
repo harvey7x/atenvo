@@ -49,6 +49,42 @@
   flex-shrink: 0;
 }
 .v2 .m-titulo { font-size: 17px; font-weight: 600; letter-spacing: -.01em; }
+.v2 .m-titulo-row { display: flex; align-items: center; gap: 8px; }
+.v2 .m-titulo-row .m-titulo { flex: 1; }
+.v2 .m-tema {
+  position: relative;
+  width: 36px; height: 36px; border-radius: 9px; cursor: pointer; flex-shrink: 0;
+  border: 1px solid rgba(var(--tint), .1); background: rgba(var(--tint), .04); color: var(--txt-2);
+  display: flex; align-items: center; justify-content: center;
+}
+.v2 .m-tema.on { color: var(--txt); border-color: rgba(var(--azul-rgb), .5); }
+.v2 .m-tema svg { width: 17px; height: 17px; }
+.v2 .m-fbadge {
+  position: absolute; top: -6px; right: -6px; min-width: 17px; height: 17px; padding: 0 4px;
+  border-radius: 99px; background: var(--azul); color: #fff; font-size: 10px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* ---------- sheet de filtros (mesmas facetas do desktop) ---------- */
+.v2 .m-sheet-acts { display: flex; align-items: center; gap: 10px; }
+.v2 .m-sheet-acts .lnk { background: none; border: none; padding: 0; color: var(--txt-2); text-decoration: underline; cursor: pointer; font-size: 12.5px; font-family: var(--fonte); }
+.v2 .m-f-corpo { gap: 13px; display: flex; flex-direction: column; padding-bottom: 4px; }
+.v2 .m-f-sec { display: flex; flex-direction: column; gap: 7px; }
+.v2 .m-f-tit { font-size: 10.5px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--txt-3); }
+.v2 .m-f-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+.v2 .m-f-it {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 34px; padding: 5px 11px; border-radius: 99px;
+  font-size: 12.5px; font-family: var(--fonte); color: var(--txt-2); cursor: pointer;
+  border: 1px solid rgba(var(--tint), .12); background: rgba(var(--tint), .04);
+}
+.v2 .m-f-it.on { color: var(--platina-txt); background: linear-gradient(180deg, var(--platina-a), var(--platina-b)); border-color: transparent; font-weight: 600; }
+.v2 .m-f-it .dot { width: 8px; height: 8px; border-radius: 99px; flex-shrink: 0; }
+.v2 .m-f-aplicar {
+  min-height: 44px; border-radius: 11px; border: none; cursor: pointer;
+  background: linear-gradient(180deg, var(--platina-a), var(--platina-b)); color: var(--platina-txt);
+  font-size: 14px; font-weight: 600; font-family: var(--fonte);
+}
 .v2 .m-busca {
   width: 100%;
   font-size: 16px;              /* ≥16px: o Android/iOS não força zoom no foco */
@@ -210,6 +246,49 @@
   background: var(--base);
   flex-shrink: 0;
 }
+/* barra de ferramentas do composer (paridade desktop): mídia, scripts, agendar, áudio */
+.v2 .m-tools { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 0 1px 7px; }
+.v2 .m-tools .tool {
+  width: 36px; height: 36px; border-radius: 9px; flex-shrink: 0; cursor: pointer;
+  border: 1px solid rgba(var(--tint), .1); background: rgba(var(--tint), .04); color: var(--txt-2);
+  display: flex; align-items: center; justify-content: center;
+}
+.v2 .m-tools .tool:disabled { opacity: .45; cursor: default; }
+.v2 .m-tools .tool svg { width: 17px; height: 17px; }
+.v2 .m-tools > .p-btn { min-height: 36px; }
+/* gravando/preview: o painel do gravador toma a linha inteira e os demais botões somem
+   (mesmo truque do desktop, whatsapp.css .tools:has(.arec-panel)) */
+.v2 .m-tools .arec-panel { flex: 1 1 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.v2 .m-tools:has(.arec-panel) > .tool { display: none; }
+.v2 .m-tools .arec-preview { max-width: 100%; }
+
+/* agendadas: teto com rolagem — sequência de 10-20 blocos não pode engolir o fio */
+.v2 .m-ags { max-height: 128px; overflow-y: auto; overscroll-behavior: contain; margin-bottom: 6px; }
+
+/* sheet de scripts (busca + favoritos primeiro; toque abre o ScriptSequenceModal).
+   bottom compensa o teclado do iOS: o viewport de LAYOUT não encolhe lá (e o
+   MobileShell desfaz o pan do WebKit) — ancorar em 0 deixaria o sheet ATRÁS do
+   teclado; 100vh − --m-alt (altura REAL visível) = altura do teclado. */
+.v2 .m-sheet {
+  position: fixed; left: 0; right: 0; bottom: calc(100vh - var(--m-alt, 100vh)); z-index: 96;
+  background: var(--base); border-top: 1px solid var(--linha);
+  border-radius: 16px 16px 0 0;
+  padding: 12px 14px calc(10px + env(safe-area-inset-bottom));
+  max-height: 72vh; display: flex; flex-direction: column; gap: 9px;
+  box-shadow: 0 -14px 44px rgba(0, 0, 0, .45);
+}
+.v2 .m-sheet-topo { display: flex; align-items: center; justify-content: space-between; font-size: 15px; }
+.v2 .m-sheet-topo .x { background: none; border: none; color: var(--txt-2); font-size: 22px; line-height: 1; cursor: pointer; padding: 2px 6px; }
+.v2 .m-sheet-lista { overflow-y: auto; min-height: 0; display: flex; flex-direction: column; overscroll-behavior: contain; }
+.v2 .m-sheet-item {
+  display: flex; flex-direction: column; gap: 2px; text-align: left;
+  padding: 11px 8px; background: none; border: none; border-bottom: 1px solid var(--linha);
+  color: var(--txt); font-family: var(--fonte); cursor: pointer;
+}
+.v2 .m-sheet-item:active { background: rgba(var(--tint), .05); }
+.v2 .m-sheet-item .tt { font-size: 14px; font-weight: 550; }
+.v2 .m-sheet-item .mt { font-size: 11.5px; color: var(--txt-3); }
+
 .v2 .m-cmsg { display: flex; align-items: flex-end; gap: 8px; }
 .v2 .m-cmsg textarea {
   flex: 1;
