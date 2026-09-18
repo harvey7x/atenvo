@@ -55,7 +55,7 @@ const ABA_KEY = 'atenvo-wa-aba';
 const GRUPOS_KEY = 'atenvo-wa-grupos-fechados';
 const TABS = [
   ['todos', 'Todos'], ['meus', 'Meus'], ['naoatrib', 'Não atribuídos'],
-  ['naolidas', 'Não lidas'], ['pendentes', 'Pendentes'], ['fechados', 'Fechados'], ['arquivadas', 'Arquivadas'],
+  ['naolidas', 'Não lidas'], ['pendentes', 'Pendentes'], ['fechados', 'Fechados'], ['perdidos', 'Perdidos'], ['arquivadas', 'Arquivadas'],
 ] as const;
 type TabId = typeof TABS[number][0];
 // Situação = baldes FIXOS de situacaoDaConversa (variante). 'etapa' fica DE FORA: as etapas
@@ -475,6 +475,54 @@ export default function WhatsAppV2() {
   });
   // persiste APENAS na escolha do usuário — a troca programática do deep-link não apaga a preferência
   const mudarAba = (t: TabId) => { setTab(t); try { localStorage.setItem(ABA_KEY, t); } catch { /* privado */ } };
+  // trilho segmentado: rola de lado com SETAS clicáveis + arrasto do mouse — quem
+  // não tem trackpad/gesto lateral (notebook fraco, mouse simples) não consegue
+  // rolar. A aba ativa sempre entra na vista (ex.: reabriu no "Arquivadas", ponta).
+  const abasRef = useRef<HTMLDivElement>(null);
+  const [setaEsq, setSetaEsq] = useState(false);
+  const [setaDir, setSetaDir] = useState(false);
+  const arrastoRef = useRef({ ativo: false, x0: 0, s0: 0, moveu: false });
+  const atualizarSetas = useCallback(() => {
+    const el = abasRef.current; if (!el) return;
+    const max = el.scrollWidth - el.clientWidth;
+    setSetaEsq(el.scrollLeft > 1);
+    setSetaDir(el.scrollLeft < max - 1);
+  }, []);
+  const rolarAbas = (dir: number) => {
+    const el = abasRef.current; if (!el) return;
+    // instantâneo de propósito: o smooth é cancelado quando a outra seta monta no
+    // meio da animação (re-render), parando o scroll pela metade. auto é confiável.
+    el.scrollBy({ left: dir * Math.max(130, el.clientWidth * 0.7), behavior: 'auto' });
+  };
+  const arrastoInicio = (e: React.PointerEvent<HTMLDivElement>) => {
+    const el = abasRef.current; if (!el || e.button !== 0) return;
+    arrastoRef.current = { ativo: true, x0: e.clientX, s0: el.scrollLeft, moveu: false };
+    el.classList.add('arrastando');
+    try { el.setPointerCapture(e.pointerId); } catch { /* noop */ }
+  };
+  const arrastoMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const a = arrastoRef.current; const el = abasRef.current; if (!a.ativo || !el) return;
+    const dx = e.clientX - a.x0;
+    if (Math.abs(dx) > 4) a.moveu = true;
+    el.scrollLeft = a.s0 - dx;
+  };
+  const arrastoFim = (e: React.PointerEvent<HTMLDivElement>) => {
+    const a = arrastoRef.current; const el = abasRef.current;
+    if (!a.ativo) return;
+    a.ativo = false;
+    el?.classList.remove('arrastando');
+    try { el?.releasePointerCapture(e.pointerId); } catch { /* noop */ }
+  };
+  useEffect(() => {
+    abasRef.current?.querySelector<HTMLElement>('.wa-aba.on')?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+    atualizarSetas();
+  }, [tab, atualizarSetas]);
+  useEffect(() => {
+    const el = abasRef.current; if (!el) return;
+    const ro = new ResizeObserver(() => atualizarSetas());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [atualizarSetas]);
   // grupos recolhidos na fila (por respId; '' = Não atribuídos), lembrados entre sessões
   const [gruposFechados, setGruposFechados] = useState<Set<string>>(() => {
     try { return new Set(JSON.parse(localStorage.getItem(GRUPOS_KEY) ?? '[]') as string[]); } catch { return new Set(); }
@@ -695,14 +743,19 @@ export default function WhatsAppV2() {
     (!term || c.name.toLowerCase().includes(term) || c.last.toLowerCase().includes(term) || (c.phone ?? '').toLowerCase().includes(term));
   const passaTab = (c: WaContact, t: TabId) => {
     if (t === 'arquivadas') return !!c.arquivada;
+    // cliente FECHADO (ganho) e PERDIDO (não elegível) vivem em abas próprias e saem
+    // de TODAS as listas de atendimento, inclusive "Todos", pra não se misturar com
+    // quem ainda está em atendimento (pedido do dono: fechados 11/09, perdidos 17/09).
+    // Este corte vem ANTES do de arquivadas: o não elegível arquiva sozinho, mas se um
+    // inbound o desarquivar, ele continua morando SÓ em "Perdidos", nunca no ativo.
+    const variante = situacaoDe(c).variante;
+    const fechado = variante === 'ganho';
+    const perdido = variante === 'perdido';
+    if (t === 'fechados') return fechado;
+    if (t === 'perdidos') return perdido;
+    if (fechado || perdido) return false;
     // o toggle "Arquivadas" do painel revela arquivadas em qualquer aba (como a busca já faz)
     if (c.arquivada && !buscaAtiva && !filtroArquivadas) return false;
-    // cliente FECHADO (ganho) vive SÓ na aba "Fechados" — sai de TODAS as listas de
-    // atendimento, inclusive "Todos", pra não se misturar com quem ainda está sendo
-    // atendido (pedido do dono 11/09). Perdido/cancelado já arquivam sozinhos.
-    const fechado = situacaoDe(c).variante === 'ganho';
-    if (t === 'fechados') return fechado;
-    if (fechado) return false;
     return t === 'todos' ? true
       : t === 'meus' ? c.respId === user?.id
       : t === 'naoatrib' ? !c.respId
@@ -716,6 +769,8 @@ export default function WhatsAppV2() {
     return n;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contacts, filtroCanais, filtroTransporte, filtroEtapas, filtroEtiquetas, filtroAtendentes, filtroIA, filtroSituacao, filtroNaoLidas, filtroArquivadas, filtroPeriodo, canalPorId, term, user?.id]);
+  // contadores podem aparecer/sumir e mudar a largura do trilho → revê as setas
+  useEffect(() => { atualizarSetas(); }, [tabCounts, atualizarSetas]);
   const visiveis = useMemo(() => {
     const lista = contacts.filter((c) => passaBase(c) && passaTab(c, tab));
     return lista.sort((a, b) => (a.fixada === b.fixada ? (b.lastAtMs ?? 0) - (a.lastAtMs ?? 0) : a.fixada ? -1 : 1));
@@ -993,17 +1048,32 @@ export default function WhatsAppV2() {
               <IcBusca />
               <input className="inp" placeholder="Buscar conversas..." value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
-            <div className="wa-abas" role="tablist">
-              {TABS.map(([id, rot]) => (
-                <button
-                  key={id} type="button" role="tab" aria-selected={tab === id}
-                  className={'wa-aba' + (tab === id ? ' on' : '')}
-                  title={id === 'pendentes' ? 'Pendentes inclui mensagens não lidas e clientes aguardando resposta.' : undefined}
-                  onClick={() => mudarAba(id)}
-                >
-                  {rot}{(tabCounts[id] ?? 0) > 0 && <span className="n num">{tabCounts[id]}</span>}
+            <div className="wa-abas-wrap">
+              {setaEsq && (
+                <button type="button" className="wa-abas-seta esq" aria-label="Rolar abas para a esquerda" onClick={() => rolarAbas(-1)}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M15 6l-6 6 6 6" /></svg>
                 </button>
-              ))}
+              )}
+              <div
+                className="wa-abas" role="tablist" ref={abasRef} onScroll={atualizarSetas}
+                onPointerDown={arrastoInicio} onPointerMove={arrastoMove} onPointerUp={arrastoFim} onPointerCancel={arrastoFim}
+              >
+                {TABS.map(([id, rot]) => (
+                  <button
+                    key={id} type="button" role="tab" aria-selected={tab === id}
+                    className={'wa-aba' + (tab === id ? ' on' : '')}
+                    title={id === 'pendentes' ? 'Pendentes inclui mensagens não lidas e clientes aguardando resposta.' : undefined}
+                    onClick={() => { if (arrastoRef.current.moveu) { arrastoRef.current.moveu = false; return; } mudarAba(id); }}
+                  >
+                    {rot}{(tabCounts[id] ?? 0) > 0 && <span className="n num">{tabCounts[id]}</span>}
+                  </button>
+                ))}
+              </div>
+              {setaDir && (
+                <button type="button" className="wa-abas-seta dir" aria-label="Rolar abas para a direita" onClick={() => rolarAbas(1)}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg>
+                </button>
+              )}
             </div>
             {resumoFiltros.length > 0 && (
               <div className="wa-fchips" role="list" aria-label="Filtros aplicados">
