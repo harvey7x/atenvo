@@ -10,9 +10,11 @@
    Fase 1: dados fictícios (motor.ts). Nada de backend. O orgId
    entra por contexto (useOrg) pra a Fase 2 encaixar — ver tipos.ts.
    ============================================================ */
-import { Suspense, useCallback, useEffect, useReducer, useRef, useSyncExternalStore, type CSSProperties } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useReducer, useRef, useSyncExternalStore, type CSSProperties } from 'react';
 import { useOrg } from '@/context/OrgContext';
 import { useSalaReal, SALA_REAL } from '@/data/sala';
+import { useDashboardResumo, periodoDash } from '@/data/dashboard';
+import { montarResumoReal } from '@/data/salaDashboard';
 import { lazyComRecarga as lazy } from '@/lib/recargaChunk';
 import { type Look } from '../sala/boneco';
 import { bonecoPixelSVG, botPixelSVG } from '../sala/bonecoPixel';
@@ -45,6 +47,16 @@ export default function SalaSdr() {
 
   // Fase 2.0: foto real do Supabase (null em demo/sem-org → o motor usa o mock)
   const { estado: salaReal } = useSalaReal();
+
+  // Fase 2.2: agregados REAIS do dia (RPC dashboard_resumo, a mesma fonte do Dashboard
+  // da casa) → montam o painel de baixo. Em demo o hook fica desligado (DASH_REAL=false)
+  // e resumoReal=null → o SalaDashboard cai no snapshot mock do motor.
+  const periodoHoje = useMemo(() => periodoDash('hoje'), []);
+  const dashReal = useDashboardResumo(periodoHoje);
+  const resumoReal = useMemo(
+    () => (SALA_REAL && salaReal && dashReal.data ? montarResumoReal(dashReal.data, salaReal) : null),
+    [salaReal, dashReal.data],
+  );
 
   const motorRef = useRef<MotorSala | null>(null);
   const [, forcar] = useReducer((x: number) => x + 1, 0);
@@ -158,7 +170,7 @@ export default function SalaSdr() {
 
       {/* ---------- DASHBOARD (largura total, embaixo) ---------- */}
       <Suspense fallback={<div className="sala-dash-skel">Carregando dashboard…</div>}>
-        <SalaDashboard snap={snap} motor={motor} />
+        <SalaDashboard snap={snap} motor={motor} real={SALA_REAL} resumoReal={resumoReal} />
       </Suspense>
     </div>
   );

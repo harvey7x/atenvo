@@ -117,11 +117,15 @@ function Leaderboard({ sdrs }: { sdrs: RankingSdr[] }) {
   );
 }
 
-function SalaDashboardBase({ snap, motor }: { snap: { resumo: DashboardView; feed: { hora: string; texto: string; destaque: boolean }[]; assinouPulse: number; versao: number }; motor: MotorSala | null }) {
-  const r = snap.resumo;
+function SalaDashboardBase({ snap, motor, real, resumoReal }: { snap: { resumo: DashboardView; feed: { hora: string; texto: string; destaque: boolean }[]; assinouPulse: number; versao: number }; motor: MotorSala | null; real?: boolean; resumoReal?: DashboardView | null }) {
+  // Fase 2.2: em modo real o dashboard vem do `dashboard_resumo` (mesma fonte do
+  // Dashboard da casa) montado em React; o snapshot do motor (mock) só serve à demo.
+  const r = resumoReal ?? snap.resumo;
   const [flash, setFlash] = useState(false);
   useEffect(() => { if (!snap.assinouPulse) return; setFlash(true); const id = window.setTimeout(() => setFlash(false), 700); return () => window.clearTimeout(id); }, [snap.assinouPulse]);
   if (snap.versao < 0) return <div className="sala-dash-skel">Preparando dashboard…</div>;
+  // real, mas o agregado do dia ainda carregando → esqueleto (não pisca 0s do mock)
+  if (real && !resumoReal) return <div className="sala-dash-skel">Preparando o painel do dia…</div>;
 
   const leadsData = r.leadsPorHora.horas.map((h, i) => ({ hora: h, anúncio: r.leadsPorHora.anuncio[i] || 0, remarketing: r.leadsPorHora.remarketing[i] || 0, total: r.leadsPorHora.total[i] || 0 }));
   const msgsDonut = [{ nome: 'Triagem', v: r.bot.msgs, cor: P.azul }, { nome: 'Remarketing', v: r.bot.rmkMsgs, cor: P.ambar }].filter((x) => x.v > 0);
@@ -141,7 +145,7 @@ function SalaDashboardBase({ snap, motor }: { snap: { resumo: DashboardView; fee
         <Hero rotulo="1ª resposta" valor={<>{fmt(r.primeira.media)}<small style={{ fontSize: 13, color: P.txt3, fontWeight: 500 }}>{r.primeira.media != null ? ' min' : ''}</small></>} sub={`mediana ${fmt(r.primeira.mediana)}`} delta={r.primeira.sla5 != null ? { txt: `${r.primeira.sla5}% ≤5min`, tom: r.primeira.sla5 >= 60 ? 'ok' : r.primeira.sla5 >= 40 ? 'ne' : 'er' } : undefined} />
 
         {/* Fileira 2 — leads/hora (8) + mensagens do bot donut (4) */}
-        <Secao span={8} titulo="Leads por hora" sub="anúncio × remarketing ao longo do dia" graf>
+        <Secao span={real ? 12 : 8} titulo="Leads por hora" sub={real ? 'mensagens recebidas por hora' : 'anúncio × remarketing ao longo do dia'} graf>
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={leadsData} margin={{ top: 6, right: 4, left: -8, bottom: 0 }}>
               <XAxis dataKey="hora" tick={eixo} tickLine={false} axisLine={{ stroke: tinta(0.09) }} interval={0} />
@@ -153,6 +157,7 @@ function SalaDashboardBase({ snap, motor }: { snap: { resumo: DashboardView; fee
             </ComposedChart>
           </ResponsiveContainer>
         </Secao>
+        {!real && (
         <Secao span={4} titulo="Mensagens do bot" sub="triagem × remarketing">
           <div className="db-donut-wrap">
             <div className="db-donut">
@@ -169,6 +174,7 @@ function SalaDashboardBase({ snap, motor }: { snap: { resumo: DashboardView; fee
             </div>
           </div>
         </Secao>
+        )}
 
         {/* Fileira 3 — leaderboard (7) + funil do dia (5) */}
         <Secao span={7} titulo="Ranking por SDR" sub="produção · qualificação · velocidade">
@@ -178,10 +184,11 @@ function SalaDashboardBase({ snap, motor }: { snap: { resumo: DashboardView; fee
           <Barh linhas={r.funilDia} />
         </Secao>
 
-        {/* Fileira 4 — onde estão (6) + automação do bot (6) */}
-        <Secao span={6} titulo="Onde estão agora" sub="mapa da sala">
+        {/* Fileira 4 — onde estão (real: largura total) + automação do bot (só mock) */}
+        <Secao span={real ? 12 : 6} titulo="Onde estão agora" sub="mapa da sala">
           <Barh linhas={r.ondeAgora} />
         </Secao>
+        {!real && (
         <Secao span={6} titulo="Matheo — automação da triagem" sub="onde os leads param">
           <div className="sd-auto">
             <div className="sd-auto-kpis">
@@ -193,6 +200,7 @@ function SalaDashboardBase({ snap, motor }: { snap: { resumo: DashboardView; fee
             <Barh linhas={bf} />
           </div>
         </Secao>
+        )}
 
         {/* Fileira 5 — motivos NE (6) + encaminhados (6) */}
         <Secao span={6} titulo="Motivos de não-trabalhável" sub="Pareto">
@@ -203,7 +211,8 @@ function SalaDashboardBase({ snap, motor }: { snap: { resumo: DashboardView; fee
           <div className="sd-mesas">{r.mesas.map((m) => <span key={m.id} className="mesa-led" title={`${m.nome}: ${m.desc}`}><i style={{ background: m.cor }} />{m.nome}</span>)}</div>
         </Secao>
 
-        {/* Fileira 6 — arrasto de semanas (8) + feed (4) */}
+        {/* Fileira 6 — arrasto de semanas (2.3) + feed (2.1): sem fonte real ainda → só mock */}
+        {!real && (<>
         <Secao span={8} titulo="Arrasto de semanas" sub="casos · perdidos · não-trabalháveis por semana" graf>
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={semanas} margin={{ top: 6, right: 8, left: -8, bottom: 0 }} onClick={(e) => { const w = (e as unknown as { activePayload?: { payload: { w: number } }[] })?.activePayload?.[0]?.payload?.w; if (w != null) motor?.verSemana(w); }}>
@@ -222,10 +231,11 @@ function SalaDashboardBase({ snap, motor }: { snap: { resumo: DashboardView; fee
             {snap.feed.length ? snap.feed.map((e, i) => <div key={i} className={`ev${i === 0 ? ' novo' : ''}${e.destaque ? ' dest' : ''}`}><span className="h num">{e.hora}</span><span>{e.texto}</span></div>) : <div className="db-vazio"><span aria-hidden>◌</span> Aguardando eventos…</div>}
           </div>
         </Secao>
+        </>)}
       </div>
     </div>
   );
 }
 
-export const SalaDashboard = memo(SalaDashboardBase, (a, b) => a.snap.versao === b.snap.versao);
+export const SalaDashboard = memo(SalaDashboardBase, (a, b) => a.snap.versao === b.snap.versao && a.resumoReal === b.resumoReal && a.real === b.real);
 export default SalaDashboard;
