@@ -11,6 +11,9 @@ interface Props {
   enviar: (file: File, caption: string) => Promise<void>;
   /** Opt-in: pré-visualização da IMAGEM única como card (mídia + faixa de legenda), igual ao histórico. */
   previewCard?: boolean;
+  /** Limites/validações por canal de envio: 'whatsapp' (default) = 16MB img/vídeo (evolution-send)
+   *  + rejeita HEIC; 'facebook' = 25MB p/ tudo (meta-send-message MAX_FB) e sem trava HEIC. */
+  perfil?: 'whatsapp' | 'facebook';
 }
 
 const ACCEPT: Record<MediaTipo, string> = {
@@ -18,10 +21,19 @@ const ACCEPT: Record<MediaTipo, string> = {
   documento: '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 };
 const LABEL_PL: Record<MediaTipo, string> = { imagem: 'imagens', video: 'vídeos', documento: 'documentos' };
-const MAX = 25 * 1024 * 1024;
+// Limites do SERVIDOR espelhados no client — antes aceitava 25MB pra tudo e imagem/
+// vídeo de 17-25MB no WhatsApp falhava DEPOIS da bolha otimista (evolution-send corta
+// em 16MB). O Facebook v1 usa este MESMO componente e o meta-send-message aceita 25MB
+// pra tudo — por isso o limite é por PERFIL, não global.
+const MAX_MB: Record<'whatsapp' | 'facebook', Record<MediaTipo, number>> = {
+  whatsapp: { imagem: 16, video: 16, documento: 25 },
+  facebook: { imagem: 25, video: 25, documento: 25 },
+};
 const fmt = (b: number) => b < 1024 ? b + ' B' : b < 1048576 ? (b / 1024).toFixed(0) + ' KB' : (b / 1048576).toFixed(1) + ' MB';
-function validar(tipo: MediaTipo, f: File): string | null {
-  if (f.size > MAX) return 'acima de 25 MB';
+function validar(tipo: MediaTipo, f: File, perfil: 'whatsapp' | 'facebook'): string | null {
+  const maxMb = MAX_MB[perfil][tipo];
+  if (f.size > maxMb * 1024 * 1024) return `acima de ${maxMb} MB`;
+  if (perfil === 'whatsapp' && tipo === 'imagem' && (f.type === 'image/heic' || f.type === 'image/heif')) return 'formato HEIC do iPhone não é aceito pelo WhatsApp — envie como JPEG';
   if (tipo === 'imagem' && !f.type.startsWith('image/')) return 'não é uma imagem';
   if (tipo === 'video' && !f.type.startsWith('video/')) return 'não é um vídeo';
   return null;
@@ -31,7 +43,7 @@ const IcDoc = () => <svg viewBox="0 0 24 24" width="26" height="26" fill="none" 
 interface Item { file: File; url: string | null }
 const chaveItem = (f: File) => `${f.name}::${f.size}::${f.lastModified}`;
 
-export function MediaComposer({ open, onClose, tipo, enviar, previewCard }: Props) {
+export function MediaComposer({ open, onClose, tipo, enviar, previewCard, perfil = 'whatsapp' }: Props) {
   const [items, setItems] = useState<Item[]>([]);
   const [caption, setCaption] = useState('');
   const [estado, setEstado] = useState<'idle' | 'sending' | 'error'>('idle');
@@ -55,7 +67,7 @@ export function MediaComposer({ open, onClose, tipo, enviar, previewCard }: Prop
       const vistos = new Set(cur.map((i) => chaveItem(i.file)));
       const novos: Item[] = [];
       for (const f of Array.from(lista)) {
-        const v = validar(tipo, f);
+        const v = validar(tipo, f, perfil);
         if (v) { invalidos.push(`${f.name} (${v})`); continue; }
         if (vistos.has(chaveItem(f))) continue;   // dedup
         vistos.add(chaveItem(f));
@@ -123,7 +135,7 @@ export function MediaComposer({ open, onClose, tipo, enviar, previewCard }: Prop
           onDragOver={(e) => { e.preventDefault(); setDrag(true); }} onDragLeave={() => setDrag(false)}
           onDrop={(e) => { e.preventDefault(); setDrag(false); adicionar(e.dataTransfer.files); }}>
           <strong>Clique para selecionar</strong> ou arraste {tipo === 'documento' ? 'os' : 'as'} {LABEL_PL[tipo]} aqui
-          <div className="media-drop-hint">Pode selecionar vários · até 25 MB cada</div>
+          <div className="media-drop-hint">Pode selecionar vários · até {MAX_MB[perfil][tipo]} MB cada</div>
         </div>
       ) : unico ? (
         // ---- preview rico de arquivo ÚNICO (mantém a experiência original) ----

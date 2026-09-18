@@ -370,7 +370,9 @@ export interface EtapaEnvio { posicao: number; tipo: EtapaTipo; texto: string; f
 const MIDIA_ENVIAVEL: EtapaTipo[] = ['imagem', 'audio', 'video', 'documento']; // mídia suportada no envio (WhatsApp e Facebook)
 /** Etapas para envio na conversa: texto sempre; mídia suportada quando `incluirMidia` (canal que suporta). */
 export async function fetchEtapasParaEnvio(scriptId: string, ctx: VarCtx, opts: { incluirMidia?: boolean; fallbackConteudo?: string } = {}): Promise<EtapaEnvio[]> {
-  const etapas = await fetchEtapas(scriptId);
+  // DEMO: sem supabase não há etapas no banco — cai direto no fallbackConteudo do
+  // script de amostra (antes: supabase!.from estourava "reading 'from'" no modal).
+  const etapas = SCRIPTS_REAL ? await fetchEtapas(scriptId) : [];
   const incluir = (e: EtapaItem) => e.tipo === 'texto' ? (e.conteudo ?? '').trim().length > 0 : (!!opts.incluirMidia && MIDIA_ENVIAVEL.includes(e.tipo) && !!e.storagePath);
   let lista = etapas.filter(incluir);
   if (lista.length === 0 && (opts.fallbackConteudo ?? '').trim()) lista = [{ tipo: 'texto', conteudo: opts.fallbackConteudo! }];

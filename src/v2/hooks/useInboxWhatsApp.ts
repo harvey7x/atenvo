@@ -6,7 +6,8 @@ import {
 } from '@/data/whatsapp';
 import { WA_CONTACTS, type WaContact, type WaMessage } from '@/data/whatsappDemo';
 import { useHigieneConversa, useRegistrarAdiamento, HIGIENE_VAZIO } from '@/data/higiene';
-import { decidirDono, decidirNome, estadoHigiene, conversaAtiva } from '@/lib/higieneConversa';
+import { decidirDono, decidirNome, estadoHigiene, conversaAtiva, textoBloqueio } from '@/lib/higieneConversa';
+import { aguardarConfirmacaoEnvio } from '@/data/scripts';
 import { responsavelEfetivo } from '@/lib/conversaEtiquetas';
 import { HIGIENE_CORTE_ISO, HIGIENE_DIAS_ADAPTACAO } from '@/config/higiene';
 import { useBloqueiosOrg } from './bloqueiosOrg';
@@ -387,6 +388,41 @@ export function useInboxWhatsApp(opts: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentId, replyCanalId, current.canalId, higieneBloqueia, higiene.motivoBloqueio, optout]);
 
+  /* ---------- envio via SCRIPT (ScriptSequenceModal) ----------
+     As MESMAS travas do composer, re-checadas A CADA etapa (o estado pode mudar
+     por realtime com o modal aberto — optout/higiene/canal): o caminho de script
+     não pode furar o que sendMsg bloqueia. Mesma ordem e mesmos textos do
+     composer. FONTE ÚNICA para desktop e mobile. */
+  const guardaScript = () => {
+    if (canalRestrito) throw new Error('O número deste canal está com restrição no WhatsApp e está indisponível para envio. Selecione outro canal.');
+    if (canalIndisponivel) throw new Error('Este número está desconectado. Reconecte em Integrações para enviar.');
+    if (semDestino) throw new Error('Vincule um número confirmado para responder.');
+    if (optout) throw new Error('Contato marcado como não incomodar — mensagens bloqueadas.');
+    if (higieneBloqueia) throw new Error(textoBloqueio(higiene) ?? 'Atendimento sem responsável ou com cadastro incompleto — assuma e complete o nome para enviar.');
+  };
+  const scriptEnviarEtapa = useCallback(async (texto: string, retryMensagemId?: string) => {
+    guardaScript();
+    // demo devolve um id sintético: com `confirmar` presente o modal EXIGE id
+    // (sem ele a etapa marcava "Falhou · envio sem identificador" no demo)
+    if (demo) { aoAvisar({ tom: 'ok', texto: 'Mensagem enviada' }); return 'demo-script'; }
+    const id = await sendMut.mutateAsync({ conversaId: currentId, canalId: replyCanalId || current.canalId, text: texto, retryMensagemId });
+    return id ?? undefined;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentId, replyCanalId, current.canalId, canalRestrito, canalIndisponivel, semDestino, optout, higieneBloqueia, higiene, demo]);
+  const scriptEnviarMidia = useCallback(async (m: { tipo: string; texto: string; mime?: string | null; nome?: string | null; tamanho?: number | null; storagePath?: string | null }) => {
+    guardaScript();
+    if (!m.storagePath) throw new Error('Mídia do script sem arquivo. Reenvie o anexo no arsenal de Scripts.');
+    if (demo) { aoAvisar({ tom: 'ok', texto: 'Mídia enviada' }); return; }
+    // A mídia do script já vive no bucket privado (script-midia); envia pelo mesmo caminho do compositor.
+    const id = await sendMut.mutateAsync({
+      conversaId: currentId, canalId: replyCanalId || current.canalId,
+      midiaPath: m.storagePath, midiaTipo: m.tipo, midiaMime: m.mime ?? undefined, midiaNome: m.nome ?? undefined, midiaTamanho: m.tamanho ?? undefined,
+      text: m.texto || undefined,
+    });
+    if (id) await aguardarConfirmacaoEnvio(id); // sucesso = confirmação REAL do provedor (igual ao texto)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentId, replyCanalId, current.canalId, canalRestrito, canalIndisponivel, semDestino, optout, higieneBloqueia, higiene, demo]);
+
   /* ---------- atribuição (v1 L806-867) — otimista com rollback ---------- */
   const [atribuindo, setAtribuindo] = useState(false);
   const assumir = useCallback(async () => {
@@ -487,6 +523,7 @@ export function useInboxWhatsApp(opts: {
     replyTo, setReplyTo,
     sendMsg, retryMsg, removerFalha, retryId, removendoId,
     enviarImagem, enviarVideo, enviarAudio, enviarDocumento, enviarContato,
+    scriptEnviarEtapa, scriptEnviarMidia,
     atribuindo, assumir, devolver, transferir,
     marcarLida, arquivar, aplicarEdicaoLocal, iniciarNovaConversa,
   };

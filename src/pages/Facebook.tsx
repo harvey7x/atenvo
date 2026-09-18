@@ -581,7 +581,7 @@ function FacebookInbox() {
         </div>
       )}
 
-      <MediaComposer open={!!midiaModal} tipo={midiaModal ?? 'imagem'} onClose={() => setMidiaModal(null)}
+      <MediaComposer open={!!midiaModal} tipo={midiaModal ?? 'imagem'} perfil="facebook" onClose={() => setMidiaModal(null)}
         enviar={(file, caption) => enviarMidiaManual(midiaModal ?? 'imagem', file, caption)} />
     </div>
   );

@@ -49,6 +49,7 @@ const IntegracoesV2 = lazy(() => import('@/v2/pages/Integracoes'));
 const KanbanV2 = lazy(() => import('@/v2/pages/Kanban'));
 // /whatsapp passa por um gate de viewport: celular → chat mobile (/m); desktop → inbox intocado.
 const GateWhatsApp = lazy(() => import('@/v2/mobile/GateWhatsApp'));
+const GateMobileApp = lazy(() => import('@/v2/mobile/GateMobileApp'));
 const MobileShell = lazy(() => import('@/v2/mobile/MobileShell'));
 const ListaConversasMobile = lazy(() => import('@/v2/mobile/ListaConversasMobile'));
 const ConversaMobile = lazy(() => import('@/v2/mobile/ConversaMobile'));
@@ -90,7 +91,9 @@ const routes: RouteObject[] = [
         ],
       },
       {
-        element: <Lz><AppShellV2 /></Lz>,
+        // celular → SÓ o chat: o GateMobileApp intercepta TODAS as rotas de módulo
+        // e manda pra /m (preservando ?conversa=); no desktop é pass-through.
+        element: <Lz><GateMobileApp><AppShellV2 /></GateMobileApp></Lz>,
         children: [
           // Home: entra pelo WhatsApp (entrada do v1) — decisão de escopo do dono.
           { index: true, element: <Navigate to="/whatsapp" replace /> },

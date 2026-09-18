@@ -1934,15 +1934,23 @@ export default function WhatsAppV2() {
           aoFechar={() => { setAgendarAberto(false); setAgEditId(null); }}
           aoSubmeter={async (v) => {
             if (optout) { aoAvisar({ tom: 'erro', texto: optoutTexto }); return; }   // opt-out: revalidar no submit (pode ter bloqueado com o modal aberto)
-            if (demo) { aoAvisar({ tom: 'ok', texto: 'Mensagem agendada — será enviada automaticamente no horário.' }); return; }
+            if (demo) { aoAvisar({ tom: 'ok', texto: 'Mensagem agendada — será enviada automaticamente no horário.' }); setAgendarAberto(false); setAgEditId(null); return; }
             if (agEditId) {
               await editarAgMut.mutateAsync({ id: agEditId, conversaId: current.id, canalId: v.canalId, texto: v.texto ?? '', executarEm: v.executarISO });
               aoAvisar({ tom: 'ok', texto: 'Agendamento atualizado.' });
             } else {
-              const itens = v.itens ?? [];
+              // BUG consertado 18/09: a RPC lê campos PLANOS (storage_path/mime/...) — passar
+              // v.itens cru (midia ANINHADA) agendava mídia sem arquivo → midia_path_invalido.
+              // Mapa idêntico ao v1 (src/pages/WhatsApp.tsx L485-488).
+              const itens = (v.itens ?? []).map((it) => ({
+                tipo: it.tipo, texto: it.texto || null,
+                storage_path: it.midia?.path, mime: it.midia?.mime, nome: it.midia?.nome, tamanho: it.midia?.tamanho, origem_audio: it.midia?.origemAudio,
+              }));
               await agendarSeqMut.mutateAsync({ conversaId: current.id, canalId: v.canalId, executarEm: v.executarISO, itens });
               aoAvisar({ tom: 'ok', texto: itens.length > 1 ? `${itens.length} mensagens agendadas — serão enviadas no horário.` : 'Mensagem agendada — será enviada automaticamente no horário.' });
             }
+            // fechar no SUCESSO (o v1 fechava; aberto + lista stale convidava a agendar em dobro)
+            setAgendarAberto(false); setAgEditId(null);
           }}
         />
       )}
@@ -1951,36 +1959,10 @@ export default function WhatsAppV2() {
         canal="whatsapp" conversaId={current.id} incluirMidia
         onClose={() => setScriptSeq(null)}
         ctx={{ cliente: current.name, atendente: user?.name || 'Atendente', emailAtendente: user?.email ?? '', empresa: currentOrg.name, telefone: current.phone }}
-        enviarMidia={async (m) => {
-          // Mesmas travas do composer (o estado pode mudar por realtime com o modal aberto).
-          if (inbox.canalRestrito) throw new Error('O número deste canal está com restrição no WhatsApp e está indisponível para envio. Selecione outro canal.');
-          if (inbox.canalIndisponivel) throw new Error('Este número está desconectado. Reconecte em Integrações para enviar.');
-          if (inbox.semDestino) throw new Error('Vincule um número confirmado para responder.');
-          if (optout) throw new Error(optoutTexto);
-          if (inbox.higieneBloqueia) throw new Error(textoBloqueio(inbox.higiene) ?? 'Atendimento sem responsável ou com cadastro incompleto — assuma e complete o nome para enviar.');
-          if (!m.storagePath) throw new Error('Mídia do script sem arquivo. Reenvie o anexo no arsenal de Scripts.');
-          if (demo) { aoAvisar({ tom: 'ok', texto: 'Mídia enviada' }); return; }
-          // A mídia do script já vive no bucket privado (script-midia); envia pelo mesmo caminho do compositor.
-          const id = await sendMut.mutateAsync({
-            conversaId: current.id, canalId: inbox.replyCanalId || current.canalId,
-            midiaPath: m.storagePath, midiaTipo: m.tipo, midiaMime: m.mime ?? undefined, midiaNome: m.nome ?? undefined, midiaTamanho: m.tamanho ?? undefined,
-            text: m.texto || undefined,
-          });
-          if (id) await aguardarConfirmacaoEnvio(id); // sucesso = confirmação REAL do provedor (igual ao texto)
-        }}
-        enviarEtapa={async (texto, retryMensagemId) => {
-          // TODAS as travas do composer valem também aqui — o caminho de script não pode furar
-          // o que sendMsg bloqueia (o estado pode mudar por realtime com o modal aberto). Espelha
-          // as mesmas verificações/mensagens de useInboxWhatsApp.sendMsg, na mesma ordem.
-          if (inbox.canalRestrito) throw new Error('O número deste canal está com restrição no WhatsApp e está indisponível para envio. Selecione outro canal.');
-          if (inbox.canalIndisponivel) throw new Error('Este número está desconectado. Reconecte em Integrações para enviar.');
-          if (inbox.semDestino) throw new Error('Vincule um número confirmado para responder.');
-          if (optout) throw new Error(optoutTexto);
-          if (inbox.higieneBloqueia) throw new Error(textoBloqueio(inbox.higiene) ?? 'Atendimento sem responsável ou com cadastro incompleto — assuma e complete o nome para enviar.');
-          if (demo) { aoAvisar({ tom: 'ok', texto: 'Mensagem enviada' }); return; }
-          const id = await sendMut.mutateAsync({ conversaId: current.id, canalId: inbox.replyCanalId || current.canalId, text: texto, retryMensagemId });
-          return id ?? undefined;
-        }}
+        /* Travas + envio agora vivem no HOOK (scriptEnviar*): fonte única com o
+           mobile — mesmos textos, mesma ordem, re-checadas a cada etapa. */
+        enviarMidia={inbox.scriptEnviarMidia}
+        enviarEtapa={inbox.scriptEnviarEtapa}
         confirmar={(id) => (demo ? Promise.resolve('enviada' as const) : aguardarConfirmacaoEnvio(id))}
       />
       {lightbox && (

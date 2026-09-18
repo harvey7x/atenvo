@@ -1038,7 +1038,10 @@ export function useAgendarMensagem() {
       if (error) throw new Error(traduzErroAgendamento(error.message));
       return data as { id: string };
     },
-    onSettled: (_r, _e, v) => { qc.invalidateQueries({ queryKey: ['mensagens-agendadas', v.conversaId] }); qc.invalidateQueries({ queryKey: ['mensagens-agendadas-org'] }); },
+    // prefixo SEM ids: a chave da query é ['mensagens-agendadas', org, conversaId] —
+    // invalidar com conversaId na 2ª posição NUNCA casava (org lá) e a lista da
+    // conversa ficava stale após agendar/editar/cancelar (achado da revisão 18/09).
+    onSettled: () => { qc.invalidateQueries({ queryKey: ['mensagens-agendadas'] }); qc.invalidateQueries({ queryKey: ['mensagens-agendadas-org'] }); },
   });
 }
 
@@ -1055,7 +1058,10 @@ export function useAgendarMidia() {
       if (error) throw new Error(traduzErroAgendamento(error.message));
       return data as { id: string };
     },
-    onSettled: (_r, _e, v) => { qc.invalidateQueries({ queryKey: ['mensagens-agendadas', v.conversaId] }); qc.invalidateQueries({ queryKey: ['mensagens-agendadas-org'] }); },
+    // prefixo SEM ids: a chave da query é ['mensagens-agendadas', org, conversaId] —
+    // invalidar com conversaId na 2ª posição NUNCA casava (org lá) e a lista da
+    // conversa ficava stale após agendar/editar/cancelar (achado da revisão 18/09).
+    onSettled: () => { qc.invalidateQueries({ queryKey: ['mensagens-agendadas'] }); qc.invalidateQueries({ queryKey: ['mensagens-agendadas-org'] }); },
   });
 }
 
@@ -1085,7 +1091,10 @@ export function useAgendarSequencia() {
       if (error) throw new Error(traduzErroAgendamento(error.message));
       return data as Array<{ id: string }>;
     },
-    onSettled: (_r, _e, v) => { qc.invalidateQueries({ queryKey: ['mensagens-agendadas', v.conversaId] }); qc.invalidateQueries({ queryKey: ['mensagens-agendadas-org'] }); },
+    // prefixo SEM ids: a chave da query é ['mensagens-agendadas', org, conversaId] —
+    // invalidar com conversaId na 2ª posição NUNCA casava (org lá) e a lista da
+    // conversa ficava stale após agendar/editar/cancelar (achado da revisão 18/09).
+    onSettled: () => { qc.invalidateQueries({ queryKey: ['mensagens-agendadas'] }); qc.invalidateQueries({ queryKey: ['mensagens-agendadas-org'] }); },
   });
 }
 
@@ -1100,7 +1109,10 @@ export function useEditarAgendamento() {
       if (error) throw new Error(traduzErroAgendamento(error.message));
       return data as { id: string };
     },
-    onSettled: (_r, _e, v) => { qc.invalidateQueries({ queryKey: ['mensagens-agendadas', v.conversaId] }); qc.invalidateQueries({ queryKey: ['mensagens-agendadas-org'] }); },
+    // prefixo SEM ids: a chave da query é ['mensagens-agendadas', org, conversaId] —
+    // invalidar com conversaId na 2ª posição NUNCA casava (org lá) e a lista da
+    // conversa ficava stale após agendar/editar/cancelar (achado da revisão 18/09).
+    onSettled: () => { qc.invalidateQueries({ queryKey: ['mensagens-agendadas'] }); qc.invalidateQueries({ queryKey: ['mensagens-agendadas-org'] }); },
   });
 }
 
@@ -1112,7 +1124,10 @@ export function useCancelarAgendamento() {
       const { error } = await supabase!.rpc('cancelar_agendamento', { p_id: input.id });
       if (error) throw new Error(traduzErroAgendamento(error.message));
     },
-    onSettled: (_r, _e, v) => { qc.invalidateQueries({ queryKey: ['mensagens-agendadas', v.conversaId] }); qc.invalidateQueries({ queryKey: ['mensagens-agendadas-org'] }); },
+    // prefixo SEM ids: a chave da query é ['mensagens-agendadas', org, conversaId] —
+    // invalidar com conversaId na 2ª posição NUNCA casava (org lá) e a lista da
+    // conversa ficava stale após agendar/editar/cancelar (achado da revisão 18/09).
+    onSettled: () => { qc.invalidateQueries({ queryKey: ['mensagens-agendadas'] }); qc.invalidateQueries({ queryKey: ['mensagens-agendadas-org'] }); },
   });
 }
 
@@ -1174,7 +1189,10 @@ export function useReagendarAgendamento() {
       if (error) throw new Error(traduzErroAgendamento(error.message));
       return data as { id: string };
     },
-    onSettled: (_r, _e, v) => { qc.invalidateQueries({ queryKey: ['mensagens-agendadas', v.conversaId] }); qc.invalidateQueries({ queryKey: ['mensagens-agendadas-org'] }); },
+    // prefixo SEM ids: a chave da query é ['mensagens-agendadas', org, conversaId] —
+    // invalidar com conversaId na 2ª posição NUNCA casava (org lá) e a lista da
+    // conversa ficava stale após agendar/editar/cancelar (achado da revisão 18/09).
+    onSettled: () => { qc.invalidateQueries({ queryKey: ['mensagens-agendadas'] }); qc.invalidateQueries({ queryKey: ['mensagens-agendadas-org'] }); },
   });
 }
 
