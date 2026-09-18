@@ -68,6 +68,11 @@ export async function waArquivar(conversaId: string, arquivar: boolean): Promise
   const { error } = await supabase!.rpc('wa_arquivar_conversa', { p_conversa: conversaId, p_arquivar: arquivar });
   if (error) throw new Error(error.message);
 }
+/** Fixar/desfixar conversa no topo do inbox (estilo WhatsApp, SEM limite). RPC com membership. */
+export async function waFixar(conversaId: string, fixar: boolean): Promise<void> {
+  const { error } = await supabase!.rpc('wa_fixar_conversa', { p_conversa: conversaId, p_fixar: fixar });
+  if (error) throw new Error(error.message);
+}
 /** Inbox Etapa A: marcar conversa como lida (zera não lidas) ou não lida. */
 export async function waMarcarLida(conversaId: string, lida: boolean): Promise<void> {
   const { error } = await supabase!.rpc('wa_marcar_lida', { p_conversa: conversaId, p_lida: lida });

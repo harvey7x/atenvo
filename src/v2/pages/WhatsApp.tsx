@@ -1726,6 +1726,7 @@ export default function WhatsAppV2() {
               {(current.unread ?? 0) > 0
                 ? <button type="button" className="it" onClick={() => { setPop(null); inbox.marcarLida(true); }}>Marcar como lida</button>
                 : <button type="button" className="it" onClick={() => { setPop(null); inbox.marcarLida(false); }}>Marcar como não lida</button>}
+              <button type="button" className="it" onClick={() => { setPop(null); void inbox.fixar(!current.fixada); }}>{current.fixada ? 'Desafixar conversa' : '📌 Fixar conversa no topo'}</button>
               <button type="button" className="it" onClick={() => { setPop(null); inbox.arquivar(!current.arquivada); }}>{current.arquivada ? 'Desarquivar conversa' : 'Arquivar conversa'}</button>
               {(iaEstado?.existe || iaAtiva) && (
                 <button type="button" className="it" disabled={iaRecomecar.isPending} onClick={() => { setPop(null); void recomecarIa(); }}>↻ Recomeçar atendimento (IA)</button>
