@@ -6,6 +6,7 @@ import { useOrg } from '@/context/OrgContext';
 import type { WaContact, WaMessage, WaUltimoCanal } from '@/data/whatsappDemo';
 import { previewUltimaMensagem, type OppStatus } from '@/lib/conversaEtiquetas';
 import { patchListaConversa, patchListaMensagem, removerDoHistorico, upsertHistorico, type RowConversa } from '@/data/whatsappRealtime';
+import { buscarKeyset } from '@/data/paginacao';
 type EtapaVariante = 'ganho' | 'perdido' | 'neutro';
 
 export const WA_REAL = isSupabaseConfigured && !!supabase;
@@ -234,15 +235,28 @@ interface EtapaContato { etapa: string; cor: string | null; entrada: boolean; re
 async function etapasPorContato(orgId: string): Promise<Map<string, EtapaContato>> {
   const map = new Map<string, EtapaContato>();
   try {
-    const { data, error } = await supabase!
-      .from('oportunidades')
-      .select('contato_id, status, responsavel_id, atualizado_em, funil_colunas(nome, cor, entrada, resultado)')
-      .eq('organizacao_id', orgId)
-      .order('atualizado_em', { ascending: false });
-    if (error) return map;
     type Col = { nome: string | null; cor: string | null; entrada: boolean | null; resultado: string | null };
-    type Row = { contato_id: string | null; status: string | null; responsavel_id: string | null; funil_colunas: Col | Col[] | null };
-    for (const r of ((data as unknown as Row[]) ?? [])) {
+    type Row = { contato_id: string | null; status: string | null; responsavel_id: string | null; atualizado_em: string | null; id: string; funil_colunas: Col | Col[] | null };
+    // PAGINAÇÃO (18/09): sem paginar, o PostgREST corta em 1000 linhas (db-max-rows) — com 3,3k+
+    // oportunidades, os ganhos/perdidos ANTIGOS caíam fora do mapa e o cliente aparecia como ativo
+    // (ganho vazava pra "Meus"). KEYSET por id (imutável) p/ não pular/duplicar na fronteira; a regra
+    // "ganho grudento" depende da ordem de NEGÓCIO (atualizado_em desc), então ordenamos em JS depois.
+    const linhas = await buscarKeyset<Row>(
+      (cursor, tam) => {
+        let q = supabase!
+          .from('oportunidades')
+          .select('contato_id, status, responsavel_id, atualizado_em, id, funil_colunas(nome, cor, entrada, resultado)')
+          .eq('organizacao_id', orgId)
+          .order('id', { ascending: false })
+          .limit(tam);
+        if (cursor) q = q.lt('id', cursor);
+        return q.then((r) => ({ data: (r.data as unknown as Row[]) ?? null, error: r.error }));
+      },
+      (r) => r.id,
+      { melhorEsforco: true, rotulo: 'oportunidades' },
+    );
+    linhas.sort((a, b) => String(b.atualizado_em ?? '').localeCompare(String(a.atualizado_em ?? '')) || String(b.id).localeCompare(String(a.id)));
+    for (const r of linhas) {
       const cid = r.contato_id;
       if (!cid) continue;
       const col = Array.isArray(r.funil_colunas) ? r.funil_colunas[0] : r.funil_colunas;
@@ -250,7 +264,7 @@ async function etapasPorContato(orgId: string): Promise<Map<string, EtapaContato
       const emAndamento = r.status === 'em_andamento';
       const curGanho = r.status === 'ganho';
       const prev = map.get(cid);
-      // Ordenado por atualizado_em desc: o 1º visto é o mais recente.
+      // Processado em atualizado_em desc: o 1º visto é o mais recente.
       // Regra: um GANHO é "grudento" — cliente fechado (ganho) NUNCA perde o selo FECHADO no
       // inbox por causa de uma oportunidade ativa/paralela. Fora isso, mantém-se o comportamento
       // antigo (a etapa ATIVA vence uma anterior encerrada, para mostrar o estágio vivo).
@@ -283,13 +297,24 @@ interface IaEstadoLista { iaAtiva: boolean; iaStatus: string }
 async function iaSessoesPorConversa(orgId: string): Promise<Map<string, IaEstadoLista>> {
   const map = new Map<string, IaEstadoLista>();
   try {
-    const { data, error } = await supabase!
-      .from('ia_sessoes')
-      .select('conversa_id, status, dados')
-      .eq('organizacao_id', orgId);
-    if (error) return map;
-    type Row = { conversa_id: string | null; status: string | null; dados: { desativado_manual?: boolean } | null };
-    for (const r of ((data as unknown as Row[]) ?? [])) {
+    type Row = { conversa_id: string; status: string | null; dados: { desativado_manual?: boolean } | null };
+    // PAGINAÇÃO (18/09): idem etapasPorContato — com 1,3k+ sessões o corte de 1000 deixava conversas
+    // com o selo de IA errado. Keyset por conversa_id (único, imutável); ordem não importa (mapa por chave).
+    const linhas = await buscarKeyset<Row>(
+      (cursor, tam) => {
+        let q = supabase!
+          .from('ia_sessoes')
+          .select('conversa_id, status, dados')
+          .eq('organizacao_id', orgId)
+          .order('conversa_id', { ascending: false })
+          .limit(tam);
+        if (cursor) q = q.lt('conversa_id', cursor);
+        return q.then((r) => ({ data: (r.data as unknown as Row[]) ?? null, error: r.error }));
+      },
+      (r) => r.conversa_id,
+      { melhorEsforco: true, rotulo: 'ia_sessoes' },
+    );
+    for (const r of linhas) {
       if (!r.conversa_id) continue;
       const status = r.status ?? '';
       const desativado = !!r.dados?.desativado_manual;
@@ -321,32 +346,39 @@ export function useWaConversations() {
     queryFn: async (): Promise<WaContact[]> => {
       const etapasPromise = etapasPorContato(orgId);   // dispara junto; espera depois do fetch principal
       const iaPromise = iaSessoesPorConversa(orgId);   // idem: estado da IA/bot por conversa (fetch paralelo)
-      const { data, error } = await supabase!
-        .from('conversas')
-        // canais!conversas_canal_id_fkey: desambigua o embed (há 2 FKs p/ canais: canal_id e ultimo_canal_id).
-        // NÃO embutimos conversa_status_def aqui: a cor/nome do status é resolvida no cliente via useStatusDefs
-        // (mantém o inbox funcional mesmo que a tabela auxiliar fique inacessível por grant).
-        .select('id, status, status_id, nao_lidas, ultima_interacao_em, criado_em, precisa_humano, precisa_humano_motivo, precisa_humano_em, atendente_id, etiquetas, ultimo_canal_id, ultimo_numero, ultimo_provider, ultima_msg_canal_em, arquivada_em, fixada_em, silenciada_ate, ultima_lida_em, contatos!inner(id, nome, telefone, email, etiquetas, origem, observacoes, responsavel_id, contato_identidades(tipo)), canais!conversas_canal_id_fkey!inner(id, nome_interno, tipo), mensagens(id, direcao, conteudo, tipo, enviada_em, recebida_em, criado_em, origem, status, erro_envio, id_externo, respondida_a_id, metadados)')
-        .eq('organizacao_id', orgId)
-        .eq('canais.tipo', 'whatsapp')
-        // PERF: o embed de mensagens NÃO tinha limite — trazia TODAS as mensagens de TODAS as
-        // conversas (9.547 linhas / 5,5 MB por fetch), das quais ~95% a lista nunca mostra.
-        // PostgREST aplica ORDER/LIMIT de recurso embutido POR LINHA-PAI (LATERAL), então isto
-        // vira "as 10 últimas mensagens de cada conversa".
-        // Por que 10 e não 1: os derivados do card precisam da última mensagem REAL (o preview e
-        // `aguardando` ignoram tipo 'sistema'/'nota_interna'), e a aba Prioridade olha se houve
-        // alguma SAÍDA recente (selo "NOVO"). Com 10, essas regras continuam exatas na prática.
-        // O histórico COMPLETO da conversa aberta vem de useWaMensagens, sob demanda.
-        .order('criado_em', { referencedTable: 'mensagens', ascending: false })
-        .limit(10, { referencedTable: 'mensagens' })
-        .order('ultima_interacao_em', { ascending: false });
-      // Etapa do Kanban por contato (etiqueta [CONTRATOS]). Query separada e BEST-EFFORT:
-      // se falhar (grant/RLS), a lista continua funcionando — só fica sem a etiqueta de etapa.
-      // Em PARALELO com o fetch principal: eram 2 roundtrips sequenciais no caminho crítico da lista.
+      // canais!conversas_canal_id_fkey: desambigua o embed (há 2 FKs p/ canais: canal_id e ultimo_canal_id).
+      // NÃO embutimos conversa_status_def aqui: a cor/nome do status é resolvida no cliente via useStatusDefs
+      // (mantém o inbox funcional mesmo que a tabela auxiliar fique inacessível por grant).
+      // O embed de mensagens é LATERAL: ORDER+LIMIT(10) por linha-pai = "as 10 últimas de cada conversa"
+      // (10 e não 1 porque preview/`aguardando` ignoram 'sistema'/'nota_interna' e a aba Prioridade olha
+      // saída recente; histórico completo vem de useWaMensagens sob demanda).
+      const SELECT_CONVERSAS = 'id, status, status_id, nao_lidas, ultima_interacao_em, criado_em, precisa_humano, precisa_humano_motivo, precisa_humano_em, atendente_id, etiquetas, ultimo_canal_id, ultimo_numero, ultimo_provider, ultima_msg_canal_em, arquivada_em, fixada_em, silenciada_ate, ultima_lida_em, contatos!inner(id, nome, telefone, email, etiquetas, origem, observacoes, responsavel_id, contato_identidades(tipo)), canais!conversas_canal_id_fkey!inner(id, nome_interno, tipo), mensagens(id, direcao, conteudo, tipo, enviada_em, recebida_em, criado_em, origem, status, erro_envio, id_externo, respondida_a_id, metadados)';
+      // PAGINAÇÃO (18/09): sem paginar, o PostgREST corta em 1000 linhas (db-max-rows) — com 2,6k+
+      // conversas não-arquivadas, ~1,6k NÃO CARREGAVAM (clientes "sumidos" do inbox). KEYSET por id
+      // (ÚNICO e IMUTÁVEL): a ordenação por ultima_interacao_em é MUTÁVEL e paginar por ela pularia/
+      // duplicaria conversas que recebem msg durante o fetch. A ordem de EXIBIÇÃO é refeita no JS
+      // (arr.sort abaixo), então paginar por id não muda o que o usuário vê — só garante lista completa.
+      const linhas = await buscarKeyset<DbConv>(
+        (cursor, tam) => {
+          let q = supabase!
+            .from('conversas')
+            .select(SELECT_CONVERSAS)
+            .eq('organizacao_id', orgId)
+            .eq('canais.tipo', 'whatsapp')
+            .order('criado_em', { referencedTable: 'mensagens', ascending: false })
+            .limit(10, { referencedTable: 'mensagens' })
+            .order('id', { ascending: false })
+            .limit(tam);
+          if (cursor) q = q.lt('id', cursor);
+          return q.then((r) => ({ data: (r.data as unknown as DbConv[]) ?? null, error: r.error }));
+        },
+        (c) => (c as unknown as { id: string }).id,
+        { rotulo: 'conversas' },
+      );
+      // Etapa do Kanban por contato + IA por conversa. Best-effort, em PARALELO com o fetch principal.
       const etapas = await etapasPromise;
       const iaEstados = await iaPromise;   // etapa por CONTATO; IA por CONVERSA
-      if (error) throw new Error(error.message);
-      const arr = ((data as unknown as DbConv[]) ?? []).map(mapConversa);
+      const arr = linhas.map(mapConversa);
       for (const c of arr) {
         const ia = iaEstados.get(c.id);
         if (ia) { c.iaAtiva = ia.iaAtiva; c.iaStatus = ia.iaStatus; }

@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { buscarKeyset } from '@/data/paginacao';
 import { useOrg } from '@/context/OrgContext';
 
 export const KANBAN_REAL = isSupabaseConfigured && !!supabase;
@@ -353,12 +354,29 @@ export function useKanban() {
   const leadsQ = useQuery({
     queryKey: ['kanban-leads', org, funilId], enabled: KANBAN_REAL && !!funilId, refetchInterval: 8000,
     queryFn: async (): Promise<KLead[]> => {
-      const { data, error } = await supabase!.from('oportunidades')
-        .select('id, coluna_id, contato_id, conversa_origem_id, canal_origem_id, contato_nome, titulo, telefone, responsavel_id, valor_estimado, origem, etiquetas, observacoes, lembrete, ordem, criado_em, atualizado_em, entrada_em, movimentado_em, prioridade, status, fechado_em, motivo_perda, motivo_nao_elegivel, responsavel_no_fechamento_id, tipo_beneficio, tipo_servico, status_cancelamento, status_ressarcimento, numero_beneficio, instituicao, tipo_desconto, data_inicio_desconto, valor_desconto_mensal, valor_ressarcimento_estimado, valor_ressarcido, contatos(nome, telefone, email, etiquetas), responsavel:usuarios!oportunidades_responsavel_id_fkey(nome), canal_origem:canais(tipo, nome_interno, numero_conectado)')
-        .eq('organizacao_id', org).eq('funil_id', funilId!).in('status', ['em_andamento', 'ganho', 'perdido'])
-        .order('ordem', { ascending: true }).order('criado_em', { ascending: true });
-      if (error) throw new Error(error.message);
-      return ((data as unknown as DbLead[]) ?? []).map(mapLead);
+      // PAGINAÇÃO (18/09): sem paginar, o PostgREST corta em 1000 (db-max-rows) e CARDS SOMEM do
+      // quadro (o funil passa de 1000 com em_andamento+ganho+perdido). KEYSET por id (imutável);
+      // a ordem do quadro (ordem asc, criado_em asc) é reaplicada em JS — paginar por `ordem`
+      // (mutável no drag-and-drop) pularia/duplicaria cards na fronteira.
+      const linhas = await buscarKeyset<DbLead & { id: string }>(
+        (cursor, tam) => {
+          let q = supabase!.from('oportunidades')
+            .select('id, coluna_id, contato_id, conversa_origem_id, canal_origem_id, contato_nome, titulo, telefone, responsavel_id, valor_estimado, origem, etiquetas, observacoes, lembrete, ordem, criado_em, atualizado_em, entrada_em, movimentado_em, prioridade, status, fechado_em, motivo_perda, motivo_nao_elegivel, responsavel_no_fechamento_id, tipo_beneficio, tipo_servico, status_cancelamento, status_ressarcimento, numero_beneficio, instituicao, tipo_desconto, data_inicio_desconto, valor_desconto_mensal, valor_ressarcimento_estimado, valor_ressarcido, contatos(nome, telefone, email, etiquetas), responsavel:usuarios!oportunidades_responsavel_id_fkey(nome), canal_origem:canais(tipo, nome_interno, numero_conectado)')
+            .eq('organizacao_id', org).eq('funil_id', funilId!).in('status', ['em_andamento', 'ganho', 'perdido'])
+            .order('id', { ascending: false }).limit(tam);
+          if (cursor) q = q.lt('id', cursor);
+          return q.then((r) => ({ data: (r.data as unknown as (DbLead & { id: string })[]) ?? null, error: r.error }));
+        },
+        (l) => l.id,
+        { rotulo: 'kanban-leads' },
+      );
+      // reproduz .order('ordem', asc).order('criado_em', asc) — ordem asc com NULLS LAST (padrão Postgres)
+      linhas.sort((a, b) => {
+        const oa = a.ordem ?? Number.POSITIVE_INFINITY, ob = b.ordem ?? Number.POSITIVE_INFINITY;
+        if (oa !== ob) return oa - ob;
+        return String(a.criado_em ?? '').localeCompare(String(b.criado_em ?? ''));
+      });
+      return linhas.map(mapLead);
     },
   });
 

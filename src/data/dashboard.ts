@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { useOrg } from '@/context/OrgContext';
 import { resolvePeriodo, spHoje, addDias, type Periodo, type Preset } from '@/data/relatorios';
+import { buscarKeyset } from '@/data/paginacao';
 
 /* ------------------------------------------------------------------
    Camada de dados do Dashboard operacional.
@@ -166,7 +167,18 @@ export function useDashboardIa(periodo: Periodo) {
     enabled: DASH_REAL && !!org,
     staleTime: 60_000,
     queryFn: async (): Promise<DashIa> => {
-      const sessQ = supabase!.from('ia_sessoes').select('status, etapa, dados').eq('organizacao_id', org);
+      // PAGINAÇÃO (18/09): ia_sessoes >1000 era truncada (db-max-rows) → contagem de sessões
+      // vivas/handoffs SUBcontada no painel. Keyset por id (agregação por contagem, ordem irrelevante).
+      const sessQ = buscarKeyset<{ id: string; status: string; etapa: string | null; dados: { aguardando_humano?: string | null } | null }>(
+        (cursor, tam) => {
+          let q = supabase!.from('ia_sessoes').select('id, status, etapa, dados')
+            .eq('organizacao_id', org).order('id', { ascending: false }).limit(tam);
+          if (cursor) q = q.lt('id', cursor);
+          return q.then((r) => ({ data: (r.data as unknown as { id: string; status: string; etapa: string | null; dados: { aguardando_humano?: string | null } | null }[]) ?? null, error: r.error }));
+        },
+        (s) => s.id,
+        { rotulo: 'dashboard-ia' },
+      ).then((data) => ({ data, error: null as null }));
       const base = () => supabase!.from('mensagens').select('id', { count: 'exact', head: true })
         .eq('organizacao_id', org).eq('direcao', 'saida')
         .gte('criado_em', periodo.iniISO).lt('criado_em', periodo.fimISO);

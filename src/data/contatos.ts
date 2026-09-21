@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { useOrg } from '@/context/OrgContext';
+import { buscarKeyset } from '@/data/paginacao';
 
 /** Linha de contato como a UI (congelada) consome. */
 export interface ContatoRow {
@@ -123,15 +124,27 @@ export function useContatos() {
     queryKey: ['contatos', currentOrg.id],
     queryFn: async (): Promise<ContatoRow[]> => {
       if (!isSupabaseConfigured || !supabase) return [...mockStore];
-      // RLS ja restringe ao org do usuario; o organizacao_id NUNCA vem do cliente para leitura
-      const { data, error } = await supabase
-        .from('contatos')
-        .select('id, nome, email, telefone, cpf, origem, etiquetas, observacoes, responsavel_id, criado_em, atualizado_em, responsavel:usuarios(nome)')
-        .eq('organizacao_id', currentOrg.id)
-        .is('mesclado_em', null) // oculta contatos absorvidos por merge (soft-merge)
-        .order('atualizado_em', { ascending: false });
-      if (error) throw new Error(error.message);
-      return ((data as unknown as DbContato[]) ?? []).map(mapRow);
+      // RLS ja restringe ao org do usuario; o organizacao_id NUNCA vem do cliente para leitura.
+      // PAGINAÇÃO (18/09): sem paginar, o PostgREST corta em 1000 (db-max-rows) e contatos SOMEM da
+      // lista (base >1000). KEYSET por id (imutável); a ordem de exibição (atualizado_em desc) é
+      // aplicada em JS depois — paginar por atualizado_em (mutável) pularia/duplicaria linhas.
+      const linhas = await buscarKeyset<DbContato & { id: string }>(
+        (cursor, tam) => {
+          let q = supabase!
+            .from('contatos')
+            .select('id, nome, email, telefone, cpf, origem, etiquetas, observacoes, responsavel_id, criado_em, atualizado_em, responsavel:usuarios(nome)')
+            .eq('organizacao_id', currentOrg.id)
+            .is('mesclado_em', null) // oculta contatos absorvidos por merge (soft-merge)
+            .order('id', { ascending: false })
+            .limit(tam);
+          if (cursor) q = q.lt('id', cursor);
+          return q.then((r) => ({ data: (r.data as unknown as (DbContato & { id: string })[]) ?? null, error: r.error }));
+        },
+        (c) => c.id,
+        { rotulo: 'contatos' },
+      );
+      linhas.sort((a, b) => String(b.atualizado_em ?? '').localeCompare(String(a.atualizado_em ?? '')) || String(b.id).localeCompare(String(a.id)));
+      return linhas.map(mapRow);
     },
   });
 }
