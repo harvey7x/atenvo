@@ -4,6 +4,7 @@
    ciclo_vencimento_competencias) ligada ao front. */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase, isDemoMode } from '@/lib/supabase';
+import { buscarKeyset } from '@/data/paginacao';
 
 export interface CicloReal {
   id: string;
@@ -91,14 +92,24 @@ export function useClientesCobranca(orgId?: string) {
     queryKey: ['cob-clientes', orgId],
     enabled: !!orgId && !isDemoMode,
     queryFn: async () => {
-      const { data, error } = await supabase!
-        .from('cobrancas')
-        .select('id, valor_mensal, status, contato:contatos(nome, telefone), responsavel:usuarios(nome), ciclo:ciclos_vencimento(codigo)')
-        .eq('organizacao_id', orgId!)
-        .neq('status', 'cancelado')
-        .order('criado_em', { ascending: false });
-      if (error) throw error;
-      return (data ?? []).map((r) => {
+      // PAGINADO (18/09): carteira não-cancelada passa de 1000 → o teto cortava a lista de clientes
+      // por turma. Keyset por id; ordem (criado_em desc) reaplicada em JS.
+      const data = await buscarKeyset<{ id: string; criado_em?: string | null; valor_mensal: number | null; status: string; contato: unknown; responsavel: unknown; ciclo: unknown }>(
+        (cursor, tam) => {
+          let q = supabase!
+            .from('cobrancas')
+            .select('id, criado_em, valor_mensal, status, contato:contatos(nome, telefone), responsavel:usuarios(nome), ciclo:ciclos_vencimento(codigo)')
+            .eq('organizacao_id', orgId!)
+            .neq('status', 'cancelado')
+            .order('id', { ascending: false }).limit(tam);
+          if (cursor) q = q.lt('id', cursor);
+          return q.then((r) => ({ data: (r.data as unknown as { id: string; criado_em?: string | null; valor_mensal: number | null; status: string; contato: unknown; responsavel: unknown; ciclo: unknown }[]) ?? null, error: r.error }));
+        },
+        (r) => r.id,
+        { rotulo: 'cob-clientes' },
+      );
+      data.sort((a, b) => String(b.criado_em ?? '').localeCompare(String(a.criado_em ?? '')));
+      return data.map((r) => {
         const contato = r.contato as unknown as { nome: string | null; telefone: string | null } | null;
         return {
           id: r.id as string,

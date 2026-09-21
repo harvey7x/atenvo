@@ -44,7 +44,7 @@ export async function buscarKeyset<T>(
   opts: OpcoesKeyset = {},
 ): Promise<T[]> {
   const tamanho = opts.tamanho ?? 1000;
-  const teto = opts.teto ?? 30;
+  const teto = opts.teto ?? 100;   // 100k linhas: folga enorme; é só a trava anti-fetch-infinito
   const acc: T[] = [];
   let cursor: string | null = null;
   for (let p = 0; p < teto; p++) {
@@ -59,6 +59,11 @@ export async function buscarKeyset<T>(
     cursor = cursorDe(bloco[bloco.length - 1]);
     if (!cursor) return acc;                   // sem cursor válido: não dá pra avançar com segurança
   }
-  console.warn(`[paginacao] teto de ${teto} páginas atingido${opts.rotulo ? ' (' + opts.rotulo + ')' : ''} — lista possivelmente truncada`);
-  return acc;
+  // Teto atingido: NÃO devolver parcial em silêncio — numa agregação financeira isso viraria
+  // subcontagem sem aviso (revisão 18/09). Satélite (melhorEsforco) degrada; o resto FALHA ALTO
+  // (o react-query mantém o último dado bom em vez de mostrar número menor que o real).
+  const rotulo = opts.rotulo ? ' (' + opts.rotulo + ')' : '';
+  console.warn(`[paginacao] teto de ${teto} páginas atingido${rotulo}`);
+  if (opts.melhorEsforco) return acc;
+  throw new Error(`Lista grande demais para carregar de uma vez${rotulo}. Avise o suporte.`);
 }

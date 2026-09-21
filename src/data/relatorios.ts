@@ -168,8 +168,8 @@ const toParcela = (r: Row): ParcelaLite => ({ status: r.status as string, valor:
 /** Contatos cuja conexão de aquisição = chip (para filtrar domínios ligados ao contato em 1 hop). */
 async function cidsConexao(org: string, conexao: string | undefined, signal: AbortSignal): Promise<Set<string> | null> {
   if (!conexao) return null;
-  const { data } = await supabase!.from('contatos').select('id').eq('organizacao_id', org).eq('canal_origem_id', conexao).is('mesclado_em', null).abortSignal(signal);
-  return new Set(((data as Row[]) ?? []).map((r) => r.id as string));
+  const data = await fetchAll(() => supabase!.from('contatos').select('id').eq('organizacao_id', org).eq('canal_origem_id', conexao).is('mesclado_em', null).order('id').abortSignal(signal));
+  return new Set((data ?? []).map((r) => r.id as string));
 }
 
 /**
@@ -188,9 +188,11 @@ export type MapaPessoa = Map<string, string>;
  * Base das métricas comerciais: pessoa única por telefone canônico (não contato bruto) e sem o interno.
  */
 async function carregaPessoas(org: string, signal: AbortSignal): Promise<{ pessoa: MapaPessoa; internos: Set<string> }> {
-  const { data } = await supabase!.from('contatos').select('id, telefone').eq('organizacao_id', org).is('mesclado_em', null).abortSignal(signal);
+  // PAGINADO (18/09): dedupe por telefone precisa de TODOS os contatos; sem paginar, o teto de 1000
+  // (db-max-rows) cortava a base e a contagem de "pessoas únicas" ficava errada.
+  const data = await fetchAll(() => supabase!.from('contatos').select('id, telefone').eq('organizacao_id', org).is('mesclado_em', null).order('id').abortSignal(signal));
   const pessoa: MapaPessoa = new Map(); const internos = new Set<string>();
-  for (const r of ((data as Row[]) ?? [])) {
+  for (const r of (data ?? [])) {
     const id = r.id as string;
     const k = chaveCanonicaTelefone(r.telefone as string | null);
     pessoa.set(id, k ?? ('cid:' + id));                 // sem telefone → cada contato é uma pessoa
@@ -221,7 +223,7 @@ export function useRelatorioOpcoes() {
         supabase!.from('organizacao_usuarios').select('usuarios(id, nome)').eq('organizacao_id', org).eq('status', 'ativo'),
         supabase!.from('fontes_aquisicao').select('nome').eq('organizacao_id', org).eq('ativo', true),
         supabase!.from('funil_colunas').select('id, nome, ordem').eq('organizacao_id', org).eq('arquivada', false).order('ordem'),
-        supabase!.from('oportunidades').select('origem').eq('organizacao_id', org).not('origem', 'is', null).limit(2000),
+        fetchAll(() => supabase!.from('oportunidades').select('origem').eq('organizacao_id', org).not('origem', 'is', null).order('id')).then(wrapRows),   // PAGINADO 18/09: .limit(2000) era FALSA segurança (db-max-rows corta em 1000 → faltavam origens no filtro)
         supabase!.from('canais').select('id, nome_interno, numero_conectado').eq('organizacao_id', org).eq('tipo', 'whatsapp').neq('status_integracao', 'removido').order('nome_interno'),
       ]);
       const responsaveis = ((us.data as Row[]) ?? []).map((r) => { const u = one(r.usuarios); return u ? { id: u.id as string, nome: u.nome as string } : null; }).filter(Boolean) as { id: string; nome: string }[];
@@ -253,28 +255,41 @@ export function useResumo(f: RelFiltros) {
   return useQuery({
     queryKey: ['rel-resumo', org, chaveFiltros(f)], enabled: REL_REAL, staleTime: 60_000,
     queryFn: async ({ signal }): Promise<ResumoData> => {
-      let qContatos = supabase!.from('contatos').select('id, criado_em, origem, responsavel_id').eq('organizacao_id', org).is('mesclado_em', null).gte('criado_em', p.prevIniISO).lt('criado_em', p.fimISO).abortSignal(signal!);
-      if (f.responsavel) qContatos = qContatos.eq('responsavel_id', f.responsavel);
-      if (f.origem) qContatos = qContatos.eq('origem', f.origem);
-      if (f.conexao) qContatos = qContatos.eq('canal_origem_id', f.conexao);
-      let qOpp = supabase!.from('oportunidades').select('id, status, criado_em, responsavel_id, origem, coluna_id').eq('organizacao_id', org).gte('criado_em', p.prevIniISO).lt('criado_em', p.fimISO).abortSignal(signal!);
-      if (f.responsavel) qOpp = qOpp.eq('responsavel_id', f.responsavel);
-      if (f.coluna) qOpp = qOpp.eq('coluna_id', f.coluna);
-      if (f.status) qOpp = qOpp.eq('status', f.status);
-      if (f.origem) qOpp = qOpp.eq('origem', f.origem);
-      if (f.conexao) qOpp = qOpp.eq('canal_origem_id', f.conexao);
+      // PAGINADO (18/09): todas via fetchAll (o teto de 1000 truncava e subcontava o resumo).
+      const qContatos = fetchAll(() => {
+        let q = supabase!.from('contatos').select('id, criado_em, origem, responsavel_id').eq('organizacao_id', org).is('mesclado_em', null).gte('criado_em', p.prevIniISO).lt('criado_em', p.fimISO).order('id').abortSignal(signal!);
+        if (f.responsavel) q = q.eq('responsavel_id', f.responsavel);
+        if (f.origem) q = q.eq('origem', f.origem);
+        if (f.conexao) q = q.eq('canal_origem_id', f.conexao);
+        return q;
+      }).then(wrapRows);
+      const qOpp = fetchAll(() => {
+        let q = supabase!.from('oportunidades').select('id, status, criado_em, responsavel_id, origem, coluna_id').eq('organizacao_id', org).gte('criado_em', p.prevIniISO).lt('criado_em', p.fimISO).order('id').abortSignal(signal!);
+        if (f.responsavel) q = q.eq('responsavel_id', f.responsavel);
+        if (f.coluna) q = q.eq('coluna_id', f.coluna);
+        if (f.status) q = q.eq('status', f.status);
+        if (f.origem) q = q.eq('origem', f.origem);
+        if (f.conexao) q = q.eq('canal_origem_id', f.conexao);
+        return q;
+      }).then(wrapRows);
       // P2: oportunidades GANHAS fechadas no período (por fechado_em) → clientes distintos + negócios
-      let qOppFech = supabase!.from('oportunidades').select('contato_id, fechado_em').eq('organizacao_id', org).eq('status', 'ganho').gte('fechado_em', p.prevIniISO).lt('fechado_em', p.fimISO).abortSignal(signal!);
-      if (f.responsavel) qOppFech = qOppFech.eq('responsavel_id', f.responsavel);
-      if (f.coluna) qOppFech = qOppFech.eq('coluna_id', f.coluna);
-      if (f.origem) qOppFech = qOppFech.eq('origem', f.origem);
-      if (f.conexao) qOppFech = qOppFech.eq('canal_origem_id', f.conexao);
-      let qConv = supabase!.from('conversas').select('id, criado_em, contato_id').eq('organizacao_id', org).gte('criado_em', p.prevIniISO).lt('criado_em', p.fimISO).abortSignal(signal!);
-      if (f.canal) qConv = qConv.eq('ultimo_provider', f.canal); // canal só afeta conversas (atendimento)
+      const qOppFech = fetchAll(() => {
+        let q = supabase!.from('oportunidades').select('contato_id, fechado_em').eq('organizacao_id', org).eq('status', 'ganho').gte('fechado_em', p.prevIniISO).lt('fechado_em', p.fimISO).order('id').abortSignal(signal!);
+        if (f.responsavel) q = q.eq('responsavel_id', f.responsavel);
+        if (f.coluna) q = q.eq('coluna_id', f.coluna);
+        if (f.origem) q = q.eq('origem', f.origem);
+        if (f.conexao) q = q.eq('canal_origem_id', f.conexao);
+        return q;
+      }).then(wrapRows);
+      const qConv = fetchAll(() => {
+        let q = supabase!.from('conversas').select('id, criado_em, contato_id').eq('organizacao_id', org).gte('criado_em', p.prevIniISO).lt('criado_em', p.fimISO).order('id').abortSignal(signal!);
+        if (f.canal) q = q.eq('ultimo_provider', f.canal); // canal só afeta conversas (atendimento)
+        return q;
+      }).then(wrapRows);
       // resposta humana = saída com autor_id (operador via app); telefone sincronizado fica de fora
-      const qResp = fetchAll(() => supabase!.from('mensagens').select('conversa_id, criado_em').eq('organizacao_id', org).eq('direcao', 'saida').not('autor_id', 'is', null).gte('criado_em', p.prevIniISO).lt('criado_em', p.fimISO).abortSignal(signal!)).then(wrapRows);
-      const qPag = supabase!.from('cobranca_pagamentos').select('status, valor, valor_pago, data_prevista, data_pagamento, cobranca_id').eq('organizacao_id', org).abortSignal(signal!);
-      const qCob = supabase!.from('cobrancas').select('id, valor_mensal, status, valor_economizado, responsavel_id, contato_id, criado_em').eq('organizacao_id', org).abortSignal(signal!);
+      const qResp = fetchAll(() => supabase!.from('mensagens').select('conversa_id, criado_em').eq('organizacao_id', org).eq('direcao', 'saida').not('autor_id', 'is', null).gte('criado_em', p.prevIniISO).lt('criado_em', p.fimISO).order('id').abortSignal(signal!)).then(wrapRows);
+      const qPag = fetchAll(() => supabase!.from('cobranca_pagamentos').select('status, valor, valor_pago, data_prevista, data_pagamento, cobranca_id').eq('organizacao_id', org).order('id').abortSignal(signal!)).then(wrapRows);
+      const qCob = fetchAll(() => supabase!.from('cobrancas').select('id, valor_mensal, status, valor_economizado, responsavel_id, contato_id, criado_em').eq('organizacao_id', org).order('id').abortSignal(signal!)).then(wrapRows);
       const [c, o, of_, cv, resp, pag, cob, cids, pes] = await Promise.all([qContatos, qOpp, qOppFech, qConv, qResp, qPag, qCob, cidsConexao(org, f.conexao, signal!), carregaPessoas(org, signal!)]);
       for (const r of [c, o, of_, cv, resp, pag, cob]) if (r.error) throw new Error(r.error.message);
 
@@ -345,16 +360,19 @@ export function useComercial(f: RelFiltros, enabled: boolean) {
   return useQuery({
     queryKey: ['rel-comercial', org, chaveFiltros(f)], enabled: REL_REAL && enabled, staleTime: 60_000,
     queryFn: async ({ signal }): Promise<ComercialData> => {
-      let qOpp = supabase!.from('oportunidades').select('id, contato_id, status, criado_em, atualizado_em, coluna_id, funil_colunas(nome, ordem)').eq('organizacao_id', org).gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).abortSignal(signal!);
-      if (f.responsavel) qOpp = qOpp.eq('responsavel_id', f.responsavel);
-      if (f.coluna) qOpp = qOpp.eq('coluna_id', f.coluna);
-      if (f.origem) qOpp = qOpp.eq('origem', f.origem);
-      if (f.status) qOpp = qOpp.eq('status', f.status);
-      if (f.conexao) qOpp = qOpp.eq('canal_origem_id', f.conexao);
-      const [{ data, error }, pes] = await Promise.all([qOpp, carregaPessoas(org, signal!)]);
-      if (error) throw new Error(error.message);
+      // PAGINADO (18/09): fetchAll — janela larga passava de 1000 opps e o funil subcontava.
+      const qOpp = fetchAll(() => {
+        let q = supabase!.from('oportunidades').select('id, contato_id, status, criado_em, atualizado_em, coluna_id, funil_colunas(nome, ordem)').eq('organizacao_id', org).gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).order('id').abortSignal(signal!);
+        if (f.responsavel) q = q.eq('responsavel_id', f.responsavel);
+        if (f.coluna) q = q.eq('coluna_id', f.coluna);
+        if (f.origem) q = q.eq('origem', f.origem);
+        if (f.status) q = q.eq('status', f.status);
+        if (f.conexao) q = q.eq('canal_origem_id', f.conexao);
+        return q;
+      });
+      const [data, pes] = await Promise.all([qOpp, carregaPessoas(org, signal!)]);
       // B: número interno fora do funil/conversão (filtro de relatório; nada é apagado do banco).
-      const rows = ((data as Row[]) ?? []).filter((r) => !pes.internos.has(r.contato_id as string));
+      const rows = (data ?? []).filter((r) => !pes.internos.has(r.contato_id as string));
       const cv = conversao(rows.map((r) => ({ status: r.status as string })));
       const fechadasNoFunil = cv.ganhas + cv.perdidas;
       const colMap = new Map<string, FunilColuna>();
@@ -437,23 +455,24 @@ export function useEquipe(f: RelFiltros, enabled: boolean) {
   return useQuery({
     queryKey: ['rel-equipe', org, chaveFiltros(f)], enabled: REL_REAL && enabled, staleTime: 60_000,
     queryFn: async ({ signal }): Promise<EquipeData> => {
-      let qCt = supabase!.from('contatos').select('id, responsavel_id, criado_em, origem').eq('organizacao_id', org).is('mesclado_em', null).gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).abortSignal(signal!);
+      // PAGINADO (18/09): .order('id') + fetchAll nos builders (o teto de 1000 subcontava a equipe).
+      let qCt = supabase!.from('contatos').select('id, responsavel_id, criado_em, origem').eq('organizacao_id', org).is('mesclado_em', null).gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).order('id').abortSignal(signal!);
       if (f.origem) qCt = qCt.eq('origem', f.origem);
       if (f.conexao) qCt = qCt.eq('canal_origem_id', f.conexao);
-      let qOp = supabase!.from('oportunidades').select('contato_id, responsavel_id, status, criado_em, coluna_id, origem, contato:contatos(responsavel_id)').eq('organizacao_id', org).gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).abortSignal(signal!);
+      let qOp = supabase!.from('oportunidades').select('contato_id, responsavel_id, status, criado_em, coluna_id, origem, contato:contatos(responsavel_id)').eq('organizacao_id', org).gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).order('id').abortSignal(signal!);
       if (f.coluna) qOp = qOp.eq('coluna_id', f.coluna);
       if (f.origem) qOp = qOp.eq('origem', f.origem);
       if (f.status) qOp = qOp.eq('status', f.status);
       if (f.conexao) qOp = qOp.eq('canal_origem_id', f.conexao);
       // P2/P5: oportunidades GANHAS fechadas no período (por fechado_em) + responsável da opp e do contato (p/ fallback)
-      let qOpFech = supabase!.from('oportunidades').select('contato_id, responsavel_id, contato:contatos(responsavel_id)').eq('organizacao_id', org).eq('status', 'ganho').gte('fechado_em', p.iniISO).lt('fechado_em', p.fimISO).abortSignal(signal!);
+      let qOpFech = supabase!.from('oportunidades').select('contato_id, responsavel_id, contato:contatos(responsavel_id)').eq('organizacao_id', org).eq('status', 'ganho').gte('fechado_em', p.iniISO).lt('fechado_em', p.fimISO).order('id').abortSignal(signal!);
       if (f.coluna) qOpFech = qOpFech.eq('coluna_id', f.coluna);
       if (f.origem) qOpFech = qOpFech.eq('origem', f.origem);
       if (f.conexao) qOpFech = qOpFech.eq('canal_origem_id', f.conexao);
       const [us, ct, op, opf, cb, ms, cvv, mi, pes] = await Promise.all([
         supabase!.from('organizacao_usuarios').select('usuarios(id, nome)').eq('organizacao_id', org).eq('status', 'ativo').abortSignal(signal!),
-        qCt, qOp, fetchAll(() => qOpFech).then(wrapRows),
-        supabase!.from('cobrancas').select('id, responsavel_id, criado_por, valor_mensal, ciclos_totais, status').eq('organizacao_id', org).abortSignal(signal!),
+        fetchAll(() => qCt).then(wrapRows), fetchAll(() => qOp).then(wrapRows), fetchAll(() => qOpFech).then(wrapRows),
+        fetchAll(() => supabase!.from('cobrancas').select('id, responsavel_id, criado_por, valor_mensal, ciclos_totais, status').eq('organizacao_id', org).order('id').abortSignal(signal!)).then(wrapRows),
         fetchAll(() => supabase!.from('mensagens').select('autor_id, conversa_id').eq('organizacao_id', org).eq('direcao', 'saida').not('autor_id', 'is', null).gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).abortSignal(signal!)).then(wrapRows),
         // P1: TODAS as conversas + responsável do contato (mapear "sem resposta" independentemente da criação da conversa)
         fetchAll(() => supabase!.from('conversas').select('id, contato:contatos(responsavel_id)').eq('organizacao_id', org).abortSignal(signal!)).then(wrapRows),
@@ -520,9 +539,8 @@ export function useEquipe(f: RelFiltros, enabled: boolean) {
       // receita recebida por responsável (parcelas pagas no período)
       const cobRows = (cb.data as Row[]) ?? [];
       const respByCob = new Map<string, string | null>(); cobRows.forEach((r) => respByCob.set(r.id as string, (r.responsavel_id as string) || (r.criado_por as string) || null));
-      const { data: pg, error: epg } = await supabase!.from('cobranca_pagamentos').select('cobranca_id, valor_pago').eq('organizacao_id', org).eq('status', 'paga').gte('data_pagamento', p.iniDate).lt('data_pagamento', p.fimDate).abortSignal(signal!);
-      if (epg) throw new Error(epg.message);
-      for (const r of (pg as Row[]) ?? []) { const l = getC(respByCob.get(r.cobranca_id as string) || null); if (l) l.receitaRecebida += num(r.valor_pago); }
+      const pg = await fetchAll(() => supabase!.from('cobranca_pagamentos').select('cobranca_id, valor_pago').eq('organizacao_id', org).eq('status', 'paga').gte('data_pagamento', p.iniDate).lt('data_pagamento', p.fimDate).order('id').abortSignal(signal!));
+      for (const r of pg) { const l = getC(respByCob.get(r.cobranca_id as string) || null); if (l) l.receitaRecebida += num(r.valor_pago); }
       // P3: taxa por atendente = clientes fechados ÷ contatos atribuídos
       for (const l of com.values()) { l.taxaConversao = l.leads === 0 ? 0 : (l.clientesFechados / l.leads) * 100; }
       const filtroResp = (id: string) => !f.responsavel || f.responsavel === id;
@@ -571,12 +589,13 @@ export function useFinanceiro(f: RelFiltros, enabled: boolean) {
   return useQuery({
     queryKey: ['rel-fin', org, chaveFiltros(f)], enabled: REL_REAL && enabled, staleTime: 60_000,
     queryFn: async ({ signal }): Promise<FinanceiroData> => {
+      // PAGINADO (18/09): parcelas e cobranças da org inteira passam de 1000 — o teto distorcia
+      // TODA a aba Financeiro (previsto/recebido/carteira). fetchAll traz a base completa.
       const [pg, cb, cids] = await Promise.all([
-        supabase!.from('cobranca_pagamentos').select('status, valor, valor_pago, data_prevista, data_pagamento, cobranca_id').eq('organizacao_id', org).abortSignal(signal!),
-        supabase!.from('cobrancas').select('id, status, valor_mensal, servico, responsavel_id, contato_id').eq('organizacao_id', org).abortSignal(signal!),
+        fetchAll(() => supabase!.from('cobranca_pagamentos').select('status, valor, valor_pago, data_prevista, data_pagamento, cobranca_id').eq('organizacao_id', org).order('id').abortSignal(signal!)).then(wrapRows),
+        fetchAll(() => supabase!.from('cobrancas').select('id, status, valor_mensal, servico, responsavel_id, contato_id').eq('organizacao_id', org).order('id').abortSignal(signal!)).then(wrapRows),
         cidsConexao(org, f.conexao, signal!),
       ]);
-      if (pg.error) throw new Error(pg.error.message); if (cb.error) throw new Error(cb.error.message);
       let cob = (cb.data as Row[]) ?? [];
       if (f.responsavel) cob = cob.filter((r) => (r.responsavel_id as string) === f.responsavel); // responsável: filtro válido p/ financeiro
       if (cids) cob = cob.filter((r) => cids.has(r.contato_id as string)); // conexão de aquisição via contato
@@ -614,15 +633,14 @@ export function useOrigens(f: RelFiltros, enabled: boolean) {
   return useQuery({
     queryKey: ['rel-origens', org, chaveFiltros(f)], enabled: REL_REAL && enabled, staleTime: 60_000,
     queryFn: async ({ signal }): Promise<LinhaOrigem[]> => {
-      let q = supabase!.from('oportunidades').select('contato_id, origem, fonte_aquisicao, status').eq('organizacao_id', org).gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).abortSignal(signal!);
+      let q = supabase!.from('oportunidades').select('contato_id, origem, fonte_aquisicao, status').eq('organizacao_id', org).gte('criado_em', p.iniISO).lt('criado_em', p.fimISO).order('id').abortSignal(signal!);
       if (f.responsavel) q = q.eq('responsavel_id', f.responsavel);
       if (f.coluna) q = q.eq('coluna_id', f.coluna);
       if (f.status) q = q.eq('status', f.status);
       if (f.conexao) q = q.eq('canal_origem_id', f.conexao);
-      const [{ data, error }, pes] = await Promise.all([q, carregaPessoas(org, signal!)]);
-      if (error) throw new Error(error.message);
+      const [data, pes] = await Promise.all([fetchAll(() => q), carregaPessoas(org, signal!)]);   // PAGINADO 18/09
       const map = new Map<string, LinhaOrigem>();
-      for (const r of (data as Row[]) ?? []) {
+      for (const r of (data ?? [])) {
         if (pes.internos.has(r.contato_id as string)) continue; // B: número interno fora do comercial
         const k = (r.origem as string) || (r.fonte_aquisicao as string) || 'Não informado';
         const cur = map.get(k) || { origem: k, oportunidades: 0, ganhas: 0, taxaConversao: 0 };

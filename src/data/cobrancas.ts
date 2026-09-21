@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { useOrg } from '@/context/OrgContext';
+import { buscarKeyset } from '@/data/paginacao';
 
 export const COB_REAL = isSupabaseConfigured && !!supabase;
 
@@ -55,10 +56,19 @@ export function useCobrancas() {
     queryKey: ['cobrancas', org],
     enabled: COB_REAL,
     queryFn: async (): Promise<Cobranca[]> => {
-      const { data, error } = await supabase!.from('cobrancas').select(SEL_COB)
-        .eq('organizacao_id', org).order('criado_em', { ascending: false });
-      if (error) throw new Error(error.message);
-      return ((data as unknown[]) ?? []).map((r) => mapCobranca(r as Record<string, unknown>));
+      // PAGINADO (18/09): a carteira acumulada passa de 1000 e o teto do PostgREST cortava a lista
+      // (cobranças SUMIAM). Keyset por id; a ordem (criado_em desc) é reaplicada em JS.
+      const linhas = await buscarKeyset<Record<string, unknown> & { id: string }>(
+        (cursor, tam) => {
+          let q = supabase!.from('cobrancas').select(SEL_COB).eq('organizacao_id', org).order('id', { ascending: false }).limit(tam);
+          if (cursor) q = q.lt('id', cursor);
+          return q.then((r) => ({ data: (r.data as unknown as (Record<string, unknown> & { id: string })[]) ?? null, error: r.error }));
+        },
+        (r) => r.id,
+        { rotulo: 'cobrancas' },
+      );
+      linhas.sort((a, b) => String(b.criado_em ?? '').localeCompare(String(a.criado_em ?? '')));
+      return linhas.map((r) => mapCobranca(r));
     },
   });
 }
@@ -95,9 +105,18 @@ export function useCobrancasMetricas() {
     queryKey: ['cobrancas-metricas', org],
     enabled: COB_REAL,
     queryFn: async (): Promise<{ m: CobMetrica; previsao: PrevisaoMes[] }> => {
-      const { data, error } = await supabase!.from('cobranca_pagamentos').select('status, valor, valor_pago, data_prevista, data_pagamento').eq('organizacao_id', org);
-      if (error) throw new Error(error.message);
-      const ps = (((data as unknown[]) ?? []) as Record<string, unknown>[]).map(mapParcela);
+      // PAGINADO (18/09): parcelas (várias por cobrança × ciclos) passam de 1000 — o teto distorcia
+      // as MÉTRICAS financeiras (previsto/recebido/atraso). Keyset por id (agregação, ordem irrelevante).
+      const data = await buscarKeyset<Record<string, unknown> & { id: string }>(
+        (cursor, tam) => {
+          let q = supabase!.from('cobranca_pagamentos').select('id, status, valor, valor_pago, data_prevista, data_pagamento').eq('organizacao_id', org).order('id', { ascending: false }).limit(tam);
+          if (cursor) q = q.lt('id', cursor);
+          return q.then((r) => ({ data: (r.data as unknown as (Record<string, unknown> & { id: string })[]) ?? null, error: r.error }));
+        },
+        (r) => r.id,
+        { rotulo: 'cobranca_pagamentos' },
+      );
+      const ps = data.map(mapParcela);
       const h = hoje(); const mesAtual = h.slice(0, 7);
       const m: CobMetrica = { previstoMes: 0, recebidoMes: 0, emAtraso: 0, aReceber: 0 };
       const prevMap = new Map<string, PrevisaoMes>();
