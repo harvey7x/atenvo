@@ -340,8 +340,12 @@ export function useWaConversations() {
     // o inbox é a query MAIS PESADA do sistema (média ~400ms, picos de ~8s) e, multiplicada por
     // várias abas + refetch ao focar, saturava o compute/conexões. O staleTime impede que cada
     // troca de aba redispare a query pesada; o realtime aplica os deltas ao vivo mesmo assim.
-    refetchInterval: 120_000,
-    staleTime: 45_000,
+    // 2026-09-21 (incidente de saturação no pico de segunda): subido de 120s/45s p/ 240s/180s.
+    // O realtime (setQueryData abaixo) é a fonte de frescor AO VIVO; este refetch é só reconciliação.
+    // Rodar a query mais pesada do sistema com metade da frequência alivia a saturação de conexão/CPU
+    // no compute Micro (mesmo com o índice novo, cada round-trip espera na fila no pico).
+    refetchInterval: 240_000,
+    staleTime: 180_000,
     refetchOnWindowFocus: true,
     queryFn: async (): Promise<WaContact[]> => {
       const etapasPromise = etapasPorContato(orgId);   // dispara junto; espera depois do fetch principal
