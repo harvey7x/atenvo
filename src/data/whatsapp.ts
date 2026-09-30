@@ -775,6 +775,14 @@ export function useWaCanais() {
   return useQuery({
     queryKey: ['wa-canais', currentOrg.id],
     enabled: WA_REAL,
+    // O status de conexão do canal NÃO tem realtime (o canal wa-<org> cobre só mensagens/conversas/contatos).
+    // Sem isso, uma piscada do WhatsApp (Evolution cai/reconecta) deixava o status preso em "desconectado" no
+    // cache e TRAVAVA o composer (sendDisabled = !canalConectado) até um refresh manual. Recarga automática a
+    // cada 20s + no foco/reconexão faz o status (e o botão de enviar) se auto-recuperarem sozinhos.
+    refetchInterval: 20000,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
     queryFn: async (): Promise<WaCanal[]> => {
       // Lista apenas canais vigentes. A remoção agora é DEFINITIVA no servidor (Edge Function
       // evolution-manage/remove exclui o registro), então canais 'removido' não devem aparecer aqui.
