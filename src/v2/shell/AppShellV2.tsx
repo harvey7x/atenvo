@@ -74,6 +74,7 @@ const GRUPOS: { rotulo: string; itens: ItemNav[] }[] = [
     itens: [
       { slug: 'ferramentas/unificador', rotulo: 'Unificador de documentos' },
       { slug: 'ferramentas/conversor', rotulo: 'Conversor de arquivos' },
+      { slug: 'ferramentas/coletor-inss', rotulo: 'Coletor INSS' },
     ],
   },
   {
@@ -124,6 +125,8 @@ const FERR_ICONES: Record<string, ReactNode> = {
   unificador: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><path d="M8 3H5a2 2 0 0 0-2 2v5M16 3h3a2 2 0 0 1 2 2v5M8 21H5a2 2 0 0 1-2-2v-5M16 21h3a2 2 0 0 0 2-2v-5M9 12h6M12 9v6" /></svg>,
   // Conversor: dois arquivos com setas trocando (converter)
   conversor: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><path d="M4 7h11M4 7l3-3M4 7l3 3M20 17H9M20 17l-3-3M20 17l-3 3" /></svg>,
+  // Coletor INSS: documento com seta descendo (baixar da fonte oficial)
+  'coletor-inss': <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z" /><path d="M12 11v6M9.5 14.5 12 17l2.5-2.5" /></svg>,
 };
 const COB_ICONES: Record<string, ReactNode> = {
   painel: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><path d="M4 20V10M10 20V4M16 20v-8M21 20H3" /></svg>,

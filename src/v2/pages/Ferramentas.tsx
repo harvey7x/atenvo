@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { BadgeStatus, BotaoPrimario, BotaoSec, CardVidro, EstadoVazio, Toggle } from '../components';
 import { unificar, BANCOS_ALVO, type ArquivoInfo, type ResultadoUnificacao } from './unificadorLib';
 import { ConversorArquivos } from './Conversor';
+import { ColetorInss } from './ColetorInss';
 import './ferramentas.css';
 
 const fmtKB = (b: number) => (b < 1024 * 1024 ? `${Math.round(b / 1024)} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`);
@@ -27,6 +28,7 @@ export default function FerramentasV2() {
   const { tool } = useParams();
   if (tool === 'unificador' || !tool) return <UnificadorDocumentos />;
   if (tool === 'conversor') return <ConversorArquivos />;
+  if (tool === 'coletor-inss') return <ColetorInss />;
   return (
     <div className="ferr-wrap">
       <div className="ph sobe"><div className="cob-migalha">Ferramentas</div><h2>Ferramenta não encontrada</h2></div>
