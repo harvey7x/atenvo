@@ -5,14 +5,22 @@
 // mesmo padrão do mensagens-agendadas-processar. Deploy --no-verify-jwt.
 //
 // Ações (POST JSON { acao, ... }):
-//   fila     -> pedidos aberto/em_andamento, mais antigo primeiro
-//   assumir  -> { pedido_id } aberto -> em_andamento (quem vai atender)
-//   reabrir  -> { pedido_id } em_andamento -> aberto (desistiu, volta pra fila)
+//   fila     -> pedidos aberto/em_andamento, mais antigo primeiro. O CPF sai
+//               MASCARADO (•••.XXX.XXX-••): o completo só vem no assumir — quem
+//               vazar a chave não monta base de CPFs só lendo a fila.
+//   assumir  -> { pedido_id, coletor_id } aberto -> em_andamento. Grava QUEM
+//               assumiu; repetir é ok só para o MESMO coletor (dois coletores no
+//               mesmo pedido = 409, um sobrescreveria os PDFs do outro).
+//               Devolve o pedido completo (com CPF inteiro).
+//   reabrir  -> { pedido_id } em_andamento -> aberto (qualquer coletor pode:
+//               é a válvula para pedido preso em máquina que morreu)
 //   enviar   -> { pedido_id, titulo, conteudo_base64 } grava o PDF no bucket
-//               inss-docs e registra em inss_documentos (repetir substitui)
+//               inss-docs e registra em inss_documentos (repetir substitui).
+//               SÓ com o pedido em_andamento: concluído não aceita mais upload
+//               (senão a chave vazada reescreveria documentos antigos).
 //   concluir -> { pedido_id, resultado: 'pronto'|'falhou', erro? }
-//   apagar   -> { pedido_id, caminho } remove UM arquivo do pedido (storage +
-//               linha) — manutenção de recoleta; o caminho tem que ser do pedido
+//   apagar   -> { pedido_id, caminho } remove UM arquivo do pedido em_andamento
+//               (storage + linha) — manutenção de recoleta
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
@@ -58,41 +66,64 @@ Deno.serve(async (req) => {
     if (acao === 'fila') {
       const { data, error } = await admin
         .from('inss_pedidos')
-        .select('id, organizacao_id, nome, cpf, documentos, status, criado_em')
+        .select('id, organizacao_id, nome, cpf, documentos, status, criado_em, assumido_por')
         .in('status', ['aberto', 'em_andamento'])
         .order('criado_em', { ascending: true })
         .limit(50);
       if (error) return json({ erro: error.message }, 500);
-      return json({ ok: true, pedidos: data ?? [] });
+      const mascarado = (data ?? []).map((r) => {
+        const d = String(r.cpf || '').replace(/\D/g, '');
+        return { ...r, cpf: d.length === 11 ? `•••.${d.slice(3, 6)}.${d.slice(6, 9)}-••` : '' };
+      });
+      return json({ ok: true, pedidos: mascarado });
     }
 
     const pedidoId = typeof corpo?.pedido_id === 'string' ? corpo.pedido_id : '';
     if (!pedidoId) return json({ erro: 'pedido_id obrigatório' }, 400);
     const { data: p, error: eP } = await admin
       .from('inss_pedidos')
-      .select('id, organizacao_id, contato_id, status')
+      .select('id, organizacao_id, contato_id, nome, cpf, documentos, status, criado_em, assumido_por')
       .eq('id', pedidoId)
       .maybeSingle();
     if (eP) return json({ erro: eP.message }, 500);
     if (!p) return json({ erro: 'pedido não existe' }, 404);
 
-    if (acao === 'assumir' || acao === 'reabrir') {
-      const de = acao === 'assumir' ? 'aberto' : 'em_andamento';
-      const para = acao === 'assumir' ? 'em_andamento' : 'aberto';
+    if (acao === 'assumir') {
+      const coletorId = typeof corpo?.coletor_id === 'string' ? corpo.coletor_id.slice(0, 80) : '';
+      if (!coletorId) return json({ erro: 'coletor_id obrigatório' }, 400);
       const { data: upd, error } = await admin
         .from('inss_pedidos')
-        .update({ status: para })
+        .update({ status: 'em_andamento', assumido_por: coletorId })
         .eq('id', pedidoId)
-        .eq('status', de)
+        .eq('status', 'aberto')
         .select('id');
       if (error) return json({ erro: error.message }, 500);
-      // já estava no destino (reenvio) não é erro; qualquer outro estado é conflito
-      if (!upd?.length && p.status !== para) return json({ erro: `pedido está '${p.status}'` }, 409);
+      if (!upd?.length) {
+        // retomar o PRÓPRIO pedido (Chrome fechou etc.) é ok; o de outro coletor, não
+        const meu = p.status === 'em_andamento' && p.assumido_por === coletorId;
+        if (!meu) {
+          const quem = p.status === 'em_andamento' ? ` por outro computador (${p.assumido_por || '?'})` : '';
+          return json({ erro: `pedido está '${p.status}'${quem}` }, 409);
+        }
+      }
+      const { assumido_por: _ap, ...pedido } = p;
+      return json({ ok: true, pedido: { ...pedido, status: 'em_andamento' } });
+    }
+
+    if (acao === 'reabrir') {
+      const { data: upd, error } = await admin
+        .from('inss_pedidos')
+        .update({ status: 'aberto', assumido_por: null })
+        .eq('id', pedidoId)
+        .eq('status', 'em_andamento')
+        .select('id');
+      if (error) return json({ erro: error.message }, 500);
+      if (!upd?.length && p.status !== 'aberto') return json({ erro: `pedido está '${p.status}'` }, 409);
       return json({ ok: true });
     }
 
     if (acao === 'enviar') {
-      if (p.status === 'cancelado') return json({ erro: 'pedido cancelado' }, 409);
+      if (p.status !== 'em_andamento') return json({ erro: `pedido está '${p.status}' — assuma antes de enviar` }, 409);
       const titulo = nomeArquivoSeguro(String(corpo?.titulo ?? ''));
       const b64 = typeof corpo?.conteudo_base64 === 'string' ? corpo.conteudo_base64 : '';
       if (!b64) return json({ erro: 'conteudo_base64 obrigatório' }, 400);
@@ -131,6 +162,7 @@ Deno.serve(async (req) => {
     }
 
     if (acao === 'apagar') {
+      if (p.status !== 'em_andamento') return json({ erro: `pedido está '${p.status}'` }, 409);
       const caminho = typeof corpo?.caminho === 'string' ? corpo.caminho : '';
       const prefixo = `${p.organizacao_id}/${p.contato_id}/${p.id}/`;
       if (!caminho.startsWith(prefixo)) return json({ erro: 'caminho não é deste pedido' }, 400);
