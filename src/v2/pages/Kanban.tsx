@@ -22,6 +22,7 @@ import { initials } from '@/lib/avatar';
 import { useVisibilidade } from '@/lib/visibilidade';
 import { FichaJudicialBox } from '@/components/FichaJudicialBox';
 import { RelacionamentoContatoBox } from '@/components/RelacionamentoContatoBox';
+import { DocumentosInssBox } from '@/components/DocumentosInssBox';
 import { useBloqueiosOrg } from '../hooks/bloqueiosOrg';
 import { BotaoPrimario, BotaoSec, CardVidro, DrawerV2, EstadoErro, ModalV2, Skeleton } from '../components';
 import './kanban.css';
@@ -2136,6 +2137,11 @@ function DetalheModalV2({ demo, l, colunas, eventosDemo, fichaDemoStatus, aoFech
       {!demo && (
         <div className="kd-ficha">
           <RelacionamentoContatoBox contatoId={l.contatoId} conversaId={l.conversaOrigemId} canalId={l.canalOrigemId} />
+        </div>
+      )}
+      {!demo && (
+        <div className="kd-ficha">
+          <DocumentosInssBox contatoId={l.contatoId} />
         </div>
       )}
       </div>

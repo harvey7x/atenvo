@@ -14,6 +14,7 @@ import { corDaEtiqueta } from '@/types/atendimento';
 import { initials } from '@/lib/avatar';
 import { useVisibilidade } from '@/lib/visibilidade';
 import { formatarNumero } from '@/data/maturacao';
+import { DocumentosInssBox } from '@/components/DocumentosInssBox';
 import { useBloqueiosOrg } from '../hooks/bloqueiosOrg';
 import { tempoCelula, tempoRelativo } from '../lib/tempo';
 import {
@@ -561,6 +562,8 @@ function FichaContato({ contato, demo, extras, bloqueado, cobSituacao, agsOrg, a
             <div className="fx-vazio">Nenhuma régua ativa para este contato.</div>
           )}
         </div>
+
+        {!demo && <DocumentosInssBox contatoId={contato.id} />}
 
         {contato.obs && (
           <div className="fx-b">

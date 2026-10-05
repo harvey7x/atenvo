@@ -477,3 +477,8 @@ verify_jwt = false
 
 [functions.cobranca-processar]
 verify_jwt = false
+
+# coletor-inss: chamada pelo coletor local (Mac do escritório), que não tem JWT de
+# usuário — autentica por x-coletor-chave == webhook_config.secret (chave='coletor-inss').
+[functions.coletor-inss]
+verify_jwt = false
