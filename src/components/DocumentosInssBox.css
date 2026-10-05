@@ -4,6 +4,11 @@
 .dib-info { font-size: 13px; color: var(--ink-2); }
 .dib-hint { font-size: 11.5px; color: var(--muted); line-height: 1.45; }
 
+/* bancos identificados no consignado — o dado de elegibilidade, antes dos PDFs */
+.dib-bancos { margin-bottom: 10px; }
+.dib-bancos-t { font-size: 10.5px; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); font-weight: 650; margin-bottom: 6px; }
+.dib-banco { display: inline-block; font-size: 12px; font-weight: 550; color: var(--ink); background: var(--hover); border: 1px solid var(--line); border-radius: 99px; padding: 3px 9px; margin: 0 5px 5px 0; }
+
 .dib-lista { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
 .dib-doc { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; width: 100%;
   border: 0; background: none; padding: 5px 7px; margin: 0 -7px; border-radius: 8px; cursor: pointer;

@@ -15,13 +15,15 @@ export type PedidoInssStatus = 'aberto' | 'em_andamento' | 'pronto' | 'falhou' |
 export interface PedidoInss {
   id: string; status: PedidoInssStatus; documentos: string[];
   erro: string | null; criadoEm: string; finalizadoEm: string | null;
+  /** Bancos identificados no consignado, ex. "Banco BMG (318)" — elegibilidade. */
+  bancos: string[];
 }
 export interface DocumentoInss {
   id: string; pedidoId: string; titulo: string; caminho: string;
   tamanhoBytes: number | null; criadoEm: string;
 }
 
-interface DbPedido { id: string; status: PedidoInssStatus; documentos: string[] | null; erro: string | null; criado_em: string; finalizado_em: string | null; }
+interface DbPedido { id: string; status: PedidoInssStatus; documentos: string[] | null; erro: string | null; criado_em: string; finalizado_em: string | null; bancos: string[] | null; }
 interface DbDoc { id: string; pedido_id: string; titulo: string; caminho: string; tamanho_bytes: number | null; criado_em: string; }
 
 export function usePedidosInss(contatoId: string | null) {
@@ -32,13 +34,14 @@ export function usePedidosInss(contatoId: string | null) {
     refetchInterval: 15_000,
     queryFn: async (): Promise<PedidoInss[]> => {
       const { data, error } = await supabase!.from('inss_pedidos')
-        .select('id,status,documentos,erro,criado_em,finalizado_em')
+        .select('id,status,documentos,erro,criado_em,finalizado_em,bancos')
         .eq('organizacao_id', currentOrg.id).eq('contato_id', contatoId!)
         .order('criado_em', { ascending: false }).limit(10);
       if (error) throw new Error(error.message);
       return ((data as unknown as DbPedido[]) ?? []).map((r) => ({
         id: r.id, status: r.status, documentos: r.documentos ?? [],
         erro: r.erro, criadoEm: r.criado_em, finalizadoEm: r.finalizado_em,
+        bancos: r.bancos ?? [],
       }));
     },
   });

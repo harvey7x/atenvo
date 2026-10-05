@@ -41,6 +41,8 @@ export function DocumentosInssBox({ contatoId }: { contatoId?: string | null }) 
   const docs = docsQ.data ?? [];
   const atual = pedidos.find((p) => p.status === 'aberto' || p.status === 'em_andamento') ?? null;
   const ultimo = pedidos[0] ?? null;
+  // bancos do consignado: o coletor extrai do PDF e grava no pedido mais recente
+  const bancos = pedidos.find((p) => p.bancos.length)?.bancos ?? [];
   const cpfContato = (contatoQ.data?.cpf ?? '').replace(/\D/g, '');
   const precisaCpf = cpfContato.length !== 11;
   const cpfOk = !precisaCpf || cpfDigitado.replace(/\D/g, '').length === 11;
@@ -72,6 +74,13 @@ export function DocumentosInssBox({ contatoId }: { contatoId?: string | null }) 
   return (
     <div className="dib">
       <div className="dib-h">Documentos do INSS</div>
+
+      {bancos.length > 0 && (
+        <div className="dib-bancos">
+          <div className="dib-bancos-t">Bancos no consignado</div>
+          {bancos.map((b) => <span className="dib-banco" key={b}>{b}</span>)}
+        </div>
+      )}
 
       {docs.length > 0 && (
         <div className="dib-lista">

@@ -18,7 +18,9 @@
 //               inss-docs e registra em inss_documentos (repetir substitui).
 //               SÓ com o pedido em_andamento: concluído não aceita mais upload
 //               (senão a chave vazada reescreveria documentos antigos).
-//   concluir -> { pedido_id, resultado: 'pronto'|'falhou', erro? }
+//   concluir -> { pedido_id, resultado: 'pronto'|'falhou', erro?, bancos? }
+//               bancos = o que o consignado revelou ("Banco BMG (318)", ...),
+//               gravado no pedido e mostrado na ficha do cliente
 //   apagar   -> { pedido_id, caminho } remove UM arquivo do pedido em_andamento
 //               (storage + linha) — manutenção de recoleta
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -179,9 +181,12 @@ Deno.serve(async (req) => {
         return json({ erro: "resultado deve ser 'pronto' ou 'falhou'" }, 400);
       }
       const erro = resultado === 'falhou' && typeof corpo?.erro === 'string' ? corpo.erro.slice(0, 2000) : null;
+      const bancos = Array.isArray(corpo?.bancos)
+        ? (corpo.bancos as unknown[]).filter((b) => typeof b === 'string' && b.trim()).map((b) => String(b).slice(0, 120)).slice(0, 40)
+        : null;
       const { data: upd, error } = await admin
         .from('inss_pedidos')
-        .update({ status: resultado, erro })
+        .update({ status: resultado, erro, ...(bancos && bancos.length ? { bancos } : {}) })
         .eq('id', pedidoId)
         .in('status', ['aberto', 'em_andamento'])
         .select('id');
