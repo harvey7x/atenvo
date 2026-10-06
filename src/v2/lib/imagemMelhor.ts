@@ -2,9 +2,9 @@
    Só tratamento CLÁSSICO — realça o que a câmera captou, não inventa pixel:
      · 'foto'      → níveis automáticos (preto/branco), balanço de branco contido, clareia foto escura,
                      nitidez leve só na luminância (sem acentuar ruído de JPEG)
-     · 'documento' → "modo scanner": estima a iluminação do papel (sombra, vinheta, luz amarela) e
-                     divide por ela → papel branco por igual, tinta escura, CORES preservadas
-                     (carimbo, caneta azul, cabeçalho), + nitidez
+     · 'documento' → corrige a ILUMINAÇÃO do papel (sombra, vinheta, foto escura) com o mesmo fator
+                     nos 3 canais — as cores do documento (fundo de segurança, carimbo, caneta)
+                     ficam como estão; aprofunda o preto da tinta + nitidez leve
    Proibido aqui: super-resolução por IA / "desembaçar" generativo — troca dígito em documento.
    A ampliação de imagem pequena é interpolação comum (bicúbica do navegador), não gera detalhe. */
 
@@ -107,59 +107,64 @@ function melhorarFoto(px: Uint8ClampedArray, w: number, h: number) {
 }
 
 function melhorarDocumento(px: Uint8ClampedArray, w: number, h: number) {
-  // 1. fundo = brilho do PAPEL em cada região: máximo por bloco (a tinta é escura, some no máximo),
-  //    suavizado e ampliado de volta → captura sombra, vinheta e cor da luz
+  // Corrige a ILUMINAÇÃO, não a cor: estima só o brilho do papel em cada região (sombra, vinheta,
+  // flash) e iguala. Cada canal é multiplicado pelo MESMO fator → fundo de segurança, holograma,
+  // brasão e carimbo mantêm a cor. (A 1ª versão dividia cor por cor e levava tudo a branco puro:
+  // apagou o fundo da CNH no 1º teste real, 06/10.)
   const bloco = Math.max(8, Math.round(Math.max(w, h) / 48));
   const bw = Math.ceil(w / bloco), bh = Math.ceil(h / bloco);
-  const fundo = [new Float32Array(bw * bh), new Float32Array(bw * bh), new Float32Array(bw * bh)];
+  const fundo = new Float32Array(bw * bh);
   for (let by = 0; by < bh; by++) for (let bx = 0; bx < bw; bx++) {
-    // p90 aproximado do bloco: média dos 10% mais claros em luminância (menos sensível a reflexo pontual)
-    const lums: number[] = []; const idx: number[] = [];
+    // brilho do papel no bloco = média dos 10% mais claros (a tinta é escura e some)
+    const lums: number[] = [];
     for (let y = by * bloco; y < Math.min(h, (by + 1) * bloco); y += 2) for (let x = bx * bloco; x < Math.min(w, (bx + 1) * bloco); x += 2) {
-      const j = (y * w + x) * 4; lums.push(lum(px[j], px[j + 1], px[j + 2])); idx.push(j);
+      const j = (y * w + x) * 4; lums.push(lum(px[j], px[j + 1], px[j + 2]));
     }
-    const ordem = lums.map((_, i) => i).sort((a, b) => lums[b] - lums[a]).slice(0, Math.max(1, Math.round(lums.length * 0.1)));
-    let r = 0, g = 0, b = 0; for (const k of ordem) { r += px[idx[k]]; g += px[idx[k] + 1]; b += px[idx[k] + 2]; }
-    const q = bx + by * bw; fundo[0][q] = r / ordem.length; fundo[1][q] = g / ordem.length; fundo[2][q] = b / ordem.length;
+    lums.sort((a, b) => b - a);
+    const k = Math.max(1, Math.round(lums.length * 0.1)); let s = 0; for (let q = 0; q < k; q++) s += lums[q];
+    fundo[by * bw + bx] = s / k;
   }
-  const suave = fundo.map((c) => desfoqueCaixa(desfoqueCaixa(c, bw, bh, 1), bw, bh, 1));
-  // nível do PAPEL na foto (p75 dos blocos). Região larga bem mais escura que isso (mesa, faixa colorida,
-  // foto 3×4) NÃO é papel: lá não divide pelo fundo (viraria halo/chiado e apagaria cor) — só clareia por
-  // igual, como no modo foto. Decide por pixel pela luminância DESFOCADA (traço de letra some no desfoque,
-  // mesa não), com raio curto pra transição na borda do papel ser estreita.
-  const lumBloco = Array.from({ length: bw * bh }, (_, q) => lum(suave[0][q], suave[1][q], suave[2][q])).sort((a, b) => a - b);
-  const papel = Math.max(1, lumBloco[Math.floor(lumBloco.length * 0.75)]);
-  // tira o chiado fino (granulação do sensor/JPEG) antes de dividir — a nitidez no fim devolve o contorno
-  const canais = [0, 1, 2].map((c) => {
-    const a = new Float32Array(w * h);
-    for (let i = 0, j = c; i < a.length; i++, j += 4) a[i] = px[j];
-    return desfoqueCaixa(a, w, h, 1);
-  });
-  const raioRegiao = Math.max(3, Math.round(bloco / 4));
-  const Lreg = desfoqueCaixa(desfoqueCaixa(new Float32Array(w * h).map((_, i) => lum(px[i * 4], px[i * 4 + 1], px[i * 4 + 2])), w, h, raioRegiao), w, h, raioRegiao);
-  const clarear = Math.min(1.6, 235 / papel);
-  // 2. divide cada canal pelo fundo (interpolação bilinear) → papel vira branco por igual, cor da tinta fica
-  const amostra = (c: Float32Array, fx: number, fy: number) => {
+  const suave = desfoqueCaixa(desfoqueCaixa(fundo, bw, bh, 1), bw, bh, 1);
+  const ord = Array.from(suave).sort((a, b) => a - b);
+  const papel = Math.max(1, ord[Math.floor(ord.length * 0.75)]);
+  const ALVO = 238;
+  const fatorGlobal = Math.min(1.6, Math.max(1, ALVO / papel));
+  // região larga bem mais escura que o papel (mesa, roupa) não é papel: recebe só o fator global
+  const raio = Math.max(3, Math.round(bloco / 4));
+  const Lreg = desfoqueCaixa(desfoqueCaixa(new Float32Array(w * h).map((_, i) => lum(px[i * 4], px[i * 4 + 1], px[i * 4 + 2])), w, h, raio), w, h, raio);
+  const amostra = (fx: number, fy: number) => {
     const x0 = Math.max(0, Math.min(bw - 1, Math.floor(fx))), y0 = Math.max(0, Math.min(bh - 1, Math.floor(fy)));
     const x1 = Math.min(bw - 1, x0 + 1), y1 = Math.min(bh - 1, y0 + 1);
     const tx = Math.max(0, Math.min(1, fx - x0)), ty = Math.max(0, Math.min(1, fy - y0));
-    return (c[y0 * bw + x0] * (1 - tx) + c[y0 * bw + x1] * tx) * (1 - ty) + (c[y1 * bw + x0] * (1 - tx) + c[y1 * bw + x1] * tx) * ty;
+    return (suave[y0 * bw + x0] * (1 - tx) + suave[y0 * bw + x1] * tx) * (1 - ty) + (suave[y1 * bw + x0] * (1 - tx) + suave[y1 * bw + x1] * tx) * ty;
   };
   for (let y = 0; y < h; y++) {
     const fy = (y + 0.5) / bloco - 0.5;
     for (let x = 0; x < w; x++) {
-      const fx = (x + 0.5) / bloco - 0.5; const i = y * w + x; const j = i * 4;
-      const fs = [amostra(suave[0], fx, fy), amostra(suave[1], fx, fy), amostra(suave[2], fx, fy)];
-      const t = Math.min(1, Math.max(0, (Lreg[i] / papel - 0.45) / 0.2)); // 0 = fora do papel, 1 = papel
-      const peso = t * t * (3 - 2 * t);
-      for (let c = 0; c < 3; c++) {
-        // razão → curva: ≥ 0,9 do fundo vira branco; tinta (≈0,3–0,5) escurece; gama 2 encorpa o texto
-        const r = Math.min(1, (canais[c][i] / Math.max(24, fs[c])) / 0.9);
-        px[j + c] = 255 * Math.pow(r, 2) * peso + Math.min(255, px[j + c] * clarear) * (1 - peso);
-      }
+      const i = y * w + x, j = i * 4;
+      const t = Math.min(1, Math.max(0, (Lreg[i] / papel - 0.45) / 0.2)); const peso = t * t * (3 - 2 * t);
+      const local = Math.min(1.8, Math.max(0.85, ALVO / Math.max(1, amostra((x + 0.5) / bloco - 0.5, fy))));
+      const f = local * peso + fatorGlobal * (1 - peso);
+      px[j] = clamp(px[j] * f); px[j + 1] = clamp(px[j + 1] * f); px[j + 2] = clamp(px[j + 2] * f);
     }
   }
-  nitidez(px, w, h, 0.8, Math.max(1, Math.round(Math.max(w, h) / 1400)), 4);
+  // luz amarelada/azulada: puxa o "branco" (p99 de cada canal) pro neutro, no máx. ±12% — contido
+  // de propósito pra não tingir documento colorido
+  const hr = new Uint32Array(256), hg = new Uint32Array(256), hb = new Uint32Array(256), hl = new Uint32Array(256);
+  for (let j = 0; j < px.length; j += 4) { hr[px[j]]++; hg[px[j + 1]]++; hb[px[j + 2]]++; }
+  const n = w * h, wr = percentil(hr, n, 0.99), wg = percentil(hg, n, 0.99), wb = percentil(hb, n, 0.99), ref = Math.max(wr, wg, wb);
+  const lim = (x: number) => Math.min(1.12, Math.max(0.9, x));
+  const fr = lim(ref / Math.max(1, wr)), fg = lim(ref / Math.max(1, wg)), fb = lim(ref / Math.max(1, wb));
+  for (let j = 0; j < px.length; j += 4) { px[j] = clamp(px[j] * fr); px[j + 1] = clamp(px[j + 1] * fg); px[j + 2] = clamp(px[j + 2] * fb); }
+  // tinta mais firme: só aprofunda o preto (o branco já foi resolvido acima, sem estourar)
+  for (let j = 0; j < px.length; j += 4) hl[Math.round(lum(px[j], px[j + 1], px[j + 2]))]++;
+  const lo = Math.min(50, percentil(hl, w * h, 0.01));
+  if (lo > 4) {
+    const lut = new Uint8ClampedArray(256);
+    for (let v = 0; v < 256; v++) lut[v] = Math.max(0, (v - lo) * 255 / (255 - lo));
+    for (let j = 0; j < px.length; j += 4) { px[j] = lut[px[j]]; px[j + 1] = lut[px[j + 1]]; px[j + 2] = lut[px[j + 2]]; }
+  }
+  nitidez(px, w, h, 0.35, Math.max(1, Math.round(Math.max(w, h) / 1600)), 6);
 }
 
 export async function melhorarImagem(src: string, modo: Exclude<ModoImagem, 'original'>): Promise<{ blob: Blob; largura: number; altura: number; ms: number }> {

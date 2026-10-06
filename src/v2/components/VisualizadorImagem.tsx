@@ -71,7 +71,7 @@ export function VisualizadorImagem({ url, nome, aoFechar }: { url: string; nome?
   }
 
   return (
-    <div className="veu vimg" role="dialog" aria-modal aria-label="Imagem" style={{ background: 'rgba(5, 6, 9, .86)' /* vence o .veu da pele Aurora: foto pede fundo escuro nos 2 temas */ }} onMouseDown={(e) => { if (e.target === e.currentTarget) aoFechar(); }}>
+    <div className="veu vimg" role="dialog" aria-modal aria-label="Imagem" style={{ background: 'rgba(5, 6, 9, .97)', backdropFilter: 'none' /* vence o .veu da pele Aurora: foto pede fundo escuro e opaco nos 2 temas (o véu translúcido deixava a conversa aparecer atrás) */ }} onMouseDown={(e) => { if (e.target === e.currentTarget) aoFechar(); }}>
       <div className="vimg-barra" onMouseDown={(e) => e.stopPropagation()}>
         {!comparando ? (
           <>
