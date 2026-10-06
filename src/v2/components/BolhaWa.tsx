@@ -41,7 +41,7 @@ export const IcBot = () => (
 export function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, optout, aoResponder, aoVerErro, aoRetry, aoRemover, aoLightbox, aoRecarregarAudio }: {
   m: WaMessage; demo: boolean; nomeCliente: string; retryId: string | null; removendoId: string | null; semDestino: boolean; optout: boolean;
   aoResponder: (m: WaMessage) => void; aoVerErro: (m: WaMessage) => void; aoRetry: (m: WaMessage) => void;
-  aoRemover: (m: WaMessage) => void; aoLightbox: (url: string, nome?: string) => void; aoRecarregarAudio: (m: WaMessage) => void;
+  aoRemover: (m: WaMessage) => void; aoLightbox: (url: string, nome?: string, mensagemId?: string) => void; aoRecarregarAudio: (m: WaMessage) => void;
 }) {
   const [urlAssinada, setUrlAssinada] = useState<string | null>(null);
   const [urlErro, setUrlErro] = useState(false);
@@ -109,7 +109,7 @@ export function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, 
       {m.tipo === 'imagem' && (
         (url || demo)
           ? <>
-              {url ? <div className="m-media"><img className="m-img" loading="lazy" src={url} alt="Imagem" title="Ampliar" onClick={() => aoLightbox(url, nomeArquivoMidia(m))} />{btnBaixar}</div> : <div className="audio-ind">Imagem de demonstração</div>}
+              {url ? <div className="m-media"><img className="m-img" loading="lazy" src={url} alt="Imagem" title="Ampliar" onClick={() => aoLightbox(url, nomeArquivoMidia(m), m.id)} />{btnBaixar}</div> : <div className="audio-ind">Imagem de demonstração</div>}
               {m.text && <div className="m-cap"><WaTexto texto={m.text} /></div>}
             </>
           : carregandoMidia ? <div className="audio-ind">Carregando imagem…</div>

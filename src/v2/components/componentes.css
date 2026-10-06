@@ -641,3 +641,11 @@
 .v2 .vimg-moldura { position: relative; flex: 1 1 auto; min-height: 0; width: 100%; display: flex; align-items: center; justify-content: center; }
 .v2 .vimg-moldura .vimg-img { max-width: 100%; }
 @media (max-width: 760px) { .v2 .vimg-comparar { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; } }
+.v2 .vimg-ia-cta { display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: 380px; text-align: center; font-size: 12.5px; color: rgba(255, 255, 255, .72); line-height: 1.45; }
+.v2 .vimg-ia-cta b { color: #fff; font-size: 14px; font-weight: 600; }
+.v2 .vimg-ia-cta .p-btn { margin-top: 6px; }
+.v2 .vimg-ia-aviso { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; margin-bottom: 8px; border-radius: 10px; background: rgba(var(--rubro-rgb), .14); border: 1px solid rgba(var(--rubro-rgb), .35); }
+.v2 .vimg-ia-aviso b { font-size: 12.5px; }
+.v2 .vimg-ok { font-size: 12px; color: var(--verde); }
+.v2 .vimg-spin { width: 22px; height: 22px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .2); border-top-color: #fff; animation: v2-vimg-gira .9s linear infinite; }
+@keyframes v2-vimg-gira { to { transform: rotate(360deg); } }

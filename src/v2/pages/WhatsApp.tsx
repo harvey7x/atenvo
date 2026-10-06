@@ -567,7 +567,7 @@ export default function WhatsAppV2() {
   const [foco, setFoco] = useState(() => { try { return localStorage.getItem(FOCO_KEY) === '1'; } catch { return false; } });
   const [ctxAberto, setCtxAberto] = useState(() => { try { return sessionStorage.getItem('atenvo-wa-ctx') !== '0'; } catch { return true; } });
   useEffect(() => { try { sessionStorage.setItem('atenvo-wa-ctx', ctxAberto ? '1' : '0'); } catch { /* privado */ } }, [ctxAberto]);
-  const [lightbox, setLightbox] = useState<{ url: string; nome?: string } | null>(null);
+  const [lightbox, setLightbox] = useState<{ url: string; nome?: string; mensagemId?: string } | null>(null);
   const [novaConversa, setNovaConversa] = useState(false);
   const [transferirAberto, setTransferirAberto] = useState(false);
   const [vincAberto, setVincAberto] = useState(false);
@@ -1329,7 +1329,7 @@ export default function WhatsAppV2() {
                     aoVerErro={(m) => setVerErro(traduzErroEnvio(m.erro ?? ''))}
                     aoRetry={inbox.retryMsg}
                     aoRemover={(m) => setRemoverAlvo(m)}
-                    aoLightbox={(url, nome) => setLightbox({ url, nome })}
+                    aoLightbox={(url, nome, mensagemId) => setLightbox({ url, nome, mensagemId })}
                     aoRecarregarAudio={async (m) => {
                       if (!WA_REAL || !m.id) return;
                       try { await waRecarregarAudio(currentOrg.id, m.id); await inbox.msgsQ.refetch(); }
@@ -1952,7 +1952,7 @@ export default function WhatsAppV2() {
         enviarEtapa={inbox.scriptEnviarEtapa}
         confirmar={(id) => (demo ? Promise.resolve('enviada' as const) : aguardarConfirmacaoEnvio(id))}
       />
-      {lightbox && <VisualizadorImagem url={lightbox.url} nome={lightbox.nome} aoFechar={() => setLightbox(null)} />}
+      {lightbox && <VisualizadorImagem url={lightbox.url} nome={lightbox.nome} mensagemId={lightbox.mensagemId} contatoId={current?.contatoId ?? null} aoFechar={() => setLightbox(null)} />}
     </div>
   );
 }
