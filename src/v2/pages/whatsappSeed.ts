@@ -36,6 +36,9 @@ export function seedWa(): WaContact[] {
           transcricao: 'Meu nome é Maria Aparecida, eu recebo aposentadoria desde 2019 e vi uns descontos que eu não reconheço.',
           ...( { seconds: 34 } as Partial<WaMessage>),
         }),
+        // fotos "ruins" (escuras, tortas, amareladas) de documentos FICTÍCIOS — vitrine do visualizador com melhoria
+        IN('', '14:38', { tsISO: iso(agora - 4 * min), id: 'wm-5', tipo: 'imagem', localUrl: '/demo-midia/conta-luz-ficticia.jpg', nome: 'conta-luz.jpg', mime: 'image/jpeg' }),
+        IN('', '14:38', { tsISO: iso(agora - 4 * min), id: 'wm-6', tipo: 'imagem', localUrl: '/demo-midia/extrato-ficticio.jpg', nome: 'extrato.jpg', mime: 'image/jpeg' }),
       ],
     },
     {

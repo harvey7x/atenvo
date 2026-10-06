@@ -622,3 +622,22 @@
 /* toggle da IA no cabeçalho: verde quando ligada */
 .v2 .p-btn.ia-on{ background: #1f9d55; border-color: #1f9d55; color: #fff; }
 .v2 .p-btn.ia-on:hover:not(:disabled){ background: #199150; }
+
+/* ---- Visualizador de imagem com melhoria (vimg-) ---- */
+.v2 .veu.vimg { flex-direction: column; gap: 12px; padding: 16px; z-index: 96; }
+.v2 .vimg-barra { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.v2 .vimg-barra .p-btn.vimg-x { font-size: 20px; line-height: 1; color: var(--txt-2); padding: 0 10px; background: rgba(var(--tint), .06); }
+.v2 .vimg-palco { position: relative; flex: 1 1 auto; min-height: 0; width: 100%; display: flex; align-items: center; justify-content: center; }
+.v2 .vimg-img { max-width: min(92vw, 1100px); max-height: 100%; border-radius: 10px; object-fit: contain; transition: opacity .2s var(--ease); box-shadow: 0 10px 40px rgba(0, 0, 0, .35); }
+.v2 .vimg-img.esmaecida { opacity: .45; }
+.v2 .vimg-status { position: absolute; padding: 6px 12px; border-radius: 999px; font-size: 12px; color: var(--txt); background: rgba(var(--tint), .12); backdrop-filter: blur(6px); }
+.v2 .vimg-rodape { font-size: 12px; color: rgba(255, 255, 255, .78); text-align: center; max-width: 720px; }
+.v2 .vimg-meta { color: rgba(255, 255, 255, .5); }
+.v2 .vimg-erro { color: var(--rubro); }
+.v2 .vimg-comparar { flex: 1 1 auto; min-height: 0; width: 100%; max-width: 1400px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.v2 .vimg-lado { margin: 0; min-height: 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.v2 .vimg-lado figcaption { font-size: 13px; font-weight: 600; color: #fff; }
+.v2 .vimg-lado figcaption span { font-weight: 400; color: rgba(255, 255, 255, .6); }
+.v2 .vimg-moldura { position: relative; flex: 1 1 auto; min-height: 0; width: 100%; display: flex; align-items: center; justify-content: center; }
+.v2 .vimg-moldura .vimg-img { max-width: 100%; }
+@media (max-width: 760px) { .v2 .vimg-comparar { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; } }

@@ -41,7 +41,7 @@ export const IcBot = () => (
 export function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, optout, aoResponder, aoVerErro, aoRetry, aoRemover, aoLightbox, aoRecarregarAudio }: {
   m: WaMessage; demo: boolean; nomeCliente: string; retryId: string | null; removendoId: string | null; semDestino: boolean; optout: boolean;
   aoResponder: (m: WaMessage) => void; aoVerErro: (m: WaMessage) => void; aoRetry: (m: WaMessage) => void;
-  aoRemover: (m: WaMessage) => void; aoLightbox: (url: string) => void; aoRecarregarAudio: (m: WaMessage) => void;
+  aoRemover: (m: WaMessage) => void; aoLightbox: (url: string, nome?: string) => void; aoRecarregarAudio: (m: WaMessage) => void;
 }) {
   const [urlAssinada, setUrlAssinada] = useState<string | null>(null);
   const [urlErro, setUrlErro] = useState(false);
@@ -109,7 +109,7 @@ export function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, 
       {m.tipo === 'imagem' && (
         (url || demo)
           ? <>
-              {url ? <div className="m-media"><img className="m-img" loading="lazy" src={url} alt="Imagem" title="Ampliar" onClick={() => aoLightbox(url)} />{btnBaixar}</div> : <div className="audio-ind">Imagem de demonstração</div>}
+              {url ? <div className="m-media"><img className="m-img" loading="lazy" src={url} alt="Imagem" title="Ampliar" onClick={() => aoLightbox(url, nomeArquivoMidia(m))} />{btnBaixar}</div> : <div className="audio-ind">Imagem de demonstração</div>}
               {m.text && <div className="m-cap"><WaTexto texto={m.text} /></div>}
             </>
           : carregandoMidia ? <div className="audio-ind">Carregando imagem…</div>
@@ -230,7 +230,7 @@ export function AudioBolha({ anexoPath, localUrl, segundos, demo, acaoNode }: { 
   const prog = durS > 0 ? pos / durS : 0;
   return (
     <div className="audio2">
-      <button type="button" className="play" title={demo ? 'Áudio de demonstração' : carregando ? 'Carregando…' : tocando ? 'Pausar' : 'Reproduzir'} onClick={toggle} disabled={demo || carregando}>
+      <button type="button" className="play" title={demo && !localUrl ? 'Áudio de demonstração' : carregando ? 'Carregando…' : tocando ? 'Pausar' : 'Reproduzir'} onClick={toggle} disabled={(demo && !localUrl) || carregando}>
         {tocando ? <svg viewBox="0 0 24 24" fill="currentColor" width="10" height="10" aria-hidden><path d="M7 5h3v14H7zM14 5h3v14h-3z" /></svg> : <IcPlay />}
       </button>
       <div className="onda" onClick={(e) => {

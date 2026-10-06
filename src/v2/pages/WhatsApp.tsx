@@ -31,6 +31,7 @@ import { AlertaLeadQuenteModal } from '../components/AlertaLeadQuenteModal';
 import { useInboxWhatsApp, type AvisoInbox } from '../hooks/useInboxWhatsApp';
 import { assinaturaAtendente } from '../hooks/inboxWhatsApp';
 import { AudioRecorderV2 } from '../components/AudioRecorderV2';
+import { VisualizadorImagem } from '../components/VisualizadorImagem';
 import { AgendarMensagemModalV2 } from './AgendarMensagemModalV2';
 import { CLASSE_RAIZ_PORTAL } from '../components/portal';
 import { BotaoMini, BotaoPrimario, BotaoSec, ConfirmDialogV2, EstadoErro, ModalV2, Skeleton } from '../components';
@@ -566,7 +567,7 @@ export default function WhatsAppV2() {
   const [foco, setFoco] = useState(() => { try { return localStorage.getItem(FOCO_KEY) === '1'; } catch { return false; } });
   const [ctxAberto, setCtxAberto] = useState(() => { try { return sessionStorage.getItem('atenvo-wa-ctx') !== '0'; } catch { return true; } });
   useEffect(() => { try { sessionStorage.setItem('atenvo-wa-ctx', ctxAberto ? '1' : '0'); } catch { /* privado */ } }, [ctxAberto]);
-  const [lightbox, setLightbox] = useState<string | null>(null);
+  const [lightbox, setLightbox] = useState<{ url: string; nome?: string } | null>(null);
   const [novaConversa, setNovaConversa] = useState(false);
   const [transferirAberto, setTransferirAberto] = useState(false);
   const [vincAberto, setVincAberto] = useState(false);
@@ -1328,7 +1329,7 @@ export default function WhatsAppV2() {
                     aoVerErro={(m) => setVerErro(traduzErroEnvio(m.erro ?? ''))}
                     aoRetry={inbox.retryMsg}
                     aoRemover={(m) => setRemoverAlvo(m)}
-                    aoLightbox={setLightbox}
+                    aoLightbox={(url, nome) => setLightbox({ url, nome })}
                     aoRecarregarAudio={async (m) => {
                       if (!WA_REAL || !m.id) return;
                       try { await waRecarregarAudio(currentOrg.id, m.id); await inbox.msgsQ.refetch(); }
@@ -1951,12 +1952,7 @@ export default function WhatsAppV2() {
         enviarEtapa={inbox.scriptEnviarEtapa}
         confirmar={(id) => (demo ? Promise.resolve('enviada' as const) : aguardarConfirmacaoEnvio(id))}
       />
-      {lightbox && (
-        <div className="veu" role="dialog" aria-modal onMouseDown={(e) => { if (e.target === e.currentTarget) setLightbox(null); }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 96 }}>
-          <button type="button" aria-label="Fechar" onClick={() => setLightbox(null)} style={{ position: 'fixed', top: 14, right: 18, fontSize: 22, background: 'none', border: 'none', color: 'var(--txt)', cursor: 'pointer' }}>×</button>
-          <img src={lightbox} alt="Imagem ampliada" style={{ maxWidth: '86vw', maxHeight: '86vh', borderRadius: 10 }} />
-        </div>
-      )}
+      {lightbox && <VisualizadorImagem url={lightbox.url} nome={lightbox.nome} aoFechar={() => setLightbox(null)} />}
     </div>
   );
 }

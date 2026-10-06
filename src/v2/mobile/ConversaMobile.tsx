@@ -17,6 +17,7 @@ import { MediaComposer, type MediaTipo } from '@/components/MediaComposer';
 import { ScriptSequenceModal } from '@/components/ScriptSequenceModal';
 import { AgendarMensagemModalV2 } from '../pages/AgendarMensagemModalV2';
 import { AudioRecorderV2 } from '../components/AudioRecorderV2';
+import { VisualizadorImagem } from '../components/VisualizadorImagem';
 import { useScriptsResumoEtapas } from '../hooks/scriptsResumo';
 import { BotaoMini, ConfirmDialogV2, EstadoErro, Skeleton } from '../components';
 import { Bolha } from '../components/BolhaWa';
@@ -87,7 +88,7 @@ export default function ConversaMobile() {
 
   const [draft, setDraft] = useState('');
   const [verTodas, setVerTodas] = useState(false);
-  const [lightbox, setLightbox] = useState<string | null>(null);
+  const [lightbox, setLightbox] = useState<{ url: string; nome?: string } | null>(null);
   const [removerAlvo, setRemoverAlvo] = useState<WaMessage | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const msgsRef = useRef<HTMLDivElement>(null);
@@ -264,7 +265,7 @@ export default function ConversaMobile() {
               aoVerErro={(m) => aoAvisar({ tom: 'erro', texto: traduzErroEnvio(m.erro ?? '') })}
               aoRetry={inbox.retryMsg}
               aoRemover={(m) => setRemoverAlvo(m)}
-              aoLightbox={setLightbox}
+              aoLightbox={(url, nome) => setLightbox({ url, nome })}
               aoRecarregarAudio={async (m) => {
                 if (!WA_REAL || !m.id) return;
                 try { await waRecarregarAudio(currentOrg.id, m.id); await inbox.msgsQ.refetch(); }
@@ -441,12 +442,7 @@ export default function ConversaMobile() {
         }}
         aoCancelar={() => setCancelarAgId(null)}
       />
-      {lightbox && (
-        <div className="veu" role="dialog" aria-modal onMouseDown={(e) => { if (e.target === e.currentTarget) setLightbox(null); }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 96 }}>
-          <button type="button" aria-label="Fechar" onClick={() => setLightbox(null)} style={{ position: 'fixed', top: 14, right: 18, fontSize: 22, background: 'none', border: 'none', color: 'var(--txt)', cursor: 'pointer' }}>×</button>
-          <img src={lightbox} alt="Imagem ampliada" style={{ maxWidth: '92vw', maxHeight: '86vh', borderRadius: 10 }} />
-        </div>
-      )}
+      {lightbox && <VisualizadorImagem url={lightbox.url} nome={lightbox.nome} aoFechar={() => setLightbox(null)} />}
     </>
   );
 }

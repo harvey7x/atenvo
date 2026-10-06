@@ -33,12 +33,14 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        // limpador de áudio (≈4,8 MB, wasm embutido) é carregado sob demanda quando alguém grava — fora do precache
+        globIgnores: ['rnnoise/**', 'demo-midia/**'],
         // o chunk de entrada tem ~1,3 MB — o teto default do Workbox (2 MiB) dropa
         // arquivos maiores DO PRECACHE EM SILÊNCIO; 3 MiB dá folga p/ crescimento.
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [
-          /^\/assets\//, /^\/opus\//, /^\/icons\//,
+          /^\/assets\//, /^\/opus\//, /^\/rnnoise\//, /^\/icons\//,
           /^\/sw\.js$/, /^\/manifest\.webmanifest$/, /^\/favicon\.svg$/,
         ],
         skipWaiting: true,

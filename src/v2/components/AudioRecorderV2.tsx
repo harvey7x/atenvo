@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { transcodificarParaOggOpus } from '../lib/oggOpus';
+import { limparAudio, preaquecerLimpeza, type ResumoLimpeza } from '../lib/audioLimpo';
+import { Segmentado } from './Segmentado';
 import './componentes.css';
 
 /* Pele Platina do gravador de áudio do composer.
@@ -38,6 +40,10 @@ export function escolherMime(): string {
   return '';
 }
 const baseMime = (m: string) => (m.split(';')[0] || 'audio/webm');
+// preferência do atendente (por navegador): ouvir/enviar a versão limpa. Padrão: ligada.
+const LIMPO_KEY = 'atenvo-audio-limpo';
+const lerUsarLimpo = () => { try { return localStorage.getItem(LIMPO_KEY) !== '0'; } catch { return true; } };
+type Limpeza = { estado: 'limpando'; p: number } | { estado: 'pronto'; blob: Blob; url: string; resumo: ResumoLimpeza } | { estado: 'falhou' };
 const mmss = (s: number) => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
 export const SINAL_MIN = 0.03; // pico normalizado mínimo p/ considerar que houve som
 
@@ -66,6 +72,9 @@ export function AudioRecorderV2({ disabled, onEnviar, permitirArquivo, rotuloEnv
   const [deviceId, setDeviceId] = useState<string>('');
   const [info, setInfo] = useState<{ mime: string; size: number; dur: number; sinal: boolean; verificando?: boolean; rms?: number } | null>(null);
   const [picoVivo, setPicoVivo] = useState(0); // maior nível visto na gravação atual (p/ avisar "sem sinal")
+  const [limpeza, setLimpeza] = useState<Limpeza | null>(null);   // versão limpa da GRAVAÇÃO (arquivo anexado não passa)
+  const [usarLimpo, setUsarLimpo] = useState(lerUsarLimpo);
+  const limpezaSeqRef = useRef(0);                                // descarta resultado de gravação antiga
 
   const streamRef = useRef<MediaStream | null>(null);
   const recRef = useRef<MediaRecorder | null>(null);
@@ -92,7 +101,26 @@ export function AudioRecorderV2({ disabled, onEnviar, permitirArquivo, rotuloEnv
     if (acRef.current) { try { acRef.current.close(); } catch { /* ignore */ } acRef.current = null; }
   }
   function pararTracks() { streamRef.current?.getTracks().forEach((t) => t.stop()); streamRef.current = null; }
-  function limparPreview() { setPreviewUrl((u) => { if (u) URL.revokeObjectURL(u); return null; }); }
+  function descartarLimpeza() {
+    limpezaSeqRef.current++;
+    setLimpeza((l) => { if (l?.estado === 'pronto') URL.revokeObjectURL(l.url); return null; });
+  }
+  function limparPreview() { setPreviewUrl((u) => { if (u) URL.revokeObjectURL(u); return null; }); descartarLimpeza(); }
+  // roda a limpeza sobre o arquivo JÁ gravado (a captura não é tocada); falha → fica o original
+  function gerarLimpeza(blob: Blob) {
+    const seq = ++limpezaSeqRef.current;
+    setLimpeza({ estado: 'limpando', p: 0 });
+    limparAudio(blob, (p) => { if (seq === limpezaSeqRef.current) setLimpeza({ estado: 'limpando', p }); })
+      .then(({ blob: b, resumo }) => {
+        if (seq !== limpezaSeqRef.current) return;
+        setLimpeza({ estado: 'pronto', blob: b, url: URL.createObjectURL(b), resumo });
+      })
+      .catch(() => { if (seq === limpezaSeqRef.current) setLimpeza({ estado: 'falhou' }); });
+  }
+  function escolherVersao(v: 'limpo' | 'original') {
+    const on = v === 'limpo'; setUsarLimpo(on);
+    try { localStorage.setItem(LIMPO_KEY, on ? '1' : '0'); } catch { /* ignore */ }
+  }
 
   useEffect(() => {
     const onUnload = () => pararTracks();
@@ -154,7 +182,10 @@ export function AudioRecorderV2({ disabled, onEnviar, permitirArquivo, rotuloEnv
     correlationRef.current = (crypto as { randomUUID?: () => string }).randomUUID?.() ?? String(Date.now()); diagRef.current = null;
     let stream: MediaStream;
     try {
-      stream = await md.getUserMedia({ audio: idDispositivo ? { deviceId: { exact: idDispositivo } } : true }); // só após o clique
+      // tratamentos do PRÓPRIO navegador pedidos explicitamente (eco, ruído, ganho) — o Chrome já liga por
+      // padrão; deixar explícito garante o mesmo nos demais. A limpeza pesada vem depois, no arquivo.
+      const trat = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+      stream = await md.getUserMedia({ audio: idDispositivo ? { deviceId: { exact: idDispositivo }, ...trat } : trat }); // só após o clique
     } catch (e) {
       const n = (e as DOMException).name;
       const msg = n === 'NotAllowedError' || n === 'SecurityError' ? 'Permissão de microfone negada.'
@@ -174,6 +205,7 @@ export function AudioRecorderV2({ disabled, onEnviar, permitirArquivo, rotuloEnv
     // Sem medidor no iOS a gravação fica intocada; a checagem anti-mudo passa a ser
     // só a do ARQUIVO (medirBlob), que é a verdade final de qualquer jeito.
     if (!ehIOS()) montarMedidor(stream);
+    preaquecerLimpeza();                                     // carrega o removedor de ruído enquanto a pessoa fala
     const mime = escolherMime(); mimeRef.current = mime;
     let rec: MediaRecorder;
     try { rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined); }
@@ -201,6 +233,7 @@ export function AudioRecorderV2({ disabled, onEnviar, permitirArquivo, rotuloEnv
       setInfo({ mime: tipo, size: blob.size, dur: 0, sinal: sinalInicial(!ehIOS(), maxNivelRef.current), verificando: true });
       setEstado('preview');
       void medirBlob(blob, tipo);                              // verdade absoluta: o arquivo gravado tem som?
+      gerarLimpeza(blob);
     };
     rec.onerror = () => { pararMedidor(); pararTracks(); pararTimer(); setEstado('error'); setErro('Erro durante a gravação.'); };
     // iOS: timeslice de 1s → ondataavailable periódico (o WebKit já PERDEU gravações
@@ -236,19 +269,21 @@ export function AudioRecorderV2({ disabled, onEnviar, permitirArquivo, rotuloEnv
     const blob = blobRef.current; if (!blob) return;
     if (!info || info.verificando || !info.sinal) { setErro('Nenhum som foi detectado. Verifique o microfone selecionado.'); return; }
     enviandoRef.current = true;
-    let envioBlob = blob;
-    let mime = baseMime(mimeRef.current || blob.type || 'audio/webm');
+    const limpo = usarLimpo && limpeza?.estado === 'pronto' ? limpeza : null;
+    let envioBlob: Blob = limpo ? limpo.blob : blob;
+    let mime = limpo ? 'audio/wav' : baseMime(mimeRef.current || blob.type || 'audio/webm');
     let ext = EXT[mime] ?? 'm4a';
     setEstado('sending'); setErro(null);
     // GRAVAÇÃO vira ogg/opus DE VERDADE antes do envio: no WhatsApp oficial (Cloud API) só esse
     // codec entrega — m4a/mp4 é aceito no upload e falha assíncrono ("Media upload error").
     // Arquivo anexado segue como está (mídia comum, por design). Se a conversão falhar,
     // cai no comportamento antigo (registrado no diag) em vez de bloquear o envio.
-    const diag = { ...(diagRef.current ?? {}) };
+    const diag: Record<string, unknown> = { ...(diagRef.current ?? {}) };
+    if (limpo) diag.limpeza = limpo.resumo;
     if (diag.origem !== 'arquivo_anexado' && mime !== 'audio/ogg') {
       try {
-        const ogg = await transcodificarParaOggOpus(blob);
-        diag.transcode = { de: mime, para: 'audio/ogg', bytes_antes: blob.size, bytes_depois: ogg.size };
+        const ogg = await transcodificarParaOggOpus(envioBlob);
+        diag.transcode = { de: mime, para: 'audio/ogg', bytes_antes: envioBlob.size, bytes_depois: ogg.size };
         envioBlob = ogg; mime = 'audio/ogg'; ext = 'ogg';
       } catch (e) {
         diag.transcode_erro = String((e as Error)?.message ?? e);
@@ -321,7 +356,13 @@ export function AudioRecorderV2({ disabled, onEnviar, permitirArquivo, rotuloEnv
 
       {estado === 'preview' && previewUrl && (
         <>
-          <audio className="arec-preview" controls src={previewUrl} onLoadedMetadata={(e) => { const d = (e.currentTarget as HTMLAudioElement).duration; setInfo((x) => x ? { ...x, dur: isFinite(d) ? d : x.dur } : x); }} />
+          {limpeza && (
+            <Segmentado<'limpo' | 'original'>
+              rotulo="Versão do áudio" valor={usarLimpo ? 'limpo' : 'original'} aoMudar={escolherVersao}
+              opcoes={[{ valor: 'limpo', rotulo: limpeza.estado === 'limpando' ? `Limpando${limpeza.p > 0.05 ? ` ${Math.round(limpeza.p * 100)}%` : '…'}` : 'Limpo' }, { valor: 'original', rotulo: 'Original' }]}
+            />
+          )}
+          <audio className="arec-preview" controls src={usarLimpo && limpeza?.estado === 'pronto' ? limpeza.url : previewUrl} onLoadedMetadata={(e) => { const d = (e.currentTarget as HTMLAudioElement).duration; setInfo((x) => x ? { ...x, dur: isFinite(d) ? d : x.dur } : x); }} />
           <span className="arec-meta">{info ? `${info.dur ? mmss(info.dur) + ' · ' : ''}${baseMime(info.mime)} · ${(info.size / 1024).toFixed(0)} KB` : ''}</span>
           {info?.verificando && <span className="arec-meta">verificando o áudio…</span>}
           {info && !info.verificando && !info.sinal && <span className="arec-erro">Nenhum som no áudio gravado. Troque o microfone e regrave.</span>}
@@ -329,10 +370,16 @@ export function AudioRecorderV2({ disabled, onEnviar, permitirArquivo, rotuloEnv
               é aviso neutro — afirmar ✓ num arquivo não-verificável enganava o atendente */}
           {info && !info.verificando && info.sinal && info.rms !== undefined && <span className="arec-sinal">✓ som no áudio</span>}
           {info && !info.verificando && info.sinal && info.rms === undefined && <span className="arec-meta">não deu pra verificar o som — ouça o preview antes de enviar</span>}
+          {usarLimpo && limpeza?.estado === 'pronto' && limpeza.resumo.falaRuidoDepoisDb > limpeza.resumo.falaRuidoAntesDb && (
+            <span className="arec-sinal" title={`Distância entre a voz e o ruído de fundo: ${limpeza.resumo.falaRuidoAntesDb} dB → ${limpeza.resumo.falaRuidoDepoisDb} dB`}>
+              ruído −{limpeza.resumo.falaRuidoDepoisDb - limpeza.resumo.falaRuidoAntesDb} dB
+            </span>
+          )}
+          {usarLimpo && limpeza?.estado === 'falhou' && <span className="arec-meta">não deu pra limpar — vai o original</span>}
           {seletorMic}
           <button type="button" className="p-btn btn-mini arec-ghost" onClick={() => iniciar(deviceId || undefined)} title="Gravar novamente">Regravar</button>
           <button type="button" className="p-btn btn-mini arec-ghost" onClick={cancelar} title="Apagar">Apagar</button>
-          <button type="button" className="p-btn btn-pri btn-mini" disabled={!info || info.verificando || !info.sinal} onClick={enviar} title={rotuloEnviar ?? 'Enviar áudio'}>{rotuloEnviar ?? 'Enviar'}</button>
+          <button type="button" className="p-btn btn-pri btn-mini" disabled={!info || info.verificando || !info.sinal || (usarLimpo && limpeza?.estado === 'limpando')} onClick={enviar} title={rotuloEnviar ?? 'Enviar áudio'}>{rotuloEnviar ?? 'Enviar'}</button>
         </>
       )}
 

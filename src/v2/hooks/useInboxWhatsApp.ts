@@ -362,12 +362,19 @@ export function useInboxWhatsApp(opts: {
   }, [dispararMidia]);
   const enviarAudio = useCallback(async (blob: Blob, mime: string, ext: string, diag?: Record<string, unknown>) => {
     if (!blob || !blob.size) throw new Error('Áudio vazio. Grave novamente.');   // tolera blob nulo (v1 L760)
-    if (!WA_REAL) { guardaMidia(); aoAvisar({ tom: 'ok', texto: 'Mensagem enviada' }); return; }
+    if (!WA_REAL) {
+      guardaMidia();
+      // demo: a bolha toca o áudio EXATAMENTE como sairia (já limpo + convertido) — dá pra conferir o resultado
+      const now = new Date();
+      const hh = ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
+      setContacts((cur) => aplicarEnvioOtimista(cur, currentId, { dir: 'out', tipo: 'audio', time: hh, tsISO: now.toISOString(), status: 'entregue', cid: novoCid(now.getTime()), localUrl: URL.createObjectURL(blob), mime, tamanho: blob.size }, '🎤 Áudio'));
+      aoAvisar({ tom: 'ok', texto: 'Mensagem enviada' }); return;
+    }
     const file = new File([blob], `audio.${ext}`, { type: mime });
     const origemAudio = diag?.origem === 'arquivo_anexado' ? 'arquivo_anexado' : 'gravacao_painel';
     dispararMidia('audio', file, '', { audioDiag: diag, origemAudio });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dispararMidia]);
+  }, [dispararMidia, currentId]);
   const enviarDocumento = useCallback(async (file: File, caption: string) => {
     if (!WA_REAL) { guardaMidia(); aoAvisar({ tom: 'ok', texto: 'Mensagem enviada' }); return; }
     dispararMidia('documento', file, caption);
