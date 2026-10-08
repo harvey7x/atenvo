@@ -56,6 +56,7 @@ const GRUPOS: { rotulo: string; itens: ItemNav[] }[] = [
       // Facebook e Disparo fora do menu (pedido do dono 27/08) — rotas seguem vivas por URL
       { slug: 'kanban', rotulo: 'Kanban' },
       { slug: 'recuperacao', rotulo: 'Recuperação' },
+      { slug: 'pendencias', rotulo: 'Pendências' },
       { slug: 'agendamentos', rotulo: 'Agendamentos' },
     ],
   },

@@ -57,6 +57,10 @@ export const ICONES: Record<string, ReactNode> = {
   recuperacao: (
     <Ic><path d="M3 12a9 9 0 0 1 15-6.7L21 8" /><path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-15 6.7L3 16" /><path d="M3 21v-5h5" /></Ic>
   ),
+  // Pendências do processo: prancheta com marca (o que falta o cliente mandar/assinar)
+  pendencias: (
+    <Ic><rect x="5" y="4" width="14" height="17" rx="2.2" /><path d="M9 4V3h6v1" /><path d="M8.5 11h7M8.5 15h4.5" /></Ic>
+  ),
   // Simulador de Valores: calculadora (corpo + visor + teclas em pontos)
   simulador: (
     <Ic><rect x="5" y="3" width="14" height="18" rx="2.2" /><path d="M8.5 7.5h7" /><path strokeLinecap="round" d="M8.5 12h.01M12 12h.01M15.5 12h.01M8.5 15h.01M12 15h.01M15.5 15h.01M8.5 18h.01M12 18h.01M15.5 18h.01" /></Ic>
