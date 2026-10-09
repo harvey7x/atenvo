@@ -3,8 +3,8 @@
 import { useMemo } from 'react';
 import { DEMO_MODE } from '@/lib/demo';
 import {
-  pendAcoes, usePendDemo, usuarioAtual,
-  type AjustesPendencias, type Bloco, type ClienteFechado, type Modelo, type Passo, type Pendencia, type TipoPendencia,
+  clienteCasaBusca, pendAcoes, usePendDemo, usuarioAtual,
+  type AjustesPendencias, type Bloco, type ChecagemNumero, type ClienteFechado, type DadosNovaPendencia, type Modelo, type Passo, type Pendencia,
 } from '@/data/pendencias';
 import { erroAmigavel, rpcPend, subirArquivoPend, useClientesFechados, usePendReal } from '@/data/pendenciasReal';
 
@@ -24,8 +24,12 @@ export interface Fonte {
   /** admin: muda os Ajustes. gestor (administrador ou supervisor): exclui mensagem pronta. */
   usuario: { id: string; nome: string; admin: boolean; gestor: boolean };
   cliente: (id: string) => ClienteFechado;
+  /** Nova pendência por número (cliente fora do sistema): o número é válido? já é de algum contato? Só leitura. */
+  checarNumero: (tel: string) => Promise<ChecagemNumero>;
   acoes: {
-    criar: (d: { clienteId: string; tipo: TipoPendencia; oQue: string; prazo?: string; processo?: string; passos: Passo[]; agendarPara?: string }) => Promise<string>;
+    criar: (d: { clienteId: string } & DadosNovaPendencia) => Promise<string>;
+    /** cadastra o cliente pelo número + nome (ou usa quem já tem o número) e abre a pendência */
+    criarNumero: (d: { nome: string; telefone: string } & DadosNovaPendencia) => Promise<string>;
     resolver: (id: string) => Promise<void>;
     reabrir: (id: string) => Promise<void>;
     pausar: (id: string, v: boolean) => Promise<void>;
@@ -46,6 +50,8 @@ const SEM_CLIENTE: ClienteFechado = { id: '', nome: 'CLIENTE', telefone: '', pro
  *  clique de um duplo clique cai nele (desabilitado), e não no botão que aparece embaixo quando a
  *  tela cheia fecha na hora (ex.: "Nova pendência" atrás do "Salvar"/"Enviar" do topo). */
 const ESPERA_DEMO_MS = 400;
+/** a conferência do número também demora um pouco (o "Conferindo…" aparece como no real) */
+const ESPERA_CHECAR_MS = 250;
 function comEspera(a: Fonte['acoes']): Fonte['acoes'] {
   const r: Record<string, unknown> = {};
   for (const [k, f] of Object.entries(a)) {
@@ -64,8 +70,10 @@ function useFonteDemo(): Fonte {
     pendencias: e.pendencias, modelos: e.modelos, ajustes: e.ajustes, canais: [], motorNovo: true,
     usuario: { id: 'demo', nome: usuarioAtual(), admin: true, gestor: true },
     cliente: (id) => e.clientes.find((c) => c.id === id) ?? SEM_CLIENTE,
+    checarNumero: async (tel) => { await new Promise((ok) => setTimeout(ok, ESPERA_CHECAR_MS)); return pendAcoes.checarNumero(tel); },
     acoes: comEspera({
       criar: async (d) => pendAcoes.criar(d).id,
+      criarNumero: async (d) => pendAcoes.criarNumero(d).id,
       resolver: async (id) => pendAcoes.resolver(id),
       reabrir: async (id) => pendAcoes.reabrir(id),
       pausar: async (id, v) => pendAcoes.pausar(id, v),
@@ -92,8 +100,9 @@ function useFonteReal(): Fonte {
       ajustes: d?.ajustes ?? { numero: { nome: '—', telefone: '', conectado: false }, ativo: false, diasUteis: true, janelaIni: '09:00', janelaFim: '19:00', limiteDia: 40, avisarResponsavel: true },
       usuario: q.usuario,
       cliente: (id) => mapa.get(id) ?? SEM_CLIENTE,
+      checarNumero: rpcPend.checarNumero,
       acoes: {
-        criar: depois(rpcPend.criar), resolver: depois(rpcPend.resolver), reabrir: depois(rpcPend.reabrir),
+        criar: depois(rpcPend.criar), criarNumero: depois(rpcPend.criarNumero), resolver: depois(rpcPend.resolver), reabrir: depois(rpcPend.reabrir),
         pausar: depois(rpcPend.pausar), lembretes: depois(rpcPend.lembretes), enviarAgora: depois(rpcPend.enviarAgora),
         salvarModelo: depois(rpcPend.salvarModelo), excluirModelo: depois(rpcPend.excluirModelo), salvarAjustes: depois(rpcPend.salvarAjustes),
       },
@@ -107,17 +116,18 @@ function useFonteReal(): Fonte {
 /* DEMO_MODE é constante de build: a ordem dos hooks nunca muda. */
 export const useFonte: () => Fonte = DEMO_MODE ? useFonteDemo : useFonteReal;
 
-/** busca de clientes fechados (Nova pendência) */
+/** busca de clientes da Nova pendência: fechados + quem já tem pendência (cadastrado por número) */
 export function useBuscaClientes(busca: string): { lista: ClienteBusca[]; carregando: boolean } {
   if (DEMO_MODE) {
     // eslint-disable-next-line react-hooks/rules-of-hooks
     const e = usePendDemo();
     // eslint-disable-next-line react-hooks/rules-of-hooks
     return useMemo(() => {
-      /* = pendencias_clientes_fechados: nome, ou telefone com 4+ dígitos (não procura por processo) */
-      const q = busca.trim().toLowerCase(); const dg = q.replace(/\D/g, '');
+      /* = pendencias_clientes_fechados: nome, ou telefone (pedaço com 4+ dígitos, ou o número inteiro pela
+         chave canônica). Não procura por processo. e.clientes já é quem fechou + quem ganhou pendência
+         pelo número (o store move o contato junto) */
       const lista = e.clientes
-        .filter((c) => !q || c.nome.toLowerCase().includes(q) || (dg.length >= 4 && c.telefone.replace(/\D/g, '').includes(dg)))
+        .filter((c) => clienteCasaBusca(c, busca))
         .map((c) => ({ ...c, abertas: e.pendencias.filter((p) => p.clienteId === c.id && p.status !== 'resolvida').length }));
       return { lista, carregando: false };
     }, [e, busca]);

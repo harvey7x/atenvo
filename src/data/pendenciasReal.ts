@@ -9,15 +9,16 @@ import { useAuth } from '@/context/AuthContext';
 import { subirMidiaWa } from '@/data/whatsapp';
 import { transcodificarParaOggOpus } from '@/v2/lib/oggOpus';
 import {
-  ordenarPassos,
-  type AjustesPendencias, type Bloco, type ClienteFechado, type Modelo, type Passo, type Pendencia, type PassoPendencia,
-  type StatusPendencia, type TipoPendencia,
+  ordenarPassos, telefoneTela,
+  type AjustesPendencias, type Bloco, type ChecagemNumero, type ClienteFechado, type DadosNovaPendencia, type Modelo, type Passo,
+  type Pendencia, type PassoPendencia, type StatusPendencia, type TipoPendencia,
 } from './pendencias';
 
 type Row = Record<string, unknown>;
+const formatarFone = telefoneTela;
 type BlocoDb = { tipo: Bloco['tipo']; texto?: string; storage_path?: string; mime?: string; nome?: string; tamanho?: number; duracao?: number };
 
-/* Códigos das RPCs (raise exception das migrations 20261008160000 + 20261008190000) → frase para a tela. */
+/* Códigos das RPCs (raise exception das migrations 20261008160000 + 20261008190000 + número fora do sistema) → frase para a tela. */
 export const ERROS: Record<string, string> = {
   sem_acesso: 'Você não tem acesso a esta organização.',
   contato_invalido: 'Cliente não encontrado.',
@@ -50,6 +51,9 @@ export const ERROS: Record<string, string> = {
   ligar_sem_numero: 'Escolha o número antes de ligar os envios.',
   numero_desconectado: 'O número está desconectado. Reconecte em Integrações para ligar os envios.',
   canal_invalido: 'Esse número não pode ser usado nas pendências.',
+  nome_invalido: 'O nome do cliente precisa ter letras (de 2 a 80 caracteres).',
+  telefone_invalido: 'Número de WhatsApp inválido. Confira o DDD e o número.',
+  contato_mesclado: 'Esse cadastro foi unido a outro. Atualize a página e escolha o cliente de novo.',
 };
 /* erros do Postgres que não são código nosso (frase inteira, procurada por trecho) */
 const ERROS_PG: [string, string][] = [
@@ -167,7 +171,11 @@ export function usePendReal() {
     },
   });
   const qc = useQueryClient();
-  const recarregar = () => qc.invalidateQueries({ queryKey: ['pendencias', org] });
+  /* a busca da Nova pendência também: cliente cadastrado por número passa a aparecer nela */
+  const recarregar = () => Promise.all([
+    qc.invalidateQueries({ queryKey: ['pendencias', org] }),
+    qc.invalidateQueries({ queryKey: ['pend-fechados', org] }),
+  ]);
   const { admin, gestor } = permissoesPend(currentOrg?.role);
   return { ...q, org, usuario: { id: user?.id ?? '', nome: (user?.name ?? '').split(/\s+/)[0], admin, gestor }, recarregar };
 }
@@ -183,7 +191,8 @@ export function detectarMotorNovo(linhas: Row[], sondagemOk: boolean) {
   return linhas.length ? 'lembrar_desde' in linhas[0] : sondagemOk;
 }
 
-/** busca de clientes FECHADOS (oportunidade ganha) para abrir pendência */
+/** busca de clientes para abrir pendência: quem FECHOU (oportunidade ganha) e quem já tem pendência
+ *  (cadastrado por número). Os sem oportunidade ganha vêm com servico = null. */
 export function useClientesFechados(busca: string, ativo: boolean) {
   const { currentOrg } = useOrg();
   return useQuery({
@@ -202,14 +211,42 @@ export function useClientesFechados(busca: string, ativo: boolean) {
   });
 }
 
+/** resposta de pendencias_checar_numero → tela (nome em maiúsculas e telefone formatado, como o resto da aba) */
+export function lerChecagem(v: unknown): ChecagemNumero {
+  const r = (v && typeof v === 'object' ? v : {}) as Row;
+  const c = (r.contato && typeof r.contato === 'object' ? r.contato : null) as Row | null;
+  return {
+    valido: r.valido === true,
+    telefone: (r.telefone as string) || null,
+    contato: c?.id ? {
+      /* sem nome fica '' (não 'Cliente'): a tela vê que o contato não tem nome e pede (contatoSemNome) */
+      id: c.id as string, nome: ((c.nome as string) || '').trim().toUpperCase(), telefone: formatarFone((c.telefone as string) || ''),
+      fechado: c.fechado === true, responsavel: ((c.responsavel_nome as string) || '').split(/\s+/)[0], temPendencia: c.tem_pendencia === true,
+    } : null,
+  };
+}
+const camposCriar = (p: DadosNovaPendencia) => ({
+  p_tipo: p.tipo, p_o_que: p.oQue, p_prazo: p.prazo ? p.prazo.slice(0, 10) : null,
+  p_processo: p.processo || null, p_passos: paraPassosDb(p.passos), p_iniciar_em: p.agendarPara ?? null,
+});
+
 export const rpcPend = {
-  async criar(p: { clienteId: string; tipo: TipoPendencia; oQue: string; prazo?: string; processo?: string; passos: Passo[]; agendarPara?: string }) {
-    const { data, error } = await supabase!.rpc('pendencia_criar', {
-      p_contato: p.clienteId, p_tipo: p.tipo, p_o_que: p.oQue, p_prazo: p.prazo ? p.prazo.slice(0, 10) : null,
-      p_processo: p.processo || null, p_passos: paraPassosDb(p.passos), p_iniciar_em: p.agendarPara ?? null,
-    });
+  async criar(p: { clienteId: string } & DadosNovaPendencia) {
+    const { data, error } = await supabase!.rpc('pendencia_criar', { p_contato: p.clienteId, ...camposCriar(p) });
     if (error) throw new Error(error.message);
     return data as string;
+  },
+  /** cliente que não está no sistema: cadastra (ou reaproveita quem já tem o número) e abre a pendência */
+  async criarNumero(p: { nome: string; telefone: string } & DadosNovaPendencia) {
+    const { data, error } = await supabase!.rpc('pendencia_criar_numero', { p_nome: p.nome, p_telefone: p.telefone, ...camposCriar(p) });
+    if (error) throw new Error(error.message);
+    return data as string;
+  },
+  /** só leitura: o número é válido? já é de algum contato? */
+  async checarNumero(tel: string) {
+    const { data, error } = await supabase!.rpc('pendencias_checar_numero', { p_telefone: tel });
+    if (error) throw new Error(error.message);
+    return lerChecagem(data);
   },
   async resolver(id: string) { const { error } = await supabase!.rpc('pendencia_resolver', { p_id: id }); if (error) throw new Error(error.message); },
   async reabrir(id: string) { const { error } = await supabase!.rpc('pendencia_reabrir', { p_id: id }); if (error) throw new Error(error.message); },
@@ -327,12 +364,6 @@ function maiorData(a?: string | null, b?: string | null) {
   return new Date(a).getTime() >= new Date(b).getTime() ? a : b;
 }
 
-function formatarFone(t: string) {
-  const d = t.replace(/\D/g, '').replace(/^55(?=\d{10,11}$)/, '');
-  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
-  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
-  return t;
-}
 function rotuloServico(s?: string) {
   if (!s) return '';
   return s.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());

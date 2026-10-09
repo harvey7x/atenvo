@@ -2,10 +2,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   dataPrevista, estadoDemo, instanteLembrete, limiteDiaValido, ordenarPassos, pendAcoes, podeMandarAgora, podeMudarLembretes, preencher,
   previsaoSaida, proximaJanela, rotuloEnvio, travaEnvios, variavelSemDado, entregues, envioFalhou,
+  chaveTelefone, contatoElegivel, iniciais, limparNome, mascaraTelefone, nomeClienteValido, normalizarTelefone, telefoneTela,
+  celularSemNove, clienteCasaBusca, contatoSemNome, digitosAntes, digitosLocais, editarTelefone, posAposDigitos, primeiroNomeMsg,
+  problemaNome, telefoneEstrangeiro, apagarSinal,
   type AjustesPendencias, type Pendencia, type PassoPendencia,
 } from './pendencias';
 import {
-  ERROS, baseLembretesDe, detectarMotorNovo, entregaDoPasso, erroAmigavel, montarPassos, permissoesPend, textoResposta, type LinhaFila,
+  ERROS, baseLembretesDe, detectarMotorNovo, entregaDoPasso, erroAmigavel, lerChecagem, montarPassos, permissoesPend, textoResposta, type LinhaFila,
 } from './pendenciasReal';
 
 const J = { janelaIni: '09:00', janelaFim: '19:00', diasUteis: true };
@@ -210,7 +213,7 @@ describe('erros das RPCs (migrations 20261008160000 + 20261008190000)', () => {
     'pendencia_resolvida', 'modo_invalido', 'passos_invalidos', 'passos_demais', 'passo_muito_longo', 'texto_muito_longo', 'o_que_vazio',
     'sem_mensagem', 'contato_invalido', 'pendencia_nao_encontrada', 'tipo_invalido', 'so_admin', 'janela_invalida', 'passo_vazio',
     'passo_ficou_vazio', 'sem_acesso', 'hora_invalida', 'mime_incompativel', 'midia_path_invalido', 'arquivo_muito_grande', 'texto_vazio',
-    'sem_numero_pendencias', 'numero_pendencias_invalido', 'contato_sem_telefone', 'cliente_nao_fechado'];
+    'sem_numero_pendencias', 'numero_pendencias_invalido', 'contato_sem_telefone', 'cliente_nao_fechado', 'nome_invalido', 'telefone_invalido', 'contato_mesclado'];
   it('todo código tem frase própria', () => {
     for (const c of CODIGOS) {
       expect(ERROS[c], c).toBeTruthy();
@@ -312,5 +315,283 @@ describe('demonstração = motor novo', () => {
     expect(d.passos[d.passos.length - 1]).toMatchObject({ avulso: true, estado: 'enviado' });
     const res = estadoDemo().pendencias.find((p) => p.status === 'resolvida')!;
     expect(() => pendAcoes.enviarAgora(res.id, [{ id: 'b', tipo: 'texto', texto: 'oi' }])).toThrow('pendencia_resolvida');
+  });
+});
+
+describe('cliente fora do sistema: telefone e nome (= pend_normalizar_telefone / pendencia_criar_numero)', () => {
+  it('normaliza: só dígitos; 10/11 ganham o 55; 12/13 com 55 ficam; DDD 11..99', () => {
+    expect(normalizarTelefone('(51) 99488-3071')).toBe('5551994883071');
+    expect(normalizarTelefone('51 9948-8307')).toBe('555199488307');
+    expect(normalizarTelefone('+55 51 99488-3071')).toBe('5551994883071');
+    expect(normalizarTelefone('555199488307')).toBe('555199488307');
+    expect(normalizarTelefone('(99) 3333-4444')).toBe('559933334444');
+    expect(normalizarTelefone('(10) 99488-3071')).toBeNull();      // DDD 10 não existe
+    expect(normalizarTelefone('(01) 99488-3071')).toBeNull();
+    expect(normalizarTelefone('5199488307')).toBe('555199488307');
+    expect(normalizarTelefone('99488-3071')).toBeNull();           // sem DDD
+    expect(normalizarTelefone('4451994883071')).toBeNull();        // 13 dígitos sem 55
+    expect(normalizarTelefone('55519948830712')).toBeNull();       // 14 dígitos
+    expect(normalizarTelefone('')).toBeNull();
+  });
+  it('máscara do campo: celular 9XXXX-XXXX, fixo XXXX-XXXX, cola com +55 ou zero na frente', () => {
+    expect(['', '5', '51', '519', '519948', '5199488', '51994883', '51994883071'].map((x) => mascaraTelefone(x)))
+      .toEqual(['', '(5', '(51', '(51) 9', '(51) 9948', '(51) 99488', '(51) 99488-3', '(51) 99488-3071']);
+    expect(mascaraTelefone('5133334444')).toBe('(51) 3333-4444');
+    expect(mascaraTelefone('513333')).toBe('(51) 3333');
+    expect(mascaraTelefone('51333344')).toBe('(51) 3333-44');
+    expect(mascaraTelefone('+55 (51) 99488-3071')).toBe('(51) 99488-3071');
+    expect(mascaraTelefone('051994883071')).toBe('(51) 99488-3071');
+    expect(mascaraTelefone('519948830719999')).toBe('(51) 99488-3071');   // passa de 11: corta
+    expect(mascaraTelefone('(51) 99488-3071a')).toBe('(51) 99488-3071');
+    // apagar o hífen/parêntese não trava: a máscara sai dos dígitos
+    expect(mascaraTelefone('(51) 99488-')).toBe('(51) 99488');
+    expect(mascaraTelefone('(51) ')).toBe('(51');
+    // o que a máscara entrega é o que a normalização aceita
+    expect(normalizarTelefone(mascaraTelefone('+55 51 99488 3071'))).toBe('5551994883071');
+  });
+  it('chave canônica: com ou sem o nono dígito é o mesmo número (= chave_canonica_telefone)', () => {
+    expect(chaveTelefone('5551994883071')).toBe('5194883071');
+    expect(chaveTelefone('555194883071')).toBe('5194883071');
+    expect(chaveTelefone('(51) 99488-3071')).toBe('5194883071');
+    expect(chaveTelefone('(51) 9488-3071')).toBe('5194883071');
+    expect(chaveTelefone('')).toBeNull();
+  });
+  it('telefone na tela', () => {
+    expect(telefoneTela('5551994883071')).toBe('(51) 99488-3071');
+    expect(telefoneTela('555133334444')).toBe('(51) 3333-4444');
+    expect(telefoneTela('123')).toBe('123');
+  });
+  it('nome: 2 a 80 caracteres, com letra; espaços sobrando saem', () => {
+    expect(['José da Silva', 'Zé', 'Ana Lúcia', 'Ç'.repeat(80)].map(nomeClienteValido)).toEqual([true, true, true, true]);
+    expect(['', ' ', 'A', '  B  ', '1234', '(51) 99488-3071', '--', 'a'.repeat(81)].map(nomeClienteValido)).toEqual(Array(8).fill(false));
+    expect(limparNome('  José   da  Silva ')).toBe('José da Silva');
+    expect(nomeClienteValido(' A  ')).toBe(false);
+  });
+  it('avatar de nome curto não fica vazio', () => {
+    expect(iniciais('ZÉ')).toBe('Z');
+    expect(iniciais('JOSÉ DA SILVA')).toBe('JS');
+  });
+  it('resposta de pendencias_checar_numero → tela', () => {
+    expect(lerChecagem({ valido: false, telefone: null, contato: null })).toEqual({ valido: false, telefone: null, contato: null });
+    expect(lerChecagem({ valido: true, telefone: '5551994883071', contato: null })).toEqual({ valido: true, telefone: '5551994883071', contato: null });
+    expect(lerChecagem({
+      valido: true, telefone: '5551994883071',
+      contato: { id: 'u1', nome: 'Maria Aparecida', telefone: '5551994883071', fechado: true, responsavel_nome: 'Juliana Souza', tem_pendencia: false },
+    }).contato).toEqual({ id: 'u1', nome: 'MARIA APARECIDA', telefone: '(51) 99488-3071', fechado: true, responsavel: 'Juliana', temPendencia: false });
+    // sem encarregado / sem nome
+    expect(lerChecagem({ valido: true, telefone: '5551994883071', contato: { id: 'u2', nome: null, telefone: null, fechado: false, responsavel_nome: null, tem_pendencia: true } }).contato)
+      .toMatchObject({ nome: '', responsavel: '', fechado: false, temPendencia: true });
+    expect(lerChecagem(null)).toEqual({ valido: false, telefone: null, contato: null });
+  });
+  it('elegível para o jeito normal (pendencia_criar) = fechou ou já tem pendência', () => {
+    const c = { id: 'x', nome: 'X', telefone: '', fechado: false, responsavel: '', temPendencia: false };
+    expect(contatoElegivel(c)).toBe(false);
+    expect(contatoElegivel({ ...c, fechado: true })).toBe(true);
+    expect(contatoElegivel({ ...c, temPendencia: true })).toBe(true);
+  });
+});
+
+describe('store da demonstração: cadastrar número (= pendencias_checar_numero + pendencia_criar_numero)', () => {
+  const um = [{ id: 'a', dia: 0, hora: 'agora', blocos: [{ id: 'b', tipo: 'texto' as const, texto: 'Oi {primeiro_nome}' }] }];
+  const base = { tipo: 'documento' as const, oQue: 'RG frente e verso', passos: um };
+  const contar = () => ({ cli: estadoDemo().clientes.length, leads: estadoDemo().leads.length, pend: estadoDemo().pendencias.length });
+
+  it('conferir: inválido, número novo, número de cliente fechado (com ou sem o nono dígito) e de lead', () => {
+    expect(pendAcoes.checarNumero('(10) 99999-0000')).toEqual({ valido: false, telefone: null, contato: null });
+    expect(pendAcoes.checarNumero('(51) 99777-1234')).toEqual({ valido: true, telefone: '5551997771234', contato: null });
+    const maria = pendAcoes.checarNumero('(51) 99812-4471');
+    expect(maria.contato).toMatchObject({ id: 'c1', fechado: true, temPendencia: true, responsavel: 'Matheus' });
+    expect(pendAcoes.checarNumero('51 9812-4471').contato?.id).toBe('c1');
+    expect(pendAcoes.checarNumero('(51) 98233-6150').contato).toMatchObject({ id: 'l1', fechado: false, temPendencia: false });
+  });
+  it('número novo: cadastra o cliente (nome digitado, encarregado = quem cadastrou) e abre a pendência', () => {
+    const antes = contar();
+    const p = pendAcoes.criarNumero({ nome: '  José   da Silva ', telefone: '(51) 99777-1234', ...base });
+    const cli = estadoDemo().clientes.find((c) => c.id === p.clienteId)!;
+    expect(cli).toMatchObject({ nome: 'JOSÉ DA SILVA', telefone: '(51) 99777-1234', fechadoEm: '', responsavel: 'Matheus' });
+    expect(p).toMatchObject({ status: 'aguardando', responsavel: 'Matheus', oQue: 'RG frente e verso' });
+    expect(contar()).toEqual({ cli: antes.cli + 1, leads: antes.leads, pend: antes.pend + 1 });
+    // a prévia usa o nome digitado
+    expect(preencher('Oi {primeiro_nome}', { cliente: cli, oQue: '', atendente: 'Ana' })).toBe('Oi José');
+    // agora o número é dele e ele aparece como cliente com pendência
+    expect(pendAcoes.checarNumero('5551997771234').contato).toMatchObject({ id: cli.id, fechado: false, temPendencia: true });
+  });
+  it('não duplica: o mesmo número de novo (com ou sem o 9, outro nome) usa o MESMO cliente, sem renomear', () => {
+    const p1 = estadoDemo().pendencias.find((p) => estadoDemo().clientes.find((c) => c.id === p.clienteId)?.telefone === '(51) 99777-1234')!;
+    const antes = contar();
+    const p2 = pendAcoes.criarNumero({ nome: 'Outro Nome', telefone: '+55 51 9777-1234', ...base });
+    expect(p2.clienteId).toBe(p1.clienteId);
+    expect(contar()).toEqual({ cli: antes.cli, leads: antes.leads, pend: antes.pend + 1 });
+    expect(estadoDemo().clientes.find((c) => c.id === p1.clienteId)!.nome).toBe('JOSÉ DA SILVA');
+    // "Nova pendência para este cliente" (pendencia_criar) aceita quem foi cadastrado por número
+    const p3 = pendAcoes.criar({ clienteId: p1.clienteId, ...base });
+    expect(p3.clienteId).toBe(p1.clienteId);
+  });
+  it('número de cliente fechado: reaproveita o cliente da lista', () => {
+    const antes = contar();
+    const p = pendAcoes.criarNumero({ nome: 'Maria', telefone: '(51) 99812-4471', ...base });
+    expect(p.clienteId).toBe('c1');
+    expect(contar().cli).toBe(antes.cli);
+    expect(estadoDemo().clientes.find((c) => c.id === 'c1')!.nome).toBe('MARIA APARECIDA DOS SANTOS');
+  });
+  it('lead (está no Atenvo, não fechou): pendencia_criar recusa; pelo número usa o lead, que passa para a lista', () => {
+    expect(() => pendAcoes.criar({ clienteId: 'l2', ...base })).toThrow('cliente_nao_fechado');
+    expect(() => pendAcoes.criar({ clienteId: 'nao-existe', ...base })).toThrow('contato_invalido');
+    const antes = contar();
+    const p = pendAcoes.criarNumero({ nome: 'Geralda Moura', telefone: '(54) 99104-7781', ...base });
+    expect(p.clienteId).toBe('l2');
+    expect(p.responsavel).toBe('Matheus');   // lead sem encarregado: fica com quem abriu
+    expect(contar()).toEqual({ cli: antes.cli + 1, leads: antes.leads - 1, pend: antes.pend + 1 });
+    expect(pendAcoes.criar({ clienteId: 'l2', ...base }).clienteId).toBe('l2');
+  });
+  it('lead com encarregado: a pendência vai para o encarregado', () => {
+    expect(pendAcoes.criarNumero({ nome: 'Marcos', telefone: '(51) 98233-6150', ...base }).responsavel).toBe('Juliana');
+  });
+  it('recusa nome e número inválidos sem cadastrar nada; pendência com defeito não deixa cliente para trás', () => {
+    const antes = contar();
+    expect(() => pendAcoes.criarNumero({ nome: '1234', telefone: '(51) 99666-0001', ...base })).toThrow('nome_invalido');
+    expect(() => pendAcoes.criarNumero({ nome: 'A', telefone: '(51) 99666-0001', ...base })).toThrow('nome_invalido');
+    expect(() => pendAcoes.criarNumero({ nome: 'Ana Paula', telefone: '(10) 99666-0001', ...base })).toThrow('telefone_invalido');
+    expect(() => pendAcoes.criarNumero({ nome: 'Ana Paula', telefone: '9666-0001', ...base })).toThrow('telefone_invalido');
+    expect(() => pendAcoes.criarNumero({ nome: 'Ana Paula', telefone: '(51) 99666-0001', ...base, oQue: '  ' })).toThrow('o_que_vazio');
+    expect(() => pendAcoes.criarNumero({ nome: 'Ana Paula', telefone: '(51) 99666-0001', ...base, passos: [] })).toThrow('sem_mensagem');
+    expect(contar()).toEqual(antes);
+    expect(pendAcoes.checarNumero('(51) 99666-0001').contato).toBeNull();
+  });
+  it('a busca da Nova pendência passa a achar quem foi cadastrado por número', () => {
+    const achados = estadoDemo().clientes.filter((c) => c.telefone.replace(/\D/g, '').includes('997771234'));
+    expect(achados).toHaveLength(1);
+  });
+});
+
+describe('campo do WhatsApp: uma tecla nunca vira OUTRO número', () => {
+  it('DDD 55 (RS): tecla a mais com o campo cheio é ignorada (não tira o 55 achando que é o país)', () => {
+    expect(editarTelefone('55981112222')).toBe('(55) 98111-2222');
+    expect(editarTelefone('(55) 98111-22223')).toBeNull();          // digitou um 3 a mais
+    expect(editarTelefone('(55) 99123-45678')).toBeNull();
+    expect(editarTelefone('(55) 991234567')).toBe('(55) 99123-4567');
+    // digitar nunca tira o 55; só o "+" ou um número colado inteiro
+    expect(mascaraTelefone('55981112222')).toBe('(55) 98111-2222');
+    expect(mascaraTelefone('5551981112222')).toBe('(55) 51981-1122');   // sem "+" e sem colar: 55 é DDD (corta em 11)
+    expect(mascaraTelefone('5551981112222', true)).toBe('(51) 98111-2222');
+    expect(mascaraTelefone('+55 51 98111-2222')).toBe('(51) 98111-2222');
+  });
+  it('colar o número inteiro troca o campo: +55, formato do banco (sem o nono dígito) e com zero', () => {
+    expect(editarTelefone('+55 51 99123-4567', true)).toBe('(51) 99123-4567');
+    expect(editarTelefone('5551991234567', true)).toBe('(51) 99123-4567');
+    expect(editarTelefone('555191234567', true)).toBe('(51) 9123-4567');   // 10 dígitos: (DD) XXXX-XXXX
+    expect(editarTelefone('5191234567', true)).toBe('(51) 9123-4567');
+    expect(editarTelefone('(55) 99123-4567', true)).toBe('(55) 99123-4567'); // DDD 55 colado continua 55
+    expect(editarTelefone('5555991234567', true)).toBe('(55) 99123-4567');
+    expect(editarTelefone('051991234567', true)).toBe('(51) 99123-4567');
+  });
+  it('"+" de outro país fica como veio (a tela recusa); +55 incompleto espera', () => {
+    expect(editarTelefone('+1 415 555 2671', true)).toBe('+1 415 555 2671');
+    expect(telefoneEstrangeiro('+1 415 555 2671')).toBe(true);
+    expect(digitosLocais('+1 415 555 2671')).toBe('');
+    expect(telefoneEstrangeiro('+55 51 9')).toBe(false);
+    expect(telefoneEstrangeiro('+5')).toBe(false);
+    expect(telefoneEstrangeiro('(51) 99123-4567')).toBe(false);
+    expect(editarTelefone('+55 51 9912')).toBe('+55 51 9912');
+    expect(digitosLocais('+55 51 9912')).toBe('519912');
+    expect(editarTelefone('+55 51 99123-4567')).toBe('(51) 99123-4567');  // digitando com +55: completou, vira o local
+    expect(editarTelefone('+55 51 99123-45678')).toBeNull();
+  });
+  it('cursor: volta para o mesmo dígito depois de formatar', () => {
+    // "(51) 99123-4567", Backspace depois do "2" (posição 9) → o navegador manda "(51) 9913-4567" com o cursor em 8
+    const bruto = '(51) 9913-4567';
+    const v = editarTelefone(bruto)!;
+    expect(v).toBe('(51) 99134-567');
+    const pos = posAposDigitos(v, digitosAntes(bruto, 8));
+    expect(pos).toBe(8);
+    // digitar "2" ali devolve o número certo
+    const bruto2 = v.slice(0, pos) + '2' + v.slice(pos);
+    const v2 = editarTelefone(bruto2)!;
+    expect(v2).toBe('(51) 99123-4567');
+    expect(posAposDigitos(v2, digitosAntes(bruto2, pos + 1))).toBe(9);
+    expect(posAposDigitos('(51) 9', 0)).toBe(0);
+    expect(posAposDigitos('(51) 9', 9)).toBe(6);
+  });
+  it('Backspace/Delete em cima do hífen apaga o dígito vizinho (a máscara não devolve o hífen)', () => {
+    // "(51) 99123-|4567": Backspace tira o hífen → o navegador manda "(51) 991234567" com o cursor em 10
+    expect(apagarSinal('(51) 99123-4567', '(51) 991234567', 10, false)).toEqual({ valor: '(51) 99124-567', pos: 9 });
+    // "(51) 99123|-4567": Delete tira o hífen → apaga o 4
+    expect(apagarSinal('(51) 99123-4567', '(51) 991234567', 10, true)).toEqual({ valor: '(51) 99123-567', pos: 10 });
+    // apagou um dígito de verdade: não é com ele
+    expect(apagarSinal('(51) 99123-4567', '(51) 9913-4567', 8, false)).toBeNull();
+    expect(apagarSinal('+55 51 9', '+55 519', 3, false)).toBeNull();
+  });
+  it('celular com 10 dígitos (sem o nono) é suspeito; fixo não', () => {
+    expect(celularSemNove('5191234567')).toBe(true);
+    expect(celularSemNove('5161234567')).toBe(true);
+    expect(celularSemNove('5133334444')).toBe(false);
+    expect(celularSemNove('51991234567')).toBe(false);
+  });
+});
+
+describe('nome digitado e contato sem nome', () => {
+  it('o que falta no nome', () => {
+    expect(['', '   ', '12345', 'A', 'José', 'Zé', `${'a'.repeat(81)}`].map(problemaNome)).toEqual(['vazio', 'vazio', 'sem_letra', 'curto', '', '', 'longo']);
+  });
+  it('contato sem nome = sem letra (o nome é o telefone, vazio)', () => {
+    expect(contatoSemNome({ nome: '555191035329' })).toBe(true);
+    expect(contatoSemNome({ nome: '' })).toBe(true);
+    expect(contatoSemNome({ nome: 'ADAOROSAGARCIA05' })).toBe(false);
+  });
+});
+
+describe('{primeiro_nome} igual ao servidor (pend_preencher)', () => {
+  const cli = (nome: string) => ({ id: 'x', nome, telefone: '', processo: '', acao: '', responsavel: '', fechadoEm: '' });
+  const ctx = (nome: string) => ({ cliente: cli(nome), oQue: 'RG', atendente: 'Ana' });
+  it('nome de verdade: initcap da 1ª palavra (hífen separa; apóstrofo não)', () => {
+    expect(primeiroNomeMsg('MARIA APARECIDA')).toBe('Maria');
+    expect(primeiroNomeMsg('ANA-PAULA SOUZA')).toBe('Ana-Paula');
+    expect(primeiroNomeMsg("D'ÁVILA")).toBe("D'ávila");
+    expect(primeiroNomeMsg('élcio')).toBe('Élcio');
+  });
+  it('sem nome usável, o nome sai da frase (como o cliente recebe)', () => {
+    expect(primeiroNomeMsg('Dr. João Silva')).toBe('');
+    expect(primeiroNomeMsg('555191035329')).toBe('');
+    expect(primeiroNomeMsg('Zé2')).toBe('');
+    expect(preencher('Olá, {primeiro_nome}! Tudo bem?', ctx('Dr. João Silva'))).toBe('Olá! Tudo bem?');
+    expect(preencher('{primeiro_nome}, conseguiu o {pendencia}?', ctx('555191035329'))).toBe('Conseguiu o RG?');
+    expect(preencher('Oi {primeiro_nome}', ctx('5551'))).toBe('Oi');
+    expect(preencher('Olá, {primeiro_nome}! Aqui é {atendente}.', ctx('JOSÉ DA SILVA'))).toBe('Olá, José! Aqui é Ana.');
+  });
+});
+
+describe('busca de clientes (= pendencias_clientes_fechados com a chave canônica)', () => {
+  const sandra = { nome: 'SANDRA REGINA COSTA', telefone: '(51) 8455-2209' };   // gravada sem o nono dígito
+  it('o celular inteiro acha quem foi gravado sem o nono dígito (e com +55)', () => {
+    expect(clienteCasaBusca(sandra, '(51) 98455-2209')).toBe(true);
+    expect(clienteCasaBusca(sandra, '51984552209')).toBe(true);
+    expect(clienteCasaBusca(sandra, '+55 51 98455-2209')).toBe(true);
+    expect(clienteCasaBusca(sandra, '5184552209')).toBe(true);
+  });
+  it('pedaço do número gravado e nome', () => {
+    expect(clienteCasaBusca(sandra, '8455')).toBe(true);
+    expect(clienteCasaBusca(sandra, '5551')).toBe(true);
+    expect(clienteCasaBusca(sandra, 'regina')).toBe(true);
+    expect(clienteCasaBusca(sandra, '845')).toBe(false);
+    expect(clienteCasaBusca(sandra, '(51) 98455-2208')).toBe(false);
+    expect(clienteCasaBusca(sandra, '')).toBe(true);
+  });
+});
+
+describe('store da demonstração: contato sem nome ganha o nome digitado (= pendencia_criar_numero)', () => {
+  const um = [{ id: 'a', dia: 0, hora: 'agora', blocos: [{ id: 'b', tipo: 'texto' as const, texto: 'Olá, {primeiro_nome}!' }] }];
+  it('lead com o telefone no lugar do nome: usa o MESMO contato e grava o nome; quem tem nome não muda', () => {
+    const ch = pendAcoes.checarNumero('(51) 99330-7712');
+    expect(ch.contato).toMatchObject({ id: 'l3', fechado: false, temPendencia: false });
+    expect(contatoSemNome(ch.contato!)).toBe(true);
+    const p = pendAcoes.criarNumero({ nome: 'Maria Teste', telefone: '(51) 99330-7712', tipo: 'outro', oQue: 'x', passos: um });
+    expect(p.clienteId).toBe('l3');
+    const cli = estadoDemo().clientes.find((c) => c.id === 'l3')!;
+    expect(cli.nome).toBe('MARIA TESTE');
+    expect(preencher(um[0].blocos[0].texto, { cliente: cli, oQue: 'x', atendente: 'Ana' })).toBe('Olá, Maria!');
+    expect(estadoDemo().leads.some((l) => l.id === 'l3')).toBe(false);
+    // de novo, com outro nome: agora ele TEM nome, não muda
+    pendAcoes.criarNumero({ nome: 'Outra Pessoa', telefone: '(51) 9330-7712', tipo: 'outro', oQue: 'y', passos: um });
+    expect(estadoDemo().clientes.find((c) => c.id === 'l3')!.nome).toBe('MARIA TESTE');
   });
 });

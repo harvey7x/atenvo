@@ -474,6 +474,8 @@
 .v2 .pd-etapa-corpo { max-width: 640px; margin: 0 auto; padding: 40px 24px 64px; display: flex; flex-direction: column; }
 .v2 .pd-h { font-size: 20px; font-weight: 600; letter-spacing: -.015em; line-height: 1.3; }
 .v2 .pd-h-2 { margin-top: 28px; }
+/* o título recebe o foco ao entrar na etapa (tabIndex -1): sem anel, é só o ponto de partida do teclado */
+.v2 .pd-ed .pd-h:focus { outline: none; }
 .v2 .pd-h-sub { margin-top: 6px; font-size: 13px; color: var(--txt-2); }
 .v2 .pd-busca {
   margin-top: 20px; height: 44px; display: flex; align-items: center; gap: 10px; padding: 0 14px; border-radius: var(--pd-r);
@@ -504,6 +506,47 @@
 .v2 .pd-cands-vz { padding: 48px 16px; text-align: center; font-size: 12.5px; color: var(--txt-2); }
 
 .v2 .pd-cli-min { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; column-gap: 12px; align-items: center; min-height: 56px; padding: 0 12px 0 14px; }
+.v2 .pd-cli-min-n { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.v2 .pd-cli-min-n .pd-selo { flex: none; }
+
+/* cliente que não está no Atenvo: "Cadastrar número" */
+.v2 .pd-cad { margin-top: 12px; display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--txt-2); }
+/* link de ação da etapa 1 ("Cadastrar número", "Procurar na lista", "Está certo"): o mesmo nos três.
+   Alvo de clique de 24px sem mexer na linha (padding compensado pela margem). */
+.v2 .pd-link-acao {
+  padding: 3px 0; margin: -3px 0; border: 0; background: none; font: inherit; font-weight: 500; color: var(--azul); cursor: pointer;
+  text-decoration: none; text-underline-offset: 3px; text-decoration-color: rgba(var(--azul-rgb), .45);
+}
+.v2 .pd-link-acao:hover { text-decoration-line: underline; }
+.v2 .pd-cands-vz-acao { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+.v2 .pd-cands-vz-acao .btn-sec svg { width: 14px; height: 14px; flex: none; }
+/* o título/subtítulo se descola do formulário (o mesmo respiro do .pd-h-2 da etapa 2) */
+.v2 .pd-campo.pd-campo-1 { margin-top: 28px; }
+.v2 .pd-fone { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.v2 .pd-fone .pd-inp { width: 220px; flex: none; }
+.v2 .pd-fone .pd-inp[aria-invalid="true"] { border-color: rgba(var(--rubro-rgb), .55); }
+.v2 .pd-fone .pd-inp[aria-invalid="true"]:focus { border-color: rgba(var(--rubro-rgb), .55); box-shadow: 0 0 0 3px rgba(var(--rubro-rgb), .10); }
+.v2 .pd-fone-st { display: inline-flex; align-items: center; gap: 6px; min-width: 0; font-size: 12px; color: var(--txt-2); white-space: nowrap; }
+.v2 .pd-fone-st svg { flex: none; }
+.v2 .pd-fone-st b { font-weight: 600; color: var(--txt); }
+/* azul, como o selo "Número novo" da etapa 2 (verde na aba = resolvido / envios ligados) */
+.v2 .pd-fone-st[data-tom="ok"] svg { color: var(--azul); }
+.v2 .pd-fone-st[data-tom="erro"] { color: var(--rubro); }
+.v2 .pd-fone-st .pd-link-sutil { margin-left: 6px; }
+.v2 .pd-fone-st-dica { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.v2 .pd-fone-st-dica::before { content: "·"; margin: 0 6px 0 0; color: var(--txt-3); }
+/* celular sem o nono dígito: aviso âmbar embaixo do campo (como o erro do prazo na etapa 2) */
+.v2 .pd-campo-aviso { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 12px; color: var(--txt-2); }
+.v2 .pd-campo-aviso > svg { flex: none; color: var(--ambar); }
+.v2 .pd-campo-aviso .pd-link-acao { margin-left: 4px; }
+/* "Este número é de…": as medidas do cartão do cliente da etapa 2 (.pd-cli-min) + o check de "escolhido" */
+.v2 .pd-fone-dono {
+  margin-top: 16px; display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; column-gap: 12px; align-items: center;
+  min-height: 56px; padding: 0 12px 0 14px;
+}
+.v2 .pd-fone-dono .pd-av svg { width: 16px; height: 16px; }
+.v2 .pd-fone-dono-t { font-size: 13.5px; color: var(--txt-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2 .pd-fone-dono-t b { font-weight: 600; color: var(--txt); }
 .v2 .pd-tipos { margin-top: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .v2 .pd-tipo {
   position: relative; display: grid; grid-template-columns: 36px minmax(0, 1fr); column-gap: 12px; align-items: center;

@@ -247,14 +247,173 @@ export const primeiroNome = (n: string) => {
 };
 const MINUSC = new Set(['DA', 'DE', 'DO', 'DAS', 'DOS', 'E']);
 export const nomeBonito = (n: string) => n.split(/\s+/).map((p) => (MINUSC.has(p) ? p.toLowerCase() : p.charAt(0) + p.slice(1).toLowerCase())).join(' ');
-export const iniciais = (n: string) => n.split(/\s+/).filter((x) => x.length > 2).slice(0, 2).map((x) => x[0]).join('').toUpperCase();
+/** iniciais do avatar (nome curto, ex. "Zé", fica com a 1ª letra: o círculo nunca sai vazio) */
+export const iniciais = (n: string) => n.split(/\s+/).filter((x) => x.length > 2).slice(0, 2).map((x) => x[0]).join('').toUpperCase() || n.trim().charAt(0).toUpperCase();
 export const mmss = (s?: number) => (s == null ? '' : `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`);
 
+/* ============================ cliente que não está no sistema ============================
+   Nova pendência para um NÚMERO que não está no Atenvo: cadastra o número + o nome do cliente.
+   Espelham o servidor (pendencias_checar_numero / pendencia_criar_numero). */
+/** = normalização do servidor: só dígitos; 10 ou 11 → prefixa 55; 12/13 começando com 55 → como está;
+ *  DDD de 11 a 99. Devolve "55DDDNNNNNNNN" ou null (inválido). */
+export function normalizarTelefone(t: string): string | null {
+  const d = (t ?? '').replace(/\D/g, '');
+  const n = d.length === 10 || d.length === 11 ? `55${d}` : (d.length === 12 || d.length === 13) && d.startsWith('55') ? d : '';
+  if (!n) return null;
+  const ddd = Number(n.slice(2, 4));
+  return ddd >= 11 && ddd <= 99 ? n : null;
+}
+/** = chave_canonica_telefone do banco (DDD + 8 últimos): com ou sem o nono dígito é o MESMO número */
+export function chaveTelefone(t: string): string | null {
+  const d = (t ?? '').replace(/\D/g, '');
+  if (!d) return null;
+  const core = d.startsWith('55') && (d.length === 12 || d.length === 13) ? d.slice(2) : d;
+  return core.length === 10 || core.length === 11 ? core.slice(0, 2) + core.slice(-8) : d;
+}
+/** = pendencias_clientes_fechados(p_busca): nome (contém) ou telefone com 4+ dígitos contidos no número
+ *  GRAVADO (55DDD…), ou — com 10 a 13 dígitos — o MESMO número pela chave canônica (com ou sem o nono
+ *  dígito, com ou sem o 55): "(51) 98455-2209" acha quem foi gravado 555184552209. */
+export function clienteCasaBusca(c: { nome: string; telefone: string }, busca: string): boolean {
+  const q = (busca ?? '').trim();
+  if (!q) return true;
+  if (c.nome.toLowerCase().includes(q.toLowerCase())) return true;
+  const dg = q.replace(/\D/g, '');
+  if (dg.length < 4) return false;
+  const gravado = normalizarTelefone(c.telefone) ?? c.telefone.replace(/\D/g, '');
+  if (gravado.includes(dg)) return true;
+  return dg.length >= 10 && dg.length <= 13 && chaveTelefone(gravado) === chaveTelefone(dg);
+}
+/** máscara: (DD) 9XXXX-XXXX para celular, (DD) XXXX-XXXX para fixo. O zero da frente sai.
+ *  O 55 da frente só sai quando o texto TEM cara de código do país: começa com "+", ou `inteiro`
+ *  (o número veio todo de uma vez: colagem, busca) com 12/13 dígitos. Digitando, 55 é DDD (RS).
+ *  `inteiro` com 10 dígitos formata (DD) XXXX-XXXX (o número completo, como o banco guarda). */
+export function mascaraTelefone(entrada: string, inteiro = false): string {
+  let d = (entrada ?? '').replace(/\D/g, '').replace(/^0+/, '');
+  if ((inteiro || /^\s*\+/.test(entrada ?? '')) && (d.length === 12 || d.length === 13) && d.startsWith('55')) d = d.slice(2);
+  d = d.slice(0, 11);
+  if (d.length <= 2) return d ? `(${d}` : '';
+  const ddd = d.slice(0, 2); const n = d.slice(2);
+  const corte = inteiro && n.length === 8 ? 4 : n[0] === '9' || n.length > 8 ? 5 : 4;
+  return n.length <= corte ? `(${ddd}) ${n}` : `(${ddd}) ${n.slice(0, corte)}-${n.slice(corte)}`;
+}
+/** "+1 415…": código de país que não é o do Brasil (o campo não converte; a tela recusa) */
+export function telefoneEstrangeiro(t: string): boolean {
+  const s = (t ?? '').trim();
+  if (!s.startsWith('+')) return false;
+  const d = s.replace(/\D/g, '');
+  return !(d === '' || d === '5' || d.startsWith('55'));
+}
+/** dígitos do número local (DDD + número) do que está no campo: "+55 51 9…" → "519…"; outro país → '' */
+export function digitosLocais(v: string): string {
+  const d = (v ?? '').replace(/\D/g, '');
+  if (!(v ?? '').trim().startsWith('+')) return d;
+  return d.startsWith('55') ? d.slice(2) : '';
+}
+/** campo do WhatsApp: o que fica no campo depois de uma edição. null = ignorar (fica o valor de antes).
+ *  - "+…" é código de país: +55 vira o número local quando chega a 12/13 dígitos; enquanto isso, ou
+ *    se for de outro país, fica como veio (a tela diz o que falta / recusa);
+ *  - `inteiro` (colou um número completo): o 55 da frente sai e 10 dígitos ficam (DD) XXXX-XXXX;
+ *  - digitando/apagando: passou de 11 dígitos → null (uma tecla a mais nunca vira OUTRO número). */
+export function editarTelefone(bruto: string, inteiro = false): string | null {
+  const s = (bruto ?? '').trimStart();
+  if (s.startsWith('+')) {
+    const d = s.replace(/\D/g, '');
+    if (d.startsWith('55') && d.length > 13) return null;
+    if (d.startsWith('55') && d.length >= 12) return mascaraTelefone(s, true);
+    return '+' + s.slice(1).replace(/[^\d ()-]/g, '').slice(0, 24);
+  }
+  if (inteiro) return mascaraTelefone(s, true);
+  if (s.replace(/\D/g, '').replace(/^0+/, '').length > 11) return null;
+  return mascaraTelefone(s);
+}
+/** cursor do campo com máscara: quantos dígitos há antes da posição `pos` */
+export const digitosAntes = (s: string, pos: number) => (s ?? '').slice(0, Math.max(0, pos)).replace(/\D/g, '').length;
+/** posição logo depois do n-ésimo dígito (0 = início) — o cursor volta para o mesmo dígito depois de formatar */
+export function posAposDigitos(s: string, n: number): number {
+  if (n <= 0) return 0;
+  let k = 0;
+  for (let i = 0; i < s.length; i++) if (/\d/.test(s[i]) && ++k === n) return i + 1;
+  return s.length;
+}
+/** apagou só um sinal da máscara (hífen, parêntese, espaço): apaga o dígito vizinho — senão a máscara põe
+ *  o sinal de volta e o Backspace "não faz nada". null = não é esse caso (segue a edição normal). */
+export function apagarSinal(anterior: string, bruto: string, caret: number, paraFrente: boolean): { valor: string; pos: number } | null {
+  if ((anterior ?? '').trim().startsWith('+')) return null;
+  const dA = (anterior ?? '').replace(/\D/g, '');
+  if ((bruto ?? '').replace(/\D/g, '') !== dA || (bruto ?? '').length >= (anterior ?? '').length) return null;
+  const k = digitosAntes(bruto, caret);
+  const i = paraFrente ? k : k - 1;
+  if (i < 0 || i >= dA.length) return null;
+  const valor = mascaraTelefone(dA.slice(0, i) + dA.slice(i + 1));
+  return { valor, pos: posAposDigitos(valor, i) };
+}
+/** 10 dígitos com o número começando em 6–9: celular sem o nono dígito (faltou um? ou é o número antigo) */
+export const celularSemNove = (dgLocal: string) => dgLocal.length === 10 && /[6-9]/.test(dgLocal[2]);
+/** "5551994883071" (ou qualquer forma) → "(51) 99488-3071"; o que não for telefone volta como veio */
+export function telefoneTela(t: string): string {
+  const d = (t ?? '').replace(/\D/g, '').replace(/^55(?=\d{10,11}$)/, '');
+  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return t;
+}
+/** nome como vai para o banco: sem espaço sobrando */
+export const limparNome = (n: string) => (n ?? '').trim().replace(/\s+/g, ' ');
+/** nome do cliente: 2 a 80 caracteres e com letra (o servidor recusa só dígitos: 'nome_invalido') */
+export function nomeClienteValido(n: string) {
+  return !problemaNome(n);
+}
+/** o que falta no nome digitado ('' = está bom). Mesma regra do servidor ('nome_invalido'). */
+export function problemaNome(n: string): '' | 'vazio' | 'sem_letra' | 'curto' | 'longo' {
+  const x = limparNome(n);
+  if (!x) return 'vazio';
+  if (!temLetra(x)) return 'sem_letra';
+  if (x.length < 2) return 'curto';
+  if (x.length > 80) return 'longo';
+  return '';
+}
+export const temLetra = (n: string) => /\p{L}/u.test(n ?? '');
+/** contato do número sem nome de verdade (o "nome" é o telefone, vazio…): o cadastro pede o nome e
+ *  pendencia_criar_numero grava o nome digitado no lugar (os outros contatos nunca são renomeados). */
+export const contatoSemNome = (c: { nome: string }) => !temLetra(c.nome);
+/** contato que já tem o número (= pendencias_checar_numero.contato) */
+export interface ContatoDoNumero {
+  id: string;
+  nome: string;
+  telefone: string;
+  /** tem oportunidade ganha */
+  fechado: boolean;
+  /** primeiro nome do encarregado ('' sem encarregado) */
+  responsavel: string;
+  temPendencia: boolean;
+}
+export interface ChecagemNumero { valido: boolean; telefone: string | null; contato: ContatoDoNumero | null }
+/** o contato já pode receber pendência pelo jeito normal (pendencia_criar): fechou ou já tem pendência */
+export const contatoElegivel = (c: ContatoDoNumero) => c.fechado || c.temPendencia;
+export interface DadosNovaPendencia { tipo: TipoPendencia; oQue: string; prazo?: string; processo?: string; passos: Passo[]; agendarPara?: string }
+
+/** {primeiro_nome} como o servidor (pend_preencher): a 1ª palavra (separada por espaço), só se for
+ *  nome de verdade — letras (com acento), apóstrofo e hífen, 2+ — com initcap ("ANA-PAULA" → "Ana-Paula").
+ *  '' = o servidor tira o nome da frase ("Dr.", telefone, "Zé2"). */
+export function primeiroNomeMsg(nome: string): string {
+  const p = (nome ?? '').replace(/^ +| +$/g, '').split(' ')[0] ?? '';
+  if (!/^[A-Za-zÀ-ÖØ-öø-ÿ'-]{2,}$/.test(p)) return '';
+  return p.toLowerCase().replace(/(^|-)(.)/g, (_, a: string, b: string) => a + b.toUpperCase());
+}
 /** troca as variáveis pelo dado do cliente (prévia do que ele vai receber).
- *  Igual ao servidor (pend_preencher): dado que falta vira VAZIO, não marcador. */
+ *  Igual ao servidor (pend_preencher): dado que falta vira VAZIO, não marcador; sem primeiro nome
+ *  usável, ele sai da frase ("Olá, {primeiro_nome}!" → "Olá!"; "{primeiro_nome}, conseguiu" → "Conseguiu"). */
 export function preencher(t: string, ctx: { cliente: ClienteFechado; oQue: string; prazo?: string; processo?: string; atendente: string }) {
-  return t
-    .split('{primeiro_nome}').join(primeiroNome(ctx.cliente.nome))
+  let s = t ?? '';
+  const pn = primeiroNomeMsg(ctx.cliente.nome);
+  if (pn) s = s.split('{primeiro_nome}').join(pn);
+  else {
+    if (/^\s*\{primeiro_nome\}/.test(s)) {
+      s = s.replace(/^\s*\{primeiro_nome\}\s*,?\s*/, '').replace(/^ +| +$/g, '');
+      s = s.charAt(0).toUpperCase() + s.slice(1);
+    }
+    s = s.replace(/[ ,]*\{primeiro_nome\}/g, '');
+  }
+  return s
     .split('{pendencia}').join(ctx.oQue.trim())
     .split('{prazo}').join(ctx.prazo ? dataBR(ctx.prazo) : '')
     .split('{processo}').join((ctx.processo ?? '').trim())
@@ -282,7 +441,8 @@ export const usuarioAtual = () => USUARIO;
 
 const CLIENTES: ClienteFechado[] = [
   { id: 'c1', nome: 'MARIA APARECIDA DOS SANTOS', telefone: '(51) 99812-4471', processo: '5001873-22.2026.8.21.0001', acao: 'Juros abusivos', responsavel: 'Matheus', fechadoEm: emDias(-42) },
-  { id: 'c2', nome: 'JOÃO CARLOS PEREIRA', telefone: '(51) 98144-0932', processo: '5003310-87.2026.8.21.0010', acao: 'Juros abusivos', responsavel: 'Matheus', fechadoEm: emDias(-35) },
+  /* como no real (a maioria gravada SEM o nono dígito: 5551XXXXXXXX), alguns vêm com 8 dígitos */
+  { id: 'c2', nome: 'JOÃO CARLOS PEREIRA', telefone: '(51) 8144-0932', processo: '5003310-87.2026.8.21.0010', acao: 'Juros abusivos', responsavel: 'Matheus', fechadoEm: emDias(-35) },
   { id: 'c3', nome: 'IVONE TEREZINHA MACHADO', telefone: '(54) 99630-1288', processo: '5000945-11.2026.8.21.0039', acao: 'Revisão de empréstimo', responsavel: 'Juliana', fechadoEm: emDias(-60) },
   { id: 'c4', nome: 'ANTÔNIO MARCOS DA SILVA', telefone: '(51) 99577-6402', processo: '5007721-04.2026.8.21.0008', acao: 'Juros abusivos', responsavel: 'Matheus', fechadoEm: emDias(-28) },
   { id: 'c5', nome: 'NEUSA MARIA OLIVEIRA', telefone: '(53) 98420-7715', processo: '5002288-63.2026.8.21.0022', acao: 'Revisão de empréstimo', responsavel: 'Juliana', fechadoEm: emDias(-74) },
@@ -291,8 +451,16 @@ const CLIENTES: ClienteFechado[] = [
   { id: 'c8', nome: 'PEDRO HENRIQUE BORGES', telefone: '(51) 98706-5590', processo: '5006634-18.2026.8.21.0001', acao: 'Revisão de empréstimo', responsavel: 'Matheus', fechadoEm: emDias(-12) },
   { id: 'c9', nome: 'LUCIA HELENA RAMOS', telefone: '(51) 99340-8817', processo: '5005519-45.2026.8.21.0015', acao: 'Juros abusivos', responsavel: 'Juliana', fechadoEm: emDias(-88) },
   { id: 'c10', nome: 'VALDIR JOSÉ KLEIN', telefone: '(54) 99973-1120', processo: '5000387-92.2026.8.21.0041', acao: 'Juros abusivos', responsavel: 'Matheus', fechadoEm: emDias(-23) },
-  { id: 'c11', nome: 'SANDRA REGINA COSTA', telefone: '(51) 98455-2209', processo: '5008812-37.2026.8.21.0001', acao: 'Revisão de empréstimo', responsavel: 'Giovana', fechadoEm: emDias(-9) },
+  { id: 'c11', nome: 'SANDRA REGINA COSTA', telefone: '(51) 8455-2209', processo: '5008812-37.2026.8.21.0001', acao: 'Revisão de empréstimo', responsavel: 'Giovana', fechadoEm: emDias(-9) },
   { id: 'c12', nome: 'OSMAR LUIZ BECKER', telefone: '(51) 99611-4093', processo: '5002976-50.2026.8.21.0033', acao: 'Juros abusivos', responsavel: 'Matheus', fechadoEm: emDias(-66) },
+];
+/* contatos que estão no Atenvo mas NÃO fecharam (conversaram, viraram lead): não aparecem na busca
+   da Nova pendência, mas o número deles é reconhecido no "Cadastrar número" */
+const LEADS: ClienteFechado[] = [
+  { id: 'l1', nome: 'MARCOS VINÍCIUS TEIXEIRA', telefone: '(51) 98233-6150', processo: '', acao: '', responsavel: 'Juliana', fechadoEm: '' },
+  { id: 'l2', nome: 'GERALDA MOURA', telefone: '(54) 99104-7781', processo: '', acao: '', responsavel: '', fechadoEm: '' },
+  /* lead SEM nome (o "nome" é o próprio telefone, como centenas no real): o cadastro pede o nome e grava */
+  { id: 'l3', nome: '555193307712', telefone: '(51) 9330-7712', processo: '', acao: '', responsavel: 'Juliana', fechadoEm: '' },
 ];
 
 const t = (texto: string): Bloco => ({ id: novoId('b'), tipo: 'texto', texto });
@@ -423,13 +591,17 @@ function eventosIniciais(p: Pendencia): Evento[] {
 interface Estado {
   pendencias: Pendencia[];
   modelos: Modelo[];
+  /** = o que pendencias_clientes_fechados lista: quem fechou e quem já tem pendência (cadastrado por número) */
   clientes: ClienteFechado[];
+  /** contatos do Atenvo que não fecharam (só para reconhecer o número) */
+  leads: ClienteFechado[];
   ajustes: AjustesPendencias;
 }
 let estado: Estado = {
   pendencias: semente(),
   modelos: MODELOS,
   clientes: CLIENTES,
+  leads: LEADS,
   ajustes: {
     numero: { nome: 'PENDÊNCIAS', telefone: '(51) 99488-3071', conectado: true },
     ativo: true, diasUteis: true, janelaIni: '09:00', janelaFim: '19:00', limiteDia: 40, avisarResponsavel: true,
@@ -448,22 +620,78 @@ const ev = (texto: string, de: Evento['de'] = 'sistema'): Evento => ({ quando: a
 /** demo: o "motor" sai na hora se pudesse sair de verdade (ligado, número conectado, dentro da janela) */
 const saiNaHora = (aj: AjustesPendencias) => !!aj.ativo && aj.numero.conectado && dentroDaJanela(agora(), aj);
 
+/** contato com esse número (mesma chave canônica): primeiro os clientes, depois os leads */
+function contatoPorNumero(tel: string): { c: ClienteFechado; cliente: boolean } | undefined {
+  const k = chaveTelefone(tel);
+  if (!k) return undefined;
+  const c = estado.clientes.find((x) => chaveTelefone(x.telefone) === k);
+  if (c) return { c, cliente: true };
+  const l = estado.leads.find((x) => chaveTelefone(x.telefone) === k);
+  return l ? { c: l, cliente: false } : undefined;
+}
+
+/* = pend_criar_interno: monta a pendência (sem gravar). Responsável = encarregado do cliente ou, sem ele,
+   quem abriu; 1ª no início, lembretes contados da data do início. */
+function montarPendencia(cli: ClienteFechado, dados: DadosNovaPendencia): Pendencia {
+  if (!Object.prototype.hasOwnProperty.call(ROTULO_TIPO, dados.tipo)) throw new Error('tipo_invalido');
+  if (!(dados.oQue ?? '').trim()) throw new Error('o_que_vazio');
+  if (!dados.passos.length) throw new Error('sem_mensagem');
+  const aj = estado.ajustes;
+  const inicio = dados.agendarPara && new Date(dados.agendarPara).getTime() > agora().getTime() ? new Date(dados.agendarPara) : agora();
+  const saiJa = !dados.agendarPara && saiNaHora(aj);
+  const passos: PassoPendencia[] = dados.passos.map((p, i) => (i === 0
+    ? { ...p, dia: 0, hora: 'agora', quando: inicio.toISOString(), estado: saiJa ? 'enviado' : 'agendado' }
+    : { ...p, dia: Math.max(1, p.dia), quando: instanteLembrete(inicio, Math.max(1, p.dia), p.hora, aj.diasUteis), estado: 'agendado' }));
+  const p: Pendencia = {
+    id: novoId('pd'), clienteId: cli.id, tipo: dados.tipo, oQue: dados.oQue, prazo: dados.prazo, processo: dados.processo,
+    responsavel: cli.responsavel || USUARIO, criadaEm: agora().toISOString(), status: 'aguardando', passos: ordenarPassos(passos), eventos: [],
+  };
+  p.eventos = [ev(`Pendência aberta por ${USUARIO}`), ...(saiJa ? [ev(`Primeira mensagem enviada (${resumoBlocos(passos[0].blocos)})`, 'nos')] : [])];
+  return p;
+}
+
 export const pendAcoes = {
-  /* = pendencia_criar: responsável = encarregado do cliente; 1ª no início, lembretes contados da data do início */
-  criar(dados: { clienteId: string; tipo: TipoPendencia; oQue: string; prazo?: string; processo?: string; passos: Passo[]; agendarPara?: string }) {
-    const aj = estado.ajustes;
-    const inicio = dados.agendarPara && new Date(dados.agendarPara).getTime() > agora().getTime() ? new Date(dados.agendarPara) : agora();
-    const saiJa = !dados.agendarPara && saiNaHora(aj);
-    const passos: PassoPendencia[] = dados.passos.map((p, i) => (i === 0
-      ? { ...p, dia: 0, hora: 'agora', quando: inicio.toISOString(), estado: saiJa ? 'enviado' : 'agendado' }
-      : { ...p, dia: Math.max(1, p.dia), quando: instanteLembrete(inicio, Math.max(1, p.dia), p.hora, aj.diasUteis), estado: 'agendado' }));
+  /* = pendencia_criar: o cliente tem que ter fechado OU já ter pendência (cadastrado por número) */
+  criar(dados: { clienteId: string } & DadosNovaPendencia) {
     const cli = estado.clientes.find((c) => c.id === dados.clienteId);
-    const p: Pendencia = {
-      id: novoId('pd'), clienteId: dados.clienteId, tipo: dados.tipo, oQue: dados.oQue, prazo: dados.prazo, processo: dados.processo,
-      responsavel: cli?.responsavel || USUARIO, criadaEm: agora().toISOString(), status: 'aguardando', passos: ordenarPassos(passos), eventos: [],
-    };
-    p.eventos = [ev(`Pendência aberta por ${USUARIO}`), ...(saiJa ? [ev(`Primeira mensagem enviada (${resumoBlocos(passos[0].blocos)})`, 'nos')] : [])];
+    if (!cli) throw new Error(estado.leads.some((l) => l.id === dados.clienteId) ? 'cliente_nao_fechado' : 'contato_invalido');
+    const p = montarPendencia(cli, dados);
     set((e) => ({ ...e, pendencias: [p, ...e.pendencias] }));
+    return p;
+  },
+  /* = pendencias_checar_numero (só leitura) */
+  checarNumero(tel: string): ChecagemNumero {
+    const n = normalizarTelefone(tel);
+    if (!n) return { valido: false, telefone: null, contato: null };
+    const achou = contatoPorNumero(n);
+    if (!achou) return { valido: true, telefone: n, contato: null };
+    const { c } = achou;
+    return {
+      valido: true, telefone: n,
+      contato: { id: c.id, nome: c.nome, telefone: c.telefone, fechado: !!c.fechadoEm, responsavel: c.responsavel, temPendencia: estado.pendencias.some((p) => p.clienteId === c.id) },
+    };
+  },
+  /* = pendencia_criar_numero: valida nome e número; o número que já é de alguém usa ESSE contato (só
+     ganha o nome digitado se não tinha nome — sem letra, ex. o próprio telefone); senão cadastra o
+     cliente (encarregado = quem cadastrou). Cliente e pendência entram juntos: se a pendência falhar,
+     o cliente não fica. Não exige ter fechado. */
+  criarNumero(dados: { nome: string; telefone: string } & DadosNovaPendencia) {
+    const nome = limparNome(dados.nome);
+    if (!nomeClienteValido(nome)) throw new Error('nome_invalido');
+    const tel = normalizarTelefone(dados.telefone);
+    if (!tel) throw new Error('telefone_invalido');
+    const achou = contatoPorNumero(tel);
+    const cli: ClienteFechado = achou
+      ? (contatoSemNome(achou.c) ? { ...achou.c, nome: nome.toUpperCase() } : achou.c)
+      : { id: novoId('c'), nome: nome.toUpperCase(), telefone: telefoneTela(tel), processo: '', acao: '', responsavel: USUARIO, fechadoEm: '' };
+    const p = montarPendencia(cli, dados);
+    set((e) => ({
+      ...e,
+      pendencias: [p, ...e.pendencias],
+      /* com pendência, o contato passa a aparecer na busca (= pendencias_clientes_fechados) */
+      clientes: achou?.cliente ? e.clientes.map((c) => (c.id === cli.id ? cli : c)) : [...e.clientes, cli],
+      leads: achou && !achou.cliente ? e.leads.filter((l) => l.id !== cli.id) : e.leads,
+    }));
     return p;
   },
   resolver(id: string) {

@@ -7,7 +7,7 @@ import { Fragment, useEffect, useLayoutEffect, useRef, useState, type MutableRef
 import { AudioRecorderV2, BotaoSec } from '../../components';
 import {
   EXT_DOC, MAX_BLOCOS, MAX_ENVIOS, MAX_TEXTO, ROTULO_BLOCO, VARIAVEIS, extDe, mmss, nomeBonito, novoBloco, novoId,
-  preencher, primeiroNome, quandoCurto,
+  preencher, primeiroNomeMsg, quandoCurto,
   type Bloco, type ClienteFechado, type Passo, type TipoBloco,
 } from '@/data/pendencias';
 import { barras, cap, hhmmAgora, hhmmDe, paraBanco, paraTela, pedacosComVariaveis, tamanhoBR, telefoneIntl, tiposDe } from './exibir';
@@ -241,7 +241,7 @@ export function EditorRegua({
       </section>
 
       <aside className="pd-previa" aria-label="Prévia">
-        <span className="pd-previa-rot">{rotuloPrevia ?? `Como ${primeiroNome(ctx.cliente.nome)} vê`}</span>
+        <span className="pd-previa-rot">{rotuloPrevia ?? `Como ${primeiroNomeMsg(ctx.cliente.nome) || 'o cliente'} vê`}</span>
         <Celular ctx={ctx} blocos={passo?.blocos ?? []} legenda={legenda} hora={hora} />
       </aside>
     </div>
