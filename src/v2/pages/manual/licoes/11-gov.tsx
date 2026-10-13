@@ -28,7 +28,7 @@ const licao: Licao = {
   corpo: (
     <>
       <p className="mv-lead">
-        Os documentos do Meu INSS mostram o benefício do cliente e os descontos dos empréstimos. Agora vamos buscar dois
+        Na lição 10 você viu os documentos do Meu INSS: a carta de concessão e os extratos. Agora vamos buscar dois
         documentos que vêm da <b>Receita Federal</b>: o <b>imposto de renda dos últimos 3 anos</b>, no serviço
         <b> Meu Imposto de Renda</b> (que fica dentro do <b>gov.br</b>), e a <b>situação cadastral do CPF</b>, numa consulta
         aberta no site da Receita. Parece muita coisa, mas a regra é curta e sempre igual: <b>três anos, um print por ano;

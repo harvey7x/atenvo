@@ -4,16 +4,21 @@
    do canal de juros, o pivô honesto do canal de empréstimo, o momento dos 30%
    (a regra completa é da lição 2), o pedido de documentos sem susto, os gatilhos
    honestos, os sinais de compra e de dúvida e o fechamento (do "sim" à ação).
+   Correção do dono (13/10): o processo revisa os juros do EMPRÉSTIMO PESSOAL
+   (cobrado pela financeira, fora do INSS), não o consignado. O consignado é o
+   assunto dos ganchos do canal de empréstimo (margem, aumento de margem,
+   portabilidade). A aula completa da diferença é a lição 3.
    Fatos da empresa: só os do brief (áudio do dono de 13/10 + processo oficial do
-   robô). Roteiros do atendente = sugestões. Ilustrações em 07-conversao-figuras.tsx. */
+   robô) e da correção. Roteiros do atendente = sugestões. Ilustrações em
+   07-conversao-figuras.tsx. */
 import type { Licao } from '../tipos';
 import {
   Aviso, BomRuim, Celular, Conversa, Fatos, Frase, LinhaTempo, Lista, Passos, Sanfona, Secao, Tabela, TesteRapido,
 } from '../pecas';
 import { MapaMental } from '../ilustracoes';
 import {
-  BlocosDocumentos, ClassificarGatilhos, DezReais, EscadaConfianca, FechamentoAnotado, FunilVenda, GatilhosPainel, MatrizCanal,
-  OrdenarPivo, PivoEmprestimo, Principios, QuatroFrases, TradutorSimples,
+  BlocosDocumentos, ClassificarGatilhos, DezReais, DoisEmprestimos, EscadaConfianca, FechamentoAnotado, FunilVenda,
+  GatilhosPainel, MatrizCanal, OrdenarPivo, PivoEmprestimo, Principios, QuatroFrases, TradutorSimples,
 } from './07-conversao-figuras';
 import './07-conversao.css';
 
@@ -29,14 +34,15 @@ const corpo = (
       transforma uma conversa em um processo de verdade: <b>converter</b>. Converter é levar o cliente da primeira
       mensagem até o “vamos fazer”, e do “vamos fazer” até a <b>ação</b>, que é o primeiro documento chegando. Nesta
       lição você vai aprender a estratégia inteira: o mapa da venda, os cinco degraus do funil, como construir confiança,
-      como a conversa muda em cada canal (com roteiros completos), a hora certa de falar dos 30%, como pedir os
-      documentos sem assustar, o que é um gatilho honesto e como reconhecer a hora de fechar.
+      qual empréstimo é assunto de quê na conversa (o consignado e o empréstimo pessoal), como a conversa muda em cada
+      canal (com roteiros completos), a hora certa de falar dos 30%, como pedir os documentos sem assustar, o que é um
+      gatilho honesto e como reconhecer a hora de fechar.
     </p>
 
     <Fatos itens={[
       { grande: '5 degraus', texto: 'Atenção, confiança, entendimento, decisão e documentos. Um de cada vez, nessa ordem.' },
       { grande: '2 abordagens', texto: 'Canal de juros abusivos: venda direta. Canal de empréstimo: o pivô honesto.' },
-      { grande: '3 caminhos', texto: 'Aumento de margem, portabilidade e o processo. Sempre como possibilidade, nunca como promessa.' },
+      { grande: '3 caminhos', texto: 'Aumento de margem e portabilidade (do consignado) e a revisão do empréstimo pessoal. Sempre como possibilidade.' },
       { grande: '1 regra', texto: 'Toda conversa termina com um próximo passo combinado.' },
     ]} />
 
@@ -180,14 +186,46 @@ const corpo = (
       <TradutorSimples />
     </Secao>
 
+    {/* ------------------------------------------------------------------ consignado × pessoal */}
+    <Secao titulo="Consignado ou empréstimo pessoal: quem é quem na venda">
+      <p>
+        Antes de ver os dois canais, acerte uma coisa que muda a conversa inteira: o aposentado pode ter <b>dois tipos de
+        empréstimo</b>, e cada um tem um papel diferente na venda. O <b>consignado</b> é descontado pelo INSS direto do
+        benefício e depende de margem. O <b>empréstimo pessoal</b> é um contrato direto com a financeira, cobrado fora do
+        INSS. <b>O nosso processo olha os juros do empréstimo pessoal</b>, que o cliente fez com Agibank, BMG, Facta,
+        Mercantil ou Crefisa. A aula completa da diferença está na lição 3; aqui, o que importa é onde cada um entra na
+        conversa.
+      </p>
+      <DoisEmprestimos />
+      <p>
+        Na prática, é simples: quando o assunto é <b>margem</b>, <b>aumento de margem</b> ou <b>portabilidade</b>, você
+        está falando do consignado. Quando o assunto é a <b>revisão dos juros</b> e o <b>ressarcimento</b>, você está
+        falando do empréstimo pessoal. Misturar os dois (por exemplo, dizer “vamos revisar os juros do seu consignado”)
+        confunde o cliente e passa uma informação errada. E cuidado com o nome do banco: o BMG, por exemplo, também tem
+        consignado e cartão consignado. O que vale para o processo é o <b>empréstimo pessoal</b> com uma das cinco.
+      </p>
+      <TesteRapido
+        pergunta="No canal de empréstimo, a Dona Lúcia está sem margem. Qual frase apresenta o processo do jeito certo?"
+        opcoes={[
+          '“Podemos revisar os juros dos seus consignados.”',
+          '“Podemos ver os juros do seu empréstimo pessoal.”',
+          '“O processo libera margem para um consignado novo.”',
+        ]}
+        certa={1}
+        explica="O processo revisa os juros do empréstimo pessoal, que a financeira cobra fora do INSS. Os consignados são o assunto dos ganchos (margem e portabilidade), e o processo não libera margem."
+      />
+    </Secao>
+
     {/* ------------------------------------------------------------------ matriz */}
     <Secao titulo="Dois canais, duas abordagens">
       <p>
-        O processo que a gente oferece é um só: o ressarcimento de juros abusivos, que é o carro-chefe da CAF. Mas o cliente
-        chega por dois tráfegos pagos diferentes, e com intenções diferentes. Quem vem pelo <b>tráfego do Andrius</b>, o de
-        juros abusivos, <b>já quer a revisão</b>: é um cliente mais nichado, e a venda é mais direta. Quem vem pelo
-        <b> tráfego de empréstimo</b> quer <b>dinheiro rápido</b>, mas a maioria <b>não tem margem disponível</b>. Com ele,
-        é preciso convencer: entender o que ele quer, contar a verdade e mostrar os caminhos.
+        O processo que a gente oferece é um só: o ressarcimento de juros abusivos dos <b>empréstimos pessoais</b> que o
+        aposentado ou pensionista fez com as financeiras. É o carro-chefe da CAF. Mas o cliente chega por dois tráfegos
+        pagos diferentes, e com intenções diferentes. Quem vem pelo <b>tráfego do Andrius</b>, o de juros abusivos,
+        <b> já quer a revisão</b> dos juros do empréstimo pessoal: é um cliente mais nichado, e a venda é mais direta. Quem
+        vem pelo <b>tráfego de empréstimo</b> quer <b>dinheiro rápido</b>, um consignado novo, mas a maioria <b>não tem
+        margem disponível</b>. Com ele, é preciso convencer: entender o que ele quer, contar a verdade e mostrar os
+        caminhos.
       </p>
       <MatrizCanal />
       <p>
@@ -201,13 +239,14 @@ const corpo = (
     <Secao titulo="Canal de juros abusivos: a venda direta">
       <p>
         O cliente viu o anúncio, assistiu ao vídeo do robô e respondeu <b>SIM</b> para a análise gratuita. Ele já chega
-        sabendo mais ou menos o que quer: revisar os juros. O seu trabalho é <b>confirmar que ele pode</b>, <b>escutar</b>,
+        sabendo mais ou menos o que quer: revisar os juros do empréstimo pessoal que tem com a financeira. O seu trabalho
+        é <b>confirmar que ele pode</b>, <b>escutar</b>,
         <b> explicar com clareza</b> e <b>levar para os documentos</b>, sem rodeio e sem pressa. Venda direta não é venda
         apressada: é venda sem desvio.
       </p>
       <LinhaTempo itens={[
         { quando: 'Abertura', titulo: 'Assumir onde o robô parou', texto: 'Seu nome + CAF + “já recebi seus dados”. Nada de pedir nome e CPF de novo.' },
-        { quando: 'Qualificação', titulo: 'Confirmar o perfil', texto: 'Recebe benefício do INSS (ou um familiar recebe)? Tem empréstimo no Agibank, BMG, Facta, Mercantil ou Crefisa?' },
+        { quando: 'Qualificação', titulo: 'Confirmar o perfil', texto: 'Recebe benefício do INSS (ou um familiar recebe)? Tem empréstimo pessoal com Agibank, BMG, Facta, Mercantil ou Crefisa?' },
         { quando: 'Escuta', titulo: 'Descobrir a dor', texto: 'O que pesa? Há quanto tempo paga? Anote com as palavras dele.' },
         { quando: 'Explicação', titulo: 'O processo em 4 frases', texto: 'O que é, quem faz, quanto tempo leva, quanto custa.' },
         { quando: 'Dúvidas', titulo: 'Conferir e dar segurança', texto: '“Ficou alguma dúvida?” Responda com calma, um ponto por vez.' },
@@ -226,11 +265,11 @@ const corpo = (
           { quem: 'eu', texto: 'Olá, Dona Maria! Aqui é [seu nome], da CAF, a Central de Assessoria Financeira. Já recebi seu nome e seu CPF, não precisa mandar de novo. A partir de agora sou eu que cuido da sua análise.' },
           { quem: 'eu', texto: 'Pra começar, me conta: a senhora recebe algum benefício do INSS?' },
           { quem: 'cliente', texto: 'Recebo sim, sou aposentada.' },
-          { quem: 'eu', texto: 'Que bom. E a senhora tem empréstimo em algum destes bancos: Agibank, BMG, Facta, Mercantil ou Crefisa?' },
-          { quem: 'cliente', texto: 'Tenho no BMG e no Agibank. Desconta muito, viu. Vi o vídeo e achei que era o meu caso.' },
-          { quem: 'eu', texto: 'Entendo, Dona Maria. Esses descontos pesam no fim do mês, né? Faz muito tempo que a senhora paga esses empréstimos?' },
+          { quem: 'eu', texto: 'Que bom. E a senhora tem empréstimo pessoal com alguma destas financeiras: Agibank, BMG, Facta, Mercantil ou Crefisa? É aquele empréstimo que a financeira cobra na sua conta, e não o que o INSS desconta direto do benefício.' },
+          { quem: 'cliente', texto: 'Tenho no BMG e no Agibank. A parcela pesa muito, viu. Vi o vídeo e achei que era o meu caso.' },
+          { quem: 'eu', texto: 'Entendo, Dona Maria. Essas parcelas pesam no fim do mês, né? Faz muito tempo que a senhora paga esses empréstimos?' },
           { quem: 'cliente', texto: 'Uns seis anos, já nem sei mais.' },
-          { quem: 'eu', texto: 'Obrigado por me contar. Vou te explicar como funciona, bem simples. Se os seus empréstimos tiverem juros abusivos, o nosso advogado, o Dr. Rafael Menezes, entra com uma ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos, ou seja, pedindo esse dinheiro de volta. O resultado depende da análise.' },
+          { quem: 'eu', texto: 'Obrigado por me contar. Vou te explicar como funciona, bem simples. Se os juros desses empréstimos pessoais forem abusivos, o nosso advogado, o Dr. Rafael Menezes, entra com uma ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos nesses empréstimos, ou seja, pedindo esse dinheiro de volta. O resultado depende da análise.' },
           { quem: 'eu', texto: 'Leva em média de 6 a 12 meses. E a senhora não paga nada para começar: só no final, 30% do valor que a senhora receber ficam para o advogado. De cada R$ 10 que a senhora receber, R$ 7 são seus.' },
           { quem: 'eu', texto: 'Ficou alguma dúvida até aqui?' },
           { quem: 'cliente', texto: 'E é seguro? Tenho medo de golpe.' },
@@ -241,17 +280,18 @@ const corpo = (
           { quem: 'eu', texto: 'Sem problema, eu te guio passo a passo, a gente faz junto. Abre o Meu INSS aí e me avisa quando estiver na tela inicial?' },
         ]}
       />
-      <p>Repare em cinco detalhes deste roteiro, porque são eles que fazem a venda andar:</p>
+      <p>Repare em seis detalhes deste roteiro, porque são eles que fazem a venda andar:</p>
       <Lista itens={[
         <><b>Uma pergunta por mensagem.</b> O cliente responde uma coisa de cada vez e não se perde.</>,
-        <><b>A dor vem antes da explicação.</b> Quando a Dona Maria diz “desconta muito”, o atendente acolhe antes de explicar. A explicação passa a ser a resposta para um problema dela.</>,
+        <><b>A pergunta do empréstimo pessoal vem explicada.</b> “É aquele empréstimo que a financeira cobra na sua conta, e não o que o INSS desconta” evita que a cliente responda pensando no consignado.</>,
+        <><b>A dor vem antes da explicação.</b> Quando a Dona Maria diz “a parcela pesa muito”, o atendente acolhe antes de explicar. A explicação passa a ser a resposta para um problema dela.</>,
         <><b>Os 30% aparecem cedo</b>, junto com o “não paga nada para começar”. Ela sabe da regra inteira antes de decidir.</>,
         <><b>A desconfiança é bem-vinda.</b> “É muito bom a senhora perguntar isso” transforma o medo em conversa, em vez de tratar como ofensa.</>,
         <><b>O “sim” vira ação na hora.</b> “O que eu preciso fazer?” é respondido com um passo pequeno e imediato, não com uma lista.</>,
       ]} />
       <Aviso tom="ambar" titulo="Nunca prometa valor, nem para “animar”">
-        Mesmo no canal de juros, em que o cliente já está animado, não diga quanto ele vai receber. O valor depende do que
-        aparece nos extratos e do resultado do processo. Fale em <b>análise</b>, <b>possibilidade</b> e <b>em média</b>.
+        Mesmo no canal de juros, em que o cliente já está animado, não diga quanto ele vai receber. O valor depende da
+        análise e do resultado do processo. Fale em <b>análise</b>, <b>possibilidade</b> e <b>em média</b>.
       </Aviso>
     </Secao>
 
@@ -260,13 +300,13 @@ const corpo = (
       <p>
         Aqui a conversa é outra. O cliente viu um anúncio de empréstimo, o robô ofereceu “uma análise pra ver se é liberado
         algum valor”, a IA fez as perguntas de elegibilidade e mandou: <span className="mv-cv-cit">Boa notícia,
-        {' {nome}'}! Sua análise foi *pré-aprovada*.</span> Ele chega até você querendo <b>dinheiro rápido</b>. Mas a
-        maioria dos clientes desse canal
-        <b> não tem margem disponível</b>: a parte do benefício que pode ser descontada para empréstimos já está ocupada.
+        {' {nome}'}! Sua análise foi *pré-aprovada*.</span> Ele chega até você querendo <b>dinheiro rápido</b>, um
+        consignado novo. Mas a maioria dos clientes desse canal
+        <b> não tem margem disponível</b>: a parte do benefício que o INSS pode descontar para consignado já está ocupada.
       </p>
       <p>
         É aqui que entra o <b>pivô</b>. Pivô é mudar a direção da conversa <b>sem mudar a verdade</b>: sair do que não é
-        possível agora (um empréstimo novo) e ir para o que pode ser possível. Nas palavras do dono da empresa, com esse
+        possível agora (um consignado novo) e ir para o que pode ser possível. Nas palavras do dono da empresa, com esse
         cliente “a gente tem que estar convencendo”. Convencer com verdade, e é isso que faz o pivô ser honesto.
       </p>
       <PivoEmprestimo />
@@ -276,23 +316,33 @@ const corpo = (
         cliente percebe que você olhou o caso dele com cuidado. A notícia “hoje não há margem” é ruim, mas é uma
         <b> informação útil</b>: ele passa a entender por que o banco não libera, e passa a ouvir os caminhos com atenção.
       </p>
-      <p>Os três caminhos (os <b>ganchos</b>) são sempre apresentados como <b>possibilidade</b>, porque cada caso é analisado:</p>
+      <p>
+        Os três caminhos são sempre apresentados como <b>possibilidade</b>, porque cada caso é analisado. Os dois
+        primeiros são os <b>ganchos do consignado</b>; o terceiro é a revisão do <b>empréstimo pessoal</b> que ele já tem:
+      </p>
       <div className="mv-ganchos">
-        <div className="vidro mv-gancho"><span className="num">1</span><b>Aumento de margem</b><p>Ver se existe a possibilidade de o cliente voltar a ter espaço para empréstimo. É avaliado caso a caso, e nunca se promete antes da análise.</p></div>
-        <div className="vidro mv-gancho"><span className="num">2</span><b>Portabilidade</b><p>Levar os consignados para outro banco. Em alguns casos libera um valor, que pode passar de R$ 1.500. Depende da análise.</p></div>
-        <div className="vidro mv-gancho"><span className="num">3</span><b>O processo</b><p>Se houver juros abusivos, o advogado entra com uma ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos. Nada se paga para começar.</p></div>
+        <div className="vidro mv-gancho"><span className="num">1</span><b>Aumento de margem</b><p>Do consignado. Ver se existe a possibilidade de o cliente voltar a ter espaço para um consignado. É avaliado caso a caso, e nunca se promete antes da análise.</p></div>
+        <div className="vidro mv-gancho"><span className="num">2</span><b>Portabilidade dos consignados</b><p>Levar os consignados para outro banco. Em alguns casos libera um valor, que pode passar de R$ 1.500. Depende da análise.</p></div>
+        <div className="vidro mv-gancho"><span className="num">3</span><b>Revisão do empréstimo pessoal</b><p>O processo. Se os juros do empréstimo pessoal que ele tem com a financeira forem abusivos, o advogado entra com uma ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos. Nada se paga para começar.</p></div>
       </div>
       <p>
-        Os dois primeiros ganchos abrem a conversa: mostram que você está procurando uma saída para ele. O terceiro, o
-        processo, é o nosso carro-chefe. Mas atenção ao jeito de apresentá-lo: <b>o processo não é empréstimo</b>. Não é
-        dinheiro novo e não é rápido (leva em média de 6 a 12 meses). É pedir de volta um dinheiro que já saiu do benefício
-        dele. Diga isso com todas as letras. O cliente que entende a diferença decide com consciência e não se sente
-        enganado lá na frente.
+        Os dois ganchos do consignado respondem ao que ele pediu e abrem a conversa: mostram que você está
+        procurando uma saída para ele. O terceiro caminho <b>muda de empréstimo</b>: é a revisão dos juros do empréstimo pessoal, o
+        nosso carro-chefe. Faz sentido para esse cliente porque quem está sem margem para consignado muitas vezes recorre ao
+        empréstimo pessoal, que é mais caro, e a IA já perguntou, na porta 3, se ele tem empréstimo pessoal numa das cinco
+        financeiras.
+      </p>
+      <p>
+        Mas atenção ao jeito de apresentá-lo: <b>o processo não é empréstimo</b>. Não é dinheiro novo e não é rápido (leva
+        em média de 6 a 12 meses). É pedir de volta o que foi descontado nos últimos 10 anos no empréstimo pessoal, se os
+        juros forem abusivos. Diga isso com todas as letras, e nunca diga que o processo revisa os consignados: eles
+        ocupam a margem, mas o que o processo olha é o empréstimo pessoal. O cliente que entende a diferença decide com
+        consciência e não se sente enganado lá na frente.
       </p>
       <Aviso tom="azul" titulo="E se o cliente tiver margem?">
         Aí o caminho é outro: combine o próximo passo com o seu gestor. E o processo continua valendo, porque ele não
-        depende da margem: depende de o cliente (ou um familiar) receber benefício do INSS e ter desconto de uma das cinco
-        financeiras.
+        depende da margem: depende de o cliente (ou um familiar) receber benefício do INSS e ter empréstimo pessoal com uma
+        das cinco financeiras.
       </Aviso>
       <p>
         Agora o roteiro completo, dividido nos três momentos da conversa. A Parte 1 é o primeiro passo de sempre no canal
@@ -319,13 +369,15 @@ const corpo = (
         titulo="Parte 2 · A verdade e os caminhos"
         nota="Sugestão de roteiro, adapte ao cliente. Só depois de conferir os extratos."
         falas={[
-          { quem: 'eu', texto: 'Recebi, obrigado! Conferi com calma, Dona Lúcia, e vou ser bem sincero com a senhora: hoje a sua margem está toda ocupada pelos empréstimos e cartões que a senhora já tem. Por isso o banco não libera um empréstimo novo agora.' },
+          { quem: 'eu', texto: 'Recebi, obrigado! Conferi com calma, Dona Lúcia, e vou ser bem sincero com a senhora: hoje a sua margem está toda ocupada pelos consignados que a senhora já tem, os empréstimos e cartões que o INSS desconta do benefício. Por isso não sai um consignado novo agora.' },
           { quem: 'cliente', texto: 'Ah, que pena. Eu precisava muito desse dinheiro.' },
-          { quem: 'eu', texto: 'Eu entendo, de verdade. Mas não acabou aqui: olhando os seus contratos, existem alguns caminhos que podemos analisar. Posso te explicar rapidinho?' },
+          { quem: 'eu', texto: 'Eu entendo, de verdade. Mas não acabou aqui: existem alguns caminhos que podemos analisar. Posso te explicar rapidinho?' },
           { quem: 'cliente', texto: 'Pode.' },
           { quem: 'eu', texto: 'O primeiro é ver se existe a possibilidade de aumentar a sua margem. Isso é analisado caso a caso.' },
-          { quem: 'eu', texto: 'O segundo é a portabilidade: levar os seus empréstimos para outro banco. Em alguns casos, essa troca libera um valor, que pode passar de R$ 1.500. Também depende da análise.' },
-          { quem: 'eu', texto: 'E o terceiro é o que eu mais quero te mostrar: os seus contratos podem ter juros abusivos. Se tiverem, o nosso advogado, o Dr. Rafael Menezes, entra com uma ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos. O resultado depende da análise.' },
+          { quem: 'eu', texto: 'O segundo é a portabilidade: levar os seus consignados para outro banco. Em alguns casos, essa troca libera um valor, que pode passar de R$ 1.500. Também depende da análise.' },
+          { quem: 'eu', texto: 'E o terceiro é o que eu mais quero te mostrar. Vi aqui na conversa que a senhora tem empréstimo pessoal no Agibank, certo? Aquele que a financeira cobra na sua conta, e não o que o INSS desconta direto do benefício.' },
+          { quem: 'cliente', texto: 'Tenho, sim. Faz uns anos já.' },
+          { quem: 'eu', texto: 'Os juros desse empréstimo pessoal podem ser abusivos. Se forem, o nosso advogado, o Dr. Rafael Menezes, entra com uma ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos nesse empréstimo. O resultado depende da análise.' },
         ]}
       />
       <Conversa
@@ -334,17 +386,19 @@ const corpo = (
         falas={[
           { quem: 'cliente', texto: 'E quanto custa isso?' },
           { quem: 'eu', texto: 'Para começar, nada. Leva em média de 6 a 12 meses e, só no final, 30% do valor que a senhora receber ficam para o advogado. De cada R$ 10, R$ 7 são seus.' },
-          { quem: 'eu', texto: 'Só para ficar bem claro: o processo é diferente do empréstimo. Não é um dinheiro novo e não é rápido. É pedir de volta o que já saiu do seu benefício. A senhora decide com calma.' },
+          { quem: 'eu', texto: 'Só para ficar bem claro: o processo é diferente do empréstimo que a senhora veio buscar. Não é um dinheiro novo e não é rápido. É pedir de volta o que foi descontado no seu empréstimo pessoal, se os juros forem abusivos. A senhora decide com calma.' },
           { quem: 'cliente', texto: 'Entendi. Quero fazer sim. E a portabilidade, dá pra ver também?' },
           { quem: 'eu', texto: 'Dá para analisar, sim. Vou ver com a equipe e te dou um retorno sobre isso.' },
-          { quem: 'eu', texto: 'E para o processo a gente já pode começar agora: o extrato de empréstimo a senhora já me mandou. Faltam a carta de concessão e os extratos de pagamento, também no Meu INSS. Vamos pegar a carta de concessão primeiro?' },
+          { quem: 'eu', texto: 'E para o processo a gente já pode começar agora: o extrato de empréstimo consignado a senhora já me mandou. Faltam a carta de concessão e os extratos de pagamento, também no Meu INSS. Vamos pegar a carta de concessão primeiro?' },
         ]}
       />
       <p>
         Repare como a Parte 2 começa: <b>“vou ser bem sincero com a senhora”</b>. É a frase que marca o pivô. Ela avisa
         que vem uma verdade, e o cliente agradece a sinceridade mesmo quando a notícia não é a que ele queria. Repare
-        também que a portabilidade não fica sem resposta: “vou ver com a equipe e te dou um retorno” é um próximo passo
-        combinado, e você precisa cumprir.
+        também na passagem do segundo para o terceiro caminho: os dois primeiros falam dos <b>consignados</b>; o terceiro
+        fala de <b>outro empréstimo</b>, o pessoal, e o atendente diz qual é com uma frase simples, para a cliente não
+        achar que o processo vai mexer nos consignados. E a portabilidade não fica sem resposta: “vou ver com a equipe e te
+        dou um retorno” é um próximo passo combinado, e você precisa cumprir.
       </p>
       <TesteRapido
         pergunta="Depois de ouvir que está sem margem, a cliente pergunta: “Então não dá nada?”. Qual a melhor resposta?"
@@ -591,12 +645,13 @@ const corpo = (
           ),
         },
         {
-          titulo: 'O cliente não sabe se tem empréstimo nas cinco financeiras',
+          titulo: 'O cliente não sabe se tem empréstimo pessoal nas cinco financeiras',
           corpo: (
             <p>
-              Pergunte de novo uma vez, de um jeito concreto: “Aparece algum desconto de Agibank, BMG, Facta, Mercantil ou
-              Crefisa no seu benefício?”. Se ele continuar sem saber, siga em frente: o extrato de empréstimo consignado vai
-              mostrar os contratos. A regra completa está na lição 4.
+              Pergunte de novo uma vez, citando as cinco e explicando a diferença numa frase: “É aquele empréstimo que a
+              financeira cobra na sua conta, e não o que o INSS desconta direto do benefício. O senhor tem algum assim com
+              Agibank, BMG, Facta, Mercantil ou Crefisa?”. O cliente costuma lembrar pelo nome do banco e pelo débito na
+              conta. Se ele continuar sem saber, siga em frente. A regra completa está na lição 4.
             </p>
           ),
         },
@@ -625,9 +680,9 @@ const corpo = (
     {/* ------------------------------------------------------------------ resumo */}
     <Secao titulo="Resumo da lição">
       <Lista itens={[
-        <>Converter é <b>ajudar o cliente a entender, a decidir com a verdade e a dar o primeiro passo</b>. Não é empurrar.</>,
-        <>O funil tem cinco degraus: <b>atenção → confiança → entendimento → decisão → documentos</b>. Responda o degrau em que o cliente está.</>,
-        <>Canal de juros: <b>venda direta</b> (confirmar, escutar, explicar em 4 frases, levar aos documentos). Canal de empréstimo: <b>pivô honesto</b> (apresentar-se, explicar a “pré-aprovada”, perguntar o que precisa, pedir os extratos, contar a verdade sobre a margem, apresentar os caminhos como possibilidade e deixar claro que o processo é outra coisa).</>,
+        <>Converter é <b>ajudar o cliente a entender, a decidir com a verdade e a dar o primeiro passo</b>, e não empurrar. O funil tem cinco degraus: <b>atenção → confiança → entendimento → decisão → documentos</b>. Responda o degrau em que o cliente está.</>,
+        <>O <b>consignado</b> é descontado pelo INSS e depende de margem: é o assunto dos ganchos. O <b>empréstimo pessoal</b> é cobrado pela financeira, fora do INSS: <b>é ele que o processo revisa</b>.</>,
+        <>Canal de juros: <b>venda direta</b> (confirmar, escutar, explicar em 4 frases, levar aos documentos). Canal de empréstimo: <b>pivô honesto</b> (apresentar-se, explicar a “pré-aprovada”, perguntar o que precisa, pedir os extratos, contar a verdade sobre a margem e apresentar os caminhos como possibilidade: aumento de margem e portabilidade dos consignados, e a revisão dos juros do empréstimo pessoal que ele já tem, deixando claro que o processo é outra coisa).</>,
         <>Os 30% vêm <b>cedo, junto com o “não paga nada para começar”</b>: de cada R$ 10, R$ 7 são do cliente. A regra completa está na lição 2.</>,
         <>Documentos <b>um bloco por vez</b>, na ordem sugerida (Meu INSS, gov.br, pessoais) sem rigidez, com o porquê de cada um e ajuda oferecida. Gatilho só o honesto: <b>nada de urgência falsa, promessa de valor ou pressão</b>.</>,
         <>Sinal de compra pede ação; sinal de dúvida pede escuta. O fechamento é o <b>primeiro documento chegando</b>, e toda conversa termina com um próximo passo combinado.</>,
@@ -640,8 +695,8 @@ const licao: Licao = {
   id: 'conversao',
   modulo: 'venda',
   titulo: 'Como converter o cliente',
-  resumo: 'A estratégia de conversão: o funil em cinco degraus, a confiança, a venda direta do canal de juros, o pivô honesto do canal de empréstimo, a hora certa dos 30%, o pedido de documentos sem susto, os gatilhos honestos e o fechamento.',
-  minutos: 33,
+  resumo: 'A estratégia de conversão: o funil em cinco degraus, a confiança, o papel do consignado e do empréstimo pessoal na conversa, a venda direta do canal de juros, o pivô honesto do canal de empréstimo, a hora certa dos 30%, o pedido de documentos sem susto, os gatilhos honestos e o fechamento.',
+  minutos: 35,
   corpo,
   questoes: [
     {
@@ -672,17 +727,17 @@ const licao: Licao = {
         'Para o cliente esquecer o empréstimo e pensar só no processo',
       ],
       c: 1,
-      e: 'O processo pede o ressarcimento do que já foi descontado e leva em média de 6 a 12 meses. Quem entende a diferença decide com consciência e não se sente enganado depois. E o processo não depende da margem.',
+      e: 'O processo pede o ressarcimento do que foi descontado no empréstimo pessoal nos últimos 10 anos e leva em média de 6 a 12 meses. Quem entende a diferença decide com consciência e não se sente enganado depois. E o processo não depende da margem.',
     },
     {
-      p: 'Qual destas falas do cliente é um SINAL DE COMPRA?',
+      p: 'Na conversa de venda, em que momento você fala dos 30% de honorários?',
       o: [
-        '“Tá bom. E o que eu preciso fazer agora?”',
-        '“Vou pensar e depois eu te falo.”',
-        '“Mas isso aí não é golpe, não? Tenho medo.”',
+        'Cedo e com clareza, antes de o cliente decidir',
+        'Só no fim, depois de o cliente mandar os documentos',
+        'Só se o cliente perguntar quanto custa o processo',
       ],
       c: 0,
-      e: 'Quem pergunta o que precisa fazer já se imagina dentro do processo: pare de explicar e proponha o primeiro passo. “Vou pensar” e “é golpe?” são sinais de dúvida, que pedem escuta.',
+      e: 'Os 30% entram cedo, na mesma mensagem do “para começar, não paga nada”. Dito assim, vira argumento a favor: o cliente decide sabendo a regra inteira e não se sente enganado depois.',
     },
     {
       p: 'O cliente topou o processo. Qual é a melhor forma de transformar esse “sim” em ação?',
@@ -699,7 +754,7 @@ const licao: Licao = {
     { termo: 'Conversão', def: 'Levar o cliente da primeira mensagem até a decisão de seguir com o processo, e dessa decisão até a ação: os documentos chegando.' },
     { termo: 'Funil da venda', def: 'O caminho em cinco degraus que o cliente percorre: atenção, confiança, entendimento, decisão e documentos. Nem todos passam de um degrau para o outro, e tudo bem.' },
     { termo: 'Rapport', def: 'Palavra de origem francesa (lê-se “rapór”) que quer dizer sintonia: o cliente sentir que conversa com alguém que escuta, entende e respeita. É a base da confiança.' },
-    { termo: 'Pivô honesto', def: 'No canal de empréstimo, mudar a direção da conversa do empréstimo (que não cabe) para os caminhos possíveis, contando a verdade sobre a margem e sem disfarçar que o processo é outra coisa.' },
+    { termo: 'Pivô honesto', def: 'No canal de empréstimo, mudar a direção da conversa do consignado novo (que não cabe na margem) para os caminhos possíveis: aumento de margem, portabilidade dos consignados e a revisão dos juros do empréstimo pessoal, contando a verdade e sem disfarçar que o processo é outra coisa.' },
     { termo: 'Gatilho honesto', def: 'Algo verdadeiro que ajuda o cliente a decidir: clareza, segurança, facilidade e a prova de que não se paga nada para começar.' },
     { termo: 'Urgência falsa', def: 'Pressa inventada para empurrar o cliente, como “só até hoje” ou “últimas vagas”. Não usamos, nunca.' },
     { termo: 'Sinal de compra', def: 'Fala que mostra que o cliente está pronto para seguir, como “o que eu preciso fazer?”. É a hora de propor o primeiro passo.' },
@@ -711,12 +766,12 @@ const licao: Licao = {
     {
       titulo: 'Explicar o processo em 4 frases',
       quando: 'Canal de juros, depois de confirmar o perfil e escutar a dor do cliente.',
-      texto: 'Vou te explicar de um jeito simples, [nome do cliente]:\n\n1) Se os seus empréstimos tiverem juros abusivos, o nosso advogado, o Dr. Rafael Menezes, entra com uma ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos. O resultado depende da análise.\n2) Leva em média de 6 a 12 meses.\n3) Para começar, você não paga nada.\n4) Só no final, 30% do valor que você receber ficam para o advogado. De cada R$ 10 que você receber, R$ 7 são seus.\n\nFicou alguma dúvida?',
+      texto: 'Vou te explicar de um jeito simples, [nome do cliente]:\n\n1) Se os juros do seu empréstimo pessoal com a financeira forem abusivos, o nosso advogado, o Dr. Rafael Menezes, entra com uma ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos nesse empréstimo. O resultado depende da análise.\n2) Leva em média de 6 a 12 meses.\n3) Para começar, você não paga nada.\n4) Só no final, 30% do valor que você receber ficam para o advogado. De cada R$ 10 que você receber, R$ 7 são seus.\n\nFicou alguma dúvida?',
     },
     {
       titulo: 'Processo não é empréstimo',
       quando: 'Canal de empréstimo, depois de contar que não há margem e apresentar os caminhos.',
-      texto: '[nome do cliente], só para ficar bem claro: o processo é diferente do empréstimo. Não é um dinheiro novo que o banco empresta, e não é rápido: leva em média de 6 a 12 meses. É pedir o ressarcimento do que já foi descontado do seu benefício nos últimos 10 anos, se houver juros abusivos nos seus contratos. O resultado depende da análise.\n\nPara começar, você não paga nada. No final, 30% do valor que você receber ficam para o advogado.\n\nQuer seguir com a análise?',
+      texto: '[nome do cliente], só para ficar bem claro: o processo é diferente do empréstimo que você veio buscar. Não é um dinheiro novo que o banco empresta, e não é rápido: leva em média de 6 a 12 meses. É a revisão dos juros do empréstimo pessoal que você já tem com a financeira: se os juros forem abusivos, o advogado entra com uma ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos nesse empréstimo. O resultado depende da análise.\n\nPara começar, você não paga nada. No final, 30% do valor que você receber ficam para o advogado.\n\nQuer seguir com a análise?',
     },
     {
       titulo: 'Do sim ao primeiro passo',
@@ -726,7 +781,7 @@ const licao: Licao = {
     {
       titulo: 'Pedir os documentos do Meu INSS sem assustar',
       quando: 'Ao começar o primeiro bloco de documentos.',
-      texto: 'Agora vamos ao primeiro bloco, [nome do cliente]: três documentos do aplicativo Meu INSS.\n\n• Carta de concessão: mostra qual é o seu benefício.\n• Extrato de empréstimo consignado: mostra os seus empréstimos.\n• Extratos de pagamento: mostram, mês a mês, o que foi descontado.\n\nFica tranquilo(a): eu te guio tela por tela, sem pressa. Seus dados são usados só para o seu processo. Pode abrir o aplicativo?',
+      texto: 'Agora vamos ao primeiro bloco, [nome do cliente]: três documentos do aplicativo Meu INSS.\n\n• Carta de concessão: mostra qual é o seu benefício.\n• Extrato de empréstimo consignado: mostra os seus empréstimos consignados.\n• Extratos de pagamento: mostram, mês a mês, o que o benefício pagou e o que foi descontado.\n\nOs três fazem parte da documentação do seu processo. Fica tranquilo(a): eu te guio tela por tela, sem pressa. Seus dados são usados só para o seu processo. Pode abrir o aplicativo?',
     },
   ],
 };

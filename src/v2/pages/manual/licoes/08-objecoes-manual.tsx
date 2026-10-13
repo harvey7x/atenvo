@@ -1,8 +1,11 @@
-/* Lição 8 — o manual de objeções (prefixo mv-ob-): as 5 famílias, as 18
+/* Lição 8 — o manual de objeções (prefixo mv-ob-): as 5 famílias, as 20
    objeções com o que o cliente diz, o que pode estar por trás, a pergunta que
    descobre o motivo real, a resposta sugerida (pronta para copiar, com troca
    de tratamento: o senhor / a senhora / você) e o que NÃO dizer. Também a
-   matriz-resumo em tabela. Fatos da empresa: só os do brief. Estilos em
+   matriz-resumo em tabela. Fatos da empresa: só os do brief e da correção do
+   dono de 13/10: o processo revisa os juros do EMPRÉSTIMO PESSOAL (cobrado pela
+   financeira, fora do INSS), não do consignado; margem e portabilidade são do
+   consignado e ficam como gancho do canal de empréstimo. Estilos em
    08-objecoes.css. */
 import { useState, type ReactNode } from 'react';
 import { Aviso, copiar, IcCheck, IcX, Sanfona, Tabela } from '../pecas';
@@ -16,8 +19,8 @@ export const FAMILIAS: Familia[] = [
   { id: 'confianca', nome: 'Confiança', tom: 'azul', sente: 'Medo de golpe, de expor dados, documentos ou senha.', precisa: 'Segurança: saber quem somos e que nada é pago antes.' },
   { id: 'dinheiro', nome: 'Dinheiro', tom: 'verde', sente: 'Medo de pagar do bolso, de perder ou de ser explorado.', precisa: 'Clareza: quanto paga, quando paga e de onde sai.' },
   { id: 'tempo', nome: 'Tempo e decisão', tom: 'ambar', sente: 'Pressa, insegurança ou vontade de decidir em família.', precisa: 'Respeito: decidir no tempo dele, com quem quiser.' },
-  { id: 'expectativa', nome: 'Expectativa', tom: 'rubro', sente: 'Esperava outra coisa: o empréstimo, o “está tudo certo” do banco.', precisa: 'Honestidade: a verdade sobre o que é possível hoje.' },
-  { id: 'pratica', nome: 'Praticidade', tom: 'neutro', sente: 'Não sabe mexer, não tem o documento, não tem e-mail.', precisa: 'Ajuda: “a gente resolve junto, um passo de cada vez”.' },
+  { id: 'expectativa', nome: 'Expectativa', tom: 'rubro', sente: 'Esperava outra coisa: o empréstimo, o “está tudo certo” do banco, a revisão do consignado.', precisa: 'Honestidade: a verdade sobre o que é possível hoje.' },
+  { id: 'pratica', nome: 'Praticidade', tom: 'neutro', sente: 'Não sabe mexer, não tem o documento ou o e-mail, não sabe o tipo do empréstimo.', precisa: 'Ajuda: “a gente resolve junto, um passo de cada vez”.' },
 ];
 export const FAMILIA: Record<FamiliaId, Familia> = Object.fromEntries(FAMILIAS.map((f) => [f.id, f])) as Record<FamiliaId, Familia>;
 
@@ -30,7 +33,7 @@ export function tratar(t: string, i: Trat): string {
   return t.replace(/\[([^\]|]*)\|([^\]|]*)\|([^\]|]*)\]/g, (_m, a: string, b: string, c: string) => [a, b, c][i]);
 }
 
-/* ===================================================================== as 18 objeções */
+/* ===================================================================== as 20 objeções */
 export type Objecao = {
   id: string;
   familia: FamiliaId;
@@ -69,7 +72,7 @@ export const OBJECOES: Objecao[] = [
     ],
     curto: 'Medo real de golpe; às vezes, um caso próximo.',
     pergunta: `Posso perguntar: aconteceu alguma coisa que deixou ${S} com o pé atrás?`,
-    resposta: `Entendo a sua preocupação, e é muito bom ${S} desconfiar. Hoje todo cuidado é pouco. Por isso eu explico com calma: o nosso advogado, o Dr. Rafael Menezes, entra com uma ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos. ${SM} não paga nada para começar: os honorários dele são 30% do valor que ${S} receber, só no final. O resultado depende da análise. As procurações são assinadas pelo gov.br, o sistema oficial do governo. Se quiser, pode chamar alguém da família para acompanhar a nossa conversa.`,
+    resposta: `Entendo a sua preocupação, e é muito bom ${S} desconfiar. Hoje todo cuidado é pouco. Por isso eu explico com calma: o nosso trabalho é a revisão dos juros do empréstimo pessoal com as financeiras. O nosso advogado, o Dr. Rafael Menezes, entra com uma ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos nesses empréstimos. ${SM} não paga nada para começar: os honorários dele são 30% do valor que ${S} receber, só no final. O resultado depende da análise. As procurações são assinadas pelo gov.br, o sistema oficial do governo. Se quiser, pode chamar alguém da família para acompanhar a nossa conversa.`,
     naoDizer: [
       '“Pode confiar, golpe nenhum!” Confiança não se pede: se mostra com fatos.',
       '“Somos a maior empresa do ramo.” Não é um fato que você possa provar.',
@@ -109,14 +112,14 @@ export const OBJECOES: Objecao[] = [
     ],
     curto: 'Precisa de dinheiro rápido; não conhece o processo.',
     pergunta: `${SM} está precisando desse valor para alguma coisa específica?`,
-    resposta: `Entendi, e eu vou olhar isso com toda a atenção. Conferi os seus extratos: hoje a sua margem está comprometida com os empréstimos que ${S} já tem, por isso um empréstimo novo não sai agora. Mas existem caminhos: posso ver a possibilidade de aumento de margem, ou de portabilidade dos seus consignados para outro banco, que pode liberar um valor acima de R$ 1.500. E tem mais uma coisa: o nosso advogado pode entrar com uma ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos, sem ${S} pagar nada para começar. O resultado depende da análise. Posso explicar como funciona?`,
+    resposta: `Entendi, e eu vou olhar isso com toda a atenção. Conferi os seus extratos: hoje a sua margem está comprometida com os consignados que ${S} já tem, por isso um empréstimo consignado novo não sai agora. Mas existem caminhos: posso ver a possibilidade de aumento de margem, ou de portabilidade dos seus consignados para outro banco, que pode liberar um valor acima de R$ 1.500. E tem mais uma coisa: a revisão dos juros do seu empréstimo pessoal, aquele que a financeira cobra na sua conta, fora do INSS. O nosso advogado pode entrar com uma ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos nesse empréstimo, sem ${S} pagar nada para começar. O resultado depende da análise. Posso explicar como funciona?`,
     naoDizer: [
       '“O empréstimo vai sair, é só mandar os documentos.” Promessa falsa: quando ele descobrir, você perdeu o cliente.',
       'Ignorar o pedido dele e falar só do processo. Ele precisa sentir que você ouviu.',
-      'Inventar um valor de portabilidade ou de margem.',
+      'Dizer que a revisão é do consignado. A margem e a portabilidade são do consignado; o processo revisa os juros do empréstimo pessoal.',
     ],
-    ancora: 'Sem margem hoje · possibilidade de aumento de margem e de portabilidade · ação dos últimos 10 anos.',
-    dica: 'Só diga que não há margem depois de conferir os extratos: é um fato do caso dele, não uma frase de efeito. Se a conferência mostrar outra situação, pergunte ao seu gestor como seguir. O roteiro completo do “sem margem” está na lição 7; o que é margem e portabilidade, na lição 3.',
+    ancora: 'Sem margem para consignado novo · aumento de margem e portabilidade · revisão do empréstimo pessoal.',
+    dica: 'Só diga que não há margem depois de conferir os extratos: é um fato do caso dele, não uma frase de efeito. Se a conferência mostrar outra situação, pergunte ao seu gestor como seguir. Nunca invente um valor de portabilidade ou de margem. O roteiro completo do “sem margem” está na lição 7; o que é margem, portabilidade e a diferença entre consignado e empréstimo pessoal, na lição 3.',
   },
   {
     id: 'demora', familia: 'tempo', chip: '“Demora muito”',
@@ -129,7 +132,7 @@ export const OBJECOES: Objecao[] = [
     ],
     curto: 'Pressa: precisa de dinheiro agora.',
     pergunta: `O que pesa mais para ${S}: o tempo de espera, ou precisar de um dinheiro agora?`,
-    resposta: `Entendo. O processo costuma levar de 6 a 12 meses, e eu prefiro falar a verdade sobre isso. Enquanto ele anda, ${S} não paga nada. E quanto antes a gente começar, antes ele anda. Se ${S} também precisa de um valor mais rápido, eu posso ver a possibilidade de portabilidade ou de aumento de margem.`,
+    resposta: `Entendo. O processo costuma levar de 6 a 12 meses, e eu prefiro falar a verdade sobre isso. Enquanto ele anda, ${S} não paga nada. E quanto antes a gente começar, antes ele anda. Se ${S} também precisa de um valor mais rápido, eu posso ver a possibilidade de portabilidade dos seus consignados ou de aumento de margem.`,
     naoDizer: [
       '“Que nada, em dois meses sai.” Prazo inventado: o cliente vai cobrar.',
       '“Tem gente que recebeu em um mês.” A exceção vira promessa.',
@@ -258,17 +261,17 @@ export const OBJECOES: Objecao[] = [
     porTras: [
       'Confia no gerente que conhece há anos.',
       'Tem medo de “brigar” com o banco.',
-      'Não sabe que dá para conferir os descontos com calma.',
+      'Não sabe que dá para conferir os juros do empréstimo pessoal com calma.',
     ],
     curto: 'Confia no banco; medo de “brigar” com ele.',
-    pergunta: 'O banco chegou a mostrar os contratos e os descontos, ou só falou que estava tudo certo?',
-    resposta: `Que bom que ${S} já procurou o banco. A nossa análise é gratuita e serve justamente para conferir isso com calma: ela olha os empréstimos e os descontos que aparecem nos seus extratos do INSS, para descobrir se ${S} paga juros abusivos. Se estiver tudo certo, ${S} fica com a tranquilidade de ter conferido. Se não estiver, o nosso advogado pode entrar com uma ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos. O resultado depende da análise.`,
+    pergunta: 'A financeira chegou a mostrar o contrato e os juros do seu empréstimo pessoal, ou só falou que estava tudo certo?',
+    resposta: `Que bom que ${S} já procurou o banco. A nossa análise é gratuita e serve justamente para conferir isso com calma: ela olha os juros do seu empréstimo pessoal com a financeira, para descobrir se ${S} paga juros abusivos. Se estiver tudo certo, ${S} fica com a tranquilidade de ter conferido. Se não estiver, o nosso advogado pode entrar com uma ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos. O resultado depende da análise.`,
     naoDizer: [
       '“O banco está mentindo.” Acusação que você não pode provar.',
       '“Todo banco rouba aposentado.” Generalização que só assusta.',
       '“Tenho certeza de que tem juros abusivos no seu contrato.” Só a análise pode dizer.',
     ],
-    ancora: 'A análise gratuita confere, nos extratos do INSS, se o cliente paga juros abusivos.',
+    ancora: 'A análise gratuita confere se os juros do empréstimo pessoal são abusivos.',
   },
   {
     id: 'perder', familia: 'dinheiro', chip: '“E se eu perder?”',
@@ -319,7 +322,7 @@ export const OBJECOES: Objecao[] = [
     ],
     curto: 'Medo de uso indevido; parece muita coisa.',
     pergunta: 'Ficou com receio de algum documento em especial?',
-    resposta: `Entendo, parece bastante coisa mesmo. Mas é a documentação básica desse procedimento, nada fora do normal. Os documentos do INSS mostram os empréstimos e os descontos dos últimos anos, que é o que o advogado precisa para pedir o ressarcimento. E a foto do rosto serve para confirmar que é a própria pessoa fazendo, e não outra pessoa usando o seu nome. Eu ajudo a juntar tudo, um de cada vez.`,
+    resposta: `Entendo, parece bastante coisa mesmo. Mas é a documentação básica desse procedimento, nada fora do normal: cada um faz parte da documentação do processo, e eu explico um por um. E a foto do rosto serve para confirmar que é a própria pessoa fazendo, e não outra pessoa usando o seu nome. Eu ajudo a juntar tudo, um de cada vez.`,
     naoDizer: [
       '“É assim e pronto.” O cliente tem o direito de entender.',
       'Inventar para que serve um documento. Se não souber, pergunte ao gestor.',
@@ -379,7 +382,7 @@ export const OBJECOES: Objecao[] = [
     ],
     curto: 'Entendeu “pré-aprovada” como dinheiro liberado.',
     pergunta: 'Posso mostrar o que eu encontrei nos seus extratos?',
-    resposta: `Entendo, e peço desculpa pela confusão. “Pré-aprovada” quer dizer que a sua análise inicial passou nas primeiras perguntas, e por isso pôde seguir. Não quer dizer que já existe um valor liberado. Eu conferi os seus extratos: hoje a sua margem está comprometida, por isso um empréstimo novo não sai agora. Mas existem caminhos, e eu vou explicar cada um com sinceridade: a possibilidade de aumento de margem, a de portabilidade, que pode liberar um valor acima de R$ 1.500, e uma ação com o nosso advogado pedindo o ressarcimento do que foi descontado nos últimos 10 anos. O resultado depende da análise.`,
+    resposta: `Entendo, e peço desculpa pela confusão. “Pré-aprovada” quer dizer que a sua análise inicial passou nas primeiras perguntas, e por isso pôde seguir. Não quer dizer que já existe um valor liberado. Eu conferi os seus extratos: hoje a sua margem está comprometida, por isso um empréstimo consignado novo não sai agora. Mas existem caminhos, e eu vou explicar cada um com sinceridade: a possibilidade de aumento de margem, a de portabilidade dos seus consignados, que pode liberar um valor acima de R$ 1.500, e a revisão dos juros do seu empréstimo pessoal, com uma ação do nosso advogado pedindo o ressarcimento do que foi descontado nos últimos 10 anos. O resultado depende da análise.`,
     naoDizer: [
       '“Foi erro do robô.” Joga a empresa contra ela mesma e não resolve.',
       '“Vai sair sim, só falta documento.” Promessa falsa.',
@@ -405,7 +408,7 @@ export const OBJECOES: Objecao[] = [
     ],
     curto: 'Quer saber se vale a pena.',
     pergunta: `${SM} ouviu falar de algum valor?`,
-    resposta: `Essa é a pergunta que todo mundo faz, e a resposta honesta é: o resultado depende da análise. Depende dos contratos e dos descontos de cada pessoa. O que eu posso dizer é que o advogado entra com uma ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos, e que os 30% dele saem do valor que ${S} receber. Para saber do seu caso, o primeiro passo são os extratos do Meu INSS.`,
+    resposta: `Essa é a pergunta que todo mundo faz, e a resposta honesta é: o resultado depende da análise. Depende dos contratos de empréstimo pessoal de cada pessoa. O que eu posso dizer é que o advogado entra com uma ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos nesses empréstimos, e que os 30% dele saem do valor que ${S} receber. Para saber do seu caso, o primeiro passo é a análise, e eu ajudo ${S} a juntar a documentação, um documento de cada vez.`,
     naoDizer: [
       'Qualquer número: “uns 10 mil”, “mais ou menos 5 mil”.',
       '“Muita gente recebe bastante.” Vira promessa.',
@@ -424,15 +427,61 @@ export const OBJECOES: Objecao[] = [
       'Tem vergonha de não saber.',
     ],
     curto: 'Não guardou o nome do banco.',
-    pergunta: 'Aparece algum desconto de Agibank, BMG, Facta, Mercantil ou Crefisa no seu benefício?',
-    resposta: `Sem problema, é muito comum não lembrar. Me ajuda só com uma coisa: aparece algum desconto de Agibank, BMG, Facta, Mercantil ou Crefisa no seu benefício? Se ${S} não souber, tudo bem: o Extrato de Empréstimo Consignado, do Meu INSS, mostra isso, e a gente confere lá.`,
+    pergunta: `${SM} tem empréstimo pessoal com Agibank, BMG, Facta, Mercantil ou Crefisa? É aquele que a financeira cobra na sua conta, e não o que o INSS desconta direto do benefício.`,
+    resposta: `Sem problema, é muito comum não lembrar. Me ajuda só com uma coisa: ${S} tem algum empréstimo pessoal com Agibank, BMG, Facta, Mercantil ou Crefisa? É aquele que a financeira cobra na sua conta, e não o que o INSS desconta direto do benefício. Às vezes ajuda lembrar de uma parcela que sai da sua conta todo mês. Se ${S} não lembrar agora, tudo bem: a gente segue em frente.`,
     naoDizer: [
       'Encerrar porque ele não sabe. A regra é perguntar de novo uma vez e, se seguir sem saber, seguir em frente.',
-      'Perguntar a mesma coisa várias vezes.',
+      'Perguntar se “aparece algum desconto no benefício”. O que o INSS desconta do benefício é o consignado, não o empréstimo pessoal.',
       'Chutar o banco por ele.',
     ],
-    ancora: 'Pergunte uma vez pelas 5 financeiras · se não souber, siga.',
-    dica: 'Se ele souber, e o empréstimo for só em bancos fora das 5 financeiras, ele não é elegível: agradeça com carinho e encerre sem insistir. A CAF só trabalha com Agibank, BMG, Facta, Mercantil e Crefisa. As 3 portas da elegibilidade estão na lição 4.',
+    ancora: 'Pergunte uma vez pelo empréstimo pessoal nas 5 financeiras · se não souber, siga.',
+    dica: 'O cliente costuma lembrar pelo nome do banco e pela parcela que sai da conta. Se ele souber, e o empréstimo pessoal for só em bancos fora das 5 financeiras, ou se ele só tiver consignado, ele não é elegível: agradeça com carinho e encerre sem insistir. A CAF só trabalha com o empréstimo pessoal de Agibank, BMG, Facta, Mercantil e Crefisa. As 3 portas da elegibilidade estão na lição 4.',
+  },
+  {
+    id: 'consignado', familia: 'expectativa', chip: '“Mas o meu é consignado”',
+    diz: 'Mas o meu empréstimo é consignado.',
+    variacoes: ['O meu é aquele que o INSS desconta direto.', 'Eu só tenho o que sai do benefício.'],
+    porTras: [
+      'Acha que todo empréstimo de aposentado é consignado.',
+      'Tem consignado e também um empréstimo pessoal, mas só lembrou do consignado.',
+      'Entendeu que a revisão era do consignado.',
+      'Tem só consignado mesmo.',
+    ],
+    curto: 'Confunde os dois tipos, ou tem só consignado.',
+    pergunta: `Além desse que o INSS desconta, ${S} tem algum empréstimo que a financeira cobra na sua conta, com Agibank, BMG, Facta, Mercantil ou Crefisa?`,
+    resposta: `Que bom que ${S} me contou, isso ajuda muito. O nosso processo olha os juros do empréstimo pessoal. O consignado é aquele que o INSS desconta direto do benefício, antes de o dinheiro cair na conta. O empréstimo pessoal é diferente: é um contrato direto com a financeira, e a parcela costuma ser cobrada na sua conta ou por boleto. Às vezes a pessoa tem os dois. Além do consignado, ${S} tem algum empréstimo pessoal com Agibank, BMG, Facta, Mercantil ou Crefisa? Se não souber, eu ajudo a descobrir.`,
+    naoDizer: [
+      '“Não tem problema, o consignado também entra.” O processo olha os juros do empréstimo pessoal.',
+      '“Então não dá”, sem perguntar se ele também tem um empréstimo pessoal.',
+      'Insistir depois que ele confirmou que só tem consignado.',
+    ],
+    ancora: 'O processo olha o empréstimo pessoal nas 5 financeiras · só consignado não passa na porta 3.',
+    dica: (
+      <>
+        <p>Se ele confirmar que só tem consignado, ele não passa na porta 3 da elegibilidade (lição 4): agradeça com carinho e encerre sem insistir. Se ele não souber, ajude a descobrir como na objeção 20 (“Não sei se é pessoal ou consignado”).</p>
+        <p>Atenção: o nome do banco não basta para saber o tipo. O BMG, por exemplo, também faz consignado e cartão consignado. O que importa é se é um empréstimo pessoal, cobrado pela financeira, fora do INSS. A diferença completa está na lição 3.</p>
+      </>
+    ),
+  },
+  {
+    id: 'qualtipo', familia: 'pratica', chip: '“Não sei se é pessoal ou consignado”',
+    diz: 'Não sei se o meu empréstimo é pessoal ou consignado.',
+    variacoes: ['Qual é a diferença?', 'Para mim, empréstimo é tudo igual.'],
+    porTras: [
+      'Nunca ouviu falar da diferença: para ele, empréstimo é empréstimo.',
+      'Tem mais de um empréstimo e confunde.',
+      'Tem vergonha de não saber.',
+    ],
+    curto: 'Não conhece a diferença entre os dois.',
+    pergunta: `A parcela desse empréstimo, o INSS desconta direto do benefício, ou a financeira cobra na sua conta ou por boleto?`,
+    resposta: `É normal não saber, eu explico de um jeito simples. O consignado é aquele que o INSS desconta direto do benefício, antes de o dinheiro cair na conta. O empréstimo pessoal é cobrado pela financeira, fora do INSS: em geral, sai da sua conta ou vem em boleto ou carnê. O nosso processo olha os juros do empréstimo pessoal. ${SM} tem algum assim com Agibank, BMG, Facta, Mercantil ou Crefisa?`,
+    naoDizer: [
+      '“Se é do BMG, é pessoal.” O nome do banco não basta: o BMG também faz consignado.',
+      'Explicar com termos difíceis, como “margem consignável” e “juros livres”.',
+      'Responder por ele, ou perguntar a mesma coisa várias vezes.',
+    ],
+    ancora: 'Consignado: o INSS desconta · pessoal: a financeira cobra, fora do INSS.',
+    dica: 'O segredo é falar do que o cliente vê no dia a dia: quem cobra a parcela. Ele costuma lembrar pelo nome do banco e pela parcela que sai da conta. Faça a pergunta uma vez, de um jeito simples, e, se ele seguir sem saber, siga em frente, como na porta 3 (lição 4). A explicação completa, com margem e juros, está na lição 3.',
   },
 ];
 

@@ -2,8 +2,11 @@
    abusivos), os 4 números, quem é quem, as etapas do caso, os 30%, por que não
    há risco de pagar antes, "quanto vou receber?" e os ganchos do canal de
    empréstimo. Esta lição é a DONA do processo, dos 10 anos, dos 6–12 meses, dos
-   30% e do "não prometer valor". Canais e robô = lição 5; consignado e margem =
-   lição 3; elegibilidade = lição 4 (aqui só 1–2 frases + referência).
+   30% e do "não prometer valor". Canais e robô = lição 5; consignado, margem e a
+   diferença completa consignado × empréstimo pessoal = lição 3; elegibilidade =
+   lição 4 (aqui só 1–2 frases + referência).
+   Correção do dono (13/10/2026): a revisão é dos juros do EMPRÉSTIMO PESSOAL com
+   as 5 financeiras, NÃO do consignado. O consignado só entra como gancho.
    Fatos: só os do dono (13/10/2026) e do processo oficial (18/09).
    As ilustrações próprias ficam em 02-empresa-visuais.tsx. */
 import type { Licao } from '../tipos';
@@ -13,43 +16,45 @@ import {
 import { CalculadoraHonorarios } from '../ilustracoes';
 import {
   CincoFinanceiras, DoDocumentoAoValor, Divisao7030, EtapasDoCaso, GanchosAteOProcesso, JanelaDezAnos,
-  JurosSimplificado, MargemBeneficio, QuatroNumeros, QuemEQuem, VerdadeOuMito,
+  JurosSimplificado, MargemBeneficio, PessoalOuConsignado, QuatroNumeros, QuemEQuem, VerdadeOuMito,
 } from './02-empresa-visuais';
 
 const licao: Licao = {
   id: 'empresa',
   modulo: 'fundamentos',
   titulo: 'O que a gente faz',
-  resumo: 'A CAF e o nosso carro-chefe, o ressarcimento de juros abusivos: os 4 números, quem faz cada parte, os 30% e como responder sem prometer.',
-  minutos: 30, // ~2.170 palavras de texto ÷ 180 ≈ 12 min + 9 interativos/treinos × 2 min
+  resumo: 'A CAF e o nosso carro-chefe, o ressarcimento de juros abusivos do empréstimo pessoal: os 4 números, quem faz cada parte, os 30% e como responder sem prometer.',
+  minutos: 34, // ~2.600 palavras de texto ÷ 180 ≈ 14 min + 10 interativos/treinos × 2 min
   corpo: (
     <>
       <p className="mv-lead">
         Antes de aprender a atender, você precisa saber muito bem <b>o que a gente oferece</b>. Somos a{' '}
         <b>CAF, Central de Assessoria Financeira</b>. O nosso principal trabalho, o <b>carro-chefe</b> da empresa, são os{' '}
-        <b>processos de ressarcimento de juros abusivos</b>: quem recebe benefício do INSS e tem empréstimo em certas
-        financeiras pode pedir na Justiça, pelo nosso advogado, o ressarcimento do que foi descontado nos últimos 10 anos.
+        <b>processos de ressarcimento de juros abusivos</b>: quem recebe benefício do INSS e fez <b>empréstimo pessoal</b> em
+        certas financeiras pode pedir na Justiça, pelo nosso advogado, o ressarcimento do que foi descontado nos últimos
+        10 anos nesses empréstimos.
       </p>
       <p>Nesta lição você vai entender:</p>
       <Lista itens={[
         'O que é o processo, em linguagem simples, e por que ele existe.',
+        'Qual empréstimo a gente revisa (o pessoal) e qual não é o processo (o consignado).',
         'Os 4 números que aparecem em quase toda conversa.',
         'Quem faz o quê: o cliente, o robô, você e o advogado.',
         'As etapas do caso, do “sim” do cliente até o ressarcimento.',
         'Como explicar os 30% sem medo e como responder “quanto eu vou receber?” sem prometer nada.',
-        'Onde entram o empréstimo, o aumento de margem e a portabilidade.',
+        'Onde entram o consignado, o aumento de margem e a portabilidade: os ganchos.',
       ]} />
 
       <Secao titulo="A CAF em uma frase">
         <Frase autor="Guarde esta frase. Ela é o resumo de tudo o que a gente faz.">
           A CAF ajuda quem recebe benefício do INSS a pedir na Justiça o ressarcimento dos juros abusivos cobrados nos
-          empréstimos.
+          empréstimos pessoais.
         </Frase>
         <p>
-          <b>Carro-chefe</b> quer dizer produto principal. Tudo o que acontece no atendimento leva até ele. Empréstimo,
-          aumento de margem e portabilidade também aparecem nas conversas, principalmente no canal de empréstimo, mas
-          como <b>ganchos</b>: assuntos que abrem a conversa e levam o cliente até o processo. Você vai ver isso no fim
-          desta lição.
+          <b>Carro-chefe</b> quer dizer produto principal. Tudo o que acontece no atendimento leva até ele. Consignado
+          novo, aumento de margem e portabilidade dos consignados também aparecem nas conversas, principalmente no canal
+          de empréstimo, mas como <b>ganchos</b>: assuntos que abrem a conversa e levam o cliente até o processo. Você vai
+          ver isso no fim desta lição.
         </p>
         <p>
           <b>Para quem é.</b> O nosso anúncio no Facebook fala com <b>aposentados e pensionistas do INSS</b>, e são eles
@@ -58,15 +63,45 @@ const licao: Licao = {
           familiar, e aí os documentos passam a ser os do familiar que recebe. Quem só trabalha de carteira assinada (CLT)
           e não tem ninguém na família recebendo do INSS não serve. As regras completas estão na lição 4.
         </p>
+      </Secao>
+
+      <Secao titulo="Qual empréstimo a gente revisa: o pessoal">
         <p>
-          <b>Com quais empréstimos.</b> O processo é para empréstimos em <b>cinco financeiras</b>. As três que mais chegam
-          até a gente são Agibank, Mercantil e BMG.
+          Uma palavra muda tudo: <b>pessoal</b>. O processo é sobre os juros dos <b>empréstimos pessoais</b> que o
+          aposentado ou pensionista fez com as financeiras, e não sobre o consignado. O consignado é descontado pelo INSS;
+          o empréstimo pessoal é cobrado pela financeira, fora do INSS. O consignado também aparece nas conversas, mas como
+          tema dos <b>ganchos</b> do canal de empréstimo, que você vê no fim desta lição.
+        </p>
+        <figure className="mv-emp-fig">
+          <PessoalOuConsignado />
+          <figcaption><span className="mv-tag">Comparativo</span>O que a gente revisa e o que não é o processo. A diferença completa, com exemplos, está na lição 3.</figcaption>
+        </figure>
+        <Aviso titulo="Mesma financeira, dois tipos de empréstimo">
+          Uma financeira pode ter os dois tipos: o BMG, por exemplo, também faz consignado e cartão consignado. Ver o nome
+          do banco num consignado não quer dizer que é o empréstimo que a gente revisa. O que conta para o processo é o{' '}
+          <b>empréstimo pessoal</b>.
+        </Aviso>
+        <p>
+          <b>Com quais financeiras.</b> O processo é para empréstimos pessoais em <b>cinco financeiras</b>. As três que mais
+          chegam até a gente são Agibank, Mercantil e BMG.
         </p>
         <CincoFinanceiras />
-        <Aviso tom="ambar" titulo="Sem empréstimo em nenhuma das cinco?">
-          Então a pessoa não é elegível: agradeça com carinho e encerre, sem insistir. A lição 4 mostra o que perguntar
-          quando ela não sabe dizer e como encerrar com respeito.
+        <Aviso tom="ambar" titulo="Sem empréstimo pessoal em nenhuma das cinco?">
+          Então a pessoa não é elegível: agradeça com carinho e encerre, sem insistir. Se ela não souber a diferença,
+          pergunte de um jeito simples: “é aquele empréstimo que a financeira cobra na sua conta, e não o que o INSS
+          desconta direto do benefício”. A lição 4 mostra o que perguntar quando ela não sabe dizer e como encerrar com
+          respeito.
         </Aviso>
+        <TesteRapido
+          pergunta="O cliente conta: “Tenho um consignado do BMG, descontado direto no meu benefício.” É esse empréstimo que o nosso processo revisa?"
+          opcoes={[
+            'Sim, porque o BMG é uma das 5 financeiras',
+            'Não, o processo olha o empréstimo pessoal',
+            'Sim, todo desconto no benefício entra',
+          ]}
+          certa={1}
+          explica="O processo é sobre os juros do empréstimo pessoal, cobrado pela financeira, fora do INSS. O consignado é descontado pelo INSS e é assunto dos ganchos. Pergunte se ele também tem empréstimo pessoal com alguma das 5 financeiras."
+        />
       </Secao>
 
       <Secao titulo="Juros abusivos, em linguagem simples">
@@ -76,20 +111,23 @@ const licao: Licao = {
           financeira ganha dinheiro, e isso é normal.
         </p>
         <p>
-          No <b>empréstimo consignado</b>, a parcela é descontada direto do benefício, todo mês, antes de o dinheiro cair
-          na conta. O cliente quase nunca vê a conta sendo feita: ele só percebe que o benefício “chega menor”.
+          No <b>empréstimo pessoal</b>, que é o que a gente revisa, a parcela não passa pelo INSS: é um contrato direto
+          com a financeira. Em geral ela é cobrada na conta do cliente (débito automático na conta em que o benefício cai)
+          ou por boleto/carnê. Os juros são <b>livres</b>, sem o teto que existe no consignado, e em geral bem mais altos.
+          Quem está sem margem para consignado muitas vezes recorre ao empréstimo pessoal, que é mais caro.
         </p>
         <p>
           <b>Juros abusivos</b> são juros cobrados bem acima do que deveriam ser para aquele empréstimo. Quando isso
-          acontece, todo mês sai do benefício mais do que deveria sair, e isso pode durar anos sem ninguém perceber. A
-          lição 3 explica o consignado e os juros com mais calma; aqui basta a ideia.
+          acontece, toda parcela leva mais do que deveria, e isso pode durar anos sem ninguém perceber: o cliente costuma
+          lembrar só do nome do banco e do débito na conta. A lição 3 explica com calma a diferença entre o consignado e o
+          empréstimo pessoal; aqui basta a ideia.
         </p>
-        <Figura tag="Ideia simplificada" legenda="Sem valores reais. A parte listrada é o juro cobrado a mais, e ela se repete em cada parcela, todo mês.">
+        <Figura tag="Ideia simplificada" legenda="Sem valores reais. Uma parcela de empréstimo pessoal: a parte listrada é o juro cobrado a mais, e ela se repete em cada parcela, todo mês.">
           <JurosSimplificado />
         </Figura>
         <Aviso tom="ambar" titulo="Não é você quem decide se é abusivo">
-          Você não precisa (e não deve) calcular juros na conversa. Quem mostra se houve abuso é a análise dos documentos,
-          principalmente dos extratos. O seu papel é explicar a ideia com calma e juntar a documentação.
+          Você não precisa (e não deve) calcular juros na conversa. Quem mostra se houve abuso é a análise do caso, feita
+          com a documentação. O seu papel é explicar a ideia com calma e juntar os documentos.
         </Aviso>
       </Secao>
 
@@ -97,20 +135,20 @@ const licao: Licao = {
         <p>
           Quando o cliente topa, a gente junta a documentação e o nosso advogado, o <b>Dr. Rafael Menezes</b>, entra com
           uma <b>ação</b> (um pedido formal na Justiça) pedindo o <b>ressarcimento do que foi descontado nos últimos 10
-          anos</b>. Para o cliente, diga sempre junto: <b>o resultado depende da análise</b>.
+          anos</b> nesses empréstimos pessoais. Para o cliente, diga sempre junto: <b>o resultado depende da análise</b>.
         </p>
         <p>
           Pense assim: é como pedir de volta um valor cobrado a mais numa conta. A diferença é que aqui são até 10 anos de
-          descontos, e quem faz o pedido é um advogado, do jeito certo, na Justiça.
+          parcelas, e quem faz o pedido é um advogado, do jeito certo, na Justiça.
         </p>
-        <Figura tag="Diagrama" legenda="Cada bloco é um ano de descontos no benefício e é também um extrato que você vai baixar no Meu INSS. As datas acompanham o mês de hoje.">
+        <Figura tag="Diagrama" legenda="Os 10 anos do pedido, contados a partir de hoje. Cada bloco é um ano; as datas acompanham o mês atual.">
           <JanelaDezAnos />
         </Figura>
         <p>
-          Repare na ligação: o pedido olha para <b>10 anos</b>, por isso a gente precisa dos <b>extratos de pagamento dos
-          últimos 10 anos</b>. Esse extrato mostra, mês a mês, o que foi pago e o que foi descontado do benefício. O Meu
-          INSS só entrega 12 meses por vez, então são 10 consultas, uma por ano. O passo a passo está na lição 10; agora o
-          importante é entender o porquê: <b>sem os extratos, não há como mostrar o que foi descontado</b>.
+          Os documentos do Meu INSS fazem parte da documentação do processo: a <b>carta de concessão</b>, o <b>Extrato de
+          Empréstimo Consignado</b> e os <b>extratos de pagamento do benefício dos últimos 10 anos</b>. O Meu INSS
+          só entrega 12 meses de extrato de pagamento por vez, então são 10 arquivos, um por ano. O passo a passo está
+          na lição 10.
         </p>
       </Secao>
 
@@ -276,8 +314,9 @@ const licao: Licao = {
       <Secao titulo="“Quanto eu vou receber?”">
         <p>
           É a pergunta que mais aparece, e a mais perigosa. A resposta honesta é: <b>depende da análise</b>. Não é
-          desculpa, é a verdade. O valor depende do que aparece nos extratos (quais empréstimos, quanto foi descontado e
-          por quanto tempo) e do resultado do processo. Dois clientes com o mesmo banco podem ter valores bem diferentes.
+          desculpa, é a verdade. O valor depende da análise de cada caso (quais empréstimos pessoais a pessoa tem, quanto
+          foi pago e por quanto tempo) e do resultado do processo. Dois clientes com o mesmo banco podem ter valores bem
+          diferentes.
         </p>
         <p>
           <b>Por que prometer é tão grave:</b> o cliente guarda o número que você fala. Se o valor final for menor, ele vai
@@ -304,7 +343,7 @@ const licao: Licao = {
               <>
                 <p>
                   “Ainda não dá para saber, e eu não quero prometer um número que eu não sei. Quem vai mostrar é a análise
-                  dos seus extratos dos últimos 10 anos. Por isso os documentos são tão importantes.”
+                  do seu caso, feita com os seus documentos. Por isso eles são tão importantes.”
                 </p>
                 <p className="mv-emp-dica">Depois, leve a conversa para o próximo passo: os documentos.</p>
               </>
@@ -317,7 +356,7 @@ const licao: Licao = {
           bolhas={[
             { de: 'cliente', texto: 'E quanto eu vou receber?', hora: '10:02' },
             { de: 'eu', texto: 'Essa é a pergunta mais importante, né, Dona Neusa? Hoje eu ainda não consigo dizer um valor, e não quero prometer à senhora um número que eu não sei.', hora: '10:03' },
-            { de: 'eu', texto: 'Quem mostra isso é a análise dos seus extratos do INSS dos últimos 10 anos. Por isso esses documentos são tão importantes.', hora: '10:03' },
+            { de: 'eu', texto: 'Quem mostra isso é a análise do seu caso, feita com os seus documentos. Por isso eles são tão importantes.', hora: '10:03' },
             { de: 'cliente', texto: 'Entendi. E o que você precisa de mim?', hora: '10:05' },
             { de: 'eu', texto: 'Vamos começar pelo Meu INSS. A senhora consegue entrar no aplicativo ou prefere que eu ajude?', hora: '10:05' },
           ]}
@@ -326,7 +365,7 @@ const licao: Licao = {
           pergunta="O cliente insiste: “Só me diz um valor aproximado, pra eu ter uma ideia”. O que fazer?"
           opcoes={[
             'Dizer um valor baixo, para não decepcionar',
-            'Dizer que depende da análise dos extratos',
+            'Dizer que depende da análise do caso',
             'Contar quanto outro cliente parecido recebeu',
           ]}
           certa={1}
@@ -337,25 +376,27 @@ const licao: Licao = {
       <Secao titulo="As outras frentes: ganchos, não produtos">
         <p>
           A CAF tem dois tráfegos pagos no Facebook: no de <b>juros abusivos</b> (o tráfego do Andrius) o cliente já quer
-          a revisão e a venda é mais direta; no de <b>empréstimo</b> ele quer dinheiro rápido, e é preciso convencer. Como
-          reconhecer cada canal e o que o robô já disse em cada um, veja a lição 5.
+          a revisão dos juros do empréstimo pessoal e a venda é mais direta; no de <b>empréstimo</b> ele quer dinheiro
+          rápido, e é preciso convencer. Como reconhecer cada canal e o que o robô já disse em cada um, veja a lição 5.
         </p>
         <p>
-          No canal de empréstimo, o cliente não pediu o processo. Só que, na maioria das vezes, ele <b>não tem margem</b>.
-          A <b>margem consignável</b> é a parte do benefício que pode ficar comprometida com descontos de empréstimo e de
-          cartão consignado. Quando essa parte já está tomada pelas parcelas que ele paga, não cabe empréstimo novo (a
-          lição 3 explica a margem em detalhe).
+          No canal de empréstimo, o cliente não pediu o processo: ele quer um <b>consignado novo</b>. Só que, na maioria
+          das vezes, ele <b>não tem margem</b>. A <b>margem consignável</b> é a parte do benefício que pode ficar
+          comprometida com os descontos do consignado (empréstimos e cartões consignados). Quando essa parte já está
+          tomada pelas parcelas que ele paga, não sai consignado novo (a lição 3 explica a margem em detalhe).
         </p>
-        <Figura tag="Ideia simplificada" legenda="Regra geral do consignado do INSS: até 45% do benefício (35% para empréstimos e 5% + 5% para os cartões consignados). Veja com calma na lição 3.">
+        <Figura tag="Ideia simplificada" legenda="Regra geral do consignado do INSS: até 45% do benefício (35% para empréstimos consignados e 5% + 5% para os cartões consignados). O empréstimo pessoal fica fora dessa conta. Veja com calma na lição 3.">
           <MargemBeneficio />
         </Figura>
         <p>
           É aí que entram os <b>ganchos</b>. Eles não são produtos que a gente promete: são assuntos que abrem a conversa,
-          mostram que você entende a situação do cliente e levam até o carro-chefe.
+          mostram que você entende a situação do cliente e levam até o carro-chefe. O caminho é este: sem margem para
+          consignado novo, você apresenta as possibilidades (aumento de margem e portabilidade dos consignados) e chega à
+          revisão dos juros do <b>empréstimo pessoal</b>, se ele tiver um com alguma das 5 financeiras.
         </p>
         <figure className="mv-emp-fig">
           <GanchosAteOProcesso />
-          <figcaption><span className="mv-tag">Diagrama</span>O caminho da conversa no canal de empréstimo.</figcaption>
+          <figcaption><span className="mv-tag">Diagrama</span>O caminho da conversa no canal de empréstimo: do consignado que não sai até a revisão do empréstimo pessoal.</figcaption>
         </figure>
         <Aviso tom="ambar" titulo="Gancho é possibilidade, não promessa">
           Fale sempre em “ver a possibilidade”. A portabilidade pode liberar um valor acima de R$&nbsp;1.500, mas isso depende de
@@ -370,7 +411,7 @@ const licao: Licao = {
             '“Sem margem não tem jeito, sinto muito.”',
           ]}
           certa={1}
-          explica="Portabilidade é possibilidade, nunca garantia. E sem margem não é o fim da conversa: depois, apresente o processo de ressarcimento."
+          explica="Portabilidade é possibilidade, nunca garantia. E sem margem não é o fim da conversa: depois, pergunte do empréstimo pessoal e apresente a revisão dos juros dele."
         />
       </Secao>
 
@@ -379,6 +420,10 @@ const licao: Licao = {
           {
             titulo: '“Vocês são do INSS?” ou “Vocês são do banco?”',
             corpo: <p>Não. Somos a CAF, Central de Assessoria Financeira. O Meu INSS e o gov.br são os sites oficiais onde a gente busca os documentos e onde o cliente assina. Nunca deixe o cliente achar que você fala em nome do INSS ou do banco.</p>,
+          },
+          {
+            titulo: '“É sobre o meu consignado?”',
+            corpo: <p>Não. O nosso processo olha os juros do <b>empréstimo pessoal</b>: aquele que a financeira cobra na conta do cliente, e não o que o INSS desconta direto do benefício. Se ele não souber a diferença, use essa frase simples e pergunte se ele tem esse tipo de empréstimo com Agibank, BMG, Facta, Mercantil ou Crefisa.</p>,
           },
           {
             titulo: '“Quem é o advogado?”',
@@ -394,11 +439,11 @@ const licao: Licao = {
           },
           {
             titulo: '“Por que vocês precisam de tanto documento?”',
-            corpo: <p>É a documentação básica do procedimento, nada fora do normal. E tem um porquê: os extratos de 10 anos mostram os descontos do período do pedido. Sem eles, não há o que analisar.</p>,
+            corpo: <p>É a documentação básica do procedimento, nada fora do normal. É com ela completa que o caso é cadastrado e segue para o advogado. E o cliente não fica sozinho: você ajuda a pegar um documento de cada vez.</p>,
           },
           {
             titulo: '“Quanto eu vou receber?”',
-            corpo: <p>Depende da análise dos extratos. Não prometa valor: explique o porquê e leve a conversa para os documentos.</p>,
+            corpo: <p>Depende da análise do caso. Não prometa valor: explique o porquê e leve a conversa para os documentos.</p>,
           },
         ]} />
       </Secao>
@@ -410,12 +455,12 @@ const licao: Licao = {
 
       <Secao titulo="Resumo da lição">
         <Lista itens={[
-          <>A <b>CAF</b> (Central de Assessoria Financeira) tem como carro-chefe o <b>processo de ressarcimento de juros abusivos</b>, para quem recebe benefício do INSS e tem empréstimo em uma das 5 financeiras.</>,
-          <>O <b>Dr. Rafael Menezes</b>, nosso advogado, entra com a ação pedindo o ressarcimento do que foi descontado nos <b>últimos 10 anos</b>. Em média, leva de <b>6 a 12 meses</b>.</>,
+          <>A <b>CAF</b> (Central de Assessoria Financeira) tem como carro-chefe o <b>processo de ressarcimento de juros abusivos</b>, para quem recebe benefício do INSS e tem <b>empréstimo pessoal</b> em uma das 5 financeiras. O consignado (descontado pelo INSS) não é o processo: é tema dos ganchos.</>,
+          <>O <b>Dr. Rafael Menezes</b>, nosso advogado, entra com a ação pedindo o ressarcimento do que foi descontado nos <b>últimos 10 anos</b> nesses empréstimos pessoais. Em média, leva de <b>6 a 12 meses</b>.</>,
           <>Para começar, o cliente <b>não paga nada</b>. No final, <b>30% fixos</b> do valor que ele receber são os honorários; 70% ficam com ele.</>,
           <>O caso anda assim: documentos, cadastro, procurações assinadas, ação, acompanhamento e ressarcimento.</>,
-          <>“Quanto vou receber?”: <b>depende da análise dos extratos</b>. Nunca prometa valor, data ou resultado.</>,
-          <>Aumento de margem e portabilidade são <b>ganchos</b> do canal de empréstimo: possibilidades, não promessas. O destino da conversa é o processo.</>,
+          <>“Quanto vou receber?”: <b>depende da análise do caso</b>. Nunca prometa valor, data ou resultado.</>,
+          <>Sem margem para consignado novo, aumento de margem e portabilidade dos consignados são <b>ganchos</b> do canal de empréstimo: possibilidades, não promessas. O destino da conversa é a revisão dos juros do empréstimo pessoal.</>,
         ]} />
       </Secao>
     </>
@@ -424,12 +469,12 @@ const licao: Licao = {
     {
       p: 'Qual é o carro-chefe da CAF, o produto principal da empresa?',
       o: [
-        'Empréstimo consignado novo para quem tem margem',
-        'Processo de ressarcimento de juros abusivos',
-        'Portabilidade de consignado para outro banco',
+        'O processo de ressarcimento de juros abusivos',
+        'A venda de consignado novo pelo canal de empréstimo',
+        'A portabilidade dos consignados para outro banco',
       ],
-      c: 1,
-      e: 'O principal trabalho da CAF são os processos de ressarcimento de juros abusivos. Empréstimo e portabilidade aparecem como ganchos de conversa.',
+      c: 0,
+      e: 'O carro-chefe é o processo de ressarcimento de juros abusivos dos empréstimos pessoais com as 5 financeiras. Consignado, margem e portabilidade são ganchos do canal de empréstimo.',
     },
     {
       p: 'Exemplo: o cliente recebeu R$ 20.000 no final do processo. Como fica a divisão?',
@@ -455,11 +500,11 @@ const licao: Licao = {
       p: 'O cliente pergunta: “Quanto eu vou receber?”. Qual é a resposta certa?',
       o: [
         'Um valor médio, só para o cliente ter uma ideia',
-        'Que o valor depende da análise dos extratos',
+        'Que o valor depende da análise do caso',
         'Quanto recebeu outro cliente do mesmo banco',
       ],
       c: 1,
-      e: 'O valor depende da análise dos extratos e do resultado do processo. Qualquer número dito antes, mesmo “médio” ou de outro cliente, vira promessa.',
+      e: 'O valor depende da análise do caso e do resultado do processo. Qualquer número dito antes, mesmo “médio” ou de outro cliente, vira promessa.',
     },
     {
       p: 'O que a ação do Dr. Rafael Menezes pede e quanto tempo o ressarcimento costuma levar, em média?',
@@ -469,23 +514,25 @@ const licao: Licao = {
         'O que foi descontado nos últimos 10 anos; 6 a 12 meses',
       ],
       c: 2,
-      e: 'A ação pede o ressarcimento do que foi descontado nos últimos 10 anos, e o ressarcimento leva, em média, de 6 a 12 meses.',
+      e: 'A ação pede o ressarcimento do que foi descontado nos últimos 10 anos nos empréstimos pessoais, e o ressarcimento leva, em média, de 6 a 12 meses.',
     },
   ],
   glossario: [
-    { termo: 'CAF', def: 'Central de Assessoria Financeira, a nossa empresa. O carro-chefe é o processo de ressarcimento de juros abusivos.' },
+    { termo: 'CAF', def: 'Central de Assessoria Financeira, a nossa empresa. O carro-chefe é o processo de ressarcimento de juros abusivos dos empréstimos pessoais.' },
     { termo: 'Juros', def: 'O “preço” de um empréstimo: o que a financeira cobra, além do dinheiro emprestado, para emprestar.' },
-    { termo: 'Ressarcimento', def: 'Devolução de um valor pago ou descontado. A nossa ação pede o ressarcimento do que foi descontado nos últimos 10 anos.' },
+    { termo: 'Ressarcimento', def: 'Devolução de um valor pago ou descontado. A nossa ação pede o ressarcimento do que foi descontado nos últimos 10 anos nos empréstimos pessoais com as financeiras.' },
     { termo: 'Ação judicial', def: 'Pedido formal feito na Justiça por um advogado. Quem entra com a ação dos nossos clientes é o Dr. Rafael Menezes.' },
     { termo: 'Honorários', def: 'O pagamento do advogado pelo trabalho dele. No nosso processo: 30% fixos, só no final, retirados do valor que o cliente receber.' },
-    { termo: 'Gancho', def: 'Assunto usado para abrir a conversa e levar o cliente até o processo, como o aumento de margem e a portabilidade no canal de empréstimo.' },
+    { termo: 'Gancho', def: 'Assunto usado para abrir a conversa e levar o cliente até o processo, como o aumento de margem e a portabilidade dos consignados no canal de empréstimo.' },
   ],
   mensagens: [
     {
       titulo: 'O processo em poucas palavras',
       quando: 'Quando o cliente pergunta “como funciona?”.',
       texto: [
-        'Funciona assim: a gente junta os seus documentos e o nosso advogado, o Dr. Rafael Menezes, entra com uma ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos. O resultado depende da análise.',
+        'Funciona assim: a gente olha os juros do seu empréstimo pessoal, aquele que a financeira cobra na sua conta (e não o que o INSS desconta direto do benefício).',
+        '',
+        'Com os seus documentos, o nosso advogado, o Dr. Rafael Menezes, entra com uma ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos nesses empréstimos. O resultado depende da análise.',
         '',
         'Para começar, você não paga nada. No final, do valor que você receber, 30% ficam para o advogado, como honorários.',
         '',
@@ -509,7 +556,7 @@ const licao: Licao = {
       texto: [
         'Entendo, essa pergunta é muito importante! Mas eu ainda não consigo te dizer um valor, e não quero te prometer um número que eu não sei.',
         '',
-        'Quem vai mostrar isso é a análise dos seus extratos do INSS dos últimos 10 anos. Por isso os documentos são tão importantes. Vamos começar por eles?',
+        'Quem vai mostrar isso é a análise do seu caso, feita com os seus documentos. Por isso eles são tão importantes. Vamos começar por eles?',
       ].join('\n'),
     },
     {

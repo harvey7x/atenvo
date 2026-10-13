@@ -2,7 +2,9 @@
    quatro regras da senha, o jogo "é dado pessoal?", o caminho do dado, o print que
    mostra demais, sinais de golpe × jeito CAF, o detector de golpe, os quatro
    "nunca", a régua da persuasão, o semáforo das situações delicadas, o treino
-   "pode ou não pode?" e o cartaz do combinado. Só tokens do v2 (claro e escuro).
+   "pode ou não pode?", o cartaz do combinado e a troca de frases do nome certo
+   (empréstimo pessoal × consignado; cores iguais às da lição 3: consignado azul,
+   pessoal âmbar, processo verde). Só tokens do v2 (claro e escuro).
    Fatos da empresa: só os do brief. Casos e nomes de clientes são fictícios. */
 import { useState, type ReactNode } from 'react';
 import { Figura, IcCheck, IcX } from '../pecas';
@@ -569,7 +571,7 @@ export function QuatroNuncas() {
 
 /* ===================================================================== 9. régua da persuasão */
 const DEGRAUS: { t: string; d: string; ex: string; ok: boolean }[] = [
-  { t: 'Informar', d: 'Explicar o processo, os 30% e o prazo médio.', ok: true, ex: '“O advogado entra com uma ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos. Leva em média de 6 a 12 meses, e o resultado depende da análise.”' },
+  { t: 'Informar', d: 'Explicar o processo, os 30% e o prazo médio.', ok: true, ex: '“O advogado entra com uma ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos no seu empréstimo pessoal. Leva em média de 6 a 12 meses, e o resultado depende da análise.”' },
   { t: 'Esclarecer', d: 'Responder dúvidas e medos com paciência.', ok: true, ex: '“Boa pergunta! Os 30% só existem no final, e saem do valor que a senhora receber.”' },
   { t: 'Recomendar', d: 'Mostrar por que pode valer a pena para ele.', ok: true, ex: '“Pelo que a senhora me contou, vale fazer a análise. Ela é gratuita, e a senhora só decide depois de entender tudo.”' },
   { t: 'Pressionar', d: 'Pressa falsa, medo, insistir depois do não.', ok: false, ex: '“Se não mandar os documentos hoje, a senhora perde o direito!”' },
@@ -740,11 +742,13 @@ const NUNCA_FACA = [
   'Usar a senha para qualquer coisa além dos documentos',
   'Compartilhar dado de cliente fora do trabalho',
   'Esconder ou diminuir os 30% de honorários',
+  'Chamar o processo de “revisão do consignado”',
   'Decidir sozinho um caso delicado',
 ];
 const SEMPRE_FACA = [
   'Dizer quem você é e que fala da CAF',
   'Explicar os 30% com clareza, com um exemplo',
+  'Dizer que o processo revisa os juros do empréstimo pessoal',
   'Pedir só o que o processo precisa, e dizer para quê',
   'Oferecer guiar o cliente antes de falar em senha',
   'Ajudar o cliente a trocar a senha depois',
@@ -783,7 +787,7 @@ export function CartazCompromisso() {
       <div className="mv-et-cz">
         <div className="mv-et-cz-cab">
           <span className="mv-et-cz-selo"><Icone id="escudo" /></span>
-          <span><b>O combinado do atendente</b><small>Segurança, ética e LGPD em 20 linhas</small></span>
+          <span><b>O combinado do atendente</b><small>Segurança, ética e LGPD em {total} linhas</small></span>
           <span className="mv-et-cz-prog num">{ok.size} de {total}</span>
         </div>
         <div className="mv-et-cz-barra" aria-hidden><i style={{ width: `${(ok.size / total) * 100}%` }} /></div>
@@ -796,6 +800,104 @@ export function CartazCompromisso() {
             <b>Combinado fechado.</b> É isso que faz o cliente confiar na CAF, mensagem após mensagem.
           </div>
         )}
+      </div>
+    </Figura>
+  );
+}
+
+/* ===================================================================== 13. o nome certo (pessoal × consignado) */
+const DIFERENCA: { tom: 'azul' | 'ambar'; t: string; quem: string; regra: string; conversa: string; selo?: string }[] = [
+  {
+    tom: 'azul', t: 'Empréstimo consignado',
+    quem: 'O INSS desconta a parcela direto do benefício, antes de o dinheiro cair na conta.',
+    regra: 'Usa a margem consignável e tem teto de juros.',
+    conversa: 'Assunto dos ganchos do canal de empréstimo: aumento de margem e portabilidade dos consignados.',
+  },
+  {
+    tom: 'ambar', t: 'Empréstimo pessoal', selo: 'O processo olha aqui',
+    quem: 'A financeira cobra a parcela fora do INSS, em geral na conta do cliente.',
+    regra: 'Não usa a margem; os juros são livres e, em geral, bem mais altos.',
+    conversa: 'É o objeto do processo: a revisão dos juros e o pedido de ressarcimento.',
+  },
+];
+const TROCAS: { ctx: string; errada: string; certa: string; pq: string }[] = [
+  {
+    ctx: 'Explicando o processo',
+    errada: '“Vamos revisar o seu consignado.”',
+    certa: '“Vamos analisar os juros do empréstimo pessoal que a senhora fez com a financeira.”',
+    pq: 'O processo é sobre os juros do empréstimo pessoal. Com o nome errado, o cliente decide achando que é outra coisa.',
+  },
+  {
+    ctx: 'Perguntando a porta 3',
+    errada: '“Aparece algum desconto da Agibank no seu benefício?”',
+    certa: '“A senhora tem empréstimo pessoal com Agibank, BMG, Facta, Mercantil ou Crefisa? É aquele que a financeira cobra na sua conta, e não o que o INSS desconta direto do benefício.”',
+    pq: 'Desconto no benefício é o consignado. A porta 3 pergunta pelo empréstimo pessoal; se o cliente não souber a diferença, explique com uma frase simples.',
+  },
+  {
+    ctx: 'Falando dos juros',
+    errada: '“O desconto que o INSS faz no seu benefício tem juros abusivos.”',
+    certa: '“Os juros que a gente analisa são os do empréstimo pessoal, que a financeira cobra fora do INSS.”',
+    pq: 'O consignado que o INSS desconta tem teto de juros. É no empréstimo pessoal, de juros livres, que aparecem os juros abusivos que a CAF revisa.',
+  },
+  {
+    ctx: 'No canal de empréstimo, sem margem',
+    errada: '“Não tem margem, mas a gente resolve revisando o seu consignado.”',
+    certa: '“Hoje não há margem para um consignado novo. Podemos ver a possibilidade de aumento de margem, a portabilidade dos consignados e, se a senhora tiver empréstimo pessoal numa dessas financeiras, a revisão dos juros dele.”',
+    pq: 'Margem e portabilidade são assuntos do consignado; o processo é sobre o empréstimo pessoal. Cada caminho com o seu nome, e todos como possibilidade, nunca como garantia.',
+  },
+];
+export function FraseCerta() {
+  const [abertas, setAbertas] = useState<Set<number>>(() => new Set());
+  const todas = abertas.size === TROCAS.length;
+  const abrir = (i: number) => setAbertas((s) => new Set(s).add(i));
+  return (
+    <Figura tag="Interativo" legenda="Frases de exemplo: as certas são sugestão de roteiro, adapte ao cliente. Toque em “Corrigir a frase” para ver o nome certo e o porquê. A diferença completa está na lição 3.">
+      <div className="mv-et-fc">
+        <div className="mv-et-fc-dif">
+          {DIFERENCA.map((d) => (
+            <div key={d.t} className="mv-et-fc-card" data-tom={d.tom}>
+              <div className="mv-et-fc-ct">
+                <b>{d.t}</b>
+                {d.selo && <em className="mv-et-fc-selo">{d.selo}</em>}
+              </div>
+              <span>{d.quem}</span>
+              <span>{d.regra}</span>
+              <span className="mv-et-fc-na"><small>Na conversa</small>{d.conversa}</span>
+            </div>
+          ))}
+        </div>
+        <div className="mv-et-fc-topo">
+          <b>Quatro frases que escapam sem perceber</b>
+          <button type="button" className="mv-et-bt" disabled={todas}
+            onClick={() => setAbertas(new Set(TROCAS.map((_, i) => i)))}>Corrigir todas</button>
+        </div>
+        <ol className="mv-et-fc-lista">
+          {TROCAS.map((t, i) => {
+            const aberta = abertas.has(i);
+            return (
+              <li key={t.ctx} className="mv-et-fc-it" data-aberta={aberta ? '' : undefined}>
+                <small className="mv-et-fc-ctx"><i className="num">{i + 1}</i>{t.ctx}</small>
+                <div className="mv-et-fc-par">
+                  <div className="mv-et-fc-b" data-tom="rubro">
+                    <span className="mv-et-fc-rot"><Mini><IcX /></Mini>Nome errado</span>
+                    <span>{t.errada}</span>
+                  </div>
+                  {aberta ? (
+                    <div className="mv-et-fc-b" data-tom="verde" role="status">
+                      <span className="mv-et-fc-rot"><Mini><IcCheck /></Mini>Nome certo</span>
+                      <span>{t.certa}</span>
+                    </div>
+                  ) : (
+                    <div className="mv-et-fc-vazio">
+                      <button type="button" className="mv-et-bt" data-tom="azul" onClick={() => abrir(i)}>Corrigir a frase</button>
+                    </div>
+                  )}
+                </div>
+                {aberta && <span className="mv-et-fc-pq"><em>Por quê:</em> {t.pq}</span>}
+              </li>
+            );
+          })}
+        </ol>
       </div>
     </Figura>
   );

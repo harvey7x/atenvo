@@ -2,7 +2,11 @@
    vários motivos, o método de 6 passos (diagrama clicável), a anatomia de uma
    boa resposta, as cinco famílias de objeção, a caixa de fatos, os sinais de
    seriedade × sinais de golpe, a linha do tempo do pagamento, a árvore "até
-   onde ir", as conversas encenadas e o treino de respostas.
+   onde ir", o caminho da parcela (consignado × empréstimo pessoal), a árvore
+   do "mas o meu é consignado", as conversas encenadas e o treino de respostas.
+   Correção do dono (13/10): o processo revisa os juros do EMPRÉSTIMO PESSOAL,
+   cobrado pela financeira fora do INSS; o consignado (margem, portabilidade)
+   é só gancho do canal de empréstimo.
    Mensagens do robô/IA: copiadas literalmente do processo oficial. Falas do
    atendente: sugestões de roteiro. Estilos em 08-objecoes.css. */
 import { useState, type ReactNode } from 'react';
@@ -255,7 +259,7 @@ const IC_FAMILIA: Record<FamiliaId, ReactNode> = {
 };
 export function FamiliasObjecao() {
   return (
-    <Figura legenda="As 18 objeções do manual, agrupadas pelo sentimento de onde nascem. A última linha de cada cartão é o que o cliente precisa sentir para seguir.">
+    <Figura legenda={`As ${OBJECOES.length} objeções do manual, agrupadas pelo sentimento de onde nascem. A última linha de cada cartão é o que o cliente precisa sentir para seguir.`}>
       <div className="mv-ob-fam">
         {FAMILIAS.map((f) => {
           const itens = OBJECOES.filter((o) => o.familia === f.id);
@@ -284,18 +288,18 @@ export function FamiliasObjecao() {
 
 /* ===================================================================== caixa de fatos */
 const FATOS_USO: { f: string; usa: string }[] = [
-  { f: 'Nada é pago para começar.', usa: 'golpe · sem dinheiro · 30%' },
-  { f: 'Honorários: 30% do valor que o cliente receber, no final. Percentual fixo.', usa: '30% · e se eu perder · sem dinheiro' },
-  { f: 'O advogado, Dr. Rafael Menezes, entra com uma ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos.', usa: 'golpe · outra empresa · só quero empréstimo' },
+  { f: 'Nada é pago para começar. Honorários: 30% do valor que o cliente receber, no final. Percentual fixo.', usa: 'golpe · sem dinheiro · 30% · e se eu perder' },
+  { f: 'O processo revisa os juros do empréstimo pessoal com Agibank, BMG, Facta, Mercantil ou Crefisa.', usa: 'qual banco · é consignado · o banco disse que está certo' },
+  { f: 'O consignado é descontado pelo INSS; o empréstimo pessoal é cobrado pela financeira, fora do INSS.', usa: 'é consignado · pessoal ou consignado' },
+  { f: 'O advogado, Dr. Rafael Menezes, entra com uma ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos nesses empréstimos.', usa: 'golpe · outra empresa · só quero empréstimo' },
   { f: 'O resultado depende da análise: ninguém garante valor nem resultado.', usa: 'quanto vou receber · e se eu perder' },
   { f: 'Costuma levar de 6 a 12 meses.', usa: 'demora muito' },
   { f: 'As procurações são assinadas digitalmente pelo gov.br (conta prata ou ouro).', usa: 'golpe · documentos' },
-  { f: 'Possibilidade de aumento de margem e de portabilidade, que pode liberar um valor acima de R$\u00a01.500.', usa: 'só quero empréstimo · pré-aprovada · demora' },
+  { f: 'Consignado sem margem: possibilidade de aumento de margem e de portabilidade dos consignados, que pode liberar um valor acima de R$\u00a01.500.', usa: 'só quero empréstimo · pré-aprovada · demora' },
   { f: 'A senha nunca é condição: o cliente pode baixar os documentos com a sua ajuda.', usa: 'senha · Meu INSS' },
   { f: 'A foto do rosto confirma que é a própria pessoa fazendo.', usa: 'documentos' },
   { f: 'Sem e-mail? A gente cria um.', usa: 'e-mail' },
   { f: 'Comprovante de alguém da família: documento com foto dessa pessoa + declaração de residência.', usa: 'comprovante' },
-  { f: 'Financeiras com que trabalhamos: Agibank, BMG, Facta, Mercantil e Crefisa.', usa: 'qual banco' },
 ];
 const NUNCA_FATO: { f: string; porque: string }[] = [
   { f: '“Você vai receber X.”', porque: 'O resultado depende da análise.' },
@@ -474,6 +478,97 @@ export function ArvoreInsistir() {
   );
 }
 
+/* ===================================================================== o caminho da parcela: consignado × empréstimo pessoal */
+type IcCp = 'beneficio' | 'inss' | 'conta' | 'financeira';
+const IC_CP: Record<IcCp, ReactNode> = {
+  beneficio: <><rect x="4.5" y="3.5" width="15" height="17" rx="2" /><path d="M8 8h8M8 12h8M8 16h5" /></>,
+  inss: <><path d="M3 9.5L12 4l9 5.5" /><path d="M5.5 10v8M10 10v8M14 10v8M18.5 10v8M3 20.5h18" /></>,
+  conta: <><rect x="2.5" y="5.5" width="19" height="13" rx="2" /><path d="M2.5 10h19M15 15h3.5" /></>,
+  financeira: <><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3z" /><path d="M9 8h6M9 12h6" /></>,
+};
+const PASSOS_CP: { ic: IcCp; tom: TomOb; tag?: string; t: string; d: string }[] = [
+  { ic: 'beneficio', tom: 'neutro', t: 'Benefício do INSS', d: 'O valor do mês, antes de qualquer desconto.' },
+  { ic: 'inss', tom: 'azul', tag: 'Consignado', t: 'O INSS desconta a parcela', d: 'Direto do benefício, antes de o dinheiro cair na conta.' },
+  { ic: 'conta', tom: 'neutro', t: 'O dinheiro cai na conta', d: 'O que sobrou depois dos descontos do INSS.' },
+  { ic: 'financeira', tom: 'verde', tag: 'Empréstimo pessoal', t: 'A financeira cobra a parcela', d: 'Fora do INSS: em geral na conta do cliente ou por boleto/carnê.' },
+];
+export function CaminhoParcela() {
+  return (
+    <Figura legenda="Ideia simplificada, sem valores. O consignado é descontado pelo INSS antes de o dinheiro cair na conta; o empréstimo pessoal é cobrado pela financeira, fora do INSS. A CAF revisa os juros do empréstimo pessoal.">
+      <div className="mv-ob-cp">
+        <ol className="mv-ob-cp-trilho" aria-label="O caminho do dinheiro do benefício, em quatro etapas">
+          {PASSOS_CP.map((p) => (
+            <li key={p.t} data-obtom={p.tom} data-tipo={p.tag ? '' : undefined}>
+              <span className="mv-ob-cp-cab">
+                <span className="mv-ob-cp-ic" aria-hidden>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{IC_CP[p.ic]}</svg>
+                </span>
+                {p.tag && <span className="mv-ob-cp-tag">{p.tag}</span>}
+              </span>
+              <b>{p.t}</b>
+              <small>{p.d}</small>
+            </li>
+          ))}
+        </ol>
+        <div className="mv-ob-cp-caf">
+          <div data-obtom="ambar">
+            <span>O consignado, na CAF</span>
+            <p>É gancho do canal de empréstimo: sem margem para um consignado novo, os caminhos são o aumento de margem e a portabilidade dos consignados.</p>
+          </div>
+          <div data-obtom="verde">
+            <span>O empréstimo pessoal, na CAF</span>
+            <p>É o objeto do processo: a revisão dos juros e o ressarcimento do que foi descontado nos últimos 10 anos.</p>
+          </div>
+        </div>
+        <div className="mv-ob-cp-perg">
+          <span>Como perguntar ao cliente</span>
+          <p>“É aquele empréstimo que a financeira cobra na sua conta, e não o que o INSS desconta direto do benefício.”</p>
+        </div>
+      </div>
+    </Figura>
+  );
+}
+
+/* ===================================================================== árvore: "mas o meu é consignado" */
+export function ArvoreConsignado() {
+  const caixa = (x: number, y: number, w: number, h: number, tom: TomOb, linhas: string[]) => (
+    <g data-obtom={tom}>
+      <rect className="mv-ob-av-cx" x={x} y={y} width={w} height={h} rx="10" />
+      {linhas.map((l, i) => (
+        <text key={l} className="mv-ob-av-t" x={x + w / 2} y={y + h / 2 + 4.5 + (i - (linhas.length - 1) / 2) * 18} textAnchor="middle">{l}</text>
+      ))}
+    </g>
+  );
+  return (
+    <Figura legenda="Antes de concluir, pergunte pelo empréstimo pessoal. Ter consignado não impede ter também um pessoal; só quem tem apenas consignado não passa na porta 3.">
+      <Rolo>
+      <svg viewBox="0 0 760 284" role="img" aria-label="Árvore de decisão. O cliente diz: mas o meu é consignado. Pergunte uma vez se, além dele, tem empréstimo pessoal com Agibank, BMG, Facta, Mercantil ou Crefisa. Se tem, siga a análise normalmente: ele passa na porta 3. Se não sabe, explique a diferença numa frase; se seguir sem saber, siga em frente. Se só tem consignado, não passa na porta 3: agradeça com carinho e não insista.">
+        <defs>
+          <marker id="mv-ob-ac-seta" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path className="mv-ob-seta-p" d="M0,0 L10,5 L0,10 z" />
+          </marker>
+        </defs>
+        <g className="mv-ob-av-setas">
+          <line x1="380" y1="50" x2="380" y2="78" markerEnd="url(#mv-ob-ac-seta)" />
+          <line x1="380" y1="136" x2="380" y2="162" />
+          <path d="M380,162 H126 V198" markerEnd="url(#mv-ob-ac-seta)" />
+          <line x1="380" y1="162" x2="380" y2="198" markerEnd="url(#mv-ob-ac-seta)" />
+          <path d="M380,162 H634 V198" markerEnd="url(#mv-ob-ac-seta)" />
+        </g>
+        {caixa(200, 10, 360, 40, 'neutro', ['O cliente diz: “mas o meu é consignado”'])}
+        {caixa(130, 80, 500, 56, 'ambar', ['Pergunte uma vez: além dele, tem empréstimo pessoal', 'com Agibank, BMG, Facta, Mercantil ou Crefisa?'])}
+        {caixa(10, 200, 232, 72, 'verde', ['Siga a análise normalmente:', 'ele passa na porta 3'])}
+        {caixa(264, 200, 232, 72, 'ambar', ['Explique a diferença numa', 'frase. Seguiu sem saber?', 'Siga em frente'])}
+        {caixa(518, 200, 232, 72, 'rubro', ['Não passa na porta 3:', 'agradeça com carinho', 'e não insista'])}
+        <text className="mv-ob-av-r" x="134" y="186">tem</text>
+        <text className="mv-ob-av-r" x="388" y="186">não sabe</text>
+        <text className="mv-ob-av-r" x="642" y="186">só consignado</text>
+      </svg>
+      </Rolo>
+    </Figura>
+  );
+}
+
 /* ===================================================================== conversas encenadas */
 type Nota = { grupo: Grupo | 'extra'; passo: string; t: string };
 function CenaAnotada({ contato, sub, legenda, bolhas, notas }: { contato: string; sub: string; legenda: string; bolhas: Bolha[]; notas: Nota[] }) {
@@ -506,7 +601,7 @@ export function CenaGolpe() {
         { de: 'eu', texto: 'Posso perguntar: aconteceu alguma coisa que deixou o senhor com o pé atrás?', hora: '09:42' },
         { de: 'cliente', texto: 'Meu vizinho caiu num golpe. Pediram um Pix pra liberar um dinheiro e sumiram.', hora: '09:44' },
         { de: 'eu', texto: 'Que situação triste. Então o senhor vai gostar de saber como é aqui: o senhor não paga nada para começar. Nem Pix, nem taxa, nada.', hora: '09:45' },
-        { de: 'eu', texto: 'O nosso advogado, o Dr. Rafael Menezes, entra com uma ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos. Os honorários dele são 30% do valor que o senhor receber, só no final. O resultado depende da análise.', hora: '09:45' },
+        { de: 'eu', texto: 'O nosso trabalho é a revisão dos juros do empréstimo pessoal com as financeiras. O advogado, o Dr. Rafael Menezes, entra com uma ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos nesses empréstimos. Os honorários dele são 30% do valor que o senhor receber, só no final. O resultado depende da análise.', hora: '09:45' },
         { de: 'eu', texto: 'E as procurações são assinadas no gov.br, o sistema oficial do governo. Ficou claro? Se quiser, pode chamar alguém da família para ler a conversa junto.', hora: '09:46' },
         { de: 'cliente', texto: 'Ficou. Minha filha chega às 6, vou mostrar pra ela.', hora: '09:48' },
         { de: 'eu', texto: 'Combinado! Posso chamar o senhor hoje, às 18h30, para a gente seguir com ela junto?', hora: '09:48' },
@@ -556,7 +651,7 @@ export function CenaSenha() {
    a atendente conferiu os extratos e a margem está comprometida. */
 export function CenaPreAprovada() {
   const inicio: Bolha[] = [
-    { de: 'eu', texto: 'Dona Lúcia, conferi os seus extratos. Hoje a sua margem está comprometida com os empréstimos que a senhora já tem, por isso um empréstimo novo não sai agora.', hora: '15:02' },
+    { de: 'eu', texto: 'Dona Lúcia, conferi os seus extratos. Hoje a sua margem está comprometida com os consignados que a senhora já tem, por isso um empréstimo consignado novo não sai agora.', hora: '15:02' },
     { de: 'cliente', texto: 'Mas a mensagem disse que estava pré-aprovada! Por que falaram isso, então?', hora: '15:04' },
   ];
   return (
@@ -580,7 +675,8 @@ export function CenaPreAprovada() {
               ...inicio,
               { de: 'eu', texto: 'Entendo a sua chateação, Dona Lúcia, e peço desculpa se a mensagem deu outra impressão.', hora: '15:05' },
               { de: 'eu', texto: '“Pré-aprovada” quer dizer que a sua análise inicial passou nas primeiras perguntas, e por isso pôde seguir até aqui. Não é um valor liberado.', hora: '15:05' },
-              { de: 'eu', texto: 'Mas existem caminhos: a possibilidade de aumento de margem, a de portabilidade, que pode liberar um valor acima de R$\u00a01.500, e uma ação com o nosso advogado pedindo o ressarcimento do que foi descontado nos últimos 10 anos. O resultado depende da análise. Posso explicar cada um?', hora: '15:06' },
+              { de: 'eu', texto: 'Mas existem caminhos: a possibilidade de aumento de margem e a de portabilidade dos seus consignados, que pode liberar um valor acima de R$\u00a01.500.', hora: '15:06' },
+              { de: 'eu', texto: 'E tem a revisão dos juros do seu empréstimo pessoal, aquele que a financeira cobra na sua conta: o nosso advogado entra com uma ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos. O resultado depende da análise. Posso explicar cada caminho?', hora: '15:06' },
               { de: 'cliente', texto: 'Pode sim.', hora: '15:08' },
             ]} />
         ),
@@ -622,6 +718,35 @@ export function CenaFilho() {
   );
 }
 
+/* "Mas o meu é consignado": o processo olha o empréstimo pessoal; a atendente
+   explica a diferença numa frase e pergunta, sem concluir antes da hora. */
+export function CenaConsignado() {
+  return (
+    <CenaAnotada
+      contato="Dona Marlene" sub="cliente · canal de juros abusivos"
+      legenda="Conversa de exemplo (nome fictício). Sugestão de roteiro: adapte ao cliente."
+      bolhas={[
+        { de: 'cliente', texto: 'Mas o meu empréstimo é consignado, é aquele que o INSS desconta.', hora: '10:20' },
+        { de: 'eu', texto: 'Que bom que a senhora me contou, Dona Marlene, isso ajuda muito.', hora: '10:21' },
+        { de: 'eu', texto: 'O nosso processo olha os juros do empréstimo pessoal. O consignado é o que o INSS desconta direto do benefício. O pessoal é cobrado pela financeira, fora do INSS: em geral sai da conta ou vem em boleto.', hora: '10:21' },
+        { de: 'eu', texto: 'Além do consignado, a senhora tem algum empréstimo que a financeira cobra na sua conta, com Agibank, BMG, Facta, Mercantil ou Crefisa?', hora: '10:22' },
+        { de: 'cliente', texto: 'Tem um do Agibank que sai da minha conta todo mês.', hora: '10:25' },
+        { de: 'eu', texto: 'Pelo que a senhora conta, esse parece ser um empréstimo pessoal, que é justamente o que a gente analisa. Ficou claro?', hora: '10:26' },
+        { de: 'cliente', texto: 'Ficou. Não sabia que era diferente.', hora: '10:27' },
+        { de: 'eu', texto: 'É muito comum não saber! Então o próximo passo é a análise. Posso explicar o que a gente precisa?', hora: '10:27' },
+      ]}
+      notas={[
+        { grupo: 'conexao', passo: '2 · Acolher', t: 'Agradece a informação em vez de corrigir a cliente. Ela não se sente errada.' },
+        { grupo: 'extra', passo: 'Ajuda prática', t: 'A diferença numa frase, pelo que ela vê no dia a dia: quem cobra a parcela. Sem “margem” nem “juros livres”.' },
+        { grupo: 'diagnostico', passo: '3 · Entender', t: 'Pergunta pelo empréstimo pessoal citando as 5 financeiras. Ter consignado não impede ter também um pessoal.' },
+        { grupo: 'resposta', passo: '4 · Fato', t: '“Parece ser um empréstimo pessoal”: responde com cuidado, sem afirmar o que ainda não conferiu.' },
+        { grupo: 'resposta', passo: '5 · Confirmar', t: '“Ficou claro?” E a cliente mostra que entendeu a diferença.' },
+        { grupo: 'avanco', passo: '6 · Próximo passo', t: 'Leva para a análise. Se ela tivesse só consignado, o caminho seria agradecer com carinho e encerrar, sem insistir.' },
+      ]}
+    />
+  );
+}
+
 /* ===================================================================== treino: escolha a melhor resposta */
 type Rodada = { ctx: string; cliente: string; certa: number; ops: { t: string; fb: string }[] };
 /* As três opções de cada rodada têm tamanho parecido: a certa não é a mais longa,
@@ -648,11 +773,11 @@ const RODADAS: Rodada[] = [
     ],
   },
   {
-    ctx: 'Canal de empréstimo. Você já se apresentou e explicou a “pré-aprovada”. Conferiu os extratos de Dona Lúcia: ela está sem margem.',
+    ctx: 'Canal de empréstimo. Você já se apresentou e explicou a “pré-aprovada”. Conferiu os extratos de Dona Lúcia: ela está sem margem para um consignado novo.',
     cliente: 'Mas disseram que estava pré-aprovado! Cadê o meu dinheiro?',
     certa: 0,
     ops: [
-      { t: 'Peço desculpa pela confusão: pré-aprovada não é valor liberado. Posso mostrar os caminhos?', fb: 'Acolhe, repete com honestidade o que a palavra quer dizer e abre espaço para os caminhos: aumento de margem, portabilidade e a ação.' },
+      { t: 'Peço desculpa pela confusão: pré-aprovada não é valor liberado. Posso mostrar os caminhos?', fb: 'Acolhe, repete com honestidade o que a palavra quer dizer e abre espaço para os caminhos: aumento de margem, portabilidade dos consignados e a revisão dos juros do empréstimo pessoal.' },
       { t: 'Ah, isso foi o robô que se confundiu, Dona Lúcia. Pode desconsiderar aquela mensagem, tá bom?', fb: 'Culpar o robô joga a empresa contra ela mesma e não resolve a frustração.' },
       { t: 'Calma, Dona Lúcia! Manda os documentos que eu dou um jeito de o seu empréstimo sair, viu?', fb: 'Promessa falsa: ela está sem margem. Quando descobrir, a confiança acaba.' },
     ],
@@ -675,6 +800,16 @@ const RODADAS: Rodada[] = [
       { t: 'É fácil, qualquer um consegue! Baixa o aplicativo e me manda os extratos.', fb: 'Para quem não sabe, “é fácil” soa como “você é que não sabe”. E mandar fazer sozinha não ajuda.' },
       { t: 'Então me passa a senha do gov.br que eu resolvo tudo por aqui para a senhora.', fb: 'A senha é uma escolha do cliente, nunca o seu ponto de partida. Primeiro ofereça ajuda para ela mesma baixar.' },
       { t: 'Sem problema, a gente faz junto, um passo de cada vez. Vamos tentar agora?', fb: 'Acolhe sem diminuir e propõe fazer junto, no tempo dela. Se ela travar, peça um print da tela.' },
+    ],
+  },
+  {
+    ctx: 'Canal de juros. Você perguntou a Seu Amaro se ele tem empréstimo pessoal com alguma das 5 financeiras.',
+    cliente: 'Mas o meu é consignado, aquele que o INSS desconta direto.',
+    certa: 0,
+    ops: [
+      { t: 'Entendi! O processo olha o empréstimo pessoal. Tem algum que a financeira cobra na conta?', fb: 'Explica numa frase o que o processo olha e pergunta pelo que ele vê no dia a dia: quem cobra a parcela. Se ele tiver só consignado, aí sim agradeça e encerre sem insistir.' },
+      { t: 'Sem problema, Seu Amaro! O consignado também entra na revisão, é só mandar os extratos.', fb: 'Errado: o processo revisa os juros do empréstimo pessoal, não do consignado. A resposta cria uma expectativa falsa.' },
+      { t: 'Ah, então o senhor não pode participar, infelizmente. Obrigada pelo contato, viu, Seu Amaro!', fb: 'Cedo demais. Ter consignado não impede: ele pode ter também um empréstimo pessoal. Pergunte antes de encerrar.' },
     ],
   },
 ];

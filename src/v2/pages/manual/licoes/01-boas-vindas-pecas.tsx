@@ -1,27 +1,15 @@
 /* Lição 1 — ilustrações e atividades próprias (prefixo mv-bv-): sumário,
-   "como funciona", financeiras, quem faz o quê, de quem é a tarefa, trilha do
+   "como funciona", consignado × empréstimo pessoal, financeiras, quem faz o quê, de quem é a tarefa, trilha do
    manual, consulta rápida, simulador da nota, caminho do cliente, conversas em
    paralelo, valores e regras de ouro. Só tokens do tema (claro e escuro).
    Números da prova vêm de tipos.ts; títulos e resumos das lições vêm de LICOES,
    lido só na hora de renderizar (index.ts importa esta lição: import circular). */
 import { useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
 import { Aviso, IcCheck, IcX, Lista } from '../pecas';
-import { MODULOS, NOTA_MINIMA_PCT, PERGUNTAS_POR_PROVA, type ModuloId } from '../tipos';
+import { MODULOS, type ModuloId } from '../tipos';
 import { LICOES } from '.';
-
-/* ------------------------------------------------------------ números da prova (nunca fixos no texto) */
-/** Menor número de acertos que chega à nota mínima, com o mesmo arredondamento da prova. */
-function minimoAcertos(total: number, pct: number) {
-  for (let a = 0; a <= total; a++) if (Math.round((a / total) * 100) >= pct) return a;
-  return total;
-}
-export const PROVA = {
-  total: PERGUNTAS_POR_PROVA,
-  pct: NOTA_MINIMA_PCT,
-  minimo: minimoAcertos(PERGUNTAS_POR_PROVA, NOTA_MINIMA_PCT),
-} as const;
-/** Nota (em %) com `acertos` certas na prova. */
-export const notaDe = (acertos: number) => Math.round((acertos / PROVA.total) * 100);
+/* números da prova e ids das seções: em arquivo próprio, sem import circular */
+import { notaDe, PROVA, SEC } from './01-boas-vindas-dados';
 
 /** Quantidade de lições da trilha (lida na hora de renderizar). */
 export function QtdLicoes() {
@@ -30,7 +18,7 @@ export function QtdLicoes() {
 
 /* ------------------------------------------------------------ módulos da trilha (lista) */
 const DESC_MODULO: Record<ModuloId, string> = {
-  fundamentos: 'a empresa, o consignado e os juros abusivos, e quem é o nosso cliente.',
+  fundamentos: 'a empresa, consignado × empréstimo pessoal e os juros abusivos, e quem é o nosso cliente.',
   venda: 'os dois canais, o primeiro contato, como converter, objeções e follow-up.',
   documentacao: 'Meu INSS, gov.br (imposto de renda e CPF) e documentos pessoais.',
   fechamento: 'cadastro, procurações e assinatura; segurança, ética e LGPD.',
@@ -60,19 +48,6 @@ export function ProximaLicao({ children }: { children: ReactNode }) {
   const prox = k >= 0 ? LICOES[k + 1] : undefined;
   return <Aviso tom="verde" titulo={prox ? `Próxima lição: ${prox.titulo}` : 'Próxima lição'}>{children}</Aviso>;
 }
-
-/** ids das seções da lição (o sumário rola até elas). */
-export const SEC = {
-  caf: 'bv-caf',
-  papel: 'bv-papel',
-  mapa: 'bv-mapa',
-  estudar: 'bv-estudar',
-  caminho: 'bv-caminho',
-  dia: 'bv-dia',
-  valores: 'bv-valores',
-  regras: 'bv-regras',
-  resumo: 'bv-resumo',
-} as const;
 
 /* ------------------------------------------------------------ ícones */
 const Ic = ({ children, t = 20 }: { children: ReactNode; t?: number }) => (
@@ -131,7 +106,7 @@ export function Sumario() {
 
 /* ------------------------------------------------------------ como funciona (CAF em 1 minuto) */
 const ETAPAS_CAF: { ic: ReactNode; t: string; d: string }[] = [
-  { ic: <IcMoeda />, t: 'O desconto', d: 'O aposentado tem empréstimo consignado numa financeira. A parcela sai direto do benefício, todo mês.' },
+  { ic: <IcMoeda />, t: 'O empréstimo', d: 'O cliente fez um empréstimo pessoal numa das 5 financeiras, fora do INSS, com juros livres que podem ser abusivos.' },
   { ic: <IcLupa />, t: 'A análise', d: 'Ele chama a CAF pelo WhatsApp. Você confere se ele pode ser atendido e junta os documentos.' },
   { ic: <IcBalanca />, t: 'A ação', d: 'O nosso advogado, Dr. Rafael Menezes, entra com a ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos.' },
   { ic: <IcCarteira />, t: 'O resultado', d: 'Leva em média de 6 a 12 meses. Se houver ressarcimento, 30% ficam como honorários do advogado, só no final.' },
@@ -164,6 +139,81 @@ export function ComoFunciona() {
   );
 }
 
+/* ------------------------------------------------------------ consignado × empréstimo pessoal */
+/* Fatos só da correção do dono (13/10): o consignado passa pelo INSS; o empréstimo
+   pessoal é cobrado pela financeira, fora do INSS. O processo revisa o PESSOAL.
+   Nada de números de juros; nada sobre como cada financeira cobra. */
+type TipoEmp = 'consig' | 'pessoal';
+const VIAS: { id: TipoEmp; t: string; sub: string; nos: { t: string; d: string; fin?: boolean }[] }[] = [
+  {
+    id: 'consig', t: 'Empréstimo consignado', sub: 'passa pelo INSS',
+    nos: [
+      { t: 'INSS', d: 'desconta a parcela direto do benefício' },
+      { t: 'Financeira', d: 'recebe a parcela antes de o dinheiro cair na conta', fin: true },
+      { t: 'Conta do cliente', d: 'o benefício já cai com o desconto' },
+    ],
+  },
+  {
+    id: 'pessoal', t: 'Empréstimo pessoal', sub: 'fora do INSS',
+    nos: [
+      { t: 'INSS', d: 'paga o benefício normalmente' },
+      { t: 'Conta do cliente', d: 'o benefício cai na conta' },
+      { t: 'Financeira', d: 'cobra a parcela, em geral na conta ou por boleto', fin: true },
+    ],
+  },
+];
+const CXP_LINHAS: { k: string; consig: string; pessoal: string }[] = [
+  {
+    k: 'Margem',
+    consig: 'Precisa de margem consignável. Sem margem, não sai consignado novo.',
+    pessoal: 'Não usa a margem do INSS. A financeira empresta até para quem está sem margem.',
+  },
+  {
+    k: 'Juros',
+    consig: 'Têm um teto próprio do consignado do INSS. São os mais baratos para o aposentado.',
+    pessoal: 'Livres, sem o teto do consignado, e em geral bem mais altos.',
+  },
+  {
+    k: 'Na CAF',
+    consig: 'Gancho do canal de empréstimo: sem margem, aumento de margem, portabilidade dos consignados.',
+    pessoal: 'É o objeto do processo: a revisão dos juros e o pedido de ressarcimento.',
+  },
+];
+const CXP_CARTAO: Record<TipoEmp, { t: string; tag: string }> = {
+  consig: { t: 'Empréstimo consignado', tag: 'Gancho do canal de empréstimo' },
+  pessoal: { t: 'Empréstimo pessoal', tag: 'É o que a CAF revisa' },
+};
+export function ConsignadoXPessoal() {
+  return (
+    <div className="mv-bv-cxp">
+      <div className="mv-bv-cxp-vias">
+        {VIAS.map((v) => (
+          <section key={v.id} className="mv-bv-cxp-via" data-t={v.id} aria-label={`${v.t}: ${v.nos.map((n) => `${n.t}, ${n.d}`).join('; ')}`}>
+            <header><b>{v.t}</b><small>{v.sub}</small></header>
+            <ol>
+              {v.nos.map((n) => (
+                <li key={n.t} data-fin={n.fin ? '' : undefined}><b>{n.t}</b><span>{n.d}</span></li>
+              ))}
+            </ol>
+          </section>
+        ))}
+      </div>
+      <div className="mv-bv-cxp-cards">
+        {(['consig', 'pessoal'] as const).map((k) => (
+          <section key={k} className="mv-bv-cxp-card" data-t={k} aria-label={CXP_CARTAO[k].t}>
+            <header><b>{CXP_CARTAO[k].t}</b><span className="mv-bv-cxp-tag">{CXP_CARTAO[k].tag}</span></header>
+            <dl>
+              {CXP_LINHAS.map((l) => (
+                <div key={l.k}><dt>{l.k}</dt><dd>{l[k]}</dd></div>
+              ))}
+            </dl>
+          </section>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------ financeiras */
 export function Financeiras() {
   const top = ['Agibank', 'Mercantil', 'BMG'];
@@ -186,7 +236,7 @@ export function Financeiras() {
 
 /* ------------------------------------------------------------ quem faz o quê */
 const VERBOS: { t: string; d: string }[] = [
-  { t: 'Qualificar', d: 'Conferir as 3 portas: benefício do INSS (dele ou de um familiar) e empréstimo numa das 5 financeiras.' },
+  { t: 'Qualificar', d: 'Conferir as 3 portas: benefício do INSS (dele ou de um familiar) e empréstimo pessoal numa das 5 financeiras.' },
   { t: 'Convencer', d: 'Explicar o processo em palavras simples, tirar dúvidas e, no canal de empréstimo, mostrar os caminhos.' },
   { t: 'Coletar documentos', d: 'Meu INSS, gov.br e documentos pessoais, um de cada vez, com paciência.' },
   { t: 'Encaminhar', d: 'Cadastro, procurações e assinatura digital pelo gov.br. Aí o caso segue para o advogado.' },
@@ -265,7 +315,7 @@ export function AntesDeVoce() {
   ];
   const falta = [
     'Ninguém conferiu se ele recebe benefício do INSS',
-    'Ninguém perguntou sobre as financeiras',
+    'Ninguém perguntou sobre empréstimo pessoal nas financeiras',
     'Ninguém explicou o processo nem os 30%',
     'Nenhum documento foi pedido ainda',
   ];
@@ -356,7 +406,7 @@ export function DeQuemETarefa() {
 const CURTO: Record<string, string> = {
   'boas-vindas': 'Boas-vindas',
   empresa: 'O que a gente faz',
-  consignado: 'Consignado e juros',
+  consignado: 'Consignado × pessoal',
   cliente: 'Quem é o cliente',
   canais: 'Os dois canais',
   'primeiro-contato': 'Primeiro contato',
@@ -621,8 +671,8 @@ export function CaminhoCliente() {
 /* ------------------------------------------------------------ conversas em paralelo */
 const QUADRO: { etapa: string; nome: string; canal: string; prox: string }[] = [
   { etapa: 'Chegou agora', nome: 'Dona Cida', canal: 'Juros abusivos', prox: 'Se apresentar e confirmar o benefício do INSS' },
-  { etapa: 'Qualificando', nome: 'Seu Antônio', canal: 'Juros abusivos', prox: 'Perguntar em quais financeiras tem empréstimo' },
-  { etapa: 'Conversando', nome: 'Dona Lúcia', canal: 'Empréstimo', prox: 'Explicar que hoje não há margem e mostrar os caminhos' },
+  { etapa: 'Qualificando', nome: 'Seu Antônio', canal: 'Juros abusivos', prox: 'Perguntar em quais financeiras tem empréstimo pessoal' },
+  { etapa: 'Conversando', nome: 'Dona Lúcia', canal: 'Empréstimo', prox: 'Explicar que não há margem para consignado novo e mostrar os caminhos' },
   { etapa: 'Documentos', nome: 'Dona Maria', canal: 'Juros abusivos', prox: 'Faltam os extratos de pagamento de 10 anos' },
   { etapa: 'Fechamento', nome: 'Seu José', canal: 'Empréstimo', prox: 'Conta gov.br no bronze: ajudar a subir para prata' },
 ];
@@ -685,11 +735,11 @@ export function Pilares() {
 
 /* ------------------------------------------------------------ as 10 regras de ouro */
 const REGRAS: { t: string; porque: string }[] = [
-  { t: 'Confira se a pessoa pode ser atendida antes de tudo.', porque: 'São 3 portas: recebe algum benefício do INSS (aposentadoria, pensão, auxílio, BPC/LOAS)? Se não recebe, algum familiar (pai, mãe, avô, avó, filho) recebe? E tem empréstimo em uma das 5 financeiras? Conferir cedo evita que o cliente perca tempo mandando documentos à toa.' },
+  { t: 'Confira se a pessoa pode ser atendida antes de tudo.', porque: 'São 3 portas: recebe algum benefício do INSS (aposentadoria, pensão, auxílio, BPC/LOAS)? Se não recebe, algum familiar (pai, mãe, avô, avó, filho) recebe? E tem empréstimo pessoal em uma das 5 financeiras? Conferir cedo evita que o cliente perca tempo mandando documentos à toa.' },
   { t: 'Nunca prometa valor nem resultado.', porque: 'Cada caso depende da análise. Fale em “análise”, “possibilidade” e “em média”. Prometer e não cumprir destrói a confiança do cliente na CAF.' },
   { t: 'Fale dos 30% com clareza, desde o começo.', porque: 'O cliente não paga nada para começar; no final, 30% do que ele receber ficam como honorários do advogado. Quem entende isso no início não se sente enganado no final.' },
   { t: 'Nunca peça dinheiro ao cliente.', porque: 'O processo é gratuito para começar. No canal de juros abusivos, o robô já avisa o cliente de que a CAF nunca pede pagamento. Qualquer pedido de dinheiro parece golpe e quebra a confiança.' },
-  { t: 'Escute primeiro, ofereça depois.', porque: 'Quem vem pelo canal de empréstimo quer dinheiro rápido e não pediu o processo. Entenda o que ele precisa, verifique a situação e só então mostre os caminhos: aumento de margem, portabilidade e o processo.' },
+  { t: 'Escute primeiro, ofereça depois.', porque: 'Quem vem pelo canal de empréstimo quer dinheiro rápido e não pediu o processo. Entenda o que ele precisa, verifique a situação e só então mostre os caminhos: aumento de margem, portabilidade dos consignados e a revisão dos juros do empréstimo pessoal que ele tem com as financeiras.' },
   { t: 'Fale com respeito, calma e palavras simples.', porque: 'O nosso público principal é aposentado e pensionista, muitas vezes uma pessoa idosa. Frases curtas, sem gíria e sem pressa fazem o cliente se sentir seguro para seguir com você.' },
   { t: 'Recebeu um “não”? Agradeça e não insista.', porque: 'Quando o cliente diz NÃO ou não pode ser atendido, a regra é agradecer com carinho e encerrar. A porta fica aberta: se ele mudar de ideia, pode chamar de novo.' },
   { t: 'Senha e dados servem só para o processo.', porque: 'Não peça nem exija a senha: o robô já avisou o cliente de que a CAF nunca pede senhas. Se o próprio cliente não conseguir entrar no Meu INSS e decidir passar a senha do gov.br, use só para buscar os documentos, com total segurança, e depois ajude ele a trocar a senha. Dados do cliente não saem do atendimento.' },

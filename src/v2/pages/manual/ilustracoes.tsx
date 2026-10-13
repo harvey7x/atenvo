@@ -15,21 +15,21 @@ const real = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', curre
 /* ------------------------------------------------------------ mapa mental */
 type Ramo = { t: string; folhas: string[]; tom: string; lado: 'e' | 'd'; y: number };
 const RAMOS: Ramo[] = [
-  { t: 'Perfil', tom: 'verde', lado: 'e', y: 80, folhas: ['Qualquer benefício do INSS', 'Ou um familiar que recebe', 'Empréstimo nas 5 financeiras'] },
+  { t: 'Perfil', tom: 'verde', lado: 'e', y: 80, folhas: ['Qualquer benefício do INSS', 'Ou um familiar que recebe', 'Empréstimo pessoal: 5 financeiras'] },
   { t: 'Canal', tom: 'azul', lado: 'e', y: 230, folhas: ['Juros abusivos → direto', 'Empréstimo → ganchos', 'Top 3: Agibank, Mercantil, BMG'] },
   { t: 'Objeções', tom: 'rubro', lado: 'e', y: 380, folhas: ['"É golpe?"', '"Não tenho dinheiro"', '"Só quero empréstimo"'] },
-  { t: 'Ganchos', tom: 'ambar', lado: 'd', y: 80, folhas: ['Aumento de margem', 'Portabilidade (+R$ 1.500)', 'Ressarcimento de 10 anos'] },
+  { t: 'Ganchos', tom: 'ambar', lado: 'd', y: 80, folhas: ['Aumento de margem', 'Portabilidade (+R$ 1.500)', 'Levam à revisão do pessoal'] },
   { t: 'Documentos', tom: 'azul', lado: 'd', y: 230, folhas: ['Meu INSS (3 documentos)', 'gov.br: IR + CPF', 'Pessoais + e-mail'] },
   { t: 'Fechamento', tom: 'verde', lado: 'd', y: 380, folhas: ['Cadastro no admin', 'Procurações', 'Assinatura prata ou ouro'] },
 ];
 export function MapaMental() {
-  const cx = 480, cy = 230, FW = 102; // FW = meia largura da folha
+  const cx = 480, cy = 230, FW = 112; // FW = meia largura da folha
   return (
     <figure className="vidro mv-mapa">
       <svg viewBox="0 0 960 460" role="img" aria-label="Mapa mental da venda do processo">
         {RAMOS.map((r) => {
           const bx = r.lado === 'e' ? 322 : 638;
-          const fx = r.lado === 'e' ? 120 : 840;
+          const fx = r.lado === 'e' ? 128 : 832;
           return (
             <g key={r.t} className="mv-mapa-ramo" data-tom={r.tom}>
               <path className="mv-mapa-fio" d={`M${cx + (r.lado === 'e' ? -85 : 85)},${cy} C${(cx + bx) / 2},${cy} ${(cx + bx) / 2},${r.y} ${bx + (r.lado === 'e' ? 48 : -48)},${r.y}`} />

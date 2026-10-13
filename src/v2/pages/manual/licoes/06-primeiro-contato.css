@@ -145,6 +145,60 @@
 .v2 .mv-pc-perg-se[data-tom="rubro"] { background: var(--rubro-bg); }
 .v2 .mv-pc-perg-se b { font-weight: 600; }
 
+/* ---------- caminho do dinheiro: consignado × empréstimo pessoal ---------- */
+.v2 .mv-pc-din { display: flex; flex-direction: column; gap: 16px; }
+.v2 .mv-pc-din-trilha { list-style: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 22px; }
+.v2 .mv-pc-din-trilha > li {
+  position: relative; display: flex; flex-direction: column; gap: 4px; padding: 10px 12px;
+  border-radius: 10px; background: var(--base); border: 1px solid var(--linha);
+}
+.v2 .mv-pc-din-trilha > li + li::before {
+  content: ""; position: absolute; left: -19px; top: 50%; width: 15px; height: 1.5px;
+  background: rgba(var(--tint), .36); transform: translateY(-50%);
+}
+.v2 .mv-pc-din-trilha > li + li::after {
+  content: ""; position: absolute; left: -11px; top: 50%; width: 6px; height: 6px;
+  border-top: 1.5px solid rgba(var(--tint), .36); border-right: 1.5px solid rgba(var(--tint), .36);
+  transform: translateY(-50%) rotate(45deg);
+}
+.v2 .mv-pc-din-trilha > li[data-k="cons"] { background: rgba(var(--azul-rgb), .07); border-color: rgba(var(--azul-rgb), .45); }
+.v2 .mv-pc-din-trilha > li[data-k="pess"] { background: var(--ambar-bg); border-color: var(--ambar); }
+.v2 .mv-pc-din-cab { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-height: 22px; }
+.v2 .mv-pc-din-n {
+  flex: none; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center;
+  background: rgba(var(--tint), .08); color: var(--txt-2); font-size: 11px; font-weight: 600;
+}
+.v2 .mv-pc-din-tag { padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 600; line-height: 1.3; white-space: nowrap; }
+.v2 .mv-pc-din-trilha > li[data-k="cons"] .mv-pc-din-tag { background: rgba(var(--azul-rgb), .14); color: var(--azul); }
+.v2 .mv-pc-din-trilha > li[data-k="pess"] .mv-pc-din-tag { background: var(--base); color: var(--ambar); border: 1px solid var(--ambar); }
+.v2 .mv-pc-din-trilha b { font-size: 13px; line-height: 1.35; }
+.v2 .mv-pc-din-d { font-size: 12px; line-height: 1.45; color: var(--txt-2); }
+.v2 .mv-pc-din-lados { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.v2 .mv-pc-din-lado {
+  display: flex; flex-direction: column; gap: 8px; padding: 14px; border-radius: var(--r-ctl);
+  background: rgba(var(--tint), .035); border: 1px solid var(--linha);
+}
+.v2 .mv-pc-din-lado[data-k="cons"] { box-shadow: inset 0 3px 0 var(--azul); }
+.v2 .mv-pc-din-lado[data-k="pess"] { box-shadow: inset 0 3px 0 var(--ambar); border-color: var(--ambar); }
+.v2 .mv-pc-din-lado > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; min-height: 24px; }
+.v2 .mv-pc-din-lado > header b { font-size: 14px; }
+.v2 .mv-pc-din-selo {
+  padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600;
+  background: var(--ambar-bg); color: var(--ambar); border: 1px solid var(--ambar);
+}
+.v2 .mv-pc-din-lado dl { display: flex; flex-direction: column; }
+.v2 .mv-pc-din-lado dl > div {
+  display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 10px; padding: 6px 0;
+  border-bottom: 1px dashed var(--linha); font-size: 12.5px; line-height: 1.45;
+}
+.v2 .mv-pc-din-lado dl > div:last-child { border-bottom: 0; }
+.v2 .mv-pc-din-lado dt { padding-top: 1px; font-size: 11.5px; font-weight: 600; color: var(--txt-3); }
+.v2 .mv-pc-din-lado dd { color: var(--txt); }
+.v2 .mv-pc-din-lado dl > div:last-child dd { font-weight: 600; }
+.v2 .mv-pc-din-caf { margin-top: auto; padding: 8px 10px; border-radius: 8px; font-size: 12.5px; line-height: 1.45; }
+.v2 .mv-pc-din-lado[data-k="cons"] .mv-pc-din-caf { background: rgba(var(--azul-rgb), .08); color: var(--txt); }
+.v2 .mv-pc-din-lado[data-k="pess"] .mv-pc-din-caf { background: var(--ambar-bg); color: var(--txt); font-weight: 600; }
+
 /* ---------- funil de qualificação ---------- */
 .v2 .mv-pc-funil { display: flex; flex-direction: column; gap: 6px; }
 .v2 .mv-pc-funil-lin { display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: 14px; align-items: center; }
@@ -416,7 +470,12 @@
 /* ---------- telas menores ---------- */
 @media (max-width: 900px) {
   .v2 .mv-pc-tem, .v2 .mv-pc-anat, .v2 .mv-pc-pergs, .v2 .mv-pc-funil-lin, .v2 .mv-pc-sim-corpo,
-  .v2 .mv-pc-af-tipos, .v2 .mv-pc-tec, .v2 .mv-pc-ficha, .v2 .mv-pc-chk-grade, .v2 .mv-pc-term-grade { grid-template-columns: 1fr; }
+  .v2 .mv-pc-af-tipos, .v2 .mv-pc-tec, .v2 .mv-pc-ficha, .v2 .mv-pc-chk-grade, .v2 .mv-pc-term-grade,
+  .v2 .mv-pc-din-trilha, .v2 .mv-pc-din-lados { grid-template-columns: 1fr; }
+  .v2 .mv-pc-din-trilha { gap: 20px; }
+  .v2 .mv-pc-din-trilha > li + li::before { left: 50%; top: -17px; width: 1.5px; height: 13px; transform: none; }
+  .v2 .mv-pc-din-trilha > li + li::after { left: calc(50% - 2.25px); top: -10px; transform: rotate(135deg); }
+  .v2 .mv-pc-din-lado dl > div { grid-template-columns: 1fr; gap: 2px; }
   .v2 .mv-pc-funil-lado { padding: 0 0 6px; border-left: 0; text-align: center; }
   .v2 .mv-pc-aud-segs { grid-template-columns: 1fr 1fr; margin: 0; }
   .v2 .mv-pc-af-it { grid-template-columns: 1fr; }

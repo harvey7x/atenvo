@@ -115,6 +115,44 @@
 .v2 .mv-cn-meta { fill: var(--verde-bg); stroke: var(--verde); stroke-width: 2; }
 .v2 .mv-cn-meta-ok { fill: none; stroke: var(--verde); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 
+/* ---------- consignado × empréstimo pessoal (comparativo) ---------- */
+.v2 .mv-cn-de { display: flex; flex-direction: column; gap: 14px; }
+.v2 .mv-cn-de-grade { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+/* subgrid: as linhas (cabeçalho, trilha, quem cobra, margem, juros, na CAF) alinham nas duas colunas */
+.v2 .mv-cn-de-col {
+  display: grid; grid-row: span 6; grid-template-rows: subgrid; row-gap: 0; padding: 16px 14px 6px;
+  border-radius: var(--r-ctl); border: 1px solid var(--linha); background: rgba(var(--tint), .025);
+  box-shadow: inset 0 3px 0 var(--ambar);
+}
+.v2 .mv-cn-de-col[data-tom="azul"] { box-shadow: inset 0 3px 0 var(--azul); }
+.v2 .mv-cn-de-col header { display: flex; flex-direction: column; gap: 2px; padding-bottom: 12px; }
+.v2 .mv-cn-de-col header small { font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--ambar); }
+.v2 .mv-cn-de-col[data-tom="azul"] header small { color: var(--azul); }
+.v2 .mv-cn-de-col header b { font-size: 16px; }
+/* trilha: por onde passa o dinheiro; o passo destacado é quem cobra a parcela */
+.v2 .mv-cn-de-trilha { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; padding-bottom: 12px; }
+.v2 .mv-cn-de-passo {
+  position: relative; min-height: 54px; padding: 6px 8px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  border-radius: 8px; border: 1px solid rgba(var(--tint), .16); background: var(--base);
+  font-size: 12px; line-height: 1.3; text-align: center; color: var(--txt-2);
+}
+.v2 .mv-cn-de-passo + .mv-cn-de-passo::before {
+  content: ""; position: absolute; left: -13px; top: 50%; width: 7px; height: 7px; margin-top: -4px;
+  border-top: 2px solid rgba(var(--tint), .45); border-right: 2px solid rgba(var(--tint), .45); transform: rotate(45deg);
+}
+.v2 .mv-cn-de-passo[data-cobra] { border-color: var(--ambar); background: var(--ambar-bg); color: var(--txt); font-weight: 600; }
+.v2 .mv-cn-de-col[data-tom="azul"] .mv-cn-de-passo[data-cobra] { border-color: var(--azul); background: rgba(var(--azul-rgb), .1); }
+.v2 .mv-cn-de-col dl { display: contents; }
+.v2 .mv-cn-de-col dl > div { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 10px; padding: 9px 0; border-top: 1px dashed var(--linha); }
+.v2 .mv-cn-de-col dt { padding-top: 2px; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--txt-3); }
+.v2 .mv-cn-de-col dd { font-size: 13px; color: var(--txt-2); }
+.v2 .mv-cn-de-col dd b { color: var(--txt); }
+.v2 .mv-cn-de-ponte {
+  display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 14px;
+  border-radius: var(--r-ctl); background: rgba(var(--azul-rgb), .07); font-size: 13px; text-align: center; color: var(--txt-2);
+}
+.v2 .mv-cn-de-ponte b { color: var(--txt); }
+
 /* ---------- simulador das 3 portas ---------- */
 .v2 .mv-cn-sim { padding: 18px; display: flex; flex-direction: column; gap: 14px; box-shadow: inset 3px 0 0 var(--ambar), var(--sombra-1); }
 .v2 .mv-cn-sim-cab { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -332,7 +370,7 @@
 
 /* ---------- telas menores ---------- */
 @media (max-width: 900px) {
-  .v2 .mv-cn-cel-grade, .v2 .mv-cn-ads-grade, .v2 .mv-cn-fichas, .v2 .mv-cn-ad-leg, .v2 .mv-cn-arv-ramos, .v2 .mv-cn-ene-grade { grid-template-columns: 1fr; }
+  .v2 .mv-cn-cel-grade, .v2 .mv-cn-ads-grade, .v2 .mv-cn-de-grade, .v2 .mv-cn-fichas, .v2 .mv-cn-ad-leg, .v2 .mv-cn-arv-ramos, .v2 .mv-cn-ene-grade { grid-template-columns: 1fr; }
   .v2 .mv-cn-fichas { gap: 22px; }
   .v2 .mv-cn-anot { justify-content: flex-start; padding: 0; }
   .v2 .mv-cn-arv { gap: 12px; }
@@ -343,6 +381,9 @@
 }
 @media (max-width: 600px) {
   .v2 .mv-cn-sim-portas { grid-template-columns: 1fr; }
+  .v2 .mv-cn-de-col dl > div { grid-template-columns: 1fr; gap: 2px; }
+  .v2 .mv-cn-de-trilha { gap: 14px; }
+  .v2 .mv-cn-de-passo { padding: 6px 4px; font-size: 11.5px; }
 }
 
 /* ---------- texto ao lado do celular do NÃO ---------- */

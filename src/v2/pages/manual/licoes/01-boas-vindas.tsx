@@ -4,16 +4,17 @@
    dia do atendente em visão geral, os 4 valores e as 10 regras de ouro.
    Fatos da empresa: só os do brief do dono (13/10/2026) e do processo oficial.
    Assuntos de outras lições aparecem em 1–2 frases com "veja a lição N".
-   Números da prova vêm de tipos.ts (via PROVA): nunca os escreva fixos no texto. */
+   Números da prova vêm de tipos.ts (via PROVA, em 01-boas-vindas-dados): nunca os escreva fixos no texto. */
 import { MODULOS, type Licao } from '../tipos';
 import {
   Aviso, BomRuim, Celular, Fatos, Figura, Frase, LinhaTempo, Lista, Passos, Sanfona, Secao, Tabela, TesteRapido,
 } from '../pecas';
 import {
-  AntesDeVoce, CaminhoCliente, ComoFunciona, ConsultaRapida, ConversasParalelo, DeQuemETarefa, Financeiras,
-  ModulosDaTrilha, MsgExemplo, notaDe, Pilares, PROVA, ProximaLicao, QtdLicoes, QuemFazOQue, RegrasOuro, SEC,
+  AntesDeVoce, CaminhoCliente, ComoFunciona, ConsignadoXPessoal, ConsultaRapida, ConversasParalelo, DeQuemETarefa,
+  Financeiras, ModulosDaTrilha, MsgExemplo, Pilares, ProximaLicao, QtdLicoes, QuemFazOQue, RegrasOuro,
   SimuladorNota, Sumario, TrilhaManual,
 } from './01-boas-vindas-pecas';
+import { notaDe, PROVA, SEC } from './01-boas-vindas-dados';
 import './01-boas-vindas.css';
 
 /* um acerto abaixo do mínimo, para o teste rápido da nota */
@@ -36,34 +37,64 @@ const corpo = (
       <p>
         CAF quer dizer <b>Central de Assessoria Financeira</b>. O nosso serviço principal, o “carro-chefe” da empresa,
         é o <b>processo de ressarcimento de juros abusivos</b>. Em palavras simples: muita gente que recebe benefício
-        do INSS tem empréstimo consignado, aquele em que a parcela é descontada direto do benefício, todo mês, antes
-        de o dinheiro cair na conta. Quando os juros desses empréstimos são abusivos, a pessoa paga mais do que
-        deveria, e nem sempre consegue perceber isso sozinha.
+        do INSS fez um <b>empréstimo pessoal</b> com uma financeira. É um contrato direto com a financeira, fora do
+        INSS, e os juros dele são livres, em geral bem mais altos que os do consignado. Quando esses juros são
+        abusivos, a pessoa paga mais do que deveria, e nem sempre consegue perceber isso sozinha.
       </p>
       <p>
         É aí que a gente entra. O cliente nos procura, a gente confere se ele pode ser atendido e junta a documentação.
         Com tudo pronto, o nosso advogado, o <b>Dr. Rafael Menezes</b>, entra com uma ação pedindo o
-        <b> ressarcimento do que foi descontado nos últimos 10 anos</b>. Veja o caminho em 4 etapas:
+        <b> ressarcimento do que foi descontado nos últimos 10 anos</b> nesses empréstimos pessoais. Veja o caminho
+        em 4 etapas:
       </p>
-      <Figura legenda="Como funciona o processo, do desconto no benefício até o resultado. Valores do exemplo são ilustrativos.">
+      <Figura legenda="Como funciona o processo, do empréstimo pessoal com a financeira até o resultado. Valores do exemplo são ilustrativos.">
         <ComoFunciona />
       </Figura>
+
+      <h4 className="mv-bv-h4">Consignado ou empréstimo pessoal? Não confunda</h4>
+      <p>
+        Há dois tipos de empréstimo bem diferentes que o cliente costuma confundir e chamar só de “empréstimo”.
+        O <b>consignado</b> é descontado direto do benefício <b>pelo INSS</b>, antes de o dinheiro cair na conta, e
+        tem um teto de juros. O <b>empréstimo pessoal</b> não passa pelo INSS: é cobrado <b>pela financeira</b>, em
+        geral na conta do cliente ou por boleto, com juros livres. <b>O nosso processo olha os juros do empréstimo
+        pessoal.</b> O consignado aparece em outra parte do trabalho: no canal de empréstimo, quando o cliente quer um
+        consignado novo e está sem margem. Veja a diferença num desenho (a lição 3 explica tudo em detalhe):
+      </p>
+      <Figura legenda="Os dois empréstimos lado a lado. O consignado passa pelo INSS; o empréstimo pessoal é cobrado pela financeira, fora do INSS. É o pessoal que a CAF revisa.">
+        <ConsignadoXPessoal />
+      </Figura>
+      <p>
+        Por que alguém faria o empréstimo mais caro? Um motivo comum: o consignado depende de <b>margem</b>, e quem está sem
+        margem para consignado muitas vezes recorre ao empréstimo pessoal, que não usa a margem e é mais caro. É sobre
+        os juros desse empréstimo, o pessoal, que o nosso advogado entra com a ação.
+      </p>
+      <TesteRapido
+        pergunta="O cliente conta: “Tenho um empréstimo no Agibank que eles cobram direto na minha conta; o INSS não desconta nada.” Pelo que ele descreve, que empréstimo é esse?"
+        opcoes={['Um consignado, porque é com uma financeira', 'Um empréstimo pessoal, cobrado fora do INSS', 'Nenhum dos dois: só se sabe no fim do processo']}
+        certa={1}
+        explica="O consignado é descontado pelo INSS, direto do benefício. Quando quem cobra é a financeira, na conta ou por boleto, fora do INSS, é empréstimo pessoal: é esse que o nosso processo revisa. Ter o nome de uma das 5 financeiras não basta para saber o tipo: o BMG, por exemplo, também tem consignado."
+      />
       <p>
         Quatro números resumem o que você vai repetir muitas vezes para os clientes. Eles respondem às perguntas que
         mais aparecem: “quanto tempo demora?”, “preciso pagar alguma coisa para começar?” e “quanto fica para o
         advogado?”. Aqui é só o mapa: a lição 2 explica cada número e como falar dele com o cliente.
       </p>
       <Fatos itens={[
-        { grande: '10 anos', texto: 'O processo pede o ressarcimento do que foi descontado nos últimos 10 anos.' },
+        { grande: '10 anos', texto: 'O processo pede o ressarcimento do que foi descontado nos últimos 10 anos, nos empréstimos pessoais.' },
         { grande: '6 a 12 meses', texto: 'É o tempo médio do processo até o ressarcimento. Fale sempre em “em média”.' },
         { grande: 'R$ 0', texto: 'O cliente não paga nada para começar. O processo é gratuito no início.' },
         { grande: '30%', texto: 'Honorários do advogado, só no final, retirados do que o cliente receber. O percentual é sempre o mesmo.' },
       ]} />
       <p>
-        O cliente chega querendo revisar os juros dos empréstimos em cinco financeiras. Três delas são as que mais
-        aparecem no dia a dia, então você vai ouvir muito esses nomes:
+        O cliente chega querendo revisar os juros do <b>empréstimo pessoal</b> que fez em alguma destas cinco
+        financeiras. Três delas são as que mais aparecem no dia a dia, então você vai ouvir muito esses nomes:
       </p>
       <Financeiras />
+      <p>
+        Repare: o que importa para o processo é o <b>empréstimo pessoal</b> nessas financeiras, não o simples nome do
+        banco. Algumas delas também têm outros produtos (o BMG, por exemplo, também tem consignado e cartão
+        consignado). A lição 4 mostra como perguntar isso ao cliente de um jeito simples.
+      </p>
       <p>
         E como o cliente chega até a gente? Pelos nossos <b>anúncios no Facebook</b> (tráfego pago), feitos para
         aposentados e pensionistas do INSS. A pessoa vê o anúncio, chama a CAF no WhatsApp e é recebida primeiro por um
@@ -72,8 +103,9 @@ const corpo = (
         lição 5 trata dos dois canais em detalhe.
       </p>
       <Frase>
-        A CAF ajuda quem recebe benefício do INSS e paga juros abusivos no consignado a pedir, com o nosso advogado, o
-        ressarcimento do que foi descontado nos últimos 10 anos, sem pagar nada para começar.
+        A CAF ajuda quem recebe benefício do INSS e paga juros abusivos num empréstimo pessoal com as financeiras a
+        pedir, com o nosso advogado, o ressarcimento do que foi descontado nos últimos 10 anos, sem pagar nada para
+        começar.
       </Frase>
     </Secao>
 
@@ -130,7 +162,7 @@ const corpo = (
       </div>
       <p>
         No canal de <b>empréstimo</b> o começo é parecido, mas a IA vai mais longe: ela confere as 3 portas (benefício
-        do INSS, familiar e financeiras), avisa que a análise foi <b>“pré-aprovada”</b>, manda a lista de documentos e
+        do INSS, familiar e empréstimo pessoal nas financeiras), avisa que a análise foi <b>“pré-aprovada”</b>, manda a lista de documentos e
         pergunta se a pessoa usa o gov.br e o Meu INSS. Só então passa a conversa para um analista, que é você. A IA
         nunca fala de valores, taxas ou juros. Compare os dois canais (a lição 5 mostra o fluxo de cada um, mensagem por
         mensagem):
@@ -140,9 +172,10 @@ const corpo = (
         destaque={0}
         linhas={[
           ['De onde vem', 'Tráfego do Andrius, no Facebook', 'Tráfego de empréstimo, no Facebook'],
-          ['O que o cliente quer', 'Revisar os juros: já quer o processo', 'Dinheiro rápido: quer um empréstimo novo'],
+          ['O que o cliente quer', 'Revisar os juros do empréstimo pessoal: já quer o processo', 'Dinheiro rápido: em geral, um consignado novo'],
           ['O que o robô já fez', 'Boas-vindas, vídeo, SIM ou NÃO, nome e CPF', 'Boas-vindas, SIM ou NÃO, nome, CPF, as 3 portas, “pré-aprovada”, a lista de documentos e a pergunta sobre o gov.br'],
-          ['Como é a venda', 'Mais direta: o cliente já veio por isso', 'Precisa convencer: a maioria não tem margem para empréstimo'],
+          ['Como é a venda', 'Mais direta: o cliente já veio por isso', 'Precisa convencer: a maioria não tem margem para um consignado novo'],
+          ['O que você apresenta', 'O processo: a revisão dos juros do empréstimo pessoal', 'Os caminhos (aumento de margem, portabilidade dos consignados) e a revisão dos juros do empréstimo pessoal'],
           ['Seu primeiro passo', 'Apresentar-se e conferir as 3 portas', 'Apresentar-se, explicar a “pré-aprovada”, perguntar o que a pessoa precisa e pedir os extratos do Meu INSS'],
         ]}
       />
@@ -258,13 +291,15 @@ const corpo = (
           <p>
             Primeiro você confere se a pessoa pode ser atendida. Depois explica o processo com calma: gratuito para
             começar, 30% só no final, em média de 6 a 12 meses. No canal de empréstimo, depois de olhar os extratos, é
-            aqui que você mostra a situação com honestidade (muitas vezes, sem margem) e os caminhos possíveis.
+            aqui que você mostra a situação com honestidade (muitas vezes, sem margem para um consignado novo) e os
+            caminhos possíveis: aumento de margem, portabilidade dos consignados e a revisão dos juros do empréstimo
+            pessoal.
           </p>
         </div>
         <div className="vidro mv-cartao" data-tom="ambar">
           <h4>Os documentos · paradas 5 a 7</h4>
           <Lista itens={[
-            <><b>Meu INSS:</b> carta de concessão, extrato de consignado e extratos de pagamento dos últimos 10 anos.</>,
+            <><b>Meu INSS:</b> carta de concessão, Extrato de Empréstimo Consignado e extratos de pagamento dos últimos 10 anos.</>,
             <><b>gov.br:</b> imposto de renda dos últimos 3 anos e situação cadastral do CPF.</>,
             <><b>Pessoais:</b> identidade, foto do rosto, comprovante de residência (mês atual ou passado) e e-mail.</>,
           ]} />
@@ -312,8 +347,8 @@ const corpo = (
       </p>
       <LinhaTempo itens={[
         { quando: 'Etapa 1', titulo: 'Chega uma conversa', texto: 'O robô já deu as boas-vindas e pegou nome e CPF. O cliente está esperando: apresente-se logo e continue de onde o robô parou. No canal de empréstimo, explique a “pré-aprovada”, pergunte o que a pessoa precisa e peça os extratos do Meu INSS.' },
-        { quando: 'Etapa 2', titulo: 'Qualificar', texto: 'Confira as 3 portas: benefício do INSS (dele ou de um familiar) e empréstimo numa das 5 financeiras. No canal de empréstimo, a IA já perguntou, e você confere a situação nos extratos. Não passou? Agradeça com carinho e encerre (lição 4).' },
-        { quando: 'Etapa 3', titulo: 'Conversar e convencer', texto: 'Explique o processo com palavras simples e responda às dúvidas. No canal de empréstimo, mostre com honestidade os caminhos possíveis.' },
+        { quando: 'Etapa 2', titulo: 'Qualificar', texto: 'Confira as 3 portas: benefício do INSS (dele ou de um familiar) e empréstimo pessoal numa das 5 financeiras. No canal de empréstimo, a IA já perguntou, e você confere a situação nos extratos. Não passou? Agradeça com carinho e encerre (lição 4).' },
+        { quando: 'Etapa 3', titulo: 'Conversar e convencer', texto: 'Explique o processo com palavras simples e responda às dúvidas. No canal de empréstimo, mostre com honestidade os caminhos possíveis: aumento de margem, portabilidade dos consignados e a revisão dos juros do empréstimo pessoal.' },
         { quando: 'Etapa 4', titulo: 'Documentos', texto: 'Meu INSS, gov.br e documentos pessoais. Um pedido de cada vez, com paciência, conferindo se cada documento veio certo.' },
         { quando: 'Etapa 5', titulo: 'Fechamento', texto: 'Cadastro, procurações e assinatura pelo gov.br (conta prata ou ouro). Depois, o caso segue com o advogado.' },
       ]} />
@@ -384,11 +419,11 @@ const corpo = (
     {/* ================================================================ 9. Resumo */}
     <Secao titulo="Resumo da lição" id={SEC.resumo}>
       <Lista itens={[
-        <>A <b>CAF</b> (Central de Assessoria Financeira) tem como carro-chefe o <b>processo de ressarcimento de juros abusivos</b> para quem recebe benefício do INSS, com empréstimo em Agibank, BMG, Facta, Mercantil ou Crefisa.</>,
+        <>A <b>CAF</b> (Central de Assessoria Financeira) tem como carro-chefe o <b>processo de ressarcimento de juros abusivos</b> dos <b>empréstimos pessoais</b> que quem recebe benefício do INSS fez com Agibank, BMG, Facta, Mercantil ou Crefisa.</>,
+        <>Não confunda: o <b>consignado</b> é descontado pelo INSS, direto do benefício, e tem teto de juros; o <b>empréstimo pessoal</b> é cobrado pela financeira, fora do INSS, com juros livres. O processo revisa o <b>pessoal</b>; o consignado (margem, aumento de margem, portabilidade) é o gancho do canal de empréstimo.</>,
         <>O cliente <b>não paga nada para começar</b>. No final, <b>30%</b> do que ele receber ficam como honorários do advogado, o Dr. Rafael Menezes. O processo leva <b>em média de 6 a 12 meses</b> e pede o ressarcimento dos <b>últimos 10 anos</b>.</>,
         <>O <b>robô</b> começa a conversa e pega nome e CPF (no canal de empréstimo, a <b>IA</b> ainda confere as 3 portas). <b>Você</b> assume e faz quatro coisas: <b>qualificar, convencer, coletar documentos e encaminhar</b>. O <b>advogado</b> entra com a ação.</>,
-        <>Os 4 valores: <b>respeito ao idoso, honestidade, rapidez e segurança dos dados</b>.</>,
-        <>O que nunca se faz: prometer valor, pedir dinheiro ao cliente, insistir com quem disse não e inventar resposta.</>,
+        <>Os 4 valores: <b>respeito ao idoso, honestidade, rapidez e segurança dos dados</b>. O que nunca se faz: prometer valor, pedir dinheiro ao cliente, insistir com quem disse não e inventar resposta.</>,
         <>Estude <b>na ordem</b>, faça os testes rápidos e a <b>prova final</b> ({PROVA.pct}%, ou {PROVA.minimo} de {PROVA.total}). No dia a dia, use a <b>consulta rápida</b>.</>,
       ]} />
       <ProximaLicao>
@@ -404,7 +439,7 @@ const licao: Licao = {
   modulo: 'fundamentos',
   titulo: 'Boas-vindas e como usar o manual',
   resumo: 'O que a CAF faz, qual é o seu papel no atendimento, o caminho do cliente e como estudar até a prova final.',
-  minutos: 30,
+  minutos: 32,
   corpo,
   questoes: [
     {

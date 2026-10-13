@@ -366,11 +366,11 @@ type Situacao = {
 const SITUACOES: Situacao[] = [
   {
     id: 'qualif', titulo: 'Sumiu na qualificação', temp: 'morno', formato: 'Texto curto',
-    sinal: 'Parou no meio das perguntas (benefício, financeira).',
-    porTras: 'Distração, desconfiança com tanta pergunta, ou não sabe a resposta (por exemplo, o nome do banco).',
+    sinal: 'Parou no meio das perguntas (benefício, empréstimo pessoal).',
+    porTras: 'Distração, desconfiança com tanta pergunta, ou não sabe a resposta (o nome da financeira, ou se o empréstimo é pessoal ou consignado).',
     objetivo: 'Voltar com UMA pergunta fácil de responder.',
     msg: 'Oi, Dona Maria! Aqui é [seu nome], da CAF. A nossa conversa parou ali no meio, sem problema nenhum. Pra eu seguir com a sua análise gratuita, só preciso de uma resposta: a senhora recebe algum benefício do INSS?',
-    seNao: 'No próximo toque, um áudio curto se apresentando. Se ele não souber o banco, pergunte uma vez se aparece desconto de Agibank, BMG, Facta, Mercantil ou Crefisa no benefício; se continuar sem saber, siga em frente.',
+    seNao: 'No próximo toque, um áudio curto se apresentando. Se a dúvida for sobre o empréstimo, pergunte uma vez se tem empréstimo pessoal com Agibank, BMG, Facta, Mercantil ou Crefisa, explicando de um jeito simples: “é aquele que a financeira cobra na sua conta, e não o que o INSS desconta direto do benefício”. Se continuar sem saber, siga em frente.',
   },
   {
     id: 'topou', titulo: 'Topou, mas não mandou os documentos', temp: 'morno', formato: 'Texto + um passo',
@@ -414,11 +414,11 @@ const SITUACOES: Situacao[] = [
   },
   {
     id: 'margem', titulo: 'Esfriou ao saber que não tem margem', temp: 'frio', formato: 'Texto + áudio',
-    sinal: 'Veio pelo anúncio de empréstimo, soube que a margem está comprometida e parou de responder.',
+    sinal: 'Veio pelo anúncio de empréstimo, soube que não há margem para um consignado novo e parou de responder.',
     porTras: 'Esperava dinheiro rápido. Achou que, sem margem, não havia mais nada para ele.',
     objetivo: 'Mostrar, com honestidade, os caminhos que ainda existem, sempre como possibilidade.',
-    msg: 'Oi, Seu Pedro! Aqui é [seu nome], da CAF. Sei que o senhor queria um valor rápido e que hoje a margem está comprometida. Mas não quero deixar o senhor sem caminho: dá pra ver a possibilidade de aumentar a margem, de fazer a portabilidade dos consignados pra outro banco, que pode liberar um valor acima de R$ 1.500, e a revisão dos juros que o senhor já paga. Quer que eu explique como cada um funciona? Antes de prometer qualquer coisa, a gente precisa analisar o caso do senhor.',
-    seNao: 'Explique num áudio a diferença entre os caminhos. Nunca garanta que a portabilidade ou um empréstimo vai sair.',
+    msg: 'Oi, Seu Pedro! Aqui é [seu nome], da CAF. Sei que o senhor queria um valor rápido e que hoje não há margem para um consignado novo. Mas não quero deixar o senhor sem caminho: dá pra ver a possibilidade de aumentar a margem, de fazer a portabilidade dos consignados pra outro banco, que pode liberar um valor acima de R$ 1.500, e a revisão dos juros do empréstimo pessoal que o senhor já tem. Quer que eu explique como cada um funciona? Antes de prometer qualquer coisa, a gente precisa analisar o caso do senhor.',
+    seNao: 'Explique num áudio curto, e depois por texto, a diferença entre os caminhos: margem e portabilidade são do consignado; a revisão é dos juros do empréstimo pessoal, cobrado pela financeira fora do INSS. Nunca garanta que a portabilidade ou um empréstimo vai sair.',
   },
 ];
 export function MapaSituacoes() {

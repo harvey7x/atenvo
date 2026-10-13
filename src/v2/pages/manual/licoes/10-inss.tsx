@@ -1,10 +1,13 @@
 /* Lição 10 — Documentos do Meu INSS. O passo a passo completo da primeira parada
    da documentação: o que é o Meu INSS e o gov.br (a senha é a mesma), os três
    documentos (carta de concessão, extrato de empréstimo consignado e extrato de
-   pagamento / Histórico de Créditos) e para que serve cada um, o caminho no
+   pagamento / Histórico de Créditos), o que cada um mostra, o caminho no
    aplicativo tela por tela, a regra dos períodos a fundo (com exemplos e erros
    comuns), o cuidado com a senha do cliente, como guiar quem faz sozinho, como
    conferir o PDF e o checklist final.
+   Correção do dono (13/10): o processo revisa os juros do EMPRÉSTIMO PESSOAL, não
+   do consignado. Os extratos do Meu INSS mostram o consignado e só "fazem parte da
+   documentação do processo": nunca dizer que é neles que aparece o abuso.
    Fatos da empresa: só os do brief (áudio do dono de 13/10 + processo oficial do
    robô). Mensagens do robô copiadas literalmente; as do atendente são sugestões
    de roteiro. Ilustrações próprias em 10-inss-figuras.tsx. */
@@ -14,8 +17,8 @@ import {
 } from '../pecas';
 import { CalculadoraPeriodos, PrintMeuInss } from '../ilustracoes';
 import {
-  CaminhoDoCliente, ChecklistMeuInss, ConfiraOPdf, DocCarta, DocConsignado, DocHiscre, EncaixeDosAnos, JanelaDozeMeses,
-  PassoAPassoApp, TabelaExemplosPeriodos, TabelaResponsiva, UmaSenhaVariasPortas, VidaDaSenha,
+  CaminhoDoCliente, ChecklistMeuInss, ConfiraOPdf, ConsignadoOuPessoal, DocCarta, DocConsignado, DocHiscre, EncaixeDosAnos,
+  JanelaDozeMeses, PassoAPassoApp, TabelaExemplosPeriodos, TabelaResponsiva, UmaSenhaVariasPortas, VidaDaSenha,
 } from './10-inss-figuras';
 import './10-inss.css';
 
@@ -23,18 +26,18 @@ const corpo = (
   <>
     <p className="mv-lead">
       O cliente topou seguir? Ótimo: agora começa a <b>documentação</b>, e a primeira parada sugerida é o <b>Meu INSS</b>. De lá
-      saem três documentos que contam a história do benefício do cliente: a <b>carta de concessão</b>, o <b>extrato de
+      saem três documentos que fazem parte da documentação do processo: a <b>carta de concessão</b>, o <b>extrato de
       empréstimo consignado</b> e o <b>extrato de pagamento de benefício dos últimos 10 anos</b>. A maioria dos clientes
       não sabe entrar no aplicativo, e é aí que você entra: guiando o cliente passo a passo ou, quando ele prefere,
       entrando com a senha que ele passou, com total segurança. Nesta lição você vai entender o que é cada documento e
-      por que a gente precisa dele, ver o caminho no aplicativo tela por tela, dominar a regra dos períodos (é onde mais
+      o que ele mostra, ver o caminho no aplicativo tela por tela, dominar a regra dos períodos (é onde mais
       se erra), cuidar da senha do cliente, conferir cada PDF e fechar tudo com um checklist.
     </p>
 
     <Fatos itens={[
       { grande: '3 documentos', texto: 'Carta de concessão, extrato de empréstimo consignado e extrato de pagamento de benefício.' },
       { grande: '1 senha', texto: 'O Meu INSS entra com a conta gov.br. A senha do Meu INSS é a senha do gov.br.' },
-      { grande: '10 anos', texto: 'O processo pede o ressarcimento do que foi descontado nos últimos 10 anos. Por isso, 10 anos de extrato.' },
+      { grande: '10 anos', texto: 'O extrato de pagamento entra na documentação do processo cobrindo os últimos 10 anos.' },
       { grande: '12 meses', texto: 'O máximo que o extrato de pagamento entrega por consulta. Resultado: 10 arquivos, um por ano.' },
     ]} />
 
@@ -42,8 +45,8 @@ const corpo = (
     <Secao titulo="1. Meu INSS e gov.br: a porta e a chave">
       <p>
         O <b>Meu INSS</b> é o canal oficial do INSS na internet. Funciona como aplicativo de celular (Android e iPhone) e
-        como site (meu.inss.gov.br). Ali, quem recebe um benefício consulta tudo sobre ele: quanto recebe, o que é
-        descontado, os empréstimos, os pedidos feitos ao INSS. E baixa documentos oficiais em PDF. É de lá que saem os
+        como site (meu.inss.gov.br). Ali, quem recebe um benefício consulta tudo sobre ele: quanto recebe, o que o INSS
+        desconta, os empréstimos consignados, os pedidos feitos ao INSS. E baixa documentos oficiais em PDF. É de lá que saem os
         três documentos desta lição.
       </p>
       <p>
@@ -96,23 +99,36 @@ const corpo = (
     </Secao>
 
     {/* ------------------------------------------------------------------ 2. os três documentos */}
-    <Secao titulo="2. Os três documentos e para que serve cada um">
+    <Secao titulo="2. Os três documentos e o que cada um mostra">
       <p>
-        Pense nos três documentos como três capítulos da mesma história. A <b>carta de concessão</b> conta <b>quem</b>
-        recebe e <b>que benefício</b> é. O <b>extrato de consignado</b> conta <b>quais empréstimos</b> existem e em quais
-        bancos. O <b>extrato de pagamento</b> conta, <b>mês a mês</b>, quanto foi pago e quanto foi descontado. Juntos,
-        eles formam a base da análise e do processo. Veja o resumo e, depois, cada um em detalhe.
+        Pense nos três documentos como três capítulos da história do benefício. A <b>carta de concessão</b> conta
+        <b> quem</b> recebe e <b>que benefício</b> é. O <b>extrato de consignado</b> conta quais <b>consignados</b> existem
+        (os empréstimos e os cartões que o INSS desconta direto do benefício), em quais bancos, e quanto sobra de margem. O
+        <b> extrato de pagamento</b> conta, <b>mês a mês</b>, quanto o benefício pagou e quanto o INSS descontou. Os três
+        fazem parte da documentação do processo. Veja o resumo e, depois, cada um em detalhe.
       </p>
       <TabelaResponsiva
         corte="largo"
-        colunas={['Documento', 'Nome no aplicativo', 'O que mostra', 'Para que a gente usa', 'Arquivos']}
+        colunas={['Documento', 'Nome no aplicativo', 'O que mostra', 'No nosso trabalho', 'Arquivos']}
         destaque={0}
         linhas={[
-          ['Carta de concessão', 'Carta de Concessão', 'Quem recebe, número e tipo do benefício, desde quando', 'Prova oficial do benefício: qual é e desde quando', '1'],
-          ['Extrato de consignado', 'Extrato de Empréstimo Consignado (ou Histórico de Empréstimo Consignado)', 'Contratos, bancos, parcelas, cartões e margem', 'Ver os empréstimos e em quais das 5 financeiras', '1'],
-          ['Extrato de pagamento', 'Extrato de Pagamento de Benefício (ou Histórico de Créditos)', 'Mês a mês: valor do benefício, cada desconto e o líquido', 'Mostrar o que foi descontado nos últimos 10 anos', '10'],
+          ['Carta de concessão', 'Carta de Concessão', 'Quem recebe, número e tipo do benefício, desde quando', 'Documentação do processo; mostra qual é o benefício', '1'],
+          ['Extrato de consignado', 'Extrato de Empréstimo Consignado (ou Histórico de Empréstimo Consignado)', 'Consignados: contratos, bancos, parcelas, cartões e margem', 'Documentação do processo; no canal de empréstimo, mostra a margem', '1'],
+          ['Extrato de pagamento', 'Extrato de Pagamento de Benefício (ou Histórico de Créditos)', 'Mês a mês: valor do benefício, cada desconto do INSS e o líquido', 'Documentação do processo: os últimos 10 anos, um arquivo por ano', '10'],
         ]}
       />
+
+      <h4 className="mv-ins-h4">Antes de abrir os extratos: consignado não é empréstimo pessoal</h4>
+      <p>
+        Um cuidado que evita uma confusão séria. O processo da CAF é sobre os juros dos <b>empréstimos pessoais</b> que o
+        aposentado ou pensionista fez com as financeiras (Agibank, BMG, Facta, Mercantil e Crefisa): o nosso advogado, o
+        Dr. Rafael Menezes, entra com uma ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos nesses
+        empréstimos pessoais. Já os extratos do Meu INSS mostram outra coisa: o <b>consignado</b>, que o INSS desconta
+        direto do benefício. <b>O consignado é descontado pelo INSS; o empréstimo pessoal é cobrado pela financeira, fora
+        do INSS</b>, e não aparece como desconto do INSS. Então, quando aparecerem bancos nos extratos, lembre: são
+        consignados, e não o que a gente revisa. Os documentos do Meu INSS fazem parte da documentação do processo.
+      </p>
+      <ConsignadoOuPessoal />
       <Aviso tom="ambar" titulo="Rota do familiar: os documentos são do familiar que recebe">
         Quando a análise segue pelo benefício de um familiar (a rota do familiar, lição 4), os três documentos do Meu INSS
         são <b>do familiar que recebe o benefício</b>: a carta de concessão, o extrato de consignado e os 10 extratos de
@@ -127,7 +143,7 @@ const corpo = (
         <div className="mv-ins-doc-grade">
           <div><small>O que é</small>A carta que o INSS emite quando aprova (concede) o benefício. É a “certidão de nascimento” do benefício.</div>
           <div><small>O que mostra</small>Nome do titular, número do benefício (NB), espécie (o tipo), data de início e valor inicial.</div>
-          <div><small>Para que serve</small>Prova que o cliente recebe um benefício do INSS, mostra qual é e desde quando ele é pago.</div>
+          <div><small>No nosso trabalho</small>Faz parte da documentação do processo. Mostra que o cliente recebe um benefício do INSS, qual é e desde quando ele é pago.</div>
         </div>
       </div>
       <p>
@@ -141,40 +157,51 @@ const corpo = (
       <div className="vidro mv-ins-doc" data-tom="ambar">
         <div className="mv-ins-doc-cab"><b>Extrato de consignado</b><span className="mv-ins-nome-app">Extrato de Empréstimo Consignado</span></div>
         <div className="mv-ins-doc-grade">
-          <div><small>O que é</small>A lista de tudo o que está “consignado” no benefício: cada empréstimo e cada cartão consignado.</div>
+          <div><small>O que é</small>A lista de tudo o que está “consignado” no benefício: cada empréstimo consignado e cada cartão consignado que o INSS desconta.</div>
           <div><small>O que mostra</small>Banco de cada contrato, início do desconto, número de parcelas, valor da parcela, cartões (RMC e RCC) e a margem.</div>
-          <div><small>Para que serve</small>Ver, no documento, os contratos e em quais financeiras eles estão, e se o cliente tem margem.</div>
+          <div><small>No nosso trabalho</small>Faz parte da documentação do processo. No canal de empréstimo, é onde se vê se o cliente tem margem.</div>
         </div>
       </div>
       <p>
-        É nele que você confirma, com o documento na mão, em quais das cinco financeiras com que trabalhamos (Agibank,
-        BMG, Facta, Mercantil e Crefisa) o cliente tem contrato. É nele também que aparece a <b>margem</b>: quanto do
-        benefício ainda pode ir para parcelas novas. Quando o cliente que veio pelo anúncio de empréstimo está “sem
-        margem”, é aqui que isso aparece escrito: margem disponível zerada. No aplicativo, ele também pode aparecer com o
-        nome <b>Histórico de Empréstimo Consignado</b>.
+        Ele mostra os <b>consignados</b> do benefício, cada um com o banco, as parcelas e o valor. E mostra a <b>margem</b>:
+        quanto do benefício ainda pode ir para parcelas novas de consignado. É aí que ele ajuda no canal de empréstimo:
+        quando o cliente que veio pelo anúncio de empréstimo está “sem margem”, é aqui que isso aparece escrito, margem
+        disponível zerada. Daí vêm os ganchos, a possibilidade de aumento de margem e a de portabilidade dos consignados
+        (lições 3 e 7). No aplicativo, ele também pode aparecer com o nome <b>Histórico de Empréstimo Consignado</b>.
+      </p>
+      <p>
+        <b>Atenção a uma confusão comum.</b> Ver o nome de uma das 5 financeiras neste extrato não quer dizer que você achou
+        o empréstimo pessoal do cliente. Tudo o que está aqui é consignado, descontado pelo INSS (o BMG, por exemplo,
+        também tem consignado e cartão consignado). Se o cliente tem empréstimo pessoal com alguma das 5 financeiras, você
+        descobre conversando com ele (lições 3 e 4).
       </p>
       <DocConsignado />
+      <TesteRapido
+        pergunta="O extrato de consignado da Dona Lúcia (exemplo) mostra um contrato com o BMG. O que esse contrato é?"
+        opcoes={['O empréstimo pessoal que a CAF revisa', 'Um consignado, que o INSS desconta', 'A prova de juros abusivos do caso']}
+        certa={1}
+        explica="O extrato de consignado mostra os consignados, descontados pelo INSS direto do benefício. O processo da CAF olha os juros do empréstimo pessoal, cobrado pela financeira fora do INSS: se a cliente tem um com alguma das 5 financeiras, você descobre conversando com ela."
+      />
 
       <h4 className="mv-ins-h4">O extrato de pagamento de benefício (Histórico de Créditos)</h4>
       <div className="vidro mv-ins-doc" data-tom="verde">
         <div className="mv-ins-doc-cab"><b>Extrato de pagamento</b><span className="mv-ins-nome-app">Histórico de Créditos</span></div>
         <div className="mv-ins-doc-grade">
           <div><small>O que é</small>O “contracheque” do benefício, mês a mês. No aplicativo: Extrato de Pagamento de Benefício ou Histórico de Créditos (HISCRE).</div>
-          <div><small>O que mostra</small>Para cada mês (a competência): o valor do benefício, cada desconto com o nome do banco e o valor líquido.</div>
-          <div><small>Para que serve</small>Mostrar, mês por mês, o que foi descontado do benefício nos últimos 10 anos.</div>
+          <div><small>O que mostra</small>Para cada mês (a competência): o valor do benefício, cada desconto do INSS com o nome do banco e o valor líquido.</div>
+          <div><small>No nosso trabalho</small>Faz parte da documentação do processo, cobrindo os últimos 10 anos: um arquivo por ano.</div>
         </div>
       </div>
       <p>
-        Este é o documento mais importante e o mais trabalhoso. <b>Por que 10 anos?</b> Porque o nosso advogado, o Dr.
-        Rafael Menezes, entra com uma ação pedindo o ressarcimento <b>do que foi descontado nos últimos
-        10 anos</b>, e é este extrato que mostra esses descontos, um mês de cada vez. <b>Por que ano a ano?</b> Porque o
-        Histórico de Créditos só entrega <b>12 meses por consulta</b>. Para cobrir 10 anos, são 10 consultas e 10
-        arquivos. É daí que vem a regra dos períodos, na seção 4.
+        Este é o documento mais trabalhoso. A documentação do processo pede o extrato de pagamento dos <b>últimos 10
+        anos</b>. <b>Por que ano a ano?</b> Porque o Histórico de Créditos só entrega <b>12 meses por consulta</b>. Para
+        cobrir 10 anos, são 10 consultas e 10 arquivos. É daí que vem a regra dos períodos, na seção 4. Os descontos de
+        empréstimo e de cartão que aparecem nele são consignados; o empréstimo pessoal não aparece como desconto do INSS.
       </p>
       <DocHiscre />
       <Aviso titulo="Pegar é uma coisa, ler é outra">
-        Na lição 3 (“Consignado e juros abusivos”) você aprendeu a <b>ler</b> o extrato de pagamento, linha por linha. Aqui o
-        foco é <b>pegar</b> o documento certo, no período certo, e conferir se ele veio completo.
+        Na lição 3 (“Consignado × empréstimo pessoal”) você aprendeu a <b>ler</b> o extrato de pagamento, linha por linha.
+        Aqui o foco é <b>pegar</b> o documento certo, no período certo, e conferir se ele veio completo.
       </Aviso>
       <TesteRapido
         pergunta="Você quer ver, mês a mês, quanto foi descontado do benefício da Dona Lúcia em 2019. Qual documento você pede?"
@@ -209,8 +236,8 @@ const corpo = (
       />
       <PrintMeuInss />
       <Aviso tom="ambar" titulo="Cuidado com os dois extratos">
-        Existem dois “extratos”, e eles são documentos diferentes. O de <b>empréstimo</b> mostra os contratos; o de
-        <b> pagamento</b> mostra os meses. Pedir um no lugar do outro é um dos erros mais comuns. Antes de seguir, confira
+        Existem dois “extratos”, e eles são documentos diferentes. O de <b>empréstimo</b> mostra os contratos consignados;
+        o de <b>pagamento</b> mostra os meses. Pedir um no lugar do outro é um dos erros mais comuns. Antes de seguir, confira
         o título no topo do PDF.
       </Aviso>
     </Secao>
@@ -524,9 +551,9 @@ const corpo = (
     <Secao titulo="Resumo da lição">
       <Lista itens={[
         <>A senha do Meu INSS é a senha do <b>gov.br</b>. Cliente “sem senha do INSS” muitas vezes tem a do gov.br.</>,
-        <>São <b>3 documentos</b>: carta de concessão (o benefício), extrato de empréstimo consignado (os contratos e a margem) e extrato de pagamento, o Histórico de Créditos (os descontos mês a mês).</>,
-        <>O caminho é sempre o mesmo: entrar com gov.br, buscar em <b>“Do que você precisa?”</b>, baixar o PDF e mandar no WhatsApp.</>,
-        <>Extrato de pagamento: <b>10 arquivos de 12 meses</b>. Início no mês seguinte do ano passado, fim no mês atual; depois, desce 1 no ano. Sem repetir, sem pular.</>,
+        <>São <b>3 documentos</b>, todos parte da documentação do processo: carta de concessão (o benefício), extrato de empréstimo consignado (os consignados e a margem) e extrato de pagamento, o Histórico de Créditos (os descontos do INSS mês a mês).</>,
+        <>Os extratos mostram o <b>consignado</b>, que o INSS desconta. O processo revisa os juros do <b>empréstimo pessoal</b>, cobrado pela financeira fora do INSS: se o cliente tem um, você descobre conversando (lição 3).</>,
+        <>Caminho no app: entrar com gov.br, buscar em <b>“Do que você precisa?”</b>, baixar o PDF e mandar. No extrato de pagamento, <b>10 arquivos de 12 meses</b>: início no mês seguinte do ano passado, fim no mês atual; depois, desce 1 no ano.</>,
         <>Senha do cliente: primeiro ofereça guiar. Se ele passar, use <b>só para os documentos</b>, não guarde, saia da conta e ajude a trocar.</>,
         <>Confira cada PDF na hora: <b>título, nome, período, legível e completo</b>. Depois, o checklist e o gov.br.</>,
       ]} />
@@ -558,13 +585,13 @@ const licao: Licao = {
       p: 'Por que o extrato de pagamento (Histórico de Créditos) é baixado em 10 arquivos, ano a ano?',
       o: ['O app entrega 12 meses por vez, e são 10 anos', 'Cada arquivo mostra os descontos de um só banco', 'O INSS só deixa baixar um arquivo por dia'],
       c: 0,
-      e: 'O processo pede o ressarcimento do que foi descontado nos últimos 10 anos, e o Histórico de Créditos só entrega 12 meses por consulta: 10 consultas, 10 arquivos.',
+      e: 'A documentação do processo pede o extrato de pagamento dos últimos 10 anos, e o Histórico de Créditos só entrega 12 meses por consulta: 10 consultas, 10 arquivos.',
     },
     {
-      p: 'Qual documento mostra os contratos de empréstimo, os bancos, as parcelas e a margem?',
+      p: 'Qual documento mostra os contratos que o INSS desconta, os bancos, as parcelas e a margem?',
       o: ['Extrato de Empréstimo Consignado', 'Extrato de Pagamento de Benefício', 'Carta de concessão do benefício'],
       c: 0,
-      e: 'O Extrato de Empréstimo Consignado lista cada contrato e mostra a margem. O de pagamento mostra os meses; a carta, o benefício.',
+      e: 'O Extrato de Empréstimo Consignado lista cada consignado e mostra a margem. O de pagamento mostra os meses; a carta, o benefício.',
     },
     {
       p: 'Em dezembro de 2026, qual é o primeiro período do extrato?',
@@ -577,8 +604,8 @@ const licao: Licao = {
     { termo: 'Meu INSS', def: 'Aplicativo e site oficiais do INSS (meu.inss.gov.br). É onde quem recebe benefício consulta tudo sobre ele e baixa documentos como a carta de concessão e os extratos.' },
     { termo: 'Carta de concessão', def: 'Documento que o INSS emite quando concede o benefício. Mostra quem recebe, o número do benefício, a espécie (o tipo) e a data de início.' },
     { termo: 'Número do benefício (NB)', def: 'O número que identifica o benefício no INSS. Aparece na carta e nos extratos; quem recebe dois benefícios tem dois números.' },
-    { termo: 'Extrato de Empréstimo Consignado', def: 'Documento do Meu INSS com os contratos de empréstimo e os cartões consignados do benefício: banco, parcelas, valor e margem. Também aparece como Histórico de Empréstimo Consignado.' },
-    { termo: 'Histórico de Créditos', def: 'Nome do Extrato de Pagamento de Benefício no Meu INSS (sigla HISCRE). Mostra, mês a mês, o valor do benefício, cada desconto e o que caiu na conta. Entrega 12 meses por vez.' },
+    { termo: 'Extrato de Empréstimo Consignado', def: 'Documento do Meu INSS com os consignados do benefício (empréstimos e cartões que o INSS desconta direto): banco, parcelas, valor e margem. Também aparece como Histórico de Empréstimo Consignado.' },
+    { termo: 'Histórico de Créditos', def: 'Nome do Extrato de Pagamento de Benefício no Meu INSS (sigla HISCRE). Mostra, mês a mês, o valor do benefício, cada desconto do INSS e o que caiu na conta. Entrega 12 meses por vez.' },
     { termo: 'Período do extrato', def: 'Os 12 meses de cada consulta do Histórico de Créditos. Início no mês seguinte ao atual, do ano passado; fim no mês atual. São 10 períodos para cobrir 10 anos.' },
     { termo: 'Competência', def: 'O mês a que um pagamento do benefício se refere. No extrato de pagamento, cada bloco é uma competência.' },
     { termo: 'PDF', def: 'Tipo de arquivo de documento que abre igual em qualquer celular ou computador. É o formato em que o Meu INSS entrega os documentos.' },

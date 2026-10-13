@@ -1,9 +1,12 @@
 /* Lição 7 — ilustrações e treinos próprios (prefixo mv-cv-): o funil da venda
    (clicável), a escada da confiança, os cinco princípios, o tradutor de jargão,
-   as 4 frases do processo, a matriz canal × abordagem, o pivô do canal de
-   empréstimo (diagrama + treino de ordenar), os R$ 10 dos honorários, os três
-   blocos de documentos, o painel dos gatilhos honestos e o treino "pode ou não
-   pode". Fatos da empresa: só os do brief. Estilos em 07-conversao.css. */
+   os dois empréstimos na conversa (consignado × pessoal), as 4 frases do
+   processo, a matriz canal × abordagem, o pivô do canal de empréstimo (diagrama
+   + treino de ordenar), os R$ 10 dos honorários, os três blocos de documentos, o
+   painel dos gatilhos honestos e o treino "pode ou não pode".
+   Correção do dono (13/10): o processo revisa os juros do EMPRÉSTIMO PESSOAL; o
+   consignado é o assunto dos ganchos (margem, portabilidade). Fatos da empresa:
+   só os do brief e da correção. Estilos em 07-conversao.css. */
 import { useState } from 'react';
 import { Celular, Figura, IcCheck, IcX } from '../pecas';
 
@@ -47,7 +50,7 @@ const DEGRAUS: Degrau[] = [
     t: 'Decisão', curto: 'ele decide seguir',
     pensa: '“Vale a pena para mim? Tenho algo a perder?”',
     faz: [
-      'Mostrar o benefício para ele: pedir de volta, sem pagar nada para começar',
+      'Mostrar a vantagem para ele: pedir de volta, sem pagar nada para começar',
       'Responder cada dúvida com calma (a lição 8 ensina as objeções)',
       'Respeitar o tempo dele e convidar a família, se ele quiser',
     ],
@@ -156,7 +159,7 @@ const PRINCIPIOS = [
     t: 'Rapport (sintonia)',
     porque: 'Ninguém entrega documentos para quem não confia. Sintonia é o cliente sentir que do outro lado existe uma pessoa que escuta e respeita.',
     evite: '“Prezado cliente, informamos que a sua solicitação foi recebida.”',
-    diga: '“Dona Maria, entendi: esses descontos estão pesando no fim do mês, né?”',
+    diga: '“Dona Maria, entendi: essas parcelas estão pesando no fim do mês, né?”',
   },
   {
     t: 'Explicar simples',
@@ -165,10 +168,10 @@ const PRINCIPIOS = [
     diga: '“De cada R$ 10 que a senhora receber, R$ 7 são seus.”',
   },
   {
-    t: 'Mostrar o benefício para ele',
+    t: 'Mostrar a vantagem para ele',
     porque: 'O cliente decide pelo que muda na vida dele, e não pelo que a empresa faz.',
     evite: '“A CAF trabalha com processos de juros abusivos.”',
-    diga: '“A ideia é pedir de volta o que já saiu do seu benefício, sem a senhora pagar nada para começar.”',
+    diga: '“Se os juros do seu empréstimo pessoal forem abusivos, a ideia é pedir de volta o que foi descontado, sem a senhora pagar nada para começar.”',
   },
   {
     t: 'Segurança',
@@ -201,10 +204,12 @@ export function Principios() {
 
 /* ===================================================================== tradutor de jargão */
 const TRADUCOES = [
-  { j: 'Ressarcimento dos descontos dos últimos 10 anos', s: 'Pedir de volta o que foi descontado do seu benefício nos últimos 10 anos, se houver juros abusivos. O resultado depende da análise.' },
+  { j: 'Ressarcimento dos juros abusivos do empréstimo pessoal', s: 'Se os juros do empréstimo que a senhora fez direto com a financeira forem abusivos, o advogado pede de volta o que foi descontado nos últimos 10 anos. O resultado depende da análise.' },
   { j: 'Honorários advocatícios de 30% ao final', s: 'Para começar, a senhora não paga nada. No final, de cada R$ 10 que receber, R$ 7 são seus e R$ 3 ficam com o advogado.' },
-  { j: 'Margem consignável comprometida', s: 'A parte do benefício que pode ir para empréstimos já está toda ocupada. Por isso o banco não libera um novo agora.' },
-  { j: 'Portabilidade do consignado', s: 'Levar o seu empréstimo para outro banco. Em alguns casos, essa troca libera um valor para a senhora.' },
+  { j: 'Empréstimo consignado', s: 'É o empréstimo que o INSS desconta direto do seu benefício, antes de o dinheiro cair na conta.' },
+  { j: 'Empréstimo pessoal', s: 'É o empréstimo que a senhora fez direto com a financeira. Ela cobra fora do INSS, em geral na sua conta ou por boleto.' },
+  { j: 'Margem consignável comprometida', s: 'A parte do benefício que o INSS pode descontar para consignado já está toda ocupada. Por isso não sai um consignado novo agora.' },
+  { j: 'Portabilidade do consignado', s: 'Levar o seu consignado para outro banco. Em alguns casos, essa troca libera um valor para a senhora. Depende da análise.' },
   { j: 'Procuração com assinatura digital pelo gov.br', s: 'Um documento que autoriza o advogado a cuidar do seu caso. A senhora assina pela internet, no gov.br, o sistema oficial do governo.' },
   { j: 'Extrato de pagamento de benefício', s: 'O papel do Meu INSS que mostra, mês a mês, quanto a senhora recebeu e o que foi descontado.' },
 ];
@@ -247,7 +252,7 @@ export function TradutorSimples() {
 
 /* ===================================================================== as 4 frases do processo */
 const QUATRO = [
-  { q: 'O que é', t: 'Se houver juros abusivos, uma ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos. O resultado depende da análise.' },
+  { q: 'O que é', t: 'Se os juros do empréstimo pessoal forem abusivos, uma ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos. O resultado depende da análise.' },
   { q: 'Quem faz', t: 'O nosso advogado, o Dr. Rafael Menezes, entra com a ação.' },
   { q: 'Quanto tempo', t: 'Leva em média de 6 a 12 meses.' },
   { q: 'Quanto custa', t: 'Nada para começar. No final, 30% do valor que o cliente receber ficam para o advogado.' },
@@ -268,14 +273,70 @@ export function QuatroFrases() {
   );
 }
 
+/* ===================================================================== os dois empréstimos na conversa */
+/* Só o que está na correção do dono (13/10). Sem números de juros nem de teto. */
+const LADOS = [
+  {
+    t: 'Empréstimo consignado', tom: 'azul', sup: 'Os ganchos falam dele',
+    rota: ['Benefício', 'INSS desconta a parcela', 'O resto cai na conta'],
+    linhas: [
+      { r: 'Quem cobra', d: 'O INSS, direto do benefício, antes de o dinheiro cair na conta.' },
+      { r: 'Margem', d: 'Precisa de margem. Sem margem, não sai consignado novo.' },
+      { r: 'Juros', d: 'Têm um teto. São os mais baratos para o aposentado.' },
+    ],
+    papel: 'É o que o cliente do canal de empréstimo veio pedir. Dele saem os ganchos: sem margem, aumento de margem e portabilidade dos consignados.',
+  },
+  {
+    t: 'Empréstimo pessoal', tom: 'verde', sup: 'O processo revisa este',
+    rota: ['Benefício', 'Cai na conta', 'A financeira cobra'],
+    linhas: [
+      { r: 'Quem cobra', d: 'A financeira, fora do INSS: em geral na conta do cliente ou por boleto/carnê.' },
+      { r: 'Margem', d: 'Não usa a margem. Por isso a financeira consegue emprestar até para quem já está sem margem.' },
+      { r: 'Juros', d: 'Livres, sem o teto do consignado, e em geral bem mais altos.' },
+    ],
+    papel: 'É o objeto do processo: a revisão dos juros e o pedido de ressarcimento do que foi descontado nos últimos 10 anos.',
+  },
+];
+export function DoisEmprestimos() {
+  return (
+    <Figura tag="Comparativo" legenda="Dois empréstimos, dois papéis na venda. A aula completa da diferença está na lição 3.">
+      <div className="mv-cv-dois">
+        {LADOS.map((l) => (
+          <section key={l.t} className="mv-cv-dois-lado" data-tom={l.tom} aria-label={l.t}>
+            <header><small>{l.sup}</small><b>{l.t}</b></header>
+            <ol className="mv-cv-dois-rota" aria-label={`Caminho da parcela: ${l.rota.join(', ')}`}>
+              {l.rota.map((p) => <li key={p}>{p}</li>)}
+            </ol>
+            <dl>
+              {l.linhas.map((x) => (
+                <div key={x.r}><dt>{x.r}</dt><dd>{x.d}</dd></div>
+              ))}
+            </dl>
+            <div className="mv-cv-dois-papel"><small>Na sua conversa</small><span>{l.papel}</span></div>
+          </section>
+        ))}
+      </div>
+      <div className="mv-cv-dois-ponte">
+        <b>A ponte entre os dois:</b> quem está sem margem para consignado muitas vezes recorre ao empréstimo pessoal,
+        que é mais caro. Por isso, no canal de empréstimo, os dois aparecem na mesma conversa.
+      </div>
+      <div className="mv-cv-dois-frase">
+        <small>Se o cliente não souber qual é qual</small>
+        <span>“É aquele empréstimo que a financeira cobra na sua conta, e não o que o INSS desconta direto do benefício.”</span>
+      </div>
+    </Figura>
+  );
+}
+
 /* ===================================================================== matriz canal × abordagem */
 const MATRIZ: { r: string; juros: string; emp: string }[] = [
-  { r: 'O que ele quer', juros: 'A revisão dos juros. Já chega querendo o processo.', emp: 'Dinheiro rápido: um empréstimo novo.' },
+  { r: 'O que ele quer', juros: 'A revisão dos juros do empréstimo pessoal. Já chega querendo o processo.', emp: 'Dinheiro rápido: um consignado novo. A maioria está sem margem.' },
   { r: 'Como chega até você', juros: 'O robô pegou nome e CPF e avisou que a análise começou.', emp: 'O robô e a IA fizeram as 3 portas, mandaram a “pré-aprovada” e a lista de documentos.' },
   { r: 'Tipo de venda', juros: 'Direta.', emp: 'Consultiva, com o pivô honesto.' },
+  { r: 'Que empréstimo entra na conversa', juros: 'O empréstimo pessoal com a financeira: é ele que o processo revisa.', emp: 'Os dois: o consignado, nos ganchos, e o empréstimo pessoal, no processo.' },
   { r: 'Seu primeiro objetivo', juros: 'Confirmar o perfil e explicar o processo.', emp: 'Apresentar-se, explicar a “pré-aprovada”, perguntar o que precisa e pedir os extratos.' },
-  { r: 'Argumento central', juros: 'Pedir de volta o que foi descontado, sem pagar nada para começar.', emp: 'A verdade sobre a margem e os caminhos possíveis.' },
-  { r: 'Onde mora o risco', juros: 'Pular a explicação dos 30%, ou prometer valor.', emp: 'Deixar o cliente achar que o dinheiro está aprovado, ou disfarçar que o processo é outra coisa.' },
+  { r: 'Argumento central', juros: 'Pedir de volta o que foi descontado no empréstimo pessoal, sem pagar nada para começar.', emp: 'A verdade sobre a margem, os caminhos do consignado e a revisão dos juros do empréstimo pessoal.' },
+  { r: 'Onde mora o risco', juros: 'Pular a explicação dos 30%, prometer valor ou confundir o empréstimo pessoal com o consignado.', emp: 'Deixar o cliente achar que o dinheiro está aprovado, ou dizer que o processo revisa os consignados.' },
   { r: 'Fechamento', juros: 'Começar pelos documentos do Meu INSS.', emp: 'Completar os documentos do Meu INSS (os extratos da verificação já adiantam).' },
 ];
 export function MatrizCanal() {
@@ -315,8 +376,8 @@ export function PivoEmprestimo() {
   return (
     <Figura tag="Diagrama" legenda="O pivô honesto: primeiro a apresentação e a verdade, depois os caminhos. Nunca o contrário.">
       <div className="mv-cv-rolagem">
-        <svg className="mv-cv-svg-largo" viewBox="0 0 760 380" role="img"
-          aria-label="Fluxo do pivô no canal de empréstimo. O cliente quer dinheiro rápido. Você se apresenta e explica que a pré-aprovada não é valor liberado, pergunta o que a pessoa precisa e pede os extratos do Meu INSS para conferir. Tem margem? Se sim, combine o próximo passo com o gestor. Se não, conte a verdade com calma e apresente três caminhos: aumento de margem, como possibilidade; portabilidade, que pode liberar acima de R$ 1.500; e o processo de ressarcimento dos últimos 10 anos, sem pagar nada antes. No fim, sempre um próximo passo combinado.">
+        <svg className="mv-cv-svg-largo" viewBox="0 0 760 414" role="img"
+          aria-label="Fluxo do pivô no canal de empréstimo. O cliente quer dinheiro rápido, um consignado novo. Você se apresenta e explica que a pré-aprovada não é valor liberado, pergunta o que a pessoa precisa e pede os extratos do Meu INSS para conferir. Tem margem? Se sim, combine o próximo passo com o gestor. Se não, conte a verdade com calma e apresente três caminhos. Dois são do consignado: aumento de margem, como possibilidade, e portabilidade, que pode liberar acima de R$ 1.500. O terceiro é do empréstimo pessoal que ele já tem: a revisão dos juros, o processo, sem pagar nada antes. No fim, sempre um próximo passo combinado.">
           <defs>
             <marker id="mv-cv-seta-pivo" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
               <path className="mv-cv-pv-ponta" d="M0,0 L10,5 L0,10 z" />
@@ -324,7 +385,7 @@ export function PivoEmprestimo() {
           </defs>
 
           {/* linha 1: o pedido e o primeiro passo de sempre (apresentar-se, pré-aprovada, pergunta, extratos) */}
-          <Caixa x={6} y={16} w={166} h={54} t="O que ele quer" s="dinheiro rápido" tom="ambar" />
+          <Caixa x={6} y={16} w={166} h={54} t="O que ele quer" s="um consignado novo" tom="ambar" />
           <Caixa x={200} y={16} w={166} h={54} t="1. Apresentar-se" s="explicar a pré-aprovada" tom="neutro" />
           <Caixa x={394} y={16} w={166} h={54} t="2. Perguntar" s="o que a pessoa precisa" tom="neutro" />
           <Caixa x={588} y={16} w={166} h={54} t="3. Pedir os extratos" s="e conferir a situação" tom="neutro" />
@@ -350,12 +411,18 @@ export function PivoEmprestimo() {
           <path className="mv-cv-pv-fio" d="M630,212 L630,216" markerEnd={seta} />
           <Caixa x={15} y={220} w={230} h={60} t="Aumento de margem" s="possibilidade, caso a caso" tom="verde" />
           <Caixa x={265} y={220} w={230} h={60} t="Portabilidade" s="pode liberar acima de R$ 1.500" tom="verde" />
-          <Caixa x={515} y={220} w={230} h={60} t="Processo de ressarcimento" s="10 anos · nada pago antes" tom="verde" />
+          <Caixa x={515} y={220} w={230} h={60} t="Revisão dos juros" s="o processo · nada pago antes" tom="verde" />
           <text className="mv-cv-pv-r" x="255" y="186" textAnchor="middle">5. Apresentar os caminhos</text>
 
+          {/* chaves: de qual empréstimo é cada caminho (correção do dono, 13/10) */}
+          <path className="mv-cv-pv-chave" data-tom="ambar" d="M15,288 L15,294 L495,294 L495,288" />
+          <text className="mv-cv-pv-grupo" data-tom="ambar" x="255" y="312" textAnchor="middle">Caminhos do consignado</text>
+          <path className="mv-cv-pv-chave" data-tom="verde" d="M515,288 L515,294 L745,294 L745,288" />
+          <text className="mv-cv-pv-grupo" data-tom="verde" x="630" y="312" textAnchor="middle">Do empréstimo pessoal que ele tem</text>
+
           {/* linha 4: sempre um próximo passo */}
-          <path className="mv-cv-pv-fio" d="M130,280 L130,300 L630,300 L630,280 M380,280 L380,316" markerEnd={seta} />
-          <Caixa x={220} y={320} w={320} h={52} t="6. Próximo passo combinado" s="o cliente sabe o que vem agora" tom="azul" />
+          <path className="mv-cv-pv-fio" d="M255,320 L255,332 L630,332 L630,320 M380,332 L380,348" markerEnd={seta} />
+          <Caixa x={220} y={352} w={320} h={52} t="6. Próximo passo combinado" s="o cliente sabe o que vem agora" tom="azul" />
         </svg>
       </div>
     </Figura>
@@ -368,7 +435,7 @@ const PIVO_PASSOS = [
   'Perguntar o que a pessoa está precisando',
   'Pedir os extratos do Meu INSS e conferir',
   'Contar a verdade sobre a margem, com calma',
-  'Apresentar os caminhos, deixando claro que o processo é outra coisa',
+  'Apresentar os caminhos: os do consignado e a revisão do empréstimo pessoal',
   'Combinar o próximo passo: os documentos',
 ];
 const EMBARALHADO = [3, 0, 5, 2, 4, 1];
@@ -452,8 +519,8 @@ const BLOCOS = [
     t: 'Meu INSS', tom: 'azul', quando: 'Primeiro bloco',
     itens: [
       { d: 'Carta de concessão', p: 'Mostra qual é o seu benefício.' },
-      { d: 'Extrato de empréstimo consignado', p: 'Mostra os seus empréstimos e com quais bancos.' },
-      { d: 'Extratos de pagamento dos últimos 10 anos', p: 'Mostram, mês a mês, o que foi descontado do benefício. É a base do pedido.' },
+      { d: 'Extrato de empréstimo consignado', p: 'Mostra os empréstimos consignados do benefício. Faz parte da documentação do processo.' },
+      { d: 'Extratos de pagamento dos últimos 10 anos', p: 'Mostram, mês a mês, o que o benefício pagou e o que foi descontado. Fazem parte da documentação do processo.' },
     ],
   },
   {
@@ -474,7 +541,7 @@ const BLOCOS = [
 ];
 export function BlocosDocumentos() {
   return (
-    <Figura tag="Esquema" legenda="A ordem sugerida do pedido (sem ser rígida) e o “por quê” de cada documento, do jeito que você explica ao cliente. Os detalhes de cada um estão nas lições 10, 11 e 12.">
+    <Figura tag="Esquema" legenda="A ordem sugerida do pedido (sem ser rígida) e o que é cada documento, do jeito que você explica ao cliente. Os detalhes de cada um estão nas lições 10, 11 e 12.">
       <div className="mv-cv-blocos">
         {BLOCOS.map((b, i) => (
           <section key={b.t} className="mv-cv-bloco-doc" data-tom={b.tom} aria-label={b.t}>

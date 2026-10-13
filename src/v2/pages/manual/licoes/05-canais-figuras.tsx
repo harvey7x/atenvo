@@ -1,7 +1,8 @@
 /* Lição 5 — ilustrações e interativos próprios (prefixo mv-cn-): o caminho do
    lead, os anúncios ilustrados, o ponto de partida de cada canal, o simulador
    das 3 portas, a ficha do que chega na mão, a régua da pré-aprovação, o fluxo
-   por canal, a árvore do NÃO e o treino "de qual canal é esta mensagem?". */
+   por canal, a árvore do NÃO, o treino "de qual canal é esta mensagem?" e o
+   comparativo consignado × empréstimo pessoal (a revisão é do PESSOAL). */
 import { useState, type ReactNode } from 'react';
 import { IcCheck, IcX } from '../pecas';
 
@@ -137,8 +138,8 @@ export function CaminhoDoLead() {
 const ANUNCIOS = [
   {
     canal: 'juros', rot: 'Canal de juros abusivos',
-    texto: 'Aposentado(a) ou pensionista do INSS? Você pode estar pagando juros abusivos no seu empréstimo consignado. Fale com a gente e faça uma análise gratuita.',
-    arteT: 'Análise gratuita', arteS: 'dos juros do seu empréstimo', glifo: '%',
+    texto: 'Aposentado(a) ou pensionista do INSS? Você pode estar pagando juros abusivos. Fale com a gente e faça uma análise gratuita.',
+    arteT: 'Análise gratuita', arteS: 'veja se você paga juros abusivos', glifo: '%',
   },
   {
     canal: 'emprestimo', rot: 'Canal de empréstimo',
@@ -210,6 +211,62 @@ export function PontoDePartida() {
   );
 }
 
+/* ------------------------------------------------------------ consignado × empréstimo pessoal (comparativo) */
+type ColunaEmp = {
+  tom: 'ambar' | 'azul'; canal: string; nome: string; trilha: string[]; cobra: number;
+  linhas: { t: string; d: ReactNode }[];
+};
+const EMPRESTIMOS: ColunaEmp[] = [
+  {
+    tom: 'azul', canal: 'O que o cliente do canal de empréstimo quer', nome: 'Empréstimo consignado',
+    trilha: ['Benefício do INSS', 'INSS desconta a parcela', 'O resto cai na conta'], cobra: 1,
+    linhas: [
+      { t: 'Como paga', d: <>A parcela é <b>descontada direto do benefício pelo INSS</b>, antes de o dinheiro cair na conta.</> },
+      { t: 'Margem', d: <>Precisa de <b>margem consignável</b>. Sem margem, não sai um consignado novo.</> },
+      { t: 'Juros', d: <>Têm um <b>teto</b> definido para o consignado do INSS. É o mais barato para o aposentado.</> },
+      { t: 'Na CAF', d: <>É o assunto dos <b>ganchos</b> do canal de empréstimo: aumento de margem e portabilidade dos consignados.</> },
+    ],
+  },
+  {
+    tom: 'ambar', canal: 'O que o processo da CAF revisa', nome: 'Empréstimo pessoal',
+    trilha: ['Benefício do INSS', 'Cai na conta do cliente', 'A financeira cobra a parcela'], cobra: 2,
+    linhas: [
+      { t: 'Como paga', d: <>Não passa pelo INSS: é um contrato direto com a <b>financeira</b>, em geral cobrado na conta do cliente ou por boleto/carnê.</> },
+      { t: 'Margem', d: <><b>Não usa a margem</b> do INSS. Por isso a financeira consegue emprestar mesmo para quem já está sem margem.</> },
+      { t: 'Juros', d: <><b>Livres</b>, sem o teto do consignado, e em geral bem mais altos. É aqui que aparecem os abusivos.</> },
+      { t: 'Na CAF', d: <>É o <b>objeto do processo</b>: a revisão dos juros do empréstimo pessoal e o ressarcimento.</> },
+    ],
+  },
+];
+export function DoisEmprestimos() {
+  return (
+    <div className="mv-cn-de" role="group"
+      aria-label="Comparativo. Empréstimo consignado: o INSS desconta a parcela direto do benefício, precisa de margem e tem juros com teto; é o que o cliente do canal de empréstimo quer. Empréstimo pessoal: a financeira cobra fora do INSS, não usa a margem e tem juros livres, em geral mais altos; é o que o processo da CAF revisa.">
+      <div className="mv-cn-de-grade">
+        {EMPRESTIMOS.map((c) => (
+          <div key={c.nome} className="mv-cn-de-col" data-tom={c.tom}>
+            <header><small>{c.canal}</small><b>{c.nome}</b></header>
+            <div className="mv-cn-de-trilha" aria-hidden>
+              {c.trilha.map((t, i) => (
+                <span key={t} className="mv-cn-de-passo" data-cobra={i === c.cobra ? '' : undefined}>{t}</span>
+              ))}
+            </div>
+            <dl>
+              {c.linhas.map((l) => (
+                <div key={l.t}><dt>{l.t}</dt><dd>{l.d}</dd></div>
+              ))}
+            </dl>
+          </div>
+        ))}
+      </div>
+      <div className="mv-cn-de-ponte">
+        <span>Quem está sem margem para um consignado novo muitas vezes recorre ao empréstimo pessoal, que é mais caro.</span>
+        <b>É nos juros do empréstimo pessoal que o nosso processo olha.</b>
+      </div>
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------ simulador das 3 portas */
 type R1 = 'sim' | 'nao';
 type R3 = 'sim' | 'nao' | 'naosabe';
@@ -233,7 +290,7 @@ export function SimuladorPortas() {
   function responder3(r: R3) {
     if (r === 'naosabe' && !naoSabe) { setNaoSabe(true); return; }
     if (r === 'nao') {
-      setFim({ ok: false, titulo: 'Não elegível', texto: 'O empréstimo não é em nenhuma das 5 financeiras. A IA explica que a CAF só trabalha com essas, agradece e encerra, sem insistir.' });
+      setFim({ ok: false, titulo: 'Não elegível', texto: 'A pessoa não tem empréstimo pessoal em nenhuma das 5 financeiras. A IA explica que a CAF só trabalha com essas, agradece e encerra, sem insistir.' });
       return;
     }
     setFim({
@@ -243,7 +300,7 @@ export function SimuladorPortas() {
           A IA avisa que vai fazer a análise, espera uns 5 minutos e manda a mensagem de <b>pré-aprovada</b> com a lista de documentos.
           Depois pergunta sobre o gov.br e o Meu INSS e passa a conversa para você.
           {r2 === 'sim' && <> <b>Atenção:</b> a análise segue pelo benefício do familiar, então os documentos passam a ser do familiar que recebe. Na dúvida, pergunte ao gestor.</>}
-          {r === 'naosabe' && <> <b>{r2 === 'sim' ? 'E mais:' : 'Atenção:'}</b> o cliente não soube dizer a financeira. Confira nos extratos do INSS.</>}
+          {r === 'naosabe' && <> <b>{r2 === 'sim' ? 'E mais:' : 'Atenção:'}</b> o cliente não soube dizer se tem empréstimo pessoal numa dessas financeiras. Ajude a lembrar: ele costuma reconhecer pelo nome do banco e pelo débito na conta.</>}
         </>
       ),
     });
@@ -295,11 +352,14 @@ export function SimuladorPortas() {
       )}
       {!fim && porta === 3 && (
         <div className="mv-cn-sim-q">
-          <p className="mv-cn-sim-p">Tem empréstimo em alguma destas financeiras?</p>
+          <p className="mv-cn-sim-p">Tem empréstimo pessoal em alguma destas financeiras?</p>
+          <p className="mv-cn-sim-ajuda">Empréstimo pessoal é o que a financeira cobra fora do INSS, e não o consignado que o INSS desconta do benefício.</p>
           <div className="mv-cn-sim-fin">{FINANCEIRAS.map((f) => <span key={f}>{f}</span>)}</div>
           {naoSabe && (
             <p className="mv-cn-sim-reask">
-              O cliente não soube responder. A IA pergunta de novo, uma vez: “aparece algum desconto de Agibank, BMG, Facta, Mercantil ou Crefisa no benefício?”
+              O cliente não soube responder. A IA pergunta de novo, uma vez, e, se ele continuar sem saber, segue em frente. Quando
+              for você perguntando, simplifique: “é aquele empréstimo que a financeira cobra na sua conta, e não o que o INSS
+              desconta direto do benefício”.
             </p>
           )}
           <div className="mv-cn-sim-bts">
@@ -332,7 +392,7 @@ const FICHAS: { canal: string; titulo: string; itens: ItemFicha[]; espera: strin
       { t: 'Leu que os dados são só para a consulta', ok: true },
       { t: 'A atualização que o robô prometeu', ok: false },
       { t: 'Benefício do INSS confirmado', ok: false },
-      { t: 'Financeira confirmada', ok: false },
+      { t: 'Empréstimo pessoal confirmado', ok: false },
       { t: 'Processo explicado', ok: false },
       { t: 'Documentos recebidos', ok: false },
     ],
@@ -415,7 +475,7 @@ const ETAPAS_REGUA = [
   { t: 'Disse SIM', s: 'nome e CPF' },
   { t: 'Pré-aprovada', s: 'passou nas 3 portas' },
   { t: 'Extratos', s: 'do INSS na mão' },
-  { t: 'Verificação', s: 'margem e contratos' },
+  { t: 'Verificação', s: 'margem e consignados' },
   { t: 'Resposta clara', s: 'o que é possível' },
 ];
 export function ReguaPreAprovada() {
@@ -472,7 +532,8 @@ const ETAPA_PROCESSO: Etapa = {
   det: (
     <>
       O cliente é cadastrado no sistema, as procurações são assinadas pelo gov.br (conta prata ou ouro) e o
-      <b> Dr. Rafael Menezes</b> entra com a ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos.
+      <b> Dr. Rafael Menezes</b> entra com a ação de revisão dos juros do <b>empréstimo pessoal</b>, pedindo o ressarcimento do
+      que foi descontado nos últimos 10 anos.
       Costuma levar de 6 a 12 meses. O cliente não paga nada para começar: 30% de honorários só no final, tirados do que ele receber.
     </>
   ),
@@ -481,11 +542,11 @@ const FLUXOS: Record<'juros' | 'emprestimo', { rot: string; venda: string; etapa
   juros: {
     rot: 'Juros abusivos', venda: 'Venda mais direta: o cliente já quer a revisão.',
     etapas: [
-      { quem: 'cliente', t: 'Anúncio', curto: 'de juros abusivos', det: 'O aposentado ou pensionista vê no Facebook o anúncio sobre os juros do empréstimo e toca no botão. O WhatsApp abre numa conversa com a CAF.' },
+      { quem: 'cliente', t: 'Anúncio', curto: 'de juros abusivos', det: 'O aposentado ou pensionista vê no Facebook um anúncio sobre juros abusivos e toca no botão. O WhatsApp abre numa conversa com a CAF.' },
       { quem: 'robo', t: 'Robô', curto: 'vídeo, SIM, nome e CPF', det: 'Boas-vindas, vídeo de 30 segundos, convite para a análise gratuita, SIM ou NÃO, nome completo e CPF. Termina prometendo uma atualização “em alguns minutos”.' },
       {
         quem: 'voce', t: 'Você', curto: 'confirma e explica', venda: true,
-        det: 'Você dá a atualização prometida, confere as 3 portas (benefício do INSS, familiar, financeira) e explica o processo: gratuito para começar, 30% só no final e prazo que costuma ser de 6 a 12 meses. Como o cliente já quer a revisão, a conversa tende a ser mais direta.',
+        det: 'Você dá a atualização prometida, confere as 3 portas (benefício do INSS, familiar, empréstimo pessoal numa das 5 financeiras) e explica o processo de revisão dos juros do empréstimo pessoal: gratuito para começar, 30% só no final e prazo que costuma ser de 6 a 12 meses. Como o cliente já quer a revisão, a conversa tende a ser mais direta.',
       },
       ETAPA_DOCS,
       ETAPA_PROCESSO,
@@ -494,12 +555,12 @@ const FLUXOS: Record<'juros' | 'emprestimo', { rot: string; venda: string; etapa
   emprestimo: {
     rot: 'Empréstimo', venda: 'Venda consultiva: é preciso entender, verificar e convencer.',
     etapas: [
-      { quem: 'cliente', t: 'Anúncio', curto: 'de empréstimo', det: 'A pessoa vê um anúncio para ver se é liberado algum valor e toca no botão. Ela chega querendo dinheiro rápido.' },
+      { quem: 'cliente', t: 'Anúncio', curto: 'de empréstimo', det: 'A pessoa vê um anúncio para ver se é liberado algum valor e toca no botão. Ela chega querendo dinheiro rápido, em geral um consignado novo.' },
       { quem: 'robo', t: 'Robô', curto: 'imagem, SIM, nome e CPF', det: 'Imagem de boas-vindas, convite para a análise, SIM ou NÃO, nome e CPF. Termina dizendo que “em instantes um analista vai falar com você”.' },
       { quem: 'ia', t: 'IA', curto: '3 portas e pré-aprovada', det: 'A IA confere as 3 portas, avisa que vai analisar e, uns 5 minutos depois, manda a pré-aprovação e a lista de documentos. Pergunta sobre a senha do gov.br e o Meu INSS e passa a conversa para você. Ela nunca cita valores, taxas ou juros.' },
       {
         quem: 'voce', t: 'Você', curto: 'verifica e convence', venda: true,
-        det: 'Você se apresenta, explica com honestidade o que é a pré-aprovada (a análise inicial passou nas perguntas; não é valor liberado), pergunta o que a pessoa precisa e pede os extratos do Meu INSS. Conferida a margem: sem margem, explica com clareza e apresenta os caminhos, sempre como possibilidade: aumento de margem, portabilidade (que pode liberar um valor acima de R$\u00a01.500) e o processo. É aqui que a venda acontece.',
+        det: 'Você se apresenta, explica com honestidade o que é a pré-aprovada (a análise inicial passou nas perguntas; não é valor liberado), pergunta o que a pessoa precisa e pede os extratos do Meu INSS. Conferida a margem: sem margem para um consignado novo, explica com clareza e apresenta os caminhos, sempre como possibilidade: aumento de margem e portabilidade dos consignados (que pode liberar um valor acima de R$\u00a01.500) e o processo de revisão dos juros do empréstimo pessoal que ele já tem. É aqui que a venda acontece.',
       },
       ETAPA_DOCS,
       ETAPA_PROCESSO,

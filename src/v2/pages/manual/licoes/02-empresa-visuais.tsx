@@ -1,7 +1,10 @@
 /* Lição 2 — ilustrações e exercícios próprios (prefixo mv-emp-): as 5
-   financeiras, a ideia dos juros abusivos, a janela de 10 anos, os 4 números,
-   quem é quem, as etapas do caso, a divisão 70/30, do documento ao valor, a
-   margem do benefício, os ganchos e o exercício "verdade ou mito".
+   financeiras, o comparativo "empréstimo pessoal (o que revisamos) × consignado
+   (não é o processo)", a ideia dos juros abusivos, a janela de 10 anos, os 4
+   números, quem é quem, as etapas do caso, a divisão 70/30, do documento ao
+   valor, a margem do consignado, os ganchos e o exercício "verdade ou mito".
+   Correção do dono (13/10/2026): a revisão é do EMPRÉSTIMO PESSOAL, não do
+   consignado. O consignado só aparece como gancho do canal de empréstimo.
    Fatos da empresa: só os do brief do dono (13/10/2026) e do processo oficial. */
 import { useState, type ReactNode } from 'react';
 import { IcCheck, IcX } from '../pecas';
@@ -51,6 +54,65 @@ export function CincoFinanceiras() {
   );
 }
 
+/* ------------------------------------------------------------ empréstimo pessoal × consignado (mini comparativo) */
+type LadoPc = {
+  id: 'sim' | 'nao'; selo: string; nome: string; sub: string;
+  fluxo: { t: string; destaque?: boolean }[]; nota: string;
+  linhas: { r: string; v: ReactNode }[];
+};
+const LADOS_PC: LadoPc[] = [
+  {
+    id: 'sim', selo: 'O que a gente revisa', nome: 'Empréstimo pessoal', sub: 'com Agibank, BMG, Facta, Mercantil ou Crefisa',
+    fluxo: [{ t: 'Benefício' }, { t: 'Conta do cliente' }, { t: 'A financeira cobra', destaque: true }],
+    nota: 'Não passa pelo INSS',
+    linhas: [
+      { r: 'Como paga', v: <>Contrato direto com a financeira. Em geral, cobrado na conta do cliente ou por boleto/carnê.</> },
+      { r: 'Margem', v: <>Não usa a margem do INSS. Por isso a financeira consegue emprestar mesmo para quem já está sem margem.</> },
+      { r: 'Juros', v: <>Livres, sem o teto do consignado, em geral bem mais altos. <b>É aqui que aparecem os juros abusivos.</b></> },
+      { r: 'Na CAF', v: <><b>É o objeto do processo:</b> revisar os juros e pedir o ressarcimento.</> },
+    ],
+  },
+  {
+    id: 'nao', selo: 'Não é o processo', nome: 'Empréstimo consignado', sub: 'descontado direto do benefício',
+    fluxo: [{ t: 'Benefício' }, { t: 'O INSS desconta', destaque: true }, { t: 'Conta, já menor' }],
+    nota: 'Passa pelo INSS',
+    linhas: [
+      { r: 'Como paga', v: <>A parcela é descontada direto do benefício pelo INSS, antes de o dinheiro cair na conta.</> },
+      { r: 'Margem', v: <>Precisa de margem consignável (até 45% do benefício). Sem margem, não sai consignado novo.</> },
+      { r: 'Juros', v: <>Têm um teto definido. São os mais baratos para o aposentado.</> },
+      { r: 'Na CAF', v: <>É assunto dos <b>ganchos</b> do canal de empréstimo: aumento de margem e portabilidade dos consignados.</> },
+    ],
+  },
+];
+export function PessoalOuConsignado() {
+  return (
+    <div className="mv-emp-pc" role="group" aria-label="Empréstimo pessoal (o que a CAF revisa) e empréstimo consignado (não é o processo)">
+      {LADOS_PC.map((l) => (
+        <div key={l.id} className="vidro mv-emp-pc-col" data-lado={l.id}>
+          <div className="mv-emp-pc-cab">
+            <span className="mv-emp-pc-selo">{l.id === 'sim' ? <IcCheck /> : <IcX />}{l.selo}</span>
+            <b>{l.nome}</b>
+            <small>{l.sub}</small>
+          </div>
+          <div className="mv-emp-pc-fluxo">
+            <ol aria-label={`Caminho da parcela: ${l.fluxo.map((f) => f.t).join(', ')}`}>
+              {l.fluxo.map((f) => (
+                <li key={f.t} data-destaque={f.destaque ? '' : undefined}>{f.t}</li>
+              ))}
+            </ol>
+            <span className="mv-emp-pc-nota">{l.nota}</span>
+          </div>
+          <dl className="mv-emp-pc-lin">
+            {l.linhas.map((x) => (
+              <div key={x.r}><dt>{x.r}</dt><dd>{x.v}</dd></div>
+            ))}
+          </dl>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------ juros: a ideia (sem valores reais) */
 export function JurosSimplificado() {
   return (
@@ -82,7 +144,7 @@ export function JurosSimplificado() {
 /* ------------------------------------------------------------ janela de 10 anos */
 const mesCurto = (m: MesAno) => `${MESES_CURTOS[m.mes - 1]}/${String(m.ano).slice(2)}`;
 export function JanelaDezAnos() {
-  // mais antigo à esquerda, mais recente à direita (cada bloco = 1 extrato de 12 meses)
+  // mais antigo à esquerda, mais recente à direita (cada bloco = 1 ano, 12 meses)
   const periodos = periodosDoExtrato(hojeMesAno()).slice().reverse();
   return (
     <div className="mv-emp-jan">
@@ -101,8 +163,8 @@ export function JanelaDezAnos() {
         <div className="mv-emp-jan-hoje" aria-hidden>hoje</div>
       </div>
       <ul className="mv-emp-leg">
-        <li><i data-c="mes" />1 tracinho = 1 mês do benefício, com os descontos daquele mês</li>
-        <li><i data-c="ano" />1 bloco = 12 meses = 1 extrato de pagamento para baixar</li>
+        <li><i data-c="mes" />1 tracinho = 1 mês dentro do período do pedido</li>
+        <li><i data-c="ano" />1 bloco = 12 meses = 1 ano do pedido</li>
       </ul>
     </div>
   );
@@ -115,8 +177,8 @@ type Numero = {
 };
 const NUMEROS: Numero[] = [
   {
-    id: 'anos', tom: 'azul', icone: <IcCalendario />, grande: '10 anos', rotulo: 'de descontos no pedido',
-    significa: <>A ação pede o ressarcimento do que foi descontado <b>nos últimos 10 anos</b>. É por isso que a gente busca 10 anos de extratos no Meu INSS.</>,
+    id: 'anos', tom: 'azul', icone: <IcCalendario />, grande: '10 anos', rotulo: 'o período do pedido de ressarcimento',
+    significa: <>A ação pede o ressarcimento do que foi descontado <b>nos últimos 10 anos</b> nos empréstimos pessoais com as financeiras. Entre os documentos do processo estão os extratos de pagamento do benefício dos últimos 10 anos, baixados no Meu INSS um ano por vez.</>,
     dizer: '“O nosso advogado entra com uma ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos. O resultado depende da análise.”',
     cuidado: <>Pedir não é o mesmo que receber. Nunca diga “você vai receber 10 anos de parcelas de volta”: o que volta depende da análise e do processo.</>,
   },
@@ -215,7 +277,7 @@ const NOME_FASE: Record<Fase, string> = { voce: 'com você', adv: 'com o advogad
 const ETAPAS: { t: string; curto: string; fase: Fase; quem: string; acontece: ReactNode; dizer: string }[] = [
   {
     t: 'Documentos', curto: 'Documentos', fase: 'voce', quem: 'Você e o cliente',
-    acontece: <>Você junta a documentação: no <b>Meu INSS</b> (carta de concessão, extrato de empréstimo consignado e os extratos de pagamento de 10 anos), no <b>gov.br</b> (imposto de renda dos últimos 3 anos), no site da <b>Receita</b> (situação cadastral do CPF) e os <b>documentos pessoais</b> (identidade, comprovante de residência do mês atual ou do mês passado e o e-mail). Essa é a ordem sugerida, não uma regra: o cliente pode mandar primeiro o que tiver. A maioria não sabe entrar no Meu INSS: você ajuda em tudo.</>,
+    acontece: <>Você junta a documentação: no <b>Meu INSS</b> (carta de concessão, Extrato de Empréstimo Consignado e os extratos de pagamento de 10 anos), no <b>gov.br</b> (imposto de renda dos últimos 3 anos), no site da <b>Receita</b> (situação cadastral do CPF) e os <b>documentos pessoais</b> (identidade, comprovante de residência do mês atual ou do mês passado e o e-mail). Essa é a ordem sugerida, não uma regra: o cliente pode mandar primeiro o que tiver. A maioria não sabe entrar no Meu INSS: você ajuda em tudo.</>,
     dizer: '“Vou te ajudar a pegar cada documento, um de cada vez. É mais fácil do que parece.”',
   },
   {
@@ -230,7 +292,7 @@ const ETAPAS: { t: string; curto: string; fase: Fase; quem: string; acontece: Re
   },
   {
     t: 'O advogado entra com a ação', curto: 'Ação', fase: 'adv', quem: 'Dr. Rafael Menezes',
-    acontece: <>Com tudo assinado, o nosso advogado entra com uma <b>ação na Justiça</b> pedindo o ressarcimento do que foi descontado nos últimos 10 anos. O resultado depende da análise.</>,
+    acontece: <>Com tudo assinado, o nosso advogado entra com uma <b>ação na Justiça</b> pedindo o ressarcimento do que foi descontado nos últimos 10 anos nos <b>empréstimos pessoais</b> com as financeiras. O resultado depende da análise.</>,
     dizer: '“O seu caso foi para o nosso advogado, o Dr. Rafael Menezes, que entra com a ação.”',
   },
   {
@@ -334,15 +396,15 @@ export function Divisao7030() {
 
 /* ------------------------------------------------------------ do documento ao valor */
 const CAMINHO = [
-  { ic: <IcDoc />, t: 'Extratos', d: '10 anos de descontos no benefício' },
-  { ic: <IcLupa />, t: 'Análise', d: 'Quais empréstimos, quanto foi descontado e por quanto tempo' },
+  { ic: <IcDoc />, t: 'Documentos', d: 'Meu INSS, gov.br, Receita e documentos pessoais' },
+  { ic: <IcLupa />, t: 'Análise', d: 'Quais empréstimos pessoais, quanto foi cobrado e por quanto tempo' },
   { ic: <IcBalanca />, t: 'Processo', d: 'O advogado pede o ressarcimento na Justiça' },
   { ic: <IcPergunta />, t: 'O valor', d: 'Só aparece no fim desse caminho' },
 ];
 export function DoDocumentoAoValor() {
   return (
     <div className="mv-emp-cam">
-      <ol aria-label="Do documento ao valor: extratos, análise, processo e, por último, o valor">
+      <ol aria-label="Do documento ao valor: documentos, análise, processo e, por último, o valor">
         {CAMINHO.map((c, i) => (
           <li key={c.t} data-ultimo={i === CAMINHO.length - 1 ? '' : undefined}>
             {i === 0 && <span className="mv-emp-cam-pin">Você está aqui</span>}
@@ -356,9 +418,9 @@ export function DoDocumentoAoValor() {
   );
 }
 
-/* ------------------------------------------------------------ margem do benefício (conhecimento público) */
+/* ------------------------------------------------------------ margem do consignado (conhecimento público) */
 const MARGENS = [
-  { t: 'Com margem livre', s: 'ainda cabe um empréstimo novo', usado: 20, livre: 15 },
+  { t: 'Com margem livre', s: 'ainda cabe um consignado novo', usado: 20, livre: 15 },
   { t: 'Sem margem', s: 'a situação da maioria no canal de empréstimo', usado: 35, livre: 0 },
 ];
 export function MargemBeneficio() {
@@ -380,28 +442,32 @@ export function MargemBeneficio() {
         </div>
       ))}
       <ul className="mv-emp-leg">
-        <li><i data-p="usado" />Margem já usada pelas parcelas de empréstimo (até 35%)</li>
-        <li><i data-p="livre" />Margem livre para empréstimo novo</li>
+        <li><i data-p="usado" />Margem já usada pelas parcelas de consignado (até 35%)</li>
+        <li><i data-p="livre" />Margem livre para consignado novo</li>
         <li><i data-p="cartao" />Cartões consignados: 5% + 5%</li>
         <li><i data-p="resto" />Resto do benefício</li>
       </ul>
+      <div className="mv-emp-mg-fora">
+        <b>Fora dessa conta: o empréstimo pessoal</b>
+        <span>Ele é cobrado pela financeira, fora do INSS, e não usa a margem. Por isso a financeira consegue emprestar mesmo para quem já está sem margem. É nos juros dele que está o nosso processo.</span>
+      </div>
     </div>
   );
 }
 
 /* ------------------------------------------------------------ ganchos até o processo */
 const GANCHOS = [
-  { t: 'A verdade sobre a margem', d: 'Explicar, com calma, que hoje não há margem para um empréstimo novo, e por quê.' },
+  { t: 'A verdade sobre a margem', d: 'Explicar, com calma, que hoje não há margem para um consignado novo, e por quê.' },
   { t: 'Aumento de margem', d: 'Ver a possibilidade de aumentar a margem do cliente.' },
   { t: 'Portabilidade', d: 'Ver a possibilidade de levar os consignados para outro banco, o que pode liberar um valor acima de R$\u00a01.500.' },
 ];
 export function GanchosAteOProcesso() {
   return (
-    <div className="mv-emp-gan" role="group" aria-label="Do pedido de empréstimo até o processo: os ganchos">
+    <div className="mv-emp-gan" role="group" aria-label="Do pedido de empréstimo até a revisão do empréstimo pessoal: os ganchos">
       <div className="mv-emp-gan-ini">
         <div className="vidro mv-emp-gan-no"><span className="mv-emp-rotulo">O cliente chega</span><b>“Quero um empréstimo, preciso de dinheiro rápido”</b></div>
         <span className="mv-emp-gan-seta" aria-hidden><IcSeta /></span>
-        <div className="vidro mv-emp-gan-no" data-tom="ambar"><span className="mv-emp-rotulo">Você verifica</span><b>Na maioria das vezes, não há margem disponível</b></div>
+        <div className="vidro mv-emp-gan-no" data-tom="ambar"><span className="mv-emp-rotulo">Você verifica</span><b>Na maioria das vezes, não há margem para um consignado novo</b></div>
       </div>
       <div className="mv-emp-gan-desce" aria-hidden />
       <div className="mv-emp-gan-ganchos">
@@ -414,10 +480,16 @@ export function GanchosAteOProcesso() {
         ))}
       </div>
       <div className="mv-emp-gan-desce" aria-hidden />
+      <div className="vidro mv-emp-gan-no mv-emp-gan-ponte">
+        <span className="mv-emp-rotulo">A ponte: você pergunta</span>
+        <b>“O senhor tem empréstimo pessoal com Agibank, BMG, Facta, Mercantil ou Crefisa?”</b>
+        <span>Quem está sem margem para consignado muitas vezes recorre ao empréstimo pessoal, que é mais caro.</span>
+      </div>
+      <div className="mv-emp-gan-desce" aria-hidden />
       <div className="vidro mv-emp-gan-fim">
         <span className="mv-emp-rotulo">Onde a conversa chega</span>
-        <b>O processo de ressarcimento</b>
-        <span>O carro-chefe: pedir o ressarcimento do que foi descontado nos últimos 10 anos, sem pagar nada para começar.</span>
+        <b>A revisão dos juros do empréstimo pessoal</b>
+        <span>O carro-chefe: o advogado pede o ressarcimento do que foi descontado nos últimos 10 anos nesses empréstimos. Para começar, o cliente não paga nada.</span>
       </div>
     </div>
   );
@@ -426,12 +498,13 @@ export function GanchosAteOProcesso() {
 /* ------------------------------------------------------------ exercício: verdade ou mito */
 const AFIRMACOES: { t: string; verdade: boolean; porque: string }[] = [
   { t: 'O cliente paga uma taxa pequena para dar entrada no processo.', verdade: false, porque: 'Para começar, não paga nada. A única cobrança são os 30% no final, retirados do valor recebido.' },
+  { t: 'O processo da CAF revisa os juros do empréstimo consignado, aquele que o INSS desconta do benefício.', verdade: false, porque: 'O processo olha os juros do empréstimo pessoal com as 5 financeiras, cobrado pela financeira, fora do INSS. O consignado é assunto dos ganchos do canal de empréstimo.' },
   { t: 'Os honorários são 30% do valor que o cliente receber.', verdade: true, porque: 'Percentual fixo, só no final, tirado do que ele receber.' },
-  { t: 'Se o cliente mandar todos os documentos, dá para garantir o valor.', verdade: false, porque: 'Ninguém garante valor. Ele depende da análise dos extratos e do processo.' },
+  { t: 'Se o cliente mandar todos os documentos, dá para garantir o valor.', verdade: false, porque: 'Ninguém garante valor. Ele depende da análise do caso e do processo.' },
   { t: 'Em média, o ressarcimento leva de 6 a 12 meses.', verdade: true, porque: 'É a média que a gente informa. Sem data certa e sem prazos por etapa.' },
   { t: 'Quem entra com a ação é o atendente.', verdade: false, porque: 'Quem entra com a ação é o nosso advogado, o Dr. Rafael Menezes. Você prepara o caso.' },
   { t: 'Aumento de margem e portabilidade são ganchos de conversa, não promessas.', verdade: true, porque: 'Fale sempre em possibilidade. O carro-chefe é o processo.' },
-  { t: 'Se a pessoa não tem empréstimo em nenhuma das 5 financeiras, a gente insiste até ela lembrar de algum.', verdade: false, porque: 'Se não souber, pergunte de novo uma vez. Se não tem em nenhuma, não é elegível: agradeça com carinho e encerre, sem insistir.' },
+  { t: 'Se a pessoa não tem empréstimo pessoal em nenhuma das 5 financeiras, a gente insiste até ela lembrar de algum.', verdade: false, porque: 'Se não souber, pergunte de novo uma vez. Se não tem em nenhuma, não é elegível: agradeça com carinho e encerre, sem insistir.' },
 ];
 export function VerdadeOuMito() {
   const [resp, setResp] = useState<Record<number, boolean>>({});

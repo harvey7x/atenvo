@@ -3,7 +3,8 @@
    da senha do cliente, dados pessoais e LGPD em linguagem simples, o caminho do
    dado, prints e grupos (onde os dados vazam), golpes (por que o medo do cliente
    é legítimo e como a CAF se diferencia), os quatro "nunca", a ética de venda com
-   pessoas idosas, as situações delicadas (chamar o gestor) e o combinado final.
+   pessoas idosas (inclusive o nome certo: o processo revisa os juros do empréstimo
+   PESSOAL, não do consignado), as situações delicadas (chamar o gestor) e o combinado final.
    Fatos da empresa: só os do brief. Mensagens do robô copiadas literalmente; as
    do atendente são sugestões de roteiro. Ilustrações em 14-etica-figuras.tsx.
    Assuntos de outras lições só citados com referência: 30% e "não prometer" (L02),
@@ -13,7 +14,7 @@ import {
   Aviso, Celular, Conversa, Fatos, Frase, Lista, Passos, Sanfona, Secao, Tabela, TesteRapido,
 } from '../pecas';
 import {
-  CartazCompromisso, CicloDoDado, DetectorGolpe, EscudoConfianca, PodeOuNaoPode, PrintSeguro, QuaisSaoDados,
+  CartazCompromisso, CicloDoDado, DetectorGolpe, EscudoConfianca, FraseCerta, PodeOuNaoPode, PrintSeguro, QuaisSaoDados,
   QuatroNuncas, RegrasDaSenha, ReguaPersuasao, SemaforoDelicadas, SinaisGolpeConfianca,
 } from './14-etica-figuras';
 import './14-etica.css';
@@ -42,8 +43,8 @@ const corpo = (
     <Secao titulo="1. Por que isso vem antes de tudo">
       <p>
         Pense em tudo o que um cliente nos entrega ao longo do atendimento: o nome e o CPF logo no começo (o robô já
-        pede); os documentos do Meu INSS (a carta de concessão e os extratos de empréstimo e de pagamento dos últimos 10
-        anos); o imposto de renda dos últimos 3 anos e a situação cadastral do CPF; e os documentos pessoais (identidade,
+        pede); os documentos do Meu INSS (a carta de concessão, o Extrato de Empréstimo Consignado e o extrato de
+        pagamento do benefício dos últimos 10 anos); o imposto de renda dos últimos 3 anos e a situação cadastral do CPF; e os documentos pessoais (identidade,
         comprovante de residência, foto do rosto e e-mail). Juntas, essas informações contam quem a pessoa é, onde mora,
         quanto recebe e quanto deve. Nas mãos certas, viram um processo. Nas mãos erradas, viram ferramenta de golpe.
       </p>
@@ -203,8 +204,8 @@ const corpo = (
 
       <h4 className="mv-et-h4">O print que mostra demais</h4>
       <p>
-        Imagine que você ficou em dúvida sobre uma linha do extrato de consignado da Dona Maria e quer perguntar ao seu
-        gestor. Você tira um print da tela inteira. Agora olhe com atenção o que foi junto, e compare com o print
+        Imagine que você ficou em dúvida sobre uma linha do Extrato de Empréstimo Consignado da Dona Maria (um dos
+        documentos do Meu INSS que fazem parte do processo) e quer perguntar ao seu gestor. Você tira um print da tela inteira. Agora olhe com atenção o que foi junto, e compare com o print
         recortado:
       </p>
       <PrintSeguro />
@@ -313,7 +314,7 @@ const corpo = (
         A mais traiçoeira é a promessa, porque ela parece gentileza. Dizer “a senhora vai receber uns 20 mil” deixa o
         cliente feliz na hora e decepcionado depois: o valor depende da análise e do processo, e ninguém sabe antes. Como
         responder ao “quanto eu vou receber?” sem prometer está na lição 2. O mesmo vale no canal de empréstimo: aumento
-        de margem e portabilidade são possibilidades que dependem da análise, nunca uma garantia.
+        de margem e portabilidade dos consignados são possibilidades que dependem da análise, nunca uma garantia.
       </p>
       <Aviso tom="rubro" titulo="“Só dessa vez” não existe">
         Nenhum dos quatro “nunca” tem exceção: nem para fechar mais rápido, nem porque o cliente pediu, nem porque parece
@@ -349,6 +350,36 @@ const corpo = (
         explicar, com exemplo de número e calculadora, está na lição 2.
       </p>
 
+      <h4 className="mv-et-h4">O nome certo: empréstimo pessoal, não consignado</h4>
+      <p>
+        Dizer a verdade também é chamar cada coisa pelo nome certo. O processo da CAF é sobre os juros dos
+        <b> empréstimos pessoais</b> que o aposentado ou pensionista fez com as financeiras (Agibank, BMG, Facta,
+        Mercantil e Crefisa): o advogado entra com uma ação pedindo o ressarcimento do que foi descontado nos últimos 10
+        anos nesses empréstimos pessoais. Não é uma “revisão do consignado”. Parece detalhe, mas são dois contratos
+        diferentes: <b>o consignado é descontado pelo INSS; o empréstimo pessoal é cobrado pela financeira, fora do
+        INSS</b>, sem usar a margem e com juros livres, em geral bem mais altos. É no empréstimo pessoal que aparecem os
+        juros abusivos que a CAF revisa.
+      </p>
+      <p>
+        Quem chama o processo de “revisão do consignado” passa uma informação errada, mesmo sem querer. O cliente que só
+        tem consignado acha que o processo serve para ele (e não serve: a porta 3 pede empréstimo pessoal numa das 5
+        financeiras), e quem tem empréstimo pessoal pode nem perceber que o processo é para ele. Decidir com uma ideia errada não é decidir
+        livre, e quem descobre depois se sente enganado. Como muitos clientes confundem os dois, cabe a você explicar com
+        calma, em palavras simples. A explicação completa da diferença, com o caminho do dinheiro de cada um, está na
+        lição 3. Aqui, treine as trocas de frase mais comuns:
+      </p>
+      <FraseCerta />
+      <TesteRapido
+        pergunta="Um colega diz ao cliente: “A CAF revisa o seu consignado.” Por que isso é um problema de ética, e não só de palavra?"
+        opcoes={[
+          'Nenhum: consignado e empréstimo pessoal são a mesma coisa',
+          'O cliente decide com uma ideia errada do processo',
+          'O certo seria falar em “revisão do benefício do INSS”',
+        ]}
+        certa={1}
+        explica="O processo revisa os juros do empréstimo pessoal, que a financeira cobra fora do INSS. Com o nome errado, quem só tem consignado acha que o processo serve para ele, e a decisão do cliente deixa de ser bem informada."
+      />
+
       <h4 className="mv-et-h4">O direito de dizer não</h4>
       <div className="mv-et-duas">
         <div>
@@ -381,14 +412,16 @@ const corpo = (
         “pré-aprovada”, que só quer dizer que a análise inicial passou nas perguntas, e não que há valor liberado (a
         explicação completa está na lição 5). Só que a maioria não tem margem disponível. Aqui a ética pede três cuidados:
         <b> verificar antes de falar</b> (os extratos do Meu INSS mostram a situação), <b>explicar com franqueza</b> quando
-        não houver margem e <b>apresentar os caminhos</b> (a possibilidade de aumento de margem, a possibilidade de
-        portabilidade, o processo) como possibilidades, nunca como garantia.
+        não houver margem para um consignado novo e <b>apresentar os caminhos</b> como possibilidades, nunca como
+        garantia: a possibilidade de aumento de margem, a portabilidade dos consignados e, se ele tiver empréstimo
+        pessoal numa das 5 financeiras, a revisão dos juros desse empréstimo. Cada caminho com o seu nome: margem e portabilidade são assuntos do
+        consignado; o processo é sobre o empréstimo pessoal.
       </p>
       <p>
-        E deixe sempre claro que o processo não é um empréstimo: o advogado entra com uma ação pedindo o ressarcimento do
-        que foi descontado nos últimos 10 anos, o prazo médio é de 6 a 12 meses e o resultado depende da análise. Um
-        cliente que topa o processo achando que vai sair dinheiro na semana que vem foi mal informado, e vai se sentir
-        enganado.
+        E deixe sempre claro que o processo não é um empréstimo novo: o advogado entra com uma ação pedindo o
+        ressarcimento do que foi descontado nos últimos 10 anos nos empréstimos pessoais com as financeiras, o prazo médio
+        é de 6 a 12 meses e o resultado depende da análise. Um cliente que topa o processo achando que vai sair dinheiro
+        na semana que vem foi mal informado, e vai se sentir enganado.
       </p>
       <TesteRapido
         pergunta="A Dona Lurdes respondeu: “Não quero, obrigada.” Qual é a atitude certa?"
@@ -481,7 +514,7 @@ const corpo = (
       <p>
         Este é o resumo prático da lição, em forma de combinado. Leia cada linha e marque quando sentir que ela já é sua.
         Se um dia ficar em dúvida no meio de um atendimento, volte aqui: quase toda dúvida de ética se resolve com uma
-        destas 20 linhas.
+        destas 22 linhas.
       </p>
       <CartazCompromisso />
       <Frase>Na dúvida entre fechar rápido e fazer certo, faça certo. Se a dúvida continuar, pergunte ao gestor.</Frase>
@@ -494,7 +527,7 @@ const corpo = (
         <><b>Dado pessoal</b> é tudo o que identifica o cliente (nome, CPF, documentos, extratos). Peça e acesse só o necessário, e nunca compartilhe fora do trabalho.</>,
         <>A maioria dos vazamentos vem da pressa: confira <b>para quem</b> vai, <b>recorte</b> o print e, se errar, <b>avise o gestor</b> na hora.</>,
         <>O medo de golpe é legítimo. A CAF mostra a diferença com atitudes: <b>nada pago antes</b> (30% só no final, do que o cliente receber), assinatura no gov.br oficial, sem promessas e sem pressão.</>,
-        <>Venda com ética: os 30% explicados com clareza e exemplo, respeito ao tempo e à família do cliente, e <b>não é não</b>.</>,
+        <>Venda com ética: o processo com o nome certo (os juros do <b>empréstimo pessoal</b>, não do consignado), os 30% explicados com clareza e exemplo, respeito ao tempo e à família do cliente, e <b>não é não</b>.</>,
         <>Cliente confuso, curatela, representação ou alguém se aproveitando? <b>Pare e chame o gestor.</b></>,
       ]} />
     </Secao>
@@ -506,7 +539,7 @@ const licao: Licao = {
   modulo: 'fechamento',
   titulo: 'Segurança, ética e LGPD',
   resumo: 'Como cuidar da senha e dos dados do cliente, reconhecer golpes, vender com ética para pessoas idosas e agir nas situações delicadas.',
-  minutos: 35,
+  minutos: 38,
   corpo,
   questoes: [
     {

@@ -5,7 +5,9 @@
    regra da empresa), a anatomia da retomada, a mensagem certa para cada
    situação, áudio, família, registro do combinado e horários respeitosos.
    Fatos da empresa: só os do brief. Mensagens do robô copiadas literalmente;
-   as do atendente são sugestões de roteiro. Ilustrações em 09-followup-figuras.tsx. */
+   as do atendente são sugestões de roteiro. Ilustrações em 09-followup-figuras.tsx.
+   Correção do dono (13/10): a revisão é dos juros do EMPRÉSTIMO PESSOAL, não do
+   consignado; margem e portabilidade (consignado) são só gancho do canal de empréstimo. */
 import type { Licao } from '../tipos';
 import {
   Aviso, BomRuim, Celular, Conversa, Fatos, Frase, LinhaTempo, Lista, Passos, Sanfona, Secao, Tabela, TesteRapido,
@@ -19,8 +21,9 @@ import './09-followup.css';
 /* Resumo que o cliente pode mostrar para a família (usado na conversa e nas mensagens prontas). */
 const RESUMO_FAMILIA =
   'Resumo da análise (CAF – Central de Assessoria Financeira):\n\n' +
-  '• A gente analisa os empréstimos descontados do benefício do INSS para ver se há juros abusivos.\n' +
-  '• Se houver, o advogado, Dr. Rafael Menezes, entra com uma ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos.\n' +
+  '• É a revisão dos juros do empréstimo pessoal feito com as financeiras (Agibank, BMG, Facta, Mercantil ou Crefisa), para ver se há juros abusivos.\n' +
+  '• Empréstimo pessoal não é o consignado: o consignado é descontado pelo INSS; o empréstimo pessoal é cobrado pela financeira, fora do INSS.\n' +
+  '• Se houver juros abusivos, o advogado, Dr. Rafael Menezes, entra com uma ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos nesses empréstimos pessoais.\n' +
   '• O resultado depende da análise de cada caso: ninguém pode garantir valor antes.\n' +
   '• Não se paga nada para começar. No final do processo, 30% do valor recebido ficam para o advogado, como honorários, tirados do próprio valor.\n' +
   '• Em média, o processo leva de 6 a 12 meses.\n' +
@@ -119,7 +122,7 @@ const corpo = (
         trabalho, não um extra, por três motivos:
       </p>
       <Lista itens={[
-        <><b>Pelo cliente.</b> Se ele paga juros abusivos, desistir no primeiro silêncio significa ele perder a chance de ter a análise e, se for o caso, de pedir o ressarcimento do que foi descontado nos últimos 10 anos. Retomar com educação é cuidar dele.</>,
+        <><b>Pelo cliente.</b> Se ele paga juros abusivos num empréstimo pessoal com uma das financeiras, desistir no primeiro silêncio significa ele perder a chance de ter a análise e, se for o caso, de pedir o ressarcimento do que foi descontado nos últimos 10 anos. Retomar com educação é cuidar dele.</>,
         <><b>Pela CAF.</b> Cada contato chega pelos anúncios no Facebook, que são um investimento da empresa. Perder alguém por esquecimento, e não por decisão dele, é desperdício.</>,
         <><b>Por você.</b> Um cliente que trava e recebe ajuda passa a ver você como a pessoa que resolve. É assim que a confiança cresce, e cliente que confia vai até o fim.</>,
       ]} />
@@ -168,7 +171,7 @@ const corpo = (
       />
       <Aviso tom="rubro" titulo="Quando parar de vez">
         Pare quando o cliente: disse NÃO; não é elegível (não recebe benefício do INSS e ninguém da família recebe, ou não
-        tem empréstimo em nenhuma das 5 financeiras: Agibank, BMG, Facta, Mercantil e Crefisa); pediu para não receber mais
+        tem empréstimo pessoal em nenhuma das 5 financeiras: Agibank, BMG, Facta, Mercantil e Crefisa); pediu para não receber mais
         mensagens; ou respondeu irritado pedindo para parar. Nesses casos, a única mensagem que cabe é um agradecimento
         educado encerrando a conversa (se o robô ainda não encerrou), e mais nada. Se o cliente voltar por conta própria,
         atenda normalmente.
@@ -259,16 +262,25 @@ const corpo = (
         <Celular
           contato="Seu Pedro"
           sub="canal de empréstimo · sem margem"
-          legenda="Honestidade sobre a margem e os caminhos, sempre como possibilidade."
+          legenda="Honestidade sobre a margem e os caminhos, sempre como possibilidade. Margem e portabilidade são do consignado; a revisão é do empréstimo pessoal."
           bolhas={[
-            { de: 'eu', texto: 'Oi, Seu Pedro! Aqui é [seu nome], da CAF. Sei que o senhor queria um valor rápido e que hoje a margem está comprometida. Mas não quero deixar o senhor sem caminho.', hora: '14:10' },
-            { de: 'eu', texto: 'Dá pra ver a possibilidade de aumentar a margem, de fazer a portabilidade dos consignados pra outro banco, que pode liberar um valor acima de R$ 1.500, e a revisão dos juros que o senhor já paga. Tudo depende da análise do caso, mas quer que eu explique?', hora: '14:10' },
-            { de: 'cliente', texto: 'Essa revisão é de graça mesmo?', hora: '16:02' },
-            { de: 'eu', texto: 'O senhor não paga nada pra começar. A única coisa é no final do processo: 30% do valor que o senhor receber ficam pro advogado, como honorários, tirados do próprio valor.', hora: '16:04' },
-            { de: 'cliente', texto: 'Entendi. Pode explicar sim', hora: '16:09' },
+            { de: 'eu', texto: 'Oi, Seu Pedro! Aqui é [seu nome], da CAF. Sei que o senhor queria um valor rápido e que hoje não há margem para um consignado novo. Mas não quero deixar o senhor sem caminho.', hora: '14:10' },
+            { de: 'eu', texto: 'Dá pra ver a possibilidade de aumentar a margem, de fazer a portabilidade dos consignados pra outro banco, que pode liberar um valor acima de R$ 1.500, e a revisão dos juros do empréstimo pessoal que o senhor já tem. Tudo depende da análise do caso, mas quer que eu explique?', hora: '14:10' },
+            { de: 'cliente', texto: 'Empréstimo pessoal não é a mesma coisa que consignado?', hora: '16:02' },
+            { de: 'eu', texto: 'Não é, não. O consignado é descontado pelo INSS, direto do benefício. O empréstimo pessoal é cobrado pela financeira, fora do INSS, e em geral tem juros bem mais altos. A revisão olha os juros do empréstimo pessoal.', hora: '16:04' },
+            { de: 'cliente', texto: 'E essa revisão é de graça mesmo?', hora: '16:06' },
+            { de: 'eu', texto: 'O senhor não paga nada pra começar. A única coisa é no final do processo: 30% do valor que o senhor receber ficam pro advogado, como honorários, tirados do próprio valor.', hora: '16:08' },
+            { de: 'cliente', texto: 'Entendi. Pode explicar sim', hora: '16:12' },
           ]}
         />
       </div>
+      <Aviso tom="azul" titulo="Consignado ou empréstimo pessoal? Não confunda na retomada">
+        O <b>consignado</b> é descontado pelo INSS, direto do benefício, e depende de margem: é dele que falam o “sem
+        margem”, o aumento de margem e a portabilidade dos consignados. O <b>empréstimo pessoal</b> é cobrado pela
+        financeira, fora do INSS, não usa a margem e em geral tem juros bem mais altos: <b>é nele que a CAF olha os juros
+        abusivos</b>. Se o cliente não souber qual é qual, explique do jeito mais simples: “é aquele empréstimo que a
+        financeira cobra na sua conta, e não o que o INSS desconta direto do benefício”. A diferença completa está na lição 3.
+      </Aviso>
       <TesteRapido
         pergunta="Dona Cida tentou assinar as procurações e não conseguiu: a conta gov.br dela está no nível bronze. O que a sua retomada deve explicar?"
         opcoes={[

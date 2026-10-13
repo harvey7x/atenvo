@@ -52,7 +52,7 @@ function Caixa({ x, y, w, h, tom, linhas, tracejado }: { x: number; y: number; w
 
 /* ------------------------------------------------------------ 1. onde estamos */
 const ETAPAS: { t: string; d: string; st: 'feito' | 'agora' | 'depois' }[] = [
-  { t: 'Meu INSS', d: 'Carta de concessão, consignado e extratos', st: 'feito' },
+  { t: 'Meu INSS', d: 'Carta de concessão, extrato de empréstimo consignado e extratos de pagamento', st: 'feito' },
   { t: 'gov.br', d: 'Imposto de renda e situação do CPF', st: 'agora' },
   { t: 'Documentos pessoais', d: 'Identidade, comprovante e e-mail', st: 'depois' },
   { t: 'Cadastro e procurações', d: 'Cadastro no admin e assinatura pelo gov.br', st: 'depois' },
@@ -78,7 +78,7 @@ export function OndeEstamos() {
 export function MapaGovBr() {
   const s = 'mv-gov-s1';
   const portas: { y: number; k: string; b: string; s: string; tom?: Tom; trac?: boolean }[] = [
-    { y: 14, k: 'SERVIÇO DO INSS', b: 'Meu INSS', s: 'Carta, consignado e extratos' },
+    { y: 14, k: 'SERVIÇO DO INSS', b: 'Meu INSS', s: 'Carta de concessão e extratos' },
     { y: 92, k: 'SERVIÇO DA RECEITA FEDERAL', b: 'Meu Imposto de Renda', s: 'As declarações de cada ano', tom: 'azul' },
     { y: 170, k: 'ASSINATURA ELETRÔNICA', b: 'Assinar documentos', s: 'Procurações: só prata ou ouro' },
     { y: 248, k: 'E MUITO MAIS', b: 'Outros serviços', s: 'CNH, Carteira de Trabalho e outros', trac: true },
@@ -88,7 +88,7 @@ export function MapaGovBr() {
     <Figura legenda="Uma conta gov.br (CPF + senha) abre vários serviços do governo. A consulta da situação do CPF fica à parte: não precisa de login.">
       <div className="mv-gov-rola">
         <svg className="mv-gov-svg" viewBox="0 0 760 320" role="img"
-          aria-label="Mapa. A conta gov.br, que se acessa com CPF e senha e tem nível bronze, prata ou ouro, abre: o Meu INSS, com carta, consignado e extratos; o Meu Imposto de Renda, da Receita Federal, com as declarações de cada ano; a assinatura eletrônica de documentos, em que as procurações só são assinadas com conta prata ou ouro; e outros serviços. À parte, sem login: a situação cadastral do CPF, no site da Receita, com CPF e data de nascimento.">
+          aria-label="Mapa. A conta gov.br, que se acessa com CPF e senha e tem nível bronze, prata ou ouro, abre: o Meu INSS, com a carta de concessão e os extratos; o Meu Imposto de Renda, da Receita Federal, com as declarações de cada ano; a assinatura eletrônica de documentos, em que as procurações só são assinadas com conta prata ou ouro; e outros serviços. À parte, sem login: a situação cadastral do CPF, no site da Receita, com CPF e data de nascimento.">
           <Setas id={s} />
           {portas.map((p) => {
             const py = p.y + 29;

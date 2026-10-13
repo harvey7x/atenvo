@@ -2,8 +2,11 @@
    robô para você, o termômetro do lead, a anatomia da primeira mensagem, as
    perguntas do roteiro, o funil e o fluxograma da qualificação, o simulador do
    roteiro, perguntas abertas × fechadas, o iceberg da dor, as atitudes da
-   escuta, a ficha de anotação, a anatomia do áudio, os erros clássicos e o
-   checklist do primeiro contato. Estilos em 06-primeiro-contato.css. */
+   escuta, a ficha de anotação, a anatomia do áudio, os erros clássicos, o
+   checklist do primeiro contato e o caminho do dinheiro (consignado × empréstimo
+   pessoal). A pergunta 3 é sobre EMPRÉSTIMO PESSOAL com as 5 financeiras: o
+   processo revisa os juros dele, não os do consignado (correção do dono, 13/10).
+   Estilos em 06-primeiro-contato.css. */
 import { useState, type ReactNode } from 'react';
 import { BomRuim, Celular, copiar, Figura, IcCheck, type Bolha } from '../pecas';
 
@@ -27,7 +30,7 @@ const TRILHOS: { canal: string; sub: string; passos: { q: Quem; t: string }[]; c
       { q: 'robo', t: 'CPF' }, { q: 'robo', t: '“Recebido!”' }, { q: 'ia', t: 'As 3 portas' },
       { q: 'ia', t: '“Pré-aprovada” + documentos' }, { q: 'ia', t: 'Usa gov.br / Meu INSS?' }, { q: 'voce', t: 'Você assume' },
     ],
-    chega: ['Nome completo e CPF', 'As respostas das 3 portas (benefício, familiar, financeira)', 'A lista de documentos', 'A resposta sobre o gov.br e o Meu INSS', 'A expectativa de “pré-aprovada”'],
+    chega: ['Nome completo e CPF', 'As respostas das 3 portas (benefício, familiar, empréstimo pessoal nas 5)','A lista de documentos', 'A resposta sobre o gov.br e o Meu INSS', 'A expectativa de “pré-aprovada”'],
     fica: ['Apresentar-se: seu nome + CAF', 'Explicar com honestidade a “pré-aprovada”', 'Uma pergunta aberta: o que ele precisa', 'Pedir os extratos do Meu INSS'],
     ordem: true,
   },
@@ -152,7 +155,7 @@ export function AnatomiaMensagem() {
 const PERGUNTAS = [
   {
     q: '“Você recebe algum benefício do INSS?”', forma: 'fechada',
-    pq: 'É a primeira porta. O nosso trabalho é com empréstimos ligados a um benefício do INSS. O público principal é aposentado e pensionista (é para eles que o anúncio fala), mas qualquer benefício do INSS serve: aposentadoria, pensão, auxílio, BPC/LOAS.',
+    pq: 'É a primeira porta. O nosso trabalho é com quem recebe do INSS. O público principal é aposentado e pensionista (é para eles que o anúncio fala), mas qualquer benefício do INSS serve: aposentadoria, pensão, auxílio, BPC/LOAS.',
     se: <><b>Se não recebe:</b> pergunte se algum familiar recebe (pai, mãe, avó, avô, filho). CLT ou servidor público sem benefício do INSS, e sem familiar que receba, não é elegível.</>, tom: 'rubro',
   },
   {
@@ -161,14 +164,14 @@ const PERGUNTAS = [
     se: <><b>Se não sabe dizer:</b> tudo bem, siga em frente. Os documentos do Meu INSS vão mostrar.</>, tom: 'neutro',
   },
   {
-    q: '“Você tem empréstimo em algum destes bancos: Agibank, BMG, Facta, Mercantil ou Crefisa?”', forma: 'fechada',
-    pq: 'É a outra porta: só trabalhamos com essas 5 financeiras. As que mais chegam até a gente são Agibank, Mercantil e BMG. Citar os nomes ajuda o cliente a lembrar.',
-    se: <><b>Nenhuma das 5:</b> não elegível (“só trabalhamos com essas”). <b>Não sabe:</b> pergunte de novo, uma vez; se seguir sem saber, siga em frente.</>, tom: 'rubro',
+    q: '“Você tem empréstimo pessoal com algum destes bancos: Agibank, BMG, Facta, Mercantil ou Crefisa?”', forma: 'fechada',
+    pq: 'É a outra porta. O processo da CAF revisa os juros do empréstimo pessoal (não do consignado), e só com essas 5 financeiras. As que mais chegam até a gente são Agibank, Mercantil e BMG. Citar os nomes ajuda o cliente a lembrar.',
+    se: <><b>Nenhuma das 5:</b> não elegível (“só trabalhamos com essas”). <b>Não sabe a diferença:</b> explique em uma frase (veja a próxima seção). <b>Não sabe:</b> pergunte de novo, uma vez; se seguir sem saber, siga em frente.</>, tom: 'rubro',
   },
   {
     q: '“E me conta: o que você está buscando hoje?”', forma: 'aberta',
     pq: 'Descobre se ele quer revisar os juros, um empréstimo ou os dois. Isso muda toda a conversa de venda: quem quer revisar já está pronto para ouvir sobre o processo; quem quer empréstimo precisa primeiro ser ouvido e entender os caminhos.',
-    se: <><b>Não é filtro.</b> Às vezes quem veio pelo canal de juros também precisa de dinheiro, e quem veio pelo de empréstimo nem sabia que dava para revisar. Se a resposta vier vaga, ofereça as opções.</>, tom: 'neutro',
+    se: <><b>Não é filtro.</b> Às vezes quem veio pelo canal de juros também precisa de dinheiro, e quem veio pelo de empréstimo nem sabia que dava para revisar os juros do empréstimo pessoal. Se a resposta vier vaga, ofereça as opções.</>, tom: 'neutro',
   },
 ];
 export function PerguntasRoteiro() {
@@ -189,13 +192,78 @@ export function PerguntasRoteiro() {
   );
 }
 
+/* ===================================================================== consignado × empréstimo pessoal: o caminho do dinheiro */
+type Din = 'inss' | 'cons' | 'conta' | 'pess';
+const CAMINHO: { k: Din; tag?: string; t: string; d: string }[] = [
+  { k: 'inss', t: 'O INSS paga o benefício', d: 'Aposentadoria, pensão, auxílio ou BPC/LOAS.' },
+  { k: 'cons', tag: 'Consignado', t: 'O INSS desconta a parcela', d: 'Direto do benefício, antes de o dinheiro cair na conta.' },
+  { k: 'conta', t: 'O dinheiro cai na conta', d: 'O benefício, já sem a parcela do consignado, chega na conta.' },
+  { k: 'pess', tag: 'Empréstimo pessoal', t: 'A financeira cobra a parcela', d: 'Fora do INSS. Em geral, débito na conta do cliente, ou boleto ou carnê.' },
+];
+const LADOS: { k: Din; t: string; itens: [string, string][]; caf: string }[] = [
+  {
+    k: 'cons', t: 'Empréstimo consignado',
+    itens: [
+      ['Quem cobra', 'O INSS, direto do benefício'],
+      ['Juros', 'Têm teto: são os mais baratos para o aposentado'],
+      ['O cliente lembra', 'Pelo desconto no extrato do benefício'],
+      ['Diga assim', '“É o que o INSS desconta direto do seu benefício.”'],
+    ],
+    caf: 'Na CAF: é o assunto dos ganchos do canal de empréstimo (aumento de margem, portabilidade dos consignados).',
+  },
+  {
+    k: 'pess', t: 'Empréstimo pessoal',
+    itens: [
+      ['Quem cobra', 'A financeira, fora do INSS'],
+      ['Juros', 'Livres, sem o teto do consignado; em geral bem mais altos'],
+      ['O cliente lembra', 'Pelo nome do banco e pelo débito na conta'],
+      ['Diga assim', '“É o que a financeira cobra na sua conta, fora do INSS.”'],
+    ],
+    caf: 'Na CAF: é o que o processo revisa. É aqui que aparecem os juros abusivos.',
+  },
+];
+export function CaminhoDinheiro() {
+  return (
+    <Figura legenda="Ilustrativo e simplificado. O consignado sai do benefício antes de o dinheiro cair na conta, descontado pelo INSS. O empréstimo pessoal é cobrado pela financeira, fora do INSS. Em “Diga assim”, o jeito simples de explicar ao cliente. A comparação completa está na lição 3.">
+      <div className="mv-pc-din">
+        <ol className="mv-pc-din-trilha" aria-label="O caminho do dinheiro do benefício">
+          {CAMINHO.map((c, i) => (
+            <li key={c.k} data-k={c.k}>
+              <span className="mv-pc-din-cab">
+                <span className="mv-pc-din-n num">{i + 1}</span>
+                {c.tag && <span className="mv-pc-din-tag">{c.tag}</span>}
+              </span>
+              <b>{c.t}</b>
+              <span className="mv-pc-din-d">{c.d}</span>
+            </li>
+          ))}
+        </ol>
+        <div className="mv-pc-din-lados">
+          {LADOS.map((l) => (
+            <section key={l.k} className="mv-pc-din-lado" data-k={l.k} aria-label={l.t}>
+              <header>
+                <b>{l.t}</b>
+                {l.k === 'pess' && <span className="mv-pc-din-selo">O que a CAF revisa</span>}
+              </header>
+              <dl>
+                {l.itens.map(([c, v]) => <div key={c}><dt>{c}</dt><dd>{v}</dd></div>)}
+              </dl>
+              <span className="mv-pc-din-caf">{l.caf}</span>
+            </section>
+          ))}
+        </div>
+      </div>
+    </Figura>
+  );
+}
+
 /* ===================================================================== funil de qualificação */
 const NIVEIS: { t: string; s: string; w: number; lado?: { tom?: 'rubro'; tx: ReactNode } }[] = [
   { t: 'Todo mundo que chamou', s: 'Viu o anúncio e respondeu ao robô', w: 100 },
   { t: 'Recebe benefício do INSS', s: 'Ele mesmo ou um familiar: pai, mãe, avó, avô, filho', w: 88, lado: { tom: 'rubro', tx: <><b>Sai:</b> ninguém da família recebe do INSS. Agradeça e encerre.</> } },
-  { t: 'Tem empréstimo em uma das 5', s: 'Agibank · BMG · Facta · Mercantil · Crefisa', w: 76, lado: { tom: 'rubro', tx: <><b>Sai:</b> nenhuma das 5 (“só trabalhamos com essas”). Encerre com carinho.</> } },
+  { t: 'Tem empréstimo pessoal numa das 5', s: 'Agibank · BMG · Facta · Mercantil · Crefisa', w: 76, lado: { tom: 'rubro', tx: <><b>Sai:</b> sem empréstimo pessoal em nenhuma das 5 (“só trabalhamos com essas”). Encerre com carinho.</> } },
   { t: 'Sabemos o que ele quer', s: 'Revisar os juros, um empréstimo, ou os dois', w: 64, lado: { tx: 'Não é filtro: muda o rumo da conversa de venda.' } },
-  { t: 'Sabemos a dor', s: 'Desconto alto, dinheiro que não sobra, dívidas', w: 52, lado: { tx: 'Não é filtro: é o que vai fazer sentido para ele depois.' } },
+  { t: 'Sabemos a dor', s: 'Parcela pesada, mês apertado, dívidas', w: 52, lado: { tx: 'Não é filtro: é o que vai fazer sentido para ele depois.' } },
 ];
 export function FunilQualificacao() {
   return (
@@ -242,7 +310,7 @@ export function FluxogramaRoteiro() {
     <Figura legenda="O roteiro de qualificação inteiro, como um mapa. Em verde, o caminho de quem segue; em vermelho, quem não é elegível.">
       <span className="mv-pc-rolo-dica">Arraste para o lado para ver o mapa inteiro.</span>
       <div className="mv-pc-rolo">
-        <svg viewBox="0 0 760 640" role="img" aria-label="Fluxograma do roteiro: 1, recebe benefício do INSS? Se não, algum familiar recebe? Se ninguém recebe, não elegível. 2, qual é o benefício. 3, tem empréstimo em uma das 5 financeiras? Se não, não elegível; se não sabe, pergunte de novo uma vez e siga. 4, o que ele quer. 5, qual é a dor. Fim: qualificado, segue para a conversa de venda.">
+        <svg viewBox="0 0 760 640" role="img" aria-label="Fluxograma do roteiro: 1, recebe benefício do INSS? Se não, algum familiar recebe? Se ninguém recebe, não elegível. 2, qual é o benefício. 3, tem empréstimo pessoal com uma das 5 financeiras? Se não, não elegível; se não sabe, explique a diferença para o consignado, pergunte de novo uma vez e siga. 4, o que ele quer. 5, qual é a dor. Fim: qualificado, segue para a conversa de venda.">
           <defs>
             <marker id="mv-pc-ponta" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
               <path className="mv-pc-fx-ponta" d="M0,0 L10,5 L0,10 z" />
@@ -271,13 +339,13 @@ export function FluxogramaRoteiro() {
           <Fio d="M210,224 L210,255" />
 
           {/* 3 — financeira */}
-          <Caixa x={30} y={258} w={360} h={64} t="3. Tem empréstimo em uma das 5 financeiras?" s="Agibank · BMG · Facta · Mercantil · Crefisa" />
+          <Caixa x={30} y={258} w={360} h={64} t="3. Tem empréstimo pessoal numa das 5?" s="com Agibank · BMG · Facta · Mercantil · Crefisa" />
           <Fio d="M390,280 L447,280" />
           <Rotulo x={419} y={273} t="Não" tom="nao" />
           <Caixa x={450} y={258} w={290} h={50} tom="rubro" t="Não elegível" s="“só trabalhamos com essas 5”" />
           <Fio d="M372,322 L372,352 L447,352" />
           <Rotulo x={411} y={345} t="Não sabe" tom="talvez" />
-          <Caixa x={450} y={326} w={290} h={64} tom="ambar" t="Pergunte de novo, uma vez só" s="citando as 5 financeiras pelo nome" />
+          <Caixa x={450} y={326} w={290} h={64} tom="ambar" t="Pergunte de novo, uma vez só" s="explique a diferença e cite as 5" />
           <Fio d="M595,390 L595,436 L393,436" />
           <Rotulo x={603} y={411} t="tem numa das 5, ou" tom="neutro" anchor="start" />
           <Rotulo x={603} y={427} t="seguiu sem saber" tom="neutro" anchor="start" />
@@ -290,7 +358,7 @@ export function FluxogramaRoteiro() {
           <Fio d="M210,462 L210,491" />
 
           {/* 5 — dor */}
-          <Caixa x={30} y={494} w={360} h={52} t="5. Escute: qual é a dor?" s="desconto alto · dinheiro que não sobra · dívidas" />
+          <Caixa x={30} y={494} w={360} h={52} t="5. Escute: qual é a dor?" s="parcela pesada · dinheiro que não sobra · dívidas" />
           <Fio d="M210,546 L210,575" />
 
           {/* fim */}
@@ -346,23 +414,34 @@ const ARVORE: Record<string, NoPergunta | NoFim> = {
     ],
   },
   financeira: {
-    tipo: 'p', etapa: 'Pergunta 3', titulo: 'Tem empréstimo em uma das 5 financeiras?', forma: 'fechada',
-    fala: 'E você tem empréstimo em algum destes bancos: Agibank, BMG, Facta, Mercantil ou Crefisa?',
-    porque: 'É a outra porta: só trabalhamos com essas 5.',
+    tipo: 'p', etapa: 'Pergunta 3', titulo: 'Tem empréstimo pessoal numa das 5?', forma: 'fechada',
+    fala: 'E você tem empréstimo pessoal com algum destes bancos: Agibank, BMG, Facta, Mercantil ou Crefisa?',
+    porque: 'É a outra porta: o processo revisa os juros do empréstimo pessoal, e só com essas 5.',
     resps: [
-      { r: 'Sim, em uma ou mais', vai: 'quer', nota: ['Financeira', 'Sim, em uma das 5'] },
-      { r: 'Não, em nenhuma', vai: 'fimOutraFinanceira', nota: ['Financeira', 'Nenhuma das 5'] },
+      { r: 'Sim, em uma ou mais', vai: 'quer', nota: ['Financeira', 'Empréstimo pessoal numa das 5'] },
+      { r: 'Não, em nenhuma', vai: 'fimOutraFinanceira', nota: ['Financeira', 'Nenhum empréstimo pessoal nas 5'] },
+      { r: '“Pessoal? Qual a diferença?”', vai: 'diferenca' },
       { r: 'Não sabe', vai: 'financeira2' },
+    ],
+  },
+  diferenca: {
+    tipo: 'p', etapa: 'Pergunta 3, explicando', titulo: 'Explique a diferença em poucas palavras', forma: 'fechada',
+    fala: 'É uma dúvida bem comum! O consignado é aquele que o INSS desconta direto do benefício. O empréstimo pessoal é cobrado pela financeira, fora do INSS, em geral na sua conta. Você tem algum empréstimo assim com Agibank, BMG, Facta, Mercantil ou Crefisa?',
+    porque: 'O processo olha os juros do empréstimo pessoal. Explique sem jargão e devolva a mesma pergunta, citando as 5.',
+    resps: [
+      { r: 'Tem sim, sai da conta', vai: 'quer', nota: ['Financeira', 'Empréstimo pessoal numa das 5'] },
+      { r: 'Só tem o consignado', vai: 'fimOutraFinanceira', nota: ['Financeira', 'Só consignado, sem empréstimo pessoal'], obs: 'O consignado não é o que o nosso processo revisa. Sem empréstimo pessoal numa das 5, a pessoa não é elegível.' },
+      { r: 'Continua sem saber', vai: 'quer', nota: ['Financeira', 'Não soube dizer (seguiu em frente)'], obs: 'Siga em frente, sem insistir. Anote que ele não soube dizer; na dúvida, combine com o seu gestor como conferir.' },
     ],
   },
   financeira2: {
     tipo: 'p', etapa: 'Pergunta 3, de novo', titulo: 'Pergunte de novo, uma vez só', forma: 'fechada',
-    fala: 'Sem problema, isso é bem comum! Aparece algum desconto de Agibank, BMG, Facta, Mercantil ou Crefisa no benefício?',
-    porque: 'Ouvir os nomes ajuda a lembrar. Se ele tiver por perto o papel do contrato ou o extrato do benefício, às vezes o nome do banco aparece ali.',
+    fala: 'Sem problema, isso é bem comum! É aquele empréstimo que a financeira cobra na sua conta, e não o que o INSS desconta direto do benefício. Tem algum assim com Agibank, BMG, Facta, Mercantil ou Crefisa?',
+    porque: 'Ouvir os nomes ajuda a lembrar. O empréstimo pessoal não aparece como desconto do INSS: muita gente lembra pelo nome do banco e pelo débito na conta.',
     resps: [
-      { r: 'Lembrou: tem sim', vai: 'quer', nota: ['Financeira', 'Sim (lembrou na segunda pergunta)'] },
-      { r: 'Lembrou: não tem', vai: 'fimOutraFinanceira', nota: ['Financeira', 'Nenhuma das 5 (lembrou na segunda pergunta)'] },
-      { r: 'Continua sem saber', vai: 'quer', nota: ['Financeira', 'Não sabe: conferir no extrato do Meu INSS'], obs: 'Siga em frente, sem insistir: o extrato de empréstimos do Meu INSS vai mostrar cada contrato.' },
+      { r: 'Lembrou: tem sim', vai: 'quer', nota: ['Financeira', 'Empréstimo pessoal (lembrou na segunda pergunta)'] },
+      { r: 'Lembrou: não tem', vai: 'fimOutraFinanceira', nota: ['Financeira', 'Nenhum empréstimo pessoal nas 5 (lembrou na segunda pergunta)'] },
+      { r: 'Continua sem saber', vai: 'quer', nota: ['Financeira', 'Não soube dizer (seguiu em frente)'], obs: 'Siga em frente, sem insistir. Anote que ele não soube dizer; na dúvida, combine com o seu gestor como conferir.' },
     ],
   },
   quer: {
@@ -370,17 +449,17 @@ const ARVORE: Record<string, NoPergunta | NoFim> = {
     fala: 'E me conta: o que você está buscando hoje?',
     porque: 'Deixe ele dizer com as palavras dele. Se vier vago, ofereça as opções: revisar os juros, um empréstimo, ou os dois. A resposta muda toda a conversa de venda.',
     resps: [
-      { r: '“Quero revisar os juros”', vai: 'dor', nota: ['Quer', 'Revisar os juros'] },
+      { r: '“Quero revisar os juros”', vai: 'dor', nota: ['Quer', 'Revisar os juros do empréstimo pessoal'] },
       { r: '“Quero um empréstimo”', vai: 'dor', nota: ['Quer', 'Empréstimo (dinheiro rápido)'], obs: 'Não prometa valor: a verificação vem depois, com os extratos. Primeiro, escute.' },
       { r: '“Os dois”', vai: 'dor', nota: ['Quer', 'Revisar e conseguir um valor'] },
     ],
   },
   dor: {
     tipo: 'p', etapa: 'Escuta', titulo: 'Qual é a dor?', forma: 'aberta',
-    fala: 'E como esses descontos estão pesando no seu mês?',
+    fala: 'E como essas parcelas estão pesando no seu mês?',
     porque: 'Deixe a pessoa contar, sem interromper. A dor é o que vai fazer sentido na sua explicação depois. Anote com as palavras dela.',
     resps: [
-      { r: '“O desconto está muito alto”', vai: 'fimQualificado', nota: ['Dor', '“O desconto está muito alto”'] },
+      { r: '“A parcela está muito alta”', vai: 'fimQualificado', nota: ['Dor', '“A parcela está muito alta”'] },
       { r: '“No fim do mês não sobra nada”', vai: 'fimQualificado', nota: ['Dor', '“No fim do mês não sobra nada”'] },
       { r: '“Estou cheio de dívidas”', vai: 'fimQualificado', nota: ['Dor', '“Estou cheio de dívidas”'] },
     ],
@@ -394,8 +473,8 @@ const ARVORE: Record<string, NoPergunta | NoFim> = {
     texto: 'Agradeça com carinho e encerre, sem insistir. Como encerrar bem, com a mensagem pronta, está na lição 4.',
   },
   fimOutraFinanceira: {
-    tipo: 'f', tom: 'rubro', titulo: 'Não elegível: nenhuma das 5 financeiras',
-    texto: 'Explique com gentileza que só trabalhamos com essas 5, agradeça e encerre, sem insistir. A mensagem pronta está na lição 4.',
+    tipo: 'f', tom: 'rubro', titulo: 'Não elegível: sem empréstimo pessoal nas 5',
+    texto: 'Explique com gentileza que o nosso processo é sobre o empréstimo pessoal com essas 5 financeiras, agradeça e encerre, sem insistir. A mensagem pronta está na lição 4.',
   },
 };
 const etapaDe = (id: string) => { const n = ARVORE[id]; return n.tipo === 'p' ? n.etapa : ''; };
@@ -484,11 +563,11 @@ export function SimuladorRoteiro() {
 /* ===================================================================== perguntas abertas × fechadas */
 const FRASES = [
   { f: '“Você recebe algum benefício do INSS?”', aberta: false, e: 'A resposta é sim ou não. Ótima para confirmar um fato.' },
-  { f: '“Me conta: como esses descontos estão pesando no seu mês?”', aberta: true, e: 'Convida a pessoa a contar. É assim que a dor aparece.' },
+  { f: '“Me conta: como essas parcelas estão pesando no seu mês?”', aberta: true, e: 'Convida a pessoa a contar. É assim que a dor aparece.' },
   { f: '“O empréstimo é no BMG?”', aberta: false, e: 'Sim ou não. Serve para confirmar o banco.' },
   { f: '“Como foi que esses empréstimos começaram?”', aberta: true, e: 'A pessoa conta a história, e você descobre coisas que nem sabia perguntar.' },
   { f: '“É aposentadoria ou pensão?”', aberta: false, e: 'É uma escolha entre opções: continua sendo fechada.' },
-  { f: '“O que você gostaria que mudasse no seu benefício?”', aberta: true, e: 'Mostra o que a pessoa quer de verdade, com as palavras dela.' },
+  { f: '“O que você gostaria que mudasse nesses empréstimos?”', aberta: true, e: 'Mostra o que a pessoa quer de verdade, com as palavras dela.' },
 ];
 export function AbertaFechada() {
   const [resp, setResp] = useState<Record<number, boolean>>({});
@@ -509,7 +588,7 @@ export function AbertaFechada() {
         <div className="vidro mv-pc-af-tipo" data-tipo="aberta">
           <div className="mv-pc-af-topo"><h4>Pergunta aberta</h4><div className="mv-pc-af-vis" data-aberta="" aria-hidden><i /><i /><i /></div></div>
           <div className="mv-pc-af-def">A pessoa responde <b>contando</b>, com as palavras dela.</div>
-          <ul className="mv-pc-af-ex"><li>“Me conta: como esses descontos estão pesando no seu mês?”</li><li>“O que você está buscando hoje?”</li></ul>
+          <ul className="mv-pc-af-ex"><li>“Me conta: como essas parcelas estão pesando no seu mês?”</li><li>“O que você está buscando hoje?”</li></ul>
           <div className="mv-pc-af-uso">
             <span><b>Use para:</b> descobrir a dor, o que ela quer e o que sente.</span>
             <span><b>Cuidado:</b> faça curta e simples. Só abertas e a conversa não anda.</span>
@@ -547,13 +626,13 @@ export function AbertaFechada() {
 }
 
 /* ===================================================================== iceberg da dor */
-const DORES = ['O desconto está alto demais', 'No fim do mês não sobra nada', 'Estou cheio(a) de dívidas', 'Tenho medo de cair em golpe', 'Sinto que fui enganado(a)'];
+const DORES = ['A parcela pesa demais no mês', 'No fim do mês não sobra nada', 'Estou cheio(a) de dívidas', 'Tenho medo de cair em golpe', 'Sinto que fui enganado(a)'];
 export function Iceberg() {
   return (
     <Figura legenda="O que o cliente diz é a ponta. A dor, o motivo de verdade, fica por baixo, e só aparece quando você pergunta e escuta.">
       <span className="mv-pc-rolo-dica">Arraste para o lado para ver a imagem inteira.</span>
       <div className="mv-pc-rolo">
-        <svg viewBox="0 0 760 370" role="img" aria-label="Iceberg: acima da água, o que o cliente diz (quero revisar os meus juros, quero um empréstimo). Abaixo da água, o que ele sente: o desconto está alto demais, no fim do mês não sobra nada, estou cheio de dívidas, tenho medo de cair em golpe, sinto que fui enganado.">
+        <svg viewBox="0 0 760 370" role="img" aria-label="Iceberg: acima da água, o que o cliente diz (quero revisar os meus juros, quero um empréstimo). Abaixo da água, o que ele sente: a parcela pesa demais no mês, no fim do mês não sobra nada, estou cheio de dívidas, tenho medo de cair em golpe, sinto que fui enganado.">
           <rect className="mv-pc-ice-agua" x="0" y="118" width="760" height="252" />
           <polygon className="mv-pc-ice-massa" points="262,118 500,118 556,176 584,252 528,330 392,356 252,326 186,250 208,170" />
           <polygon className="mv-pc-ice-ponta" points="300,118 342,48 384,26 428,56 466,118" />
@@ -592,7 +671,7 @@ const ATITUDES = [
   { t: 'Deixe terminar', d: 'Não interrompa nem responda no meio. Se ele manda várias mensagens seguidas, espere ele parar.', ex: 'Espere a última mensagem chegar.' },
   { t: 'Repita com suas palavras', d: 'Mostra que você entendeu e corrige um mal-entendido na hora.', ex: '“Então, se eu entendi bem…”' },
   { t: 'Valide o sentimento', d: 'Reconheça o que ele sente antes de explicar qualquer coisa.', ex: '“Imagino como isso aperta.”' },
-  { t: 'Anote', d: 'Com as palavras dele. Você vai usar na explicação, e ninguém precisa perguntar de novo.', ex: '“Todo mês vem menos.”' },
+  { t: 'Anote', d: 'Com as palavras dele. Você vai usar na explicação, e ninguém precisa perguntar de novo.', ex: '“Tô devendo a farmácia.”' },
 ];
 export function AtitudesEscuta() {
   return (
@@ -614,9 +693,9 @@ const FICHA: { c: string; v: string; dor?: boolean }[] = [
   { c: 'Cliente', v: 'Dona Cida (exemplo)' },
   { c: 'Canal', v: 'Juros abusivos' },
   { c: 'Benefício', v: 'Aposentadoria, dela mesma' },
-  { c: 'Financeiras', v: 'BMG e Agibank (acha que tem mais um)' },
-  { c: 'O que quer', v: 'Revisar os juros' },
-  { c: 'A dor, nas palavras dela', v: '“Todo mês vem menos e eu tô devendo a farmácia.”', dor: true },
+  { c: 'Financeiras', v: 'Empréstimo pessoal no BMG e no Agibank, que saem da conta (acha que tem mais um)' },
+  { c: 'O que quer', v: 'Revisar os juros desses empréstimos' },
+  { c: 'A dor, nas palavras dela', v: '“Todo mês o dinheiro some e eu tô devendo a farmácia.”', dor: true },
   { c: 'Família', v: 'A filha ajuda com o celular, à noite' },
   { c: 'Próximo passo', v: 'Explicar o processo hoje à noite, com a filha junto' },
 ];
@@ -650,8 +729,8 @@ export function FichaAnotacao() {
 const SEGMENTOS = [
   { s: 1, t: 'Cumprimente pelo nome', ex: '“Oi, Dona Maria, tudo bem?”', barras: 12 },
   { s: 2, t: 'Diga quem você é', ex: '“Aqui é [seu nome], da CAF.”', barras: 12 },
-  { s: 3, t: 'Uma ideia só', ex: '“Ouvi seu áudio e entendi que os descontos estão apertando o seu mês…”', barras: 28 },
-  { s: 4, t: 'Termine com uma pergunta', ex: '“Além do BMG, tem desconto de outro banco?”', barras: 12 },
+  { s: 3, t: 'Uma ideia só', ex: '“Ouvi seu áudio e entendi que as parcelas estão apertando o seu mês…”', barras: 28 },
+  { s: 4, t: 'Termine com uma pergunta', ex: '“Tem outro empréstimo pessoal?”', barras: 12 },
 ];
 /* alturas fixas (determinísticas) da "onda" do áudio, em % */
 const altura = (i: number) => Math.round(28 + 66 * Math.abs(Math.sin(i * 1.7) * Math.cos(i * 0.45)));
@@ -679,8 +758,8 @@ export function AnatomiaAudio() {
         <div className="mv-pc-aud-ex">
           <small>Exemplo do áudio inteiro</small>
           “Oi, Dona Maria, tudo bem? Aqui é [seu nome], da CAF. Ouvi o seu áudio todinho, obrigado(a) por me contar.
-          Pelo que entendi, a senhora tem empréstimo no BMG e os descontos estão apertando o seu mês. Pra eu te ajudar
-          direitinho, me conta: além do BMG, tem desconto de algum outro banco no seu benefício?”
+          Pelo que entendi, a senhora tem um empréstimo pessoal no BMG e as parcelas estão apertando o seu mês. Pra eu te
+          ajudar direitinho, me conta: fora o BMG, a senhora tem empréstimo pessoal em algum outro banco?”
         </div>
       </div>
     </Figura>
@@ -710,13 +789,13 @@ const ERROS: Erro[] = [
     id: 'jargao', nome: 'Jargão', contato: 'Seu Jorge',
     resumo: 'Usar palavras técnicas da nossa área, que o cliente não conhece.',
     ruim: [
-      { de: 'eu', texto: 'Qual a espécie do seu benefício? E tem contrato consignado averbado com qual IF?', hora: '09:20' },
+      { de: 'eu', texto: 'Qual a espécie do seu benefício? E possui contrato de crédito pessoal ativo com qual IF?', hora: '09:20' },
       { de: 'cliente', texto: 'Desculpa, não entendi 😕', hora: '09:26' },
     ],
     bom: [
       { de: 'eu', texto: 'O senhor recebe aposentadoria, pensão ou outro benefício do INSS?', hora: '09:20' },
       { de: 'cliente', texto: 'Aposentadoria.', hora: '09:21' },
-      { de: 'eu', texto: 'Ótimo! E tem empréstimo em algum destes bancos: Agibank, BMG, Facta, Mercantil ou Crefisa?', hora: '09:21' },
+      { de: 'eu', texto: 'Ótimo! E o senhor tem empréstimo pessoal com algum destes bancos: Agibank, BMG, Facta, Mercantil ou Crefisa?', hora: '09:21' },
       { de: 'cliente', texto: 'Tenho no Mercantil.', hora: '09:23' },
     ],
     porque: 'Quem não entende fica com vergonha de perguntar, ou desconfia. Jargão afasta, principalmente o cliente mais velho. Fale como você explicaria para a sua avó.',
@@ -726,13 +805,13 @@ const ERROS: Erro[] = [
     resumo: 'Mandar tudo num bloco só: processo, prazos, valores e documentos de uma vez.',
     ruim: [
       { de: 'cliente', texto: 'Como funciona?', hora: '11:02' },
-      { de: 'eu', texto: 'Funciona assim: o nosso advogado, o Dr. Rafael Menezes, entra com uma ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos, o que leva de 6 a 12 meses, e o senhor não paga nada no começo, só 30% no final, que são os honorários do advogado, tirados do que o senhor ganhar. Para isso eu preciso da carta de concessão, do extrato de consignado, dos extratos de pagamento dos últimos 10 anos, do imposto de renda dos últimos 3 anos, da situação cadastral do CPF, da sua identidade, do comprovante de residência e do seu e-mail.', hora: '11:03' },
+      { de: 'eu', texto: 'Funciona assim: o nosso advogado, o Dr. Rafael Menezes, entra com uma ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos nos seus empréstimos pessoais com as financeiras, o que leva de 6 a 12 meses, e o senhor não paga nada no começo, só 30% no final, que são os honorários do advogado, tirados do que o senhor ganhar. Para isso eu preciso da carta de concessão, do extrato de consignado, dos extratos de pagamento dos últimos 10 anos, do imposto de renda dos últimos 3 anos, da situação cadastral do CPF, da sua identidade, do comprovante de residência e do seu e-mail.', hora: '11:03' },
       { de: 'cliente', texto: 'Ok, tá bom.', hora: '11:20' },
     ],
     bom: [
       { de: 'cliente', texto: 'Como funciona?', hora: '11:02' },
       { de: 'eu', texto: 'Vou te explicar por partes, tá bom?', hora: '11:03' },
-      { de: 'eu', texto: 'Primeiro, a gente analisa os seus empréstimos para ver se tem cobrança de juros abusivos.', hora: '11:03' },
+      { de: 'eu', texto: 'Primeiro, a gente analisa os seus empréstimos pessoais com as financeiras, para ver se tem cobrança de juros abusivos.', hora: '11:03' },
       { de: 'eu', texto: 'Ficou claro até aqui?', hora: '11:03' },
       { de: 'cliente', texto: 'Ficou sim, pode continuar!', hora: '11:05' },
     ],
@@ -742,13 +821,13 @@ const ERROS: Erro[] = [
     id: 'tudo', nome: 'Tudo de uma vez', contato: 'Seu Antônio',
     resumo: 'Fazer várias perguntas na mesma mensagem.',
     ruim: [
-      { de: 'eu', texto: 'Recebe benefício do INSS? Qual? Tem empréstimo em qual banco? Quanto desconta? Quer revisar ou fazer empréstimo? Tem senha do gov.br?', hora: '16:40' },
+      { de: 'eu', texto: 'Recebe benefício do INSS? Qual? Tem empréstimo pessoal em qual banco? Quanto paga por mês? Quer revisar ou fazer empréstimo? Tem senha do gov.br?', hora: '16:40' },
       { de: 'cliente', texto: 'Sou aposentado', hora: '16:47' },
     ],
     bom: [
       { de: 'eu', texto: 'O senhor recebe algum benefício do INSS?', hora: '16:40' },
       { de: 'cliente', texto: 'Sim, sou aposentado.', hora: '16:41' },
-      { de: 'eu', texto: 'Ótimo. E tem empréstimo em algum destes bancos: Agibank, BMG, Facta, Mercantil ou Crefisa?', hora: '16:41' },
+      { de: 'eu', texto: 'Ótimo. E o senhor tem empréstimo pessoal com algum destes bancos: Agibank, BMG, Facta, Mercantil ou Crefisa?', hora: '16:41' },
       { de: 'cliente', texto: 'Tenho no BMG.', hora: '16:43' },
     ],
     porque: 'O cliente responde uma (quase sempre a primeira) e as outras se perdem. Parece um formulário, não uma conversa. Repare no lado certo: como ele já disse “aposentado”, o atendente nem precisou perguntar qual é o benefício. Isso é escutar.',
@@ -783,7 +862,7 @@ export function ErrosClassicos() {
 const CHECK: { g: string; itens: string[] }[] = [
   { g: 'Antes de escrever', itens: ['Li a conversa inteira, inclusive as mensagens automáticas', 'Vi por qual canal o cliente veio (juros ou empréstimo)', 'Separei o que ele já respondeu (nome, CPF, respostas à IA)'] },
   { g: 'Apresentação', itens: ['Chamei o cliente pelo nome', 'Disse o meu nome e que sou da CAF', 'Mostrei que já recebi os dados, sem pedir de novo', 'No empréstimo: expliquei a “pré-aprovada” e pedi os extratos do Meu INSS'] },
-  { g: 'Qualificação', itens: ['Confirmei o benefício do INSS (dele ou de um familiar)', 'Perguntei qual é o benefício', 'Confirmei empréstimo em Agibank, BMG, Facta, Mercantil ou Crefisa', 'Entendi se ele quer revisar, um empréstimo ou os dois'] },
+  { g: 'Qualificação', itens: ['Confirmei o benefício do INSS (dele ou de um familiar)', 'Perguntei qual é o benefício', 'Confirmei empréstimo pessoal com Agibank, BMG, Facta, Mercantil ou Crefisa', 'Entendi se ele quer revisar, um empréstimo ou os dois'] },
   { g: 'Escuta', itens: ['Fiz pelo menos uma pergunta aberta', 'Descobri a dor e anotei com as palavras dele', 'Repeti o que entendi para confirmar'] },
   { g: 'Forma', itens: ['Uma pergunta por mensagem', 'Mensagens curtas e sem jargão', 'Áudio só quando ajuda: curto e com pergunta no final'] },
   { g: 'Saída', itens: ['Combinei o próximo passo, ou encerrei com carinho quem não é elegível', 'Não prometi valor nem resultado'] },

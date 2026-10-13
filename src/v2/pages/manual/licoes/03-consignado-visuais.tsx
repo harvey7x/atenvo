@@ -1,8 +1,9 @@
-/* Lição 3 — ilustrações próprias (prefixo mv-csg-): fluxo do dinheiro no
-   consignado, barra da margem, simulador de margem, ciclo do cartão RMC,
-   extrato de pagamento clicável, resumo da margem no extrato de consignado,
-   árvore "sem margem", portabilidade antes/depois, juros razoáveis × abusivos
-   e o mapa conceitual. Todos os valores são de EXEMPLO. Só tokens no cromo;
+/* Lição 3 — ilustrações do CONSIGNADO (prefixo mv-csg-): barra da margem,
+   simulador de margem, extrato de pagamento clicável, resumo da margem no
+   extrato de consignado, árvore "sem margem", portabilidade antes/depois e
+   juros razoáveis × abusivos (no empréstimo pessoal). As ilustrações da
+   DIFERENÇA consignado × pessoal ficam em 03-consignado-diferenca.tsx.
+   Valores e bancos (Banco A, Banco B) são de EXEMPLO. Só tokens no cromo;
    o documento do INSS ilustrado tem paleta própria e leva a tag Ilustração. */
 import { useState } from 'react';
 import { Figura, IcCheck, Print } from '../pecas';
@@ -12,11 +13,11 @@ const real = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', curre
 const real0 = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
 const menos = (v: number) => `− ${real(v)}`;
 
-type Tom = 'azul' | 'verde' | 'ambar' | 'rubro';
+export type Tom = 'azul' | 'verde' | 'ambar' | 'rubro';
 
 /* ------------------------------------------------------------ peças de SVG */
 /** Pontas de seta (uma por tom) para as linhas de cada desenho. */
-function Setas({ id }: { id: string }) {
+export function Setas({ id }: { id: string }) {
   const tons = ['n', 'azul', 'verde', 'ambar', 'rubro'] as const;
   return (
     <defs>
@@ -29,9 +30,9 @@ function Setas({ id }: { id: string }) {
   );
 }
 
-type Linha = { t: string; c?: 'k' | 'b' | 's' };
+export type Linha = { t: string; c?: 'k' | 'b' | 's' };
 /** Caixa com até 3 linhas centralizadas (k = rótulo pequeno, b = título, s = apoio). */
-function Caixa({ x, y, w, h, tom, linhas, tracejado }: { x: number; y: number; w: number; h: number; tom?: Tom; linhas: Linha[]; tracejado?: boolean }) {
+export function Caixa({ x, y, w, h, tom, linhas, tracejado }: { x: number; y: number; w: number; h: number; tom?: Tom; linhas: Linha[]; tracejado?: boolean }) {
   const alt = (c?: Linha['c']) => (c === 'k' ? 15 : c === 's' ? 16 : 18);
   const total = linhas.reduce((s, l) => s + alt(l.c), 0);
   let topo = y + h / 2 - total / 2;
@@ -49,55 +50,13 @@ function Caixa({ x, y, w, h, tom, linhas, tracejado }: { x: number; y: number; w
   );
 }
 
-/* ------------------------------------------------------------ 1. fluxo do dinheiro */
-export function FluxoDinheiro() {
-  const s = 'mv-csg-s1';
-  return (
-    <Figura tag="Diagrama" legenda="No empréstimo comum, o cliente recebe tudo e paga depois. No consignado, a parcela sai antes: só o que sobra cai na conta.">
-      <div className="mv-csg-rola">
-        <svg className="mv-csg-svg" viewBox="0 0 760 330" role="img"
-          aria-label="Comparação. Empréstimo comum: o INSS paga o benefício inteiro na conta do cliente, e o cliente paga a parcela ao banco por boleto ou débito. Consignado: o INSS desconta a parcela antes e manda direto ao banco; só o que sobra cai na conta do cliente.">
-          <Setas id={s} />
-          {/* faixa 1: empréstimo comum */}
-          <text className="mv-csg-tit" x={20} y={24}>Empréstimo comum</text>
-          <text className="mv-csg-t2" x={162} y={24}>o cliente recebe tudo e paga depois</text>
-          <Caixa x={20} y={40} w={160} h={58} linhas={[{ t: 'INSS' }, { t: 'paga o benefício', c: 's' }]} />
-          <Caixa x={300} y={40} w={160} h={58} linhas={[{ t: 'Conta do cliente' }, { t: 'recebe o valor inteiro', c: 's' }]} />
-          <Caixa x={580} y={40} w={160} h={58} linhas={[{ t: 'Banco' }, { t: 'recebe a parcela', c: 's' }]} />
-          <path className="mv-csg-fio" d="M180,69 H297" markerEnd={`url(#${s}-n)`} />
-          <text className="mv-csg-t2" x={240} y={61} textAnchor="middle">benefício inteiro</text>
-          <path className="mv-csg-fio" d="M460,69 H577" markerEnd={`url(#${s}-n)`} />
-          <text className="mv-csg-t2" x={520} y={61} textAnchor="middle">o cliente paga</text>
-          <text className="mv-csg-t3" x={520} y={87} textAnchor="middle">boleto ou débito</text>
-
-          <line className="mv-csg-div" x1={20} x2={740} y1={124} y2={124} />
-
-          {/* faixa 2: consignado */}
-          <text className="mv-csg-tit" x={20} y={154}>Consignado</text>
-          <text className="mv-csg-t2" x={112} y={154}>a parcela sai antes de o dinheiro cair na conta</text>
-          <Caixa x={20} y={214} w={160} h={58} linhas={[{ t: 'INSS' }, { t: 'paga o benefício', c: 's' }]} />
-          <path className="mv-csg-fio" d="M180,243 H320" />
-          <circle className="mv-csg-ponto" cx={320} cy={243} r={5} />
-          <text className="mv-csg-t3" x={250} y={266} textAnchor="middle">desconto automático</text>
-          <path className="mv-csg-fio" data-tom="azul" d="M320,243 C420,243 430,196 576,196" markerEnd={`url(#${s}-azul)`} />
-          <path className="mv-csg-fio" data-tom="verde" d="M320,243 C420,243 430,290 576,290" markerEnd={`url(#${s}-verde)`} />
-          <text className="mv-csg-t2" x={334} y={186}>1º a parcela vai para o banco</text>
-          <text className="mv-csg-t2" x={334} y={312}>2º só o resto cai na conta</text>
-          <Caixa x={580} y={168} w={160} h={56} tom="azul" linhas={[{ t: 'Banco' }, { t: 'recebe a parcela direto', c: 's' }]} />
-          <Caixa x={580} y={262} w={160} h={56} tom="verde" linhas={[{ t: 'Conta do cliente' }, { t: 'recebe só o que sobra', c: 's' }]} />
-        </svg>
-      </div>
-    </Figura>
-  );
-}
-
-/* ------------------------------------------------------------ 2. barra da margem */
+/* ------------------------------------------------------------ 1. barra da margem */
 export function BarraMargem() {
   return (
-    <Figura tag="Exemplo" legenda="As gavetas da margem num benefício de exemplo de R$ 2.000. Cada gaveta só aceita o seu tipo de desconto.">
+    <Figura tag="Exemplo" legenda="As gavetas da margem consignável num benefício de exemplo de R$ 2.000. Cada gaveta só aceita o seu tipo de desconto. O empréstimo pessoal não entra nesta barra: ele não usa a margem.">
       <div className="mv-csg-rola">
         <svg className="mv-csg-svg" viewBox="0 0 760 200" role="img"
-          aria-label="Barra de um benefício de exemplo de 2 mil reais: 55%, 1.100 reais, fica protegido com o cliente; 35%, 700 reais, é a margem para empréstimos; 5%, 100 reais, para o cartão RMC; 5%, 100 reais, para o cartão RCC. A margem consignável soma 45%, 900 reais.">
+          aria-label="Barra de um benefício de exemplo de 2 mil reais: 55%, 1.100 reais, fica protegido com o cliente; 35%, 700 reais, é a margem para empréstimos consignados; 5%, 100 reais, para o cartão RMC; 5%, 100 reais, para o cartão RCC. A margem consignável soma 45%, 900 reais.">
           <text className="mv-csg-tit" x={20} y={22}>Benefício de exemplo: R$ 2.000 por mês</text>
           <path className="mv-csg-chave" d="M416,56 V46 H740 V56" />
           <text className="mv-csg-tx-b" x={578} y={36} textAnchor="middle">Margem consignável: 45% = R$ 900</text>
@@ -108,7 +67,7 @@ export function BarraMargem() {
 
           <rect className="mv-csg-seg" data-tom="azul" x={418} y={62} width={248} height={58} rx={6} />
           <text className="mv-csg-seg-t" x={542} y={87} textAnchor="middle">35% · R$ 700</text>
-          <text className="mv-csg-tx-s" x={542} y={106} textAnchor="middle">gaveta dos empréstimos</text>
+          <text className="mv-csg-tx-s" x={542} y={106} textAnchor="middle">gaveta dos consignados</text>
 
           <rect className="mv-csg-seg" data-tom="ambar" x={668} y={62} width={34} height={58} rx={4} />
           <rect className="mv-csg-seg" data-tom="ambar2" x={705} y={62} width={35} height={58} rx={4} />
@@ -126,7 +85,7 @@ export function BarraMargem() {
   );
 }
 
-/* ------------------------------------------------------------ 3. simulador de margem */
+/* ------------------------------------------------------------ 2. simulador de margem */
 export function SimuladorMargem() {
   const [beneficio, setBeneficio] = useState(2000);
   const [parcelas, setParcelas] = useState(450);
@@ -157,7 +116,7 @@ export function SimuladorMargem() {
             onChange={(e) => mudarBeneficio(Number(e.target.value))} />
         </div>
         <div className="mv-csg-sim-campo">
-          <label htmlFor="mv-csg-parc">Parcelas de empréstimo que já paga</label>
+          <label htmlFor="mv-csg-parc">Parcelas de consignado que já paga</label>
           <b className="num">{real0(usado)} <small>por mês</small></b>
           <input id="mv-csg-parc" type="range" min={0} max={gaveta} step={5} value={usado}
             onChange={(e) => setParcelas(Number(e.target.value))} />
@@ -187,7 +146,7 @@ export function SimuladorMargem() {
       </div>
       <ul className="mv-csg-sim-leg">
         <li><i data-seg="prot" />Protegido (55%): <b className="num">{real0(beneficio - gaveta - 2 * cartao)}</b></li>
-        <li><i data-seg="usado" />Empréstimos em uso: <b className="num">{real0(usado)}</b></li>
+        <li><i data-seg="usado" />Consignados em uso: <b className="num">{real0(usado)}</b></li>
         <li><i data-seg="livre" />Margem livre: <b className="num">{real0(livre)}</b></li>
         <li><i data-seg="rmc" data-on={rmc ? '' : undefined} />RMC (5%): <b className="num">{real0(cartao)}</b> {rmc ? 'em uso' : 'livre'}</li>
         <li><i data-seg="rcc" data-on={rcc ? '' : undefined} />RCC (5%): <b className="num">{real0(cartao)}</b> {rcc ? 'em uso' : 'livre'}</li>
@@ -199,64 +158,42 @@ export function SimuladorMargem() {
 
       <div className="mv-csg-sim-res" data-tom={estado === 'sem' ? 'rubro' : estado === 'quase' ? 'ambar' : 'verde'} role="status">
         {estado === 'sem' && (
-          <><b>Sem margem para empréstimo.</b> As parcelas já ocupam a gaveta inteira dos 35% ({real0(gaveta)}). Um empréstimo
-            novo não cabe. É a hora de explicar com calma e apresentar os caminhos: aumento de margem, portabilidade e o processo.</>
+          <><b>Sem margem para consignado novo.</b> As parcelas já ocupam a gaveta inteira dos 35% ({real0(gaveta)}). Um
+            consignado novo não cabe. É a hora de explicar com calma, apresentar os ganchos (aumento de margem e portabilidade)
+            e perguntar se o cliente tem empréstimo pessoal numa das 5 financeiras.</>
         )}
         {estado === 'quase' && (
           <><b>Quase sem margem: sobram {real0(livre)} por mês.</b> Cabe só uma parcela muito pequena. Na prática, a conversa
             costuma ser a mesma de quem está sem margem.</>
         )}
         {estado === 'com' && (
-          <><b>Tem margem livre: {real0(livre)} por mês.</b> Em tese, cabe uma parcela nova de até esse valor. Quem decide a
-            liberação é sempre o banco.</>
+          <><b>Tem margem livre: {real0(livre)} por mês.</b> Em tese, cabe uma parcela nova de consignado de até esse valor.
+            Quem decide a liberação é sempre o banco.</>
         )}
         {(!rmc || !rcc) && (
           <small>Gaveta de cartão livre não vira empréstimo: os 5% do RMC e os 5% do RCC só servem para cartão.</small>
         )}
+        <small>O empréstimo pessoal não entra nesta conta: ele é cobrado pela financeira, fora do INSS, e não usa a margem.</small>
       </div>
     </div>
   );
 }
 
-/* ------------------------------------------------------------ 4. ciclo do cartão RMC */
-export function CicloRmc() {
-  const s = 'mv-csg-s4';
-  return (
-    <Figura tag="Diagrama" legenda="Em linhas gerais, o ciclo do cartão consignado: se o restante da fatura não for pago à parte, a dívida continua e o desconto segue, mês após mês.">
-      <div className="mv-csg-rola">
-        <svg className="mv-csg-svg" viewBox="0 0 760 186" role="img"
-          aria-label="Ciclo do cartão RMC: o cliente faz um saque ou compra no cartão consignado; chega a fatura do mês; o INSS desconta do benefício só uma parte da fatura, o mínimo; o que falta pagar segue rendendo juros de cartão; e no mês seguinte o ciclo se repete.">
-          <Setas id={s} />
-          <Caixa x={10} y={26} w={170} h={80} linhas={[{ t: 'Saque ou compra' }, { t: 'no cartão consignado', c: 's' }]} />
-          <Caixa x={202} y={26} w={170} h={80} linhas={[{ t: 'Chega a fatura' }, { t: 'do mês', c: 's' }]} />
-          <Caixa x={394} y={26} w={180} h={80} tom="ambar" linhas={[{ t: 'O INSS desconta' }, { t: 'uma parte da fatura', c: 's' }, { t: '(o mínimo)', c: 's' }]} />
-          <Caixa x={596} y={26} w={154} h={80} tom="rubro" linhas={[{ t: 'O que falta pagar' }, { t: 'segue rendendo', c: 's' }, { t: 'juros de cartão', c: 's' }]} />
-          <path className="mv-csg-fio" d="M180,66 H199" markerEnd={`url(#${s}-n)`} />
-          <path className="mv-csg-fio" d="M372,66 H391" markerEnd={`url(#${s}-n)`} />
-          <path className="mv-csg-fio" d="M574,66 H593" markerEnd={`url(#${s}-n)`} />
-          <path className="mv-csg-fio" data-tom="rubro" d="M673,106 V140 H287 V109" markerEnd={`url(#${s}-rubro)`} />
-          <text className="mv-csg-t2" x={480} y={166} textAnchor="middle">todo mês o ciclo se repete: por isso o desconto pode durar muito tempo</text>
-        </svg>
-      </div>
-    </Figura>
-  );
-}
-
-/* ------------------------------------------------------------ 5. extrato de pagamento clicável */
+/* ------------------------------------------------------------ 3. extrato de pagamento clicável */
 type Chave = 'comp' | 'bruto' | 'emp' | 'rmc' | 'rcc' | 'tot' | 'liq';
 const ORDEM: Chave[] = ['comp', 'bruto', 'emp', 'rmc', 'rcc', 'tot', 'liq'];
 const EXPLICA: Record<Chave, { titulo: string; texto: string }> = {
   comp: {
     titulo: 'Competência',
-    texto: 'É o mês a que aquele pagamento se refere. O extrato que você baixa do Meu INSS traz um bloco como este para cada mês do período. Com 10 anos de extratos, dá para ver, mês a mês, cada desconto feito no benefício.',
+    texto: 'É o mês a que aquele pagamento se refere. O extrato que você baixa do Meu INSS traz um bloco como este para cada mês do período.',
   },
   bruto: {
     titulo: 'Valor do benefício (bruto)',
-    texto: 'É quanto o benefício vale antes de qualquer desconto. É a partir dele que se entende a margem: 35% para empréstimos, 5% para o cartão RMC e 5% para o cartão RCC.',
+    texto: 'É quanto o benefício vale antes de qualquer desconto. É a partir dele que se entende a margem: 35% para empréstimos consignados, 5% para o cartão RMC e 5% para o cartão RCC.',
   },
   emp: {
     titulo: 'Empréstimos consignados',
-    texto: 'Cada contrato aparece numa linha, com o nome do banco e o valor da parcela do mês. Aqui são três: Agibank, Mercantil e BMG. Anote sempre os bancos: aparece Agibank, BMG, Facta, Mercantil ou Crefisa? São as financeiras com que trabalhamos.',
+    texto: 'Cada consignado aparece numa linha, com o nome do banco e o valor da parcela do mês. Aqui são três: Banco A, Banco B e BMG. Atenção: tudo o que está neste extrato foi descontado pelo INSS, então é consignado. O empréstimo pessoal não aparece como desconto do INSS.',
   },
   rmc: {
     titulo: 'Cartão de crédito consignado (RMC)',
@@ -272,18 +209,18 @@ const EXPLICA: Record<Chave, { titulo: string; texto: string }> = {
   },
   liq: {
     titulo: 'Valor líquido',
-    texto: 'O que de fato caiu na conta: R$ 1.100. É com esse dinheiro que a Dona Lúcia paga comida, remédio e as contas do mês. É esse peso que o cliente sente no dia a dia.',
+    texto: 'O que de fato caiu na conta: R$ 1.100. É com esse dinheiro que a Dona Lúcia paga comida, remédio e as contas do mês. Se ela tiver um empréstimo pessoal cobrado em débito automático, a parcela sai depois, desta conta, e não como desconto do INSS.',
   },
 };
 type LinhaExt = { chave: Chave; rotulo: string; valor: string; tipo: 'info' | 'cred' | 'desc' | 'tot' | 'liq' };
 const LINHAS: LinhaExt[] = [
   { chave: 'comp', rotulo: 'Competência', valor: '09/2026', tipo: 'info' },
   { chave: 'bruto', rotulo: 'Valor do benefício (bruto)', valor: real(2000), tipo: 'cred' },
-  { chave: 'emp', rotulo: 'Empréstimo consignado · Agibank', valor: menos(310), tipo: 'desc' },
-  { chave: 'emp', rotulo: 'Empréstimo consignado · Mercantil', valor: menos(240), tipo: 'desc' },
+  { chave: 'emp', rotulo: 'Empréstimo consignado · Banco A', valor: menos(310), tipo: 'desc' },
+  { chave: 'emp', rotulo: 'Empréstimo consignado · Banco B', valor: menos(240), tipo: 'desc' },
   { chave: 'emp', rotulo: 'Empréstimo consignado · BMG', valor: menos(150), tipo: 'desc' },
   { chave: 'rmc', rotulo: 'Cartão de crédito consignado (RMC) · BMG', valor: menos(100), tipo: 'desc' },
-  { chave: 'rcc', rotulo: 'Cartão consignado de benefício (RCC) · Agibank', valor: menos(100), tipo: 'desc' },
+  { chave: 'rcc', rotulo: 'Cartão consignado de benefício (RCC) · Banco A', valor: menos(100), tipo: 'desc' },
   { chave: 'tot', rotulo: 'Total de descontos', valor: menos(900), tipo: 'tot' },
   { chave: 'liq', rotulo: 'Valor líquido (creditado na conta)', valor: real(1100), tipo: 'liq' },
 ];
@@ -335,32 +272,32 @@ export function ExtratoInterativo() {
           </button>
           {soma && (
             <div className="mv-csg-soma num">
-              R$ 310 + R$ 240 + R$ 150 = <b>R$ 700</b>, exatamente 35% de R$ 2.000. A gaveta dos empréstimos está
-              cheia: a Dona Lúcia está <b>sem margem</b> para um empréstimo novo.
+              R$ 310 + R$ 240 + R$ 150 = <b>R$ 700</b>, exatamente 35% de R$ 2.000. A gaveta dos consignados está
+              cheia: a Dona Lúcia está <b>sem margem</b> para um consignado novo.
             </div>
           )}
         </div>
       </div>
       <figcaption>
         <span className="mv-tag">Ilustração</span>
-        Exemplo fictício para treino. No documento real, os nomes das linhas podem vir abreviados e com códigos.
+        Exemplo fictício para treino (Banco A e Banco B são genéricos). No documento real, os nomes das linhas podem vir abreviados e com códigos.
       </figcaption>
     </figure>
   );
 }
 
-/* ------------------------------------------------------------ 6. resumo da margem (extrato de consignado) */
+/* ------------------------------------------------------------ 4. resumo da margem (extrato de consignado) */
 export function PrintMargem() {
   const contratos = [
-    { b: 'Agibank', t: 'Empréstimo', v: 310 },
-    { b: 'Mercantil', t: 'Empréstimo', v: 240 },
+    { b: 'Banco A', t: 'Empréstimo', v: 310 },
+    { b: 'Banco B', t: 'Empréstimo', v: 240 },
     { b: 'BMG', t: 'Empréstimo', v: 150 },
     { b: 'BMG', t: 'Cartão (RMC)', v: 100 },
-    { b: 'Agibank', t: 'Cartão (RCC)', v: 100 },
+    { b: 'Banco A', t: 'Cartão (RCC)', v: 100 },
   ];
   return (
     <Print endereco="meu.inss.gov.br › extrato de empréstimo consignado"
-      legenda="Versão simplificada para treino. No documento real a arrumação e os nomes mudam: procure a parte da margem e a lista de contratos.">
+      legenda="Versão simplificada para treino. No documento real a arrumação e os nomes mudam: procure a parte da margem e a lista de contratos consignados.">
       <div className="mvp-app">
         <div className="mvp-topo"><b>Extrato de Empréstimo Consignado</b><span>Lúcia (exemplo)</span></div>
         <div className="mv-csg-mg">
@@ -389,19 +326,19 @@ export function PrintMargem() {
   );
 }
 
-/* ------------------------------------------------------------ 7. árvore do cliente sem margem */
+/* ------------------------------------------------------------ 5. árvore do cliente sem margem */
 export function ArvoreSemMargem() {
   const s = 'mv-csg-s7';
   return (
-    <Figura tag="Diagrama" legenda="O caminho da conversa no canal de empréstimo. Os caminhos são sempre apresentados como possibilidade, nunca como promessa.">
+    <Figura tag="Diagrama" legenda="O caminho da conversa no canal de empréstimo: primeiro o consignado (margem e ganchos), depois o empréstimo pessoal (a revisão). Tudo como possibilidade, nunca como promessa.">
       <div className="mv-csg-rola">
         <svg className="mv-csg-svg" viewBox="0 0 760 524" role="img"
-          aria-label="Árvore de decisão. O cliente do canal de empréstimo quer dinheiro. Tem margem livre, conferindo no extrato de consignado? Se sim, combine com o gestor o próximo passo. Se não, explique com calma que a gaveta dos 35% está cheia e apresente as possibilidades, como análise: aumento de margem e portabilidade. Depois: aparece desconto de uma das 5 financeiras? Se o cliente não sabe, pergunte de novo uma vez e, se seguir sem saber, siga em frente. Se sim, apresente o processo de juros abusivos: pedir de volta o que foi descontado nos últimos 10 anos. Se não, o cliente não é elegível ao processo: agradeça e encerre sem insistir.">
+          aria-label="Árvore de decisão. O cliente do canal de empréstimo quer um consignado novo. Tem margem livre, conferindo no extrato de consignado? Se sim, combine com o gestor o próximo passo; a revisão do empréstimo pessoal também pode valer. Se não, explique com calma que a gaveta dos 35% está cheia e apresente os ganchos, como possibilidade: aumento de margem e portabilidade dos consignados. Depois: tem empréstimo pessoal numa das 5 financeiras? Se o cliente não sabe, explique a diferença e pergunte de novo uma vez; se seguir sem saber, siga em frente. Se sim, apresente a revisão dos juros do empréstimo pessoal: o ressarcimento do que foi descontado nos últimos 10 anos. Se não, o cliente não é elegível ao processo: agradeça e encerre sem insistir.">
           <Setas id={s} />
-          <Caixa x={130} y={14} w={340} h={48} linhas={[{ t: 'Cliente do canal de empréstimo' }, { t: 'quer dinheiro rápido', c: 's' }]} />
+          <Caixa x={130} y={14} w={340} h={48} linhas={[{ t: 'Cliente do canal de empréstimo' }, { t: 'quer um consignado novo', c: 's' }]} />
           <path className="mv-csg-fio" d="M300,62 V77" markerEnd={`url(#${s}-n)`} />
 
-          <polygon className="mv-csg-cx" points="300,80 430,122 300,164 170,122" />
+          <polygon className="mv-csg-cx" data-tom="azul" points="300,80 430,122 300,164 170,122" />
           <text className="mv-csg-tx-b" x={300} y={120} textAnchor="middle">Tem margem livre?</text>
           <text className="mv-csg-tx-s" x={300} y={137} textAnchor="middle">(extrato de consignado)</text>
 
@@ -413,32 +350,34 @@ export function ArvoreSemMargem() {
           <text className="mv-csg-t2" x={310} y={180}>Não</text>
           <Caixa x={100} y={190} w={400} h={48} linhas={[{ t: 'Explique com calma: a gaveta dos 35% está cheia' }, { t: 'use o exemplo das gavetas e mostre o extrato', c: 's' }]} />
           <path className="mv-csg-fio" d="M300,238 V253" markerEnd={`url(#${s}-n)`} />
-          <Caixa x={100} y={256} w={400} h={50} tom="ambar" linhas={[{ t: 'Apresente as possibilidades, como análise' }, { t: 'aumento de margem · portabilidade (pode liberar troco)', c: 's' }]} />
+          <Caixa x={100} y={256} w={400} h={50} tom="azul" linhas={[{ t: 'Apresente os ganchos, como possibilidade' }, { t: 'aumento de margem · portabilidade dos consignados', c: 's' }]} />
           <path className="mv-csg-fio" d="M300,306 V323" markerEnd={`url(#${s}-n)`} />
 
-          {/* com margem, o processo também pode valer */}
+          {/* com margem, a revisão do pessoal também pode valer */}
           <path className="mv-csg-fio" d="M630,148 V316 H300" />
           <circle className="mv-csg-ponto" cx={300} cy={316} r={3.5} />
-          <text className="mv-csg-t3" x={640} y={226}>o processo</text>
-          <text className="mv-csg-t3" x={640} y={242}>também vale</text>
+          <text className="mv-csg-t3" x={640} y={214}>a revisão do</text>
+          <text className="mv-csg-t3" x={640} y={230}>pessoal também</text>
+          <text className="mv-csg-t3" x={640} y={246}>pode valer</text>
 
-          <polygon className="mv-csg-cx" points="300,326 450,372 300,418 150,372" />
-          <text className="mv-csg-tx-b" x={300} y={368} textAnchor="middle">Desconto de uma das</text>
-          <text className="mv-csg-tx-b" x={300} y={385} textAnchor="middle">5 financeiras?</text>
-          <rect className="mv-csg-cx" data-tracejado="" x={6} y={334} width={136} height={76} rx={8} />
-          <path className="mv-csg-fio" d="M142,372 H150" />
-          <text className="mv-csg-t3" x={14} y={350}>Não sabe?</text>
-          <text className="mv-csg-t3" x={14} y={366}>Pergunte de novo</text>
-          <text className="mv-csg-t3" x={14} y={382}>uma vez. Se seguir</text>
-          <text className="mv-csg-t3" x={14} y={398}>sem saber, siga.</text>
+          <polygon className="mv-csg-cx" data-tom="ambar" points="300,326 440,372 300,418 160,372" />
+          <text className="mv-csg-tx-b" x={300} y={367} textAnchor="middle">Tem empréstimo pessoal</text>
+          <text className="mv-csg-tx-b" x={300} y={384} textAnchor="middle">numa das 5 financeiras?</text>
+          <rect className="mv-csg-cx" data-tracejado="" x={6} y={330} width={146} height={84} rx={8} />
+          <path className="mv-csg-fio" d="M152,372 H160" />
+          <text className="mv-csg-t3" x={14} y={346}>Não sabe? Explique</text>
+          <text className="mv-csg-t3" x={14} y={361}>a diferença e</text>
+          <text className="mv-csg-t3" x={14} y={376}>pergunte de novo</text>
+          <text className="mv-csg-t3" x={14} y={391}>uma vez. Se seguir</text>
+          <text className="mv-csg-t3" x={14} y={406}>sem saber, siga.</text>
 
-          <path className="mv-csg-fio" d="M450,372 H517" markerEnd={`url(#${s}-n)`} />
-          <text className="mv-csg-t2" x={484} y={364} textAnchor="middle">Não</text>
+          <path className="mv-csg-fio" d="M440,372 H517" markerEnd={`url(#${s}-n)`} />
+          <text className="mv-csg-t2" x={478} y={364} textAnchor="middle">Não</text>
           <Caixa x={520} y={346} w={220} h={52} tom="rubro" linhas={[{ t: 'Não elegível ao processo' }, { t: 'agradeça e encerre sem insistir', c: 's' }]} />
 
           <path className="mv-csg-fio" d="M300,418 V439" markerEnd={`url(#${s}-n)`} />
           <text className="mv-csg-t2" x={310} y={433}>Sim</text>
-          <Caixa x={100} y={442} w={400} h={50} tom="verde" linhas={[{ t: 'Apresente o processo de juros abusivos' }, { t: 'pedir de volta o que foi descontado nos últimos 10 anos', c: 's' }]} />
+          <Caixa x={100} y={442} w={400} h={50} tom="verde" linhas={[{ t: 'Apresente a revisão dos juros do pessoal' }, { t: 'ressarcimento do que foi descontado nos últimos 10 anos', c: 's' }]} />
 
           <text className="mv-csg-t2" x={380} y={514} textAnchor="middle">Em todos os caminhos: nada de promessa de valor ou de resultado.</text>
         </svg>
@@ -447,14 +386,14 @@ export function ArvoreSemMargem() {
   );
 }
 
-/* ------------------------------------------------------------ 8. portabilidade: antes e depois */
+/* ------------------------------------------------------------ 6. portabilidade: antes e depois */
 export function PortabilidadeAntesDepois() {
   const s = 'mv-csg-s8';
   return (
-    <Figura tag="Exemplo" legenda="Portabilidade em três tempos. Banco A e Banco B são genéricos; a parcela é só um exemplo.">
+    <Figura tag="Exemplo" legenda="Portabilidade de um consignado em três tempos. Banco A e Banco B são genéricos; a parcela é só um exemplo.">
       <div className="mv-csg-rola">
         <svg className="mv-csg-svg" viewBox="0 0 760 290" role="img"
-          aria-label="Portabilidade. Antes: o contrato está no Banco A, com parcela de exemplo de 310 reais e um saldo devedor, ocupando espaço na margem. A troca: o Banco B paga ao Banco A o saldo devedor, e o cliente não tira dinheiro do bolso. Depois: o contrato novo fica no Banco B, com a nova parcela no mesmo espaço da margem, e pode haver um troco liberado ao cliente, que só a análise confirma.">
+          aria-label="Portabilidade de um consignado. Antes: o contrato consignado está no Banco A, com parcela de exemplo de 310 reais e um saldo devedor, ocupando espaço na margem. A troca: o Banco B paga ao Banco A o saldo devedor, e o cliente não tira dinheiro do bolso. Depois: o contrato novo fica no Banco B, com a nova parcela no mesmo espaço da margem, e pode haver um troco liberado ao cliente, que só a análise confirma.">
           <Setas id={s} />
           <text className="mv-csg-tx-k" x={115} y={20} textAnchor="middle">1 · ANTES</text>
           <text className="mv-csg-tx-k" x={380} y={20} textAnchor="middle">2 · A TROCA</text>
@@ -464,7 +403,7 @@ export function PortabilidadeAntesDepois() {
           <rect className="mv-csg-cx" x={10} y={32} width={210} height={180} rx={12} />
           <text className="mv-csg-tx-b" x={115} y={57} textAnchor="middle">Banco A</text>
           <line className="mv-csg-div" x1={26} x2={204} y1={70} y2={70} />
-          <text className="mv-csg-tx-s" x={115} y={93} textAnchor="middle">Contrato de empréstimo</text>
+          <text className="mv-csg-tx-s" x={115} y={93} textAnchor="middle">Contrato consignado</text>
           <text className="mv-csg-tx-b" x={115} y={118} textAnchor="middle">Parcela: R$ 310 por mês</text>
           <text className="mv-csg-tx-s" x={115} y={140} textAnchor="middle">Saldo devedor: o que falta</text>
           <Caixa x={24} y={156} w={182} h={40} tom="azul" linhas={[{ t: 'ocupa espaço na margem', c: 's' }]} />
@@ -486,7 +425,7 @@ export function PortabilidadeAntesDepois() {
           <rect className="mv-csg-cx" data-tom="verde" x={540} y={32} width={210} height={180} rx={12} />
           <text className="mv-csg-tx-b" x={645} y={57} textAnchor="middle">Banco B</text>
           <line className="mv-csg-div" x1={556} x2={734} y1={70} y2={70} />
-          <text className="mv-csg-tx-s" x={645} y={93} textAnchor="middle">Contrato novo</text>
+          <text className="mv-csg-tx-s" x={645} y={93} textAnchor="middle">Contrato consignado novo</text>
           <text className="mv-csg-tx-b" x={645} y={116} textAnchor="middle">Nova parcela</text>
           <text className="mv-csg-tx-s" x={645} y={134} textAnchor="middle">no mesmo espaço da margem</text>
           <Caixa x={560} y={148} w={170} h={50} tom="verde" tracejado linhas={[{ t: 'Possível troco' }, { t: 'só a análise confirma', c: 's' }]} />
@@ -498,20 +437,20 @@ export function PortabilidadeAntesDepois() {
   );
 }
 
-/* ------------------------------------------------------------ 9. juros razoáveis × abusivos */
+/* ------------------------------------------------------------ 7. juros razoáveis × abusivos (empréstimo pessoal) */
 export function JurosRazoavelAbusivo() {
   return (
-    <Figura tag="Ideia simplificada" legenda="A ideia geral, sem números: o desenho não representa nenhum caso real.">
+    <Figura tag="Ideia simplificada" legenda="A ideia geral, sem números, num empréstimo pessoal: o desenho não representa nenhum caso real.">
       <div className="mv-csg-rola">
         <svg className="mv-csg-svg" viewBox="0 0 760 240" role="img"
-          aria-label="Duas barras. Empréstimo com juros razoáveis: valor emprestado mais juros. Empréstimo com juros abusivos: valor emprestado, mais juros razoáveis, mais uma parte grande cobrada a mais. Essa parte que passou muito do razoável é o que pesa a mais no benefício todo mês.">
-          <text className="mv-csg-tx-b" x={20} y={30}>Empréstimo com juros razoáveis</text>
+          aria-label="Duas barras. Empréstimo pessoal com juros razoáveis: valor emprestado mais juros. Empréstimo pessoal com juros abusivos: valor emprestado, mais juros razoáveis, mais uma parte grande cobrada a mais. Essa parte que passou muito do razoável é o que pesa a mais no orçamento do cliente, todo mês.">
+          <text className="mv-csg-tx-b" x={20} y={30}>Empréstimo pessoal com juros razoáveis</text>
           <rect className="mv-csg-seg" data-tom="neutro" x={20} y={42} width={280} height={40} rx={6} />
           <text className="mv-csg-seg-t" x={160} y={67} textAnchor="middle">Valor emprestado</text>
           <rect className="mv-csg-seg" data-tom="azul" x={302} y={42} width={150} height={40} rx={6} />
           <text className="mv-csg-seg-t" x={377} y={67} textAnchor="middle">Juros</text>
 
-          <text className="mv-csg-tx-b" x={20} y={118}>Empréstimo com juros abusivos</text>
+          <text className="mv-csg-tx-b" x={20} y={118}>Empréstimo pessoal com juros abusivos</text>
           <rect className="mv-csg-seg" data-tom="neutro" x={20} y={130} width={280} height={40} rx={6} />
           <text className="mv-csg-seg-t" x={160} y={155} textAnchor="middle">Valor emprestado</text>
           <rect className="mv-csg-seg" data-tom="azul" x={302} y={130} width={150} height={40} rx={6} />
@@ -523,67 +462,7 @@ export function JurosRazoavelAbusivo() {
           <text className="mv-csg-t2" x={464} y={67}>até aqui, o razoável</text>
           <path className="mv-csg-chave" data-tom="rubro" d="M454,180 V188 H720 V180" />
           <text className="mv-csg-tx-b mv-csg-cor" data-tom="rubro" x={587} y={208} textAnchor="middle">A parte que passou muito do razoável</text>
-          <text className="mv-csg-tx-s" x={587} y={226} textAnchor="middle">é o que pesa a mais no benefício, todo mês</text>
-        </svg>
-      </div>
-    </Figura>
-  );
-}
-
-/* ------------------------------------------------------------ 10. mapa conceitual */
-export function MapaConsignado() {
-  const s = 'mv-csg-s10';
-  return (
-    <Figura tag="Mapa" legenda="O mapa da lição: o consignado no centro, e de cada ideia sai a próxima. Leia de cima para baixo, coluna por coluna.">
-      <div className="mv-csg-rola">
-        <svg className="mv-csg-svg" viewBox="0 0 760 470" role="img"
-          aria-label="Mapa conceitual. Consignado do INSS. Como funciona: desconto direto no benefício, que aparece no extrato de pagamento, cada desconto mês a mês; juntamos 10 anos de extratos, a base do processo. O limite: margem consignável de 45%, dividida em 35% para empréstimos, 5% RMC e 5% RCC; quando os 35% enchem, a gaveta fica cheia e o cliente fica sem margem; aí entram os caminhos, sempre como análise: aumento de margem e portabilidade. O problema: juros abusivos, quer dizer cobrança muito acima do que seria razoável, o que dá direito a pedir de volta: o nosso processo, que vale com ou sem margem.">
-          <Setas id={s} />
-          <rect className="mv-csg-centro" x={270} y={12} width={220} height={48} rx={12} />
-          <text className="mv-csg-centro-t" x={380} y={41} textAnchor="middle">Consignado do INSS</text>
-          <path className="mv-csg-fio" d="M380,60 C380,84 130,80 130,103" markerEnd={`url(#${s}-n)`} />
-          <path className="mv-csg-fio" d="M380,60 V103" markerEnd={`url(#${s}-n)`} />
-          <path className="mv-csg-fio" d="M380,60 C380,84 630,80 630,103" markerEnd={`url(#${s}-n)`} />
-
-          {/* linha 1 */}
-          <Caixa x={20} y={106} w={220} h={54} tom="azul" linhas={[{ t: 'COMO FUNCIONA', c: 'k' }, { t: 'Desconto direto' }, { t: 'no benefício', c: 's' }]} />
-          <Caixa x={270} y={106} w={220} h={54} tom="ambar" linhas={[{ t: 'O LIMITE', c: 'k' }, { t: 'Margem consignável' }, { t: 'até 45% do benefício', c: 's' }]} />
-          <Caixa x={520} y={106} w={220} h={54} tom="rubro" linhas={[{ t: 'O PROBLEMA', c: 'k' }, { t: 'Juros abusivos' }, { t: 'o que o processo questiona', c: 's' }]} />
-
-          <path className="mv-csg-fio" d="M130,160 V203" markerEnd={`url(#${s}-n)`} />
-          <text className="mv-csg-t3" x={138} y={186}>aparece no</text>
-          <path className="mv-csg-fio" d="M380,160 V203" markerEnd={`url(#${s}-n)`} />
-          <text className="mv-csg-t3" x={388} y={186}>dividida em</text>
-          <path className="mv-csg-fio" d="M630,160 V203" markerEnd={`url(#${s}-n)`} />
-          <text className="mv-csg-t3" x={638} y={186}>quer dizer</text>
-
-          {/* linha 2 */}
-          <Caixa x={20} y={206} w={220} h={52} linhas={[{ t: 'Extrato de pagamento' }, { t: 'cada desconto, mês a mês', c: 's' }]} />
-          <Caixa x={270} y={206} w={104} h={52} tom="azul" linhas={[{ t: '35%' }, { t: 'empréstimos', c: 's' }]} />
-          <Caixa x={380} y={206} w={52} h={52} tom="ambar" linhas={[{ t: '5%' }, { t: 'RMC', c: 's' }]} />
-          <Caixa x={438} y={206} w={52} h={52} tom="ambar" linhas={[{ t: '5%' }, { t: 'RCC', c: 's' }]} />
-          <Caixa x={520} y={206} w={220} h={52} tom="rubro" linhas={[{ t: 'Cobrança muito acima' }, { t: 'do que seria razoável', c: 's' }]} />
-
-          <path className="mv-csg-fio" d="M130,258 V301" markerEnd={`url(#${s}-n)`} />
-          <text className="mv-csg-t3" x={138} y={284}>juntamos</text>
-          <path className="mv-csg-fio" d="M322,258 C322,282 380,278 380,301" markerEnd={`url(#${s}-n)`} />
-          <text className="mv-csg-t3" x={390} y={284}>quando enche</text>
-          <path className="mv-csg-fio" d="M630,258 V301" markerEnd={`url(#${s}-n)`} />
-          <text className="mv-csg-t3" x={638} y={284}>dá direito a</text>
-
-          {/* linha 3 */}
-          <Caixa x={20} y={304} w={220} h={52} linhas={[{ t: '10 anos de extratos' }, { t: 'a base do processo', c: 's' }]} />
-          <Caixa x={270} y={304} w={220} h={52} tom="rubro" linhas={[{ t: 'Gaveta cheia' }, { t: 'cliente sem margem', c: 's' }]} />
-          <Caixa x={520} y={304} w={220} h={52} tom="verde" linhas={[{ t: 'Pedir de volta' }, { t: 'o nosso processo', c: 's' }]} />
-
-          <path className="mv-csg-fio" d="M380,356 V399" markerEnd={`url(#${s}-n)`} />
-          <text className="mv-csg-t3" x={388} y={382}>aí entram</text>
-
-          {/* linha 4 */}
-          <Caixa x={256} y={402} w={248} h={52} tom="ambar" linhas={[{ t: 'Caminhos (sempre análise)' }, { t: 'aumento de margem · portabilidade', c: 's' }]} />
-          <path className="mv-csg-fio" data-tom="verde" d="M504,428 C596,428 630,404 630,359" markerEnd={`url(#${s}-verde)`} />
-          <text className="mv-csg-t3" x={636} y={398}>o processo vale</text>
-          <text className="mv-csg-t3" x={636} y={414}>com ou sem margem</text>
+          <text className="mv-csg-tx-s" x={587} y={226} textAnchor="middle">é o que pesa a mais no orçamento, todo mês</text>
         </svg>
       </div>
     </Figura>

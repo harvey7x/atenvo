@@ -5,14 +5,16 @@
    perguntas abertas × fechadas, escuta ativa da dor, texto × áudio, situações
    comuns e erros clássicos. Esta lição é a DONA de "assumir a conversa"; os
    canais e o fluxo do robô estão na lição 5, a elegibilidade na lição 4.
-   Fatos da empresa: só os do brief. Mensagens do atendente são sugestões de
-   roteiro. Ilustrações próprias em 06-primeiro-contato-figuras.tsx. */
+   Fatos da empresa: só os do brief e da correção do dono (13/10): a pergunta 3
+   é sobre EMPRÉSTIMO PESSOAL com as 5 financeiras; o processo revisa os juros
+   dele, não os do consignado. Mensagens do atendente são sugestões de roteiro.
+   Ilustrações próprias em 06-primeiro-contato-figuras.tsx. */
 import type { Licao } from '../tipos';
 import {
   Aviso, BomRuim, Celular, Conversa, Fatos, Frase, LinhaTempo, Lista, Passos, Sanfona, Secao, Tabela, TesteRapido,
 } from '../pecas';
 import {
-  AbertaFechada, AnatomiaAudio, AnatomiaMensagem, AtitudesEscuta, ChecklistContato, ErrosClassicos, FichaAnotacao,
+  AbertaFechada, AnatomiaAudio, AnatomiaMensagem, AtitudesEscuta, CaminhoDinheiro, ChecklistContato, ErrosClassicos, FichaAnotacao,
   FluxogramaRoteiro, FunilQualificacao, Iceberg, Passagem, PerguntasRoteiro, SimuladorRoteiro, Termometro,
 } from './06-primeiro-contato-figuras';
 import './06-primeiro-contato.css';
@@ -25,13 +27,13 @@ const corpo = (
       muita coisa: se o cliente confia em você, se ele continua respondendo e se você descobre, logo cedo, se a gente
       pode ajudar e do que ele realmente precisa. Nesta lição você vai aprender a entrar na conversa sem repetir nada, a
       se apresentar do jeito certo em cada canal, a fazer as perguntas certas na ordem certa (isso se chama
-      <b> qualificar</b>), a escutar de verdade, a escolher entre texto e áudio e a fugir dos erros que mais afastam o
+      <b> qualificar</b>), a explicar a diferença entre <b>empréstimo pessoal</b> e consignado, a escutar de verdade, a escolher entre texto e áudio e a fugir dos erros que mais afastam o
       cliente.
     </p>
 
     <Fatos itens={[
       { grande: '1ª mensagem', texto: 'Seu nome + CAF + uma pergunta. Nada de repetir o que o robô já perguntou.' },
-      { grande: '4 perguntas', texto: 'O roteiro: benefício do INSS, qual benefício, financeira e o que ele quer.' },
+      { grande: '4 perguntas', texto: 'O roteiro: benefício do INSS, qual benefício, empréstimo pessoal numa das 5 e o que ele quer.' },
       { grande: '1 por vez', texto: 'Uma pergunta por mensagem. Várias juntas viram formulário.' },
       { grande: '1 dor', texto: 'Descobrir o problema real do cliente e anotar com as palavras dele.' },
     ]} />
@@ -41,7 +43,7 @@ const corpo = (
       <LinhaTempo itens={[
         { quando: 'Antes de digitar', titulo: 'Ler a conversa inteira', texto: 'O que o robô (e, no canal de empréstimo, a IA) já perguntou e o que o cliente respondeu.' },
         { quando: '1ª mensagem', titulo: 'Apresentar-se e fazer a ponte', texto: 'Nome do cliente, seu nome, CAF, “já recebi seus dados” e uma pergunta.' },
-        { quando: 'Qualificação', titulo: 'As perguntas do roteiro', texto: 'Benefício do INSS, qual benefício, financeira, o que ele quer. Uma por mensagem.' },
+        { quando: 'Qualificação', titulo: 'As perguntas do roteiro', texto: 'Benefício do INSS, qual benefício, empréstimo pessoal numa das 5, o que ele quer. Uma por mensagem.' },
         { quando: 'Escuta', titulo: 'Descobrir a dor', texto: 'Perguntas abertas, deixar falar, repetir o que entendeu e anotar.' },
         { quando: 'Saída', titulo: 'Próximo passo combinado', texto: 'Segue para a conversa de venda (lição 7), ou encerra com carinho quem não é elegível (lição 4).' },
       ]} />
@@ -181,9 +183,10 @@ const corpo = (
         máximo uma pergunta, e a resposta do José (“as coisas tão apertadas”) já é uma pista da dor, que você anota.
       </p>
       <Aviso tom="ambar" titulo="“Pré-aprovada” não é dinheiro liberado">
-        Nunca confirme valor nem prometa que o dinheiro vai sair. Se os extratos mostrarem que hoje não há margem, a
-        lição 7 mostra como apresentar os caminhos, sempre como possibilidade. Se o cliente reclamar do “pré-aprovada”,
-        a resposta está na lição 8.
+        Nunca confirme valor nem prometa que o dinheiro vai sair. Se os extratos mostrarem que hoje não há margem para
+        um consignado novo, a lição 7 mostra como apresentar os caminhos (aumento de margem, portabilidade dos
+        consignados e a revisão dos juros do empréstimo pessoal que ele já tem), sempre como possibilidade. Se o cliente
+        reclamar do “pré-aprovada”, a resposta está na lição 8.
       </Aviso>
     </Secao>
 
@@ -204,6 +207,95 @@ const corpo = (
         renda, CPF, identidade, foto do rosto, comprovante e e-mail) passam a ser dele; na dúvida, pergunte ao gestor. Os
         detalhes estão na lição 4.
       </p>
+    </Secao>
+
+    <Secao titulo="Pergunta 3: empréstimo pessoal, não consignado">
+      <p>
+        A pergunta 3 tem uma palavra que muda tudo: <b>pessoal</b>. O processo da CAF é sobre os juros dos
+        <b> empréstimos pessoais</b> que o aposentado ou pensionista fez com as financeiras (Agibank, BMG, Facta,
+        Mercantil ou Crefisa). <b>Não é sobre o consignado.</b> Só que muita gente chama tudo de “empréstimo” e nunca
+        parou para pensar na diferença. Por isso você precisa saber explicar em poucas palavras, sem jargão.
+      </p>
+      <p>
+        O jeito mais fácil de entender é seguir o caminho do dinheiro do benefício. O <b>consignado</b> é descontado
+        <b> pelo INSS</b>, direto do benefício, antes de o dinheiro cair na conta. O <b>empréstimo pessoal</b> não passa
+        pelo INSS: é um contrato direto com a financeira, que cobra a parcela por fora (em geral na conta do cliente, ou
+        por boleto ou carnê).
+      </p>
+      <CaminhoDinheiro />
+      <Frase>O consignado é descontado pelo INSS; o empréstimo pessoal é cobrado pela financeira, fora do INSS.</Frase>
+      <p>
+        <b>Por que isso importa tanto?</b> O consignado tem um teto de juros e é o empréstimo mais barato para o
+        aposentado. O empréstimo pessoal tem juros livres, em geral bem mais altos, e é nele que aparecem os juros
+        abusivos que a CAF revisa. E quem está sem margem para consignado muitas vezes recorre ao empréstimo pessoal, que
+        é mais caro. A explicação completa do consignado (margem, RMC/RCC, portabilidade) está na lição 3.
+      </p>
+      <p>
+        Na hora de perguntar, diga a palavra <b>“pessoal”</b> e, se o cliente hesitar, explique em uma frase. E cuidado
+        com perguntas que apontam para o lugar errado: falar em “desconto no benefício” leva o cliente a pensar no
+        consignado, que é justamente o que o INSS desconta.
+      </p>
+      <BomRuim
+        ruim={{
+          titulo: 'Aponta para o consignado',
+          corpo: (
+            <div className="mv-pc-pilha">
+              <div className="mv-pc-cit">“Aparece algum desconto de Agibank, BMG, Facta, Mercantil ou Crefisa no seu benefício?”</div>
+              <span className="mv-pc-obs">
+                Desconto no benefício é o consignado. O cliente pode dizer “sim” pensando no consignado, e a qualificação
+                sai errada.
+              </span>
+            </div>
+          ),
+        }}
+        bom={{
+          titulo: 'Pergunta pelo empréstimo pessoal',
+          corpo: (
+            <div className="mv-pc-pilha">
+              <div className="mv-pc-cit">“O senhor tem empréstimo pessoal com algum destes bancos: Agibank, BMG, Facta, Mercantil ou Crefisa? É aquele que a financeira cobra na sua conta, e não o que o INSS desconta direto do benefício.”</div>
+              <span className="mv-pc-obs">
+                Usa a palavra certa e já explica a diferença com palavras do dia a dia do cliente.
+              </span>
+            </div>
+          ),
+        }}
+      />
+      <p>
+        E quando o cliente pergunta qual é a diferença? Explique em duas mensagens curtas e devolva a pergunta. Uma boa
+        saída é perguntar <b>como ele paga</b> aquele empréstimo: é uma pergunta fácil, que ele sabe responder.
+      </p>
+      <Celular
+        contato="Dona Zilda"
+        sub="cliente · exemplo"
+        legenda="Não sabe a diferença? Explique em poucas palavras e devolva a pergunta."
+        bolhas={[
+          { de: 'eu', texto: 'E a senhora tem empréstimo pessoal com algum destes bancos: Agibank, BMG, Facta, Mercantil ou Crefisa?', hora: '14:20' },
+          { de: 'cliente', texto: 'Tenho um no BMG, mas não sei se é pessoal. Qual a diferença?', hora: '14:23' },
+          { de: 'eu', texto: 'Ótima pergunta! O consignado é aquele que o INSS desconta direto do seu benefício, antes de o dinheiro cair na conta.', hora: '14:24' },
+          { de: 'eu', texto: 'O empréstimo pessoal é cobrado pela financeira, fora do INSS. Em geral, sai da sua conta ou vem em boleto ou carnê.', hora: '14:24' },
+          { de: 'eu', texto: 'E esse do BMG, a senhora paga como?', hora: '14:24' },
+          { de: 'cliente', texto: 'Ah, esse sai da minha conta todo mês.', hora: '14:27' },
+          { de: 'eu', texto: 'Então pelo jeito é um empréstimo pessoal, e é justamente dele que o nosso processo olha os juros. Já anotei aqui!', hora: '14:28' },
+        ]}
+      />
+      <Aviso tom="ambar" titulo="O nome do banco não diz o tipo de empréstimo">
+        Ouvir “BMG” ou “Agibank” não basta. A mesma financeira pode ter mais de um tipo de produto: o BMG, por exemplo,
+        também tem consignado e cartão consignado. Confirme que é <b>empréstimo pessoal</b>, sem afirmar nada que você
+        não sabe sobre como cada banco cobra.
+      </Aviso>
+      <TesteRapido
+        pergunta="Seu Valdir conta: “Tenho empréstimo no BMG, o INSS desconta direto do meu benefício.” O que essa resposta indica?"
+        opcoes={[
+          'Que é um empréstimo pessoal: pode seguir para a pergunta 4',
+          'Que esse é um consignado: pergunte se ele tem também um pessoal',
+          'Que ele não é elegível: agradeça e encerre a conversa agora',
+        ]}
+        certa={1}
+        explica="Desconto feito pelo INSS, direto do benefício, é consignado, e o processo olha os juros do empréstimo pessoal. Pergunte, uma vez, se ele tem algum empréstimo que a financeira cobra fora do INSS. Só se ele não tiver empréstimo pessoal em nenhuma das 5 é que não é elegível."
+      />
+    </Secao>
+
+    <Secao titulo="O roteiro inteiro, num mapa">
       <p>
         Abaixo, o roteiro inteiro como um mapa. É o mesmo caminho que a IA segue no canal de empréstimo; por isso, quando
         a conversa vem de lá, as perguntas de elegibilidade já estão respondidas.
@@ -215,18 +307,18 @@ const corpo = (
       </p>
       <SimuladorRoteiro />
       <Aviso tom="rubro" titulo="Não elegível: agradeça e não insista">
-        Se ninguém recebe do INSS (nem a pessoa nem um familiar), ou se o empréstimo não é em nenhuma das 5 financeiras,
-        agradeça com carinho e encerre, sem insistir. Como encerrar bem, com a mensagem pronta, está na lição 4.
+        Se ninguém recebe do INSS (nem a pessoa nem um familiar), ou se ela não tem empréstimo pessoal em nenhuma das 5
+        financeiras, agradeça com carinho e encerre, sem insistir. Como encerrar bem, com a mensagem pronta, está na lição 4.
       </Aviso>
       <TesteRapido
-        pergunta="Dona Neusa respondeu de uma vez: “Sou pensionista e tenho empréstimo no BMG e no Agibank.” Qual é a sua próxima pergunta?"
+        pergunta="Dona Neusa respondeu de uma vez: “Sou pensionista e tenho empréstimo pessoal no BMG e no Agibank, que eles cobram na minha conta.” Qual é a sua próxima pergunta?"
         opcoes={[
           '“A senhora recebe algum benefício do INSS?”',
-          '“E qual é o banco do seu empréstimo consignado?”',
+          '“E esse empréstimo é pessoal ou consignado?”',
           '“E o que a senhora está buscando hoje?”',
         ]}
         certa={2}
-        explica="Ela já respondeu as perguntas 1, 2 e 3 numa mensagem só. Perguntar de novo mostra que você não leu. Siga o roteiro a partir do que falta: o que ela quer."
+        explica="Ela já respondeu as perguntas 1, 2 e 3 numa mensagem só, e até disse que é empréstimo pessoal cobrado na conta. Perguntar de novo mostra que você não leu. Siga o roteiro a partir do que falta: o que ela quer."
       />
     </Secao>
 
@@ -238,7 +330,7 @@ const corpo = (
       <AbertaFechada />
       <Frase>Pergunta fechada confirma fatos. Pergunta aberta descobre a dor.</Frase>
       <p>
-        Na prática: use <b>fechadas</b> nas portas do roteiro (benefício, financeira), porque ali você precisa de uma
+        Na prática: use <b>fechadas</b> nas portas do roteiro (benefício, empréstimo pessoal), porque ali você precisa de uma
         resposta clara. E use <b>abertas</b> assim que as portas estiverem abertas, para a pessoa contar a história dela.
         Uma conversa só de fechadas parece um formulário; uma conversa só de abertas não anda, e você não confirma o que
         precisa. Mais uma dica: pergunta aberta boa é <b>curta</b>. “Me conta como está?” funciona muito melhor do que
@@ -252,28 +344,30 @@ const corpo = (
         <b> por que</b> o cliente quer ajuda. A gente chama isso de <b>dor</b>.
       </p>
       <p>
-        Ninguém procura revisão de juros porque acha juros um assunto interessante. A pessoa procura porque o desconto
-        está alto, porque o dinheiro não sobra no fim do mês, porque está com dívidas. O que ela fala primeiro (“quero
+        Ninguém procura revisão de juros porque acha juros um assunto interessante. A pessoa procura porque a parcela do
+        empréstimo pessoal pesa no mês, porque o dinheiro não sobra, porque está com dívidas. O que ela fala primeiro (“quero
         revisar”, “quero um empréstimo”) é só a ponta do iceberg.
       </p>
       <Iceberg />
       <p>
         Quando você sabe qual é a dor, a sua explicação deixa de ser genérica. Em vez de “a gente faz revisão de juros”,
-        você diz: “a senhora me contou que no fim do mês não sobra nada; é justamente por isso que vale a pena olhar esses
-        descontos com calma”. O cliente sente que foi ouvido, e quem se sente ouvido confia. Escutar bem tem quatro
+        você diz: “a senhora me contou que no fim do mês não sobra nada; é justamente por isso que vale a pena olhar com
+        calma os juros do seu empréstimo pessoal”. O cliente sente que foi ouvido, e quem se sente ouvido confia. Escutar bem tem quatro
         atitudes:
       </p>
       <AtitudesEscuta />
       <Conversa
         titulo="Escuta ativa na prática"
-        nota="Repare: o atendente deixa falar, repete, valida e só depois pergunta."
+        nota="Repare: o atendente deixa falar, repete, valida e só depois pergunta. E confirma se é empréstimo pessoal sem usar jargão."
         falas={[
-          { quem: 'cliente', texto: 'Olha, eu tenho uns três empréstimos, nem sei mais direito. Todo mês vem menos e eu tô devendo a farmácia.' },
-          { quem: 'eu', texto: 'Entendi, Dona Cida. Então hoje o benefício chega bem menor por causa dos descontos, e isso está fazendo falta até para a farmácia. É isso?' },
+          { quem: 'cliente', texto: 'Olha, eu tenho uns três empréstimos, nem sei mais direito. Todo mês o dinheiro some e eu tô devendo a farmácia.' },
+          { quem: 'eu', texto: 'Entendi, Dona Cida. Então as parcelas desses empréstimos estão levando o dinheiro do mês, e isso está fazendo falta até para a farmácia. É isso?' },
           { quem: 'cliente', texto: 'É isso mesmo, minha filha.' },
           { quem: 'eu', texto: 'Imagino como isso aperta. Pode ficar tranquila: eu vou olhar tudo com calma junto com a senhora.' },
-          { quem: 'eu', texto: 'A senhora lembra em quais bancos são esses empréstimos?' },
+          { quem: 'eu', texto: 'A senhora lembra com quais bancos são esses empréstimos?' },
           { quem: 'cliente', texto: 'Um é do BMG, o outro do Agibank. O terceiro eu não lembro.' },
+          { quem: 'eu', texto: 'Já ajuda muito! E esses dois, o banco cobra na sua conta, ou o INSS desconta direto do benefício?' },
+          { quem: 'cliente', texto: 'Os dois saem da minha conta, todo mês.' },
         ]}
       />
       <p>
@@ -329,7 +423,7 @@ const corpo = (
           'Ouve tudo, resume o que ela contou e pergunta só o que ainda falta',
         ]}
         certa={2}
-        explica="Ouvir tudo e devolver um resumo mostra respeito e evita perguntar o que ela já contou. Depois você segue o roteiro só com o que falta (por exemplo, confirmar o benefício)."
+        explica="Ouvir tudo e devolver um resumo mostra respeito e evita perguntar o que ela já contou. Depois você segue o roteiro só com o que falta (por exemplo, confirmar o benefício e se os empréstimos são pessoais)."
       />
     </Secao>
 
@@ -363,20 +457,20 @@ const corpo = (
                 trate isso como problema, nem como um “não”.
               </p>
               <Passos itens={[
-                { titulo: 'Pergunte de novo, uma vez só, citando as 5', texto: '“Aparece algum desconto de Agibank, BMG, Facta, Mercantil ou Crefisa no benefício?” Ouvir os nomes ajuda a lembrar.' },
-                { titulo: 'Sugira onde olhar', texto: 'Se ele tiver por perto o papel do contrato ou o extrato do benefício (o “contracheque” do INSS), às vezes o nome do banco aparece ali.' },
-                { titulo: 'Continuou sem saber? Siga em frente', texto: 'Mais adiante, o Extrato de Empréstimo Consignado, que você vai pegar no Meu INSS, mostra cada contrato com o nome do banco.' },
+                { titulo: 'Pergunte de novo, uma vez só, citando as 5', texto: '“É aquele empréstimo que a financeira cobra na sua conta, e não o que o INSS desconta direto do benefício. Tem algum assim com Agibank, BMG, Facta, Mercantil ou Crefisa?” Ouvir os nomes ajuda a lembrar.' },
+                { titulo: 'Ajude a lembrar', texto: 'O empréstimo pessoal não aparece como desconto do INSS. Muita gente lembra pelo nome do banco e pelo débito na conta. Se ele tiver o papel do contrato por perto, o nome da financeira está ali.' },
+                { titulo: 'Continuou sem saber? Siga em frente', texto: 'Sem insistir. Anote que ele não soube dizer e continue a conversa; na dúvida, combine com o seu gestor como conferir.' },
               ]} />
               <Celular
                 contato="Seu Antônio"
                 sub="cliente · exemplo"
                 legenda="Não saber o banco não é um “não”."
                 bolhas={[
-                  { de: 'eu', texto: 'E o senhor tem empréstimo em algum destes bancos: Agibank, BMG, Facta, Mercantil ou Crefisa?', hora: '10:12' },
+                  { de: 'eu', texto: 'E o senhor tem empréstimo pessoal com algum destes bancos: Agibank, BMG, Facta, Mercantil ou Crefisa?', hora: '10:12' },
                   { de: 'cliente', texto: 'Ih, não sei não. Foi meu neto que fez pra mim.', hora: '10:15' },
-                  { de: 'eu', texto: 'Sem problema, isso é bem comum! Aparece algum desconto de Agibank, BMG, Facta, Mercantil ou Crefisa no benefício?', hora: '10:15' },
-                  { de: 'cliente', texto: 'Acho que tem um do Mercantil… mas não tenho certeza.', hora: '10:18' },
-                  { de: 'eu', texto: 'Já ajuda muito! Quando a gente pegar o extrato de empréstimos no Meu INSS, lá aparece cada contrato com o nome do banco. Vamos seguir?', hora: '10:19' },
+                  { de: 'eu', texto: 'Sem problema, isso é bem comum! É aquele empréstimo que a financeira cobra na sua conta, e não o que o INSS desconta direto do benefício. Tem algum assim com Agibank, BMG, Facta, Mercantil ou Crefisa?', hora: '10:15' },
+                  { de: 'cliente', texto: 'Acho que tem um do Mercantil, que sai da minha conta… mas não tenho certeza.', hora: '10:18' },
+                  { de: 'eu', texto: 'Já ajuda muito! Vou anotar aqui. Se o senhor ou o seu neto lembrarem de mais algum, é só me contar. Vamos seguir?', hora: '10:19' },
                 ]}
               />
             </div>
@@ -428,7 +522,7 @@ const corpo = (
           titulo: 'A pessoa não é elegível',
           corpo: (
             <p>
-              Ninguém recebe do INSS (nem um familiar), ou o empréstimo não é em nenhuma das 5 financeiras. Agradeça com
+              Ninguém recebe do INSS (nem um familiar), ou não há empréstimo pessoal em nenhuma das 5 financeiras. Agradeça com
               carinho, explique em uma frase e encerre, sem insistir. A lição 4 mostra como, com a mensagem pronta.
             </p>
           ),
@@ -451,9 +545,10 @@ const corpo = (
         linhas={[
           ['Margem consignável', '“A parte do seu benefício que pode ser usada para descontar empréstimo e cartão consignado.”'],
           ['RMC / RCC', '“Cartão consignado, aquele que desconta direto no benefício.”'],
-          ['Portabilidade', '“Levar o seu empréstimo para outro banco.”'],
+          ['Portabilidade', '“Levar o seu consignado para outro banco.”'],
           ['Espécie do benefício', '“Qual é o seu benefício: aposentadoria, pensão…?”'],
-          ['Contrato averbado', '“O empréstimo que aparece descontando no seu benefício.”'],
+          ['Contrato averbado', '“O consignado, que o INSS desconta direto do seu benefício.”'],
+          ['Crédito pessoal ativo, IF', '“O empréstimo pessoal que o senhor ainda está pagando, com o banco.”'],
           ['Honorários', '“A parte do advogado, que só sai no final.”'],
           ['Histórico de Créditos (HISCRE)', '“O extrato que mostra quanto o INSS te pagou, mês a mês.”'],
           ['Lead, qualificar, elegível', 'Palavras de dentro da empresa: nunca use com o cliente.'],
@@ -474,7 +569,7 @@ const corpo = (
         <>Você entra <b>onde o robô parou</b>: leia a conversa inteira e não repita o que já foi perguntado. Responda <b>rápido</b>, porque o interesse esfria; depois, calma para conversar.</>,
         <>No canal de juros: <b>o seu nome + CAF</b>, a ponte com o robô (“já recebi seus dados”) e uma pergunta só.</>,
         <>No canal de empréstimo, sempre nesta ordem: <b>apresentar-se</b> → explicar que <b>“pré-aprovada” não é valor liberado</b> → <b>uma pergunta aberta curta</b> → <b>pedir os extratos do Meu INSS</b>.</>,
-        <>Roteiro: <b>benefício do INSS</b> (ou de um familiar) → <b>qual benefício</b> → empréstimo em <b>Agibank, BMG, Facta, Mercantil ou Crefisa</b> → <b>o que ele quer</b>. Uma pergunta por mensagem.</>,
+        <>Roteiro: <b>benefício do INSS</b> (ou de um familiar) → <b>qual benefício</b> → <b>empréstimo pessoal</b> com Agibank, BMG, Facta, Mercantil ou Crefisa → <b>o que ele quer</b>. Uma pergunta por mensagem. O consignado o INSS desconta do benefício; o <b>empréstimo pessoal</b> a financeira cobra fora do INSS, e é dos juros dele que o processo cuida.</>,
         <>Perguntas fechadas confirmam fatos; abertas descobrem a <b>dor</b>. Deixe terminar, repita, valide e anote.</>,
         <>Texto para o que precisa ficar guardado; áudio curto para aproximar. Fuja da <b>pressa</b>, do <b>jargão</b>, da <b>mensagem gigante</b> e de <b>perguntar tudo de uma vez</b>.</>,
       ]} />
@@ -486,8 +581,8 @@ const licao: Licao = {
   id: 'primeiro-contato',
   modulo: 'venda',
   titulo: 'Primeiro contato e qualificação',
-  resumo: 'Os primeiros minutos depois que você assume: a apresentação em cada canal, o roteiro de qualificação, a escuta da dor, texto ou áudio e os erros que afastam o cliente.',
-  minutos: 35,
+  resumo: 'Os primeiros minutos depois que você assume: a apresentação em cada canal, o roteiro de qualificação, a pergunta do empréstimo pessoal (e a diferença para o consignado), a escuta da dor, texto ou áudio e os erros que afastam o cliente.',
+  minutos: 40,
   corpo,
   questoes: [
     {
@@ -514,39 +609,39 @@ const licao: Licao = {
       p: 'Qual destas é uma pergunta aberta, boa para descobrir a dor do cliente?',
       o: [
         '“O senhor é aposentado ou pensionista?”',
-        '“Como os descontos pesam no seu mês?”',
+        '“Como as parcelas pesam no seu mês?”',
         '“O seu empréstimo é no BMG ou no Agibank?”',
       ],
       c: 1,
       e: 'Pergunta aberta convida a pessoa a contar com as palavras dela. As outras duas são fechadas: servem para confirmar fatos.',
     },
     {
-      p: 'Você precisa saber o benefício, o banco e o que o cliente quer. Como fazer essas perguntas?',
+      p: 'Você vai mandar a lista de documentos ao cliente. Qual formato usar?',
       o: [
-        'Uma pergunta por mensagem, e a próxima só depois da resposta',
-        'Tudo numa mensagem só, numerado, para ele responder de uma vez',
-        'Num áudio só, com as três perguntas de uma vez',
+        'Áudio, porque é mais rápido do que digitar tudo',
+        'Texto, porque ele vai consultar a lista depois',
+        'Uma foto da lista escrita à mão, bem caprichada',
       ],
-      c: 0,
-      e: 'Várias perguntas juntas, por escrito ou em áudio, fazem o cliente responder só uma, e as outras se perdem. Uma pergunta por mensagem vira conversa.',
+      c: 1,
+      e: 'Lista de documentos, nomes de bancos e datas vão por texto: é informação que o cliente vai consultar depois, e áudio não dá para copiar. O áudio é ótimo para explicar e aproximar, não para listas.',
     },
     {
-      p: 'O cliente não sabe dizer em qual banco é o empréstimo. Pelo roteiro, o que fazer?',
+      p: 'O cliente não sabe dizer com qual banco é o empréstimo pessoal. Pelo roteiro, o que fazer?',
       o: [
         'Encerrar como não elegível, com carinho e sem insistir',
         'Perguntar de novo uma vez, citando as 5, e depois seguir',
         'Pedir que ele ligue para o banco e volte com o nome certo',
       ],
       c: 1,
-      e: 'Não saber o banco não é um “não”. Pergunte mais uma vez citando Agibank, BMG, Facta, Mercantil e Crefisa; se seguir sem saber, siga em frente: o Meu INSS vai mostrar os contratos.',
+      e: 'Não saber o banco não é um “não”. Pergunte mais uma vez, citando Agibank, BMG, Facta, Mercantil e Crefisa (é o empréstimo que a financeira cobra fora do INSS); se seguir sem saber, siga em frente, sem insistir.',
     },
   ],
   glossario: [
-    { termo: 'Qualificação', def: 'As perguntas do começo do atendimento que mostram se a pessoa pode ser atendida e do que ela precisa: benefício do INSS, qual benefício, financeira e o que ela quer. Uma pergunta por mensagem.' },
+    { termo: 'Qualificação', def: 'As perguntas do começo do atendimento que mostram se a pessoa pode ser atendida e do que ela precisa: benefício do INSS, qual benefício, empréstimo pessoal com uma das 5 financeiras e o que ela quer. Uma pergunta por mensagem.' },
     { termo: 'Pergunta fechada', def: 'Pergunta com resposta curta: sim, não ou uma escolha entre opções. Boa para confirmar fatos.' },
     { termo: 'Pergunta aberta', def: 'Pergunta que convida a pessoa a contar com as palavras dela. Boa para descobrir a dor e o que ela quer.' },
     { termo: 'Escuta ativa', def: 'Ouvir com atenção: deixar a pessoa terminar, repetir o que entendeu, validar o que ela sente e anotar. Mostra que ela foi ouvida e evita perguntar de novo.' },
-    { termo: 'Dor do cliente', def: 'O problema real que faz a pessoa querer ajuda, como desconto alto, dinheiro que não sobra no fim do mês ou dívidas.' },
+    { termo: 'Dor do cliente', def: 'O problema real que faz a pessoa querer ajuda, como a parcela do empréstimo pessoal pesando no mês, dinheiro que não sobra ou dívidas.' },
     { termo: 'Jargão', def: 'Palavra técnica da nossa área (margem consignável, RMC, portabilidade, averbação). Com o cliente, troque por palavras simples.' },
   ],
   mensagens: [
@@ -559,6 +654,11 @@ const licao: Licao = {
       titulo: 'Apresentação no canal de empréstimo',
       quando: 'Quando a IA passar a conversa para você, depois da “pré-aprovada” e da lista de documentos. Tem uma pergunta só. Se preferir, mande em partes, como no exemplo da lição 6, e peça os extratos depois da resposta.',
       texto: 'Olá, [nome do cliente]! Aqui é [seu nome], da CAF, a Central de Assessoria Financeira. A partir de agora sou eu que cuido da sua análise.\n\nSobre a mensagem de “pré-aprovada”: ela quer dizer que você passou nas primeiras perguntas da análise. Ainda não é um valor liberado.\n\nMe conta: o que você está precisando hoje?\n\nPara conferir a sua situação com segurança, vou precisar dos seus extratos do Meu INSS. Pode deixar que eu te ajudo a pegar, passo a passo.',
+    },
+    {
+      titulo: 'Pergunta 3 para quem não sabe a diferença',
+      quando: 'Na pergunta do empréstimo pessoal, quando o cliente não sabe se o empréstimo dele é pessoal ou consignado.',
+      texto: 'É uma dúvida bem comum! 😊\n\nO consignado é aquele que o INSS desconta direto do seu benefício, antes de o dinheiro cair na conta.\n\nO empréstimo pessoal é cobrado pela financeira, fora do INSS. Em geral, sai da sua conta ou vem em boleto ou carnê.\n\nO nosso processo olha os juros do empréstimo pessoal. Você tem algum empréstimo assim com Agibank, BMG, Facta, Mercantil ou Crefisa?',
     },
     {
       titulo: 'Depois de um áudio longo',

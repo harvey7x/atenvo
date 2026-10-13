@@ -40,7 +40,7 @@ const MAPA: { t: string; d: string; fase: 'docs' | 'fecha' | 'proc'; ic: IcNome;
   { t: 'Cadastro no admin', d: 'Você cadastra o cliente no sistema.', fase: 'fecha', ic: 'cadastro' },
   { t: 'Procurações', d: 'O cadastro gera as procurações.', fase: 'fecha', ic: 'doc' },
   { t: 'Assinatura gov.br', d: 'O cliente assina com a conta prata ou ouro.', fase: 'fecha', ic: 'caneta' },
-  { t: 'Ação na Justiça', d: 'O advogado entra com o processo.', fase: 'proc', ic: 'balanca' },
+  { t: 'Ação na Justiça', d: 'O advogado entra com a ação sobre os juros do empréstimo pessoal.', fase: 'proc', ic: 'balanca' },
 ];
 export function MapaFechamento() {
   return (
@@ -690,7 +690,7 @@ const CHECK: { t: string; itens: string[] }[] = [
   {
     t: 'Depois de assinar',
     itens: [
-      'Próximos passos explicados: ação, 6 a 12 meses em média, 30% só no final',
+      'Próximos passos explicados: a ação (juros do empréstimo pessoal), 6 a 12 meses em média, 30% só no final',
       'Cliente avisado: nenhum pagamento é feito antes',
       'Senha do gov.br trocada, se o cliente tinha passado a senha para você',
       'Canal aberto: o cliente sabe que pode te chamar',

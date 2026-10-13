@@ -1,5 +1,6 @@
 /* Lição 04 — ilustrações próprias (SVG e HTML+CSS): as 3 portas, o público em
-   anéis, os tipos de benefício, as 5 financeiras, o extrato ilustrado, a rota do
+   anéis, os tipos de benefício, o caminho da parcela (empréstimo pessoal ×
+   consignado), as 5 financeiras, o extrato de consignado ilustrado, a rota do
    familiar, a persona, os pensamentos do cliente e as seis atitudes.
    Cores só por classes com tokens (arquivo 04-cliente.css). */
 import type { ReactNode } from 'react';
@@ -49,7 +50,7 @@ function IconePorta({ tipo, cx, cy }: { tipo: IconeTipo; cx: number; cy: number 
 const PORTAS: { x: number; n: string; t1: string; t2: string; tom: 'azul' | 'verde'; ic: IconeTipo }[] = [
   { x: 30, n: '1', t1: 'Benefício do INSS', t2: 'da própria pessoa', tom: 'azul', ic: 'inss' },
   { x: 250, n: '2', t1: 'Familiar recebe', t2: 'pai, mãe, avó, avô ou filho', tom: 'azul', ic: 'familia' },
-  { x: 560, n: '3', t1: 'Tem empréstimo', t2: 'numa das 5 financeiras', tom: 'verde', ic: 'banco' },
+  { x: 560, n: '3', t1: 'Empréstimo pessoal', t2: 'numa das 5 financeiras', tom: 'verde', ic: 'banco' },
 ];
 
 /** As três portas: (1 OU 2) E 3. */
@@ -58,7 +59,7 @@ export function TresPortas() {
   return (
     <Rolar>
       <svg className="mv-cli-svg" viewBox="0 0 760 292" role="img"
-        aria-label="Três portas. Porta 1: benefício do INSS da própria pessoa. Porta 2: um familiar recebe do INSS. A pessoa precisa passar pela porta 1 ou pela porta 2, e também pela porta 3: empréstimo numa das 5 financeiras.">
+        aria-label="Três portas. Porta 1: benefício do INSS da própria pessoa. Porta 2: um familiar recebe do INSS. A pessoa precisa passar pela porta 1 ou pela porta 2, e também pela porta 3: empréstimo pessoal numa das 5 financeiras.">
         <path className="mv-cli-chave" d="M30,46 V34 H420 V46" />
         <text className="mv-cli-rot" x="225" y="24" textAnchor="middle">Precisa passar por uma destas duas</text>
         <path className="mv-cli-chave" d="M560,46 V34 H730 V46" />
@@ -102,7 +103,7 @@ export function PublicoAlvo() {
   return (
     <Rolar>
       <svg className="mv-cli-svg" viewBox="0 0 760 316" role="img"
-        aria-label="Três anéis. No centro, o público principal: aposentados e pensionistas do INSS. No anel do meio, quem recebe auxílio ou BPC/LOAS. No anel de fora, a rota do familiar. Em todos os casos, é preciso ter empréstimo numa das 5 financeiras.">
+        aria-label="Três anéis. No centro, o público principal: aposentados e pensionistas do INSS. No anel do meio, quem recebe auxílio ou BPC/LOAS. No anel de fora, a rota do familiar. Em todos os casos, é preciso ter empréstimo pessoal numa das 5 financeiras.">
         <circle className="mv-cli-anel" data-n="3" cx={cx} cy={cy} r="142" />
         <circle className="mv-cli-anel" data-n="2" cx={cx} cy={cy} r="100" />
         <circle className="mv-cli-anel" data-n="1" cx={cx} cy={cy} r="58" />
@@ -118,7 +119,7 @@ export function PublicoAlvo() {
             {r.s.map((l, i) => <text key={l} className="mv-cli-lb-s" x="346" y={r.y + 20 + i * 18}>{l}</text>)}
           </g>
         ))}
-        <text className="mv-cli-nota" x="346" y="306">Sempre: empréstimo numa das 5 financeiras (porta 3).</text>
+        <text className="mv-cli-nota" x="346" y="306">Sempre (porta 3): empréstimo pessoal numa das 5.</text>
       </svg>
     </Rolar>
   );
@@ -228,30 +229,131 @@ export function Financeiras() {
   );
 }
 
-/** Extrato de empréstimos ilustrado: achar o NOME do banco em cada linha. */
+/** Extrato de consignado ilustrado. Ele mostra os CONSIGNADOS (descontos feitos pelo INSS);
+    a porta 3 pergunta de outra coisa: o empréstimo pessoal com a financeira. */
 export function ExtratoIlustrado() {
   const linhas = [
-    { banco: 'AGIBANK', contrato: '•••• 4821', ok: true },
-    { banco: 'BANCO EXEMPLO S.A.', contrato: '•••• 0937', ok: false },
-    { banco: 'BMG', contrato: '•••• 1560', ok: true },
+    { banco: 'BMG', contrato: '•••• 1560', tipo: 'Consignado' },
+    { banco: 'AGIBANK', contrato: '•••• 4821', tipo: 'Consignado' },
+    { banco: 'BMG', contrato: '•••• 7702', tipo: 'Cartão consignado' },
   ];
   return (
     <Print endereco="meu.inss.gov.br › extrato de empréstimo consignado"
-      legenda="Exemplo simplificado: o documento real tem outro visual e mais colunas. O que importa aqui é o nome do banco de cada empréstimo.">
+      legenda="Exemplo simplificado: o documento real tem outro visual e mais colunas. Repare na coluna Tipo: tudo o que este extrato lista é consignado, descontado pelo INSS. Achar o BMG ou o Agibank aqui não responde à porta 3.">
       <div className="mvp-app">
         <div className="mvp-topo"><b>Extrato de Empréstimo Consignado</b><span>Exemplo</span></div>
         <div className="mv-cli-ext">
-          <div className="mv-cli-ext-cab"><span>Banco</span><span>Contrato</span><span>Está entre as 5?</span></div>
+          <div className="mv-cli-ext-cab"><span>Banco</span><span>Contrato</span><span data-destaque="">Tipo</span></div>
           {linhas.map((l) => (
-            <div key={l.banco} className="mv-cli-ext-lin">
+            <div key={l.contrato} className="mv-cli-ext-lin">
               <b>{l.banco}</b>
               <span className="num">{l.contrato}</span>
-              <span className="mv-cli-ext-v" data-ok={l.ok ? '' : undefined}>{l.ok ? 'Sim, na lista' : 'Fora da lista'}</span>
+              <span className="mv-cli-ext-v">{l.tipo}</span>
             </div>
           ))}
+          <p className="mv-cli-ext-pe">Descontos feitos pelo INSS, direto no benefício.</p>
         </div>
       </div>
     </Print>
+  );
+}
+
+/* ===================================================================== pessoal × consignado */
+type CaixaCp = { x: number; t1: string; t2: string; tom?: 'azul' | 'verde' };
+function FluxoParcela({ tipo }: { tipo: 'consignado' | 'pessoal' }) {
+  const y = 62, h = 48, w = 150, meio = y + h / 2;
+  const caixas: CaixaCp[] = tipo === 'consignado'
+    ? [
+      { x: 10, t1: 'INSS', t2: 'paga o benefício', tom: 'azul' },
+      { x: 285, t1: 'Conta do cliente', t2: 'onde o benefício cai' },
+      { x: 560, t1: 'Banco', t2: 'recebe a parcela' },
+    ]
+    : [
+      { x: 10, t1: 'INSS', t2: 'paga o benefício', tom: 'azul' },
+      { x: 285, t1: 'Conta do cliente', t2: 'onde o benefício cai' },
+      { x: 560, t1: 'Financeira', t2: 'contrato direto', tom: 'verde' },
+    ];
+  const pessoal = tipo === 'pessoal';
+  return (
+    <svg className="mv-cli-svg" viewBox="0 0 720 118" role="img"
+      aria-label={pessoal
+        ? 'Empréstimo pessoal: o INSS paga o benefício na conta do cliente, e a parcela não passa pelo INSS. A financeira cobra na conta do cliente ou por boleto.'
+        : 'Empréstimo consignado: a parcela sai direto do benefício, pelo INSS, para o banco. O benefício cai na conta do cliente já com o desconto.'}>
+      {/* caminho por cima: no consignado, o INSS manda a parcela ao banco; no pessoal, isso não acontece */}
+      <path className="mv-cli-cp-fio" data-mudo={pessoal ? '' : undefined} d={`M85,${y} V32 H635 V${y - 2}`} />
+      {pessoal ? (
+        <g className="mv-cli-cp-x">
+          <circle cx="560" cy="32" r="9" />
+          <path d="M555.5,27.5 l9,9 M564.5,27.5 l-9,9" />
+        </g>
+      ) : (
+        <polygon className="mv-cli-cp-ponta" points={`635,${y} 629.5,${y - 10} 640.5,${y - 10}`} />
+      )}
+      <text className="mv-cli-cp-rot" data-forte={pessoal ? undefined : ''} x="360" y="22" textAnchor="middle">
+        {pessoal ? 'esta parcela não passa pelo INSS' : 'a parcela sai direto do benefício, pelo INSS'}
+      </text>
+
+      {caixas.map((c) => (
+        <g key={c.t1} className="mv-cli-cp-cx" data-tom={c.tom}>
+          <rect x={c.x} y={y} width={w} height={h} rx="9" />
+          <text className="mv-cli-cp-b1" x={c.x + w / 2} y={y + 20} textAnchor="middle">{c.t1}</text>
+          <text className="mv-cli-cp-b2" x={c.x + w / 2} y={y + 37} textAnchor="middle">{c.t2}</text>
+        </g>
+      ))}
+
+      {/* INSS → conta: o benefício cai */}
+      <path className="mv-cli-cp-fio" data-fino="" d={`M160,${meio} H${283 - 9}`} />
+      <polygon className="mv-cli-cp-ponta" data-fino="" points={`283,${meio} 274,${meio - 5} 274,${meio + 5}`} />
+      <text className="mv-cli-cp-rot" x="222" y={meio - 8} textAnchor="middle">benefício</text>
+      <text className="mv-cli-cp-rot" x="222" y={meio + 18} textAnchor="middle">{pessoal ? 'sem esta parcela' : 'já com o desconto'}</text>
+
+      {/* só no pessoal: conta → financeira */}
+      {pessoal && (
+        <>
+          <path className="mv-cli-cp-fio" data-tom="verde" d={`M435,${meio} H${558 - 9}`} />
+          <polygon className="mv-cli-cp-ponta" data-tom="verde" points={`558,${meio} 549,${meio - 5} 549,${meio + 5}`} />
+          <text className="mv-cli-cp-rot" data-tom="verde" x="497" y={meio - 8} textAnchor="middle">cobra na conta</text>
+          <text className="mv-cli-cp-rot" data-tom="verde" x="497" y={meio + 18} textAnchor="middle">ou por boleto</text>
+        </>
+      )}
+    </svg>
+  );
+}
+
+const CP_LINHAS: { tipo: 'consignado' | 'pessoal'; nome: string; resumo: string; chips: { t: string; porta3?: boolean }[] }[] = [
+  {
+    tipo: 'consignado', nome: 'Empréstimo consignado',
+    resumo: 'A parcela é descontada direto do benefício pelo INSS, antes de o dinheiro cair na conta.',
+    chips: [{ t: 'Precisa de margem consignável' }, { t: 'Juros com teto: os mais baratos' }, { t: 'Não é o que a porta 3 pergunta' }],
+  },
+  {
+    tipo: 'pessoal', nome: 'Empréstimo pessoal',
+    resumo: 'Contrato direto com a financeira: a parcela não passa pelo INSS. Em geral é cobrada na conta do cliente ou por boleto/carnê.',
+    chips: [{ t: 'Não usa a margem do INSS' }, { t: 'Juros livres, em geral bem mais altos' }, { t: 'É o que a porta 3 pergunta e a CAF revisa', porta3: true }],
+  },
+];
+/** Os dois empréstimos lado a lado: por onde a parcela passa e o que isso muda para a porta 3. */
+export function CaminhoParcela() {
+  return (
+    <div className="mv-cli-cp">
+      {CP_LINHAS.map((l) => (
+        <div key={l.tipo} className="mv-cli-cp-lin" data-tom={l.tipo === 'pessoal' ? 'verde' : undefined}>
+          <div className="mv-cli-cp-cab">
+            <b>{l.nome}</b>
+            <span>{l.resumo}</span>
+          </div>
+          <div className="mv-cli-cp-svgw"><FluxoParcela tipo={l.tipo} /></div>
+          <ul className="mv-cli-cp-chips">
+            {l.chips.map((c, i) => (
+              <li key={c.t} data-tom={c.porta3 ? 'sim' : i === 2 ? 'nao' : undefined}>
+                {c.porta3 && <IcCheck />}{!c.porta3 && i === 2 && <IcX />}{c.t}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+      <p className="mv-cli-rolar-dica" aria-hidden>Figura larga: arraste o desenho para o lado para ver tudo.</p>
+    </div>
   );
 }
 
@@ -380,7 +482,7 @@ export function Persona() {
           <div className="mv-cli-per-col" data-tom="verde">
             <b>O que ela quer</b>
             <ul>
-              <li>Entender, sem pressa, o que acontece com o benefício.</li>
+              <li>Entender, sem pressa, como funciona a análise.</li>
               <li>Ser tratada com respeito, pelo nome.</li>
               <li>Falar com uma pessoa de verdade.</li>
             </ul>

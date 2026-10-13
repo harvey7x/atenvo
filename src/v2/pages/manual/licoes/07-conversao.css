@@ -166,6 +166,61 @@
 .v2 .mv-cv-pv-fio { fill: none; stroke: rgba(var(--tint), .38); stroke-width: 1.6; }
 .v2 .mv-cv-pv-ponta { fill: rgba(var(--tint), .5); }
 .v2 .mv-cv-pv-losango { fill: rgba(var(--azul-rgb), .12); stroke: var(--azul); stroke-width: 1.6; }
+/* chaves que dizem de qual empréstimo é cada caminho */
+.v2 .mv-cv-pv-chave { fill: none; stroke-width: 1.6; }
+.v2 .mv-cv-pv-chave[data-tom="ambar"] { stroke: var(--ambar); }
+.v2 .mv-cv-pv-chave[data-tom="verde"] { stroke: var(--verde); }
+.v2 .mv-cv-pv-grupo { font-size: 12px; font-weight: 600; }
+.v2 .mv-cv-pv-grupo[data-tom="ambar"] { fill: var(--ambar); }
+.v2 .mv-cv-pv-grupo[data-tom="verde"] { fill: var(--verde); }
+
+/* ---------- os dois empréstimos na conversa ---------- */
+.v2 .mv-cv-dois { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.v2 .mv-cv-dois-lado {
+  display: flex; flex-direction: column; gap: 12px; padding: 14px; border-radius: var(--r-ctl);
+  background: rgba(var(--tint), .035); border-top: 3px solid var(--ambar);
+}
+.v2 .mv-cv-dois-lado[data-tom="verde"] { border-top-color: var(--verde); }
+.v2 .mv-cv-dois-lado[data-tom="azul"] { border-top-color: var(--azul); }
+.v2 .mv-cv-dois-lado > header { display: flex; flex-direction: column; gap: 1px; line-height: 1.25; }
+.v2 .mv-cv-dois-lado > header small { font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--ambar); }
+.v2 .mv-cv-dois-lado[data-tom="verde"] > header small { color: var(--verde); }
+.v2 .mv-cv-dois-lado[data-tom="azul"] > header small { color: var(--azul); }
+.v2 .mv-cv-dois-lado > header b { font-size: 15px; }
+.v2 .mv-cv-dois-rota { list-style: none; display: flex; align-items: stretch; gap: 18px; }
+.v2 .mv-cv-dois-rota > li {
+  position: relative; flex: 1 1 0; min-width: 0; display: grid; place-items: center; text-align: center;
+  min-height: 40px; padding: 6px 8px; border-radius: 8px; font-size: 12px; font-weight: 600; line-height: 1.3;
+  background: var(--base); border: 1px solid var(--linha); color: var(--txt);
+}
+.v2 .mv-cv-dois-rota > li:nth-child(2) { background: var(--ambar-bg); border-color: rgba(var(--tint), .12); }
+.v2 .mv-cv-dois-lado[data-tom="verde"] .mv-cv-dois-rota > li:last-child { background: var(--verde-bg); }
+.v2 .mv-cv-dois-lado[data-tom="verde"] .mv-cv-dois-rota > li:nth-child(2) { background: var(--base); border-color: var(--linha); }
+.v2 .mv-cv-dois-lado[data-tom="azul"] .mv-cv-dois-rota > li:nth-child(2) { background: rgba(var(--azul-rgb), .12); }
+/* seta entre as etapas */
+.v2 .mv-cv-dois-rota > li:not(:last-child)::after {
+  content: ""; position: absolute; right: -14px; top: 50%; width: 9px; height: 9px; margin-top: -5px;
+  border-top: 1.6px solid var(--txt-3); border-right: 1.6px solid var(--txt-3); transform: rotate(45deg);
+}
+.v2 .mv-cv-dois-lado dl { display: flex; flex-direction: column; gap: 6px; }
+.v2 .mv-cv-dois-lado dl > div { display: grid; grid-template-columns: 82px minmax(0, 1fr); gap: 8px; font-size: 12.5px; line-height: 1.45; }
+.v2 .mv-cv-dois-lado dt { font-weight: 600; color: var(--txt-2); }
+.v2 .mv-cv-dois-lado dd { color: var(--txt); }
+.v2 .mv-cv-dois-papel {
+  margin-top: auto; display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border-radius: 8px;
+  background: var(--ambar-bg); font-size: 12.5px; line-height: 1.45;
+}
+.v2 .mv-cv-dois-lado[data-tom="verde"] .mv-cv-dois-papel { background: var(--verde-bg); }
+.v2 .mv-cv-dois-lado[data-tom="azul"] .mv-cv-dois-papel { background: rgba(var(--azul-rgb), .12); }
+.v2 .mv-cv-dois-papel small { font-size: 10.5px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--ambar); }
+.v2 .mv-cv-dois-lado[data-tom="verde"] .mv-cv-dois-papel small { color: var(--verde); }
+.v2 .mv-cv-dois-lado[data-tom="azul"] .mv-cv-dois-papel small { color: var(--azul); }
+.v2 .mv-cv-dois-ponte {
+  margin-top: 10px; padding: 10px 12px; border-radius: var(--r-ctl); font-size: 13px; line-height: 1.5;
+  background: rgba(var(--azul-rgb), .08); box-shadow: inset 3px 0 0 var(--azul);
+}
+.v2 .mv-cv-dois-frase { display: flex; flex-direction: column; gap: 3px; margin-top: 8px; padding: 10px 12px; border-radius: var(--r-ctl); border: 1px dashed rgba(var(--tint), .22); font-size: 13px; line-height: 1.5; }
+.v2 .mv-cv-dois-frase small { font-size: 10.5px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--txt-3); }
 
 /* ---------- treino: o pivô em ordem ---------- */
 .v2 .mv-cv-ord { padding: 18px; display: flex; flex-direction: column; gap: 14px; box-shadow: inset 3px 0 0 var(--azul), var(--sombra-1); }
@@ -316,7 +371,7 @@
 }
 @media (max-width: 900px) {
   .v2 .mv-cv-funil, .v2 .mv-cv-princ, .v2 .mv-cv-trad-lista, .v2 .mv-cv-blocos, .v2 .mv-cv-gat,
-  .v2 .mv-cv-ord-opcoes, .v2 .mv-cv-mapa-leg, .v2 .mv-cv-duo { grid-template-columns: 1fr; }
+  .v2 .mv-cv-ord-opcoes, .v2 .mv-cv-mapa-leg, .v2 .mv-cv-duo, .v2 .mv-cv-dois { grid-template-columns: 1fr; }
   .v2 .mv-cv-princ-it:last-child:nth-child(odd) { grid-column: auto; }
   /* viewBox de 760 com texto de 12px: abaixo de 700px de largura o texto ficaria < 11px, então rola. */
   .v2 .mv-fig-corpo .mv-cv-svg-largo, .v2 .mv-fig-corpo .mv-cv-svg-medio { min-width: 700px; }
@@ -332,4 +387,8 @@
 }
 @media (max-width: 560px) {
   .v2 .mv-cv-quatro { grid-template-columns: 1fr; }
+  .v2 .mv-cv-dois-rota { gap: 14px; }
+  .v2 .mv-cv-dois-rota > li { padding: 6px 4px; font-size: 11.5px; }
+  .v2 .mv-cv-dois-rota > li:not(:last-child)::after { right: -11px; width: 7px; height: 7px; margin-top: -4px; }
+  .v2 .mv-cv-dois-lado dl > div { grid-template-columns: 1fr; gap: 0; }
 }

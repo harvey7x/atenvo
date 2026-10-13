@@ -46,6 +46,49 @@
 .v2 .mv-emp-fin-it small { font-size: 11.5px; line-height: 1.35; color: var(--txt-3); }
 .v2 .mv-emp-fin-it[data-top] small { color: var(--azul); }
 
+/* ---------- empréstimo pessoal × consignado (mini comparativo) ---------- */
+/* subgrid: as linhas dos dois cartões ficam alinhadas (leitura de tabela); no celular vira coluna simples */
+.v2 .mv-emp-pc { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(6, auto); column-gap: 12px; row-gap: 0; }
+.v2 .mv-emp-pc-col { grid-row: 1 / span 6; min-width: 0; padding: 16px; display: grid; grid-template-rows: subgrid; row-gap: 0; }
+.v2 .mv-emp-pc-col[data-lado="sim"] { box-shadow: inset 0 3px 0 var(--verde), var(--sombra-1); }
+.v2 .mv-emp-pc-col[data-lado="nao"] { box-shadow: inset 0 3px 0 rgba(var(--tint), .28), var(--sombra-1); }
+.v2 .mv-emp-pc-cab { display: flex; flex-direction: column; gap: 2px; margin-bottom: 14px; }
+.v2 .mv-emp-pc-selo {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; margin-bottom: 8px; padding: 3px 9px;
+  border-radius: 6px; font-size: 11.5px; font-weight: 600;
+}
+.v2 .mv-emp-pc-selo svg { width: 12px; height: 12px; flex: none; }
+.v2 .mv-emp-pc-col[data-lado="sim"] .mv-emp-pc-selo { background: var(--verde-bg); color: var(--verde); }
+.v2 .mv-emp-pc-col[data-lado="nao"] .mv-emp-pc-selo { background: rgba(var(--tint), .07); color: var(--txt-2); }
+.v2 .mv-emp-pc-cab b { font-size: 16px; letter-spacing: -.01em; }
+.v2 .mv-emp-pc-cab small { font-size: 12px; color: var(--txt-3); }
+.v2 .mv-emp-pc-fluxo {
+  display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 10px; margin-bottom: 14px;
+  border-radius: var(--r-ctl); background: rgba(var(--tint), .035);
+}
+.v2 .mv-emp-pc-fluxo ol { list-style: none; align-self: stretch; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+.v2 .mv-emp-pc-fluxo li {
+  position: relative; min-width: 0; min-height: 40px; display: grid; place-items: center; padding: 4px 6px;
+  border-radius: 8px; text-align: center; font-size: 11.5px; font-weight: 600; line-height: 1.25;
+  background: var(--base); box-shadow: inset 0 0 0 1px var(--linha); color: var(--txt-2);
+}
+.v2 .mv-emp-pc-fluxo li:not(:first-child)::before {
+  content: ""; position: absolute; left: -13px; top: calc(50% - 4px); width: 7px; height: 7px;
+  border-top: 2px solid rgba(var(--tint), .35); border-right: 2px solid rgba(var(--tint), .35); transform: rotate(45deg);
+}
+.v2 .mv-emp-pc-col[data-lado="sim"] .mv-emp-pc-fluxo li[data-destaque] {
+  background: var(--verde-bg); color: var(--verde); box-shadow: inset 0 0 0 1.5px rgba(var(--verde-rgb), .5);
+}
+.v2 .mv-emp-pc-col[data-lado="nao"] .mv-emp-pc-fluxo li[data-destaque] {
+  background: rgba(var(--azul-rgb), .1); color: var(--azul); box-shadow: inset 0 0 0 1.5px rgba(var(--azul-rgb), .45);
+}
+.v2 .mv-emp-pc-nota { font-size: 11.5px; font-weight: 600; color: var(--txt-3); }
+.v2 .mv-emp-pc-lin { display: contents; }
+.v2 .mv-emp-pc-lin > div { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 10px; padding: 9px 0; border-top: 1px solid var(--linha); }
+.v2 .mv-emp-pc-lin dt { padding-top: 2px; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--txt-3); }
+.v2 .mv-emp-pc-lin dd { font-size: 13px; line-height: 1.45; color: var(--txt); }
+.v2 .mv-emp-pc-pe { font-size: 12.5px; color: var(--txt-2); }
+
 /* ---------- juros: a ideia (barras) ---------- */
 .v2 .mv-emp-juros { display: flex; flex-direction: column; gap: 14px; }
 .v2 .mv-emp-juros-lin, .v2 .mv-emp-mg-lin, .v2 .mv-emp-mg-topo {
@@ -298,6 +341,13 @@
   border: 2px solid rgba(var(--azul-rgb), .55); border-bottom: 0; border-radius: 6px 6px 0 0;
 }
 
+.v2 .mv-emp-mg-fora {
+  display: flex; flex-direction: column; gap: 3px; padding: 10px 14px; border-radius: var(--r-ctl);
+  border: 1.5px dashed rgba(var(--verde-rgb), .5); background: var(--verde-bg);
+}
+.v2 .mv-emp-mg-fora b { font-size: 13px; color: var(--verde); }
+.v2 .mv-emp-mg-fora span { font-size: 12.5px; line-height: 1.45; color: var(--txt-2); }
+
 /* ---------- ganchos até o processo ---------- */
 .v2 .mv-emp-gan { display: flex; flex-direction: column; }
 .v2 .mv-emp-gan-ini { display: grid; grid-template-columns: minmax(0, 1fr) 40px minmax(0, 1fr); align-items: stretch; }
@@ -318,6 +368,8 @@
 }
 .v2 .mv-emp-gan-g b { font-size: 13.5px; margin-top: 2px; }
 .v2 .mv-emp-gan-g > span:last-child { font-size: 12.5px; line-height: 1.45; color: var(--txt-2); }
+.v2 .mv-emp-gan-ponte { box-shadow: inset 3px 0 0 var(--azul), var(--sombra-1); }
+.v2 .mv-emp-gan-ponte > span:last-child { margin-top: 2px; font-size: 12.5px; line-height: 1.45; color: var(--txt-2); }
 .v2 .mv-emp-gan-fim { padding: 16px 18px; display: flex; flex-direction: column; gap: 4px; box-shadow: inset 0 3px 0 var(--verde), var(--sombra-1); }
 .v2 .mv-emp-gan-fim b { font-size: 16px; }
 .v2 .mv-emp-gan-fim > span:last-child { font-size: 13px; line-height: 1.5; color: var(--txt-2); }
@@ -349,6 +401,8 @@
 }
 @media (max-width: 900px) {
   .v2 .mv-emp-fin { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .v2 .mv-emp-pc { display: flex; flex-direction: column; gap: 12px; }
+  .v2 .mv-emp-pc-col, .v2 .mv-emp-pc-lin { display: flex; flex-direction: column; }
   .v2 .mv-emp-juros-lin, .v2 .mv-emp-mg-lin, .v2 .mv-emp-mg-topo { grid-template-columns: 1fr; gap: 6px; }
   .v2 .mv-emp-mg-topo > span:first-child { display: none; }
   .v2 .mv-emp-mg-chave { width: 45%; font-size: 11.5px; }

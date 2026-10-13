@@ -229,6 +229,43 @@
 .v2 .mv-ob .mv-ob-av-setas line, .v2 .mv-ob .mv-ob-av-setas path { fill: none; stroke: rgba(var(--tint), .35); stroke-width: 1.5; }
 .v2 .mv-ob .mv-ob-av-r { fill: var(--txt-2); font-size: 12px; font-weight: 600; }
 
+/* ---------- o caminho da parcela: consignado × empréstimo pessoal ---------- */
+.v2 .mv-ob .mv-ob-cp { display: flex; flex-direction: column; gap: 12px; }
+.v2 .mv-ob .mv-ob-cp-trilho { list-style: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px; }
+.v2 .mv-ob .mv-ob-cp-trilho li {
+  position: relative; display: flex; flex-direction: column; gap: 6px; padding: 12px; border-radius: var(--r-ctl);
+  background: rgba(var(--ob-rgb), .045); border: 1px solid rgba(var(--ob-rgb), .2);
+}
+.v2 .mv-ob .mv-ob-cp-trilho li[data-tipo] { background: rgba(var(--ob-rgb), .09); border-color: rgba(var(--ob-rgb), .55); box-shadow: inset 0 3px 0 var(--ob-c); }
+/* seta entre um cartão e o próximo */
+.v2 .mv-ob .mv-ob-cp-trilho li:not(:last-child)::after {
+  content: ""; position: absolute; top: 50%; right: -17px; width: 9px; height: 9px;
+  border-top: 2px solid rgba(var(--tint), .45); border-right: 2px solid rgba(var(--tint), .45);
+  transform: translateY(-50%) rotate(45deg);
+}
+.v2 .mv-ob .mv-ob-cp-cab { display: flex; align-items: center; gap: 8px; min-height: 30px; }
+.v2 .mv-ob .mv-ob-cp-ic {
+  flex: none; width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center;
+  background: rgba(var(--ob-rgb), .14); color: var(--ob-c);
+}
+.v2 .mv-ob .mv-fig-corpo .mv-ob-cp-ic svg { width: 18px; height: 18px; }
+.v2 .mv-ob .mv-ob-cp-tag { font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; line-height: 1.25; color: var(--ob-c); }
+.v2 .mv-ob .mv-ob-cp-trilho b { font-size: 13px; line-height: 1.35; color: var(--txt); }
+.v2 .mv-ob .mv-ob-cp-trilho small { font-size: 12px; line-height: 1.45; color: var(--txt-2); }
+.v2 .mv-ob .mv-ob-cp-caf { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.v2 .mv-ob .mv-ob-cp-caf > div {
+  display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: 8px;
+  background: rgba(var(--ob-rgb), .06); box-shadow: inset 3px 0 0 var(--ob-c);
+}
+.v2 .mv-ob .mv-ob-cp-caf span { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--ob-c); }
+.v2 .mv-ob .mv-ob-cp-caf p { font-size: 12.5px; line-height: 1.5; color: var(--txt); }
+.v2 .mv-ob .mv-ob-cp-perg {
+  display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: 10px 10px 4px 10px;
+  background: rgba(var(--verde-rgb), .1); border: 1px solid rgba(var(--verde-rgb), .24);
+}
+.v2 .mv-ob .mv-ob-cp-perg span { font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--txt-3); }
+.v2 .mv-ob .mv-ob-cp-perg p { font-size: 13px; font-style: italic; line-height: 1.5; color: var(--txt); }
+
 /* ---------- conversas encenadas (celular + notas) ---------- */
 .v2 .mv-ob .mv-ob-cena { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 16px; align-items: start; }
 .v2 .mv-ob .mv-ob-cena-notas { padding: 16px; display: flex; flex-direction: column; gap: 10px; }
@@ -355,6 +392,10 @@
   .v2 .mv-ob .mv-ob-fam > .mv-ob-fam-card:last-child { grid-column: 1 / -1; }
   .v2 .mv-ob .mv-ob-an-b { max-width: 92%; }
   .v2 .mv-ob .mv-ob-rolo-dica { display: block; }
+  /* o caminho da parcela vira uma coluna, com a seta apontando para baixo */
+  .v2 .mv-ob .mv-ob-cp-trilho { grid-template-columns: 1fr; gap: 22px; }
+  .v2 .mv-ob .mv-ob-cp-trilho li:not(:last-child)::after { top: auto; right: auto; bottom: -16px; left: 50%; transform: translateX(-50%) rotate(135deg); }
+  .v2 .mv-ob .mv-ob-cp-caf { grid-template-columns: 1fr; }
 }
 @media (max-width: 560px) {
   .v2 .mv-ob .mv-ob-met .mv-ob-rolo { display: none; }

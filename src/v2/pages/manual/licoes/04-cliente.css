@@ -37,6 +37,9 @@
 .v2 .mv-cli-con[data-forte] { stroke: var(--verde); stroke-width: 2; }
 .v2 .mv-cli-con-t { fill: var(--txt); font-size: 14px; font-weight: 700; }
 
+/* aviso com dois parágrafos (os dois erros mais comuns) */
+.v2 .mv-cli-aviso-par { display: flex; flex-direction: column; gap: 8px; }
+
 /* ---------- as 3 portas (cartões explicativos) ---------- */
 /* subgrid: cabeçalho, "abre quando", "por quê" e "cuidado" ficam na mesma altura nos três cartões */
 .v2 .mv-cli-pcs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
@@ -187,9 +190,50 @@
 .v2 .mv-cli-ext-lin:last-child { border-bottom: 0; }
 .v2 .mv-cli-ext-lin b { font-weight: 700; }
 .v2 .mv-cli-ext-lin span { color: #55607A; }
-.v2 .mv-cli-ext-v { justify-self: start; white-space: nowrap; height: 24px; padding: 0 10px; border-radius: 12px; display: inline-flex; align-items: center; font-size: 11.5px; font-weight: 600; }
-.v2 .mv-cli-ext-v[data-ok] { background: #E3F4EA; color: #1F7A4D; border: 2px solid #E8A33D; }
-.v2 .mv-cli-ext-v:not([data-ok]) { background: #EEF1F5; color: #55607A; }
+.v2 .mv-cli-ext-cab span[data-destaque] { color: #1B2333; font-weight: 700; }
+.v2 .mv-cli-ext-v {
+  justify-self: start; white-space: nowrap; height: 24px; padding: 0 10px; border-radius: 12px; display: inline-flex; align-items: center;
+  font-size: 11.5px; font-weight: 600; background: #EEF1F5; color: #3A4660; border: 1px solid #C9D1DD;
+}
+.v2 .mv-cli-ext-pe { margin-top: 10px; padding: 8px 12px; border-radius: 8px; background: #F3F5F9; font-size: 12px; color: #3A4660 !important; }
+
+/* ---------- pessoal × consignado: o caminho da parcela ---------- */
+.v2 .mv-cli-cp { display: flex; flex-direction: column; gap: 12px; }
+.v2 .mv-cli-cp-lin {
+  padding: 14px 16px; border-radius: var(--r-ctl); display: flex; flex-direction: column; gap: 10px;
+  background: rgba(var(--tint), .03); border: 1px solid var(--linha); box-shadow: inset 3px 0 0 rgba(var(--tint), .3);
+}
+.v2 .mv-cli-cp-lin[data-tom="verde"] { background: rgba(var(--verde-rgb), .06); border-color: rgba(var(--verde-rgb), .3); box-shadow: inset 3px 0 0 var(--verde); }
+.v2 .mv-cli-cp-cab { display: flex; flex-direction: column; gap: 2px; }
+.v2 .mv-cli-cp-cab b { font-size: 15px; }
+.v2 .mv-cli-cp-lin[data-tom="verde"] .mv-cli-cp-cab b { color: var(--verde); }
+.v2 .mv-cli-cp-cab span { font-size: 12.5px; color: var(--txt-2); line-height: 1.5; }
+.v2 .mv-cli-cp-svgw { overflow-x: auto; overscroll-behavior-x: contain; }
+.v2 .mv-cli-cp-cx rect { fill: var(--base); stroke: rgba(var(--tint), .28); stroke-width: 1.4; }
+.v2 .mv-cli-cp-cx[data-tom="azul"] rect { fill: rgba(var(--azul-rgb), .1); stroke: rgba(var(--azul-rgb), .55); }
+.v2 .mv-cli-cp-cx[data-tom="verde"] rect { fill: var(--verde-bg); stroke: var(--verde); }
+.v2 .mv-cli-cp-b1 { fill: var(--txt); font-size: 13px; font-weight: 700; }
+.v2 .mv-cli-cp-b2 { fill: var(--txt-2); font-size: 12px; }
+.v2 .mv-cli-cp-fio { fill: none; stroke: var(--azul); stroke-width: 2.2; stroke-linejoin: round; }
+.v2 .mv-cli-cp-fio[data-fino] { stroke: rgba(var(--tint), .45); stroke-width: 1.6; }
+.v2 .mv-cli-cp-fio[data-tom="verde"] { stroke: var(--verde); stroke-width: 2.2; }
+.v2 .mv-cli-cp-fio[data-mudo] { stroke: rgba(var(--tint), .3); stroke-width: 1.6; stroke-dasharray: 5 4; }
+.v2 .mv-cli-cp-ponta { fill: var(--azul); }
+.v2 .mv-cli-cp-ponta[data-fino] { fill: rgba(var(--tint), .5); }
+.v2 .mv-cli-cp-ponta[data-tom="verde"] { fill: var(--verde); }
+.v2 .mv-cli-cp-x circle { fill: var(--base); stroke: var(--rubro); stroke-width: 1.6; }
+.v2 .mv-cli-cp-x path { fill: none; stroke: var(--rubro); stroke-width: 1.8; stroke-linecap: round; }
+.v2 .mv-cli-cp-rot { fill: var(--txt-2); font-size: 12px; font-weight: 600; }
+.v2 .mv-cli-cp-rot[data-forte] { fill: var(--azul); }
+.v2 .mv-cli-cp-rot[data-tom="verde"] { fill: var(--verde); }
+.v2 .mv-cli-cp-chips { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; }
+.v2 .mv-cli-cp-chips li {
+  display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600;
+  background: rgba(var(--tint), .05); border: 1px solid var(--linha); color: var(--txt-2);
+}
+.v2 .mv-cli-cp-chips li svg { width: 12px; height: 12px; flex: none; }
+.v2 .mv-cli-cp-chips li[data-tom="sim"] { background: var(--verde-bg); border-color: rgba(var(--verde-rgb), .45); color: var(--verde); }
+.v2 .mv-cli-cp-chips li[data-tom="nao"] { background: var(--rubro-bg); border-color: transparent; color: var(--rubro); }
 
 /* ---------- familiar (SVG) e pessoas desenhadas ---------- */
 .v2 .mv-cli-pele { fill: rgba(var(--tint), .09); stroke: var(--txt-2); stroke-width: 1.6; }
@@ -242,6 +286,27 @@
 .v2 .mv-cli-ati-ic { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: var(--verde-bg); color: var(--verde); }
 .v2 .mv-cli-ati-it b { font-size: 14px; }
 .v2 .mv-cli-ati-it p { font-size: 12.5px; color: var(--txt-2) !important; line-height: 1.5; }
+
+/* ---------- treino: pessoal ou consignado? ---------- */
+.v2 .mv-cli-tp { padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; }
+.v2 .mv-cli-tp-topo { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.v2 .mv-cli-tp-topo b { font-size: 14px; }
+.v2 .mv-cli-tp-topo span { flex: 1; font-size: 12.5px; color: var(--txt-3); }
+.v2 .mv-cli-tp-lista { list-style: none; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.v2 .mv-cli-tp-it {
+  padding: 12px 14px; border-radius: var(--r-ctl); display: flex; flex-direction: column; gap: 10px;
+  background: rgba(var(--tint), .035); border: 1px solid var(--linha);
+}
+.v2 .mv-cli-tp-it[data-estado="certo"] { background: var(--verde-bg); border-color: rgba(var(--verde-rgb), .35); }
+.v2 .mv-cli-tp-it[data-estado="errado"] { background: var(--rubro-bg); border-color: transparent; }
+.v2 .mv-cli-tp-fala { font-size: 13.5px; line-height: 1.5; font-weight: 500; }
+.v2 .mv-cli-tp-bts { display: flex; flex-wrap: wrap; gap: 6px; }
+.v2 .mv-cli-tp-bts .mv-cli-btn { min-height: 32px; padding: 0 10px; font-size: 12.5px; }
+.v2 .mv-cli-tp-r { display: flex; flex-direction: column; gap: 4px; }
+.v2 .mv-cli-tp-r b { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--verde); }
+.v2 .mv-cli-tp-it[data-estado="errado"] .mv-cli-tp-r b { color: var(--rubro); }
+.v2 .mv-cli-tp-r b svg { width: 14px; height: 14px; flex: none; }
+.v2 .mv-cli-tp-r span { font-size: 12.5px; color: var(--txt-2); line-height: 1.5; }
 
 /* ---------- tradutor de jargão ---------- */
 .v2 .mv-cli-trad { padding: 18px; display: flex; flex-direction: column; gap: 14px; }
@@ -323,13 +388,15 @@
   .v2 .mv-cli-lado .mv-cel { position: static; }
   /* 700px: o menor texto (12px no viewBox de 760) continua com 11px ou mais */
   .v2 .mv-cli-rolar > .mv-cli-svg, .v2 .mv-cli-arv-fig > .mv-cli-svg { min-width: 700px; }
+  .v2 .mv-cli-cp-svgw > .mv-cli-svg { min-width: 660px; }
   .v2 .mv-cli-fin { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .v2 .mv-cli-trad-seta { transform: rotate(90deg); height: 24px; }
   .v2 .mv-cli-per-av { flex-direction: row; text-align: left; }
   .v2 .mv-cli-per-av svg { width: 96px; }
 }
-/* extrato no celular: banco ocupa o que sobra; contrato e selo com largura fixa (as linhas são grades separadas) */
+/* extrato no celular: some a coluna do contrato (é só enfeite); banco ocupa o que sobra e o tipo fica inteiro */
 @media (max-width: 600px) {
   .v2 .mv-cli-ext { padding: 6px 12px 12px; }
-  .v2 .mv-cli-ext-cab, .v2 .mv-cli-ext-lin { grid-template-columns: minmax(0, 1fr) 66px 100px; gap: 8px; }
+  .v2 .mv-cli-ext-cab, .v2 .mv-cli-ext-lin { grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+  .v2 .mv-cli-ext-cab > span:nth-child(2), .v2 .mv-cli-ext-lin > .num { display: none; }
 }

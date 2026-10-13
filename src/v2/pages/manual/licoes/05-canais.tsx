@@ -2,15 +2,17 @@
    Facebook → WhatsApp), a diferença entre o canal de juros abusivos e o de
    empréstimo, o que o robô e a IA já conversaram (copy LITERAL do processo
    oficial de 18/09), o que chega na mão do atendente, o cuidado com a
-   "pré-aprovada" e o que fazer quando o cliente responde NÃO. */
+   "pré-aprovada" e o que fazer quando o cliente responde NÃO.
+   Correção do dono (13/10): a revisão é dos juros do EMPRÉSTIMO PESSOAL; o
+   consignado é o assunto dos ganchos do canal de empréstimo. */
 import type { Licao } from '../tipos';
 import {
   Aviso, BomRuim, Celular, Conversa, Fatos, Figura, Frase, Lista, Passos, Sanfona, Secao, Tabela, TesteRapido,
   type Bolha,
 } from '../pecas';
 import {
-  Anotacoes, AnunciosIlustrados, ArvoreNao, CaminhoDoLead, FichasNaMao, FluxoPorCanal, PontoDePartida, PreAprovadaEeNao,
-  QualCanal, ReguaPreAprovada, SimuladorPortas,
+  Anotacoes, AnunciosIlustrados, ArvoreNao, CaminhoDoLead, DoisEmprestimos, FichasNaMao, FluxoPorCanal, PontoDePartida,
+  PreAprovadaEeNao, QualCanal, ReguaPreAprovada, SimuladorPortas,
 } from './05-canais-figuras';
 import './05-canais.css';
 
@@ -63,7 +65,7 @@ const LISTA_DOCS = [
 const CEL_EMP_IA: Bolha[] = [
   { de: 'robo', texto: '[a IA pergunta se ele recebe algum benefício do INSS]', hora: '14:05' },
   { de: 'cliente', texto: 'Sou aposentado.', hora: '14:06' },
-  { de: 'robo', texto: '[pergunta se ele tem empréstimo no Agibank, BMG, Facta, Mercantil ou Crefisa]', hora: '14:06' },
+  { de: 'robo', texto: '[pergunta se ele tem empréstimo pessoal no Agibank, BMG, Facta, Mercantil ou Crefisa]', hora: '14:06' },
   { de: 'cliente', texto: 'Tenho no Mercantil e no BMG.', hora: '14:07' },
   { de: 'robo', texto: '[avisa que vai fazer a análise e espera uns 5 minutos]', hora: '14:07' },
   { de: 'robo', texto: 'Boa notícia, José! Sua análise foi *pré-aprovada*.', hora: '14:12' },
@@ -124,7 +126,7 @@ const corpo = (
         <AnunciosIlustrados />
       </Figura>
       <p>
-        O texto de cada anúncio já separa os dois públicos. Um fala de <b>juros do empréstimo</b>; o outro fala em <b>ver se é
+        O texto de cada anúncio já separa os dois públicos. Um fala de <b>juros abusivos</b>; o outro fala em <b>ver se é
         liberado algum valor</b>. Cada um atrai uma pessoa com uma vontade diferente, e é essa vontade que muda a sua conversa.
       </p>
     </Secao>
@@ -139,8 +141,8 @@ const corpo = (
           <small>Canal 1 · tráfego do Andrius</small>
           <h4>Juros abusivos</h4>
           <p>
-            O nome do canal é <b>JUROS ABUSIVO (ANDRIUS)</b>. O cliente viu um anúncio sobre juros e veio por isso: <b>ele já
-            quer a revisão</b>. É um público mais nichado, que chega sabendo o assunto.
+            O nome do canal é <b>JUROS ABUSIVO (ANDRIUS)</b>. O cliente viu um anúncio sobre <b>juros abusivos</b> e
+            veio por isso: <b>ele já quer a revisão</b>. É um público mais nichado, que chega sabendo o assunto.
           </p>
           <div className="mv-canal-pe"><span>Venda</span><b>Mais direta</b></div>
           <Lista itens={['Dar a atualização que o robô prometeu', 'Confirmar o perfil (as 3 portas)', 'Explicar o processo e partir para os documentos']} />
@@ -149,8 +151,8 @@ const corpo = (
           <small>Canal 2 · tráfego de empréstimo</small>
           <h4>Empréstimo</h4>
           <p>
-            O cliente <b>quer dinheiro rápido</b> e chega com a palavra “pré-aprovada” na cabeça. Só que a maioria <b>não tem
-            margem disponível</b> para um empréstimo novo.
+            O cliente <b>quer dinheiro rápido</b>, em geral um <b>consignado novo</b>, e chega com a palavra “pré-aprovada” na
+            cabeça. Só que a maioria <b>não tem margem disponível</b> para isso.
           </p>
           <div className="mv-canal-pe"><span>Venda</span><b>Convencer</b></div>
           <Lista itens={['Apresentar-se e explicar a pré-aprovada', 'Entender o que ele precisa e pedir os extratos', 'Explicar a margem e mostrar os caminhos']} />
@@ -169,7 +171,8 @@ const corpo = (
         colunas={['Comparando', 'Juros abusivos (Andrius)', 'Empréstimo']}
         destaque={0}
         linhas={[
-          ['O que o cliente quer', 'Revisar os juros do empréstimo. Veio por causa disso.', 'Dinheiro rápido: um empréstimo novo.'],
+          ['O que o cliente quer', 'Revisar os juros do empréstimo pessoal que tem com a financeira.', 'Dinheiro rápido: um consignado novo. A maioria não tem margem para isso.'],
+          ['O que você oferece', 'O processo de revisão dos juros do empréstimo pessoal.', 'Os caminhos do consignado (aumento de margem, portabilidade) e a revisão dos juros do empréstimo pessoal que ele já tem.'],
           ['Tipo de venda', 'Mais direta: confirmar, explicar, pedir os documentos.', 'Consultiva: entender, verificar, convencer.'],
           ['O que ele espera ouvir', 'Como funciona, se ele tem direito e quanto custa.', 'Quanto vai ser liberado e quando o dinheiro cai.'],
           ['O que o robô mandou', 'Vídeo de 30 segundos e convite para a análise gratuita.', 'Imagem de boas-vindas e convite para ver se é liberado algum valor.'],
@@ -187,7 +190,39 @@ const corpo = (
           'Que ele só queira tirar uma dúvida, sem intenção de seguir adiante',
         ]}
         certa={1}
-        explica="Quem vem pelo tráfego do Andrius viu um anúncio sobre juros e veio por isso. Confirme o perfil, explique o processo e siga para os documentos."
+        explica="Quem vem pelo tráfego do Andrius viu um anúncio sobre juros abusivos e veio por isso. Confirme o perfil, explique o processo e siga para os documentos."
+      />
+    </Secao>
+
+    <Secao titulo="Consignado ou empréstimo pessoal: não confunda">
+      <p>
+        Repare que os dois canais falam de <b>empréstimos diferentes</b>. O cliente do canal de empréstimo quer um
+        <b> consignado</b> novo. Já o processo da CAF, nos dois canais, revisa os juros do <b>empréstimo pessoal</b> que o
+        cliente fez com as financeiras (Agibank, BMG, Facta, Mercantil ou Crefisa). Em uma frase: <b>o consignado é descontado
+        pelo INSS; o empréstimo pessoal é cobrado pela financeira, fora do INSS.</b>
+      </p>
+      <Figura tag="Comparativo" legenda="Os dois empréstimos lado a lado. O destaque na trilha mostra em que ponto a parcela é paga. A explicação completa de consignado e margem está na lição 3.">
+        <DoisEmprestimos />
+      </Figura>
+      <p>
+        É por isso que o canal de empréstimo tem duas conversas numa só. Uma é sobre os <b>consignados</b>: sem margem, não sai
+        um novo, e os caminhos são o aumento de margem e a portabilidade dos consignados. A outra é sobre o <b>empréstimo
+        pessoal</b> que ele já tem: a revisão dos juros. Misturar as duas confunde o cliente e passa uma informação errada.
+      </p>
+      <Aviso titulo="Como perguntar sem complicar">
+        Muita gente não sabe o nome do empréstimo que tem. Em vez de perguntar só “o senhor tem empréstimo pessoal?”, explique:
+        “é aquele empréstimo que a financeira cobra na sua conta, e não o que o INSS desconta direto do benefício”. O cliente
+        costuma lembrar pelo nome do banco e pelo débito na conta.
+      </Aviso>
+      <TesteRapido
+        pergunta="No canal de juros, a cliente pergunta: “É sobre aquele empréstimo que o INSS desconta direto do meu benefício?” O que você responde?"
+        opcoes={[
+          '“É esse mesmo: os juros abusivos ficam no consignado que o INSS desconta.”',
+          '“Não, é outro: o empréstimo pessoal, que a financeira cobra fora do INSS.”',
+          '“Tanto faz: a revisão vale para qualquer empréstimo que a senhora tiver.”',
+        ]}
+        certa={1}
+        explica="O que o INSS desconta direto do benefício é o consignado. O processo da CAF revisa os juros do empréstimo pessoal: o contrato direto com a financeira, cobrado fora do INSS."
       />
     </Secao>
 
@@ -240,8 +275,9 @@ const corpo = (
         ]} />
       </div>
       <Aviso tom="ambar" titulo="Repare no que o robô NÃO perguntou">
-        No canal de juros, o robô não pergunta se a pessoa recebe do INSS nem em qual financeira é o empréstimo. Ou seja: as <b>3
-        portas ficam com você</b>. Antes de explicar o processo, confirme o benefício do INSS e a financeira.
+        No canal de juros, o robô não pergunta se a pessoa recebe do INSS nem se ela tem empréstimo pessoal numa das 5
+        financeiras. Ou seja: as <b>3 portas ficam com você</b>. Antes de explicar o processo, confirme o benefício do INSS e o
+        <b> empréstimo pessoal</b> com Agibank, BMG, Facta, Mercantil ou Crefisa.
       </Aviso>
       <p>
         Na prática, você entra na conversa logo depois da mensagem de “Recebido”. O cliente está esperando a atualização
@@ -252,7 +288,7 @@ const corpo = (
         pergunta="No canal de juros, o que o robô já pegou do cliente quando a conversa chega até você?"
         opcoes={['Benefício do INSS e a financeira', 'Senha do gov.br e comprovante', 'Nome completo e CPF']}
         certa={2}
-        explica="O robô do canal de juros pega só o nome completo e o CPF. Confirmar o benefício do INSS e a financeira (as 3 portas) é com você."
+        explica="O robô do canal de juros pega só o nome completo e o CPF. Confirmar o benefício do INSS e o empréstimo pessoal numa das 5 financeiras (as 3 portas) é com você."
       />
     </Secao>
 
@@ -279,7 +315,7 @@ const corpo = (
       <h4 className="mv-cn-sub">Parte 2: a IA confere as 3 portas <span>elegibilidade</span></h4>
       <p>
         Logo em seguida a IA faz as perguntas que decidem se a pessoa pode seguir. São as <b>3 portas</b>: (1) recebe algum
-        benefício do INSS? (2) se não recebe, algum familiar recebe? (3) tem empréstimo em alguma das 5 financeiras? Experimente o
+        benefício do INSS? (2) se não recebe, algum familiar recebe? (3) tem empréstimo pessoal em alguma das 5 financeiras? Experimente o
         simulador: responda como se fosse o cliente e veja o que a IA faz em cada caso.
       </p>
       <SimuladorPortas />
@@ -290,8 +326,8 @@ const corpo = (
         completa das portas, caso a caso, está na lição 4.
       </p>
       <Aviso tom="ambar" titulo="Não elegível: com carinho, sem insistir">
-        Quando ninguém da família recebe do INSS, ou quando o empréstimo não é em nenhuma das 5 financeiras, a IA agradece e encerra
-        a conversa sem insistir. Se isso acontecer numa conversa sua, faça igual.
+        Quando ninguém da família recebe do INSS, ou quando a pessoa não tem empréstimo pessoal em nenhuma das 5 financeiras, a IA
+        agradece e encerra a conversa sem insistir. Se isso acontecer numa conversa sua, faça igual.
       </Aviso>
 
       <h4 className="mv-cn-sub">Parte 3: pré-aprovada e documentos <span>IA</span></h4>
@@ -299,7 +335,7 @@ const corpo = (
         <Celular contato="CAF" bolhas={CEL_EMP_IA}
           legenda="Canal de empréstimo: a parte da IA. Entre colchetes, resumo do que acontece; “[…]” marca um trecho omitido aqui. O resto é o texto exato." />
         <Anotacoes itens={[
-          { t: 'As perguntas das portas', d: 'A IA confere o benefício do INSS e a financeira. O texto dela varia, por isso aparece resumido.' },
+          { t: 'As perguntas das portas', d: 'A IA confere o benefício do INSS e se há empréstimo pessoal numa das 5 financeiras. O texto dela varia, por isso aparece resumido.' },
           { t: 'Uns 5 minutos de espera', d: 'A IA avisa que vai fazer a análise e espera um pouco antes de responder.' },
           { t: 'Pré-aprovada', d: <>“Boa notícia, José! Sua análise foi <b>pré-aprovada</b>.” Para o cliente, isso soa como dinheiro garantido. <b>Não é.</b> Veja a seção sobre isso logo abaixo.</> },
           { t: 'Lista de documentos', d: 'Uma lista fixa: RG ou CNH (frente e verso), comprovante de residência, foto do rosto e e-mail, com exemplos de conta que servem como comprovante (água ou luz, internet ou telefone, TV).' },
@@ -367,10 +403,10 @@ const corpo = (
       </p>
       <PreAprovadaEeNao />
       <p>
-        E aqui está o ponto: a maioria de quem vem por esse canal <b>não tem margem disponível</b> para um empréstimo novo. A margem
-        é a parte do benefício que pode ser descontada para pagar empréstimos e cartões consignados; quando ela já está toda usada,
-        o banco não libera um empréstimo novo (a lição 3 explica a margem em detalhe). E você só sabe disso com segurança depois
-        de conferir os extratos do INSS.
+        E aqui está o ponto: a maioria de quem vem por esse canal <b>não tem margem disponível</b> para um consignado novo. A margem
+        é a parte do benefício que pode ser descontada para pagar os consignados (empréstimos e cartões); quando ela já está toda
+        usada, não sai um novo (a lição 3 explica a margem em detalhe). E você só sabe disso com segurança depois de
+        conferir os extratos do INSS.
       </p>
       <Figura tag="Diagrama" legenda="O cliente acha que está no fim do caminho. Na verdade, está no começo. O seu trabalho é mostrar isso com calma.">
         <ReguaPreAprovada />
@@ -381,12 +417,13 @@ const corpo = (
         { titulo: 'Apresente-se', texto: 'Diga o seu nome e que é da CAF. O cliente estava esperando “um analista em instantes”: agora ele sabe que é você.' },
         { titulo: 'Explique a pré-aprovada com honestidade', texto: 'A análise inicial passou nas perguntas; isso não é valor liberado. Não diga “foi aprovado” e não cite valor nenhum.' },
         { titulo: 'Faça uma pergunta aberta e curta', texto: 'Sobre o que a pessoa precisa: “Me conta, o que o senhor está precisando hoje?”. A resposta mostra o que pesa para ela e ajuda a escolher o caminho depois.' },
-        { titulo: 'Peça os extratos do Meu INSS', texto: 'É com eles que você confere a situação real: os contratos e a margem. Como pegar cada extrato está na lição 10.' },
+        { titulo: 'Peça os extratos do Meu INSS', texto: 'É com eles que você confere a situação real: os consignados e a margem. Como pegar cada extrato está na lição 10.' },
       ]} />
       <p>
-        Só depois de conferir os extratos vem a resposta. Se não houver margem, diga isso com clareza e apresente os caminhos,
-        sempre como possibilidade: <b>aumento de margem</b>, <b>portabilidade</b> (que pode liberar um valor acima de R$&nbsp;1.500) e
-        o <b>processo de revisão dos juros</b>. Se houver margem, combine o próximo passo com o seu gestor.
+        Só depois de conferir os extratos vem a resposta. Se não houver margem para um consignado novo, diga isso com clareza e
+        apresente os caminhos, sempre como possibilidade. Do lado dos consignados: o <b>aumento de margem</b> e a <b>portabilidade
+        dos consignados</b> (que pode liberar um valor acima de R$&nbsp;1.500). Do lado do empréstimo pessoal que ele já tem: o
+        <b> processo de revisão dos juros</b>. Se houver margem, combine o próximo passo com o seu gestor.
       </p>
       <BomRuim
         ruim={{
@@ -397,6 +434,7 @@ const corpo = (
               '“Deve sair uns 5 mil para o senhor.” (qualquer valor, antes de verificar)',
               'Sumir da conversa quando descobre que o cliente não tem margem.',
               'Falar do processo como se fosse o empréstimo, para o cliente não perceber a diferença.',
+              'Dizer que a revisão é dos consignados dele. O processo revisa os juros do empréstimo pessoal.',
             ]} />
           ),
         }}
@@ -406,7 +444,7 @@ const corpo = (
             <Lista tom="sim" itens={[
               '“A pré-aprovação quer dizer que a sua análise inicial passou nas primeiras perguntas. Ainda não é valor liberado: preciso conferir os seus extratos do INSS.”',
               'Contar a verdade sobre a margem, com calma, e logo em seguida mostrar os caminhos.',
-              'Explicar que o processo é outra coisa: o advogado entra com uma ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos. O resultado depende da análise, e o cliente não paga nada para começar.',
+              'Explicar que o processo é outra coisa: a revisão dos juros do empréstimo pessoal que o cliente já tem com a financeira. O advogado entra com uma ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos. O resultado depende da análise, e o cliente não paga nada para começar.',
             ]} />
           ),
         }}
@@ -428,10 +466,11 @@ const corpo = (
         titulo="Depois de verificar: quando não há margem"
         nota="Sugestão de roteiro, adapte ao cliente. Como conduzir cada caminho está na lição 7."
         falas={[
-          { quem: 'eu', texto: 'Seu José, conferi os seus extratos. Hoje a sua margem está toda comprometida com os empréstimos que o senhor já tem. Por isso o banco não libera um empréstimo novo agora.' },
+          { quem: 'eu', texto: 'Seu José, conferi os seus extratos. Hoje a sua margem está toda comprometida com os consignados que o senhor já tem. Por isso não sai um consignado novo agora.' },
           { quem: 'cliente', texto: 'Ah, então não dá nada?' },
           { quem: 'eu', texto: 'Tem caminhos, sim. Dá para analisar a possibilidade de aumentar a sua margem, ou de levar os seus consignados para outro banco, que é a portabilidade. Ela pode liberar um valor acima de R$\u00a01.500.' },
-          { quem: 'eu', texto: 'E tem mais uma coisa: os seus contratos podem ter juros abusivos. O nosso advogado, o Dr. Rafael Menezes, entra com uma ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos. O resultado depende da análise, e o senhor não paga nada para começar. Posso te explicar como funciona?' },
+          { quem: 'eu', texto: 'E tem mais uma coisa. O senhor contou que tem empréstimo pessoal no Mercantil e no BMG: aquele que a financeira cobra na sua conta, e não o que o INSS desconta direto do benefício. Os juros desse empréstimo podem ser analisados.' },
+          { quem: 'eu', texto: 'O nosso advogado, o Dr. Rafael Menezes, entra com uma ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos. O resultado depende da análise, e o senhor não paga nada para começar. Posso te explicar como funciona?' },
         ]}
       />
       <Aviso tom="rubro" titulo="Nunca prometa">
@@ -521,11 +560,11 @@ const corpo = (
 
     <Secao titulo="Resumo da lição">
       <Lista itens={[
-        <>O cliente chega por <b>anúncio no Facebook</b>, em dois canais: <b>juros abusivos</b> (do Andrius), com venda mais direta, e <b>empréstimo</b>, em que é preciso convencer.</>,
-        <>Antes de você, o robô já pegou <b>nome e CPF</b>. No empréstimo, a IA também conferiu as <b>3 portas</b> e mandou a “pré-aprovada” e a lista de documentos.</>,
+        <>O cliente chega por <b>anúncio no Facebook</b>, em dois canais: <b>juros abusivos</b> (do Andrius), de quem já quer revisar os juros do empréstimo pessoal, com venda mais direta; e <b>empréstimo</b>, de quem quer um consignado novo (a maioria sem margem) e precisa ser convencido.</>,
+        <>O <b>consignado</b> é descontado pelo INSS e depende de margem; o <b>empréstimo pessoal</b> é cobrado pela financeira, fora do INSS. <b>O processo revisa os juros do empréstimo pessoal.</b></>,
+        <>Antes de você, o robô já pegou <b>nome e CPF</b>; no empréstimo, a IA também conferiu as <b>3 portas</b> e mandou a “pré-aprovada” e a lista de documentos. <b>Leia o histórico antes de escrever</b> e não repita perguntas.</>,
         <>No canal de juros, <b>as 3 portas são com você</b>, e o robô prometeu uma atualização “em alguns minutos”: cumpra.</>,
-        <><b>“Pré-aprovada” não é dinheiro garantido.</b> Apresente-se, explique isso com honestidade, pergunte o que a pessoa precisa e peça os extratos. Só depois de conferir fale dos caminhos, como possibilidade.</>,
-        <><b>Leia o histórico antes de escrever</b> e não repita perguntas que o robô já fez.</>,
+        <><b>“Pré-aprovada” não é dinheiro garantido.</b> Apresente-se, explique isso com honestidade, pergunte o que a pessoa precisa e peça os extratos. Só depois de conferir fale dos caminhos (aumento de margem, portabilidade dos consignados e a revisão dos juros do empréstimo pessoal), como possibilidade.</>,
         <>O cliente disse NÃO? <b>Agradeça com carinho e não insista.</b> A porta fica aberta.</>,
       ]} />
       <Frase>O robô abre a porta. Quem conquista a confiança é você.</Frase>
@@ -537,7 +576,7 @@ const licao: Licao = {
   id: 'canais',
   modulo: 'venda',
   titulo: 'Os dois canais e o robô',
-  resumo: 'De onde vem o cliente, a diferença entre o canal de juros abusivos e o de empréstimo, o que o robô e a IA já conversaram antes de você e como continuar com honestidade.',
+  resumo: 'De onde vem o cliente, a diferença entre o canal de juros abusivos e o de empréstimo (e entre consignado e empréstimo pessoal), o que o robô e a IA já conversaram antes de você e como continuar com honestidade.',
   minutos: 25,
   corpo,
   questoes: [
@@ -549,7 +588,7 @@ const licao: Licao = {
         'Os dois querem a revisão dos juros; muda só o anúncio que cada um deles viu no Facebook',
       ],
       c: 1,
-      e: 'Quem vem pelo tráfego do Andrius já quer a revisão: a venda é mais direta. Quem vem pelo de empréstimo quer dinheiro rápido, a maioria sem margem, e precisa ser convencido.',
+      e: 'Quem vem pelo tráfego do Andrius já quer a revisão dos juros do empréstimo pessoal: a venda é mais direta. Quem vem pelo de empréstimo quer dinheiro rápido (um consignado novo), a maioria sem margem, e precisa ser convencido.',
     },
     {
       p: 'No canal de empréstimo, a IA manda “Sua análise foi pré-aprovada”. O que isso quer dizer?',
@@ -584,18 +623,18 @@ const licao: Licao = {
     {
       p: 'Você conferiu os extratos e o cliente do canal de empréstimo não tem margem. O que você faz?',
       o: [
-        'Explica com calma e mostra os caminhos: aumento de margem, portabilidade e o processo',
+        'Mostra os caminhos do consignado e a revisão dos juros do empréstimo pessoal dele',
+        'Promete que a portabilidade vai liberar R$ 1.500 para ele',
         'Encerra com carinho, porque sem margem a CAF não tem mais nada para oferecer a ele',
-        'Diz que a margem deve liberar no mês que vem e já pede os documentos para adiantar',
       ],
       c: 0,
-      e: 'Sem margem é justamente quando entram os caminhos: aumento de margem, portabilidade e o processo de revisão dos juros. Sempre como possibilidade, nunca como promessa.',
+      e: 'Sem margem é justamente quando entram os caminhos: aumento de margem e portabilidade dos consignados e o processo de revisão dos juros do empréstimo pessoal. Sempre como possibilidade, nunca como promessa.',
     },
   ],
   glossario: [
     { termo: 'Tráfego pago', def: 'Anúncio pago em redes sociais, como o Facebook, para aparecer para um público escolhido. É de onde vêm os nossos clientes.' },
     { termo: 'Lead', def: 'Pessoa que mostrou interesse (por exemplo, tocou no anúncio e abriu a conversa) e ainda não fechou. É um possível cliente.' },
-    { termo: 'Canal', def: 'Cada porta de entrada dos clientes. A CAF tem dois: o de juros abusivos (do Andrius) e o de empréstimo.' },
+    { termo: 'Canal', def: 'Cada porta de entrada dos clientes. A CAF tem dois: o de juros abusivos (do Andrius), de quem quer revisar os juros do empréstimo pessoal, e o de empréstimo, de quem quer um consignado novo.' },
     { termo: 'Robô (fluxo automático)', def: 'Sequência de mensagens fixas que o nosso sistema manda sozinho no WhatsApp, sempre na mesma ordem: boas-vindas, vídeo ou imagem, SIM ou NÃO, nome e CPF.' },
     { termo: 'IA de atendimento', def: 'Assistente automático que conversa de forma mais livre. No canal de empréstimo, confere as 3 portas, manda a pré-aprovada e a lista de documentos e passa a conversa para um analista. Nunca cita valores, taxas ou juros.' },
     { termo: 'Pré-aprovada', def: 'Mensagem da IA no canal de empréstimo, enviada depois das 3 portas. Quer dizer que a análise inicial passou nas perguntas e dá para seguir. Não é valor liberado nem empréstimo garantido.' },
@@ -609,7 +648,7 @@ const licao: Licao = {
     {
       titulo: 'Sem margem: apresentar os caminhos',
       quando: 'Depois de conferir os extratos, quando o cliente do empréstimo não tem margem.',
-      texto: 'Conferi os seus extratos, [nome do cliente]. Hoje a sua margem está toda comprometida com os empréstimos que você já tem, por isso o banco não libera um empréstimo novo agora.\n\nMas existem caminhos que podemos analisar: a possibilidade de aumentar a sua margem, a portabilidade dos seus consignados para outro banco (que pode liberar um valor acima de R$\u00a01.500) e o processo de revisão dos juros, em que o advogado entra com uma ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos. O resultado depende da análise.\n\nPara começar você não paga nada: os honorários do advogado (30%) só saem no final, do valor que você receber. Posso te explicar cada caminho?',
+      texto: 'Conferi os seus extratos, [nome do cliente]. Hoje a sua margem está toda comprometida com os consignados que você já tem, por isso não sai um consignado novo agora.\n\nMas existem caminhos que podemos analisar: a possibilidade de aumentar a sua margem e a portabilidade dos seus consignados para outro banco (que pode liberar um valor acima de R$\u00a01.500).\n\nE tem mais um: a revisão dos juros do empréstimo pessoal que você já tem com a financeira (aquele que a financeira cobra na sua conta, e não o que o INSS desconta direto do benefício). O advogado entra com uma ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos. O resultado depende da análise.\n\nPara começar você não paga nada: os honorários do advogado (30%) só saem no final, do valor que você receber. Posso te explicar cada caminho?',
     },
     {
       titulo: 'Cliente disse não',

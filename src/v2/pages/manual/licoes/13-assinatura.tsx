@@ -19,7 +19,7 @@ import './13-assinatura.css';
 /* Mensagem de "próximos passos" (usada no roteiro e nas mensagens prontas). */
 const PROXIMOS_PASSOS =
   '[nome], recebi as procurações assinadas e conferi: está tudo certo! Muito obrigado pela confiança.\n\n' +
-  'Agora o nosso advogado, Dr. Rafael Menezes, entra com uma ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos. O resultado depende da análise. Em média, o processo leva de 6 a 12 meses.\n\n' +
+  'Agora o nosso advogado, Dr. Rafael Menezes, entra com uma ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos nos seus empréstimos pessoais com as financeiras: o processo é sobre os juros desses empréstimos. O resultado depende da análise. Em média, o processo leva de 6 a 12 meses.\n\n' +
   'Você não paga nada agora: os honorários do advogado são 30% e só saem no final, do valor que você receber. Se alguém pedir qualquer pagamento em nome do processo, não pague e me chame aqui.\n\n' +
   'Qualquer dúvida, é só me chamar!';
 
@@ -102,8 +102,9 @@ const corpo = (
       </p>
       <p>
         No nosso caso: <b>o cliente autoriza o advogado a agir em nome dele no processo</b>. É o nosso advogado, o Dr.
-        Rafael Menezes, quem entra com a ação. Só que ninguém pode entrar na Justiça em nome de outra pessoa sem
-        autorização dela. A procuração assinada é essa autorização: sem ela, o processo não sai do lugar.
+        Rafael Menezes, quem entra com a ação sobre os juros dos <b>empréstimos pessoais</b> que o cliente fez com as
+        financeiras (Agibank, BMG, Facta, Mercantil ou Crefisa). Só que ninguém pode entrar na Justiça em nome de outra
+        pessoa sem autorização dela. A procuração assinada é essa autorização: sem ela, o processo não sai do lugar.
       </p>
       <ProcuracaoIlustrada />
       <p>Os termos do documento assustam, mas cada um tem um significado simples:</p>
@@ -137,7 +138,7 @@ const corpo = (
           titulo: 'Assim o cliente entende',
           corpo: (
             <div className="mv-as-br">
-              <p>“Dona Maria, a procuração é a autorização para o nosso advogado entrar com o processo em nome da senhora. Sem ela, ele não pode agir. Assinar não tem custo nenhum, e a senhora pode ler com calma antes.”</p>
+              <p>“Dona Maria, a procuração é a autorização para o nosso advogado entrar, em nome da senhora, com o processo sobre os juros do seu empréstimo pessoal. Sem ela, ele não pode agir. Assinar não tem custo nenhum, e a senhora pode ler com calma antes.”</p>
               <p className="mv-as-obs">Explica para que serve, tira o medo do custo e respeita o tempo do cliente.</p>
             </div>
           ),
@@ -345,10 +346,17 @@ const corpo = (
         precisa sair dessa etapa sabendo três coisas, ditas com clareza:
       </p>
       <Passos itens={[
-        { titulo: 'O advogado entra com a ação', texto: 'O Dr. Rafael Menezes, o nosso advogado, entra com uma ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos. Para o cliente, diga junto: o resultado depende da análise.' },
+        { titulo: 'O advogado entra com a ação', texto: 'O Dr. Rafael Menezes, o nosso advogado, entra com uma ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos nos empréstimos pessoais que o cliente fez com as financeiras. Para o cliente, diga junto: o resultado depende da análise.' },
         { titulo: 'Leva, em média, de 6 a 12 meses', texto: 'É uma média: cada processo anda no seu ritmo. Nunca prometa data.' },
         { titulo: 'Nada é pago antes; os 30% só no final', texto: 'Os honorários do advogado são 30%, tirados do valor que o cliente receber, no final do processo. A conta com exemplo está na lição 2.' },
       ]} />
+      <Aviso titulo="Use o nome certo: empréstimo pessoal, não consignado">
+        O processo é sobre os juros do <b>empréstimo pessoal</b>, e é fácil o cliente confundir os dois. O <b>consignado</b> é
+        descontado pelo INSS direto do benefício, antes de o dinheiro cair na conta. O <b>empréstimo pessoal</b> é um
+        contrato direto com a financeira e é cobrado por ela, fora do INSS; tem juros livres, em geral bem mais altos, e
+        é nele que aparecem os juros abusivos que a CAF revisa. Se o cliente perguntar, explique assim, em linguagem
+        simples. A diferença completa está na lição 3.
+      </Aviso>
       <LinhaTempoPos />
       <p>
         Repare no tom. O cliente está feliz e ansioso ao mesmo tempo, e vai querer saber “quanto” e “quando”. É aí que
@@ -383,7 +391,9 @@ const corpo = (
         nota="Sugestão de roteiro, adapte ao cliente"
         falas={[
           { quem: 'eu', texto: 'Dona Maria, recebi as procurações assinadas e conferi: está tudo certo! Muito obrigado pela confiança.' },
-          { quem: 'eu', texto: 'Agora o próximo passo é com o nosso advogado, o Dr. Rafael Menezes: ele entra com uma ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos. O resultado depende da análise.' },
+          { quem: 'eu', texto: 'Agora o próximo passo é com o nosso advogado, o Dr. Rafael Menezes: ele entra com uma ação pedindo o ressarcimento do que foi descontado nos últimos 10 anos nos seus empréstimos pessoais. O resultado depende da análise.' },
+          { quem: 'cliente', texto: 'É sobre aquele desconto que o INSS faz no meu benefício?' },
+          { quem: 'eu', texto: 'Não, Dona Maria. O desconto que o INSS faz direto no benefício é o consignado. O processo é sobre os juros do empréstimo pessoal: o contrato que a senhora fez direto com a financeira, que ela cobra fora do INSS.' },
           { quem: 'cliente', texto: 'E demora muito?' },
           { quem: 'eu', texto: 'Em média, o processo leva de 6 a 12 meses. Cada processo anda no seu ritmo, então não dá para cravar uma data, mas eu sigo aqui com a senhora.' },
           { quem: 'cliente', texto: 'E eu tenho que pagar alguma coisa?' },
@@ -420,7 +430,7 @@ const corpo = (
         <><b>Nunca prometa valor nem data.</b> Fale em “média”, “análise” e “possibilidade”.</>,
         <><b>Reforce sempre:</b> nada é pago antes; os 30% só saem no final, do valor recebido.</>,
         <><b>Senha:</b> se o cliente passou a senha do gov.br para você, ajude-o a trocar (como fazer: lição 10).</>,
-        <><b>Família:</b> se ele contar que um parente também recebe do INSS e tem desconto de empréstimo de uma das cinco financeiras (Agibank, BMG, Facta, Mercantil ou Crefisa), ofereça a análise gratuita para esse parente também.</>,
+        <><b>Família:</b> se ele contar que um parente também recebe do INSS e tem empréstimo pessoal com uma das cinco financeiras (Agibank, BMG, Facta, Mercantil ou Crefisa), ofereça a análise gratuita para esse parente também.</>,
         <><b>Registre</b> o que foi feito e combinado na conversa, para qualquer colega conseguir continuar o atendimento.</>,
       ]} />
       <Frase>A assinatura fecha a venda. O jeito como você trata o cliente depois dela é o que constrói a confiança.</Frase>
@@ -442,7 +452,7 @@ const corpo = (
         <>A assinatura é <b>digital, pelo gov.br</b>: oficial, segura e sem sair de casa. Conta <b>bronze não assina</b>: precisa subir para <b>prata</b> (validação pelo banco) ou <b>ouro</b> (reconhecimento facial, feito só pelo titular da conta).</>,
         <>Assinar tem <b>4 passos</b>: receber, entrar no gov.br, assinar e devolver. Quem assina é o cliente; senha de banco você nunca pede. Na volta, confira arquivo por arquivo.</>,
         <>Travou (sem banco, facial não passa, senha perdida)? <b>Leve ao gestor</b>, sem atalhos.</>,
-        <>Depois de assinar: o advogado entra com a ação; em média, <b>6 a 12 meses</b>; nada pago antes, <b>30% só no final</b>. Agradeça, não prometa valor nem data e mantenha o contato.</>,
+        <>Depois de assinar: o advogado entra com a ação sobre os juros dos <b>empréstimos pessoais</b> do cliente (não do consignado); em média, <b>6 a 12 meses</b>; nada pago antes, <b>30% só no final</b>. Agradeça, não prometa valor nem data e mantenha o contato.</>,
       ]} />
     </Secao>
   </>
@@ -531,7 +541,7 @@ const licao: Licao = {
     {
       titulo: 'Enviar a procuração para assinar',
       quando: 'A conta já está em prata ou ouro e as procurações foram geradas.',
-      texto: 'Oi, [nome]! Vou te mandar agora a procuração. Ela é a autorização para o nosso advogado entrar com o processo em seu nome. Assinar não tem custo nenhum, e é pelo gov.br, o mesmo login do Meu INSS. Pode ler com calma, e eu te ajudo em cada passo da assinatura.',
+      texto: 'Oi, [nome]! Vou te mandar agora a procuração. Ela é a autorização para o nosso advogado entrar, em seu nome, com o processo sobre os juros do seu empréstimo pessoal. Assinar não tem custo nenhum, e é pelo gov.br, o mesmo login do Meu INSS. Pode ler com calma, e eu te ajudo em cada passo da assinatura.',
     },
     {
       titulo: 'Depois de assinar: próximos passos',

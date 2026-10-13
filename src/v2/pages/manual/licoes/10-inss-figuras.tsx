@@ -4,7 +4,9 @@
    (com os erros comuns), a vida da senha, o caminho de cada cliente, o exercício
    de conferir o PDF e o checklist final. Telas do app e documentos em papel têm
    paleta própria (são "de fora") e levam a tag Ilustração. Dados de exemplo:
-   a cliente fictícia Lúcia, a mesma da lição sobre consignado.
+   a cliente fictícia Lúcia, a mesma da lição 3 (consignados no Banco A, Banco B
+   e BMG, valores iguais aos de lá). Os extratos mostram CONSIGNADOS: nenhuma
+   legenda pode tratá-los como o alvo do processo (que é o empréstimo pessoal).
    Estilos em 10-inss.css. */
 import { useState, type ReactNode } from 'react';
 import { Figura, IcCheck, IcX, Tabela } from '../pecas';
@@ -23,7 +25,7 @@ const IcTroca = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
 
 /* ===================================================================== 1. uma chave, várias portas */
 const PORTAS = [
-  { t: 'Meu INSS', d: 'carta, consignado e extratos', tag: 'esta lição', y: 22, atual: true },
+  { t: 'Meu INSS', d: 'carta e os dois extratos', tag: 'esta lição', y: 22, atual: true },
   { t: 'Meu Imposto de Renda', d: 'imposto de renda, últimos 3 anos', tag: 'a seguir', y: 117, atual: false },
   { t: 'Assinatura digital', d: 'procurações (prata ou ouro)', tag: 'adiante', y: 212, atual: false },
 ];
@@ -113,6 +115,48 @@ export function TabelaResponsiva({ colunas, linhas, destaque, corte = 'medio', c
   );
 }
 
+/* ===================================================================== 2a. consignado × pessoal nos documentos */
+/* Só os fatos da correção do dono (13/10). Cores iguais às da lição 3: consignado = azul, pessoal = âmbar. */
+const DOIS_EMPRESTIMOS: { tom: 'azul' | 'ambar'; t: string; s: string; itens: { r: string; d: string; forte?: boolean }[] }[] = [
+  {
+    tom: 'azul', t: 'Empréstimo consignado', s: 'o INSS desconta',
+    itens: [
+      { r: 'Como é pago', d: 'A parcela é descontada direto do benefício pelo INSS, antes de o dinheiro cair na conta.' },
+      { r: 'Juros', d: 'Têm um teto definido para o consignado do INSS. São os mais baratos para o aposentado.' },
+      { r: 'Onde aparece', d: 'No Extrato de Empréstimo Consignado e como desconto no extrato de pagamento do benefício.' },
+      { r: 'Na CAF', d: 'Gancho do canal de empréstimo: o “sem margem”, a possibilidade de aumento de margem e a de portabilidade dos consignados.', forte: true },
+    ],
+  },
+  {
+    tom: 'ambar', t: 'Empréstimo pessoal', s: 'a financeira cobra',
+    itens: [
+      { r: 'Como é pago', d: 'Contrato direto com a financeira, fora do INSS. Em geral, cobrado na conta do cliente ou por boleto ou carnê.' },
+      { r: 'Juros', d: 'Livres, sem o teto do consignado, e em geral bem mais altos.' },
+      { r: 'Onde aparece', d: 'Não aparece como desconto do INSS. O cliente costuma lembrar pelo nome do banco e pelo débito na conta.' },
+      { r: 'Na CAF', d: 'É o objeto do processo: a revisão dos juros do empréstimo pessoal e o ressarcimento.', forte: true },
+    ],
+  },
+];
+export function ConsignadoOuPessoal() {
+  return (
+    <Figura tag="Comparativo" legenda="Os dois empréstimos do aposentado, lado a lado. Os extratos do Meu INSS mostram o consignado; o processo da CAF revisa os juros do empréstimo pessoal. A diferença completa está na lição 3.">
+      <div className="mv-ins-cq"><div className="mv-ins-dp">
+        {DOIS_EMPRESTIMOS.map((c) => (
+          <section key={c.t} className="mv-ins-dp-col" data-tom={c.tom} aria-label={c.t}>
+            <div className="mv-ins-dp-cab"><b>{c.t}</b><span>{c.s}</span></div>
+            {c.itens.map((it) => (
+              <div key={it.r} className="mv-ins-dp-it" data-forte={it.forte ? '' : undefined}>
+                <small>{it.r}</small>
+                <span>{it.d}</span>
+              </div>
+            ))}
+          </section>
+        ))}
+      </div></div>
+    </Figura>
+  );
+}
+
 /* ===================================================================== 2. documentos anotados */
 type Nota = { t: string; d: ReactNode };
 const Marca = ({ n }: { n: number }) => <span className="mv-ins-marca" aria-hidden>{n}</span>;
@@ -186,19 +230,19 @@ export function DocCarta() {
 }
 
 const CONTRATOS = [
-  { b: 'AGIBANK', ini: '03/2021', parc: '84', v: 'R$ 310,00' },
-  { b: 'MERCANTIL', ini: '08/2022', parc: '84', v: 'R$ 240,00' },
+  { b: 'BANCO A', ini: '03/2021', parc: '84', v: 'R$ 310,00' },
+  { b: 'BANCO B', ini: '08/2022', parc: '84', v: 'R$ 240,00' },
   { b: 'BMG', ini: '01/2024', parc: '84', v: 'R$ 150,00' },
 ];
 export function DocConsignado() {
   return (
     <PapelAnotado titulo="Extrato de Empréstimo Consignado" sub="também aparece como Histórico de Empréstimo Consignado"
-      legenda="Extrato de consignado simplificado, com os contratos da cliente de exemplo. No real, a arrumação e os nomes das colunas mudam: procure estas informações."
+      legenda="Extrato de consignado simplificado, com os consignados da cliente de exemplo (Banco A e Banco B são genéricos). Tudo o que aparece nele é consignado, descontado pelo INSS. No real, a arrumação e os nomes das colunas mudam: procure estas informações."
       notas={[
         { t: 'Titular e benefício', d: 'Mesmo nome e mesmo número de benefício da carta de concessão.' },
-        { t: 'Margem', d: 'Quanto ainda cabe de parcela nova. “Disponível R$ 0,00” é o cliente sem margem, como você viu na lição 3.' },
-        { t: 'Banco de cada contrato', d: 'Procure Agibank, BMG, Facta, Mercantil e Crefisa: são as financeiras com que trabalhamos.' },
-        { t: 'Parcelas e valor', d: 'Quantas parcelas o contrato tem e quanto sai do benefício todo mês.' },
+        { t: 'Margem', d: 'Quanto ainda cabe de parcela nova de consignado. “Disponível R$ 0,00” é o cliente sem margem, como você viu na lição 3.' },
+        { t: 'Banco de cada contrato', d: 'Com quem é cada consignado. Um nome conhecido aqui (como o BMG) é consignado, e não o empréstimo pessoal que o processo revisa.' },
+        { t: 'Parcelas e valor', d: 'Quantas parcelas o contrato tem e quanto o INSS desconta do benefício todo mês.' },
         { t: 'Início do desconto', d: 'Desde quando cada contrato desconta do benefício.' },
         { t: 'Cartões consignados', d: 'RMC e RCC aparecem separados dos empréstimos. Não pule esta parte.' },
       ]}>
@@ -240,25 +284,25 @@ export function DocConsignado() {
       <div className="mv-ins-cartoes" data-m={6}>
         <Marca n={6} />
         <div><span><b>Cartão de crédito consignado (RMC)</b> · BMG</span><span className="num">R$ 100,00</span></div>
-        <div><span><b>Cartão consignado de benefício (RCC)</b> · AGIBANK</span><span className="num">R$ 100,00</span></div>
+        <div><span><b>Cartão consignado de benefício (RCC)</b> · BANCO A</span><span className="num">R$ 100,00</span></div>
       </div>
     </PapelAnotado>
   );
 }
 
 const DESCONTOS = [
-  ['Consignado · AGIBANK', '310,00'], ['Consignado · MERCANTIL', '240,00'], ['Consignado · BMG', '150,00'],
-  ['Cartão RMC · BMG', '100,00'], ['Cartão RCC · AGIBANK', '100,00'],
+  ['Consignado · BANCO A', '310,00'], ['Consignado · BANCO B', '240,00'], ['Consignado · BMG', '150,00'],
+  ['Cartão RMC · BMG', '100,00'], ['Cartão RCC · BANCO A', '100,00'],
 ];
 export function DocHiscre() {
   return (
     <PapelAnotado titulo="Histórico de Créditos" sub="Extrato de Pagamento de Benefício · 1 dos 10 arquivos"
-      legenda="Um arquivo do extrato de pagamento, simplificado. Cada arquivo traz 12 meses; aqui aparece só o mês mais recente por inteiro."
+      legenda="Um arquivo do extrato de pagamento, simplificado (Banco A e Banco B são genéricos). Cada arquivo traz 12 meses; aqui aparece só o mês mais recente por inteiro."
       notas={[
         { t: 'Titular e benefício', d: 'Os mesmos da carta. Confira nos 10 arquivos.' },
         { t: 'Período', d: 'As datas pedidas na consulta. Têm que bater com a lista dos 10 períodos.' },
         { t: 'Competência', d: 'O mês daquele pagamento. Cada arquivo traz 12 blocos como este, um por mês.' },
-        { t: 'Descontos', d: 'Cada consignado numa linha, com o nome do banco. É aqui que se vê o que foi descontado, mês a mês.' },
+        { t: 'Descontos do INSS', d: 'Cada desconto numa linha. Os de empréstimo e de cartão, com o nome do banco, são consignados. O empréstimo pessoal não aparece como desconto do INSS.' },
         { t: 'Valor líquido', d: 'O que caiu na conta do cliente depois dos descontos.' },
       ]}>
       <div className="mv-ins-campos">
@@ -328,7 +372,7 @@ function textoDoPasso(id: PassoId, d: DocApp, p: Periodo): TextoPasso {
       faz: <>Toque em <b>{d.nome}</b>{d.tambem && <> (pode aparecer como <b>{d.tambem}</b>)</>}.</>,
       atencao: d.id === 'carta'
         ? 'Se o cliente tem mais de um benefício, o aplicativo pode pedir para escolher qual. Anote os números e pergunte ao seu gestor.'
-        : 'Existem dois extratos: o de empréstimo mostra os contratos; o de pagamento mostra os meses. Não troque um pelo outro.',
+        : 'Existem dois extratos: o de empréstimo mostra os contratos consignados; o de pagamento mostra os meses. Não troque um pelo outro.',
     };
     case 'periodo': return {
       titulo: 'Preencher o início e o fim do período',
@@ -610,7 +654,7 @@ const MODOS: { id: Modo; t: string }[] = [
 const EXPLICA_MODO: Record<Modo, { tom: 'verde' | 'rubro' | 'ambar'; t: string; d: string }> = {
   certo: { tom: 'verde', t: 'Certo: 10 tijolos encaixados', d: 'Cada arquivo começa logo no mês seguinte ao fim do arquivo mais antigo que ele (o ano 2 termina em 10/2025; o ano 1 começa em 11/2025). Os 120 meses ficam cobertos uma vez só: nada repetido, nada faltando.' },
   repetiu: { tom: 'rubro', t: 'Repetiu um ano', d: 'O período 11/2024 a 10/2025 foi baixado duas vezes. Você conta 10 arquivos, mas só tem 9 anos diferentes: o mais antigo (11/2016 a 10/2017) ficou de fora.' },
-  pulou: { tom: 'rubro', t: 'Pulou um ano', d: 'Depois de 11/2024 a 10/2025, o próximo baixado foi 11/2022 a 10/2023. O ano de 11/2023 a 10/2024 sumiu: são 12 meses de descontos sem extrato, no meio da história do cliente.' },
+  pulou: { tom: 'rubro', t: 'Pulou um ano', d: 'Depois de 11/2024 a 10/2025, o próximo baixado foi 11/2022 a 10/2023. O ano de 11/2023 a 10/2024 sumiu: são 12 meses sem extrato, no meio da história do benefício.' },
   mesAtual: { tom: 'ambar', t: 'Começou no mês atual do ano passado', d: '10/2025 a 10/2026 tem 13 meses, mais do que os 12 que o aplicativo entrega por vez. E, descendo os anos assim, todo outubro aparece em dois arquivos. Se você “consertar” tirando um mês do fim, o mês atual fica de fora.' },
 };
 
@@ -658,7 +702,7 @@ export function EncaixeDosAnos() {
   const NCY = NY0 + linhas.length * NLH + 14;
   const rotuloSvg = `${ex.t}. ${ex.d}`;
   return (
-    <Figura tag="Interativo" legenda="Cada barra é um arquivo baixado, no exemplo de outubro de 2026. A faixa de baixo mostra os 10 anos que o processo pede: verde coberto uma vez, âmbar repetido, vermelho faltando.">
+    <Figura tag="Interativo" legenda="Cada barra é um arquivo baixado, no exemplo de outubro de 2026. A faixa de baixo mostra os 10 anos pedidos na documentação: verde coberto uma vez, âmbar repetido, vermelho faltando.">
       <div className="mv-ins-cq"><div className="mv-ins-enc">
         <div className="mv-ins-seg" role="group" aria-label="Ver o encaixe">
           {MODOS.map((m) => (

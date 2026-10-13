@@ -1,18 +1,20 @@
 /* Lição 4 — Quem é o nosso cliente. Elegibilidade pelas 3 portas do processo
-   oficial (benefício do INSS, rota do familiar, empréstimo numa das 5
-   financeiras), os tipos de benefício, quem não serve e como encerrar, a persona
-   do cliente e como falar com ele. Fonte: o dono (13/10/2026) e o processo
-   oficial da IA (aprovado em 18/09). Ilustrações em 04-cliente-ilustracoes.tsx,
-   peças interativas em 04-cliente-interativos.tsx, estilos em 04-cliente.css. */
+   oficial (benefício do INSS, rota do familiar, EMPRÉSTIMO PESSOAL numa das 5
+   financeiras), a diferença entre empréstimo pessoal e consignado, os tipos de
+   benefício, quem não serve e como encerrar, a persona do cliente e como falar
+   com ele. Fonte: o dono (13/10/2026, inclusive a correção "a revisão é em
+   empréstimo pessoal, não em consignado") e o processo oficial da IA (aprovado
+   em 18/09). Ilustrações em 04-cliente-ilustracoes.tsx, peças interativas em
+   04-cliente-interativos.tsx, estilos em 04-cliente.css. */
 import type { Licao } from '../tipos';
 import {
   Aviso, BomRuim, Celular, Conversa, Fatos, Figura, Frase, Lista, Passos, Sanfona, Secao, Tabela, TesteRapido,
 } from '../pecas';
 import {
-  ExtratoIlustrado, FamiliarDocs, Financeiras, NaoEInss, Pensamentos, Persona, PublicoAlvo, SeisAtitudes,
-  TiposBeneficio, TresPortas,
+  CaminhoParcela, ExtratoIlustrado, FamiliarDocs, Financeiras, NaoEInss, Pensamentos, Persona, PublicoAlvo,
+  SeisAtitudes, TiposBeneficio, TresPortas,
 } from './04-cliente-ilustracoes';
-import { ArvorePortas, TradutorJargao, TriagemCasos } from './04-cliente-interativos';
+import { ArvorePortas, PessoalOuConsignado, TOTAL_CASOS, TradutorJargao, TriagemCasos } from './04-cliente-interativos';
 import './04-cliente.css';
 
 /* ---------------------------------------------------------------- as 3 portas, explicadas */
@@ -30,9 +32,9 @@ const PORTAS_TX = [
     cuidado: <>Ninguém na família recebe? Não é elegível: agradeça e encerre, <b>sem insistir</b>.</>,
   },
   {
-    n: '3', tom: 'verde', quando: 'Vale para todos', titulo: 'Tem empréstimo numa das 5 financeiras?',
-    abre: <>Quando há empréstimo no <b>Agibank, BMG, Facta, Mercantil ou Crefisa</b>.</>,
-    porque: <>São as financeiras com que a empresa trabalha. Fora delas: "só trabalhamos com essas".</>,
+    n: '3', tom: 'verde', quando: 'Vale para todos', titulo: 'Tem empréstimo pessoal numa das 5 financeiras?',
+    abre: <>Quando há <b>empréstimo pessoal</b> no <b>Agibank, BMG, Facta, Mercantil ou Crefisa</b>. Só consignado não abre.</>,
+    porque: <>É nos juros do empréstimo pessoal que o processo olha. E são as 5 financeiras com que a empresa trabalha.</>,
     cuidado: <>Não sabe? Pergunte de novo <b>uma vez</b>, citando as 5. Seguiu sem saber? Siga em frente.</>,
   },
 ] as const;
@@ -60,7 +62,7 @@ const licao: Licao = {
   id: 'cliente',
   modulo: 'fundamentos',
   titulo: 'Quem é o nosso cliente',
-  resumo: 'As 3 portas que dizem quem pode ser cliente, os benefícios do INSS, as 5 financeiras, a rota do familiar, quem não serve e como falar com o nosso público.',
+  resumo: 'As 3 portas que dizem quem pode ser cliente, os benefícios do INSS, o empréstimo pessoal nas 5 financeiras (e a diferença para o consignado), a rota do familiar, quem não serve e como falar com o nosso público.',
   minutos: 35,
   corpo: (
     <>
@@ -74,18 +76,23 @@ const licao: Licao = {
       <Fatos itens={[
         { grande: '3 portas', texto: 'Três perguntas dizem se a pessoa pode ser cliente. Você vai usá-las em toda conversa.' },
         { grande: 'Todo benefício', texto: 'Aposentadoria, pensão, auxílio ou BPC/LOAS: qualquer benefício do INSS abre a porta 1.' },
-        { grande: '5 financeiras', texto: 'Agibank, BMG, Facta, Mercantil e Crefisa. As top 3: Agibank, Mercantil e BMG.' },
+        { grande: '5 financeiras', texto: 'Empréstimo pessoal no Agibank, BMG, Facta, Mercantil ou Crefisa. É ele que a porta 3 procura, não o consignado.' },
         { grande: 'Sem insistir', texto: 'Quem não é elegível recebe um agradecimento carinhoso, e a conversa termina ali.' },
       ]} />
 
       {/* ------------------------------------------------------------ por quê */}
       <Secao titulo="Por que começar pelo perfil">
         <p>
-          Todo o nosso trabalho é montado em cima de documentos do INSS: a <b>carta de concessão</b>, o <b>extrato de
-          empréstimo consignado</b> e o <b>extrato de pagamento do benefício</b> dos últimos 10 anos. É com essa
-          documentação que o nosso advogado, o Dr. Rafael Menezes, entra com uma ação pedindo o ressarcimento do que foi
-          descontado nos últimos 10 anos (o processo inteiro está na lição 2). Se a pessoa não tem benefício do INSS (nem
-          ela, nem um familiar), esses documentos simplesmente não existem, e não há o que analisar.
+          O nosso processo é sobre os <b>juros dos empréstimos pessoais</b> que o aposentado ou pensionista fez com as
+          financeiras. O nosso advogado, o Dr. Rafael Menezes, entra com uma ação pedindo o ressarcimento do que foi
+          descontado nos últimos 10 anos nesses empréstimos pessoais (o processo inteiro está na lição 2).
+        </p>
+        <p>
+          E a documentação desse processo começa no INSS: a <b>carta de concessão</b>, o <b>extrato de empréstimo
+          consignado</b> e o <b>extrato de pagamento do benefício</b> dos últimos 10 anos, todos tirados do Meu INSS.
+          Se a pessoa não tem benefício do INSS (nem ela, nem um familiar), esses documentos simplesmente não existem, e
+          não há o que analisar. E se ela não tem empréstimo pessoal com as financeiras com que a gente trabalha, não há
+          o que revisar.
         </p>
         <p>Por isso, conferir o perfil logo no começo protege os três lados da conversa:</p>
         <Lista itens={[
@@ -109,8 +116,8 @@ const licao: Licao = {
         </Figura>
         <p>
           Repare na frase verde da figura: ela vale para os três anéis. Não importa por qual caminho a pessoa entrou,
-          ela também precisa ter empréstimo numa das 5 financeiras com que a empresa trabalha. É isso que as 3 portas
-          organizam.
+          ela também precisa ter <b>empréstimo pessoal</b> numa das 5 financeiras com que a empresa trabalha. É isso que
+          as 3 portas organizam.
         </p>
       </Secao>
 
@@ -125,10 +132,19 @@ const licao: Licao = {
           <TresPortas />
         </Figura>
         <PortasExplicadas />
-        <Aviso tom="ambar" titulo="O erro mais comum">
-          Descartar quem recebe BPC/LOAS ou auxílio porque "não é aposentado nem pensionista". O anúncio fala com
-          aposentados e pensionistas, mas a porta 1 abre para <b>qualquer</b> benefício do INSS. Antes de descartar
-          alguém, pergunte sempre pelo benefício, com os exemplos: "aposentadoria, pensão, auxílio ou BPC/LOAS".
+        <Aviso tom="ambar" titulo="Os dois erros mais comuns">
+          <div className="mv-cli-aviso-par">
+            <p>
+              <b>Na porta 1:</b> descartar quem recebe BPC/LOAS ou auxílio porque "não é aposentado nem pensionista". O
+              anúncio fala com aposentados e pensionistas, mas a porta 1 abre para <b>qualquer</b> benefício do INSS.
+              Pergunte sempre pelo benefício, com os exemplos: "aposentadoria, pensão, auxílio ou BPC/LOAS".
+            </p>
+            <p>
+              <b>Na porta 3:</b> abrir a porta só porque o cliente tem <b>consignado</b> num desses bancos. A porta 3
+              pergunta do <b>empréstimo pessoal</b>, que a financeira cobra fora do INSS. A diferença entre os dois está
+              explicada mais abaixo, na seção "Porta 3: empréstimo pessoal, não consignado".
+            </p>
+          </div>
         </Aviso>
       </Secao>
 
@@ -148,14 +164,14 @@ const licao: Licao = {
       </Secao>
 
       <TesteRapido
-        pergunta={'Dona Aurora escreve: "Aposentada eu não sou. Recebo o LOAS." Ela tem desconto do BMG no benefício. E agora?'}
+        pergunta={'Dona Aurora escreve: "Aposentada eu não sou. Recebo o LOAS." Ela tem um empréstimo pessoal no BMG. E agora?'}
         opcoes={[
           'Não elegível: ela não é aposentada nem pensionista',
           'Elegível: o LOAS é do INSS e o BMG está entre as 5',
           'Só segue se algum familiar dela for aposentado do INSS',
         ]}
         certa={1}
-        explica="Qualquer benefício do INSS abre a porta 1, e o BPC/LOAS é pago pelo INSS. Com o BMG, a porta 3 também está aberta."
+        explica="Qualquer benefício do INSS abre a porta 1, e o BPC/LOAS é pago pelo INSS. Com empréstimo pessoal no BMG, a porta 3 também está aberta."
       />
 
       {/* ------------------------------------------------------------ quando conferir */}
@@ -176,8 +192,10 @@ const licao: Licao = {
               { de: 'eu', texto: 'Oi, Dona Maria! Aqui é [seu nome], da CAF. Vou continuar a sua análise. 😊', hora: '14:05' },
               { de: 'eu', texto: 'Uma pergunta rápida: a senhora recebe algum benefício do INSS? Pode ser aposentadoria, pensão, auxílio ou BPC/LOAS.', hora: '14:05' },
               { de: 'cliente', texto: 'Recebo a pensão do meu marido', hora: '14:09' },
-              { de: 'eu', texto: 'Entendi. E aparece algum desconto de empréstimo no seu benefício? De Agibank, BMG, Facta, Mercantil ou Crefisa?', hora: '14:10' },
-              { de: 'cliente', texto: 'Tem do Agibank sim', hora: '14:12' },
+              { de: 'eu', texto: 'Entendi. E a senhora tem algum empréstimo pessoal com Agibank, BMG, Facta, Mercantil ou Crefisa?', hora: '14:10' },
+              { de: 'cliente', texto: 'Empréstimo pessoal? Não sei se é esse', hora: '14:11' },
+              { de: 'eu', texto: 'É aquele empréstimo que a financeira cobra na sua conta, e não o que o INSS desconta direto do benefício.', hora: '14:12' },
+              { de: 'cliente', texto: 'Ah, esse eu tenho sim, do Agibank', hora: '14:14' },
             ]}
           />
           <div>
@@ -186,7 +204,7 @@ const licao: Licao = {
               { titulo: 'Diga quem você é', texto: 'O cliente acabou de falar com um robô. Seu nome e "da CAF" mostram que agora tem uma pessoa ali.' },
               { titulo: 'Porta 1 com exemplos', texto: 'Citar "aposentadoria, pensão, auxílio ou BPC/LOAS" evita que quem recebe BPC ou auxílio diga "não" por engano.' },
               { titulo: 'Porta 2 só se precisar', texto: 'Ela é pensionista: a porta 1 abriu, então não há por que perguntar da família.' },
-              { titulo: 'Porta 3 com os nomes', texto: 'Falar "desconto no benefício" e citar as 5 ajuda o cliente a lembrar. Agibank: porta 3 aberta.' },
+              { titulo: 'Porta 3: empréstimo pessoal', texto: 'Diga "empréstimo pessoal" e cite as 5. Se o cliente não entender, explique numa frase: é o que a financeira cobra na conta, não o que o INSS desconta. Agibank: porta 3 aberta.' },
             ]} />
           </div>
         </div>
@@ -194,7 +212,9 @@ const licao: Licao = {
           Ali a IA já passou pelas portas com o cliente antes de chamar você. Mesmo assim, fique atento: se no meio da
           conversa aparecer algo que não bate (por exemplo, "na verdade eu trabalho de carteira assinada"), volte à árvore
           e confira de novo. Esse cliente também chega tendo lido que a análise foi "pré-aprovada": o que isso quer dizer, e
-          como explicar com honestidade, está na lição 5.
+          como explicar com honestidade, está na lição 5. E repare: ele chega pensando num consignado novo, mas a porta 3
+          é sobre o <b>empréstimo pessoal</b> que ele já tem numa das 5. Como conduzir essa virada na conversa está na
+          lição 7.
         </Aviso>
       </Secao>
 
@@ -217,39 +237,122 @@ const licao: Licao = {
         </Aviso>
       </Secao>
 
+      {/* ------------------------------------------------------------ pessoal × consignado */}
+      <Secao titulo="Porta 3: empréstimo pessoal, não consignado">
+        <p>
+          A porta 3 não pergunta de qualquer empréstimo. Ela pergunta do <b>empréstimo pessoal</b>, porque é nos juros
+          dele que aparecem os juros abusivos que a CAF revisa. Só que existem dois tipos de empréstimo muito comuns para
+          quem recebe do INSS, e o cliente quase sempre chama os dois só de "empréstimo". Antes de abrir a porta 3, você
+          precisa saber de qual dos dois ele está falando.
+        </p>
+        <Figura legenda="Por onde a parcela passa: no consignado, o INSS desconta do benefício e repassa ao banco; no empréstimo pessoal, a financeira cobra fora do INSS.">
+          <CaminhoParcela />
+        </Figura>
+        <Frase>O consignado é descontado pelo INSS; o empréstimo pessoal é cobrado pela financeira, fora do INSS.</Frase>
+        <p>
+          A diferença não é só de caminho. O consignado só sai quando há <b>margem consignável</b> e tem um <b>teto de
+          juros</b>: é o empréstimo mais barato para o aposentado. O empréstimo pessoal <b>não usa a margem</b> do INSS,
+          então a financeira consegue emprestar mesmo para quem já está sem margem, e os juros são <b>livres</b>, em geral
+          bem mais altos. Por isso, quem está sem margem para consignado muitas vezes recorre ao empréstimo pessoal, que é
+          mais caro. O nosso processo olha os juros do empréstimo pessoal. (Margem, cartões consignados e portabilidade
+          estão explicados por inteiro na lição 3.)
+        </p>
+        <Tabela
+          colunas={['', 'Consignado', 'Empréstimo pessoal']}
+          destaque={2}
+          linhas={[
+            ['Quem cobra a parcela', 'O INSS desconta direto do benefício.', 'A financeira, fora do INSS: em geral na conta do cliente ou por boleto/carnê.'],
+            ['Margem consignável', 'Precisa. Sem margem, não sai consignado novo.', 'Não usa.'],
+            ['Juros', 'Têm teto. São os mais baratos para o aposentado.', 'Livres, em geral bem mais altos.'],
+            ['Para a porta 3', 'Não abre a porta.', 'Abre, se for numa das 5 financeiras.'],
+            ['Na CAF', 'Tema dos ganchos do canal de empréstimo (margem, portabilidade).', 'Objeto do processo: a revisão dos juros e o ressarcimento.'],
+          ]}
+        />
+        <h4 className="mv-cli-sub">O mesmo banco pode ter os dois</h4>
+        <p>
+          O nome do banco, sozinho, não responde à porta 3. O BMG, por exemplo, também trabalha com consignado e com
+          cartão consignado. Quando o cliente diz "tenho empréstimo no BMG", ainda falta saber de qual tipo. E cuidado na
+          hora dos documentos: o <b>Extrato de Empréstimo Consignado</b>, um dos documentos do Meu INSS que fazem parte da
+          documentação do processo, mostra os <b>consignados</b>.
+        </p>
+        <ExtratoIlustrado />
+        <Aviso tom="ambar" titulo="Achou o banco no extrato do INSS? Isso é consignado">
+          Ver BMG ou Agibank no Extrato de Empréstimo Consignado não abre a porta 3: tudo o que esse extrato lista é
+          descontado pelo INSS. A porta 3 continua sendo a pergunta ao cliente: ele tem empréstimo pessoal com alguma das
+          5 financeiras?
+        </Aviso>
+        <h4 className="mv-cli-sub">Como perguntar sem confundir</h4>
+        <BomRuim
+          ruim={{
+            titulo: 'Leva ao consignado',
+            corpo: (
+              <Lista tom="nao" itens={[
+                '"Aparece algum desconto de banco no seu benefício?" (desconto no benefício é consignado)',
+                '"Tem empréstimo no BMG?" (não diz de qual tipo)',
+                'Abrir a porta 3 só porque o banco está na lista',
+              ]} />
+            ),
+          }}
+          bom={{
+            titulo: 'Leva ao empréstimo pessoal',
+            corpo: (
+              <Lista tom="sim" itens={[
+                '"O(a) senhor(a) tem algum empréstimo pessoal com Agibank, BMG, Facta, Mercantil ou Crefisa?"',
+                'Se ele não entender: "É aquele empréstimo que a financeira cobra na sua conta, e não o que o INSS desconta direto do benefício."',
+                'Falou só o banco? Confirme o tipo antes de abrir a porta.',
+              ]} />
+            ),
+          }}
+        />
+        <p>
+          Agora treine o ouvido. Para cada fala, decida se é consignado, empréstimo pessoal ou se ainda não dá para saber
+          (e você precisa perguntar):
+        </p>
+        <PessoalOuConsignado />
+        <TesteRapido
+          pergunta="Dona Célia é aposentada e tem dois consignados, do BMG e do Agibank, descontados pelo INSS. Empréstimo pessoal, nenhum. E a porta 3?"
+          opcoes={[
+            'Aberta: o BMG e o Agibank estão entre as 5',
+            'Fechada: ela não tem empréstimo pessoal',
+            'Aberta, se ela estiver sem margem hoje',
+          ]}
+          certa={1}
+          explica="A porta 3 pede empréstimo pessoal numa das 5 financeiras. Consignado, mesmo de um banco da lista, não abre a porta. Sem nenhum empréstimo pessoal nas 5, ela não é elegível: agradeça e encerre com carinho."
+        />
+      </Secao>
+
       {/* ------------------------------------------------------------ financeiras */}
       <Secao titulo="As 5 financeiras">
         <p>
-          A porta 3 olha para o empréstimo. Hoje a empresa trabalha com <b>cinco financeiras</b>. As <b>top 3</b> (Agibank,
+          Hoje a empresa trabalha com o empréstimo pessoal de <b>cinco financeiras</b>. As <b>top 3</b> (Agibank,
           Mercantil e BMG) são as que mais chegam até a gente, então são os nomes que você mais vai ouvir.
           Facta e Crefisa completam a lista.
         </p>
         <Financeiras />
         <p>
           Vale decorar os cinco nomes. Você vai perguntar por eles várias vezes por dia, e falar com segurança passa
-          confiança ao cliente. Fora dessas cinco, a resposta é sempre a mesma, sem rodeio e com gentileza: só
-          trabalhamos com essas.
+          confiança ao cliente. Empréstimo pessoal fora dessas cinco? A resposta é sempre a mesma, sem rodeio e com
+          gentileza: só trabalhamos com essas.
         </p>
-        <h4 className="mv-cli-sub">Quando o cliente não sabe o banco</h4>
+        <h4 className="mv-cli-sub">Quando o cliente não sabe o banco (ou o tipo)</h4>
         <p>
-          Isso acontece: o empréstimo foi feito há anos, foi o filho que contratou pelo celular, ou a pessoa só
-          conhece o desconto, não o nome do banco. Não trave a conversa por isso. A regra é simples:
+          Isso acontece: o empréstimo foi feito há anos, foi o filho que contratou pelo celular, ou a pessoa não sabe se
+          o empréstimo dela é pessoal ou consignado. Não trave a conversa por isso. A regra é simples:
         </p>
         <Passos itens={[
-          { titulo: 'Pergunte de novo, uma vez só', texto: 'Cite as 5 pelo nome e fale do desconto: "Aparece algum desconto de Agibank, BMG, Facta, Mercantil ou Crefisa no seu benefício?"' },
-          { titulo: 'Lembrou? Siga a árvore', texto: 'Se tem numa das 5, a porta 3 está aberta. Se lembrou e não é nenhuma delas, não é elegível.' },
-          { titulo: 'Continuou sem saber? Siga em frente', texto: 'Não insista na pergunta. Quando você pegar os documentos do Meu INSS, o extrato de empréstimo consignado mostra cada empréstimo e o banco.' },
+          { titulo: 'Pergunte de novo, uma vez só', texto: 'Cite as 5 pelo nome e explique numa frase: "É aquele empréstimo que a financeira cobra na sua conta, e não o que o INSS desconta direto do benefício."' },
+          { titulo: 'Lembrou? Siga a árvore', texto: 'Tem empréstimo pessoal numa das 5? A porta 3 está aberta. Lembrou e não tem (ou só tem consignado)? Não é elegível.' },
+          { titulo: 'Continuou sem saber? Siga em frente', texto: 'Não insista na pergunta: siga com o atendimento. Muitas vezes o cliente lembra depois, pelo débito na conta ou com a ajuda da família. Na dúvida, fale com o seu gestor.' },
         ]} />
-        <ExtratoIlustrado />
         <TesteRapido
           pergunta="Seu Gilberto é aposentado, mas não lembra o banco do empréstimo. Você já perguntou de novo, citando as 5, e ele continua sem saber. O que fazer?"
           opcoes={[
             'Encerrar: sem saber o banco, não dá para seguir com ele',
             'Pedir que ele descubra o nome do banco e volte outro dia',
-            'Seguir em frente: o extrato do Meu INSS mostra o banco',
+            'Seguir com o atendimento, sem insistir na pergunta',
           ]}
           certa={2}
-          explica="A regra é perguntar de novo uma vez. Se ele seguir sem saber, segue em frente: o extrato de empréstimo consignado mostra os bancos."
+          explica="A regra é perguntar de novo uma vez. Se ele seguir sem saber, siga em frente, sem travar a conversa. A porta 3 continua valendo se depois ficar claro que não há empréstimo pessoal nas 5."
         />
       </Secao>
 
@@ -270,7 +373,7 @@ const licao: Licao = {
             contato="Cláudio"
             legenda="Rota do familiar: quem escreve não recebe, o pai recebe."
             bolhas={[
-              { de: 'cliente', texto: 'Boa tarde. Eu não sou aposentado não, sou servidor da prefeitura. Mas o meu pai é aposentado do INSS e paga um empréstimo do Mercantil', hora: '15:20' },
+              { de: 'cliente', texto: 'Boa tarde. Eu não sou aposentado não, sou servidor da prefeitura. Mas o meu pai é aposentado do INSS e tem um empréstimo pessoal no Mercantil', hora: '15:20' },
               { de: 'eu', texto: 'Boa tarde, Cláudio! Obrigado por explicar. 😊 Nesse caso, a análise pode ser feita pelo benefício do seu pai.', hora: '15:22' },
               { de: 'eu', texto: 'Ele sabe que você está falando com a gente? Os documentos vão ser todos dele, então ele precisa estar de acordo.', hora: '15:22' },
               { de: 'cliente', texto: 'Sabe sim, ele que pediu pra eu ver. Ele não mexe muito no celular', hora: '15:25' },
@@ -283,7 +386,7 @@ const licao: Licao = {
               <>Explique que a análise pode seguir <b>pelo benefício do familiar</b>.</>,
               <>Confirme que o familiar <b>sabe e está de acordo</b>: o benefício e os dados são dele.</>,
               <>Peça o <b>nome completo e o CPF do familiar</b>. O nome e o CPF que chegaram pelo robô são de quem estava conversando.</>,
-              <>Na porta 3, pergunte pelo <b>empréstimo do familiar</b>.</>,
+              <>Na porta 3, pergunte pelo <b>empréstimo pessoal do familiar</b>. Aqui o filho já disse que é pessoal, no Mercantil; se ele não souber o tipo, use a mesma explicação de antes.</>,
               <>Daqui em diante, <b>todo documento é do familiar</b>: os do Meu INSS, o imposto de renda, a situação do CPF, a identidade, a foto do rosto, o comprovante de residência e o e-mail. Na dúvida sobre algum deles, pergunte ao seu gestor antes de pedir.</>,
             ]} />
           </div>
@@ -313,7 +416,7 @@ const licao: Licao = {
             <Lista tom="sim" itens={[
               'Recebe qualquer benefício do INSS (aposentadoria, pensão, auxílio, BPC/LOAS)',
               'Ou tem pai, mãe, avó, avô ou filho que recebe do INSS',
-              'E tem empréstimo no Agibank, BMG, Facta, Mercantil ou Crefisa (ou não sabe, e segue em frente)',
+              'E tem empréstimo pessoal no Agibank, BMG, Facta, Mercantil ou Crefisa (ou não sabe, e segue em frente)',
             ]} />
           </div>
           <div className="vidro mv-cartao" data-tom="rubro">
@@ -321,7 +424,7 @@ const licao: Licao = {
             <Lista tom="nao" itens={[
               'CLT ou servidor sem benefício do INSS e sem familiar que receba',
               'Quem só tem "pensão" alimentícia, Bolsa Família ou aposentadoria fora do INSS, e ninguém da família recebe',
-              'Quem não tem empréstimo em nenhuma das 5 financeiras',
+              'Quem não tem empréstimo pessoal em nenhuma das 5 financeiras (por exemplo, só tem consignado)',
             ]} />
           </div>
         </div>
@@ -384,15 +487,19 @@ const licao: Licao = {
           },
           {
             titulo: 'Trabalha de carteira assinada, mas também recebe pensão do INSS',
-            corpo: <p>Serve. Ser CLT não fecha porta nenhuma: o que importa é receber benefício do INSS. Com empréstimo numa das 5, é elegível.</p>,
+            corpo: <p>Serve. Ser CLT não fecha porta nenhuma: o que importa é receber benefício do INSS. Com empréstimo pessoal numa das 5, é elegível.</p>,
           },
           {
-            titulo: 'Tem empréstimo numa das 5 e também em outro banco',
-            corpo: <p>Serve. A porta 3 pede empréstimo em pelo menos uma das 5 financeiras.</p>,
+            titulo: 'Tem empréstimo pessoal numa das 5 e também em outro banco',
+            corpo: <p>Serve. A porta 3 pede empréstimo pessoal em pelo menos uma das 5 financeiras. Ter consignado em qualquer banco, ou outro empréstimo fora da lista, não atrapalha.</p>,
+          },
+          {
+            titulo: 'Só tem consignado, mesmo que seja do BMG ou do Agibank',
+            corpo: <p>Não abre a porta 3. O consignado é descontado pelo INSS; a porta 3 pergunta do empréstimo pessoal, que a financeira cobra fora do INSS. Confirme uma vez, com a explicação simples. Se não houver empréstimo pessoal numa das 5, não é elegível: agradeça e encerre com carinho.</p>,
           },
           {
             titulo: '"É muito novo para ser aposentado"',
-            corpo: <p>Não existe porta de idade. Quem recebe pensão por morte, auxílio ou BPC/LOAS pode ter bem menos de 60 anos. O que conta é o benefício do INSS e a financeira.</p>,
+            corpo: <p>Não existe porta de idade. Quem recebe pensão por morte, auxílio ou BPC/LOAS pode ter bem menos de 60 anos. O que conta é o benefício do INSS e o empréstimo pessoal numa das 5.</p>,
           },
           {
             titulo: '"Sou aposentado pela prefeitura" (ou pelo Estado)',
@@ -552,7 +659,7 @@ const licao: Licao = {
       {/* ------------------------------------------------------------ treino */}
       <Secao titulo="Treino: atende ou descarta?">
         <p>
-          Hora de praticar com 12 casos fictícios, um por vez. Leia o que a pessoa escreveu e as informações do caso e
+          Hora de praticar com {TOTAL_CASOS} casos fictícios, um por vez. Leia o que a pessoa escreveu e as informações do caso e
           decida: <b>atende</b>, <b>atende pelo familiar</b> ou <b>não elegível</b>. Depois de cada resposta você vê qual
           porta decidiu e por quê.
         </p>
@@ -562,9 +669,9 @@ const licao: Licao = {
       {/* ------------------------------------------------------------ resumo */}
       <Secao titulo="Resumo da lição">
         <Lista itens={[
-          <>Toda conversa começa pelo <b>perfil</b>: sem benefício do INSS (próprio ou de um familiar), não há documentos para analisar.</>,
-          <><b>As 3 portas:</b> porta 1 (qualquer benefício do INSS) <b>ou</b> porta 2 (um familiar que recebe), <b>e</b> sempre a porta 3 (empréstimo numa das 5 financeiras).</>,
-          <><b>As 5 financeiras:</b> Agibank, BMG, Facta, Mercantil e Crefisa; as top 3 são Agibank, Mercantil e BMG. Não sabe o banco? Pergunte de novo uma vez; seguiu sem saber, siga em frente.</>,
+          <>Toda conversa começa pelo <b>perfil</b>, com <b>as 3 portas</b>: porta 1 (qualquer benefício do INSS) <b>ou</b> porta 2 (um familiar que recebe), <b>e</b> sempre a porta 3 (empréstimo pessoal numa das 5 financeiras).</>,
+          <><b>Pessoal, não consignado:</b> o consignado é descontado pelo INSS; o empréstimo pessoal é cobrado pela financeira, fora do INSS, com juros livres. O processo revisa os juros do empréstimo pessoal, e só ter consignado não abre a porta 3.</>,
+          <><b>As 5 financeiras:</b> Agibank, BMG, Facta, Mercantil e Crefisa; as top 3 são Agibank, Mercantil e BMG. Não sabe o banco ou o tipo? Pergunte de novo uma vez; seguiu sem saber, siga em frente.</>,
           <><b>Rota do familiar:</b> a análise segue pelo benefício do familiar, e todos os documentos passam a ser dele, do Meu INSS ao e-mail.</>,
           <><b>Não elegível:</b> agradeça com carinho, explique o motivo em uma frase e encerre, sem insistir.</>,
           <>O nosso cliente costuma ser <b>idoso, desconfiado e apoiado pela família</b>: frases curtas, uma pergunta por vez, áudio quando ajudar e paciência para repetir.</>,
@@ -577,15 +684,15 @@ const licao: Licao = {
     {
       p: 'Qual destas pessoas NÃO é elegível?',
       o: [
-        'Pensionista do INSS com empréstimo no Agibank e em outro banco',
-        'Trabalhador CLT sem benefício do INSS nem familiar que receba',
-        'Quem recebe BPC/LOAS e tem desconto do BMG no benefício',
+        'Pensionista do INSS com empréstimo pessoal no Agibank',
+        'CLT sem benefício do INSS e sem familiar que receba',
+        'Quem recebe BPC/LOAS e tem empréstimo pessoal no BMG',
       ],
       c: 1,
-      e: 'Sem benefício do INSS, nem próprio nem de um familiar, as portas 1 e 2 ficam fechadas. BPC/LOAS serve, e ter empréstimo também em outro banco não atrapalha.',
+      e: 'Sem benefício do INSS, nem próprio nem de um familiar, as portas 1 e 2 ficam fechadas. BPC/LOAS serve, e empréstimo pessoal no Agibank ou no BMG abre a porta 3.',
     },
     {
-      p: 'Quais são as 5 financeiras com que trabalhamos?',
+      p: 'Em quais financeiras o empréstimo pessoal abre a porta 3?',
       o: [
         'Agibank, BMG, Facta, Mercantil e Crefisa',
         'Agibank, BMG, Facta, Mercantil, Crefisa e Caixa',
@@ -595,7 +702,7 @@ const licao: Licao = {
       e: 'São cinco: Agibank, BMG, Facta, Mercantil e Crefisa. Agibank, Mercantil e BMG são as top 3 (as que mais chegam), mas não as únicas.',
     },
     {
-      p: 'Quem escreveu não recebe nada do INSS, mas a mãe é pensionista e tem empréstimo no Mercantil. O que acontece?',
+      p: 'Quem escreveu não recebe nada do INSS, mas a mãe é pensionista e tem empréstimo pessoal no Mercantil. O que acontece?',
       o: [
         'Não é elegível, porque quem escreveu não recebe do INSS',
         'Segue normalmente, com os documentos de quem escreveu',
@@ -605,37 +712,37 @@ const licao: Licao = {
       e: 'É a porta 2: um familiar recebe do INSS. A análise segue pelo benefício da mãe, e os documentos passam a ser dela.',
     },
     {
-      p: 'Seu Jorge é aposentado pelo regime próprio do Estado e ninguém da família recebe do INSS. É elegível?',
+      p: 'O que a porta 3 pergunta sobre o empréstimo do cliente?',
       o: [
-        'Sim: é aposentado, e qualquer aposentadoria abre a porta 1',
-        'Não: aposentadoria de regime próprio não é do INSS',
-        'Sim, desde que tenha empréstimo numa das 5 financeiras',
+        'Se tem empréstimo pessoal numa das 5 financeiras',
+        'Se tem consignado descontado num dos 5 bancos',
+        'Se tem algum empréstimo, em qualquer banco ou financeira',
       ],
-      c: 1,
-      e: 'Aposentadoria de regime próprio é paga pelo Estado, não pelo INSS. Sem ninguém da família no INSS, as portas 1 e 2 ficam fechadas: não é elegível.',
+      c: 0,
+      e: 'A porta 3 pede empréstimo pessoal, que a financeira cobra fora do INSS, numa das 5. Consignado, que o INSS desconta do benefício, não abre a porta, mesmo que seja de um banco da lista.',
     },
     {
       p: 'Qual é o jeito certo de falar com um cliente idoso que tem dificuldade com o celular?',
       o: [
-        'Frases curtas, uma pergunta por vez e paciência para repetir',
         'Uma mensagem longa e completa, para não incomodar várias vezes',
+        'Frases curtas, uma pergunta por vez e paciência para repetir',
         'Linguagem formal e termos técnicos, para passar mais seriedade',
       ],
-      c: 0,
+      c: 1,
       e: 'Menos texto, menos jargão, uma coisa de cada vez e paciência. Um áudio curto, com resumo escrito, também ajuda.',
     },
   ],
 
   glossario: [
     { termo: 'Elegível', def: 'Quem passa pelas 3 portas e pode seguir para a análise. É palavra de uso interno: com o cliente, diga "o senhor pode fazer a análise".' },
-    { termo: '3 portas', def: 'As três perguntas do processo oficial: recebe benefício do INSS? Se não, algum familiar recebe? E tem empréstimo numa das 5 financeiras?' },
+    { termo: '3 portas', def: 'As três perguntas do processo oficial: recebe benefício do INSS? Se não, algum familiar recebe? E tem empréstimo pessoal numa das 5 financeiras?' },
     { termo: 'Benefício do INSS', def: 'Pagamento mensal feito pelo INSS: aposentadoria, pensão, auxílio ou BPC/LOAS. Qualquer um deles abre a porta 1.' },
     { termo: 'Pensão por morte', def: 'Benefício pago pelo INSS à família de quem contribuía ou era aposentado e faleceu. Quem recebe é o pensionista.' },
     { termo: 'Auxílio', def: 'Benefício do INSS pago em situações como doença ou acidente. O cliente costuma dizer que está "encostado".' },
     { termo: 'BPC/LOAS', def: 'Benefício de um salário mínimo por mês, pago pelo INSS a idosos de 65 anos ou mais e a pessoas com deficiência, de família de baixa renda. Não é aposentadoria, mas serve.' },
     { termo: 'Rota do familiar', def: 'Quando quem procura a gente não recebe do INSS, mas pai, mãe, avó, avô ou filho recebe. A análise segue pelo benefício do familiar.' },
     { termo: 'Titular do benefício', def: 'A pessoa que recebe o benefício do INSS. Na rota do familiar, o titular é o familiar, e os documentos passam a ser dele.' },
-    { termo: 'Top 3', def: 'Agibank, Mercantil e BMG: as financeiras que mais chegam até a gente. A lista completa tem também Facta e Crefisa.' },
+    { termo: 'Top 3', def: 'Agibank, Mercantil e BMG: as financeiras de empréstimo pessoal que mais chegam até a gente. A lista completa tem também Facta e Crefisa.' },
     { termo: 'Regime próprio', def: 'Sistema de aposentadoria de muitos servidores públicos (do Estado, da prefeitura ou da União). Quem se aposenta por ele não recebe do INSS.' },
   ],
 
@@ -652,8 +759,8 @@ const licao: Licao = {
     },
     {
       titulo: 'Perguntar de novo pela financeira (porta 3)',
-      quando: 'Quando o cliente não soube dizer o banco na primeira vez. Use uma vez só.',
-      texto: 'Sem problema! Me ajuda com uma coisa: aparece algum desconto de Agibank, BMG, Facta, Mercantil ou Crefisa no seu benefício? Se não lembrar agora, tudo bem, a gente segue.',
+      quando: 'Quando o cliente não soube dizer o banco, ou se o empréstimo é pessoal, na primeira vez. Use uma vez só.',
+      texto: 'Sem problema! Me ajuda com uma coisa: o(a) senhor(a) tem algum empréstimo pessoal com Agibank, BMG, Facta, Mercantil ou Crefisa? É aquele empréstimo que a financeira cobra na sua conta, e não o que o INSS desconta direto do benefício. Se não lembrar agora, tudo bem, a gente segue.',
     },
     {
       titulo: 'Encerrar: sem benefício do INSS',
@@ -661,9 +768,9 @@ const licao: Licao = {
       texto: 'Muito obrigado por conversar com a gente! 😊\nHoje o nosso trabalho é só para quem recebe algum benefício do INSS, ou tem um familiar que recebe. Por isso, neste caso, não temos como fazer a análise.\nAgradeço muito a sua confiança. Se precisar, é só chamar aqui.',
     },
     {
-      titulo: 'Encerrar: sem empréstimo nas 5 financeiras',
-      quando: 'Quando a pessoa confirmou que o empréstimo não é com nenhuma das 5.',
-      texto: 'Obrigado pelas informações! 😊\nHoje a gente trabalha só com empréstimos do Agibank, BMG, Facta, Mercantil e Crefisa. Como o seu não é com nenhum deles, não temos como seguir com a análise.\nAgradeço muito a sua confiança. Fico à disposição!',
+      titulo: 'Encerrar: sem empréstimo pessoal nas 5 financeiras',
+      quando: 'Quando a pessoa confirmou que não tem empréstimo pessoal com nenhuma das 5 (por exemplo, só tem consignado).',
+      texto: 'Obrigado pelas informações! 😊\nHoje a gente trabalha só com empréstimos pessoais do Agibank, BMG, Facta, Mercantil e Crefisa. Como o(a) senhor(a) não tem empréstimo pessoal com nenhum deles, não temos como seguir com a análise.\nAgradeço muito a sua confiança. Fico à disposição!',
     },
   ],
 };
