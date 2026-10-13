@@ -61,6 +61,10 @@ export const ICONES: Record<string, ReactNode> = {
   pendencias: (
     <Ic><rect x="5" y="4" width="14" height="17" rx="2.2" /><path d="M9 4V3h6v1" /><path d="M8.5 11h7M8.5 15h4.5" /></Ic>
   ),
+  // Portabilidades: duas setas trocando de lado (o contrato muda de banco)
+  portabilidades: (
+    <Ic><path d="M4 8h13" /><path d="M14 4.5L17.5 8 14 11.5" /><path d="M20 16H7" /><path d="M10 12.5L6.5 16l3.5 3.5" /></Ic>
+  ),
   // Simulador de Valores: calculadora (corpo + visor + teclas em pontos)
   simulador: (
     <Ic><rect x="5" y="3" width="14" height="18" rx="2.2" /><path d="M8.5 7.5h7" /><path strokeLinecap="round" d="M8.5 12h.01M12 12h.01M15.5 12h.01M8.5 15h.01M12 15h.01M15.5 15h.01M8.5 18h.01M12 18h.01M15.5 18h.01" /></Ic>

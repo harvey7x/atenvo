@@ -57,6 +57,7 @@ const GRUPOS: { rotulo: string; itens: ItemNav[] }[] = [
       { slug: 'kanban', rotulo: 'Kanban' },
       { slug: 'recuperacao', rotulo: 'Recuperação' },
       { slug: 'pendencias', rotulo: 'Pendências' },
+      { slug: 'portabilidades', rotulo: 'Portabilidades' },
       { slug: 'agendamentos', rotulo: 'Agendamentos' },
     ],
   },

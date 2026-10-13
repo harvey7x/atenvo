@@ -42,6 +42,7 @@ const ConfiguracoesV2 = lazy(() => import('@/v2/pages/Configuracoes'));
 const IaV2 = lazy(() => import('@/v2/pages/Ia'));
 const RecuperacaoV2 = lazy(() => import('@/v2/pages/Recuperacao'));
 const PendenciasV2 = lazy(() => import('@/v2/pages/Pendencias'));
+const PortabilidadesV2 = lazy(() => import('@/v2/pages/Portabilidades'));
 const FluxosV2 = lazy(() => import('@/v2/pages/Fluxos'));
 const ContatosV2 = lazy(() => import('@/v2/pages/Contatos'));
 const DisparoV2 = lazy(() => import('@/v2/pages/Disparo'));
@@ -109,6 +110,7 @@ const routes: RouteObject[] = [
           { path: 'agendamentos', element: <Lz><AgendamentosV2 /></Lz> },
           { path: 'recuperacao', element: <Lz><RecuperacaoV2 /></Lz> },
           { path: 'pendencias', element: <Lz><PendenciasV2 /></Lz> },
+          { path: 'portabilidades', element: <Lz><PortabilidadesV2 /></Lz> },
           { path: 'disparo', element: <Lz><DisparoV2 /></Lz> },
           { path: 'contatos', element: <Lz><ContatosV2 /></Lz> },
           { path: 'scripts', element: <Lz><ScriptsV2 /></Lz> },
