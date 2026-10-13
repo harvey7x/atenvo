@@ -1,7 +1,6 @@
-/* Ilustrações e ferramentas interativas do Manual de vendas: jornada do
-   cliente, mapa mental da venda, "prints" ilustrados (Meu INSS, Meu Imposto de
-   Renda, níveis do gov.br), calculadora de honorários, calculadora de períodos
-   e o jogo "Atende ou descarta?". */
+/* Ilustrações e ferramentas interativas compartilhadas do Manual de vendas:
+   mapa mental da venda, "prints" ilustrados (Meu INSS, Meu Imposto de Renda,
+   níveis do gov.br), calculadora de honorários e calculadora de períodos. */
 import { useMemo, useState } from 'react';
 import { copiar, IcCheck, IcX, Print } from './pecas';
 import { MESES, MESES_CURTOS, mmaaaa, periodosDoExtrato, type MesAno, type Periodo } from './periodos';
@@ -13,51 +12,24 @@ export function hojeMesAno(): MesAno {
 const fmtMes = (m: MesAno) => `${MESES_CURTOS[m.mes - 1]}/${m.ano}`;
 const real = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
 
-/* ------------------------------------------------------------ jornada */
-const JORNADA = [
-  { t: 'Lead chega', d: 'Anúncio no Facebook' },
-  { t: 'Qualificar', d: 'Aposentado ou pensionista do INSS?' },
-  { t: 'Convencer', d: 'Explicar o processo e quebrar objeções' },
-  { t: 'Meu INSS', d: 'Carta, consignado, extratos de 10 anos' },
-  { t: 'gov.br', d: 'Imposto de renda + situação do CPF' },
-  { t: 'Documentos pessoais', d: 'Identidade, comprovante, e-mail' },
-  { t: 'Cadastro', d: 'Cliente cadastrado no admin' },
-  { t: 'Procurações', d: 'Assinatura digital pelo gov.br' },
-  { t: 'Processo', d: 'Dr. Rafael Menezes · 6 a 12 meses' },
-  { t: 'Ressarcimento', d: 'Cliente recebe · 30% honorários' },
-];
-export function Jornada() {
-  return (
-    <ol className="mv-jornada" aria-label="Jornada do cliente, do anúncio ao ressarcimento">
-      {JORNADA.map((p, i) => (
-        <li key={p.t} data-fase={i < 3 ? 'venda' : i < 8 ? 'docs' : 'processo'}>
-          <span className="mv-jor-n num">{String(i + 1).padStart(2, '0')}</span>
-          <b>{p.t}</b>
-          <small>{p.d}</small>
-        </li>
-      ))}
-    </ol>
-  );
-}
-
 /* ------------------------------------------------------------ mapa mental */
 type Ramo = { t: string; folhas: string[]; tom: string; lado: 'e' | 'd'; y: number };
 const RAMOS: Ramo[] = [
-  { t: 'Perfil', tom: 'verde', lado: 'e', y: 80, folhas: ['Aposentado do INSS', 'Pensionista do INSS', 'CLT → descarta'] },
-  { t: 'Canal', tom: 'azul', lado: 'e', y: 230, folhas: ['Juros abusivos → direto', 'Empréstimo → ganchos', 'Top 3: Agibank · Mercantil · BMG'] },
+  { t: 'Perfil', tom: 'verde', lado: 'e', y: 80, folhas: ['Qualquer benefício do INSS', 'Ou um familiar que recebe', 'Empréstimo nas 5 financeiras'] },
+  { t: 'Canal', tom: 'azul', lado: 'e', y: 230, folhas: ['Juros abusivos → direto', 'Empréstimo → ganchos', 'Top 3: Agibank, Mercantil, BMG'] },
   { t: 'Objeções', tom: 'rubro', lado: 'e', y: 380, folhas: ['"É golpe?"', '"Não tenho dinheiro"', '"Só quero empréstimo"'] },
   { t: 'Ganchos', tom: 'ambar', lado: 'd', y: 80, folhas: ['Aumento de margem', 'Portabilidade (+R$ 1.500)', 'Ressarcimento de 10 anos'] },
   { t: 'Documentos', tom: 'azul', lado: 'd', y: 230, folhas: ['Meu INSS (3 documentos)', 'gov.br: IR + CPF', 'Pessoais + e-mail'] },
   { t: 'Fechamento', tom: 'verde', lado: 'd', y: 380, folhas: ['Cadastro no admin', 'Procurações', 'Assinatura prata ou ouro'] },
 ];
 export function MapaMental() {
-  const cx = 450, cy = 230;
+  const cx = 480, cy = 230, FW = 102; // FW = meia largura da folha
   return (
     <figure className="vidro mv-mapa">
-      <svg viewBox="0 0 900 460" role="img" aria-label="Mapa mental da venda do processo">
+      <svg viewBox="0 0 960 460" role="img" aria-label="Mapa mental da venda do processo">
         {RAMOS.map((r) => {
-          const bx = r.lado === 'e' ? 300 : 600;
-          const fx = r.lado === 'e' ? 175 : 725;
+          const bx = r.lado === 'e' ? 322 : 638;
+          const fx = r.lado === 'e' ? 120 : 840;
           return (
             <g key={r.t} className="mv-mapa-ramo" data-tom={r.tom}>
               <path className="mv-mapa-fio" d={`M${cx + (r.lado === 'e' ? -85 : 85)},${cy} C${(cx + bx) / 2},${cy} ${(cx + bx) / 2},${r.y} ${bx + (r.lado === 'e' ? 48 : -48)},${r.y}`} />
@@ -65,8 +37,8 @@ export function MapaMental() {
                 const fy = r.y + (i - 1) * 36;
                 return (
                   <g key={f}>
-                    <path className="mv-mapa-fio fino" d={`M${bx + (r.lado === 'e' ? -48 : 48)},${r.y} C${(bx + fx) / 2},${r.y} ${(bx + fx) / 2},${fy} ${fx + (r.lado === 'e' ? 92 : -92)},${fy}`} />
-                    <rect className="mv-mapa-folha" x={fx - 92} y={fy - 14} width="184" height="28" rx="7" />
+                    <path className="mv-mapa-fio fino" d={`M${bx + (r.lado === 'e' ? -48 : 48)},${r.y} C${(bx + fx) / 2},${r.y} ${(bx + fx) / 2},${fy} ${fx + (r.lado === 'e' ? FW : -FW)},${fy}`} />
+                    <rect className="mv-mapa-folha" x={fx - FW} y={fy - 14} width={FW * 2} height="28" rx="7" />
                     <text className="mv-mapa-ft" x={fx} y={fy + 4} textAnchor="middle">{f}</text>
                   </g>
                 );
@@ -114,14 +86,14 @@ export function CalculadoraHonorarios() {
 export function PrintMeuInss() {
   const servicos = [
     { t: 'Carta de Concessão', alvo: true },
-    { t: 'Extrato de Empréstimos', alvo: true, sub: 'é o extrato de consignado' },
-    { t: 'Extrato de Pagamento de Benefício', alvo: true },
+    { t: 'Extrato de Empréstimo Consignado', alvo: true, sub: 'também aparece como Histórico de Empréstimo Consignado' },
+    { t: 'Extrato de Pagamento de Benefício', alvo: true, sub: 'também aparece como Histórico de Créditos' },
     { t: 'Agendamentos' }, { t: 'Declaração de Imposto de Renda' }, { t: 'Consultar Pedidos' },
   ];
   return (
     <Print endereco="meu.inss.gov.br" legenda="Na tela inicial do Meu INSS, busque os três serviços marcados. A aparência real pode mudar.">
       <div className="mvp-app">
-        <div className="mvp-topo"><b>Meu INSS</b><span>Olá, Maria</span></div>
+        <div className="mvp-topo"><b>Meu INSS</b><span>Olá!</span></div>
         <div className="mvp-busca">Do que você precisa?</div>
         <div className="mvp-grade">
           {servicos.map((s) => (
@@ -141,7 +113,7 @@ export function PrintExtrato({ p }: { p: Periodo }) {
   return (
     <Print endereco="meu.inss.gov.br › extrato de pagamento" legenda="Preencha o início e o fim do período e baixe o PDF. Repita para cada ano.">
       <div className="mvp-app">
-        <div className="mvp-topo"><b>Extrato de Pagamento de Benefício</b></div>
+        <div className="mvp-topo"><b>Extrato de Pagamento de Benefício · Histórico de Créditos</b></div>
         <div className="mvp-form">
           <div className="mvp-campo"><small>Início do período</small><span className="num">{mmaaaa(p.inicio)}</span></div>
           <div className="mvp-campo"><small>Fim do período</small><span className="num">{mmaaaa(p.fim)}</span></div>
@@ -257,47 +229,6 @@ export function NiveisGov() {
           <small>{v.como}</small>
         </div>
       ))}
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------ atende ou descarta */
-const CASOS = [
-  { quem: 'Dona Maria, 67 anos', d: 'Aposentada do INSS, empréstimo consignado no BMG.', atende: true, porque: 'Aposentada do INSS com empréstimo: é exatamente o nosso cliente.' },
-  { quem: 'João, 34 anos', d: 'Trabalha de carteira assinada (CLT) e quer revisar o consignado da empresa.', atende: false, porque: 'CLT não é aposentado nem pensionista do INSS. A gente descarta, com educação.' },
-  { quem: 'Seu Antônio, 72 anos', d: 'Pensionista do INSS, empréstimo no Agibank e no Mercantil.', atende: true, porque: 'Pensionista do INSS com Agibank e Mercantil, duas das nossas top 3.' },
-  { quem: 'Dona Lúcia, 61 anos', d: 'Aposentada do INSS, veio pelo anúncio de empréstimo e quer dinheiro rápido. Está sem margem.', atende: true, porque: 'Sem margem para empréstimo, mas é aposentada do INSS: oferecemos o processo (e os ganchos).' },
-  { quem: 'Carla, 45 anos', d: 'Servidora pública do estado, sem benefício do INSS.', atende: false, porque: 'Não é aposentada nem pensionista do INSS. Fora do nosso público.' },
-];
-export function AtendeOuDescarta() {
-  const [resp, setResp] = useState<Record<number, boolean>>({});
-  const feitos = Object.keys(resp).length;
-  const acertos = CASOS.filter((c, i) => resp[i] === c.atende).length;
-  return (
-    <div className="mv-jogo">
-      {CASOS.map((c, i) => {
-        const r = resp[i];
-        const respondeu = r !== undefined;
-        return (
-          <div key={c.quem} className="vidro mv-caso" data-estado={!respondeu ? undefined : r === c.atende ? 'certo' : 'errado'}>
-            <div className="mv-caso-tx"><b>{c.quem}</b><span>{c.d}</span></div>
-            {!respondeu ? (
-              <div className="mv-caso-bts">
-                <button type="button" data-tom="verde" onClick={() => setResp((r) => ({ ...r, [i]: true }))}><IcCheck />Atende</button>
-                <button type="button" data-tom="rubro" onClick={() => setResp((r) => ({ ...r, [i]: false }))}><IcX />Descarta</button>
-              </div>
-            ) : (
-              <p className="mv-caso-r"><b>{r === c.atende ? 'Acertou.' : 'Errou.'}</b> {c.porque}</p>
-            )}
-          </div>
-        );
-      })}
-      {feitos === CASOS.length && (
-        <div className="mv-jogo-fim" role="status">
-          <b className="num">{acertos} de {CASOS.length}</b> acertos.
-          <button type="button" className="mv-link" onClick={() => setResp({})}>Jogar de novo</button>
-        </div>
-      )}
     </div>
   );
 }
