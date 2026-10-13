@@ -72,6 +72,13 @@ const GRUPOS: { rotulo: string; itens: ItemNav[] }[] = [
     ],
   },
   {
+    // Manual de vendas (13/10): treinamento dos novos estagiários — trilha, prova e consulta rápida.
+    rotulo: 'Treinamento',
+    itens: [
+      { slug: 'manual', rotulo: 'Manual de vendas' },
+    ],
+  },
+  {
     rotulo: 'Ferramentas',
     itens: [
       { slug: 'ferramentas/unificador', rotulo: 'Unificador de documentos' },
