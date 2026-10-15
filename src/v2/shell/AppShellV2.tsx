@@ -13,6 +13,9 @@ import { instalarSpotlight } from '../lib/spotlight';
 import { criarRaizPortalV2 } from '../components/portal';
 import { ICONES } from './icones';
 import { NotificacaoResposta, type DadosNotificacao } from './NotificacaoResposta';
+import { DEMO_MODE } from '@/lib/demo';
+import { seedWa } from '../pages/whatsappSeed';
+import { usePosVendaAguardando } from '@/data/posvenda';
 import { useNotificacaoInbound } from '../hooks/useNotificacaoInbound';
 import { aplicarTema, lerTema, salvarTema, type Tema } from '../lib/tema';
 import { deveMostrarIntroDia, marcarIntroVista } from '../lib/introDia';
@@ -55,6 +58,8 @@ const GRUPOS: { rotulo: string; itens: ItemNav[] }[] = [
       { slug: 'whatsapp', rotulo: 'WhatsApp' },
       // Facebook e Disparo fora do menu (pedido do dono 27/08) — rotas seguem vivas por URL
       { slug: 'kanban', rotulo: 'Kanban' },
+      // Pós-venda: clientes fechados (ganho) com fila de "aguardando resposta" (pedido do dono 15/10)
+      { slug: 'pos-venda', rotulo: 'Pós-venda' },
       { slug: 'recuperacao', rotulo: 'Recuperação' },
       { slug: 'pendencias', rotulo: 'Pendências' },
       { slug: 'portabilidades', rotulo: 'Portabilidades' },
@@ -195,6 +200,14 @@ export default function AppShellV2() {
   const [notif, setNotif] = useState<(DadosNotificacao & { conversaId?: string }) | null>(null);
   const [sinoOn, setSinoOn] = useState(false);
   const [badgePop, setBadgePop] = useState(0);
+  // Pós-venda no menu: fechados com mensagem NÃO LIDA, visível de qualquer tela.
+  // Real = contagem leve no servidor (usePosVendaAguardando); demo = seed do inbox.
+  const pvAguardaQ = usePosVendaAguardando();
+  const pvAguardaDemo = useMemo(
+    () => (DEMO_MODE ? seedWa().filter((c) => c.oppStatus === 'ganho' && ((c.unread ?? 0) > 0 || !!c.aguardando)).length : 0),
+    [],
+  );
+  const pvAguarda = DEMO_MODE ? pvAguardaDemo : (pvAguardaQ.data ?? 0);
   const [menuUsuario, setMenuUsuario] = useState(false);
   const [menuPos, setMenuPos] = useState<{ top: number; right: number }>({ top: 60, right: 20 });
 
@@ -386,6 +399,9 @@ export default function AppShellV2() {
                       <span className="lab">{i.rotulo}</span>
                       {i.slug === 'whatsapp' && badgePop > 0 && (
                         <span key={badgePop} className="badge-n lab pop num">{badgePop}</span>
+                      )}
+                      {i.slug === 'pos-venda' && pvAguarda > 0 && (
+                        <span className="badge-n rubro lab num" title={`${pvAguarda} aguardando resposta`}>{pvAguarda}</span>
                       )}
                     </NavLink>
                   ))}

@@ -53,6 +53,10 @@ export const ICONES: Record<string, ReactNode> = {
   remarketing: (
     <Ic><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="3.2" /><path d="M21.5 2.5 15 9" /><path d="M15.5 4.5 15 9l4.5-.5" /></Ic>
   ),
+  // Pós-venda: contato acompanhado (pessoa + check do fechamento)
+  'pos-venda': (
+    <Ic><circle cx="9" cy="8" r="3.4" /><path d="M3.5 20c.6-3.4 2.8-5 5.5-5s4.9 1.6 5.5 5" /><path strokeLinecap="round" strokeLinejoin="round" d="M15.2 9.2l2.1 2.1L21 7.4" /></Ic>
+  ),
   // Recuperação: setas de retomada (loop) recuperando o cliente
   recuperacao: (
     <Ic><path d="M3 12a9 9 0 0 1 15-6.7L21 8" /><path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-15 6.7L3 16" /><path d="M3 21v-5h5" /></Ic>
