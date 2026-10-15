@@ -708,7 +708,13 @@ export default function WhatsAppV2() {
   useEffect(() => {
     if (!conversaParam) return;
     inbox.selecionarPorDeepLink(conversaParam);
-    setTab('todos'); limparFiltros(); setSearch(''); // revela o alvo: sem faceta ativa escondendo o card
+    // revela o alvo: sem faceta ativa escondendo o card. Fechado/perdido moram SÓ nas abas
+    // próprias — cair no 'todos' deixaria o card invisível (contatos ainda não carregados
+    // caem no 'todos' como antes; a conversa em si abre do mesmo jeito).
+    const alvo = contacts.find((c) => c.id === conversaParam);
+    const varianteAlvo = alvo ? situacaoDe(alvo).variante : null;
+    setTab(varianteAlvo === 'ganho' ? 'fechados' : varianteAlvo === 'perdido' ? 'perdidos' : 'todos');
+    limparFiltros(); setSearch('');
     setGruposFechados(new Set()); // expande tudo: o card alvo pode estar num grupo recolhido
     const t = window.setTimeout(() => {
       document.querySelector(`[data-cid="${CSS.escape(conversaParam)}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
@@ -734,6 +740,10 @@ export default function WhatsAppV2() {
     naoLidas: filtroNaoLidas, arquivadas: filtroArquivadas, periodo: filtroPeriodo,
   };
   const passaBase = (c: WaContact) => passaFiltroInbox(c, filtros, { term, relogioMs, transporteDe });
+  // "aguarda resposta" = cliente falou e ninguém respondeu (não lida OU flag aguardando) —
+  // mesma régua da aba Pendentes. Dirige o selo da aba Fechados e a seção do topo dela
+  // (pedido do dono 15/10: fechado que mandava mensagem ficava invisível pro time).
+  const aguardaResposta = (c: WaContact) => (c.unread ?? 0) > 0 || !!c.aguardando;
   const passaTab = (c: WaContact, t: TabId) => {
     if (t === 'arquivadas') return !!c.arquivada;
     // cliente FECHADO (ganho) e PERDIDO (não elegível) vivem em abas próprias e saem
@@ -759,6 +769,9 @@ export default function WhatsAppV2() {
     const base = contacts.filter(passaBase);
     const n: Record<string, number> = {};
     for (const [t] of TABS) n[t] = base.filter((c) => passaTab(c, t)).length;
+    // Fechados: o selo da aba conta só quem AGUARDA RESPOSTA — o total da carteira nunca
+    // mudava de cara e deixava passar fechado sem resposta (pedido do dono 15/10).
+    n.fechadosAguarda = base.filter((c) => passaTab(c, 'fechados') && aguardaResposta(c)).length;
     return n;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contacts, filtroCanais, filtroTransporte, filtroEtapas, filtroEtiquetas, filtroAtendentes, filtroIA, filtroSituacao, filtroNaoLidas, filtroArquivadas, filtroPeriodo, canalPorId, term, relogioMs, user?.id]);
@@ -774,6 +787,20 @@ export default function WhatsAppV2() {
   const grupos = useMemo(() => {
     // "Todos" é a visão geral: lista ÚNICA, sem dividir por atendente (pedido do dono)
     if (tab === 'todos') return [['', visiveis]] as [string, WaContact[]][];
+    // Fechados é fila de pós-venda, não carteira por atendente: "Aguardando resposta"
+    // primeiro (espera mais antiga no topo — fixadas na frente), depois "Em dia" por
+    // recência (ordem que visiveis já traz). Chaves __aguarda/__emdia têm rótulo próprio
+    // no cabeçalho do grupo e convivem com o recolhimento normal (gruposFechados).
+    if (tab === 'fechados') {
+      const porEspera = (a: WaContact, b: WaContact) =>
+        a.fixada === b.fixada ? (a.lastAtMs ?? 0) - (b.lastAtMs ?? 0) : a.fixada ? -1 : 1;
+      const aguarda = visiveis.filter(aguardaResposta).sort(porEspera);
+      const emDia = visiveis.filter((c) => !aguardaResposta(c));
+      const out: [string, WaContact[]][] = [];
+      if (aguarda.length > 0) out.push(['__aguarda', aguarda]);
+      if (emDia.length > 0) out.push(['__emdia', emDia]);
+      return out;
+    }
     const m = new Map<string, WaContact[]>();
     for (const c of visiveis) {
       const k = responsavelEfetivo(c) ?? '';
@@ -1048,10 +1075,14 @@ export default function WhatsAppV2() {
                   <button
                     key={id} type="button" role="tab" aria-selected={tab === id}
                     className={'wa-aba' + (tab === id ? ' on' : '')}
-                    title={id === 'pendentes' ? 'Pendentes inclui mensagens não lidas e clientes aguardando resposta.' : undefined}
+                    title={id === 'pendentes' ? 'Pendentes inclui mensagens não lidas e clientes aguardando resposta.'
+                      : id === 'fechados' ? 'Clientes fechados (pós-venda). O número mostra quantos aguardam resposta.' : undefined}
                     onClick={() => { if (arrastoRef.current.moveu) { arrastoRef.current.moveu = false; return; } mudarAba(id); }}
                   >
-                    {rot}{(tabCounts[id] ?? 0) > 0 && <span className="n num">{tabCounts[id]}</span>}
+                    {/* Fechados: selo vermelho SÓ com quem aguarda resposta — o total da carteira não alerta nada */}
+                    {rot}{id === 'fechados'
+                      ? (tabCounts.fechadosAguarda ?? 0) > 0 && <span className="n num urg" title={`${tabCounts.fechadosAguarda} aguardando resposta`}>{tabCounts.fechadosAguarda}</span>
+                      : (tabCounts[id] ?? 0) > 0 && <span className="n num">{tabCounts[id]}</span>}
                   </button>
                 ))}
               </div>
@@ -1102,13 +1133,15 @@ export default function WhatsAppV2() {
                 <div key={respId || '(fila)'}>
                   {tab !== 'todos' && (
                   <button
-                    type="button" className={'wa-grupo' + (fechado ? ' fech' : '')} aria-expanded={!fechado}
+                    type="button" className={'wa-grupo' + (fechado ? ' fech' : '') + (respId === '__aguarda' ? ' urg' : '')} aria-expanded={!fechado}
                     title={buscaAtiva ? 'Limpe a busca para recolher grupos' : fechado ? 'Mostrar as conversas deste grupo' : 'Recolher este grupo'}
                     onClick={() => { if (!buscaAtiva) alternarGrupo(respId); }}
                   >
                     <span className="seta" aria-hidden>▾</span>
                     <span className="rot">
-                      {respId ? <>Atendimento distribuído para <b>{respId === user?.id ? 'Você' : nomePorId(respId) ?? 'Atendente'}</b></> : 'Não atribuídos'}
+                      {respId === '__aguarda' ? <>Aguardando resposta</>
+                        : respId === '__emdia' ? <>Em dia</>
+                        : respId ? <>Atendimento distribuído para <b>{respId === user?.id ? 'Você' : nomePorId(respId) ?? 'Atendente'}</b></> : 'Não atribuídos'}
                     </span>
                     <span className="num qt">{lista.length}</span>
                     {atrasoGrupo && <span className="galer" title="Há conversas aguardando resposta há tempo demais neste grupo">⚠</span>}

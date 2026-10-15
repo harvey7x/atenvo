@@ -382,6 +382,8 @@
 /* aba do inbox: pastilha ativa é ouro SÓLIDO — texto/contador escuros pra contraste */
 :root[data-acento="dourado"]:not([data-tema="light"]) .v2 .wa-aba.on { color: #2A1E00; }
 :root[data-acento="dourado"]:not([data-tema="light"]) .v2 .wa-aba.on .n { color: #2A1E00; background: rgba(0, 0, 0, .16); }
+/* selo urgente (Fechados aguardando resposta) continua vermelho mesmo na pastilha ouro */
+:root[data-acento="dourado"]:not([data-tema="light"]) .v2 .wa-aba.on .n.urg { color: #fff; background: var(--rubro); }
 
 /* bolha enviada: vidro âmbar-mata profundo */
 :root[data-acento="dourado"]:not([data-tema="light"]) .v2 .bolha.env2 {

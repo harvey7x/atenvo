@@ -110,6 +110,50 @@ export function seedWa(): WaContact[] {
         IN('Obrigado, moço. Deus abençoe', '10:05', { tsISO: iso(agora - 275 * min), id: 'ws-2' }),
       ],
     },
+    /* ---- FECHADOS (ganho): moram na aba Fechados / pós-venda. Dois AGUARDANDO
+       resposta (acendem o selo vermelho da aba) e dois em dia. ---- */
+    {
+      ...base,
+      id: 'wa-odete', name: 'Odete F. Carvalho', phone: '5551987770006', contatoId: 'wa-odete-ct',
+      time: '12:50', unread: 2, lastAtMs: agora - 110 * min, aguardando: true, aguardandoDesde: iso(agora - 110 * min),
+      oppStatus: 'ganho', respId: 'u-mock', tags: ['Juros abusivos'],
+      last: 'O advogado já deu entrada no meu processo?', lastInter: 'há 1 h 50',
+      msgs: [
+        OUT('Dona Odete, seu contrato está fechado! Agora nossa equipe jurídica prepara a entrada do processo, tá bem?', '09:10', { tsISO: iso(agora - 330 * min), id: 'wo-1' }),
+        IN('Boa tarde! O advogado já deu entrada no meu processo?', '12:48', { tsISO: iso(agora - 112 * min), id: 'wo-2' }),
+        IN('Minha filha pediu pra eu perguntar, desculpa incomodar', '12:50', { tsISO: iso(agora - 110 * min), id: 'wo-3' }),
+      ],
+    },
+    {
+      ...base,
+      id: 'wa-pedro', name: 'Pedro Henrique Dias', phone: '5551987770007', contatoId: 'wa-pedro-ct',
+      time: '14:18', unread: 1, lastAtMs: agora - 24 * min, aguardando: true, aguardandoDesde: iso(agora - 24 * min),
+      oppStatus: 'ganho', respId: 'u-mock', tags: ['Revisão de contrato'],
+      last: 'Chegou uma carta do banco aqui, mando foto?', lastInter: 'há 24 min',
+      msgs: [
+        IN('Moço, chegou uma carta do banco aqui, mando foto?', '14:18', { tsISO: iso(agora - 24 * min), id: 'wp-1' }),
+      ],
+    },
+    {
+      ...base,
+      id: 'wa-neusa', name: 'Neusa Trindade', phone: '5551987770008', contatoId: 'wa-neusa-ct',
+      time: 'Ontem', unread: 0, lastAtMs: agora - 1320 * min, oppStatus: 'ganho', respId: 'u-mock', status: 'Fechada',
+      last: 'Você: Qualquer novidade do fórum eu te aviso…', lastInter: 'ontem', tags: ['Juros abusivos'],
+      msgs: [
+        IN('Tem novidade do meu caso?', '15:02', { tsISO: iso(agora - 1325 * min), id: 'wn-1' }),
+        OUT('Dona Neusa, seu processo segue andando normal — qualquer novidade do fórum eu te aviso por aqui, combinado?', '15:07', { tsISO: iso(agora - 1320 * min), id: 'wn-2' }),
+      ],
+    },
+    {
+      ...base,
+      id: 'wa-joaob', name: 'João Batista Ramos', phone: '5551987770010', contatoId: 'wa-joaob-ct',
+      time: 'Seg', unread: 0, lastAtMs: agora - 4300 * min, oppStatus: 'ganho', respId: 'u-mock', status: 'Fechada',
+      last: 'Você: Recebido, seu João! Já encaminhei…', lastInter: 'há 3 dias', tags: ['Revisão de contrato'],
+      msgs: [
+        IN('', '10:40', { tsISO: iso(agora - 4305 * min), id: 'wb-1', tipo: 'documento', nome: 'Comprovante_Residencia.pdf', mime: 'application/pdf', tamanho: 482_112 }),
+        OUT('Recebido, seu João! Já encaminhei pro jurídico — era o último documento que faltava.', '10:45', { tsISO: iso(agora - 4300 * min), id: 'wb-2' }),
+      ],
+    },
     {
       ...base,
       id: 'wa-cleusa', name: 'Cleusa M. Barros', phone: '5551987770005', contatoId: 'wa-cleusa-ct',
