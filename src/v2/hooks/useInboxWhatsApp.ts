@@ -236,15 +236,21 @@ export function useInboxWhatsApp(opts: {
   const [replyTo, setReplyTo] = useState<ReplyTo | null>(null);
 
   /* ---------- envio (v1 L669-743) ---------- */
-  const enviandoRef = useRef(false);
+  // Anti-duplo-clique por TEMPO, não por "requisição em voo": a trava antiga só soltava no
+  // onSettled — se a chamada ficava pendurada (rede piscou, aba dormiu, token renovando), TODO
+  // envio seguinte era ignorado em silêncio até recarregar a página. Agora cada mensagem sai na
+  // hora e independente; só bloqueia o MESMO texto repetido em < 1,5s (Enter duplo).
+  const ultimoEnvioRef = useRef<{ chave: string; em: number } | null>(null);
   const [retryId, setRetryId] = useState<string | null>(null);
   const [removendoId, setRemovendoId] = useState<string | null>(null);
 
   const sendMsg = useCallback((draft: string, assinaturaNome: string | null, aoAceitar: () => void) => {
     const v = draft.trim();
     if (!v) return;
-    if (enviandoRef.current) return;
     if (WA_REAL && !currentId) return;
+    const chaveEnvio = currentId + '|' + v;
+    const ult = ultimoEnvioRef.current;
+    if (ult && ult.chave === chaveEnvio && Date.now() - ult.em < 1500) return;
     if (canalRestrito) { aoAvisar({ tom: 'erro', texto: 'O número deste canal está com restrição no WhatsApp e está indisponível para envio. Selecione outro canal.' }); return; }
     if (canalIndisponivel) { aoAvisar({ tom: 'erro', texto: 'Este número está desconectado. Reconecte em Integrações para enviar.' }); return; }
     if (semDestino) { aoAvisar({ tom: 'erro', texto: 'Vincule um número confirmado para responder.' }); return; }
@@ -254,23 +260,20 @@ export function useInboxWhatsApp(opts: {
     const hh = ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
     const corpo = montarCorpoAssinado(v, assinaturaNome);
     const cid = novoCid(now.getTime());
+    ultimoEnvioRef.current = { chave: chaveEnvio, em: now.getTime() };
     const replyEnvio = replyTo ? { id: replyTo.id, idExt: replyTo.idExt, fromMe: replyTo.fromMe, preview: { remetente: replyTo.remetente, tipo: replyTo.tipo, texto: replyTo.texto } } : undefined;
     const quotedBolha = replyTo ? { remetente: replyTo.remetente, tipo: replyTo.tipo, texto: replyTo.texto } : undefined;
     setContacts((cur) => aplicarEnvioOtimista(cur, currentId, { dir: 'out', text: corpo, time: hh, tsISO: now.toISOString(), status: 'pendente', cid, quoted: quotedBolha }, v));
     aoAceitar();                                               // limpa o draft na página
     if (!WA_REAL) { aoAvisar({ tom: 'ok', texto: 'Mensagem enviada' }); setReplyTo(null); return; }
-    enviandoRef.current = true;
     const convAlvo = currentId;
     const marcarFalha = (erro: string) => setContacts((cur) => aplicarFalha(cur, convAlvo, cid, erro));
     const to = window.setTimeout(() => marcarFalha('Sem confirmação de envio a tempo. Tente novamente.'), 25_000);
-    sendMut.mutate(
-      { conversaId: currentId, text: v, canalId: replyCanalId || current.canalId, replyTo: replyEnvio },
-      {
-        onError: (e) => { window.clearTimeout(to); const msg = (e as Error)?.message || 'Falha no envio.'; marcarFalha(msg); aoAvisar({ tom: 'erro', texto: msg }); },
-        onSuccess: (idReal) => { window.clearTimeout(to); setReplyTo(null); if (idReal) setContacts((cur) => marcarIdReal(cur, convAlvo, cid, idReal)); },
-        onSettled: () => { enviandoRef.current = false; },
-      },
-    );
+    // mutateAsync (não mutate): com envios em paralelo, os callbacks do mutate() só disparam
+    // para a ÚLTIMA chamada — as anteriores ficariam sem confirmação e cairiam no timeout.
+    sendMut.mutateAsync({ conversaId: currentId, text: v, canalId: replyCanalId || current.canalId, replyTo: replyEnvio })
+      .then((idReal) => { window.clearTimeout(to); setReplyTo(null); if (idReal) setContacts((cur) => marcarIdReal(cur, convAlvo, cid, idReal)); })
+      .catch((e) => { window.clearTimeout(to); const msg = (e as Error)?.message || 'Falha no envio.'; marcarFalha(msg); aoAvisar({ tom: 'erro', texto: msg }); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentId, canalRestrito, canalIndisponivel, semDestino, optout, bloquearPorHigiene, replyTo, replyCanalId, current.canalId]);
 
@@ -283,13 +286,11 @@ export function useInboxWhatsApp(opts: {
     setRetryId(m.id);
     setContacts((cur) => aplicarRetry(cur, currentId, m.id!));
     if (!WA_REAL) { setRetryId(null); return; }
-    sendMut.mutate(
-      { conversaId: currentId, text: m.text ?? '', canalId: replyCanalId || current.canalId, retryMensagemId: m.id },
-      {
-        onError: (e) => aoAvisar({ tom: 'erro', texto: (e as Error)?.message || 'Falha no reenvio.' }),
-        onSettled: () => setRetryId(null),
-      },
-    );
+    // chamada pendurada não pode prender o "Reenviar" para sempre (mesmo bug do envio)
+    const soltar = window.setTimeout(() => setRetryId(null), 25_000);
+    sendMut.mutateAsync({ conversaId: currentId, text: m.text ?? '', canalId: replyCanalId || current.canalId, retryMensagemId: m.id })
+      .catch((e) => aoAvisar({ tom: 'erro', texto: (e as Error)?.message || 'Falha no reenvio.' }))
+      .finally(() => { window.clearTimeout(soltar); setRetryId(null); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentId, retryId, canalRestrito, canalIndisponivel, semDestino, optout, replyCanalId, current.canalId]);
 

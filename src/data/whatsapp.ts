@@ -565,6 +565,10 @@ export function useSendWaMessage() {
   const { currentOrg } = useOrg();
   const qc = useQueryClient();
   return useMutation({
+    // 'always': o React Query PAUSA mutações quando acha que está offline (navigator.onLine
+    // pisca no Wi-Fi/aba em segundo plano) e só retoma quando "volta" — a mensagem ficava
+    // presa em "enviando" até recarregar. Envio vai direto; se a rede falhar, cai no onError.
+    networkMode: 'always',
     // Assinatura OBRIGATÓRIA aplicada no backend (evolution-send), resolvida lá pelo autor do
     // JWT — o payload NÃO leva nome de assinatura (front velho em cache não fura o padrão).
     // canalId = canal escolhido em "Responder por". O backend nunca confia em org vinda do cliente.
