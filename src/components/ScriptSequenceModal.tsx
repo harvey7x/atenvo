@@ -32,7 +32,9 @@ interface Props {
 const temPendenciaTexto = (t: string) => /\{\{\s*\w+\s*\}\}/.test(t) || /\[[^\]]*não inform/i.test(t);
 // Intervalo entre etapas da sequência (evita rajada recusada pelo provider). Aplicado só ENTRE
 // envios consecutivos no mesmo disparo — nunca antes da 1ª nem antes de um retry manual isolado.
-const INTERVALO_SEQUENCIA_MS = 2500;
+// 20/10: 2500→1000ms. Cada etapa já espera o WhatsApp aceitar a anterior (~2-3s no servidor),
+// então o espaçamento real entre mensagens segue em vários segundos; a pausa extra só atrasava.
+const INTERVALO_SEQUENCIA_MS = 1000;
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 /**

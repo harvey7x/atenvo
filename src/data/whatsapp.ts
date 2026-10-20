@@ -587,7 +587,11 @@ export function useSendWaMessage() {
       });
       return r.mensagem?.id ?? null;
     },
-    onSettled: () => qc.invalidateQueries({ queryKey: ['wa-conversas', currentOrg.id] }),
+    // Recarrega SÓ o histórico da conversa (barato). A LISTA ['wa-conversas'] é a query mais pesada
+    // do sistema (keyset de todas as conversas, picos de ~8s) e era refeita inteira a CADA envio de
+    // CADA atendente — disputando o banco com o próprio envio. A mensagem nova já chega na lista
+    // pelo realtime (patch na hora + reconciliação coalescida em 4s em useWaConversations).
+    onSettled: (_d, _e, input) => qc.invalidateQueries({ queryKey: ['wa-msgs', currentOrg.id, input.conversaId] }),
   });
 }
 
