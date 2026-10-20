@@ -1974,7 +1974,7 @@ export default function WhatsAppV2() {
           }}
         />
       )}
-      <ScriptSequenceModal
+      <ScriptSequenceModal segundoPlano
         open={!!scriptSeq} script={scriptSeq}
         canal="whatsapp" conversaId={current.id} incluirMidia
         onClose={() => setScriptSeq(null)}

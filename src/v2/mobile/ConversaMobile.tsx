@@ -390,7 +390,7 @@ export default function ConversaMobile() {
           </div>
         </div>
       )}
-      <ScriptSequenceModal
+      <ScriptSequenceModal segundoPlano
         open={!!scriptSeq} script={scriptSeq}
         canal="whatsapp" conversaId={conv.id} incluirMidia
         onClose={() => setScriptSeq(null)}

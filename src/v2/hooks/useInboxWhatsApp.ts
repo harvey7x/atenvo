@@ -408,26 +408,53 @@ export function useInboxWhatsApp(opts: {
     if (optout) throw new Error('Contato marcado como não incomodar — mensagens bloqueadas.');
     if (higieneBloqueia) throw new Error(textoBloqueio(higiene) ?? 'Atendimento sem responsável ou com cadastro incompleto — assuma e complete o nome para enviar.');
   };
+  /** Bolha otimista de uma etapa de script (texto ou mídia do arsenal). */
+  const bolhaScript = (conv: string, b: Partial<WaMessage>, last: string) => {
+    const now = new Date();
+    const hh = ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
+    const cid = novoCid(now.getTime());
+    setContacts((cur) => aplicarEnvioOtimista(cur, conv, { dir: 'out', time: hh, tsISO: now.toISOString(), status: 'pendente', cid, ...b }, last));
+    return { conv, cid };
+  };
   const scriptEnviarEtapa = useCallback(async (texto: string, retryMensagemId?: string) => {
     guardaScript();
     // demo devolve um id sintético: com `confirmar` presente o modal EXIGE id
     // (sem ele a etapa marcava "Falhou · envio sem identificador" no demo)
     if (demo) { aoAvisar({ tom: 'ok', texto: 'Mensagem enviada' }); return 'demo-script'; }
-    const id = await sendMut.mutateAsync({ conversaId: currentId, canalId: replyCanalId || current.canalId, text: texto, retryMensagemId });
-    return id ?? undefined;
+    // bolha "enviando" NA HORA (o script roda em segundo plano): some quando a linha real chega
+    // (marcarIdReal → reconciliação por id); em erro vira "falhou" (o backend grava a falha com Reenviar).
+    const bolha = retryMensagemId ? null : bolhaScript(currentId, { tipo: 'texto', text: texto }, texto);
+    try {
+      const id = await sendMut.mutateAsync({ conversaId: currentId, canalId: replyCanalId || current.canalId, text: texto, retryMensagemId });
+      if (bolha && id) setContacts((cur) => marcarIdReal(cur, bolha.conv, bolha.cid, id));
+      return id ?? undefined;
+    } catch (e) {
+      if (bolha) setContacts((cur) => aplicarFalha(cur, bolha.conv, bolha.cid, (e as Error)?.message || 'Falha no envio.'));
+      throw e;
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentId, replyCanalId, current.canalId, canalRestrito, canalIndisponivel, semDestino, optout, higieneBloqueia, higiene, demo]);
-  const scriptEnviarMidia = useCallback(async (m: { tipo: string; texto: string; mime?: string | null; nome?: string | null; tamanho?: number | null; storagePath?: string | null }) => {
+  const scriptEnviarMidia = useCallback(async (m: { tipo: string; texto: string; mime?: string | null; nome?: string | null; tamanho?: number | null; storagePath?: string | null; previewUrl?: string }) => {
     guardaScript();
     if (!m.storagePath) throw new Error('Mídia do script sem arquivo. Reenvie o anexo no arsenal de Scripts.');
     if (demo) { aoAvisar({ tom: 'ok', texto: 'Mídia enviada' }); return; }
     // A mídia do script já vive no bucket privado (script-midia); envia pelo mesmo caminho do compositor.
-    const id = await sendMut.mutateAsync({
-      conversaId: currentId, canalId: replyCanalId || current.canalId,
-      midiaPath: m.storagePath, midiaTipo: m.tipo, midiaMime: m.mime ?? undefined, midiaNome: m.nome ?? undefined, midiaTamanho: m.tamanho ?? undefined,
-      text: m.texto || undefined,
-    });
-    if (id) await aguardarConfirmacaoEnvio(id); // sucesso = confirmação REAL do provedor (igual ao texto)
+    const tipoBolha = (['imagem', 'video', 'audio', 'documento'].includes(m.tipo) ? m.tipo : 'documento') as 'imagem' | 'video' | 'audio' | 'documento';
+    const bolha = bolhaScript(currentId,
+      { tipo: tipoBolha, text: m.texto || '', localUrl: m.previewUrl, nome: m.nome ?? undefined, mime: m.mime ?? undefined, tamanho: m.tamanho ?? undefined },
+      previewUltimaMensagem({ tipo: tipoBolha, texto: m.texto || null }));
+    try {
+      const id = await sendMut.mutateAsync({
+        conversaId: currentId, canalId: replyCanalId || current.canalId,
+        midiaPath: m.storagePath, midiaTipo: m.tipo, midiaMime: m.mime ?? undefined, midiaNome: m.nome ?? undefined, midiaTamanho: m.tamanho ?? undefined,
+        text: m.texto || undefined,
+      });
+      if (id) setContacts((cur) => marcarIdReal(cur, bolha.conv, bolha.cid, id));
+      if (id) await aguardarConfirmacaoEnvio(id); // sucesso = confirmação REAL do provedor (igual ao texto)
+    } catch (e) {
+      setContacts((cur) => aplicarFalha(cur, bolha.conv, bolha.cid, (e as Error)?.message || 'Falha no envio da mídia.'));
+      throw e;
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentId, replyCanalId, current.canalId, canalRestrito, canalIndisponivel, semDestino, optout, higieneBloqueia, higiene, demo]);
 

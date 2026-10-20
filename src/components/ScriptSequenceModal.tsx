@@ -8,7 +8,7 @@ import { removerMensagemFalha } from '@/data/whatsapp';
 type Status = 'pendente' | 'enviando' | 'ok' | 'falha';
 type Confirmado = 'enviada' | 'entregue' | 'lida';
 interface Item { posicao: number; tipo: EtapaTipo; texto: string; faltando: string[]; etapaId?: string; nome?: string | null; mime?: string | null; tamanho?: number | null; storagePath?: string | null; previewUrl?: string; removida?: boolean; mensagemId?: string }
-export interface MidiaEtapa { etapaId: string; tipo: EtapaTipo; texto: string; nome?: string | null; mime?: string | null; tamanho?: number | null; storagePath?: string | null }
+export interface MidiaEtapa { etapaId: string; tipo: EtapaTipo; texto: string; nome?: string | null; mime?: string | null; tamanho?: number | null; storagePath?: string | null; previewUrl?: string }
 
 interface Props {
   open: boolean;
@@ -27,6 +27,11 @@ interface Props {
   /** Inclui etapas de imagem na sequência (canal que suporta — Facebook). */
   incluirMidia?: boolean;
   onEnviado?: () => void;
+  /** ENVIO EM SEGUNDO PLANO (inbox v2): ao clicar em Enviar o modal fecha NA HORA e a sequência
+   *  segue sozinha — o chamador mostra cada etapa como bolha "enviando" na conversa. Mesma ordem,
+   *  mesmo intervalo, para na 1ª falha (avisada por toast; a mensagem falhada fica na conversa
+   *  com Reenviar). Sem esta flag (v1/Facebook) o modal acompanha etapa a etapa, como sempre. */
+  segundoPlano?: boolean;
 }
 
 const temPendenciaTexto = (t: string) => /\{\{\s*\w+\s*\}\}/.test(t) || /\[[^\]]*não inform/i.test(t);
@@ -42,7 +47,7 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
  * Sucesso de etapa = confirmação REAL do provedor (texto: status da mensagem; imagem: retorno
  * válido da Send API). HTTP 200 / avanço do loop NÃO contam. Para na 1ª recusa; retry só do que faltou.
  */
-export function ScriptSequenceModal({ open, onClose, script, canal, ctx, conversaId, enviarEtapa, confirmar, enviarMidia, incluirMidia, onEnviado }: Props) {
+export function ScriptSequenceModal({ open, onClose, script, canal, ctx, conversaId, enviarEtapa, confirmar, enviarMidia, incluirMidia, onEnviado, segundoPlano }: Props) {
   const { toast } = useToast();
   const qc = useQueryClient();
   const registrar = useRegistrarExecucaoScript();
@@ -120,8 +125,56 @@ export function ScriptSequenceModal({ open, onClose, script, canal, ctx, convers
     registrar.mutate({ scriptId: script.id, conversaId, canal, total: ativos.length, enviadas, entregues, falhas, ultimaEtapaOk: ultimaOk, erro: erroMsg });
   }
 
+  /** Segundo plano: roda a MESMA sequência sem prender a tela. Não toca no estado do modal
+   *  (ele já fechou); o resultado vai por toast e a auditoria é registrada no fim. */
+  async function rodarEmSegundoPlano(its: Item[], scr: { id: string; titulo: string }) {
+    const st: Status[] = its.map(() => 'pendente'); const conf: (Confirmado | null)[] = its.map(() => null);
+    let erroMsg: string | null = null; let falhouEm = 0;
+    let enviouNesteRun = false;
+    for (let i = 0; i < its.length; i++) {
+      const it = its[i];
+      if (it.removida) continue;
+      if (enviouNesteRun) await sleep(INTERVALO_SEQUENCIA_MS);
+      try {
+        if (it.tipo !== 'texto') {
+          if (!enviarMidia || !it.etapaId) throw new Error('Envio de mídia indisponível neste canal.');
+          await enviarMidia({ etapaId: it.etapaId, tipo: it.tipo, texto: it.texto, nome: it.nome, mime: it.mime, tamanho: it.tamanho, storagePath: it.storagePath, previewUrl: it.previewUrl });
+          conf[i] = 'enviada';
+        } else {
+          const ref = await enviarEtapa(it.texto);
+          if (confirmar) { if (!ref || typeof ref !== 'string') throw new Error('Envio sem identificador para confirmar.'); conf[i] = await confirmar(ref); }
+          else conf[i] = 'enviada';
+        }
+        st[i] = 'ok'; enviouNesteRun = true;
+      } catch (e) {
+        st[i] = 'falha'; erroMsg = (e as Error).message || 'Falha no envio'; falhouEm = it.posicao;
+        break;
+      }
+    }
+    const ativos = its.map((it, i) => ({ it, st: st[i], cf: conf[i] })).filter((x) => !x.it.removida);
+    const enviadas = ativos.filter((x) => x.st === 'ok').length;
+    const falhas = ativos.filter((x) => x.st === 'falha').length;
+    const entregues = ativos.filter((x) => x.cf === 'entregue' || x.cf === 'lida').length;
+    let ultimaOk = 0; ativos.forEach((x, i) => { if (x.st === 'ok') ultimaOk = i + 1; });
+    if (enviadas > 0 || falhas > 0) registrar.mutate({ scriptId: scr.id, conversaId, canal, total: ativos.length, enviadas, entregues, falhas, ultimaEtapaOk: ultimaOk, erro: erroMsg });
+    if (erroMsg) {
+      const resto = ativos.length - enviadas - falhas;
+      toast(`Script "${scr.titulo}": a mensagem ${falhouEm} não foi enviada — ${erroMsg}${resto > 0 ? ` (${resto === 1 ? 'a seguinte ficou' : `as ${resto} seguintes ficaram`} sem enviar)` : ''}.`, 'warn');
+    }
+  }
+
   async function enviarSequencia() {
     if (enviando || !script || !itens.length) return;
+    // 1º disparo em segundo plano: fecha já e deixa a sequência correndo (retry/continuação
+    // de um disparo que falhou DENTRO do modal segue pelo caminho acompanhado abaixo).
+    if (segundoPlano && status.every((x) => x === 'pendente')) {
+      const its = itens.map((x) => ({ ...x }));
+      const scr = { id: script.id, titulo: script.titulo };
+      jaReg.current = true; // a auditoria fica com o segundo plano (fechar não registra de novo)
+      onEnviado?.(); onClose();
+      void rodarEmSegundoPlano(its, scr);
+      return;
+    }
     setEnviando(true);
     const st = [...status]; const conf = [...confirmados]; const er = [...erros];
     let parou = false;
