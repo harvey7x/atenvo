@@ -8,7 +8,8 @@
 
 /* --- moldura do app ----------------------------------------- */
 .v2.app-v2 { position: relative; height: 100dvh; overflow: hidden; }
-.v2 .p-app { position: relative; z-index: 1; height: 100%; padding-left: 64px; }
+/* 84 = 10 de respiro + 64 do rail flutuante + 10 de vão até o conteúdo */
+.v2 .p-app { position: relative; z-index: 1; height: 100%; padding-left: 84px; }
 
 /* --- sidebar (rail 64 → 242 no hover, em overlay) -----------
    Recriada SEM animação de layout (o `width` 64→242 reflowava a
@@ -19,13 +20,16 @@
    transform; a sombra é um irmão que faz fade em opacity. Três
    propriedades compositáveis, zero reflow. will-change entra por JS
    só durante a transição (AppShellV2). */
+/* FLUTUANTE (14/10, referência aprovada pelo dono): a barra descola das bordas
+   (10px de respiro) e vira um painel de vidro com cantos arredondados — o
+   `round 18px` no clip-path recorta o conteúdo no mesmo raio do fundo. */
 .v2 .p-sidebar {
-  position: absolute; left: 0; top: 0; bottom: 0; width: 242px; z-index: 30;
+  position: absolute; left: 10px; top: 10px; bottom: 10px; width: 242px; z-index: 30;
   display: flex; flex-direction: column; padding: 13px 11px 10px; overflow: hidden;
-  clip-path: inset(0 178px 0 0);
+  clip-path: inset(0 178px 0 0 round 18px);
   transition: clip-path .36s var(--ease);
 }
-.v2 .p-sidebar:hover, .v2 .p-sidebar:focus-within { clip-path: inset(0 0 0 0); }
+.v2 .p-sidebar:hover, .v2 .p-sidebar:focus-within { clip-path: inset(0 0 0 0 round 18px); }
 /* recolhida, o conteúdo assume o content box do rail original (42px = 64 −
    2×11 de padding): a pill do item ativo e os hairlines de grupo/rodapé
    terminam arredondados em x=53 com respiro do fio, como no rail antigo, em
@@ -33,30 +37,41 @@
    layout no instante do hover (sem transition de width) — nada anima layout
    por frame. */
 .v2 .p-sidebar:not(:hover):not(:focus-within) > * { width: 42px; }
-/* fundo: carrega vidro, gradiente e o fio direito — o fio viaja com o
-   transform (borda no host seria clipada quando recolhida). É IRMÃO do
-   aside, não filho: o clip-path do host cria um backdrop root novo, e um
-   backdrop-filter lá dentro deixaria de amostrar a página (vidro sem
-   blur). Fora do clip, pintando logo abaixo (z 29 < 30), o blur enxerga
-   o palco como o vidro original. */
-.v2 .sb-fundo {
-  position: absolute; left: 0; top: 0; bottom: 0; width: 242px; z-index: 29;
+/* fundo em DUAS peças, irmãs do aside (o clip-path do host criaria um backdrop
+   root e mataria o blur de um filho):
+   - .sb-rail: a cápsula de 64px do estado RECOLHIDO — estática, com os 4 cantos
+     arredondados, borda e sombra próprias (era o vazamento do flutuante: um
+     retângulo de 242px transladado deixava os cantos esquerdos fora da tela e
+     pintava vidro até x=0);
+   - .sb-fundo: o painel de 242px do estado ABERTO — desliza E esmaece (opacity 0
+     recolhido, como a .sb-sombra), então nunca aparece fora do hover.
+   Só transform/opacity animam; zero reflow. */
+.v2 .sb-rail, .v2 .sb-fundo {
+  position: absolute; left: 10px; top: 10px; bottom: 10px;
   pointer-events: none;
-  border-right: 1px solid var(--linha);
-  background: linear-gradient(180deg, rgba(20, 21, 25, .74), rgba(14, 15, 18, .68));
+  border: 1px solid var(--linha); border-radius: 18px;
+  /* vidro de verdade (o blur de 22px garante a leitura); perf lite e corp
+     desligam o blur e trocam por fundo sólido nas seções de override */
+  background: linear-gradient(180deg, rgba(22, 23, 28, .82), rgba(13, 14, 17, .86));
   backdrop-filter: var(--desfoque-chrome);
   -webkit-backdrop-filter: var(--desfoque-chrome);
-  transform: translateX(-178px);
-  transition: transform .36s var(--ease);
+  box-shadow: 0 12px 32px rgba(2, 4, 10, .38), inset 0 1px 0 rgba(255, 255, 255, .07);
 }
-.v2 .p-sidebar:hover ~ .sb-fundo, .v2 .p-sidebar:focus-within ~ .sb-fundo { transform: translateX(0); }
+.v2 .sb-rail { width: 64px; z-index: 28; transition: opacity .3s var(--ease); }
+.v2 .p-sidebar:hover ~ .sb-rail, .v2 .p-sidebar:focus-within ~ .sb-rail { opacity: 0; }
+.v2 .sb-fundo {
+  width: 242px; z-index: 29; opacity: 0;
+  transform: translateX(-178px);
+  transition: transform .36s var(--ease), opacity .3s var(--ease);
+}
+.v2 .p-sidebar:hover ~ .sb-fundo, .v2 .p-sidebar:focus-within ~ .sb-fundo { transform: translateX(0); opacity: 1; }
 /* sombra da expansão: também irmã, sob o vidro (box-shadow no host seria
    clipado); viaja em lockstep com o fundo (mesmo translateX — a sombra
    acompanha a aresta visível, não fica fantasma em x=242) e faz fade em
    opacity no lugar de animar box-shadow (paint) */
 .v2 .sb-sombra {
-  position: absolute; left: 0; top: 0; bottom: 0; width: 242px; z-index: 28;
-  pointer-events: none; opacity: 0;
+  position: absolute; left: 10px; top: 10px; bottom: 10px; width: 242px; z-index: 27;
+  pointer-events: none; opacity: 0; border-radius: 18px;
   box-shadow: 30px 0 80px rgba(0, 0, 0, .55);
   transform: translateX(-178px);
   transition: opacity .36s var(--ease), transform .36s var(--ease);
@@ -67,34 +82,106 @@
   transition: opacity .22s .07s, transform .3s .07s var(--ease);
 }
 .v2 .p-sidebar:hover .lab, .v2 .p-sidebar:focus-within .lab { opacity: 1; transform: none; }
-.v2 .p-logo { display: flex; align-items: center; gap: 11px; padding: 2px 4px 0; height: 30px; }
-/* marca = SVG LogoAtenvo (o desenho traz o próprio fundo/raio; o CSS só dimensiona
-   e dá o glow azul da identidade) */
-.v2 .p-logo .marca {
-  width: 29px; height: 29px; flex-shrink: 0; display: block;
-  filter: drop-shadow(0 5px 14px rgba(62, 123, 240, calc(.4 * var(--fx))));
+/* --- cabeçalho: marca + seletor de módulo numa linha (14/10) ---
+   Recolhida, a caixa tem os 42px do rail e só a marca aparece, centrada
+   (padding 7 + marca 28 = centro em 21). Aberta, módulo + org ao lado. */
+.v2 .sb-topo {
+  flex: none; display: flex; align-items: center; gap: 10px; width: 100%;
+  height: 44px; padding: 0 8px 0 7px; margin: 1px 0 4px;
+  background: none; border: 0; border-radius: 10px; cursor: pointer;
+  font-family: var(--fonte); text-align: left; color: var(--txt);
+  transition: background .18s;
 }
-/* acentos: o glow da marca acompanha o bloom (skinAurora --lg-*) */
-:root[data-acento="verde"] .v2 .p-logo .marca { filter: drop-shadow(0 5px 14px rgba(39, 183, 108, calc(.4 * var(--fx)))); }
-:root[data-acento="dourado"] .v2 .p-logo .marca { filter: drop-shadow(0 5px 14px rgba(209, 154, 46, calc(.4 * var(--fx)))); }
-.v2 .p-logo .word { font-weight: 600; font-size: 15px; letter-spacing: .02em; }
-.v2 .tenant {
-  margin: 11px 2px 0; display: flex; align-items: center; justify-content: space-between;
-  background: rgba(var(--tint), .05); border: 1px solid rgba(var(--tint), .09);
-  border-radius: 9px; padding: 6px 10px; font-size: 12px; color: var(--txt-2);
-  cursor: pointer; opacity: 0; transition: opacity .22s .07s;
+.v2 .sb-topo:hover { background: rgba(var(--tint), .05); }
+.v2 .sb-topo:focus-visible { outline: none; box-shadow: 0 0 0 2px rgba(var(--tint), .3); }
+/* marca = SVG LogoAtenvo (o desenho traz o próprio fundo/raio; o CSS só dimensiona) */
+.v2 .sb-topo .marca {
+  width: 28px; height: 28px; flex-shrink: 0; display: block;
+  filter: drop-shadow(0 4px 10px rgba(62, 123, 240, calc(.35 * var(--fx))));
 }
-.v2 .p-sidebar:hover .tenant, .v2 .p-sidebar:focus-within .tenant { opacity: 1; }
-.v2 .tenant b { font-weight: 500; color: var(--txt); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.v2 .grupo { margin-top: 9px; padding-top: 8px; border-top: 1px solid var(--linha); }
-.v2 .grupo:first-of-type { border-top: none; margin-top: 11px; padding-top: 0; }
-.v2 .glabel { padding: 0 6px; margin-bottom: 4px; height: 12px; font-size: 10px; }
+:root[data-acento="verde"] .v2 .sb-topo .marca { filter: drop-shadow(0 4px 10px rgba(39, 183, 108, calc(.35 * var(--fx)))); }
+:root[data-acento="dourado"] .v2 .sb-topo .marca { filter: drop-shadow(0 4px 10px rgba(209, 154, 46, calc(.35 * var(--fx)))); }
+.v2 .sb-topo-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.2; }
+.v2 .sb-topo-txt b { font-size: 13px; font-weight: 600; letter-spacing: -.005em; color: var(--txt); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2 .sb-topo-txt i { font-size: 11px; font-style: normal; color: var(--txt-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2 .sb-topo-seta { flex: none; color: var(--txt-3); }
+.v2 .sb-topo:hover .sb-topo-seta { color: var(--txt-2); }
+/* lista principal: ocupa o meio e ROLA quando a tela é baixa — o grupo fixo
+   (Integrações/Configurações), o canal e o usuário ficam sempre à vista.
+   margin/padding −11/11 estica a caixa de rolagem até a borda da sidebar para
+   o trilho do item ativo (left −11px) não ser cortado pelo overflow. */
+.v2 .sb-nav {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden;
+  margin: 0 -11px; padding: 0 11px 16px;
+  scrollbar-width: none;
+  /* esmaece as bordas: sinaliza que a lista continua quando a tela é baixa
+     (o 1º rótulo nasce a 12px, abaixo do esmaecido de cima) */
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 10px, #000 calc(100% - 20px), transparent);
+  mask-image: linear-gradient(180deg, transparent, #000 10px, #000 calc(100% - 20px), transparent);
+}
+.v2 .sb-nav::-webkit-scrollbar { display: none; }
+.v2 .p-sidebar:not(:hover):not(:focus-within) > .sb-nav { width: 64px; }
+.v2 .grupo {
+  margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--linha);
+  transition: border-color .22s;
+}
+.v2 .grupo:first-of-type { border-top: none; margin-top: 10px; padding-top: 0; }
+/* aberta, o rótulo já separa os grupos — o fio só serve ao rail recolhido */
+.v2 .p-sidebar:hover .grupo, .v2 .p-sidebar:focus-within .grupo { border-top-color: transparent; }
+/* rótulo de seção discreto, em caixa normal (sem o "grito" das maiúsculas espaçadas) */
+.v2 .glabel {
+  padding: 0 10px 0 13px; margin-bottom: 2px; height: 20px; line-height: 20px;
+  font-size: 11px; font-weight: 500; letter-spacing: .01em;
+  color: var(--txt-3);
+}
+.v2 .sb-fixo {
+  flex: none; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--linha);
+}
+/* --- itens da sidebar (escopo próprio: .item solto existe em outras telas) ---
+   ícone a 13px da borda = centro em 21, o meio do rail de 42. PÍLULAS (referência
+   14/10): raio total; a página ativa é uma pílula de PLATINA (metal claro, texto
+   escuro) — o mesmo "polegar" do segmentado da intro. Recolhida, vira o disco
+   claro no rail. */
+.v2 .p-sidebar .item {
+  height: 34px; padding: 0 9px 0 13px; gap: 11px; margin: 1.5px 0;
+  font-size: 13px; font-weight: 450; color: var(--txt-2); border-radius: 999px;
+}
+.v2 .p-sidebar .item svg { width: 16px; height: 16px; color: var(--txt-3); transition: color .18s; }
+.v2 .p-sidebar .item:hover { color: var(--txt); background: rgba(var(--tint), .05); }
+.v2 .p-sidebar .item:hover svg { color: var(--txt-2); }
+.v2.app-v2 .p-sidebar .item.on {
+  color: var(--platina-txt); font-weight: 600;
+  background: linear-gradient(180deg, var(--platina-a), var(--platina-b));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .6), 0 4px 14px rgba(2, 4, 10, calc(.35 * var(--fx) + .12));
+}
+.v2.app-v2 .p-sidebar .item.on svg { color: var(--platina-txt); }
+.v2.app-v2 .p-sidebar .item.on::before { content: none; }
+/* contador (não lidas): pílula cheia no acento — o único ponto de cor da lista */
+.v2 .p-sidebar .badge-n {
+  min-width: 20px; height: 18px; padding: 0 6px; border: 0; border-radius: 99px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 10.5px; font-weight: 650; line-height: 1;
+  background: var(--azul, var(--txt)); color: #fff;
+}
+:root[data-acento="dourado"] .v2 .p-sidebar .badge-n { color: #241A05; }
+/* acento verde no dark: fora da pílula o contador seria branco sobre mint #3BD689 — texto escuro.
+   (A regra do contador DENTRO da pílula vem depois e vence o empate de especificidade.) */
+:root[data-acento="verde"]:not([data-tema="light"]) .v2 .p-sidebar .badge-n { color: #0A2E1D; }
+/* dentro da pílula o contador é o INVERSO exato dela (fundo = texto da pílula,
+   texto = fundo da pílula): legível em toda variante — inclusive no corp, onde
+   a pílula é azul com texto branco e --platina-txt-rgb é 255,255,255 */
+.v2.app-v2 .p-sidebar .item.on .badge-n { background: var(--platina-txt); color: var(--platina-a); }
+/* foco de teclado na pílula ativa: o anel soma ao relevo (antes o box-shadow da pílula o engolia) */
+.v2.app-v2 .p-sidebar .item.on:focus-visible {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .6), 0 4px 14px rgba(2, 4, 10, .2), 0 0 0 2px rgba(var(--tint), .5);
+}
 .v2 .item {
-  position: relative; display: flex; align-items: center; gap: 13px; padding: 7.5px 10px;
+  position: relative; display: flex; align-items: center; gap: 12px; padding: 6.5px 10px;
   margin: 1px 0; border-radius: 8px; font-size: 12.5px; color: var(--txt-2); cursor: pointer;
   transition: background .18s, color .18s; text-decoration: none;
   width: 100%; border: none; background: none; font-family: var(--fonte); text-align: left;
 }
+.v2 .item > .lab:not(.badge-n) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .v2 .item svg { width: 17px; height: 17px; flex-shrink: 0; }
 .v2 .item:hover { color: var(--txt); background: rgba(var(--tint), .055); }
 .v2 .item.on { color: #fff; background: rgba(var(--tint), .075); font-weight: 500; }
@@ -116,29 +203,26 @@
   background: rgba(var(--tint), .10); color: var(--txt); border: 1px solid rgba(var(--tint), .14);
 }
 .v2 .badge-n.rubro { background: var(--rubro-bg); color: var(--rubro); border-color: rgba(var(--rubro-rgb), .3); }
-.v2 .canal {
-  margin: 9px 2px 0; display: flex; align-items: center; gap: 9px; font-size: 10.5px;
-  color: var(--verde); background: var(--verde-bg); border: 1px solid rgba(var(--verde-rgb), .2);
-  border-radius: 8px; padding: 6px 10px; opacity: 0; transition: opacity .22s .07s;
-}
-.v2 .p-sidebar:hover .canal, .v2 .p-sidebar:focus-within .canal { opacity: 1; }
-.v2 .canal i {
-  width: 6px; height: 6px; border-radius: 50%; background: var(--verde); flex-shrink: 0;
-  animation: v2-pulsa 2.6s ease-out infinite;
-}
-.v2 .canal span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .v2 .rodape-sb {
-  margin-top: auto; border-top: 1px solid var(--linha); padding: 9px 2px 2px;
-  display: flex; align-items: center; gap: 11px;
+  margin-top: auto; border-top: 1px solid var(--linha); padding: 10px 0 2px 6px;
+  display: flex; align-items: center; gap: 10px;
 }
+.v2 .rodape-sb .avatar { position: relative; width: 30px; height: 30px; font-size: 11.5px; }
+/* bolinha verde no avatar = canal operante (substitui a caixa "Canal · operante") */
+.v2 .rodape-sb .avatar-on {
+  position: absolute; right: -1px; bottom: -1px; width: 9px; height: 9px; border-radius: 50%;
+  background: var(--verde); border: 2px solid var(--base, #0E0F12);
+}
+:root[data-tema="light"] .v2 .rodape-sb .avatar-on { border-color: #FBFBFC; }
+.v2 .rodape-txt { min-width: 0; }
 .v2 .avatar {
   width: 29px; height: 29px; flex-shrink: 0; border-radius: 50%; display: flex; align-items: center;
   justify-content: center; font-size: 12px; font-weight: 600; color: var(--txt);
   background: linear-gradient(150deg, #2B2E34, #17191D);
   box-shadow: inset 0 1px 0 rgba(var(--tint), .16), 0 0 0 1.5px rgba(var(--tint), .20);
 }
-.v2 .rodape-sb .nome { font-size: 12.5px; font-weight: 500; line-height: 1.2; white-space: nowrap; }
-.v2 .rodape-sb .cargo { font-size: 10.5px; color: var(--txt-3); }
+.v2 .rodape-sb .nome { font-size: 12.5px; font-weight: 600; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2 .rodape-sb .cargo { font-size: 11px; color: var(--txt-3); line-height: 1.3; }
 
 /* --- topbar ------------------------------------------------- */
 .v2 .principal { height: 100%; display: flex; flex-direction: column; min-width: 0; }
@@ -292,15 +376,20 @@
    invertidas (sidebar, logo, avatar, menu, dots) ganham par claro;
    o resto herdou o canal --tint no swap acima. Dark não muda.
    ============================================================ */
-:root[data-tema="light"] .v2 .sb-fundo {
-  background: linear-gradient(180deg, rgba(255, 255, 255, .92), rgba(247, 248, 250, .86));
+:root[data-tema="light"] .v2 .sb-fundo, :root[data-tema="light"] .v2 .sb-rail {
+  background: linear-gradient(180deg, rgba(255, 255, 255, .88), rgba(248, 249, 251, .84));
+  border-color: rgba(22, 25, 31, .10);
+  box-shadow: 0 12px 30px rgba(22, 25, 31, .12), inset 0 1px 0 rgba(255, 255, 255, .85);
 }
 :root[data-tema="light"] .v2 .sb-sombra { box-shadow: 30px 0 80px rgba(22, 25, 31, .14); }
+/* visual corporativo (o VIVO: main.tsx fixa data-visual="corp"): sem blur,
+   o translúcido vazaria o conteúdo — fundo sólido, flutuante e raio mantidos */
+html:root[data-visual="corp"] .v2 .sb-fundo, html:root[data-visual="corp"] .v2 .sb-rail { background: linear-gradient(180deg, #17181D, #101115); }
+html:root[data-visual="corp"][data-tema="light"] .v2 .sb-fundo, html:root[data-visual="corp"][data-tema="light"] .v2 .sb-rail { background: linear-gradient(180deg, #FFFFFF, #F7F8FA); }
 /* logo: metal claro do dark → grafite no claro (a marca sobrevive sobre a sidebar clara) */
 /* marca SVG: mesmo desenho nos dois temas (ícone escuro com glow lê bem no claro) */
 /* item ativo: texto e trilho brancos → tinta/accent escuros no claro */
-:root[data-tema="light"] .v2 .item.on { color: var(--txt); }
-:root[data-tema="light"] .v2 .item.on::before { background: var(--accent); box-shadow: none; }
+/* (item ativo no light: a pílula de platina em shell.css cuida da cor nos dois temas) */
 /* avatares: gradiente escuro → prata clara (iniciais escuras legíveis) */
 :root[data-tema="light"] .v2 .avatar,
 :root[data-tema="light"] .v2 .notif .p-av { background: linear-gradient(150deg, #E4E8ED, #C2C8D1); }
@@ -334,9 +423,9 @@
    tema) — sem transparência não há recomposição por frame.
    Dark e light têm cada um seu par; o Completo não muda.
    ============================================================ */
-:root[data-perf="lite"] .v2 .sb-fundo { background: linear-gradient(180deg, #111216, #0D0E10); }
+:root[data-perf="lite"] .v2 .sb-fundo, :root[data-perf="lite"] .v2 .sb-rail { background: linear-gradient(180deg, #111216, #0D0E10); }
 :root[data-perf="lite"] .v2 .p-topbar { background: linear-gradient(180deg, #111214, #0C0D0F); }
-:root[data-perf="lite"][data-tema="light"] .v2 .sb-fundo { background: linear-gradient(180deg, #FEFEFE, #F7F8FA); }
+:root[data-perf="lite"][data-tema="light"] .v2 .sb-fundo, :root[data-perf="lite"][data-tema="light"] .v2 .sb-rail { background: linear-gradient(180deg, #FEFEFE, #F7F8FA); }
 :root[data-perf="lite"][data-tema="light"] .v2 .p-topbar { background: linear-gradient(180deg, #EDEEF0, #F2F3F5); }
 
 /* ============================================================
@@ -551,11 +640,10 @@
 
 /* ============================================================
    TROCA DE ORGANIZAÇÃO (Fase 2.0) — só existe para quem tem mais
-   de um vínculo; uma org = .tenant decorativo idêntico ao de sempre.
+   de um vínculo. O gatilho hoje é o .sb-topo (marca + módulo).
    Menu herda a pele do .usuario-menu; seleção = texto + dot no
    acento (zero emoji, zero badge).
    ============================================================ */
-.v2 button.tenant.trocavel { font-family: var(--fonte); text-align: left; }
 .v2 .org-troca { min-width: 208px; } /* org-menu colidiria com o display:none do OrgSwitcher v1 em global.css */
 .v2 .om-item { display: flex; align-items: center; gap: 9px; }
 .v2 .om-item .om-dot {
@@ -565,10 +653,3 @@
 .v2 .om-item.on { color: var(--txt); font-weight: 600; }
 .v2 .om-item.on .om-dot { background: var(--azul, var(--txt)); box-shadow: 0 0 8px rgba(var(--azul-rgb, 76, 141, 255), calc(.5 * var(--fx))); }
 .v2 .om-nome { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-/* ---- seletor de módulo (Atendimento ↔ Cobranças ↔ …), 29/08 ----
-   herda o visual do antigo .tenant; ganha subtítulo com o nome da org. */
-.v2 .tenant.modulo-sel { align-items: center; }
-.v2 .modulo-txt { display: flex; flex-direction: column; min-width: 0; line-height: 1.15; }
-.v2 .modulo-txt b { font-size: 13px; font-weight: 600; color: var(--txt); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.v2 .modulo-org { font-size: 10.5px; font-style: normal; color: var(--txt-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

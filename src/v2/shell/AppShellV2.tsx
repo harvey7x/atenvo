@@ -50,7 +50,10 @@ const IconeLua = () => (
    órfãs do mockup e entram nos grupos pela função. Badges chegam com as
    páginas reais — por ora ficam zerados (nada de número inventado). */
 type ItemNav = { slug: string; rotulo: string; admin?: boolean };
-const GRUPOS: { rotulo: string; itens: ItemNav[] }[] = [
+/* `fixo`: grupo preso ao pé da sidebar, sem rótulo, acima do usuário — fica
+   sempre visível mesmo quando a lista de cima precisa rolar. */
+type GrupoNav = { rotulo: string; itens: ItemNav[]; fixo?: boolean };
+const GRUPOS: GrupoNav[] = [
   {
     rotulo: 'Operação',
     itens: [
@@ -58,12 +61,18 @@ const GRUPOS: { rotulo: string; itens: ItemNav[] }[] = [
       { slug: 'whatsapp', rotulo: 'WhatsApp' },
       // Facebook e Disparo fora do menu (pedido do dono 27/08) — rotas seguem vivas por URL
       { slug: 'kanban', rotulo: 'Kanban' },
+      { slug: 'agendamentos', rotulo: 'Agendamentos' },
+    ],
+  },
+  {
+    // o que acontece com o cliente DEPOIS do primeiro atendimento
+    rotulo: 'Acompanhamento',
+    itens: [
       // Pós-venda: clientes fechados (ganho) com fila de "aguardando resposta" (pedido do dono 15/10)
       { slug: 'pos-venda', rotulo: 'Pós-venda' },
-      { slug: 'recuperacao', rotulo: 'Recuperação' },
+      // Recuperação fora do menu (pedido do dono 14/10) — rota segue viva por URL
       { slug: 'pendencias', rotulo: 'Pendências' },
       { slug: 'portabilidades', rotulo: 'Portabilidades' },
-      { slug: 'agendamentos', rotulo: 'Agendamentos' },
     ],
   },
   {
@@ -71,16 +80,11 @@ const GRUPOS: { rotulo: string; itens: ItemNav[] }[] = [
     itens: [
       { slug: 'contatos', rotulo: 'Contatos' },
       { slug: 'scripts', rotulo: 'Scripts' },
+      // Manual de vendas (13/10): treinamento dos novos estagiários — trilha, prova e consulta rápida.
+      { slug: 'manual', rotulo: 'Manual de vendas' },
       // Simulador fora do menu (pedido do dono 27/08) — rota segue viva por URL
       // Cobranças SAIU daqui (29/08): virou um MÓDULO próprio no seletor do topo.
       // Relatórios fora do menu (pedido do dono 27/08) — rota segue viva por URL
-    ],
-  },
-  {
-    // Manual de vendas (13/10): treinamento dos novos estagiários — trilha, prova e consulta rápida.
-    rotulo: 'Treinamento',
-    itens: [
-      { slug: 'manual', rotulo: 'Manual de vendas' },
     ],
   },
   {
@@ -91,17 +95,11 @@ const GRUPOS: { rotulo: string; itens: ItemNav[] }[] = [
       { slug: 'ferramentas/coletor-inss', rotulo: 'Coletor INSS' },
     ],
   },
-  {
-    // IA configurável (Fase 1, 30/08): o cliente cria o próprio atendente de IA
-    // (provedor + chave própria + prompt). Chave é sensível → item só de admin.
-    rotulo: 'Inteligência',
-    itens: [
-      { slug: 'ia', rotulo: 'Atendente de IA', admin: true },
-      { slug: 'fluxos', rotulo: 'Fluxos do bot', admin: true },
-    ],
-  },
+  // Atendente de IA (/ia) e Fluxos do bot (/fluxos) fora do menu (pedido do dono 14/10) —
+  // rotas seguem vivas por URL, só para admin.
   {
     rotulo: 'Sistema',
+    fixo: true,
     itens: [
       { slug: 'integracoes', rotulo: 'Integrações' },
       // Maturação descontinuada (Evolution restrito pela Meta) — item removido do menu; rota → placeholder.
@@ -117,7 +115,7 @@ const GRUPOS: { rotulo: string; itens: ItemNav[] }[] = [
    inteiro da esquerda. Atendimento = a operação de sempre; Cobranças = as
    seções do Modo Cobrança viram itens de menu. Novos módulos entram aqui. */
 type ModuloId = 'atendimento' | 'cobrancas';
-type Modulo = { id: ModuloId; rotulo: string; home: string; grupos: { rotulo: string; itens: ItemNav[] }[] };
+type Modulo = { id: ModuloId; rotulo: string; home: string; grupos: GrupoNav[] };
 const COB_SECOES: ItemNav[] = [
   { slug: 'cobrancas/painel', rotulo: 'Painel' },
   { slug: 'cobrancas/atendentes', rotulo: 'Atendentes' },
@@ -266,6 +264,21 @@ export default function AppShellV2() {
     const desinstalar = [instala(sidebarRef.current, 'clip-path'), instala(fundoRef.current, 'transform')];
     return () => { desinstalar.forEach((d) => d()); };
   }, []);
+  // A lista da sidebar rola em telas baixas. Recolhida (rail de ícones) ela não deve
+  // ficar parada onde o mouse a deixou: volta ao topo, ou só o necessário para o
+  // item ativo aparecer. Calculado à mão — scrollIntoView rolaria também a página.
+  const navRef = useRef<HTMLElement>(null);
+  const alinharNav = useCallback(() => {
+    const n = navRef.current;
+    if (!n) return;
+    const ativo = n.querySelector<HTMLElement>('.item.on');
+    const fimAtivo = ativo ? ativo.offsetTop - n.offsetTop + ativo.offsetHeight : 0;
+    n.scrollTop = Math.max(0, fimAtivo - n.clientHeight + 24);
+  }, []);
+  useEffect(() => {
+    // clique num item com a sidebar aberta: não puxa a lista debaixo do mouse
+    if (!sidebarRef.current?.matches(':hover')) alinharNav();
+  }, [location.pathname, alinharNav]);
   const fecharNotif = useCallback(() => setNotif(null), []);
   // raiz de portal (regra 10): o menu monta no body, fora do stacking context da topbar
   // (que tem backdrop-filter) — senão o conteúdo do palco pinta por cima dele. Shell monta 1×.
@@ -343,25 +356,40 @@ export default function AppShellV2() {
     navigate(m.home);
   }, [navigate]);
 
+  const renderItem = (i: ItemNav) => (
+    <NavLink
+      key={i.slug}
+      to={`/${i.slug}`}
+      className={({ isActive }) => (isActive ? 'item on' : 'item')}
+      title={i.rotulo}
+    >
+      {iconeDoItem(i.slug)}
+      <span className="lab">{i.rotulo}</span>
+      {i.slug === 'whatsapp' && badgePop > 0 && (
+        <span key={badgePop} className="badge-n lab pop num">{badgePop}</span>
+      )}
+      {i.slug === 'pos-venda' && pvAguarda > 0 && (
+        <span className="badge-n rubro lab num" title={`${pvAguarda} aguardando resposta`}>{pvAguarda}</span>
+      )}
+    </NavLink>
+  );
+
   return (
     <div className="v2 app-v2">
       <div className="luz" />
       <div className="grao" />
       <div className="p-app">
-        <aside className="p-sidebar" ref={sidebarRef}>
-          <div className="p-logo">
-            <LogoAtenvo className="marca" />
-            <span className="word lab">atenvo</span>
-          </div>
+        <aside className="p-sidebar" ref={sidebarRef} onMouseLeave={alinharNav}>
           {/* SELETOR DE MÓDULO (29/08): troca o sistema inteiro de parte —
-              Atendimento ↔ Cobranças (e novos módulos no futuro). Ocupa o
-              lugar do antigo seletor de organização (single-tenant: a org é
-              fixa; seu nome vira o subtítulo). */}
-          <button ref={tenantRef} type="button" className="tenant trocavel modulo-sel" title={`Módulo: ${modulo.rotulo} — clique para trocar`}
+              Atendimento ↔ Cobranças (e novos módulos no futuro). A marca e o
+              seletor dividem UMA linha (14/10): recolhida, sobra só a marca no
+              rail; aberta, módulo + organização ao lado. */}
+          <button ref={tenantRef} type="button" className="sb-topo" title={`Módulo: ${modulo.rotulo} — clique para trocar`}
             aria-haspopup="menu" aria-expanded={menuOrg} onClick={abrirMenuOrg}>
-            <span className="modulo-txt"><b>{modulo.rotulo}</b><i className="modulo-org lab">{org}</i></span>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: 'var(--txt-2)' }} aria-hidden>
-              <path d="M7 15l5 5 5-5M7 9l5-5 5 5" />
+            <LogoAtenvo className="marca" />
+            <span className="sb-topo-txt lab"><b>{modulo.rotulo}</b><i>{org}</i></span>
+            <svg className="sb-topo-seta lab" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M8 15l4 4 4-4M8 9l4-4 4 4" />
             </svg>
           </button>
           {menuOrg && createPortal(
@@ -381,35 +409,27 @@ export default function AppShellV2() {
             </>,
             raizMenu,
           )}
-          <nav aria-label="Navegação principal">
-            {modulo.grupos.map((g) => {
+          <nav className="sb-nav" ref={navRef} aria-label="Navegação principal">
+            {modulo.grupos.filter((g) => !g.fixo).map((g) => {
               const itens = g.itens.filter((i) => admin || !i.admin);
               if (!itens.length) return null;
               return (
                 <div className="grupo" key={g.rotulo}>
-                  <div className="glabel caps lab">{g.rotulo}</div>
-                  {itens.map((i) => (
-                    <NavLink
-                      key={i.slug}
-                      to={`/${i.slug}`}
-                      className={({ isActive }) => (isActive ? 'item on' : 'item')}
-                      title={i.rotulo}
-                    >
-                      {iconeDoItem(i.slug)}
-                      <span className="lab">{i.rotulo}</span>
-                      {i.slug === 'whatsapp' && badgePop > 0 && (
-                        <span key={badgePop} className="badge-n lab pop num">{badgePop}</span>
-                      )}
-                      {i.slug === 'pos-venda' && pvAguarda > 0 && (
-                        <span className="badge-n rubro lab num" title={`${pvAguarda} aguardando resposta`}>{pvAguarda}</span>
-                      )}
-                    </NavLink>
-                  ))}
+                  <div className="glabel lab">{g.rotulo}</div>
+                  {itens.map(renderItem)}
                 </div>
               );
             })}
           </nav>
-          <div className="canal"><i aria-hidden /><span>Canal · operante</span></div>
+          {modulo.grupos.filter((g) => g.fixo).map((g) => {
+            const itens = g.itens.filter((i) => admin || !i.admin);
+            if (!itens.length) return null;
+            return (
+              <nav className="sb-fixo" key={g.rotulo} aria-label={g.rotulo}>
+                {itens.map(renderItem)}
+              </nav>
+            );
+          })}
           {import.meta.env.DEV && (
             <div className="dev-ferramentas">
               <button type="button" className="p-btn btn-sec btn-mini" onClick={simularResposta}>
@@ -418,17 +438,19 @@ export default function AppShellV2() {
             </div>
           )}
           <div className="rodape-sb">
-            <div className="avatar">{iniciaisDe(nome)}</div>
-            <div className="lab">
+            <div className="avatar" title="Canal operante">{iniciaisDe(nome)}<i className="avatar-on" aria-hidden /></div>
+            <div className="rodape-txt lab">
               <div className="nome">{nome}</div>
               <div className="cargo">{papel}</div>
             </div>
           </div>
         </aside>
-        {/* fundo (vidro+fio) e sombra da expansão: irmãos do aside — fora do
-            clip-path (que criaria um backdrop root sem blur), pintando abaixo
-            dele. A sidebar anima só clip-path/transform/opacity, nunca width
-            (shell.css). */}
+        {/* fundos do flutuante: .sb-rail = cápsula do estado recolhido (estática);
+            .sb-fundo = painel aberto (desliza+esmaece); .sb-sombra = sombra da
+            expansão. Irmãos do aside — fora do clip-path (que criaria um backdrop
+            root sem blur). A sidebar anima só clip-path/transform/opacity, nunca
+            width (shell.css). */}
+        <div className="sb-rail" aria-hidden />
         <div className="sb-fundo" aria-hidden ref={fundoRef} />
         <div className="sb-sombra" aria-hidden />
 

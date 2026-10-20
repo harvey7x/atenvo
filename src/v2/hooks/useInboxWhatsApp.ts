@@ -436,7 +436,7 @@ export function useInboxWhatsApp(opts: {
   }, [currentId, replyCanalId, current.canalId, canalRestrito, canalIndisponivel, semDestino, optout, higieneBloqueia, higiene, demo]);
   const scriptEnviarMidia = useCallback(async (m: { tipo: string; texto: string; mime?: string | null; nome?: string | null; tamanho?: number | null; storagePath?: string | null; previewUrl?: string }) => {
     guardaScript();
-    if (!m.storagePath) throw new Error('Mídia do script sem arquivo. Reenvie o anexo no arsenal de Scripts.');
+    if (!m.storagePath) throw new Error('Mídia do script sem arquivo. Reenvie o anexo na página de Scripts.');
     if (demo) { aoAvisar({ tom: 'ok', texto: 'Mídia enviada' }); return; }
     // A mídia do script já vive no bucket privado (script-midia); envia pelo mesmo caminho do compositor.
     const tipoBolha = (['imagem', 'video', 'audio', 'documento'].includes(m.tipo) ? m.tipo : 'documento') as 'imagem' | 'video' | 'audio' | 'documento';

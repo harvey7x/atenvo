@@ -243,6 +243,46 @@ function SeletorEtiquetas({
    por useScripts('whatsapp'). Sem banco/RPC.
    ================================================================== */
 type ScriptResumo = Record<string, { total?: number; temMidia?: boolean } | undefined>;
+
+/* Os títulos chegam do arsenal quase sempre em CAIXA ALTA ("PEGAR DOCS MEUS INSS").
+   Exibição: texto TODO em maiúsculas vira frase normal, preservando siglas e nomes
+   do ramo (INSS, GOV, BMG, Crefisa…). Só muda a EXIBIÇÃO no seletor — o dado, a
+   busca e o que vai pro compositor seguem intactos. Texto já misto passa reto. */
+const SIGLAS_SCRIPT: Record<string, string> = {
+  INSS: 'INSS', GOV: 'GOV', 'GOV.BR': 'GOV.BR', CPF: 'CPF', CNPJ: 'CNPJ', RG: 'RG',
+  IA: 'IA', PDF: 'PDF', FGTS: 'FGTS', MIR: 'MIR', MIIR: 'MIIR', BMG: 'BMG',
+  PAN: 'PAN', C6: 'C6', RMC: 'RMC', RCC: 'RCC', TED: 'TED', CREFISA: 'Crefisa',
+  FACTA: 'Facta', SANTANDER: 'Santander', BRADESCO: 'Bradesco', ITAU: 'Itaú',
+  'ITAÚ': 'Itaú', SAFRA: 'Safra', DAYCOVAL: 'Daycoval', WHATSAPP: 'WhatsApp', PIX: 'Pix',
+};
+function exibirTextoScript(txt: string): string {
+  const t = txt.trim();
+  if (!t || t !== t.toLocaleUpperCase('pt-BR') || t === t.toLocaleLowerCase('pt-BR')) return t;
+  return t.split(/\s+/).map((p, i) => {
+    // descola pontuação de ABERTURA e fechamento, e trata compostos com / e -
+    // (ex.: "(INSS)", "CPF/CNPJ", "INSS-GOV") para o lookup de siglas casar
+    const m = p.match(/^([(["'«]*)(.*?)([)\]."'»:;!?,…]*)$/);
+    const abre = m?.[1] ?? '', nucleo = m?.[2] ?? p, fecha = m?.[3] ?? '';
+    const partes = nucleo.split(/([/-])/).map((seg, sIdx) => {
+      if (sIdx % 2 === 1 || !seg) return seg;
+      const fixa = SIGLAS_SCRIPT[seg];
+      if (fixa) return fixa;
+      if (/\d/.test(seg)) return seg;
+      const baixa = seg.toLocaleLowerCase('pt-BR');
+      return i === 0 && sIdx === 0
+        ? baixa.charAt(0).toLocaleUpperCase('pt-BR') + baixa.slice(1)
+        : baixa;
+    });
+    return abre + partes.join('') + fecha;
+  }).join(' ');
+}
+
+const IcStarMini = () => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <path d="M12 3.4l2.6 5.26 5.8.84-4.2 4.1.99 5.78L12 16.65l-5.19 2.73.99-5.78-4.2-4.1 5.8-.84z" />
+  </svg>
+);
+
 function SeletorScripts({
   anchor, scripts, categorias, resumo, etapaCounts, onSelecionar, onGerenciar, onClose,
 }: {
@@ -290,7 +330,7 @@ function SeletorScripts({
   // FLIPA pra cima se não couber; a LISTA rola por dentro, busca/rodapé ficam.
   const [pos, setPos] = useState<React.CSSProperties>({ left: -9999, top: -9999, visibility: 'hidden' });
   useLayoutEffect(() => {
-    const margem = 8, larg = 320, vw = window.innerWidth, vh = window.innerHeight;
+    const margem = 8, larg = 336, vw = window.innerWidth, vh = window.innerHeight;
     const left = Math.max(margem, Math.min(anchor.left, vw - larg - margem));
     const abaixo = vh - anchor.bottom - margem;
     const acima = anchor.top - margem;
@@ -318,15 +358,27 @@ function SeletorScripts({
       window.removeEventListener('resize', onResize);
     };
   }, [onClose]);
-  useEffect(() => { setHi(0); }, [q]);
+  useEffect(() => {
+    setHi(0);
+    painelRef.current?.querySelector('.scrp-lista')?.scrollTo({ top: 0 });
+  }, [q]);
+  // Navegação por TECLADO acompanha o scroll — o item realçado nunca some da vista.
+  // Só teclado: mouseenter também seta hi, e rolar no hover faria a lista fugir
+  // debaixo do cursor (novo mouseenter → nova rolagem, em cascata).
+  const hiPorTeclado = useRef(false);
+  useEffect(() => {
+    if (!hiPorTeclado.current) return;
+    hiPorTeclado.current = false;
+    painelRef.current?.querySelector('.scrp-it.hi')?.scrollIntoView({ block: 'nearest' });
+  }, [hi]);
 
   const onInputKey = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       const alvo = flat[Math.min(hi, flat.length - 1)];
       if (alvo) onSelecionar(alvo);
-    } else if (e.key === 'ArrowDown') { e.preventDefault(); setHi((i) => Math.min(i + 1, flat.length - 1)); }
-    else if (e.key === 'ArrowUp') { e.preventDefault(); setHi((i) => Math.max(i - 1, 0)); }
+    } else if (e.key === 'ArrowDown') { e.preventDefault(); hiPorTeclado.current = true; setHi((i) => Math.min(i + 1, flat.length - 1)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); hiPorTeclado.current = true; setHi((i) => Math.max(i - 1, 0)); }
   };
 
   let idx = -1; // índice global (achatado) para casar com o highlight do teclado
@@ -343,11 +395,15 @@ function SeletorScripts({
 
       <div className="etqp-lista scrp-lista" role="listbox" aria-label="Scripts">
         {flat.length === 0 && (
-          <div className="etqp-vazio">{scripts.length === 0 ? 'Nenhum script para WhatsApp. Crie no arsenal.' : 'Nenhum script encontrado.'}</div>
+          <div className="etqp-vazio">{scripts.length === 0 ? 'Nenhum script para WhatsApp. Crie um na página de Scripts.' : 'Nenhum script encontrado.'}</div>
         )}
         {grupos.map((g) => (
           <div key={g.chave} className="scrp-grupo">
-            <div className={'scrp-cab' + (g.fav ? ' fav' : '')}>{g.fav ? '★ ' : ''}{g.rotulo}</div>
+            <div className={'scrp-cab' + (g.fav ? ' fav' : '')}>
+              {g.fav && <IcStarMini />}
+              <span>{exibirTextoScript(g.rotulo) || g.rotulo}</span>
+              <span className="scrp-cab-n">{g.itens.length}</span>
+            </div>
             {g.itens.map((s) => {
               idx += 1;
               const i = idx;
@@ -361,11 +417,16 @@ function SeletorScripts({
                   onMouseEnter={() => setHi(i)} onClick={() => onSelecionar(s)}
                 >
                   <span className="scrp-txt">
-                    <span className="scrp-nome">{s.favorito ? '★ ' : ''}{s.titulo}</span>
-                    {s.descricao && <span className="scrp-desc">{s.descricao}</span>}
+                    <span className="scrp-nome">
+                      {s.favorito && <IcStarMini />}
+                      <span className="scrp-nome-t">{exibirTextoScript(s.titulo)}</span>
+                    </span>
+                    {s.descricao && <span className="scrp-desc">{exibirTextoScript(s.descricao)}</span>}
                   </span>
-                  {temMidia && <span className="scrp-tag">mídia</span>}
-                  <span className="scrp-cnt">{total} msg{total === 1 ? '' : 's'}</span>
+                  <span className="scrp-meta">
+                    {temMidia && <span className="scrp-tag" title="Inclui mídia (imagem, áudio ou vídeo)"><IcImg />mídia</span>}
+                    <span className="scrp-cnt">{total} msg{total === 1 ? '' : 's'}</span>
+                  </span>
                 </button>
               );
             })}
@@ -373,7 +434,10 @@ function SeletorScripts({
         ))}
       </div>
 
-      <button type="button" className="etqp-lk" onClick={onGerenciar}>Gerenciar no arsenal…</button>
+      <div className="scrp-ft">
+        <button type="button" className="scrp-ger" onClick={onGerenciar}>Gerenciar scripts</button>
+        <span className="scrp-dica" aria-hidden="true"><kbd>↑↓</kbd> navegar <kbd>⏎</kbd> abrir</span>
+      </div>
     </div>
   );
 }
@@ -620,11 +684,20 @@ export default function WhatsAppV2() {
     { id: 'sd-2', titulo: 'Pedir CPF', descricao: null, conteudo: 'Para conferir os descontos no benefício eu preciso do seu CPF, pode me enviar?', categoriaId: null, canais: ['whatsapp'], favorito: true, ativo: true, tags: [], autorId: null, criadoEm: '', atualizadoEm: '' },
     { id: 'sd-3', titulo: 'Explicar o processo', descricao: null, conteudo: 'A análise é simples: conferimos seu benefício, identificamos descontos indevidos e cuidamos do cancelamento e do ressarcimento.', categoriaId: null, canais: ['whatsapp'], favorito: false, ativo: true, tags: [], autorId: null, criadoEm: '', atualizadoEm: '' },
     { id: 'sd-4', titulo: 'Agendar ligação', descricao: null, conteudo: 'Posso te ligar para explicar melhor. Qual o melhor horário para você?', categoriaId: null, canais: ['whatsapp'], favorito: false, ativo: true, tags: [], autorId: null, criadoEm: '', atualizadoEm: '' },
+    // espelho do arsenal REAL (demo é o contrato): títulos em caixa alta como o time
+    // cadastra, categoria própria, descrição e mídia — é assim que o seletor aparece em produção.
+    { id: 'sd-5', titulo: 'PEGAR DOCS MEUS INSS', descricao: 'COMO PEGAR OS DOCUMENTOS DO MEU INSS', conteudo: 'Passo a passo para baixar os documentos no Meu INSS.', categoriaId: 'sdc-1', canais: ['whatsapp'], favorito: false, ativo: true, tags: ['documentos'], autorId: null, criadoEm: '', atualizadoEm: '' },
+    { id: 'sd-6', titulo: 'GERAR CÓDIGO DE ACESSO GOV', descricao: null, conteudo: 'Como gerar o código de acesso do GOV.', categoriaId: 'sdc-1', canais: ['whatsapp'], favorito: false, ativo: true, tags: ['gov'], autorId: null, criadoEm: '', atualizadoEm: '' },
+    { id: 'sd-7', titulo: 'ASSINANDO PELO CELULAR', descricao: 'Como assinar as proc pelo celular', conteudo: 'Vídeo mostrando a assinatura pelo celular.', categoriaId: 'sdc-1', canais: ['whatsapp'], favorito: false, ativo: true, tags: ['assinatura'], autorId: null, criadoEm: '', atualizadoEm: '' },
   ]), []);
   const scripts = WA_REAL ? (scriptsQ.data ?? []) : scriptsDemo;
   const etapaCounts = useScriptEtapaCounts().data ?? {};
-  const scriptCategorias = useScriptCategorias().data ?? [];
-  const scriptsResumo = useScriptsResumoEtapas().data ?? {};
+  const scriptCategoriasReais = useScriptCategorias().data ?? [];
+  const scriptCategorias = useMemo(() => (WA_REAL ? scriptCategoriasReais : [{ id: 'sdc-1', nome: 'Necessidades', ordem: 1 }]), [scriptCategoriasReais]);
+  const scriptsResumoReal = useScriptsResumoEtapas().data ?? {};
+  const scriptsResumo: ScriptResumo = WA_REAL ? scriptsResumoReal : {
+    'sd-1': { total: 2 }, 'sd-5': { total: 2, temMidia: true }, 'sd-6': { total: 1, temMidia: true }, 'sd-7': { total: 1, temMidia: true },
+  };
   // O agrupamento (favoritos → categorias → Outros) e a busca vivem no SeletorScripts;
   // aqui basta a lista já filtrada por canal (useScripts('whatsapp')) e os satélites.
   const bloqueados = inbox.bloqueados;

@@ -94,10 +94,10 @@
    carta branca (--vidro-a já é sólida). Some quando o card
    consolidado entra em vista (IntersectionObserver na página; no
    Leve a transition global já é none → esconde direto).
-   left: 64px = rail fixo da sidebar (.p-app, shell.css). */
+   left: 84px = respiro 10 + rail flutuante 64 + vão 10 (.p-app, shell.css). */
 .v2 .sim-barra-espaco { height: 56px; }
 .v2 .sim-barra-total {
-  position: fixed; left: 64px; right: 0; bottom: 0; z-index: 30;
+  position: fixed; left: 84px; right: 0; bottom: 0; z-index: 30;
   height: 56px; padding: 0 24px;
   display: flex; align-items: center; gap: 12px;
   background-color: var(--base);

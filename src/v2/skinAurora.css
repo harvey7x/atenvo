@@ -44,12 +44,8 @@
 /* bolhas: tratamento completo na seção 5 (FIO PREMIUM) */
 
 /* --- 3. AZUL COMO SECUNDÁRIA DE INTERAÇÃO ------------------- */
-/* item ativo da navegação (pill azul, como a referência) */
-:root:not([data-tema="light"]) .v2 .item.on {
-  background: rgba(var(--azul-rgb), .16);
-  color: #fff;
-}
-:root:not([data-tema="light"]) .v2 .item.on::before { background: var(--azul); }
+/* item ativo da navegação: o estilo vive em shell/shell.css (superfície neutra +
+   ícone no acento, 14/10) — a pílula azul saiu */
 
 /* ação primária: o metal platina vira azul (referência "Dispatch Now") */
 :root:not([data-tema="light"]) .v2 .btn-pri {
@@ -206,8 +202,6 @@
 :root[data-tema="light"] .v2.app-v2 .wa-msgs { background-color: rgba(244, 245, 247, .5); }
 
 /* azul de interação */
-:root[data-tema="light"] .v2.app-v2 .item.on { background: rgba(var(--azul-rgb), .1); color: var(--azul); }
-:root[data-tema="light"] .v2.app-v2 .item.on::before { background: var(--azul); }
 :root[data-tema="light"] .v2 .btn-pri {
   background: linear-gradient(180deg, #3D7BE8, #2A62C9);
   color: #fff;
@@ -377,8 +371,6 @@
 :root[data-acento="dourado"]:not([data-tema="light"]) .v2 .conv2 .nl { background: linear-gradient(180deg, #F9D478, #D29A35); color: #241A05; }
 :root[data-acento="dourado"]:not([data-tema="light"]) .v2 .barv.hoje2 { background: linear-gradient(180deg, #FFE49A, #DCA43C); }
 :root[data-acento="dourado"]:not([data-tema="light"]) .v2 .bolha .tick.lida { color: #F5CE74; }
-/* pill ativa (.item): texto âmbar-claro em vez do branco (o véu ouro é quente) */
-:root[data-acento="dourado"]:not([data-tema="light"]) .v2 .item.on { color: #FFE9B8; }
 /* aba do inbox: pastilha ativa é ouro SÓLIDO — texto/contador escuros pra contraste */
 :root[data-acento="dourado"]:not([data-tema="light"]) .v2 .wa-aba.on { color: #2A1E00; }
 :root[data-acento="dourado"]:not([data-tema="light"]) .v2 .wa-aba.on .n { color: #2A1E00; background: rgba(0, 0, 0, .16); }
