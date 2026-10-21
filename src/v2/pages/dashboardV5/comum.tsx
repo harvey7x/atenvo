@@ -1,7 +1,7 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { initials } from '@/lib/avatar';
-import { fmtInt, fmtVariacao, variacao } from '@/data/dashboardV5.formato';
+import { fmtDuracaoH, fmtInt, fmtVariacao, variacao } from '@/data/dashboardV5.formato';
 import { CardVidro } from '../../components';
 import { criarRaizPortalV2 } from '../../components/portal';
 
@@ -58,26 +58,40 @@ export function Pop({ ancora, id, children, largura = 280, papel = 'tooltip' }: 
   );
 }
 
-/** Ícone "i" com bolha de definição — abre no hover E no foco do teclado. */
+/** Ícone "i" com bolha de definição. Abre no hover, no foco do teclado e no clique/toque.
+ *  O clique FIXA (não alterna): no toque o navegador emula hover + foco + clique no mesmo
+ *  gesto — alternar fechava na hora o que acabou de abrir. Fecha com Esc, ao sair do foco,
+ *  ao tocar/clicar fora, ao rolar ou redimensionar. */
+const FECHADA = { hover: false, foco: false, fixa: false };
 export function Ajuda({ texto, rotulo }: { texto: string; rotulo: string }) {
   const id = useId();
   const btn = useRef<HTMLButtonElement>(null);
+  const [motivo, setMotivo] = useState(FECHADA);
+  const aberta = motivo.hover || motivo.foco || motivo.fixa;
   const [ancora, setAncora] = useState<Ancora | null>(null);
-  const abrir = () => { if (btn.current) setAncora(ancoraDe(btn.current)); };
-  const fechar = () => setAncora(null);
+  const mudar = (m: Partial<typeof FECHADA>) => setMotivo((s) => ({ ...s, ...m }));
+  const fechar = () => setMotivo(FECHADA);
+  useLayoutEffect(() => { setAncora(aberta && btn.current ? ancoraDe(btn.current) : null); }, [aberta]);
   useEffect(() => {
-    if (!ancora) return;
-    const sair = () => setAncora(null);
+    if (!aberta) return;
+    const sair = () => setMotivo(FECHADA);
+    const fora = (e: PointerEvent) => { if (btn.current && !btn.current.contains(e.target as Node)) sair(); };
     window.addEventListener('scroll', sair, true);
     window.addEventListener('resize', sair);
-    return () => { window.removeEventListener('scroll', sair, true); window.removeEventListener('resize', sair); };
-  }, [ancora]);
+    document.addEventListener('pointerdown', fora, true);
+    return () => {
+      window.removeEventListener('scroll', sair, true);
+      window.removeEventListener('resize', sair);
+      document.removeEventListener('pointerdown', fora, true);
+    };
+  }, [aberta]);
   return (
     <span className="d5-ajuda">
-      <button type="button" ref={btn} className={'d5-ajuda-btn' + (ancora ? ' on' : '')} aria-label={`O que é ${rotulo}`}
-        aria-describedby={ancora ? id : undefined}
-        onMouseEnter={abrir} onMouseLeave={fechar} onFocus={abrir} onBlur={fechar}
-        onClick={(e) => { e.stopPropagation(); if (ancora) fechar(); else abrir(); }}
+      <button type="button" ref={btn} className={'d5-ajuda-btn' + (aberta ? ' on' : '')} aria-label={`O que é ${rotulo}`}
+        aria-describedby={ancora ? id : undefined} aria-expanded={aberta}
+        onMouseEnter={() => mudar({ hover: true })} onMouseLeave={() => mudar({ hover: false })}
+        onFocus={() => mudar({ foco: true })} onBlur={() => mudar({ foco: false, fixa: false })}
+        onClick={(e) => { e.stopPropagation(); mudar({ fixa: true }); }}
         onKeyDown={(e) => { if (e.key === 'Escape') fechar(); }}>
         <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden>
           <circle cx="8" cy="8" r="6.3" fill="none" stroke="currentColor" strokeWidth="1.2" />
@@ -120,7 +134,8 @@ export function Variacao({ atual, anterior, sentido, comparacao }: {
   atual: number | null | undefined; anterior: number | null | undefined; sentido: Sentido; comparacao: string;
 }) {
   const v = variacao(atual, anterior);
-  if (!v) return <span className="d5-var-ctx">{comparacao}</span>;
+  // sem base (ou 0 contra 0): só o contexto, sem um chip "estável" que não diz nada
+  if (!v || (atual === 0 && anterior === 0)) return <span className="d5-var-ctx">{comparacao}</span>;
   const txt = fmtVariacao(v);
   const estavel = txt === 'estável';
   const tom = estavel || sentido === 'neutro' ? 'ne' : (sentido === 'maior' ? v.abs > 0 : v.abs < 0) ? 'ok' : 'er';
@@ -137,6 +152,35 @@ export function Variacao({ atual, anterior, sentido, comparacao }: {
         <span className="d5-sr">{seta === 'up' ? ' (subiu)' : seta === 'dn' ? ' (caiu)' : ''}</span>
       </span>
       <span className="d5-var-ctx">{comparacao}</span>
+    </span>
+  );
+}
+
+/** Legenda curta de uma célula ("média 1 h 10 · 202 respostas · 18 pelo celular"). Cada
+ *  pedaço é inquebrável: quando falta largura, a linha só quebra DEPOIS de um " · ",
+ *  nunca no meio de "1 h 10" nem separando o número da palavra. */
+export function Legenda({ partes }: { partes: ReactNode[] }) {
+  const v = partes.filter((p) => p != null && p !== false && p !== '');
+  return (
+    <>
+      {v.map((p, i) => (
+        <Fragment key={i}>
+          {i > 0 && '\u00a0· '}
+          <span className="d5-seg">{p}</span>
+        </Fragment>
+      ))}
+    </>
+  );
+}
+
+/** Tempo para fechar numa célula: mediana em destaque e, embaixo, a média e quantos
+ *  fechados entraram na conta (a mesma frase nas duas tabelas). */
+export function TempoFechar({ med, media, n }: { med: number | null; media: number | null; n: number }) {
+  if (!n || med == null) return <span className="d5-mudo">—</span>;
+  return (
+    <span className="d5-cel2 d5-cel2-dir">
+      <b className="num">{fmtDuracaoH(med)}</b>
+      <small className="num"><Legenda partes={[`média ${fmtDuracaoH(media)}`, `${fmtInt(n)} ${n === 1 ? 'fechado' : 'fechados'}`]} /></small>
     </span>
   );
 }

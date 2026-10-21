@@ -112,8 +112,11 @@ export interface CelulaMapaV5 {
 }
 
 export interface DashV5 {
-  /** instante da foto (ISO) */
+  /** instante da foto (ISO) — now() do banco */
   geradoEm: string;
+  /** instante (relógio do navegador) com que o hook cortou o período anterior; o rótulo
+   *  "vs ontem até HH:MM" sai DESTE instante, não de geradoEm, para nomear o mesmo minuto */
+  buscaEm: string;
   periodo: { inicio: string; fim: string; mapaInicio: string };
   kpis: KpisV5;
   /** mesmo trecho do período anterior (cortado no mesmo tempo decorrido) */

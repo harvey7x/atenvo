@@ -24,6 +24,15 @@
 --   e rodar de novo. Num rebuild via `supabase db push` (que envolve a migration em
 --   BEGIN/COMMIT), remover a palavra CONCURRENTLY — numa base recém-criada o índice sai
 --   instantâneo.
+-- DEPOIS DE APLICAR com `db query`: conferir `select indisvalid from pg_index where
+--   indexrelid = 'public.idx_mensagens_org_criado'::regclass` (tem de ser true) e
+--   registrar a versão à mão (insert into supabase_migrations.schema_migrations
+--   (version, name) values ('20261021200100', 'idx_mensagens_org_criado')). Se a v4 for
+--   abandonada, apagar a cópia dela (20261014200100_idx_mensagens_org_criado.sql) para o
+--   histórico não ter dois arquivos para o mesmo índice.
+-- Com cache frio e SEM este índice, períodos longos podem passar do statement_timeout de
+--   8 s do papel authenticated (92 dias: 16,6 s na 1ª chamada) — por isso a RPC limita o
+--   período a 45 dias. Com o índice, o custo passa a seguir o período, não a tabela.
 -- NÃO APLICADO: depende do ok do dono (junto com 20261021200000_dashboard_v5.sql).
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_mensagens_org_criado
   ON public.mensagens (organizacao_id, criado_em);

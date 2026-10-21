@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
 import type { AtendenteV5 } from '@/data/dashboardV5.tipos';
-import { fmtDuracaoH, fmtDuracaoMin, fmtInt } from '@/data/dashboardV5.formato';
+import { fmtDuracaoMin, fmtInt } from '@/data/dashboardV5.formato';
 import { Skeleton } from '../../components';
-import { Ajuda, Avatar, Secao, Vazio } from './comum';
+import { Ajuda, Avatar, Legenda, Secao, TempoFechar, Vazio } from './comum';
 
 /* Desempenho por atendente — o bloco mais importante. Colunas ordenáveis (clique
    ou Enter no título), cada uma com a definição em uma frase no "i". */
@@ -12,6 +12,9 @@ type Dir = 'asc' | 'desc';
 
 interface Coluna {
   chave: Chave; rotulo: string; ajuda?: string;
+  /** onde o título quebra quando a página é estreita (sempre em 2 linhas fixas — assim o
+   *  bloco do título tem a largura da linha mais longa e o "i" fica colado nele) */
+  linhas?: [string, string];
   /** direção do 1º clique (tempo: o mais rápido primeiro) */
   primeira: Dir;
   valor: (a: AtendenteV5) => number | string | null;
@@ -28,7 +31,8 @@ const COLS: Coluna[] = [
     ajuda: 'Leads marcados como fechados no período em que a pessoa era a responsável, inclusive leads que chegaram antes.',
   },
   {
-    chave: 'neMarcados', rotulo: 'Não elegíveis', primeira: 'desc', valor: (a) => a.neMarcados,
+    // não é o mesmo "Não elegíveis" da tabela de números (lá entram IA e regra RS)
+    chave: 'neMarcados', rotulo: 'Marcou não elegível', linhas: ['Marcou não', 'elegível'], primeira: 'desc', valor: (a) => a.neMarcados,
     ajuda: 'Leads que a própria pessoa marcou como não elegíveis no período. Os descartados pela IA ou pela regra do RS não entram.',
   },
   {
@@ -36,7 +40,7 @@ const COLS: Coluna[] = [
     ajuda: 'Tempo de resposta: mediana, em horário comercial (seg–sex, 9h–19h), entre a mensagem do cliente e a primeira resposta humana. Inclui respostas pelo celular, creditadas ao dono do lead.',
   },
   {
-    chave: 'fech', rotulo: 'Tempo para fechar', primeira: 'asc', valor: (a) => a.fechMedianaH,
+    chave: 'fech', rotulo: 'Tempo para fechar', linhas: ['Tempo para', 'fechar'], primeira: 'asc', valor: (a) => a.fechMedianaH,
     ajuda: 'Mediana do tempo entre o lead chegar à pessoa e o fechamento, de todos os fechados dela no período.',
   },
 ];
@@ -58,17 +62,19 @@ function ordenar(lista: AtendenteV5[], chave: Chave, dir: Dir): AtendenteV5[] {
 function Cabeca({ col, ordem, aoOrdenar }: { col: Coluna; ordem: { chave: Chave; dir: Dir }; aoOrdenar: (c: Coluna) => void }) {
   const ativa = ordem.chave === col.chave;
   const sort = ativa ? (ordem.dir === 'asc' ? 'ascending' : 'descending') : 'none';
+  // coluna numérica (alinhada à direita): o "i" vem ANTES do rótulo, para o rótulo
+  // terminar na mesma borda dos números e o "i" não encostar no título vizinho
   return (
     <th scope="col" aria-sort={sort} className={(col.chave === 'nome' ? '' : 'd5-dir') + (ativa ? ' d5-th-on' : '')}>
       <span className="d5-th-ajuda">
+        {col.ajuda && <Ajuda texto={col.ajuda} rotulo={col.rotulo} />}
         <button type="button" className="d5-ord" onClick={() => aoOrdenar(col)}>
-          {col.rotulo}
+          <span className="d5-ord-tx">{col.linhas ? <><span>{col.linhas[0]}</span> <span>{col.linhas[1]}</span></> : col.rotulo}</span>
           <svg viewBox="0 0 10 12" width="8" height="10" aria-hidden className={'d5-ord-ic' + (ativa ? ` d5-ord-${ordem.dir}` : '')}>
             <path d="M5 1.2 8.2 4.8H1.8z" className="d5-ord-up" />
             <path d="M5 10.8 1.8 7.2h6.4z" className="d5-ord-dn" />
           </svg>
         </button>
-        {col.ajuda && <Ajuda texto={col.ajuda} rotulo={col.rotulo} />}
       </span>
     </th>
   );
@@ -91,7 +97,7 @@ export function Atendentes({ atendentes }: { atendentes: AtendenteV5[] }) {
         <div className="d5-tab-rolo">
           <table className="d5-tab d5-tab-at">
             <colgroup>
-              <col className="d5-c-pessoa" /><col className="d5-c-rec" /><col className="d5-c-n" /><col className="d5-c-n" /><col className="d5-c-tl" /><col className="d5-c-tl" />
+              <col className="d5-c-pessoa" /><col className="d5-c-rec" /><col className="d5-c-n" /><col className="d5-c-ne" /><col className="d5-c-resp" /><col className="d5-c-fech" />
             </colgroup>
             <thead>
               <tr>{COLS.map((c) => <Cabeca key={c.chave} col={c} ordem={ordem} aoOrdenar={aoOrdenar} />)}</tr>
@@ -108,33 +114,30 @@ export function Atendentes({ atendentes }: { atendentes: AtendenteV5[] }) {
                   <td className="d5-dir">
                     <span className="d5-cel2 d5-cel2-dir">
                       <span className="d5-ent">
-                        <span className="d5-trilho" aria-hidden><i style={{ width: `${a.recebidos ? Math.max(2, (a.recebidos / maxRec) * 100) : 0}%` }} /></span>
+                        {/* sem % ao lado: barra relativa ao maior, sem trilho (não é progresso) */}
+                        <span className="d5-trilho d5-trilho-livre" aria-hidden><i style={{ width: `${a.recebidos ? Math.max(2, (a.recebidos / maxRec) * 100) : 0}%` }} /></span>
                         <b className={'num' + (a.recebidos ? '' : ' d5-mudo')}>{fmtInt(a.recebidos)}</b>
                       </span>
                       {a.transferidos > 0 && <small className="num">+{fmtInt(a.transferidos)} {a.transferidos === 1 ? 'transferido' : 'transferidos'}</small>}
                     </span>
                   </td>
-                  <td className="d5-dir"><b className={'num' + (a.ganhos ? '' : ' d5-mudo d5-fino')}>{fmtInt(a.ganhos)}</b></td>
-                  <td className="d5-dir"><b className={'num' + (a.neMarcados ? '' : ' d5-mudo d5-fino')}>{fmtInt(a.neMarcados)}</b></td>
+                  <td className="d5-dir"><b className={'num' + (a.ganhos ? '' : ' d5-mudo')}>{fmtInt(a.ganhos)}</b></td>
+                  <td className="d5-dir"><b className={'num' + (a.neMarcados ? '' : ' d5-mudo')}>{fmtInt(a.neMarcados)}</b></td>
                   <td className="d5-dir">
                     {a.respN > 0 && a.respMedianaMin != null ? (
                       <span className="d5-cel2 d5-cel2-dir">
                         <b className="num">{fmtDuracaoMin(a.respMedianaMin)}</b>
                         <small className="num">
-                          média {fmtDuracaoMin(a.respMediaMin)} · {fmtInt(a.respN)} {a.respN === 1 ? 'resposta' : 'respostas'}
-                          {a.respCelularN > 0 && <> · {fmtInt(a.respCelularN)} pelo celular</>}
+                          <Legenda partes={[
+                            `média ${fmtDuracaoMin(a.respMediaMin)}`,
+                            `${fmtInt(a.respN)} ${a.respN === 1 ? 'resposta' : 'respostas'}`,
+                            a.respCelularN > 0 && `${fmtInt(a.respCelularN)} pelo celular`,
+                          ]} />
                         </small>
                       </span>
                     ) : <span className="d5-mudo">—</span>}
                   </td>
-                  <td className="d5-dir">
-                    {a.fechN > 0 && a.fechMedianaH != null ? (
-                      <span className="d5-cel2 d5-cel2-dir">
-                        <b className="num">{fmtDuracaoH(a.fechMedianaH)}</b>
-                        <small className="num">média {fmtDuracaoH(a.fechMediaH)} · {fmtInt(a.fechN)} {a.fechN === 1 ? 'fechamento' : 'fechamentos'}</small>
-                      </span>
-                    ) : <span className="d5-mudo">—</span>}
-                  </td>
+                  <td className="d5-dir"><TempoFechar med={a.fechMedianaH} media={a.fechMediaH} n={a.fechN} /></td>
                 </tr>
               ))}
             </tbody>

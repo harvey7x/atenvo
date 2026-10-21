@@ -22,7 +22,17 @@
   margin: 0 auto;
   padding-bottom: 28px;
   display: flex; flex-direction: column; gap: var(--d5-gap);
+  /* as quebras de layout seguem a LARGURA DA PÁGINA (barra lateral aberta ou compacta),
+     não a da janela */
+  container: d5pg / inline-size;
 }
+/* trocou de período: os números anteriores ficam esmaecidos até a nova foto chegar */
+.v2 .d5-pg .d5-kpis, .v2 .d5-pg .d5-linha2, .v2 .d5-pg > .d5-sec { transition: opacity .15s var(--ease); }
+.v2 .d5-pg[aria-busy="true"] .d5-kpis,
+.v2 .d5-pg[aria-busy="true"] .d5-linha2,
+.v2 .d5-pg[aria-busy="true"] > .d5-sec { opacity: .55; }
+:root[data-perf="lite"] .v2 .d5-pg .d5-kpis, :root[data-perf="lite"] .v2 .d5-pg .d5-linha2,
+:root[data-perf="lite"] .v2 .d5-pg > .d5-sec { transition: none; }
 
 /* ---------------- utilitários ---------------- */
 .v2 .d5-sr {
@@ -30,7 +40,6 @@
   clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
 }
 .v2 .d5-mudo { color: var(--txt-3); }
-.v2 .d5-fino { font-weight: 500 !important; }
 .v2 .d5-ib:focus-visible,
 .v2 .d5-ord:focus-visible,
 .v2 .d5-ajuda-btn:focus-visible,
@@ -47,7 +56,6 @@
   display: flex; flex-wrap: wrap; align-items: center; gap: 2px 0;
   font-size: 12.5px; color: var(--txt-2); margin-top: 5px; font-variant-numeric: tabular-nums;
 }
-.v2 .d5-cab-comp { color: var(--txt-3); white-space: pre; }
 .v2 .d5-demo {
   margin-left: 10px; vertical-align: 3px; font-size: 10.5px; font-weight: 500; letter-spacing: .01em;
   padding: 2px 7px; border-radius: 4px; color: var(--txt-2);
@@ -135,10 +143,11 @@
   margin-top: 10px; color: var(--txt); white-space: nowrap;
 }
 .v2 .d5-kpi-un { font-size: 17px; font-weight: 500; letter-spacing: -.01em; color: var(--txt-2); white-space: pre; }
-.v2 .d5-kpi-pe { margin-top: auto; padding-top: 12px; min-height: 34px; display: flex; align-items: flex-end; }
-.v2 .d5-kpi-pe > .d5-var-ctx { line-height: 22px; }
+.v2 .d5-kpi-pe { margin-top: 14px; min-height: 22px; display: flex; align-items: center; min-width: 0; }
+.v2 .d5-kpi-pe > .d5-var-ctx { line-height: 1.4; }
+.v2 .d5-kpi-leg { display: block; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-.v2 .d5-var { display: inline-flex; align-items: center; gap: 4px 8px; flex-wrap: wrap; }
+.v2 .d5-var { display: inline-flex; align-items: center; gap: 4px 8px; flex-wrap: wrap; line-height: 1.4; }
 .v2 .d5-var-chip {
   display: inline-flex; align-items: center; gap: 4px;
   font-size: 11.5px; font-weight: 600; line-height: 1; padding: 4px 6px; border-radius: 4px;
@@ -173,6 +182,9 @@
   padding-top: 9px; padding-bottom: 9px; white-space: nowrap;
   border-top: 1px solid var(--d5-fio); border-bottom-color: var(--d5-fio-forte);
 }
+/* corpo: todas as células alinham pela LINHA DE BASE da 1ª linha — o número principal
+   de cada coluna fica na mesma altura, tenha a célula uma ou duas linhas */
+.v2 .d5-tab tbody > tr > *, .v2 .d5-tab tfoot > tr > * { vertical-align: baseline; line-height: 1.25; }
 .v2 .d5-tab tbody tr:last-child > * { border-bottom: 0; }
 .v2 .d5-tab tbody tr:hover { background: transparent; }
 .v2 .d5-tab tbody tr:hover > * { background: var(--d5-hover); }
@@ -181,41 +193,46 @@
   padding-top: 13px; padding-bottom: 0;
 }
 .v2 .d5-tab .d5-dir { text-align: right; }
-.v2 .d5-tab b.num, .v2 .d5-tab span.num { font-size: 13.5px; font-weight: 600; }
-.v2 .d5-tab span.num.d5-mudo { font-weight: 500; }
+/* hierarquia por peso: contagens 500; nomes, tempos principais e a linha Total 600 */
+.v2 .d5-tab b.num, .v2 .d5-tab span.num { font-size: 13.5px; font-weight: 500; }
+.v2 .d5-tab tfoot b.num, .v2 .d5-tab tfoot span.num { font-weight: 600; }
+.v2 .d5-tab .d5-cel2 > b.num { font-weight: 600; } /* tempo principal (mediana) */
 .v2 .d5-tab col.d5-c-nome { width: auto; }
 .v2 .d5-tab col.d5-c-ent { width: 190px; }
 .v2 .d5-tab col.d5-c-n { width: 118px; }
 .v2 .d5-tab col.d5-c-t { width: 168px; }
 
-.v2 .d5-nome-in { display: flex; align-items: center; gap: 11px; min-width: 0; }
-.v2 .d5-cel2 { display: inline-flex; flex-direction: column; gap: 3px; line-height: 1.25; min-width: 0; vertical-align: middle; }
+.v2 .d5-nome-in { display: flex; align-items: baseline; gap: 11px; min-width: 0; }
+.v2 .d5-cel2 { display: inline-flex; flex-direction: column; gap: 3px; line-height: 1.25; min-width: 0; vertical-align: baseline; }
 .v2 .d5-cel2-dir { align-items: flex-end; }
 .v2 .d5-cel2 > b { font-size: 13.5px; font-weight: 600; color: var(--txt); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .v2 .d5-cel2 > small { font-size: 11.5px; color: var(--txt-3); white-space: nowrap; }
+/* legenda em pedaços: só quebra depois de um " · " */
+.v2 .d5-seg { white-space: nowrap; }
 .v2 .d5-lin-antigo .d5-cel2 > b { color: var(--txt-2); font-weight: 500; }
 .v2 .d5-tot-rot > b { font-weight: 600; }
 
-.v2 .d5-ponto { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; background: rgba(var(--tint), .26); }
+.v2 .d5-ponto { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; background: rgba(var(--tint), .26);
+  align-self: flex-start; margin-top: 5px; /* no meio da 1ª linha (o nome) */ }
 .v2 .d5-ponto-ok { background: var(--verde); }
 
-/* entradas: trilho de participação + número + % */
-.v2 .d5-ent { display: inline-flex; align-items: center; justify-content: flex-end; gap: 10px; }
+/* entradas: trilho de participação + número; o % fica embaixo do número */
+.v2 .d5-ent { display: inline-flex; align-items: baseline; justify-content: flex-end; gap: 10px; }
 .v2 .d5-ent > b { min-width: 38px; text-align: right; }
-.v2 .d5-ent .d5-trilho { width: 72px; }
-.v2 .d5-pct { width: 32px; text-align: right; font-size: 11.5px; color: var(--txt-3); }
+.v2 .d5-ent .d5-trilho { width: 84px; align-self: center; }
 .v2 .d5-trilho {
   display: block; height: 6px; border-radius: 3px; overflow: hidden;
   background: var(--d5-trilho);
 }
 .v2 .d5-trilho > i { display: block; height: 100%; border-radius: 3px; background: var(--dado-1); }
-.v2 .d5-trilho-vazio { background: transparent; }
+/* barra relativa ao maior (sem % ao lado): sem trilho, para não parecer progresso */
+.v2 .d5-trilho-livre { background: transparent; }
 .v2 .d5-trilho.d5-trilho-g { height: 7px; border-radius: 4px; }
 .v2 .d5-trilho.d5-trilho-g > i { border-radius: 4px; }
 
 /* não elegíveis com bolha de motivos */
 .v2 .d5-ne-btn {
-  font: inherit; font-size: 13.5px; font-weight: 600; color: var(--txt);
+  font: inherit; font-size: 13.5px; font-weight: 500; color: var(--txt); line-height: 1.25;
   background: none; border: 0; padding: 2px 4px; margin: -2px -4px; border-radius: 4px; cursor: help;
   text-decoration: underline dotted rgba(var(--tint), .32); text-decoration-thickness: 1px; text-underline-offset: 4px;
   font-variant-numeric: tabular-nums;
@@ -231,7 +248,7 @@
 .v2 .d5-barra-v b { font-size: 13px; font-weight: 600; color: var(--txt); }
 .v2 .d5-barra-v small { font-size: 11.5px; color: var(--txt-3); min-width: 34px; text-align: right; }
 
-.v2 .d5-quem { margin-top: auto; padding-top: 18px; }
+.v2 .d5-quem { margin-top: 22px; }
 .v2 .d5-quem::before { content: ""; display: block; border-top: 1px solid var(--d5-fio); margin: 4px 0 16px; }
 .v2 .d5-quem-tit { font-size: 12px; font-weight: 500; color: var(--txt-2); margin-bottom: 10px; }
 .v2 .d5-quem-barra { display: flex; gap: 2px; height: 8px; border-radius: 4px; overflow: hidden; }
@@ -248,10 +265,12 @@
 /* ---------------- atendentes ---------------- */
 .v2 .d5-tab-at th, .v2 .d5-tab-at td { padding-top: 12px; padding-bottom: 12px; }
 .v2 .d5-tab-at thead th { padding-top: 9px; padding-bottom: 9px; }
-.v2 .d5-tab-at col.d5-c-pessoa { width: auto; min-width: 180px; }
+.v2 .d5-tab-at col.d5-c-pessoa { width: auto; }
 .v2 .d5-tab-at col.d5-c-rec { width: 170px; }
 .v2 .d5-tab-at col.d5-c-n { width: 120px; }
-.v2 .d5-tab-at col.d5-c-tl { width: 300px; }
+.v2 .d5-tab-at col.d5-c-ne { width: 196px; }
+.v2 .d5-tab-at col.d5-c-resp { width: 300px; }
+.v2 .d5-tab-at col.d5-c-fech { width: 300px; }
 .v2 .d5-av {
   width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
   display: inline-flex; align-items: center; justify-content: center;
@@ -259,11 +278,17 @@
   background: rgba(var(--tint), .07); border: 1px solid var(--d5-fio);
 }
 .v2 .d5-pessoa { font-size: 13.5px; font-weight: 600; color: var(--txt); white-space: nowrap; }
-.v2 .d5-th-ajuda { display: inline-flex; align-items: center; gap: 3px; vertical-align: middle; }
-/* coluna numérica: o "i" fica PENDURADO à direita (fora do fluxo) para o rótulo
-   alinhar com os números embaixo; ele ocupa o respiro entre as colunas */
-.v2 .d5-tab .d5-dir .d5-th-ajuda { position: relative; }
-.v2 .d5-tab .d5-dir .d5-th-ajuda > .d5-ajuda { position: absolute; left: 100%; top: 50%; transform: translateY(-50%); margin-left: 1px; }
+.v2 .d5-th-ajuda { display: inline-flex; align-items: center; gap: 6px; vertical-align: middle; }
+/* no cabeçalho, um flex de BLOCO (sem linha de base): título com ou sem "i" fica na mesma
+   altura, e todos encostam embaixo (vertical-align: bottom) quando algum quebra em 2 linhas */
+.v2 .d5-tab thead th { vertical-align: bottom; }
+.v2 .d5-tab thead .d5-th-ajuda { display: flex; gap: 10px; }
+/* o "i" (16px) não aumenta a altura do título (12px): fica centrado nele sem empurrá-lo;
+   o vão de 10px deixa o anel de foco do botão de ordenar (2px + 2px) longe do "i" */
+.v2 .d5-tab thead .d5-ajuda { margin: -2px 0; }
+.v2 .d5-tab thead th.d5-dir .d5-th-ajuda { justify-content: flex-end; }
+/* coluna numérica: o "i" vem ANTES do rótulo (no fluxo) — o rótulo termina na borda dos
+   números e o "i" não encosta no título da coluna vizinha nem na borda do cartão */
 .v2 .d5-tab thead .d5-ajuda-btn { width: 16px; height: 16px; }
 .v2 .d5-ord {
   font: inherit; color: inherit; background: none; border: 0; cursor: pointer;
@@ -285,7 +310,7 @@
 }
 .v2 .d5-calor-rot { font-size: 12px; color: var(--txt-2); white-space: nowrap; padding-right: 10px; overflow: hidden; text-overflow: ellipsis; }
 .v2 .d5-calor-h { font-size: 10.5px; color: var(--txt-3); text-align: center; padding-bottom: 5px; font-variant-numeric: tabular-nums; }
-.v2 .d5-calor-tot { text-align: right; font-size: 12px; font-weight: 500; color: var(--txt-2); padding-left: 12px; }
+.v2 .d5-calor-tot { text-align: right; font-size: 12px; font-weight: 500; color: var(--txt-2); padding-left: 12px; white-space: nowrap; }
 .v2 .d5-calor-cab .d5-calor-tot { font-size: 10.5px; font-weight: 400; color: var(--txt-3); padding-bottom: 5px; }
 .v2 .d5-cel { display: block; height: 26px; border-radius: 4px; }
 .v2 .d5-cel:hover { box-shadow: inset 0 0 0 1.5px rgba(var(--tint), .55); }
@@ -297,32 +322,39 @@
 .v2 .d5-q3 { background: rgba(var(--dado-1-rgb), .64); }
 .v2 .d5-q4 { background: var(--dado-1); }
 .v2 .d5-q5 { background: color-mix(in srgb, var(--dado-1) 70%, #ffffff); }
-:root[data-tema="light"] .v2 .d5-q0 { background: rgba(var(--tint), .05); }
-:root[data-tema="light"] .v2 .d5-q1 { background: rgba(var(--dado-1-rgb), .13); }
-:root[data-tema="light"] .v2 .d5-q2 { background: rgba(var(--dado-1-rgb), .3); }
+/* claro: zero NEUTRO com um fio (vazio lê vazio, não azul-claro) e o 1º degrau mais firme */
+:root[data-tema="light"] .v2 .d5-q0 { background: rgba(var(--tint), .04); box-shadow: inset 0 0 0 1px rgba(var(--tint), .05); }
+:root[data-tema="light"] .v2 .d5-q1 { background: rgba(var(--dado-1-rgb), .2); }
+:root[data-tema="light"] .v2 .d5-q2 { background: rgba(var(--dado-1-rgb), .36); }
 :root[data-tema="light"] .v2 .d5-q3 { background: rgba(var(--dado-1-rgb), .55); }
 :root[data-tema="light"] .v2 .d5-q4 { background: rgba(var(--dado-1-rgb), .82); }
 :root[data-tema="light"] .v2 .d5-q5 { background: color-mix(in srgb, var(--dado-1) 78%, #000000); }
 .v2 .d5-cel-futuro { background: transparent; box-shadow: inset 0 0 0 1px rgba(var(--tint), .07); }
 .v2 .d5-cel-futuro:hover { box-shadow: inset 0 0 0 1px rgba(var(--tint), .07); }
-/* hoje: rótulo e total no peso forte e uma faixa de fundo que não mexe na grade */
-.v2 .d5-calor-hoje { background: rgba(var(--tint), .04); box-shadow: 0 0 0 3px rgba(var(--tint), .04); }
+/* hoje: rótulo e total no peso forte, o ponto e um contorno de 1px FORA das células —
+   nada por baixo delas (as células têm alfa: um fundo mudaria a cor do mesmo valor) */
+.v2 .d5-calor-hoje { outline: 1px solid var(--d5-fio-forte); outline-offset: 2px; }
 .v2 .d5-calor-hoje .d5-calor-rot, .v2 .d5-calor-hoje .d5-calor-tot { color: var(--txt); font-weight: 600; }
 .v2 .d5-calor-hoje .d5-calor-rot::before {
   content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%;
   background: var(--dado-1); margin-right: 7px; vertical-align: 1px;
 }
+/* dia fora do período escolhido (mapa esticado para 7 dias): só contexto */
+.v2 .d5-calor-fora .d5-cel { opacity: .58; }
+.v2 .d5-calor-fora .d5-calor-rot, .v2 .d5-calor-fora .d5-calor-tot { color: var(--txt-3); }
 /* total por hora */
 .v2 .d5-calor-pe { margin-top: 10px; align-items: end; }
 .v2 .d5-calor-pe .d5-calor-rot { font-size: 11px; color: var(--txt-3); align-self: end; line-height: 1; }
 .v2 .d5-calor-pe .d5-calor-tot { align-self: end; line-height: 1; }
+.v2 .d5-calor-tot-pe { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.v2 .d5-calor-tot-pe b { font-weight: 600; color: var(--txt); }
+.v2 .d5-calor-tot-pe small { font-size: 10.5px; font-weight: 400; color: var(--txt-3); }
 .v2 .d5-hbar { height: 36px; display: flex; align-items: flex-end; }
 .v2 .d5-hbar > i { display: block; width: 100%; border-radius: 3px 3px 1px 1px; background: rgba(var(--dado-1-rgb), .55); }
 .v2 .d5-hbar:hover > i { background: var(--dado-1); }
-.v2 .d5-leg { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; color: var(--txt-3); }
-.v2 .d5-leg > span:first-child { margin-right: 5px; }
-.v2 .d5-leg > span:last-child { margin-left: 5px; }
-.v2 .d5-leg > i { width: 14px; height: 10px; border-radius: 2px; display: block; }
+.v2 .d5-leg { list-style: none; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; font-size: 11px; color: var(--txt-3); }
+.v2 .d5-leg > li { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.v2 .d5-leg i { width: 14px; height: 10px; border-radius: 2px; display: block; }
 
 /* ---------------- vazio e carregando ---------------- */
 .v2 .d5-vazio { display: flex; flex-direction: column; gap: 4px; padding: 18px 0 8px; }
@@ -333,25 +365,49 @@
 /* ---------------- telas largas: trilhos maiores (sem vão entre nome e número) ---------------- */
 @media (min-width: 1680px) {
   .v2 .d5-tab col.d5-c-ent { width: 250px; }
-  .v2 .d5-ent .d5-trilho { width: 116px; }
+  .v2 .d5-ent .d5-trilho { width: 140px; }
   .v2 .d5-tab-at col.d5-c-rec { width: 230px; }
   .v2 .d5-tab-at col.d5-c-n { width: 140px; }
-  .v2 .d5-tab-at col.d5-c-tl { width: 320px; }
+  .v2 .d5-tab-at col.d5-c-resp { width: 320px; }
+  .v2 .d5-tab-at col.d5-c-fech { width: 320px; }
 }
 
 /* ---------------- telas menores ---------------- */
 @media (max-width: 1360px) {
   .v2 .d5-calor-h-sec { visibility: hidden; }
-  .v2 .d5-tab-at col.d5-c-tl { width: 250px; }
+  .v2 .d5-tab-at col.d5-c-resp { width: 280px; }
+  .v2 .d5-tab-at col.d5-c-fech { width: 230px; }
 }
 @media (max-width: 1180px) {
   .v2 .d5-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  /* atendentes: colunas mais justas e a legenda dos tempos quebra em duas linhas */
-  .v2 .d5-tab-at col.d5-c-rec { width: 138px; }
-  .v2 .d5-tab-at col.d5-c-n { width: 92px; }
-  .v2 .d5-tab-at col.d5-c-tl { width: 196px; }
-  .v2 .d5-tab-at .d5-cel2 > small { white-space: normal; text-align: right; }
-  .v2 .d5-tab-at .d5-ent .d5-trilho { width: 52px; }
-  .v2 .d5-linha2 { grid-template-columns: minmax(0, 1fr); }
   .v2 .d5-cab { align-items: flex-start; }
+}
+/* página estreita (janela ~1180–1320 com a barra aberta, ou menor): a tabela de números
+   não cabe em 2/3 — empilha, e os motivos se dividem em duas colunas (barras | quem
+   marcou). Atendentes: colunas mais justas e a legenda dos tempos pode quebrar (só entre
+   pedaços, .d5-seg). */
+@container d5pg (max-width: 1175px) {
+  .v2 .d5-linha2 { grid-template-columns: minmax(0, 1fr); }
+  .v2 .d5-mot { display: grid; grid-template-columns: minmax(0, 3fr) minmax(250px, 2fr); column-gap: 44px; align-items: start; }
+  .v2 .d5-mot > .d5-sec-cab { grid-column: 1 / -1; }
+  .v2 .d5-mot > .d5-quem { margin-top: 0; padding: 2px 0 2px 28px; border-left: 1px solid var(--d5-fio); }
+  .v2 .d5-mot > .d5-quem::before { display: none; }
+
+  .v2 .d5-tab-at col.d5-c-rec { width: 150px; }
+  .v2 .d5-tab-at col.d5-c-n { width: 110px; }
+  .v2 .d5-tab-at col.d5-c-resp { width: 270px; }
+  .v2 .d5-tab-at col.d5-c-fech { width: 200px; }
+  .v2 .d5-tab-at .d5-cel2 > small { white-space: normal; text-align: right; }
+  .v2 .d5-tab-at .d5-ent .d5-trilho { width: 60px; }
+}
+/* bem estreita (janela ~1024–1210): os títulos das colunas também podem quebrar */
+@container d5pg (max-width: 1080px) {
+  .v2 .d5-tab-at col.d5-c-rec { width: 130px; }
+  .v2 .d5-tab-at col.d5-c-n { width: 96px; }
+  .v2 .d5-tab-at col.d5-c-ne { width: 140px; }
+  .v2 .d5-tab-at col.d5-c-resp { width: 200px; }
+  .v2 .d5-tab-at col.d5-c-fech { width: 170px; }
+  .v2 .d5-tab-at .d5-ent .d5-trilho { width: 48px; }
+  .v2 .d5-tab-at thead .d5-ord { text-align: right; }
+  .v2 .d5-tab-at thead .d5-ord-tx > span { display: block; }
 }

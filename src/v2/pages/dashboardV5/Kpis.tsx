@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import type { KpisV5 } from '@/data/dashboardV5.tipos';
 import { fmtDuracaoH, fmtInt } from '@/data/dashboardV5.formato';
 import { CardVidro, Skeleton } from '../../components';
-import { Ajuda, Variacao, type Sentido } from './comum';
+import { Ajuda, Legenda, Variacao, type Sentido } from './comum';
 
 /* Os quatro números do topo. Entradas, não elegíveis e fechados comparam com o
    MESMO trecho do período anterior; o tempo para fechar mostra mediana, média e n. */
@@ -11,7 +11,7 @@ const AJUDA = {
   entradas: 'Clientes diferentes que mandaram a primeira mensagem no período, em qualquer número. O número interno do escritório não conta.',
   ne: 'Leads marcados como não elegíveis no período, pela IA, pela regra automática do RS ou por alguém da equipe.',
   ganhos: 'Leads marcados como fechados no período, inclusive os que chegaram antes dele.',
-  tempo: 'Mediana do tempo entre a chegada do lead e o fechamento, considerando todos os fechados do período. Metade fecha mais rápido do que isso.',
+  tempo: 'Mediana do tempo entre a chegada do lead e o fechamento, considerando todos os fechados do período. Metade fecha mais rápido do que isso. Embaixo, a média e quantos fechados entraram na conta.',
 };
 
 /** Número grande com a unidade menor: '2,6 dias' → 2,6 + dias; '3 h 20' → 3 h 20. */
@@ -55,9 +55,11 @@ export function Kpis({ k, ant, comparacao }: { k: KpisV5; ant: KpisV5 | null; co
         {v(k.ganhos, ant?.ganhos, 'maior')}
       </Cartao>
       <Cartao rotulo="Tempo para fechar" ajuda={AJUDA.tempo} valor={fmtDuracaoH(k.fechMedianaH)}>
-        <span className="d5-var-ctx">
+        {/* "mediana" já está na definição do "i": a legenda fica numa linha só */}
+        <span className="d5-var-ctx d5-kpi-leg"
+          title={k.fechN > 0 ? `Mediana ${fmtDuracaoH(k.fechMedianaH)} · média ${fmtDuracaoH(k.fechMediaH)} · ${fmtInt(k.fechN)} ${k.fechN === 1 ? 'fechado' : 'fechados'}` : undefined}>
           {k.fechN > 0
-            ? <>mediana · média <span className="num">{fmtDuracaoH(k.fechMediaH)}</span> · <span className="num">{fmtInt(k.fechN)}</span> {k.fechN === 1 ? 'fechamento' : 'fechamentos'}</>
+            ? <Legenda partes={[`média ${fmtDuracaoH(k.fechMediaH)}`, `${fmtInt(k.fechN)} ${k.fechN === 1 ? 'fechado' : 'fechados'}`]} />
             : 'nenhum fechamento no período'}
         </span>
       </Cartao>

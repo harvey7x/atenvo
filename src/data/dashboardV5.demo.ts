@@ -395,6 +395,7 @@ export function demoDashV5(janela: JanelaV5, agora: Date): DashV5 {
 
   return {
     geradoEm: agora.toISOString(),
+    buscaEm: agora.toISOString(),
     periodo: { inicio: janela.iniISO, fim: janela.fimISO, mapaInicio: janela.mapaIniISO },
     kpis, kpisAnterior, canais, ne, atendentes, mapa,
   };

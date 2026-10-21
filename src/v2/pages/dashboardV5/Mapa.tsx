@@ -1,14 +1,16 @@
 import { useMemo, useState } from 'react';
 import type { CelulaMapaV5 } from '@/data/dashboardV5.tipos';
 import { dowIsoV5, type JanelaMapaV5 } from '@/data/dashboardV5.periodo';
-import { fmtDec, fmtInt } from '@/data/dashboardV5.formato';
+import { faixasEscalaV5, fmtDec, fmtInt } from '@/data/dashboardV5.formato';
 import { Skeleton } from '../../components';
 import { Pop, Secao, Vazio, ancoraDe, type Ancora } from './comum';
 
 /* Entradas por dia e hora (São Paulo). Até 14 dias: uma linha por data; acima
    disso, média por dia da semana. Escala sequencial de 5 degraus a partir da cor
    de dado (--dado-1), células arredondadas com 2px de respiro, hoje em destaque,
-   total por linha à direita e uma faixa com o total por hora embaixo. */
+   total por linha à direita e uma faixa com o total por hora embaixo.
+   Período curto (Hoje, 3 dias): o mapa mostra 7 dias para dar contexto; os dias
+   FORA do período escolhido ficam esmaecidos e o total do pé diz "em 7 dias". */
 
 const HORAS = Array.from({ length: 24 }, (_, h) => h);
 const DOW_CURTO = ['', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb', 'dom'];
@@ -25,6 +27,8 @@ interface Linha {
   valores: number[];
   total: number;
   hoje: boolean;
+  /** dia desenhado só como contexto (fora do período escolhido) */
+  fora: boolean;
   /** a partir desta hora ainda não aconteceu (só a linha de hoje) */
   futuroDesde: number | null;
 }
@@ -54,6 +58,7 @@ export function Mapa({ mapa, janela, hoje, geradoEm }: {
       if (lin && c.hora >= 0 && c.hora < 24) lin[c.hora] += c.entradas;
     }
     const horaAgora = horaSP(geradoEm);
+    const noPeriodo = (d: string) => d >= janela.periodoIniDate && d < janela.periodoFimDate;
     let ls: Linha[];
     if (!semana) {
       ls = janela.dias.map((d) => {
@@ -64,23 +69,29 @@ export function Mapa({ mapa, janela, hoje, geradoEm }: {
           rotulo: ehHoje ? 'Hoje' : `${DOW_CURTO[dowIsoV5(d)]} ${ddmm(d)}`,
           nomeTip: `${DOW_CURTO[dowIsoV5(d)]} ${ddmm(d)}`,
           valores, total: valores.reduce((a, b) => a + b, 0), hoje: ehHoje,
+          fora: janela.estendido && !noPeriodo(d),
           futuroDesde: ehHoje ? horaAgora + 1 : null,
         };
       });
     } else {
-      // média por ocorrência do dia da semana (só dias que já começaram)
+      // média por ocorrência do dia da semana, HORA a HORA: hoje só entra nas horas que já
+      // terminaram (o dia pela metade puxaria para baixo a média das horas que ainda não vieram)
       const somas = Array.from({ length: 8 }, () => Array<number>(24).fill(0));
-      const ocorr = Array<number>(8).fill(0);
+      const ocorr = Array.from({ length: 8 }, () => Array<number>(24).fill(0));
       for (const d of janela.dias) {
         const w = dowIsoV5(d);
-        ocorr[w]++;
-        porDia.get(d)!.forEach((v, h) => { somas[w][h] += v; });
+        porDia.get(d)!.forEach((v, h) => {
+          if (d === hoje && h >= horaAgora) return;
+          somas[w][h] += v;
+          ocorr[w][h]++;
+        });
       }
-      ls = [1, 2, 3, 4, 5, 6, 7].filter((w) => ocorr[w] > 0).map((w) => {
-        const valores = somas[w].map((v) => v / ocorr[w]);
+      ls = [1, 2, 3, 4, 5, 6, 7].filter((w) => ocorr[w].some((n) => n > 0)).map((w) => {
+        const valores = somas[w].map((v, h) => (ocorr[w][h] ? v / ocorr[w][h] : 0));
+        const dias = Math.max(...ocorr[w]);
         return {
-          chave: `w${w}`, rotulo: DOW_LONGO[w], nomeTip: `${DOW_LONGO[w].toLowerCase()} (média de ${ocorr[w]})`,
-          valores, total: valores.reduce((a, b) => a + b, 0), hoje: false, futuroDesde: null,
+          chave: `w${w}`, rotulo: DOW_LONGO[w], nomeTip: `${DOW_LONGO[w].toLowerCase()} (média de ${dias})`,
+          valores, total: valores.reduce((a, b) => a + b, 0), hoje: false, fora: false, futuroDesde: null,
         };
       });
     }
@@ -96,24 +107,28 @@ export function Mapa({ mapa, janela, hoje, geradoEm }: {
 
   const fmtV = (v: number) => (semana ? fmtDec(v, 1) : fmtInt(v));
   const unid = (v: number) => (!semana && Math.round(v) === 1 ? 'entrada' : 'entradas');
+  const nDias = janela.dias.length;
   const sub = janela.estendido
-    ? 'Últimos 7 dias, pela hora de chegada (horário de Brasília).'
+    ? `${janela.terminaHoje ? 'Últimos 7 dias' : `7 dias até ${ddmm(janela.ultimoDate)}`}, pela hora de chegada (horário de Brasília). Em destaque, o período escolhido.`
     : semana
-      ? `Média por dia da semana em ${janela.dias.length} dias, pela hora de chegada.`
+      ? `Média por dia da semana em ${nDias} dias, pela hora de chegada (horário de Brasília).`
       : 'Uma linha por dia, pela hora de chegada (horário de Brasília).';
 
+  const faixas = faixasEscalaV5(max, semana);
   const legenda = (
-    <div className="d5-leg" aria-hidden>
-      <span>Menos</span>
-      {[1, 2, 3, 4, 5].map((q) => <i key={q} className={`d5-q${q}`} />)}
-      <span>Mais</span>
-    </div>
+    <ul className="d5-leg" aria-label={semana ? 'Escala: média de entradas por hora' : 'Escala: entradas por hora'}>
+      <li><i className="d5-q0" aria-hidden /><span className="num">0</span></li>
+      {faixas.map((f) => <li key={f.q}><i className={`d5-q${f.q}`} aria-hidden /><span className="num">{f.rotulo}</span></li>)}
+    </ul>
   );
 
   const mostrar = (el: Element, texto: string) => setTip({ ancora: ancoraDe(el), texto });
+  // pé: total do que está desenhado; diz a que se refere quando não é o período escolhido
+  const peTotal = semana ? total / Math.max(1, linhas.length) : total;
+  const peLegenda = semana ? 'por dia' : janela.estendido ? `em ${fmtInt(nDias)} ${nDias === 1 ? 'dia' : 'dias'}` : null;
 
   return (
-    <Secao className="d5-mapa" titulo="Entradas por dia e hora" sub={sub} acao={total > 0 ? legenda : undefined}>
+    <Secao className="d5-mapa" titulo="Entradas por dia e hora" sub={total > 0 ? sub : undefined} acao={total > 0 ? legenda : undefined}>
       {total === 0 ? (
         <Vazio texto="Sem entradas para desenhar neste período." />
       ) : (
@@ -127,12 +142,12 @@ export function Mapa({ mapa, janela, hoje, geradoEm }: {
               <span className="d5-calor-tot" role="columnheader">{semana ? 'Média' : 'Total'}</span>
             </div>
             {linhas.map((l) => (
-              <div key={l.chave} role="row" className={'d5-calor-lin' + (l.hoje ? ' d5-calor-hoje' : '')}>
-                <span className="d5-calor-rot" role="rowheader" title={l.nomeTip}>{l.rotulo}</span>
+              <div key={l.chave} role="row" className={'d5-calor-lin' + (l.hoje ? ' d5-calor-hoje' : '') + (l.fora ? ' d5-calor-fora' : '')}>
+                <span className="d5-calor-rot" role="rowheader" title={l.fora ? `${l.nomeTip} (fora do período escolhido)` : l.nomeTip}>{l.rotulo}</span>
                 {l.valores.map((v, h) => {
                   const futuro = l.futuroDesde != null && h >= l.futuroDesde;
                   const q = futuro ? 0 : degrau(v, max);
-                  const texto = `${l.nomeTip} · ${h}h · ${fmtV(v)} ${unid(v)}${semana ? ' em média' : ''}`;
+                  const texto = `${l.nomeTip} · ${h}h · ${fmtV(v)} ${unid(v)}${semana ? ' em média' : ''}${l.fora ? ' (fora do período)' : ''}`;
                   return (
                     <span key={h} role="cell"
                       className={'d5-cel' + (futuro ? ' d5-cel-futuro' : q ? ` d5-q${q}` : ' d5-q0')}
@@ -147,7 +162,9 @@ export function Mapa({ mapa, janela, hoje, geradoEm }: {
               <span className="d5-calor-rot" role="rowheader">{semana ? 'Média/hora' : 'Por hora'}</span>
               {porHora.map((v, h) => {
                 const vv = semana ? v / Math.max(1, linhas.length) : v;
-                const texto = semana ? `${h}h · ${fmtDec(vv, 1)} entradas por dia em média` : `${h}h · ${fmtInt(v)} ${unid(v)} no total`;
+                const texto = semana
+                  ? `${h}h · ${fmtDec(vv, 1)} entradas por dia em média`
+                  : `${h}h · ${fmtInt(v)} ${unid(v)}${janela.estendido ? ` em ${fmtInt(nDias)} dias` : ' no total'}`;
                 return (
                   <span key={h} role="cell" className="d5-hbar" aria-label={texto}
                     onMouseEnter={(e) => mostrar(e.currentTarget, texto)}>
@@ -155,7 +172,10 @@ export function Mapa({ mapa, janela, hoje, geradoEm }: {
                   </span>
                 );
               })}
-              <span className="d5-calor-tot num" role="cell">{semana ? fmtDec(total / Math.max(1, linhas.length), 0) : fmtInt(total)}</span>
+              <span className="d5-calor-tot d5-calor-tot-pe" role="cell">
+                <b className="num">{semana ? fmtDec(peTotal, 0) : fmtInt(peTotal)}</b>
+                {peLegenda && <small>{peLegenda}</small>}
+              </span>
             </div>
           </div>
           <Pop ancora={tip?.ancora ?? null} papel="status"><span className="d5-pop-tx num">{tip?.texto}</span></Pop>

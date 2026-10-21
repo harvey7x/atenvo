@@ -16,7 +16,8 @@
 --     o build é instantâneo; IF NOT EXISTS (a v4, que não foi aplicada, previa o mesmo nome);
 --   * cria os helpers internos dash_v5_* (SEM grant para anon/authenticated);
 --   * cria a RPC pública dashboard_v5 (SECURITY DEFINER, mesmo portão de dashboard_resumo).
--- Só LEITURA: nada aqui grava, envia ou altera objeto existente.
+-- Sem gravação de dados (só DDL: 1 índice + funções novas); não envia nada e não altera
+-- nenhum objeto existente.
 --
 -- DEFINIÇÕES (validadas em produção em 21/10 — relatórios rel-canais / rel-atendentes):
 --   ENTRADA       = oportunidade criada no período (criado_em), no número de
@@ -49,19 +50,32 @@
 --                                 autor; resposta pelo celular (origem telefone, sem autor)
 --                                 vai para o dono do card (contatos.responsavel_id).
 --                                 Minutos ÚTEIS: seg–sex, 9h–19h de São Paulo. Vezes cujo
---                                 início está no período.
+--                                 início está no período; a resposta pode cair até 3 dias
+--                                 depois do fim (período já fechado não perde a resposta
+--                                 de segunda-feira à mensagem de sexta à noite).
 --                   tempo p/ fechar = fechado_em − max(criado_em, 1ª atribuição do contato a
---                                 ele no audit_log), mesmos filtros de qualidade acima.
+--                                 ele no audit_log a partir de criado_em − 5 min), mesmos
+--                                 filtros de qualidade acima. Atribuição de um lead ANTERIOR
+--                                 do mesmo contato não conta (o relógio seria de semanas);
+--                                 sem atribuição nova, o relógio começa na entrada.
 --   MAPA          = entradas por data e hora de São Paulo em [p_mapa_inicio, p_fim)
 --                   (p_mapa_inicio nulo = p_inicio). Só células com entrada; o front
 --                   completa os zeros e, acima de 14 dias, agrega por dia da semana.
 --
--- VALIDAÇÃO (produção, begin … rollback, 21/10 ~17:30, sem nenhum índice novo):
---   hoje   : 127 entradas (EMPRESTIMO 82 · JUROS 30 · ANTONIO 15), 79 NE, 5 fechados;
---   7 dias : 927 entradas, 486 NE (IA 293 · regra RS 40 · equipe 153), 25 fechados,
---            mediana 2,2 d (EMPRESTIMO 26,9 h · JUROS 4,75 d);
---   mês CAF: 1.489 clientes, 729 NE (IA 484 · regra RS 59 · equipe 186), 29 fechados.
---   EXPLAIN ANALYZE de dash_v5_dados: 7 dias ≈ 245–290 ms; mês CAF ≈ 355–375 ms.
+-- VALIDAÇÃO (produção, begin … rollback, sem nenhum índice novo — snapshot 21/10 ~19:30;
+-- "clientes" = contatos distintos do KPI, "oportunidades" = soma das linhas por número):
+--   hoje   : 140 clientes (140 oportunidades: EMPRESTIMO 91 · JUROS 32 · ANTONIO 17),
+--            84 NE, 10 fechados;
+--   7 dias : 938 clientes (940 oportunidades), 491 NE (IA 295 · regra RS 40 · equipe 156),
+--            30 fechados, mediana 2,4 d;
+--   mês CAF: 1.502 clientes (1.504 oportunidades), 734 NE (IA 486 · regra RS 59 ·
+--            equipe 189), 34 fechados.
+--   Semana já fechada 08–15/10: 1.081 → 1.115 respostas humanas contadas com a janela de
+--   resposta de +3 dias (a versão anterior cortava no fim do período). Hoje, 7 dias e mês
+--   CAF saem idênticos à versão anterior (inclusive o tempo p/ fechar por atendente).
+--   EXPLAIN ANALYZE de dash_v5_dados: 7 dias ≈ 255–300 ms; mês CAF ≈ 360–370 ms; semana
+--   fechada ≈ 260–280 ms. Teto: 46 dias → periodo_longo; sem auth.uid() → sem_permissao.
+--   Com cache frio, 92 dias chegaram a 16,6 s (auditoria 21/10) — daí o teto de 45 dias.
 -- O tempo de resposta lê mensagens por org + criado_em: 20261021200100_idx_mensagens_org_criado.sql
 -- impede que o custo cresça com o histórico (aplicar ao vivo, CONCURRENTLY, fora de transação).
 -- ============================================================================
@@ -279,7 +293,9 @@ begin
   fe as (
     select * from public.dash_v5_fechamentos(p_org, p_inicio, p_fim)
   ),
-  -- fechados e o tempo para fechar de cada um (relógio a partir da atribuição a ele)
+  -- fechados e o tempo para fechar de cada um (relógio a partir da atribuição a ele NESTE
+  -- lead: a 1ª a partir de criado_em − 5 min — o rodízio às vezes grava a atribuição
+  -- segundos antes da oportunidade; a de um lead anterior do mesmo contato não conta)
   gan as (
     select g.credito_id as uid, count(*) as ganhos,
            percentile_cont(0.5) within group (order by g.h) as med,
@@ -293,6 +309,7 @@ begin
                       where a.entidade = 'contatos' and a.entidade_id = f.contato_id
                         and a.acao = 'sync_responsavel_cliente'
                         and a.dados_depois->>'responsavel_id' = f.credito_id::text
+                        and a.criado_em >= f.criado_em - interval '5 minutes'
                         and a.criado_em <= f.fechado_em), f.criado_em))) / 3600.0)::double precision
                end as h
           from fe f
@@ -322,7 +339,10 @@ begin
                 else 'auto' end as k
       from public.mensagens mm
      where mm.organizacao_id = p_org
-       and mm.criado_em >= p_inicio - interval '1 day' and mm.criado_em < p_fim
+       -- a resposta pode vir depois do fim do período (a vez do cliente é que precisa estar
+       -- dentro): período já fechado lê até 3 dias além; em andamento, até agora
+       and mm.criado_em >= p_inicio - interval '1 day'
+       and mm.criado_em < least(p_fim + interval '3 days', now())
        and mm.tipo not in ('sistema', 'nota_interna')
        and not (mm.direcao = 'saida' and mm.status = 'falhou')
   ),
@@ -427,8 +447,10 @@ begin
   if p_inicio is null or p_fim is null or p_fim <= p_inicio then
     raise exception 'periodo_invalido';
   end if;
-  -- teto de segurança: o tempo de resposta lê as mensagens do período inteiro
-  if p_fim - p_inicio > interval '93 days' then
+  -- teto de segurança: o tempo de resposta lê as mensagens do período inteiro (+3 dias).
+  -- Com cache frio e sem idx_mensagens_org_criado, 92 dias levaram 16,6 s (o papel
+  -- authenticated tem statement_timeout de 8 s). 45 dias cobre o mês comercial com folga.
+  if p_fim - p_inicio > interval '45 days' then
     raise exception 'periodo_longo';
   end if;
 
@@ -458,7 +480,7 @@ begin
 
   -- início do mapa (o front pede os últimos 7 dias quando o período é curto)
   v_mapa := coalesce(p_mapa_inicio, p_inicio);
-  if v_mapa >= p_fim or p_fim - v_mapa > interval '93 days' then
+  if v_mapa >= p_fim or p_fim - v_mapa > interval '45 days' then
     raise exception 'periodo_mapa_invalido';
   end if;
 

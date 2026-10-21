@@ -1,4 +1,4 @@
-import { useQuery, type UseQueryResult } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { useOrg } from '@/context/OrgContext';
 import { spHoje, type Periodo } from '@/data/relatorios';
@@ -21,7 +21,7 @@ import { janelaMapaV5, periodoAnteriorV5 } from '@/data/dashboardV5.periodo';
 
 export const DASH_V5_REAL: boolean = isSupabaseConfigured && !!supabase;
 
-export { PRESETS_DASH, periodoDash, type PresetDash } from '@/data/dashboard';
+export { periodoDash, type PresetDash } from '@/data/dashboard';
 export type { Periodo } from '@/data/relatorios';
 
 const CINCO_MIN = 5 * 60_000;
@@ -116,9 +116,10 @@ function normalizarAtendente(v: unknown): AtendenteV5 {
 function normalizarCelula(v: unknown): CelulaMapaV5 | null {
   const c = obj(v);
   const dia = txt(c.dia).slice(0, 10);
-  const hora = num(c.hora);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(dia) || hora < 0 || hora > 23) return null;
-  return { dia, hora: Math.trunc(hora), entradas: num(c.entradas) };
+  // hora ausente NÃO vira 0h (desenharia a entrada de madrugada): célula descartada
+  const hora = numOuNulo(c.hora);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dia) || hora == null || !Number.isInteger(hora) || hora < 0 || hora > 23) return null;
+  return { dia, hora, entradas: num(c.entradas) };
 }
 
 export function normalizarDashV5(bruto: unknown): DashV5 {
@@ -126,8 +127,11 @@ export function normalizarDashV5(bruto: unknown): DashV5 {
   const p = obj(b.periodo);
   const kpis = normalizarKpis(b.kpis);
   const ant = b.kpis_anterior ?? b.kpisAnterior;
+  const geradoEm = txt(b.gerado_em ?? b.geradoEm) || new Date().toISOString();
   return {
-    geradoEm: txt(b.gerado_em ?? b.geradoEm) || new Date().toISOString(),
+    geradoEm,
+    // o hook troca pelo instante em que montou a janela (é dele que sai o corte do anterior)
+    buscaEm: txt(b.busca_em ?? b.buscaEm) || geradoEm,
     periodo: {
       inicio: txt(p.inicio), fim: txt(p.fim),
       mapaInicio: txt(p.mapa_inicio ?? p.mapaInicio) || txt(p.inicio),
@@ -141,10 +145,18 @@ export function normalizarDashV5(bruto: unknown): DashV5 {
   };
 }
 
+/** Teto do período (igual ao da RPC: 'periodo_longo' acima de 45 dias). */
+export const DASH_V5_MAX_DIAS = 45;
+
 /** Erro da RPC em português (nunca SQL cru na tela). */
 export function traduzErroDashV5(e: unknown): string {
   const m = (e instanceof Error ? e.message : typeof e === 'object' && e && 'message' in e ? String((e as { message: unknown }).message) : String(e ?? '')).toLowerCase();
-  if (m.includes('periodo_longo')) return 'Escolha um período de até 93 dias.';
+  const codigo = typeof e === 'object' && e && 'code' in e ? String((e as { code: unknown }).code) : '';
+  // 57014 = statement_timeout (o papel authenticated tem 8 s): período longo com cache frio
+  if (codigo === '57014' || m.includes('statement timeout') || m.includes('canceling statement')) {
+    return 'A consulta demorou demais. Tente de novo em instantes ou escolha um período menor.';
+  }
+  if (m.includes('periodo_longo')) return `Escolha um período de até ${DASH_V5_MAX_DIAS} dias.`;
   if (m.includes('periodo')) return 'O período escolhido não é válido.';
   if (m.includes('sem_permissao')) return 'Você não tem acesso aos números desta empresa.';
   if (m.includes('org_indefinida')) return 'Não foi possível identificar a sua empresa.';
@@ -152,8 +164,10 @@ export function traduzErroDashV5(e: unknown): string {
   return 'Não foi possível carregar os números agora.';
 }
 
-/** Foto do período: seis blocos numa chamada. Recarrega a cada 5 min com a aba
- *  visível e ao voltar para ela. O anterior é cortado no mesmo tempo decorrido. */
+/** Foto do período: seis blocos numa chamada. Recarrega a cada 5 min (o react-query
+ *  já pausa o intervalo com a aba escondida) e ao voltar para ela. O anterior é cortado
+ *  no mesmo tempo decorrido. Ao trocar de período, os números do anterior ficam na tela
+ *  (esmaecidos pela página) até a nova foto chegar — sem piscar esqueleto. */
 export function useDashV5(periodo: Periodo): UseQueryResult<DashV5> {
   const { currentOrg } = useOrg();
   const org = currentOrg.id;
@@ -163,12 +177,13 @@ export function useDashV5(periodo: Periodo): UseQueryResult<DashV5> {
     queryKey: ['dashboard-v5', org, periodo.iniISO, periodo.fimISO, periodo.prevIniISO, mapaIni],
     enabled: !!org,
     staleTime: 60_000,
-    refetchInterval: () => (typeof document !== 'undefined' && document.visibilityState === 'visible' ? CINCO_MIN : false),
+    refetchInterval: CINCO_MIN,
     refetchOnWindowFocus: true,
+    placeholderData: keepPreviousData,
     queryFn: async (): Promise<DashV5> => {
       const agora = new Date();
       const j = janelaV5(periodo, agora, hoje);
-      if (!DASH_V5_REAL) return demoDashV5(j, agora);
+      if (!DASH_V5_REAL) return { ...demoDashV5(j, agora), buscaEm: agora.toISOString() };
       const { data, error } = await supabase!.rpc('dashboard_v5', {
         p_inicio: j.iniISO,
         p_fim: j.fimISO,
@@ -178,7 +193,7 @@ export function useDashV5(periodo: Periodo): UseQueryResult<DashV5> {
         p_mapa_inicio: j.mapaIniISO,
       });
       if (error) throw new Error(traduzErroDashV5(error));
-      return normalizarDashV5(data);
+      return { ...normalizarDashV5(data), buscaEm: agora.toISOString() };
     },
   });
 }

@@ -99,3 +99,26 @@ export function fmtVariacao(v: { pct: number | null; abs: number } | null): stri
   if (Math.round(a * 10 ** casas) === 0) return 'estável';
   return `${v.pct > 0 ? '+' : '−'}${a.toLocaleString('pt-BR', { minimumFractionDigits: casas, maximumFractionDigits: casas })}%`;
 }
+
+/* Mapa dia × hora: escala de 5 degraus (degrau = ⌈v / topo × 5⌉, limitado a 1–5). */
+
+/** Faixa de valores de cada degrau, para a legenda. Degrau k cobre (k−1)/5·ref < v ≤ k/5·ref;
+ *  o último também leva tudo acima do topo (os picos). Em contagens inteiras, um degrau que
+ *  nenhum inteiro alcança some da legenda. */
+export function faixasEscalaV5(ref: number, decimal: boolean): { q: number; rotulo: string }[] {
+  if (ref <= 0) return [];
+  const out: { q: number; rotulo: string }[] = [];
+  for (let k = 1; k <= 5; k++) {
+    if (decimal) {
+      const a = ((k - 1) * ref) / 5, b = (k * ref) / 5;
+      out.push({ q: k, rotulo: k === 1 ? `até ${fmtDec(b, 1)}` : k === 5 ? `> ${fmtDec(a, 1)}` : `${fmtDec(a, 1)}–${fmtDec(b, 1)}` });
+      continue;
+    }
+    const lo = Math.floor(((k - 1) * ref) / 5) + 1;
+    const hi = Math.floor((k * ref) / 5);
+    if (k === 5) { out.push({ q: k, rotulo: `≥ ${fmtInt(lo)}` }); continue; }
+    if (lo > hi) continue;
+    out.push({ q: k, rotulo: lo === hi ? fmtInt(lo) : `${fmtInt(lo)}–${fmtInt(hi)}` });
+  }
+  return out;
+}

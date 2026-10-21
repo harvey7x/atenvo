@@ -4,14 +4,17 @@
    1) Período anterior (portado do v4, testado): começa em prevIniISO (a matemática
       de @/data/relatorios) e dura o MESMO tempo decorrido do período atual. Período
       em andamento (hoje, 7 dias, nosso mês) → o anterior é cortado no mesmo ponto
-      ("ontem até 14:05"); período já fechado → o anterior inteiro (ou cortado na
-      duração do atual, se o anterior for mais longo). Sem isso, 3 horas de hoje
-      eram comparadas com o dia de ontem inteiro e a seta mostrava queda que não existe.
+      ("ontem até 14:05"); período já fechado → o anterior INTEIRO (mês comercial
+      fechado 10/09–09/10 compara com 10/08–09/09 inteiro, mesmo que um tenha 30 dias e
+      o outro 31 — o dono lê o mês da casa, dia 10 a dia 9). Sem o corte, 3 horas de
+      hoje eram comparadas com o dia de ontem inteiro e a seta mostrava queda que não existe.
 
    2) Janela do mapa dia × hora: período com menos de 7 dias (Hoje, 3 dias) desenha
       os ÚLTIMOS 7 DIAS terminando no último dia do período; até 14 dias, uma linha
       por data; acima disso, média por dia da semana. Os dias contados são os que já
-      começaram (o mês comercial no dia 12 tem 12 linhas, não 31). */
+      começaram (o mês comercial no dia 12 tem 3 linhas, não 31) — desvio CONSCIENTE da
+      regra "pela duração do período": com poucos dias, a média por dia da semana teria
+      uma ocorrência só e esconderia as datas. */
 
 import { addDias, type Periodo } from '@/data/relatorios';
 
@@ -35,9 +38,10 @@ export function periodoAnteriorV5(p: Periodo, agora: Date): PeriodoAnteriorV5 {
   const ini = Date.parse(p.iniISO), fim = Date.parse(p.fimISO), prevIni = Date.parse(p.prevIniISO);
   const ate = Math.min(Math.max(agora.getTime(), ini), fim);
   const decorrido = ate - ini;
+  const fechado = agora.getTime() >= fim;
   // arredonda para o minuto (a chamada não muda a cada segundo e o rótulo fica limpo) e
   // garante pelo menos 1 minuto de anterior (a RPC recusa fim <= início)
-  const corte = Math.min(ini, Math.max(prevIni + 60_000, Math.floor((prevIni + decorrido) / 60_000) * 60_000));
+  const corte = fechado ? ini : Math.min(ini, Math.max(prevIni + 60_000, Math.floor((prevIni + decorrido) / 60_000) * 60_000));
   const parcial = corte < ini;
   if (!parcial) {
     // anterior inteiro: "13/10" ou "01/10 a 07/10" (mesmo formato curto do trecho cortado)
@@ -71,6 +75,13 @@ export type ModoMapaV5 = 'dias' | 'semana';
 export interface JanelaMapaV5 {
   /** primeiro dia desenhado (YYYY-MM-DD, SP) */
   iniDate: string;
+  /** último dia da janela (inclusivo) e se ele é hoje */
+  ultimoDate: string;
+  terminaHoje: boolean;
+  /** o período escolhido, em datas SP [ini, fim) — no mapa esticado, o que fica fora
+   *  dele aparece esmaecido */
+  periodoIniDate: string;
+  periodoFimDate: string;
   /** instante de início que vai para a RPC (p_mapa_inicio) */
   iniISO: string;
   /** dias que já começaram dentro da janela, em ordem */
@@ -89,6 +100,10 @@ export function janelaMapaV5(p: Periodo, hoje: string): JanelaMapaV5 {
   for (let d = iniDate; d <= ultimo && d <= hoje && dias.length < 400; d = addDias(d, 1)) dias.push(d);
   return {
     iniDate,
+    ultimoDate: ultimo,
+    terminaHoje: ultimo === hoje,
+    periodoIniDate: p.iniDate,
+    periodoFimDate: p.fimDate,
     iniISO: `${iniDate}T00:00:00-03:00`,
     dias,
     modo: dias.length > 14 ? 'semana' : 'dias',

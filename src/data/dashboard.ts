@@ -12,14 +12,6 @@ import { resolvePeriodo, spHoje, addDias, type Periodo, type Preset } from '@/da
  *  (dia 10 → dia 10, navegável por ‹ › via mesCaf). Personalizado cobre o resto. */
 export type PresetDash = 'hoje' | '3d' | '7d' | 'mes_caf' | 'custom';
 
-export const PRESETS_DASH: { id: PresetDash; label: string }[] = [
-  { id: 'hoje', label: 'Hoje' },
-  { id: '3d', label: '3 dias' },
-  { id: '7d', label: '7 dias' },
-  { id: 'mes_caf', label: 'Nosso mês (10→10)' },
-  { id: 'custom', label: 'Personalizado' },
-];
-
 export function periodoDash(preset: PresetDash, ini?: string, fim?: string, mesCaf = 0): Periodo {
   if (preset === 'custom') {
     const h = spHoje();

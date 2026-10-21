@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { periodoDash } from '@/data/dashboard';
 import {
-  fmtDuracaoH, fmtDuracaoMin, fmtInt, fmtPct, fmtTelefone, fmtVariacao, pctDe, rotuloMotivoNe, variacao,
+  faixasEscalaV5, fmtDuracaoH, fmtDuracaoMin, fmtInt, fmtPct, fmtTelefone, fmtVariacao, pctDe, rotuloMotivoNe, variacao,
 } from '@/data/dashboardV5.formato';
 import { demoDashV5, DEMO_CANAIS } from '@/data/dashboardV5.demo';
 import { janelaV5, normalizarDashV5, traduzErroDashV5 } from '@/data/dashboardV5';
@@ -103,6 +103,19 @@ describe('período anterior: mesmo tempo decorrido', () => {
     expect(a).toMatchObject({ parcial: false, fimISO: p.iniISO, rotulo: '24/09 a 30/09' });
     const um = periodoAnteriorV5(periodoDash('custom', '2026-10-07', '2026-10-07'), SP('2026-10-14T14:00:00'));
     expect(um.rotulo).toBe('06/10');
+  });
+  it('mês comercial FECHADO compara com o mês anterior inteiro (10→10), mesmo com 31 dias', () => {
+    // 10/09–09/10 (30 dias) × 10/08–09/09 (31 dias): nada de "10/08 a 08/09"
+    const p = periodoDash('mes_caf', undefined, undefined, -1);
+    expect(p.iniDate).toBe('2026-09-10');
+    const a = periodoAnteriorV5(p, SP('2026-10-14T14:00:00'));
+    expect(a).toMatchObject({ parcial: false, iniISO: p.prevIniISO, fimISO: p.iniISO, rotulo: '10/08 a 09/09' });
+  });
+  it('mês comercial EM ANDAMENTO segue cortado no mesmo tempo decorrido', () => {
+    const p = periodoDash('mes_caf');
+    const a = periodoAnteriorV5(p, SP('2026-10-14T14:00:00'));
+    expect(a.parcial).toBe(true);
+    expect(a.fimISO).toBe(SP('2026-09-14T14:00:00').toISOString());
   });
   it('logo depois da meia-noite ainda manda pelo menos 1 minuto de anterior', () => {
     const p = periodoDash('hoje');
@@ -283,7 +296,12 @@ describe('normalizarDashV5', () => {
       ],
       ne: { motivos: [{ motivo: 'sem_interesse', qtd: 2 }, { motivo: null, qtd: 3 }], quem: { regra_rs: 1 } },
       atendentes: [{ usuario_id: 'u1', nome: 'Juliana', resp_mediana_min: 4.2 }, { nome: 'sem id' }],
-      mapa: [{ dia: '2026-10-21', hora: 14, entradas: 12 }, { dia: 'ruim', hora: 3 }, { dia: '2026-10-21', hora: 25 }],
+      mapa: [
+        { dia: '2026-10-21', hora: 14, entradas: 12 }, { dia: 'ruim', hora: 3 }, { dia: '2026-10-21', hora: 25 },
+        // sem hora (ou hora quebrada) NÃO vira 0h
+        { dia: '2026-10-21', entradas: 3 }, { dia: '2026-10-21', hora: null, entradas: 2 }, { dia: '2026-10-21', hora: 2.5, entradas: 1 },
+        { dia: '2026-10-21', hora: '0', entradas: 4 },
+      ],
     });
     expect(d.kpis).toEqual({ entradas: 127, ne: 79, ganhos: 5, fechMedianaH: 162.5, fechMediaH: null, fechN: 0 });
     expect(d.kpisAnterior?.entradas).toBe(85);
@@ -295,12 +313,52 @@ describe('normalizarDashV5', () => {
     expect(d.ne.quem).toEqual({ ia: 0, regraRs: 1, equipe: 0 });
     expect(d.atendentes).toHaveLength(1);
     expect(d.atendentes[0]).toMatchObject({ usuarioId: 'u1', respMedianaMin: 4.2, respMediaMin: null, recebidos: 0 });
-    expect(d.mapa).toEqual([{ dia: '2026-10-21', hora: 14, entradas: 12 }]);
+    expect(d.mapa).toEqual([{ dia: '2026-10-21', hora: 14, entradas: 12 }, { dia: '2026-10-21', hora: 0, entradas: 4 }]);
+    // sem busca_em, o instante da busca cai no da foto (o hook sobrescreve com o seu relógio)
+    expect(d.buscaEm).toBe('2026-10-21T20:30:00Z');
   });
 
   it('erro da RPC vira frase em português', () => {
-    expect(traduzErroDashV5(new Error('periodo_longo'))).toMatch(/93 dias/);
+    expect(traduzErroDashV5(new Error('periodo_longo'))).toMatch(/45 dias/);
+    // statement_timeout (57014) do papel authenticated: frase amigável, não SQL
+    expect(traduzErroDashV5({ code: '57014', message: 'canceling statement due to statement timeout' })).toMatch(/demorou demais/);
+    expect(traduzErroDashV5(new Error('canceling statement due to statement timeout'))).toMatch(/demorou demais/);
     expect(traduzErroDashV5({ message: 'sem_permissao' })).toMatch(/acesso/);
     expect(traduzErroDashV5('qualquer coisa')).toMatch(/Não foi possível/);
+  });
+});
+
+/* ====================================================================== */
+/* Legenda do mapa                                                         */
+/* ====================================================================== */
+describe('faixasEscalaV5', () => {
+  it('contagens: faixas inteiras contíguas; o último degrau leva os picos (≥)', () => {
+    expect(faixasEscalaV5(12, false)).toEqual([
+      { q: 1, rotulo: '1–2' }, { q: 2, rotulo: '3–4' }, { q: 3, rotulo: '5–7' }, { q: 4, rotulo: '8–9' }, { q: 5, rotulo: '≥ 10' },
+    ]);
+  });
+  it('topo pequeno: degraus que nenhum inteiro alcança somem', () => {
+    expect(faixasEscalaV5(3, false)).toEqual([{ q: 2, rotulo: '1' }, { q: 4, rotulo: '2' }, { q: 5, rotulo: '≥ 3' }]);
+    expect(faixasEscalaV5(1, false)).toEqual([{ q: 5, rotulo: '≥ 1' }]);
+    expect(faixasEscalaV5(0, false)).toEqual([]);
+  });
+  it('médias (dia da semana): uma casa decimal', () => {
+    expect(faixasEscalaV5(10, true).map((f) => f.rotulo)).toEqual(['até 2,0', '2,0–4,0', '4,0–6,0', '6,0–8,0', '> 8,0']);
+  });
+  it('cada valor cai no degrau da sua faixa', () => {
+    const degrau = (v: number, ref: number) => Math.min(5, Math.max(1, Math.ceil((v / ref) * 5)));
+    for (const ref of [3, 7, 12, 25]) {
+      const fx = faixasEscalaV5(ref, false);
+      for (let v = 1; v <= ref + 5; v++) {
+        const f = fx.find((x) => x.q === degrau(v, ref))!;
+        expect(f).toBeDefined();
+        if (f.rotulo.startsWith('≥')) expect(v).toBeGreaterThanOrEqual(Number(f.rotulo.slice(2)));
+        else {
+          const [lo, hi = lo] = f.rotulo.split('–').map(Number);
+          expect(v).toBeGreaterThanOrEqual(lo);
+          expect(v).toBeLessThanOrEqual(hi);
+        }
+      }
+    }
   });
 });

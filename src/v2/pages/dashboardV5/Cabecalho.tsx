@@ -1,7 +1,9 @@
 import type { Periodo, PresetDash } from '@/data/dashboardV5';
 import { Input, Segmentado } from '../../components';
 
-/* Cabeçalho: título, período em palavras, seletor de período e "Atualizado às". */
+/* Cabeçalho: título, período em palavras, seletor de período e "Atualizado às".
+   O trecho comparado ("vs ontem até 14:05") fica só nos cartões, ao lado de cada
+   variação — dito uma vez onde é lido. */
 
 export const PRESETS_V5: { valor: PresetDash; rotulo: string }[] = [
   { valor: 'hoje', rotulo: 'Hoje' },
@@ -37,11 +39,11 @@ export function rotuloPeriodoV5(preset: PresetDash, p: Periodo, hoje: string): s
 }
 
 export function Cabecalho({
-  preset, setPreset, periodo, rotulo, comparacao, ini, fim, setIni, setFim, hoje,
+  preset, setPreset, periodo, rotulo, ini, fim, setIni, setFim, hoje,
   mesCaf, setMesCaf, geradoEm, atualizando, aoAtualizar, demo,
 }: {
   preset: PresetDash; setPreset: (p: PresetDash) => void;
-  periodo: Periodo; rotulo: string; comparacao: string | null;
+  periodo: Periodo; rotulo: string;
   ini: string; fim: string; setIni: (v: string) => void; setFim: (v: string) => void; hoje: string;
   mesCaf: number; setMesCaf: (fn: (m: number) => number) => void;
   geradoEm: string | null; atualizando: boolean; aoAtualizar: () => void;
@@ -51,10 +53,7 @@ export function Cabecalho({
     <header className="d5-cab">
       <div className="d5-cab-tits">
         <h2>Dashboard{demo && <span className="d5-demo">Dados de demonstração</span>}</h2>
-        <p>
-          <span>{rotulo}</span>
-          {comparacao && <span className="d5-cab-comp"> · comparado {comparacao.replace(/^vs /, 'com ')}</span>}
-        </p>
+        <p><span>{rotulo}</span></p>
       </div>
       <div className="d5-cab-ctl">
         <div className="d5-cab-per">

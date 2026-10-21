@@ -4,7 +4,8 @@ import { Skeleton } from '../../components';
 import { Secao, Vazio } from './comum';
 
 /* Não elegíveis por motivo: barras horizontais (contagem e % do total), do maior
-   para o menor, e no pé quem marcou (IA, regra automática do RS, equipe). */
+   para o menor, e logo abaixo quem marcou (IA, regra automática do RS, equipe). O
+   comprimento da barra É o % ao lado dela (61% enche 61% do trilho). */
 
 const QUEM: { chave: keyof NeV5['quem']; rotulo: string; dica: string }[] = [
   { chave: 'ia', rotulo: 'IA', dica: 'A IA descartou na conversa' },
@@ -13,11 +14,10 @@ const QUEM: { chave: keyof NeV5['quem']; rotulo: string; dica: string }[] = [
 ];
 
 export function Motivos({ ne }: { ne: NeV5 }) {
-  const max = Math.max(1, ...ne.motivos.map((m) => m.qtd));
   const totQuem = ne.quem.ia + ne.quem.regraRs + ne.quem.equipe;
   return (
     <Secao className="d5-mot" titulo="Não elegíveis por motivo"
-      sub={ne.total > 0 ? <><b className="num">{fmtInt(ne.total)}</b> no período</> : 'Nenhum no período'}>
+      sub={ne.total > 0 ? <><b className="num">{fmtInt(ne.total)}</b> no período</> : undefined}>
       {ne.motivos.length === 0 ? (
         <Vazio texto="Nenhum lead marcado como não elegível no período." />
       ) : (
@@ -34,7 +34,7 @@ export function Motivos({ ne }: { ne: NeV5 }) {
                   </span>
                 </div>
                 <span className="d5-trilho d5-trilho-g" aria-hidden>
-                  <i style={{ width: `${Math.max(1.5, (m.qtd / max) * 100)}%` }} />
+                  <i style={{ width: `${Math.max(1.5, p ?? 0)}%` }} />
                 </span>
               </li>
             );
