@@ -34,7 +34,8 @@ export function rotuloPeriodoV5(preset: PresetDash, p: Periodo, hoje: string): s
   if (preset === 'hoje') return `Hoje, ${diaSemana(hoje)} ${ddmm(hoje)}`;
   if (preset === '3d') return `Últimos 3 dias, ${ddmm(p.iniDate)} a ${ddmm(ultimo)}`;
   if (preset === '7d') return `Últimos 7 dias, ${ddmm(p.iniDate)} a ${ddmm(ultimo)}`;
-  if (preset === 'mes_caf') return `Nosso mês, ${ddmm(p.iniDate)} a ${ddmm(ultimo)}`;
+  // mês corrente: os dados vão só até hoje — não anunciar um fim que ainda não chegou
+  if (preset === 'mes_caf') return ultimo > hoje ? `Nosso mês, de ${ddmm(p.iniDate)} até hoje, ${ddmm(hoje)}` : `Nosso mês, ${ddmm(p.iniDate)} a ${ddmm(ultimo)}`;
   return p.iniDate === ultimo ? `${diaSemana(ultimo)}, ${ddmm(ultimo)}` : `${ddmm(p.iniDate)} a ${ddmm(ultimo)}`;
 }
 
