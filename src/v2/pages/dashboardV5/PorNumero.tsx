@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { CanalV5, KpisV5 } from '@/data/dashboardV5.tipos';
 import { fmtInt, fmtPct, fmtTelefone, pctDe, rotuloMotivoNe } from '@/data/dashboardV5.formato';
 import { Skeleton } from '../../components';
-import { Ajuda, Pop, PontoStatus, Secao, TempoFechar, ancoraDe, type Ancora } from './comum';
+import { Ajuda, Legenda, Pop, PontoStatus, Secao, TempoFechar, ancoraDe, type Ancora } from './comum';
 
 /* Entradas por número: todos os WhatsApp conectados (mesmo com zero) e uma linha
    "Números antigos" para o que chega por números que já saíram. Não elegíveis e
@@ -26,7 +26,7 @@ function CelulaNe({ c }: { c: CanalV5 }) {
         {fmtInt(c.ne)}
       </button>
       <Pop ancora={ancora} id={id} largura={300}>
-        <span className="d5-pop-tit">{c.nome} · não elegíveis</span>
+        <span className="d5-pop-tit"><Legenda partes={[c.nome, 'não elegíveis']} /></span>
         <ul className="d5-pop-lista">
           {motivos.map(([m, q]) => (
             <li key={m}>
@@ -77,9 +77,9 @@ export function PorNumero({ canais, kpis }: { canais: CanalV5[]; kpis: KpisV5 })
                       <PontoStatus situacao={c.situacao} />
                       <span className="d5-cel2">
                         <b title={c.nome}>{c.situacao === 'antigo' ? 'Números antigos' : c.nome}</b>
-                        <small className="num">
-                          {c.situacao === 'antigo' ? 'Removidos ou desconectados' : fmtTelefone(c.numero)}
-                        </small>
+                        {c.situacao === 'antigo'
+                          ? <small>Removidos ou desconectados</small>
+                          : <small className="num d5-tel">{fmtTelefone(c.numero)}</small>}
                       </span>
                     </span>
                   </th>

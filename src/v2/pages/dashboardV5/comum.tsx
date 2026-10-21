@@ -158,14 +158,16 @@ export function Variacao({ atual, anterior, sentido, comparacao }: {
 
 /** Legenda curta de uma célula ("média 1 h 10 · 202 respostas · 18 pelo celular"). Cada
  *  pedaço é inquebrável: quando falta largura, a linha só quebra DEPOIS de um " · ",
- *  nunca no meio de "1 h 10" nem separando o número da palavra. */
+ *  nunca no meio de "1 h 10" nem separando o número da palavra. O "·" é um elemento com
+ *  margem própria (.d5-sep): o espaço da fonte (0,2em) deixava "dia·10" colado. A quebra
+ *  é o espaço comum depois dele (um <wbr> quebraria até sob white-space: nowrap no Chrome). */
 export function Legenda({ partes }: { partes: ReactNode[] }) {
   const v = partes.filter((p) => p != null && p !== false && p !== '');
   return (
     <>
       {v.map((p, i) => (
         <Fragment key={i}>
-          {i > 0 && '\u00a0· '}
+          {i > 0 && <><span className="d5-sep">·</span>{' '}</>}
           <span className="d5-seg">{p}</span>
         </Fragment>
       ))}

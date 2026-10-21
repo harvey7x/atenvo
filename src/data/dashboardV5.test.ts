@@ -22,9 +22,18 @@ describe('formato', () => {
     expect(fmtInt(12.6)).toBe('13');
     expect(fmtInt(null)).toBe('—');
     expect(fmtInt(Number.NaN)).toBe('—');
+    // porcentagem sempre inteira; abaixo de 1 (e acima de 0) é '<1%', nunca '0%'
     expect(fmtPct(34.4)).toBe('34%');
-    expect(fmtPct(8.33)).toBe('8,3%');
+    expect(fmtPct(8.33)).toBe('8%');
+    expect(fmtPct(8.7)).toBe('9%');
+    expect(fmtPct(1.1)).toBe('1%');
     expect(fmtPct(4)).toBe('4%');
+    expect(fmtPct(0.4)).toBe('<1%');
+    expect(fmtPct(0.99)).toBe('<1%');
+    expect(fmtPct(1)).toBe('1%');
+    expect(fmtPct(0)).toBe('0%');
+    expect(fmtPct(99.6)).toBe('>99%');
+    expect(fmtPct(100)).toBe('100%');
     expect(fmtPct(null)).toBe('—');
     expect(pctDe(1, 4)).toBe(25);
     expect(pctDe(1, 0)).toBeNull();
@@ -67,7 +76,9 @@ describe('formato', () => {
   it('variação: % relativo, +N quando o anterior é zero, estável', () => {
     expect(fmtVariacao(variacao(120, 100))).toBe('+20%');
     expect(fmtVariacao(variacao(95, 100))).toBe('−5%');
-    expect(fmtVariacao(variacao(103.5, 100))).toBe('+3,5%');
+    expect(fmtVariacao(variacao(103.5, 100))).toBe('+4%');
+    expect(fmtVariacao(variacao(90.7, 100))).toBe('−9%');
+    expect(fmtVariacao(variacao(1004, 1000))).toBe('estável');
     expect(fmtVariacao(variacao(4, 0))).toBe('+4');
     expect(fmtVariacao(variacao(7, 7))).toBe('estável');
     expect(fmtVariacao(variacao(null, 7))).toBe('—');

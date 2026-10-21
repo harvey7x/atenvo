@@ -3,7 +3,7 @@ import type { CelulaMapaV5 } from '@/data/dashboardV5.tipos';
 import { dowIsoV5, type JanelaMapaV5 } from '@/data/dashboardV5.periodo';
 import { faixasEscalaV5, fmtDec, fmtInt } from '@/data/dashboardV5.formato';
 import { Skeleton } from '../../components';
-import { Pop, Secao, Vazio, ancoraDe, type Ancora } from './comum';
+import { Legenda, Pop, Secao, Vazio, ancoraDe, type Ancora } from './comum';
 
 /* Entradas por dia e hora (São Paulo). Até 14 dias: uma linha por data; acima
    disso, média por dia da semana. Escala sequencial de 5 degraus a partir da cor
@@ -178,7 +178,9 @@ export function Mapa({ mapa, janela, hoje, geradoEm }: {
               </span>
             </div>
           </div>
-          <Pop ancora={tip?.ancora ?? null} papel="status"><span className="d5-pop-tx num">{tip?.texto}</span></Pop>
+          <Pop ancora={tip?.ancora ?? null} papel="status">
+            <span className="d5-pop-tx num">{tip && <Legenda partes={tip.texto.split(' · ')} />}</span>
+          </Pop>
         </div>
       )}
     </Secao>

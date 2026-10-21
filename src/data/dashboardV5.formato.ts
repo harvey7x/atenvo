@@ -24,11 +24,14 @@ export function pctDe(parte: number | null | undefined, total: number | null | u
   return (parte / total) * 100;
 }
 
-/** Porcentagem já em 0–100, inteira (uma casa abaixo de 10, quando não é redonda): 34% · 8,3% · 0,4%. */
+/** Porcentagem já em 0–100, SEMPRE inteira (a mesma precisão em toda a página): 34% · 8% · 1%.
+ *  Acima de 0 e abaixo de 1 vira '<1%' (não some num '0%'); acima de 99 e abaixo de 100,
+ *  '>99%' (não vira um '100%' que não é). */
 export function fmtPct(n: number | null | undefined): string {
   if (!ok(n)) return TRACO;
-  const umaCasa = n > 0 && n < 10 && Math.round(n * 10) % 10 !== 0;
-  return `${n.toLocaleString('pt-BR', { minimumFractionDigits: umaCasa ? 1 : 0, maximumFractionDigits: umaCasa ? 1 : 0 })}%`;
+  if (n > 0 && n < 1) return '<1%';
+  if (n > 99 && n < 100) return '>99%';
+  return `${Math.round(n).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}%`;
 }
 
 /** Duração em MINUTOS: < 1 min → '< 1 min'; < 60 → '4 min'; < 24 h → '3 h 20' (ou '3 h');
@@ -89,15 +92,15 @@ export function variacao(atual: number | null | undefined, anterior: number | nu
   return { pct: anterior === 0 ? null : (abs / anterior) * 100, abs };
 }
 
-/** Texto da variação: '+12%', '−3,5%', '+4' (anterior zero), 'estável'. */
+/** Texto da variação, inteira como as outras porcentagens: '+12%', '−4%', '+4' (anterior
+ *  zero), 'estável' (nada mudou ou mudou menos de meio por cento). */
 export function fmtVariacao(v: { pct: number | null; abs: number } | null): string {
   if (!v) return TRACO;
   if (Math.abs(v.abs) < 0.5) return 'estável';
   if (v.pct == null) return `+${fmtInt(v.abs)}`;
-  const a = Math.abs(v.pct);
-  const casas = a < 10 && Math.round(a * 10) % 10 !== 0 ? 1 : 0;
-  if (Math.round(a * 10 ** casas) === 0) return 'estável';
-  return `${v.pct > 0 ? '+' : '−'}${a.toLocaleString('pt-BR', { minimumFractionDigits: casas, maximumFractionDigits: casas })}%`;
+  const a = Math.round(Math.abs(v.pct));
+  if (a === 0) return 'estável';
+  return `${v.pct > 0 ? '+' : '−'}${a.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}%`;
 }
 
 /* Mapa dia × hora: escala de 5 degraus (degrau = ⌈v / topo × 5⌉, limitado a 1–5). */

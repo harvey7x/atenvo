@@ -157,7 +157,7 @@
 .v2 .d5-var-ok { color: var(--verde); background: var(--verde-bg); }
 .v2 .d5-var-er { color: var(--rubro); background: var(--rubro-bg); }
 .v2 .d5-var-ne { color: var(--txt-2); background: rgba(var(--tint), .07); }
-.v2 .d5-var-ctx { font-size: 12px; color: var(--txt-3); font-variant-numeric: tabular-nums; }
+.v2 .d5-var-ctx { font-size: 12px; color: var(--txt-2); font-variant-numeric: tabular-nums; } /* o "vs …" explica a variação */
 
 /* ---------------- linha 2: por número (2/3) + motivos (1/3) ---------------- */
 .v2 .d5-linha2 {
@@ -178,7 +178,9 @@
 .v2 .d5-tab thead th {
   /* anatomia da tabela da casa (caps pequenas sobre faixa de 2%), com o fio mais firme */
   font-size: 10.5px; font-weight: 500; letter-spacing: .05em; text-transform: uppercase;
-  color: var(--txt-3); background: rgba(var(--tint), .022);
+  /* --txt-2: em 10,5px caixa-alta o --txt-3 (~3:1) ficava apagado demais para o que nomeia
+     as colunas */
+  color: var(--txt-2); background: rgba(var(--tint), .022);
   padding-top: 9px; padding-bottom: 9px; white-space: nowrap;
   border-top: 1px solid var(--d5-fio); border-bottom-color: var(--d5-fio-forte);
 }
@@ -207,8 +209,13 @@
 .v2 .d5-cel2-dir { align-items: flex-end; }
 .v2 .d5-cel2 > b { font-size: 13.5px; font-weight: 600; color: var(--txt); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .v2 .d5-cel2 > small { font-size: 11.5px; color: var(--txt-3); white-space: nowrap; }
-/* legenda em pedaços: só quebra depois de um " · " */
+/* legenda em pedaços: só quebra depois de um " · " (no espaço logo após o ponto). O ponto
+   leva margem própria: o espaço do Instrument Sans (0,2em) colava "dia·10". À direita,
+   margem + o espaço (0,2em) = a margem da esquerda */
 .v2 .d5-seg { white-space: nowrap; }
+.v2 .d5-sep { margin: 0 .18em 0 .38em; font-variant-numeric: normal; }
+/* telefone: o mesmo espaço estreito colava "(51)99426" — alarga só o espaço */
+.v2 .d5-tel { word-spacing: .2em; }
 .v2 .d5-lin-antigo .d5-cel2 > b { color: var(--txt-2); font-weight: 500; }
 .v2 .d5-tot-rot > b { font-weight: 600; }
 
@@ -241,7 +248,11 @@
 
 /* ---------------- motivos ---------------- */
 .v2 .d5-mot { display: flex; flex-direction: column; }
-.v2 .d5-barras { list-style: none; display: flex; flex-direction: column; gap: 19px; }
+/* o cartão estica até a altura da tabela de números (mesma linha): a lista ocupa o meio e
+   cada motivo cresce por igual — até +26px de respiro embaixo da barra —, o que deixa
+   "Quem marcou" no pé, na linha do Total da tabela, em vez de uma faixa vazia embaixo */
+.v2 .d5-barras { list-style: none; display: flex; flex-direction: column; gap: 19px; flex: 1 0 auto; }
+.v2 .d5-barra { flex: 1 0 auto; max-height: 56px; }
 .v2 .d5-barra-tx { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 7px; }
 .v2 .d5-barra-rot { font-size: 12.5px; color: var(--txt-2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .v2 .d5-barra-v { display: inline-flex; align-items: baseline; gap: 8px; flex-shrink: 0; }
@@ -265,12 +276,21 @@
 /* ---------------- atendentes ---------------- */
 .v2 .d5-tab-at th, .v2 .d5-tab-at td { padding-top: 12px; padding-bottom: 12px; }
 .v2 .d5-tab-at thead th { padding-top: 9px; padding-bottom: 9px; }
+/* o MESMO respiro entre todas as colunas: cada coluna numérica = o que ela pede (o maior
+   entre título e conteúdo, + 24px de padding) + uma fatia IGUAL da sobra; 100cqw é a
+   largura da página = a da tabela (a última coluna tem 20px de padding à direita, a 1ª 20px à
+   esquerda). O nome fica com o resto (a estimativa --d5-at-nome),
+   então o vão nome → Recebidos é o mesmo dos outros. Sem sobra, a fatia é zero. */
+.v2 .d5-tab-at {
+  --d5-at-nome: 130px; --d5-at-rec: 156px; --d5-at-gan: 126px; --d5-at-ne: 198px; --d5-at-resp: 268px; --d5-at-fech: 193px;
+  --d5-at-folga: max(0px, (100cqw - var(--d5-at-nome) - var(--d5-at-rec) - var(--d5-at-gan) - var(--d5-at-ne) - var(--d5-at-resp) - var(--d5-at-fech)) / 5);
+}
 .v2 .d5-tab-at col.d5-c-pessoa { width: auto; }
-.v2 .d5-tab-at col.d5-c-rec { width: 170px; }
-.v2 .d5-tab-at col.d5-c-n { width: 120px; }
-.v2 .d5-tab-at col.d5-c-ne { width: 196px; }
-.v2 .d5-tab-at col.d5-c-resp { width: 300px; }
-.v2 .d5-tab-at col.d5-c-fech { width: 300px; }
+.v2 .d5-tab-at col.d5-c-rec { width: calc(var(--d5-at-rec) + var(--d5-at-folga)); }
+.v2 .d5-tab-at col.d5-c-n { width: calc(var(--d5-at-gan) + var(--d5-at-folga)); }
+.v2 .d5-tab-at col.d5-c-ne { width: calc(var(--d5-at-ne) + var(--d5-at-folga)); }
+.v2 .d5-tab-at col.d5-c-resp { width: calc(var(--d5-at-resp) + var(--d5-at-folga)); }
+.v2 .d5-tab-at col.d5-c-fech { width: calc(var(--d5-at-fech) + var(--d5-at-folga)); }
 .v2 .d5-av {
   width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
   display: inline-flex; align-items: center; justify-content: center;
@@ -296,7 +316,7 @@
   display: inline-flex; align-items: center; gap: 5px; padding: 2px 4px; margin: -2px -4px; border-radius: 4px;
   transition: color .12s var(--ease);
 }
-.v2 .d5-ord:hover { color: var(--txt-2); }
+.v2 .d5-ord:hover { color: var(--txt); }
 .v2 .d5-th-on .d5-ord { color: var(--txt); }
 .v2 .d5-ord-ic path { fill: currentColor; opacity: .25; }
 .v2 .d5-ord-asc .d5-ord-up, .v2 .d5-ord-desc .d5-ord-dn { opacity: 1; }
@@ -309,17 +329,20 @@
   column-gap: 2px; align-items: center; border-radius: 6px;
 }
 .v2 .d5-calor-rot { font-size: 12px; color: var(--txt-2); white-space: nowrap; padding-right: 10px; overflow: hidden; text-overflow: ellipsis; }
-.v2 .d5-calor-h { font-size: 10.5px; color: var(--txt-3); text-align: center; padding-bottom: 5px; font-variant-numeric: tabular-nums; }
+.v2 .d5-calor-h { font-size: 10.5px; color: var(--txt-2); text-align: center; padding-bottom: 5px; font-variant-numeric: tabular-nums; } /* eixo: lê-se o mapa por ele */
 .v2 .d5-calor-tot { text-align: right; font-size: 12px; font-weight: 500; color: var(--txt-2); padding-left: 12px; white-space: nowrap; }
-.v2 .d5-calor-cab .d5-calor-tot { font-size: 10.5px; font-weight: 400; color: var(--txt-3); padding-bottom: 5px; }
+.v2 .d5-calor-cab .d5-calor-tot { font-size: 10.5px; font-weight: 400; color: var(--txt-2); padding-bottom: 5px; }
 .v2 .d5-cel { display: block; height: 26px; border-radius: 4px; }
 .v2 .d5-cel:hover { box-shadow: inset 0 0 0 1.5px rgba(var(--tint), .55); }
 /* escala sequencial de 5 degraus a partir da cor de dado: no escuro o topo CLAREIA
-   (mais luminância = mais entradas); no claro o topo ESCURECE. Zero = tinta neutra. */
+   (mais luminância = mais entradas); no claro o topo ESCURECE. Zero = tinta neutra.
+   Escuro: os degraus sobem em passos IGUAIS de luminância (OKLab L ≈ .29 → .38 → .48 →
+   .57 → .66 → .76 sobre a carta #212327): 0, 1–2 e 3–5 se separam à primeira vista (com
+   alfa .2/.4 o 1–2 quase sumia no zero). */
 .v2 .d5-q0 { background: rgba(var(--tint), .045); }
-.v2 .d5-q1 { background: rgba(var(--dado-1-rgb), .2); }
-.v2 .d5-q2 { background: rgba(var(--dado-1-rgb), .4); }
-.v2 .d5-q3 { background: rgba(var(--dado-1-rgb), .64); }
+.v2 .d5-q1 { background: rgba(var(--dado-1-rgb), .3); }
+.v2 .d5-q2 { background: rgba(var(--dado-1-rgb), .54); }
+.v2 .d5-q3 { background: rgba(var(--dado-1-rgb), .76); }
 .v2 .d5-q4 { background: var(--dado-1); }
 .v2 .d5-q5 { background: color-mix(in srgb, var(--dado-1) 70%, #ffffff); }
 /* claro: zero NEUTRO com um fio (vazio lê vazio, não azul-claro) e o 1º degrau mais firme */
@@ -339,8 +362,19 @@
   content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%;
   background: var(--dado-1); margin-right: 7px; vertical-align: 1px;
 }
-/* dia fora do período escolhido (mapa esticado para 7 dias): só contexto */
-.v2 .d5-calor-fora .d5-cel { opacity: .58; }
+/* dia fora do período escolhido (mapa esticado para 7 dias): só contexto. Esmaece com a
+   MESMA cor de dado em alfa menor, em degraus iguais entre si (o zero continua neutro) —
+   nada de opacidade por cima do topo clareado/escurecido, que virava um cinza-azulado sujo */
+.v2 .d5-calor-fora .d5-q1 { background: rgba(var(--dado-1-rgb), .22); }
+.v2 .d5-calor-fora .d5-q2 { background: rgba(var(--dado-1-rgb), .34); }
+.v2 .d5-calor-fora .d5-q3 { background: rgba(var(--dado-1-rgb), .46); }
+.v2 .d5-calor-fora .d5-q4 { background: rgba(var(--dado-1-rgb), .58); }
+.v2 .d5-calor-fora .d5-q5 { background: rgba(var(--dado-1-rgb), .7); }
+:root[data-tema="light"] .v2 .d5-calor-fora .d5-q1 { background: rgba(var(--dado-1-rgb), .13); }
+:root[data-tema="light"] .v2 .d5-calor-fora .d5-q2 { background: rgba(var(--dado-1-rgb), .22); }
+:root[data-tema="light"] .v2 .d5-calor-fora .d5-q3 { background: rgba(var(--dado-1-rgb), .32); }
+:root[data-tema="light"] .v2 .d5-calor-fora .d5-q4 { background: rgba(var(--dado-1-rgb), .44); }
+:root[data-tema="light"] .v2 .d5-calor-fora .d5-q5 { background: rgba(var(--dado-1-rgb), .56); }
 .v2 .d5-calor-fora .d5-calor-rot, .v2 .d5-calor-fora .d5-calor-tot { color: var(--txt-3); }
 /* total por hora */
 .v2 .d5-calor-pe { margin-top: 10px; align-items: end; }
@@ -366,17 +400,12 @@
 @media (min-width: 1680px) {
   .v2 .d5-tab col.d5-c-ent { width: 250px; }
   .v2 .d5-ent .d5-trilho { width: 140px; }
-  .v2 .d5-tab-at col.d5-c-rec { width: 230px; }
-  .v2 .d5-tab-at col.d5-c-n { width: 140px; }
-  .v2 .d5-tab-at col.d5-c-resp { width: 320px; }
-  .v2 .d5-tab-at col.d5-c-fech { width: 320px; }
+  .v2 .d5-tab-at { --d5-at-rec: 212px; } /* trilho de 140px */
 }
 
 /* ---------------- telas menores ---------------- */
 @media (max-width: 1360px) {
   .v2 .d5-calor-h-sec { visibility: hidden; }
-  .v2 .d5-tab-at col.d5-c-resp { width: 280px; }
-  .v2 .d5-tab-at col.d5-c-fech { width: 230px; }
 }
 @media (max-width: 1180px) {
   .v2 .d5-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -393,10 +422,7 @@
   .v2 .d5-mot > .d5-quem { margin-top: 0; padding: 2px 0 2px 28px; border-left: 1px solid var(--d5-fio); }
   .v2 .d5-mot > .d5-quem::before { display: none; }
 
-  .v2 .d5-tab-at col.d5-c-rec { width: 150px; }
-  .v2 .d5-tab-at col.d5-c-n { width: 110px; }
-  .v2 .d5-tab-at col.d5-c-resp { width: 270px; }
-  .v2 .d5-tab-at col.d5-c-fech { width: 200px; }
+  .v2 .d5-tab-at { --d5-at-rec: 132px; } /* trilho de 60px */
   .v2 .d5-tab-at .d5-cel2 > small { white-space: normal; text-align: right; }
   .v2 .d5-tab-at .d5-ent .d5-trilho { width: 60px; }
 }
