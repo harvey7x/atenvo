@@ -4,7 +4,7 @@ import {
   WA_REAL, mascararNumero, waRecarregarAudio, useAssinaturaMarca,
   useMensagensAgendadas, useAgendarSequencia, useEditarAgendamento, useCancelarAgendamento,
 } from '@/data/whatsapp';
-import { assinaturaAtendente } from '../hooks/inboxWhatsApp';
+import { assinaturaAtendente, deepLinkDeveSelecionar } from '../hooks/inboxWhatsApp';
 import type { WaMessage } from '@/data/whatsappDemo';
 import { traduzErroEnvio, useScripts, aguardarConfirmacaoEnvio, type Script } from '@/data/scripts';
 import { textoBloqueio } from '@/lib/higieneConversa';
@@ -70,16 +70,15 @@ export default function ConversaMobile() {
   // igualdade de currentId (a lista zera a seleção ao montar; comparar com currentId
   // pularia a seleção e a conversa abriria sem marcar lida), nem re-seleção contínua
   // (deep-link de conversa apagada entraria em ping-pong com o reset de selecaoValida).
-  // Só id que EXISTE na lista (ou enquanto ela ainda não chegou).
+  // Seleciona MESMO que a conversa ainda não esteja na lista (lead recém-criado do toast/sino):
+  // é a seleção que faz o hook buscar só ela (busca-alvo, uma vez por id, seleção protegida).
   const sincronizadaRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!conversaId || sincronizadaRef.current === conversaId) return;
-    if (contacts.length === 0 || contacts.some((c) => c.id === conversaId)) {
-      inbox.selecionarPorDeepLink(conversaId);
-      sincronizadaRef.current = conversaId;
-    }
+    if (!deepLinkDeveSelecionar(conversaId, sincronizadaRef.current)) return;
+    inbox.selecionarPorDeepLink(conversaId!);
+    sincronizadaRef.current = conversaId!;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversaId, contacts]);
+  }, [conversaId]);
 
   // Renderizar SEMPRE pelo id da URL — inbox.current tem fallback contacts[0] e
   // piscaria a conversa errada no primeiro paint de um deep-link.

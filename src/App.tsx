@@ -3,27 +3,45 @@ import { Suspense, type ReactNode } from 'react';
 import { lazyComRecarga as lazy } from '@/lib/recargaChunk';
 import { createBrowserRouter, createHashRouter, RouterProvider, Navigate, useParams, type RouteObject } from 'react-router-dom';
 // v1 — preservado APENAS em /v1/* como fallback técnico (sem link na interface). Nada é deletado.
-import { AppShell } from '@/components/AppShell';
+// Guardas do v1 ficam estáticas: são minúsculas e só usam os contextos que já estão no entry.
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { RequireRole } from '@/components/RequireRole';
-import { Login } from '@/pages/Login';
-import { RedefinirSenha } from '@/pages/RedefinirSenha';
-import { AlterarSenha } from '@/pages/AlterarSenha';
-import { DefinirSenha } from '@/pages/DefinirSenha';
-import { WhatsApp } from '@/pages/WhatsApp';
-import { Facebook } from '@/pages/Facebook';
-import { Kanban } from '@/pages/Kanban';
+// CSS dos componentes v1 REUSADOS dentro do v2 (Modal, MediaComposer, AudioRecorder, ficha
+// judicial, RelacionamentoContatoBox): ficam no CSS de ENTRADA, nesta ordem, de propósito.
+// Os overrides do v2 (componentes.css, o reset `.v2 *` do base.css) vencem por VIR DEPOIS
+// com a mesma especificidade; se este CSS fosse junto com o chunk lazy, entraria no <head>
+// DEPOIS do CSS do v2 e o v1 voltaria a ganhar (padding/hover do tema claro). NÃO remover.
+import '@/components/Modal.css';
+import '@/components/MediaComposer.css';
+import '@/components/AudioRecorder.css';
+import '@/components/FichaJudicialModal.css';
+import '@/components/RelacionamentoContatoBox.css';
+// Páginas e shell do v1 SOB DEMANDA (perf 20/10): antes eram import estático e arrastavam o v1
+// inteiro (JS ~845 kB + ~340 kB de CSS de página) para o bundle de entrada de TODA rota. Agora
+// o v1 é UM chunk (src/pages/rotasV1.ts) que só baixa ao abrir /v1/*; o import() é cacheado,
+// então as várias rotas abaixo compartilham o mesmo download. O lazy precisa de { default }.
+// ATENÇÃO: CSS de página do v1 (src/pages/*.css) não vem mais no entry — classe dele usada
+// no v2 tem que morar no CSS do próprio componente (ex.: .atv-lightbox → MediaComposer.css).
+const v1 = () => import('@/pages/rotasV1');
+const AppShell = lazy(() => v1().then((m) => ({ default: m.AppShell })));
+const Login = lazy(() => v1().then((m) => ({ default: m.Login })));
+const RedefinirSenha = lazy(() => v1().then((m) => ({ default: m.RedefinirSenha })));
+const AlterarSenha = lazy(() => v1().then((m) => ({ default: m.AlterarSenha })));
+const DefinirSenha = lazy(() => v1().then((m) => ({ default: m.DefinirSenha })));
+const WhatsApp = lazy(() => v1().then((m) => ({ default: m.WhatsApp })));
+const Facebook = lazy(() => v1().then((m) => ({ default: m.Facebook })));
+const Kanban = lazy(() => v1().then((m) => ({ default: m.Kanban })));
 // Presencial preservado no código (src/pages/Agendamentos.tsx), fora da navegação — a rota
 // /agendamentos foi reaproveitada para a central de Agendamentos de Mensagens (Fase 2B).
-import { AgendamentosMensagens } from '@/pages/AgendamentosMensagens';
-import { Relacionamento } from '@/pages/Relacionamento';
-import { Scripts } from '@/pages/Scripts';
-import { Cobrancas } from '@/pages/Cobrancas';
-import { Integracoes } from '@/pages/Integracoes';
-import { Relatorios } from '@/pages/Relatorios';
-import { Configuracoes } from '@/pages/Configuracoes';
-import { PlanoUso } from '@/pages/PlanoUso';
-import { Maturacao } from '@/pages/Maturacao';
+const AgendamentosMensagens = lazy(() => v1().then((m) => ({ default: m.AgendamentosMensagens })));
+const Relacionamento = lazy(() => v1().then((m) => ({ default: m.Relacionamento })));
+const Scripts = lazy(() => v1().then((m) => ({ default: m.Scripts })));
+const Cobrancas = lazy(() => v1().then((m) => ({ default: m.Cobrancas })));
+const Integracoes = lazy(() => v1().then((m) => ({ default: m.Integracoes })));
+const Relatorios = lazy(() => v1().then((m) => ({ default: m.Relatorios })));
+const Configuracoes = lazy(() => v1().then((m) => ({ default: m.Configuracoes })));
+const PlanoUso = lazy(() => v1().then((m) => ({ default: m.PlanoUso })));
+const Maturacao = lazy(() => v1().then((m) => ({ default: m.Maturacao })));
 
 // ===== Redesign Platina (design-ref/CONTRATO.md): AGORA as rotas OFICIAIS. Tudo sob demanda. =====
 const AppShellV2 = lazy(() => import('@/v2/shell/AppShellV2'));
@@ -144,29 +162,29 @@ const routes: RouteObject[] = [
   {
     path: '/v1',
     children: [
-      { path: 'login', element: <Login /> },
-      { path: 'redefinir-senha', element: <RedefinirSenha /> },
-      { path: 'definir-senha', element: <DefinirSenha /> },
+      { path: 'login', element: <Lz><Login /></Lz> },
+      { path: 'redefinir-senha', element: <Lz><RedefinirSenha /></Lz> },
+      { path: 'definir-senha', element: <Lz><DefinirSenha /></Lz> },
       {
         element: <ProtectedRoute />,
         children: [
-          { path: 'alterar-senha', element: <AlterarSenha /> },
+          { path: 'alterar-senha', element: <Lz><AlterarSenha /></Lz> },
           {
-            element: <AppShell />,
+            element: <Lz><AppShell /></Lz>,
             children: [
               { index: true, element: <Navigate to="/v1/whatsapp" replace /> },
-              { path: 'whatsapp', handle: { title: 'WhatsApp', subtitle: 'Caixa de atendimento do WhatsApp.', fullBleed: true }, element: <WhatsApp /> },
-              { path: 'facebook', handle: { title: 'Facebook', subtitle: 'Caixa de atendimento do Messenger e Facebook.', fullBleed: true }, element: <Facebook /> },
-              { path: 'kanban', handle: { title: 'Kanban', subtitle: 'Funil comercial em colunas.', fullBleed: true }, element: <Kanban /> },
-              { path: 'agendamentos', handle: { title: 'Agendamentos de Mensagens', subtitle: 'Acompanhe mensagens programadas, enviadas, falhas e canceladas.', fullBleed: true }, element: <AgendamentosMensagens /> },
-              { path: 'relacionamento', handle: { title: 'Relacionamento', subtitle: 'Réguas leves de relacionamento e nutrição — ativadas manualmente por cliente.', fullBleed: true }, element: <Relacionamento /> },
-              { path: 'scripts', handle: { title: 'Scripts', subtitle: 'Biblioteca de scripts e mídias.', fullBleed: true }, element: <Scripts /> },
-              { path: 'cobrancas', handle: { title: 'Cobranças', subtitle: 'Cobranças que sua organização faz aos próprios clientes.', fullBleed: true }, element: <Cobrancas /> },
-              { path: 'integracoes', handle: { title: 'Integrações', subtitle: 'Conecte, configure e monitore os serviços externos utilizados pela sua operação.', fullBleed: true }, element: <Integracoes /> },
-              { path: 'relatorios', handle: { title: 'Relatórios', subtitle: 'Desempenho do atendimento e das cobranças.', fullBleed: true }, element: <Relatorios /> },
-              { path: 'configuracoes', handle: { title: 'Configurações', subtitle: 'Conta, equipe, notificações e canais já conectados.', fullBleed: true }, element: <Configuracoes /> },
-              { path: 'maturacao', handle: { title: 'Maturação de Números', subtitle: 'Aquecimento de chips de WhatsApp — isolado do atendimento.' }, element: <RequireRole role="admin"><Maturacao /></RequireRole> },
-              { path: 'plano-uso', handle: { title: 'Plano e uso', subtitle: 'Assinatura, consumo e contratação de adicionais da sua organização.' }, element: <RequireRole role="admin"><PlanoUso /></RequireRole> },
+              { path: 'whatsapp', handle: { title: 'WhatsApp', subtitle: 'Caixa de atendimento do WhatsApp.', fullBleed: true }, element: <Lz><WhatsApp /></Lz> },
+              { path: 'facebook', handle: { title: 'Facebook', subtitle: 'Caixa de atendimento do Messenger e Facebook.', fullBleed: true }, element: <Lz><Facebook /></Lz> },
+              { path: 'kanban', handle: { title: 'Kanban', subtitle: 'Funil comercial em colunas.', fullBleed: true }, element: <Lz><Kanban /></Lz> },
+              { path: 'agendamentos', handle: { title: 'Agendamentos de Mensagens', subtitle: 'Acompanhe mensagens programadas, enviadas, falhas e canceladas.', fullBleed: true }, element: <Lz><AgendamentosMensagens /></Lz> },
+              { path: 'relacionamento', handle: { title: 'Relacionamento', subtitle: 'Réguas leves de relacionamento e nutrição — ativadas manualmente por cliente.', fullBleed: true }, element: <Lz><Relacionamento /></Lz> },
+              { path: 'scripts', handle: { title: 'Scripts', subtitle: 'Biblioteca de scripts e mídias.', fullBleed: true }, element: <Lz><Scripts /></Lz> },
+              { path: 'cobrancas', handle: { title: 'Cobranças', subtitle: 'Cobranças que sua organização faz aos próprios clientes.', fullBleed: true }, element: <Lz><Cobrancas /></Lz> },
+              { path: 'integracoes', handle: { title: 'Integrações', subtitle: 'Conecte, configure e monitore os serviços externos utilizados pela sua operação.', fullBleed: true }, element: <Lz><Integracoes /></Lz> },
+              { path: 'relatorios', handle: { title: 'Relatórios', subtitle: 'Desempenho do atendimento e das cobranças.', fullBleed: true }, element: <Lz><Relatorios /></Lz> },
+              { path: 'configuracoes', handle: { title: 'Configurações', subtitle: 'Conta, equipe, notificações e canais já conectados.', fullBleed: true }, element: <Lz><Configuracoes /></Lz> },
+              { path: 'maturacao', handle: { title: 'Maturação de Números', subtitle: 'Aquecimento de chips de WhatsApp — isolado do atendimento.' }, element: <Lz><RequireRole role="admin"><Maturacao /></RequireRole></Lz> },
+              { path: 'plano-uso', handle: { title: 'Plano e uso', subtitle: 'Assinatura, consumo e contratação de adicionais da sua organização.' }, element: <Lz><RequireRole role="admin"><PlanoUso /></RequireRole></Lz> },
             ],
           },
         ],

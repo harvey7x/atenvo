@@ -1,13 +1,16 @@
 import { useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { focusManager, useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { DEMO_MODE, acaoSimulada } from '@/lib/demo';
 import { useOrg } from '@/context/OrgContext';
 import type { WaContact, WaMessage, WaUltimoCanal } from '@/data/whatsappDemo';
-import { previewUltimaMensagem, type OppStatus } from '@/lib/conversaEtiquetas';
-import { patchListaConversa, patchListaMensagem, removerDoHistorico, upsertHistorico, type RowConversa } from '@/data/whatsappRealtime';
-import { buscarKeyset } from '@/data/paginacao';
-type EtapaVariante = 'ganho' | 'perdido' | 'neutro';
+import { previewUltimaMensagem } from '@/lib/conversaEtiquetas';
+import {
+  CarimbosRealtime, TABELAS_CANAL_WA, aplicarPatchComDesfazer, aplicarSatelites, contarDivergencias, criarMotorRealtime, etapasDeOportunidades,
+  iaDaLinha, linhaMsgIncompleta, nomeDoContato, pousarCargaCompleta, removerDoHistorico, upsertHistorico,
+  type Alvos, type DepsMotor, type EtapaContato, type IaEstadoLista, type LoteAlvos, type MotorRealtime, type OppLinha, type TabelaRt,
+} from '@/data/whatsappRealtime';
+import { buscarKeyset, ehAbortado, lancarSeAbortado } from '@/data/paginacao';
 
 export const WA_REAL = isSupabaseConfigured && !!supabase;
 
@@ -98,9 +101,9 @@ const STATUS_LABEL: Record<string, string> = {
   aberta: 'Aberta', em_atendimento: 'Em atendimento', pendente: 'Pendente', resolvida: 'Resolvida', fechada: 'Fechada',
 };
 
-interface DbMsg { id: string; direcao: string; conteudo: string | null; tipo: string; enviada_em: string | null; recebida_em: string | null; criado_em: string | null; origem: string | null; status: string | null; erro_envio: string | null; id_externo?: string | null; respondida_a_id?: string | null; metadados: { anexo_path?: string; mime?: string; tamanho?: number; nome?: string; midia_pendente?: boolean; seconds?: number | null; ptt?: boolean; quoted?: { remetente?: string; tipo?: string; texto?: string }; contato?: { nome?: string; telefone?: string } } | null; }
+export interface DbMsg { id: string; direcao: string; conteudo: string | null; tipo: string; enviada_em: string | null; recebida_em: string | null; criado_em: string | null; origem: string | null; status: string | null; erro_envio: string | null; id_externo?: string | null; respondida_a_id?: string | null; metadados: { anexo_path?: string; mime?: string; tamanho?: number; nome?: string; midia_pendente?: boolean; seconds?: number | null; ptt?: boolean; quoted?: { remetente?: string; tipo?: string; texto?: string }; contato?: { nome?: string; telefone?: string } } | null; }
 const TIPOS_MIDIA = ['imagem', 'audio', 'video', 'documento'];
-interface DbConv {
+export interface DbConv {
   id: string; status: string; status_id: string | null; nao_lidas: number | null; ultima_interacao_em: string | null; criado_em: string | null;
   precisa_humano: boolean | null;
   precisa_humano_motivo: string | null; precisa_humano_em: string | null;
@@ -110,14 +113,76 @@ interface DbConv {
   arquivada_em: string | null; fixada_em: string | null; silenciada_ate: string | null; ultima_lida_em: string | null;
   contatos: { id: string; nome: string; telefone: string | null; email: string | null; etiquetas: string[] | null; origem: string | null; observacoes: string | null; responsavel_id: string | null; contato_identidades: { tipo: string }[] | null } | null;
   canais: { id: string; nome_interno: string | null } | null;
-  mensagens: DbMsg[] | null;
+  /** Embed `real` (SELECT_CONVERSAS): a ÚLTIMA mensagem real (fora sistema/nota_interna), LIMIT 1. */
+  real?: DbMsg[] | null;
+  /** Embed `ult`: a ÚLTIMA mensagem de qualquer tipo, LIMIT 1 (cobre conversa sem mensagem real e a 1ª pintura). */
+  ult?: DbMsg[] | null;
+  /** Formato ANTIGO (até 20/10): as 10 últimas por criado_em. Não vem mais do banco; o mapConversa
+   *  ainda aceita para o teste de equivalência (10 msgs × real+ult) em whatsapp.lista.test.ts. */
+  mensagens?: DbMsg[] | null;
 }
 
 function tsOf(m: DbMsg): number {
   return new Date(m.enviada_em || m.recebida_em || m.criado_em || 0).getTime();
 }
 
-/** Linhas de `mensagens` -> bolhas da UI. FONTE ÚNICA: usada pela lista (últimas N) e pelo
+/** Colunas de mensagem da lista — as MESMAS do histórico (useWaMensagens), para a bolha da 1ª
+ *  pintura sair idêntica à do histórico (mapMensagens precisa do metadados: mídia sem legenda). */
+const COLS_MSG_LISTA = 'id, direcao, conteudo, tipo, enviada_em, recebida_em, criado_em, origem, status, erro_envio, id_externo, respondida_a_id, metadados';
+
+/** SELECT da lista do inbox — FONTE ÚNICA: a carga completa (useWaConversations) e qualquer busca
+ *  pontual de conversas da lista (busca-alvo do realtime, deep-link) TÊM de usar este select junto
+ *  com `consultaListaConversas`, senão o mapConversa recebe outro formato e os derivados
+ *  (preview, aguardando, lastAtMs) saem diferentes.
+ *  canais!conversas_canal_id_fkey: desambigua o embed (há 2 FKs p/ canais: canal_id e ultimo_canal_id).
+ *  NÃO embutimos conversa_status_def aqui: a cor/nome do status é resolvida no cliente via useStatusDefs
+ *  (mantém o inbox funcional mesmo que a tabela auxiliar fique inacessível por grant).
+ *  Mensagens: dois embeds LATERAL de 1 linha cada (alias sobre a mesma tabela):
+ *   - `real`: a última mensagem REAL (exclui sistema/nota_interna) — é dela que saem preview,
+ *     `aguardando`/`aguardandoDesde` e lastAtMs. Vem direto, sem depender de quantas notas
+ *     internas vieram depois (com as 10 de antes, uma rajada de 10+ notas escondia a entrada).
+ *   - `ult`: a última de QUALQUER tipo — fallback de preview para conversa só com sistema/nota e
+ *     a bolha da 1ª pintura. Na maioria das conversas é a mesma linha da `real` (mapConversa
+ *     deduplica por id).
+ *  Ordem por enviada_em desc (NOT NULL; índice idx_mensagens_conversa (conversa_id, enviada_em
+ *  DESC)) e não criado_em: é o mesmo relógio do tsOf/mapMensagens, então a "última" é a mesma
+ *  que a tela ordena. Por criado_em, áudio enviado pelo celular (criado depois de baixar a mídia)
+ *  passava à frente de um texto enviado depois dele (4 conversas na medição de 20/10).
+ *  Histórico completo vem de useWaMensagens sob demanda. Até 20/10 eram as 10 últimas por
+ *  conversa (~37 MB por carga completa; agora ~14 MB e metade do tempo de banco). A "aba
+ *  Prioridade" que justificava as 10 (olhava saída recente) não existe mais — inboxGroups.classificar
+ *  só é usado pelo teste — e as "últimas 4" do Pós-venda vêm de useWaMensagens da selecionada. */
+export const SELECT_CONVERSAS = 'id, status, status_id, nao_lidas, ultima_interacao_em, criado_em, precisa_humano, precisa_humano_motivo, precisa_humano_em, atendente_id, etiquetas, ultimo_canal_id, ultimo_numero, ultimo_provider, ultima_msg_canal_em, arquivada_em, fixada_em, silenciada_ate, ultima_lida_em, contatos!inner(id, nome, telefone, email, etiquetas, origem, observacoes, responsavel_id, contato_identidades(tipo)), canais!conversas_canal_id_fkey!inner(id, nome_interno, tipo), '
+  + `real:mensagens(${COLS_MSG_LISTA}), ult:mensagens(${COLS_MSG_LISTA})`;
+
+/** Consulta da lista com SELECT_CONVERSAS + os filtros/ordem/limite dos embeds (`real`, `ult`) e do
+ *  canal. O chamador acrescenta só o recorte: keyset (`.order('id').limit().lt()`) na carga
+ *  completa, ou `.in('id' | 'contato_id', lote)` numa busca pontual. */
+export function consultaListaConversas(orgId: string) {
+  return supabase!
+    .from('conversas')
+    .select(SELECT_CONVERSAS)
+    .eq('organizacao_id', orgId)
+    .eq('canais.tipo', 'whatsapp')
+    .not('real.tipo', 'in', '(sistema,nota_interna)')
+    .order('enviada_em', { referencedTable: 'real', ascending: false })
+    .limit(1, { referencedTable: 'real' })
+    .order('enviada_em', { referencedTable: 'ult', ascending: false })
+    .limit(1, { referencedTable: 'ult' });
+}
+
+/** Mensagens que vieram com a conversa. Formato atual: `real` + `ult` (no máximo 2, sem repetir id).
+ *  Ordenadas por criado_em desc — a mesma ordem do embed antigo — para o laço `>=` do mapConversa
+ *  desempatar exatamente como antes (empate de horário → a de menor criado_em). */
+function mensagensDaLista(c: DbConv): DbMsg[] {
+  if (c.real === undefined && c.ult === undefined) return c.mensagens ?? [];
+  const porId = new Map<string, DbMsg>();
+  for (const m of [...(c.real ?? []), ...(c.ult ?? [])]) if (m?.id && !porId.has(m.id)) porId.set(m.id, m);
+  const criado = (m: DbMsg) => new Date(m.criado_em || m.enviada_em || 0).getTime();
+  return [...porId.values()].sort((a, b) => criado(b) - criado(a));
+}
+
+/** Linhas de `mensagens` -> bolhas da UI. FONTE ÚNICA: usada pela lista (embeds real+ult) e pelo
  *  histórico completo da conversa aberta (useWaMensagens) — as duas precisam produzir bolhas
  *  idênticas, senão o histórico "muda de forma" ao abrir a conversa. */
 export function mapMensagens(rows: DbMsg[]): WaMessage[] {
@@ -155,14 +220,16 @@ export function mapMensagens(rows: DbMsg[]): WaMessage[] {
     } as WaMessage));
 }
 
-function mapConversa(c: DbConv): WaContact {
-  const msgs: WaMessage[] = mapMensagens(c.mensagens ?? []);
+export function mapConversa(c: DbConv): WaContact {
+  const brutas = mensagensDaLista(c);
+  const msgs: WaMessage[] = mapMensagens(brutas);
   const lastMsg = msgs[msgs.length - 1];
   const chip = c.canais?.nome_interno ?? 'WhatsApp';
   // "aguardando resposta": conversa ABERTA cuja ÚLTIMA mensagem real (exclui sistema/nota_interna)
   // é de ENTRADA (cliente) — sem resposta de saída posterior do atendente.
+  // A última real vem pronta no embed `real` (o `ult` só conta se também for real; vence a mais nova).
   const aberta = c.status !== 'resolvida' && c.status !== 'fechada';
-  const reais = (c.mensagens ?? []).filter((m) => m.tipo !== 'sistema' && m.tipo !== 'nota_interna');
+  const reais = brutas.filter((m) => m.tipo !== 'sistema' && m.tipo !== 'nota_interna');
   let ultimaReal: DbMsg | null = null;
   for (const m of reais) { if (!ultimaReal || tsOf(m) >= tsOf(ultimaReal)) ultimaReal = m; }
   const aguardando = aberta && !!ultimaReal && ultimaReal.direcao === 'entrada';
@@ -173,12 +240,9 @@ function mapConversa(c: DbConv): WaContact {
     : null;
   // Caso D / @lid: nunca exibir um LID cru como nome. Se JÁ há telefone (resolvido), mostra o número
   // mesmo que o nome tenha ficado como placeholder; só sem telefone → "Identidade protegida".
+  // Regra em nomeDoContato (fonte única: também o patch de `contatos` do realtime).
   const temPn = (c.contatos?.contato_identidades ?? []).some((i) => i.tipo === 'whatsapp');
-  const nomeCru = c.contatos?.nome ?? null;
-  const tel = c.contatos?.telefone ?? null;
-  const ehLidCru = !!nomeCru && /^[0-9]{12,}$/.test(nomeCru) && !tel && !temPn;
-  const ehPlaceholder = nomeCru === 'Identidade protegida' || ehLidCru;
-  const displayName = ehPlaceholder ? (tel ?? 'Identidade protegida') : (nomeCru ?? 'Contato');
+  const displayName = nomeDoContato(c.contatos?.nome ?? null, c.contatos?.telefone ?? null, temPn);
   return {
     id: c.id,
     name: displayName,
@@ -229,99 +293,302 @@ function mapConversa(c: DbConv): WaContact {
 }
 
 /* ===================== Etapa do Kanban por contato (etiqueta da lista) =====================
- * Uma query por org (não N por conversa). Preferência: oportunidade EM ANDAMENTO mais recente;
- * senão, a mais recente de qualquer situação. Best-effort: erro => Map vazio (lista segue viva). */
-interface EtapaContato { etapa: string; cor: string | null; entrada: boolean; resultado: EtapaVariante; status: OppStatus; respId: string | null; emAndamento: boolean }
-async function etapasPorContato(orgId: string): Promise<Map<string, EtapaContato>> {
-  const map = new Map<string, EtapaContato>();
+ * Uma query por org (não N por conversa). Regra ('ganho grudento') em etapasDeOportunidades /
+ * etapaDoContato (whatsappRealtime.ts) — a MESMA da busca-alvo. Best-effort: erro => Map vazio
+ * (lista segue viva). ABORTO NÃO: carga cancelada RELANÇA o AbortError — um mapa vazio aplicado
+ * tiraria o selo de todo cliente com ganho (cairia em Todos). */
+const SELECT_OPPS = 'contato_id, status, responsavel_id, atualizado_em, id, funil_colunas(nome, cor, entrada, resultado)';
+export async function etapasPorContato(orgId: string, signal?: AbortSignal | null): Promise<Map<string, EtapaContato>> {
   try {
-    type Col = { nome: string | null; cor: string | null; entrada: boolean | null; resultado: string | null };
-    type Row = { contato_id: string | null; status: string | null; responsavel_id: string | null; atualizado_em: string | null; id: string; funil_colunas: Col | Col[] | null };
     // PAGINAÇÃO (18/09): sem paginar, o PostgREST corta em 1000 linhas (db-max-rows) — com 3,3k+
     // oportunidades, os ganhos/perdidos ANTIGOS caíam fora do mapa e o cliente aparecia como ativo
     // (ganho vazava pra "Meus"). KEYSET por id (imutável) p/ não pular/duplicar na fronteira; a regra
-    // "ganho grudento" depende da ordem de NEGÓCIO (atualizado_em desc), então ordenamos em JS depois.
-    const linhas = await buscarKeyset<Row>(
-      (cursor, tam) => {
+    // "ganho grudento" depende da ordem de NEGÓCIO (atualizado_em desc), ordenada em JS depois.
+    const linhas = await buscarKeyset<OppLinha>(
+      (cursor, tam, sig) => {
         let q = supabase!
           .from('oportunidades')
-          .select('contato_id, status, responsavel_id, atualizado_em, id, funil_colunas(nome, cor, entrada, resultado)')
+          .select(SELECT_OPPS)
           .eq('organizacao_id', orgId)
           .order('id', { ascending: false })
           .limit(tam);
         if (cursor) q = q.lt('id', cursor);
-        return q.then((r) => ({ data: (r.data as unknown as Row[]) ?? null, error: r.error }));
+        if (sig) q = q.abortSignal(sig);
+        return q.then((r) => ({ data: (r.data as unknown as OppLinha[]) ?? null, error: r.error }));
       },
       (r) => r.id,
-      { melhorEsforco: true, rotulo: 'oportunidades' },
+      { melhorEsforco: true, rotulo: 'oportunidades', signal },
     );
-    linhas.sort((a, b) => String(b.atualizado_em ?? '').localeCompare(String(a.atualizado_em ?? '')) || String(b.id).localeCompare(String(a.id)));
-    for (const r of linhas) {
-      const cid = r.contato_id;
-      if (!cid) continue;
-      const col = Array.isArray(r.funil_colunas) ? r.funil_colunas[0] : r.funil_colunas;
-      if (!col?.nome) continue;
-      const emAndamento = r.status === 'em_andamento';
-      const curGanho = r.status === 'ganho';
-      const prev = map.get(cid);
-      // Processado em atualizado_em desc: o 1º visto é o mais recente.
-      // Regra: um GANHO é "grudento" — cliente fechado (ganho) NUNCA perde o selo FECHADO no
-      // inbox por causa de uma oportunidade ativa/paralela. Fora isso, mantém-se o comportamento
-      // antigo (a etapa ATIVA vence uma anterior encerrada, para mostrar o estágio vivo).
-      if (prev) {
-        if (prev.status === 'ganho') continue;                          // ganho já registrado vence tudo
-        if (!curGanho && !(emAndamento && !prev.emAndamento)) continue; // não-ganho: regra antiga
-        // curGanho (com prev não-ganho) cai fora do continue e substitui abaixo
-      }
-      const st = r.status;
-      map.set(cid, {
-        etapa: col.nome,
-        cor: col.cor ?? null,
-        entrada: !!col.entrada,
-        resultado: (col.resultado === 'ganho' || col.resultado === 'perdido') ? col.resultado : 'neutro',
-        status: (st === 'ganho' || st === 'perdido' || st === 'cancelado') ? st : 'em_andamento',
-        respId: r.responsavel_id ?? null,
-        emAndamento,
-      });
-    }
-  } catch { /* sem etapa: a lista continua funcionando */ }
-  return map;
+    return etapasDeOportunidades(linhas);
+  } catch (e) {
+    if (ehAbortado(e)) throw e;
+    return new Map();   // sem etapa: a lista continua funcionando
+  }
 }
 
 /* Estado da IA/bot por conversa (tabela ia_sessoes). Fetch SEPARADO e BEST-EFFORT, exatamente
-   como etapasPorContato: se falhar (grant/RLS) a lista segue funcionando, só sem o selo de IA.
-   conversa_id é UNIQUE em ia_sessoes (uma sessão por conversa), então não há desempate.
-   iaAtiva reproduz a MESMA fórmula do botão do cabeçalho (WhatsApp.tsx): existe && status='ativa'
-   && !desativado_manual. Expõe também o status bruto (ativa/pausada/handoff/encerrada) p/ o filtro. */
-interface IaEstadoLista { iaAtiva: boolean; iaStatus: string }
-async function iaSessoesPorConversa(orgId: string): Promise<Map<string, IaEstadoLista>> {
+   como etapasPorContato (inclusive o aborto relançado): se falhar (grant/RLS) a lista segue
+   funcionando, só sem o selo de IA. conversa_id é UNIQUE em ia_sessoes (uma sessão por conversa).
+   iaAtiva reproduz a MESMA fórmula do botão do cabeçalho (iaDaLinha). ENXUTA: só
+   dados->desativado_manual, não o `dados` inteiro (1,63 MB → ~0,3 MB por carga). */
+const SELECT_IA = 'conversa_id, status, desativado_manual:dados->desativado_manual';
+type RowIa = { conversa_id: string; status: string | null; desativado_manual?: unknown };
+/** Todas as sessões de IA da org, enxutas. `melhorEsforco`: página com erro devolve o que juntou. */
+async function lerIaSessoes(orgId: string, signal: AbortSignal | null | undefined, melhorEsforco: boolean): Promise<Map<string, IaEstadoLista>> {
   const map = new Map<string, IaEstadoLista>();
+  // PAGINAÇÃO (18/09): idem etapasPorContato — com 1,3k+ sessões o corte de 1000 deixava conversas
+  // com o selo de IA errado. Keyset por conversa_id (único, imutável); ordem não importa (mapa por chave).
+  const linhas = await buscarKeyset<RowIa>(
+    (cursor, tam, sig) => {
+      let q = supabase!
+        .from('ia_sessoes')
+        .select(SELECT_IA)
+        .eq('organizacao_id', orgId)
+        .order('conversa_id', { ascending: false })
+        .limit(tam);
+      if (cursor) q = q.lt('conversa_id', cursor);
+      if (sig) q = q.abortSignal(sig);
+      return q.then((r) => ({ data: (r.data as unknown as RowIa[]) ?? null, error: r.error }));
+    },
+    (r) => r.conversa_id,
+    { melhorEsforco, rotulo: 'ia_sessoes', signal },
+  );
+  for (const r of linhas) if (r.conversa_id) map.set(r.conversa_id, iaDaLinha(r));
+  return map;
+}
+export async function iaSessoesPorConversa(orgId: string, signal?: AbortSignal | null): Promise<Map<string, IaEstadoLista>> {
   try {
-    type Row = { conversa_id: string; status: string | null; dados: { desativado_manual?: boolean } | null };
-    // PAGINAÇÃO (18/09): idem etapasPorContato — com 1,3k+ sessões o corte de 1000 deixava conversas
-    // com o selo de IA errado. Keyset por conversa_id (único, imutável); ordem não importa (mapa por chave).
-    const linhas = await buscarKeyset<Row>(
-      (cursor, tam) => {
+    return await lerIaSessoes(orgId, signal, true);
+  } catch (e) {
+    if (ehAbortado(e)) throw e;
+    return new Map();   // sem estado de IA: a lista continua funcionando
+  }
+}
+/** Releitura ENXUTA do estado de IA para o refresh de 60 s do realtime (ia_sessoes não tem evento).
+ *  ESTRITA: qualquer erro lança — um mapa parcial "desligaria" o selo de quem ficou de fora. */
+export const iaSessoesEstrito = (orgId: string, signal?: AbortSignal | null) => lerIaSessoes(orgId, signal, false);
+
+/* ===================== Busca-alvo (realtime sem recarga completa) =====================
+ * Busca SÓ as conversas pedidas — por id ou por contato — com o MESMO select/embeds
+ * (consultaListaConversas), o MESMO mapConversa e a MESMA etapa/IA da carga completa (restritas aos
+ * contatos/conversas do lote: TODAS as oportunidades de cada contato, p/ o ganho grudento). Os
+ * derivados saem iguais por construção. ESTRITA: qualquer erro (inclusive satélite) LANÇA — quem
+ * chama cai na recarga completa; nunca aplica card sem etapa (cliente com ganho cairia em Todos). */
+const LOTE_ALVO = 100;   // ≤ 200 pedidos; 100 UUIDs mantêm a URL longe do teto (~4 KB de filtro)
+async function etapasDosContatos(orgId: string, contatoIds: string[], signal?: AbortSignal | null): Promise<Map<string, EtapaContato>> {
+  const linhas: OppLinha[] = [];
+  for (let i = 0; i < contatoIds.length; i += LOTE_ALVO) {
+    const lote = contatoIds.slice(i, i + LOTE_ALVO);
+    const parte = await buscarKeyset<OppLinha>(
+      (cursor, tam, sig) => {
+        let q = supabase!
+          .from('oportunidades')
+          .select(SELECT_OPPS)
+          .eq('organizacao_id', orgId)
+          .in('contato_id', lote)
+          .order('id', { ascending: false })
+          .limit(tam);
+        if (cursor) q = q.lt('id', cursor);
+        if (sig) q = q.abortSignal(sig);
+        return q.then((r) => ({ data: (r.data as unknown as OppLinha[]) ?? null, error: r.error }));
+      },
+      (r) => r.id,
+      { rotulo: 'oportunidades (alvo)', signal },
+    );
+    for (const l of parte) linhas.push(l);
+  }
+  return etapasDeOportunidades(linhas);
+}
+async function iaDasConversas(orgId: string, conversaIds: string[], signal?: AbortSignal | null): Promise<Map<string, IaEstadoLista>> {
+  const map = new Map<string, IaEstadoLista>();
+  for (let i = 0; i < conversaIds.length; i += LOTE_ALVO) {
+    const lote = conversaIds.slice(i, i + LOTE_ALVO);
+    const parte = await buscarKeyset<RowIa>(
+      (cursor, tam, sig) => {
         let q = supabase!
           .from('ia_sessoes')
-          .select('conversa_id, status, dados')
+          .select(SELECT_IA)
           .eq('organizacao_id', orgId)
+          .in('conversa_id', lote)
           .order('conversa_id', { ascending: false })
           .limit(tam);
         if (cursor) q = q.lt('conversa_id', cursor);
-        return q.then((r) => ({ data: (r.data as unknown as Row[]) ?? null, error: r.error }));
+        if (sig) q = q.abortSignal(sig);
+        return q.then((r) => ({ data: (r.data as unknown as RowIa[]) ?? null, error: r.error }));
       },
       (r) => r.conversa_id,
-      { melhorEsforco: true, rotulo: 'ia_sessoes' },
+      { rotulo: 'ia_sessoes (alvo)', signal },
     );
-    for (const r of linhas) {
-      if (!r.conversa_id) continue;
-      const status = r.status ?? '';
-      const desativado = !!r.dados?.desativado_manual;
-      map.set(r.conversa_id, { iaAtiva: status === 'ativa' && !desativado, iaStatus: status });
-    }
-  } catch { /* sem estado de IA: a lista continua funcionando */ }
+    for (const r of parte) if (r.conversa_id) map.set(r.conversa_id, iaDaLinha(r));
+  }
   return map;
+}
+
+export async function buscarConversasAlvo(orgId: string, alvos: LoteAlvos, signal?: AbortSignal | null): Promise<WaContact[]> {
+  const porId = new Map<string, DbConv>();
+  const pedir = async (col: 'id' | 'contato_id', vals: string[]) => {
+    for (let i = 0; i < vals.length; i += LOTE_ALVO) {
+      lancarSeAbortado(signal);
+      let q = consultaListaConversas(orgId).in(col, vals.slice(i, i + LOTE_ALVO));
+      if (signal) q = q.abortSignal(signal);
+      const { data, error } = await q;
+      lancarSeAbortado(signal);
+      if (error) throw new Error(error.message);
+      const rows = (data as unknown as DbConv[]) ?? [];
+      // sem limit explícito o PostgREST corta em 1000 (db-max-rows): lote cheio = pode ter faltado linha
+      if (rows.length >= 1000) throw new Error('Busca pontual atingiu o teto do PostgREST.');
+      for (const c of rows) if (c?.id) porId.set(c.id, c);
+    }
+  };
+  await pedir('id', alvos.ids);
+  await pedir('contato_id', alvos.contatoIds);
+  const linhas = [...porId.values()];
+  if (!linhas.length) return [];
+  const contatos = [...new Set(linhas.map((c) => c.contatos?.id).filter((x): x is string => !!x))];
+  const [etapas, ia] = await Promise.all([
+    etapasDosContatos(orgId, contatos, signal),
+    iaDasConversas(orgId, linhas.map((c) => c.id), signal),
+  ]);
+  lancarSeAbortado(signal);
+  return linhas.map((l) => {
+    const c = mapConversa(l);
+    return aplicarSatelites(c, c.contatoId ? etapas.get(c.contatoId) : null, ia.get(c.id));
+  });
+}
+
+/* ===================== Motor do realtime por org (módulo) =====================
+ * Estado COMPARTILHADO entre a carga completa (queryFn) e o canal wa-<org> (useWaConversations):
+ * os carimbos da corrida carga × evento e a fila de busca-alvo do canal montado. */
+interface EstadoRtOrg {
+  carimbos: CarimbosRealtime; motor: MotorRealtime | null; inscrito: boolean;
+  /** quando a última carga completa da lista partiu ou pousou (ms) — relógio do backstop próprio */
+  ultimaCargaEm: number;
+}
+const RT_ORG = new Map<string, EstadoRtOrg>();
+function estadoRt(orgId: string): EstadoRtOrg {
+  let e = RT_ORG.get(orgId);
+  if (!e) { e = { carimbos: new CarimbosRealtime(), motor: null, inscrito: false, ultimaCargaEm: 0 }; RT_ORG.set(orgId, e); }
+  return e;
+}
+/** O queryFn da lista registra aqui cada carga completa (ao partir e ao pousar). */
+export function registrarCargaCompleta(orgId: string, em = Date.now()): void {
+  estadoRt(orgId).ultimaCargaEm = em;
+}
+
+/** Escrita INCREMENTAL na lista ['wa-conversas', org] (patch do realtime, busca-alvo, refresh de IA,
+ *  patch otimista). Mantém o dataUpdatedAt da última CARGA COMPLETA: setQueryData sem `updatedAt`
+ *  grava "agora" — com eventos a cada poucos segundos a lista nunca ficava velha (staleTime 180 s)
+ *  e o refetchOnWindowFocus/montagem nunca recarregava. Updater devolvendo undefined = não grava. */
+export function gravarListaIncremental(
+  qc: QueryClient, orgId: string, fn: (l: WaContact[] | undefined) => WaContact[] | undefined,
+): void {
+  const chave = ['wa-conversas', orgId];
+  const em = qc.getQueryState(chave)?.dataUpdatedAt;
+  qc.setQueryData<WaContact[]>(chave, (old) => fn(old), em ? { updatedAt: em } : undefined);
+}
+
+/** Pede a busca-alvo destas conversas/contatos (o banco acabou de mudar para eles). Sem o canal do
+ *  inbox montado nesta aba, só marca a lista como velha (recarrega ao montar). */
+export function pedirBuscaAlvo(qc: QueryClient, orgId: string, alvos: Alvos): void {
+  const rt = estadoRt(orgId);
+  rt.carimbos.tocar(alvos);
+  if (rt.motor) rt.motor.pedir(alvos);
+  else void qc.invalidateQueries({ queryKey: ['wa-conversas', orgId] });
+}
+
+/** Busca-alvo IMEDIATA (nova conversa, deep-link para conversa ainda fora da lista).
+ *  false = sem canal montado ou a busca falhou (a recarga completa já foi pedida). */
+export async function buscarConversasAgora(orgId: string, alvos: Alvos): Promise<boolean> {
+  const m = RT_ORG.get(orgId)?.motor;
+  return m ? m.agora(alvos) : false;
+}
+
+/** Patch OTIMISTA de um card direto no cache ['wa-conversas', org] (marcar lida/arquivar/fixar):
+ *  no cache — não só no estado local — para a reconciliação da lista não desfazer, e carimbado para
+ *  uma carga completa que partiu antes não sobrescrever.
+ *  - confirmar(): chamar quando a RPC RESOLVE — recarimba: uma busca que abriu depois do patch mas
+ *    leu o banco ANTES do commit da RPC desconfia e rebusca (se o UPDATE do realtime se perder);
+ *  - desfazer(): erro da RPC — volta só os campos tocados e pede a recarga completa. */
+export interface PatchOtimista { confirmar: () => void; desfazer: () => void }
+export function patchOtimistaLista(qc: QueryClient, orgId: string, conversaId: string, patch: Partial<WaContact>): PatchOtimista {
+  const rt = estadoRt(orgId);
+  let anterior: Partial<WaContact> | null = null;
+  gravarListaIncremental(qc, orgId, (l) => {
+    if (!l) return undefined;
+    const r = aplicarPatchComDesfazer(l, conversaId, patch);
+    anterior = r.desfazer;
+    return r.lista;
+  });
+  rt.carimbos.tocar({ ids: [conversaId] });
+  return {
+    confirmar: () => { rt.carimbos.tocar({ ids: [conversaId] }); },
+    desfazer: () => {
+      const volta: Partial<WaContact> | null = anterior;
+      if (volta) gravarListaIncremental(qc, orgId, (l) => (l ? aplicarPatchComDesfazer(l, conversaId, volta).lista : undefined));
+      rt.carimbos.tocar({ ids: [conversaId] });
+      void qc.invalidateQueries({ queryKey: ['wa-conversas', orgId] });
+    },
+  };
+}
+
+/** Histórico da conversa ABERTA (['wa-msgs', org, conversa]) a partir do payload do realtime:
+ *  patch direto; INSERT ainda invalida SÓ a conversa do evento (rede barata).
+ *  CORRIDA: um refetch do histórico JÁ EM VOO leu o banco antes deste evento e, ao pousar, SUBSTITUI
+ *  o cache (o react-query não mescla) — desfaria o patch (ACK voltava, a mídia que acabou de ficar
+ *  visível SUMIA). Por isso, com fetch em voo, o UPDATE também invalida: cancela o velho e refaz. */
+export function aplicarEventoNoHistorico(
+  qc: QueryClient, orgId: string, evt: string, novo: Record<string, unknown> | null, velho: Record<string, unknown> | null,
+): void {
+  try {
+    if (evt === 'DELETE') {
+      const id = velho?.id as string | undefined;
+      if (id) qc.setQueriesData<WaMessage[]>({ queryKey: ['wa-msgs'] }, (old) => (old ? removerDoHistorico(old, id) : old));
+      void qc.invalidateQueries({ queryKey: ['wa-msgs', orgId] });
+      return;
+    }
+    const convId = novo?.conversa_id as string | undefined;
+    if (!convId) { void qc.invalidateQueries({ queryKey: ['wa-msgs', orgId] }); return; }
+    const chave = ['wa-msgs', orgId, convId];
+    // UPDATE sem as colunas grandes inalteradas (TOAST): não patcha às cegas, recarrega a conversa
+    if (linhaMsgIncompleta(novo)) { void qc.invalidateQueries({ queryKey: chave }); return; }
+    const [m] = mapMensagens([novo as unknown as DbMsg]);
+    if (m) qc.setQueryData<WaMessage[]>(chave, (old) => (old ? upsertHistorico(old, m) : undefined));
+    const emVoo = qc.getQueryState(chave)?.fetchStatus === 'fetching';
+    if (evt === 'INSERT' || !m || emVoo) void qc.invalidateQueries({ queryKey: chave });
+  } catch {
+    void qc.invalidateQueries({ queryKey: ['wa-msgs', orgId] });
+  }
+}
+
+/** Motor do realtime da lista desta org, com os fios do react-query/supabase (useWaConversations o
+ *  monta junto do canal). `sobrepor` só para teste. */
+export function criarMotorDaLista(qc: QueryClient, orgId: string, sobrepor: Partial<DepsMotor> = {}): MotorRealtime {
+  const rt = estadoRt(orgId);
+  return criarMotorRealtime({
+    carimbos: rt.carimbos,
+    ler: () => qc.getQueryData<WaContact[]>(['wa-conversas', orgId]),
+    gravar: (fn) => gravarListaIncremental(qc, orgId, fn),
+    buscar: (lote, signal) => buscarConversasAlvo(orgId, lote, signal),
+    // piso: a recarga completa (o comportamento antigo), coalescida pelo motor
+    recarregarTudo: () => { void qc.invalidateQueries({ queryKey: ['wa-conversas', orgId] }); },
+    aviso: (m) => console.info('[wa]', m),
+    ctx: {
+      mapMensagem: (row) => mapMensagens([row as unknown as DbMsg])[0] ?? null,
+      canalPorId: (id) => {
+        const c = qc.getQueryData<WaCanal[]>(['wa-canais', orgId])?.find((x) => x.id === id);
+        return c ? { alias: c.alias } : null;
+      },
+    },
+    intervaloMs: 1000,   // throttle (não debounce): no máximo 1 busca-alvo por segundo por aba
+    atrasoMs: 150,       // junta a rajada do webhook (conversa + mensagem + UPDATEs) numa busca só
+    // BACKSTOP de 240 s e refresh de IA de 60 s, só com a aba visível (mesma regra do refetchInterval)
+    backstopMs: 240_000,
+    ultimaCargaCompletaEm: () => rt.ultimaCargaEm,
+    visivel: () => focusManager.isFocused(),
+    buscarIa: (signal) => iaSessoesEstrito(orgId, signal),
+    iaIntervaloMs: 60_000,
+    ...sobrepor,
+  });
 }
 
 /* ===================== Hooks ===================== */
@@ -344,139 +611,165 @@ export function useWaConversations() {
     // O realtime (setQueryData abaixo) é a fonte de frescor AO VIVO; este refetch é só reconciliação.
     // Rodar a query mais pesada do sistema com metade da frequência alivia a saturação de conexão/CPU
     // no compute Micro (mesmo com o índice novo, cada round-trip espera na fila no pico).
+    // NÃO desligar este backstop nem o refetchOnWindowFocus (nem o structuralSharing) antes de uma
+    // semana com '[wa] reconciliação' perto de 0: são a rede de segurança do caminho incremental.
+    // ATENÇÃO (react-query 5): todo setQueryData reinicia este intervalo — com o realtime fazendo
+    // patch a cada poucos segundos ele quase nunca dispara. O backstop QUE VALE é o relógio do motor
+    // (criarMotorDaLista: 240 s desde a última carga completa, registrarCargaCompleta) e as escritas
+    // incrementais preservam o dataUpdatedAt (gravarListaIncremental) para o foco recarregar. Este
+    // intervalo fica como reforço (sem patches, dispara sozinho).
     refetchInterval: 240_000,
     staleTime: 180_000,
     refetchOnWindowFocus: true,
-    queryFn: async (): Promise<WaContact[]> => {
-      const etapasPromise = etapasPorContato(orgId);   // dispara junto; espera depois do fetch principal
-      const iaPromise = iaSessoesPorConversa(orgId);   // idem: estado da IA/bot por conversa (fetch paralelo)
-      // canais!conversas_canal_id_fkey: desambigua o embed (há 2 FKs p/ canais: canal_id e ultimo_canal_id).
-      // NÃO embutimos conversa_status_def aqui: a cor/nome do status é resolvida no cliente via useStatusDefs
-      // (mantém o inbox funcional mesmo que a tabela auxiliar fique inacessível por grant).
-      // O embed de mensagens é LATERAL: ORDER+LIMIT(10) por linha-pai = "as 10 últimas de cada conversa"
-      // (10 e não 1 porque preview/`aguardando` ignoram 'sistema'/'nota_interna' e a aba Prioridade olha
-      // saída recente; histórico completo vem de useWaMensagens sob demanda).
-      const SELECT_CONVERSAS = 'id, status, status_id, nao_lidas, ultima_interacao_em, criado_em, precisa_humano, precisa_humano_motivo, precisa_humano_em, atendente_id, etiquetas, ultimo_canal_id, ultimo_numero, ultimo_provider, ultima_msg_canal_em, arquivada_em, fixada_em, silenciada_ate, ultima_lida_em, contatos!inner(id, nome, telefone, email, etiquetas, origem, observacoes, responsavel_id, contato_identidades(tipo)), canais!conversas_canal_id_fkey!inner(id, nome_interno, tipo), mensagens(id, direcao, conteudo, tipo, enviada_em, recebida_em, criado_em, origem, status, erro_envio, id_externo, respondida_a_id, metadados)';
-      // PAGINAÇÃO (18/09): sem paginar, o PostgREST corta em 1000 linhas (db-max-rows) — com 2,6k+
-      // conversas não-arquivadas, ~1,6k NÃO CARREGAVAM (clientes "sumidos" do inbox). KEYSET por id
-      // (ÚNICO e IMUTÁVEL): a ordenação por ultima_interacao_em é MUTÁVEL e paginar por ela pularia/
-      // duplicaria conversas que recebem msg durante o fetch. A ordem de EXIBIÇÃO é refeita no JS
-      // (arr.sort abaixo), então paginar por id não muda o que o usuário vê — só garante lista completa.
-      const linhas = await buscarKeyset<DbConv>(
-        (cursor, tam) => {
-          let q = supabase!
-            .from('conversas')
-            .select(SELECT_CONVERSAS)
-            .eq('organizacao_id', orgId)
-            .eq('canais.tipo', 'whatsapp')
-            .order('criado_em', { referencedTable: 'mensagens', ascending: false })
-            .limit(10, { referencedTable: 'mensagens' })
-            .order('id', { ascending: false })
-            .limit(tam);
-          if (cursor) q = q.lt('id', cursor);
-          return q.then((r) => ({ data: (r.data as unknown as DbConv[]) ?? null, error: r.error }));
-        },
-        (c) => (c as unknown as { id: string }).id,
-        { rotulo: 'conversas' },
-      );
-      // Etapa do Kanban por contato + IA por conversa. Best-effort, em PARALELO com o fetch principal.
-      const etapas = await etapasPromise;
-      const iaEstados = await iaPromise;   // etapa por CONTATO; IA por CONVERSA
-      const arr = linhas.map(mapConversa);
-      for (const c of arr) {
-        const ia = iaEstados.get(c.id);
-        if (ia) { c.iaAtiva = ia.iaAtiva; c.iaStatus = ia.iaStatus; }
-        const e = c.contatoId ? etapas.get(c.contatoId) : null;
-        if (!e) continue;
-        c.etapa = e.etapa; c.etapaCor = e.cor; c.etapaEntrada = e.entrada; c.etapaResultado = e.resultado;
-        c.oppStatus = e.status; c.oppRespId = e.respId;
-        c.stage = e.etapa;
+    // 30 min (só nesta query): voltar ao inbox depois de passar pelo Kanban/Dashboard pinta na
+    // hora com a lista em memória (o canal, ao se inscrever de novo, dispara a recarga atrás).
+    // Antes, com o padrão de 5 min, era partida a frio: esqueleto + 18 requisições.
+    gcTime: 30 * 60_000,
+    queryFn: async ({ signal }): Promise<WaContact[]> => {
+      const rt = estadoRt(orgId);
+      const inscritoNoInicio = rt.inscrito;
+      registrarCargaCompleta(orgId);   // relógio do backstop: partiu agora (falha também conta: 240 s até a próxima)
+      const marco = rt.carimbos.abrir();
+      try {
+        // ABORTO REAL: o react-query cancela a carga em andamento a cada invalidate/refetch
+        // (cancelRefetch). Com o signal em CADA página das 3 cadeias, as páginas restantes param
+        // (antes a carga abandonada ia até o fim e o banco fazia o trabalho em dobro).
+        const etapasPromise = etapasPorContato(orgId, signal);   // dispara junto; espera depois do fetch principal
+        const iaPromise = iaSessoesPorConversa(orgId, signal);   // idem: estado da IA/bot por conversa (fetch paralelo)
+        // abortados, os satélites rejeitam: marca como tratado p/ não virar "unhandled rejection"
+        // se a cadeia principal lançar antes de chegar ao await deles
+        etapasPromise.catch(() => undefined);
+        iaPromise.catch(() => undefined);
+        // Select e embeds (só a última mensagem real + a última de qualquer tipo, não mais as 10
+        // últimas): ver SELECT_CONVERSAS / consultaListaConversas — fonte única, também da busca-alvo.
+        // PAGINAÇÃO (18/09): sem paginar, o PostgREST corta em 1000 linhas (db-max-rows) — com 2,6k+
+        // conversas não-arquivadas, ~1,6k NÃO CARREGAVAM (clientes "sumidos" do inbox). KEYSET por id
+        // (ÚNICO e IMUTÁVEL): a ordenação por ultima_interacao_em é MUTÁVEL e paginar por ela pularia/
+        // duplicaria conversas que recebem msg durante o fetch. A ordem de EXIBIÇÃO é refeita no JS
+        // (arr.sort abaixo), então paginar por id não muda o que o usuário vê — só garante lista completa.
+        const linhas = await buscarKeyset<DbConv>(
+          (cursor, tam, sig) => {
+            let q = consultaListaConversas(orgId)
+              .order('id', { ascending: false })
+              .limit(tam);
+            if (cursor) q = q.lt('id', cursor);
+            if (sig) q = q.abortSignal(sig);
+            return q.then((r) => ({ data: (r.data as unknown as DbConv[]) ?? null, error: r.error }));
+          },
+          (c) => (c as unknown as { id: string }).id,
+          { rotulo: 'conversas', signal },
+        );
+        // Etapa do Kanban por contato + IA por conversa. Best-effort, em PARALELO com o fetch principal.
+        const etapas = await etapasPromise;
+        const iaEstados = await iaPromise;   // etapa por CONTATO; IA por CONVERSA
+        lancarSeAbortado(signal);
+        const carga = linhas.map((l) => {
+          const c = mapConversa(l);
+          return aplicarSatelites(c, c.contatoId ? etapas.get(c.contatoId) : null, iaEstados.get(c.id));
+        });
+        // CORRIDA: evento/patch/busca-alvo aplicado DEPOIS que esta carga partiu está mais novo no
+        // cache do que aqui — o item fica com a versão do cache e ganha uma busca-alvo nova; conversa
+        // que chegou por busca-alvo e ainda não está nesta carga não some.
+        const atual = qc.getQueryData<WaContact[]>(['wa-conversas', orgId]);
+        const { lista: arr, tocados } = pousarCargaCompleta(atual, carga, rt.carimbos, marco);
+        if (atual) {
+          // métrica do caminho incremental: o que os patches/buscas-alvo deixaram de refletir
+          const d = contarDivergencias(atual, arr);
+          if (d.total) console.info('[wa] reconciliação', d);
+        }
+        if (tocados.ids.length || tocados.contatoIds.length) rt.motor?.pedir(tocados);
+        // O canal se inscreveu DURANTE esta carga (partida a frio): eventos entre a leitura das
+        // páginas e a inscrição nunca chegam → mais uma carga completa, já com o canal no ar.
+        if (!inscritoNoInicio && rt.inscrito) setTimeout(() => { void qc.invalidateQueries({ queryKey: ['wa-conversas', orgId] }); }, 0);
+        // Ordenação: 1) abertas aguardando resposta (mais antiga primeiro);
+        // 2) demais abertas por atividade mais recente; 3) encerradas por atividade.
+        const rank = (x: WaContact) => (x.aguardando ? 0 : x.aberta ? 1 : 2);
+        arr.sort((a, b) => {
+          const ra = rank(a), rb = rank(b);
+          if (ra !== rb) return ra - rb;
+          if (ra === 0) return new Date(a.aguardandoDesde || 0).getTime() - new Date(b.aguardandoDesde || 0).getTime();
+          return (b.lastAtMs || 0) - (a.lastAtMs || 0);
+        });
+        registrarCargaCompleta(orgId);   // pousou
+        return arr;
+      } finally {
+        rt.carimbos.fechar(marco);
       }
-      // Ordenação: 1) abertas aguardando resposta (mais antiga primeiro);
-      // 2) demais abertas por atividade mais recente; 3) encerradas por atividade.
-      const rank = (x: WaContact) => (x.aguardando ? 0 : x.aberta ? 1 : 2);
-      arr.sort((a, b) => {
-        const ra = rank(a), rb = rank(b);
-        if (ra !== rb) return ra - rb;
-        if (ra === 0) return new Date(a.aguardandoDesde || 0).getTime() - new Date(b.aguardandoDesde || 0).getTime();
-        return (b.lastAtMs || 0) - (a.lastAtMs || 0);
-      });
-      return arr;
     },
   });
 
-  // realtime: invalida ao chegar mensagem/conversa nova.
-  // PERF: os eventos chegam em RAJADA (cada ACK de status de saída é um UPDATE em `mensagens`) e
-  // antes cada um disparava um refetch da lista inteira. Agora as invalidações da LISTA são
-  // coalescidas numa só por janela; o histórico da conversa aberta é invalidado na hora (é barato
-  // e é o que o atendente está olhando).
+  // REALTIME SEM RECARGA COMPLETA (ver o cabeçalho de whatsappRealtime.ts). Antes, TODO evento
+  // (INSERT/ACK/DELETE de mensagens, qualquer evento de conversas/contatos) chamava a recarga
+  // completa coalescida em 4 s — cada evento isolado virava 1 carga completa por aba (18
+  // requisições, ~36 MB; 11 eventos geraram 21 cargas em 55 s). Agora cada evento é roteado:
+  // patch no cache, e/ou busca-alvo SÓ das linhas afetadas (fila com throttle ~1 s), e recarga
+  // completa só no que o caminho incremental não sabe tratar ou quando ele falha.
+  // Etapa: `oportunidades` (na publication, como no Kanban) vira busca-alvo por contato — mover no
+  // Kanban (ganho → Fechados, etapa nova) chega nas outras abas em ~1 s. IA: ia_sessoes está FORA da
+  // publication (pedir tabela fora dela derruba o canal inteiro em silêncio) → o motor relê o estado
+  // de IA enxuto a cada 60 s com a aba visível. Backstop próprio de 240 s no relógio do motor.
   useEffect(() => {
     if (!WA_REAL) return;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    const invalidarListaEmBreve = () => {
-      if (timer) clearTimeout(timer);
-      // 2026-09-04: 900ms→4s. O patch por setQueryData (abaixo) já reflete o evento na hora, então
-      // este refetch completo é só reconciliação. Coalescer mais agressivamente corta as rajadas de
-      // ACK (cada status de saída era um refetch da query mais pesada do sistema) sem perder frescor.
-      timer = setTimeout(() => { timer = null; qc.invalidateQueries({ queryKey: ['wa-conversas', orgId] }); }, 4000);
+    const chave = ['wa-conversas', orgId];
+    const rt = estadoRt(orgId);
+    let vivo = true;
+    const motor = criarMotorDaLista(qc, orgId);
+    rt.motor = motor;
+
+    const aoEvento = (tabela: TabelaRt) => (payload: { eventType: string; new: unknown; old: unknown }) => {
+      if (!vivo) return;
+      const novo = (payload.new ?? null) as Record<string, unknown> | null;
+      const velho = (payload.old ?? null) as Record<string, unknown> | null;
+      // histórico da conversa ABERTA: patch direto (ACK é só patch; antes cada evento da org refazia
+      // o histórico inteiro da conversa aberta)
+      if (tabela === 'mensagens') aplicarEventoNoHistorico(qc, orgId, payload.eventType, novo, velho);
+      motor.evento(tabela, payload.eventType, novo, velho);
     };
-    // prefixo ['wa-msgs'] atinge só as queries de histórico; a da lista é ['wa-conversas', orgId].
-    const invalidarHistorico = () => qc.invalidateQueries({ queryKey: ['wa-msgs'] });
-    // LATÊNCIA: o payload do realtime JÁ TRAZ a linha — aplicamos direto nos caches (histórico da
-    // conversa + card da lista) e a tela reflete em milissegundos, sem esperar o roundtrip do
-    // refetch (a lista custa segundos). As invalidações abaixo continuam como backstop: o fetch
-    // completo logo atrás corrige qualquer divergência destes patches parciais.
-    const aplicarEventoMensagem = (evt: string, novo: Record<string, unknown>, velho: Record<string, unknown>) => {
-      try {
-        if (evt === 'DELETE') {
-          const id = velho?.id as string | undefined;
-          if (id) qc.setQueriesData<WaMessage[]>({ queryKey: ['wa-msgs'] }, (old) => (old ? removerDoHistorico(old, id) : old));
-          return;
-        }
-        const convId = novo?.conversa_id as string | undefined;
-        if (!convId) return;
-        const [m] = mapMensagens([novo as unknown as DbMsg]);
-        if (!m) return;                                     // filtrada (sem conteúdo e sem mídia)
-        qc.setQueryData<WaMessage[]>(['wa-msgs', orgId, convId], (old) => (old ? upsertHistorico(old, m) : undefined));
-        qc.setQueryData<WaContact[]>(['wa-conversas', orgId], (old) => (old ? patchListaMensagem(old, convId, m, evt === 'INSERT') : undefined));
-      } catch { /* patch é atalho best-effort; o refetch logo atrás garante o estado certo */ }
-    };
-    const ch = supabase!
-      .channel(`wa-${orgId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'mensagens', filter: `organizacao_id=eq.${orgId}` }, (payload) => {
-        aplicarEventoMensagem(payload.eventType, payload.new as Record<string, unknown>, payload.old as Record<string, unknown>);
-        invalidarHistorico();
-        invalidarListaEmBreve();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversas', filter: `organizacao_id=eq.${orgId}` }, (payload) => {
-        if (payload.eventType === 'UPDATE') {
-          try { qc.setQueryData<WaContact[]>(['wa-conversas', orgId], (old) => (old ? patchListaConversa(old, payload.new as RowConversa) : undefined)); }
-          catch { /* backstop abaixo */ }
-        }
-        invalidarListaEmBreve();
-      })
-      // responsável (assumir/transferir) vive em contatos.responsavel_id → refaz a lista em tempo real
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'contatos', filter: `organizacao_id=eq.${orgId}` }, () => {
-        invalidarListaEmBreve();
-      })
+
+    let jaInscrito = false;
+    let ch = supabase!.channel(`wa-${orgId}`);
+    // mensagens/conversas: patch + busca-alvo; contatos (responsável: assumir/transferir, nome):
+    // patch + busca-alvo do contato; oportunidades (etapa/ganho): busca-alvo do contato
+    for (const tabela of TABELAS_CANAL_WA) {
+      ch = ch.on('postgres_changes', { event: '*', schema: 'public', table: tabela, filter: `organizacao_id=eq.${orgId}` }, aoEvento(tabela));
+    }
+    ch = ch
       // GOTCHA: se QUALQUER tabela pedida estiver fora da publication supabase_realtime, o
-      // Realtime rejeita o pedido de postgres_changes INTEIRO (as 3 tabelas) — e o aviso chega
+      // Realtime rejeita o pedido de postgres_changes INTEIRO (todas as tabelas) — e o aviso chega
       // como evento 'system' com o channel ainda reportando SUBSCRIBED. Foi exatamente assim que
       // o inbox ficou sem realtime nenhum (contatos fora da publication) sem nenhum erro visível.
       .on('system', {}, (msg: { status?: string; message?: string }) => {
         if (msg?.status === 'error') console.error('[wa] realtime postgres_changes recusado:', msg?.message);
       })
       .subscribe((status, err) => {
+        if (!vivo) return;
+        if (status === 'SUBSCRIBED') {
+          // (RE)INSCRITO: o que aconteceu sem o canal (montagem, queda, aba dormindo, volta ao inbox
+          // com a lista em memória) nunca vai chegar como evento → 1 recarga completa. Na partida a
+          // frio a carga em voo não é cancelada (sem dado ainda): ela mesma pede a segunda ao pousar.
+          rt.inscrito = true;
+          void qc.invalidateQueries({ queryKey: chave });
+          if (jaInscrito) void qc.invalidateQueries({ queryKey: ['wa-msgs', orgId] });
+          jaInscrito = true;
+          return;
+        }
+        rt.inscrito = false;
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') console.error('[wa] realtime indisponível:', err?.message ?? status);
       });
-    return () => { if (timer) clearTimeout(timer); supabase!.removeChannel(ch); };
+    return () => {
+      vivo = false;
+      rt.inscrito = false;
+      motor.parar();
+      if (rt.motor === motor) rt.motor = null;
+      supabase!.removeChannel(ch);
+    };
   }, [orgId, qc]);
 
   return query;
 }
 
 /** Histórico COMPLETO da conversa ABERTA, sob demanda.
- *  A lista passou a trazer só as últimas mensagens de cada conversa (payload leve); o histórico
+ *  A lista traz só a última mensagem de cada conversa (embeds `real` + `ult`, payload leve); o histórico
  *  integral — que é o que o atendente lê — vem por aqui, de UMA conversa só. Usa exatamente as
  *  mesmas colunas e o mesmo mapeamento (mapMensagens) da lista, então a bolha não muda de forma:
  *  mídia (anexo/pendente), status/erro para "Ver erro" e retry, id_externo/respondida_a_id/quoted
@@ -487,7 +780,8 @@ export function useWaMensagens(conversaId: string | null | undefined) {
   return useQuery({
     queryKey: ['wa-msgs', orgId, conversaId ?? ''],
     enabled: WA_REAL && !!conversaId,
-    // BACKSTOP: o frescor vem do realtime (invalidação em useWaConversations), mas a conversa
+    // BACKSTOP: o frescor vem do realtime (patch + invalidação da conversa do evento em
+    // useWaConversations), mas a conversa
     // ABERTA não pode congelar se o realtime cair — a lista tem o backstop de 30s e devolve o
     // histórico VELHO à conversa aberta (reconciliarLista), então sem isto a mensagem nova só
     // aparecia ao trocar de conversa. É UMA conversa por consulta: barato.
@@ -496,7 +790,7 @@ export function useWaMensagens(conversaId: string | null | undefined) {
     queryFn: async (): Promise<WaMessage[]> => {
       const { data, error } = await supabase!
         .from('mensagens')
-        .select('id, direcao, conteudo, tipo, enviada_em, recebida_em, criado_em, origem, status, erro_envio, id_externo, respondida_a_id, metadados')
+        .select(COLS_MSG_LISTA)
         .eq('conversa_id', conversaId!)
         .eq('organizacao_id', orgId) // Fase 2.0: escopo explícito — RLS vira cinto
         .order('criado_em', { ascending: true });
@@ -522,26 +816,35 @@ export function useIaEstadoConversa(conversaId: string | null | undefined) {
 }
 export function useIaToggle() {
   const qc = useQueryClient();
+  const { currentOrg } = useOrg();
   return useMutation({
     mutationFn: async ({ conversaId, ativar }: { conversaId: string; ativar: boolean }) => {
       const { data, error } = await supabase!.rpc('ia_conversa_toggle', { p_conversa: conversaId, p_ativar: ativar });
       if (error) throw new Error(error.message);
       return data as { ok: boolean; ia: string };
     },
-    onSettled: (_d, _e, v) => { qc.invalidateQueries({ queryKey: ['ia-estado', v.conversaId] }); },
+    onSettled: (_d, _e, v) => {
+      qc.invalidateQueries({ queryKey: ['ia-estado', v.conversaId] });
+      // selo/filtro de IA do card: ia_sessoes não tem realtime → busca-alvo da conversa
+      pedirBuscaAlvo(qc, currentOrg.id, { ids: [v.conversaId] });
+    },
   });
 }
 /** "Recomeçar atendimento": reativa a IA DO ZERO (etapa inicial, estado limpo) — RPC ia_conversa_recomecar.
  *  Diferente do toggle (que só retoma): usado quando a pessoa volta a chamar e o atendente quer que a IA reinicie. */
 export function useIaRecomecar() {
   const qc = useQueryClient();
+  const { currentOrg } = useOrg();
   return useMutation({
     mutationFn: async ({ conversaId }: { conversaId: string }) => {
       const { data, error } = await supabase!.rpc('ia_conversa_recomecar', { p_conversa: conversaId });
       if (error) throw new Error(error.message);
       return data as { ok: boolean; ia: string };
     },
-    onSettled: (_d, _e, v) => { qc.invalidateQueries({ queryKey: ['ia-estado', v.conversaId] }); },
+    onSettled: (_d, _e, v) => {
+      qc.invalidateQueries({ queryKey: ['ia-estado', v.conversaId] });
+      pedirBuscaAlvo(qc, currentOrg.id, { ids: [v.conversaId] });   // selo de IA do card (ver useIaToggle)
+    },
   });
 }
 
@@ -590,7 +893,7 @@ export function useSendWaMessage() {
     // Recarrega SÓ o histórico da conversa (barato). A LISTA ['wa-conversas'] é a query mais pesada
     // do sistema (keyset de todas as conversas, picos de ~8s) e era refeita inteira a CADA envio de
     // CADA atendente — disputando o banco com o próprio envio. A mensagem nova já chega na lista
-    // pelo realtime (patch na hora + reconciliação coalescida em 4s em useWaConversations).
+    // pelo realtime (patch na hora + busca-alvo da conversa em useWaConversations).
     onSettled: (_d, _e, input) => qc.invalidateQueries({ queryKey: ['wa-msgs', currentOrg.id, input.conversaId] }),
   });
 }
@@ -608,8 +911,11 @@ export function useAtribuirAtendimento() {
       });
       return r.responsavel_id ?? null;
     },
-    onSettled: () => {
-      qc.invalidateQueries({ queryKey: ['wa-conversas', currentOrg.id] });
+    onSettled: (_d, erro, input) => {
+      // Lista do inbox: o evento de `contatos` (responsavel_id) já faz patch + busca-alvo do contato;
+      // aqui só reforça a busca-alvo (sem a recarga completa de antes). Erro = piso: recarga completa.
+      if (erro) qc.invalidateQueries({ queryKey: ['wa-conversas', currentOrg.id] });
+      else pedirBuscaAlvo(qc, currentOrg.id, { ids: [input.conversaId], contatoIds: [input.contatoId] });
       qc.invalidateQueries({ queryKey: ['wa-atividades'] });
       // Responsável é sincronizado no backend (trigger) para conversas + oportunidades +
       // ficha do contato + cobranças + agendamentos. Invalida cada superfície para refletir
@@ -707,7 +1013,12 @@ export function useIniciarConversaWa() {
       if (e2 || !nc) throw new Error('Não foi possível iniciar a conversa.');
       return { conversaId: nc.id as string, reused: false };
     },
-    onSettled: () => qc.invalidateQueries({ queryKey: ['wa-conversas', currentOrg.id] }),
+    // Conversa nova/reutilizada: busca-alvo SÓ dela (o inbox v2 ainda espera a busca imediata antes
+    // de selecionar — buscarConversasAgora). Erro = piso: recarga completa.
+    onSettled: (d, erro) => {
+      if (erro || !d) qc.invalidateQueries({ queryKey: ['wa-conversas', currentOrg.id] });
+      else pedirBuscaAlvo(qc, currentOrg.id, { ids: [d.conversaId] });
+    },
   });
 }
 

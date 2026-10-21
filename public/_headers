@@ -1,7 +1,21 @@
 # O script do service worker e o manifest NUNCA podem ficar presos em edge-cache:
-# sw.js velho = app instalado preso numa versão antiga. Os assets em /assets/ são
-# hasheados e já ganham cache imutável do próprio Pages — não precisam de nada aqui.
+# sw.js velho = app instalado preso numa versão antiga.
 /sw.js
   Cache-Control: no-cache, no-store, must-revalidate
 /manifest.webmanifest
   Cache-Control: no-cache
+
+# Assets do build (perf 20/10): todo arquivo em /assets/ tem hash do conteúdo no nome, então
+# pode ficar em cache por 1 ano sem revalidar. O Pages NÃO faz isso sozinho (respondia
+# "public, max-age=0, must-revalidate" — conferido com curl em produção).
+# Regras de precedência (asset-server do Pages): as regras casam pela URL PEDIDA; se duas
+# regras definem o mesmo header, os valores são JUNTADOS com vírgula — por isso nenhuma outra
+# regra aqui pode casar /assets/* com Cache-Control. Resposta 404 sempre sai com "no-store"
+# (o Pages sobrescreve), e o public/assets/404.html garante que asset inexistente (chunk de
+# deploy antigo) responda 404 em vez do index.html com 200 — sem ele, o index.html ficaria
+# cacheado por 1 ano no lugar do chunk. /index.html, /sw.js e /manifest ficam como estão.
+# O build QUEBRA se esta regra existir sem o public/assets/404.html (vite.config.ts +
+# src/lib/cacheAssets.ts). Pós-deploy: `curl -sI <site>/assets/<asset do build>` = immutable;
+# `curl -sI <site>/assets/nao-existe-123.js` = 404 + no-store (NUNCA 200 text/html).
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

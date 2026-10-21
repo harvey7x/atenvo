@@ -32,3 +32,13 @@
 .media-prev-band { padding: 10px 12px; background: var(--surface); border-top: 1px solid var(--line); }
 .media-prev-cap { display: block; width: 100%; border: 0; background: transparent; resize: vertical; min-height: 36px; font-family: inherit; font-size: 13.5px; line-height: 1.45; color: var(--ink-1); outline: none; }
 .media-prev-cap::placeholder { color: var(--muted); }
+
+/* Herdados de CSS de PÁGINA do v1 (perf 20/10). Eles vinham no bundle de entrada e valiam
+   no composer reusado pelo v2; com o v1 sob demanda (src/App.tsx), passam a morar aqui
+   — idênticos, mesma posição relativa na cascata (antes do global.css e do CSS do v2).
+   - .media-meta: o src/pages/Scripts.css vinha DEPOIS deste arquivo e vencia (flex, 13px).
+   - lightbox de imagem: só existia em src/pages/Facebook.css (o v1 segue com a sua cópia). */
+.media-meta{ display:flex; align-items:center; gap:8px; font-size:13px; }
+.atv-lightbox{ position:fixed; inset:0; background:rgba(0,0,0,.82); display:flex; align-items:center; justify-content:center; z-index:1000; padding:24px; }
+.atv-lightbox img{ max-width:92vw; max-height:90vh; border-radius:8px; box-shadow:0 12px 48px rgba(0,0,0,.5); }
+.atv-lightbox-close{ position:fixed; top:14px; right:20px; background:none; border:0; color:#fff; font-size:34px; line-height:1; cursor:pointer; }

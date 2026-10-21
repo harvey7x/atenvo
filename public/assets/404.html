@@ -1,0 +1,8 @@
+<!doctype html>
+<!-- Asset inexistente em /assets/ (ex.: chunk de um deploy antigo). O Pages serve o 404.html
+     mais próximo da URL pedida; sem este arquivo caía no modo SPA e respondia o index.html com
+     200 — que, com o cache imutável de /assets/* (public/_headers), ficaria preso no navegador
+     no lugar do chunk. Com 404 o Pages manda "no-store" e o guard de recarga (recargaChunk.ts /
+     vite:preloadError) recarrega a página para pegar o index novo. Não há 404.html na raiz de
+     propósito: lá ele desligaria o modo SPA do site inteiro. -->
+<meta charset="utf-8"><title>404</title>

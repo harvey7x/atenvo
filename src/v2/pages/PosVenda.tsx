@@ -4,10 +4,12 @@
    (rubro = aguardando resposta), caps nos rótulos, números tabulares.
 
    DADOS REAIS: a carteira vem de useWaConversations — a MESMA fonte do inbox
-   (ganho "grudento", não-lidas, aguardando derivado das últimas mensagens,
-   cache compartilhado com o atendimento). Complementos leves (pendências
-   abertas, total de mensagens) em src/data/posvenda.ts. Em modo demo a
-   carteira vem do seed do inbox, como na prévia aprovada.
+   (ganho "grudento", não-lidas, aguardando derivado da última mensagem real,
+   cache compartilhado com o atendimento). A lista traz só a última mensagem
+   de cada conversa: as "Últimas mensagens" do painel vêm do histórico da
+   selecionada (useWaMensagens, o mesmo do inbox). Complementos leves
+   (pendências abertas, total de mensagens) em src/data/posvenda.ts. Em modo
+   demo a carteira vem do seed do inbox, como na prévia aprovada.
    ============================================================================ */
 import { useMemo, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -17,7 +19,7 @@ import { BotaoPrimario, BotaoSec, CardVidro, EstadoErro, Input, Skeleton } from 
 import { DEMO_MODE } from '@/lib/demo';
 import { seedWa } from './whatsappSeed';
 import { nomeExibicao, situacaoDe, tierEspera } from '../lib/waUi';
-import { WA_REAL, useWaConversations } from '@/data/whatsapp';
+import { WA_REAL, useWaConversations, useWaMensagens } from '@/data/whatsapp';
 import { useOrgUsuarios } from '@/data/atendimento';
 import { useMensagensTotal, usePendenciasAbertas } from '@/data/posvenda';
 import type { WaContact } from '@/data/whatsappDemo';
@@ -118,6 +120,10 @@ export default function PosVendaV2() {
   // complementos do painel (real): pendências abertas + total de mensagens
   const pendenciasQ = usePendenciasAbertas(WA_REAL ? sel?.contatoId : null);
   const msgTotalQ = useMensagensTotal(WA_REAL ? sel?.id : null);
+  // "Últimas mensagens": histórico da selecionada (a lista só traz a última). Enquanto carrega
+  // (ou se falhar), mostra o que veio com a lista — nunca fica vazio à toa.
+  const historicoSelQ = useWaMensagens(WA_REAL ? sel?.id : null);
+  const msgsSel = sel ? (WA_REAL && historicoSelQ.data ? historicoSelQ.data : sel.msgs) : [];
   const pendentesSel: string[] = sel
     ? (WA_REAL ? (pendenciasQ.data ?? []).map((p) => p.oQue || p.tipo || 'Pendência') : PENDENCIAS_DEMO[sel.id] ?? [])
     : [];
@@ -256,13 +262,13 @@ export default function PosVendaV2() {
                       </div>
                     </div>
                     <div className="pv-fone-chat">
-                      {sel.msgs.slice(-4).map((m, i) => (
+                      {msgsSel.slice(-4).map((m, i) => (
                         <div key={i} className={'pv-bolha' + (m.dir === 'out' ? ' out' : '')}>
                           <span className="tx">{m.text || (m.tipo === 'audio' ? 'Mensagem de áudio' : m.tipo === 'imagem' ? 'Imagem' : m.tipo === 'documento' ? `Documento — ${m.nome ?? ''}` : m.tipo === 'video' ? 'Vídeo' : '—')}</span>
                           {m.time && <span className="hr num">{m.time}</span>}
                         </div>
                       ))}
-                      {sel.msgs.length === 0 && <div className="pv-mudo">Sem mensagens recentes.</div>}
+                      {msgsSel.length === 0 && <div className="pv-mudo">Sem mensagens recentes.</div>}
                     </div>
                   </div>
                 </div>

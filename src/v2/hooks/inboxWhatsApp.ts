@@ -55,12 +55,19 @@ export function mesclarPendentes(servidor: WaMessage[], locais: WaMessage[] | un
   return pend.length ? [...servidor, ...pend] : servidor;
 }
 
-/** Reconciliação da LISTA (v1 effect L251-260): o payload da lista traz só as
- *  últimas 10 msgs (LATERAL) — a lista substitui as conversas, MAS: a conversa
+/** Reconciliação da LISTA (v1 effect L251-260): o payload da lista traz só a
+ *  última msg de cada conversa (embeds `real` + `ult`) — a lista substitui as conversas, MAS: a conversa
  *  ABERTA recebe de volta o histórico completo já carregado, e bolhas otimistas
- *  PENDENTES sobrevivem à substituição (mesclarPendentes — morrem quando a
- *  linha real chega, jamais duplicam). Conversa com pendente preservada mantém
- *  também o card local (preview/horário/posição): está à frente do servidor. */
+ *  PENDENTES sobrevivem à substituição (morrem quando a linha real chega, jamais duplicam).
+ *
+ *  Duas regras por causa da lista enxuta (no máximo 2 linhas por conversa, antes eram 10):
+ *   - Fora da conversa aberta, bolha pendente que JÁ tem idReal não é preservada: o envio foi
+ *     confirmado, a linha existe no banco e o servidor manda. Com 1–2 linhas no payload, uma
+ *     bolha que não seja a última nunca seria "coberta" e ficaria presa para sempre (script de
+ *     várias etapas + troca de conversa). Ao reabrir, o histórico completo traz a linha.
+ *   - O card local (preview/horário/posição/aguardando) só vence enquanto está À FRENTE do
+ *     servidor (refetch que partiu antes do envio). Servidor à frente — ex.: o cliente respondeu —
+ *     manda no card; senão a resposta do cliente não aparecia e a conversa perdia o "aguardando". */
 export function reconciliarLista(
   atuais: WaContact[],
   liveData: WaContact[],
@@ -70,11 +77,16 @@ export function reconciliarLista(
   const porId = new Map(atuais.map((c) => [c.id, c]));
   return liveData.map((c) => {
     const local = porId.get(c.id);
-    const base = c.id === abertaId && historicoAberta?.length ? historicoAberta : c.msgs;
-    const msgs = mesclarPendentes(base, local?.msgs);
-    const temPendente = !!local && msgs !== base;
-    if (!temPendente) return msgs === c.msgs ? c : { ...c, msgs };
-    return { ...c, msgs, last: local.last, time: local.time, lastAtMs: local.lastAtMs, aguardando: local.aguardando, aguardandoDesde: local.aguardandoDesde };
+    const aberta = c.id === abertaId;
+    const base = aberta && historicoAberta?.length ? historicoAberta : c.msgs;
+    const pend = (local?.msgs ?? []).filter((x) => x.cid && x.status === 'pendente' && !bolhaCoberta(base, x));
+    if (!local || !pend.length) return base === c.msgs ? c : { ...c, msgs: base };
+    const mantidas = aberta ? pend : pend.filter((x) => !x.idReal);
+    const msgs = mantidas.length ? [...base, ...mantidas] : base;
+    const out = msgs === c.msgs ? c : { ...c, msgs };
+    const localAFrente = (local.lastAtMs ?? 0) > (c.lastAtMs ?? 0);
+    if (!localAFrente) return out;
+    return { ...out, last: local.last, time: local.time, lastAtMs: local.lastAtMs, aguardando: local.aguardando, aguardandoDesde: local.aguardandoDesde };
   });
 }
 
@@ -160,4 +172,29 @@ export function canalAutomatico(
  *  existe; senão cai para a primeira conversa. */
 export function selecaoValida(idAtual: string, lista: WaContact[]): string {
   return idAtual && lista.some((c) => c.id === idAtual) ? idAtual : (lista[0]?.id ?? '');
+}
+
+/** Conversa EXIBIDA para a seleção `currentId`. No real, seleção que ainda não está na lista
+ *  (deep-link/restauração durante a busca-alvo dela, que fica PROTEGIDA) NÃO cai em contacts[0]:
+ *  a tela, a bolha otimista, o canal automático e as travas (opt-out, semDestino, higiene) seriam
+ *  de OUTRA conversa enquanto o envio vai para currentId. null = nada a exibir (estado vazio).
+ *  No demo (seleção sempre na lista) mantém o fallback da 1ª. */
+export function conversaAtual(contacts: WaContact[], currentId: string, real: boolean): WaContact | null {
+  const achada = contacts.find((c) => c.id === currentId);
+  if (achada) return achada;
+  if (real && currentId) return null;
+  return contacts[0] ?? null;
+}
+
+/** A conversa exibida não é a selecionada (ainda carregando): todo envio é recusado. */
+export function selecaoDescasada(real: boolean, currentId: string, exibidaId: string): boolean {
+  return real && !!currentId && exibidaId !== currentId;
+}
+
+/** Deep-link do /m (URL → seleção): seleciona UMA vez por conversaId — inclusive quando a conversa
+ *  ainda NÃO está na lista (lead recém-criado do toast/sino): é a seleção que dispara a busca-alvo
+ *  só dela no hook. Sem ping-pong com selecaoValida: o hook protege a seleção durante a busca e
+ *  busca cada id uma vez; se ela não existir, a seleção cai na 1ª e a URL mostra "não encontrada". */
+export function deepLinkDeveSelecionar(conversaId: string | null | undefined, sincronizada: string | null): boolean {
+  return !!conversaId && sincronizada !== conversaId;
 }

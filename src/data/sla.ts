@@ -7,7 +7,9 @@ export const SLA_REAL = isSupabaseConfigured && !!supabase;
 
 const VAZIO: SlaAlertasResumo = { total: 0, imediatos: 0, criticos: 0, vermelhos: 0, amarelos: 0, leves: 0, itens: [] };
 
-/** Alertas de SLA ativos (role-aware no backend). Refetch leve (30s); o cron atualiza a cada 1 min.
+/** Alertas de SLA ativos (role-aware no backend). Refetch a cada 60s: o cron sla-avaliar só muda o
+    dado a cada 1 min, então 30s pagava o dobro (sla_alertas_ativos ~185 ms × 40,8 mil chamadas e ~4,5 MB
+    de JSON por chamada na aba de admin/supervisor) para no máximo ~30s de antecedência num alerta novo.
     Sem canal realtime: este hook é montado em vários componentes ao mesmo tempo (barra/sino/Inbox/
     Kanban) e um canal de topic único (sla-<org>) colidiria (.on após subscribe). O refetch cobre. */
 export function useSlaAlertas() {
@@ -17,8 +19,8 @@ export function useSlaAlertas() {
   const query = useQuery({
     queryKey: ['sla-alertas', orgId],
     enabled: SLA_REAL && !!orgId,
-    staleTime: 20_000,
-    refetchInterval: 30_000,           // backstop; o cron atualiza a cada 1 min
+    staleTime: 50_000,
+    refetchInterval: 60_000,           // backstop; o cron atualiza a cada 1 min (mesmo ritmo do dado)
     refetchOnWindowFocus: true,
     queryFn: async (): Promise<SlaAlertasResumo> => {
       const { data, error } = await supabase!.rpc('sla_alertas_ativos', { p_org: orgId });

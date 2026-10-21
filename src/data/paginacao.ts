@@ -18,6 +18,25 @@
 
 type RespostaPagina<T> = { data: T[] | null; error: { message?: string } | null };
 
+/* ---- Cancelamento (AbortSignal do react-query) ----
+   O react-query cancela a carga em andamento a cada invalidate/refetch (cancelRefetch=true é o
+   padrão do v5) e DESCARTA o resultado — mas sem o signal o laço abaixo seguia pedindo as páginas
+   restantes ao banco (trabalho em dobro na consulta nº1 do sistema). Atenção: o postgrest-js NÃO
+   lança no aborto, devolve `{ error: { message: 'AbortError: …' } }` — por isso o laço confere o
+   signal DEPOIS de cada página também, e o aborto vence o `melhorEsforco` (um satélite abortado
+   NUNCA pode virar "mapa vazio aplicado"). */
+export function erroAbortado(): Error {
+  const e = new Error('Carga cancelada.');
+  e.name = 'AbortError';
+  return e;
+}
+export function ehAbortado(e: unknown): boolean {
+  return !!e && typeof e === 'object' && (e as { name?: string }).name === 'AbortError';
+}
+export function lancarSeAbortado(signal?: AbortSignal | null): void {
+  if (signal?.aborted) throw erroAbortado();
+}
+
 interface OpcoesKeyset {
   /** Linhas por página. Deve ser <= db-max-rows (1000). */
   tamanho?: number;
@@ -28,6 +47,8 @@ interface OpcoesKeyset {
   melhorEsforco?: boolean;
   /** Rótulo p/ o aviso de teto atingido (debug). */
   rotulo?: string;
+  /** Cancelamento: abortado => lança AbortError antes/depois de cada página (vence o melhorEsforco). */
+  signal?: AbortSignal | null;
 }
 
 /**
@@ -36,10 +57,11 @@ interface OpcoesKeyset {
  *        linha da página anterior, ou null na 1ª) e o tamanho; deve aplicar
  *        `.order(<coluna cursor>, desc).limit(tamanho)` e, se cursor != null,
  *        `.lt(<coluna cursor>, cursor)`.
+ *        Recebe também o `signal` (opts.signal) para repassar a `.abortSignal(signal)`.
  * @param cursorDe extrai o valor do cursor de uma linha (o menor id da página, na ordem desc).
  */
 export async function buscarKeyset<T>(
-  buscarPagina: (cursor: string | null, tamanho: number) => PromiseLike<RespostaPagina<T>>,
+  buscarPagina: (cursor: string | null, tamanho: number, signal?: AbortSignal | null) => PromiseLike<RespostaPagina<T>>,
   cursorDe: (linha: T) => string,
   opts: OpcoesKeyset = {},
 ): Promise<T[]> {
@@ -48,7 +70,9 @@ export async function buscarKeyset<T>(
   const acc: T[] = [];
   let cursor: string | null = null;
   for (let p = 0; p < teto; p++) {
-    const { data, error } = await buscarPagina(cursor, tamanho);
+    lancarSeAbortado(opts.signal);
+    const { data, error } = await buscarPagina(cursor, tamanho, opts.signal);
+    lancarSeAbortado(opts.signal);            // aborto chega como `error` do postgrest: não é "falha de página"
     if (error) {
       if (opts.melhorEsforco) return acc;   // satélite: segue com o que tem
       throw new Error(error.message ?? 'Falha ao carregar a lista.');

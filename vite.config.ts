@@ -2,9 +2,30 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import { fileURLToPath, URL } from 'node:url';
+import { existsSync, readFileSync } from 'node:fs';
+import { problemasCacheAssets } from './src/lib/cacheAssets';
+
+/* Guarda do cache imutável de /assets/* (public/_headers): o BUILD quebra se a regra for ao ar
+   sem o public/assets/404.html (ou com um public/404.html, que desliga o SPA). Sem isto, um commit
+   que esquecesse o 404.html (arquivo novo) publicava sem aviso e o index.html ficava cacheado
+   por 1 ano no lugar de chunks antigos. Ver src/lib/cacheAssets.ts. */
+const guardaCacheAssets = () => ({
+  name: 'atenvo-guarda-cache-assets',
+  apply: 'build' as const,
+  buildStart(this: { error: (m: string) => never }) {
+    const pub = (f: string) => fileURLToPath(new URL(`./public/${f}`, import.meta.url));
+    const problemas = problemasCacheAssets({
+      headers: existsSync(pub('_headers')) ? readFileSync(pub('_headers'), 'utf8') : '',
+      temAssets404: existsSync(pub('assets/404.html')),
+      temRaiz404: existsSync(pub('404.html')),
+    });
+    if (problemas.length) this.error(problemas.join(' | '));
+  },
+});
 
 export default defineConfig({
   plugins: [
+    guardaCacheAssets(),
     react(),
     /* PWA (Fase 1 mobile): precache SÓ dos assets estáticos do build.
        SEM runtimeCaching — de propósito e para sempre: o Supabase (REST/auth/storage)

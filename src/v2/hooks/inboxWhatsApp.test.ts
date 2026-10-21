@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { WaContact, WaMessage } from '@/data/whatsappDemo';
+import { mapConversa, type DbConv, type DbMsg } from '@/data/whatsapp';
 import {
-  aplicarEnvioOtimista, aplicarFalha, aplicarRetry, bolhaCoberta, canalAutomatico, hidratarHistorico,
+  aplicarEnvioOtimista, aplicarFalha, aplicarRetry, bolhaCoberta, canalAutomatico, conversaAtual, deepLinkDeveSelecionar, hidratarHistorico,
   assinaturaAtendente, marcarIdReal, mesclarPendentes, montarCorpoAssinado, novoCid, patchBolha, reconciliarLista,
-  removerMensagemLocal, selecaoValida,
+  removerMensagemLocal, selecaoDescasada, selecaoValida,
 } from './inboxWhatsApp';
 
 /* Testes da máquina do inbox (funções puras extraídas de WhatsApp.tsx v1).
@@ -172,5 +173,114 @@ describe('máquina do inbox — canal de resposta automático', () => {
     expect(canalAutomatico(null, 'o1', ['o1'])).toBe('o1');
     expect(canalAutomatico(null, null, ['o1'])).toBe('');
     expect(canalAutomatico('u1', 'o1', [])).toBe('');
+  });
+});
+
+/* Lista enxuta (real+ult, 20/10): fora da conversa aberta a lista traz no máximo 2 linhas, então
+   uma bolha otimista que não seja a última nunca é "coberta" pelo payload. Sem tratamento, o card
+   ficava congelado no estado local e a RESPOSTA DO CLIENTE não aparecia (nem 'aguardando'). */
+describe('máquina do inbox — lista enxuta × bolhas otimistas fora da conversa aberta', () => {
+  const T = Date.parse('2026-10-20T15:00:00.000Z');
+  const isoS = (s: number) => new Date(T + s * 1000).toISOString();
+  const db = (id: string, s: number, m: Partial<DbMsg> = {}): DbMsg => {
+    const direcao = m.direcao ?? 'saida';
+    return {
+      id, direcao, conteudo: m.conteudo ?? id, tipo: m.tipo ?? 'texto',
+      enviada_em: isoS(s), recebida_em: direcao === 'entrada' ? isoS(s) : null, criado_em: isoS(s),
+      origem: null, status: direcao === 'entrada' ? 'recebida' : 'enviada', erro_envio: null,
+      id_externo: null, respondida_a_id: null, metadados: {},
+    };
+  };
+  const dbConv = (id: string, ultimaEm: string, emb: Partial<DbConv>): DbConv => ({
+    id, status: 'aberta', status_id: null, nao_lidas: 1, ultima_interacao_em: ultimaEm, criado_em: isoS(-9999),
+    precisa_humano: false, precisa_humano_motivo: null, precisa_humano_em: null, atendente_id: null, etiquetas: null,
+    ultimo_canal_id: null, ultimo_numero: null, ultimo_provider: null, ultima_msg_canal_em: null,
+    arquivada_em: null, fixada_em: null, silenciada_ate: null, ultima_lida_em: null,
+    contatos: { id: 'k-' + id, nome: 'Maria', telefone: '5551999999999', email: null, etiquetas: null, origem: null, observacoes: null, responsavel_id: null, contato_identidades: [{ tipo: 'whatsapp' }] },
+    canais: { id: 'ch1', nome_interno: 'ANDRIUS' },
+    ...emb,
+  });
+  /** Estado local depois de disparar um script de N etapas em A (bolhas + marcarIdReal), já fora de A. */
+  function scriptEmA(n: number, comIdReal = true): WaContact[] {
+    let cur: WaContact[] = [mapConversa(dbConv('A', isoS(0), { real: [db('cli0', 0, { direcao: 'entrada', conteudo: 'oi' })], ult: [db('cli0', 0, { direcao: 'entrada', conteudo: 'oi' })] })), conv({ id: 'B' })];
+    for (let i = 1; i <= n; i++) {
+      const bolha = msg({ cid: `tmp_${i}`, status: 'pendente', text: `etapa${i}`, time: '15:00', tsISO: isoS(i) });
+      cur = aplicarEnvioOtimista(cur, 'A', bolha, `etapa${i}`);
+      if (comIdReal) cur = marcarIdReal(cur, 'A', `tmp_${i}`, `real-${i}`);
+    }
+    return cur;
+  }
+  const resposta = db('cli1', 60, { direcao: 'entrada', conteudo: 'quero sim' });
+
+  it('script de 3 etapas em A (com idReal), atendente em B, cliente responde: o card mostra a RESPOSTA e volta a aguardar', () => {
+    const cur = scriptEmA(3);
+    const live = [mapConversa(dbConv('A', isoS(60), { real: [resposta], ult: [resposta] })), conv({ id: 'B' })];
+    const a = reconciliarLista(cur, live, 'B', [msg({ id: 'b1' })]).find((c) => c.id === 'A')!;
+    expect(a).toMatchObject({ last: 'quero sim', aguardando: true, aguardandoDesde: isoS(60), lastAtMs: T + 60_000 });
+    // a linha das etapas já está no banco (idReal): nada fica preso como "pendente" no estado local
+    expect(a.msgs.filter((m) => m.status === 'pendente')).toHaveLength(0);
+    // e o mesmo resultado do formato antigo (10 últimas), onde as etapas vinham por id
+    const dez = [resposta, db('real-3', 3), db('real-2', 2), db('real-1', 1), db('cli0', 0, { direcao: 'entrada', conteudo: 'oi' })];
+    const aAntigo = reconciliarLista(cur, [mapConversa(dbConv('A', isoS(60), { mensagens: dez })), conv({ id: 'B' })], 'B', [msg({ id: 'b1' })]).find((c) => c.id === 'A')!;
+    expect({ last: a.last, aguardando: a.aguardando, aguardandoDesde: a.aguardandoDesde, lastAtMs: a.lastAtMs })
+      .toEqual({ last: aAntigo.last, aguardando: aAntigo.aguardando, aguardandoDesde: aAntigo.aguardandoDesde, lastAtMs: aAntigo.lastAtMs });
+  });
+  it('recargas seguintes e o patch do realtime continuam refletindo o cliente (não congela)', () => {
+    let cur = scriptEmA(2);
+    const live1 = [mapConversa(dbConv('A', isoS(60), { real: [resposta], ult: [resposta] }))];
+    cur = reconciliarLista(cur, live1, 'B', undefined);
+    const resp2 = db('cli2', 90, { direcao: 'entrada', conteudo: 'pode ligar?' });
+    const live2 = [mapConversa(dbConv('A', isoS(90), { real: [resp2], ult: [resp2] }))];
+    expect(reconciliarLista(cur, live2, 'B', undefined)[0]).toMatchObject({ last: 'pode ligar?', aguardando: true, lastAtMs: T + 90_000 });
+  });
+  it('envio ainda SEM idReal (em voo) e cliente responde: servidor à frente manda no card; a bolha não some', () => {
+    const cur = scriptEmA(1, false);
+    const live = [mapConversa(dbConv('A', isoS(60), { real: [resposta], ult: [resposta] }))];
+    const a = reconciliarLista(cur, live, 'B', undefined)[0];
+    expect(a).toMatchObject({ last: 'quero sim', aguardando: true, lastAtMs: T + 60_000 });
+    expect(a.msgs.map((m) => m.cid ?? m.id)).toEqual(['cli1', 'tmp_1']);
+  });
+  it('refetch VELHO em voo (servidor atrás do envio) mantém o card local — com ou sem idReal', () => {
+    for (const comId of [true, false]) {
+      const cur = scriptEmA(2, comId);
+      const velho = db('cli0', 0, { direcao: 'entrada', conteudo: 'oi' });
+      const a = reconciliarLista(cur, [mapConversa(dbConv('A', isoS(0), { real: [velho], ult: [velho] }))], 'B', undefined)[0];
+      expect(a).toMatchObject({ last: 'etapa2', aguardando: false, lastAtMs: T + 2_000 });
+    }
+  });
+  it('conversa ABERTA: bolha com idReal ainda fora do histórico é preservada (a hidratação mata por id)', () => {
+    const cur = scriptEmA(2);
+    const hist = [msg({ id: 'cli0', dir: 'in', text: 'oi', tsISO: isoS(0) })];
+    const live = [mapConversa(dbConv('A', isoS(2), { real: [db('real-2', 2)], ult: [db('real-2', 2)] }))];
+    const a = reconciliarLista(cur, live, 'A', hist)[0];
+    expect(a.msgs.map((m) => m.cid ?? m.id)).toEqual(['cli0', 'tmp_1', 'tmp_2']);
+    const hidr = hidratarHistorico([a], 'A', [...hist, msg({ id: 'real-1', tsISO: isoS(1) }), msg({ id: 'real-2', tsISO: isoS(2) })]);
+    expect(hidr[0].msgs.map((m) => m.cid ?? m.id)).toEqual(['cli0', 'real-1', 'real-2']);
+  });
+});
+
+describe('seleção fora da lista (deep-link durante a busca-alvo dela)', () => {
+  const lista = [conv({ id: 'Y', name: 'Outra', canalId: 'c-y', contatoId: 'k-y' }), conv({ id: 'Z' })];
+  it('real: a conversa exibida NUNCA é a 1ª da lista enquanto a selecionada não chegou (envio iria para X com canal/travas de Y)', () => {
+    expect(conversaAtual(lista, 'X', true)).toBeNull();           // antes: contacts[0] (Y)
+    expect(conversaAtual(lista, 'Z', true)!.id).toBe('Z');
+    expect(conversaAtual(lista, '', true)!.id).toBe('Y');          // sem seleção: como sempre
+    expect(conversaAtual([], 'X', true)).toBeNull();
+  });
+  it('demo mantém o fallback da 1ª', () => {
+    expect(conversaAtual(lista, 'X', false)!.id).toBe('Y');
+  });
+  it('envio recusado só quando a exibida não é a selecionada (no real)', () => {
+    expect(selecaoDescasada(true, 'X', '')).toBe(true);
+    expect(selecaoDescasada(true, 'X', 'Y')).toBe(true);
+    expect(selecaoDescasada(true, 'X', 'X')).toBe(false);
+    expect(selecaoDescasada(true, '', '')).toBe(false);
+    expect(selecaoDescasada(false, 'X', 'Y')).toBe(false);
+  });
+  it('/m: deep-link seleciona UMA vez por conversa, mesmo ausente da lista (é o que dispara a busca-alvo)', () => {
+    expect(deepLinkDeveSelecionar('X', null)).toBe(true);           // antes: só se X estivesse na lista (ou lista vazia)
+    expect(deepLinkDeveSelecionar('X', 'X')).toBe(false);           // sem ping-pong
+    expect(deepLinkDeveSelecionar('W', 'X')).toBe(true);
+    expect(deepLinkDeveSelecionar(undefined, null)).toBe(false);
   });
 });
