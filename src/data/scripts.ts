@@ -246,6 +246,9 @@ export function useScriptAnexoMutations() {
 
 /** URL assinada (temporária) para visualizar/baixar um anexo privado. */
 export async function urlAssinadaAnexo(path: string): Promise<string | null> {
+  // DEMO (sem backend): não há bucket — sem prévia em vez de estourar "reading 'storage'"
+  // (o compositor do demo recebe etapas de mídia de amostra; ver definirEtapasDemoScripts).
+  if (!SCRIPTS_REAL) return null;
   const { data, error } = await supabase!.storage.from(SCRIPT_BUCKET).createSignedUrl(path, 3600);
   if (error) return null;
   return data?.signedUrl ?? null;
@@ -334,22 +337,33 @@ export async function resolverSequenciaScript(scriptId: string, ctx: VarCtx): Pr
 }
 
 /* ===================== Envio de sequência de TEXTO na conversa ===================== */
-const VAR_LABEL: Record<string, string> = { nome_cliente: 'Nome do cliente', telefone: 'Telefone', seu_nome: 'Seu nome', empresa: 'Empresa', data_atual: 'Data' };
-const VAR_AUSENTE: Record<string, string> = { nome_cliente: '[Nome não informado]', telefone: '[Telefone não informado]', seu_nome: '[Seu nome não informado]', empresa: '[Empresa não informada]', data_atual: '[Data não informada]' };
+const VAR_LABEL: Record<string, string> = { nome_cliente: 'Nome do cliente', telefone: 'Telefone', seu_nome: 'Seu nome', empresa: 'Empresa', data_atual: 'Data', email_atendente: 'Seu e-mail' };
+const VAR_AUSENTE: Record<string, string> = { nome_cliente: '[Nome não informado]', telefone: '[Telefone não informado]', seu_nome: '[Seu nome não informado]', empresa: '[Empresa não informada]', data_atual: '[Data não informada]', email_atendente: '[E-mail não informado]' };
+// aliases → chave canônica (rótulo/placeholder de ausência). Os mesmos nomes que o editor de
+// Scripts oferece (SCRIPT_VARIAVEIS) e que substituirVariaveis já entendia — antes o compositor
+// deixava {{primeiro_nome_cliente}}/{{nome_atendente}}/{{nome_empresa}} CRUS e travava o envio.
+const VAR_CANON: Record<string, string> = {
+  cliente: 'nome_cliente', primeiro_nome_cliente: 'nome_cliente',
+  atendente: 'seu_nome', nome_atendente: 'seu_nome',
+  nome_empresa: 'empresa',
+};
 
 /** Substitui variáveis e relata quais dados reais estão ausentes (sem deixar token cru). */
 export function resolverComFaltas(texto: string, ctx: VarCtx): { texto: string; faltando: string[] } {
   const hoje = new Date().toLocaleDateString('pt-BR');
+  const cliente = ctx.cliente ?? '';
   const tabela: Record<string, string> = {
-    nome_cliente: ctx.cliente ?? '', cliente: ctx.cliente ?? '',
-    seu_nome: ctx.atendente ?? '', atendente: ctx.atendente ?? '',
-    empresa: ctx.empresa ?? '', telefone: ctx.telefone ?? '', data_atual: hoje,
+    nome_cliente: cliente, cliente, primeiro_nome_cliente: cliente.trim().split(/\s+/)[0] ?? '',
+    seu_nome: ctx.atendente ?? '', atendente: ctx.atendente ?? '', nome_atendente: ctx.atendente ?? '',
+    email_atendente: ctx.emailAtendente ?? '',
+    empresa: ctx.empresa ?? '', nome_empresa: ctx.empresa ?? '',
+    telefone: ctx.telefone ?? '', data_atual: hoje,
   };
   const faltando = new Set<string>();
   const out = texto.replace(/\{\{\s*([a-zA-Z_]+)\s*\}\}/g, (m, k: string) => {
     const key = k.toLowerCase();
     if (!(key in tabela)) return m;
-    const canon = key === 'cliente' ? 'nome_cliente' : key === 'atendente' ? 'seu_nome' : key;
+    const canon = VAR_CANON[key] ?? key;
     const val = tabela[key];
     if (!val) { faltando.add(VAR_LABEL[canon] ?? canon); return VAR_AUSENTE[canon] ?? m; }
     return val;
@@ -368,11 +382,21 @@ export async function fetchEtapasTextoResolvidas(scriptId: string, ctx: VarCtx, 
 
 export interface EtapaEnvio { posicao: number; tipo: EtapaTipo; texto: string; faltando: string[]; etapaId?: string; nome?: string | null; mime?: string | null; tamanho?: number | null; storagePath?: string | null; }
 const MIDIA_ENVIAVEL: EtapaTipo[] = ['imagem', 'audio', 'video', 'documento']; // mídia suportada no envio (WhatsApp e Facebook)
+
+/* DEMO É O CONTRATO: sem backend, a sequência de amostra de cada script demo é registrada
+   aqui (pela paleta de scripts do inbox) para o compositor mostrar EXATAMENTE as etapas que
+   a prévia mostrou. Só é lido quando !SCRIPTS_REAL — produção nunca passa por este mapa. */
+const ETAPAS_DEMO = new Map<string, EtapaItem[]>();
+export function definirEtapasDemoScripts(mapa: Record<string, EtapaItem[]>): void {
+  for (const [id, etapas] of Object.entries(mapa)) ETAPAS_DEMO.set(id, etapas);
+}
+
 /** Etapas para envio na conversa: texto sempre; mídia suportada quando `incluirMidia` (canal que suporta). */
 export async function fetchEtapasParaEnvio(scriptId: string, ctx: VarCtx, opts: { incluirMidia?: boolean; fallbackConteudo?: string } = {}): Promise<EtapaEnvio[]> {
-  // DEMO: sem supabase não há etapas no banco — cai direto no fallbackConteudo do
-  // script de amostra (antes: supabase!.from estourava "reading 'from'" no modal).
-  const etapas = SCRIPTS_REAL ? await fetchEtapas(scriptId) : [];
+  // DEMO: sem supabase não há etapas no banco — usa a sequência de amostra registrada
+  // (definirEtapasDemoScripts) ou cai no fallbackConteudo do script de amostra
+  // (antes: supabase!.from estourava "reading 'from'" no modal).
+  const etapas = SCRIPTS_REAL ? await fetchEtapas(scriptId) : (ETAPAS_DEMO.get(scriptId) ?? []);
   const incluir = (e: EtapaItem) => e.tipo === 'texto' ? (e.conteudo ?? '').trim().length > 0 : (!!opts.incluirMidia && MIDIA_ENVIAVEL.includes(e.tipo) && !!e.storagePath);
   let lista = etapas.filter(incluir);
   if (lista.length === 0 && (opts.fallbackConteudo ?? '').trim()) lista = [{ tipo: 'texto', conteudo: opts.fallbackConteudo! }];

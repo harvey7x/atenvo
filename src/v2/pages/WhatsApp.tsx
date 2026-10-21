@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { WA_REAL, mascararNumero, waRecarregarAudio, waValidarNumero, waVincularNumero, useWaAtividades, useMensagensAgendadas, useAgendarSequencia, useEditarAgendamento, useCancelarAgendamento, normalizeWaPhone } from '@/data/whatsapp';
 import type { WaContact, WaMessage } from '@/data/whatsappDemo';
 import { useStatusDefs, useEtiquetas, useOrgUsuarios, useAtendimentoActions } from '@/data/atendimento';
-import { useScripts, useScriptEtapaCounts, useScriptCategorias, traduzErroEnvio, aguardarConfirmacaoEnvio, type Script } from '@/data/scripts';
+import { useScripts, useScriptCategorias, traduzErroEnvio, aguardarConfirmacaoEnvio, type Script, type ScriptCategoria, type VarCtx } from '@/data/scripts';
 import { useScriptsResumoEtapas } from '../hooks/scriptsResumo';
 import { useJanelaCanal, rotuloJanela } from '@/data/cloudApi';
 import { useSlaAlertas } from '@/data/sla';
@@ -39,6 +39,7 @@ import { Bolha, Ic, IcBot, IcDoc } from '../components/BolhaWa';
 import { corDaSituacao, nomeExibicao, situacaoDe, tierEspera } from '../lib/waUi';
 import { IA_OPCOES, PERIODO_OPCOES, SITUACAO_OPCOES, etapasDaLista, passaFiltroInbox, type FiltrosInbox } from '../lib/filtroInbox';
 import { seedWa } from './whatsappSeed';
+import { PaletaScripts, SCRIPTS_DEMO, CATEGORIAS_DEMO } from './scriptsPaleta';
 import './whatsapp.css';
 
 /* ------------------------------------------------------------------
@@ -233,214 +234,9 @@ function SeletorEtiquetas({
   );
 }
 
-/* ==================================================================
-   Seletor de SCRIPTS do chat — mesmo vidro e posicionamento viewport-aware
-   do SeletorEtiquetas (flip pra cima quando não cabe; só a lista rola,
-   busca/rodapé fixos). Acesso rápido: um botão no lugar da tira horizontal.
-   Comportamento de clique INALTERADO: onSelecionar reusa o setScriptSeq do
-   composer (abre o ScriptSequenceModal — nunca envio cego, nunca insere
-   texto). Escopo por canal INALTERADO: recebe a mesma lista já filtrada
-   por useScripts('whatsapp'). Sem banco/RPC.
-   ================================================================== */
-type ScriptResumo = Record<string, { total?: number; temMidia?: boolean } | undefined>;
-
-/* Os títulos chegam do arsenal quase sempre em CAIXA ALTA ("PEGAR DOCS MEUS INSS").
-   Exibição: texto TODO em maiúsculas vira frase normal, preservando siglas e nomes
-   do ramo (INSS, GOV, BMG, Crefisa…). Só muda a EXIBIÇÃO no seletor — o dado, a
-   busca e o que vai pro compositor seguem intactos. Texto já misto passa reto. */
-const SIGLAS_SCRIPT: Record<string, string> = {
-  INSS: 'INSS', GOV: 'GOV', 'GOV.BR': 'GOV.BR', CPF: 'CPF', CNPJ: 'CNPJ', RG: 'RG',
-  IA: 'IA', PDF: 'PDF', FGTS: 'FGTS', MIR: 'MIR', MIIR: 'MIIR', BMG: 'BMG',
-  PAN: 'PAN', C6: 'C6', RMC: 'RMC', RCC: 'RCC', TED: 'TED', CREFISA: 'Crefisa',
-  FACTA: 'Facta', SANTANDER: 'Santander', BRADESCO: 'Bradesco', ITAU: 'Itaú',
-  'ITAÚ': 'Itaú', SAFRA: 'Safra', DAYCOVAL: 'Daycoval', WHATSAPP: 'WhatsApp', PIX: 'Pix',
-};
-function exibirTextoScript(txt: string): string {
-  const t = txt.trim();
-  if (!t || t !== t.toLocaleUpperCase('pt-BR') || t === t.toLocaleLowerCase('pt-BR')) return t;
-  return t.split(/\s+/).map((p, i) => {
-    // descola pontuação de ABERTURA e fechamento, e trata compostos com / e -
-    // (ex.: "(INSS)", "CPF/CNPJ", "INSS-GOV") para o lookup de siglas casar
-    const m = p.match(/^([(["'«]*)(.*?)([)\]."'»:;!?,…]*)$/);
-    const abre = m?.[1] ?? '', nucleo = m?.[2] ?? p, fecha = m?.[3] ?? '';
-    const partes = nucleo.split(/([/-])/).map((seg, sIdx) => {
-      if (sIdx % 2 === 1 || !seg) return seg;
-      const fixa = SIGLAS_SCRIPT[seg];
-      if (fixa) return fixa;
-      if (/\d/.test(seg)) return seg;
-      const baixa = seg.toLocaleLowerCase('pt-BR');
-      return i === 0 && sIdx === 0
-        ? baixa.charAt(0).toLocaleUpperCase('pt-BR') + baixa.slice(1)
-        : baixa;
-    });
-    return abre + partes.join('') + fecha;
-  }).join(' ');
-}
-
-const IcStarMini = () => (
-  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-    <path d="M12 3.4l2.6 5.26 5.8.84-4.2 4.1.99 5.78L12 16.65l-5.19 2.73.99-5.78-4.2-4.1 5.8-.84z" />
-  </svg>
-);
-
-function SeletorScripts({
-  anchor, scripts, categorias, resumo, etapaCounts, onSelecionar, onGerenciar, onClose,
-}: {
-  anchor: DOMRect;
-  scripts: Script[];
-  categorias: { id: string; nome: string; ordem: number }[];
-  resumo: ScriptResumo;
-  etapaCounts: Record<string, number>;
-  onSelecionar: (s: Script) => void;
-  onGerenciar: () => void;
-  onClose: () => void;
-}) {
-  const painelRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [busca, setBusca] = useState('');
-  const [hi, setHi] = useState(0);
-  const q = busca.trim().toLocaleLowerCase('pt-BR');
-
-  // FAVORITOS primeiro; depois por CATEGORIA (ordem da categoria); sem categoria → "Outros".
-  // Busca filtra por titulo E tags (o caminho mais rápido). Favorito não se repete nos grupos.
-  const grupos = useMemo(() => {
-    const casa = (s: Script) =>
-      !q ||
-      s.titulo.toLocaleLowerCase('pt-BR').includes(q) ||
-      (s.tags ?? []).some((t) => t.toLocaleLowerCase('pt-BR').includes(q));
-    const gs: { chave: string; rotulo: string; fav?: boolean; itens: Script[] }[] = [];
-    const favs = scripts.filter((s) => s.favorito && casa(s));
-    if (favs.length) gs.push({ chave: '__fav', rotulo: 'Favoritos', fav: true, itens: favs });
-    const restantes = scripts.filter((s) => !s.favorito);
-    const cats = [...categorias].sort((a, b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome));
-    const idsValidos = new Set(cats.map((c) => c.id));
-    for (const c of cats) {
-      const itens = restantes.filter((s) => s.categoriaId === c.id && casa(s));
-      if (itens.length) gs.push({ chave: c.id, rotulo: c.nome, itens });
-    }
-    const soltos = restantes.filter((s) => (!s.categoriaId || !idsValidos.has(s.categoriaId)) && casa(s));
-    if (soltos.length) gs.push({ chave: '__outros', rotulo: 'Outros', itens: soltos });
-    return gs;
-  }, [scripts, categorias, q]);
-
-  // lista achatada na ordem visual → teclado (setas/Enter) casa com o que se vê
-  const flat = useMemo(() => grupos.flatMap((g) => g.itens), [grupos]);
-
-  // Posicionamento viewport-aware — idêntico ao seletor de etiquetas: abre pra baixo,
-  // FLIPA pra cima se não couber; a LISTA rola por dentro, busca/rodapé ficam.
-  const [pos, setPos] = useState<React.CSSProperties>({ left: -9999, top: -9999, visibility: 'hidden' });
-  useLayoutEffect(() => {
-    const margem = 8, larg = 336, vw = window.innerWidth, vh = window.innerHeight;
-    const left = Math.max(margem, Math.min(anchor.left, vw - larg - margem));
-    const abaixo = vh - anchor.bottom - margem;
-    const acima = anchor.top - margem;
-    const flip = abaixo < 320 && acima > abaixo;
-    const maxH = Math.min(480, Math.max(220, flip ? acima : abaixo));
-    setPos(flip
-      ? { left, bottom: vh - anchor.top + 6, maxHeight: maxH }
-      : { left, top: anchor.bottom + 6, maxHeight: maxH });
-  }, [anchor]);
-
-  useEffect(() => { inputRef.current?.focus(); }, []);
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } };
-    const onDown = (e: MouseEvent) => {
-      const t = e.target as HTMLElement;
-      if (!painelRef.current?.contains(t) && !t.closest?.('.wa-scr-btn')) onClose();
-    };
-    const onResize = () => onClose();
-    document.addEventListener('keydown', onKey, true);
-    document.addEventListener('mousedown', onDown);
-    window.addEventListener('resize', onResize);
-    return () => {
-      document.removeEventListener('keydown', onKey, true);
-      document.removeEventListener('mousedown', onDown);
-      window.removeEventListener('resize', onResize);
-    };
-  }, [onClose]);
-  useEffect(() => {
-    setHi(0);
-    painelRef.current?.querySelector('.scrp-lista')?.scrollTo({ top: 0 });
-  }, [q]);
-  // Navegação por TECLADO acompanha o scroll — o item realçado nunca some da vista.
-  // Só teclado: mouseenter também seta hi, e rolar no hover faria a lista fugir
-  // debaixo do cursor (novo mouseenter → nova rolagem, em cascata).
-  const hiPorTeclado = useRef(false);
-  useEffect(() => {
-    if (!hiPorTeclado.current) return;
-    hiPorTeclado.current = false;
-    painelRef.current?.querySelector('.scrp-it.hi')?.scrollIntoView({ block: 'nearest' });
-  }, [hi]);
-
-  const onInputKey = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      const alvo = flat[Math.min(hi, flat.length - 1)];
-      if (alvo) onSelecionar(alvo);
-    } else if (e.key === 'ArrowDown') { e.preventDefault(); hiPorTeclado.current = true; setHi((i) => Math.min(i + 1, flat.length - 1)); }
-    else if (e.key === 'ArrowUp') { e.preventDefault(); hiPorTeclado.current = true; setHi((i) => Math.max(i - 1, 0)); }
-  };
-
-  let idx = -1; // índice global (achatado) para casar com o highlight do teclado
-  return (
-    <div ref={painelRef} className="wa-scrpop" style={pos} role="dialog" aria-label="Scripts">
-      <div className="etqp-busca">
-        <IcBusca />
-        <input
-          ref={inputRef} value={busca} maxLength={60} autoComplete="off"
-          placeholder="Buscar script por nome ou tag…" aria-label="Buscar script"
-          onChange={(e) => setBusca(e.target.value)} onKeyDown={onInputKey}
-        />
-      </div>
-
-      <div className="etqp-lista scrp-lista" role="listbox" aria-label="Scripts">
-        {flat.length === 0 && (
-          <div className="etqp-vazio">{scripts.length === 0 ? 'Nenhum script para WhatsApp. Crie um na página de Scripts.' : 'Nenhum script encontrado.'}</div>
-        )}
-        {grupos.map((g) => (
-          <div key={g.chave} className="scrp-grupo">
-            <div className={'scrp-cab' + (g.fav ? ' fav' : '')}>
-              {g.fav && <IcStarMini />}
-              <span>{exibirTextoScript(g.rotulo) || g.rotulo}</span>
-              <span className="scrp-cab-n">{g.itens.length}</span>
-            </div>
-            {g.itens.map((s) => {
-              idx += 1;
-              const i = idx;
-              const r = resumo[s.id];
-              const total = r?.total ?? etapaCounts[s.id] ?? (s.conteudo.trim() ? 1 : 0);
-              const temMidia = r?.temMidia ?? false;
-              return (
-                <button
-                  key={s.id} type="button" role="option" aria-selected={i === hi}
-                  className={'etqp-it scrp-it' + (i === hi ? ' hi' : '')}
-                  onMouseEnter={() => setHi(i)} onClick={() => onSelecionar(s)}
-                >
-                  <span className="scrp-txt">
-                    <span className="scrp-nome">
-                      {s.favorito && <IcStarMini />}
-                      <span className="scrp-nome-t">{exibirTextoScript(s.titulo)}</span>
-                    </span>
-                    {s.descricao && <span className="scrp-desc">{exibirTextoScript(s.descricao)}</span>}
-                  </span>
-                  <span className="scrp-meta">
-                    {temMidia && <span className="scrp-tag" title="Inclui mídia (imagem, áudio ou vídeo)"><IcImg />mídia</span>}
-                    <span className="scrp-cnt">{total} msg{total === 1 ? '' : 's'}</span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        ))}
-      </div>
-
-      <div className="scrp-ft">
-        <button type="button" className="scrp-ger" onClick={onGerenciar}>Gerenciar scripts</button>
-        <span className="scrp-dica" aria-hidden="true"><kbd>↑↓</kbd> navegar <kbd>⏎</kbd> abrir</span>
-      </div>
-    </div>
-  );
-}
+/* Paleta de SCRIPTS do composer: módulo próprio em ./scriptsPaleta (busca, pílulas de
+   categoria, lista agrupada e prévia da sequência já preenchida). Aqui só o render. */
+const SEM_CATEGORIAS: ScriptCategoria[] = [];
 
 /* Motivo (slug) pelo qual a IA pediu um humano → frase curta em PT. Fonte real:
    ia_conversa_estado.aguardando_humano (dados->>'aguardando_humano' da ia_sessoes) —
@@ -679,27 +475,12 @@ export default function WhatsAppV2() {
   const assinaturaMarcaQ = useAssinaturaMarca();
   const acoes = useAtendimentoActions();
   const scriptsQ = useScripts('whatsapp');
-  const scriptsDemo: Script[] = useMemo(() => (WA_REAL ? [] : [
-    { id: 'sd-1', titulo: 'Boas-vindas ao cliente', descricao: null, conteudo: 'Olá {{nome_cliente}}! Aqui é {{seu_nome}}, da {{empresa}}. Como posso ajudar?', categoriaId: null, canais: ['whatsapp'], favorito: true, ativo: true, tags: [], autorId: null, criadoEm: '', atualizadoEm: '' },
-    { id: 'sd-2', titulo: 'Pedir CPF', descricao: null, conteudo: 'Para conferir os descontos no benefício eu preciso do seu CPF, pode me enviar?', categoriaId: null, canais: ['whatsapp'], favorito: true, ativo: true, tags: [], autorId: null, criadoEm: '', atualizadoEm: '' },
-    { id: 'sd-3', titulo: 'Explicar o processo', descricao: null, conteudo: 'A análise é simples: conferimos seu benefício, identificamos descontos indevidos e cuidamos do cancelamento e do ressarcimento.', categoriaId: null, canais: ['whatsapp'], favorito: false, ativo: true, tags: [], autorId: null, criadoEm: '', atualizadoEm: '' },
-    { id: 'sd-4', titulo: 'Agendar ligação', descricao: null, conteudo: 'Posso te ligar para explicar melhor. Qual o melhor horário para você?', categoriaId: null, canais: ['whatsapp'], favorito: false, ativo: true, tags: [], autorId: null, criadoEm: '', atualizadoEm: '' },
-    // espelho do arsenal REAL (demo é o contrato): títulos em caixa alta como o time
-    // cadastra, categoria própria, descrição e mídia — é assim que o seletor aparece em produção.
-    { id: 'sd-5', titulo: 'PEGAR DOCS MEUS INSS', descricao: 'COMO PEGAR OS DOCUMENTOS DO MEU INSS', conteudo: 'Passo a passo para baixar os documentos no Meu INSS.', categoriaId: 'sdc-1', canais: ['whatsapp'], favorito: false, ativo: true, tags: ['documentos'], autorId: null, criadoEm: '', atualizadoEm: '' },
-    { id: 'sd-6', titulo: 'GERAR CÓDIGO DE ACESSO GOV', descricao: null, conteudo: 'Como gerar o código de acesso do GOV.', categoriaId: 'sdc-1', canais: ['whatsapp'], favorito: false, ativo: true, tags: ['gov'], autorId: null, criadoEm: '', atualizadoEm: '' },
-    { id: 'sd-7', titulo: 'ASSINANDO PELO CELULAR', descricao: 'Como assinar as proc pelo celular', conteudo: 'Vídeo mostrando a assinatura pelo celular.', categoriaId: 'sdc-1', canais: ['whatsapp'], favorito: false, ativo: true, tags: ['assinatura'], autorId: null, criadoEm: '', atualizadoEm: '' },
-  ]), []);
-  const scripts = WA_REAL ? (scriptsQ.data ?? []) : scriptsDemo;
-  const etapaCounts = useScriptEtapaCounts().data ?? {};
-  const scriptCategoriasReais = useScriptCategorias().data ?? [];
-  const scriptCategorias = useMemo(() => (WA_REAL ? scriptCategoriasReais : [{ id: 'sdc-1', nome: 'Necessidades', ordem: 1 }]), [scriptCategoriasReais]);
-  const scriptsResumoReal = useScriptsResumoEtapas().data ?? {};
-  const scriptsResumo: ScriptResumo = WA_REAL ? scriptsResumoReal : {
-    'sd-1': { total: 2 }, 'sd-5': { total: 2, temMidia: true }, 'sd-6': { total: 1, temMidia: true }, 'sd-7': { total: 1, temMidia: true },
-  };
-  // O agrupamento (favoritos → categorias → Outros) e a busca vivem no SeletorScripts;
-  // aqui basta a lista já filtrada por canal (useScripts('whatsapp')) e os satélites.
+  // demo: scripts de amostra com SEQUÊNCIA própria (scriptsPaleta/demoEtapas — demo é o contrato)
+  const scripts = WA_REAL ? (scriptsQ.data ?? []) : SCRIPTS_DEMO;
+  const scriptCategoriasReais = useScriptCategorias().data;
+  const scriptCategorias = WA_REAL ? (scriptCategoriasReais ?? SEM_CATEGORIAS) : CATEGORIAS_DEMO;
+  // resumo de etapas aquecido aqui (a paleta abre já com composição e textos para a busca)
+  const scriptsResumo = useScriptsResumoEtapas().data;
   const bloqueados = inbox.bloqueados;
   const canalEhCloud = inbox.canalSel?.transporte === 'cloud_api';
   // canal oficial (Cloud API/Meta) × número conectado por QR (Evolution) — sinalização na fila,
@@ -896,7 +677,19 @@ export default function WhatsAppV2() {
   // Acesso rápido aos scripts: abrir o painel glass ancorado no botão; selecionar reusa
   // EXATAMENTE o caminho da tira antiga (setScriptSeq → ScriptSequenceModal), com a mesma
   // trava de opt-out. Nada de envio cego nem inserção no composer.
-  const abrirScripts = () => { const r = scrBtnRef.current?.getBoundingClientRect(); if (r) setScrPop((p) => (p ? null : r)); };
+  // origem da abertura: o Esc da paleta devolve o foco a ela ("/" → caixa de mensagem; clique → botão)
+  const scrOrigemRef = useRef<HTMLElement | null>(null);
+  const abrirScripts = (origem: 'barra' | 'botao' = 'botao') => {
+    const r = scrBtnRef.current?.getBoundingClientRect();
+    if (!r) return;
+    scrOrigemRef.current = origem === 'barra' ? textareaRef.current : scrBtnRef.current;
+    setScrPop((p) => (p ? null : r));
+  };
+  // UM ctx de variáveis para a prévia da paleta E o compositor: o que a prévia mostra é o que o envio usa
+  const scriptCtx = useMemo<VarCtx>(
+    () => ({ cliente: current.name, atendente: user?.name || 'Atendente', emailAtendente: user?.email ?? '', empresa: currentOrg.name, telefone: current.phone }),
+    [current.name, current.phone, user?.name, user?.email, currentOrg.name],
+  );
   const selecionarScript = (s: Script) => {
     setScrPop(null);
     if (optout) { aoAvisar({ tom: 'erro', texto: optoutTexto }); return; }
@@ -1535,7 +1328,7 @@ export default function WhatsAppV2() {
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviar(); return; }
                     // "/" com a mensagem vazia abre o painel de scripts (a via mais rápida do teclado)
-                    if (e.key === '/' && draft === '' && scripts.length > 0 && !composerBloqueado) { e.preventDefault(); abrirScripts(); }
+                    if (e.key === '/' && draft === '' && scripts.length > 0 && !composerBloqueado) { e.preventDefault(); abrirScripts('barra'); }
                   }}
                 />
                 <div className="tools">
@@ -1549,7 +1342,7 @@ export default function WhatsAppV2() {
                       ref={scrBtnRef} type="button" className={'wa-scr-btn' + (scrPop ? ' on' : '')}
                       disabled={composerBloqueado} aria-haspopup="dialog" aria-expanded={!!scrPop}
                       title="Scripts — busca, favoritos e categorias (atalho: / com a mensagem vazia)"
-                      onClick={abrirScripts}
+                      onClick={() => abrirScripts('botao')}
                     >
                       <IcRaio /><span>Scripts</span><span className="ct">{scripts.length}</span>
                     </button>
@@ -1883,12 +1676,16 @@ export default function WhatsAppV2() {
       )}
 
       {scrPop && createPortal(
-        <SeletorScripts
+        <PaletaScripts
           anchor={scrPop}
+          botaoRef={scrBtnRef}
+          origemRef={scrOrigemRef}
           scripts={scripts}
           categorias={scriptCategorias}
           resumo={scriptsResumo}
-          etapaCounts={etapaCounts}
+          ctx={scriptCtx}
+          canal={demo ? inbox.replyChip : inbox.canalSel?.alias ?? null}
+          mensagens={current.msgs}
           onSelecionar={selecionarScript}
           onGerenciar={() => { setScrPop(null); nav('/scripts'); }}
           onClose={() => setScrPop(null)}
@@ -2050,8 +1847,10 @@ export default function WhatsAppV2() {
       <ScriptSequenceModal segundoPlano
         open={!!scriptSeq} script={scriptSeq}
         canal="whatsapp" conversaId={current.id} incluirMidia
-        onClose={() => setScriptSeq(null)}
-        ctx={{ cliente: current.name, atendente: user?.name || 'Atendente', emailAtendente: user?.email ?? '', empresa: currentOrg.name, telefone: current.phone }}
+        /* teclado de ponta a ponta: fechou o compositor (Esc, Cancelar ou Enviar) → o
+           foco volta à caixa de mensagem, sem o atendente precisar clicar de novo */
+        onClose={() => { setScriptSeq(null); window.setTimeout(() => textareaRef.current?.focus({ preventScroll: true }), 0); }}
+        ctx={scriptCtx}
         /* Travas + envio agora vivem no HOOK (scriptEnviar*): fonte única com o
            mobile — mesmos textos, mesma ordem, re-checadas a cada etapa. */
         enviarMidia={inbox.scriptEnviarMidia}

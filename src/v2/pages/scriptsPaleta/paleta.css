@@ -1,0 +1,638 @@
+/* ==================================================================
+   Paleta de scripts do inbox — prefixo spl- (escopo .v2, portal v2).
+   Linguagem Platina/Obsidiana SÓ por tokens de src/v2/tokens.css (e o
+   acento --azul da pele): no Corporativo (fixo em produção) vidro-a ==
+   vidro-b achata o gradiente em chapa, r-card/r-ctl encolhem o raio e
+   o acento vira o azul do sistema — sem uma linha extra. Zero
+   backdrop-filter (superfície opaca). Lite = sólido e sem sombra
+   pesada. Tema claro completo no fim do arquivo.
+   Grade: espaçamentos em 4/8/12/16/20/24 (borda de 1px contabilizada
+   no padding: 7 + 1 = 8). Raios SEMPRE de r-card/r-ctl (canto-âncora
+   das bolhas em 4px). Gutter da LISTA = 16px (busca, trilho das
+   pílulas, rótulo de grupo, texto do item e "Gerenciar" no mesmo x);
+   gutter da PRÉVIA = 20px (título, bolhas e o CTA na mesma borda).
+   Tipografia em 5 passos: 10 (teclas, rótulos de grupo, selos),
+   11 (meta, contadores, dicas), 12 (descrição, apoio), 13 (títulos da
+   lista, texto das bolhas), 16 (título da prévia) + 15 só na busca.
+   Nada anima a barra de acento; o realce é instantâneo.
+   ================================================================== */
+
+.v2 .spl {
+  /* aliases locais — todos apontam para tokens base (nenhuma cor fixa) */
+  --spl-r: calc(var(--r-card) + 2px);
+  --spl-r-in: max(4px, calc(var(--r-ctl) - 2px));      /* raio de controle DENTRO de um trilho de 2px */
+  --spl-acc: var(--azul, var(--platina-b));          /* acento da pele; sem pele, a platina */
+  --spl-acc-rgb: var(--azul-rgb, var(--tint));
+  --spl-acc-txt: #fff;                               /* texto sobre o acento sólido (pílula ativa) */
+  --spl-ouro: var(--ambar);                          /* estrela = a mesma da página /scripts */
+  --spl-hair: rgba(var(--tint), .075);
+  --spl-fundo: var(--base);                          /* chapa opaca; o vidro vem por cima */
+  --spl-elev: rgba(var(--tint), .035);               /* um degrau acima da base */
+  --spl-canvas: var(--base);                         /* fundo da conversa na prévia: um degrau ABAIXO do cabeçalho */
+  --spl-canvas-sombra: inset 0 10px 12px -12px rgba(0, 0, 0, .55); /* o cabeçalho "assenta" sobre a conversa */
+  --spl-lista-bg: transparent;
+  --spl-gcab-bg: linear-gradient(var(--vidro-a), var(--vidro-a)), linear-gradient(var(--spl-elev), var(--spl-elev)), var(--spl-fundo);
+  --spl-hi-bg: rgba(var(--tint), .068);
+  --spl-hi-borda: rgba(var(--tint), .075);
+  --spl-hi-sombra: var(--sombra-1), inset 0 1px 0 rgba(var(--tint), .04);
+  --spl-bolha-base: var(--base);
+  --spl-rec-bg: rgba(var(--tint), .085);             /* bolha de ENTRADA (cliente): neutra, sem borda */
+  --spl-rec-bg-hover: rgba(var(--tint), .115);
+  --spl-rec-sombra: inset 0 1px 0 rgba(var(--tint), .06), 0 1px 2px rgba(0, 0, 0, .22);
+  --spl-scroll: rgba(var(--tint), .16);
+  --spl-tile: rgba(var(--spl-acc-rgb), .16);         /* ícone do anexo: a mesma família da bolha */
+  --spl-tile-ic: color-mix(in srgb, var(--spl-acc) 55%, var(--txt));
+  --spl-fio-leg: rgba(var(--spl-acc-rgb), .2);       /* fio entre o arquivo e a legenda, dentro da bolha */
+  --spl-var-tinta: rgba(var(--spl-acc-rgb), .07);    /* variável preenchida: tinta leve + sublinhado pontilhado */
+  --spl-var-traco: rgba(var(--spl-acc-rgb), .7);
+  --spl-mark-bg: rgba(var(--spl-acc-rgb), .28);      /* trecho da BUSCA: marca forte */
+
+  position: fixed; z-index: 96;
+  display: flex; flex-direction: column; min-height: 0;
+  border-radius: var(--spl-r);
+  border: 1px solid rgba(var(--tint), .12);
+  background-color: var(--spl-fundo);
+  background-image: linear-gradient(180deg, var(--vidro-a), var(--vidro-b)), linear-gradient(var(--spl-elev), var(--spl-elev));
+  box-shadow: 0 30px 80px color-mix(in srgb, var(--base) 70%, transparent), var(--sombra-2), inset 0 1px 0 rgba(var(--tint), .06);
+  color: var(--txt); font-family: var(--fonte); font-size: 12px; line-height: 1.4;
+  overflow: hidden; isolation: isolate;
+  animation: spl-entra .14s var(--ease);
+}
+@keyframes spl-entra { from { opacity: 0; transform: translateY(4px) scale(.995); } }
+.v2 .spl *, .v2 .spl *::before, .v2 .spl *::after { box-sizing: border-box; }
+.v2 .spl :focus-visible { outline: 2px solid rgba(var(--spl-acc-rgb), .55); outline-offset: 1px; }
+.v2 .spl .spl-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* ---------- teclas ---------- */
+.v2 .spl .spl-kbd {
+  display: inline-grid; place-items: center; min-width: 16px; height: 16px; padding: 0 4px;
+  font-family: var(--fonte); font-size: 10px; font-weight: 600; line-height: 1; color: var(--txt-2);
+  background: rgba(var(--tint), .05);
+  border: 1px solid rgba(var(--tint), .13); border-radius: 4px;
+  box-shadow: inset 0 -1px 0 rgba(var(--tint), .1);
+}
+
+/* ---------- cabeçalho: busca grande ---------- */
+.v2 .spl-cab {
+  flex: none; display: flex; align-items: center; gap: 12px;
+  height: 52px; padding: 0 16px;
+  border-bottom: 1px solid var(--spl-hair);
+}
+.v2 .spl-cab-ic { display: inline-flex; margin-left: -3px; color: var(--txt-3); transition: color .14s; } /* óptico: o traço da lupa começa 3px dentro do svg — o glifo encosta no gutter de 16px */
+.v2 .spl-cab-ic svg { width: 16px; height: 16px; }
+.v2 .spl-cab:focus-within .spl-cab-ic { color: var(--txt-2); }
+.v2 .spl .spl-busca {
+  flex: 1; min-width: 0; height: 100%; padding: 0; margin: 0;
+  background: none; border: none; outline: none; box-shadow: none;
+  font-family: var(--fonte); font-size: 15px; font-weight: 450; letter-spacing: -.005em;
+  color: var(--txt); caret-color: var(--spl-acc);
+}
+.v2 .spl .spl-busca::placeholder { color: var(--txt-3); font-weight: 400; }
+.v2 .spl .spl-busca:focus-visible { outline: none; }
+.v2 .spl-limpar {
+  flex: none; width: 20px; height: 20px; display: grid; place-items: center; padding: 0;
+  border: none; border-radius: 50%; cursor: pointer;
+  background: rgba(var(--tint), .08); color: var(--txt-2);
+}
+.v2 .spl-limpar:hover { background: rgba(var(--tint), .14); color: var(--txt); }
+.v2 .spl-limpar svg { width: 10px; height: 10px; }
+.v2 .spl-cont { flex: none; font-size: 11px; color: var(--txt-3); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* ---------- pílulas: O MESMO segmentado do inbox (.wa-abas-wrap/.wa-aba) ----------
+   trilho rebaixado que nunca rola + scroller interno com degradê na ponta cortada +
+   setas só do lado cortado (mouse comum) · ativa = pastilha SÓLIDA do acento com
+   texto e contador brancos, igual à aba "Todos" da fila ao lado. */
+.v2 .spl-pills-faixa { flex: none; padding: 8px 16px; border-bottom: 1px solid var(--spl-hair); }
+.v2 .spl-pills-trilho {
+  position: relative; width: fit-content; max-width: 100%;
+  padding: 2px; background: rgba(var(--tint), .04); border: 1px solid var(--linha); border-radius: var(--r-ctl);
+}
+/* 4px de folga DENTRO do scroller (padding + margem negativa: nada se mexe) — o anel de foco
+   com afastamento da pílula ativa não é cortado pelo overflow da fileira */
+.v2 .spl-pills {
+  position: relative; display: flex; gap: 4px;
+  padding: 4px; margin: -4px;
+  overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none;
+}
+.v2 .spl-pills::-webkit-scrollbar { display: none; }
+.v2 .spl-pills.spl-corte-dir { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 32px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 32px), transparent); }
+.v2 .spl-pills.spl-corte-esq { -webkit-mask-image: linear-gradient(90deg, transparent, #000 32px); mask-image: linear-gradient(90deg, transparent, #000 32px); }
+.v2 .spl-pills.spl-corte-esq.spl-corte-dir { -webkit-mask-image: linear-gradient(90deg, transparent, #000 32px, #000 calc(100% - 32px), transparent); mask-image: linear-gradient(90deg, transparent, #000 32px, #000 calc(100% - 32px), transparent); }
+.v2 .spl-pills-seta {
+  position: absolute; top: 50%; transform: translateY(-50%); z-index: 2;
+  width: 20px; height: 28px; display: inline-flex; align-items: center; justify-content: center; padding: 0;
+  border: 1px solid var(--linha); border-radius: var(--spl-r-in); cursor: pointer;
+  background: var(--spl-fundo); color: var(--txt-2);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--base) 60%, transparent);
+}
+.v2 .spl-pills-seta:hover { color: var(--txt); background: color-mix(in srgb, var(--spl-fundo) 88%, rgb(var(--tint))); }
+.v2 .spl-pills-seta svg { width: 12px; height: 12px; }
+.v2 .spl-pills-seta.spl-esq { left: 2px; }
+.v2 .spl-pills-seta.spl-dir { right: 2px; }
+.v2 .spl-pill {
+  flex: none; display: inline-flex; align-items: center; gap: 8px;
+  height: 28px; padding: 0 12px; white-space: nowrap; cursor: pointer;
+  font-family: var(--fonte); font-size: 12px; font-weight: 500; color: var(--txt-2);
+  background: none; border: none; border-radius: var(--spl-r-in);
+  transition: background .14s, color .14s;
+}
+.v2 .spl-pill:hover { color: var(--txt); background: rgba(var(--tint), .05); }
+.v2 .spl-pill.spl-on {
+  color: var(--spl-acc-txt); font-weight: 600;
+  background: var(--spl-acc);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .18);
+}
+.v2 .spl-pill:focus-visible { outline-offset: -1px; }
+/* ativa com foco: pastilha sólida + anel AFASTADO (2px da base, 2px do acento) — um contorno
+   por dentro sumiria no acento sólido. Especificidade acima da sombra do tema claro. */
+.v2 .spl .spl-pills .spl-pill.spl-on:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--base), 0 0 0 4px rgba(var(--spl-acc-rgb), .6);
+}
+.v2 .spl-pill-ic { display: inline-flex; margin-right: -4px; color: var(--spl-ouro); }
+.v2 .spl-pill.spl-on .spl-pill-ic { color: currentColor; }
+.v2 .spl-pill-ic svg { width: 10px; height: 10px; }
+.v2 .spl-pill-n {
+  min-width: 20px; padding: 0 4px; border-radius: 99px; text-align: center;
+  font-size: 11px; font-weight: 550; line-height: 16px; color: var(--txt-3);
+  background: rgba(var(--tint), .08); font-variant-numeric: tabular-nums;
+}
+.v2 .spl-pill.spl-on .spl-pill-n { color: var(--spl-acc-txt); background: rgba(255, 255, 255, .22); }
+/* pílula com 0 recua inteira — com ou sem busca (continua focável e clicável) */
+.v2 .spl-pill.spl-pill-zero:not(.spl-on) { color: var(--txt-3); opacity: .6; }
+.v2 .spl-pill.spl-pill-zero:not(.spl-on):hover { opacity: .85; }
+
+/* ---------- corpo ---------- */
+.v2 .spl-corpo { flex: 1 1 auto; min-height: 0; display: flex; }
+
+/* lista */
+.v2 .spl-lista {
+  position: relative; flex: none; width: clamp(296px, 42.5%, 324px); min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  padding: 4px 8px 8px; background: var(--spl-lista-bg);
+  border-right: 1px solid var(--spl-hair);
+  scrollbar-width: thin; scrollbar-color: var(--spl-scroll) transparent;
+}
+/* mais itens fora da vista: degradê na borda (a barra some no macOS), do tamanho do que falta
+   rolar (--spl-ft/--spl-fb, ver rolagem.ts) */
+.v2 .spl-lista.spl-sombra-baixo { -webkit-mask-image: linear-gradient(#000 calc(100% - var(--spl-fb, 24px)), transparent); mask-image: linear-gradient(#000 calc(100% - var(--spl-fb, 24px)), transparent); }
+.v2 .spl-lista.spl-sombra-cima { -webkit-mask-image: linear-gradient(transparent, #000 var(--spl-ft, 16px)); mask-image: linear-gradient(transparent, #000 var(--spl-ft, 16px)); }
+.v2 .spl-lista.spl-sombra-cima.spl-sombra-baixo { -webkit-mask-image: linear-gradient(transparent, #000 var(--spl-ft, 16px), #000 calc(100% - var(--spl-fb, 24px)), transparent); mask-image: linear-gradient(transparent, #000 var(--spl-ft, 16px), #000 calc(100% - var(--spl-fb, 24px)), transparent); }
+.v2 .spl-grupo + .spl-grupo { margin-top: 4px; }
+.v2 .spl-gcab {
+  position: sticky; top: -4px; z-index: 2;
+  display: flex; align-items: center; gap: 4px;
+  margin: 0 -8px; padding: 12px 16px 4px;
+  font-size: 10px; font-weight: 650; letter-spacing: .085em; line-height: 16px; text-transform: uppercase; color: var(--txt-3);
+  background: var(--spl-gcab-bg);
+}
+/* cabeçalho FIXO: degradê embaixo para o título que rola por baixo não sair fatiado */
+.v2 .spl-gcab.spl-gcab-fixo::after {
+  content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 12px; pointer-events: none;
+  background: var(--spl-gcab-bg);
+  -webkit-mask-image: linear-gradient(#000, transparent); mask-image: linear-gradient(#000, transparent);
+}
+.v2 .spl-gcab svg { width: 10px; height: 10px; flex: none; }
+.v2 .spl-gcab-fav { color: var(--spl-ouro); }
+.v2 .spl-gcab-n {
+  margin-left: auto; min-width: 20px; padding: 0 4px; border-radius: 99px; text-align: center;
+  font-size: 10px; font-weight: 600; letter-spacing: 0; line-height: 16px; color: var(--txt-3);
+  background: rgba(var(--tint), .06); font-variant-numeric: tabular-nums;
+}
+
+/* item: padding 8 da lista + (borda 1 + padding 7) = texto a 16px da borda (os dois lados).
+   Grade 2×2: título | composição (centrada na linha do título) / apoio | "N msgs". */
+.v2 .spl-it {
+  position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; row-gap: 2px; align-items: center;
+  min-height: 52px; padding: 7px;
+  border: 1px solid transparent; border-radius: var(--r-ctl);
+  cursor: pointer; user-select: none;
+  scroll-margin-top: 36px; scroll-margin-bottom: 8px;
+}
+.v2 .spl-it.spl-hi { background: var(--spl-hi-bg); border-color: var(--spl-hi-borda); box-shadow: var(--spl-hi-sombra); }
+.v2 .spl-it.spl-hi::before {
+  /* na borda esquerda do cartão realçado (longe do texto: não parece cursor) */
+  content: ""; position: absolute; left: -1px; top: 12px; bottom: 12px; width: 2px;
+  border-radius: 0 2px 2px 0; background: var(--spl-acc);
+}
+.v2 .spl-it-tit {
+  display: flex; align-items: center; gap: 4px; min-width: 0;
+  font-size: 13px; font-weight: 550; letter-spacing: .002em; line-height: 18px; color: var(--txt);
+}
+.v2 .spl-it-nome { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .spl .spl-estrela { flex: none; display: inline-flex; color: var(--spl-ouro); }
+.v2 .spl .spl-estrela svg { width: 10px; height: 10px; }
+/* modo estreito (sem prévia): falta preencher campo — o aviso âmbar fica no próprio item */
+.v2 .spl-it-falta { flex: none; display: inline-flex; margin-left: 2px; color: var(--ambar); }
+.v2 .spl-it-falta svg { width: 12px; height: 12px; }
+.v2 .spl-it-sub {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 12px; line-height: 16px; color: var(--txt-3);
+}
+.v2 .spl-it.spl-hi .spl-it-sub { color: var(--txt-2); }
+.v2 .spl-sub-onde {
+  display: inline-block; margin-right: 4px; padding: 0 4px; border-radius: 4px;
+  font-size: 10px; font-weight: 600; line-height: 16px; vertical-align: 0;
+  color: var(--txt-2); background: rgba(var(--tint), .07);
+}
+/* tag que casou: o mesmo "#texto" discreto do cabeçalho da prévia (sem caixa) */
+.v2 .spl-sub-tag { margin-right: 8px; font-weight: 600; color: var(--txt-2); }
+.v2 .spl-sub-vazio { font-style: italic; }
+/* composição: ícones 13px em txt-2, centrados na linha do título (18px) */
+.v2 .spl-comp { grid-column: 2; grid-row: 1; justify-self: end; display: inline-flex; align-items: center; gap: 4px; height: 18px; color: var(--txt-2); }
+.v2 .spl-comp-ic { display: inline-flex; }
+.v2 .spl-comp-ic svg { width: 13px; height: 13px; }
+.v2 .spl-it-tit { grid-column: 1; grid-row: 1; }
+.v2 .spl-it-sub { grid-column: 1; grid-row: 2; }
+.v2 .spl-it-n { grid-column: 2; grid-row: 2; justify-self: end; font-size: 11px; line-height: 16px; color: var(--txt-3); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.v2 .spl-it.spl-hi .spl-it-n { color: var(--txt-2); }
+
+/* trecho da BUSCA — marca FORTE (fundo de acento + texto forte), nunca amarelo cru.
+   A VARIÁVEL é outra linguagem (sublinhado pontilhado, sem caixa): as duas nunca se confundem. */
+.v2 .spl mark.spl-mark, .v2 .spl .spl-mark {
+  color: var(--txt); font-weight: 600; background: var(--spl-mark-bg);
+  border-radius: 3px; box-shadow: 0 0 0 1px rgba(var(--spl-acc-rgb), .3);
+  -webkit-box-decoration-break: clone; box-decoration-break: clone;
+}
+
+/* ---------- prévia ---------- */
+.v2 .spl-pv { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+/* cabeçalho COMPACTO: título · UMA linha de meta (mensagens · composição · categoria · #tags)
+   · descrição em 1 linha. Sem descrição (.spl-pv-cab-sd) o bloco fica mais baixo e título ·
+   meta CENTRADOS nele — nada de faixa vazia embaixo do cabeçalho. */
+.v2 .spl-pv-cab {
+  flex: none; min-height: 88px; padding: 14px 20px 12px;
+  display: flex; flex-direction: column; gap: 4px;
+  border-bottom: 1px solid var(--spl-hair);
+}
+.v2 .spl-pv-cab.spl-pv-cab-sd { min-height: 76px; justify-content: center; }
+.v2 .spl .spl-pv-tit {
+  display: flex; align-items: center; gap: 8px; min-width: 0; margin: 0;
+  font-size: 16px; font-weight: 600; letter-spacing: -.012em; line-height: 20px; color: var(--txt);
+}
+.v2 .spl .spl-pv-tit-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .spl .spl-pv-tit .spl-estrela svg { width: 12px; height: 12px; }
+.v2 .spl-pv-meta {
+  position: relative; display: flex; flex-wrap: nowrap; align-items: center; gap: 8px;
+  min-width: 0; height: 20px; overflow: hidden;
+}
+/* ordem de sacrifício: as tags viram "+N" primeiro (JS); a composição é a ÚNICA que encolhe
+   (reticências, último caso); categoria, tags e "+N" nunca encolhem. Durante a medida tudo
+   fica na largura natural — a trava precisa vencer .v2 .spl .spl-pv-linha (4 classes > 3). */
+.v2 .spl .spl-pv-meta.spl-medindo > * { flex-shrink: 0; }
+.v2 .spl .spl-pv-linha {
+  flex: 0 1 auto; min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 12px; line-height: 16px; color: var(--txt-3);
+}
+.v2 .spl-pv-linha b { font-weight: 600; color: var(--txt-2); }
+.v2 .spl .spl-pv-desc {
+  margin: 2px 0 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 12px; line-height: 16px; color: var(--txt-2);
+}
+/* categoria = pílula com ponto PREENCHIDO (neutra: o acento fica no CTA) — sempre inteira,
+   nunca reticências (sem categoria = "Outros", a mesma pílula) */
+.v2 .spl .spl-chip-cat {
+  flex: none; display: inline-flex; align-items: center; gap: 6px; height: 20px; padding: 0 8px 0 7px; border-radius: 99px;
+  font-size: 11px; font-weight: 550; white-space: nowrap; color: var(--txt-2);
+  background: rgba(var(--tint), .06); border: 1px solid rgba(var(--tint), .1);
+}
+.v2 .spl .spl-chip-cat > span { white-space: nowrap; }
+.v2 .spl-chip-cat > i { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--spl-acc); }
+/* tags = texto discreto com '#', sem borda */
+.v2 .spl .spl-tag { flex: none; font-size: 11px; font-weight: 500; line-height: 16px; white-space: nowrap; color: var(--txt-3); }
+.v2 .spl-tag-mais { font-weight: 600; }
+
+/* o fundo da conversa fica na JANELA: a máscara do corpo apaga só o conteúdo, nunca o fundo */
+.v2 .spl-pv-janela { position: relative; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; background: var(--spl-canvas); box-shadow: var(--spl-canvas-sombra); }
+/* padding de baixo 16px = PAD_BASE do Previa.tsx: o degradê só conta conteúdo de verdade.
+   margin-bottom (JS) = corte alinhado antes de um cartão de mídia partido no meio */
+.v2 .spl-pv-corpo {
+  position: relative; flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  padding: 12px 20px 16px;
+  scrollbar-width: thin; scrollbar-color: var(--spl-scroll) transparent;
+}
+/* degradê SÓ nos últimos 28px (--spl-fb ≤ 28, ver rolagem.ts) — o selo "+N abaixo" senta
+   sobre essa faixa, com fundo opaco */
+.v2 .spl-pv-corpo.spl-sombra-baixo { -webkit-mask-image: linear-gradient(#000 calc(100% - var(--spl-fb, 28px)), transparent); mask-image: linear-gradient(#000 calc(100% - var(--spl-fb, 28px)), transparent); }
+.v2 .spl-pv-corpo.spl-sombra-cima { -webkit-mask-image: linear-gradient(transparent, #000 var(--spl-ft, 20px)); mask-image: linear-gradient(transparent, #000 var(--spl-ft, 20px)); }
+.v2 .spl-pv-corpo.spl-sombra-cima.spl-sombra-baixo { -webkit-mask-image: linear-gradient(transparent, #000 var(--spl-ft, 20px), #000 calc(100% - var(--spl-fb, 28px)), transparent); mask-image: linear-gradient(transparent, #000 var(--spl-ft, 20px), #000 calc(100% - var(--spl-fb, 28px)), transparent); }
+.v2 .spl-pv-fio { display: flex; flex-direction: column; gap: 12px; min-height: 100%; }
+/* selo "+N mensagens abaixo" (clicável: rola até a próxima) — conta só as TOTALMENTE
+   escondidas; senta na faixa do degradê (ou na faixa livre do corte alinhado) */
+.v2 .spl-pv-mais {
+  position: absolute; left: 50%; bottom: 4px; transform: translateX(-50%); z-index: 3;
+  display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 12px 0 8px; margin: 0;
+  font-family: var(--fonte); font-size: 11px; font-weight: 600; white-space: nowrap; color: var(--txt-2); cursor: pointer;
+  border-radius: 99px; border: 1px solid rgba(var(--tint), .12);
+  background: var(--spl-gcab-bg);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--base) 55%, transparent);
+}
+.v2 .spl-pv-mais:hover { color: var(--txt); border-color: rgba(var(--tint), .2); }
+.v2 .spl-pv-mais svg { width: 12px; height: 12px; }
+
+/* contexto: o que o cliente acabou de dizer — BOLHA DE ENTRADA de 1 linha ("Cliente · há 4 min"
+   + a fala): à esquerda, superfície neutra, raio de bolha com o canto-âncora embaixo à esquerda
+   (o espelho da bolha de saída), SEM borda cheia (só o brilho de cima e uma sombra curta) e
+   largura de bolha (88%, como as de saída) — nada de cara de campo. Abre ao clicar quando a
+   fala não cabe; o que veio DEPOIS numa linha à parte. */
+.v2 .spl .spl-ctx {
+  flex: none; min-width: 0; max-width: 88%; align-self: flex-start;
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 6px 12px; border: none; border-radius: var(--r-card); border-bottom-left-radius: 4px;
+  background-color: var(--spl-bolha-base); background-image: linear-gradient(var(--spl-rec-bg), var(--spl-rec-bg));
+  box-shadow: var(--spl-rec-sombra);
+  transition: background-color .14s;
+}
+.v2 .spl .spl-ctx.spl-ctx-abre { cursor: pointer; }
+.v2 .spl .spl-ctx.spl-ctx-abre:hover { background-image: linear-gradient(var(--spl-rec-bg-hover), var(--spl-rec-bg-hover)); }
+.v2 .spl-ctx-linha { display: flex; align-items: baseline; gap: 8px; min-width: 0; font-size: 12px; line-height: 16px; }
+.v2 .spl-ctx-rot { flex: none; white-space: nowrap; font-size: 11px; font-weight: 600; color: var(--txt-3); }
+.v2 .spl .spl-ctx-txt {
+  flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--txt-2);
+}
+.v2 .spl-ctx.spl-ctx-aberto .spl-ctx-txt { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 5; overflow-wrap: anywhere; }
+.v2 .spl-ctx-ver { flex: none; align-self: center; display: inline-flex; color: var(--txt-3); transition: transform .14s; }
+.v2 .spl-ctx-ver svg { width: 12px; height: 12px; }
+.v2 .spl-ctx.spl-ctx-aberto .spl-ctx-ver { transform: rotate(180deg); }
+.v2 .spl-ctx-aud { display: inline-flex; align-items: center; gap: 4px; margin-right: 4px; vertical-align: top; font-weight: 600; color: var(--txt-3); }
+.v2 .spl-ctx-aud svg { width: 12px; height: 12px; align-self: center; }
+.v2 .spl-ctx-depois { display: flex; align-items: center; gap: 4px; min-width: 0; font-size: 11px; line-height: 14px; color: var(--txt-3); }
+.v2 .spl-ctx-depois > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .spl-ctx-depois svg { flex: none; width: 11px; height: 11px; }
+
+/* sequência: bolha de SAÍDA à direita e o número GRUDADO nela (8px), na coluna do lado da
+   âncora; o trilho vertical liga os números. --n-y alinha o número à 1ª linha / ao tile. */
+.v2 .spl .spl-ets { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.v2 .spl .spl-et {
+  --n-y: 8px;
+  position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 20px; column-gap: 8px; align-items: start; margin: 0;
+}
+.v2 .spl .spl-et.spl-et-mid,
+.v2 .spl .spl-et.spl-et-leg { --n-y: 16px; }
+.v2 .spl .spl-et:not(:last-child)::before {
+  /* do fim deste número até 4px antes do próximo (que pode estar mais baixo: mídia) */
+  content: ""; position: absolute; right: 10px; width: 1px; transform: translateX(50%);
+  top: calc(var(--n-y) + 24px); bottom: -16px;
+  background: rgba(var(--tint), .1);
+}
+.v2 .spl .spl-et:has(+ .spl-et-mid):not(:last-child)::before,
+.v2 .spl .spl-et:has(+ .spl-et-leg):not(:last-child)::before { bottom: -24px; }
+.v2 .spl-et-n {
+  grid-column: 2; grid-row: 1; width: 20px; height: 20px; margin-top: var(--n-y); border-radius: 50%;
+  display: grid; place-items: center;
+  font-size: 10px; font-weight: 650; color: var(--txt-3); font-variant-numeric: tabular-nums;
+  border: 1px solid rgba(var(--tint), .13); background: var(--spl-fundo);
+}
+.v2 .spl-et-col { grid-column: 1; grid-row: 1; justify-self: end; min-width: 0; max-width: 88%; display: flex; flex-direction: column; align-items: flex-end; }
+.v2 .spl-et-sk .spl-et-n { opacity: .5; }
+.v2 .spl-et-sk .spl-et-col { width: 100%; max-width: 100%; }
+.v2 .spl-et-sk .spl-et-col > .skel { width: 100%; }
+
+/* bolha de SAÍDA — a mesma família da .bolha.env2 do inbox (vidro do acento, canto-âncora) */
+.v2 .spl-bolha {
+  min-width: 0; max-width: 100%;
+  padding: 8px 12px; border-radius: var(--r-card); border-bottom-right-radius: 4px;
+  font-size: 13px; line-height: 1.45; color: var(--txt);
+  white-space: pre-wrap; overflow-wrap: anywhere;
+  background-color: var(--spl-bolha-base);
+  background-image: linear-gradient(180deg, rgba(var(--spl-acc-rgb), .16), rgba(var(--spl-acc-rgb), .055));
+  border: 1px solid rgba(var(--spl-acc-rgb), .22);
+  box-shadow: var(--sombra-2), inset 0 1px 0 rgba(var(--tint), .09);
+}
+.v2 .spl-bolha.spl-casou { border-color: rgba(var(--spl-acc-rgb), .6); box-shadow: 0 0 0 1px rgba(var(--spl-acc-rgb), .45), var(--sombra-2); }
+/* MÍDIA = uma bolha só: a linha do arquivo (ícone · nome · tipo·duração·tamanho) dentro dela;
+   com legenda, a legenda vem embaixo separada por um fio de ponta a ponta — sem caixa dentro
+   de caixa. Mesma família da bolha de texto nos dois temas. */
+.v2 .spl-bolha.spl-bolha-mid,
+.v2 .spl-bolha.spl-bolha-leg { width: 256px; padding: 8px 12px 8px 8px; }
+.v2 .spl-leg { margin: 8px -12px 0 -8px; padding: 8px 12px 0; border-top: 1px solid var(--spl-fio-leg); }
+.v2 .spl-fmt { white-space: pre-wrap; }
+/* variável PREENCHIDA: tinta leve + sublinhado pontilhado, SEM padding lateral (a pontuação
+   cola: "Souza!") e sem negrito (o negrito é só o *texto* do WhatsApp) */
+.v2 .spl .spl-var {
+  background: var(--spl-var-tinta); border-radius: 2px;
+  text-decoration: underline dotted var(--spl-var-traco); text-decoration-thickness: 1px; text-underline-offset: 3px;
+  -webkit-box-decoration-break: clone; box-decoration-break: clone;
+}
+/* variável SEM valor: o nome humano em âmbar, sublinhado pontilhado âmbar (atômico, nunca partido) */
+.v2 .spl .spl-tok {
+  font-weight: 550; color: var(--ambar); background: rgba(var(--ambar-rgb), .08); border-radius: 2px;
+  text-decoration: underline dotted rgba(var(--ambar-rgb), .8); text-decoration-thickness: 1px; text-underline-offset: 3px;
+  white-space: nowrap; -webkit-box-decoration-break: clone; box-decoration-break: clone;
+}
+/* sem valor E casou com a busca: a marca da busca por cima, o texto segue âmbar */
+.v2 .spl .spl-tok.spl-mark { color: var(--ambar); background: var(--spl-mark-bg); }
+/* linha de apoio da LISTA: um degrau mais leve (12px apagado) — variável preenchida SÓ com a
+   tinta leve, sem sublinhado (o pontilhado é das bolhas da prévia); sem valor = só o âmbar */
+.v2 .spl-it-sub .spl-fmt { white-space: inherit; }
+.v2 .spl .spl-it-sub .spl-var { background: var(--spl-var-tinta); text-decoration: none; }
+.v2 .spl .spl-it-sub .spl-tok { font-weight: 500; text-decoration: none; }
+.v2 .spl .spl-it-sub .spl-tok:not(.spl-mark),
+:root[data-tema="light"] .v2 .spl .spl-it-sub .spl-tok:not(.spl-mark) { background: none; }
+/* trecho da BUSCA vence a tinta da variável preenchida (prévia e lista) */
+.v2 .spl .spl-var.spl-mark { background: var(--spl-mark-bg); }
+.v2 .spl .spl-b { font-weight: 650; }
+.v2 .spl .spl-link { text-decoration: underline; text-underline-offset: 2px; }
+/* aviso por etapa (UM só): largura da BOLHA, texto discreto — só o ícone em âmbar */
+.v2 .spl-et-aviso {
+  align-self: stretch; contain: inline-size;
+  display: flex; align-items: flex-start; gap: 4px; margin-top: 4px; padding: 0 4px;
+  font-size: 11px; line-height: 16px; color: var(--txt-3); text-wrap: pretty;
+}
+.v2 .spl-et-aviso svg { flex: none; width: 12px; height: 12px; margin-top: 2px; color: var(--ambar); }
+
+/* linha do arquivo (o mesmo formato para todos os tipos) */
+.v2 .spl-mid { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.v2 .spl-mid-tile {
+  position: relative; flex: none; width: 36px; height: 36px; overflow: hidden;
+  display: grid; place-items: center; border-radius: var(--spl-r-in);
+  color: var(--spl-tile-ic); background: var(--spl-tile);
+}
+.v2 .spl-mid-tile > svg { width: 18px; height: 18px; }
+.v2 .spl-mid-documento .spl-mid-tile > svg { width: 14px; height: 14px; margin-top: -10px; }
+.v2 .spl-mid-tile b {
+  position: absolute; left: 0; right: 0; bottom: 3px;
+  text-align: center; white-space: nowrap; letter-spacing: .02em;
+  font-size: 10px; font-weight: 700; line-height: 12px; color: var(--txt);
+}
+.v2 .spl-mid-tile.spl-com-img { background: var(--spl-fundo); }
+.v2 .spl-mid-tile img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.v2 .spl-mid-inf { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+/* nome com reticência NO MEIO calculada em JS (NomeArquivo): a extensão nunca some nem descola */
+.v2 .spl-mid-nm { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; line-height: 16px; font-weight: 550; color: var(--txt); }
+.v2 .spl-mid-mt { font-size: 11px; line-height: 16px; color: var(--txt-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+
+/* prévia: vazio / erro */
+.v2 .spl-pv-vazio, .v2 .spl-pv-erro {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  padding: 24px; text-align: center; font-size: 12px; color: var(--txt-3); text-wrap: balance;
+}
+.v2 .spl-pv-erro { height: 100%; }
+.v2 .spl-pv-erro b { font-size: 13px; font-weight: 600; color: var(--txt); }
+.v2 .spl-pv-erro .btn-sec { margin-top: 8px; }
+.v2 .spl-pv-erro-ic { display: inline-flex; color: var(--ambar); }
+.v2 .spl-pv-erro-ic svg { width: 20px; height: 20px; }
+
+/* rodapé da prévia: PARA quem (prioridade) + POR qual número (+ pendência) · CTA */
+.v2 .spl-pv-rod {
+  flex: none; display: flex; align-items: center; gap: 12px;
+  height: 56px; padding: 0 20px; border-top: 1px solid var(--spl-hair);
+}
+.v2 .spl-pv-para { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 11px; line-height: 16px; color: var(--txt-3); }
+.v2 .spl-pv-l { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.v2 .spl-pv-l > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .spl-pv-l > svg { flex: none; width: 12px; height: 12px; }
+.v2 .spl-pv-l b { font-weight: 600; color: var(--txt-2); }
+.v2 .spl-pv-quem { font-size: 12px; color: var(--txt-2); }
+.v2 .spl-pv-quem b { color: var(--txt); }
+.v2 .spl-pv-falta { display: inline-flex; align-items: center; gap: 4px; vertical-align: top; color: var(--txt-3); font-weight: 400; }
+.v2 .spl-pv-alerta { flex: none; display: inline-flex; color: var(--ambar); }
+.v2 .spl-pv-alerta svg { width: 12px; height: 12px; }
+.v2 .spl .spl-usar { flex: none; height: 32px; padding: 0 8px 0 16px; gap: 8px; font-size: 13px; }
+.v2 .spl-usar-kbd {
+  display: grid; place-items: center; width: 20px; height: 20px; border-radius: 4px;
+  background: rgba(var(--platina-txt-rgb), .14);
+}
+.v2 .spl-usar-kbd svg { width: 12px; height: 12px; }
+/* painel estreito (< 720px): o CTA vira "Usar ↵" e o nome do cliente ganha o espaço */
+.v2 .spl.spl-curto .spl-usar-x { display: none; }
+.v2 .spl.spl-curto .spl-usar { padding-left: 12px; }
+
+/* ---------- vazio do corpo ---------- */
+.v2 .spl-vazio {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  padding: 28px 24px 36px; text-align: center;
+}
+.v2 .spl-vazio-ic {
+  display: grid; place-items: center; width: 40px; height: 40px; margin-bottom: 8px; border-radius: 50%;
+  color: var(--txt-3); background: rgba(var(--tint), .05); border: 1px solid rgba(var(--tint), .09);
+}
+.v2 .spl-vazio-ic svg { width: 18px; height: 18px; }
+.v2 .spl-vazio b { font-size: 13px; font-weight: 600; color: var(--txt); }
+.v2 .spl-vazio > span { max-width: 320px; font-size: 12px; color: var(--txt-3); text-wrap: balance; }
+.v2 .spl-vazio-acoes { display: flex; gap: 8px; margin-top: 12px; }
+
+/* ---------- rodapé ---------- */
+.v2 .spl-rod {
+  flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  height: 40px; padding: 0 16px 0 8px;
+  border-top: 1px solid var(--spl-hair); background: rgba(var(--tint), .02);
+}
+/* link de navegação (não rótulo): txt-2 → txt no hover, com a seta no acento */
+.v2 .spl-ger {
+  display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; margin: 0;
+  background: none; border: none; border-radius: var(--spl-r-in); cursor: pointer;
+  font-family: var(--fonte); font-size: 12px; font-weight: 500; color: var(--txt-2);
+  transition: color .14s, background .14s;
+}
+.v2 .spl-ger svg { width: 12px; height: 12px; color: var(--txt-3); transition: color .14s, transform .14s; }
+.v2 .spl-ger:hover { color: var(--txt); background: rgba(var(--tint), .05); }
+.v2 .spl-ger:hover svg { color: var(--spl-acc); transform: translateX(2px); }
+.v2 .spl-dicas { display: flex; align-items: center; gap: 16px; font-size: 11px; color: var(--txt-3); white-space: nowrap; }
+.v2 .spl-dicas > span { display: inline-flex; align-items: center; gap: 4px; }
+
+/* ---------- janela BAIXA (notebook 1366×768 / 1280×720): modo compacto ----------
+   tudo que é cromo encolhe um degrau (busca 44, faixa das pílulas 4, rodapés 36/48) e
+   o cabeçalho da prévia fica em título · meta (a descrição já está no item realçado da
+   lista, ao lado) — as mensagens ganham a altura. */
+.v2 .spl.spl-compacto .spl-cab { height: 44px; }
+.v2 .spl.spl-compacto .spl-pills-faixa { padding-top: 4px; padding-bottom: 4px; }
+.v2 .spl.spl-compacto .spl-rod { height: 36px; }
+.v2 .spl.spl-compacto .spl-pv-rod { height: 48px; }
+.v2 .spl.spl-compacto .spl-pv-cab { min-height: 0; padding: 12px 20px 10px; }
+.v2 .spl.spl-compacto .spl-pv-desc { display: none; }
+.v2 .spl.spl-compacto .spl-pv-corpo { padding-top: 10px; }
+.v2 .spl.spl-compacto .spl-ctx { padding-top: 4px; padding-bottom: 4px; }
+
+/* ---------- coluna única (< 820px) ---------- */
+.v2 .spl.spl-estreito .spl-lista { flex: 1; width: auto; border-right: none; }
+/* sem prévia: para quem e por qual número, numa linha compacta acima do rodapé */
+.v2 .spl-para {
+  flex: none; display: flex; align-items: center; gap: 8px; min-width: 0;
+  height: 32px; padding: 0 16px; border-top: 1px solid var(--spl-hair);
+  font-size: 12px; color: var(--txt-3);
+}
+.v2 .spl-para > svg { flex: none; width: 12px; height: 12px; }
+.v2 .spl-para-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .spl-para-t b { font-weight: 600; color: var(--txt-2); }
+.v2 .spl-para-t svg { width: 12px; height: 12px; margin-right: 4px; vertical-align: -2px; }
+.v2 .spl.spl-estreito .spl-dicas { gap: 12px; }
+@media (max-width: 420px) {
+  .v2 .spl.spl-estreito .spl-dicas > span:not(:last-child) { display: none; }
+}
+
+/* ---------- movimento: lite e reduced-motion entram prontos ---------- */
+@media (prefers-reduced-motion: reduce) { .v2 .spl { animation: none; } .v2 .spl-ger svg { transition: none; } }
+:root[data-perf="lite"] .v2 .spl { animation: none; }
+
+/* ---------- MODO LEVE: sólido, sombra contida ---------- */
+:root[data-perf="lite"] .v2 .spl {
+  background-image: none; background-color: var(--vidro-a);
+  box-shadow: var(--sombra-2), 0 0 0 1px rgba(var(--tint), .06);
+  --spl-gcab-bg: var(--vidro-a);
+}
+:root[data-perf="lite"] .v2 .spl-bolha { background-image: none; background-color: color-mix(in srgb, var(--spl-acc) 12%, var(--vidro-a)); box-shadow: none; }
+:root[data-perf="lite"] .v2 .spl-it.spl-hi { box-shadow: none; }
+:root[data-perf="lite"] .v2 .spl-pv-mais { box-shadow: none; }
+:root[data-perf="lite"] .v2 .spl { --spl-canvas-sombra: none; }
+
+/* ---------- CORPORATIVO: dado/controle em retângulo suave ---------- */
+html:root[data-visual="corp"] .v2 .spl-chip-cat,
+html:root[data-visual="corp"] .v2 .spl-pill-n,
+html:root[data-visual="corp"] .v2 .spl-gcab-n,
+html:root[data-visual="corp"] .v2 .spl-pv-mais { border-radius: 4px; }
+
+/* ---------- ACENTO DOURADO (escuro): pastilha ouro sólida pede texto escuro — o par do inbox ---------- */
+:root[data-acento="dourado"]:not([data-tema="light"]) .v2 .spl { --spl-acc-txt: #2A1E00; }
+:root[data-acento="dourado"]:not([data-tema="light"]) .v2 .spl-pill.spl-on .spl-pill-n { background: rgba(0, 0, 0, .16); }
+
+/* ==================================================================
+   TEMA CLARO — carta branca elevada (vidro-a), lista em off-white
+   (vidro-b) com o item realçado num véu do acento (lê-se sem depender
+   da barra), conversa sobre a base, bolha azul-clara como a enviada
+   do inbox; pílula ativa = a mesma pastilha azul da fila.
+   ================================================================== */
+:root[data-tema="light"] .v2 .spl {
+  --spl-hair: rgba(var(--tint), .08);
+  --spl-fundo: var(--vidro-a);
+  --spl-elev: transparent;
+  --spl-canvas: var(--base);
+  --spl-canvas-sombra: inset 0 1px 0 rgba(var(--tint), .03);
+  --spl-lista-bg: var(--vidro-b);
+  --spl-gcab-bg: var(--vidro-b);
+  --spl-hi-bg: rgba(var(--spl-acc-rgb), .06);
+  --spl-hi-borda: rgba(var(--spl-acc-rgb), .18);
+  --spl-hi-sombra: 0 1px 3px rgba(var(--tint), .07), 0 1px 1px rgba(var(--tint), .03);
+  --spl-bolha-base: var(--vidro-a);
+  --spl-rec-bg: transparent;                         /* entrada = carta branca sobre a conversa off-white */
+  --spl-rec-bg-hover: rgba(var(--tint), .03);
+  --spl-rec-sombra: 0 1px 2px rgba(var(--tint), .09), 0 1px 1px rgba(var(--tint), .04);
+  --spl-scroll: rgba(var(--tint), .18);
+  --spl-tile: rgba(var(--spl-acc-rgb), .1);
+  --spl-tile-ic: var(--spl-acc);
+  --spl-fio-leg: rgba(var(--spl-acc-rgb), .18);
+  --spl-var-tinta: rgba(var(--spl-acc-rgb), .06);
+  --spl-var-traco: rgba(var(--spl-acc-rgb), .65);
+  --spl-mark-bg: rgba(var(--spl-acc-rgb), .24);
+  border-color: rgba(var(--tint), .13);
+  box-shadow: var(--shadow-pop), 0 3px 10px rgba(var(--tint), .08), inset 0 1px 0 var(--vidro-a);
+}
+:root[data-tema="light"] .v2 .spl .spl-kbd { background: var(--vidro-a); border-color: rgba(var(--tint), .14); color: var(--txt-2); }
+:root[data-tema="light"] .v2 .spl-pills-trilho { background: rgba(var(--tint), .045); border-color: rgba(var(--tint), .08); }
+:root[data-tema="light"] .v2 .spl-pill:hover:not(.spl-on) { background: color-mix(in srgb, var(--vidro-a) 70%, transparent); }
+:root[data-tema="light"] .v2 .spl-pill.spl-on { box-shadow: 0 1px 2px rgba(var(--spl-acc-rgb), .28); }
+:root[data-tema="light"] .v2 .spl-pills-seta { box-shadow: 0 1px 3px rgba(var(--tint), .12); }
+:root[data-tema="light"] .v2 .spl mark.spl-mark,
+:root[data-tema="light"] .v2 .spl .spl-mark { box-shadow: 0 0 0 1px rgba(var(--spl-acc-rgb), .3); }
+:root[data-tema="light"] .v2 .spl .spl-tok:not(.spl-mark) { background: rgba(var(--ambar-rgb), .07); }
+:root[data-tema="light"] .v2 .spl-bolha {
+  background-image: linear-gradient(180deg, rgba(var(--spl-acc-rgb), .1), rgba(var(--spl-acc-rgb), .04));
+  border-color: rgba(var(--spl-acc-rgb), .22);
+  box-shadow: 0 6px 16px rgba(var(--spl-acc-rgb), .1), inset 0 1px 0 color-mix(in srgb, var(--vidro-a) 80%, transparent);
+}
+:root[data-tema="light"] .v2 .spl-bolha.spl-casou { border-color: rgba(var(--spl-acc-rgb), .55); box-shadow: 0 0 0 1px rgba(var(--spl-acc-rgb), .4), 0 6px 16px rgba(var(--spl-acc-rgb), .1); }
+:root[data-tema="light"] .v2 .spl-et-n { border-color: rgba(var(--tint), .14); }
+:root[data-tema="light"] .v2 .spl-rod { background: var(--vidro-b); }
+:root[data-tema="light"] .v2 .spl-pv-mais { background: var(--vidro-a); box-shadow: 0 2px 8px rgba(var(--tint), .12); }
+:root[data-tema="light"][data-perf="lite"] .v2 .spl { background-color: var(--vidro-a); box-shadow: var(--shadow-pop), 0 0 0 1px rgba(var(--tint), .08); }
+:root[data-tema="light"][data-perf="lite"] .v2 .spl-bolha { background-color: color-mix(in srgb, var(--spl-acc) 7%, var(--vidro-a)); }
