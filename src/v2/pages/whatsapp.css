@@ -660,7 +660,7 @@
 /* MODO LEVE: sem backdrop-blur — fundo sólido translúcido opaco. */
 :root[data-perf="lite"] .v2 .wa-etqpop {
   -webkit-backdrop-filter: none; backdrop-filter: none;
-  background: rgba(20, 22, 26, .98);
+  background: var(--surface);   /* (21/10) acompanha o cinza do app — a cor fixa ficava abaixo da página */
 }
 
 /* Tema claro */
@@ -743,7 +743,7 @@
 .v2 .wa-filtro .fp-ok:hover { background: rgba(var(--tint), .26); }
 
 /* MODO LEVE: sem blur — sólido translúcido opaco (gotcha do modo performance) */
-:root[data-perf="lite"] .v2 .wa-pop.wa-filtro { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(20, 22, 26, .98); }
+:root[data-perf="lite"] .v2 .wa-pop.wa-filtro { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--surface); }
 
 /* TEMA CLARO */
 :root[data-tema="light"] .v2 .wa-pop.wa-filtro {
