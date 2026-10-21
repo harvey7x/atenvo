@@ -1,0 +1,29 @@
+-- 2026-10-21 — Índice mensagens (organizacao_id, criado_em) para o Dashboard v5
+-- (cópia do 20261014200100 do Dashboard v4, que nunca foi aplicado; mesmo nome e
+-- IF NOT EXISTS, então aplicar um dos dois basta).
+--
+-- POR QUÊ: o tempo de resposta por atendente (dash_v5_dados, bloco auto_ag … rv) lê as
+-- mensagens da org de [início − 1 dia, fim). Hoje mensagens só tem índice em
+-- (organizacao_id), (conversa_id, criado_em) e (conversa_id, enviada_em): o intervalo de
+-- datas não vira busca no índice e o custo cresce com o histórico da tabela (~202 mil
+-- linhas em 21/10), não com o período escolhido.
+--
+-- MEDIDO SEM ESTE ÍNDICE (EXPLAIN ANALYZE em produção, transação desfeita, 21/10 ~17:30):
+--   dash_v5_dados 7 dias  ≈ 245–290 ms (≈ 78 mil buffers, todos em cache)
+--   dash_v5_dados mês CAF ≈ 355–375 ms (≈ 115 mil buffers)
+-- Já está dentro da meta (< 3 s). O índice é para o custo não crescer junto com a tabela.
+--
+-- APLICAÇÃO: AO VIVO, FORA de transação. CREATE INDEX CONCURRENTLY não roda dentro de
+--   BEGIN/COMMIT. Este arquivo tem UM único comando de propósito: rodar sozinho com
+--   `supabase db query --linked -f <este arquivo>` (um comando só não abre bloco de
+--   transação). NÃO juntar com outro SQL no mesmo envio e NÃO pôr SET antes. Não trava
+--   escrita (mensagens recebe insert do webhook o tempo todo — sem CONCURRENTLY o build
+--   travaria esses inserts). Se falhar (ex.: statement_timeout esperando transação
+--   antiga), o índice fica INVALID e o IF NOT EXISTS passa a pular em silêncio: conferir
+--   pg_index.indisvalid e, se false, DROP INDEX CONCURRENTLY public.idx_mensagens_org_criado
+--   e rodar de novo. Num rebuild via `supabase db push` (que envolve a migration em
+--   BEGIN/COMMIT), remover a palavra CONCURRENTLY — numa base recém-criada o índice sai
+--   instantâneo.
+-- NÃO APLICADO: depende do ok do dono (junto com 20261021200000_dashboard_v5.sql).
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_mensagens_org_criado
+  ON public.mensagens (organizacao_id, criado_em);

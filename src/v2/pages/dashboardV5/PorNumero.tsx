@@ -1,0 +1,147 @@
+import { useState } from 'react';
+import type { CanalV5, KpisV5 } from '@/data/dashboardV5.tipos';
+import { fmtDuracaoH, fmtInt, fmtPct, fmtTelefone, pctDe, rotuloMotivoNe } from '@/data/dashboardV5.formato';
+import { Skeleton } from '../../components';
+import { Ajuda, Pop, PontoStatus, Secao, ancoraDe, type Ancora } from './comum';
+
+/* Entradas por número: todos os WhatsApp conectados (mesmo com zero) e uma linha
+   "Números antigos" para o que chega por números que já saíram. Não elegíveis e
+   fechados contam pela data em que foram marcados. */
+
+function TempoFechar({ med, media, n }: { med: number | null; media: number | null; n: number }) {
+  if (!n || med == null) return <span className="d5-mudo">—</span>;
+  return (
+    <span className="d5-cel2">
+      <b className="num">{fmtDuracaoH(med)}</b>
+      <small className="num">média {fmtDuracaoH(media)} · {fmtInt(n)}</small>
+    </span>
+  );
+}
+
+/** Contagem de não elegíveis com a quebra por motivo numa bolha (hover e foco). */
+function CelulaNe({ c }: { c: CanalV5 }) {
+  const [ancora, setAncora] = useState<Ancora | null>(null);
+  const motivos = Object.entries(c.neMotivos).filter(([, q]) => q > 0).sort((a, b) => b[1] - a[1]);
+  if (c.ne === 0) return <span className="num d5-mudo">0</span>;
+  const abrir = (el: Element) => setAncora(ancoraDe(el));
+  const fechar = () => setAncora(null);
+  const id = `d5-ne-${c.canalId ?? 'antigos'}`;
+  return (
+    <>
+      <button type="button" className="d5-ne-btn num" aria-describedby={ancora ? id : undefined}
+        aria-label={`${fmtInt(c.ne)} não elegíveis em ${c.nome}. Ver motivos`}
+        onMouseEnter={(e) => abrir(e.currentTarget)} onMouseLeave={fechar}
+        onFocus={(e) => abrir(e.currentTarget)} onBlur={fechar}>
+        {fmtInt(c.ne)}
+      </button>
+      <Pop ancora={ancora} id={id} largura={300}>
+        <span className="d5-pop-tit">{c.nome} · não elegíveis</span>
+        <ul className="d5-pop-lista">
+          {motivos.map(([m, q]) => (
+            <li key={m}>
+              <span>{rotuloMotivoNe(m)}</span>
+              <b className="num">{fmtInt(q)}</b>
+            </li>
+          ))}
+        </ul>
+      </Pop>
+    </>
+  );
+}
+
+export function PorNumero({ canais, kpis }: { canais: CanalV5[]; kpis: KpisV5 }) {
+  const totEnt = canais.reduce((s, c) => s + c.entradas, 0);
+  const totNe = canais.reduce((s, c) => s + c.ne, 0);
+  const totGan = canais.reduce((s, c) => s + c.ganhos, 0);
+  const maxEnt = Math.max(1, ...canais.map((c) => c.entradas));
+  const repetidos = totEnt - kpis.entradas;
+  return (
+    <Secao className="d5-num" titulo="Entradas por número"
+      sub="Todos os números conectados, mesmo sem entrada. Não elegíveis e fechados contam pelo dia da marcação.">
+      <div className="d5-tab-rolo">
+        <table className="d5-tab">
+          <colgroup>
+            <col className="d5-c-nome" /><col className="d5-c-ent" /><col className="d5-c-n" /><col className="d5-c-n" /><col className="d5-c-t" />
+          </colgroup>
+          <thead>
+            <tr>
+              <th scope="col">Número</th>
+              <th scope="col" className="d5-dir">Entradas</th>
+              <th scope="col" className="d5-dir">Não elegíveis</th>
+              <th scope="col" className="d5-dir">Fechados</th>
+              <th scope="col" className="d5-dir">
+                <span className="d5-th-ajuda">Tempo para fechar
+                  <Ajuda rotulo="Tempo para fechar" texto="Mediana do tempo entre a chegada do lead e o fechamento, de todos os fechados do período neste número. Embaixo: a média e quantos fecharam." />
+                </span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {canais.map((c) => {
+              const share = pctDe(c.entradas, totEnt);
+              return (
+                <tr key={c.canalId ?? 'antigos'} className={c.situacao === 'antigo' ? 'd5-lin-antigo' : undefined}>
+                  <th scope="row" className="d5-nome">
+                    <span className="d5-nome-in">
+                      <PontoStatus situacao={c.situacao} />
+                      <span className="d5-cel2">
+                        <b title={c.nome}>{c.situacao === 'antigo' ? 'Números antigos' : c.nome}</b>
+                        <small className="num">
+                          {c.situacao === 'antigo' ? 'Removidos ou desconectados' : fmtTelefone(c.numero)}
+                        </small>
+                      </span>
+                    </span>
+                  </th>
+                  <td className="d5-dir">
+                    <span className="d5-ent">
+                      <span className="d5-trilho" aria-hidden>
+                        <i style={{ width: `${c.entradas ? Math.max(2, (c.entradas / maxEnt) * 100) : 0}%` }} />
+                      </span>
+                      <b className={'num' + (c.entradas ? '' : ' d5-mudo')}>{fmtInt(c.entradas)}</b>
+                      <small className="num d5-pct">{share == null || !c.entradas ? '' : fmtPct(share)}</small>
+                    </span>
+                  </td>
+                  <td className="d5-dir"><CelulaNe c={c} /></td>
+                  <td className="d5-dir"><span className={'num' + (c.ganhos ? '' : ' d5-mudo')}>{fmtInt(c.ganhos)}</span></td>
+                  <td className="d5-dir"><TempoFechar med={c.fechMedianaH} media={c.fechMediaH} n={c.fechN} /></td>
+                </tr>
+              );
+            })}
+          </tbody>
+          <tfoot>
+            <tr>
+              <th scope="row" className="d5-nome">
+                <span className="d5-cel2 d5-tot-rot">
+                  <b>Total</b>
+                  {repetidos > 0 && (
+                    <small className="num">{fmtInt(kpis.entradas)} clientes diferentes</small>
+                  )}
+                </span>
+              </th>
+              <td className="d5-dir">
+                <span className="d5-ent">
+                  <span className="d5-trilho d5-trilho-vazio" aria-hidden />
+                  <b className="num">{fmtInt(totEnt)}</b>
+                  <small className="num d5-pct">{totEnt ? '100%' : ''}</small>
+                </span>
+              </td>
+              <td className="d5-dir"><b className="num">{fmtInt(totNe)}</b></td>
+              <td className="d5-dir"><b className="num">{fmtInt(totGan)}</b></td>
+              <td className="d5-dir"><TempoFechar med={kpis.fechMedianaH} media={kpis.fechMediaH} n={kpis.fechN} /></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </Secao>
+  );
+}
+
+export function PorNumeroSkeleton() {
+  return (
+    <Secao className="d5-num" titulo="Entradas por número">
+      <div className="d5-sk-linhas" aria-hidden>
+        {Array.from({ length: 6 }, (_, i) => <Skeleton key={i} altura={38} raio={6} />)}
+      </div>
+    </Secao>
+  );
+}

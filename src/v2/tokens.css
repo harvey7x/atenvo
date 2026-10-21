@@ -37,6 +37,11 @@
   --verde-rgb: 74, 190, 140;
   --ambar-rgb: 217, 164, 74;
   --rubro-rgb: 229, 102, 92;
+  /* Cor de DADO (série principal de gráficos e barras de contagem): FIXA. Não usa o
+     acento da gota (--azul), que vira dourado/verde e colide com âmbar (atenção) e
+     verde (ganho). Interação, foco e links seguem no acento. */
+  --dado-1: #5B8DEF;
+  --dado-1-rgb: 91, 141, 239;
   --r-card: 16px;
   --r-ctl: 9px;
   --fonte: 'Instrument Sans Variable', 'Instrument Sans', system-ui, sans-serif;
@@ -113,6 +118,8 @@ html[data-demo] .v2 { --fx: 1; }
   --verde-rgb: 62, 142, 107;
   --ambar-rgb: 158, 122, 46;
   --rubro-rgb: 178, 74, 60;
+  --dado-1: #2F5FB8;              /* dado no claro: azul fechado, longe do âmbar e do verde */
+  --dado-1-rgb: 47, 95, 184;
   --tint: 22, 25, 31;             /* tinta = grafite: superfícies em alpha viram escuras */
   --platina-a: #E4E8ED;           /* assinatura: platina LUMINOSA — prata escovada (o primo claro */
   --platina-b: #BAC1CC;           /* do botão do dark), NÃO preto. Gradiente claro→médio metálico. */
