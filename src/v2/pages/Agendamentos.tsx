@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useOrg } from '@/context/OrgContext';
 import { useOrgUsuarios } from '@/data/atendimento';
@@ -498,9 +498,11 @@ export default function AgendamentosV2() {
                         {painel.semana.map((s, i) => (
                           <button type="button" className="bwrap" key={s.iso} title={`Ver o dia ${s.iso.split('-').reverse().slice(0, 2).join('/')}`}
                             onClick={() => setFDia(s.iso)}>
-                            <span className="bval num" style={{ animationDelay: `${.6 + i * .06}s` }}>{s.total}</span>
+                            {/* cascata pela --mo-atraso (movimento.css 4.11): o animation-delay inline
+                                perdia para o shorthand !important da camada */}
+                            <span className="bval num" style={{ '--mo-atraso': `${i * 40}ms` } as CSSProperties}>{s.total}</span>
                             <span className={s.hoje ? 'barv hoje2' : 'barv'}
-                              style={{ height: `${Math.max(8, (s.total / painel.maxSemana) * 100)}%`, animationDelay: `${.25 + i * .07}s` }} />
+                              style={{ height: `${Math.max(8, (s.total / painel.maxSemana) * 100)}%`, '--mo-atraso': `${i * 40}ms` } as CSSProperties} />
                             <span className={s.hoje ? 'blab hoje-lb' : 'blab'}>{s.rotulo}</span>
                           </button>
                         ))}

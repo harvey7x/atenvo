@@ -7,6 +7,8 @@
    skinAurora.css (tokens --azul/--azul-rgb + gradientes hardcoded),
    kanban/dashboard/shell/login e as vars --lg-* da LogoAtenvo. */
 
+import { semTransicao } from './semTransicao';
+
 export type Acento = 'azul' | 'verde' | 'dourado';
 
 export const CHAVE_ACENTO = 'atenvo-acento';
@@ -23,8 +25,12 @@ export function lerAcento(): Acento {
 /* azul = atributo AUSENTE de propósito: o CSS do azul é o caminho sem
    guarda nenhuma, então remover o atributo devolve produção exata */
 export function aplicarAcento(acento: Acento): void {
-  if (acento === 'azul') document.documentElement.removeAttribute('data-acento');
-  else document.documentElement.setAttribute('data-acento', acento);
+  const raiz = document.documentElement;
+  if ((raiz.getAttribute('data-acento') ?? 'azul') === acento) return;
+  semTransicao(() => {
+    if (acento === 'azul') raiz.removeAttribute('data-acento');
+    else raiz.setAttribute('data-acento', acento);
+  });
 }
 
 type OuvinteAcento = (acento: Acento) => void;

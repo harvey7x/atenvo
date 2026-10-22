@@ -367,7 +367,7 @@ export default function CobrancasV2() {
             </div>
           </div>
 
-          <CardVidro spot sobe style={{ borderRadius: 'var(--r-card)', animationDelay: '.18s' }}>
+          <CardVidro spot sobe className="mo-fixo" style={{ borderRadius: 'var(--r-card)', animationDelay: '.18s' }}>
             {lista.length === 0 ? (
               cobrancas.length === 0 ? (
                 <EstadoVazio

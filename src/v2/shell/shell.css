@@ -453,7 +453,10 @@ html:root[data-visual="corp"][data-tema="light"] .v2 .sb-fundo, html:root[data-v
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .7), 0 18px 44px rgba(22, 25, 31, .18);
 }
 /* modo Leve: sem blur o translúcido vira mingau — volta à carta sólida do light */
-:root[data-perf="lite"][data-tema="light"] .v2 .notif.vidro { background: linear-gradient(180deg, #FFFFFF, #FBFCFD); box-shadow: var(--sombra-2); }
+:root[data-perf="lite"][data-tema="light"] .v2 .notif.vidro {
+  background: linear-gradient(180deg, #FFFFFF, #FBFCFD); box-shadow: var(--sombra-2);
+  backdrop-filter: none; -webkit-backdrop-filter: none; /* carta sólida: o blur(28px) seguia ativo e o toast agora DESLIZA no Leve */
+}
 /* menu do usuário: superfície sólida escura → branca com sombra real */
 /* (par light do .usuario-menu herdado dos tokens --surface/--shadow-pop) */
 /* dots (pulso do sino, minis da sidebar recolhida): branco → accent, borda clara */
@@ -498,23 +501,23 @@ html:root[data-visual="corp"][data-tema="light"] .v2 .sb-fundo, html:root[data-v
 .v2 .intro-palco { width: min(660px, 100%); margin: auto; text-align: center; }
 
 /* cascata (8 filhos: marca, data, título, sub, stats, aparência, CTA, nota) */
-.v2 .intro-palco > * { opacity: 0; animation: it-sobe .6s var(--ease) forwards; }
-.v2 .intro-palco > *:nth-child(1) { animation-delay: .08s; }
-.v2 .intro-palco > *:nth-child(2) { animation-delay: .2s; }
-.v2 .intro-palco > *:nth-child(3) { animation-delay: .3s; }
-.v2 .intro-palco > *:nth-child(4) { animation-delay: .42s; }
-.v2 .intro-palco > *:nth-child(5) { animation-delay: .56s; }
-.v2 .intro-palco > *:nth-child(6) { animation-delay: .72s; }
-.v2 .intro-palco > *:nth-child(7) { animation-delay: .84s; }
-.v2 .intro-palco > *:nth-child(8) { animation-delay: .96s; }
+.v2 .intro-palco > .it-p { opacity: 0; animation: it-sobe .6s var(--ease) forwards; }
+.v2 .intro-palco > .it-p:nth-child(1) { animation-delay: .08s; }
+.v2 .intro-palco > .it-p:nth-child(2) { animation-delay: .2s; }
+.v2 .intro-palco > .it-p:nth-child(3) { animation-delay: .3s; }
+.v2 .intro-palco > .it-p:nth-child(4) { animation-delay: .42s; }
+.v2 .intro-palco > .it-p:nth-child(5) { animation-delay: .56s; }
+.v2 .intro-palco > .it-p:nth-child(6) { animation-delay: .72s; }
+.v2 .intro-palco > .it-p:nth-child(7) { animation-delay: .84s; }
+.v2 .intro-palco > .it-p:nth-child(8) { animation-delay: .96s; }
 @keyframes it-sobe { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
 @keyframes it-fade { from { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
-  .v2 .intro-veu, .v2 .intro-palco > * { animation: none; opacity: 1; }
+  .v2 .intro-veu, .v2 .intro-palco > .it-p { animation: none; opacity: 1; }
 }
 /* MODO LEVE mata toda animação (base.css) — estado final obrigatório, senão
    o opacity:0 de nascença fica pra sempre (bug do dono 28/08) */
-:root[data-perf="lite"] .v2 .intro-palco > * { opacity: 1; transform: none; }
+:root[data-perf="lite"] .v2 .intro-palco > .it-p { opacity: 1; transform: none; }
 
 /* marca: glow discreto que segue o acento pelo triplet */
 .v2 .it-marca {

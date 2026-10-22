@@ -18,9 +18,17 @@
    - Só transform, opacity, cores, box-shadow (elementos pequenos ou um
      cartão por vez), outline e --sb-fio. Nada de layout por frame,
      nada de filter/blur animado, nenhuma promoção de camada fixa no CSS.
+     Cartão grande (≳100 mil px²) NÃO transiciona sombra: repinta e
+     re-rasteriza o cartão inteiro a cada quadro.
    - Listas que re-renderizam por realtime/polling (inbox, fio da
      conversa, kanban, pós-venda, pendências) ganham SÓ transição de
      hover/press: reordenar re-insere nós e reiniciaria as animações.
+     Na lista do inbox, só propriedades do compositor (transform/opacity):
+     rolar com o mouse em cima passa o hover por dezenas de cards.
+   - Seletores: a classe fica SEMPRE no fim (nada de `:is(...)` ou `*` no
+     composto da direita) — o Blink indexa a regra pela classe; o resto
+     cai no balde universal e é testado contra todo elemento.
+   - Troca de tema/acento não anima (lib/semTransicao.ts).
    - Reverter tudo = apagar o import no main.tsx.
    ============================================================ */
 
@@ -33,17 +41,15 @@
   --mo-m: 180ms;    /* médio: foco, popover/menu, modal, véu, drawer, toggle, linha, card, aba, página */
   --mo-l: 240ms;    /* longo: sidebar, toast (entrada), pop de contador, pílula ativa, login, intro */
   --mo-dado: 700ms; /* revelação de dado (barras) — o mesmo d5-cresce do Dashboard */
-  /* curvas (só duas) */
+  /* curvas (só duas):
+     --mo-pad = TROCA DE ESTADO (hover, seleção, cor, saída, deslize de algo já visível);
+     --mo-enf = ENTRADA (tudo que nasce de opacity 0, abre ou encaixa) — a partida lenta
+     da --mo-pad deixaria o conteúdo novo quase invisível nos primeiros 60ms (pisca). */
   --mo-pad: cubic-bezier(.2, 0, .38, .9);  /* padrão = Carbon productive-standard (= --ease do corp) */
-  --mo-enf: cubic-bezier(.05, .7, .1, 1);  /* enfática: desaceleração forte para o que ENTRA/abre/encaixa */
-  /* distâncias */
-  --mo-d1: 2px;  --mo-d2: 3px;  --mo-d3: 4px;   /* nudges e subidas */
-  --mo-viagem: 12px;                            /* superfícies ancoradas na borda: drawer, toast */
+  --mo-enf: cubic-bezier(.05, .7, .1, 1);  /* enfática: desaceleração forte */
   /* escalas */
   --mo-aperta: .97;     /* press em botão/chip/aba com texto */
   --mo-aperta-ic: .94;  /* press em botão-ícone ≤ 36px (abaixo de .96 o press some num alvo de 26px) */
-  --mo-abre: .98;       /* escala de partida de popover/menu */
-  --mo-pop: 1.15;       /* pico do pop de contador (one-shot) */
   /* linguagem do Dashboard (dashboardV5.css: .d5-kpi:hover e fio da linha) */
   --mo-sombra-card: 0 0 0 1px rgba(var(--azul-rgb, 76, 141, 255), .32), 0 14px 30px -16px rgba(0, 0, 0, .55);
   --mo-trilho: var(--azul, #4C8DFF);            /* fio de 3px da linha em hover */
@@ -71,15 +77,18 @@
    outline é transparente para a cor e o afastamento "assentarem" em 180ms;
    fora de forced-colors (lá o transparente viraria contorno visível). */
 @media (forced-colors: none) {
-  .v2 .p-btn, .v2 .ib, .v2 .ib2, .v2 .chip, .v2 .cmsg .tool, .v2 .env-b { outline: 2px solid transparent; outline-offset: 0; }
+  .v2 .p-btn, .v2 .ib, .v2 .ib2, .v2 .chip, .v2 .cmsg .tool, .v2 .env-b,
+  .v2 .avatar-btn, .v2 .cbx, .v2 .cnt-wa, .v2 .pd-icb, .v2 .pt-icb { outline: 2px solid transparent; outline-offset: 0; }
 }
 .v2 .p-btn:focus-visible, .v2 .ib:focus-visible, .v2 .ib2:focus-visible, .v2 .chip:focus-visible,
-.v2 .cmsg .tool:focus-visible, .v2 .env-b:focus-visible { outline: 2px solid var(--mo-anel); outline-offset: 2px; }
+.v2 .cmsg .tool:focus-visible, .v2 .env-b:focus-visible,
+.v2 .avatar-btn:focus-visible, .v2 .cbx:focus-visible, .v2 .cnt-wa:focus-visible,
+.v2 .pd-icb:focus-visible, .v2 .pt-icb:focus-visible { outline: 2px solid var(--mo-anel); outline-offset: 2px; }
 /* enviar: aro fino no hover (outline, para não apagar o box-shadow da pele) */
 .v2 .env-b:hover:not(:disabled):not(:focus-visible) { outline: 2px solid rgba(var(--azul-rgb, 76, 141, 255), .22); outline-offset: 0; }
 
 /* hovers que faltavam */
-.v2 .chip:hover:not(.on) { background: rgba(var(--tint), .075); color: var(--txt); }
+.v2 .chip:hover:not(.on):not(:disabled) { background: rgba(var(--tint), .075); color: var(--txt); }
 .v2 .pag button:hover:not(:disabled):not(.on) { background: rgba(var(--tint), .07); }
 .v2 .segm button:hover:not(.on) { color: var(--txt); background: rgba(var(--tint), .05); }
 
@@ -89,8 +98,13 @@
   box-shadow: 0 0 0 3px rgba(var(--azul-rgb, 76, 141, 255), .1);
 }
 
+/* toggle: trilho LIGADO numa cor só (o "um azul" do corp, segue o acento) — o
+   gradiente das peles não interpola, e o trilho trocava seco no quadro 0 com o
+   botão ainda à esquerda. Cor chapada ↔ cor chapada = esmaece junto com o botão. */
+html:root[data-perf] .v2.app-v2 .tgl:not(.off) { background: var(--azul, var(--platina-a)); }
+
 /* linhas de tabela (TabelaPadrao → .mo-tab): o fio azul do Dashboard + avatar aceso */
-.v2 .mo-tab tbody tr:hover > :first-child { box-shadow: inset 3px 0 0 var(--mo-trilho); }
+.v2 .mo-tab tbody tr:hover > td:first-child { box-shadow: inset 3px 0 0 var(--mo-trilho); }
 .v2 .mo-tab tbody tr:hover .cnt-av { box-shadow: inset 0 0 0 1px var(--mo-aro); }
 
 /* pós-venda: avatar aceso (sem fio: a linha não tem recuo — o fio cairia por cima do avatar) */
@@ -104,31 +118,51 @@
 }
 .v2 .pd-lin:not(.pd-lin-esq):hover .pd-av, .v2 .pt-lin:not(.pt-lin-esq):hover .pt-av { box-shadow: inset 0 0 0 1px var(--mo-aro); }
 
-/* cartões clicáveis/de resumo: sobem 2px com o fio azul do Dashboard. Prefixo
-   html:root[data-perf] para vencer o .v2 .spot:hover (--sombra-2) seja qual for
-   a ordem de carga dos chunks. */
-html:root[data-perf] .v2 :is(.kpi, .rl2-kpi, .pv-hero, .int-card, .ars-card, .pd-mod, .conv-tipo, .pd-tipo, .ferr-kpi):hover {
+/* cartões: no corp NENHUM .spot sobe por padrão (o base.css levantava todo cartão de
+   vidro — painéis de 1308×510 com sombra animada, sugerindo um clique que não existe).
+   Só a família de ladrilhos pequenos de resumo/atalho sobe 2px com o fio azul do
+   Dashboard. Mesma especificidade (0,5,1): a família vem DEPOIS e vence; prefixo
+   html:root[data-perf] para vencer o .v2 .spot:hover do base.css em qualquer ordem. */
+html:root[data-perf] .v2 .spot:hover { transform: none; box-shadow: var(--sombra-1); }
+html:root[data-perf] .v2 .kpi:hover,
+html:root[data-perf] .v2 .rl2-kpi:hover,
+html:root[data-perf] .v2 .pv-hero:hover,
+html:root[data-perf] .v2 .ars-card:hover,
+html:root[data-perf] .v2 .pd-mod:hover,
+html:root[data-perf] .v2 .conv-tipo:hover,
+html:root[data-perf] .v2 .pd-tipo:hover,
+html:root[data-perf] .v2 .ferr-kpi:hover {
   transform: translateY(-2px); box-shadow: var(--mo-sombra-card);
 }
-/* contêineres de tabela/lista NÃO sobem: animar a sombra de um cartão grande
-   repinta uma área enorme e o "salto" de uma tabela inteira lê errado */
-html:root[data-perf] .v2 :is(.mo-fixo, .cfg-painel, .cm-ciclo, .rl2-painel).spot:hover { transform: none; box-shadow: var(--sombra-1); }
+/* marcação explícita "não sobe" (tabelas/listas), mesmo se um dia ganhar classe da família */
+html:root[data-perf] .v2 .mo-fixo.spot:hover { transform: none; box-shadow: var(--sombra-1); }
 
 /* inbox: o fio da esquerda "espia" (40%) nos cards neutros e cresce no hover;
-   tier (crítico/vermelho/âmbar) e conversa ativa seguem com o fio cheio */
+   tier (crítico/vermelho/âmbar) e conversa ativa seguem com o fio cheio.
+   Fundo, cor do fio e aro do avatar trocam SECOS (só o scaleY desliza). */
 .v2 .conv2:not(.ativa):not(.t-critico):not(.t-vermelho):not(.t-ambar)::before { transform: scaleY(.4); }
 .v2 .conv2:not(.ativa):not(.t-critico):not(.t-vermelho):not(.t-ambar):hover::before { transform: scaleY(.7); background: rgba(var(--azul-rgb, 76, 141, 255), .5); }
 .v2 .conv2:hover .av2 { box-shadow: inset 0 1px 0 rgba(var(--tint), .14), 0 0 0 1px var(--mo-aro); }
 
 /* kanban: avatar do responsável acende (o âmbar do "sem dono" fica) */
 .v2 .kc:hover .kc-av:not(.semdono) { box-shadow: inset 0 0 0 1px var(--mo-aro); }
-/* "pegar" o card: no kanban.css o :hover vem depois e engolia a inclinação/sombra do
-   .drag (durante o arrasto o card de origem segue em :hover). Mesmos valores de lá. */
-html:root[data-perf] .v2 .kc.drag { transform: rotate(-1.6deg); box-shadow: 0 18px 40px rgba(0, 0, 0, .55); }
-html:root[data-perf][data-tema="light"] .v2 .kc.drag { box-shadow: var(--sombra-2); }
+/* arrastar: o card de ORIGEM vira lugar-marcado esmaecido (quem segue o cursor é o
+   fantasma nativo do navegador — inclinar/levantar a origem mostrava dois cards
+   "pegos"). Vence o :hover do kanban.css (a origem segue em :hover no arrasto). */
+html:root[data-perf] .v2 .kc.drag { transform: none; box-shadow: none; opacity: .5; }
 
 /* barras de atividade: a barra sob o mouse se destaca pelas vizinhas recuarem (sem filter) */
 .v2 .barras:hover .bwrap:not(:hover) .barv { opacity: .55; }
+
+/* Configurações: o retorno ("Status desativado", erros) FLUTUA em vez de entrar no
+   topo da página — empurrava todo o conteúdo ~45px e o toggle fugia do cursor.
+   Mesma anatomia do aviso flutuante da conversa (whatsapp.css .wa-conv > .aviso-inline);
+   (0,3,1) vence o fundo do .aviso-inline/.erro (0,2,0)/(0,3,0) em qualquer ordem de carga. */
+html .v2 .aviso-inline.cfg-aviso {
+  position: fixed; left: calc(50% + 42px); bottom: 28px; transform: translateX(-50%); z-index: 60;
+  margin: 0; width: max-content; max-width: min(560px, calc(100vw - 140px));
+  background: var(--surface); box-shadow: var(--sombra-2);
+}
 
 /* ============================================================
    MOVIMENTO (só sem "reduzir movimento")
@@ -136,46 +170,82 @@ html:root[data-perf][data-tema="light"] .v2 .kc.drag { box-shadow: var(--sombra-
 @media (prefers-reduced-motion: no-preference) {
 
   /* ---------- 2. KEYFRAMES (prefixo v2-mo-; só from{}, fill backwards) ---------- */
-  @keyframes v2-mo-pagina   { from { opacity: 0; transform: translateY(4px); } }             /* --mo-d3 */
+  @keyframes v2-mo-sobe     { from { opacity: 0; transform: translateY(4px); } }             /* página, modal (sem escala: vidro com blur), retorno inline */
   @keyframes v2-mo-esmaece  { from { opacity: 0; } }
-  @keyframes v2-mo-sobe     { from { opacity: 0; transform: translateY(4px); } }             /* --mo-d3: retorno inline */
-  @keyframes v2-mo-cai      { from { opacity: 0; transform: translateY(-3px) scale(.98); } } /* --mo-d2/--mo-abre: menu que abre p/ baixo */
-  @keyframes v2-mo-surge    { from { opacity: 0; transform: scale(.98); } }                  /* --mo-abre: popover sem direção fixa */
-  @keyframes v2-mo-modal    { from { opacity: 0; transform: translateY(4px); } }             /* sem scale: vidro com blur */
-  @keyframes v2-mo-desliza  { from { opacity: 0; transform: translateX(12px); } }            /* --mo-viagem: drawer */
-  @keyframes v2-mo-pop      { 40% { transform: scale(1.15); } }                              /* --mo-pop: contador, compõe com o repouso */
+  @keyframes v2-mo-veu      { from { background-color: transparent; } }                      /* véu do modal: a COR entra, não a opacity (ver 4.5) */
+  @keyframes v2-mo-cai      { from { opacity: 0; transform: translateY(-3px) scale(.98); } } /* menu que abre p/ baixo */
+  @keyframes v2-mo-surge    { from { opacity: 0; transform: scale(.98); } }                  /* popover sem direção fixa */
+  @keyframes v2-mo-desliza  { from { opacity: 0; transform: translateX(12px); } }            /* drawer (viagem de 12px) */
+  @keyframes v2-mo-pop      { 40% { transform: scale(1.15); } }                              /* contador, compõe com o repouso */
   @keyframes v2-mo-pilula   { from { opacity: .4; transform: scale(.96); } }                 /* item ativo da sidebar */
   @keyframes v2-mo-marca    { from { opacity: 0; transform: rotate(45deg) scale(.5); } }     /* check do .cbx (base é rotate 45) */
   @keyframes v2-mo-abre-y   { from { opacity: 0; transform: scaleY(.85); } }                 /* fantasma do kanban, fio da linha */
   @keyframes v2-mo-cresce-y { from { transform: scaleY(0); } }                               /* .barv (--mo-dado) */
   @keyframes v2-mo-respira  { to   { opacity: .55; } }                                       /* skeleton (alternate) */
-  @keyframes v2-mo-sobe-it  { from { opacity: 0; transform: translate(-50%, 6px); } }        /* centrado por translateX(-50%) */
+  @keyframes v2-mo-sobe-it  { from { opacity: 0; transform: translate(-50%, 6px); } }        /* centrados por translateX(-50%) */
 
   /* ---------- 3. GLOBAL ---------- */
 
   /* 4.1 controles — cor/fundo a 120ms, anel a 180ms, press a 120ms */
-  html:root[data-perf] .v2 :is(.p-btn, .ib, .ib2, .chip, .env-b, .wa-chipbtn, .wa-scr-btn, .kb-fchip, .mbtn,
-    .kb-col-toggle, .wa-abas-seta, .midia-dl, .entrar, .ferr-drop, .cfa-kebab),
+  html:root[data-perf] .v2 .p-btn,
+  html:root[data-perf] .v2 .ib,
+  html:root[data-perf] .v2 .ib2,
+  html:root[data-perf] .v2 .chip,
+  html:root[data-perf] .v2 .env-b,
+  html:root[data-perf] .v2 .wa-chipbtn,
+  html:root[data-perf] .v2 .wa-scr-btn,
+  html:root[data-perf] .v2 .kb-fchip,
+  html:root[data-perf] .v2 .mbtn,
+  html:root[data-perf] .v2 .kb-col-toggle,
+  html:root[data-perf] .v2 .wa-abas-seta,
+  html:root[data-perf] .v2 .midia-dl,
+  html:root[data-perf] .v2 .entrar,
+  html:root[data-perf] .v2 .ferr-drop,
+  html:root[data-perf] .v2 .cfa-kebab,
+  html:root[data-perf] .v2 .cnt-wa,
+  html:root[data-perf] .v2 .pd-icb,
+  html:root[data-perf] .v2 .pt-icb,
   html:root[data-perf] .v2 .cmsg .tool,
   html:root[data-perf] .v2 .pag button,
   html:root[data-perf] .v2 .audio2 .play {
     transition: var(--mo-tr-ctl) !important;
   }
   /* press: escala só em quem NÃO é posicionado por transform (.wa-abas-seta e .midia-dl ficam de fora) */
-  html:root[data-perf] .v2 :is(.p-btn, .chip, .wa-chipbtn, .kb-fchip, .entrar, .wa-aba, .spl-pill):active:not(:disabled),
+  html:root[data-perf] .v2 .p-btn:active:not(:disabled),
+  html:root[data-perf] .v2 .chip:active:not(:disabled),
+  html:root[data-perf] .v2 .wa-chipbtn:active:not(:disabled),
+  html:root[data-perf] .v2 .kb-fchip:active:not(:disabled),
+  html:root[data-perf] .v2 .entrar:active:not(:disabled),
+  html:root[data-perf] .v2 .wa-aba:active:not(:disabled),
+  html:root[data-perf] .v2 .spl-pill:active:not(:disabled),
   html:root[data-perf] .v2 .segm button:active:not(:disabled),
   html:root[data-perf] .v2 .pag button:active:not(:disabled) {
     transform: scale(var(--mo-aperta)) !important;
   }
-  html:root[data-perf] .v2 :is(.ib, .ib2, .env-b, .wa-scr-btn, .mbtn, .wa-pin, .avatar-btn, .cfa-kebab):active:not(:disabled),
+  html:root[data-perf] .v2 .ib:active:not(:disabled),
+  html:root[data-perf] .v2 .ib2:active:not(:disabled),
+  html:root[data-perf] .v2 .env-b:active:not(:disabled),
+  html:root[data-perf] .v2 .wa-scr-btn:active:not(:disabled),
+  html:root[data-perf] .v2 .mbtn:active:not(:disabled),
+  html:root[data-perf] .v2 .wa-pin:active:not(:disabled),
+  html:root[data-perf] .v2 .avatar-btn:active:not(:disabled),
+  html:root[data-perf] .v2 .cfa-kebab:active:not(:disabled),
+  html:root[data-perf] .v2 .cnt-wa:active:not(:disabled),
+  html:root[data-perf] .v2 .pd-icb:active:not(:disabled),
+  html:root[data-perf] .v2 .pt-icb:active:not(:disabled),
   html:root[data-perf] .v2 .cmsg .tool:active:not(:disabled),
   html:root[data-perf] .v2 .audio2 .play:active:not(:disabled) {
     transform: scale(var(--mo-aperta-ic)) !important;
   }
-  html:root[data-perf] .v2 :is(.conv-tipo, .pd-tipo, .ferr-drop):active { transform: scale(.985) !important; }
+  html:root[data-perf] .v2 .conv-tipo:active,
+  html:root[data-perf] .v2 .pd-tipo:active,
+  html:root[data-perf] .v2 .ferr-drop:active { transform: scale(.985) !important; }
   html:root[data-perf] .v2 .scr-fav:active { transform: scale(.9) !important; }
-  /* avatar da topbar: aro existente + press */
-  html:root[data-perf] .v2 .avatar-btn { transition: box-shadow var(--mo-m) var(--mo-pad), transform var(--mo-r) var(--mo-pad) !important; }
+  /* avatar da topbar: aro existente + anel de foco + press */
+  html:root[data-perf] .v2 .avatar-btn {
+    transition: box-shadow var(--mo-m) var(--mo-pad), outline-color var(--mo-m) var(--mo-pad),
+                outline-offset var(--mo-m) var(--mo-pad), transform var(--mo-r) var(--mo-pad) !important;
+  }
   /* enviar: a seta "vai" no hover (o deslocamento está no bloco hover-only) */
   html:root[data-perf] .v2 .env-b svg { transition: transform var(--mo-r) var(--mo-pad) !important; }
   /* campos: o anel do foco anima UMA vez ao focar; nada por tecla, nunca height (o JS redimensiona) */
@@ -194,32 +264,36 @@ html:root[data-perf][data-tema="light"] .v2 .kc.drag { box-shadow: var(--sombra-
   html:root[data-perf] .v2 .wa-grupo .seta { transition: transform var(--mo-m) var(--mo-pad) !important; }
 
   /* 4.2 seleção — o .on/.sel troca em crossfade */
-  html:root[data-perf] .v2 .segm button {
-    transition: background-color var(--mo-m) var(--mo-pad), color var(--mo-m) var(--mo-pad),
-                box-shadow var(--mo-m) var(--mo-pad), transform var(--mo-r) var(--mo-pad) !important;
-  }
+  html:root[data-perf] .v2 .segm button,
   html:root[data-perf] .v2 .wa-aba {
     transition: background-color var(--mo-m) var(--mo-pad), color var(--mo-m) var(--mo-pad),
                 box-shadow var(--mo-m) var(--mo-pad), transform var(--mo-r) var(--mo-pad) !important;
   }
   html:root[data-perf] .v2 .wa-aba .n { transition: background-color var(--mo-m) var(--mo-pad), color var(--mo-m) var(--mo-pad) !important; }
-  html:root[data-perf] .v2 :is(.pd-nav-it, .pt-nav-it, .mv-nav-it, .cob-aba),
+  html:root[data-perf] .v2 .pd-nav-it,
+  html:root[data-perf] .v2 .pt-nav-it,
+  html:root[data-perf] .v2 .mv-nav-it,
   html:root[data-perf] .v2 .cfg-nav .it { transition: var(--mo-tr-fundo) !important; }
   html:root[data-perf] .v2 .spl-pill { transition: var(--mo-tr-fundo), transform var(--mo-r) var(--mo-pad) !important; }
   /* Configurações: o painel da aba escolhida esmaece ao entrar (display none → block) */
-  html:root[data-perf] .v2 .cfg-aba.on { animation: v2-mo-esmaece var(--mo-m) var(--mo-pad) backwards !important; }
-  /* toggle: o botão DESLIZA (geometria left+translateX em componentes.css); o trilho é
-     gradiente e troca seco — gradiente não interpola */
+  html:root[data-perf] .v2 .cfg-aba.on { animation: v2-mo-esmaece var(--mo-r) var(--mo-enf) backwards !important; }
+  /* toggle: o botão DESLIZA (geometria left+translateX em componentes.css) e o trilho
+     (cor chapada, seção 1) esmaece no mesmo passo */
+  html:root[data-perf] .v2 .tgl { transition: background-color var(--mo-m) var(--mo-pad), box-shadow var(--mo-m) var(--mo-pad) !important; }
   html:root[data-perf] .v2 .tgl::after {
     transition: transform var(--mo-m) var(--mo-enf), background-color var(--mo-m) var(--mo-pad) !important;
   }
-  /* checkbox: fundo/borda e o "v" que se desenha (o ::after nasce com o .on → toca uma vez) */
-  html:root[data-perf] .v2 .cbx { transition: background-color var(--mo-r) var(--mo-pad), border-color var(--mo-r) var(--mo-pad) !important; }
+  /* checkbox: fundo/borda, anel de foco e o "v" que se desenha (o ::after nasce com o .on → toca uma vez) */
+  html:root[data-perf] .v2 .cbx {
+    transition: background-color var(--mo-r) var(--mo-pad), border-color var(--mo-r) var(--mo-pad),
+                outline-color var(--mo-m) var(--mo-pad), outline-offset var(--mo-m) var(--mo-pad) !important;
+  }
   html:root[data-perf] .v2 .cbx.on::after { animation: v2-mo-marca var(--mo-r) var(--mo-enf) backwards !important; }
   /* barra de seleção em massa: monta por ação do usuário */
   html:root[data-perf] .v2 .bulk { transform-origin: top; animation: v2-mo-cai var(--mo-m) var(--mo-enf) backwards !important; }
   /* manual: quiz, checklist, sanfona */
-  html:root[data-perf] .v2 :is(.mv-opcao, .mv-check-it) {
+  html:root[data-perf] .v2 .mv-opcao,
+  html:root[data-perf] .v2 .mv-check-it {
     transition: background-color var(--mo-m) var(--mo-pad), border-color var(--mo-m) var(--mo-pad), color var(--mo-m) var(--mo-pad) !important;
   }
   html:root[data-perf] .v2 .mv-sanf-it > button { transition: var(--mo-tr-fundo) !important; }
@@ -227,9 +301,16 @@ html:root[data-perf][data-tema="light"] .v2 .kc.drag { box-shadow: var(--sombra-
 
   /* 4.3 linhas — SÓ transição de hover, nunca entrada */
   html:root[data-perf] .v2 tbody tr { transition: background-color var(--mo-m) var(--mo-pad) !important; }
-  html:root[data-perf] .v2 .mo-tab tbody tr > :first-child { transition: box-shadow var(--mo-m) var(--mo-pad) !important; }
+  html:root[data-perf] .v2 .mo-tab tbody tr > td:first-child { transition: box-shadow var(--mo-m) var(--mo-pad) !important; }
   html:root[data-perf] .v2 .mo-tab .cnt-av { transition: box-shadow var(--mo-m) var(--mo-pad) !important; }
-  html:root[data-perf] .v2 :is(.li, .tl-item, .combo-item, .um-item, .np-item, .ctp-item, .ferr-item, .etqp-it),
+  html:root[data-perf] .v2 .li,
+  html:root[data-perf] .v2 .tl-item,
+  html:root[data-perf] .v2 .combo-item,
+  html:root[data-perf] .v2 .um-item,
+  html:root[data-perf] .v2 .np-item,
+  html:root[data-perf] .v2 .ctp-item,
+  html:root[data-perf] .v2 .ferr-item,
+  html:root[data-perf] .v2 .etqp-it,
   html:root[data-perf] .v2 .wa-pop .it,
   html:root[data-perf] .v2 .kb-menu .it,
   html:root[data-perf] .v2 .cfa-menu .mi,
@@ -244,37 +325,70 @@ html:root[data-perf][data-tema="light"] .v2 .kc.drag { box-shadow: var(--sombra-
   html:root[data-perf] .v2 .pv-av { transition: border-color var(--mo-m) var(--mo-pad) !important; }
   html:root[data-perf] .v2 .pv-fila-tx .nm,
   html:root[data-perf] .v2 .pv-tab .lin > span:first-child { transition: transform var(--mo-m) var(--mo-pad) !important; }
-  /* pendências/portabilidades: o fio do hover nasce no hover (pseudo gerado) → abre uma vez por linha */
-  html:root[data-perf] .v2 :is(.pd-lin, .pt-lin) { transition: background-color var(--mo-r) var(--mo-pad) !important; }
-  html:root[data-perf] .v2 :is(.pd-lin, .pt-lin)::after { transform-origin: center; animation: v2-mo-abre-y var(--mo-m) var(--mo-enf) backwards !important; }
-  html:root[data-perf] .v2 :is(.pd-lin-nome, .pt-lin-nome) { transition: transform var(--mo-m) var(--mo-pad) !important; }
-  html:root[data-perf] .v2 :is(.pd-av, .pt-av) { transition: box-shadow var(--mo-m) var(--mo-pad), background-color var(--mo-m) var(--mo-pad), color var(--mo-m) var(--mo-pad) !important; }
+  /* pendências/portabilidades: o fio do hover nasce no hover (pseudo gerado) → abre uma vez
+     por linha. SÓ o do hover: o fio da linha ATIVA ([data-ativo]::after) é permanente e
+     tocaria de novo a cada reordenação da lista (o React re-insere o nó). */
+  html:root[data-perf] .v2 .pd-lin,
+  html:root[data-perf] .v2 .pt-lin { transition: background-color var(--mo-r) var(--mo-pad) !important; }
+  html:root[data-perf] .v2 .pd-lin:not([data-ativo]):not(.pd-lin-esq):hover::after,
+  html:root[data-perf] .v2 .pt-lin:not([data-ativo]):not(.pt-lin-esq):hover::after {
+    transform-origin: center; animation: v2-mo-abre-y var(--mo-m) var(--mo-enf) backwards !important;
+  }
+  html:root[data-perf] .v2 .pd-lin-nome,
+  html:root[data-perf] .v2 .pt-lin-nome { transition: transform var(--mo-m) var(--mo-pad) !important; }
+  html:root[data-perf] .v2 .pd-av,
+  html:root[data-perf] .v2 .pt-av { transition: box-shadow var(--mo-m) var(--mo-pad), background-color var(--mo-m) var(--mo-pad), color var(--mo-m) var(--mo-pad) !important; }
 
-  /* 4.4 cartões — o lift que já existe passa a deslizar; família clicável/resumo depois
-     (lista SUPERCONJUNTO das propriedades: ganha o empate pela ordem) */
-  html:root[data-perf] .v2 .spot { transition: var(--mo-tr-card) !important; }
-  html:root[data-perf] .v2 :is(.kpi, .rl2-kpi, .pv-hero, .int-card, .ars-card, .pd-mod, .conv-tipo, .pd-tipo, .ferr-kpi) {
+  /* 4.4 cartões — .spot genérico não sobe (seção 1): só transform/borda, NUNCA a sombra
+     (cartão grande repintaria inteiro por quadro). A família de ladrilhos pequenos vem
+     depois com a lista SUPERCONJUNTO (sombra incluída): ganha o empate pela ordem. */
+  html:root[data-perf] .v2 .spot { transition: transform var(--mo-m) var(--mo-pad), border-color var(--mo-m) var(--mo-pad) !important; }
+  html:root[data-perf] .v2 .kpi,
+  html:root[data-perf] .v2 .rl2-kpi,
+  html:root[data-perf] .v2 .pv-hero,
+  html:root[data-perf] .v2 .ars-card,
+  html:root[data-perf] .v2 .pd-mod,
+  html:root[data-perf] .v2 .conv-tipo,
+  html:root[data-perf] .v2 .pd-tipo,
+  html:root[data-perf] .v2 .ferr-kpi {
     transition: var(--mo-tr-card), background-color var(--mo-r) var(--mo-pad), color var(--mo-r) var(--mo-pad) !important;
   }
 
   /* 4.5 abrir — menus, popovers, modal, drawer, toast, avisos (só entrada; saída = desmontagem) */
-  html:root[data-perf] .v2 :is(.usuario-menu, .kb-menu, .wa-pop, .combo-pop, .cfa-menu, .cor-pop, .pd-menu, .pt-menu) {
+  html:root[data-perf] .v2 .usuario-menu,
+  html:root[data-perf] .v2 .kb-menu,
+  html:root[data-perf] .v2 .wa-pop,
+  html:root[data-perf] .v2 .combo-pop,
+  html:root[data-perf] .v2 .cfa-menu,
+  html:root[data-perf] .v2 .cor-pop,
+  html:root[data-perf] .v2 .pd-menu,
+  html:root[data-perf] .v2 .pt-menu {
     animation: v2-mo-cai var(--mo-m) var(--mo-enf) backwards !important;
   }
-  html:root[data-perf] .v2 :is(.usuario-menu, .kb-menu, .pd-menu, .pt-menu, .cfa-menu) { transform-origin: top right; }
+  html:root[data-perf] .v2 .usuario-menu,
+  html:root[data-perf] .v2 .kb-menu,
+  html:root[data-perf] .v2 .pd-menu,
+  html:root[data-perf] .v2 .pt-menu,
+  html:root[data-perf] .v2 .cfa-menu { transform-origin: top right; }
   html:root[data-perf] .v2 .wa-pop { transform-origin: top left; }
-  html:root[data-perf] .v2 :is(.combo-pop, .cor-pop) { transform-origin: top; }
+  html:root[data-perf] .v2 .combo-pop,
+  html:root[data-perf] .v2 .cor-pop { transform-origin: top; }
   /* popovers com blur(20px) no Completo: mais curtos; o de etiquetas pode abrir para cima → sem direção */
   html:root[data-perf] .v2 .wa-pop.wa-filtro { animation: v2-mo-cai var(--mo-r) var(--mo-enf) backwards !important; }
   html:root[data-perf] .v2 .wa-etqpop { animation: v2-mo-surge var(--mo-r) var(--mo-enf) backwards !important; }
   /* paleta de scripts: a entrada dela mesma (spl-entra, paleta.css). O realce do item
      (.spl-hi) segue INSTANTÂNEO de propósito: teclado + medição de rolagem */
   html:root[data-perf] .v2 .spl { animation: spl-entra var(--mo-m) var(--mo-enf) backwards !important; }
-  /* modal: véu esmaece, cartão sobe 4px SEM escala (o vidro mantém blur(26px)) */
-  html:root[data-perf] .v2 :is(.veu, .atv-modal-overlay) { animation: v2-mo-esmaece var(--mo-m) var(--mo-pad) backwards !important; }
-  html:root[data-perf] .v2 :is(.p-modal, .atv-modal) { animation: v2-mo-modal var(--mo-m) var(--mo-enf) backwards !important; }
-  /* drawer: véu esmaece, painel desliza 12px da borda */
-  html:root[data-perf] .v2 .veu-drawer { animation: v2-mo-esmaece var(--mo-m) var(--mo-pad) backwards !important; }
+  /* modal: o véu entra pela COR de fundo, não pela opacity — o cartão é FILHO do véu e
+     tem backdrop-filter (vidro fumê, skinAurora): um ancestral com opacity < 1 corta o
+     blur da página, que ficava nítida atrás do vidro nos 180ms e borrava de estalo no
+     fim. O cartão sobe 4px SEM escala; a opacity DELE não quebra o próprio blur. */
+  html:root[data-perf] .v2 .veu,
+  html:root[data-perf] .v2 .atv-modal-overlay { animation: v2-mo-veu var(--mo-m) var(--mo-enf) backwards !important; }
+  html:root[data-perf] .v2 .p-modal,
+  html:root[data-perf] .v2 .atv-modal { animation: v2-mo-sobe var(--mo-m) var(--mo-enf) backwards !important; }
+  /* drawer: véu (IRMÃO do painel: a opacity não corta o blur dele) esmaece, painel desliza 12px da borda */
+  html:root[data-perf] .v2 .veu-drawer { animation: v2-mo-esmaece var(--mo-m) var(--mo-enf) backwards !important; }
   html:root[data-perf] .v2 .drawer-v2 { animation: v2-mo-desliza var(--mo-m) var(--mo-enf) backwards !important; }
   /* toast de resposta: entra da direita; a barra de 9s volta a esvaziar no Leve
      (forwards ok: .prog não tem classe de estado). Repouso P exige o .show em P. */
@@ -288,22 +402,27 @@ html:root[data-perf][data-tema="light"] .v2 .kc.drag { box-shadow: var(--sombra-
   }
   html:root[data-perf] .v2 .notif.show .prog { animation: v2-esvazia 9s linear forwards !important; }
   /* retornos inline (montam uma vez por ação) */
-  html:root[data-perf] .v2 :is(.aviso-inline, .estado, .pd-aj-barra) { animation: v2-mo-sobe var(--mo-m) var(--mo-enf) backwards !important; }
+  html:root[data-perf] .v2 .aviso-inline,
+  html:root[data-perf] .v2 .estado,
+  html:root[data-perf] .v2 .pd-aj-barra { animation: v2-mo-sobe var(--mo-m) var(--mo-enf) backwards !important; }
   html:root[data-perf] .v2 .lg-banner.show { animation: v2-mo-sobe var(--mo-m) var(--mo-enf) backwards !important; }
   html:root[data-perf] .v2 .reply-box { animation: v2-mo-sobe var(--mo-r) var(--mo-enf) backwards !important; }
-  html:root[data-perf] .v2 :is(.wa-fchip, .fbadge) { animation: v2-mo-surge var(--mo-r) var(--mo-enf) backwards !important; }
+  html:root[data-perf] .v2 .wa-fchip,
+  html:root[data-perf] .v2 .fbadge { animation: v2-mo-surge var(--mo-r) var(--mo-enf) backwards !important; }
   /* centrados por translateX(-50%): o keyframe compõe a centragem */
   html:root[data-perf] .v2 .wa-conv > .aviso-inline,
-  html:root[data-perf] .v2 :is(.pd-toast, .pt-toast) { animation: v2-mo-sobe-it var(--mo-m) var(--mo-enf) backwards !important; }
+  html:root[data-perf] .v2 .aviso-inline.cfg-aviso,
+  html:root[data-perf] .v2 .pd-toast,
+  html:root[data-perf] .v2 .pt-toast { animation: v2-mo-sobe-it var(--mo-m) var(--mo-enf) backwards !important; }
   html:root[data-perf] .v2 .aviso-up { animation: v2-mo-sobe-it var(--mo-l) var(--mo-enf) backwards !important; }
 
   /* 4.6 entrada de página — só o contêiner (keyed por pathname: uma vez por rota).
      Inbox/kanban (.cheia) só esmaecem: página cheia não "sobe". Nos 180ms do transform a
-     .pagina vira bloco de contenção de position:fixed — o único fixo dentro dela é a
-     barra de total do Simulador, que só monta depois que o usuário digita um valor. */
-  html:root[data-perf] .v2 .pagina.pg-entra { animation: v2-mo-pagina var(--mo-m) var(--mo-enf) backwards !important; }
-  html:root[data-perf] .v2 .pagina.pg-entra.cheia { animation: v2-mo-esmaece var(--mo-r) var(--mo-pad) backwards !important; }
-  html:root[data-perf] .v2 .lg-card.pg-entra { animation: v2-mo-pagina var(--mo-l) var(--mo-enf) backwards !important; }
+     .pagina vira bloco de contenção de position:fixed — os fixos dentro dela (barra de
+     total do Simulador, retorno de Configurações) só montam depois de uma ação do usuário. */
+  html:root[data-perf] .v2 .pagina.pg-entra { animation: v2-mo-sobe var(--mo-m) var(--mo-enf) backwards !important; }
+  html:root[data-perf] .v2 .pagina.pg-entra.cheia { animation: v2-mo-esmaece var(--mo-r) var(--mo-enf) backwards !important; }
+  html:root[data-perf] .v2 .lg-card.pg-entra { animation: v2-mo-sobe var(--mo-l) var(--mo-enf) backwards !important; }
 
   /* 4.7 skeleton — no corp/Leve o brilho some (--fx 0); vira um respiro calmo no bloco.
      300ms de atraso: carga rápida nunca pulsa. O conteúdo troca SECO (o pulso parar é o sinal). */
@@ -314,18 +433,28 @@ html:root[data-perf][data-tema="light"] .v2 .kc.drag { box-shadow: var(--sombra-
   html:root[data-perf] .v2 .ib .pt { transition: opacity var(--mo-m) var(--mo-pad), transform var(--mo-m) var(--mo-enf) !important; }
 
   /* 4.9 sidebar e topbar — clip-path no host (sem blur atrás no Leve/corp), fundo em
-     transform, sombra em opacity; a promoção de camada entra por JS só durante a transição */
+     transform; a promoção de camada entra por JS só durante a transição */
   html:root[data-perf] .v2 .p-sidebar { transition: clip-path var(--mo-l) var(--mo-pad) !important; }
   html:root[data-perf] .v2 .sb-rail { transition: opacity var(--mo-m) var(--mo-pad) !important; }
-  html:root[data-perf] .v2 .sb-fundo,
+  /* fundo OPACO do 1º ao último quadro: no corp/Leve não há blur atrás dele — esmaecendo,
+     os rótulos apareciam desenhados direto sobre o texto da página. Ao abrir ele parte
+     exatamente sobre o rail e só desliza; ao recolher desliza opaco e some no fim. */
+  html:root[data-perf] .v2 .sb-fundo { transition: transform var(--mo-l) var(--mo-pad), opacity 0s linear var(--mo-l) !important; }
+  html:root[data-perf] .v2 .p-sidebar:hover ~ .sb-fundo,
+  html:root[data-perf] .v2 .p-sidebar:focus-within ~ .sb-fundo { transition: transform var(--mo-l) var(--mo-pad), opacity 0s !important; }
   html:root[data-perf] .v2 .sb-sombra { transition: transform var(--mo-l) var(--mo-pad), opacity var(--mo-m) var(--mo-pad) !important; }
-  /* rótulos: somem JÁ ao recolher; ao abrir entram com 40ms de atraso */
+  /* rótulos: somem JÁ ao recolher (o layout encolhe seco para 42px — esmaecendo, apareciam
+     truncados "Operaç", "Acompa"); ao abrir entram com 40ms de atraso */
   html:root[data-perf] .v2 .lab,
-  html:root[data-perf] .v2 .dev-ferramentas { transition: opacity var(--mo-r) var(--mo-pad), transform var(--mo-r) var(--mo-pad) !important; }
-  html:root[data-perf] .v2 .p-sidebar:is(:hover, :focus-within) .lab,
-  html:root[data-perf] .v2 .p-sidebar:is(:hover, :focus-within) .dev-ferramentas {
+  html:root[data-perf] .v2 .dev-ferramentas { transition: none !important; }
+  html:root[data-perf] .v2 .p-sidebar:hover .lab,
+  html:root[data-perf] .v2 .p-sidebar:focus-within .lab,
+  html:root[data-perf] .v2 .p-sidebar:hover .dev-ferramentas,
+  html:root[data-perf] .v2 .p-sidebar:focus-within .dev-ferramentas {
     transition: opacity var(--mo-m) var(--mo-pad) 40ms, transform var(--mo-l) var(--mo-enf) 40ms !important;
   }
+  /* pontinhos do rail recolhido: esmaecem como no Completo (shell.css) */
+  html:root[data-perf] .v2 .mini { transition: opacity var(--mo-r) var(--mo-pad) !important; }
   html:root[data-perf] .v2 .grupo,
   html:root[data-perf] .v2 .p-sidebar .grupo:not(:first-of-type) { transition: border-color var(--mo-m) var(--mo-pad), --sb-fio var(--mo-m) var(--mo-pad) !important; }
   html:root[data-perf] .v2 .item,
@@ -335,41 +464,49 @@ html:root[data-perf][data-tema="light"] .v2 .kc.drag { box-shadow: var(--sombra-
   /* pílula ativa encaixa quando a rota muda (o NavLink troca a classe) */
   html:root[data-perf] .v2.app-v2 .p-sidebar .item.on { animation: v2-mo-pilula var(--mo-l) var(--mo-enf) backwards !important; }
 
-  /* 4.10 carregadores e status que JÁ existem (congelavam no Leve). Únicos infinitos
-     do arquivo junto com o .skel; cada um só existe enquanto o status é verdadeiro. */
+  /* 4.10 carregadores que JÁ existem (congelavam no Leve). Únicos infinitos do arquivo
+     junto com o .skel; cada um só existe enquanto a CARGA está acontecendo. Status que
+     fica na tela por horas (o ponto do aviso "O Atenvo foi atualizado") segue PARADO no
+     Leve, como o shell.css decidiu: um pulso infinito ali = 60 quadros/s por horas. */
   html:root[data-perf] .v2 .vimg-spin { animation: v2-vimg-gira .9s linear infinite !important; }
   html:root[data-perf] .v2 .arec-dot.on { animation: v2-arec-pulsa 1s infinite !important; }
   html:root[data-perf] .v2 .d5-gira { animation: d5-gira .9s linear infinite !important; }
   html:root[data-perf] .v2 .intg-qr-aguarda i { animation: intg-pulsa 1.4s ease-in-out infinite !important; }
-  html:root[data-perf] .v2 .au-dot { animation: au-pulsa 1.6s ease-in-out infinite !important; }
 
-  /* 4.11 dado — barras crescem ao abrir (paridade com o d5-cresce do Dashboard) */
+  /* 4.11 dado — barras crescem ao abrir (paridade com o d5-cresce do Dashboard). Cascata
+     opcional por --mo-atraso no style da barra (o shorthand !important apagaria um
+     animation-delay inline). O valor entra 400ms depois da sua barra. */
   html:root[data-perf] .v2 .barv {
     transform: scaleY(1);
     animation: v2-mo-cresce-y var(--mo-dado) var(--mo-pad) backwards !important;
+    animation-delay: var(--mo-atraso, 0ms) !important;
     transition: opacity var(--mo-m) var(--mo-pad) !important;
   }
-  html:root[data-perf] .v2 .bval { opacity: 1; animation: v2-mo-esmaece var(--mo-m) var(--mo-pad) 400ms backwards !important; }
+  html:root[data-perf] .v2 .bval {
+    opacity: 1;
+    animation: v2-mo-esmaece var(--mo-m) var(--mo-enf) backwards !important;
+    animation-delay: calc(400ms + var(--mo-atraso, 0ms)) !important;
+  }
 
   /* ---------- 4. PÁGINAS ---------- */
 
-  /* 4.12 INBOX — performance crítica: SÓ transições (reordenar reinicia keyframes) */
+  /* 4.12 INBOX — performance crítica: SÓ transições, e SÓ de propriedades do compositor
+     (reordenar reinicia keyframes; rolar a lista com o mouse em cima passa o hover por
+     dezenas de cards — fundo/aro/cor animados repintavam cada um por ~11 quadros na
+     thread principal). Fundo do card, cor do fio e aro do avatar trocam SECOS. */
   html:root[data-perf] .v2 .conv2,
-  html:root[data-perf] .v2 .conv2.spot { transition: background-color var(--mo-m) var(--mo-pad) !important; }  /* vence a regra .spot */
-  html:root[data-perf] .v2 .conv2::before { transition: transform var(--mo-m) var(--mo-enf), background-color var(--mo-m) var(--mo-pad) !important; }
-  html:root[data-perf] .v2 .conv2 .av2 { transition: box-shadow var(--mo-m) var(--mo-pad) !important; }
-  html:root[data-perf] .v2 .conv2 .n { transition: transform var(--mo-m) var(--mo-pad) !important; }
-  html:root[data-perf] .v2 .conv2 .wa-pin {
-    transition: opacity var(--mo-r) var(--mo-pad), color var(--mo-r) var(--mo-pad),
-                background-color var(--mo-r) var(--mo-pad), transform var(--mo-r) var(--mo-pad) !important;
-  }
+  html:root[data-perf] .v2 .conv2.spot { transition: none !important; }  /* vence a regra .spot */
+  html:root[data-perf] .v2 .conv2::before { transition: transform var(--mo-m) var(--mo-enf) !important; }
+  html:root[data-perf] .v2 .conv2 .wa-pin { transition: opacity var(--mo-r) var(--mo-pad), transform var(--mo-r) var(--mo-pad) !important; }
   html:root[data-perf] .v2 .wa-grupo { transition: color var(--mo-r) var(--mo-pad) !important; }
   /* painel de contexto: a LARGURA troca seca também no Completo (o fio da conversa não
      reflowa por frame); o conteúdo desliza depois que a largura assentou */
   html:root[data-perf] .v2 .wa-ctx { transition: opacity var(--mo-m) var(--mo-pad) !important; }
   html:root[data-perf] .v2 .wa-ctx-inner { transition: opacity var(--mo-m) var(--mo-pad), transform var(--mo-l) var(--mo-enf) !important; }
   html:root[data-perf] .v2 .wa-ctx.recolhido .wa-ctx-inner { opacity: 0; transform: translateX(10px); }
-  html:root[data-perf] .v2 :is(.ctx-tag, .etq-add, .ctx-status) { transition: var(--mo-tr-fundo), border-color var(--mo-r) var(--mo-pad) !important; }
+  html:root[data-perf] .v2 .ctx-tag,
+  html:root[data-perf] .v2 .etq-add,
+  html:root[data-perf] .v2 .ctx-status { transition: var(--mo-tr-fundo), border-color var(--mo-r) var(--mo-pad) !important; }
   /* barra da IA: o status troca em crossfade — sem pulso */
   html:root[data-perf] .v2 .wa-iabar .dot { transition: background-color var(--mo-l) var(--mo-pad) !important; }
   /* bolha: o "responder" desliza em direção à bolha (deslocamento no bloco hover-only) */
@@ -378,12 +515,11 @@ html:root[data-perf][data-tema="light"] .v2 .kc.drag { box-shadow: var(--sombra-
   html:root[data-perf] .v2 .audio2 .onda i { transition: background-color var(--mo-r) linear !important; }
 
   /* 4.13 KANBAN — polling de 8s + realtime: nenhuma entrada em .kc/.kb-col.
-     O lift vira deslize; .drag vira um "pegar" visível; .moving (.55 → 1) assenta
-     sozinho quando o servidor confirma; .col-drop/.arrastando esmaecem. */
-  html:root[data-perf] .v2 .kc {
-    transition: transform var(--mo-m) var(--mo-pad), box-shadow var(--mo-m) var(--mo-pad),
-                border-color var(--mo-m) var(--mo-pad), opacity var(--mo-m) var(--mo-pad) !important;
-  }
+     O lift vira deslize (SÓ transform: sombra e borda do hover trocam secas — fora do
+     compositor, repintavam o card e a área da sombra por quadro); .drag esmaece para
+     lugar-marcado; .moving (.55 → 1) assenta sozinho quando o servidor confirma;
+     .col-drop/.arrastando esmaecem. */
+  html:root[data-perf] .v2 .kc { transition: transform var(--mo-m) var(--mo-pad), opacity var(--mo-m) var(--mo-pad) !important; }
   html:root[data-perf] .v2 .kc > .kb-menu-wrap .mbtn,
   html:root[data-perf] .v2 .kb-cab .kb-col-toggle,
   html:root[data-perf] .v2 .kb-cab .mbtn { transition: opacity var(--mo-r) var(--mo-pad), var(--mo-tr-fundo), transform var(--mo-r) var(--mo-pad) !important; }
@@ -392,30 +528,52 @@ html:root[data-perf][data-tema="light"] .v2 .kc.drag { box-shadow: var(--sombra-
   html:root[data-perf] .v2 .kb-carga-c { transition: transform var(--mo-r) var(--mo-pad), border-color var(--mo-r) var(--mo-pad), background-color var(--mo-r) var(--mo-pad) !important; }
   html:root[data-perf] .v2 .fantasma { transform-origin: top; animation: v2-mo-abre-y var(--mo-m) var(--mo-enf) backwards !important; }
 
+  /* 4.13b ROLANDO (lib/rolagem.ts marca o contêiner que rola): as linhas que passam sob
+     o ponteiro trocam o hover SECO — sem isso cada uma disparava a própria transição */
+  html:root[data-perf] .v2 .mo-rolando .conv2::before,
+  html:root[data-perf] .v2 .mo-rolando .wa-pin,
+  html:root[data-perf] .v2 .mo-rolando .kc,
+  html:root[data-perf] .v2 .mo-rolando tbody tr,
+  html:root[data-perf] .v2 .mo-rolando tbody tr > td:first-child,
+  html:root[data-perf] .v2 .mo-rolando .cnt-av,
+  html:root[data-perf] .v2 .mo-rolando .pv-fila,
+  html:root[data-perf] .v2 .mo-rolando .lin,
+  html:root[data-perf] .v2 .mo-rolando .pv-av,
+  html:root[data-perf] .v2 .mo-rolando .pd-lin,
+  html:root[data-perf] .v2 .mo-rolando .pt-lin,
+  html:root[data-perf] .v2 .mo-rolando .pd-av,
+  html:root[data-perf] .v2 .mo-rolando .pt-av,
+  html:root[data-perf] .v2 .mo-rolando .li,
+  html:root[data-perf] .v2 .mo-rolando .tl-item { transition: none !important; }
+
   /* 4.14 demais páginas */
   /* pendências/portabilidades: painel do cliente (keyed por id) volta a esmaecer; editor */
   html:root[data-perf] .v2 .pd-cli-in { animation: pd-fade var(--mo-r) var(--mo-pad) backwards !important; }
   html:root[data-perf] .v2 .pt-cli-in { animation: pt-fade var(--mo-r) var(--mo-pad) backwards !important; }
-  html:root[data-perf] .v2 :is(.pd-etapa, .pd-cand) { transition: var(--mo-tr-fundo), border-color var(--mo-r) var(--mo-pad) !important; }
+  html:root[data-perf] .v2 .pd-etapa,
+  html:root[data-perf] .v2 .pd-cand { transition: var(--mo-tr-fundo), border-color var(--mo-r) var(--mo-pad) !important; }
   /* configurações: cor da equipe */
-  html:root[data-perf] .v2 :is(.atd-cor, .cor-sw) { transition: transform var(--mo-r) var(--mo-pad), box-shadow var(--mo-r) var(--mo-pad) !important; }
+  html:root[data-perf] .v2 .atd-cor,
+  html:root[data-perf] .v2 .cor-sw { transition: transform var(--mo-r) var(--mo-pad), box-shadow var(--mo-r) var(--mo-pad) !important; }
   /* manual: o artigo entra a cada lição (keyed por vista) — o dono quer movimento */
   html:root[data-perf] .v2 .mv-artigo { animation: v2-mo-sobe var(--mo-m) var(--mo-enf) backwards !important; }
   /* integrações: lápis do nome */
   html:root[data-perf] .v2 .intg-nome { transition: background-color var(--mo-r) var(--mo-pad) !important; }
   /* simulador: a barra fixa de total desliza ao sumir/voltar (.oculta) */
   html:root[data-perf] .v2 .sim-barra-total { transition: transform var(--mo-l) var(--mo-enf), opacity var(--mo-m) var(--mo-pad) !important; }
-  /* intro do dia (uma vez por dia; o blur dela é estático): cascata de ~450ms (antes ~1,56s).
-     opacity:1 no repouso — no Completo a regra-base nasce em 0 com fill forwards. */
-  html:root[data-perf] .v2 .intro-veu { animation: v2-mo-esmaece var(--mo-l) var(--mo-pad) backwards !important; }
-  html:root[data-perf] .v2 .intro-palco > * { opacity: 1; transform: none; animation: v2-mo-sobe var(--mo-l) var(--mo-enf) backwards !important; }
-  html:root[data-perf] .v2 .intro-palco > *:nth-child(2) { animation-delay: 30ms !important; }
-  html:root[data-perf] .v2 .intro-palco > *:nth-child(3) { animation-delay: 60ms !important; }
-  html:root[data-perf] .v2 .intro-palco > *:nth-child(4) { animation-delay: 90ms !important; }
-  html:root[data-perf] .v2 .intro-palco > *:nth-child(5) { animation-delay: 120ms !important; }
-  html:root[data-perf] .v2 .intro-palco > *:nth-child(6) { animation-delay: 150ms !important; }
-  html:root[data-perf] .v2 .intro-palco > *:nth-child(7) { animation-delay: 180ms !important; }
-  html:root[data-perf] .v2 .intro-palco > *:nth-child(8) { animation-delay: 210ms !important; }
+  /* intro do dia (uma vez por dia; o blur dela é estático): o véu entra na curva de
+     entrada e a cascata (.it-p = filhos do palco, IntroDia.tsx) só começa aos 80ms —
+     o fundo já está quase opaco quando o texto chega (antes "Boa tarde" nascia sobre o
+     inbox nítido). opacity:1 no repouso — no Completo a regra-base nasce em 0. */
+  html:root[data-perf] .v2 .intro-veu { animation: v2-mo-esmaece var(--mo-l) var(--mo-enf) backwards !important; }
+  html:root[data-perf] .v2 .intro-palco > .it-p { opacity: 1; transform: none; animation: v2-mo-sobe var(--mo-l) var(--mo-enf) 80ms backwards !important; }
+  html:root[data-perf] .v2 .intro-palco > .it-p:nth-child(2) { animation-delay: 110ms !important; }
+  html:root[data-perf] .v2 .intro-palco > .it-p:nth-child(3) { animation-delay: 140ms !important; }
+  html:root[data-perf] .v2 .intro-palco > .it-p:nth-child(4) { animation-delay: 170ms !important; }
+  html:root[data-perf] .v2 .intro-palco > .it-p:nth-child(5) { animation-delay: 200ms !important; }
+  html:root[data-perf] .v2 .intro-palco > .it-p:nth-child(6) { animation-delay: 230ms !important; }
+  html:root[data-perf] .v2 .intro-palco > .it-p:nth-child(7) { animation-delay: 260ms !important; }
+  html:root[data-perf] .v2 .intro-palco > .it-p:nth-child(8) { animation-delay: 290ms !important; }
   html:root[data-perf] .v2 .it-disc { transition: transform var(--mo-m) var(--mo-enf), box-shadow var(--mo-m) var(--mo-pad) !important; }
   html:root[data-perf] .v2 .it-disc svg { transition: opacity var(--mo-r) var(--mo-pad), transform var(--mo-m) var(--mo-enf) !important; }
   html:root[data-perf] .v2 .it-seg-thumb { transition: transform var(--mo-l) var(--mo-enf) !important; }
@@ -425,9 +583,17 @@ html:root[data-perf][data-tema="light"] .v2 .kc.drag { box-shadow: var(--sombra-
 /* ============================================================
    5. NUDGES — deslocamento no hover. Só com mouse de verdade
    (hover: hover): num toque o :hover "gruda" e o nome ficaria torto.
+   Nada no inbox: lá o nome deslizando custava um layout por card
+   a cada troca de hover (transform none ↔ valor) durante a rolagem.
    ============================================================ */
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
-  .v2 .conv2:hover .n { transform: translateX(2px); }
+  /* repouso com translate ZERO (não none): trocar none ↔ valor muda "tem transform"
+     (bloco de contenção) e custa um layout a cada troca de hover */
+  .v2 .env-b svg,
+  .v2 .pv-fila-tx .nm,
+  .v2 .pv-tab .lin > span:first-child,
+  .v2 .pd-lin-nome,
+  .v2 .pt-lin-nome { transform: translateX(0); }
   .v2 .env-b:hover:not(:disabled) svg { transform: translate(1px, -1px); }
   .v2 .pv-fila:hover .pv-fila-tx .nm,
   .v2 .pv-tab .lin:not(.cab):hover > span:first-child { transform: translateX(3px); }
@@ -436,5 +602,5 @@ html:root[data-perf][data-tema="light"] .v2 .kc.drag { box-shadow: var(--sombra-
   /* "responder" encosta na bolha: parte 3px para fora e volta no hover */
   .v2 .bolha .resp-btn { transform: translateX(-3px); }
   .v2 .bolha.rec .resp-btn { transform: translateX(3px); }
-  .v2 .bolha:hover .resp-btn { transform: none; }
+  .v2 .bolha:hover .resp-btn { transform: translateX(0); }
 }

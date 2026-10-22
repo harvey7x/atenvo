@@ -95,8 +95,8 @@ function BarrasV({ pts, money, destaqueUltima, altura = 120, mostraValor = true 
     <div className="barras" style={{ height: altura }}>
       {pts.map((p, i) => (
         <div className="bwrap" key={i} title={`${p.label}: ${money ? fmtBRL(p.v) : fmtInt(p.v)}`}>
-          {mostraValor && pts.length <= 16 && <span className="bval num" style={{ opacity: 1, animation: 'none' }}>{p.v > 0 ? fmtV(p.v) : ''}</span>}
-          <div className={'barv' + (destaqueUltima && i === pts.length - 1 ? ' hoje2' : '')} style={{ height: `${Math.max(3, (p.v / max) * 100)}%`, animation: 'none', transform: 'none' }} />
+          {mostraValor && pts.length <= 16 && <span className="bval num">{p.v > 0 ? fmtV(p.v) : ''}</span>}
+          <div className={'barv' + (destaqueUltima && i === pts.length - 1 ? ' hoje2' : '')} style={{ height: `${Math.max(3, (p.v / max) * 100)}%` }} />
           <span className="blab" style={destaqueUltima && i === pts.length - 1 ? { color: 'var(--txt)' } : undefined}>{i % passo === 0 || i === pts.length - 1 ? p.label : ''}</span>
         </div>
       ))}

@@ -146,6 +146,13 @@ export default function ConfiguracoesV2() {
   useEffect(() => { if (initialTab && TAB_IDS.includes(initialTab)) setTab(initialTab); }, [initialTab]);
 
   const [aviso, setAviso] = useState<Aviso>(null);
+  // o retorno FLUTUA (movimento.css .cfg-aviso) em vez de empurrar a página: sucesso sai
+  // sozinho como o toast das pendências; erro fica até o ×
+  useEffect(() => {
+    if (!aviso || aviso.tom === 'erro') return;
+    const t = setTimeout(() => setAviso(null), 4200);
+    return () => clearTimeout(t);
+  }, [aviso]);
   const [seed, setSeed] = useState<SeedCfg | null>(() => (demo ? seedCfg() : null));
 
   // cascata de entrada roda UMA vez (carga da página); trocas de aba não re-animam
@@ -173,7 +180,7 @@ export default function ConfiguracoesV2() {
       </div>
 
       {aviso && (
-        <div className={aviso.tom === 'erro' ? 'aviso-inline erro' : 'aviso-inline'} role="status">
+        <div key={aviso.tom + aviso.texto} className={aviso.tom === 'erro' ? 'aviso-inline cfg-aviso erro' : 'aviso-inline cfg-aviso'} role="status">
           {aviso.texto}
           <button type="button" onClick={() => setAviso(null)} aria-label="Fechar aviso">×</button>
         </div>

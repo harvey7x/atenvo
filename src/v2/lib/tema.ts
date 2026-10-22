@@ -3,6 +3,8 @@
    PADRÃO: dark. A ausência do atributo já resolve dark (tokens.css), então não há
    flash ao atualizar. SEM "seguir o sistema" por enquanto: só a escolha explícita do
    usuário (decisão registrada no CONTRATO). Persistência por usuário via `escopo`. */
+import { semTransicao } from './semTransicao';
+
 export type Tema = 'dark' | 'light';
 
 const PREFIXO = 'atenvo-tema';
@@ -17,7 +19,9 @@ export function lerTema(escopo?: string): Tema {
 }
 
 export function aplicarTema(tema: Tema): void {
-  document.documentElement.setAttribute('data-tema', tema);
+  const raiz = document.documentElement;
+  if (raiz.getAttribute('data-tema') === tema) return;
+  semTransicao(() => raiz.setAttribute('data-tema', tema));
 }
 
 export function salvarTema(tema: Tema, escopo?: string): void {

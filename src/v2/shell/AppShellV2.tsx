@@ -10,6 +10,7 @@ import './shell.css';
 import '../skinAurora.css'; // TESTE (branch teste/skin-aurora-azul): fundo bokeh + azul secundário
 import { LogoAtenvo } from '../components/LogoAtenvo';
 import { instalarSpotlight } from '../lib/spotlight';
+import { instalarRolagemSemHover } from '../lib/rolagem';
 import { criarRaizPortalV2 } from '../components/portal';
 import { ICONES } from './icones';
 import { NotificacaoResposta, type DadosNotificacao } from './NotificacaoResposta';
@@ -183,6 +184,7 @@ export default function AppShellV2() {
   const navigate = useNavigate();
 
   useEffect(() => instalarSpotlight(), []);
+  useEffect(() => instalarRolagemSemHover(), []); // movimento.css: lista rolando = hover seco
 
   /* Trava o scroll da JANELA sob o shell (bug do dono: deep-links conversa↔kanban
      disparavam scrollIntoView que rolava o body — topbar sumia, o toast de

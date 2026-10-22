@@ -115,13 +115,14 @@ export function IntroDia({ aberta, aoConcluir, nome, tema, aoMudarTema }: {
       aria-label="Boas-vindas do dia"
       onMouseDown={(e) => { if (e.target === e.currentTarget) aoConcluir(); }}
     >
+      {/* .it-p = filho do palco (cascata de entrada; classe para o Blink indexar a regra) */}
       <div className="intro-palco">
-        <LogoAtenvo className="it-marca" />
-        <div className="it-eyebrow">{dataLonga}</div>
-        <h1 className="it-titulo">{saudacaoPorHora()}, {primeiroNome}.</h1>
-        <p className="it-sub">Seja bem-vindo ao Atenvo. O seu dia, num relance:</p>
+        <LogoAtenvo className="it-marca it-p" />
+        <div className="it-eyebrow it-p">{dataLonga}</div>
+        <h1 className="it-titulo it-p">{saudacaoPorHora()}, {primeiroNome}.</h1>
+        <p className="it-sub it-p">Seja bem-vindo ao Atenvo. O seu dia, num relance:</p>
 
-        <div className="it-stats">
+        <div className="it-stats it-p">
           {brief ? (
             <>
               <div className="it-stat">
@@ -143,7 +144,7 @@ export function IntroDia({ aberta, aoConcluir, nome, tema, aoMudarTema }: {
           )}
         </div>
 
-        <div className="it-aparencia">
+        <div className="it-aparencia it-p">
           <div className="it-ap-rot">Aparência</div>
           <div className="it-faixa">
             <div className="it-celula">
@@ -193,8 +194,8 @@ export function IntroDia({ aberta, aoConcluir, nome, tema, aoMudarTema }: {
           </div>
         </div>
 
-        <BotaoPrimario className="it-cta" onClick={aoConcluir}>Começar o dia</BotaoPrimario>
-        <p className="it-nota">Você ajusta tudo depois em Configurações · Esc pula</p>
+        <BotaoPrimario className="it-cta it-p" onClick={aoConcluir}>Começar o dia</BotaoPrimario>
+        <p className="it-nota it-p">Você ajusta tudo depois em Configurações · Esc pula</p>
       </div>
     </div>,
     raiz,
