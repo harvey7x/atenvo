@@ -334,7 +334,7 @@ export default function ContatosV2() {
             {filtrando && <Chip limpar onClick={limpar}>Limpar</Chip>}
           </div>
 
-          <CardVidro spot sobe style={{ borderRadius: 12, animationDelay: '.12s' }}>
+          <CardVidro spot sobe className="mo-fixo" style={{ borderRadius: 12, animationDelay: '.12s' }}>
             {lista.length === 0 ? (
               <EstadoVazio
                 titulo="Nenhum contato neste filtro"

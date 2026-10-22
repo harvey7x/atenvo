@@ -247,7 +247,8 @@ export default function AppShellV2() {
   // will-change com disciplina (Modo de Performance): promove camada SÓ enquanto
   // a transição de abrir/fechar roda (clip-path no host, transform no fundo) e
   // remove ao terminar — camada permanente custa memória de GPU justo nas
-  // máquinas fracas. (No Modo Leve transition:none → nunca liga, e está certo.)
+  // máquinas fracas. (Desde a camada de movimento a transição roda também no Modo
+  // Leve — movimento.css — então liga/desliga igual; com "reduzir movimento" não liga.)
   useEffect(() => {
     const instala = (el: HTMLElement | null, prop: string) => {
       if (!el) return () => {};

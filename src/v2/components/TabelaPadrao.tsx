@@ -97,7 +97,7 @@ export function TabelaPadrao<T>({ colunas, linhas, chave, selecao, rodape, aoCli
           </div>
         </div>
       )}
-      <table>
+      <table className="mo-tab">
         <thead>
           <tr>
             {selecao && <th style={{ width: 36 }} aria-label="Seleção" />}

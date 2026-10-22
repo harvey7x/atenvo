@@ -460,7 +460,7 @@ export default function AgendamentosV2() {
                 </div>
 
                 <div className="pc-grade sobe" style={{ animationDelay: '.2s' }}>
-                  <CardVidro spot>
+                  <CardVidro spot className="mo-fixo">
                     <CardCab titulo="Próximos envios" />
                     {painel.filaVazia ? (
                       <EstadoVazio
@@ -508,7 +508,7 @@ export default function AgendamentosV2() {
                     </CardVidro>
 
                     {painel.precisaAcao.length > 0 && (
-                      <CardVidro spot>
+                      <CardVidro spot className="mo-fixo">
                         <CardCab titulo="Precisa de ação" contador={painel.precisaAcao.length} />
                         {painel.precisaAcao.map((g) => {
                           const item = g.itens[0];
@@ -535,7 +535,7 @@ export default function AgendamentosV2() {
                 </div>
               </div>
             ) : (
-            <CardVidro spot sobe style={{ borderRadius: 12, animationDelay: '.12s' }}>
+            <CardVidro spot sobe className="mo-fixo" style={{ borderRadius: 12, animationDelay: '.12s' }}>
               {filtrados.length === 0 ? (
                 grupos.length === 0 ? (
                   <EstadoVazio

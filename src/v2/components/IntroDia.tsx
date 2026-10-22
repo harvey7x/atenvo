@@ -50,7 +50,7 @@ const IcCheck = () => (
 function Contagem({ ate }: { ate: number }) {
   const [v, setV] = useState(0);
   useEffect(() => {
-    if (ate <= 0 || document.visibilityState === 'hidden') { setV(ate); return; }
+    if (ate <= 0 || document.visibilityState === 'hidden' || window.matchMedia('(prefers-reduced-motion: reduce)').matches) { setV(ate); return; }
     const dur = 900;
     let ini = 0;
     let raf = 0;

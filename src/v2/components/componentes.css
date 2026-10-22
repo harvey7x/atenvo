@@ -243,11 +243,13 @@
   position: relative; cursor: pointer; flex-shrink: 0; border: none; padding: 0;
 }
 .v2 .tgl::after {
-  content: ""; position: absolute; top: 2px; right: 2px; width: 16px; height: 16px;
-  border-radius: 50%; background: var(--platina-txt);
+  /* left + translateX (não right/left): o botão pode DESLIZAR (movimento.css) —
+     ligado fica em 2 + 16 = 18px, o mesmo pixel do antigo right:2px */
+  content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
+  border-radius: 50%; background: var(--platina-txt); transform: translateX(16px);
 }
 .v2 .tgl.off { background: rgba(var(--tint), .12); }
-.v2 .tgl.off::after { right: auto; left: 2px; background: var(--txt-2); }
+.v2 .tgl.off::after { transform: none; background: var(--txt-2); }
 .v2 .tgl:disabled { opacity: .5; cursor: default; }
 .v2 .tgl:focus-visible { outline: none; box-shadow: 0 0 0 2px rgba(var(--tint), .35); }
 .v2 .tgl-l { display: flex; align-items: center; gap: 11px; padding: 7px 0; font-size: 12.5px; }

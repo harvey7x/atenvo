@@ -756,7 +756,7 @@ function AbaEnviosReal({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (t: st
           <EstadoVazio titulo="Fila vazia" descricao="Quando houver clientes em ciclos com mensagens ativas, os disparos do dia aparecem aqui (sempre nascendo em simulação)." />
         </CardVidro>
       ) : (
-        <CardVidro spot sobe style={{ borderRadius: 'var(--r-card)', animationDelay: '.1s' }}>
+        <CardVidro spot sobe className="mo-fixo" style={{ borderRadius: 'var(--r-card)', animationDelay: '.1s' }}>
           <TabelaPadrao
             colunas={[
               { chave: 'cli', titulo: 'Cliente', render: (x: CobFilaItem) => x.cliente },
@@ -816,7 +816,7 @@ function AbaEnviosDemo({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (t: st
         </Chips>
         {gestor && <BotaoSec mini onClick={() => aoAvisar(dryRun ? 'Simulação: a fila seria processada em modo teste — nada sai.' : 'Envio real exige confirmação (Fase C).')}>Processar fila agora</BotaoSec>}
       </div>
-      <CardVidro spot sobe style={{ borderRadius: 'var(--r-card)', animationDelay: '.18s' }}>
+      <CardVidro spot sobe className="mo-fixo" style={{ borderRadius: 'var(--r-card)', animationDelay: '.18s' }}>
         {lista.length === 0
           ? <EstadoVazio titulo="Nada na fila" descricao="Ajuste o filtro ou enfileire cobranças na aba Ciclos." />
           : <TabelaPadrao colunas={colunas} linhas={lista} chave={(f) => f.id} rodape={{ texto: `${lista.length} na fila` }} />}
@@ -941,7 +941,7 @@ function AbaAtendentesReal() {
     return <CardVidro spot sobe style={{ borderRadius: 'var(--r-card)' }}><EstadoVazio titulo="Sem clientes na cobrança" descricao="Cadastre clientes para acompanhar a carteira de cada atendente." /></CardVidro>;
   }
   return (
-    <CardVidro spot sobe style={{ borderRadius: 'var(--r-card)' }}>
+    <CardVidro spot sobe className="mo-fixo" style={{ borderRadius: 'var(--r-card)' }}>
       <TabelaPadrao
         colunas={[
           { chave: 'at', titulo: 'Atendente', render: (x) => x.atendente },
@@ -973,7 +973,7 @@ function AbaAtendentesDemo() {
   return (
     <>
       <p className="cm-hint sobe">Faturamento, carteira e desempenho de cada atendente. Clique para ver os clientes dele.</p>
-      <CardVidro spot sobe style={{ borderRadius: 'var(--r-card)', animationDelay: '.08s' }}>
+      <CardVidro spot sobe className="mo-fixo" style={{ borderRadius: 'var(--r-card)', animationDelay: '.08s' }}>
         <TabelaPadrao colunas={colunas} linhas={metricas} chave={(m) => m.nome} aoClicarLinha={(m) => setSel(m.nome)} rodape={{ texto: `${metricas.length} atendentes` }} />
       </CardVidro>
 
@@ -1034,7 +1034,7 @@ function AbaClientesReal({ gestor, aoNovo }: { gestor: boolean; aoNovo: () => vo
           <span><b>{semNumero} cliente{semNumero === 1 ? '' : 's'} sem número de WhatsApp.</b> Sem o número, a cobrança automática não chega a este cliente.</span>
         </div>
       )}
-      <CardVidro spot sobe style={{ borderRadius: 'var(--r-card)', animationDelay: '.06s' }}>
+      <CardVidro spot sobe className="mo-fixo" style={{ borderRadius: 'var(--r-card)', animationDelay: '.06s' }}>
         <TabelaPadrao
           colunas={[
             { chave: 'nome', titulo: 'Cliente', render: (x: ClienteCobranca) => <div className="cm-cli-nm">{!x.telefone && <span className="cm-cli-alerta" title="Sem número de WhatsApp"><IcAtencao /></span>}{x.nome}</div> },
@@ -1104,7 +1104,7 @@ function AbaClientesDemo() {
           <Chip ativo={seg === 'inadimplente'} onClick={() => trocarSeg('inadimplente')}>Inadimplente ({cont('inadimplente')})</Chip>
         </Chips>
       </div>
-      <CardVidro spot sobe style={{ borderRadius: 'var(--r-card)', animationDelay: '.12s' }}>
+      <CardVidro spot sobe className="mo-fixo" style={{ borderRadius: 'var(--r-card)', animationDelay: '.12s' }}>
         {lista.length === 0
           ? <EstadoVazio titulo="Nenhum cliente neste filtro" descricao="Troque o segmento acima." />
           : <TabelaPadrao colunas={colunas} linhas={linhasPag} chave={(c) => c.id} aoClicarLinha={(c) => setSel(c)}

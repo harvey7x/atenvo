@@ -626,7 +626,7 @@ export function Disparo() {
       {carregando ? (
         <CardVidro style={{ borderRadius: 12, padding: 16 }}><SkeletonTexto linhas={6} /></CardVidro>
       ) : aba === 'contatados' ? (
-        <CardVidro spot sobe style={{ borderRadius: 12 }}>
+        <CardVidro spot sobe className="mo-fixo" style={{ borderRadius: 12 }}>
           {contQ.isLoading ? (
             <div style={{ padding: 16 }}><SkeletonTexto linhas={6} /></div>
           ) : contatados.length === 0 ? (
@@ -649,7 +649,7 @@ export function Disparo() {
           )}
         </CardVidro>
       ) : aba === 'excluidos' ? (
-        <CardVidro spot sobe style={{ borderRadius: 12 }}>
+        <CardVidro spot sobe className="mo-fixo" style={{ borderRadius: 12 }}>
           {(optQ.data ?? []).length === 0 ? (
             <EstadoVazio titulo="Ninguém em opt-out" descricao="Quem responder SAIR (ou for marcado manualmente) aparece aqui e nunca mais recebe disparo." />
           ) : (
@@ -1017,7 +1017,7 @@ export function Disparo() {
               {atendentesQ.isLoading ? (
                 <CardVidro spot sobe style={{ borderRadius: 12 }}><SkeletonTexto linhas={4} /></CardVidro>
               ) : (
-                <CardVidro spot sobe className="dsp-rel-tab" style={{ borderRadius: 12 }}>
+                <CardVidro spot sobe className="dsp-rel-tab mo-fixo" style={{ borderRadius: 12 }}>
                   <TabelaPadrao
                     colunas={colsAtendentes}
                     linhas={atendentesOrdenados}
@@ -1124,7 +1124,7 @@ export function Disparo() {
                       <EstadoVazio titulo="Ninguém neste filtro" descricao="Troque o filtro acima para ver as outras pessoas da campanha." />
                     </CardVidro>
                   ) : (
-                    <CardVidro spot sobe className="dsp-rel-tab" style={{ borderRadius: 12, animationDelay: '.1s' }}>
+                    <CardVidro spot sobe className="dsp-rel-tab mo-fixo" style={{ borderRadius: 12, animationDelay: '.1s' }}>
                       <TabelaPadrao
                         colunas={colsRelatorio}
                         linhas={pessoasOrdenadas}

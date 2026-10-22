@@ -12,6 +12,7 @@ import { isMisconfigured, isDemoMode } from '@/lib/supabase';
 import { resolverEAplicarPerf } from './v2/lib/perf';
 import { aplicarAcento, lerAcento } from './v2/lib/acento';
 import './v2/serio.css'; // visual Corporativo FIXO (decisão do dono 29/08) — global: vale no login/mobile também
+import './v2/movimento.css'; // camada de movimento (dono 22/10) — Leve e Completo iguais; reverter = apagar esta linha
 import { sinalizarAtualizacao } from './v2/lib/atualizacao';
 import { tentarRecarga } from '@/lib/recargaChunk';
 import { registerSW } from 'virtual:pwa-register';
