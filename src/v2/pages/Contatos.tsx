@@ -508,10 +508,10 @@ function FichaContato({ contato, demo, extras, bloqueado, cobSituacao, agsOrg, a
           )}
         </div>
 
-        <div className="fx-b">
+        {/* Cobranças saiu do sistema (dono 22/10): o bloco só aparece se o contato TIVER cobrança */}
+        {veCobrancas && (demo ? !!cobSituacao : cobrancas.length > 0) && <div className="fx-b">
           <div className="fx-t">
             Cobranças
-            {(cobrancas.length > 0 || cobSituacao) && veCobrancas && <BotaoMini onClick={() => navigate('/cobrancas')}>Ver todas</BotaoMini>}
           </div>
           {demo ? (
             cobSituacao
@@ -530,7 +530,7 @@ function FichaContato({ contato, demo, extras, bloqueado, cobSituacao, agsOrg, a
               </div>
             ))
           )}
-        </div>
+        </div>}
 
         <div className="fx-b">
           <div className="fx-t">Agendamentos</div>

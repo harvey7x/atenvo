@@ -1427,7 +1427,7 @@ export default function WhatsAppV2() {
 
           {cobrancasCtx.length > 0 && (
             <div className="ctx-b spot">
-              <div className="ctx-t">Cobranças {vis.veTodos && <button type="button" className="lk" onClick={() => nav('/cobrancas')}>ver</button>}</div>
+              <div className="ctx-t">Cobranças</div>
               {cobrancasCtx.map((cb) => (
                 <div className="cx-l" key={cb.id}>
                   <span className="k num">

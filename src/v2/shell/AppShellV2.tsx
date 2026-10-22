@@ -116,25 +116,15 @@ const GRUPOS: GrupoNav[] = [
 /* MÓDULOS do sistema (seletor do topo, 29/08): cada módulo troca o menu
    inteiro da esquerda. Atendimento = a operação de sempre; Cobranças = as
    seções do Modo Cobrança viram itens de menu. Novos módulos entram aqui. */
-type ModuloId = 'atendimento' | 'cobrancas';
+/* Cobranças SAIU do sistema (dono 22/10: "a gente nem usa, pode excluir ela") — o
+   seletor fica com um módulo só e some a seta; /cobrancas* redireciona ao inbox
+   (App.tsx). Os dados no banco ficam intactos; voltar = recolocar a entrada aqui. */
+type ModuloId = 'atendimento';
 type Modulo = { id: ModuloId; rotulo: string; home: string; grupos: GrupoNav[] };
-const COB_SECOES: ItemNav[] = [
-  { slug: 'cobrancas/painel', rotulo: 'Painel' },
-  { slug: 'cobrancas/atendentes', rotulo: 'Atendentes' },
-  { slug: 'cobrancas/clientes', rotulo: 'Clientes' },
-  { slug: 'cobrancas/ciclos', rotulo: 'Ciclos' },
-  { slug: 'cobrancas/regua', rotulo: 'Régua de mensagens' },
-  { slug: 'cobrancas/numeros', rotulo: 'Números' },
-  { slug: 'cobrancas/envios', rotulo: 'Envios' },
-];
 const MODULOS: Modulo[] = [
   { id: 'atendimento', rotulo: 'Atendimento', home: '/whatsapp', grupos: GRUPOS },
-  { id: 'cobrancas', rotulo: 'Cobranças', home: '/cobrancas/painel', grupos: [{ rotulo: 'Cobranças', itens: COB_SECOES }] },
 ];
-/* ícones das seções de cobrança (mesma família traço 1.7) */
-const IcC = (d: string) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><path d={d} /></svg>
-);
+const TEM_TROCA = MODULOS.length > 1;
 const FERR_ICONES: Record<string, ReactNode> = {
   unificador: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><path d="M8 3H5a2 2 0 0 0-2 2v5M16 3h3a2 2 0 0 1 2 2v5M8 21H5a2 2 0 0 1-2-2v-5M16 21h3a2 2 0 0 0 2-2v-5M9 12h6M12 9v6" /></svg>,
   // Conversor: dois arquivos com setas trocando (converter)
@@ -142,17 +132,7 @@ const FERR_ICONES: Record<string, ReactNode> = {
   // Coletor INSS: documento com seta descendo (baixar da fonte oficial)
   'coletor-inss': <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z" /><path d="M12 11v6M9.5 14.5 12 17l2.5-2.5" /></svg>,
 };
-const COB_ICONES: Record<string, ReactNode> = {
-  painel: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><path d="M4 20V10M10 20V4M16 20v-8M21 20H3" /></svg>,
-  atendentes: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><circle cx="9" cy="8" r="3.4" /><path d="M3.5 20c.6-3.4 2.8-5 5.5-5s4.9 1.6 5.5 5M16 4.6a3.4 3.4 0 010 6.8" /></svg>,
-  clientes: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><circle cx="12" cy="8" r="3.6" /><path d="M5 20c.7-4 3.4-6 7-6s6.3 2 7 6" /></svg>,
-  ciclos: IcC('M20 12a8 8 0 1 1-2.3-5.6M20 4v4h-4'),
-  regua: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.9 8.9 0 0 1-3.8-.8L3 20l1-4.9a8.3 8.3 0 0 1-1-4A8.4 8.4 0 0 1 12 3a8.4 8.4 0 0 1 9 8.5z" /></svg>,
-  numeros: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L20 13l-.5-.2 1 4.2A2 2 0 0 1 18.5 19 15 15 0 0 1 5 5.5 2 2 0 0 1 5 4z" /></svg>,
-  envios: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><path d="M21 3L10.5 13.5M21 3l-6.8 17.4a.35.35 0 0 1-.65.02L10.5 13.5 3.6 10.45a.35.35 0 0 1 .02-.65L21 3z" /></svg>,
-};
 function iconeDoItem(slug: string): ReactNode {
-  if (slug.startsWith('cobrancas/')) return COB_ICONES[slug.split('/')[1]] ?? ICONES.cobrancas;
   if (slug.startsWith('ferramentas/')) return FERR_ICONES[slug.split('/')[1]] ?? FERR_ICONES.unificador;
   return ICONES[slug];
 }
@@ -351,9 +331,9 @@ export default function AppShellV2() {
     setMenuOrg(true);
   }, []);
 
-  // MÓDULO ativo derivado da rota: /cobrancas* = Cobranças, senão Atendimento.
-  // Trocar de módulo navega pra home do módulo (o menu da esquerda se refaz).
-  const moduloAtivo: ModuloId = location.pathname.startsWith('/cobrancas') ? 'cobrancas' : 'atendimento';
+  // MÓDULO ativo: hoje só Atendimento (Cobranças saiu em 22/10). Trocar de módulo
+  // navega pra home do módulo (o menu da esquerda se refaz).
+  const moduloAtivo: ModuloId = 'atendimento';
   const modulo = MODULOS.find((m) => m.id === moduloAtivo) ?? MODULOS[0];
   const trocarModulo = useCallback((m: Modulo) => {
     setMenuOrg(false);
@@ -388,21 +368,24 @@ export default function AppShellV2() {
               Atendimento ↔ Cobranças (e novos módulos no futuro). A marca e o
               seletor dividem UMA linha (14/10): recolhida, sobra só a marca no
               rail; aberta, módulo + organização ao lado. */}
-          <button ref={tenantRef} type="button" className="sb-topo" title={`Módulo: ${modulo.rotulo} — clique para trocar`}
-            aria-haspopup="menu" aria-expanded={menuOrg} onClick={abrirMenuOrg}>
+          <button ref={tenantRef} type="button" className="sb-topo" title={TEM_TROCA ? `Módulo: ${modulo.rotulo} — clique para trocar` : modulo.rotulo}
+            aria-haspopup={TEM_TROCA ? 'menu' : undefined} aria-expanded={TEM_TROCA ? menuOrg : undefined}
+            onClick={TEM_TROCA ? abrirMenuOrg : undefined} style={TEM_TROCA ? undefined : { cursor: 'default' }}>
             <LogoAtenvo className="marca" />
             <span className="sb-topo-txt lab"><b>{modulo.rotulo}</b><i>{org}</i></span>
-            <svg className="sb-topo-seta lab" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M8 15l4 4 4-4M8 9l4-4 4 4" />
-            </svg>
+            {TEM_TROCA && (
+              <svg className="sb-topo-seta lab" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M8 15l4 4 4-4M8 9l4-4 4 4" />
+              </svg>
+            )}
           </button>
           {menuOrg && createPortal(
             <>
               <div className="um-backdrop" onClick={() => setMenuOrg(false)} aria-hidden />
               <div className="usuario-menu org-troca" role="menu" aria-label="Trocar de módulo" style={{ top: orgMenuPos.top, left: orgMenuPos.left }}>
                 <div className="um-head"><div className="um-cargo">Ir para</div></div>
-                {/* Cobranças é gestão: só o admin (visibilidade 22/10; rota com RequireRoleV2) */}
-                {MODULOS.filter((m) => admin || m.id !== 'cobrancas').map((m) => (
+                {/* (Cobranças saiu do sistema em 22/10 — sobrou só Atendimento; o menu só abre com 2+ módulos) */}
+                {MODULOS.map((m) => (
                   <button key={m.id} type="button" role="menuitemradio" aria-checked={m.id === moduloAtivo}
                     className={m.id === moduloAtivo ? 'um-item om-item on' : 'um-item om-item'}
                     onClick={() => trocarModulo(m)}>

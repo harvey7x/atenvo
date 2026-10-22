@@ -1299,7 +1299,6 @@ function PainelPrefs({ anima, demo, seed, setSeed, aoAvisar }: {
               <select id="cfa-p-home" className="inp" value={p.pagina_inicial} onChange={(e) => persist({ pagina_inicial: e.target.value })}>
                 <option value="/whatsapp">WhatsApp</option>
                 <option value="/kanban">Kanban</option>
-                <option value="/cobrancas">Cobranças</option>
                 <option value="/relatorios">Relatórios</option>
               </select>
               <div className="cfa-desc-c">Tela exibida ao entrar.</div>

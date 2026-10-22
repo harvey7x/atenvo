@@ -36,7 +36,6 @@ const Kanban = lazy(() => v1().then((m) => ({ default: m.Kanban })));
 const AgendamentosMensagens = lazy(() => v1().then((m) => ({ default: m.AgendamentosMensagens })));
 const Relacionamento = lazy(() => v1().then((m) => ({ default: m.Relacionamento })));
 const Scripts = lazy(() => v1().then((m) => ({ default: m.Scripts })));
-const Cobrancas = lazy(() => v1().then((m) => ({ default: m.Cobrancas })));
 const Integracoes = lazy(() => v1().then((m) => ({ default: m.Integracoes })));
 const Relatorios = lazy(() => v1().then((m) => ({ default: m.Relatorios })));
 const Configuracoes = lazy(() => v1().then((m) => ({ default: m.Configuracoes })));
@@ -51,7 +50,6 @@ const RequireAuthV2 = lazy(() => import('@/v2/guards/RequireAuthV2'));
 const RequireRoleV2 = lazy(() => import('@/v2/guards/RequireRoleV2'));
 const SoAdminV1 = lazy(() => import('@/v2/guards/SoAdminV1'));
 const PlanoUsoV2 = lazy(() => import('@/v2/pages/PlanoUso'));
-const CobrancasV2 = lazy(() => import('@/v2/pages/Cobrancas'));
 const FerramentasV2 = lazy(() => import('@/v2/pages/Ferramentas'));
 const AgendamentosV2 = lazy(() => import('@/v2/pages/Agendamentos'));
 const ScriptsV2 = lazy(() => import('@/v2/pages/Scripts'));
@@ -142,8 +140,10 @@ const routes: RouteObject[] = [
           { path: 'contatos', element: <Lz><ContatosV2 /></Lz> },
           { path: 'scripts', element: <Lz><ScriptsV2 /></Lz> },
           { path: 'simulador', element: <Lz><SimuladorV2 /></Lz> },
-          { path: 'cobrancas', element: <Navigate to="/cobrancas/painel" replace /> },
-          { path: 'cobrancas/:secao', element: <Lz><RequireRoleV2 role="admin"><CobrancasV2 /></RequireRoleV2></Lz> },
+          // Cobranças saiu do sistema (dono 22/10) — links antigos caem no inbox (o Dashboard
+          // é só do admin desde a visibilidade de 22/10; o inbox todo mundo vê)
+          { path: 'cobrancas', element: <Navigate to="/whatsapp" replace /> },
+          { path: 'cobrancas/:secao', element: <Navigate to="/whatsapp" replace /> },
           { path: 'ferramentas', element: <Navigate to="/ferramentas/unificador" replace /> },
           { path: 'ferramentas/:tool', element: <Lz><FerramentasV2 /></Lz> },
           { path: 'relatorios', element: <Lz><RequireRoleV2 role="admin"><RelatoriosV2 /></RequireRoleV2></Lz> },
@@ -184,7 +184,7 @@ const routes: RouteObject[] = [
               { path: 'agendamentos', handle: { title: 'Agendamentos de Mensagens', subtitle: 'Acompanhe mensagens programadas, enviadas, falhas e canceladas.', fullBleed: true }, element: <Lz><AgendamentosMensagens /></Lz> },
               { path: 'relacionamento', handle: { title: 'Relacionamento', subtitle: 'Réguas leves de relacionamento e nutrição — ativadas manualmente por cliente.', fullBleed: true }, element: <Lz><Relacionamento /></Lz> },
               { path: 'scripts', handle: { title: 'Scripts', subtitle: 'Biblioteca de scripts e mídias.', fullBleed: true }, element: <Lz><Scripts /></Lz> },
-              { path: 'cobrancas', handle: { title: 'Cobranças', subtitle: 'Cobranças que sua organização faz aos próprios clientes.', fullBleed: true }, element: <Lz><Cobrancas /></Lz> },
+              { path: 'cobrancas', element: <Navigate to="/whatsapp" replace /> },
               { path: 'integracoes', handle: { title: 'Integrações', subtitle: 'Conecte, configure e monitore os serviços externos utilizados pela sua operação.', fullBleed: true }, element: <Lz><Integracoes /></Lz> },
               { path: 'relatorios', handle: { title: 'Relatórios', subtitle: 'Desempenho do atendimento e das cobranças.', fullBleed: true }, element: <Lz><Relatorios /></Lz> },
               { path: 'configuracoes', handle: { title: 'Configurações', subtitle: 'Conta, equipe, notificações e canais já conectados.', fullBleed: true }, element: <Lz><Configuracoes /></Lz> },
