@@ -556,3 +556,65 @@
 }
 :root[data-perf="lite"] .v2 tr.d5-realce > *, :root[data-perf="lite"] .v2 li.d5-realce,
 :root[data-perf="lite"] .v2 .d5-kpi.d5-realce, :root[data-perf="lite"] .v2 .d5-sec.d5-realce { animation: none; }
+
+/* ============================================================
+   CENTRALIZADO + VIDA NO HOVER (dono 22/10: "deixa mais centralizado… quando
+   passar por cima, algum efeito, para não ficar tão parado"). Só transform,
+   opacity, filter, cor e sombra — nada de layout por frame.
+   ============================================================ */
+/* atendentes: título, número e legenda de cada coluna numérica no centro dela */
+.v2 .d5-tab-at .d5-dir { text-align: center; }
+.v2 .d5-tab-at thead th.d5-dir .d5-th-ajuda { justify-content: center; }
+.v2 .d5-tab-at thead .d5-ord { text-align: center; }
+.v2 .d5-tab-at .d5-cel2-dir { align-items: center; }
+.v2 .d5-tab-at .d5-cel2 > small { text-align: center; }
+.v2 .d5-tab-at .d5-ent { justify-content: center; }
+.v2 .d5-tab-at .d5-ent > b { min-width: 3ch; text-align: left; }  /* grupo barra+número com a mesma largura em toda linha: as barras começam na mesma borda */
+
+/* linhas das tabelas: faixa mais clara + fio azul entrando pela esquerda */
+.v2 .d5-tab tbody tr > * { transition: background-color .2s var(--ease), box-shadow .2s var(--ease); }
+.v2 .d5-tab tbody tr:hover > * { background: rgba(var(--tint), .045); }
+.v2 .d5-tab tbody tr:hover > :first-child { box-shadow: inset 3px 0 0 var(--azul); }
+.v2 .d5-tab .d5-pessoa, .v2 .d5-tab .d5-nome-in > b { display: inline-block; transition: transform .2s var(--ease); }
+.v2 .d5-tab tbody tr:hover .d5-pessoa, .v2 .d5-tab tbody tr:hover .d5-nome-in > b { transform: translateX(3px); }
+.v2 .d5-av { transition: border-color .2s var(--ease), background-color .2s var(--ease), color .2s var(--ease); }
+.v2 .d5-tab tbody tr:hover .d5-av { border-color: rgba(var(--azul-rgb), .55); background: rgba(var(--azul-rgb), .14); color: var(--txt); }
+/* barras: acendem no hover e CRESCEM ao abrir a página */
+@keyframes d5-cresce { from { transform: scaleX(0); } }
+.v2 .d5-trilho > i { transform-origin: left center; animation: d5-cresce .7s var(--ease) both; transition: filter .2s var(--ease); }
+.v2 .d5-tab tbody tr:hover .d5-trilho > i, .v2 .d5-barra:hover .d5-trilho > i { filter: brightness(1.28) saturate(1.1); }
+.v2 .d5-barra-rot { transition: color .2s var(--ease); }
+.v2 .d5-barra:hover .d5-barra-rot { color: var(--txt); }
+
+/* cartões dos números: sobem 2px com sombra e fio azul suave */
+.v2 .d5-kpi { transition: transform .22s var(--ease), box-shadow .22s var(--ease); }
+.v2 .d5-kpi:hover { transform: translateY(-2px); box-shadow: 0 0 0 1px rgba(var(--azul-rgb), .32), 0 14px 30px -16px rgba(0, 0, 0, .55); }
+:root[data-tema="light"] .v2 .d5-kpi:hover { box-shadow: 0 0 0 1px rgba(var(--azul-rgb), .28), 0 14px 30px -16px rgba(22, 25, 31, .22); }
+
+/* mapa: a célula salta um pouco à frente das vizinhas */
+.v2 .d5-cel { transition: transform .15s var(--ease), box-shadow .15s var(--ease); }
+.v2 .d5-cel:hover { transform: scale(1.14); position: relative; z-index: 1; }
+.v2 .d5-hbar > i { transition: background-color .15s var(--ease), transform .15s var(--ease); transform-origin: bottom; }
+.v2 .d5-hbar:hover > i { transform: scaleY(1.06); }
+
+/* Leitura do dia: o achado em foco ganha faixa e o link avança */
+.v2 .d5-lt-item { transition: background-color .2s var(--ease); border-radius: 8px; }
+.v2 .d5-lt-item:hover { background: rgba(var(--tint), .035); }
+.v2 .d5-lt-link { transition: transform .2s var(--ease); display: inline-block; }
+.v2 .d5-lt-item:hover .d5-lt-link { transform: translateX(3px); }
+
+/* MODO LEVE (padrão das máquinas da equipe) desliga TODA transição com !important. Estes
+   efeitos são baratos (transform/cor em poucos elementos, só no hover) — ficam ligados
+   no Leve, mas NUNCA com "reduzir movimento" do sistema. */
+@media (prefers-reduced-motion: no-preference) {
+  :root[data-perf="lite"] .v2 .d5-pg .d5-tab tbody tr > * { transition: background-color .2s var(--ease), box-shadow .2s var(--ease) !important; }
+  :root[data-perf="lite"] .v2 .d5-pg .d5-pessoa, :root[data-perf="lite"] .v2 .d5-pg .d5-nome-in > b,
+  :root[data-perf="lite"] .v2 .d5-pg .d5-lt-link { transition: transform .2s var(--ease) !important; }
+  :root[data-perf="lite"] .v2 .d5-pg .d5-av { transition: border-color .2s var(--ease), background-color .2s var(--ease), color .2s var(--ease) !important; }
+  :root[data-perf="lite"] .v2 .d5-pg .d5-trilho > i { animation: d5-cresce .7s var(--ease) both !important; transition: filter .2s var(--ease) !important; }
+  :root[data-perf="lite"] .v2 .d5-pg .d5-barra-rot { transition: color .2s var(--ease) !important; }
+  :root[data-perf="lite"] .v2 .d5-pg .d5-kpi { transition: transform .22s var(--ease), box-shadow .22s var(--ease) !important; }
+  :root[data-perf="lite"] .v2 .d5-pg .d5-cel { transition: transform .15s var(--ease), box-shadow .15s var(--ease) !important; }
+  :root[data-perf="lite"] .v2 .d5-pg .d5-hbar > i { transition: background-color .15s var(--ease), transform .15s var(--ease) !important; }
+  :root[data-perf="lite"] .v2 .d5-pg .d5-lt-item { transition: background-color .2s var(--ease) !important; }
+}
