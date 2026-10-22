@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useOrg } from '@/context/OrgContext';
 import { useAuth } from '@/context/AuthContext';
+import { useVisibilidade } from '@/lib/visibilidade';
 import { subirMidiaWa } from '@/data/whatsapp';
 import { transcodificarParaOggOpus } from '@/v2/lib/oggOpus';
 import {
@@ -97,9 +98,12 @@ export function usePendReal() {
   const { currentOrg } = useOrg();
   const org = currentOrg?.id;
   const { user } = useAuth();
+  // visibilidade (22/10): quem não vê todos recebe só as pendências dos clientes DELE
+  const vis = useVisibilidade();
+  const soDe = vis.veTodos ? null : vis.uid;
   const q = useQuery({
-    queryKey: ['pendencias', org],
-    enabled: !!supabase && !!org,
+    queryKey: ['pendencias', org, soDe ?? 'todos'],
+    enabled: !!supabase && !!org && (vis.veTodos || !!soDe),
     refetchInterval: 30_000,
     queryFn: async (): Promise<DadosPend> => {
       const sb = supabase!;
@@ -118,15 +122,22 @@ export function usePendReal() {
         sb.from('pendencias').select('lembrar_desde').eq('organizacao_id', org!).limit(1),
       ]);
       for (const r of [pr, mr, cr, kr, ur]) if (r.error) throw new Error(r.error.message);
-      const entregas = await lerEntregas((pr.data as Row[]) ?? []);
-      const motorNovo = detectarMotorNovo((pr.data as Row[]) ?? [], !mn.error);
+      const todasPend = (pr.data as Row[]) ?? [];
+      /* dono = encarregado ATUAL do cliente; sem encarregado, quem abriu (mesma regra do map abaixo) */
+      const donoDe = (r: Row) => {
+        const ct = (Array.isArray(r.contatos) ? r.contatos[0] : r.contatos) as { responsavel_id?: string | null } | null;
+        return (ct?.responsavel_id as string) || (r.criado_por as string) || undefined;
+      };
+      const linhasPend = soDe ? todasPend.filter((r) => donoDe(r) === soDe) : todasPend;
+      const entregas = await lerEntregas(linhasPend);
+      const motorNovo = detectarMotorNovo(todasPend, !mn.error);
       const nomes = new Map<string, string>();
       for (const r of (ur.data as Row[]) ?? []) {
         const u = (Array.isArray(r.usuarios) ? r.usuarios[0] : r.usuarios) as { id: string; nome: string } | null;
         if (u) nomes.set(u.id, (u.nome || '').split(/\s+/)[0]);
       }
       const clientes = new Map<string, ClienteFechado>();
-      const pendencias: Pendencia[] = ((pr.data as Row[]) ?? []).map((r) => {
+      const pendencias: Pendencia[] = linhasPend.map((r) => {
         const ct = (Array.isArray(r.contatos) ? r.contatos[0] : r.contatos) as { nome?: string; telefone?: string; responsavel_id?: string | null } | null;
         const cid = r.contato_id as string;
         /* dono = encarregado ATUAL do cliente (segue a troca de encarregado); sem encarregado, quem abriu */
@@ -177,7 +188,7 @@ export function usePendReal() {
     qc.invalidateQueries({ queryKey: ['pend-fechados', org] }),
   ]);
   const { admin, gestor } = permissoesPend(currentOrg?.role);
-  return { ...q, org, usuario: { id: user?.id ?? '', nome: (user?.name ?? '').split(/\s+/)[0], admin, gestor }, recarregar };
+  return { ...q, org, usuario: { id: user?.id ?? '', nome: (user?.name ?? '').split(/\s+/)[0], admin, gestor, veTodos: vis.veTodos }, recarregar };
 }
 
 /** papel da org ativa (OrgContext: admin | gestor = supervisor no banco | atendente) →
@@ -195,14 +206,17 @@ export function detectarMotorNovo(linhas: Row[], sondagemOk: boolean) {
  *  (cadastrado por número). Os sem oportunidade ganha vêm com servico = null. */
 export function useClientesFechados(busca: string, ativo: boolean) {
   const { currentOrg } = useOrg();
+  const vis = useVisibilidade();
+  const soDe = vis.veTodos ? null : vis.uid;
   return useQuery({
-    queryKey: ['pend-fechados', currentOrg?.id, busca.trim()],
-    enabled: !!supabase && ativo,
+    queryKey: ['pend-fechados', currentOrg?.id, busca.trim(), soDe ?? 'todos'],
+    enabled: !!supabase && ativo && (vis.veTodos || !!soDe),
     staleTime: 20_000,
     queryFn: async (): Promise<(ClienteFechado & { abertas: number })[]> => {
       const { data, error } = await supabase!.rpc('pendencias_clientes_fechados', { p_busca: busca.trim() || null, p_limite: 40 });
       if (error) throw new Error(error.message);
-      return ((data as Row[]) ?? []).map((r) => ({
+      // visibilidade (22/10): só os clientes de que o usuário é o responsável
+      return ((data as Row[]) ?? []).filter((r) => !soDe || r.responsavel_id === soDe).map((r) => ({
         id: r.contato_id as string, nome: ((r.nome as string) || 'Cliente').toUpperCase(), telefone: formatarFone((r.telefone as string) || ''),
         processo: '', acao: rotuloServico(r.servico as string), responsavel: ((r.responsavel_nome as string) || '—').split(/\s+/)[0],
         fechadoEm: (r.fechado_em as string) || '', abertas: Number(r.abertas ?? 0),

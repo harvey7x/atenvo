@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { buscarKeyset } from '@/data/paginacao';
 import { useOrg } from '@/context/OrgContext';
+import { useVisibilidade } from '@/lib/visibilidade';
 
 export const KANBAN_REAL = isSupabaseConfigured && !!supabase;
 
@@ -337,6 +338,10 @@ export function useKanban() {
   const { currentOrg } = useOrg();
   const org = currentOrg.id;
   const qc = useQueryClient();
+  // visibilidade (22/10): quem não vê todos só vê os cards DELE (oportunidades.responsavel_id —
+  // o mesmo responsável que o card mostra; o gatilho de sincronia o mantém igual ao do contato)
+  const vis = useVisibilidade();
+  const soDe = vis.veTodos ? null : vis.uid;
 
   const funilQ = useQuery({ queryKey: ['kanban-funil', org], enabled: KANBAN_REAL, queryFn: () => garantirFunil(org) });
   const funilId = funilQ.data?.id ?? null;
@@ -352,7 +357,7 @@ export function useKanban() {
   });
 
   const leadsQ = useQuery({
-    queryKey: ['kanban-leads', org, funilId], enabled: KANBAN_REAL && !!funilId, refetchInterval: 8000,
+    queryKey: ['kanban-leads', org, funilId, soDe ?? 'todos'], enabled: KANBAN_REAL && !!funilId && (vis.veTodos || !!soDe), refetchInterval: 8000,
     queryFn: async (): Promise<KLead[]> => {
       // PAGINAÇÃO (18/09): sem paginar, o PostgREST corta em 1000 (db-max-rows) e CARDS SOMEM do
       // quadro (o funil passa de 1000 com em_andamento+ganho+perdido). KEYSET por id (imutável);
@@ -364,6 +369,7 @@ export function useKanban() {
             .select('id, coluna_id, contato_id, conversa_origem_id, canal_origem_id, contato_nome, titulo, telefone, responsavel_id, valor_estimado, origem, etiquetas, observacoes, lembrete, ordem, criado_em, atualizado_em, entrada_em, movimentado_em, prioridade, status, fechado_em, motivo_perda, motivo_nao_elegivel, responsavel_no_fechamento_id, tipo_beneficio, tipo_servico, status_cancelamento, status_ressarcimento, numero_beneficio, instituicao, tipo_desconto, data_inicio_desconto, valor_desconto_mensal, valor_ressarcimento_estimado, valor_ressarcido, contatos(nome, telefone, email, etiquetas), responsavel:usuarios!oportunidades_responsavel_id_fkey(nome), canal_origem:canais(tipo, nome_interno, numero_conectado)')
             .eq('organizacao_id', org).eq('funil_id', funilId!).in('status', ['em_andamento', 'ganho', 'perdido'])
             .order('id', { ascending: false }).limit(tam);
+          if (soDe) q = q.eq('responsavel_id', soDe);
           if (cursor) q = q.lt('id', cursor);
           return q.then((r) => ({ data: (r.data as unknown as (DbLead & { id: string })[]) ?? null, error: r.error }));
         },
@@ -430,7 +436,8 @@ export function useKanban() {
       organizacao_id: org, funil_id: funilId, coluna_id: input.colunaId,
       contato_id: input.contatoId ?? null, contato_nome: input.contatoId ? null : input.nome, titulo: input.nome,
       conversa_origem_id: input.conversaOrigemId ?? null, canal_origem_id: input.canalOrigemId ?? null,
-      telefone: input.telefone || null, responsavel_id: input.responsavelId ?? null,
+      // visibilidade (22/10): lead criado por quem não vê todos nasce DELE (senão some do próprio board)
+      telefone: input.telefone || null, responsavel_id: input.responsavelId ?? soDe ?? null,
       valor_estimado: input.valor ?? null, origem: input.origem || null,
       etiquetas: input.etiquetas ?? [], observacoes: input.observacoes || null, lembrete: input.lembrete || null, ordem,
       tipo_beneficio: input.tipoBeneficio ?? null, tipo_servico: input.tipoServico ?? 'analise_inicial',

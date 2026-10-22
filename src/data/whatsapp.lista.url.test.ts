@@ -47,4 +47,21 @@ describe('consultaListaConversas → URL do PostgREST', () => {
     expect(url.searchParams.get('real.limit')).toBe('1');
     expect(url.searchParams.get('select')).toBe(SELECT_CONVERSAS.replace(/\s/g, ''));
   });
+
+  it('visibilidade (22/10): sem escopo não recorta; com escopo só o responsável — inclusive na busca pontual', async () => {
+    const { consultaListaConversas } = await import('./whatsapp');
+    const { definirEscopoLista } = await import('@/lib/visibilidade');
+    const semEscopo = (consultaListaConversas('org-1') as unknown as { url: URL }).url;
+    expect(semEscopo.searchParams.has('contatos.responsavel_id')).toBe(false);
+    definirEscopoLista('org-2', 'u-1');
+    const carga = (consultaListaConversas('org-2').order('id', { ascending: false }).limit(1000) as unknown as { url: URL }).url;
+    expect(carga.searchParams.get('contatos.responsavel_id')).toBe('eq.u-1');
+    const alvo = (consultaListaConversas('org-2').in('id', ['a']) as unknown as { url: URL }).url;
+    expect(alvo.searchParams.get('contatos.responsavel_id')).toBe('eq.u-1');
+    expect(alvo.searchParams.get('real.limit')).toBe('1');
+    // outra org da mesma aba não herda o recorte; voltar a null tira o filtro
+    expect((consultaListaConversas('org-1') as unknown as { url: URL }).url.searchParams.has('contatos.responsavel_id')).toBe(false);
+    definirEscopoLista('org-2', null);
+    expect((consultaListaConversas('org-2') as unknown as { url: URL }).url.searchParams.has('contatos.responsavel_id')).toBe(false);
+  });
 });

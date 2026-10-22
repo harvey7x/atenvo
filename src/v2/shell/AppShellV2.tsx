@@ -57,7 +57,8 @@ const GRUPOS: GrupoNav[] = [
   {
     rotulo: 'Operação',
     itens: [
-      { slug: 'dashboard', rotulo: 'Dashboard' },
+      // visibilidade (22/10): painel da equipe inteira — só o admin (rota com RequireRoleV2)
+      { slug: 'dashboard', rotulo: 'Dashboard', admin: true },
       { slug: 'whatsapp', rotulo: 'WhatsApp' },
       // Facebook e Disparo fora do menu (pedido do dono 27/08) — rotas seguem vivas por URL
       { slug: 'kanban', rotulo: 'Kanban' },
@@ -397,7 +398,8 @@ export default function AppShellV2() {
               <div className="um-backdrop" onClick={() => setMenuOrg(false)} aria-hidden />
               <div className="usuario-menu org-troca" role="menu" aria-label="Trocar de módulo" style={{ top: orgMenuPos.top, left: orgMenuPos.left }}>
                 <div className="um-head"><div className="um-cargo">Ir para</div></div>
-                {MODULOS.map((m) => (
+                {/* Cobranças é gestão: só o admin (visibilidade 22/10; rota com RequireRoleV2) */}
+                {MODULOS.filter((m) => admin || m.id !== 'cobrancas').map((m) => (
                   <button key={m.id} type="button" role="menuitemradio" aria-checked={m.id === moduloAtivo}
                     className={m.id === moduloAtivo ? 'um-item om-item on' : 'um-item om-item'}
                     onClick={() => trocarModulo(m)}>

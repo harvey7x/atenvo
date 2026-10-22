@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { focusManager, useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { DEMO_MODE, acaoSimulada } from '@/lib/demo';
@@ -11,6 +11,7 @@ import {
   type Alvos, type DepsMotor, type EtapaContato, type IaEstadoLista, type LoteAlvos, type MotorRealtime, type OppLinha, type TabelaRt,
 } from '@/data/whatsappRealtime';
 import { buscarKeyset, ehAbortado, lancarSeAbortado } from '@/data/paginacao';
+import { definirEscopoLista, escopoLista, useVisibilidade } from '@/lib/visibilidade';
 
 export const WA_REAL = isSupabaseConfigured && !!supabase;
 
@@ -159,11 +160,17 @@ export const SELECT_CONVERSAS = 'id, status, status_id, nao_lidas, ultima_intera
  *  canal. O chamador acrescenta só o recorte: keyset (`.order('id').limit().lt()`) na carga
  *  completa, ou `.in('id' | 'contato_id', lote)` numa busca pontual. */
 export function consultaListaConversas(orgId: string) {
-  return supabase!
+  let q = supabase!
     .from('conversas')
     .select(SELECT_CONVERSAS)
     .eq('organizacao_id', orgId)
-    .eq('canais.tipo', 'whatsapp')
+    .eq('canais.tipo', 'whatsapp');
+  // VISIBILIDADE (22/10): fora do admin, só os clientes de que o usuário é o responsável
+  // (contatos!inner: o filtro no embed corta a conversa). Vale para a carga completa, a
+  // busca-alvo do realtime e o deep-link — todos passam por aqui. Ver lib/visibilidade.
+  const resp = escopoLista(orgId);
+  if (resp) q = q.eq('contatos.responsavel_id', resp);
+  return q
     .not('real.tipo', 'in', '(sistema,nota_interna)')
     .order('enviada_em', { referencedTable: 'real', ascending: false })
     .limit(1, { referencedTable: 'real' })
@@ -596,10 +603,21 @@ export function useWaConversations() {
   const { currentOrg } = useOrg();
   const qc = useQueryClient();
   const orgId = currentOrg.id;
+  // VISIBILIDADE (22/10): o recorte vai na consulta (escopo gravado ANTES da query partir) e
+  // também na saída (select): o cache nunca remove um card — conversa transferida para outra
+  // pessoa, ou carregada por outro usuário nesta mesma aba, não pode aparecer.
+  const vis = useVisibilidade();
+  const soDoUsuario = vis.veTodos ? null : vis.uid ?? '';
+  definirEscopoLista(orgId, soDoUsuario);
+  const recortar = useCallback(
+    (lista: WaContact[]) => (soDoUsuario === null ? lista : lista.filter((c) => !!soDoUsuario && c.respId === soDoUsuario)),
+    [soDoUsuario],
+  );
 
   const query = useQuery({
     queryKey: ['wa-conversas', orgId],
     enabled: WA_REAL,
+    select: recortar,
     // PERF: o realtime (abaixo) é a fonte de frescor; este intervalo é só BACKSTOP, como o
     // comentário sempre disse. Antes eram 6s — e como o fetch levava ~3,8s, a requisição mal
     // terminava antes da próxima começar. O realtime cobre o tempo-real; este intervalo é só a
@@ -967,6 +985,10 @@ export function normalizeWaPhone(raw: string): string | null {
 export function useIniciarConversaWa() {
   const { currentOrg } = useOrg();
   const qc = useQueryClient();
+  // visibilidade (22/10): quem não vê todos não abre (nem move de número) a conversa de cliente
+  // de outra pessoa; contato NOVO criado por ele já nasce dele (senão sumiria da própria lista)
+  const vis = useVisibilidade();
+  const soDe = vis.veTodos ? null : vis.uid;
   return useMutation({
     mutationFn: async (input: { canalId: string; telefone: string; nome?: string }): Promise<{ conversaId: string; reused: boolean }> => {
       const org = currentOrg.id;
@@ -981,6 +1003,17 @@ export function useIniciarConversaWa() {
       if (!contatoId) {
         const { data: ct } = await supabase!.from('contatos').select('id').eq('organizacao_id', org).eq('telefone', norm).is('mesclado_em', null).maybeSingle();
         if (ct?.id) contatoId = ct.id as string;
+      }
+      if (contatoId && !vis.veTodos) {
+        const { data: dono } = await supabase!.from('contatos')
+          .select('responsavel_id, responsavel:usuarios(nome)').eq('id', contatoId).maybeSingle();
+        const d = dono as { responsavel_id?: string | null; responsavel?: { nome?: string | null } | { nome?: string | null }[] | null } | null;
+        if (!soDe || d?.responsavel_id !== soDe) {
+          const r = Array.isArray(d?.responsavel) ? d?.responsavel[0] : d?.responsavel;
+          throw new Error(d?.responsavel_id
+            ? `Este número já é cliente de ${r?.nome?.trim() || 'outro atendente'}. Peça a transferência para atender.`
+            : 'Este número já é um cliente sem responsável. Peça ao administrador para distribuir.');
+        }
       }
       // 2/3) v27: UM atendimento ativo por CONTATO (não por canal). Se já existe conversa ativa,
       // reutiliza e só move o CANAL ATUAL para o canal escolhido — nunca cria duplicata.
@@ -1001,7 +1034,7 @@ export function useIniciarConversaWa() {
         // 5) cria contato (nome informado ou telefone como rótulo temporário)
         const nome = (input.nome || '').trim() || norm;
         const { data: novo, error: e1 } = await supabase!.from('contatos')
-          .insert({ nome, telefone: norm, origem: 'WhatsApp', organizacao_id: org }).select('id').single();
+          .insert({ nome, telefone: norm, origem: 'WhatsApp', organizacao_id: org, ...(soDe ? { responsavel_id: soDe } : {}) }).select('id').single();
         if (e1 || !novo) throw new Error('Não foi possível iniciar a conversa.');
         contatoId = novo.id as string;
         // identidade whatsapp (best-effort; espelha o webhook p/ dedup quando o cliente responder)
@@ -1525,15 +1558,21 @@ export interface AgendamentoOrg {
 /** Lista TODAS as mensagens agendadas da organização (para a central). Isolado por org + RLS. */
 export function useAgendamentosOrg() {
   const { currentOrg } = useOrg();
+  // visibilidade (22/10): quem não vê todos só vê os agendamentos dos clientes DELE
+  const vis = useVisibilidade();
+  const soDe = vis.veTodos ? null : vis.uid;
   return useQuery({
-    queryKey: ['mensagens-agendadas-org', currentOrg.id],
-    enabled: WA_REAL,
+    queryKey: ['mensagens-agendadas-org', currentOrg.id, soDe ?? 'todos'],
+    enabled: WA_REAL && (vis.veTodos || !!soDe),
     refetchInterval: 30_000,
     queryFn: async (): Promise<AgendamentoOrg[]> => {
-      const { data, error } = await supabase!
+      let q = supabase!
         .from('mensagens_agendadas')
-        .select('id, conversa_id, contato_id, canal_id, nome_canal_snapshot, tipo, texto, nome_arquivo, executar_em, status, tentativas, ultimo_erro, motivo_bloqueio, criado_por, criado_em, enviada_em, mensagem_id_enviada, sequencia_id, ordem_na_sequencia, contatos(nome, telefone)')
-        .eq('organizacao_id', currentOrg.id)
+        .select('id, conversa_id, contato_id, canal_id, nome_canal_snapshot, tipo, texto, nome_arquivo, executar_em, status, tentativas, ultimo_erro, motivo_bloqueio, criado_por, criado_em, enviada_em, mensagem_id_enviada, sequencia_id, ordem_na_sequencia, '
+          + (soDe ? 'contatos!inner(nome, telefone, responsavel_id)' : 'contatos(nome, telefone)'))
+        .eq('organizacao_id', currentOrg.id);
+      if (soDe) q = q.eq('contatos.responsavel_id', soDe);
+      const { data, error } = await q
         .order('executar_em', { ascending: false });
       if (error) throw new Error(error.message);
       type Row = {

@@ -22,7 +22,8 @@ export interface Fonte {
   /** banco com o motor novo (20261008190000, no ar). A demo segue o mesmo motor (demo = contrato). */
   motorNovo: boolean;
   /** admin: muda os Ajustes. gestor (administrador ou supervisor): exclui mensagem pronta. */
-  usuario: { id: string; nome: string; admin: boolean; gestor: boolean };
+  /** veTodos: vê as pendências da equipe toda (visibilidade 22/10 — só o admin) */
+  usuario: { id: string; nome: string; admin: boolean; gestor: boolean; veTodos: boolean };
   cliente: (id: string) => ClienteFechado;
   /** Nova pendência por número (cliente fora do sistema): o número é válido? já é de algum contato? Só leitura. */
   checarNumero: (tel: string) => Promise<ChecagemNumero>;
@@ -68,7 +69,7 @@ function useFonteDemo(): Fonte {
   return useMemo(() => ({
     real: false, pronto: true, carregando: false,
     pendencias: e.pendencias, modelos: e.modelos, ajustes: e.ajustes, canais: [], motorNovo: true,
-    usuario: { id: 'demo', nome: usuarioAtual(), admin: true, gestor: true },
+    usuario: { id: 'demo', nome: usuarioAtual(), admin: true, gestor: true, veTodos: true },
     cliente: (id) => e.clientes.find((c) => c.id === id) ?? SEM_CLIENTE,
     checarNumero: async (tel) => { await new Promise((ok) => setTimeout(ok, ESPERA_CHECAR_MS)); return pendAcoes.checarNumero(tel); },
     acoes: comEspera({

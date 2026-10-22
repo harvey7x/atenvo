@@ -49,6 +49,7 @@ const LoginV2 = lazy(() => import('@/v2/pages/Login'));
 const NaoEncontradaV2 = lazy(() => import('@/v2/pages/NaoEncontrada'));
 const RequireAuthV2 = lazy(() => import('@/v2/guards/RequireAuthV2'));
 const RequireRoleV2 = lazy(() => import('@/v2/guards/RequireRoleV2'));
+const SoAdminV1 = lazy(() => import('@/v2/guards/SoAdminV1'));
 const PlanoUsoV2 = lazy(() => import('@/v2/pages/PlanoUso'));
 const CobrancasV2 = lazy(() => import('@/v2/pages/Cobrancas'));
 const FerramentasV2 = lazy(() => import('@/v2/pages/Ferramentas'));
@@ -119,7 +120,10 @@ const routes: RouteObject[] = [
         children: [
           // Home: entra pelo WhatsApp (entrada do v1) — decisão de escopo do dono.
           { index: true, element: <Navigate to="/whatsapp" replace /> },
-          { path: 'dashboard', element: <Lz><DashboardV2 /></Lz> },
+          // Visibilidade (22/10, pedido do dono): só o admin vê a carteira de todos — as telas de
+          // GESTÃO (visão da equipe inteira) ficam só para ele: Dashboard, Relatórios, Recuperação,
+          // Disparo e Cobranças. As de trabalho (inbox, Kanban, Contatos…) mostram só os clientes de cada um.
+          { path: 'dashboard', element: <Lz><RequireRoleV2 role="admin"><DashboardV2 /></RequireRoleV2></Lz> },
           { path: 'whatsapp', element: <Lz><GateWhatsApp /></Lz> },
           { path: 'facebook', element: <Lz><ManutencaoV2 area="Facebook" /></Lz> },
           { path: 'relacionamento', element: <Lz><ManutencaoV2 area="Relacionamento" /></Lz> },
@@ -130,19 +134,19 @@ const routes: RouteObject[] = [
           // preservada (não deletada), só fora do menu/rota — reversível. Link antigo cai no WhatsApp.
           { path: 'remarketing', element: <Navigate to="/whatsapp" replace /> },
           { path: 'agendamentos', element: <Lz><AgendamentosV2 /></Lz> },
-          { path: 'recuperacao', element: <Lz><RecuperacaoV2 /></Lz> },
+          { path: 'recuperacao', element: <Lz><RequireRoleV2 role="admin"><RecuperacaoV2 /></RequireRoleV2></Lz> },
           { path: 'pendencias', element: <Lz><PendenciasV2 /></Lz> },
           { path: 'portabilidades', element: <Lz><PortabilidadesV2 /></Lz> },
           { path: 'manual', element: <Lz><ManualV2 /></Lz> },
-          { path: 'disparo', element: <Lz><DisparoV2 /></Lz> },
+          { path: 'disparo', element: <Lz><RequireRoleV2 role="admin"><DisparoV2 /></RequireRoleV2></Lz> },
           { path: 'contatos', element: <Lz><ContatosV2 /></Lz> },
           { path: 'scripts', element: <Lz><ScriptsV2 /></Lz> },
           { path: 'simulador', element: <Lz><SimuladorV2 /></Lz> },
           { path: 'cobrancas', element: <Navigate to="/cobrancas/painel" replace /> },
-          { path: 'cobrancas/:secao', element: <Lz><CobrancasV2 /></Lz> },
+          { path: 'cobrancas/:secao', element: <Lz><RequireRoleV2 role="admin"><CobrancasV2 /></RequireRoleV2></Lz> },
           { path: 'ferramentas', element: <Navigate to="/ferramentas/unificador" replace /> },
           { path: 'ferramentas/:tool', element: <Lz><FerramentasV2 /></Lz> },
-          { path: 'relatorios', element: <Lz><RelatoriosV2 /></Lz> },
+          { path: 'relatorios', element: <Lz><RequireRoleV2 role="admin"><RelatoriosV2 /></RequireRoleV2></Lz> },
           { path: 'integracoes', element: <Lz><IntegracoesV2 /></Lz> },
           // Maturação DESCONTINUADA (Evolution restrito pela Meta): rota → placeholder "descontinuada".
           // Página Maturacao.tsx preservada (não deletada), só fora do menu/rota — reversível.
@@ -170,7 +174,8 @@ const routes: RouteObject[] = [
         children: [
           { path: 'alterar-senha', element: <Lz><AlterarSenha /></Lz> },
           {
-            element: <Lz><AppShell /></Lz>,
+            // visibilidade (22/10): o v1 não tem o recorte por responsável — só o admin entra
+            element: <Lz><SoAdminV1><AppShell /></SoAdminV1></Lz>,
             children: [
               { index: true, element: <Navigate to="/v1/whatsapp" replace /> },
               { path: 'whatsapp', handle: { title: 'WhatsApp', subtitle: 'Caixa de atendimento do WhatsApp.', fullBleed: true }, element: <Lz><WhatsApp /></Lz> },

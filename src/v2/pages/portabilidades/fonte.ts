@@ -15,7 +15,8 @@ export interface Fonte {
   erro?: string;
   portabilidades: Portabilidade[];
   atendentes: Atendente[];
-  usuario: { id: string; nome: string };
+  /** veTodos: vê a equipe toda (visibilidade 22/10 — só o admin); ausente = demo, vê tudo */
+  usuario: { id: string; nome: string; veTodos?: boolean };
   cliente: (id: string) => ClientePort;
   atendente: (id: string) => string;
   acoes: {

@@ -13,6 +13,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { WA_REAL } from '@/data/whatsapp';
 import { useOrg } from '@/context/OrgContext';
+import { useVisibilidade } from '@/lib/visibilidade';
 
 export interface PendenciaAberta { id: string; oQue: string; tipo: string | null; status: string | null }
 
@@ -62,18 +63,23 @@ export function useMensagensTotal(conversaId: string | null | undefined) {
  *  conta no servidor, sem carregar a lista pesada do inbox em todas as telas. */
 export function usePosVendaAguardando() {
   const { currentOrg } = useOrg();
+  // visibilidade (22/10): quem não vê todos conta só os fechados DELE
+  const vis = useVisibilidade();
+  const soDe = vis.veTodos ? null : vis.uid;
   return useQuery({
-    queryKey: ['pv-aguardando', currentOrg.id],
-    enabled: WA_REAL && !!currentOrg.id,
+    queryKey: ['pv-aguardando', currentOrg.id, soDe ?? 'todos'],
+    enabled: WA_REAL && !!currentOrg.id && (vis.veTodos || !!soDe),
     refetchInterval: 180_000,
     staleTime: 120_000,
     queryFn: async (): Promise<number> => {
-      const { count, error } = await supabase!
+      let q = supabase!
         .from('conversas')
-        .select('id, contatos!inner(id, oportunidades!inner(id, status))', { count: 'exact', head: true })
+        .select('id, contatos!inner(id, responsavel_id, oportunidades!inner(id, status))', { count: 'exact', head: true })
         .eq('organizacao_id', currentOrg.id)
         .gt('nao_lidas', 0)
         .eq('contatos.oportunidades.status', 'ganho');
+      if (soDe) q = q.eq('contatos.responsavel_id', soDe);
+      const { count, error } = await q;
       if (error) throw new Error(error.message);
       return count ?? 0;
     },

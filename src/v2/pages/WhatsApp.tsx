@@ -18,6 +18,7 @@ import { responsavelEfetivo } from '@/lib/conversaEtiquetas';
 import { chaveDiaSP, construirItensConversa, type ItemConversa } from '@/lib/dataConversa';
 import { canalValidoParaEnvio, itensParaRpc } from '@/lib/agendamentoMensagem';
 import { initials } from '@/lib/avatar';
+import { useVisibilidade } from '@/lib/visibilidade';
 import { useAuth } from '@/context/AuthContext';
 import { useOrg } from '@/context/OrgContext';
 import { MediaComposer } from '@/components/MediaComposer';
@@ -61,6 +62,8 @@ const TABS = [
   ['naolidas', 'Não lidas'], ['pendentes', 'Pendentes'], ['fechados', 'Fechados'], ['perdidos', 'Perdidos'], ['arquivadas', 'Arquivadas'],
 ] as const;
 type TabId = typeof TABS[number][0];
+// visibilidade (22/10): só o admin vê a carteira de todos — para os demais estas abas não existem
+const ABAS_SO_ADMIN: readonly TabId[] = ['todos', 'naoatrib'];
 // Situação/IA/Período + o PREDICADO dos filtros agora vivem em ../lib/filtroInbox —
 // regra compartilhada com o chat mobile (18/09): mudar lá muda as duas telas juntas.
 
@@ -292,6 +295,7 @@ export default function WhatsAppV2() {
   const [params, setParams] = useSearchParams();
   const { user } = useAuth();
   const { currentOrg } = useOrg();
+  const vis = useVisibilidade();
   const [aviso, setAviso] = useState<AvisoInbox | null>(null);
   const avisoTimer = useRef(0);
   const aoAvisar = useCallback((a: AvisoInbox) => {
@@ -330,6 +334,9 @@ export default function WhatsAppV2() {
   });
   // persiste APENAS na escolha do usuário — a troca programática do deep-link não apaga a preferência
   const mudarAba = (t: TabId) => { setTab(t); try { localStorage.setItem(ABA_KEY, t); } catch { /* privado */ } };
+  // quem não vê todos nunca fica em "Todos"/"Não atribuídos" (aba salva de antes da regra → "Meus")
+  const abas = vis.veTodos ? TABS : TABS.filter(([id]) => !ABAS_SO_ADMIN.includes(id));
+  useEffect(() => { if (!vis.veTodos && ABAS_SO_ADMIN.includes(tab)) setTab('meus'); }, [vis.veTodos, tab]);
   // trilho segmentado: rola de lado com SETAS clicáveis + arrasto do mouse — quem
   // não tem trackpad/gesto lateral (notebook fraco, mouse simples) não consegue
   // rolar. A aba ativa sempre entra na vista (ex.: reabriu no "Arquivadas", ponta).
@@ -567,7 +574,7 @@ export default function WhatsAppV2() {
     // caem no 'todos' como antes; a conversa em si abre do mesmo jeito).
     const alvo = contacts.find((c) => c.id === conversaParam);
     const varianteAlvo = alvo ? situacaoDe(alvo).variante : null;
-    setTab(varianteAlvo === 'ganho' ? 'fechados' : varianteAlvo === 'perdido' ? 'perdidos' : 'todos');
+    setTab(varianteAlvo === 'ganho' ? 'fechados' : varianteAlvo === 'perdido' ? 'perdidos' : vis.veTodos ? 'todos' : 'meus');
     limparFiltros(); setSearch('');
     setGruposFechados(new Set()); // expande tudo: o card alvo pode estar num grupo recolhido
     const t = window.setTimeout(() => {
@@ -599,6 +606,8 @@ export default function WhatsAppV2() {
   // (pedido do dono 15/10: fechado que mandava mensagem ficava invisível pro time).
   const aguardaResposta = (c: WaContact) => (c.unread ?? 0) > 0 || !!c.aguardando;
   const passaTab = (c: WaContact, t: TabId) => {
+    // 2ª camada da visibilidade (a lista já vem recortada): cliente de outro nunca entra
+    if (!vis.podeVer(c.respId)) return false;
     if (t === 'arquivadas') return !!c.arquivada;
     // cliente FECHADO (ganho) e PERDIDO (não elegível) vivem em abas próprias e saem
     // de TODAS as listas de atendimento, inclusive "Todos", pra não se misturar com
@@ -628,14 +637,14 @@ export default function WhatsAppV2() {
     n.fechadosAguarda = base.filter((c) => passaTab(c, 'fechados') && aguardaResposta(c)).length;
     return n;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contacts, filtroCanais, filtroTransporte, filtroEtapas, filtroEtiquetas, filtroAtendentes, filtroIA, filtroSituacao, filtroNaoLidas, filtroArquivadas, filtroPeriodo, canalPorId, term, relogioMs, user?.id]);
+  }, [contacts, filtroCanais, filtroTransporte, filtroEtapas, filtroEtiquetas, filtroAtendentes, filtroIA, filtroSituacao, filtroNaoLidas, filtroArquivadas, filtroPeriodo, canalPorId, term, relogioMs, user?.id, vis.veTodos]);
   // contadores podem aparecer/sumir e mudar a largura do trilho → revê as setas
   useEffect(() => { atualizarSetas(); }, [tabCounts, atualizarSetas]);
   const visiveis = useMemo(() => {
     const lista = contacts.filter((c) => passaBase(c) && passaTab(c, tab));
     return lista.sort((a, b) => (a.fixada === b.fixada ? (b.lastAtMs ?? 0) - (a.lastAtMs ?? 0) : a.fixada ? -1 : 1));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contacts, tab, filtroCanais, filtroTransporte, filtroEtapas, filtroEtiquetas, filtroAtendentes, filtroIA, filtroSituacao, filtroNaoLidas, filtroArquivadas, filtroPeriodo, canalPorId, term, relogioMs, user?.id]);
+  }, [contacts, tab, filtroCanais, filtroTransporte, filtroEtapas, filtroEtiquetas, filtroAtendentes, filtroIA, filtroSituacao, filtroNaoLidas, filtroArquivadas, filtroPeriodo, canalPorId, term, relogioMs, user?.id, vis.veTodos]);
   /* agrupamento por responsável — VOCÊ primeiro (seus clientes sempre visíveis no Todos),
      depois Não atribuídos, depois os demais atendentes em ordem alfabética */
   const grupos = useMemo(() => {
@@ -657,7 +666,8 @@ export default function WhatsAppV2() {
     }
     const m = new Map<string, WaContact[]>();
     for (const c of visiveis) {
-      const k = responsavelEfetivo(c) ?? '';
+      // quem não vê todos: a carteira é toda dele (respId) — sem grupo de "outro" por dono da oportunidade
+      const k = (vis.veTodos ? responsavelEfetivo(c) : c.respId) ?? '';
       m.set(k, [...(m.get(k) ?? []), c]);
     }
     const uid = user?.id;
@@ -669,7 +679,7 @@ export default function WhatsAppV2() {
     return [...m.entries()].sort((a, b) =>
       rank(a[0]) - rank(b[0]) || (nomePorId(a[0]) ?? '').localeCompare(nomePorId(b[0]) ?? '', 'pt-BR'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visiveis, usuarios, user?.id, tab]);
+  }, [visiveis, usuarios, user?.id, tab, vis.veTodos]);
 
   /* ---------- envio / composer ---------- */
   const optoutTexto = 'Contato marcado como não incomodar — mensagens bloqueadas.';
@@ -937,7 +947,7 @@ export default function WhatsAppV2() {
                 className="wa-abas" role="tablist" ref={abasRef} onScroll={atualizarSetas}
                 onPointerDown={arrastoInicio} onPointerMove={arrastoMove} onPointerUp={arrastoFim} onPointerCancel={arrastoFim}
               >
-                {TABS.map(([id, rot]) => (
+                {abas.map(([id, rot]) => (
                   <button
                     key={id} type="button" role="tab" aria-selected={tab === id}
                     className={'wa-aba' + (tab === id ? ' on' : '')}
@@ -1527,7 +1537,8 @@ export default function WhatsAppV2() {
                     </div>
                   </section>
                 )}
-                {/* 2. ATENDENTE (multi + Não atribuído) */}
+                {/* 2. ATENDENTE (multi + Não atribuído) — só para quem vê a carteira de todos */}
+                {vis.veTodos && (
                 <section className="fp-sec">
                   <div className="fp-h">Atendente</div>
                   <div className="fp-itens">
@@ -1541,6 +1552,7 @@ export default function WhatsAppV2() {
                     ))}
                   </div>
                 </section>
+                )}
                 {/* 3. IA / BOT */}
                 <section className="fp-sec">
                   <div className="fp-h">IA / bot</div>

@@ -60,6 +60,7 @@ export default function PortabilidadesTela() {
   const f = useFonte();
   const navigate = useNavigate();
   const [escopo, setEscopo] = useState<'minhas' | 'equipe'>('minhas');
+  const veEquipe = f.usuario.veTodos !== false;
   const [vista, setVista] = useState<Situacao>('em_andamento');
   const [sel, setSel] = useState<string | null>(null);
   const [busca, setBusca] = useState('');
@@ -160,8 +161,11 @@ export default function PortabilidadesTela() {
 
         <div className="pt-corpo" data-sem-painel={listaVazia ? '' : undefined}>
           <nav className="pt-nav" aria-label="Portabilidades">
+            {/* visibilidade (22/10): "Equipe toda" só para quem vê a carteira de todos */}
+            {veEquipe && (
             <Segmentado rotulo="Ver" valor={escopo} aoMudar={setEscopo} style={{ width: '100%' }}
               opcoes={[{ valor: 'minhas', rotulo: 'Minhas' }, { valor: 'equipe', rotulo: 'Equipe toda' }]} />
+            )}
             <div className="pt-nav-grupo">
               {VISTAS.map((v) => {
                 const n = f.carregando ? 0 : conta(v.id);
@@ -233,7 +237,7 @@ export default function PortabilidadesTela() {
           <NovaPortabilidade f={f} aoFechar={() => setNova(false)}
             aoCriar={(id, atendenteId) => {
               setNova(false);
-              if (escopo === 'minhas' && atendenteId !== f.usuario.id) setEscopo('equipe');
+              if (veEquipe && escopo === 'minhas' && atendenteId !== f.usuario.id) setEscopo('equipe');
               setVista('aguardando_aceite'); setBusca(''); setSel(id);
               avisar('Portabilidade adicionada. Agora é esperar o cliente aceitar.');
             }} />
@@ -242,7 +246,7 @@ export default function PortabilidadesTela() {
           <TrocarAtendente p={trocar} aoFechar={() => setTrocar(null)}
             aoTrocou={(atendenteId) => {
               setTrocar(null);
-              if (escopo === 'minhas' && atendenteId !== f.usuario.id) setEscopo('equipe');
+              if (veEquipe && escopo === 'minhas' && atendenteId !== f.usuario.id) setEscopo('equipe');
             }} />
         )}
         <ConfirmDialogV2 aberto={!!excluir} titulo="Tirar da aba Portabilidades?" carregando={ocupado}

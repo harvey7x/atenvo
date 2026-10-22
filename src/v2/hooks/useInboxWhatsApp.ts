@@ -15,6 +15,7 @@ import { HIGIENE_CORTE_ISO, HIGIENE_DIAS_ADAPTACAO } from '@/config/higiene';
 import { useBloqueiosOrg } from './bloqueiosOrg';
 import { useAuth } from '@/context/AuthContext';
 import { useOrg } from '@/context/OrgContext';
+import { useVisibilidade } from '@/lib/visibilidade';
 import {
   aplicarEnvioOtimista, aplicarFalha, aplicarRetry, canalAutomatico, conversaAtual, hidratarHistorico, marcarIdReal,
   montarCorpoAssinado, novoCid, patchBolha, patchConversa, reconciliarLista, removerMensagemLocal, selecaoDescasada, selecaoValida,
@@ -82,7 +83,11 @@ export function useInboxWhatsApp(opts: {
     if (WA_REAL && currentId) { try { sessionStorage.setItem(CURR_KEY, currentId); } catch { /* privado */ } }
   }, [currentId]);
 
-  const msgsQ = useWaMensagens(WA_REAL ? currentId || null : null);
+  // visibilidade (22/10): quem não vê todos só baixa o histórico de conversa que está na PRÓPRIA
+  // lista (já recortada) — deep-link/sessão para conversa de outro não puxa as mensagens dela
+  const vis = useVisibilidade();
+  const naListaVisivel = !!currentId && (vis.veTodos || (live.data ?? []).some((c) => c.id === currentId));
+  const msgsQ = useWaMensagens(WA_REAL && naListaVisivel ? currentId : null);
   const historicoRef = useRef<WaMessage[] | undefined>(undefined);
   historicoRef.current = msgsQ.data;
 

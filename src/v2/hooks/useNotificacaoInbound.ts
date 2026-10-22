@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { WA_REAL, mascararNumero } from '@/data/whatsapp';
 import { useOrg } from '@/context/OrgContext';
+import { useVisibilidade } from '@/lib/visibilidade';
 import { CURR_KEY } from './useInboxWhatsApp';
 import type { DadosNotificacao } from '../shell/NotificacaoResposta';
 
@@ -45,6 +46,10 @@ export function useNotificacaoInbound(opts: {
   const { currentOrg } = useOrg();
   const cb = useRef(opts);
   cb.current = opts;
+  // visibilidade (22/10): quem não vê todos só é avisado de cliente DELE (null = avisa de todos)
+  const vis = useVisibilidade();
+  const soDeRef = useRef<string | null>(null);
+  soDeRef.current = vis.veTodos ? null : vis.uid ?? '';
 
   useEffect(() => {
     if (!WA_REAL || !supabase || !currentOrg.id) return;
@@ -64,23 +69,31 @@ export function useNotificacaoInbound(opts: {
         const focada = document.visibilityState === 'visible' && document.hasFocus();
         // conversa aberta E focada → o inbox já mostra: nem toast nem badge
         if (naPagina && focada && abertaId === m.conversa_id) return;
-        cb.current.aoBadge();
+        const soDe = soDeRef.current;
+        if (soDe === null) cb.current.aoBadge();
         // identifica quem falou (leitura leve na MESMA tabela que a lista já consulta)
         let quem = 'Cliente';
         let fonte = 'WhatsApp';
         try {
           const { data } = await supabase!
             .from('conversas')
-            .select('contatos!inner(nome, telefone), canais!conversas_canal_id_fkey(nome_interno)')
+            .select('contatos!inner(nome, telefone, responsavel_id), canais!conversas_canal_id_fkey(nome_interno)')
             .eq('id', m.conversa_id)
             .single();
-          const c = data as { contatos?: { nome?: string | null; telefone?: string | null } | { nome?: string | null; telefone?: string | null }[]; canais?: { nome_interno?: string | null } | { nome_interno?: string | null }[] } | null;
+          type Ct = { nome?: string | null; telefone?: string | null; responsavel_id?: string | null };
+          const c = data as { contatos?: Ct | Ct[]; canais?: { nome_interno?: string | null } | { nome_interno?: string | null }[] } | null;
           const ct = Array.isArray(c?.contatos) ? c?.contatos[0] : c?.contatos;
+          // cliente de outro (ou sem dono): nem toast nem badge para quem não vê todos
+          if (soDe !== null && (!soDe || ct?.responsavel_id !== soDe)) return;
           const ca = Array.isArray(c?.canais) ? c?.canais[0] : c?.canais;
           const nome = ct?.nome?.trim();
           quem = nome && !/^[\d\s()+\-]+$/.test(nome) ? nome : ct?.telefone ? mascararNumero(ct.telefone) : 'Cliente sem nome';
           if (ca?.nome_interno) fonte = `WhatsApp · ${ca.nome_interno}`;
-        } catch { /* melhor esforço: notifica mesmo sem o nome */ }
+        } catch {
+          // melhor esforço: notifica mesmo sem o nome — exceto com recorte (sem saber o dono, não avisa)
+          if (soDe !== null) return;
+        }
+        if (soDe !== null) cb.current.aoBadge();
         const iniciais = quem.split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase() ?? '').join('') || '?';
         cb.current.aoNotificar({ iniciais, quem, mensagem: previewDe(m), fonte, quando: 'agora', conversaId: m.conversa_id });
       })

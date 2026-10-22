@@ -192,8 +192,11 @@ export default function PendenciasTela() {
 
         <div className="pd-corpo" data-cheia={!ehStatus ? '' : undefined} data-sem-painel={listaVazia ? '' : undefined} {...inerte}>
           <nav className="pd-nav" aria-label="Pendências">
+            {/* visibilidade (22/10): "Equipe toda" só para quem vê a carteira de todos */}
+            {f.usuario.veTodos && (
             <Segmentado rotulo="Ver" valor={escopo} aoMudar={setEscopo} style={{ width: '100%' }}
               opcoes={[{ valor: 'minhas', rotulo: 'Minhas' }, { valor: 'equipe', rotulo: 'Equipe toda' }]} />
+            )}
             <div className="pd-nav-grupo">
               {VISTAS.map((v) => {
                 const n = f.carregando ? 0 : conta(v.id);

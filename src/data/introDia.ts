@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { useOrg } from '@/context/OrgContext';
+import { useVisibilidade } from '@/lib/visibilidade';
 
 /* ------------------------------------------------------------------
    Briefing da Intro do dia — 2 contagens head:true (0 bytes de payload),
@@ -12,6 +13,9 @@ import { useOrg } from '@/context/OrgContext';
      conversas.atendente_id — usar atendente_id divergiria da aba).
    - "não lidas" = nao_lidas > 0 (a aba Pendentes exata não dá em SQL:
      `aguardando` é derivado client-side da última mensagem).
+   Visibilidade (22/10): quem não vê todos não tem fila sem dono — conta só
+   a PRÓPRIA carteira: "novos pra atender" = conversas dele abertas nas
+   últimas 24 h; não lidas = as dele; fechados = oportunidades dele.
    ------------------------------------------------------------------ */
 
 export const BRIEF_REAL = isSupabaseConfigured && !!supabase;
@@ -30,32 +34,46 @@ export const seedBriefingDia = (): BriefingDia => ({ paraAtender: 2, naoLidas: 3
 export function useBriefingDia(ativo: boolean) {
   const { currentOrg } = useOrg();
   const org = currentOrg?.id;
+  const vis = useVisibilidade();
+  const soDe = vis.veTodos ? null : vis.uid;
   return useQuery({
-    queryKey: ['briefing-dia', org],
-    enabled: BRIEF_REAL && !!org && ativo,
+    queryKey: ['briefing-dia', org, soDe ?? 'todos'],
+    enabled: BRIEF_REAL && !!org && ativo && (vis.veTodos || !!soDe),
     staleTime: 5 * 60_000,
     queryFn: async (): Promise<BriefingDia> => {
-      const semDonoQ = supabase!
+      const umDiaAtras = new Date(Date.now() - 86_400_000).toISOString();
+      const semDonoQ = soDe
+        ? supabase!
+          .from('conversas')
+          .select('id, contatos!inner(responsavel_id)', { count: 'exact', head: true })
+          .eq('organizacao_id', org!)
+          .is('arquivada_em', null)
+          .not('status', 'in', '("resolvida","fechada")')
+          .eq('contatos.responsavel_id', soDe)
+          .gte('criado_em', umDiaAtras)
+        : supabase!
+          .from('conversas')
+          .select('id, contatos!inner(responsavel_id)', { count: 'exact', head: true })
+          .eq('organizacao_id', org!)
+          .is('arquivada_em', null)
+          .not('status', 'in', '("resolvida","fechada")')
+          .is('contatos.responsavel_id', null);
+      let naoLidasQ = supabase!
         .from('conversas')
-        .select('id, contatos!inner(responsavel_id)', { count: 'exact', head: true })
-        .eq('organizacao_id', org!)
-        .is('arquivada_em', null)
-        .not('status', 'in', '("resolvida","fechada")')
-        .is('contatos.responsavel_id', null);
-      const naoLidasQ = supabase!
-        .from('conversas')
-        .select('id', { count: 'exact', head: true })
+        .select(soDe ? 'id, contatos!inner(responsavel_id)' : 'id', { count: 'exact', head: true })
         .eq('organizacao_id', org!)
         .is('arquivada_em', null)
         .not('status', 'in', '("resolvida","fechada")')
         .gt('nao_lidas', 0);
+      if (soDe) naoLidasQ = naoLidasQ.eq('contatos.responsavel_id', soDe);
       const seteDiasAtras = new Date(Date.now() - 7 * 86_400_000).toISOString();
-      const fechadosQ = supabase!
+      let fechadosQ = supabase!
         .from('oportunidades')
         .select('id', { count: 'exact', head: true })
         .eq('organizacao_id', org!)
         .eq('status', 'ganho')
         .gte('fechado_em', seteDiasAtras);
+      if (soDe) fechadosQ = fechadosQ.eq('responsavel_id', soDe);
       const [semDono, naoLidas, fechados] = await Promise.all([semDonoQ, naoLidasQ, fechadosQ]);
       if (semDono.error) throw semDono.error;
       if (naoLidas.error) throw naoLidas.error;

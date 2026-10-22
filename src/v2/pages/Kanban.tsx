@@ -19,6 +19,7 @@ import { useSlaAlertas } from '@/data/sla';
 import { indexPorChave, type SlaAlerta, type SlaTipo } from '@/data/slaView';
 import { corDaEtiqueta, type Etiqueta } from '@/types/atendimento';
 import { initials } from '@/lib/avatar';
+import { useVisibilidade } from '@/lib/visibilidade';
 import { FichaJudicialBox } from '@/components/FichaJudicialBox';
 import { RelacionamentoContatoBox } from '@/components/RelacionamentoContatoBox';
 import { useBloqueiosOrg } from '../hooks/bloqueiosOrg';
@@ -243,6 +244,7 @@ export default function KanbanV2() {
   const demoSeq = useRef(0);
 
   const podeConfig = currentOrg.role === 'admin' || currentOrg.role === 'gestor';
+  const vis = useVisibilidade();
 
   const k = useKanban();
   const naoLidasQ = useNaoLidasPorContato();
@@ -1183,6 +1185,8 @@ export default function KanbanV2() {
               </div>
             )}
           </div>
+          {/* visibilidade (22/10): o board de quem não vê todos já é só dele — sem filtro por atendente */}
+          {vis.veTodos && (
           <div className="kbf-sec">
             <div className="kbf-cab">
               <span className="ic"><Ic><circle cx="12" cy="8" r="3.5" /><path d="M5 20a7 7 0 0 1 14 0" /></Ic></span>
@@ -1199,6 +1203,7 @@ export default function KanbanV2() {
               ))}
             </div>
           </div>
+          )}
           {origens.length > 1 && (
             <div className="kbf-sec">
               <div className="kbf-cab">

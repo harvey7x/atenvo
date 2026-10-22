@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useOrg } from '@/context/OrgContext';
 import { useAuth } from '@/context/AuthContext';
+import { useVisibilidade } from '@/lib/visibilidade';
 import { buscarKeyset } from './paginacao';
 import { telefoneTela } from './pendencias';
 import type { Aceite, Atendente, ClientePort, EstadoLink, EventoPort, Portabilidade } from './portabilidades';
@@ -31,9 +32,12 @@ export function usePortReal() {
   const { currentOrg } = useOrg();
   const org = currentOrg?.id;
   const { user } = useAuth();
+  // visibilidade (22/10): quem não vê todos recebe só as portabilidades DELE (atendente_id)
+  const vis = useVisibilidade();
+  const soDe = vis.veTodos ? null : vis.uid;
   const q = useQuery({
-    queryKey: ['portabilidades', org],
-    enabled: !!supabase && !!org,
+    queryKey: ['portabilidades', org, soDe ?? 'todos'],
+    enabled: !!supabase && !!org && (vis.veTodos || !!soDe),
     refetchInterval: 30_000,
     queryFn: async (): Promise<DadosPort> => {
       const sb = supabase!;
@@ -43,6 +47,7 @@ export function usePortReal() {
           (cursor, tamanho) => {
             let b = sb.from('portabilidades').select(COLUNAS).eq('organizacao_id', org!).is('excluida_em', null)
               .order('id', { ascending: false }).limit(tamanho);
+            if (soDe) b = b.eq('atendente_id', soDe);
             if (cursor) b = b.lt('id', cursor);
             return b as unknown as PromiseLike<{ data: Row[] | null; error: { message?: string } | null }>;
           },
@@ -91,22 +96,25 @@ export function usePortReal() {
     },
   });
   const recarregar = async () => { await q.refetch(); };
-  return { ...q, org, usuario: { id: user?.id ?? '', nome: primeiro(user?.name ?? '') }, recarregar };
+  return { ...q, org, usuario: { id: user?.id ?? '', nome: primeiro(user?.name ?? ''), veTodos: vis.veTodos }, recarregar };
 }
 
 /** Nova portabilidade: qualquer contato da org por nome ou telefone (sem busca = os mexidos por último) */
 export function useBuscaClientesReal(busca: string) {
   const { currentOrg } = useOrg();
   const org = currentOrg?.id;
+  const vis = useVisibilidade();
+  const soDe = vis.veTodos ? null : vis.uid;
   return useQuery({
-    queryKey: ['port-busca', org, busca.trim()],
-    enabled: !!supabase && !!org,
+    queryKey: ['port-busca', org, busca.trim(), soDe ?? 'todos'],
+    enabled: !!supabase && !!org && (vis.veTodos || !!soDe),
     staleTime: 20_000,
     placeholderData: (anterior) => anterior,
     queryFn: async (): Promise<(ClientePort & { abertas: number })[]> => {
       const { data, error } = await supabase!.rpc('portabilidades_buscar_clientes', { p_org: org, p_busca: busca.trim() || null, p_limite: 8 });
       if (error) throw new Error(error.message);
-      return ((data as Row[]) ?? []).map((r) => ({
+      // visibilidade (22/10): só os clientes de que o usuário é o responsável
+      return ((data as Row[]) ?? []).filter((r) => !soDe || r.responsavel_id === soDe).map((r) => ({
         id: r.contato_id as string, nome: ((r.nome as string) || 'Cliente').toUpperCase(), telefone: telefoneTela((r.telefone as string) || ''),
         responsavelId: opc(r.responsavel_id), responsavel: r.responsavel_nome ? primeiro(r.responsavel_nome as string) : '—',
         abertas: Number(r.abertas ?? 0),

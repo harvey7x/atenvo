@@ -4,6 +4,7 @@ import type { WaContact } from '@/data/whatsappDemo';
 import { tempoRelativo } from '@/data/slaView';
 import { initials } from '@/lib/avatar';
 import { useAuth } from '@/context/AuthContext';
+import { useVisibilidade } from '@/lib/visibilidade';
 import { useEtiquetas, useOrgUsuarios } from '@/data/atendimento';
 import { corDaEtiqueta } from '@/types/atendimento';
 import { EstadoErro, Skeleton } from '../components';
@@ -35,7 +36,11 @@ export default function ListaConversasMobile() {
   const { inbox } = useInboxMobile();
   const { contacts, relogioMs, demo } = inbox;
   const [search, setSearch] = useState('');
-  const [aba, setAba] = useState<AbaId>('todos');
+  // visibilidade (22/10): só o admin tem "Todos"; os demais abrem e ficam no "Meus"
+  const vis = useVisibilidade();
+  const abas = vis.veTodos ? ABAS : ABAS.filter(([id]) => id !== 'todos');
+  const [aba, setAba] = useState<AbaId>(() => (vis.veTodos ? 'todos' : 'meus'));
+  useEffect(() => { if (!vis.veTodos && aba === 'todos') setAba('meus'); }, [vis.veTodos, aba]);
   // tema claro/escuro no CELULAR (pedido do dono 18/09): mesmo mecanismo do desktop
   // (lib/tema.ts, escopo por usuário) — o MobileShell já aplica o salvo na entrada.
   const [tema, setTema] = useState<Tema>(() => lerTema(user?.id));
@@ -74,12 +79,13 @@ export default function ListaConversasMobile() {
     const passa = (c: WaContact) =>
       // arquivadas escondidas por padrão; busca OU o toggle "Só arquivadas" revelam (paridade desktop)
       (!c.arquivada || buscaAtiva || filtros.arquivadas) &&
+      vis.podeVer(c.respId) &&
       (aba === 'todos' ? true : aba === 'meus' ? c.respId === user?.id : (c.unread ?? 0) > 0) &&
       // busca (term) e todas as facetas vivem no predicado COMPARTILHADO com o desktop
       passaFiltroInbox(c, filtros, { term, relogioMs, transporteDe });
     return contacts.filter(passa).sort((a, b) => (a.fixada === b.fixada ? (b.lastAtMs ?? 0) - (a.lastAtMs ?? 0) : a.fixada ? -1 : 1));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contacts, aba, term, buscaAtiva, user?.id, filtros, relogioMs, canalPorId]);
+  }, [contacts, aba, term, buscaAtiva, user?.id, filtros, relogioMs, canalPorId, vis.veTodos]);
 
   const carregando = !demo && inbox.live.isLoading && contacts.length === 0;
   const erro = !demo && inbox.live.isError && contacts.length === 0;
@@ -110,7 +116,7 @@ export default function ListaConversasMobile() {
         </div>
         <input className="m-busca" type="search" placeholder="Buscar conversas..." value={search} onChange={(e) => setSearch(e.target.value)} />
         <div className="m-abas" role="tablist">
-          {ABAS.map(([id, rotulo]) => (
+          {abas.map(([id, rotulo]) => (
             <button key={id} type="button" role="tab" aria-selected={aba === id} className={'m-aba' + (aba === id ? ' on' : '')} onClick={() => setAba(id)}>{rotulo}</button>
           ))}
         </div>
@@ -174,6 +180,7 @@ export default function ListaConversasMobile() {
                   </div>
                 </div>
               )}
+              {vis.veTodos && (
               <div className="m-f-sec">
                 <div className="m-f-tit">Atendente</div>
                 <div className="m-f-grid">
@@ -185,6 +192,7 @@ export default function ListaConversasMobile() {
                   ))}
                 </div>
               </div>
+              )}
               <div className="m-f-sec">
                 <div className="m-f-tit">IA / bot</div>
                 <div className="m-f-grid">
