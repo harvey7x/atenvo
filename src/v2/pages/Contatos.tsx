@@ -12,6 +12,7 @@ import { useAtivacaoDoContato } from '@/data/relacionamento';
 import { useEtiquetas, useOrgUsuarios } from '@/data/atendimento';
 import { corDaEtiqueta } from '@/types/atendimento';
 import { initials } from '@/lib/avatar';
+import { useVisibilidade } from '@/lib/visibilidade';
 import { formatarNumero } from '@/data/maturacao';
 import { useBloqueiosOrg } from '../hooks/bloqueiosOrg';
 import { tempoCelula, tempoRelativo } from '../lib/tempo';
@@ -419,6 +420,8 @@ function FichaContato({ contato, demo, extras, bloqueado, cobSituacao, agsOrg, a
   aoFechar: () => void; aoAbrirConversa: () => void; aoAgendar: () => void;
   aoEditar: () => void; aoExcluir: () => void;
 }) {
+  // Cobranças (módulo) é só do admin desde 22/10 — o atalho some para os demais
+  const veCobrancas = useVisibilidade().veTodos;
   const navigate = useNavigate();
   const oppsQ = useOportunidadesDoContato(demo ? null : contato.id);
   const ativQ = useAtivacaoDoContato(demo ? null : contato.id);
@@ -508,7 +511,7 @@ function FichaContato({ contato, demo, extras, bloqueado, cobSituacao, agsOrg, a
         <div className="fx-b">
           <div className="fx-t">
             Cobranças
-            {(cobrancas.length > 0 || cobSituacao) && <BotaoMini onClick={() => navigate('/cobrancas')}>Ver todas</BotaoMini>}
+            {(cobrancas.length > 0 || cobSituacao) && veCobrancas && <BotaoMini onClick={() => navigate('/cobrancas')}>Ver todas</BotaoMini>}
           </div>
           {demo ? (
             cobSituacao

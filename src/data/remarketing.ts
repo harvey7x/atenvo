@@ -6,6 +6,7 @@ import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { useOrg } from '@/context/OrgContext';
+import { useVisibilidade } from '@/lib/visibilidade';
 
 export const REMARKETING_REAL = isSupabaseConfigured && !!supabase;
 
@@ -259,15 +260,22 @@ export function useSalvarRemarketingConfig() {
 /* ---------- notificações (central persistida) ---------- */
 export function useNotificacoes() {
   const { currentOrg } = useOrg();
+  // visibilidade (22/10): aviso SEM destinatário (usuario_id nulo, ex.: pendência sem responsável)
+  // traz nome de cliente — quem não vê todos recebe só os avisos endereçados a ele
+  const vis = useVisibilidade();
+  const soDe = vis.veTodos ? null : vis.uid;
   return useQuery({
-    queryKey: ['notificacoes', currentOrg.id],
+    queryKey: ['notificacoes', currentOrg.id, soDe ?? 'todos'],
+    enabled: vis.veTodos || !!soDe,
     staleTime: 10_000, refetchInterval: 30_000,
     queryFn: async (): Promise<Notificacao[]> => {
       if (!REMARKETING_REAL) return DEMO_NOTIFS;
-      const { data, error } = await supabase!
+      let q = supabase!
         .from('notificacoes')
         .select('id, tipo, titulo, corpo, rota, lida_em, criado_em')
-        .eq('organizacao_id', currentOrg.id)
+        .eq('organizacao_id', currentOrg.id);
+      if (soDe) q = q.eq('usuario_id', soDe);
+      const { data, error } = await q
         .order('criado_em', { ascending: false })
         .limit(50);
       if (error) throw new Error(error.message);

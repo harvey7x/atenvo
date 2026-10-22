@@ -159,6 +159,7 @@ export const SELECT_CONVERSAS = 'id, status, status_id, nao_lidas, ultima_intera
 /** Consulta da lista com SELECT_CONVERSAS + os filtros/ordem/limite dos embeds (`real`, `ult`) e do
  *  canal. O chamador acrescenta só o recorte: keyset (`.order('id').limit().lt()`) na carga
  *  completa, ou `.in('id' | 'contato_id', lote)` numa busca pontual. */
+const SEM_DONO_POSSIVEL = '00000000-0000-0000-0000-000000000000';
 export function consultaListaConversas(orgId: string) {
   let q = supabase!
     .from('conversas')
@@ -168,8 +169,9 @@ export function consultaListaConversas(orgId: string) {
   // VISIBILIDADE (22/10): fora do admin, só os clientes de que o usuário é o responsável
   // (contatos!inner: o filtro no embed corta a conversa). Vale para a carga completa, a
   // busca-alvo do realtime e o deep-link — todos passam por aqui. Ver lib/visibilidade.
+  // escopo '' = recorte sem usuário conhecido: não casa com ninguém (nunca vira "sem filtro")
   const resp = escopoLista(orgId);
-  if (resp) q = q.eq('contatos.responsavel_id', resp);
+  if (resp !== null) q = q.eq('contatos.responsavel_id', resp || SEM_DONO_POSSIVEL);
   return q
     .not('real.tipo', 'in', '(sistema,nota_interna)')
     .order('enviada_em', { referencedTable: 'real', ascending: false })
@@ -580,6 +582,8 @@ export function criarMotorDaLista(qc: QueryClient, orgId: string, sobrepor: Part
     recarregarTudo: () => { void qc.invalidateQueries({ queryKey: ['wa-conversas', orgId] }); },
     aviso: (m) => console.info('[wa]', m),
     ctx: {
+      // visibilidade: com recorte, contato que acabou de virar MEU entra por busca-alvo do contato
+      donoDoEscopo: () => escopoLista(orgId),
       mapMensagem: (row) => mapMensagens([row as unknown as DbMsg])[0] ?? null,
       canalPorId: (id) => {
         const c = qc.getQueryData<WaCanal[]>(['wa-canais', orgId])?.find((x) => x.id === id);

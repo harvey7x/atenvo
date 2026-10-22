@@ -189,6 +189,9 @@ export function useBuscaContatos(term: string) {
 export function useCreateContato() {
   const qc = useQueryClient();
   const { currentOrg } = useOrg();
+  // visibilidade (22/10): contato criado por quem não vê todos nasce DELE (senão some da própria lista)
+  const vis = useVisibilidade();
+  const soDe = vis.veTodos ? null : vis.uid;
   return useMutation({
     mutationFn: async (input: NovoContato) => {
       if (!isSupabaseConfigured || !supabase) {
@@ -202,7 +205,7 @@ export function useCreateContato() {
         email: input.email ?? null,
         cpf: input.cpf ?? null,
         origem: input.origem ?? null,
-        responsavel_id: input.responsavelId ?? null,
+        responsavel_id: input.responsavelId ?? soDe ?? null,
         observacoes: input.observacoes ?? null,
         etiquetas: input.etiquetas ?? [],
         organizacao_id: currentOrg.id,

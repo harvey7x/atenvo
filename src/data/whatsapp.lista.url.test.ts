@@ -61,6 +61,10 @@ describe('consultaListaConversas → URL do PostgREST', () => {
     expect(alvo.searchParams.get('real.limit')).toBe('1');
     // outra org da mesma aba não herda o recorte; voltar a null tira o filtro
     expect((consultaListaConversas('org-1') as unknown as { url: URL }).url.searchParams.has('contatos.responsavel_id')).toBe(false);
+    // recorte SEM usuário conhecido ('') nunca vira "sem filtro": não casa com ninguém
+    definirEscopoLista('org-2', '');
+    expect((consultaListaConversas('org-2') as unknown as { url: URL }).url.searchParams.get('contatos.responsavel_id'))
+      .toBe('eq.00000000-0000-0000-0000-000000000000');
     definirEscopoLista('org-2', null);
     expect((consultaListaConversas('org-2') as unknown as { url: URL }).url.searchParams.has('contatos.responsavel_id')).toBe(false);
   });

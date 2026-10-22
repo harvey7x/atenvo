@@ -213,10 +213,11 @@ export function useClientesFechados(busca: string, ativo: boolean) {
     enabled: !!supabase && ativo && (vis.veTodos || !!soDe),
     staleTime: 20_000,
     queryFn: async (): Promise<(ClienteFechado & { abertas: number })[]> => {
-      const { data, error } = await supabase!.rpc('pendencias_clientes_fechados', { p_busca: busca.trim() || null, p_limite: 40 });
+      // visibilidade (22/10): com recorte, pede o teto da RPC (200) e corta nos 40 DEPOIS do filtro —
+      // o limite da RPC é da org inteira e vinha antes do filtro (a lista do atendente saía vazia)
+      const { data, error } = await supabase!.rpc('pendencias_clientes_fechados', { p_busca: busca.trim() || null, p_limite: soDe ? 200 : 40 });
       if (error) throw new Error(error.message);
-      // visibilidade (22/10): só os clientes de que o usuário é o responsável
-      return ((data as Row[]) ?? []).filter((r) => !soDe || r.responsavel_id === soDe).map((r) => ({
+      return ((data as Row[]) ?? []).filter((r) => !soDe || r.responsavel_id === soDe).slice(0, 40).map((r) => ({
         id: r.contato_id as string, nome: ((r.nome as string) || 'Cliente').toUpperCase(), telefone: formatarFone((r.telefone as string) || ''),
         processo: '', acao: rotuloServico(r.servico as string), responsavel: ((r.responsavel_nome as string) || '—').split(/\s+/)[0],
         fechadoEm: (r.fechado_em as string) || '', abertas: Number(r.abertas ?? 0),

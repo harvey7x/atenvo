@@ -139,6 +139,15 @@ describe('rotearEvento — contatos', () => {
     expect(rotearEvento('contatos', 'INSERT', row({ id: 'k9' }), null, lista(), ctx).alvoContatos).toEqual([]);
     expect(rotearEvento('contatos', 'UPDATE', row(), null, undefined, ctx).tocarContatos).toEqual(['k2']);
   });
+  it('visibilidade: lista recortada e o cliente acabou de virar MEU → busca as conversas dele; de outro → nada', () => {
+    const recortado: CtxRoteamento = { ...ctx, donoDoEscopo: () => 'u-eu' };
+    const meu = rotearEvento('contatos', 'UPDATE', row({ id: 'k-novo', responsavel_id: 'u-eu' }), null, lista(), recortado);
+    expect(meu).toMatchObject({ alvoContatos: ['k-novo'], tocarContatos: ['k-novo'], motivo: 'contato-passou-para-mim' });
+    const deOutro = rotearEvento('contatos', 'UPDATE', row({ id: 'k-novo', responsavel_id: 'u-outro' }), null, lista(), recortado);
+    expect(deOutro).toMatchObject({ alvoContatos: [], motivo: 'contato-sem-conversa-na-lista' });
+    // sem recorte (admin): comportamento de sempre
+    expect(rotearEvento('contatos', 'UPDATE', row({ id: 'k-novo', responsavel_id: 'u-eu' }), null, lista(), ctx).alvoContatos).toEqual([]);
+  });
   it('DELETE de contato com conversa na lista → recarga completa; tabela desconhecida → recarga', () => {
     expect(rotearEvento('contatos', 'DELETE', null, { id: 'k2' }, lista(), ctx).recarregarTudo).toBe(true);
     expect(rotearEvento('contatos', 'DELETE', null, { id: 'k-x' }, lista(), ctx).recarregarTudo).toBe(false);

@@ -520,6 +520,8 @@ export type TabelaRt = (typeof TABELAS_CANAL_WA)[number];
 export interface CtxRoteamento extends CtxCanal {
   /** Linha crua de `mensagens` → bolha (mapMensagens); null quando a linha não vira bolha. */
   mapMensagem: (row: Record<string, unknown>) => WaMessage | null;
+  /** Visibilidade (22/10): responsável a que a lista está recortada (null = vê todos). */
+  donoDoEscopo?: () => string | null;
 }
 export interface Roteamento {
   /** Lista depois do patch (a MESMA referência da entrada quando nada mudou; undefined sem cache). */
@@ -632,7 +634,13 @@ export function rotearEvento(
     // só o carimbo (sem busca): a conversa nova deste contato pode estar numa busca-alvo EM VOO que
     // leu o contato antes deste UPDATE (nome resolvido, responsável do roteamento) — com o carimbo
     // ela desconfia e rebusca em vez de pousar com nome/dono velhos
-    if (!lista.some((c) => c.contatoId === cid)) return r({ tocarContatos: [cid], motivo: 'contato-sem-conversa-na-lista' });
+    if (!lista.some((c) => c.contatoId === cid)) {
+      // lista recortada (visibilidade): o cliente acabou de ser passado PARA este usuário → busca as
+      // conversas dele (conversa fechada não recebe o UPDATE do gatilho de sincronia do dono)
+      const dono = ctx.donoDoEscopo?.() ?? null;
+      if (dono && texto(novo?.responsavel_id) === dono) return r({ alvoContatos: [cid], tocarContatos: [cid], motivo: 'contato-passou-para-mim' });
+      return r({ tocarContatos: [cid], motivo: 'contato-sem-conversa-na-lista' });
+    }
     let incompleto = false;
     let mudou = false;
     const out = lista.map((c) => {

@@ -111,10 +111,10 @@ export function useBuscaClientesReal(busca: string) {
     staleTime: 20_000,
     placeholderData: (anterior) => anterior,
     queryFn: async (): Promise<(ClientePort & { abertas: number })[]> => {
-      const { data, error } = await supabase!.rpc('portabilidades_buscar_clientes', { p_org: org, p_busca: busca.trim() || null, p_limite: 8 });
+      // visibilidade (22/10): com recorte, pede o teto da RPC (50) e corta nos 8 DEPOIS do filtro
+      const { data, error } = await supabase!.rpc('portabilidades_buscar_clientes', { p_org: org, p_busca: busca.trim() || null, p_limite: soDe ? 50 : 8 });
       if (error) throw new Error(error.message);
-      // visibilidade (22/10): só os clientes de que o usuário é o responsável
-      return ((data as Row[]) ?? []).filter((r) => !soDe || r.responsavel_id === soDe).map((r) => ({
+      return ((data as Row[]) ?? []).filter((r) => !soDe || r.responsavel_id === soDe).slice(0, 8).map((r) => ({
         id: r.contato_id as string, nome: ((r.nome as string) || 'Cliente').toUpperCase(), telefone: telefoneTela((r.telefone as string) || ''),
         responsavelId: opc(r.responsavel_id), responsavel: r.responsavel_nome ? primeiro(r.responsavel_nome as string) : '—',
         abertas: Number(r.abertas ?? 0),

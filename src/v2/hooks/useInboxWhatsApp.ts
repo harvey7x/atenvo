@@ -86,6 +86,8 @@ export function useInboxWhatsApp(opts: {
   // visibilidade (22/10): quem não vê todos só baixa o histórico de conversa que está na PRÓPRIA
   // lista (já recortada) — deep-link/sessão para conversa de outro não puxa as mensagens dela
   const vis = useVisibilidade();
+  const visRef = useRef(vis);
+  visRef.current = vis;
   const naListaVisivel = !!currentId && (vis.veTodos || (live.data ?? []).some((c) => c.id === currentId));
   const msgsQ = useWaMensagens(WA_REAL && naListaVisivel ? currentId : null);
   const historicoRef = useRef<WaMessage[] | undefined>(undefined);
@@ -107,7 +109,7 @@ export function useInboxWhatsApp(opts: {
       // falhou: a recarga completa já foi pedida — segue protegida por mais alguns segundos
       if (!ok) { alvoPendenteRef.current = { id, ate: Date.now() + 8_000 }; return; }
       alvoPendenteRef.current = null;
-      const lista = qc.getQueryData<WaContact[]>(['wa-conversas', orgId]);
+      const lista = qc.getQueryData<WaContact[]>(['wa-conversas', orgId])?.filter((c) => visRef.current.podeVer(c.respId));
       if (lista) setCurrentId((cur) => (cur === id ? selecaoValida(cur, lista) : cur));
     });
   }, [orgId, qc]);
@@ -627,7 +629,7 @@ export function useInboxWhatsApp(opts: {
     // antes de selecionar. Se a busca falhar ou não trouxer a conversa, cai na recarga completa.
     tentadosRef.current.add(r.conversaId);
     const ok = await buscarConversasAgora(orgId, { ids: [r.conversaId] });
-    const naLista = (qc.getQueryData<WaContact[]>(['wa-conversas', orgId]) ?? []).some((c) => c.id === r.conversaId);
+    const naLista = (qc.getQueryData<WaContact[]>(['wa-conversas', orgId]) ?? []).some((c) => c.id === r.conversaId && visRef.current.podeVer(c.respId));
     if (!ok || !naLista) await live.refetch();
     canalManualRef.current = canalId;
     setReplyCanalId(canalId);

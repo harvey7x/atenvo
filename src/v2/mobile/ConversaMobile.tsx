@@ -13,6 +13,7 @@ import { construirItensConversa } from '@/lib/dataConversa';
 import { initials } from '@/lib/avatar';
 import { useAuth } from '@/context/AuthContext';
 import { useOrg } from '@/context/OrgContext';
+import { useVisibilidade } from '@/lib/visibilidade';
 import { MediaComposer, type MediaTipo } from '@/components/MediaComposer';
 import { ScriptSequenceModal } from '@/components/ScriptSequenceModal';
 import { AgendarMensagemModalV2 } from '../pages/AgendarMensagemModalV2';
@@ -103,7 +104,9 @@ export default function ConversaMobile() {
   const agendarSeqMut = useAgendarSequencia();
   const editarAgMut = useEditarAgendamento();
   const cancelarAgMut = useCancelarAgendamento();
-  const agendadasQ = useMensagensAgendadas(WA_REAL ? conversaId ?? null : null);
+  // visibilidade (22/10): agendadas só de conversa que está na lista do usuário
+  const vis = useVisibilidade();
+  const agendadasQ = useMensagensAgendadas(WA_REAL && (vis.veTodos || !!conv) ? conversaId ?? null : null);
   const scriptsQ = useScripts('whatsapp');
   const scripts = WA_REAL ? (scriptsQ.data ?? []) : SCRIPTS_DEMO;
   const scriptsResumo = useScriptsResumoEtapas().data ?? {};

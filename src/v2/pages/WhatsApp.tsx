@@ -307,6 +307,9 @@ export default function WhatsAppV2() {
 
   const inbox = useInboxWhatsApp({ aoAvisar, seedDemo: useMemo(() => seedWa(), []), bloqueadosDemo: useMemo(() => new Set(['wa-cleusa-ct']), []) });
   const { demo, contacts, current, currentId, relogioMs } = inbox;
+  // visibilidade (22/10): os satélites da conversa aberta (atividades, agendadas, IA) só para conversa
+  // que está na lista do usuário — deep-link/sessão para conversa de outro não busca nada dela
+  const idVisivel = vis.veTodos ? currentId : (current.id || '');
   const sendMut = useSendWaMessage();
 
   // LEAD QUENTE: fila de alertas de abandono do bot (Realtime). Um modal por vez,
@@ -475,7 +478,7 @@ export default function WhatsAppV2() {
   /* ---------- dados satélites ---------- */
   const slaQ = useSlaAlertas();
   const slaPorConversa = useMemo(() => indexPorChave(slaQ.data?.itens ?? [], 'conversa_id'), [slaQ.data]);
-  const atividadesQ = useWaAtividades(WA_REAL ? currentId || null : null);
+  const atividadesQ = useWaAtividades(WA_REAL ? idVisivel || null : null);
   const statusQ = useStatusDefs();
   const etiquetasQ = useEtiquetas();
   const usuariosQ = useOrgUsuarios();
@@ -501,8 +504,8 @@ export default function WhatsAppV2() {
     : transporte ? `${nome ?? 'WhatsApp'} — número conectado por QR (não oficial)`
     : nome ?? 'WhatsApp';
   const janelaQ = useJanelaCanal(WA_REAL && canalEhCloud ? inbox.canalSel?.id ?? null : null, WA_REAL ? current.contatoId ?? null : null, canalEhCloud);
-  const agendadasQ = useMensagensAgendadas(WA_REAL ? currentId || null : null);
-  const iaEstadoQ = useIaEstadoConversa(WA_REAL ? currentId || null : null);
+  const agendadasQ = useMensagensAgendadas(WA_REAL ? idVisivel || null : null);
+  const iaEstadoQ = useIaEstadoConversa(WA_REAL ? idVisivel || null : null);
   const iaEstado = iaEstadoQ.data;
   const iaToggle = useIaToggle();
   const iaRecomecar = useIaRecomecar();
@@ -1424,7 +1427,7 @@ export default function WhatsAppV2() {
 
           {cobrancasCtx.length > 0 && (
             <div className="ctx-b spot">
-              <div className="ctx-t">Cobranças <button type="button" className="lk" onClick={() => nav('/cobrancas')}>ver</button></div>
+              <div className="ctx-t">Cobranças {vis.veTodos && <button type="button" className="lk" onClick={() => nav('/cobrancas')}>ver</button>}</div>
               {cobrancasCtx.map((cb) => (
                 <div className="cx-l" key={cb.id}>
                   <span className="k num">
