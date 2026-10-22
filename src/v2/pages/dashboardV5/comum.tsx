@@ -105,13 +105,15 @@ export function Ajuda({ texto, rotulo }: { texto: string; rotulo: string }) {
 }
 
 /** Cartão de seção: título (com ajuda opcional), linha de apoio e ação à direita. */
-export function Secao({ titulo, sub, ajuda, acao, children, className, id }: {
+export function Secao({ titulo, sub, ajuda, acao, children, className, id, alvo }: {
   titulo: string; sub?: ReactNode; ajuda?: string; acao?: ReactNode;
   children: ReactNode; className?: string; id?: string;
+  /** destino de "Ver na tabela" da Leitura do dia (atributo data-d5-alvo) */
+  alvo?: string;
 }) {
   const idTit = useId();
   return (
-    <CardVidro className={'d5-sec ' + (className ?? '')} id={id} role="region" aria-labelledby={idTit}>
+    <CardVidro className={'d5-sec ' + (className ?? '')} id={id} role="region" aria-labelledby={idTit} data-d5-alvo={alvo}>
       <div className="d5-sec-cab">
         <div className="d5-sec-tits">
           <h3 className="d5-sec-tit" id={idTit}>
@@ -129,6 +131,9 @@ export function Secao({ titulo, sub, ajuda, acao, children, className, id }: {
 
 export type Sentido = 'maior' | 'menor' | 'neutro';
 
+/** abaixo disso nos dois lados a variação em % engana (0 contra 1 = "−100%") */
+const VAR_MIN = 5;
+
 /** Variação vs o mesmo trecho do período anterior. `sentido` diz qual direção é boa. */
 export function Variacao({ atual, anterior, sentido, comparacao }: {
   atual: number | null | undefined; anterior: number | null | undefined; sentido: Sentido; comparacao: string;
@@ -136,6 +141,11 @@ export function Variacao({ atual, anterior, sentido, comparacao }: {
   const v = variacao(atual, anterior);
   // sem base (ou 0 contra 0): só o contexto, sem um chip "estável" que não diz nada
   if (!v || (atual === 0 && anterior === 0)) return <span className="d5-var-ctx">{comparacao}</span>;
+  // contagens miúdas (os dois lados abaixo de 5): 0 contra 1 não é "−100%" em vermelho —
+  // mostra o número de antes, neutro ("ontem até 14:00: 1")
+  if (typeof atual === 'number' && typeof anterior === 'number' && Math.max(atual, anterior) < VAR_MIN) {
+    return <span className="d5-var-ctx">{comparacao.replace(/^vs /, '')}: <span className="num">{fmtInt(anterior)}</span></span>;
+  }
   const txt = fmtVariacao(v);
   const estavel = txt === 'estável';
   const tom = estavel || sentido === 'neutro' ? 'ne' : (sentido === 'maior' ? v.abs > 0 : v.abs < 0) ? 'ok' : 'er';
@@ -202,7 +212,9 @@ export function Vazio({ texto, detalhe }: { texto: string; detalhe?: string }) {
   );
 }
 
-/** Ponto de status do número (conectado = verde; antigo = neutro). */
-export function PontoStatus({ situacao }: { situacao: 'conectado' | 'antigo' }) {
-  return <i className={'d5-ponto' + (situacao === 'conectado' ? ' d5-ponto-ok' : '')} aria-hidden />;
+/** Ponto de status do número (conectado = verde; antigo = neutro). Com a Leitura do dia
+ *  avisando que o número parou, o ponto fica âmbar (o verde "conectado" contradiria o aviso:
+ *  o status da integração segue "conectado" mesmo com o chip caído). */
+export function PontoStatus({ situacao, alerta }: { situacao: 'conectado' | 'antigo'; alerta?: boolean }) {
+  return <i className={'d5-ponto' + (alerta ? ' d5-ponto-alerta' : situacao === 'conectado' ? ' d5-ponto-ok' : '')} aria-hidden />;
 }

@@ -25,7 +25,7 @@ export function Motivos({ ne }: { ne: NeV5 }) {
           {ne.motivos.map((m) => {
             const p = pctDe(m.qtd, ne.total);
             return (
-              <li key={m.motivo} className="d5-barra">
+              <li key={m.motivo} className="d5-barra" data-d5-alvo={`motivos:${m.motivo}`}>
                 <div className="d5-barra-tx">
                   <span className="d5-barra-rot">{rotuloMotivoNe(m.motivo)}</span>
                   <span className="d5-barra-v">

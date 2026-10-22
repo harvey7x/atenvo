@@ -26,9 +26,9 @@ function ValorKpi({ txt }: { txt: string }) {
   );
 }
 
-function Cartao({ rotulo, ajuda, valor, children }: { rotulo: string; ajuda: string; valor: string; children: ReactNode }) {
+function Cartao({ rotulo, ajuda, valor, children, alvo }: { rotulo: string; ajuda: string; valor: string; children: ReactNode; alvo?: string }) {
   return (
-    <CardVidro className="d5-kpi">
+    <CardVidro className="d5-kpi" data-d5-alvo={alvo}>
       <div className="d5-kpi-rot">
         <span>{rotulo}</span>
         <Ajuda texto={ajuda} rotulo={rotulo} />
@@ -45,13 +45,13 @@ export function Kpis({ k, ant, comparacao }: { k: KpisV5; ant: KpisV5 | null; co
   );
   return (
     <section className="d5-kpis" aria-label="Resumo do período">
-      <Cartao rotulo="Entradas de clientes" ajuda={AJUDA.entradas} valor={fmtInt(k.entradas)}>
+      <Cartao rotulo="Entradas de clientes" ajuda={AJUDA.entradas} valor={fmtInt(k.entradas)} alvo="kpi:entradas">
         {v(k.entradas, ant?.entradas, 'maior')}
       </Cartao>
-      <Cartao rotulo="Não elegíveis" ajuda={AJUDA.ne} valor={fmtInt(k.ne)}>
+      <Cartao rotulo="Não elegíveis" ajuda={AJUDA.ne} valor={fmtInt(k.ne)} alvo="kpi:ne">
         {v(k.ne, ant?.ne, 'neutro')}
       </Cartao>
-      <Cartao rotulo="Fechados" ajuda={AJUDA.ganhos} valor={fmtInt(k.ganhos)}>
+      <Cartao rotulo="Fechados" ajuda={AJUDA.ganhos} valor={fmtInt(k.ganhos)} alvo="kpi:ganhos">
         {v(k.ganhos, ant?.ganhos, 'maior')}
       </Cartao>
       <Cartao rotulo="Tempo para fechar" ajuda={AJUDA.tempo} valor={fmtDuracaoH(k.fechMedianaH)}>

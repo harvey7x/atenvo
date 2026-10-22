@@ -5,7 +5,7 @@ import { spHoje, type Periodo } from '@/data/relatorios';
 import type {
   AtendenteV5, CanalV5, CelulaMapaV5, DashV5, JanelaV5, KpisV5, MotivoQtdV5, NeV5,
 } from '@/data/dashboardV5.tipos';
-import { demoDashV5 } from '@/data/dashboardV5.demo';
+import { cenarioDemoV5, demoDashV5 } from '@/data/dashboardV5.demo';
 import { janelaMapaV5, periodoAnteriorV5 } from '@/data/dashboardV5.periodo';
 
 /* ------------------------------------------------------------------
@@ -183,7 +183,7 @@ export function useDashV5(periodo: Periodo): UseQueryResult<DashV5> {
     queryFn: async (): Promise<DashV5> => {
       const agora = new Date();
       const j = janelaV5(periodo, agora, hoje);
-      if (!DASH_V5_REAL) return { ...demoDashV5(j, agora), buscaEm: agora.toISOString() };
+      if (!DASH_V5_REAL) return { ...demoDashV5(j, agora, cenarioDemoV5()), buscaEm: agora.toISOString() };
       const { data, error } = await supabase!.rpc('dashboard_v5', {
         p_inicio: j.iniISO,
         p_fim: j.fimISO,

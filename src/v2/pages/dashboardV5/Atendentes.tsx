@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { AtendenteV5 } from '@/data/dashboardV5.tipos';
+import type { MarcadorV5 } from '@/data/dashboardV5.sinais.tipos';
 import { fmtDuracaoMin, fmtInt } from '@/data/dashboardV5.formato';
 import { Skeleton } from '../../components';
 import { Ajuda, Avatar, Legenda, Secao, TempoFechar, Vazio } from './comum';
@@ -80,7 +81,11 @@ function Cabeca({ col, ordem, aoOrdenar }: { col: Coluna; ordem: { chave: Chave;
   );
 }
 
-export function Atendentes({ atendentes }: { atendentes: AtendenteV5[] }) {
+export function Atendentes({ atendentes, marcadores }: {
+  atendentes: AtendenteV5[];
+  /** da Leitura do dia (só admin): "12 esperam 1ª mensagem" */
+  marcadores?: Record<string, MarcadorV5>;
+}) {
   const [ordem, setOrdem] = useState<{ chave: Chave; dir: Dir }>({ chave: 'recebidos', dir: 'desc' });
   const linhas = useMemo(() => ordenar(atendentes, ordem.chave, ordem.dir), [atendentes, ordem]);
   const maxRec = Math.max(1, ...atendentes.map((a) => a.recebidos));
@@ -89,7 +94,7 @@ export function Atendentes({ atendentes }: { atendentes: AtendenteV5[] }) {
     : { chave: c.chave, dir: c.primeira }));
 
   return (
-    <Secao className="d5-at" titulo="Desempenho por atendente"
+    <Secao className="d5-at" titulo="Desempenho por atendente" alvo="atendentes"
       sub="Quem teve movimento no período. Clique no título de uma coluna para ordenar.">
       {atendentes.length === 0 ? (
         <Vazio texto="Ninguém da equipe teve movimento no período." detalhe="Recebidos, fechados, não elegíveis e respostas aparecem aqui quando acontecerem." />
@@ -103,12 +108,19 @@ export function Atendentes({ atendentes }: { atendentes: AtendenteV5[] }) {
               <tr>{COLS.map((c) => <Cabeca key={c.chave} col={c} ordem={ordem} aoOrdenar={aoOrdenar} />)}</tr>
             </thead>
             <tbody>
-              {linhas.map((a) => (
-                <tr key={a.usuarioId}>
+              {linhas.map((a) => {
+                const marca = marcadores?.[a.usuarioId];
+                return (
+                <tr key={a.usuarioId} data-d5-alvo={`atendentes:${a.usuarioId}`}>
                   <th scope="row" className="d5-nome">
                     <span className="d5-nome-in">
                       <Avatar nome={a.nome} />
-                      <b className="d5-pessoa">{a.nome}</b>
+                      {marca ? (
+                        <span className="d5-cel2">
+                          <b className="d5-pessoa">{a.nome}</b>
+                          <small className={`d5-marca d5-marca-${marca.tom}`}>{marca.texto}</small>
+                        </span>
+                      ) : <b className="d5-pessoa">{a.nome}</b>}
                     </span>
                   </th>
                   <td className="d5-dir">
@@ -139,7 +151,8 @@ export function Atendentes({ atendentes }: { atendentes: AtendenteV5[] }) {
                   </td>
                   <td className="d5-dir"><TempoFechar med={a.fechMedianaH} media={a.fechMediaH} n={a.fechN} /></td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

@@ -34,7 +34,7 @@ function mulberry32(seed: number): () => number {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
-const rngDe = (k: string) => mulberry32(hash32(k));
+export const rngDe = (k: string) => mulberry32(hash32(k));
 const normal = (a: number, b: number) => Math.sqrt(-2 * Math.log(Math.max(1e-12, a))) * Math.cos(2 * Math.PI * b);
 const logNormal = (med: number, sd: number, r: () => number) => med * Math.exp(sd * normal(r(), r()));
 function poisson(lambda: number, r: () => number): number {
@@ -42,7 +42,7 @@ function poisson(lambda: number, r: () => number): number {
   do { k++; p *= r(); } while (p > l && k < 40);
   return k - 1;
 }
-function mediana(v: number[]): number | null {
+export function mediana(v: number[]): number | null {
   if (!v.length) return null;
   const s = [...v].sort((a, b) => a - b), m = s.length >> 1;
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
@@ -58,12 +58,12 @@ function escolher<T>(itens: readonly (readonly [T, number])[], u: number): T {
 }
 
 /* ============================== Relógio de SP (UTC-3 fixo) ============================== */
-const MIN = 60_000, HORA = 3_600_000, DIA = 86_400_000;
-const msDe = (dia: string, minDia = 0) => Date.parse(`${dia}T00:00:00-03:00`) + minDia * MIN;
-const diaDe = (ms: number) => new Date(ms - 3 * HORA).toISOString().slice(0, 10);
-const horaDe = (ms: number) => new Date(ms - 3 * HORA).getUTCHours();
-const addDias = (dia: string, n: number) => new Date(Date.parse(`${dia}T12:00:00Z`) + n * DIA).toISOString().slice(0, 10);
-const dowDe = (dia: string) => { const g = new Date(`${dia}T12:00:00Z`).getUTCDay(); return g === 0 ? 7 : g; };
+export const MIN = 60_000, HORA = 3_600_000, DIA = 86_400_000;
+export const msDe = (dia: string, minDia = 0) => Date.parse(`${dia}T00:00:00-03:00`) + minDia * MIN;
+export const diaDe = (ms: number) => new Date(ms - 3 * HORA).toISOString().slice(0, 10);
+export const horaDe = (ms: number) => new Date(ms - 3 * HORA).getUTCHours();
+export const addDias = (dia: string, n: number) => new Date(Date.parse(`${dia}T12:00:00Z`) + n * DIA).toISOString().slice(0, 10);
+export const dowDe = (dia: string) => { const g = new Date(`${dia}T12:00:00Z`).getUTCDay(); return g === 0 ? 7 : g; };
 /** início do relógio do "tempo para fechar" (antes houve backfill) — igual ao SQL */
 const CORTE_QUALIDADE = Date.parse('2026-08-01T00:00:00-03:00');
 
@@ -81,6 +81,7 @@ interface AtendCfg {
   /** fração respondida pelo celular */
   cel: number;
 }
+export type { AtendCfg, CanalCfg };
 export const DEMO_ATENDENTES: readonly AtendCfg[] = [
   { id: 'demo-u-juliana', nome: 'Juliana', peso: 7, fecha: 0.35, marca: 1.25, respMed: 5.1, respSd: 2.0, vezes: 1.8, cel: 0.2 },
   { id: 'demo-u-matheus', nome: 'Matheus', peso: 7, fecha: 1.25, marca: 0.55, respMed: 16.5, respSd: 1.8, vezes: 1.1, cel: 0.09 },
@@ -129,21 +130,25 @@ export const DEMO_CANAIS: readonly CanalCfg[] = [
 ];
 
 /** peso por hora do dia (SP): pico entre 11h e 16h, madrugada quase vazia */
-const PESO_HORA = [2.0, 1.2, 0.7, 0.5, 0.5, 0.8, 1.8, 3.5, 5.5, 8.0, 9.3, 9.8, 10.6, 9.4, 10.0, 9.8, 10.2, 8.5, 7.0, 6.6, 6.4, 6.0, 4.8, 3.4];
-const PESO_HORA_TOT = PESO_HORA.reduce((a, b) => a + b, 0);
+export const PESO_HORA = [2.0, 1.2, 0.7, 0.5, 0.5, 0.8, 1.8, 3.5, 5.5, 8.0, 9.3, 9.8, 10.6, 9.4, 10.0, 9.8, 10.2, 8.5, 7.0, 6.6, 6.4, 6.0, 4.8, 3.4];
+export const PESO_HORA_TOT = PESO_HORA.reduce((a, b) => a + b, 0);
 /** volume por dia da semana ISO (1 = segunda): segunda forte, domingo fraco */
-const MULT_DOW = [0, 1.45, 1.06, 0.95, 0.93, 1.18, 0.86, 0.57];
+export const MULT_DOW = [0, 1.45, 1.06, 0.95, 0.93, 1.18, 0.86, 0.57];
 
 /* ============================== Lead ============================== */
 interface VezDemo { t0: number; resp: number; min: number; cel: boolean }
-interface LeadDemo {
+export interface LeadDemo {
   id: string;
   canalId: string | null;
   criado: number;
   dono: string | null;
   rotEm: number | null;
   ne: { em: number; motivo: MotivoNeV5; quem: 'ia' | 'regra_rs' | 'equipe'; por: string | null } | null;
+  /** fechamento do plano base (fator 1) */
   ganho: { em: number; credito: string } | null;
+  /** o fechamento POSSÍVEL (sorteio e chance) — o cenário da leitura escala a chance pelo
+   *  dia do fechamento sem mudar o sorteio (fator 1 = exatamente `ganho`) */
+  pot: { em: number; credito: string; u: number; p: number } | null;
   vezes: VezDemo[];
 }
 
@@ -217,9 +222,8 @@ function montarLead(c: CanalCfg, dia: string, i: number): LeadDemo {
   let ganho: LeadDemo['ganho'] = null;
   const uG = r();
   const durG = logNormal(c.ganhoMedH, c.ganhoSd, r);
-  if (!ne && at && uG < c.pGanho * at.fecha) {
-    ganho = { em: criado + Math.round(Math.max(3, durG) * HORA), credito: at.id };
-  }
+  const pot = !ne && at ? { em: criado + Math.round(Math.max(3, durG) * HORA), credito: at.id, u: uG, p: c.pGanho * at.fecha } : null;
+  if (pot && uG < pot.p) ganho = { em: pot.em, credito: pot.credito };
 
   // vezes do cliente respondidas por uma pessoa (a IA conduz quem ela descarta rápido)
   const vezes: VezDemo[] = [];
@@ -238,13 +242,13 @@ function montarLead(c: CanalCfg, dia: string, i: number): LeadDemo {
     }
   }
 
-  return { id, canalId: c.id, criado, dono, rotEm, ne, ganho, vezes };
+  return { id, canalId: c.id, criado, dono, rotEm, ne, ganho, pot, vezes };
 }
 
 /** Trocas de dono (transferências) do dia — poucas por dia, mais o lote real de 21/10 13:06. */
 interface TransfDemo { em: number; para: string; contato: string }
 const cacheTransf = new Map<string, TransfDemo[]>();
-function transferenciasDoDia(dia: string): TransfDemo[] {
+export function transferenciasDoDia(dia: string): TransfDemo[] {
   const pronto = cacheTransf.get(dia);
   if (pronto) return pronto;
   const r = rngDe(`v5|transf|${dia}`);
@@ -261,6 +265,125 @@ function transferenciasDoDia(dia: string): TransfDemo[] {
   }
   cacheTransf.set(dia, out);
   return out;
+}
+
+/* ============================== Cenários da Leitura do dia ============================== */
+/** `?leitura=` no demo: padrao (3 achados), calmo (nada a dizer), incidente (o 05/10) e
+ *  cheio (5 achados: mostra o "Ver mais 1"). */
+export type CenarioDemoV5 = 'padrao' | 'calmo' | 'incidente' | 'cheio';
+
+export interface AjusteDemoV5 {
+  /** entradas planejadas que não chegam: número em [ini, fim) */
+  suprimir: { canalId: string; ini: number; fim: number }[];
+  /** mensagens que não chegam: número a partir de `ini` (até agora) */
+  silencioMsg: { canalId: string; ini: number }[];
+  /** fator da chance de fechar, pelo dia (SP) do fechamento */
+  fatorGanho: Record<string, number>;
+  /** fator das fichas finalizadas, pelo dia */
+  fatorFichas: Record<string, number>;
+  /** rajada: entradas do número que chegariam em [de, ate) chegam juntas a partir de `em` */
+  rajada: { canalId: string; de: number; ate: number; em: number; n: number } | null;
+  /** crédito do Gemini acabou em [ini, agora) */
+  creditoIni: number | null;
+  /** fila da 1ª mensagem do Matheus acima do normal */
+  filaMatheus: boolean;
+}
+
+/** Cenário da leitura no demo: `?leitura=padrao|calmo|incidente` (só no demo — o hook
+ *  real nunca chama). Sem parâmetro: padrao. */
+export function cenarioDemoV5(): CenarioDemoV5 {
+  try {
+    const v = new URLSearchParams(window.location.search).get('leitura');
+    if (v === 'calmo' || v === 'incidente' || v === 'padrao' || v === 'cheio') return v;
+  } catch { /* sem window (teste) */ }
+  return 'padrao';
+}
+
+const SEM_AJUSTE: AjusteDemoV5 = { suprimir: [], silencioMsg: [], fatorGanho: {}, fatorFichas: {}, rajada: null, creditoIni: null, filaMatheus: false };
+
+/** Os botões do cenário, aplicados ao MESMO plano de leads (deterministas, relativos a agora). */
+export function ajusteDemoV5(cenario: CenarioDemoV5 | undefined, agora: Date): AjusteDemoV5 {
+  if (!cenario || cenario === 'calmo') return SEM_AJUSTE;
+  const ag = agora.getTime();
+  const hoje = diaDe(ag);
+  const ontem = addDias(hoje, -1), anteontem = addDias(hoje, -2);
+  const FIM = ag + 2 * DIA;
+  if (cenario === 'padrao' || cenario === 'cheio') {
+    const padrao: AjusteDemoV5 = {
+      ...SEM_AJUSTE,
+      // JUROS: último cliente novo há 2 h 50 e última mensagem há 1 h 40 (o chip caiu)
+      suprimir: [{ canalId: 'demo-canal-juros', ini: ag - (2 * 60 + 50) * MIN, fim: FIM }],
+      silencioMsg: [{ canalId: 'demo-canal-juros', ini: ag - 100 * MIN }],
+      // semana boa: os 2 últimos dias fecharam bem mais (e as fichas acompanharam) e HOJE
+      // também — o cartão "Fechados" de Hoje compara com ontem no mesmo horário e não pode
+      // despencar ao lado de uma semana boa (o teste do demo confere: nunca abaixo de −50%)
+      fatorGanho: { [hoje]: 8, [ontem]: 4, [anteontem]: 4 },
+      fatorFichas: { [ontem]: 2.2, [anteontem]: 2.2 },
+      filaMatheus: true,
+    };
+    if (cenario === 'padrao') return padrao;
+    // cheio: o padrão + o crédito da IA acabou há 52 min + o EMPRESTIMO ficou de 7 h a 4 h
+    // atrás sem entradas e já voltou (queda encerrada) — 5 achados, 4 na tela
+    return {
+      ...padrao,
+      suprimir: [...padrao.suprimir, { canalId: 'demo-canal-emprestimo', ini: ag - 7 * HORA, fim: ag - 4 * HORA }],
+      creditoIni: ag - 52 * MIN,
+    };
+  }
+  // incidente (o padrão de 04–05/10): os dois números de anúncio param juntos, o crédito da
+  // IA acaba e os fechamentos dos últimos 4 dias caem (as fichas seguem no normal)
+  const fg: Record<string, number> = {};
+  for (let i = 1; i <= 4; i++) fg[addDias(hoje, -i)] = 0.15;
+  const nove = msDe(hoje, 9 * 60 + 5);
+  return {
+    ...SEM_AJUSTE,
+    suprimir: [
+      { canalId: 'demo-canal-emprestimo', ini: ag - 150 * MIN, fim: FIM },
+      { canalId: 'demo-canal-juros', ini: ag - 160 * MIN, fim: FIM },
+    ],
+    silencioMsg: [
+      { canalId: 'demo-canal-emprestimo', ini: ag - 110 * MIN },
+      { canalId: 'demo-canal-juros', ini: ag - 120 * MIN },
+    ],
+    fatorGanho: fg,
+    rajada: ag >= nove + 20 * MIN ? { canalId: 'demo-canal-emprestimo', de: nove + 12 * MIN, ate: msDe(hoje, 13 * 60), em: nove, n: 22 } : null,
+    creditoIni: ag - 52 * MIN,
+  };
+}
+
+/** Fechamento do lead neste cenário (fator 1 = o do plano). */
+export function ganhoDe(l: LeadDemo, aj: AjusteDemoV5): LeadDemo['ganho'] {
+  if (!l.pot) return null;
+  const f = aj.fatorGanho[diaDe(l.pot.em)] ?? 1;
+  return l.pot.u < l.pot.p * f ? { em: l.pot.em, credito: l.pot.credito } : null;
+}
+
+/** Os leads do plano depois dos botões do cenário: primeiro a rajada (entradas que
+ *  chegariam depois chegam juntas — antes, nunca depois: nada do lead acontece antes de o
+ *  cliente chegar), depois a supressão (a rajada já chegou e não é suprimida). */
+export function aplicarAjusteDemoV5(leads: LeadDemo[], aj: AjusteDemoV5): LeadDemo[] {
+  if (!aj.suprimir.length && !aj.rajada) return leads;
+  let out = leads;
+  const movidos = new Set<string>();
+  const rj = aj.rajada;
+  if (rj) {
+    const mover = out.filter((l) => l.canalId === rj.canalId && l.criado >= rj.de && l.criado < rj.ate)
+      .sort((a, b) => a.criado - b.criado).slice(0, rj.n);
+    const pos = new Map(mover.map((l, i) => [l.id, i]));
+    out = out.map((l) => {
+      const i = pos.get(l.id);
+      if (i == null) return l;
+      movidos.add(l.id);
+      return { ...l, criado: rj.em + i * 30_000 };
+    }).sort((a, b) => a.criado - b.criado);
+  }
+  return out.filter((l) => movidos.has(l.id)
+    || !aj.suprimir.some((x) => x.canalId === l.canalId && l.criado >= x.ini && l.criado < x.fim));
+}
+
+/** Todos os leads do plano entre dois dias (fim exclusivo), já com o cenário. */
+export function leadsDemoV5(iniDia: string, fimDiaExcl: string, aj: AjusteDemoV5 = SEM_AJUSTE): LeadDemo[] {
+  return aplicarAjusteDemoV5(leadsEntre(iniDia, fimDiaExcl), aj);
 }
 
 /* ============================== Agregação ============================== */
@@ -280,26 +403,29 @@ const dentro = (t: number, j: Janela, agora: number) => t >= j.ini && t < j.fim 
 function statsFech(horas: number[]): Pick<KpisV5, 'fechMedianaH' | 'fechMediaH' | 'fechN'> {
   return { fechMedianaH: r3(mediana(horas)), fechMediaH: r3(media(horas)), fechN: horas.length };
 }
-const horasGanho = (l: LeadDemo) =>
-  (l.ganho && l.criado >= CORTE_QUALIDADE && l.ganho.em >= l.criado ? (l.ganho.em - l.criado) / HORA : null);
+const horasGanho = (l: LeadDemo, g: LeadDemo['ganho']) =>
+  (g && l.criado >= CORTE_QUALIDADE && g.em >= l.criado ? (g.em - l.criado) / HORA : null);
 
-function kpisDe(leads: LeadDemo[], j: Janela, agora: number): KpisV5 {
+function kpisDe(leads: LeadDemo[], j: Janela, agora: number, aj: AjusteDemoV5): KpisV5 {
   const contatos = new Set<string>();
   let ne = 0; let ganhos = 0; const horas: number[] = [];
   for (const l of leads) {
     if (dentro(l.criado, j, agora)) contatos.add(l.id);
     if (l.ne && dentro(l.ne.em, j, agora)) ne++;
-    if (l.ganho && dentro(l.ganho.em, j, agora)) {
+    const g = ganhoDe(l, aj);
+    if (g && dentro(g.em, j, agora)) {
       ganhos++;
-      const h = horasGanho(l);
+      const h = horasGanho(l, g);
       if (h != null) horas.push(h);
     }
   }
   return { entradas: contatos.size, ne, ganhos, ...statsFech(horas) };
 }
 
-/** Foto do período no demo. `agora` só filtra o que já aconteceu. */
-export function demoDashV5(janela: JanelaV5, agora: Date): DashV5 {
+/** Foto do período no demo. `agora` só filtra o que já aconteceu; `cenario` (o da Leitura
+ *  do dia) aplica os mesmos botões que os sinais do demo — tabela e leitura batem. */
+export function demoDashV5(janela: JanelaV5, agora: Date, cenario?: CenarioDemoV5): DashV5 {
+  const aj = ajusteDemoV5(cenario, agora);
   const ag = agora.getTime();
   const per: Janela = { ini: Date.parse(janela.iniISO), fim: Date.parse(janela.fimISO) };
   const ant: Janela = { ini: Date.parse(janela.antIniISO), fim: Date.parse(janela.antFimISO) };
@@ -307,10 +433,10 @@ export function demoDashV5(janela: JanelaV5, agora: Date): DashV5 {
   // fechamentos do período podem vir de leads de até ~90 dias antes
   const desde = Math.min(per.ini, ant.ini, mapaIni) - 95 * DIA;
   const ate = Math.min(per.fim, ag + DIA);
-  const leads = leadsEntre(diaDe(desde), addDias(diaDe(ate), 1));
+  const leads = leadsDemoV5(diaDe(desde), addDias(diaDe(ate), 1), aj);
 
-  const kpis = kpisDe(leads, per, ag);
-  const kpisAnterior = kpisDe(leads, ant, ag);
+  const kpis = kpisDe(leads, per, ag, aj);
+  const kpisAnterior = kpisDe(leads, ant, ag, aj);
 
   /* ---- números ---- */
   const linhas = DEMO_CANAIS.filter((c) => c.id).map((c) => ({ id: c.id, nome: c.nome, numero: c.numero, situacao: 'conectado' as const }));
@@ -321,9 +447,10 @@ export function demoDashV5(janela: JanelaV5, agora: Date): DashV5 {
     for (const l of meus) {
       if (dentro(l.criado, per, ag)) entradas++;
       if (l.ne && dentro(l.ne.em, per, ag)) { ne++; neMotivos[l.ne.motivo] = (neMotivos[l.ne.motivo] ?? 0) + 1; }
-      if (l.ganho && dentro(l.ganho.em, per, ag)) {
+      const g = ganhoDe(l, aj);
+      if (g && dentro(g.em, per, ag)) {
         ganhos++;
-        const h = horasGanho(l);
+        const h = horasGanho(l, g);
         if (h != null) horas.push(h);
       }
     }
@@ -363,9 +490,10 @@ export function demoDashV5(janela: JanelaV5, agora: Date): DashV5 {
       if (l.dono !== a.id) continue;
       if (l.rotEm != null && dentro(l.rotEm, per, ag)) recebidos++;
       if (l.ne && l.ne.por === a.id && dentro(l.ne.em, per, ag)) neMarcados++;
-      if (l.ganho && l.ganho.credito === a.id && dentro(l.ganho.em, per, ag)) {
+      const g = ganhoDe(l, aj);
+      if (g && g.credito === a.id && dentro(g.em, per, ag)) {
         ganhos++;
-        const h = horasGanho(l);
+        const h = horasGanho(l, g);
         if (h != null) horas.push(h - (Math.max(l.criado, l.rotEm ?? l.criado) - l.criado) / HORA);
       }
       for (const v of l.vezes) {
