@@ -123,6 +123,10 @@
 .v2 .conv2 .cchip.repasse { color: var(--txt-2); border-color: rgba(var(--tint), .22); background: rgba(var(--tint), .06); text-transform: none; letter-spacing: 0; }
 .v2 .wa-hchip.repasse { color: var(--txt-2); border-color: rgba(var(--tint), .25); }
 .v2 .wa-hchip.repasse.ok { color: var(--verde); border-color: rgba(var(--verde-rgb), .4); }
+/* Radar "📞 Ligar": lead parou de responder o robô — azul (ação, não alarme) */
+.v2 .conv2 .cchip.ligar { color: var(--azul, #3B82F6); border-color: rgba(var(--azul-rgb, 59, 130, 246), .45); background: rgba(var(--azul-rgb, 59, 130, 246), .1); font-weight: 700; }
+.v2 .wa-hchip.ligar { cursor: pointer; font-family: var(--fonte); color: var(--azul, #3B82F6); border-color: rgba(var(--azul-rgb, 59, 130, 246), .45); background: rgba(var(--azul-rgb, 59, 130, 246), .08); }
+.v2 .wa-hchip.ligar:hover { background: rgba(var(--azul-rgb, 59, 130, 246), .16); }
 .v2 .conv2 .m { text-align: right; flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
 .v2 .conv2 .h2 { font-size: 10px; color: var(--txt-3); }
 .v2 .conv2 .nl {

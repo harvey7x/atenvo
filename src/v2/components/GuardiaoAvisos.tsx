@@ -18,7 +18,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useGuardiaoAvisos, useVacuoDecisoes, type GuardiaoAviso } from '@/data/vacuo';
+import { useGuardiaoAvisos, useVacuoDecisoes, useLigarMeus, useConcluirLigacao, type GuardiaoAviso } from '@/data/vacuo';
 import { useOrg } from '@/context/OrgContext';
 import { tempoRelativo } from '@/data/slaView';
 import { CLASSE_RAIZ_PORTAL, criarRaizPortalV2 } from './portal';
@@ -81,11 +81,91 @@ function PilulaDecisoes() {
   );
 }
 
-/** Pílulas da barra superior: avisos do próprio usuário (1º/2º) + decisões do gestor. */
+/** Raiz de portal v2 reaproveitada por sessão (regra 10) — uma por lista suspensa. */
+function useRaizPortal(marca: string): HTMLElement {
+  return useMemo(() => {
+    const sel = '.' + CLASSE_RAIZ_PORTAL.split(' ').join('.') + '[' + marca + ']';
+    let el = document.querySelector(sel) as HTMLElement | null;
+    if (!el) { el = criarRaizPortalV2(document) as unknown as HTMLElement; el.setAttribute(marca, '1'); }
+    return el;
+  }, [marca]);
+}
+
+/** Pílula "📞 Ligar": leads do PRÓPRIO usuário que pararam de responder o robô (2 h úteis). */
+function PilulaLigar() {
+  const itens = useLigarMeus();
+  const nav = useNavigate();
+  const concluir = useConcluirLigacao();
+  const [agora, setAgora] = useState(Date.now());
+  useEffect(() => { const t = setInterval(() => setAgora(Date.now()), 30_000); return () => clearInterval(t); }, []);
+  const [aberto, setAberto] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+  const pilulaRef = useRef<HTMLButtonElement>(null);
+  const listaRef = useRef<HTMLDivElement>(null);
+  const raiz = useRaizPortal('data-radar-ligar');
+
+  useEffect(() => {
+    if (!aberto) return;
+    const fora = (e: MouseEvent) => {
+      const alvo = e.target as Node;
+      if (pilulaRef.current?.contains(alvo) || listaRef.current?.contains(alvo)) return;
+      setAberto(false);
+    };
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setAberto(false); };
+    document.addEventListener('mousedown', fora);
+    document.addEventListener('keydown', esc);
+    return () => { document.removeEventListener('mousedown', fora); document.removeEventListener('keydown', esc); };
+  }, [aberto]);
+  useEffect(() => { if (itens.length === 0) setAberto(false); }, [itens.length]);
+
+  if (itens.length === 0) return null;
+  const primeiro = itens[0];
+  return (
+    <>
+      <button type="button" ref={pilulaRef} className={'gva-pilula ligar' + (aberto ? ' on' : '')} aria-expanded={aberto}
+        title="Leads que pararam de responder o robô — ligue para retomar a venda"
+        onClick={() => {
+          const r = pilulaRef.current?.getBoundingClientRect();
+          if (r) setPos({ top: r.bottom + 8, left: r.left + r.width / 2 });
+          setAberto((v) => !v);
+        }}>
+        <i className="gva-dot" aria-hidden />
+        {itens.length === 1
+          ? <><b>📞 Ligar: {primeiro.nome}</b><span>parou no robô</span></>
+          : <><b>📞 {itens.length} clientes pra ligar</b><span>pararam no robô</span></>}
+        <svg viewBox="0 0 10 6" aria-hidden><path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+      </button>
+      {aberto && pos && createPortal(
+        <div className="gva-lista" role="menu" ref={listaRef} style={{ top: pos.top, left: pos.left }}>
+          {itens.map((it) => (
+            <div key={it.alertaId} className="gva-card ligar">
+              <div className="gva-topo"><span className="gva-n ligar">📞 Ligar</span></div>
+              <div className="gva-nome">{it.nome}</div>
+              <div className="gva-sub">parou de responder o robô · aviso {tempoRelativo(it.desde, agora)}</div>
+              <div className="gva-dupla">
+                <button type="button" className="gva-btn sec" onClick={() => { setAberto(false); nav('/whatsapp?conversa=' + encodeURIComponent(it.conversaId)); }}>Abrir conversa</button>
+                <button type="button" className="gva-btn pri" disabled={concluir.isPending}
+                  onClick={() => { setErro(null); concluir.mutate(it.conversaId, { onError: (e) => setErro((e as Error).message) }); }}>
+                  Já liguei
+                </button>
+              </div>
+            </div>
+          ))}
+          {erro && <div className="gva-erro">{erro}</div>}
+        </div>,
+        raiz,
+      )}
+    </>
+  );
+}
+
+/** Pílulas da barra superior: avisos (1º/2º), clientes pra ligar e decisões do gestor. */
 export function RadarPilula() {
   return (
     <>
       <PilulaAvisos />
+      <PilulaLigar />
       <PilulaDecisoes />
     </>
   );

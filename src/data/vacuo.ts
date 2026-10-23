@@ -409,3 +409,65 @@ export function useDecidirRepasse() {
     },
   });
 }
+
+/* ---- "LIGAR PRO CLIENTE": lead parou de responder o ROBÔ por 2 h úteis ---- */
+export interface LigarItem {
+  alertaId: string;
+  conversaId: string;
+  nome: string;
+  donoId: string | null;
+  donoNome?: string;
+  desde: string; // quando o aviso foi criado
+}
+
+export const LIGAR_DEMO: LigarItem[] = [
+  { alertaId: 'lig-1', conversaId: 'wa-neusa', nome: 'Neusa Trindade', donoId: null, donoNome: 'Matheus', desde: new Date(Date.now() - 25 * 60e3).toISOString() },
+  { alertaId: 'lig-2', conversaId: 'wa-joaob', nome: 'João Batista Ramos', donoId: null, donoNome: 'Juliana', desde: new Date(Date.now() - 70 * 60e3).toISOString() },
+];
+
+function useLigarBase(soMeus: boolean): LigarItem[] {
+  const { user } = useAuth();
+  const slaQ = useSlaAlertas();
+  const itens = useMemo(
+    () => (slaQ.data?.itens ?? []).filter((a) =>
+      a.tipo === 'robo_ligar' && !!a.conversa_id && (!soMeus || (!!user?.id && a.responsavel_id === user.id))),
+    [slaQ.data, user?.id, soMeus],
+  );
+  const alvos = useSlaAlvos(itens);
+  return useMemo(() => {
+    if (!VACUO_REAL) return soMeus ? LIGAR_DEMO.slice(0, 1) : LIGAR_DEMO;
+    return itens.map((a) => ({
+      alertaId: a.id, conversaId: a.conversa_id!, nome: alvos.get(a.id)?.nome ?? 'Cliente',
+      donoId: a.responsavel_id, desde: a.criado_em,
+    })).sort((x, y) => x.desde.localeCompare(y.desde));
+  }, [itens, alvos, soMeus]);
+}
+
+/** Clientes pra LIGAR do próprio usuário (aviso pessoal — só o dono vê). */
+export function useLigarMeus(): LigarItem[] { return useLigarBase(true); }
+/** Visão de equipe (painel /radar, admin). */
+export function useLigarEquipe(): LigarItem[] { return useLigarBase(false); }
+
+/** "Já liguei": encerra o aviso e registra a ligação na conversa. */
+export function useConcluirLigacao() {
+  const qc = useQueryClient();
+  const { currentOrg } = useOrg();
+  const orgId = currentOrg.id;
+  return useMutation({
+    mutationFn: async (conversaId: string) => {
+      if (!VACUO_REAL) return { ok: true };
+      const { data, error } = await supabase!.rpc('robo_ligar_concluir', { p_conversa: conversaId });
+      if (error) throw new Error(error.message);
+      return data as { ok: boolean };
+    },
+    onSuccess: (_r, conversaId) => {
+      if (!VACUO_REAL) return;
+      qc.setQueryData(['sla-alertas', orgId], (old: unknown) => {
+        const o = old as { itens?: Array<{ tipo: string; conversa_id: string | null }> } | undefined;
+        if (!o?.itens) return old;
+        return { ...o, itens: o.itens.filter((a) => !(a.tipo === 'robo_ligar' && a.conversa_id === conversaId)) };
+      });
+      qc.invalidateQueries({ queryKey: ['sla-alertas'] });
+    },
+  });
+}

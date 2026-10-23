@@ -14,7 +14,7 @@ import { BotaoPrimario, BotaoSec, CardVidro, EstadoErro, Skeleton } from '../com
 import { tempoRelativo } from '@/data/slaView';
 import { useOrgUsuarios, type OrgUsuario } from '@/data/atendimento';
 import {
-  useVacuoRepasses, useVacuoRanking, useVacuoConfig, useRadarRisco, useVacuoDecisoes, useDecidirRepasse,
+  useVacuoRepasses, useVacuoRanking, useVacuoConfig, useRadarRisco, useVacuoDecisoes, useDecidirRepasse, useLigarEquipe,
   repasseEfetivo, type VacuoRepasse, type RadarRisco, type VacuoDecisao,
 } from '@/data/vacuo';
 
@@ -149,6 +149,7 @@ export default function GuardiaoV2() {
   const usuariosQ = useOrgUsuarios();
   const decisoesQ = useVacuoDecisoes();
   const decisoes = decisoesQ.data ?? [];
+  const ligar = useLigarEquipe();
 
   const risco = riscoQ;
   const repasses = repassesQ.data ?? [];
@@ -233,6 +234,27 @@ export default function GuardiaoV2() {
                     <td className={r.donoId || r.donoNome ? '' : 'rub'}>{nomeDono(r)}</td>
                     <td className="num mudo">{tempoRelativo(r.desde, agora)}</td>
                     <td className="gd-acao">Responder →</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </Secao>
+
+        <Secao titulo="Pararam no robô — ligar" badge={ligar.length} badgeTom={ligar.length > 0 ? 'rubro' : 'neutro'}
+          sub="Leads que o robô atendeu e pararam de responder há 2 horas úteis, sem nenhum contato humano. O dono de cada um recebeu o aviso pra ligar." atraso={5}>
+          {ligar.length === 0 ? (
+            <div className="gd-vazio ok">✓ Nenhum lead parado no robô agora.</div>
+          ) : (
+            <table className="gd-tab">
+              <thead><tr><th>Cliente</th><th>Quem deve ligar</th><th>Aviso</th><th /></tr></thead>
+              <tbody>
+                {ligar.map((l) => (
+                  <tr key={l.alertaId} className="clk" title="Abrir a conversa no inbox" onClick={() => abrir(l.conversaId)}>
+                    <td className="forte"><span className="gd-cli"><span className="gd-av">{iniciaisDe(l.nome)}</span>{l.nome}</span></td>
+                    <td className={l.donoId || l.donoNome ? '' : 'rub'}>{l.donoNome ?? (l.donoId ? (usuariosQ.data ?? []).find((u) => u.id === l.donoId)?.nome ?? 'Atendente' : 'Sem dono')}</td>
+                    <td className="num mudo">{tempoRelativo(l.desde, agora)}</td>
+                    <td className="gd-acao">Abrir →</td>
                   </tr>
                 ))}
               </tbody>

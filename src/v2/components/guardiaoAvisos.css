@@ -94,3 +94,13 @@
 .v2 .gva-tk-txt b { color: var(--txt); }
 .v2 .gva-tk-acoes { display: flex; flex-direction: column; gap: 7px; margin-top: 16px; }
 .v2 .gva-tk .gva-btn { margin-top: 0; }
+
+/* ---- "📞 Ligar": lead parou de responder o robô ---- */
+.v2 .gva-pilula.ligar { border-color: rgba(var(--azul-rgb, 59, 130, 246), .5); }
+.v2 .gva-pilula.ligar .gva-dot { background: var(--azul, #3B82F6); animation: none; }
+.v2 .gva-card.ligar { border-left: 3px solid var(--azul, #3B82F6); }
+.v2 .gva-n.ligar { color: var(--azul, #3B82F6); background: rgba(var(--azul-rgb, 59, 130, 246), .12); }
+.v2 .gva-dupla { display: flex; gap: 6px; }
+.v2 .gva-dupla .gva-btn { flex: 1; }
+.v2 .gva-btn:disabled { opacity: .6; cursor: default; }
+.v2 .gva-erro { font-size: 11px; color: var(--rubro); background: var(--surface); border-radius: 10px; padding: 8px 10px; }
