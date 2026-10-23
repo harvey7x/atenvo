@@ -1,0 +1,115 @@
+/* Radar de Atendimento — painel do admin (anatomia executiva do Dashboard) */
+.v2 .gd-pg { padding: 18px 22px 28px; display: flex; flex-direction: column; gap: 14px; max-width: 1240px; margin: 0 auto; width: 100%; }
+
+.v2 .gd-heros { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.v2 .gd-hero { position: relative; overflow: hidden; padding: 14px 16px 13px; transition: transform .18s var(--ease, ease), box-shadow .18s; }
+.v2 .gd-hero:hover { transform: translateY(-2px); }
+.v2 .gd-hero { text-align: center; }
+.v2 .gd-hero .rot { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 9.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--txt-3); }
+.v2 .gd-hero .val { font-size: 27px; font-weight: 700; margin-top: 5px; letter-spacing: -.025em; line-height: 1.1; }
+.v2 .gd-hero .val.rub { color: var(--rubro); text-shadow: 0 0 22px rgba(var(--rubro-rgb), .35); }
+.v2 .gd-hero .val.vrd { color: var(--verde); text-shadow: 0 0 22px rgba(var(--verde-rgb), .3); }
+.v2 .gd-hero .pe { font-size: 10.5px; color: var(--txt-3); margin-top: 3px; }
+/* aura semântica no topo de cada hero */
+.v2 .gd-hero::before { content: ''; position: absolute; left: -20%; right: -20%; top: -55%; height: 100%; pointer-events: none; opacity: .9; }
+.v2 .gd-hero.t-rubro::before { background: radial-gradient(ellipse at 50% 0%, rgba(var(--rubro-rgb), .16), transparent 70%); }
+.v2 .gd-hero.t-verde::before, .v2 .gd-hero.h-ok.t-verde::before { background: radial-gradient(ellipse at 50% 0%, rgba(var(--verde-rgb), .14), transparent 70%); }
+.v2 .gd-hero.h-alvo::before { background: radial-gradient(ellipse at 50% 0%, rgba(var(--azul-rgb, 59, 130, 246), .13), transparent 70%); }
+/* pulso "ao vivo" no rótulo quando há risco */
+.v2 .gd-ping { width: 6px; height: 6px; border-radius: 50%; background: var(--rubro); box-shadow: 0 0 0 0 rgba(var(--rubro-rgb), .5); animation: gd-ping 1.8s ease-out infinite; }
+@keyframes gd-ping { 0% { box-shadow: 0 0 0 0 rgba(var(--rubro-rgb), .5); } 70% { box-shadow: 0 0 0 7px rgba(var(--rubro-rgb), 0); } 100% { box-shadow: 0 0 0 0 rgba(var(--rubro-rgb), 0); } }
+[data-perf] .v2 .gd-ping { animation: none; }
+[data-perf] .v2 .gd-hero:hover { transform: none; }
+
+.v2 .gd-grid { display: flex; flex-direction: column; gap: 12px; }
+.v2 .gd-sec { padding: 14px 16px; }
+.v2 .gd-sec-cab { margin-bottom: 12px; text-align: center; }
+.v2 .gd-sec-cab .t { font-size: 13.5px; font-weight: 700; letter-spacing: -.01em; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.v2 .gd-sec-cab .s { font-size: 11px; color: var(--txt-3); margin-top: 3px; max-width: 640px; margin-left: auto; margin-right: auto; }
+.v2 .gd-badge { font-size: 10px; font-weight: 800; min-width: 20px; text-align: center; border-radius: 99px; padding: 1px 7px; background: rgba(var(--tint), .09); color: var(--txt-2); }
+.v2 .gd-badge.rub { background: var(--rubro-bg); color: var(--rubro); box-shadow: 0 0 0 1px rgba(var(--rubro-rgb), .3); }
+
+/* cliente com avatar */
+.v2 .gd-cli { display: inline-flex; align-items: center; gap: 8px; }
+.v2 .gd-av {
+  width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 8.5px; font-weight: 700; letter-spacing: .02em; color: var(--txt-2);
+  background: rgba(var(--tint), .09); box-shadow: inset 0 0 0 1px rgba(var(--tint), .16);
+}
+.v2 .gd-av.n2, .v2 .gd-av.n3 { color: var(--rubro); background: var(--rubro-bg); box-shadow: inset 0 0 0 1px rgba(var(--rubro-rgb), .35); }
+.v2 .gd-av.n1 { color: var(--ambar); background: var(--ambar-bg); box-shadow: inset 0 0 0 1px rgba(var(--ambar-rgb), .35); }
+.v2 .gd-av.ouro { color: #B8860B; background: rgba(218, 165, 32, .14); box-shadow: inset 0 0 0 1px rgba(218, 165, 32, .4); }
+:root:not([data-tema="light"]) .v2 .gd-av.ouro { color: #F3D98D; }
+.v2 .gd-coroa { margin-left: 4px; font-size: 11px; }
+
+/* medidor de escalada 1º→3º */
+.v2 .gd-esc { display: inline-flex; align-items: center; gap: 3px; }
+.v2 .gd-esc .s { width: 16px; height: 5px; border-radius: 3px; background: rgba(var(--tint), .12); }
+.v2 .gd-esc .s.a1.on { background: var(--ambar); }
+.v2 .gd-esc .s.a2.on { background: var(--rubro); opacity: .8; }
+.v2 .gd-esc .s.a3.on { background: var(--rubro); box-shadow: 0 0 7px rgba(var(--rubro-rgb), .6); }
+.v2 .gd-esc b { margin-left: 5px; font-size: 9.5px; font-weight: 800; }
+.v2 .gd-esc b.n1 { color: var(--ambar); }
+.v2 .gd-esc b.n2, .v2 .gd-esc b.n3 { color: var(--rubro); }
+
+/* barra de conversão no ranking: trilho + preenchimento, % ao lado */
+.v2 .gd-conv { display: inline-flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.v2 .gd-conv .tr { width: 62px; height: 5px; border-radius: 3px; background: rgba(var(--tint), .1); overflow: hidden; }
+.v2 .gd-conv .tr i { display: block; height: 100%; border-radius: 3px; background: linear-gradient(90deg, rgba(var(--verde-rgb), .35), var(--verde)); }
+.v2 .gd-conv b { font-weight: 700; min-width: 36px; text-align: right; }
+
+/* repasse De → Para */
+.v2 .gd-fluxo { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.v2 .gd-fluxo b { font-weight: 650; }
+.v2 .gd-fluxo .de { color: var(--rubro); }
+.v2 .gd-fluxo svg { width: 20px; height: 9px; color: var(--txt-3); }
+
+/* fila de risco: borda viva por estágio */
+.v2 .gd-tab.risco tr.clk td:first-child { border-left: 2px solid transparent; }
+.v2 .gd-tab.risco tr.r1 td:first-child { border-left-color: var(--ambar); }
+.v2 .gd-tab.risco tr.r2 td:first-child, .v2 .gd-tab.risco tr.r3 td:first-child { border-left-color: var(--rubro); }
+.v2 .gd-tab.risco tr.r3 td { background: rgba(var(--rubro-rgb), .045); }
+
+.v2 .gd-tab { width: 100%; max-width: 1020px; margin: 0 auto; border-collapse: collapse; font-size: 12px; }
+.v2 .gd-tab th { text-align: left; font-size: 9.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--txt-3); padding: 5px 8px; border-bottom: 1px solid rgba(var(--tint), .12); }
+.v2 .gd-tab th.num, .v2 .gd-tab td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.v2 .gd-tab td { padding: 7px 8px; border-bottom: 1px solid rgba(var(--tint), .07); }
+.v2 .gd-tab tr:last-child td { border-bottom: none; }
+.v2 .gd-tab tr.lider td { background: rgba(var(--tint), .045); }
+.v2 .gd-tab tr.clk { cursor: pointer; }
+.v2 .gd-tab tr.clk:hover td { background: rgba(var(--tint), .06); }
+.v2 .gd-tab .forte { font-weight: 600; }
+.v2 .gd-tab .mudo { color: var(--txt-3); }
+.v2 .gd-tab .rub { color: var(--rubro); }
+
+.v2 .gd-pill { font-size: 10px; font-weight: 600; border: 1px solid rgba(var(--tint), .18); border-radius: 99px; padding: 1px 8px; color: var(--txt-2); white-space: nowrap; }
+.v2 .gd-pill.ok { color: var(--verde); border-color: rgba(var(--verde-rgb), .4); background: var(--verde-bg); }
+.v2 .gd-pill.bad { color: var(--rubro); border-color: rgba(var(--rubro-rgb), .4); background: var(--rubro-bg); }
+.v2 .gd-pill.mudo { color: var(--txt-3); }
+
+.v2 .gd-vazio { font-size: 12px; color: var(--txt-3); padding: 14px 4px; text-align: center; }
+.v2 .gd-vazio.ok { color: var(--verde); }
+
+/* faixa de regras vigentes (compacta, sob os heros) */
+.v2 .gd-regras {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 18px; font-size: 10.5px; color: var(--txt-3);
+  padding: 7px 14px; border: 1px dashed rgba(var(--tint), .16); border-radius: 10px;
+}
+.v2 .gd-regras b { color: var(--txt-2); font-weight: 650; }
+
+/* pílula do estágio do aviso na fila de risco */
+.v2 .gd-aviso { font-size: 9.5px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; border-radius: 5px; padding: 1px 7px; white-space: nowrap; }
+.v2 .gd-aviso.n1 { color: var(--ambar); background: var(--ambar-bg); }
+.v2 .gd-aviso.n2, .v2 .gd-aviso.n3 { color: var(--rubro); background: var(--rubro-bg); }
+.v2 .gd-aviso.n3 { outline: 1px solid rgba(var(--rubro-rgb), .5); }
+
+.v2 .gd-acao { font-size: 10.5px; font-weight: 650; color: var(--azul, #3B82F6); text-align: right; white-space: nowrap; opacity: 0; transition: opacity .15s; }
+.v2 .gd-tab tr.clk:hover .gd-acao { opacity: 1; }
+.v2 .gd-sub b { color: var(--txt); font-weight: 650; }
+
+@media (max-width: 900px) {
+  .v2 .gd-heros { grid-template-columns: repeat(2, 1fr); }
+  .v2 .gd-pg { padding: 14px 12px 22px; }
+  .v2 .gd-tab { font-size: 11px; }
+}

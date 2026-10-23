@@ -68,6 +68,7 @@ const RelatoriosV2 = lazy(() => import('@/v2/pages/Relatorios'));
 const IntegracoesV2 = lazy(() => import('@/v2/pages/Integracoes'));
 const KanbanV2 = lazy(() => import('@/v2/pages/Kanban'));
 const PosVendaV2 = lazy(() => import('@/v2/pages/PosVenda'));
+const GuardiaoV2 = lazy(() => import('@/v2/pages/Guardiao'));
 // /whatsapp passa por um gate de viewport: celular → chat mobile (/m); desktop → inbox intocado.
 const GateWhatsApp = lazy(() => import('@/v2/mobile/GateWhatsApp'));
 const GateMobileApp = lazy(() => import('@/v2/mobile/GateMobileApp'));
@@ -151,6 +152,8 @@ const routes: RouteObject[] = [
           // Maturação DESCONTINUADA (Evolution restrito pela Meta): rota → placeholder "descontinuada".
           // Página Maturacao.tsx preservada (não deletada), só fora do menu/rota — reversível.
           { path: 'maturacao', element: <Lz><ManutencaoV2 area="Maturação" descontinuada /></Lz> },
+          // Radar de Atendimento: nenhum cliente esquecido — risco ao vivo, punições e repasses (só admin)
+          { path: 'radar', element: <Lz><RequireRoleV2 role="admin"><GuardiaoV2 /></RequireRoleV2></Lz> },
           { path: 'ia', element: <Lz><RequireRoleV2 role="admin"><IaV2 /></RequireRoleV2></Lz> },
           { path: 'fluxos', element: <Lz><RequireRoleV2 role="admin"><FluxosV2 /></RequireRoleV2></Lz> },
           { path: 'configuracoes', element: <Lz><ConfiguracoesV2 /></Lz> },

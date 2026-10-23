@@ -1,0 +1,96 @@
+/* Radar de Atendimento — avisos na tela (pílula na barra superior + takeover). Abaixo da IntroDia (1300). */
+
+/* ---- pílula no encaixe da barra superior (#radar-slot): não cobre o compositor do inbox ---- */
+.v2 .gva-pilula {
+  display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px 0 11px; min-width: 0;
+  border-radius: 99px; cursor: pointer; font-family: var(--fonte); white-space: nowrap; max-width: min(100%, 380px);
+  background: var(--surface); color: var(--txt); border: 1px solid rgba(var(--ambar-rgb), .45);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .18);
+  animation: gva-entra .28s var(--ease, ease-out);
+}
+.v2 .gva-pilula.n2 { border-color: rgba(var(--rubro-rgb), .5); }
+.v2 .gva-pilula:hover, .v2 .gva-pilula.on { box-shadow: 0 6px 22px rgba(0, 0, 0, .26), 0 0 0 3px rgba(var(--ambar-rgb), .12); }
+.v2 .gva-pilula.n2:hover, .v2 .gva-pilula.n2.on { box-shadow: 0 6px 22px rgba(0, 0, 0, .26), 0 0 0 3px rgba(var(--rubro-rgb), .12); }
+.v2 .gva-pilula b { font-size: 12px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; }
+.v2 .gva-pilula span { font-size: 11px; color: var(--txt-3); overflow: hidden; text-overflow: ellipsis; }
+.v2 .gva-pilula svg { width: 10px; height: 6px; color: var(--txt-3); flex-shrink: 0; transition: transform .15s; }
+.v2 .gva-pilula.on svg { transform: rotate(180deg); }
+.v2 .gva-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; background: var(--ambar); animation: gva-ping 1.8s ease-out infinite; }
+.v2 .gva-pilula.n2 .gva-dot { background: var(--rubro); }
+@keyframes gva-ping { 0% { box-shadow: 0 0 0 0 rgba(var(--ambar-rgb), .55); } 70% { box-shadow: 0 0 0 7px rgba(var(--ambar-rgb), 0); } 100% { box-shadow: 0 0 0 0 rgba(var(--ambar-rgb), 0); } }
+[data-perf] .v2 .gva-dot, [data-perf] .v2 .gva-pilula { animation: none; }
+
+/* em barra apertada some o texto secundário; fica nome/contagem + ponto */
+@media (max-width: 1180px) { .v2 .gva-pilula span { display: none; } }
+
+.v2 .gva-lista {
+  position: fixed; z-index: 1200; transform: translateX(-50%);
+  width: 320px; max-width: calc(100vw - 32px); max-height: min(70vh, 520px); overflow: auto;
+  display: flex; flex-direction: column; gap: 8px; padding: 2px;
+}
+
+.v2 .gva-card {
+  position: relative; border-radius: 14px; padding: 12px 14px;
+  background: var(--surface); border: 1px solid rgba(var(--tint), .16);
+  box-shadow: 0 14px 38px rgba(0, 0, 0, .35), inset 0 1px 0 rgba(var(--tint), .1);
+  animation: gva-entra .2s var(--ease, ease-out);
+}
+.v2 .gva-card.n1 { border-left: 3px solid var(--ambar); }
+.v2 .gva-card.n2 { border-left: 3px solid var(--rubro); }
+.v2 .gva-card.prio { box-shadow: 0 14px 38px rgba(0, 0, 0, .4), 0 0 0 1px rgba(var(--ambar-rgb), .25); }
+/* prioridade: fio de destaque no topo do card */
+.v2 .gva-card.prio::before { content: ''; position: absolute; left: 10px; right: 10px; top: 0; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, var(--ambar), transparent); }
+@keyframes gva-entra { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+[data-perf] .v2 .gva-card { animation: none; }
+
+.v2 .gva-x {
+  position: absolute; top: 6px; right: 8px; width: 22px; height: 22px; border: none; background: none;
+  color: var(--txt-3); font-size: 15px; line-height: 1; cursor: pointer; border-radius: 6px;
+}
+.v2 .gva-x:hover { color: var(--txt); background: rgba(var(--tint), .1); }
+
+.v2 .gva-topo { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding-right: 20px; }
+.v2 .gva-n { font-size: 9px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; border-radius: 5px; padding: 1px 6px; }
+.v2 .gva-n.n1 { color: var(--ambar); background: var(--ambar-bg); }
+.v2 .gva-n.n2, .v2 .gva-n.n3 { color: var(--rubro); background: var(--rubro-bg); }
+.v2 .gva-prio { font-size: 9.5px; font-weight: 700; border-radius: 99px; padding: 1px 8px; border: 1px solid; white-space: nowrap; }
+.v2 .gva-prio.docs { color: var(--verde); border-color: rgba(var(--verde-rgb), .45); background: var(--verde-bg); }
+.v2 .gva-prio.quente { color: var(--rubro); border-color: rgba(var(--rubro-rgb), .45); background: var(--rubro-bg); }
+
+.v2 .gva-nome { font-size: 13.5px; font-weight: 650; margin-top: 7px; letter-spacing: -.01em; }
+.v2 .gva-sub { font-size: 11px; color: var(--txt-2); margin-top: 2px; }
+
+.v2 .gva-btn {
+  margin-top: 9px; width: 100%; border-radius: 9px; padding: 7px 10px; font-size: 12px; font-weight: 650;
+  font-family: var(--fonte); cursor: pointer; border: 1px solid transparent;
+}
+.v2 .gva-btn.pri { background: var(--azul, #3B82F6); color: #fff; }
+.v2 .gva-btn.pri:hover { filter: brightness(1.08); }
+.v2 .gva-btn.sec { background: none; border-color: rgba(var(--tint), .2); color: var(--txt-2); }
+.v2 .gva-btn.sec:hover { color: var(--txt); border-color: rgba(var(--tint), .35); }
+
+
+/* ---- takeover do 3º aviso ---- */
+.v2 .gva-tk {
+  position: fixed; inset: 0; z-index: 1250; display: flex; align-items: center; justify-content: center;
+  background: rgba(8, 9, 11, .62); backdrop-filter: blur(3px); padding: 16px;
+}
+[data-perf] .v2 .gva-tk { backdrop-filter: none; }
+.v2 .gva-tk-card {
+  width: 420px; max-width: 100%; border-radius: 18px; padding: 22px 24px; text-align: center;
+  background: var(--surface); border: 1px solid rgba(var(--rubro-rgb), .35);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, .5), 0 0 0 4px rgba(var(--rubro-rgb), .08);
+  animation: gva-entra .28s var(--ease, ease-out), gva-anel 2.2s ease-in-out .3s infinite;
+}
+@keyframes gva-anel {
+  0%, 100% { box-shadow: 0 30px 80px rgba(0, 0, 0, .5), 0 0 0 4px rgba(var(--rubro-rgb), .08); }
+  50% { box-shadow: 0 30px 80px rgba(0, 0, 0, .5), 0 0 0 7px rgba(var(--rubro-rgb), .16); }
+}
+[data-perf] .v2 .gva-tk-card { animation: none; }
+.v2 .gva-tk-rotulo { font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--rubro); }
+.v2 .gva-tk-nome { font-size: 19px; font-weight: 700; letter-spacing: -.01em; margin: 8px 0 6px; }
+.v2 .gva-tk .gva-prio { display: inline-block; }
+.v2 .gva-tk-txt { font-size: 12.5px; line-height: 1.6; color: var(--txt-2); margin: 10px 0 0; }
+.v2 .gva-tk-txt b { color: var(--txt); }
+.v2 .gva-tk-acoes { display: flex; flex-direction: column; gap: 7px; margin-top: 16px; }
+.v2 .gva-tk .gva-btn { margin-top: 0; }

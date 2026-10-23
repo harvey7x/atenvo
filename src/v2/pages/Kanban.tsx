@@ -17,6 +17,7 @@ import { useEtiquetas, useOrgUsuarios } from '@/data/atendimento';
 import { useFichasStatusDeOportunidades, fichaDemoDaOportunidade, type FichaBoardResumo } from '@/data/fichaJudicial';
 import { useSlaAlertas } from '@/data/sla';
 import { indexPorChave, type SlaAlerta, type SlaTipo } from '@/data/slaView';
+import { useVacuoRepasses, repassesPorOportunidade, estagioAviso, type VacuoRepasse } from '@/data/vacuo';
 import { corDaEtiqueta, type Etiqueta } from '@/types/atendimento';
 import { initials } from '@/lib/avatar';
 import { useVisibilidade } from '@/lib/visibilidade';
@@ -333,6 +334,9 @@ export default function KanbanV2() {
     () => indexPorChave(demo ? seed.sla : (slaQ.data?.itens ?? []), 'oportunidade_id'),
     [demo, seed.sla, slaQ.data],
   );
+  // Radar de Atendimento: selo "era de X" no card (último repasse por oportunidade)
+  const vacuoQ = useVacuoRepasses();
+  const repassePorOpp = useMemo(() => repassesPorOportunidade(vacuoQ.data ?? []), [vacuoQ.data]);
   const fichaStatusQ = useFichasStatusDeOportunidades(useMemo(() => leads.map((l) => l.id), [leads]));
   // resumo por lead (status + bancos da ficha); no demo, sintetiza dos seeds
   const fichaResumoMap: Record<string, FichaBoardResumo> = useMemo(() => (demo
@@ -1015,6 +1019,7 @@ export default function KanbanV2() {
                 key={l.id} l={l} colunas={colunas} etiquetasCat={etiquetas}
                 naoLidas={naoLidasMap[l.contatoId ?? ''] ?? 0}
                 sla={(slaPorOpp.get(l.id) ?? []).filter((a) => !SLA_OCULTO_NO_CARD.has(a.tipo))}
+                repasse={repassePorOpp.get(l.id) ?? null}
                 fichaInfo={fichaResumoMap[l.id]} optout={!!l.contatoId && bloqueados.has(l.contatoId)}
                 aoAbrirConversa={() => { if (l.conversaOrigemId) nav((l.canalTipo === 'facebook' ? '/facebook' : '/whatsapp') + `?conversa=${encodeURIComponent(l.conversaOrigemId)}`); }}
                 moving={optim[l.id] !== undefined} arrastando={dragando === l.id} destacado={destaque === l.id}
@@ -1403,9 +1408,9 @@ function DetRow({ l, v }: { l: string; v: ReactNode }) {
    vs .hot (+30d ou SLA vermelho, trilho/tempo rubro) — com 51% do
    funil parado, só o .hot ganha o alarme forte para o vermelho valer.
    ================================================================ */
-function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, fichaInfo, optout, moving, arrastando, destacado, menuAberto, aoRef, aoClicar, aoMenu, aoDragStart, aoDragEnd, aoAbrirConversa }: {
+function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, repasse, fichaInfo, optout, moving, arrastando, destacado, menuAberto, aoRef, aoClicar, aoMenu, aoDragStart, aoDragEnd, aoAbrirConversa }: {
   l: KLead; colunas: KColuna[]; etiquetasCat: Etiqueta[]; naoLidas: number;
-  sla: SlaAlerta[]; fichaInfo: FichaBoardResumo | undefined; optout: boolean; moving: boolean; arrastando: boolean;
+  sla: SlaAlerta[]; repasse: VacuoRepasse | null; fichaInfo: FichaBoardResumo | undefined; optout: boolean; moving: boolean; arrastando: boolean;
   destacado: boolean; menuAberto: boolean;
   aoRef: (el: HTMLDivElement | null) => void; aoClicar: () => void; aoMenu: (btn: HTMLElement) => void;
   aoDragStart: (e: DragEvent) => void; aoDragEnd: () => void; aoAbrirConversa: () => void;
@@ -1486,7 +1491,9 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, fichaInfo, optout, mo
       {/* L2 TÍTULO — o único elemento forte do card */}
       <div className="kc-r1">
         <span className="kc-nm" title={l.nome}>{fone ? <span className="num">{fone}</span> : nomeCard}{fone && <i className="kc-semnome">· sem nome</i>}</span>
-        {l.status === 'ganho' && <span className="kc-flag ganho" title="Fechado como ganho">Ganho</span>}
+        {(() => { const av = sla.find((a) => a.tipo === 'vacuo_aviso'); return av ? <span className={'sla-chip s-' + av.severidade} title={av.titulo + ' — Radar de Atendimento'}>⏰ {estagioAviso(av.severidade)}º aviso</span> : null; })()}
+        {repasse && <span className="kc-flag repasse" title={`Radar de Atendimento: este cliente era de ${repasse.deNome} e foi repassado para ${repasse.paraNome} após 3 avisos ignorados${repasse.desfecho === 'fechado' ? ` — ${repasse.paraNome} fechou` : ''}`}>↪ era de {repasse.deNome}</span>}
+        {l.status === 'ganho' && <span className="kc-flag ganho" title={'Fechado como ganho' + (repasse ? ` por ${repasse.paraNome} (era de ${repasse.deNome})` : '')}>Ganho</span>}
         {l.status === 'perdido' && <span className="kc-flag perdido" title={'Perdido' + (l.motivoPerda ? ' · ' + rotuloPerdaCompleto(l.motivoPerda, l.motivoNaoElegivel) : '')}>Perdido</span>}
       </div>
 

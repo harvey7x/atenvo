@@ -112,6 +112,17 @@
 .v2 .conv2 .cchip.etapa { border-color: transparent; }
 .v2 .conv2 .cchip.alerta { color: var(--ambar); border-color: rgba(var(--ambar-rgb), .35); }
 .v2 .conv2 .cchip.fim { color: var(--verde); border-color: rgba(var(--verde-rgb), .35); }
+/* Guardião do vácuo: aviso escalonado (1º âmbar → 2º/3º rubro, o 3º pulsa) + selo de repasse */
+.v2 .conv2 .cchip.vacuo.a1 { color: var(--ambar); border-color: rgba(var(--ambar-rgb), .4); background: var(--ambar-bg); }
+.v2 .conv2 .cchip.vacuo.a2, .v2 .conv2 .cchip.vacuo.a3 { color: var(--rubro); border-color: rgba(var(--rubro-rgb), .45); background: var(--rubro-bg); }
+.v2 .conv2 .cchip.vacuo.a3 { animation: vacuo-pulsa 1.6s ease-in-out infinite; }
+@keyframes vacuo-pulsa { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
+[data-perf] .v2 .conv2 .cchip.vacuo.a3 { animation: none; }
+/* lead PRIORITÁRIO (docs/interesse confirmado): mais peso pra saltar na fila */
+.v2 .conv2 .cchip.vacuo.p { font-weight: 700; border-width: 1.5px; }
+.v2 .conv2 .cchip.repasse { color: var(--txt-2); border-color: rgba(var(--tint), .22); background: rgba(var(--tint), .06); text-transform: none; letter-spacing: 0; }
+.v2 .wa-hchip.repasse { color: var(--txt-2); border-color: rgba(var(--tint), .25); }
+.v2 .wa-hchip.repasse.ok { color: var(--verde); border-color: rgba(var(--verde-rgb), .4); }
 .v2 .conv2 .m { text-align: right; flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
 .v2 .conv2 .h2 { font-size: 10px; color: var(--txt-3); }
 .v2 .conv2 .nl {

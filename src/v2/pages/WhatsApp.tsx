@@ -9,6 +9,7 @@ import { useScriptsResumoEtapas } from '../hooks/scriptsResumo';
 import { useJanelaCanal, rotuloJanela } from '@/data/cloudApi';
 import { useSlaAlertas } from '@/data/sla';
 import { indexPorChave, tipoLabel, tempoRelativo } from '@/data/slaView';
+import { useVacuoRepasses, repassesPorConversa, estagioAviso, prioDoTitulo, AVISOS_DEMO, type VacuoRepasse, type VacuoPrio } from '@/data/vacuo';
 import { useOportunidadesDoContato, useFunisDaOrg, chamarGarantirEntrada, useColunasFunil, useMoverOportunidade, classificarMovimento, MOTIVOS_NAO_ELEGIVEL, traduzErroKanban } from '@/data/kanban';
 import { useChecklist } from '@/data/checklist';
 import { useCobrancas } from '@/data/cobrancas';
@@ -478,6 +479,15 @@ export default function WhatsAppV2() {
   /* ---------- dados satélites ---------- */
   const slaQ = useSlaAlertas();
   const slaPorConversa = useMemo(() => indexPorChave(slaQ.data?.itens ?? [], 'conversa_id'), [slaQ.data]);
+  /* Radar de Atendimento: selo "era de X → Y" por conversa + estágio do aviso (1º/2º/3º).
+     No demo os avisos vêm de AVISOS_DEMO (sla_alertas não existe sem backend). */
+  const vacuoQ = useVacuoRepasses();
+  const repassePorConv = useMemo(() => repassesPorConversa(vacuoQ.data ?? []), [vacuoQ.data]);
+  const avisoVacuoDe = useCallback((cid: string): { n: 1 | 2 | 3; prio: VacuoPrio } | null => {
+    if (!WA_REAL) return AVISOS_DEMO.get(cid) ?? null;
+    const a = (slaPorConversa.get(cid) ?? []).find((x) => x.tipo === 'vacuo_aviso');
+    return a ? { n: estagioAviso(a.severidade), prio: prioDoTitulo(a.titulo) } : null;
+  }, [slaPorConversa]);
   const atividadesQ = useWaAtividades(WA_REAL ? idVisivel || null : null);
   const statusQ = useStatusDefs();
   const etiquetasQ = useEtiquetas();
@@ -913,7 +923,8 @@ export default function WhatsAppV2() {
     const atrasado = wait && (wait.tier === 'critico' || wait.tier === 'vermelho');
     const out: string[] = [];
     if (atrasado && wait) out.push('Sem resposta ' + wait.label.replace('Aguardando ', ''));
-    for (const a of slaPorConversa.get(c.id) ?? []) out.push(tipoLabel(a.tipo) + (a.detalhe ? ' — ' + a.detalhe : ''));
+    // vacuo_aviso fica FORA do agregado ⚠ — tem chip dedicado "⏰ Nº aviso" (evita sinal em dobro)
+    for (const a of slaPorConversa.get(c.id) ?? []) { if (a.tipo === 'vacuo_aviso') continue; out.push(tipoLabel(a.tipo) + (a.detalhe ? ' — ' + a.detalhe : '')); }
     if (c.precisaHumano) out.push('Precisa de atendimento humano');
     if (analisarNome(c.name).fraco && conversaAtiva({ status: c.status, arquivada: c.arquivada })) out.push('Cadastro incompleto: preencha o nome do cliente');
     // opt-out NÃO entra no agregado ⚠ — já tem chip dedicado "Não incomodar" (evita sinal em dobro)
@@ -1053,6 +1064,13 @@ export default function WhatsAppV2() {
                           <span className="chips">
                             {(() => { const cor = corDaSituacao(c, sit.texto); return <span className={'cchip etapa sit-' + sit.variante} title="Situação no funil" style={cor ? { background: cor + '26', color: cor } : undefined}>{sit.texto}</span>; })()}
                             {c.iaAtiva && <span className="cchip ia" title="A IA/bot está atendendo esta conversa agora"><IcBot />IA</span>}
+                            {(() => {
+                              const av = avisoVacuoDe(c.id);
+                              if (!av) return null;
+                              const prioTxt = av.prio === 'docs' ? 'LEAD PRIORITÁRIO (documentação enviada) — escada acelerada. ' : av.prio === 'quente' ? 'LEAD PRIORITÁRIO (interesse confirmado) — escada acelerada. ' : '';
+                              return <span className={'cchip vacuo a' + av.n + (av.prio ? ' p' : '')} title={prioTxt + (av.n === 3 ? 'ÚLTIMO aviso do Radar de Atendimento: responda agora ou o cliente será repassado para quem mais fecha (com punição registrada)' : `${av.n}º de 3 avisos do Radar de Atendimento — o cliente está sem resposta; responda para interromper a escalada`)}>{av.prio === 'docs' ? '📄' : av.prio === 'quente' ? '🔥' : '⏰'} {av.n}º aviso</span>;
+                            })()}
+                            {(() => { const rp = repassePorConv.get(c.id); return rp ? <span className="cchip repasse" title={`Radar de Atendimento: este cliente era de ${rp.deNome} e foi repassado para ${rp.paraNome} após 3 avisos ignorados${rp.desfecho === 'fechado' ? ` — ${rp.paraNome} fechou` : ''}`}>↪ era de {rp.deNome}</span> : null; })()}
                             {alertas.length > 0 && <span className="cchip alerta" title={alertas.join(' · ')}>⚠{alertas.length > 1 ? ' ' + alertas.length : ''}</span>}
                             {c.contatoId && bloqueados.has(c.contatoId) && <span className="cchip alerta" style={{ color: 'var(--rubro)', borderColor: 'rgba(var(--rubro-rgb),.4)' }} title={optoutTexto}>Não incomodar</span>}
                             {/* "Finalizado" só quando a situação NÃO já é terminal (ganho/perdido/cancelado) — evita verde ao lado de PERDIDO (Adendo 3) */}
@@ -1118,6 +1136,13 @@ export default function WhatsAppV2() {
                     </span>
                   )}
                   <span className="wa-hchip" title="Atendente responsável">{current.respId ? nomePorId(current.respId) ?? 'Atendente' : 'Não atribuído'}</span>
+                  {(() => {
+                    const rp: VacuoRepasse | undefined = repassePorConv.get(current.id);
+                    if (!rp) return null;
+                    return rp.desfecho === 'fechado'
+                      ? <span className="wa-hchip repasse ok" title={`Radar de Atendimento: ${rp.paraNome} fechou este cliente, que era de ${rp.deNome} (repassado após 3 avisos ignorados, ${rp.minutos ?? '—'} min sem resposta)`}>✓ {rp.paraNome} fechou · era de {rp.deNome}</span>
+                      : <span className="wa-hchip repasse" title={`Radar de Atendimento: este cliente era de ${rp.deNome} e foi repassado para ${rp.paraNome} após 3 avisos ignorados (${rp.minutos ?? '—'} min sem resposta)`}>🛡️ era de {rp.deNome} → {rp.paraNome}</span>;
+                  })()}
                   {current.tags.slice(0, 3).map((t) => <EtiquetaChip key={t} nome={t} cor={corDaEtiqueta(t, etiquetasQ.data)} title={'Etiqueta: ' + t} />)}
                   {current.tags.length > 3 && <EtiquetaChip mais nome={'+' + (current.tags.length - 3)} title={current.tags.slice(3).join(' · ')} />}
                 </div>
@@ -1484,7 +1509,7 @@ export default function WhatsAppV2() {
               <ul className="ativ-tl">
                 {(atividadesQ.data ?? []).map((a) => (
                   <li key={a.id}>
-                    <b>{a.usuario ?? 'Alguém'}</b> {a.tipo === 'assumido' ? 'assumiu o atendimento' : a.tipo === 'transferido' ? 'transferiu o atendimento' : a.tipo === 'devolvido' ? 'devolveu para a fila' : a.tipo}
+                    <b>{a.usuario ?? (a.motivo?.startsWith('Radar') ? '🛡️ Radar de Atendimento' : 'Alguém')}</b> {a.tipo === 'assumido' ? 'assumiu o atendimento' : a.tipo === 'transferido' ? 'transferiu o atendimento' : a.tipo === 'devolvido' ? 'devolveu para a fila' : a.tipo}
                     {' · '}{new Date(a.em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                     {a.motivo && <div className="mot">Motivo: {a.motivo}</div>}
                   </li>

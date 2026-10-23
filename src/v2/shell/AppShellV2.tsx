@@ -14,6 +14,7 @@ import { instalarRolagemSemHover } from '../lib/rolagem';
 import { criarRaizPortalV2 } from '../components/portal';
 import { ICONES } from './icones';
 import { NotificacaoResposta, type DadosNotificacao } from './NotificacaoResposta';
+import { GuardiaoAvisos, RadarPilula } from '../components/GuardiaoAvisos';
 import { DEMO_MODE } from '@/lib/demo';
 import { seedWa } from '../pages/whatsappSeed';
 import { usePosVendaAguardando } from '@/data/posvenda';
@@ -84,6 +85,8 @@ const GRUPOS: GrupoNav[] = [
       { slug: 'scripts', rotulo: 'Scripts' },
       // Manual de vendas (13/10): treinamento dos novos estagiários — trilha, prova e consulta rápida.
       { slug: 'manual', rotulo: 'Manual de vendas' },
+      // Radar de Atendimento (22-23/10): nenhum cliente esquecido — risco ao vivo + punições — só admin.
+      { slug: 'radar', rotulo: 'Radar de Atendimento', admin: true },
       // Simulador fora do menu (pedido do dono 27/08) — rota segue viva por URL
       // Cobranças SAIU daqui (29/08): virou um MÓDULO próprio no seletor do topo.
       // Relatórios fora do menu (pedido do dono 27/08) — rota segue viva por URL
@@ -450,6 +453,8 @@ export default function AppShellV2() {
               </svg>
               <span className="busca-texto">Buscar contatos, conversas, cobranças…</span><kbd>⌘K</kbd>
             </div>
+            {/* Radar de Atendimento: pílula dos avisos 1º/2º no vão entre a busca e os ícones */}
+            <div className="radar-slot"><RadarPilula /></div>
             <div className="top-dir">
               <button
                 type="button" className="ib"
@@ -547,6 +552,8 @@ export default function AppShellV2() {
         {/* portais soltos: intro do dia + aviso de deploy (dono 28/08) */}
         <IntroDia aberta={introAberta} aoConcluir={concluirIntro} nome={nome} tema={tema} aoMudarTema={definirTema} />
         <AvisoAtualizacao />
+        {/* Radar de Atendimento (23/10): takeover do último aviso (a pílula fica na barra) */}
+        <GuardiaoAvisos />
       </div>
 
     </div>
