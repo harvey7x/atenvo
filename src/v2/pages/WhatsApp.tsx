@@ -483,11 +483,13 @@ export default function WhatsAppV2() {
      No demo os avisos vêm de AVISOS_DEMO (sla_alertas não existe sem backend). */
   const vacuoQ = useVacuoRepasses();
   const repassePorConv = useMemo(() => repassesPorConversa(vacuoQ.data ?? []), [vacuoQ.data]);
+  // aviso é NOTIFICAÇÃO PESSOAL: só aparece pro dono do cliente — nem o admin, que enxerga a
+  // carteira de todos, vê o aviso do cliente alheio (dono 23/10). A visão de equipe é o /radar.
   const avisoVacuoDe = useCallback((cid: string): { n: 1 | 2 | 3; prio: VacuoPrio } | null => {
     if (!WA_REAL) return AVISOS_DEMO.get(cid) ?? null;
-    const a = (slaPorConversa.get(cid) ?? []).find((x) => x.tipo === 'vacuo_aviso');
+    const a = (slaPorConversa.get(cid) ?? []).find((x) => x.tipo === 'vacuo_aviso' && !!user?.id && x.responsavel_id === user.id);
     return a ? { n: estagioAviso(a.severidade), prio: prioDoTitulo(a.titulo) } : null;
-  }, [slaPorConversa]);
+  }, [slaPorConversa, user?.id]);
   const atividadesQ = useWaAtividades(WA_REAL ? idVisivel || null : null);
   const statusQ = useStatusDefs();
   const etiquetasQ = useEtiquetas();

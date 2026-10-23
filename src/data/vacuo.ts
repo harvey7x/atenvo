@@ -150,7 +150,8 @@ export function useGuardiaoAvisos(): GuardiaoAviso[] {
   const slaQ = useSlaAlertas();
   const meus = useMemo(
     () => (slaQ.data?.itens ?? []).filter((a) =>
-      a.tipo === 'vacuo_aviso' && !!a.conversa_id && (!user?.id || a.responsavel_id === user.id)),
+      // só os clientes do PRÓPRIO usuário (sem usuário carregado = nenhum, nunca "todos")
+      a.tipo === 'vacuo_aviso' && !!a.conversa_id && !!user?.id && a.responsavel_id === user.id),
     [slaQ.data, user?.id],
   );
   const alvos = useSlaAlvos(meus);
