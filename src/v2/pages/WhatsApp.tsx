@@ -1070,9 +1070,9 @@ export default function WhatsAppV2() {
                               const av = avisoVacuoDe(c.id);
                               if (!av) return null;
                               const prioTxt = av.prio === 'docs' ? 'LEAD PRIORITÁRIO (documentação enviada) — escada acelerada. ' : av.prio === 'quente' ? 'LEAD PRIORITÁRIO (interesse confirmado) — escada acelerada. ' : '';
-                              return <span className={'cchip vacuo a' + av.n + (av.prio ? ' p' : '')} title={prioTxt + (av.n === 3 ? 'ÚLTIMO aviso do Radar de Atendimento: responda agora ou o cliente será repassado para quem mais fecha (com punição registrada)' : `${av.n}º de 3 avisos do Radar de Atendimento — o cliente está sem resposta; responda para interromper a escalada`)}>{av.prio === 'docs' ? '📄' : av.prio === 'quente' ? '🔥' : '⏰'} {av.n}º aviso</span>;
+                              return <span className={'cchip vacuo a' + av.n + (av.prio ? ' p' : '')} title={prioTxt + (av.n === 3 ? 'ÚLTIMO aviso do Radar de Atendimento: responda — com 1 dia útil sem resposta o gestor decide o repasse' : `${av.n}º de 3 avisos do Radar de Atendimento — o cliente está sem resposta; responda para interromper a escalada`)}>{av.prio === 'docs' ? '📄' : av.prio === 'quente' ? '🔥' : '⏰'} {av.n}º aviso</span>;
                             })()}
-                            {(() => { const rp = repassePorConv.get(c.id); return rp ? <span className="cchip repasse" title={`Radar de Atendimento: este cliente era de ${rp.deNome} e foi repassado para ${rp.paraNome} após 3 avisos ignorados${rp.desfecho === 'fechado' ? ` — ${rp.paraNome} fechou` : ''}`}>↪ era de {rp.deNome}</span> : null; })()}
+                            {(() => { const rp = repassePorConv.get(c.id); return rp ? <span className="cchip repasse" title={`Radar de Atendimento: este cliente era de ${rp.deNome} e o gestor repassou para ${rp.paraNome} (1 dia útil sem resposta)${rp.desfecho === 'fechado' ? ` — ${rp.paraNome} fechou` : ''}`}>↪ era de {rp.deNome}</span> : null; })()}
                             {alertas.length > 0 && <span className="cchip alerta" title={alertas.join(' · ')}>⚠{alertas.length > 1 ? ' ' + alertas.length : ''}</span>}
                             {c.contatoId && bloqueados.has(c.contatoId) && <span className="cchip alerta" style={{ color: 'var(--rubro)', borderColor: 'rgba(var(--rubro-rgb),.4)' }} title={optoutTexto}>Não incomodar</span>}
                             {/* "Finalizado" só quando a situação NÃO já é terminal (ganho/perdido/cancelado) — evita verde ao lado de PERDIDO (Adendo 3) */}
@@ -1142,8 +1142,8 @@ export default function WhatsAppV2() {
                     const rp: VacuoRepasse | undefined = repassePorConv.get(current.id);
                     if (!rp) return null;
                     return rp.desfecho === 'fechado'
-                      ? <span className="wa-hchip repasse ok" title={`Radar de Atendimento: ${rp.paraNome} fechou este cliente, que era de ${rp.deNome} (repassado após 3 avisos ignorados, ${rp.minutos ?? '—'} min sem resposta)`}>✓ {rp.paraNome} fechou · era de {rp.deNome}</span>
-                      : <span className="wa-hchip repasse" title={`Radar de Atendimento: este cliente era de ${rp.deNome} e foi repassado para ${rp.paraNome} após 3 avisos ignorados (${rp.minutos ?? '—'} min sem resposta)`}>🛡️ era de {rp.deNome} → {rp.paraNome}</span>;
+                      ? <span className="wa-hchip repasse ok" title={`Radar de Atendimento: ${rp.paraNome} fechou este cliente, que era de ${rp.deNome} (o gestor repassou após 1 dia útil sem resposta)`}>✓ {rp.paraNome} fechou · era de {rp.deNome}</span>
+                      : <span className="wa-hchip repasse" title={`Radar de Atendimento: este cliente era de ${rp.deNome} e o gestor repassou para ${rp.paraNome} (1 dia útil sem resposta)`}>🛡️ era de {rp.deNome} → {rp.paraNome}</span>;
                   })()}
                   {current.tags.slice(0, 3).map((t) => <EtiquetaChip key={t} nome={t} cor={corDaEtiqueta(t, etiquetasQ.data)} title={'Etiqueta: ' + t} />)}
                   {current.tags.length > 3 && <EtiquetaChip mais nome={'+' + (current.tags.length - 3)} title={current.tags.slice(3).join(' · ')} />}

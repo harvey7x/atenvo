@@ -1,22 +1,21 @@
 /* ============================================================================
    Radar de Atendimento — painel do ADMIN (nome interno: vácuo).
    Missão (dono, 23/10): "não esquecer clientes, não deixar cliente pra trás
-   que confirmou interesse". O radar vigia cada conversa sem resposta humana,
-   avisa o atendente NA TELA em 3 toques (escada acelerada pra lead
-   prioritário) e, ignorados os 3, repassa pra quem mais fecha com punição
-   registrada. Aqui o admin enxerga: quem está em risco AGORA (a fila viva),
-   a régua do repasse e o histórico de punições com desfecho.
+   que confirmou interesse". O radar vigia cada conversa sem resposta humana
+   (seg–sex 9h–19h), avisa o atendente NA TELA em 3 toques ao longo do dia e,
+   com 1 dia útil sem resposta, pede a DECISÃO do gestor: repassar (pra quem
+   ele escolher) ou manter. Nada é repassado automaticamente.
    Anatomia executiva (Dashboard): monocromático, cor só como semântica.
    ============================================================================ */
-import { useMemo, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './guardiao.css';
-import { CardVidro, EstadoErro, Skeleton } from '../components';
+import { BotaoPrimario, BotaoSec, CardVidro, EstadoErro, Skeleton } from '../components';
 import { tempoRelativo } from '@/data/slaView';
-import { useOrgUsuarios } from '@/data/atendimento';
+import { useOrgUsuarios, type OrgUsuario } from '@/data/atendimento';
 import {
-  useVacuoRepasses, useVacuoRanking, useVacuoConfig, useRadarRisco,
-  type VacuoRepasse, type RadarRisco,
+  useVacuoRepasses, useVacuoRanking, useVacuoConfig, useRadarRisco, useVacuoDecisoes, useDecidirRepasse,
+  repasseEfetivo, type VacuoRepasse, type RadarRisco, type VacuoDecisao,
 } from '@/data/vacuo';
 
 function Hero({ rotulo, val, sub, tom, marca, atraso }: {
@@ -75,7 +74,66 @@ function PrioMarca({ prio, motivo }: { prio: RadarRisco['prio'] | boolean; motiv
   );
 }
 
+/** "1 dia útil", "1 dia útil e 40 min", "2 h", "45 min" (dia útil = 600 min, 9h–19h). */
+function fmtUteis(min: number | null): string {
+  if (min == null) return '—';
+  const dias = Math.floor(min / 600);
+  const resto = min % 600;
+  const h = Math.floor(resto / 60), m = resto % 60;
+  const partes: string[] = [];
+  if (dias) partes.push(dias + (dias > 1 ? ' dias úteis' : ' dia útil'));
+  if (h) partes.push(h + ' h');
+  if (m && !dias) partes.push(m + ' min');
+  return partes.length ? partes.join(dias ? ' e ' : ' ') : '0 min';
+}
+
+/** Uma decisão pendente: o gestor escolhe o destino (sugestão = maior conversão) ou mantém. */
+function DecisaoLinha({ d, atendentes, agora, aoAbrir }: {
+  d: VacuoDecisao; atendentes: OrgUsuario[]; agora: number; aoAbrir: () => void;
+}) {
+  const decidir = useDecidirRepasse();
+  const opcoes = atendentes.filter((u) => u.id !== d.donoId);
+  const [destino, setDestino] = useState<string>(d.sugeridoId && opcoes.some((u) => u.id === d.sugeridoId) ? d.sugeridoId : (opcoes[0]?.id ?? ''));
+  const [erro, setErro] = useState<string | null>(null);
+  const nomeDestino = opcoes.find((u) => u.id === destino)?.nome ?? d.sugeridoNome ?? '';
+  const enviar = (destinoId: string | null) => {
+    setErro(null);
+    decidir.mutate({ conversaId: d.conversaId, destinoId }, { onError: (e) => setErro((e as Error).message) });
+  };
+  return (
+    <div className={'gd-dec' + (d.prioritario ? ' prio' : '')}>
+      <div className="gd-dec-cli">
+        <span className="gd-av n3">{iniciaisDe(d.contatoNome)}</span>
+        <div>
+          <button type="button" className="gd-dec-nome" title="Abrir a conversa no inbox" onClick={aoAbrir}>{d.contatoNome}</button>
+          <div className="gd-dec-meta">
+            com <b>{d.donoNome}</b> · sem resposta há <b>{fmtUteis(d.minutos)}</b> · pedido {tempoRelativo(d.pedidaEm, agora)}
+          </div>
+        </div>
+        {d.prioritario && <PrioMarca prio={true} motivo={d.prioMotivo} />}
+      </div>
+      <div className="gd-dec-acoes">
+        <label className="gd-dec-sel">
+          <span>Repassar para</span>
+          <select value={destino} onChange={(e) => setDestino(e.target.value)} disabled={decidir.isPending || opcoes.length === 0}>
+            {opcoes.map((u) => (
+              <option key={u.id} value={u.id}>{u.nome}{u.id === d.sugeridoId ? ' · sugerido (maior conversão)' : ''}</option>
+            ))}
+          </select>
+        </label>
+        <BotaoPrimario disabled={!destino || decidir.isPending} onClick={() => enviar(destino)}>
+          {decidir.isPending ? 'Salvando…' : `Repassar para ${nomeDestino}`}
+        </BotaoPrimario>
+        <BotaoSec disabled={decidir.isPending} onClick={() => enviar(null)}>Manter com {d.donoNome}</BotaoSec>
+      </div>
+      {erro && <div className="gd-dec-erro">{erro}</div>}
+    </div>
+  );
+}
+
 function Desfecho({ r }: { r: VacuoRepasse }) {
+  if (r.desfeito) return <span className="gd-pill mudo" title="Repasse automático antigo, desfeito pelo gestor">Desfeito · voltou para {r.deNome}</span>;
+  if (r.decisao === 'mantido') return <span className="gd-pill">Mantido com {r.deNome}</span>;
   if (r.desfecho === 'fechado') return <span className="gd-pill ok" title={r.fechadoEm ? 'Fechado em ' + dtCurta(r.fechadoEm) : undefined}>✓ {r.paraNome} fechou</span>;
   if (r.desfecho === 'perdido') return <span className="gd-pill bad">Perdido</span>;
   if (r.desfecho === 'andamento') return <span className="gd-pill">Em andamento</span>;
@@ -89,6 +147,8 @@ export default function GuardiaoV2() {
   const rankingQ = useVacuoRanking();
   const configQ = useVacuoConfig();
   const usuariosQ = useOrgUsuarios();
+  const decisoesQ = useVacuoDecisoes();
+  const decisoes = decisoesQ.data ?? [];
 
   const risco = riscoQ;
   const repasses = repassesQ.data ?? [];
@@ -104,7 +164,7 @@ export default function GuardiaoV2() {
 
   const stats = useMemo(() => {
     const corte = agora - 30 * 86400e3;
-    const ultimos = repasses.filter((r) => new Date(r.criadoEm).getTime() >= corte);
+    const ultimos = repasses.filter((r) => repasseEfetivo(r) && new Date(r.criadoEm).getTime() >= corte);
     return {
       total: ultimos.length,
       fechados: ultimos.filter((r) => r.desfecho === 'fechado').length,
@@ -112,7 +172,6 @@ export default function GuardiaoV2() {
     };
   }, [repasses, risco, agora]);
 
-  const campeao = ranking[0] ?? null; // a RPC já ordena pela régua do motor (taxa de conversão)
 
   if (repassesQ.isError) return <EstadoErro titulo="Radar de Atendimento" descricao={(repassesQ.error as Error)?.message} aoTentarDeNovo={() => void repassesQ.refetch()} />;
 
@@ -123,22 +182,36 @@ export default function GuardiaoV2() {
       <div className="gd-heros">
         <Hero rotulo="Em risco agora" val={risco.length} tom={risco.length > 0 ? 'rubro' : 'verde'} marca="h-risco"
           sub={risco.length === 0 ? 'radar limpo' : `${stats.riscoPrio} prioritário${stats.riscoPrio === 1 ? '' : 's'} · aja agora`} atraso={0} />
-        <Hero rotulo="Punições · 30 dias" val={repassesQ.isLoading ? <Skeleton largura={48} /> : stats.total} tom={stats.total > 0 ? 'rubro' : 'neutro'} marca="h-puni" sub="clientes repassados por falta de resposta" atraso={1} />
-        <Hero rotulo="Resgatados e fechados" val={repassesQ.isLoading ? <Skeleton largura={48} /> : stats.fechados} tom={stats.fechados > 0 ? 'verde' : 'neutro'} marca="h-ok" sub="o novo dono fechou o negócio" atraso={2} />
-        <Hero rotulo="Pra onde o cliente vai hoje" val={campeao ? campeao.nome : '—'} marca="h-alvo" sub={campeao ? `${campeao.taxa}% de conversão · ${campeao.fechados} fechados` : 'sem elegível na janela'} atraso={3} />
+        <Hero rotulo="Aguardando sua decisão" val={decisoesQ.isLoading ? <Skeleton largura={48} /> : decisoes.length} tom={decisoes.length > 0 ? 'rubro' : 'neutro'} marca="h-alvo"
+          sub={decisoes.length === 0 ? 'nenhum repasse pendente' : '1 dia útil sem resposta'} atraso={1} />
+        <Hero rotulo="Repasses · 30 dias" val={repassesQ.isLoading ? <Skeleton largura={48} /> : stats.total} tom={stats.total > 0 ? 'rubro' : 'neutro'} marca="h-puni" sub="decididos por você" atraso={2} />
+        <Hero rotulo="Resgatados e fechados" val={repassesQ.isLoading ? <Skeleton largura={48} /> : stats.fechados} tom={stats.fechados > 0 ? 'verde' : 'neutro'} marca="h-ok" sub="o novo dono fechou o negócio" atraso={3} />
       </div>
 
       {cfg && (
         <div className="gd-regras num" title="Minutos ÚTEIS: o relógio só anda dentro do horário de atendimento">
-          <span>Avisos <b>{cfg.aviso1} · {cfg.aviso2} · {cfg.aviso3} min</b> → repasse <b>{cfg.repasse} min</b></span>
-          <span>Prioritário <b>{cfg.prioAviso1} · {cfg.prioAviso2} · {cfg.prioAviso3} min</b> → repasse <b>{cfg.prioRepasse} min</b></span>
-          <span>Horário útil <b>{String(cfg.horaInicio).padStart(2, '0')}–{String(cfg.horaFim).padStart(2, '0')}h</b></span>
-          <span>Conversão dos últimos <b>{cfg.janelaDias} dias</b></span>
-          <span>Teto <b>{cfg.maxRepassesDia} repasses/dia</b></span>
+          <span>Avisos em <b>{fmtUteis(cfg.aviso1)} · {fmtUteis(cfg.aviso2)} · {fmtUteis(cfg.aviso3)}</b></span>
+          <span>Prioritário <b>{fmtUteis(cfg.prioAviso1)} · {fmtUteis(cfg.prioAviso2)} · {fmtUteis(cfg.prioAviso3)}</b></span>
+          <span>Sua decisão com <b>{fmtUteis(cfg.repasse)}</b> sem resposta</span>
+          <span>Horário útil <b>seg–sex {String(cfg.horaInicio).padStart(2, '0')}h–{String(cfg.horaFim).padStart(2, '0')}h</b></span>
+          <span>Repasse <b>só com sua decisão</b></span>
         </div>
       )}
 
       <div className="gd-grid">
+        {(decisoes.length > 0 || decisoesQ.isLoading) && (
+          <Secao titulo="Aguardando sua decisão" badge={decisoes.length} badgeTom={decisoes.length > 0 ? 'rubro' : 'neutro'}
+            sub="Clientes com 1 dia útil sem resposta. Escolha para quem repassar — a sugestão é quem mais converte — ou mantenha com o atendente." atraso={4}>
+            {decisoesQ.isLoading ? <Skeleton altura={90} /> : (
+              <div className="gd-decs">
+                {decisoes.map((d) => (
+                  <DecisaoLinha key={d.conversaId} d={d} atendentes={usuariosQ.data ?? []} agora={agora} aoAbrir={() => abrir(d.conversaId)} />
+                ))}
+              </div>
+            )}
+          </Secao>
+        )}
+
         <Secao titulo="Clientes em risco agora" badge={risco.length} badgeTom={risco.length > 0 ? 'rubro' : 'neutro'}
           sub="A fila viva do radar: estão SEM RESPOSTA neste momento — prioritários primeiro. Clique para abrir e responder." atraso={4}>
           {risco.length === 0 ? (
@@ -167,14 +240,14 @@ export default function GuardiaoV2() {
           )}
         </Secao>
 
-        <Secao titulo="Quem mais fecha" sub="A régua que decide o destino do repasse — conversão na janela (fechados ÷ recebidos), recalculada ao vivo" atraso={5}>
+        <Secao titulo="Quem mais fecha" sub="Conversão na janela (fechados ÷ recebidos), recalculada ao vivo — é daqui que sai a sugestão de repasse" atraso={5}>
           {rankingQ.isLoading ? <Skeleton altura={120} /> : ranking.length === 0 ? <div className="gd-vazio">Sem dados na janela.</div> : (
             <table className="gd-tab">
-              <thead><tr><th>Atendente</th><th className="num">Fechados</th><th className="num">Recebidos</th><th className="num">Conversão</th><th className="num">Punições</th></tr></thead>
+              <thead><tr><th>Atendente</th><th className="num">Fechados</th><th className="num">Recebidos</th><th className="num">Conversão</th><th className="num">Repasses sofridos</th></tr></thead>
               <tbody>
                 {(() => { const topo = Math.max(...ranking.map((p) => p.taxa), 0.1); return ranking.map((p, i) => (
                   <tr key={p.usuarioId} className={i === 0 ? 'lider' : ''}>
-                    <td><span className="gd-cli"><span className={'gd-av' + (i === 0 ? ' ouro' : '')}>{iniciaisDe(p.nome)}</span>{p.nome}{i === 0 && <span className="gd-coroa" title="Maior conversão da janela — é pra cá que o repasse vai">🏆</span>}</span></td>
+                    <td><span className="gd-cli"><span className={'gd-av' + (i === 0 ? ' ouro' : '')}>{iniciaisDe(p.nome)}</span>{p.nome}{i === 0 && <span className="gd-coroa" title="Maior conversão da janela — sugestão padrão de repasse">🏆</span>}</span></td>
                     <td className="num">{p.fechados}</td>
                     <td className="num">{p.recebidos}</td>
                     <td className="num forte">
@@ -188,26 +261,26 @@ export default function GuardiaoV2() {
           )}
         </Secao>
 
-        <Secao titulo="Punições e repasses" badge={stats.total} badgeTom={stats.total > 0 ? 'rubro' : 'neutro'}
-          sub="Cada linha é um cliente que ficou pra trás após 3 avisos — com quem estava, pra quem foi e o desfecho" atraso={6}>
+        <Secao titulo="Histórico de decisões" badge={repasses.length} badgeTom="neutro"
+          sub="Cada linha é um cliente que ficou 1 dia útil sem resposta — o que você decidiu e o desfecho" atraso={6}>
           {repassesQ.isLoading ? <Skeleton altura={160} /> : repasses.length === 0 ? (
-            <div className="gd-vazio">Nenhuma punição registrada — a equipe está respondendo dentro do prazo. 👏</div>
+            <div className="gd-vazio">Nenhuma decisão ainda — a equipe está respondendo dentro do prazo. 👏</div>
           ) : (
             <table className="gd-tab">
-              <thead><tr><th>Quando</th><th>Cliente</th><th>Repasse</th><th className="num">Vácuo</th><th>Desfecho</th></tr></thead>
+              <thead><tr><th>Quando</th><th>Cliente</th><th>Decisão</th><th className="num">Sem resposta</th><th>Desfecho</th></tr></thead>
               <tbody>
                 {repasses.slice(0, 80).map((r) => (
                   <tr key={r.id} className="clk" title="Abrir a conversa no inbox" onClick={() => abrir(r.conversaId)}>
                     <td className="num mudo">{dtCurta(r.criadoEm)}</td>
                     <td className="forte">{r.prioritario && <span title={'Lead PRIORITÁRIO no momento do vácuo: ' + (r.prioMotivo ?? '')}>{r.prioMotivo === 'documentação enviada' ? '📄 ' : '🔥 '}</span>}{r.contatoNome ?? '—'}</td>
                     <td>
-                      <span className="gd-fluxo">
+                      {r.decisao === 'mantido' ? <span className="mudo">ficou com <b>{r.deNome}</b></span> : <span className={'gd-fluxo' + (r.desfeito ? ' riscado' : '')}>
                         <b className="de">{r.deNome}</b>
                         <svg viewBox="0 0 24 10" aria-hidden><path d="M1 5h19M16 1.5L20.5 5 16 8.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
                         <b className="para">{r.paraNome}</b>
-                      </span>
+                      </span>}
                     </td>
-                    <td className="num mudo">{r.minutos != null ? `${r.minutos} min` : '—'}</td>
+                    <td className="num mudo">{fmtUteis(r.minutos)}</td>
                     <td><Desfecho r={r} /></td>
                   </tr>
                 ))}

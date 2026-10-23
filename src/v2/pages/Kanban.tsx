@@ -1492,7 +1492,7 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, repasse, fichaInfo, o
       <div className="kc-r1">
         <span className="kc-nm" title={l.nome}>{fone ? <span className="num">{fone}</span> : nomeCard}{fone && <i className="kc-semnome">· sem nome</i>}</span>
         {(() => { const av = sla.find((a) => a.tipo === 'vacuo_aviso'); return av ? <span className={'sla-chip s-' + av.severidade} title={av.titulo + ' — Radar de Atendimento'}>⏰ {estagioAviso(av.severidade)}º aviso</span> : null; })()}
-        {repasse && <span className="kc-flag repasse" title={`Radar de Atendimento: este cliente era de ${repasse.deNome} e foi repassado para ${repasse.paraNome} após 3 avisos ignorados${repasse.desfecho === 'fechado' ? ` — ${repasse.paraNome} fechou` : ''}`}>↪ era de {repasse.deNome}</span>}
+        {repasse && <span className="kc-flag repasse" title={`Radar de Atendimento: este cliente era de ${repasse.deNome} e o gestor repassou para ${repasse.paraNome} (1 dia útil sem resposta)${repasse.desfecho === 'fechado' ? ` — ${repasse.paraNome} fechou` : ''}`}>↪ era de {repasse.deNome}</span>}
         {l.status === 'ganho' && <span className="kc-flag ganho" title={'Fechado como ganho' + (repasse ? ` por ${repasse.paraNome} (era de ${repasse.deNome})` : '')}>Ganho</span>}
         {l.status === 'perdido' && <span className="kc-flag perdido" title={'Perdido' + (l.motivoPerda ? ' · ' + rotuloPerdaCompleto(l.motivoPerda, l.motivoNaoElegivel) : '')}>Perdido</span>}
       </div>

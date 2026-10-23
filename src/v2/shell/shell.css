@@ -274,7 +274,7 @@ html:root[data-visual="corp"] .v2.app-v2 .p-sidebar .item.on:focus-visible {
   backdrop-filter: var(--desfoque-topbar); -webkit-backdrop-filter: var(--desfoque-topbar);
 }
 /* encaixe da pílula do Radar de Atendimento: ocupa o vão entre a busca e os ícones */
-.v2 .radar-slot { flex: 1; min-width: 0; display: flex; justify-content: center; }
+.v2 .radar-slot { flex: 1; min-width: 0; display: flex; justify-content: center; gap: 8px; }
 .v2 .busca {
   display: flex; align-items: center; gap: 9px; width: 320px; height: 33px;
   font-size: 13px; color: var(--txt-3); white-space: nowrap; overflow: hidden;

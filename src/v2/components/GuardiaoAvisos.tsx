@@ -8,7 +8,9 @@
      inferior direito cobria o botão de enviar do inbox (dono 23/10). A lista
      monta na raiz de portal v2 (regra 10) — fora do backdrop-filter da barra.
    - GuardiaoAvisos: 3º aviso = TAKEOVER central até "Responder agora" ou
-     assumir o risco do repasse.
+     "Responder depois". Com 1 dia útil sem resposta o GESTOR decide o repasse
+     (nada é repassado automaticamente — dono 23/10); o gestor vê uma pílula
+     própria "⚖ N decisões de repasse" que leva ao /radar.
    Dispensa é POR ESTÁGIO (sessionStorage, merge na escrita — os dois
    componentes gravam na mesma chave): o 2º aviso reabre mesmo que o 1º tenha
    sido dispensado. A conversa ABERTA não vira aviso (a pessoa já está lá).
@@ -16,7 +18,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useGuardiaoAvisos, type GuardiaoAviso } from '@/data/vacuo';
+import { useGuardiaoAvisos, useVacuoDecisoes, type GuardiaoAviso } from '@/data/vacuo';
+import { useOrg } from '@/context/OrgContext';
 import { tempoRelativo } from '@/data/slaView';
 import { CLASSE_RAIZ_PORTAL, criarRaizPortalV2 } from './portal';
 import './guardiaoAvisos.css';
@@ -61,8 +64,35 @@ function useAvisosVisiveis() {
   return { visiveis, agora, dispensar, responder };
 }
 
-/** Pílula da barra superior (1º/2º avisos) + lista ao clicar. */
+/** Pílula do GESTOR: decisões de repasse pendentes (1 dia útil sem resposta) → /radar. */
+function PilulaDecisoes() {
+  const { currentOrg } = useOrg();
+  const nav = useNavigate();
+  const decisoesQ = useVacuoDecisoes();
+  const n = currentOrg.role === 'admin' ? (decisoesQ.data ?? []).length : 0;
+  if (n === 0) return null;
+  return (
+    <button type="button" className="gva-pilula n2 decisao" title="Clientes com 1 dia útil sem resposta — decida o repasse"
+      onClick={() => nav('/radar')}>
+      <i className="gva-dot" aria-hidden />
+      <b>⚖️ {n} {n === 1 ? 'decisão' : 'decisões'} de repasse</b>
+      <span>aguardando você</span>
+    </button>
+  );
+}
+
+/** Pílulas da barra superior: avisos do próprio usuário (1º/2º) + decisões do gestor. */
 export function RadarPilula() {
+  return (
+    <>
+      <PilulaAvisos />
+      <PilulaDecisoes />
+    </>
+  );
+}
+
+/** Pílula dos avisos 1º/2º do usuário + lista ao clicar. */
+function PilulaAvisos() {
   const { visiveis, agora, dispensar, responder } = useAvisosVisiveis();
   const pilha = visiveis.filter((a) => a.n < 3);
   const topo = pilha[0] ?? null;
@@ -153,12 +183,12 @@ export function GuardiaoAvisos() {
         <div className="gva-tk-nome">{takeover.nome}</div>
         {selo && <span className={'gva-prio ' + selo.cls}>{selo.txt}</span>}
         <p className="gva-tk-txt">
-          Este cliente está no vácuo {tempoRelativo(takeover.desde, agora)} e você já recebeu dois avisos.
-          Se não responder agora, o cliente será <b>repassado para quem mais fecha</b> e a punição ficará registrada no painel.
+          Este cliente está sem resposta {tempoRelativo(takeover.desde, agora)} e você já recebeu dois avisos.
+          Se completar <b>1 dia útil sem resposta</b>, o caso vai para o <b>gestor decidir o repasse</b> para outro atendente.
         </p>
         <div className="gva-tk-acoes">
           <button type="button" className="gva-btn pri" onClick={() => responder(takeover)}>Responder agora</button>
-          <button type="button" className="gva-btn sec" onClick={() => dispensar(takeover)}>Assumir o risco do repasse</button>
+          <button type="button" className="gva-btn sec" onClick={() => dispensar(takeover)}>Responder depois</button>
         </div>
       </div>
     </div>

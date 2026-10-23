@@ -113,3 +113,26 @@
   .v2 .gd-pg { padding: 14px 12px 22px; }
   .v2 .gd-tab { font-size: 11px; }
 }
+
+/* ---- decisões do gestor (1 dia útil sem resposta) ---- */
+.v2 .gd-decs { display: flex; flex-direction: column; gap: 8px; max-width: 1020px; margin: 0 auto; }
+.v2 .gd-dec {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px;
+  padding: 10px 12px; border-radius: 12px; text-align: left;
+  border: 1px solid rgba(var(--rubro-rgb), .22); background: rgba(var(--rubro-rgb), .04);
+}
+.v2 .gd-dec.prio { border-color: rgba(var(--rubro-rgb), .4); box-shadow: inset 3px 0 0 var(--rubro); }
+.v2 .gd-dec-cli { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.v2 .gd-dec-nome { background: none; border: none; padding: 0; font-family: var(--fonte); font-size: 13px; font-weight: 650; color: var(--txt); cursor: pointer; text-align: left; }
+.v2 .gd-dec-nome:hover { text-decoration: underline; }
+.v2 .gd-dec-meta { font-size: 11px; color: var(--txt-3); margin-top: 1px; }
+.v2 .gd-dec-meta b { color: var(--txt-2); font-weight: 600; }
+.v2 .gd-dec-acoes { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.v2 .gd-dec-sel { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--txt-3); }
+.v2 .gd-dec-sel select {
+  font-family: var(--fonte); font-size: 12px; color: var(--txt); height: 30px; padding: 0 8px; border-radius: 8px;
+  background: rgba(var(--tint), .05); border: 1px solid rgba(var(--tint), .16); max-width: 260px;
+}
+.v2 .gd-dec-erro { flex-basis: 100%; font-size: 11px; color: var(--rubro); }
+.v2 .gd-fluxo.riscado b { text-decoration: line-through; opacity: .6; }
+.v2 .gd-tab .mudo b { color: var(--txt-2); }

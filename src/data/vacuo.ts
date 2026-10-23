@@ -1,11 +1,10 @@
 // Radar de Atendimento (nome interno: vácuo) — dados do front (risco ao vivo,
-// repasses/punições + ranking de conversão).
-// O motor vive no banco (vacuo_avaliar, cron 1 min); aqui é só leitura RLS.
-// Os AVISOS chegam pelo canal de sempre (sla_alertas, tipo 'vacuo_aviso') — este
-// módulo cuida da MARCAÇÃO do repasse ("era do Matheus → foi pra Juliana → fechou")
-// e do painel do admin.
+// decisões do gestor, histórico de repasses + ranking de conversão).
+// O motor vive no banco (vacuo_avaliar, cron 1 min) e NÃO transfere cliente: com 1 dia
+// útil sem resposta ele pede a decisão do GESTOR, que repassa (pra quem escolher) ou
+// mantém via vacuo_decidir. Os AVISOS chegam por sla_alertas (tipo 'vacuo_aviso').
 import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { useOrg } from '@/context/OrgContext';
 import { useAuth } from '@/context/AuthContext';
@@ -27,9 +26,19 @@ export interface VacuoRepasse {
   /** o lead já era PRIORITÁRIO quando foi vacuado (docs/interesse) — agrava a punição */
   prioritario: boolean;
   prioMotivo: string | null;
+  /** decisão do gestor: repassou ou manteve com o mesmo dono */
+  decisao: 'repassado' | 'mantido';
+  decididoPorNome: string | null;
+  /** repasse automático antigo desfeito a pedido do dono (23/10) */
+  desfeito: boolean;
   /** desfecho da oportunidade amarrada ao repasse (null = sem oportunidade) */
   desfecho: 'fechado' | 'perdido' | 'andamento' | null;
   fechadoEm: string | null;
+}
+
+/** Repasse que vale como marcação "era de X → Y" (decidido e não desfeito). */
+export function repasseEfetivo(r: VacuoRepasse): boolean {
+  return r.decisao === 'repassado' && !r.desfeito;
 }
 
 export interface VacuoRankItem {
@@ -50,6 +59,7 @@ export const REPASSES_DEMO: VacuoRepasse[] = [
     contatoNome: 'Ivone Camargo', deNome: 'Matheus', paraNome: 'Juliana',
     avisos: 3, minutos: 64, criadoEm: new Date(Date.now() - 2 * 3600e3).toISOString(),
     prioritario: true, prioMotivo: 'documentação enviada',
+    decisao: 'repassado', decididoPorNome: 'Matheus', desfeito: false,
     desfecho: 'andamento', fechadoEm: null,
   },
   {
@@ -57,6 +67,7 @@ export const REPASSES_DEMO: VacuoRepasse[] = [
     contatoNome: 'Terezinha Lopes', deNome: 'Juliana', paraNome: 'Isadora',
     avisos: 3, minutos: 71, criadoEm: new Date(Date.now() - 26 * 3600e3).toISOString(),
     prioritario: false, prioMotivo: null,
+    decisao: 'repassado', decididoPorNome: 'Matheus', desfeito: false,
     desfecho: 'fechado', fechadoEm: new Date(Date.now() - 20 * 3600e3).toISOString(),
   },
 ];
@@ -98,7 +109,7 @@ export interface RadarRisco extends GuardiaoAviso {
 export const GUARDIAO_AVISOS_DEMO: GuardiaoAviso[] = [
   {
     alertaId: 'gav-3', conversaId: 'wa-sebastiao', n: 3, prio: 'docs', nome: 'Sebastião R. Nunes',
-    detalhe: 'LEAD PRIORITÁRIO (documentação enviada) — escada acelerada. Responda o cliente para interromper a escalada. Depois do 3º aviso ignorado, o cliente é repassado para quem mais fecha e a punição fica registrada.',
+    detalhe: 'LEAD PRIORITÁRIO (documentação enviada) — escada acelerada. Responda o cliente para interromper a escalada. Com 1 dia útil sem resposta, o gestor decide se o cliente será repassado.',
     desde: new Date(Date.now() - 48 * 60e3).toISOString(),
   },
   {
@@ -108,7 +119,7 @@ export const GUARDIAO_AVISOS_DEMO: GuardiaoAviso[] = [
   },
   {
     alertaId: 'gav-1', conversaId: 'wa-jose', n: 1, prio: null, nome: 'José Carlos Ferreira',
-    detalhe: 'Responda o cliente para interromper a escalada. Depois do 3º aviso ignorado, o cliente é repassado para quem mais fecha.',
+    detalhe: 'Responda o cliente para interromper a escalada. Com 1 dia útil sem resposta, o gestor decide o repasse.',
     desde: new Date(Date.now() - 17 * 60e3).toISOString(),
   },
 ];
@@ -173,6 +184,8 @@ type RowRepasse = {
   id: string; conversa_id: string; contato_id: string | null; oportunidade_id: string | null;
   avisos: number; minutos_vacuo: number | null; criado_em: string;
   prioritario: boolean | null; prio_motivo: string | null;
+  decisao: string | null; desfeito_em: string | null;
+  decidido: { nome: string } | { nome: string }[] | null;
   de: { nome: string } | { nome: string }[] | null;
   para: { nome: string } | { nome: string }[] | null;
   contato: { nome: string | null } | { nome: string | null }[] | null;
@@ -187,6 +200,9 @@ function mapRepasse(r: RowRepasse): VacuoRepasse {
     deNome: um(r.de)?.nome ?? 'Atendente', paraNome: um(r.para)?.nome ?? 'Atendente',
     avisos: r.avisos, minutos: r.minutos_vacuo, criadoEm: r.criado_em,
     prioritario: !!r.prioritario, prioMotivo: r.prio_motivo,
+    decisao: r.decisao === 'mantido' ? 'mantido' : 'repassado',
+    decididoPorNome: um(r.decidido)?.nome ?? null,
+    desfeito: !!r.desfeito_em,
     desfecho: !opp ? null : opp.status === 'ganho' ? 'fechado' : opp.status === 'perdido' ? 'perdido' : 'andamento',
     fechadoEm: opp?.fechado_em ?? null,
   };
@@ -205,7 +221,8 @@ export function useVacuoRepasses() {
       if (!VACUO_REAL) return REPASSES_DEMO;
       const { data, error } = await supabase!
         .from('vacuo_repasses')
-        .select(`id, conversa_id, contato_id, oportunidade_id, avisos, minutos_vacuo, prioritario, prio_motivo, criado_em,
+        .select(`id, conversa_id, contato_id, oportunidade_id, avisos, minutos_vacuo, prioritario, prio_motivo, decisao, desfeito_em, criado_em,
+          decidido:usuarios!vacuo_repasses_decidido_por_fkey(nome),
           de:usuarios!vacuo_repasses_de_usuario_id_fkey(nome),
           para:usuarios!vacuo_repasses_para_usuario_id_fkey(nome),
           contato:contatos(nome),
@@ -219,17 +236,17 @@ export function useVacuoRepasses() {
   });
 }
 
-/** Último repasse por conversa (o selo "era de X"). */
+/** Último repasse EFETIVO por conversa (o selo "era de X"); "mantido" e desfeito não marcam. */
 export function repassesPorConversa(itens: VacuoRepasse[]): Map<string, VacuoRepasse> {
   const m = new Map<string, VacuoRepasse>();
-  for (const r of itens) if (!m.has(r.conversaId)) m.set(r.conversaId, r); // já vem desc
+  for (const r of itens) if (repasseEfetivo(r) && !m.has(r.conversaId)) m.set(r.conversaId, r); // já vem desc
   return m;
 }
 
 /** Último repasse por oportunidade (selo no card do Kanban). */
 export function repassesPorOportunidade(itens: VacuoRepasse[]): Map<string, VacuoRepasse> {
   const m = new Map<string, VacuoRepasse>();
-  for (const r of itens) if (r.oportunidadeId && !m.has(r.oportunidadeId)) m.set(r.oportunidadeId, r);
+  for (const r of itens) if (repasseEfetivo(r) && r.oportunidadeId && !m.has(r.oportunidadeId)) m.set(r.oportunidadeId, r);
   return m;
 }
 
@@ -277,9 +294,9 @@ export interface VacuoConfigView {
 
 const CONFIG_DEMO: VacuoConfigView = {
   ativo: true, ativoDesde: new Date().toISOString(),
-  aviso1: 15, aviso2: 30, aviso3: 45, repasse: 60,
-  prioAviso1: 10, prioAviso2: 20, prioAviso3: 30, prioRepasse: 40,
-  horaInicio: 8, horaFim: 20, janelaDias: 30, minRecebidos: 30, maxRepassesDia: 25,
+  aviso1: 30, aviso2: 120, aviso3: 300, repasse: 600,
+  prioAviso1: 15, prioAviso2: 60, prioAviso3: 180, prioRepasse: 600,
+  horaInicio: 9, horaFim: 19, janelaDias: 30, minRecebidos: 30, maxRepassesDia: 0,
 };
 
 /** Regras vigentes (leitura; ajustes por enquanto são feitos pelo suporte). */
@@ -307,6 +324,88 @@ export function useVacuoConfig() {
         janelaDias: data.conversao_janela_dias, minRecebidos: data.conversao_min_recebidos,
         maxRepassesDia: data.max_repasses_dia,
       };
+    },
+  });
+}
+
+/* ---- decisões do GESTOR (1 dia útil sem resposta → ele decide repassar ou manter) ---- */
+export interface VacuoDecisao {
+  conversaId: string;
+  contatoNome: string;
+  donoId: string | null;
+  donoNome: string;
+  desde: string;            // início do vácuo
+  pedidaEm: string;         // quando o motor pediu a decisão
+  minutos: number | null;   // minutos úteis sem resposta no pedido
+  prioritario: boolean;
+  prioMotivo: string | null;
+  sugeridoId: string | null;   // maior conversão (sugestão, o gestor escolhe)
+  sugeridoNome: string | null;
+}
+
+export const DECISOES_DEMO: VacuoDecisao[] = [
+  {
+    conversaId: 'wa-sebastiao', contatoNome: 'Sebastião R. Nunes', donoId: 'u-juliana', donoNome: 'Juliana',
+    desde: new Date(Date.now() - 26 * 3600e3).toISOString(), pedidaEm: new Date(Date.now() - 40 * 60e3).toISOString(),
+    minutos: 600, prioritario: true, prioMotivo: 'documentação enviada', sugeridoId: 'u-isadora', sugeridoNome: 'Isadora',
+  },
+  {
+    conversaId: 'wa-odete', contatoNome: 'Odete F. Carvalho', donoId: 'u-matheus', donoNome: 'Matheus',
+    desde: new Date(Date.now() - 30 * 3600e3).toISOString(), pedidaEm: new Date(Date.now() - 2 * 3600e3).toISOString(),
+    minutos: 640, prioritario: false, prioMotivo: null, sugeridoId: 'u-isadora', sugeridoNome: 'Isadora',
+  },
+];
+
+/** Fila de decisões pendentes — só o gestor (admin) consulta; a RPC também confere. */
+export function useVacuoDecisoes() {
+  const { currentOrg } = useOrg();
+  const orgId = currentOrg.id;
+  const gestor = currentOrg.role === 'admin';
+  return useQuery({
+    queryKey: ['vacuo-decisoes', orgId],
+    enabled: !!orgId && gestor,
+    staleTime: 50_000,
+    refetchInterval: 60_000,
+    queryFn: async (): Promise<VacuoDecisao[]> => {
+      if (!VACUO_REAL) return DECISOES_DEMO;
+      const { data, error } = await supabase!.rpc('vacuo_decisoes_pendentes', { p_org: orgId });
+      if (error) throw new Error(error.message);
+      type Row = {
+        conversa_id: string; contato_nome: string | null; dono_id: string | null; dono_nome: string | null;
+        desde: string; decisao_pedida_em: string; minutos_vacuo: number | null;
+        prioritario: boolean; prio_motivo: string | null; sugerido_id: string | null; sugerido_nome: string | null;
+      };
+      return ((data as Row[]) ?? []).map((r) => ({
+        conversaId: r.conversa_id, contatoNome: r.contato_nome ?? 'Cliente',
+        donoId: r.dono_id, donoNome: r.dono_nome ?? 'Atendente',
+        desde: r.desde, pedidaEm: r.decisao_pedida_em, minutos: r.minutos_vacuo,
+        prioritario: !!r.prioritario, prioMotivo: r.prio_motivo,
+        sugeridoId: r.sugerido_id, sugeridoNome: r.sugerido_nome,
+      }));
+    },
+  });
+}
+
+/** Decide: destinoId = outro atendente → repassa; null → mantém com o dono atual. */
+export function useDecidirRepasse() {
+  const qc = useQueryClient();
+  const { currentOrg } = useOrg();
+  const orgId = currentOrg.id;
+  return useMutation({
+    mutationFn: async (p: { conversaId: string; destinoId: string | null }) => {
+      if (!VACUO_REAL) return { decisao: p.destinoId ? 'repassado' : 'mantido' };
+      const { data, error } = await supabase!.rpc('vacuo_decidir', { p_conversa: p.conversaId, p_destino: p.destinoId });
+      if (error) throw new Error(error.message);
+      return data as { decisao: string; para: string };
+    },
+    onSuccess: (_r, p) => {
+      if (!VACUO_REAL) {
+        qc.setQueryData<VacuoDecisao[]>(['vacuo-decisoes', orgId], (old) => (old ?? []).filter((d) => d.conversaId !== p.conversaId));
+        return;
+      }
+      for (const k of ['vacuo-decisoes', 'vacuo-repasses', 'vacuo-ranking', 'sla-alertas', 'wa-conversas']) {
+        qc.invalidateQueries({ queryKey: [k] });
+      }
     },
   });
 }
