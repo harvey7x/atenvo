@@ -294,9 +294,9 @@ export interface VacuoConfigView {
 
 const CONFIG_DEMO: VacuoConfigView = {
   ativo: true, ativoDesde: new Date().toISOString(),
-  aviso1: 30, aviso2: 120, aviso3: 300, repasse: 600,
-  prioAviso1: 15, prioAviso2: 60, prioAviso3: 180, prioRepasse: 600,
-  horaInicio: 9, horaFim: 19, janelaDias: 30, minRecebidos: 30, maxRepassesDia: 0,
+  aviso1: 30, aviso2: 120, aviso3: 300, repasse: 540,
+  prioAviso1: 15, prioAviso2: 60, prioAviso3: 180, prioRepasse: 540,
+  horaInicio: 9, horaFim: 18, janelaDias: 30, minRecebidos: 30, maxRepassesDia: 0,
 };
 
 /** Regras vigentes (leitura; ajustes por enquanto são feitos pelo suporte). */
@@ -470,4 +470,14 @@ export function useConcluirLigacao() {
       qc.invalidateQueries({ queryKey: ['sla-alertas'] });
     },
   });
+}
+
+/** Horário útil do Radar (seg–sex, horaInicio ≤ hora < horaFim, America/Sao_Paulo).
+    Fora dele a pílula e o takeover ficam escondidos — ninguém é avisado no fim de semana/noite. */
+export function radarHorarioAberto(cfg: { horaInicio: number; horaFim: number } | null | undefined, agora = new Date()): boolean {
+  const ini = cfg?.horaInicio ?? 9, fim = cfg?.horaFim ?? 18;
+  const partes = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Sao_Paulo', weekday: 'short', hour: 'numeric', hour12: false }).formatToParts(agora);
+  const dia = partes.find((x) => x.type === 'weekday')?.value ?? '';
+  const hora = Number(partes.find((x) => x.type === 'hour')?.value ?? '0') % 24;
+  return !['Sat', 'Sun'].includes(dia) && hora >= ini && hora < fim;
 }

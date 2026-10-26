@@ -74,11 +74,12 @@ function PrioMarca({ prio, motivo }: { prio: RadarRisco['prio'] | boolean; motiv
   );
 }
 
-/** "1 dia útil", "1 dia útil e 40 min", "2 h", "45 min" (dia útil = 600 min, 9h–19h). */
+/** "1 dia útil", "1 dia útil e 2 h", "2 h", "45 min" (dia útil = 540 min, seg–sex 9h–18h). */
+const DIA_UTIL_MIN = 540;
 function fmtUteis(min: number | null): string {
   if (min == null) return '—';
-  const dias = Math.floor(min / 600);
-  const resto = min % 600;
+  const dias = Math.floor(min / DIA_UTIL_MIN);
+  const resto = min % DIA_UTIL_MIN;
   const h = Math.floor(resto / 60), m = resto % 60;
   const partes: string[] = [];
   if (dias) partes.push(dias + (dias > 1 ? ' dias úteis' : ' dia útil'));

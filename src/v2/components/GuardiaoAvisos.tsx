@@ -18,7 +18,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useGuardiaoAvisos, useVacuoDecisoes, useLigarMeus, useConcluirLigacao, type GuardiaoAviso } from '@/data/vacuo';
+import { useGuardiaoAvisos, useVacuoDecisoes, useLigarMeus, useConcluirLigacao, useVacuoConfig, radarHorarioAberto, type GuardiaoAviso } from '@/data/vacuo';
 import { useOrg } from '@/context/OrgContext';
 import { tempoRelativo } from '@/data/slaView';
 import { CLASSE_RAIZ_PORTAL, criarRaizPortalV2 } from './portal';
@@ -160,8 +160,18 @@ function PilulaLigar() {
   );
 }
 
-/** Pílulas da barra superior: avisos (1º/2º), clientes pra ligar e decisões do gestor. */
+/** Re-renderiza a cada minuto e diz se o Radar está no horário útil (seg–sex, 9h–18h). */
+function useRadarAberto(): boolean {
+  const cfgQ = useVacuoConfig();
+  const [, tick] = useState(0);
+  useEffect(() => { const t = setInterval(() => tick((n) => n + 1), 60_000); return () => clearInterval(t); }, []);
+  return radarHorarioAberto(cfgQ.data);
+}
+
+/** Pílulas da barra superior: avisos (1º/2º), clientes pra ligar e decisões do gestor.
+    Fora do horário útil nada aparece (dono 26/10: sem aviso no fim de semana/fora das 9–18h). */
 export function RadarPilula() {
+  if (!useRadarAberto()) return null;
   return (
     <>
       <PilulaAvisos />
@@ -253,8 +263,9 @@ function PilulaAvisos() {
 /** Takeover central do 3º e último aviso. */
 export function GuardiaoAvisos() {
   const { visiveis, agora, dispensar, responder } = useAvisosVisiveis();
+  const aberto = useRadarAberto();
   const takeover = visiveis.find((a) => a.n === 3) ?? null;
-  if (!takeover) return null;
+  if (!takeover || !aberto) return null;
   const selo = prioSelo(takeover);
   return (
     <div className="gva-tk" role="alertdialog" aria-modal="true" aria-label="Último aviso do Radar de Atendimento">
