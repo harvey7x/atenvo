@@ -930,7 +930,7 @@ export default function WhatsAppV2() {
     const out: string[] = [];
     if (atrasado && wait) out.push('Sem resposta ' + wait.label.replace('Aguardando ', ''));
     // vacuo_aviso fica FORA do agregado ⚠ — tem chip dedicado "⏰ Nº aviso" (evita sinal em dobro)
-    for (const a of slaPorConversa.get(c.id) ?? []) { if (a.tipo === 'vacuo_aviso' || a.tipo === 'robo_ligar') continue; out.push(tipoLabel(a.tipo) + (a.detalhe ? ' — ' + a.detalhe : '')); }
+    for (const a of slaPorConversa.get(c.id) ?? []) { if (a.tipo === 'vacuo_aviso' || a.tipo === 'robo_ligar' || a.tipo === 'vacuo_cutucada') continue; out.push(tipoLabel(a.tipo) + (a.detalhe ? ' — ' + a.detalhe : '')); }
     if (c.precisaHumano) out.push('Precisa de atendimento humano');
     if (analisarNome(c.name).fraco && conversaAtiva({ status: c.status, arquivada: c.arquivada })) out.push('Cadastro incompleto: preencha o nome do cliente');
     // opt-out NÃO entra no agregado ⚠ — já tem chip dedicado "Não incomodar" (evita sinal em dobro)
@@ -1076,6 +1076,7 @@ export default function WhatsAppV2() {
                               const prioTxt = av.prio === 'docs' ? 'LEAD PRIORITÁRIO (documentação enviada) — escada acelerada. ' : av.prio === 'quente' ? 'LEAD PRIORITÁRIO (interesse confirmado) — escada acelerada. ' : '';
                               return <span className={'cchip vacuo a' + av.n + (av.prio ? ' p' : '')} title={prioTxt + (av.n === 3 ? 'ÚLTIMO aviso do Radar de Atendimento: responda — com 1 dia útil sem resposta o gestor decide o repasse' : `${av.n}º de 3 avisos do Radar de Atendimento — o cliente está sem resposta; responda para interromper a escalada`)}>{av.prio === 'docs' ? '📄' : av.prio === 'quente' ? '🔥' : '⏰'} {av.n}º aviso</span>;
                             })()}
+                            {(slaPorConversa.get(c.id) ?? []).some((a) => a.tipo === 'vacuo_cutucada' && !!user?.id && a.responsavel_id === user.id) && <span className="cchip cutucada" title="O gestor pediu pra você responder este cliente agora">👉 Gestor</span>}
                             {ligarPorConv.has(c.id) && <span className="cchip ligar" title="Radar de Atendimento: o cliente parou de responder o robô há 2 horas úteis — ligue para retomar a venda">📞 Ligar</span>}
                             {(() => { const rp = repassePorConv.get(c.id); return rp ? <span className="cchip repasse" title={`Radar de Atendimento: este cliente era de ${rp.deNome} e o gestor repassou para ${rp.paraNome} (1 dia útil sem resposta)${rp.desfecho === 'fechado' ? ` — ${rp.paraNome} fechou` : ''}`}>↪ era de {rp.deNome}</span> : null; })()}
                             {alertas.length > 0 && <span className="cchip alerta" title={alertas.join(' · ')}>⚠{alertas.length > 1 ? ' ' + alertas.length : ''}</span>}

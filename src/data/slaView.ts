@@ -10,7 +10,8 @@ export type SlaTipo =
   | 'prazo_2_dias_em_risco'
   | 'prazo_2_dias_estourado'
   | 'vacuo_aviso'
-  | 'robo_ligar';
+  | 'robo_ligar'
+  | 'vacuo_cutucada';
 
 export interface SlaAlerta {
   id: string;
@@ -65,6 +66,8 @@ export const TIPO_META: Record<SlaTipo, { label: string; emoji: string }> = {
   vacuo_aviso: { label: 'Cliente no vácuo', emoji: '⏰' },
   // Radar: lead parou de responder o robô por 2 h úteis → o dono liga
   robo_ligar: { label: 'Ligar pro cliente', emoji: '📞' },
+  // Radar: o gestor cutucou o atendente pra responder agora
+  vacuo_cutucada: { label: 'Gestor pediu resposta', emoji: '👉' },
 };
 export function tipoLabel(t: SlaTipo): string { return TIPO_META[t]?.label ?? t; }
 export function tipoEmoji(t: SlaTipo): string { return TIPO_META[t]?.emoji ?? '•'; }

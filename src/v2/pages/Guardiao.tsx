@@ -15,6 +15,7 @@ import { tempoRelativo } from '@/data/slaView';
 import { useOrgUsuarios, type OrgUsuario } from '@/data/atendimento';
 import {
   useVacuoRepasses, useVacuoRanking, useVacuoConfig, useRadarRisco, useVacuoDecisoes, useDecidirRepasse, useLigarEquipe,
+  useCutucar, CUTUCAR_INTERVALO_MS,
   repasseEfetivo, type VacuoRepasse, type RadarRisco, type VacuoDecisao,
 } from '@/data/vacuo';
 
@@ -93,7 +94,12 @@ function DecisaoLinha({ d, atendentes, agora, aoAbrir }: {
   d: VacuoDecisao; atendentes: OrgUsuario[]; agora: number; aoAbrir: () => void;
 }) {
   const decidir = useDecidirRepasse();
+  const cutucar = useCutucar();
+  const [okCutucar, setOkCutucar] = useState<string | null>(null);
   const opcoes = atendentes.filter((u) => u.id !== d.donoId);
+  // "👉 Cutucar": o atendente recebe aviso de tela cheia pra responder agora (1 a cada 10 min)
+  const cutucadoRecente = !!d.cutucadoEm && agora - new Date(d.cutucadoEm).getTime() < CUTUCAR_INTERVALO_MS;
+  const ocupado = decidir.isPending || cutucar.isPending;
   const [destino, setDestino] = useState<string>(d.sugeridoId && opcoes.some((u) => u.id === d.sugeridoId) ? d.sugeridoId : (opcoes[0]?.id ?? ''));
   const [erro, setErro] = useState<string | null>(null);
   const nomeDestino = opcoes.find((u) => u.id === destino)?.nome ?? d.sugeridoNome ?? '';
@@ -109,6 +115,9 @@ function DecisaoLinha({ d, atendentes, agora, aoAbrir }: {
           <button type="button" className="gd-dec-nome" title="Abrir a conversa no inbox" onClick={aoAbrir}>{d.contatoNome}</button>
           <div className="gd-dec-meta">
             com <b>{d.donoNome}</b> · sem resposta há <b>{fmtUteis(d.minutos)}</b> · pedido {tempoRelativo(d.pedidaEm, agora)}
+            {d.cutucadas > 0 && d.cutucadoEm && (
+              <> · <span className="gd-dec-cut">👉 cutucado {tempoRelativo(d.cutucadoEm, agora)}{d.cutucadas > 1 ? ` · ${d.cutucadas}×` : ''}</span></>
+            )}
           </div>
         </div>
         {d.prioritario && <PrioMarca prio={true} motivo={d.prioMotivo} />}
@@ -122,11 +131,23 @@ function DecisaoLinha({ d, atendentes, agora, aoAbrir }: {
             ))}
           </select>
         </label>
-        <BotaoPrimario disabled={!destino || decidir.isPending} onClick={() => enviar(destino)}>
+        <BotaoPrimario disabled={!destino || ocupado} onClick={() => enviar(destino)}>
           {decidir.isPending ? 'Salvando…' : `Repassar para ${nomeDestino}`}
         </BotaoPrimario>
-        <BotaoSec disabled={decidir.isPending} onClick={() => enviar(null)}>Manter com {d.donoNome}</BotaoSec>
+        <BotaoSec disabled={ocupado} onClick={() => enviar(null)}>Manter com {d.donoNome}</BotaoSec>
+        <button type="button" className="gd-cutucar" disabled={ocupado || cutucadoRecente}
+          title={cutucadoRecente ? 'Você já cutucou há pouco — dê um tempo pro atendente responder' : `Aparece um aviso de tela cheia pra ${d.donoNome} responder este cliente agora`}
+          onClick={() => {
+            setErro(null); setOkCutucar(null);
+            cutucar.mutate(d.conversaId, {
+              onSuccess: () => setOkCutucar(`${d.donoNome} recebeu o aviso pra responder agora.`),
+              onError: (e) => setErro((e as Error).message),
+            });
+          }}>
+          {cutucar.isPending ? 'Cutucando…' : cutucadoRecente ? '👉 Cutucado' : `👉 Cutucar ${d.donoNome}`}
+        </button>
       </div>
+      {okCutucar && <div className="gd-dec-ok">{okCutucar}</div>}
       {erro && <div className="gd-dec-erro">{erro}</div>}
     </div>
   );

@@ -136,3 +136,13 @@
 .v2 .gd-dec-erro { flex-basis: 100%; font-size: 11px; color: var(--rubro); }
 .v2 .gd-fluxo.riscado b { text-decoration: line-through; opacity: .6; }
 .v2 .gd-tab .mudo b { color: var(--txt-2); }
+
+/* ---- "👉 Cutucar" (gestor manda o atendente responder agora) ---- */
+.v2 .gd-cutucar {
+  height: 34px; padding: 0 14px; border-radius: 9px; cursor: pointer; font-family: var(--fonte); font-size: 12.5px; font-weight: 650;
+  color: var(--ambar); background: var(--ambar-bg); border: 1px solid rgba(var(--ambar-rgb), .45);
+}
+.v2 .gd-cutucar:hover:not(:disabled) { border-color: var(--ambar); box-shadow: 0 0 0 3px rgba(var(--ambar-rgb), .12); }
+.v2 .gd-cutucar:disabled { opacity: .55; cursor: default; }
+.v2 .gd-dec-cut { color: var(--ambar); font-weight: 600; }
+.v2 .gd-dec-ok { flex-basis: 100%; font-size: 11px; color: var(--verde); }

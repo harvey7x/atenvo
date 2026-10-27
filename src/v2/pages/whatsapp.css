@@ -771,3 +771,6 @@
 :root[data-tema="light"] .v2 .wa-filtro .fp-it { background: rgba(0, 0, 0, .03); border-color: rgba(0, 0, 0, .1); }
 :root[data-tema="light"] .v2 .wa-filtro .fp-it:hover { background: rgba(0, 0, 0, .06); }
 :root[data-tema="light"] .v2 .ib2 .fbadge { color: #F4F5F7; }
+
+/* Radar "👉 Gestor": o gestor cutucou — responder agora */
+.v2 .conv2 .cchip.cutucada { color: var(--ambar); border-color: rgba(var(--ambar-rgb), .55); background: var(--ambar-bg); font-weight: 800; }

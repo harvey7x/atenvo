@@ -341,6 +341,8 @@ export interface VacuoDecisao {
   prioMotivo: string | null;
   sugeridoId: string | null;   // maior conversão (sugestão, o gestor escolhe)
   sugeridoNome: string | null;
+  cutucadoEm: string | null;   // último "👉 cutucar" do gestor
+  cutucadas: number;
 }
 
 export const DECISOES_DEMO: VacuoDecisao[] = [
@@ -348,11 +350,13 @@ export const DECISOES_DEMO: VacuoDecisao[] = [
     conversaId: 'wa-sebastiao', contatoNome: 'Sebastião R. Nunes', donoId: 'u-juliana', donoNome: 'Juliana',
     desde: new Date(Date.now() - 26 * 3600e3).toISOString(), pedidaEm: new Date(Date.now() - 40 * 60e3).toISOString(),
     minutos: 600, prioritario: true, prioMotivo: 'documentação enviada', sugeridoId: 'u-isadora', sugeridoNome: 'Isadora',
+    cutucadoEm: null, cutucadas: 0,
   },
   {
     conversaId: 'wa-odete', contatoNome: 'Odete F. Carvalho', donoId: 'u-matheus', donoNome: 'Matheus',
     desde: new Date(Date.now() - 30 * 3600e3).toISOString(), pedidaEm: new Date(Date.now() - 2 * 3600e3).toISOString(),
     minutos: 640, prioritario: false, prioMotivo: null, sugeridoId: 'u-isadora', sugeridoNome: 'Isadora',
+    cutucadoEm: new Date(Date.now() - 3 * 60e3).toISOString(), cutucadas: 1,
   },
 ];
 
@@ -374,6 +378,7 @@ export function useVacuoDecisoes() {
         conversa_id: string; contato_nome: string | null; dono_id: string | null; dono_nome: string | null;
         desde: string; decisao_pedida_em: string; minutos_vacuo: number | null;
         prioritario: boolean; prio_motivo: string | null; sugerido_id: string | null; sugerido_nome: string | null;
+        cutucado_em: string | null; cutucadas: number | null;
       };
       return ((data as Row[]) ?? []).map((r) => ({
         conversaId: r.conversa_id, contatoNome: r.contato_nome ?? 'Cliente',
@@ -381,6 +386,7 @@ export function useVacuoDecisoes() {
         desde: r.desde, pedidaEm: r.decisao_pedida_em, minutos: r.minutos_vacuo,
         prioritario: !!r.prioritario, prioMotivo: r.prio_motivo,
         sugeridoId: r.sugerido_id, sugeridoNome: r.sugerido_nome,
+        cutucadoEm: r.cutucado_em, cutucadas: Number(r.cutucadas ?? 0),
       }));
     },
   });
@@ -480,4 +486,60 @@ export function radarHorarioAberto(cfg: { horaInicio: number; horaFim: number } 
   const dia = partes.find((x) => x.type === 'weekday')?.value ?? '';
   const hora = Number(partes.find((x) => x.type === 'hour')?.value ?? '0') % 24;
   return !['Sat', 'Sun'].includes(dia) && hora >= ini && hora < fim;
+}
+
+/* ---- "👉 CUTUCAR": o gestor manda o atendente responder agora ---- */
+export const CUTUCAR_INTERVALO_MS = 10 * 60e3; // mesmo intervalo mínimo da RPC
+
+/** Gestor cutuca o dono do cliente (aviso de tela cheia + sino + nota na conversa). */
+export function useCutucar() {
+  const qc = useQueryClient();
+  const { currentOrg } = useOrg();
+  const orgId = currentOrg.id;
+  return useMutation({
+    mutationFn: async (conversaId: string) => {
+      if (!VACUO_REAL) return { ok: true, atendente: 'atendente', cutucadas: 1 };
+      const { data, error } = await supabase!.rpc('vacuo_cutucar', { p_conversa: conversaId });
+      if (error) throw new Error(error.message);
+      return data as { ok: boolean; atendente: string; cutucadas: number };
+    },
+    onSuccess: (_r, conversaId) => {
+      const agora = new Date().toISOString();
+      const dec = (qc.getQueryData<VacuoDecisao[]>(['vacuo-decisoes', orgId]) ?? []).find((d) => d.conversaId === conversaId);
+      qc.setQueryData<VacuoDecisao[]>(['vacuo-decisoes', orgId], (old) =>
+        (old ?? []).map((d) => (d.conversaId === conversaId ? { ...d, cutucadoEm: agora, cutucadas: d.cutucadas + 1 } : d)));
+      if (VACUO_REAL) { qc.invalidateQueries({ queryKey: ['vacuo-decisoes'] }); return; }
+      // demo: o próprio usuário faz o papel do atendente e vê o aviso de tela cheia na hora
+      qc.setQueryData<Cutucada[]>(['vacuo-cutucadas-demo'], (old) => [
+        { alertaId: 'cut-demo-' + Date.now(), conversaId, nome: dec?.contatoNome ?? 'Cliente',
+          detalhe: `Este cliente está sem resposta desde 23/10 às 11:51, mesmo depois dos avisos. Matheus pediu pra você responder agora.`,
+          desde: agora },
+        ...(old ?? []),
+      ]);
+    },
+  });
+}
+
+export interface Cutucada { alertaId: string; conversaId: string; nome: string; detalhe: string | null; desde: string }
+
+export const CUTUCADAS_DEMO: Cutucada[] = [];
+
+/** Cutucões do gestor pro PRÓPRIO usuário (dono do cliente). */
+export function useCutucadasMeus(): Cutucada[] {
+  const { user } = useAuth();
+  const slaQ = useSlaAlertas();
+  const itens = useMemo(
+    () => (slaQ.data?.itens ?? []).filter((a) =>
+      a.tipo === 'vacuo_cutucada' && !!a.conversa_id && !!user?.id && a.responsavel_id === user.id),
+    [slaQ.data, user?.id],
+  );
+  const alvos = useSlaAlvos(itens);
+  const demoQ = useQuery({ queryKey: ['vacuo-cutucadas-demo'], enabled: !VACUO_REAL, staleTime: Infinity, queryFn: async () => CUTUCADAS_DEMO });
+  return useMemo(() => {
+    if (!VACUO_REAL) return demoQ.data ?? CUTUCADAS_DEMO;
+    return itens.map((a) => ({
+      alertaId: a.id, conversaId: a.conversa_id!, nome: alvos.get(a.id)?.nome ?? 'Cliente',
+      detalhe: a.detalhe, desde: a.criado_em,
+    })).sort((x, y) => y.desde.localeCompare(x.desde));
+  }, [itens, alvos, demoQ.data]);
 }

@@ -18,7 +18,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useGuardiaoAvisos, useVacuoDecisoes, useLigarMeus, useConcluirLigacao, useVacuoConfig, radarHorarioAberto, type GuardiaoAviso } from '@/data/vacuo';
+import { useGuardiaoAvisos, useVacuoDecisoes, useLigarMeus, useConcluirLigacao, useVacuoConfig, radarHorarioAberto, useCutucadasMeus, type GuardiaoAviso } from '@/data/vacuo';
 import { useOrg } from '@/context/OrgContext';
 import { tempoRelativo } from '@/data/slaView';
 import { CLASSE_RAIZ_PORTAL, criarRaizPortalV2 } from './portal';
@@ -261,7 +261,78 @@ function PilulaAvisos() {
 }
 
 /** Takeover central do 3º e último aviso. */
+/** "👉 O gestor pediu": aviso de tela cheia do CUTUCÃO. Pedido direto do gestor — não depende do
+    horário útil e passa na frente do 3º aviso. Dispensa por alerta (recutucar cria alerta novo). */
+function CutucadaTakeover({ aoMostrar }: { aoMostrar: (sim: boolean) => void }) {
+  const cutucadas = useCutucadasMeus();
+  const nav = useNavigate();
+  const location = useLocation();
+  const [snooze, setSnooze] = useState<Record<string, true>>(lerSnooze);
+  const conversaAberta = new URLSearchParams(location.search).get('conversa');
+  const atual = cutucadas.find((c) => !snooze['cut:' + c.alertaId] && c.conversaId !== conversaAberta) ?? null;
+  useEffect(() => { aoMostrar(!!atual); }, [atual, aoMostrar]);
+  if (!atual) return null;
+  const dispensar = () => setSnooze(gravarSnooze('cut:' + atual.alertaId));
+  // o texto do alerta vem do banco no formato "…sem resposta desde DD/MM às HH:MM… <Gestor> pediu…";
+  // extrai os fatos pra mostrar organizados (se o formato mudar, cai no texto corrido)
+  const desde = /desde (\d{2}\/\d{2} às \d{2}:\d{2})/.exec(atual.detalhe ?? '')?.[1] ?? null;
+  const gestor = /\.\s+([^.]+?) pediu/.exec(atual.detalhe ?? '')?.[1] ?? null;
+  const iniciais = atual.nome.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]!.toUpperCase()).join('');
+  return (
+    <div className="gva-tk" role="alertdialog" aria-modal="true" aria-labelledby="gva-cut-tit">
+      <div className="gva-cut">
+        <span className="gva-cut-faixa" aria-hidden />
+        <div className="gva-cut-icone" aria-hidden>
+          <i className="onda" /><i className="onda b" />
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+          </svg>
+        </div>
+        <div className="gva-cut-eyebrow">Pedido do gestor</div>
+        <h2 id="gva-cut-tit" className="gva-cut-tit">Responda este cliente agora</h2>
+
+        <div className="gva-cut-cli">
+          <span className="gva-cut-av">{iniciais || '•'}</span>
+          <div className="gva-cut-cli-tx">
+            <b>{atual.nome}</b>
+            <span>aguardando sua resposta no WhatsApp</span>
+          </div>
+        </div>
+
+        {(desde || gestor) ? (
+          <dl className="gva-cut-fatos">
+            {desde && <div><dt>Sem resposta</dt><dd>{desde.replace(' às ', ' · ')}</dd></div>}
+            {gestor && <div><dt>Pedido por</dt><dd>{gestor}</dd></div>}
+            <div><dt>Quando</dt><dd>{tempoRelativo(atual.desde, Date.now())}</dd></div>
+          </dl>
+        ) : (
+          <p className="gva-tk-txt">{atual.detalhe ?? 'Este cliente está sem resposta depois dos avisos. Responda agora.'}</p>
+        )}
+
+        <div className="gva-cut-acoes">
+          <button type="button" className="gva-cut-pri" onClick={() => { dispensar(); nav('/whatsapp?conversa=' + encodeURIComponent(atual.conversaId)); }}>
+            Abrir conversa e responder
+            <svg viewBox="0 0 16 16" aria-hidden><path d="M3 8h9M8.5 4.5L12 8l-3.5 3.5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          </button>
+          <button type="button" className="gva-cut-sec" onClick={dispensar}>Responder em seguida</button>
+        </div>
+        <p className="gva-cut-rodape">O aviso some sozinho quando você responder o cliente.</p>
+      </div>
+    </div>
+  );
+}
+
 export function GuardiaoAvisos() {
+  const [cutucadaNaTela, setCutucadaNaTela] = useState(false);
+  return (
+    <>
+      <CutucadaTakeover aoMostrar={setCutucadaNaTela} />
+      {!cutucadaNaTela && <TakeoverUltimoAviso />}
+    </>
+  );
+}
+
+function TakeoverUltimoAviso() {
   const { visiveis, agora, dispensar, responder } = useAvisosVisiveis();
   const aberto = useRadarAberto();
   const takeover = visiveis.find((a) => a.n === 3) ?? null;
