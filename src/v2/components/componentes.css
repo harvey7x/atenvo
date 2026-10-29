@@ -118,6 +118,10 @@
 .v2 tbody tr:hover { background: rgba(var(--tint), .032); }
 .v2 tbody tr.sel { background: rgba(var(--tint), .05); }
 .v2 td.d, .v2 th.d { text-align: right; }
+/* tabela padrão: título e conteúdo de cada coluna no MEIO dela (dono 29/10: "o título tem que ficar
+   centralizado com as coisas que estão embaixo"); só a 1ª coluna (quem/o quê) fica à esquerda */
+.v2 .mo-tab thead th, .v2 .mo-tab tbody td, .v2 .mo-tab th.d, .v2 .mo-tab td.d { text-align: center; }
+.v2 .mo-tab th.ini, .v2 .mo-tab td.ini { text-align: left; }
 .v2 td.nome { color: var(--txt); font-weight: 500; }
 .v2 .val-t { font-weight: 600; color: var(--txt); }
 .v2 .val-t .cent { color: var(--txt-3); font-weight: 400; }

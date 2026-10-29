@@ -90,8 +90,10 @@
 .v2 .rl2-tab tbody tr { transition: background .16s; }
 .v2 .rl2-tab tbody tr:hover { background: rgba(var(--tint), .032); }
 .v2 .rl2-tab td.nome { color: var(--txt); font-weight: 500; }
-.v2 .rl2-tab th.d, .v2 .rl2-tab td.d { text-align: right; }
-.v2 .rl2-tab th.c, .v2 .rl2-tab td.c { text-align: center; }
+/* colunas no MEIO (dono 29/10); só a 1ª coluna (quem/o quê) fica à esquerda */
+.v2 .rl2-tab thead th, .v2 .rl2-tab tbody td,
+.v2 .rl2-tab th.d, .v2 .rl2-tab td.d, .v2 .rl2-tab th.c, .v2 .rl2-tab td.c { text-align: center; }
+.v2 .rl2-tab thead th:first-child, .v2 .rl2-tab tbody td:first-child { text-align: left; }
 .v2 .rl2-tab td.vazia { text-align: center; color: var(--txt-3); padding: 16px 0; }
 .v2 .rl2-rodape { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 9px; margin-top: 2px; border-top: 1px solid var(--linha); font-size: 11.5px; color: var(--txt-2); flex-wrap: wrap; }
 .v2 .rl2-pag { display: flex; gap: 5px; align-items: center; }

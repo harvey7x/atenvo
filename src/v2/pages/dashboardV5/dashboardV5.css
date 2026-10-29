@@ -568,12 +568,13 @@
    opacity, cor e sombra — nada de layout por frame, nada de filter. Durações nos
    tokens da camada de movimento (movimento.css: --mo-r 120ms cor/press, --mo-m 180ms).
    ============================================================ */
-/* atendentes: título, número e legenda de cada coluna numérica no centro dela */
-.v2 .d5-tab-at .d5-dir { text-align: center; }
-.v2 .d5-tab-at thead th.d5-dir .d5-th-ajuda { justify-content: center; }
-.v2 .d5-tab-at thead .d5-ord { text-align: center; }
-.v2 .d5-tab-at .d5-cel2-dir { align-items: center; }
-.v2 .d5-tab-at .d5-cel2 > small { text-align: center; }
+/* título, número e legenda de cada coluna numérica no centro dela — Atendentes (22/10) e,
+   desde 29/10, todas as tabelas do painel (dono: "tudo centralizado") */
+.v2 .d5-tab .d5-dir { text-align: center; }
+.v2 .d5-tab thead th.d5-dir .d5-th-ajuda { justify-content: center; }
+.v2 .d5-tab thead .d5-ord { text-align: center; }
+.v2 .d5-tab .d5-cel2-dir { align-items: center; }
+.v2 .d5-tab .d5-cel2 > small { text-align: center; }
 .v2 .d5-tab-at .d5-ent { justify-content: center; }
 .v2 .d5-tab-at .d5-ent > b { min-width: 3ch; text-align: left; }  /* grupo barra+número com a mesma largura em toda linha: as barras começam na mesma borda */
 

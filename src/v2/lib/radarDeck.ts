@@ -616,5 +616,8 @@ export const DECK: Record<string, RadarTexto> = {
   },
   "extra.painel.tentar_de_novo": {
     "titulo": "Tentar de novo"
+  },
+  "extra.inbox.grupo_radar": {
+    "texto": "Há clientes seus com aviso do Radar neste grupo."
   }
 };

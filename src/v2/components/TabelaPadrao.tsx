@@ -101,8 +101,9 @@ export function TabelaPadrao<T>({ colunas, linhas, chave, selecao, rodape, aoCli
         <thead>
           <tr>
             {selecao && <th style={{ width: 36 }} aria-label="Seleção" />}
-            {colunas.map((c) => (
-              <th key={c.chave} className={c.dir ? 'd' : undefined} style={c.largura ? { width: c.largura } : undefined}>
+            {colunas.map((c, i) => (
+              <th key={c.chave} className={[i === 0 ? 'ini' : '', c.dir ? 'd' : ''].filter(Boolean).join(' ') || undefined}
+                style={c.largura ? { width: c.largura } : undefined}>
                 {c.titulo}
               </th>
             ))}
@@ -128,9 +129,10 @@ export function TabelaPadrao<T>({ colunas, linhas, chave, selecao, rodape, aoCli
                     <Checkbox marcado={sel} aoAlternar={() => selecao.aoAlternar(id)} />
                   </td>
                 )}
-                {colunas.map((c) => {
+                {colunas.map((c, i) => {
                   const classe = typeof c.classe === 'function' ? c.classe(linha) : c.classe;
-                  const cls = [c.dir ? 'd' : '', classe ?? ''].filter(Boolean).join(' ');
+                  // 1ª coluna (quem/o quê) à esquerda; as demais no meio (dono 29/10)
+                  const cls = [i === 0 ? 'ini' : '', c.dir ? 'd' : '', classe ?? ''].filter(Boolean).join(' ');
                   return (
                     <td key={c.chave} className={cls || undefined}>
                       {c.render(linha)}

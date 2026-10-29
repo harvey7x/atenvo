@@ -67,6 +67,14 @@ const TABS = [
   ['naolidas', 'Não lidas'], ['pendentes', 'Pendentes'], ['fechados', 'Fechados'], ['perdidos', 'Perdidos'], ['arquivadas', 'Arquivadas'],
 ] as const;
 type TabId = typeof TABS[number][0];
+/* ⚠ do card: só o que o Radar NÃO cobre (dono 29/10: "deixa o Radar como o único aviso de cliente sem
+   resposta"). "Sem resposta" é do Radar — selo próprio, por dono, no horário útil — e "parado / 2 dias sem
+   fechamento" é assunto do Kanban; os dois saíram daqui. */
+const FORA_DO_ALERTA = new Set<string>([
+  'vacuo_aviso', 'vacuo_fechado', 'robo_ligar', 'vacuo_cutucada',
+  'atendimento_sem_resposta', 'cliente_qualificado_aguardando_atendimento', 'lead_quente_aguardando',
+  'parado_ha_muito_tempo', 'prazo_2_dias_em_risco', 'prazo_2_dias_estourado',
+]);
 // visibilidade (22/10): só o admin vê a carteira de todos — para os demais estas abas não existem
 const ABAS_SO_ADMIN: readonly TabId[] = ['todos', 'naoatrib'];
 // Situação/IA/Período + o PREDICADO dos filtros agora vivem em ../lib/filtroInbox —
@@ -1007,12 +1015,9 @@ export default function WhatsAppV2() {
   }, [cobrancasQ.data, current.contatoId]);
 
   const alertasDe = (c: WaContact): string[] => {
-    const wait = tierEspera(c.aguardando ? c.aguardandoDesde : null, relogioMs);
-    const atrasado = wait && (wait.tier === 'critico' || wait.tier === 'vermelho');
     const out: string[] = [];
-    if (atrasado && wait) out.push('Sem resposta ' + wait.label.replace('Aguardando ', ''));
-    // avisos do Radar ficam FORA do agregado ⚠ — têm selo próprio no card (evita sinal em dobro)
-    for (const a of slaPorConversa.get(c.id) ?? []) { if (a.tipo === 'vacuo_aviso' || a.tipo === 'vacuo_fechado' || a.tipo === 'robo_ligar' || a.tipo === 'vacuo_cutucada') continue; out.push(tipoLabel(a.tipo) + (a.detalhe ? ' — ' + a.detalhe : '')); }
+    // "sem resposta" (Radar) e "Kanban parado" ficam FORA do ⚠ — ver FORA_DO_ALERTA
+    for (const a of slaPorConversa.get(c.id) ?? []) { if (FORA_DO_ALERTA.has(a.tipo)) continue; out.push(tipoLabel(a.tipo) + (a.detalhe ? ' — ' + a.detalhe : '')); }
     if (c.precisaHumano) out.push('Precisa de atendimento humano');
     if (analisarNome(c.name).fraco && conversaAtiva({ status: c.status, arquivada: c.arquivada })) out.push('Cadastro incompleto: preencha o nome do cliente');
     // opt-out NÃO entra no agregado ⚠ — já tem chip dedicado "Não incomodar" (evita sinal em dobro)
@@ -1101,12 +1106,9 @@ export default function WhatsAppV2() {
                 // "Todos" é lista única (sem cabeçalho) — nunca recolhe
                 // busca ativa ignora o recolhimento: resultado escondido confunde
                 const fechado = tab !== 'todos' && gruposFechados.has(respId) && !buscaAtiva;
-                // grupo fechado não pode esconder urgência: soma de não lidas + ⚠ de espera estourada
+                // grupo fechado não pode esconder urgência: soma de não lidas + ponto do Radar (cliente seu com aviso)
                 const naoLidasGrupo = fechado ? lista.reduce((s, c) => s + (c.unread ?? 0), 0) : 0;
-                const atrasoGrupo = fechado && lista.some((c) => {
-                  const w = tierEspera(c.aguardando ? c.aguardandoDesde : null, relogioMs);
-                  return !!w && (w.tier === 'vermelho' || w.tier === 'critico');
-                });
+                const radarGrupo = fechado && lista.some((c) => { const r = radarPorConv.get(c.id); return !!r?.aviso || !!r?.pedido; });
                 return (
                 <div key={respId || '(fila)'}>
                   {tab !== 'todos' && (
@@ -1122,7 +1124,7 @@ export default function WhatsAppV2() {
                         : respId ? <>Atendimento distribuído para <b>{respId === user?.id ? 'Você' : nomePorId(respId) ?? 'Atendente'}</b></> : 'Não atribuídos'}
                     </span>
                     <span className="num qt">{lista.length}</span>
-                    {atrasoGrupo && <span className="galer" title="Há conversas aguardando resposta há tempo demais neste grupo">⚠</span>}
+                    {radarGrupo && <span className="galer" role="img" title={rtTxt('extra.inbox.grupo_radar', {}, 'Há clientes seus com aviso do Radar neste grupo.')} aria-label={rtTxt('extra.inbox.grupo_radar', {}, 'Há clientes seus com aviso do Radar neste grupo.')}><i className="galer-pt" /></span>}
                     {naoLidasGrupo > 0 && <span className="gnl num" title={`${naoLidasGrupo} não lidas neste grupo`}>{naoLidasGrupo > 99 ? '99+' : naoLidasGrupo}</span>}
                   </button>
                   )}
