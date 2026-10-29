@@ -663,16 +663,23 @@
    Seletores com html:root[...] para vencer corp/lite/light de qualquer
    folha. O conteúdo interno NÃO pode ter fundo opaco (senão some o vidro).
    ================================================================== */
-html:root:not([data-tema="light"]) .v2 .vidro-pro {
+/* escuro: os seletores 2 e 3 sobem a especificidade para vencer quem pinta
+   todo .wa-pop de sólido no escuro — shell.css (corp, 0,5,1: #27292E) e
+   repaginada.css (0,6,1: --rp-menu). Sem eles o filtro ficava CHAPADO no
+   escuro (achado do dono em produção, 29/10). */
+html:root:not([data-tema="light"]) .v2 .vidro-pro,
+html:root[data-visual]:not([data-tema="light"]) .v2 .vidro-pro.vidro-pro,
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .vidro-pro.vidro-pro {
   --vp-acc: var(--azul-rgb, 76, 141, 255);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, .035), rgba(255, 255, 255, 0) 96px),
-    linear-gradient(160deg, rgba(34, 37, 43, .66), rgba(18, 20, 24, .64));
-  border: 1px solid rgba(255, 255, 255, .1);
-  -webkit-backdrop-filter: blur(22px) saturate(1.25); backdrop-filter: blur(22px) saturate(1.25);
+    linear-gradient(180deg, rgba(255, 255, 255, .05), rgba(255, 255, 255, 0) 96px),
+    linear-gradient(160deg, rgba(40, 43, 50, .5), rgba(20, 22, 27, .48));
+  border: 1px solid rgba(255, 255, 255, .11);
+  -webkit-backdrop-filter: blur(20px) saturate(1.35); backdrop-filter: blur(20px) saturate(1.35);
   box-shadow: 0 24px 60px -14px rgba(0, 0, 0, .5), 0 6px 18px rgba(0, 0, 0, .22), inset 0 1px 0 rgba(255, 255, 255, .06);
 }
-html:root[data-tema="light"] .v2 .vidro-pro {
+html:root[data-tema="light"] .v2 .vidro-pro,
+html:root[data-visual][data-tema="light"] .v2 .vidro-pro.vidro-pro {
   --vp-acc: var(--azul-rgb, 15, 98, 254);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, .35), rgba(255, 255, 255, 0) 96px),
@@ -694,6 +701,7 @@ html:root[data-tema="light"] .v2 .vidro-pro::after {
 }
 /* quem pediu menos transparência no sistema operacional recebe a carta quase sólida */
 @media (prefers-reduced-transparency: reduce) {
-  html:root:not([data-tema="light"]) .v2 .vidro-pro { background: #17191D; }
-  html:root[data-tema="light"] .v2 .vidro-pro { background: #FFFFFF; }
+  html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .vidro-pro.vidro-pro,
+  html:root[data-visual]:not([data-tema="light"]) .v2 .vidro-pro.vidro-pro, html:root:not([data-tema="light"]) .v2 .vidro-pro { background: #17191D; }
+  html:root[data-visual][data-tema="light"] .v2 .vidro-pro.vidro-pro, html:root[data-tema="light"] .v2 .vidro-pro { background: #FFFFFF; }
 }
