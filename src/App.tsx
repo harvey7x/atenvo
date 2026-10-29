@@ -67,7 +67,6 @@ const DisparoV2 = lazy(() => import('@/v2/pages/Disparo'));
 const RelatoriosV2 = lazy(() => import('@/v2/pages/Relatorios'));
 const IntegracoesV2 = lazy(() => import('@/v2/pages/Integracoes'));
 const KanbanV2 = lazy(() => import('@/v2/pages/Kanban'));
-const PosVendaV2 = lazy(() => import('@/v2/pages/PosVenda'));
 const GuardiaoV2 = lazy(() => import('@/v2/pages/Guardiao'));
 // /whatsapp passa por um gate de viewport: celular → chat mobile (/m); desktop → inbox intocado.
 const GateWhatsApp = lazy(() => import('@/v2/mobile/GateWhatsApp'));
@@ -127,8 +126,9 @@ const routes: RouteObject[] = [
           { path: 'facebook', element: <Lz><ManutencaoV2 area="Facebook" /></Lz> },
           { path: 'relacionamento', element: <Lz><ManutencaoV2 area="Relacionamento" /></Lz> },
           { path: 'kanban', element: <Lz><KanbanV2 /></Lz> },
-          // Pós-venda: acompanhamento dos clientes fechados (ganho) — pedido do dono 15/10.
-          { path: 'pos-venda', element: <Lz><PosVendaV2 /></Lz> },
+          // Pós-venda SAIU (dono 29/10): o fechado sem resposta é avisado pelo Radar. Página
+          // PosVenda.tsx preservada (não deletada) — link antigo cai no WhatsApp.
+          { path: 'pos-venda', element: <Navigate to="/whatsapp" replace /> },
           // Remarketing fora do painel (aba removida a pedido do dono). Página Remarketing.tsx
           // preservada (não deletada), só fora do menu/rota — reversível. Link antigo cai no WhatsApp.
           { path: 'remarketing', element: <Navigate to="/whatsapp" replace /> },

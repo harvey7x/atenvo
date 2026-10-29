@@ -14,18 +14,14 @@ import { instalarRolagemSemHover } from '../lib/rolagem';
 import { criarRaizPortalV2 } from '../components/portal';
 import { ICONES } from './icones';
 import { NotificacaoResposta, type DadosNotificacao } from './NotificacaoResposta';
-import { GuardiaoAvisos, RadarPilula } from '../components/GuardiaoAvisos';
-import { DEMO_MODE } from '@/lib/demo';
-import { seedWa } from '../pages/whatsappSeed';
-import { usePosVendaAguardando } from '@/data/posvenda';
+import { GuardiaoAvisos, RadarBarra } from '../components/GuardiaoAvisos';
+import { SinoPainel, naoLidasQueAcendem, useSino } from './SinoPainel';
 import { useNotificacaoInbound } from '../hooks/useNotificacaoInbound';
 import { aplicarTema, lerTema, salvarTema, type Tema } from '../lib/tema';
 import { deveMostrarIntroDia, marcarIntroVista } from '../lib/introDia';
 import { IntroDia } from '../components/IntroDia';
 import { AvisoAtualizacao } from '../components/AvisoAtualizacao';
 import { assinarAcento, lerAcento, salvarAcento, type Acento } from '../lib/acento';
-import { useNotificacoes, useMarcarNotificacao } from '@/data/remarketing';
-import { tempoRelativo } from '../lib/tempo';
 
 /* ícones do chrome da topbar (traço fino, como o resto do v2) */
 /* gota de tinta — alternador do acento azul → verde → dourado (teste do dono 28/08) */
@@ -71,8 +67,7 @@ const GRUPOS: GrupoNav[] = [
     // o que acontece com o cliente DEPOIS do primeiro atendimento
     rotulo: 'Acompanhamento',
     itens: [
-      // Pós-venda: clientes fechados (ganho) com fila de "aguardando resposta" (pedido do dono 15/10)
-      { slug: 'pos-venda', rotulo: 'Pós-venda' },
+      // Pós-venda SAIU (dono 29/10): o fechado sem resposta agora é avisado pelo Radar de Atendimento.
       // Recuperação fora do menu (pedido do dono 14/10) — rota segue viva por URL
       { slug: 'pendencias', rotulo: 'Pendências' },
       { slug: 'portabilidades', rotulo: 'Portabilidades' },
@@ -182,16 +177,10 @@ export default function AppShellV2() {
   }, []);
 
   const [notif, setNotif] = useState<(DadosNotificacao & { conversaId?: string }) | null>(null);
-  const [sinoOn, setSinoOn] = useState(false);
+  // pulso de mensagem recebida: não acende mais o ponto do sino (Radar v5: o ponto é só para
+  // não lidas de Gestão e Outros); o contador do WhatsApp na barra lateral segue com o inbound
+  const [, setSinoOn] = useState(false);
   const [badgePop, setBadgePop] = useState(0);
-  // Pós-venda no menu: fechados com mensagem NÃO LIDA, visível de qualquer tela.
-  // Real = contagem leve no servidor (usePosVendaAguardando); demo = seed do inbox.
-  const pvAguardaQ = usePosVendaAguardando();
-  const pvAguardaDemo = useMemo(
-    () => (DEMO_MODE ? seedWa().filter((c) => c.oppStatus === 'ganho' && ((c.unread ?? 0) > 0 || !!c.aguardando)).length : 0),
-    [],
-  );
-  const pvAguarda = DEMO_MODE ? pvAguardaDemo : (pvAguardaQ.data ?? 0);
   const [menuUsuario, setMenuUsuario] = useState(false);
   const [menuPos, setMenuPos] = useState<{ top: number; right: number }>({ top: 60, right: 20 });
 
@@ -202,7 +191,8 @@ export default function AppShellV2() {
 
   // Intro do dia: primeira entrada de cada dia (o auth resolve assíncrono —
   // só decide quando o user existe; virou a data local = mostra de novo)
-  const [introAberta, setIntroAberta] = useState(false);
+  // já nasce aberta quando a Intro do dia vai aparecer: as telas cheias do Radar ficam bloqueadas desde o 1º commit
+  const [introAberta, setIntroAberta] = useState(() => !!user?.id && deveMostrarIntroDia(user.id));
   useEffect(() => { if (user?.id && deveMostrarIntroDia(user.id)) setIntroAberta(true); }, [user?.id]);
   const concluirIntro = useCallback(() => {
     marcarIntroVista(user?.id ?? undefined);
@@ -275,18 +265,29 @@ export default function AppShellV2() {
     if (r) setMenuPos({ top: Math.round(r.bottom + 8), right: Math.round(window.innerWidth - r.right) });
     setMenuUsuario((v) => !v);
   }, []);
-  // sino: central de notificações PERSISTIDA (tabela notificacoes, F2 do remarketing).
+  // sino: central de notificações PERSISTIDA (tabela notificacoes), organizada pelo Radar v5
+  // (SinoPainel: seções, filtro Não lidas | Todas, uma linha por cliente; na demo, as fixtures do Radar).
   // O clique abre o painel; o pulso/contador de inbound segue sendo zerado aqui.
   const [painelNotif, setPainelNotif] = useState(false);
   const [notifPos, setNotifPos] = useState<{ top: number; right: number }>({ top: 60, right: 60 });
   const sinoRef = useRef<HTMLButtonElement>(null);
-  const notifsQ = useNotificacoes();
-  const marcarNotif = useMarcarNotificacao();
-  const naoLidas = (notifsQ.data ?? []).filter((n) => !n.lidaEm).length;
+  const sino = useSino();
+  // o ponto indica NOVIDADE, não pendência: só não lidas de Gestão e Outros
+  // (negociação, fechados e ligar já estão na cápsula da barra e na tela cheia)
+  const naoLidas = naoLidasQueAcendem(sino.lista);
   const abrirNotificacoes = useCallback(() => {
     const r = sinoRef.current?.getBoundingClientRect();
-    if (r) setNotifPos({ top: Math.round(r.bottom + 8), right: Math.round(window.innerWidth - r.right) });
+    if (r) {
+      // painel de 380px (no máximo 100vw − 32px) preso sob o sino, sem sair da tela
+      const largura = Math.min(380, window.innerWidth - 32);
+      const direita = Math.round(window.innerWidth - r.right);
+      setNotifPos({ top: Math.round(r.bottom + 8), right: Math.max(16, Math.min(direita, window.innerWidth - 16 - largura)) });
+    }
     setSinoOn(false); setBadgePop(0); setPainelNotif((v) => !v);
+  }, []);
+  const fecharSino = useCallback((devolverFoco?: boolean) => {
+    setPainelNotif(false);
+    if (devolverFoco) sinoRef.current?.focus();
   }, []);
   useEffect(() => { setPainelNotif(false); }, [location.pathname]);
   // avatar: menu de usuário real — Configurações (rota v2) + Sair (signOut do v1, como a Topbar antiga).
@@ -354,9 +355,6 @@ export default function AppShellV2() {
       <span className="lab">{i.rotulo}</span>
       {i.slug === 'whatsapp' && badgePop > 0 && (
         <span key={badgePop} className="badge-n lab pop num">{badgePop}</span>
-      )}
-      {i.slug === 'pos-venda' && pvAguarda > 0 && (
-        <span className="badge-n rubro lab num" title={`${pvAguarda} aguardando resposta`}>{pvAguarda}</span>
       )}
     </NavLink>
   );
@@ -453,8 +451,8 @@ export default function AppShellV2() {
               </svg>
               <span className="busca-texto">Buscar contatos, conversas, cobranças…</span><kbd>⌘K</kbd>
             </div>
-            {/* Radar de Atendimento: pílula dos avisos 1º/2º no vão entre a busca e os ícones */}
-            <div className="radar-slot"><RadarPilula /></div>
+            {/* Radar de Atendimento: cápsula Em negociação · Fechados · Ligar · Decisões no vão entre a busca e os ícones */}
+            <div className="radar-slot"><RadarBarra /></div>
             <div className="top-dir">
               <button
                 type="button" className="ib"
@@ -473,36 +471,17 @@ export default function AppShellV2() {
               >
                 {tema === 'dark' ? <IconeSol /> : <IconeLua />}
               </button>
-              <button ref={sinoRef} type="button" className="ib" aria-label="Notificações" title="Notificações" aria-haspopup="menu" aria-expanded={painelNotif} onClick={abrirNotificacoes}>
+              <button ref={sinoRef} type="button" className="ib" aria-label="Notificações" title="Notificações" aria-haspopup="dialog" aria-expanded={painelNotif} onClick={abrirNotificacoes}>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
                   <path d="M18 9a6 6 0 10-12 0c0 6-2.5 7-2.5 7h17S18 15 18 9zM10 20a2.2 2.2 0 004 0" />
                 </svg>
-                <span className={sinoOn || naoLidas > 0 ? 'pt on' : 'pt'} aria-hidden />
+                <span className={naoLidas > 0 ? 'pt on' : 'pt'} aria-hidden />
               </button>
               {painelNotif && createPortal(
                 <>
-                  <div className="um-backdrop" onClick={() => setPainelNotif(false)} aria-hidden />
-                  <div className="usuario-menu notif-panel" role="menu" aria-label="Notificações" style={{ top: notifPos.top, right: notifPos.right }}>
-                    <div className="np-head">
-                      <b>Notificações</b>
-                      {naoLidas > 0 && (
-                        <button type="button" className="np-todas" onClick={() => marcarNotif.mutate({ todas: true })}>Marcar todas como lidas</button>
-                      )}
-                    </div>
-                    {(notifsQ.data ?? []).length === 0 ? (
-                      <div className="np-vazio">Nenhuma notificação ainda. Quando a Central de Remarketing identificar algo, aparece aqui.</div>
-                    ) : (notifsQ.data ?? []).slice(0, 20).map((n) => (
-                      <button key={n.id} type="button" role="menuitem" className={'np-item' + (n.lidaEm ? '' : ' nova')}
-                        onClick={() => { setPainelNotif(false); if (!n.lidaEm) marcarNotif.mutate({ id: n.id }); if (n.rota) navigate(n.rota); }}>
-                        <span className="np-dot" aria-hidden />
-                        <span className="np-tx">
-                          <span className="np-t">{n.titulo}</span>
-                          {n.corpo && <span className="np-c">{n.corpo}</span>}
-                        </span>
-                        <span className="np-h num">{tempoRelativo(n.criadoEm, Date.now())}</span>
-                      </button>
-                    ))}
-                  </div>
+                  <div className="um-backdrop" onClick={() => fecharSino()} aria-hidden />
+                  {/* o painel (pele .usuario-menu.notif-panel) marca como lida e navega por conta própria */}
+                  <SinoPainel pos={notifPos} sino={sino} aoFechar={fecharSino} />
                 </>,
                 raizMenu,
               )}
@@ -553,7 +532,7 @@ export default function AppShellV2() {
         <IntroDia aberta={introAberta} aoConcluir={concluirIntro} nome={nome} tema={tema} aoMudarTema={definirTema} />
         <AvisoAtualizacao />
         {/* Radar de Atendimento (23/10): takeover do último aviso (a pílula fica na barra) */}
-        <GuardiaoAvisos />
+        <GuardiaoAvisos bloqueado={introAberta} />
       </div>
 
     </div>

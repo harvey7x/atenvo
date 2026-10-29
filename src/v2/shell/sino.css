@@ -1,0 +1,107 @@
+/* ============================================================
+   Sino — central de notificações (Radar v5, desenho final 29/10).
+   Herda a pele do .usuario-menu (shell.css): superfície sólida,
+   fio, sombra e a entrada do movimento.css. Aqui: painel de 380px
+   até 520px, cabeçalho fixo, seções com ícone e número, linhas com
+   ponto, título, texto em 2 linhas, hora e etiqueta.
+   Cor: o ícone diz a família (selo verde = Fechados, telefone azul =
+   Ligar; Gestão, Em negociação e Outros neutros). Ponto de não lida,
+   números e vazio são neutros: verde só identifica o cliente fechado.
+   Movimento: só o hover das linhas, pela classe .np-item que o
+   movimento.css já conhece (desligado no Leve e com "reduzir movimento").
+   ============================================================ */
+.v2 .usuario-menu.notif-panel {
+  width: min(380px, calc(100vw - 32px));
+  max-height: min(520px, calc(100vh - 80px));
+  padding: 0; overflow: hidden;
+  display: flex; flex-direction: column;
+}
+
+/* --- cabeçalho fixo ----------------------------------------- */
+.v2 .sn-topo {
+  flex: none; display: flex; flex-direction: column; gap: 9px;
+  padding: 12px 14px 10px; border-bottom: 1px solid var(--linha);
+}
+.v2 .sn-topo-l1 { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 20px; }
+.v2 .sn-titulo { margin: 0; font-size: 13.5px; font-weight: 700; line-height: 1.2; letter-spacing: -.01em; color: var(--txt); }
+.v2 .sn-marcar {
+  flex: none; padding: 2px 0; border: 0; background: none; cursor: pointer; white-space: nowrap;
+  font-family: var(--fonte); font-size: 11px; font-weight: 650; color: var(--azul, #3B82F6);
+}
+.v2 .sn-marcar:hover { text-decoration: underline; }
+.v2 .sn-filtro {
+  align-self: flex-start; display: inline-flex; gap: 2px; padding: 2px; border-radius: 8px;
+  background: rgba(var(--tint), .05); border: 1px solid rgba(var(--tint), .08);
+}
+.v2 .sn-filtro button {
+  height: 24px; padding: 0 12px; border: 0; border-radius: 6px; background: none; cursor: pointer;
+  font-family: var(--fonte); font-size: 11.5px; font-weight: 650; color: var(--txt-3);
+}
+.v2 .sn-filtro button:hover { color: var(--txt-2); }
+.v2 .sn-filtro button[aria-pressed="true"] { background: rgba(var(--tint), .10); color: var(--txt); }
+.v2 .sn-marcar:focus-visible,
+.v2 .sn-filtro button:focus-visible,
+.v2 .sn-ver:focus-visible { outline: 2px solid var(--azul, #3B82F6); outline-offset: 1px; }
+
+/* --- corpo rolável ------------------------------------------ */
+.v2 .sn-corpo { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 4px 6px 8px; }
+
+/* --- seções ------------------------------------------------- */
+.v2 .sn-sec { padding: 4px 0 2px; }
+.v2 .sn-sec + .sn-sec { border-top: 1px solid var(--linha); margin-top: 4px; padding-top: 6px; }
+.v2 .sn-cab { display: flex; align-items: center; gap: 7px; padding: 6px 8px 4px; }
+.v2 .sn-ic { display: inline-flex; flex: none; color: var(--txt-2); }
+.v2 .sn-sec.g-fechados .sn-ic { color: var(--verde); }
+.v2 .sn-sec.g-ligar .sn-ic { color: var(--azul, #3B82F6); }
+.v2 .sn-rot {
+  flex: 1; min-width: 0; margin: 0; font-size: 10.5px; font-weight: 750; line-height: 1.2;
+  letter-spacing: .07em; text-transform: uppercase; color: var(--txt-3);
+}
+.v2 .sn-n {
+  flex: none; min-width: 18px; height: 16px; padding: 0 5px; border-radius: 99px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700; font-variant-numeric: tabular-nums;
+  color: var(--txt-2); background: rgba(var(--tint), .09);
+}
+
+/* --- linha -------------------------------------------------- */
+.v2 .np-item.sn-linha { gap: 9px; padding: 8px 8px 8px 9px; color: var(--txt-2); }
+.v2 .np-item.sn-linha:focus-visible { outline: 2px solid var(--azul, #3B82F6); outline-offset: -2px; }
+.v2 .sn-ponto { flex: none; width: 7px; height: 7px; margin-top: 5px; border-radius: 50%; background: transparent; }
+.v2 .sn-linha.nova .sn-ponto { background: var(--txt); }
+.v2 .sn-tx { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.v2 .sn-l1 { display: flex; align-items: baseline; gap: 10px; }
+.v2 .sn-t {
+  flex: 1; min-width: 0; font-size: 12.5px; font-weight: 600; line-height: 1.35; color: var(--txt-2);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere;
+}
+.v2 .sn-linha.nova .sn-t { color: var(--txt); }
+.v2 .sn-h { flex: none; font-size: 10px; color: var(--txt-3); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.v2 .sn-c {
+  font-size: 11.5px; line-height: 1.42; color: var(--txt-2);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+
+/* etiqueta: prioridade (ícone documento/alvo) ou Encerrado — neutras, sem cor de alerta */
+.v2 .sn-etq {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; height: 18px; margin-top: 3px; padding: 0 7px;
+  border-radius: 99px; border: 1px solid rgba(var(--tint), .16); background: rgba(var(--tint), .04);
+  font-size: 10px; font-weight: 650; white-space: nowrap; color: var(--txt-2);
+}
+.v2 .sn-etq.prio svg { flex: none; color: var(--ambar); }
+.v2 .sn-etq.enc { color: var(--txt-3); background: none; }
+
+/* --- Ver todas ---------------------------------------------- */
+.v2 .sn-ver {
+  display: inline-flex; align-items: baseline; gap: 4px; margin: 0 0 2px 25px; padding: 4px 2px;
+  border: 0; background: none; cursor: pointer;
+  font-family: var(--fonte); font-size: 11.5px; font-weight: 650; color: var(--azul, #3B82F6);
+}
+.v2 .sn-ver:hover { text-decoration: underline; }
+.v2 .sn-ver .num { color: var(--txt-3); font-weight: 600; }
+
+/* --- vazio -------------------------------------------------- */
+.v2 .sn-vazio { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 30px 24px 28px; text-align: center; }
+.v2 .sn-vazio svg { color: var(--txt-3); }
+.v2 .sn-vazio b { font-size: 13px; font-weight: 650; color: var(--txt); }
+.v2 .sn-vazio span { max-width: 270px; font-size: 11.5px; line-height: 1.45; color: var(--txt-2); }

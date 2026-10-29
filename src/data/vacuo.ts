@@ -1,14 +1,16 @@
-// Radar de Atendimento (nome interno: vácuo) — dados do front (risco ao vivo,
+// Radar de Atendimento (nome interno: vácuo) — dados do front (avisos ao vivo,
 // decisões do gestor, histórico de repasses + ranking de conversão).
 // O motor vive no banco (vacuo_avaliar, cron 1 min) e NÃO transfere cliente: com 1 dia
 // útil sem resposta ele pede a decisão do GESTOR, que repassa (pra quem escolher) ou
-// mantém via vacuo_decidir. Os AVISOS chegam por sla_alertas (tipo 'vacuo_aviso').
+// mantém via vacuo_decidir. Os AVISOS chegam pela RPC radar_avisos (dado estruturado).
+// Cliente FECHADO tem fila própria ('vacuo_fechado'), separada da negociação (dono 29/10).
 import { useMemo } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { useOrg } from '@/context/OrgContext';
 import { useAuth } from '@/context/AuthContext';
-import { useSlaAlertas, useSlaAlvos } from '@/data/sla';
+import { nomeContatoExib } from '@/data/slaView';
+import { DEMO_USER } from '@/data/demo';
 
 export const VACUO_REAL = isSupabaseConfigured && !!supabase;
 
@@ -56,128 +58,203 @@ function um<T>(v: T | T[] | null | undefined): T | null { return Array.isArray(v
 export const REPASSES_DEMO: VacuoRepasse[] = [
   {
     id: 'vr-demo-1', conversaId: 'wa-ivone', contatoId: null, oportunidadeId: null,
-    contatoNome: 'Ivone Camargo', deNome: 'Matheus', paraNome: 'Juliana',
-    avisos: 3, minutos: 64, criadoEm: new Date(Date.now() - 2 * 3600e3).toISOString(),
+    contatoNome: 'Ivone Castro dos Santos', deNome: 'Matheus', paraNome: 'Juliana',
+    avisos: 3, minutos: 560, criadoEm: new Date(Date.now() - 3 * 86400e3).toISOString(),
     prioritario: true, prioMotivo: 'documentação enviada',
     decisao: 'repassado', decididoPorNome: 'Matheus', desfeito: false,
     desfecho: 'andamento', fechadoEm: null,
   },
   {
     id: 'vr-demo-2', conversaId: 'wa-terezinha', contatoId: null, oportunidadeId: null,
-    contatoNome: 'Terezinha Lopes', deNome: 'Juliana', paraNome: 'Isadora',
-    avisos: 3, minutos: 71, criadoEm: new Date(Date.now() - 26 * 3600e3).toISOString(),
+    contatoNome: 'Terezinha M. Alves', deNome: 'Juliana', paraNome: 'Isadora',
+    avisos: 3, minutos: 600, criadoEm: new Date(Date.now() - 26 * 3600e3).toISOString(),
     prioritario: false, prioMotivo: null,
     decisao: 'repassado', decididoPorNome: 'Matheus', desfeito: false,
     desfecho: 'fechado', fechadoEm: new Date(Date.now() - 20 * 3600e3).toISOString(),
   },
 ];
-/** Prioridade do aviso, codificada no 1º caractere do título do alerta
-    (o motor prefixa 📄 = documentação enviada, 🔥 = quente/IA entregou/robô completo). */
-export type VacuoPrio = 'docs' | 'quente' | null;
-export function prioDoTitulo(titulo: string | null | undefined): VacuoPrio {
-  if (!titulo) return null;
-  if (titulo.startsWith('📄')) return 'docs';
-  if (titulo.startsWith('🔥')) return 'quente';
-  return null;
-}
+/* ============================================================================
+   AVISOS DO RADAR (v5, 29/10) — dado ESTRUTURADO da RPC radar_avisos: categoria
+   (negociação × cliente fechado × ligar × pedido do gestor), degrau 1–3, desde quando
+   o cliente espera, tempo útil ao vivo e prioridade. Uma fonte para barra, central,
+   telas cheias, inbox e painel — nada de ler emoji ou texto do alerta.
+   Atendente recebe só os próprios avisos; o gestor recebe a equipe (o painel usa).
+   ============================================================================ */
+export type RadarCategoria = 'negociacao' | 'fechado' | 'ligar' | 'cutucada';
+export type RadarEstagio = 1 | 2 | 3;
 
-/** demo: avisos escalonados visíveis nos chips (conversaId → estágio + prioridade) */
-export const AVISOS_DEMO = new Map<string, { n: 1 | 2 | 3; prio: VacuoPrio }>([
-  ['wa-jose', { n: 1, prio: null }],
-  ['wa-antonio', { n: 2, prio: 'quente' }],
-  ['wa-sebastiao', { n: 3, prio: 'docs' }],
-]);
-
-/** Um aviso do Radar pronto pra TELA do atendente. */
-export interface GuardiaoAviso {
+export interface RadarItem {
   alertaId: string;
+  categoria: RadarCategoria;
+  /** degrau do aviso (negociação/fechado); 0 em ligar e pedido do gestor */
+  estagio: 0 | RadarEstagio;
   conversaId: string;
-  n: 1 | 2 | 3;
-  prio: VacuoPrio;
   nome: string;
-  detalhe: string | null;
-  desde: string; // início do episódio (criado_em do alerta)
-}
-
-/** Cliente em risco AGORA (fila ao vivo do painel do admin): aviso ativo + quem é o dono. */
-export interface RadarRisco extends GuardiaoAviso {
   donoId: string | null;
-  /** nome do dono quando já conhecido (demo); no real o painel resolve via useOrgUsuarios */
-  donoNome?: string;
+  donoNome: string | null;
+  /** quando o cliente começou a esperar (ligar: a última mensagem do robô) */
+  desde: string;
+  /** minutos ÚTEIS de espera (seg–sex, horário do Radar), calculados no banco a cada leitura */
+  minutosUteis: number;
+  /** 'Documentação enviada' | 'Interesse confirmado' — só em negociação */
+  prioridade: string | null;
+  cutucadoEm: string | null;
+  cutucadas: number;
+  cutucadoPorNome: string | null;
+  decisaoPedidaEm: string | null;
+  /** minutos ÚTEIS até o gestor ser acionado (só negociação; null = não se aplica). "Já acionado" = decisaoPedidaEm. */
+  decisaoEmMin: number | null;
+  /** trecho da última mensagem do cliente (até 60 caracteres, números longos mascarados pelo banco) */
+  ultimaMsg: string | null;
+  criadoEm: string;
 }
 
-export const GUARDIAO_AVISOS_DEMO: GuardiaoAviso[] = [
-  {
-    alertaId: 'gav-3', conversaId: 'wa-sebastiao', n: 3, prio: 'docs', nome: 'Sebastião R. Nunes',
-    detalhe: 'LEAD PRIORITÁRIO (documentação enviada) — escada acelerada. Responda o cliente para interromper a escalada. Com 1 dia útil sem resposta, o gestor decide se o cliente será repassado.',
-    desde: new Date(Date.now() - 48 * 60e3).toISOString(),
-  },
-  {
-    alertaId: 'gav-2', conversaId: 'wa-antonio', n: 2, prio: 'quente', nome: 'Antônio Pereira Lima',
-    detalhe: 'LEAD PRIORITÁRIO (lead quente — interesse confirmado) — escada acelerada. Responda o cliente para interromper a escalada.',
-    desde: new Date(Date.now() - 27 * 60e3).toISOString(),
-  },
-  {
-    alertaId: 'gav-1', conversaId: 'wa-jose', n: 1, prio: null, nome: 'José Carlos Ferreira',
-    detalhe: 'Responda o cliente para interromper a escalada. Com 1 dia útil sem resposta, o gestor decide o repasse.',
-    desde: new Date(Date.now() - 17 * 60e3).toISOString(),
-  },
-];
+type RowRadar = {
+  alerta_id: string; tipo: string; categoria: RadarCategoria; estagio: number | null;
+  conversa_id: string | null; contato_nome: string | null; contato_telefone: string | null;
+  responsavel_id: string | null; responsavel_nome: string | null;
+  desde: string; minutos_uteis: number | null; prioritario: boolean | null; prioridade: string | null;
+  cutucado_em: string | null; cutucadas: number | null; cutucado_por_nome: string | null;
+  decisao_pedida_em: string | null; decisao_em_min: number | null; ultima_msg: string | null; criado_em: string;
+};
 
-/** Avisos do Radar pro usuário LOGADO (pra pilha na tela + takeover do 3º aviso).
-    Ordena prioritário primeiro, depois estágio mais grave. */
-export const RADAR_RISCO_DEMO: RadarRisco[] = [
-  { ...GUARDIAO_AVISOS_DEMO[0], donoId: null, donoNome: 'Matheus' },
-  { ...GUARDIAO_AVISOS_DEMO[1], donoId: null, donoNome: 'Juliana' },
-  { ...GUARDIAO_AVISOS_DEMO[2], donoId: null, donoNome: 'Isadora' },
-];
-
-/** Fila "em risco agora" do PAINEL (admin): TODOS os avisos ativos da org, com o dono.
-    Prioritário primeiro, depois estágio mais grave, depois o mais antigo. */
-export function useRadarRisco(): RadarRisco[] {
-  const slaQ = useSlaAlertas();
-  const todos = useMemo(
-    () => (slaQ.data?.itens ?? []).filter((a) => a.tipo === 'vacuo_aviso' && !!a.conversa_id),
-    [slaQ.data],
-  );
-  const alvos = useSlaAlvos(todos);
-  return useMemo(() => {
-    const lista: RadarRisco[] = !VACUO_REAL ? [...RADAR_RISCO_DEMO] : todos.map((a) => ({
-      alertaId: a.id,
-      conversaId: a.conversa_id!,
-      n: estagioAviso(a.severidade),
-      prio: prioDoTitulo(a.titulo),
-      nome: alvos.get(a.id)?.nome ?? 'Cliente',
-      detalhe: a.detalhe,
-      desde: a.criado_em,
-      donoId: a.responsavel_id,
-    }));
-    return lista.sort((x, y) => (y.prio ? 1 : 0) - (x.prio ? 1 : 0) || y.n - x.n || x.desde.localeCompare(y.desde));
-  }, [todos, alvos]);
+function mapRadar(r: RowRadar): RadarItem {
+  const e = Number(r.estagio ?? 0);
+  return {
+    alertaId: r.alerta_id,
+    categoria: r.categoria,
+    estagio: (r.categoria === 'negociacao' || r.categoria === 'fechado') ? (Math.min(3, Math.max(1, e)) as RadarEstagio) : 0,
+    conversaId: r.conversa_id!,
+    nome: nomeContatoExib(r.contato_nome, r.contato_telefone),
+    donoId: r.responsavel_id, donoNome: r.responsavel_nome,
+    desde: r.desde, minutosUteis: Number(r.minutos_uteis ?? 0),
+    prioridade: r.categoria === 'negociacao' ? (r.prioridade || null) : null,
+    cutucadoEm: r.cutucado_em, cutucadas: Number(r.cutucadas ?? 0), cutucadoPorNome: r.cutucado_por_nome,
+    decisaoPedidaEm: r.decisao_pedida_em,
+    decisaoEmMin: r.decisao_em_min == null ? null : Number(r.decisao_em_min),
+    ultimaMsg: r.ultima_msg || null,
+    criadoEm: r.criado_em,
+  };
 }
 
-export function useGuardiaoAvisos(): GuardiaoAviso[] {
+/* ---- demo (vite --mode demo): fixtures amarradas às conversas do seed ---- */
+const minAtras = (m: number) => new Date(Date.now() - m * 60e3).toISOString();
+function itemDemo(p: Partial<RadarItem> & Pick<RadarItem, 'alertaId' | 'categoria' | 'conversaId' | 'nome'>): RadarItem {
+  return {
+    estagio: 0, donoId: DEMO_USER.id, donoNome: 'Henrique', desde: minAtras(40), minutosUteis: 40,
+    prioridade: null, cutucadoEm: null, cutucadas: 0, cutucadoPorNome: null, decisaoPedidaEm: null,
+    decisaoEmMin: null, ultimaMsg: null, criadoEm: minAtras(5), ...p,
+  };
+}
+export function radarDemo(): RadarItem[] {
+  return [
+    itemDemo({ alertaId: 'rd-n3', categoria: 'negociacao', estagio: 3, conversaId: 'wa-sebastiao', nome: 'Sebastião R. Nunes',
+      prioridade: 'Documentação enviada', desde: minAtras(26 * 60), minutosUteis: 600, criadoEm: minAtras(2),
+      decisaoPedidaEm: minAtras(40), decisaoEmMin: 0, ultimaMsg: 'Já mandei todos os documentos. Falta mais alguma coisa?' }),
+    itemDemo({ alertaId: 'rd-n2', categoria: 'negociacao', estagio: 2, conversaId: 'wa-antonio', nome: 'Antônio Pereira Lima',
+      prioridade: 'Interesse confirmado', desde: minAtras(96), minutosUteis: 96, criadoEm: minAtras(30),
+      decisaoEmMin: 444, ultimaMsg: 'Recebi a carta do banco aqui' }),
+    itemDemo({ alertaId: 'rd-n1', categoria: 'negociacao', estagio: 1, conversaId: 'wa-jose', nome: 'José Carlos Ferreira',
+      desde: minAtras(44), minutosUteis: 44, criadoEm: minAtras(14), decisaoEmMin: 496 }),
+    itemDemo({ alertaId: 'rd-f3', categoria: 'fechado', estagio: 3, conversaId: 'wa-odete', nome: 'Odete F. Carvalho',
+      desde: minAtras(330), minutosUteis: 330, criadoEm: minAtras(1),
+      ultimaMsg: 'Bom dia, tem alguma novidade do meu processo?' }),
+    itemDemo({ alertaId: 'rd-f1', categoria: 'fechado', estagio: 1, conversaId: 'wa-pedro', nome: 'Pedro Henrique Dias',
+      desde: minAtras(52), minutosUteis: 52, criadoEm: minAtras(20) }),
+    itemDemo({ alertaId: 'rd-l1', categoria: 'ligar', conversaId: 'wa-maria', nome: 'Maria Aparecida Souza',
+      desde: minAtras(150), minutosUteis: 150, criadoEm: minAtras(30) }),
+    // equipe (só o painel do gestor vê)
+    itemDemo({ alertaId: 'rd-e1', categoria: 'negociacao', estagio: 3, conversaId: 'wa-ivone', nome: 'Ivone Castro dos Santos',
+      donoId: 'u-juliana', donoNome: 'Juliana', desde: minAtras(610), minutosUteis: 610, criadoEm: minAtras(70),
+      decisaoPedidaEm: minAtras(40), decisaoEmMin: 0, prioridade: 'Interesse confirmado' }),
+    itemDemo({ alertaId: 'rd-e2', categoria: 'fechado', estagio: 2, conversaId: 'wa-terezinha', nome: 'Terezinha M. Alves',
+      donoId: 'u-isadora', donoNome: 'Isadora', desde: minAtras(140), minutosUteis: 140, criadoEm: minAtras(20) }),
+    itemDemo({ alertaId: 'rd-e3', categoria: 'ligar', conversaId: 'wa-cleusa', nome: 'Cleusa M. Barros',
+      donoId: 'u-juliana', donoNome: 'Juliana', desde: minAtras(200), minutosUteis: 200, criadoEm: minAtras(80) }),
+  ];
+}
+
+/** Avisos ativos do Radar (RPC radar_avisos). Refetch 60s — o motor roda a cada 1 min. */
+export function useRadarAvisos() {
+  const { currentOrg } = useOrg();
+  const orgId = currentOrg.id;
+  return useQuery({
+    queryKey: ['radar-avisos', orgId],
+    enabled: !!orgId,
+    // demo: as fixtures nascem uma vez — refazer a cada minuto desfaria "Já liguei" e "Pedir resposta"
+    ...(VACUO_REAL
+      ? { staleTime: 50_000, refetchInterval: 60_000, refetchOnWindowFocus: true }
+      : { staleTime: Infinity, refetchInterval: false as const, refetchOnWindowFocus: false }),
+    queryFn: async (): Promise<RadarItem[]> => {
+      if (!VACUO_REAL) return radarDemo();
+      const { data, error } = await supabase!.rpc('radar_avisos', { p_org: orgId });
+      if (error) throw new Error(error.message);
+      return ((data as RowRadar[]) ?? []).filter((r) => !!r.conversa_id).map(mapRadar);
+    },
+  });
+}
+
+/** As quatro filas, já ordenadas. `pedidos` = conversas com pedido do gestor ativo (fixadas no topo). */
+export interface RadarFilas {
+  negociacao: RadarItem[];
+  fechado: RadarItem[];
+  ligar: RadarItem[];
+  cutucadas: RadarItem[];
+  pedidos: Set<string>;
+}
+
+const PESO_PRIO: Record<string, number> = { 'Documentação enviada': 2, 'Interesse confirmado': 1 };
+
+/** Último aviso → 1º; dentro do degrau, quem tem pedido do gestor, depois prioridade
+    (documentação, interesse), depois quem espera há mais tempo. */
+function ordenarAvisos(lista: RadarItem[], pedidos: Set<string>): RadarItem[] {
+  return [...lista].sort((a, b) =>
+    b.estagio - a.estagio
+    || (pedidos.has(b.conversaId) ? 1 : 0) - (pedidos.has(a.conversaId) ? 1 : 0)
+    || (PESO_PRIO[b.prioridade ?? ''] ?? 0) - (PESO_PRIO[a.prioridade ?? ''] ?? 0)
+    || a.desde.localeCompare(b.desde));
+}
+
+export function filasDoRadar(itens: RadarItem[]): RadarFilas {
+  const cutucadas = itens.filter((i) => i.categoria === 'cutucada').sort((a, b) => b.criadoEm.localeCompare(a.criadoEm));
+  const pedidos = new Set(cutucadas.map((c) => c.conversaId));
+  return {
+    negociacao: ordenarAvisos(itens.filter((i) => i.categoria === 'negociacao'), pedidos),
+    fechado: ordenarAvisos(itens.filter((i) => i.categoria === 'fechado'), pedidos),
+    ligar: itens.filter((i) => i.categoria === 'ligar').sort((a, b) => a.desde.localeCompare(b.desde)),
+    cutucadas,
+    pedidos,
+  };
+}
+
+/** Filas do PRÓPRIO usuário (barra, central, telas cheias e selos do inbox) — avisos são pessoais. */
+export function useRadarMeus(): RadarFilas & { carregando: boolean } {
   const { user } = useAuth();
-  const slaQ = useSlaAlertas();
-  const meus = useMemo(
-    () => (slaQ.data?.itens ?? []).filter((a) =>
-      // só os clientes do PRÓPRIO usuário (sem usuário carregado = nenhum, nunca "todos")
-      a.tipo === 'vacuo_aviso' && !!a.conversa_id && !!user?.id && a.responsavel_id === user.id),
-    [slaQ.data, user?.id],
+  const q = useRadarAvisos();
+  const uid = user?.id ?? null;
+  const filas = useMemo(
+    () => filasDoRadar((q.data ?? []).filter((i) => !!uid && i.donoId === uid)),
+    [q.data, uid],
   );
-  const alvos = useSlaAlvos(meus);
-  return useMemo(() => {
-    const lista: GuardiaoAviso[] = !VACUO_REAL ? [...GUARDIAO_AVISOS_DEMO] : meus.map((a) => ({
-      alertaId: a.id,
-      conversaId: a.conversa_id!,
-      n: estagioAviso(a.severidade),
-      prio: prioDoTitulo(a.titulo),
-      nome: alvos.get(a.id)?.nome ?? 'Cliente',
-      detalhe: a.detalhe,
-      desde: a.criado_em,
-    }));
-    return lista.sort((x, y) => (y.prio ? 1 : 0) - (x.prio ? 1 : 0) || y.n - x.n || x.desde.localeCompare(y.desde));
-  }, [meus, alvos]);
+  return useMemo(() => ({ ...filas, carregando: q.isLoading }), [filas, q.isLoading]);
+}
+
+/** Filas da EQUIPE (painel /radar do gestor). */
+export function useRadarEquipe(): RadarFilas & { carregando: boolean } {
+  const q = useRadarAvisos();
+  const filas = useMemo(() => filasDoRadar(q.data ?? []), [q.data]);
+  return useMemo(() => ({ ...filas, carregando: q.isLoading }), [filas, q.isLoading]);
+}
+
+/** Por conversa (selos do inbox): o aviso (negociação OU fechado), o ligar e o pedido do gestor. */
+export interface RadarDaConversa { aviso?: RadarItem; ligar?: RadarItem; pedido?: RadarItem }
+export function radarPorConversa(f: RadarFilas): Map<string, RadarDaConversa> {
+  const m = new Map<string, RadarDaConversa>();
+  const pega = (cid: string) => { let x = m.get(cid); if (!x) { x = {}; m.set(cid, x); } return x; };
+  for (const i of [...f.negociacao, ...f.fechado]) pega(i.conversaId).aviso = i;
+  for (const i of f.ligar) pega(i.conversaId).ligar = i;
+  for (const i of f.cutucadas) pega(i.conversaId).pedido = i;
+  return m;
 }
 
 type RowRepasse = {
@@ -215,8 +292,9 @@ export function useVacuoRepasses() {
   return useQuery({
     queryKey: ['vacuo-repasses', orgId],
     enabled: !!orgId,
-    staleTime: 50_000,
-    refetchInterval: 60_000,
+    ...(VACUO_REAL
+      ? { staleTime: 50_000, refetchInterval: 60_000 }
+      : { staleTime: Infinity, refetchInterval: false as const, refetchOnWindowFocus: false }),
     queryFn: async (): Promise<VacuoRepasse[]> => {
       if (!VACUO_REAL) return REPASSES_DEMO;
       const { data, error } = await supabase!
@@ -347,16 +425,17 @@ export interface VacuoDecisao {
 
 export const DECISOES_DEMO: VacuoDecisao[] = [
   {
-    conversaId: 'wa-sebastiao', contatoNome: 'Sebastião R. Nunes', donoId: 'u-juliana', donoNome: 'Juliana',
+    conversaId: 'wa-sebastiao', contatoNome: 'Sebastião R. Nunes', donoId: DEMO_USER.id, donoNome: 'Henrique',
     desde: new Date(Date.now() - 26 * 3600e3).toISOString(), pedidaEm: new Date(Date.now() - 40 * 60e3).toISOString(),
     minutos: 600, prioritario: true, prioMotivo: 'documentação enviada', sugeridoId: 'u-isadora', sugeridoNome: 'Isadora',
     cutucadoEm: null, cutucadas: 0,
   },
   {
-    conversaId: 'wa-odete', contatoNome: 'Odete F. Carvalho', donoId: 'u-matheus', donoNome: 'Matheus',
-    desde: new Date(Date.now() - 30 * 3600e3).toISOString(), pedidaEm: new Date(Date.now() - 2 * 3600e3).toISOString(),
-    minutos: 640, prioritario: false, prioMotivo: null, sugeridoId: 'u-isadora', sugeridoNome: 'Isadora',
-    cutucadoEm: new Date(Date.now() - 3 * 60e3).toISOString(), cutucadas: 1,
+    // cliente FECHADO nunca vira decisão de repasse — a fixture usa só negociação
+    conversaId: 'wa-ivone', contatoNome: 'Ivone Castro dos Santos', donoId: 'u-juliana', donoNome: 'Juliana',
+    desde: new Date(Date.now() - 610 * 60e3).toISOString(), pedidaEm: new Date(Date.now() - 40 * 60e3).toISOString(),
+    minutos: 610, prioritario: true, prioMotivo: 'lead quente (interesse confirmado)', sugeridoId: 'u-isadora', sugeridoNome: 'Isadora',
+    cutucadoEm: null, cutucadas: 0,
   },
 ];
 
@@ -368,8 +447,9 @@ export function useVacuoDecisoes() {
   return useQuery({
     queryKey: ['vacuo-decisoes', orgId],
     enabled: !!orgId && gestor,
-    staleTime: 50_000,
-    refetchInterval: 60_000,
+    ...(VACUO_REAL
+      ? { staleTime: 50_000, refetchInterval: 60_000 }
+      : { staleTime: Infinity, refetchInterval: false as const, refetchOnWindowFocus: false }),
     queryFn: async (): Promise<VacuoDecisao[]> => {
       if (!VACUO_REAL) return DECISOES_DEMO;
       const { data, error } = await supabase!.rpc('vacuo_decisoes_pendentes', { p_org: orgId });
@@ -393,66 +473,60 @@ export function useVacuoDecisoes() {
 }
 
 /** Decide: destinoId = outro atendente → repassa; null → mantém com o dono atual. */
+/** Tudo que uma decisão do gestor mexe. O lote recarrega UMA vez, no fim (não a cada cliente). */
+const CHAVES_DECISAO = ['vacuo-decisoes', 'vacuo-repasses', 'vacuo-ranking', 'radar-avisos', 'sla-alertas', 'notificacoes', 'wa-conversas'];
+export function recarregarRadar(qc: QueryClient) {
+  for (const k of CHAVES_DECISAO) qc.invalidateQueries({ queryKey: [k] });
+}
+
+/** Demo: reproduz o que vacuo_decidir faz no banco (sai da fila e dos avisos; entra no histórico). */
+function decidirNaDemo(qc: QueryClient, orgId: string, p: { conversaId: string; destinoId: string | null }) {
+  const dec = (qc.getQueryData<VacuoDecisao[]>(['vacuo-decisoes', orgId]) ?? []).find((d) => d.conversaId === p.conversaId);
+  qc.setQueryData<VacuoDecisao[]>(['vacuo-decisoes', orgId], (old) => (old ?? []).filter((d) => d.conversaId !== p.conversaId));
+  qc.setQueryData<RadarItem[]>(['radar-avisos', orgId], (old) =>
+    (old ?? []).filter((i) => !(i.conversaId === p.conversaId && i.categoria !== 'ligar')));
+  if (!dec) return;
+  const repassado = !!p.destinoId && p.destinoId !== dec.donoId;
+  const ranking = qc.getQueryData<VacuoRankItem[]>(['vacuo-ranking', orgId]) ?? [];
+  const paraNome = repassado
+    ? (ranking.find((r) => r.usuarioId === p.destinoId)?.nome ?? dec.sugeridoNome ?? 'Atendente')
+    : dec.donoNome;
+  const novo: VacuoRepasse = {
+    id: 'vr-demo-' + p.conversaId + '-' + Date.now(), conversaId: p.conversaId, contatoId: null, oportunidadeId: null,
+    contatoNome: dec.contatoNome, deNome: dec.donoNome, paraNome, avisos: 3, minutos: dec.minutos,
+    criadoEm: new Date().toISOString(), prioritario: dec.prioritario, prioMotivo: dec.prioMotivo,
+    decisao: repassado ? 'repassado' : 'mantido', decididoPorNome: DEMO_USER.name, desfeito: false,
+    desfecho: repassado ? 'andamento' : null, fechadoEm: null,
+  };
+  qc.setQueryData<VacuoRepasse[]>(['vacuo-repasses', orgId], (old) => [novo, ...(old ?? REPASSES_DEMO)]);
+}
+
+/** Decide: destinoId = outro atendente → repassa; null → mantém com o dono atual.
+    semRecarga: usado pelo lote, que recarrega tudo uma vez só no fim. */
 export function useDecidirRepasse() {
   const qc = useQueryClient();
   const { currentOrg } = useOrg();
   const orgId = currentOrg.id;
   return useMutation({
-    mutationFn: async (p: { conversaId: string; destinoId: string | null }) => {
+    mutationFn: async (p: { conversaId: string; destinoId: string | null; semRecarga?: boolean }) => {
       if (!VACUO_REAL) return { decisao: p.destinoId ? 'repassado' : 'mantido' };
       const { data, error } = await supabase!.rpc('vacuo_decidir', { p_conversa: p.conversaId, p_destino: p.destinoId });
       if (error) throw new Error(error.message);
       return data as { decisao: string; para: string };
     },
     onSuccess: (_r, p) => {
-      if (!VACUO_REAL) {
-        qc.setQueryData<VacuoDecisao[]>(['vacuo-decisoes', orgId], (old) => (old ?? []).filter((d) => d.conversaId !== p.conversaId));
-        return;
-      }
-      for (const k of ['vacuo-decisoes', 'vacuo-repasses', 'vacuo-ranking', 'sla-alertas', 'wa-conversas']) {
-        qc.invalidateQueries({ queryKey: [k] });
-      }
+      if (!VACUO_REAL) { decidirNaDemo(qc, orgId, p); return; }
+      if (!p.semRecarga) recarregarRadar(qc);
+    },
+    // decisão vencida, destino inativo…: relê a fila — "A lista foi atualizada" tem de ser verdade
+    onError: (_e, p) => {
+      if (!VACUO_REAL || p.semRecarga) return;
+      for (const k of ['vacuo-decisoes', 'radar-avisos']) qc.invalidateQueries({ queryKey: [k] });
     },
   });
 }
 
-/* ---- "LIGAR PRO CLIENTE": lead parou de responder o ROBÔ por 2 h úteis ---- */
-export interface LigarItem {
-  alertaId: string;
-  conversaId: string;
-  nome: string;
-  donoId: string | null;
-  donoNome?: string;
-  desde: string; // quando o aviso foi criado
-}
-
-export const LIGAR_DEMO: LigarItem[] = [
-  { alertaId: 'lig-1', conversaId: 'wa-neusa', nome: 'Neusa Trindade', donoId: null, donoNome: 'Matheus', desde: new Date(Date.now() - 25 * 60e3).toISOString() },
-  { alertaId: 'lig-2', conversaId: 'wa-joaob', nome: 'João Batista Ramos', donoId: null, donoNome: 'Juliana', desde: new Date(Date.now() - 70 * 60e3).toISOString() },
-];
-
-function useLigarBase(soMeus: boolean): LigarItem[] {
-  const { user } = useAuth();
-  const slaQ = useSlaAlertas();
-  const itens = useMemo(
-    () => (slaQ.data?.itens ?? []).filter((a) =>
-      a.tipo === 'robo_ligar' && !!a.conversa_id && (!soMeus || (!!user?.id && a.responsavel_id === user.id))),
-    [slaQ.data, user?.id, soMeus],
-  );
-  const alvos = useSlaAlvos(itens);
-  return useMemo(() => {
-    if (!VACUO_REAL) return soMeus ? LIGAR_DEMO.slice(0, 1) : LIGAR_DEMO;
-    return itens.map((a) => ({
-      alertaId: a.id, conversaId: a.conversa_id!, nome: alvos.get(a.id)?.nome ?? 'Cliente',
-      donoId: a.responsavel_id, desde: a.criado_em,
-    })).sort((x, y) => x.desde.localeCompare(y.desde));
-  }, [itens, alvos, soMeus]);
-}
-
-/** Clientes pra LIGAR do próprio usuário (aviso pessoal — só o dono vê). */
-export function useLigarMeus(): LigarItem[] { return useLigarBase(true); }
-/** Visão de equipe (painel /radar, admin). */
-export function useLigarEquipe(): LigarItem[] { return useLigarBase(false); }
+/* ---- "LIGAR PARA O CLIENTE": lead parou de responder o ROBÔ por 2 h úteis (fila 'ligar' do Radar) ---- */
 
 /** "Já liguei": encerra o aviso e registra a ligação na conversa. */
 export function useConcluirLigacao() {
@@ -467,13 +541,11 @@ export function useConcluirLigacao() {
       return data as { ok: boolean };
     },
     onSuccess: (_r, conversaId) => {
+      // sai da fila na hora (demo e real); no real o refetch confirma
+      qc.setQueryData<RadarItem[]>(['radar-avisos', orgId], (old) =>
+        (old ?? []).filter((i) => !(i.categoria === 'ligar' && i.conversaId === conversaId)));
       if (!VACUO_REAL) return;
-      qc.setQueryData(['sla-alertas', orgId], (old: unknown) => {
-        const o = old as { itens?: Array<{ tipo: string; conversa_id: string | null }> } | undefined;
-        if (!o?.itens) return old;
-        return { ...o, itens: o.itens.filter((a) => !(a.tipo === 'robo_ligar' && a.conversa_id === conversaId)) };
-      });
-      qc.invalidateQueries({ queryKey: ['sla-alertas'] });
+      for (const k of ['radar-avisos', 'sla-alertas', 'notificacoes']) qc.invalidateQueries({ queryKey: [k] });
     },
   });
 }
@@ -488,58 +560,44 @@ export function radarHorarioAberto(cfg: { horaInicio: number; horaFim: number } 
   return !['Sat', 'Sun'].includes(dia) && hora >= ini && hora < fim;
 }
 
-/* ---- "👉 CUTUCAR": o gestor manda o atendente responder agora ---- */
+/* ---- "PEDIR RESPOSTA" (antigo cutucar): o gestor pede ao atendente que responda agora ---- */
 export const CUTUCAR_INTERVALO_MS = 10 * 60e3; // mesmo intervalo mínimo da RPC
 
-/** Gestor cutuca o dono do cliente (aviso de tela cheia + sino + nota na conversa). */
+/** Gestor pede resposta ao dono do cliente (tela cheia + sino + nota interna na conversa). */
 export function useCutucar() {
   const qc = useQueryClient();
   const { currentOrg } = useOrg();
   const orgId = currentOrg.id;
   return useMutation({
     mutationFn: async (conversaId: string) => {
-      if (!VACUO_REAL) return { ok: true, atendente: 'atendente', cutucadas: 1 };
+      if (!VACUO_REAL) return { ok: true, atendente: 'Henrique', cutucadas: 1 };
       const { data, error } = await supabase!.rpc('vacuo_cutucar', { p_conversa: conversaId });
       if (error) throw new Error(error.message);
       return data as { ok: boolean; atendente: string; cutucadas: number };
     },
     onSuccess: (_r, conversaId) => {
       const agora = new Date().toISOString();
-      const dec = (qc.getQueryData<VacuoDecisao[]>(['vacuo-decisoes', orgId]) ?? []).find((d) => d.conversaId === conversaId);
+      const marca = (i: RadarItem): RadarItem => (i.conversaId === conversaId ? { ...i, cutucadoEm: agora, cutucadas: i.cutucadas + 1 } : i);
       qc.setQueryData<VacuoDecisao[]>(['vacuo-decisoes', orgId], (old) =>
         (old ?? []).map((d) => (d.conversaId === conversaId ? { ...d, cutucadoEm: agora, cutucadas: d.cutucadas + 1 } : d)));
-      if (VACUO_REAL) { qc.invalidateQueries({ queryKey: ['vacuo-decisoes'] }); return; }
-      // demo: o próprio usuário faz o papel do atendente e vê o aviso de tela cheia na hora
-      qc.setQueryData<Cutucada[]>(['vacuo-cutucadas-demo'], (old) => [
-        { alertaId: 'cut-demo-' + Date.now(), conversaId, nome: dec?.contatoNome ?? 'Cliente',
-          detalhe: `Este cliente está sem resposta desde 23/10 às 11:51, mesmo depois dos avisos. Matheus pediu pra você responder agora.`,
-          desde: agora },
-        ...(old ?? []),
-      ]);
+      qc.setQueryData<RadarItem[]>(['radar-avisos', orgId], (old) => {
+        const lista = (old ?? []).map(marca);
+        if (VACUO_REAL) return lista;
+        // demo: o próprio usuário faz o papel do atendente e recebe o pedido na tela na hora
+        const base = lista.find((i) => i.conversaId === conversaId && (i.categoria === 'negociacao' || i.categoria === 'fechado'))
+          ?? (qc.getQueryData<VacuoDecisao[]>(['vacuo-decisoes', orgId]) ?? []).map((d) => itemDemo({
+            alertaId: 'dec-' + d.conversaId, categoria: 'negociacao', estagio: 3, conversaId: d.conversaId, nome: d.contatoNome,
+            desde: d.desde, minutosUteis: d.minutos ?? 0 })).find((i) => i.conversaId === conversaId);
+        if (!base) return lista;
+        return [...lista.filter((i) => !(i.categoria === 'cutucada' && i.conversaId === conversaId)),
+          { ...base, alertaId: 'cut-demo-' + conversaId + '-' + agora, categoria: 'cutucada', estagio: 0,
+            donoId: DEMO_USER.id, donoNome: 'Henrique', prioridade: null, cutucadoEm: agora,
+            cutucadoPorNome: DEMO_USER.name, criadoEm: agora }];
+      });
+      if (VACUO_REAL) for (const k of ['vacuo-decisoes', 'radar-avisos']) qc.invalidateQueries({ queryKey: [k] });
+    },
+    onError: () => {
+      if (VACUO_REAL) for (const k of ['vacuo-decisoes', 'radar-avisos']) qc.invalidateQueries({ queryKey: [k] });
     },
   });
-}
-
-export interface Cutucada { alertaId: string; conversaId: string; nome: string; detalhe: string | null; desde: string }
-
-export const CUTUCADAS_DEMO: Cutucada[] = [];
-
-/** Cutucões do gestor pro PRÓPRIO usuário (dono do cliente). */
-export function useCutucadasMeus(): Cutucada[] {
-  const { user } = useAuth();
-  const slaQ = useSlaAlertas();
-  const itens = useMemo(
-    () => (slaQ.data?.itens ?? []).filter((a) =>
-      a.tipo === 'vacuo_cutucada' && !!a.conversa_id && !!user?.id && a.responsavel_id === user.id),
-    [slaQ.data, user?.id],
-  );
-  const alvos = useSlaAlvos(itens);
-  const demoQ = useQuery({ queryKey: ['vacuo-cutucadas-demo'], enabled: !VACUO_REAL, staleTime: Infinity, queryFn: async () => CUTUCADAS_DEMO });
-  return useMemo(() => {
-    if (!VACUO_REAL) return demoQ.data ?? CUTUCADAS_DEMO;
-    return itens.map((a) => ({
-      alertaId: a.id, conversaId: a.conversa_id!, nome: alvos.get(a.id)?.nome ?? 'Cliente',
-      detalhe: a.detalhe, desde: a.criado_em,
-    })).sort((x, y) => y.desde.localeCompare(x.desde));
-  }, [itens, alvos, demoQ.data]);
 }

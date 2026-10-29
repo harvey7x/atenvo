@@ -9,7 +9,10 @@ import { useScriptsResumoEtapas } from '../hooks/scriptsResumo';
 import { useJanelaCanal, rotuloJanela } from '@/data/cloudApi';
 import { useSlaAlertas } from '@/data/sla';
 import { indexPorChave, tipoLabel, tempoRelativo } from '@/data/slaView';
-import { useVacuoRepasses, repassesPorConversa, estagioAviso, prioDoTitulo, AVISOS_DEMO, useLigarMeus, useConcluirLigacao, type VacuoRepasse, type VacuoPrio } from '@/data/vacuo';
+import { useVacuoRepasses, repassesPorConversa, useRadarMeus, radarPorConversa, useConcluirLigacao, useVacuoConfig, type VacuoRepasse } from '@/data/vacuo';
+import { RadarSelosCard, RadarSeloCabecalho, RadarProximo, useRadarEmSequencia, radarDicaLigar } from '../components/RadarSelos';
+import { rt, rtTit, rtTxt, textoErroLigacao } from '../lib/radarTextos';
+import { IcEraDe, IcLigar, IcEmDia } from '../components/RadarIcones';
 import { useOportunidadesDoContato, useFunisDaOrg, chamarGarantirEntrada, useColunasFunil, useMoverOportunidade, classificarMovimento, MOTIVOS_NAO_ELEGIVEL, traduzErroKanban, bloqueioAdministrativo } from '@/data/kanban';
 import { useAdmStatus } from '@/data/admFechados';
 import { useChecklist } from '@/data/checklist';
@@ -342,6 +345,18 @@ export default function WhatsAppV2() {
   // quem não vê todos nunca fica em "Todos"/"Não atribuídos" (aba salva de antes da regra → "Meus")
   const abas = vis.veTodos ? TABS : TABS.filter(([id]) => !ABAS_SO_ADMIN.includes(id));
   useEffect(() => { if (!vis.veTodos && ABAS_SO_ADMIN.includes(tab)) setTab('meus'); }, [vis.veTodos, tab]);
+  // atalho ?aba=fechados (Central do Radar → "Abrir a aba Fechados"): troca a aba e limpa a URL.
+  // Fechados abre no grupo "Aguardando resposta": aberto (só nesta sessão) e com a lista no topo.
+  const abaParam = params.get('aba');
+  useEffect(() => {
+    if (!abaParam) return;
+    if (TABS.some(([id]) => id === abaParam)) setTab(abaParam as TabId);
+    if (abaParam === 'fechados') {
+      setGruposFechados((cur) => { if (!cur.has('__aguarda')) return cur; const s = new Set(cur); s.delete('__aguarda'); return s; });
+      window.setTimeout(() => document.querySelector('.wa-lista')?.scrollTo({ top: 0 }), 60);
+    }
+    const p = new URLSearchParams(params); p.delete('aba'); setParams(p, { replace: true });
+  }, [abaParam]); // eslint-disable-line react-hooks/exhaustive-deps
   // trilho segmentado: rola de lado com SETAS clicáveis + arrasto do mouse — quem
   // não tem trackpad/gesto lateral (notebook fraco, mouse simples) não consegue
   // rolar. A aba ativa sempre entra na vista (ex.: reabriu no "Arquivadas", ponta).
@@ -480,20 +495,27 @@ export default function WhatsAppV2() {
   /* ---------- dados satélites ---------- */
   const slaQ = useSlaAlertas();
   const slaPorConversa = useMemo(() => indexPorChave(slaQ.data?.itens ?? [], 'conversa_id'), [slaQ.data]);
-  /* Radar de Atendimento: selo "era de X → Y" por conversa + estágio do aviso (1º/2º/3º).
-     No demo os avisos vêm de AVISOS_DEMO (sla_alertas não existe sem backend). */
+  /* Radar de Atendimento: selos por conversa — aviso (negociação OU cliente fechado), pedido do
+     gestor e ligar — + o "Era de X" do repasse. Aviso é PESSOAL: só o dono do cliente vê, nem o
+     admin vê o do cliente alheio (dono 23/10); a visão de equipe é o /radar. */
   const vacuoQ = useVacuoRepasses();
   const repassePorConv = useMemo(() => repassesPorConversa(vacuoQ.data ?? []), [vacuoQ.data]);
-  // aviso é NOTIFICAÇÃO PESSOAL: só aparece pro dono do cliente — nem o admin, que enxerga a
-  // carteira de todos, vê o aviso do cliente alheio (dono 23/10). A visão de equipe é o /radar.
-  const avisoVacuoDe = useCallback((cid: string): { n: 1 | 2 | 3; prio: VacuoPrio } | null => {
-    if (!WA_REAL) return AVISOS_DEMO.get(cid) ?? null;
-    const a = (slaPorConversa.get(cid) ?? []).find((x) => x.tipo === 'vacuo_aviso' && !!user?.id && x.responsavel_id === user.id);
-    return a ? { n: estagioAviso(a.severidade), prio: prioDoTitulo(a.titulo) } : null;
-  }, [slaPorConversa, user?.id]);
-  // "📞 Ligar": lead do próprio usuário que parou de responder o robô (aviso pessoal, como o vácuo)
-  const ligarMeus = useLigarMeus();
-  const ligarPorConv = useMemo(() => new Set(ligarMeus.map((l) => l.conversaId)), [ligarMeus]);
+  const radarMeus = useRadarMeus();
+  // depende das LISTAS (estáveis entre renders), não do objeto que useRadarMeus remonta a cada render —
+  // senão as contagens das abas recalculariam a cada tecla no composer
+  const radarPorConv = useMemo(
+    () => radarPorConversa(radarMeus),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [radarMeus.negociacao, radarMeus.fechado, radarMeus.ligar, radarMeus.cutucadas, radarMeus.pedidos],
+  );
+  const radarCfg = useVacuoConfig().data;
+  const diaUtilRadar = ((radarCfg?.horaFim ?? 18) - (radarCfg?.horaInicio ?? 9)) * 60;
+  // em sequência: a resposta da equipe encerra o aviso na hora (selo, barra, Central) e o
+  // cabeçalho oferece por 10 s o próximo cliente da mesma família
+  const radarSeq = useRadarEmSequencia({
+    orgId: currentOrg.id, conversaId: current.id, msgs: current.msgs,
+    filas: radarMeus, porConversa: radarPorConv, real: WA_REAL,
+  });
   const concluirLigacao = useConcluirLigacao();
   const atividadesQ = useWaAtividades(WA_REAL ? idVisivel || null : null);
   const statusQ = useStatusDefs();
@@ -625,6 +647,14 @@ export default function WhatsAppV2() {
   // mesma régua da aba Pendentes. Dirige o selo da aba Fechados e a seção do topo dela
   // (pedido do dono 15/10: fechado que mandava mensagem ficava invisível pro time).
   const aguardaResposta = (c: WaContact) => (c.unread ?? 0) > 0 || !!c.aguardando;
+  // Fechados: a mesma régua OU um aviso/pedido do Radar ativo (o Radar só conta resposta HUMANA —
+  // um retorno automático não tira o cliente da espera). Assim o número da aba nunca fica menor que
+  // o da barra do Radar, que conta só quem já chegou ao 1º aviso (contagens diferentes de propósito).
+  const aguardaFechado = (c: WaContact) => {
+    if (aguardaResposta(c)) return true;
+    const r = radarPorConv.get(c.id);
+    return !!(r?.aviso || r?.pedido);
+  };
   const passaTab = (c: WaContact, t: TabId) => {
     // 2ª camada da visibilidade (a lista já vem recortada): cliente de outro nunca entra
     if (!vis.podeVer(c.respId)) return false;
@@ -654,10 +684,10 @@ export default function WhatsAppV2() {
     for (const [t] of TABS) n[t] = base.filter((c) => passaTab(c, t)).length;
     // Fechados: o selo da aba conta só quem AGUARDA RESPOSTA — o total da carteira nunca
     // mudava de cara e deixava passar fechado sem resposta (pedido do dono 15/10).
-    n.fechadosAguarda = base.filter((c) => passaTab(c, 'fechados') && aguardaResposta(c)).length;
+    n.fechadosAguarda = base.filter((c) => passaTab(c, 'fechados') && aguardaFechado(c)).length;
     return n;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contacts, filtroCanais, filtroTransporte, filtroEtapas, filtroEtiquetas, filtroAtendentes, filtroIA, filtroSituacao, filtroNaoLidas, filtroArquivadas, filtroPeriodo, canalPorId, term, relogioMs, user?.id, vis.veTodos]);
+  }, [contacts, filtroCanais, filtroTransporte, filtroEtapas, filtroEtiquetas, filtroAtendentes, filtroIA, filtroSituacao, filtroNaoLidas, filtroArquivadas, filtroPeriodo, canalPorId, term, relogioMs, user?.id, vis.veTodos, radarPorConv]);
   // contadores podem aparecer/sumir e mudar a largura do trilho → revê as setas
   useEffect(() => { atualizarSetas(); }, [tabCounts, atualizarSetas]);
   const visiveis = useMemo(() => {
@@ -671,14 +701,22 @@ export default function WhatsAppV2() {
     // "Todos" é a visão geral: lista ÚNICA, sem dividir por atendente (pedido do dono)
     if (tab === 'todos') return [['', visiveis]] as [string, WaContact[]][];
     // Fechados é fila de pós-venda, não carteira por atendente: "Aguardando resposta"
-    // primeiro (espera mais antiga no topo — fixadas na frente), depois "Em dia" por
-    // recência (ordem que visiveis já traz). Chaves __aguarda/__emdia têm rótulo próprio
-    // no cabeçalho do grupo e convivem com o recolhimento normal (gruposFechados).
+    // primeiro, depois "Em dia" por recência (ordem que visiveis já traz). Chaves
+    // __aguarda/__emdia têm rótulo próprio no cabeçalho do grupo e convivem com o
+    // recolhimento normal (gruposFechados).
+    // Radar (v5): dentro de "Aguardando resposta", o estágio do Radar manda — pedido do gestor,
+    // último aviso, 2º, 1º, fora do Radar. Fixar desempata DENTRO do mesmo degrau (o último aviso
+    // nunca fica abaixo de dezenas de fixadas); depois, a espera mais antiga.
     if (tab === 'fechados') {
-      const porEspera = (a: WaContact, b: WaContact) =>
-        a.fixada === b.fixada ? (a.lastAtMs ?? 0) - (b.lastAtMs ?? 0) : a.fixada ? -1 : 1;
-      const aguarda = visiveis.filter(aguardaResposta).sort(porEspera);
-      const emDia = visiveis.filter((c) => !aguardaResposta(c));
+      const degrau = (c: WaContact) => { const r = radarPorConv.get(c.id); return r?.pedido ? 4 : r?.aviso?.estagio ?? 0; };
+      const esperaMs = (c: WaContact) => {
+        const t = Date.parse(radarPorConv.get(c.id)?.aviso?.desde ?? c.aguardandoDesde ?? '');
+        return Number.isFinite(t) ? t : (c.lastAtMs ?? 0);
+      };
+      const porUrgencia = (a: WaContact, b: WaContact) =>
+        degrau(b) - degrau(a) || (!!a.fixada === !!b.fixada ? 0 : a.fixada ? -1 : 1) || esperaMs(a) - esperaMs(b);
+      const aguarda = visiveis.filter(aguardaFechado).sort(porUrgencia);
+      const emDia = visiveis.filter((c) => !aguardaFechado(c));
       const out: [string, WaContact[]][] = [];
       if (aguarda.length > 0) out.push(['__aguarda', aguarda]);
       if (emDia.length > 0) out.push(['__emdia', emDia]);
@@ -699,7 +737,18 @@ export default function WhatsAppV2() {
     return [...m.entries()].sort((a, b) =>
       rank(a[0]) - rank(b[0]) || (nomePorId(a[0]) ?? '').localeCompare(nomePorId(b[0]) ?? '', 'pt-BR'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visiveis, usuarios, user?.id, tab, vis.veTodos]);
+  }, [visiveis, usuarios, user?.id, tab, vis.veTodos, radarPorConv]);
+  /* "Próximo aguardando" (Radar): abre o próximo cliente sem tirar a pessoa da aba em que está quando
+     ele já aparece nela; senão vai pelo mesmo atalho da Central (?conversa=, que escolhe a aba certa —
+     cliente fechado cai em Fechados). */
+  const abrirProximoRadar = (id: string) => {
+    if (visiveis.some((c) => c.id === id)) {
+      inbox.selectContact(id);
+      window.setTimeout(() => document.querySelector(`[data-cid="${CSS.escape(id)}"]`)?.scrollIntoView({ block: 'nearest' }), 60);
+      return;
+    }
+    setParams((p) => { p.set('conversa', id); return p; });
+  };
 
   /* ---------- envio / composer ---------- */
   const optoutTexto = 'Contato marcado como não incomodar — mensagens bloqueadas.';
@@ -930,8 +979,8 @@ export default function WhatsAppV2() {
     const atrasado = wait && (wait.tier === 'critico' || wait.tier === 'vermelho');
     const out: string[] = [];
     if (atrasado && wait) out.push('Sem resposta ' + wait.label.replace('Aguardando ', ''));
-    // vacuo_aviso fica FORA do agregado ⚠ — tem chip dedicado "⏰ Nº aviso" (evita sinal em dobro)
-    for (const a of slaPorConversa.get(c.id) ?? []) { if (a.tipo === 'vacuo_aviso' || a.tipo === 'robo_ligar' || a.tipo === 'vacuo_cutucada') continue; out.push(tipoLabel(a.tipo) + (a.detalhe ? ' — ' + a.detalhe : '')); }
+    // avisos do Radar ficam FORA do agregado ⚠ — têm selo próprio no card (evita sinal em dobro)
+    for (const a of slaPorConversa.get(c.id) ?? []) { if (a.tipo === 'vacuo_aviso' || a.tipo === 'vacuo_fechado' || a.tipo === 'robo_ligar' || a.tipo === 'vacuo_cutucada') continue; out.push(tipoLabel(a.tipo) + (a.detalhe ? ' — ' + a.detalhe : '')); }
     if (c.precisaHumano) out.push('Precisa de atendimento humano');
     if (analisarNome(c.name).fraco && conversaAtiva({ status: c.status, arquivada: c.arquivada })) out.push('Cadastro incompleto: preencha o nome do cliente');
     // opt-out NÃO entra no agregado ⚠ — já tem chip dedicado "Não incomodar" (evita sinal em dobro)
@@ -973,7 +1022,7 @@ export default function WhatsAppV2() {
                     key={id} type="button" role="tab" aria-selected={tab === id}
                     className={'wa-aba' + (tab === id ? ' on' : '')}
                     title={id === 'pendentes' ? 'Pendentes inclui mensagens não lidas e clientes aguardando resposta.'
-                      : id === 'fechados' ? 'Clientes fechados (pós-venda). O número mostra quantos aguardam resposta.' : undefined}
+                      : id === 'fechados' ? rtTxt('extra.inbox.aba_fechados', {}, 'Clientes fechados (pós-venda). O número conta todos os que aguardam resposta, inclusive os que ainda não chegaram ao 1º aviso do Radar.') : undefined}
                     onClick={() => { if (arrastoRef.current.moveu) { arrastoRef.current.moveu = false; return; } mudarAba(id); }}
                   >
                     {/* Fechados: selo vermelho SÓ com quem aguarda resposta — o total da carteira não alerta nada */}
@@ -1070,16 +1119,15 @@ export default function WhatsAppV2() {
                           <span className="p">{c.last || '—'}</span>
                           <span className="chips">
                             {(() => { const cor = corDaSituacao(c, sit.texto); return <span className={'cchip etapa sit-' + sit.variante} title="Situação no funil" style={cor ? { background: cor + '26', color: cor } : undefined}>{sit.texto}</span>; })()}
+                            {/* Radar: UM selo logo após a situação (pedido > último > 2º > 1º) + Ligar à parte; só do dono */}
+                            <RadarSelosCard r={radarPorConv.get(c.id)} diaUtil={diaUtilRadar} />
                             {c.iaAtiva && <span className="cchip ia" title="A IA/bot está atendendo esta conversa agora"><IcBot />IA</span>}
                             {(() => {
-                              const av = avisoVacuoDe(c.id);
-                              if (!av) return null;
-                              const prioTxt = av.prio === 'docs' ? 'LEAD PRIORITÁRIO (documentação enviada) — escada acelerada. ' : av.prio === 'quente' ? 'LEAD PRIORITÁRIO (interesse confirmado) — escada acelerada. ' : '';
-                              return <span className={'cchip vacuo a' + av.n + (av.prio ? ' p' : '')} title={prioTxt + (av.n === 3 ? 'ÚLTIMO aviso do Radar de Atendimento: responda — com 1 dia útil sem resposta o gestor decide o repasse' : `${av.n}º de 3 avisos do Radar de Atendimento — o cliente está sem resposta; responda para interromper a escalada`)}>{av.prio === 'docs' ? '📄' : av.prio === 'quente' ? '🔥' : '⏰'} {av.n}º aviso</span>;
+                              const rp = repassePorConv.get(c.id);
+                              if (!rp) return null;
+                              const dica = [rt('extra.selo.era_de', { de: rp.deNome, para: rp.paraNome }).texto, rp.desfecho === 'fechado' ? rtTit('extra.painel.desfecho_fechou', { para: rp.paraNome }, rp.paraNome + ' fechou') + '.' : ''].filter(Boolean).join('\n');
+                              return <span className="cchip repasse" title={dica}><IcEraDe tamanho={9} />{rtTit('extra.selo.era_de', { de: rp.deNome }, 'Era de ' + rp.deNome)}</span>;
                             })()}
-                            {(slaPorConversa.get(c.id) ?? []).some((a) => a.tipo === 'vacuo_cutucada' && !!user?.id && a.responsavel_id === user.id) && <span className="cchip cutucada" title="O gestor pediu pra você responder este cliente agora">👉 Gestor</span>}
-                            {ligarPorConv.has(c.id) && <span className="cchip ligar" title="Radar de Atendimento: o cliente parou de responder o robô há 2 horas úteis — ligue para retomar a venda">📞 Ligar</span>}
-                            {(() => { const rp = repassePorConv.get(c.id); return rp ? <span className="cchip repasse" title={`Radar de Atendimento: este cliente era de ${rp.deNome} e o gestor repassou para ${rp.paraNome} (1 dia útil sem resposta)${rp.desfecho === 'fechado' ? ` — ${rp.paraNome} fechou` : ''}`}>↪ era de {rp.deNome}</span> : null; })()}
                             {alertas.length > 0 && <span className="cchip alerta" title={alertas.join(' · ')}>⚠{alertas.length > 1 ? ' ' + alertas.length : ''}</span>}
                             {c.contatoId && bloqueados.has(c.contatoId) && <span className="cchip alerta" style={{ color: 'var(--rubro)', borderColor: 'rgba(var(--rubro-rgb),.4)' }} title={optoutTexto}>Não incomodar</span>}
                             {/* "Finalizado" só quando a situação NÃO já é terminal (ganho/perdido/cancelado) — evita verde ao lado de PERDIDO (Adendo 3) */}
@@ -1145,19 +1193,31 @@ export default function WhatsAppV2() {
                     </span>
                   )}
                   <span className="wa-hchip" title="Atendente responsável">{current.respId ? nomePorId(current.respId) ?? 'Atendente' : 'Não atribuído'}</span>
-                  {ligarPorConv.has(current.id) && (
-                    <button type="button" className="wa-hchip ligar" disabled={concluirLigacao.isPending}
-                      title="O cliente parou de responder o robô. Depois de ligar, clique para registrar a ligação e encerrar o aviso."
-                      onClick={() => concluirLigacao.mutate(current.id, { onSuccess: () => aoAvisar({ tom: 'ok', texto: 'Ligação registrada na conversa' }), onError: (e) => aoAvisar({ tom: 'erro', texto: (e as Error).message }) })}>
-                      📞 Ligar · já liguei
-                    </button>
-                  )}
+                  {/* Radar: o mesmo selo do card com o tempo ("Último aviso · sem resposta há 5 h"); logo
+                      depois da resposta que encerra o aviso, "Próximo aguardando" por 10 s */}
+                  <RadarSeloCabecalho r={radarPorConv.get(current.id)} diaUtil={diaUtilRadar} />
+                  <RadarProximo seq={radarSeq} diaUtil={diaUtilRadar} aoAbrir={abrirProximoRadar} />
+                  {(() => {
+                    const lg = radarPorConv.get(current.id)?.ligar;
+                    if (!lg) return null;
+                    return (
+                      <button type="button" className="wa-hchip ligar" disabled={concluirLigacao.isPending}
+                        title={radarDicaLigar(lg, diaUtilRadar)}
+                        onClick={() => concluirLigacao.mutate(current.id, { onSuccess: () => aoAvisar({ tom: 'ok', texto: rtTxt('extra.central.ok_ligacao', {}, 'Ligação registrada na conversa.') }), onError: (e) => aoAvisar({ tom: 'erro', texto: textoErroLigacao(e) }) })}>
+                        <IcLigar tamanho={10} />{rtTit('selo.ligar', {}, 'Ligar')} · {rt('central.botao.ja_liguei').botao_primario ?? 'Já liguei'}
+                      </button>
+                    );
+                  })()}
                   {(() => {
                     const rp: VacuoRepasse | undefined = repassePorConv.get(current.id);
                     if (!rp) return null;
-                    return rp.desfecho === 'fechado'
-                      ? <span className="wa-hchip repasse ok" title={`Radar de Atendimento: ${rp.paraNome} fechou este cliente, que era de ${rp.deNome} (o gestor repassou após 1 dia útil sem resposta)`}>✓ {rp.paraNome} fechou · era de {rp.deNome}</span>
-                      : <span className="wa-hchip repasse" title={`Radar de Atendimento: este cliente era de ${rp.deNome} e o gestor repassou para ${rp.paraNome} (1 dia útil sem resposta)`}>🛡️ era de {rp.deNome} → {rp.paraNome}</span>;
+                    const eraDe = rtTit('extra.selo.era_de', { de: rp.deNome }, 'Era de ' + rp.deNome);
+                    const dica = rt('extra.selo.era_de', { de: rp.deNome, para: rp.paraNome }).texto ?? '';
+                    if (rp.desfecho === 'fechado') {
+                      const fechou = rtTit('extra.painel.desfecho_fechou', { para: rp.paraNome }, rp.paraNome + ' fechou');
+                      return <span className="wa-hchip repasse ok" title={[dica, fechou + '.'].filter(Boolean).join('\n')}><IcEmDia tamanho={10} />{fechou} · {eraDe}</span>;
+                    }
+                    return <span className="wa-hchip repasse" title={dica}><IcEraDe tamanho={10} />{eraDe}</span>;
                   })()}
                   {current.tags.slice(0, 3).map((t) => <EtiquetaChip key={t} nome={t} cor={corDaEtiqueta(t, etiquetasQ.data)} title={'Etiqueta: ' + t} />)}
                   {current.tags.length > 3 && <EtiquetaChip mais nome={'+' + (current.tags.length - 3)} title={current.tags.slice(3).join(' · ')} />}
@@ -1525,7 +1585,7 @@ export default function WhatsAppV2() {
               <ul className="ativ-tl">
                 {(atividadesQ.data ?? []).map((a) => (
                   <li key={a.id}>
-                    <b>{a.usuario ?? (a.motivo?.startsWith('Radar') ? '🛡️ Radar de Atendimento' : 'Alguém')}</b> {a.tipo === 'assumido' ? 'assumiu o atendimento' : a.tipo === 'transferido' ? 'transferiu o atendimento' : a.tipo === 'devolvido' ? 'devolveu para a fila' : a.tipo}
+                    <b>{a.usuario ?? (a.motivo?.startsWith('Radar') ? 'Radar de Atendimento' : 'Alguém')}</b> {a.tipo === 'assumido' ? 'assumiu o atendimento' : a.tipo === 'transferido' ? 'transferiu o atendimento' : a.tipo === 'devolvido' ? 'devolveu para a fila' : a.tipo}
                     {' · '}{new Date(a.em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                     {a.motivo && <div className="mot">Motivo: {a.motivo}</div>}
                   </li>

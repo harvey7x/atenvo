@@ -1500,8 +1500,14 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, repasse, fichaInfo, o
       {/* L2 TÍTULO — o único elemento forte do card */}
       <div className="kc-r1">
         <span className="kc-nm" title={l.nome}>{fone ? <span className="num">{fone}</span> : nomeCard}{fone && <i className="kc-semnome">· sem nome</i>}</span>
-        {(() => { const av = sla.find((a) => a.tipo === 'vacuo_aviso'); return av ? <span className={'sla-chip s-' + av.severidade} title={av.titulo + ' — Radar de Atendimento'}>⏰ {estagioAviso(av.severidade)}º aviso</span> : null; })()}
-        {repasse && <span className="kc-flag repasse" title={`Radar de Atendimento: este cliente era de ${repasse.deNome} e o gestor repassou para ${repasse.paraNome} (1 dia útil sem resposta)${repasse.desfecho === 'fechado' ? ` — ${repasse.paraNome} fechou` : ''}`}>↪ era de {repasse.deNome}</span>}
+        {(() => {
+          // Radar: negociação e cliente fechado têm avisos próprios; o selo diz o degrau, a dica diz a categoria
+          const av = sla.find((a) => a.tipo === 'vacuo_aviso' || a.tipo === 'vacuo_fechado');
+          if (!av) return null;
+          const n = estagioAviso(av.severidade);
+          return <span className={'sla-chip s-' + av.severidade} title={[av.titulo, av.detalhe].filter(Boolean).join(' — ')}>{n === 3 ? 'Último aviso' : n + 'º aviso'}</span>;
+        })()}
+        {repasse && <span className="kc-flag repasse" title={`Radar de Atendimento: repassado de ${repasse.deNome} para ${repasse.paraNome} por decisão do gestor${repasse.desfecho === 'fechado' ? `. ${repasse.paraNome} fechou` : ''}`}>Era de {repasse.deNome}</span>}
         {l.status === 'ganho' && <span className="kc-flag ganho" title={'Fechado como ganho' + (repasse ? ` por ${repasse.paraNome} (era de ${repasse.deNome})` : '')}>Ganho</span>}
         {l.status === 'perdido' && <span className="kc-flag perdido" title={'Perdido' + (l.motivoPerda ? ' · ' + rotuloPerdaCompleto(l.motivoPerda, l.motivoNaoElegivel) : '')}>Perdido</span>}
       </div>

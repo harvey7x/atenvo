@@ -890,6 +890,8 @@ export function useSendWaMessage() {
   const { currentOrg } = useOrg();
   const qc = useQueryClient();
   return useMutation({
+    // identifica o envio da equipe: o Radar encerra na hora o aviso do cliente respondido (RadarSelos)
+    mutationKey: ['wa-send'],
     // 'always': o React Query PAUSA mutações quando acha que está offline (navigator.onLine
     // pisca no Wi-Fi/aba em segundo plano) e só retoma quando "volta" — a mensagem ficava
     // presa em "enviando" até recarregar. Envio vai direto; se a rede falhar, cai no onError.

@@ -112,21 +112,70 @@
 .v2 .conv2 .cchip.etapa { border-color: transparent; }
 .v2 .conv2 .cchip.alerta { color: var(--ambar); border-color: rgba(var(--ambar-rgb), .35); }
 .v2 .conv2 .cchip.fim { color: var(--verde); border-color: rgba(var(--verde-rgb), .35); }
-/* Guardião do vácuo: aviso escalonado (1º âmbar → 2º/3º rubro, o 3º pulsa) + selo de repasse */
-.v2 .conv2 .cchip.vacuo.a1 { color: var(--ambar); border-color: rgba(var(--ambar-rgb), .4); background: var(--ambar-bg); }
-.v2 .conv2 .cchip.vacuo.a2, .v2 .conv2 .cchip.vacuo.a3 { color: var(--rubro); border-color: rgba(var(--rubro-rgb), .45); background: var(--rubro-bg); }
-.v2 .conv2 .cchip.vacuo.a3 { animation: vacuo-pulsa 1.6s ease-in-out infinite; }
-@keyframes vacuo-pulsa { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
-[data-perf] .v2 .conv2 .cchip.vacuo.a3 { animation: none; }
-/* lead PRIORITÁRIO (docs/interesse confirmado): mais peso pra saltar na fila */
-.v2 .conv2 .cchip.vacuo.p { font-weight: 700; border-width: 1.5px; }
+/* ---- Radar de Atendimento (v5): UM selo por card, logo após a situação, no tamanho dos cchip.
+   Cor = urgência: 1º aviso âmbar · 2º contorno rubro · último rubro cheio · pedido do gestor âmbar
+   (vence o degrau). Ícone = família: balão (em negociação) · selo com visto (cliente fechado, verde).
+   Prioridade = ícone pequeno DENTRO do selo. Ligar = selo próprio, azul. Nada pisca nem pulsa. ---- */
+.v2 .conv2 .cchip.rdr-selo { display: inline-flex; align-items: center; gap: 3px; max-width: 150px; font-weight: 700; letter-spacing: .04em; }
+.v2 .rdr-selo .rdr-selo-rot, .v2 .rdr-hselo .rdr-selo-rot { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.v2 .rdr-selo-fam { display: inline-flex; flex-shrink: 0; }
+.v2 .rdr-selo-prio {
+  display: inline-flex; flex-shrink: 0; margin-left: 1px; padding-left: 3px;
+  border-left: 1px solid color-mix(in srgb, currentColor 40%, transparent);
+}
+.v2 .rdr-selo svg, .v2 .rdr-hselo svg { flex-shrink: 0; }
+/* 1º aviso: âmbar */
+.v2 .conv2 .cchip.rdr-selo.e1, .v2 .wa-hchip.rdr-hselo.e1 { color: var(--ambar); border-color: rgba(var(--ambar-rgb), .45); background: var(--ambar-bg); }
+/* 2º aviso: contorno rubro */
+.v2 .conv2 .cchip.rdr-selo.e2, .v2 .wa-hchip.rdr-hselo.e2 { color: var(--rubro); border-color: rgba(var(--rubro-rgb), .75); background: transparent; }
+/* último aviso: rubro cheio */
+.v2 .conv2 .cchip.rdr-selo.e3, .v2 .wa-hchip.rdr-hselo.e3 { color: #fff; border-color: var(--rubro); background: var(--rubro); }
+/* pedido do gestor: âmbar mais carregado — o texto "Gestor pediu" diferencia do 1º aviso */
+.v2 .conv2 .cchip.rdr-selo.pedido, .v2 .wa-hchip.rdr-hselo.pedido { color: var(--ambar); border-color: rgba(var(--ambar-rgb), .8); background: rgba(var(--ambar-rgb), .2); font-weight: 800; }
+/* cliente fechado: ícone verde (sobre o rubro cheio fica branco, para ler; o verde nunca é fundo) */
+.v2 .rdr-selo.f-fechado:not(.e3) .rdr-selo-fam, .v2 .rdr-hselo.f-fechado:not(.e3) .rdr-selo-fam { color: var(--verde); }
+/* Ligar: lead parado no atendimento automático — azul (ação, não alarme) */
+.v2 .conv2 .cchip.rdr-selo.ligar { color: var(--azul, #3B82F6); border-color: rgba(var(--azul-rgb, 59, 130, 246), .45); background: rgba(var(--azul-rgb, 59, 130, 246), .1); }
+/* cabeçalho da conversa aberta: o mesmo selo + o tempo ("Último aviso · sem resposta há 5 h") */
+.v2 .wa-hchip.rdr-hselo { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; font-weight: 700; }
+.v2 .rdr-hselo .rdr-hselo-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; text-transform: none; letter-spacing: 0; font-weight: 500; }
+/* "Era de {de}" (repasse decidido pelo gestor): neutro, com seta de traço */
 .v2 .conv2 .cchip.repasse { color: var(--txt-2); border-color: rgba(var(--tint), .22); background: rgba(var(--tint), .06); text-transform: none; letter-spacing: 0; }
-.v2 .wa-hchip.repasse { color: var(--txt-2); border-color: rgba(var(--tint), .25); }
+.v2 .wa-hchip.repasse { color: var(--txt-2); border-color: rgba(var(--tint), .25); max-width: 220px; }
 .v2 .wa-hchip.repasse.ok { color: var(--verde); border-color: rgba(var(--verde-rgb), .4); }
-/* Radar "📞 Ligar": lead parou de responder o robô — azul (ação, não alarme) */
-.v2 .conv2 .cchip.ligar { color: var(--azul, #3B82F6); border-color: rgba(var(--azul-rgb, 59, 130, 246), .45); background: rgba(var(--azul-rgb, 59, 130, 246), .1); font-weight: 700; }
-.v2 .wa-hchip.ligar { cursor: pointer; font-family: var(--fonte); color: var(--azul, #3B82F6); border-color: rgba(var(--azul-rgb, 59, 130, 246), .45); background: rgba(var(--azul-rgb, 59, 130, 246), .08); }
+/* ícone em linha com o texto (o chip segue bloco, com reticências no nome longo) */
+.v2 .conv2 .cchip.repasse svg { vertical-align: -1.5px; margin-right: 3px; }
+.v2 .wa-hchip.repasse svg { vertical-align: -1.5px; margin-right: 4px; }
+/* "Ligar · Já liguei" no cabeçalho: registra a ligação e encerra o aviso */
+.v2 .wa-hchip.ligar { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; font-family: var(--fonte); color: var(--azul, #3B82F6); border-color: rgba(var(--azul-rgb, 59, 130, 246), .45); background: rgba(var(--azul-rgb, 59, 130, 246), .08); }
 .v2 .wa-hchip.ligar:hover { background: rgba(var(--azul-rgb, 59, 130, 246), .16); }
+.v2 .wa-hchip.ligar:disabled { opacity: .6; cursor: default; }
+.v2 .wa-hchip.ligar:focus-visible { outline: 2px solid var(--azul, #3B82F6); outline-offset: 1px; }
+/* em sequência: "Próximo aguardando: {cliente} · Sem resposta há {tempo}" por 10 s no cabeçalho */
+.v2 .wa-rdr-prox {
+  display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: min(460px, 100%); height: 21px;
+  padding: 0 8px 0 7px; border-radius: 99px; cursor: pointer; font-family: var(--fonte); font-size: 10.5px; font-weight: 600;
+  color: var(--txt); background: rgba(var(--tint), .06); border: 1px solid rgba(var(--tint), .16);
+  animation: wa-rdr-prox-entra .2s var(--ease) both;
+}
+.v2 .wa-rdr-prox:hover { background: rgba(var(--tint), .1); border-color: rgba(var(--tint), .28); }
+.v2 .wa-rdr-prox:focus-visible { outline: 2px solid var(--azul, #3B82F6); outline-offset: 1px; }
+.v2 .wa-rdr-prox .rdr-prox-ic { display: inline-flex; flex-shrink: 0; color: var(--txt-2); }
+.v2 .wa-rdr-prox.f-fechado .rdr-prox-ic { color: var(--verde); }
+.v2 .wa-rdr-prox .rdr-prox-nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .wa-rdr-prox .rdr-prox-tp { flex-shrink: 0; color: var(--txt-3); font-weight: 500; white-space: nowrap; }
+.v2 .wa-rdr-prox .rdr-prox-tp::before { content: '·'; margin-right: 6px; }
+.v2 .wa-rdr-prox .rdr-prox-vai { display: inline-flex; flex-shrink: 0; color: var(--txt-2); transition: transform .15s var(--ease); }
+.v2 .wa-rdr-prox:hover .rdr-prox-vai { transform: translateX(2px); }
+@keyframes wa-rdr-prox-entra { from { opacity: 0; transform: translateY(-2px); } to { opacity: 1; transform: none; } }
+:root[data-perf="lite"] .v2 .wa-rdr-prox { animation: none; }
+:root[data-perf="lite"] .v2 .wa-rdr-prox .rdr-prox-vai { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  .v2 .wa-rdr-prox { animation: none; }
+  .v2 .wa-rdr-prox .rdr-prox-vai { transition: none; }
+}
+/* região viva do "Próximo aguardando" (só leitor de tela) */
+.v2 .wa-rdr-sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .v2 .conv2 .m { text-align: right; flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
 .v2 .conv2 .h2 { font-size: 10px; color: var(--txt-3); }
 .v2 .conv2 .nl {
@@ -771,6 +820,3 @@
 :root[data-tema="light"] .v2 .wa-filtro .fp-it { background: rgba(0, 0, 0, .03); border-color: rgba(0, 0, 0, .1); }
 :root[data-tema="light"] .v2 .wa-filtro .fp-it:hover { background: rgba(0, 0, 0, .06); }
 :root[data-tema="light"] .v2 .ib2 .fbadge { color: #F4F5F7; }
-
-/* Radar "👉 Gestor": o gestor cutucou — responder agora */
-.v2 .conv2 .cchip.cutucada { color: var(--ambar); border-color: rgba(var(--ambar-rgb), .55); background: var(--ambar-bg); font-weight: 800; }

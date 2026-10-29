@@ -11,7 +11,8 @@ export type SlaTipo =
   | 'prazo_2_dias_estourado'
   | 'vacuo_aviso'
   | 'robo_ligar'
-  | 'vacuo_cutucada';
+  | 'vacuo_cutucada'
+  | 'vacuo_fechado';
 
 export interface SlaAlerta {
   id: string;
@@ -62,12 +63,14 @@ export const TIPO_META: Record<SlaTipo, { label: string; emoji: string }> = {
   parado_ha_muito_tempo: { label: 'Parado no Kanban', emoji: '⏳' },
   prazo_2_dias_em_risco: { label: 'Prazo em risco', emoji: '⏰' },
   prazo_2_dias_estourado: { label: '2 dias sem fechamento', emoji: '🚨' },
-  // Guardião do vácuo: avisos escalonados (amarelo=1º, vermelho=2º, crítico=3º/último)
-  vacuo_aviso: { label: 'Cliente no vácuo', emoji: '⏰' },
+  // Radar de Atendimento: avisos escalonados (amarelo=1º, vermelho=2º, crítico=último) — negociação
+  vacuo_aviso: { label: 'Cliente em negociação aguardando', emoji: '•' },
+  // Radar: cliente FECHADO aguardando resposta — fila própria, separada da negociação (dono 29/10)
+  vacuo_fechado: { label: 'Cliente fechado aguardando', emoji: '•' },
   // Radar: lead parou de responder o robô por 2 h úteis → o dono liga
-  robo_ligar: { label: 'Ligar pro cliente', emoji: '📞' },
-  // Radar: o gestor cutucou o atendente pra responder agora
-  vacuo_cutucada: { label: 'Gestor pediu resposta', emoji: '👉' },
+  robo_ligar: { label: 'Ligar para o cliente', emoji: '•' },
+  // Radar: o gestor pediu ao atendente que responda agora
+  vacuo_cutucada: { label: 'Pedido do gestor', emoji: '•' },
 };
 export function tipoLabel(t: SlaTipo): string { return TIPO_META[t]?.label ?? t; }
 export function tipoEmoji(t: SlaTipo): string { return TIPO_META[t]?.emoji ?? '•'; }

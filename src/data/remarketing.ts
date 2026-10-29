@@ -53,7 +53,7 @@ export interface RmktDashboard {
   tempo_medio_recuperacao_h: number | null; tempo_medio_sem_resposta_h: number | null;
   tarefas_pendentes: number; tarefas_vencidas: number;
 }
-export interface Notificacao { id: string; tipo: string; titulo: string; corpo: string | null; rota: string | null; lidaEm: string | null; criadoEm: string }
+export interface Notificacao { id: string; tipo: string; titulo: string; corpo: string | null; rota: string | null; lidaEm: string | null; criadoEm: string; /** conversa/registro de origem (o sino agrupa uma linha por cliente) */ refId?: string | null }
 
 /* ---------- demo (modo demonstração — nada é gravado) ---------- */
 const hAtras = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString();
@@ -272,15 +272,20 @@ export function useNotificacoes() {
       if (!REMARKETING_REAL) return DEMO_NOTIFS;
       let q = supabase!
         .from('notificacoes')
-        .select('id, tipo, titulo, corpo, rota, lida_em, criado_em')
+        .select('id, tipo, titulo, corpo, rota, ref_id, lida_em, criado_em')
         .eq('organizacao_id', currentOrg.id);
       if (soDe) q = q.eq('usuario_id', soDe);
+      // o sino mostra: tudo que não foi lido + o que foi lido/criado nas últimas 24 h (+ lidas antigas dos
+      // outros módulos). Só "as 100 mais recentes" deixava um repasse ou pedido do gestor não lido sumir em
+      // poucas horas, quando o Radar grava muitos avisos.
+      const dia = new Date(Date.now() - 86_400_000).toISOString();
       const { data, error } = await q
+        .or(`lida_em.is.null,lida_em.gte."${dia}",criado_em.gte."${dia}",and(tipo.not.like.vacuo*,tipo.not.like.robo*)`)
         .order('criado_em', { ascending: false })
-        .limit(50);
+        .limit(500);
       if (error) throw new Error(error.message);
-      return ((data ?? []) as { id: string; tipo: string; titulo: string; corpo: string | null; rota: string | null; lida_em: string | null; criado_em: string }[])
-        .map((n) => ({ id: n.id, tipo: n.tipo, titulo: n.titulo, corpo: n.corpo, rota: n.rota, lidaEm: n.lida_em, criadoEm: n.criado_em }));
+      return ((data ?? []) as { id: string; tipo: string; titulo: string; corpo: string | null; rota: string | null; ref_id: string | null; lida_em: string | null; criado_em: string }[])
+        .map((n) => ({ id: n.id, tipo: n.tipo, titulo: n.titulo, corpo: n.corpo, rota: n.rota, refId: n.ref_id, lidaEm: n.lida_em, criadoEm: n.criado_em }));
     },
   });
 }
