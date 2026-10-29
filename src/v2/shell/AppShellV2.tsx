@@ -21,6 +21,8 @@ import { aplicarTema, lerTema, salvarTema, type Tema } from '../lib/tema';
 import { deveMostrarIntroDia, marcarIntroVista } from '../lib/introDia';
 import { IntroDia } from '../components/IntroDia';
 import { AvisoAtualizacao } from '../components/AvisoAtualizacao';
+import { ComparadorVisual } from '../components/ComparadorVisual';
+import { DEMO_MODE } from '@/lib/demo';
 import { assinarAcento, lerAcento, salvarAcento, type Acento } from '../lib/acento';
 
 /* ícones do chrome da topbar (traço fino, como o resto do v2) */
@@ -533,6 +535,9 @@ export default function AppShellV2() {
         <AvisoAtualizacao />
         {/* Radar de Atendimento (23/10): takeover do último aviso (a pílula fica na barra) */}
         <GuardiaoAvisos bloqueado={introAberta} />
+        {/* prévia da repaginada (27/10): comparador Antes/Depois, só no demo LOCAL
+            (nunca num build publicado, nem no demo de cliente) */}
+        {import.meta.env.DEV && DEMO_MODE && <ComparadorVisual />}
       </div>
 
     </div>

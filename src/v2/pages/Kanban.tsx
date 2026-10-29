@@ -1051,7 +1051,7 @@ export default function KanbanV2() {
                 <div
                   className="kb-cab"
                   /* sublinhado na COR da coluna (anatomia da referência) — borda real de 2px */
-                  style={{ borderBottom: `2px solid ${col.cor}73` }}
+                  style={{ borderBottom: `2px solid ${col.cor}73`, ['--c']: col.cor } as React.CSSProperties}
                   draggable={podeConfig && !col.entrada}
                   onDragStart={(e) => {
                     if (!podeConfig || col.entrada) { e.preventDefault(); return; }
@@ -1547,7 +1547,7 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, repasse, fichaInfo, o
         <div className="kc-etqs">
           {todasEtiquetas.slice(0, 2).map((t) => {
             const cor = corDaEtiqueta(t, etiquetasCat);
-            return <span key={t} className="kc-etq" title={t} style={{ color: cor, background: cor + '24', borderColor: cor + '4D' }}>{t}</span>;
+            return <span key={t} className="kc-etq" title={t} style={{ color: cor, background: cor + '24', borderColor: cor + '4D', ['--c']: cor } as React.CSSProperties}>{t}</span>;
           })}
           {todasEtiquetas.length > 2 && <span className="kc-etq mais" title={todasEtiquetas.slice(2).join(' · ')}>+{todasEtiquetas.length - 2}</span>}
         </div>
@@ -1971,7 +1971,7 @@ function LeadModalV2({ demo, modo, lead, lf, setLf, selContato, setSelContato, s
                 <div className="kb-tags">
                   {clienteTags.map((t) => {
                     const cor = corDaEtiqueta(t, etiquetas);
-                    return <span key={t} className="kb-tag-ro" style={{ background: cor + '22', color: cor, borderColor: cor + '55' }}>{t}</span>;
+                    return <span key={t} className="kb-tag-ro" style={{ background: cor + '22', color: cor, borderColor: cor + '55', ['--c']: cor } as React.CSSProperties}>{t}</span>;
                   })}
                 </div>
               </div>
@@ -1986,7 +1986,7 @@ function LeadModalV2({ demo, modo, lead, lf, setLf, selContato, setSelContato, s
                     <button
                       key={t.nome} type="button"
                       className="kb-tag"
-                      style={on ? { background: t.cor + '22', color: t.cor, borderColor: t.cor + '66' } : undefined}
+                      style={on ? ({ background: t.cor + '22', color: t.cor, borderColor: t.cor + '66', ['--c']: t.cor } as React.CSSProperties) : undefined}
                       onClick={() => setLf((f) => ({ ...f, etiquetas: on ? f.etiquetas.filter((x) => x !== t.nome) : [...f.etiquetas, t.nome] }))}
                     >
                       {t.nome}
@@ -2095,10 +2095,10 @@ function DetalheModalV2({ demo, l, colunas, eventosDemo, fichaDemoStatus, aoFech
       <DetRow l="Etapa" v={colNome(l.colunaId)} />
       <DetRow l="Lembrete no card" v={l.lembrete ? <span className="kd-lem"><IcSino />{l.lembrete}</span> : null} />
       {l.contatoEtiquetas.length > 0 && (
-        <DetRow l="Etiquetas do cliente" v={<span className="kb-tags" style={{ justifyContent: 'flex-end' }}>{l.contatoEtiquetas.map((t) => { const cor = corDaEtiqueta(t, etiquetasCat); return <span key={t} className="kb-tag-ro" style={{ background: cor + '22', color: cor, borderColor: cor + '55' }}>{t}</span>; })}</span>} />
+        <DetRow l="Etiquetas do cliente" v={<span className="kb-tags" style={{ justifyContent: 'flex-end' }}>{l.contatoEtiquetas.map((t) => { const cor = corDaEtiqueta(t, etiquetasCat); return <span key={t} className="kb-tag-ro" style={{ background: cor + '22', color: cor, borderColor: cor + '55', ['--c']: cor } as React.CSSProperties}>{t}</span>; })}</span>} />
       )}
       {l.etiquetas.length > 0 && (
-        <DetRow l="Etiquetas do caso" v={<span className="kb-tags" style={{ justifyContent: 'flex-end' }}>{l.etiquetas.map((t) => { const cor = corDaEtiqueta(t, etiquetasCat); return <span key={t} className="kb-tag-ro" style={{ background: cor + '22', color: cor, borderColor: cor + '55' }}>{t}</span>; })}</span>} />
+        <DetRow l="Etiquetas do caso" v={<span className="kb-tags" style={{ justifyContent: 'flex-end' }}>{l.etiquetas.map((t) => { const cor = corDaEtiqueta(t, etiquetasCat); return <span key={t} className="kb-tag-ro" style={{ background: cor + '22', color: cor, borderColor: cor + '55', ['--c']: cor } as React.CSSProperties}>{t}</span>; })}</span>} />
       )}
       <DetRow l="Resumo do caso" v={l.observacoes ? <span className="kd-resumo">{l.observacoes}</span> : null} />
 

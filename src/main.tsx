@@ -13,6 +13,8 @@ import { resolverEAplicarPerf } from './v2/lib/perf';
 import { aplicarAcento, lerAcento } from './v2/lib/acento';
 import './v2/serio.css'; // visual Corporativo FIXO (decisão do dono 29/08) — global: vale no login/mobile também
 import './v2/movimento.css'; // camada de movimento (dono 22/10) — Leve e Completo iguais; reverter = apagar esta linha
+import './v2/repaginada.css'; // repaginada "mais profissional" (dono 27/10) — só age com [data-repaginada] na raiz
+import { aplicarRepaginada, lerRepaginada } from './v2/lib/repaginada';
 import { sinalizarAtualizacao } from './v2/lib/atualizacao';
 import { tentarRecarga } from '@/lib/recargaChunk';
 import { registerSW } from 'virtual:pwa-register';
@@ -68,6 +70,10 @@ if (typeof document !== 'undefined') aplicarAcento(lerAcento());
 // no modo sério (serio.css) — sem alternador, sem preferência. O tema
 // escuro/claro continua livre; reverter = apagar esta linha.
 if (typeof document !== 'undefined') document.documentElement.setAttribute('data-visual', 'corp');
+
+// Repaginada (prévia 27/10): marca [data-repaginada] antes do primeiro paint.
+// Padrão ligado; o comparador do demo grava a escolha por dispositivo.
+if (typeof document !== 'undefined') aplicarRepaginada(lerRepaginada());
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, retry: 1, refetchOnWindowFocus: false } },

@@ -1,0 +1,1065 @@
+/* ============================================================
+   REPAGINADA — "mais profissional" (pedido do dono 27/10).
+   Camada ADITIVA sobre Platina + Corporativo + movimento, ligada por
+   [data-repaginada] na raiz (lib/repaginada.ts). Sem o atributo, o
+   sistema é byte-idêntico ao que está no ar. Só apresentação: zero
+   mudança de comportamento, dado ou texto.
+
+   O diagnóstico (telas do demo, 27/10): tudo é a MESMA caixa cinza com
+   o mesmo fio — página, cartão, cabeçalho e controle no mesmo plano.
+   A linguagem de SaaS maduro (Linear, Stripe, Attio) separa em 3 níveis:
+     1) página — fundo calmo;
+     2) cartão — superfície ELEVADA (fio com bisel no topo + sombra curta);
+     3) controle — campo AFUNDADO, seleção como "polegar" elevado.
+   Mais: um acento só, usado onde há estado (seleção/foco/primário);
+   barra lateral com seleção em tinta (não o disco azul cheio); topo
+   limpo (pílulas neutras, ponto de cor faz o alarme); tipografia de
+   título com mais presença. Mantidos de propósito (decisões do dono):
+   cápsula flutuante preta + sombra, tema dual, acentos da gota, família
+   Instrument Sans e o tamanho dos números de KPI.
+
+   Especificidade: o prefixo DUPLICA o atributo (`[data-repaginada]
+   [data-repaginada]`) para vencer shell.css (0,5,1) e serio.css em
+   qualquer ordem de import, sem !important (exceto onde o corp já usa).
+   ============================================================ */
+
+/* ---- 1. TOKENS — escuro (o conteúdo segue CINZA sob a cápsula preta,
+   regra do dono 21/10; só ganha um degrau de separação) ---- */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2,
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2.app-v2,
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2.portal-v2 {
+  /* ESCURO MAIS FUNDO (dono 29/10: "muito acinzentado"): página quase preta,
+     cartão um degrau acima, controles mais um — a hierarquia vem do degrau e
+     do fio, não do cinza. Referência enviada: painel "Kravio" (preto + cartões
+     grafite + cor só onde há dado). */
+  --base: #0A0B0D;
+  --vidro-a: #131417;                       /* cartão: luz de cima → base um tico mais funda */
+  --vidro-b: #111215;
+  --surface: #17181C;
+  --linha: rgba(255, 255, 255, .06);
+  --fio-a: rgba(255, 255, 255, .10);
+  --fio-b: rgba(255, 255, 255, .055);
+  --txt: #EDEEF0;
+  --txt-2: #9DA2AB;
+  --txt-3: #7C828D;                         /* ≥ 4,6:1 no cartão e no card do Kanban (AA) */
+  --r-card: 12px;
+  --r-ctl: 8px;
+  --sombra-1: 0 1px 2px rgba(0, 0, 0, .5), 0 10px 26px -16px rgba(0, 0, 0, .85);
+  --sombra-2: 0 2px 6px rgba(0, 0, 0, .5), 0 18px 42px -14px rgba(0, 0, 0, .9);
+  --rp-elev: #1D1F23;                       /* polegar/seleção elevada */
+  --rp-menu: #1A1B1F;                       /* menus/popovers flutuantes */
+  --rp-campo: #0D0E10;                      /* campo afundado (abaixo do cartão) */
+  --rp-campo-fio: rgba(255, 255, 255, .08);
+  --rp-campo-fio-hover: rgba(255, 255, 255, .15);
+  --rp-trilho: #0F1013;                     /* trilho de segmentado / coluna do kanban (um fio acima da página) */
+  --rp-bisel: inset 0 1px 0 rgba(255, 255, 255, .04);
+  --rp-cartao-solido: #17181C;              /* card de kanban (opaco, sobre o trilho) */
+
+  /* cores de STATUS mais fundas e sóbrias (dono: "um vermelho mais escuro,
+     algo que combine"): saem o salmão, o menta e o ouro claro; entram tons
+     de joia, legíveis sobre o cartão (contraste ≥ 4,7:1) */
+  --rubro: #E0504F;
+  --rubro-rgb: 224, 80, 79;
+  --rubro-bg: rgba(224, 80, 79, .13);
+  --verde: #3FAA79;
+  --verde-rgb: 63, 170, 121;
+  --verde-bg: rgba(63, 170, 121, .12);
+  --ambar: #CF9A3A;
+  --ambar-rgb: 207, 154, 58;
+  --ambar-bg: rgba(207, 154, 58, .12);
+  /* ponte dos componentes v1 reusados no .v2 (Modal, ficha, documentos,
+     gravador): o acento deles era PRATA (#C9CED6, branco sobre prata ilegível)
+     e o verde do v1 vazava pelo :root — tudo passa a seguir a paleta nova */
+  --accent: var(--platina-a);
+  --accent-ink: var(--azul);
+  --accent-soft: rgba(var(--azul-rgb), .14);
+  --accent-soft-2: rgba(var(--azul-rgb), .22);
+  --ring: rgba(var(--azul-rgb), .22);
+  --ok: var(--verde); --ok-soft: var(--verde-bg);
+  --warn: var(--ambar); --warn-soft: var(--ambar-bg);
+  --err: var(--rubro); --err-soft: var(--rubro-bg);
+  --info: var(--azul); --info-soft: rgba(var(--azul-rgb), .14);
+  --display-a: var(--txt);
+  --display-b: var(--txt);
+  --cor-ring: var(--dado-1);
+  --dado-1: #4A78DA;
+  --dado-1-rgb: 74, 120, 218;
+  /* chrome dos componentes v1 reusados (ver tokens.css) acompanha a base nova */
+  --surface-2: rgba(255, 255, 255, .03);
+  --line-2: rgba(255, 255, 255, .07);
+  --hover: rgba(255, 255, 255, .045);
+  --shadow-pop: 0 24px 60px rgba(0, 0, 0, .7);
+}
+
+/* acento AZUL (padrão, atributo ausente) — sai o azul elétrico (#0F62FE /
+   #4C8DFF), entra um cobalto mais fundo: botão primário com texto branco a
+   5,5:1, links/tintas a 4,8:1 sobre o cartão */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]):not([data-acento]) .v2,
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]):not([data-acento]) .v2.app-v2,
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]):not([data-acento]) .v2.portal-v2 {
+  --azul: #4A78E6;
+  --azul-rgb: 74, 120, 230;
+  --platina-a: #2F5FDB;
+  --platina-b: #2F5FDB;
+}
+/* acentos da gota no escuro: mesmas famílias, um degrau mais fundas */
+html:root[data-repaginada][data-repaginada][data-acento="verde"]:not([data-tema="light"]) .v2 {
+  --azul: #2FB574;
+  --azul-rgb: 47, 181, 116;
+}
+html:root[data-repaginada][data-repaginada][data-acento="dourado"]:not([data-tema="light"]) .v2 {
+  --azul: #D9A640;
+  --azul-rgb: 217, 166, 64;
+}
+
+/* cápsula da barra lateral: com a página quase preta, "preto sobre preto"
+   sumiria — vira um painel GRAFITE um degrau acima (como o cartão), com fio
+   e a mesma sombra difusa que o dono gosta */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2.app-v2 { --sb-cor: #101114; }
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .sb-rail,
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .sb-fundo {
+  background: linear-gradient(180deg, #131417, #0F1013);
+  border-color: rgba(255, 255, 255, .075);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05),
+    0 2px 6px rgba(0, 0, 0, .5), 0 20px 46px -10px rgba(0, 0, 0, .85);
+}
+
+/* ---- 1b. TOKENS — claro (carta branca sobre cinza frio, sombra real curta) ---- */
+html:root[data-repaginada][data-repaginada][data-tema="light"] .v2,
+html:root[data-repaginada][data-repaginada][data-tema="light"] .v2.app-v2,
+html:root[data-repaginada][data-repaginada][data-tema="light"] .v2.portal-v2 {
+  --base: #F3F4F6;
+  --vidro-a: #FFFFFF;
+  --vidro-b: #FFFFFF;
+  --surface: #FFFFFF;
+  --linha: rgba(17, 24, 39, .08);
+  --fio-a: rgba(17, 24, 39, .085);
+  --fio-b: rgba(17, 24, 39, .085);
+  --txt: #12141A;
+  --txt-2: #555B66;
+  --txt-3: #878D97;
+  --r-card: 12px;
+  --r-ctl: 8px;
+  --sombra-1: 0 1px 2px rgba(16, 24, 40, .05), 0 6px 18px -10px rgba(16, 24, 40, .12);
+  --sombra-2: 0 2px 6px rgba(16, 24, 40, .06), 0 20px 44px -14px rgba(16, 24, 40, .2);
+  --rp-elev: #FFFFFF;
+  --rp-campo: #FFFFFF;
+  --rp-campo-fio: rgba(17, 24, 39, .13);
+  --rp-campo-fio-hover: rgba(17, 24, 39, .22);
+  --rp-trilho: rgba(17, 24, 39, .05);
+  --rp-bisel: inset 0 1px 0 rgba(255, 255, 255, .9);
+  --rp-cartao-solido: #FFFFFF;
+}
+
+/* ---- 2. TIPOGRAFIA de base: suavização + números tabulares ---- */
+html:root[data-repaginada][data-repaginada] .v2 {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+html:root[data-repaginada][data-repaginada] .v2 .num,
+html:root[data-repaginada][data-repaginada] .v2 .kpi .val,
+html:root[data-repaginada][data-repaginada] .v2 td { font-variant-numeric: tabular-nums; }
+
+/* rolagem fina e discreta (especificidade zero: quem esconde a barra, como a
+   lista da sidebar, continua vencendo) */
+:where(html[data-repaginada]) :where(.v2, .v2 *) {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(var(--tint), .16) transparent;
+}
+
+/* ---- 3. PÁGINA: fundo com uma luz MUITO baixa no topo (só escuro) ----
+   o corp crava background com !important — a repaginada é a nova palavra final */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2.app-v2 {
+  background:
+    radial-gradient(1100px 380px at 58% -140px, rgba(110, 140, 210, .045), transparent 70%),
+    var(--base) !important;
+}
+html:root[data-repaginada][data-repaginada][data-tema="light"] .v2.app-v2 { background: var(--base) !important; }
+
+html:root[data-repaginada][data-repaginada] .v2 .pagina:not(.cheia) { padding: 26px 30px 36px; }
+html:root[data-repaginada][data-repaginada] .v2 .kb-pg { padding: 26px 30px 14px; }
+
+/* cabeçalho de página: título com presença, subtítulo calmo, respiro antes do conteúdo */
+html:root[data-repaginada][data-repaginada] .v2 .ph {
+  margin-bottom: 20px; padding-bottom: 18px; align-items: center;
+  border-bottom: 1px solid var(--linha);
+}
+html:root[data-repaginada][data-repaginada] .v2 .ph h2,
+html:root[data-repaginada][data-repaginada] .v2 .d5-cab h2 {
+  font-size: 23px; font-weight: 650; letter-spacing: -.028em; line-height: 1.15; color: var(--txt);
+}
+html:root[data-repaginada][data-repaginada] .v2 .ph p { font-size: 13px; color: var(--txt-3); margin-top: 6px; }
+
+/* ---- 4. CARTÃO (.vidro): superfície elevada — bisel claro no topo do fio
+   + sombra curta de contato. É a peça que mais muda a percepção. ---- */
+html:root[data-repaginada][data-repaginada] .v2 .vidro {
+  background: linear-gradient(180deg, var(--vidro-a), var(--vidro-b));
+  border-radius: var(--r-card);
+  box-shadow: var(--sombra-1);
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .vidro::before {
+  background: linear-gradient(180deg, rgba(255, 255, 255, .13), rgba(255, 255, 255, .07) 28%, rgba(255, 255, 255, .055));
+}
+html:root[data-repaginada][data-repaginada][data-tema="light"] .v2 .vidro::before {
+  background: rgba(17, 24, 39, .085);
+}
+/* hover dos cartões clicáveis: sobe 1px (era 2) e só a sombra cresce */
+html:root[data-repaginada][data-repaginada] .v2 .spot:hover { transform: translateY(-1px); box-shadow: var(--sombra-2); }
+
+html:root[data-repaginada][data-repaginada] .v2 .card-cab { padding: 14px 18px; }
+html:root[data-repaginada][data-repaginada] .v2 .card-cab h3 { font-size: 13.5px; font-weight: 600; letter-spacing: -.01em; }
+
+/* ---- 5. BARRA LATERAL: a cápsula preta FICA (dono gosta da sombra);
+   muda a seleção — de disco azul cheio para TINTA do acento num quadrado
+   suave, ícone aceso. Ícones maiores e mais legíveis no rail. ---- */
+html:root[data-repaginada][data-repaginada] .v2.app-v2 .p-sidebar .item {
+  height: 36px; border-radius: 10px; margin: 2px 0; font-weight: 500;
+}
+html:root[data-repaginada][data-repaginada] .v2.app-v2 .p-sidebar .item svg { width: 18px; height: 18px; }
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2.app-v2 .p-sidebar .item svg { color: #8B919C; }
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2.app-v2 .p-sidebar .item:hover svg { color: var(--txt); }
+html:root[data-repaginada][data-repaginada] .v2.app-v2 .p-sidebar .item.on {
+  color: var(--txt); font-weight: 600;
+  background: color-mix(in srgb, var(--platina-a) 17%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--platina-a) 34%, transparent);
+}
+html:root[data-repaginada][data-repaginada] .v2.app-v2 .p-sidebar .item.on svg { color: color-mix(in srgb, var(--platina-a) 62%, #fff); }
+html:root[data-repaginada][data-repaginada][data-tema="light"] .v2.app-v2 .p-sidebar .item.on {
+  background: color-mix(in srgb, var(--platina-a) 10%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--platina-a) 24%, transparent);
+}
+html:root[data-repaginada][data-repaginada][data-tema="light"] .v2.app-v2 .p-sidebar .item.on svg { color: var(--platina-a); }
+html:root[data-repaginada][data-repaginada] .v2.app-v2 .p-sidebar .item.on:focus-visible {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--platina-a) 34%, transparent), 0 0 0 2px color-mix(in srgb, var(--platina-a) 55%, transparent);
+}
+/* contador dentro da seleção: pílula cheia no acento (antes era o inverso do disco) */
+html:root[data-repaginada][data-repaginada] .v2.app-v2 .p-sidebar .item.on .badge-n { background: var(--platina-a); color: var(--platina-txt); }
+/* marca sem halo colorido: o logo já tem luz própria */
+html:root[data-repaginada][data-repaginada] .v2 .sb-topo .marca { filter: drop-shadow(0 2px 6px rgba(0, 0, 0, .35)); }
+/* rótulo de grupo: micro-caps discretas — dá "índice" ao menu aberto */
+html:root[data-repaginada][data-repaginada] .v2 .glabel {
+  font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+}
+
+/* ---- 6. BARRA SUPERIOR: superfície da página + fio; controles fantasmas;
+   busca como campo afundado (a cápsula do Radar v5 já nasce neutra, sem
+   emoji, no mesmo desenho da busca) ---- */
+html:root[data-repaginada][data-repaginada] .v2 .p-topbar {
+  height: 58px; padding: 0 24px 0 22px; gap: 12px;
+  background: transparent; border-bottom: 1px solid var(--linha);
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+html:root[data-repaginada][data-repaginada] .v2 .busca {
+  width: 340px; height: 34px; border-radius: 9px;
+  background: var(--rp-campo); border-color: var(--rp-campo-fio); box-shadow: none;
+  transition: border-color .15s;
+}
+html:root[data-repaginada][data-repaginada] .v2 .busca:hover { border-color: var(--rp-campo-fio-hover); }
+html:root[data-repaginada][data-repaginada][data-tema="light"] .v2 .busca { box-shadow: 0 1px 2px rgba(16, 24, 40, .04); }
+html:root[data-repaginada][data-repaginada] .v2 .busca kbd { border-radius: 5px; background: rgba(var(--tint), .06); }
+html:root[data-repaginada][data-repaginada] .v2 .p-topbar .ib {
+  width: 34px; height: 34px; border-radius: 9px;
+  background: transparent; border-color: transparent; color: var(--txt-2);
+  transition: background .15s, color .15s;
+}
+html:root[data-repaginada][data-repaginada] .v2 .p-topbar .ib:hover { background: rgba(var(--tint), .07); color: var(--txt); }
+
+/* ---- 7. BOTÕES: secundário com bisel e sombra de contato; primário com
+   gradiente curto do PRÓPRIO acento (segue a gota) + fio mais escuro ---- */
+html:root[data-repaginada][data-repaginada] .v2 .p-btn {
+  border-radius: var(--r-ctl); font-weight: 550; letter-spacing: -.003em;
+  transition: background .15s, border-color .15s, box-shadow .15s, color .15s;
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .btn-sec {
+  color: var(--txt);
+  background: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, .032));
+  border-color: rgba(255, 255, 255, .1);
+  box-shadow: var(--rp-bisel), 0 1px 2px rgba(0, 0, 0, .3);
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .btn-sec:hover:not(:disabled) {
+  background: rgba(255, 255, 255, .08); border-color: rgba(255, 255, 255, .17);
+}
+html:root[data-repaginada][data-repaginada][data-tema="light"] .v2 .btn-sec {
+  color: var(--txt); background: #FFFFFF; border-color: rgba(17, 24, 39, .13);
+  box-shadow: 0 1px 2px rgba(16, 24, 40, .06);
+}
+html:root[data-repaginada][data-repaginada][data-tema="light"] .v2 .btn-sec:hover:not(:disabled) {
+  background: #F8F9FA; border-color: rgba(17, 24, 39, .2);
+}
+html:root[data-repaginada][data-repaginada] .v2 .btn-pri,
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .btn-pri {
+  color: var(--platina-txt);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--platina-a), #fff 13%), var(--platina-a));
+  border: 1px solid color-mix(in srgb, var(--platina-a), #000 24%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .24), 0 1px 2px rgba(0, 0, 0, .22),
+    0 6px 16px -8px color-mix(in srgb, var(--platina-a) 85%, transparent);
+}
+html:root[data-repaginada][data-repaginada] .v2 .btn-pri:hover:not(:disabled) {
+  transform: none;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--platina-a), #fff 20%), color-mix(in srgb, var(--platina-a), #fff 5%));
+}
+html:root[data-repaginada][data-repaginada] .v2 .btn-pri:active:not(:disabled) {
+  background: color-mix(in srgb, var(--platina-a), #000 8%);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, .25);
+}
+
+/* ---- 8. CAMPOS: afundados no escuro, carta branca no claro; foco = anel
+   do acento; select ganha seta própria (a nativa parecia improvisada) ---- */
+html:root[data-repaginada][data-repaginada] .v2 .inp {
+  border-radius: var(--r-ctl);
+  background-color: var(--rp-campo); border-color: var(--rp-campo-fio);
+  transition: border-color .15s, box-shadow .15s;
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .inp { box-shadow: inset 0 1px 2px rgba(0, 0, 0, .18); }
+html:root[data-repaginada][data-repaginada][data-tema="light"] .v2 .inp { box-shadow: 0 1px 2px rgba(16, 24, 40, .04); }
+html:root[data-repaginada][data-repaginada] .v2 .inp:hover:not(:focus) { border-color: var(--rp-campo-fio-hover); }
+html:root[data-repaginada][data-repaginada] .v2 .inp:focus {
+  border-color: color-mix(in srgb, var(--platina-a) 75%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--platina-a) 22%, transparent);
+}
+html:root[data-repaginada][data-repaginada] .v2 select.inp {
+  -webkit-appearance: none; appearance: none; padding-right: 32px; cursor: pointer;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M3 4.5l3 3 3-3' fill='none' stroke='%238A909B' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-repeat: no-repeat; background-position: right 10px center; background-size: 12px;
+}
+
+/* ---- 9. SELEÇÃO: segmentado = trilho afundado + polegar ELEVADO;
+   chips = contorno calmo, ligado em tinta do acento ---- */
+html:root[data-repaginada][data-repaginada] .v2 .segm {
+  background: var(--rp-trilho); border-color: transparent; border-radius: 9px; padding: 3px;
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .segm { box-shadow: inset 0 1px 2px rgba(0, 0, 0, .25); }
+html:root[data-repaginada][data-repaginada] .v2 .segm button { border-radius: 6px; color: var(--txt-2); font-weight: 550; }
+html:root[data-repaginada][data-repaginada] .v2 .segm button:hover:not(.on) { color: var(--txt); }
+html:root[data-repaginada][data-repaginada] .v2 .segm button.on {
+  background: var(--rp-elev); color: var(--txt);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 0 0 1px rgba(var(--tint), .07), var(--rp-bisel);
+}
+html:root[data-repaginada][data-repaginada][data-tema="light"] .v2 .segm button.on {
+  box-shadow: 0 1px 2px rgba(16, 24, 40, .1), 0 0 0 1px rgba(17, 24, 39, .06);
+}
+
+html:root[data-repaginada][data-repaginada] .v2 .chip {
+  border-radius: 8px; background: transparent; border-color: var(--rp-campo-fio);
+  color: var(--txt-2); font-weight: 550; transition: background .15s, border-color .15s, color .15s;
+}
+html:root[data-repaginada][data-repaginada] .v2 .chip:hover { background: rgba(var(--tint), .045); color: var(--txt); }
+html:root[data-repaginada][data-repaginada] .v2 .chip.on {
+  background: color-mix(in srgb, var(--platina-a) 14%, transparent);
+  border-color: color-mix(in srgb, var(--platina-a) 42%, transparent);
+  color: var(--txt);
+}
+
+/* ---- 10. STATUS e TAGS: pílula com contorno da própria cor (mais nítida) ---- */
+html:root[data-repaginada][data-repaginada] .v2 .st {
+  border-radius: 6px; font-weight: 550;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 24%, transparent);
+}
+html:root[data-repaginada][data-repaginada] .v2 .s-ne { border-color: transparent; }
+
+/* ---- 11. TABELAS: cabeçalho em micro-caps sem faixa, linhas mais altas,
+   fio leve; o hover marca a linha sem pintar a tela ---- */
+html:root[data-repaginada][data-repaginada] .v2 thead th {
+  font-size: 10.5px; font-weight: 600; letter-spacing: .07em; color: var(--txt-3);
+  background: transparent; padding: 11px 16px; border-bottom: 1px solid var(--linha);
+}
+html:root[data-repaginada][data-repaginada] .v2 tbody td {
+  height: 48px; padding: 0 16px; border-bottom-color: rgba(var(--tint), .05);
+}
+html:root[data-repaginada][data-repaginada] .v2 tbody tr:hover { background: rgba(var(--tint), .028); }
+html:root[data-repaginada][data-repaginada] .v2 td.nome { color: var(--txt); font-weight: 550; }
+html:root[data-repaginada][data-repaginada] .v2 .rodape-tab { padding: 12px 16px; color: var(--txt-3); }
+
+/* KPIs: rótulo calmo; número com o mesmo tamanho/família (decisão do dono) */
+html:root[data-repaginada][data-repaginada] .v2 .kpi { padding: 16px 18px 14px; }
+html:root[data-repaginada][data-repaginada] .v2 .kpi .rot { color: var(--txt-2); font-weight: 500; }
+
+/* ---- 12. KANBAN: coluna vira TRILHO afundado; card vira peça OPACA
+   elevada (contraste real entre os dois, como Linear/Jira) ---- */
+html:root[data-repaginada][data-repaginada] .v2 .kb-col {
+  background: var(--rp-trilho); border-color: transparent; border-radius: 14px;
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .kb-col { box-shadow: inset 0 1px 2px rgba(0, 0, 0, .22), inset 0 0 0 1px rgba(255, 255, 255, .035); }
+html:root[data-repaginada][data-repaginada][data-tema="light"] .v2 .kb-col { box-shadow: inset 0 0 0 1px rgba(17, 24, 39, .04); }
+html:root[data-repaginada][data-repaginada] .v2 .kb-col.col-drop {
+  background: color-mix(in srgb, var(--platina-a) 7%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--platina-a) 38%, transparent);
+}
+html:root[data-repaginada][data-repaginada] .v2 .kb-cab .n { font-size: 12.5px; font-weight: 650; letter-spacing: -.005em; }
+html:root[data-repaginada][data-repaginada] .v2 .kc {
+  background: var(--rp-cartao-solido);
+  border-color: rgba(var(--tint), .085);
+  box-shadow: var(--rp-bisel), 0 1px 2px rgba(0, 0, 0, .3), 0 6px 16px -10px rgba(0, 0, 0, .6);
+}
+html:root[data-repaginada][data-repaginada][data-tema="light"] .v2 .kc {
+  border-color: rgba(17, 24, 39, .08);
+  box-shadow: 0 1px 2px rgba(16, 24, 40, .06), 0 1px 3px rgba(16, 24, 40, .04);
+}
+html:root[data-repaginada][data-repaginada] .v2 .kc:hover {
+  transform: translateY(-1px);
+  border-color: rgba(var(--tint), .16);
+  box-shadow: var(--rp-bisel), 0 2px 4px rgba(0, 0, 0, .3), 0 14px 30px -12px rgba(0, 0, 0, .7);
+}
+html:root[data-repaginada][data-repaginada][data-tema="light"] .v2 .kc:hover {
+  box-shadow: 0 2px 4px rgba(16, 24, 40, .06), 0 12px 26px -10px rgba(16, 24, 40, .2);
+}
+html:root[data-repaginada][data-repaginada] .v2 .kc.drag { transform: rotate(-1.6deg); box-shadow: 0 18px 40px rgba(0, 0, 0, .55); }
+html:root[data-repaginada][data-repaginada] .v2 .kc.destaque { border-color: rgba(var(--tint), .45); box-shadow: 0 0 0 3px rgba(var(--tint), .12); }
+html:root[data-repaginada][data-repaginada] .v2 .kc-benef { border-radius: 5px; letter-spacing: .05em; }
+html:root[data-repaginada][data-repaginada] .v2 .kb-add { border-radius: 10px; border-color: rgba(var(--tint), .1); }
+
+/* ---- 13. ATENDIMENTO (inbox): conversa selecionada em tinta do acento,
+   painéis laterais no plano da carta ---- */
+html:root[data-repaginada][data-repaginada] .v2 .conv2.ativa {
+  background: color-mix(in srgb, var(--platina-a) 9%, transparent);
+}
+html:root[data-repaginada][data-repaginada] .v2 .wa-composer { background: var(--vidro-b); }
+/* papel de parede de figuras: fica (é a identidade do fio), com um véu da cor
+   do fundo por cima — metade do contraste, a conversa respira */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .wa-msgs {
+  background-image: linear-gradient(rgba(10, 11, 13, .55), rgba(10, 11, 13, .55)), var(--wa-conv-figuras);
+}
+html:root[data-repaginada][data-repaginada][data-tema="light"] .v2 .wa-msgs {
+  background-image: linear-gradient(rgba(243, 244, 246, .5), rgba(243, 244, 246, .5)), var(--wa-conv-figuras);
+}
+
+/* ---- 14. MENUS FLUTUANTES (avatar, filtros): um degrau acima da carta ---- */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .usuario-menu,
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .wa-pop,
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .wa-etqpop {
+  background: var(--rp-menu); border-color: rgba(255, 255, 255, .09);
+}
+
+/* ============================================================
+   15. ESCURO FUNDO — peças com cor CRAVADA (varredura 29/10: 6 agentes
+   em todo o v2 + crítico de cobertura). Tudo aqui vale só no escuro e
+   só com a repaginada; o tema claro e o "Antes" não mudam.
+   ============================================================ */
+
+/* 15a. primários fora do .btn-pri (toast "Responder", "Criar ficha", botões
+   dos modais v1, "Entrar" do login, enviar do compositor, contadores) —
+   mesma receita do primário: gradiente curto do acento, fio interno .24 */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .bm.claro,
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .fjb-btn.primary,
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .atv-btn.primary,
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .entrar,
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .env-b {
+  color: var(--platina-txt);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--platina-a), #fff 13%), var(--platina-a));
+  border: 1px solid color-mix(in srgb, var(--platina-a), #000 24%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .24), 0 1px 2px rgba(0, 0, 0, .3);
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .fjb-btn.primary::after { display: none; }
+/* contadores de não lidas (lista e grupos): o mesmo azul, sem metal branco */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .conv2 .nl,
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .wa-grupo .gnl {
+  color: var(--platina-txt);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--platina-a), #fff 13%), var(--platina-a));
+  box-shadow: none;
+}
+/* polegar do segmentado da intro do dia: sem o fio branco a 65% */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .it-seg-thumb {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .24), 0 1px 3px rgba(0, 0, 0, .45);
+}
+/* discos de cor da intro (cor inline): os mesmos tons fundos da gota */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .it-disc[data-cor="azul"] { background: #4A78E6 !important; }
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .it-disc[data-cor="verde"] { background: #2FB574 !important; }
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .it-disc[data-cor="dourado"] { background: #D9A640 !important; }
+
+/* 15b. "IA ligada" no cabeçalho do atendimento: o .btn-sec da repaginada
+   apagava o verde (ficava igual a desligada) — volta como chapa verde funda */
+html:root[data-repaginada][data-repaginada] .v2 .p-btn.ia-on {
+  color: #fff; box-shadow: none;
+  background: color-mix(in srgb, var(--verde), #000 22%);
+  border-color: color-mix(in srgb, var(--verde), #000 22%);
+}
+html:root[data-repaginada][data-repaginada] .v2 .p-btn.ia-on:hover:not(:disabled) { background: color-mix(in srgb, var(--verde), #000 32%); }
+
+/* 15c. seleção em massa e paginação: de faixa/disco BRANCO para tinta do acento */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .bulk {
+  color: var(--txt);
+  background: color-mix(in srgb, var(--platina-a) 16%, var(--surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--platina-a) 40%, transparent);
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .bulk button {
+  color: var(--txt); background: rgba(255, 255, 255, .06); border-color: rgba(255, 255, 255, .12);
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .bulk button:hover { background: rgba(255, 255, 255, .1); }
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .bulk .cbx { border-color: rgba(255, 255, 255, .45); }
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .pag button.on {
+  color: var(--txt);
+  background: color-mix(in srgb, var(--platina-a) 18%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--platina-a) 42%, transparent);
+}
+
+/* 15d. AVATARES: os discos #2B2E34 eram o cinza mais lavado da tela —
+   descem para o degrau elevado da paleta nova */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .avatar,
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .notif .p-av,
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .conv2 .av2,
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .conv2-av,
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .ctx-topo .av2,
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .av3,
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .kc-av,
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .kb-carga-c .kb-carga-av,
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .drawer-v2 .kd-hero-av,
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .cnt-av {
+  background: linear-gradient(150deg, #202226, #15161A);
+}
+
+/* 15e. ATENDIMENTO — fio da conversa: bolha recebida no grafite do cartão
+   (era o "acinzentado" #222428), enviada num cobalto discreto que segue o
+   acento; ticks de leitura e marcador da conversa ativa no acento */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .bolha.rec {
+  background-color: #141518;
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, .04), rgba(255, 255, 255, .012));
+  border-color: rgba(255, 255, 255, .08);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .45), inset 0 1px 0 rgba(255, 255, 255, .05);
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .bolha.env2 {
+  background-color: color-mix(in srgb, var(--platina-a) 15%, #0D0E11);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, .045), transparent);
+  border-color: color-mix(in srgb, var(--platina-a) 30%, transparent);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .5), inset 0 1px 0 rgba(255, 255, 255, .07);
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .bolha.env2.bot {
+  box-shadow: inset 2.5px 0 0 rgba(255, 255, 255, .22), 0 6px 18px rgba(0, 0, 0, .5), inset 0 1px 0 rgba(255, 255, 255, .07);
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .bolha .tick.lida { color: color-mix(in srgb, var(--azul) 78%, #fff); }
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .conv2.ativa::before { background: var(--azul); }
+/* etapa atual no painel do cliente: a cor da COLUNA (dado) entra rebaixada */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .ctx-fase {
+  background: color-mix(in oklab, var(--fase) 9%, transparent);
+  border-color: color-mix(in oklab, var(--fase) 26%, transparent);
+}
+/* indicador da etapa: ANEL na cor da coluna (era disco cheio com glifo branco,
+   o ponto mais aceso do painel) */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .ctx-fase .ic {
+  background: color-mix(in oklab, var(--fase) 18%, var(--base));
+  color: color-mix(in oklab, var(--fase) 72%, var(--txt-2));
+  box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--fase) 55%, transparent);
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .ctx-fase .tx b { color: color-mix(in oklab, var(--fase) 70%, var(--txt-2)); }
+
+/* 15f. ETIQUETAS e ETAPAS com cor de DADO (cor escolhida no cadastro — o
+   valor gravado não muda): o TSX passa a cor também em --c e aqui ela entra
+   rebaixada — o texto ESCURECE em direção ao cinza médio (tom de joia, não
+   pastel), fundo e fio em tinta baixa. A guarda [style*="--c"] evita pintar um
+   chip sem a variável. */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 :is(.kc-etq, .kb-tag-ro, .kb-tag, .cnt-etq, .ctx-tag, .cchip.etapa, .wa-hchip.etapa)[style*="--c"] {
+  color: color-mix(in oklab, var(--c) 66%, var(--txt-2)) !important;
+  background: color-mix(in oklab, var(--c) 12%, transparent) !important;
+  border-color: color-mix(in oklab, var(--c) 24%, transparent) !important;
+}
+/* sublinhado de cada coluna do Kanban: a cor da coluna em fio, não em néon */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .kb-cab[style*="--c"] {
+  border-bottom-color: color-mix(in oklab, var(--c) 42%, transparent) !important;
+}
+/* bolinhas de cor (coluna, etiqueta, status) só perdem o brilho excessivo */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 :is(.kb-cab .pt2, .kb-col.recolhida .pt2, .kb-menu .pt, .kd-etapa .pt, .etqchip > i, .etqp-it .dot, .fp-it .dot, .wa-pop .dot, .ctx-status .dot, .wa-hetapa .dot) {
+  filter: saturate(.78) brightness(.92);
+}
+
+/* 15g. KANBAN — tag de benefício sem o pastel elétrico; banco principal
+   cheio no acento sem o fio branco; faixa "Responder" em tinta, não cinza */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .kc-benef {
+  color: color-mix(in srgb, var(--azul) 42%, var(--txt));
+  background: rgba(var(--azul-rgb), .14);
+  border-color: rgba(var(--azul-rgb), .32);
+}
+/* banco principal: segue o chip mais FORTE do card (pedido do dono), como
+   chapa de joia — cheio, mais fundo, sem brilho */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .kc-banco.prin {
+  color: var(--platina-txt);
+  background: color-mix(in srgb, var(--platina-a) 80%, var(--base));
+  border-color: transparent;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1);
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .kc-badge.msg {
+  color: color-mix(in srgb, var(--azul) 45%, var(--txt));
+  background: rgba(var(--azul-rgb), .12);
+}
+
+/* 15h. GRÁFICOS e marcadores: barras de atividade em grafite com HOJE no azul
+   de dado do Dashboard (era azul-marinho sujo + azul-céu brilhante); trilho
+   da linha do tempo de Agendamentos só no hover/foco (não carrega estado);
+   barras/aneis de Maturação no dado */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .barv {
+  background: linear-gradient(180deg, rgba(var(--tint), .13), rgba(var(--tint), .055));
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .barv.hoje2 {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--dado-1), #fff 8%), var(--dado-1));
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .tl-item::before {
+  background: transparent; box-shadow: none; transition: background .15s;
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .tl-item:hover::before,
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .tl-item:focus-visible::before { background: var(--azul); }
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .mtc-bar i { background: linear-gradient(90deg, rgba(var(--dado-1-rgb), .55), var(--dado-1)); }
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 :is(.cfa-check input, .mtc-check input, .mat2-range input[type="range"]) { accent-color: var(--platina-a); }
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .cfg-nav .it.on {
+  color: var(--txt); background: color-mix(in srgb, var(--platina-a) 14%, transparent);
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .ib .pt { background: var(--azul); }
+
+/* 15i. MODAL e GAVETA: a skin cravava vidro azulado com !important (o modal
+   ficava MAIS fundo que a página) — agora degrau elevado neutro */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .p-modal.vidro {
+  background: linear-gradient(180deg, #17181C, #131417) !important;
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .drawer-v2 {
+  background: linear-gradient(180deg, #141518, #101114) !important;
+}
+
+/* 15j. componentes v1 reusados: estados com verde/âmbar/vermelho do v1 */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .fj-ind.ok { background: var(--verde-bg); }
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .fj-ind.warn { background: var(--ambar-bg); }
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .fj-revrow.confirmar { background: rgba(var(--ambar-rgb), .06); }
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .fj-x:hover { color: var(--rubro); }
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .fj-conflitos { border-color: rgba(var(--ambar-rgb), .3); }
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .fj-erro { background: var(--rubro-bg); }
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .fj-alertas { border-color: rgba(var(--ambar-rgb), .32); background: rgba(var(--ambar-rgb), .07); }
+
+/* 15k. RADAR v5 (entrou no main 29/10) — primário da tela cheia e hover da
+   central no azul do PRIMÁRIO (era o azul-tinta chapado com halo); "último
+   aviso" em rubro um degrau mais fundo para o branco passar de AA */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .rdr-tela-pri,
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .rdr-tela-pri:hover {
+  filter: none;
+  color: var(--platina-txt);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--platina-a), #fff 13%), var(--platina-a));
+  border: 1px solid color-mix(in srgb, var(--platina-a), #000 24%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .24), 0 1px 2px rgba(0, 0, 0, .3);
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .rdr-central .rdr-linha:hover .rdr-btn,
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .rdr-central .rdr-linha:focus-visible .rdr-btn,
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .rdr-central button.rdr-btn:hover:not(:disabled) {
+  color: var(--platina-txt);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--platina-a), #fff 13%), var(--platina-a));
+  border-color: color-mix(in srgb, var(--platina-a), #000 24%);
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 :is(.rdr-seg.rdr-u3 .rdr-seg-num, .rdr-aba.rdr-u3 b, .gd-cont.t-u3, .gd-esc.e3 .gd-esc-rot, .gd-ult) {
+  background: color-mix(in srgb, var(--rubro), #000 18%);
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 :is(.conv2 .cchip.rdr-selo.e3, .wa-hchip.rdr-hselo.e3) {
+  background: color-mix(in srgb, var(--rubro), #000 18%);
+  border-color: color-mix(in srgb, var(--rubro), #000 18%);
+}
+/* paleta de scripts: a pílula ativa vira o polegar grafite (igual às abas do
+   inbox), o acento fica só no contador */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .spl .spl-pill.spl-on { color: var(--txt); background: var(--rp-elev); }
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .spl .spl-pill.spl-on:not(:focus-visible) {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .45), 0 0 0 1px rgba(255, 255, 255, .1), var(--rp-bisel);
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .spl .spl-pill.spl-on .spl-pill-n {
+  color: color-mix(in srgb, var(--azul) 55%, #fff);
+  background: rgba(var(--azul-rgb), .18);
+}
+/* filtro do inbox: o lilás cravado de "Aguardando cliente" no tom de joia das irmãs */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .wa-filtro .fp-it.sit-aguardando .dot {
+  background: color-mix(in oklab, #A78BFA 80%, var(--base));
+}
+
+/* ============================================================
+   16. REVISÃO VISUAL TELA A TELA (29/10: 5 diretores de arte + auditor
+   de contraste + consolidador que conferiu seletor e especificidade).
+   Só cor/superfície, só no escuro; layout e tipografia ficaram de fora
+   para não criar diferença entre os temas. Vem DEPOIS das seções 7 e 9
+   de propósito (mesma especificidade em .btn-pri e .segm).
+   ============================================================ */
+
+/* 15l. primário sem halo colorido no escuro: mesma sombra dos primários da 15a.
+   Mesma especificidade da seção 7: colar DEPOIS dela (fim da seção 15). */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .btn-pri {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .24), 0 1px 2px rgba(0, 0, 0, .3);
+}
+
+/* Dashboard: o cabeçalho caps de 10,5px volta ao --txt-2 que o dashboardV5.css escolheu */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .d5-tab thead th { color: var(--txt-2); }
+
+/* Scripts: a prévia sobe MEIO degrau (era dois) e a variável vira tinta do acento */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .bolha-rec {
+  background: rgba(255, 255, 255, .022);
+  border-color: rgba(255, 255, 255, .075);
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .var-hl {
+  color: color-mix(in srgb, var(--azul) 45%, var(--txt));
+  background: rgba(var(--azul-rgb), .14);
+}
+
+/* 15d+: avatares das mesas de trabalho, da ficha de Contatos e do Perfil no mesmo grafite da 15d */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .pd-av,
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .pt-av,
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .pv-av,
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .fx-topo .av2,
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .cfa-av:not(.foto) {
+  background: linear-gradient(150deg, #202226, #15161A);
+}
+/* estes dois tinham texto --platina-txt (escuro no acento dourado): texto claro fixo */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .fx-topo .av2 {
+  color: var(--txt);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06), 0 0 0 1px rgba(255, 255, 255, .12);
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .cfa-av:not(.foto) {
+  color: var(--txt);
+  border-color: rgba(255, 255, 255, .1);
+}
+/* a linha ATIVA e o escolhido seguem acesos no acento */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .pd-lin[data-ativo] .pd-av,
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .pt-lin[data-ativo] .pt-av,
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .pt-nv-esc .pt-av {
+  background: rgba(var(--azul-rgb), .16);
+}
+
+/* abas do inbox = segmentado da repaginada: trilho afundado + polegar grafite; acento só no contador */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .wa-abas-wrap {
+  background: var(--rp-trilho); border-color: transparent; border-radius: 9px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .06), inset 0 1px 2px rgba(0, 0, 0, .3);
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .wa-aba.on {
+  background: var(--rp-elev); color: var(--txt);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .45), 0 0 0 1px rgba(255, 255, 255, .1), var(--rp-bisel);
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .wa-aba.on .n:not(.urg) {
+  color: color-mix(in srgb, var(--azul) 55%, #fff);
+  background: rgba(var(--azul-rgb), .18);
+}
+
+/* seleção em TINTA do acento (igual ao .chip.on e ao .cfg-nav) */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .kb-fchip:not(.foco) {
+  background: transparent; border-color: var(--rp-campo-fio); color: var(--txt-2); box-shadow: none;
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .kb-fchip:not(.foco):hover {
+  background: rgba(255, 255, 255, .045); border-color: var(--rp-campo-fio-hover); color: var(--txt);
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .kb-fchip.on:not(.foco),
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .kb-carga-c.on {
+  background: color-mix(in srgb, var(--platina-a) 14%, transparent);
+  border-color: color-mix(in srgb, var(--platina-a) 42%, transparent);
+  color: var(--txt); box-shadow: none;
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .kb-fchip.on .c { color: color-mix(in srgb, var(--azul) 55%, var(--txt)); }
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .pd-nav-it[aria-current="page"],
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .pt-nav-it[aria-current="page"],
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .mv-nav-it[aria-current="page"] {
+  color: var(--txt);
+  background: color-mix(in srgb, var(--platina-a) 14%, transparent);
+}
+
+/* campos afundados como todo .inp da repaginada; foco = anel do acento */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .cmsg textarea,
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 :is(.pt-filtro, .pt-nv-busca, .pd-busca, .mono) {
+  background: var(--rp-campo); border-color: var(--rp-campo-fio);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, .18);
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .cmsg textarea:hover:not(:focus):not(:disabled),
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 :is(.pt-filtro, .pt-nv-busca, .pd-busca):hover:not(:focus-within) {
+  border-color: var(--rp-campo-fio-hover);
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .cmsg textarea:focus,
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 :is(.pt-filtro, .pt-nv-busca, .pd-busca):focus-within {
+  background: var(--rp-campo);
+  border-color: color-mix(in srgb, var(--platina-a) 75%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--platina-a) 22%, transparent);
+}
+/* 'Copiar' do webhook com cara de link (mesma fórmula do link do Dashboard) */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .mono b { color: color-mix(in srgb, var(--azul) 85%, #fff); }
+
+/* painel lateral: destaque em TINTA do acento; o único primário sólido da tela segue sendo 'Pausar IA' */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .wa-ctx .p-btn.btn-pri,
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .wa-ctx .fjb-btn.primary {
+  color: var(--txt);
+  background: color-mix(in srgb, var(--platina-a) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--platina-a) 42%, transparent);
+  box-shadow: var(--rp-bisel);
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .wa-ctx .p-btn.btn-pri:hover:not(:disabled),
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .wa-ctx .fjb-btn.primary:hover:not(:disabled) {
+  transform: none;
+  background: color-mix(in srgb, var(--platina-a) 24%, transparent);
+  border-color: color-mix(in srgb, var(--platina-a) 56%, transparent);
+}
+
+/* etiqueta do painel = mesmo desenho do .etqchip (lista/cabeçalho): chip neutro + bolinha na cor */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .wa-ctx .ctx-tags .ctx-tag[style*="--c"] {
+  color: var(--txt-2) !important;
+  background: rgba(var(--tint), .06) !important;
+  border-color: var(--linha) !important;
+  gap: 6px; padding-left: 7px; font-weight: 600;
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .wa-ctx .ctx-tags .ctx-tag[style*="--c"]::before {
+  content: ""; width: 7px; height: 7px; border-radius: 50%; flex: none;
+  background: var(--c); filter: saturate(.78) brightness(.92);
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .wa-ctx .ctx-tag .x { color: var(--txt-3); }
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .wa-ctx .ctx-tag .x:hover { color: var(--txt); }
+
+/* KPIs de Agendamentos iguais aos do Dashboard: número branco, a cor fica só no chip */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .pc-coluna > .kpis .kpi .val[style*="color"] {
+  color: var(--txt) !important;
+}
+/* legenda neutra não é status: texto calmo, sem pílula */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .pc-coluna > .kpis .delta.d-ne {
+  background: transparent; padding-left: 0; padding-right: 0; color: var(--txt-2);
+}
+
+/* ação destrutiva de LINHA: vermelho só no texto; a chapa acende no hover */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .p-btn.btn-perigo.btn-mini {
+  background: transparent;
+  border-color: rgba(255, 255, 255, .1);
+  color: color-mix(in srgb, var(--rubro) 88%, var(--txt));
+  box-shadow: none;
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .p-btn.btn-perigo.btn-mini:hover:not(:disabled) {
+  background: var(--rubro-bg);
+  border-color: rgba(var(--rubro-rgb), .4);
+  color: var(--rubro);
+}
+
+/* saúde OK = neutra com ponto verde; âmbar/rubro seguem tintos (só o problema chama) */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .intg-chip.t-ok {
+  background: transparent;
+  border-color: rgba(255, 255, 255, .09);
+  color: var(--txt-2);
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .intg-chip.t-ok i { background: var(--verde); }
+/* Entrega/Auto não têm o <i>: a bolinha entra por pseudo-elemento */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .intg-chip.t-ok:not(:has(> i))::before {
+  content: ""; width: 6px; height: 6px; border-radius: 50%; flex: none; background: var(--verde);
+}
+
+/* bolhas fora do inbox = a mesma receita da 15e */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 :is(.pd-resp-bolha, .pt-tl-it[data-e="nota"] .pt-tl-q) {
+  background-color: #141518;
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, .04), rgba(255, 255, 255, .012));
+  border-color: rgba(255, 255, 255, .08);
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .pv-bolha:not(.out) {
+  background-color: #141518;
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, .04), rgba(255, 255, 255, .012));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08);
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .pv-bolha.out {
+  background-color: color-mix(in srgb, var(--platina-a) 15%, #0D0E11);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, .045), transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--platina-a) 30%, transparent);
+}
+/* a 'telinha' vira tela afundada: as bolhas se destacam dela */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .pv-fone { background: var(--rp-campo); }
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .pv-fone-top { background: rgba(255, 255, 255, .03); }
+
+/* etapa feita = tinta do acento (o foco fica no passo ATUAL) */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .pt-et[data-e="feito"]:not(:last-child) .pt-et-pt {
+  background: rgba(var(--azul-rgb), .16);
+  border-color: rgba(var(--azul-rgb), .42);
+  color: color-mix(in srgb, var(--azul) 70%, #fff);
+}
+/* selo de concluído: verde FUNDO (mesma chapa do 'IA ligada', 15b), branco legível */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .pt-et:last-child[data-e="feito"] .pt-et-pt,
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .pd-tl-it[data-e="resolvida"] .pd-tl-pt,
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .pt-tl-it[data-e="concluida"] .pt-tl-pt {
+  background: color-mix(in srgb, var(--verde), #000 22%);
+  border-color: color-mix(in srgb, var(--verde), #000 22%);
+  color: #fff;
+}
+
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .kb-col.gargalo:not(.col-drop) {
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, .22), inset 0 0 0 1px rgba(var(--ambar-rgb), .3);
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .kb-col.recolhida:hover {
+  background: var(--vidro-a);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .09);
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .kb-col.ghost-col {
+  background: transparent;
+  box-shadow: none;
+  border: 1px dashed rgba(255, 255, 255, .09);
+}
+
+/* preenchimento cheio = azul do PRIMÁRIO (--azul fica para tinta/link) */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .pv-fila-tx .nl {
+  color: var(--platina-txt);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--platina-a), #fff 13%), var(--platina-a));
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .pd-nav-n[data-tom="azul"] {
+  background: var(--platina-a);
+  color: var(--platina-txt);
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .pd-etapa[data-e="atual"] .pd-etapa-n {
+  background: var(--platina-a);
+  border-color: var(--platina-a);
+  color: var(--platina-txt);
+}
+
+/* Dashboard: link na família do acento e trilho a um fio do cartão */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .d5-pg {
+  --d5-link: color-mix(in srgb, var(--azul) 85%, #fff);
+  --d5-trilho: rgba(var(--tint), .05);
+}
+
+/* segmentado: fio próprio no trilho (no quase-preto a sombra interna some) + polegar mais nítido */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .segm {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .06), inset 0 1px 2px rgba(0, 0, 0, .3);
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .segm button.on {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .45), 0 0 0 1px rgba(255, 255, 255, .1), var(--rp-bisel);
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .segm button:focus-visible {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--platina-a) 55%, transparent);
+}
+
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .d5-kpi:hover {
+  box-shadow: 0 0 0 1px rgba(var(--azul-rgb), .3), var(--sombra-2);
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 :is(.d5-kpi, .d5-sec).d5-realce {
+  box-shadow: 0 0 0 2px rgba(var(--dado-1-rgb), .55), var(--sombra-1);
+}
+
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .kb-menu,
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .kb-combo-pop {
+  background: var(--rp-menu);
+  border-color: rgba(255, 255, 255, .09);
+  box-shadow: var(--shadow-pop);
+}
+
+/* enviar em espera: neutro (sem azul barrento); acende no acento quando há texto */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .env-b:disabled {
+  opacity: 1; color: var(--txt-3);
+  background: rgba(255, 255, 255, .04);
+  border: 1px solid rgba(255, 255, 255, .08);
+  box-shadow: none;
+}
+/* ferramentas no mesmo degrau do .btn-sec (sem cinza extra no Scripts) */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .cmsg .tool,
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .cmsg .tools .wa-scr-btn:not(.on) {
+  background: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, .032));
+  border-color: rgba(255, 255, 255, .1);
+  box-shadow: var(--rp-bisel), 0 1px 2px rgba(0, 0, 0, .3);
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .cmsg .tool:hover:not(:disabled),
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .cmsg .tools .wa-scr-btn:not(.on):hover:not(:disabled) {
+  background: rgba(255, 255, 255, .08); border-color: rgba(255, 255, 255, .17);
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .cmsg .tools .wa-scr-btn .ct {
+  background: rgba(255, 255, 255, .08); color: var(--txt-2);
+}
+
+/* rótulo de campo no cinza secundário: o branco fica para o VALOR */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .campo > label { color: var(--txt-2); }
+
+/* etiqueta neutra só no fio: sai mais um cinza de fundo */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .ag-pill {
+  background: transparent;
+  border-color: rgba(255, 255, 255, .09);
+}
+
+/* ficha judicial: tag vazia contornada (sem faixa cinza) e botão secundário no idioma do .btn-sec */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .fjb-card > .fjb-tag { align-self: flex-start; }
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .fjb-tag.vazia {
+  background: transparent; color: var(--txt-3);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .1);
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .fjb-btn:not(.primary) {
+  background: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, .032));
+  border-color: rgba(255, 255, 255, .1);
+  box-shadow: var(--rp-bisel), 0 1px 2px rgba(0, 0, 0, .3);
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .fjb-btn:not(.primary):hover:not(:disabled) {
+  background: rgba(255, 255, 255, .08); border-color: rgba(255, 255, 255, .17);
+}
+
+/* rótulos caps do Pós-venda no mesmo tom dos KPIs */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .pv-hero .rot,
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .pv-p-meta span,
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .pv-p-sec .cap {
+  color: var(--txt-2);
+}
+
+/* parcelas opacas: mesmo tom na barra e na legenda, sem virar ardósia */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 :is(.pt-tela, .pt-nv, .pt-at-lista) {
+  --pt-p-escritorio: color-mix(in srgb, var(--azul) 58%, var(--base));
+  --pt-p-atendente: color-mix(in srgb, var(--azul) 38%, var(--base));
+}
+/* situação de progresso (azul) = caixa neutra; só o texto leva a cor */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .pt-sit[data-tom="azul"] {
+  background: rgba(255, 255, 255, .025);
+  border-color: var(--linha);
+}
+
+/* ícone do canal e linhas internas no plano do cartão: o fio separa, não o cinza */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 :is(.int-ic, .cfa-canal .ic) {
+  background: rgba(255, 255, 255, .03);
+  border-color: rgba(255, 255, 255, .08);
+  color: var(--txt-2);
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .intg-linha {
+  background: transparent;
+  border-color: rgba(255, 255, 255, .07);
+}
+
+/* papel do número e 'toque N do remarketing' = etiqueta neutra; o status à direita (fora do .nm) segue colorido */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .intg-linha .nm .st:is(.s-ok, .s-at) {
+  color: var(--txt-2);
+  background: transparent;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .1);
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .intg-linha .nm .st:is(.s-ok, .s-at) i { background: var(--txt-3); }
+
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .kc.destaque {
+  border-color: color-mix(in srgb, var(--platina-a) 60%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--platina-a) 20%, transparent), var(--rp-bisel);
+}
+
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .kb-fchip.foco:not(.on) {
+  background: transparent;
+  border-color: var(--rp-campo-fio);
+  color: color-mix(in srgb, var(--rubro) 62%, var(--txt-2));
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .kb-fchip.foco:not(.on):hover {
+  background: var(--rubro-bg);
+  border-color: rgba(var(--rubro-rgb), .32);
+  color: var(--rubro);
+}
+
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .cnt-wa {
+  background: transparent; border-color: transparent; color: var(--txt-3);
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 tbody tr:hover .cnt-wa:not(:hover):not(:focus-visible) {
+  color: var(--txt-2); border-color: var(--rp-campo-fio);
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .cnt-wa:hover,
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .cnt-wa:focus-visible {
+  color: color-mix(in srgb, var(--azul) 65%, #fff);
+  background: rgba(var(--azul-rgb), .14);
+  border-color: rgba(var(--azul-rgb), .42);
+}
+
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .kb-barra { border-bottom-color: transparent; }
+
+/* ============================================================
+   COMPARADOR "Antes / Depois" — só no modo demonstração (prévia
+   para o dono aprovar). Fora da guarda [data-repaginada] de
+   propósito: aparece igual nos dois visuais.
+   ============================================================ */
+.v2 .rp-comparador {
+  /* canto inferior esquerdo, ao lado da barra: no inbox cai sobre o pé da lista
+     de conversas, nunca sobre o compositor */
+  position: fixed; left: 96px; bottom: 16px; z-index: 1250;
+  display: flex; align-items: center; gap: 10px; padding: 5px 5px 5px 14px;
+  border-radius: 12px; font-family: var(--fonte);
+  background: #0C0D10; border: 1px solid rgba(255, 255, 255, .12);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .45);
+}
+.v2 .rp-comparador .rp-rot { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #8A909B; }
+.v2 .rp-comparador .rp-seg { display: flex; gap: 2px; padding: 3px; border-radius: 9px; background: rgba(255, 255, 255, .06); }
+.v2 .rp-comparador button {
+  border: 0; cursor: pointer; font-family: var(--fonte); font-size: 12px; font-weight: 600;
+  padding: 6px 14px; border-radius: 7px; background: none; color: #A4A9B2;
+}
+.v2 .rp-comparador button:hover { color: #fff; }
+.v2 .rp-comparador button.on { background: #fff; color: #111318; }
+.v2 .rp-comparador .rp-x {
+  width: 26px; height: 26px; padding: 0; display: grid; place-items: center;
+  font-size: 15px; line-height: 1; color: #6F7580;
+}

@@ -231,7 +231,7 @@ export default function ContatosV2() {
           <span className="cnt-etqs" title={c.tags.join(' · ')}>
             {c.tags.slice(0, 2).map((t) => {
               const cor = corDaEtiqueta(t, etiquetasCat);
-              return <em key={t} className="cnt-etq" style={{ color: cor, background: cor + '22', borderColor: cor + '4D' }}>{t}</em>;
+              return <em key={t} className="cnt-etq" style={{ color: cor, background: cor + '22', borderColor: cor + '4D', ['--c']: cor } as React.CSSProperties}>{t}</em>;
             })}
             {c.tags.length > 2 && <em className="cnt-etq mais">+{c.tags.length - 2}</em>}
           </span>

@@ -1150,7 +1150,7 @@ export default function WhatsAppV2() {
                           </span>
                           <span className="p">{c.last || '—'}</span>
                           <span className="chips">
-                            {(() => { const cor = corDaSituacao(c, sit.texto); return <span className={'cchip etapa sit-' + sit.variante} title="Situação no funil" style={cor ? { background: cor + '26', color: cor } : undefined}>{sit.texto}</span>; })()}
+                            {(() => { const cor = corDaSituacao(c, sit.texto); return <span className={'cchip etapa sit-' + sit.variante} title="Situação no funil" style={cor ? ({ background: cor + '26', color: cor, ['--c']: cor } as React.CSSProperties) : undefined}>{sit.texto}</span>; })()}
                             {/* Radar: UM selo logo após a situação (pedido > último > 2º > 1º) + Ligar à parte; só do dono */}
                             <RadarSelosCard r={radarPorConv.get(c.id)} diaUtil={diaUtilRadar} />
                             {c.iaAtiva && <span className="cchip ia" title="A IA/bot está atendendo esta conversa agora"><IcBot />IA</span>}
@@ -1582,7 +1582,7 @@ export default function WhatsAppV2() {
               {current.tags.map((t) => {
                 const cor = corDaEtiqueta(t, etiquetasQ.data);
                 return (
-                  <span key={t} className="ctx-tag" style={{ background: cor + '22', color: cor, borderColor: cor + '55' }}>
+                  <span key={t} className="ctx-tag" style={{ background: cor + '22', color: cor, borderColor: cor + '55', ['--c']: cor } as React.CSSProperties}>
                     {t}
                     <button type="button" className="x" aria-label={'Remover etiqueta ' + t} onClick={() => alternarEtiqueta(t)}>×</button>
                   </span>
@@ -2010,7 +2010,7 @@ function SituacaoChipTopo({ lead, demo }: { lead: WaContact; demo: boolean }) {
   // assume — inclusive para mover/reabrir um cliente fechado. O chip fica só p/ conversa sem opp.
   if (!demo && (oppsQ.isLoading || (oppsQ.data ?? []).length > 0)) return null;
   const sit = situacaoDe(lead); const cor = corDaSituacao(lead, sit.texto);
-  return <span className={'wa-hchip etapa sit-' + sit.variante} title="Situação no funil" style={cor ? { background: cor + '26', color: cor } : undefined}>{sit.texto}</span>;
+  return <span className={'wa-hchip etapa sit-' + sit.variante} title="Situação no funil" style={cor ? ({ background: cor + '26', color: cor, ['--c']: cor } as React.CSSProperties) : undefined}>{sit.texto}</span>;
 }
 
 /* ================================================================
