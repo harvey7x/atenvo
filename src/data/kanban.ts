@@ -20,6 +20,14 @@ export function classificarMovimento(resOrigem: ColResultado, resDestino: ColRes
   return 'neutro';                                   // neutra→neutra: move direto
 }
 
+/** 29/10: com o administrativo ligado, só ele põe ou tira o cliente do Fechado
+ *  (trigger opp_sync_fechamento recusa com 'fechado_pelo_administrativo'). A tela avisa antes. */
+export function bloqueioAdministrativo(resOrigem: ColResultado, resDestino: ColResultado): string | null {
+  if (resDestino === 'ganho') return 'O Fechado vem do sistema do administrativo: quando o cliente ficar completo lá, ele fecha sozinho aqui.';
+  if (resOrigem === 'ganho') return 'Este cliente está completo no sistema do administrativo. Para tirar do Fechado, mude o caso dele lá.';
+  return null;
+}
+
 export const MOTIVOS_PERDA: [string, string][] = [
   ['sem_interesse', 'Sem interesse'], ['nao_respondeu', 'Não respondeu'], ['nao_elegivel', 'Não elegível'],
   ['concorrente', 'Fechou com concorrente'], ['dados_invalidos', 'Dados inválidos'], ['outro', 'Outro'],
@@ -48,6 +56,7 @@ export function rotuloPerdaCompleto(motivoPerda: string | null, motivoNE: string
 /** Traduz erros do trigger/RLS/lock em mensagens legíveis (nunca SQL bruto). */
 export function traduzErroKanban(msg: string): string {
   const m = (msg || '').toLowerCase();
+  if (m.includes('fechado_pelo_administrativo')) return 'O Fechado vem do sistema do administrativo: mude o caso do cliente lá.';
   if (m.includes('motivo_perda_desc')) return 'Descreva o motivo (você escolheu "Outro").';
   if (m.includes('motivo_perda')) return 'Selecione o motivo da perda.';
   if (m.includes('motivo_reabertura')) return 'Informe o motivo da reabertura.';
@@ -494,7 +503,8 @@ export function useKanban() {
     invalida();
   }
 
-  /** Arquiva o lead (status='cancelado') — sai do quadro sem exclusão física. */
+  /** Arquiva o lead (status='cancelado') — sai do quadro sem exclusão física. Card do Fechado com o
+   *  administrativo ligado: o banco recusa (adm_trava_status); a tela avisa antes. */
   async function arquivarLead(id: string) {
     const { error } = await supabase!.from('oportunidades').update({ status: 'cancelado' }).eq('id', id).eq('organizacao_id', org);
     if (error) throw new Error(error.message);

@@ -203,7 +203,7 @@ describe('momentos reais (produção, replay)', () => {
     const a = l.achados[0];
     expect(a.severidade).toBe('bom');
     expect(a.titulo).toBe('30 fechados nos últimos 7 dias, acima do normal');
-    expect(a.frase).toBe('Uma semana típica tem cerca de 11 (nas 4 anteriores, de 5 a 23). Outras 60 fichas finalizadas na semana ainda estão sem “fechado” no Kanban.');
+    expect(a.frase).toBe('Uma semana típica tem cerca de 11 (nas 4 anteriores, de 5 a 23). Outras 60 fichas finalizadas na semana ainda não estão completas no administrativo.');
     expect(a.frase).not.toContain('é venda');
     // em Hoje a tabela mostra HOJE: o link troca para os 7 dias (não rola para números que não batem)
     expect(a.acao?.link).toEqual({ rotulo: 'Ver os 7 dias', preset: '7d' });
@@ -242,7 +242,7 @@ describe('momentos reais (produção, replay)', () => {
     const l = ler(real('2026-10-01-1830-7d'), '7d');
     const f = achado(l, 'fechamentos_semana:queda');
     expect(f.frase).toContain('As fichas finalizadas seguem no normal (38 na semana)');
-    expect(f.acao?.texto).toBe('Confira com a equipe as fichas finalizadas sem “fechado” no Kanban.');
+    expect(f.acao?.texto).toBe('Confira com o administrativo as fichas finalizadas que ainda não estão completas lá.');
   });
 
   it('29/09 14:00 — o lote do sistema: 223 leads (só 9 eram antigos — a nota não diz "antigos")', () => {
@@ -810,7 +810,7 @@ describe('observações', () => {
   it('fichas sem “fechado”: até 3 nomes e "e mais N pessoas" (nada de reticências); link "Ver Fechados"', () => {
     const fs = { total: 71, porPessoa: [{ nome: 'Juliana', qtd: 40 }, { nome: 'Isadora', qtd: 16 }, { nome: 'Luiz', qtd: 9 }, { nome: 'Matheus', qtd: 4 }, { nome: 'Giovana', qtd: 2 }] };
     const n = lerS(sinais({ notas: { lotesNe: [], transferencias: [], fichasSemFechado: fs } })).notas[0];
-    expect(n.texto).toBe('71 fichas finalizadas hoje ainda estão sem “fechado” no Kanban (Juliana 40, Isadora 16, Luiz 9 e mais 2 pessoas). “Fechados” conta só o que foi marcado.');
+    expect(n.texto).toBe('71 fichas finalizadas hoje ainda não estão completas no administrativo (Juliana 40, Isadora 16, Luiz 9 e mais 2 pessoas). “Fechados” conta só o que o administrativo confirmou.');
     expect(n.link).toEqual({ rotulo: 'Ver Fechados', alvo: { bloco: 'kpi', kpi: 'ganhos' } });
   });
   it('feriados: a lista da migration (as duas funções) é a mesma do demo', () => {

@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import type { KpisV5 } from '@/data/dashboardV5.tipos';
 import { fmtDuracaoH, fmtInt } from '@/data/dashboardV5.formato';
 import { CardVidro, Skeleton } from '../../components';
+import { useAdmStatus } from '@/data/admFechados';
 import { Ajuda, Legenda, Variacao, type Sentido } from './comum';
 
 /* Os quatro números do topo. Entradas, não elegíveis e fechados comparam com o
@@ -10,7 +11,7 @@ import { Ajuda, Legenda, Variacao, type Sentido } from './comum';
 const AJUDA = {
   entradas: 'Clientes diferentes que mandaram a primeira mensagem no período, em qualquer número. O número interno do escritório não conta.',
   ne: 'Leads marcados como não elegíveis no período, pela IA, pela regra automática do RS ou por alguém da equipe.',
-  ganhos: 'Leads marcados como fechados no período, inclusive os que chegaram antes dele.',
+  ganhos: 'Clientes que o sistema do administrativo marcou como completos no período, pela data em que ficaram completos lá. A lista é lida de lá a cada 5 minutos.',
   tempo: 'Mediana do tempo entre a chegada do lead e o fechamento, considerando todos os fechados do período. Metade fecha mais rápido do que isso. Embaixo, a média e quantos fechados entraram na conta.',
 };
 
@@ -26,17 +27,28 @@ function ValorKpi({ txt }: { txt: string }) {
   );
 }
 
-function Cartao({ rotulo, ajuda, valor, children, alvo }: { rotulo: string; ajuda: string; valor: string; children: ReactNode; alvo?: string }) {
+function Cartao({ rotulo, ajuda, valor, children, alvo, selo }: { rotulo: string; ajuda: string; valor: string; children: ReactNode; alvo?: string; selo?: ReactNode }) {
   return (
     <CardVidro className="d5-kpi" data-d5-alvo={alvo}>
       <div className="d5-kpi-rot">
         <span>{rotulo}</span>
         <Ajuda texto={ajuda} rotulo={rotulo} />
+        {selo}
       </div>
       <div className="d5-kpi-val num"><ValorKpi txt={valor} /></div>
       <div className="d5-kpi-pe">{children}</div>
     </CardVidro>
   );
+}
+
+/** Selo "administrativo" ao lado de Fechados: a fonte do número e a hora da última leitura. */
+function SeloAdministrativo() {
+  const st = useAdmStatus().data;
+  if (!st?.ativo) return null;
+  const hora = st.ultimaLeituraEm
+    ? new Date(st.ultimaLeituraEm).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' })
+    : null;
+  return <span className="d5-kpi-fonte" title={hora ? `Sistema do administrativo lido às ${hora}` : 'Sistema do administrativo'}>administrativo</span>;
 }
 
 export function Kpis({ k, ant, comparacao }: { k: KpisV5; ant: KpisV5 | null; comparacao: string }) {
@@ -51,7 +63,7 @@ export function Kpis({ k, ant, comparacao }: { k: KpisV5; ant: KpisV5 | null; co
       <Cartao rotulo="Não elegíveis" ajuda={AJUDA.ne} valor={fmtInt(k.ne)} alvo="kpi:ne">
         {v(k.ne, ant?.ne, 'neutro')}
       </Cartao>
-      <Cartao rotulo="Fechados" ajuda={AJUDA.ganhos} valor={fmtInt(k.ganhos)} alvo="kpi:ganhos">
+      <Cartao rotulo="Fechados" ajuda={AJUDA.ganhos} valor={fmtInt(k.ganhos)} alvo="kpi:ganhos" selo={<SeloAdministrativo />}>
         {v(k.ganhos, ant?.ganhos, 'maior')}
       </Cartao>
       <Cartao rotulo="Tempo para fechar" ajuda={AJUDA.tempo} valor={fmtDuracaoH(k.fechMedianaH)}>

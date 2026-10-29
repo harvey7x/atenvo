@@ -448,6 +448,12 @@ verify_jwt = false
 verify_jwt = false
 [functions.bot-remarketing]
 verify_jwt = false
+# planilha-fechados: Apps Script da planilha CONTROLE ADM manda o segredo no corpo, sem JWT.
+[functions.planilha-fechados]
+verify_jwt = false
+# adm-fechados: cron secret-gated (x-bot-secret == webhook_config.adm_fechados), sem JWT.
+[functions.adm-fechados]
+verify_jwt = false
 # janela-guardia: cron secret-gated (x-bot-secret == webhook_config.janela_guardia), sem JWT.
 [functions.janela-guardia]
 verify_jwt = false

@@ -915,7 +915,7 @@ function achadoFechamentos(s: SinaisV5, agora: Date, modo: Modo, preset: PresetD
   const u = s.fechamentos.semFechadoSemana;
   const contaSemFechado = u >= F.semFechadoMin;
   const clausSemFechado = contaSemFechado
-    ? ` Outras ${fmtInt(u)} fichas finalizadas na semana ainda estão sem “fechado” no Kanban.` : '';
+    ? ` Outras ${fmtInt(u)} fichas finalizadas na semana ainda não estão completas no administrativo.` : '';
   if (e0 === 'queda') {
     const fichasOk = j0.fb != null && j0.fb > 0 && j0.f >= F.fichasOk * j0.fb;
     const entradasCairam = j0.eb != null && j0.eb > 0 && j0.e <= F.entradasQueda * j0.eb;
@@ -928,7 +928,7 @@ function achadoFechamentos(s: SinaisV5, agora: Date, modo: Modo, preset: PresetD
         id: 'fechamentos_semana:queda', tipo: 'fechamentos_semana', severidade: 'atencao', prioridade: 80,
         titulo: `${qtd(j0.c, 'fechado', 'fechados')} nos últimos 7 dias, abaixo do normal`,
         frase: `${faixa}${clausula}`,
-        acao: { texto: fichasOk ? 'Confira com a equipe as fichas finalizadas sem “fechado” no Kanban.' : null, link },
+        acao: { texto: fichasOk ? 'Confira com o administrativo as fichas finalizadas que ainda não estão completas lá.' : null, link },
         soAdmin: false,
       },
       semFechado: false,
@@ -1078,7 +1078,7 @@ function notasDados(s: SinaisV5, agora: Date, modo: Modo, explicadas: Set<string
     const quando = modo === 'hoje' ? 'hoje' : 'no período';
     out.push({
       id: 'fichas_sem_fechado',
-      texto: `${qtd(fs.total, 'ficha finalizada', 'fichas finalizadas')} ${quando} ${pl(fs.total, 'ainda está', 'ainda estão')} sem “fechado” no Kanban${quem}. “Fechados” conta só o que foi marcado.`,
+      texto: `${qtd(fs.total, 'ficha finalizada', 'fichas finalizadas')} ${quando} ${pl(fs.total, 'ainda não está completa', 'ainda não estão completas')} no administrativo${quem}. “Fechados” conta só o que o administrativo confirmou.`,
       link: linkAlvo('Ver Fechados', { bloco: 'kpi', kpi: 'ganhos' }),
     });
   }

@@ -141,6 +141,11 @@
   display: flex; flex-direction: column; min-height: 126px; min-width: 0;
 }
 .v2 .d5-kpi-rot { display: flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 500; color: var(--txt-2); }
+.v2 .d5-kpi-fonte {
+  margin-left: auto; font-size: 9.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+  padding: 2px 6px; border-radius: 4px; color: var(--txt-2);
+  background: rgba(var(--tint), .06); border: 1px solid var(--linha);
+}
 .v2 .d5-kpi-val {
   font-size: 30px; font-weight: 600; letter-spacing: -.025em; line-height: 1.1;
   margin-top: 10px; color: var(--txt); white-space: nowrap;
