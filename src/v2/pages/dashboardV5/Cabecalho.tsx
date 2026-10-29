@@ -64,7 +64,7 @@ export function Cabecalho({
               <button type="button" className="d5-ib" aria-label="Mês anterior" onClick={() => setMesCaf((m) => m - 1)}>
                 <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden><path d="M10 3.5 5.5 8l4.5 4.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
               </button>
-              <span className="num" title={`Mês comercial da casa: do dia 10 ao dia 10 seguinte (${periodo.label})`}>{rotuloMes(periodo, hoje)}</span>
+              <span className="num" title={`Mês comercial da casa, o mesmo do CAF: do dia 11 ao dia 10 seguinte (${periodo.label})`}>{rotuloMes(periodo, hoje)}</span>
               <button type="button" className="d5-ib" aria-label="Próximo mês" disabled={mesCaf >= 0} onClick={() => setMesCaf((m) => Math.min(0, m + 1))}>
                 <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden><path d="M6 3.5 10.5 8 6 12.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
               </button>

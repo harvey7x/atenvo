@@ -10,7 +10,8 @@ import { useOrg } from '@/context/OrgContext';
    Demo: sempre ligado.
    ------------------------------------------------------------------ */
 
-export interface AdmStatus { ativo: boolean; ultimaLeituraEm: string | null; completos: number }
+/** placar = os fechados do dashboard já vêm dos casos do CAF pela regra do pódio (API nova, 29/10). */
+export interface AdmStatus { ativo: boolean; ultimaLeituraEm: string | null; completos: number; placar: boolean }
 
 const REAL = isSupabaseConfigured && !!supabase;
 
@@ -23,11 +24,11 @@ export function useAdmStatus() {
     staleTime: 60_000,
     refetchInterval: 5 * 60_000,
     queryFn: async (): Promise<AdmStatus> => {
-      if (!REAL) return { ativo: true, ultimaLeituraEm: new Date(Date.now() - 3 * 60_000).toISOString(), completos: 327 };
+      if (!REAL) return { ativo: true, ultimaLeituraEm: new Date(Date.now() - 3 * 60_000).toISOString(), completos: 327, placar: true };
       const { data, error } = await supabase!.rpc('adm_status', { p_org: orgId });
       if (error) throw error;
-      const d = (data ?? {}) as { ativo?: boolean; ultima_leitura_em?: string | null; completos?: number };
-      return { ativo: !!d.ativo, ultimaLeituraEm: d.ultima_leitura_em ?? null, completos: d.completos ?? 0 };
+      const d = (data ?? {}) as { ativo?: boolean; ultima_leitura_em?: string | null; completos?: number; placar?: boolean };
+      return { ativo: !!d.ativo, ultimaLeituraEm: d.ultima_leitura_em ?? null, completos: d.completos ?? 0, placar: !!d.placar };
     },
   });
 }

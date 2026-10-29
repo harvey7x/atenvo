@@ -660,7 +660,7 @@ export default function RelatoriosV2() {
         {f.preset === 'mes_caf' && (
           <span className="rl2-datas">
             <BotaoSec mini onClick={() => navegaMesCaf(-1)}>‹</BotaoSec>
-            <span className="num" title="Mês comercial: do dia 10 ao dia 10 seguinte">{periodo.label}</span>
+            <span className="num" title="Mês comercial (o mesmo do CAF): do dia 11 ao dia 10 seguinte">{periodo.label}</span>
             <BotaoSec mini disabled={(f.mesCaf ?? 0) >= 0} onClick={() => navegaMesCaf(1)}>›</BotaoSec>
           </span>
         )}

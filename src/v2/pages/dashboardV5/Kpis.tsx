@@ -12,6 +12,8 @@ const AJUDA = {
   entradas: 'Clientes diferentes que mandaram a primeira mensagem no período, em qualquer número. O número interno do escritório não conta.',
   ne: 'Leads marcados como não elegíveis no período, pela IA, pela regra automática do RS ou por alguém da equipe.',
   ganhos: 'Clientes que o sistema do administrativo marcou como completos no período, pela data em que ficaram completos lá. A lista é lida de lá a cada 5 minutos.',
+  /* com a API nova do CAF (29/10): a mesma conta do pódio do "Meu painel" */
+  ganhosPlacar: 'Casos completos no sistema do CAF no período, pela mesma regra do pódio do "Meu painel": data em que o caso ficou completo, vendedor do caso, só os vendedores do campeonato e sem os casos que o gerente tirou da conta. Lido de lá a cada 5 minutos.',
   tempo: 'Mediana do tempo entre a chegada do lead e o fechamento, considerando todos os fechados do período. Metade fecha mais rápido do que isso. Embaixo, a média e quantos fechados entraram na conta.',
 };
 
@@ -52,6 +54,7 @@ function SeloAdministrativo() {
 }
 
 export function Kpis({ k, ant, comparacao }: { k: KpisV5; ant: KpisV5 | null; comparacao: string }) {
+  const placar = useAdmStatus().data?.placar ?? false;
   const v = (atual: number, anterior: number | undefined, sentido: Sentido) => (
     <Variacao atual={atual} anterior={anterior ?? null} sentido={sentido} comparacao={comparacao} />
   );
@@ -63,7 +66,7 @@ export function Kpis({ k, ant, comparacao }: { k: KpisV5; ant: KpisV5 | null; co
       <Cartao rotulo="Não elegíveis" ajuda={AJUDA.ne} valor={fmtInt(k.ne)} alvo="kpi:ne">
         {v(k.ne, ant?.ne, 'neutro')}
       </Cartao>
-      <Cartao rotulo="Fechados" ajuda={AJUDA.ganhos} valor={fmtInt(k.ganhos)} alvo="kpi:ganhos" selo={<SeloAdministrativo />}>
+      <Cartao rotulo="Fechados" ajuda={placar ? AJUDA.ganhosPlacar : AJUDA.ganhos} valor={fmtInt(k.ganhos)} alvo="kpi:ganhos" selo={<SeloAdministrativo />}>
         {v(k.ganhos, ant?.ganhos, 'maior')}
       </Cartao>
       <Cartao rotulo="Tempo para fechar" ajuda={AJUDA.tempo} valor={fmtDuracaoH(k.fechMedianaH)}>

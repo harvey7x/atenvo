@@ -115,12 +115,12 @@ describe('período anterior: mesmo tempo decorrido', () => {
     const um = periodoAnteriorV5(periodoDash('custom', '2026-10-07', '2026-10-07'), SP('2026-10-14T14:00:00'));
     expect(um.rotulo).toBe('06/10');
   });
-  it('mês comercial FECHADO compara com o mês anterior inteiro (10→10), mesmo com 31 dias', () => {
-    // 10/09–09/10 (30 dias) × 10/08–09/09 (31 dias): nada de "10/08 a 08/09"
+  it('mês comercial FECHADO compara com o mês anterior inteiro (11→10), mesmo com 31 dias', () => {
+    // 11/09–10/10 (30 dias) × 11/08–10/09 (31 dias): nada de "11/08 a 09/09"
     const p = periodoDash('mes_caf', undefined, undefined, -1);
-    expect(p.iniDate).toBe('2026-09-10');
+    expect(p.iniDate).toBe('2026-09-11');
     const a = periodoAnteriorV5(p, SP('2026-10-14T14:00:00'));
-    expect(a).toMatchObject({ parcial: false, iniISO: p.prevIniISO, fimISO: p.iniISO, rotulo: '10/08 a 09/09' });
+    expect(a).toMatchObject({ parcial: false, iniISO: p.prevIniISO, fimISO: p.iniISO, rotulo: '11/08 a 10/09' });
   });
   it('mês comercial EM ANDAMENTO segue cortado no mesmo tempo decorrido', () => {
     const p = periodoDash('mes_caf');
@@ -158,8 +158,8 @@ describe('janela do mapa', () => {
   });
   it('mês comercial em andamento conta só os dias que já começaram', () => {
     const m = janelaMapaV5(periodoDash('mes_caf'), '2026-10-21');
-    expect(m.iniDate).toBe('2026-10-10');
-    expect(m.dias).toHaveLength(12);
+    expect(m.iniDate).toBe('2026-10-11');
+    expect(m.dias).toHaveLength(11);
     expect(m.modo).toBe('dias');
   });
   it('mês fechado (mais de 14 dias) vira média por dia da semana', () => {

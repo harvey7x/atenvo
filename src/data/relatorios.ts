@@ -6,16 +6,18 @@ export const REL_REAL = isSupabaseConfigured && !!supabase;
 const TZ = 'America/Sao_Paulo';
 
 /* ====================== Período (America/Sao_Paulo) ====================== */
-// 'mes_caf' = o mês COMERCIAL da casa: do dia 10 (00:00) ao dia 10 do mês seguinte
-// (fim exclusivo), navegável por offset de meses (RelFiltros.mesCaf; 0 = corrente).
-// O período anterior dele é o mês 10→10 EXATO anterior — não o deslocamento por
+// 'mes_caf' = o mês COMERCIAL da casa, o MESMO do campeonato do sistema do CAF
+// (campeonato_inicio, dono 29/10: "os números do CAF têm que bater no Atenvo"): do dia
+// 11 (00:00) ao dia 11 do mês seguinte (fim exclusivo) — o dia 10 fecha o mês. Navegável
+// por offset de meses (RelFiltros.mesCaf; 0 = corrente).
+// O período anterior dele é o mês 11→10 EXATO anterior — não o deslocamento por
 // duração, que erraria 1 dia em meses de 31. Os presets civis (mes_atual/mes_anterior)
 // saíram da lista visível mas continuam válidos no tipo (estado antigo não quebra).
 export type Preset = 'hoje' | 'ontem' | '3d' | '7d' | '30d' | 'mes_caf' | 'mes_atual' | 'mes_anterior' | 'custom';
 export const PRESETS: { id: Preset; label: string }[] = [
   { id: 'hoje', label: 'Hoje' }, { id: 'ontem', label: 'Ontem' },
   { id: '3d', label: 'Últimos 3 dias' }, { id: '7d', label: 'Últimos 7 dias' },
-  { id: '30d', label: 'Últimos 30 dias' }, { id: 'mes_caf', label: 'Nosso mês (10→10)' },
+  { id: '30d', label: 'Últimos 30 dias' }, { id: 'mes_caf', label: 'Nosso mês (11→10)' },
   { id: 'custom', label: 'Personalizado' },
 ];
 
@@ -23,15 +25,15 @@ export const PRESETS: { id: Preset; label: string }[] = [
 export function spHoje(): string { return new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()); }
 export function addDias(dateStr: string, n: number): string { const d = new Date(dateStr + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
 function primeiroDoMes(dateStr: string): string { return dateStr.slice(0, 8) + '01'; }
-/** Soma n meses mantendo o DIA 10 (dia 10 existe em todo mês — sem borda de 29/30/31). */
-function addMeses10(dateStr: string, n: number): string {
+/** Soma n meses mantendo o DIA 11 (dia 11 existe em todo mês — sem borda de 29/30/31). */
+function addMeses11(dateStr: string, n: number): string {
   const [y, m] = dateStr.split('-').map(Number);
-  return new Date(Date.UTC(y, m - 1 + n, 10)).toISOString().slice(0, 10);
+  return new Date(Date.UTC(y, m - 1 + n, 11)).toISOString().slice(0, 10);
 }
-/** Dia 10 que ABRE o mês comercial (10→10) contendo `hoje`, deslocado `off` meses (off <= 0 = passado). */
+/** Dia 11 que ABRE o mês comercial (11→10) contendo `hoje`, deslocado `off` meses (off <= 0 = passado). */
 export function mesCafInicio(hoje: string, off = 0): string {
-  const abre10 = hoje.slice(8, 10) >= '10' ? hoje.slice(0, 7) + '-10' : addMeses10(hoje.slice(0, 7) + '-10', -1);
-  return addMeses10(abre10, off);
+  const abre11 = hoje.slice(8, 10) >= '11' ? hoje.slice(0, 7) + '-11' : addMeses11(hoje.slice(0, 7) + '-11', -1);
+  return addMeses11(abre11, off);
 }
 function instante(dateStr: string): string { return dateStr + 'T00:00:00-03:00'; } // SP = UTC-3 (sem DST)
 function difDias(aIso: string, bIso: string): number { return Math.round((new Date(bIso).getTime() - new Date(aIso).getTime()) / 86400000); }
@@ -46,13 +48,13 @@ export interface Periodo {
 export function resolvePeriodo(preset: Preset, ini?: string, fim?: string, mesCaf = 0): Periodo {
   const hoje = spHoje();
   let di = hoje, df = addDias(hoje, 1); // df exclusivo
-  let prevIniOverride: string | null = null; // mes_caf: anterior = mês 10→10 exato (duração pode diferir)
+  let prevIniOverride: string | null = null; // mes_caf: anterior = mês 11→10 exato (duração pode diferir)
   if (preset === 'hoje') { di = hoje; df = addDias(hoje, 1); }
   else if (preset === 'ontem') { di = addDias(hoje, -1); df = hoje; }
   else if (preset === '3d') { di = addDias(hoje, -2); df = addDias(hoje, 1); }
   else if (preset === '7d') { di = addDias(hoje, -6); df = addDias(hoje, 1); }
   else if (preset === '30d') { di = addDias(hoje, -29); df = addDias(hoje, 1); }
-  else if (preset === 'mes_caf') { di = mesCafInicio(hoje, mesCaf); df = addMeses10(di, 1); prevIniOverride = addMeses10(di, -1); }
+  else if (preset === 'mes_caf') { di = mesCafInicio(hoje, mesCaf); df = addMeses11(di, 1); prevIniOverride = addMeses11(di, -1); }
   else if (preset === 'mes_atual') { di = primeiroDoMes(hoje); df = addDias(hoje, 1); }
   else if (preset === 'mes_anterior') { const p = primeiroDoMes(hoje); di = primeiroDoMes(addDias(p, -1)); df = p; }
   else if (preset === 'custom' && ini && fim) { di = ini <= fim ? ini : fim; df = addDias(ini <= fim ? fim : ini, 1); }

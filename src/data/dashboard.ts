@@ -9,7 +9,7 @@ import { resolvePeriodo, spHoje, addDias, type Periodo, type Preset } from '@/da
    ------------------------------------------------------------------ */
 
 /** Janelas do dono (10/09): diário, 3 dias, 7 dias e o mês COMERCIAL da casa
- *  (dia 10 → dia 10, navegável por ‹ › via mesCaf). Personalizado cobre o resto. */
+ *  (dia 11 → dia 10, o mesmo do CAF, navegável por ‹ › via mesCaf). Personalizado cobre o resto. */
 export type PresetDash = 'hoje' | '3d' | '7d' | 'mes_caf' | 'custom';
 
 export function periodoDash(preset: PresetDash, ini?: string, fim?: string, mesCaf = 0): Periodo {

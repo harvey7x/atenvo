@@ -5,8 +5,8 @@
       de @/data/relatorios) e dura o MESMO tempo decorrido do período atual. Período
       em andamento (hoje, 7 dias, nosso mês) → o anterior é cortado no mesmo ponto
       ("ontem até 14:05"); período já fechado → o anterior INTEIRO (mês comercial
-      fechado 10/09–09/10 compara com 10/08–09/09 inteiro, mesmo que um tenha 30 dias e
-      o outro 31 — o dono lê o mês da casa, dia 10 a dia 9). Sem o corte, 3 horas de
+      fechado 11/09–10/10 compara com 11/08–10/09 inteiro, mesmo que um tenha 30 dias e
+      o outro 31 — o dono lê o mês da casa, dia 11 a dia 10, o mesmo do CAF). Sem o corte, 3 horas de
       hoje eram comparadas com o dia de ontem inteiro e a seta mostrava queda que não existe.
 
    2) Janela do mapa dia × hora: período com menos de 7 dias (Hoje, 3 dias) desenha

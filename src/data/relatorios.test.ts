@@ -255,28 +255,29 @@ describe('Pessoas que chamaram — regras de negócio (dedup/outbound/LID)', () 
   });
 });
 
-describe('mês comercial 10→10 (mes_caf, dono 10/09)', () => {
-  it('dia >= 10 abre no dia 10 do próprio mês', () => {
-    expect(mesCafInicio('2026-09-10')).toBe('2026-09-10');
-    expect(mesCafInicio('2026-09-25')).toBe('2026-09-10');
-    expect(mesCafInicio('2026-12-31')).toBe('2026-12-10');
+describe('mês comercial 11→10 (mes_caf = mês do campeonato do CAF, dono 29/10)', () => {
+  it('dia >= 11 abre no dia 11 do próprio mês', () => {
+    expect(mesCafInicio('2026-09-11')).toBe('2026-09-11');
+    expect(mesCafInicio('2026-09-25')).toBe('2026-09-11');
+    expect(mesCafInicio('2026-12-31')).toBe('2026-12-11');
   });
-  it('dia < 10 ainda pertence ao mês que abriu no dia 10 anterior', () => {
-    expect(mesCafInicio('2026-09-09')).toBe('2026-08-10');
-    expect(mesCafInicio('2026-01-05')).toBe('2025-12-10');
+  it('dia <= 10 ainda pertence ao mês que abriu no dia 11 anterior (o dia 10 fecha o mês, como no CAF)', () => {
+    expect(mesCafInicio('2026-09-10')).toBe('2026-08-11');
+    expect(mesCafInicio('2026-09-09')).toBe('2026-08-11');
+    expect(mesCafInicio('2026-01-05')).toBe('2025-12-11');
   });
-  it('offset navega meses mantendo o dia 10 (sem borda de 28/30/31)', () => {
-    expect(mesCafInicio('2026-09-15', -1)).toBe('2026-08-10');
-    expect(mesCafInicio('2026-03-15', -3)).toBe('2025-12-10');
-    expect(mesCafInicio('2026-03-05', -1)).toBe('2026-01-10'); // corrente = 10/02; -1 = 10/01
+  it('offset navega meses mantendo o dia 11 (sem borda de 28/30/31)', () => {
+    expect(mesCafInicio('2026-09-15', -1)).toBe('2026-08-11');
+    expect(mesCafInicio('2026-03-15', -3)).toBe('2025-12-11');
+    expect(mesCafInicio('2026-03-05', -1)).toBe('2026-01-11'); // corrente = 11/02; -1 = 11/01
   });
-  it('resolvePeriodo(mes_caf): janela 10→10 com ANTERIOR contíguo exato (não deslocado por duração)', () => {
+  it('resolvePeriodo(mes_caf): janela 11→10 com ANTERIOR contíguo exato (não deslocado por duração)', () => {
     const p = resolvePeriodo('mes_caf');
-    expect(p.iniDate.slice(8)).toBe('10');
-    expect(p.fimDate.slice(8)).toBe('10');
+    expect(p.iniDate.slice(8)).toBe('11');
+    expect(p.fimDate.slice(8)).toBe('11');               // fim exclusivo: o último dia do mês é o 10
     expect(p.dias).toBeGreaterThanOrEqual(28);
     expect(p.dias).toBeLessThanOrEqual(31);
-    expect(p.prevIniDate.slice(8)).toBe('10');           // anterior também abre num dia 10
+    expect(p.prevIniDate.slice(8)).toBe('11');           // anterior também abre num dia 11
     expect(p.prevIniDate < p.iniDate).toBe(true);        // e termina exatamente onde o atual começa
     const pAnt = resolvePeriodo('mes_caf', undefined, undefined, -1);
     expect(pAnt.iniDate).toBe(p.prevIniDate);            // navegar -1 mês = exatamente o período anterior
