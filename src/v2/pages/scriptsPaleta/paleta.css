@@ -26,18 +26,18 @@
   --spl-acc-txt: #fff;                               /* texto sobre o acento sólido (pílula ativa) */
   --spl-ouro: var(--ambar);                          /* estrela = a mesma da página /scripts */
   --spl-hair: rgba(var(--tint), .075);
-  --spl-fundo: var(--base);                          /* chapa opaca; o vidro vem por cima */
+  --spl-fundo: rgba(24, 27, 32, .55);                /* VIDRO 29/10: miolos translúcidos (o vidro é o .vidro-pro) */
   --spl-elev: rgba(var(--tint), .035);               /* um degrau acima da base */
-  --spl-canvas: var(--base);                         /* fundo da conversa na prévia: um degrau ABAIXO do cabeçalho */
+  --spl-canvas: rgba(0, 0, 0, .18);                  /* conversa da prévia: vidro rebaixado, um degrau ABAIXO do cabeçalho */
   --spl-canvas-sombra: inset 0 10px 12px -12px rgba(0, 0, 0, .55); /* o cabeçalho "assenta" sobre a conversa */
   --spl-lista-bg: transparent;
-  --spl-gcab-bg: linear-gradient(var(--vidro-a), var(--vidro-a)), linear-gradient(var(--spl-elev), var(--spl-elev)), var(--spl-fundo);
-  --spl-hi-bg: rgba(var(--tint), .068);
-  --spl-hi-borda: rgba(var(--tint), .075);
-  --spl-hi-sombra: var(--sombra-1), inset 0 1px 0 rgba(var(--tint), .04);
-  --spl-bolha-base: var(--base);
-  --spl-rec-bg: rgba(var(--tint), .085);             /* bolha de ENTRADA (cliente): neutra, sem borda */
-  --spl-rec-bg-hover: rgba(var(--tint), .115);
+  --spl-gcab-bg: rgba(30, 33, 39, .5);               /* cabeçalho de grupo fixo: vidro com desfoque próprio */
+  --spl-hi-bg: rgba(255, 255, 255, .07);
+  --spl-hi-borda: rgba(255, 255, 255, .11);
+  --spl-hi-sombra: none;
+  --spl-bolha-base: transparent;
+  --spl-rec-bg: rgba(255, 255, 255, .08);            /* bolha de ENTRADA (cliente): vidro neutro, sem borda */
+  --spl-rec-bg-hover: rgba(255, 255, 255, .12);
   --spl-rec-sombra: inset 0 1px 0 rgba(var(--tint), .06), 0 1px 2px rgba(0, 0, 0, .22);
   --spl-scroll: rgba(var(--tint), .16);
   --spl-tile: rgba(var(--spl-acc-rgb), .16);         /* ícone do anexo: a mesma família da bolha */
@@ -49,11 +49,7 @@
 
   position: fixed; z-index: 96;
   display: flex; flex-direction: column; min-height: 0;
-  border-radius: var(--spl-r);
-  border: 1px solid rgba(var(--tint), .12);
-  background-color: var(--spl-fundo);
-  background-image: linear-gradient(180deg, var(--vidro-a), var(--vidro-b)), linear-gradient(var(--spl-elev), var(--spl-elev));
-  box-shadow: 0 30px 80px color-mix(in srgb, var(--base) 70%, transparent), var(--sombra-2), inset 0 1px 0 rgba(var(--tint), .06);
+  border-radius: calc(var(--spl-r) + 6px);         /* fundo, borda, sombra e desfoque = .vidro-pro (componentes.css) */
   color: var(--txt); font-family: var(--fonte); font-size: 12px; line-height: 1.4;
   overflow: hidden; isolation: isolate;
   animation: spl-entra .14s var(--ease);
@@ -184,6 +180,7 @@
   margin: 0 -8px; padding: 12px 16px 4px;
   font-size: 10px; font-weight: 650; letter-spacing: .085em; line-height: 16px; text-transform: uppercase; color: var(--txt-3);
   background: var(--spl-gcab-bg);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4); backdrop-filter: blur(16px) saturate(1.4);
 }
 /* cabeçalho FIXO: degradê embaixo para o título que rola por baixo não sair fatiado */
 .v2 .spl-gcab.spl-gcab-fixo::after {
@@ -395,9 +392,9 @@
   font-size: 13px; line-height: 1.45; color: var(--txt);
   white-space: pre-wrap; overflow-wrap: anywhere;
   background-color: var(--spl-bolha-base);
-  background-image: linear-gradient(180deg, rgba(var(--spl-acc-rgb), .16), rgba(var(--spl-acc-rgb), .055));
-  border: 1px solid rgba(var(--spl-acc-rgb), .22);
-  box-shadow: var(--sombra-2), inset 0 1px 0 rgba(var(--tint), .09);
+  background-image: linear-gradient(rgba(var(--spl-acc-rgb), .18), rgba(var(--spl-acc-rgb), .18));
+  border: 1px solid rgba(var(--spl-acc-rgb), .3);
+  box-shadow: none;
 }
 .v2 .spl-bolha.spl-casou { border-color: rgba(var(--spl-acc-rgb), .6); box-shadow: 0 0 0 1px rgba(var(--spl-acc-rgb), .45), var(--sombra-2); }
 /* MÍDIA = uma bolha só: a linha do arquivo (ícone · nome · tipo·duração·tamanho) dentro dela;
@@ -562,16 +559,19 @@
 }
 
 /* ---------- movimento: lite e reduced-motion entram prontos ---------- */
+/* 29/10 (pedido do dono): toda a paleta em MAIÚSCULO — nomes, categorias,
+   linha de apoio, rótulos e dicas. A BOLHA da prévia fica de fora de
+   propósito: ela mostra a mensagem exatamente como o cliente recebe. */
+.v2 .spl { text-transform: uppercase; }
+.v2 .spl button, .v2 .spl input { text-transform: inherit; }   /* o navegador zera em botão/campo */
+.v2 .spl .spl-bolha { text-transform: none; }
+.v2 .spl .spl-it-nome, .v2 .spl .spl-pv-tit-t { letter-spacing: .02em; }
+
 @media (prefers-reduced-motion: reduce) { .v2 .spl { animation: none; } .v2 .spl-ger svg { transition: none; } }
 :root[data-perf="lite"] .v2 .spl { animation: none; }
 
-/* ---------- MODO LEVE: sólido, sombra contida ---------- */
-:root[data-perf="lite"] .v2 .spl {
-  background-image: none; background-color: var(--vidro-a);
-  box-shadow: var(--sombra-2), 0 0 0 1px rgba(var(--tint), .06);
-  --spl-gcab-bg: var(--vidro-a);
-}
-:root[data-perf="lite"] .v2 .spl-bolha { background-image: none; background-color: color-mix(in srgb, var(--spl-acc) 12%, var(--vidro-a)); box-shadow: none; }
+/* ---------- MODO LEVE: o vidro FICA (overlay transitório, pedido do dono 29/10);
+   só some o que é sombra decorativa dentro dele ---------- */
 :root[data-perf="lite"] .v2 .spl-it.spl-hi { box-shadow: none; }
 :root[data-perf="lite"] .v2 .spl-pv-mais { box-shadow: none; }
 :root[data-perf="lite"] .v2 .spl { --spl-canvas-sombra: none; }
@@ -594,18 +594,18 @@ html:root[data-visual="corp"] .v2 .spl-pv-mais { border-radius: 4px; }
    ================================================================== */
 :root[data-tema="light"] .v2 .spl {
   --spl-hair: rgba(var(--tint), .08);
-  --spl-fundo: var(--vidro-a);
+  --spl-fundo: rgba(255, 255, 255, .62);
   --spl-elev: transparent;
-  --spl-canvas: var(--base);
-  --spl-canvas-sombra: inset 0 1px 0 rgba(var(--tint), .03);
-  --spl-lista-bg: var(--vidro-b);
-  --spl-gcab-bg: var(--vidro-b);
-  --spl-hi-bg: rgba(var(--spl-acc-rgb), .06);
-  --spl-hi-borda: rgba(var(--spl-acc-rgb), .18);
-  --spl-hi-sombra: 0 1px 3px rgba(var(--tint), .07), 0 1px 1px rgba(var(--tint), .03);
-  --spl-bolha-base: var(--vidro-a);
-  --spl-rec-bg: transparent;                         /* entrada = carta branca sobre a conversa off-white */
-  --spl-rec-bg-hover: rgba(var(--tint), .03);
+  --spl-canvas: rgba(255, 255, 255, .26);
+  --spl-canvas-sombra: inset 0 1px 0 rgba(255, 255, 255, .6), inset 0 8px 14px -12px rgba(22, 34, 60, .18);
+  --spl-lista-bg: rgba(255, 255, 255, .16);
+  --spl-gcab-bg: rgba(250, 251, 253, .62);
+  --spl-hi-bg: rgba(255, 255, 255, .85);
+  --spl-hi-borda: rgba(22, 25, 31, .1);
+  --spl-hi-sombra: 0 1px 2px rgba(22, 34, 60, .06);
+  --spl-bolha-base: transparent;
+  --spl-rec-bg: rgba(255, 255, 255, .78);            /* entrada = vidro branco sobre a conversa leitosa */
+  --spl-rec-bg-hover: rgba(255, 255, 255, .92);
   --spl-rec-sombra: 0 1px 2px rgba(var(--tint), .09), 0 1px 1px rgba(var(--tint), .04);
   --spl-scroll: rgba(var(--tint), .18);
   --spl-tile: rgba(var(--spl-acc-rgb), .1);
@@ -614,8 +614,6 @@ html:root[data-visual="corp"] .v2 .spl-pv-mais { border-radius: 4px; }
   --spl-var-tinta: rgba(var(--spl-acc-rgb), .06);
   --spl-var-traco: rgba(var(--spl-acc-rgb), .65);
   --spl-mark-bg: rgba(var(--spl-acc-rgb), .24);
-  border-color: rgba(var(--tint), .13);
-  box-shadow: var(--shadow-pop), 0 3px 10px rgba(var(--tint), .08), inset 0 1px 0 var(--vidro-a);
 }
 :root[data-tema="light"] .v2 .spl .spl-kbd { background: var(--vidro-a); border-color: rgba(var(--tint), .14); color: var(--txt-2); }
 :root[data-tema="light"] .v2 .spl-pills-trilho { background: rgba(var(--tint), .045); border-color: rgba(var(--tint), .08); }
@@ -626,13 +624,56 @@ html:root[data-visual="corp"] .v2 .spl-pv-mais { border-radius: 4px; }
 :root[data-tema="light"] .v2 .spl .spl-mark { box-shadow: 0 0 0 1px rgba(var(--spl-acc-rgb), .3); }
 :root[data-tema="light"] .v2 .spl .spl-tok:not(.spl-mark) { background: rgba(var(--ambar-rgb), .07); }
 :root[data-tema="light"] .v2 .spl-bolha {
-  background-image: linear-gradient(180deg, rgba(var(--spl-acc-rgb), .1), rgba(var(--spl-acc-rgb), .04));
-  border-color: rgba(var(--spl-acc-rgb), .22);
-  box-shadow: 0 6px 16px rgba(var(--spl-acc-rgb), .1), inset 0 1px 0 color-mix(in srgb, var(--vidro-a) 80%, transparent);
+  background-color: rgba(255, 255, 255, .55);
+  background-image: linear-gradient(rgba(var(--spl-acc-rgb), .1), rgba(var(--spl-acc-rgb), .1));
+  border-color: rgba(var(--spl-acc-rgb), .24);
+  box-shadow: none;
 }
-:root[data-tema="light"] .v2 .spl-bolha.spl-casou { border-color: rgba(var(--spl-acc-rgb), .55); box-shadow: 0 0 0 1px rgba(var(--spl-acc-rgb), .4), 0 6px 16px rgba(var(--spl-acc-rgb), .1); }
+:root[data-tema="light"] .v2 .spl-bolha.spl-casou { border-color: rgba(var(--spl-acc-rgb), .55); box-shadow: 0 0 0 1px rgba(var(--spl-acc-rgb), .3); }
 :root[data-tema="light"] .v2 .spl-et-n { border-color: rgba(var(--tint), .14); }
-:root[data-tema="light"] .v2 .spl-rod { background: var(--vidro-b); }
-:root[data-tema="light"] .v2 .spl-pv-mais { background: var(--vidro-a); box-shadow: 0 2px 8px rgba(var(--tint), .12); }
-:root[data-tema="light"][data-perf="lite"] .v2 .spl { background-color: var(--vidro-a); box-shadow: var(--shadow-pop), 0 0 0 1px rgba(var(--tint), .08); }
-:root[data-tema="light"][data-perf="lite"] .v2 .spl-bolha { background-color: color-mix(in srgb, var(--spl-acc) 7%, var(--vidro-a)); }
+:root[data-tema="light"] .v2 .spl-rod { background: rgba(255, 255, 255, .34); }
+:root[data-tema="light"] .v2 .spl-pv-mais { background: rgba(255, 255, 255, .8); box-shadow: 0 2px 8px rgba(var(--tint), .12); }
+
+/* ==================================================================
+   VIDRO 29/10 — acabamento SÓBRIO da paleta sobre o .vidro-pro
+   ("mais minimalista, puxado pro profissional"): trilho e botões
+   flutuantes em vidro rebaixado, sem brilho colorido nem sombra do
+   acento. Nada aqui tem fundo opaco.
+   ================================================================== */
+.v2 .spl .spl-busca { font-size: 13px; font-weight: 600; letter-spacing: .05em; }
+.v2 .spl .spl-pills-trilho { background: rgba(0, 0, 0, .12); border-color: rgba(255, 255, 255, .07); border-radius: 10px; }
+.v2 .spl .spl-pill { border-radius: 8px; font-size: 11px; font-weight: 650; letter-spacing: .06em; }
+.v2 .spl .spl-pill.spl-on { box-shadow: none; }
+.v2 .spl .spl-pills-seta, .v2 .spl .spl-pv-mais { -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+.v2 .spl .spl-it { border-radius: 10px; transition: background .14s, border-color .14s; }
+.v2 .spl .spl-it:hover:not(.spl-hi) { background: rgba(255, 255, 255, .035); }
+.v2 .spl .spl-usar { border-radius: 10px; box-shadow: none; letter-spacing: .08em; font-weight: 700; }
+.v2 .spl .spl-et-n { -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+.v2 .spl .spl-ger { letter-spacing: .06em; font-weight: 650; }
+:root[data-tema="light"] .v2 .spl .spl-pills-trilho { background: rgba(255, 255, 255, .4); border-color: rgba(22, 25, 31, .08); }
+:root[data-tema="light"] .v2 .spl .spl-pill.spl-on { box-shadow: none; }
+:root[data-tema="light"] .v2 .spl .spl-it:hover:not(.spl-hi) { background: rgba(255, 255, 255, .5); }
+/* COMPACTO 29/10 ("mais minimalista… não tão grande"): painel 680×600 (Paleta.tsx)
+   e cromo um degrau abaixo — busca 46, pílulas 24, item 44, prévia com título 14. */
+.v2 .spl .spl-cab { height: 46px; padding: 0 14px; }
+.v2 .spl .spl-busca { font-size: 12px; font-weight: 500; letter-spacing: .04em; }
+.v2 .spl .spl-pills-faixa { padding: 6px 14px; }
+.v2 .spl .spl-pill { height: 24px; padding: 0 10px; gap: 6px; font-size: 10px; font-weight: 600; letter-spacing: .04em; }
+.v2 .spl .spl-lista { width: clamp(264px, 42%, 292px); padding: 2px 6px 6px; }
+.v2 .spl .spl-gcab { margin: 0 -6px; padding: 9px 14px 3px; font-size: 9px; letter-spacing: .07em; }
+.v2 .spl .spl-it { min-height: 44px; padding: 5px 8px; row-gap: 1px; }
+.v2 .spl .spl-it-tit { font-size: 11.5px; font-weight: 600; line-height: 16px; }
+.v2 .spl .spl-it-nome, .v2 .spl .spl-pv-tit-t { letter-spacing: .02em; }
+.v2 .spl .spl-it-sub { font-size: 10.5px; line-height: 15px; letter-spacing: .01em; }
+.v2 .spl .spl-it-n { font-size: 10px; }
+.v2 .spl .spl-pv-cab { min-height: 64px; padding: 10px 18px 9px; gap: 3px; }
+.v2 .spl .spl-pv-cab.spl-pv-cab-sd { min-height: 56px; }
+.v2 .spl .spl-pv-tit { font-size: 13px; font-weight: 650; line-height: 18px; }
+.v2 .spl .spl-pv-linha, .v2 .spl .spl-tag, .v2 .spl .spl-pv-desc { font-size: 10px; }
+.v2 .spl .spl-pv-corpo { padding: 10px 18px 12px; }
+.v2 .spl .spl-bolha { font-size: 12px; }
+.v2 .spl .spl-pv-rod { height: 48px; padding: 0 18px; }
+.v2 .spl .spl-usar { height: 28px; padding: 0 6px 0 12px; font-size: 10.5px; letter-spacing: .05em; font-weight: 650; }
+.v2 .spl .spl-rod { height: 34px; padding: 0 14px 0 6px; }
+.v2 .spl .spl-ger { font-size: 10.5px; letter-spacing: .04em; font-weight: 600; }
+.v2 .spl .spl-dicas { font-size: 10px; gap: 12px; }

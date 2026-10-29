@@ -651,3 +651,49 @@
 .v2 .vimg-ok { font-size: 12px; color: var(--verde); }
 .v2 .vimg-spin { width: 22px; height: 22px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .2); border-top-color: #fff; animation: v2-vimg-gira .9s linear infinite; }
 @keyframes v2-vimg-gira { to { transform: rotate(360deg); } }
+
+/* ==================================================================
+   VIDRO PRO — superfície flutuante translúcida com desfoque real e
+   fio de luz discreto no topo. v2 (mesmo dia): SÓBRIO — sem tinta do
+   acento, sem brilho colorido ("mais minimalista, profissional"). Pedido do
+   dono 29/10 para o painel de FILTROS e a paleta de SCRIPTS do inbox
+   ("transparente com glass, não algo tão simples"). EXCEÇÃO consciente
+   ao Corporativo (que chapa tudo) e vale também no Modo Leve: é um
+   overlay transitório, o custo do blur só existe enquanto está aberto.
+   Seletores com html:root[...] para vencer corp/lite/light de qualquer
+   folha. O conteúdo interno NÃO pode ter fundo opaco (senão some o vidro).
+   ================================================================== */
+html:root:not([data-tema="light"]) .v2 .vidro-pro {
+  --vp-acc: var(--azul-rgb, 76, 141, 255);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .035), rgba(255, 255, 255, 0) 96px),
+    linear-gradient(160deg, rgba(34, 37, 43, .66), rgba(18, 20, 24, .64));
+  border: 1px solid rgba(255, 255, 255, .1);
+  -webkit-backdrop-filter: blur(22px) saturate(1.25); backdrop-filter: blur(22px) saturate(1.25);
+  box-shadow: 0 24px 60px -14px rgba(0, 0, 0, .5), 0 6px 18px rgba(0, 0, 0, .22), inset 0 1px 0 rgba(255, 255, 255, .06);
+}
+html:root[data-tema="light"] .v2 .vidro-pro {
+  --vp-acc: var(--azul-rgb, 15, 98, 254);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .35), rgba(255, 255, 255, 0) 96px),
+    linear-gradient(160deg, rgba(255, 255, 255, .72), rgba(246, 248, 251, .62));
+  border: 1px solid rgba(22, 25, 31, .09);
+  -webkit-backdrop-filter: blur(22px) saturate(1.4); backdrop-filter: blur(22px) saturate(1.4);
+  box-shadow: 0 24px 56px -16px rgba(22, 34, 60, .22), 0 6px 16px rgba(22, 34, 60, .07), inset 0 1px 0 rgba(255, 255, 255, .85);
+}
+/* fio de luz discreto só no topo (neutro, sem cor do acento) */
+html:root .v2 .vidro-pro::after {
+  content: ""; position: absolute; inset: 0; z-index: 5; pointer-events: none;
+  border-radius: inherit; padding: 1px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .14), rgba(255, 255, 255, 0) 35%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+html:root[data-tema="light"] .v2 .vidro-pro::after {
+  background: linear-gradient(180deg, rgba(255, 255, 255, .9), rgba(255, 255, 255, 0) 35%);
+}
+/* quem pediu menos transparência no sistema operacional recebe a carta quase sólida */
+@media (prefers-reduced-transparency: reduce) {
+  html:root:not([data-tema="light"]) .v2 .vidro-pro { background: #17191D; }
+  html:root[data-tema="light"] .v2 .vidro-pro { background: #FFFFFF; }
+}

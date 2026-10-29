@@ -24,7 +24,7 @@ import './paleta.css';
    lista agrupada + PRÉVIA da sequência já preenchida para o cliente.
    Posição: logo ACIMA do compositor (respiro de 12px), alinhada às
    bordas internas dele (a linha "Responder por" e a caixa de texto
-   continuam à vista); cresce até ~720px de altura, com o topo no máximo
+   continuam à vista); cresce até ~600px de altura, com o topo no máximo
    logo abaixo do cabeçalho da conversa (nome, Transferir, Arquivar
    seguem à vista) e nunca na barra global; janela baixa (notebook
    1366×768 / 1280×720) encolhe a altura e liga o modo compacto;
@@ -62,7 +62,7 @@ export interface PaletaScriptsProps {
   onClose: () => void;
 }
 
-const LARG = 760, LARG_MIN = 700, LARG_MAX = 800, ALT = 720, LARG_ESTREITA = 520, ALT_ESTREITA = 520, MARGEM = 8, CORTE_ESTREITO = 820;
+const LARG = 680, LARG_MIN = 640, LARG_MAX = 720, ALT = 600, LARG_ESTREITA = 520, ALT_ESTREITA = 520, MARGEM = 8, CORTE_ESTREITO = 820;
 /** respiro entre o painel e o topo do compositor */
 const RESPIRO = 12;
 /** altura mínima antes de aceitar cobrir o cabeçalho da conversa · abaixo disto liga o modo compacto */
@@ -511,7 +511,7 @@ export function PaletaScripts({ anchor, botaoRef, origemRef, scripts, categorias
   return (
     <div
       ref={painelRef}
-      className={'spl' + (estreito ? ' spl-estreito' : '') + (compacto ? ' spl-compacto' : '') + (curto ? ' spl-curto' : '') + (termos.length ? ' spl-buscando' : '')}
+      className={'spl vidro-pro' + (estreito ? ' spl-estreito' : '') + (compacto ? ' spl-compacto' : '') + (curto ? ' spl-curto' : '') + (termos.length ? ' spl-buscando' : '')}
       style={layout.estilo}
       role="dialog" aria-modal="false" aria-label="Scripts" onKeyDown={onPainelKey} onMouseUp={aoSoltarMouse}
     >

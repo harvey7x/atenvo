@@ -427,7 +427,7 @@
 .v2 .wa-composer { padding: 9px 14px 12px; border-top: 1px solid var(--linha); background: rgba(var(--tint), .015); flex-shrink: 0; }
 /* acesso rápido aos scripts: um botão ENCAIXADO na barra de ferramentas do composer
    (no lugar do antigo "Arquivo"); casa a altura dos .tool (30px) e leva ícone + rótulo + contagem. */
-.v2 .cmsg .tools .wa-scr-btn {
+.v2 .cmsg .tools .wa-scr-btn { text-transform: uppercase; letter-spacing: .05em;
   display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 9px;
   font-size: 11px; font-weight: 600; color: var(--txt); background: rgba(var(--tint), .09);
   border: 1px solid rgba(var(--tint), .16); border-radius: 9px;
@@ -753,7 +753,7 @@
 
 /* resumo ativo: chips removíveis sob as abas */
 .v2 .wa-fchips { display: flex; flex-wrap: wrap; gap: 5px; padding: 8px 2px 2px; }
-.v2 .wa-fchip { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; background: rgba(var(--tint), .1); border: 1px solid rgba(var(--tint), .18); color: var(--txt); font-family: var(--fonte); font-size: 10.5px; border-radius: 999px; padding: 2px 7px; cursor: pointer; }
+.v2 .wa-fchip { text-transform: uppercase; letter-spacing: .04em; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; max-width: 100%; background: rgba(var(--tint), .1); border: 1px solid rgba(var(--tint), .18); color: var(--txt); font-family: var(--fonte); font-size: 10.5px; border-radius: 999px; padding: 2px 7px; cursor: pointer; }
 .v2 .wa-fchip:hover { background: rgba(var(--tint), .18); }
 .v2 .wa-fchip .tt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 118px; }
 .v2 .wa-fchip .x { color: var(--txt-3); font-size: 13px; line-height: 1; margin-top: -1px; }
@@ -764,59 +764,118 @@
 .v2 .ib2 { position: relative; }
 .v2 .ib2 .fbadge { position: absolute; top: -3px; right: -3px; min-width: 14px; height: 14px; padding: 0 3px; display: inline-flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; border-radius: 999px; background: var(--accent); color: #fff; }
 
-/* painel glass do filtro (estende .wa-pop) */
+/* painel de filtros — v4 29/10: VIDRO (fundo/borda/sombra/desfoque vêm de .vidro-pro
+   em componentes.css), MINIMALISTA e compacto (pedido do dono: "não tão exagerado,
+   muito grande"): 360px, ladrilhos de 28px, ícone de seção solto (sem caixinha), tudo
+   em MAIÚSCULO com espaçamento de letra contido. O acento só marca o selecionado e a
+   ação principal. */
 .v2 .wa-pop.wa-filtro {
-  width: 288px; min-width: 288px; max-width: 288px;
+  --fp-acc: var(--azul-rgb, 76, 141, 255);
+  width: 360px; min-width: 0; max-width: calc(100vw - 24px);
   max-height: calc(100vh - 130px); padding: 0; overflow: hidden;
   display: flex; flex-direction: column;
-  border-radius: 14px; border: 1px solid rgba(255, 255, 255, .10);
-  background: rgba(10, 11, 13, .74);
-  -webkit-backdrop-filter: blur(20px) saturate(1.3); backdrop-filter: blur(20px) saturate(1.3);
-  box-shadow: 0 18px 50px rgba(0, 0, 0, .55), inset 0 1px 0 rgba(255, 255, 255, .06);
+  border-radius: 14px;
+  text-transform: uppercase;
 }
-.v2 .wa-filtro .fp-cab { flex: none; display: flex; align-items: center; justify-content: space-between; padding: 11px 13px; border-bottom: 1px solid rgba(255, 255, 255, .08); }
-.v2 .wa-filtro .fp-tit { font-size: 12.5px; font-weight: 700; color: var(--txt); }
-.v2 .wa-filtro .fp-cont { font-size: 11px; font-weight: 700; color: var(--txt-2); background: rgba(var(--tint), .12); border-radius: 999px; padding: 1px 8px; }
-.v2 .wa-filtro .fp-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 4px 8px 8px; }
-.v2 .wa-filtro .fp-sec { padding: 7px 0 3px; }
+.v2 .wa-filtro .fp-cab { position: relative; flex: none; display: flex; align-items: center; gap: 10px; padding: 12px 12px 10px 14px; border-bottom: 1px solid rgba(255, 255, 255, .07); }
+.v2 .wa-filtro .fp-cab-t { flex: 1; display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.v2 .wa-filtro .fp-tit { font-size: 11.5px; font-weight: 700; letter-spacing: .08em; color: var(--txt); }
+.v2 .wa-filtro .fp-sub { font-size: 9.5px; font-weight: 500; letter-spacing: .04em; color: var(--txt-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2 .wa-filtro .fp-sub b { color: var(--txt-2); font-weight: 700; }
+.v2 .wa-filtro .fp-x {
+  flex: none; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 6px;
+  border: none; background: none; color: var(--txt-3); font-size: 16px; line-height: 1; cursor: pointer;
+  transition: background .14s, color .14s;
+}
+.v2 .wa-filtro .fp-x:hover { background: rgba(255, 255, 255, .07); color: var(--txt); }
+
+.v2 .wa-filtro .fp-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0 14px 4px; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, .14) transparent; }
+.v2 .wa-filtro .fp-sec { padding: 10px 0; }
 .v2 .wa-filtro .fp-sec + .fp-sec { border-top: 1px solid rgba(255, 255, 255, .05); }
-.v2 .wa-filtro .fp-h { font-size: 9.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--txt-3); padding: 3px 3px 6px; }
-.v2 .wa-filtro .fp-itens { display: flex; flex-wrap: wrap; gap: 5px; }
+.v2 .wa-filtro .fp-h { display: flex; align-items: center; gap: 6px; min-height: 16px; margin-bottom: 7px; }
+.v2 .wa-filtro .fp-h-ic { flex: none; display: inline-flex; color: var(--txt-3); }
+.v2 .wa-filtro .fp-h-ic svg { width: 11px; height: 11px; }
+.v2 .wa-filtro .fp-sec.ativa .fp-h-ic { color: rgb(var(--fp-acc)); }
+.v2 .wa-filtro .fp-h-t { font-size: 9.5px; font-weight: 700; letter-spacing: .08em; color: var(--txt-3); }
+.v2 .wa-filtro .fp-sec.ativa .fp-h-t { color: var(--txt-2); }
+.v2 .wa-filtro .fp-h-n {
+  font-size: 9px; font-weight: 700; min-width: 15px; height: 15px; padding: 0 4px;
+  display: inline-flex; align-items: center; justify-content: center; border-radius: 999px;
+  background: linear-gradient(180deg, var(--platina-a), var(--platina-b)); color: var(--platina-txt);
+}
+.v2 .wa-filtro .fp-h-limpar {
+  margin-left: auto; padding: 0 2px; background: none; border: none;
+  font-family: var(--fonte); font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--txt-3); cursor: pointer;
+}
+.v2 .wa-filtro .fp-h-limpar:hover { color: var(--txt); }
+
+.v2 .wa-filtro .fp-busca {
+  display: flex; align-items: center; gap: 6px; height: 28px; margin-bottom: 7px; padding: 0 9px;
+  border-radius: 7px; border: 1px solid rgba(255, 255, 255, .08); background: rgba(0, 0, 0, .1);
+  color: var(--txt-3); cursor: text; transition: border-color .14s;
+}
+.v2 .wa-filtro .fp-busca svg { flex: none; width: 11px; height: 11px; }
+.v2 .wa-filtro .fp-busca input {
+  flex: 1; min-width: 0; height: 100%; padding: 0; border: none; outline: none; background: none;
+  color: var(--txt); font-family: var(--fonte); font-size: 10px; font-weight: 500; letter-spacing: .04em; text-transform: uppercase;
+}
+.v2 .wa-filtro .fp-busca input::placeholder { color: var(--txt-3); }
+.v2 .wa-filtro .fp-busca:focus-within { border-color: rgba(var(--fp-acc), .5); }
+
+.v2 .wa-filtro .fp-itens { display: grid; gap: 5px; }
+.v2 .wa-filtro .fp-itens.c1 { grid-template-columns: minmax(0, 1fr); }
+.v2 .wa-filtro .fp-itens.c2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.v2 .wa-filtro .fp-itens.c3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .v2 .wa-filtro .fp-it {
-  display: inline-flex; align-items: center; gap: 6px;
-  background: rgba(255, 255, 255, .04); border: 1px solid rgba(255, 255, 255, .08);
-  color: var(--txt-2); font-family: var(--fonte); font-size: 11.5px;
-  border-radius: 8px; padding: 5px 8px; cursor: pointer; max-width: 100%;
+  display: flex; align-items: center; gap: 6px; min-width: 0; height: 28px; box-sizing: border-box;
+  background: rgba(255, 255, 255, .035); border: 1px solid rgba(255, 255, 255, .07);
+  color: var(--txt-2); font-family: var(--fonte); font-size: 10px; font-weight: 500; letter-spacing: .03em; text-transform: uppercase; text-align: left;
+  border-radius: 7px; padding: 0 8px; cursor: pointer;
+  transition: background .14s, border-color .14s, color .14s;
 }
-.v2 .wa-filtro .fp-it:hover { background: rgba(255, 255, 255, .08); color: var(--txt); }
-.v2 .wa-filtro .fp-it.sel { background: rgba(var(--tint), .16); border-color: rgba(var(--tint), .5); color: var(--txt); }
-.v2 .wa-filtro .fp-it .tt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 150px; }
-.v2 .wa-filtro .fp-it .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
-.v2 .wa-filtro .fp-it .ck { color: var(--verde); font-weight: 700; margin-left: 1px; }
-.v2 .wa-filtro .fp-it .oftag { font-size: 8.5px; font-weight: 700; letter-spacing: .03em; color: var(--txt-3); border: 1px solid rgba(var(--tint), .25); border-radius: 4px; padding: 0 3px; }
-.v2 .wa-filtro .fp-it .oftag.qr { color: var(--ambar); border-color: rgba(var(--ambar-rgb), .3); }
-/* dica de cor na Situação (mesma paleta do chip da lista) */
-.v2 .wa-filtro .fp-it.sit-ganho.sel { border-color: rgba(var(--verde-rgb), .5); }
-.v2 .wa-filtro .fp-it.sit-perdido.sel, .v2 .wa-filtro .fp-it.sit-cancelado.sel { border-color: rgba(var(--rubro-rgb), .5); }
-.v2 .wa-filtro .fp-it.sit-lead.sel, .v2 .wa-filtro .fp-it.sit-aguardando.sel { border-color: rgba(var(--ambar-rgb), .45); }
-.v2 .wa-filtro .fp-rod { flex: none; display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-top: 1px solid rgba(255, 255, 255, .08); }
-.v2 .wa-filtro .fp-limpar { flex: 1; background: none; border: none; color: var(--txt-2); font-family: var(--fonte); font-size: 11.5px; text-align: left; cursor: pointer; text-decoration: underline; padding: 4px 2px; }
-.v2 .wa-filtro .fp-limpar:disabled { color: var(--txt-3); opacity: .5; cursor: default; text-decoration: none; }
-.v2 .wa-filtro .fp-limpar:not(:disabled):hover { color: var(--txt); }
-.v2 .wa-filtro .fp-ok { background: rgba(var(--tint), .16); border: 1px solid rgba(var(--tint), .3); color: var(--txt); font-family: var(--fonte); font-size: 12px; font-weight: 600; border-radius: 8px; padding: 6px 14px; cursor: pointer; }
-.v2 .wa-filtro .fp-ok:hover { background: rgba(var(--tint), .26); }
+.v2 .wa-filtro .fp-it:hover { background: rgba(255, 255, 255, .07); border-color: rgba(255, 255, 255, .12); color: var(--txt); }
+.v2 .wa-filtro .fp-it.sel { background: rgba(var(--fp-acc), .14); border-color: rgba(var(--fp-acc), .55); color: var(--txt); }
+.v2 .wa-filtro .fp-it .tt { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .wa-filtro .fp-it .dot { width: 6px; height: 6px; border-radius: 50%; flex: none; background: var(--txt-3); }
+.v2 .wa-filtro .fp-it .ck { flex: none; font-size: 10px; font-weight: 700; color: rgb(var(--fp-acc)); }
+.v2 .wa-filtro .fp-it .oftag { flex: none; font-size: 8px; font-weight: 600; letter-spacing: .03em; color: var(--txt-3); border: 1px solid rgba(255, 255, 255, .14); border-radius: 4px; padding: 0 3px; }
+.v2 .wa-filtro .fp-it .oftag.qr { color: var(--ambar); border-color: rgba(var(--ambar-rgb), .35); }
+.v2 .wa-filtro .fp-it.sel .oftag { border-color: rgba(var(--fp-acc), .4); }
+.v2 .wa-filtro .fp-nada { grid-column: 1 / -1; font-size: 10px; letter-spacing: .03em; color: var(--txt-3); padding: 6px 2px; }
+/* bolinha semântica da Situação (a mesma família do chip da lista) */
+.v2 .wa-filtro .fp-it.sit-lead .dot { background: var(--ambar); }
+.v2 .wa-filtro .fp-it.sit-atendimento .dot { background: rgb(var(--fp-acc)); }
+.v2 .wa-filtro .fp-it.sit-aguardando .dot { background: #A78BFA; }
+.v2 .wa-filtro .fp-it.sit-ganho .dot { background: var(--verde); }
+.v2 .wa-filtro .fp-it.sit-perdido .dot { background: var(--rubro); }
+.v2 .wa-filtro .fp-it.sit-cancelado .dot { background: var(--txt-3); }
 
-/* MODO LEVE: sem blur — sólido translúcido opaco (gotcha do modo performance) */
-:root[data-perf="lite"] .v2 .wa-pop.wa-filtro { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--surface); }
-
-/* TEMA CLARO */
-:root[data-tema="light"] .v2 .wa-pop.wa-filtro {
-  background: rgba(255, 255, 255, .82); border-color: rgba(0, 0, 0, .08);
-  box-shadow: 0 18px 50px rgba(0, 0, 0, .18), inset 0 1px 0 rgba(255, 255, 255, .6);
+.v2 .wa-filtro .fp-rod { flex: none; display: flex; align-items: center; gap: 8px; padding: 10px 14px 12px; border-top: 1px solid rgba(255, 255, 255, .07); }
+.v2 .wa-filtro .fp-limpar {
+  flex: none; height: 30px; padding: 0 12px; border-radius: 8px; background: none; border: 1px solid rgba(255, 255, 255, .1);
+  color: var(--txt-2); font-family: var(--fonte); font-size: 9.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; cursor: pointer;
+  transition: background .14s, color .14s;
 }
-:root[data-tema="light"][data-perf="lite"] .v2 .wa-pop.wa-filtro { background: #fff; -webkit-backdrop-filter: none; backdrop-filter: none; }
-:root[data-tema="light"] .v2 .wa-filtro .fp-cab, :root[data-tema="light"] .v2 .wa-filtro .fp-rod { border-color: rgba(0, 0, 0, .08); }
-:root[data-tema="light"] .v2 .wa-filtro .fp-sec + .fp-sec { border-color: rgba(0, 0, 0, .06); }
-:root[data-tema="light"] .v2 .wa-filtro .fp-it { background: rgba(0, 0, 0, .03); border-color: rgba(0, 0, 0, .1); }
-:root[data-tema="light"] .v2 .wa-filtro .fp-it:hover { background: rgba(0, 0, 0, .06); }
+.v2 .wa-filtro .fp-limpar:disabled { opacity: .38; cursor: default; }
+.v2 .wa-filtro .fp-limpar:not(:disabled):hover { color: var(--txt); background: rgba(255, 255, 255, .06); }
+.v2 .wa-filtro .fp-ok {
+  flex: 1; height: 30px; padding: 0 12px; border-radius: 8px; border: 1px solid transparent;
+  background: linear-gradient(180deg, var(--platina-a), var(--platina-b)); color: var(--platina-txt);
+  font-family: var(--fonte); font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; cursor: pointer;
+  transition: filter .14s;
+}
+.v2 .wa-filtro .fp-ok:hover { filter: brightness(1.06); }
+
+/* TEMA CLARO — ladrilhos em vidro branco leitoso, fios em grafite suave */
+:root[data-tema="light"] .v2 .wa-filtro .fp-cab, :root[data-tema="light"] .v2 .wa-filtro .fp-rod { border-color: rgba(22, 25, 31, .08); }
+:root[data-tema="light"] .v2 .wa-filtro .fp-sec + .fp-sec { border-color: rgba(22, 25, 31, .06); }
+:root[data-tema="light"] .v2 .wa-filtro .fp-x:hover { background: rgba(22, 25, 31, .06); }
+:root[data-tema="light"] .v2 .wa-filtro .fp-limpar { border-color: rgba(22, 25, 31, .12); }
+:root[data-tema="light"] .v2 .wa-filtro .fp-limpar:not(:disabled):hover { background: rgba(255, 255, 255, .7); }
+:root[data-tema="light"] .v2 .wa-filtro .fp-busca { background: rgba(255, 255, 255, .5); border-color: rgba(22, 25, 31, .1); }
+:root[data-tema="light"] .v2 .wa-filtro .fp-it:not(.sel) { background: rgba(255, 255, 255, .55); border-color: rgba(22, 25, 31, .08); }
+:root[data-tema="light"] .v2 .wa-filtro .fp-it:not(.sel):hover { background: rgba(255, 255, 255, .9); border-color: rgba(22, 25, 31, .14); }
+:root[data-tema="light"] .v2 .wa-filtro .fp-it.sel { background: rgba(var(--fp-acc), .08); border-color: rgba(var(--fp-acc), .5); }
+:root[data-tema="light"] .v2 .wa-filtro .fp-it .oftag { border-color: rgba(22, 25, 31, .14); }
+:root[data-tema="light"] .v2 .wa-filtro .fp-body { scrollbar-color: rgba(22, 25, 31, .16) transparent; }
 :root[data-tema="light"] .v2 .ib2 .fbadge { color: #F4F5F7; }

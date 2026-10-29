@@ -76,6 +76,14 @@ const IcWa = () => <Ic><path d="M21 11.5a8.4 8.4 0 01-9 8.4 8.9 8.9 0 01-3.8-.8L
 const IcBusca = () => <Ic><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></Ic>;
 const IcMais = () => <Ic><path d="M12 5v14M5 12h14" /></Ic>;
 const IcFunil = () => <Ic><path d="M3 5h18l-7 8v5l-4 2v-7z" /></Ic>;
+// ícones das seções do painel de filtros (mesmo traço 1.8)
+const IcEtq = () => <Ic><path d="M3.5 12.2V4.5a1 1 0 0 1 1-1h7.7l8.3 8.3a1.4 1.4 0 0 1 0 2l-6.2 6.2a1.4 1.4 0 0 1-2 0z" /><circle cx="8" cy="8" r="1.4" /></Ic>;
+const IcGente = () => <Ic><circle cx="12" cy="8.5" r="3.5" /><path d="M5 20c.9-3.6 3.6-5.5 7-5.5s6.1 1.9 7 5.5" /></Ic>;
+const IcBandeira = () => <Ic><path d="M5 21V4" /><path d="M5 4h11l-2 4 2 4H5" /></Ic>;
+const IcColunas = () => <Ic><rect x="3.5" y="4" width="5" height="16" rx="1.5" /><rect x="10.5" y="4" width="5" height="11" rx="1.5" /><rect x="17.5" y="4" width="3" height="7" rx="1.2" /></Ic>;
+const IcFone = () => <Ic><rect x="7" y="2.8" width="10" height="18.4" rx="2.4" /><path d="M11 17.6h2" /></Ic>;
+const IcElo = () => <Ic><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" /><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" /></Ic>;
+const IcSino = () => <Ic><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z" /><path d="M10 20.5a2 2 0 0 0 4 0" /></Ic>;
 const IcDots = () => <Ic fill><circle cx="12" cy="5" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="12" cy="19" r="1.5" /></Ic>;
 const IcPin = () => <Ic><path d="M9 3h6l-1 6 3.5 3v2h-11v-2l3.5-3z" /><path d="M12 14v7" /></Ic>;
 const IcImg = () => <Ic><rect x="3" y="4" width="18" height="16" rx="2.5" /><circle cx="9" cy="10" r="1.6" /><path d="m5 18 5-5 3 3 3-3 3 3" /></Ic>;
@@ -105,6 +113,29 @@ function EtiquetaChip({ nome, cor, size, mais, title }: {
       {!mais && cor && <i style={{ background: cor }} />}
       <span className="etqchip-nm">{nome}</span>
     </span>
+  );
+}
+
+/* ==================================================================
+   Seção do painel de filtros — cabeçalho fixo (título + quantos marcados
+   + "limpar" só da seção) e grade de opções. `cols` = colunas da grade
+   (opções longas usam 1–2; curtas 3). Visual só; a regra segue em
+   filtroInbox.ts.
+   ================================================================== */
+function FiltroSecao({ titulo, ic, n, onLimpar, cols = 2, topo, children }: {
+  titulo: string; ic: React.ReactNode; n: number; onLimpar: () => void; cols?: 1 | 2 | 3; topo?: React.ReactNode; children: React.ReactNode;
+}) {
+  return (
+    <section className={'fp-sec' + (n > 0 ? ' ativa' : '')}>
+      <div className="fp-h">
+        <span className="fp-h-ic" aria-hidden>{ic}</span>
+        <span className="fp-h-t">{titulo}</span>
+        {n > 0 && <span className="fp-h-n num">{n}</span>}
+        {n > 0 && <button type="button" className="fp-h-limpar" onClick={onLimpar}>Limpar</button>}
+      </div>
+      {topo}
+      <div className={'fp-itens c' + cols}>{children}</div>
+    </section>
   );
 }
 
@@ -439,6 +470,7 @@ export default function WhatsAppV2() {
   // alterna um valor num Set-state (imutável) — mantém o painel aberto (multi-seleção)
   const alternarSet = (setter: React.Dispatch<React.SetStateAction<Set<string>>>, v: string) =>
     setter((cur) => { const n = new Set(cur); if (n.has(v)) n.delete(v); else n.add(v); return n; });
+  const [buscaEtqFiltro, setBuscaEtqFiltro] = useState('');                        // só o painel: acha etiqueta na lista longa
   const limparFiltros = () => {
     setFiltroCanais(new Set()); setFiltroTransporte(new Set()); setFiltroEtapas(new Set());
     setFiltroEtiquetas(new Set()); setFiltroAtendentes(new Set()); setFiltroIA(new Set());
@@ -859,7 +891,7 @@ export default function WhatsAppV2() {
   }, [pop]);
   const abrirPop = (kind: Pop extends null ? never : Exclude<Pop, null>['kind'], e: React.MouseEvent) => {
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const x = Math.min(r.left, window.innerWidth - 300);
+    const x = Math.max(12, Math.min(r.left, window.innerWidth - (kind === 'filtro' ? 372 : 300)));  // filtro = 360px de largura
     setPop((p) => (p?.kind === kind ? null : { kind, x, y: r.bottom + 6 }));
   };
 
@@ -1620,133 +1652,121 @@ export default function WhatsAppV2() {
 
       {/* ===================== POPOVERS (portal) ===================== */}
       {pop && createPortal(
-        <div className={'wa-pop' + (pop.kind === 'filtro' ? ' wa-filtro' : '')} style={pop.acima ? { left: pop.x, bottom: window.innerHeight - pop.y } : { left: pop.x, top: pop.y }} role={pop.kind === 'acoes' ? 'menu' : undefined}>
-          {pop.kind === 'filtro' && (
+        <div className={'wa-pop' + (pop.kind === 'filtro' ? ' wa-filtro vidro-pro' : '')} style={pop.acima ? { left: pop.x, bottom: window.innerHeight - pop.y } : { left: pop.x, top: pop.y }} role={pop.kind === 'acoes' ? 'menu' : undefined}>
+          {pop.kind === 'filtro' && (() => {
+            const etqs = etiquetasQ.data ?? [];
+            const termoEtq = buscaEtqFiltro.trim().toLowerCase();
+            const etqsVis = termoEtq ? etqs.filter((e) => e.nome.toLowerCase().includes(termoEtq)) : etqs;
+            const ck = <span className="ck" aria-hidden>✓</span>;
+            return (
             <>
               <div className="fp-cab">
-                <span className="fp-tit">Filtros</span>
-                <span className="fp-cont num" title="Conversas que casam com os filtros nesta aba">{visiveis.length}</span>
+                <div className="fp-cab-t">
+                  <span className="fp-tit">Filtros</span>
+                  <span className="fp-sub"><b className="num">{visiveis.length}</b> {visiveis.length === 1 ? 'conversa' : 'conversas'}{filtrosAtivos && <> · <b className="num">{resumoFiltros.length}</b> {resumoFiltros.length === 1 ? 'filtro ativo' : 'filtros ativos'}</>}</span>
+                </div>
+                <button type="button" className="fp-x" aria-label="Fechar filtros" onClick={() => setPop(null)}>×</button>
               </div>
               <div className="fp-body">
-                {/* 1. ETIQUETA (multi) */}
-                {(etiquetasQ.data ?? []).length > 0 && (
-                  <section className="fp-sec">
-                    <div className="fp-h">Etiqueta</div>
-                    <div className="fp-itens">
-                      {(etiquetasQ.data ?? []).map((e) => (
-                        <button key={e.nome} type="button" className={'fp-it' + (filtroEtiquetas.has(e.nome) ? ' sel' : '')} onClick={() => alternarSet(setFiltroEtiquetas, e.nome)}>
-                          <span className="dot" style={{ background: corDaEtiqueta(e.nome, etiquetasQ.data) ?? 'var(--txt-3)' }} /><span className="tt">{e.nome}</span>{filtroEtiquetas.has(e.nome) && <span className="ck">✓</span>}
-                        </button>
-                      ))}
-                    </div>
-                  </section>
+                {/* 1. ETIQUETA (multi) — busca própria quando a lista é longa */}
+                {etqs.length > 0 && (
+                  <FiltroSecao
+                    titulo="Etiqueta" ic={<IcEtq />} n={filtroEtiquetas.size} onLimpar={() => setFiltroEtiquetas(new Set())}
+                    topo={etqs.length > 8 && (
+                      <label className="fp-busca"><IcBusca /><input value={buscaEtqFiltro} onChange={(e) => setBuscaEtqFiltro(e.target.value)} placeholder="Buscar etiqueta…" spellCheck={false} autoComplete="off" /></label>
+                    )}
+                  >
+                    {etqsVis.map((e) => (
+                      <button key={e.nome} type="button" className={'fp-it' + (filtroEtiquetas.has(e.nome) ? ' sel' : '')} title={e.nome} onClick={() => alternarSet(setFiltroEtiquetas, e.nome)}>
+                        <span className="dot" style={{ background: corDaEtiqueta(e.nome, etiquetasQ.data) ?? 'var(--txt-3)' }} /><span className="tt">{e.nome}</span>{filtroEtiquetas.has(e.nome) && ck}
+                      </button>
+                    ))}
+                    {etqsVis.length === 0 && <span className="fp-nada">Nenhuma etiqueta com “{buscaEtqFiltro.trim()}”</span>}
+                  </FiltroSecao>
                 )}
                 {/* 2. ATENDENTE (multi + Não atribuído) — só para quem vê a carteira de todos */}
                 {vis.veTodos && (
-                <section className="fp-sec">
-                  <div className="fp-h">Atendente</div>
-                  <div className="fp-itens">
+                  <FiltroSecao titulo="Atendente" ic={<IcGente />} n={filtroAtendentes.size} onLimpar={() => setFiltroAtendentes(new Set())}>
                     <button type="button" className={'fp-it' + (filtroAtendentes.has('') ? ' sel' : '')} onClick={() => alternarSet(setFiltroAtendentes, '')}>
-                      <span className="tt">Não atribuído</span>{filtroAtendentes.has('') && <span className="ck">✓</span>}
+                      <span className="tt">Não atribuído</span>{filtroAtendentes.has('') && ck}
                     </button>
                     {usuarios.map((u) => (
-                      <button key={u.id} type="button" className={'fp-it' + (filtroAtendentes.has(u.id) ? ' sel' : '')} onClick={() => alternarSet(setFiltroAtendentes, u.id)}>
-                        <span className="tt">{u.id === user?.id ? `${u.nome} (você)` : u.nome}</span>{filtroAtendentes.has(u.id) && <span className="ck">✓</span>}
+                      <button key={u.id} type="button" className={'fp-it' + (filtroAtendentes.has(u.id) ? ' sel' : '')} title={u.nome} onClick={() => alternarSet(setFiltroAtendentes, u.id)}>
+                        <span className="tt">{u.id === user?.id ? `${u.nome} (você)` : u.nome}</span>{filtroAtendentes.has(u.id) && ck}
                       </button>
                     ))}
-                  </div>
-                </section>
+                  </FiltroSecao>
                 )}
-                {/* 3. IA / BOT */}
-                <section className="fp-sec">
-                  <div className="fp-h">IA / bot</div>
-                  <div className="fp-itens">
-                    {IA_OPCOES.map(([k, rot]) => (
-                      <button key={k} type="button" className={'fp-it' + (filtroIA.has(k) ? ' sel' : '')} onClick={() => alternarSet(setFiltroIA, k)}>
-                        <span className="tt">{rot}</span>{filtroIA.has(k) && <span className="ck">✓</span>}
-                      </button>
-                    ))}
-                  </div>
-                </section>
-                {/* 4. SITUAÇÃO (multi) — reusa situacaoDaConversa; substitui o antigo grupo "Status" (status_id) */}
-                <section className="fp-sec">
-                  <div className="fp-h">Situação</div>
-                  <div className="fp-itens">
-                    {SITUACAO_OPCOES.map(([k, rot]) => (
-                      <button key={k} type="button" className={'fp-it sit-' + k + (filtroSituacao.has(k) ? ' sel' : '')} onClick={() => alternarSet(setFiltroSituacao, k)}>
-                        <span className="tt">{rot}</span>{filtroSituacao.has(k) && <span className="ck">✓</span>}
-                      </button>
-                    ))}
-                  </div>
-                </section>
+                {/* 3. SITUAÇÃO (multi) — reusa situacaoDaConversa; substitui o antigo grupo "Status" (status_id) */}
+                <FiltroSecao titulo="Situação" ic={<IcBandeira />} n={filtroSituacao.size} onLimpar={() => setFiltroSituacao(new Set())}>
+                  {SITUACAO_OPCOES.map(([k, rot]) => (
+                    <button key={k} type="button" className={'fp-it sit-' + k + (filtroSituacao.has(k) ? ' sel' : '')} onClick={() => alternarSet(setFiltroSituacao, k)}>
+                      <span className="dot" /><span className="tt">{rot}</span>{filtroSituacao.has(k) && ck}
+                    </button>
+                  ))}
+                </FiltroSecao>
+                {/* 4. IA / BOT */}
+                <FiltroSecao titulo="IA / bot" ic={<IcBot />} n={filtroIA.size} onLimpar={() => setFiltroIA(new Set())}>
+                  {IA_OPCOES.map(([k, rot]) => (
+                    <button key={k} type="button" className={'fp-it' + (filtroIA.has(k) ? ' sel' : '')} title={rot} onClick={() => alternarSet(setFiltroIA, k)}>
+                      <span className="tt">{rot}</span>{filtroIA.has(k) && ck}
+                    </button>
+                  ))}
+                </FiltroSecao>
                 {/* 5. ETAPA DO KANBAN (multi) */}
                 {etapasFiltro.length > 0 && (
-                  <section className="fp-sec">
-                    <div className="fp-h">Etapa do Kanban</div>
-                    <div className="fp-itens">
-                      {etapasFiltro.map((e) => (
-                        <button key={e.nome} type="button" className={'fp-it' + (filtroEtapas.has(e.nome) ? ' sel' : '')} onClick={() => alternarSet(setFiltroEtapas, e.nome)}>
-                          <span className="dot" style={{ background: e.cor ?? 'var(--txt-3)' }} /><span className="tt">{e.nome}</span>{filtroEtapas.has(e.nome) && <span className="ck">✓</span>}
-                        </button>
-                      ))}
-                    </div>
-                  </section>
+                  <FiltroSecao titulo="Etapa do Kanban" ic={<IcColunas />} n={filtroEtapas.size} onLimpar={() => setFiltroEtapas(new Set())}>
+                    {etapasFiltro.map((e) => (
+                      <button key={e.nome} type="button" className={'fp-it' + (filtroEtapas.has(e.nome) ? ' sel' : '')} title={e.nome} onClick={() => alternarSet(setFiltroEtapas, e.nome)}>
+                        <span className="dot" style={{ background: e.cor ?? 'var(--txt-3)' }} /><span className="tt">{e.nome}</span>{filtroEtapas.has(e.nome) && ck}
+                      </button>
+                    ))}
+                  </FiltroSecao>
                 )}
                 {/* 6. CANAL / NÚMERO (multi) */}
                 {inbox.realCanais.length > 0 && (
-                  <section className="fp-sec">
-                    <div className="fp-h">Número</div>
-                    <div className="fp-itens">
-                      {inbox.realCanais.map((c) => (
-                        <button key={c.id} type="button" className={'fp-it' + (filtroCanais.has(c.id) ? ' sel' : '')} title={tituloCanal(c.alias, c.transporte)} onClick={() => alternarSet(setFiltroCanais, c.id)}>
-                          <span className="tt">{c.alias}</span><span className={'oftag' + (c.transporte === 'cloud_api' ? '' : ' qr')}>{c.transporte === 'cloud_api' ? '✓ Oficial' : 'QR'}</span>{filtroCanais.has(c.id) && <span className="ck">✓</span>}
-                        </button>
-                      ))}
-                    </div>
-                  </section>
-                )}
-                {/* 7. CONEXÃO */}
-                <section className="fp-sec">
-                  <div className="fp-h">Conexão</div>
-                  <div className="fp-itens">
-                    <button type="button" className={'fp-it' + (filtroTransporte.has('cloud_api') ? ' sel' : '')} title="Canal oficial (API do WhatsApp/Meta)" onClick={() => alternarSet(setFiltroTransporte, 'cloud_api')}>
-                      <span className="tt">Oficial (API do WhatsApp)</span>{filtroTransporte.has('cloud_api') && <span className="ck">✓</span>}
-                    </button>
-                    <button type="button" className={'fp-it' + (filtroTransporte.has('evolution') ? ' sel' : '')} title="Números conectados por QR e canais já removidos" onClick={() => alternarSet(setFiltroTransporte, 'evolution')}>
-                      <span className="tt">QR (não oficial)</span>{filtroTransporte.has('evolution') && <span className="ck">✓</span>}
-                    </button>
-                  </div>
-                </section>
-                {/* 8. NÃO LIDAS / ARQUIVADAS (toggles) */}
-                <section className="fp-sec">
-                  <div className="fp-h">Sinalização</div>
-                  <div className="fp-itens">
-                    <button type="button" className={'fp-it' + (filtroNaoLidas ? ' sel' : '')} onClick={() => setFiltroNaoLidas((v) => !v)}>
-                      <span className="tt">Só não lidas</span>{filtroNaoLidas && <span className="ck">✓</span>}
-                    </button>
-                    <button type="button" className={'fp-it' + (filtroArquivadas ? ' sel' : '')} onClick={() => setFiltroArquivadas((v) => !v)}>
-                      <span className="tt">Só arquivadas</span>{filtroArquivadas && <span className="ck">✓</span>}
-                    </button>
-                  </div>
-                </section>
-                {/* 9. PERÍODO (última interação, single) */}
-                <section className="fp-sec">
-                  <div className="fp-h">Última interação</div>
-                  <div className="fp-itens">
-                    {PERIODO_OPCOES.map(([k, rot]) => (
-                      <button key={k} type="button" className={'fp-it' + (filtroPeriodo === k ? ' sel' : '')} onClick={() => setFiltroPeriodo((v) => (v === k ? null : k))}>
-                        <span className="tt">{rot}</span>{filtroPeriodo === k && <span className="ck">✓</span>}
+                  <FiltroSecao titulo="Número" ic={<IcFone />} n={filtroCanais.size} onLimpar={() => setFiltroCanais(new Set())}>
+                    {inbox.realCanais.map((c) => (
+                      <button key={c.id} type="button" className={'fp-it' + (filtroCanais.has(c.id) ? ' sel' : '')} title={tituloCanal(c.alias, c.transporte)} onClick={() => alternarSet(setFiltroCanais, c.id)}>
+                        <span className="tt">{c.alias}</span><span className={'oftag' + (c.transporte === 'cloud_api' ? '' : ' qr')}>{c.transporte === 'cloud_api' ? '✓ Oficial' : 'QR'}</span>{filtroCanais.has(c.id) && ck}
                       </button>
                     ))}
-                  </div>
-                </section>
+                  </FiltroSecao>
+                )}
+                {/* 7. CONEXÃO */}
+                <FiltroSecao titulo="Conexão" ic={<IcElo />} n={filtroTransporte.size} onLimpar={() => setFiltroTransporte(new Set())}>
+                  <button type="button" className={'fp-it' + (filtroTransporte.has('cloud_api') ? ' sel' : '')} title="Canal oficial (API do WhatsApp/Meta)" onClick={() => alternarSet(setFiltroTransporte, 'cloud_api')}>
+                    <span className="tt">Oficial (API)</span>{filtroTransporte.has('cloud_api') && ck}
+                  </button>
+                  <button type="button" className={'fp-it' + (filtroTransporte.has('evolution') ? ' sel' : '')} title="Números conectados por QR e canais já removidos" onClick={() => alternarSet(setFiltroTransporte, 'evolution')}>
+                    <span className="tt">QR (não oficial)</span>{filtroTransporte.has('evolution') && ck}
+                  </button>
+                </FiltroSecao>
+                {/* 8. NÃO LIDAS / ARQUIVADAS (toggles) */}
+                <FiltroSecao titulo="Sinalização" ic={<IcSino />} n={(filtroNaoLidas ? 1 : 0) + (filtroArquivadas ? 1 : 0)} onLimpar={() => { setFiltroNaoLidas(false); setFiltroArquivadas(false); }}>
+                  <button type="button" className={'fp-it' + (filtroNaoLidas ? ' sel' : '')} onClick={() => setFiltroNaoLidas((v) => !v)}>
+                    <span className="tt">Só não lidas</span>{filtroNaoLidas && ck}
+                  </button>
+                  <button type="button" className={'fp-it' + (filtroArquivadas ? ' sel' : '')} onClick={() => setFiltroArquivadas((v) => !v)}>
+                    <span className="tt">Só arquivadas</span>{filtroArquivadas && ck}
+                  </button>
+                </FiltroSecao>
+                {/* 9. PERÍODO (última interação, single) — controle segmentado */}
+                <FiltroSecao titulo="Última interação" ic={<IcClock />} n={filtroPeriodo ? 1 : 0} onLimpar={() => setFiltroPeriodo(null)} cols={3}>
+                  {PERIODO_OPCOES.map(([k, rot]) => (
+                    <button key={k} type="button" className={'fp-it' + (filtroPeriodo === k ? ' sel' : '')} onClick={() => setFiltroPeriodo((v) => (v === k ? null : k))}>
+                      <span className="tt">{rot}</span>{filtroPeriodo === k && ck}
+                    </button>
+                  ))}
+                </FiltroSecao>
               </div>
               <div className="fp-rod">
                 <button type="button" className="fp-limpar" disabled={!filtrosAtivos} onClick={limparFiltros}>Limpar tudo</button>
-                <button type="button" className="fp-ok" onClick={() => setPop(null)}>Concluir</button>
+                <button type="button" className="fp-ok" onClick={() => setPop(null)}>Ver {visiveis.length} {visiveis.length === 1 ? 'conversa' : 'conversas'}</button>
               </div>
             </>
-          )}
+            );
+          })()}
           {pop.kind === 'acoes' && (
             <>
               <button type="button" className="it" onClick={() => { setPop(null); iniciarEdicao(); }}>Editar dados do cliente</button>
