@@ -23,6 +23,10 @@
 //               gravado no pedido e mostrado na ficha do cliente
 //   apagar   -> { pedido_id, caminho } remove UM arquivo do pedido em_andamento
 //               (storage + linha) — manutenção de recoleta
+//   enviar/concluir/apagar aceitam coletor_id OPCIONAL: se vier e o pedido estiver
+//   com outro computador (assumido_por diferente), 409. Sem ele, como antes.
+//   O caminho no bucket é ASCII (o Storage recusa acento); o título com acento
+//   fica só em inss_documentos.titulo. Ver chaveSegura/tituloLimpo.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
@@ -46,10 +50,70 @@ function seguroIgual(a: string, b: string): boolean {
   return diff === 0;
 }
 
-// o título vira parte do caminho no storage: sem separadores nem caracteres de caminho
-function nomeArquivoSeguro(n: string): string {
+// O título tem DOIS destinos com regras diferentes, por isso duas funções:
+//  - tituloLimpo: o que a ficha mostra (coluna inss_documentos.titulo). Mantém
+//    acento — "EXTRATO_COMPLETO_João_da_Conceição.pdf" é o que o atendente
+//    reconhece. Só tira caractere de controle e normaliza para NFC (o Mac manda
+//    nome de arquivo em NFD, letra + acento solto, que aparece torto na tela).
+//  - chaveSegura: o caminho no bucket. O Storage só aceita chave ASCII
+//    (isValidKey do storage-api); com 'ã' o upload volta "Invalid key" e o
+//    reenvio falha igual para sempre, deixando o pedido preso em em_andamento.
+function tituloLimpo(n: string): string {
+  const so = n.normalize('NFC').replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim();
+  return (so || 'documento.pdf').slice(0, 200);
+}
+
+// limpeza antiga (até v2.5.0). Continua sendo a chave quando o resultado já é
+// ASCII aceito pelo Storage: assim um título que SEMPRE funcionou cai no MESMO
+// caminho de antes e o reenvio de um pedido já em andamento substitui o arquivo
+// (upsert por caminho) em vez de duplicar a linha na ficha.
+function chaveLegada(n: string): string {
   const so = n.replace(/[\\/:*?"<>|#%{}]/g, ' ').replace(/\s+/g, ' ').trim();
   return (so || 'documento.pdf').slice(0, 120);
+}
+
+async function sha256Hex8(s: string): Promise<string> {
+  const dig = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+  return Array.from(new Uint8Array(dig).slice(0, 4), (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Só quando a limpeza precisou MEXER no nome (acento, ’, º, NBSP...) a chave
+// ganha 8 hex do SHA-256 do título: "João.pdf" e "Joao.pdf" virariam a mesma
+// chave ASCII e um sobrescreveria o outro pelo upsert — documento de um no lugar
+// do outro, sem erro nenhum. O hash é do título já em NFC, então o mesmo nome
+// vindo em NFD (Mac) ou NFC (Windows) cai na mesma chave e o reenvio substitui.
+async function chaveSegura(titulo: string): Promise<string> {
+  const legada = chaveLegada(titulo);
+  if (/^[A-Za-z0-9_!.'() &$=@;+,-]+$/.test(legada)) return legada;
+  const ascii = titulo
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^A-Za-z0-9._ ()-]/g, '_')
+    .replace(/\s+/g, ' ')
+    .replace(/_+/g, '_')
+    .trim();
+  // a extensão fica de fora do corte de tamanho: sem o .pdf o arquivo baixado
+  // da ficha não abre com dois cliques
+  const m = /\.[A-Za-z0-9]{1,5}$/.exec(ascii);
+  const ext = m ? m[0] : '.pdf';
+  const base = (m ? ascii.slice(0, -ext.length) : ascii).replace(/[ ._]+$/, '') || 'documento';
+  return `${base.slice(0, 100)}_${await sha256Hex8(titulo)}${ext}`;
+}
+
+// #83: só o assumir conferia QUEM é o coletor; enviar/concluir/apagar aceitavam
+// qualquer um enquanto o pedido estivesse em_andamento. Cenário real: o painel A
+// "devolve à fila" no meio da coleta, a extensão B assume, e A termina subindo
+// PDFs por cima dos de B e concluindo 'pronto' com B ainda coletando. Agora,
+// quando o chamador manda coletor_id e o pedido está com OUTRO (ou com ninguém,
+// porque foi devolvido à fila), é 409. Sem coletor_id segue como antes: a
+// extensão do Chrome antiga e o pacote portátil antigo não mandam, e exigir de
+// cara faria TODO envio deles levar 409.
+function coletorDoCorpo(corpo: Record<string, unknown> | null): string {
+  return typeof corpo?.coletor_id === 'string' ? corpo.coletor_id.slice(0, 80) : '';
+}
+function outroComputador(assumidoPor: unknown): Response {
+  const quem = assumidoPor ? ` (${assumidoPor})` : ' (foi devolvido à fila)';
+  return json({ erro: `pedido está com outro computador${quem}` }, 409);
 }
 
 Deno.serve(async (req) => {
@@ -126,7 +190,9 @@ Deno.serve(async (req) => {
 
     if (acao === 'enviar') {
       if (p.status !== 'em_andamento') return json({ erro: `pedido está '${p.status}' — assuma antes de enviar` }, 409);
-      const titulo = nomeArquivoSeguro(String(corpo?.titulo ?? ''));
+      const coletorId = coletorDoCorpo(corpo);
+      if (coletorId && p.assumido_por !== coletorId) return outroComputador(p.assumido_por);
+      const titulo = tituloLimpo(String(corpo?.titulo ?? ''));
       const b64 = typeof corpo?.conteudo_base64 === 'string' ? corpo.conteudo_base64 : '';
       if (!b64) return json({ erro: 'conteudo_base64 obrigatório' }, 400);
       if (b64.length * 0.75 > MAX_PDF_BYTES) return json({ erro: 'arquivo acima de 25MB' }, 413);
@@ -137,7 +203,7 @@ Deno.serve(async (req) => {
         return json({ erro: 'conteudo_base64 inválido' }, 400);
       }
 
-      const caminho = `${p.organizacao_id}/${p.contato_id}/${p.id}/${titulo}`;
+      const caminho = `${p.organizacao_id}/${p.contato_id}/${p.id}/${await chaveSegura(titulo)}`;
       const up = await admin.storage.from(BUCKET).upload(caminho, bytes, {
         contentType: 'application/pdf',
         upsert: true,
@@ -165,6 +231,8 @@ Deno.serve(async (req) => {
 
     if (acao === 'apagar') {
       if (p.status !== 'em_andamento') return json({ erro: `pedido está '${p.status}'` }, 409);
+      const coletorId = coletorDoCorpo(corpo);
+      if (coletorId && p.assumido_por !== coletorId) return outroComputador(p.assumido_por);
       const caminho = typeof corpo?.caminho === 'string' ? corpo.caminho : '';
       const prefixo = `${p.organizacao_id}/${p.contato_id}/${p.id}/`;
       if (!caminho.startsWith(prefixo)) return json({ erro: 'caminho não é deste pedido' }, 400);
@@ -184,14 +252,36 @@ Deno.serve(async (req) => {
       const bancos = Array.isArray(corpo?.bancos)
         ? (corpo.bancos as unknown[]).filter((b) => typeof b === 'string' && b.trim()).map((b) => String(b).slice(0, 120)).slice(0, 40)
         : null;
-      const { data: upd, error } = await admin
+      const coletorId = coletorDoCorpo(corpo);
+      // vale também para o pedido já concluído: se outro computador concluiu,
+      // este não deve receber "ok" como se a entrega fosse dele
+      if (coletorId && p.assumido_por !== coletorId) return outroComputador(p.assumido_por);
+      // [] = "lido e sem contrato" — diferente de "não lido" (bancos ausente =
+      // null no banco, a ficha não diz nada). Só o coletor 3.0+ (o que manda
+      // coletor_id no concluir) distingue os dois; o 2.5 manda [] também quando
+      // NÃO leu, e isso não pode virar "nenhum contrato" na ficha.
+      const gravaBancos = bancos !== null && (bancos.length > 0 || !!coletorId);
+      let q = admin
         .from('inss_pedidos')
-        .update({ status: resultado, erro, ...(bancos && bancos.length ? { bancos } : {}) })
+        .update({ status: resultado, erro, ...(gravaBancos ? { bancos } : {}) })
         .eq('id', pedidoId)
-        .in('status', ['aberto', 'em_andamento'])
-        .select('id');
+        .in('status', ['aberto', 'em_andamento']);
+      // o filtro no próprio UPDATE fecha a janela entre o SELECT lá de cima e
+      // aqui: se alguém reabriu/assumiu nesse meio-tempo, nada é atualizado
+      if (coletorId) q = q.eq('assumido_por', coletorId);
+      const { data: upd, error } = await q.select('id');
       if (error) return json({ erro: error.message }, 500);
-      if (!upd?.length && p.status !== resultado) return json({ erro: `pedido está '${p.status}'` }, 409);
+      if (!upd?.length) {
+        if (coletorId) {
+          // a corrida perdida: relê para dizer a verdade em vez de um 'ok' falso
+          const { data: agora } = await admin.from('inss_pedidos').select('status, assumido_por').eq('id', pedidoId).maybeSingle();
+          if (!agora) return json({ erro: 'pedido não existe' }, 404);
+          if (agora.assumido_por !== coletorId) return outroComputador(agora.assumido_por);
+          if (agora.status !== resultado) return json({ erro: `pedido está '${agora.status}'` }, 409);
+        } else if (p.status !== resultado) {
+          return json({ erro: `pedido está '${p.status}'` }, 409);
+        }
+      }
       return json({ ok: true });
     }
 

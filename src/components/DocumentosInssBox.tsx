@@ -41,8 +41,9 @@ export function DocumentosInssBox({ contatoId }: { contatoId?: string | null }) 
   const docs = docsQ.data ?? [];
   const atual = pedidos.find((p) => p.status === 'aberto' || p.status === 'em_andamento') ?? null;
   const ultimo = pedidos[0] ?? null;
-  // bancos do consignado: o coletor extrai do PDF e grava no pedido mais recente
-  const bancos = pedidos.find((p) => p.bancos.length)?.bancos ?? [];
+  // bancos do consignado: o pedido mais recente que LEU o consignado. null = não
+  // lido (não diz nada); [] = lido e sem contrato — "não li" nunca vira "nenhum"
+  const bancos = pedidos.find((p) => p.bancos !== null)?.bancos ?? null;
   const cpfContato = (contatoQ.data?.cpf ?? '').replace(/\D/g, '');
   const precisaCpf = cpfContato.length !== 11;
   const cpfOk = !precisaCpf || cpfDigitado.replace(/\D/g, '').length === 11;
@@ -75,10 +76,18 @@ export function DocumentosInssBox({ contatoId }: { contatoId?: string | null }) 
     <div className="dib">
       <div className="dib-h">Documentos do INSS</div>
 
-      {bancos.length > 0 && (
+      {bancos && bancos.length > 0 && (
         <div className="dib-bancos">
           <div className="dib-bancos-t">Bancos no consignado</div>
-          {bancos.map((b) => <span className="dib-banco" key={b}>{b}</span>)}
+          {bancos.map((b) => (
+            <span className={/suspens/i.test(b) ? 'dib-banco is-susp' : 'dib-banco'} key={b}>{b}</span>
+          ))}
+        </div>
+      )}
+      {bancos && bancos.length === 0 && (
+        <div className="dib-bancos">
+          <div className="dib-bancos-t">Bancos no consignado</div>
+          <span className="dib-banco-nenhum">Nenhum contrato ativo ou suspenso no extrato do consignado</span>
         </div>
       )}
 

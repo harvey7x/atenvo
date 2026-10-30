@@ -15,8 +15,9 @@ export type PedidoInssStatus = 'aberto' | 'em_andamento' | 'pronto' | 'falhou' |
 export interface PedidoInss {
   id: string; status: PedidoInssStatus; documentos: string[];
   erro: string | null; criadoEm: string; finalizadoEm: string | null;
-  /** Bancos identificados no consignado, ex. "Banco BMG (318)" — elegibilidade. */
-  bancos: string[];
+  /** Bancos identificados no consignado, ex. "Banco BMG (318)" — elegibilidade.
+      null = o consignado NÃO foi lido nesse pedido; [] = lido e sem contrato. */
+  bancos: string[] | null;
 }
 export interface DocumentoInss {
   id: string; pedidoId: string; titulo: string; caminho: string;
@@ -41,7 +42,7 @@ export function usePedidosInss(contatoId: string | null) {
       return ((data as unknown as DbPedido[]) ?? []).map((r) => ({
         id: r.id, status: r.status, documentos: r.documentos ?? [],
         erro: r.erro, criadoEm: r.criado_em, finalizadoEm: r.finalizado_em,
-        bancos: r.bancos ?? [],
+        bancos: r.bancos,
       }));
     },
   });
