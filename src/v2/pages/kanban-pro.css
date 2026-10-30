@@ -246,3 +246,60 @@ html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-cols.denso .kc-pe { margin-top: 6
 @media (max-width: 1080px) {
   html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-busca input { width: 220px; }
 }
+
+/* ---------- carregando (dono 30/10: "carregando o Kanban, aguarde… bonita, profissional") ----------
+   Esboço das colunas ao fundo (sumindo para baixo) + cartão central com ícone, texto e progresso. */
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr {
+  position: relative; flex: 1; width: 100%; min-height: calc(100dvh - 120px);
+  display: flex; align-items: center; justify-content: center; overflow: hidden;
+}
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-fundo {
+  position: absolute; inset: 0; display: flex; gap: 14px; padding-top: 4px; pointer-events: none;
+  opacity: .7; -webkit-mask-image: linear-gradient(to bottom, #000 25%, transparent 92%); mask-image: linear-gradient(to bottom, #000 25%, transparent 92%);
+}
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-col {
+  flex: 0 0 286px; display: flex; flex-direction: column; gap: 9px; padding: 14px 10px; border-radius: 14px; background: var(--kp-col-bg);
+}
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-tit { height: 10px; width: 44%; margin: 2px 4px 8px; border-radius: 6px; background: var(--kp-line); }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-card {
+  position: relative; height: 72px; border-radius: 11px; overflow: hidden; background: var(--kp-card); box-shadow: var(--kp-sh);
+}
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-card::after {
+  content: ""; position: absolute; inset: 0; transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--kp-txt) 5%, transparent), transparent);
+}
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-caixa {
+  position: relative; z-index: 1; width: min(372px, calc(100% - 32px)); display: flex; flex-direction: column; align-items: center; text-align: center;
+  padding: 28px 28px 22px; border-radius: 16px; background: var(--kp-card); border: 1px solid var(--kp-line);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .04) inset, 0 24px 60px rgba(0, 0, 0, .55);
+}
+html:root[data-tema="light"] .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-caixa { box-shadow: 0 2px 6px rgba(16, 24, 40, .05), 0 24px 56px rgba(16, 24, 40, .14); }
+/* ícone: três colunas do quadro subindo e descendo */
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-ic { display: flex; align-items: flex-end; gap: 4px; height: 28px; margin-bottom: 14px; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-ic i { width: 7px; height: 100%; border-radius: 3px; background: var(--kp-blue); transform-origin: bottom; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-ic i:nth-child(1) { transform: scaleY(.55); }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-ic i:nth-child(2) { transform: scaleY(1); opacity: .8; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-ic i:nth-child(3) { transform: scaleY(.75); opacity: .6; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-caixa strong { font-size: 15.5px; font-weight: 600; letter-spacing: -.01em; color: var(--kp-txt); }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-txt { margin-top: 5px; max-width: 270px; font-size: 12.5px; line-height: 1.45; color: var(--kp-txt-2); }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-barra {
+  position: relative; display: block; width: 100%; height: 4px; margin-top: 18px; border-radius: 99px; overflow: hidden; background: var(--kp-chip);
+  box-shadow: 0 0 0 1px var(--kp-line) inset;
+}
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-barra i { display: block; height: 100%; width: 0; border-radius: inherit; background: var(--kp-blue); }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-barra.indet i { position: absolute; left: 0; width: 32%; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-num { margin-top: 9px; font-size: 11.5px; color: var(--kp-txt-3); font-variant-numeric: tabular-nums; }
+
+@keyframes kb-carr-coluna { 0%, 100% { transform: scaleY(.45); } 50% { transform: scaleY(1); } }
+@keyframes kb-carr-brilho { to { transform: translateX(100%); } }
+@keyframes kb-carr-indet { 0% { transform: translateX(-100%); } 100% { transform: translateX(320%); } }
+/* movimento: também no Modo Leve (o base.css zera tudo com !important) — é o sinal de que está
+   trabalhando; com "reduzir movimento" do sistema fica parado */
+@media (prefers-reduced-motion: no-preference) {
+  html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-ic i { animation: kb-carr-coluna 1.05s ease-in-out infinite !important; }
+  html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-ic i:nth-child(2) { animation-delay: -.35s !important; }
+  html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-ic i:nth-child(3) { animation-delay: -.7s !important; }
+  html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-card::after { animation: kb-carr-brilho 1.6s ease-in-out infinite !important; }
+  html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-barra i { transition: width .4s cubic-bezier(.2, .7, .2, 1) !important; }
+  html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-barra.indet i { animation: kb-carr-indet 1.25s ease-in-out infinite !important; }
+}

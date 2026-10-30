@@ -91,3 +91,59 @@ export async function buscarKeyset<T>(
   if (opts.melhorEsforco) return acc;
   throw new Error(`Lista grande demais para carregar de uma vez${rotulo}. Avise o suporte.`);
 }
+
+/* ---- Faixas de id em PARALELO (Kanban, 30/10) ----
+   buscarKeyset é SEQUENCIAL: o funil passou de 7,8 mil oportunidades = 8 páginas de 1000, ~1 s cada,
+   uma depois da outra (~10 s de tela vazia ao abrir o Kanban). Com id uuid ALEATÓRIO
+   (gen_random_uuid) as linhas se espalham por igual no espaço de ids; fatiando esse espaço pelo
+   1º dígito hex, cada faixa pagina por keyset sozinha (mesma garantia: nada pula nem duplica, as
+   faixas não se cruzam) e várias correm ao mesmo tempo. `simultaneas` limita quantas vão ao banco
+   de uma vez. Só serve para id uuid v4 — id sequencial cairia todo numa faixa só. */
+export interface FaixaId { /** id >= de (null = sem piso) */ de: string | null; /** id < ate (null = sem teto) */ ate: string | null }
+
+/** O espaço de uuid em `qtd` faixas pelo 1º dígito hex (qtd ∈ 1, 2, 4, 8, 16). */
+export function faixasUuid(qtd: 1 | 2 | 4 | 8 | 16 = 16): FaixaId[] {
+  const passo = 16 / qtd;
+  const limite = (d: number) => (d >= 16 ? null : d.toString(16) + '0000000-0000-0000-0000-000000000000');
+  return Array.from({ length: qtd }, (_, i) => ({ de: i === 0 ? null : limite(i * passo), ate: limite((i + 1) * passo) }));
+}
+
+interface OpcoesFaixas extends OpcoesKeyset {
+  faixas?: FaixaId[];
+  /** Quantas faixas pedem ao banco ao mesmo tempo (padrão 6). */
+  simultaneas?: number;
+  /** A cada faixa concluída: quantas já vieram, de quantas, e quantas linhas no total até agora. */
+  aoAvancar?: (feitas: number, total: number, linhas: number) => void;
+}
+
+/**
+ * Como buscarKeyset, mas fatiando o id em faixas que correm em paralelo.
+ * @param buscarPagina igual ao do buscarKeyset, mais a faixa: deve aplicar `.gte(id, faixa.de)` e
+ *        `.lt(id, faixa.ate)` quando não forem null.
+ * O resultado vem na ordem das faixas (id desc dentro de cada uma); reordene em JS se precisar.
+ */
+export async function buscarKeysetEmFaixas<T>(
+  buscarPagina: (faixa: FaixaId, cursor: string | null, tamanho: number, signal?: AbortSignal | null) => PromiseLike<RespostaPagina<T>>,
+  cursorDe: (linha: T) => string,
+  opts: OpcoesFaixas = {},
+): Promise<T[]> {
+  const faixas = opts.faixas ?? faixasUuid(16);
+  const partes: T[][] = new Array(faixas.length);
+  let proxima = 0, feitas = 0, linhas = 0, parar = false;
+  const trabalhador = async () => {
+    while (!parar && proxima < faixas.length) {
+      const i = proxima++;
+      try {
+        partes[i] = await buscarKeyset((c, t, s) => buscarPagina(faixas[i], c, t, s), cursorDe, opts);
+      } catch (e) {
+        parar = true;   // uma faixa falhou: as outras não começam faixas novas (a carga inteira já falhou)
+        throw e;
+      }
+      feitas++; linhas += partes[i].length;
+      opts.aoAvancar?.(feitas, faixas.length, linhas);
+    }
+  };
+  const n = Math.max(1, Math.min(opts.simultaneas ?? 6, faixas.length));
+  await Promise.all(Array.from({ length: n }, trabalhador));
+  return partes.flat();
+}

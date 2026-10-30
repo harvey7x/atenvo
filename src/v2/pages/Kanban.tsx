@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CLASSE_RAIZ_PORTAL, criarRaizPortalV2 } from '../components/portal';
 import { useOrg } from '@/context/OrgContext';
 import {
-  KANBAN_REAL, useKanban, useOportunidadesAbertasDeContatos, useConversasDoContato,
+  KANBAN_REAL, useKanban, useProgressoKanban, useOportunidadesAbertasDeContatos, useConversasDoContato,
   useNaoLidasPorContato, useOportunidadeEventos,
   classificarMovimento, traduzErroKanban, valorRelevante, bloqueioAdministrativo, bloqueioAssinar,
   MOTIVOS_NAO_ELEGIVEL, rotuloMotivoPerda, rotuloPerdaCompleto, rotuloDe,
@@ -27,7 +27,7 @@ import { FichaJudicialBox } from '@/components/FichaJudicialBox';
 import { RelacionamentoContatoBox } from '@/components/RelacionamentoContatoBox';
 import { DocumentosInssBox } from '@/components/DocumentosInssBox';
 import { useBloqueiosOrg } from '../hooks/bloqueiosOrg';
-import { BotaoPrimario, BotaoSec, CardVidro, DrawerV2, EstadoErro, ModalV2, Skeleton } from '../components';
+import { BotaoPrimario, BotaoSec, DrawerV2, EstadoErro, ModalV2 } from '../components';
 import './kanban.css';
 import './kanban-pro.css';
 
@@ -246,6 +246,39 @@ function seedKb(): SeedKb {
 }
 
 /* ================================================================== */
+
+/* Tela de carregamento (dono 30/10: "uma mensagem tipo carregando o Kanban, aguarde… bonita,
+   profissional"). Atrás, o esboço das colunas; na frente, o cartão com o progresso REAL
+   (faixas de cards já recebidas — ver buscarKeysetEmFaixas). */
+function CarregandoKanban() {
+  const p = useProgressoKanban();
+  const pct = p && p.total > 0 ? Math.round((p.feitas / p.total) * 100) : 0;
+  return (
+    <div className="kb-pg kb-pro">
+      <div className="kb-carr" role="status" aria-live="polite" aria-busy>
+        <div className="kb-carr-fundo" aria-hidden>
+          {[4, 3, 4, 2, 3, 2].map((n, i) => (
+            <div key={i} className="kb-carr-col">
+              <span className="kb-carr-tit" />
+              {Array.from({ length: n }, (_, j) => <span key={j} className="kb-carr-card" />)}
+            </div>
+          ))}
+        </div>
+        <div className="kb-carr-caixa">
+          <span className="kb-carr-ic" aria-hidden><i /><i /><i /></span>
+          <strong>Carregando o Kanban</strong>
+          <span className="kb-carr-txt">Aguarde, estamos organizando as oportunidades nas colunas.</span>
+          <span className={'kb-carr-barra' + (pct === 0 ? ' indet' : '')}>
+            <i style={pct > 0 ? { width: `${Math.max(pct, 6)}%` } : undefined} />
+          </span>
+          <span className="kb-carr-num num">
+            {p && p.cards > 0 ? `${p.cards.toLocaleString('pt-BR')} oportunidades · ${pct}%` : 'Buscando os cards…'}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function KanbanV2() {
   const { currentOrg } = useOrg();
@@ -871,21 +904,7 @@ export default function KanbanV2() {
   const detLead = detId ? leads.find((l) => l.id === detId) ?? null : null;
 
   /* ---------- estados de página (contrato item 7: skeleton em vidro + EstadoErro) ---------- */
-  if (!demo && k.loading) {
-    return (
-      <div className="kb-pg kb-pro">
-        <div className="kb-skel" aria-busy aria-label="Carregando funil">
-          {[0, 1, 2].map((i) => (
-            <CardVidro key={i} className="kb-skel-col">
-              <Skeleton largura="55%" />
-              <Skeleton largura="100%" altura={64} raio={12} />
-              <Skeleton largura="100%" altura={64} raio={12} />
-            </CardVidro>
-          ))}
-        </div>
-      </div>
-    );
-  }
+  if (!demo && k.loading) return <CarregandoKanban />;
   if (!demo && k.isError) {
     return (
       <div className="kb-pg kb-pro">

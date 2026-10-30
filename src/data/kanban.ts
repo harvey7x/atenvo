@@ -1,7 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import { buscarKeyset } from '@/data/paginacao';
+import { buscarKeysetEmFaixas } from '@/data/paginacao';
 import { useOrg } from '@/context/OrgContext';
 import { useVisibilidade } from '@/lib/visibilidade';
 
@@ -352,6 +352,29 @@ async function garantirFunil(org: string): Promise<{ id: string; nome: string } 
   return (novo as { id: string; nome: string } | null) ?? null;
 }
 
+/* ---- Abertura rápida (dono 30/10: "tem como tirar o delay quando a gente entra no Kanban?") ----
+   - leads em 16 faixas de id em paralelo (antes: 8 páginas de 1000 em fila, ~10 s);
+   - o id do funil fica guardado no navegador: os cards começam a vir sem esperar a ida ao `funis`;
+   - o quadro fica 30 min na memória depois de sair da tela: voltar ao Kanban é imediato
+     (os dados aparecem na hora e se atualizam por baixo). */
+const KANBAN_GC_MS = 30 * 60_000;
+const chaveFunil = (org: string) => `atenvo-kb-funil:${org}`;
+function funilGuardado(org: string): { id: string; nome: string } | undefined {
+  try {
+    const f = JSON.parse(localStorage.getItem(chaveFunil(org)) ?? 'null') as { id?: unknown; nome?: unknown } | null;
+    return f && typeof f.id === 'string' ? { id: f.id, nome: String(f.nome ?? '') } : undefined;
+  } catch { return undefined; }
+}
+
+/** Progresso da 1ª carga dos cards (tela "Carregando o Kanban"): faixas prontas de quantas. */
+export interface ProgressoKanban { feitas: number; total: number; cards: number }
+let progressoKanban: ProgressoKanban | null = null;
+const ouvintesProgresso = new Set<() => void>();
+function publicarProgresso(p: ProgressoKanban | null) { progressoKanban = p; ouvintesProgresso.forEach((f) => f()); }
+export function useProgressoKanban(): ProgressoKanban | null {
+  return useSyncExternalStore((f) => { ouvintesProgresso.add(f); return () => { ouvintesProgresso.delete(f); }; }, () => progressoKanban);
+}
+
 /** Núcleo do Kanban: funil + colunas + leads (oportunidades em andamento) + ações + realtime. */
 export function useKanban() {
   const { currentOrg } = useOrg();
@@ -362,11 +385,20 @@ export function useKanban() {
   const vis = useVisibilidade();
   const soDe = vis.veTodos ? null : vis.uid;
 
-  const funilQ = useQuery({ queryKey: ['kanban-funil', org], enabled: KANBAN_REAL, queryFn: () => garantirFunil(org) });
+  const funilQ = useQuery({
+    queryKey: ['kanban-funil', org], enabled: KANBAN_REAL, gcTime: KANBAN_GC_MS,
+    // o guardado vale como "velho" (updatedAt 0): mostra na hora e confere com o banco por baixo
+    initialData: () => funilGuardado(org), initialDataUpdatedAt: 0,
+    queryFn: async () => {
+      const f = await garantirFunil(org);
+      try { if (f) localStorage.setItem(chaveFunil(org), JSON.stringify(f)); } catch { /* sem storage: só não acelera */ }
+      return f;
+    },
+  });
   const funilId = funilQ.data?.id ?? null;
 
   const colunasQ = useQuery({
-    queryKey: ['kanban-colunas', org, funilId], enabled: KANBAN_REAL && !!funilId, refetchInterval: 8000,
+    queryKey: ['kanban-colunas', org, funilId], enabled: KANBAN_REAL && !!funilId, refetchInterval: 8000, gcTime: KANBAN_GC_MS,
     queryFn: async (): Promise<KColuna[]> => {
       const { data, error } = await supabase!.from('funil_colunas').select('id, nome, cor, ordem, entrada, resultado, encerra_oportunidade').eq('organizacao_id', org).eq('funil_id', funilId!).eq('arquivada', false).order('ordem', { ascending: true });
       if (error) throw new Error(error.message);
@@ -375,25 +407,36 @@ export function useKanban() {
     },
   });
 
+  const chaveLeads = ['kanban-leads', org, funilId, soDe ?? 'todos'];
   const leadsQ = useQuery({
-    queryKey: ['kanban-leads', org, funilId, soDe ?? 'todos'], enabled: KANBAN_REAL && !!funilId && (vis.veTodos || !!soDe), refetchInterval: 8000,
-    queryFn: async (): Promise<KLead[]> => {
+    queryKey: chaveLeads, enabled: KANBAN_REAL && !!funilId && (vis.veTodos || !!soDe), refetchInterval: 8000, gcTime: KANBAN_GC_MS,
+    queryFn: async ({ signal }): Promise<KLead[]> => {
+      // 1ª carga (tela vazia): 6 faixas ao mesmo tempo e progresso na tela. Atualização de fundo
+      // (a cada 8 s / realtime), com o quadro já na tela: 2 por vez, para não pesar no banco.
+      const primeira = qc.getQueryData(chaveLeads) === undefined;
+      if (primeira) publicarProgresso({ feitas: 0, total: 16, cards: 0 });
       // PAGINAÇÃO (18/09): sem paginar, o PostgREST corta em 1000 (db-max-rows) e CARDS SOMEM do
       // quadro (o funil passa de 1000 com em_andamento+ganho+perdido). KEYSET por id (imutável);
       // a ordem do quadro (ordem asc, criado_em asc) é reaplicada em JS — paginar por `ordem`
       // (mutável no drag-and-drop) pularia/duplicaria cards na fronteira.
-      const linhas = await buscarKeyset<DbLead & { id: string }>(
-        (cursor, tam) => {
+      const linhas = await buscarKeysetEmFaixas<DbLead & { id: string }>(
+        (faixa, cursor, tam, sinal) => {
           let q = supabase!.from('oportunidades')
             .select('id, coluna_id, contato_id, conversa_origem_id, canal_origem_id, contato_nome, titulo, telefone, responsavel_id, valor_estimado, origem, etiquetas, observacoes, lembrete, ordem, criado_em, atualizado_em, entrada_em, movimentado_em, prioridade, status, fechado_em, motivo_perda, motivo_nao_elegivel, responsavel_no_fechamento_id, tipo_beneficio, tipo_servico, status_cancelamento, status_ressarcimento, numero_beneficio, instituicao, tipo_desconto, data_inicio_desconto, valor_desconto_mensal, valor_ressarcimento_estimado, valor_ressarcido, contatos(nome, telefone, email, etiquetas), responsavel:usuarios!oportunidades_responsavel_id_fkey(nome), canal_origem:canais(tipo, nome_interno, numero_conectado)')
             .eq('organizacao_id', org).eq('funil_id', funilId!).in('status', ['em_andamento', 'ganho', 'perdido'])
             .order('id', { ascending: false }).limit(tam);
           if (soDe) q = q.eq('responsavel_id', soDe);
+          if (faixa.de) q = q.gte('id', faixa.de);
+          if (faixa.ate) q = q.lt('id', faixa.ate);
           if (cursor) q = q.lt('id', cursor);
+          if (sinal) q = q.abortSignal(sinal);
           return q.then((r) => ({ data: (r.data as unknown as (DbLead & { id: string })[]) ?? null, error: r.error }));
         },
         (l) => l.id,
-        { rotulo: 'kanban-leads' },
+        {
+          rotulo: 'kanban-leads', signal, simultaneas: primeira ? 6 : 2,
+          aoAvancar: primeira ? (feitas, total, cards) => publicarProgresso({ feitas, total, cards }) : undefined,
+        },
       );
       // reproduz .order('ordem', asc).order('criado_em', asc) — ordem asc com NULLS LAST (padrão Postgres)
       linhas.sort((a, b) => {
