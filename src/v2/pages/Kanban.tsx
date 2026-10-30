@@ -21,6 +21,7 @@ import { indexPorChave, type SlaAlerta, type SlaTipo } from '@/data/slaView';
 import { useVacuoRepasses, repassesPorOportunidade, estagioAviso, type VacuoRepasse } from '@/data/vacuo';
 import { corDaEtiqueta, type Etiqueta } from '@/types/atendimento';
 import { initials, avatarColor } from '@/lib/avatar';
+import { fotoIlustrativa } from '../lib/fotoIlustrativa';
 import { useVisibilidade } from '@/lib/visibilidade';
 import { FichaJudicialBox } from '@/components/FichaJudicialBox';
 import { RelacionamentoContatoBox } from '@/components/RelacionamentoContatoBox';
@@ -160,6 +161,11 @@ const IcKb = () => <Ic><rect x="3" y="4" width="5" height="16" rx="1.4" /><rect 
 const IcColapsar = () => <Ic><path d="M13 5l-6 7 6 7M20 5l-6 7 6 7" /></Ic>; // « recolher coluna
 const IcSino = () => <Ic><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></Ic>; // lembrete no card
 const IcChat = () => <Ic><path d="M21 12a8 8 0 0 1-8 8H4l2.2-2.6A8 8 0 1 1 21 12z" /></Ic>; // atalho pro WhatsApp no card
+// Kanban PRO (29/10): ícones dos chips do card
+const IcRelogio = () => <Ic><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></Ic>;
+const IcCal = () => <Ic><rect x="3.5" y="5" width="17" height="15" rx="2.5" /><path d="M8 3v4M16 3v4M3.5 10h17" /></Ic>;
+const IcEtapas = () => <Ic><path d="M4 17h4v-4h4V9h4V5h4" /></Ic>;
+const IcAlerta = () => <Ic><path d="M12 4 2.8 19.5h18.4L12 4z" /><path d="M12 10v4M12 17h.01" /></Ic>;
 
 type Aviso = { tom: 'ok' | 'erro'; texto: string } | null;
 
@@ -1080,9 +1086,11 @@ export default function KanbanV2() {
                 >
                   <button type="button" className="kb-col-toggle" aria-label={'Recolher coluna ' + col.nome} title="Recolher coluna" onClick={(e) => { e.stopPropagation(); toggleCol(col.id); }}><IcColapsar /></button>
                   {/* v5: o dot saiu do cabeçalho expandido — a cor da coluna vive no sublinhado (na recolhida o dot fica) */}
+                  <span className="kb-cab-ic" aria-hidden />
                   <span className="n" title={col.nome}>{col.nome}</span>
                   {col.entrada && <span className="tag-entrada" title="Coluna de entrada — recebe novos leads dos canais">entrada</span>}
                   <span className="q num">{todosCol.length.toLocaleString('pt-BR')}</span>
+                  <button type="button" className="kb-col-add" aria-label={'Adicionar lead em ' + col.nome} title="Adicionar lead" onClick={(e) => { e.stopPropagation(); abrirNovoLead(col.id); }}><IcMais /></button>
                   {podeConfig && (
                     <span className="kb-menu-wrap">
                       <button type="button" className="mbtn" aria-label={'Ações da coluna ' + col.nome} onClick={(e) => { e.stopPropagation(); setMenu(menu?.kind === 'col' && menu.id === col.id ? null : { kind: 'col', id: col.id, ...posMenu(e.currentTarget) }); }}>
@@ -1102,11 +1110,6 @@ export default function KanbanV2() {
                       </>
                     )}
                   {gargalo && <span className="glr" title={`${nParadosCol} leads travados +${LIMIAR_PARADO_DIAS}d nesta etapa — gargalo do funil`}>Gargalo</span>}
-                  {!desfecho && todosCol.length > 0 && (
-                    <span className="kb-sub-bar" aria-hidden title={`${nParadosCol} parados de ${todosCol.length}`}>
-                      <i style={{ width: Math.round((nParadosCol / todosCol.length) * 100) + '%' }} />
-                    </span>
-                  )}
                 </div>
                 <div
                   className="kb-corpo"
@@ -1473,7 +1476,6 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, repasse, fichaInfo, o
   // meta corrida: só a instituição (bancos ganharam a própria fileira de destaque)
   const metaPartes = [l.instituicao].filter(Boolean) as string[];
   const revN = fichaInfo?.revBancos.length ?? 0;
-  const metaTitle = metaPartes.join(' · ');
   // progresso do funil DO JEITO DO DONO (27/08): TODAS as etapas contam menos Perdido
   // (Lead novo, Qualificado, Documentação, Assinar, Fechado = 5). Entrada = 0/5; cada
   // avanço de coluna sobe 1; chegou no Fechado/ganho = 5/5 cheio (verde).
@@ -1483,7 +1485,6 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, repasse, fichaInfo, o
   const noGanho = l.status === 'ganho' || (colAtual ? (colAtual.resultado ?? 'neutro') === 'ganho' : false);
   const mostraProg = l.status !== 'perdido' && nEtapas > 1 && (noGanho || idxEtapa >= 0);
   const progVal = noGanho ? nEtapas : Math.max(0, idxEtapa);
-  const progPct = (progVal / Math.max(nEtapas, 1)) * 100;
   // v3 F2 — PRÓXIMO PASSO: 1 badge que diz o que FAZER (não só o que é). "Sem responsável" já vive
   // em âmbar na linha do atendente; a estagnação, no "parado Xd" ao lado — o badge não os repete.
   const badge = optout ? { cls: 'blk', txt: 'Não incomodar' }
@@ -1500,6 +1501,17 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, repasse, fichaInfo, o
   const fone = tituloTelefone(l.nome);
   const nomeCard = fone ?? nomeExibicao(l.nome);
 
+  // Kanban PRO (29/10, dono: "mais minimalista, profissional"): nome + 1 linha cinza + chips
+  // com ícone (situação · entrada · etapa) + pessoas à direita (responsável e a foto ILUSTRATIVA).
+  const subtitulo = [benefLbl, ...metaPartes].filter(Boolean).join(' · ');
+  const foto = fotoIlustrativa(l.nome, l.contatoId ?? l.id);
+  const estado = badge
+    ? { cls: badge.cls, txt: badge.cls === 'hot' && paradoAtivo ? `Retomar · ${dp}d` : badge.txt, msg: badge.cls === 'msg' }
+    : paradoAtivo ? { cls: hot ? 'hot' : 'warm', txt: `parado ${dp}d`, msg: false }
+    : { cls: '', txt: haDe(l.atualizadoEm || l.criadoEm), msg: false };
+  const estadoTitle = badge ? badge.txt + (paradoAtivo ? ` — sem trocar de coluna há ${dp} dia(s)` : '')
+    : paradoAtivo ? `Sem trocar de coluna há ${dp} dia(s)` : 'Última atualização';
+
   return (
     <div
       ref={aoRef}
@@ -1509,23 +1521,21 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, repasse, fichaInfo, o
       onDragStart={aoDragStart}
       onDragEnd={aoDragEnd}
     >
-      {/* ⋮ absoluto no canto — em repouso o card é só informação (aparece no hover) */}
-      <span className="kb-menu-wrap">
-        <button type="button" className={'mbtn' + (menuAberto ? ' on' : '')} aria-label={'Ações do lead ' + l.nome} aria-expanded={menuAberto} onClick={(e) => { e.stopPropagation(); aoMenu(e.currentTarget); }}>
-          <IcPontos />
-        </button>
-        {/* o dropdown do card é renderizado em PORTAL no nível da página (fora do overflow da coluna) */}
+      {/* ações no canto, só no hover: conversa + ⋮ (o dropdown do card vai em PORTAL) */}
+      <span className="kc-acoes">
+        {l.conversaOrigemId && (
+          <button type="button" className="kc-wa" title="Abrir a conversa do cliente no WhatsApp" aria-label={'Abrir a conversa de ' + l.nome + ' no WhatsApp'}
+            onClick={(e) => { e.stopPropagation(); aoAbrirConversa(); }}>
+            <IcChat />
+          </button>
+        )}
+        <span className="kb-menu-wrap">
+          <button type="button" className={'mbtn' + (menuAberto ? ' on' : '')} aria-label={'Ações do lead ' + l.nome} aria-expanded={menuAberto} onClick={(e) => { e.stopPropagation(); aoMenu(e.currentTarget); }}>
+            <IcPontos />
+          </button>
+        </span>
       </span>
 
-      {/* L1: TAG de benefício colorida (a energia da referência) + data de entrada */}
-      {(benefLbl || dataCurta) && (
-        <div className="kc-eyebrow">
-          {benefLbl && <span className="kc-benef" title={'Tipo de benefício: ' + benefLbl}>{benefLbl}</span>}
-          {dataCurta && <span className="kc-data num" title={'No funil desde ' + dataFull}>{dataCurta}</span>}
-        </div>
-      )}
-
-      {/* L2 TÍTULO — o único elemento forte do card */}
       <div className="kc-r1">
         <span className="kc-nm" title={l.nome}>{fone ? <span className="num">{fone}</span> : nomeCard}{fone && <i className="kc-semnome">· sem nome</i>}</span>
         {(() => {
@@ -1539,14 +1549,9 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, repasse, fichaInfo, o
         {l.status === 'ganho' && <span className="kc-flag ganho" title={'Fechado como ganho' + (repasse ? ` por ${repasse.paraNome} (era de ${repasse.deNome})` : '')}>Ganho</span>}
         {l.status === 'perdido' && <span className="kc-flag perdido" title={'Perdido' + (l.motivoPerda ? ' · ' + rotuloPerdaCompleto(l.motivoPerda, l.motivoNaoElegivel) : '')}>Perdido</span>}
       </div>
+      {subtitulo && <div className="kc-meta" title={subtitulo}>{subtitulo}</div>}
 
-      {/* L3 META corrida: instituição */}
-      {metaPartes.length > 0 && (
-        <div className="kc-meta" title={metaTitle}>{metaPartes.join(' · ')}</div>
-      )}
-
-      {/* L3b BANCOS DA FICHA em DESTAQUE (dono: "muito importante"): o banco do cliente
-          (recebe) no chip mais forte do card (assinatura platina); REVs em contorno */}
+      {/* BANCOS DA FICHA (dono: "muito importante"): o banco do cliente em destaque; REVs em contorno */}
       {fichaInfo && (fichaInfo.bancoNome || revN > 0) && (
         <div className="kc-bancos" title={'Bancos da ficha' + (fichaInfo.bancoNome ? ` · recebe: ${fichaInfo.bancoNome}` : '') + (revN ? ` · REV: ${fichaInfo.revBancos.join(', ')}` : '')}>
           {fichaInfo.bancoNome && <span className="kc-banco prin">{fichaInfo.bancoNome}</span>}
@@ -1554,57 +1559,39 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, repasse, fichaInfo, o
           {revN > 2 && <span className="kc-banco mais">+{revN - 2}</span>}
         </div>
       )}
-      {/* RESERVADO — estado do BOT no card (dono 27/08): quando a opção nascer no bot,
-          entra aqui (fonte provável: ia_sessoes da conversa). */}
 
-      {/* L5 PROGRESSO do funil: avançou X de N etapas (0/N na entrada; N/N no Fechado) */}
-      {mostraProg && (
-        <div className="kc-prog" title={noGanho ? `Fechado — completou as ${nEtapas} etapas` : `Avançou ${progVal} de ${nEtapas} etapas · está em ${colAtual?.nome ?? ''}`}>
-          <span className="trilho"><span className="fill" style={{ width: progPct + '%' }} /></span>
-          <span className="frac num">{progVal}/{nEtapas}</span>
-        </div>
-      )}
-
-      {/* L6 LEMBRETE — texto âmbar, sem caixa */}
       {l.lembrete && (
         <div className="kc-lem" title={'Lembrete: ' + l.lembrete}><IcSino /><span>{l.lembrete}</span></div>
       )}
 
-      {/* L6b ETIQUETAS coloridas — mesma linguagem da tag de benefício, na cor da etiqueta */}
+      {/* ETIQUETAS sempre visíveis (dono): chip neutro com o ponto na cor da etiqueta */}
       {todasEtiquetas.length > 0 && (
         <div className="kc-etqs">
           {todasEtiquetas.slice(0, 2).map((t) => {
             const cor = corDaEtiqueta(t, etiquetasCat);
-            return <span key={t} className="kc-etq" title={t} style={{ color: cor, background: cor + '24', borderColor: cor + '4D', ['--c']: cor } as React.CSSProperties}>{t}</span>;
+            return <span key={t} className="kc-etq" title={t}><i style={{ background: cor }} />{t}</span>;
           })}
           {todasEtiquetas.length > 2 && <span className="kc-etq mais" title={todasEtiquetas.slice(2).join(' · ')}>+{todasEtiquetas.length - 2}</span>}
         </div>
       )}
 
-      {/* L7 RODAPÉ: gente + (ação OU tempo) + WhatsApp. Kanban PRO (29/10): a ação que era a faixa
-          do pé virou SELO aqui — o board deixou de ser um mar vermelho; a borda esquerda segue o alerta */}
-      <div className="kc-foot">
-        <span className={'kc-av' + (l.respNome ? '' : ' semdono')} title={l.respNome ? 'Responsável · ' + l.respNome : 'Sem responsável'}
-          style={l.respNome ? ({ ['--av']: avatarColor(l.respNome) } as React.CSSProperties) : undefined}>{l.respNome ? initials(l.respNome) : '·'}</span>
-        <span className={'kc-resp' + (l.respNome ? '' : ' none')} title={l.respNome || 'Não atribuído'}>{l.respNome || 'Não atribuído'}</span>
-        {badge ? (
-          <span className={'kc-acao num ' + badge.cls}
-            title={badge.txt + (paradoAtivo ? ` — sem trocar de coluna há ${dp} dia(s)` : '')}>
-            {badge.cls === 'hot' && paradoAtivo ? `Retomar · ${dp}d` : badge.txt}
-          </span>
-        ) : (
-          <span className={'kc-time num' + (paradoAtivo ? (hot ? ' hot' : ' warm') : '')} title={paradoAtivo ? `Sem trocar de coluna há ${dp} dia(s)` : 'Última atualização'}>
-            {paradoAtivo ? `parado ${dp}d` : haDe(l.atualizadoEm || l.criadoEm)}
+      <div className="kc-pe">
+        <span className={'kc-chip est num ' + estado.cls} title={estadoTitle}>
+          {estado.msg ? <IcChat /> : badge && badge.cls !== 'hot' ? <IcAlerta /> : <IcRelogio />}
+          {estado.txt}
+        </span>
+        {dataCurta && <span className="kc-chip num" title={'No funil desde ' + dataFull}><IcCal />{dataCurta}</span>}
+        {mostraProg && (
+          <span className={'kc-chip num' + (noGanho ? ' ok' : '')} title={noGanho ? `Fechado — completou as ${nEtapas} etapas` : `Avançou ${progVal} de ${nEtapas} etapas · está em ${colAtual?.nome ?? ''}`}>
+            <IcEtapas />{progVal}/{nEtapas}
           </span>
         )}
-        {l.conversaOrigemId && (
-          <button type="button" className="kc-wa" title="Abrir a conversa do cliente no WhatsApp" aria-label={'Abrir a conversa de ' + l.nome + ' no WhatsApp'}
-            onClick={(e) => { e.stopPropagation(); aoAbrirConversa(); }}>
-            <IcChat />
-          </button>
-        )}
+        <span className="kc-pessoas">
+          <span className={'kc-av' + (l.respNome ? '' : ' semdono')} title={l.respNome ? 'Responsável · ' + l.respNome : 'Sem responsável'}
+            style={l.respNome ? ({ ['--av']: avatarColor(l.respNome) } as React.CSSProperties) : undefined}>{l.respNome ? initials(l.respNome) : '?'}</span>
+          <img className="kc-foto" src={foto} alt="" loading="lazy" decoding="async" width={26} height={26} title="Foto ilustrativa" draggable={false} />
+        </span>
       </div>
-
     </div>
   );
 }
