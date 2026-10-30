@@ -28,6 +28,15 @@ export function bloqueioAdministrativo(resOrigem: ColResultado, resDestino: ColR
   return null;
 }
 
+/** 30/10: com os pendentes do CAF ligados (adm_status.assinar), o Assinar é só de quem está
+ *  "aguardando assinatura" lá (trigger adm_trava_assinar recusa com 'assinar_pelo_administrativo'). */
+export function bloqueioAssinar(nomeOrigem: string | null | undefined, nomeDestino: string | null | undefined): string | null {
+  const ehAssinar = (n?: string | null) => (n ?? '').trim().toUpperCase().startsWith('ASSINAR');
+  if (ehAssinar(nomeDestino)) return 'O Assinar vem do sistema do administrativo: quando o caso ficar "aguardando assinatura" lá, o cliente vem sozinho para cá.';
+  if (ehAssinar(nomeOrigem)) return 'Este cliente está aguardando assinatura no sistema do administrativo. Para tirar do Assinar, mude o caso dele lá.';
+  return null;
+}
+
 export const MOTIVOS_PERDA: [string, string][] = [
   ['sem_interesse', 'Sem interesse'], ['nao_respondeu', 'Não respondeu'], ['nao_elegivel', 'Não elegível'],
   ['concorrente', 'Fechou com concorrente'], ['dados_invalidos', 'Dados inválidos'], ['outro', 'Outro'],
@@ -57,6 +66,7 @@ export function rotuloPerdaCompleto(motivoPerda: string | null, motivoNE: string
 export function traduzErroKanban(msg: string): string {
   const m = (msg || '').toLowerCase();
   if (m.includes('fechado_pelo_administrativo')) return 'O Fechado vem do sistema do administrativo: mude o caso do cliente lá.';
+  if (m.includes('assinar_pelo_administrativo')) return 'O Assinar vem do sistema do administrativo: mude o caso do cliente lá.';
   if (m.includes('motivo_perda_desc')) return 'Descreva o motivo (você escolheu "Outro").';
   if (m.includes('motivo_perda')) return 'Selecione o motivo da perda.';
   if (m.includes('motivo_reabertura')) return 'Informe o motivo da reabertura.';

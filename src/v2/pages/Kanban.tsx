@@ -6,7 +6,7 @@ import { useOrg } from '@/context/OrgContext';
 import {
   KANBAN_REAL, useKanban, useOportunidadesAbertasDeContatos, useConversasDoContato,
   useNaoLidasPorContato, useOportunidadeEventos,
-  classificarMovimento, traduzErroKanban, valorRelevante, bloqueioAdministrativo,
+  classificarMovimento, traduzErroKanban, valorRelevante, bloqueioAdministrativo, bloqueioAssinar,
   MOTIVOS_NAO_ELEGIVEL, rotuloMotivoPerda, rotuloPerdaCompleto, rotuloDe,
   TIPO_BENEFICIO_OPCOES as TIPO_BENEFICIO, TIPO_SERVICO_OPCOES as TIPO_SERVICO,
   STATUS_CANCEL_OPCOES as ST_CANCEL, STATUS_RESS_OPCOES as ST_RESS,
@@ -257,7 +257,9 @@ export default function KanbanV2() {
   const bloqueiosQ = useBloqueiosOrg();
 
   const [aviso, setAviso] = useState<Aviso>(null);
-  const admAtivo = useAdmStatus().data?.ativo ?? false;
+  const admSt = useAdmStatus().data;
+  const admAtivo = admSt?.ativo ?? false;
+  const admAssinar = admSt?.assinar ?? false;
   const [search, setSearch] = useState('');
   const [menu, setMenu] = useState<{ kind: 'card' | 'col'; id: string; top: number; right: number } | null>(null);
   // raiz de portal (regra 10): o menu "⋮" monta no body, fora do overflow da coluna e do stacking
@@ -655,8 +657,10 @@ export default function KanbanV2() {
     if (optim[id]) return; // card já em movimentação
     const colDest = colunas.find((c) => c.id === colId);
     if (!colDest) return;
-    const resOrig: ColResultado = colunas.find((c) => c.id === colunaDoLead(lead))?.resultado ?? 'neutro';
-    const trava = admAtivo ? bloqueioAdministrativo(resOrig, colDest.resultado) : null;
+    const colOrig = colunas.find((c) => c.id === colunaDoLead(lead));
+    const resOrig: ColResultado = colOrig?.resultado ?? 'neutro';
+    const trava = (admAtivo ? bloqueioAdministrativo(resOrig, colDest.resultado) : null)
+      ?? (admAssinar ? bloqueioAssinar(colOrig?.nome, colDest.nome) : null);
     if (trava) { setAviso({ tom: 'erro', texto: trava }); return; }
     const tipo = classificarMovimento(resOrig, colDest.resultado);
     if (tipo !== 'neutro') {
@@ -814,8 +818,11 @@ export default function KanbanV2() {
         const el = leadModal!.lead!;
         const mudouEtapa = lf.colunaId && lf.colunaId !== colunaDoLead(el);
         const colDest = colunas.find((c) => c.id === lf.colunaId);
-        const resOrig: ColResultado = colunas.find((c) => c.id === colunaDoLead(el))?.resultado ?? 'neutro';
-        const trava = mudouEtapa && colDest && admAtivo ? bloqueioAdministrativo(resOrig, colDest.resultado) : null;
+        const colOrig = colunas.find((c) => c.id === colunaDoLead(el));
+        const resOrig: ColResultado = colOrig?.resultado ?? 'neutro';
+        const trava = !mudouEtapa || !colDest ? null
+          : (admAtivo ? bloqueioAdministrativo(resOrig, colDest.resultado) : null)
+            ?? (admAssinar ? bloqueioAssinar(colOrig?.nome, colDest.nome) : null);
         if (trava) { setLeadErr(trava); return; }
         const tipo = colDest ? classificarMovimento(resOrig, colDest.resultado) : 'neutro';
         const aplicarDemo = (patch: Partial<KLead>, colunaId?: string) => setSeed((s) => ({

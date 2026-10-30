@@ -13,7 +13,7 @@ import { useVacuoRepasses, repassesPorConversa, useRadarMeus, radarPorConversa, 
 import { RadarSelosCard, RadarSeloCabecalho, RadarProximo, useRadarEmSequencia, radarDicaLigar } from '../components/RadarSelos';
 import { rt, rtTit, rtTxt, textoErroLigacao } from '../lib/radarTextos';
 import { IcEraDe, IcLigar, IcEmDia } from '../components/RadarIcones';
-import { useOportunidadesDoContato, useFunisDaOrg, chamarGarantirEntrada, useColunasFunil, useMoverOportunidade, classificarMovimento, MOTIVOS_NAO_ELEGIVEL, traduzErroKanban, bloqueioAdministrativo } from '@/data/kanban';
+import { useOportunidadesDoContato, useFunisDaOrg, chamarGarantirEntrada, useColunasFunil, useMoverOportunidade, classificarMovimento, MOTIVOS_NAO_ELEGIVEL, traduzErroKanban, bloqueioAdministrativo, bloqueioAssinar } from '@/data/kanban';
 import { useAdmStatus } from '@/data/admFechados';
 import { useChecklist } from '@/data/checklist';
 import { useCobrancas } from '@/data/cobrancas';
@@ -2037,7 +2037,9 @@ function EtapaTopoSel({ lead, demo, aoAvisar }: { lead: WaContact; demo: boolean
   const [movBusy, setMovBusy] = useState(false);
   const [pendCol, setPendCol] = useState<string | null>(null);        // coluna alvo enquanto salva (feedback imediato)
   const [motivoModal, setMotivoModal] = useState<null | { destinoId: string; tipo: 'perdido' | 'reabertura' }>(null);
-  const admAtivo = useAdmStatus().data?.ativo ?? false;
+  const admSt = useAdmStatus().data;
+  const admAtivo = admSt?.ativo ?? false;
+  const admAssinar = admSt?.assinar ?? false;
   const [motivoNE, setMotivoNE] = useState(''); // motivo do descarte ("Não elegível" é a única coluna perdida)
   const [motivoTxt, setMotivoTxt] = useState('');
   useEffect(() => { setPendCol(null); setMotivoModal(null); }, [contatoId]); // troca de conversa não herda estado de mover
@@ -2049,7 +2051,8 @@ function EtapaTopoSel({ lead, demo, aoAvisar }: { lead: WaContact; demo: boolean
     const destino = colunas.find((c) => c.id === destinoId);
     if (!destino) return;
     const origem = colunas.find((c) => c.id === alvo.colunaId);
-    const trava = admAtivo ? bloqueioAdministrativo(origem?.resultado ?? 'neutro', destino.resultado) : null;
+    const trava = (admAtivo ? bloqueioAdministrativo(origem?.resultado ?? 'neutro', destino.resultado) : null)
+      ?? (admAssinar ? bloqueioAssinar(origem?.nome, destino.nome) : null);
     if (trava) { aoAvisar({ tom: 'erro', texto: trava }); return; }
     const tipo = classificarMovimento(origem?.resultado ?? 'neutro', destino.resultado);
     if (tipo === 'perdido') { setMotivoNE(''); setMotivoTxt(''); setMotivoModal({ destinoId, tipo: 'perdido' }); return; }

@@ -60,6 +60,7 @@ const IaV2 = lazy(() => import('@/v2/pages/Ia'));
 const RecuperacaoV2 = lazy(() => import('@/v2/pages/Recuperacao'));
 const PendenciasV2 = lazy(() => import('@/v2/pages/Pendencias'));
 const PortabilidadesV2 = lazy(() => import('@/v2/pages/Portabilidades'));
+const PresenciaisV2 = lazy(() => import('@/v2/pages/Presenciais'));
 const ManualV2 = lazy(() => import('@/v2/pages/Manual'));
 const FluxosV2 = lazy(() => import('@/v2/pages/Fluxos'));
 const ContatosV2 = lazy(() => import('@/v2/pages/Contatos'));
@@ -133,6 +134,8 @@ const routes: RouteObject[] = [
           // preservada (não deletada), só fora do menu/rota — reversível. Link antigo cai no WhatsApp.
           { path: 'remarketing', element: <Navigate to="/whatsapp" replace /> },
           { path: 'agendamentos', element: <Lz><AgendamentosV2 /></Lz> },
+          // Presenciais (dono 29/10): calendário dos atendimentos presenciais + aviso no grupo
+          { path: 'presenciais', element: <Lz><PresenciaisV2 /></Lz> },
           { path: 'recuperacao', element: <Lz><RequireRoleV2 role="admin"><RecuperacaoV2 /></RequireRoleV2></Lz> },
           { path: 'pendencias', element: <Lz><PendenciasV2 /></Lz> },
           { path: 'portabilidades', element: <Lz><PortabilidadesV2 /></Lz> },

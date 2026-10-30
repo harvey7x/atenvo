@@ -454,6 +454,9 @@ verify_jwt = false
 # adm-fechados: cron secret-gated (x-bot-secret == webhook_config.adm_fechados), sem JWT.
 [functions.adm-fechados]
 verify_jwt = false
+# presenciais-avisos: cron secret-gated (x-bot-secret == webhook_config.presenciais_avisos), sem JWT.
+[functions.presenciais-avisos]
+verify_jwt = false
 # janela-guardia: cron secret-gated (x-bot-secret == webhook_config.janela_guardia), sem JWT.
 [functions.janela-guardia]
 verify_jwt = false

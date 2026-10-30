@@ -1,0 +1,66 @@
+/* ============================================================
+   Presenciais — calendário (esquerda) + lista do dia (direita).
+   ============================================================ */
+
+.v2 .pr-grade { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 12px; align-items: start; }
+@media (max-width: 1100px) { .v2 .pr-grade { grid-template-columns: 1fr; } }
+
+/* calendário */
+.v2 .pr-cal { padding: 14px 16px 16px; }
+.v2 .pr-cal-cab { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.v2 .pr-cal-cab h3 { font-size: 14px; font-weight: 600; text-transform: capitalize; min-width: 150px; text-align: center; }
+.v2 .pr-cal-cab .pr-hoje { margin-left: auto; }
+.v2 .pr-semana { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-bottom: 6px; }
+.v2 .pr-semana span { font-size: 9.5px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--txt-3); text-align: center; }
+.v2 .pr-dias { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.v2 .pr-dia {
+  position: relative; height: 64px; border: 1px solid var(--linha); border-radius: 10px; background: transparent;
+  color: var(--txt); font: inherit; cursor: pointer; text-align: center; padding: 8px 6px;
+  transition: border-color .15s, background .15s;
+}
+.v2 .pr-dia > span { font-size: 12.5px; font-weight: 500; }
+.v2 .pr-dia:hover { border-color: rgba(var(--tint), .35); }
+.v2 .pr-dia.fora { color: var(--txt-3); opacity: .55; }
+.v2 .pr-dia.hoje > span { color: var(--acento, var(--txt)); font-weight: 700; }
+.v2 .pr-dia.hoje { border-color: rgba(var(--tint), .45); }
+.v2 .pr-dia.sel { background: rgba(var(--tint), .10); border-color: rgba(var(--tint), .6); }
+.v2 .pr-dia em {
+  position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%);
+  font-style: normal; font-size: 10.5px; font-weight: 600; min-width: 20px; padding: 1px 6px; border-radius: 99px;
+  background: rgba(var(--tint), .16); color: var(--txt);
+}
+
+/* lista do dia */
+.v2 .pr-dia-lista { padding: 14px 16px; }
+.v2 .pr-itens { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.v2 .pr-itens li { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 4px 10px; border: 1px solid var(--linha); border-radius: 10px; padding: 10px 11px; }
+.v2 .pr-itens li.desmarcado { opacity: .6; }
+.v2 .pr-itens li.desmarcado .nm { text-decoration: line-through; }
+.v2 .pr-hora { font-size: 14px; font-weight: 600; padding-top: 1px; }
+.v2 .pr-info .nm { font-size: 13px; font-weight: 600; }
+.v2 .pr-info .sub { font-size: 11px; color: var(--txt-2); margin-top: 2px; }
+.v2 .pr-info .obs { font-size: 11.5px; color: var(--txt-2); margin-top: 5px; font-style: italic; }
+.v2 .pr-selos { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 7px; }
+.v2 .pr-acoes { grid-column: 2; display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+
+/* formulários */
+.v2 .pr-form { display: flex; flex-direction: column; gap: 6px; }
+.v2 .pr-rot { font-size: 9.5px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--txt-3); margin-top: 8px; }
+.v2 .pr-linha { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.v2 .pr-linha .pr-rot { display: block; margin-bottom: 6px; }
+.v2 .pr-form textarea.inp { resize: vertical; min-height: 54px; }
+.v2 .pr-cliente { display: flex; align-items: center; gap: 10px; border: 1px solid var(--linha); border-radius: 10px; padding: 8px 10px; }
+.v2 .pr-cliente .nm { font-size: 13px; font-weight: 600; }
+.v2 .pr-cliente .tel { font-size: 11px; color: var(--txt-2); }
+.v2 .pr-cliente .btn-mini, .v2 .pr-cliente button { margin-left: auto; }
+.v2 .pr-achados { list-style: none; margin: 4px 0 0; padding: 0; border: 1px solid var(--linha); border-radius: 10px; max-height: 210px; overflow: auto; }
+.v2 .pr-achados li + li { border-top: 1px solid var(--linha); }
+.v2 .pr-achados li.vazio { padding: 9px 11px; font-size: 12px; color: var(--txt-3); }
+.v2 .pr-achados button { display: flex; gap: 10px; align-items: baseline; width: 100%; padding: 8px 11px; background: transparent; border: 0; color: var(--txt); font: inherit; cursor: pointer; text-align: left; }
+.v2 .pr-achados button:hover { background: rgba(var(--tint), .08); }
+.v2 .pr-achados .nm { font-size: 12.5px; font-weight: 500; }
+.v2 .pr-achados .tel { font-size: 11px; color: var(--txt-3); }
+.v2 .pr-previa {
+  margin: 2px 0 0; white-space: pre-wrap; font: inherit; font-size: 12px; line-height: 1.5;
+  background: rgba(var(--tint), .06); border: 1px solid var(--linha); border-radius: 10px; padding: 9px 11px;
+}

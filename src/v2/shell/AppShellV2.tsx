@@ -63,6 +63,8 @@ const GRUPOS: GrupoNav[] = [
       // Facebook e Disparo fora do menu (pedido do dono 27/08) — rotas seguem vivas por URL
       { slug: 'kanban', rotulo: 'Kanban' },
       { slug: 'agendamentos', rotulo: 'Agendamentos' },
+      // Presenciais (dono 29/10): calendário dos atendimentos presenciais; avisa o grupo DOCUMENTOS
+      { slug: 'presenciais', rotulo: 'Presenciais' },
     ],
   },
   {

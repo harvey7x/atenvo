@@ -9,6 +9,9 @@
 // Só nome, CPF, telefone e data passam daqui (e, da API nova, caso, vendedor, data do
 // pódio e "fora da conta"); qualquer outro campo é descartado.
 //
+// PENDENTES (30/10): com a API nova, lê também ?pendentes=1 (aguardando documentos/assinatura)
+// e grava em adm_pendentes antes do sincronizar — o Kanban segue o CAF em Documentos e Assinar.
+//
 // PLACAR (29/10): quando a lista já vem com caso_id, também lê ?placar=DIA do mês do
 // campeonato (dia 11 → dia 10) e grava em adm_placar — o corrente a cada leitura, os
 // dois anteriores uma vez por hora se faltarem ou tiverem mais de um dia.
@@ -86,6 +89,37 @@ Deno.serve(async (req) => {
   if (!Array.isArray(corpo.fechados) || corpo.total !== corpo.fechados.length) return await falha('api_resposta_invalida');
 
   const lista = (corpo.fechados as Record<string, unknown>[]).map(limpa);
+
+  // 30/10: casos ainda não completos (Kanban: Documentos e Assinar) — só com a API nova, e
+  // ANTES do sincronizar, que aplica o plano já com eles. Falhou: segue com a última leitura boa.
+  let pendentes: unknown = null;
+  if (lista.some((f) => f.caso_id)) {
+    try {
+      const u = new URL(api);
+      u.searchParams.set('pendentes', '1');
+      const r = await fetch(u, { headers: { 'x-api-key': chaveApi }, signal: AbortSignal.timeout(30_000) });
+      const c = r.ok ? await r.json() : null;
+      if (c && Array.isArray(c.pendentes) && c.total === c.pendentes.length) {
+        const limpos = (c.pendentes as Record<string, unknown>[]).map((p) => ({
+          caso_id: String(p.caso_id ?? '').slice(0, 40),
+          nome: String(p.nome ?? '').slice(0, 160),
+          cpf: String(p.cpf ?? '').slice(0, 20),
+          telefone: String(p.telefone ?? '').slice(0, 30),
+          vendedor: p.vendedor == null ? null : String(p.vendedor).slice(0, 80),
+          estagio: String(p.estagio ?? '').slice(0, 40),
+          estagio_em: DATA.test(String(p.estagio_em ?? '')) ? String(p.estagio_em) : null,
+        }));
+        const { data: g, error: e } = await admin.rpc('adm_pendentes_gravar', { p_org: org, p_lista: limpos });
+        pendentes = e ? `erro: ${e.message.slice(0, 120)}` : g;
+      } else {
+        pendentes = r.ok ? 'sem_pendentes' : `http_${r.status}`;
+      }
+    } catch (e) {
+      pendentes = `sem_resposta: ${String((e as Error)?.message ?? e).slice(0, 120)}`;
+    }
+    if (typeof pendentes === 'string') await admin.from('adm_sync_log').insert({ organizacao_id: org, erro: `pendentes: ${pendentes}` });
+  }
+
   const { data, error } = await admin.rpc('adm_sincronizar', { p_org: org, p_fechados: lista });
   if (error) return await falha(`sincronizar: ${error.message.slice(0, 160)}`, 500);
 
@@ -118,5 +152,5 @@ Deno.serve(async (req) => {
       }
     }
   }
-  return json({ ...(data as Record<string, unknown>), placar });
+  return json({ ...(data as Record<string, unknown>), placar, pendentes });
 });

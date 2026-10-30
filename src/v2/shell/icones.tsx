@@ -28,6 +28,9 @@ export const ICONES: Record<string, ReactNode> = {
   agendamentos: (
     <Ic><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M8 3v4M16 3v4M3 10h18" /></Ic>
   ),
+  presenciais: (
+    <Ic><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0113 0c0 5.4-6.5 11-6.5 11z" /><circle cx="12" cy="10" r="2.4" /></Ic>
+  ),
   disparo: (
     <Ic><path d="M21 3L10.5 13.5M21 3l-6.8 17.4a.35.35 0 01-.65.02L10.5 13.5 3.6 10.45a.35.35 0 01.02-.65L21 3z" /></Ic>
   ),
