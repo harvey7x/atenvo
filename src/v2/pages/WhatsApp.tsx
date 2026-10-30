@@ -1305,6 +1305,10 @@ export default function WhatsAppV2() {
                     </span>
                   )}
                   <span className="wa-hchip" title="Atendente responsável">{current.respId ? nomePorId(current.respId) ?? 'Atendente' : 'Não atribuído'}</span>
+                </div>
+                {/* 3ª linha (dono 30/10: "não pode ficar cortado assim"): avisos da Central, Ligar,
+                    repasse e etiquetas, sempre INTEIROS — só ocupa espaço quando há algum */}
+                <div className="sb sb-selos">
                   {/* Radar: o mesmo selo do card com o tempo ("Último aviso · sem resposta há 5 h"); logo
                       depois da resposta que encerra o aviso, "Próximo aguardando" por 10 s */}
                   <RadarSeloCabecalho r={radarPorConv.get(current.id)} diaUtil={diaUtilRadar} />

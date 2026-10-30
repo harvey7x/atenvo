@@ -974,5 +974,17 @@ html:root[data-repaginada][data-repaginada] .v2 :is(.conv2, .ctx-topo, .ctx-b).s
 .v2 .wa-ctopo .idw { flex: 1 1 auto; min-width: 0; }
 .v2 .wa-ctopo .sb { flex-wrap: nowrap; min-width: 0; overflow: hidden; }
 .v2 .wa-ctopo .sb > * { flex: 0 0 auto; }
-.v2 .wa-ctopo .sb > .wa-hchip:not(.rdr-hselo):not(.ligar):not(.repasse):not([title="Atendente responsável"]) { flex: 0 1 auto; min-width: 34px; }
+.v2 .wa-ctopo .sb > .wa-hchip:not(.rdr-hselo):not(.ligar):not(.repasse):not([title="Atendente responsável"]) { flex: 0 1 auto; min-width: 64px; }
 /* (o responsável — nome curto — fica fora da regra acima: inteiro; quem encolhe é o número de resposta) */
+/* 3ª linha do cabeçalho (dono 30/10: "não pode ficar cortado assim"): avisos da Central, Ligar,
+   repasse e etiquetas, sempre inteiros (quebram em mais linhas se precisar). Sem nenhum, a linha
+   não ocupa espaço (o leitor de tela do "próximo aguardando" é invisível). */
+.v2 .wa-ctopo .sb.sb-selos { flex-wrap: wrap; overflow: visible; row-gap: 4px; }
+.v2 .wa-ctopo .sb.sb-selos > * { flex: 0 0 auto; max-width: 100%; }
+html:root .v2 .wa-ctopo .sb.sb-selos,
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-ctopo .sb.sb-selos { margin-top: 0; }
+html:root .v2 .wa-ctopo .sb.sb-selos:has(> :not(.wa-rdr-sr)),
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-ctopo .sb.sb-selos:has(> :not(.wa-rdr-sr)) { margin-top: 5px; }
+/* o visual do inbox limita todo chip a 170 px — na 3ª linha o aviso usa a largura toda, texto inteiro */
+html:root .v2 .wa-ctopo .sb.sb-selos > .wa-hchip,
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-ctopo .sb.sb-selos > .wa-hchip { max-width: 100%; }
