@@ -26,7 +26,7 @@ const dbConv = (real: DbMsg[], ult: DbMsg[]): DbConv => ({
   id: 'c1', status: 'aberta', status_id: null, nao_lidas: 0, ultima_interacao_em: T1, criado_em: '2026-10-20T13:00:00.000Z',
   precisa_humano: false, precisa_humano_motivo: null, precisa_humano_em: null, atendente_id: null, etiquetas: [],
   ultimo_canal_id: 'c-a', ultimo_numero: '5551', ultimo_provider: 'evolution', ultima_msg_canal_em: T1,
-  arquivada_em: null, fixada_em: null, silenciada_ate: null, ultima_lida_em: null,
+  arquivada_em: null, fixada_em: null, silenciada_ate: null,
   contatos: { id: 'k1', nome: 'Maria', telefone: '5551999990000', email: null, etiquetas: null, origem: null, observacoes: null, responsavel_id: null, contato_identidades: [{ tipo: 'whatsapp' }] },
   canais: { id: 'c-a', nome_interno: 'ANDRIUS' },
   real, ult,

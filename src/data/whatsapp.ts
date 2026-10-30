@@ -117,25 +117,34 @@ export interface DbConv {
   atendente_id: string | null;
   etiquetas: string[] | null;
   ultimo_canal_id: string | null; ultimo_numero: string | null; ultimo_provider: string | null; ultima_msg_canal_em: string | null;
-  arquivada_em: string | null; fixada_em: string | null; silenciada_ate: string | null; ultima_lida_em: string | null;
+  arquivada_em: string | null; fixada_em: string | null; silenciada_ate: string | null;
   contatos: { id: string; nome: string; telefone: string | null; email: string | null; etiquetas: string[] | null; origem: string | null; observacoes: string | null; responsavel_id: string | null; contato_identidades: { tipo: string }[] | null } | null;
   canais: { id: string; nome_interno: string | null } | null;
   /** Embed `real` (SELECT_CONVERSAS): a ÚLTIMA mensagem real (fora sistema/nota_interna), LIMIT 1. */
   real?: DbMsg[] | null;
-  /** Embed `ult`: a ÚLTIMA mensagem de qualquer tipo, LIMIT 1 (cobre conversa sem mensagem real e a 1ª pintura). */
+  /** A ÚLTIMA mensagem de qualquer tipo (cobre conversa sem mensagem real e a 1ª pintura). O banco
+   *  manda só o id (embed `ult`); a linha inteira vem de completarUltimas, e só quando NÃO é a real. */
   ult?: DbMsg[] | null;
   /** Formato ANTIGO (até 20/10): as 10 últimas por criado_em. Não vem mais do banco; o mapConversa
    *  ainda aceita para o teste de equivalência (10 msgs × real+ult) em whatsapp.lista.test.ts. */
   mensagens?: DbMsg[] | null;
 }
+/** Linha da lista como o PostgREST devolve: o embed `ult` traz só o id (ver SELECT_CONVERSAS).
+ *  Passa por completarUltimas antes do mapConversa. */
+export type DbConvBruta = Omit<DbConv, 'ult'> & { ult?: { id: string }[] | null };
 
 function tsOf(m: DbMsg): number {
   return new Date(m.enviada_em || m.recebida_em || m.criado_em || 0).getTime();
 }
 
-/** Colunas de mensagem da lista — as MESMAS do histórico (useWaMensagens), para a bolha da 1ª
- *  pintura sair idêntica à do histórico (mapMensagens precisa do metadados: mídia sem legenda). */
-const COLS_MSG_LISTA = 'id, direcao, conteudo, tipo, enviada_em, recebida_em, criado_em, origem, status, erro_envio, id_externo, respondida_a_id, metadados';
+/** Colunas de mensagem do histórico da conversa aberta (useWaMensagens). */
+const COLS_MSG_HISTORICO = 'id, direcao, conteudo, tipo, enviada_em, recebida_em, criado_em, origem, status, erro_envio, id_externo, respondida_a_id, metadados';
+/** Colunas de mensagem da LISTA: as do histórico menos id_externo e respondida_a_id. Os dois só
+ *  servem para responder citando (idExterno) — vêm com o histórico ao abrir a conversa (ver
+ *  idExtDaResposta). São texto aleatório que não comprime: ~7% dos bytes da lista (medido 30/10).
+ *  O metadados fica: a bolha da 1ª pintura (mídia sem legenda, duração do áudio, citação) sai
+ *  igual à do histórico. */
+const COLS_MSG_LISTA = 'id, direcao, conteudo, tipo, enviada_em, recebida_em, criado_em, origem, status, erro_envio, metadados';
 
 /** SELECT da lista do inbox — FONTE ÚNICA: a carga completa (useWaConversations) e qualquer busca
  *  pontual de conversas da lista (busca-alvo do realtime, deep-link) TÊM de usar este select junto
@@ -149,8 +158,9 @@ const COLS_MSG_LISTA = 'id, direcao, conteudo, tipo, enviada_em, recebida_em, cr
  *     `aguardando`/`aguardandoDesde` e lastAtMs. Vem direto, sem depender de quantas notas
  *     internas vieram depois (com as 10 de antes, uma rajada de 10+ notas escondia a entrada).
  *   - `ult`: a última de QUALQUER tipo — fallback de preview para conversa só com sistema/nota e
- *     a bolha da 1ª pintura. Na maioria das conversas é a mesma linha da `real` (mapConversa
- *     deduplica por id).
+ *     a bolha da 1ª pintura. SÓ O ID (30/10): em 97% das conversas é a mesma linha da `real`
+ *     (7.688 de 7.947 na CAF), e mandá-la inteira de novo era ~25% dos bytes da lista. Quando o
+ *     id difere, completarUltimas busca a linha pelo id (~3%, uma consulta por PK no fim).
  *  Ordem por enviada_em desc (NOT NULL; índice idx_mensagens_conversa (conversa_id, enviada_em
  *  DESC)) e não criado_em: é o mesmo relógio do tsOf/mapMensagens, então a "última" é a mesma
  *  que a tela ordena. Por criado_em, áudio enviado pelo celular (criado depois de baixar a mídia)
@@ -158,9 +168,14 @@ const COLS_MSG_LISTA = 'id, direcao, conteudo, tipo, enviada_em, recebida_em, cr
  *  Histórico completo vem de useWaMensagens sob demanda. Até 20/10 eram as 10 últimas por
  *  conversa (~37 MB por carga completa; agora ~14 MB e metade do tempo de banco). A "aba
  *  Prioridade" que justificava as 10 (olhava saída recente) não existe mais — inboxGroups.classificar
- *  só é usado pelo teste — e as "últimas 4" do Pós-venda vêm de useWaMensagens da selecionada. */
-export const SELECT_CONVERSAS = 'id, status, status_id, nao_lidas, ultima_interacao_em, criado_em, precisa_humano, precisa_humano_motivo, precisa_humano_em, atendente_id, etiquetas, ultimo_canal_id, ultimo_numero, ultimo_provider, ultima_msg_canal_em, arquivada_em, fixada_em, silenciada_ate, ultima_lida_em, contatos!inner(id, nome, telefone, email, etiquetas, origem, observacoes, responsavel_id, contato_identidades(tipo)), canais!conversas_canal_id_fkey!inner(id, nome_interno, tipo), '
-  + `real:mensagens(${COLS_MSG_LISTA}), ult:mensagens(${COLS_MSG_LISTA})`;
+ *  só é usado pelo teste — e as "últimas 4" do Pós-venda vêm de useWaMensagens da selecionada.
+ *  LISTA LEVE (30/10, dono: "demora quando entra no WhatsApp"): medido com a sessão logada, o
+ *  tempo de cada página acompanha os BYTES (a conexão é o gargalo, não o banco). Saíram o `ult`
+ *  inteiro (fica o id), id_externo/respondida_a_id (COLS_MSG_LISTA) e ultima_lida_em (nenhum
+ *  uso no front). Página de 518 conversas: 1.093 → ~760 KB, 138 → ~117 KB comprimidos. O que a
+ *  lista mostra não muda. */
+export const SELECT_CONVERSAS = 'id, status, status_id, nao_lidas, ultima_interacao_em, criado_em, precisa_humano, precisa_humano_motivo, precisa_humano_em, atendente_id, etiquetas, ultimo_canal_id, ultimo_numero, ultimo_provider, ultima_msg_canal_em, arquivada_em, fixada_em, silenciada_ate, contatos!inner(id, nome, telefone, email, etiquetas, origem, observacoes, responsavel_id, contato_identidades(tipo)), canais!conversas_canal_id_fkey!inner(id, nome_interno, tipo), '
+  + `real:mensagens(${COLS_MSG_LISTA}), ult:mensagens(id)`;
 
 /** Consulta da lista com SELECT_CONVERSAS + os filtros/ordem/limite dos embeds (`real`, `ult`) e do
  *  canal. O chamador acrescenta só o recorte: keyset (`.order('id').limit().lt()`) na carga
@@ -184,6 +199,48 @@ export function consultaListaConversas(orgId: string) {
     .limit(1, { referencedTable: 'real' })
     .order('enviada_em', { referencedTable: 'ult', ascending: false })
     .limit(1, { referencedTable: 'ult' });
+}
+
+/** Ids das `ult` que NÃO são a `real` da mesma conversa (sistema/nota mais nova que a última
+ *  real, ou conversa sem mensagem real) — só essas precisam da linha inteira. */
+export function idsUltimasFaltando(linhas: DbConvBruta[]): string[] {
+  const ids: string[] = [];
+  for (const l of linhas) {
+    const u = l.ult?.[0]?.id;
+    if (u && u !== l.real?.[0]?.id) ids.push(u);
+  }
+  return ids;
+}
+
+/** Troca o `ult` só-id pela linha inteira — o formato que o mapConversa sempre recebeu. `ult`
+ *  igual à `real` vira [] (o mapConversa deduplica por id: sai a mesma lista de mensagens);
+ *  linha que não voltou (apagada entre as duas leituras) também. */
+export function juntarUltimas(linhas: DbConvBruta[], porId: Map<string, DbMsg>): DbConv[] {
+  return linhas.map((l) => {
+    const u = l.ult?.[0]?.id;
+    const m = u && u !== l.real?.[0]?.id ? porId.get(u) : undefined;
+    return { ...l, ult: m ? [m] : [] };
+  });
+}
+
+const LOTE_ULTIMAS = 100;   // ids por consulta: a URL fica longe do teto (~4 KB de filtro)
+/** Completa as linhas da lista (carga completa e busca-alvo): busca pelo id (PK), em lotes
+ *  paralelos, as `ult` que não são a `real`. ESTRITA como as páginas: erro ou aborto lança. */
+export async function completarUltimas(orgId: string, linhas: DbConvBruta[], signal?: AbortSignal | null): Promise<DbConv[]> {
+  const ids = idsUltimasFaltando(linhas);
+  const porId = new Map<string, DbMsg>();
+  const lotes: string[][] = [];
+  for (let i = 0; i < ids.length; i += LOTE_ULTIMAS) lotes.push(ids.slice(i, i + LOTE_ULTIMAS));
+  await Promise.all(lotes.map(async (lote) => {
+    lancarSeAbortado(signal);
+    let q = supabase!.from('mensagens').select(COLS_MSG_LISTA).eq('organizacao_id', orgId).in('id', lote);
+    if (signal) q = q.abortSignal(signal);
+    const { data, error } = await q;
+    lancarSeAbortado(signal);
+    if (error) throw new Error(error.message);
+    for (const m of (data as unknown as DbMsg[]) ?? []) porId.set(m.id, m);
+  }));
+  return juntarUltimas(linhas, porId);
 }
 
 /** Mensagens que vieram com a conversa. Formato atual: `real` + `ult` (no máximo 2, sem repetir id).
@@ -444,7 +501,7 @@ async function iaDasConversas(orgId: string, conversaIds: string[], signal?: Abo
 }
 
 export async function buscarConversasAlvo(orgId: string, alvos: LoteAlvos, signal?: AbortSignal | null): Promise<WaContact[]> {
-  const porId = new Map<string, DbConv>();
+  const porId = new Map<string, DbConvBruta>();
   const pedir = async (col: 'id' | 'contato_id', vals: string[]) => {
     for (let i = 0; i < vals.length; i += LOTE_ALVO) {
       lancarSeAbortado(signal);
@@ -453,7 +510,7 @@ export async function buscarConversasAlvo(orgId: string, alvos: LoteAlvos, signa
       const { data, error } = await q;
       lancarSeAbortado(signal);
       if (error) throw new Error(error.message);
-      const rows = (data as unknown as DbConv[]) ?? [];
+      const rows = (data as unknown as DbConvBruta[]) ?? [];
       // sem limit explícito o PostgREST corta em 1000 (db-max-rows): lote cheio = pode ter faltado linha
       if (rows.length >= 1000) throw new Error('Busca pontual atingiu o teto do PostgREST.');
       for (const c of rows) if (c?.id) porId.set(c.id, c);
@@ -461,12 +518,13 @@ export async function buscarConversasAlvo(orgId: string, alvos: LoteAlvos, signa
   };
   await pedir('id', alvos.ids);
   await pedir('contato_id', alvos.contatoIds);
-  const linhas = [...porId.values()];
-  if (!linhas.length) return [];
-  const contatos = [...new Set(linhas.map((c) => c.contatos?.id).filter((x): x is string => !!x))];
-  const [etapas, ia] = await Promise.all([
+  const brutas = [...porId.values()];
+  if (!brutas.length) return [];
+  const contatos = [...new Set(brutas.map((c) => c.contatos?.id).filter((x): x is string => !!x))];
+  const [linhas, etapas, ia] = await Promise.all([
+    completarUltimas(orgId, brutas, signal),
     etapasDosContatos(orgId, contatos, signal),
-    iaDasConversas(orgId, linhas.map((c) => c.id), signal),
+    iaDasConversas(orgId, brutas.map((c) => c.id), signal),
   ]);
   lancarSeAbortado(signal);
   return linhas.map((l) => {
@@ -690,7 +748,7 @@ export function useWaConversations() {
         // pesar no banco no pico (a query mais pesada do sistema — ver o comentário do refetch).
         const primeira = qc.getQueryData(['wa-conversas', orgId]) === undefined;
         if (primeira) publicarProgresso(PROGRESSO_WA, { feitas: 0, total: 16, itens: 0 });
-        const linhas = await buscarKeysetEmFaixas<DbConv>(
+        const brutas = await buscarKeysetEmFaixas<DbConvBruta>(
           (faixa, cursor, tam, sig) => {
             let q = consultaListaConversas(orgId)
               .order('id', { ascending: false })
@@ -699,17 +757,21 @@ export function useWaConversations() {
             if (faixa.ate) q = q.lt('id', faixa.ate);
             if (cursor) q = q.lt('id', cursor);
             if (sig) q = q.abortSignal(sig);
-            return q.then((r) => ({ data: (r.data as unknown as DbConv[]) ?? null, error: r.error }));
+            return q.then((r) => ({ data: (r.data as unknown as DbConvBruta[]) ?? null, error: r.error }));
           },
-          (c) => (c as unknown as { id: string }).id,
+          (c) => c.id,
           {
             rotulo: 'conversas', signal, simultaneas: primeira ? 6 : 2,
             aoAvancar: primeira ? (feitas, total, itens) => publicarProgresso(PROGRESSO_WA, { feitas, total, itens }) : undefined,
           },
         );
         // Etapa do Kanban por contato + IA por conversa. Best-effort, em PARALELO com o fetch principal.
-        const etapas = await etapasPromise;
-        const iaEstados = await iaPromise;   // etapa por CONTATO; IA por CONVERSA
+        // A `ult` que não é a `real` (~3%) vem pelo id enquanto os satélites ainda chegam.
+        const [linhas, etapas, iaEstados] = await Promise.all([
+          completarUltimas(orgId, brutas, signal),
+          etapasPromise,
+          iaPromise,   // etapa por CONTATO; IA por CONVERSA
+        ]);
         lancarSeAbortado(signal);
         const carga = linhas.map((l) => {
           const c = mapConversa(l);
@@ -818,10 +880,10 @@ export function useWaConversations() {
 
 /** Histórico COMPLETO da conversa ABERTA, sob demanda.
  *  A lista traz só a última mensagem de cada conversa (embeds `real` + `ult`, payload leve); o histórico
- *  integral — que é o que o atendente lê — vem por aqui, de UMA conversa só. Usa exatamente as
- *  mesmas colunas e o mesmo mapeamento (mapMensagens) da lista, então a bolha não muda de forma:
- *  mídia (anexo/pendente), status/erro para "Ver erro" e retry, id_externo/respondida_a_id/quoted
- *  para a resposta citada e tsISO para o separador de dia continuam todos presentes. */
+ *  integral — que é o que o atendente lê — vem por aqui, de UMA conversa só. Usa o mesmo
+ *  mapeamento (mapMensagens) e as colunas da lista MAIS id_externo/respondida_a_id (só daqui:
+ *  responder citando), então a bolha não muda de forma: mídia (anexo/pendente), status/erro para
+ *  "Ver erro" e retry, quoted e tsISO para o separador de dia continuam todos presentes. */
 export function useWaMensagens(conversaId: string | null | undefined) {
   const { currentOrg } = useOrg();
   const orgId = currentOrg.id;
@@ -838,7 +900,7 @@ export function useWaMensagens(conversaId: string | null | undefined) {
     queryFn: async (): Promise<WaMessage[]> => {
       const { data, error } = await supabase!
         .from('mensagens')
-        .select(COLS_MSG_LISTA)
+        .select(COLS_MSG_HISTORICO)
         .eq('conversa_id', conversaId!)
         .eq('organizacao_id', orgId) // Fase 2.0: escopo explícito — RLS vira cinto
         .order('criado_em', { ascending: true });

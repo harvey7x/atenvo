@@ -37,7 +37,9 @@ describe('consultaListaConversas → URL do PostgREST', () => {
     expect(p.get('id')).toBe('lt.zzz');
     const select = p.get('select') ?? '';
     expect(select).toContain('real:mensagens(');
-    expect(select).toContain('ult:mensagens(');
+    expect(select).toContain('ult:mensagens(id)');      // lista leve: a `ult` só diz QUAL é
+    expect(select).not.toContain('id_externo');
+    expect(select).not.toContain('ultima_lida_em');
   });
 
   it('busca pontual (ids) usa o MESMO select e os mesmos embeds', async () => {

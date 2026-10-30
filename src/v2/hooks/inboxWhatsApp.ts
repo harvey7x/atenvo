@@ -156,6 +156,13 @@ export function patchBolha(contacts: WaContact[], conversaId: string, cid: strin
     : c));
 }
 
+/** id_externo da mensagem citada ao responder. A lista não traz id_externo (lista leve, 30/10):
+ *  a bolha da 1ª pintura, respondida antes do histórico chegar, fica sem idExt — no envio o
+ *  histórico já chegou, e o id sai dele. Sem idExt o WhatsApp recebe a resposta sem a citação. */
+export function idExtDaResposta(r: { id: string; idExt?: string }, historico: readonly WaMessage[] | null | undefined): string | undefined {
+  return r.idExt || (r.id ? historico?.find((m) => m.id === r.id)?.idExterno : undefined) || undefined;
+}
+
 /** Canal de resposta automático (v1 L394-408): último canal recebido → canal
  *  de origem → vazio. Inclui canais desconectados (o aviso trata depois). */
 export function canalAutomatico(

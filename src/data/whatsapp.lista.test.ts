@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { mapConversa, SELECT_CONVERSAS, type DbConv, type DbMsg } from './whatsapp';
+import { idsUltimasFaltando, juntarUltimas, mapConversa, SELECT_CONVERSAS, type DbConv, type DbConvBruta, type DbMsg } from './whatsapp';
+import type { WaContact } from './whatsappDemo';
 
 /* Lista do inbox com só a última mensagem real (embed `real`) + a última de qualquer tipo
    (embed `ult`) em vez das 10 últimas. Regra-mãe: os derivados do card — preview (`last`),
@@ -50,7 +51,7 @@ function conv(hist: DbMsg[], extra: Partial<DbConv> = {}): Omit<DbConv, 'mensage
     precisa_humano: false, precisa_humano_motivo: null, precisa_humano_em: null,
     atendente_id: null, etiquetas: null,
     ultimo_canal_id: null, ultimo_numero: null, ultimo_provider: null, ultima_msg_canal_em: null,
-    arquivada_em: null, fixada_em: null, silenciada_ate: null, ultima_lida_em: null,
+    arquivada_em: null, fixada_em: null, silenciada_ate: null,
     contatos: { id: 'k1', nome: 'Maria', telefone: '5551999999999', email: null, etiquetas: null, origem: null, observacoes: null, responsavel_id: null, contato_identidades: [{ tipo: 'whatsapp' }] },
     canais: { id: 'ch1', nome_interno: 'ANDRIUS' },
     ...extra,
@@ -234,11 +235,77 @@ describe('SELECT_CONVERSAS (fonte única da lista)', () => {
     expect(SELECT_CONVERSAS).toContain('ult:mensagens(');
     expect(SELECT_CONVERSAS).not.toMatch(/(^|[ ,])mensagens\(/);
   });
-  it('as mensagens da lista trazem metadados (mídia sem legenda) e as mesmas colunas do histórico', () => {
-    const cols = SELECT_CONVERSAS.match(/real:mensagens\(([^)]*)\)/)![1];
-    expect(SELECT_CONVERSAS.match(/ult:mensagens\(([^)]*)\)/)![1]).toBe(cols);
-    for (const c of ['id', 'direcao', 'conteudo', 'tipo', 'enviada_em', 'recebida_em', 'criado_em', 'origem', 'status', 'erro_envio', 'id_externo', 'respondida_a_id', 'metadados']) {
-      expect(cols.split(', ')).toContain(c);
+  it('lista leve: a `real` traz o que o card e a bolha usam (metadados inclusive), sem id_externo/respondida_a_id', () => {
+    const cols = SELECT_CONVERSAS.match(/real:mensagens\(([^)]*)\)/)![1].split(', ');
+    for (const c of ['id', 'direcao', 'conteudo', 'tipo', 'enviada_em', 'recebida_em', 'criado_em', 'origem', 'status', 'erro_envio', 'metadados']) {
+      expect(cols).toContain(c);
     }
+    expect(cols).not.toContain('id_externo');
+    expect(cols).not.toContain('respondida_a_id');
+  });
+  it('lista leve: a `ult` vem só com o id; ultima_lida_em saiu (nenhum uso no front)', () => {
+    expect(SELECT_CONVERSAS.match(/ult:mensagens\(([^)]*)\)/)![1]).toBe('id');
+    expect(SELECT_CONVERSAS).not.toContain('ultima_lida_em');
+  });
+});
+
+/* LISTA LEVE (30/10): o banco manda a `real` sem id_externo/respondida_a_id e a `ult` só com o id;
+   completarUltimas busca pelo id a `ult` que difere da `real`. Regra-mãe: o card sai IGUAL ao da
+   lista cheia — todos os campos, inclusive as bolhas da 1ª pintura, menos os dois ids de resposta
+   (que vêm com o histórico ao abrir a conversa). */
+describe('lista leve: ult só id + completar × real+ult inteiras', () => {
+  const comIdsResposta = (m: DbMsg): DbMsg => ({ ...m, id_externo: 'wamid.' + m.id, respondida_a_id: 'r-' + m.id });
+  const semIdsResposta = ({ id_externo: _e, respondida_a_id: _r, ...m }: DbMsg): DbMsg => m;
+  const cheia = (hist: DbMsg[], extra: Partial<DbConv> = {}): DbConv => ({ ...conv(hist, extra), real: real(hist), ult: ult(hist) });
+  const bruta = (hist: DbMsg[], extra: Partial<DbConv> = {}): DbConvBruta => ({
+    ...conv(hist, extra), real: real(hist).map(semIdsResposta), ult: ult(hist).map((m) => ({ id: m.id })),
+  });
+  /** o que completarUltimas faz, sem a rede: a linha da `ult` vem do banco (sem os ids de resposta) */
+  const leve = (hist: DbMsg[], extra: Partial<DbConv> = {}): DbConv => {
+    const b = bruta(hist, extra);
+    const banco = new Map(hist.map((m) => [m.id, semIdsResposta(m)]));
+    const porId = new Map(idsUltimasFaltando([b]).map((id) => [id, banco.get(id)!]));
+    return juntarUltimas([b], porId)[0];
+  };
+  const semIdsNaBolha = (w: WaContact) => ({ ...w, msgs: w.msgs.map(({ idExterno: _e, respondidaAId: _r, ...m }) => m) });
+
+  const casos: Record<string, { hist: DbMsg[]; extra?: Partial<DbConv> }> = {
+    'entrada simples (real = ult)': { hist: [msg({ seg: 0, direcao: 'saida', conteudo: 'Olá' }), msg({ seg: 10, direcao: 'entrada', conteudo: 'Quero revisar' })] },
+    'nota interna depois da entrada (ult ≠ real)': { hist: [msg({ seg: 0, direcao: 'entrada', conteudo: 'Oi' }), msg({ seg: 10, direcao: 'saida', tipo: 'nota_interna', conteudo: 'ligar amanhã' })] },
+    'só mensagens de sistema (sem real)': { hist: [msg({ seg: 0, direcao: 'saida', tipo: 'sistema', conteudo: 'Conversa iniciada pelo anúncio' }), msg({ seg: 5, direcao: 'saida', tipo: 'sistema', conteudo: 'Atribuída a Luiza' })] },
+    'imagem sem legenda + sistema depois': { hist: [msg({ seg: 0, direcao: 'saida', conteudo: 'Manda a foto' }), msg({ seg: 30, direcao: 'entrada', tipo: 'imagem', conteudo: null, metadados: { anexo_path: 'org/c1/img.jpg', mime: 'image/jpeg' } }), msg({ seg: 40, direcao: 'saida', tipo: 'sistema', conteudo: 'IA pausada' })] },
+    'áudio do celular (criado depois, enviado antes) + texto': { hist: [msg({ seg: 0, direcao: 'entrada', conteudo: 'Como fica?' }), msg({ seg: 5, envSeg: 2, direcao: 'saida', tipo: 'audio', conteudo: null, origem: 'telefone', metadados: { anexo_path: 'org/c1/x.ogg', seconds: 30, ptt: true } }), msg({ seg: 4, envSeg: 4, direcao: 'saida', conteudo: 'Te expliquei no áudio' })] },
+    'citação na última real': { hist: [msg({ seg: 0, direcao: 'saida', conteudo: 'Qual o banco?' }), msg({ seg: 9, direcao: 'entrada', conteudo: 'BMG', metadados: { quoted: { remetente: 'Você', tipo: 'texto', texto: 'Qual o banco?' } } })] },
+    'sem ultima_interacao_em (time sai da bolha)': { hist: [msg({ seg: 0, direcao: 'saida', conteudo: 'Olá' }), msg({ seg: 70, direcao: 'entrada', conteudo: 'Oi' }), msg({ seg: 90, direcao: 'saida', tipo: 'sistema', conteudo: 'IA pausada' })], extra: { ultima_interacao_em: null } },
+    'sem nenhuma mensagem': { hist: [], extra: { ultima_interacao_em: null } },
+    'resolvida com entrada': { hist: [msg({ seg: 0, direcao: 'saida', conteudo: 'Obrigado!' }), msg({ seg: 60, direcao: 'entrada', conteudo: 'valeu' })], extra: { status: 'resolvida' } },
+  };
+  for (const [nome, { hist: h0, extra }] of Object.entries(casos)) {
+    it(nome, () => {
+      const hist = h0.map(comIdsResposta);
+      const antes = mapConversa(cheia(hist, extra));
+      const depois = mapConversa(leve(hist, extra));
+      expect(semIdsNaBolha(depois)).toEqual(semIdsNaBolha(antes));
+      // a única diferença: os ids de resposta, que só a lista cheia trazia
+      expect(depois.msgs.every((m) => m.idExterno === undefined && m.respondidaAId === undefined)).toBe(true);
+    });
+  }
+
+  it('só pede ao banco a `ult` que não é a `real` (o caso comum não custa consulta)', () => {
+    const igual = bruta([msg({ id: 'a', seg: 0 }), msg({ id: 'b', seg: 10 })]);
+    const nota = bruta([msg({ id: 'c', seg: 0 }), msg({ id: 'd', seg: 10, tipo: 'nota_interna' })]);
+    const soSistema = bruta([msg({ id: 'e', seg: 0, tipo: 'sistema' })]);
+    const vazia = bruta([]);
+    expect(idsUltimasFaltando([igual, nota, soSistema, vazia])).toEqual(['d', 'e']);
+  });
+
+  it('a `ult` que sumiu entre as leituras (apagada) cai fora; a `real` segue no card', () => {
+    const b = bruta([msg({ id: 'r', seg: 0, direcao: 'entrada', conteudo: 'oi' }), msg({ id: 'n', seg: 10, tipo: 'nota_interna', conteudo: 'x' })]);
+    const [c] = juntarUltimas([b], new Map());
+    expect(c.ult).toEqual([]);
+    const w = mapConversa(c);
+    expect(w.msgs.map((m) => m.id)).toEqual(['r']);
+    expect(w.last).toBe('oi');
+    expect(w.aguardando).toBe(true);
   });
 });

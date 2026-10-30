@@ -3,7 +3,7 @@ import type { WaContact, WaMessage } from '@/data/whatsappDemo';
 import { mapConversa, type DbConv, type DbMsg } from '@/data/whatsapp';
 import {
   aplicarEnvioOtimista, aplicarFalha, aplicarRetry, bolhaCoberta, canalAutomatico, conversaAtual, deepLinkDeveSelecionar, hidratarHistorico,
-  assinaturaAtendente, marcarIdReal, mesclarPendentes, montarCorpoAssinado, novoCid, patchBolha, reconciliarLista,
+  assinaturaAtendente, idExtDaResposta, marcarIdReal, mesclarPendentes, montarCorpoAssinado, novoCid, patchBolha, reconciliarLista,
   removerMensagemLocal, selecaoDescasada, selecaoValida,
 } from './inboxWhatsApp';
 
@@ -195,7 +195,7 @@ describe('máquina do inbox — lista enxuta × bolhas otimistas fora da convers
     id, status: 'aberta', status_id: null, nao_lidas: 1, ultima_interacao_em: ultimaEm, criado_em: isoS(-9999),
     precisa_humano: false, precisa_humano_motivo: null, precisa_humano_em: null, atendente_id: null, etiquetas: null,
     ultimo_canal_id: null, ultimo_numero: null, ultimo_provider: null, ultima_msg_canal_em: null,
-    arquivada_em: null, fixada_em: null, silenciada_ate: null, ultima_lida_em: null,
+    arquivada_em: null, fixada_em: null, silenciada_ate: null,
     contatos: { id: 'k-' + id, nome: 'Maria', telefone: '5551999999999', email: null, etiquetas: null, origem: null, observacoes: null, responsavel_id: null, contato_identidades: [{ tipo: 'whatsapp' }] },
     canais: { id: 'ch1', nome_interno: 'ANDRIUS' },
     ...emb,
@@ -282,5 +282,23 @@ describe('seleção fora da lista (deep-link durante a busca-alvo dela)', () => 
     expect(deepLinkDeveSelecionar('X', 'X')).toBe(false);           // sem ping-pong
     expect(deepLinkDeveSelecionar('W', 'X')).toBe(true);
     expect(deepLinkDeveSelecionar(undefined, null)).toBe(false);
+  });
+});
+
+describe('responder citando com a lista leve (sem id_externo na 1ª pintura)', () => {
+  const hist: WaMessage[] = [
+    { id: 'm1', dir: 'in', text: 'oi', time: '10:00', idExterno: 'wamid.AAA' },
+    { id: 'm2', dir: 'out', text: 'olá', time: '10:01' },
+  ];
+  it('o idExt que veio na bolha vence', () => {
+    expect(idExtDaResposta({ id: 'm1', idExt: 'wamid.BBB' }, hist)).toBe('wamid.BBB');
+  });
+  it('bolha da lista (sem idExt): sai do histórico já carregado', () => {
+    expect(idExtDaResposta({ id: 'm1' }, hist)).toBe('wamid.AAA');
+  });
+  it('sem histórico, sem a mensagem nele ou sem id: undefined (vai sem citação, como antes)', () => {
+    expect(idExtDaResposta({ id: 'm1' }, undefined)).toBeUndefined();
+    expect(idExtDaResposta({ id: 'm2' }, hist)).toBeUndefined();
+    expect(idExtDaResposta({ id: '' }, [{ id: '', dir: 'in', text: '', time: '', idExterno: 'x' }])).toBeUndefined();
   });
 });

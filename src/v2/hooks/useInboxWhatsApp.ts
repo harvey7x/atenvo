@@ -17,7 +17,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useOrg } from '@/context/OrgContext';
 import { useVisibilidade } from '@/lib/visibilidade';
 import {
-  aplicarEnvioOtimista, aplicarFalha, aplicarRetry, canalAutomatico, conversaAtual, hidratarHistorico, marcarIdReal,
+  aplicarEnvioOtimista, aplicarFalha, aplicarRetry, canalAutomatico, conversaAtual, hidratarHistorico, idExtDaResposta, marcarIdReal,
   montarCorpoAssinado, novoCid, patchBolha, patchConversa, reconciliarLista, removerMensagemLocal, selecaoDescasada, selecaoValida,
 } from './inboxWhatsApp';
 import { previewUltimaMensagem } from '@/lib/conversaEtiquetas';
@@ -302,6 +302,7 @@ export function useInboxWhatsApp(opts: {
 
   /* ---------- reply (quoted) ---------- */
   const [replyTo, setReplyTo] = useState<ReplyTo | null>(null);
+  const replyPayload = () => (replyTo ? { id: replyTo.id, idExt: idExtDaResposta(replyTo, historicoRef.current), fromMe: replyTo.fromMe, preview: { remetente: replyTo.remetente, tipo: replyTo.tipo, texto: replyTo.texto } } : undefined);
 
   /* ---------- envio (v1 L669-743) ---------- */
   // Anti-duplo-clique por TEMPO, não por "requisição em voo": a trava antiga só soltava no
@@ -330,7 +331,7 @@ export function useInboxWhatsApp(opts: {
     const corpo = montarCorpoAssinado(v, assinaturaNome);
     const cid = novoCid(now.getTime());
     ultimoEnvioRef.current = { chave: chaveEnvio, em: now.getTime() };
-    const replyEnvio = replyTo ? { id: replyTo.id, idExt: replyTo.idExt, fromMe: replyTo.fromMe, preview: { remetente: replyTo.remetente, tipo: replyTo.tipo, texto: replyTo.texto } } : undefined;
+    const replyEnvio = replyPayload();
     const quotedBolha = replyTo ? { remetente: replyTo.remetente, tipo: replyTo.tipo, texto: replyTo.texto } : undefined;
     setContacts((cur) => aplicarEnvioOtimista(cur, currentId, { dir: 'out', text: corpo, time: hh, tsISO: now.toISOString(), status: 'pendente', cid, quoted: quotedBolha }, v));
     aoAceitar();                                               // limpa o draft na página
@@ -393,7 +394,6 @@ export function useInboxWhatsApp(opts: {
     // v1: motivo do bloqueio decide o texto (não o estado do dono)
     throw new Error(higiene.motivoBloqueio === 'dono' ? 'Assuma o atendimento para responder.' : 'Preencha o nome completo do cliente para responder.');
   };
-  const replyPayload = () => (replyTo ? { id: replyTo.id, idExt: replyTo.idExt, fromMe: replyTo.fromMe, preview: { remetente: replyTo.remetente, tipo: replyTo.tipo, texto: replyTo.texto } } : undefined);
   const dispararMidia = useCallback((tipo: 'imagem' | 'video' | 'audio' | 'documento', file: File, caption: string, extra?: { audioDiag?: Record<string, unknown>; origemAudio?: string }) => {
     guardaMidia();
     const convAlvo = currentId;

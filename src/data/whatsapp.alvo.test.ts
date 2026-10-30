@@ -46,7 +46,7 @@ const conversaDb = (id: string, contato: string) => ({
   id, status: 'aberta', status_id: null, nao_lidas: 1, ultima_interacao_em: '2026-10-20T12:00:00Z', criado_em: '2026-10-20T11:00:00Z',
   precisa_humano: false, precisa_humano_motivo: null, precisa_humano_em: null, atendente_id: null, etiquetas: [],
   ultimo_canal_id: 'c1', ultimo_numero: '5551', ultimo_provider: 'evolution', ultima_msg_canal_em: null,
-  arquivada_em: null, fixada_em: null, silenciada_ate: null, ultima_lida_em: null,
+  arquivada_em: null, fixada_em: null, silenciada_ate: null,
   contatos: { id: contato, nome: 'Cliente ' + id, telefone: '5551999', email: null, etiquetas: null, origem: null, observacoes: null, responsavel_id: 'u1', contato_identidades: [{ tipo: 'whatsapp' }] },
   canais: { id: 'c1', nome_interno: 'ANDRIUS', tipo: 'whatsapp' },
   real: [{ id: 'm-' + id, direcao: 'entrada', conteudo: 'quero revisar', tipo: 'texto', enviada_em: '2026-10-20T12:00:00Z', recebida_em: '2026-10-20T12:00:00Z', criado_em: '2026-10-20T12:00:00Z', origem: null, status: 'recebida', erro_envio: null, metadados: {} }],
@@ -88,6 +88,32 @@ describe('buscarConversasAlvo', () => {
     expect(ia.searchParams.get('conversa_id')).toBe('in.(a)');
     expect(ia.searchParams.get('select')).toContain('desativado_manual:dados->desativado_manual');
     expect(ia.searchParams.get('select')).not.toMatch(/(^|,)dados(,|$)/);
+  });
+
+  it('lista leve: `ult` diferente da `real` vem inteira pelo id (só ela), em paralelo com os satélites', async () => {
+    const nota = { id: 'n-b', direcao: 'saida', conteudo: 'ligar amanhã', tipo: 'nota_interna', enviada_em: '2026-10-20T12:05:00Z', recebida_em: null, criado_em: '2026-10-20T12:05:00Z', origem: null, status: 'enviada', erro_envio: null, metadados: {} };
+    h.estado.respostas = {
+      conversas: (u) => inLista(u, 'id').map((id) => ({ ...conversaDb(id, 'k-' + id), ult: [{ id: id === 'b' ? 'n-b' : 'm-' + id }] })),
+      mensagens: (u) => (inLista(u, 'id').includes('n-b') ? [nota] : []),
+    };
+    const out = await buscarConversasAlvo('org-1', { ids: ['a', 'b'], contatoIds: [] });
+    const msgs = h.estado.chamadas.filter((u) => u.pathname.endsWith('/mensagens'));
+    expect(msgs).toHaveLength(1);
+    expect(inLista(msgs[0], 'id')).toEqual(['n-b']);
+    expect(msgs[0].searchParams.get('organizacao_id')).toBe('eq.org-1');
+    expect(msgs[0].searchParams.get('select')).not.toContain('id_externo');
+    const b = out.find((c) => c.id === 'b')!;
+    expect(b.msgs.map((m) => m.id)).toEqual(['m-b', 'n-b']);   // 1ª pintura: a real e a nota
+    expect(b.last).toBe('quero revisar');                       // preview segue a real
+    expect(out.find((c) => c.id === 'a')!.msgs.map((m) => m.id)).toEqual(['m-a']);
+  });
+
+  it('lista leve: erro ao completar a `ult` rejeita (estrita, como as páginas)', async () => {
+    h.estado.respostas = {
+      conversas: (u) => inLista(u, 'id').map((id) => ({ ...conversaDb(id, 'k-' + id), ult: [{ id: 'outra' }] })),
+      mensagens: () => ({ erro: 'permission denied' }),
+    };
+    await expect(buscarConversasAlvo('org-1', { ids: ['a'], contatoIds: [] })).rejects.toThrow();
   });
 
   it('recorte por contato e lotes de no máximo 100 ids', async () => {
