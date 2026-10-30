@@ -39,6 +39,9 @@ export function seedWa(): WaContact[] {
         // fotos "ruins" (escuras, tortas, amareladas) de documentos FICTÍCIOS — vitrine do visualizador com melhoria
         IN('', '14:38', { tsISO: iso(agora - 4 * min), id: 'wm-5', tipo: 'imagem', localUrl: '/demo-midia/conta-luz-ficticia.jpg', nome: 'conta-luz.jpg', mime: 'image/jpeg' }),
         IN('', '14:38', { tsISO: iso(agora - 4 * min), id: 'wm-6', tipo: 'imagem', localUrl: '/demo-midia/extrato-ficticio.jpg', nome: 'extrato.jpg', mime: 'image/jpeg' }),
+        // dados FICTÍCIOS — vitrine do "Identificar senha / e-mail" (o bot não capta senha; o atendente marca)
+        IN('Meu email é maria.aparecida.demo@gmail.com', '14:39', { tsISO: iso(agora - 3 * min), id: 'wm-7' }),
+        IN('A senha do meu INSS é Maria@2019', '14:39', { tsISO: iso(agora - 3 * min), id: 'wm-8' }),
       ],
     },
     {

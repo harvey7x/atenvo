@@ -709,3 +709,61 @@ html:root[data-tema="light"] .v2 .vidro-pro::after {
   html:root[data-visual]:not([data-tema="light"]) .v2 .vidro-pro.vidro-pro, html:root:not([data-tema="light"]) .v2 .vidro-pro { background: #17191D; }
   html:root[data-visual][data-tema="light"] .v2 .vidro-pro.vidro-pro, html:root[data-tema="light"] .v2 .vidro-pro { background: #FFFFFF; }
 }
+
+/* ============================================================
+   FICHA JUDICIAL em vidro com LEDs (dono 29/10: "meio transparentezinho com LEDs, mais profissional").
+   O cartão reusa o .vidro-pro (o mesmo vidro sóbrio aprovado no filtro/scripts — exceção consciente
+   ao Corporativo/Leve por ser overlay transitório). Os LEDs: fio de luz no topo, etapas
+   Importar → Revisar → Prévia com o LED aceso, e um LED nos selos dos campos. Brilho só no LED.
+   ============================================================ */
+/* só escurece: backdrop-filter aqui viraria a "raiz" do desfoque e o vidro do cartão deixaria de desfocar a página */
+.v2 .atv-modal-overlay:has(> .fj-modal) { background: rgba(10, 12, 16, .42); }
+html:root[data-tema="light"] .v2 .atv-modal-overlay:has(> .fj-modal) { background: rgba(22, 28, 40, .28); }
+.v2 .atv-modal.fj-modal { border-radius: 16px; overflow: hidden; }
+/* o .atv-modal::before (fio Platina) some: o vidro já traz o próprio fio */
+.v2 .atv-modal.fj-modal::before { display: none; }
+.v2 .fj-modal .atv-modal-head { position: static; padding: 18px 20px 14px; border-bottom: 1px solid rgba(var(--tint), .08); background: transparent; }
+.v2 .fj-modal .atv-modal-body { padding: 16px 20px; }
+.v2 .fj-modal .atv-modal-foot { padding: 12px 20px 14px; border-top: 1px solid rgba(var(--tint), .08); background: rgba(var(--tint), .02); }
+/* faixa de LED no topo do cartão */
+.v2 .fj-modal .fj-cab::before {
+  content: ""; position: absolute; top: 0; left: 28px; right: 28px; height: 2px; border-radius: 0 0 2px 2px; pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(var(--azul-rgb), .85) 22%, rgba(var(--azul-rgb), .95) 50%, rgba(var(--azul-rgb), .85) 78%, transparent);
+  box-shadow: 0 0 10px rgba(var(--azul-rgb), .45), 0 0 2px rgba(var(--azul-rgb), .6);
+}
+.v2 .fj-modal .fj-cab { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; font-size: 16px; font-weight: 650; letter-spacing: -.01em; }
+.v2 .fj-modal .fj-cab-tx { min-width: 0; }
+.v2 .fj-modal .fj-sub { font-size: 12px; font-weight: 400; letter-spacing: 0; color: var(--txt-3); }
+/* etapas com LED */
+.v2 .fj-passos { list-style: none; display: flex; align-items: center; gap: 14px; margin-top: 4px; flex-shrink: 0; }
+.v2 .fj-passos li { display: inline-flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 650; letter-spacing: .07em; text-transform: uppercase; color: var(--txt-3); }
+.v2 .fj-passos li + li::before { content: ""; width: 14px; height: 1px; margin-right: 8px; background: rgba(var(--tint), .16); }
+.v2 .fj-led { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; background: rgba(var(--tint), .2); box-shadow: inset 0 0 0 1px rgba(var(--tint), .12); }
+.v2 .fj-passos li.feito { color: var(--txt-2); }
+.v2 .fj-passos li.feito .fj-led { background: var(--verde); box-shadow: 0 0 6px rgba(var(--verde-rgb), .7); }
+.v2 .fj-passos li.atual { color: var(--txt); }
+.v2 .fj-passos li.atual .fj-led { background: var(--azul); box-shadow: 0 0 0 3px rgba(var(--azul-rgb), .16), 0 0 8px rgba(var(--azul-rgb), .75); }
+/* seções e campos no vidro */
+.v2 .fj-modal .fj-sec { display: flex; align-items: center; gap: 8px; font-size: 10.5px; letter-spacing: .08em; color: var(--txt-2); border-top-color: rgba(var(--tint), .08); }
+.v2 .fj-modal .fj-sec::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--azul); box-shadow: 0 0 6px rgba(var(--azul-rgb), .6); }
+.v2 .fj-modal :is(.atv-input, .atv-select, .atv-textarea, .fj-textarea) {
+  background: rgba(var(--tint), .035); border: 1px solid rgba(var(--tint), .12); border-radius: 9px; font-size: 13px;
+}
+html:root[data-tema="light"] .v2 .fj-modal :is(.atv-input, .atv-select, .atv-textarea, .fj-textarea) { background: rgba(255, 255, 255, .7); }
+.v2 .fj-modal :is(.atv-input, .atv-select, .atv-textarea, .fj-textarea):focus {
+  border-color: rgba(var(--azul-rgb), .6); box-shadow: 0 0 0 3px rgba(var(--azul-rgb), .14); outline: none;
+}
+.v2 .fj-modal .fj-textarea { min-height: 220px; line-height: 1.5; }
+/* selos dos campos = LED + texto (Encontrado / Sai na ficha / Revisar…) */
+.v2 .fj-modal .fj-ind { display: inline-flex; align-items: center; gap: 5px; background: transparent; padding: 0; font-size: 10px; letter-spacing: .03em; }
+.v2 .fj-modal .fj-ind::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; box-shadow: 0 0 5px currentColor; }
+.v2 .fj-modal .fj-ind.man { color: var(--txt-3); }
+.v2 .fj-modal .fj-ind.man::before { box-shadow: none; }
+.v2 .fj-modal .fj-eye { height: 36px; border-radius: 9px; border-color: rgba(var(--tint), .12); }
+.v2 .fj-modal .atv-btn { height: 34px; border-radius: 9px; font-size: 13px; }
+.v2 .fj-modal .atv-btn:not(.primary):not(.danger) { background: rgba(var(--tint), .04); border-color: rgba(var(--tint), .12); }
+.v2 .fj-modal .atv-btn.primary { background: var(--platina-a); color: var(--platina-txt); box-shadow: 0 0 0 1px rgba(var(--azul-rgb), .25); }
+.v2 .fj-modal .atv-btn.primary:hover:not(:disabled) { transform: none; filter: brightness(1.06); }
+/* cartão da ficha no painel: aviso da senha identificada no chat (LED verde) */
+.v2 .fjb-ident { display: flex; align-items: center; gap: 7px; font-size: 11.5px; font-weight: 550; color: var(--verde); margin: 2px 0 2px; }
+.v2 .fjb-ident .fj-led { background: var(--verde); box-shadow: 0 0 6px rgba(var(--verde-rgb), .7); }

@@ -18,9 +18,11 @@ interface Props {
   responsavelSugerido?: { id?: string | null; nome?: string };
   contatoAtual?: { nome?: string; cpf?: string; telefone?: string; email?: string };
   oportunidadeAtual?: { tipoBeneficio?: string | null; numeroBeneficio?: string | null; instituicao?: string | null };
+  /** senha do Meu INSS marcada no chat — repassada ao modal (fica só na tela até salvar a ficha) */
+  senhaIdentificada?: string;
 }
 
-export function FichaJudicialBox({ contatoId, oportunidadeId, conversaId, canalId, responsavelSugerido, contatoAtual, oportunidadeAtual }: Props) {
+export function FichaJudicialBox({ contatoId, oportunidadeId, conversaId, canalId, responsavelSugerido, contatoAtual, oportunidadeAtual, senhaIdentificada }: Props) {
   const { currentOrg } = useOrg();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -115,6 +117,7 @@ export function FichaJudicialBox({ contatoId, oportunidadeId, conversaId, canalI
           responsavelSugerido={responsavelSugerido}
           contatoAtual={contatoAtual}
           oportunidadeAtual={oportunidadeAtual}
+          senhaIdentificada={senhaIdentificada}
         />
       )}
 

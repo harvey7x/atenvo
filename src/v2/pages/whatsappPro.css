@@ -359,7 +359,7 @@ html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .w
 html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-composer .reply-box { background: var(--ip-chip); border-left-color: var(--platina-a); }
 
 html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .cmsg {
-  display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "ta ta" "tools env";
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "ta ta ta" "tools resp env";
   align-items: center; gap: 2px 8px; padding: 4px 6px 6px;
   border: 1px solid var(--ip-fio-forte); border-radius: 12px; background: var(--ip-painel);
   box-shadow: 0 1px 2px rgba(16, 24, 40, .04);
@@ -401,6 +401,16 @@ html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .c
 }
 html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .cmsg .tools .wa-scr-btn svg { color: currentColor; }
 html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .cmsg .tools .wa-scr-btn .ct { background: var(--ip-chip); color: var(--txt-2); }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .cmsg .wa-resp-sel {
+  grid-area: resp; justify-self: start; margin-left: 6px; max-width: 100%;
+  border-color: var(--ip-fio-forte); background: var(--ip-painel);
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .cmsg .wa-resp-sel:hover,
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .cmsg .wa-resp-sel.on { background: var(--ip-chip); border-color: color-mix(in srgb, var(--platina-a) 35%, transparent); }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro]:not([data-tema="light"]) .v2 .cmsg .wa-resp-sel { background: transparent; }
+/* gravando áudio: o painel do gravador precisa da fileira — o seletor some enquanto grava */
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .cmsg:has(.arec-panel) .wa-resp-sel { display: none; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .cmsg:has(.arec-panel) .tools { grid-column: 1 / 3; }
 html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .cmsg .env-b {
   grid-area: env; width: 34px; height: 34px; border-radius: 9px;
   background: var(--platina-a); color: var(--platina-txt); box-shadow: none;

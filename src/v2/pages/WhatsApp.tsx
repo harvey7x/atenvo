@@ -29,6 +29,7 @@ import { useOrg } from '@/context/OrgContext';
 import { MediaComposer } from '@/components/MediaComposer';
 import { ScriptSequenceModal } from '@/components/ScriptSequenceModal';
 import { FichaJudicialBox } from '@/components/FichaJudicialBox';
+import { FichaJudicialModal } from '@/components/FichaJudicialModal';
 import { fichaDemoDoContato } from '@/data/fichaJudicial';
 import { useSendWaMessage, useAssinaturaMarca } from '@/data/whatsapp';
 import { useIaEstadoConversa, useIaToggle, useIaRecomecar, type IaEstadoConversa } from '@/data/whatsapp';
@@ -59,6 +60,18 @@ import './whatsappPro.css'; // atendimento renovado (dono 29/10) — só age com
    REGRA DE OURO: mutações só no demo; no real esta página só é
    validada em leitura — enviar mensagem é falar com cliente real.
    ------------------------------------------------------------------ */
+
+/* "Identificar senha / e-mail" (dono 29/10): sugere o trecho da mensagem do cliente; o atendente confere e
+   edita antes de salvar. Trecho marcado com o mouse vence (vem pronto do balão); senão, heurística simples. */
+function sugerirDado(texto: string, campo: 'senha' | 'email'): string {
+  const t = texto.trim();
+  if (campo === 'email') return (t.match(/[^\s@<>"']+@[^\s@<>"']+\.[^\s@<>"'.,;:!?)]+/)?.[0] ?? t).toLowerCase();
+  if (!/\s/.test(t)) return t;
+  const aposSenha = t.match(/senha[^:\n]*?(?:\bé\b|\be\b|\beh\b|:|=)\s*["“']?([^\s"”']+)/i)?.[1];
+  if (aposSenha) return aposSenha.replace(/[.,;!?]+$/, '');
+  const tokens = t.split(/\s+/).map((x) => x.replace(/^[("“']+|[)"”'.,;!?]+$/g, ''));
+  return tokens.filter((x) => /\d/.test(x) && /[a-zA-Z@#$%&*!]/.test(x)).sort((a, b) => b.length - a.length)[0] ?? t;
+}
 
 const FOCO_KEY = 'atenvo-wa-foco';
 const ABA_KEY = 'atenvo-wa-aba';
@@ -104,7 +117,7 @@ const IcContato = () => <Ic><circle cx="10" cy="8" r="3.2" /><path d="M4.5 19.5c
 const IcCopy = () => <Ic><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></Ic>;
 const IcFoco = () => <Ic><path d="M4 9V5a1 1 0 0 1 1-1h4M15 4h4a1 1 0 0 1 1 1v4M20 15v4a1 1 0 0 1-1 1h-4M9 20H5a1 1 0 0 1-1-1v-4" /></Ic>;
 
-type Pop = { kind: 'filtro' | 'acoes' | 'status'; x: number; y: number; acima?: boolean } | null;
+type Pop = { kind: 'filtro' | 'acoes' | 'status' | 'resp'; x: number; y: number; acima?: boolean } | null;
 
 /* ==================================================================
    Chip de etiqueta-CRUD — Platina estilo B, UNIFICADO entre a lista de
@@ -501,6 +514,13 @@ export default function WhatsAppV2() {
   const [vincAberto, setVincAberto] = useState(false);
   const [fecharConfirm, setFecharConfirm] = useState(false);
   const [devolverConfirm, setDevolverConfirm] = useState(false);
+  // "Responder por" (dono 29/10): trocar de número pede confirmação — o cliente passa a receber de outro celular
+  const [trocaCanal, setTrocaCanal] = useState<{ id: string; alias: string } | null>(null);
+  // "Identificar senha / e-mail": SENHA fica só na tela, por conversa (vai ao banco apenas quando a ficha é
+  // salva — fichas_judiciais.senha_inss, como já era; nenhuma cópia nova). E-MAIL vai para o cadastro.
+  const [senhasIdent, setSenhasIdent] = useState<Record<string, string>>({});
+  const [identAlvo, setIdentAlvo] = useState<{ campo: 'senha' | 'email'; valor: string } | null>(null);
+  const [salvandoIdent, setSalvandoIdent] = useState(false);
   const [cancelarAgId, setCancelarAgId] = useState<string | null>(null); // auditoria: era window.confirm nativo
   const [verErro, setVerErro] = useState<string | null>(null);
   const [removerAlvo, setRemoverAlvo] = useState<WaMessage | null>(null);
@@ -900,6 +920,11 @@ export default function WhatsAppV2() {
   }, [pop]);
   const abrirPop = (kind: Pop extends null ? never : Exclude<Pop, null>['kind'], e: React.MouseEvent) => {
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    if (kind === 'resp') {
+      const x = Math.max(12, Math.min(r.right - 280, window.innerWidth - 292));
+      setPop((p) => (p?.kind === kind ? null : { kind, x, y: r.top - 6, acima: true }));
+      return;
+    }
     const x = Math.max(12, Math.min(r.left, window.innerWidth - (kind === 'filtro' ? 372 : 300)));  // filtro = 360px de largura
     setPop((p) => (p?.kind === kind ? null : { kind, x, y: r.bottom + 6 }));
   };
@@ -929,6 +954,31 @@ export default function WhatsAppV2() {
     } catch (e) {
       aoAvisar({ tom: 'erro', texto: (e as Error)?.message || 'Falha ao salvar.' });
     } finally { setSalvandoEdicao(false); }
+  };
+  const aoIdentificar = (m: WaMessage, campo: 'senha' | 'email', marcado: string) => {
+    const base = m.text || m.transcricao || '';
+    setIdentAlvo({ campo, valor: marcado.trim() || sugerirDado(base, campo) });
+  };
+  const salvarIdent = async () => {
+    if (!identAlvo || salvandoIdent) return;
+    const valor = identAlvo.valor.trim();
+    if (!valor) return;
+    if (identAlvo.campo === 'senha') {
+      setSenhasIdent((s) => ({ ...s, [current.id]: valor }));
+      setIdentAlvo(null);
+      aoAvisar({ tom: 'ok', texto: 'Senha identificada — já entra na ficha.' });
+      return;
+    }
+    if (!EMAIL_RE.test(valor)) { aoAvisar({ tom: 'erro', texto: 'E-mail inválido.' }); return; }
+    setSalvandoIdent(true);
+    try {
+      if (WA_REAL && current.contatoId) await acoes.atualizarContato(current.contatoId, { email: valor });
+      inbox.aplicarEdicaoLocal({ email: valor });
+      setIdentAlvo(null);
+      aoAvisar({ tom: 'ok', texto: 'E-mail salvo no cadastro — já entra na ficha.' });
+    } catch (e) {
+      aoAvisar({ tom: 'erro', texto: (e as Error)?.message || 'Falha ao salvar o e-mail.' });
+    } finally { setSalvandoIdent(false); }
   };
   const copiarTelefone = async () => {
     if (!current.phone) { aoAvisar({ tom: 'erro', texto: 'Este contato não tem telefone.' }); return; }
@@ -1357,6 +1407,7 @@ export default function WhatsAppV2() {
                       });
                       textareaRef.current?.focus();
                     }}
+                    aoIdentificar={aoIdentificar}
                     aoVerErro={(m) => setVerErro(traduzErroEnvio(m.erro ?? ''))}
                     aoRetry={inbox.retryMsg}
                     aoRemover={(m) => setRemoverAlvo(m)}
@@ -1372,28 +1423,6 @@ export default function WhatsAppV2() {
             </div>
 
             <div className="wa-composer">
-              <div className="wa-linha-resp">
-                Responder por:
-                {demo ? (
-                  ['Chip 1', 'Chip 2', 'Chip 3'].map((chip) => (
-                    <button key={chip} type="button" className={'wa-chipbtn' + (inbox.replyChip === chip ? ' on' : '')} onClick={() => inbox.onReplyChip(chip)}>{chip}</button>
-                  ))
-                ) : inbox.realCanais.length === 0 ? (
-                  <>Nenhum número conectado · <button type="button" className="lnk" style={{ background: 'none', border: 'none', color: 'var(--txt-2)', textDecoration: 'underline', cursor: 'pointer', fontSize: 10.5, fontFamily: 'var(--fonte)' }} onClick={() => nav('/integracoes')}>conectar</button></>
-                ) : (
-                  inbox.realCanais.map((c) => (
-                    <button
-                      key={c.id} type="button"
-                      className={'wa-chipbtn' + (inbox.replyCanalId === c.id ? ' on' : '') + (c.status !== 'conectado' ? ' off' : '')}
-                      title={c.status !== 'conectado' ? `Indisponível (${c.status})` : tituloCanal(c.alias, c.transporte)}
-                      onClick={() => inbox.onReplyCanal(c.id)}
-                    >
-                      {c.alias}<span className={'oftag' + (c.transporte === 'cloud_api' ? '' : ' qr')}>{c.transporte === 'cloud_api' ? '✓ Oficial' : 'QR'}</span>
-                    </button>
-                  ))
-                )}
-              </div>
-
               {/* avisos do composer (cascata v1 + opt-out) */}
               {optout && (
                 <div className="wa-aviso bloq" title={optoutTexto}><b>Não incomodar</b> — este contato pediu para não receber mensagens</div>
@@ -1483,6 +1512,25 @@ export default function WhatsAppV2() {
                   <button type="button" className="tool" title="Compartilhar contato" disabled={midiaDisabled} onClick={() => setCtModal(true)}><IcContato /></button>
                   <button type="button" className="tool" title="Agendar mensagem" disabled={agendarDisabled} onClick={() => { setAgEditId(null); setAgendarAberto(true); }}><IcClock /></button>
                 </div>
+                {/* Responder por (dono 29/10): compacto, no vão ao lado do relógio. Mostra o número atual;
+                    trocar abre a lista e pede confirmação (o cliente passa a receber de outro celular). */}
+                {(() => {
+                  const sel = demo ? null : inbox.canalSel;
+                  const nome = demo ? inbox.replyChip : inbox.realCanais.length === 0 ? 'Nenhum número conectado' : sel?.alias ?? 'Escolher número';
+                  const cloud = sel?.transporte === 'cloud_api';
+                  return (
+                    <button
+                      type="button" className={'wa-resp-sel' + (pop?.kind === 'resp' ? ' on' : '') + (sel && sel.status !== 'conectado' ? ' off' : '')}
+                      aria-haspopup="menu" aria-expanded={pop?.kind === 'resp'}
+                      title={sel ? tituloCanal(sel.alias, sel.transporte ?? null) + (sel.numero ? ' · ' + mascararNumero(sel.numero) : '') : 'Responder por: ' + nome}
+                      onClick={(e) => abrirPop('resp', e)}
+                    >
+                      <span className="rs-tx"><span className="rs-rot">Responder por</span><span className="rs-nm">{nome}</span></span>
+                      {sel && <span className={'oftag' + (cloud ? '' : ' qr')}>{cloud ? '✓ Oficial' : 'QR'}</span>}
+                      <svg className="rs-seta" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M6 15l6-6 6 6" /></svg>
+                    </button>
+                  );
+                })()}
                 <button type="button" className="env-b" title="Enviar" disabled={sendDisabled} onClick={enviar}><IcSend /></button>
               </div>
             </div>
@@ -1540,7 +1588,7 @@ export default function WhatsAppV2() {
             </button>
           </div>
 
-          <KanbanCtx contatoId={current.contatoId ?? null} demo={demo} etapa={current.etapa} origem={current.origin} respNome={current.respId ? nomePorId(current.respId) : undefined} lead={current} aoAvisar={aoAvisar} />
+          <KanbanCtx contatoId={current.contatoId ?? null} demo={demo} etapa={current.etapa} origem={current.origin} respNome={current.respId ? nomePorId(current.respId) : undefined} lead={current} aoAvisar={aoAvisar} senhaIdentificada={senhasIdent[current.id]} />
 
           <ChecklistDocsCtx contatoId={current.contatoId ?? null} demo={demo} />
 
@@ -1770,6 +1818,43 @@ export default function WhatsAppV2() {
               )}
             </>
           )}
+          {pop.kind === 'resp' && (() => {
+            const escolher = (id: string, alias: string) => {
+              setPop(null);
+              if (id === (demo ? inbox.replyChip : inbox.replyCanalId)) return;
+              setTrocaCanal({ id, alias });
+            };
+            return (
+              <>
+                <div className="ph2">Responder por</div>
+                {demo ? (
+                  ['Chip 1', 'Chip 2', 'Chip 3'].map((chip) => (
+                    <button key={chip} type="button" className="it" onClick={() => escolher(chip, chip)}>
+                      {chip}{inbox.replyChip === chip && <span className="ck">✓</span>}
+                    </button>
+                  ))
+                ) : inbox.realCanais.length === 0 ? (
+                  <>
+                    <div className="vazio">Nenhum número conectado.</div>
+                    <button type="button" className="lk" onClick={() => { setPop(null); nav('/integracoes'); }}>Conectar número…</button>
+                  </>
+                ) : (
+                  inbox.realCanais.map((c) => (
+                    <button
+                      key={c.id} type="button" className={'it rs-it' + (c.status !== 'conectado' ? ' off' : '')}
+                      title={c.status !== 'conectado' ? `Indisponível (${c.status})` : tituloCanal(c.alias, c.transporte)}
+                      onClick={() => escolher(c.id, c.alias)}
+                    >
+                      <span className="rs-it-nm">{c.alias}</span>
+                      <span className={'oftag' + (c.transporte === 'cloud_api' ? '' : ' qr')}>{c.transporte === 'cloud_api' ? '✓ Oficial' : 'QR'}</span>
+                      {c.status !== 'conectado' && <span className="rs-it-off">indisponível</span>}
+                      {inbox.replyCanalId === c.id && <span className="ck">✓</span>}
+                    </button>
+                  ))
+                )}
+              </>
+            );
+          })()}
           {pop.kind === 'status' && (
             <>
               <div className="ph2">Status da conversa</div>
@@ -1860,6 +1945,43 @@ export default function WhatsAppV2() {
           aoVinculado={async () => { setVincAberto(false); await inbox.live.refetch(); aoAvisar({ tom: 'ok', texto: 'Número vinculado e confirmado. Você já pode responder.' }); }}
         />
       )}
+      <ModalV2
+        aberto={identAlvo !== null} aoFechar={() => { if (!salvandoIdent) setIdentAlvo(null); }} fecharNoVeu={!salvandoIdent}
+        titulo={identAlvo?.campo === 'senha' ? 'Identificar senha do INSS' : 'Identificar e-mail'} largura={400}
+        rodape={<>
+          <BotaoSec disabled={salvandoIdent} onClick={() => setIdentAlvo(null)}>Cancelar</BotaoSec>
+          <BotaoPrimario disabled={salvandoIdent || !identAlvo?.valor.trim()} onClick={() => void salvarIdent()}>{salvandoIdent ? 'Salvando…' : 'Salvar'}</BotaoPrimario>
+        </>}
+      >
+        <div className="wa-ident">
+          <div className="campo">
+            <label>{identAlvo?.campo === 'senha' ? 'Senha do Meu INSS' : 'E-mail do cliente'}</label>
+            <input
+              className="inp" autoFocus autoComplete="off" spellCheck={false} value={identAlvo?.valor ?? ''}
+              onChange={(e) => setIdentAlvo((a) => (a ? { ...a, valor: e.target.value } : a))}
+              onKeyDown={(e) => { if (e.key === 'Enter') void salvarIdent(); }}
+            />
+          </div>
+          <p className="wa-ident-nota">
+            {identAlvo?.campo === 'senha'
+              ? 'Confira o trecho. A senha fica só nesta tela e entra no campo “Senha Meu INSS” quando você criar a ficha.'
+              : 'Confira o trecho. O e-mail vai para o cadastro do cliente e já entra na ficha.'}
+          </p>
+        </div>
+      </ModalV2>
+      <ConfirmDialogV2
+        aberto={trocaCanal !== null}
+        titulo={trocaCanal ? `Responder por ${trocaCanal.alias}?` : ''}
+        mensagem="Ao alterar isso, você estará respondendo por outro celular, e o cliente vai receber uma mensagem de um número novo."
+        rotuloConfirmar="Confirmar"
+        aoConfirmar={() => {
+          const t = trocaCanal;
+          setTrocaCanal(null);
+          if (!t) return;
+          if (demo) inbox.onReplyChip(t.id); else inbox.onReplyCanal(t.id);
+        }}
+        aoCancelar={() => setTrocaCanal(null)}
+      />
       <ConfirmDialogV2
         aberto={fecharConfirm}
         titulo="Fechar conversa"
@@ -2110,9 +2232,9 @@ function EtapaTopoSel({ lead, demo, aoAvisar }: { lead: WaContact; demo: boolean
    /v2/kanban?oportunidade= (KanbanContatoBox v1 recriado; hooks reais
    reusados; ficha judicial reusada inteira no real).
    ================================================================ */
-function KanbanCtx({ contatoId, demo, etapa, origem, respNome, lead, aoAvisar }: {
+function KanbanCtx({ contatoId, demo, etapa, origem, respNome, lead, aoAvisar, senhaIdentificada }: {
   contatoId: string | null; demo: boolean; etapa?: string | null;
-  origem: string; respNome?: string; lead: WaContact; aoAvisar: (a: AvisoInbox) => void;
+  origem: string; respNome?: string; lead: WaContact; aoAvisar: (a: AvisoInbox) => void; senhaIdentificada?: string;
 }) {
   const nav = useNavigate();
   const oppsQ = useOportunidadesDoContato(!demo ? contatoId : null);
@@ -2121,6 +2243,7 @@ function KanbanCtx({ contatoId, demo, etapa, origem, respNome, lead, aoAvisar }:
   const [addAberto, setAddAberto] = useState(false);
   const [funilSel, setFunilSel] = useState('');
   const [addBusy, setAddBusy] = useState(false);
+  const [fichaDemoAberta, setFichaDemoAberta] = useState(false); // demo: o modal real da ficha (sem salvar)
   if (!contatoId) return null;
   const oppDemo = demo && etapa
     ? { id: 'demo-opp', funilNome: 'Funil comercial', colunaId: null as string | null, colunaNome: etapa, colunaCor: lead.etapaCor ?? null, respId: lead.respId ?? null, respNome: respNome ?? '', tipoServico: 'analise_inicial', tipoBeneficio: 'aposentadoria', valor: null, atualizadoEm: '', status: lead.oppStatus === 'ganho' || lead.oppStatus === 'perdido' || lead.oppStatus === 'cancelado' ? lead.oppStatus : 'em_andamento' }
@@ -2178,12 +2301,22 @@ function KanbanCtx({ contatoId, demo, etapa, origem, respNome, lead, aoAvisar }:
               <div className="fjb-card">
                 <span className="fjb-tag vazia">Nenhuma ficha</span>
                 <div className="fjb-info">Importe a consulta do Promosys/iCred e gere a ficha judicial.</div>
-                <div className="fjb-acts"><button type="button" className="fjb-btn" onClick={() => aoAvisar({ tom: 'ok', texto: 'Modo demonstração: a ficha real (importar, revisar, finalizar) abre no ambiente com backend.' })}>Criar ficha</button></div>
+                {senhaIdentificada && <div className="fjb-ident"><i className="fj-led" aria-hidden />Senha do INSS identificada no chat</div>}
+                <div className="fjb-acts"><button type="button" className="fjb-btn primary" onClick={() => setFichaDemoAberta(true)}>Criar ficha</button></div>
               </div>
+              {fichaDemoAberta && (
+                <FichaJudicialModal
+                  open onClose={() => setFichaDemoAberta(false)}
+                  vinculos={{ organizacaoId: 'demo', contatoId, oportunidadeId: opp.id, conversaId: lead.id, canalId: lead.canalId ?? null }}
+                  modo="novo" responsavelSugerido={{ id: opp.respId ?? lead.respId ?? undefined, nome: opp.respNome || respNome }}
+                  contatoAtual={{ nome: lead.name, telefone: lead.phone, email: lead.email }} senhaIdentificada={senhaIdentificada}
+                />
+              )}
             </div>
           ) : (
             <div style={{ marginTop: 10 }}>
-              <FichaJudicialBox contatoId={contatoId} oportunidadeId={fichaDemo?.oportunidadeId ?? opp.id} conversaId={lead.id} canalId={lead.canalId ?? null} responsavelSugerido={{ id: opp.respId ?? lead.respId ?? undefined, nome: opp.respNome || respNome }} contatoAtual={{ nome: lead.name, telefone: lead.phone, email: lead.email }} />
+              {senhaIdentificada && <div className="fjb-ident"><i className="fj-led" aria-hidden />Senha do INSS identificada no chat — entra na ficha</div>}
+              <FichaJudicialBox contatoId={contatoId} oportunidadeId={fichaDemo?.oportunidadeId ?? opp.id} conversaId={lead.id} canalId={lead.canalId ?? null} responsavelSugerido={{ id: opp.respId ?? lead.respId ?? undefined, nome: opp.respNome || respNome }} contatoAtual={{ nome: lead.name, telefone: lead.phone, email: lead.email }} senhaIdentificada={senhaIdentificada} />
             </div>
           )}
         </>
