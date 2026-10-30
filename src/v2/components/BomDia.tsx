@@ -55,7 +55,7 @@ type Voz = 'ia' | 'navegador';
 const PREVIA = import.meta.env.DEV && DEMO_MODE;
 
 const MIN_ABERTURA_MS = 1300;   // a esfera acende no meio (1,1 s) e respira um instante antes da saudação
-const ESPERA_VOZ_MS = 12_000;   // a voz da IA não chegou → voz do navegador
+const ESPERA_VOZ_MS = 60_000;   // a voz da IA não chegou → legenda sem voz. A fala do gestor leva ~12 s para gerar no Gemini (medido 30/10): com 12 s a tela desistia antes e o Murilo ficava sem áudio
 const CARACTERES_POR_S = 14.5;  // ritmo de fala sem áudio (mudo e voz do navegador)
 const DEPOIS_DA_VOZ_S = 0.5;    // o painel sobe meio segundo depois da última sílaba (não do fim do arquivo)
 const FOCO_CTA_MS = 700;        // o foco vai para "Começar o dia" quando o painel já subiu
