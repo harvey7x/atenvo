@@ -49,6 +49,16 @@ export function fmtDuracaoMin(min: number | null | undefined): string {
   return `${fmtDec(d, 1)} ${d < 2 ? 'dia' : 'dias'}`;
 }
 
+/** Tráfego em poucas letras: 'Empréstimo · Diego' → 'Diego' (o que vem depois do último "·");
+ *  'Outros números' fica em minúscula no meio da frase. */
+export function nomeTrafego(nome: string | null | undefined): string {
+  const t = String(nome ?? '').trim();
+  if (!t) return 'outros números';
+  if (t.toLocaleLowerCase('pt-BR') === 'outros números') return 'outros números';
+  const partes = t.split('·').map((p) => p.trim()).filter(Boolean);
+  return partes[partes.length - 1] ?? t;
+}
+
 /** Duração em SEGUNDOS (o robô trabalha em segundos e poucos minutos — a mesma régua do PDF
  *  diário): < 1 min → '45 s'; < 10 min → '1,9 min' (uma casa); depois, a de fmtDuracaoMin. */
 export function fmtDuracaoS(s: number | null | undefined): string {

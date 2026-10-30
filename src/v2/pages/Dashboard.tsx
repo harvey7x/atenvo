@@ -10,6 +10,7 @@ import { Motivos, MotivosSkeleton } from './dashboardV5/Motivos';
 import { Atendentes, AtendentesSkeleton } from './dashboardV5/Atendentes';
 import { Mapa, MapaSkeleton } from './dashboardV5/Mapa';
 import { Robo, RoboSkeleton } from './dashboardV5/Robo';
+import { Anuncio, AnuncioSkeleton } from './dashboardV5/Anuncio';
 import './dashboardV5/dashboardV5.css';
 
 /* ------------------------------------------------------------------
@@ -118,6 +119,8 @@ export default function DashboardV2() {
             {carregando ? <PorNumeroSkeleton /> : <PorNumero canais={d.canais} kpis={d.kpis} />}
             {carregando ? <MotivosSkeleton /> : <Motivos ne={d.ne} />}
           </div>
+
+          {carregando ? <AnuncioSkeleton /> : <Anuncio canais={d.canais} />}
 
           {carregando ? <RoboSkeleton /> : d.robo && <Robo robo={d.robo} />}
 

@@ -8,10 +8,10 @@ import { Ajuda, Legenda, Pop, PontoStatus, Secao, TempoFechar, ancoraDe, type An
    "Números antigos" para o que chega por números que já saíram. Não elegíveis e
    fechados contam pela data em que foram marcados. A barra de entradas mede a
    PARTICIPAÇÃO no total (o mesmo número do % embaixo dela).
-   JÁ ESTAVAM NO SISTEMA (dono, 30/10): as entradas contam também quem já tinha falado com a
-   CAF e voltou pela mensagem do anúncio (o Gerenciador conta); embaixo da barra, "N já
-   estavam" abre por qual tráfego eles tinham entrado antes e quantos vieram pelo anúncio —
-   a mesma régua e os mesmos rótulos do relatório diário em PDF. */
+   TUDO QUE ENTROU (dono, 30/10): cada cliente que chega por um número num dia é uma entrada —
+   o novo e quem já estava no sistema e voltou pela mensagem do anúncio —, como no Gerenciador
+   de Anúncios. Aqui só o total; a quebra (pelo anúncio, já estavam, por onde tinham entrado
+   antes) fica na seção à parte (Anuncio.tsx). */
 
 /** Contagem de não elegíveis com a quebra por motivo numa bolha (hover e foco). */
 function CelulaNe({ c }: { c: CanalV5 }) {
@@ -44,49 +44,14 @@ function CelulaNe({ c }: { c: CanalV5 }) {
   );
 }
 
-/** "N já estavam": por qual tráfego tinham entrado antes e quantos vieram pela mensagem do anúncio (bolha). */
-function JaEstavam({ c }: { c: CanalV5 }) {
-  const [ancora, setAncora] = useState<Ancora | null>(null);
-  const abrir = (el: Element) => setAncora(ancoraDe(el));
-  const fechar = () => setAncora(null);
-  const id = `d5-ja-${c.canalId ?? 'antigos'}`;
-  const nome = c.situacao === 'antigo' ? 'Números antigos' : c.nome;
-  const ja = `${fmtInt(c.retornos)} já ${c.retornos === 1 ? 'estava' : 'estavam'}`;
-  return (
-    <>
-      <button type="button" className="d5-ja-btn num" aria-describedby={ancora ? id : undefined}
-        aria-label={`${ja} no sistema em ${nome}. Ver por onde tinham entrado`}
-        onMouseEnter={(e) => abrir(e.currentTarget)} onMouseLeave={fechar}
-        onFocus={(e) => abrir(e.currentTarget)} onBlur={fechar}>
-        {ja}
-      </button>
-      <Pop ancora={ancora} id={id} largura={320}>
-        <span className="d5-pop-tit"><Legenda partes={[nome, `${ja} no sistema`]} /></span>
-        <span className="d5-pop-sub">Voltaram pela mensagem do anúncio; tinham entrado antes por:</span>
-        <ul className="d5-pop-lista">
-          {c.retornosOrigens.map((o) => (
-            <li key={o.nome}><span>{o.nome}</span><b className="num">{fmtInt(o.n)}</b></li>
-          ))}
-        </ul>
-        {c.peloAnuncio != null && (
-          <span className="d5-pop-rod">
-            <span>Pelo anúncio (como no Gerenciador de Anúncios)</span><b className="num">{fmtInt(c.peloAnuncio)}</b>
-          </span>
-        )}
-      </Pop>
-    </>
-  );
-}
-
 export function PorNumero({ canais, kpis }: { canais: CanalV5[]; kpis: KpisV5 }) {
   const totEnt = canais.reduce((s, c) => s + c.entradas, 0);
   const totNe = canais.reduce((s, c) => s + c.ne, 0);
   const totGan = canais.reduce((s, c) => s + c.ganhos, 0);
-  const totRet = canais.reduce((s, c) => s + c.retornos, 0);
   const repetidos = totEnt - kpis.entradas;
   return (
     <Secao className="d5-num" titulo="Entradas por número"
-      sub="Todos os números conectados, mesmo sem entrada. As entradas contam também quem já estava no sistema e voltou pela mensagem do anúncio. Não elegíveis e fechados contam pelo dia da marcação.">
+      sub="Todos os números conectados, mesmo sem entrada. Entradas: tudo que entrou, cada dia, como no Gerenciador de Anúncios. Não elegíveis e fechados contam pelo dia da marcação.">
       <div className="d5-tab-rolo">
         <table className="d5-tab">
           <colgroup>
@@ -130,11 +95,7 @@ export function PorNumero({ canais, kpis }: { canais: CanalV5[]; kpis: KpisV5 })
                         </span>
                         <b className={'num' + (c.entradas ? '' : ' d5-mudo')}>{fmtInt(c.entradas)}</b>
                       </span>
-                      {share != null && c.entradas > 0 && (
-                        <small className="num">
-                          {c.retornos > 0 ? <Legenda partes={[fmtPct(share), <JaEstavam key="ja" c={c} />]} /> : fmtPct(share)}
-                        </small>
-                      )}
+                      {share != null && c.entradas > 0 && <small className="num">{fmtPct(share)}</small>}
                     </span>
                   </td>
                   <td className="d5-dir"><CelulaNe c={c} /></td>
@@ -154,12 +115,7 @@ export function PorNumero({ canais, kpis }: { canais: CanalV5[]; kpis: KpisV5 })
                   )}
                 </span>
               </th>
-              <td className="d5-dir">
-                <span className="d5-cel2 d5-cel2-dir">
-                  <b className="num">{fmtInt(totEnt)}</b>
-                  {totRet > 0 && <small className="num">{fmtInt(totRet)} já {totRet === 1 ? 'estava' : 'estavam'} no sistema</small>}
-                </span>
-              </td>
+              <td className="d5-dir"><b className="num">{fmtInt(totEnt)}</b></td>
               <td className="d5-dir"><b className="num">{fmtInt(totNe)}</b></td>
               <td className="d5-dir"><b className="num">{fmtInt(totGan)}</b></td>
               <td className="d5-dir"><TempoFechar med={kpis.fechMedianaH} media={kpis.fechMediaH} n={kpis.fechN} /></td>

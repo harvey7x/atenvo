@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { periodoDash } from '@/data/dashboard';
 import {
-  faixasEscalaV5, fmtDuracaoH, fmtDuracaoMin, fmtDuracaoS, fmtInt, fmtPct, fmtTelefone, fmtVariacao, pctDe, rotuloMotivoNe, variacao,
+  faixasEscalaV5, fmtDuracaoH, fmtDuracaoMin, fmtDuracaoS, fmtInt, fmtPct, fmtTelefone, fmtVariacao, nomeTrafego, pctDe, rotuloMotivoNe, variacao,
 } from '@/data/dashboardV5.formato';
 import { demoDashV5, DEMO_CANAIS } from '@/data/dashboardV5.demo';
 import { janelaV5, normalizarDashV5, traduzErroDashV5 } from '@/data/dashboardV5';
@@ -37,6 +37,14 @@ describe('formato', () => {
     expect(fmtPct(null)).toBe('—');
     expect(pctDe(1, 4)).toBe(25);
     expect(pctDe(1, 0)).toBeNull();
+  });
+
+  it('tráfego em poucas letras: o que vem depois do último "·"; outros números em minúscula', () => {
+    expect(nomeTrafego('Empréstimo · Diego')).toBe('Diego');
+    expect(nomeTrafego('Juros abusivos · Andrius')).toBe('Andrius');
+    expect(nomeTrafego('Outros números')).toBe('outros números');
+    expect(nomeTrafego('ANTONIO CAMPANHA')).toBe('ANTONIO CAMPANHA');
+    expect(nomeTrafego(null)).toBe('outros números');
   });
 
   it('duração do robô em segundos: s, minutos com uma casa até 10 min, depois a régua de sempre', () => {

@@ -9,7 +9,7 @@ import { Ajuda, Legenda, Variacao, type Sentido } from './comum';
    MESMO trecho do período anterior; o tempo para fechar mostra mediana, média e n. */
 
 const AJUDA = {
-  entradas: 'Clientes diferentes que chegaram no período, em qualquer número — contando quem já tinha falado com a CAF e voltou pela mensagem do anúncio (o Gerenciador de Anúncios também conta essas pessoas). O número interno do escritório não conta.',
+  entradas: 'Tudo que entrou no período, em qualquer número, contado como no Gerenciador de Anúncios: cada cliente que chega por um número num dia é uma entrada — o cliente novo e quem já tinha falado com a CAF e voltou pela mensagem do anúncio (quem volta em outro dia conta de novo). O número interno do escritório não conta. Quem já estava no sistema está na seção "Anúncio e quem já estava no sistema".',
   ne: 'Leads marcados como não elegíveis no período, pela IA, pela regra automática do RS ou por alguém da equipe.',
   ganhos: 'Clientes que o sistema do administrativo marcou como completos no período, pela data em que ficaram completos lá. A lista é lida de lá a cada 5 minutos.',
   /* com a API nova do CAF (29/10): a mesma conta do pódio do "Meu painel" */
@@ -29,10 +29,8 @@ function ValorKpi({ txt }: { txt: string }) {
   );
 }
 
-function Cartao({ rotulo, ajuda, valor, children, selo, nota }: {
+function Cartao({ rotulo, ajuda, valor, children, selo }: {
   rotulo: string; ajuda: string; valor: string; children: ReactNode; selo?: ReactNode;
-  /** linha logo abaixo do número (ex.: quantos já estavam no sistema) */
-  nota?: ReactNode;
 }) {
   return (
     <CardVidro className="d5-kpi">
@@ -42,7 +40,6 @@ function Cartao({ rotulo, ajuda, valor, children, selo, nota }: {
         {selo}
       </div>
       <div className="d5-kpi-val num"><ValorKpi txt={valor} /></div>
-      {nota && <div className="d5-kpi-nota">{nota}</div>}
       <div className="d5-kpi-pe">{children}</div>
     </CardVidro>
   );
@@ -65,8 +62,7 @@ export function Kpis({ k, ant, comparacao }: { k: KpisV5; ant: KpisV5 | null; co
   );
   return (
     <section className="d5-kpis" aria-label="Resumo do período">
-      <Cartao rotulo="Entradas de clientes" ajuda={AJUDA.entradas} valor={fmtInt(k.entradas)}
-        nota={k.retornos > 0 ? `${fmtInt(k.retornos)} já ${k.retornos === 1 ? 'estava' : 'estavam'} no sistema` : undefined}>
+      <Cartao rotulo="Entradas de clientes" ajuda={AJUDA.entradas} valor={fmtInt(k.entradas)}>
         {v(k.entradas, ant?.entradas, 'maior')}
       </Cartao>
       <Cartao rotulo="Não elegíveis" ajuda={AJUDA.ne} valor={fmtInt(k.ne)}>

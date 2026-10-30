@@ -269,21 +269,10 @@
   font-variant-numeric: tabular-nums;
 }
 .v2 .d5-ne-btn:hover { background: rgba(var(--tint), .06); text-decoration-color: rgba(var(--tint), .6); }
-/* "N já estavam" (30/10): mesmo gesto do botão de não elegíveis, no azul de "já estavam no sistema" */
-.v2 .d5-ja-btn {
-  font: inherit; font-size: inherit; font-weight: 500; color: var(--azul); line-height: inherit;
-  background: none; border: 0; padding: 1px 3px; margin: -1px -3px; border-radius: 4px; cursor: help;
-  text-decoration: underline dotted rgba(var(--azul-rgb), .45); text-decoration-thickness: 1px; text-underline-offset: 3px;
-}
-.v2 .d5-ja-btn:hover { background: rgba(var(--azul-rgb), .1); text-decoration-color: rgba(var(--azul-rgb), .8); }
-.v2 .d5-ja-btn:focus-visible { outline: 2px solid var(--d5-foco); outline-offset: 2px; }
-.v2 .d5-pop-sub { display: block; color: var(--txt-2); margin: -3px 0 7px; }
-.v2 .d5-pop-rod {
-  display: flex; justify-content: space-between; gap: 18px; margin-top: 8px; padding-top: 7px;
-  border-top: 1px solid rgba(var(--tint), .1); color: var(--txt-2);
-}
-.v2 .d5-pop-rod b { color: var(--txt); font-weight: 600; font-variant-numeric: tabular-nums; }
-.v2 .d5-kpi-nota { margin-top: 6px; font-size: 12px; font-weight: 500; color: var(--azul); }
+/* ---------------- anúncio e quem já estava no sistema (30/10): a quebra das entradas ---------------- */
+.v2 .d5-anuncio .d5-tab col.d5-c-orig { width: 34%; }
+.v2 .d5-ja { color: var(--azul); }
+.v2 .d5-orig { white-space: normal !important; line-height: 1.4; }
 
 /* ---------------- motivos ---------------- */
 .v2 .d5-mot { display: flex; flex-direction: column; }
