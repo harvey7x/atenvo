@@ -92,7 +92,9 @@ html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-col {
   background: var(--kp-col-bg); border: 1px solid transparent; border-radius: 12px; box-shadow: none;
 }
 html:root[data-tema="light"] .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-col { border-color: transparent; }
-html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-col.gargalo:not(.col-drop) { border-color: transparent; }
+/* sem o contorno dourado do "gargalo" da repaginada (dono 29/10: "um negócio amarelo na borda") */
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-col.gargalo:not(.col-drop) { border-color: transparent; box-shadow: none; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-col:not(.col-drop) { box-shadow: none; }
 html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-col.col-drop { border-color: color-mix(in srgb, var(--kp-blue) 55%, transparent); background: color-mix(in srgb, var(--kp-blue) 6%, var(--kp-col-bg)); }
 
 /* cabeçalho da coluna: ícone na cor da etapa + nome + contagem · + e ⋯ à direita */
