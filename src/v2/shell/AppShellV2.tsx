@@ -59,14 +59,12 @@ const GRUPOS: GrupoNav[] = [
     itens: [
       { slug: 'whatsapp', rotulo: 'WhatsApp' },
       // Facebook e Disparo fora do menu (pedido do dono 27/08) — rotas seguem vivas por URL
-      { slug: 'kanban', rotulo: 'Kanban' },
+      // Kanban desceu para a Gestão (dono 30/10)
       // Agendamentos e Contatos fora do menu (pedido do dono 30/10: "ocultar") — rotas seguem vivas por URL
       // Presenciais (dono 29/10): calendário dos atendimentos presenciais; avisa o grupo DOCUMENTOS
       { slug: 'presenciais', rotulo: 'Presenciais' },
       // Scripts veio da Gestão (dono 29/10): ferramenta do dia a dia de quem atende
       { slug: 'scripts', rotulo: 'Scripts' },
-      // Coletor INSS subiu das Ferramentas para a Operação (dono 30/10); a rota continua a mesma
-      { slug: 'ferramentas/coletor-inss', rotulo: 'Coletor INSS' },
     ],
   },
   {
@@ -84,6 +82,9 @@ const GRUPOS: GrupoNav[] = [
     // Manual de vendas SAIU do sistema a pedido do dono (link antigo cai no WhatsApp).
     rotulo: 'Gestão',
     itens: [
+      // Kanban veio da Operação (dono 30/10: "desce o Kanban para gestão"). SEM admin: a equipe
+      // continua vendo o quadro (cada um só os seus cards — useKanban/visibilidade)
+      { slug: 'kanban', rotulo: 'Kanban' },
       { slug: 'dashboard', rotulo: 'Dashboard', admin: true },
       // Painel da Equipe (29/10): um celular por atendente, igual ao WhatsApp, somente leitura
       { slug: 'equipe', rotulo: 'Painel da Equipe', admin: true },
@@ -100,6 +101,8 @@ const GRUPOS: GrupoNav[] = [
     itens: [
       { slug: 'ferramentas/unificador', rotulo: 'Unificador de documentos' },
       { slug: 'ferramentas/conversor', rotulo: 'Conversor de arquivos' },
+      // Coletor INSS voltou para as Ferramentas (dono 30/10, depois de passar pela Operação)
+      { slug: 'ferramentas/coletor-inss', rotulo: 'Coletor INSS' },
     ],
   },
   // Atendente de IA (/ia) e Fluxos do bot (/fluxos) fora do menu (pedido do dono 14/10) —

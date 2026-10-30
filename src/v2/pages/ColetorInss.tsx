@@ -1,4 +1,4 @@
-/* Coletor INSS (Operação · 30/10) — instalado no NOTEBOOK de cada atendente (Windows).
+/* Coletor INSS (Ferramentas · 30/10) — instalado no NOTEBOOK de cada atendente (Windows).
 
    Dono 30/10: "coloca mais pra cima, em Operação… um passo a passo com o que tem que
    fazer para usar o coletor no notebook da pessoa, que é Windows… o que tiver que fazer
@@ -76,7 +76,7 @@ export function ColetorInss() {
     <div className="ferr-wrap larga">
       <div className="ph sobe">
         <div>
-          <div className="cob-migalha">Operação</div>
+          <div className="cob-migalha">Ferramentas</div>
           <h2>Coletor INSS</h2>
           <p>Baixa os documentos do Meu INSS do cliente direto no seu notebook — extratos, consignado, carta, imposto de renda e situação cadastral.</p>
         </div>
