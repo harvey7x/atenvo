@@ -353,7 +353,7 @@ async function garantirFunil(org: string): Promise<{ id: string; nome: string } 
 }
 
 /* ---- Abertura rápida (dono 30/10: "tem como tirar o delay quando a gente entra no Kanban?") ----
-   - leads em 16 faixas de id em paralelo (antes: 8 páginas de 1000 em fila, ~10 s);
+   - leads em 16 faixas de id em paralelo (antes: 8 páginas de 1000 em fila, ~10 s; agora ~2 s);
    - o id do funil fica guardado no navegador: os cards começam a vir sem esperar a ida ao `funis`;
    - o quadro fica 30 min na memória depois de sair da tela: voltar ao Kanban é imediato
      (os dados aparecem na hora e se atualizam por baixo). */
@@ -411,8 +411,9 @@ export function useKanban() {
   const leadsQ = useQuery({
     queryKey: chaveLeads, enabled: KANBAN_REAL && !!funilId && (vis.veTodos || !!soDe), refetchInterval: 8000, gcTime: KANBAN_GC_MS,
     queryFn: async ({ signal }): Promise<KLead[]> => {
-      // 1ª carga (tela vazia): 6 faixas ao mesmo tempo e progresso na tela. Atualização de fundo
-      // (a cada 8 s / realtime), com o quadro já na tela: 2 por vez, para não pesar no banco.
+      // 1ª carga (tela vazia): 8 faixas ao mesmo tempo e progresso na tela — medido 30/10 com 7.813
+      // cards: 1 por vez 10,4 s · 6 → 2,7 s · 8 → 2,2 s · 16 → 2,0 s (o banco satura; não compensa).
+      // Atualização de fundo (a cada 8 s / realtime), com o quadro já na tela: 2 por vez (~5,6 s).
       const primeira = qc.getQueryData(chaveLeads) === undefined;
       if (primeira) publicarProgresso({ feitas: 0, total: 16, cards: 0 });
       // PAGINAÇÃO (18/09): sem paginar, o PostgREST corta em 1000 (db-max-rows) e CARDS SOMEM do
@@ -434,7 +435,7 @@ export function useKanban() {
         },
         (l) => l.id,
         {
-          rotulo: 'kanban-leads', signal, simultaneas: primeira ? 6 : 2,
+          rotulo: 'kanban-leads', signal, simultaneas: primeira ? 8 : 2,
           aoAvancar: primeira ? (feitas, total, cards) => publicarProgresso({ feitas, total, cards }) : undefined,
         },
       );
