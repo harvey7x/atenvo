@@ -9,6 +9,9 @@ describe('foto ilustrativa do card', () => {
     expect(generoProvavel('José Antônio')).toBe('h');
     expect(generoProvavel('Carlos Alberto')).toBe('h');
     expect(generoProvavel('(51) 9796-8799')).toBeNull();
+    expect(generoProvavel('SHIRLEY')).toBe('f');
+    expect(generoProvavel('Kelly Cristina')).toBe('f');
+    expect(generoProvavel('Wesley Souza')).toBe('h');
   });
   it('mesma pessoa → mesma foto; mulher → foto de mulher', () => {
     const a = fotoIlustrativa('Maria', 'id-1');

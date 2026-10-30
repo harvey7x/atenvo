@@ -15,6 +15,15 @@ const FEM_SEM_A = new Set([
   'rosane', 'luciane', 'gislaine', 'jaqueline', 'miriam', 'noemi', 'nair', 'sueli', 'neli', 'ivonete', 'elizete',
   'marinez', 'marines', 'iracy', 'juraci', 'nilce', 'cleonice', 'eunice', 'berenice', 'geni', 'zeni', 'eni',
   'aparecida', 'dona', 'vo', 'avo', 'mae', 'tania', 'lucimar', 'rosemar', 'deise', 'daiane', 'viviane', 'tatiane',
+  // 30/10 (WhatsApp: "Shirley" saía com foto de homem) — femininos comuns sem "a" no fim
+  'shirley', 'shirlei', 'sirlei', 'sirley', 'kelly', 'keli', 'kelli', 'nathaly', 'nataly', 'natali', 'suely', 'suelly',
+  'ely', 'nely', 'marly', 'rosely', 'roseli', 'rosilei', 'gisele', 'giselle', 'michele', 'michelle', 'rachel',
+  'esther', 'ingrid', 'edith', 'judith', 'judite', 'elisabete', 'elizabete', 'elizabeth', 'elisabeth', 'lizete',
+  'mercedes', 'dolores', 'iris', 'luz', 'helen', 'ellen', 'karen', 'karin', 'evelyn', 'jennifer', 'jenifer',
+  'franciele', 'daniele', 'danielle', 'gabriele', 'adriele', 'micheli', 'cristiane', 'adriane', 'ariane', 'josiane',
+  'eliane', 'rosemeri', 'rosemery', 'rosimeri', 'marisete', 'claudete', 'elizete', 'odete', 'bernadete', 'ivani',
+  'leni', 'loreni', 'zeli', 'zuleide', 'neuci', 'neusa', 'nilza', 'ilse', 'elsi', 'liane', 'lisiane', 'roselaine',
+  'jucelaine', 'marilene', 'darlene', 'arlete', 'ivonilde', 'nadir', 'lurdes', 'cecilia', 'cleci', 'cleusi',
 ]);
 const MASC_COM_A = new Set(['luca', 'nicola', 'joshua', 'andrea', 'garcia']);
 
