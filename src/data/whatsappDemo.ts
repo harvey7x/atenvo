@@ -27,6 +27,9 @@ export interface WaMessage {
   contato?: { nome: string; telefone: string } | null;
   /** caminho do anexo no bucket privado (mídia); a URL assinada é gerada sob demanda. */
   anexoPath?: string;
+  /** URL PÚBLICA da mídia quando ela não tem anexo no bucket privado — imagens e vídeos do fluxo
+   *  do robô (metadados.media_url, bucket público bot-midia). A bolha usa só quando não há anexoPath. */
+  midiaUrl?: string;
   /** metadados de mídia para renderização. */
   mime?: string;
   tamanho?: number | null;

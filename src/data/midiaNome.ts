@@ -8,6 +8,7 @@ export interface MidiaNomeParams {
   tipo?: string;        // imagem | audio | video | documento
   mime?: string;        // metadados.mime
   anexoPath?: string;   // {org}/wa-midia/{id}.{ext}
+  midiaUrl?: string;    // URL pública da mídia do robô (sem anexo) — só para a extensão
   dataISO?: string;     // AAAA-MM-DD
 }
 
@@ -38,6 +39,7 @@ const limpaExt = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '').slice(
  */
 export function nomeArquivoMidia(m: MidiaNomeParams): string {
   const ext = limpaExt(m.anexoPath?.split('.').pop() ?? '')
+    || limpaExt(/\.([a-z0-9]{1,5})(?:[?#]|$)/i.exec(m.midiaUrl ?? '')?.[1] ?? '')
     || limpaExt((m.mime ?? '').split('/')[1] ?? '')
     || 'bin';
   const original = (m.nome ?? '').trim();

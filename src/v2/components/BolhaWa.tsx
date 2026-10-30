@@ -57,7 +57,8 @@ export function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, 
     return () => { vivo = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [m.anexoPath, precisaUrl]);
-  const url = m.localUrl ?? urlAssinada;
+  // mídia do fluxo do robô não tem anexo no bucket privado: toca direto da URL pública (antes caía em "indisponível")
+  const url = m.localUrl ?? urlAssinada ?? (m.anexoPath ? null : m.midiaUrl ?? null);
   // enquanto a URL assinada não resolveu (anexo presente) é CARREGANDO, não "indisponível" (v1 não pisca)
   const carregandoMidia = precisaUrl && !url && !urlErro;
   const ack = m.dir === 'out' ? ackOf(m.status) : null;
@@ -109,7 +110,7 @@ export function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, 
       {m.tipo === 'imagem' && (
         (url || demo)
           ? <>
-              {url ? <div className="m-media"><img className="m-img" loading="lazy" src={url} alt="Imagem" title="Ampliar" onClick={() => aoLightbox(url, nomeArquivoMidia(m), m.id)} />{btnBaixar}</div> : <div className="audio-ind">Imagem de demonstração</div>}
+              {url ? <div className="m-media"><img className="m-img" loading="lazy" src={url} alt="Imagem" title="Ampliar" onClick={() => aoLightbox(url, nomeArquivoMidia(m), m.anexoPath ? m.id : undefined)} />{btnBaixar}</div> : <div className="audio-ind">Imagem de demonstração</div>}
               {m.text && <div className="m-cap"><WaTexto texto={m.text} /></div>}
             </>
           : carregandoMidia ? <div className="audio-ind">Carregando imagem…</div>

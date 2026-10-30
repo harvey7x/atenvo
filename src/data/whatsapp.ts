@@ -102,8 +102,13 @@ const STATUS_LABEL: Record<string, string> = {
   aberta: 'Aberta', em_atendimento: 'Em atendimento', pendente: 'Pendente', resolvida: 'Resolvida', fechada: 'Fechada',
 };
 
-export interface DbMsg { id: string; direcao: string; conteudo: string | null; tipo: string; enviada_em: string | null; recebida_em: string | null; criado_em: string | null; origem: string | null; status: string | null; erro_envio: string | null; id_externo?: string | null; respondida_a_id?: string | null; metadados: { anexo_path?: string; mime?: string; tamanho?: number; nome?: string; midia_pendente?: boolean; seconds?: number | null; ptt?: boolean; quoted?: { remetente?: string; tipo?: string; texto?: string }; contato?: { nome?: string; telefone?: string } } | null; }
+export interface DbMsg { id: string; direcao: string; conteudo: string | null; tipo: string; enviada_em: string | null; recebida_em: string | null; criado_em: string | null; origem: string | null; status: string | null; erro_envio: string | null; id_externo?: string | null; respondida_a_id?: string | null; metadados: { anexo_path?: string; media_url?: string; mime?: string; tamanho?: number; nome?: string; midia_pendente?: boolean; seconds?: number | null; ptt?: boolean; quoted?: { remetente?: string; tipo?: string; texto?: string }; contato?: { nome?: string; telefone?: string } } | null; }
 const TIPOS_MIDIA = ['imagem', 'audio', 'video', 'documento'];
+
+/** metadados.media_url (mídia do fluxo do robô, URL pública do Storage) → só https; qualquer outra coisa é ignorada. */
+export function urlPublicaMidia(u: unknown): string | undefined {
+  return typeof u === 'string' && /^https:\/\/\S+$/i.test(u.trim()) ? u.trim() : undefined;
+}
 export interface DbConv {
   id: string; status: string; status_id: string | null; nao_lidas: number | null; ultima_interacao_em: string | null; criado_em: string | null;
   precisa_humano: boolean | null;
@@ -196,9 +201,10 @@ function mensagensDaLista(c: DbConv): DbMsg[] {
  *  idênticas, senão o histórico "muda de forma" ao abrir a conversa. */
 export function mapMensagens(rows: DbMsg[]): WaMessage[] {
   return (rows ?? [])
-    // mantém texto com conteúdo OU qualquer mídia (imagem/áudio/vídeo/documento) mesmo sem legenda;
-    // também mantém mídia PENDENTE (download falhou) para mostrar "indisponível" + recarregar.
-    .filter((m) => (m.conteudo ?? '').length > 0 || (TIPOS_MIDIA.includes(m.tipo) && (!!m.metadados?.anexo_path || !!m.metadados?.midia_pendente)))
+    // mantém texto com conteúdo OU qualquer mídia (imagem/áudio/vídeo/documento) mesmo sem legenda —
+    // anexo do painel/webhook OU URL pública do fluxo do robô; também mantém mídia PENDENTE (download
+    // falhou) para mostrar "indisponível" + recarregar.
+    .filter((m) => (m.conteudo ?? '').length > 0 || (TIPOS_MIDIA.includes(m.tipo) && (!!m.metadados?.anexo_path || !!urlPublicaMidia(m.metadados?.media_url) || !!m.metadados?.midia_pendente)))
     .sort((a, b) => tsOf(a) - tsOf(b))
     .map((m) => ({
       id: m.id,
@@ -212,6 +218,7 @@ export function mapMensagens(rows: DbMsg[]): WaMessage[] {
       erro: m.erro_envio ?? undefined,
       tipo: m.tipo,
       anexoPath: m.metadados?.anexo_path,
+      midiaUrl: urlPublicaMidia(m.metadados?.media_url),
       mime: m.metadados?.mime,
       tamanho: m.metadados?.tamanho ?? null,
       nome: m.metadados?.nome,
