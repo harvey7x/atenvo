@@ -1509,7 +1509,7 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, repasse, fichaInfo, o
     ? { cls: badge.cls, txt: badge.cls === 'hot' && paradoAtivo ? `Retomar · ${dp}d` : badge.txt, msg: badge.cls === 'msg' }
     : paradoAtivo ? { cls: hot ? 'hot' : 'warm', txt: `parado ${dp}d`, msg: false }
     : { cls: '', txt: haDe(l.atualizadoEm || l.criadoEm), msg: false };
-  const estadoTitle = badge ? badge.txt + (paradoAtivo ? ` — sem trocar de coluna há ${dp} dia(s)` : '')
+  const estadoTitle = badge ? badge.txt + (paradoAtivo ? ` — sem trocar de coluna há ${dp} dia(s)` : '') + (dataFull ? ` · no funil desde ${dataFull}` : '')
     : paradoAtivo ? `Sem trocar de coluna há ${dp} dia(s)` : 'Última atualização';
 
   return (
@@ -1580,7 +1580,8 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, repasse, fichaInfo, o
           {estado.msg ? <IcChat /> : badge && badge.cls !== 'hot' ? <IcAlerta /> : <IcRelogio />}
           {estado.txt}
         </span>
-        {dataCurta && <span className="kc-chip num" title={'No funil desde ' + dataFull}><IcCal />{dataCurta}</span>}
+        {/* com ação no selo ("Retomar · 122d"), a data sai do pé para o selo caber inteiro (fica no title) */}
+        {dataCurta && !badge && <span className="kc-chip num" title={'No funil desde ' + dataFull}><IcCal />{dataCurta}</span>}
         {mostraProg && (
           <span className={'kc-chip num' + (noGanho ? ' ok' : '')} title={noGanho ? `Fechado — completou as ${nEtapas} etapas` : `Avançou ${progVal} de ${nEtapas} etapas · está em ${colAtual?.nome ?? ''}`}>
             <IcEtapas />{progVal}/{nEtapas}
