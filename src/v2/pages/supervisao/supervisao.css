@@ -62,18 +62,56 @@
 .v2 .sv-tom-ok { color: var(--verde); }
 
 .v2 .sv-barra { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 2px; }
-.v2 .sv-barra-esq { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--txt); }
+.v2 .sv-barra-esq { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 14px; color: var(--txt); min-width: 0; }
 .v2 .sv-barra-esq b { font-weight: 600; }
 .v2 .sv-cont {
   font-size: 11.5px; font-weight: 600; padding: 1px 8px; border-radius: 99px;
   background: rgba(var(--tint), .07); color: var(--txt-2);
 }
 
-/* parede de celulares */
-.v2 .sv-parede {
-  display: grid; gap: 18px; align-items: start;
-  grid-template-columns: repeat(auto-fill, minmax(calc(var(--sv-tel) + 40px), 1fr));
+/* faixa de celulares (dono 30/10): lado a lado, de correr, com setas e nomes para pular */
+.v2 .sv-carrossel { position: relative; min-width: 0; }
+.v2 .sv-trilho {
+  position: relative; display: flex; gap: 18px; align-items: flex-start;
+  overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory; scroll-behavior: smooth; scroll-padding-inline: 2px;
+  padding: 6px 2px 16px;                              /* respiro do anel de foco e da sombra dos cartões */
+  scrollbar-width: none; cursor: grab;
 }
+.v2 .sv-trilho::-webkit-scrollbar { display: none; }
+.v2 .sv-trilho > .sv-posto { flex: 0 0 auto; width: calc(var(--sv-tel) + 36px); scroll-snap-align: start; }
+/* tem mais celular para o lado: a ponta esmaece */
+.v2 .sv-trilho.sv-mais-dir { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 56px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 56px), transparent); }
+.v2 .sv-trilho.sv-mais-esq { -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 56px), transparent); mask-image: linear-gradient(to left, #000 calc(100% - 56px), transparent); }
+.v2 .sv-trilho.sv-mais-esq.sv-mais-dir {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 56px, #000 calc(100% - 56px), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 56px, #000 calc(100% - 56px), transparent);
+}
+/* arrastando com o mouse: sem encaixe nem rolagem suave (seguem o ponteiro), sem selecionar texto */
+.v2 .sv-trilho.sv-arrastando { cursor: grabbing; scroll-snap-type: none; scroll-behavior: auto; user-select: none; }
+.v2 .sv-trilho.sv-arrastando * { pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .v2 .sv-trilho { scroll-behavior: auto; } }
+/* setas em vidro (.vidro-pro), no meio da altura dos celulares; somem na ponta */
+.v2 .sv-seta {
+  position: absolute; top: calc(50% - 32px); z-index: 4;
+  width: 48px; height: 48px; padding: 0; border-radius: 50%;
+  display: grid; place-items: center; color: var(--txt); cursor: pointer;
+}
+.v2 .sv-seta-esq { left: -6px; }
+.v2 .sv-seta-dir { right: -6px; }
+.v2 .sv-seta:disabled { opacity: 0; pointer-events: none; transform: scale(.88); }
+.v2 .sv-seta:focus-visible { outline: 2px solid var(--platina-a); outline-offset: 2px; }
+/* nomes da equipe (barra de cima): quem está na tela fica aceso; clique leva ao celular */
+.v2 .sv-pontos { display: flex; flex-wrap: wrap; gap: 6px; margin-left: 10px; }
+.v2 .sv-ponto {
+  display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 13px 0 11px;
+  border-radius: 99px; border: 1px solid var(--linha); background: rgba(var(--tint), .03);
+  color: var(--txt-2); font-family: var(--fonte); font-size: 12.5px; font-weight: 500; cursor: pointer;
+}
+.v2 .sv-ponto i { width: 8px; height: 8px; border-radius: 50%; opacity: .5; }
+.v2 .sv-ponto:hover { color: var(--txt); background: rgba(var(--tint), .06); }
+.v2 .sv-ponto-on { color: var(--txt); background: rgba(var(--tint), .085); border-color: rgba(var(--tint), .2); }
+.v2 .sv-ponto-on i { opacity: 1; }
 .v2 .sv-posto {
   display: flex; flex-direction: column; align-items: center; gap: 14px;
   padding: 14px 14px 16px; min-width: 0;
@@ -666,6 +704,9 @@
   html:root[data-perf] .v2 .zp-empurra { animation: zp-entra .3s cubic-bezier(.2, .8, .2, 1) both !important; }
   html:root[data-perf] .v2 .zp-giro { animation: zp-gira .8s linear infinite !important; }
   html:root[data-perf] .v2 .sv-posto { transition: border-color .3s var(--ease), box-shadow .3s var(--ease) !important; }
+  html:root[data-perf] .v2 .sv-seta { transition: opacity .2s var(--ease), transform .18s var(--ease) !important; }
+  html:root[data-perf] .v2 .sv-seta:hover { transform: scale(1.07); }
+  html:root[data-perf] .v2 .sv-ponto { transition: background-color .15s var(--ease), color .15s var(--ease), border-color .15s var(--ease) !important; }
   html:root[data-perf] .v2 .zp-onda-ponto { transition: left .25s linear !important; }
 }
 @keyframes sv-pulso {

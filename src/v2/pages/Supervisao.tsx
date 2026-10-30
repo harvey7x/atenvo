@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { periodoDash, useDashV5, type PresetDash } from '@/data/dashboardV5';
 import type { AtendenteV5 } from '@/data/dashboardV5.tipos';
@@ -9,6 +9,7 @@ import { SUPERVISAO_REAL, radarDoAtendente, resumirCarteira, useEquipeAoVivo } f
 import { CardVidro, EstadoErro, Segmentado, Skeleton } from '../components';
 import { VisualizadorImagem } from '../components/VisualizadorImagem';
 import { Celular } from './supervisao/Celular';
+import { Faixa, type ControleFaixa } from './supervisao/Faixa';
 import { FichaAtendente, type DadosPosto } from './supervisao/FichaAtendente';
 import { corDe, fmtHa, iniciaisDe, tomEspera } from './supervisao/zapUi';
 import './supervisao/supervisao.css';
@@ -66,9 +67,8 @@ function useAgora(passoMs = 15_000): number {
   return agora;
 }
 
-function Posto({ p, rotuloPeriodo, agora, zoom, aberta, foco, refPosto, aoAbrir, aoFicha, aoAbrirNoAtenvo, aoAmpliar }: {
+function Posto({ p, rotuloPeriodo, agora, zoom, aberta, foco, aoAbrir, aoFicha, aoAbrirNoAtenvo, aoAmpliar }: {
   p: DadosPosto; rotuloPeriodo: string; agora: number; zoom: number; aberta: string | null; foco: boolean;
-  refPosto: (el: HTMLElement | null) => void;
   aoAbrir: (conversaId: string | null) => void; aoFicha: () => void;
   aoAbrirNoAtenvo: (conversaId: string) => void; aoAmpliar: (url: string, nome: string) => void;
 }) {
@@ -76,7 +76,7 @@ function Posto({ p, rotuloPeriodo, agora, zoom, aberta, foco, refPosto, aoAbrir,
   const espera = resumo.esperaMaisAntiga ? Date.parse(resumo.esperaMaisAntiga) : 0;
   const tomRadar = radar.ultimoAviso ? 'rubro' : radar.emAviso ? 'ambar' : 'ok';
   return (
-    <article className={foco ? 'sv-posto sv-posto-foco' : 'sv-posto'} ref={refPosto} aria-label={`Celular de ${m.nome}`}>
+    <article className={foco ? 'sv-posto sv-posto-foco' : 'sv-posto'} data-faixa-id={m.id} aria-label={`Celular de ${m.nome}`}>
       <header className="sv-posto-cab">
         <span className="sv-av" style={{ background: corDe(m.id) }} aria-hidden>{iniciaisDe(m.nome)}</span>
         <div className="sv-posto-quem">
@@ -186,8 +186,9 @@ export default function SupervisaoV2() {
   const [fichaId, setFichaId] = useState<string | null>(null);
   const fichaPosto = fichaId ? postos.find((p) => p.membro.id === fichaId) ?? null : null;
 
-  /* da ficha para o celular: fecha a gaveta, leva o celular para o meio da tela e acende a borda */
-  const refs = useRef(new Map<string, HTMLElement>());
+  /* da ficha para o celular: fecha a gaveta, corre a faixa até o celular e acende a borda */
+  const faixa = useRef<ControleFaixa>(null);
+  const [naTela, setNaTela] = useState<ReadonlySet<string>>(new Set());
   const [foco, setFoco] = useState<string | null>(null);
   useEffect(() => {
     if (!foco) return;
@@ -198,7 +199,7 @@ export default function SupervisaoV2() {
     abrirNoCelular(membroId, conversaId);
     setFichaId(null);
     setFoco(membroId);
-    window.requestAnimationFrame(() => refs.current.get(membroId)?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+    window.requestAnimationFrame(() => faixa.current?.irPara(membroId));
   }, [abrirNoCelular]);
 
   const abrirNoAtenvo = useCallback((conversaId: string) => {
@@ -254,7 +255,20 @@ export default function SupervisaoV2() {
       </CardVidro>
 
       <div className="sv-barra">
-        <div className="sv-barra-esq"><b>Equipe</b><span className="sv-cont num">{postos.length}</span></div>
+        <div className="sv-barra-esq">
+          <b>Equipe</b><span className="sv-cont num">{postos.length}</span>
+          {/* quem está na tela fica aceso; clique corre a faixa até o celular da pessoa */}
+          {ordenados.length > 1 && (
+            <nav className="sv-pontos" aria-label="Celulares da equipe">
+              {ordenados.map(({ membro: m }) => (
+                <button key={m.id} type="button" className={naTela.has(m.id) ? 'sv-ponto sv-ponto-on' : 'sv-ponto'}
+                  onClick={() => faixa.current?.irPara(m.id)} aria-label={`Ir para o celular de ${m.nome}`} aria-current={naTela.has(m.id) || undefined}>
+                  <i style={{ background: corDe(m.id) }} aria-hidden />{m.nome}
+                </button>
+              ))}
+            </nav>
+          )}
+        </div>
         <div className="sv-barra-dir">
           <span className="sv-rot">Ordenar</span>
           <Segmentado rotulo="Ordenar os celulares" opcoes={ORDENS} valor={ordem} aoMudar={setOrdem} />
@@ -268,7 +282,7 @@ export default function SupervisaoV2() {
           <EstadoErro titulo="Não foi possível carregar as conversas da equipe" descricao={equipe.erro} aoTentarDeNovo={equipe.recarregar} />
         </CardVidro>
       ) : (
-        <div className="sv-parede" style={{ '--sv-tel': `${larguraTel}px` } as CSSProperties}>
+        <Faixa ref={faixa} larguraTel={larguraTel} ids={equipe.carregando ? [] : ordenados.map((p) => p.membro.id)} aoMudarNaTela={setNaTela}>
           {equipe.carregando
             ? [0, 1, 2, 3].map((i) => (
               <div key={i} className="sv-posto sv-posto-esq" aria-hidden>
@@ -285,17 +299,16 @@ export default function SupervisaoV2() {
                 zoom={zoom}
                 aberta={abertas[p.membro.id] ?? null}
                 foco={foco === p.membro.id}
-                refPosto={(el) => { if (el) refs.current.set(p.membro.id, el); else refs.current.delete(p.membro.id); }}
                 aoAbrir={(id) => abrirNoCelular(p.membro.id, id)}
                 aoFicha={() => setFichaId(p.membro.id)}
                 aoAbrirNoAtenvo={abrirNoAtenvo}
                 aoAmpliar={aoAmpliar}
               />
             ))}
-          {!equipe.carregando && !postos.length && (
-            <CardVidro className="sv-vazio">Nenhum atendente com carteira de clientes ainda.</CardVidro>
-          )}
-        </div>
+        </Faixa>
+      )}
+      {!equipe.carregando && !equipe.erro && !postos.length && (
+        <CardVidro className="sv-vazio">Nenhum atendente com carteira de clientes ainda.</CardVidro>
       )}
 
       <FichaAtendente
