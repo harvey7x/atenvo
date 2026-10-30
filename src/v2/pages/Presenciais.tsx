@@ -203,7 +203,7 @@ export default function Presenciais() {
           <CardVidro spot className="pr-cal">
             <div className="pr-cal-cab">
               <BotaoMini onClick={() => mudarMes(-1)} aria-label="Mês anterior">‹</BotaoMini>
-              <h3>{MESES[m - 1]} de {a}</h3>
+              <h3>{MESES[m - 1].charAt(0).toUpperCase() + MESES[m - 1].slice(1)} de {a}</h3>
               <BotaoMini onClick={() => mudarMes(1)} aria-label="Próximo mês">›</BotaoMini>
               <BotaoMini className="pr-hoje" onClick={() => { setMes(hoje.slice(0, 7)); setDiaSel(hoje); }}>Hoje</BotaoMini>
             </div>
