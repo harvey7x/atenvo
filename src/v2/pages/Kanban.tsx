@@ -20,7 +20,7 @@ import { useSlaAlertas } from '@/data/sla';
 import { indexPorChave, type SlaAlerta, type SlaTipo } from '@/data/slaView';
 import { useVacuoRepasses, repassesPorOportunidade, estagioAviso, type VacuoRepasse } from '@/data/vacuo';
 import { corDaEtiqueta, type Etiqueta } from '@/types/atendimento';
-import { initials } from '@/lib/avatar';
+import { initials, avatarColor } from '@/lib/avatar';
 import { useVisibilidade } from '@/lib/visibilidade';
 import { FichaJudicialBox } from '@/components/FichaJudicialBox';
 import { RelacionamentoContatoBox } from '@/components/RelacionamentoContatoBox';
@@ -28,6 +28,7 @@ import { DocumentosInssBox } from '@/components/DocumentosInssBox';
 import { useBloqueiosOrg } from '../hooks/bloqueiosOrg';
 import { BotaoPrimario, BotaoSec, CardVidro, DrawerV2, EstadoErro, ModalV2, Skeleton } from '../components';
 import './kanban.css';
+import './kanban-pro.css';
 
 /* ------------------------------------------------------------------
    Kanban v2 — funil comercial (anatomia pg-kanban do mockup; verdade
@@ -105,6 +106,8 @@ const SLA_OCULTO_NO_CARD = new Set<SlaTipo>(['parado_ha_muito_tempo', 'prazo_2_d
 /** LIMIAR DECLARADO da estagnação visual (trilho rubro + "parado Xd"):
     7 dias sem trocar de coluna (movimentadoEm), só em lead aberto em coluna neutra. */
 const LIMIAR_PARADO_DIAS = 7;
+/** Kanban PRO (29/10): cards montados por vez em cada coluna (o resto vem ao rolar / "Mostrar mais"). */
+const PASSO_CARDS = 40;
 const diasParado = (l: KLead) => {
   const base = l.movimentadoEm || l.entradaEm || l.criadoEm;
   if (!base) return 0;
@@ -308,6 +311,8 @@ export default function KanbanV2() {
 
   const [detId, setDetId] = useState<string | null>(null);
   const [destaque, setDestaque] = useState<string | null>(null);
+  // Kanban PRO (29/10): cada coluna monta os cards aos poucos (Lead Novo passa de 2 mil) — mais rolando
+  const [limiteCol, setLimiteCol] = useState<Record<string, number>>({});
   const [filtroOrigem, setFiltroOrigem] = useState<string | null>(null); // v2.1: origem repetida vira filtro no topo
   // v3 — ordenação inteligente (persistida) + Foco (filtro opcional, NÃO ocupa espaço vertical) + recolher coluna.
   const [sortModo, setSortModo] = useState<SortModo>(() => { try { const s = sessionStorage.getItem('atenvo-kb-sort'); return s === 'lembrete' || s === 'recencia' ? s : 'urgencia'; } catch { return 'urgencia'; } });
@@ -862,7 +867,7 @@ export default function KanbanV2() {
   /* ---------- estados de página (contrato item 7: skeleton em vidro + EstadoErro) ---------- */
   if (!demo && k.loading) {
     return (
-      <div className="kb-pg">
+      <div className="kb-pg kb-pro">
         <div className="kb-skel" aria-busy aria-label="Carregando funil">
           {[0, 1, 2].map((i) => (
             <CardVidro key={i} className="kb-skel-col">
@@ -877,7 +882,7 @@ export default function KanbanV2() {
   }
   if (!demo && k.isError) {
     return (
-      <div className="kb-pg">
+      <div className="kb-pg kb-pro">
         <div className="kb-estado">
           <EstadoErro descricao="Não foi possível carregar o Kanban." aoTentarDeNovo={() => k.refetch()} />
         </div>
@@ -886,7 +891,7 @@ export default function KanbanV2() {
   }
   if (colunas.length === 0) {
     return (
-      <div className="kb-pg">
+      <div className="kb-pg kb-pro">
         <div className="kb-vazio-geral sobe">
           <IcKb />
           <div className="t">Seu funil está vazio</div>
@@ -900,7 +905,7 @@ export default function KanbanV2() {
   }
 
   return (
-    <div className="kb-pg">
+    <div className="kb-pg kb-pro">
       <div className="ph sobe">
         <div>
           <h2>Kanban</h2>
@@ -1030,6 +1035,11 @@ export default function KanbanV2() {
                 </button>
               );
             }
+            // aos poucos: PASSO cards por vez (o card em destaque sempre entra)
+            const idxDest = destaque ? cardsCol.findIndex((l) => l.id === destaque) : -1;
+            const lim = Math.max(limiteCol[col.id] ?? PASSO_CARDS, idxDest + 1);
+            const faltam = Math.max(0, cardsCol.length - lim);
+            const maisCards = () => setLimiteCol((m) => ({ ...m, [col.id]: lim + PASSO_CARDS }));
             const renderCard = (l: KLead) => (
               <CardKc
                 key={l.id} l={l} colunas={colunas} etiquetasCat={etiquetas}
@@ -1051,14 +1061,14 @@ export default function KanbanV2() {
               <div
                 key={col.id}
                 className={'kb-col sobe' + (hoverCol === col.id ? ' col-drop' : '') + (colArrastando === col.id ? ' arrastando' : '') + (gargalo ? ' gargalo' : '')}
-                style={{ animationDelay: atraso }}
+                style={{ animationDelay: atraso, ['--c']: col.cor } as React.CSSProperties}
                 onDragOver={(e) => { if (dragColId.current && dragColId.current !== col.id) { e.preventDefault(); setHoverCol(col.id); } }}
                 onDrop={(e) => { if (dragColId.current) { e.preventDefault(); e.stopPropagation(); soltarColuna(col.id); } }}
               >
                 <div
                   className="kb-cab"
-                  /* sublinhado na COR da coluna (anatomia da referência) — borda real de 2px */
-                  style={{ borderBottom: `2px solid ${col.cor}73`, ['--c']: col.cor } as React.CSSProperties}
+                  /* a COR da coluna vem do --c da coluna (faixa no topo, kanban-pro.css) */
+                  style={{ ['--c']: col.cor } as React.CSSProperties}
                   draggable={podeConfig && !col.entrada}
                   onDragStart={(e) => {
                     if (!podeConfig || col.entrada) { e.preventDefault(); return; }
@@ -1072,7 +1082,7 @@ export default function KanbanV2() {
                   {/* v5: o dot saiu do cabeçalho expandido — a cor da coluna vive no sublinhado (na recolhida o dot fica) */}
                   <span className="n" title={col.nome}>{col.nome}</span>
                   {col.entrada && <span className="tag-entrada" title="Coluna de entrada — recebe novos leads dos canais">entrada</span>}
-                  <span className="q num">{todosCol.length}</span>
+                  <span className="q num">{todosCol.length.toLocaleString('pt-BR')}</span>
                   {podeConfig && (
                     <span className="kb-menu-wrap">
                       <button type="button" className="mbtn" aria-label={'Ações da coluna ' + col.nome} onClick={(e) => { e.stopPropagation(); setMenu(menu?.kind === 'col' && menu.id === col.id ? null : { kind: 'col', id: col.id, ...posMenu(e.currentTarget) }); }}>
@@ -1087,14 +1097,20 @@ export default function KanbanV2() {
                     ? <span className="rec">{nRecentesCol} nos últimos 7 dias</span>
                     : (
                       <>
-                        <span className={'par' + (nParadosCol > 0 ? '' : ' zero')}>{nParadosCol} parado{nParadosCol === 1 ? '' : 's'}</span>
-                        <span className="rec">· {nRecentesCol} recente{nRecentesCol === 1 ? '' : 's'}</span>
+                        <span className={'par' + (nParadosCol > 0 ? '' : ' zero')}>{nParadosCol.toLocaleString('pt-BR')} parado{nParadosCol === 1 ? '' : 's'}</span>
+                        <span className="rec">· {nRecentesCol.toLocaleString('pt-BR')} recente{nRecentesCol === 1 ? '' : 's'}</span>
                       </>
                     )}
-                  {gargalo && <span className="glr" title={`${nParadosCol} leads travados +${LIMIAR_PARADO_DIAS}d nesta etapa — gargalo do funil`}>Gargalo · {nParadosCol}</span>}
+                  {gargalo && <span className="glr" title={`${nParadosCol} leads travados +${LIMIAR_PARADO_DIAS}d nesta etapa — gargalo do funil`}>Gargalo</span>}
+                  {!desfecho && todosCol.length > 0 && (
+                    <span className="kb-sub-bar" aria-hidden title={`${nParadosCol} parados de ${todosCol.length}`}>
+                      <i style={{ width: Math.round((nParadosCol / todosCol.length) * 100) + '%' }} />
+                    </span>
+                  )}
                 </div>
                 <div
                   className="kb-corpo"
+                  onScroll={(e) => { const t = e.currentTarget; if (faltam > 0 && t.scrollTop + t.clientHeight > t.scrollHeight - 400) maisCards(); }}
                   onDragOver={(e) => { if (dragColId.current) return; e.preventDefault(); setHover(col.id); }}
                   onDragLeave={() => setHover((hAtual) => (hAtual === col.id ? null : hAtual))}
                   onDrop={() => {
@@ -1106,7 +1122,12 @@ export default function KanbanV2() {
                     if (id) mover(id, col.id);
                   }}
                 >
-                  {cardsCol.map(renderCard)}
+                  {cardsCol.slice(0, lim).map(renderCard)}
+                  {faltam > 0 && (
+                    <button type="button" className="kb-mais" onClick={maisCards}>
+                      Mostrar mais {Math.min(PASSO_CARDS, faltam)} <span className="num">· faltam {faltam.toLocaleString('pt-BR')}</span>
+                    </button>
+                  )}
                   {hover === col.id && dragando && <div className="fantasma" aria-hidden />}
                   {cardsCol.length === 0 && hover !== col.id && <div className="kb-vazia">{foco ? 'Nada crítico aqui' : 'Sem leads'}</div>}
                   <button type="button" className="kb-add" onClick={() => abrirNovoLead(col.id)}><IcMais />Adicionar lead</button>
@@ -1560,13 +1581,22 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, repasse, fichaInfo, o
         </div>
       )}
 
-      {/* L7 RODAPÉ: gente + tempo + WhatsApp */}
+      {/* L7 RODAPÉ: gente + (ação OU tempo) + WhatsApp. Kanban PRO (29/10): a ação que era a faixa
+          do pé virou SELO aqui — o board deixou de ser um mar vermelho; a borda esquerda segue o alerta */}
       <div className="kc-foot">
-        <span className={'kc-av' + (l.respNome ? '' : ' semdono')} title={l.respNome ? 'Responsável · ' + l.respNome : 'Sem responsável'}>{l.respNome ? initials(l.respNome) : '·'}</span>
+        <span className={'kc-av' + (l.respNome ? '' : ' semdono')} title={l.respNome ? 'Responsável · ' + l.respNome : 'Sem responsável'}
+          style={l.respNome ? ({ ['--av']: avatarColor(l.respNome) } as React.CSSProperties) : undefined}>{l.respNome ? initials(l.respNome) : '·'}</span>
         <span className={'kc-resp' + (l.respNome ? '' : ' none')} title={l.respNome || 'Não atribuído'}>{l.respNome || 'Não atribuído'}</span>
-        <span className={'kc-time num' + (paradoAtivo ? (hot ? ' hot' : ' warm') : '')} title={paradoAtivo ? `Sem trocar de coluna há ${dp} dia(s)` : 'Última atualização'}>
-          {paradoAtivo ? `parado ${dp}d` : haDe(l.atualizadoEm || l.criadoEm)}
-        </span>
+        {badge ? (
+          <span className={'kc-acao num ' + badge.cls}
+            title={badge.txt + (paradoAtivo ? ` — sem trocar de coluna há ${dp} dia(s)` : '')}>
+            {badge.cls === 'hot' && paradoAtivo ? `Retomar · ${dp}d` : badge.txt}
+          </span>
+        ) : (
+          <span className={'kc-time num' + (paradoAtivo ? (hot ? ' hot' : ' warm') : '')} title={paradoAtivo ? `Sem trocar de coluna há ${dp} dia(s)` : 'Última atualização'}>
+            {paradoAtivo ? `parado ${dp}d` : haDe(l.atualizadoEm || l.criadoEm)}
+          </span>
+        )}
         {l.conversaOrigemId && (
           <button type="button" className="kc-wa" title="Abrir a conversa do cliente no WhatsApp" aria-label={'Abrir a conversa de ' + l.nome + ' no WhatsApp'}
             onClick={(e) => { e.stopPropagation(); aoAbrirConversa(); }}>
@@ -1575,8 +1605,6 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, repasse, fichaInfo, o
         )}
       </div>
 
-      {/* L8 FAIXA DE AÇÃO full-width no pé — o call-to-action que o atendente varre */}
-      {badge && <span className={'kc-badge ' + badge.cls} title={badge.txt}>{badge.txt}</span>}
     </div>
   );
 }
