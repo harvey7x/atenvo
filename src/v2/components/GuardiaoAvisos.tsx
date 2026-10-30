@@ -1088,7 +1088,7 @@ export function GuardiaoAvisos({ bloqueado = false }: { bloqueado?: boolean }) {
   useEffect(() => {
     if (tela || !uid || !carregado || bloqueado) return;                      // bloqueado = Intro do dia aberta
     if (document.visibilityState !== 'visible') return;                     // a aba visível é que mostra
-    if (document.querySelector('.intro-veu, .rdr-central')) return;          // Intro do dia (reforço), Central aberta
+    if (document.querySelector('.bd-veu, .rdr-central')) return;            // Bom dia (reforço), Central aberta
     const agora = Date.now();
     // aviso de atualização: fica até a pessoa recarregar — segura só o último aviso, e só no 1º minuto dele;
     // o pedido do gestor passa sempre

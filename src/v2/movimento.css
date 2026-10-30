@@ -561,23 +561,6 @@ html .v2 .aviso-inline.cfg-aviso {
   html:root[data-perf] .v2 .intg-nome { transition: background-color var(--mo-r) var(--mo-pad) !important; }
   /* simulador: a barra fixa de total desliza ao sumir/voltar (.oculta) */
   html:root[data-perf] .v2 .sim-barra-total { transition: transform var(--mo-l) var(--mo-enf), opacity var(--mo-m) var(--mo-pad) !important; }
-  /* intro do dia (uma vez por dia; o blur dela é estático): o véu entra na curva de
-     entrada e a cascata (.it-p = filhos do palco, IntroDia.tsx) só começa aos 80ms —
-     o fundo já está quase opaco quando o texto chega (antes "Boa tarde" nascia sobre o
-     inbox nítido). opacity:1 no repouso — no Completo a regra-base nasce em 0. */
-  html:root[data-perf] .v2 .intro-veu { animation: v2-mo-esmaece var(--mo-l) var(--mo-enf) backwards !important; }
-  html:root[data-perf] .v2 .intro-palco > .it-p { opacity: 1; transform: none; animation: v2-mo-sobe var(--mo-l) var(--mo-enf) 80ms backwards !important; }
-  html:root[data-perf] .v2 .intro-palco > .it-p:nth-child(2) { animation-delay: 110ms !important; }
-  html:root[data-perf] .v2 .intro-palco > .it-p:nth-child(3) { animation-delay: 140ms !important; }
-  html:root[data-perf] .v2 .intro-palco > .it-p:nth-child(4) { animation-delay: 170ms !important; }
-  html:root[data-perf] .v2 .intro-palco > .it-p:nth-child(5) { animation-delay: 200ms !important; }
-  html:root[data-perf] .v2 .intro-palco > .it-p:nth-child(6) { animation-delay: 230ms !important; }
-  html:root[data-perf] .v2 .intro-palco > .it-p:nth-child(7) { animation-delay: 260ms !important; }
-  html:root[data-perf] .v2 .intro-palco > .it-p:nth-child(8) { animation-delay: 290ms !important; }
-  html:root[data-perf] .v2 .it-disc { transition: transform var(--mo-m) var(--mo-enf), box-shadow var(--mo-m) var(--mo-pad) !important; }
-  html:root[data-perf] .v2 .it-disc svg { transition: opacity var(--mo-r) var(--mo-pad), transform var(--mo-m) var(--mo-enf) !important; }
-  html:root[data-perf] .v2 .it-seg-thumb { transition: transform var(--mo-l) var(--mo-enf) !important; }
-  html:root[data-perf] .v2 .it-seg-opt { transition: color var(--mo-m) var(--mo-pad) !important; }
 }
 
 /* ============================================================

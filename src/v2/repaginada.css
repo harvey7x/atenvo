@@ -458,14 +458,6 @@ html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .wa-gru
   background: linear-gradient(180deg, color-mix(in srgb, var(--platina-a), #fff 13%), var(--platina-a));
   box-shadow: none;
 }
-/* polegar do segmentado da intro do dia: sem o fio branco a 65% */
-html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .it-seg-thumb {
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .24), 0 1px 3px rgba(0, 0, 0, .45);
-}
-/* discos de cor da intro (cor inline): os mesmos tons fundos da gota */
-html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .it-disc[data-cor="azul"] { background: #4A78E6 !important; }
-html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .it-disc[data-cor="verde"] { background: #2FB574 !important; }
-html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .it-disc[data-cor="dourado"] { background: #D9A640 !important; }
 
 /* 15b. "IA ligada" no cabeçalho do atendimento: o .btn-sec da repaginada
    apagava o verde (ficava igual a desligada) — volta como chapa verde funda */

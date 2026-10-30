@@ -18,8 +18,11 @@ import { GuardiaoAvisos, RadarBarra } from '../components/GuardiaoAvisos';
 import { SinoPainel, naoLidasQueAcendem, useSino } from './SinoPainel';
 import { useNotificacaoInbound } from '../hooks/useNotificacaoInbound';
 import { aplicarTema, lerTema, salvarTema, type Tema } from '../lib/tema';
-import { deveMostrarIntroDia, marcarIntroVista } from '../lib/introDia';
-import { IntroDia } from '../components/IntroDia';
+import {
+  HORA_FIM_DIA, hojeLocal, marcarMomentoVisto, momentoAtual, momentoDevido, msAteProximoMomento, proximaTelaBomDia, type TelaBomDia,
+} from '../lib/bomDia';
+import { BomDia } from '../components/BomDia';
+import { assinarPreviaGestor, BOM_DIA_REAL, buscarModoBomDia, prepararBomDia } from '@/data/bomDia';
 import { AvisoAtualizacao } from '../components/AvisoAtualizacao';
 import { ComparadorVisual } from '../components/ComparadorVisual';
 import { DEMO_MODE } from '@/lib/demo';
@@ -53,6 +56,10 @@ type ItemNav = { slug: string; rotulo: string; admin?: boolean };
 /* `fixo`: grupo preso ao pé da sidebar, sem rótulo, acima do usuário — fica
    sempre visível mesmo quando a lista de cima precisa rolar. */
 type GrupoNav = { rotulo: string; itens: ItemNav[]; fixo?: boolean };
+/* Menu do perfil GESTOR (o administrador Murilo — dono 30/10): Operação, Kanban, Dashboard, Painel da
+   Equipe e Ferramentas; sem a Central de Avisos "por enquanto" e sem o Acompanhamento (não listado). */
+const ESCONDIDO_DO_GESTOR = new Set(['radar', 'pendencias']);
+
 const GRUPOS: GrupoNav[] = [
   {
     rotulo: 'Operação',
@@ -199,15 +206,127 @@ export default function AppShellV2() {
   const [tema, setTema] = useState<Tema>(() => lerTema(escopoTema));
   useEffect(() => { setTema(lerTema(escopoTema)); }, [escopoTema]); // recarrega a preferência quando o usuário resolve
 
-  // Intro do dia: primeira entrada de cada dia (o auth resolve assíncrono —
-  // só decide quando o user existe; virou a data local = mostra de novo)
-  // já nasce aberta quando a Intro do dia vai aparecer: as telas cheias do Radar ficam bloqueadas desde o 1º commit
-  const [introAberta, setIntroAberta] = useState(() => !!user?.id && deveMostrarIntroDia(user.id));
-  useEffect(() => { if (user?.id && deveMostrarIntroDia(user.id)) setIntroAberta(true); }, [user?.id]);
-  const concluirIntro = useCallback(() => {
-    marcarIntroVista(user?.id ?? undefined);
-    setIntroAberta(false);
-  }, [user?.id]);
+  // Bom dia do Atenvo (dono 30/10): DOIS momentos — às 8h para todos e às 17h só para o GESTOR (quem está
+  // em bom_dia_gestores: o Murilo). Quem entra depois do horário vê ao entrar; com o sistema aberto, abre
+  // sozinho no horário (e espera o play: a tela nunca fala sozinha). Já nasce aberto quando vai aparecer:
+  // as telas cheias do Radar ficam bloqueadas desde o 1º commit. O dia é marcado na ABERTURA (outra aba
+  // não repete). Depois das 17h, sem saber ainda se a pessoa é gestor, espera a RPC (o gestor ouve o da
+  // tarde, não o da manhã). A tela guarda o DIA em que abriu: esquecida aberta de um dia para o outro
+  // (falta, fim de semana com o notebook no site), às 8h ela dá lugar à de hoje (proximaTelaBomDia).
+  const orgBomDia = currentOrg?.id ?? '';
+  const [modoBomDia, setModoBomDia] = useState<'gestor' | 'vendedor' | null>(null);
+  useEffect(() => {
+    if (!user?.id || !orgBomDia) return;
+    let vivo = true;
+    buscarModoBomDia(orgBomDia)
+      .then((m) => { if (vivo) setModoBomDia(m); })
+      .catch(() => { if (vivo) setModoBomDia('vendedor'); });
+    // a RPC não respondeu (rede presa): segue como vendedor — se ela responder depois, o modo se corrige
+    const teto = window.setTimeout(() => { if (vivo) setModoBomDia((m) => m ?? 'vendedor'); }, 6000);
+    // demo: o modo é a pessoa escolhida na barra da prévia
+    const sair = BOM_DIA_REAL ? () => undefined : assinarPreviaGestor((g) => setModoBomDia(g ? 'gestor' : 'vendedor'));
+    return () => { vivo = false; window.clearTimeout(teto); sair(); };
+  }, [user?.id, orgBomDia]);
+  const gestorBomDia = modoBomDia === 'gestor';
+  const [bomDia, setBomDia] = useState<TelaBomDia | null>(() => {
+    if (!user?.id || new Date().getHours() >= HORA_FIM_DIA) return null;
+    const m = momentoDevido(user.id);
+    return m ? { momento: m, dia: hojeLocal() } : null;
+  });
+  const bomDiaRef = useRef(bomDia);
+  bomDiaRef.current = bomDia;
+  const bomDiaMeuRef = useRef(false); // esta aba marcou o momento (o StrictMode roda o efeito 2x)
+  const bomDiaNoInicioRef = useRef(bomDia !== null); // aberto otimista no 1º render (pode ser de outra aba)
+  const devolverFocoRef = useRef<HTMLElement | null>(null);
+  const preparoBomDiaRef = useRef({ org: '', nome: '' });
+  useEffect(() => {
+    const uid = user?.id;
+    if (!uid) return;
+    const gestor = modoBomDia === 'gestor';
+    const modoConhecido = modoBomDia !== null;
+    let vivo = true;
+    let ultimaTecla = 0;
+    let tAbre = 0;
+    let tPre = 0;
+    let tDigitando = 0;
+    const aoTeclar = () => { ultimaTecla = Date.now(); };
+    const abrir = (motivo: 'entrada' | 'agendado') => {
+      const tentar = () => {
+        if (!vivo) return;
+        const agora = new Date();
+        if (!modoConhecido && agora.getHours() >= HORA_FIM_DIA) return;
+        const m = momentoDevido(uid, agora, { gestor });
+        if (m) {
+          // o outro resumo de HOJE ainda está na tela (ex.: o da manhã esquecido aberto até as 17h): espera
+          // fechar. A tela de OUTRO dia não segura nada: dá lugar à de hoje (abaixo)
+          if (proximaTelaBomDia(bomDiaRef.current, m, agora) === 'esperar') return;
+          // no horário, no meio de uma mensagem: espera a pessoa parar de digitar
+          const el = document.activeElement as HTMLElement | null;
+          const editando = !!el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName));
+          if (motivo === 'agendado' && editando && Date.now() - ultimaTecla < 8000) {
+            window.clearTimeout(tDigitando);
+            tDigitando = window.setTimeout(() => abrir(motivo), 10_000);
+            return;
+          }
+          marcarMomentoVisto(uid, m, agora);
+          bomDiaMeuRef.current = true;
+          bomDiaNoInicioRef.current = false;
+          // a mesma tela de hoje fica (o mesmo objeto); a de outro dia vira a de hoje: identidade nova →
+          // o Hud remonta e prepara de novo (números e voz do dia)
+          setBomDia((b) => {
+            const prox = proximaTelaBomDia(b, m, agora);
+            return prox === 'esperar' ? b : prox;
+          });
+        } else if (bomDiaRef.current && bomDiaRef.current.dia !== hojeLocal(agora)) {
+          setBomDia(null); // a tela de outro dia esquecida nesta aba: outra aba já abriu a de hoje
+        } else if (!bomDiaMeuRef.current && bomDiaNoInicioRef.current) {
+          bomDiaNoInicioRef.current = false;
+          setBomDia(null); // outra aba já mostrou hoje
+        }
+      };
+      // abas abertas juntas: a trava faz uma de cada vez — a 2ª já encontra o momento marcado
+      const locks = (navigator as Navigator & { locks?: LockManager }).locks;
+      if (locks) locks.request('atenvo-bomdia', { ifAvailable: true }, async (l) => { if (l) tentar(); }).catch(tentar);
+      else tentar();
+    };
+    const preaquecer = () => {
+      const p = preparoBomDiaRef.current;
+      const m = momentoDevido(uid, new Date(Date.now() + 3 * 60_000), { gestor });
+      if (p.org && m) prepararBomDia({ uid, org: p.org, nome: p.nome, momento: m, gestor });
+    };
+    const agendar = () => {
+      window.clearTimeout(tAbre);
+      window.clearTimeout(tPre);
+      const ms = msAteProximoMomento(new Date(), { gestor });
+      tAbre = window.setTimeout(() => { abrir('agendado'); agendar(); }, ms + 400 + Math.random() * 1200);
+      // 2 min antes: números e voz prontos no horário
+      if (ms > 120_000) tPre = window.setTimeout(preaquecer, ms - 120_000);
+    };
+    abrir('entrada');
+    agendar();
+    // notebook dormindo congela o setTimeout: reconfere a cada minuto e ao voltar para a aba
+    const devido = () => momentoDevido(uid, new Date(), { gestor }) !== null;
+    const iv = window.setInterval(() => { if (devido()) abrir('agendado'); }, 60_000);
+    const aoVoltar = () => { if (document.visibilityState === 'visible' && devido()) abrir('agendado'); };
+    document.addEventListener('visibilitychange', aoVoltar);
+    window.addEventListener('keydown', aoTeclar, true);
+    return () => {
+      vivo = false;
+      window.clearTimeout(tAbre);
+      window.clearTimeout(tPre);
+      window.clearTimeout(tDigitando);
+      window.clearInterval(iv);
+      document.removeEventListener('visibilitychange', aoVoltar);
+      window.removeEventListener('keydown', aoTeclar, true);
+    };
+  }, [user?.id, modoBomDia]);
+  // aberto pelo menu: o item some no mesmo clique — o foco volta para o avatar ao fechar
+  const concluirBomDia = useCallback(() => {
+    setBomDia(null);
+    const alvo = devolverFocoRef.current;
+    devolverFocoRef.current = null;
+    if (alvo) window.requestAnimationFrame(() => { if (alvo.isConnected) alvo.focus({ preventScroll: true }); });
+  }, []);
   useEffect(() => { aplicarTema(tema); }, [tema]);
   // valor explícito (a intro do dia escolhe direto); o toggle da topbar cicla por cima
   const definirTema = useCallback((novo: Tema) => {
@@ -332,6 +451,7 @@ export default function AppShellV2() {
   const papel = currentOrg ? (PAPEL_ROTULO[currentOrg.role] ?? currentOrg.role) : '—';
   const org = currentOrg?.name ?? 'Atenvo';
   const admin = !currentOrg || currentOrg.role === 'admin';
+  preparoBomDiaRef.current = { org: currentOrg?.id ?? '', nome };
 
   // Fase 2.0: troca de organização — só EXISTE para quem tem mais de um vínculo
   const [menuOrg, setMenuOrg] = useState(false);
@@ -410,7 +530,7 @@ export default function AppShellV2() {
           )}
           <nav className="sb-nav" ref={navRef} aria-label="Navegação principal">
             {modulo.grupos.filter((g) => !g.fixo).map((g) => {
-              const itens = g.itens.filter((i) => admin || !i.admin);
+              const itens = g.itens.filter((i) => (admin || !i.admin) && !(gestorBomDia && ESCONDIDO_DO_GESTOR.has(i.slug)));
               if (!itens.length) return null;
               return (
                 <div className="grupo" key={g.rotulo}>
@@ -421,7 +541,7 @@ export default function AppShellV2() {
             })}
           </nav>
           {modulo.grupos.filter((g) => g.fixo).map((g) => {
-            const itens = g.itens.filter((i) => admin || !i.admin);
+            const itens = g.itens.filter((i) => (admin || !i.admin) && !(gestorBomDia && ESCONDIDO_DO_GESTOR.has(i.slug)));
             if (!itens.length) return null;
             return (
               <nav className="sb-fixo" key={g.rotulo} aria-label={g.rotulo}>
@@ -464,7 +584,8 @@ export default function AppShellV2() {
               <span className="busca-texto">Buscar contatos, conversas, cobranças…</span><kbd>⌘K</kbd>
             </div>
             {/* Radar de Atendimento: cápsula Em negociação · Fechados · Ligar · Decisões no vão entre a busca e os ícones */}
-            <div className="radar-slot"><RadarBarra /></div>
+            {/* o perfil gestor (Murilo) não vê a Central de Avisos por enquanto (dono 30/10) */}
+            {!gestorBomDia && <div className="radar-slot"><RadarBarra /></div>}
             <div className="top-dir">
               <button
                 type="button" className="ib"
@@ -511,6 +632,12 @@ export default function AppShellV2() {
                       <div className="um-cargo">{papel}</div>
                     </div>
                     <button type="button" role="menuitem" className="um-item" onClick={() => { setMenuUsuario(false); navigate('/configuracoes'); }}>Configurações</button>
+                    <button type="button" role="menuitem" className="um-item" onClick={() => {
+                      setMenuUsuario(false);
+                      bomDiaNoInicioRef.current = false;
+                      devolverFocoRef.current = avatarRef.current;
+                      setBomDia({ momento: momentoAtual(new Date(), { gestor: gestorBomDia }), dia: hojeLocal() });
+                    }}>Ouvir o bom dia</button>
                     <button type="button" role="menuitem" className="um-item perigo" onClick={sair}>Sair</button>
                   </div>
                 </>,
@@ -541,10 +668,20 @@ export default function AppShellV2() {
         </main>
 
         {/* portais soltos: intro do dia + aviso de deploy (dono 28/08) */}
-        <IntroDia aberta={introAberta} aoConcluir={concluirIntro} nome={nome} tema={tema} aoMudarTema={definirTema} />
+        <BomDia
+          aberta={bomDia !== null && !!user?.id && !!currentOrg?.id}
+          momento={bomDia?.momento ?? 'manha'}
+          dia={bomDia?.dia ?? ''}
+          gestor={gestorBomDia}
+          aoConcluir={concluirBomDia}
+          nome={nome}
+          uid={user?.id ?? ''}
+          orgId={currentOrg?.id ?? ''}
+        />
         <AvisoAtualizacao />
         {/* Radar de Atendimento (23/10): takeover do último aviso (a pílula fica na barra) */}
-        <GuardiaoAvisos bloqueado={introAberta} />
+        {/* depois das 17h, enquanto o modo (gestor?) não chegou, o Radar também espera */}
+        <GuardiaoAvisos bloqueado={gestorBomDia || bomDia !== null || (modoBomDia === null && !!orgBomDia && new Date().getHours() >= HORA_FIM_DIA)} />
         {/* prévia da repaginada (27/10): comparador Antes/Depois, só no demo LOCAL
             (nunca num build publicado, nem no demo de cliente) */}
         {import.meta.env.DEV && DEMO_MODE && <ComparadorVisual />}

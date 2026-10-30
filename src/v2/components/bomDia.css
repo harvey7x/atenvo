@@ -1,0 +1,493 @@
+/* ============================================================
+   BOM DIA DO ATENVO — fluxo falado PRETO E BRANCO com a ESFERA
+   LÍQUIDA (dono 30/10: "deixa mais minimalista, profissional…
+   pode ser na cor preta e no branco"). Nenhuma cor: fundo preto
+   puro, forma branca/prateada, textos branco e cinzas — inclusive
+   no painel e no "Começar o dia" (branco com texto preto). O acento
+   do sistema não entra nesta tela.
+   - No meio: a ESFERA (1 canvas WebGL pequeno, bomDiaAnimacao.ts),
+     escura, de vidro, com um redemoinho de metal líquido por dentro;
+     respira em repouso e reage à voz REAL. Sem WebGL: a pose
+     estática em CSS (.bd-esfera-estatica).
+   - Embaixo: a legenda palavra a palavra (a frase troca no início
+     da pausa; o número dito fica branco e a esfera dá um brilho).
+   - Ao abrir: a esfera respirando, a saudação e o PLAY ("Ouvir o
+     resumo", pílula branca) — a tela nunca fala sozinha (dono 30/10).
+   - No fim: SOBE o painel (vidro fumê muito sutil) e a esfera pousa
+     no alto, no meio do topo, respirando. O do GESTOR (o Murilo) tem 6
+     cartões compactos, 3 por linha (manhã e o diagnóstico das 17h).
+   Escala: múltiplos de --bd-u (1px no notebook 1366×657, até 1,42px
+   no 1920×1000; o JS mede o canvas pelo layout, não lê o clamp()).
+   Prefixo bd- (colisoesCss). MOVIMENTO no padrão da casa: o CSS de
+   base é o estado FINAL; entradas e transições em "sem reduzir
+   movimento" com html:root[data-perf] (vencem o kill do Leve); o
+   que é longo ou contínuo (painel subindo, esfera viajando,
+   respiração) só no Completo. Sem blend, sem blur animado.
+   ============================================================ */
+.v2 .bd-veu {
+  --bd-u: clamp(.8px, min(calc(100vw / 1366), calc(100vh / 657)), 1.42px);
+  --bd-base: #000;
+  --bd-txt: #EDEDED;
+  --bd-txt-forte: #FFFFFF;
+  --bd-txt-2: #A3A3A3;
+  --bd-txt-3: #808080;
+  --bd-fio: rgba(255, 255, 255, .1);
+  --bd-sai: cubic-bezier(.2, .75, .2, 1);
+  --bd-sobe: cubic-bezier(.22, 1, .36, 1);
+  --bd-topo-h: calc(var(--bd-u) * 84);
+  --bd-lado: max(calc(var(--bd-u) * 40), calc(50vw - 800px));   /* margem do topo e do painel (teto ~1600 px) */
+  --bd-esfera-y: 40vh;                                          /* centro da esfera enquanto ela fala */
+  --bd-esfera-caixa: min(calc(var(--bd-u) * 284), 420px);       /* o canvas (a esfera ocupa 72% dele) */
+  --bd-esfera-k: .2;                                            /* pousada no alto (= ESFERA_K_FIM) */
+  position: fixed; inset: 0; z-index: 1300; overflow: hidden; overflow: clip;   /* o painel escondido embaixo não vira rolagem */
+  background: var(--bd-base);
+  color: var(--bd-txt);
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+.v2 .bd-veu:focus { outline: none; }
+/* leitor de tela: a frase inteira (a legenda palavra a palavra fica oculta para ele) */
+.v2 .bd-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* ---- topo: só o essencial (marca discreta · Pular · silenciar); no fim, a marca e o silenciar ---- */
+.v2 .bd-topo {
+  position: absolute; z-index: 6; top: 0; left: 0; right: 0; height: var(--bd-topo-h);
+  display: flex; align-items: center; justify-content: space-between; gap: calc(var(--bd-u) * 16);
+  padding: 0 var(--bd-lado);
+}
+.v2 .bd-marca {
+  display: inline-flex; align-items: center; gap: calc(var(--bd-u) * 9); min-width: 0;
+  font-size: calc(var(--bd-u) * 14); font-weight: 500; letter-spacing: -.005em; color: #CFCFCF; white-space: nowrap;
+}
+.v2 .bd-logo { width: calc(var(--bd-u) * 20); height: calc(var(--bd-u) * 20); flex: none; }
+.v2 .bd-topo-ctrl { display: flex; align-items: center; gap: calc(var(--bd-u) * 8); }
+.v2 .bd-ic {
+  display: grid; place-items: center; flex: none;
+  width: calc(var(--bd-u) * 34); height: calc(var(--bd-u) * 34); padding: 0;
+  border: 1px solid var(--bd-fio); border-radius: calc(var(--bd-u) * 10); cursor: pointer;
+  background: transparent; color: #9E9E9E; font: inherit;
+}
+.v2 .bd-ic svg { width: calc(var(--bd-u) * 16); height: calc(var(--bd-u) * 16); }
+.v2 .bd-ic:hover { background: rgba(255, 255, 255, .06); color: #E6E6E6; }
+.v2 .bd-ic[aria-pressed="true"] { color: #6E6E6E; }
+.v2 .bd-pular {
+  display: inline-flex; align-items: center; gap: calc(var(--bd-u) * 9);
+  height: calc(var(--bd-u) * 34); padding: 0 calc(var(--bd-u) * 6) 0 calc(var(--bd-u) * 13);
+  border: 1px solid var(--bd-fio); border-radius: calc(var(--bd-u) * 10); cursor: pointer;
+  background: transparent; color: #D6D6D6; font: inherit; font-size: calc(var(--bd-u) * 13); font-weight: 500;
+}
+.v2 .bd-pular:hover { background: rgba(255, 255, 255, .06); border-color: rgba(255, 255, 255, .16); }
+.v2 .bd-fase-fim .bd-pular,
+.v2 .bd-fase-boot .bd-pular,
+.v2 .bd-fase-pronta .bd-pular { opacity: 0; visibility: hidden; pointer-events: none; }
+.v2 .bd-kbd {
+  font: inherit; font-size: calc(var(--bd-u) * 10.5); font-weight: 560; line-height: 1.2; color: #8A8A8A;
+  padding: calc(var(--bd-u) * 2.5) calc(var(--bd-u) * 5.5); border-radius: calc(var(--bd-u) * 5);
+  border: 1px solid rgba(255, 255, 255, .12);
+}
+
+/* ============================================================
+   A ESFERA — 1 canvas WebGL (no máximo ~420 px), centrado. O laço
+   do motor escreve --bd-nivel (0..1) aqui. No fim ela sobe e
+   encolhe até o meio do topo e fica respirando (CSS, sem rAF).
+   ============================================================ */
+.v2 .bd-esfera {
+  --bd-nivel: 0;
+  position: absolute; z-index: 4; left: 50%; top: var(--bd-esfera-y);
+  width: var(--bd-esfera-caixa); height: var(--bd-esfera-caixa);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.v2 .bd-fase-fim .bd-esfera {
+  transform: translate(-50%, -50%) translateY(calc(var(--bd-topo-h) / 2 - var(--bd-esfera-y))) scale(var(--bd-esfera-k));
+}
+.v2 .bd-esfera-corpo { position: absolute; inset: 0; }
+.v2 .bd-esfera-tela { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+/* sem WebGL (ou contexto perdido): esfera estática em degradê — corpo preto, fio claro em cima à esquerda */
+.v2 .bd-esfera-estatica {
+  display: none; position: absolute; inset: 14%; border-radius: 50%;
+  background:
+    radial-gradient(42% 30% at 38% 26%, rgba(255, 255, 255, .13), rgba(255, 255, 255, 0) 70%),
+    radial-gradient(circle closest-side, #000 0 88%, rgba(255, 255, 255, .05) 100%);
+}
+.v2 .bd-esfera-estatica::before {   /* o fio da borda: claro em cima à esquerda, some embaixo à direita */
+  content: ""; position: absolute; inset: 0; border-radius: 50%; padding: 1.5px;
+  background: conic-gradient(from 225deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, .6) 22%, rgba(255, 255, 255, .5) 34%, rgba(255, 255, 255, .06) 58%, rgba(255, 255, 255, .03) 80%, rgba(255, 255, 255, .06));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+.v2 .bd-esfera.bd-sem-gl .bd-esfera-tela { display: none; }
+.v2 .bd-esfera.bd-sem-gl .bd-esfera-estatica { display: block; }
+
+/* ---- a legenda, embaixo da esfera: 2 linhas reservadas, palavra a palavra ---- */
+.v2 .bd-fala {
+  position: absolute; z-index: 3; left: 50%; top: calc(var(--bd-esfera-y) + var(--bd-u) * 146);
+  width: min(calc(var(--bd-u) * 820), calc(100vw - 48px));
+  transform: translateX(-50%); text-align: center;
+}
+.v2 .bd-fase-fim .bd-fala { opacity: 0; transform: translate(-50%, calc(var(--bd-u) * -24)); pointer-events: none; }
+.v2 .bd-legenda-caixa { position: relative; height: calc(var(--bd-u) * 28 * 1.4 * 2); }
+.v2 .bd-legenda {
+  position: absolute; left: 0; right: 0; top: 0; margin: 0;
+  font-size: calc(var(--bd-u) * 28); font-weight: 400; line-height: 1.4; letter-spacing: -.012em;
+  color: var(--bd-txt); text-wrap: balance;
+}
+/* a frase que sai some em 0,12 s (a nova entra 0,06 s depois): nunca duas legíveis juntas */
+.v2 .bd-legenda.bd-sai { opacity: 0; }
+/* cada palavra é um span: nunca quebra DENTRO dela ("bem-" / "vindo"); a linha quebra entre palavras */
+.v2 .bd-legenda > span { color: rgba(255, 255, 255, .3); white-space: nowrap; }
+.v2 .bd-legenda > span.dita { color: #F2F2F2; }
+.v2 .bd-legenda > .bd-num-fala { font-weight: 500; }
+.v2 .bd-legenda > .bd-num-fala.dita { color: #FFFFFF; }
+
+/* ---- a tela do PLAY (dono 30/10: "teria que ter um botão da gente dar um play"): a saudação, uma
+   linha discreta e a pílula branca "Ouvir o resumo" (o ▶ num círculo preto); "Ver sem áudio" embaixo.
+   O clique é também a liberação de som do navegador. ---- */
+.v2 .bd-play-caixa { display: grid; justify-items: center; }
+.v2 .bd-play-ola {
+  margin: 0; font-size: calc(var(--bd-u) * 30); font-weight: 400; line-height: 1.25;
+  letter-spacing: -.022em; color: var(--bd-txt-forte); text-wrap: balance;
+}
+.v2 .bd-play-linha {
+  margin: calc(var(--bd-u) * 8) 0 0; min-height: 1.4em;
+  font-size: calc(var(--bd-u) * 16); font-weight: 400; line-height: 1.4; letter-spacing: -.004em; color: var(--bd-txt-2);
+}
+.v2 .bd-play-linha.bd-erro { max-width: calc(var(--bd-u) * 520); text-wrap: balance; }
+.v2 .bd-play {
+  margin-top: calc(var(--bd-u) * 28);
+  display: inline-flex; align-items: center; gap: calc(var(--bd-u) * 13);
+  height: calc(var(--bd-u) * 56); padding: 0 calc(var(--bd-u) * 28) 0 calc(var(--bd-u) * 9);
+  border: 0; border-radius: 999px; cursor: pointer;
+  background: #F2F2F2; color: #050505; font: inherit; font-size: calc(var(--bd-u) * 16.5); font-weight: 560; letter-spacing: -.008em;
+  /* o anel fino em volta (o mesmo do "Começar o dia"): elegante e visível sem depender do foco */
+  outline: 1px solid rgba(255, 255, 255, .3); outline-offset: calc(var(--bd-u) * 5);
+}
+.v2 .bd-play.bd-play-so-texto { padding: 0 calc(var(--bd-u) * 30); }
+.v2 .bd-play:hover { background: #FFFFFF; }
+.v2 .bd-play:focus-visible { outline: 1.5px solid rgba(255, 255, 255, .85); outline-offset: calc(var(--bd-u) * 5); }
+.v2 .bd-play-ic {
+  display: grid; place-items: center; flex: none;
+  width: calc(var(--bd-u) * 38); height: calc(var(--bd-u) * 38); border-radius: 50%;
+  background: #0A0A0A; color: #FFFFFF;
+}
+.v2 .bd-play-ic svg { width: calc(var(--bd-u) * 15); height: calc(var(--bd-u) * 15); margin-left: calc(var(--bd-u) * 2); }
+/* clicado enquanto preparava: espera e toca sozinho quando ficar pronto */
+.v2 .bd-play.bd-play-espera { cursor: progress; background: #CFCFCF; }
+.v2 .bd-sem-audio {
+  margin-top: calc(var(--bd-u) * 16);
+  height: calc(var(--bd-u) * 30); padding: 0 calc(var(--bd-u) * 10);
+  border: 0; border-radius: calc(var(--bd-u) * 8); cursor: pointer;
+  background: transparent; color: #8C8C8C; font: inherit; font-size: calc(var(--bd-u) * 13.5); font-weight: 450;
+}
+.v2 .bd-sem-audio:hover { color: #E6E6E6; }
+.v2 .bd-sem-audio:focus-visible { outline: 1.5px solid rgba(255, 255, 255, .7); outline-offset: 2px; }
+
+/* ============================================================
+   O PAINEL que sobe no fim — vidro fumê muito sutil (branco 4%,
+   borda branca 10%). Data + saudação à esquerda; números e
+   informações à direita; rodapé com "Ouvir de novo" e "Começar o
+   dia". Teto de largura nas telas grandes (~1600 px), centralizado.
+   ============================================================ */
+.v2 .bd-painel {
+  position: absolute; z-index: 3;
+  left: var(--bd-lado); right: var(--bd-lado);
+  top: var(--bd-topo-h); bottom: calc(var(--bd-u) * 26);
+  border-radius: calc(var(--bd-u) * 24);
+  background: rgba(255, 255, 255, .04);
+  border: 1px solid rgba(255, 255, 255, .1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04);
+  transform: translateY(calc(100% + var(--bd-u) * 80));
+  opacity: 0; visibility: hidden;
+}
+.v2 .bd-fase-fim .bd-painel { transform: none; opacity: 1; visibility: visible; }
+.v2 .bd-painel-grade {
+  height: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) calc(var(--bd-u) * 540);
+  grid-template-rows: minmax(0, 1fr) auto;
+  column-gap: calc(var(--bd-u) * 56); row-gap: calc(var(--bd-u) * 20);
+  padding: calc(var(--bd-u) * 38) calc(var(--bd-u) * 38) calc(var(--bd-u) * 28);
+}
+.v2 .bd-surge { opacity: 0; transform: translateY(calc(var(--bd-u) * 16)); }
+.v2 .bd-fase-fim .bd-surge { opacity: 1; transform: none; }
+
+.v2 .bd-saudacao { align-self: center; min-width: 0; padding-left: calc(var(--bd-u) * 4); container-type: inline-size; }
+.v2 .bd-hoje { margin: 0 0 calc(var(--bd-u) * 16); font-size: calc(var(--bd-u) * 14); font-weight: 450; line-height: 1.3; letter-spacing: .005em; color: var(--bd-txt-3); }
+.v2 .bd-sep { margin: 0 .45em; color: #555; }
+/* a saudação encolhe com o nome (≤8 letras · 9–10 · mais) e com a coluna: nunca invade os cartões */
+.v2 .bd-ola {
+  margin: 0; font-size: calc(var(--bd-u) * 92); font-weight: 400; line-height: 1;
+  letter-spacing: -.045em; color: var(--bd-txt-forte); overflow-wrap: break-word;
+}
+.v2 .bd-ola.bd-ola-m { font-size: calc(var(--bd-u) * 80); }
+.v2 .bd-ola.bd-ola-p { font-size: calc(var(--bd-u) * 68); }
+/* --bd-ola-em = largura do texto em "em" (medida no JS com a fonte real) */
+@supports (font-size: 1cqi) {
+  .v2 .bd-ola { font-size: min(calc(var(--bd-u) * 92), calc(97cqi / var(--bd-ola-em, 5.9))); }
+  .v2 .bd-ola.bd-ola-m { font-size: min(calc(var(--bd-u) * 80), calc(97cqi / var(--bd-ola-em, 6.9))); }
+  .v2 .bd-ola.bd-ola-p { font-size: min(calc(var(--bd-u) * 68), calc(97cqi / var(--bd-ola-em, 7.9))); }
+}
+.v2 .bd-fecho { margin: calc(var(--bd-u) * 22) 0 0; font-size: calc(var(--bd-u) * 24); font-weight: 400; line-height: 1.3; letter-spacing: -.01em; color: #BDBDBD; }
+
+/* ---- cartões: vidro fumê ainda mais leve que o painel ---- */
+.v2 .bd-quadro { align-self: center; display: grid; gap: calc(var(--bd-u) * 12); min-width: 0; }
+.v2 .bd-cartao {
+  border-radius: calc(var(--bd-u) * 16);
+  background: rgba(255, 255, 255, .025);
+  border: 1px solid rgba(255, 255, 255, .075);
+}
+.v2 .bd-nums { display: grid; grid-template-columns: 1fr 1fr; gap: calc(var(--bd-u) * 12); }
+.v2 .bd-num { display: flex; flex-direction: column; min-width: 0; min-height: calc(var(--bd-u) * 184); padding: calc(var(--bd-u) * 19) calc(var(--bd-u) * 20) calc(var(--bd-u) * 20); }
+.v2 .bd-rot { font-size: calc(var(--bd-u) * 13.5); font-weight: 500; letter-spacing: -.002em; color: var(--bd-txt-2); }
+.v2 .bd-valor {
+  margin-top: auto; font-size: calc(var(--bd-u) * 84); font-weight: 400; line-height: .9;
+  letter-spacing: -.05em; color: var(--bd-txt-forte); font-variant-numeric: tabular-nums lining-nums;
+}
+.v2 .bd-valor-vazio { color: var(--bd-txt-3); }
+.v2 .bd-sub { margin: calc(var(--bd-u) * 12) 0 0; font-size: calc(var(--bd-u) * 12.5); line-height: 1.38; color: var(--bd-txt-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* informações importantes: linhas fixas ícone | título + sub | valor */
+.v2 .bd-info { padding: calc(var(--bd-u) * 17) calc(var(--bd-u) * 22) calc(var(--bd-u) * 5); }
+.v2 .bd-info-tit { margin: 0; font-size: calc(var(--bd-u) * 13.5); font-weight: 500; line-height: 1.3; letter-spacing: -.002em; color: var(--bd-txt-2); }
+.v2 .bd-lista { margin: calc(var(--bd-u) * 4) 0 0; padding: 0; list-style: none; }
+.v2 .bd-item {
+  display: grid; grid-template-columns: calc(var(--bd-u) * 20) minmax(0, 1fr) auto; align-items: center;
+  column-gap: calc(var(--bd-u) * 15); padding: calc(var(--bd-u) * 13) 0;
+}
+.v2 .bd-item + .bd-item { border-top: 1px solid rgba(255, 255, 255, .07); }
+.v2 .bd-item-ic { display: grid; place-items: center; color: #8C8C8C; }
+.v2 .bd-item-ic svg { width: calc(var(--bd-u) * 19); height: calc(var(--bd-u) * 19); }
+.v2 .bd-item-tx { min-width: 0; }
+.v2 .bd-item-tx > b { display: block; font-size: calc(var(--bd-u) * 15); font-weight: 500; line-height: 1.3; letter-spacing: -.006em; color: var(--bd-txt); }
+.v2 .bd-item-tx > small { display: block; margin-top: calc(var(--bd-u) * 2); font-size: calc(var(--bd-u) * 13); line-height: 1.3; color: var(--bd-txt-3); }
+.v2 .bd-item-tx > small b { font-weight: 500; color: #CFCFCF; font-variant-numeric: tabular-nums; }
+.v2 .bd-item-v {
+  padding-right: calc(var(--bd-u) * 2);
+  font-size: calc(var(--bd-u) * 28); font-weight: 400; line-height: 1; letter-spacing: -.03em;
+  color: var(--bd-txt-forte); font-variant-numeric: tabular-nums lining-nums;
+}
+/* clientes sem dono: o ícone acende em branco (nada de cor) */
+.v2 .bd-item.bd-alerta .bd-item-ic { color: #FFFFFF; }
+.v2 .bd-item.bd-calmo .bd-item-tx > b { color: var(--bd-txt-2); }
+.v2 .bd-item.bd-calmo .bd-item-ic { color: var(--bd-txt-3); }
+/* esperando os números */
+.v2 .bd-item-vazio .bd-item-tx > i { display: block; width: 62%; height: calc(var(--bd-u) * 9); border-radius: 99px; background: rgba(255, 255, 255, .07); }
+.v2 .bd-item-vazio .bd-item-tx > i + i { width: 38%; margin-top: calc(var(--bd-u) * 8); background: rgba(255, 255, 255, .045); }
+/* ============================================================
+   O painel do GESTOR (o Murilo): a saudação à esquerda ("Bom dia, /
+   Murilo." ou "Diagnóstico / do dia.") e SEIS cartões do MESMO
+   tamanho, 3 por linha, à direita. Manhã: Leads hoje · Melhor
+   campanha · Não elegíveis / Fechados hoje · Melhor vendedor de
+   ontem · Casos críticos. 17h: Fechados hoje · Quem mais vendeu hoje
+   · Melhor campanha / Leads hoje · Não elegíveis · Casos críticos.
+   - A grade OCUPA a área dela e nunca passa: duas linhas iguais e
+     cada cartão corta o que sobrar (revisão: numa queda do servidor
+     do WhatsApp os casos críticos empurravam a grade para fora do
+     painel e o rodapé cobria o cartão).
+   - Anatomia única, a do vendedor (.bd-num): o rótulo no alto; o
+     valor e o detalhe presos EMBAIXO (.bd-g-pe). O valor fica numa
+     caixa da altura do número (.bd-g-v): o nome assenta na linha de
+     base do número e o detalhe começa na mesma altura em toda a
+     linha; a sobra vira espaço no meio, igual nos seis.
+   - Leads: as campanhas AO LADO do número, presas embaixo (sobem
+     para o espaço do meio); lista apertada esconde o "Campanha ".
+   - Casos críticos: no máximo 3 itens, embaixo (casosDoPainel).
+   - Telas grandes: teto de ~1760 px (o do vendedor é ~1600): três
+     cartões por linha pedem largura.
+   ============================================================ */
+@media (min-width: 901px) {
+  .v2 .bd-veu.bd-gestor { --bd-lado: max(calc(var(--bd-u) * 40), calc(50vw - 880px)); }
+  .v2 .bd-previa.bd-previa-g { left: calc(max(calc(var(--bd-u) * 40), calc(50vw - 880px)) + var(--bd-u) * 104); }
+}
+.v2 .bd-gestor .bd-painel-grade {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2.5fr);
+  column-gap: calc(var(--bd-u) * 44); row-gap: calc(var(--bd-u) * 16);
+  padding: calc(var(--bd-u) * 30) calc(var(--bd-u) * 30) calc(var(--bd-u) * 24);
+}
+.v2 .bd-gestor .bd-saudacao { padding-left: calc(var(--bd-u) * 8); }
+.v2 .bd-ola.bd-ola-g { font-size: calc(var(--bd-u) * 76); line-height: 1.02; letter-spacing: -.042em; }
+.v2 .bd-ola.bd-ola-g > span { display: block; }
+@supports (font-size: 1cqi) {
+  .v2 .bd-ola.bd-ola-g { font-size: min(calc(var(--bd-u) * 76), calc(97cqi / var(--bd-ola-em, 4.4))); }
+}
+.v2 .bd-gestor .bd-fecho { margin-top: calc(var(--bd-u) * 20); font-size: calc(var(--bd-u) * 21); }
+.v2 .bd-quadro-g {
+  align-self: stretch; min-width: 0; min-height: 0;
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: calc(var(--bd-u) * 12);
+}
+.v2 .bd-g {
+  display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden;
+  padding: calc(var(--bd-u) * 16) calc(var(--bd-u) * 18) calc(var(--bd-u) * 17);
+}
+/* o pé do cartão (valor + detalhe, ou os casos): preso embaixo; a sobra fica entre ele e o rótulo */
+.v2 .bd-g-pe { margin-top: auto; padding-top: calc(var(--bd-u) * 10); min-width: 0; }
+/* a caixa do valor: a altura da linha do número (54 × 0,9) em todos os cartões; o conteúdo assenta embaixo */
+.v2 .bd-g-v { display: flex; flex-direction: column; justify-content: flex-end; min-width: 0; min-height: calc(var(--bd-u) * 48.6); }
+.v2 .bd-g .bd-valor { margin: 0; font-size: calc(var(--bd-u) * 54); }
+.v2 .bd-g .bd-sub { margin-top: calc(var(--bd-u) * 9); }
+/* nome (campanha, vendedor) no lugar do número: na linha de base do número; o comprido (empate) desce para
+   22 e vai a 2 linhas — cabe na caixa, nada cresce */
+.v2 .bd-g-nome {
+  margin: 0; font-size: calc(var(--bd-u) * 25); font-weight: 400; line-height: 1.14; letter-spacing: -.022em;
+  color: var(--bd-txt-forte); overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+}
+.v2 .bd-g-nome.bd-g-nome-longo { font-size: calc(var(--bd-u) * 22); }
+.v2 .bd-g-nome.bd-g-vazio { color: var(--bd-txt-3); }
+/* leads: o número e, AO LADO, as campanhas em linhas finas (a última rente ao pé do número) */
+.v2 .bd-g-numlista { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: end; column-gap: calc(var(--bd-u) * 16); }
+.v2 .bd-g-lista {
+  margin: 0; padding: 0; list-style: none; min-width: 0;
+  container-type: inline-size; font-size: calc(var(--bd-u) * 12.5);   /* o "em" da consulta abaixo = 12,5u */
+}
+.v2 .bd-g-lista > li {
+  display: flex; align-items: baseline; justify-content: space-between; gap: calc(var(--bd-u) * 10);
+  padding: calc(var(--bd-u) * 2.5) 0; line-height: 1.3; color: var(--bd-txt-3);
+}
+.v2 .bd-g-lista > li + li { border-top: 1px solid rgba(255, 255, 255, .07); }
+.v2 .bd-g-lista > li > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .bd-g-lista > li > b { flex: none; font-weight: 500; color: #E6E6E6; font-variant-numeric: tabular-nums lining-nums; }
+/* lista apertada (número de 3 dígitos, cartão estreito): "Campanha Antônio 29" não cabe → "Antônio 29" */
+@container (width < 11em) {
+  .v2 .bd-g-pref { display: none; }
+}
+/* casos críticos: ícone + título (+ 2ª linha pequena); o ícone de alerta acende em branco, nada de cor */
+.v2 .bd-g-casos { margin: 0; padding: 0; list-style: none; display: grid; gap: calc(var(--bd-u) * 8); }
+.v2 .bd-g-caso { display: grid; grid-template-columns: calc(var(--bd-u) * 18) minmax(0, 1fr); column-gap: calc(var(--bd-u) * 10); align-items: start; }
+.v2 .bd-g-caso-ic { display: grid; place-items: center; height: calc(var(--bd-u) * 13.5 * 1.3); color: #FFFFFF; }
+.v2 .bd-g-caso-ic svg { width: calc(var(--bd-u) * 17); height: calc(var(--bd-u) * 17); }
+.v2 .bd-g-caso-tx { min-width: 0; }
+.v2 .bd-g-caso-tx > b,
+.v2 .bd-g-caso-tx > small { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2 .bd-g-caso-tx > b { font-size: calc(var(--bd-u) * 13.5); font-weight: 450; line-height: 1.3; color: var(--bd-txt); }
+.v2 .bd-g-caso-tx > small { margin-top: calc(var(--bd-u) * 1); font-size: calc(var(--bd-u) * 12); line-height: 1.3; color: var(--bd-txt-3); }
+
+/* ---- rodapé do painel: "Ouvir de novo" · "Esc fecha" colado no "Começar o dia" ---- */
+.v2 .bd-rodape { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: calc(var(--bd-u) * 16); }
+.v2 .bd-saida { display: flex; align-items: center; gap: calc(var(--bd-u) * 16); }
+.v2 .bd-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: calc(var(--bd-u) * 8);
+  height: calc(var(--bd-u) * 42); padding: 0 calc(var(--bd-u) * 16) 0 calc(var(--bd-u) * 13);
+  border: 1px solid rgba(255, 255, 255, .12); border-radius: calc(var(--bd-u) * 12); cursor: pointer;
+  background: transparent; color: #E0E0E0; font: inherit; font-size: calc(var(--bd-u) * 14); font-weight: 500;
+}
+.v2 .bd-btn:hover:not(:disabled) { background: rgba(255, 255, 255, .06); border-color: rgba(255, 255, 255, .2); }
+.v2 .bd-btn:disabled { opacity: .4; cursor: default; }
+.v2 .bd-btn svg { width: calc(var(--bd-u) * 16); height: calc(var(--bd-u) * 16); flex: none; color: #9A9A9A; }
+.v2 .bd-dica { display: inline-flex; align-items: center; gap: calc(var(--bd-u) * 7); font-size: calc(var(--bd-u) * 12.5); color: #7A7A7A; white-space: nowrap; }
+/* "Começar o dia": branco com texto preto */
+.v2 .bd-cta {
+  display: inline-flex; align-items: center; gap: calc(var(--bd-u) * 10);
+  height: calc(var(--bd-u) * 46); padding: 0 calc(var(--bd-u) * 19) 0 calc(var(--bd-u) * 23);
+  border: 0; border-radius: calc(var(--bd-u) * 12); cursor: pointer;
+  background: #F2F2F2; color: #050505; font: inherit; font-size: calc(var(--bd-u) * 15); font-weight: 560; letter-spacing: -.005em;
+}
+.v2 .bd-cta:hover { background: #FFFFFF; }
+.v2 .bd-cta svg { width: calc(var(--bd-u) * 17); height: calc(var(--bd-u) * 17); flex: none; }
+.v2 .bd-cta:hover svg { transform: translateX(calc(var(--bd-u) * 2)); }
+.v2 .bd-ic:focus-visible, .v2 .bd-pular:focus-visible, .v2 .bd-btn:focus-visible {
+  outline: 1.5px solid rgba(255, 255, 255, .7); outline-offset: 3px;
+}
+.v2 .bd-cta:focus-visible { outline: 1px solid rgba(255, 255, 255, .38); outline-offset: 4px; }
+/* o anel do mock aprovado fica SEMPRE no fim (antes só aparecia sem clique de mouse antes) */
+.v2 .bd-fase-fim .bd-cta { outline: 1px solid rgba(255, 255, 255, .38); outline-offset: 4px; }
+
+/* "Começar o dia": a tela esmaece e devolve o sistema */
+.v2 .bd-veu.bd-fechando { opacity: 0; pointer-events: none; }
+
+/* ---- prévia local (só no vite --mode demo): troca de pessoa, pequena no topo, logo depois da marca
+   (fora do .bd-veu: a unidade é refeita aqui) — nunca em cima da esfera pousada no meio do topo ---- */
+.v2 .bd-previa {
+  --bd-u: clamp(.8px, min(calc(100vw / 1366), calc(100vh / 657)), 1.42px);
+  position: fixed; top: calc(var(--bd-u) * 42); left: calc(max(calc(var(--bd-u) * 40), calc(50vw - 800px)) + var(--bd-u) * 104);
+  transform: translateY(-50%); z-index: 1310;
+  display: flex; align-items: center; gap: 2px; padding: 3px;
+  border-radius: 999px; background: rgba(20, 20, 20, .9); border: 1px solid rgba(255, 255, 255, .1);
+  font-size: 11px; font-weight: 500; line-height: 1; color: #7A7A7A;
+}
+.v2 .bd-previa > span { padding: 0 7px 0 9px; }
+.v2 .bd-previa button {
+  height: 22px; padding: 0 10px; border: 0; border-radius: 999px; cursor: pointer;
+  background: transparent; color: #B0B0B0; font: inherit;
+}
+.v2 .bd-previa button:hover { color: #fff; }
+.v2 .bd-previa button[aria-pressed="true"] { background: rgba(255, 255, 255, .1); color: #fff; }
+.v2 .bd-previa-sep { width: 1px; height: 14px; margin: 0 4px; background: rgba(255, 255, 255, .14); }
+
+/* ---- telas estreitas (fora do notebook): o painel vira uma coluna e rola por dentro ---- */
+@media (max-width: 900px) {
+  .v2 .bd-veu { --bd-u: 1px; --bd-topo-h: 64px; --bd-lado: 16px; --bd-esfera-caixa: 220px; }
+  .v2 .bd-painel { left: 12px; right: 12px; bottom: 12px; overflow: auto; overscroll-behavior: contain; }
+  .v2 .bd-painel-grade { height: auto; min-height: 100%; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto; row-gap: 24px; padding: 26px 20px 20px; }
+  .v2 .bd-num { min-height: 132px; }
+  .v2 .bd-valor { font-size: 56px; }
+  .v2 .bd-gestor .bd-painel-grade { grid-template-columns: minmax(0, 1fr); padding: 26px 20px 20px; }
+  .v2 .bd-quadro-g { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: none; }
+  .v2 .bd-g { min-height: 128px; }
+  .v2 .bd-g .bd-valor { font-size: 44px; }
+  .v2 .bd-g-v { min-height: 39.6px; }
+  .v2 .bd-fala { top: calc(var(--bd-esfera-y) + 124px); }
+}
+@media (max-width: 560px) {
+  /* celular: os cartões do gestor em uma coluna (dois por linha ficavam com ~150 px e cortavam nomes e casos) */
+  .v2 .bd-quadro-g { grid-template-columns: minmax(0, 1fr); }
+  .v2 .bd-dica { display: none; }
+  .v2 .bd-saida { flex: 1; justify-content: flex-end; }
+  .v2 .bd-legenda { font-size: 22px; }
+}
+
+/* ============================================================
+   MOVIMENTO — prefixo `html:root[data-perf] .v2` (vale no Leve e no
+   Completo, vence o kill do base.css), dentro de "sem reduzir
+   movimento". Painel subindo, esfera viajando ao alto, cartões em
+   sequência e tudo que é contínuo: só [data-perf="full"]. No Leve
+   o painel só esmaece rápido e a esfera fica numa pose.
+   ============================================================ */
+@media (prefers-reduced-motion: no-preference) {
+  html:root[data-perf] .v2 .bd-veu { animation: bd-esmaece .5s ease backwards !important; transition: opacity .42s ease !important; }
+  html:root[data-perf] .v2 .bd-topo { animation: bd-esmaece .9s ease .1s backwards !important; }
+  /* a frase nova entra 0,06 s depois da velha começar a sair (0,12 s) */
+  html:root[data-perf] .v2 .bd-legenda { animation: bd-frase-entra .34s var(--bd-sai) .06s backwards !important; }
+  html:root[data-perf] .v2 .bd-legenda.bd-sai { animation: bd-frase-sai .12s ease both !important; }
+  /* o play entra depois que a esfera acende (no Leve, logo) */
+  html:root[data-perf] .v2 .bd-play-caixa { animation: bd-frase-entra .6s var(--bd-sai) 1.2s backwards !important; }
+  html:root[data-perf] .v2 .bd-leve .bd-play-caixa { animation-delay: .15s !important; }
+  html:root[data-perf] .v2 .bd-legenda > span { transition: color .2s ease !important; }
+  html:root[data-perf] .v2 .bd-fala { transition: opacity .45s ease, transform .8s var(--bd-sai) !important; }
+  html:root[data-perf] .v2 .bd-pular { transition: opacity .45s ease, visibility 0s linear 0s, background-color .2s ease, border-color .2s ease !important; }
+  html:root[data-perf] .v2 .bd-fase-fim .bd-pular { transition: opacity .45s ease, visibility 0s linear .45s !important; }
+  html:root[data-perf] .v2 .bd-ic,
+  html:root[data-perf] .v2 .bd-btn,
+  html:root[data-perf] .v2 .bd-play,
+  html:root[data-perf] .v2 .bd-sem-audio { transition: background-color .2s ease, border-color .2s ease, color .2s ease !important; }
+  html:root[data-perf] .v2 .bd-cta { transition: background-color .2s ease !important; }
+  html:root[data-perf] .v2 .bd-cta svg { transition: transform .3s ease !important; }
+  /* Leve: o painel entra sem animação longa; a esfera vai ao alto depressa */
+  html:root[data-perf] .v2 .bd-painel { transition: opacity .2s ease, visibility 0s linear .2s !important; }
+  html:root[data-perf] .v2 .bd-fase-fim .bd-painel { transition: opacity .24s ease, visibility 0s !important; }
+  html:root[data-perf] .v2 .bd-esfera { transition: transform .35s var(--bd-sobe) !important; }
+
+  /* Completo: o painel SOBE, a esfera sobe e pousa no alto, os cartões entram em sequência */
+  html:root[data-perf="full"] .v2 .bd-painel { transition: transform .6s cubic-bezier(.5, 0, .75, 0), opacity .32s ease, visibility 0s linear .6s !important; }
+  html:root[data-perf="full"] .v2 .bd-fase-fim .bd-painel { transition: transform 1.15s var(--bd-sobe), opacity .3s ease, visibility 0s !important; }
+  html:root[data-perf="full"] .v2 .bd-esfera { transition: transform 1.15s var(--bd-sobe) !important; }
+  html:root[data-perf="full"] .v2 .bd-surge { transition: opacity .3s ease, transform .3s ease !important; }
+  html:root[data-perf="full"] .v2 .bd-fase-fim .bd-surge { transition: opacity .6s ease, transform .85s var(--bd-sai) !important; }
+  html:root[data-perf="full"] .v2 .bd-fase-fim .bd-surge-1 { transition-delay: .2s !important; }
+  html:root[data-perf="full"] .v2 .bd-fase-fim .bd-surge-2 { transition-delay: .27s !important; }
+  html:root[data-perf="full"] .v2 .bd-fase-fim .bd-surge-3 { transition-delay: .33s !important; }
+  html:root[data-perf="full"] .v2 .bd-fase-fim .bd-surge-4 { transition-delay: .39s !important; }
+  html:root[data-perf="full"] .v2 .bd-fase-fim .bd-surge-5 { transition-delay: .5s !important; }
+
+  /* contínuo, só no Completo: com o laço dormindo (pousada no alto, à espera numa sala vazia, sem WebGL)
+     ou parada por máquina fraca, quem respira é o CSS */
+  html:root[data-perf="full"] .v2 .bd-esfera.bd-repouso .bd-esfera-corpo,
+  html:root[data-perf="full"] .v2 .bd-esfera.bd-pose-fixa .bd-esfera-corpo { animation: bd-respira 5.2s ease-in-out infinite alternate !important; }
+}
+@keyframes bd-esmaece { from { opacity: 0; } }
+@keyframes bd-frase-entra { from { opacity: 0; transform: translateY(calc(var(--bd-u) * 8)); } }
+@keyframes bd-frase-sai { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(calc(var(--bd-u) * -5)); } }
+/* a respiração começa no tamanho desenhado (sem salto quando o laço dorme) e volta a ele */
+@keyframes bd-respira { from { transform: none; opacity: 1; } to { transform: scale(1.03); opacity: .86; } }
