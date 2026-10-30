@@ -703,11 +703,35 @@ html:root .v2 .vidro-pro::after {
 html:root[data-tema="light"] .v2 .vidro-pro::after {
   background: linear-gradient(180deg, rgba(255, 255, 255, .9), rgba(255, 255, 255, 0) 35%);
 }
+/* GAVETA em vidro (DrawerV2 com className="vidro-pro" — 1º uso: a ficha do Painel da Equipe,
+   dono 29/10). A skin Aurora e a repaginada cravam o fundo de TODA gaveta com !important (vidro
+   fumê / degrau sólido); só a gaveta que pediu o vidro volta aos valores do .vidro-pro acima. As
+   outras gavetas do sistema não mudam. A sombra puxa para a ESQUERDA: a gaveta encosta na borda. */
+html:root:not([data-tema="light"]) .v2 .drawer-v2.vidro-pro.vidro-pro,
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .drawer-v2.vidro-pro.vidro-pro {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .05), rgba(255, 255, 255, 0) 96px),
+    linear-gradient(160deg, rgba(40, 43, 50, .5), rgba(20, 22, 27, .48)) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(1.35) !important; backdrop-filter: blur(20px) saturate(1.35) !important;
+  box-shadow: -28px 0 70px -18px rgba(0, 0, 0, .55), inset 1px 0 0 rgba(255, 255, 255, .06);
+}
+html:root[data-tema="light"] .v2 .drawer-v2.vidro-pro.vidro-pro,
+html:root[data-repaginada][data-repaginada][data-tema="light"] .v2 .drawer-v2.vidro-pro.vidro-pro {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .35), rgba(255, 255, 255, 0) 96px),
+    linear-gradient(160deg, rgba(255, 255, 255, .72), rgba(246, 248, 251, .62)) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(1.4) !important; backdrop-filter: blur(22px) saturate(1.4) !important;
+  box-shadow: -28px 0 64px -20px rgba(22, 34, 60, .22), inset 1px 0 0 rgba(255, 255, 255, .85);
+}
 /* quem pediu menos transparência no sistema operacional recebe a carta quase sólida */
 @media (prefers-reduced-transparency: reduce) {
   html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .vidro-pro.vidro-pro,
   html:root[data-visual]:not([data-tema="light"]) .v2 .vidro-pro.vidro-pro, html:root:not([data-tema="light"]) .v2 .vidro-pro { background: #17191D; }
   html:root[data-visual][data-tema="light"] .v2 .vidro-pro.vidro-pro, html:root[data-tema="light"] .v2 .vidro-pro { background: #FFFFFF; }
+  html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .drawer-v2.vidro-pro.vidro-pro,
+  html:root:not([data-tema="light"]) .v2 .drawer-v2.vidro-pro.vidro-pro { background: #17191D !important; }
+  html:root[data-repaginada][data-repaginada][data-tema="light"] .v2 .drawer-v2.vidro-pro.vidro-pro,
+  html:root[data-tema="light"] .v2 .drawer-v2.vidro-pro.vidro-pro { background: #FFFFFF !important; }
 }
 
 /* ============================================================

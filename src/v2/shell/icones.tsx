@@ -72,13 +72,13 @@ export const ICONES: Record<string, ReactNode> = {
   portabilidades: (
     <Ic><path d="M4 8h13" /><path d="M14 4.5L17.5 8 14 11.5" /><path d="M20 16H7" /><path d="M10 12.5L6.5 16l3.5 3.5" /></Ic>
   ),
-  // Manual de vendas: livro aberto (trilha de aprendizagem)
-  manual: (
-    <Ic><path d="M12 6.5C10.3 5 7.8 4.5 4 4.5v13c3.8 0 6.3.5 8 2 1.7-1.5 4.2-2 8-2v-13c-3.8 0-6.3.5-8 2z" /><path d="M12 6.5v13" /></Ic>
+  // Painel da Equipe: dois celulares lado a lado (um por atendente)
+  equipe: (
+    <Ic><rect x="2.8" y="3.5" width="8.4" height="16" rx="2" /><rect x="12.8" y="3.5" width="8.4" height="16" rx="2" /><path d="M6 16.5h2M16 16.5h2" /></Ic>
   ),
-  // Radar de Atendimento: varredura de radar (nenhum cliente fora do alcance)
+  // Central de Avisos (ex-Radar de Atendimento): cronômetro — o tempo de resposta sob controle
   radar: (
-    <Ic><circle cx="12" cy="12" r="8.6" /><circle cx="12" cy="12" r="4.3" /><path d="M12 12l5.4-6.7" /><path strokeLinecap="round" d="M12 12h.01" /></Ic>
+    <Ic><circle cx="12" cy="13.5" r="7.6" /><path d="M12 13.5V9.6" /><path d="M9.8 2.6h4.4M12 2.6v3.3" /><path d="M18.3 7.2l1.4-1.4" /></Ic>
   ),
   // Simulador de Valores: calculadora (corpo + visor + teclas em pontos)
   simulador: (

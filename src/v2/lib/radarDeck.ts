@@ -134,7 +134,7 @@ export const DECK: Record<string, RadarTexto> = {
     "texto": "Clientes em negociação com 1 dia útil sem resposta, aguardando sua decisão. Clique para ver a lista."
   },
   "barra.dica": {
-    "titulo": "Radar de Atendimento",
+    "titulo": "Central de Avisos",
     "texto": "Clientes que aguardam você, com negociação e fechados separados. Avisos de segunda a sexta, das 9h às 18h."
   },
   "extra.barra.sub_ultimo": {
@@ -146,7 +146,7 @@ export const DECK: Record<string, RadarTexto> = {
   },
   "extra.barra.mais": {
     "titulo": "Mais",
-    "texto": "Outras filas do Radar. Clique para abrir a lista."
+    "texto": "Outras filas da Central de Avisos. Clique para abrir a lista."
   },
   "central.titulo": {
     "titulo": "Aguardando você"
@@ -239,7 +239,7 @@ export const DECK: Record<string, RadarTexto> = {
     "titulo": "Abrir a aba Fechados"
   },
   "extra.central.link_painel": {
-    "titulo": "Abrir painel do Radar"
+    "titulo": "Abrir a Central de Avisos"
   },
   "extra.central.ok_ligacao": {
     "texto": "Ligação registrada na conversa."
@@ -552,13 +552,13 @@ export const DECK: Record<string, RadarTexto> = {
   },
   "extra.sino.resumo_decisoes": {
     "titulo": "Decisões de repasse pendentes: {n}",
-    "texto": "Clientes em negociação com 1 dia útil sem resposta. Clique para decidir no painel do Radar."
+    "texto": "Clientes em negociação com 1 dia útil sem resposta. Clique para decidir na Central de Avisos."
   },
   "extra.erro.ligacao_falhou": {
     "texto": "Não foi possível registrar a ligação. Tente de novo."
   },
   "extra.inbox.aba_fechados": {
-    "texto": "Clientes fechados (pós-venda). O número conta todos os que aguardam resposta, inclusive os que ainda não chegaram ao 1º aviso do Radar."
+    "texto": "Clientes fechados (pós-venda). O número conta todos os que aguardam resposta, inclusive os que ainda não chegaram ao 1º aviso."
   },
   "extra.sino.vazio_todas": {
     "titulo": "Tudo em dia"
@@ -618,6 +618,6 @@ export const DECK: Record<string, RadarTexto> = {
     "titulo": "Tentar de novo"
   },
   "extra.inbox.grupo_radar": {
-    "texto": "Há clientes seus com aviso do Radar neste grupo."
+    "texto": "Há clientes seus na Central de Avisos neste grupo."
   }
 };

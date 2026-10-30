@@ -105,15 +105,13 @@ export function Ajuda({ texto, rotulo }: { texto: string; rotulo: string }) {
 }
 
 /** Cartão de seção: título (com ajuda opcional), linha de apoio e ação à direita. */
-export function Secao({ titulo, sub, ajuda, acao, children, className, id, alvo }: {
+export function Secao({ titulo, sub, ajuda, acao, children, className, id }: {
   titulo: string; sub?: ReactNode; ajuda?: string; acao?: ReactNode;
   children: ReactNode; className?: string; id?: string;
-  /** destino de "Ver na tabela" da Leitura do dia (atributo data-d5-alvo) */
-  alvo?: string;
 }) {
   const idTit = useId();
   return (
-    <CardVidro className={'d5-sec ' + (className ?? '')} id={id} role="region" aria-labelledby={idTit} data-d5-alvo={alvo}>
+    <CardVidro className={'d5-sec ' + (className ?? '')} id={id} role="region" aria-labelledby={idTit}>
       <div className="d5-sec-cab">
         <div className="d5-sec-tits">
           <h3 className="d5-sec-tit" id={idTit}>
@@ -215,6 +213,6 @@ export function Vazio({ texto, detalhe }: { texto: string; detalhe?: string }) {
 /** Ponto de status do número (conectado = verde; antigo = neutro). Com a Leitura do dia
  *  avisando que o número parou, o ponto fica âmbar (o verde "conectado" contradiria o aviso:
  *  o status da integração segue "conectado" mesmo com o chip caído). */
-export function PontoStatus({ situacao, alerta }: { situacao: 'conectado' | 'antigo'; alerta?: boolean }) {
-  return <i className={'d5-ponto' + (alerta ? ' d5-ponto-alerta' : situacao === 'conectado' ? ' d5-ponto-ok' : '')} aria-hidden />;
+export function PontoStatus({ situacao }: { situacao: 'conectado' | 'antigo' }) {
+  return <i className={'d5-ponto' + (situacao === 'conectado' ? ' d5-ponto-ok' : '')} aria-hidden />;
 }

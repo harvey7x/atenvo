@@ -61,7 +61,6 @@ const RecuperacaoV2 = lazy(() => import('@/v2/pages/Recuperacao'));
 const PendenciasV2 = lazy(() => import('@/v2/pages/Pendencias'));
 const PortabilidadesV2 = lazy(() => import('@/v2/pages/Portabilidades'));
 const PresenciaisV2 = lazy(() => import('@/v2/pages/Presenciais'));
-const ManualV2 = lazy(() => import('@/v2/pages/Manual'));
 const FluxosV2 = lazy(() => import('@/v2/pages/Fluxos'));
 const ContatosV2 = lazy(() => import('@/v2/pages/Contatos'));
 const DisparoV2 = lazy(() => import('@/v2/pages/Disparo'));
@@ -69,6 +68,7 @@ const RelatoriosV2 = lazy(() => import('@/v2/pages/Relatorios'));
 const IntegracoesV2 = lazy(() => import('@/v2/pages/Integracoes'));
 const KanbanV2 = lazy(() => import('@/v2/pages/Kanban'));
 const GuardiaoV2 = lazy(() => import('@/v2/pages/Guardiao'));
+const SupervisaoV2 = lazy(() => import('@/v2/pages/Supervisao'));
 // /whatsapp passa por um gate de viewport: celular → chat mobile (/m); desktop → inbox intocado.
 const GateWhatsApp = lazy(() => import('@/v2/mobile/GateWhatsApp'));
 const GateMobileApp = lazy(() => import('@/v2/mobile/GateMobileApp'));
@@ -139,7 +139,8 @@ const routes: RouteObject[] = [
           { path: 'recuperacao', element: <Lz><RequireRoleV2 role="admin"><RecuperacaoV2 /></RequireRoleV2></Lz> },
           { path: 'pendencias', element: <Lz><PendenciasV2 /></Lz> },
           { path: 'portabilidades', element: <Lz><PortabilidadesV2 /></Lz> },
-          { path: 'manual', element: <Lz><ManualV2 /></Lz> },
+          // Manual de vendas SAIU do sistema (dono 29/10: "não precisa mais ter") — link antigo cai no WhatsApp
+          { path: 'manual', element: <Navigate to="/whatsapp" replace /> },
           { path: 'disparo', element: <Lz><RequireRoleV2 role="admin"><DisparoV2 /></RequireRoleV2></Lz> },
           { path: 'contatos', element: <Lz><ContatosV2 /></Lz> },
           { path: 'scripts', element: <Lz><ScriptsV2 /></Lz> },
@@ -155,8 +156,11 @@ const routes: RouteObject[] = [
           // Maturação DESCONTINUADA (Evolution restrito pela Meta): rota → placeholder "descontinuada".
           // Página Maturacao.tsx preservada (não deletada), só fora do menu/rota — reversível.
           { path: 'maturacao', element: <Lz><ManutencaoV2 area="Maturação" descontinuada /></Lz> },
-          // Radar de Atendimento: nenhum cliente esquecido — risco ao vivo, punições e repasses (só admin)
+          // Central de Avisos (ex-Radar de Atendimento): nenhum cliente esquecido — risco ao vivo e repasses (só admin)
           { path: 'radar', element: <Lz><RequireRoleV2 role="admin"><GuardiaoV2 /></RequireRoleV2></Lz> },
+          // Painel da Equipe (Gestão, 29/10): um celular por atendente, somente leitura (só admin).
+          // Nome interno dos arquivos segue "supervisao" (Supervisao.tsx, data/supervisao.ts).
+          { path: 'equipe', element: <Lz><RequireRoleV2 role="admin"><SupervisaoV2 /></RequireRoleV2></Lz> },
           { path: 'ia', element: <Lz><RequireRoleV2 role="admin"><IaV2 /></RequireRoleV2></Lz> },
           { path: 'fluxos', element: <Lz><RequireRoleV2 role="admin"><FluxosV2 /></RequireRoleV2></Lz> },
           { path: 'configuracoes', element: <Lz><ConfiguracoesV2 /></Lz> },

@@ -221,6 +221,8 @@ export function mapMensagens(rows: DbMsg[]): WaMessage[] {
       midiaUrl: urlPublicaMidia(m.metadados?.media_url),
       mime: m.metadados?.mime,
       tamanho: m.metadados?.tamanho ?? null,
+      // duração do áudio gravada pelo webhook: a bolha mostra o tempo antes do play (como no WhatsApp)
+      seconds: m.metadados?.seconds ?? null,
       nome: m.metadados?.nome,
       dataISO: (m.recebida_em || m.enviada_em || m.criado_em || '').slice(0, 10) || undefined,
       // ISO completo (mesma fonte do horário exibido) para o separador de dia calcular no fuso de SP.

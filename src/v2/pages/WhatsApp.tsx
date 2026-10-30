@@ -1651,7 +1651,7 @@ export default function WhatsAppV2() {
               <ul className="ativ-tl">
                 {(atividadesQ.data ?? []).map((a) => (
                   <li key={a.id}>
-                    <b>{a.usuario ?? (a.motivo?.startsWith('Radar') ? 'Radar de Atendimento' : 'Alguém')}</b> {a.tipo === 'assumido' ? 'assumiu o atendimento' : a.tipo === 'transferido' ? 'transferiu o atendimento' : a.tipo === 'devolvido' ? 'devolveu para a fila' : a.tipo}
+                    <b>{a.usuario ?? (a.motivo?.startsWith('Radar') ? 'Central de Avisos' : 'Alguém')}</b> {a.tipo === 'assumido' ? 'assumiu o atendimento' : a.tipo === 'transferido' ? 'transferiu o atendimento' : a.tipo === 'devolvido' ? 'devolveu para a fila' : a.tipo}
                     {' · '}{new Date(a.em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                     {a.motivo && <div className="mot">Motivo: {a.motivo}</div>}
                   </li>

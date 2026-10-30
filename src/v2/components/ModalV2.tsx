@@ -65,6 +65,8 @@ type DrawerV2Props = {
   aoFechar: () => void;
   children: ReactNode;
   largura?: number;
+  /** classe extra na gaveta (ex.: `vidro-pro` para o vidro translúcido do filtro/scripts) */
+  className?: string;
 };
 
 /**
@@ -73,7 +75,7 @@ type DrawerV2Props = {
  * com classe `v2` na raiz (regra 10) do ModalV2. O conteúdo (cabeçalho
  * com X, corpo, ações) é do chamador.
  */
-export function DrawerV2({ aberto, aoFechar, children, largura = 380 }: DrawerV2Props) {
+export function DrawerV2({ aberto, aoFechar, children, largura = 380, className }: DrawerV2Props) {
   const aoFecharRef = useRef(aoFechar);
   useEffect(() => { aoFecharRef.current = aoFechar; });
 
@@ -96,7 +98,7 @@ export function DrawerV2({ aberto, aoFechar, children, largura = 380 }: DrawerV2
   return createPortal(
     <>
       <div className="veu-drawer" onMouseDown={aoFechar} role="presentation" />
-      <aside className="drawer-v2" style={{ width: largura }} role="dialog" aria-modal="true">
+      <aside className={className ? `drawer-v2 ${className}` : 'drawer-v2'} style={{ width: largura }} role="dialog" aria-modal="true">
         {children}
       </aside>
     </>,

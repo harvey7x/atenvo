@@ -87,6 +87,8 @@ export const DEMO_ATENDENTES: readonly AtendCfg[] = [
   { id: 'demo-u-matheus', nome: 'Matheus', peso: 7, fecha: 1.25, marca: 0.55, respMed: 16.5, respSd: 1.8, vezes: 1.1, cel: 0.09 },
   { id: 'demo-u-isadora', nome: 'Isadora', peso: 3, fecha: 3.0, marca: 0.9, respMed: 6.6, respSd: 1.6, vezes: 2.2, cel: 0.04 },
   { id: 'demo-u-luiz', nome: 'Luiz', peso: 3, fecha: 0.05, marca: 1.6, respMed: 3.3, respSd: 2.1, vezes: 1.7, cel: 0.09 },
+  // Giovana (Painel da Equipe, 29/10): a equipe da demo é a mesma dos celulares
+  { id: 'demo-u-giovana', nome: 'Giovana', peso: 3, fecha: 0.8, marca: 1.1, respMed: 8.4, respSd: 1.9, vezes: 1.4, cel: 0.12 },
 ];
 const ATEND = new Map(DEMO_ATENDENTES.map((a) => [a.id, a]));
 

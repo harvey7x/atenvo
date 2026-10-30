@@ -57,35 +57,38 @@ const GRUPOS: GrupoNav[] = [
   {
     rotulo: 'Operação',
     itens: [
-      // visibilidade (22/10): painel da equipe inteira — só o admin (rota com RequireRoleV2)
-      { slug: 'dashboard', rotulo: 'Dashboard', admin: true },
       { slug: 'whatsapp', rotulo: 'WhatsApp' },
       // Facebook e Disparo fora do menu (pedido do dono 27/08) — rotas seguem vivas por URL
       { slug: 'kanban', rotulo: 'Kanban' },
       { slug: 'agendamentos', rotulo: 'Agendamentos' },
       // Presenciais (dono 29/10): calendário dos atendimentos presenciais; avisa o grupo DOCUMENTOS
       { slug: 'presenciais', rotulo: 'Presenciais' },
+      // Contatos e Scripts vieram da Gestão (dono 29/10): são ferramentas do dia a dia de quem atende
+      { slug: 'contatos', rotulo: 'Contatos' },
+      { slug: 'scripts', rotulo: 'Scripts' },
     ],
   },
   {
     // o que acontece com o cliente DEPOIS do primeiro atendimento
     rotulo: 'Acompanhamento',
     itens: [
-      // Pós-venda SAIU (dono 29/10): o fechado sem resposta agora é avisado pelo Radar de Atendimento.
+      // Pós-venda SAIU (dono 29/10): o fechado sem resposta agora é avisado pela Central de Avisos.
       // Recuperação fora do menu (pedido do dono 14/10) — rota segue viva por URL
       { slug: 'pendencias', rotulo: 'Pendências' },
       { slug: 'portabilidades', rotulo: 'Portabilidades' },
     ],
   },
   {
+    // Gestão (dono 29/10): a visão da equipe inteira, só para o admin (rotas com RequireRoleV2).
+    // Manual de vendas SAIU do sistema a pedido do dono (link antigo cai no WhatsApp).
     rotulo: 'Gestão',
     itens: [
-      { slug: 'contatos', rotulo: 'Contatos' },
-      { slug: 'scripts', rotulo: 'Scripts' },
-      // Manual de vendas (13/10): treinamento dos novos estagiários — trilha, prova e consulta rápida.
-      { slug: 'manual', rotulo: 'Manual de vendas' },
-      // Radar de Atendimento (22-23/10): nenhum cliente esquecido — risco ao vivo + punições — só admin.
-      { slug: 'radar', rotulo: 'Radar de Atendimento', admin: true },
+      { slug: 'dashboard', rotulo: 'Dashboard', admin: true },
+      // Painel da Equipe (29/10): um celular por atendente, igual ao WhatsApp, somente leitura
+      { slug: 'equipe', rotulo: 'Painel da Equipe', admin: true },
+      // Central de Avisos = o antigo "Radar de Atendimento" (renomeado 29/10; rota /radar mantida):
+      // clientes sem resposta, decisões de repasse e conversão.
+      { slug: 'radar', rotulo: 'Central de Avisos', admin: true },
       // Simulador fora do menu (pedido do dono 27/08) — rota segue viva por URL
       // Cobranças SAIU daqui (29/08): virou um MÓDULO próprio no seletor do topo.
       // Relatórios fora do menu (pedido do dono 27/08) — rota segue viva por URL
@@ -444,7 +447,9 @@ export default function AppShellV2() {
             root sem blur). A sidebar anima só clip-path/transform/opacity, nunca
             width (shell.css). */}
         <div className="sb-rail" aria-hidden />
-        <div className="sb-fundo" aria-hidden ref={fundoRef} />
+        {/* menu ABERTO em vidro (dono 29/10: "aquele glaze transparente, que nem nas outras coisas") —
+            a mesma receita .vidro-pro do filtro e da paleta de scripts; a cápsula recolhida segue sólida */}
+        <div className="sb-fundo vidro-pro" aria-hidden ref={fundoRef} />
         <div className="sb-sombra" aria-hidden />
 
         <main className="principal">

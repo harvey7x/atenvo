@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import type { CanalV5, KpisV5 } from '@/data/dashboardV5.tipos';
-import type { MarcadorV5 } from '@/data/dashboardV5.sinais.tipos';
 import { fmtInt, fmtPct, fmtTelefone, pctDe, rotuloMotivoNe } from '@/data/dashboardV5.formato';
 import { Skeleton } from '../../components';
 import { Ajuda, Legenda, Pop, PontoStatus, Secao, TempoFechar, ancoraDe, type Ancora } from './comum';
@@ -41,11 +40,7 @@ function CelulaNe({ c }: { c: CanalV5 }) {
   );
 }
 
-export function PorNumero({ canais, kpis, marcadores }: {
-  canais: CanalV5[]; kpis: KpisV5;
-  /** da Leitura do dia: "sem cliente novo há 2 h", "aprendendo até 28/10" */
-  marcadores?: Record<string, MarcadorV5>;
-}) {
+export function PorNumero({ canais, kpis }: { canais: CanalV5[]; kpis: KpisV5 }) {
   const totEnt = canais.reduce((s, c) => s + c.entradas, 0);
   const totNe = canais.reduce((s, c) => s + c.ne, 0);
   const totGan = canais.reduce((s, c) => s + c.ganhos, 0);
@@ -75,19 +70,16 @@ export function PorNumero({ canais, kpis, marcadores }: {
           <tbody>
             {canais.map((c) => {
               const share = pctDe(c.entradas, totEnt);
-              const marca = c.canalId ? marcadores?.[c.canalId] : undefined;
               return (
-                <tr key={c.canalId ?? 'antigos'} className={c.situacao === 'antigo' ? 'd5-lin-antigo' : undefined}
-                  data-d5-alvo={c.canalId ? `numeros:${c.canalId}` : undefined}>
+                <tr key={c.canalId ?? 'antigos'} className={c.situacao === 'antigo' ? 'd5-lin-antigo' : undefined}>
                   <th scope="row" className="d5-nome">
                     <span className="d5-nome-in">
-                      <PontoStatus situacao={c.situacao} alerta={marca?.tom === 'ambar'} />
+                      <PontoStatus situacao={c.situacao} />
                       <span className="d5-cel2">
                         <b title={c.nome}>{c.situacao === 'antigo' ? 'Números antigos' : c.nome}</b>
                         {c.situacao === 'antigo'
                           ? <small>Removidos ou desconectados</small>
                           : <small className="num d5-tel">{fmtTelefone(c.numero)}</small>}
-                        {marca && <small className={`d5-marca d5-marca-${marca.tom}`}>{marca.texto}</small>}
                       </span>
                     </span>
                   </th>

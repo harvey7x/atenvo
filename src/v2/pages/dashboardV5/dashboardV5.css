@@ -18,9 +18,6 @@
   --d5-hover: rgba(var(--tint), .028);
   --d5-trilho: rgba(var(--tint), .075);
   --d5-foco: var(--platina-a);                     /* corp: o azul interativo */
-  /* texto de link: no escuro o azul de preenchimento (#0F62FE) não passa 4,5:1 sobre o
-     cartão; clareado com branco (~#7BA9FE, 6,7:1) e acompanhando o acento */
-  --d5-link: color-mix(in srgb, var(--d5-foco) 55%, #fff);
   max-width: 1600px;
   margin: 0 auto;
   padding-bottom: 28px;
@@ -230,7 +227,6 @@
 .v2 .d5-ponto { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; background: rgba(var(--tint), .26);
   align-self: flex-start; margin-top: 5px; /* no meio da 1ª linha (o nome) */ }
 .v2 .d5-ponto-ok { background: var(--verde); }
-.v2 .d5-ponto-alerta { background: var(--ambar); }
 
 /* entradas: trilho de participação + número; o % fica embaixo do número */
 .v2 .d5-ent { display: inline-flex; align-items: baseline; justify-content: flex-end; gap: 10px; }
@@ -447,121 +443,6 @@
   .v2 .d5-tab-at thead .d5-ord-tx > span { display: block; }
 }
 
-/* ---------------- leitura do dia (22/10) ----------------
-   Um painel, largura toda, entre o cabeçalho e os cartões. Linhas separadas por fio de
-   1px; o ponto é a ÚNICA cor de severidade (âmbar 8px; verde/neutro 6px — nada de
-   vermelho) e "bom"/"informação" têm o título mais quieto, então "atenção" se destaca sem
-   gritar; a ação é texto quieto no azul da interação, numa coluna só à direita (todas as
-   ações na mesma borda; o texto tem teto de largura). Sem ícone, emoji, chip ou cartão dentro. */
-:root[data-tema="light"] .v2 .d5-pg { --d5-link: var(--d5-foco); }
-.v2 .d5-lt { padding: 13px var(--d5-px) 11px; }
-.v2 .d5-lt .d5-lt-lista { transition: opacity .15s var(--ease); }
-.v2 .d5-lt-trocando .d5-lt-lista { opacity: .55; }
-:root[data-perf="lite"] .v2 .d5-lt .d5-lt-lista { transition: none; }
-.v2 .d5-lt-cab { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 2px; }
-.v2 .d5-lt-tit { font-size: 14px; font-weight: 600; letter-spacing: -.005em; line-height: 1.3; color: var(--txt); }
-.v2 .d5-lt-hora { font-size: 12px; color: var(--txt-2); white-space: nowrap; }
-.v2 .d5-lt-estado { font-size: 12.5px; color: var(--txt-2); padding: 10px 0 6px; }
-/* UMA grade para o painel inteiro (as linhas são subgrade dela): ponto · texto (teto de
-   1080 px) · folga · ação. A coluna da ação tem a largura do maior link e todos terminam na
-   MESMA borda direita — a do painel —, em qualquer cenário e largura */
-.v2 .d5-lt-lista {
-  list-style: none; margin: 0; padding: 0;
-  display: grid; grid-template-columns: 8px minmax(0, 1080px) minmax(0, 1fr) auto; column-gap: 14px;
-}
-.v2 .d5-lt-item {
-  display: grid; grid-column: 1 / -1; grid-template-columns: subgrid;
-  align-items: start; padding: 9px 0 8px;
-}
-.v2 .d5-lt-item + .d5-lt-item { border-top: 1px solid var(--d5-fio); }
-.v2 .d5-lt-ponto { width: 6px; height: 6px; border-radius: 50%; margin: 7px 0 0 1px; background: var(--txt-3); }
-.v2 .d5-lt-ponto.d5-lt-atencao { width: 8px; height: 8px; margin: 6px 0 0; background: var(--ambar); }
-.v2 .d5-lt-ponto.d5-lt-bom { background: var(--verde); }
-.v2 .d5-lt-ponto.d5-lt-info { background: color-mix(in srgb, var(--txt-3) 80%, transparent); }
-.v2 .d5-lt-tx { min-width: 0; }
-.v2 .d5-lt-t { font-size: 13.5px; font-weight: 600; line-height: 1.4; color: var(--txt); }
-.v2 .d5-lt-sev-bom .d5-lt-t, .v2 .d5-lt-sev-info .d5-lt-t { font-weight: 500; color: var(--txt-2); }
-/* sem corte de linhas: os textos são modelos fixos e curtos, e o "o que fazer" nunca pode
-   sumir num "…" (era o que acontecia em 768–900 px) */
-.v2 .d5-lt-f {
-  font-size: 12.5px; line-height: 1.5; color: var(--txt-2); margin-top: 1px;
-  font-variant-numeric: tabular-nums;
-}
-.v2 .d5-lt-o { color: var(--txt); }                       /* o que fazer (fora da tela) */
-.v2 .d5-lt-acao { grid-column: -2 / -1; align-self: center; justify-self: end; white-space: nowrap; min-height: 1px; }
-.v2 .d5-lt-link {
-  font: inherit; font-size: 12.5px; font-weight: 500; line-height: 1.4; color: var(--d5-link);
-  background: none; border: 0; padding: 2px 4px; margin: -2px -4px; border-radius: 4px;
-  cursor: pointer; text-decoration: none; white-space: nowrap;
-}
-.v2 .d5-lt-link:hover { text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
-.v2 .d5-lt-link:focus-visible, .v2 .d5-lt-mais:focus-visible, .v2 .d5-lt-disc:focus-visible {
-  outline: 2px solid var(--d5-foco); outline-offset: 2px;
-}
-.v2 .d5-lt-mais {
-  font: inherit; font-size: 12px; font-weight: 500; color: var(--txt-2); background: none; border: 0;
-  padding: 2px 4px; margin: 0 0 2px 16px; border-radius: 4px; cursor: pointer;
-}
-.v2 .d5-lt-mais:hover { color: var(--txt); }
-.v2 .d5-lt-pe { border-top: 1px solid var(--d5-fio); margin-top: 2px; padding-top: 8px; }
-.v2 .d5-lt-rod { font-size: 12px; line-height: 1.5; color: var(--txt-2); }
-.v2 .d5-lt-disc {
-  font: inherit; color: var(--txt-2); background: none; border: 0; padding: 0; margin-left: 2px; cursor: pointer;
-  display: inline-flex; align-items: center; gap: 5px; border-radius: 3px;
-}
-.v2 .d5-lt-disc:hover { color: var(--txt); }
-.v2 .d5-lt-disc svg { transition: transform .15s var(--ease); }
-.v2 .d5-lt-disc .d5-lt-disc-on { transform: rotate(180deg); }
-:root[data-perf="lite"] .v2 .d5-lt-disc svg { transition: none; }
-.v2 .d5-lt-notas { list-style: none; margin: 8px 0 2px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.v2 .d5-lt-notas[hidden] { display: none; }
-.v2 .d5-lt-notas li {
-  position: relative; display: flex; align-items: baseline; gap: 16px;
-  padding-left: 13px; font-size: 12px; line-height: 1.5; color: var(--txt-2);
-}
-.v2 .d5-lt-notas li > span { flex: 0 1 auto; min-width: 0; max-width: 1080px; }
-.v2 .d5-lt-notas li > .d5-lt-link { margin-left: 0; flex: none; }
-.v2 .d5-lt-notas li::before {
-  content: ""; position: absolute; left: 0; top: .62em; width: 4px; height: 4px; border-radius: 50%;
-  background: color-mix(in srgb, var(--txt-3) 80%, transparent);
-}
-.v2 .d5-lt-notas .d5-lt-link { font-size: 12px; }
-@container d5pg (max-width: 1024px) {
-  .v2 .d5-lt-lista { grid-template-columns: 8px minmax(0, 1fr); }
-  .v2 .d5-lt-acao { grid-column: 2; justify-self: start; margin-top: 5px; }
-  .v2 .d5-lt-acao:empty { display: none; }
-  .v2 .d5-lt-notas li { flex-direction: column; gap: 2px; }
-  .v2 .d5-lt-notas li > .d5-lt-link { margin-left: -4px; }
-}
-
-/* marca da leitura na linha da tabela (só enquanto o achado está ativo) */
-.v2 .d5-cel2 > small.d5-marca { font-size: 11.5px; font-weight: 500; white-space: nowrap; }
-.v2 .d5-cel2 > small.d5-marca-ambar { color: var(--ambar); }
-.v2 .d5-cel2 > small.d5-marca-mudo { color: var(--txt-3); font-weight: 400; }
-.v2 .d5-tab-at .d5-cel2 > small.d5-marca { white-space: nowrap; text-align: left; }
-
-/* "Ver na tabela": a linha de destino acende e apaga em 1,6 s */
-/* acende, segura um instante (a rolagem suave termina) e apaga */
-@keyframes d5-realce-fundo {
-  0%, 40% { background-color: rgba(var(--dado-1-rgb), .18); }
-  100% { background-color: rgba(var(--dado-1-rgb), 0); }
-}
-@keyframes d5-realce-anel {
-  0%, 40% { box-shadow: 0 0 0 2px rgba(var(--dado-1-rgb), .6); }
-  100% { box-shadow: 0 0 0 2px rgba(var(--dado-1-rgb), 0); }
-}
-/* sem animação (modo de performance, menos movimento) a marca fica PARADA pelos mesmos
-   1,6 s — o realce nunca some, só deixa de esmaecer */
-.v2 tr.d5-realce > * { background-color: rgba(var(--dado-1-rgb), .14); animation: d5-realce-fundo 1.6s ease-out forwards; }
-.v2 li.d5-realce { background-color: rgba(var(--dado-1-rgb), .12); border-radius: 6px; animation: d5-realce-fundo 1.6s ease-out forwards; }
-.v2 .d5-kpi.d5-realce, .v2 .d5-sec.d5-realce { box-shadow: 0 0 0 2px rgba(var(--dado-1-rgb), .55); animation: d5-realce-anel 1.6s ease-out forwards; }
-.v2 [data-d5-alvo]:focus:not(:focus-visible) { outline: none; }
-@media (prefers-reduced-motion: reduce) {
-  .v2 tr.d5-realce > *, .v2 li.d5-realce, .v2 .d5-kpi.d5-realce, .v2 .d5-sec.d5-realce { animation: none; }
-}
-:root[data-perf="lite"] .v2 tr.d5-realce > *, :root[data-perf="lite"] .v2 li.d5-realce,
-:root[data-perf="lite"] .v2 .d5-kpi.d5-realce, :root[data-perf="lite"] .v2 .d5-sec.d5-realce { animation: none; }
-
 /* ============================================================
    CENTRALIZADO + VIDA NO HOVER (dono 22/10: "deixa mais centralizado… quando
    passar por cima, algum efeito, para não ficar tão parado"). Só transform,
@@ -604,24 +485,16 @@
 .v2 .d5-hbar > i { transition: background-color var(--mo-r, 120ms) var(--ease), transform var(--mo-r, 120ms) var(--ease); transform-origin: bottom; }
 .v2 .d5-hbar:hover > i { transform: scaleY(1.06); }
 
-/* Leitura do dia: o achado em foco ganha faixa e o link avança */
-.v2 .d5-lt-item { transition: background-color var(--mo-m, 180ms) var(--ease); border-radius: 8px; }
-.v2 .d5-lt-item:hover { background: rgba(var(--tint), .035); }
-.v2 .d5-lt-link { transition: transform var(--mo-m, 180ms) var(--ease); display: inline-block; }
-.v2 .d5-lt-item:hover .d5-lt-link { transform: translateX(3px); }
-
 /* MODO LEVE (padrão das máquinas da equipe) desliga TODA transição com !important. Estes
    efeitos são baratos (transform/cor em poucos elementos, só no hover) — ficam ligados
    no Leve, mas NUNCA com "reduzir movimento" do sistema. */
 @media (prefers-reduced-motion: no-preference) {
   :root[data-perf="lite"] .v2 .d5-pg .d5-tab tbody tr > * { transition: background-color var(--mo-m, 180ms) var(--ease), box-shadow var(--mo-m, 180ms) var(--ease) !important; }
-  :root[data-perf="lite"] .v2 .d5-pg .d5-pessoa, :root[data-perf="lite"] .v2 .d5-pg .d5-nome-in > b,
-  :root[data-perf="lite"] .v2 .d5-pg .d5-lt-link { transition: transform var(--mo-m, 180ms) var(--ease) !important; }
+  :root[data-perf="lite"] .v2 .d5-pg .d5-pessoa, :root[data-perf="lite"] .v2 .d5-pg .d5-nome-in > b { transition: transform var(--mo-m, 180ms) var(--ease) !important; }
   :root[data-perf="lite"] .v2 .d5-pg .d5-av { transition: border-color var(--mo-m, 180ms) var(--ease), background-color var(--mo-m, 180ms) var(--ease), color var(--mo-m, 180ms) var(--ease) !important; }
   :root[data-perf="lite"] .v2 .d5-pg .d5-trilho > i { animation: d5-cresce .7s var(--ease) both !important; transition: background-color var(--mo-r, 120ms) var(--ease) !important; }
   :root[data-perf="lite"] .v2 .d5-pg .d5-barra-rot { transition: color var(--mo-r, 120ms) var(--ease) !important; }
   :root[data-perf="lite"] .v2 .d5-pg .d5-kpi { transition: transform var(--mo-m, 180ms) var(--ease), box-shadow var(--mo-m, 180ms) var(--ease) !important; }
   :root[data-perf="lite"] .v2 .d5-pg .d5-cel { transition: transform var(--mo-r, 120ms) var(--ease), box-shadow var(--mo-r, 120ms) var(--ease) !important; }
   :root[data-perf="lite"] .v2 .d5-pg .d5-hbar > i { transition: background-color var(--mo-r, 120ms) var(--ease), transform var(--mo-r, 120ms) var(--ease) !important; }
-  :root[data-perf="lite"] .v2 .d5-pg .d5-lt-item { transition: background-color var(--mo-m, 180ms) var(--ease) !important; }
 }
