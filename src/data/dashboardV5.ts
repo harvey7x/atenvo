@@ -26,6 +26,30 @@ export type { Periodo } from '@/data/relatorios';
 
 const CINCO_MIN = 5 * 60_000;
 
+/* ABERTURA RÁPIDA (dono 30/10: "o dashboard demora para carregar… deixa mais rápido para
+   entrar"). A RPC leva ~0,9 s em média, mas tem picos de 5–8 s no horário cheio. A última foto
+   de cada período fica guardada NESTE navegador e aparece na hora ao entrar — esmaecida, com
+   "Atualizando…" — enquanto a RPC traz a nova. A chave é a da query (org + janela): o "Hoje" de
+   ontem nunca aparece hoje. Até 6 períodos; sem storage, só não acelera. E o gcTime de 30 min
+   faz a volta ao Dashboard na mesma sessão ser imediata. */
+const GUARDA_DASH = 'atenvo-dash-v5';
+const MAX_GUARDADOS = 6;
+type Guardados = Record<string, { em: number; d: DashV5 }>;
+function lerGuardados(): Guardados {
+  try { return (JSON.parse(localStorage.getItem(GUARDA_DASH) ?? '{}') as Guardados) ?? {}; } catch { return {}; }
+}
+function fotoGuardada(chave: string): DashV5 | undefined {
+  return lerGuardados()[chave]?.d;
+}
+function guardarFoto(chave: string, d: DashV5): void {
+  try {
+    const todos = lerGuardados();
+    todos[chave] = { em: Date.now(), d };
+    const ficam = Object.entries(todos).sort((a, b) => b[1].em - a[1].em).slice(0, MAX_GUARDADOS);
+    localStorage.setItem(GUARDA_DASH, JSON.stringify(Object.fromEntries(ficam)));
+  } catch { /* sem storage (ou cheio): só não acelera */ }
+}
+
 /** Janela completa de uma busca: período, trecho comparado e início do mapa. */
 export function janelaV5(periodo: Periodo, agora: Date, hoje = spHoje()): JanelaV5 {
   const ant = periodoAnteriorV5(periodo, agora);
@@ -173,13 +197,17 @@ export function useDashV5(periodo: Periodo): UseQueryResult<DashV5> {
   const org = currentOrg.id;
   const hoje = spHoje();
   const mapaIni = janelaMapaV5(periodo, hoje).iniISO;
+  const queryKey = ['dashboard-v5', org, periodo.iniISO, periodo.fimISO, periodo.prevIniISO, mapaIni];
+  const chaveGuarda = JSON.stringify(queryKey);
   return useQuery({
-    queryKey: ['dashboard-v5', org, periodo.iniISO, periodo.fimISO, periodo.prevIniISO, mapaIni],
+    queryKey,
     enabled: !!org,
     staleTime: 60_000,
+    gcTime: 30 * 60_000,
     refetchInterval: CINCO_MIN,
     refetchOnWindowFocus: true,
-    placeholderData: keepPreviousData,
+    // a foto guardada DESTE período vence a do período anterior (que é o keepPreviousData)
+    placeholderData: (anterior) => (DASH_V5_REAL ? fotoGuardada(chaveGuarda) : undefined) ?? keepPreviousData(anterior),
     queryFn: async (): Promise<DashV5> => {
       const agora = new Date();
       const j = janelaV5(periodo, agora, hoje);
@@ -193,7 +221,9 @@ export function useDashV5(periodo: Periodo): UseQueryResult<DashV5> {
         p_mapa_inicio: j.mapaIniISO,
       });
       if (error) throw new Error(traduzErroDashV5(error));
-      return { ...normalizarDashV5(data), buscaEm: agora.toISOString() };
+      const foto = { ...normalizarDashV5(data), buscaEm: agora.toISOString() };
+      guardarFoto(chaveGuarda, foto);
+      return foto;
     },
   });
 }

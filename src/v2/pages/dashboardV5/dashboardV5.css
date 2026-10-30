@@ -498,3 +498,40 @@
   :root[data-perf="lite"] .v2 .d5-pg .d5-cel { transition: transform var(--mo-r, 120ms) var(--ease), box-shadow var(--mo-r, 120ms) var(--ease) !important; }
   :root[data-perf="lite"] .v2 .d5-pg .d5-hbar > i { transition: background-color var(--mo-r, 120ms) var(--ease), transform var(--mo-r, 120ms) var(--ease) !important; }
 }
+
+/* ---------- Carregando o Dashboard (dono 30/10: "aquela tela de carregando… do WhatsApp e do
+   Kanban") — por cima dos esqueletos na primeira abertura ---------- */
+.v2 .d5-pg { position: relative; }
+.v2 .d5-carr { position: absolute; left: 0; right: 0; top: 150px; display: flex; justify-content: center; padding: 0 16px; pointer-events: none; z-index: 2; }
+.v2 .d5-carr-caixa {
+  width: min(372px, 100%); display: flex; flex-direction: column; align-items: center; text-align: center;
+  padding: 28px 28px 24px; border-radius: 16px; pointer-events: auto;
+  background: linear-gradient(180deg, var(--vidro-a), var(--vidro-b)), var(--base); border: 1px solid var(--linha);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .04) inset, 0 24px 60px rgba(0, 0, 0, .5);
+}
+:root[data-tema="light"] .v2 .d5-carr-caixa { background: #FFFFFF; box-shadow: 0 2px 6px rgba(16, 24, 40, .05), 0 24px 56px rgba(16, 24, 40, .14); }
+/* ícone: quatro barras de gráfico subindo e descendo */
+.v2 .d5-carr-ic { display: flex; align-items: flex-end; gap: 4px; height: 28px; margin-bottom: 14px; }
+.v2 .d5-carr-ic i { width: 6px; height: 100%; border-radius: 3px; background: var(--dado-1); transform-origin: bottom; }
+.v2 .d5-carr-ic i:nth-child(1) { transform: scaleY(.45); opacity: .55; }
+.v2 .d5-carr-ic i:nth-child(2) { transform: scaleY(.8); opacity: .75; }
+.v2 .d5-carr-ic i:nth-child(3) { transform: scaleY(.6); opacity: .9; }
+.v2 .d5-carr-ic i:nth-child(4) { transform: scaleY(1); }
+.v2 .d5-carr-caixa strong { font-size: 15.5px; font-weight: 600; letter-spacing: -.01em; color: var(--txt); }
+.v2 .d5-carr-txt { margin-top: 5px; max-width: 280px; font-size: 12.5px; line-height: 1.45; color: var(--txt-2); }
+.v2 .d5-carr-barra {
+  position: relative; display: block; width: 100%; height: 4px; margin-top: 18px; border-radius: 99px; overflow: hidden;
+  background: rgba(var(--tint), .07); box-shadow: 0 0 0 1px var(--linha) inset;
+}
+.v2 .d5-carr-barra i { position: absolute; left: 0; top: 0; height: 100%; width: 32%; border-radius: inherit; background: var(--dado-1); }
+@keyframes d5-carr-barra { 0%, 100% { transform: scaleY(.4); } 50% { transform: scaleY(1); } }
+@keyframes d5-carr-indet { 0% { transform: translateX(-100%); } 100% { transform: translateX(320%); } }
+/* movimento também no Modo Leve (o base.css zera tudo com !important): é o sinal de que está
+   trabalhando; com "reduzir movimento" do sistema fica parado */
+@media (prefers-reduced-motion: no-preference) {
+  :root .v2 .d5-carr .d5-carr-ic i { animation: d5-carr-barra 1.1s ease-in-out infinite !important; }
+  :root .v2 .d5-carr .d5-carr-ic i:nth-child(2) { animation-delay: -.25s !important; }
+  :root .v2 .d5-carr .d5-carr-ic i:nth-child(3) { animation-delay: -.5s !important; }
+  :root .v2 .d5-carr .d5-carr-ic i:nth-child(4) { animation-delay: -.75s !important; }
+  :root .v2 .d5-carr .d5-carr-barra i { animation: d5-carr-indet 1.25s ease-in-out infinite !important; }
+}

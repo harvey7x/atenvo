@@ -38,6 +38,22 @@ function useHojeSP(): string {
   return hoje;
 }
 
+/* Primeira abertura (sem foto guardada neste navegador) — dono 30/10: "coloca aquela tela de
+   carregando que a gente colocou no WhatsApp e no Kanban". Fica por cima dos esqueletos. É uma
+   chamada só ao banco, então a barra é de espera (sem porcentagem inventada). */
+function CarregandoDash() {
+  return (
+    <div className="d5-carr" role="status" aria-live="polite">
+      <div className="d5-carr-caixa">
+        <span className="d5-carr-ic" aria-hidden><i /><i /><i /><i /></span>
+        <strong>Carregando o Dashboard</strong>
+        <span className="d5-carr-txt">Calculando as entradas, os fechados e o desempenho da equipe. Só um instante.</span>
+        <span className="d5-carr-barra"><i /></span>
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardV2() {
   const hoje = useHojeSP();
   const [preset, setPresetRaw] = useState<PresetDash>('hoje');
@@ -104,6 +120,8 @@ export default function DashboardV2() {
           {carregando ? <AtendentesSkeleton /> : <Atendentes atendentes={d.atendentes} />}
 
           {carregando ? <MapaSkeleton /> : <Mapa mapa={d.mapa} janela={janelaMapa} hoje={hoje} geradoEm={d.geradoEm} />}
+
+          {carregando && <CarregandoDash />}
         </>
       )}
     </div>
