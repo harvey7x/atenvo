@@ -974,4 +974,5 @@ html:root[data-repaginada][data-repaginada] .v2 :is(.conv2, .ctx-topo, .ctx-b).s
 .v2 .wa-ctopo .idw { flex: 1 1 auto; min-width: 0; }
 .v2 .wa-ctopo .sb { flex-wrap: nowrap; min-width: 0; overflow: hidden; }
 .v2 .wa-ctopo .sb > * { flex: 0 0 auto; }
-.v2 .wa-ctopo .sb > .wa-hchip:not(.rdr-hselo):not(.ligar):not(.repasse) { flex: 0 1 auto; min-width: 34px; }
+.v2 .wa-ctopo .sb > .wa-hchip:not(.rdr-hselo):not(.ligar):not(.repasse):not([title="Atendente responsável"]) { flex: 0 1 auto; min-width: 34px; }
+/* (o responsável — nome curto — fica fora da regra acima: inteiro; quem encolhe é o número de resposta) */
