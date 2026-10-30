@@ -149,3 +149,31 @@
 .v2 .cl-doc:last-child { padding-bottom: 0; border-bottom: none; }
 .v2 .cl-doc b { font-size: 13px; color: var(--txt); font-weight: 500; }
 .v2 .cl-doc span { font-size: 11.5px; color: var(--txt-2); line-height: 1.45; }
+
+/* ---------- Coletor INSS: guia de instalação no notebook (dono 30/10) ---------- */
+.v2 .clg-layout { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; align-items: start; margin-top: 14px; }
+.v2 .clg-lado { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+@media (max-width: 1080px) { .v2 .clg-layout { grid-template-columns: 1fr; } }
+.v2 .clg-sub { font-size: 11.5px; color: var(--txt-3); }
+.v2 .clg-passos { list-style: none; margin: 0; padding: 6px 16px 16px; display: flex; flex-direction: column; }
+.v2 .clg-passo { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--linha); }
+.v2 .clg-passo:last-child { border-bottom: none; padding-bottom: 4px; }
+.v2 .clg-n {
+  width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 12px; font-weight: 600; color: var(--txt); background: rgba(var(--tint), .07); border: 1px solid rgba(var(--tint), .14);
+}
+.v2 .clg-corpo { min-width: 0; padding-top: 3px; }
+.v2 .clg-corpo > b { display: block; font-size: 13.5px; font-weight: 600; color: var(--txt); }
+.v2 .clg-corpo > p { margin: 4px 0 0; font-size: 12.5px; line-height: 1.55; color: var(--txt-2); }
+.v2 .clg-corpo p b { color: var(--txt); font-weight: 600; }
+.v2 .clg-corpo code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11.5px; color: var(--txt);
+  padding: 1px 5px; border-radius: 5px; background: rgba(var(--tint), .07); border: 1px solid rgba(var(--tint), .1);
+}
+.v2 .clg-acao { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
+.v2 .clg-acao a.p-btn { text-decoration: none; }
+.v2 .clg-corpo > p.clg-dica { margin-top: 8px; font-size: 11.5px; color: var(--txt-3); }
+.v2 .clg-passos.compacto .clg-passo { padding: 11px 0; }
+.v2 .clg-ajuda { margin: 0; padding-left: 16px; display: flex; flex-direction: column; gap: 7px; font-size: 12.5px; line-height: 1.5; color: var(--txt-2); }
+.v2 .clg-ajuda b { color: var(--txt); font-weight: 600; }
+.v2 .clg-erro { margin-top: 12px; padding: 10px 14px; border-radius: 10px; font-size: 12.5px; color: var(--txt); background: rgba(229, 72, 77, .1); border: 1px solid rgba(229, 72, 77, .3); }
