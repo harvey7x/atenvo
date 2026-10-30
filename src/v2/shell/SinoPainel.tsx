@@ -17,6 +17,9 @@
    - O ponto do sino (AppShellV2) acende só para não lidas de Gestão e Outros: negociação,
      fechados e ligar já aparecem na barra e na tela cheia.
    - Sino pessoal: a consulta já traz só o que é do usuário (atendente: usuario_id = eu).
+   - Perfil GESTOR do bom dia (o Murilo — dono 30/10: "a central de avisos não precisa aparecer
+     por enquanto"): NADA do Radar — nem na lista, nem nas seções (Gestão, Em negociação,
+     Fechados, Ligar, decisões de repasse), nem no ponto. Atendentes e o Matheus: nada muda.
    ============================================================================ */
 import { useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -24,6 +27,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useOrg } from '@/context/OrgContext';
 import { useNotificacoes, useMarcarNotificacao, REMARKETING_REAL, type Notificacao } from '@/data/remarketing';
 import { useRadarAvisos, useRadarMeus, useVacuoDecisoes, type RadarFilas, type RadarItem, type VacuoDecisao } from '@/data/vacuo';
+import { useModoBomDia } from '@/data/bomDia';
 import { dataHoraSP, tempoRelativo } from '../lib/tempo';
 import { rt, rtTit, rtTxt, type RadarParams } from '../lib/radarTextos';
 import { IcNegociacao, IcFechado, IcLigar, IcDecisao, IcEmDia, IcDocumento, IcInteresse } from '../components/RadarIcones';
@@ -80,6 +84,17 @@ export function notificacoesDoSino(lista: Notificacao[], agora = Date.now()): No
 /** Não lidas que ACENDEM o ponto do sino: só Gestão e Outros. */
 export function naoLidasQueAcendem(lista: Notificacao[]): number {
   return notificacoesDoSino(lista).filter((n) => !n.lidaEm && ACENDEM.has(secaoDaNotificacao(n))).length;
+}
+
+/** A notificação é do Radar (a Central de Avisos)? Negociação, fechados, ligar e Gestão (pedido do gestor,
+    decisão de repasse, repassado/recebido/mantido/devolvido, lead sem responsável). */
+export const ehDoRadar = (n: Pick<Notificacao, 'tipo'>): boolean => RADAR.has(n.tipo);
+
+/** O sino do perfil GESTOR do bom dia (o Murilo): sem a Central de Avisos, sem nada do Radar — fica o resto
+    (Outros: remarketing e os demais módulos). Filtrar AQUI, antes do sino, tira o Radar da lista, das seções,
+    da linha-resumo das decisões e do ponto de uma vez. */
+export function semRadar(lista: Notificacao[]): Notificacao[] {
+  return lista.filter((n) => !ehDoRadar(n));
 }
 
 /* ---- etiqueta da linha: desenhada a partir das filas ativas do Radar, nada lido do texto ---- */
@@ -226,23 +241,26 @@ const SEM_DECISAO: VacuoDecisao[] = [];
 export function useSino(): SinoDados {
   const { currentOrg } = useOrg();
   const gestor = currentOrg?.role === 'admin';
+  // perfil gestor do bom dia (ou perfil ainda não lido — a Central nunca pisca para o gestor): sem o Radar
+  const comRadar = useModoBomDia() === 'vendedor';
   const qc = useQueryClient();
   const notifsQ = useNotificacoes();
   const { mutate: marcarNotif } = useMarcarNotificacao();
   const decisoesQ = useVacuoDecisoes();
   const { negociacao, fechado, ligar, cutucadas } = useRadarMeus();
   const lidas = useSyncExternalStore(assinarDemo, lerLidasDemo, lerLidasDemo);
-  const decisoes = gestor ? (decisoesQ.data ?? SEM_DECISAO) : SEM_DECISAO;
+  const decisoes = gestor && comRadar ? (decisoesQ.data ?? SEM_DECISAO) : SEM_DECISAO;
 
   const lista = useMemo(() => {
     const base = notifsQ.data ?? SEM_NOTIF;
-    if (!SINO_DEMO) return base;
+    if (!SINO_DEMO) return comRadar ? base : semRadar(base);
     // se a demo de notificações já trouxer itens do Radar, não duplica
-    const radar = base.some((n) => RADAR.has(n.tipo)) ? [] : radarNoSinoDemo({ negociacao, fechado, ligar, cutucadas }, decisoes);
-    return [...base, ...radar]
+    const radar = !comRadar || base.some((n) => RADAR.has(n.tipo)) ? [] : radarNoSinoDemo({ negociacao, fechado, ligar, cutucadas }, decisoes);
+    const todas = [...base, ...radar]
       .map((n) => (n.lidaEm || !lidas.has(n.id) ? n : { ...n, lidaEm: lidas.get(n.id) ?? null }))
       .sort((a, b) => new Date(b.criadoEm).getTime() - new Date(a.criadoEm).getTime());
-  }, [notifsQ.data, negociacao, fechado, ligar, cutucadas, decisoes, lidas]);
+    return comRadar ? todas : semRadar(todas);
+  }, [notifsQ.data, negociacao, fechado, ligar, cutucadas, decisoes, lidas, comRadar]);
 
   // leitura otimista: a linha perde o ponto na hora; o refetch confirma com o banco
   const marcarNoCache = useCallback((alvo: (n: Notificacao) => boolean) => {

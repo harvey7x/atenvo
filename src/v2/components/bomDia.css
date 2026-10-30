@@ -140,6 +140,8 @@
 .v2 .bd-legenda > span.dita { color: #F2F2F2; }
 .v2 .bd-legenda > .bd-num-fala { font-weight: 500; }
 .v2 .bd-legenda > .bd-num-fala.dita { color: #FFFFFF; }
+/* apresentação: a 2ª parte esperando a voz dela (o painel desceu, a esfera voltou ao meio) */
+.v2 .bd-legenda.bd-legenda-espera { font-size: calc(var(--bd-u) * 17); line-height: 1.4; color: var(--bd-txt-3); }
 
 /* ---- a tela do PLAY (dono 30/10: "teria que ter um botão da gente dar um play"): a saudação, uma
    linha discreta e a pílula branca "Ouvir o resumo" (o ▶ num círculo preto); "Ver sem áudio" embaixo.
@@ -213,6 +215,16 @@
 .v2 .bd-fase-fim .bd-surge { opacity: 1; transform: none; }
 
 .v2 .bd-saudacao { align-self: center; min-width: 0; padding-left: calc(var(--bd-u) * 4); container-type: inline-size; }
+/* APRESENTAÇÃO: o selo diz qual resumo é aquele painel ("Resumo da manhã" / "Diagnóstico do dia") — pílula
+   fina acima da data, como a da prévia: um ponto branco e o nome; nada de cor */
+.v2 .bd-selo {
+  display: inline-flex; align-items: center; gap: calc(var(--bd-u) * 8); max-width: 100%;
+  margin: 0 0 calc(var(--bd-u) * 18); padding: calc(var(--bd-u) * 6) calc(var(--bd-u) * 13) calc(var(--bd-u) * 6) calc(var(--bd-u) * 11);
+  border: 1px solid rgba(255, 255, 255, .16); border-radius: 999px; background: rgba(255, 255, 255, .03);
+  font-size: calc(var(--bd-u) * 13); font-weight: 500; line-height: 1.2; letter-spacing: -.002em; color: #DCDCDC;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.v2 .bd-selo > i { flex: none; width: calc(var(--bd-u) * 6); height: calc(var(--bd-u) * 6); border-radius: 50%; background: #FFFFFF; }
 .v2 .bd-hoje { margin: 0 0 calc(var(--bd-u) * 16); font-size: calc(var(--bd-u) * 14); font-weight: 450; line-height: 1.3; letter-spacing: .005em; color: var(--bd-txt-3); }
 .v2 .bd-sep { margin: 0 .45em; color: #555; }
 /* a saudação encolhe com o nome (≤8 letras · 9–10 · mais) e com a coluna: nunca invade os cartões */
@@ -379,10 +391,17 @@
 .v2 .bd-dica { display: inline-flex; align-items: center; gap: calc(var(--bd-u) * 7); font-size: calc(var(--bd-u) * 12.5); color: #7A7A7A; white-space: nowrap; }
 /* "Começar o dia": branco com texto preto */
 .v2 .bd-cta {
+  position: relative; overflow: hidden;   /* a contagem da apresentação corre no pé dele (o anel é outline: não corta) */
   display: inline-flex; align-items: center; gap: calc(var(--bd-u) * 10);
   height: calc(var(--bd-u) * 46); padding: 0 calc(var(--bd-u) * 19) 0 calc(var(--bd-u) * 23);
   border: 0; border-radius: calc(var(--bd-u) * 12); cursor: pointer;
   background: #F2F2F2; color: #050505; font: inherit; font-size: calc(var(--bd-u) * 15); font-weight: 560; letter-spacing: -.005em;
+}
+/* apresentação: "Continuar" conta até a 2ª parte vir sozinha — uma barrinha preta enche no pé do botão (sem
+   movimento, ela não aparece; o avanço acontece igual) */
+.v2 .bd-cta-auto::after {
+  content: ""; position: absolute; left: 0; bottom: 0; width: 100%; height: calc(var(--bd-u) * 3);
+  background: rgba(0, 0, 0, .32); transform-origin: left center; transform: scaleX(0);
 }
 .v2 .bd-cta:hover { background: #FFFFFF; }
 .v2 .bd-cta svg { width: calc(var(--bd-u) * 17); height: calc(var(--bd-u) * 17); flex: none; }
@@ -464,6 +483,8 @@
   html:root[data-perf] .v2 .bd-sem-audio { transition: background-color .2s ease, border-color .2s ease, color .2s ease !important; }
   html:root[data-perf] .v2 .bd-cta { transition: background-color .2s ease !important; }
   html:root[data-perf] .v2 .bd-cta svg { transition: transform .3s ease !important; }
+  /* a contagem do "Continuar" (apresentação): funcional e curta — no Leve também */
+  html:root[data-perf] .v2 .bd-cta-auto::after { animation: bd-conta var(--bd-auto-ms, 6s) linear var(--bd-auto-espera, 1s) both !important; }
   /* Leve: o painel entra sem animação longa; a esfera vai ao alto depressa */
   html:root[data-perf] .v2 .bd-painel { transition: opacity .2s ease, visibility 0s linear .2s !important; }
   html:root[data-perf] .v2 .bd-fase-fim .bd-painel { transition: opacity .24s ease, visibility 0s !important; }
@@ -487,6 +508,7 @@
   html:root[data-perf="full"] .v2 .bd-esfera.bd-pose-fixa .bd-esfera-corpo { animation: bd-respira 5.2s ease-in-out infinite alternate !important; }
 }
 @keyframes bd-esmaece { from { opacity: 0; } }
+@keyframes bd-conta { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 @keyframes bd-frase-entra { from { opacity: 0; transform: translateY(calc(var(--bd-u) * 8)); } }
 @keyframes bd-frase-sai { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(calc(var(--bd-u) * -5)); } }
 /* a respiração começa no tamanho desenhado (sem salto quando o laço dorme) e volta a ele */

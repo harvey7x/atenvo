@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  acharPausas, agruparCampanhas, analisarVoz, aplicarGanho, casosDoPainel, chaveTelaBomDia, criarGanho, criarMedidor,
-  detalheNaoElegiveis, deveMostrarBomDia, encaixarNasPausas, escalaU, fraseNoTempo, hojeLocal, inicioPorPeso, lideresCampanha,
-  limiarPalavra, listaE, mapearFala, marcarBomDiaVisto, marcarMomentoVisto, medirPalavras, momentoAtual, momentoDevido, montarFala,
-  msAteProximoBomDia, msAteProximoMomento, nomeCampanha, porExtenso, progressoFrase, proximaTelaBomDia, quadroLento,
-  respiracaoCalma, resumoDaRpc, saudacaoDoDia, textoCorrido, textoFalado, textoResumo, vaoDaFita, vozAte,
+  acharPausas, agruparCampanhas, analisarVoz, aplicarGanho, blocosDaVoz, casosDoPainel, chaveTelaBomDia, criarGanho, criarMedidor,
+  destinoDaCentral, detalheNaoElegiveis, deveMostrarBomDia, encaixarNasPausas, escalaU, falasDaTela, fraseComparacao, fraseIa,
+  fraseNoTempo, hojeLocal, inicioPorPeso, juntarPcm, lideresCampanha, limiarPalavra, listaE, mapearFala, marcarBomDiaVisto,
+  marcarMomentoVisto, MAX_CHARS_VOZ, medirPalavras, momentoAtual, momentoDevido, montarApresentacao, montarFala,
+  msAteProximoBomDia, msAteProximoMomento, nomeCampanha, painelDaTela, PAUSA_ENTRE_PEDACOS_S, porExtenso, progressoFrase,
+  proximaTelaBomDia, quadroLento, respiracaoCalma, resumoDaRpc, saudacaoDoDia, textoCorrido, textoFalado, textoResumo,
+  textosDoPlay, vaoDaFita, vozAte,
   type ResumoGestor, type ResumoVendedor, type TelaBomDia, type Trecho,
 } from './bomDia';
 import { prepararBomDia, seedResumoBomDia } from '@/data/bomDia';
@@ -705,24 +707,34 @@ describe('bom dia do ADMINISTRADOR: o painel (o cartão nunca cresce com os dado
 });
 
 describe('bom dia: a prévia (os textos dos áudios da demo)', () => {
-  // o seed do administrador; os áudios /demo-midia/bom-dia-gestor-{manha,tarde}-despina.wav saem DESTES textos
+  // o seed do administrador; os áudios /demo-midia/bom-dia-gestor-{manha,tarde}-despina.wav e
+  // /demo-midia/bom-dia-apresentacao-{1,2}-despina.wav saem DESTES textos
   const g = seedResumoBomDia(true) as ResumoGestor;
 
-  it('o seed exercita o agrupamento e o empate', () => {
+  it('o seed exercita o agrupamento, o empate, a comparação com ontem e a IA', () => {
     expect(agruparCampanhas(g.nePorCampanha).map((x) => [x.nome.rotulo, x.n])).toEqual([['Empréstimo', 3], ['Campanha Antônio', 1]]);
     expect(g.melhorHoje).toEqual({ n: 2, nomes: ['Juliana', 'Isadora'] });
     expect(g.fechadosHoje).toBeGreaterThanOrEqual(g.melhorHoje!.n * g.melhorHoje!.nomes.length); // a fala não se contradiz
     expect(g.porCampanha.reduce((a, x) => a + x.n, 0)).toBe(g.chegaram);
     expect(g.nePorCampanha.reduce((a, x) => a + x.n, 0)).toBe(g.naoElegiveis);
+    expect([g.leadsOntemMesmaHora, g.iaAtendeuHoje]).toEqual([16, 12]);   // SINTESE-PUB2 §3
   });
 
   it('manhã, 08:00', () => {
-    expect(textoCorrido(montarFala('Murilo', g, { momento: 'manha', agora: dia(8) }))).toBe(
+    const f = montarFala('Murilo', g, { momento: 'manha', agora: dia(8) });
+    // §8: a comparação logo depois dos leads; a IA depois da campanha com mais não elegíveis
+    expect(f.map((t) => t.id)).toEqual([
+      'saudacao', 'saudacao', 'leads', 'leads', 'comparacao', 'melhor-campanha', 'nao-elegiveis', 'campanha-ne', 'ia', 'melhor-ontem',
+      'fechados', 'criticos', 'criticos', 'criticos', 'fecho',
+    ]);
+    expect(textoCorrido(f)).toBe(
       'Bom dia, Murilo, tudo bem? Seja bem-vindo ao seu acesso de administrador. Aqui você pode acompanhar o desempenho da sua equipe. '
       + 'Até o momento, entraram 20 leads no sistema: 6 do número oficial, 5 da campanha Antônio, 5 da campanha Andrius e 4 do chip do Murillo. '
+      + 'São 4 a mais que ontem no mesmo horário, quando eram 16. '
       + 'A melhor campanha até agora é a do número oficial, com 6 leads. '
       + '4 clientes foram marcados como não elegíveis. '
       + 'A campanha com mais não elegíveis é a do Empréstimo, com 3 clientes. '
+      + 'A IA atendeu 12 leads hoje. '
       + 'A melhor vendedora de ontem foi a Juliana, com 5 contratos fechados. '
       + 'Hoje já foram fechados 4 contratos. '
       + 'Casos críticos: O número do Empréstimo está desconectado. 3 clientes novos estão sem dono. '
@@ -731,15 +743,47 @@ describe('bom dia: a prévia (os textos dos áudios da demo)', () => {
   });
 
   it('17h', () => {
-    expect(textoCorrido(montarFala('Murilo', g, { momento: 'tarde', agora: dia(17) }))).toBe(
+    const f = montarFala('Murilo', g, { momento: 'tarde', agora: dia(17) });
+    // §8: a comparação depois dos leads; a IA depois da comparação
+    expect(f.map((t) => t.id)).toEqual([
+      'saudacao', 'fechados', 'melhor-vendedor', 'melhor-campanha', 'leads', 'comparacao', 'ia', 'criticos', 'criticos', 'criticos', 'fecho',
+    ]);
+    expect(textoCorrido(f)).toBe(
       'Olá, Murilo, seu diagnóstico do dia chegou. '
       + 'Até o momento, fechamos 4 clientes. '
       + 'Quem mais vendeu hoje foram a Juliana e a Isadora, com 2 contratos cada. '
       + 'A melhor campanha até o momento é a do número oficial, com 6 leads. '
       + 'Hoje entraram 20 leads no sistema, e 4 foram marcados como não elegíveis. '
+      + 'São 4 a mais que ontem no mesmo horário, quando eram 16. '
+      + 'A IA atendeu 12 leads hoje. '
       + 'Casos críticos: O número do Empréstimo está desconectado. 3 clientes novos estão sem dono. '
       + 'Bom fim de dia!',
     );
+  });
+
+  it('apresentação: as duas falas (o roteiro, literal)', () => {
+    // o texto não depende da hora: a parte das 8h diz "Bom dia" mesmo apresentada às 17h
+    const [p1, p2] = falasDaTela('Murilo', g, 'apresentacao', dia(17));
+    expect(textoCorrido(p1)).toBe(
+      'Olá, Murilo! Eu sou a assistente do Atenvo. A partir de agora, todos os dias, eu vou te passar os números da sua equipe. '
+      + 'Às oito da manhã, você recebe o resumo da manhã. Ele fica assim. '
+      + textoCorrido(montarFala('Murilo', g, { momento: 'manha', agora: dia(8) })),
+    );
+    expect(textoCorrido(p2)).toBe(
+      'E às cinco da tarde, eu te entrego o diagnóstico do dia. Fica assim. '
+      + 'Olá, Murilo, seu diagnóstico do dia chegou. '
+      + 'Até o momento, fechamos 4 clientes. '
+      + 'Quem mais vendeu hoje foram a Juliana e a Isadora, com 2 contratos cada. '
+      + 'A melhor campanha até o momento é a do número oficial, com 6 leads. '
+      + 'Hoje entraram 20 leads no sistema, e 4 foram marcados como não elegíveis. '
+      + 'São 4 a mais que ontem no mesmo horário, quando eram 16. '
+      + 'A IA atendeu 12 leads hoje. '
+      + 'Casos críticos: O número do Empréstimo está desconectado. 3 clientes novos estão sem dono. '
+      + 'É isso, Murilo. Quando quiser me ouvir de novo, é só abrir o menu e clicar em Ouvir o bom dia. Seja bem-vindo ao Atenvo!',
+    );
+    expect(falasDaTela('Murilo', g, 'apresentacao', dia(8)).map(textoCorrido)).toEqual([p1, p2].map(textoCorrido));
+    // cada fala da demo cabe num pedido só (um áudio por parte: bom-dia-apresentacao-1/-2)
+    expect([p1, p2].map((f) => blocosDaVoz(f).length)).toEqual([1, 1]);
   });
 
   it('a atendente da prévia segue com o texto do áudio que já existe', () => {
@@ -765,11 +809,227 @@ describe('bom dia: a prévia (os textos dos áudios da demo)', () => {
       expect(textoCorrido(f).length).toBeLessThanOrEqual(1200);
       for (const t of f) expect(t.texto.length, t.texto).toBeLessThanOrEqual(150);
     }
+    // a apresentação do mesmo dia: cada fala cabe ou sai em pedaços que cabem, o texto igual
+    for (const f of montarApresentacao('Maria Eduarda', com({ ...pesado, leadsOntemMesmaHora: 125, iaAtendeuHoje: 37 }), dia(17))) {
+      const pedacos = blocosDaVoz(f);
+      for (const p of pedacos) expect(textoCorrido(p).length).toBeLessThanOrEqual(MAX_CHARS_VOZ);
+      expect(pedacos.map(textoCorrido).join(' ')).toBe(textoCorrido(f));
+    }
+  });
+
+  it('o pior dia na apresentação: a 1ª fala passa de 1.200 e vai em DOIS pedidos (antes: a função recusava e ficava sem voz)', () => {
+    const pior = com({
+      chegaram: 133,
+      porCampanha: [
+        { canal: 'ANTONIO CAMPANHA', n: 41 }, { canal: 'JUROS ABUSIVO (ANDRIUS)', n: 41 }, { canal: 'OFICIAL', n: 19 }, { canal: 'MURILLO CHIP', n: 12 },
+        { canal: 'EMPRESTIMO', n: 8 }, { canal: 'EMPRESTIMO DIEGO', n: 8 }, { canal: 'Sem campanha', n: 4 },
+      ],
+      naoElegiveis: 18, nePorCampanha: [{ canal: 'EMPRESTIMO', n: 5 }, { canal: 'ANTONIO CAMPANHA', n: 5 }, { canal: 'OFICIAL', n: 4 }],
+      fechadosHoje: 6, melhorOntem: { n: 3, nomes: ['Juliana', 'Gabriela', 'Isadora'] }, melhorHoje: { n: 2, nomes: ['Juliana', 'Gabriela', 'Isadora'] },
+      criticos: { desconectados: ['EMPRESTIMO', 'ANTONIO CAMPANHA', 'JUROS ABUSIVO (ANDRIUS)', 'OFICIAL', 'MURILLO CHIP'], iaSemCredito: true, semDono: 12 },
+      leadsOntemMesmaHora: 47, iaAtendeuHoje: 37,
+    });
+    const [p1, p2] = montarApresentacao('Maria Eduarda', pior, dia(17));
+    expect(textoCorrido(p1).length).toBeGreaterThan(MAX_CHARS_VOZ);
+    const pedacos = blocosDaVoz(p1);
+    expect(pedacos).toHaveLength(2);
+    for (const p of pedacos) expect(textoCorrido(p).length).toBeLessThanOrEqual(MAX_CHARS_VOZ);
+    expect(pedacos.map(textoCorrido).join(' ')).toBe(textoCorrido(p1));      // sem mudar o texto
+    expect(Math.abs(textoCorrido(pedacos[0]).length - textoCorrido(pedacos[1]).length)).toBeLessThan(250);   // equilibrados
+    expect(blocosDaVoz(p2)).toHaveLength(1);
   });
 
   it('nenhuma "página" da legenda passa de ~2 linhas (≤ 110 caracteres)', () => {
-    for (const f of [montarFala('Murilo', g, { momento: 'manha', agora: dia(8) }), montarFala('Murilo', g, { momento: 'tarde', agora: dia(17) }), manha(real), tarde(real)]) {
+    for (const f of [
+      montarFala('Murilo', g, { momento: 'manha', agora: dia(8) }), montarFala('Murilo', g, { momento: 'tarde', agora: dia(17) }), manha(real), tarde(real),
+      ...falasDaTela('Murilo', g, 'apresentacao', dia(17)),
+    ]) {
       for (const t of f) expect(t.texto.length, t.texto).toBeLessThanOrEqual(110);
     }
+  });
+});
+
+describe('bom dia do ADMINISTRADOR: comparação com ontem e o trabalho da IA (SINTESE-GESTOR-V2 §8)', () => {
+  it('todas as faixas da comparação, nesta ordem', () => {
+    expect(fraseComparacao(57, null)).toBeNull();                 // RPC antiga: pula (nunca "não tinha nenhum")
+    expect(fraseComparacao(0, 0)).toBeNull();                     // hoje e ontem zero: pula
+    expect(fraseComparacao(5, 0)).toBe('Ontem, no mesmo horário, ainda não tinha entrado nenhum lead.');
+    expect(fraseComparacao(257, 125)).toBe('É mais que o dobro de ontem no mesmo horário, quando eram 125.');
+    expect(fraseComparacao(250, 125)).toBe('São 125 a mais que ontem no mesmo horário, quando eram 125.');   // o dobro exato não é "mais que o dobro"
+    expect(fraseComparacao(47, 35)).toBe('São 12 a mais que ontem no mesmo horário, quando eram 35.');
+    expect(fraseComparacao(50, 47)).toBe('Praticamente o mesmo que ontem no mesmo horário, quando eram 47.');   // até 10%
+    expect(fraseComparacao(52, 47)).toBe('São 5 a mais que ontem no mesmo horário, quando eram 47.');         // passou de 10%
+    expect(fraseComparacao(47, 59)).toBe('São 12 a menos que ontem no mesmo horário, quando eram 59.');
+    expect(fraseComparacao(60, 125)).toBe('É menos da metade de ontem no mesmo horário, quando eram 125.');
+    expect(fraseComparacao(0, 125)).toBe('É menos da metade de ontem no mesmo horário, quando eram 125.');
+    expect(fraseComparacao(20, 16)).toBe('São 4 a mais que ontem no mesmo horário, quando eram 16.');          // o seed da prévia
+    expect(fraseComparacao(57, 125)).toBe('É menos da metade de ontem no mesmo horário, quando eram 125.');    // os números de hoje ~15h
+    expect(fraseComparacao(3, 1)).toBe('É mais que o dobro de ontem no mesmo horário, quando era 1.');
+    expect(fraseComparacao(12, 11)).toBe('Praticamente o mesmo que ontem no mesmo horário, quando eram 11.');
+    expect(fraseComparacao(14, 12)).toBe('São 2 a mais que ontem no mesmo horário, quando eram 12.');
+    expect(fraseComparacao(10, 11)).toBe('Praticamente o mesmo que ontem no mesmo horário, quando eram 11.');
+    expect(fraseComparacao(30, 32)).toBe('Praticamente o mesmo que ontem no mesmo horário, quando eram 32.');
+    expect(fraseComparacao(28, 32)).toBe('São 4 a menos que ontem no mesmo horário, quando eram 32.');
+    expect(fraseComparacao(9, 20)).toBe('É menos da metade de ontem no mesmo horário, quando eram 20.');
+    expect(fraseComparacao(10, 20)).toBe('São 10 a menos que ontem no mesmo horário, quando eram 20.');          // a metade exata
+  });
+
+  it('a IA: plural, singular, zero e campo ausente', () => {
+    expect(fraseIa(37)).toBe('A IA atendeu 37 leads hoje.');
+    expect(fraseIa(1)).toBe('A IA atendeu 1 lead hoje.');
+    expect(fraseIa(0)).toBe('A IA ainda não atendeu nenhum lead hoje.');
+    expect(fraseIa(null)).toBeNull();
+    // RPC antiga (sem os campos): a fala segue sem os dois trechos
+    const f = manha(com({ leadsOntemMesmaHora: null, iaAtendeuHoje: null }));
+    expect(f.some((t) => t.id === 'comparacao' || t.id === 'ia')).toBe(false);
+  });
+
+  it('o lugar dos trechos: 8h depois dos leads / da campanha com mais NE; 17h depois dos leads / da comparação', () => {
+    const r = com({ leadsOntemMesmaHora: 125, iaAtendeuHoje: 37 });
+    const ids8 = manha(r).map((t) => t.id);
+    expect(ids8.slice(ids8.lastIndexOf('leads') + 1, ids8.lastIndexOf('leads') + 2)).toEqual(['comparacao']);
+    expect(ids8[ids8.indexOf('campanha-ne') + 1]).toBe('ia');
+    const ids17 = tarde(r).map((t) => t.id);
+    expect(ids17.slice(ids17.indexOf('leads') + 1, ids17.indexOf('leads') + 3)).toEqual(['comparacao', 'ia']);
+    // sem não elegíveis (pula a campanha-ne): a IA vem depois de "nenhum não elegível"
+    const ids0 = manha(com({ leadsOntemMesmaHora: 10, iaAtendeuHoje: 3, naoElegiveis: 0, nePorCampanha: [] })).map((t) => t.id);
+    expect(ids0[ids0.indexOf('nao-elegiveis') + 1]).toBe('ia');
+  });
+});
+
+describe('bom dia: a APRESENTAÇÃO de lançamento (gestor, só pelo menu)', () => {
+  const r = com({ leadsOntemMesmaHora: 125, iaAtendeuHoje: 37 });
+
+  it('duas falas: a 1ª = quem ela é + o resumo das 8h inteiro; a 2ª = o das 17h SEM o "Bom fim de dia!" + o fecho', () => {
+    const [p1, p2] = montarApresentacao('Murilo', r, dia(17, 40));
+    expect(p1.slice(0, 3).map((t) => t.texto)).toEqual([
+      'Olá, Murilo! Eu sou a assistente do Atenvo.',
+      'A partir de agora, todos os dias, eu vou te passar os números da sua equipe.',
+      'Às oito da manhã, você recebe o resumo da manhã. Ele fica assim.',
+    ]);
+    // o exemplo das 8h é o resumo de verdade (números de agora), com a saudação das 8h e o "Bom trabalho!"
+    expect(textoCorrido(p1.slice(3))).toBe(textoCorrido(manha(r, 'Murilo', 8)));
+    expect(p1[3].texto.startsWith('Bom dia, Murilo, tudo bem?')).toBe(true);
+    expect(p2[0].texto).toBe('E às cinco da tarde, eu te entrego o diagnóstico do dia. Fica assim.');
+    expect(textoCorrido(p2.slice(1, -3))).toBe(textoCorrido(tarde(r).slice(0, -1)));
+    expect(p2.some((t) => t.texto === 'Bom fim de dia!')).toBe(false);
+    expect(p2.slice(-3).map((t) => t.texto)).toEqual([
+      'É isso, Murilo.',
+      'Quando quiser me ouvir de novo, é só abrir o menu e clicar em Ouvir o bom dia.',
+      'Seja bem-vindo ao Atenvo!',
+    ]);
+  });
+
+  it('o nome vem do usuário; bem-vinda para nome feminino', () => {
+    const [p1, p2] = montarApresentacao('Fernanda Lima', r, dia(10));
+    expect(p1[0].texto).toBe('Olá, Fernanda! Eu sou a assistente do Atenvo.');
+    expect(p1[3].texto).toBe('Bom dia, Fernanda, tudo bem? Seja bem-vinda ao seu acesso de administrador.');
+    expect(p2.slice(-3).map((t) => t.texto)).toEqual([
+      'É isso, Fernanda.',
+      'Quando quiser me ouvir de novo, é só abrir o menu e clicar em Ouvir o bom dia.',
+      'Seja bem-vinda ao Atenvo!',
+    ]);
+  });
+
+  it('as falas da tela: o resumo = 1; a apresentação = 2 (de quem não é gestor, o resumo dele)', () => {
+    expect(falasDaTela('Murilo', r, 'manha', dia(8)).map(textoCorrido)).toEqual([textoCorrido(manha(r))]);
+    expect(falasDaTela('Murilo', r, 'tarde', dia(17)).map(textoCorrido)).toEqual([textoCorrido(tarde(r))]);
+    expect(falasDaTela('Murilo', r, 'apresentacao', dia(17))).toHaveLength(2);
+    const vend: ResumoVendedor = { modo: 'vendedor', novos: 2, semResposta: 1, passados: 0, presenciais: 0 };
+    expect(falasDaTela('Juliana', vend, 'apresentacao', dia(17)).map(textoCorrido)).toEqual([textoCorrido(montarFala('Juliana', vend))]);
+  });
+
+  it('o painel de cada parte: selo, saudação, fecho, botão e se segue sozinho', () => {
+    const p = (tipo: 'manha' | 'tarde' | 'apresentacao', parte = 0, nPartes = tipo === 'apresentacao' ? 2 : 1, gestor = true) =>
+      painelDaTela({ tipo, parte, nPartes, gestor, nome: 'Murilo', agora: dia(17, 40) });
+    expect(p('apresentacao', 0)).toEqual({
+      tarde: false, selo: 'Resumo da manhã', saudacao: 'Bom dia', fecho: 'Bom trabalho!', comHora: false, cta: 'Continuar', avanca: true,
+    });
+    expect(p('apresentacao', 1)).toEqual({
+      tarde: true, selo: 'Diagnóstico do dia', saudacao: 'Boa tarde', fecho: 'Seja bem-vindo ao Atenvo!', comHora: false, cta: 'Começar', avanca: false,
+    });
+    expect(painelDaTela({ tipo: 'apresentacao', parte: 1, nPartes: 2, gestor: true, nome: 'Fernanda', agora: dia(17) }).fecho).toBe('Seja bem-vinda ao Atenvo!');
+    // o resumo de sempre (nada muda): 8h "Começar o dia"; 17h "Continuar" com "Bom fim de dia, Murilo!"
+    expect(p('manha')).toEqual({ tarde: false, selo: null, saudacao: 'Boa tarde', fecho: 'Bom trabalho!', comHora: true, cta: 'Começar o dia', avanca: false });
+    expect(p('tarde')).toEqual({ tarde: true, selo: null, saudacao: 'Boa tarde', fecho: 'Bom fim de dia, Murilo!', comHora: true, cta: 'Continuar', avanca: false });
+    // vendedor nunca tem a tarde nem a apresentação
+    expect(p('apresentacao', 0, 1, false)).toMatchObject({ tarde: false, selo: null, cta: 'Começar o dia', avanca: false });
+    expect(p('tarde', 0, 1, false)).toMatchObject({ tarde: false, cta: 'Começar o dia' });
+  });
+
+  it('a tela do play', () => {
+    expect(textosDoPlay('apresentacao', true)).toEqual({
+      linha: 'A apresentação do bom dia está pronta.', preparando: 'Preparando a apresentação…', botao: 'Ouvir a apresentação',
+    });
+    expect(textosDoPlay('manha', true)).toEqual({ linha: 'Seu resumo da manhã está pronto.', preparando: 'Preparando o seu resumo…', botao: 'Ouvir o resumo' });
+    expect(textosDoPlay('tarde', true).linha).toBe('O resumo do dia está pronto.');
+    expect(textosDoPlay('manha', false).botao).toBe('Ouvir o resumo');
+  });
+
+  it('a tela da apresentação é OUTRA tela (o Hud remonta) e o resumo do momento espera ela fechar', () => {
+    const ap: TelaBomDia = { momento: 'tarde', dia: '2026-10-30', apresentacao: true };
+    expect(chaveTelaBomDia(ap)).toBe('apresentacao-2026-10-30');
+    expect(chaveTelaBomDia({ momento: 'tarde', dia: '2026-10-30' })).toBe('tarde-2026-10-30');
+    // aberta pelo menu às 16h59: às 17h o diagnóstico espera ela fechar (não toca os dois)
+    expect(proximaTelaBomDia(ap, 'tarde', dia(17, 0))).toBe('esperar');
+  });
+});
+
+describe('bom dia: a voz em pedaços (bom-dia-voz aceita até 1.200 caracteres por pedido)', () => {
+  const tr = (n: number, tam: number): Trecho[] => Array.from({ length: n }, (_, i) => ({ id: 'leads', texto: `${String(i).padStart(3, '0')}${'x'.repeat(tam - 4)}.` }));
+
+  it('cabe: um pedaço só, o MESMO texto (o cache da voz continua valendo)', () => {
+    const f = tr(10, 100);   // 10 × 100 + 9 espaços = 1009
+    expect(blocosDaVoz(f)).toEqual([f]);
+    expect(blocosDaVoz([])).toEqual([]);
+    expect(MAX_CHARS_VOZ).toBe(1200);
+  });
+
+  it('não cabe: o menor número de pedaços, equilibrados, cortados entre frases — juntos dão o texto inteiro', () => {
+    const f = tr(15, 100);   // 1514 caracteres → 2 pedaços de ~750 (não 1200 + 314)
+    const b = blocosDaVoz(f);
+    expect(b).toHaveLength(2);
+    expect(b.map((x) => x.length)).toEqual([8, 7]);
+    for (const x of b) expect(textoCorrido(x).length).toBeLessThanOrEqual(1200);
+    expect(b.map(textoCorrido).join(' ')).toBe(textoCorrido(f));
+    expect(b.flat()).toEqual(f);
+    // 3 pedaços quando 2 não cabem
+    const g = tr(30, 100);
+    const b3 = blocosDaVoz(g);
+    expect(b3).toHaveLength(3);
+    expect(b3.map((x) => x.length)).toEqual([10, 10, 10]);
+    expect(b3.flat()).toEqual(g);
+  });
+
+  it('uma frase maior que o teto fica sozinha (nunca cortada no meio)', () => {
+    const f = [...tr(2, 100), { id: 'leads' as const, texto: 'y'.repeat(1300) }, ...tr(2, 100)];
+    const b = blocosDaVoz(f);
+    expect(b.flat()).toEqual(f);
+    expect(b.some((x) => x.length === 1 && x[0].texto.length === 1300)).toBe(true);
+  });
+
+  it('os pedaços tocam como UM áudio: juntos, com o respiro entre eles (vira pausa real)', () => {
+    const a = new Float32Array([0.1, 0.2]);
+    const b = new Float32Array([0.3]);
+    expect(juntarPcm([a], 10)).toBe(a);
+    const j = juntarPcm([a, b], 10, 0.3);
+    expect(Array.from(j)).toEqual([a[0], a[1], 0, 0, 0, b[0]]);
+    expect(juntarPcm([a, b, a], 10, 0.1)).toHaveLength(2 + 1 + 1 + 1 + 2);
+    expect(PAUSA_ENTRE_PEDACOS_S).toBeGreaterThanOrEqual(0.16);   // ≥ a pausa mínima que a legenda reconhece
+    // e o mapa da fala acha essa pausa: a frase do 2º pedaço começa nela
+    const taxa = 8000;
+    const voz = (s: number) => Float32Array.from({ length: Math.round(s * taxa) }, (_, i) => Math.sin(i / 3) * 0.5);
+    const junto = juntarPcm([voz(2), voz(2)], taxa);
+    const an = analisarVoz(junto, taxa);
+    expect(an.pausas).toHaveLength(1);
+    expect(an.pausas[0]).toBeCloseTo(2 + PAUSA_ENTRE_PEDACOS_S / 2, 1);
+  });
+});
+
+describe('bom dia: a Central de Avisos fora do perfil gestor (dono 30/10)', () => {
+  it('/radar: gestor → Dashboard; vendedor (Matheus, atendentes) → a Central; perfil ainda não lido → espera', () => {
+    expect(destinoDaCentral('gestor')).toBe('dashboard');
+    expect(destinoDaCentral('vendedor')).toBe('central');
+    expect(destinoDaCentral(null)).toBe('esperar');
   });
 });

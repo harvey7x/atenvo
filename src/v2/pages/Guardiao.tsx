@@ -14,11 +14,13 @@
    ============================================================================ */
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import './guardiao.css';
 import { BotaoPrimario, BotaoSec, CardVidro, Checkbox, Chip, Skeleton } from '../components';
 import { criarRaizPortalV2 } from '../components/portal';
 import { useOrgUsuarios } from '@/data/atendimento';
+import { useModoBomDia } from '@/data/bomDia';
+import { destinoDaCentral } from '../lib/bomDia';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   VACUO_REAL, CUTUCAR_INTERVALO_MS, repasseEfetivo, recarregarRadar,
@@ -845,7 +847,17 @@ function TabelaHistorico({ itens, agora, diaUtil, aoAbrir }: {
 interface GrupoDec { chave: string; donoId: string | null; nome: string; itens: VacuoDecisao[] }
 interface LoteRodando { grupo: string; total: number; feitos: number; andando: string | null; fila: string[] }
 
+/** /radar. No perfil GESTOR do bom dia (o Murilo — dono 30/10: "a central de avisos não precisa aparecer por
+    enquanto") a rota acessada por URL vai para o Dashboard; enquanto o perfil não chega (a mesma consulta do
+    shell, em cache), nada aparece — a Central nunca pisca para ele. Matheus e atendentes: a Central de sempre. */
 export default function GuardiaoV2() {
+  const destino = destinoDaCentral(useModoBomDia());
+  if (destino === 'dashboard') return <Navigate to="/dashboard" replace />;
+  if (destino === 'esperar') return null;
+  return <CentralDeAvisos />;
+}
+
+function CentralDeAvisos() {
   const nav = useNavigate();
   const location = useLocation();
   const avisosQ = useRadarAvisos(); // mesmo cache de useRadarEquipe: aqui só para erro e "tentar de novo"

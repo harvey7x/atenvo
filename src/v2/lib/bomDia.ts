@@ -64,39 +64,31 @@ export const momentoAtual = (agora = new Date(), o: { gestor: boolean } = { gest
    APRESENTAÇÃO DE LANÇAMENTO (dono 30/10, fechamento: "tu faz a IA meio
    que fazer uma apresentação… mostrar para o Murilo como ficaria essa
    mensagem quando ele começasse o dia e como terminaria no final").
-   Só o GESTOR: no 1º acesso ela entra NO LUGAR do resumo daquele momento
-   (não toca os dois) e, depois, sempre que ele pedir no menu do usuário
-   ("Apresentação do bom dia"). Marcada na ABERTURA, como o resto.
+   Só o GESTOR e SÓ pelo menu do usuário ("Apresentação do bom dia"):
+   ela NÃO abre sozinha (dono 30/10 17h25: "quando ele entrar, eu quero
+   que mostre a análise do final do dia") — ao entrar, o momento normal.
    ------------------------------------------------------------------ */
-const CHAVE_APRESENTACAO = `${PREFIXO}-apresentacao`;
-
-/** O gestor ainda não viu a apresentação? (vendedor nunca; storage quebrado = não insiste a cada load) */
-export function apresentacaoDevida(escopo: string | undefined, o: { gestor: boolean }): boolean {
-  if (!o.gestor) return false;
-  try {
-    return !localStorage.getItem(escopo ? `${CHAVE_APRESENTACAO}:${escopo}` : CHAVE_APRESENTACAO);
-  } catch {
-    return false;
-  }
-}
-
-export function marcarApresentacaoVista(escopo?: string, agora = new Date()): void {
-  try {
-    localStorage.setItem(escopo ? `${CHAVE_APRESENTACAO}:${escopo}` : CHAVE_APRESENTACAO, hojeLocal(agora));
-  } catch {
-    /* sem persistir: volta no próximo load, aceitável */
-  }
-}
 
 /** O que a tela toca: o resumo de um momento ou a apresentação (as duas falas do gestor). */
 export type TipoTela = Momento | 'apresentacao';
+
+/** O perfil do bom dia (RPC bom_dia_modo): 'gestor' = quem está em bom_dia_gestores (o Murilo). */
+export type ModoBomDia = 'gestor' | 'vendedor';
 
 /** A tela aberta: o momento E o dia (data local) em que ela abriu — a identidade da tela. */
 export interface TelaBomDia {
   momento: Momento;
   dia: string;
-  /** a apresentação de lançamento (gestor), no lugar do resumo deste momento */
+  /** a apresentação de lançamento (gestor), aberta pelo menu do usuário */
   apresentacao?: boolean;
+}
+
+/** A Central de Avisos (/radar) no perfil GESTOR (dono 30/10: "a central de avisos não precisa aparecer por
+    enquanto"): a rota acessada por URL vai para o Dashboard. Perfil ainda não lido → espera (a Central nunca
+    pisca para o gestor). Matheus e atendentes: a Central de sempre. */
+export function destinoDaCentral(modo: ModoBomDia | null): 'central' | 'dashboard' | 'esperar' {
+  if (modo === 'gestor') return 'dashboard';
+  return modo === 'vendedor' ? 'central' : 'esperar';
 }
 
 export const tipoDaTela = (t: Pick<TelaBomDia, 'momento' | 'apresentacao'>): TipoTela => (t.apresentacao ? 'apresentacao' : t.momento);
@@ -105,7 +97,7 @@ export const tipoDaTela = (t: Pick<TelaBomDia, 'momento' | 'apresentacao'>): Tip
 export const chaveTelaBomDia = (t: TelaBomDia): string => `${tipoDaTela(t)}-${t.dia}`;
 
 /** Um momento está DEVIDO: qual tela fica? (dono 30/10: "às 8 horas tem que dar o reset")
-    - nada aberto → a do momento devido, de hoje (a apresentação no lugar dele, quando ela é devida);
+    - nada aberto → a do momento devido, de hoje (o shell nunca pede a apresentação aqui: ela é só do menu);
     - a tela aberta é de OUTRO dia (ficou aberta de um dia para o outro: falta, fim de semana com o notebook
       no site) → dá lugar à de hoje. Antes ela ficava: o dia novo era marcado como visto e o play falava os
       números do dia em que a tela abriu;
@@ -694,6 +686,124 @@ export function falasDaTela(nome: string, r: ResumoBomDia, tipo: TipoTela, agora
 }
 
 export const textoCorrido = (trechos: Trecho[]): string => trechos.map((x) => x.texto).join(' ');
+
+/* ------------------------------------------------------------------
+   A voz de cada fala. A função bom-dia-voz aceita até 1.200 caracteres
+   por pedido (MAX_CHARS lá): uma fala maior (a 1ª parte da apresentação
+   num dia carregado) sai em pedaços SEQUENCIAIS, cortados entre frases —
+   o texto não muda: os pedaços juntos com um espaço = a fala inteira. Os
+   pedaços são gerados em paralelo e tocam como UM áudio só (juntarPcm).
+   ------------------------------------------------------------------ */
+
+/** O teto da função de voz (supabase/functions/bom-dia-voz: MAX_CHARS). */
+export const MAX_CHARS_VOZ = 1200;
+
+/** As frases de uma fala em pedaços de no máximo `max` caracteres (o texto de cada pedaço = textoCorrido).
+    Cabe inteira → um pedaço só (o mesmo texto de sempre: o cache da voz continua valendo). Não cabe → o MENOR
+    número de pedaços, equilibrados (geram em paralelo: quem manda na espera é o mais longo). Uma frase sozinha
+    maior que o teto fica num pedaço só dela (a função recusa e a tela cai na legenda — nunca corta a frase). */
+export function blocosDaVoz(trechos: Trecho[], max = MAX_CHARS_VOZ): Trecho[][] {
+  if (!trechos.length) return [];
+  const tam = trechos.map((t) => t.texto.length);
+  const total = tam.reduce((a, b) => a + b, 0) + tam.length - 1;
+  if (total <= max) return [trechos];
+  /* guloso com teto L: onde começa cada pedaço (o menor número de pedaços para esse teto) */
+  const cortes = (teto: number): number[] => {
+    const inicios = [0];
+    let n = tam[0];
+    for (let i = 1; i < tam.length; i++) {
+      if (n + 1 + tam[i] <= teto) n += 1 + tam[i];
+      else { inicios.push(i); n = tam[i]; }
+    }
+    return inicios;
+  };
+  const maior = Math.max(...tam);
+  const teto = Math.max(max, maior);
+  const pedacos = cortes(teto).length;
+  // o menor teto que ainda dá esse número de pedaços: os pedaços saem do mesmo tamanho
+  let lo = Math.max(maior, Math.ceil((total - (pedacos - 1)) / pedacos));
+  let hi = teto;
+  while (lo < hi) {
+    const meio = Math.floor((lo + hi) / 2);
+    if (cortes(meio).length <= pedacos) hi = meio;
+    else lo = meio + 1;
+  }
+  const inicios = cortes(lo);
+  return inicios.map((ini, k) => trechos.slice(ini, inicios[k + 1] ?? trechos.length));
+}
+
+/** O respiro entre dois pedaços da mesma fala (s): vira uma pausa real, e a legenda troca de frase ali. */
+export const PAUSA_ENTRE_PEDACOS_S = 0.3;
+
+/** Os pedaços de voz de uma fala (um canal, a mesma taxa) num canal só, com o respiro entre eles. */
+export function juntarPcm(pedacos: Float32Array[], taxa: number, pausaS = PAUSA_ENTRE_PEDACOS_S): Float32Array {
+  if (pedacos.length === 1) return pedacos[0];
+  const vao = Math.max(0, Math.round(pausaS * taxa));
+  const out = new Float32Array(pedacos.reduce((a, p) => a + p.length, 0) + vao * Math.max(0, pedacos.length - 1));
+  let off = 0;
+  for (const p of pedacos) {
+    out.set(p, off);
+    off += p.length + vao;
+  }
+  return out;
+}
+
+/* ------------------------------------------------------------------
+   O que muda na tela entre o resumo e a apresentação (o resto é igual).
+   ------------------------------------------------------------------ */
+
+export interface TextosDoPlay {
+  /** a linha discreta sob a saudação */
+  linha: string;
+  /** a mesma linha enquanto números e voz não chegaram (ou o play foi clicado antes) */
+  preparando: string;
+  /** a pílula branca */
+  botao: string;
+}
+
+export function textosDoPlay(tipo: TipoTela, gestor: boolean): TextosDoPlay {
+  if (tipo === 'apresentacao' && gestor) {
+    return { linha: 'A apresentação do bom dia está pronta.', preparando: 'Preparando a apresentação…', botao: 'Ouvir a apresentação' };
+  }
+  return {
+    linha: tipo === 'tarde' && gestor ? 'O resumo do dia está pronto.' : 'Seu resumo da manhã está pronto.',
+    preparando: 'Preparando o seu resumo…',
+    botao: 'Ouvir o resumo',
+  };
+}
+
+export interface PainelDaTela {
+  /** o painel do gestor das 17h ("Diagnóstico do dia.") no lugar do das 8h */
+  tarde: boolean;
+  /** só na apresentação: o selo que diz qual resumo é aquele painel */
+  selo: string | null;
+  /** a saudação grande do painel das 8h (a apresentação mostra o das 8h: "Bom dia", como a fala disse) */
+  saudacao: 'Bom dia' | 'Boa tarde' | 'Boa noite';
+  /** a linha embaixo da saudação: o fecho que a fala disse */
+  fecho: string;
+  /** a data com a hora (o resumo de agora) ou só a data (a apresentação mostra um exemplo) */
+  comHora: boolean;
+  /** o botão branco */
+  cta: string;
+  /** o botão branco leva à próxima parte da apresentação (e ela segue sozinha depois de alguns segundos) */
+  avanca: boolean;
+}
+
+/** O painel que sobe no fim de cada fala. Apresentação (2 partes, gestor): parte 1 = o painel das 8h com o selo
+    "Resumo da manhã" e "Continuar"; parte 2 = o das 17h com o selo "Diagnóstico do dia" e "Começar". */
+export function painelDaTela(o: { tipo: TipoTela; parte: number; nPartes: number; gestor: boolean; nome: string; agora: Date }): PainelDaTela {
+  const pn = primeiroNome(o.nome);
+  const sd = saudacaoDoDia(o.agora);
+  if (o.gestor && o.tipo === 'apresentacao' && o.nPartes > 1) {
+    if (o.parte <= 0) return { tarde: false, selo: 'Resumo da manhã', saudacao: 'Bom dia', fecho: 'Bom trabalho!', comHora: false, cta: 'Continuar', avanca: true };
+    const vinda = generoProvavel(pn) === 'f' ? 'bem-vinda' : 'bem-vindo';
+    return { tarde: true, selo: 'Diagnóstico do dia', saudacao: sd, fecho: `Seja ${vinda} ao Atenvo!`, comHora: false, cta: 'Começar', avanca: false };
+  }
+  if (o.gestor && o.tipo === 'tarde') {
+    return { tarde: true, selo: null, saudacao: sd, fecho: `Bom fim de dia${pn ? `, ${pn}` : ''}!`, comHora: true, cta: 'Continuar', avanca: false };
+  }
+  return { tarde: false, selo: null, saudacao: sd, fecho: 'Bom trabalho!', comHora: true, cta: 'Começar o dia', avanca: false };
+}
 
 /* ------------------------------------------------------------------
    Números por extenso (pt-BR). A legenda e o encaixe medem o que se

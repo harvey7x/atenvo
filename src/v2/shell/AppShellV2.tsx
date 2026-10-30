@@ -22,7 +22,7 @@ import {
   HORA_FIM_DIA, hojeLocal, marcarMomentoVisto, momentoAtual, momentoDevido, msAteProximoMomento, proximaTelaBomDia, type TelaBomDia,
 } from '../lib/bomDia';
 import { BomDia } from '../components/BomDia';
-import { assinarPreviaGestor, BOM_DIA_REAL, buscarModoBomDia, prepararBomDia } from '@/data/bomDia';
+import { prepararBomDia, useModoBomDia } from '@/data/bomDia';
 import { AvisoAtualizacao } from '../components/AvisoAtualizacao';
 import { ComparadorVisual } from '../components/ComparadorVisual';
 import { DEMO_MODE } from '@/lib/demo';
@@ -214,19 +214,10 @@ export default function AppShellV2() {
   // tarde, não o da manhã). A tela guarda o DIA em que abriu: esquecida aberta de um dia para o outro
   // (falta, fim de semana com o notebook no site), às 8h ela dá lugar à de hoje (proximaTelaBomDia).
   const orgBomDia = currentOrg?.id ?? '';
-  const [modoBomDia, setModoBomDia] = useState<'gestor' | 'vendedor' | null>(null);
-  useEffect(() => {
-    if (!user?.id || !orgBomDia) return;
-    let vivo = true;
-    buscarModoBomDia(orgBomDia)
-      .then((m) => { if (vivo) setModoBomDia(m); })
-      .catch(() => { if (vivo) setModoBomDia('vendedor'); });
-    // a RPC não respondeu (rede presa): segue como vendedor — se ela responder depois, o modo se corrige
-    const teto = window.setTimeout(() => { if (vivo) setModoBomDia((m) => m ?? 'vendedor'); }, 6000);
-    // demo: o modo é a pessoa escolhida na barra da prévia
-    const sair = BOM_DIA_REAL ? () => undefined : assinarPreviaGestor((g) => setModoBomDia(g ? 'gestor' : 'vendedor'));
-    return () => { vivo = false; window.clearTimeout(teto); sair(); };
-  }, [user?.id, orgBomDia]);
+  // o perfil (RPC bom_dia_modo) é UMA consulta para o sistema todo (useModoBomDia: o sino e a Central de Avisos
+  // leem o mesmo cache). null até a RPC responder; sem resposta em 6 s, vendedor (e se ela responder depois, o
+  // modo se corrige); na demo, a pessoa escolhida na barra da prévia
+  const modoBomDia = useModoBomDia();
   const gestorBomDia = modoBomDia === 'gestor';
   const [bomDia, setBomDia] = useState<TelaBomDia | null>(() => {
     if (!user?.id || new Date().getHours() >= HORA_FIM_DIA) return null;
@@ -284,10 +275,16 @@ export default function AppShellV2() {
           setBomDia(null); // outra aba já mostrou hoje
         }
       };
-      // abas abertas juntas: a trava faz uma de cada vez — a 2ª já encontra o momento marcado
+      // abas abertas juntas: a trava faz uma de cada vez — a 2ª já encontra o momento marcado. Trava ocupada
+      // (outra aba no mesmo instante, ou a montagem dupla do StrictMode com o perfil já conhecido): tenta de novo
+      // logo — quem abriu já marcou o momento, então nada abre duas vezes
       const locks = (navigator as Navigator & { locks?: LockManager }).locks;
-      if (locks) locks.request('atenvo-bomdia', { ifAvailable: true }, async (l) => { if (l) tentar(); }).catch(tentar);
-      else tentar();
+      if (locks) {
+        locks.request('atenvo-bomdia', { ifAvailable: true }, async (l) => {
+          if (l) tentar();
+          else window.setTimeout(() => { if (vivo) abrir(motivo); }, 400);
+        }).catch(tentar);
+      } else tentar();
     };
     const preaquecer = () => {
       const p = preparoBomDiaRef.current;
@@ -638,6 +635,15 @@ export default function AppShellV2() {
                       devolverFocoRef.current = avatarRef.current;
                       setBomDia({ momento: momentoAtual(new Date(), { gestor: gestorBomDia }), dia: hojeLocal() });
                     }}>Ouvir o bom dia</button>
+                    {/* a apresentação de lançamento (dono 30/10): SÓ o perfil gestor e SÓ por aqui — não abre sozinha */}
+                    {gestorBomDia && (
+                      <button type="button" role="menuitem" className="um-item" onClick={() => {
+                        setMenuUsuario(false);
+                        bomDiaNoInicioRef.current = false;
+                        devolverFocoRef.current = avatarRef.current;
+                        setBomDia({ momento: momentoAtual(new Date(), { gestor: true }), dia: hojeLocal(), apresentacao: true });
+                      }}>Apresentação do bom dia</button>
+                    )}
                     <button type="button" role="menuitem" className="um-item perigo" onClick={sair}>Sair</button>
                   </div>
                 </>,
@@ -671,6 +677,7 @@ export default function AppShellV2() {
         <BomDia
           aberta={bomDia !== null && !!user?.id && !!currentOrg?.id}
           momento={bomDia?.momento ?? 'manha'}
+          apresentacao={!!bomDia?.apresentacao}
           dia={bomDia?.dia ?? ''}
           gestor={gestorBomDia}
           aoConcluir={concluirBomDia}

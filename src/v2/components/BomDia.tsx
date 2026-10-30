@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { criarRaizPortalV2 } from './portal';
 import { criarAnimacao } from './bomDiaAnimacao';
@@ -6,10 +6,11 @@ import { DEMO_MODE } from '@/lib/demo';
 import { BOM_DIA_REAL, lerPreviaGestor, prepararBomDia, salvarPreviaGestor, VOZ_BOM_DIA } from '@/data/bomDia';
 import {
   agruparCampanhas, analisarVoz, aplicarGanho, casosDoPainel, chaveTelaBomDia, criarGanho, criarMedidor, detalheNaoElegiveis,
-  fraseNoTempo, lerMudo, lideresCampanha, limiarPalavra, listaE, mapearFala, medirPalavras, montarFala, primeiroNome,
-  progressoFrase, quadroLento, respiracaoCalma, salvarMudo, saudacaoDoDia, textoFalado, textoResumo,
+  falasDaTela, fraseNoTempo, juntarPcm, lerMudo, lideresCampanha, limiarPalavra, listaE, mapearFala, medirPalavras, painelDaTela,
+  primeiroNome, progressoFrase, quadroLento, respiracaoCalma, salvarMudo, saudacaoDoDia, textoCorrido, textoFalado, textoResumo,
+  textosDoPlay,
   type AnaliseVoz, type CampanhaAgrupada, type MapaFala, type Momento, type NomeCampanha, type PalavraFalada, type ResumoBomDia,
-  type Trecho, type IdTrecho, type Vendedores,
+  type TipoTela, type Trecho, type IdTrecho, type Vendedores,
 } from '../lib/bomDia';
 import './bomDia.css';
 
@@ -44,6 +45,15 @@ import './bomDia.css';
    alto dorme. Leve = pose fixa; máquina que não aguenta (janelas de
    1,5 s acima de 30 ms) baixa a resolução e, se continuar, para a esfera
    até a próxima fala.
+   APRESENTAÇÃO DE LANÇAMENTO (gestor, só pelo menu do usuário): DUAS
+   falas, cada uma com a sua voz e o seu painel. Play → parte 1 (quem ela
+   é + o resumo das 8h com os números de agora) → sobe o painel das 8h
+   com o selo "Resumo da manhã" → depois de alguns segundos (ou no
+   "Continuar") o painel desce → parte 2 (o diagnóstico das 17h + o fecho)
+   → sobe o das 17h com o selo "Diagnóstico do dia" e "Começar". Pular
+   (Esc) vai ao painel da parte atual; "Ouvir de novo" recomeça do início.
+   A voz das duas é pedida junto: a 2ª fica pronta enquanto a 1ª toca; se
+   ainda não chegou, a tela espera por ela (o mesmo teto de 60 s) e toca.
    ------------------------------------------------------------------ */
 
 /* boot: preparando · pronta: o play · falando · voltando: "Ouvir de novo" (o painel desce) · fim: o painel */
@@ -55,12 +65,18 @@ type Voz = 'ia' | 'navegador';
 const PREVIA = import.meta.env.DEV && DEMO_MODE;
 
 const MIN_ABERTURA_MS = 1300;   // a esfera acende no meio (1,1 s) e respira um instante antes da saudação
-const ESPERA_VOZ_MS = 60_000;   // a voz da IA não chegou → legenda sem voz. A fala do gestor leva ~12 s para gerar no Gemini (medido 30/10): com 12 s a tela desistia antes e o Murilo ficava sem áudio
+// a voz da IA não chegou → legenda sem voz. A fala do gestor leva ~12 s para gerar no Gemini (medido 30/10): com 12 s
+// a tela desistia antes e o Murilo ficava sem áudio. A apresentação tem falas ainda mais longas: NUNCA reduzir.
+// Vale para CADA fala (a da 2ª parte da apresentação também), contada desde o pedido.
+const ESPERA_VOZ_MS = 60_000;
 const CARACTERES_POR_S = 14.5;  // ritmo de fala sem áudio (mudo e voz do navegador)
 const DEPOIS_DA_VOZ_S = 0.5;    // o painel sobe meio segundo depois da última sílaba (não do fim do arquivo)
 const FOCO_CTA_MS = 700;        // o foco vai para "Começar o dia" quando o painel já subiu
 const DE_NOVO_MS = 550;         // "Ouvir de novo": o painel desce, a esfera volta ao meio e ela fala
 const SAIDA_MS = 420;           // "Começar o dia": a tela esmaece e devolve o sistema
+const AVANCO_ESPERA_MS = 1000;  // apresentação: o painel da 1ª parte sobe (~1 s)…
+const AVANCO_CONTA_MS = 6000;   // …e fica ~6 s à vista (a contagem corre no "Continuar"); então desce e vem a 2ª parte
+const ESPERA_PARTE = 'Preparando a segunda parte…';
 const OCIOSO_MS = 28;           // à espera do play: o redemoinho gira devagar, ~24 quadros/s…
 const OCIOSO_POR_MS = 9000;     // …por alguns segundos; depois dorme (a respiração é CSS)
 const VIGIA_DESDE_S = 2;        // o vigia de quadro ignora os 2 primeiros segundos de cada fala
@@ -86,6 +102,21 @@ function vozNeuralDoNavegador(): SpeechSynthesisVoice | null {
   const neurais = speechSynthesis.getVoices()
     .filter((v) => /^pt[-_]br/i.test(v.lang) && /natural|neural/i.test(v.name));
   return neurais.find((v) => /francisca|thalita|brenda|leila|let[ií]cia|manuela|yara/i.test(v.name)) ?? neurais[0] ?? null;
+}
+
+/* os pedaços de WAV de uma fala (a que passa de 1.200 caracteres sai em pedaços, gerados em paralelo) → UM
+   AudioBuffer: o motor toca, mede e legenda como sempre; o respiro entre os pedaços vira uma pausa real */
+async function decodificarFala(ctx: AudioContext, pedacos: ArrayBuffer[]): Promise<AudioBuffer> {
+  const bufs: AudioBuffer[] = [];
+  // slice: o decode desanexa o ArrayBuffer e o do preparo fica em cache (abrir de novo reaproveita)
+  for (const ab of pedacos) bufs.push(await ctx.decodeAudioData(ab.slice(0)));
+  if (bufs.length === 1) return bufs[0];
+  const canais = Math.min(...bufs.map((b) => b.numberOfChannels));
+  const taxa = bufs[0].sampleRate;   // o decode entrega todos na taxa do contexto
+  const dados = Array.from({ length: canais }, (_, c) => juntarPcm(bufs.map((b) => b.getChannelData(c)), taxa));
+  const out = ctx.createBuffer(canais, dados[0].length, taxa);
+  dados.forEach((d, c) => out.getChannelData(c).set(d));
+  return out;
 }
 
 const visivel = (el: Element) => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
@@ -183,13 +214,18 @@ interface PropsHud {
   /** o shell sabe pela RPC bom_dia_modo (a prévia, pela pessoa escolhida); a RPC do resumo decide de fato */
   gestor: boolean;
   momento: Momento;
+  /** a apresentação de lançamento (gestor, só pelo menu do usuário): duas falas, cada uma com o seu painel */
+  apresentacao: boolean;
   voz: string;
   /** prévia: a hora fixa (8 ou 17) — a legenda bate com o áudio pré-gerado */
   horaFixa: number | null;
-  arquivoDemo: string | null;
+  /** demo: o áudio pré-gerado de cada fala, na ordem */
+  arquivosDemo: readonly string[] | null;
 }
 
-function Hud({ aoConcluir, nome, uid, orgId, gestor, momento, voz: vozGemini, horaFixa, arquivoDemo }: PropsHud) {
+function Hud({ aoConcluir, nome, uid, orgId, gestor, momento, apresentacao, voz: vozGemini, horaFixa, arquivosDemo }: PropsHud) {
+  const tipo: TipoTela = apresentacao ? 'apresentacao' : momento;
+  const chaveDemo = arquivosDemo?.join('|') ?? '';
   const leve = useLeve();
   const relogio = useCallback(() => {
     const d = new Date();
@@ -201,7 +237,8 @@ function Hud({ aoConcluir, nome, uid, orgId, gestor, momento, voz: vozGemini, ho
   /* a hora com que o texto da voz foi montado (a saudação do gestor): legenda = áudio */
   const [horaDaFala, setHoraDaFala] = useState<Date | null>(null);
   const [erro, setErro] = useState(false);
-  const [voz, setVoz] = useState<Voz | null>(null);
+  /* a voz de CADA fala (o resumo = 1; a apresentação = 2): null = ainda preparando */
+  const [vozes, setVozes] = useState<Array<Voz | null>>([]);
   const [aberturaFeita, setAberturaFeita] = useState(false);
   const [querTocar, setQuerTocar] = useState(false);    // play clicado ainda preparando: toca quando ficar pronta
   const [jaOuviu, setJaOuviu] = useState(false);
@@ -211,14 +248,26 @@ function Hud({ aoConcluir, nome, uid, orgId, gestor, momento, voz: vozGemini, ho
   const [mudo, setMudo] = useState(() => lerMudo(uid));
   const [fechando, setFechando] = useState(false);
   const [agora, setAgora] = useState(relogio);
+  /* apresentação: a fala da vez; o painel que está à vista (desce mostrando a parte que acabou); a 2ª parte
+     esperando a voz dela; a contagem do "Continuar" (a 1ª parte acabou de verdade: segue sozinha) */
+  const [parte, setParte] = useState(0);
+  const [painelVisto, setPainelVisto] = useState(0);
+  const [esperaParte, setEsperaParte] = useState(false);
+  const [avancoAuto, setAvancoAuto] = useState(false);
 
   const opFala = useMemo(() => ({ momento, agora: horaDaFala ?? undefined }), [momento, horaDaFala]);
-  const trechos: Trecho[] = useMemo(() => (resumo ? montarFala(nome, resumo, opFala) : []), [resumo, nome, opFala]);
-  const palavras: PalavraFalada[][] = useMemo(() => trechos.map((t) => medirPalavras(t.texto)), [trechos]);
+  /* as falas da tela, cada uma com a sua voz (o texto = o da voz: a mesma hora do preparo) */
+  const falas: Trecho[][] = useMemo(
+    () => (resumo ? falasDaTela(nome, resumo, tipo, horaDaFala ?? undefined) : []),
+    [resumo, nome, tipo, horaDaFala],
+  );
+  const palavrasDasFalas: PalavraFalada[][][] = useMemo(() => falas.map((f) => f.map((t) => medirPalavras(t.texto))), [falas]);
+  const trechos: Trecho[] = falas[parte] ?? [];
+  const palavras: PalavraFalada[][] = palavrasDasFalas[parte] ?? [];
 
   const ctxRef = useRef<AudioContext | null>(null);
-  const bufRef = useRef<AudioBuffer | null>(null);
-  const analiseRef = useRef<AnaliseVoz | null>(null);
+  const bufsRef = useRef<Array<AudioBuffer | null>>([]);
+  const analisesRef = useRef<Array<AnaliseVoz | null>>([]);
   const mapaRef = useRef<{ de: Trecho[]; mapa: MapaFala } | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const ganhoRef = useRef<GainNode | null>(null);
@@ -245,12 +294,19 @@ function Hud({ aoConcluir, nome, uid, orgId, gestor, momento, voz: vozGemini, ho
   const brilhoRef = useRef(0);      // número dito: a esfera dá um brilho (~0,5 s)
   const contagemRef = useRef<{ ini: number; alvos: Array<{ no: Text; ate: number }> } | null>(null);
   const mudoRef = useRef(mudo);
-  const vozRef = useRef(voz);
-  vozRef.current = voz;
+  const vozesRef = useRef(vozes);
+  vozesRef.current = vozes;
+  const falasRef = useRef(falas);
+  falasRef.current = falas;
+  /* a fala da vez: o clique (Continuar, Ouvir de novo) muda a ref NA HORA — o tocar() agendado não depende do render */
+  const parteRef = useRef(parte);
+  /* as frases que estão tocando (tocar() fixa as da parte da vez antes de usar) */
   const trechosRef = useRef(trechos);
   trechosRef.current = trechos;
-  const palavrasRef = useRef(palavras);
-  palavrasRef.current = palavras;
+  const palavrasRef = useRef(palavrasDasFalas);
+  palavrasRef.current = palavrasDasFalas;
+  /* "Ver sem áudio": a apresentação segue sem fala (o "Continuar" sobe o painel seguinte direto) */
+  const semAudioRef = useRef(false);
   /* o laço dorme quando ela cala; a fase e o Leve chegam a ele por ref */
   const faseRef = useRef(fase);
   faseRef.current = fase;
@@ -288,27 +344,37 @@ function Hud({ aoConcluir, nome, uid, orgId, gestor, momento, voz: vozGemini, ho
     let vivo = true;
     const ctx = ctxRef.current;
     const prep = prepararBomDia({
-      org: orgId, uid, nome, momento, gestor: gestorSeed, voz: vozGemini, arquivoDemo,
+      org: orgId, uid, nome, momento, tipo, gestor: gestorSeed, voz: vozGemini, arquivosDemo: chaveDemo ? chaveDemo.split('|') : null,
       agora: horaFixa == null ? undefined : relogio(),
     });
     prep.resumo.then((r) => { if (vivo) { setHoraDaFala(prep.agora); setResumo(r); } }).catch(() => { if (vivo) setErro(true); });
-    const espera = window.setTimeout(() => { if (vivo) setVoz((v) => v ?? 'navegador'); }, ESPERA_VOZ_MS);
-    prep.voz.then(async (ab) => {
-      if (!vivo) return;
-      if (!ab || !ctx) { setVoz((v) => v ?? 'navegador'); return; }
-      try {
-        const buf = await ctx.decodeAudioData(ab.slice(0));
-        // chegou atrasada com a voz do navegador já falando: deixa terminar
-        if (!vivo || relogioRef.current === 'frase') return;
-        bufRef.current = buf;
-        // pausas reais, voz acumulada e fim da última sílaba: lidos UMA vez do PCM
-        analiseRef.current = analisarVoz(buf.getChannelData(0), buf.sampleRate);
-        setVoz('ia');
-      } catch { if (vivo) setVoz((v) => v ?? 'navegador'); }
+    /* a voz de cada fala: a 1ª abre o play; as outras ficam prontas enquanto a anterior toca */
+    const marcar = (i: number, v: Voz, soSeVazia: boolean) => setVozes((vs) => {
+      if (vs[i] === v || (soSeVazia && vs[i])) return vs;
+      const n = vs.slice();
+      n[i] = v;
+      return n;
+    });
+    // cada fala espera a SUA voz até 60 s desde o pedido (ESPERA_VOZ_MS) — depois, legenda sem voz
+    const esperas = prep.vozes.map((_, i) => window.setTimeout(() => { if (vivo) marcar(i, 'navegador', true); }, ESPERA_VOZ_MS));
+    prep.vozes.forEach((pedido, i) => {
+      pedido.then(async (pedacos) => {
+        if (!vivo) return;
+        if (!pedacos || !ctx) { marcar(i, 'navegador', true); return; }
+        try {
+          const buf = await decodificarFala(ctx, pedacos);
+          // chegou atrasada com ESTA fala já tocando pela voz do navegador (ou pela legenda): deixa terminar
+          if (!vivo || (relogioRef.current === 'frase' && parteRef.current === i)) return;
+          bufsRef.current[i] = buf;
+          // pausas reais, voz acumulada e fim da última sílaba: lidos UMA vez do PCM
+          analisesRef.current[i] = analisarVoz(buf.getChannelData(0), buf.sampleRate);
+          marcar(i, 'ia', false);
+        } catch { if (vivo) marcar(i, 'navegador', true); }
+      });
     });
     return () => {
       vivo = false;
-      window.clearTimeout(espera);
+      esperas.forEach((t) => window.clearTimeout(t));
       // os dados mudaram com a tela aberta (ex.: o nome foi relido): a fala velha para por inteiro
       // (relógio, fonte, mapa) e a tela volta ao play — o laço não lê o tempo de outro áudio
       execRef.current++;
@@ -317,18 +383,21 @@ function Hud({ aoConcluir, nome, uid, orgId, gestor, momento, voz: vozGemini, ho
       fonteRef.current = null;
       if (f) { f.onended = null; try { f.stop(); } catch { /* já parou */ } }
       if ('speechSynthesis' in window) speechSynthesis.cancel();
-      bufRef.current = null;
-      analiseRef.current = null;
+      bufsRef.current = [];
+      analisesRef.current = [];
       mapaRef.current = null;
       fimRef.current = false;
       atualRef.current = -1;
       setAtual(-1);
+      if (faseRef.current !== 'fim') { parteRef.current = 0; setParte(0); }
+      setEsperaParte(false);
+      setAvancoAuto(false);
       setFase((x) => (x === 'fim' ? x : 'boot'));
-      setVoz(null);
+      setVozes([]);
       setResumo(null);
       setErro(false);
     };
-  }, [orgId, uid, nome, momento, gestorSeed, vozGemini, arquivoDemo, horaFixa, relogio]);
+  }, [orgId, uid, nome, momento, tipo, gestorSeed, vozGemini, chaveDemo, horaFixa, relogio]);
 
   /* a esfera acende e respira um instante antes da saudação */
   useEffect(() => {
@@ -376,9 +445,9 @@ function Hud({ aoConcluir, nome, uid, orgId, gestor, momento, voz: vozGemini, ho
   const pintarLegenda = useCallback((prog: number) => {
     const i = atualRef.current;
     const el = fraseAtualRef.current;
-    const ps = palavrasRef.current[i];
-    // o React ainda não trocou o nó: não pinta a frase velha com o progresso da nova
-    if (!el || !ps || el.dataset.i !== String(i)) return;
+    const ps = palavrasRef.current[parteRef.current]?.[i];
+    // o React ainda não trocou o nó (de frase ou de parte): não pinta a frase velha com o progresso da nova
+    if (!el || !ps || el.dataset.i !== `${parteRef.current}:${i}`) return;
     const spans = el.children;
     let numero = false;
     for (let k = 0; k < ps.length && k < spans.length; k++) {
@@ -401,12 +470,15 @@ function Hud({ aoConcluir, nome, uid, orgId, gestor, momento, voz: vozGemini, ho
     if ('speechSynthesis' in window) speechSynthesis.cancel();
   }, []);
 
-  /** fim da fala (relógio da voz, onended, Pular, Esc, "Ver sem áudio"): uma vez só */
-  const terminar = useCallback(() => {
+  /** fim da fala (relógio da voz, onended, Pular, Esc, "Ver sem áudio"): uma vez só. `natural` = a fala acabou
+      de verdade (não foi pulada): na apresentação, a parte seguinte vem sozinha depois do painel */
+  const terminar = useCallback((natural = false) => {
     if (fimRef.current) return;
     fimRef.current = true;
     pararTudo();
     setQuerTocar(false);
+    setEsperaParte(false);
+    setAvancoAuto(natural && !semAudioRef.current && parteRef.current + 1 < falasRef.current.length);
     setFase('fim');
     acordar();
   }, [acordar, pararTudo]);
@@ -422,7 +494,7 @@ function Hud({ aoConcluir, nome, uid, orgId, gestor, momento, voz: vozGemini, ho
       if (execRef.current !== exec) return;
       if (i >= tr.length) {
         fraseRef.current = { ini: performance.now(), dur: 0, char: null };
-        window.setTimeout(() => { if (execRef.current === exec) terminar(); }, DEPOIS_DA_VOZ_S * 1000);
+        window.setTimeout(() => { if (execRef.current === exec) terminar(true); }, DEPOIS_DA_VOZ_S * 1000);
         return;
       }
       // a legenda troca já no início da pausa; a frase nova acende quando a "voz" dela começa
@@ -455,8 +527,9 @@ function Hud({ aoConcluir, nome, uid, orgId, gestor, momento, voz: vozGemini, ho
     frase(desde, 0);
   }, [acordar, irPara, terminar]);
 
-  /* tocar: SEMPRE a partir de um gesto (o play, "Ouvir de novo", trocar o mudo) ou de um play
-     clicado enquanto preparava (o contexto já foi liberado no clique).
+  /* tocar a fala da vez (parteRef): SEMPRE a partir de um gesto (o play, "Ouvir de novo", "Continuar",
+     trocar o mudo) ou de um play clicado enquanto preparava (o contexto já foi liberado no clique) — a 2ª
+     parte da apresentação também (o contexto segue liberado desde o play).
      desde = frase de onde (re)começar (troca de mudo no meio da fala) */
   const tocar = useCallback((desde = 0) => {
     pararTudo();
@@ -467,11 +540,13 @@ function Hud({ aoConcluir, nome, uid, orgId, gestor, momento, voz: vozGemini, ho
     setSaindo(null);
     setRodada((r) => r + 1);
     setJaOuviu(true);
+    const p = parteRef.current;
+    trechosRef.current = falasRef.current[p] ?? [];
     if (!trechosRef.current.length) { terminar(); return; }
     const exec = execRef.current;
     const ctx = ctxRef.current;
-    const buf = bufRef.current;
-    if (vozRef.current === 'ia' && ctx && buf) {
+    const buf = bufsRef.current[p];
+    if (vozesRef.current[p] === 'ia' && ctx && buf) {
       // mesmo depois do clique o som não saiu: a legenda segue pelo relógio (sem voz, sem erro)
       const semSom = () => {
         if (execRef.current !== exec) return;
@@ -496,7 +571,7 @@ function Hud({ aoConcluir, nome, uid, orgId, gestor, momento, voz: vozGemini, ho
         }
         ganhoRef.current!.gain.value = mudoRef.current ? 0 : 1;
         // fronteiras de cada frase encaixadas nas pausas reais; a legenda anda pela voz acumulada
-        const analise = analiseRef.current ?? (analiseRef.current = analisarVoz(buf.getChannelData(0), buf.sampleRate));
+        const analise = analisesRef.current[p] ?? (analisesRef.current[p] = analisarVoz(buf.getChannelData(0), buf.sampleRate));
         if (mapaRef.current?.de !== trechosRef.current) mapaRef.current = { de: trechosRef.current, mapa: mapearFala(trechosRef.current, analise) };
         const mapa = mapaRef.current.mapa;
         const desloc = desde > 0 ? Math.max(0, mapa.trocas[desde] ?? 0) : 0;
@@ -507,7 +582,7 @@ function Hud({ aoConcluir, nome, uid, orgId, gestor, momento, voz: vozGemini, ho
         fonte.onended = () => {
           if (fonteRef.current !== fonte || execRef.current !== exec) return;
           const resta = mapa.voz.fimVoz + DEPOIS_DA_VOZ_S - (ctx.currentTime - t0Ref.current);
-          window.setTimeout(() => { if (execRef.current === exec) terminar(); }, Math.max(0, resta * 1000));
+          window.setTimeout(() => { if (execRef.current === exec) terminar(true); }, Math.max(0, resta * 1000));
         };
         const quando = ctx.currentTime + 0.06;
         t0Ref.current = quando - desloc;
@@ -534,6 +609,51 @@ function Hud({ aoConcluir, nome, uid, orgId, gestor, momento, voz: vozGemini, ho
     if (f === 'pronta') tocar();
     else if (f === 'boot') setQuerTocar(true);
   }, [tocar]);
+
+  /** a fala da vez com a voz já decidida (IA ou sem ela) toca agora; a voz ainda vindo (a 2ª parte da
+      apresentação num dia de geração lenta): "Preparando…" e ela toca quando chegar (ou no teto de 60 s) */
+  const tocarQuandoPronta = useCallback(() => {
+    if (vozesRef.current[parteRef.current] != null) tocar();
+    else setEsperaParte(true);
+  }, [tocar]);
+
+  /** apresentação: "Continuar" (ou a contagem) — o painel desce e vem a próxima parte (sem áudio: o painel dela) */
+  const avancar = useCallback(() => {
+    if (faseRef.current !== 'fim') return;
+    const prox = parteRef.current + 1;
+    if (prox >= falasRef.current.length) return;
+    const ctx = ctxRef.current;
+    if (ctx && ctx.state !== 'running') ctx.resume().catch(() => undefined);   // dentro do gesto (Continuar)
+    pararTudo();
+    fimRef.current = false;
+    setAvancoAuto(false);
+    parteRef.current = prox;
+    setParte(prox);
+    setFase('voltando');
+    veuRef.current?.focus({ preventScroll: true });
+    const exec = execRef.current;
+    window.setTimeout(() => {
+      if (execRef.current !== exec) return;
+      if (semAudioRef.current) terminar(); else tocarQuandoPronta();
+    }, leveRef.current ? 0 : DE_NOVO_MS);
+  }, [pararTudo, terminar, tocarQuandoPronta]);
+
+  /* a voz da parte que esperava chegou (ou deu o teto): toca */
+  useEffect(() => {
+    if (!esperaParte || vozes[parte] == null) return;
+    setEsperaParte(false);
+    tocar();
+  }, [esperaParte, vozes, parte, tocar]);
+
+  /* apresentação: a 1ª parte acabou de verdade → o painel fica à vista ~6 s (a contagem no "Continuar") e segue */
+  useEffect(() => {
+    if (fase !== 'fim' || !avancoAuto) return;
+    const t = window.setTimeout(avancar, AVANCO_ESPERA_MS + AVANCO_CONTA_MS);
+    return () => window.clearTimeout(t);
+  }, [fase, avancoAuto, avancar]);
+
+  /* o painel que desce continua mostrando a parte que acabou (troca escondido, quando a próxima começa) */
+  useEffect(() => { if (fase === 'fim') setPainelVisto(parte); }, [fase, parte]);
 
   /* ---------- o laço: legenda + níveis + esfera + contagem (UM rAF só) ----------
      falando / abrindo / pousando: a cada quadro; à espera do play: ~24 q/s por alguns segundos e
@@ -651,7 +771,7 @@ function Hud({ aoConcluir, nome, uid, orgId, gestor, momento, voz: vozGemini, ho
         const i = fraseNoTempo(mapa, t);
         if (i !== atualRef.current) irPara(i);
         pintarLegenda(progressoFrase(mapa, i, t));
-        if (t >= mapa.voz.fimVoz + DEPOIS_DA_VOZ_S) terminar();
+        if (t >= mapa.voz.fimVoz + DEPOIS_DA_VOZ_S) terminar(true);
         else if (vivaAgora && t > 0 && t < mapa.voz.fimVoz + 0.1) alvo = lerBandas(dt);
       } else if (rel === 'frase') {
         const i = atualRef.current;
@@ -780,10 +900,12 @@ function Hud({ aoConcluir, nome, uid, orgId, gestor, momento, voz: vozGemini, ho
     };
   }, [fase, resumo, acordar]);
 
-  /* abertura → pronta (o play espera a pessoa); play clicado enquanto preparava → toca agora */
+  /* abertura → pronta (o play espera a pessoa); play clicado enquanto preparava → toca agora, quando a voz
+     da 1ª fala chegar (ou der o teto de 60 s) — o contexto de som já foi liberado no clique */
+  const voz0 = vozes[0] ?? null;
   useEffect(() => {
-    if (fase === 'boot' && aberturaFeita && (resumo || erro) && (voz || erro)) setFase('pronta');
-  }, [fase, aberturaFeita, resumo, erro, voz]);
+    if (fase === 'boot' && aberturaFeita && (resumo || erro) && (voz0 || erro)) setFase('pronta');
+  }, [fase, aberturaFeita, resumo, erro, voz0]);
   useEffect(() => {
     if (fase !== 'pronta' || !querTocar) return;
     setQuerTocar(false);
@@ -802,8 +924,10 @@ function Hud({ aoConcluir, nome, uid, orgId, gestor, momento, voz: vozGemini, ho
     saidaTelaRef.current = window.setTimeout(aoConcluir, SAIDA_MS);
   }, [aoConcluir, pararTudo]);
 
-  /** "Pular" (ou Esc) durante a fala: para a voz e sobe o painel. "Ver sem áudio" faz o mesmo antes do play. */
+  /** "Pular" (ou Esc) durante a fala: para a voz e sobe o painel da parte atual. */
   const pular = useCallback(() => { if (faseRef.current !== 'fim') terminar(); }, [terminar]);
+  /** "Ver sem áudio" (antes do play): o painel direto — e, na apresentação, as partes seguintes também sem fala */
+  const verSemAudio = useCallback(() => { semAudioRef.current = true; pular(); }, [pular]);
 
   /* Tab fica preso no diálogo (o sistema atrás não recebe foco) — no document: vale até com o foco no <body> */
   const prenderTab = useCallback((e: KeyboardEvent) => {
@@ -842,16 +966,21 @@ function Hud({ aoConcluir, nome, uid, orgId, gestor, momento, voz: vozGemini, ho
     return () => document.removeEventListener('keydown', tecla);
   }, [clicarPlay, concluir, prenderTab, pular]);
 
-  /** "Ouvir de novo": o painel desce, a esfera volta ao meio e ela fala de novo (o clique libera o som) */
+  /** "Ouvir de novo": o painel desce, a esfera volta ao meio e ela fala de novo (o clique libera o som). Na
+      apresentação, recomeça do início (a 1ª parte; a 2ª vem depois, como da primeira vez) */
   const ouvirDeNovo = () => {
     const ctx = ctxRef.current;
     if (ctx && ctx.state !== 'running') ctx.resume().catch(() => undefined);   // dentro do gesto
     pararTudo();
     fimRef.current = false;
+    semAudioRef.current = false;
+    setAvancoAuto(false);
+    setEsperaParte(false);
+    if (parteRef.current !== 0) { parteRef.current = 0; setParte(0); }
     setFase('voltando');
     veuRef.current?.focus({ preventScroll: true });
     const exec = execRef.current;
-    window.setTimeout(() => { if (execRef.current === exec) tocar(); }, leveRef.current ? 0 : DE_NOVO_MS);
+    window.setTimeout(() => { if (execRef.current === exec) tocarQuandoPronta(); }, leveRef.current ? 0 : DE_NOVO_MS);
   };
 
   const alternarMudo = () => {
@@ -871,27 +1000,36 @@ function Hud({ aoConcluir, nome, uid, orgId, gestor, momento, voz: vozGemini, ho
   /* ---------- tela ---------- */
   const pn = primeiroNome(nome);
   const ehGestor = resumo ? resumo.modo === 'gestor' : gestor;
-  const tarde = ehGestor && momento === 'tarde';
   const sd = saudacaoDoDia(agora);
-  useLarguraEm(olaRef, `${ehGestor ? 'g' : 'v'}|${tarde ? 't' : 'm'}|${sd}|${pn}`);
+  /* a apresentação: 2 partes (antes dos números chegarem, pelo pedido); o painel de cada uma (o que desce
+     continua mostrando a parte que acabou) */
+  const nPartes = resumo ? falas.length : (tipo === 'apresentacao' && ehGestor ? 2 : 1);
+  const ehApresentacao = tipo === 'apresentacao' && ehGestor && nPartes > 1;
+  const parteDoPainel = fase === 'voltando' ? painelVisto : parte;
+  const painel = painelDaTela({ tipo, parte: parteDoPainel, nPartes, gestor: ehGestor, nome, agora });
+  const tarde = ehGestor && painel.tarde;
+  useLarguraEm(olaRef, `${ehGestor ? 'g' : 'v'}|${tarde ? 't' : 'm'}|${painel.saudacao}|${pn}`);
   const dataLonga = agora.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
   const data = dataLonga.charAt(0).toUpperCase() + dataLonga.slice(1);
   const hora = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   /* a saudação do vendedor encolhe com o nome (e nunca invade os cartões) */
   const tamOla = pn.length > 10 ? ' bd-ola-p' : pn.length > 8 ? ' bd-ola-m' : '';
 
-  /* a tela do play: a saudação + uma linha discreta + "Ouvir o resumo" */
+  /* a tela do play: a saudação + uma linha discreta + "Ouvir o resumo" ("Ouvir a apresentação") */
   const saudacaoTela = `${sd}${pn ? `, ${pn}` : ''}.`;
-  const linhaPronta = tarde ? 'O resumo do dia está pronto.' : 'Seu resumo da manhã está pronto.';
+  const textosPlay = textosDoPlay(tipo, ehGestor);
   const naTelaDoPlay = fase === 'boot' || fase === 'pronta';
   /* "Preparando…" só quando a espera passou da abertura (ou o play já foi clicado) — sem piscar */
-  const preparando = fase === 'boot' && (aberturaFeita || querTocar) && !((resumo || erro) && (voz || erro) && aberturaFeita);
-  const linhaPlay = erro ? ERRO_DADOS : preparando ? 'Preparando o seu resumo…' : linhaPronta;
+  const preparando = fase === 'boot' && (aberturaFeita || querTocar) && !((resumo || erro) && (voz0 || erro) && aberturaFeita);
+  const linhaPlay = erro ? ERRO_DADOS : preparando ? textosPlay.preparando : textosPlay.linha;
 
   const falandoAgora = fase === 'falando' && atual >= 0 ? trechos[atual] : null;
+  /* a 2ª parte esperando a voz dela (entre o painel que desceu e a fala) */
+  const esperandoVoz = esperaParte && fase === 'voltando';
   const fraseSr = naTelaDoPlay ? `${saudacaoTela} ${linhaPlay}`
-    : fase === 'fim' ? (resumo ? textoResumo(nome, resumo, opFala) : '')
-      : falandoAgora ? falandoAgora.texto : '';
+    : fase === 'fim' ? (resumo ? (ehApresentacao ? textoCorrido(falas[parte] ?? []) : textoResumo(nome, resumo, opFala)) : '')
+      : esperandoVoz ? ESPERA_PARTE
+        : falandoAgora ? falandoAgora.texto : '';
   /* na tela: a frase que sai (0,12 s) e a atual */
   const legendas: number[] = [];
   if ((fase === 'falando' || fase === 'fim') && atual >= 0 && atual < trechos.length) {
@@ -1051,13 +1189,20 @@ function Hud({ aoConcluir, nome, uid, orgId, gestor, momento, voz: vozGemini, ho
     </div>
   );
 
+  /* "Continuar" da apresentação: a contagem até a 2ª parte vir sozinha (a barrinha corre dentro do botão) */
+  const contando = ehApresentacao && avancoAuto && fase === 'fim' && painel.avanca;
+  const estiloConta = contando
+    ? ({ '--bd-auto-espera': `${AVANCO_ESPERA_MS}ms`, '--bd-auto-ms': `${AVANCO_CONTA_MS}ms` } as CSSProperties)
+    : undefined;
+
   return (
     <div
       ref={veuRef}
-      className={`bd-veu bd-fase-${fase}${leve ? ' bd-leve' : ''}${ehGestor ? ' bd-gestor' : ''}${tarde ? ' bd-tarde' : ''}${fechando ? ' bd-fechando' : ''}`}
+      className={`bd-veu bd-fase-${fase}${leve ? ' bd-leve' : ''}${ehGestor ? ' bd-gestor' : ''}${tarde ? ' bd-tarde' : ''}${ehApresentacao ? ' bd-apresentacao' : ''}${fechando ? ' bd-fechando' : ''}`}
+      data-parte={ehApresentacao ? parte + 1 : undefined}
       role="dialog"
       aria-modal="true"
-      aria-label={tarde ? 'Diagnóstico do dia do Atenvo' : 'Bom dia do Atenvo'}
+      aria-label={ehApresentacao ? 'Apresentação do bom dia do Atenvo' : tarde ? 'Diagnóstico do dia do Atenvo' : 'Bom dia do Atenvo'}
       tabIndex={-1}
     >
       <header className="bd-topo">
@@ -1110,19 +1255,20 @@ function Hud({ aoConcluir, nome, uid, orgId, gestor, momento, voz: vozGemini, ho
                   aria-busy={querTocar || undefined}
                 >
                   <span className="bd-play-ic" aria-hidden>{IcPlay}</span>
-                  <span>Ouvir o resumo</span>
+                  <span>{textosPlay.botao}</span>
                 </button>
-                <button type="button" className="bd-sem-audio" onClick={pular}>Ver sem áudio</button>
+                <button type="button" className="bd-sem-audio" onClick={verSemAudio}>Ver sem áudio</button>
               </>
             )}
           </div>
         ) : (
           <div className="bd-legenda-caixa" aria-hidden>
+            {esperandoVoz && <p key="espera" className="bd-legenda bd-legenda-espera">{ESPERA_PARTE}</p>}
             {legendas.map((i) => {
               const sai = i === saindo && i !== atual;
               const ps = palavras[i] ?? [];
               return (
-                <p key={`${rodada}-${i}`} ref={sai ? undefined : fraseAtualRef} data-i={i} className={`bd-legenda${sai ? ' bd-sai' : ''}`}>
+                <p key={`${rodada}-${parte}-${i}`} ref={sai ? undefined : fraseAtualRef} data-i={`${parte}:${i}`} className={`bd-legenda${sai ? ' bd-sai' : ''}`}>
                   {ps.map((p, k) => (
                     <span key={k} className={p.numero ? 'bd-num-fala' : undefined}>{p.texto}</span>
                   )).flatMap((s, k) => (k ? [' ', s] : [s]))}
@@ -1140,29 +1286,40 @@ function Hud({ aoConcluir, nome, uid, orgId, gestor, momento, voz: vozGemini, ho
       >
         <div className="bd-painel-grade">
           <div className="bd-saudacao bd-surge bd-surge-1">
-            <p className="bd-hoje">{data}<span className="bd-sep" aria-hidden>·</span>{hora}</p>
+            {/* apresentação: o selo diz qual resumo é este painel ("Resumo da manhã" / "Diagnóstico do dia") */}
+            {painel.selo && <p className="bd-selo"><i aria-hidden />{painel.selo}</p>}
+            <p className="bd-hoje">
+              {data}
+              {painel.comHora && <><span className="bd-sep" aria-hidden>·</span>{hora}</>}
+            </p>
             {ehGestor ? (
               <h1 ref={olaRef} className="bd-ola bd-ola-g">
-                {tarde ? <><span>Diagnóstico</span> <span>do dia.</span></> : <><span>{sd},</span> <span>{pn || 'equipe'}.</span></>}
+                {tarde ? <><span>Diagnóstico</span> <span>do dia.</span></> : <><span>{painel.saudacao},</span> <span>{pn || 'equipe'}.</span></>}
               </h1>
             ) : (
               <h1 ref={olaRef} className={`bd-ola${tamOla}`}>Olá, {pn || 'equipe'}.</h1>
             )}
-            <p className="bd-fecho">{tarde ? `Bom fim de dia${pn ? `, ${pn}` : ''}!` : 'Bom trabalho!'}</p>
+            <p className="bd-fecho">{painel.fecho}</p>
           </div>
 
           {ehGestor ? painelGestor : painelVendedor}
 
           <footer className="bd-rodape bd-surge bd-surge-5">
             <div className="bd-ctrl">
-              <button type="button" className="bd-btn" onClick={ouvirDeNovo} disabled={!trechos.length || fase !== 'fim'}>
-                {jaOuviu ? Ic.denovo : Ic.ouvir}<span>{jaOuviu ? 'Ouvir de novo' : 'Ouvir o resumo'}</span>
+              <button type="button" className="bd-btn" onClick={ouvirDeNovo} disabled={!falas.length || fase !== 'fim'}>
+                {jaOuviu ? Ic.denovo : Ic.ouvir}<span>{jaOuviu ? 'Ouvir de novo' : textosPlay.botao}</span>
               </button>
             </div>
             <div className="bd-saida">
               <span className="bd-dica"><kbd className="bd-kbd">Esc</kbd>fecha</span>
-              <button ref={ctaRef} type="button" className="bd-cta" onClick={concluir}>
-                <span>{tarde ? 'Continuar' : 'Começar o dia'}</span>{Ic.seta}
+              <button
+                ref={ctaRef}
+                type="button"
+                className={`bd-cta${contando ? ' bd-cta-auto' : ''}`}
+                style={estiloConta}
+                onClick={painel.avanca && ehApresentacao ? avancar : concluir}
+              >
+                <span>{painel.cta}</span>{Ic.seta}
               </button>
             </div>
           </footer>
@@ -1172,10 +1329,20 @@ function Hud({ aoConcluir, nome, uid, orgId, gestor, momento, voz: vozGemini, ho
   );
 }
 
-export function BomDia({ aberta, momento, dia, gestor, aoConcluir, nome, uid, orgId }: {
+/** demo: o áudio pré-gerado de cada fala (public/demo-midia; sem o arquivo, a legenda segue pelo relógio) */
+function arquivosDaPrevia(gestor: boolean, tipo: TipoTela): string[] {
+  const v = VOZ_BOM_DIA.toLowerCase();
+  if (!gestor) return [`/demo-midia/bom-dia-atendente-${v}.wav`];
+  if (tipo === 'apresentacao') return [1, 2].map((n) => `/demo-midia/bom-dia-apresentacao-${n}-${v}.wav`);
+  return [`/demo-midia/bom-dia-gestor-${tipo}-${v}.wav`];
+}
+
+export function BomDia({ aberta, momento, apresentacao = false, dia, gestor, aoConcluir, nome, uid, orgId }: {
   aberta: boolean;
   /** 'manha' (8h, todos) ou 'tarde' (17h, só o gestor) */
   momento: Momento;
+  /** a apresentação de lançamento (gestor): o shell só pede pelo menu do usuário — nunca sozinha */
+  apresentacao?: boolean;
   /** o dia (data local) em que a tela abriu: outro dia = outra tela (a key do Hud) — às 8h a tela esquecida
       aberta desde ontem remonta e prepara os números e a voz de hoje */
   dia: string;
@@ -1194,29 +1361,34 @@ export function BomDia({ aberta, momento, dia, gestor, aoConcluir, nome, uid, or
     setRaiz(el);
     return () => { el.remove(); setRaiz(null); };
   }, [aberta]);
-  /* prévia: Atendente | Administrador e, para o administrador, Manhã | 17h. A pessoa escolhida
-     fica guardada: o shell da demo agenda como ela (o das 17h é só do gestor) */
+  /* prévia: Atendente | Administrador e, para o administrador, Manhã | 17h | Apresentação. A pessoa
+     escolhida fica guardada: o shell da demo agenda como ela (o das 17h e a apresentação são só do gestor) */
   const [previaGestor, setPreviaGestor] = useState(() => PREVIA && lerPreviaGestor());
-  const [previaMomento, setPreviaMomento] = useState<Momento>(momento);
-  useEffect(() => { if (aberta) setPreviaMomento(momento); }, [aberta, momento]);
+  const pedido: TipoTela = apresentacao ? 'apresentacao' : momento;
+  const [previaTipo, setPreviaTipo] = useState<TipoTela>(pedido);
+  useEffect(() => { if (aberta) setPreviaTipo(pedido); }, [aberta, pedido]);
   const escolherPessoa = (g: boolean) => { setPreviaGestor(g); salvarPreviaGestor(g); };
 
   if (!aberta || !raiz) return null;
   const g = PREVIA ? previaGestor : gestor;
-  const m: Momento = PREVIA ? (previaGestor ? previaMomento : 'manha') : momento;
+  const t: TipoTela = PREVIA ? (previaGestor ? previaTipo : 'manha') : pedido;
+  // a apresentação não depende da hora (a parte das 8h fala "Bom dia" sempre); na prévia, às 17h (a tela do play)
+  const m: Momento = t === 'apresentacao' ? (PREVIA ? 'tarde' : momento) : t;
+  const tela = { momento: m, dia, apresentacao: t === 'apresentacao' };
   return createPortal(
     <>
       <Hud
-        key={PREVIA ? `${g ? 'gestor' : 'atendente'}-${chaveTelaBomDia({ momento: m, dia })}` : chaveTelaBomDia({ momento: m, dia })}
+        key={PREVIA ? `${g ? 'gestor' : 'atendente'}-${chaveTelaBomDia(tela)}` : chaveTelaBomDia(tela)}
         aoConcluir={aoConcluir}
         nome={PREVIA ? (g ? 'Murilo' : 'Juliana') : nome}
         uid={uid}
         orgId={orgId}
         gestor={g}
         momento={m}
+        apresentacao={t === 'apresentacao'}
         voz={VOZ_BOM_DIA}
         horaFixa={PREVIA ? (m === 'tarde' ? 17 : 8) : null}
-        arquivoDemo={PREVIA ? `/demo-midia/bom-dia-${g ? `gestor-${m}` : 'atendente'}-${VOZ_BOM_DIA.toLowerCase()}.wav` : null}
+        arquivosDemo={PREVIA ? arquivosDaPrevia(g, t) : null}
       />
       {PREVIA && (
         <div className={`bd-previa${g ? ' bd-previa-g' : ''}`} role="group" aria-label="Prévia: trocar a pessoa e o horário">
@@ -1226,8 +1398,9 @@ export function BomDia({ aberta, momento, dia, gestor, aoConcluir, nome, uid, or
           {g && (
             <>
               <i className="bd-previa-sep" aria-hidden />
-              <button type="button" aria-pressed={m === 'manha'} onClick={() => setPreviaMomento('manha')}>Manhã</button>
-              <button type="button" aria-pressed={m === 'tarde'} onClick={() => setPreviaMomento('tarde')}>17h</button>
+              <button type="button" aria-pressed={t === 'manha'} onClick={() => setPreviaTipo('manha')}>Manhã</button>
+              <button type="button" aria-pressed={t === 'tarde'} onClick={() => setPreviaTipo('tarde')}>17h</button>
+              <button type="button" aria-pressed={t === 'apresentacao'} onClick={() => setPreviaTipo('apresentacao')}>Apresentação</button>
             </>
           )}
         </div>
