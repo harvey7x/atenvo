@@ -1,0 +1,501 @@
+/* ============================================================
+   ATENDIMENTO RENOVADO (dono 29/10: "deixar essa tela mais bonita, mais
+   profissional, completa"). Camada ADITIVA sobre whatsapp.css + corp +
+   repaginada, ligada por [data-inbox-pro] na raiz (lib/inboxPro.ts).
+   Atributo ausente = inbox de antes, byte-idêntico.
+
+   Prefixo com 4× o atributo (0,5,1) para vencer corp/aurora/repaginada
+   (no máximo (0,4,1) + cauda) sem !important. NÃO pinta .wa-pop/.spl —
+   o vidro (.vidro-pro) segue mandando nos painéis flutuantes.
+
+   Direção (o gosto do dono, já aprendido): pequeno, denso, contido; a cor
+   do acento só no SELECIONADO e na AÇÃO PRINCIPAL; nada de brilho/glow.
+   O que muda: fila em grade (nada encosta), cartões com ritmo único,
+   chips da mesma família, cabeçalho e faixas mais limpos, compositor em
+   cartão único, painel lateral em seções arejadas. Textos intocados.
+   ============================================================ */
+
+/* ---------- 0. tokens da tela ---------- */
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro][data-tema="light"] .v2 .wa-pg {
+  --ip-painel: #FFFFFF;
+  --ip-faixa: #FAFBFC;
+  --ip-fio: rgba(17, 24, 39, .07);
+  --ip-fio-forte: rgba(17, 24, 39, .12);
+  --ip-hover: rgba(17, 24, 39, .028);
+  --ip-sel: color-mix(in srgb, var(--platina-a) 7%, #FFFFFF);
+  --ip-chip: rgba(17, 24, 39, .045);
+  --ip-chip-fio: rgba(17, 24, 39, .07);
+  --ip-campo: #F6F7F9;
+  --ip-trilho: rgba(17, 24, 39, .045);
+  --ip-polegar: #FFFFFF;
+  --ip-cartao: #FAFBFC;
+  --ip-acc-tx: var(--platina-a);
+  --ip-rec: #FFFFFF;
+  --ip-rec-fio: rgba(17, 24, 39, .08);
+  --ip-env: color-mix(in srgb, var(--platina-a) 7%, #FFFFFF);
+  --ip-env-fio: color-mix(in srgb, var(--platina-a) 20%, #FFFFFF);
+  --ip-sombra-bolha: 0 1px 1.5px rgba(16, 24, 40, .06);
+  --ip-sombra-polegar: 0 1px 2px rgba(16, 24, 40, .08), 0 0 0 1px rgba(17, 24, 39, .08);
+  --ip-av-a: #EEF0F3;
+  --ip-av-b: #D8DCE2;
+  --ip-av-tx: #3A3F48;
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro]:not([data-tema="light"]) .v2 .wa-pg {
+  --ip-painel: #0F1013;
+  --ip-faixa: #0C0D10;
+  --ip-fio: rgba(255, 255, 255, .06);
+  --ip-fio-forte: rgba(255, 255, 255, .1);
+  --ip-hover: rgba(255, 255, 255, .025);
+  --ip-sel: color-mix(in srgb, var(--platina-a) 13%, #0F1013);
+  --ip-chip: rgba(255, 255, 255, .05);
+  --ip-chip-fio: rgba(255, 255, 255, .07);
+  --ip-campo: #0B0C0E;
+  --ip-trilho: #0B0C0E;
+  --ip-polegar: #1D1F23;
+  --ip-cartao: #131417;
+  --ip-acc-tx: color-mix(in srgb, var(--platina-a) 55%, #FFFFFF);
+  --ip-rec: #16171B;
+  --ip-rec-fio: rgba(255, 255, 255, .07);
+  --ip-env: color-mix(in srgb, var(--platina-a) 20%, #141518);
+  --ip-env-fio: color-mix(in srgb, var(--platina-a) 34%, #141518);
+  --ip-sombra-bolha: 0 1px 2px rgba(0, 0, 0, .35);
+  --ip-sombra-polegar: 0 1px 2px rgba(0, 0, 0, .45), 0 0 0 1px rgba(255, 255, 255, .09), inset 0 1px 0 rgba(255, 255, 255, .04);
+  --ip-av-a: #202227;
+  --ip-av-b: #16171A;
+  --ip-av-tx: #E4E6EA;
+}
+
+/* ---------- 1. FILA ---------- */
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-fila {
+  background: var(--ip-painel); border-right: 1px solid var(--ip-fio);
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-ftopo {
+  padding: 16px 14px 12px; border-bottom: 1px solid var(--ip-fio); background: var(--ip-painel);
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-ftopo .l1 { margin-bottom: 12px; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-ftopo h3 { font-size: 16px; font-weight: 650; letter-spacing: -.012em; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-ftopo .l1 .bts { gap: 6px; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 :is(.wa-ftopo, .wa-ctopo) .ib2 {
+  width: 30px; height: 30px; border-radius: 8px;
+  background: transparent; border: 1px solid var(--ip-fio-forte); color: var(--txt-2); box-shadow: none;
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 :is(.wa-ftopo, .wa-ctopo) .ib2:hover { background: var(--ip-chip); color: var(--txt); }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 :is(.wa-ftopo, .wa-ctopo) .ib2.on {
+  color: var(--ip-acc-tx); border-color: color-mix(in srgb, var(--platina-a) 40%, transparent);
+  background: color-mix(in srgb, var(--platina-a) 9%, transparent);
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 :is(.wa-ftopo, .wa-ctopo) .ib2 svg { width: 14px; height: 14px; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .ib2 .fbadge { background: var(--platina-a); color: var(--platina-txt); }
+
+/* busca: campo calmo, foco = anel do acento */
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-busca { margin-bottom: 10px; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-busca svg { left: 11px; width: 14px; height: 14px; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-busca input {
+  height: 34px; padding-left: 33px; font-size: 12.5px; border-radius: 9px;
+  background: var(--ip-campo); border: 1px solid var(--ip-fio); box-shadow: none;
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-busca input:hover:not(:focus) { border-color: var(--ip-fio-forte); }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-busca input:focus {
+  outline: none; background: var(--ip-painel);
+  border-color: color-mix(in srgb, var(--platina-a) 60%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--platina-a) 15%, transparent);
+}
+
+/* abas: segmentado com polegar neutro elevado; o acento fica só no contador da aba ativa */
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-abas-wrap {
+  background: var(--ip-trilho); border: 1px solid transparent; border-radius: 10px; padding: 3px;
+  box-shadow: inset 0 0 0 1px var(--ip-fio);
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-aba {
+  font-size: 12px; font-weight: 550; padding: 5px 10px; border-radius: 7px; color: var(--txt-2);
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-aba:hover:not(.on) { background: transparent; color: var(--txt); }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-aba.on {
+  background: var(--ip-polegar); color: var(--txt); box-shadow: var(--ip-sombra-polegar);
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-aba .n:not(.urg) {
+  font-size: 10px; font-weight: 600; padding: 2px 6px; background: var(--ip-chip); color: var(--txt-3);
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-aba.on .n:not(.urg) {
+  background: color-mix(in srgb, var(--platina-a) 12%, transparent); color: var(--ip-acc-tx);
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-abas-seta {
+  width: 22px; height: 26px; border-radius: 7px; background: var(--ip-polegar);
+  border: 1px solid var(--ip-fio-forte); box-shadow: 0 1px 3px rgba(16, 24, 40, .12);
+}
+
+/* cabeçalho de grupo: rótulo discreto + contador em pastilha */
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-grupo {
+  padding: 12px 16px 8px; font-size: 10px; font-weight: 650; letter-spacing: .07em; color: var(--txt-3);
+  background: var(--ip-painel); border-bottom: 1px solid var(--ip-fio); gap: 7px;
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-grupo .qt {
+  font-size: 10px; font-weight: 650; letter-spacing: 0; padding: 1px 7px; border-radius: 99px;
+  background: var(--ip-chip); color: var(--txt-2);
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-grupo.urg .qt { background: color-mix(in srgb, var(--rubro) 12%, transparent); color: var(--rubro); }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-grupo .gnl { background: var(--platina-a); color: var(--platina-txt); }
+
+/* CARTÃO DA CONVERSA — grade de 3 colunas (avatar · texto · meta): nome e prévia
+   nunca mais encostam no horário/contador. O pino mora sob o avatar (aparece no
+   hover; fixado fica aceso). Fio separador começa no texto, não na borda. */
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .conv2 {
+  display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; grid-template-rows: auto auto auto;
+  column-gap: 11px; row-gap: 2px; align-items: center;
+  padding: 12px 14px 12px 16px; border-bottom: 0;
+  background-color: transparent;
+  background-image: linear-gradient(var(--ip-fio), var(--ip-fio));
+  background-repeat: no-repeat; background-position: 63px 100%; background-size: calc(100% - 63px) 1px;
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .conv2:hover { background-color: var(--ip-hover); }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .conv2.ativa { background-color: var(--ip-sel); }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .conv2::before { top: 8px; bottom: 8px; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .conv2.ativa::before { background: var(--platina-a); box-shadow: none; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .conv2 .tx { display: contents; }
+/* meta (horário · espera · não lidas) numa mini-grade à direita das 2 primeiras linhas:
+   linha 1 = horário; linha 2 = espera + contador. Assim os chips usam a largura toda. */
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .conv2 .m {
+  grid-column: 3; grid-row: 1 / 3; align-self: start;
+  display: grid; grid-template-columns: auto auto; grid-template-rows: 18px 18px; row-gap: 2px;
+  justify-content: end; justify-items: end; align-items: center; gap: 2px 0;
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .conv2 .av2 {
+  grid-column: 1; grid-row: 1 / 3; align-self: start; margin-top: 1px;
+  width: 36px; height: 36px; font-size: 12.5px; font-weight: 600; color: var(--ip-av-tx);
+  background: linear-gradient(150deg, var(--ip-av-a), var(--ip-av-b));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06), 0 0 0 1px var(--ip-fio);
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .conv2 .av2 .sig {
+  bottom: -3px; right: -5px; height: 14px; line-height: 12px; padding: 0 3px; border-radius: 4px;
+  font-size: 8px; font-weight: 700; letter-spacing: .02em;
+  background: var(--ip-painel); border: 1px solid var(--ip-fio-forte); color: var(--txt-2);
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .conv2 .av2 .sig.of { color: var(--verde); border-color: color-mix(in srgb, var(--verde) 45%, transparent); }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .conv2 .n {
+  grid-column: 2; grid-row: 1; font-size: 13px; font-weight: 600; letter-spacing: -.003em; line-height: 18px; color: var(--txt);
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .conv2 .p {
+  grid-column: 2; grid-row: 2; margin-top: 0; font-size: 12px; line-height: 17px; color: var(--txt-2);
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .conv2 .chips {
+  grid-column: 2 / 4; grid-row: 3; align-self: start; margin-top: 5px; gap: 4px;
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .conv2 .h2 {
+  grid-column: 1 / 3; grid-row: 1; justify-self: end; font-size: 10.5px; line-height: 18px; color: var(--txt-3); white-space: nowrap;
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .conv2 .nl {
+  grid-column: 2; grid-row: 2; justify-self: end; margin-left: 6px;
+  min-width: 18px; height: 18px; padding: 0 5px; font-size: 10px; font-weight: 700;
+  background: var(--platina-a); color: var(--platina-txt); box-shadow: none;
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .conv2 .cr {
+  grid-column: 1; grid-row: 2; justify-self: end; line-height: 18px;
+  font-size: 10px; font-weight: 650; white-space: nowrap;
+}
+/* não lida: nome e prévia sobem um degrau, horário no acento (como o WhatsApp) */
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .conv2:has(.nl) .n { font-weight: 700; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .conv2:has(.nl) .p { color: var(--txt); }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .conv2:has(.nl) .h2 { color: var(--ip-acc-tx); font-weight: 600; }
+/* pino: sob o avatar */
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .conv2 .wa-pin {
+  grid-column: 1; grid-row: 3; justify-self: center; align-self: start; margin-top: 4px;
+  width: 20px; height: 20px; border-radius: 6px; opacity: 0;
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .conv2 .wa-pin svg { width: 13px; height: 13px; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .conv2:hover .wa-pin { opacity: .5; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .conv2 .wa-pin:hover { opacity: 1; background: var(--ip-chip); }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .conv2 .wa-pin.on { opacity: 1; color: var(--platina-a); }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro]:not([data-tema="light"]) .v2 .conv2 .wa-pin.on { color: var(--ip-acc-tx); }
+
+/* CHIPS DO CARTÃO — uma família só: 17px, raio 5, caixa alta contida. A cor de
+   DADO (situação/etapa, Radar, alerta, fechado) continua vindo das regras próprias;
+   aqui só a geometria + o neutro dos que não carregam cor. */
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .conv2 .cchip {
+  height: 17px; line-height: 15px; padding: 0 6px; border-radius: 5px;
+  font-size: 9px; font-weight: 650; letter-spacing: .045em; max-width: 128px;
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .conv2 .cchip:is(.ia, .repasse),
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .conv2 .cchip:not(.etapa):not(.rdr-selo):not(.alerta):not(.fim):not(.repasse):not(.ia) {
+  background: var(--ip-chip); border-color: var(--ip-chip-fio); color: var(--txt-2);
+}
+/* situação sem cor própria (ex.: EM ATENDIMENTO): neutro como os demais, não solto */
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .conv2 .cchip.etapa:not([style]) { background: var(--ip-chip); border-color: var(--ip-chip-fio); }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .conv2 .cchip.alerta { background: color-mix(in srgb, var(--ambar) 9%, transparent); }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .conv2 .cchip.fim { background: color-mix(in srgb, var(--verde) 9%, transparent); }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .conv2 .cchip.rdr-selo,
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .conv2 .cchip.ia { line-height: 1; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .conv2 .etqchip.sm {
+  height: 17px; padding: 0 6px 0 5px; border-radius: 5px; font-size: 9.5px; font-weight: 600;
+  background: var(--ip-chip); border-color: var(--ip-chip-fio); color: var(--txt-2); max-width: 118px;
+}
+
+/* ---------- 2. CABEÇALHO DA CONVERSA ---------- */
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-ctopo {
+  padding: 11px 16px; gap: 12px; min-height: 62px;
+  background: var(--ip-painel); border-bottom: 1px solid var(--ip-fio);
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-ctopo .av2 {
+  width: 38px; height: 38px; font-size: 13px; color: var(--ip-av-tx);
+  background: linear-gradient(150deg, var(--ip-av-a), var(--ip-av-b));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06), 0 0 0 1px var(--ip-fio);
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-ctopo .nm { font-size: 15px; font-weight: 650; letter-spacing: -.01em; line-height: 1.25; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-ctopo .sb {
+  margin-top: 4px; gap: 6px; font-size: 11.5px; color: var(--txt-2); font-variant-numeric: tabular-nums;
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-hchip {
+  height: 19px; line-height: 17px; padding: 0 7px; border-radius: 5px;
+  font-size: 9.5px; font-weight: 650; letter-spacing: .045em; max-width: 170px;
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-hchip:not(.of):not(.rdr-hselo):not(.repasse):not(.ligar):not(.etapa) {
+  background: var(--ip-chip); border-color: var(--ip-chip-fio); color: var(--txt-2);
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-hchip.of { background: color-mix(in srgb, var(--verde) 8%, transparent); }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-hchip:is(.rdr-hselo, .ligar) { line-height: 1; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-ctopo .etqchip {
+  height: 19px; padding: 0 7px 0 6px; border-radius: 5px; font-size: 10px;
+  background: var(--ip-chip); border-color: var(--ip-chip-fio);
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-ctopo .janela { height: 19px; padding: 0 8px; border-radius: 5px; font-size: 10px; font-weight: 600; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-ctopo .dir { gap: 6px; }
+/* telas de notebook: os chips quebram DENTRO do bloco do nome e os botões ficam na linha (antes caíam para baixo) */
+@media (min-width: 1100px) {
+  html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-ctopo { flex-wrap: nowrap; }
+  html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-ctopo .idw { flex: 1 1 auto; }
+  html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-ctopo .dir { flex-shrink: 0; flex-wrap: nowrap; }
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-ctopo .dir .p-btn {
+  height: 30px; padding: 0 12px; font-size: 12px; font-weight: 550; border-radius: 8px;
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-ctopo .dir .p-btn.btn-sec {
+  background: var(--ip-painel); border: 1px solid var(--ip-fio-forte); color: var(--txt); box-shadow: none;
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-ctopo .dir .p-btn.btn-sec:hover:not(:disabled) { background: var(--ip-chip); }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-ctopo .dir .wa-hetapa { padding-right: 28px; }
+
+/* ---------- 3. FAIXA DA IA + FAIXAS DE AVISO ---------- */
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-iabar {
+  min-height: 44px; padding: 6px 16px; gap: 9px; font-size: 12px;
+  background: var(--ip-faixa); border-bottom: 1px solid var(--ip-fio);
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-iabar.aguarda { background: color-mix(in srgb, var(--ambar) 5%, var(--ip-faixa)); }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-iabar.handoff { background: color-mix(in srgb, var(--rubro) 5%, var(--ip-faixa)); }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-iabar .glifo {
+  width: 28px; height: 28px; border-radius: 8px; background: var(--ip-painel); border: 1px solid var(--ip-fio-forte);
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-iabar .dot { width: 8px; height: 8px; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-iabar.ok .dot { box-shadow: 0 0 0 3px color-mix(in srgb, var(--verde) 18%, transparent); }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-iabar.aguarda .dot { box-shadow: 0 0 0 3px color-mix(in srgb, var(--ambar) 18%, transparent); }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-iabar.handoff .dot { box-shadow: 0 0 0 3px color-mix(in srgb, var(--rubro) 18%, transparent); }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-iabar .est { font-size: 12.5px; font-weight: 650; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-iabar :is(.etp, .mot) { font-size: 12px; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 :is(.wa-iabar, .wa-banner) .acts { gap: 6px; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 :is(.wa-iabar, .wa-banner) .p-btn {
+  height: 30px; padding: 0 12px; font-size: 12px; font-weight: 550; border-radius: 8px;
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 :is(.wa-iabar, .wa-banner) .p-btn.btn-sec {
+  background: var(--ip-painel); border: 1px solid var(--ip-fio-forte); color: var(--txt); box-shadow: none;
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 :is(.wa-iabar, .wa-banner) .p-btn.btn-sec:hover:not(:disabled) { background: var(--ip-chip); }
+/* faixas de higiene/opt-out: continuam faixa (não flutuam), com a cor num fio à esquerda */
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-banner {
+  min-height: 44px; padding: 6px 16px; gap: 10px; font-size: 12px; color: var(--txt-2);
+  background: color-mix(in srgb, var(--ambar) 7%, var(--ip-painel));
+  border-bottom: 1px solid color-mix(in srgb, var(--ambar) 20%, transparent);
+  box-shadow: inset 3px 0 0 var(--ambar);
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-banner b { font-weight: 650; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-banner.bloq {
+  background: color-mix(in srgb, var(--rubro) 6%, var(--ip-painel));
+  border-bottom-color: color-mix(in srgb, var(--rubro) 20%, transparent);
+  box-shadow: inset 3px 0 0 var(--rubro);
+}
+
+/* ---------- 4. FIO DE MENSAGENS ---------- */
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-msgs { padding: 20px clamp(16px, 2.6vw, 32px) 16px; gap: 6px; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-msgs .bolha {
+  max-width: min(64%, 640px); padding: 8px 12px 6px; border-radius: 14px;
+  font-size: 13px; line-height: 1.5;
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-msgs .bolha.rec {
+  background: var(--ip-rec); border: 1px solid var(--ip-rec-fio); border-bottom-left-radius: 4px;
+  box-shadow: var(--ip-sombra-bolha);
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-msgs .bolha.env2 {
+  background: var(--ip-env); border: 1px solid var(--ip-env-fio); border-bottom-right-radius: 4px;
+  box-shadow: var(--ip-sombra-bolha);
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-msgs .bolha.env2.bot {
+  box-shadow: inset 2.5px 0 0 rgba(var(--tint), .16), var(--ip-sombra-bolha);
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-msgs .bolha.falha { border-color: color-mix(in srgb, var(--rubro) 45%, transparent); }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-msgs .bolha .hh { font-size: 10px; margin-top: 3px; color: var(--txt-3); }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-msgs .bt-tag.ia { font-size: 10.5px; margin-bottom: 4px; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-msgs .bolha .m-img { border-radius: 10px; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-msgs .transc { font-size: 12px; line-height: 1.5; border-top-color: var(--ip-fio-forte); }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-msgs .dia {
+  margin: 6px 0 4px; padding: 3px 12px; font-size: 10.5px; font-weight: 600; letter-spacing: .02em;
+  color: var(--txt-2); background: var(--ip-rec); border: 1px solid var(--ip-rec-fio); box-shadow: var(--ip-sombra-bolha);
+}
+
+/* ---------- 5. COMPOSITOR: um cartão só (texto em cima, ferramentas embaixo) ---------- */
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-composer {
+  padding: 10px 16px 14px; background: var(--ip-painel); border-top: 1px solid var(--ip-fio);
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-linha-resp { gap: 6px; margin-bottom: 9px; font-size: 11px; font-weight: 500; color: var(--txt-3); }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-chipbtn {
+  display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: 7px;
+  font-size: 11px; font-weight: 550; color: var(--txt-2);
+  background: transparent; border: 1px solid var(--ip-fio-forte);
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-chipbtn:hover { background: var(--ip-chip); color: var(--txt); }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-chipbtn.on {
+  color: var(--ip-acc-tx); font-weight: 600;
+  background: color-mix(in srgb, var(--platina-a) 9%, transparent);
+  border-color: color-mix(in srgb, var(--platina-a) 42%, transparent);
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-chipbtn .oftag { height: 14px; line-height: 12px; margin-left: 6px; font-size: 8px; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-composer :is(.wa-aviso, .reply-box) { border-radius: 9px; font-size: 11.5px; margin-bottom: 8px; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-composer .reply-box { background: var(--ip-chip); border-left-color: var(--platina-a); }
+
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .cmsg {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "ta ta" "tools env";
+  align-items: center; gap: 2px 8px; padding: 4px 6px 6px;
+  border: 1px solid var(--ip-fio-forte); border-radius: 12px; background: var(--ip-painel);
+  box-shadow: 0 1px 2px rgba(16, 24, 40, .04);
+  transition: border-color .15s var(--ease), box-shadow .15s var(--ease);
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro]:not([data-tema="light"]) .v2 .cmsg { background: var(--ip-campo); box-shadow: none; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .cmsg:focus-within {
+  border-color: color-mix(in srgb, var(--platina-a) 55%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--platina-a) 14%, transparent);
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .cmsg textarea,
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .cmsg textarea:is(:hover, :focus, :disabled) {
+  grid-area: ta; width: 100%; min-height: 40px; padding: 9px 8px 5px;
+  font-size: 13px; line-height: 1.45;
+  background: transparent; border: 0; border-radius: 0; box-shadow: none; outline: none;
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .cmsg .tools { grid-area: tools; gap: 2px; min-width: 0; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .cmsg .tool {
+  width: 32px; height: 32px; border-radius: 8px; border: 1px solid transparent; background: transparent; color: var(--txt-2); box-shadow: none;
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .cmsg .tool:hover:not(:disabled) { background: var(--ip-chip); color: var(--txt); border-color: transparent; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .cmsg .tool svg { width: 16px; height: 16px; }
+/* "Áudio" (BotaoMini do gravador) com a mesma cara dos ícones: fantasma */
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .cmsg .tools > .p-btn.btn-mini {
+  height: 32px; padding: 0 10px; gap: 6px; border-radius: 8px; font-size: 12px; font-weight: 550;
+  background: transparent; border: 1px solid transparent; color: var(--txt-2); box-shadow: none;
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .cmsg .tools > .p-btn.btn-mini:hover:not(:disabled) { background: var(--ip-chip); color: var(--txt); }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .cmsg .tools > .p-btn.btn-mini svg { width: 15px; height: 15px; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .cmsg .tools .wa-scr-btn {
+  height: 30px; margin: 0 4px; padding: 0 10px; gap: 6px; border-radius: 8px;
+  font-size: 10.5px; letter-spacing: .06em; color: var(--txt);
+  background: var(--ip-chip); border: 1px solid var(--ip-chip-fio); box-shadow: none;
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .cmsg .tools .wa-scr-btn:hover:not(:disabled),
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .cmsg .tools .wa-scr-btn.on {
+  color: var(--ip-acc-tx); background: color-mix(in srgb, var(--platina-a) 9%, transparent);
+  border-color: color-mix(in srgb, var(--platina-a) 40%, transparent);
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .cmsg .tools .wa-scr-btn svg { color: currentColor; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .cmsg .tools .wa-scr-btn .ct { background: var(--ip-chip); color: var(--txt-2); }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .cmsg .env-b {
+  grid-area: env; width: 34px; height: 34px; border-radius: 9px;
+  background: var(--platina-a); color: var(--platina-txt); box-shadow: none;
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .cmsg .env-b:disabled { opacity: 1; background: var(--ip-chip); color: var(--txt-3); }
+
+/* ---------- 6. PAINEL DO CONTATO ---------- */
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-ctx { width: 284px; background: var(--ip-painel); border-left: 1px solid var(--ip-fio); }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-ctx.recolhido { width: 0; border-left-color: transparent; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-ctx-inner { width: 284px; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .ctx-topo { padding: 22px 18px 16px; border-bottom: 1px solid var(--ip-fio); }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .ctx-topo .av2 {
+  width: 56px; height: 56px; margin-bottom: 10px; font-size: 18px; color: var(--ip-av-tx);
+  background: linear-gradient(150deg, var(--ip-av-a), var(--ip-av-b));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06), 0 0 0 1px var(--ip-fio), 0 0 0 4px var(--ip-painel), 0 0 0 5px var(--ip-fio);
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .ctx-topo .n2 { font-size: 14.5px; font-weight: 650; letter-spacing: -.005em; line-height: 1.3; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .ctx-topo .t2 { margin-top: 3px; font-size: 12px; font-variant-numeric: tabular-nums; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .ctx-topo .t2 .cp svg { width: 12px; height: 12px; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .ctx-topo .bb { gap: 8px; margin-top: 14px; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-ctx .p-btn.btn-mini { height: 30px; padding: 0 12px; font-size: 12px; font-weight: 550; border-radius: 8px; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-ctx .p-btn.btn-sec {
+  background: var(--ip-painel); border: 1px solid var(--ip-fio-forte); color: var(--txt); box-shadow: none;
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-ctx .p-btn.btn-sec:hover:not(:disabled) { background: var(--ip-chip); }
+/* no painel, o primário é TINTA do acento — o único sólido da tela segue sendo "Pausar IA" */
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-ctx :is(.p-btn.btn-pri, .fjb-btn.primary) {
+  background: color-mix(in srgb, var(--platina-a) 10%, var(--ip-painel)); color: var(--ip-acc-tx);
+  border: 1px solid color-mix(in srgb, var(--platina-a) 34%, transparent); box-shadow: none;
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-ctx :is(.p-btn.btn-pri, .fjb-btn.primary)::after { display: none; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-ctx :is(.p-btn.btn-pri, .fjb-btn.primary):hover:not(:disabled) {
+  transform: none; background: color-mix(in srgb, var(--platina-a) 16%, var(--ip-painel));
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .ctx-b { padding: 16px 18px; border-bottom: 1px solid var(--ip-fio); }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .ctx-b:last-child { border-bottom: 0; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 :is(.ctx-t, .wa-ctx .fjb-h) {
+  margin-bottom: 10px; font-size: 10px; font-weight: 650; letter-spacing: .08em; color: var(--txt-3);
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-ctx .fjb-h { margin-bottom: 0; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .cx-l { padding: 4px 0; font-size: 12.5px; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .cx-l .k { color: var(--txt-2); }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .cx-l .v { font-weight: 500; color: var(--txt); }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .cx-l .cx-lk {
+  font-size: 12px; font-weight: 550; color: var(--ip-acc-tx); text-decoration: none;
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .cx-l .cx-lk:hover { text-decoration: underline; text-underline-offset: 2px; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .ctx-status {
+  height: 28px; padding: 0 11px; gap: 7px; font-size: 12px; border-radius: 8px;
+  background: var(--ip-painel); border: 1px solid var(--ip-fio-forte);
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .ctx-status:hover { background: var(--ip-chip); }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .ctx-fase {
+  margin: 0 0 12px; padding: 10px 12px; gap: 10px; border-radius: 10px;
+  background: color-mix(in srgb, var(--fase) 6%, var(--ip-painel));
+  border: 1px solid color-mix(in srgb, var(--fase) 24%, transparent);
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .ctx-fase .ic { box-shadow: 0 0 0 3px color-mix(in srgb, var(--fase) 14%, transparent); }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .ctx-fase .tx b { font-size: 13px; font-weight: 650; color: color-mix(in srgb, var(--fase) 80%, var(--txt)); }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .ctx-fase .tx small { font-size: 11px; color: var(--txt-2); }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .ctx-nota { font-size: 12.5px; line-height: 1.55; color: var(--txt-2); }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .ctx-tags { gap: 6px; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .ctx-tag { height: 24px; padding: 0 8px 0 9px; border-radius: 6px; font-size: 11px; font-weight: 550; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .etq-add {
+  height: 24px; padding: 0 10px; border-radius: 6px; font-size: 11px; border-color: var(--ip-fio-forte);
+}
+/* ficha judicial: cartão calmo; "Nenhuma ficha" vira selo (antes esticava como barra) */
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-ctx .fjb { gap: 10px; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-ctx .fjb-card {
+  gap: 8px; padding: 12px; border-radius: 10px; background: var(--ip-cartao); border: 1px solid var(--ip-fio-forte);
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-ctx .fjb-card > .fjb-tag { align-self: flex-start; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-ctx .fjb-tag {
+  height: 20px; padding: 0 8px; border-radius: 5px; font-size: 10px; letter-spacing: .03em;
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-ctx .fjb-tag.vazia { background: var(--ip-chip); color: var(--txt-2); border: 1px solid var(--ip-chip-fio); }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-ctx .fjb-info { font-size: 12px; line-height: 1.5; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-ctx .fjb-row { font-size: 12px; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-ctx .fjb-btn {
+  height: 30px; padding: 0 12px; font-size: 12px; font-weight: 550; border-radius: 8px;
+}
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-ctx .fjb-btn:not(.primary) {
+  background: var(--ip-painel); border: 1px solid var(--ip-fio-forte); color: var(--txt);
+}
+/* documentos */
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .chk-cnt { font-size: 10.5px; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .chk-bar { height: 5px; margin-bottom: 12px; background: var(--ip-chip); }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .chk-bar i.cheio { box-shadow: none; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .chk-sh { font-size: 9.5px; letter-spacing: .07em; margin-bottom: 4px; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .chk-it { padding: 4px 0; gap: 9px; font-size: 12px; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .chk-it input { width: 15px; height: 15px; }
+html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .ativ-tl { font-size: 12px; gap: 8px; }
+
+/* telas menores: o painel vira gaveta (regra base) — só acompanha a largura nova */
+@media (max-width: 1200px) {
+  html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-ctx { background: var(--ip-painel); }
+  html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-ctx.recolhido { width: 0; }
+}

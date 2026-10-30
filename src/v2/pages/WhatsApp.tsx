@@ -47,6 +47,7 @@ import { IA_OPCOES, PERIODO_OPCOES, SITUACAO_OPCOES, etapasDaLista, passaFiltroI
 import { seedWa } from './whatsappSeed';
 import { PaletaScripts, SCRIPTS_DEMO, CATEGORIAS_DEMO } from './scriptsPaleta';
 import './whatsapp.css';
+import './whatsappPro.css'; // atendimento renovado (dono 29/10) — só age com [data-inbox-pro] na raiz
 
 /* ------------------------------------------------------------------
    WhatsApp v2 — inbox de atendimento (anatomia pg-wa: fila 296px ·
@@ -1212,7 +1213,7 @@ export default function WhatsAppV2() {
           <>
             <div className="wa-ctopo">
               <button type="button" className="ib2 wa-ftopo-solto" style={{ display: 'none' }} aria-hidden />
-              <span className="av2 conv2-av" style={{ display: 'flex', width: 32, height: 32, borderRadius: '50%', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 12 }}>{initials(nomeExibicao(current))}</span>
+              <span className="av2 conv2-av">{initials(nomeExibicao(current))}</span>
               <div className="idw">
                 <div className="nm">{nomeExibicao(current)}</div>
                 <div className="sb num">
@@ -1269,8 +1270,8 @@ export default function WhatsAppV2() {
                     onClick={alternarIa}>{iaAtiva ? 'IA ligada' : 'IA desligada'}</BotaoMini>
                 )}
                 {!ctxAberto && <BotaoMini title="Abrir painel de dados do contato" onClick={() => setCtxAberto(true)}>Dados</BotaoMini>}
-                <button type="button" className={'ib2' + (foco ? ' on' : '')} title="Modo de foco (Esc para sair)" onClick={() => setFoco((f) => !f)} style={{ width: 26, height: 26 }}><IcFoco /></button>
-                <button type="button" className="ib2" title="Ações" aria-label="Ações da conversa" style={{ width: 26, height: 26 }} onClick={(e) => abrirPop('acoes', e)}><IcDots /></button>
+                <button type="button" className={'ib2' + (foco ? ' on' : '')} title="Modo de foco (Esc para sair)" onClick={() => setFoco((f) => !f)}><IcFoco /></button>
+                <button type="button" className="ib2" title="Ações" aria-label="Ações da conversa" onClick={(e) => abrirPop('acoes', e)}><IcDots /></button>
               </div>
             </div>
 
@@ -1278,8 +1279,7 @@ export default function WhatsAppV2() {
                 sessão de IA. Superfície SÓLIDA de propósito (faixa de estado, não overlay → sem
                 glass; lite-safe por construção). Cor SÓ no semântico do estado.
                 "Assumir" grava o responsável mas NÃO para o bot sozinho (ele só para quando o
-                atendente manda mensagem ou pausa a IA) — por isso "Pausar IA" fica destacado
-                quando a IA está ativa: anti-colisão, pare o bot ANTES de digitar. */}
+                atendente manda mensagem ou pausa a IA no "IA ligada" do cabeçalho). */}
             {iaBarSinal && (
               <div className={'wa-iabar ' + iaBarSinal.cls} role="status">
                 <span className="glifo" aria-hidden><IcBot /></span>
@@ -1287,29 +1287,13 @@ export default function WhatsAppV2() {
                 <b className="est">{iaBarSinal.rotulo}</b>
                 {iaBar?.etapa && <span className="etp" title={'Etapa atual do fluxo da IA: ' + iaBar.etapa}>· {etapaIaLabel(iaBar.etapa)}</span>}
                 {iaBarMotivo && <span className="mot" title="Por que a IA pediu um humano">· {iaBarMotivo}</span>}
-                <span className="acts">
-                  {!inbox.donoEfetivo && (
+                {/* dono 29/10: "Pausar IA" e "Recomeçar atendimento" saíram da faixa (ela só mostra o estado).
+                    Pausar/reativar segue no "IA ligada/desligada" do cabeçalho; recomeçar foi para o menu ⋮. */}
+                {!inbox.donoEfetivo && (
+                  <span className="acts">
                     <BotaoMini disabled={inbox.atribuindo} title="Grava você como responsável. NÃO pausa a IA sozinho — ela só para quando você manda mensagem ou quando é pausada." onClick={inbox.assumir}>Assumir</BotaoMini>
-                  )}
-                  {/* anti-colisão: com a IA ativa, "Pausar IA" é A ação da barra → sólido (padrão
-                      dos primários mini dos painéis); reativar é secundário → ghost */}
-                  {iaBarAtiva ? (
-                    <BotaoPrimario mini disabled={iaToggle.isPending}
-                      title="Pare a IA antes de digitar — evita você e o bot responderem juntos em cima do cliente."
-                      onClick={() => { if (!WA_REAL) { aoAvisar({ tom: 'ok', texto: 'Demonstração: a IA seria pausada' }); return; } void alternarIa(); }}>
-                      Pausar IA
-                    </BotaoPrimario>
-                  ) : (
-                    <BotaoMini disabled={iaToggle.isPending} title="Reativar a IA nesta conversa (retoma de onde parou)."
-                      onClick={() => { if (!WA_REAL) { aoAvisar({ tom: 'ok', texto: 'Demonstração: a IA seria reativada' }); return; } void alternarIa(); }}>
-                      Reativar IA
-                    </BotaoMini>
-                  )}
-                  <BotaoMini disabled={iaRecomecar.isPending} title="Recomeçar o atendimento do ZERO — a IA reinicia pela pergunta do benefício e limpa o que já coletou. Use quando a pessoa voltar a chamar."
-                    onClick={() => { void recomecarIa(); }}>
-                    Recomeçar atendimento
-                  </BotaoMini>
-                </span>
+                  </span>
+                )}
               </div>
             )}
 
@@ -1606,9 +1590,9 @@ export default function WhatsAppV2() {
                   /* devolver: só o próprio dono — ou admin/gestor, e sempre com confirmação (um clique
                      solto aqui derrubava o responsável de outra pessoa em silêncio) */
                   ? ((inbox.donoEfetivo === user?.id || currentOrg.role !== 'atendente')
-                    ? <button type="button" className="lk" style={{ background: 'none', border: 'none', color: 'var(--txt-2)', textDecoration: 'underline', cursor: 'pointer', fontSize: 10.5, fontFamily: 'var(--fonte)' }} onClick={() => setDevolverConfirm(true)}>Devolver para a fila</button>
+                    ? <button type="button" className="lk cx-lk" onClick={() => setDevolverConfirm(true)}>Devolver para a fila</button>
                     : null)
-                  : <button type="button" className="lk" style={{ background: 'none', border: 'none', color: 'var(--txt-2)', textDecoration: 'underline', cursor: 'pointer', fontSize: 10.5, fontFamily: 'var(--fonte)' }} onClick={inbox.assumir}>{inbox.atribuindo ? 'Assumindo…' : 'Assumir atendimento'}</button>}
+                  : <button type="button" className="lk cx-lk" onClick={inbox.assumir}>{inbox.atribuindo ? 'Assumindo…' : 'Assumir atendimento'}</button>}
               </span>
             </div>
           </div>
@@ -1778,6 +1762,9 @@ export default function WhatsAppV2() {
               <button type="button" className="it" onClick={() => { setPop(null); void inbox.fixar(!current.fixada); }}>{current.fixada ? 'Desafixar conversa' : 'Fixar conversa no topo'}</button>
               <button type="button" className="it" onClick={() => { setPop(null); inbox.arquivar(!current.arquivada); }}>{current.arquivada ? 'Desarquivar conversa' : 'Arquivar conversa'}</button>
               {current.phone && <button type="button" className="it" onClick={() => { setPop(null); copiarTelefone(); }}>Copiar telefone</button>}
+              {iaBarSinal && (
+                <button type="button" className="it" disabled={iaRecomecar.isPending} title="Recomeçar o atendimento do ZERO — a IA reinicia pela pergunta do benefício e limpa o que já coletou. Use quando a pessoa voltar a chamar." onClick={() => { setPop(null); void recomecarIa(); }}>Recomeçar atendimento da IA</button>
+              )}
               {statusFechada && current.status !== statusFechada.nome && (
                 <button type="button" className="it" onClick={() => { setPop(null); setFecharConfirm(true); }}>Fechar conversa</button>
               )}

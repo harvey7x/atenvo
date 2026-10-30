@@ -170,6 +170,7 @@ describe('colisões de CSS v1 × v2', () => {
     const paginasDir = join(RAIZ, 'v2', 'pages');
     const waTsx = join(paginasDir, 'WhatsApp.tsx');
     const waCss = join(paginasDir, 'whatsapp.css');
+    const waProCss = join(paginasDir, 'whatsappPro.css'); // camada do atendimento renovado — importada pelo próprio WhatsApp.tsx
 
     // classes sempre carregadas no .v2: tudo fora de pages/ — tokens.css/base.css
     // (importados pelo AppShellV2 em toda rota) e components/ (Botao/Campo/AudioRecorderV2…).
@@ -186,7 +187,7 @@ describe('colisões de CSS v1 × v2', () => {
     for (const f of csssEm(paginasDir)) {
       const classes = new Set<string>();
       for (const lista of classesDeSeletores(readFileSync(f, 'utf8'))) lista.forEach((c) => classes.add(c));
-      if (f === waCss) { classes.forEach((c) => doWhats.add(c)); continue; }
+      if (f === waCss || f === waProCss) { classes.forEach((c) => doWhats.add(c)); continue; }
       for (const c of classes) deOutraPagina.set(c, [...(deOutraPagina.get(c) ?? []), basename(f)]);
     }
 
