@@ -60,12 +60,13 @@ const GRUPOS: GrupoNav[] = [
       { slug: 'whatsapp', rotulo: 'WhatsApp' },
       // Facebook e Disparo fora do menu (pedido do dono 27/08) — rotas seguem vivas por URL
       { slug: 'kanban', rotulo: 'Kanban' },
-      { slug: 'agendamentos', rotulo: 'Agendamentos' },
+      // Agendamentos e Contatos fora do menu (pedido do dono 30/10: "ocultar") — rotas seguem vivas por URL
       // Presenciais (dono 29/10): calendário dos atendimentos presenciais; avisa o grupo DOCUMENTOS
       { slug: 'presenciais', rotulo: 'Presenciais' },
-      // Contatos e Scripts vieram da Gestão (dono 29/10): são ferramentas do dia a dia de quem atende
-      { slug: 'contatos', rotulo: 'Contatos' },
+      // Scripts veio da Gestão (dono 29/10): ferramenta do dia a dia de quem atende
       { slug: 'scripts', rotulo: 'Scripts' },
+      // Coletor INSS subiu das Ferramentas para a Operação (dono 30/10); a rota continua a mesma
+      { slug: 'ferramentas/coletor-inss', rotulo: 'Coletor INSS' },
     ],
   },
   {
@@ -75,7 +76,7 @@ const GRUPOS: GrupoNav[] = [
       // Pós-venda SAIU (dono 29/10): o fechado sem resposta agora é avisado pela Central de Avisos.
       // Recuperação fora do menu (pedido do dono 14/10) — rota segue viva por URL
       { slug: 'pendencias', rotulo: 'Pendências' },
-      { slug: 'portabilidades', rotulo: 'Portabilidades' },
+      // Portabilidades fora do menu (pedido do dono 30/10) — rota segue viva por URL
     ],
   },
   {
@@ -99,7 +100,6 @@ const GRUPOS: GrupoNav[] = [
     itens: [
       { slug: 'ferramentas/unificador', rotulo: 'Unificador de documentos' },
       { slug: 'ferramentas/conversor', rotulo: 'Conversor de arquivos' },
-      { slug: 'ferramentas/coletor-inss', rotulo: 'Coletor INSS' },
     ],
   },
   // Atendente de IA (/ia) e Fluxos do bot (/fluxos) fora do menu (pedido do dono 14/10) —
