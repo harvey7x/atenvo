@@ -202,6 +202,23 @@ describe('demo — invariantes', () => {
     describe(nome, () => {
       const pegar = (): DashV5 => demoDashV5(janelaV5(casos()[nome], AGORA, '2026-10-21'), AGORA);
 
+      it('já estavam no sistema: entradas = novos + já estavam (KPI e números); tráfego de antes soma os que já estavam', () => {
+        const d = pegar();
+        expect(d.kpis.entradas).toBe(d.kpis.entradasNovas + d.kpis.retornos);
+        expect(soma(d.canais.map((c) => c.retornos))).toBe(d.kpis.retornos);
+        expect(soma(d.canais.map((c) => c.entradasNovas))).toBe(d.kpis.entradasNovas);
+        for (const c of d.canais) {
+          expect(c.entradas).toBe(c.entradasNovas + c.retornos);
+          expect(soma(c.retornosOrigens.map((o) => o.n))).toBe(c.retornos);
+          // pelo anúncio: todos os que já estavam + os novos que mandaram a mensagem do anúncio
+          if (c.peloAnuncio != null) {
+            expect(c.peloAnuncio).toBeGreaterThanOrEqual(c.retornos);
+            expect(c.peloAnuncio).toBeLessThanOrEqual(c.entradas);
+          }
+        }
+        expect(d.kpisAnterior!.entradas).toBe(d.kpisAnterior!.entradasNovas + d.kpisAnterior!.retornos);
+      });
+
       it('robô: total = soma dos números; entregues ≤ concluíram ≤ começaram; elegíveis ≤ entregues', () => {
         const r = pegar().robo!;
         expect(r).not.toBeNull();
@@ -322,7 +339,7 @@ describe('normalizarDashV5', () => {
       expect(d.atendentes).toEqual([]);
       expect(d.mapa).toEqual([]);
       expect(d.ne).toEqual({ total: 0, motivos: [], quem: { ia: 0, regraRs: 0, equipe: 0 } });
-      expect(d.kpis).toEqual({ entradas: 0, ne: 0, ganhos: 0, fechMedianaH: null, fechMediaH: null, fechN: 0 });
+      expect(d.kpis).toEqual({ entradas: 0, entradasNovas: 0, retornos: 0, ne: 0, ganhos: 0, fechMedianaH: null, fechMediaH: null, fechN: 0 });
       expect(d.kpisAnterior).toBeNull();
       expect(typeof d.geradoEm).toBe('string');
     }
@@ -367,10 +384,12 @@ describe('normalizarDashV5', () => {
         { dia: '2026-10-21', hora: '0', entradas: 4 },
       ],
     });
-    expect(d.kpis).toEqual({ entradas: 127, ne: 79, ganhos: 5, fechMedianaH: 162.5, fechMediaH: null, fechN: 0 });
+    // RPC antiga (sem a quebra de 30/10): tudo era cliente novo
+    expect(d.kpis).toEqual({ entradas: 127, entradasNovas: 127, retornos: 0, ne: 79, ganhos: 5, fechMedianaH: 162.5, fechMediaH: null, fechN: 0 });
     expect(d.kpisAnterior?.entradas).toBe(85);
     expect(d.periodo.mapaInicio).toBe('a');
-    expect(d.canais[0]).toMatchObject({ canalId: 'c1', neMotivos: { sem_beneficio_inss: 45 }, ganhos: 0, fechMedianaH: null });
+    expect(d.canais[0]).toMatchObject({ canalId: 'c1', neMotivos: { sem_beneficio_inss: 45 }, ganhos: 0, fechMedianaH: null,
+      entradas: 82, entradasNovas: 82, retornos: 0, retornosOrigens: [], peloAnuncio: null });
     expect(d.canais[1]).toMatchObject({ canalId: null, situacao: 'antigo', numero: null, entradas: 0, ne: 1 });
     expect(d.ne.total).toBe(5);
     expect(d.ne.motivos).toEqual([{ motivo: 'sem_categoria', qtd: 3 }, { motivo: 'sem_interesse', qtd: 2 }]);
@@ -380,6 +399,21 @@ describe('normalizarDashV5', () => {
     expect(d.mapa).toEqual([{ dia: '2026-10-21', hora: 14, entradas: 12 }, { dia: '2026-10-21', hora: 0, entradas: 4 }]);
     // sem busca_em, o instante da busca cai no da foto (o hook sobrescreve com o seu relógio)
     expect(d.buscaEm).toBe('2026-10-21T20:30:00Z');
+  });
+
+  it('já estavam no sistema (30/10): entradas = novos + já estavam; tráfego de antes do maior para o menor', () => {
+    const d = normalizarDashV5({
+      kpis: { entradas: 202, entradas_novas: '155', retornos: 47 },
+      canais: [{
+        canal_id: 'c2', nome: 'ANTONIO CAMPANHA', situacao: 'conectado', entradas: 58, entradas_novas: 35, retornos: 23, pelo_anuncio: '58',
+        retornos_origens: [{ nome: 'Juros abusivos · Andrius', n: 4 }, { nome: 'Empréstimo · Diego', n: '17' }, { nome: 'Empréstimo · Antônio', n: 2 }, { nome: 'x', n: 0 }],
+      }],
+    });
+    expect([d.kpis.entradas, d.kpis.entradasNovas, d.kpis.retornos]).toEqual([202, 155, 47]);
+    expect(d.canais[0]).toMatchObject({ entradas: 58, entradasNovas: 35, retornos: 23, peloAnuncio: 58 });
+    expect(d.canais[0].retornosOrigens).toEqual([
+      { nome: 'Empréstimo · Diego', n: 17 }, { nome: 'Juros abusivos · Andrius', n: 4 }, { nome: 'Empréstimo · Antônio', n: 2 },
+    ]);
   });
 
   it('erro da RPC vira frase em português', () => {

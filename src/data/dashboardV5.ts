@@ -3,7 +3,7 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { useOrg } from '@/context/OrgContext';
 import { spHoje, type Periodo } from '@/data/relatorios';
 import type {
-  AtendenteV5, CanalV5, CelulaMapaV5, DashV5, JanelaV5, KpisV5, MotivoQtdV5, NeV5, RoboCanalV5, RoboNumerosV5, RoboV5,
+  AtendenteV5, CanalV5, CelulaMapaV5, DashV5, JanelaV5, KpisV5, MotivoQtdV5, NeV5, OrigemRetornoV5, RoboCanalV5, RoboNumerosV5, RoboV5,
 } from '@/data/dashboardV5.tipos';
 import { cenarioDemoV5, demoDashV5 } from '@/data/dashboardV5.demo';
 import { janelaMapaV5, periodoAnteriorV5 } from '@/data/dashboardV5.periodo';
@@ -84,12 +84,24 @@ const txtOuNulo = (v: unknown): string | null => (typeof v === 'string' && v !==
 
 function normalizarKpis(v: unknown): KpisV5 {
   const k = obj(v);
+  const entradas = num(k.entradas);
+  // RPC antiga (ou foto guardada antes de 30/10): sem a quebra — tudo era cliente novo
+  const retornos = num(k.retornos);
   return {
-    entradas: num(k.entradas), ne: num(k.ne), ganhos: num(k.ganhos),
+    entradas, entradasNovas: (k.entradas_novas ?? k.entradasNovas) != null ? num(k.entradas_novas ?? k.entradasNovas) : entradas - retornos,
+    retornos, ne: num(k.ne), ganhos: num(k.ganhos),
     fechMedianaH: numOuNulo(k.fech_mediana_h ?? k.fechMedianaH),
     fechMediaH: numOuNulo(k.fech_media_h ?? k.fechMediaH),
     fechN: num(k.fech_n ?? k.fechN),
   };
+}
+
+/** Tráfegos de antes de quem já estava no sistema: só n > 0, do maior para o menor (empate: nome). */
+function normalizarOrigens(v: unknown): OrigemRetornoV5[] {
+  return arr(v)
+    .map((x) => ({ nome: txt(obj(x).nome ?? obj(x).rotulo, '') || 'Outros números', n: num(obj(x).n) }))
+    .filter((o) => o.n > 0)
+    .sort((a, b) => b.n - a.n || a.nome.localeCompare(b.nome, 'pt-BR'));
 }
 
 function normalizarCanal(v: unknown): CanalV5 {
@@ -97,12 +109,19 @@ function normalizarCanal(v: unknown): CanalV5 {
   const motivos = obj(c.ne_motivos ?? c.neMotivos);
   const neMotivos: Record<string, number> = {};
   for (const [k, q] of Object.entries(motivos)) neMotivos[k] = num(q);
+  const entradas = num(c.entradas);
+  const retornos = num(c.retornos);
   return {
     canalId: txtOuNulo(c.canal_id ?? c.canalId),
     nome: txt(c.nome, 'Sem nome'),
     numero: txtOuNulo(c.numero),
     situacao: c.situacao === 'antigo' ? 'antigo' : 'conectado',
-    entradas: num(c.entradas), ne: num(c.ne), neMotivos, ganhos: num(c.ganhos),
+    entradas,
+    entradasNovas: (c.entradas_novas ?? c.entradasNovas) != null ? num(c.entradas_novas ?? c.entradasNovas) : entradas - retornos,
+    retornos,
+    retornosOrigens: normalizarOrigens(c.retornos_origens ?? c.retornosOrigens),
+    peloAnuncio: numOuNulo(c.pelo_anuncio ?? c.peloAnuncio),
+    ne: num(c.ne), neMotivos, ganhos: num(c.ganhos),
     fechMedianaH: numOuNulo(c.fech_mediana_h ?? c.fechMedianaH),
     fechMediaH: numOuNulo(c.fech_media_h ?? c.fechMediaH),
     fechN: num(c.fech_n ?? c.fechN),

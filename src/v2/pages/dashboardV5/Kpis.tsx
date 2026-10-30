@@ -9,7 +9,7 @@ import { Ajuda, Legenda, Variacao, type Sentido } from './comum';
    MESMO trecho do período anterior; o tempo para fechar mostra mediana, média e n. */
 
 const AJUDA = {
-  entradas: 'Clientes diferentes que mandaram a primeira mensagem no período, em qualquer número. O número interno do escritório não conta.',
+  entradas: 'Clientes diferentes que chegaram no período, em qualquer número — contando quem já tinha falado com a CAF e voltou pela mensagem do anúncio (o Gerenciador de Anúncios também conta essas pessoas). O número interno do escritório não conta.',
   ne: 'Leads marcados como não elegíveis no período, pela IA, pela regra automática do RS ou por alguém da equipe.',
   ganhos: 'Clientes que o sistema do administrativo marcou como completos no período, pela data em que ficaram completos lá. A lista é lida de lá a cada 5 minutos.',
   /* com a API nova do CAF (29/10): a mesma conta do pódio do "Meu painel" */
@@ -29,7 +29,11 @@ function ValorKpi({ txt }: { txt: string }) {
   );
 }
 
-function Cartao({ rotulo, ajuda, valor, children, selo }: { rotulo: string; ajuda: string; valor: string; children: ReactNode; selo?: ReactNode }) {
+function Cartao({ rotulo, ajuda, valor, children, selo, nota }: {
+  rotulo: string; ajuda: string; valor: string; children: ReactNode; selo?: ReactNode;
+  /** linha logo abaixo do número (ex.: quantos já estavam no sistema) */
+  nota?: ReactNode;
+}) {
   return (
     <CardVidro className="d5-kpi">
       <div className="d5-kpi-rot">
@@ -38,6 +42,7 @@ function Cartao({ rotulo, ajuda, valor, children, selo }: { rotulo: string; ajud
         {selo}
       </div>
       <div className="d5-kpi-val num"><ValorKpi txt={valor} /></div>
+      {nota && <div className="d5-kpi-nota">{nota}</div>}
       <div className="d5-kpi-pe">{children}</div>
     </CardVidro>
   );
@@ -60,7 +65,8 @@ export function Kpis({ k, ant, comparacao }: { k: KpisV5; ant: KpisV5 | null; co
   );
   return (
     <section className="d5-kpis" aria-label="Resumo do período">
-      <Cartao rotulo="Entradas de clientes" ajuda={AJUDA.entradas} valor={fmtInt(k.entradas)}>
+      <Cartao rotulo="Entradas de clientes" ajuda={AJUDA.entradas} valor={fmtInt(k.entradas)}
+        nota={k.retornos > 0 ? `${fmtInt(k.retornos)} já ${k.retornos === 1 ? 'estava' : 'estavam'} no sistema` : undefined}>
         {v(k.entradas, ant?.entradas, 'maior')}
       </Cartao>
       <Cartao rotulo="Não elegíveis" ajuda={AJUDA.ne} valor={fmtInt(k.ne)}>

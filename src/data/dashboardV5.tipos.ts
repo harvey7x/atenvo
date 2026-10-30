@@ -8,8 +8,10 @@
    (dashboardV5.demo.ts) já nasce nesta forma.
 
    DEFINIÇÕES (iguais ao SQL — conferidas no banco real em 21/10):
-   - ENTRADA      = oportunidade criada no período, no número de canal_origem_id.
-                    KPI = clientes distintos. Número interno do escritório fora.
+   - ENTRADA      = oportunidade criada no período, no número de canal_origem_id — e, desde
+                    30/10, também quem JÁ ESTAVA NO SISTEMA e voltou pela mensagem do anúncio
+                    para o número (o Gerenciador de Anúncios conta; a régua é a do PDF diário,
+                    dash_v5_anuncio). KPI = clientes distintos. Número interno do escritório fora.
    - NÚMEROS      = todo WhatsApp conectado aparece (mesmo com 0); o resto
                     (removidos, desconectados, sem número) soma em "Números antigos".
    - NÃO ELEGÍVEL = perdido como não elegível com fechado_em no período (estado atual).
@@ -33,8 +35,12 @@ export type MotivoNeV5 =
   | 'sem_categoria';
 
 export interface KpisV5 {
-  /** clientes distintos que chegaram no período */
+  /** clientes distintos que chegaram no período (novos + quem já estava no sistema) */
   entradas: number;
+  /** só os clientes novos (a régua de antes de 30/10) */
+  entradasNovas: number;
+  /** clientes que já estavam no sistema e voltaram pela mensagem do anúncio (e não são novos em nenhum número) */
+  retornos: number;
   /** não elegíveis marcados no período */
   ne: number;
   /** fechados (ganhos) no período */
@@ -55,8 +61,16 @@ export interface CanalV5 {
   /** só dígitos, com 55 (ex.: '555194266757'); null na linha de antigos */
   numero: string | null;
   situacao: SituacaoCanalV5;
-  /** oportunidades criadas no período por este número */
+  /** entradas do número no período: oportunidades novas + quem já estava no sistema e voltou pelo anúncio */
   entradas: number;
+  /** só as oportunidades novas */
+  entradasNovas: number;
+  /** já estavam no sistema e mandaram a mensagem do anúncio para este número */
+  retornos: number;
+  /** por qual tráfego eles tinham entrado antes (rótulos do PDF diário), do maior para o menor */
+  retornosOrigens: OrigemRetornoV5[];
+  /** mandaram a mensagem do anúncio (novos + já estavam) — o número do Gerenciador; null = RPC antiga */
+  peloAnuncio: number | null;
   ne: number;
   /** não elegíveis por motivo (código → quantidade) */
   neMotivos: Record<string, number>;
@@ -67,6 +81,9 @@ export interface CanalV5 {
 }
 
 export interface MotivoQtdV5 { motivo: string; qtd: number }
+
+/** Tráfego por onde quem já estava no sistema tinha entrado antes, e quantos. */
+export interface OrigemRetornoV5 { nome: string; n: number }
 
 export interface QuemMarcouV5 {
   /** IA / robô (sem usuário no fechamento) */
