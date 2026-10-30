@@ -9,13 +9,15 @@ import { PorNumero, PorNumeroSkeleton } from './dashboardV5/PorNumero';
 import { Motivos, MotivosSkeleton } from './dashboardV5/Motivos';
 import { Atendentes, AtendentesSkeleton } from './dashboardV5/Atendentes';
 import { Mapa, MapaSkeleton } from './dashboardV5/Mapa';
+import { Robo, RoboSkeleton } from './dashboardV5/Robo';
 import './dashboardV5/dashboardV5.css';
 
 /* ------------------------------------------------------------------
    Dashboard v5 (21/10) — o pedido FECHADO do dono, e nada além:
    entradas de clientes (no total e em cada número conectado), não
    elegíveis com o motivo, tempo para fechar, avaliação de cada
-   atendente e o mapa dia × hora das entradas.
+   atendente e o mapa dia × hora das entradas — e, desde 30/10, o robô
+   (quanto ele conclui e entrega à equipe; a mesma régua do PDF diário).
    Uma RPC por período (dashboard_v5). Demo é o contrato: em
    `vite --mode demo` o mesmo hook devolve a fixture com os mesmos tipos.
    A "Leitura do dia" (22/10) SAIU a pedido do dono (29/10).
@@ -116,6 +118,8 @@ export default function DashboardV2() {
             {carregando ? <PorNumeroSkeleton /> : <PorNumero canais={d.canais} kpis={d.kpis} />}
             {carregando ? <MotivosSkeleton /> : <Motivos ne={d.ne} />}
           </div>
+
+          {carregando ? <RoboSkeleton /> : d.robo && <Robo robo={d.robo} />}
 
           {carregando ? <AtendentesSkeleton /> : <Atendentes atendentes={d.atendentes} />}
 

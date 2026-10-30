@@ -3,7 +3,7 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { useOrg } from '@/context/OrgContext';
 import { spHoje, type Periodo } from '@/data/relatorios';
 import type {
-  AtendenteV5, CanalV5, CelulaMapaV5, DashV5, JanelaV5, KpisV5, MotivoQtdV5, NeV5,
+  AtendenteV5, CanalV5, CelulaMapaV5, DashV5, JanelaV5, KpisV5, MotivoQtdV5, NeV5, RoboCanalV5, RoboNumerosV5, RoboV5,
 } from '@/data/dashboardV5.tipos';
 import { cenarioDemoV5, demoDashV5 } from '@/data/dashboardV5.demo';
 import { janelaMapaV5, periodoAnteriorV5 } from '@/data/dashboardV5.periodo';
@@ -11,7 +11,7 @@ import { janelaMapaV5, periodoAnteriorV5 } from '@/data/dashboardV5.periodo';
 /* ------------------------------------------------------------------
    Camada de dados do Dashboard v5. UMA chamada por período: a RPC
    public.dashboard_v5 (SECURITY DEFINER, portão igual ao de dashboard_resumo)
-   devolve os seis blocos da tela de uma vez. A matemática de período é a de
+   devolve os blocos da tela de uma vez (o do robô desde 30/10). A matemática de período é a de
    @/data/relatorios (fim exclusivo, fuso SP) — a mesma dos Relatórios.
 
    DEMO É O CONTRATO: sem backend (vite --mode demo) o MESMO hook devolve a
@@ -146,6 +146,33 @@ function normalizarCelula(v: unknown): CelulaMapaV5 | null {
   return { dia, hora, entradas: num(c.entradas) };
 }
 
+function normalizarRoboNumeros(v: unknown): RoboNumerosV5 {
+  const r = obj(v);
+  return {
+    entraram: num(r.entraram), terminaram: num(r.terminaram), entregues: num(r.entregues),
+    entreguesElegiveis: num(r.entregues_elegiveis ?? r.entreguesElegiveis),
+    entregaMedianaS: numOuNulo(r.entrega_mediana_s ?? r.entregaMedianaS),
+    entregaP90S: numOuNulo(r.entrega_p90_s ?? r.entregaP90S),
+  };
+}
+
+/** Bloco do robô; sem o bloco (RPC antiga, foto guardada antes dele) → null e a seção some. */
+function normalizarRobo(v: unknown): RoboV5 | null {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+  const r = obj(v);
+  const canais: RoboCanalV5[] = arr(r.canais).map((x): RoboCanalV5 => {
+    const c = obj(x);
+    return {
+      ...normalizarRoboNumeros(c),
+      canalId: txt(c.canal_id ?? c.canalId),
+      nome: txt(c.nome, 'Sem nome') || 'Sem nome',
+      numero: txtOuNulo(c.numero),
+      situacao: c.situacao === 'antigo' ? 'antigo' : 'conectado',
+    };
+  }).filter((c) => c.canalId !== '');
+  return { total: normalizarRoboNumeros(r.total), canais };
+}
+
 export function normalizarDashV5(bruto: unknown): DashV5 {
   const b = obj(bruto);
   const p = obj(b.periodo);
@@ -166,6 +193,7 @@ export function normalizarDashV5(bruto: unknown): DashV5 {
     ne: normalizarNe(b.ne),
     atendentes: arr(b.atendentes).map(normalizarAtendente).filter((a) => a.usuarioId !== ''),
     mapa: arr(b.mapa).map(normalizarCelula).filter((c): c is CelulaMapaV5 => c !== null),
+    robo: normalizarRobo(b.robo),
   };
 }
 
@@ -188,7 +216,7 @@ export function traduzErroDashV5(e: unknown): string {
   return 'Não foi possível carregar os números agora.';
 }
 
-/** Foto do período: seis blocos numa chamada. Recarrega a cada 5 min (o react-query
+/** Foto do período: todos os blocos numa chamada. Recarrega a cada 5 min (o react-query
  *  já pausa o intervalo com a aba escondida) e ao voltar para ela. O anterior é cortado
  *  no mesmo tempo decorrido. Ao trocar de período, os números do anterior ficam na tela
  *  (esmaecidos pela página) até a nova foto chegar — sem piscar esqueleto. */

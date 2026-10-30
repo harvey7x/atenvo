@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { periodoDash } from '@/data/dashboard';
 import {
-  faixasEscalaV5, fmtDuracaoH, fmtDuracaoMin, fmtInt, fmtPct, fmtTelefone, fmtVariacao, pctDe, rotuloMotivoNe, variacao,
+  faixasEscalaV5, fmtDuracaoH, fmtDuracaoMin, fmtDuracaoS, fmtInt, fmtPct, fmtTelefone, fmtVariacao, pctDe, rotuloMotivoNe, variacao,
 } from '@/data/dashboardV5.formato';
 import { demoDashV5, DEMO_CANAIS } from '@/data/dashboardV5.demo';
 import { janelaV5, normalizarDashV5, traduzErroDashV5 } from '@/data/dashboardV5';
@@ -37,6 +37,19 @@ describe('formato', () => {
     expect(fmtPct(null)).toBe('—');
     expect(pctDe(1, 4)).toBe(25);
     expect(pctDe(1, 0)).toBeNull();
+  });
+
+  it('duração do robô em segundos: s, minutos com uma casa até 10 min, depois a régua de sempre', () => {
+    expect(fmtDuracaoS(45)).toBe('45 s');
+    expect(fmtDuracaoS(59.4)).toBe('59 s');
+    expect(fmtDuracaoS(60)).toBe('1 min');
+    expect(fmtDuracaoS(116)).toBe('1,9 min');
+    expect(fmtDuracaoS(565)).toBe('9,4 min');
+    expect(fmtDuracaoS(639)).toBe('11 min');
+    expect(fmtDuracaoS(3316)).toBe('55 min');
+    expect(fmtDuracaoS(4000)).toBe('1 h 07');
+    expect(fmtDuracaoS(null)).toBe('—');
+    expect(fmtDuracaoS(-1)).toBe('—');
   });
 
   it('durações: min, h + min, dias com uma casa', () => {
@@ -189,6 +202,26 @@ describe('demo — invariantes', () => {
     describe(nome, () => {
       const pegar = (): DashV5 => demoDashV5(janelaV5(casos()[nome], AGORA, '2026-10-21'), AGORA);
 
+      it('robô: total = soma dos números; entregues ≤ concluíram ≤ começaram; elegíveis ≤ entregues', () => {
+        const r = pegar().robo!;
+        expect(r).not.toBeNull();
+        const t = r.total;
+        for (const k of ['entraram', 'terminaram', 'entregues', 'entreguesElegiveis'] as const) {
+          expect(soma(r.canais.map((c) => c[k]))).toBe(t[k]);
+        }
+        for (const x of [t, ...r.canais]) {
+          expect(x.entregues).toBeLessThanOrEqual(x.terminaram);
+          expect(x.terminaram).toBeLessThanOrEqual(x.entraram);
+          expect(x.entreguesElegiveis).toBeLessThanOrEqual(x.entregues);
+          // tempo só existe com entrega; a cauda (90%) nunca abaixo da mediana
+          expect(x.entregaMedianaS == null).toBe(x.entregues === 0);
+          if (x.entregaMedianaS != null) expect(x.entregaP90S!).toBeGreaterThanOrEqual(x.entregaMedianaS);
+        }
+        // só números com robô e com alguém que começou, por "começaram"
+        expect(r.canais.every((c) => c.entraram > 0)).toBe(true);
+        expect(r.canais.map((c) => c.entraram)).toEqual([...r.canais.map((c) => c.entraram)].sort((a, b) => b - a));
+      });
+
       it('números: todos os conectados aparecem; soma = KPIs', () => {
         const d = pegar();
         const conectados = d.canais.filter((c) => c.situacao === 'conectado');
@@ -293,6 +326,26 @@ describe('normalizarDashV5', () => {
       expect(d.kpisAnterior).toBeNull();
       expect(typeof d.geradoEm).toBe('string');
     }
+  });
+
+  it('robô: snake_case vira camelCase; sem o bloco (RPC antiga ou foto guardada) é null', () => {
+    expect(normalizarDashV5({}).robo).toBeNull();
+    expect(normalizarDashV5({ robo: null }).robo).toBeNull();
+    const d = normalizarDashV5({
+      robo: {
+        total: { entraram: '134', terminaram: 90, entregues: 90, entregues_elegiveis: 51, entrega_mediana_s: 116, entrega_p90_s: null },
+        canais: [
+          { canal_id: 'c1', nome: 'EMPRESTIMO', numero: '555194266757', situacao: 'antigo', entraram: 76, terminaram: 52,
+            entregues: 52, entregues_elegiveis: 17, entrega_mediana_s: 103, entrega_p90_s: 318 },
+          { nome: 'sem id', entraram: 1 },
+        ],
+      },
+    });
+    expect(d.robo!.total).toEqual({ entraram: 134, terminaram: 90, entregues: 90, entreguesElegiveis: 51, entregaMedianaS: 116, entregaP90S: null });
+    expect(d.robo!.canais).toEqual([{
+      canalId: 'c1', nome: 'EMPRESTIMO', numero: '555194266757', situacao: 'antigo', entraram: 76, terminaram: 52,
+      entregues: 52, entreguesElegiveis: 17, entregaMedianaS: 103, entregaP90S: 318,
+    }]);
   });
 
   it('converte snake_case, tolera campos faltando e números como texto', () => {

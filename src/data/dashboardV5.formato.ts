@@ -49,6 +49,20 @@ export function fmtDuracaoMin(min: number | null | undefined): string {
   return `${fmtDec(d, 1)} ${d < 2 ? 'dia' : 'dias'}`;
 }
 
+/** Duração em SEGUNDOS (o robô trabalha em segundos e poucos minutos — a mesma régua do PDF
+ *  diário): < 1 min → '45 s'; < 10 min → '1,9 min' (uma casa); depois, a de fmtDuracaoMin. */
+export function fmtDuracaoS(s: number | null | undefined): string {
+  if (!ok(s) || s < 0) return TRACO;
+  const t = Math.round(s);
+  if (t < 60) return `${t} s`;
+  const min = t / 60;
+  if (min < 10) {
+    const m1 = Math.round(min * 10) / 10;
+    return `${m1.toLocaleString('pt-BR', { minimumFractionDigits: Number.isInteger(m1) ? 0 : 1, maximumFractionDigits: 1 })} min`;
+  }
+  return fmtDuracaoMin(min);
+}
+
 /** Duração em HORAS, mesma régua de fmtDuracaoMin: 0,5 → '30 min'; 3,33 → '3 h 20'; 33,6 → '1,4 dia'. */
 export function fmtDuracaoH(h: number | null | undefined): string {
   if (!ok(h)) return TRACO;

@@ -15,7 +15,7 @@
    = IA + regra RS + equipe, fechados por atendente ≤ fechados. */
 
 import type {
-  AtendenteV5, CanalV5, CelulaMapaV5, DashV5, JanelaV5, KpisV5, MotivoNeV5, NeV5,
+  AtendenteV5, CanalV5, CelulaMapaV5, DashV5, JanelaV5, KpisV5, MotivoNeV5, NeV5, RoboCanalV5, RoboNumerosV5,
 } from '@/data/dashboardV5.tipos';
 
 /* ============================== PRNG ============================== */
@@ -110,6 +110,8 @@ interface CanalCfg {
   pGanho: number; ganhoMedH: number; ganhoSd: number;
   /** quem pode receber pelo rodízio (null = todos) */
   rodizio: string[] | null;
+  /** robô do número: chance de mandar a abertura e de o cliente concluir (null = sem robô) */
+  robo: { abre: number; conclui: number } | null;
 }
 const MOTIVOS_EMP: Motivos = [['sem_beneficio_inss', 61], ['sem_emprestimo_banco', 24.5], ['nao_mora_rs', 7], ['sem_interesse', 6], ['muitos_processos', 1.5]];
 const MOTIVOS_JUROS: Motivos = [['sem_beneficio_inss', 38], ['nao_mora_rs', 31], ['sem_emprestimo_banco', 19], ['sem_interesse', 12]];
@@ -117,18 +119,21 @@ const MOTIVOS_ANTONIO: Motivos = [['sem_emprestimo_banco', 60], ['sem_beneficio_
 
 export const DEMO_CANAIS: readonly CanalCfg[] = [
   { chave: 'emp', id: 'demo-canal-emprestimo', nome: 'EMPRESTIMO', numero: '555194266757', desde: '2026-09-25', ate: null,
-    porDia: 108, domingo: 0.62, pNe: 0.53, motivos: MOTIVOS_EMP, iaMin: 4, pGanho: 0.045, ganhoMedH: 30, ganhoSd: 0.95, rodizio: null },
+    porDia: 108, domingo: 0.62, pNe: 0.53, motivos: MOTIVOS_EMP, iaMin: 4, pGanho: 0.045, ganhoMedH: 30, ganhoSd: 0.95, rodizio: null,
+    robo: { abre: 0.8, conclui: 0.68 } },
   { chave: 'juros', id: 'demo-canal-juros', nome: 'JUROS ABUSIVO (ANDRIUS)', numero: '555193930488', desde: '2026-07-30', ate: null,
-    porDia: 19, domingo: 0.3, pNe: 0.17, motivos: MOTIVOS_JUROS, iaMin: 90, pGanho: 0.065, ganhoMedH: 110, ganhoSd: 1.2, rodizio: null },
+    porDia: 19, domingo: 0.3, pNe: 0.17, motivos: MOTIVOS_JUROS, iaMin: 90, pGanho: 0.065, ganhoMedH: 110, ganhoSd: 1.2, rodizio: null,
+    robo: { abre: 0.92, conclui: 0.55 } },
   { chave: 'antonio', id: 'demo-canal-antonio', nome: 'ANTONIO CAMPANHA', numero: '555191655320', desde: '2026-10-21', ate: null,
-    porDia: 17, domingo: 0.7, pNe: 0.29, motivos: MOTIVOS_ANTONIO, iaMin: 6, pGanho: 0.03, ganhoMedH: 60, ganhoSd: 1, rodizio: ['demo-u-juliana', 'demo-u-matheus'] },
+    porDia: 17, domingo: 0.7, pNe: 0.29, motivos: MOTIVOS_ANTONIO, iaMin: 6, pGanho: 0.03, ganhoMedH: 60, ganhoSd: 1, rodizio: ['demo-u-juliana', 'demo-u-matheus'],
+    robo: { abre: 0.7, conclui: 0.88 } },
   { chave: 'murillo', id: 'demo-canal-murillo', nome: 'MURILLO CHIP', numero: '555191035329', desde: '2026-07-31', ate: null,
-    porDia: 0.16, domingo: 1, pNe: 0.1, motivos: MOTIVOS_JUROS, iaMin: 60, pGanho: 0.1, ganhoMedH: 70, ganhoSd: 1, rodizio: ['demo-u-matheus'] },
+    porDia: 0.16, domingo: 1, pNe: 0.1, motivos: MOTIVOS_JUROS, iaMin: 60, pGanho: 0.1, ganhoMedH: 70, ganhoSd: 1, rodizio: ['demo-u-matheus'], robo: null },
   { chave: 'oficial', id: 'demo-canal-oficial', nome: 'OFICIAL', numero: '555191781390', desde: '2026-07-23', ate: '2026-08-07',
-    porDia: 6, domingo: 0.6, pNe: 0.3, motivos: MOTIVOS_EMP, iaMin: 30, pGanho: 0.05, ganhoMedH: 90, ganhoSd: 1.1, rodizio: null },
+    porDia: 6, domingo: 0.6, pNe: 0.3, motivos: MOTIVOS_EMP, iaMin: 30, pGanho: 0.05, ganhoMedH: 90, ganhoSd: 1.1, rodizio: null, robo: null },
   // números antigos do EMPRÉSTIMO (removidos): os leads deles ainda fecham e ainda são descartados
   { chave: 'emp_antigo', id: null, nome: 'EMPRÉSTIMO (número antigo)', numero: null, desde: '2026-08-17', ate: '2026-09-25',
-    porDia: 72, domingo: 0.62, pNe: 0.5, motivos: MOTIVOS_EMP, iaMin: 6, pGanho: 0.05, ganhoMedH: 40, ganhoSd: 1.05, rodizio: null },
+    porDia: 72, domingo: 0.62, pNe: 0.5, motivos: MOTIVOS_EMP, iaMin: 6, pGanho: 0.05, ganhoMedH: 40, ganhoSd: 1.05, rodizio: null, robo: null },
 ];
 
 /** peso por hora do dia (SP): pico entre 11h e 16h, madrugada quase vazia */
@@ -245,6 +250,28 @@ function montarLead(c: CanalCfg, dia: string, i: number): LeadDemo {
   }
 
   return { id, canalId: c.id, criado, dono, rotEm, ne, ganho, pot, vezes };
+}
+
+/** O robô no lead (régua do banco, 30/10): abriu o fluxo segundos depois da chegada; quem
+ *  conclui é entregue na mesma hora a um atendente (mediana ~1,9 min, cauda longa de quem
+ *  demora a responder). Sorteio PRÓPRIO por lead: os números de antes não mudam. */
+interface RoboLeadDemo { entrou: number; entregue: number | null }
+const cacheRobo = new Map<string, RoboLeadDemo | null>();
+export function roboDoLead(l: LeadDemo): RoboLeadDemo | null {
+  if (cacheRobo.has(l.id)) return cacheRobo.get(l.id)!;
+  const c = DEMO_CANAIS.find((x) => x.id === l.canalId && x.id);
+  let out: RoboLeadDemo | null = null;
+  if (c?.robo) {
+    const r = rngDe(`v5|robo|${l.id}`);
+    if (r() < c.robo.abre) {
+      const entrou = l.criado + Math.round((3 + r() * 9) * 1000);
+      const conclui = r() < c.robo.conclui;
+      const dur = Math.min(6 * HORA, logNormal(110, 1.05, r) * 1000);
+      out = { entrou, entregue: conclui ? entrou + Math.round(Math.max(35_000, dur)) : null };
+    }
+  }
+  cacheRobo.set(l.id, out);
+  return out;
 }
 
 /** Trocas de dono (transferências) do dia — poucas por dia, mais o lote real de 21/10 13:06. */
@@ -512,6 +539,34 @@ export function demoDashV5(janela: JanelaV5, agora: Date, cenario?: CenarioDemoV
   }).filter((a) => a.recebidos + a.transferidos + a.ganhos + a.neMarcados + a.respN > 0)
     .sort((x, y) => y.recebidos - x.recebidos || y.ganhos - x.ganhos || x.nome.localeCompare(y.nome));
 
+  /* ---- robô ---- */
+  // mesma régua do banco: coorte = abertura no período; entregue no período; segue elegível =
+  // entregue que não virou não elegível até o fim do período (ou até agora)
+  const fimNe = Math.min(per.fim, ag + 1);
+  const somaRobo = (xs: { entrou: number; entregue: number | null; ne: boolean }[]): RoboNumerosV5 => {
+    const ent = xs.filter((x) => x.entregue != null);
+    const seg = ent.map((x) => (x.entregue! - x.entrou) / 1000);
+    const p90 = seg.length ? [...seg].sort((a, b) => a - b)[Math.max(0, Math.ceil(seg.length * 0.9) - 1)] : null;
+    return {
+      entraram: xs.length, terminaram: ent.length, entregues: ent.length,
+      entreguesElegiveis: ent.filter((x) => !x.ne).length,
+      entregaMedianaS: seg.length ? Math.round(mediana(seg)!) : null,
+      entregaP90S: p90 == null ? null : Math.round(p90),
+    };
+  };
+  const coorte = leads.flatMap((l) => {
+    const rb = roboDoLead(l);
+    if (!rb || !dentro(rb.entrou, per, ag)) return [];
+    const entregue = rb.entregue != null && dentro(rb.entregue, per, ag) ? rb.entregue : null;
+    return [{ canalId: l.canalId, entrou: rb.entrou, entregue, ne: !!l.ne && l.ne.em < fimNe }];
+  });
+  const roboCanais: RoboCanalV5[] = DEMO_CANAIS.filter((c) => c.id && c.robo).map((c) => ({
+    ...somaRobo(coorte.filter((x) => x.canalId === c.id)),
+    canalId: c.id!, nome: c.nome, numero: c.numero, situacao: 'conectado' as const,
+  })).filter((c) => c.entraram > 0)
+    .sort((a, b) => b.entraram - a.entraram || b.entregues - a.entregues || a.nome.localeCompare(b.nome));
+  const robo = { total: somaRobo(coorte), canais: roboCanais };
+
   /* ---- mapa ---- */
   const celulas = new Map<string, CelulaMapaV5>();
   const jMapa: Janela = { ini: mapaIni, fim: per.fim };
@@ -527,6 +582,6 @@ export function demoDashV5(janela: JanelaV5, agora: Date, cenario?: CenarioDemoV
     geradoEm: agora.toISOString(),
     buscaEm: agora.toISOString(),
     periodo: { inicio: janela.iniISO, fim: janela.fimISO, mapaInicio: janela.mapaIniISO },
-    kpis, kpisAnterior, canais, ne, atendentes, mapa,
+    kpis, kpisAnterior, canais, ne, atendentes, mapa, robo,
   };
 }

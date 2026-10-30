@@ -17,7 +17,11 @@
    - TEMPO P/ FECHAR = fechado_em − criado_em (horas); mediana é o número principal.
    - ATENDENTE    = recebidos pelo rodízio, fechados creditados a ele, não elegíveis
                     que ele marcou, tempo de resposta humana em minutos úteis
-                    (seg–sex, 9h–19h) e tempo para fechar desde a atribuição. */
+                    (seg–sex, 9h–19h) e tempo para fechar desde a atribuição.
+   - ROBÔ (30/10) = a MESMA régua do relatório diário em PDF (dash_v5_robo): só cliente
+                    NOVO para quem o robô mandou a abertura no período; concluiu = chegou
+                    ao fim do fluxo; entregue = o robô passou a um atendente; seguem
+                    elegíveis = entregues que não viraram não elegível até o fim do período. */
 
 /** Motivos de não elegível (códigos do Kanban) + o balde dos antigos sem motivo. */
 export type MotivoNeV5 =
@@ -103,6 +107,36 @@ export interface AtendenteV5 {
   fechMediaH: number | null;
 }
 
+/** Números do robô num recorte (o total ou um número). */
+export interface RoboNumerosV5 {
+  /** clientes NOVOS para quem o robô mandou a abertura no período */
+  entraram: number;
+  /** chegaram ao fim do fluxo */
+  terminaram: number;
+  /** o robô passou a um atendente (hoje: na mesma hora em que conclui) */
+  entregues: number;
+  /** dos entregues, os que não viraram não elegível até o fim do período */
+  entreguesElegiveis: number;
+  /** segundos da abertura do robô até a entrega: mediana e 90º percentil (null sem entrega) */
+  entregaMedianaS: number | null;
+  entregaP90S: number | null;
+}
+
+export interface RoboCanalV5 extends RoboNumerosV5 {
+  canalId: string;
+  nome: string;
+  /** só dígitos, com 55; null quando o número saiu */
+  numero: string | null;
+  /** conectado agora ou não (um número que caiu no meio do período continua na lista) */
+  situacao: SituacaoCanalV5;
+}
+
+export interface RoboV5 {
+  total: RoboNumerosV5;
+  /** números em que o robô atendeu no período, por "começaram" */
+  canais: RoboCanalV5[];
+}
+
 export interface CelulaMapaV5 {
   /** 'YYYY-MM-DD' em São Paulo */
   dia: string;
@@ -128,6 +162,8 @@ export interface DashV5 {
   atendentes: AtendenteV5[];
   /** só as células com entrada; a tela completa os zeros */
   mapa: CelulaMapaV5[];
+  /** desempenho do robô; null quando a RPC ainda não traz o bloco (ou foto guardada antiga) */
+  robo: RoboV5 | null;
 }
 
 /** O que a busca precisa saber do período (o mesmo para a RPC e para o demo). */
