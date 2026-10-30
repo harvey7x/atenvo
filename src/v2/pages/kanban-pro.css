@@ -56,7 +56,12 @@ html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-filtro-origem {
   display: inline-flex; align-items: center; gap: 2px; padding: 2px; flex-wrap: nowrap;
   border-radius: 9px; background: var(--kp-chip); border: 1px solid var(--kp-line);
 }
-html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-filtro-origem { margin-left: auto; overflow-x: auto; scrollbar-width: none; max-width: 100%; }
+/* dono 29/10: "as duas coisas alinhadas, uma embaixo da outra" — linha 1: Ordenar · Foco · Equipe ·
+   Filtros · Exportar; linha 2: os canais, começando no mesmo ponto (a quebra é o ::before) */
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-barra::before { content: ""; flex-basis: 100%; height: 0; order: 2; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-barra > .kb-ord { order: 0; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-barra > .kb-fchip { order: 1; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-filtro-origem { order: 3; margin-left: 0; overflow-x: auto; scrollbar-width: none; max-width: 100%; }
 html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-ord-l { padding: 0 6px 0 8px; margin: 0; font-size: 11px; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--kp-txt-3); }
 html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-ord .kb-fchip,
 html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-filtro-origem .kb-fchip {
