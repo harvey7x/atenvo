@@ -10,7 +10,8 @@ import {
   iaDaLinha, linhaMsgIncompleta, nomeDoContato, pousarCargaCompleta, removerDoHistorico, upsertHistorico,
   type Alvos, type DepsMotor, type EtapaContato, type IaEstadoLista, type LoteAlvos, type MotorRealtime, type OppLinha, type TabelaRt,
 } from '@/data/whatsappRealtime';
-import { buscarKeyset, ehAbortado, lancarSeAbortado } from '@/data/paginacao';
+import { buscarKeyset, buscarKeysetEmFaixas, ehAbortado, lancarSeAbortado } from '@/data/paginacao';
+import { publicarProgresso } from '@/data/progressoCarga';
 import { definirEscopoLista, escopoLista, useVisibilidade } from '@/lib/visibilidade';
 
 export const WA_REAL = isSupabaseConfigured && !!supabase;
@@ -611,6 +612,9 @@ export function criarMotorDaLista(qc: QueryClient, orgId: string, sobrepor: Part
   });
 }
 
+/** Canal do progresso da 1ª carga da lista (tela "Iniciando o WhatsApp", ver progressoCarga.ts). */
+export const PROGRESSO_WA = 'wa-conversas';
+
 /* ===================== Hooks ===================== */
 export function useWaConversations() {
   const { currentOrg } = useOrg();
@@ -678,17 +682,30 @@ export function useWaConversations() {
         // (ÚNICO e IMUTÁVEL): a ordenação por ultima_interacao_em é MUTÁVEL e paginar por ela pularia/
         // duplicaria conversas que recebem msg durante o fetch. A ordem de EXIBIÇÃO é refeita no JS
         // (arr.sort abaixo), então paginar por id não muda o que o usuário vê — só garante lista completa.
-        const linhas = await buscarKeyset<DbConv>(
-          (cursor, tam, sig) => {
+        // ABERTURA RÁPIDA (dono 30/10: "às vezes demora quando entra no WhatsApp"): eram 8 páginas
+        // de 1000 EM FILA (~1 s cada; o esqueleto ficava ~10–14 s). Agora o id (uuid aleatório) é
+        // fatiado em 16 faixas que pagam por keyset em paralelo — mesma garantia, nada pula nem
+        // duplica (ver buscarKeysetEmFaixas). Partida a frio (sem lista na memória): 6 por vez e
+        // progresso na tela. Reconciliação de fundo, com a lista já na tela: 2 por vez, para não
+        // pesar no banco no pico (a query mais pesada do sistema — ver o comentário do refetch).
+        const primeira = qc.getQueryData(['wa-conversas', orgId]) === undefined;
+        if (primeira) publicarProgresso(PROGRESSO_WA, { feitas: 0, total: 16, itens: 0 });
+        const linhas = await buscarKeysetEmFaixas<DbConv>(
+          (faixa, cursor, tam, sig) => {
             let q = consultaListaConversas(orgId)
               .order('id', { ascending: false })
               .limit(tam);
+            if (faixa.de) q = q.gte('id', faixa.de);
+            if (faixa.ate) q = q.lt('id', faixa.ate);
             if (cursor) q = q.lt('id', cursor);
             if (sig) q = q.abortSignal(sig);
             return q.then((r) => ({ data: (r.data as unknown as DbConv[]) ?? null, error: r.error }));
           },
           (c) => (c as unknown as { id: string }).id,
-          { rotulo: 'conversas', signal },
+          {
+            rotulo: 'conversas', signal, simultaneas: primeira ? 6 : 2,
+            aoAvancar: primeira ? (feitas, total, itens) => publicarProgresso(PROGRESSO_WA, { feitas, total, itens }) : undefined,
+          },
         );
         // Etapa do Kanban por contato + IA por conversa. Best-effort, em PARALELO com o fetch principal.
         const etapas = await etapasPromise;

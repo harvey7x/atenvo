@@ -33,6 +33,8 @@ import { FichaJudicialModal } from '@/components/FichaJudicialModal';
 import { fichaDemoDoContato } from '@/data/fichaJudicial';
 import { useSendWaMessage, useAssinaturaMarca } from '@/data/whatsapp';
 import { useIaEstadoConversa, useIaToggle, useIaRecomecar, type IaEstadoConversa } from '@/data/whatsapp';
+import { PROGRESSO_WA } from '@/data/whatsapp';
+import { pctProgresso, useProgressoCarga } from '@/data/progressoCarga';
 import { mensagemAssumir, useAlertasLeadQuente } from '@/data/alertasLeadQuente';
 import { AlertaLeadQuenteModal } from '../components/AlertaLeadQuenteModal';
 import { useInboxWhatsApp, type AvisoInbox } from '../hooks/useInboxWhatsApp';
@@ -95,6 +97,29 @@ const ABAS_SO_ADMIN: readonly TabId[] = ['todos', 'naoatrib'];
 // regra compartilhada com o chat mobile (18/09): mudar lá muda as duas telas juntas.
 
 const IcWa = () => <Ic><path d="M21 11.5a8.4 8.4 0 01-9 8.4 8.9 8.9 0 01-3.8-.8L3 20l1-4.9a8.3 8.3 0 01-1-4A8.4 8.4 0 0112 3a8.4 8.4 0 019 8.5z" /></Ic>;
+
+/* Partida a frio do inbox (dono 30/10: "coloca uma mensagem igual, tipo iniciando o WhatsApp,
+   carregando mensagens"). Fica no lugar do "Selecione uma conversa" enquanto a lista chega;
+   a barra é o progresso REAL (faixas de conversas já recebidas — ver useWaConversations). */
+function IniciandoWhatsApp() {
+  const p = useProgressoCarga(PROGRESSO_WA);
+  const pct = pctProgresso(p);
+  return (
+    <div className="wa-carr" role="status" aria-live="polite" aria-busy>
+      <div className="wa-carr-caixa">
+        <span className="wa-carr-ic" aria-hidden><IcWa /></span>
+        <strong>Iniciando o WhatsApp</strong>
+        <span className="wa-carr-txt">Carregando as conversas e as últimas mensagens. Só um instante.</span>
+        <span className={'wa-carr-barra' + (pct === 0 ? ' indet' : '')}>
+          <i style={pct > 0 ? { width: `${Math.max(pct, 6)}%` } : undefined} />
+        </span>
+        <span className="wa-carr-num num">
+          {p && p.itens > 0 ? `${p.itens.toLocaleString('pt-BR')} conversas · ${pct}%` : 'Conectando…'}
+        </span>
+      </div>
+    </div>
+  );
+}
 const IcBusca = () => <Ic><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></Ic>;
 const IcMais = () => <Ic><path d="M12 5v14M5 12h14" /></Ic>;
 const IcFunil = () => <Ic><path d="M3 5h18l-7 8v5l-4 2v-7z" /></Ic>;
@@ -1252,7 +1277,9 @@ export default function WhatsAppV2() {
             <button type="button" onClick={() => setAviso(null)} aria-label="Fechar aviso">×</button>
           </div>
         )}
-        {!current.id ? (
+        {!current.id && WA_REAL && inbox.live.isLoading && contacts.length === 0 ? (
+          <IniciandoWhatsApp />
+        ) : !current.id ? (
           <div className="wa-conv-vazia">
             <IcWa />
             <div className="t">Selecione uma conversa</div>

@@ -1,7 +1,8 @@
-import { useEffect, useSyncExternalStore } from 'react';
+import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { buscarKeysetEmFaixas } from '@/data/paginacao';
+import { publicarProgresso } from '@/data/progressoCarga';
 import { useOrg } from '@/context/OrgContext';
 import { useVisibilidade } from '@/lib/visibilidade';
 
@@ -366,14 +367,8 @@ function funilGuardado(org: string): { id: string; nome: string } | undefined {
   } catch { return undefined; }
 }
 
-/** Progresso da 1ª carga dos cards (tela "Carregando o Kanban"): faixas prontas de quantas. */
-export interface ProgressoKanban { feitas: number; total: number; cards: number }
-let progressoKanban: ProgressoKanban | null = null;
-const ouvintesProgresso = new Set<() => void>();
-function publicarProgresso(p: ProgressoKanban | null) { progressoKanban = p; ouvintesProgresso.forEach((f) => f()); }
-export function useProgressoKanban(): ProgressoKanban | null {
-  return useSyncExternalStore((f) => { ouvintesProgresso.add(f); return () => { ouvintesProgresso.delete(f); }; }, () => progressoKanban);
-}
+/** Canal do progresso da 1ª carga dos cards (tela "Carregando o Kanban", ver progressoCarga.ts). */
+export const PROGRESSO_KANBAN = 'kanban';
 
 /** Núcleo do Kanban: funil + colunas + leads (oportunidades em andamento) + ações + realtime. */
 export function useKanban() {
@@ -415,7 +410,7 @@ export function useKanban() {
       // cards: 1 por vez 10,4 s · 6 → 2,7 s · 8 → 2,2 s · 16 → 2,0 s (o banco satura; não compensa).
       // Atualização de fundo (a cada 8 s / realtime), com o quadro já na tela: 2 por vez (~5,6 s).
       const primeira = qc.getQueryData(chaveLeads) === undefined;
-      if (primeira) publicarProgresso({ feitas: 0, total: 16, cards: 0 });
+      if (primeira) publicarProgresso(PROGRESSO_KANBAN, { feitas: 0, total: 16, itens: 0 });
       // PAGINAÇÃO (18/09): sem paginar, o PostgREST corta em 1000 (db-max-rows) e CARDS SOMEM do
       // quadro (o funil passa de 1000 com em_andamento+ganho+perdido). KEYSET por id (imutável);
       // a ordem do quadro (ordem asc, criado_em asc) é reaplicada em JS — paginar por `ordem`
@@ -436,7 +431,7 @@ export function useKanban() {
         (l) => l.id,
         {
           rotulo: 'kanban-leads', signal, simultaneas: primeira ? 8 : 2,
-          aoAvancar: primeira ? (feitas, total, cards) => publicarProgresso({ feitas, total, cards }) : undefined,
+          aoAvancar: primeira ? (feitas, total, itens) => publicarProgresso(PROGRESSO_KANBAN, { feitas, total, itens }) : undefined,
         },
       );
       // reproduz .order('ordem', asc).order('criado_em', asc) — ordem asc com NULLS LAST (padrão Postgres)

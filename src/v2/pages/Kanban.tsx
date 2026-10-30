@@ -3,8 +3,9 @@ import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CLASSE_RAIZ_PORTAL, criarRaizPortalV2 } from '../components/portal';
 import { useOrg } from '@/context/OrgContext';
+import { pctProgresso, useProgressoCarga } from '@/data/progressoCarga';
 import {
-  KANBAN_REAL, useKanban, useProgressoKanban, useOportunidadesAbertasDeContatos, useConversasDoContato,
+  KANBAN_REAL, PROGRESSO_KANBAN, useKanban, useOportunidadesAbertasDeContatos, useConversasDoContato,
   useNaoLidasPorContato, useOportunidadeEventos,
   classificarMovimento, traduzErroKanban, valorRelevante, bloqueioAdministrativo, bloqueioAssinar,
   MOTIVOS_NAO_ELEGIVEL, rotuloMotivoPerda, rotuloPerdaCompleto, rotuloDe,
@@ -251,8 +252,8 @@ function seedKb(): SeedKb {
    profissional"). Atrás, o esboço das colunas; na frente, o cartão com o progresso REAL
    (faixas de cards já recebidas — ver buscarKeysetEmFaixas). */
 function CarregandoKanban() {
-  const p = useProgressoKanban();
-  const pct = p && p.total > 0 ? Math.round((p.feitas / p.total) * 100) : 0;
+  const p = useProgressoCarga(PROGRESSO_KANBAN);
+  const pct = pctProgresso(p);
   return (
     <div className="kb-pg kb-pro">
       <div className="kb-carr" role="status" aria-live="polite" aria-busy>
@@ -272,7 +273,7 @@ function CarregandoKanban() {
             <i style={pct > 0 ? { width: `${Math.max(pct, 6)}%` } : undefined} />
           </span>
           <span className="kb-carr-num num">
-            {p && p.cards > 0 ? `${p.cards.toLocaleString('pt-BR')} oportunidades · ${pct}%` : 'Buscando os cards…'}
+            {p && p.itens > 0 ? `${p.itens.toLocaleString('pt-BR')} oportunidades · ${pct}%` : 'Buscando os cards…'}
           </span>
         </div>
       </div>
