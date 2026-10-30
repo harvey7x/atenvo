@@ -960,3 +960,7 @@ html:root[data-repaginada][data-repaginada] .v2 :is(.conv2, .ctx-topo, .ctx-b).s
   :root .v2 .wa-carr .wa-carr-barra i { transition: width .4s cubic-bezier(.2, .7, .2, 1) !important; }
   :root .v2 .wa-carr .wa-carr-barra.indet i { animation: wa-carr-indet 1.25s ease-in-out infinite !important; }
 }
+
+/* foto ilustrativa do cliente (FotoCliente, dono 30/10) por cima das iniciais; o selo do canal fica na frente */
+.v2 .wa-ctopo .conv2-av, .v2 .ctx-topo .av2 { position: relative; }
+.v2 .conv2 .av2 .sig { z-index: 1; }

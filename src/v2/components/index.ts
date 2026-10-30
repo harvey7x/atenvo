@@ -11,6 +11,7 @@ export { Campo, Input } from './Campo';
 export { Toggle, LinhaToggle } from './Toggle';
 export { StatusBar, type CorSeg } from './StatusBar';
 export { Skeleton, SkeletonTexto } from './Skeleton';
+export { FotoCliente } from './FotoCliente';
 export { EstadoVazio, EstadoErro } from './Estado';
 export { ModalV2, ConfirmDialogV2, DrawerV2 } from './ModalV2';
 export { AudioRecorderV2 } from './AudioRecorderV2';

@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import type { WaContact, WaMessage } from '@/data/whatsappDemo';
 import { useMensagensSupervisao } from '@/data/supervisao';
 import { ZapBolha } from './ZapBolha';
+import { FotoCliente } from '../../components';
 import {
   corDe, diaSP, fmtHa, iniciaisDe, nomeAgenda, rotuloDiaFio, tomEspera,
   IcAbrir, IcCadeado, IcCamera, IcFigurinha, IcFone, IcMais, IcVideo, IcVoltar,
@@ -110,7 +111,7 @@ export function ZapConversa({ conversa, nomeAtendente, agora, outrasNaoLidas, ao
         <button type="button" className="zp-voltar" onClick={aoVoltar} aria-label="Voltar para as conversas">
           <IcVoltar />{outrasNaoLidas > 0 && <span className="zp-voltar-n">{outrasNaoLidas}</span>}
         </button>
-        <span className="zp-av zp-av-p" style={{ background: corDe(conversa.id) }} aria-hidden>{iniciaisDe(nome) || '#'}</span>
+        <span className="zp-av zp-av-p" style={{ background: corDe(conversa.id) }} aria-hidden>{iniciaisDe(nome) || '#'}<FotoCliente nome={nome} id={conversa.contatoId ?? conversa.id} tam={38} /></span>
         <span className="zp-conv-quem">
           <b>{nome}</b>
           <span className={sub.cls || undefined}>{sub.txt}</span>

@@ -43,7 +43,7 @@ import { AudioRecorderV2 } from '../components/AudioRecorderV2';
 import { VisualizadorImagem } from '../components/VisualizadorImagem';
 import { AgendarMensagemModalV2 } from './AgendarMensagemModalV2';
 import { CLASSE_RAIZ_PORTAL } from '../components/portal';
-import { BotaoMini, BotaoPrimario, BotaoSec, ConfirmDialogV2, EstadoErro, ModalV2, Skeleton } from '../components';
+import { BotaoMini, BotaoPrimario, BotaoSec, ConfirmDialogV2, EstadoErro, FotoCliente, ModalV2, Skeleton } from '../components';
 import { Bolha, Ic, IcBot, IcDoc } from '../components/BolhaWa';
 import { corDaSituacao, nomeExibicao, situacaoDe, tierEspera } from '../lib/waUi';
 import { IA_OPCOES, PERIODO_OPCOES, SITUACAO_OPCOES, etapasDaLista, passaFiltroInbox, type FiltrosInbox } from '../lib/filtroInbox';
@@ -1219,7 +1219,7 @@ export default function WhatsAppV2() {
                         title={`Atendente: ${c.respId ? nomePorId(c.respId) ?? 'Atendente' : 'Não atribuído'} · Canal: ${tituloCanal(c.chip, transporte)} · ${finalizado ? 'Finalizado' : c.status || 'Em atendimento'} · ${c.time}`}
                         onClick={() => inbox.selectContact(c.id)}
                       >
-                        <span className="av2">{initials(nomeExibicao(c))}{c.canalAtual && <span className={'sig' + (oficial ? ' of' : '')} title={tituloCanal(c.canalAtual, transporte)}>{oficial ? '✓ ' : ''}{c.canalAtual.slice(0, 2)}</span>}</span>
+                        <span className="av2">{initials(nomeExibicao(c))}<FotoCliente nome={nomeExibicao(c)} id={c.contatoId ?? c.id} tam={33} />{c.canalAtual && <span className={'sig' + (oficial ? ' of' : '')} title={tituloCanal(c.canalAtual, transporte)}>{oficial ? '✓ ' : ''}{c.canalAtual.slice(0, 2)}</span>}</span>
                         <span className="tx">
                           <span className="n">
                             {c.silenciada && <span className="fl" title="Silenciada">🔕</span>}
@@ -1290,7 +1290,7 @@ export default function WhatsAppV2() {
           <>
             <div className="wa-ctopo">
               <button type="button" className="ib2 wa-ftopo-solto" style={{ display: 'none' }} aria-hidden />
-              <span className="av2 conv2-av">{initials(nomeExibicao(current))}</span>
+              <span className="av2 conv2-av">{initials(nomeExibicao(current))}<FotoCliente nome={nomeExibicao(current)} id={current.contatoId ?? current.id} tam={32} /></span>
               <div className="idw">
                 <div className="nm">{nomeExibicao(current)}</div>
                 <div className="sb num">
@@ -1572,7 +1572,7 @@ export default function WhatsAppV2() {
         <aside className={'wa-ctx' + (ctxAberto ? '' : ' recolhido')} aria-hidden={!ctxAberto} {...(!ctxAberto ? ({ inert: '' } as Record<string, string>) : {})}>
          <div className="wa-ctx-inner">
           <div className="ctx-topo spot">
-            <div className="av2">{initials(nomeExibicao(current))}</div>
+            <div className="av2">{initials(nomeExibicao(current))}<FotoCliente nome={nomeExibicao(current)} id={current.contatoId ?? current.id} tam={44} /></div>
             <div className="n2">{nomeExibicao(current)}</div>
             <div className="t2 num">
               {current.phone ? mascararNumero(current.phone) : 'sem número'}

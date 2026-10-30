@@ -3,6 +3,7 @@ import type { WaContact, WaMessage } from '@/data/whatsappDemo';
 import { esperaDesde } from '@/data/supervisao';
 import { previewUltimaMensagem } from '@/lib/conversaEtiquetas';
 import { IcBot } from '../../components/BolhaWa';
+import { FotoCliente } from '../../components';
 import {
   corDe, iniciaisDe, mmss, nomeAgenda, rotuloHoraLista, Tiques,
   IcAbaAtualizacoes, IcAbaComunidades, IcAbaConfig, IcAbaConversas, IcAbaLigacoes, IcArquivo, IcBusca, IcCamera,
@@ -63,7 +64,7 @@ function Linha({ c, agora, aoAbrir }: { c: WaContact; agora: number; aoAbrir: (i
   const novidade = temNovidade(c, agora);
   return (
     <button type="button" className="zp-linha" onClick={() => aoAbrir(c.id)}>
-      <span className="zp-av" style={{ background: ini ? corDe(c.id) : undefined }} aria-hidden>{ini || <IcContatoMini />}</span>
+      <span className="zp-av" style={{ background: ini ? corDe(c.id) : undefined }} aria-hidden>{ini || <IcContatoMini />}<FotoCliente nome={nome} id={c.contatoId ?? c.id} tam={54} /></span>
       <span className="zp-linha-tx">
         <span className="zp-l1">
           <b>{nome}</b>

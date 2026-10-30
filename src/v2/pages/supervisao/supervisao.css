@@ -716,3 +716,6 @@
 }
 @keyframes zp-entra { from { transform: translateX(100%); } to { transform: none; } }
 @keyframes zp-gira { to { transform: rotate(360deg); } }
+
+/* foto ilustrativa do cliente (FotoCliente, dono 30/10) por cima das iniciais */
+.v2 .zp-av, .v2 .sv-av-p { position: relative; }

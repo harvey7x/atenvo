@@ -3,7 +3,7 @@ import type { WaContact } from '@/data/whatsappDemo';
 import type { AtendenteV5 } from '@/data/dashboardV5.tipos';
 import { fmtDuracaoH, fmtDuracaoMin, fmtInt, TRACO } from '@/data/dashboardV5.formato';
 import { esperaDesde, type MembroEquipe, type RadarDoAtendente, type ResumoCarteira } from '@/data/supervisao';
-import { DrawerV2 } from '../../components';
+import { DrawerV2, FotoCliente } from '../../components';
 import { corDe, fmtHa, iniciaisDe, nomeAgenda, tomEspera, IcContatoMini } from './zapUi';
 
 /* ------------------------------------------------------------------
@@ -166,7 +166,7 @@ export function FichaAtendente({ aberto, posto, postos, rotuloPeriodo, agora, ao
                 return (
                   <li key={c.id}>
                     <button type="button" onClick={() => aoAbrirConversa(id, c.id)}>
-                      <span className="sv-av sv-av-p" style={{ background: iniciaisDe(nome) ? corDe(c.id) : undefined }} aria-hidden>{iniciaisDe(nome) || <IcContatoMini />}</span>
+                      <span className="sv-av sv-av-p" style={{ background: iniciaisDe(nome) ? corDe(c.id) : undefined }} aria-hidden>{iniciaisDe(nome) || <IcContatoMini />}<FotoCliente nome={nome} id={c.contatoId ?? c.id} tam={34} /></span>
                       <span className="sv-lista-tx"><b>{nome}</b><span>{c.last || 'Mensagem'}</span></span>
                       {desde ? <span className={`sv-lista-ha sv-tom-${tomEspera(desde, agora)}`}>{fmtHa(desde, agora)}</span> : null}
                     </button>
