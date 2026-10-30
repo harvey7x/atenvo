@@ -3,29 +3,18 @@
    livres (Unsplash, ver public/avatares/idosos/CREDITOS.md), escolhidos pelo primeiro nome
    (palpite de mulher/homem) e fixos por cliente (mesmo id → mesma foto). */
 
+import { FEMININOS_SEM_A, MASCULINOS_COM_A } from './nomesGenero';
+
 const BASE = '/avatares/idosos/';
 const MULHERES = ['f1', 'f2', 'f3', 'f4', 'f5'].map((f) => `${BASE}${f}.webp`);
 const HOMENS = ['h1', 'h2', 'h3', 'h4', 'h5'].map((f) => `${BASE}${f}.webp`);
 const TODAS = [...MULHERES, ...HOMENS];
 
-/** Nomes femininos comuns que NÃO terminam em "a" (e masculinos que terminam). */
-const FEM_SEM_A = new Set([
-  'raquel', 'isabel', 'beatriz', 'ester', 'ruth', 'rute', 'carmen', 'ivone', 'neide', 'cleide', 'rose', 'alice',
-  'denise', 'simone', 'ivete', 'lurdes', 'lourdes', 'ines', 'dulce', 'marli', 'marlene', 'irene', 'elaine', 'eliane',
-  'rosane', 'luciane', 'gislaine', 'jaqueline', 'miriam', 'noemi', 'nair', 'sueli', 'neli', 'ivonete', 'elizete',
-  'marinez', 'marines', 'iracy', 'juraci', 'nilce', 'cleonice', 'eunice', 'berenice', 'geni', 'zeni', 'eni',
-  'aparecida', 'dona', 'vo', 'avo', 'mae', 'tania', 'lucimar', 'rosemar', 'deise', 'daiane', 'viviane', 'tatiane',
-  // 30/10 (WhatsApp: "Shirley" saía com foto de homem) — femininos comuns sem "a" no fim
-  'shirley', 'shirlei', 'sirlei', 'sirley', 'kelly', 'keli', 'kelli', 'nathaly', 'nataly', 'natali', 'suely', 'suelly',
-  'ely', 'nely', 'marly', 'rosely', 'roseli', 'rosilei', 'gisele', 'giselle', 'michele', 'michelle', 'rachel',
-  'esther', 'ingrid', 'edith', 'judith', 'judite', 'elisabete', 'elizabete', 'elizabeth', 'elisabeth', 'lizete',
-  'mercedes', 'dolores', 'iris', 'luz', 'helen', 'ellen', 'karen', 'karin', 'evelyn', 'jennifer', 'jenifer',
-  'franciele', 'daniele', 'danielle', 'gabriele', 'adriele', 'micheli', 'cristiane', 'adriane', 'ariane', 'josiane',
-  'eliane', 'rosemeri', 'rosemery', 'rosimeri', 'marisete', 'claudete', 'elizete', 'odete', 'bernadete', 'ivani',
-  'leni', 'loreni', 'zeli', 'zuleide', 'neuci', 'neusa', 'nilza', 'ilse', 'elsi', 'liane', 'lisiane', 'roselaine',
-  'jucelaine', 'marilene', 'darlene', 'arlete', 'ivonilde', 'nadir', 'lurdes', 'cecilia', 'cleci', 'cleusi',
-]);
-const MASC_COM_A = new Set(['luca', 'nicola', 'joshua', 'andrea', 'garcia']);
+/** Exceções à regra "termina em 'a' = mulher", tiradas do IBGE (Censo 2010) — ver nomesGenero.ts.
+ *  Dono 30/10: "tem que acertar direitinho se é homem ou mulher". Mais os tratamentos que às vezes
+ *  ficam no lugar do nome ("Dona Maria", "Mãe"). */
+const FEM_SEM_A = new Set([...FEMININOS_SEM_A.split('|'), 'dona', 'vo', 'avo', 'mae']);
+const MASC_COM_A = new Set(MASCULINOS_COM_A.split('|'));
 
 function primeiroNome(nome: string): string {
   const limpo = (nome || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();

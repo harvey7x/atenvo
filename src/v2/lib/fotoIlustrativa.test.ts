@@ -12,6 +12,16 @@ describe('foto ilustrativa do card', () => {
     expect(generoProvavel('SHIRLEY')).toBe('f');
     expect(generoProvavel('Kelly Cristina')).toBe('f');
     expect(generoProvavel('Wesley Souza')).toBe('h');
+    // base do IBGE (30/10): exceções reais à regra do "a" no fim
+    expect(generoProvavel('JUSCEMARA RODRIGUES')).toBe('f');
+    expect(generoProvavel('Nadir')).toBe('f');
+    expect(generoProvavel('Iraci Souza')).toBe('f');
+    expect(generoProvavel('Geni')).toBe('f');
+    expect(generoProvavel('Luca')).toBe('h');
+    expect(generoProvavel('Akira')).toBe('h');
+    expect(generoProvavel('Valdir')).toBe('h');
+    expect(generoProvavel('Nilton')).toBe('h');
+    expect(generoProvavel('Ângela')).toBe('f');
   });
   it('mesma pessoa → mesma foto; mulher → foto de mulher', () => {
     const a = fotoIlustrativa('Maria', 'id-1');
