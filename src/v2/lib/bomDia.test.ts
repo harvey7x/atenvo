@@ -1,15 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  acharPausas, agruparCampanhas, analisarVoz, aplicarGanho, blocosDaVoz, casosDoPainel, chaveTelaBomDia, criarGanho, criarMedidor,
-  destinoDaCentral, detalheNaoElegiveis, deveMostrarBomDia, encaixarNasPausas, escalaU, falasDaTela, fraseComparacao, fraseIa,
-  fraseNoTempo, hojeLocal, inicioPorPeso, juntarPcm, lideresCampanha, limiarPalavra, listaE, mapearFala, marcarBomDiaVisto,
-  marcarMomentoVisto, MAX_CHARS_VOZ, medirPalavras, momentoAtual, momentoDevido, montarApresentacao, montarFala,
-  msAteProximoBomDia, msAteProximoMomento, nomeCampanha, painelDaTela, PAUSA_ENTRE_PEDACOS_S, porExtenso, progressoFrase,
-  proximaTelaBomDia, quadroLento, respiracaoCalma, resumoDaRpc, saudacaoDoDia, textoCorrido, textoFalado, textoResumo,
-  textosDoPlay, vaoDaFita, vozAte,
-  type ResumoGestor, type ResumoVendedor, type TelaBomDia, type Trecho,
+  acharPausas, agruparCampanhas, analisarVoz, aplicarGanho, blocosDaVoz, cartaoMelhorDia, casosDoPainel, chaveTelaBomDia, criarGanho,
+  criarMedidor, deFeriado, destinoDaCentral, detalheNaoElegiveis, deveMostrarBomDia, diaDoMelhor, ehDiaUtil, encaixarNasPausas,
+  escalaU, falasDaTela, fraseComparacao, fraseFolga, fraseIa, fraseNoTempo, hojeLocal, inicioPorPeso, juntarPcm, lideresCampanha,
+  limiarPalavra, listaE, mapearFala, marcarBomDiaVisto, marcarMomentoVisto, MAX_CHARS_VOZ, medirPalavras, momentoAtual,
+  momentoDevido, montarApresentacao, montarFala, msAteProximoBomDia, msAteProximoMomento, nomeCampanha, nomeCurtoDoDia, nomeDoDia,
+  painelDaTela, PAUSA_ENTRE_PEDACOS_S, porExtenso, progressoFrase, proximaTelaBomDia, quadroLento, respiracaoCalma, resumoDaRpc,
+  rotuloLeads, saudacaoDoDia, textoCorrido, textoFalado, textoResumo, textosDoPlay, vaoDaFita, vozAte,
+  type PausaBomDia, type ResumoGestor, type ResumoVendedor, type TelaBomDia, type Trecho,
 } from './bomDia';
-import { prepararBomDia, seedResumoBomDia } from '@/data/bomDia';
+import { DIA_PREVIA_POS_FOLGA, prepararBomDia, seedPosFolga, seedResumoBomDia } from '@/data/bomDia';
 
 const dia = (h: number, m = 0) => new Date(2026, 9, 30, h, m); // sexta, 30/10/2026 (hora local)
 
@@ -649,7 +649,7 @@ describe('bom dia: o jsonb da RPC → a tela', () => {
       modo: 'gestor', chegaram: 41, porCampanha: [{ canal: 'ANTONIO CAMPANHA', n: 29 }, { canal: 'Sem campanha', n: 2 }], naoElegiveis: 16,
       nePorCampanha: [{ canal: 'EMPRESTIMO', n: 6 }], fechadosHoje: 3, melhorOntem: { n: 5, nomes: ['Juliana'] }, melhorHoje: null,
       criticos: { desconectados: ['EMPRESTIMO'], iaSemCredito: false, semDono: 0 },
-      leadsOntemMesmaHora: null, iaAtendeuHoje: null,
+      leadsOntemMesmaHora: null, iaAtendeuHoje: null, pausa: null, melhorDia: null,
     });
     // campo faltando (RPC antiga): não quebra
     const velho = resumoDaRpc({ modo: 'gestor', chegaram: 2 }) as ResumoGestor;
@@ -657,7 +657,7 @@ describe('bom dia: o jsonb da RPC → a tela', () => {
     expect(velho.melhorHoje).toBeNull();
     expect(velho.criticos).toEqual({ desconectados: [], iaSemCredito: false, semDono: 0 });
     expect(resumoDaRpc({ modo: 'vendedor', novos: 3, sem_resposta: '2', passados: 0, presenciais: 1 }))
-      .toEqual({ modo: 'vendedor', novos: 3, semResposta: 2, passados: 0, presenciais: 1 });
+      .toEqual({ modo: 'vendedor', novos: 3, semResposta: 2, passados: 0, presenciais: 1, pausa: null });
   });
 });
 
@@ -1031,5 +1031,333 @@ describe('bom dia: a Central de Avisos fora do perfil gestor (dono 30/10)', () =
     expect(destinoDaCentral('gestor')).toBe('dashboard');
     expect(destinoDaCentral('vendedor')).toBe('central');
     expect(destinoDaCentral(null)).toBe('esperar');
+  });
+});
+
+/* ============================================================
+   PÓS-FOLGA (dono 30/10: "na terça-feira quero que a mensagem da IA
+   fale sobre o final de semana e o feriado, fale que espere que o
+   final de semana tenha sido bom, e fale os dados do sistema").
+   Terça 03/11/2026: depois de sábado, domingo e Finados.
+   ============================================================ */
+
+const terca = (h: number, m = 0) => new Date(2026, 10, 3, h, m);   // terça, 03/11/2026 (hora local)
+const FINADOS: PausaBomDia = { inicio: '2026-10-31', dias: 3, fimDeSemana: true, feriados: ['Finados'] };
+/* o jsonb que bom_dia_resumo (a migration 20261030220000, aplicada) devolve na terça 03/11 de manhã */
+const rpcTerca = {
+  modo: 'gestor', chegaram: 230,
+  por_campanha: [{ canal: 'Empréstimo · Diego', n: 150 }, { canal: 'Juros abusivos · Andrius', n: 80 }],
+  leads_ontem_mesma_hora: null, ia_atendeu_hoje: 80, nao_elegiveis: 40,
+  ne_por_campanha: [{ canal: 'Empréstimo · Diego', n: 36 }, { canal: 'Juros abusivos · Andrius', n: 4 }],
+  fechados_hoje: 0, melhor_ontem: { n: 5, nomes: ['Juliana'] }, melhor_hoje: null,
+  criticos: { desconectados: [], ia_sem_credito: false, sem_dono: 0 },
+  pausa: { inicio: '2026-10-31T03:00:00+00:00', dias: 3, fim_de_semana: true, feriados: ['Finados'] },
+  melhor_dia: '2026-10-30',
+};
+
+describe('bom dia PÓS-FOLGA: o jsonb da RPC → a tela', () => {
+  it('pausa (o timestamptz vira a data de São Paulo) e melhor_dia; null ou ausente = dia normal', () => {
+    const g = resumoDaRpc(rpcTerca) as ResumoGestor;
+    expect(g.pausa).toEqual(FINADOS);
+    expect(g.melhorDia).toBe('2026-10-30');
+    const v = resumoDaRpc({ modo: 'vendedor', novos: 4, sem_resposta: 1, passados: 0, presenciais: 0, desde: '2026-10-30T21:00:00+00:00', pausa: rpcTerca.pausa });
+    expect(v.pausa).toEqual(FINADOS);
+    expect((resumoDaRpc({ ...rpcTerca, pausa: null, melhor_dia: '2026-10-29' }) as ResumoGestor).pausa).toBeNull();
+    const semCampos = resumoDaRpc({ modo: 'gestor', chegaram: 3 }) as ResumoGestor;   // RPC antiga
+    expect([semCampos.pausa, semCampos.melhorDia]).toEqual([null, null]);
+    expect(resumoDaRpc({ modo: 'gestor', pausa: { dias: 3 } }).pausa).toBeNull();      // sem início: não é pausa
+    expect(resumoDaRpc({ modo: 'gestor', pausa: { ...rpcTerca.pausa, inicio: '2026-10-31' } }).pausa?.inicio).toBe('2026-10-31');
+  });
+
+  it('o Carnaval são dois dias: o nome repetido entra uma vez só (a RPC manda ["Carnaval", "Carnaval"])', () => {
+    const r = resumoDaRpc({ modo: 'gestor', pausa: { inicio: '2027-02-06T03:00:00+00:00', dias: 4, fim_de_semana: true, feriados: ['Carnaval', 'Carnaval'] } });
+    expect(r.pausa).toEqual({ inicio: '2027-02-06', dias: 4, fimDeSemana: true, feriados: ['Carnaval'] });
+    expect(fraseFolga(r.pausa)).toBe('Espero que o final de semana e o feriado de Carnaval tenham sido bons.');
+    // mesmo que chegue repetido direto (seed, outra fonte)
+    expect(fraseFolga({ inicio: '2027-02-06', dias: 4, fimDeSemana: true, feriados: ['Carnaval', 'Carnaval'] }))
+      .toBe('Espero que o final de semana e o feriado de Carnaval tenham sido bons.');
+  });
+});
+
+describe('bom dia PÓS-FOLGA: o desejo da folga (SINTESE-POSFOLGA §2)', () => {
+  it('todas as variantes da frase', () => {
+    // fim de semana + feriado (terça 03/11)
+    expect(fraseFolga(FINADOS)).toBe('Espero que o final de semana e o feriado de Finados tenham sido bons.');
+    // feriado ANTES do fim de semana: a folga começa numa sexta (segunda 23/11)
+    expect(fraseFolga({ inicio: '2026-11-20', dias: 3, fimDeSemana: true, feriados: ['Consciência Negra'] }))
+      .toBe('Espero que o feriado da Consciência Negra e o final de semana tenham sido bons.');
+    // só o fim de semana (toda segunda)
+    expect(fraseFolga({ inicio: '2026-10-24', dias: 2, fimDeSemana: true, feriados: [] })).toBe('Espero que o final de semana tenha sido bom.');
+    // só o feriado (quinta 22/04/2027, depois de Tiradentes numa quarta)
+    expect(fraseFolga({ inicio: '2027-04-21', dias: 1, fimDeSemana: false, feriados: ['Tiradentes'] })).toBe('Espero que o feriado de Tiradentes tenha sido bom.');
+    // dois feriados
+    expect(fraseFolga({ inicio: '2026-10-31', dias: 4, fimDeSemana: true, feriados: ['Finados', 'Proclamação da República'] }))
+      .toBe('Espero que o final de semana e os feriados de Finados e da Proclamação da República tenham sido bons.');
+    expect(fraseFolga({ inicio: '2026-11-02', dias: 2, fimDeSemana: false, feriados: ['Finados', 'Tiradentes'] }))
+      .toBe('Espero que os feriados de Finados e de Tiradentes tenham sido bons.');
+    // feriado sem nome no banco ('feriado'): "o feriado"
+    expect(fraseFolga({ inicio: '2026-11-02', dias: 1, fimDeSemana: false, feriados: ['feriado'] })).toBe('Espero que o feriado tenha sido bom.');
+    expect(fraseFolga({ inicio: '2026-11-04', dias: 1, fimDeSemana: false, feriados: [] })).toBeNull();
+    expect(fraseFolga(null)).toBeNull();
+    expect(fraseFolga(undefined)).toBeNull();
+  });
+
+  it('a preposição com o artigo de cada feriado (nunca "feriado de Proclamação da República")', () => {
+    expect(['Ano-Novo', 'Carnaval', 'Sexta-feira Santa', 'Tiradentes', 'Dia do Trabalho', 'Corpus Christi', 'Independência',
+      'Revolução Farroupilha', 'Nossa Senhora Aparecida', 'Finados', 'Proclamação da República', 'Consciência Negra', 'Natal'].map(deFeriado))
+      .toEqual(['de Ano-Novo', 'de Carnaval', 'da Sexta-feira Santa', 'de Tiradentes', 'do Dia do Trabalho', 'de Corpus Christi', 'da Independência',
+        'da Revolução Farroupilha', 'de Nossa Senhora Aparecida', 'de Finados', 'da Proclamação da República', 'da Consciência Negra', 'de Natal']);
+    // as folgas de 2026–2027 que a RPC devolve (bom_dia_ultimo_util + dash_v5s_feriados, conferido no banco)
+    expect(fraseFolga({ inicio: '2026-11-14', dias: 2, fimDeSemana: true, feriados: ['Proclamação da República'] }))
+      .toBe('Espero que o final de semana e o feriado da Proclamação da República tenham sido bons.');
+    expect(fraseFolga({ inicio: '2027-05-01', dias: 2, fimDeSemana: true, feriados: ['Dia do Trabalho'] }))
+      .toBe('Espero que o final de semana e o feriado do Dia do Trabalho tenham sido bons.');
+    expect(fraseFolga({ inicio: '2027-03-26', dias: 3, fimDeSemana: true, feriados: ['Sexta-feira Santa'] }))
+      .toBe('Espero que o feriado da Sexta-feira Santa e o final de semana tenham sido bons.');
+    expect(fraseFolga({ inicio: '2026-12-25', dias: 3, fimDeSemana: true, feriados: ['Natal'] }))
+      .toBe('Espero que o feriado de Natal e o final de semana tenham sido bons.');
+    expect(fraseFolga({ inicio: '2026-09-05', dias: 3, fimDeSemana: true, feriados: ['Independência'] }))
+      .toBe('Espero que o final de semana e o feriado da Independência tenham sido bons.');
+    expect(fraseFolga({ inicio: '2026-10-10', dias: 3, fimDeSemana: true, feriados: ['Nossa Senhora Aparecida'] }))
+      .toBe('Espero que o final de semana e o feriado de Nossa Senhora Aparecida tenham sido bons.');
+  });
+
+  it('o dia da semana (pt-BR) e o dia útil', () => {
+    expect(['2026-10-30', '2026-10-31', '2026-11-01', '2026-11-02', '2026-11-03'].map(nomeDoDia))
+      .toEqual(['sexta-feira', 'sábado', 'domingo', 'segunda-feira', 'terça-feira']);
+    expect(['2026-10-30', '2026-10-31', '2026-11-19', '2026-11-03'].map(nomeCurtoDoDia)).toEqual(['sexta', 'sábado', 'quinta', 'terça']);
+    expect(['2026-10-30', '2026-10-31', '2026-11-01', '2026-11-02', '2026-11-03', '2026-11-20', '2027-02-09', '2027-02-10'].map(ehDiaUtil))
+      .toEqual([true, false, false, false, true, false, false, true]);
+  });
+});
+
+describe('bom dia PÓS-FOLGA: o VENDEDOR (o desejo logo depois da saudação; o resto é o roteiro literal)', () => {
+  const atendente: ResumoVendedor = { modo: 'vendedor', novos: 12, semResposta: 8, passados: 3, presenciais: 2 };
+
+  it('terça 03/11 às 8h', () => {
+    const f = montarFala('Juliana Souza', { ...atendente, pausa: FINADOS }, { momento: 'manha', agora: terca(8) });
+    expect(f.map((t) => t.id)).toEqual(['saudacao', 'folga', 'numeros', 'avisos', 'passados', 'presenciais', 'fecho']);
+    expect(textoCorrido(f)).toBe(
+      'Olá, Juliana! Seja bem-vinda ao Atenvo. Espero que o final de semana e o feriado de Finados tenham sido bons. '
+      + 'Hoje você tem 12 novos clientes e 8 clientes sem resposta. '
+      + 'Informações importantes: O robô passou 3 clientes para você. Eles estão esperando atendimento. '
+      + 'Você tem 2 atendimentos presenciais hoje. Bom trabalho!',
+    );
+    // sem o trecho da folga, a fala de sempre
+    expect(textoCorrido(f.filter((t) => t.id !== 'folga'))).toBe(textoCorrido(montarFala('Juliana Souza', atendente, { momento: 'manha', agora: terca(8) })));
+  });
+
+  it('dia normal, 17h e o meio da folga (domingo; o próprio Finados): nada de desejo', () => {
+    expect(montarFala('Juliana', atendente, { momento: 'manha', agora: terca(8) }).some((t) => t.id === 'folga')).toBe(false);
+    expect(montarFala('Juliana', { ...atendente, pausa: FINADOS }, { momento: 'tarde', agora: terca(17) }).some((t) => t.id === 'folga')).toBe(false);
+    // o banco aplicado manda a pausa também no domingo 01/11 (1 dia) e no Finados 02/11 (2 dias): o desejo espera a terça
+    const domingo = montarFala('Matheus', { ...atendente, pausa: { inicio: '2026-10-31', dias: 1, fimDeSemana: true, feriados: [] } },
+      { momento: 'manha', agora: new Date(2026, 10, 1, 8) });
+    const finados = montarFala('Matheus', { ...atendente, pausa: { inicio: '2026-10-31', dias: 2, fimDeSemana: true, feriados: [] } },
+      { momento: 'manha', agora: new Date(2026, 10, 2, 8) });
+    expect(domingo.some((t) => t.id === 'folga')).toBe(false);
+    expect(finados.some((t) => t.id === 'folga')).toBe(false);
+  });
+});
+
+describe('bom dia PÓS-FOLGA: o GESTOR de manhã (SINTESE-POSFOLGA §3)', () => {
+  const g = resumoDaRpc(rpcTerca) as ResumoGestor;
+  const manhaTerca = (r: ResumoGestor) => montarFala('Murilo', r, { momento: 'manha', agora: terca(8) });
+
+  it('terça 03/11 às 8h, com o jsonb da RPC aplicada: o desejo, "desde sábado", sem comparação, o melhor de sexta', () => {
+    const f = manhaTerca(g);
+    expect(f.map((t) => t.id)).toEqual([
+      'saudacao', 'saudacao', 'folga', 'leads', 'leads', 'melhor-campanha', 'nao-elegiveis', 'campanha-ne', 'ia', 'melhor-ontem', 'fechados',
+      'criticos', 'fecho',
+    ]);
+    expect(textoCorrido(f)).toBe(
+      'Bom dia, Murilo, tudo bem? Seja bem-vindo ao seu acesso de administrador. Aqui você pode acompanhar o desempenho da sua equipe. '
+      + 'Espero que o final de semana e o feriado de Finados tenham sido bons. '
+      + 'Desde sábado, entraram 230 leads no sistema: 150 da campanha Diego e 80 da campanha Andrius. '
+      + 'A melhor campanha até agora é a campanha Diego, com 150 leads. '
+      + '40 clientes foram marcados como não elegíveis. '
+      + 'A campanha com mais não elegíveis é a campanha Diego, com 36 clientes. '
+      + 'Desde sábado, a IA atendeu 80 leads. '
+      + 'A melhor vendedora de sexta-feira foi a Juliana, com 5 contratos fechados. '
+      + 'Hoje ainda não teve nenhum fechamento. '
+      + 'Nenhum caso crítico no momento. '
+      + 'Bom trabalho!',
+    );
+    // a comparação PULA depois de folga, mesmo que o número viesse (ontem foi feriado)
+    expect(manhaTerca({ ...g, leadsOntemMesmaHora: 12 }).some((t) => t.id === 'comparacao')).toBe(false);
+  });
+
+  it('a folga que começa numa sexta (Consciência Negra): "Desde sexta-feira" e o melhor de quinta-feira', () => {
+    const r: ResumoGestor = { ...g, pausa: { inicio: '2026-11-20', dias: 3, fimDeSemana: true, feriados: ['Consciência Negra'] }, melhorDia: '2026-11-19' };
+    const f = montarFala('Murilo', r, { momento: 'manha', agora: new Date(2026, 10, 23, 8) });
+    expect(trecho(f, 'folga')).toBe('Espero que o feriado da Consciência Negra e o final de semana tenham sido bons.');
+    expect(trecho(f, 'leads')).toBe('Desde sexta-feira, entraram 230 leads no sistema: 150 da campanha Diego e 80 da campanha Andrius.');
+    expect(trecho(f, 'ia')).toBe('Desde sexta-feira, a IA atendeu 80 leads.');
+    expect(trecho(f, 'melhor-ontem')).toBe('A melhor vendedora de quinta-feira foi a Juliana, com 5 contratos fechados.');
+  });
+
+  it('leads, IA e melhor do último dia útil: singular, zero, empate, ninguém', () => {
+    const r = (p: Partial<ResumoGestor>) => manhaTerca({ ...g, ...p });
+    expect(trecho(r({ chegaram: 12, porCampanha: [{ canal: 'ANTONIO CAMPANHA', n: 12 }] }), 'leads')).toBe('Desde sábado, entraram 12 leads no sistema, todos da campanha Antônio.');
+    expect(trecho(r({ chegaram: 1, porCampanha: [{ canal: 'ANTONIO CAMPANHA', n: 1 }] }), 'leads')).toBe('Desde sábado, entrou 1 lead no sistema, da campanha Antônio.');
+    expect(trecho(r({ chegaram: 0, porCampanha: [] }), 'leads')).toBe('Desde sábado, nenhum lead entrou no sistema.');
+    expect(trecho(r({ iaAtendeuHoje: 1 }), 'ia')).toBe('Desde sábado, a IA atendeu 1 lead.');
+    expect(trecho(r({ iaAtendeuHoje: 0 }), 'ia')).toBe('Desde sábado, a IA não atendeu nenhum lead.');
+    expect(r({ iaAtendeuHoje: null }).some((t) => t.id === 'ia')).toBe(false);
+    expect(trecho(r({ melhorOntem: { n: 1, nomes: ['Matheus'] } }), 'melhor-ontem')).toBe('O melhor vendedor de sexta-feira foi o Matheus, com 1 contrato fechado.');
+    expect(trecho(r({ melhorOntem: { n: 3, nomes: ['Juliana', 'Matheus'] } }), 'melhor-ontem'))
+      .toBe('Os melhores vendedores de sexta-feira foram a Juliana e o Matheus, com 3 contratos cada.');
+    expect(trecho(r({ melhorOntem: null }), 'melhor-ontem')).toBe('Na sexta-feira não houve contratos fechados.');
+  });
+
+  it('o melhor é "de ontem" quando o último dia útil FOI ontem (ou a RPC antiga não manda melhor_dia)', () => {
+    expect(diaDoMelhor({ melhorDia: '2026-10-29' }, dia(8))).toBeNull();
+    expect(diaDoMelhor({ melhorDia: '2026-10-31' }, new Date(2026, 10, 1, 8))).toBeNull();     // virada do mês
+    expect(diaDoMelhor({ melhorDia: null }, terca(8))).toBeNull();
+    expect(diaDoMelhor({}, terca(8))).toBeNull();
+    expect(diaDoMelhor({ melhorDia: '2026-10-30' }, terca(8))).toBe('sexta-feira');
+    // o banco aplicado já manda melhor_dia em todo dia: hoje (sexta 30/10), o de quinta = ontem → a fala de sempre
+    expect(trecho(manha(com({ melhorDia: '2026-10-29' })), 'melhor-ontem')).toBe('A melhor vendedora de ontem foi a Juliana, com 5 contratos fechados.');
+    // no domingo (sem pausa, se o banco deixar de mandá-la no meio da folga): o de sexta, pelo nome
+    expect(trecho(montarFala('Murilo', com({ melhorDia: '2026-10-30' }), { momento: 'manha', agora: new Date(2026, 10, 1, 8) }), 'melhor-ontem'))
+      .toBe('A melhor vendedora de sexta-feira foi a Juliana, com 5 contratos fechados.');
+  });
+
+  it('no meio da folga (domingo, o próprio feriado) o banco aplicado conta desde sábado: os números dizem isso, sem o desejo', () => {
+    const domingo = montarFala('Murilo', { ...g, pausa: { inicio: '2026-10-31', dias: 1, fimDeSemana: true, feriados: [] } },
+      { momento: 'manha', agora: new Date(2026, 10, 1, 8) });
+    expect(domingo.some((t) => t.id === 'folga')).toBe(false);
+    expect(trecho(domingo, 'leads').startsWith('Desde sábado, entraram 230 leads')).toBe(true);
+    expect(trecho(domingo, 'ia')).toBe('Desde sábado, a IA atendeu 80 leads.');
+  });
+
+  it('as 17h não mudam (o banco manda o dia sem pausa para p_momento "tarde")', () => {
+    const tardeTerca = (r: ResumoGestor) => textoCorrido(montarFala('Murilo', r, { momento: 'tarde', agora: terca(17) }));
+    expect(tardeTerca({ ...real, pausa: FINADOS, melhorDia: '2026-10-30' })).toBe(tardeTerca(real));
+    expect(tardeTerca(real)).not.toMatch(/Desde|Espero/);
+  });
+});
+
+describe('bom dia PÓS-FOLGA: o painel do gestor', () => {
+  it('"Leads desde sábado", "Melhor vendedor de sexta" (vazio: "nenhum contrato na sexta"); dia normal: os de sempre', () => {
+    expect(rotuloLeads({ pausa: FINADOS })).toBe('Leads desde sábado');
+    expect(rotuloLeads({ pausa: { inicio: '2026-11-20', dias: 3, fimDeSemana: true, feriados: ['Consciência Negra'] } })).toBe('Leads desde sexta');
+    expect(rotuloLeads({ pausa: null })).toBe('Leads hoje');
+    expect(rotuloLeads({})).toBe('Leads hoje');
+    expect(rotuloLeads(null)).toBe('Leads hoje');
+    expect(cartaoMelhorDia({ melhorDia: '2026-10-30' }, terca(8))).toEqual({ rotulo: 'Melhor vendedor de sexta', vazio: 'nenhum contrato na sexta' });
+    expect(cartaoMelhorDia({ melhorDia: '2026-11-19' }, new Date(2026, 10, 23, 8))).toEqual({ rotulo: 'Melhor vendedor de quinta', vazio: 'nenhum contrato na quinta' });
+    expect(cartaoMelhorDia({ melhorDia: '2026-10-29' }, dia(8))).toEqual({ rotulo: 'Melhor vendedor de ontem', vazio: 'nenhum contrato ontem' });
+    expect(cartaoMelhorDia({}, terca(8))).toEqual({ rotulo: 'Melhor vendedor de ontem', vazio: 'nenhum contrato ontem' });
+    expect(cartaoMelhorDia(null, terca(8))).toEqual({ rotulo: 'Melhor vendedor de ontem', vazio: 'nenhum contrato ontem' });
+  });
+
+  it('não elegíveis contam desde o início da folga: "nenhum desde sábado" / "marcados desde sábado" (antes: "hoje")', () => {
+    expect(detalheNaoElegiveis({ naoElegiveis: 0, nePorCampanha: [], pausa: FINADOS })).toBe('nenhum desde sábado');
+    expect(detalheNaoElegiveis({ naoElegiveis: 2, nePorCampanha: [{ canal: 'Sem campanha', n: 2 }], pausa: FINADOS })).toBe('marcados desde sábado');
+    expect(detalheNaoElegiveis(resumoDaRpc(rpcTerca) as ResumoGestor)).toBe('mais na campanha Diego · 36');
+    expect(detalheNaoElegiveis({ naoElegiveis: 0, nePorCampanha: [], pausa: null })).toBe('nenhum hoje');
+  });
+});
+
+describe('bom dia PÓS-FOLGA: a apresentação com DOIS resumos (manhã e 17h)', () => {
+  const manhaR = resumoDaRpc(rpcTerca) as ResumoGestor;
+  const tardeR = resumoDaRpc({
+    ...rpcTerca, pausa: null, chegaram: 41, por_campanha: [{ canal: 'Empréstimo · Diego', n: 30 }, { canal: 'Juros abusivos · Andrius', n: 11 }],
+    ia_atendeu_hoje: 20, nao_elegiveis: 9, ne_por_campanha: [{ canal: 'Empréstimo · Diego', n: 9 }], fechados_hoje: 3,
+    melhor_hoje: { n: 2, nomes: ['Juliana'] }, leads_ontem_mesma_hora: null,
+  }) as ResumoGestor;
+
+  it('a parte 1 fala o resumo da manhã (com a folga); a parte 2, o das 17h (só o dia)', () => {
+    const [p1, p2] = falasDaTela('Murilo', manhaR, 'apresentacao', terca(17), tardeR);
+    expect(textoCorrido(p1.slice(3))).toBe(textoCorrido(montarFala('Murilo', manhaR, { momento: 'manha', agora: terca(8) })));
+    expect(textoCorrido(p1)).toContain('Espero que o final de semana e o feriado de Finados tenham sido bons. Desde sábado, entraram 230 leads no sistema:');
+    expect(textoCorrido(p2.slice(1, -3))).toBe(textoCorrido(montarFala('Murilo', tardeR, { momento: 'tarde', agora: terca(17) }).slice(0, -1)));
+    expect(textoCorrido(p2)).toContain('Hoje entraram 41 leads no sistema, e 9 foram marcados como não elegíveis.');
+    expect(textoCorrido(p2)).not.toMatch(/Desde sábado|230/);
+    // sem o resumo da tarde (o jeito antigo), as duas partes saem do mesmo
+    expect(falasDaTela('Murilo', manhaR, 'apresentacao', terca(17)).map(textoCorrido)).toEqual(montarApresentacao('Murilo', manhaR, terca(17)).map(textoCorrido));
+    // um "resumo da tarde" de vendedor não entra na fala do gestor
+    expect(falasDaTela('Murilo', manhaR, 'apresentacao', terca(17), { modo: 'vendedor', novos: 1, semResposta: 0, passados: 0, presenciais: 0 }).map(textoCorrido))
+      .toEqual(montarApresentacao('Murilo', manhaR, terca(17)).map(textoCorrido));
+  });
+});
+
+describe('bom dia PÓS-FOLGA: a prévia "Pós-feriado" (demo)', () => {
+  it('o seed da manhã com a folga; a fala inteira do administrador e da atendente', () => {
+    const g = seedPosFolga(seedResumoBomDia(true)) as ResumoGestor;
+    expect([g.pausa, g.melhorDia, g.leadsOntemMesmaHora]).toEqual([FINADOS, '2026-10-30', null]);
+    // desde sábado: mais que o dia (o seed das 17h, de hoje) — as contas fecham; os fechados seguem os de hoje
+    const dia17 = seedResumoBomDia(true) as ResumoGestor;
+    expect(g.porCampanha.reduce((a, x) => a + x.n, 0)).toBe(g.chegaram);
+    expect(g.nePorCampanha.reduce((a, x) => a + x.n, 0)).toBe(g.naoElegiveis);
+    expect(g.chegaram).toBeGreaterThan(dia17.chegaram);
+    expect([g.fechadosHoje, g.melhorHoje]).toEqual([dia17.fechadosHoje, dia17.melhorHoje]);
+    expect(DIA_PREVIA_POS_FOLGA).toBe('2026-11-03');
+    const agora = new Date(2026, 10, 3, 8);
+    expect(hojeLocal(agora)).toBe(DIA_PREVIA_POS_FOLGA);
+    expect(textoCorrido(montarFala('Murilo', g, { momento: 'manha', agora }))).toBe(
+      'Bom dia, Murilo, tudo bem? Seja bem-vindo ao seu acesso de administrador. Aqui você pode acompanhar o desempenho da sua equipe. '
+      + 'Espero que o final de semana e o feriado de Finados tenham sido bons. '
+      + 'Desde sábado, entraram 230 leads no sistema: 70 do número oficial, 60 da campanha Antônio, 55 da campanha Andrius e 45 do chip do Murillo. '
+      + 'A melhor campanha até agora é a do número oficial, com 70 leads. '
+      + '40 clientes foram marcados como não elegíveis. '
+      + 'A campanha com mais não elegíveis é a do Empréstimo, com 28 clientes. '
+      + 'Desde sábado, a IA atendeu 80 leads. '
+      + 'A melhor vendedora de sexta-feira foi a Juliana, com 5 contratos fechados. '
+      + 'Hoje já foram fechados 4 contratos. '
+      + 'Casos críticos: O número do Empréstimo está desconectado. 3 clientes novos estão sem dono. '
+      + 'Bom trabalho!',
+    );
+    expect(textoCorrido(montarFala('Juliana', seedPosFolga(seedResumoBomDia(false)), { momento: 'manha', agora }))).toBe(
+      'Olá, Juliana! Seja bem-vinda ao Atenvo. Espero que o final de semana e o feriado de Finados tenham sido bons. '
+      + 'Hoje você tem 12 novos clientes e 8 clientes sem resposta. '
+      + 'Informações importantes: O robô passou 3 clientes para você. Eles estão esperando atendimento. '
+      + 'Você tem 2 atendimentos presenciais hoje. Bom trabalho!',
+    );
+  });
+
+  it('o preparo: a apresentação traz a manhã COM a folga e as 17h SEM; a chave separa a prévia do dia normal', async () => {
+    const base = { org: 'org-folga', uid: 'u-folga', nome: 'Murilo', momento: 'tarde' as const, tipo: 'apresentacao' as const, gestor: true, agora: terca(17) };
+    const comFolga = prepararBomDia({ ...base, posFolga: true });
+    const semFolga = prepararBomDia(base);
+    expect(comFolga).not.toBe(semFolga);
+    expect(prepararBomDia({ ...base, posFolga: true })).toBe(comFolga);
+    const [m, t] = await Promise.all([comFolga.resumo, comFolga.resumoTarde]);
+    expect(m.pausa).toEqual(FINADOS);
+    expect(t?.pausa ?? null).toBeNull();
+    expect((await semFolga.resumo).pausa ?? null).toBeNull();
+    // fora da apresentação, um resumo só
+    expect(prepararBomDia({ ...base, tipo: 'manha', momento: 'manha', posFolga: true }).resumoTarde).toBeNull();
+  });
+
+  it('a frase da folga cabe numa página da legenda (≤ 110); no pior dia as páginas seguem ≤ 150 e a fala cabe na voz', () => {
+    const folgas: PausaBomDia[] = [
+      FINADOS,
+      { inicio: '2026-11-14', dias: 2, fimDeSemana: true, feriados: ['Proclamação da República'] },
+      { inicio: '2026-10-10', dias: 3, fimDeSemana: true, feriados: ['Nossa Senhora Aparecida'] },
+      { inicio: '2026-09-19', dias: 2, fimDeSemana: true, feriados: ['Revolução Farroupilha'] },
+      { inicio: '2026-10-31', dias: 4, fimDeSemana: true, feriados: ['Finados', 'Proclamação da República'] },
+    ];
+    const pesado = com({
+      chegaram: 133,
+      porCampanha: [{ canal: 'ANTONIO CAMPANHA', n: 41 }, { canal: 'JUROS ABUSIVO (ANDRIUS)', n: 41 }, { canal: 'OFICIAL', n: 19 }, { canal: 'MURILLO CHIP', n: 12 },
+        { canal: 'EMPRESTIMO', n: 8 }, { canal: 'EMPRESTIMO DIEGO', n: 8 }, { canal: 'Sem campanha', n: 4 }],
+      naoElegiveis: 18, nePorCampanha: [{ canal: 'EMPRESTIMO', n: 5 }, { canal: 'ANTONIO CAMPANHA', n: 5 }, { canal: 'OFICIAL', n: 4 }],
+      melhorOntem: { n: 3, nomes: ['Juliana', 'Gabriela', 'Isadora'] }, iaAtendeuHoje: 137, melhorDia: '2026-10-30',
+      criticos: { desconectados: ['EMPRESTIMO', 'ANTONIO CAMPANHA', 'JUROS ABUSIVO (ANDRIUS)', 'OFICIAL', 'MURILLO CHIP'], iaSemCredito: true, semDono: 12 },
+    });
+    for (const pausa of folgas) {
+      const f = montarFala('Maria Eduarda', { ...pesado, pausa }, { momento: 'manha', agora: terca(8) });
+      // o mesmo teto do pior dia de sempre ("o texto mais longo do administrador cabe na voz"): a lista de 7 campanhas
+      for (const t of f) expect(t.texto.length, t.texto).toBeLessThanOrEqual(150);
+      expect(trecho(f, 'folga').length).toBeGreaterThan(0);
+      expect(trecho(f, 'folga').length).toBeLessThanOrEqual(110);
+      for (const t of montarFala('Murilo', { ...real, pausa }, { momento: 'manha', agora: terca(8) })) expect(t.texto.length, t.texto).toBeLessThanOrEqual(110);
+      for (const p of blocosDaVoz(f)) expect(textoCorrido(p).length).toBeLessThanOrEqual(MAX_CHARS_VOZ);
+      for (const parte of falasDaTela('Maria Eduarda', { ...pesado, pausa }, 'apresentacao', terca(17), pesado)) {
+        for (const p of blocosDaVoz(parte)) expect(textoCorrido(p).length).toBeLessThanOrEqual(MAX_CHARS_VOZ);
+      }
+    }
   });
 });

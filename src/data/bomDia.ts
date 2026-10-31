@@ -5,7 +5,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useOrg } from '@/context/OrgContext';
 import {
   blocosDaVoz, falasDaTela, hojeLocal, resumoDaRpc, textoCorrido,
-  type ModoBomDia, type Momento, type ResumoBomDia, type TipoTela, type Trecho,
+  type ModoBomDia, type Momento, type PausaBomDia, type ResumoBomDia, type TipoTela, type Trecho,
 } from '@/v2/lib/bomDia';
 
 /* ------------------------------------------------------------------
@@ -53,6 +53,37 @@ export function seedResumoBomDia(gestor: boolean): ResumoBomDia {
       iaAtendeuHoje: 12,
     }
     : { modo: 'vendedor', novos: 12, semResposta: 8, passados: 3, presenciais: 2 };
+}
+
+/** A prévia "Pós-feriado" (SINTESE-POSFOLGA §5): terça, 03/11/2026 — o 1º dia útil depois de sábado, domingo e
+    Finados. O painel mostra esta data. */
+export const DIA_PREVIA_POS_FOLGA = '2026-11-03';
+
+/** O resumo da MANHÃ da prévia "Pós-feriado": o seed com a folga {sábado, 3 dias, fim de semana, Finados}, o melhor
+    de ontem sendo o de sexta e sem a comparação com ontem (o banco manda null depois de folga). O gestor conta desde
+    sábado: leads, campanhas, não elegíveis e IA de 3 dias e meio (os números do exemplo da SINTESE-POSFOLGA: 230
+    leads, a IA em 80) — os fechados e quem mais vendeu continuam os de hoje. O das 17h fica o seed de sempre: é do
+    dia, sem pausa, como no banco (na apresentação, a 2ª parte não repete os números da 1ª). */
+export function seedPosFolga(r: ResumoBomDia): ResumoBomDia {
+  const pausa: PausaBomDia = { inicio: '2026-10-31', dias: 3, fimDeSemana: true, feriados: ['Finados'] };
+  if (r.modo !== 'gestor') return { ...r, pausa };
+  return {
+    ...r, pausa, melhorDia: '2026-10-30', leadsOntemMesmaHora: null,
+    chegaram: 230,
+    porCampanha: [
+      { canal: 'OFICIAL', n: 70 },
+      { canal: 'ANTONIO CAMPANHA', n: 60 },
+      { canal: 'JUROS ABUSIVO (ANDRIUS)', n: 55 },
+      { canal: 'MURILLO CHIP', n: 45 },
+    ],
+    naoElegiveis: 40,
+    nePorCampanha: [
+      { canal: 'EMPRESTIMO', n: 20 },
+      { canal: 'ANTONIO CAMPANHA', n: 12 },
+      { canal: 'EMPRÉSTIMO', n: 8 },
+    ],
+    iaAtendeuHoje: 80,
+  };
 }
 
 /* ---------- quem é gestor: a RPC bom_dia_modo; na prévia local, a pessoa escolhida na barra ---------- */
@@ -116,12 +147,16 @@ export function useModoBomDia(): ModoBomDia | null {
   return q.isError || tetoDe === quem ? 'vendedor' : null;
 }
 
-async function buscarResumo(org: string, gestor: boolean): Promise<ResumoBomDia> {
+/** O resumo de UM momento. O momento vai para o banco (p_momento): sem ele o banco usa 'manha' sempre e, depois de
+    uma folga, o diagnóstico das 17h contaria a folga inteira como "hoje". Demo: o seed (com a folga, na prévia
+    "Pós-feriado", só de manhã — como o banco). */
+async function buscarResumo(org: string, gestor: boolean, momento: Momento, posFolga = false): Promise<ResumoBomDia> {
   if (!BOM_DIA_REAL) {
     await new Promise((r) => setTimeout(r, 700));
-    return seedResumoBomDia(gestor);
+    const r = seedResumoBomDia(gestor);
+    return posFolga && momento === 'manha' ? seedPosFolga(r) : r;
   }
-  const { data, error } = await supabase!.rpc('bom_dia_resumo', { p_org: org });
+  const { data, error } = await supabase!.rpc('bom_dia_resumo', { p_org: org, p_momento: momento });
   if (error) throw new Error(error.message);
   return resumoDaRpc(data);
 }
@@ -150,7 +185,10 @@ async function pedirVozDaFala(trechos: Trecho[], voz: string, arquivoDemo: strin
 }
 
 export interface PreparoBomDia {
+  /** os números da tela: o resumo do momento; na apresentação, o da MANHÃ (a 1ª parte) */
   resumo: Promise<ResumoBomDia>;
+  /** só na apresentação: o resumo das 17h (p_momento 'tarde': SÓ o dia) da 2ª parte; fora dela, null */
+  resumoTarde: Promise<ResumoBomDia> | null;
   /** a voz de cada fala da tela, na ordem (o resumo = 1 fala; a apresentação = 2): os pedaços de WAV da fala
       (tocam juntos, como um áudio só) ou null = sem voz da IA (crédito, rede, limite) → voz do navegador /
       legenda. A fala que não existe (a 2ª de quem não é gestor) também resolve null. */
@@ -173,26 +211,34 @@ export function prepararBomDia(p: {
   arquivosDemo?: string[] | null;
   /** prévia: a hora do texto do áudio pré-gerado (8h / 17h) */
   agora?: Date;
+  /** só a demo (a prévia "Pós-feriado"): o seed da manhã vem com a folga */
+  posFolga?: boolean;
 }): PreparoBomDia {
   const voz = p.voz ?? VOZ_BOM_DIA;
   const tipo: TipoTela = p.tipo ?? p.momento;
   // no sistema real quem decide o modo é a RPC: o "gestor" do shell (que chega depois) não refaz o preparo
   const gestorSeed = !BOM_DIA_REAL && !!p.gestor;
+  const folgaSeed = !BOM_DIA_REAL && !!p.posFolga;
   const demo = p.arquivosDemo ?? [];
-  const k = [p.uid, p.org, p.nome, p.momento, tipo, gestorSeed ? 'g' : '', voz, demo.join(','), p.agora?.getHours() ?? '', hojeLocal()].join('|');
+  const k = [p.uid, p.org, p.nome, p.momento, tipo, gestorSeed ? 'g' : '', folgaSeed ? 'f' : '', voz, demo.join(','), p.agora?.getHours() ?? '', hojeLocal()].join('|');
   const c = cache.get(k);
   if (c && Date.now() - c.criadoEm < VALIDADE_MS) return c;
   const agora = p.agora ?? new Date();
-  const resumo = buscarResumo(p.org, gestorSeed);
-  const falas = resumo.then((r) => falasDaTela(p.nome, r, tipo, agora));
+  // os números de cada fala: o resumo do momento; a apresentação, DOIS — o da manhã (parte 1) e o das 17h (parte 2),
+  // cada um com o seu p_momento (o da manhã pode vir com a folga; o das 17h é só do dia). A chave cobre os dois.
+  const apresentacao = tipo === 'apresentacao';
+  const resumo = buscarResumo(p.org, gestorSeed, apresentacao ? 'manha' : p.momento, folgaSeed);
+  const resumoTarde = apresentacao ? buscarResumo(p.org, gestorSeed, 'tarde', folgaSeed) : null;
+  const numeros = Promise.all([resumo, resumoTarde]);
+  const falas = numeros.then(([r, rt]) => falasDaTela(p.nome, r, tipo, agora, rt));
   // as falas da apresentação pedem a voz JUNTAS: a 2ª fica pronta enquanto a 1ª toca
   const nFalas = tipo === 'apresentacao' ? 2 : 1;
   const vozes = Array.from({ length: nFalas }, (_, i) => falas
     .then((f) => pedirVozDaFala(f[i] ?? [], voz, demo[i] ?? null))
     .catch(() => null));
-  const novo = { resumo, vozes, agora, criadoEm: Date.now() };
+  const novo = { resumo, resumoTarde, vozes, agora, criadoEm: Date.now() };
   cache.set(k, novo);
-  // número que falhou não fica em cache: a próxima abertura tenta de novo
-  resumo.catch(() => { if (cache.get(k) === novo) cache.delete(k); });
+  // número que falhou (qualquer um dos dois) não fica em cache: a próxima abertura tenta de novo
+  numeros.catch(() => { if (cache.get(k) === novo) cache.delete(k); });
   return novo;
 }

@@ -149,11 +149,24 @@ export function saudacaoDoDia(agora = new Date()): 'Bom dia' | 'Boa tarde' | 'Bo
 }
 
 /* ------------------------------------------------------------------
-   Os números. bom_dia_resumo devolve UM de dois modos:
+   Os números. bom_dia_resumo(p_org, p_momento) devolve UM de dois modos:
    - VENDEDOR (todo mundo, inclusive o admin Matheus): a carteira dele;
    - GESTOR (quem está em bom_dia_gestores — o Murilo): a empresa
-     inteira, "hoje" desde a meia-noite.
+     inteira, "hoje" desde a meia-noite — de manhã, depois de uma folga,
+     desde o 1º dia dela (a pausa). O das 17h ('tarde') é sempre do dia.
    ------------------------------------------------------------------ */
+
+/** A folga entre o último dia útil e hoje (dono 30/10: "na terça-feira quero que a mensagem da IA fale sobre o final
+    de semana e o feriado… e fale os dados do sistema"). Só no resumo da manhã: no das 17h o banco manda null. */
+export interface PausaBomDia {
+  /** o 1º dia da folga, data de São Paulo ('2026-10-31'): os números do gestor contam desde a meia-noite dele */
+  inicio: string;
+  /** dias de folga (sábado, domingo e Finados = 3) */
+  dias: number;
+  fimDeSemana: boolean;
+  /** os nomes dos feriados da folga, na ordem e sem repetir (o Carnaval são 2 dias: o banco manda 'Carnaval' 2x) */
+  feriados: string[];
+}
 
 export interface ResumoVendedor {
   modo: 'vendedor';
@@ -163,6 +176,8 @@ export interface ResumoVendedor {
   passados: number;
   /** presenciais marcados para hoje */
   presenciais: number;
+  /** a folga antes de hoje (só de manhã); null/ausente = dia normal (ou RPC antiga) */
+  pausa?: PausaBomDia | null;
 }
 
 /** canal = canais.nome_interno ('ANTONIO CAMPANHA', 'JUROS ABUSIVO (ANDRIUS)', 'EMPRESTIMO'…) ou 'Sem campanha' */
@@ -179,7 +194,8 @@ export interface Vendedores {
 
 export interface ResumoGestor {
   modo: 'gestor';
-  /** leads de hoje (as entradas do Dashboard v5: clientes distintos desde a meia-noite) */
+  /** leads de hoje (as entradas do Dashboard v5: clientes distintos desde a meia-noite; de manhã, depois de folga,
+      desde a meia-noite do 1º dia dela — pausa.inicio; o mesmo vale para campanhas, não elegíveis e IA) */
   chegaram: number;
   porCampanha: CampanhaN[];
   /** leads de ontem até a MESMA hora de agora (o kpis_anterior do Dashboard); null = a RPC não mandou —
@@ -193,6 +209,12 @@ export interface ResumoGestor {
   melhorOntem: Vendedores | null;
   melhorHoje: Vendedores | null;
   criticos: { desconectados: string[]; iaSemCredito: boolean; semDono: number };
+  /** a folga antes de hoje (só de manhã): leads, campanhas, não elegíveis e IA contam desde pausa.inicio e a
+      comparação com ontem não vem. null/ausente = dia normal (ou RPC antiga) */
+  pausa?: PausaBomDia | null;
+  /** o último dia útil ('2026-10-30'): o melhorOntem é DELE — "de sexta-feira" quando não foi ontem. null/ausente
+      (RPC antiga) = ontem */
+  melhorDia?: string | null;
 }
 
 export type ResumoBomDia = ResumoVendedor | ResumoGestor;
@@ -217,6 +239,37 @@ const vendedores = (v: unknown): Vendedores | null => {
   return n > 0 && nomes.length ? { n, nomes } : null;
 };
 
+const FMT_DIA_SP = (() => {
+  try {
+    return new Intl.DateTimeFormat('en-US', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' });
+  } catch { return null; }
+})();
+/** 'AAAA-MM-DD' de São Paulo: a data ('2026-10-30', o melhor_dia) como veio; o timestamptz ('2026-10-31T03:00:00+00:00',
+    o início da folga) no fuso de São Paulo. Inválido → null. */
+function diaDeSaoPaulo(v: unknown): string | null {
+  if (typeof v !== 'string') return null;
+  const s = v.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const d = new Date(s);
+  if (!s || Number.isNaN(d.getTime())) return null;
+  if (FMT_DIA_SP) {
+    const p: Record<string, string> = {};
+    for (const x of FMT_DIA_SP.formatToParts(d)) p[x.type] = x.value;
+    if (p.year && p.month && p.day) return `${p.year}-${p.month}-${p.day}`;
+  }
+  return new Date(d.getTime() - 3 * 3_600_000).toISOString().slice(0, 10);   // São Paulo = UTC−3 (sem horário de verão)
+}
+/** a pausa da RPC ({ inicio, dias, fim_de_semana, feriados }); null ou ausente = dia normal. Os feriados saem sem
+    repetir, na ordem (o Carnaval são dois dias: o banco manda ['Carnaval', 'Carnaval']) */
+const pausaDaRpc = (v: unknown): PausaBomDia | null => {
+  const o = v as Record<string, unknown> | null;
+  if (!o || typeof o !== 'object') return null;
+  const inicio = diaDeSaoPaulo(o.inicio);
+  if (!inicio) return null;
+  const feriados = [...new Set((Array.isArray(o.feriados) ? o.feriados : []).map((x) => String(x ?? '').trim()).filter(Boolean))];
+  return { inicio, dias: num(o.dias), fimDeSemana: o.fim_de_semana === true, feriados };
+};
+
 /** O jsonb da RPC bom_dia_resumo → o resumo da tela (tolerante a campo faltando). */
 export function resumoDaRpc(row: unknown): ResumoBomDia {
   const r = (row ?? {}) as Record<string, unknown>;
@@ -238,9 +291,91 @@ export function resumoDaRpc(row: unknown): ResumoBomDia {
         iaSemCredito: c.ia_sem_credito === true,
         semDono: num(c.sem_dono),
       },
+      pausa: pausaDaRpc(r.pausa),
+      melhorDia: diaDeSaoPaulo(r.melhor_dia),
     };
   }
-  return { modo: 'vendedor', novos: num(r.novos), semResposta: num(r.sem_resposta), passados: num(r.passados), presenciais: num(r.presenciais) };
+  return {
+    modo: 'vendedor', novos: num(r.novos), semResposta: num(r.sem_resposta), passados: num(r.passados), presenciais: num(r.presenciais),
+    pausa: pausaDaRpc(r.pausa),
+  };
+}
+
+/* ------------------------------------------------------------------
+   PÓS-FOLGA: o dia da semana, o dia útil e o desejo da folga.
+   ------------------------------------------------------------------ */
+
+const DIAS_DA_SEMANA = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'] as const;
+/** 0 = domingo … 6 = sábado, da data do calendário 'AAAA-MM-DD' (sem fuso: a data já é a de São Paulo) */
+const diaDaSemana = (dia: string): number => {
+  const [a, m, d] = dia.split('-').map(Number);
+  return new Date(Date.UTC(a, (m || 1) - 1, d || 1)).getUTCDay();
+};
+/** "sábado", "sexta-feira" (a fala) */
+export const nomeDoDia = (dia: string): string => DIAS_DA_SEMANA[diaDaSemana(dia)] ?? '';
+/** "sábado", "sexta" (o rótulo do painel) */
+export const nomeCurtoDoDia = (dia: string): string => nomeDoDia(dia).replace('-feira', '');
+/** "na sexta", "no sábado" */
+const naNo = (dia: string) => `${/^(sábado|domingo)$/.test(dia) ? 'no' : 'na'} ${dia}`;
+
+/** A MESMA lista de dash_v5s_feriados() (o banco: os feriados nacionais + 20/09 do RS, 2026–2027) — editar os dois.
+    Só para saber se HOJE é dia útil: no domingo e no próprio feriado a RPC também manda a pausa (o meio da folga). */
+const FERIADOS = new Set([
+  '2026-01-01', '2026-02-16', '2026-02-17', '2026-04-03', '2026-04-21', '2026-05-01', '2026-06-04', '2026-09-07', '2026-09-20',
+  '2026-10-12', '2026-11-02', '2026-11-15', '2026-11-20', '2026-12-25',
+  '2027-01-01', '2027-02-08', '2027-02-09', '2027-03-26', '2027-04-21', '2027-05-01', '2027-05-27', '2027-09-07', '2027-09-20',
+  '2027-10-12', '2027-11-02', '2027-11-15', '2027-11-20', '2027-12-25',
+]);
+/** seg–sex fora dos feriados ('AAAA-MM-DD') */
+export const ehDiaUtil = (dia: string): boolean => {
+  const s = diaDaSemana(dia);
+  return s >= 1 && s <= 5 && !FERIADOS.has(dia);
+};
+
+/** "de Finados", "da Proclamação da República", "do Dia do Trabalho" (a preposição com o artigo do nome) */
+const FERIADO_DA = new Set(['Independência', 'Revolução Farroupilha', 'Proclamação da República', 'Consciência Negra', 'Sexta-feira Santa']);
+const FERIADO_DO = new Set(['Dia do Trabalho']);
+export const deFeriado = (nome: string): string => `${FERIADO_DO.has(nome) ? 'do' : FERIADO_DA.has(nome) ? 'da' : 'de'} ${nome}`;
+
+/** O desejo depois da folga (SINTESE-POSFOLGA §2), logo depois da saudação:
+    - fim de semana + feriado → "Espero que o final de semana e o feriado de Finados tenham sido bons.";
+    - a folga começou num dia de semana (sexta feriado) → "Espero que o feriado da Consciência Negra e o final de
+      semana tenham sido bons.";
+    - só o fim de semana → "Espero que o final de semana tenha sido bom."; só o feriado → "Espero que o feriado de
+      Tiradentes tenha sido bom."; dois feriados → "…os feriados de Finados e da Proclamação da República…".
+    O nome repetido conta uma vez (Carnaval); o feriado sem nome ('feriado') vira "o feriado". null = sem folga. */
+export function fraseFolga(p: PausaBomDia | null | undefined): string | null {
+  if (!p) return null;
+  const nomes = [...new Set(p.feriados.map((x) => x.trim()).filter(Boolean))];
+  const comNome = nomes.filter((x) => x.toLowerCase() !== 'feriado');
+  const feriado = !nomes.length ? null
+    : comNome.length > 1 ? `os feriados ${listaE(comNome.map(deFeriado))}`
+      : comNome.length === 1 ? `o feriado ${deFeriado(comNome[0])}` : 'o feriado';
+  const fds = p.fimDeSemana ? 'o final de semana' : null;
+  if (feriado && fds) {
+    const s = diaDaSemana(p.inicio);
+    return `Espero que ${s >= 1 && s <= 5 ? `${feriado} e ${fds}` : `${fds} e ${feriado}`} tenham sido bons.`;
+  }
+  const so = feriado ?? fds;
+  if (!so) return null;
+  return so.startsWith('os ') ? `Espero que ${so} tenham sido bons.` : `Espero que ${so} tenha sido bom.`;
+}
+
+/** O desejo só de manhã e só num dia ÚTIL: no domingo ou no próprio feriado a RPC também manda a pausa (é o meio
+    da folga) — o desejo fica para o 1º dia útil; os números seguem "desde" o início dela (é o que a RPC contou). */
+const desejoDaFolga = (p: PausaBomDia | null | undefined, momento: Momento, agora: Date): string | null =>
+  (momento !== 'tarde' && p && ehDiaUtil(hojeLocal(agora)) ? fraseFolga(p) : null);
+
+/** "Desde sábado" / "Desde sexta-feira" (o 1º dia da folga): de onde contam os números do gestor; null = hoje */
+const desdeDaFolga = (p: PausaBomDia | null | undefined): string | null => (p ? `Desde ${nomeDoDia(p.inicio)}` : null);
+
+/** De que dia é o "melhor de ontem": null = ontem (o normal; a RPC antiga não manda melhor_dia); depois de folga, o
+    último dia útil pelo nome — "sexta-feira". */
+export function diaDoMelhor(r: Pick<ResumoGestor, 'melhorDia'>, agora: Date): string | null {
+  if (!r.melhorDia) return null;
+  const ontem = new Date(agora);
+  ontem.setDate(ontem.getDate() - 1);
+  return r.melhorDia === hojeLocal(ontem) ? null : nomeDoDia(r.melhorDia);
 }
 
 /* ------------------------------------------------------------------
@@ -374,7 +509,7 @@ export function listaE(itens: string[]): string {
    ------------------------------------------------------------------ */
 
 export type IdTrecho =
-  | 'saudacao' | 'numeros' | 'avisos' | 'passados' | 'presenciais' | 'nenhum' | 'fecho'
+  | 'saudacao' | 'folga' | 'numeros' | 'avisos' | 'passados' | 'presenciais' | 'nenhum' | 'fecho'
   | 'leads' | 'comparacao' | 'melhor-campanha' | 'nao-elegiveis' | 'campanha-ne' | 'ia' | 'melhor-ontem' | 'melhor-vendedor'
   | 'fechados' | 'criticos'
   /** as falas da própria apresentação de lançamento (o que não é número) */
@@ -402,14 +537,17 @@ export function montarFala(nome: string, r: ResumoBomDia, o: OpcoesFala = {}): T
   if (r.modo === 'gestor') return falaGestor(nome, r, o.momento ?? 'manha', o.agora ?? new Date());
   const pn = primeiroNome(nome);
   const vinda = generoProvavel(pn) === 'f' ? 'bem-vinda' : 'bem-vindo';
-  const t: Trecho[] = [
-    { id: 'saudacao', texto: pn ? `Olá, ${pn}! Seja ${vinda} ao Atenvo.` : `Olá! Seja ${vinda} ao Atenvo.` },
+  const t: Trecho[] = [{ id: 'saudacao', texto: pn ? `Olá, ${pn}! Seja ${vinda} ao Atenvo.` : `Olá! Seja ${vinda} ao Atenvo.` }];
+  // depois de folga, o desejo logo depois da saudação; o resto do vendedor não muda (copy do dono é literal)
+  const folga = desejoDaFolga(r.pausa, o.momento ?? 'manha', o.agora ?? new Date());
+  if (folga) t.push({ id: 'folga', texto: folga });
+  t.push(
     {
       id: 'numeros',
       texto: `Hoje você tem ${qtd(r.novos, 'novo cliente', 'novos clientes')} e ${qtd(r.semResposta, 'cliente sem resposta', 'clientes sem resposta')}.`,
     },
     { id: 'avisos', texto: 'Informações importantes:' },
-  ];
+  );
   let avisos = 0;
   if (r.passados > 0) {
     avisos++;
@@ -435,17 +573,19 @@ export function montarFala(nome: string, r: ResumoBomDia, o: OpcoesFala = {}): T
 const comArtigo = (nome: string) => `${generoProvavel(nome) === 'f' ? 'a' : 'o'} ${nome}`;
 const contratos = (n: number) => qtd(n, 'contrato', 'contratos');
 
-export function fraseLeadsManha(chegaram: number, grupos: CampanhaAgrupada[]): Trecho[] {
-  if (chegaram <= 0) return [{ id: 'leads', texto: 'Até o momento, nenhum lead entrou no sistema hoje.' }];
+/** desde = "Desde sábado" depois de folga (a RPC conta desde o 1º dia dela; SINTESE-POSFOLGA §3); null = hoje */
+export function fraseLeadsManha(chegaram: number, grupos: CampanhaAgrupada[], desde: string | null = null): Trecho[] {
+  const ini = desde ?? 'Até o momento';
+  if (chegaram <= 0) return [{ id: 'leads', texto: desde ? `${desde}, nenhum lead entrou no sistema.` : 'Até o momento, nenhum lead entrou no sistema hoje.' }];
   if (chegaram === 1) {
-    return [{ id: 'leads', texto: grupos[0] ? `Até o momento, entrou 1 lead no sistema, ${grupos[0].nome.de}.` : 'Até o momento, entrou 1 lead no sistema.' }];
+    return [{ id: 'leads', texto: grupos[0] ? `${ini}, entrou 1 lead no sistema, ${grupos[0].nome.de}.` : `${ini}, entrou 1 lead no sistema.` }];
   }
   if (grupos.length <= 1) {
-    return [{ id: 'leads', texto: grupos[0] ? `Até o momento, entraram ${chegaram} leads no sistema, todos ${grupos[0].nome.de}.` : `Até o momento, entraram ${chegaram} leads no sistema.` }];
+    return [{ id: 'leads', texto: grupos[0] ? `${ini}, entraram ${chegaram} leads no sistema, todos ${grupos[0].nome.de}.` : `${ini}, entraram ${chegaram} leads no sistema.` }];
   }
   // a lista vira uma 2ª "página" da legenda (o texto falado é o mesmo, com os dois-pontos)
   return [
-    { id: 'leads', texto: `Até o momento, entraram ${chegaram} leads no sistema:` },
+    { id: 'leads', texto: `${ini}, entraram ${chegaram} leads no sistema:` },
     { id: 'leads', texto: `${listaE(grupos.map((g) => `${g.n} ${g.nome.de}`))}.` },
   ];
 }
@@ -473,16 +613,22 @@ export function fraseCampanhaNe(grupos: CampanhaAgrupada[]): string | null {
     : `As campanhas com mais não elegíveis são ${listaE(l.nomes.map((x) => x.a))}, com ${clientes} cada.`;
 }
 
-export function fraseMelhorOntem(m: Vendedores | null): string {
-  if (!m || m.n <= 0 || !m.nomes.length) return 'Ontem não houve contratos fechados.';
+/** dia = o último dia útil pelo nome ("sexta-feira") quando não foi ontem (diaDoMelhor); null = ontem */
+export function fraseMelhorOntem(m: Vendedores | null, dia: string | null = null): string {
+  const de = dia ? `de ${dia}` : 'de ontem';
+  if (!m || m.n <= 0 || !m.nomes.length) {
+    if (!dia) return 'Ontem não houve contratos fechados.';
+    const quando = naNo(dia);
+    return `${quando.charAt(0).toUpperCase()}${quando.slice(1)} não houve contratos fechados.`;
+  }
   if (m.nomes.length === 1) {
     const nome = m.nomes[0];
     return generoProvavel(nome) === 'f'
-      ? `A melhor vendedora de ontem foi a ${nome}, com ${contratos(m.n)} ${m.n === 1 ? 'fechado' : 'fechados'}.`
-      : `O melhor vendedor de ontem foi o ${nome}, com ${contratos(m.n)} ${m.n === 1 ? 'fechado' : 'fechados'}.`;
+      ? `A melhor vendedora ${de} foi a ${nome}, com ${contratos(m.n)} ${m.n === 1 ? 'fechado' : 'fechados'}.`
+      : `O melhor vendedor ${de} foi o ${nome}, com ${contratos(m.n)} ${m.n === 1 ? 'fechado' : 'fechados'}.`;
   }
   const todasMulheres = m.nomes.every((x) => generoProvavel(x) === 'f');
-  return `${todasMulheres ? 'As melhores vendedoras' : 'Os melhores vendedores'} de ontem foram ${listaE(m.nomes.map(comArtigo))}, com ${contratos(m.n)} cada.`;
+  return `${todasMulheres ? 'As melhores vendedoras' : 'Os melhores vendedores'} ${de} foram ${listaE(m.nomes.map(comArtigo))}, com ${contratos(m.n)} cada.`;
 }
 
 export function fraseMelhorHoje(m: Vendedores | null): string {
@@ -533,9 +679,11 @@ export function fraseComparacao(hoje: number, ontem: number | null | undefined):
   return `É menos da metade de ontem no mesmo horário, ${quando}.`;
 }
 
-/** O trabalho da IA hoje (§8): "A IA atendeu 37 leads hoje." — ausente (RPC antiga) → pula. */
-export function fraseIa(n: number | null | undefined): string | null {
+/** O trabalho da IA hoje (§8): "A IA atendeu 37 leads hoje." — ausente (RPC antiga) → pula. Depois de folga (desde =
+    "Desde sábado"): "Desde sábado, a IA atendeu 80 leads." */
+export function fraseIa(n: number | null | undefined, desde: string | null = null): string | null {
   if (n == null) return null;
+  if (desde) return n <= 0 ? `${desde}, a IA não atendeu nenhum lead.` : `${desde}, a IA atendeu ${qtd(n, 'lead', 'leads')}.`;
   if (n <= 0) return 'A IA ainda não atendeu nenhum lead hoje.';
   return n === 1 ? 'A IA atendeu 1 lead hoje.' : `A IA atendeu ${n} leads hoje.`;
 }
@@ -598,12 +746,27 @@ export function detalheLeads(r: Pick<ResumoGestor, 'chegaram' | 'leadsOntemMesma
 }
 
 /** O detalhe do cartão "Não elegíveis" (uma linha): "mais no Empréstimo · 7"; empate, com os nomes curtos:
-    "Empréstimo e Antônio · 5 cada" (a forma longa "mais no Empréstimo e na campanha Antônio · 5" não cabia). */
-export function detalheNaoElegiveis(r: Pick<ResumoGestor, 'naoElegiveis' | 'nePorCampanha'>): string {
-  if (r.naoElegiveis <= 0) return 'nenhum hoje';
+    "Empréstimo e Antônio · 5 cada" (a forma longa "mais no Empréstimo e na campanha Antônio · 5" não cabia).
+    Depois de folga a RPC conta desde o 1º dia dela: "nenhum desde sábado" / "marcados desde sábado". */
+export function detalheNaoElegiveis(r: Pick<ResumoGestor, 'naoElegiveis' | 'nePorCampanha' | 'pausa'>): string {
+  const quando = r.pausa ? `desde ${nomeCurtoDoDia(r.pausa.inicio)}` : 'hoje';
+  if (r.naoElegiveis <= 0) return `nenhum ${quando}`;
   const l = lideresCampanha(agruparCampanhas(r.nePorCampanha));
-  if (!l) return 'marcados hoje';
+  if (!l) return `marcados ${quando}`;
   return l.nomes.length === 1 ? `mais ${l.nomes[0].em} · ${l.n}` : `${listaE(l.nomes.map((x) => x.curto))} · ${l.n} cada`;
+}
+
+/** O rótulo do cartão dos leads: "Leads hoje"; depois de folga, "Leads desde sábado" (a RPC conta desde o 1º dia dela). */
+export const rotuloLeads = (r: Pick<ResumoGestor, 'pausa'> | null): string =>
+  (r?.pausa ? `Leads desde ${nomeCurtoDoDia(r.pausa.inicio)}` : 'Leads hoje');
+
+/** O cartão do melhor vendedor do último dia útil: "Melhor vendedor de ontem" (vazio: "nenhum contrato ontem"); quando
+    ele não foi ontem (depois de folga), "Melhor vendedor de sexta" ("nenhum contrato na sexta"). */
+export function cartaoMelhorDia(r: Pick<ResumoGestor, 'melhorDia'> | null, agora: Date): { rotulo: string; vazio: string } {
+  const dia = r ? diaDoMelhor(r, agora) : null;
+  if (!dia) return { rotulo: 'Melhor vendedor de ontem', vazio: 'nenhum contrato ontem' };
+  const curto = dia.replace('-feira', '');
+  return { rotulo: `Melhor vendedor de ${curto}`, vazio: `nenhum contrato ${naNo(curto)}` };
 }
 
 function falaGestor(nome: string, r: ResumoGestor, momento: Momento, agora: Date): Trecho[] {
@@ -611,9 +774,9 @@ function falaGestor(nome: string, r: ResumoGestor, momento: Momento, agora: Date
   const grupos = agruparCampanhas(r.porCampanha);
   // §8: a comparação vem logo depois dos leads; a IA, depois da campanha com mais NE (8h) / da comparação (17h)
   const comparacao = fraseComparacao(r.chegaram, r.leadsOntemMesmaHora);
-  const ia = fraseIa(r.iaAtendeuHoje);
   const t: Trecho[] = [];
   if (momento === 'tarde') {
+    const ia = fraseIa(r.iaAtendeuHoje);
     // 17h — "olá Murilo, seu diagnóstico do dia chegou"
     t.push({ id: 'saudacao', texto: pn ? `Olá, ${pn}, seu diagnóstico do dia chegou.` : 'Olá, seu diagnóstico do dia chegou.' });
     t.push({ id: 'fechados', texto: fraseFechadosTarde(r.fechadosHoje) });
@@ -632,15 +795,21 @@ function falaGestor(nome: string, r: ResumoGestor, momento: Momento, agora: Date
   const sd = saudacaoDoDia(agora);
   t.push({ id: 'saudacao', texto: `${pn ? `${sd}, ${pn}, tudo bem?` : `${sd}, tudo bem?`} Seja ${vinda} ao seu acesso de administrador.` });
   t.push({ id: 'saudacao', texto: 'Aqui você pode acompanhar o desempenho da sua equipe.' });
-  t.push(...fraseLeadsManha(r.chegaram, grupos));
-  if (comparacao) t.push({ id: 'comparacao', texto: comparacao });
+  // depois de folga (SINTESE-POSFOLGA §2–3): o desejo logo depois da saudação; leads e IA "desde sábado" (a RPC conta
+  // desde o 1º dia da folga), sem a comparação com ontem (ontem foi domingo/feriado) e o melhor do último dia útil
+  const folga = desejoDaFolga(r.pausa, momento, agora);
+  if (folga) t.push({ id: 'folga', texto: folga });
+  const desde = desdeDaFolga(r.pausa);
+  t.push(...fraseLeadsManha(r.chegaram, grupos, desde));
+  if (comparacao && !desde) t.push({ id: 'comparacao', texto: comparacao });
   const melhor = r.chegaram > 0 ? fraseMelhorCampanha(grupos, 'até agora') : null;
   if (melhor) t.push({ id: 'melhor-campanha', texto: melhor });
   t.push({ id: 'nao-elegiveis', texto: fraseNaoElegiveis(r.naoElegiveis) });
   const ne = r.naoElegiveis > 0 ? fraseCampanhaNe(agruparCampanhas(r.nePorCampanha)) : null;
   if (ne) t.push({ id: 'campanha-ne', texto: ne });
+  const ia = fraseIa(r.iaAtendeuHoje, desde);
   if (ia) t.push({ id: 'ia', texto: ia });
-  t.push({ id: 'melhor-ontem', texto: fraseMelhorOntem(r.melhorOntem) });
+  t.push({ id: 'melhor-ontem', texto: fraseMelhorOntem(r.melhorOntem, diaDoMelhor(r, agora)) });
   t.push({ id: 'fechados', texto: fraseFechadosManha(r.fechadosHoje) });
   t.push(...frasesCriticos(r.criticos));
   t.push({ id: 'fecho', texto: 'Bom trabalho!' });
@@ -650,14 +819,16 @@ function falaGestor(nome: string, r: ResumoGestor, momento: Momento, agora: Date
 /** A APRESENTAÇÃO de lançamento (SINTESE-FINAL §4, roteiro proposto ao dono — texto exato): DUAS falas (duas
     vozes). 1ª: quem ela é + "Ele fica assim." + o resumo das 8h com os números de AGORA (a saudação do exemplo
     é a das 8h: "Bom dia, Murilo, tudo bem?…", mesmo apresentada à tarde); 2ª: "Fica assim." + o diagnóstico
-    das 17h sem o "Bom fim de dia!" + o fecho da apresentação. As páginas da legenda seguem as frases. */
-export function montarApresentacao(nome: string, r: ResumoGestor, agora = new Date()): [Trecho[], Trecho[]] {
+    das 17h sem o "Bom fim de dia!" + o fecho da apresentação. As páginas da legenda seguem as frases.
+    Cada parte com os números DELA: r = o resumo da manhã (p_momento 'manha': depois de folga, desde o 1º dia dela);
+    rTarde = o das 17h ('tarde': só o dia). Sem rTarde, o mesmo r nas duas. */
+export function montarApresentacao(nome: string, r: ResumoGestor, agora = new Date(), rTarde: ResumoGestor = r): [Trecho[], Trecho[]] {
   const pn = primeiroNome(nome);
   const vinda = generoProvavel(pn) === 'f' ? 'bem-vinda' : 'bem-vindo';
   const oito = new Date(agora);
   oito.setHours(HORA_BOM_DIA, 0, 0, 0);
   const ap = (texto: string): Trecho => ({ id: 'apresentacao', texto });
-  const tarde = falaGestor(nome, r, 'tarde', agora);
+  const tarde = falaGestor(nome, rTarde, 'tarde', agora);
   if (tarde[tarde.length - 1]?.id === 'fecho') tarde.pop();
   return [
     [
@@ -677,10 +848,13 @@ export function montarApresentacao(nome: string, r: ResumoGestor, agora = new Da
 }
 
 /** As falas de uma tela, na ordem (cada uma com a sua voz): o resumo do momento = 1; a apresentação = 2. A
-    apresentação é do gestor: se a RPC disser que a pessoa é vendedor, fica o resumo dela (1 fala). */
-export function falasDaTela(nome: string, r: ResumoBomDia, tipo: TipoTela, agora = new Date()): Trecho[][] {
+    apresentação é do gestor: se a RPC disser que a pessoa é vendedor, fica o resumo dela (1 fala). Na apresentação,
+    r = o resumo da manhã (parte 1) e rTarde = o das 17h (parte 2). */
+export function falasDaTela(nome: string, r: ResumoBomDia, tipo: TipoTela, agora = new Date(), rTarde?: ResumoBomDia | null): Trecho[][] {
   if (tipo === 'apresentacao') {
-    return r.modo === 'gestor' ? montarApresentacao(nome, r, agora) : [montarFala(nome, r, { momento: 'manha', agora })];
+    return r.modo === 'gestor'
+      ? montarApresentacao(nome, r, agora, rTarde?.modo === 'gestor' ? rTarde : r)
+      : [montarFala(nome, r, { momento: 'manha', agora })];
   }
   return [montarFala(nome, r, { momento: tipo, agora })];
 }

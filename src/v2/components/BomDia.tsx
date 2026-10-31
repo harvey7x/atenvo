@@ -3,12 +3,12 @@ import { createPortal } from 'react-dom';
 import { criarRaizPortalV2 } from './portal';
 import { criarAnimacao } from './bomDiaAnimacao';
 import { DEMO_MODE } from '@/lib/demo';
-import { BOM_DIA_REAL, lerPreviaGestor, prepararBomDia, salvarPreviaGestor, VOZ_BOM_DIA } from '@/data/bomDia';
+import { BOM_DIA_REAL, DIA_PREVIA_POS_FOLGA, lerPreviaGestor, prepararBomDia, salvarPreviaGestor, VOZ_BOM_DIA } from '@/data/bomDia';
 import {
-  agruparCampanhas, analisarVoz, aplicarGanho, casosDoPainel, chaveTelaBomDia, criarGanho, criarMedidor, detalheNaoElegiveis,
-  falasDaTela, fraseNoTempo, juntarPcm, lerMudo, lideresCampanha, limiarPalavra, listaE, mapearFala, medirPalavras, painelDaTela,
-  primeiroNome, progressoFrase, quadroLento, respiracaoCalma, salvarMudo, saudacaoDoDia, textoCorrido, textoFalado, textoResumo,
-  textosDoPlay,
+  agruparCampanhas, analisarVoz, aplicarGanho, cartaoMelhorDia, casosDoPainel, chaveTelaBomDia, criarGanho, criarMedidor,
+  detalheNaoElegiveis, falasDaTela, fraseNoTempo, juntarPcm, lerMudo, lideresCampanha, limiarPalavra, listaE, mapearFala,
+  medirPalavras, painelDaTela, primeiroNome, progressoFrase, quadroLento, respiracaoCalma, rotuloLeads, salvarMudo, saudacaoDoDia,
+  textoCorrido, textoFalado, textoResumo, textosDoPlay,
   type AnaliseVoz, type CampanhaAgrupada, type MapaFala, type Momento, type NomeCampanha, type PalavraFalada, type ResumoBomDia,
   type TipoTela, type Trecho, type IdTrecho, type Vendedores,
 } from '../lib/bomDia';
@@ -219,21 +219,31 @@ interface PropsHud {
   voz: string;
   /** prévia: a hora fixa (8 ou 17) — a legenda bate com o áudio pré-gerado */
   horaFixa: number | null;
+  /** prévia "Pós-feriado": a data fixa ('2026-11-03') — o painel não mostra a sexta junto de uma fala sobre o feriado */
+  diaFixo: string | null;
+  /** prévia "Pós-feriado": o seed da manhã vem com a folga (só a demo) */
+  posFolga: boolean;
   /** demo: o áudio pré-gerado de cada fala, na ordem */
   arquivosDemo: readonly string[] | null;
 }
 
-function Hud({ aoConcluir, nome, uid, orgId, gestor, momento, apresentacao, voz: vozGemini, horaFixa, arquivosDemo }: PropsHud) {
+function Hud({ aoConcluir, nome, uid, orgId, gestor, momento, apresentacao, voz: vozGemini, horaFixa, diaFixo, posFolga, arquivosDemo }: PropsHud) {
   const tipo: TipoTela = apresentacao ? 'apresentacao' : momento;
   const chaveDemo = arquivosDemo?.join('|') ?? '';
   const leve = useLeve();
   const relogio = useCallback(() => {
     const d = new Date();
+    if (diaFixo) {
+      const [a, m, dd] = diaFixo.split('-').map(Number);
+      d.setFullYear(a, m - 1, dd);
+    }
     if (horaFixa != null) d.setHours(horaFixa, 0, 0, 0);
     return d;
-  }, [horaFixa]);
+  }, [horaFixa, diaFixo]);
   const [fase, setFase] = useState<Fase>('boot');
   const [resumo, setResumo] = useState<ResumoBomDia | null>(null);
+  /* a apresentação: o resumo das 17h da 2ª parte (o `resumo` é o da manhã); fora dela, null */
+  const [resumoTarde, setResumoTarde] = useState<ResumoBomDia | null>(null);
   /* a hora com que o texto da voz foi montado (a saudação do gestor): legenda = áudio */
   const [horaDaFala, setHoraDaFala] = useState<Date | null>(null);
   const [erro, setErro] = useState(false);
@@ -258,8 +268,8 @@ function Hud({ aoConcluir, nome, uid, orgId, gestor, momento, apresentacao, voz:
   const opFala = useMemo(() => ({ momento, agora: horaDaFala ?? undefined }), [momento, horaDaFala]);
   /* as falas da tela, cada uma com a sua voz (o texto = o da voz: a mesma hora do preparo) */
   const falas: Trecho[][] = useMemo(
-    () => (resumo ? falasDaTela(nome, resumo, tipo, horaDaFala ?? undefined) : []),
-    [resumo, nome, tipo, horaDaFala],
+    () => (resumo ? falasDaTela(nome, resumo, tipo, horaDaFala ?? undefined, resumoTarde) : []),
+    [resumo, resumoTarde, nome, tipo, horaDaFala],
   );
   const palavrasDasFalas: PalavraFalada[][][] = useMemo(() => falas.map((f) => f.map((t) => medirPalavras(t.texto))), [falas]);
   const trechos: Trecho[] = falas[parte] ?? [];
@@ -345,9 +355,12 @@ function Hud({ aoConcluir, nome, uid, orgId, gestor, momento, apresentacao, voz:
     const ctx = ctxRef.current;
     const prep = prepararBomDia({
       org: orgId, uid, nome, momento, tipo, gestor: gestorSeed, voz: vozGemini, arquivosDemo: chaveDemo ? chaveDemo.split('|') : null,
-      agora: horaFixa == null ? undefined : relogio(),
+      agora: horaFixa == null ? undefined : relogio(), posFolga,
     });
-    prep.resumo.then((r) => { if (vivo) { setHoraDaFala(prep.agora); setResumo(r); } }).catch(() => { if (vivo) setErro(true); });
+    // a apresentação tem dois resumos (manhã e 17h): a tela abre com os dois (as falas saem dos dois, como a voz)
+    Promise.all([prep.resumo, prep.resumoTarde])
+      .then(([r, rt]) => { if (vivo) { setHoraDaFala(prep.agora); setResumoTarde(rt); setResumo(r); } })
+      .catch(() => { if (vivo) setErro(true); });
     /* a voz de cada fala: a 1ª abre o play; as outras ficam prontas enquanto a anterior toca */
     const marcar = (i: number, v: Voz, soSeVazia: boolean) => setVozes((vs) => {
       if (vs[i] === v || (soSeVazia && vs[i])) return vs;
@@ -395,9 +408,10 @@ function Hud({ aoConcluir, nome, uid, orgId, gestor, momento, apresentacao, voz:
       setFase((x) => (x === 'fim' ? x : 'boot'));
       setVozes([]);
       setResumo(null);
+      setResumoTarde(null);
       setErro(false);
     };
-  }, [orgId, uid, nome, momento, tipo, gestorSeed, vozGemini, chaveDemo, horaFixa, relogio]);
+  }, [orgId, uid, nome, momento, tipo, gestorSeed, vozGemini, chaveDemo, horaFixa, relogio, posFolga]);
 
   /* a esfera acende e respira um instante antes da saudação */
   useEffect(() => {
@@ -1099,8 +1113,12 @@ function Hud({ aoConcluir, nome, uid, orgId, gestor, momento, apresentacao, voz:
      fica numa caixa da altura do número (.bd-g-v): o nome assenta na linha de base do número e o detalhe começa
      na mesma altura em toda a linha; a sobra vira espaço no meio, igual nos seis. As campanhas dos leads ficam
      AO LADO do número (sobem para o espaço do meio); os casos críticos, embaixo, no máximo 3 (casosDoPainel:
-     os números caídos viram um item só, como na fala). Nada aqui cresce com os dados. */
-  const ges = resumo?.modo === 'gestor' ? resumo : null;
+     os números caídos viram um item só, como na fala). Nada aqui cresce com os dados.
+     Cada painel com os números da SUA fala: na apresentação, o das 17h (2ª parte) é o resumo da tarde (só o dia); o
+     da manhã pode vir depois de folga ("Leads desde sábado", "Melhor vendedor de sexta"). */
+  const resumoDoPainel = ehApresentacao && parteDoPainel >= 1 && resumoTarde ? resumoTarde : resumo;
+  const ges = resumoDoPainel?.modo === 'gestor' ? resumoDoPainel : null;
+  const melhorDia = cartaoMelhorDia(ges, horaDaFala ?? agora);
   const grupos = ges ? agruparCampanhas(ges.porCampanha) : [];
   const lider = lideresCampanha(grupos);
   const casos = ges ? casosDoPainel(ges.criticos) : [];
@@ -1132,7 +1150,7 @@ function Hud({ aoConcluir, nome, uid, orgId, gestor, momento, apresentacao, voz:
   );
   const cartoesGestor = (linhas: Array<Array<[IdTrecho, string, ReactNode, string?]>>) =>
     linhas.flatMap((l, i) => l.map(([id, rot, corpo, extra]) => cartao(id, (i + 1) as 1 | 2, rot, corpo, extra)));
-  const cLeads: [IdTrecho, string, ReactNode, string] = ['leads', 'Leads hoje', (
+  const cLeads: [IdTrecho, string, ReactNode, string] = ['leads', rotuloLeads(ges), (
     <>
       <div className="bd-g-numlista">
         {valor(ges?.chegaram)}
@@ -1164,7 +1182,7 @@ function Hud({ aoConcluir, nome, uid, orgId, gestor, momento, apresentacao, voz:
       {detalhe(ges ? (ges.fechadosHoje <= 0 ? 'nenhum ainda' : ges.fechadosHoje === 1 ? 'contrato fechado' : 'contratos fechados') : null)}
     </>
   )];
-  const cOntem: [IdTrecho, string, ReactNode] = ['melhor-ontem', 'Melhor vendedor de ontem', vendedoresCartao(ges?.melhorOntem ?? null, 'nenhum contrato ontem')];
+  const cOntem: [IdTrecho, string, ReactNode] = ['melhor-ontem', melhorDia.rotulo, vendedoresCartao(ges?.melhorOntem ?? null, melhorDia.vazio)];
   const cHoje: [IdTrecho, string, ReactNode] = ['melhor-vendedor', 'Quem mais vendeu hoje', vendedoresCartao(ges?.melhorHoje ?? null, 'ninguém fechou ainda')];
   /* sem caso: "Nenhum" no lugar do valor (a fala diz "Nenhum caso crítico no momento.") */
   const cCriticos: [IdTrecho, string, ReactNode, string] = ['criticos', 'Casos críticos', (
@@ -1329,11 +1347,14 @@ function Hud({ aoConcluir, nome, uid, orgId, gestor, momento, apresentacao, voz:
   );
 }
 
-/** demo: o áudio pré-gerado de cada fala (public/demo-midia; sem o arquivo, a legenda segue pelo relógio) */
-function arquivosDaPrevia(gestor: boolean, tipo: TipoTela): string[] {
+/** demo: o áudio pré-gerado de cada fala (public/demo-midia; sem o arquivo, a legenda segue pelo relógio). Na prévia
+    "Pós-feriado" a fala da MANHÃ muda (a folga) e não tem áudio: fica a legenda ('' = sem arquivo); o das 17h e a 2ª
+    parte da apresentação são do dia, o mesmo texto de sempre: o mesmo áudio. */
+function arquivosDaPrevia(gestor: boolean, tipo: TipoTela, posFolga = false): string[] {
   const v = VOZ_BOM_DIA.toLowerCase();
-  if (!gestor) return [`/demo-midia/bom-dia-atendente-${v}.wav`];
-  if (tipo === 'apresentacao') return [1, 2].map((n) => `/demo-midia/bom-dia-apresentacao-${n}-${v}.wav`);
+  if (!gestor) return posFolga ? [] : [`/demo-midia/bom-dia-atendente-${v}.wav`];
+  if (tipo === 'apresentacao') return [1, 2].map((n) => (posFolga && n === 1 ? '' : `/demo-midia/bom-dia-apresentacao-${n}-${v}.wav`));
+  if (posFolga && tipo === 'manha') return [];
   return [`/demo-midia/bom-dia-gestor-${tipo}-${v}.wav`];
 }
 
@@ -1368,6 +1389,9 @@ export function BomDia({ aberta, momento, apresentacao = false, dia, gestor, aoC
   const [previaTipo, setPreviaTipo] = useState<TipoTela>(pedido);
   useEffect(() => { if (aberta) setPreviaTipo(pedido); }, [aberta, pedido]);
   const escolherPessoa = (g: boolean) => { setPreviaGestor(g); salvarPreviaGestor(g); };
+  /* prévia "Pós-feriado" (SINTESE-POSFOLGA §5): terça 03/11, depois de sábado, domingo e Finados — o resumo da manhã
+     com a folga (o das 17h é do dia, como no banco). Vale para a atendente e para o administrador */
+  const [previaFolga, setPreviaFolga] = useState(false);
 
   if (!aberta || !raiz) return null;
   const g = PREVIA ? previaGestor : gestor;
@@ -1375,10 +1399,11 @@ export function BomDia({ aberta, momento, apresentacao = false, dia, gestor, aoC
   // a apresentação não depende da hora (a parte das 8h fala "Bom dia" sempre); na prévia, às 17h (a tela do play)
   const m: Momento = t === 'apresentacao' ? (PREVIA ? 'tarde' : momento) : t;
   const tela = { momento: m, dia, apresentacao: t === 'apresentacao' };
+  const folga = PREVIA && previaFolga;
   return createPortal(
     <>
       <Hud
-        key={PREVIA ? `${g ? 'gestor' : 'atendente'}-${chaveTelaBomDia(tela)}` : chaveTelaBomDia(tela)}
+        key={PREVIA ? `${g ? 'gestor' : 'atendente'}${folga ? '-folga' : ''}-${chaveTelaBomDia(tela)}` : chaveTelaBomDia(tela)}
         aoConcluir={aoConcluir}
         nome={PREVIA ? (g ? 'Murilo' : 'Juliana') : nome}
         uid={uid}
@@ -1388,7 +1413,9 @@ export function BomDia({ aberta, momento, apresentacao = false, dia, gestor, aoC
         apresentacao={t === 'apresentacao'}
         voz={VOZ_BOM_DIA}
         horaFixa={PREVIA ? (m === 'tarde' ? 17 : 8) : null}
-        arquivosDemo={PREVIA ? arquivosDaPrevia(g, t) : null}
+        diaFixo={folga ? DIA_PREVIA_POS_FOLGA : null}
+        posFolga={folga}
+        arquivosDemo={PREVIA ? arquivosDaPrevia(g, t, folga) : null}
       />
       {PREVIA && (
         <div className={`bd-previa${g ? ' bd-previa-g' : ''}`} role="group" aria-label="Prévia: trocar a pessoa e o horário">
@@ -1403,6 +1430,8 @@ export function BomDia({ aberta, momento, apresentacao = false, dia, gestor, aoC
               <button type="button" aria-pressed={t === 'apresentacao'} onClick={() => setPreviaTipo('apresentacao')}>Apresentação</button>
             </>
           )}
+          <i className="bd-previa-sep" aria-hidden />
+          <button type="button" aria-pressed={previaFolga} onClick={() => setPreviaFolga((x) => !x)}>Pós-feriado</button>
         </div>
       )}
     </>,

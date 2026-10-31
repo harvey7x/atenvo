@@ -422,18 +422,20 @@
   --bd-u: clamp(.8px, min(calc(100vw / 1366), calc(100vh / 657)), 1.42px);
   position: fixed; top: calc(var(--bd-u) * 42); left: calc(max(calc(var(--bd-u) * 40), calc(50vw - 800px)) + var(--bd-u) * 104);
   transform: translateY(-50%); z-index: 1310;
-  display: flex; align-items: center; gap: 2px; padding: 3px;
+  display: flex; align-items: center; gap: 1px; padding: 3px;
   border-radius: 999px; background: rgba(20, 20, 20, .9); border: 1px solid rgba(255, 255, 255, .1);
   font-size: 11px; font-weight: 500; line-height: 1; color: #7A7A7A;
 }
-.v2 .bd-previa > span { padding: 0 7px 0 9px; }
+/* espaços mais justos (antes: gap 2, botão 0 10px, separador 0 4px): com o "Pós-feriado", a barra do administrador
+   chegava na esfera pousada no alto (1366 e 1280) */
+.v2 .bd-previa > span { padding: 0 6px 0 8px; }
 .v2 .bd-previa button {
-  height: 22px; padding: 0 10px; border: 0; border-radius: 999px; cursor: pointer;
+  height: 22px; padding: 0 8px; border: 0; border-radius: 999px; cursor: pointer;
   background: transparent; color: #B0B0B0; font: inherit;
 }
 .v2 .bd-previa button:hover { color: #fff; }
 .v2 .bd-previa button[aria-pressed="true"] { background: rgba(255, 255, 255, .1); color: #fff; }
-.v2 .bd-previa-sep { width: 1px; height: 14px; margin: 0 4px; background: rgba(255, 255, 255, .14); }
+.v2 .bd-previa-sep { width: 1px; height: 14px; margin: 0 3px; background: rgba(255, 255, 255, .14); }
 
 /* ---- telas estreitas (fora do notebook): o painel vira uma coluna e rola por dentro ---- */
 @media (max-width: 900px) {
