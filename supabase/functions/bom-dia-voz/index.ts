@@ -19,14 +19,19 @@ import { adminClient, getUser } from './client.ts';
 const BUCKET = 'bom-dia-voz';
 const API = 'https://generativelanguage.googleapis.com/v1beta';
 const MODELO = Deno.env.get('BOM_DIA_MODELO') || 'gemini-3.8-flash-tts';
-const VOZ_PADRAO = Deno.env.get('BOM_DIA_VOZ') || 'Despina'; // escolhida pelo dono 30/10
+// a VOZ DEFINIDA do sistema (dono 31/10: "os dois, vai ser a voz definida" — Gacrux com sotaque gaúcho, a mesma do
+// atendimento); antes, 30/10, Despina
+const VOZ_PADRAO = Deno.env.get('BOM_DIA_VOZ') || 'Gacrux';
 // timbres femininos do catálogo do Gemini — a tela só pede estes
 const VOZES = new Set(['Kore', 'Despina', 'Sulafat', 'Aoede', 'Leda', 'Zephyr', 'Erinome', 'Callirrhoe',
   'Autonoe', 'Achernar', 'Gacrux', 'Pulcherrima', 'Vindemiatrix', 'Laomedeia']);
 // dono 30/10: "voz boa, profissional, que fuja da forma IAzona" — locução de gente, nunca de robô.
 // A doc do Gemini pede o estilo em inglês e SEM idade/gênero/sotaque (isso é da voz escolhida).
+// O sotaque gaúcho entra no estilo por escolha do dono (31/10, ouviu as amostras e escolheu esta), mesmo a doc
+// recomendando voz regional — mudar esta frase muda a voz definida (é a mesma da prévia aprovada).
 const ESTILO = 'natural and professional, like an experienced presenter giving a short morning update to a colleague; '
-  + 'warm and confident, relaxed conversational pace, clear diction, never robotic, never exaggerated';
+  + 'warm and confident, relaxed conversational pace, clear diction, never robotic, never exaggerated; '
+  + 'with a soft gaúcho accent from Porto Alegre, Rio Grande do Sul, southern Brazil';
 const TETO_DIA = 12;
 const TETO_DIA_SERVICO = 40;
 // o do administrador (Murilo, 30/10) é mais longo: campanhas, empates e vários casos críticos passam de 700
@@ -116,7 +121,8 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const texto = typeof body.texto === 'string' ? body.texto.replace(/\s+/g, ' ').trim() : '';
     if (texto.length < 8 || texto.length > MAX_CHARS) return json({ error: 'Texto inválido.' }, 400);
-    const voz = typeof body.voz === 'string' && VOZES.has(body.voz) ? body.voz : VOZ_PADRAO;
+    // usuário (bom dia, lembretes): SEMPRE a voz definida; só a service key escolhe outra (amostras)
+    const voz = servico && typeof body.voz === 'string' && VOZES.has(body.voz) ? body.voz : VOZ_PADRAO;
 
     const admin = adminClient();
     if (user) {

@@ -19,7 +19,7 @@ import { VOZ_BOM_DIA } from '@/data/bomDia';
      Sem rede, a tela segura sozinha (o Ok não volta; o adiado volta em
      10 min) e tenta o servidor de novo.
    - ELA FALA: "{primeiro nome}, seu lembrete: {texto}." pela edge
-     bom-dia-voz (a voz do bom dia, Despina; pedida 2 min antes). Sem voz
+     bom-dia-voz (a voz do bom dia, a voz definida Gacrux; pedida 2 min antes). Sem voz
      (limite do dia, crédito, rede): um som curto e discreto (Web Audio,
      sem arquivo). Som travado pelo navegador (nenhum clique na página
      ainda): ela fala no primeiro toque/tecla com o aviso na tela.
@@ -45,7 +45,7 @@ export const LEMBRETES_REAL = isSupabaseConfigured && !!supabase;
 /** a simulação da tela (?lembrete-demo=…) nunca vale num build publicado do sistema real */
 const DEMO_PERMITIDA = import.meta.env.DEV || DEMO_MODE;
 
-/** a voz do bom dia (Despina) — o lembrete fala com a mesma */
+/** a voz do bom dia (a voz definida, Gacrux) — o lembrete fala com a mesma */
 export const VOZ_LEMBRETE = VOZ_BOM_DIA;
 export const FUSO_LEMBRETE = 'America/Sao_Paulo';
 export const ADIAR_MIN = 10;

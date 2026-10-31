@@ -13,7 +13,7 @@ import './lembrete.css';
    ACIMA do balão do assistente — a esfera pequena (a do balão), a
    palavra "Lembrete", o texto grande, "Marcado para 13:00" e os botões
    "Lembrar em 10 min" e "Ok". Ela fala ao mesmo tempo (useLembretes:
-   voz Despina; sem voz, um som curto). Vários de uma vez: as bordas dos
+   voz definida, Gacrux; sem voz, um som curto). Vários de uma vez: as bordas dos
    próximos aparecem atrás (pilha) e "1 de 3".
    - REGRA DO DONO: nada flutuando cobre o ENVIAR nem o compositor do
      WhatsApp — no /whatsapp o aviso sobe acima do compositor real

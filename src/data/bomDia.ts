@@ -21,8 +21,9 @@ import {
 
 export const BOM_DIA_REAL = isSupabaseConfigured && !!supabase;
 
-/** Voz da IA no Gemini: Despina (suave), escolhida pelo dono 30/10 entre Despina, Erinome, Sulafat e Kore. */
-export const VOZ_BOM_DIA = 'Despina';
+/** Voz da IA no Gemini: Gacrux com sotaque gaúcho — a VOZ DEFINIDA do sistema (dono 31/10: "os dois, vai ser a voz
+    definida"); antes, 30/10, Despina. O sotaque vem do estilo da edge bom-dia-voz, que usa sempre esta voz. */
+export const VOZ_BOM_DIA = 'Gacrux';
 
 /** demo: uma atendente e o administrador (Murilo). Gestor: dados da SINTESE-GESTOR + o empate de hoje
     (Juliana e Isadora, 2 cada — por isso 4 fechados hoje, senão a fala se contradiz), os não
