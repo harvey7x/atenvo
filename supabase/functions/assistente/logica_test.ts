@@ -1,9 +1,12 @@
 import { assert, assertEquals, assertRejects } from 'jsr:@std/assert@1';
 import {
   type ChamarGemini, type ConteudoGemini, type Contexto, type PedidoGemini, type RespostaGemini,
-  ErroAssistente, MAX_ARGS_JSON, MAX_RODADAS, PERIODOS, RESPOSTA_VAZIA, autenticar, bearerDe, classificarErroGemini, papelDoJwt,
+  ErroAssistente, LEMBRETES, MAX_ARGS_JSON, MAX_LEMBRETES_LISTA, MAX_RODADAS, MENSAGEM_DIA_INEXISTENTE, MENSAGENS_LEMBRETE,
+  PERIODOS, RESPOSTA_VAZIA,
+  argsParaLog, autenticar, bearerDe, calendarioLembretes, classificarErroGemini, papelDoJwt,
   criarGemini, declaracoes, diaIso, ehChaveDeServico, executarFerramenta, extrairLinks, higienizarResultado,
-  linhaDaFolga, mascararNomeCliente, mascararTrecho, montarContents, normalizarNome, resolverPeriodo, resolverPessoa,
+  lembreteParaModelo, linhaDaFolga, mascararNomeCliente, mascararTextoLembrete, mascararTrecho, montarContents,
+  normalizarNome, normalizarQuandoLocal, paramsDoCriar, resolverPeriodo, resolverPessoa,
   responder, significadoDosNumeros, somarDias, systemPrompt, validarEntrada, validarPedidoFerramenta,
 } from './logica.ts';
 
@@ -125,11 +128,11 @@ Deno.test('nomes: ambíguo devolve as opções; não achou devolve a equipe', ()
 
 Deno.test('declarações: atendente sem `pessoa`, sem ver_equipe e sem ver_leads; admin com tudo', () => {
   const at = declaracoes(false);
-  assertEquals(at.map((d) => d.name), ['ver_carteira', 'clientes_para_resolver', 'ver_fechados', 'buscar_cliente']);
+  assertEquals(at.map((d) => d.name), ['ver_carteira', 'clientes_para_resolver', 'ver_fechados', 'buscar_cliente', ...LEMBRETES]);
   for (const d of at) assert(!('pessoa' in (d.parameters?.properties ?? {})), `${d.name} não pode ter pessoa`);
   assertEquals(at[0].parameters, undefined); // função sem parâmetros: sem objeto vazio (o Gemini recusa)
   const ad = declaracoes(true);
-  assertEquals(ad.map((d) => d.name), ['ver_carteira', 'clientes_para_resolver', 'ver_fechados', 'ver_equipe', 'ver_leads', 'buscar_cliente']);
+  assertEquals(ad.map((d) => d.name), ['ver_carteira', 'clientes_para_resolver', 'ver_fechados', 'ver_equipe', 'ver_leads', 'buscar_cliente', ...LEMBRETES]);
   for (const n of ['ver_carteira', 'clientes_para_resolver', 'ver_fechados']) {
     assert('pessoa' in (ad.find((d) => d.name === n)!.parameters!.properties), `${n} do admin tem pessoa`);
   }
@@ -649,4 +652,377 @@ Deno.test('S2: autenticar — caminho 2: JWT com role service_role SÓ com a con
   perguntados.length = 0;
   await autenticar(pedido(jwtUsuario, MUR), { chaveServico: CHAVE, getUser, confirmarServico: banco(true) });
   assertEquals(perguntados.length, 0);
+});
+
+// ================================================================== lembretes (versão 1, dono 31/10)
+// Respostas REAIS das RPCs (prova pg_temp da migration 20261031000000 — scratchpad lembretes/saida-run2.txt).
+
+const L_JOAO = {
+  id: '2ab12b7b-7dd9-43bc-9d64-85910035f10a', hora: '13:00', texto: 'ligar para o João', quando: '2026-10-31T13:00:00-03:00',
+  dia_semana: 'sábado', hora_falada: 'à uma da tarde', data_extenso: '31 de outubro', dia_relativo: 'hoje', quando_local: '2026-10-31T13:00',
+};
+const L_2027 = {
+  id: 'bb1c620b-e3b4-406e-b44a-72495936c2f3', hora: '09:30', texto: 'renovar o contrato', quando: '2027-01-05T09:30:00-03:00',
+  dia_semana: 'terça-feira', hora_falada: 'às nove e meia da manhã', data_extenso: '5 de janeiro de 2027', dia_relativo: null,
+  quando_local: '2027-01-05T09:30',
+};
+const L_CPF = {
+  id: '3b78607e-4fe2-4bfb-999f-d3ee68a320cf', hora: '00:45', texto: 'ligar para o João no ••••, CPF ••••, e-mail ••••',
+  quando: '2026-10-31T00:45:44-03:00', dia_semana: 'sábado', hora_falada: 'à meia-noite e quarenta e cinco',
+  data_extenso: '31 de outubro', dia_relativo: 'hoje', quando_local: '2026-10-31T00:45',
+};
+const L_DOCS = {
+  id: '740c2715-e51e-42fb-bf39-0a3c4a13d2df', hora: '01:30', texto: 'mandar os documentos da Dona Maria',
+  quando: '2026-10-31T01:30:44-03:00', dia_semana: 'sábado', hora_falada: 'à uma e meia da madrugada',
+  data_extenso: '31 de outubro', dia_relativo: 'hoje', quando_local: '2026-10-31T01:30',
+};
+/** o mesmo lembrete como o MODELO recebe: id, texto e o instante já falado */
+const falado = (l: Record<string, unknown>) => {
+  const { id, texto, dia_relativo, dia_semana, data_extenso, hora_falada } = l;
+  return { id, texto, ...(dia_relativo ? { dia_relativo } : {}), dia_semana, data_extenso, hora_falada };
+};
+
+/** RPC falsa dos lembretes: grava as chamadas e devolve a resposta da tabela (Error = a RPC lança). */
+function rpcLembretes(respostas: Record<string, unknown>) {
+  const chamadas: { nome: string; params: Record<string, unknown> }[] = [];
+  const rpc = (nome: string, params: Record<string, unknown>) => {
+    chamadas.push({ nome, params });
+    const r = respostas[nome];
+    return r instanceof Error ? Promise.reject(r) : Promise.resolve(structuredClone(r));
+  };
+  return { chamadas, rpc };
+}
+
+const MAT_CTX = () => ctxDe({ admin: true, id: MAT, nome: 'Matheus' });
+const FORA_ORG = '00000000-0000-4000-8000-000000000000';
+const AMANHA_13 = '2026-10-31T13:00';
+
+Deno.test('lembretes: as 3 ferramentas nos dois papéis, iguais, sem destinatário; ver_lembretes sem parâmetros', () => {
+  for (const admin of [false, true]) {
+    const ds = declaracoes(admin).filter((d) => LEMBRETES.includes(d.name));
+    assertEquals(ds.map((d) => d.name), ['criar_lembrete', 'ver_lembretes', 'cancelar_lembrete']);
+    assertEquals(Object.keys(ds[0].parameters!.properties), ['texto', 'quando_local', 'em_minutos']);
+    assertEquals(ds[0].parameters!.required, ['texto']);
+    assertEquals((ds[0].parameters!.properties.em_minutos as { type: string }).type, 'integer');
+    assertEquals(ds[1].parameters, undefined); // sem objeto vazio (o Gemini recusa)
+    assertEquals(Object.keys(ds[2].parameters!.properties), ['busca']);
+    // o id do que acabou de marcar também serve (corrigir: cancela o antigo pelo id e cria o novo)
+    assert((ds[2].parameters!.properties.busca as { description: string }).description.includes('criar_lembrete, ver_lembretes'));
+    const txt = JSON.stringify(ds);
+    for (const nao of ['"para"', '"pessoa"', 'p_ator', 'p_org']) assert(!txt.includes(nao), `admin=${admin}: ${nao}`);
+  }
+  assertEquals(JSON.stringify(declaracoes(false).slice(-3)), JSON.stringify(declaracoes(true).slice(-3)));
+});
+
+Deno.test('lembretes: criar — quando_local e em_minutos viram os parâmetros da RPC, com o ator da autenticação', async () => {
+  const { chamadas, rpc } = rpcLembretes({ assistente_lembrete_criar: L_JOAO });
+  await executarFerramenta('criar_lembrete', { texto: '  ligar   para o João ', quando_local: AMANHA_13 }, ctxDe(), ORG, rpc);
+  assertEquals(chamadas[0], {
+    nome: 'assistente_lembrete_criar',
+    params: { p_org: ORG, p_ator: JUL, p_texto: 'ligar para o João', p_quando_local: AMANHA_13, p_em_minutos: null },
+  });
+  // o que a RPC também aceita (espaço no lugar do T, segundos, o -03:00 de Brasília) vai no formato básico
+  for (const q of ['2026-10-31 13:00', '2026-10-31T13:00:00', '2026-10-31T13:00:00-03:00', '2026-10-31T13:00-0300', ' 2026-10-31T13:00 ']) {
+    await executarFerramenta('criar_lembrete', { texto: 'ligar para o João', quando_local: q }, ctxDe(), ORG, rpc);
+    assertEquals(chamadas[chamadas.length - 1].params.p_quando_local, AMANHA_13, q);
+  }
+  // "daqui a 20 minutos": em_minutos, que vence o quando_local (como na RPC); texto com dígitos e decimal arredondado
+  await executarFerramenta('criar_lembrete', { texto: 'tomar o remédio', em_minutos: 20, quando_local: AMANHA_13 }, ctxDe(), ORG, rpc);
+  assertEquals(chamadas[chamadas.length - 1].params, { p_org: ORG, p_ator: JUL, p_texto: 'tomar o remédio', p_quando_local: null, p_em_minutos: 20 });
+  await executarFerramenta('criar_lembrete', { texto: 'tomar o remédio', em_minutos: ' 45 ' }, ctxDe(), ORG, rpc);
+  assertEquals(chamadas[chamadas.length - 1].params.p_em_minutos, 45);
+  await executarFerramenta('criar_lembrete', { texto: 'tomar o remédio', em_minutos: 89.6 }, ctxDe(), ORG, rpc);
+  assertEquals(chamadas[chamadas.length - 1].params.p_em_minutos, 90);
+  // admin: o lembrete é dele; p_ator/p_org forjados nos args são ignorados
+  await executarFerramenta('criar_lembrete', { texto: 'ligar para o João', quando_local: AMANHA_13, p_ator: JUL, p_org: FORA_ORG }, MAT_CTX(), ORG, rpc);
+  assertEquals(chamadas[chamadas.length - 1].params, { p_org: ORG, p_ator: MAT, p_texto: 'ligar para o João', p_quando_local: AMANHA_13, p_em_minutos: null });
+  assert(chamadas.every((c) => c.nome === 'assistente_lembrete_criar' && Object.keys(c.params).length === 5));
+});
+
+Deno.test('lembretes: criar — sem horário, dia/hora inválidos, texto inválido e minutos fora do teto voltam ao modelo SEM banco', async () => {
+  const { chamadas, rpc } = rpcLembretes({ assistente_lembrete_criar: L_JOAO });
+  const t = 'ligar para o João';
+  const casos: [Record<string, unknown>, string, string?][] = [
+    [{ texto: t }, 'sem_horario'],
+    [{ texto: t, quando_local: '   ' }, 'sem_horario'],
+    [{ texto: t, quando_local: null, em_minutos: null }, 'sem_horario'],
+    [{ texto: t, em_minutos: '' }, 'sem_horario'],
+    ...['31/10/2026 13:00', '2026-10-31T24:00', '2026-10-31T13:60', '2026-10-31',
+      '2026-10-31T13:00Z', '2026-10-31T13:00+01:00', '2026-10-31T13:00-02:00', 'amanhã 13h', '2026-10-31T1:00']
+      .map((q): [Record<string, unknown>, string] => [{ texto: t, quando_local: q }, 'quando_invalido']),
+    // o formato certo com um dia que não existe: a frase manda DIZER à pessoa ("corrigir o formato" trocaria o dia calado)
+    ...['2026-02-30T10:00', '2026-13-01T10:00', '2026-11-31 09:00']
+      .map((q): [Record<string, unknown>, string, string] => [{ texto: t, quando_local: q }, 'quando_invalido', MENSAGEM_DIA_INEXISTENTE]),
+    [{ quando_local: AMANHA_13 }, 'texto_invalido'],
+    [{ texto: '', quando_local: AMANHA_13 }, 'texto_invalido'],
+    [{ texto: '   ', quando_local: AMANHA_13 }, 'texto_invalido'],
+    [{ texto: '(11) 98765-4321', quando_local: AMANHA_13 }, 'texto_invalido'], // sem letra nenhuma
+    [{ texto: 'a'.repeat(201), quando_local: AMANHA_13 }, 'texto_invalido'],
+    [{ texto: 42, quando_local: AMANHA_13 }, 'args_invalidos'],
+    [{ texto: t, quando_local: 1300 }, 'args_invalidos'],
+    [{ texto: t, em_minutos: 'vinte' }, 'args_invalidos'],
+    [{ texto: t, em_minutos: Number.NaN }, 'args_invalidos'],
+    [{ texto: t, em_minutos: 0 }, 'no_passado'],
+    [{ texto: t, em_minutos: -5 }, 'no_passado'],
+    [{ texto: t, em_minutos: '-5' }, 'no_passado'],
+    [{ texto: t, em_minutos: 525_601 }, 'longe_demais'],
+  ];
+  for (const [args, codigo, frase] of casos) {
+    const r = (await executarFerramenta('criar_lembrete', args, ctxDe(), ORG, rpc)).resultado as { erro: string; mensagem?: string };
+    assertEquals(r.erro, codigo, JSON.stringify(args).slice(0, 80));
+    assert(r.mensagem, `${codigo} sem frase para o modelo`);
+    const esperada = frase ?? MENSAGENS_LEMBRETE[codigo];
+    if (esperada) assertEquals(r.mensagem, esperada, JSON.stringify(args).slice(0, 80));
+  }
+  assertEquals(chamadas.length, 0);
+  // os limites que passam: 200 caracteres e 525.600 minutos (365 dias) — daí em diante quem decide é a RPC
+  await executarFerramenta('criar_lembrete', { texto: 'a'.repeat(200), quando_local: AMANHA_13 }, ctxDe(), ORG, rpc);
+  await executarFerramenta('criar_lembrete', { texto: t, em_minutos: 525_600 }, ctxDe(), ORG, rpc);
+  await executarFerramenta('criar_lembrete', { texto: t, em_minutos: 1 }, ctxDe(), ORG, rpc);
+  assertEquals(chamadas.map((c) => c.params.p_em_minutos), [null, 525_600, 1]);
+});
+
+Deno.test('lembretes: criar — em_minutos zero/negativo JUNTO de um quando_local (o modelo preencheu o opcional) vale o dia e a hora', async () => {
+  // antes: {quando_local amanhã 13:00, em_minutos 0} → no_passado, e ela diria "esse horário já passou" para amanhã à uma
+  const { chamadas, rpc } = rpcLembretes({ assistente_lembrete_criar: L_JOAO });
+  for (const em of [0, -1, '0', 0.4, -30]) {
+    const r = await executarFerramenta('criar_lembrete', { texto: 'ligar para o João', quando_local: AMANHA_13, em_minutos: em }, ctxDe(), ORG, rpc);
+    assertEquals(r.resultado, falado(L_JOAO), String(em));
+    assertEquals(chamadas[chamadas.length - 1].params,
+      { p_org: ORG, p_ator: JUL, p_texto: 'ligar para o João', p_quando_local: AMANHA_13, p_em_minutos: null }, String(em));
+  }
+  assertEquals(chamadas.length, 5);
+  // com o quando_local fora do formato, o erro é o do formato (o modelo corrige), não "já passou"
+  assertEquals((paramsDoCriar({ texto: 'x y', quando_local: 'amanhã 13h', em_minutos: 0 }) as { erro: string }).erro, 'quando_invalido');
+  // sozinho (ou com quando_local vazio) continua no_passado; positivo continua vencendo o quando_local (como na RPC)
+  assertEquals((paramsDoCriar({ texto: 'x y', em_minutos: 0 }) as { erro: string }).erro, 'no_passado');
+  assertEquals((paramsDoCriar({ texto: 'x y', em_minutos: -5, quando_local: '  ' }) as { erro: string }).erro, 'no_passado');
+  assertEquals(paramsDoCriar({ texto: 'x y', em_minutos: 20, quando_local: AMANHA_13 }), { p_texto: 'x y', p_quando_local: null, p_em_minutos: 20 });
+});
+
+Deno.test('lembretes: caractere de controle no texto e na busca vira espaço (o NUL o PostgREST recusa → falha_consulta)', async () => {
+  assertEquals(paramsDoCriar({ texto: 'ligar\u0000para o\u0007 João\r\n', em_minutos: 5 }),
+    { p_texto: 'ligar para o João', p_quando_local: null, p_em_minutos: 5 });
+  assertEquals((paramsDoCriar({ texto: '\u0000\u0001 \u0002', em_minutos: 5 }) as { erro: string }).erro, 'texto_invalido');
+  const { chamadas, rpc } = rpcLembretes({ assistente_lembrete_cancelar: { erro: 'nao_encontrado' } });
+  await executarFerramenta('cancelar_lembrete', { busca: 'João\u0000 do\u001fremédio' }, ctxDe(), ORG, rpc);
+  assertEquals(chamadas[0].params.p_busca, 'João do remédio');
+});
+
+Deno.test('lembretes: normalizarQuandoLocal = o formato da RPC (Brasília), com dia de verdade', () => {
+  assertEquals(normalizarQuandoLocal('2026-10-31T13:00'), '2026-10-31T13:00');
+  assertEquals(normalizarQuandoLocal('2028-02-29 00:00:59.5-03:00'), '2028-02-29T00:00'); // bissexto
+  assertEquals(normalizarQuandoLocal('2026-11-01T23:59-03'), '2026-11-01T23:59');
+  assertEquals(normalizarQuandoLocal(' 2026-10-31T13:00 '), '2026-10-31T13:00'); // espaço nas pontas
+  // os parâmetros da RPC saem daqui (texto numa linha só; em_minutos vence; nada além dos três)
+  assertEquals(paramsDoCriar({ texto: ' ligar\n para  o João ', quando_local: '2026-10-31 13:00' }),
+    { p_texto: 'ligar para o João', p_quando_local: '2026-10-31T13:00', p_em_minutos: null });
+  assertEquals(paramsDoCriar({ texto: 'tomar o remédio', em_minutos: 30, quando_local: 'qualquer coisa' }),
+    { p_texto: 'tomar o remédio', p_quando_local: null, p_em_minutos: 30 });
+  for (const ruim of ['2027-02-29T10:00', '2026-10-31T13:00:60', '2026-10-31t13:00', 'x2026-10-31T13:00', '2026-10-31T13:00 -03:00']) {
+    assertEquals(normalizarQuandoLocal(ruim), null, ruim);
+  }
+});
+
+Deno.test('lembretes: criar — o modelo recebe o instante JÁ FALADO: sem ISO, sem quando_local, sem "13:00"; o id fica', async () => {
+  const criar = async (resposta: unknown) => (await executarFerramenta('criar_lembrete', { texto: 'x y', quando_local: AMANHA_13 },
+    ctxDe(), ORG, rpcLembretes({ assistente_lembrete_criar: resposta }).rpc)).resultado;
+  const r = await criar(L_JOAO);
+  assertEquals(r, {
+    id: L_JOAO.id, texto: 'ligar para o João', dia_relativo: 'hoje', dia_semana: 'sábado', data_extenso: '31 de outubro',
+    hora_falada: 'à uma da tarde',
+  });
+  const txt = JSON.stringify(r);
+  for (const nao of ['quando', '13:00', '2026-10-31', '-03:00']) assert(!txt.includes(nao), nao);
+  // dia_relativo nulo (passa de depois de amanhã) sai; outro ano vem na data por extenso
+  assertEquals(await criar(L_2027), {
+    id: L_2027.id, texto: 'renovar o contrato', dia_semana: 'terça-feira', data_extenso: '5 de janeiro de 2027',
+    hora_falada: 'às nove e meia da manhã',
+  });
+  // o modelo repetiu a ferramenta: a RPC devolve o que existe com ja_existia
+  assertEquals(await criar({ ...L_JOAO, ja_existia: true }), { ...falado(L_JOAO), ja_existia: true });
+  // campo novo que a RPC venha a mandar não passa (lista fechada)
+  assertEquals(await criar({ ...L_JOAO, usuario_id: MAT, faltam_ms: 1000 }), falado(L_JOAO));
+});
+
+Deno.test('lembretes: erros da RPC chegam ao modelo com o código e uma frase curta; falha e contrato quebrado = falha_consulta', async () => {
+  const criar = (resposta: unknown) => executarFerramenta('criar_lembrete', { texto: 'ligar para o João', quando_local: AMANHA_13 },
+    ctxDe(), ORG, rpcLembretes({ assistente_lembrete_criar: resposta }).rpc);
+  for (const codigo of ['no_passado', 'longe_demais', 'lembretes_demais', 'quando_invalido', 'texto_invalido']) {
+    assertEquals((await criar({ erro: codigo })).resultado, { erro: codigo, mensagem: MENSAGENS_LEMBRETE[codigo] });
+  }
+  assertEquals((await criar({ erro: 'outro_codigo' })).resultado, { erro: 'outro_codigo' });
+  const falhou = await criar(new Error('function assistente_lembrete_criar does not exist'));
+  assertEquals(falhou.resultado, { erro: 'falha_consulta' });
+  assertEquals(falhou.erro, 'function assistente_lembrete_criar does not exist');
+  for (const fora of [null, 'ok', [L_JOAO], { id: L_JOAO.id }]) {
+    const r = await criar(fora);
+    assertEquals(r.resultado, { erro: 'falha_consulta' }, JSON.stringify(fora));
+    assert(r.erro?.includes('fora do contrato'));
+  }
+});
+
+Deno.test('lembretes: ver — o total real e os 10 mais próximos, cada um com id, texto e instante falado', async () => {
+  const muitos = Array.from({ length: 13 }, (_, i) => ({ ...L_JOAO, id: `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`, texto: `tarefa ${i}` }));
+  const { chamadas, rpc } = rpcLembretes({ assistente_lembretes_listar: { total: 13, lembretes: muitos } });
+  const r = await executarFerramenta('ver_lembretes', { qualquer: 'coisa', p_ator: MAT }, ctxDe(), ORG, rpc);
+  assertEquals(chamadas, [{ nome: 'assistente_lembretes_listar', params: { p_org: ORG, p_ator: JUL } }]);
+  const v = r.resultado as { total: number; lembretes: Record<string, unknown>[] };
+  assertEquals(v.total, 13);
+  assertEquals(v.lembretes.length, MAX_LEMBRETES_LISTA);
+  assertEquals(v.lembretes[0], { ...falado(L_JOAO), id: muitos[0].id, texto: 'tarefa 0' });
+  assertEquals(v.lembretes.map((l) => l.texto), muitos.slice(0, 10).map((l) => l.texto)); // a ordem da RPC (mais próximo primeiro)
+  // a saída real da prova (Juliana, 1 lembrete) e a lista vazia
+  const real = await executarFerramenta('ver_lembretes', {}, ctxDe(), ORG, rpcLembretes({ assistente_lembretes_listar: { total: 1, lembretes: [L_DOCS] } }).rpc);
+  assertEquals(real.resultado, { total: 1, lembretes: [falado(L_DOCS)] });
+  const vazio = await executarFerramenta('ver_lembretes', {}, ctxDe(), ORG, rpcLembretes({ assistente_lembretes_listar: { total: 0, lembretes: [] } }).rpc);
+  assertEquals(vazio.resultado, { total: 0, lembretes: [] });
+});
+
+Deno.test('lembretes: cancelar — a busca vai à RPC; ok, ambíguo (opções com id, nada cancelado), não encontrado e pelo id', async () => {
+  const { chamadas, rpc } = rpcLembretes({ assistente_lembrete_cancelar: { ok: true, cancelado: L_CPF } });
+  const r = await executarFerramenta('cancelar_lembrete', { busca: '  o lembrete do  JOÃO do cpf ' }, ctxDe(), ORG, rpc);
+  assertEquals(chamadas[0], { nome: 'assistente_lembrete_cancelar', params: { p_org: ORG, p_ator: JUL, p_busca: 'o lembrete do JOÃO do cpf' } });
+  assertEquals(r.resultado, { ok: true, cancelado: falado(L_CPF) });
+  // pelo id que veio das opções (ou de ver_lembretes): vai igual — a RPC aceita o id
+  await executarFerramenta('cancelar_lembrete', { busca: L_JOAO.id }, ctxDe(), ORG, rpc);
+  assertEquals(chamadas[1].params.p_busca, L_JOAO.id);
+  // "cancela o lembrete" (sem busca): a RPC decide — um só cancela, vários = ambíguo
+  await executarFerramenta('cancelar_lembrete', {}, ctxDe(), ORG, rpc);
+  assertEquals(chamadas[2].params.p_busca, '');
+  await executarFerramenta('cancelar_lembrete', { busca: 'x'.repeat(500) }, ctxDe(), ORG, rpc);
+  assertEquals((chamadas[3].params.p_busca as string).length, 200);
+  // busca de outro tipo: args_invalidos, sem banco
+  assertEquals(((await executarFerramenta('cancelar_lembrete', { busca: ['João'] }, ctxDe(), ORG, rpc)).resultado as { erro: string }).erro, 'args_invalidos');
+  assertEquals(chamadas.length, 4);
+
+  const amb = await executarFerramenta('cancelar_lembrete', { busca: 'João' }, ctxDe(), ORG,
+    rpcLembretes({ assistente_lembrete_cancelar: { erro: 'ambiguo', opcoes: [L_CPF, L_JOAO] } }).rpc);
+  assertEquals(amb.resultado, { erro: 'ambiguo', mensagem: MENSAGENS_LEMBRETE.ambiguo, opcoes: [falado(L_CPF), falado(L_JOAO)] });
+  assert(!JSON.stringify(amb.resultado).includes('quando'));
+  const nada = await executarFerramenta('cancelar_lembrete', { busca: 'Pedro' }, ctxDe(), ORG,
+    rpcLembretes({ assistente_lembrete_cancelar: { erro: 'nao_encontrado' } }).rpc);
+  assertEquals(nada.resultado, { erro: 'nao_encontrado', mensagem: MENSAGENS_LEMBRETE.nao_encontrado });
+  const quebrado = await executarFerramenta('cancelar_lembrete', { busca: 'João' }, ctxDe(), ORG,
+    rpcLembretes({ assistente_lembrete_cancelar: { ok: true } }).rpc);
+  assertEquals(quebrado.resultado, { erro: 'falha_consulta' });
+});
+
+Deno.test('lembretes: só da própria pessoa — `para`/`pessoa` de outra = so_para_voce SEM banco; o próprio nome, "eu" e "mim" passam', async () => {
+  const { chamadas, rpc } = rpcLembretes({
+    assistente_lembrete_criar: L_JOAO, assistente_lembretes_listar: { total: 0, lembretes: [] },
+    assistente_lembrete_cancelar: { erro: 'nao_encontrado' },
+  });
+  const criarArgs = { texto: 'ligar para o João', quando_local: AMANHA_13 };
+  const recusados: [Contexto, string, Record<string, unknown>][] = [
+    [MAT_CTX(), 'criar_lembrete', { ...criarArgs, para: 'Juliana' }],
+    [MAT_CTX(), 'criar_lembrete', { ...criarArgs, pessoa: 'Murilo' }],
+    [MAT_CTX(), 'criar_lembrete', { ...criarArgs, para: 'a equipe toda' }],
+    [MAT_CTX(), 'criar_lembrete', { ...criarArgs, para: 'pra Juliana mesmo' }],
+    [MAT_CTX(), 'ver_lembretes', { pessoa: 'Juliana' }],
+    [MAT_CTX(), 'cancelar_lembrete', { busca: 'João', para: 'Juliana' }],
+    [ctxDe(), 'criar_lembrete', { ...criarArgs, para: 'Matheus' }],
+    [ctxDe(), 'ver_lembretes', { para: { id: MAT } }],
+    [ctxDe(), 'cancelar_lembrete', { busca: 'João', pessoa: 'Murilo' }],
+    // quem fala E mais alguém, ou outra pessoa com o mesmo primeiro nome: antes passavam como "a própria pessoa" (pelo
+    // primeiro nome) e viravam lembrete SÓ de quem fala, sem ela saber
+    [MAT_CTX(), 'criar_lembrete', { ...criarArgs, para: 'Matheus e Juliana' }],
+    [MAT_CTX(), 'criar_lembrete', { ...criarArgs, para: 'Matheus, Juliana' }],
+    [MAT_CTX(), 'criar_lembrete', { ...criarArgs, para: 'eu e o Murilo' }],
+    [MAT_CTX(), 'criar_lembrete', { ...criarArgs, para: 'Matheus Souza' }],
+    [ctxDe({ nome: 'Maria' }), 'criar_lembrete', { ...criarArgs, para: 'Maria José' }],
+    [MAT_CTX(), 'criar_lembrete', { ...criarArgs, para: 'a gente' }],
+    [MAT_CTX(), 'ver_lembretes', { pessoa: 'Matheus e Murilo' }],
+  ];
+  for (const [c, nome, args] of recusados) {
+    const r = await executarFerramenta(nome, args, c, ORG, rpc);
+    assertEquals(r.resultado, { erro: 'so_para_voce', mensagem: MENSAGENS_LEMBRETE.so_para_voce }, `${nome} ${JSON.stringify(args)}`);
+  }
+  assertEquals(chamadas.length, 0);
+  // a própria pessoa (o modelo repetiu quem fala, ou falou com ela: "você", "o usuário"): passa, sempre com o ator autenticado
+  const proprios = ['Matheus', 'MATHEUS', 'o Matheus', 'eu', 'mim', 'pra mim mesmo', 'para mim', 'você', 'pra você mesmo',
+    'o usuário', '', '  ', null];
+  for (const para of proprios) {
+    const r = await executarFerramenta('criar_lembrete', { ...criarArgs, para }, MAT_CTX(), ORG, rpc);
+    assertEquals(r.resultado, falado(L_JOAO), String(para));
+  }
+  // nome completo de quem fala: o nome inteiro, só o primeiro ou só o sobrenome
+  for (const para of ['Matheus Silva', 'matheus', 'Silva']) {
+    const r = await executarFerramenta('criar_lembrete', { ...criarArgs, para }, ctxDe({ admin: true, id: MAT, nome: 'Matheus Silva' }), ORG, rpc);
+    assertEquals(r.resultado, falado(L_JOAO), para);
+  }
+  await executarFerramenta('ver_lembretes', { pessoa: 'Juliana' }, ctxDe(), ORG, rpc);
+  assert(chamadas.every((c) => c.params.p_ator === (c === chamadas[chamadas.length - 1] ? JUL : MAT)));
+  assertEquals(chamadas.length, proprios.length + 3 + 1);
+});
+
+Deno.test('lembretes: no log, o texto e a busca saem com a máscara; com senha, nem isso; o resto como sempre', () => {
+  assertEquals(argsParaLog('criar_lembrete', { texto: 'ligar para o João no (51) 99876-5432', quando_local: AMANHA_13, em_minutos: null }),
+    { texto: 'ligar para o João no ••••', quando_local: AMANHA_13, em_minutos: null });
+  assertEquals(argsParaLog('criar_lembrete', { texto: 'entrar no gov com a senha Maria2024', em_minutos: 20 }),
+    { texto: '[texto com senha]', em_minutos: 20 });
+  assertEquals(argsParaLog('cancelar_lembrete', { busca: 'o do joao.silva@gmail.com' }), { busca: 'o do ••••' });
+  assertEquals(argsParaLog('criar_lembrete', { texto: 'ligar', lembrete: 'cpf 123.456.789-00', extra: { senha: 'x' } }),
+    { texto: 'ligar', lembrete: 'cpf ••••', extra: '[valor]' });
+  assertEquals(argsParaLog('ver_fechados', { periodo: 'hoje', pessoa: 'Juliana' }), { periodo: 'hoje', pessoa: 'Juliana' });
+  assertEquals(argsParaLog('criar_lembrete', null), {});
+  // quando_local: no formato fica como veio (a máscara comeria a data); fora dele pode ser qualquer coisa — o modelo pôs
+  // o texto ali, ou um pedido forjado — e leva a máscara (antes ia CRU para o assistente_log)
+  assertEquals(argsParaLog('criar_lembrete', { quando_local: '2026-11-01 13:00:00-03:00' }), { quando_local: '2026-11-01 13:00:00-03:00' });
+  assertEquals(argsParaLog('criar_lembrete', { texto: 'x y', quando_local: 'ligar 51 99876-5432' }), { texto: 'x y', quando_local: 'ligar ••••' });
+  assertEquals(argsParaLog('criar_lembrete', { quando_local: 'cpf 123.456.789-00 amanhã' }), { quando_local: 'cpf •••• amanhã' });
+  assertEquals(argsParaLog('criar_lembrete', { quando_local: 'senha Maria2024' }), { quando_local: '[texto com senha]' });
+});
+
+Deno.test('lembretes: no laço do texto o lembrete funciona e o registro da ferramenta sai mascarado', async () => {
+  const { g } = geminiFalso([
+    { candidates: [{ content: { role: 'model', parts: [{ functionCall: { name: 'criar_lembrete', args: { texto: 'ligar para 51 99876-5432', quando_local: AMANHA_13 } } }] } }] },
+    { candidates: [{ content: { role: 'model', parts: [{ text: 'Combinado.' }] } }] },
+  ]);
+  const { chamadas, rpc } = rpcLembretes({ assistente_lembrete_criar: L_JOAO });
+  const r = await responder({ ctx: ctxDe(), org: ORG, pergunta: 'me lembra', historico: [], gemini: g, rpc });
+  assertEquals(r.resposta, 'Combinado.');
+  assertEquals(chamadas[0].params.p_texto, 'ligar para 51 99876-5432'); // a RPC guarda já higienizado (o banco mascara)
+  assertEquals(r.ferramentas[0].args, { texto: 'ligar para ••••', quando_local: AMANHA_13 });
+  assertEquals(r.links, []);
+});
+
+Deno.test('lembretes: a máscara do texto é a do banco (nada muda no que o banco já higienizou)', () => {
+  for (const ja of ['ligar para o João no ••••, CPF ••••, e-mail ••••', 'pagar R$ 350 do aluguel às 15h30', 'trocar a senha do wifi',
+    'entrar no INSS do seu Antônio, senha é ••••', 'cobrar o benefício •••• da Dona Rosa']) {
+    assertEquals(mascararTextoLembrete(ja), ja);
+  }
+  assertEquals(mascararTextoLembrete('ligar para 51 99876-5432'), 'ligar para ••••');
+  assertEquals(mascararTextoLembrete('mandar para fulano arroba gmail ponto com'), 'mandar para ••••');
+  assertEquals(mascararTextoLembrete('mandar para maria@gm'), 'mandar para ••••');
+  // o que não é lembrete (sem texto ou sem hora_falada) não vira item; id que não é uuid sai
+  assertEquals(lembreteParaModelo({ erro: 'x' }), null);
+  assertEquals(lembreteParaModelo(null), null);
+  assertEquals(lembreteParaModelo({ texto: 'x' }), null);
+  const { id: _semId, ...semId } = falado(L_JOAO);
+  assertEquals(lembreteParaModelo({ ...L_JOAO, id: 'nao-e-uuid' }), semId);
+});
+
+Deno.test('lembretes: calendário — hoje e os próximos 7 dias com o dia da semana, virando o mês e o ano', () => {
+  assertEquals(calendarioLembretes(ctxDe()), 'hoje = 2026-10-30 (sexta-feira); amanhã = 2026-10-31 (sábado); depois de amanhã = '
+    + '2026-11-01 (domingo); 2026-11-02 (segunda-feira); 2026-11-03 (terça-feira); 2026-11-04 (quarta-feira); 2026-11-05 '
+    + '(quinta-feira); 2026-11-06 (sexta-feira)');
+  const fimDoAno = calendarioLembretes(ctxDe({ hoje: '2026-12-30', dia_semana: 'quarta-feira' }));
+  assert(fimDoAno.startsWith('hoje = 2026-12-30 (quarta-feira); amanhã = 2026-12-31 (quinta-feira); depois de amanhã = 2027-01-01 (sexta-feira);'));
+  assert(fimDoAno.endsWith('; 2027-01-06 (quarta-feira)'));
+  assertEquals(fimDoAno.split('; ').length, 8);
+});
+
+Deno.test('lembretes: prompt do texto — calendário, as regras e "marca lembretes" no lugar de "só consulta"', () => {
+  for (const admin of [false, true]) {
+    const p = systemPrompt(ctxDe({ admin }));
+    assert(p.includes('Calendário para os lembretes (quando_local): hoje = 2026-10-30 (sexta-feira); amanhã = 2026-10-31 (sábado);'));
+    for (const regra of ['"amanhã de tarde, à uma" = amanhã às 13:00', '→ em_minutos', 'pergunte o horário antes de criar',
+      'nunca para outra pessoa', 'por enquanto é um lembrete de cada vez', 'nunca diga que marcou sem essa confirmação',
+      'Para mudar ou corrigir um lembrete, cancele o antigo pelo id e crie o novo (nunca deixe os dois marcados).',
+      'Você consulta os dados e marca lembretes para quem pergunta', 'busca de cliente pelo nome e lembretes']) {
+      assert(p.includes(regra), `admin=${admin}: ${regra}`);
+    }
+    assert(!p.includes('Você só consulta'));
+  }
 });

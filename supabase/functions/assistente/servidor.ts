@@ -5,7 +5,8 @@
 //   · FERRAMENTA (voz, 30/10): {org, ferramenta: {nome, args}} → contexto → UMA ferramenta pela logica.ts, com o
 //     mesmo recorte por papel, sem Gemini e sem teto (o teto da voz é por sessão, no assistente-voz) →
 //     {resultado: <json da RPC ou erro de ferramenta>, links}. O navegador manda aqui cada functionCall do Live
-//     API e devolve o resultado ao modelo como functionResponse.
+//     API e devolve o resultado ao modelo como functionResponse. Inclui os LEMBRETES da própria pessoa (versão 1,
+//     31/10: criar/ver/cancelar_lembrete); no log, o texto deles vai mascarado (argsParaLog).
 //
 // Erros {error, mensagem} nos dois modos: 400 pergunta_invalida (corpo fora do formato) · 401 nao_autenticado ·
 // 403 sem_acesso (sem vínculo ativo na org) · 429 limite_dia · 503 sem_credito · 502 ia_indisponivel.
@@ -14,7 +15,8 @@
 import { corsHeaders, json } from './cors.ts';
 import {
   type ChamarGemini, type ChamarRpc, type CodigoErro, type Contexto, type RegistroFerramenta, ErroAssistente,
-  STATUS_DO_ERRO, autenticar, executarFerramenta, extrairLinks, responder, validarEntrada, validarPedidoFerramenta,
+  STATUS_DO_ERRO, argsParaLog, autenticar, executarFerramenta, extrairLinks, responder, validarEntrada,
+  validarPedidoFerramenta,
 } from './logica.ts';
 
 export const MENSAGENS: Record<CodigoErro, string> = {
@@ -95,7 +97,9 @@ export function criarTratador(d: Dependencias): (req: Request) => Promise<Respon
       if (ctx instanceof Response) return ctx;
       const t1 = agora();
       const r = await executarFerramenta(pedido.nome, pedido.args, ctx, pedido.org, d.rpc);
-      const registro: RegistroFerramenta = { nome: pedido.nome, args: pedido.args, ms: agora() - t1, ...(r.erro ? { erro: r.erro } : {}) };
+      const registro: RegistroFerramenta = {
+        nome: pedido.nome, args: argsParaLog(pedido.nome, pedido.args), ms: agora() - t1, ...(r.erro ? { erro: r.erro } : {}),
+      };
       d.gravarLog({
         organizacao_id: pedido.org, usuario_id: ator, pergunta: `ferramenta: ${pedido.nome}`, ms: agora() - t0,
         resposta: null, ferramentas: [registro], erro: r.erro ?? null,

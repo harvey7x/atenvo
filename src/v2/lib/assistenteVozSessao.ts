@@ -42,6 +42,8 @@ export interface EstadoVoz {
   limiteS: number;
   /** a última fala dela inteira, quando acaba de tocar (o leitor de tela ouve esta) */
   falaConcluida: string;
+  /** as ferramentas da última consulta (a linha de estado diz "Anotando o lembrete…" em criar_lembrete) */
+  consulta?: string[];
 }
 
 export interface SessaoVoz {
@@ -127,6 +129,7 @@ export function criarSessaoVoz(op: OpcoesSessao, d: DepsSessao): SessaoVoz {
   let parcial = '';
   let links: LinkAssistente[] = [];
   let falaConcluida = '';
+  let consulta: string[] = [];
 
   let ws: WsLike | null = null;
   let servidor: SessaoVozServidor | null = null;
@@ -165,7 +168,7 @@ export function criarSessaoVoz(op: OpcoesSessao, d: DepsSessao): SessaoVoz {
   const cancelarTimer = (t: ReturnType<typeof setTimeout> | null) => { if (t) { clearTimeout(t); timers.delete(t); } };
 
   const estado = (): EstadoVoz => ({
-    fase, mudo, erro, fim, limiteS, links, falaConcluida,
+    fase, mudo, erro, fim, limiteS, links, falaConcluida, consulta,
     palavras: legenda.palavras(posTocada),
     voce: (voce || parcial).replace(/\s+/g, ' ').trim(),
   });
@@ -260,6 +263,7 @@ export function criarSessaoVoz(op: OpcoesSessao, d: DepsSessao): SessaoVoz {
   async function executar(chamadas: ChamadaFerramenta[]) {
     mudar({ tipo: 'ferramenta' });
     respostaEnviada = false;
+    consulta = chamadas.map((c) => c.nome);
     atividade();
     emitir();
     const lote: Pendente[] = chamadas.map((c) => ({ c, ctrl: new AbortController(), cancelada: false }));

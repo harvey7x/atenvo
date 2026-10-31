@@ -32,7 +32,11 @@ const b64url = (o: unknown) => btoa(JSON.stringify(o)).replace(/=+$/, '').replac
 const JWT_FORJADO = `${b64url({ alg: 'none', typ: 'JWT' })}.${b64url({ role: 'service_role', iss: 'supabase' })}.`;
 
 /** Um servidor com tudo falso e gravando: RPCs chamadas, getUser, Gemini e log. */
-function montar(o: { uso?: number; gemini?: ChamarGemini | null; chave?: string; confirmar?: (token: string) => Promise<boolean> } = {}) {
+function montar(o: {
+  uso?: number; gemini?: ChamarGemini | null; chave?: string; confirmar?: (token: string) => Promise<boolean>;
+  /** resposta fixa de outras RPCs (os lembretes) */
+  respostas?: Record<string, unknown>;
+} = {}) {
   const rpcs: { nome: string; params: Record<string, unknown> }[] = [];
   const tokens: string[] = [];
   const logs: LinhaLog[] = [];
@@ -56,6 +60,7 @@ function montar(o: { uso?: number; gemini?: ChamarGemini | null; chave?: string;
         return Promise.resolve(contextoDe(String(params.p_ator)));
       }
       if (nome === 'assistente_registrar_uso') return Promise.resolve(o.uso ?? 1);
+      if (o.respostas && nome in o.respostas) return Promise.resolve(structuredClone(o.respostas[nome]));
       if (nome === 'assistente_pendentes') {
         return Promise.resolve({
           escopo: 'pessoa',
@@ -264,4 +269,92 @@ Deno.test('modo pergunta: teto do dia (429), sem chave do Gemini (502) e a respo
   assertEquals((await ok.pedir({ org: ORG, pergunta: '' }, { bearer: 'token-juliana' })).status, 400);
   assertEquals((await ok.pedir('não é json', { bearer: 'token-juliana' })).status, 400);
   assertEquals((await ok.pedir(null, { bearer: 'token-juliana', metodo: 'GET' })).status, 400);
+});
+
+// ------------------------------------------------------------------ lembretes (versão 1, 31/10) pelo modo ferramenta
+
+// respostas REAIS das RPCs (prova pg_temp da migration 20261031000000)
+const L_JOAO = {
+  id: '2ab12b7b-7dd9-43bc-9d64-85910035f10a', hora: '13:00', texto: 'ligar para o João', quando: '2026-10-31T13:00:00-03:00',
+  dia_semana: 'sábado', hora_falada: 'à uma da tarde', data_extenso: '31 de outubro', dia_relativo: 'amanhã', quando_local: '2026-10-31T13:00',
+};
+const L_JOAO_FALADO = {
+  id: L_JOAO.id, texto: 'ligar para o João', dia_relativo: 'amanhã', dia_semana: 'sábado', data_extenso: '31 de outubro',
+  hora_falada: 'à uma da tarde',
+};
+
+Deno.test('modo ferramenta: lembretes — criar/ver/cancelar com o ator do JWT, sem teto e sem Gemini; o resultado sem ISO', async () => {
+  const s = montar({
+    respostas: {
+      assistente_lembrete_criar: L_JOAO,
+      assistente_lembretes_listar: { total: 1, lembretes: [L_JOAO] },
+      assistente_lembrete_cancelar: { ok: true, cancelado: L_JOAO },
+    },
+  });
+  // a atendente marca o dela; p_ator/p_org forjados nos args não valem
+  const r = await s.pedir(ferramenta('criar_lembrete', { texto: 'ligar para o João', quando_local: '2026-10-31T13:00', p_ator: MAT, p_org: FORA }),
+    { bearer: 'token-juliana' });
+  assertEquals(r.status, 200);
+  assertEquals(await r.json(), { resultado: L_JOAO_FALADO, links: [] });
+  assertEquals(s.rpcs[1], {
+    nome: 'assistente_lembrete_criar',
+    params: { p_org: ORG, p_ator: JUL, p_texto: 'ligar para o João', p_quando_local: '2026-10-31T13:00', p_em_minutos: null },
+  });
+  // o admin vê e cancela os DELE
+  const ver = await s.pedir(ferramenta('ver_lembretes'), { bearer: 'token-murilo' });
+  assertEquals(await ver.json(), { resultado: { total: 1, lembretes: [L_JOAO_FALADO] }, links: [] });
+  const cancelar = await s.pedir(ferramenta('cancelar_lembrete', { busca: 'João' }), { bearer: 'token-murilo' });
+  assertEquals(await cancelar.json(), { resultado: { ok: true, cancelado: L_JOAO_FALADO }, links: [] });
+  assertEquals(s.rpcs.filter((c) => c.nome !== 'assistente_contexto'), [
+    s.rpcs[1],
+    { nome: 'assistente_lembretes_listar', params: { p_org: ORG, p_ator: MUR } },
+    { nome: 'assistente_lembrete_cancelar', params: { p_org: ORG, p_ator: MUR, p_busca: 'João' } },
+  ]);
+  assert(!s.rpcs.some((c) => c.nome === 'assistente_registrar_uso')); // sem teto
+  assertEquals(s.gemini(), 0);
+  assertEquals(s.logs.map((l) => l.pergunta), ['ferramenta: criar_lembrete', 'ferramenta: ver_lembretes', 'ferramenta: cancelar_lembrete']);
+});
+
+Deno.test('modo ferramenta: lembrete de outra pessoa = so_para_voce e argumento errado = erro de ferramenta, sem consulta', async () => {
+  const s = montar({ respostas: { assistente_lembrete_criar: L_JOAO } });
+  const casos: [unknown, string][] = [
+    [ferramenta('criar_lembrete', { texto: 'ligar para o João', quando_local: '2026-10-31T13:00', para: 'Juliana' }), 'so_para_voce'],
+    [ferramenta('ver_lembretes', { pessoa: 'Juliana' }), 'so_para_voce'],
+    [ferramenta('criar_lembrete', { texto: 'ligar para o João' }), 'sem_horario'],
+    [ferramenta('criar_lembrete', { texto: 'ligar para o João', quando_local: 'amanhã 13h' }), 'quando_invalido'],
+    [ferramenta('criar_lembrete', { texto: 'ligar para o João', em_minutos: 0 }), 'no_passado'],
+    [ferramenta('cancelar_lembrete', { busca: 42 }), 'args_invalidos'],
+    [ferramenta('criar_lembrete', { texto: 'ligar para o João', quando_local: '2026-11-01T13:00', para: 'Murilo e Juliana' }), 'so_para_voce'],
+  ];
+  for (const [corpo, codigo] of casos) {
+    const r = await s.pedir(corpo, { bearer: 'token-murilo' });
+    assertEquals(r.status, 200);
+    const j = await r.json();
+    assertEquals(j.resultado.erro, codigo, JSON.stringify(corpo));
+    assert(typeof j.resultado.mensagem === 'string' && j.resultado.mensagem.length > 0, codigo);
+  }
+  assertEquals(s.rpcs.map((c) => c.nome), Array(casos.length).fill('assistente_contexto'));
+});
+
+Deno.test('modo ferramenta: o log dos lembretes não guarda telefone, CPF nem senha ditos no texto', async () => {
+  const s = montar({ respostas: { assistente_lembrete_criar: L_JOAO, assistente_lembrete_cancelar: { erro: 'nao_encontrado' } } });
+  await s.pedir(ferramenta('criar_lembrete', { texto: 'ligar para o João no (51) 99876-5432, cpf 123.456.789-00', em_minutos: 20 }),
+    { bearer: 'token-juliana' });
+  await s.pedir(ferramenta('criar_lembrete', { texto: 'entrar no gov do seu Antônio, senha: Antonio1952', em_minutos: 20 }),
+    { bearer: 'token-juliana' });
+  await s.pedir(ferramenta('cancelar_lembrete', { busca: 'o do joao@gmail.com' }), { bearer: 'token-juliana' });
+  // quando_local fora do formato (pedido forjado ou o modelo pôs o texto ali): também mascarado; no formato, fica
+  await s.pedir(ferramenta('criar_lembrete', { texto: 'ligar para o João', quando_local: 'ligar 51 98888-7777' }), { bearer: 'token-juliana' });
+  await s.pedir(ferramenta('criar_lembrete', { texto: 'ligar para o João', quando_local: '2026-10-31 13:00' }), { bearer: 'token-juliana' });
+  assertEquals(s.logs.map((l) => l.ferramentas?.[0].args), [
+    { texto: 'ligar para o João no ••••, cpf ••••', em_minutos: 20 },
+    { texto: '[texto com senha]', em_minutos: 20 },
+    { busca: 'o do ••••' },
+    { texto: 'ligar para o João', quando_local: 'ligar ••••' },
+    { texto: 'ligar para o João', quando_local: '2026-10-31 13:00' },
+  ]);
+  const txt = JSON.stringify(s.logs);
+  for (const segredo of ['99876', '123.456', 'Antonio1952', 'joao@gmail', '98888']) assert(!txt.includes(segredo), segredo);
+  // a RPC recebe o texto como foi dito: é ela que higieniza antes de guardar (assistente_lembrete_texto)
+  assertEquals(s.rpcs[1].params.p_texto, 'ligar para o João no (51) 99876-5432, cpf 123.456.789-00');
 });

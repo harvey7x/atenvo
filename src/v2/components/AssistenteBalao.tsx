@@ -4,7 +4,8 @@ import { useAuth } from '@/context/AuthContext';
 import { useOrg } from '@/context/OrgContext';
 import { DEMO_MODE } from '@/lib/demo';
 import { ASSISTENTE_REAL, executarFerramentaVoz, pedirSessaoVoz } from '@/data/assistente';
-import { ErroVoz, primeiroNomeDe } from '../lib/assistenteVoz';
+import { avisarLembretesMudaram } from '@/data/lembretes';
+import { ErroVoz, lembretesMudaram, primeiroNomeDe } from '../lib/assistenteVoz';
 import { criarAudioVoz } from '../lib/assistenteVozAudio';
 import {
   criarSessaoVoz, sessaoComErro, type EstadoVoz, type PermissaoMicrofone, type SessaoVoz, type WsLike,
@@ -33,12 +34,12 @@ import './assistente.css';
      conversa sobrevive à troca de rota (o shell monta uma vez).
    ================================================================== */
 
-/** Quem vê o balão de voz agora (dono 30/10: "por enquanto só eu"). */
-export const LIBERADOS_VOZ: ReadonlySet<string> = new Set(['4ac197b4-9600-4756-81aa-1ac29280df09']); // Matheus
 /** prévia local (vite --mode demo): a conversa simulada — nunca num build publicado */
 const PREVIA_DEMO = import.meta.env.DEV && DEMO_MODE;
+/** Quem vê o balão de voz (e os avisos de lembrete): toda a equipe logada — dono 31/10, versão 1 publicada para
+    "Toda a equipe" (antes, 30/10, só o Matheus). O servidor recorta os dados pelo papel de cada um. */
 export const vozLiberadaPara = (id: string | null | undefined, previa: boolean = PREVIA_DEMO): boolean =>
-  previa || (!!id && LIBERADOS_VOZ.has(id));
+  previa || !!id;
 
 const BASE_PADRAO = 20;   // px do rodapé da janela
 // no servidor (testes com renderToString) o efeito de layout vira efeito comum: sem o aviso do React
@@ -131,7 +132,12 @@ function novaSessao(p: { org: string; nome: string; admin: boolean; aoMudar: (e:
   return criarSessaoVoz({ org: p.org, nome: p.nome, aoMudar: p.aoMudar }, {
     audio,
     pedirSessao: pedirSessaoVoz,
-    executarFerramenta: executarFerramentaVoz,
+    executarFerramenta: async (q) => {
+      const r = await executarFerramentaVoz(q);
+      // criou/cancelou um lembrete: o aviso na tela (LembreteAviso) busca de novo agora, nesta aba e nas outras
+      if (lembretesMudaram(q.nome, r.resultado)) avisarLembretesMudaram();
+      return r;
+    },
     // o WebSocket do navegador (os handlers dele têm `this` tipado; a sessão só usa o pedaço de WsLike)
     criarWs: (url) => new WebSocket(url) as unknown as WsLike,
     permissaoMicrofone,

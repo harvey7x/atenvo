@@ -1,12 +1,12 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import {
-  AMOSTRAS_POR_PEDACO, ErroVoz, GRACA_FIM_MS, INICIO_DA_CONVERSA, LEGENDA_ADIANTE, MAX_ITENS_LISTA, MENSAGENS_ERRO_VOZ,
-  SILENCIO_MAX_MS, WS_BASE,
+  AMOSTRAS_POR_PEDACO, ErroVoz, GRACA_FIM_MS, INICIO_DA_CONVERSA, LEGENDA_ADIANTE, MAX_ITENS_LISTA, MAX_LEMBRETES_VOZ,
+  MENSAGENS_ERRO_VOZ, SILENCIO_MAX_MS, WS_BASE,
   base64ParaBytes, bytesParaBase64, criarDecodificadorPcm, criarLegenda, criarReamostrador, cumprimentoReserva, duracaoMs,
-  erroDoFechamento, erroDoMicrofone, floatParaPcm16, horarioFalado, lerMensagemServidor, limiteDaSessao, montarToolResponse,
-  msgAudio, msgCumprimento, msgFimDoAudio, msgSetup, pcm16ParaBytes, pedacoParaEnvio, primeiroNomeDe, proximaFase,
-  resultadoParaVoz, textoDaFase, textoDoFim, urlDoWebSocket, verificarFim,
+  erroDoFechamento, erroDoMicrofone, floatParaPcm16, horarioFalado, lembretesMudaram, lerMensagemServidor, limiteDaSessao,
+  montarToolResponse, msgAudio, msgCumprimento, msgFimDoAudio, msgSetup, pcm16ParaBytes, pedacoParaEnvio, primeiroNomeDe,
+  proximaFase, resultadoParaVoz, textoDaConsulta, textoDaFase, textoDoFim, urlDoWebSocket, verificarFim,
   type CodigoErroVoz, type EventoFase, type FaseVoz,
 } from './assistenteVoz';
 
@@ -281,6 +281,75 @@ describe('mensagens do cliente (JSON exato da documentação)', () => {
     expect((resultadoParaVoz({ membros: Array.from({ length: 60 }, (_, i) => ({ nome: `P${i}` })) }) as { membros: unknown[] }).membros).toHaveLength(MAX_ITENS_LISTA);
   });
 
+  /* os lembretes (V1, dono 31/10: "só coloco os lembretes ali"): o item das RPCs assistente_lembrete_* (migration
+     20261031000000, assistente_lembrete_item) traz o instante em ISO para a tela e JÁ FALADO para a voz */
+  const item = (o: Record<string, unknown> = {}) => ({
+    id: '9b1c2d3e-0000-4000-8000-00000000000a', texto: 'ligar para o João',
+    quando: '2026-11-01T13:00:00-03:00', quando_local: '2026-11-01T13:00', hora: '13:00',
+    hora_falada: 'à uma da tarde', dia_semana: 'domingo', data_extenso: '1º de novembro', dia_relativo: 'amanhã', ...o,
+  });
+  const falado = (o: Record<string, unknown> = {}) => ({
+    id: '9b1c2d3e-0000-4000-8000-00000000000a', texto: 'ligar para o João',
+    hora_falada: 'à uma da tarde', dia_semana: 'domingo', data_extenso: '1º de novembro', dia_relativo: 'amanhã', ...o,
+  });
+  const semIso = (v: unknown) => {
+    const j = JSON.stringify(v);
+    expect(j).not.toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/);
+    expect(j).not.toMatch(/"(quando|quando_local|hora)"/);
+    expect(j).not.toContain('13:00');
+  };
+
+  it('lembrete criado: o modelo recebe o texto e o instante JÁ FALADO (dia relativo, semana, data, hora), sem o ISO; o id fica', () => {
+    const original = item();
+    const copia = JSON.parse(JSON.stringify(original));
+    const v = resultadoParaVoz(original);
+    expect(v).toEqual(falado());
+    semIso(v);
+    expect(original).toEqual(copia); // não mexe no original
+    // o mesmo pedido repetido: "já estava anotado"
+    expect(resultadoParaVoz(item({ ja_existia: true }))).toEqual(falado({ ja_existia: true }));
+    // fora de ontem/hoje/amanhã/depois de amanhã a RPC manda dia_relativo null: some (o modelo fala o dia da semana e a data)
+    const quinta = resultadoParaVoz(item({ dia_relativo: null, dia_semana: 'quinta-feira', data_extenso: '5 de novembro' }));
+    expect(quinta).toEqual({ id: falado().id, texto: 'ligar para o João', hora_falada: 'à uma da tarde', dia_semana: 'quinta-feira', data_extenso: '5 de novembro' });
+    expect(resultadoParaVoz(item({ data_extenso: '5 de janeiro de 2027', dia_relativo: null }))).toMatchObject({ data_extenso: '5 de janeiro de 2027' });
+    // a toolResponse de criar_lembrete leva o enxuto
+    const m = montarToolResponse([{ id: 'fc-1', nome: 'criar_lembrete', ok: true, resultado: item() }]);
+    expect(m.toolResponse.functionResponses[0]).toEqual({ id: 'fc-1', name: 'criar_lembrete', response: { output: falado() } });
+    semIso(m);
+  });
+
+  it('meus lembretes: até 10 itens falados com o total ao lado; cancelado e as opções do ambíguo também falados; erros intactos', () => {
+    const lista = Array.from({ length: 12 }, (_, i) => item({ id: `l${i}`, texto: `tarefa ${i}` }));
+    const v = resultadoParaVoz({ total: 12, lembretes: lista }) as { total: number; lembretes: Record<string, unknown>[] };
+    expect(MAX_LEMBRETES_VOZ).toBe(10);
+    expect(v.total).toBe(12);
+    expect(v.lembretes).toHaveLength(10);
+    expect(v.lembretes[0]).toEqual(falado({ id: 'l0', texto: 'tarefa 0' }));
+    semIso(v);
+    expect(resultadoParaVoz({ total: 0, lembretes: [] })).toEqual({ total: 0, lembretes: [] });
+    // cancelar: o cancelado; o ambíguo com as opções (o id fica — dois lembretes com o mesmo texto só se separam por ele)
+    expect(resultadoParaVoz({ ok: true, cancelado: item() })).toEqual({ ok: true, cancelado: falado() });
+    const amb = resultadoParaVoz({ erro: 'ambiguo', opcoes: [item({ id: 'a' }), item({ id: 'b', dia_relativo: 'hoje', hora_falada: 'às cinco da tarde' })] });
+    expect(amb).toEqual({ erro: 'ambiguo', opcoes: [falado({ id: 'a' }), falado({ id: 'b', dia_relativo: 'hoje', hora_falada: 'às cinco da tarde' })] });
+    semIso(amb);
+    for (const erro of ['nao_encontrado', 'no_passado', 'longe_demais', 'lembretes_demais', 'quando_invalido', 'texto_invalido']) {
+      expect(resultadoParaVoz({ erro })).toEqual({ erro });
+    }
+    // o que não é lembrete continua como antes (o id sai)
+    expect(resultadoParaVoz({ pessoa: { id: 'u1', nome: 'Juliana' }, texto: 'oi' })).toEqual({ pessoa: { nome: 'Juliana' }, texto: 'oi' });
+  });
+
+  it('criar ou cancelar um lembrete muda a agenda da tela (busca de novo); erro, listar e as outras ferramentas, não', () => {
+    expect(lembretesMudaram('criar_lembrete', item())).toBe(true);
+    expect(lembretesMudaram('criar_lembrete', item({ ja_existia: true }))).toBe(true);
+    expect(lembretesMudaram('cancelar_lembrete', { ok: true, cancelado: item() })).toBe(true);
+    expect(lembretesMudaram('criar_lembrete', { erro: 'no_passado' })).toBe(false);
+    expect(lembretesMudaram('cancelar_lembrete', { erro: 'ambiguo', opcoes: [] })).toBe(false);
+    expect(lembretesMudaram('ver_lembretes', { total: 1, lembretes: [item()] })).toBe(false);
+    expect(lembretesMudaram('ver_fechados', { total: 3 })).toBe(false);
+    expect(lembretesMudaram('criar_lembrete', null)).toBe(false);
+  });
+
   it('URL do WebSocket: endpoint Constrained v1beta com access_token (a "/" do token fica); ws_url só do Google', () => {
     expect(urlDoWebSocket('auth_tokens/abc-123_x')).toBe(`${WS_BASE}?access_token=auth_tokens/abc-123_x`);
     expect(WS_BASE).toBe('wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContentConstrained');
@@ -392,6 +461,15 @@ describe('erros e frases', () => {
     expect(textoDaFase('ouvindo', true)).toBe('Microfone desligado');
     expect(textoDaFase('consultando', false)).toBe('Consultando o sistema…');
     expect(textoDaFase('falando', false)).toBe('Falando');
+    // a consulta dos lembretes diz o que ela está fazendo; o resto (ou uma mistura) é a frase de sempre
+    expect(textoDaFase('consultando', false, ['criar_lembrete'])).toBe('Anotando o lembrete…');
+    expect(textoDaConsulta(['criar_lembrete', 'criar_lembrete'])).toBe('Anotando os lembretes…');
+    expect(textoDaConsulta(['cancelar_lembrete'])).toBe('Cancelando o lembrete…');
+    expect(textoDaConsulta(['ver_lembretes'])).toBe('Consultando os lembretes…');
+    expect(textoDaConsulta(['criar_lembrete', 'cancelar_lembrete'])).toBe('Consultando o sistema…');
+    expect(textoDaConsulta(['ver_fechados'])).toBe('Consultando o sistema…');
+    expect(textoDaConsulta([])).toBe('Consultando o sistema…');
+    expect(textoDaFase('ouvindo', false, ['criar_lembrete'])).toBe('Ouvindo');
     expect(textoDoFim('silencio', 600)).toBe('Encerrada depois de 1 minuto sem fala.');
     expect(textoDoFim('tempo', 600)).toBe('Encerrada no limite de 10 minutos por conversa.');
     expect(textoDoFim('servidor', 600)).toBe('A IA encerrou a sessão.');

@@ -14,7 +14,8 @@ import type { EstadoVoz, SessaoVoz } from '../lib/assistenteVozSessao';
      sua. Um laço de quadro só; no Leve (ou reduzir movimento) fica numa
      pose parada; máquina que não aguenta baixa a resolução e depois para.
    - Uma linha de estado: Conectando… · Ouvindo · Consultando o sistema… ·
-     Falando (· Microfone desligado).
+     Falando (· Microfone desligado); nos lembretes, "Anotando o
+     lembrete…" (e "Cancelando…", "Consultando os lembretes…").
    - A legenda do que ela fala (2–3 linhas; as palavras acendem quando a
      voz passa por elas) e, menor e em cinza, o que você disse.
    - "Abrir conversa · {cliente}" quando a ferramenta trouxe clientes.
@@ -232,7 +233,7 @@ export function CartaoVoz({ sessao, estado, aoFechar, aoRecomecar, aoAbrirLink, 
       {/* no fim e no erro a frase vem no aviso logo abaixo: a linha de estado fica só para o leitor de tela */}
       <p className="ast-voz-estado" role="status" aria-live="polite">
         {!final && <i className="ast-voz-ponto" aria-hidden />}
-        <span className={final ? 'ast-sr' : undefined}>{textoDaFase(fase, estado.mudo)}</span>
+        <span className={final ? 'ast-sr' : undefined}>{textoDaFase(fase, estado.mudo, estado.consulta)}</span>
       </p>
 
       <div className="ast-voz-meio">

@@ -378,6 +378,30 @@ describe('ferramentas', () => {
     const l = (i: number) => ({ rotulo: `c${i}`, rota: `/whatsapp?conversa=c${i}` });
     expect(juntarLinks([l(1), l(2)], [l(2), l(3), l(4), l(5), l(6)])).toEqual([l(1), l(2), l(3), l(4), l(5)]);
   });
+
+  it('lembrete: "Anotando o lembrete…" enquanto cria; o modelo recebe o dia e a hora falados (sem o ISO); a consulta seguinte troca a frase', async () => {
+    const criado = {
+      id: '9b1c2d3e-0000-4000-8000-00000000000a', texto: 'ligar para o João', quando: '2026-10-31T13:00:00-03:00',
+      quando_local: '2026-10-31T13:00', hora: '13:00', hora_falada: 'à uma da tarde', dia_semana: 'sábado',
+      data_extenso: '31 de outubro', dia_relativo: 'amanhã',
+    };
+    const m = await aberta({
+      ferramenta: async ({ nome }) => ({ resultado: nome === 'criar_lembrete' ? criado : { total: 1, lembretes: [criado] }, links: [] }),
+    });
+    m.ws().receber({ toolCall: { functionCalls: [{ id: 'fc-1', name: 'criar_lembrete', args: { texto: 'ligar para o João', quando_local: '2026-10-31T13:00' } }] } });
+    expect(m.ultimo()).toMatchObject({ fase: 'consultando', consulta: ['criar_lembrete'] });
+    expect(m.ferramenta.mock.calls[0][0]).toMatchObject({ nome: 'criar_lembrete', args: { texto: 'ligar para o João', quando_local: '2026-10-31T13:00' } });
+    await passa(0);
+    const resp = m.ws().enviados.filter((x) => 'toolResponse' in x);
+    expect(resp[0]).toEqual({ toolResponse: { functionResponses: [{ id: 'fc-1', name: 'criar_lembrete', response: { output: {
+      id: criado.id, texto: 'ligar para o João', hora_falada: 'à uma da tarde', dia_semana: 'sábado', data_extenso: '31 de outubro', dia_relativo: 'amanhã',
+    } } }] } });
+    expect(JSON.stringify(resp)).not.toMatch(/T13:00|"13:00"/);
+    // ela confirma falando; a próxima consulta (outra ferramenta) troca a frase da linha de estado
+    m.ws().receber({ serverContent: { modelTurn: { parts: [{ inlineData: { data: audioB64(2400) } }] }, outputTranscription: { text: 'Combinado.' }, turnComplete: true } });
+    m.ws().receber({ toolCall: { functionCalls: [{ id: 'fc-2', name: 'ver_lembretes', args: {} }] } });
+    expect(m.ultimo().consulta).toEqual(['ver_lembretes']);
+  });
 });
 
 describe('mudo e fim', () => {

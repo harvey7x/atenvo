@@ -10,6 +10,8 @@
 //
 // Os dados vêm SÓ das RPCs assistente_* (service_role), que recortam pelo papel de quem pergunta:
 // atendente vê a própria carteira; admin vê a equipe. O modelo nunca escolhe quem é o ator.
+// Versão 1 (31/10): + criar_lembrete / ver_lembretes / cancelar_lembrete, SÓ da própria pessoa — as RPCs
+// assistente_lembrete* vêm da migration 20261031000000: aplique-a ANTES do deploy (sem ela, falha_consulta).
 //
 // QA sem senha (S2, revisão 30/10): bearer IGUAL à SUPABASE_SERVICE_ROLE_KEY (tempo constante) +
 // x-assistente-ator: <uuid> → age como essa pessoa. verify_jwt = true fixado no config.toml (NÃO desligar).

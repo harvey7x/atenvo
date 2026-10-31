@@ -5,7 +5,9 @@
    pelo relógio) e uma pergunta/resposta roteirizada. Nada de microfone,
    rede ou Gemini. Mesma interface da sessão real (SessaoVoz).
    Roteiros (prévia local: window.__astVozRoteiro antes do clique):
-   conversa (padrão) · microfone · credito · limite · silencio · queda.
+   conversa (padrão) · lembrete ("me lembra amanhã à uma da tarde…" →
+   "Anotando o lembrete…" → a confirmação com o dia e a hora falados) ·
+   microfone · credito · limite · silencio · queda.
    ------------------------------------------------------------------ */
 
 import {
@@ -16,9 +18,37 @@ import type { BandasVoz } from './assistenteVozAudio';
 import { juntarLinks, type EstadoVoz, type SessaoVoz, TIQUE_MS } from './assistenteVozSessao';
 import type { LinkAssistente } from '@/data/assistente';
 
-export type RoteiroDemo = 'conversa' | 'microfone' | 'credito' | 'limite' | 'silencio' | 'queda';
-const ROTEIROS: ReadonlySet<string> = new Set<RoteiroDemo>(['conversa', 'microfone', 'credito', 'limite', 'silencio', 'queda']);
+export type RoteiroDemo = 'conversa' | 'lembrete' | 'microfone' | 'credito' | 'limite' | 'silencio' | 'queda';
+const ROTEIROS: ReadonlySet<string> = new Set<RoteiroDemo>(['conversa', 'lembrete', 'microfone', 'credito', 'limite', 'silencio', 'queda']);
 export const ehRoteiroDemo = (x: unknown): x is RoteiroDemo => typeof x === 'string' && ROTEIROS.has(x);
+
+/* ------------------------------------------------------------------ o lembrete da demo */
+
+const SEMANA = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'];
+const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+const fmtDiaSP = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' });
+
+/** Amanhã no fuso do CAF, como a RPC do lembrete fala (assistente_lembrete_quando): {dia_semana: "domingo",
+    data_extenso: "1º de novembro"} — com o ano quando não é o ano corrente ("1º de janeiro de 2027"). */
+export function amanhaFalado(agoraMs: number): { dia_semana: string; data_extenso: string } {
+  const p = fmtDiaSP.formatToParts(agoraMs);
+  const n = (t: string) => Number(p.find((x) => x.type === t)?.value);
+  const ano = n('year');
+  const amanha = new Date(Date.UTC(ano, n('month') - 1, n('day') + 1, 12));
+  const d = amanha.getUTCDate();
+  const a = amanha.getUTCFullYear();
+  return {
+    dia_semana: SEMANA[amanha.getUTCDay()],
+    data_extenso: `${d === 1 ? '1º' : d} de ${MESES[amanha.getUTCMonth()]}${a !== ano ? ` de ${a}` : ''}`,
+  };
+}
+
+export const PERGUNTA_LEMBRETE_DEMO = 'Me lembra amanhã à uma da tarde de ligar para o João.';
+/** a confirmação falada (LEMBRETES.md: o dia relativo, o dia da semana, a data, a hora e o texto) */
+export function confirmacaoLembreteDemo(agoraMs: number): string {
+  const q = amanhaFalado(agoraMs);
+  return `Combinado: amanhã, ${q.dia_semana}, ${q.data_extenso}, à uma da tarde, eu te lembro de ligar para o João.`;
+}
 
 /** Fala sintética: sílabas ~4,6/s com pausas entre frases (determinística: o print sai igual). */
 export function envelopeFala(t: number): number {
@@ -39,8 +69,11 @@ interface Passo { ms: number; fazer: () => void }
 
 export function criarSessaoDemo(op: {
   nome: string; admin: boolean; roteiro?: RoteiroDemo; aoMudar: (e: EstadoVoz) => void; agora?: () => number;
+  /** o calendário da confirmação do lembrete ("amanhã, domingo, 1º de novembro") — testes */
+  dataMs?: () => number;
 }): SessaoVoz {
   const agora = op.agora ?? (() => performance.now());
+  const dataMs = op.dataMs ?? (() => Date.now());
   const legenda = criarLegenda();
   let fase: FaseVoz = 'conectando';
   let mudo = false;
@@ -49,6 +82,7 @@ export function criarSessaoDemo(op: {
   let voce = '';
   let links: LinkAssistente[] = [];
   let falaConcluida = '';
+  let consulta: string[] = [];
   let pos = 0;
   let marcaFim = 0;
   let falaIni = -1;
@@ -64,7 +98,7 @@ export function criarSessaoDemo(op: {
 
   const acabou = () => fase === 'encerrada' || fase === 'erro';
   const estado = (): EstadoVoz => ({
-    fase, mudo, erro, fim, limiteS, links, falaConcluida, voce,
+    fase, mudo, erro, fim, limiteS, links, falaConcluida, voce, consulta,
     palavras: legenda.palavras(pos),
   });
   const emitir = () => op.aoMudar(estado());
@@ -123,7 +157,9 @@ export function criarSessaoDemo(op: {
     depois(dur * 1000 + 450, () => { voceIni = -1; depoisDe(); });
   };
 
-  const consultar = (ms: number, depoisDe: () => void) => {
+  /** ela "consulta" (as ferramentas dão a frase da linha de estado: criar_lembrete = "Anotando o lembrete…") */
+  const consultar = (ms: number, depoisDe: () => void, ferramentas: string[] = []) => {
+    consulta = ferramentas;
     mudar({ tipo: 'ferramenta' });
     emitir();
     depois(ms, depoisDe);
@@ -141,6 +177,15 @@ export function criarSessaoDemo(op: {
     }
     if (r === 'queda') {
       return [abrir, { ms: 1100, fazer: () => falar(ola, 1.7, () => depois(1400, () => { erro = 'queda'; mudar({ tipo: 'erro' }); parar(); emitir(); })) }];
+    }
+    if (r === 'lembrete') {
+      // o pedido do dono (30/10): "me lembra amanhã de tarde, a uma hora, de fazer tal coisa" — ela anota e confirma
+      return [abrir, {
+        ms: 1100,
+        fazer: () => falar(ola, 1.7, () => depois(1300, () => perguntar(PERGUNTA_LEMBRETE_DEMO, 2.6, () => consultar(1300, () => {
+          falar(confirmacaoLembreteDemo(dataMs()), 6.4);
+        }, ['criar_lembrete'])))),
+      }];
     }
     return [
       abrir,

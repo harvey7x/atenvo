@@ -134,7 +134,7 @@ Deno.test('atendente: contexto → teto (30) → token travado no Google → 200
   for (const segredo of [TOKEN, 'auth_tokens', 'access_token', CHAVE_GEMINI]) assertFalse(txtLog.includes(segredo), segredo);
 });
 
-Deno.test('admin: o corpo do token leva as 6 ferramentas e a equipe; a chave do Gemini nunca volta ao navegador', async () => {
+Deno.test('admin: o corpo do token leva as 9 ferramentas (com os lembretes) e a equipe; a chave do Gemini nunca volta ao navegador', async () => {
   const s = montar();
   const r = await s.pedir({ org: ORG }, { bearer: 'token-murilo' });
   assertEquals(r.status, 200);
@@ -146,8 +146,10 @@ Deno.test('admin: o corpo do token leva as 6 ferramentas e a equipe; a chave do 
     systemInstruction: { parts: { text: string }[] };
   };
   assertEquals(setup.tools[0].functionDeclarations.map((d) => d.name),
-    ['ver_carteira', 'clientes_para_resolver', 'ver_fechados', 'ver_equipe', 'ver_leads', 'buscar_cliente']);
+    ['ver_carteira', 'clientes_para_resolver', 'ver_fechados', 'ver_equipe', 'ver_leads', 'buscar_cliente',
+      'criar_lembrete', 'ver_lembretes', 'cancelar_lembrete']);
   assert(setup.tools[0].functionDeclarations.every((d) => d.behavior === 'BLOCKING'));
+  assert(setup.systemInstruction.parts[0].text.includes('**Lembretes (só de Murilo):**'));
   assert(setup.systemInstruction.parts[0].text.includes('Equipe ativa: Juliana, Matheus, Murilo.'));
 });
 

@@ -20,7 +20,9 @@
      documentação) e o resultado ENXUTO que vai para o modelo (sem id de
      conversa nem horário ISO; listas de clientes cortadas em 5, com o
      total ao lado; equipe e campanhas inteiras — os links vão à parte,
-     para a tela);
+     para a tela); os LEMBRETES (criar/ver/cancelar_lembrete) chegam com
+     o instante já falado (dia relativo, dia da semana, data por extenso,
+     hora falada) e sem o ISO;
    - os erros (fechamento do WebSocket, microfone) e as frases da tela.
    Protocolo: scratchpad/assistente/LIVE-API.md (pesquisa de 30/10).
    ------------------------------------------------------------------ */
@@ -50,6 +52,9 @@ export const MAX_ITENS_VOZ = 5;
 /** teto das outras listas (equipe, vendedores, campanhas, opções de nome): vão INTEIRAS — sem `total` ao lado, um
     corte faria o modelo responder errado ("quem tem mais sem resposta?" sem a 6ª pessoa); o teto só segura o custo */
 export const MAX_ITENS_LISTA = 40;
+/** itens de `lembretes` (ver_lembretes: os pendentes da pessoa, até 50) que vão para o modelo — a fala diz os
+    próximos 3 + o total, que vem junto */
+export const MAX_LEMBRETES_VOZ = 10;
 
 /* ================================================================== áudio */
 
@@ -350,6 +355,25 @@ export function montarToolResponse(rs: RespostaFerramentaVoz[]) {
 
 const CHAVES_FORA = new Set(['conversa_id', 'id']);
 const CHAVES_HORARIO = new Set(['esperando_desde', 'ultima_msg_em']);
+/** o instante do lembrete em ISO e em "13:00" (a RPC manda os dois para a tela): o modelo fala pelos campos falados */
+const CHAVES_INSTANTE_LEMBRETE = new Set(['quando', 'quando_local', 'hora']);
+
+/** Um lembrete das RPCs assistente_lembrete* ({id, texto, quando, quando_local, hora, hora_falada, dia_semana,
+    data_extenso, dia_relativo}, migration 20261031000000) — o único resultado com `hora_falada`. */
+const ehLembrete = (o: Record<string, unknown>): boolean => typeof o.hora_falada === 'string' && typeof o.texto === 'string';
+
+/** O lembrete como vai para o MODELO: o texto e o instante JÁ FALADO — dia relativo ("amanhã"; fora quando a
+    RPC manda null), dia da semana, data por extenso ("1º de novembro") e hora falada ("à uma da tarde"), para a
+    confirmação em voz sem conta de calendário. Sem o ISO (quando, quando_local) nem o "13:00". O `id` FICA:
+    cancelar_lembrete aceita o id das opções (dois lembretes com o mesmo texto só se separam por ele). */
+function lembreteParaVoz(o: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, x] of Object.entries(o)) {
+    if (CHAVES_INSTANTE_LEMBRETE.has(k) || x === null || x === undefined) continue;
+    out[k] = k === 'id' ? x : resultadoParaVoz(x, k);
+  }
+  return out;
+}
 
 /** "2026-08-07T16:54:47-03:00" → "07/08/2026 16:54" (o horário já vem no fuso de São Paulo). */
 export function horarioFalado(iso: string): string {
@@ -360,14 +384,18 @@ export function horarioFalado(iso: string): string {
 /** O resultado da ferramenta como vai para o MODELO: sem ids (o modelo fala de pessoas pelo nome; os links das
     conversas vão à parte, para a tela), horários legíveis e cada lista de CLIENTES em até 5 itens (o total real
     continua no campo `total`). As listas de equipe/vendedores/campanhas/opções vão inteiras (não têm `total` ao
-    lado). Cada token conta duas vezes na voz: o contexto inteiro é cobrado de novo a cada turno. */
+    lado). Os lembretes (criado, listados, cancelado, opções do ambíguo) com o instante já falado, sem o ISO, e a
+    lista em até 10 (o total ao lado). Cada token conta duas vezes na voz: o contexto inteiro é cobrado de novo a
+    cada turno. */
 export function resultadoParaVoz(v: unknown, chave?: string): unknown {
   if (typeof v === 'string') return chave && CHAVES_HORARIO.has(chave) ? horarioFalado(v) : v;
   if (Array.isArray(v)) {
-    return v.slice(0, chave === 'clientes' ? MAX_ITENS_VOZ : MAX_ITENS_LISTA).map((x) => resultadoParaVoz(x));
+    const teto = chave === 'clientes' ? MAX_ITENS_VOZ : chave === 'lembretes' ? MAX_LEMBRETES_VOZ : MAX_ITENS_LISTA;
+    return v.slice(0, teto).map((x) => resultadoParaVoz(x));
   }
   const o = obj(v);
   if (o) {
+    if (ehLembrete(o)) return lembreteParaVoz(o);
     const out: Record<string, unknown> = {};
     for (const [k, x] of Object.entries(o)) {
       if (CHAVES_FORA.has(k)) continue;
@@ -508,12 +536,31 @@ export function textoDoFim(motivo: MotivoFim, limiteS: number): string {
   return 'A IA encerrou a sessão.';
 }
 
-/** A linha de estado embaixo da esfera. */
-export function textoDaFase(f: FaseVoz, mudo: boolean): string {
+/** O que ela está fazendo na consulta (pelas ferramentas que o modelo chamou): os lembretes têm a frase deles;
+    o resto (ou uma mistura) é "Consultando o sistema…". */
+export function textoDaConsulta(ferramentas: readonly string[] = []): string {
+  const n = ferramentas.length;
+  const uma = n > 0 && ferramentas.every((f) => f === ferramentas[0]) ? ferramentas[0] : '';
+  if (uma === 'criar_lembrete') return n > 1 ? 'Anotando os lembretes…' : 'Anotando o lembrete…';
+  if (uma === 'cancelar_lembrete') return n > 1 ? 'Cancelando os lembretes…' : 'Cancelando o lembrete…';
+  if (uma === 'ver_lembretes') return 'Consultando os lembretes…';
+  return 'Consultando o sistema…';
+}
+
+/** A consulta criou ou cancelou um lembrete? (o aviso na tela busca de novo na hora — o "daqui a 1 minuto" não
+    espera a próxima busca). Erro de ferramenta ({erro}) não muda nada. */
+export function lembretesMudaram(nome: string, resultado: unknown): boolean {
+  if (nome !== 'criar_lembrete' && nome !== 'cancelar_lembrete') return false;
+  const o = obj(resultado);
+  return !!o && o.erro === undefined;
+}
+
+/** A linha de estado embaixo da esfera (`consulta` = as ferramentas da consulta em andamento). */
+export function textoDaFase(f: FaseVoz, mudo: boolean, consulta?: readonly string[]): string {
   switch (f) {
     case 'conectando': return 'Conectando…';
     case 'ouvindo': return mudo ? 'Microfone desligado' : 'Ouvindo';
-    case 'consultando': return 'Consultando o sistema…';
+    case 'consultando': return textoDaConsulta(consulta);
     case 'falando': return 'Falando';
     case 'encerrada': return 'Conversa encerrada';
     default: return 'Não deu certo';

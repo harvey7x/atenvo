@@ -17,7 +17,7 @@ const estado = vi.hoisted(() => ({
 vi.mock('@/context/AuthContext', () => ({ useAuth: () => ({ user: estado.user }) }));
 vi.mock('@/context/OrgContext', () => ({ useOrg: () => ({ currentOrg: estado.org }) }));
 
-import { AssistenteBalao, LARGURA_CARTAO, LIBERADOS_VOZ, baseDoBalao, vozLiberadaPara } from './AssistenteBalao';
+import { AssistenteBalao, LARGURA_CARTAO, baseDoBalao, vozLiberadaPara } from './AssistenteBalao';
 import { CartaoVoz, focoVaiParaOCartao } from './AssistenteVoz';
 
 // o MemoryRouter (e o useNavigate) usam useLayoutEffect: no render de servidor o React só avisa (ruído) — como no SinoPainel.test
@@ -27,13 +27,13 @@ vi.spyOn(console, 'error').mockImplementation((...a: unknown[]) => {
   erroOriginal(...a);
 });
 
-describe('liberação: por enquanto só o Matheus', () => {
-  it('só o id do Matheus; na prévia local da demo, quem estiver logado (a conversa é simulada)', () => {
-    expect([...LIBERADOS_VOZ]).toEqual([MATHEUS]);
+describe('liberação: toda a equipe logada (versão 1, dono 31/10)', () => {
+  it('qualquer pessoa logada; sem login, não; na prévia local da demo, quem estiver logado', () => {
     expect(vozLiberadaPara(MATHEUS, false)).toBe(true);
-    expect(vozLiberadaPara('d7e59652-d3eb-4d7d-8830-7fc780701a8e', false)).toBe(false); // Juliana
-    expect(vozLiberadaPara('f81fcc8a-07a7-436a-9224-34003b65fc67', false)).toBe(false); // Murilo
+    expect(vozLiberadaPara('d7e59652-d3eb-4d7d-8830-7fc780701a8e', false)).toBe(true); // Juliana
+    expect(vozLiberadaPara('f81fcc8a-07a7-436a-9224-34003b65fc67', false)).toBe(true); // Murilo
     expect(vozLiberadaPara(null, false)).toBe(false);
+    expect(vozLiberadaPara(undefined, false)).toBe(false);
     expect(vozLiberadaPara('usr_henrique', true)).toBe(true);
   });
 });
@@ -72,9 +72,9 @@ describe('balão fechado', () => {
     expect(html).not.toMatch(/<textarea|<input/);
   });
 
-  it('a Juliana (e qualquer outra pessoa) não vê; some com o bom dia aberto e sem usuário ou empresa', () => {
+  it('a Juliana (toda a equipe) também vê; some com o bom dia aberto e sem usuário ou empresa', () => {
     estado.user = { id: 'd7e59652-d3eb-4d7d-8830-7fc780701a8e', name: 'Juliana' };
-    expect(render()).toBe('');
+    expect(render()).not.toBe('');
     estado.user = { id: MATHEUS, name: 'Matheus' };
     expect(render(true)).toBe('');
     estado.org = null;
@@ -150,6 +150,17 @@ describe('cartão de voz em cada estado', () => {
     expect(c).toContain('“o que eu tenho para resolver”');
     expect(c).toContain('Abrir conversa · <!-- -->Eva Pereira');
     expect(c).toContain('Abrir conversa · <!-- -->José Carlos');
+    semEmoji(c);
+  });
+
+  it('lembrete: a linha de estado diz "Anotando o lembrete…" enquanto ela cria (e o que você pediu fica em cinza)', () => {
+    const c = cartao({ fase: 'consultando', voce: 'me lembra amanhã à uma da tarde de ligar para o João', consulta: ['criar_lembrete'] });
+    expect(c).toContain('>Anotando o lembrete…<');
+    expect(c).not.toContain('Consultando o sistema…');
+    expect(c).toContain('“me lembra amanhã à uma da tarde de ligar para o João”');
+    expect(cartao({ fase: 'consultando', consulta: ['ver_lembretes'] })).toContain('>Consultando os lembretes…<');
+    // a frase vale só na consulta: falando, a linha volta a "Falando"
+    expect(cartao({ fase: 'falando', consulta: ['criar_lembrete'] })).toContain('>Falando<');
     semEmoji(c);
   });
 

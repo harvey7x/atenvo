@@ -24,7 +24,8 @@ import {
 import { BomDia } from '../components/BomDia';
 import { prepararBomDia, useModoBomDia } from '@/data/bomDia';
 import { AvisoAtualizacao } from '../components/AvisoAtualizacao';
-import { AssistenteBalao } from '../components/AssistenteBalao';
+import { AssistenteBalao, vozLiberadaPara } from '../components/AssistenteBalao';
+import { LembreteAviso } from '../components/LembreteAviso';
 import { ComparadorVisual } from '../components/ComparadorVisual';
 import { DEMO_MODE } from '@/lib/demo';
 import { assinarAcento, lerAcento, salvarAcento, type Acento } from '../lib/acento';
@@ -692,6 +693,8 @@ export default function AppShellV2() {
         <GuardiaoAvisos bloqueado={gestorBomDia || bomDia !== null || (modoBomDia === null && !!orgBomDia && new Date().getHours() >= HORA_FIM_DIA)} />
         {/* Assistente de IA (dono 30/10): balão no canto inferior direito; some enquanto o bom dia está na tela */}
         <AssistenteBalao oculto={bomDia !== null} />
+        {/* Lembretes por voz (dono 30/10): o aviso na hora, acima do balão; liberado junto com a voz */}
+        <LembreteAviso oculto={bomDia !== null} ativo={vozLiberadaPara(user?.id)} />
         {/* prévia da repaginada (27/10): comparador Antes/Depois, só no demo LOCAL
             (nunca num build publicado, nem no demo de cliente) */}
         {import.meta.env.DEV && DEMO_MODE && <ComparadorVisual />}
