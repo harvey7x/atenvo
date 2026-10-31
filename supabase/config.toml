@@ -491,3 +491,15 @@ verify_jwt = false
 # usuário — autentica por x-coletor-chave == webhook_config.secret (chave='coletor-inss').
 [functions.coletor-inss]
 verify_jwt = false
+
+# Assistente de IA (balão + modo de voz) e a voz do bom dia: só a app logada chama, com o JWT do usuário.
+# NÃO desligar (revisão de segurança 30/10, S2): com verify_jwt = true o gateway confere a ASSINATURA do
+# JWT antes da função rodar. O atalho de QA (assistente e assistente-voz: x-assistente-ator; bom-dia-voz:
+# pasta "servico") só vale com a service key DE VERDADE no bearer: igual à do ambiente (tempo constante) ou um
+# JWT service_role que o próprio banco aceita — nunca só pelo `role` do payload.
+[functions.assistente]
+verify_jwt = true
+[functions.assistente-voz]
+verify_jwt = true
+[functions.bom-dia-voz]
+verify_jwt = true

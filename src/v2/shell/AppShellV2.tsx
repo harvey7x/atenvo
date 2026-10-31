@@ -24,6 +24,7 @@ import {
 import { BomDia } from '../components/BomDia';
 import { prepararBomDia, useModoBomDia } from '@/data/bomDia';
 import { AvisoAtualizacao } from '../components/AvisoAtualizacao';
+import { AssistenteBalao } from '../components/AssistenteBalao';
 import { ComparadorVisual } from '../components/ComparadorVisual';
 import { DEMO_MODE } from '@/lib/demo';
 import { assinarAcento, lerAcento, salvarAcento, type Acento } from '../lib/acento';
@@ -689,6 +690,8 @@ export default function AppShellV2() {
         {/* Radar de Atendimento (23/10): takeover do último aviso (a pílula fica na barra) */}
         {/* depois das 17h, enquanto o modo (gestor?) não chegou, o Radar também espera */}
         <GuardiaoAvisos bloqueado={gestorBomDia || bomDia !== null || (modoBomDia === null && !!orgBomDia && new Date().getHours() >= HORA_FIM_DIA)} />
+        {/* Assistente de IA (dono 30/10): balão no canto inferior direito; some enquanto o bom dia está na tela */}
+        <AssistenteBalao oculto={bomDia !== null} />
         {/* prévia da repaginada (27/10): comparador Antes/Depois, só no demo LOCAL
             (nunca num build publicado, nem no demo de cliente) */}
         {import.meta.env.DEV && DEMO_MODE && <ComparadorVisual />}
