@@ -21,9 +21,9 @@ import {
 
 export const BOM_DIA_REAL = isSupabaseConfigured && !!supabase;
 
-/** Voz da IA no Gemini: Gacrux com sotaque gaúcho — a VOZ DEFINIDA do sistema (dono 31/10: "os dois, vai ser a voz
-    definida"); antes, 30/10, Despina. O sotaque vem do estilo da edge bom-dia-voz, que usa sempre esta voz. */
-export const VOZ_BOM_DIA = 'Gacrux';
+/** A voz única do sistema: a IRIS (voz 3 da biblioteca do Google, pt-br-assistant-6) — dono 31/10: "a mesma que dá bom
+    dia… Isso não vai mudar". A edge bom-dia-voz usa sempre esta voz. Antes: Despina (30/10), Gacrux gaúcha (31/10). */
+export const VOZ_BOM_DIA = 'pt-br-assistant-6';
 
 /** demo: uma atendente e o administrador (Murilo). Gestor: dados da SINTESE-GESTOR + o empate de hoje
     (Juliana e Isadora, 2 cada — por isso 4 fechados hoje, senão a fala se contradiz), os não

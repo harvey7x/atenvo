@@ -1,6 +1,6 @@
 // assistente-voz — lógica PURA do MODO DE VOZ (pedido do dono 30/10/2026 ~21h50: "Não, eu não quero por texto,
 // eu quero por voz mesmo"): o corpo do TOKEN EFÊMERO do Live API do Gemini com a configuração inteira TRAVADA
-// no servidor — modelo, voz Despina, resposta em áudio, transcrição de entrada e de saída, detecção de fala e o
+// no servidor — modelo, voz da Iris (pt-br-assistant-6), resposta em áudio, transcrição de entrada e de saída, detecção de fala e o
 // system prompt de VOZ com o contexto de quem fala (assistente_contexto) — e as ferramentas do papel.
 //
 // As ferramentas são as MESMAS do balão (declaracoes(admin) de ../assistente/logica.ts, sem duplicar): aqui só
@@ -21,7 +21,7 @@ import {
 // ------------------------------------------------------------------ constantes (LIVE-API.md, pesquisa de 30/10)
 
 export const MODELO_VOZ = 'gemini-3.8-live';  // GA desde 15/09/2026: áudio nativo + function calling
-export const VOZ_PADRAO = 'Despina';          // a do bom dia (escolha do dono)
+export const VOZ_PADRAO = 'pt-br-assistant-6'; // a IRIS — a voz única do sistema (dono 31/10: "Sim, troca já")
 export const LIMITE_S = 600;                  // teto da conversa (a tela encerra; o expireTime cobra do lado do Google)
 export const ABRIR_EM_S = 60;                 // newSessionExpireTime: prazo para abrir o WebSocket
 export const FOLGA_S = 30;                    // expireTime = abrir + teto + folga (≈ 11,5 min)

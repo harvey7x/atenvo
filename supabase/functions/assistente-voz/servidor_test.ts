@@ -127,7 +127,7 @@ Deno.test('atendente: contexto → teto (30) → token travado no Google → 200
   assertFalse('fieldMask' in s.google[0].corpo);
   // log da sessão, sem token, sem ws_url e sem a chave
   assertEquals(s.logs.length, 1);
-  assertEquals(s.logs[0].pergunta, 'voz: nova sessão (gemini-3.8-live, Despina)');
+  assertEquals(s.logs[0].pergunta, 'voz: nova sessão (gemini-3.8-live, pt-br-assistant-6)');
   assertEquals(s.logs[0].usuario_id, JUL);
   assertEquals(s.logs[0].erro, null);
   const txtLog = JSON.stringify(s.logs);

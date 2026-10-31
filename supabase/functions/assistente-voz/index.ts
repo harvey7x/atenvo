@@ -14,7 +14,7 @@
 // QA sem senha (S2): bearer IGUAL à SUPABASE_SERVICE_ROLE_KEY (tempo constante) + x-assistente-ator: <uuid> → age
 // como essa pessoa (conta no teto dela). verify_jwt = true fixado no config.toml (NÃO desligar).
 // Secrets: GEMINI_API_KEY (a mesma da IA de vendas). Opcionais: ASSISTENTE_VOZ_MODELO (padrão gemini-3.8-live —
-// o Extended Thinking NÃO serve: exige ferramentas NON_BLOCKING), ASSISTENTE_VOZ_VOZ (padrão Despina),
+// o Extended Thinking NÃO serve: exige ferramentas NON_BLOCKING), ASSISTENTE_VOZ_VOZ (padrão a Iris, pt-br-assistant-6),
 // ASSISTENTE_VOZ_TETO_DIA (padrão 30).
 import { adminClient, confirmarServico, getUser } from '../assistente/client.ts';
 import type { LinhaLog } from '../assistente/servidor.ts';

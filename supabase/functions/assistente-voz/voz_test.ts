@@ -122,7 +122,7 @@ Deno.test('token: atendente — tudo travado no setup, 1 uso, 60 s para abrir, �
   assertEquals(s.model, 'models/gemini-3.8-live');
   assertEquals(s.generationConfig, {
     responseModalities: ['AUDIO'],
-    speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Despina' } } },
+    speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'pt-br-assistant-6' } } },
   });
   assertEquals(s.systemInstruction, { parts: [{ text: systemPromptVoz(ctx) }] });
   assertEquals(s.tools, [{ functionDeclarations: declaracoesVoz(false) }]);
@@ -157,7 +157,7 @@ Deno.test('token: o recorte do papel — atendente não leva ninguém da equipe;
   assert(ad.bidiGenerateContentSetup.systemInstruction.parts[0].text.includes('Equipe ativa: Giovana, Isadora, Juliana, Luiz, Matheus, Murilo.'));
 });
 
-Deno.test('token: modelo e voz vêm do servidor (env), com "models/" uma vez só; padrões 3.8 Live e Despina', () => {
+Deno.test('token: modelo e voz vêm do servidor (env), com "models/" uma vez só; padrões 3.8 Live e a Iris (pt-br-assistant-6)', () => {
   assertEquals(nomeDoModelo(undefined), MODELO_VOZ);
   assertEquals(nomeDoModelo('  '), MODELO_VOZ);
   assertEquals(nomeDoModelo('models/gemini-3.8-live'), 'gemini-3.8-live');

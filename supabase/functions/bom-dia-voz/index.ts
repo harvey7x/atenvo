@@ -19,19 +19,18 @@ import { adminClient, getUser } from './client.ts';
 const BUCKET = 'bom-dia-voz';
 const API = 'https://generativelanguage.googleapis.com/v1beta';
 const MODELO = Deno.env.get('BOM_DIA_MODELO') || 'gemini-3.8-flash-tts';
-// a VOZ DEFINIDA do sistema (dono 31/10: "os dois, vai ser a voz definida" — Gacrux com sotaque gaúcho, a mesma do
-// atendimento); antes, 30/10, Despina
-const VOZ_PADRAO = Deno.env.get('BOM_DIA_VOZ') || 'Gacrux';
+// a VOZ ÚNICA do sistema = IRIS (dono 31/10: "a voz… tem que ser a de atendimento… a mesma que dá bom dia… Isso não vai
+// mudar"): a voz 3 da biblioteca do Google, pt-br-assistant-6, que entra no mesmo campo das vozes prontas.
+// Histórico: Despina (30/10) → Gacrux gaúcha (31/10 manhã) → Iris (31/10 tarde, "Sim, troca já").
+const VOZ_PADRAO = Deno.env.get('BOM_DIA_VOZ') || 'pt-br-assistant-6';
 // timbres femininos do catálogo do Gemini — a tela só pede estes
 const VOZES = new Set(['Kore', 'Despina', 'Sulafat', 'Aoede', 'Leda', 'Zephyr', 'Erinome', 'Callirrhoe',
   'Autonoe', 'Achernar', 'Gacrux', 'Pulcherrima', 'Vindemiatrix', 'Laomedeia']);
 // dono 30/10: "voz boa, profissional, que fuja da forma IAzona" — locução de gente, nunca de robô.
 // A doc do Gemini pede o estilo em inglês e SEM idade/gênero/sotaque (isso é da voz escolhida).
-// O sotaque gaúcho entra no estilo por escolha do dono (31/10, ouviu as amostras e escolheu esta), mesmo a doc
-// recomendando voz regional — mudar esta frase muda a voz definida (é a mesma da prévia aprovada).
+// A Iris já tem sotaque brasileiro nativo: o estilo NÃO pede sotaque (a frase gaúcha era só da Gacrux).
 const ESTILO = 'natural and professional, like an experienced presenter giving a short morning update to a colleague; '
-  + 'warm and confident, relaxed conversational pace, clear diction, never robotic, never exaggerated; '
-  + 'with a soft gaúcho accent from Porto Alegre, Rio Grande do Sul, southern Brazil';
+  + 'warm and confident, relaxed conversational pace, clear diction, never robotic, never exaggerated';
 const TETO_DIA = 12;
 const TETO_DIA_SERVICO = 40;
 // o do administrador (Murilo, 30/10) é mais longo: campanhas, empates e vários casos críticos passam de 700
