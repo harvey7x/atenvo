@@ -36,10 +36,14 @@ import './assistente.css';
 
 /** prévia local (vite --mode demo): a conversa simulada — nunca num build publicado */
 const PREVIA_DEMO = import.meta.env.DEV && DEMO_MODE;
-/** Quem vê o balão de voz (e os avisos de lembrete): toda a equipe logada — dono 31/10, versão 1 publicada para
-    "Toda a equipe" (antes, 30/10, só o Matheus). O servidor recorta os dados pelo papel de cada um. */
+/** Quem vê o balão de voz (e os avisos de lembrete): SÓ o Matheus e o Murilo — dono 02/11 ("pode remover esse assistente, só
+    coloca só pro Murilo e para o Matheus; os outros atendentes não precisam ter agora"). Antes (31/10) era toda a equipe. */
+const LIBERADOS_VOZ = new Set([
+  '4ac197b4-9600-4756-81aa-1ac29280df09', // Matheus
+  'f81fcc8a-07a7-436a-9224-34003b65fc67', // Murilo
+]);
 export const vozLiberadaPara = (id: string | null | undefined, previa: boolean = PREVIA_DEMO): boolean =>
-  previa || !!id;
+  previa || (!!id && LIBERADOS_VOZ.has(id));
 
 const BASE_PADRAO = 20;   // px do rodapé da janela
 // no servidor (testes com renderToString) o efeito de layout vira efeito comum: sem o aviso do React

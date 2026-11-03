@@ -30,7 +30,7 @@ vi.spyOn(console, 'error').mockImplementation((...a: unknown[]) => {
 describe('liberação: toda a equipe logada (versão 1, dono 31/10)', () => {
   it('qualquer pessoa logada; sem login, não; na prévia local da demo, quem estiver logado', () => {
     expect(vozLiberadaPara(MATHEUS, false)).toBe(true);
-    expect(vozLiberadaPara('d7e59652-d3eb-4d7d-8830-7fc780701a8e', false)).toBe(true); // Juliana
+    expect(vozLiberadaPara('d7e59652-d3eb-4d7d-8830-7fc780701a8e', false)).toBe(false); // Juliana: fora (dono 02/11)
     expect(vozLiberadaPara('f81fcc8a-07a7-436a-9224-34003b65fc67', false)).toBe(true); // Murilo
     expect(vozLiberadaPara(null, false)).toBe(false);
     expect(vozLiberadaPara(undefined, false)).toBe(false);
