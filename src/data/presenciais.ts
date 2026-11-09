@@ -63,10 +63,23 @@ export function naTxt(iso: string): string {
   return `${dow === 0 || dow === 6 ? 'no' : 'na'} ${diaTxt(iso)}`;
 }
 
+const PARTICULAS = new Set(['da', 'de', 'do', 'das', 'dos', 'e']);
+/** "AMANDA da silva" → "Amanda da Silva" */
+export function nomeTxt(nome: string): string {
+  return nome.trim().split(/\s+/).map((w) => {
+    const l = w.toLowerCase();
+    return PARTICULAS.has(l) ? l : l.charAt(0).toUpperCase() + l.slice(1);
+  }).join(' ');
+}
+/** "Seg, 09/11" */
+export function diaCurtoTxt(iso: string): string {
+  const { a, m, d } = partesSP(iso);
+  return `${['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'][new Date(Date.UTC(a, m - 1, d)).getUTCDay()]}, ${dd(d)}/${dd(m)}`;
+}
+
 export function textoPresencial(tipo: 'marcado' | 'remarcado' | 'desmarcado', nome: string, quando: string, quem: string): string {
   if (tipo === 'marcado') {
-    return `📅 *PRESENCIAL MARCADO*\n${nome} foi marcado para atendimento presencial ${naTxt(quando)}, às ${horaTxt(quando)}.\n`
-      + `Marcado por ${quem}. No dia, aviso aqui de novo.`;
+    return `*📅  Presencial agendado*\n${nomeTxt(nome)}\n${diaCurtoTxt(quando)} às ${horaTxt(quando)} · ${quem}`;
   }
   if (tipo === 'remarcado') {
     return `🔁 *PRESENCIAL REMARCADO*\n${nome} passou para ${diaTxt(quando)}, às ${horaTxt(quando)}.\nRemarcado por ${quem}.`;

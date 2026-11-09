@@ -6,16 +6,14 @@ import { diaSP, horaTxt, instanteSP, naTxt, textoLembrete, textoPresencial } fro
    tem de ser idêntica. */
 
 describe('presenciais: textos do grupo (iguais ao banco)', () => {
-  it('marcado', () => {
-    expect(textoPresencial('marcado', 'Joice Elena de Souza Silveira', '2026-10-30T17:00:00Z', 'Matheus')).toBe(
-      '📅 *PRESENCIAL MARCADO*\nJoice Elena de Souza Silveira foi marcado para atendimento presencial na sexta, 30/10, às 14h.\n'
-      + 'Marcado por Matheus. No dia, aviso aqui de novo.',
+  it('marcado (texto curto, aprovado 09/11)', () => {
+    expect(textoPresencial('marcado', 'Amanda Cristina Silveira da silva', '2026-11-09T17:00:00Z', 'Matheus')).toBe(
+      '*📅  Presencial agendado*\nAmanda Cristina Silveira da Silva\nSeg, 09/11 às 14h · Matheus',
     );
   });
-  it('sábado e domingo usam "no"; minutos aparecem', () => {
-    expect(textoPresencial('marcado', 'Fulano', '2026-10-31T19:30:00Z', 'Isadora')).toBe(
-      '📅 *PRESENCIAL MARCADO*\nFulano foi marcado para atendimento presencial no sábado, 31/10, às 16h30.\n'
-      + 'Marcado por Isadora. No dia, aviso aqui de novo.',
+  it('minutos aparecem; fim de semana abreviado', () => {
+    expect(textoPresencial('marcado', 'FULANO DE TAL', '2026-10-31T19:30:00Z', 'Isadora')).toBe(
+      '*📅  Presencial agendado*\nFulano de Tal\nSáb, 31/10 às 16h30 · Isadora',
     );
     expect(naTxt('2026-11-01T13:00:00Z')).toBe('no domingo, 01/11');
   });
