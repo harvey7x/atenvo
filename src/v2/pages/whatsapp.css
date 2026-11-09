@@ -988,3 +988,9 @@ html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .w
 /* o visual do inbox limita todo chip a 170 px — na 3ª linha o aviso usa a largura toda, texto inteiro */
 html:root .v2 .wa-ctopo .sb.sb-selos > .wa-hchip,
 html:root[data-inbox-pro][data-inbox-pro][data-inbox-pro][data-inbox-pro] .v2 .wa-ctopo .sb.sb-selos > .wa-hchip { max-width: 100%; }
+
+/* Aba Iris: filtro secundário + selo "Era: ..." */
+.v2 .wa-iris-filtros { display: flex; gap: 4px; flex-wrap: wrap; padding: 4px 10px 6px; }
+.v2 .wa-iris-filtros .chip { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 99px; color: var(--txt-3); background: transparent; border: 1px solid rgba(var(--tint), .12); cursor: pointer; }
+.v2 .wa-iris-filtros .chip.on { color: var(--txt-1); border-color: rgba(var(--tint), .35); background: rgba(var(--tint), .08); }
+.v2 .conv2 .cchip.iris-era { margin-left: 6px; text-transform: none; max-width: 120px; vertical-align: middle; }

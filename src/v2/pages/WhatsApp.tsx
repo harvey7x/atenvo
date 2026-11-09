@@ -37,6 +37,7 @@ import { PROGRESSO_WA } from '@/data/whatsapp';
 import { pctProgresso, useProgressoCarga } from '@/data/progressoCarga';
 import { mensagemAssumir, useAlertasLeadQuente } from '@/data/alertasLeadQuente';
 import { AlertaLeadQuenteModal } from '../components/AlertaLeadQuenteModal';
+import { useIrisCarteira } from '../hooks/useEhIris';
 import { useInboxWhatsApp, type AvisoInbox } from '../hooks/useInboxWhatsApp';
 import { assinaturaAtendente } from '../hooks/inboxWhatsApp';
 import { AudioRecorderV2 } from '../components/AudioRecorderV2';
@@ -80,7 +81,7 @@ const ABA_KEY = 'atenvo-wa-aba';
 const GRUPOS_KEY = 'atenvo-wa-grupos-fechados';
 const TABS = [
   ['todos', 'Todos'], ['meus', 'Meus'], ['naoatrib', 'Não atribuídos'],
-  ['naolidas', 'Não lidas'], ['pendentes', 'Pendentes'], ['fechados', 'Fechados'], ['perdidos', 'Perdidos'], ['arquivadas', 'Arquivadas'],
+  ['naolidas', 'Não lidas'], ['pendentes', 'Pendentes'], ['fechados', 'Fechados'], ['iris', 'Iris'], ['perdidos', 'Perdidos'], ['arquivadas', 'Arquivadas'],
 ] as const;
 type TabId = typeof TABS[number][0];
 /* ⚠ do card: só o que o Radar NÃO cobre (dono 29/10: "deixa o Radar como o único aviso de cliente sem
@@ -418,10 +419,15 @@ export default function WhatsAppV2() {
   const [tab, setTab] = useState<TabId>(() => {
     try { const t = localStorage.getItem(ABA_KEY); return TABS.some(([id]) => id === t) ? (t as TabId) : 'todos'; } catch { return 'todos'; }
   });
+  // aba Iris: só Matheus/Murilo, e só depois da RPC responder (o servidor é a proteção real)
+  const { eIris, mapa: irisMapa, carteiraIds: irisCarteira } = useIrisCarteira();
+  const [irisFiltro, setIrisFiltro] = useState<'todos' | 'carteira' | 'meus' | 'fechados'>('todos');
+  // aba 'iris' guardada mas sem permissão: cai em 'todos' (sem apagar a preferência)
+  const tabEf: TabId = tab === 'iris' && !eIris ? 'todos' : tab;
   // persiste APENAS na escolha do usuário — a troca programática do deep-link não apaga a preferência
   const mudarAba = (t: TabId) => { setTab(t); try { localStorage.setItem(ABA_KEY, t); } catch { /* privado */ } };
   // quem não vê todos nunca fica em "Todos"/"Não atribuídos" (aba salva de antes da regra → "Meus")
-  const abas = vis.veTodos ? TABS : TABS.filter(([id]) => !ABAS_SO_ADMIN.includes(id));
+  const abas = (vis.veTodos ? TABS : TABS.filter(([id]) => !ABAS_SO_ADMIN.includes(id))).filter(([id]) => id !== 'iris' || eIris);
   useEffect(() => { if (!vis.veTodos && ABAS_SO_ADMIN.includes(tab)) setTab('meus'); }, [vis.veTodos, tab]);
   // atalho ?aba=fechados (Central do Radar → "Abrir a aba Fechados"): troca a aba e limpa a URL.
   // Fechados abre no grupo "Aguardando resposta": aberto (só nesta sessão) e com a lista no topo.
@@ -482,7 +488,7 @@ export default function WhatsAppV2() {
   useEffect(() => {
     abasRef.current?.querySelector<HTMLElement>('.wa-aba.on')?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
     atualizarSetas();
-  }, [tab, atualizarSetas]);
+  }, [tabEf, atualizarSetas]);
   useEffect(() => {
     const el = abasRef.current; if (!el) return;
     const ro = new ResizeObserver(() => atualizarSetas());
@@ -702,7 +708,9 @@ export default function WhatsAppV2() {
     // caem no 'todos' como antes; a conversa em si abre do mesmo jeito).
     const alvo = contacts.find((c) => c.id === conversaParam);
     const varianteAlvo = alvo ? situacaoDe(alvo).variante : null;
-    setTab(varianteAlvo === 'ganho' ? 'fechados' : varianteAlvo === 'perdido' ? 'perdidos' : vis.veTodos ? 'todos' : 'meus');
+    // conversa da carteira da Iris mora SÓ na aba Iris (some das demais) — quem pode vê-la vai pra lá
+    if (eIris && irisCarteira.has(conversaParam)) setIrisFiltro('todos');
+    setTab(eIris && irisCarteira.has(conversaParam) ? 'iris' : varianteAlvo === 'ganho' ? 'fechados' : varianteAlvo === 'perdido' ? 'perdidos' : vis.veTodos ? 'todos' : 'meus');
     limparFiltros(); setSearch('');
     setGruposFechados(new Set()); // expande tudo: o card alvo pode estar num grupo recolhido
     const t = window.setTimeout(() => {
@@ -753,9 +761,19 @@ export default function WhatsAppV2() {
     const variante = situacaoDe(c).variante;
     const fechado = variante === 'ganho';
     const perdido = variante === 'perdido';
+    if (t === 'iris') {
+      const l = irisMapa.get(c.id);
+      if (!eIris || !l) return false;
+      return irisFiltro === 'todos' ? true
+        : irisFiltro === 'carteira' ? l.origem === 'carteira'
+        : irisFiltro === 'fechados' ? fechado
+        : l.origem === 'matheus' && !fechado;
+    }
     if (t === 'fechados') return fechado;
     if (t === 'perdidos') return perdido;
     if (fechado || perdido) return false;
+    // carteira da Iris mora SÓ na aba Iris
+    if (irisCarteira.has(c.id) && ['todos', 'meus', 'naoatrib', 'naolidas', 'pendentes'].includes(t)) return false;
     // o toggle "Arquivadas" do painel revela arquivadas em qualquer aba (como a busca já faz)
     if (c.arquivada && !buscaAtiva && !filtroArquivadas) return false;
     return t === 'todos' ? true
@@ -767,25 +785,25 @@ export default function WhatsAppV2() {
   const tabCounts = useMemo(() => {
     const base = contacts.filter(passaBase);
     const n: Record<string, number> = {};
-    for (const [t] of TABS) n[t] = base.filter((c) => passaTab(c, t)).length;
+    for (const [t] of abas) n[t] = base.filter((c) => passaTab(c, t)).length;
     // Fechados: o selo da aba conta só quem AGUARDA RESPOSTA — o total da carteira nunca
     // mudava de cara e deixava passar fechado sem resposta (pedido do dono 15/10).
     n.fechadosAguarda = base.filter((c) => passaTab(c, 'fechados') && aguardaFechado(c)).length;
     return n;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contacts, filtroCanais, filtroTransporte, filtroEtapas, filtroEtiquetas, filtroAtendentes, filtroIA, filtroSituacao, filtroNaoLidas, filtroArquivadas, filtroPeriodo, canalPorId, term, relogioMs, user?.id, vis.veTodos, radarPorConv]);
+  }, [contacts, filtroCanais, filtroTransporte, filtroEtapas, filtroEtiquetas, filtroAtendentes, filtroIA, filtroSituacao, filtroNaoLidas, filtroArquivadas, filtroPeriodo, canalPorId, term, relogioMs, user?.id, vis.veTodos, radarPorConv, irisMapa, irisCarteira, eIris, irisFiltro, abas]);
   // contadores podem aparecer/sumir e mudar a largura do trilho → revê as setas
   useEffect(() => { atualizarSetas(); }, [tabCounts, atualizarSetas]);
   const visiveis = useMemo(() => {
-    const lista = contacts.filter((c) => passaBase(c) && passaTab(c, tab));
+    const lista = contacts.filter((c) => passaBase(c) && passaTab(c, tabEf));
     return lista.sort((a, b) => (a.fixada === b.fixada ? (b.lastAtMs ?? 0) - (a.lastAtMs ?? 0) : a.fixada ? -1 : 1));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contacts, tab, filtroCanais, filtroTransporte, filtroEtapas, filtroEtiquetas, filtroAtendentes, filtroIA, filtroSituacao, filtroNaoLidas, filtroArquivadas, filtroPeriodo, canalPorId, term, relogioMs, user?.id, vis.veTodos]);
+  }, [contacts, tabEf, filtroCanais, filtroTransporte, filtroEtapas, filtroEtiquetas, filtroAtendentes, filtroIA, filtroSituacao, filtroNaoLidas, filtroArquivadas, filtroPeriodo, canalPorId, term, relogioMs, user?.id, vis.veTodos, irisMapa, irisCarteira, eIris, irisFiltro, abas]);
   /* agrupamento por responsável — VOCÊ primeiro (seus clientes sempre visíveis no Todos),
      depois Não atribuídos, depois os demais atendentes em ordem alfabética */
   const grupos = useMemo(() => {
     // "Todos" é a visão geral: lista ÚNICA, sem dividir por atendente (pedido do dono)
-    if (tab === 'todos') return [['', visiveis]] as [string, WaContact[]][];
+    if (tabEf === 'todos' || tabEf === 'iris') return [['', visiveis]] as [string, WaContact[]][];
     // Fechados é fila de pós-venda, não carteira por atendente: "Aguardando resposta"
     // primeiro, depois "Em dia" por recência (ordem que visiveis já traz). Chaves
     // __aguarda/__emdia têm rótulo próprio no cabeçalho do grupo e convivem com o
@@ -793,7 +811,7 @@ export default function WhatsAppV2() {
     // Radar (v5): dentro de "Aguardando resposta", o estágio do Radar manda — pedido do gestor,
     // último aviso, 2º, 1º, fora do Radar. Fixar desempata DENTRO do mesmo degrau (o último aviso
     // nunca fica abaixo de dezenas de fixadas); depois, a espera mais antiga.
-    if (tab === 'fechados') {
+    if (tabEf === 'fechados') {
       const degrau = (c: WaContact) => { const r = radarPorConv.get(c.id); return r?.pedido ? 4 : r?.aviso?.estagio ?? 0; };
       const esperaMs = (c: WaContact) => {
         const t = Date.parse(radarPorConv.get(c.id)?.aviso?.desde ?? c.aguardandoDesde ?? '');
@@ -818,12 +836,12 @@ export default function WhatsAppV2() {
     // na aba "Não atribuídos" a fila sem dono continua PRIMEIRO (propósito da aba);
     // nas demais, Você abre a lista
     const rank = (k: string) =>
-      tab === 'naoatrib' ? (k === '' ? 0 : 1)
+      tabEf === 'naoatrib' ? (k === '' ? 0 : 1)
       : uid && k === uid ? 0 : k === '' ? 1 : 2;
     return [...m.entries()].sort((a, b) =>
       rank(a[0]) - rank(b[0]) || (nomePorId(a[0]) ?? '').localeCompare(nomePorId(b[0]) ?? '', 'pt-BR'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visiveis, usuarios, user?.id, tab, vis.veTodos, radarPorConv]);
+  }, [visiveis, usuarios, user?.id, tabEf, vis.veTodos, radarPorConv]);
   /* "Próximo aguardando" (Radar): abre o próximo cliente sem tirar a pessoa da aba em que está quando
      ele já aparece nela; senão vai pelo mesmo atalho da Central (?conversa=, que escolhe a aba certa —
      cliente fechado cai em Fechados). */
@@ -1120,6 +1138,13 @@ export default function WhatsAppV2() {
               <IcBusca />
               <input className="inp" placeholder="Buscar conversas..." value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
+            {tabEf === 'iris' && (
+              <div className="wa-iris-filtros" role="group" aria-label="Filtrar carteira da Iris">
+                {([['todos', 'Todos'], ['carteira', 'Carteira Iris'], ['meus', 'Meus'], ['fechados', 'Fechados']] as const).map(([id, rot]) => (
+                  <button key={id} type="button" className={'chip' + (irisFiltro === id ? ' on' : '')} aria-pressed={irisFiltro === id} onClick={() => setIrisFiltro(id)}>{rot}</button>
+                ))}
+              </div>
+            )}
             <div className="wa-abas-wrap">
               {setaEsq && (
                 <button type="button" className="wa-abas-seta esq" aria-label="Rolar abas para a esquerda" onClick={() => rolarAbas(-1)}>
@@ -1132,9 +1157,10 @@ export default function WhatsAppV2() {
               >
                 {abas.map(([id, rot]) => (
                   <button
-                    key={id} type="button" role="tab" aria-selected={tab === id}
-                    className={'wa-aba' + (tab === id ? ' on' : '')}
+                    key={id} type="button" role="tab" aria-selected={tabEf === id}
+                    className={'wa-aba' + (tabEf === id ? ' on' : '')}
                     title={id === 'pendentes' ? 'Pendentes inclui mensagens não lidas e clientes aguardando resposta.'
+                      : id === 'iris' ? 'Carteira da Iris: leads reatribuídos e seus clientes atendidos pela Iris.'
                       : id === 'fechados' ? rtTxt('extra.inbox.aba_fechados', {}, 'Clientes fechados (pós-venda). O número conta todos os que aguardam resposta, inclusive os que ainda não chegaram ao 1º aviso do Radar.') : undefined}
                     onClick={() => { if (arrastoRef.current.moveu) { arrastoRef.current.moveu = false; return; } mudarAba(id); }}
                   >
@@ -1181,13 +1207,13 @@ export default function WhatsAppV2() {
               grupos.map(([respId, lista]) => {
                 // "Todos" é lista única (sem cabeçalho) — nunca recolhe
                 // busca ativa ignora o recolhimento: resultado escondido confunde
-                const fechado = tab !== 'todos' && gruposFechados.has(respId) && !buscaAtiva;
+                const fechado = tabEf !== 'todos' && tabEf !== 'iris' && gruposFechados.has(respId) && !buscaAtiva;
                 // grupo fechado não pode esconder urgência: soma de não lidas + ponto do Radar (cliente seu com aviso)
                 const naoLidasGrupo = fechado ? lista.reduce((s, c) => s + (c.unread ?? 0), 0) : 0;
                 const radarGrupo = fechado && lista.some((c) => { const r = radarPorConv.get(c.id); return !!r?.aviso || !!r?.pedido; });
                 return (
                 <div key={respId || '(fila)'}>
-                  {tab !== 'todos' && (
+                  {tabEf !== 'todos' && tabEf !== 'iris' && (
                   <button
                     type="button" className={'wa-grupo' + (fechado ? ' fech' : '') + (respId === '__aguarda' ? ' urg' : '')} aria-expanded={!fechado}
                     title={buscaAtiva ? 'Limpe a busca para recolher grupos' : fechado ? 'Mostrar as conversas deste grupo' : 'Recolher este grupo'}
@@ -1225,6 +1251,7 @@ export default function WhatsAppV2() {
                             {c.silenciada && <span className="fl" title="Silenciada">🔕</span>}
                             {c.arquivada && <span className="fl" title="Arquivada">🗄️</span>}
                             {nomeExibicao(c)}
+                            {tabEf === 'iris' && irisMapa.get(c.id)?.atendente_original_nome && <span className="cchip iris-era" title="Atendente original">Era: {irisMapa.get(c.id)?.atendente_original_nome}</span>}
                           </span>
                           <span className="p">{c.last || '—'}</span>
                           <span className="chips">
