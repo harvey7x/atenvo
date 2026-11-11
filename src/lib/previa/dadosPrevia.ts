@@ -11,6 +11,8 @@ export interface Banco {
   tabelas: Record<string, Linha[]>;
   midia: Map<string, string>;
   usuario: { id: string; email: string; user_metadata: Record<string, unknown> };
+  /** chamado depois de cada gravação (a prévia guarda os usuários entre recargas) */
+  aoMudar?: (tabela: string) => void;
 }
 
 const MIN = 60_000;
@@ -118,12 +120,19 @@ export function criarBanco(): Banco {
   const comerciais = [...new Set(dados.linhas.map((l) => l.comercial).filter(Boolean))].sort();
   const usuario = { id: 'u-matheus', email: 'matheus@reviza.local', user_metadata: { name: 'Matheus' } };
 
+  /* AMBIENTES (11/11): quem entra em Cobranças, em Atendimento ou nos dois — o seletor do topo e a tela
+     Usuários mostram. Dois comerciais também atendem; duas atendentes só no Atendimento; a Bruna só Cobranças. */
+  const NOS_DOIS = new Set(['Eduardo', 'Paty']);
   const profiles: Linha[] = [
-    { id: usuario.id, nome: 'Matheus', email: usuario.email, papel: 'admin', ativo: true, deve_trocar_senha: false, created_at: '2026-09-10T12:00:00Z' },
+    { id: usuario.id, nome: 'Matheus', email: usuario.email, papel: 'admin', ativo: true, deve_trocar_senha: false, created_at: '2026-09-10T12:00:00Z', modulos: ['cobrancas', 'atendimento'] },
+    { id: 'u-bruna', nome: 'Bruna', email: 'bruna@reviza.local', papel: 'financeiro', ativo: true, deve_trocar_senha: false, created_at: '2026-09-10T15:00:00Z', modulos: ['cobrancas'] },
     ...comerciais.map((c, i) => ({
       id: `u-${slug(c)}`, nome: c, email: `${slug(c)}@reviza.local`, papel: 'comercial', ativo: true, deve_trocar_senha: false,
       created_at: `2026-09-${String(11 + i).padStart(2, '0')}T12:00:00Z`,
+      modulos: NOS_DOIS.has(c) ? ['cobrancas', 'atendimento'] : ['cobrancas'],
     })),
+    { id: 'u-carla', nome: 'Carla', email: 'carla@reviza.local', papel: 'atendente', ativo: true, deve_trocar_senha: false, created_at: '2026-11-03T12:00:00Z', modulos: ['atendimento'] },
+    { id: 'u-bianca', nome: 'Bianca', email: 'bianca@reviza.local', papel: 'atendente', ativo: true, deve_trocar_senha: false, created_at: '2026-11-06T12:00:00Z', modulos: ['atendimento'] },
   ];
 
   const canais: Linha[] = comerciais.map((c, i) => ({

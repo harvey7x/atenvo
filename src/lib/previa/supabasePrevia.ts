@@ -84,16 +84,19 @@ class Consulta implements PromiseLike<Resp> {
     if (this.modo === 'insert' || this.modo === 'upsert') {
       const novos = (Array.isArray(this.carga) ? this.carga : [this.carga ?? {}]).map((r) => ({ id: id(), created_at: new Date().toISOString(), ...DEFAULTS[this.tabela], ...r }));
       t.push(...novos);
+      this.db.aoMudar?.(this.tabela);
       return this.fim(novos);
     }
     if (this.modo === 'update') {
       const alvos = t.filter(casa);
       for (const r of alvos) Object.assign(r, this.carga);
+      this.db.aoMudar?.(this.tabela);
       return this.fim(alvos);
     }
     if (this.modo === 'delete') {
       const fora = t.filter(casa);
       this.db.tabelas[this.tabela] = t.filter((r) => !casa(r));
+      this.db.aoMudar?.(this.tabela);
       return this.fim(fora);
     }
     // o embed entra ANTES dos filtros: .eq('wa_envios.origem', …) (o !inner da tela) filtra por ele
@@ -167,6 +170,25 @@ const folhaNoFormatoDoBanco = (d: PlDados) => ({
 export function criarSupabasePrevia() {
   const db = criarBanco();
   const T = db.tabelas;
+  /* USUÁRIOS da prévia: o que se cria/edita/exclui na tela Usuários sobrevive ao recarregar, e o
+     "Ver como" do selo (selo.ts) troca quem está logado — pra ver o sistema como cada pessoa
+     (ex.: a atendente só enxerga o Atendimento). Só na prévia; nada sai do navegador. */
+  const LS_PERFIS = 'previa-perfis-v2';
+  const LS_VER = 'previa-ver-como';
+  try { const salvo = JSON.parse(localStorage.getItem(LS_PERFIS) || 'null'); if (Array.isArray(salvo) && salvo.length) T.profiles = salvo; } catch { /* sem armazenamento: só a memória */ }
+  const salvarPerfis = () => { try { localStorage.setItem(LS_PERFIS, JSON.stringify(T.profiles)); } catch { /* idem */ } };
+  db.aoMudar = (tabela) => { if (tabela === 'profiles') salvarPerfis(); };
+  try {
+    const ver = localStorage.getItem(LS_VER);
+    const p = ver ? T.profiles.find((x) => x.id === ver && x.ativo) : null;
+    if (p) db.usuario = { id: String(p.id), email: String(p.email), user_metadata: { name: p.nome } };
+  } catch { /* idem */ }
+  (window as unknown as { __previa?: unknown }).__previa = {
+    perfis: () => T.profiles.map((p) => ({ ...p })),
+    eu: () => db.usuario.id,
+    verComo: (pid: string) => { try { localStorage.setItem(LS_VER, pid); } catch { /* idem */ } location.reload(); },
+    restaurar: () => { try { localStorage.removeItem(LS_PERFIS); localStorage.removeItem(LS_VER); } catch { /* idem */ } location.reload(); },
+  };
   const sessao = { access_token: 'previa', refresh_token: 'previa', token_type: 'bearer', expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + 3600, user: db.usuario };
   let logado = true;
   type OuvinteAuth = (evento: string, s: typeof sessao | null) => void;
@@ -176,6 +198,8 @@ export function criarSupabasePrevia() {
   const agoraIso = () => new Date().toISOString();
 
   const rpcs: Record<string, (a: Linha) => unknown> = {
+    // 1º acesso de quem nasceu com senha temporária (visto pelo "Ver como"): trocou → entra
+    senha_redefinida: () => { const p = T.profiles.find((x) => x.id === db.usuario.id); if (p) p.deve_trocar_senha = false; salvarPerfis(); return null; },
     wa_canais_visao_equipe: () => T.wa_canais.map(({ qr: _q, instancia: _i, ...r }) => r),
     wa_marcar_lida: (a) => { const c = conversa(a.p_conversa); if (c) c.nao_lidas = 0; return null; },
     wa_envios_resumo: () => ({ enviadas: 75, entregues: 71, lidas: 58, responderam: 34, erros: 1, pulados: 3, na_fila: 0, agendados: 0, optouts: 0 }),
@@ -281,7 +305,30 @@ export function criarSupabasePrevia() {
       return { hoje: dia(0), de: b.de, ate: b.ate, itens, cobertura: coberturaRegua(), config: cfg };
     },
     'reviza-wa-instancia': () => ({ ok: true }),
-    'reviza-admin': () => ({ ok: true }),
+    'reviza-admin': (b) => {
+      const loginDe = (e: unknown) => String(e ?? '').replace(/@reviza\.local$/i, '');
+      const gerar = () => `Rv-${Math.random().toString(36).slice(2, 11)}`;
+      const achar = () => T.profiles.find((x) => x.id === b.id);
+      if (b.acao === 'criar') {
+        const usuario = String(b.usuario ?? '').trim().toLowerCase();
+        if (!usuario) return { error: 'Usuario invalido (use letras, numeros, ponto, hifen).' };
+        if (T.profiles.some((x) => loginDe(x.email) === usuario)) return { error: 'Ja existe um usuario com esse login.' };
+        const senha = (b.senha as string) || gerar();
+        T.profiles.push({ id: id(), nome: String(b.nome || usuario), email: `${usuario}@reviza.local`, papel: b.papel ?? 'comercial', ativo: true,
+          deve_trocar_senha: b.senha ? b.exigirTroca !== false : true, created_at: agoraIso(), modulos: Array.isArray(b.modulos) ? b.modulos : null });
+        salvarPerfis();
+        return { usuario, senha };
+      }
+      if (b.acao === 'resetar') { const p = achar(); if (p) p.deve_trocar_senha = true; salvarPerfis(); return { senha: gerar() }; }
+      if (b.acao === 'definir_senha') { const p = achar(); if (p) p.deve_trocar_senha = !!b.exigirTroca; salvarPerfis(); return {}; }
+      if (b.acao === 'renomear') { const p = achar(); if (p) p.email = `${String(b.usuario)}@reviza.local`; salvarPerfis(); return { usuario: b.usuario }; }
+      if (b.acao === 'excluir') {
+        const p = achar(); if (!p) return { error: 'id invalido' };
+        if (String(b.confirmar ?? '').trim().toLowerCase() !== loginDe(p.email)) return { error: 'Confirmação não confere: digite o login do usuário.' };
+        T.profiles = T.profiles.filter((x) => x.id !== b.id); salvarPerfis(); return {};
+      }
+      return { ok: true };
+    },
   };
 
   const canalFalso = () => {

@@ -4,6 +4,7 @@ import { viteSingleFile } from 'vite-plugin-singlefile';
 import { VitePWA } from 'vite-plugin-pwa';
 import { fileURLToPath, URL } from 'node:url';
 import { readFileSync } from 'node:fs';
+import { resolve as resolverCaminho } from 'node:path';
 
 // Prévia de design da Reviza: UM index.html com tudo embutido (JS/CSS/fontes/fotos/áudios),
 // abre direto como arquivo. Dados fictícios em memória (src/lib/previa) e rede bloqueada.
@@ -27,8 +28,32 @@ const iconeEmbutido = {
   },
 };
 
+/* AMBIENTE ATENDIMENTO na prévia (11/11): o código do Atenvo (dados, hooks e telas do Atendimento)
+   recebe '@/lib/supabase' na versão "modo demonstração" (supabaseAtendimentoDemo.ts: sem cliente →
+   os dados de exemplo do próprio Atenvo). O resto — Cobranças, sessão, login, shell, Usuários — segue no
+   cliente falso da prévia. Decide-se por QUEM importa; o código de produção não muda nada. */
+const LADO_ATENDIMENTO = [
+  /\/src\/data\//,                       // camada de dados do Atenvo (WhatsApp, Kanban, Dashboard, Scripts, Presenciais…)
+  /\/src\/adapters\//,
+  /\/src\/components\/(DocumentosInssBox|FichaJudicialModal)\.tsx$/,
+  /\/src\/v2\/components\/SeloAoVivo\.tsx$/,
+  /\/src\/v2\/hooks\/(bloqueiosOrg|scriptsResumo|useAtivacaoConvite|useEhIris|useNotificacaoInbound)\.ts$/,
+  /\/src\/v2\/pages\/(ColetorInss|Configuracoes)\.tsx$/,
+  /\/src\/v2\/services\/conta\.ts$/,
+];
+const MODULO_DEMO = resolverCaminho(fileURLToPath(new URL('.', import.meta.url)), 'src/lib/previa/supabaseAtendimentoDemo.ts');
+const previaAtendimentoDemo = {
+  name: 'previa-atendimento-demo',
+  enforce: 'pre' as const,
+  resolveId(fonte: string, quem?: string) {
+    if (!quem || !/(^@\/lib\/supabase$)|(\/lib\/supabase(\.ts)?$)/.test(fonte)) return null;
+    if (quem.includes('/src/lib/previa/')) return null; // o próprio módulo demo reexporta o de verdade
+    return LADO_ATENDIMENTO.some((r) => r.test(quem)) ? MODULO_DEMO : null;
+  },
+};
+
 export default defineConfig({
-  plugins: [react(), viteSingleFile(), VitePWA({ disable: true }), semFontesExternas, iconeEmbutido],
+  plugins: [previaAtendimentoDemo, react(), viteSingleFile(), VitePWA({ disable: true }), semFontesExternas, iconeEmbutido],
   base: './',
   mode: 'previa',
   define: {
