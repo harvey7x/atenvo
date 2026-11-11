@@ -967,6 +967,9 @@
 .v2 .calx-pill b { font-weight: 500; margin-left: auto; padding: 0; font-size: 11px; color: var(--txt-3); background: none; border-radius: 0; }
 .v2 .calx-pill .calx-rot { display: inline-flex; align-items: center; color: var(--ambar); flex-shrink: 0; }
 .v2 .calx-pill.fantasma { color: var(--txt-3); border: 0; background: transparent; font-weight: 400; opacity: .75; }
+/* a regra genérica `.v2 .fantasma` do Kanban do Atendimento (card fantasma de 64px) chega com o CSS do
+   Kanban e não sai mais da página: a pílula da Cobrança segue uma linha de texto */
+.v2 .calx-pills .calx-pill.fantasma { height: auto; margin-bottom: 0; border-radius: 0; }
 .v2 .calx-pill.foco, .v2 .calx-cell:hover .calx-pill { color: var(--txt); }
 .v2 .calx-pill.foco b { color: var(--txt-2); }
 .v2 .calx-pill[draggable="true"] { cursor: grab; }

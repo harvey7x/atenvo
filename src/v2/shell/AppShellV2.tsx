@@ -26,7 +26,7 @@ import { useConfiguracaoPendente } from '../data/cobranca/configuracao';
 import { useNotificacoes, useMarcarNotificacao, type Notificacao } from '@/data/remarketing';
 import { useNotificacoesCob, useMarcarNotifCob } from '../data/cobranca/notificacoes';
 import { secaoDoPapel } from '../data/cobranca/secoes';
-import { rotaAtendimentoFora } from '../data/modulos';
+import { rotaAtendimentoPermitida } from '../data/modulos';
 import { useConversasWA } from '../data/wa/wa';
 import { tempoRelativo } from '../lib/tempo';
 import { usePapel } from '../data/cobranca/sessao';
@@ -155,10 +155,10 @@ const COB_GRUPO_DE: Record<string, string> = {
 const COB_GRUPOS = ['Visão geral', 'Carteira', 'WhatsApp', 'Ferramentas', 'Equipe']
   .map((rotulo) => ({ rotulo, itens: COB_SECOES.filter((i) => (COB_GRUPO_DE[i.slug.replace('cobrancas/', '')] ?? 'Equipe') === rotulo) }))
   .filter((g) => g.itens.length > 0);
-const MODULOS: Modulo[] = [
-  { id: 'atendimento', rotulo: 'Atendimento', home: '/whatsapp', grupos: GRUPOS },
-  { id: 'cobrancas', rotulo: 'Cobranças', home: '/cobrancas/painel', grupos: COB_GRUPOS },
-];
+const MOD_ATENDIMENTO: Modulo = { id: 'atendimento', rotulo: 'Atendimento', home: '/whatsapp', grupos: GRUPOS };
+const MOD_COBRANCAS: Modulo = { id: 'cobrancas', rotulo: 'Cobranças', home: '/cobrancas/painel', grupos: COB_GRUPOS };
+// Reviza: Cobranças vem primeiro — é o início de quem tem os dois ambientes (o coração da Reviza)
+const MODULOS: Modulo[] = isRevizaMode ? [MOD_COBRANCAS, MOD_ATENDIMENTO] : [MOD_ATENDIMENTO, MOD_COBRANCAS];
 /* ícones das seções de cobrança (mesma família traço 1.7) */
 const IcC = (d: string) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><path d={d} /></svg>
@@ -167,6 +167,8 @@ const FERR_ICONES: Record<string, ReactNode> = {
   unificador: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><path d="M8 3H5a2 2 0 0 0-2 2v5M16 3h3a2 2 0 0 1 2 2v5M8 21H5a2 2 0 0 1-2-2v-5M16 21h3a2 2 0 0 0 2-2v-5M9 12h6M12 9v6" /></svg>,
   // Conversor: dois arquivos com setas trocando (converter)
   conversor: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><path d="M4 7h11M4 7l3-3M4 7l3 3M20 17H9M20 17l-3-3M20 17l-3 3" /></svg>,
+  // Coletor INSS: documento com seta para baixo (o ícone do Atenvo)
+  'coletor-inss': <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z" /><path d="M12 11v6M9.5 14.5 12 17l2.5-2.5" /></svg>,
 };
 const COB_ICONES: Record<string, ReactNode> = {
   // Análise INSS: extrato (documento) com lupa
@@ -240,7 +242,7 @@ type ItemPaleta =
   | { tipo: 'secao'; slug: string; rotulo: string; grupo: string }
   | { tipo: 'cliente'; id: string; nome: string; comercial: string; dia: number };
 
-function PaletaBusca({ secoes, raiz, aoFechar }: { secoes: SecaoPaleta[]; raiz: HTMLElement; aoFechar: () => void }) {
+function PaletaBusca({ secoes, raiz, aoFechar, comClientes }: { secoes: SecaoPaleta[]; raiz: HTMLElement; aoFechar: () => void; comClientes: boolean }) {
   const navigate = useNavigate();
   const [q, setQ] = useState('');
   const [ativo, setAtivo] = useState(0);
@@ -249,9 +251,9 @@ function PaletaBusca({ secoes, raiz, aoFechar }: { secoes: SecaoPaleta[]; raiz: 
   useEffect(() => { inputRef.current?.focus(); }, []);
   useEffect(() => { setAtivo(0); }, [q]);
 
-  // clientes = a MESMA query da Gestão (chave compartilhada → cache aproveitado);
-  // fora de Reviza/demo (Atenvo puro) nem liga — a paleta fica só com as seções
-  const comClientes = isRevizaMode || isDemoMode;
+  // clientes = a MESMA query da Gestão (chave compartilhada → cache aproveitado). Quem decide é o
+  // shell (`comClientes`): só no ambiente Cobranças e só para quem tem Cobranças — no Atendimento a
+  // paleta é a do Atenvo (só as seções) e quem é só do Atendimento nunca busca a carteira
   const clientesQ = useQuery<Dados>({
     queryKey: chavesCobranca.dados,
     queryFn: () => getCobrancaRepo().carregar(),
@@ -439,25 +441,32 @@ export default function AppShellV2() {
   const [painelNotif, setPainelNotif] = useState(false);
   const [notifPos, setNotifPos] = useState<{ top: number; right: number }>({ top: 60, right: 60 });
   const sinoRef = useRef<HTMLButtonElement>(null);
-  const papelSessao = usePapel().data;
+  const papelQ = usePapel();
+  const papelSessao = papelQ.data;
+  // AMBIENTES (dono 11/11): "nem todo mundo do atendimento vai ter acesso a cobranças".
+  // `temCob` = a pessoa CONFIRMADAMENTE tem Cobranças (perfil carregado). Enquanto o perfil não
+  // chega, é false: nada da Cobrança (clientes na busca, sino, conversas) é buscado para quem
+  // talvez seja só do Atendimento. Fora da Reviza (demo ALFA/Atenvo) vale sempre.
+  const temCob = !isRevizaMode || !!papelSessao?.ambientes.includes('cobrancas');
   // configuração inicial pendente: o assistente cobra a mensalidade — o LicencaGate fica desmontado
   const configPendente = useConfiguracaoPendente();
   // fonte do sino: Cobranças (Reviza real + demo ALFA) usa a central própria —
-  // confirmações do financeiro, avisos e mensagens; Atenvo segue no remarketing
+  // confirmações do financeiro, avisos e mensagens; Atenvo segue no remarketing.
+  // Quem é só do Atendimento não recebe nada da Cobrança (o sino do Atenvo segue desligado na Reviza).
   const fonteCob = isRevizaMode || isDemoMode;
   const notifsAtenvoQ = useNotificacoes();
-  const notifsCobQ = useNotificacoesCob(fonteCob);
+  const notifsCobQ = useNotificacoesCob(fonteCob && temCob);
   const marcarAtenvo = useMarcarNotificacao();
   const marcarCob = useMarcarNotifCob();
   const marcarNotif = fonteCob ? marcarCob : marcarAtenvo;
   // sintética de WhatsApp só pra quem TEM a seção Conversas na matriz (financeiro/cadastro ficam fora)
-  const veConversas = isRevizaMode && papelSessao?.papel != null && papelSessao.papel !== 'financeiro' && papelSessao.papel !== 'cadastro';
+  const veConversas = isRevizaMode && temCob && papelSessao?.papel != null && papelSessao.papel !== 'financeiro' && papelSessao.papel !== 'cadastro';
   const conversasWa = useConversasWA(veConversas).data ?? [];
   const waNaoLidas = conversasWa.reduce((s, c) => s + (c.nao_lidas || 0), 0);
-  const avisosNaoLidosSino = useAvisosNaoLidos().data ?? 0;
-  const notifsBase: Notificacao[] = fonteCob ? (notifsCobQ.data ?? []) : (notifsAtenvoQ.data ?? []);
+  const avisosNaoLidosSino = useAvisosNaoLidos(temCob).data ?? 0;
+  const notifsBase: Notificacao[] = fonteCob ? (temCob ? (notifsCobQ.data ?? []) : []) : (notifsAtenvoQ.data ?? []);
   // linhas agregadas (não são "marcáveis" — somem quando lidas na origem)
-  const sinteticas: Notificacao[] = fonteCob ? [
+  const sinteticas: Notificacao[] = fonteCob && temCob ? [
     ...(avisosNaoLidosSino > 0 ? [{ id: 'sn-avisos', tipo: 'avisos', titulo: `${avisosNaoLidosSino} aviso${avisosNaoLidosSino === 1 ? '' : 's'} do administrativo`, corpo: 'Clique para abrir os Avisos.', rota: '/cobrancas/avisos', lidaEm: null, criadoEm: new Date().toISOString() }] : []),
     ...(waNaoLidas > 0 ? [{ id: 'sn-wa', tipo: 'mensagens', titulo: `${waNaoLidas} mensage${waNaoLidas === 1 ? 'm' : 'ns'} não lida${waNaoLidas === 1 ? '' : 's'} no WhatsApp`, corpo: 'Clique para abrir as Conversas.', rota: '/cobrancas/conversas', lidaEm: null, criadoEm: new Date().toISOString() }] : []),
   ] : [];
@@ -507,7 +516,7 @@ export default function AppShellV2() {
   // Reviza: papel real decide quem vê o Financeiro (comercial não vê; fora da instância, todos);
   // papel "cadastro" só vê a tela Novos
   // Avisos do administrativo: contador de não lidos no item do menu (reviza real; demo usa a persona)
-  const avisosNaoLidos = useAvisosNaoLidos().data ?? 0;
+  const avisosNaoLidos = useAvisosNaoLidos(temCob).data ?? 0;
   // débito parado aguardando aprovação (dono 24/09): selo no "Novos" só pra quem aprova
   const pendentesAprovacao = usePendentesAprovacao(location.pathname.startsWith('/cobrancas') && !!papelSessao?.podeAprovar).data ?? 0;
   const podeVerFinanceiro = !isRevizaMode || papelSessao?.gestor || papelSessao?.papel === 'financeiro';
@@ -518,10 +527,13 @@ export default function AppShellV2() {
   const menuDoPapel = (slug: string) => slug.startsWith('cobrancas/') && secaoDoPapel(papelSessao?.papel, slug.slice('cobrancas/'.length));
   // filtro de papel dos itens do menu — FONTE ÚNICA também da paleta ⌘K
   // (a paleta nunca lista uma seção que o papel não veria na sidebar)
-  // "admin" no Atendimento = administrador OU gestor (Dashboard, como no Atenvo); nas Cobranças segue só o admin (Registros, Usuários)
-  const veAdminAtend = admin || currentOrg?.role === 'gestor';
+  // itens "admin" = só o administrador, nos dois ambientes — no Atendimento é o Dashboard, como no
+  // Atenvo (visibilidade 22/10: as telas da equipe inteira são só do admin) e igual à rota (RequireRoleV2)
+  // quem a Reviza sabe que NÃO tem Cobranças (perfil já carregado) não vê nenhum item da Cobrança
+  const semCobConfirmado = isRevizaMode && papelSessao?.papel != null && !papelSessao.ambientes.includes('cobrancas');
   const filtrarItensNav = (itens: ItemNav[]) => itens
-    .filter((i) => !i.admin || (i.slug.startsWith('cobrancas/') ? admin : veAdminAtend))
+    .filter((i) => !i.admin || admin)
+    .filter((i) => !i.slug.startsWith('cobrancas/') || !semCobConfirmado)
     // Reviza: Financeiro é restrito — comercial não vê o item
     .filter((i) => i.slug !== 'cobrancas/financeiro' || podeVerFinanceiro)
     // Reviza: matriz do dono — financeiro, comercial e cadastro só veem as suas seções
@@ -546,18 +558,28 @@ export default function AppShellV2() {
   // MÓDULO ativo derivado da rota: /cobrancas* = Cobranças, senão Atendimento.
   // Trocar de módulo navega pra home do módulo (o menu da esquerda se refaz).
   const moduloAtivo: ModuloId = location.pathname.startsWith('/cobrancas') ? 'cobrancas' : 'atendimento';
-  const modulo = MODULOS.find((m) => m.id === moduloAtivo) ?? MODULOS[0];
   // DEMO da ALFA: Atendimento removido — só Cobranças.
   // AMBIENTES (dono 11/11): na Reviza o seletor mostra só os ambientes do perfil (admin = os dois; atendente =
   // só Atendimento; demais = o que o administrador marcou). Enquanto o perfil carrega, só o ambiente atual
   // (sem seta e sem redirecionar). Demo segue só Cobranças.
-  const ambientesSessao = papelSessao?.ambientes;
+  // Perfil sem papel (falha ao ler o perfil, conta sem papel) = sem decisão de ambiente: fica como a
+  // Reviza de antes (a página abre; os dados seguem protegidos pelo banco) — nunca uma tela em branco.
+  const ambientesSessao = papelSessao?.papel != null ? papelSessao.ambientes : undefined;
   const modulosDisponiveis = isRevizaMode
     ? (ambientesSessao ? MODULOS.filter((m) => ambientesSessao.includes(m.id)) : MODULOS.filter((m) => m.id === moduloAtivo))
     : isDemoMode ? MODULOS.filter((m) => m.id !== 'atendimento') : MODULOS;
   // ambiente da rota que a pessoa NÃO tem → vai pro primeiro que ela tem (ex.: atendente que caiu em /cobrancas)
   const semAcessoAoAmbiente = isRevizaMode && !!ambientesSessao && !ambientesSessao.includes(moduloAtivo);
   const homeDaPessoa = modulosDisponiveis[0]?.home ?? '/cobrancas/painel';
+  // enquanto o perfil (e com ele os ambientes) não chegou, a página NÃO monta: sem isso a tela do
+  // ambiente proibido pintava os dados por um instante (atendente via a Gestão de cobranças)
+  const acessoCarregando = isRevizaMode && papelQ.isPending;
+  // a barra lateral desenha o ambiente para onde a pessoa VAI (sem piscar o menu do ambiente que ela não tem)
+  const moduloDaBarra: ModuloId = semAcessoAoAmbiente ? (modulosDisponiveis[0]?.id ?? moduloAtivo) : moduloAtivo;
+  const modulo = MODULOS.find((m) => m.id === moduloDaBarra) ?? MODULOS[0];
+  // busca de CLIENTES na paleta ⌘K: só no ambiente Cobranças e só para quem tem Cobranças
+  // (no Atendimento a busca é a do Atenvo: só as seções)
+  const buscaClientes = (isRevizaMode || isDemoMode) && temCob && moduloAtivo === 'cobrancas';
   const trocarModulo = useCallback((m: Modulo) => {
     setMenuOrg(false);
     navigate(m.home);
@@ -699,7 +721,7 @@ export default function AppShellV2() {
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
                 <circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" />
               </svg>
-              <span className="busca-texto">{(isRevizaMode || isDemoMode) ? 'Buscar clientes e seções…' : 'Buscar seções do sistema…'}</span><kbd>⌘K</kbd>
+              <span className="busca-texto">{buscaClientes ? 'Buscar clientes e seções…' : 'Buscar seções do sistema…'}</span><kbd>⌘K</kbd>
             </button>
             <div className="top-dir">
               {(isRevizaMode || isDemoMode) && <BotaoDesfazer />}
@@ -729,7 +751,7 @@ export default function AppShellV2() {
                     </div>
                     {notifsLista.length === 0 ? (
                       <div className="np-vazio">{fonteCob
-                        ? 'Nenhuma notificação ainda. Confirmações do financeiro, avisos do administrativo e mensagens aparecem aqui.'
+                        ? (temCob ? 'Nenhuma notificação ainda. Confirmações do financeiro, avisos do administrativo e mensagens aparecem aqui.' : 'Nenhuma notificação ainda.')
                         : 'Nenhuma notificação ainda. Quando a Central de Remarketing identificar algo, aparece aqui.'}</div>
                     ) : notifsLista.slice(0, 20).map((n) => (
                       <button key={n.id} type="button" role="menuitem" className={'np-item' + (n.lidaEm ? '' : ' nova')}
@@ -785,8 +807,9 @@ export default function AppShellV2() {
                 Rotas OFICIAIS estão na RAIZ desde o CORTE (/whatsapp, /kanban) — não mais em /v2/*. */}
             <div className={/^\/(kanban|whatsapp)(\/|$)/.test(location.pathname) ? 'pagina pg-entra cheia' : 'pagina pg-entra'} key={location.pathname}>
               {isDemoMode && moduloAtivo === 'atendimento' ? <Navigate to="/cobrancas/painel" replace />
+                : acessoCarregando ? <div className="acesso-carregando" role="status" aria-label="Carregando seu acesso" />
                 : semAcessoAoAmbiente ? <Navigate to={homeDaPessoa} replace />
-                : isRevizaMode && moduloAtivo === 'atendimento' && rotaAtendimentoFora(location.pathname) ? <Navigate to="/whatsapp" replace />
+                : isRevizaMode && moduloAtivo === 'atendimento' && !rotaAtendimentoPermitida(location.pathname) ? <Navigate to="/whatsapp" replace />
                 : <Outlet />}
             </div>
           </div>
@@ -803,7 +826,7 @@ export default function AppShellV2() {
         </main>
 
         {/* portais soltos: intro do dia + aviso de deploy (dono 28/08) + paleta ⌘K */}
-        {paletaAberta && <PaletaBusca secoes={secoesPaleta} raiz={raizMenu} aoFechar={fecharPaleta} />}
+        {paletaAberta && <PaletaBusca secoes={secoesPaleta} raiz={raizMenu} aoFechar={fecharPaleta} comClientes={buscaClientes} />}
         <AvisoAtualizacao />
       </div>
 

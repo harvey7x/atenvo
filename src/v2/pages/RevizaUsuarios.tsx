@@ -6,7 +6,7 @@
    Real: profiles + Edge Function reviza-admin. Demo: store local (usuarios.ts).
    AMBIENTES (11/11): a mesma tela vale para os dois ambientes — fica em Cobranças → Usuários e em
    Atendimento → Configurações → Usuários. Cada pessoa tem os ambientes que enxerga (data/modulos.ts). */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { BadgeStatus, BotaoPrimario, BotaoSec, CardVidro, EstadoVazio, ModalV2 } from '../components';
 import {
   bloqueioDesativar, bloqueioExclusao, loginValido, senhaFraca,
@@ -15,6 +15,7 @@ import {
 } from '../data/cobranca/usuarios';
 import type { Papel } from '../data/cobranca/types';
 import { AMBIENTES, ROTULO_AMBIENTE, alternarAmbiente, ambientesDoPerfil, ambientesFixos, type Ambiente } from '../data/modulos';
+import { lerDesfazer, useDesfazerEstado } from '../data/desfazer';
 import './painel/painel.css';
 
 const PAPEL_ROTULO: Record<Papel, string> = { admin: 'Administrador', gestor: 'Gestor', comercial: 'Comercial', financeiro: 'Financeiro', cadastro: 'Cadastro', atendente: 'Atendente' };
@@ -82,7 +83,14 @@ export function AbaUsuarios({ gestor }: { demo: boolean; gestor: boolean }) {
   const setAmbientes = useDefinirAmbientes();
 
   const [aviso, setAvisoSt] = useState<{ texto: string; tom: 'ok' | 'erro' } | null>(null);
-  const ok = (texto: string) => setAvisoSt({ texto, tom: 'ok' });
+  // a faixa verde descreve a ÚLTIMA ação; se ela for desfeita (botão Desfazer do topo) ou o
+  // desfazer trocar de ação, a faixa sai — senão ficava dizendo o estado que já não vale
+  const acaoDoAviso = useRef<number | null>(null);
+  const slotDesfazer = useDesfazerEstado();
+  useEffect(() => {
+    if (acaoDoAviso.current != null && slotDesfazer?.quando !== acaoDoAviso.current) { acaoDoAviso.current = null; setAvisoSt(null); }
+  }, [slotDesfazer]);
+  const ok = (texto: string) => { setAvisoSt({ texto, tom: 'ok' }); acaoDoAviso.current = lerDesfazer()?.quando ?? null; };
   const falha = (e: unknown) => setAvisoSt({ texto: (e as Error)?.message || String(e), tom: 'erro' });
   const [senhaMostrar, setSenhaMostrar] = useState<{ quem: string; senha: string; troca: boolean } | null>(null);
   const [janela, setJanela] = useState<Janela | null>(null);

@@ -9,7 +9,7 @@ import { Ajuda, Legenda, Variacao, type Sentido } from './comum';
    MESMO trecho do período anterior; o tempo para fechar mostra mediana, média e n. */
 
 const AJUDA = {
-  entradas: 'Tudo que entrou no período, em qualquer número, contado como no Gerenciador de Anúncios: cada cliente que chega por um número num dia é uma entrada — o cliente novo e quem já tinha falado com a CAF e voltou pela mensagem do anúncio (quem volta em outro dia conta de novo). O número interno do escritório não conta. Quem já estava no sistema está na seção "Anúncio e quem já estava no sistema".',
+  entradas: 'Tudo que entrou no período, em qualquer número, contado como no Gerenciador de Anúncios: cada cliente que chega por um número num dia é uma entrada — o cliente novo e quem já tinha falado com a ALFA e voltou pela mensagem do anúncio (quem volta em outro dia conta de novo). O número interno do escritório não conta. Quem já estava no sistema está na seção "Anúncio e quem já estava no sistema".',
   ne: 'Leads marcados como não elegíveis no período, pela IA, pela regra automática do RS ou por alguém da equipe.',
   ganhos: 'Clientes que o sistema do administrativo marcou como completos no período, pela data em que ficaram completos lá. A lista é lida de lá a cada 5 minutos.',
   /* com a API nova do CAF (29/10): a mesma conta do pódio do "Meu painel" */

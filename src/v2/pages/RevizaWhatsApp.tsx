@@ -31,6 +31,7 @@ import {
 } from './regua/ReguaTela';
 import { useDadosCobranca } from '../data/cobranca/hooks';
 import { useUsuarios } from '../data/cobranca/usuarios';
+import { ambientesDoPerfil } from '../data/modulos';
 import { NumerosVista, type ComercialCobertura, type NumeroItem } from './painel/NumerosVista';
 import {
   corDe, diaSP, fmtHa, horaSP, iniciaisDe, mmss, nomeAgenda, ondaDe, rotuloDiaFio, rotuloHoraLista, tomEspera, Tiques,
@@ -125,7 +126,9 @@ export function NumerosReviza({ gestor, aoAvisar }: { gestor: boolean; aoAvisar:
   // profiles); self-service não precisa dela, já sabe quem é (sessao)
   const usuariosQ = useUsuarios(gestor);
   const reservaId = useReguaConfigWA().data?.canal_reserva_id ?? null;
-  const atendentes = (usuariosQ.data ?? []).filter((u) => u.ativo);
+  // só quem tem o ambiente Cobranças: um número da régua dado a quem só tem o Atendimento ficaria sem
+  // ninguém vendo as conversas dele
+  const atendentes = (usuariosQ.data ?? []).filter((u) => u.ativo && ambientesDoPerfil(u.papel, u.modulos).includes('cobrancas'));
 
   // carteira EM COBRANÇA por comercial (é quem a régua manda pelo número do dono)
   const comerciais = useMemo<ComercialCobertura[]>(() => {

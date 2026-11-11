@@ -6,13 +6,17 @@
 // Cliente FECHADO tem fila própria ('vacuo_fechado'), separada da negociação (dono 29/10).
 import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
-import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured, isRevizaMode } from '@/lib/supabase';
 import { useOrg } from '@/context/OrgContext';
 import { useAuth } from '@/context/AuthContext';
 import { nomeContatoExib } from '@/data/slaView';
 import { DEMO_USER } from '@/data/demo';
 
 export const VACUO_REAL = isSupabaseConfigured && !!supabase;
+/* REVIZA (dono 11/11: "não vou querer ... a central de avisos"): o Radar não existe lá — nem avisos,
+   ligar e pedidos do gestor, nem o "Era de X" dos repasses, no WhatsApp e no Kanban do Atendimento.
+   Nenhuma consulta sai (o banco da Reviza não tem o motor). */
+const RADAR_LIGADO = !isRevizaMode;
 
 export interface VacuoRepasse {
   id: string;
@@ -180,7 +184,7 @@ export function useRadarAvisos() {
   const orgId = currentOrg.id;
   return useQuery({
     queryKey: ['radar-avisos', orgId],
-    enabled: !!orgId,
+    enabled: RADAR_LIGADO && !!orgId,
     // demo: as fixtures nascem uma vez — refazer a cada minuto desfaria "Já liguei" e "Pedir resposta"
     ...(VACUO_REAL
       ? { staleTime: 50_000, refetchInterval: 60_000, refetchOnWindowFocus: true }
@@ -291,7 +295,7 @@ export function useVacuoRepasses() {
   const orgId = currentOrg.id;
   return useQuery({
     queryKey: ['vacuo-repasses', orgId],
-    enabled: !!orgId,
+    enabled: RADAR_LIGADO && !!orgId,
     ...(VACUO_REAL
       ? { staleTime: 50_000, refetchInterval: 60_000 }
       : { staleTime: Infinity, refetchInterval: false as const, refetchOnWindowFocus: false }),
@@ -345,7 +349,7 @@ export function useVacuoRanking() {
   const orgId = currentOrg.id;
   return useQuery({
     queryKey: ['vacuo-ranking', orgId],
-    enabled: !!orgId,
+    enabled: RADAR_LIGADO && !!orgId,
     staleTime: 120_000,
     refetchInterval: 180_000,
     queryFn: async (): Promise<VacuoRankItem[]> => {
@@ -383,7 +387,7 @@ export function useVacuoConfig() {
   const orgId = currentOrg.id;
   return useQuery({
     queryKey: ['vacuo-config', orgId],
-    enabled: !!orgId,
+    enabled: RADAR_LIGADO && !!orgId,
     staleTime: 300_000,
     queryFn: async (): Promise<VacuoConfigView | null> => {
       if (!VACUO_REAL) return CONFIG_DEMO;
@@ -446,7 +450,7 @@ export function useVacuoDecisoes() {
   const gestor = currentOrg.role === 'admin';
   return useQuery({
     queryKey: ['vacuo-decisoes', orgId],
-    enabled: !!orgId && gestor,
+    enabled: RADAR_LIGADO && !!orgId && gestor,
     ...(VACUO_REAL
       ? { staleTime: 50_000, refetchInterval: 60_000 }
       : { staleTime: Infinity, refetchInterval: false as const, refetchOnWindowFocus: false }),

@@ -17,6 +17,7 @@ import {
 import { DEMO_MODE } from '@/lib/demo';
 import { isRevizaMode } from '@/lib/supabase';
 import { AbaUsuarios } from './RevizaUsuarios';
+import { usePapel } from '../data/cobranca/sessao';
 import { PALETA_CORES, podeGerenciarAtendimento, type StatusDef } from '@/types/atendimento';
 import { resetDemonstracao, solicitarTrocaEmail } from '../services/conta';
 import { criarRaizPortalV2 } from '../components/portal';
@@ -101,13 +102,17 @@ interface SeedCfg {
   fb: { id: string; pagina_id: string; pagina_nome: string | null; estado: string }[];
   contatos: { id: string; nome: string; telefone: string | null }[];
 }
-/** Reviza: os dados de exemplo com a empresa (ALFA GROUP) e a pessoa logada */
-function seedReviza(b: SeedCfg, nome: string | null): SeedCfg {
+/** Reviza: papel de verdade (profiles.papel) → rótulo da tela — o currentOrg.role só sabe admin/gestor/atendente */
+const ROTULO_PAPEL_REVIZA: Record<string, string> = { admin: 'Administrador', gestor: 'Gestor', comercial: 'Comercial', financeiro: 'Financeiro', cadastro: 'Cadastro', atendente: 'Atendente' };
+/** Reviza: o login é o "usuário" (a conta é usuario@reviza.local — o domínio não aparece) */
+const loginReviza = (email: string | null | undefined) => String(email ?? '').replace(/@reviza\.local$/i, '');
+/** Reviza: os dados de exemplo com a empresa (ALFA GROUP) e a pessoa logada (nome, papel e usuário dela) */
+function seedReviza(b: SeedCfg, nome: string | null, papel: string | null, email: string | null): SeedCfg {
   const quem = nome?.trim() || 'Administrador';
-  const login = quem.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().split(/\s+/)[0] || 'admin';
+  const login = loginReviza(email) || quem.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().split(/\s+/)[0] || 'admin';
   return {
     ...b,
-    perfil: { ...b.perfil, nome: quem, email: `${login}@alfagroup.com.br`, cargo: 'Administrador' },
+    perfil: { ...b.perfil, nome: quem, email: login, cargo: (papel && ROTULO_PAPEL_REVIZA[papel]) || '' },
     org: { ...b.org, nome: 'ALFA GROUP', nomeFantasia: 'ALFA GROUP', email: 'contato@alfagroup.com.br' },
     canais: b.canais.map((c) => ({ ...c, gestorNome: c.gestorNome ? quem : null })),
     fb: b.fb.map((f) => ({ ...f, pagina_nome: 'ALFA GROUP' })),
@@ -174,7 +179,9 @@ export default function ConfiguracoesV2() {
     const t = setTimeout(() => setAviso(null), 4200);
     return () => clearTimeout(t);
   }, [aviso]);
-  const [seed, setSeed] = useState<SeedCfg | null>(() => (demo ? (isRevizaMode ? seedReviza(seedCfg(), user?.name ?? null) : seedCfg()) : null));
+  // Reviza: o shell só monta a página com o perfil já carregado — papel e nome de verdade no exemplo
+  const sessaoR = usePapel().data;
+  const [seed, setSeed] = useState<SeedCfg | null>(() => (demo ? (isRevizaMode ? seedReviza(seedCfg(), sessaoR?.nome ?? user?.name ?? null, sessaoR?.papel ?? null, user?.email ?? null) : seedCfg()) : null));
 
   // cascata de entrada roda UMA vez (carga da página); trocas de aba não re-animam
   const primeiraCarga = useRef(true);
@@ -304,7 +311,10 @@ function PainelConta({ anima, demo, seed, setSeed, aoAvisar, podeGerenciar }: {
 
   const perfil = demo ? seed?.perfil ?? null : perfilQ.data ?? null;
   const orgDado = demo ? seed?.org ?? null : orgQ.data ?? null;
-  const email = demo ? seed?.perfil.email : user?.email;
+  // Reviza: não há e-mail — a conta é o USUÁRIO (login), que só o administrador troca (Usuários)
+  const papelR = usePapel().data?.papel ?? null;
+  const rotuloPapel = isRevizaMode ? ((papelR && ROTULO_PAPEL_REVIZA[papelR]) || '—') : (PAPEL_LABEL[currentOrg.role === 'gestor' ? 'supervisor' : currentOrg.role] || currentOrg.role);
+  const email = demo ? seed?.perfil.email : isRevizaMode ? loginReviza(user?.email) : user?.email;
 
   const [form, setForm] = useState({ nome: '', telefone: '', cargo: '' });
   const [avatarSrc, setAvatarSrc] = useState<string | null>(null);
@@ -386,7 +396,7 @@ function PainelConta({ anima, demo, seed, setSeed, aoAvisar, podeGerenciar }: {
             <Av n={form.nome || 'U'} src={avatarSrc} />
             <div className="pi">
               <div className="nm">{form.nome || '—'}</div>
-              <div className="rl">{PAPEL_LABEL[currentOrg.role === 'gestor' ? 'supervisor' : currentOrg.role] || currentOrg.role} · {email}</div>
+              <div className="rl">{rotuloPapel} · {email}</div>
             </div>
             <div className="pa">
               <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) trocarFoto(f); e.currentTarget.value = ''; }} />
@@ -404,10 +414,10 @@ function PainelConta({ anima, demo, seed, setSeed, aoAvisar, podeGerenciar }: {
               <Input id="cfa-cargo" value={form.cargo} onChange={(e) => setForm({ ...form, cargo: e.target.value })} placeholder="Ex.: Atendente, Gestor" />
             </div>
             <div className="campo" style={{ marginBottom: 0 }}>
-              <label htmlFor="cfa-email">Email</label>
+              <label htmlFor="cfa-email">{isRevizaMode ? 'Usuário' : 'Email'}</label>
               <div className="cfa-email">
-                <Input id="cfa-email" type="email" value={email || ''} readOnly />
-                <BotaoSec onClick={() => setEmailModal(true)}>Alterar</BotaoSec>
+                <Input id="cfa-email" type={isRevizaMode ? 'text' : 'email'} value={email || ''} readOnly title={isRevizaMode ? 'O usuário de entrada é trocado pelo administrador, em Usuários' : undefined} />
+                {!isRevizaMode && <BotaoSec onClick={() => setEmailModal(true)}>Alterar</BotaoSec>}
               </div>
             </div>
             <div className="campo" style={{ marginBottom: 0 }}>
@@ -1325,7 +1335,7 @@ function PainelPrefs({ anima, demo, seed, setSeed, aoAvisar }: {
               <select id="cfa-p-home" className="inp" value={p.pagina_inicial} onChange={(e) => persist({ pagina_inicial: e.target.value })}>
                 <option value="/whatsapp">WhatsApp</option>
                 <option value="/kanban">Kanban</option>
-                <option value="/relatorios">Relatórios</option>
+                {!isRevizaMode && <option value="/relatorios">Relatórios</option>}
               </select>
               <div className="cfa-desc-c">Tela exibida ao entrar.</div>
             </div>

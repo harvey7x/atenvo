@@ -3,6 +3,7 @@ import { Suspense, type ReactNode } from 'react';
 import { lazyComRecarga as lazy } from '@/lib/recargaChunk';
 import { createBrowserRouter, createHashRouter, RouterProvider, Navigate, Outlet, useParams, type RouteObject } from 'react-router-dom';
 import { isRevizaMode } from '@/lib/supabase';
+import { DESTINO_PADRAO_V2 } from '@/v2/destino';
 // v1 — preservado APENAS em /v1/* como fallback técnico (sem link na interface). Nada é deletado.
 // Guardas do v1 ficam estáticas: são minúsculas e só usam os contextos que já estão no entry.
 import { ProtectedRoute } from '@/components/ProtectedRoute';
@@ -125,7 +126,8 @@ const routes: RouteObject[] = [
         element: <Lz><GateMobileApp><AppShellV2 /></GateMobileApp></Lz>,
         children: [
           // Home: entra pelo WhatsApp (entrada do v1) — decisão de escopo do dono.
-          { index: true, element: <Navigate to="/whatsapp" replace /> },
+          // Reviza: entra pela Cobrança (o coração dela); quem é só do Atendimento o shell leva ao WhatsApp.
+          { index: true, element: <Navigate to={isRevizaMode ? DESTINO_PADRAO_V2 : '/whatsapp'} replace /> },
           // Visibilidade (22/10, pedido do dono): só o admin vê a carteira de todos — as telas de
           // GESTÃO (visão da equipe inteira) ficam só para ele: Dashboard, Relatórios, Recuperação,
           // Disparo e Cobranças. As de trabalho (inbox, Kanban, Contatos…) mostram só os clientes de cada um.
