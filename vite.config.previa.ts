@@ -52,8 +52,9 @@ const previaAtendimentoDemo = {
   },
 };
 
-/* mídias de exemplo do Atenvo (public/demo-midia: fotos e áudios das conversas de demonstração) — o HTML
-   da prévia vai sozinho, sem a pasta public/: o caminho '/demo-midia/x' vira o próprio arquivo embutido */
+/* mídias de exemplo do Atenvo (fotos e áudios das conversas de demonstração) — moram só na prévia
+   (src/lib/previa/demo-midia; o pacote da Reviza não as leva). O HTML da prévia vai sozinho: o caminho
+   '/demo-midia/x' vira o próprio arquivo embutido */
 const RAIZ = fileURLToPath(new URL('.', import.meta.url));
 const MIME: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', m4a: 'audio/mp4', mp3: 'audio/mpeg', ogg: 'audio/ogg', wav: 'audio/wav', pdf: 'application/pdf' };
 const midiaDemoEmbutida = {
@@ -61,7 +62,7 @@ const midiaDemoEmbutida = {
   transform(codigo: string, idArq: string) {
     if (!/\/src\/.*\.[jt]sx?$/.test(idArq) || !codigo.includes('/demo-midia/')) return null;
     return codigo.replace(/\/demo-midia\/([A-Za-z0-9._-]+)\.(jpe?g|png|webp|m4a|mp3|ogg|wav|pdf)\b/g, (m: string, nome: string, ext: string) => {
-      try { return `data:${MIME[ext]};base64,${readFileSync(resolverCaminho(RAIZ, 'public/demo-midia', `${nome}.${ext}`)).toString('base64')}`; } catch { return m; }
+      try { return `data:${MIME[ext]};base64,${readFileSync(resolverCaminho(RAIZ, 'src/lib/previa/demo-midia', `${nome}.${ext}`)).toString('base64')}`; } catch { return m; }
     });
   },
 };
