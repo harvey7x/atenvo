@@ -23,7 +23,7 @@ import { ROTULO_ETAPA, TrilhaEtapas } from './TrilhaEtapas';
 export { IcCheck } from './TrilhaEtapas';
 
 const ROTULO_PAPEL: Record<Papel, string> = {
-  admin: 'Administrador', gestor: 'Gestor', comercial: 'Comercial', financeiro: 'Financeiro', cadastro: 'Cadastro',
+  admin: 'Administrador', gestor: 'Gestor', comercial: 'Comercial', financeiro: 'Financeiro', cadastro: 'Cadastro', atendente: 'Atendente',
 };
 
 /** "Ana Paula Ribeiro" → "AP" */

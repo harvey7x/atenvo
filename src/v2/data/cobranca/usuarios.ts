@@ -10,10 +10,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { isRevizaMode, supabase } from '@/lib/supabase';
 import { registrarDesfazer, registrarBloqueada } from '../desfazer';
 import type { Papel } from './types';
+import { AMBIENTES, type Ambiente } from '../modulos';
 
 export interface UsuarioRow {
   id: string; nome: string; email: string; papel: Papel; ativo: boolean;
   deve_trocar_senha: boolean; created_at: string; usuario: string;
+  /** ambientes marcados pelo administrador (profiles.modulos) — o que vale é ambientesDoPerfil(papel, modulos) */
+  modulos?: Ambiente[] | null;
 }
 
 const CHAVE = ['reviza', 'usuarios'] as const;
@@ -31,13 +34,15 @@ function demoSeed(): UsuarioRow[] {
     u(DEMO_EU, 'Henrique', 'henrique', 'admin', 60),
     u('demo-bruna', 'Bruna', 'bruna', 'financeiro', 45),
     u('demo-adm', 'Administrativo', 'administrativo', 'cadastro', 44),
-    u('demo-eduardo', 'Eduardo', 'eduardo', 'comercial', 40),
-    u('demo-paty', 'Paty', 'paty', 'comercial', 38),
+    u('demo-eduardo', 'Eduardo', 'eduardo', 'comercial', 40, { modulos: ['cobrancas', 'atendimento'] }),
+    u('demo-paty', 'Paty', 'paty', 'comercial', 38, { modulos: ['cobrancas', 'atendimento'] }),
     u('demo-augusto', 'Augusto', 'augusto', 'comercial', 36),
     u('demo-junior', 'Junior', 'junior', 'comercial', 30),
     u('demo-garcia', 'Garcia', 'garcia', 'comercial', 25),
     u('demo-emillyn', 'Emillyn', 'emillyn', 'comercial', 12, { deve_trocar_senha: true }),
     u('demo-leandro', 'Leandro', 'leandro', 'comercial', 90, { ativo: false }),
+    u('demo-carla', 'Carla', 'carla', 'atendente', 8),
+    u('demo-bianca', 'Bianca', 'bianca', 'atendente', 5),
   ];
 }
 function demoLer(): UsuarioRow[] {
@@ -87,11 +92,12 @@ export function useUsuarios(habilitado: boolean) {
     queryFn: async () => {
       if (!real()) return demoLer();
       const { data, error } = await supabase!
-        .from('profiles').select('id, nome, email, papel, ativo, deve_trocar_senha, created_at')
+        .from('profiles').select('*') // '*': `modulos` (ambientes) entrou depois — banco sem a coluna segue respondendo
         .order('created_at', { ascending: true });
       if (error) throw new Error(error.message);
       return (data ?? []).map((r) => ({
         ...(r as Omit<UsuarioRow, 'usuario'>),
+        modulos: Array.isArray((r as { modulos?: unknown }).modulos) ? ((r as { modulos: Ambiente[] }).modulos) : null,
         usuario: String((r as { email?: string }).email ?? '').replace(/@reviza\.local$/i, ''),
       })) as UsuarioRow[];
     },
@@ -137,7 +143,7 @@ export function useCriarUsuario() {
   const qc = useQueryClient();
   return useMutation({
     /** senha vazia = gera temporária (troca obrigatória no 1º acesso) */
-    mutationFn: async (a: { usuario: string; nome: string; papel: Papel; senha?: string; exigirTroca?: boolean }) => {
+    mutationFn: async (a: { usuario: string; nome: string; papel: Papel; senha?: string; exigirTroca?: boolean; modulos?: Ambiente[] }) => {
       if (real()) return chamarAdmin({ acao: 'criar', ...a });
       const usuario = loginValido(a.usuario);
       if (!usuario) throw new Error('Usuário inválido (use letras, números, ponto, hífen).');
@@ -145,7 +151,7 @@ export function useCriarUsuario() {
       if (l.some((x) => x.usuario === usuario)) throw new Error('Já existe um usuário com esse nome.');
       if (a.senha) { const f = senhaFraca(a.senha); if (f) throw new Error(f); }
       const senha = a.senha || gerarSenhaDemo();
-      demoGravar([...l, { id: `demo-${Date.now().toString(36)}`, nome: a.nome.trim() || usuario, usuario, email: `${usuario}@alfa.demo`, papel: a.papel, ativo: true, deve_trocar_senha: a.senha ? a.exigirTroca !== false : true, created_at: new Date().toISOString() }]);
+      demoGravar([...l, { id: `demo-${Date.now().toString(36)}`, nome: a.nome.trim() || usuario, usuario, email: `${usuario}@alfa.demo`, papel: a.papel, ativo: true, deve_trocar_senha: a.senha ? a.exigirTroca !== false : true, created_at: new Date().toISOString(), modulos: a.modulos ?? null }]);
       return { usuario, senha };
     },
     onSuccess: (_d, a) => { invalidar(qc); registrarBloqueada(`criar usuário ${a.nome}`, 'Criação de usuário não é desfeita por aqui — desative ou exclua o usuário na tela Usuários.'); },
@@ -250,6 +256,31 @@ export function useDefinirPapel() {
       registrarDesfazer({ rotulo: `papel de ${ctx?.nome ?? 'usuário'}`, inverso: async () => {
         if (!real()) { demoMudar(a.id, { papel: antes }); return; }
         const { error } = await supabase!.from('profiles').update({ papel: antes }).eq('id', a.id); if (error) throw new Error(error.message);
+      } });
+    },
+  });
+}
+
+/** AMBIENTES do usuário (Cobranças / Atendimento) — só vale para quem não tem acesso fixo
+    (administrador = os dois; atendente = só Atendimento: ver data/modulos.ts) */
+export function useDefinirAmbientes() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (a: { id: string; modulos: Ambiente[] }) => {
+      const lista = AMBIENTES.filter((m) => a.modulos.includes(m));
+      if (!lista.length) throw new Error('Marque pelo menos um ambiente — sem nenhum, a pessoa não entra em nada.');
+      if (!real()) { demoMudar(a.id, { modulos: lista }); return; }
+      const { error } = await supabase!.from('profiles').update({ modulos: lista }).eq('id', a.id);
+      if (error) throw new Error(error.message);
+    },
+    onMutate: async (a) => { const u = qc.getQueryData<UsuarioRow[]>(CHAVE)?.find((x) => x.id === a.id); return { antes: u?.modulos ?? null, nome: u?.nome }; },
+    onSuccess: (_d, a, ctx) => {
+      invalidar(qc);
+      void qc.invalidateQueries({ queryKey: ['cobranca', 'papel'] });
+      const antes = ctx?.antes ?? null;
+      registrarDesfazer({ rotulo: `ambientes de ${ctx?.nome ?? 'usuário'}`, inverso: async () => {
+        if (!real()) { demoMudar(a.id, { modulos: antes }); return; }
+        const { error } = await supabase!.from('profiles').update({ modulos: antes }).eq('id', a.id); if (error) throw new Error(error.message);
       } });
     },
   });

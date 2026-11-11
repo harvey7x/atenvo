@@ -554,6 +554,11 @@
 .v2 .pn-us-check { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--txt-2); cursor: pointer; }
 .v2 .pn-us-check input { width: 15px; height: 15px; accent-color: var(--azul, #F0BC4E); }
 .v2 .pn-us-opcoes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+/* ambientes da pessoa (Cobranças / Atendimento): chips do sistema; travado = acesso fixo do papel */
+.v2 .pn-us-amb { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.v2 .pn-us-amb .chip { white-space: nowrap; }
+.v2 .pn-us-amb .chip:disabled { cursor: default; opacity: .62; }
+.v2 .pn-us-amb .chip.on:disabled { opacity: .85; }
 .v2 .pn-us-opcoes button {
   display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border-radius: 10px; text-align: left; cursor: pointer;
   border: 1px solid var(--linha); background: rgba(var(--tint), .025); color: var(--txt-3); font: inherit; font-size: 11.5px; line-height: 1.4;

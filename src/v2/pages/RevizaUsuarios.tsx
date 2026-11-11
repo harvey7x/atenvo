@@ -3,25 +3,30 @@
    Adicionar · editar nome e login · senha (gerar temporária OU definir) · papel ·
    desativar/reativar (reversível) · EXCLUIR do sistema (definitivo, digitando o login;
    nunca a si mesmo nem o último admin). Mesma linguagem do Painel (painel.css, pn-*).
-   Real: profiles + Edge Function reviza-admin. Demo: store local (usuarios.ts). */
+   Real: profiles + Edge Function reviza-admin. Demo: store local (usuarios.ts).
+   AMBIENTES (11/11): a mesma tela vale para os dois ambientes — fica em Cobranças → Usuários e em
+   Atendimento → Configurações → Usuários. Cada pessoa tem os ambientes que enxerga (data/modulos.ts). */
 import { useMemo, useState } from 'react';
 import { BadgeStatus, BotaoPrimario, BotaoSec, CardVidro, EstadoVazio, ModalV2 } from '../components';
 import {
   bloqueioDesativar, bloqueioExclusao, loginValido, senhaFraca,
-  useCriarUsuario, useDefinirAtivo, useDefinirPapel, useDefinirSenha, useEditarUsuario, useExcluirUsuario,
+  useCriarUsuario, useDefinirAmbientes, useDefinirAtivo, useDefinirPapel, useDefinirSenha, useEditarUsuario, useExcluirUsuario,
   useMeuId, useResetarSenha, useUsuarios, type UsuarioRow,
 } from '../data/cobranca/usuarios';
 import type { Papel } from '../data/cobranca/types';
+import { AMBIENTES, ROTULO_AMBIENTE, alternarAmbiente, ambientesDoPerfil, ambientesFixos, type Ambiente } from '../data/modulos';
 import './painel/painel.css';
 
-const PAPEL_ROTULO: Record<Papel, string> = { admin: 'Administrador', gestor: 'Gestor', comercial: 'Comercial', financeiro: 'Financeiro', cadastro: 'Cadastro' };
+const PAPEL_ROTULO: Record<Papel, string> = { admin: 'Administrador', gestor: 'Gestor', comercial: 'Comercial', financeiro: 'Financeiro', cadastro: 'Cadastro', atendente: 'Atendente' };
 // papéis por decisão do dono (11/09): comercial/financeiro/admin + cadastro; "gestor" só p/ exibir contas antigas
-const PAPEIS: Papel[] = ['comercial', 'financeiro', 'cadastro', 'admin'];
+// + atendente (11/11): quem trabalha só no Atendimento
+const PAPEIS: Papel[] = ['comercial', 'financeiro', 'cadastro', 'atendente', 'admin'];
 const PAPEL_DESC: Record<Papel, string> = {
   comercial: 'Painel com os clientes dele, Novos, Gestão, Calendário, Régua, Conversas, Números e Envios. Vê só a própria carteira.',
   financeiro: 'Painel geral, Novos, Financeiro, Gestão, Atendentes e Avisos. Confere pagamentos e aprova o ciclo.',
   cadastro: 'Novos, Gestão e Avisos. Acompanha reclamações, marca débito parado e aprova o ciclo — sem painel nem números.',
-  admin: 'Vê e faz tudo, inclusive gerenciar os usuários.',
+  atendente: 'Só o Atendimento: WhatsApp, Presenciais, Scripts, Kanban e as Ferramentas. Não vê as Cobranças.',
+  admin: 'Vê e faz tudo nos dois ambientes, inclusive gerenciar os usuários.',
   gestor: 'Papel antigo — equivale a administrador sem a tela de usuários.',
 };
 const opcoesPapel = (atual?: Papel): Papel[] => (atual && !PAPEIS.includes(atual) ? [atual, ...PAPEIS] : PAPEIS);
@@ -31,6 +36,31 @@ const desde = (iso: string) => { const d = new Date(iso); return isNaN(d.getTime
 const IcLixo = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6" /></svg>
 );
+
+/* ambientes da pessoa: chips Cobranças / Atendimento. Administrador e Atendente têm acesso fixo
+   (chips travados, com o porquê na dica); os demais ligam/desligam (sempre fica pelo menos um). */
+function Ambientes({ papel, modulos, aoMudar, travado, rotulo }: {
+  papel: Papel; modulos: readonly Ambiente[] | null | undefined; aoMudar: (l: Ambiente[]) => void; travado?: string; rotulo: string;
+}) {
+  const fixos = ambientesFixos(papel);
+  const atuais = ambientesDoPerfil(papel, modulos);
+  const motivo = travado || (fixos ? (papel === 'admin' ? 'O administrador vê os dois ambientes.' : 'O atendente vê só o Atendimento.') : '');
+  return (
+    <span className="pn-us-amb" role="group" aria-label={rotulo}>
+      {AMBIENTES.map((a) => {
+        const on = atuais.includes(a);
+        const unico = on && atuais.length === 1;
+        return (
+          <button key={a} type="button" className={on ? 'chip on' : 'chip'} aria-pressed={on} disabled={!!motivo || unico}
+            title={motivo || (unico ? 'Pelo menos um ambiente fica marcado' : on ? `Tirar o acesso ao ${ROTULO_AMBIENTE[a]}` : `Dar acesso ao ${ROTULO_AMBIENTE[a]}`)}
+            onClick={() => aoMudar(alternarAmbiente(atuais, a))}>
+            {ROTULO_AMBIENTE[a]}
+          </button>
+        );
+      })}
+    </span>
+  );
+}
 
 type Janela =
   | { tipo: 'novo' }
@@ -49,6 +79,7 @@ export function AbaUsuarios({ gestor }: { demo: boolean; gestor: boolean }) {
   const excluir = useExcluirUsuario();
   const setAtivo = useDefinirAtivo();
   const setPapel = useDefinirPapel();
+  const setAmbientes = useDefinirAmbientes();
 
   const [aviso, setAvisoSt] = useState<{ texto: string; tom: 'ok' | 'erro' } | null>(null);
   const ok = (texto: string) => setAvisoSt({ texto, tom: 'ok' });
@@ -112,7 +143,7 @@ export function AbaUsuarios({ gestor }: { demo: boolean; gestor: boolean }) {
 
       <CardVidro spot className="pn-card sobe" style={{ animationDelay: '.04s' }}>
         <div className="pn-card-cab">
-          <div><h3>Usuários</h3><p>Quem entra no sistema e o que cada um pode ver. Desativar é reversível; excluir é definitivo.</p></div>
+          <div><h3>Usuários</h3><p>Quem entra no sistema, em qual ambiente (Cobranças e/ou Atendimento) e o que cada um pode ver. Desativar é reversível; excluir é definitivo.</p></div>
           <div className="pn-us-filtros">
             <div className="pn-fin-seg" role="tablist" aria-label="Filtrar por situação">
               {([['todos', 'Todos', usuarios.length], ['ativos', 'Ativos', ativos], ['inativos', 'Inativos', usuarios.length - ativos]] as const).map(([id, rot, n]) => (
@@ -133,6 +164,7 @@ export function AbaUsuarios({ gestor }: { demo: boolean; gestor: boolean }) {
                 <tr>
                   <th scope="col">Pessoa</th>
                   <th scope="col">Papel</th>
+                  <th scope="col">Ambientes</th>
                   <th scope="col">Situação</th>
                   <th scope="col"><span className="pn-vh">Ações</span></th>
                 </tr>
@@ -159,6 +191,11 @@ export function AbaUsuarios({ gestor }: { demo: boolean; gestor: boolean }) {
                           }}>
                           {opcoesPapel(u.papel).map((p) => <option key={p} value={p}>{PAPEL_ROTULO[p]}</option>)}
                         </select>
+                      </td>
+                      <td>
+                        <Ambientes papel={u.papel} modulos={u.modulos} rotulo={`Ambientes de ${u.nome}`}
+                          travado={souEu && !ambientesFixos(u.papel) ? 'Você não muda os seus próprios ambientes' : undefined}
+                          aoMudar={(l) => setAmbientes.mutate({ id: u.id, modulos: l }, { onSuccess: () => ok(`${u.nome} agora entra em: ${l.map((a) => ROTULO_AMBIENTE[a]).join(' e ')}.`), onError: falha })} />
                       </td>
                       <td>
                         {u.ativo ? <BadgeStatus tom="ok">Ativo</BadgeStatus> : <BadgeStatus tom="neutro">Desativado</BadgeStatus>}
@@ -249,12 +286,13 @@ function CampoSenha({ valor, aoMudar, id }: { valor: string; aoMudar: (v: string
 
 function JanelaNovo({ ocupado, aoCriar, aoFechar }: {
   ocupado: boolean; aoFechar: () => void;
-  aoCriar: (a: { nome: string; usuario: string; papel: Papel; senha?: string; exigirTroca?: boolean }) => void;
+  aoCriar: (a: { nome: string; usuario: string; papel: Papel; senha?: string; exigirTroca?: boolean; modulos?: Ambiente[] }) => void;
 }) {
   const [nome, setNome] = useState('');
   const [usuario, setUsuario] = useState('');
   const [tocouLogin, setTocouLogin] = useState(false);
   const [papel, setPapel] = useState<Papel>('comercial');
+  const [ambientes, setAmbientes] = useState<Ambiente[]>(['cobrancas']);
   const [modo, setModo] = useState<'gerar' | 'definir'>('gerar');
   const [senha, setSenha] = useState('');
   const [troca, setTroca] = useState(true);
@@ -264,7 +302,7 @@ function JanelaNovo({ ocupado, aoCriar, aoFechar }: {
   return (
     <ModalV2 aberto aoFechar={aoFechar} largura={560}
       titulo={<div>Novo usuário<div className="mod-sub">A pessoa entra com o login e a senha que aparecem ao criar</div></div>}
-      rodape={<><BotaoSec onClick={aoFechar}>Cancelar</BotaoSec><BotaoPrimario disabled={!pode || ocupado} onClick={() => aoCriar({ nome: nome.trim(), usuario: loginValido(login), papel, ...(modo === 'definir' ? { senha, exigirTroca: troca } : {}) })}>{ocupado ? 'Criando…' : 'Criar usuário'}</BotaoPrimario></>}>
+      rodape={<><BotaoSec onClick={aoFechar}>Cancelar</BotaoSec><BotaoPrimario disabled={!pode || ocupado} onClick={() => aoCriar({ nome: nome.trim(), usuario: loginValido(login), papel, modulos: ambientesDoPerfil(papel, ambientes), ...(modo === 'definir' ? { senha, exigirTroca: troca } : {}) })}>{ocupado ? 'Criando…' : 'Criar usuário'}</BotaoPrimario></>}>
       <div className="pn-us-form">
         <div className="pn-us-duas">
           <div className="pn-us-campo"><label htmlFor="us-nome">Nome</label><input id="us-nome" className="inp" value={nome} placeholder="Nome da pessoa" onChange={(e) => setNome(e.target.value)} autoFocus /></div>
@@ -279,6 +317,11 @@ function JanelaNovo({ ocupado, aoCriar, aoFechar }: {
               </button>
             ))}
           </div>
+        </div>
+        <div className="pn-us-campo">
+          <span className="pn-us-rot">Ambientes</span>
+          <Ambientes papel={papel} modulos={ambientes} aoMudar={setAmbientes} rotulo="Ambientes do novo usuário" />
+          <span className="pn-us-dica">{ambientesFixos(papel) ? (papel === 'admin' ? 'O administrador entra nos dois: Cobranças e Atendimento.' : 'O atendente entra só no Atendimento.') : 'Marque onde a pessoa vai trabalhar: Cobranças, Atendimento ou os dois. Dá pra mudar depois na lista.'}</span>
         </div>
         <div className="pn-us-campo">
           <span className="pn-us-rot">Senha inicial</span>

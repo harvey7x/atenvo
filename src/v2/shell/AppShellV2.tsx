@@ -26,6 +26,7 @@ import { useConfiguracaoPendente } from '../data/cobranca/configuracao';
 import { useNotificacoes, useMarcarNotificacao, type Notificacao } from '@/data/remarketing';
 import { useNotificacoesCob, useMarcarNotifCob } from '../data/cobranca/notificacoes';
 import { secaoDoPapel } from '../data/cobranca/secoes';
+import { rotaAtendimentoFora } from '../data/modulos';
 import { useConversasWA } from '../data/wa/wa';
 import { tempoRelativo } from '../lib/tempo';
 import { usePapel } from '../data/cobranca/sessao';
@@ -53,26 +54,27 @@ const IconeLua = () => (
    órfãs do mockup e entram nos grupos pela função. Badges chegam com as
    páginas reais — por ora ficam zerados (nada de número inventado). */
 type ItemNav = { slug: string; rotulo: string; admin?: boolean };
-const GRUPOS: { rotulo: string; itens: ItemNav[] }[] = [
+/* `fixo`: grupo preso ao pé da sidebar, sem rótulo, acima do usuário (como no Atenvo) */
+type GrupoNav = { rotulo: string; itens: ItemNav[]; fixo?: boolean };
+/* ATENDIMENTO dentro da Reviza (dono 11/11: "importar o Atenvo para dentro da Reviza"): o menu do
+   Atenvo de hoje, SÓ com WhatsApp, Presenciais, Scripts, Kanban, Dashboard, Unificador de documentos,
+   Conversor de arquivos e Coletor do INSS — sem Pendências, Painel da Equipe e Central de Avisos (fora
+   do menu e da URL: data/modulos.ts). Configurações fica no pé, como no Atenvo, e ganhou os Usuários. */
+const GRUPOS: GrupoNav[] = [
   {
     rotulo: 'Operação',
     itens: [
-      { slug: 'dashboard', rotulo: 'Dashboard' },
       { slug: 'whatsapp', rotulo: 'WhatsApp' },
-      // Facebook e Disparo fora do menu (pedido do dono 27/08) — rotas seguem vivas por URL
-      { slug: 'kanban', rotulo: 'Kanban' },
-      { slug: 'recuperacao', rotulo: 'Recuperação' },
-      { slug: 'agendamentos', rotulo: 'Agendamentos' },
+      { slug: 'presenciais', rotulo: 'Presenciais' },
+      { slug: 'scripts', rotulo: 'Scripts' },
     ],
   },
   {
     rotulo: 'Gestão',
     itens: [
-      { slug: 'contatos', rotulo: 'Contatos' },
-      { slug: 'scripts', rotulo: 'Scripts' },
-      // Simulador fora do menu (pedido do dono 27/08) — rota segue viva por URL
-      // Cobranças SAIU daqui (29/08): virou um MÓDULO próprio no seletor do topo.
-      // Relatórios fora do menu (pedido do dono 27/08) — rota segue viva por URL
+      // Kanban sem admin: a equipe vê o quadro (cada um os seus cards); Dashboard = administrador e gestor
+      { slug: 'kanban', rotulo: 'Kanban' },
+      { slug: 'dashboard', rotulo: 'Dashboard', admin: true },
     ],
   },
   {
@@ -80,27 +82,13 @@ const GRUPOS: { rotulo: string; itens: ItemNav[] }[] = [
     itens: [
       { slug: 'ferramentas/unificador', rotulo: 'Unificador de documentos' },
       { slug: 'ferramentas/conversor', rotulo: 'Conversor de arquivos' },
-    ],
-  },
-  {
-    // IA configurável (Fase 1, 30/08): o cliente cria o próprio atendente de IA
-    // (provedor + chave própria + prompt). Chave é sensível → item só de admin.
-    rotulo: 'Inteligência',
-    itens: [
-      { slug: 'ia', rotulo: 'Atendente de IA', admin: true },
-      { slug: 'fluxos', rotulo: 'Fluxos do bot', admin: true },
+      { slug: 'ferramentas/coletor-inss', rotulo: 'Coletor INSS' },
     ],
   },
   {
     rotulo: 'Sistema',
-    itens: [
-      { slug: 'integracoes', rotulo: 'Integrações' },
-      // Maturação descontinuada (Evolution restrito pela Meta) — item removido do menu; rota → placeholder.
-      // paridade: /configuracoes NÃO tem RequireRole no app antigo (as abas variam por papel)
-      { slug: 'configuracoes', rotulo: 'Configurações' },
-      // Plano e uso fora do menu (pedido do dono 27/08) — rota segue viva por URL
-
-    ],
+    fixo: true,
+    itens: [{ slug: 'configuracoes', rotulo: 'Configurações' }],
   },
 ];
 
@@ -108,7 +96,7 @@ const GRUPOS: { rotulo: string; itens: ItemNav[] }[] = [
    inteiro da esquerda. Atendimento = a operação de sempre; Cobranças = as
    seções do Modo Cobrança viram itens de menu. Novos módulos entram aqui. */
 type ModuloId = 'atendimento' | 'cobrancas';
-type Modulo = { id: ModuloId; rotulo: string; home: string; grupos: { rotulo: string; itens: ItemNav[] }[] };
+type Modulo = { id: ModuloId; rotulo: string; home: string; grupos: GrupoNav[] };
 const COB_SECOES_BASE: ItemNav[] = [
   { slug: 'cobrancas/painel', rotulo: 'Painel' },
   { slug: 'cobrancas/atendentes', rotulo: 'Atendentes' },
@@ -530,14 +518,16 @@ export default function AppShellV2() {
   const menuDoPapel = (slug: string) => slug.startsWith('cobrancas/') && secaoDoPapel(papelSessao?.papel, slug.slice('cobrancas/'.length));
   // filtro de papel dos itens do menu — FONTE ÚNICA também da paleta ⌘K
   // (a paleta nunca lista uma seção que o papel não veria na sidebar)
+  // "admin" no Atendimento = administrador OU gestor (Dashboard, como no Atenvo); nas Cobranças segue só o admin (Registros, Usuários)
+  const veAdminAtend = admin || currentOrg?.role === 'gestor';
   const filtrarItensNav = (itens: ItemNav[]) => itens
-    .filter((i) => admin || !i.admin)
+    .filter((i) => !i.admin || (i.slug.startsWith('cobrancas/') ? admin : veAdminAtend))
     // Reviza: Financeiro é restrito — comercial não vê o item
     .filter((i) => i.slug !== 'cobrancas/financeiro' || podeVerFinanceiro)
     // Reviza: matriz do dono — financeiro, comercial e cadastro só veem as suas seções
     .filter((i) => !(ehFinanceiroR || ehComercialR || soCadastro) || menuDoPapel(i.slug));
   // cargo exibido: na Reviza usa o papel REAL do banco (o role da org é só admin/gestor/atendente)
-  const ROTULO_REVIZA: Record<string, string> = { admin: 'Administrador', gestor: 'Gestor', comercial: 'Comercial', financeiro: 'Financeiro', cadastro: 'Cadastro' };
+  const ROTULO_REVIZA: Record<string, string> = { admin: 'Administrador', gestor: 'Gestor', comercial: 'Comercial', financeiro: 'Financeiro', cadastro: 'Cadastro', atendente: 'Atendente' };
   const cargo = isRevizaMode && papelSessao?.papel ? (ROTULO_REVIZA[papelSessao.papel] ?? papelSessao.papel) : papel;
 
   // Fase 2.0: troca de organização — só EXISTE para quem tem mais de um vínculo
@@ -557,7 +547,16 @@ export default function AppShellV2() {
   const moduloAtivo: ModuloId = location.pathname.startsWith('/cobrancas') ? 'cobrancas' : 'atendimento';
   const modulo = MODULOS.find((m) => m.id === moduloAtivo) ?? MODULOS[0];
   // DEMO da ALFA: Atendimento removido — só Cobranças.
-  const modulosDisponiveis = (isDemoMode || isRevizaMode) ? MODULOS.filter((m) => m.id !== 'atendimento') : MODULOS;
+  // AMBIENTES (dono 11/11): na Reviza o seletor mostra só os ambientes do perfil (admin = os dois; atendente =
+  // só Atendimento; demais = o que o administrador marcou). Enquanto o perfil carrega, só o ambiente atual
+  // (sem seta e sem redirecionar). Demo segue só Cobranças.
+  const ambientesSessao = papelSessao?.ambientes;
+  const modulosDisponiveis = isRevizaMode
+    ? (ambientesSessao ? MODULOS.filter((m) => ambientesSessao.includes(m.id)) : MODULOS.filter((m) => m.id === moduloAtivo))
+    : isDemoMode ? MODULOS.filter((m) => m.id !== 'atendimento') : MODULOS;
+  // ambiente da rota que a pessoa NÃO tem → vai pro primeiro que ela tem (ex.: atendente que caiu em /cobrancas)
+  const semAcessoAoAmbiente = isRevizaMode && !!ambientesSessao && !ambientesSessao.includes(moduloAtivo);
+  const homeDaPessoa = modulosDisponiveis[0]?.home ?? '/cobrancas/painel';
   const trocarModulo = useCallback((m: Modulo) => {
     setMenuOrg(false);
     navigate(m.home);
@@ -584,6 +583,28 @@ export default function AppShellV2() {
     // clique num item com a sidebar aberta: não puxa a lista debaixo do mouse
     if (!sidebarRef.current?.matches(':hover')) alinharNav();
   }, [location.pathname, chaveNav, alinharNav]);
+
+  // um item do menu (o mesmo render nos grupos da lista e no grupo fixo do pé)
+  const itemNav = (i: ItemNav) => (
+      <NavLink
+        key={i.slug}
+        to={`/${i.slug}`}
+        className={({ isActive }) => (isActive ? 'item on' : 'item')}
+        title={i.rotulo}
+      >
+        {iconeDoItem(i.slug)}
+        <span className="lab">{i.rotulo}</span>
+        {i.slug === 'whatsapp' && badgePop > 0 && (
+          <span key={badgePop} className="badge-n lab pop num">{badgePop}</span>
+        )}
+        {i.slug === 'cobrancas/avisos' && avisosNaoLidos > 0 && (
+          <span className="badge-n lab num">{avisosNaoLidos}</span>
+        )}
+        {i.slug === 'cobrancas/novos' && pendentesAprovacao > 0 && (
+          <span className="badge-n lab num" title={`${pendentesAprovacao} aguardando aprovação`}>{pendentesAprovacao}</span>
+        )}
+      </NavLink>
+  );
 
   return (
     <div className="v2 app-v2">
@@ -622,36 +643,26 @@ export default function AppShellV2() {
             raizMenu,
           )}
           <nav className="sb-nav" ref={navRef} aria-label="Navegação principal">
-            {modulo.grupos.map((g) => {
+            {modulo.grupos.filter((g) => !g.fixo).map((g) => {
               const itens = filtrarItensNav(g.itens);
               if (!itens.length) return null;
               return (
                 <div className="grupo" key={g.rotulo}>
                   <div className="glabel lab">{g.rotulo}</div>
-                  {itens.map((i) => (
-                    <NavLink
-                      key={i.slug}
-                      to={`/${i.slug}`}
-                      className={({ isActive }) => (isActive ? 'item on' : 'item')}
-                      title={i.rotulo}
-                    >
-                      {iconeDoItem(i.slug)}
-                      <span className="lab">{i.rotulo}</span>
-                      {i.slug === 'whatsapp' && badgePop > 0 && (
-                        <span key={badgePop} className="badge-n lab pop num">{badgePop}</span>
-                      )}
-                      {i.slug === 'cobrancas/avisos' && avisosNaoLidos > 0 && (
-                        <span className="badge-n lab num">{avisosNaoLidos}</span>
-                      )}
-                      {i.slug === 'cobrancas/novos' && pendentesAprovacao > 0 && (
-                        <span className="badge-n lab num" title={`${pendentesAprovacao} aguardando aprovação`}>{pendentesAprovacao}</span>
-                      )}
-                    </NavLink>
-                  ))}
+                  {itens.map(itemNav)}
                 </div>
               );
             })}
           </nav>
+          {modulo.grupos.filter((g) => g.fixo).map((g) => {
+            const itens = filtrarItensNav(g.itens);
+            if (!itens.length) return null;
+            return (
+              <nav className="sb-fixo" key={g.rotulo} aria-label={g.rotulo}>
+                {itens.map(itemNav)}
+              </nav>
+            );
+          })}
           {import.meta.env.DEV && (
             <div className="dev-ferramentas">
               <button type="button" className="p-btn btn-sec btn-mini" onClick={simularResposta}>
@@ -772,7 +783,10 @@ export default function AppShellV2() {
             {/* páginas cheias (kanban, inbox) gerenciam a própria altura — shell.css .pagina.cheia.
                 Rotas OFICIAIS estão na RAIZ desde o CORTE (/whatsapp, /kanban) — não mais em /v2/*. */}
             <div className={/^\/(kanban|whatsapp)(\/|$)/.test(location.pathname) ? 'pagina pg-entra cheia' : 'pagina pg-entra'} key={location.pathname}>
-              {(isDemoMode || isRevizaMode) && moduloAtivo === 'atendimento' ? <Navigate to="/cobrancas/painel" replace /> : <Outlet />}
+              {isDemoMode && moduloAtivo === 'atendimento' ? <Navigate to="/cobrancas/painel" replace />
+                : semAcessoAoAmbiente ? <Navigate to={homeDaPessoa} replace />
+                : isRevizaMode && moduloAtivo === 'atendimento' && rotaAtendimentoFora(location.pathname) ? <Navigate to="/whatsapp" replace />
+                : <Outlet />}
             </div>
           </div>
 

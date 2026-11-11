@@ -13,12 +13,14 @@ export const SECOES_COMERCIAL = ['painel', 'novos', 'planilha', 'cancelados', 'c
     (+ Análise INSS para TODOS os papéis: roda só no navegador, não lê o banco) */
 export const SECOES_CADASTRO = ['novos', 'planilha', 'cancelados', 'avisos', 'numeros', 'analise'] as const;
 
-export type PapelReviza = 'admin' | 'gestor' | 'comercial' | 'financeiro' | 'cadastro';
+export type PapelReviza = 'admin' | 'gestor' | 'comercial' | 'financeiro' | 'cadastro' | 'atendente';
 
 /** a seção `secao` de Cobranças pode aparecer para este papel? (admin/gestor: sim) */
 export function secaoDoPapel(papel: PapelReviza | null | undefined, secao: string): boolean {
   if (papel === 'financeiro') return (SECOES_FINANCEIRO as readonly string[]).includes(secao);
   if (papel === 'comercial') return (SECOES_COMERCIAL as readonly string[]).includes(secao);
   if (papel === 'cadastro') return (SECOES_CADASTRO as readonly string[]).includes(secao);
+  // atendente: só o Atendimento — nenhuma tela de Cobranças (o seletor do topo nem oferece o ambiente)
+  if (papel === 'atendente') return false;
   return true;
 }

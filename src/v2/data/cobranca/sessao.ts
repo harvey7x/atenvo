@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { isRevizaMode, supabase } from '@/lib/supabase';
 import { chavesCobranca } from './keys';
 import type { Papel } from './types';
+import { ambientesDoPerfil, type Ambiente } from '../modulos';
 
 export interface SessaoPapel {
   papel: Papel | null; gestor: boolean; podeRevelar: boolean; nome: string | null;
@@ -11,6 +12,8 @@ export interface SessaoPapel {
   podeAprovar: boolean;
   /** id do usuário logado (quem pediu pode cancelar o próprio pedido); null no demo */
   id: string | null;
+  /** ambientes que a pessoa enxerga (Cobranças / Atendimento) — ver data/modulos.ts */
+  ambientes: Ambiente[];
 }
 
 /** mesma lista do banco (pode_aprovar_parado): o cadastro aprova, o comercial não */
@@ -23,16 +26,18 @@ export function usePapel() {
     staleTime: 60_000,
     queryFn: async () => {
       // fora da instância Reviza (demo E Atenvo) não há papel Reviza a consultar
-      if (!isRevizaMode || !supabase) return { papel: 'gestor', gestor: true, podeRevelar: true, nome: null, podeAprovar: true, id: null };
+      if (!isRevizaMode || !supabase) return { papel: 'gestor', gestor: true, podeRevelar: true, nome: null, podeAprovar: true, id: null, ambientes: ['cobrancas', 'atendimento'] };
       const u = (await supabase.auth.getUser()).data.user;
-      if (!u) return { papel: null, gestor: false, podeRevelar: false, nome: null, podeAprovar: false, id: null };
-      const { data } = await supabase.from('profiles').select('papel, ativo, nome').eq('id', u.id).maybeSingle();
+      if (!u) return { papel: null, gestor: false, podeRevelar: false, nome: null, podeAprovar: false, id: null, ambientes: [] };
+      // '*' e não a lista: `modulos` (ambientes) entrou depois — banco sem a coluna ainda responde (cai em Cobranças)
+      const { data } = await supabase.from('profiles').select('*').eq('id', u.id).maybeSingle();
       const papel = (data && data.ativo ? (data.papel as Papel) : null);
       const gestor = papel === 'gestor' || papel === 'admin';
       // senhas para TODOS os perfis (dono 25/09: "é para a equipe"; mig 61) — cada um vê as
       // dos clientes que já enxerga (o comercial, os dele: reveal_senha/senhas_grade). Cifradas no banco.
       const podeRevelar = papel != null;
-      return { papel, gestor, podeRevelar, nome: (data?.nome as string) ?? null, podeAprovar: papelAprova(papel, gestor), id: u.id };
+      const ambientes = papel ? ambientesDoPerfil(papel, (data as { modulos?: unknown } | null)?.modulos) : [];
+      return { papel, gestor, podeRevelar, nome: (data?.nome as string) ?? null, podeAprovar: papelAprova(papel, gestor), id: u.id, ambientes };
     },
   });
 }

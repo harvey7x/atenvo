@@ -7,7 +7,8 @@
    ===================================================================== */
 
 export type SitDebito = 'ativo' | 'cancelado';
-export type Papel = 'admin' | 'gestor' | 'comercial' | 'financeiro' | 'cadastro';
+/* 'atendente' (11/11): quem trabalha SÓ no Atendimento (o Atenvo dentro da Reviza) — não tem papel na cobrança */
+export type Papel = 'admin' | 'gestor' | 'comercial' | 'financeiro' | 'cadastro' | 'atendente';
 
 export interface Comprovante {
   nome: string;

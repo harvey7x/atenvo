@@ -15,6 +15,8 @@ import {
   traduzCfg,
 } from '@/data/configuracoes';
 import { DEMO_MODE } from '@/lib/demo';
+import { isRevizaMode } from '@/lib/supabase';
+import { AbaUsuarios } from './RevizaUsuarios';
 import { PALETA_CORES, podeGerenciarAtendimento, type StatusDef } from '@/types/atendimento';
 import { resetDemonstracao, solicitarTrocaEmail } from '../services/conta';
 import { criarRaizPortalV2 } from '../components/portal';
@@ -40,7 +42,11 @@ const TABS = [
   { id: 'conta', label: 'Conta' }, { id: 'equipe', label: 'Equipe' }, { id: 'canais', label: 'Canais' },
   { id: 'atendimento', label: 'Atendimento' }, { id: 'notif', label: 'Notificações' }, { id: 'prefs', label: 'Preferências' },
 ];
-const TAB_IDS = TABS.map((t) => t.id);
+/* REVIZA (dono 11/11: "em configurações, criar usuários que nem na Reviza — criar, excluir, mudar de senha"):
+   a aba Equipe do Atenvo (convites por e-mail) dá lugar aos Usuários da Reviza — a MESMA tela de
+   Cobranças → Usuários, com os ambientes de cada pessoa. Só o administrador vê. */
+const TABS_REVIZA = TABS.flatMap((t) => (t.id === 'equipe' ? [{ id: 'usuarios', label: 'Usuários' }] : [t]));
+const TAB_IDS = [...TABS.map((t) => t.id), 'usuarios'];
 const PAPEL_LABEL: Record<string, string> = { admin: 'Administrador', supervisor: 'Supervisor', atendente: 'Atendente' };
 const STATUS_LABEL: Record<string, string> = { ativo: 'Ativo', inativo: 'Inativo', convidado: 'Convite pendente', pendente: 'Convite pendente', expirado: 'Convite expirado' };
 const STATUS_TOM: Record<string, TomStatus> = { ativo: 'ok', inativo: 'neutro', convidado: 'atencao', pendente: 'atencao', expirado: 'erro' };
@@ -95,6 +101,18 @@ interface SeedCfg {
   fb: { id: string; pagina_id: string; pagina_nome: string | null; estado: string }[];
   contatos: { id: string; nome: string; telefone: string | null }[];
 }
+/** Reviza: os dados de exemplo com a empresa (ALFA GROUP) e a pessoa logada */
+function seedReviza(b: SeedCfg, nome: string | null): SeedCfg {
+  const quem = nome?.trim() || 'Administrador';
+  const login = quem.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().split(/\s+/)[0] || 'admin';
+  return {
+    ...b,
+    perfil: { ...b.perfil, nome: quem, email: `${login}@alfagroup.com.br`, cargo: 'Administrador' },
+    org: { ...b.org, nome: 'ALFA GROUP', nomeFantasia: 'ALFA GROUP', email: 'contato@alfagroup.com.br' },
+    canais: b.canais.map((c) => ({ ...c, gestorNome: c.gestorNome ? quem : null })),
+    fb: b.fb.map((f) => ({ ...f, pagina_nome: 'ALFA GROUP' })),
+  };
+}
 function seedCfg(): SeedCfg {
   const dia = 86_400_000; const agora = Date.now();
   const iso = (t: number) => new Date(t).toISOString();
@@ -142,8 +160,11 @@ export default function ConfiguracoesV2() {
   const [searchParams] = useSearchParams();
   const sectionParam = searchParams.get('section');
   const initialTab = searchParams.get('tab');
-  const [tab, setTab] = useState(initialTab && TAB_IDS.includes(initialTab) ? initialTab : 'conta');
-  useEffect(() => { if (initialTab && TAB_IDS.includes(initialTab)) setTab(initialTab); }, [initialTab]);
+  // Reviza: o administrador abre direto nos Usuários (é o que esta tela ganhou); quem não é admin não tem a aba
+  const abas = isRevizaMode ? TABS_REVIZA.filter((t) => t.id !== 'usuarios' || podeAdmin) : TABS;
+  const abaPadrao = isRevizaMode && podeAdmin ? 'usuarios' : 'conta';
+  const [tab, setTab] = useState(initialTab && abas.some((t) => t.id === initialTab) ? initialTab : abaPadrao);
+  useEffect(() => { if (initialTab && TAB_IDS.includes(initialTab) && abas.some((t) => t.id === initialTab)) setTab(initialTab); }, [initialTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [aviso, setAviso] = useState<Aviso>(null);
   // o retorno FLUTUA (movimento.css .cfg-aviso) em vez de empurrar a página: sucesso sai
@@ -153,7 +174,7 @@ export default function ConfiguracoesV2() {
     const t = setTimeout(() => setAviso(null), 4200);
     return () => clearTimeout(t);
   }, [aviso]);
-  const [seed, setSeed] = useState<SeedCfg | null>(() => (demo ? seedCfg() : null));
+  const [seed, setSeed] = useState<SeedCfg | null>(() => (demo ? (isRevizaMode ? seedReviza(seedCfg(), user?.name ?? null) : seedCfg()) : null));
 
   // cascata de entrada roda UMA vez (carga da página); trocas de aba não re-animam
   const primeiraCarga = useRef(true);
@@ -190,7 +211,7 @@ export default function ConfiguracoesV2() {
 
       <div className="cfg" ref={raizRef}>
         <CardVidro sobe className="cfg-nav" atraso={0.08} role="tablist" aria-label="Seções de configurações">
-          {TABS.map((t) => (
+          {abas.map((t) => (
             <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} className={tab === t.id ? 'it on' : 'it'} onClick={() => setTab(t.id)}>
               {t.label}
             </button>
@@ -203,9 +224,14 @@ export default function ConfiguracoesV2() {
           <section className={tab === 'conta' ? 'cfg-aba on' : 'cfg-aba'}>
             <PainelConta anima={anima && abaInicial === 'conta'} demo={demo} seed={seed} setSeed={setSeed} aoAvisar={setAviso} podeGerenciar={podeGerenciar} />
           </section>
-          <section className={tab === 'equipe' ? 'cfg-aba on' : 'cfg-aba'}>
+          {isRevizaMode && podeAdmin && (
+            <section className={tab === 'usuarios' ? 'cfg-aba on' : 'cfg-aba'}>
+              <AbaUsuarios demo={false} gestor={podeAdmin} />
+            </section>
+          )}
+          {!isRevizaMode && <section className={tab === 'equipe' ? 'cfg-aba on' : 'cfg-aba'}>
             <PainelEquipe anima={anima && abaInicial === 'equipe'} demo={demo} seed={seed} setSeed={setSeed} aoAvisar={setAviso} podeAdmin={podeAdmin} podeGerenciar={podeGerenciar} meuId={demo ? 'u-demo' : user?.id} />
-          </section>
+          </section>}
           <section className={tab === 'canais' ? 'cfg-aba on' : 'cfg-aba'}>
             <PainelCanais anima={anima && abaInicial === 'canais'} demo={demo} seed={seed} podeGerenciar={podeGerenciar} onNav={navigate} />
           </section>
