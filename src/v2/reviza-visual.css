@@ -1,0 +1,330 @@
+/* ============================================================
+   REVIZA × ATENVO — revisão fina das telas (prévia de design, 09/11).
+   Camada SÓ de apresentação, depois da repaginada (main.tsx): as telas
+   da Reviza passam a falar a mesma língua do Atenvo nos dois temas —
+   página calma / cartão ELEVADO (bisel + sombra curta) / campo AFUNDADO;
+   seleção = polegar elevado no segmentado e tinta do acento no chip;
+   tabela com o título no MEIO da coluna (1ª coluna à esquerda).
+   Nada de leiaute, ordem, texto ou comportamento muda aqui.
+
+   Especificidade: o prefixo DUPLICA o atributo como a repaginada.css
+   (html:root[data-repaginada][data-repaginada] …) para vencer o CSS de
+   cada módulo em qualquer ordem de import, sem !important (só onde o
+   módulo já usa).
+   ============================================================ */
+
+/* tinta do acento para TEXTO pequeno (o dourado puro no claro fica a 3:1
+   no branco — aqui desce um degrau para passar de 4,5:1) */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 { --rv-tinta: color-mix(in srgb, var(--azul) 88%, #fff); }
+html:root[data-repaginada][data-repaginada][data-tema="light"] .v2 { --rv-tinta: color-mix(in srgb, var(--azul), #000 24%); }
+
+/* ---- 1. KPI (componente <Kpi>): a nota de rodapé ("nada pendente",
+   "71 entregues · 58 lidas", "fila vazia"…) nunca teve estilo e saía no
+   tamanho/cor do valor. Agora é a legenda calma de 12px dos KPIs do
+   Painel e do Dashboard do Atenvo; o chip de variação fica ao lado. ---- */
+html:root[data-repaginada][data-repaginada] .v2 .kpi .kpi-cab { display: flex; align-items: center; gap: 8px; min-height: 18px; }
+html:root[data-repaginada][data-repaginada] .v2 .kpi .kpi-pe { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; margin: -1px 0 4px; }
+html:root[data-repaginada][data-repaginada] .v2 .kpi .kpi-nota { font-size: 12px; line-height: 1.5; color: var(--txt-3); }
+
+/* ---- 2. SEGMENTADOS da Reviza = o .segm do Atenvo: trilho afundado,
+   polegar ELEVADO neutro (o acento fica para chip/foco/primário).
+   Painel (mês de referência), Financeiro/Usuários (Todos · Ativos…),
+   Envios, Régua (Sequência padrão · Grupos · Cliente específico). ---- */
+html:root[data-repaginada][data-repaginada] .v2 :is(.pn-mes, .pn-fin-seg, .ev-seg, .cm-seg) {
+  background: var(--rp-trilho); border-color: transparent;
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 :is(.pn-mes, .pn-fin-seg, .ev-seg, .cm-seg) {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .06), inset 0 1px 2px rgba(0, 0, 0, .3);
+}
+html:root[data-repaginada][data-repaginada][data-tema="light"] .v2 :is(.pn-mes, .pn-fin-seg, .ev-seg, .cm-seg) {
+  box-shadow: inset 0 0 0 1px rgba(17, 24, 39, .04);
+}
+html:root[data-repaginada][data-repaginada] .v2 :is(.pn-fin-seg button, .ev-seg button, .cm-seg-btn):hover:not(.on) { color: var(--txt); background: transparent; }
+html:root[data-repaginada][data-repaginada] .v2 :is(.pn-fin-seg button.on, .ev-seg button.on, .cm-seg-btn.on, .pn-mes-sel select) {
+  background: var(--rp-elev); color: var(--txt);
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 :is(.pn-fin-seg button.on, .ev-seg button.on, .cm-seg-btn.on, .pn-mes-sel select) {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .45), 0 0 0 1px rgba(255, 255, 255, .1), var(--rp-bisel);
+}
+html:root[data-repaginada][data-repaginada][data-tema="light"] .v2 :is(.pn-fin-seg button.on, .ev-seg button.on, .cm-seg-btn.on, .pn-mes-sel select) {
+  box-shadow: 0 1px 2px rgba(16, 24, 40, .1), 0 0 0 1px rgba(17, 24, 39, .06);
+}
+html:root[data-repaginada][data-repaginada] .v2 .pn-mes-sel select:hover { background: var(--rp-elev); }
+html:root[data-repaginada][data-repaginada] .v2 .pn-fin-seg button.on span { color: var(--txt-2); }
+html:root[data-repaginada][data-repaginada] .v2 :is(.pn-fin-seg button, .ev-seg button, .cm-seg-btn):focus-visible {
+  outline: none; box-shadow: 0 0 0 2px color-mix(in srgb, var(--platina-a) 55%, transparent);
+}
+
+/* ---- 3. TABELAS: título e conteúdo de cada coluna no MEIO dela; só a
+   1ª coluna (quem/o quê) à esquerda — a regra do Atenvo (29/10). A
+   coluna de ações do fim (sem título visível) segue encostada à direita. ---- */
+html:root[data-repaginada][data-repaginada] .v2 :is(.pn-eq, .pn-atend) :is(thead th, tbody td, tfoot th, tfoot td) { text-align: center; }
+html:root[data-repaginada][data-repaginada] .v2 :is(.pn-eq, .pn-atend) :is(thead th, tbody td, tfoot th, tfoot td):first-child { text-align: left; }
+html:root[data-repaginada][data-repaginada] .v2 :is(.pn-eq, .pn-atend) :is(td.pn-fin-acoes, td.pn-com-acao) { text-align: right; }
+html:root[data-repaginada][data-repaginada] .v2 .pn-eq :is(.pn-eq-atraso, .pn-eq-rec) { align-items: center; }
+html:root[data-repaginada][data-repaginada] .v2 .pn-eq :is(.pn-eq-adim, .pn-fin-v) { justify-content: center; }
+html:root[data-repaginada][data-repaginada] .v2 .pn-eq th.num .pn-ord { margin-left: -5px; }
+/* Régua → Comerciais (grade de divs, mesma regra) */
+html:root[data-repaginada][data-repaginada] .v2 .rt-tab :is(.rt-tab-h, .rt-tab-l) > :not(:first-child):not(.rt-tab-acao) { text-align: center; }
+html:root[data-repaginada][data-repaginada] .v2 .rt-tab :is(.rt-tab-cli, .rt-tab-num) { align-items: center; }
+/* Envios: a etiqueta (Régua · …) e a prévia no meio da coluna, como o texto */
+html:root[data-repaginada][data-repaginada] .v2 .ev-tabela td:not(:first-child) :is(.ev-chip, .ev-previa, .ev-det) { align-self: center; }
+
+/* ---- 4. CARTÕES na página que estavam no plano da página (cinza no claro,
+   apagados no escuro): viram a peça ELEVADA do Atenvo ---- */
+/* Conversas: os 4 indicadores do topo */
+html:root[data-repaginada][data-repaginada] .v2 .cv2-kpi {
+  border-radius: var(--r-card);
+  background: linear-gradient(180deg, var(--vidro-a), var(--vidro-b));
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .cv2-kpi {
+  border-color: rgba(255, 255, 255, .075); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05), var(--sombra-1);
+}
+html:root[data-repaginada][data-repaginada][data-tema="light"] .v2 .cv2-kpi {
+  border-color: var(--fio-b); box-shadow: var(--sombra-1);
+}
+/* o de atenção (não lidas) segue âmbar, agora por cima do cartão */
+html:root[data-repaginada][data-repaginada] .v2 .cv2-kpi.atencao {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--ambar) 9%, var(--vidro-a)), color-mix(in srgb, var(--ambar) 9%, var(--vidro-b)));
+  border-color: rgba(var(--ambar-rgb), .34);
+}
+/* Régua: os passos da sequência */
+html:root[data-repaginada][data-repaginada] .v2 .rg-card {
+  background: linear-gradient(180deg, var(--vidro-a), var(--vidro-b));
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .rg-card {
+  border-color: rgba(255, 255, 255, .075); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05), var(--sombra-1);
+}
+html:root[data-repaginada][data-repaginada][data-tema="light"] .v2 .rg-card { border-color: var(--fio-b); box-shadow: var(--sombra-1); }
+html:root[data-repaginada][data-repaginada] .v2 .rg-card.rg-card-propria { border-color: rgba(var(--ambar-rgb), .4); }
+/* Régua (abas Comerciais e Configuração, "minha régua" do comercial): os blocos
+   da página eram a superfície de CONTROLE (#17181C no escuro) sem sombra — viram cartão */
+html:root[data-repaginada][data-repaginada] .v2 :is(.rt-tab, .rt-cfg-g, .rt-com, .rt-como) {
+  background: linear-gradient(180deg, var(--vidro-a), var(--vidro-b)); box-shadow: var(--sombra-1);
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 :is(.rt-tab, .rt-cfg-g, .rt-com, .rt-como) { border-color: rgba(255, 255, 255, .075); }
+html:root[data-repaginada][data-repaginada] .v2 .rt-com.pausada { border-color: rgba(var(--ambar-rgb), .45); }
+/* Gestão: a folha e o calendário lateral sobem junto com os outros cartões */
+html:root[data-repaginada][data-repaginada] .v2 :is(.plx, .calx-aside) { box-shadow: var(--sombra-1); }
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .calx-aside {
+  background: linear-gradient(180deg, var(--vidro-a), var(--vidro-b)); border-color: rgba(255, 255, 255, .075);
+}
+/* Registros: o console (sempre escuro, de propósito) ganha a mesma elevação */
+html:root[data-repaginada][data-repaginada] .v2 .reg-console { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04), var(--sombra-1); }
+
+/* ---- 5. ETIQUETAS com o ouro antigo cravado (#D9A44A): no claro o texto
+   ficava a ~2:1. Passam a seguir o acento do tema ---- */
+html:root[data-repaginada][data-repaginada] .v2 :is(.rg-strip-quando, .cm-cli-badge, .cm-chip-aj, .cm-blk-tag, .cm-pm-varia) {
+  color: var(--rv-tinta); background: rgba(var(--azul-rgb), .12); border-color: rgba(var(--azul-rgb), .32);
+}
+/* chips "Régua de: Padrão · Alexandra…" = o .chip do Atenvo (raio 8, ligado em tinta do acento) */
+html:root[data-repaginada][data-repaginada] .v2 .rg-de button { border-radius: 8px; border-color: var(--rp-campo-fio); }
+html:root[data-repaginada][data-repaginada] .v2 .rg-de button:hover:not(.on) { background: rgba(var(--tint), .045); border-color: var(--rp-campo-fio-hover); }
+html:root[data-repaginada][data-repaginada] .v2 .rg-de button.on {
+  background: color-mix(in srgb, var(--platina-a) 14%, transparent);
+  border-color: color-mix(in srgb, var(--platina-a) 42%, transparent);
+}
+html:root[data-repaginada][data-repaginada] .v2 .rg-de-n { background: rgba(var(--azul-rgb), .18); border-color: rgba(var(--azul-rgb), .42); }
+
+/* ---- 6. CALENDÁRIO: "hoje" era o quadrado inteiro pintado de ouro (a
+   peça mais gritante do sistema). Vira a seleção do Atenvo: tinta do
+   acento num quadrado suave, número aceso; o conteúdo do dia fica legível. ---- */
+html:root[data-repaginada][data-repaginada] .v2 .calx-cell.hoje {
+  background: color-mix(in srgb, var(--platina-a) 12%, transparent);
+  border-color: color-mix(in srgb, var(--platina-a) 48%, transparent);
+}
+html:root[data-repaginada][data-repaginada] .v2 .calx-cell.hoje:hover {
+  background: color-mix(in srgb, var(--platina-a) 17%, transparent); filter: none;
+}
+html:root[data-repaginada][data-repaginada] .v2 .calx-cell.hoje.sel { border-color: color-mix(in srgb, var(--platina-a) 70%, transparent); }
+html:root[data-repaginada][data-repaginada] .v2 .calx-cell.hoje .calx-daynum { color: var(--rv-tinta); font-weight: 700; }
+html:root[data-repaginada][data-repaginada] .v2 .calx-cell.hoje .calx-fer { color: var(--rubro); }
+html:root[data-repaginada][data-repaginada] .v2 .calx-cell.hoje .calx-fer::before { background: var(--rubro); }
+html:root[data-repaginada][data-repaginada] .v2 .calx-cell.hoje :is(.calx-pill, .calx-pill .calx-rot) { color: var(--txt-2); }
+html:root[data-repaginada][data-repaginada] .v2 .calx-cell.hoje .calx-pill b { color: var(--txt-3); }
+html:root[data-repaginada][data-repaginada] .v2 .calx-cell.hoje .calx-pill .calx-rot { color: var(--ambar); }
+html:root[data-repaginada][data-repaginada] .v2 .calx-cell.hoje .calx-pill.fantasma { color: var(--txt-3); }
+html:root[data-repaginada][data-repaginada] .v2 .calx-cell.hoje.tem .calx-pills { border-top-color: color-mix(in srgb, var(--platina-a) 22%, transparent); }
+
+/* ---- 7. GESTÃO (folha "Excel 2.0"): o ciclo escolhido afundava (fundo
+   da PÁGINA, mais escuro que o trilho) — sobe como polegar; e o botão
+   ligado da barra ("Congelar A–C") saía no azul do Google em vez do acento ---- */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .gp-sc-caixa {
+  background: var(--rp-trilho);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .06), inset 0 1px 2px rgba(0, 0, 0, .3);
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .gp-sc-item.on {
+  background: var(--rp-elev);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .45), var(--rp-bisel), inset 0 0 0 1px rgba(var(--ambar-rgb), .55);
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .gp-sc-seta { background: var(--rp-elev); border-color: rgba(255, 255, 255, .1); }
+html:root[data-repaginada][data-repaginada] .v2 .plx-bt.on {
+  background: color-mix(in srgb, var(--platina-a) 14%, transparent);
+  border-color: color-mix(in srgb, var(--platina-a) 42%, transparent);
+}
+
+/* ---- 8. NOVOS: "Marcar débito parado" / "Aprovar" eram um ouro chapado
+   cravado (#D9A44A), igual nos dois temas — seguem a receita do primário ---- */
+html:root[data-repaginada][data-repaginada] .v2 .fin-btn.fin-ok {
+  color: var(--platina-txt);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--platina-a), #fff 13%), var(--platina-a));
+  border-color: color-mix(in srgb, var(--platina-a), #000 24%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .24), 0 1px 2px rgba(0, 0, 0, .22);
+}
+html:root[data-repaginada][data-repaginada] .v2 .fin-btn.fin-ok:hover:not(:disabled) {
+  filter: none;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--platina-a), #fff 20%), color-mix(in srgb, var(--platina-a), #fff 5%));
+}
+/* o painel "Aguardando aprovação": o título no tom de atenção do tema */
+html:root[data-repaginada][data-repaginada] .v2 .nv-pend .fin-head h3 { color: var(--ambar); }
+
+/* ---- 9. REGISTROS: o console é escuro nos DOIS temas (de propósito), mas
+   o vazio e a etiqueta do título usavam as cores do tema — no claro, texto
+   escuro sobre o console (sumia). Ficam com as cores do próprio console ---- */
+html:root[data-repaginada][data-repaginada] .v2 .reg-console .estado .t { color: #c7d0da; }
+html:root[data-repaginada][data-repaginada] .v2 .reg-console .estado :is(.s, .ic) { color: #8b98a8; }
+/* as duas etiquetas da barra (título e "ao vivo") herdam o .mono das Integrações:
+   no claro ficavam tinta escura sobre o console — agora iguais ao escuro */
+html:root[data-repaginada][data-repaginada] .v2 .reg-console :is(.reg-console-tt, .reg-live) {
+  color: #8b98a8; background: rgba(255, 255, 255, .04); border-color: rgba(255, 255, 255, .08);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, .18);
+}
+
+/* ---- 10. SINO: o painel ganha o desenho do sino do Atenvo (cabeçalho com
+   fio, "Marcar todas" no acento, linha com ponto neutro de não lida) ---- */
+html:root[data-repaginada][data-repaginada] .v2 .usuario-menu.notif-panel { width: min(380px, calc(100vw - 32px)); padding: 0 0 6px; }
+html:root[data-repaginada][data-repaginada] .v2 .notif-panel .np-head {
+  padding: 12px 14px 10px; margin-bottom: 4px; border-bottom: 1px solid var(--linha);
+}
+html:root[data-repaginada][data-repaginada] .v2 .notif-panel .np-head > b { font-size: 13.5px; font-weight: 700; letter-spacing: -.01em; color: var(--txt); }
+html:root[data-repaginada][data-repaginada] .v2 .notif-panel .np-todas {
+  padding: 2px 0; font-size: 11px; font-weight: 650; text-decoration: none; color: var(--rv-tinta);
+}
+html:root[data-repaginada][data-repaginada] .v2 .notif-panel .np-todas:hover { color: var(--rv-tinta); text-decoration: underline; }
+html:root[data-repaginada][data-repaginada] .v2 .notif-panel .np-item { gap: 9px; margin: 0 6px; width: calc(100% - 12px); padding: 8px 8px 8px 9px; color: var(--txt-2); }
+html:root[data-repaginada][data-repaginada] .v2 .notif-panel .np-dot { width: 7px; height: 7px; }
+html:root[data-repaginada][data-repaginada] .v2 .notif-panel .np-item.nova .np-dot { background: var(--txt); box-shadow: none; }
+html:root[data-repaginada][data-repaginada] .v2 .notif-panel .np-t { font-size: 12.5px; line-height: 1.35; color: var(--txt-2); }
+html:root[data-repaginada][data-repaginada] .v2 .notif-panel .np-item.nova .np-t { color: var(--txt); }
+html:root[data-repaginada][data-repaginada] .v2 .notif-panel .np-c { font-size: 11.5px; line-height: 1.42; color: var(--txt-2); }
+html:root[data-repaginada][data-repaginada] .v2 .notif-panel .np-h { font-size: 10px; }
+html:root[data-repaginada][data-repaginada] .v2 .notif-panel .np-vazio { padding: 22px 18px 18px; text-align: center; color: var(--txt-2); }
+
+/* ---- 11. BOTÕES secundários próprios da Reviza ("Gerenciar", "Ver painel",
+   "Editar · Senha · Desativar", "Inserir", "Configurar", setas e "Hoje" do
+   Calendário, "Gerenciar" ciclos, "Recusar"): no claro eram uma caixa CINZA
+   (ou só o contorno) enquanto o .btn-sec do Atenvo é carta branca com sombra
+   de contato — mesma receita do .btn-sec nos dois temas ---- */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 :is(.pn-link, .ev-st-acao, .cv2-bt:not(.pri), .fin-btn:not(.fin-ok), .calx-seta, .calx-hojebtn, .gp-sc-ger) {
+  background: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, .032));
+  border-color: rgba(255, 255, 255, .1);
+  box-shadow: var(--rp-bisel), 0 1px 2px rgba(0, 0, 0, .3);
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 :is(.pn-link, .ev-st-acao, .cv2-bt:not(.pri), .fin-btn:not(.fin-ok), .calx-seta, .calx-hojebtn, .gp-sc-ger):hover:not(:disabled) {
+  background: rgba(255, 255, 255, .08); border-color: rgba(255, 255, 255, .17);
+}
+html:root[data-repaginada][data-repaginada][data-tema="light"] .v2 :is(.pn-link, .ev-st-acao, .cv2-bt:not(.pri), .fin-btn:not(.fin-ok), .calx-seta, .calx-hojebtn, .gp-sc-ger) {
+  background: #FFFFFF; border-color: rgba(17, 24, 39, .13);
+  box-shadow: 0 1px 2px rgba(16, 24, 40, .06);
+}
+html:root[data-repaginada][data-repaginada][data-tema="light"] .v2 :is(.pn-link, .ev-st-acao, .cv2-bt:not(.pri), .fin-btn:not(.fin-ok), .calx-seta, .calx-hojebtn, .gp-sc-ger):hover:not(:disabled) {
+  background: #F8F9FA; border-color: rgba(17, 24, 39, .2);
+}
+html:root[data-repaginada][data-repaginada] .v2 :is(.pn-link, .ev-st-acao, .calx-seta, .calx-hojebtn, .gp-sc-ger) { color: var(--txt); }
+/* o desativado não acende no hover */
+html:root[data-repaginada][data-repaginada] .v2 .pn-link:disabled { box-shadow: none; }
+/* "Enviar" do script = o primário do sistema (no claro era um marrom cravado #7A5C1E) */
+html:root[data-repaginada][data-repaginada] .v2 .cv2-bt.pri {
+  color: var(--platina-txt);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--platina-a), #fff 13%), var(--platina-a));
+  border-color: color-mix(in srgb, var(--platina-a), #000 24%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .24), 0 1px 2px rgba(0, 0, 0, .22);
+}
+html:root[data-repaginada][data-repaginada] .v2 .cv2-bt.pri:hover:not(:disabled) {
+  filter: none;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--platina-a), #fff 20%), color-mix(in srgb, var(--platina-a), #fff 5%));
+}
+
+/* ---- 12. CAMPO da % de comissão (Atendentes): era uma caixa cinza — vira o
+   campo afundado do Atenvo (branco no claro, abaixo do cartão no escuro) ---- */
+html:root[data-repaginada][data-repaginada] .v2 .pn-pct-campo { background: var(--rp-campo); border-color: var(--rp-campo-fio); }
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .pn-pct-campo { box-shadow: inset 0 1px 2px rgba(0, 0, 0, .18); }
+html:root[data-repaginada][data-repaginada][data-tema="light"] .v2 .pn-pct-campo { box-shadow: 0 1px 2px rgba(16, 24, 40, .04); }
+html:root[data-repaginada][data-repaginada] .v2 .pn-pct-campo:hover:not(:focus-within) { border-color: var(--rp-campo-fio-hover); }
+html:root[data-repaginada][data-repaginada] .v2 .pn-pct-campo:focus-within {
+  border-color: color-mix(in srgb, var(--platina-a) 75%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--platina-a) 22%, transparent);
+}
+html:root[data-repaginada][data-repaginada] .v2 .pn-pct-campo.sujo { border-color: rgba(var(--ambar-rgb), .6); }
+
+/* ---- 13. LINKS no acento ("Pausar", "Ver", "trocar"…): o dourado puro no
+   claro ficava a 3:1 — a tinta do acento legível ---- */
+html:root[data-repaginada][data-repaginada] .v2 .cm-num-lnk:not(.perigo) { color: var(--rv-tinta); }
+
+/* ---- 14. BARRA LATERAL em tela baixa (até 912px de altura, ex. 1470×820):
+   o menu da Reviza tem 15 itens + 5 grupos (o do Atenvo, 12) e passava 89px
+   da altura útil — Registros e Usuários ficavam escondidos/cortados no pé
+   da cápsula. Só aqui o ritmo aperta um pouco (item 33px, grupos mais
+   juntos) e o menu inteiro cabe; em tela alta nada muda. O limite é 912
+   (e não 880): no ritmo normal o menu só cabe sem rolar a partir de ~910px —
+   entre 881 e 899 o ícone de Usuários saía cortado pelo fio do rodapé. ---- */
+@media (max-height: 912px) {
+  /* .item.item: a repaginada define o item com a MESMA especificidade — dobrar a classe não depende da ordem */
+  html:root[data-repaginada][data-repaginada] .v2.app-v2 .p-sidebar .item.item { height: 33px; margin: 1px 0; }
+  html:root[data-repaginada][data-repaginada] .v2.app-v2 .p-sidebar .grupo { margin-top: 6px; padding-top: 6px; }
+  html:root[data-repaginada][data-repaginada] .v2.app-v2 .p-sidebar .grupo:first-of-type { margin-top: 6px; padding-top: 0; }
+  html:root[data-repaginada][data-repaginada] .v2.app-v2 .p-sidebar .glabel { height: 18px; line-height: 18px; }
+  html:root[data-repaginada][data-repaginada] .v2.app-v2 .p-sidebar .sb-nav { padding-bottom: 8px; }
+}
+
+/* ---- 15. FINANCEIRO: "Confirmar" no escuro era o verde claro com texto
+   escuro — vira a chapa verde FUNDA com branco (a mesma do "IA ligada" e
+   do selo de concluído do Atenvo); o claro já era essa receita ---- */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .pn-fin-ok {
+  color: #fff;
+  background: color-mix(in srgb, var(--verde), #000 22%);
+  border-color: color-mix(in srgb, var(--verde), #000 22%);
+}
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .pn-fin-ok:hover:not(:disabled) {
+  filter: none; background: color-mix(in srgb, var(--verde), #000 32%);
+}
+
+/* ---- 16. PALETA ⌘K no escuro: o mesmo degrau dos menus flutuantes
+   (avatar, sino) — um acima da carta ---- */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .pal-caixa {
+  background: var(--rp-menu); border-color: rgba(255, 255, 255, .09);
+}
+
+/* "você" na lista de usuários: tinta do acento legível */
+html:root[data-repaginada][data-repaginada] .v2 .pn-us-voce { color: var(--rv-tinta); }
+
+/* ---- 17. FAIXA DE STATUS dos cartões: Números (desconectado = rubro, sincronizando
+   = âmbar) e Avisos (não lido = âmbar + aro) marcam o cartão com uma sombra
+   INTERNA de 3px — e o cartão elevado (.vidro, .spot:hover) troca o box-shadow
+   inteiro pela sombra de contato: a faixa sumia. Aqui as duas vão juntas (o
+   cartão de aviso não é .spot: não cresce no hover, então não ganha :hover) ---- */
+html:root[data-repaginada][data-repaginada] .v2 .pn-num.desconectado { box-shadow: inset 3px 0 0 var(--rubro), var(--sombra-1); }
+html:root[data-repaginada][data-repaginada] .v2 .pn-num.desconectado:hover { box-shadow: inset 3px 0 0 var(--rubro), var(--sombra-2); }
+html:root[data-repaginada][data-repaginada] .v2 .pn-num.sincronizando { box-shadow: inset 3px 0 0 var(--ambar), var(--sombra-1); }
+html:root[data-repaginada][data-repaginada] .v2 .pn-num.sincronizando:hover { box-shadow: inset 3px 0 0 var(--ambar), var(--sombra-2); }
+html:root[data-repaginada][data-repaginada] .v2 .pn-mural-card.novo { box-shadow: inset 3px 0 0 var(--ambar), 0 0 0 1px rgba(var(--ambar-rgb), .35), var(--sombra-1); }
+
+/* ---- 18. CAIXAS DE SELEÇÃO e rádios nativos (Importar novos, Gestão › Colunas,
+   Envios › "Mostrar digitando…", Atendentes › mudar %) saíam no azul do
+   navegador: seguem o acento, como as do Atenvo. Especificidade BAIXA de
+   propósito (:where) — a regra própria de cada tela continua valendo ---- */
+.v2 :where(input[type="checkbox"], input[type="radio"]) { accent-color: var(--platina-a); }
+
+/* ---- 19. CAMPOS DE DATA/HORA no escuro: o ícone do calendário/relógio é do
+   navegador e saía preto sobre o campo afundado (quase invisível). Como o
+   Atenvo faz nos campos de data dele: color-scheme do tema ---- */
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 input:is([type="date"], [type="datetime-local"], [type="time"], [type="month"], [type="week"]) { color-scheme: dark; }
+
+/* ---- 20. RÓTULOS esmaecidos com opacity (DOM/SÁB e "D01→3" do Calendário,
+   passo vazio da Régua de hoje em Envios, "(todos)" do chip ligado da Régua):
+   a opacidade levava o --txt-3 abaixo de 3:1. No Atenvo o mais apagado é o
+   próprio --txt-3 — a hierarquia fica na cor e no peso, sem transparência ---- */
+html:root[data-repaginada][data-repaginada] .v2 :is(.calx-wk span.fds, .calx-pill.fantasma, .ev-passo.vazio) { opacity: 1; }
+html:root[data-repaginada][data-repaginada] .v2 .ev-passo.vazio :is(.ev-passo-cab b, .ev-passo-num b) { color: var(--txt-2); }
+html:root[data-repaginada][data-repaginada] .v2 .ev-passo.vazio .ev-q { color: var(--txt-3); background: rgba(var(--tint), .07); }
+html:root[data-repaginada][data-repaginada] .v2 .rg-de button.on small { color: var(--txt-2); }

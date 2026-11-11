@@ -1,7 +1,9 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { supabase, isSupabaseConfigured, isDemoMode } from '@/lib/supabase';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { supabase, isSupabaseConfigured, isDemoMode, isRevizaMode } from '@/lib/supabase';
 import type { SessionUser } from '@/types/org';
 import { DEMO_USER } from '@/data/demo';
+import { limparDesfazer } from '@/v2/data/desfazer';
 
 type AuthMode = 'supabase' | 'mock';
 const MOCK_KEY = 'atenvo-mock-session';
@@ -22,13 +24,13 @@ interface AuthState {
   /** Define a nova senha na sessão de recuperação (ou logado). Indisponível no demo. */
   updatePassword: (newPassword: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
-  /** Recarrega o nome do perfil (usuarios.nome) sem exigir logout — usar após salvar o perfil. */
+  /** Recarrega o nome do perfil (usuarios.nome; profiles.nome no Reviza) sem exigir logout — usar após salvar o perfil. */
   refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
 
-/** Monta o SessionUser resolvendo o nome com prioridade: usuarios.nome -> metadados do Auth -> ''.
+/** Monta o SessionUser resolvendo o nome com prioridade: perfil no banco -> metadados do Auth -> ''.
  *  NUNCA usa o e-mail como nome (o e-mail tem seu próprio campo). */
 async function buildSessionUser(u: { id: string; email?: string | null; user_metadata?: Record<string, unknown> } | null | undefined): Promise<SessionUser | null> {
   if (!u) return null;
@@ -37,7 +39,10 @@ async function buildSessionUser(u: { id: string; email?: string | null; user_met
   let deveTrocarSenha = false;
   if (supabase) {
     try {
-      const { data } = await supabase.from('usuarios').select('nome, deve_trocar_senha').eq('id', u.id).maybeSingle();
+      // Reviza: o perfil mora em public.profiles ('usuarios' não existe lá — dava 404 em todo login);
+      // mesmas colunas nas duas tabelas. Atenvo segue em 'usuarios', intocado.
+      const tabelaPerfil = isRevizaMode ? 'profiles' : 'usuarios';
+      const { data } = await supabase.from(tabelaPerfil).select('nome, deve_trocar_senha').eq('id', u.id).maybeSingle();
       nome = ((data?.nome as string | undefined) ?? '').trim();
       deveTrocarSenha = Boolean((data as { deve_trocar_senha?: boolean } | null)?.deve_trocar_senha);
     } catch { /* mantém metaName */ }
@@ -45,16 +50,32 @@ async function buildSessionUser(u: { id: string; email?: string | null; user_met
   return { id: u.id, email: u.email ?? '', name: nome || metaName || '', deveTrocarSenha };
 }
 
+/** Saiu (ou entrou OUTRA pessoa) na mesma aba: nada do usuário anterior fica em
+ *  memória. As chaves do react-query não levam o id do usuário — a planilha (CPF
+ *  completo), as senhas reveladas e o papel apareceriam pro próximo login até o
+ *  refetch. Zera também as edições pendentes/fila da planilha (gancho em
+ *  window, sem importar o módulo da cobrança no chunk de entrada) e o Desfazer
+ *  (o inverso rodaria com a sessão nova). Síncrono: seguro dentro do onAuthStateChange. */
+function limparSessaoAnterior(qc: QueryClient) {
+  try { void qc.cancelQueries(); } catch { /* segue */ }
+  try { qc.clear(); } catch { /* segue */ }
+  try { (window as unknown as { __rvResetPlanilha?: () => void }).__rvResetPlanilha?.(); } catch { /* planilha não carregada: nada a zerar */ }
+  try { limparDesfazer(); } catch { /* segue */ }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const mode: AuthMode = isSupabaseConfigured ? 'supabase' : 'mock';
+  const qc = useQueryClient();
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<SessionUser | null>(null);
   const [recovery, setRecovery] = useState(false);
+  const uidRef = useRef<string | null>(null); // dono do que está no cache agora
 
   useEffect(() => {
     let active = true;
     if (mode === 'supabase' && supabase) {
       supabase.auth.getSession().then(async ({ data }) => {
+        if (uidRef.current == null) uidRef.current = data.session?.user?.id ?? null;
         const su = await buildSessionUser(data.session?.user);
         if (!active) return;
         setUser(su);
@@ -62,6 +83,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
         if (event === 'PASSWORD_RECOVERY') setRecovery(true);
+        // SIGNED_OUT (Sair, sessão expirada, saiu em outra aba) ou login de outro usuário
+        const uid = session?.user?.id ?? null;
+        if (event === 'SIGNED_OUT' || (uid && uidRef.current && uid !== uidRef.current)) limparSessaoAnterior(qc);
+        uidRef.current = uid;
         buildSessionUser(session?.user).then((su) => { if (active) setUser(su); });
       });
       return () => { active = false; sub.subscription.unsubscribe(); };
@@ -73,7 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch { /* ignore */ }
     setLoading(false);
     return () => { active = false; };
-  }, [mode]);
+  }, [mode, qc]);
 
   const signIn: AuthState['signIn'] = async (email, password) => {
     if (mode === 'supabase' && supabase) {
@@ -118,6 +143,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await supabase.auth.signOut();
     } else {
       try { localStorage.removeItem(MOCK_KEY); } catch { /* ignore */ }
+      limparSessaoAnterior(qc); // demo: mesma regra do real (o próximo login começa limpo)
       setUser(null);
     }
   };

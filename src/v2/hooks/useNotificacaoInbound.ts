@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { supabase } from '@/lib/supabase';
+import { isRevizaMode, supabase } from '@/lib/supabase';
 import { WA_REAL, mascararNumero } from '@/data/whatsapp';
 import { useOrg } from '@/context/OrgContext';
 import { CURR_KEY } from './useInboxWhatsApp';
@@ -47,6 +47,7 @@ export function useNotificacaoInbound(opts: {
   cb.current = opts;
 
   useEffect(() => {
+    if (isRevizaMode) return; // instância Reviza: sem realtime de mensagens do Atenvo
     if (!WA_REAL || !supabase || !currentOrg.id) return;
     const orgId = currentOrg.id;
     const ch = supabase

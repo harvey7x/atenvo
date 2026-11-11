@@ -1,7 +1,8 @@
 import { Suspense, type ReactNode } from 'react';
 // lazy com auto-recarga: chunk que sumiu após deploy novo força 1 reload (recargaChunk.ts)
 import { lazyComRecarga as lazy } from '@/lib/recargaChunk';
-import { createBrowserRouter, createHashRouter, RouterProvider, Navigate, useParams, type RouteObject } from 'react-router-dom';
+import { createBrowserRouter, createHashRouter, RouterProvider, Navigate, Outlet, useParams, type RouteObject } from 'react-router-dom';
+import { isRevizaMode } from '@/lib/supabase';
 // v1 — preservado APENAS em /v1/* como fallback técnico (sem link na interface). Nada é deletado.
 import { AppShell } from '@/components/AppShell';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
@@ -59,6 +60,10 @@ const CoexistenciaV2 = lazy(() => import('@/v2/pages/Coexistencia'));
 const DefinirSenhaV2 = lazy(() => import('@/v2/pages/DefinirSenha'));
 const AlterarSenhaV2 = lazy(() => import('@/v2/pages/AlterarSenha'));
 
+// Instância Reviza: só existe /cobrancas/* — qualquer rota de Atendimento (v1, mobile) redireciona.
+function RevizaGate({ children }: { children: ReactNode }) {
+  return isRevizaMode ? <Navigate to="/cobrancas/painel" replace /> : <>{children}</>;
+}
 function Lz({ children }: { children: ReactNode }) {
   return <Suspense fallback={null}>{children}</Suspense>;
 }
@@ -83,7 +88,7 @@ const routes: RouteObject[] = [
       // montado (realtime + otimista sobrevivem à navegação lista ↔ conversa).
       {
         path: 'm',
-        element: <Lz><MobileShell /></Lz>,
+        element: <RevizaGate><Lz><MobileShell /></Lz></RevizaGate>,
         children: [
           { index: true, element: <Lz><ListaConversasMobile /></Lz> },
           { path: ':conversaId', element: <Lz><ConversaMobile /></Lz> },
@@ -131,6 +136,7 @@ const routes: RouteObject[] = [
   // ============ v1 preservado em /v1/* (fallback técnico, sem link; nada deletado) ============
   {
     path: '/v1',
+    element: <RevizaGate><Outlet /></RevizaGate>,
     children: [
       { path: 'login', element: <Login /> },
       { path: 'redefinir-senha', element: <RedefinirSenha /> },

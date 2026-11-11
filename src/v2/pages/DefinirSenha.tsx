@@ -41,8 +41,8 @@ export default function DefinirSenhaV2() {
       <div className="grao" />
       <div className="lg-card vidro pg-entra">
         <div className="marca2">A</div>
-        <div className="caps">Bem-vindo ao Atenvo</div>
-        <h1 className="p-display">Bem-vindo(a) à Atenvo.</h1>
+        <div className="caps">Bem-vindo à ALFA GROUP</div>
+        <h1 className="p-display">Bem-vindo(a) à ALFA GROUP.</h1>
 
         {fase === 'carregando' ? (
           <div className="sub">Validando seu convite…</div>

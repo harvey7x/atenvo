@@ -44,12 +44,8 @@
 /* bolhas: tratamento completo na seção 5 (FIO PREMIUM) */
 
 /* --- 3. AZUL COMO SECUNDÁRIA DE INTERAÇÃO ------------------- */
-/* item ativo da navegação (pill azul, como a referência) */
-:root:not([data-tema="light"]) .v2 .item.on {
-  background: rgba(var(--azul-rgb), .16);
-  color: #fff;
-}
-:root:not([data-tema="light"]) .v2 .item.on::before { background: var(--azul); }
+/* item ativo da navegação: o estilo vive em shell/shell.css (superfície neutra +
+   ícone no acento, 14/10) — a pílula azul saiu */
 
 /* ação primária: o metal platina vira azul (referência "Dispatch Now") */
 :root:not([data-tema="light"]) .v2 .btn-pri {
@@ -60,9 +56,9 @@
 
 /* aba ativa do inbox */
 :root:not([data-tema="light"]) .v2 .wa-aba.on {
-  background: rgba(var(--azul-rgb), .09);
+  background: var(--azul);
   color: #fff;
-  box-shadow: inset 0 1px 0 rgba(var(--azul-rgb), .13);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .28);
 }
 
 /* --- 3b. AZUL: segunda leva de pontos de interação --------------
@@ -206,14 +202,12 @@
 :root[data-tema="light"] .v2.app-v2 .wa-msgs { background-color: rgba(244, 245, 247, .5); }
 
 /* azul de interação */
-:root[data-tema="light"] .v2.app-v2 .item.on { background: rgba(var(--azul-rgb), .1); color: var(--azul); }
-:root[data-tema="light"] .v2.app-v2 .item.on::before { background: var(--azul); }
 :root[data-tema="light"] .v2 .btn-pri {
   background: linear-gradient(180deg, #3D7BE8, #2A62C9);
   color: #fff;
   box-shadow: 0 10px 26px rgba(var(--azul-rgb), .25), inset 0 1px 0 rgba(255, 255, 255, .35);
 }
-:root[data-tema="light"] .v2.app-v2 .wa-aba.on { background: rgba(var(--azul-rgb), .09); color: var(--azul); box-shadow: inset 0 1px 0 rgba(var(--azul-rgb), .13); }
+:root[data-tema="light"] .v2.app-v2 .wa-aba.on { background: var(--azul); color: #fff; box-shadow: 0 1px 2px rgba(var(--azul-rgb), .28); }
 :root[data-tema="light"] .v2.app-v2 .conv2 .nl { background: linear-gradient(180deg, #3D7BE8, #2A62C9); color: #fff; }
 :root[data-tema="light"] .v2.app-v2 .env-b { background: linear-gradient(180deg, #3D7BE8, #2A62C9); color: #fff; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35); }
 :root[data-tema="light"] .v2.app-v2 .tgl { background: linear-gradient(180deg, #3D7BE8, #2A62C9); }
@@ -377,9 +371,11 @@
 :root[data-acento="dourado"]:not([data-tema="light"]) .v2 .conv2 .nl { background: linear-gradient(180deg, #F9D478, #D29A35); color: #241A05; }
 :root[data-acento="dourado"]:not([data-tema="light"]) .v2 .barv.hoje2 { background: linear-gradient(180deg, #FFE49A, #DCA43C); }
 :root[data-acento="dourado"]:not([data-tema="light"]) .v2 .bolha .tick.lida { color: #F5CE74; }
-/* pill/aba ativas: texto âmbar-claro em vez do branco (o véu ouro é quente) */
-:root[data-acento="dourado"]:not([data-tema="light"]) .v2 .item.on,
-:root[data-acento="dourado"]:not([data-tema="light"]) .v2 .wa-aba.on { color: #FFE9B8; }
+/* aba do inbox: pastilha ativa é ouro SÓLIDO — texto/contador escuros pra contraste */
+:root[data-acento="dourado"]:not([data-tema="light"]) .v2 .wa-aba.on { color: #2A1E00; }
+:root[data-acento="dourado"]:not([data-tema="light"]) .v2 .wa-aba.on .n { color: #2A1E00; background: rgba(0, 0, 0, .16); }
+/* selo urgente (Fechados aguardando resposta) continua vermelho mesmo na pastilha ouro */
+:root[data-acento="dourado"]:not([data-tema="light"]) .v2 .wa-aba.on .n.urg { color: #fff; background: var(--rubro); }
 
 /* bolha enviada: vidro âmbar-mata profundo */
 :root[data-acento="dourado"]:not([data-tema="light"]) .v2 .bolha.env2 {

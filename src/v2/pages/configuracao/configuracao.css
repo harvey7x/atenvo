@@ -1,0 +1,781 @@
+/* ============================================================
+   CONFIGURAÇÃO INICIAL (Reviza) — prefixo EXCLUSIVO cini-.
+   (cfg- já é da tela Configurações; nada de classe genérica solta:
+   modificadores também levam o prefixo — colisoesCss.test.ts.)
+   1) .cini-veu     takeover de tela cheia (portal .v2), fundo da base
+                    com véu dourado opcional (some sozinho no claro);
+   2) .cini-topo    cromo do assistente: marca, rótulo, identidade, Sair;
+   3) .cini-espera  tela de espera (comercial) — card central .vidro;
+   4) .cini-trilha  stepper horizontal das três etapas (m e s);
+   5) .cini-ass     assistente: cabeçalho, trilha, card da etapa aberta
+                    (.vidro.cini-painel) com rodapé fixo .cini-pe;
+   6) etapas        WhatsApp (.cini-wa) e Mensalidade (.cini-ms);
+   7) .cini-faixa   aviso discreto das contas de suporte.
+   ESCALA (guardada por escalaVisual.test.ts): fontes 11 / 12.5 / 13.5 /
+   15 / 20 / 28 · raios r-card / r-ctl / 50% / 999px · espaço 4–48.
+   Cor só por tokens v2 (claro/escuro saem sozinhos). --txt-3 só em
+   desabilitado/decorativo. Âmbar = risco real; rubro = erro/vencimento;
+   verde = concluído; dourado (--azul) = atual/seleção/progresso/foco.
+   Zero emoji no cromo.
+   ============================================================ */
+
+/* ---------- 0. utilitários ---------- */
+.v2 .cini-vh {
+  position: absolute !important; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0;
+  overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+}
+
+/* ---------- 1. takeover ---------- */
+.v2 .cini-veu {
+  position: fixed; inset: 0; z-index: 1250; /* abaixo da intro (1300) e do LicencaGate (1400) */
+  overflow-y: auto; overscroll-behavior: contain;
+  background:
+    radial-gradient(900px 360px at 50% -10%, rgba(var(--azul-rgb), calc(.05 * var(--luz-op))), transparent 70%),
+    var(--base);
+  animation: cini-fade .28s var(--ease);
+}
+/* modais abertos DE DENTRO do takeover (QR do WhatsApp, confirmações da etapa 1)
+   nascem em outra raiz de portal com z-index 90 — sobem acima do véu enquanto ele existe */
+:root[data-config-inicial] .v2.portal-v2 > .veu { z-index: 1260; }
+
+/* foco: o mesmo anel do Painel aprovado, em todo interativo */
+:root[data-config-inicial] .v2 .p-btn:focus-visible,
+.v2 .cini-faixa .p-btn:focus-visible,
+.v2 .cini-sair:focus-visible,
+.v2 .cini-link:focus-visible,
+.v2 .cini-tr-btn:focus-visible,
+.v2 .cini-chk input:focus-visible,
+.v2 .cini-op:has(input:focus-visible),
+.v2 .cini-num:has(input:focus-visible) {
+  outline: 2px solid rgba(var(--azul-rgb), .7); outline-offset: 2px;
+}
+/* títulos recebem foco programático (tabIndex -1): sem anel, o leitor de tela anuncia */
+.v2 .cini-titulo:focus, .v2 .cini-pc-tit:focus, .v2 .cini-fim-titulo:focus,
+.v2 .cini-espera-titulo:focus, .v2 .cini-carregando span:focus, .v2 .cini-sec-tit:focus { outline: none; }
+
+/* botões: 40 no card e no rodapé (44 no estreito); mini 32 */
+.v2 .cini-wa .p-btn:not(.btn-mini), .v2 .cini-ms .p-btn:not(.btn-mini),
+.v2 .cini-pe .p-btn:not(.btn-mini), .v2 .cini-qr .p-btn:not(.btn-mini) {
+  height: 40px; padding: 0 16px; font-size: 13.5px; justify-content: center;
+}
+.v2 .cini-wa .p-btn.btn-mini, .v2 .cini-ms .p-btn.btn-mini, .v2 .cini-topo .p-btn.btn-mini,
+.v2 .cini-espera .p-btn.btn-mini, .v2 .cini-faixa .p-btn.btn-mini {
+  height: 32px; padding: 0 12px; font-size: 12.5px; border-radius: var(--r-ctl); justify-content: center; white-space: nowrap;
+}
+.v2 .cini-pe .p-btn.btn-pri { min-width: 152px; }
+
+/* primário desabilitado NEUTRO — (0,7,0) vence os pares dourados do skinAurora e o modo corp */
+:root .v2 .cini-veu .p-btn.btn-pri:disabled:not([aria-busy="true"]),
+:root .v2 .cini-qr .p-btn.btn-pri:disabled:not([aria-busy="true"]) {
+  opacity: 1; background: rgba(var(--tint), .06); color: var(--txt-3);
+  border-color: rgba(var(--tint), .08); box-shadow: none; transform: none; cursor: not-allowed;
+}
+:root .v2 .cini-veu .p-btn.btn-pri:disabled:not([aria-busy="true"])::after,
+:root .v2 .cini-qr .p-btn.btn-pri:disabled:not([aria-busy="true"])::after { display: none; }
+:root .v2 .cini-veu .p-btn.btn-pri[aria-busy="true"],
+:root .v2 .cini-qr .p-btn.btn-pri[aria-busy="true"] { opacity: .85; cursor: progress; }
+
+/* anel de carregamento (16 · 20 · 12) */
+.v2 .cini-anel {
+  width: 16px; height: 16px; border-radius: 50%; display: inline-block; flex-shrink: 0;
+  border: 1.5px solid rgba(var(--tint), .16); border-top-color: var(--txt-2);
+  animation: cini-gira 1.6s linear infinite;
+}
+.v2 .cini-anel.cini-anel-g { width: 20px; height: 20px; border-width: 2px; }
+.v2 .cini-anel.cini-anel-p { width: 12px; height: 12px; }
+/* dentro do quadro branco do QR (os dois temas) */
+.v2 .cini-anel.cini-anel-qr { border-color: rgba(17, 17, 17, .12); border-top-color: #6B7079; }
+
+.v2 .cini-ass { min-height: 100%; display: flex; flex-direction: column; }
+.v2 .cini-carregando {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 12px;
+  padding: 80px 24px; font-size: 13.5px; line-height: 1.55; color: var(--txt-2);
+}
+
+/* ---------- 2. topo do assistente ---------- */
+.v2 .cini-topo {
+  position: sticky; top: 0; z-index: 3; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  height: 64px; padding: 0 32px;
+  background: var(--base);
+  border-bottom: 1px solid var(--linha);
+}
+.v2 .cini-topo-marca { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.v2 .cini-logo { width: 28px; height: 28px; flex-shrink: 0; display: block; }
+.v2 .cini-wordmark { font-size: 13.5px; font-weight: 650; letter-spacing: .14em; line-height: 1; color: var(--txt); white-space: nowrap; }
+.v2 .cini-topo-div { width: 1px; height: 20px; margin: 0 4px; flex-shrink: 0; background: var(--linha); }
+.v2 .cini-topo-rot {
+  font-size: 13.5px; font-weight: 500; line-height: 1.55; color: var(--txt-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.v2 .cini-topo-acoes { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.v2 .cini-acoes-div { width: 1px; height: 24px; flex-shrink: 0; background: var(--linha); }
+.v2 .cini-topo-acoes > .cini-acoes-div:first-child { display: none; }
+
+/* identidade (avatar + nome + papel) */
+.v2 .cini-id { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.v2 .cini-id-tx { display: flex; flex-direction: column; min-width: 0; max-width: 200px; text-align: left; }
+.v2 .cini-id-nome {
+  font-size: 13.5px; font-weight: 600; line-height: 1.3; color: var(--txt);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.v2 .cini-id-papel { font-size: 12.5px; line-height: 1.4; color: var(--txt-2); white-space: nowrap; }
+.v2 .cini-av {
+  width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+  display: grid; place-items: center;
+  font-size: 12.5px; font-weight: 650; line-height: 1; color: var(--txt-2);
+  background: rgba(var(--tint), .07); border: 1px solid rgba(var(--tint), .10);
+}
+
+/* Sair (fantasma no topo; BotaoSec mini na espera) */
+.v2 .cini-sair {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 36px; padding: 0 12px; border-radius: var(--r-ctl);
+  font: inherit; font-size: 13.5px; font-weight: 500; color: var(--txt-2);
+  background: transparent; border: 0; cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.v2 .cini-sair:hover:not(:disabled) { background: rgba(var(--tint), .06); color: var(--txt); }
+.v2 .cini-sair:disabled { opacity: .55; cursor: default; }
+.v2 .cini-sair-sec { gap: 8px; }
+
+/* ---------- 3. tela de espera ---------- */
+/* composição centrada na vertical; o fundo ganha dois brilhos suaves de token
+   (tinta + dourado) para o card não ficar perdido num mar vazio */
+.v2 .cini-espera {
+  min-height: 100%; display: grid; justify-items: center; align-content: center;
+  padding: clamp(32px, 6vh, 64px) 16px;
+  background:
+    radial-gradient(560px 300px at 16% 22%, rgba(var(--tint), .035), transparent 70%),
+    radial-gradient(640px 340px at 84% 80%, rgba(var(--azul-rgb), calc(.045 * var(--luz-op))), transparent 70%);
+}
+.v2 .cini-espera-card {
+  width: min(520px, 100%); padding: 40px 40px 28px; text-align: center;
+  display: flex; flex-direction: column; align-items: center;
+}
+/* figura de demonstração (ilustração serena das três etapas) acima do título */
+.v2 .cini-espera-fig { width: min(400px, 100%); margin-top: 24px; }
+/* cascata de entrada (só "from": quem não anima vê o estado final) */
+.v2 .cini-espera-card > *, .v2 .cini-espera-nota { animation: cini-sobe .32s var(--ease) backwards; }
+.v2 .cini-espera-card > :nth-child(2) { animation-delay: 60ms; }
+.v2 .cini-espera-card > :nth-child(3) { animation-delay: 120ms; }
+.v2 .cini-espera-card > :nth-child(4) { animation-delay: 180ms; }
+.v2 .cini-espera-card > :nth-child(n+5), .v2 .cini-espera-nota { animation-delay: 240ms; }
+
+.v2 .cini-espera-logo {
+  width: 40px; height: 40px; display: block; flex-shrink: 0;
+  filter: drop-shadow(0 8px 20px rgba(var(--azul-rgb), calc(.16 * var(--fx))));
+}
+.v2 .cini-eyebrow {
+  margin-top: 12px; display: inline-flex; align-items: center; gap: 12px;
+  font-size: 11px; font-weight: 600; letter-spacing: .18em; line-height: 1.5; text-transform: uppercase; color: var(--txt-2);
+}
+.v2 .cini-eyebrow::before, .v2 .cini-eyebrow::after { content: ""; width: 28px; height: 1px; }
+.v2 .cini-eyebrow::before { background: linear-gradient(90deg, transparent, rgba(var(--tint), .28)); }
+.v2 .cini-eyebrow::after { background: linear-gradient(90deg, rgba(var(--tint), .28), transparent); }
+
+.v2 .cini-espera-titulo, .v2 .cini-titulo {
+  font-size: 28px; font-weight: 650; letter-spacing: -.022em; line-height: 1.12; color: var(--txt);
+  background: linear-gradient(180deg, var(--display-a), var(--display-b));
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  text-wrap: balance;
+}
+.v2 .cini-espera-titulo { margin-top: 24px; }
+.v2 .cini-espera-tx { margin-top: 12px; max-width: 440px; font-size: 15px; line-height: 1.6; color: var(--txt-2); text-wrap: pretty; }
+.v2 .cini-espera-status {
+  margin-top: 28px; align-self: stretch; padding-top: 24px;
+  border-top: 1px solid rgba(var(--tint), .06);
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  font-size: 13.5px; font-weight: 600; line-height: 1.55; color: var(--txt);
+}
+.v2 .cini-espera-pe {
+  margin-top: 28px; padding-top: 20px; align-self: stretch;
+  border-top: 1px solid rgba(var(--tint), .06);
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; text-align: left;
+}
+.v2 .cini-espera-pe.cini-espera-pe-so { justify-content: flex-end; }
+.v2 .cini-espera-quem { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.v2 .cini-espera-quem-tx { display: flex; flex-direction: column; min-width: 0; }
+.v2 .cini-espera-quem-rot { font-size: 12.5px; line-height: 1.4; color: var(--txt-2); }
+.v2 .cini-espera-quem-nome {
+  font-size: 13.5px; font-weight: 600; line-height: 1.4; color: var(--txt);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.v2 .cini-espera-pe .p-btn { flex-shrink: 0; }
+.v2 .cini-espera-nota { margin-top: 16px; font-size: 12.5px; line-height: 1.5; color: var(--txt-2); text-align: center; }
+
+/* ---------- 4. trilha das etapas ---------- */
+.v2 .cini-trilha { margin: 32px 0 24px; scroll-margin-top: 80px; }
+.v2 .cini-trilha ol {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0;
+}
+.v2 .cini-tr-item { position: relative; min-width: 0; }
+/* conector até a próxima etapa (verde quando esta já foi feita) */
+.v2 .cini-tr-item:not(:last-child)::after {
+  content: ""; position: absolute; top: 26px; left: 48px; right: 12px; height: 1px;
+  background: var(--linha); pointer-events: none;
+}
+.v2 .cini-tr-item.cini-tr-feita:not(:last-child)::after { background: rgba(var(--verde-rgb), .45); }
+
+.v2 .cini-tr-btn {
+  display: flex; flex-direction: column; align-items: flex-start; width: 100%;
+  padding: 8px 12px 8px 0; border: 0; border-radius: var(--r-ctl);
+  font: inherit; color: inherit; text-align: left; background: none;
+}
+.v2 button.cini-tr-btn { cursor: pointer; transition: background .15s; }
+/* área clicável deslocada 12px à esquerda: o hover e o anel de foco envolvem o marcador com
+   respiro (sem encostar nele) e terminam 12px antes do marcador seguinte; o marcador e o
+   conector não saem do lugar */
+.v2 .cini-trilha-m button.cini-tr-btn { margin-left: -12px; width: 100%; padding-left: 12px; }
+/* hover só com ponteiro de verdade: no toque o :hover "gruda" depois do tap */
+@media (hover: hover) {
+  .v2 button.cini-tr-btn:hover { background: rgba(var(--tint), .03); }
+  .v2 button.cini-tr-btn:hover .cini-tr-tit { color: var(--txt); }
+  .v2 .cini-tr-item:not(.cini-tr-feita):not(.cini-tr-atual) button.cini-tr-btn:hover .cini-tr-marca { border-color: rgba(var(--tint), .28); }
+}
+
+.v2 .cini-tr-marca {
+  width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+  display: grid; place-items: center;
+  font-size: 13.5px; font-weight: 650; line-height: 1; color: var(--txt-2);
+  background: rgba(var(--tint), .04); border: 1px solid rgba(var(--tint), .14);
+  transition: border-color .15s, box-shadow .2s, background .2s;
+}
+.v2 .cini-tr-atual .cini-tr-marca {
+  color: var(--azul); border: 1.5px solid var(--azul);
+  box-shadow: 0 0 0 4px rgba(var(--azul-rgb), .12);
+}
+:root[data-tema="light"] .v2 .cini-tr-atual .cini-tr-marca { color: var(--txt); }
+.v2 .cini-tr-feita .cini-tr-marca {
+  color: var(--verde); background: var(--verde-bg); border: 1px solid rgba(var(--verde-rgb), .35);
+}
+.v2 .cini-tr-feita.cini-tr-atual .cini-tr-marca { box-shadow: 0 0 0 4px rgba(var(--azul-rgb), .14); }
+
+.v2 .cini-tr-tx { margin-top: 12px; display: flex; flex-direction: column; gap: 2px; min-width: 0; max-width: 100%; }
+.v2 .cini-tr-tit { font-size: 13.5px; font-weight: 600; line-height: 1.55; color: var(--txt-2); transition: color .15s; }
+.v2 .cini-tr-feita .cini-tr-tit, .v2 .cini-tr-atual .cini-tr-tit { color: var(--txt); }
+.v2 .cini-tr-meta {
+  max-width: 100%; font-size: 12.5px; line-height: 1.5; color: var(--txt-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.v2 .cini-tr-curto { display: none; }
+
+/* tamanho S (espera): centralizada, estática */
+.v2 .cini-trilha.cini-trilha-s { margin: 20px 0 0; align-self: stretch; }
+.v2 .cini-trilha-s .cini-tr-btn { align-items: center; text-align: center; padding: 0; }
+.v2 .cini-trilha-s .cini-tr-marca { width: 28px; height: 28px; font-size: 12.5px; }
+.v2 .cini-trilha-s .cini-tr-item:not(:last-child)::after { top: 14px; left: calc(50% + 22px); right: calc(-50% + 22px); }
+.v2 .cini-trilha-s .cini-tr-tx { margin-top: 8px; align-items: center; }
+.v2 .cini-trilha-s .cini-tr-tit { font-size: 12.5px; line-height: 1.5; }
+
+/* ---------- 5. assistente ---------- */
+.v2 .cini-ass-miolo { width: min(960px, 100%); margin: 0 auto; padding: 40px 32px 64px; }
+
+.v2 .cini-cab {
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 16px 32px; flex-wrap: wrap;
+  animation: cini-sobe .32s var(--ease) backwards;
+}
+.v2 .cini-cab-tx { min-width: 0; }
+.v2 .cini-cab.cini-cab-fim { justify-content: center; text-align: center; }
+.v2 .cini-sub { margin-top: 8px; font-size: 15px; line-height: 1.6; color: var(--txt-2); }
+.v2 .cini-cab-nota {
+  display: flex; align-items: flex-start; gap: 8px; max-width: 260px;
+  font-size: 12.5px; line-height: 1.5; color: var(--txt-2);
+}
+.v2 .cini-cab-nota svg { flex-shrink: 0; margin-top: 2px; color: var(--txt-2); }
+.v2 .cini-trilha.cini-trilha-m { animation: cini-sobe .32s var(--ease) 60ms backwards; }
+
+/* card da etapa aberta (.vidro — SEM overflow hidden: mataria o rodapé fixo) */
+.v2 .cini-painel {
+  --cini-pad: 32px;
+  min-width: 0; padding: var(--cini-pad);
+  display: flex; flex-direction: column;
+  animation: cini-troca .16s var(--ease);
+}
+.v2 .cini-pc-cab { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 16px; align-items: start; }
+.v2 .cini-tile {
+  width: 40px; height: 40px; border-radius: var(--r-ctl); flex-shrink: 0;
+  display: grid; place-items: center; color: var(--txt-2);
+  background: rgba(var(--tint), .05); border: 1px solid rgba(var(--tint), .08);
+}
+.v2 .cini-tile svg { width: 20px; height: 20px; }
+.v2 .cini-pc-tx { min-width: 0; padding-top: 6px; }
+.v2 .cini-pc-tit { font-size: 20px; font-weight: 650; letter-spacing: -.01em; line-height: 1.3; color: var(--txt); scroll-margin-top: 80px; }
+.v2 .cini-pc-lead { margin-top: 4px; font-size: 13.5px; line-height: 1.55; color: var(--txt-2); }
+.v2 .cini-fatos { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 24px; }
+.v2 .cini-fatos li { display: flex; align-items: flex-start; gap: 8px; min-width: 0; font-size: 12.5px; line-height: 1.5; color: var(--txt-2); }
+.v2 .cini-fatos-ic { display: inline-grid; flex-shrink: 0; margin-top: 1px; color: var(--txt-2); }
+.v2 .cini-pc-fio { margin: 24px calc(-1 * var(--cini-pad)) 0; border-top: 1px solid rgba(var(--tint), .06); }
+.v2 .cini-pc-corpo { min-width: 0; padding-top: 24px; }
+.v2 .cini-erro { margin: 0 0 16px; font-size: 12.5px; line-height: 1.5; color: var(--rubro); }
+
+/* rodapé fixo de ações (mesmos valores do .cpl-pe da etapa da planilha) */
+.v2 .cini-pe {
+  position: sticky; bottom: 0; z-index: 2;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 64px;
+  margin: 24px calc(1px - var(--cini-pad, 32px)) calc(1px - var(--cini-pad, 32px));
+  padding: 12px calc(var(--cini-pad, 32px) - 1px);
+  border-top: 1px solid var(--linha);
+  border-radius: 0 0 calc(var(--r-card) - 1px) calc(var(--r-card) - 1px);
+  background: linear-gradient(rgba(var(--tint), .055), rgba(var(--tint), .055)), var(--base);
+  box-shadow: 0 -10px 24px rgba(0, 0, 0, .22);
+}
+:root[data-tema="light"] .v2 .cini-pe { background: var(--vidro-a); box-shadow: 0 -6px 16px rgba(22, 25, 31, .06); }
+:root[data-perf="lite"] .v2 .cini-pe { background: var(--vidro-a); }
+.v2 .cini-pe-dica { display: flex; align-items: flex-start; gap: 8px; min-width: 0; font-size: 12.5px; line-height: 1.5; color: var(--txt-2); }
+.v2 .cini-pe-dica > span:last-child {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.v2 .cini-pe-acoes { display: flex; gap: 8px; flex-shrink: 0; }
+.v2 .cini-pe-ic { display: inline-grid; place-items: center; height: 19px; flex-shrink: 0; color: var(--txt-2); }
+.v2 .cini-pe-dica.cini-pe-conf { align-items: center; font-size: 13.5px; font-weight: 600; line-height: 1.55; color: var(--txt); }
+.v2 .cini-pe-ok { display: inline-grid; place-items: center; flex-shrink: 0; color: var(--verde); }
+.v2 .cini-pe-dica > .cini-pe-erro { color: var(--rubro); }
+/* um rodapé por card: a etapa com rodapé próprio esconde o "Próxima etapa" */
+.v2 .cini-painel:has(.cini-pe-etapa) .cini-pe-prox { display: none; }
+
+/* "Tudo pronto" */
+.v2 .cini-fim {
+  width: min(560px, 100%); margin: 32px auto 0; padding: 40px 32px 32px; text-align: center;
+  display: flex; flex-direction: column; align-items: center;
+  animation: cini-sobe .32s var(--ease) 60ms backwards;
+}
+.v2 .cini-fim-selo {
+  width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0;
+  color: var(--verde); background: var(--verde-bg); border: 1px solid rgba(var(--verde-rgb), .35);
+  box-shadow: 0 0 0 8px rgba(var(--verde-rgb), .06);
+}
+.v2 .cini-fim-titulo {
+  margin-top: 20px; max-width: 440px;
+  font-size: 20px; font-weight: 650; letter-spacing: -.01em; line-height: 1.3; color: var(--txt); text-wrap: balance;
+}
+.v2 .cini-fim-lista {
+  list-style: none; margin: 24px auto 28px; padding: 0; width: min(400px, 100%); text-align: left;
+  border-top: 1px solid rgba(var(--tint), .06);
+}
+.v2 .cini-fim-lista li {
+  display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 12px; align-items: start;
+  padding: 12px 0; border-bottom: 1px solid rgba(var(--tint), .06);
+}
+.v2 .cini-fim-ok { display: grid; place-items: center; height: 21px; color: var(--verde); }
+.v2 .cini-fim-tx { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.v2 .cini-fim-nome { font-size: 13.5px; font-weight: 600; line-height: 1.55; color: var(--txt); }
+.v2 .cini-fim-det { font-size: 12.5px; line-height: 1.5; color: var(--txt-2); }
+.v2 .cini-fim .p-btn.cini-fim-cta { height: 44px; min-width: 220px; padding: 0 24px; font-size: 13.5px; justify-content: center; }
+
+/* ---------- 6. miolo comum das etapas ---------- */
+.v2 .cini-sec { margin: 0; padding: 0; border: 0; min-width: 0; }
+.v2 .cini-sec + .cini-sec { margin-top: 24px; padding-top: 24px; border-top: 1px solid rgba(var(--tint), .06); }
+.v2 .cini-sec-tit { font-size: 15px; font-weight: 650; line-height: 1.6; color: var(--txt); }
+.v2 .cini-sec-sub { margin-top: 4px; font-size: 12.5px; line-height: 1.5; color: var(--txt-2); }
+/* legend flutuante: entra no fluxo (não corta o fio superior do fieldset) */
+.v2 .cini-escolha > legend { float: left; width: 100%; padding: 0; margin: 0 0 12px; }
+.v2 .cini-escolha > legend + * { clear: both; }
+
+/* bloco semântico (no máximo UM por card): fundo neutro, só a borda e o tile levam a cor */
+.v2 .cini-sem {
+  display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 12px; align-items: start;
+  padding: 16px; border-radius: var(--r-ctl);
+  background: rgba(var(--tint), .03); border: 1px solid rgba(var(--tint), .12);
+}
+.v2 .cini-sem.cini-sem-at { border-color: rgba(var(--ambar-rgb), .35); }
+.v2 .cini-sem.cini-sem-er { border-color: rgba(var(--rubro-rgb), .35); }
+.v2 .cini-sem.cini-sem-ok { border-color: rgba(var(--verde-rgb), .35); }
+.v2 .cini-sem-ic {
+  width: 32px; height: 32px; border-radius: var(--r-ctl); flex-shrink: 0;
+  display: grid; place-items: center;
+}
+.v2 .cini-sem-at .cini-sem-ic { color: var(--ambar); background: var(--ambar-bg); }
+.v2 .cini-sem-er .cini-sem-ic { color: var(--rubro); background: var(--rubro-bg); }
+.v2 .cini-sem-ok .cini-sem-ic { color: var(--verde); background: var(--verde-bg); }
+.v2 .cini-sem-corpo { display: flex; flex-direction: column; gap: 12px; min-width: 0; padding-top: 5px; }
+.v2 .cini-sem-tx { font-size: 13.5px; line-height: 1.55; color: var(--txt); }
+.v2 .cini-sec > .cini-sem { margin-top: 16px; }
+
+/* superfície neutra (confirmações, indisponível, fatura em aberto) */
+.v2 .cini-neutro { padding: 16px; border-radius: var(--r-ctl); background: rgba(var(--tint), .035); border: 1px solid transparent; }
+
+/* linha de status (sem fundo): ícone 16 na cor semântica + texto */
+.v2 .cini-status { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin: 0; }
+.v2 .cini-status-ic { display: inline-grid; place-items: center; flex-shrink: 0; }
+.v2 .cini-status-ok .cini-status-ic { color: var(--verde); }
+.v2 .cini-status-er .cini-status-ic { color: var(--rubro); }
+.v2 .cini-status-info .cini-status-ic { color: var(--txt-2); }
+.v2 .cini-status-tx { flex: 1 1 200px; min-width: 0; font-size: 13.5px; line-height: 1.55; color: var(--txt-2); }
+.v2 .cini-status-tx b { font-weight: 600; color: var(--txt); }
+.v2 .cini-status-er .cini-status-tx, .v2 .cini-status-info .cini-status-tx { color: var(--txt); }
+.v2 .cini-status .p-btn { margin-left: auto; }
+.v2 .cini-link {
+  margin-left: auto; padding: 2px 0; border: 0; background: none; cursor: pointer;
+  font: inherit; font-size: 13.5px; font-weight: 500; line-height: 1.55; color: var(--txt-2);
+  text-decoration: underline; text-decoration-color: rgba(var(--tint), .3); text-underline-offset: 3px;
+}
+.v2 .cini-link:hover { color: var(--txt); text-decoration-color: currentColor; }
+.v2 .cini-vazio { margin-top: 12px; font-size: 13.5px; line-height: 1.55; color: var(--txt-2); }
+
+/* skeleton (usa o .skel da casa; só os tamanhos) */
+.v2 .cini-skel-av { width: 32px; height: 32px; border-radius: 50%; }
+.v2 .cini-skel-tx { width: 60%; height: 12px; border-radius: 999px; }
+.v2 .cini-skel-rot { width: 160px; height: 12px; border-radius: 999px; }
+.v2 .cini-skel-valor { width: 150px; height: 28px; border-radius: var(--r-ctl); }
+
+/* tags (pílula) */
+.v2 .cini-tag-rec, .v2 .cini-tag-neutra {
+  display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 999px; white-space: nowrap;
+}
+.v2 .cini-tag-rec {
+  font-size: 11px; font-weight: 600; letter-spacing: .08em; line-height: 1; text-transform: uppercase;
+  color: var(--txt); background: rgba(var(--azul-rgb), .12); border: 1px solid rgba(var(--azul-rgb), .3);
+}
+/* mesma geometria e tipografia do "Recomendado" (par lado a lado): muda só o tom */
+.v2 .cini-tag-neutra {
+  font-size: 11px; font-weight: 600; letter-spacing: .08em; line-height: 1; text-transform: uppercase;
+  color: var(--txt-2); background: rgba(var(--tint), .06); border: 1px solid rgba(var(--tint), .12);
+}
+
+/* tile de ícone 32 (opções) */
+.v2 .cini-tile-p {
+  width: 32px; height: 32px; border-radius: var(--r-ctl); flex-shrink: 0;
+  display: grid; place-items: center; color: var(--txt-2);
+  background: rgba(var(--tint), .05); border: 1px solid rgba(var(--tint), .08);
+}
+
+/* ---------- 6a. WhatsApp ---------- */
+/* cartões de escolha (rádio nativo acessível, indicador desenhado) */
+.v2 .cini-ops { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.v2 .cini-op {
+  position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 18px; gap: 12px; align-items: start;
+  padding: 16px; border-radius: var(--r-ctl); cursor: pointer;
+  background: transparent; border: 1px solid rgba(var(--tint), .12);
+  transition: border-color .15s, background .15s;
+}
+.v2 .cini-op:hover { border-color: rgba(var(--tint), .24); }
+.v2 .cini-op.cini-sel { padding: 15.5px; border: 1.5px solid var(--azul); background: rgba(var(--azul-rgb), .05); }
+.v2 .cini-op input, .v2 .cini-num input {
+  position: absolute; width: 1px; height: 1px; opacity: 0; margin: 0; pointer-events: none;
+}
+.v2 .cini-op-corpo { min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+/* palco da figura de demonstração no topo do cartão (superfície de tinta bem leve) */
+.v2 .cini-op-fig {
+  display: block; padding: 10px 12px 6px; border-radius: calc(var(--r-ctl) - 4px);
+  background: rgba(var(--tint), .025); border: 1px solid rgba(var(--tint), .05);
+}
+.v2 .cini-op-cab { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; }
+.v2 .cini-op-cab b { font-size: 13.5px; font-weight: 600; line-height: 1.55; color: var(--txt); }
+.v2 .cini-op-tx { font-size: 12.5px; line-height: 1.5; color: var(--txt-2); }
+.v2 .cini-op-radio {
+  position: relative; width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0; margin-top: 7px;
+  border: 1.5px solid rgba(var(--tint), .32); transition: border-color .15s, box-shadow .15s;
+}
+.v2 .cini-op-radio::after {
+  content: ""; position: absolute; inset: 3px; border-radius: 50%;
+  background: var(--azul); transform: scale(0); transition: transform .15s var(--ease);
+}
+.v2 .cini-op input:checked ~ .cini-op-radio, .v2 .cini-num input:checked ~ .cini-op-radio { border-color: var(--azul); }
+.v2 .cini-op input:checked ~ .cini-op-radio::after, .v2 .cini-num input:checked ~ .cini-op-radio::after { transform: scale(1); }
+.v2 .cini-op input:focus-visible ~ .cini-op-radio, .v2 .cini-num input:focus-visible ~ .cini-op-radio { box-shadow: 0 0 0 3px rgba(var(--azul-rgb), .25); }
+
+/* alcance: atendentes com número · barra · clientes alcançados */
+.v2 .cini-alcance {
+  margin-top: 16px; display: grid; grid-template-columns: auto minmax(48px, 1fr) auto; align-items: center; gap: 8px 16px;
+  font-size: 12.5px; line-height: 1.5; color: var(--txt-2); white-space: nowrap;
+}
+.v2 .cini-alcance b { font-size: 13.5px; font-weight: 650; color: var(--txt); }
+.v2 .cini-barra { display: block; height: 4px; border-radius: 999px; overflow: hidden; background: rgba(var(--tint), .12); }
+.v2 .cini-barra i { display: block; height: 100%; border-radius: 999px; background: var(--azul); transition: width .4s var(--ease); }
+
+/* lista dos atendentes */
+.v2 .cini-lista { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; }
+.v2 .cini-linha {
+  display: grid; grid-template-columns: 32px minmax(0, 1fr) 168px 136px;
+  grid-template-areas: "av quem st acao"; align-items: center; gap: 12px 16px;
+  padding: 12px 0; border-bottom: 1px solid rgba(var(--tint), .06);
+}
+.v2 .cini-linha:last-child { border-bottom: 0; }
+.v2 .cini-linha.cini-linha-esq { grid-template-columns: 32px minmax(0, 1fr); grid-template-areas: none; }
+.v2 .cini-linha .cini-av { grid-area: av; }
+.v2 .cini-linha-quem { grid-area: quem; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.v2 .cini-linha-quem b {
+  font-size: 13.5px; font-weight: 600; line-height: 1.4; color: var(--txt);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.v2 .cini-linha-quem span { font-size: 12.5px; line-height: 1.5; color: var(--txt-2); }
+.v2 .cini-linha-st { grid-area: st; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; min-width: 0; }
+.v2 .cini-linha-tel { font-size: 12.5px; line-height: 1.5; color: var(--txt-2); white-space: nowrap; }
+.v2 .cini-linha-acao { grid-area: acao; display: flex; justify-content: flex-end; }
+
+/* ponto de estado: 6px + texto (substitui as pílulas) */
+.v2 .cini-ponto {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 12.5px; line-height: 1.5; white-space: nowrap; color: var(--txt-2);
+}
+.v2 .cini-ponto::before { content: ""; width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; background: rgba(var(--tint), .3); }
+.v2 .cini-ponto.cini-ponto-ok { color: var(--txt); }
+.v2 .cini-ponto.cini-ponto-ok::before { background: var(--verde); }
+.v2 .cini-ponto.cini-ponto-erro { color: var(--rubro); font-weight: 600; }
+.v2 .cini-ponto.cini-ponto-erro::before { background: var(--rubro); }
+
+/* caixa de confirmação (checkbox nativo desenhado, 18px) */
+.v2 .cini-chk {
+  display: inline-flex; align-items: flex-start; gap: 12px; cursor: pointer;
+  font-size: 13.5px; font-weight: 500; line-height: 1.55; color: var(--txt);
+}
+.v2 .cini-chk input {
+  appearance: none; -webkit-appearance: none; flex-shrink: 0;
+  width: 18px; height: 18px; margin: 2px 0 0; display: grid; place-items: center;
+  border: 1.5px solid rgba(var(--tint), .4); border-radius: calc(var(--r-ctl) - 4px); background: transparent; cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+.v2 .cini-chk input::after {
+  content: ""; width: 9px; height: 5px; margin-top: -2px;
+  border-left: 2px solid var(--base); border-bottom: 2px solid var(--base);
+  transform: rotate(-45deg); opacity: 0;
+}
+.v2 .cini-chk input:checked { background: var(--azul); border-color: var(--azul); }
+.v2 .cini-chk input:checked::after { opacity: 1; }
+
+/* número único: escolha entre os conectados */
+.v2 .cini-nums-bloco { margin-top: 16px; display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
+.v2 .cini-nums { display: grid; gap: 8px; align-self: stretch; }
+.v2 .cini-num {
+  position: relative; display: flex; align-items: center; gap: 12px; cursor: pointer;
+  padding: 12px 16px; border-radius: var(--r-ctl); border: 1px solid rgba(var(--tint), .12);
+  transition: border-color .15s, background .15s;
+}
+.v2 .cini-num:hover { border-color: rgba(var(--tint), .24); }
+.v2 .cini-num.cini-sel { padding: 11.5px 15.5px; border: 1.5px solid var(--azul); background: rgba(var(--azul-rgb), .05); }
+.v2 .cini-num .cini-op-radio { margin-top: 0; }
+.v2 .cini-num-tx { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.v2 .cini-num-tx b { font-size: 13.5px; font-weight: 600; line-height: 1.4; color: var(--txt); }
+.v2 .cini-num-tx span { font-size: 12.5px; line-height: 1.5; color: var(--txt-2); }
+
+/* janela de conexão (QR) — modal em portal fora do véu */
+.v2 .cini-qr { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+/* na espera da leitura, duas colunas: tutorial (figura + passos) · código a escanear */
+.v2 .cini-qr-par {
+  align-self: stretch; display: grid; grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px 28px; align-items: center;
+}
+.v2 .cini-qr-tutorial { min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+.v2 .cini-qr-demo {
+  display: block; padding: 10px 12px 6px; border-radius: var(--r-ctl);
+  background: rgba(var(--tint), .025); border: 1px solid rgba(var(--tint), .05);
+}
+.v2 .cini-qr-col { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+/* estreito: empilha com o código em primeiro (a ordem original) e a demonstração junto dos passos */
+@media (max-width: 700px) {
+  .v2 .cini-qr-par { grid-template-columns: minmax(0, 1fr); justify-items: center; gap: 16px; }
+  .v2 .cini-qr-col { order: -1; }
+  .v2 .cini-qr-tutorial { align-self: stretch; }
+}
+.v2 .cini-qr-quadro {
+  width: 232px; height: 232px; padding: 11px; border-radius: var(--r-ctl); display: grid; place-items: center;
+  background: #FFFFFF; border: 1px solid var(--linha);
+}
+.v2 .cini-qr-quadro img { width: 208px; height: 208px; display: block; }
+.v2 .cini-qr-passos {
+  list-style: none; margin: 0; padding: 0; align-self: stretch;
+  display: flex; flex-direction: column; gap: 8px; counter-reset: cini-qr;
+}
+.v2 .cini-qr-passos li {
+  position: relative; padding-left: 20px; counter-increment: cini-qr;
+  font-size: 13.5px; line-height: 1.55; color: var(--txt-2);
+}
+.v2 .cini-qr-passos li::before {
+  content: counter(cini-qr); position: absolute; left: 0; top: 1px;
+  font-size: 12.5px; font-weight: 600; line-height: 1.6; font-variant-numeric: tabular-nums; color: var(--txt-2);
+}
+.v2 .cini-qr-passos b { color: var(--txt); font-weight: 600; }
+.v2 .cini-qr-status { display: inline-flex; align-items: center; gap: 8px; margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--txt-2); }
+.v2 .cini-qr-ok, .v2 .cini-qr-erro {
+  display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 8px 4px 4px; text-align: center;
+}
+.v2 .cini-qr-tit { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 650; line-height: 1.6; color: var(--txt); }
+.v2 .cini-qr-erro-ic { display: inline-grid; place-items: center; color: var(--rubro); }
+.v2 .cini-qr-tx { font-size: 13.5px; line-height: 1.55; color: var(--txt-2); }
+.v2 .cini-qr-tx b { color: var(--txt); font-weight: 600; }
+.v2 .cini-qr-nota { font-size: 12.5px; line-height: 1.5; color: var(--txt-2); }
+.v2 .cini-qr-ok-ic {
+  width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; margin-bottom: 4px;
+  color: var(--verde); background: var(--verde-bg); border: 1px solid rgba(var(--verde-rgb), .35);
+}
+.v2 .cini-qr-erro .p-btn { margin-top: 8px; }
+
+/* ---------- 6b. mensalidade ---------- */
+/* fatura: UM bloco (atraso = rubro · paga = verde · em aberto = superfície neutra) */
+.v2 .cini-ms-fatura {
+  display: grid; grid-template-columns: 40px minmax(0, 1fr); column-gap: 16px; row-gap: 0; align-items: start;
+  padding: 20px; border-radius: var(--r-ctl);
+}
+.v2 .cini-ms-tile {
+  width: 40px; height: 40px; border-radius: var(--r-ctl); display: grid; place-items: center;
+  color: var(--txt-2); background: rgba(var(--tint), .05);
+}
+.v2 .cini-ms-em-atraso .cini-ms-tile { color: var(--rubro); background: var(--rubro-bg); }
+.v2 .cini-ms-em-paga .cini-ms-tile { color: var(--verde); background: var(--verde-bg); }
+.v2 .cini-ms-col { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
+.v2 .cini-ms-col .skel + .skel { margin-top: 8px; }
+.v2 .cini-ms-rot { font-size: 12.5px; font-weight: 600; line-height: 1.5; color: var(--txt-2); }
+.v2 .cini-ms-valor { margin-top: 2px; font-size: 28px; font-weight: 650; letter-spacing: -.02em; line-height: 1.15; color: var(--txt); }
+.v2 .cini-ms-linha { margin-top: 4px; font-size: 13.5px; line-height: 1.55; color: var(--txt-2); }
+.v2 .cini-ms-atraso { color: var(--rubro); font-weight: 600; white-space: nowrap; }
+.v2 .cini-ms-pago { margin-top: 8px; display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 600; line-height: 1.55; color: var(--txt); }
+.v2 .cini-ms-pago-ic { display: inline-grid; place-items: center; color: var(--verde); }
+.v2 .cini-ms-prox {
+  grid-column: 1 / -1; margin-top: 16px; padding-top: 12px;
+  border-top: 1px solid rgba(var(--tint), .08);
+  font-size: 12.5px; line-height: 1.5; color: var(--txt-2);
+}
+.v2 .cini-ms-prox b { color: var(--txt); font-weight: 600; }
+
+/* Pix: o PixLicenca do LicencaGate (DOM intocado) reorganizado em grade */
+.v2 .cini-ms-pix { margin-top: 24px; padding-top: 24px; border-top: 1px solid rgba(var(--tint), .06); }
+/* o copia e cola fica CENTRADO na altura do QR (linhas 1fr · auto · auto · 1fr): sem o vão
+   vazio abaixo dele ao lado dos 208px do código */
+.v2 .cini-ms-pix .lic-pix {
+  display: grid; grid-template-columns: 208px minmax(0, 1fr); grid-template-rows: 1fr auto auto 1fr;
+  column-gap: 32px; row-gap: 8px; align-items: start;
+}
+.v2 .cini-ms-pix .lic-pix:not(:has(.lic-qr)) { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; }
+.v2 .cini-ms-pix .lic-qr {
+  grid-row: 1 / -1; width: 208px; height: 208px; padding: 12px;
+  background: #FFFFFF; border-radius: var(--r-ctl); border: 1px solid var(--linha);
+}
+.v2 .cini-ms-pix .lic-copia-rot {
+  grid-column: 2; grid-row: 2; margin: 0; text-align: left; text-transform: none; letter-spacing: 0;
+  font-size: 12.5px; font-weight: 600; line-height: 1.5; color: var(--txt-2);
+}
+.v2 .cini-ms-pix .lic-copia { grid-column: 2; grid-row: 3; display: flex; align-items: center; gap: 8px; width: 100%; }
+.v2 .cini-ms-pix .lic-pix:not(:has(.lic-qr)) > * { grid-column: 1; grid-row: auto; }
+.v2 .cini-ms-pix .lic-copia-tx {
+  flex: 1; min-width: 0; height: 40px; padding: 0 12px;
+  font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px;
+}
+.v2 .cini-ms-pix .lic-copia .p-btn.btn-mini { height: 40px; padding: 0 16px; font-size: 13.5px; }
+.v2 .cini-ms-pix .lic-sem-pix { grid-column: 2; grid-row: 2 / span 2; align-self: center; margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--txt-2); text-align: left; }
+.v2 .cini-ms-pix > .cini-status { margin-top: 12px; }
+
+/* figura de demonstração do Pix — só quando o QR real não está na tela
+   (pagamento indisponível, ou mês sem QR com copia e cola apenas) */
+.v2 .cini-ms-fig { display: block; width: min(420px, 100%); margin: 16px auto 0; }
+
+/* pagamento indisponível: superfície neutra, sem alarme */
+.v2 .cini-ms-indisp { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 12px; margin-top: 24px; }
+.v2 .cini-ms-indisp .cini-ms-fig { grid-column: 1 / -1; margin-top: 4px; }
+.v2 .cini-ms-indisp-ic { display: grid; place-items: center; height: 21px; color: var(--txt-2); }
+.v2 .cini-ms-indisp-tx { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; font-size: 13.5px; line-height: 1.55; color: var(--txt-2); }
+.v2 .cini-ms-indisp-tx b { font-weight: 600; color: var(--txt); }
+.v2 .cini-ms-indisp-acao { margin-top: 8px; }
+
+/* ---------- 7. faixa das contas de suporte ---------- */
+.v2 .cini-faixa {
+  flex-shrink: 0; display: flex; align-items: center; gap: 12px;
+  min-height: 44px; padding: 8px 24px;
+  background: rgba(var(--tint), .035); border-bottom: 1px solid var(--linha);
+}
+.v2 .cini-faixa-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; background: var(--azul); }
+.v2 .cini-faixa-tx {
+  flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-size: 12.5px; line-height: 1.5; color: var(--txt-2);
+}
+.v2 .cini-faixa-tx b { font-size: 13.5px; font-weight: 600; color: var(--txt); }
+.v2 .cini-faixa-sub { font-size: 12.5px; color: var(--txt-2); }
+.v2 .cini-faixa-btn { flex-shrink: 0; }
+
+/* ---------- responsivo ---------- */
+@media (max-width: 880px) {
+  .v2 .cini-cab-nota { max-width: none; flex-basis: 100%; }
+}
+@media (max-width: 640px) {
+  .v2 .cini-topo { height: 56px; padding: 0 16px; }
+  .v2 .cini-logo { width: 24px; height: 24px; }
+  .v2 .cini-ass-miolo { padding: 24px 16px 48px; }
+  .v2 .cini-titulo { font-size: 20px; letter-spacing: -.01em; line-height: 1.3; }
+  .v2 .cini-trilha { margin: 24px 0 16px; }
+
+  .v2 .cini-tr-marca { width: 32px; height: 32px; }
+  .v2 .cini-trilha-m .cini-tr-item:not(:last-child)::after { top: 24px; left: 44px; }
+  .v2 .cini-trilha-m .cini-tr-curto { display: inline; }
+  .v2 .cini-trilha-m .cini-tr-longo {
+    position: absolute !important; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0;
+    overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+  }
+  .v2 .cini-trilha-m .cini-tr-meta { display: none; }
+  .v2 .cini-trilha-s .cini-tr-marca { width: 28px; height: 28px; }
+
+  .v2 .cini-painel { --cini-pad: 20px; }
+  .v2 .cini-pc-cab { grid-template-columns: 36px minmax(0, 1fr); gap: 12px; }
+  .v2 .cini-tile { width: 36px; height: 36px; }
+  .v2 .cini-pc-tx { padding-top: 4px; }
+
+  .v2 .cini-pe { flex-direction: column; align-items: stretch; gap: 10px; padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
+  .v2 .cini-pe-acoes .p-btn { flex: 1; min-height: 44px; justify-content: center; }
+  .v2 .cini-pe .p-btn.btn-pri { min-width: 0; }
+  .v2 .cini-wa .p-btn:not(.btn-mini), .v2 .cini-ms .p-btn:not(.btn-mini), .v2 .cini-qr .p-btn:not(.btn-mini) { height: 44px; }
+  /* rótulos longos ("Próxima etapa: …") podem quebrar em 2 linhas no rodapé */
+  .v2 .cini-pe .p-btn:not(.btn-mini) { height: auto; min-height: 44px; padding-top: 8px; padding-bottom: 8px; text-align: center; }
+
+  .v2 .cini-wa .p-btn.btn-mini, .v2 .cini-ms .p-btn.btn-mini { height: 36px; }
+  .v2 .cini-ops { grid-template-columns: minmax(0, 1fr); }
+  .v2 .cini-alcance { grid-template-columns: minmax(0, 1fr); white-space: normal; gap: 8px; }
+  .v2 .cini-linha {
+    grid-template-columns: 32px minmax(0, 1fr) auto;
+    grid-template-areas: "av quem st" ". acao acao";
+    column-gap: 12px; row-gap: 8px;
+  }
+  .v2 .cini-linha-acao { justify-content: flex-start; }
+  .v2 .cini-linha-acao:empty { display: none; }
+
+  .v2 .cini-ms-fatura { column-gap: 12px; padding: 16px; }
+  .v2 .cini-ms-pix .lic-pix { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; }
+  .v2 .cini-ms-pix .lic-qr { grid-row: auto; justify-self: center; }
+  .v2 .cini-ms-pix .lic-copia-rot, .v2 .cini-ms-pix .lic-copia, .v2 .cini-ms-pix .lic-sem-pix { grid-column: 1; grid-row: auto; }
+  .v2 .cini-ms-pix .lic-copia-rot { margin-top: 8px; }
+
+  .v2 .cini-fim { padding: 28px 20px 24px; }
+  .v2 .cini-fim .p-btn.cini-fim-cta { align-self: stretch; min-width: 0; }
+
+  .v2 .cini-espera-card { padding: 28px 20px 24px; }
+  .v2 .cini-faixa { padding: 8px 16px; }
+  .v2 .cini-faixa-sub { display: none; }
+  /* no estreito o título quebra em vez de virar "Configuração inicial p…" */
+  .v2 .cini-faixa-tx { white-space: normal; line-height: 1.4; }
+}
+@media (max-width: 560px) {
+  .v2 .cini-topo-div, .v2 .cini-topo-rot { display: none; }
+  .v2 .cini-id-tx, .v2 .cini-sair-tx {
+    position: absolute !important; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0;
+    overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+  }
+  .v2 .cini-sair { width: 36px; padding: 0; }
+  .v2 .cini-trilha-s .cini-tr-curto { display: inline; }
+  .v2 .cini-trilha-s .cini-tr-longo {
+    position: absolute !important; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0;
+    overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+  }
+}
+@media (max-width: 420px) {
+  .v2 .cini-qr-quadro { width: 208px; height: 208px; }
+  .v2 .cini-qr-quadro img { width: 184px; height: 184px; }
+}
+@media (max-width: 359px) {
+  .v2 .cini-espera-pe { flex-direction: column; align-items: stretch; gap: 12px; }
+  .v2 .cini-espera-pe .p-btn { width: 100%; }
+}
+
+/* ---------- movimento (keyframes só com "from": o estado final é o visível) ---------- */
+@keyframes cini-fade { from { opacity: 0; } }
+@keyframes cini-sobe { from { opacity: 0; transform: translateY(8px); } }
+@keyframes cini-troca { from { opacity: 0; } }
+@keyframes cini-gira { from { transform: rotate(-360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .v2 .cini-veu, .v2 .cini-espera-card > *, .v2 .cini-espera-nota, .v2 .cini-cab,
+  .v2 .cini-trilha, .v2 .cini-painel, .v2 .cini-fim { animation: none; }
+  .v2 .cini-anel { animation-duration: 2.4s; }
+}
+:root[data-perf="lite"] .v2 .cini-veu, :root[data-perf="lite"] .v2 .cini-espera-card > *,
+:root[data-perf="lite"] .v2 .cini-espera-nota, :root[data-perf="lite"] .v2 .cini-cab,
+:root[data-perf="lite"] .v2 .cini-trilha, :root[data-perf="lite"] .v2 .cini-painel,
+:root[data-perf="lite"] .v2 .cini-fim { animation: none; }
+:root[data-perf="lite"] .v2 .cini-anel { animation-duration: 2.4s; }

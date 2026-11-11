@@ -4,7 +4,6 @@ import { criarRaizPortalV2 } from './portal';
 import { BotaoPrimario } from './Botao';
 import { LogoAtenvo } from './LogoAtenvo';
 import { Toggle } from './Toggle';
-import { assinarAcento, lerAcento, salvarAcento, type Acento } from '../lib/acento';
 import { assinarModoPerf, lerModoPerf, salvarModoPerf, type ModoPerf } from '../lib/perf';
 import type { Tema } from '../lib/tema';
 import { saudacaoPorHora } from '../lib/introDia';
@@ -19,12 +18,6 @@ import { BRIEF_REAL, seedBriefingDia, useBriefingDia, type BriefingDia } from '@
    troca junto. Fechar por qualquer via (CTA, véu, Esc) marca o dia.
    ------------------------------------------------------------------ */
 
-/* amostras fixas dos acentos (tom do dark — identidade do seletor, não interação) */
-const CORES: { valor: Acento; rotulo: string; cor: string }[] = [
-  { valor: 'azul', rotulo: 'Azul', cor: '#4C8DFF' },
-  { valor: 'verde', rotulo: 'Verde', cor: '#3BD689' },
-  { valor: 'dourado', rotulo: 'Dourado', cor: '#F0BC4E' },
-];
 
 const plural = (n: number, um: string, muitos: string) => (n === 1 ? um : muitos);
 
@@ -37,11 +30,6 @@ const IcLua = () => (
 const IcSol = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
     <circle cx="12" cy="12" r="4.2" /><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19" />
-  </svg>
-);
-const IcCheck = () => (
-  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-    <path d="M3.5 8.5l3 3L12.5 5" />
   </svg>
 );
 
@@ -75,8 +63,6 @@ export function IntroDia({ aberta, aoConcluir, nome, tema, aoMudarTema }: {
   tema: Tema;
   aoMudarTema: (novo: Tema) => void;
 }) {
-  const [acento, setAcento] = useState<Acento>(() => lerAcento());
-  useEffect(() => assinarAcento(setAcento), []);
   const [modoPerf, setModoPerf] = useState<ModoPerf>(() => lerModoPerf());
   useEffect(() => assinarModoPerf(setModoPerf), []);
 
@@ -119,7 +105,7 @@ export function IntroDia({ aberta, aoConcluir, nome, tema, aoMudarTema }: {
         <LogoAtenvo className="it-marca" />
         <div className="it-eyebrow">{dataLonga}</div>
         <h1 className="it-titulo">{saudacaoPorHora()}, {primeiroNome}.</h1>
-        <p className="it-sub">Seja bem-vindo ao Atenvo. O seu dia, num relance:</p>
+        <p className="it-sub">Seja bem-vindo à ALFA GROUP. O seu dia, num relance:</p>
 
         <div className="it-stats">
           {brief ? (
@@ -146,27 +132,6 @@ export function IntroDia({ aberta, aoConcluir, nome, tema, aoMudarTema }: {
         <div className="it-aparencia">
           <div className="it-ap-rot">Aparência</div>
           <div className="it-faixa">
-            <div className="it-celula">
-              <div className="it-cel-rot">Cor</div>
-              <div className="it-discos" role="radiogroup" aria-label="Cor do sistema">
-                {CORES.map((c) => (
-                  <button
-                    key={c.valor}
-                    type="button"
-                    role="radio"
-                    aria-checked={acento === c.valor}
-                    aria-label={c.rotulo}
-                    data-cor={c.valor}
-                    className={acento === c.valor ? 'it-disc on' : 'it-disc'}
-                    style={{ background: c.cor }}
-                    onClick={() => salvarAcento(c.valor)}
-                  >
-                    <IcCheck />
-                  </button>
-                ))}
-              </div>
-              <div className="it-cel-sub">{CORES.find((c) => c.valor === acento)?.rotulo}</div>
-            </div>
             <div className="it-celula">
               <div className="it-cel-rot">Tema</div>
               {/* segmentado: a seleção É o polegar de platina — zero anel (pedido do dono) */}

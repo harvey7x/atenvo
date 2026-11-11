@@ -1,0 +1,38 @@
+/* papel do usuário logado (real) — alimenta o prop `gestor` e o "pode revelar senha".
+   No modo demo devolve acesso pleno (o demo sempre rodou como gestor/admin). */
+import { useQuery } from '@tanstack/react-query';
+import { isRevizaMode, supabase } from '@/lib/supabase';
+import { chavesCobranca } from './keys';
+import type { Papel } from './types';
+
+export interface SessaoPapel {
+  papel: Papel | null; gestor: boolean; podeRevelar: boolean; nome: string | null;
+  /** aprova "débito parado" (financeiro, cadastro, gestor, admin) — espelha pode_aprovar_parado() da mig 52 */
+  podeAprovar: boolean;
+  /** id do usuário logado (quem pediu pode cancelar o próprio pedido); null no demo */
+  id: string | null;
+}
+
+/** mesma lista do banco (pode_aprovar_parado): o cadastro aprova, o comercial não */
+export const papelAprova = (p: Papel | null | undefined, gestor?: boolean) =>
+  !!gestor || p === 'gestor' || p === 'admin' || p === 'financeiro' || p === 'cadastro';
+
+export function usePapel() {
+  return useQuery<SessaoPapel>({
+    queryKey: chavesCobranca.papel,
+    staleTime: 60_000,
+    queryFn: async () => {
+      // fora da instância Reviza (demo E Atenvo) não há papel Reviza a consultar
+      if (!isRevizaMode || !supabase) return { papel: 'gestor', gestor: true, podeRevelar: true, nome: null, podeAprovar: true, id: null };
+      const u = (await supabase.auth.getUser()).data.user;
+      if (!u) return { papel: null, gestor: false, podeRevelar: false, nome: null, podeAprovar: false, id: null };
+      const { data } = await supabase.from('profiles').select('papel, ativo, nome').eq('id', u.id).maybeSingle();
+      const papel = (data && data.ativo ? (data.papel as Papel) : null);
+      const gestor = papel === 'gestor' || papel === 'admin';
+      // senhas para TODOS os perfis (dono 25/09: "é para a equipe"; mig 61) — cada um vê as
+      // dos clientes que já enxerga (o comercial, os dele: reveal_senha/senhas_grade). Cifradas no banco.
+      const podeRevelar = papel != null;
+      return { papel, gestor, podeRevelar, nome: (data?.nome as string) ?? null, podeAprovar: papelAprova(papel, gestor), id: u.id };
+    },
+  });
+}

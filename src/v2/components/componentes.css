@@ -118,6 +118,10 @@
 .v2 tbody tr:hover { background: rgba(var(--tint), .032); }
 .v2 tbody tr.sel { background: rgba(var(--tint), .05); }
 .v2 td.d, .v2 th.d { text-align: right; }
+/* tabela padrão: título e conteúdo de cada coluna no MEIO dela (dono 29/10: "o título tem que ficar
+   centralizado com as coisas que estão embaixo"); só a 1ª coluna (quem/o quê) fica à esquerda */
+.v2 .mo-tab thead th, .v2 .mo-tab tbody td, .v2 .mo-tab th.d, .v2 .mo-tab td.d { text-align: center; }
+.v2 .mo-tab th.ini, .v2 .mo-tab td.ini { text-align: left; }
 .v2 td.nome { color: var(--txt); font-weight: 500; }
 .v2 .val-t { font-weight: 600; color: var(--txt); }
 .v2 .val-t .cent { color: var(--txt-3); font-weight: 400; }
@@ -209,6 +213,11 @@
   padding: 0 11px; font-family: var(--fonte); font-size: 13px; color: var(--txt);
 }
 .v2 .inp::placeholder { color: var(--txt-3); }
+/* selects nativos: o popup de <option> é pintado pela UA. Sem color-scheme, no tema
+   escuro ele vinha branco-no-branco (só o hover azul lia — reclamação do dono 17/09).
+   Casa o esquema da UA com o tema pra o dropdown ficar legível nos dois. */
+.v2 select.inp { color-scheme: dark; }
+:root[data-tema="light"] .v2 select.inp { color-scheme: light; }
 .v2 .inp:focus {
   outline: none; border-color: rgba(var(--tint), .5);
   box-shadow: 0 0 0 3px rgba(var(--tint), .07);
@@ -238,11 +247,13 @@
   position: relative; cursor: pointer; flex-shrink: 0; border: none; padding: 0;
 }
 .v2 .tgl::after {
-  content: ""; position: absolute; top: 2px; right: 2px; width: 16px; height: 16px;
-  border-radius: 50%; background: var(--platina-txt);
+  /* left + translateX (não right/left): o botão pode DESLIZAR (movimento.css) —
+     ligado fica em 2 + 16 = 18px, o mesmo pixel do antigo right:2px */
+  content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
+  border-radius: 50%; background: var(--platina-txt); transform: translateX(16px);
 }
 .v2 .tgl.off { background: rgba(var(--tint), .12); }
-.v2 .tgl.off::after { right: auto; left: 2px; background: var(--txt-2); }
+.v2 .tgl.off::after { transform: none; background: var(--txt-2); }
 .v2 .tgl:disabled { opacity: .5; cursor: default; }
 .v2 .tgl:focus-visible { outline: none; box-shadow: 0 0 0 2px rgba(var(--tint), .35); }
 .v2 .tgl-l { display: flex; align-items: center; gap: 11px; padding: 7px 0; font-size: 12.5px; }
@@ -393,6 +404,10 @@
   background: rgba(var(--tint), .05); border: 1px solid rgba(var(--tint), .11);
   border-radius: 99px; padding: 2px 9px; color: var(--txt-2);
 }
+/* migalha do header de página (módulo/grupo). Promovida de cobrancas.css: as três
+   telas de Ferramentas também a usam e, com o CSS code-split, saíam sem estilo
+   (texto de corpo no lugar da etiqueta) quando Cobranças não tinha sido aberta. */
+.v2 .cob-migalha { font-size: 10.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--txt-3); margin-bottom: 4px; }
 .v2 .form-grid { display: flex; flex-direction: column; gap: 12px; }
 .v2 .form-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .v2 .form-grid textarea.inp, .v2 .form-2col textarea.inp { height: auto; padding: 8px 11px; resize: vertical; font-family: var(--fonte); }
@@ -613,3 +628,169 @@
 /* toggle da IA no cabeçalho: verde quando ligada */
 .v2 .p-btn.ia-on{ background: #1f9d55; border-color: #1f9d55; color: #fff; }
 .v2 .p-btn.ia-on:hover:not(:disabled){ background: #199150; }
+
+/* ---- Visualizador de imagem com melhoria (vimg-) ---- */
+.v2 .veu.vimg { flex-direction: column; gap: 12px; padding: 16px; z-index: 96; }
+.v2 .vimg-barra { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.v2 .vimg-barra .p-btn.vimg-x { font-size: 20px; line-height: 1; color: var(--txt-2); padding: 0 10px; background: rgba(var(--tint), .06); }
+.v2 .vimg-palco { position: relative; flex: 1 1 auto; min-height: 0; width: 100%; display: flex; align-items: center; justify-content: center; }
+.v2 .vimg-img { max-width: min(92vw, 1100px); max-height: 100%; border-radius: 10px; object-fit: contain; transition: opacity .2s var(--ease); box-shadow: 0 10px 40px rgba(0, 0, 0, .35); }
+.v2 .vimg-img.esmaecida { opacity: .45; }
+.v2 .vimg-status { position: absolute; padding: 6px 12px; border-radius: 999px; font-size: 12px; color: var(--txt); background: rgba(var(--tint), .12); backdrop-filter: blur(6px); }
+.v2 .vimg-rodape { font-size: 12px; color: rgba(255, 255, 255, .78); text-align: center; max-width: 720px; }
+.v2 .vimg-meta { color: rgba(255, 255, 255, .5); }
+.v2 .vimg-erro { color: var(--rubro); }
+.v2 .vimg-comparar { flex: 1 1 auto; min-height: 0; width: 100%; max-width: 1400px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.v2 .vimg-lado { margin: 0; min-height: 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.v2 .vimg-lado figcaption { font-size: 13px; font-weight: 600; color: #fff; }
+.v2 .vimg-lado figcaption span { font-weight: 400; color: rgba(255, 255, 255, .6); }
+.v2 .vimg-moldura { position: relative; flex: 1 1 auto; min-height: 0; width: 100%; display: flex; align-items: center; justify-content: center; }
+.v2 .vimg-moldura .vimg-img { max-width: 100%; }
+@media (max-width: 760px) { .v2 .vimg-comparar { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; } }
+.v2 .vimg-ia-cta { display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: 380px; text-align: center; font-size: 12.5px; color: rgba(255, 255, 255, .72); line-height: 1.45; }
+.v2 .vimg-ia-cta b { color: #fff; font-size: 14px; font-weight: 600; }
+.v2 .vimg-ia-cta .p-btn { margin-top: 6px; }
+.v2 .vimg-ia-aviso { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; margin-bottom: 8px; border-radius: 10px; background: rgba(var(--rubro-rgb), .14); border: 1px solid rgba(var(--rubro-rgb), .35); }
+.v2 .vimg-ia-aviso b { font-size: 12.5px; }
+.v2 .vimg-ok { font-size: 12px; color: var(--verde); }
+.v2 .vimg-spin { width: 22px; height: 22px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .2); border-top-color: #fff; animation: v2-vimg-gira .9s linear infinite; }
+@keyframes v2-vimg-gira { to { transform: rotate(360deg); } }
+
+/* ==================================================================
+   VIDRO PRO — superfície flutuante translúcida com desfoque real e
+   fio de luz discreto no topo. v2 (mesmo dia): SÓBRIO — sem tinta do
+   acento, sem brilho colorido ("mais minimalista, profissional"). Pedido do
+   dono 29/10 para o painel de FILTROS e a paleta de SCRIPTS do inbox
+   ("transparente com glass, não algo tão simples"). EXCEÇÃO consciente
+   ao Corporativo (que chapa tudo) e vale também no Modo Leve: é um
+   overlay transitório, o custo do blur só existe enquanto está aberto.
+   Seletores com html:root[...] para vencer corp/lite/light de qualquer
+   folha. O conteúdo interno NÃO pode ter fundo opaco (senão some o vidro).
+   ================================================================== */
+/* escuro: os seletores 2 e 3 sobem a especificidade para vencer quem pinta
+   todo .wa-pop de sólido no escuro — shell.css (corp, 0,5,1: #27292E) e
+   repaginada.css (0,6,1: --rp-menu). Sem eles o filtro ficava CHAPADO no
+   escuro (achado do dono em produção, 29/10). */
+html:root:not([data-tema="light"]) .v2 .vidro-pro,
+html:root[data-visual]:not([data-tema="light"]) .v2 .vidro-pro.vidro-pro,
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .vidro-pro.vidro-pro {
+  --vp-acc: var(--azul-rgb, 76, 141, 255);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .05), rgba(255, 255, 255, 0) 96px),
+    linear-gradient(160deg, rgba(40, 43, 50, .5), rgba(20, 22, 27, .48));
+  border: 1px solid rgba(255, 255, 255, .11);
+  -webkit-backdrop-filter: blur(20px) saturate(1.35); backdrop-filter: blur(20px) saturate(1.35);
+  box-shadow: 0 24px 60px -14px rgba(0, 0, 0, .5), 0 6px 18px rgba(0, 0, 0, .22), inset 0 1px 0 rgba(255, 255, 255, .06);
+}
+html:root[data-tema="light"] .v2 .vidro-pro,
+html:root[data-visual][data-tema="light"] .v2 .vidro-pro.vidro-pro {
+  --vp-acc: var(--azul-rgb, 15, 98, 254);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .35), rgba(255, 255, 255, 0) 96px),
+    linear-gradient(160deg, rgba(255, 255, 255, .72), rgba(246, 248, 251, .62));
+  border: 1px solid rgba(22, 25, 31, .09);
+  -webkit-backdrop-filter: blur(22px) saturate(1.4); backdrop-filter: blur(22px) saturate(1.4);
+  box-shadow: 0 24px 56px -16px rgba(22, 34, 60, .22), 0 6px 16px rgba(22, 34, 60, .07), inset 0 1px 0 rgba(255, 255, 255, .85);
+}
+/* fio de luz discreto só no topo (neutro, sem cor do acento) */
+html:root .v2 .vidro-pro::after {
+  content: ""; position: absolute; inset: 0; z-index: 5; pointer-events: none;
+  border-radius: inherit; padding: 1px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .14), rgba(255, 255, 255, 0) 35%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+html:root[data-tema="light"] .v2 .vidro-pro::after {
+  background: linear-gradient(180deg, rgba(255, 255, 255, .9), rgba(255, 255, 255, 0) 35%);
+}
+/* GAVETA em vidro (DrawerV2 com className="vidro-pro" — 1º uso: a ficha do Painel da Equipe,
+   dono 29/10). A skin Aurora e a repaginada cravam o fundo de TODA gaveta com !important (vidro
+   fumê / degrau sólido); só a gaveta que pediu o vidro volta aos valores do .vidro-pro acima. As
+   outras gavetas do sistema não mudam. A sombra puxa para a ESQUERDA: a gaveta encosta na borda. */
+html:root:not([data-tema="light"]) .v2 .drawer-v2.vidro-pro.vidro-pro,
+html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .drawer-v2.vidro-pro.vidro-pro {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .05), rgba(255, 255, 255, 0) 96px),
+    linear-gradient(160deg, rgba(40, 43, 50, .5), rgba(20, 22, 27, .48)) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(1.35) !important; backdrop-filter: blur(20px) saturate(1.35) !important;
+  box-shadow: -28px 0 70px -18px rgba(0, 0, 0, .55), inset 1px 0 0 rgba(255, 255, 255, .06);
+}
+html:root[data-tema="light"] .v2 .drawer-v2.vidro-pro.vidro-pro,
+html:root[data-repaginada][data-repaginada][data-tema="light"] .v2 .drawer-v2.vidro-pro.vidro-pro {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .35), rgba(255, 255, 255, 0) 96px),
+    linear-gradient(160deg, rgba(255, 255, 255, .72), rgba(246, 248, 251, .62)) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(1.4) !important; backdrop-filter: blur(22px) saturate(1.4) !important;
+  box-shadow: -28px 0 64px -20px rgba(22, 34, 60, .22), inset 1px 0 0 rgba(255, 255, 255, .85);
+}
+/* quem pediu menos transparência no sistema operacional recebe a carta quase sólida */
+@media (prefers-reduced-transparency: reduce) {
+  html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .vidro-pro.vidro-pro,
+  html:root[data-visual]:not([data-tema="light"]) .v2 .vidro-pro.vidro-pro, html:root:not([data-tema="light"]) .v2 .vidro-pro { background: #17191D; }
+  html:root[data-visual][data-tema="light"] .v2 .vidro-pro.vidro-pro, html:root[data-tema="light"] .v2 .vidro-pro { background: #FFFFFF; }
+  html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2 .drawer-v2.vidro-pro.vidro-pro,
+  html:root:not([data-tema="light"]) .v2 .drawer-v2.vidro-pro.vidro-pro { background: #17191D !important; }
+  html:root[data-repaginada][data-repaginada][data-tema="light"] .v2 .drawer-v2.vidro-pro.vidro-pro,
+  html:root[data-tema="light"] .v2 .drawer-v2.vidro-pro.vidro-pro { background: #FFFFFF !important; }
+}
+
+/* ============================================================
+   FICHA JUDICIAL em vidro com LEDs (dono 29/10: "meio transparentezinho com LEDs, mais profissional").
+   O cartão reusa o .vidro-pro (o mesmo vidro sóbrio aprovado no filtro/scripts — exceção consciente
+   ao Corporativo/Leve por ser overlay transitório). Os LEDs: fio de luz no topo, etapas
+   Importar → Revisar → Prévia com o LED aceso, e um LED nos selos dos campos. Brilho só no LED.
+   ============================================================ */
+/* só escurece: backdrop-filter aqui viraria a "raiz" do desfoque e o vidro do cartão deixaria de desfocar a página */
+.v2 .atv-modal-overlay:has(> .fj-modal) { background: rgba(10, 12, 16, .42); }
+html:root[data-tema="light"] .v2 .atv-modal-overlay:has(> .fj-modal) { background: rgba(22, 28, 40, .28); }
+.v2 .atv-modal.fj-modal { border-radius: 16px; overflow: hidden; }
+/* o .atv-modal::before (fio Platina) some: o vidro já traz o próprio fio */
+.v2 .atv-modal.fj-modal::before { display: none; }
+.v2 .fj-modal .atv-modal-head { position: static; padding: 18px 20px 14px; border-bottom: 1px solid rgba(var(--tint), .08); background: transparent; }
+.v2 .fj-modal .atv-modal-body { padding: 16px 20px; }
+.v2 .fj-modal .atv-modal-foot { padding: 12px 20px 14px; border-top: 1px solid rgba(var(--tint), .08); background: rgba(var(--tint), .02); }
+/* faixa de LED no topo do cartão */
+.v2 .fj-modal .fj-cab::before {
+  content: ""; position: absolute; top: 0; left: 28px; right: 28px; height: 2px; border-radius: 0 0 2px 2px; pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(var(--azul-rgb), .85) 22%, rgba(var(--azul-rgb), .95) 50%, rgba(var(--azul-rgb), .85) 78%, transparent);
+  box-shadow: 0 0 10px rgba(var(--azul-rgb), .45), 0 0 2px rgba(var(--azul-rgb), .6);
+}
+.v2 .fj-modal .fj-cab { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; font-size: 16px; font-weight: 650; letter-spacing: -.01em; }
+.v2 .fj-modal .fj-cab-tx { min-width: 0; }
+.v2 .fj-modal .fj-sub { font-size: 12px; font-weight: 400; letter-spacing: 0; color: var(--txt-3); }
+/* etapas com LED */
+.v2 .fj-passos { list-style: none; display: flex; align-items: center; gap: 14px; margin-top: 4px; flex-shrink: 0; }
+.v2 .fj-passos li { display: inline-flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 650; letter-spacing: .07em; text-transform: uppercase; color: var(--txt-3); }
+.v2 .fj-passos li + li::before { content: ""; width: 14px; height: 1px; margin-right: 8px; background: rgba(var(--tint), .16); }
+.v2 .fj-led { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; background: rgba(var(--tint), .2); box-shadow: inset 0 0 0 1px rgba(var(--tint), .12); }
+.v2 .fj-passos li.feito { color: var(--txt-2); }
+.v2 .fj-passos li.feito .fj-led { background: var(--verde); box-shadow: 0 0 6px rgba(var(--verde-rgb), .7); }
+.v2 .fj-passos li.atual { color: var(--txt); }
+.v2 .fj-passos li.atual .fj-led { background: var(--azul); box-shadow: 0 0 0 3px rgba(var(--azul-rgb), .16), 0 0 8px rgba(var(--azul-rgb), .75); }
+/* seções e campos no vidro */
+.v2 .fj-modal .fj-sec { display: flex; align-items: center; gap: 8px; font-size: 10.5px; letter-spacing: .08em; color: var(--txt-2); border-top-color: rgba(var(--tint), .08); }
+.v2 .fj-modal .fj-sec::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--azul); box-shadow: 0 0 6px rgba(var(--azul-rgb), .6); }
+.v2 .fj-modal :is(.atv-input, .atv-select, .atv-textarea, .fj-textarea) {
+  background: rgba(var(--tint), .035); border: 1px solid rgba(var(--tint), .12); border-radius: 9px; font-size: 13px;
+}
+html:root[data-tema="light"] .v2 .fj-modal :is(.atv-input, .atv-select, .atv-textarea, .fj-textarea) { background: rgba(255, 255, 255, .7); }
+.v2 .fj-modal :is(.atv-input, .atv-select, .atv-textarea, .fj-textarea):focus {
+  border-color: rgba(var(--azul-rgb), .6); box-shadow: 0 0 0 3px rgba(var(--azul-rgb), .14); outline: none;
+}
+.v2 .fj-modal .fj-textarea { min-height: 220px; line-height: 1.5; }
+/* selos dos campos = LED + texto (Encontrado / Sai na ficha / Revisar…) */
+.v2 .fj-modal .fj-ind { display: inline-flex; align-items: center; gap: 5px; background: transparent; padding: 0; font-size: 10px; letter-spacing: .03em; }
+.v2 .fj-modal .fj-ind::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; box-shadow: 0 0 5px currentColor; }
+.v2 .fj-modal .fj-ind.man { color: var(--txt-3); }
+.v2 .fj-modal .fj-ind.man::before { box-shadow: none; }
+.v2 .fj-modal .fj-eye { height: 36px; border-radius: 9px; border-color: rgba(var(--tint), .12); }
+.v2 .fj-modal .atv-btn { height: 34px; border-radius: 9px; font-size: 13px; }
+.v2 .fj-modal .atv-btn:not(.primary):not(.danger) { background: rgba(var(--tint), .04); border-color: rgba(var(--tint), .12); }
+.v2 .fj-modal .atv-btn.primary { background: var(--platina-a); color: var(--platina-txt); box-shadow: 0 0 0 1px rgba(var(--azul-rgb), .25); }
+.v2 .fj-modal .atv-btn.primary:hover:not(:disabled) { transform: none; filter: brightness(1.06); }
+/* cartão da ficha no painel: aviso da senha identificada no chat (LED verde) */
+.v2 .fjb-ident { display: flex; align-items: center; gap: 7px; font-size: 11.5px; font-weight: 550; color: var(--verde); margin: 2px 0 2px; }
+.v2 .fjb-ident .fj-led { background: var(--verde); box-shadow: 0 0 6px rgba(var(--verde-rgb), .7); }
+
+/* --- Foto ilustrativa do cliente (FotoCliente, 30/10) — cobre as iniciais do avatar ---- */
+.v2 .foto-cli { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 50%; object-fit: cover; pointer-events: none; }

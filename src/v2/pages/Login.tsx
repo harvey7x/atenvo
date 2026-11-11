@@ -7,12 +7,18 @@ import '../base.css';
 import '../components/componentes.css';
 import './login.css';
 import { LogoAtenvo } from '../components/LogoAtenvo';
+import { isRevizaMode } from '@/lib/supabase';
 
 import { DESTINO_PADRAO_V2 as DESTINO_PADRAO } from '../destino';
 
 interface LocState { from?: { pathname: string }; aviso?: string }
 
 const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Login de teste da DEMONSTRAÇÃO (modo mock): já vem preenchido para o visitante
+// entrar em 1 clique. Em produção (Supabase real) nada disso aparece.
+const DEMO_EMAIL = 'demo@alfagroup.com.br';
+const DEMO_SENHA = 'demo1234';
 
 type Banner = { tom: 'erro' | 'aviso'; texto: string } | null;
 
@@ -43,6 +49,14 @@ export default function LoginV2() {
   const [busy, setBusy] = useState(false);
   const [recuperando, setRecuperando] = useState(false);
 
+  // demo: deixa o login de teste pronto para entrar em 1 clique (só no mock)
+  useEffect(() => {
+    if (mode === 'mock') {
+      setEmail((e) => e || DEMO_EMAIL);
+      setSenha((s) => s || DEMO_SENHA);
+    }
+  }, [mode]);
+
   if (!loading && user) {
     const to = (location.state as LocState | null)?.from?.pathname ?? DESTINO_PADRAO;
     return <Navigate to={to} replace />;
@@ -54,20 +68,22 @@ export default function LoginV2() {
     setBanner(null); setEEmail(null); setESenha(null);
     let ok = true;
     const ev = email.trim();
-    if (!ev) { setEEmail('Informe seu e-mail.'); ok = false; }
-    else if (!emailRe.test(ev)) { setEEmail('E-mail inválido.'); ok = false; }
+    if (!ev) { setEEmail(isRevizaMode ? 'Informe seu usuário.' : 'Informe seu e-mail.'); ok = false; }
+    else if (!isRevizaMode && !emailRe.test(ev)) { setEEmail('E-mail inválido.'); ok = false; }
     if (!senha) { setESenha('Informe sua senha.'); ok = false; }
-    else if (senha.length < 6) { setESenha('A senha deve ter ao menos 6 caracteres.'); ok = false; }
+    else if (senha.length < (isRevizaMode ? 8 : 6)) { setESenha(`A senha deve ter ao menos ${isRevizaMode ? 8 : 6} caracteres.`); ok = false; }
     if (!ok) return;
 
     setBusy(true);
-    const { error, reason } = await signIn(ev, senha);
+    // instância Reviza: login por USUÁRIO — vira o e-mail interno usuario@reviza.local
+    const credencial = isRevizaMode && !ev.includes('@') ? `${ev.toLowerCase()}@reviza.local` : ev;
+    const { error, reason } = await signIn(credencial, senha);
     setBusy(false);
     if (error) {
       setBanner({
         tom: 'erro',
         texto:
-          reason === 'invalid' ? 'E-mail ou senha inválidos.'
+          reason === 'invalid' ? (isRevizaMode ? 'Usuário ou senha inválidos.' : 'E-mail ou senha inválidos.')
           : reason === 'config' ? 'Servidor de autenticação não configurado. Avise o administrador.'
           : 'Não foi possível conectar ao servidor de autenticação. Tente novamente em instantes.',
       });
@@ -99,7 +115,7 @@ export default function LoginV2() {
       <div className="grao" />
       <div className="lg-card vidro pg-entra">
         <LogoAtenvo className="marca2" />
-        <div className="caps">Bem-vindo ao Atenvo</div>
+        <div className="caps">Bem-vindo à ALFA GROUP</div>
         <h1 className="p-display">Acesse sua operação.</h1>
         <div className="sub">Entre com suas credenciais para continuar.</div>
 
@@ -113,15 +129,15 @@ export default function LoginV2() {
 
         <form onSubmit={aoEntrar} noValidate>
           <div className={eEmail ? 'campo invalida' : 'campo'}>
-            <label htmlFor="lg-email">E-mail</label>
+            <label htmlFor="lg-email">{isRevizaMode ? 'Usuário' : 'E-mail'}</label>
             <input
               className="inp"
               id="lg-email"
               name="email"
-              type="email"
-              inputMode="email"
+              type={isRevizaMode ? 'text' : 'email'}
+              inputMode={isRevizaMode ? 'text' : 'email'}
               autoComplete="username"
-              placeholder="voce@empresa.com.br"
+              placeholder={isRevizaMode ? 'seu usuário' : 'voce@empresa.com.br'}
               value={email}
               aria-invalid={eEmail ? true : undefined}
               aria-describedby={eEmail ? 'lg-email-erro' : undefined}
@@ -133,9 +149,9 @@ export default function LoginV2() {
           <div className={eSenha ? 'campo invalida' : 'campo'}>
             <div className="lg-l">
               <label htmlFor="lg-senha">Senha</label>
-              <button type="button" onClick={aoEsquecer} disabled={recuperando}>
+              {!isRevizaMode && <button type="button" onClick={aoEsquecer} disabled={recuperando}>
                 {recuperando ? 'Enviando…' : 'Esqueci minha senha'}
-              </button>
+              </button>}
             </div>
             <div className="controle">
               <input
@@ -178,9 +194,8 @@ export default function LoginV2() {
           {mode === 'mock' && (
             <>
               <br />
-              Modo de demonstração: sem backend, qualquer e-mail válido e senha (6+) entram.
-              Configure <code>VITE_SUPABASE_URL</code> e <code>VITE_SUPABASE_ANON_KEY</code> para
-              usar o Supabase Auth real.
+              <b>Demonstração</b> · login de teste já preenchido:<br />
+              <code>{DEMO_EMAIL}</code> · senha <code>{DEMO_SENHA}</code> — é só clicar <b>Entrar</b>.
             </>
           )}
         </div>

@@ -20,6 +20,13 @@ interface Props {
   permitirArquivo?: boolean;
   /** Rótulo do botão de confirmação (default "Enviar"). No agendamento vira "Usar áudio" (captura, não envia). */
   rotuloEnviar?: string;
+  /** 'zap' = barra de gravação do WhatsApp (celular da tela Conversas; CSS `fzr-` em pages/fone-zap.css).
+      Mesma máquina de estados — só a pele muda. Default = pele padrão. */
+  pele?: 'padrao' | 'zap';
+  /** começa a gravar assim que monta (o toque no microfone já foi o gesto do usuário) */
+  autoIniciar?: boolean;
+  /** pele zap: fechar a barra (descartou ou o áudio foi enviado) */
+  aoFechar?: () => void;
 }
 const MAX_AUDIO = 16 * 1024 * 1024; // limite ~16MB (WhatsApp)
 
@@ -42,7 +49,15 @@ const SINAL_MIN = 0.03; // pico normalizado mínimo p/ considerar que houve som
 const IcMic = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>;
 const IcClip = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5 12.5 20a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4l7.8-7.8" /></svg>;
 
-export function AudioRecorderV2({ disabled, onEnviar, permitirArquivo, rotuloEnviar }: Props) {
+const IcLixo = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M4 7h16M10 11v6M14 11v6M5.5 7l1 12.2A2 2 0 0 0 8.5 21h7a2 2 0 0 0 2-1.8L18.5 7M9 7V4.8A.8.8 0 0 1 9.8 4h4.4a.8.8 0 0 1 .8.8V7" /></svg>;
+const IcPausa = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden><rect x="6" y="4.5" width="4.2" height="15" rx="1.2" /><rect x="13.8" y="4.5" width="4.2" height="15" rx="1.2" /></svg>;
+const IcPlay = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M7 4.8v14.4c0 .8.9 1.3 1.6.9l11-7.2a1 1 0 0 0 0-1.8l-11-7.2c-.7-.4-1.6.1-1.6.9z" /></svg>;
+const IcParar = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden><rect x="5" y="5" width="14" height="14" rx="3" /></svg>;
+const IcRegravar = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M4 12a8 8 0 1 0 2.4-5.7L4 8.6" /><path d="M4 4v4.6h4.6" /></svg>;
+const IcEnviar = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M3.4 20.4 21 12 3.4 3.6 3.4 10.2 15 12 3.4 13.8z" /></svg>;
+const IcMicZap = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" /></svg>;
+
+export function AudioRecorderV2({ disabled, onEnviar, permitirArquivo, rotuloEnviar, pele = 'padrao', autoIniciar, aoFechar }: Props) {
   const [estado, setEstado] = useState<Estado>('idle');
   const [seg, setSeg] = useState(0);
   const [erro, setErro] = useState<string | null>(null);
@@ -68,6 +83,18 @@ export function AudioRecorderV2({ disabled, onEnviar, permitirArquivo, rotuloEnv
   const barRef = useRef<HTMLDivElement>(null);
   const enviandoRef = useRef(false); // trava clique-duplo no envio
   const fileRef = useRef<HTMLInputElement>(null); // seleção de arquivo de áudio existente
+  const montadoRef = useRef(true);    // desmontou enquanto o navegador pedia o microfone → solta o microfone
+  const autoRef = useRef(false);      // autoIniciar só uma vez (StrictMode roda o efeito 2x)
+  // pele zap: "enviar" durante a gravação = parar, conferir o som e enviar (estado, pra tela refletir na hora)
+  const [aguardandoEnvio, setAguardandoEnvio] = useState(false);
+  const geracaoRef = useRef(0);        // medição de um áudio antigo não pode sobrescrever a do novo
+  const previewUrlRef = useRef<string | null>(null);
+  const lixoRef = useRef<HTMLButtonElement>(null);
+  const zapRef = useRef<HTMLDivElement>(null);
+  // mini player da prévia (pele zap)
+  const prevRef = useRef<HTMLAudioElement>(null);
+  const [prevTocando, setPrevTocando] = useState(false);
+  const [prevPos, setPrevPos] = useState(0);
 
   function pararTimer() { if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; } }
   function pararMedidor() {
@@ -78,13 +105,43 @@ export function AudioRecorderV2({ disabled, onEnviar, permitirArquivo, rotuloEnv
   }
   function pararTracks() { streamRef.current?.getTracks().forEach((t) => t.stop()); streamRef.current = null; }
   function limparPreview() { setPreviewUrl((u) => { if (u) URL.revokeObjectURL(u); return null; }); }
+  useEffect(() => { previewUrlRef.current = previewUrl; }, [previewUrl]);
 
   useEffect(() => {
+    montadoRef.current = true;
     const onUnload = () => pararTracks();
     window.addEventListener('beforeunload', onUnload);
-    return () => { window.removeEventListener('beforeunload', onUnload); pararTimer(); pararMedidor(); pararTracks(); };
+    return () => {
+      montadoRef.current = false; window.removeEventListener('beforeunload', onUnload);
+      // saiu gravando: para o gravador SEM montar o arquivo (nada fica na memória nem é medido à toa)
+      const rec = recRef.current;
+      if (rec && rec.state !== 'inactive') { rec.onstop = null; rec.ondataavailable = null; try { rec.stop(); } catch { /* ignore */ } }
+      pararTimer(); pararMedidor(); pararTracks();
+      if (previewUrlRef.current) { URL.revokeObjectURL(previewUrlRef.current); previewUrlRef.current = null; }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  useEffect(() => {
+    if (autoIniciar && !autoRef.current) { autoRef.current = true; void iniciar(); }
+    if (pele === 'zap') lixoRef.current?.focus({ preventScroll: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (pele !== 'zap') return;
+    const ativo = document.activeElement;
+    if (ativo && ativo !== document.body && zapRef.current?.contains(ativo)) return;
+    if (ativo && ativo !== document.body) return;   // o foco está em outro lugar da tela: não rouba
+    const alvo = zapRef.current?.querySelector<HTMLElement>(estado === 'preview' ? '[data-foco="ouvir"]' : estado === 'recording' || estado === 'paused' ? '[data-foco="pausa"]' : '[data-foco="lixo"]');
+    alvo?.focus({ preventScroll: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [estado]);
+  // pele zap: pediu pra enviar gravando → assim que o arquivo for conferido, envia (sem som = fica na prévia com o aviso)
+  useEffect(() => {
+    if (!aguardandoEnvio || estado !== 'preview' || !info || info.verificando) return;
+    setAguardandoEnvio(false);
+    if (info.sinal) void enviar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [estado, info, aguardandoEnvio]);
 
   // medidor visual (Web Audio) — só validação local; nada é transmitido.
   // IMPORTANTE: usa uma track CLONADA. Rotear a MESMA track do recorder pelo Web Audio faz o
@@ -117,6 +174,7 @@ export function AudioRecorderV2({ disabled, onEnviar, permitirArquivo, rotuloEnv
 
   // Decodifica o Blob gravado e mede o RMS — prova local de que o ARQUIVO tem som (independe do medidor ao vivo).
   async function medirBlob(blob: Blob, _tipo: string) {
+    const geracao = geracaoRef.current;
     try {
       const ab = await blob.arrayBuffer();
       const AC = (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext);
@@ -126,11 +184,18 @@ export function AudioRecorderV2({ disabled, onEnviar, permitirArquivo, rotuloEnv
       for (let c = 0; c < audio.numberOfChannels; c++) { const ch = audio.getChannelData(c); for (let i = 0; i < ch.length; i++) sum += ch[i] * ch[i]; n += ch.length; }
       const rms = n ? Math.sqrt(sum / n) : 0;
       try { ac.close(); } catch { /* ignore */ }
+      if (geracao !== geracaoRef.current || !montadoRef.current) return;   // já é outro áudio (ou saiu da tela)
       setInfo((x) => x ? { ...x, dur: audio.duration, sinal: rms >= 0.01, verificando: false, rms } : x); // ruído de fundo não passa
-    } catch { setInfo((x) => x ? { ...x, verificando: false } : x); } // se não decodificar, mantém o medidor ao vivo
+    } catch { if (geracao === geracaoRef.current && montadoRef.current) setInfo((x) => x ? { ...x, verificando: false } : x); } // se não decodificar, mantém o medidor ao vivo
   }
 
   async function iniciar(idDispositivo?: string) {
+    setAguardandoEnvio(false);
+    if (pele === 'zap') {
+      // gravar de novo DESCARTA o áudio anterior: nada antigo pode ficar pronto pra envio
+      prevRef.current?.pause(); setPrevTocando(false); setPrevPos(0);
+      blobRef.current = null; setInfo(null); limparPreview();
+    }
     setErro(null);
     const md = navigator.mediaDevices;
     if (!md?.getUserMedia || !(window as unknown as { MediaRecorder?: unknown }).MediaRecorder) { setEstado('error'); setErro('Este navegador não suporta gravação de áudio.'); return; }
@@ -140,6 +205,7 @@ export function AudioRecorderV2({ disabled, onEnviar, permitirArquivo, rotuloEnv
     let stream: MediaStream;
     try {
       stream = await md.getUserMedia({ audio: idDispositivo ? { deviceId: { exact: idDispositivo } } : true }); // só após o clique
+      if (!montadoRef.current) { stream.getTracks().forEach((t) => t.stop()); return; }   // fechou antes do navegador liberar
     } catch (e) {
       const n = (e as DOMException).name;
       const msg = n === 'NotAllowedError' || n === 'SecurityError' ? 'Permissão de microfone negada.'
@@ -149,6 +215,7 @@ export function AudioRecorderV2({ disabled, onEnviar, permitirArquivo, rotuloEnv
       setEstado('error'); setErro(msg); return;
     }
     streamRef.current = stream;
+    geracaoRef.current += 1;   // microfone abriu: a medição do áudio anterior não vale mais (se falhar antes disso, ela termina normal)
     const track = stream.getAudioTracks()[0];
     if (!track || track.readyState !== 'live') { pararTracks(); setEstado('error'); setErro('Microfone sem faixa de áudio ativa.'); return; }
     setDeviceId(track.getSettings().deviceId ?? idDispositivo ?? '');
@@ -173,7 +240,7 @@ export function AudioRecorderV2({ disabled, onEnviar, permitirArquivo, rotuloEnv
       setEstado('preview');
       void medirBlob(blob, tipo);                              // verdade absoluta: o arquivo gravado tem som?
     };
-    rec.onerror = () => { pararMedidor(); pararTracks(); pararTimer(); setEstado('error'); setErro('Erro durante a gravação.'); };
+    rec.onerror = () => { setAguardandoEnvio(false); pararMedidor(); pararTracks(); pararTimer(); setEstado('error'); setErro('Erro durante a gravação.'); };
     try { rec.start(); } catch { pararTracks(); pararMedidor(); setEstado('error'); setErro('Não foi possível iniciar a gravação.'); return; }
     setSeg(0); setPicoVivo(0); setEstado('recording');
     timerRef.current = setInterval(() => { setPicoVivo(maxNivelRef.current); if (recRef.current?.state === 'recording') setSeg((s) => s + 1); }, 1000);
@@ -186,11 +253,16 @@ export function AudioRecorderV2({ disabled, onEnviar, permitirArquivo, rotuloEnv
     try { rec.requestData(); } catch { /* ignore */ }   // garante o último chunk antes do stop
     rec.stop();                                          // onstop monta o Blob e só então encerra as tracks
   }
+  function pararEEnviar() { setAguardandoEnvio(true); finalizar(); }
+  function pararEOuvir() { setAguardandoEnvio(false); finalizar(); }
   function cancelar() {
+    geracaoRef.current += 1;
+    setAguardandoEnvio(false); prevRef.current?.pause(); setPrevTocando(false); setPrevPos(0);
     pararTimer(); pararMedidor();
     const rec = recRef.current;
     if (rec && rec.state !== 'inactive') { rec.onstop = null; rec.ondataavailable = null; try { rec.stop(); } catch { /* ignore */ } }
     pararTracks(); chunksRef.current = []; blobRef.current = null; limparPreview(); setSeg(0); setInfo(null); setEstado('idle'); setErro(null);
+    if (pele === 'zap') aoFechar?.();
   }
   function trocarDispositivo(id: string) {
     // encerra stream/medidor anteriores e reabre com o novo dispositivo (regrava)
@@ -224,6 +296,8 @@ export function AudioRecorderV2({ disabled, onEnviar, permitirArquivo, rotuloEnv
     try {
       await onEnviar(envioBlob, mime, ext, diag); // upload + envio + confirmação real (lança em falha)
       blobRef.current = null; limparPreview(); setSeg(0); setInfo(null); setEstado('idle');
+      setPrevTocando(false); setPrevPos(0);
+      if (pele === 'zap') aoFechar?.();
     } catch (e) {
       setEstado('error'); setErro((e as Error).message || 'Falha ao enviar o áudio.'); // preserva o blob p/ retry
     } finally { enviandoRef.current = false; }
@@ -232,6 +306,7 @@ export function AudioRecorderV2({ disabled, onEnviar, permitirArquivo, rotuloEnv
   // seleção de arquivo de áudio existente (opt-in). Não aplica a trava de silêncio do microfone.
   function escolherArquivo(f?: File | null) {
     if (!f) return;
+    geracaoRef.current += 1;
     setErro(null);
     if (!f.type.startsWith('audio/')) { setEstado('error'); setErro('Selecione um arquivo de áudio.'); return; }
     if (f.size > MAX_AUDIO) { setEstado('error'); setErro('Áudio acima de 16 MB.'); return; }
@@ -251,6 +326,67 @@ export function AudioRecorderV2({ disabled, onEnviar, permitirArquivo, rotuloEnv
       {devices.map((d, i) => <option key={d.deviceId || i} value={d.deviceId}>{d.label || `Microfone ${i + 1}`}</option>)}
     </select>
   );
+
+  if (pele === 'zap') {
+    const gravando = estado === 'recording' || estado === 'paused';
+    const semSomArquivo = estado === 'preview' && !!info && !info.verificando && !info.sinal;
+    const podeEnviar = gravando || (estado === 'preview' && !!info && !info.verificando && info.sinal) || (estado === 'error' && !!blobRef.current);
+    const durPrev = info?.dur || seg;
+    const aviso = estado === 'error' ? erro
+      : semSomArquivo ? 'Nenhum som no áudio gravado. Troque o microfone e grave de novo.'
+      : semSinalVivo ? 'Sem sinal — fale mais perto ou troque o microfone.' : '';
+    return (
+      <div className="fzr" role="group" aria-label="Gravação de áudio" ref={zapRef}>
+        {aviso && <div className={estado === 'error' || semSomArquivo ? 'fzr-aviso erro' : 'fzr-aviso'} role={estado === 'error' ? 'alert' : 'status'}>{aviso}</div>}
+        {devices.length > 1 && (semSinalVivo || semSomArquivo) && <div className="fzr-mic"><span>Microfone</span>{seletorMic}</div>}
+        <div className="fzr-linha">
+          <button type="button" ref={lixoRef} data-foco="lixo" className="fzr-bt" onClick={cancelar} disabled={estado === 'sending'} aria-label="Descartar áudio" title="Descartar"><IcLixo /></button>
+          <div className="fzr-meio">
+            {(estado === 'idle' || estado === 'requesting') && <span className="fzr-info"><span className="fzr-txt">Abrindo o microfone…</span></span>}
+            {gravando && (
+              <>
+                <span className={'fzr-dot' + (estado === 'recording' ? ' on' : '')} aria-hidden />
+                <span className="fzr-tempo num" aria-live="off">{mmss(seg)}</span>
+                {estado === 'recording'
+                  ? <span className="fzr-medidor" title="Nível do microfone" aria-hidden><span ref={barRef} className="fzr-medidor-bar" /></span>
+                  : <span className="fz-sr">Gravação pausada</span>}
+              </>
+            )}
+            {estado === 'preview' && previewUrl && (
+              <>
+                <button type="button" data-foco="ouvir" className="fzr-play" aria-label={prevTocando ? 'Pausar' : 'Ouvir'} onClick={() => { const a = prevRef.current; if (!a) return; if (a.paused) void a.play(); else a.pause(); }}>
+                  {prevTocando ? <IcPausa /> : <IcPlay />}
+                </button>
+                <span className="fzr-trilho" aria-hidden><i style={{ width: `${durPrev ? Math.min(100, (prevPos / durPrev) * 100) : 0}%` }} /></span>
+                <span className="fzr-tempo num">{mmss(prevTocando || prevPos > 0 ? prevPos : durPrev)}</span>
+                {info?.verificando && <span className="fzr-info"><span className="fzr-txt">conferindo…</span></span>}
+                <audio ref={prevRef} src={previewUrl} preload="metadata" hidden
+                  onPlay={() => setPrevTocando(true)} onPause={() => setPrevTocando(false)}
+                  onEnded={() => { setPrevTocando(false); setPrevPos(0); }}
+                  onTimeUpdate={(e) => setPrevPos((e.currentTarget as HTMLAudioElement).currentTime)}
+                  onLoadedMetadata={(e) => { const d = (e.currentTarget as HTMLAudioElement).duration; setInfo((x) => x ? { ...x, dur: isFinite(d) && d > 0 ? d : x.dur } : x); }} />
+              </>
+            )}
+            {estado === 'sending' && <span className="fzr-info" role="status"><span className="fzr-spin" aria-hidden /> Enviando áudio…</span>}
+            {estado === 'error' && !blobRef.current && <button type="button" className="fzr-link" onClick={() => iniciar()}>Tentar de novo</button>}
+          </div>
+          {gravando && (   /* UM botão só (mesma posição): trocar de estado não derruba o foco */
+            <button type="button" data-foco="pausa" className={estado === 'paused' ? 'fzr-bt rec' : 'fzr-bt'} onClick={estado === 'paused' ? continuar : pausar}
+              aria-label={estado === 'paused' ? 'Continuar gravando' : 'Pausar gravação'} title={estado === 'paused' ? 'Continuar' : 'Pausar'}>
+              {estado === 'paused' ? <IcMicZap /> : <IcPausa />}
+            </button>
+          )}
+          {gravando && <button type="button" className="fzr-bt" onClick={pararEOuvir} disabled={aguardandoEnvio} aria-label="Parar e ouvir antes de enviar" title="Parar e ouvir"><IcParar /></button>}
+          {estado === 'preview' && <button type="button" className="fzr-bt" onClick={() => void iniciar(deviceId || undefined)} disabled={aguardandoEnvio} aria-label="Gravar de novo" title="Gravar de novo"><IcRegravar /></button>}
+          <button type="button" className="fzr-enviar" disabled={disabled || !podeEnviar} aria-disabled={aguardandoEnvio || undefined} aria-busy={aguardandoEnvio || undefined}
+            onClick={() => { if (aguardandoEnvio) return; if (gravando) pararEEnviar(); else void enviar(); }}
+            aria-label={rotuloEnviar ?? 'Enviar áudio'} title={rotuloEnviar ?? 'Enviar áudio'}>
+            {aguardandoEnvio ? <span className="fzr-spin claro" aria-hidden /> : <IcEnviar />}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (estado === 'idle') {
     return (

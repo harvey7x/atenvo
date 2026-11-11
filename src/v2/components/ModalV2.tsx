@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { criarRaizPortalV2 } from './portal';
 import { BotaoPrimario, BotaoSec } from './Botao';
@@ -13,6 +13,8 @@ type ModalV2Props = {
   largura?: number;
   /** quando false, clicar fora não fecha (ex.: durante loading) — como no Modal v1 */
   fecharNoVeu?: boolean;
+  /** id de um texto do corpo que o leitor de tela lê junto com o título (aria-describedby) */
+  descricaoId?: string;
 };
 
 /**
@@ -21,7 +23,8 @@ type ModalV2Props = {
  * chamador guarda o busy), clique no véu fecha quando fecharNoVeu, autofoco
  * no primeiro campo. Monta em portal com a classe `v2` na raiz (regra 10).
  */
-export function ModalV2({ aberto, aoFechar, titulo, children, rodape, largura = 440, fecharNoVeu = true }: ModalV2Props) {
+export function ModalV2({ aberto, aoFechar, titulo, children, rodape, largura = 440, fecharNoVeu = true, descricaoId }: ModalV2Props) {
+  const tituloId = useId();
   const cartaoRef = useRef<HTMLDivElement>(null);
   const aoFecharRef = useRef(aoFechar);
   useEffect(() => { aoFecharRef.current = aoFechar; });
@@ -50,8 +53,9 @@ export function ModalV2({ aberto, aoFechar, titulo, children, rodape, largura = 
   if (!aberto || !raiz) return null;
   return createPortal(
     <div className="veu" onMouseDown={(e) => { if (fecharNoVeu && e.target === e.currentTarget) aoFechar(); }}>
-      <div className="p-modal vidro" ref={cartaoRef} style={{ width: largura }} role="dialog" aria-modal="true">
-        {titulo != null && <div className="p-modal-cab">{titulo}</div>}
+      <div className="p-modal vidro" ref={cartaoRef} style={{ width: largura }} role="dialog" aria-modal="true"
+        aria-labelledby={titulo != null ? tituloId : undefined} aria-describedby={descricaoId}>
+        {titulo != null && <div className="p-modal-cab" id={tituloId}>{titulo}</div>}
         <div className="p-modal-corpo">{children}</div>
         {rodape != null && <div className="p-modal-rodape">{rodape}</div>}
       </div>
@@ -65,6 +69,8 @@ type DrawerV2Props = {
   aoFechar: () => void;
   children: ReactNode;
   largura?: number;
+  /** classe extra na gaveta (ex.: `vidro-pro` para o vidro translúcido do filtro/scripts) */
+  className?: string;
 };
 
 /**
@@ -73,7 +79,7 @@ type DrawerV2Props = {
  * com classe `v2` na raiz (regra 10) do ModalV2. O conteúdo (cabeçalho
  * com X, corpo, ações) é do chamador.
  */
-export function DrawerV2({ aberto, aoFechar, children, largura = 380 }: DrawerV2Props) {
+export function DrawerV2({ aberto, aoFechar, children, largura = 380, className }: DrawerV2Props) {
   const aoFecharRef = useRef(aoFechar);
   useEffect(() => { aoFecharRef.current = aoFechar; });
 
@@ -96,7 +102,7 @@ export function DrawerV2({ aberto, aoFechar, children, largura = 380 }: DrawerV2
   return createPortal(
     <>
       <div className="veu-drawer" onMouseDown={aoFechar} role="presentation" />
-      <aside className="drawer-v2" style={{ width: largura }} role="dialog" aria-modal="true">
+      <aside className={className ? `drawer-v2 ${className}` : 'drawer-v2'} style={{ width: largura }} role="dialog" aria-modal="true">
         {children}
       </aside>
     </>,

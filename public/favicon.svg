@@ -1,43 +1,39 @@
-<svg viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="ALFA GROUP">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#07080C"/>
-      <stop offset=".5" stop-color="#0A101D"/>
-      <stop offset=".8" stop-color="#17337A"/>
-      <stop offset="1" stop-color="#3E7BF0"/>
+      <stop offset="0" stop-color="#0C0C0E"/>
+      <stop offset=".6" stop-color="#141210"/>
+      <stop offset="1" stop-color="#241B0A"/>
     </linearGradient>
-    <radialGradient id="glow" cx=".5" cy="1.08" r=".62">
-      <stop offset="0" stop-color="#7FB4FF" stop-opacity=".95"/>
-      <stop offset=".45" stop-color="#3E7BF0" stop-opacity=".42"/>
-      <stop offset="1" stop-color="#3E7BF0" stop-opacity="0"/>
+    <radialGradient id="glow" cx=".5" cy="1.06" r=".62">
+      <stop offset="0" stop-color="#EDC468" stop-opacity=".55"/>
+      <stop offset=".5" stop-color="#D9A93B" stop-opacity=".22"/>
+      <stop offset="1" stop-color="#D9A93B" stop-opacity="0"/>
     </radialGradient>
     <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#FFFFFF" stop-opacity=".18"/>
-      <stop offset=".55" stop-color="#7FA8FF" stop-opacity=".14"/>
-      <stop offset=".88" stop-color="#8FBCFF" stop-opacity=".75"/>
-      <stop offset="1" stop-color="#AFD2FF" stop-opacity=".95"/>
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity=".14"/>
+      <stop offset=".6" stop-color="#D9A93B" stop-opacity=".12"/>
+      <stop offset="1" stop-color="#F0C879" stop-opacity=".8"/>
     </linearGradient>
-    <linearGradient id="seta" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#FFFFFF"/>
-      <stop offset=".55" stop-color="#E9EFFA"/>
-      <stop offset="1" stop-color="#AEC4EA"/>
+    <linearGradient id="ag-go" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#F8E29A"/>
+      <stop offset=".5" stop-color="#D9A93B"/>
+      <stop offset="1" stop-color="#A9761B"/>
     </linearGradient>
-    <linearGradient id="dia" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#F2F7FF"/>
-      <stop offset="1" stop-color="#8FB0E6"/>
+    <linearGradient id="ag-go2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FBEAB0"/>
+      <stop offset="1" stop-color="#C79430"/>
     </linearGradient>
-    <filter id="sombra" x="-40%" y="-40%" width="180%" height="180%">
-      <feDropShadow dx="0" dy="7" stdDeviation="9" flood-color="#04060D" flood-opacity=".6"/>
-    </filter>
-    <filter id="sombra2" x="-60%" y="-60%" width="220%" height="220%">
-      <feDropShadow dx="0" dy="5" stdDeviation="6" flood-color="#04060D" flood-opacity=".55"/>
+    <filter id="ag-sh" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#0A0A0A" flood-opacity=".5"/>
     </filter>
   </defs>
   <rect x="4" y="4" width="248" height="248" rx="58" fill="url(#bg)"/>
   <rect x="4" y="4" width="248" height="248" rx="58" fill="url(#glow)"/>
-  <circle cx="128" cy="128" r="86" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="1.5"/>
-  <circle cx="128" cy="128" r="108" fill="none" stroke="rgba(255,255,255,.04)" stroke-width="1.5"/>
-  <path d="M128 50 L196 196 L128 150 L60 196 Z" fill="url(#seta)" filter="url(#sombra)"/>
-  <path d="M128 166 L154 188 L128 226 L102 188 Z" fill="url(#dia)" filter="url(#sombra2)"/>
+  <g filter="url(#ag-sh)" transform="translate(128 132) scale(0.62) translate(-128 -123)">
+    <path d="M128 26 L232 220 L24 220 Z" fill="none" stroke="url(#ag-go)" stroke-width="15" stroke-linejoin="round"/>
+    <path d="M128 78 L188 206 L112 206 L146 142 L104 142 L68 206" fill="none" stroke="url(#ag-go2)" stroke-width="13" stroke-linejoin="round" stroke-linecap="round"/>
+    <path d="M98 180 L158 180" stroke="url(#ag-go)" stroke-width="13" stroke-linecap="round"/>
+  </g>
   <rect x="5.5" y="5.5" width="245" height="245" rx="56.5" fill="none" stroke="url(#rim)" stroke-width="2.5"/>
 </svg>

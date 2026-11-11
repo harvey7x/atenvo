@@ -1,0 +1,288 @@
+/* ============================================================
+   Gestão de cobranças — a TELA da planilha (contrato §6).
+   Escopo `.v2 .gp-*`; a grade tem o próprio CSS (planilha.css).
+   A altura da .gp-raiz vem medida do JS (espaço útil da .pagina);
+   a grade ocupa o que sobra (flex 1) em posição absoluta.
+   ============================================================ */
+.v2 .gp-raiz { display: flex; flex-direction: column; gap: 8px; min-height: 440px; }
+.v2 .gp-raiz.gp-cheia {
+  position: fixed; inset: 0; z-index: 70;
+  height: auto; min-height: 0;
+  padding: 10px 12px 12px;
+  background: var(--base);
+}
+
+/* escopo .gp-raiz: o cobrancas.css carrega depois e empataria na especificidade */
+.v2 .gp-raiz .gp-aviso { margin: 0; flex: none; }
+.v2 .gp-raiz .gp-aviso span { flex: 1; min-width: 0; }
+
+/* ---------- toolbar ---------- */
+.v2 .gp-barra { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; flex: none; }
+.v2 .gp-barra .gp-busca { width: 250px; height: 30px; font-size: 12.5px; }
+.v2 .gp-barra .gp-sel { width: auto; max-width: 180px; height: 30px; font-size: 12.5px; padding-right: 6px; }
+.v2 .gp-conta { font-size: 11.5px; color: var(--txt-3); white-space: nowrap; margin-left: 2px; }
+.v2 .gp-esp { flex: 1; }
+.v2 .gp-salvando { font-size: 11.5px; color: var(--txt-3); white-space: nowrap; }
+
+.v2 .gp-raiz .gp-banner { margin: 0; padding: 8px 12px; flex: none; }
+
+/* ---------- linha dos chips + legenda das cores de pagamento ---------- */
+.v2 .gp-linha-chips { display: flex; align-items: center; gap: 12px; flex: none; min-width: 0; }
+.v2 .gp-linha-chips > .gp-chips { flex: 1 1 auto; min-width: 0; }
+.v2 .gp-linha-chips > .gp-legenda { flex: none; flex-wrap: nowrap; }
+@media (max-width: 980px) {
+  .v2 .gp-linha-chips { flex-wrap: wrap; row-gap: 6px; }
+  .v2 .gp-linha-chips > .gp-chips { flex-basis: 100%; }
+}
+
+/* ---------- chips de ciclo (rolam na horizontal) ---------- */
+.v2 .gp-chips {
+  display: flex; align-items: center; gap: 5px; flex: none;
+  overflow-x: auto; padding-bottom: 2px; scrollbar-width: thin;
+}
+.v2 .gp-chips > * { flex: none; }
+.v2 .gp-chip { white-space: nowrap; font-variant-numeric: tabular-nums; display: inline-flex; align-items: center; }
+.v2 .gp-chip.gp-foco { border-color: rgba(var(--tint), .38); color: var(--txt); }
+.v2 .gp-chip.gp-vazio { opacity: .65; }
+/* linhas do bloco cujo ciclo foi esvaziado (lead sem dia): "N aguardando" */
+.v2 .gp-chip-ag {
+  margin-left: 6px; padding: 0 6px; border-radius: 999px;
+  font-size: 10.5px; line-height: 16px; font-weight: 600;
+  color: var(--ambar); background: var(--ambar-bg);
+}
+
+/* ---------- colunas (mostrar/ocultar) ---------- */
+.v2 .gp-cols-wrap { position: relative; }
+.v2 .gp-cols-pop {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 40;
+  width: 270px; max-height: 380px; overflow-y: auto; padding: 8px;
+  background: var(--surface); color: var(--txt);
+  border: 1px solid rgba(var(--tint), .13); border-radius: 10px;
+  box-shadow: var(--shadow-pop);
+}
+/* não coube ancorado à direita do botão (botão na 2ª linha, à esquerda, em 1280): abre pra direita dele */
+.v2 .gp-cols-pop.gp-cols-pop-esq { left: 0; right: auto; }
+.v2 .gp-cols-nota { font-size: 11px; color: var(--txt-3); padding: 2px 6px 6px; }
+.v2 .gp-cols-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 6px; border-radius: 6px; font-size: 12px; cursor: pointer;
+}
+.v2 .gp-cols-item:hover { background: rgba(var(--tint), .06); }
+.v2 .gp-cols-letra { width: 24px; color: var(--txt-3); flex: none; }
+.v2 .gp-cols-tit { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* oculta pela equipe: quem não é financeiro+ não mostra de novo */
+.v2 .gp-cols-item.gp-cols-trava { cursor: not-allowed; color: var(--txt-3); }
+.v2 .gp-cols-item.gp-cols-trava:hover { background: transparent; }
+.v2 .gp-cols-tag { margin-left: auto; flex: none; font-size: 10.5px; color: var(--txt-3); white-space: nowrap; }
+
+/* Desfazer global dentro da barra na tela cheia (o topo fica coberto) */
+.v2 .gp-desfazer { display: inline-flex; flex: none; }
+
+/* ---------- a grade ocupa o resto ---------- */
+.v2 .gp-grade { position: relative; flex: 1 1 0; min-height: 0; }
+.v2 .gp-grade > .plx { position: absolute; inset: 0; height: auto; min-height: 0; }
+
+@media (max-width: 720px) {
+  .v2 .gp-barra .gp-busca { width: 100%; }
+  .v2 .gp-barra .gp-esp { display: none; }
+}
+
+/* =================== informar pagamento (modal em portal .v2) =================== */
+.v2 .gp-inf { display: flex; flex-direction: column; gap: 0; }
+.v2 .gp-inf-campo { margin-bottom: 14px; }
+.v2 .gp-inf-valor { position: relative; display: flex; align-items: center; }
+.v2 .gp-inf-rs {
+  position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+  font-size: 13px; font-weight: 600; color: var(--txt-3); pointer-events: none;
+}
+.v2 .gp-inf-valor .inp {
+  height: 42px; padding-left: 40px;
+  font-size: 17px; font-weight: 600; letter-spacing: -.01em; font-variant-numeric: tabular-nums;
+}
+.v2 .gp-inf-dica { display: block; margin-top: 6px; font-size: 11.5px; color: var(--txt-3); }
+.v2 .gp-inf-opc { color: var(--txt-3); font-weight: 400; }
+
+.v2 .gp-inf-rot { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 12px; font-weight: 500; }
+.v2 .gp-inf-obrig {
+  padding: 1px 7px; border-radius: 999px;
+  font-size: 10.5px; font-weight: 600; letter-spacing: .02em;
+  color: var(--txt-2); background: rgba(var(--tint), .07); border: 1px solid rgba(var(--tint), .1);
+}
+
+/* área de soltar */
+.v2 .gp-inf-drop {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+  min-height: 118px; padding: 18px 16px; text-align: center;
+  border: 1.5px dashed rgba(var(--tint), .24); border-radius: 12px;
+  background: rgba(var(--tint), .025);
+  color: var(--txt-2); cursor: pointer; outline: none;
+  transition: border-color .15s var(--ease), background .15s var(--ease), transform .15s var(--ease);
+}
+.v2 .gp-inf-drop:hover, .v2 .gp-inf-drop:focus-visible { border-color: rgba(var(--tint), .45); background: rgba(var(--tint), .045); color: var(--txt); }
+.v2 .gp-inf-drop:focus-visible { box-shadow: 0 0 0 3px rgba(var(--tint), .08); }
+.v2 .gp-inf-drop.on { border-color: rgba(var(--azul-rgb), .7); border-style: solid; background: rgba(var(--azul-rgb), .08); color: var(--txt); transform: scale(1.01); }
+.v2 .gp-inf-drop.erro { border-color: rgba(var(--rubro-rgb), .5); }
+.v2 .gp-inf-drop-ic {
+  display: grid; place-items: center; width: 36px; height: 36px; margin-bottom: 3px;
+  border-radius: 10px; background: rgba(var(--tint), .07); color: var(--txt);
+}
+.v2 .gp-inf-drop.on .gp-inf-drop-ic { background: rgba(var(--azul-rgb), .16); color: var(--azul); }
+.v2 .gp-inf-drop-tit { font-size: 13px; font-weight: 500; }
+.v2 .gp-inf-drop-sub { font-size: 11.5px; color: var(--txt-3); }
+
+/* arquivo escolhido */
+.v2 .gp-inf-arq {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 10px 10px 10px; border-radius: 12px;
+  border: 1px solid rgba(var(--tint), .13); background: rgba(var(--tint), .035);
+}
+.v2 .gp-inf-thumb {
+  flex: none; width: 52px; height: 52px; border-radius: 8px; object-fit: cover;
+  border: 1px solid rgba(var(--tint), .12); background: rgba(var(--tint), .05);
+}
+.v2 .gp-inf-pdf {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  color: var(--rubro); background: var(--rubro-bg); border-color: rgba(var(--rubro-rgb), .25);
+}
+.v2 .gp-inf-pdf b { font-size: 9.5px; font-weight: 700; letter-spacing: .06em; }
+.v2 .gp-inf-arq-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.v2 .gp-inf-arq-nome { font-size: 13px; font-weight: 500; color: var(--txt); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2 .gp-inf-arq-meta { font-size: 11.5px; color: var(--txt-3); }
+.v2 .gp-inf-link {
+  flex: none; padding: 5px 8px; border: 0; border-radius: 7px; background: none;
+  color: var(--txt-2); font: 500 12px var(--fonte); cursor: pointer;
+}
+.v2 .gp-inf-link:hover:not(:disabled) { background: rgba(var(--tint), .07); color: var(--txt); }
+.v2 .gp-inf-x {
+  flex: none; display: grid; place-items: center; width: 28px; height: 28px;
+  border: 0; border-radius: 7px; background: none; color: var(--txt-3); cursor: pointer;
+}
+.v2 .gp-inf-x:hover:not(:disabled) { background: var(--rubro-bg); color: var(--rubro); }
+.v2 .gp-inf-link:disabled, .v2 .gp-inf-x:disabled { opacity: .45; cursor: default; }
+.v2 .gp-inf-erro { margin: 8px 0 0; }
+
+/* nota "vai para o financeiro" */
+.v2 .gp-inf-nota {
+  display: flex; align-items: center; gap: 9px;
+  margin-top: 14px; padding: 9px 11px; border-radius: 10px;
+  background: var(--ambar-bg); border: 1px solid rgba(var(--ambar-rgb), .28);
+  color: var(--txt); font-size: 12.5px; line-height: 1.4;
+}
+.v2 .gp-inf-nota-ic {
+  flex: none; display: grid; place-items: center; width: 24px; height: 24px;
+  border-radius: 50%; background: rgba(var(--ambar-rgb), .2); color: var(--ambar);
+}
+/* último informe recusado (a célula estava vermelha) */
+.v2 .gp-inf-recusa {
+  margin-bottom: 14px; padding: 9px 11px; border-radius: 10px;
+  background: var(--rubro-bg); border: 1px solid rgba(var(--rubro-rgb), .28);
+  color: var(--txt); font-size: 12.5px; line-height: 1.45;
+}
+.v2 .gp-inf-recusa b { color: var(--rubro); font-weight: 600; }
+
+/* recusar: motivo */
+.v2 .gp-rec-motivo { height: auto; min-height: 76px; padding: 9px 11px; line-height: 1.45; resize: vertical; }
+.v2 .gp-rec-dica { margin-top: 8px; }
+
+/* comprovante: "abrir em nova aba" à esquerda do rodapé */
+.v2 .gp-comp-abrir { text-decoration: none; }
+.v2 .p-modal-rodape .gp-esp { flex: 1; }
+
+/* Informar pagamento: escolha Pagou / Não pagou (dono 25/09) */
+.v2 .gp-inf-modo { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+.v2 .gp-inf-modo button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 40px; border-radius: 10px; border: 1px solid var(--linha);
+  background: rgba(var(--tint), .03); color: var(--txt-2);
+  font: 600 13px var(--fonte); cursor: pointer; transition: background .15s var(--ease), border-color .15s var(--ease), color .15s var(--ease);
+}
+.v2 .gp-inf-modo button:hover:not(:disabled) { background: rgba(var(--tint), .06); color: var(--txt); }
+.v2 .gp-inf-modo button:focus-visible { outline: 2px solid rgba(var(--ambar-rgb), .6); outline-offset: 2px; }
+.v2 .gp-inf-modo button.on.ok { background: rgba(var(--verde-rgb), .12); border-color: rgba(var(--verde-rgb), .55); color: var(--verde); }
+.v2 .gp-inf-modo button.on.nao { background: rgba(var(--rubro-rgb), .1); border-color: rgba(var(--rubro-rgb), .5); color: var(--rubro); }
+:root[data-tema="light"] .v2 .gp-inf-modo button.on.ok { background: #EAF7EE; border-color: #7BC68F; color: #006100; }
+:root[data-tema="light"] .v2 .gp-inf-modo button.on.nao { background: #FDECEE; border-color: #E79AA3; color: #9C0006; }
+.v2 .gp-inf-naopagou { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 14px; align-items: center; padding: 14px; border-radius: 12px; border: 1px solid var(--linha); background: rgba(var(--tint), .025); }
+.v2 .gp-inf-naopagou-am { display: inline-flex; align-items: center; justify-content: center; min-width: 96px; height: 28px; border-radius: 6px; font: 600 11px var(--fonte); letter-spacing: .03em; background: rgba(229, 102, 92, .26); color: #FFA39C; box-shadow: inset 0 0 0 1px rgba(229, 102, 92, .32); }
+:root[data-tema="light"] .v2 .gp-inf-naopagou-am { background: #FFC7CE; color: #9C0006; box-shadow: inset 0 0 0 1px rgba(156, 0, 6, .16); }
+.v2 .gp-inf-naopagou b { display: block; font-size: 13px; font-weight: 600; color: var(--txt); margin-bottom: 3px; }
+.v2 .gp-inf-naopagou span { font-size: 12.5px; line-height: 1.5; color: var(--txt-2); }
+/* o dourado do botão principal vem com !important do tema: o vermelho precisa vencer */
+.v2 .p-btn.gp-inf-bt-nao { background: var(--rubro) !important; background-image: none !important; border-color: var(--rubro) !important; color: #fff !important; box-shadow: 0 1px 2px rgba(0, 0, 0, .18) !important; }
+:root[data-tema="light"] .v2 .p-btn.gp-inf-bt-nao { background: #C0392B !important; border-color: #C0392B !important; }
+.v2 .p-btn.gp-inf-bt-nao:hover:not(:disabled) { filter: brightness(1.06); }
+
+/* ---------- seletor de ciclos (dono 25/09) ---------- */
+.v2 .gp-linha-chips > .gp-sc { flex: 1 1 auto; min-width: 0; }
+.v2 .gp-sc { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.v2 .gp-sc-tit { flex: none; font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--txt-3); }
+.v2 .gp-sc-caixa { position: relative; flex: 1 1 auto; min-width: 0; display: flex; align-items: center;
+  border-radius: 12px; background: rgba(var(--tint), .04); box-shadow: inset 0 0 0 1px var(--linha); }
+:root[data-tema="light"] .v2 .gp-sc-caixa { background: #F1F3F6; box-shadow: inset 0 0 0 1px #E2E5EA; }
+.v2 .gp-sc-trilho { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 2px; padding: 3px;
+  overflow-x: auto; scrollbar-width: none; scroll-behavior: smooth; }
+.v2 .gp-sc-trilho::-webkit-scrollbar { display: none; }
+/* bordas esmaecidas quando há mais ciclos para os lados */
+.v2 .gp-sc-caixa.esq .gp-sc-trilho { -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 36px); mask-image: linear-gradient(90deg, transparent 0, #000 36px); }
+.v2 .gp-sc-caixa.dir .gp-sc-trilho { -webkit-mask-image: linear-gradient(270deg, transparent 0, #000 36px); mask-image: linear-gradient(270deg, transparent 0, #000 36px); }
+.v2 .gp-sc-caixa.esq.dir .gp-sc-trilho { -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 36px, #000 calc(100% - 36px), transparent 100%); mask-image: linear-gradient(90deg, transparent 0, #000 36px, #000 calc(100% - 36px), transparent 100%); }
+.v2 .gp-sc-seta { position: absolute; top: 50%; transform: translateY(-50%); z-index: 2; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px;
+  border: 1px solid var(--linha); background: var(--base); color: var(--txt-2); cursor: pointer; box-shadow: 0 2px 6px rgba(0, 0, 0, .18); }
+.v2 .gp-sc-seta.e { left: 4px; }
+.v2 .gp-sc-seta.d { right: 4px; }
+.v2 .gp-sc-seta:hover { color: var(--txt); }
+:root[data-tema="light"] .v2 .gp-sc-seta { background: #fff; box-shadow: 0 2px 6px rgba(22, 25, 31, .12); }
+
+.v2 .gp-sc-grupo { display: flex; align-items: center; gap: 2px; padding-left: 8px; margin-left: 6px; border-left: 1px solid var(--linha); }
+:root[data-tema="light"] .v2 .gp-sc-grupo { border-left-color: #D9DDE3; }
+.v2 .gp-sc-gt { flex: none; margin-right: 4px; font-size: 9.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--txt-3); white-space: nowrap; }
+
+.v2 .gp-sc-item { position: relative; flex: none; display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 10px; border-radius: 9px;
+  border: 1px solid transparent; background: none; color: var(--txt-2); font: 600 12.5px var(--fonte); cursor: pointer; white-space: nowrap;
+  transition: background .14s var(--ease), color .14s var(--ease), box-shadow .14s var(--ease); }
+.v2 .gp-sc-item:hover { background: rgba(var(--tint), .06); color: var(--txt); }
+.v2 .gp-sc-item:focus-visible { outline: 2px solid rgba(var(--ambar-rgb), .6); outline-offset: 1px; }
+.v2 .gp-sc-n { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 18px; padding: 0 6px; border-radius: 999px;
+  font-size: 10.5px; font-weight: 700; background: rgba(var(--tint), .08); color: var(--txt-3); }
+.v2 .gp-sc-item.on { background: var(--base); color: var(--txt); box-shadow: 0 1px 3px rgba(0, 0, 0, .25), inset 0 0 0 1px rgba(var(--ambar-rgb), .55); }
+:root[data-tema="light"] .v2 .gp-sc-item.on { background: #fff; box-shadow: 0 1px 3px rgba(22, 25, 31, .12), inset 0 0 0 1px rgba(158, 122, 46, .55); }
+.v2 .gp-sc-item.on .gp-sc-n { background: var(--ambar); color: #1b1407; }
+:root[data-tema="light"] .v2 .gp-sc-item.on .gp-sc-n { color: #fff; }
+.v2 .gp-sc-item.vazio { opacity: .55; }
+.v2 .gp-sc-item.aberto .gp-sc-rot { text-decoration: underline dotted; text-underline-offset: 3px; }
+.v2 .gp-sc-item.novos:not(.on) .gp-sc-rot { color: var(--txt-2); }
+/* clientes aguardando ciclo (ciclo esvaziado): pontinho âmbar com o número */
+.v2 .gp-sc-ag { position: absolute; top: -4px; right: -3px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; display: grid; place-items: center;
+  font-size: 9.5px; font-weight: 800; background: var(--ambar); color: #1b1407; box-shadow: 0 0 0 2px var(--base); }
+:root[data-tema="light"] .v2 .gp-sc-ag { color: #fff; box-shadow: 0 0 0 2px #F1F3F6; }
+
+.v2 .gp-sc-ger { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 11px; border-radius: 10px;
+  border: 1px solid var(--linha); background: none; color: var(--txt-2); font: 600 12px var(--fonte); cursor: pointer; }
+.v2 .gp-sc-ger:hover { background: rgba(var(--tint), .06); color: var(--txt); }
+@media (max-width: 720px) { .v2 .gp-sc-gt { display: none; } .v2 .gp-sc-ger span { display: none; } }
+/* seletor mais compacto: cabem todos os ciclos numa tela de computador */
+.v2 .gp-sc-item { gap: 6px; padding: 0 8px; }
+.v2 .gp-sc-grupo { padding-left: 6px; margin-left: 4px; }
+
+/* ---- Novo mês (dono 28/09): confirmação com o cabeçalho de cada ciclo ---- */
+.v2 .gp-nm { display: flex; flex-direction: column; gap: 14px; }
+.v2 .gp-nm-grupo { border: 1px solid var(--linha); border-radius: 12px; overflow: hidden; }
+.v2 .gp-nm-cab { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 10px 14px; background: rgba(var(--tint), .04); border-bottom: 1px solid var(--linha); }
+.v2 .gp-nm-rot { font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--txt-3); }
+.v2 .gp-nm-mes { font-size: 14px; font-weight: 600; color: var(--txt); }
+.v2 .gp-nm-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px 12px; padding: 12px 14px; }
+.v2 .gp-nm-item { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 8px; align-items: center; }
+.v2 .gp-nm-ciclo { grid-row: 1 / 3; display: grid; place-items: center; min-width: 40px; height: 34px; padding: 0 6px; border-radius: 8px; font-size: 12.5px; font-weight: 700; color: var(--txt); background: rgba(var(--tint), .06); }
+.v2 .gp-nm-lbl { font-size: 10.5px; color: var(--txt-3); line-height: 1.2; }
+.v2 .gp-nm-inp { height: 30px; padding: 0 9px; font-size: 13px; min-width: 0; width: 100%; box-sizing: border-box; }
+.v2 .gp-nm-nota { margin: 0; font-size: 13px; color: var(--txt-2); }
+.v2 .gp-nm-alerta { margin: 0; padding: 9px 12px; border-radius: 10px; font-size: 12.5px; line-height: 1.45; color: var(--txt-2); background: rgba(var(--ambar-rgb), .09); border: 1px solid rgba(var(--ambar-rgb), .3); }
+.v2 .gp-nm-alerta b { color: var(--txt); font-weight: 600; }
+.v2 .gp-nm-regras { margin: 0; padding: 0 0 0 18px; display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; line-height: 1.5; color: var(--txt-2); }
+.v2 .gp-nm-regras b { color: var(--txt); font-weight: 600; }
+
+/* informar pagamento: divisão do valor (líquido do escritório × parte do comercial × total do cliente) */
+.v2 .gp-inf-div { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 8px; padding: 8px 11px; border-radius: 9px; font-size: 12.5px; line-height: 1.45; color: var(--txt-2); background: rgba(var(--tint), .035); border: 1px solid var(--linha); }
+.v2 .gp-inf-div b { color: var(--txt); font-weight: 600; margin-left: 3px; }
+.v2 .gp-inf-div-aviso { flex-basis: 100%; color: var(--ambar); font-weight: 500; }
+.v2 .gp-inf-div-nota { flex-basis: 100%; color: var(--txt-3); font-size: 11.5px; }

@@ -25,6 +25,12 @@ export const isDemoMode = !isSupabaseConfigured && isDemoModeEnabled;
  *  tela de erro de configuração e bloqueia o login (ver main.tsx / ConfigError). */
 export const isMisconfigured = !isSupabaseConfigured && !isDemoModeEnabled;
 
+/** Instância deste BUILD: 'atenvo' (padrão) ou 'reviza' (cliente Reviza — backend
+ *  Supabase dedicado, só o módulo Cobranças). NÃO é demo: grava de verdade.
+ *  Definida em build-time via VITE_APP_INSTANCIA (.env.reviza.local / --mode reviza). */
+export const appInstancia = String(import.meta.env.VITE_APP_INSTANCIA || 'atenvo');
+export const isRevizaMode = appInstancia === 'reviza' && isSupabaseConfigured;
+
 /** Quais variáveis estão presentes (para a tela de configuração). */
 export const supabaseEnv = { hasUrl: Boolean(url), hasKey: Boolean(anonKey) };
 

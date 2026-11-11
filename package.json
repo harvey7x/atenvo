@@ -6,7 +6,11 @@
   "description": "Atenvo — Plataforma de Atendimento e Gestão (frontend definitivo · fase funcional)",
   "scripts": {
     "dev": "vite",
+    "dev:demo": "vite --mode demo",
+    "dev:reviza": "vite --mode reviza",
     "build": "tsc --noEmit && vite build",
+    "build:demo": "tsc --noEmit && vite build --mode demo",
+    "build:reviza": "tsc --noEmit && vite build --mode reviza",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

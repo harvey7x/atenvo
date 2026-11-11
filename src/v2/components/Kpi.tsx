@@ -104,6 +104,8 @@ const TOM_DELTA: Record<TomDelta, string> = {
 
 type KpiProps = {
   rotulo: string;
+  /** Ícone de traço fino (svg) — vai num quadradinho ao lado do rótulo (referência SaaS executivo). */
+  icone?: ReactNode;
   /** Valor numérico do contador animado. */
   valor: number;
   formato?: FormatoContador;
@@ -112,6 +114,8 @@ type KpiProps = {
   /** Sufixo apagado (.cent — ex.: ",00", "%", "min"). */
   sufixo?: ReactNode;
   delta?: { tom: TomDelta; texto: ReactNode };
+  /** Contexto mudo ao lado do delta (ex.: "vs mês anterior", "48 clientes"). */
+  nota?: ReactNode;
   /** Pontos da sparkline (omitida se ausente). */
   spark?: number[];
   /** Tinge o valor na semântica (ex.: vencidas em rubro, recebido em verde). */
@@ -120,19 +124,27 @@ type KpiProps = {
   atraso?: number;
 };
 
-/** Card de KPI do dashboard: rótulo, contador animado, delta e sparkline. */
-export function Kpi({ rotulo, valor, formato = 'int', prefixo, sufixo, delta, spark, tomValor, sobe, atraso }: KpiProps) {
+/** Card de KPI: [ícone] rótulo caps → número grande → delta + nota → sparkline. */
+export function Kpi({ rotulo, icone, valor, formato = 'int', prefixo, sufixo, delta, nota, spark, tomValor, sobe, atraso }: KpiProps) {
   const texto = useContador(valor, formato);
   const corValor = tomValor === 'ok' ? 'var(--verde)' : tomValor === 'erro' ? 'var(--rubro)' : undefined;
   return (
     <CardVidro spot sobe={sobe} atraso={atraso} className="kpi">
-      <div className="rot">{rotulo}</div>
+      <div className="kpi-cab">
+        {icone && <span className="kpi-ic" aria-hidden>{icone}</span>}
+        <span className="rot">{rotulo}</span>
+      </div>
       <div className="val num" style={corValor ? { color: corValor } : undefined}>
         {prefixo}
         <span>{texto}</span>
         {sufixo !== undefined && <span className="cent">{sufixo}</span>}
       </div>
-      {delta && <span className={`delta ${TOM_DELTA[delta.tom]}`}>{delta.texto}</span>}
+      {(delta || nota) && (
+        <div className="kpi-pe">
+          {delta && <span className={`delta ${TOM_DELTA[delta.tom]}`}>{delta.texto}</span>}
+          {nota && <span className="kpi-nota">{nota}</span>}
+        </div>
+      )}
       {spark && <Spark pontos={spark} />}
     </CardVidro>
   );

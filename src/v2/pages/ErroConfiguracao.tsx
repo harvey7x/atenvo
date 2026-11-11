@@ -22,7 +22,7 @@ export default function ErroConfiguracao() {
       <div className="grao" />
       <div className="lg-card vidro pg-entra">
         <div className="marca2">A</div>
-        <div className="caps">Atenvo</div>
+        <div className="caps">ALFA GROUP</div>
         <h1 className="p-display">Configuração ausente.</h1>
         <div className="sub">
           O acesso está bloqueado porque o backend não está configurado. Defina as

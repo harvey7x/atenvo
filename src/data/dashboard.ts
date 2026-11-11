@@ -355,7 +355,7 @@ export function seedIaConversas(): IaConversaResumo[] {
   const iso = (min: number) => new Date(agora - min * 60_000).toISOString();
   return [
     { conversaId: 'ia-cv-1', nome: 'Rosana M. Ferreira', telefone: '5551987110022', msgsBot: 7, ultimaEm: iso(9), preview: 'Perfeito, dona Rosana! Recebi a foto do documento — vou conferir e já te retorno.' },
-    { conversaId: 'ia-cv-2', nome: 'Maria Aparecida Souza', telefone: '5551988124407', msgsBot: 5, ultimaEm: iso(24), preview: 'Boa tarde, dona Maria! Aqui é o Matheo, da CAF Assessoria. Posso conferir o seu benefício?' },
+    { conversaId: 'ia-cv-2', nome: 'Maria Aparecida Souza', telefone: '5551988124407', msgsBot: 5, ultimaEm: iso(24), preview: 'Boa tarde, dona Maria! Aqui é o Matheo, da Alfa Group. Posso conferir o seu benefício?' },
     { conversaId: 'ia-cv-3', nome: 'José Carlos Ferreira', telefone: '5551987770001', msgsBot: 4, ultimaEm: iso(58), preview: 'Sem problema, seu José — vou te mandar o passo a passo do aplicativo.' },
     { conversaId: 'ia-cv-4', nome: 'Ivone Castro dos Santos', telefone: '5551987770009', msgsBot: 6, ultimaEm: iso(96), preview: 'Entendi! Nesse caso vou pedir para uma pessoa da equipe te ajudar com o acesso, tá bom?' },
   ];
@@ -367,7 +367,7 @@ export function seedConversaPreview(conversaId: string): MsgPreview[] {
   const fios: Record<string, MsgPreview[]> = {
     'ia-cv-1': [
       { dir: 'in', bot: false, texto: 'Boa tarde, vi o anúncio sobre revisão de desconto', quando: iso(42), tipo: 'texto' },
-      { dir: 'out', bot: true, texto: 'Boa tarde, dona Rosana! Aqui é o Matheo, da CAF Assessoria. Muitos aposentados têm descontos que valem a pena verificar. Posso conferir o seu?', quando: iso(41), tipo: 'texto' },
+      { dir: 'out', bot: true, texto: 'Boa tarde, dona Rosana! Aqui é o Matheo, da Alfa Group. Muitos aposentados têm descontos que valem a pena verificar. Posso conferir o seu?', quando: iso(41), tipo: 'texto' },
       { dir: 'in', bot: false, texto: 'Pode sim', quando: iso(38), tipo: 'texto' },
       { dir: 'out', bot: true, texto: 'Ótimo! Para eu conferir, me manda uma foto do seu documento (RG ou CNH), pode ser?', quando: iso(37), tipo: 'texto' },
       { dir: 'in', bot: false, texto: '[imagem]', quando: iso(12), tipo: 'imagem' },
@@ -383,7 +383,7 @@ export function seedConversaPreview(conversaId: string): MsgPreview[] {
   };
   return fios[conversaId] ?? [
     { dir: 'in', bot: false, texto: 'Boa tarde! Vi o anúncio de vocês.', quando: iso(60), tipo: 'texto' },
-    { dir: 'out', bot: true, texto: 'Boa tarde! Aqui é o Matheo, da CAF Assessoria. Posso conferir o seu benefício?', quando: iso(58), tipo: 'texto' },
+    { dir: 'out', bot: true, texto: 'Boa tarde! Aqui é o Matheo, da Alfa Group. Posso conferir o seu benefício?', quando: iso(58), tipo: 'texto' },
     { dir: 'in', bot: false, texto: 'Pode sim, meu filho', quando: iso(50), tipo: 'texto' },
     { dir: 'out', bot: true, texto: 'Perfeito! Me manda uma foto do seu documento (RG ou CNH), por favor.', quando: iso(49), tipo: 'texto' },
   ];

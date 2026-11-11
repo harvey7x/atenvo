@@ -118,6 +118,9 @@ export interface WaContact {
   oppRespId?: string | null;
   /** CANAL ATUAL do atendimento (conversas.canal_id -> nome_interno). Ex.: ANDRIUS, URA, LUIZA, RMKT. */
   canalAtual?: string | null;
+  /** Conversa PRESA neste canal (conversas.canal_preso_id): entrada por outro número não rouba
+   *  mais o atendimento. Hoje só o chip do Murillo prende. NULL = regra normal. */
+  canalPresoId?: string | null;
   last: string;
   email: string;
   stage: string;

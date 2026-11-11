@@ -4,7 +4,7 @@
    imagem, documento". Itens em cobranca_mensagem_itens; mídia no
    bucket público cobranca-midia (template, nunca dado de cliente). */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase, isDemoMode } from '@/lib/supabase';
+import { supabase, isDemoMode, isRevizaMode } from '@/lib/supabase';
 
 export type TipoMensagem = 'antes' | 'cobranca' | 'depois' | 'remarketing';
 export type TipoItem = 'texto' | 'imagem' | 'audio' | 'documento';
@@ -40,7 +40,7 @@ export const ROTULO_TIPO_MSG: Record<TipoMensagem, string> = {
 export function useCobMensagens(orgId?: string) {
   return useQuery({
     queryKey: ['cob-mensagens', orgId],
-    enabled: !!orgId && !isDemoMode,
+    enabled: !!orgId && !isDemoMode && !isRevizaMode,
     queryFn: async () => {
       const { data, error } = await supabase!
         .from('cobranca_mensagens')
@@ -129,7 +129,7 @@ export interface CobFilaItem {
 export function useCobFila(orgId?: string) {
   return useQuery({
     queryKey: ['cob-fila', orgId],
-    enabled: !!orgId && !isDemoMode,
+    enabled: !!orgId && !isDemoMode && !isRevizaMode,
     refetchInterval: 30_000,
     queryFn: async () => {
       const { data, error } = await supabase!
@@ -162,7 +162,7 @@ export async function rodarSimulacao(orgId: string): Promise<Record<string, unkn
 export function useCobConfig(orgId?: string) {
   return useQuery({
     queryKey: ['cob-config', orgId],
-    enabled: !!orgId && !isDemoMode,
+    enabled: !!orgId && !isDemoMode && !isRevizaMode,
     queryFn: async () => {
       const { data, error } = await supabase!
         .from('cobranca_config').select('envio_real').eq('organizacao_id', orgId!).maybeSingle();

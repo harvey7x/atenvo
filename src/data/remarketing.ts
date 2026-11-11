@@ -4,7 +4,7 @@
    roda em modo demonstração com seeds locais (nada é gravado). */
 import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { isRevizaMode, supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { useOrg } from '@/context/OrgContext';
 
 export const REMARKETING_REAL = isSupabaseConfigured && !!supabase;
@@ -261,6 +261,7 @@ export function useNotificacoes() {
   const { currentOrg } = useOrg();
   return useQuery({
     queryKey: ['notificacoes', currentOrg.id],
+    enabled: !isRevizaMode, // instância Reviza: tabela não existe no banco dedicado
     staleTime: 10_000, refetchInterval: 30_000,
     queryFn: async (): Promise<Notificacao[]> => {
       if (!REMARKETING_REAL) return DEMO_NOTIFS;

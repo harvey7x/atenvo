@@ -29,7 +29,7 @@ export function seedWa(): WaContact[] {
       last: 'Áudio · 0:34', lastInter: 'há 4 min', tags: ['Urgente'], notes: 'Prefere áudio. A filha ajuda com o celular — ligar depois das 18h.',
       msgs: [
         IN('Boa tarde! Vi o anúncio de vocês sobre desconto no benefício.', '14:31', { tsISO: iso(agora - 11 * min), id: 'wm-1' }),
-        OUT('Boa tarde, dona Maria! Aqui é o Matheo, da CAF Assessoria. Muitos aposentados têm descontos que valem a pena verificar. Posso conferir o seu?', '14:32', { tsISO: iso(agora - 10 * min), id: 'wm-2', origemBot: true }),
+        OUT('Boa tarde, dona Maria! Aqui é o Matheo, da Alfa Group. Muitos aposentados têm descontos que valem a pena verificar. Posso conferir o seu?', '14:32', { tsISO: iso(agora - 10 * min), id: 'wm-2', origemBot: true }),
         IN('Pode sim, meu filho', '14:35', { tsISO: iso(agora - 7 * min), id: 'wm-3' }),
         IN('', '14:38', {
           tsISO: iso(agora - 4 * min), id: 'wm-4', tipo: 'audio',
@@ -64,9 +64,9 @@ export function seedWa(): WaContact[] {
       last: 'Ah, que bom! Obrigada, meu filho', lastInter: 'há 18 min', tags: ['Revisão de contrato'],
       msgs: [
         IN('Boa tarde! Quero ver isso dos descontos no meu benefício', '13:50', { tsISO: iso(agora - 32 * min), id: 'wi-1' }),
-        OUT('Boa tarde, dona Ivone! Aqui é o Matheo, da CAF Assessoria. Para eu conferir os descontos, a senhora tem acesso ao Meu INSS (gov.br)?', '13:52', { tsISO: iso(agora - 30 * min), id: 'wi-2', origemBot: true }),
+        OUT('Boa tarde, dona Ivone! Aqui é o Matheo, da Alfa Group. Para eu conferir os descontos, a senhora tem acesso ao Meu INSS (gov.br)?', '13:52', { tsISO: iso(agora - 30 * min), id: 'wi-2', origemBot: true }),
         IN('Nunca usei isso de gov, meu filho. Não tenho senha não', '13:55', { tsISO: iso(agora - 27 * min), id: 'wi-3' }),
-        OUT('Dona Ivone, aqui é o Henrique, da equipe da CAF. Pode deixar que sigo com a senhora daqui — vamos criar o acesso juntos, passo a passo.', '14:02', { tsISO: iso(agora - 20 * min), id: 'wi-4' }),
+        OUT('Dona Ivone, aqui é o Henrique, da equipe da Alfa. Pode deixar que sigo com a senhora daqui — vamos criar o acesso juntos, passo a passo.', '14:02', { tsISO: iso(agora - 20 * min), id: 'wi-4' }),
         IN('Ah, que bom! Obrigada, meu filho', '14:04', { tsISO: iso(agora - 18 * min), id: 'wi-5' }),
       ],
     },

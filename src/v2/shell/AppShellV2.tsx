@@ -1,15 +1,19 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as RKeyboardEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useOrg } from '@/context/OrgContext';
+import { isDemoMode, isRevizaMode } from '@/lib/supabase';
 import '../fontes';
 import '../tokens.css';
 import '../base.css';
 import './shell.css';
+import './paleta.css'; // paleta de busca global (⌘K)
 import '../skinAurora.css'; // TESTE (branch teste/skin-aurora-azul): fundo bokeh + azul secundário
 import { LogoAtenvo } from '../components/LogoAtenvo';
 import { instalarSpotlight } from '../lib/spotlight';
+import { instalarRolagemSemHover } from '../lib/rolagem';
 import { criarRaizPortalV2 } from '../components/portal';
 import { ICONES } from './icones';
 import { NotificacaoResposta, type DadosNotificacao } from './NotificacaoResposta';
@@ -18,19 +22,23 @@ import { aplicarTema, lerTema, salvarTema, type Tema } from '../lib/tema';
 import { deveMostrarIntroDia, marcarIntroVista } from '../lib/introDia';
 import { IntroDia } from '../components/IntroDia';
 import { AvisoAtualizacao } from '../components/AvisoAtualizacao';
-import { assinarAcento, lerAcento, salvarAcento, type Acento } from '../lib/acento';
-import { useNotificacoes, useMarcarNotificacao } from '@/data/remarketing';
+import { LicencaGate } from '../components/LicencaGate';
+import { ConfiguracaoGate } from '../pages/configuracao/ConfiguracaoGate';
+import { useConfiguracaoPendente } from '../data/cobranca/configuracao';
+import { useNotificacoes, useMarcarNotificacao, type Notificacao } from '@/data/remarketing';
+import { useNotificacoesCob, useMarcarNotifCob } from '../data/cobranca/notificacoes';
+import { secaoDoPapel } from '../data/cobranca/secoes';
+import { useConversasWA } from '../data/wa/wa';
 import { tempoRelativo } from '../lib/tempo';
+import { usePapel } from '../data/cobranca/sessao';
+import { useAvisosNaoLidos } from '../data/cobranca/avisos';
+import { usePendentesAprovacao } from '../data/cobranca/hooks';
+import { getCobrancaRepo } from '../data/cobranca/cobrancaRepo';
+import { chavesCobranca } from '../data/cobranca/keys';
+import type { Dados } from '../data/cobranca/types';
+import { BotaoDesfazer } from './BotaoDesfazer';
 
 /* ícones do chrome da topbar (traço fino, como o resto do v2) */
-/* gota de tinta — alternador do acento azul → verde → dourado (teste do dono 28/08) */
-const ROTULO_ACENTO: Record<Acento, string> = { azul: 'Azul', verde: 'Verde', dourado: 'Dourado' };
-const ORDEM_ACENTO: Acento[] = ['azul', 'verde', 'dourado'];
-const IconeGota = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden>
-    <path d="M12 2.7S5.5 10 5.5 14.6a6.5 6.5 0 0013 0C18.5 10 12 2.7 12 2.7z" />
-  </svg>
-);
 const IconeSol = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
     <circle cx="12" cy="12" r="4.2" /><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19" />
@@ -103,18 +111,67 @@ const GRUPOS: { rotulo: string; itens: ItemNav[] }[] = [
    seções do Modo Cobrança viram itens de menu. Novos módulos entram aqui. */
 type ModuloId = 'atendimento' | 'cobrancas';
 type Modulo = { id: ModuloId; rotulo: string; home: string; grupos: { rotulo: string; itens: ItemNav[] }[] };
-const COB_SECOES: ItemNav[] = [
+const COB_SECOES_BASE: ItemNav[] = [
   { slug: 'cobrancas/painel', rotulo: 'Painel' },
   { slug: 'cobrancas/atendentes', rotulo: 'Atendentes' },
   { slug: 'cobrancas/clientes', rotulo: 'Clientes' },
+  { slug: 'cobrancas/planilha', rotulo: 'Planilha de clientes' },
   { slug: 'cobrancas/ciclos', rotulo: 'Ciclos' },
   { slug: 'cobrancas/regua', rotulo: 'Régua de mensagens' },
+  { slug: 'cobrancas/conversas', rotulo: 'Conversas' },
   { slug: 'cobrancas/numeros', rotulo: 'Números' },
   { slug: 'cobrancas/envios', rotulo: 'Envios' },
 ];
+// No demo, "Clientes"/"Planilha"/"Clientes novos" viram uma tela só: "Gestão de cobranças".
+// Na instância REVIZA (real) só entram as telas que falam com o banco dedicado.
+const COB_SECOES_REVIZA: ItemNav[] = [
+  { slug: 'cobrancas/painel', rotulo: 'Painel' },
+  { slug: 'cobrancas/atendentes', rotulo: 'Atendentes' },
+  { slug: 'cobrancas/planilha', rotulo: 'Gestão de cobranças' },
+  { slug: 'cobrancas/novos', rotulo: 'Novos' },
+  { slug: 'cobrancas/cancelados', rotulo: 'Cancelados' },
+  { slug: 'cobrancas/financeiro', rotulo: 'Financeiro' },
+  { slug: 'cobrancas/calendario', rotulo: 'Calendário' },
+  { slug: 'cobrancas/avisos', rotulo: 'Avisos' },
+  { slug: 'cobrancas/regua', rotulo: 'Régua de mensagens' },
+  { slug: 'cobrancas/conversas', rotulo: 'Conversas' },
+  { slug: 'cobrancas/numeros', rotulo: 'Números' },
+  { slug: 'cobrancas/envios', rotulo: 'Envios' },
+  { slug: 'cobrancas/analise', rotulo: 'Análise INSS' },
+  { slug: 'cobrancas/registros', rotulo: 'Registros', admin: true },
+  { slug: 'cobrancas/usuarios', rotulo: 'Usuários', admin: true },
+];
+const COB_SECOES: ItemNav[] = isRevizaMode
+  ? COB_SECOES_REVIZA
+  : isDemoMode
+  ? COB_SECOES_BASE
+      .filter((s) => s.slug !== 'cobrancas/clientes' && s.slug !== 'cobrancas/ciclos')
+      .flatMap((s) => (s.slug === 'cobrancas/planilha'
+        ? [{ ...s, rotulo: 'Gestão de cobranças' }, { slug: 'cobrancas/novos', rotulo: 'Novos' }, { slug: 'cobrancas/cancelados', rotulo: 'Cancelados' }, { slug: 'cobrancas/financeiro', rotulo: 'Financeiro' }, { slug: 'cobrancas/calendario', rotulo: 'Calendário' }, { slug: 'cobrancas/avisos', rotulo: 'Avisos' }]
+        : [s]))
+      // demo = o contrato da Reviza: Análise INSS, Registros e Usuários (só admin) também existem aqui
+      .concat([
+        { slug: 'cobrancas/analise', rotulo: 'Análise INSS' },
+        { slug: 'cobrancas/registros', rotulo: 'Registros', admin: true },
+        { slug: 'cobrancas/usuarios', rotulo: 'Usuários', admin: true },
+      ])
+  : COB_SECOES_BASE;
+/* Menu de Cobranças em GRUPOS por assunto (dono 27/09: "quero essa parte mais organizada"
+   — eram 11 itens numa lista só). Grupo vazio para o papel some sozinho (o filtro de
+   papel roda por item no render). Seção sem grupo mapeado cai em "Equipe". */
+const COB_GRUPO_DE: Record<string, string> = {
+  painel: 'Visão geral', atendentes: 'Visão geral',
+  planilha: 'Carteira', clientes: 'Carteira', novos: 'Carteira', cancelados: 'Carteira', financeiro: 'Carteira', calendario: 'Carteira', ciclos: 'Carteira',
+  regua: 'WhatsApp', conversas: 'WhatsApp', numeros: 'WhatsApp', envios: 'WhatsApp',
+  avisos: 'Equipe', registros: 'Equipe', usuarios: 'Equipe',
+  analise: 'Ferramentas',
+};
+const COB_GRUPOS = ['Visão geral', 'Carteira', 'WhatsApp', 'Ferramentas', 'Equipe']
+  .map((rotulo) => ({ rotulo, itens: COB_SECOES.filter((i) => (COB_GRUPO_DE[i.slug.replace('cobrancas/', '')] ?? 'Equipe') === rotulo) }))
+  .filter((g) => g.itens.length > 0);
 const MODULOS: Modulo[] = [
   { id: 'atendimento', rotulo: 'Atendimento', home: '/whatsapp', grupos: GRUPOS },
-  { id: 'cobrancas', rotulo: 'Cobranças', home: '/cobrancas/painel', grupos: [{ rotulo: 'Cobranças', itens: COB_SECOES }] },
+  { id: 'cobrancas', rotulo: 'Cobranças', home: '/cobrancas/painel', grupos: COB_GRUPOS },
 ];
 /* ícones das seções de cobrança (mesma família traço 1.7) */
 const IcC = (d: string) => (
@@ -126,9 +183,29 @@ const FERR_ICONES: Record<string, ReactNode> = {
   conversor: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><path d="M4 7h11M4 7l3-3M4 7l3 3M20 17H9M20 17l-3-3M20 17l-3 3" /></svg>,
 };
 const COB_ICONES: Record<string, ReactNode> = {
+  // Análise INSS: extrato (documento) com lupa
+  analise: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M13 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h5M13 3l5 5M13 3v5h5M8 12h5M8 16h2" /><circle cx="16.5" cy="16.5" r="3" /><path d="M18.7 18.7 21 21" /></svg>,
   painel: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><path d="M4 20V10M10 20V4M16 20v-8M21 20H3" /></svg>,
   atendentes: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><circle cx="9" cy="8" r="3.4" /><path d="M3.5 20c.6-3.4 2.8-5 5.5-5s4.9 1.6 5.5 5M16 4.6a3.4 3.4 0 010 6.8" /></svg>,
   clientes: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><circle cx="12" cy="8" r="3.6" /><path d="M5 20c.7-4 3.4-6 7-6s6.3 2 7 6" /></svg>,
+  // Gestão de cobranças: grade/planilha
+  planilha: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18M3 15h18M9 3v18" /></svg>,
+  // Financeiro: cédula/dinheiro
+  financeiro: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><rect x="2.5" y="6" width="19" height="12" rx="2" /><circle cx="12" cy="12" r="2.6" /><path d="M5.6 9.5h.01M18.4 14.5h.01" /></svg>,
+  // Novos: débito ativo (seta descendo = descontando)
+  novos: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5v6.5M9 11.5l3 3 3-3" /></svg>,
+  // Cancelados: pessoa com um "x" (saiu da cobrança — dá pra reativar)
+  cancelados: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden><circle cx="9" cy="8" r="3.4" /><path d="M3.5 20c.6-3.4 2.8-5 5.5-5 1.4 0 2.6.4 3.6 1.2M16 14l5 5M21 14l-5 5" /></svg>,
+  // Usuários: pessoa com engrenagem/gestão
+  usuarios: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><circle cx="9" cy="8" r="3.2" /><path d="M3.5 20c.6-3.3 2.8-5 5.5-5s4.9 1.7 5.5 5M17 8h4M19 6v4" /></svg>,
+  // Registros: histórico/auditoria (relógio com lista)
+  registros: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden><path d="M3 5h11M3 10h11M3 15h6" /><circle cx="17.5" cy="15.5" r="4.5" /><path d="M17.5 13.5v2l1.3 1" /></svg>,
+  // Avisos: megafone (comunicado do administrativo pro time)
+  avisos: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" aria-hidden><path d="M3 10v4a1 1 0 001 1h2.5L13 19V5l-6.5 4H4a1 1 0 00-1 1z" /><path d="M16.5 9a5 5 0 010 6M19 6.5a9 9 0 010 11" /></svg>,
+  // Calendário: mês com marcador de dia
+  calendario: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><rect x="3" y="4.5" width="18" height="16" rx="2" /><path d="M3 9h18M8 2.5v4M16 2.5v4" /><circle cx="12" cy="14.5" r="1.6" fill="currentColor" stroke="none" /></svg>,
+  // Conversas: balão de conversa com reticências
+  conversas: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><path d="M4 5h16a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H9l-4 4v-4H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" /><circle cx="8.5" cy="10.8" r=".95" fill="currentColor" stroke="none" /><circle cx="12" cy="10.8" r=".95" fill="currentColor" stroke="none" /><circle cx="15.5" cy="10.8" r=".95" fill="currentColor" stroke="none" /></svg>,
   ciclos: IcC('M20 12a8 8 0 1 1-2.3-5.6M20 4v4h-4'),
   regua: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.9 8.9 0 0 1-3.8-.8L3 20l1-4.9a8.3 8.3 0 0 1-1-4A8.4 8.4 0 0 1 12 3a8.4 8.4 0 0 1 9 8.5z" /></svg>,
   numeros: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L20 13l-.5-.2 1 4.2A2 2 0 0 1 18.5 19 15 15 0 0 1 5 5.5 2 2 0 0 1 5 4z" /></svg>,
@@ -147,9 +224,12 @@ const PAPEL_ROTULO: Record<string, string> = {
 };
 
 function iniciaisDe(nome: string): string {
-  const partes = nome.trim().split(/\s+/).filter(Boolean);
-  if (!partes.length) return 'A';
-  return (partes[0][0] + (partes[1]?.[0] ?? '')).toUpperCase();
+  // só a primeira LETRA de cada palavra — "Teste (verificação)" vira "TV", não "T("
+  const letras = nome.trim().split(/\s+/)
+    .map((p) => p.match(/\p{L}/u)?.[0] ?? '')
+    .filter(Boolean);
+  if (!letras.length) return 'A';
+  return (letras[0] + (letras[1] ?? '')).toUpperCase();
 }
 
 const NOTIF_DEMO: DadosNotificacao = {
@@ -159,6 +239,127 @@ const NOTIF_DEMO: DadosNotificacao = {
   fonte: 'WhatsApp · Canal 1390',
 };
 
+/* ---------------- Paleta de busca global (⌘K) ----------------
+   A barra do topo abre um spotlight de verdade: SEÇÕES do módulo ativo
+   (mesmo filtro de papel do menu) e, na Reviza/demo, CLIENTES da Gestão
+   por nome, CPF ou telefone. Enter/clique navega; escolher um cliente
+   entrega a busca pronta pra Gestão via sessionStorage
+   ('alfa_paleta_busca'). Monta só enquanto aberta — a query dos clientes
+   não pesa o shell nas telas que não precisam dela. */
+const semAcentoPal = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const soDigitos = (s: string) => s.replace(/\D/g, '');
+const d2 = (n: number) => String(n).padStart(2, '0');
+type SecaoPaleta = { slug: string; rotulo: string; grupo: string };
+type ItemPaleta =
+  | { tipo: 'secao'; slug: string; rotulo: string; grupo: string }
+  | { tipo: 'cliente'; id: string; nome: string; comercial: string; dia: number };
+
+function PaletaBusca({ secoes, raiz, aoFechar }: { secoes: SecaoPaleta[]; raiz: HTMLElement; aoFechar: () => void }) {
+  const navigate = useNavigate();
+  const [q, setQ] = useState('');
+  const [ativo, setAtivo] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const listaRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { inputRef.current?.focus(); }, []);
+  useEffect(() => { setAtivo(0); }, [q]);
+
+  // clientes = a MESMA query da Gestão (chave compartilhada → cache aproveitado);
+  // fora de Reviza/demo (Atenvo puro) nem liga — a paleta fica só com as seções
+  const comClientes = isRevizaMode || isDemoMode;
+  const clientesQ = useQuery<Dados>({
+    queryKey: chavesCobranca.dados,
+    queryFn: () => getCobrancaRepo().carregar(),
+    enabled: comClientes,
+  });
+
+  const termo = q.trim();
+  const tNorm = semAcentoPal(termo);
+  const tDig = soDigitos(termo);
+  const secoesVistas = termo ? secoes.filter((s) => semAcentoPal(s.rotulo).includes(tNorm)) : secoes;
+  const clientes = useMemo<ItemPaleta[]>(() => {
+    if (!comClientes || !termo) return [];
+    const achados: ItemPaleta[] = [];
+    for (const l of clientesQ.data?.linhas ?? []) {
+      const porNome = semAcentoPal(l.nome).includes(tNorm);
+      // CPF/telefone só por DÍGITOS (3+ pra não casar o mundo inteiro com "1")
+      const porDigitos = tDig.length >= 3 && (soDigitos(l.cpf).includes(tDig) || soDigitos(l.telefone).includes(tDig));
+      if (!porNome && !porDigitos) continue;
+      achados.push({ tipo: 'cliente', id: l.id, nome: l.nome, comercial: l.comercial, dia: l.dia });
+      if (achados.length >= 8) break;
+    }
+    return achados;
+  }, [comClientes, termo, tNorm, tDig, clientesQ.data]);
+
+  const itens: ItemPaleta[] = [
+    ...secoesVistas.map((s) => ({ tipo: 'secao' as const, slug: s.slug, rotulo: s.rotulo, grupo: s.grupo })),
+    ...clientes,
+  ];
+  const at = itens.length ? Math.min(ativo, itens.length - 1) : 0;
+  useEffect(() => { listaRef.current?.querySelector('.pal-item.on')?.scrollIntoView({ block: 'nearest' }); }, [at]);
+
+  const abrir = (it: ItemPaleta) => {
+    aoFechar();
+    if (it.tipo === 'secao') { navigate('/' + it.slug); return; }
+    // handoff: a Gestão consome a chave no mount — ou pelo evento, se já estiver aberta
+    try { sessionStorage.setItem('alfa_paleta_busca', it.nome); } catch { /* sem storage: só navega */ }
+    navigate('/cobrancas/planilha');
+    window.dispatchEvent(new Event('alfa_paleta_busca'));
+  };
+  const aoTeclar = (e: RKeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Escape') { e.preventDefault(); aoFechar(); return; }
+    if (e.key === 'ArrowDown') { e.preventDefault(); setAtivo(Math.min(at + 1, Math.max(0, itens.length - 1))); return; }
+    if (e.key === 'ArrowUp') { e.preventDefault(); setAtivo(Math.max(at - 1, 0)); return; }
+    if (e.key === 'Enter' && itens[at]) { e.preventDefault(); abrir(itens[at]); }
+  };
+
+  return createPortal(
+    <div className="pal-veu" onMouseDown={(e) => { if (e.target === e.currentTarget) aoFechar(); }}>
+      <div className="pal-caixa" role="dialog" aria-modal="true" aria-label="Busca global" onKeyDown={aoTeclar}>
+        <div className="pal-topo">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+            <circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" />
+          </svg>
+          <input ref={inputRef} className="pal-inp" type="text" value={q} onChange={(e) => setQ(e.target.value)}
+            placeholder={comClientes ? 'Buscar cliente (nome, CPF, telefone) ou seção…' : 'Buscar seção…'}
+            aria-label="Buscar" autoComplete="off" spellCheck={false} />
+          <kbd>Esc</kbd>
+        </div>
+        <div className="pal-lista" ref={listaRef}>
+          {itens.map((it, i) => {
+            const cabecalho = i === 0 || itens[i - 1].tipo !== it.tipo;
+            return (
+              <Fragment key={it.tipo === 'secao' ? 's-' + it.slug : 'c-' + it.id}>
+                {cabecalho && <div className="pal-glabel">{it.tipo === 'secao' ? 'Seções' : 'Clientes'}</div>}
+                <button type="button" className={i === at ? 'pal-item on' : 'pal-item'}
+                  onMouseEnter={() => setAtivo(i)} onClick={() => abrir(it)}>
+                  <span className="pal-ico" aria-hidden>{it.tipo === 'secao' ? iconeDoItem(it.slug) : COB_ICONES.clientes}</span>
+                  {it.tipo === 'secao' ? (
+                    <>
+                      <span className="pal-nome">{it.rotulo}</span>
+                      <span className="pal-meta">{it.grupo}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="pal-nome">{it.nome}</span>
+                      <span className="pal-meta">{(it.comercial || '—') + ' · ' + (it.dia > 0 ? 'D' + d2(it.dia) : 'Sem ciclo')}</span>
+                    </>
+                  )}
+                </button>
+              </Fragment>
+            );
+          })}
+          {comClientes && termo !== '' && clientesQ.isLoading && <div className="pal-vazio">Carregando clientes…</div>}
+          {itens.length === 0 && !(comClientes && termo !== '' && clientesQ.isLoading) && (
+            <div className="pal-vazio">Nada encontrado para “{termo}”.</div>
+          )}
+        </div>
+        <div className="pal-rodape">↑ ↓ navegam · Enter abre · Esc fecha</div>
+      </div>
+    </div>,
+    raiz,
+  );
+}
+
 /** Shell autenticado v2: sidebar em overlay (64→242 no hover), topbar e palco. */
 export default function AppShellV2() {
   const { user, signOut } = useAuth();
@@ -167,6 +368,7 @@ export default function AppShellV2() {
   const navigate = useNavigate();
 
   useEffect(() => instalarSpotlight(), []);
+  useEffect(() => instalarRolagemSemHover(), []); // movimento.css: lista rolando = hover seco
 
   /* Trava o scroll da JANELA sob o shell (bug do dono: deep-links conversa↔kanban
      disparavam scrollIntoView que rolava o body — topbar sumia, o toast de
@@ -194,7 +396,7 @@ export default function AppShellV2() {
   // Intro do dia: primeira entrada de cada dia (o auth resolve assíncrono —
   // só decide quando o user existe; virou a data local = mostra de novo)
   const [introAberta, setIntroAberta] = useState(false);
-  useEffect(() => { if (user?.id && deveMostrarIntroDia(user.id)) setIntroAberta(true); }, [user?.id]);
+  useEffect(() => { if (user?.id && !isRevizaMode && deveMostrarIntroDia(user.id)) setIntroAberta(true); }, [user?.id]); // reviza: intro consulta números do Atenvo — fica de fora até ter versão própria
   const concluirIntro = useCallback(() => {
     marcarIntroVista(user?.id ?? undefined);
     setIntroAberta(false);
@@ -208,14 +410,6 @@ export default function AppShellV2() {
   const alternarTema = useCallback(() => {
     definirTema(tema === 'dark' ? 'light' : 'dark');
   }, [definirTema, tema]);
-  // Acento do sistema (gota): cicla azul → verde → dourado. O botão do Modo
-  // de Performance saiu da topbar (dono 29/08 — o Corporativo fixo já é leve);
-  // o modo segue vivo na auto-detecção do main.tsx e no Segmentado de Configurações.
-  const [acento, setAcento] = useState<Acento>(() => lerAcento());
-  useEffect(() => assinarAcento(setAcento), []);
-  const alternarAcento = useCallback(() => {
-    salvarAcento(ORDEM_ACENTO[(ORDEM_ACENTO.indexOf(acento) + 1) % ORDEM_ACENTO.length]);
-  }, [acento]);
   const seqRef = useRef(0);
   const avatarRef = useRef<HTMLButtonElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
@@ -241,6 +435,18 @@ export default function AppShellV2() {
     const desinstalar = [instala(sidebarRef.current, 'clip-path'), instala(fundoRef.current, 'transform')];
     return () => { desinstalar.forEach((d) => d()); };
   }, []);
+  // A lista da sidebar rola em telas baixas. Recolhida (rail de ícones) ela não deve
+  // ficar parada onde o mouse a deixou: volta ao topo, ou só o necessário para o
+  // item ativo aparecer. Calculado à mão — scrollIntoView rolaria também a página.
+  const navRef = useRef<HTMLElement>(null);
+  const alinharNav = useCallback(() => {
+    const n = navRef.current;
+    if (!n) return;
+    const ativo = n.querySelector<HTMLElement>('.item.on');
+    const fimAtivo = ativo ? ativo.offsetTop - n.offsetTop + ativo.offsetHeight : 0;
+    n.scrollTop = Math.max(0, fimAtivo - n.clientHeight + 24);
+  }, []);
+  // (o efeito que chama o alinharNav fica depois do filtro dos itens — ver chaveNav)
   const fecharNotif = useCallback(() => setNotif(null), []);
   // raiz de portal (regra 10): o menu monta no body, fora do stacking context da topbar
   // (que tem backdrop-filter) — senão o conteúdo do palco pinta por cima dele. Shell monta 1×.
@@ -255,9 +461,32 @@ export default function AppShellV2() {
   const [painelNotif, setPainelNotif] = useState(false);
   const [notifPos, setNotifPos] = useState<{ top: number; right: number }>({ top: 60, right: 60 });
   const sinoRef = useRef<HTMLButtonElement>(null);
-  const notifsQ = useNotificacoes();
-  const marcarNotif = useMarcarNotificacao();
-  const naoLidas = (notifsQ.data ?? []).filter((n) => !n.lidaEm).length;
+  const papelSessao = usePapel().data;
+  // configuração inicial pendente: o assistente cobra a mensalidade — o LicencaGate fica desmontado
+  const configPendente = useConfiguracaoPendente();
+  // fonte do sino: Cobranças (Reviza real + demo ALFA) usa a central própria —
+  // confirmações do financeiro, avisos e mensagens; Atenvo segue no remarketing
+  const fonteCob = isRevizaMode || isDemoMode;
+  const notifsAtenvoQ = useNotificacoes();
+  const notifsCobQ = useNotificacoesCob(fonteCob);
+  const marcarAtenvo = useMarcarNotificacao();
+  const marcarCob = useMarcarNotifCob();
+  const marcarNotif = fonteCob ? marcarCob : marcarAtenvo;
+  // sintética de WhatsApp só pra quem TEM a seção Conversas na matriz (financeiro/cadastro ficam fora)
+  const veConversas = isRevizaMode && papelSessao?.papel != null && papelSessao.papel !== 'financeiro' && papelSessao.papel !== 'cadastro';
+  const conversasWa = useConversasWA(veConversas).data ?? [];
+  const waNaoLidas = conversasWa.reduce((s, c) => s + (c.nao_lidas || 0), 0);
+  const avisosNaoLidosSino = useAvisosNaoLidos().data ?? 0;
+  const notifsBase: Notificacao[] = fonteCob ? (notifsCobQ.data ?? []) : (notifsAtenvoQ.data ?? []);
+  // linhas agregadas (não são "marcáveis" — somem quando lidas na origem)
+  const sinteticas: Notificacao[] = fonteCob ? [
+    ...(avisosNaoLidosSino > 0 ? [{ id: 'sn-avisos', tipo: 'avisos', titulo: `${avisosNaoLidosSino} aviso${avisosNaoLidosSino === 1 ? '' : 's'} do administrativo`, corpo: 'Clique para abrir os Avisos.', rota: '/cobrancas/avisos', lidaEm: null, criadoEm: new Date().toISOString() }] : []),
+    ...(waNaoLidas > 0 ? [{ id: 'sn-wa', tipo: 'mensagens', titulo: `${waNaoLidas} mensage${waNaoLidas === 1 ? 'm' : 'ns'} não lida${waNaoLidas === 1 ? '' : 's'} no WhatsApp`, corpo: 'Clique para abrir as Conversas.', rota: '/cobrancas/conversas', lidaEm: null, criadoEm: new Date().toISOString() }] : []),
+  ] : [];
+  const notifsLista: Notificacao[] = [...sinteticas, ...notifsBase];
+  const naoLidas = notifsLista.filter((n) => !n.lidaEm).length;
+  // "Marcar todas" só quando há não lida REAL — as agregadas somem lendo na origem
+  const naoLidasReais = notifsBase.filter((n) => !n.lidaEm).length;
   const abrirNotificacoes = useCallback(() => {
     const r = sinoRef.current?.getBoundingClientRect();
     if (r) setNotifPos({ top: Math.round(r.bottom + 8), right: Math.round(window.innerWidth - r.right) });
@@ -292,10 +521,34 @@ export default function AppShellV2() {
     setSinoOn(true);
   }
 
-  const nome = user?.name?.trim() || 'Equipe';
+  // Reviza: mostra o NOME do usuário logado (do perfil), não o genérico "Equipe" (dono 15/09)
+  const nome = (isRevizaMode ? papelSessao?.nome?.trim() : '') || user?.name?.trim() || 'Equipe';
   const papel = currentOrg ? (PAPEL_ROTULO[currentOrg.role] ?? currentOrg.role) : '—';
-  const org = currentOrg?.name ?? 'Atenvo';
+  const org = currentOrg?.name ?? 'ALFA GROUP';
   const admin = !currentOrg || currentOrg.role === 'admin';
+  // Reviza: papel real decide quem vê o Financeiro (comercial não vê; fora da instância, todos);
+  // papel "cadastro" só vê a tela Novos
+  // Avisos do administrativo: contador de não lidos no item do menu (reviza real; demo usa a persona)
+  const avisosNaoLidos = useAvisosNaoLidos().data ?? 0;
+  // débito parado aguardando aprovação (dono 24/09): selo no "Novos" só pra quem aprova
+  const pendentesAprovacao = usePendentesAprovacao(location.pathname.startsWith('/cobrancas') && !!papelSessao?.podeAprovar).data ?? 0;
+  const podeVerFinanceiro = !isRevizaMode || papelSessao?.gestor || papelSessao?.papel === 'financeiro';
+  const soCadastro = isRevizaMode && papelSessao?.papel === 'cadastro';
+  // MATRIZ do dono (14/09; 27/09) — MESMA fonte do secaoLiberada de Cobrancas.tsx (data/cobranca/secoes.ts)
+  const ehComercialR = isRevizaMode && papelSessao?.papel === 'comercial';
+  const ehFinanceiroR = isRevizaMode && papelSessao?.papel === 'financeiro';
+  const menuDoPapel = (slug: string) => slug.startsWith('cobrancas/') && secaoDoPapel(papelSessao?.papel, slug.slice('cobrancas/'.length));
+  // filtro de papel dos itens do menu — FONTE ÚNICA também da paleta ⌘K
+  // (a paleta nunca lista uma seção que o papel não veria na sidebar)
+  const filtrarItensNav = (itens: ItemNav[]) => itens
+    .filter((i) => admin || !i.admin)
+    // Reviza: Financeiro é restrito — comercial não vê o item
+    .filter((i) => i.slug !== 'cobrancas/financeiro' || podeVerFinanceiro)
+    // Reviza: matriz do dono — financeiro, comercial e cadastro só veem as suas seções
+    .filter((i) => !(ehFinanceiroR || ehComercialR || soCadastro) || menuDoPapel(i.slug));
+  // cargo exibido: na Reviza usa o papel REAL do banco (o role da org é só admin/gestor/atendente)
+  const ROTULO_REVIZA: Record<string, string> = { admin: 'Administrador', gestor: 'Gestor', comercial: 'Comercial', financeiro: 'Financeiro', cadastro: 'Cadastro' };
+  const cargo = isRevizaMode && papelSessao?.papel ? (ROTULO_REVIZA[papelSessao.papel] ?? papelSessao.papel) : papel;
 
   // Fase 2.0: troca de organização — só EXISTE para quem tem mais de um vínculo
   const [menuOrg, setMenuOrg] = useState(false);
@@ -313,38 +566,60 @@ export default function AppShellV2() {
   // Trocar de módulo navega pra home do módulo (o menu da esquerda se refaz).
   const moduloAtivo: ModuloId = location.pathname.startsWith('/cobrancas') ? 'cobrancas' : 'atendimento';
   const modulo = MODULOS.find((m) => m.id === moduloAtivo) ?? MODULOS[0];
+  // DEMO da ALFA: Atendimento removido — só Cobranças.
+  const modulosDisponiveis = (isDemoMode || isRevizaMode) ? MODULOS.filter((m) => m.id !== 'atendimento') : MODULOS;
   const trocarModulo = useCallback((m: Modulo) => {
     setMenuOrg(false);
     navigate(m.home);
   }, [navigate]);
+
+  // Paleta de busca global: a barra do topo abre de verdade (clique ou ⌘K/Ctrl+K)
+  const [paletaAberta, setPaletaAberta] = useState(false);
+  const fecharPaleta = useCallback(() => setPaletaAberta(false), []);
+  useEffect(() => {
+    const aoTecla = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setPaletaAberta((v) => !v); }
+    };
+    window.addEventListener('keydown', aoTecla);
+    return () => window.removeEventListener('keydown', aoTecla);
+  }, []);
+  // seções da paleta = o menu do módulo ativo, com o MESMO filtro de papel da sidebar
+  const secoesPaleta: SecaoPaleta[] = modulo.grupos.flatMap((g) =>
+    filtrarItensNav(g.itens).map((i) => ({ slug: i.slug, rotulo: i.rotulo, grupo: g.rotulo })));
+  // alinha a lista da sidebar ao trocar de rota E quando a lista muda: os itens do papel chegam
+  // depois da 1ª pintura (ex.: Financeiro entra quando o papel carrega) e empurram o item ativo pra
+  // baixo — em 1280×720 Avisos/Registros/Usuários ficavam escondidos no pé da cápsula
+  const chaveNav = secoesPaleta.map((s) => s.slug).join('|');
+  useEffect(() => {
+    // clique num item com a sidebar aberta: não puxa a lista debaixo do mouse
+    if (!sidebarRef.current?.matches(':hover')) alinharNav();
+  }, [location.pathname, chaveNav, alinharNav]);
 
   return (
     <div className="v2 app-v2">
       <div className="luz" />
       <div className="grao" />
       <div className="p-app">
-        <aside className="p-sidebar" ref={sidebarRef}>
-          <div className="p-logo">
+        <aside className="p-sidebar" ref={sidebarRef} onMouseLeave={alinharNav}>
+          {/* marca + seletor de módulo numa linha só, como no Atenvo: recolhida, sobra
+              só a marca no rail; aberta, módulo + organização ao lado */}
+          <button ref={tenantRef} type="button" className="sb-topo" title={modulosDisponiveis.length > 1 ? `Módulo: ${modulo.rotulo} — clique para trocar` : modulo.rotulo}
+            aria-haspopup={modulosDisponiveis.length > 1 ? 'menu' : undefined} aria-expanded={modulosDisponiveis.length > 1 ? menuOrg : undefined}
+            onClick={modulosDisponiveis.length > 1 ? abrirMenuOrg : undefined} style={modulosDisponiveis.length > 1 ? undefined : { cursor: 'default' }}>
             <LogoAtenvo className="marca" />
-            <span className="word lab">atenvo</span>
-          </div>
-          {/* SELETOR DE MÓDULO (29/08): troca o sistema inteiro de parte —
-              Atendimento ↔ Cobranças (e novos módulos no futuro). Ocupa o
-              lugar do antigo seletor de organização (single-tenant: a org é
-              fixa; seu nome vira o subtítulo). */}
-          <button ref={tenantRef} type="button" className="tenant trocavel modulo-sel" title={`Módulo: ${modulo.rotulo} — clique para trocar`}
-            aria-haspopup="menu" aria-expanded={menuOrg} onClick={abrirMenuOrg}>
-            <span className="modulo-txt"><b>{modulo.rotulo}</b><i className="modulo-org lab">{org}</i></span>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: 'var(--txt-2)' }} aria-hidden>
-              <path d="M7 15l5 5 5-5M7 9l5-5 5 5" />
-            </svg>
+            <span className="sb-topo-txt lab"><b>{modulo.rotulo}</b><i>{org}</i></span>
+            {modulosDisponiveis.length > 1 && (
+              <svg className="sb-topo-seta lab" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M8 15l4 4 4-4M8 9l4-4 4 4" />
+              </svg>
+            )}
           </button>
           {menuOrg && createPortal(
             <>
               <div className="um-backdrop" onClick={() => setMenuOrg(false)} aria-hidden />
               <div className="usuario-menu org-troca" role="menu" aria-label="Trocar de módulo" style={{ top: orgMenuPos.top, left: orgMenuPos.left }}>
                 <div className="um-head"><div className="um-cargo">Ir para</div></div>
-                {MODULOS.map((m) => (
+                {modulosDisponiveis.map((m) => (
                   <button key={m.id} type="button" role="menuitemradio" aria-checked={m.id === moduloAtivo}
                     className={m.id === moduloAtivo ? 'um-item om-item on' : 'um-item om-item'}
                     onClick={() => trocarModulo(m)}>
@@ -356,13 +631,13 @@ export default function AppShellV2() {
             </>,
             raizMenu,
           )}
-          <nav aria-label="Navegação principal">
+          <nav className="sb-nav" ref={navRef} aria-label="Navegação principal">
             {modulo.grupos.map((g) => {
-              const itens = g.itens.filter((i) => admin || !i.admin);
+              const itens = filtrarItensNav(g.itens);
               if (!itens.length) return null;
               return (
                 <div className="grupo" key={g.rotulo}>
-                  <div className="glabel caps lab">{g.rotulo}</div>
+                  <div className="glabel lab">{g.rotulo}</div>
                   {itens.map((i) => (
                     <NavLink
                       key={i.slug}
@@ -375,13 +650,18 @@ export default function AppShellV2() {
                       {i.slug === 'whatsapp' && badgePop > 0 && (
                         <span key={badgePop} className="badge-n lab pop num">{badgePop}</span>
                       )}
+                      {i.slug === 'cobrancas/avisos' && avisosNaoLidos > 0 && (
+                        <span className="badge-n lab num">{avisosNaoLidos}</span>
+                      )}
+                      {i.slug === 'cobrancas/novos' && pendentesAprovacao > 0 && (
+                        <span className="badge-n lab num" title={`${pendentesAprovacao} aguardando aprovação`}>{pendentesAprovacao}</span>
+                      )}
                     </NavLink>
                   ))}
                 </div>
               );
             })}
           </nav>
-          <div className="canal"><i aria-hidden /><span>Canal · operante</span></div>
           {import.meta.env.DEV && (
             <div className="dev-ferramentas">
               <button type="button" className="p-btn btn-sec btn-mini" onClick={simularResposta}>
@@ -390,38 +670,37 @@ export default function AppShellV2() {
             </div>
           )}
           <div className="rodape-sb">
-            <div className="avatar">{iniciaisDe(nome)}</div>
-            <div className="lab">
+            <div className="avatar" title="Online">{iniciaisDe(nome)}<i className="avatar-on" aria-hidden /></div>
+            <div className="rodape-txt lab">
               <div className="nome">{nome}</div>
-              <div className="cargo">{papel}</div>
+              <div className="cargo">{cargo}</div>
             </div>
           </div>
+          {isRevizaMode && import.meta.env.VITE_BUILD_TS && (
+            <div className="sb-versao num" title="Versão do painel que você está usando agora. Se estiver diferente da mais nova, atualize a página.">
+              Painel v{String(import.meta.env.VITE_BUILD_TS)}
+            </div>
+          )}
         </aside>
-        {/* fundo (vidro+fio) e sombra da expansão: irmãos do aside — fora do
-            clip-path (que criaria um backdrop root sem blur), pintando abaixo
-            dele. A sidebar anima só clip-path/transform/opacity, nunca width
-            (shell.css). */}
-        <div className="sb-fundo" aria-hidden ref={fundoRef} />
+        {/* fundos do flutuante (como no Atenvo): .sb-rail = cápsula do estado recolhido;
+            .sb-fundo = painel aberto em vidro (.vidro-pro); .sb-sombra = sombra da expansão.
+            Irmãos do aside — fora do clip-path (que criaria um backdrop root sem blur). */}
+        <div className="sb-rail" aria-hidden />
+        <div className="sb-fundo vidro-pro" aria-hidden ref={fundoRef} />
         <div className="sb-sombra" aria-hidden />
 
         <main className="principal">
           <div className="p-topbar">
-            <div className="busca">
+            {/* barra de busca REAL: abre a paleta ⌘K (era um div decorativo) */}
+            <button type="button" className="busca" title="Buscar (⌘K)" aria-haspopup="dialog" aria-expanded={paletaAberta}
+              onClick={() => setPaletaAberta(true)}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
                 <circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" />
               </svg>
-              <span className="busca-texto">Buscar contatos, conversas, cobranças…</span><kbd>⌘K</kbd>
-            </div>
+              <span className="busca-texto">{(isRevizaMode || isDemoMode) ? 'Buscar clientes e seções…' : 'Buscar seções do sistema…'}</span><kbd>⌘K</kbd>
+            </button>
             <div className="top-dir">
-              <button
-                type="button" className="ib"
-                aria-label={`Acento do sistema: ${ROTULO_ACENTO[acento]} — clique para alternar`}
-                title={`Acento: ${ROTULO_ACENTO[acento]}`}
-                onClick={alternarAcento}
-              >
-                <IconeGota />
-                <span className={acento !== 'azul' ? 'pt on' : 'pt'} aria-hidden />
-              </button>
+              {(isRevizaMode || isDemoMode) && <BotaoDesfazer />}
               <button
                 type="button" className="ib"
                 aria-label={tema === 'dark' ? 'Mudar para o tema claro' : 'Mudar para o tema escuro'}
@@ -442,15 +721,17 @@ export default function AppShellV2() {
                   <div className="usuario-menu notif-panel" role="menu" aria-label="Notificações" style={{ top: notifPos.top, right: notifPos.right }}>
                     <div className="np-head">
                       <b>Notificações</b>
-                      {naoLidas > 0 && (
+                      {naoLidasReais > 0 && (
                         <button type="button" className="np-todas" onClick={() => marcarNotif.mutate({ todas: true })}>Marcar todas como lidas</button>
                       )}
                     </div>
-                    {(notifsQ.data ?? []).length === 0 ? (
-                      <div className="np-vazio">Nenhuma notificação ainda. Quando a Central de Remarketing identificar algo, aparece aqui.</div>
-                    ) : (notifsQ.data ?? []).slice(0, 20).map((n) => (
+                    {notifsLista.length === 0 ? (
+                      <div className="np-vazio">{fonteCob
+                        ? 'Nenhuma notificação ainda. Confirmações do financeiro, avisos do administrativo e mensagens aparecem aqui.'
+                        : 'Nenhuma notificação ainda. Quando a Central de Remarketing identificar algo, aparece aqui.'}</div>
+                    ) : notifsLista.slice(0, 20).map((n) => (
                       <button key={n.id} type="button" role="menuitem" className={'np-item' + (n.lidaEm ? '' : ' nova')}
-                        onClick={() => { setPainelNotif(false); if (!n.lidaEm) marcarNotif.mutate({ id: n.id }); if (n.rota) navigate(n.rota); }}>
+                        onClick={() => { setPainelNotif(false); if (!n.lidaEm && !n.id.startsWith('sn-')) marcarNotif.mutate({ id: n.id }); if (n.rota) navigate(n.rota); }}>
                         <span className="np-dot" aria-hidden />
                         <span className="np-tx">
                           <span className="np-t">{n.titulo}</span>
@@ -474,9 +755,9 @@ export default function AppShellV2() {
                   <div className="usuario-menu" role="menu" aria-label="Menu do usuário" style={{ top: menuPos.top, right: menuPos.right }}>
                     <div className="um-head">
                       <div className="um-nome">{nome}</div>
-                      <div className="um-cargo">{papel}</div>
+                      <div className="um-cargo">{cargo}</div>
                     </div>
-                    <button type="button" role="menuitem" className="um-item" onClick={() => { setMenuUsuario(false); navigate('/configuracoes'); }}>Configurações</button>
+                    {!isRevizaMode && <button type="button" role="menuitem" className="um-item" onClick={() => { setMenuUsuario(false); navigate('/configuracoes'); }}>Configurações</button>}
                     <button type="button" role="menuitem" className="um-item perigo" onClick={sair}>Sair</button>
                   </div>
                 </>,
@@ -485,13 +766,23 @@ export default function AppShellV2() {
             </div>
           </div>
 
+          {/* mensalidade da plataforma (Reviza): faixa de aviso p/ admins + takeover
+              de bloqueio — 'ok' não renderiza nada; fora do modo reviza nem monta.
+              Em DEV também monta só p/ a prévia ?licenca=aviso|bloqueado (código
+              morto no build de produção; o gate interno segue exigindo reviza). */}
+          {(isRevizaMode || import.meta.env.DEV) && !configPendente && <LicencaGate />}
+          {/* configuração inicial obrigatória (Reviza): assistente p/ admin/gestor/cadastro/
+              financeiro, tela de espera p/ o comercial, faixa p/ suporte. Sem backend ainda:
+              inativo na Reviza; prévia só em DEV/demo (?config=…). */}
+          {(isRevizaMode || isDemoMode || import.meta.env.DEV) && <ConfiguracaoGate />}
+
           <div className="palco">
             {/* key por caminho + geração: re-executa a entrada (pg-entra + cascata)
                 a cada troca de rota e quando a intro abre o palco */}
             {/* páginas cheias (kanban, inbox) gerenciam a própria altura — shell.css .pagina.cheia.
                 Rotas OFICIAIS estão na RAIZ desde o CORTE (/whatsapp, /kanban) — não mais em /v2/*. */}
             <div className={/^\/(kanban|whatsapp)(\/|$)/.test(location.pathname) ? 'pagina pg-entra cheia' : 'pagina pg-entra'} key={location.pathname}>
-              <Outlet />
+              {(isDemoMode || isRevizaMode) && moduloAtivo === 'atendimento' ? <Navigate to="/cobrancas/painel" replace /> : <Outlet />}
             </div>
           </div>
 
@@ -506,7 +797,8 @@ export default function AppShellV2() {
           />
         </main>
 
-        {/* portais soltos: intro do dia + aviso de deploy (dono 28/08) */}
+        {/* portais soltos: intro do dia + aviso de deploy (dono 28/08) + paleta ⌘K */}
+        {paletaAberta && <PaletaBusca secoes={secoesPaleta} raiz={raizMenu} aoFechar={fecharPaleta} />}
         <IntroDia aberta={introAberta} aoConcluir={concluirIntro} nome={nome} tema={tema} aoMudarTema={definirTema} />
         <AvisoAtualizacao />
       </div>

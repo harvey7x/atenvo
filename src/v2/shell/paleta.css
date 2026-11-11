@@ -1,0 +1,71 @@
+/* =====================================================================
+   Paleta de busca global (⌘K) — spotlight do shell v2 (AppShellV2).
+   Dois grupos de resultado: SEÇÕES do módulo ativo (mesmo filtro de
+   papel do menu) e CLIENTES da Gestão (Reviza/demo). Pele = a família
+   do .usuario-menu (surface sólida + sombra pop, sem blur — funciona
+   igual no Modo Leve); o véu fecha no clique fora.
+   ===================================================================== */
+
+/* a barra do topo virou <button> de verdade — devolve a pele que era de div */
+.v2 button.busca { font-family: var(--fonte); text-align: left; cursor: pointer; transition: background .15s var(--ease); }
+.v2 button.busca:hover { background: rgba(var(--tint), .07); color: var(--txt-2); }
+
+.v2 .pal-veu {
+  position: fixed; inset: 0; z-index: 96;
+  background: rgba(6, 7, 9, .44);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 11vh 16px 16px;
+  animation: pal-veu-entra .14s var(--ease);
+}
+@keyframes pal-veu-entra { from { opacity: 0; } }
+
+/* .pal-caixa (não ".paleta": a Vitrine já usa esse nome pra grade de cores) */
+.v2 .pal-caixa {
+  width: 580px; max-width: 100%; max-height: min(460px, 74vh);
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--surface); border: 1px solid rgba(var(--tint), .14);
+  border-radius: var(--r-card); box-shadow: var(--shadow-pop);
+  animation: v2-modal-entra .18s var(--ease);
+}
+
+/* topo: lupa + input nu + Esc */
+.v2 .pal-topo {
+  flex-shrink: 0; display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px; border-bottom: 1px solid var(--linha); color: var(--txt-3);
+}
+.v2 .pal-topo svg { flex-shrink: 0; }
+.v2 .pal-inp {
+  flex: 1; min-width: 0; background: none; border: 0; outline: none;
+  color: var(--txt); font-size: 14px; font-family: var(--fonte);
+}
+.v2 .pal-inp::placeholder { color: var(--txt-3); }
+.v2 .pal-topo kbd {
+  flex-shrink: 0; font-size: 10.5px; color: var(--txt-3); font-family: var(--fonte);
+  background: rgba(var(--tint), .05); border: 1px solid rgba(var(--tint), .10);
+  border-radius: 5px; padding: 1px 6px;
+}
+
+/* lista: grupos rotulados + itens (o "on" segue o teclado E o mouse) */
+.v2 .pal-lista { flex: 1; min-height: 0; overflow-y: auto; padding: 6px; }
+.v2 .pal-glabel {
+  padding: 8px 9px 4px; font-size: 10px; font-weight: 600;
+  letter-spacing: .08em; text-transform: uppercase; color: var(--txt-3);
+}
+.v2 .pal-item {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  padding: 8px 9px; border: 0; border-radius: 9px; cursor: pointer;
+  background: none; color: var(--txt-2); font-family: var(--fonte); font-size: 12.5px;
+}
+.v2 .pal-item.on { background: rgba(var(--tint), .08); color: var(--txt); }
+.v2 .pal-ico { flex-shrink: 0; width: 16px; height: 16px; display: flex; color: var(--txt-3); }
+.v2 .pal-ico svg { width: 16px; height: 16px; }
+.v2 .pal-item.on .pal-ico { color: var(--txt-2); }
+.v2 .pal-nome { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.v2 .pal-meta { flex-shrink: 0; font-size: 10.5px; color: var(--txt-3); }
+.v2 .pal-vazio { padding: 16px 12px 14px; font-size: 11.5px; color: var(--txt-3); }
+
+/* rodapé: dica de teclado */
+.v2 .pal-rodape {
+  flex-shrink: 0; padding: 7px 14px; border-top: 1px solid var(--linha);
+  font-size: 10px; color: var(--txt-3); letter-spacing: .02em;
+}

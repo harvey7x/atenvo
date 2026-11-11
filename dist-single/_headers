@@ -1,0 +1,7 @@
+# O script do service worker e o manifest NUNCA podem ficar presos em edge-cache:
+# sw.js velho = app instalado preso numa versão antiga. Os assets em /assets/ são
+# hasheados e já ganham cache imutável do próprio Pages — não precisam de nada aqui.
+/sw.js
+  Cache-Control: no-cache, no-store, must-revalidate
+/manifest.webmanifest
+  Cache-Control: no-cache

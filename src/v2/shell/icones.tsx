@@ -28,6 +28,9 @@ export const ICONES: Record<string, ReactNode> = {
   agendamentos: (
     <Ic><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M8 3v4M16 3v4M3 10h18" /></Ic>
   ),
+  presenciais: (
+    <Ic><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0113 0c0 5.4-6.5 11-6.5 11z" /><circle cx="12" cy="10" r="2.4" /></Ic>
+  ),
   disparo: (
     <Ic><path d="M21 3L10.5 13.5M21 3l-6.8 17.4a.35.35 0 01-.65.02L10.5 13.5 3.6 10.45a.35.35 0 01.02-.65L21 3z" /></Ic>
   ),
@@ -53,9 +56,29 @@ export const ICONES: Record<string, ReactNode> = {
   remarketing: (
     <Ic><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="3.2" /><path d="M21.5 2.5 15 9" /><path d="M15.5 4.5 15 9l4.5-.5" /></Ic>
   ),
+  // Pós-venda: contato acompanhado (pessoa + check do fechamento)
+  'pos-venda': (
+    <Ic><circle cx="9" cy="8" r="3.4" /><path d="M3.5 20c.6-3.4 2.8-5 5.5-5s4.9 1.6 5.5 5" /><path strokeLinecap="round" strokeLinejoin="round" d="M15.2 9.2l2.1 2.1L21 7.4" /></Ic>
+  ),
   // Recuperação: setas de retomada (loop) recuperando o cliente
   recuperacao: (
     <Ic><path d="M3 12a9 9 0 0 1 15-6.7L21 8" /><path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-15 6.7L3 16" /><path d="M3 21v-5h5" /></Ic>
+  ),
+  // Pendências do processo: prancheta com marca (o que falta o cliente mandar/assinar)
+  pendencias: (
+    <Ic><rect x="5" y="4" width="14" height="17" rx="2.2" /><path d="M9 4V3h6v1" /><path d="M8.5 11h7M8.5 15h4.5" /></Ic>
+  ),
+  // Portabilidades: duas setas trocando de lado (o contrato muda de banco)
+  portabilidades: (
+    <Ic><path d="M4 8h13" /><path d="M14 4.5L17.5 8 14 11.5" /><path d="M20 16H7" /><path d="M10 12.5L6.5 16l3.5 3.5" /></Ic>
+  ),
+  // Painel da Equipe: dois celulares lado a lado (um por atendente)
+  equipe: (
+    <Ic><rect x="2.8" y="3.5" width="8.4" height="16" rx="2" /><rect x="12.8" y="3.5" width="8.4" height="16" rx="2" /><path d="M6 16.5h2M16 16.5h2" /></Ic>
+  ),
+  // Central de Avisos (ex-Radar de Atendimento): cronômetro — o tempo de resposta sob controle
+  radar: (
+    <Ic><circle cx="12" cy="13.5" r="7.6" /><path d="M12 13.5V9.6" /><path d="M9.8 2.6h4.4M12 2.6v3.3" /><path d="M18.3 7.2l1.4-1.4" /></Ic>
   ),
   // Simulador de Valores: calculadora (corpo + visor + teclas em pontos)
   simulador: (
