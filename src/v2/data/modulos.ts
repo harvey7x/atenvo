@@ -36,8 +36,12 @@ export function alternarAmbiente(atual: readonly Ambiente[], a: Ambiente): Ambie
   return prox.length ? AMBIENTES.filter((x) => prox.includes(x)) : [...atual];
 }
 
-/* Telas do Atenvo que NÃO entram na Reviza (dono 11/11: "não vou querer a parte das pendências,
-   nem o painel da equipe, nem a central de avisos") — fora do menu E bloqueadas pela URL. */
-export const ROTAS_ATENDIMENTO_FORA = ['/pendencias', '/equipe', '/radar'] as const;
-export const rotaAtendimentoFora = (pathname: string) =>
-  ROTAS_ATENDIMENTO_FORA.some((r) => pathname === r || pathname.startsWith(`${r}/`));
+/* Telas do Atendimento na Reviza (dono 11/11: "Eu só vou querer WhatsApp, presenciais, script, Kanban,
+   dashboard, unificador de documentos, conversor de arquivos e coletor do INSS" — e Configurações, onde
+   ficam os usuários). Lista do que ENTRA, não do que sai: qualquer outra tela do Atenvo aberta pela URL
+   volta ao WhatsApp (Pendências, Painel da Equipe e Central de Avisos inclusive — "não vou querer").
+   Integrações fica sem item no menu: é por ela que Configurações → Canais e o "Conectar número…" do
+   WhatsApp ligam os números. A raiz ('/') passa: ela mesma manda para o início do ambiente. */
+export const ROTAS_ATENDIMENTO = ['/whatsapp', '/presenciais', '/scripts', '/kanban', '/dashboard', '/ferramentas', '/configuracoes', '/integracoes'] as const;
+export const rotaAtendimentoPermitida = (pathname: string) =>
+  pathname === '/' || ROTAS_ATENDIMENTO.some((r) => pathname === r || pathname.startsWith(`${r}/`));

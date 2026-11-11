@@ -535,7 +535,8 @@
 .v2 .pn-us-senha-cod { padding: 8px 14px; border-radius: 10px; background: rgba(var(--tint), .08); font-size: 18px; font-weight: 700; letter-spacing: .03em; color: var(--txt); }
 .v2 .pn-us-senha-ac { display: inline-flex; gap: 6px; }
 
-.v2 .pn-us-papeis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+/* 5 papéis (com o Atendente): uma linha só na tela larga; 3 + 2 na média — nunca um cartão sozinho */
+.v2 .pn-us-papeis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
 .v2 .pn-us-papel-card { display: flex; flex-direction: column; gap: 5px; padding: 12px 13px; border-radius: 10px; border: 1px solid var(--linha); background: rgba(var(--tint), .025); font-size: 12px; line-height: 1.45; color: var(--txt-3); }
 .v2 .pn-us-papel-card b { display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: var(--txt); }
 .v2 .pn-us-papel-card b span { font-size: 11px; font-weight: 700; color: var(--txt-2); padding: 1px 7px; border-radius: 999px; background: rgba(var(--tint), .07); }
@@ -570,7 +571,7 @@
 .v2 .pn-us-alerta { margin: 0; padding: 10px 12px; border-radius: 10px; font-size: 12.5px; line-height: 1.45; color: var(--txt); background: rgba(var(--ambar-rgb), .1); border: 1px solid rgba(var(--ambar-rgb), .35); }
 .v2 .pn-us-conseq { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; line-height: 1.5; color: var(--txt-2); }
 .v2 .pn-us-conseq b { color: var(--txt); }
-@media (max-width: 1080px) { .v2 .pn-us-papeis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 1180px) { .v2 .pn-us-papeis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 620px) {
   .v2 .pn-us-papeis, .v2 .pn-us-duas, .v2 .pn-us-opcoes { grid-template-columns: minmax(0, 1fr); }
   .v2 .pn-us-filtros .inp { width: 100%; }

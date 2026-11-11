@@ -17,6 +17,14 @@ rm -rf "$DEP/dist" && cp -R "$RAIZ/dist" "$DEP/dist"
 # o kill-switch → limpa caches, desregistra e recarrega → a aba renasce no sw-r3.js.
 cp "$DEP/sw-kill.js" "$DEP/dist/sw.js"
 cp "$DEP/sw-kill.js" "$DEP/dist/sw-r2.js"
+# trava (11/11): o pacote da ALFA nunca leva nada do CAF — nem o projeto Supabase do Atenvo
+# (afmzuoavvnpfossiiypz), nem páginas/mídias de demonstração que vieram com o código do Atenvo
+if grep -rlq "afmzuoavvnpfossiiypz" "$DEP/dist"; then
+  echo "✗ o pacote cita o Supabase do CAF (afmzuoavvnpfossiiypz):"; grep -rl "afmzuoavvnpfossiiypz" "$DEP/dist"; exit 1
+fi
+if [ -e "$DEP/dist/opus/iris.html" ] || [ -d "$DEP/dist/demo-midia" ]; then
+  echo "✗ o pacote leva arquivo do Atenvo (opus/iris.html ou demo-midia/)"; exit 1
+fi
 echo "» zipando…"
 cd "$DEP"
 rm -f reviza-squarecloud.zip

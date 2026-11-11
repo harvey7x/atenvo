@@ -156,10 +156,11 @@ export function useAvisos(habilitado = true) {
 
 /** quantos avisos o usuário logado ainda não leu (badge do menu + alerta).
     No demo conta os da persona escolhida na tela de Avisos. */
-export function useAvisosNaoLidos() {
+/** `habilitado` = false para quem não tem o ambiente Cobranças (o shell não busca os avisos dela) */
+export function useAvisosNaoLidos(habilitado = true) {
   return useQuery<number>({
     queryKey: K.naoLidos,
-    enabled: isRevizaMode ? !!supabase : isDemoMode,
+    enabled: habilitado && (isRevizaMode ? !!supabase : isDemoMode),
     refetchInterval: isRevizaMode ? 25000 : 5000,
     queryFn: async () => {
       if (!isRevizaMode) return avNaoLidosDemo();

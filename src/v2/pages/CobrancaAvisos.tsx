@@ -21,6 +21,7 @@ import {
   type Aviso, type AvisoDemo, type AnexoAviso, type NovoAnexoAviso, type TipoAnexoAviso,
 } from '../data/cobranca/avisos';
 import { useUsuarios } from '../data/cobranca/usuarios';
+import { ambientesDoPerfil } from '../data/modulos';
 import type { Papel } from '../data/cobranca/types';
 import { ATENDENTES_DEMO } from './cobrancaAnalytics';
 import './painel/painel.css';
@@ -391,7 +392,8 @@ export function AbaAvisos({ gestor, papel }: { gestor: boolean; papel?: Papel })
     if (!real) return ATENDENTES_DEMO.map((n) => ({ userId: `p-${n}`, nome: n }));
     const ROTULO: Record<string, string> = { comercial: 'comercial', financeiro: 'financeiro', cadastro: 'cadastro', gestor: 'gestor' };
     return (usuariosQ.data ?? [])
-      .filter((u) => u.ativo && u.papel !== 'admin')
+      // só quem tem o ambiente Cobranças (o atendente, e quem só tem o Atendimento, nunca abriria o aviso)
+      .filter((u) => u.ativo && u.papel !== 'admin' && ambientesDoPerfil(u.papel, u.modulos).includes('cobrancas'))
       .sort((a, b) => (a.papel === 'comercial' ? 0 : 1) - (b.papel === 'comercial' ? 0 : 1) || a.nome.localeCompare(b.nome))
       .map((u) => ({ userId: u.id, nome: u.nome || u.usuario, papel: ROTULO[u.papel] ?? u.papel }));
   }, [real, usuariosQ.data]);
