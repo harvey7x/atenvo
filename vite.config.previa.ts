@@ -66,8 +66,9 @@ const midiaDemoEmbutida = {
     });
   },
 };
-/* Dashboard de exemplo do Atenvo: os canais têm o nome e o número de verdade da CAF — na prévia da ALFA
-   viram nomes e números fictícios (só aqui; o arquivo de exemplo do código fica igual ao do Atenvo) */
+/* Dados de exemplo do Atenvo com nomes e números de verdade da CAF (canais do Dashboard, a origem de quem
+   voltou pelo anúncio, o chip de canal do Kanban, os números e IDs da Meta nas Integrações): na prévia da
+   ALFA viram nomes e números fictícios — só aqui; os arquivos de exemplo do código ficam iguais aos do Atenvo */
 const CANAIS_FICTICIOS: [string, string][] = [
   ["nome: 'EMPRESTIMO', numero: '555194266757'", "nome: 'ALFA PRINCIPAL', numero: '555199990101'"],
   ["nome: 'JUROS ABUSIVO (ANDRIUS)', numero: '555193930488'", "nome: 'REVISÃO DE CONTRATO', numero: '555199990202'"],
@@ -75,17 +76,41 @@ const CANAIS_FICTICIOS: [string, string][] = [
   ["nome: 'MURILLO CHIP', numero: '555191035329'", "nome: 'GERÊNCIA', numero: '555199990404'"],
   ["nome: 'OFICIAL', numero: '555191781390'", "nome: 'NÚMERO ANTIGO', numero: '555199990505'"],
 ];
-const dashboardFicticio = {
-  name: 'previa-dashboard-ficticio',
-  enforce: 'pre' as const, // no fonte .ts, antes do esbuild normalizar as aspas
+const TROCAS_FICTICIAS: [RegExp, [string, string][]][] = [
+  [/\/src\/data\/dashboardV5\.demo\.ts$/, [
+    ...CANAIS_FICTICIOS,
+    ["'Empréstimo · Diego'", "'Principal · Carla'"],
+    ["'Juros abusivos · Andrius'", "'Revisão de contrato · Bianca'"],
+    ["'Empréstimo · Antônio'", "'Campanha novembro · Eduardo'"],
+  ]],
+  [/\/src\/v2\/pages\/Kanban\.tsx$/, [["canalNome: 'ANDRIUS'", "canalNome: 'CAMPANHA'"], ["'LUIZA'", "'PRINCIPAL'"]]],
+  [/\/src\/v2\/pages\/whatsappSeed\.ts$/, [["'LUIZA'", "'PRINCIPAL'"]]],
+  [/\/src\/data\/fichaJudicial\.ts$/, [["nomeInterno: 'LUIZA'", "nomeInterno: 'PRINCIPAL'"]]],
+  [/\/src\/v2\/pages\/Integracoes\.tsx$/, [
+    ["'LUIZA'", "'PRINCIPAL'"],
+    ["'atv_luiza_01'", "'alfa_principal_01'"],
+    ["alias: 'ANDRIUS'", "alias: 'CAMPANHA'"],
+    ["'5551991781390'", "'5551999990505'"],
+    ["'431217836742210'", "'100000000000001'"],
+    ["'431217836742211'", "'100000000000002'"],
+    ["'2210433378'", "'1000000001'"],
+  ]],
+];
+const dadosFicticios = {
+  name: 'previa-dados-ficticios',
+  enforce: 'pre' as const, // no fonte, antes do esbuild normalizar as aspas
   transform(codigo: string, idArq: string) {
-    if (!idArq.endsWith('/src/data/dashboardV5.demo.ts')) return null;
-    return CANAIS_FICTICIOS.reduce((c, [de, para]) => c.split(de).join(para), codigo);
+    const caso = TROCAS_FICTICIAS.find(([r]) => r.test(idArq));
+    if (!caso) return null;
+    return caso[1].reduce((c, [de, para]) => {
+      if (!c.includes(de)) throw new Error(`prévia: troca fictícia não encontrada em ${idArq}: ${de}`);
+      return c.split(de).join(para);
+    }, codigo);
   },
 };
 
 export default defineConfig({
-  plugins: [previaAtendimentoDemo, midiaDemoEmbutida, dashboardFicticio, react(), viteSingleFile(), VitePWA({ disable: true }), semFontesExternas, iconeEmbutido],
+  plugins: [previaAtendimentoDemo, midiaDemoEmbutida, dadosFicticios, react(), viteSingleFile(), VitePWA({ disable: true }), semFontesExternas, iconeEmbutido],
   base: './',
   mode: 'previa',
   define: {

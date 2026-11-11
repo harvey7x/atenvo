@@ -3,7 +3,8 @@
    Atendimento) e as telas do papel dela. A troca recarrega a página com a outra pessoa "logada" no
    cliente falso (supabasePrevia.ts expõe window.__previa). Fica no centro da barra do topo e some (sem
    tirar do lugar) quando algo cobre a barra: a Gestão em tela cheia, um modal/gaveta (véu), a paleta ⌘K
-   e a foto ampliada. */
+   e a foto ampliada. Em janela estreita ele não cobre a busca: vai para o vão entre a busca e os botões
+   do topo e, se nem assim couber, encolhe (só "Prévia · Ver como"). */
 import { ambientesDoPerfil, ROTULO_AMBIENTE } from '@/v2/data/modulos';
 
 const ESCONDE = '.gp-raiz.gp-cheia, .veu, .veu-drawer, .pal-veu, .fz-zoom';
@@ -37,6 +38,7 @@ body:has(${ESCONDE}) #selo-previa{opacity:0;visibility:hidden}
 #selo-previa .sp-rodape{all:unset;box-sizing:border-box;cursor:pointer;display:block;width:100%;margin-top:4px;padding:8px 10px;border-top:1px solid rgba(255,255,255,.08);
   color:rgba(255,255,255,.6);font:500 11.5px/1.3 'Instrument Sans Variable','Instrument Sans',system-ui,sans-serif}
 #selo-previa .sp-rodape:hover{color:#fff}
+#selo-previa.sp-curto .sp-fict,#selo-previa.sp-curto .sp-ver b{display:none}
 @media (max-width:640px){#selo-previa .sp-fict,#selo-previa .sp-ver b{display:none}#selo-previa{top:12px}#selo-previa .sp-menu{min-width:260px}}
 @media (prefers-reduced-motion:reduce){#selo-previa{transition:none}}
 `;
@@ -100,10 +102,33 @@ export function montarSeloPrevia(): void {
       (menu.querySelector('.sp-item[aria-checked="true"]') as HTMLElement | null)?.focus();
     };
     bt.addEventListener('click', () => (menu.hidden ? abrir() : fechar()));
+    // lugar do selo: no meio da tela se couber sem encostar na busca; senão no vão entre a busca e os
+    // botões do topo; se o vão for pequeno, a versão curta
+    const cabe = (x: number, w: number, de: number, ate: number) => x - w / 2 >= de + 12 && x + w / 2 <= ate - 12;
+    const posicionar = () => {
+      const busca = document.querySelector('.p-topbar .busca');
+      const dir = document.querySelector('.p-topbar .top-dir');
+      el.classList.remove('sp-curto');
+      if (!busca || !dir || window.innerWidth <= 640) { el.style.left = '50%'; return; }
+      const de = busca.getBoundingClientRect().right;
+      const ate = dir.getBoundingClientRect().left;
+      const meio = window.innerWidth / 2;
+      const vao = de + (ate - de) / 2;
+      for (const curto of [false, true]) {
+        el.classList.toggle('sp-curto', curto);
+        const w = el.offsetWidth;
+        if (cabe(meio, w, de, ate)) { el.style.left = '50%'; return; }
+        if (cabe(vao, w, de, ate)) { el.style.left = `${Math.round(vao)}px`; return; }
+      }
+      el.style.left = `${Math.round(vao)}px`;
+    };
+    window.addEventListener('resize', posicionar);
+    window.addEventListener('hashchange', () => setTimeout(posicionar, 0));
+    setInterval(posicionar, 700);
     document.addEventListener('pointerdown', (e) => { if (!menu.hidden && !el.contains(e.target as Node)) fechar(); });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !menu.hidden) { fechar(); bt.focus(); } });
     rotular();
-    setTimeout(rotular, 0);
+    setTimeout(() => { rotular(); posicionar(); }, 0);
   };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', montar, { once: true });
   else montar();
