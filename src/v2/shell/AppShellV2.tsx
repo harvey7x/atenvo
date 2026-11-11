@@ -641,7 +641,7 @@ export default function AppShellV2() {
             aria-haspopup={modulosDisponiveis.length > 1 ? 'menu' : undefined} aria-expanded={modulosDisponiveis.length > 1 ? menuOrg : undefined}
             onClick={modulosDisponiveis.length > 1 ? abrirMenuOrg : undefined} style={modulosDisponiveis.length > 1 ? undefined : { cursor: 'default' }}>
             <LogoAtenvo className="marca" />
-            <span className="sb-topo-txt lab"><b>{modulo.rotulo}</b><i>{org}</i></span>
+            <span className="sb-topo-txt lab"><b>{acessoCarregando ? '\u00a0' : modulo.rotulo}</b><i>{org}</i></span>
             {modulosDisponiveis.length > 1 && (
               <svg className="sb-topo-seta lab" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                 <path d="M8 15l4 4 4-4M8 9l4-4 4 4" />
@@ -666,7 +666,8 @@ export default function AppShellV2() {
             raizMenu,
           )}
           <nav className="sb-nav" ref={navRef} aria-label="Navegação principal">
-            {modulo.grupos.filter((g) => !g.fixo).map((g) => {
+            {/* enquanto o perfil carrega, sem itens: o menu do ambiente da rota não pisca para quem não o tem */}
+            {!acessoCarregando && modulo.grupos.filter((g) => !g.fixo).map((g) => {
               const itens = filtrarItensNav(g.itens);
               if (!itens.length) return null;
               return (
@@ -677,7 +678,7 @@ export default function AppShellV2() {
               );
             })}
           </nav>
-          {modulo.grupos.filter((g) => g.fixo).map((g) => {
+          {!acessoCarregando && modulo.grupos.filter((g) => g.fixo).map((g) => {
             const itens = filtrarItensNav(g.itens);
             if (!itens.length) return null;
             return (
