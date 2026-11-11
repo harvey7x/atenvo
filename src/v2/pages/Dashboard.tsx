@@ -11,6 +11,7 @@ import { Atendentes, AtendentesSkeleton } from './dashboardV5/Atendentes';
 import { Mapa, MapaSkeleton } from './dashboardV5/Mapa';
 import { Robo, RoboSkeleton } from './dashboardV5/Robo';
 import { Anuncio, AnuncioSkeleton } from './dashboardV5/Anuncio';
+import { Vigia } from './dashboardV5/Vigia';
 import './dashboardV5/dashboardV5.css';
 
 /* ------------------------------------------------------------------
@@ -112,6 +113,9 @@ export default function DashboardV2() {
               {(q.error as Error)?.message || 'Não foi possível atualizar agora.'} Os números abaixo são da última leitura.
             </p>
           )}
+
+          {/* Vigia de respostas 24h (12/11): independe do período; só o gestor vê */}
+          <Vigia />
 
           {carregando ? <KpisSkeleton /> : <Kpis k={d.kpis} ant={d.kpisAnterior} comparacao={comparacao} />}
 
