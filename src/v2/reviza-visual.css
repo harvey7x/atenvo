@@ -348,4 +348,6 @@ html:root .v2 .ferr-item .cm-num-lnk:focus-visible { outline: 2px solid rgba(var
    crescia até a largura da tabela de Usuários e a página inteira rolava de lado — agora a coluna
    cabe na tela e só a tabela rola, dentro do cartão (como em Cobranças › Usuários). ---- */
 html:root .v2 .cfg > * { min-width: 0; }
+/* o rótulo invisível "Ações" (.pn-vh, absoluto) escapava da rolagem da tabela e esticava a página */
+html:root .v2 .pn-mapa-rolo:has(> .pn-us-tab) { position: relative; }
 @media (max-width: 900px) { html:root .v2 .cfg { grid-template-columns: minmax(0, 1fr); } }
