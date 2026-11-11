@@ -52,8 +52,39 @@ const previaAtendimentoDemo = {
   },
 };
 
+/* mídias de exemplo do Atenvo (public/demo-midia: fotos e áudios das conversas de demonstração) — o HTML
+   da prévia vai sozinho, sem a pasta public/: o caminho '/demo-midia/x' vira o próprio arquivo embutido */
+const RAIZ = fileURLToPath(new URL('.', import.meta.url));
+const MIME: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', m4a: 'audio/mp4', mp3: 'audio/mpeg', ogg: 'audio/ogg', wav: 'audio/wav', pdf: 'application/pdf' };
+const midiaDemoEmbutida = {
+  name: 'previa-midia-demo-embutida',
+  transform(codigo: string, idArq: string) {
+    if (!/\/src\/.*\.[jt]sx?$/.test(idArq) || !codigo.includes('/demo-midia/')) return null;
+    return codigo.replace(/\/demo-midia\/([A-Za-z0-9._-]+)\.(jpe?g|png|webp|m4a|mp3|ogg|wav|pdf)\b/g, (m: string, nome: string, ext: string) => {
+      try { return `data:${MIME[ext]};base64,${readFileSync(resolverCaminho(RAIZ, 'public/demo-midia', `${nome}.${ext}`)).toString('base64')}`; } catch { return m; }
+    });
+  },
+};
+/* Dashboard de exemplo do Atenvo: os canais têm o nome e o número de verdade da CAF — na prévia da ALFA
+   viram nomes e números fictícios (só aqui; o arquivo de exemplo do código fica igual ao do Atenvo) */
+const CANAIS_FICTICIOS: [string, string][] = [
+  ["nome: 'EMPRESTIMO', numero: '555194266757'", "nome: 'ALFA PRINCIPAL', numero: '555199990101'"],
+  ["nome: 'JUROS ABUSIVO (ANDRIUS)', numero: '555193930488'", "nome: 'REVISÃO DE CONTRATO', numero: '555199990202'"],
+  ["nome: 'ANTONIO CAMPANHA', numero: '555191655320'", "nome: 'CAMPANHA NOVEMBRO', numero: '555199990303'"],
+  ["nome: 'MURILLO CHIP', numero: '555191035329'", "nome: 'GERÊNCIA', numero: '555199990404'"],
+  ["nome: 'OFICIAL', numero: '555191781390'", "nome: 'NÚMERO ANTIGO', numero: '555199990505'"],
+];
+const dashboardFicticio = {
+  name: 'previa-dashboard-ficticio',
+  enforce: 'pre' as const, // no fonte .ts, antes do esbuild normalizar as aspas
+  transform(codigo: string, idArq: string) {
+    if (!idArq.endsWith('/src/data/dashboardV5.demo.ts')) return null;
+    return CANAIS_FICTICIOS.reduce((c, [de, para]) => c.split(de).join(para), codigo);
+  },
+};
+
 export default defineConfig({
-  plugins: [previaAtendimentoDemo, react(), viteSingleFile(), VitePWA({ disable: true }), semFontesExternas, iconeEmbutido],
+  plugins: [previaAtendimentoDemo, midiaDemoEmbutida, dashboardFicticio, react(), viteSingleFile(), VitePWA({ disable: true }), semFontesExternas, iconeEmbutido],
   base: './',
   mode: 'previa',
   define: {
