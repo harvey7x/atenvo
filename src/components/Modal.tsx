@@ -10,10 +10,12 @@ interface ModalProps {
   width?: number;
   /** quando false, clicar fora não fecha (ex.: durante loading) */
   closeOnBackdrop?: boolean;
+  /** classe extra no cartão (ex.: pele própria de um modal específico) */
+  className?: string;
 }
 
 /** Modal próprio do Atenvo (tema, foco, Esc, clique-fora). Substitui prompt/alert/confirm. */
-export function Modal({ open, onClose, title, children, footer, width = 440, closeOnBackdrop = true }: ModalProps) {
+export function Modal({ open, onClose, title, children, footer, width = 440, closeOnBackdrop = true, className }: ModalProps) {
   const cardRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
   useEffect(() => { onCloseRef.current = onClose; });
@@ -34,7 +36,7 @@ export function Modal({ open, onClose, title, children, footer, width = 440, clo
   if (!open) return null;
   return (
     <div className="atv-modal-overlay" onMouseDown={(e) => { if (closeOnBackdrop && e.target === e.currentTarget) onClose(); }}>
-      <div className="atv-modal" ref={cardRef} style={{ width }} role="dialog" aria-modal="true">
+      <div className={'atv-modal' + (className ? ' ' + className : '')} ref={cardRef} style={{ width }} role="dialog" aria-modal="true">
         {title != null && <div className="atv-modal-head">{title}</div>}
         <div className="atv-modal-body">{children}</div>
         {footer != null && <div className="atv-modal-foot">{footer}</div>}

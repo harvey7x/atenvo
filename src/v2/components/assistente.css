@@ -1,0 +1,303 @@
+/* ==================================================================
+   ASSISTENTE DE IA — balão no canto inferior direito + o CARTÃO DE VOZ
+   (dono 30/10: "eu quero por voz mesmo"). Prefixo único .ast-
+   (colisoesCss.test.ts), escopo .v2.
+   - Balão: a esfera do bom dia em miniatura, preto e branco, em CSS
+     (sem WebGL): corpo de vidro escuro, fio claro na borda e o
+     redemoinho branco por dentro. 52 px, sombra suave; no hover a
+     pílula "Pergunte à IA".
+   - Cartão de voz: VIDRO ESCURO nos dois temas (a esfera é preta e o
+     redemoinho é branco — no claro ela vira uma ilha escura, como o bom
+     dia), ~340×420: a esfera líquida no alto, a linha de estado, a
+     legenda (2–3 linhas), o que você disse em cinza, os links das
+     conversas e os botões (microfone, encerrar). Só preto e branco.
+   - Posição: --ast-base / --ast-base-cartao (px do rodapé) vêm do
+     componente — no /whatsapp, logo acima do compositor (regra do dono:
+     nada flutuando cobre o ENVIAR nem o compositor).
+   - z-index 35/36 dentro do shell: abaixo do toast de mensagem (.notif
+     40), dos menus/modais/gavetas e de tudo que é aviso (1200+).
+   - Movimento: só no bloco "sem reduzir movimento", prefixo
+     html:root[data-perf] .v2 (vale no Leve e no Completo); o que é
+     contínuo (redemoinho girando, o ponto pulsando) só no Completo.
+   ================================================================== */
+
+.v2 .ast-raiz { display: contents; }
+
+/* ---------------------------------------------------------------- balão */
+.v2 .ast-balao {
+  position: fixed; right: 20px; bottom: var(--ast-base, 20px); z-index: 35;
+  width: 52px; height: 52px; padding: 0; margin: 0; border: 0; border-radius: 50%;
+  background: transparent; cursor: pointer; display: grid; place-items: center;
+  -webkit-tap-highlight-color: transparent;
+}
+.v2 .ast-balao:focus-visible { outline: 2px solid rgba(var(--tint), .55); outline-offset: 3px; }
+.v2 .ast-balao.ast-escondido { visibility: hidden; pointer-events: none; }
+
+.v2 .ast-pilula {
+  position: absolute; right: calc(100% + 10px); top: 50%; transform: translateY(-50%) translateX(4px);
+  white-space: nowrap; padding: 7px 12px; border-radius: 999px;
+  font: 600 12px/1 var(--fonte); letter-spacing: .01em; color: var(--txt);
+  background: rgba(18, 19, 23, .92); border: 1px solid rgba(255, 255, 255, .12);
+  box-shadow: 0 10px 24px -10px rgba(0, 0, 0, .55), inset 0 1px 0 rgba(255, 255, 255, .06);
+  opacity: 0; pointer-events: none;
+}
+html:root[data-tema="light"] .v2 .ast-pilula {
+  background: rgba(255, 255, 255, .96); border-color: rgba(22, 25, 31, .10);
+  box-shadow: 0 10px 24px -12px rgba(22, 34, 60, .3), inset 0 1px 0 rgba(255, 255, 255, .9);
+}
+.v2 .ast-balao:hover .ast-pilula,
+.v2 .ast-balao:focus-visible .ast-pilula { opacity: 1; transform: translateY(-50%); }
+
+/* ---------------------------------------------------------------- a esfera (P&B, CSS puro) */
+.v2 .ast-esfera {
+  position: relative; display: block; flex: none; width: 52px; height: 52px; border-radius: 50%; overflow: hidden;
+  background:
+    radial-gradient(44% 32% at 36% 24%, rgba(255, 255, 255, .2), rgba(255, 255, 255, 0) 72%),
+    radial-gradient(circle at 50% 56%, #18191d 0, #0b0c0e 58%, #030304 100%);
+  box-shadow: 0 12px 28px -10px rgba(0, 0, 0, .62), 0 3px 8px rgba(0, 0, 0, .26);
+}
+html:root[data-tema="light"] .v2 .ast-esfera {
+  box-shadow: 0 12px 26px -10px rgba(22, 34, 60, .45), 0 2px 6px rgba(22, 34, 60, .18);
+}
+/* o fio da borda: claro em cima à esquerda, some embaixo à direita (como a esfera estática do bom dia) */
+.v2 .ast-esfera::after {
+  content: ""; position: absolute; inset: 0; border-radius: 50%; padding: 1.2px;
+  background: conic-gradient(from 225deg, rgba(255, 255, 255, .08), rgba(255, 255, 255, .62) 22%,
+    rgba(255, 255, 255, .5) 34%, rgba(255, 255, 255, .08) 58%, rgba(255, 255, 255, .04) 80%, rgba(255, 255, 255, .08));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+/* o redemoinho branco: dois braços de luz num anel, levemente desfocados */
+.v2 .ast-esfera-giro {
+  position: absolute; inset: 15%; border-radius: 50%; opacity: .88;
+  background: conic-gradient(from 10deg, rgba(255, 255, 255, 0) 0deg, rgba(255, 255, 255, .92) 52deg,
+    rgba(255, 255, 255, .14) 118deg, rgba(255, 255, 255, 0) 168deg, rgba(255, 255, 255, .6) 236deg,
+    rgba(255, 255, 255, .06) 300deg, rgba(255, 255, 255, 0) 360deg);
+  -webkit-mask: radial-gradient(circle, transparent 0 28%, #000 44%, #000 58%, transparent 74%);
+  mask: radial-gradient(circle, transparent 0 28%, #000 44%, #000 58%, transparent 74%);
+  filter: blur(1.1px);
+}
+
+/* ---------------------------------------------------------------- o cartão de voz */
+.v2 .ast-voz {
+  --av-txt: #EDEDEF;
+  --av-txt-2: rgba(237, 237, 239, .62);
+  --av-txt-3: rgba(237, 237, 239, .42);
+  position: fixed; right: 20px; bottom: var(--ast-base-cartao, 20px); z-index: 36;
+  width: min(340px, calc(100vw - 32px));
+  /* o topo nunca passa da barra do sistema nem do cabeçalho da conversa no /whatsapp (140 px): com o compositor
+     alto (respondendo a uma mensagem + texto longo) o cartão ENCOLHE (camadas compactas abaixo) em vez de subir
+     sobre Transferir/Arquivar/Dados; o piso de 200 px só vale numa janela baixa demais para qualquer cartão */
+  height: min(420px, calc(100vh - var(--ast-base-cartao, 20px) - 140px));
+  min-height: 200px; container: ast-voz / size;
+  display: flex; flex-direction: column; align-items: stretch;
+  padding: 12px 16px 16px; box-sizing: border-box;
+  border-radius: 26px; overflow: hidden; isolation: isolate;
+  color: var(--av-txt); font-family: var(--fonte); text-align: center;
+  background:
+    radial-gradient(130% 62% at 50% 0%, rgba(255, 255, 255, .075), rgba(255, 255, 255, 0) 62%),
+    linear-gradient(180deg, rgba(23, 24, 28, .88), rgba(8, 9, 11, .94));
+  border: 1px solid rgba(255, 255, 255, .1);
+  -webkit-backdrop-filter: blur(26px) saturate(1.25); backdrop-filter: blur(26px) saturate(1.25);
+  box-shadow: 0 34px 80px -24px rgba(0, 0, 0, .72), 0 10px 26px rgba(0, 0, 0, .3), inset 0 1px 0 rgba(255, 255, 255, .07);
+}
+html:root[data-tema="light"] .v2 .ast-voz {
+  border-color: rgba(8, 9, 11, .6);
+  box-shadow: 0 34px 72px -26px rgba(15, 20, 35, .55), 0 10px 24px rgba(15, 20, 35, .18), inset 0 1px 0 rgba(255, 255, 255, .08);
+}
+/* fio de luz discreto no topo */
+.v2 .ast-voz::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; padding: 1px; pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .16), rgba(255, 255, 255, 0) 32%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+@media (prefers-reduced-transparency: reduce) {
+  .v2 .ast-voz { background: #0E0F12; -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+
+.v2 .ast-voz-topo { flex: none; height: 14px; display: flex; align-items: center; justify-content: center; }
+.v2 .ast-voz-marca {
+  font: 600 10px/1 var(--fonte); letter-spacing: .2em; text-transform: uppercase; color: var(--av-txt-3);
+}
+
+/* a esfera: o canvas tem folga em volta (o raio é 72% da caixa); a linha de estado entra na folga de baixo */
+.v2 .ast-voz-esfera {
+  --ast-nivel: 0;
+  position: relative; flex: none; width: 176px; height: 176px; margin: -4px auto 0;
+}
+.v2 .ast-voz-corpo { position: absolute; inset: 0; }
+.v2 .ast-voz-tela { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.v2 .ast-voz .ast-voz-estatica {
+  display: none; position: absolute; inset: 15%; width: auto; height: auto;
+  box-shadow: 0 18px 36px -14px rgba(0, 0, 0, .7);
+  transform: scale(calc(1 + var(--ast-nivel) * .07));
+}
+.v2 .ast-voz-esfera.ast-sem-gl .ast-voz-tela { display: none; }
+.v2 .ast-voz-esfera.ast-sem-gl .ast-voz-estatica { display: block; }
+.v2 .ast-voz[data-fase="conectando"] .ast-voz-esfera { opacity: .78; }
+.v2 .ast-voz[data-fase="encerrada"] .ast-voz-esfera,
+.v2 .ast-voz[data-fase="erro"] .ast-voz-esfera { opacity: .42; }
+
+.v2 .ast-voz-estado {
+  flex: none; height: 18px; margin: -16px 0 0; display: flex; align-items: center; justify-content: center; gap: 7px;
+  font: 550 12px/1 var(--fonte); letter-spacing: .01em; color: var(--av-txt-2); position: relative; z-index: 1;
+}
+.v2 .ast-voz-ponto {
+  display: block; flex: none; width: 6px; height: 6px; border-radius: 50%;
+  background: rgba(255, 255, 255, .9); box-shadow: 0 0 8px rgba(255, 255, 255, .45);
+}
+.v2 .ast-voz[data-fase="conectando"] .ast-voz-ponto,
+.v2 .ast-voz[data-fase="consultando"] .ast-voz-ponto { background: rgba(255, 255, 255, .55); box-shadow: none; }
+.v2 .ast-voz[data-mudo] .ast-voz-ponto { background: transparent; box-shadow: inset 0 0 0 1.2px rgba(255, 255, 255, .6); }
+.v2 .ast-voz[data-fase="encerrada"] .ast-voz-ponto,
+.v2 .ast-voz[data-fase="erro"] .ast-voz-ponto { background: rgba(255, 255, 255, .3); box-shadow: none; }
+
+.v2 .ast-voz-meio {
+  flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+  gap: 8px; padding: 10px 4px 0; overflow: hidden;
+}
+/* a legenda: 3 linhas no máximo, alinhada embaixo (o que ela acabou de dizer fica sempre à vista). Ela ENCOLHE
+   quando falta altura (cartão baixo): o corte é sempre em CIMA (o começo da fala), nunca a palavra que está sendo
+   dita; as camadas do fim do arquivo baixam para 2 ou 1 linha inteira antes disso */
+.v2 .ast-voz-legenda {
+  flex: 0 1 auto; min-height: 0; margin: 0; width: 100%; max-height: calc(1.45em * 3); overflow: hidden;
+  display: flex; flex-direction: column; justify-content: flex-end;
+  font: 500 15px/1.45 var(--fonte); letter-spacing: -.006em; color: rgba(255, 255, 255, .3);
+}
+.v2 .ast-voz-linhas { display: block; }
+.v2 .ast-voz-legenda .ast-dita { color: #F5F5F6; }
+/* o que você disse: 1 linha inteira ou nada (nunca meia linha cortada) */
+.v2 .ast-voz-voce {
+  flex: none; margin: 0; max-width: 100%; font: 400 12.5px/1.42 var(--fonte); color: var(--av-txt-3);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.v2 .ast-voz-aviso { display: flex; flex-direction: column; align-items: center; gap: 6px; padding-top: 2px; }
+.v2 .ast-voz-titulo { margin: 0; font: 600 15px/1.3 var(--fonte); letter-spacing: -.01em; color: var(--av-txt); }
+.v2 .ast-voz-texto { margin: 0; max-width: 272px; font: 400 12.5px/1.5 var(--fonte); color: var(--av-txt-2); }
+
+/* os links das conversas: uma fileira que rola na horizontal (a altura fica reservada: nada pula; no fim/erro a
+   fileira sai e o aviso ganha a altura) */
+.v2 .ast-voz-links {
+  flex: none; height: 30px; margin: 6px -16px 0; padding: 0 16px; box-sizing: border-box;
+  display: flex; align-items: center; gap: 6px; overflow-x: auto; overflow-y: hidden;
+  scrollbar-width: none; overscroll-behavior-x: contain;
+  -webkit-mask: linear-gradient(90deg, transparent 0, #000 16px, #000 calc(100% - 22px), transparent);
+  mask: linear-gradient(90deg, transparent 0, #000 16px, #000 calc(100% - 22px), transparent);
+}
+.v2 .ast-voz-links::-webkit-scrollbar { display: none; }
+.v2 .ast-voz[data-fase="encerrada"] .ast-voz-links,
+.v2 .ast-voz[data-fase="erro"] .ast-voz-links { display: none; }
+.v2 .ast-voz-link {
+  flex: none; display: inline-flex; align-items: center; gap: 6px; height: 28px; max-width: 250px; padding: 0 11px;
+  border-radius: 999px; border: 1px solid rgba(255, 255, 255, .13); background: rgba(255, 255, 255, .05);
+  color: var(--av-txt); font: 600 11.5px/1 var(--fonte); cursor: pointer;
+}
+.v2 .ast-voz-link span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .ast-voz-link svg { flex: none; color: var(--av-txt-2); }
+.v2 .ast-voz-link:hover { background: rgba(255, 255, 255, .1); border-color: rgba(255, 255, 255, .22); }
+
+.v2 .ast-voz-acoes { flex: none; height: 50px; margin-top: 8px; display: flex; align-items: center; justify-content: center; gap: 18px; }
+.v2 .ast-voz-mic,
+.v2 .ast-voz-fim {
+  width: 48px; height: 48px; padding: 0; margin: 0; border-radius: 50%; display: grid; place-items: center; cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, .13); background: rgba(255, 255, 255, .06); color: var(--av-txt);
+}
+.v2 .ast-voz-mic:hover,
+.v2 .ast-voz-botao:hover { background: rgba(255, 255, 255, .11); border-color: rgba(255, 255, 255, .2); }
+.v2 .ast-voz-mic[aria-pressed="true"] { background: #F2F2F3; border-color: transparent; color: #0B0B0C; }
+.v2 .ast-voz-fim:hover { background: #F2F2F3; border-color: transparent; color: #0B0B0C; }
+.v2 .ast-voz-botao {
+  height: 38px; padding: 0 18px; margin: 0; border-radius: 999px; cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, .14); background: rgba(255, 255, 255, .06);
+  color: var(--av-txt); font: 600 12.5px/1 var(--fonte);
+}
+.v2 .ast-voz-botao.ast-voz-botao-forte { background: #F2F2F3; border-color: transparent; color: #0B0B0C; }
+.v2 .ast-voz-botao.ast-voz-botao-forte:hover { background: #FFFFFF; }
+.v2 .ast-voz-mic:focus-visible,
+.v2 .ast-voz-fim:focus-visible,
+.v2 .ast-voz-botao:focus-visible,
+.v2 .ast-voz-link:focus-visible { outline: 2px solid rgba(255, 255, 255, .62); outline-offset: 3px; }
+
+/* O cartão encolhe com a janela e com o compositor do WhatsApp (que cresce com o texto e com "Respondendo a…"),
+   sem nunca subir sobre o cabeçalho da conversa. As consultas medem a caixa de CONTEÚDO (o cartão menos os 28 px
+   de padding: 385 = cartão de 413). Em cada camada a legenda mostra só linhas INTEIRAS que cabem (3, 2 ou 1),
+   com a fala mais recente embaixo. (Depois de TODAS as regras do cartão: mesma especificidade, a última vence.) */
+/* B (cartão de 369 a 413 px; 1366×657 com o compositor de 1 linha = 392): esfera de 146 px */
+@container ast-voz (max-height: 385px) {
+  .v2 .ast-voz-esfera { width: 146px; height: 146px; }
+}
+@container ast-voz (max-height: 352px) {
+  .v2 .ast-voz-legenda { max-height: calc(1.45em * 2); }
+}
+/* C, compacto (cartão de 279 a 368 px: compositor alto ou janela baixa): sem o rótulo do topo, esfera de 112 px,
+   botões de 40 px e o rodapé comendo a folga de baixo */
+@container ast-voz (max-height: 340px) {
+  .v2 .ast-voz-topo { display: none; }
+  .v2 .ast-voz-esfera { width: 112px; height: 112px; margin-top: -6px; }
+  .v2 .ast-voz-estado { margin-top: -10px; }
+  .v2 .ast-voz-meio { padding-top: 4px; gap: 2px; }
+  .v2 .ast-voz-links { height: 28px; margin-top: 2px; }
+  .v2 .ast-voz-acoes { height: 42px; margin: 4px 0 -6px; }
+  .v2 .ast-voz-mic,
+  .v2 .ast-voz-fim { width: 40px; height: 40px; }
+  .v2 .ast-voz-botao { height: 34px; }
+  .v2 .ast-voz-legenda { max-height: calc(1.45em * 3); }
+}
+@container ast-voz (max-height: 272px) {
+  .v2 .ast-voz-legenda { max-height: calc(1.45em * 2); }
+}
+/* D, mínimo (cartão de 220 a 278 px; 1366×657 respondendo com o compositor cheio = 265): esfera de 88 px; sem a
+   linha do que você disse (a legenda dela vem antes) */
+@container ast-voz (max-height: 250px) {
+  .v2 .ast-voz-esfera { width: 88px; height: 88px; margin-top: -4px; }
+  .v2 .ast-voz-estado { margin-top: -6px; }
+  .v2 .ast-voz-voce { display: none; }
+  .v2 .ast-voz-legenda { max-height: calc(1.45em * 3); }
+}
+@container ast-voz (max-height: 235px) {
+  .v2 .ast-voz-legenda { max-height: calc(1.45em * 2); }
+}
+@container ast-voz (max-height: 213px) {
+  .v2 .ast-voz-legenda { max-height: 1.45em; }
+}
+/* E (cartão de 200 a 219 px, o piso): esfera de 64 px */
+@container ast-voz (max-height: 191px) {
+  .v2 .ast-voz-esfera { width: 64px; height: 64px; }
+}
+
+/* só para o leitor de tela */
+.v2 .ast-sr {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0; overflow: hidden;
+  clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------- movimento */
+@media (prefers-reduced-motion: no-preference) {
+  html:root[data-perf] .v2 .ast-balao { transition: transform .18s var(--mo-pad, ease) !important; }
+  html:root[data-perf] .v2 .ast-balao:hover { transform: translateY(-2px) !important; }
+  html:root[data-perf] .v2 .ast-balao:active { transform: scale(.95) !important; }
+  html:root[data-perf] .v2 .ast-pilula { transition: opacity .16s var(--mo-pad, ease), transform .2s var(--mo-enf, ease-out) !important; }
+  html:root[data-perf] .v2 .ast-voz { animation: ast-voz-entra .26s var(--mo-enf, ease-out) backwards !important; }
+  html:root[data-perf] .v2 .ast-voz-esfera { transition: opacity .3s var(--mo-pad, ease) !important; }
+  html:root[data-perf] .v2 .ast-voz-legenda span { transition: color .22s ease !important; }
+  html:root[data-perf] .v2 .ast-voz-voce,
+  html:root[data-perf] .v2 .ast-voz-aviso,
+  html:root[data-perf] .v2 .ast-voz-link { animation: ast-voz-surge .22s var(--mo-enf, ease-out) backwards !important; }
+  html:root[data-perf] .v2 .ast-voz-mic,
+  html:root[data-perf] .v2 .ast-voz-fim,
+  html:root[data-perf] .v2 .ast-voz-botao,
+  html:root[data-perf] .v2 .ast-voz-link {
+    transition: background-color .14s var(--mo-pad, ease), border-color .14s var(--mo-pad, ease), color .14s var(--mo-pad, ease) !important;
+  }
+  /* contínuo, só no Completo */
+  html:root[data-perf="full"] .v2 .ast-esfera-giro { animation: ast-gira 9s linear infinite !important; }
+  html:root[data-perf="full"] .v2 .ast-voz[data-fase="ouvindo"]:not([data-mudo]) .ast-voz-ponto,
+  html:root[data-perf="full"] .v2 .ast-voz[data-fase="conectando"] .ast-voz-ponto,
+  html:root[data-perf="full"] .v2 .ast-voz[data-fase="consultando"] .ast-voz-ponto { animation: ast-voz-pulso 1.5s ease-in-out infinite !important; }
+}
+@keyframes ast-gira { to { transform: rotate(360deg); } }
+@keyframes ast-voz-entra { from { opacity: 0; transform: translateY(12px) scale(.98); } }
+@keyframes ast-voz-surge { from { opacity: 0; transform: translateY(4px); } }
+@keyframes ast-voz-pulso { 0%, 100% { opacity: .35; transform: scale(.82); } 50% { opacity: 1; transform: scale(1); } }

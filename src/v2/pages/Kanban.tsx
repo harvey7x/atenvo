@@ -3,27 +3,34 @@ import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CLASSE_RAIZ_PORTAL, criarRaizPortalV2 } from '../components/portal';
 import { useOrg } from '@/context/OrgContext';
+import { pctProgresso, useProgressoCarga } from '@/data/progressoCarga';
 import {
-  KANBAN_REAL, useKanban, useOportunidadesAbertasDeContatos, useConversasDoContato,
+  KANBAN_REAL, PROGRESSO_KANBAN, useKanban, useOportunidadesAbertasDeContatos, useConversasDoContato,
   useNaoLidasPorContato, useOportunidadeEventos,
-  classificarMovimento, traduzErroKanban, valorRelevante,
-  MOTIVOS_PERDA, rotuloMotivoPerda, rotuloDe,
+  classificarMovimento, traduzErroKanban, valorRelevante, bloqueioAdministrativo, bloqueioAssinar,
+  MOTIVOS_NAO_ELEGIVEL, rotuloMotivoPerda, rotuloPerdaCompleto, rotuloDe,
   TIPO_BENEFICIO_OPCOES as TIPO_BENEFICIO, TIPO_SERVICO_OPCOES as TIPO_SERVICO,
   STATUS_CANCEL_OPCOES as ST_CANCEL, STATUS_RESS_OPCOES as ST_RESS,
   type KLead, type KColuna, type ColResultado, type MovimentoTipo, type OppAberta, type OppEvento,
 } from '@/data/kanban';
 import { useBuscaContatos, type ContatoRow } from '@/data/contatos';
+import { useAdmStatus } from '@/data/admFechados';
 import { useEtiquetas, useOrgUsuarios } from '@/data/atendimento';
 import { useFichasStatusDeOportunidades, fichaDemoDaOportunidade, type FichaBoardResumo } from '@/data/fichaJudicial';
 import { useSlaAlertas } from '@/data/sla';
 import { indexPorChave, type SlaAlerta, type SlaTipo } from '@/data/slaView';
+import { useVacuoRepasses, repassesPorOportunidade, estagioAviso, type VacuoRepasse } from '@/data/vacuo';
 import { corDaEtiqueta, type Etiqueta } from '@/types/atendimento';
-import { initials } from '@/lib/avatar';
+import { initials, avatarColor } from '@/lib/avatar';
+import { fotoIlustrativa } from '../lib/fotoIlustrativa';
+import { useVisibilidade } from '@/lib/visibilidade';
 import { FichaJudicialBox } from '@/components/FichaJudicialBox';
 import { RelacionamentoContatoBox } from '@/components/RelacionamentoContatoBox';
+import { DocumentosInssBox } from '@/components/DocumentosInssBox';
 import { useBloqueiosOrg } from '../hooks/bloqueiosOrg';
-import { BotaoPrimario, BotaoSec, CardVidro, DrawerV2, EstadoErro, ModalV2, Skeleton } from '../components';
+import { BotaoPrimario, BotaoSec, DrawerV2, EstadoErro, ModalV2 } from '../components';
 import './kanban.css';
+import './kanban-pro.css';
 
 /* ------------------------------------------------------------------
    Kanban v2 — funil comercial (anatomia pg-kanban do mockup; verdade
@@ -101,6 +108,8 @@ const SLA_OCULTO_NO_CARD = new Set<SlaTipo>(['parado_ha_muito_tempo', 'prazo_2_d
 /** LIMIAR DECLARADO da estagnação visual (trilho rubro + "parado Xd"):
     7 dias sem trocar de coluna (movimentadoEm), só em lead aberto em coluna neutra. */
 const LIMIAR_PARADO_DIAS = 7;
+/** Kanban PRO (29/10): cards montados por vez em cada coluna (o resto vem ao rolar / "Mostrar mais"). */
+const PASSO_CARDS = 40;
 const diasParado = (l: KLead) => {
   const base = l.movimentadoEm || l.entradaEm || l.criadoEm;
   if (!base) return 0;
@@ -153,6 +162,11 @@ const IcKb = () => <Ic><rect x="3" y="4" width="5" height="16" rx="1.4" /><rect 
 const IcColapsar = () => <Ic><path d="M13 5l-6 7 6 7M20 5l-6 7 6 7" /></Ic>; // « recolher coluna
 const IcSino = () => <Ic><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></Ic>; // lembrete no card
 const IcChat = () => <Ic><path d="M21 12a8 8 0 0 1-8 8H4l2.2-2.6A8 8 0 1 1 21 12z" /></Ic>; // atalho pro WhatsApp no card
+// Kanban PRO (29/10): ícones dos chips do card
+const IcRelogio = () => <Ic><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></Ic>;
+const IcCal = () => <Ic><rect x="3.5" y="5" width="17" height="15" rx="2.5" /><path d="M8 3v4M16 3v4M3.5 10h17" /></Ic>;
+const IcEtapas = () => <Ic><path d="M4 17h4v-4h4V9h4V5h4" /></Ic>;
+const IcAlerta = () => <Ic><path d="M12 4 2.8 19.5h18.4L12 4z" /><path d="M12 10v4M12 17h.01" /></Ic>;
 
 type Aviso = { tom: 'ok' | 'erro'; texto: string } | null;
 
@@ -175,7 +189,7 @@ function leadDemo(n: Partial<KLead> & { id: string; nome: string; colunaId: stri
     contatoId: null, conversaOrigemId: null, canalOrigemId: null, telefone: '', email: '',
     respId: null, respNome: '', valor: null, origem: 'WhatsApp', etiquetas: [], observacoes: '', lembrete: null, ordem: 0,
     criadoEm: agora, atualizadoEm: agora, entradaEm: agora, movimentadoEm: agora, prioridade: null,
-    status: 'em_andamento', fechadoEm: null, motivoPerda: null, respNoFechamentoId: null,
+    status: 'em_andamento', fechadoEm: null, motivoPerda: null, motivoNaoElegivel: null, respNoFechamentoId: null,
     tipoBeneficio: 'aposentadoria', tipoServico: 'analise_inicial', statusCancelamento: 'nao_se_aplica',
     statusRessarcimento: 'nao_se_aplica', numeroBeneficio: null, instituicao: null, tipoDesconto: null,
     dataInicioDesconto: null, valorDescontoMensal: null, valorRessarcimentoEstimado: null, valorRessarcido: null,
@@ -234,6 +248,39 @@ function seedKb(): SeedKb {
 
 /* ================================================================== */
 
+/* Tela de carregamento (dono 30/10: "uma mensagem tipo carregando o Kanban, aguarde… bonita,
+   profissional"). Atrás, o esboço das colunas; na frente, o cartão com o progresso REAL
+   (faixas de cards já recebidas — ver buscarKeysetEmFaixas). */
+function CarregandoKanban() {
+  const p = useProgressoCarga(PROGRESSO_KANBAN);
+  const pct = pctProgresso(p);
+  return (
+    <div className="kb-pg kb-pro">
+      <div className="kb-carr" role="status" aria-live="polite" aria-busy>
+        <div className="kb-carr-fundo" aria-hidden>
+          {[4, 3, 4, 2, 3, 2].map((n, i) => (
+            <div key={i} className="kb-carr-col">
+              <span className="kb-carr-tit" />
+              {Array.from({ length: n }, (_, j) => <span key={j} className="kb-carr-card" />)}
+            </div>
+          ))}
+        </div>
+        <div className="kb-carr-caixa">
+          <span className="kb-carr-ic" aria-hidden><i /><i /><i /></span>
+          <strong>Carregando o Kanban</strong>
+          <span className="kb-carr-txt">Aguarde, estamos organizando as oportunidades nas colunas.</span>
+          <span className={'kb-carr-barra' + (pct === 0 ? ' indet' : '')}>
+            <i style={pct > 0 ? { width: `${Math.max(pct, 6)}%` } : undefined} />
+          </span>
+          <span className="kb-carr-num num">
+            {p && p.itens > 0 ? `${p.itens.toLocaleString('pt-BR')} oportunidades · ${pct}%` : 'Buscando os cards…'}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function KanbanV2() {
   const { currentOrg } = useOrg();
   const nav = useNavigate();
@@ -243,6 +290,7 @@ export default function KanbanV2() {
   const demoSeq = useRef(0);
 
   const podeConfig = currentOrg.role === 'admin' || currentOrg.role === 'gestor';
+  const vis = useVisibilidade();
 
   const k = useKanban();
   const naoLidasQ = useNaoLidasPorContato();
@@ -252,6 +300,9 @@ export default function KanbanV2() {
   const bloqueiosQ = useBloqueiosOrg();
 
   const [aviso, setAviso] = useState<Aviso>(null);
+  const admSt = useAdmStatus().data;
+  const admAtivo = admSt?.ativo ?? false;
+  const admAssinar = admSt?.assinar ?? false;
   const [search, setSearch] = useState('');
   const [menu, setMenu] = useState<{ kind: 'card' | 'col'; id: string; top: number; right: number } | null>(null);
   // raiz de portal (regra 10): o menu "⋮" monta no body, fora do overflow da coluna e do stacking
@@ -279,8 +330,7 @@ export default function KanbanV2() {
 
   const [pend, setPend] = useState<{ lead: KLead; colDest: KColuna; tipo: MovimentoTipo } | null>(null);
   const [movBusy, setMovBusy] = useState(false);
-  const [motPerda, setMotPerda] = useState('');
-  const [motPerdaDesc, setMotPerdaDesc] = useState('');
+  const [motNE, setMotNE] = useState(''); // motivo do descarte ("Não elegível" é a única coluna perdida)
   const [motReab, setMotReab] = useState('');
   const [movErr, setMovErr] = useState<string | null>(null);
 
@@ -301,6 +351,8 @@ export default function KanbanV2() {
 
   const [detId, setDetId] = useState<string | null>(null);
   const [destaque, setDestaque] = useState<string | null>(null);
+  // Kanban PRO (29/10): cada coluna monta os cards aos poucos (Lead Novo passa de 2 mil) — mais rolando
+  const [limiteCol, setLimiteCol] = useState<Record<string, number>>({});
   const [filtroOrigem, setFiltroOrigem] = useState<string | null>(null); // v2.1: origem repetida vira filtro no topo
   // v3 — ordenação inteligente (persistida) + Foco (filtro opcional, NÃO ocupa espaço vertical) + recolher coluna.
   const [sortModo, setSortModo] = useState<SortModo>(() => { try { const s = sessionStorage.getItem('atenvo-kb-sort'); return s === 'lembrete' || s === 'recencia' ? s : 'urgencia'; } catch { return 'urgencia'; } });
@@ -331,6 +383,9 @@ export default function KanbanV2() {
     () => indexPorChave(demo ? seed.sla : (slaQ.data?.itens ?? []), 'oportunidade_id'),
     [demo, seed.sla, slaQ.data],
   );
+  // Radar de Atendimento: selo "era de X" no card (último repasse por oportunidade)
+  const vacuoQ = useVacuoRepasses();
+  const repassePorOpp = useMemo(() => repassesPorOportunidade(vacuoQ.data ?? []), [vacuoQ.data]);
   const fichaStatusQ = useFichasStatusDeOportunidades(useMemo(() => leads.map((l) => l.id), [leads]));
   // resumo por lead (status + bancos da ficha); no demo, sintetiza dos seeds
   const fichaResumoMap: Record<string, FichaBoardResumo> = useMemo(() => (demo
@@ -565,7 +620,7 @@ export default function KanbanV2() {
       };
     });
   };
-  const moverOportunidade = async (p: { id: string; colunaId: string; atualizadoEmEsperado: string; motivoPerda?: string; motivoPerdaDesc?: string; motivoReabertura?: string }) => {
+  const moverOportunidade = async (p: { id: string; colunaId: string; atualizadoEmEsperado: string; motivoPerda?: string; motivoPerdaDesc?: string; motivoNaoElegivel?: string | null; motivoReabertura?: string }) => {
     if (demo) demoMover(p.id, p.colunaId, p);
     else await k.moverOportunidade(p);
     // se o destino estiver recolhido, expande p/ o card movido continuar visível após o drop
@@ -647,10 +702,14 @@ export default function KanbanV2() {
     if (optim[id]) return; // card já em movimentação
     const colDest = colunas.find((c) => c.id === colId);
     if (!colDest) return;
-    const resOrig: ColResultado = colunas.find((c) => c.id === colunaDoLead(lead))?.resultado ?? 'neutro';
+    const colOrig = colunas.find((c) => c.id === colunaDoLead(lead));
+    const resOrig: ColResultado = colOrig?.resultado ?? 'neutro';
+    const trava = (admAtivo ? bloqueioAdministrativo(resOrig, colDest.resultado) : null)
+      ?? (admAssinar ? bloqueioAssinar(colOrig?.nome, colDest.nome) : null);
+    if (trava) { setAviso({ tom: 'erro', texto: trava }); return; }
     const tipo = classificarMovimento(resOrig, colDest.resultado);
     if (tipo !== 'neutro') {
-      setMotPerda(''); setMotPerdaDesc(''); setMotReab(''); setMovErr(null);
+      setMotNE(''); setMotReab(''); setMovErr(null);
       setPend({ lead, colDest, tipo });
       return;
     }
@@ -667,8 +726,7 @@ export default function KanbanV2() {
 
   const confirmarMov = async () => {
     if (!pend || movBusy) return;
-    if (pend.tipo === 'perdido' && !motPerda) { setMovErr('Selecione o motivo da perda.'); return; }
-    if (pend.tipo === 'perdido' && motPerda === 'outro' && !motPerdaDesc.trim()) { setMovErr('Descreva o motivo da perda.'); return; }
+    if (pend.tipo === 'perdido' && !motNE) { setMovErr('Diga por que o cliente não é elegível.'); return; }
     if (pend.tipo === 'reabertura' && !motReab.trim()) { setMovErr('Informe o motivo da reabertura.'); return; }
     setMovBusy(true);
     const atual = leads.find((l) => l.id === pend.lead.id)?.atualizadoEm ?? pend.lead.atualizadoEm;
@@ -676,8 +734,8 @@ export default function KanbanV2() {
     try {
       await moverOportunidade({
         id: pend.lead.id, colunaId: pend.colDest.id, atualizadoEmEsperado: atual,
-        motivoPerda: pend.tipo === 'perdido' ? motPerda : undefined,
-        motivoPerdaDesc: pend.tipo === 'perdido' && motPerda === 'outro' ? motPerdaDesc.trim() : undefined,
+        motivoPerda: pend.tipo === 'perdido' ? 'nao_elegivel' : undefined,
+        motivoNaoElegivel: pend.tipo === 'perdido' ? motNE : undefined,
         motivoReabertura: pend.tipo === 'reabertura' ? motReab.trim() : undefined,
       });
       setAviso({
@@ -745,12 +803,15 @@ export default function KanbanV2() {
     setLeadModal({ modo: 'editar', lead: l });
   };
   const arquivar = async (l: KLead) => {
+    const resCol: ColResultado = colunas.find((c) => c.id === colunaDoLead(l))?.resultado ?? 'neutro';
+    const trava = admAtivo ? bloqueioAdministrativo(resCol, 'neutro') : null;
+    if (trava) { setAviso({ tom: 'erro', texto: trava }); return; }
     try {
       if (demo) setSeed((s) => ({ ...s, leads: s.leads.filter((x) => x.id !== l.id) }));
       else await k.arquivarLead(l.id);
       setAviso({ tom: 'ok', texto: 'Lead arquivado' });
     } catch (e) {
-      setAviso({ tom: 'erro', texto: 'Falha ao arquivar: ' + ((e as Error)?.message ?? '') });
+      setAviso({ tom: 'erro', texto: 'Falha ao arquivar: ' + traduzErroKanban((e as Error)?.message ?? '') });
     }
   };
 
@@ -802,7 +863,12 @@ export default function KanbanV2() {
         const el = leadModal!.lead!;
         const mudouEtapa = lf.colunaId && lf.colunaId !== colunaDoLead(el);
         const colDest = colunas.find((c) => c.id === lf.colunaId);
-        const resOrig: ColResultado = colunas.find((c) => c.id === colunaDoLead(el))?.resultado ?? 'neutro';
+        const colOrig = colunas.find((c) => c.id === colunaDoLead(el));
+        const resOrig: ColResultado = colOrig?.resultado ?? 'neutro';
+        const trava = !mudouEtapa || !colDest ? null
+          : (admAtivo ? bloqueioAdministrativo(resOrig, colDest.resultado) : null)
+            ?? (admAssinar ? bloqueioAssinar(colOrig?.nome, colDest.nome) : null);
+        if (trava) { setLeadErr(trava); return; }
         const tipo = colDest ? classificarMovimento(resOrig, colDest.resultado) : 'neutro';
         const aplicarDemo = (patch: Partial<KLead>, colunaId?: string) => setSeed((s) => ({
           ...s,
@@ -821,7 +887,7 @@ export default function KanbanV2() {
           if (demo) aplicarDemo(patchDemo);
           else await k.editarLead({ id: el.id, ...comum });
           setLeadModal(null);
-          setMotPerda(''); setMotPerdaDesc(''); setMotReab(''); setMovErr(null);
+          setMotNE(''); setMotReab(''); setMovErr(null);
           setPend({ lead: el, colDest, tipo });
         } else {
           if (demo) aplicarDemo(patchDemo, lf.colunaId || undefined);
@@ -839,24 +905,10 @@ export default function KanbanV2() {
   const detLead = detId ? leads.find((l) => l.id === detId) ?? null : null;
 
   /* ---------- estados de página (contrato item 7: skeleton em vidro + EstadoErro) ---------- */
-  if (!demo && k.loading) {
-    return (
-      <div className="kb-pg">
-        <div className="kb-skel" aria-busy aria-label="Carregando funil">
-          {[0, 1, 2].map((i) => (
-            <CardVidro key={i} className="kb-skel-col">
-              <Skeleton largura="55%" />
-              <Skeleton largura="100%" altura={64} raio={12} />
-              <Skeleton largura="100%" altura={64} raio={12} />
-            </CardVidro>
-          ))}
-        </div>
-      </div>
-    );
-  }
+  if (!demo && k.loading) return <CarregandoKanban />;
   if (!demo && k.isError) {
     return (
-      <div className="kb-pg">
+      <div className="kb-pg kb-pro">
         <div className="kb-estado">
           <EstadoErro descricao="Não foi possível carregar o Kanban." aoTentarDeNovo={() => k.refetch()} />
         </div>
@@ -865,7 +917,7 @@ export default function KanbanV2() {
   }
   if (colunas.length === 0) {
     return (
-      <div className="kb-pg">
+      <div className="kb-pg kb-pro">
         <div className="kb-vazio-geral sobe">
           <IcKb />
           <div className="t">Seu funil está vazio</div>
@@ -879,7 +931,7 @@ export default function KanbanV2() {
   }
 
   return (
-    <div className="kb-pg">
+    <div className="kb-pg kb-pro">
       <div className="ph sobe">
         <div>
           <h2>Kanban</h2>
@@ -1009,11 +1061,17 @@ export default function KanbanV2() {
                 </button>
               );
             }
+            // aos poucos: PASSO cards por vez (o card em destaque sempre entra)
+            const idxDest = destaque ? cardsCol.findIndex((l) => l.id === destaque) : -1;
+            const lim = Math.max(limiteCol[col.id] ?? PASSO_CARDS, idxDest + 1);
+            const faltam = Math.max(0, cardsCol.length - lim);
+            const maisCards = () => setLimiteCol((m) => ({ ...m, [col.id]: lim + PASSO_CARDS }));
             const renderCard = (l: KLead) => (
               <CardKc
                 key={l.id} l={l} colunas={colunas} etiquetasCat={etiquetas}
                 naoLidas={naoLidasMap[l.contatoId ?? ''] ?? 0}
                 sla={(slaPorOpp.get(l.id) ?? []).filter((a) => !SLA_OCULTO_NO_CARD.has(a.tipo))}
+                repasse={repassePorOpp.get(l.id) ?? null}
                 fichaInfo={fichaResumoMap[l.id]} optout={!!l.contatoId && bloqueados.has(l.contatoId)}
                 aoAbrirConversa={() => { if (l.conversaOrigemId) nav((l.canalTipo === 'facebook' ? '/facebook' : '/whatsapp') + `?conversa=${encodeURIComponent(l.conversaOrigemId)}`); }}
                 moving={optim[l.id] !== undefined} arrastando={dragando === l.id} destacado={destaque === l.id}
@@ -1029,14 +1087,14 @@ export default function KanbanV2() {
               <div
                 key={col.id}
                 className={'kb-col sobe' + (hoverCol === col.id ? ' col-drop' : '') + (colArrastando === col.id ? ' arrastando' : '') + (gargalo ? ' gargalo' : '')}
-                style={{ animationDelay: atraso }}
+                style={{ animationDelay: atraso, ['--c']: col.cor } as React.CSSProperties}
                 onDragOver={(e) => { if (dragColId.current && dragColId.current !== col.id) { e.preventDefault(); setHoverCol(col.id); } }}
                 onDrop={(e) => { if (dragColId.current) { e.preventDefault(); e.stopPropagation(); soltarColuna(col.id); } }}
               >
                 <div
                   className="kb-cab"
-                  /* sublinhado na COR da coluna (anatomia da referência) — borda real de 2px */
-                  style={{ borderBottom: `2px solid ${col.cor}73` }}
+                  /* a COR da coluna vem do --c da coluna (faixa no topo, kanban-pro.css) */
+                  style={{ ['--c']: col.cor } as React.CSSProperties}
                   draggable={podeConfig && !col.entrada}
                   onDragStart={(e) => {
                     if (!podeConfig || col.entrada) { e.preventDefault(); return; }
@@ -1048,9 +1106,11 @@ export default function KanbanV2() {
                 >
                   <button type="button" className="kb-col-toggle" aria-label={'Recolher coluna ' + col.nome} title="Recolher coluna" onClick={(e) => { e.stopPropagation(); toggleCol(col.id); }}><IcColapsar /></button>
                   {/* v5: o dot saiu do cabeçalho expandido — a cor da coluna vive no sublinhado (na recolhida o dot fica) */}
+                  <span className="kb-cab-ic" aria-hidden />
                   <span className="n" title={col.nome}>{col.nome}</span>
                   {col.entrada && <span className="tag-entrada" title="Coluna de entrada — recebe novos leads dos canais">entrada</span>}
-                  <span className="q num">{todosCol.length}</span>
+                  <span className="q num">{todosCol.length.toLocaleString('pt-BR')}</span>
+                  <button type="button" className="kb-col-add" aria-label={'Adicionar lead em ' + col.nome} title="Adicionar lead" onClick={(e) => { e.stopPropagation(); abrirNovoLead(col.id); }}><IcMais /></button>
                   {podeConfig && (
                     <span className="kb-menu-wrap">
                       <button type="button" className="mbtn" aria-label={'Ações da coluna ' + col.nome} onClick={(e) => { e.stopPropagation(); setMenu(menu?.kind === 'col' && menu.id === col.id ? null : { kind: 'col', id: col.id, ...posMenu(e.currentTarget) }); }}>
@@ -1065,14 +1125,15 @@ export default function KanbanV2() {
                     ? <span className="rec">{nRecentesCol} nos últimos 7 dias</span>
                     : (
                       <>
-                        <span className={'par' + (nParadosCol > 0 ? '' : ' zero')}>{nParadosCol} parado{nParadosCol === 1 ? '' : 's'}</span>
-                        <span className="rec">· {nRecentesCol} recente{nRecentesCol === 1 ? '' : 's'}</span>
+                        <span className={'par' + (nParadosCol > 0 ? '' : ' zero')}>{nParadosCol.toLocaleString('pt-BR')} parado{nParadosCol === 1 ? '' : 's'}</span>
+                        <span className="rec">· {nRecentesCol.toLocaleString('pt-BR')} recente{nRecentesCol === 1 ? '' : 's'}</span>
                       </>
                     )}
-                  {gargalo && <span className="glr" title={`${nParadosCol} leads travados +${LIMIAR_PARADO_DIAS}d nesta etapa — gargalo do funil`}>Gargalo · {nParadosCol}</span>}
+                  {gargalo && <span className="glr" title={`${nParadosCol} leads travados +${LIMIAR_PARADO_DIAS}d nesta etapa — gargalo do funil`}>Gargalo</span>}
                 </div>
                 <div
                   className="kb-corpo"
+                  onScroll={(e) => { const t = e.currentTarget; if (faltam > 0 && t.scrollTop + t.clientHeight > t.scrollHeight - 400) maisCards(); }}
                   onDragOver={(e) => { if (dragColId.current) return; e.preventDefault(); setHover(col.id); }}
                   onDragLeave={() => setHover((hAtual) => (hAtual === col.id ? null : hAtual))}
                   onDrop={() => {
@@ -1084,7 +1145,12 @@ export default function KanbanV2() {
                     if (id) mover(id, col.id);
                   }}
                 >
-                  {cardsCol.map(renderCard)}
+                  {cardsCol.slice(0, lim).map(renderCard)}
+                  {faltam > 0 && (
+                    <button type="button" className="kb-mais" onClick={maisCards}>
+                      Mostrar mais {Math.min(PASSO_CARDS, faltam)} <span className="num">· faltam {faltam.toLocaleString('pt-BR')}</span>
+                    </button>
+                  )}
                   {hover === col.id && dragando && <div className="fantasma" aria-hidden />}
                   {cardsCol.length === 0 && hover !== col.id && <div className="kb-vazia">{foco ? 'Nada crítico aqui' : 'Sem leads'}</div>}
                   <button type="button" className="kb-add" onClick={() => abrirNovoLead(col.id)}><IcMais />Adicionar lead</button>
@@ -1185,6 +1251,8 @@ export default function KanbanV2() {
               </div>
             )}
           </div>
+          {/* visibilidade (22/10): o board de quem não vê todos já é só dele — sem filtro por atendente */}
+          {vis.veTodos && (
           <div className="kbf-sec">
             <div className="kbf-cab">
               <span className="ic"><Ic><circle cx="12" cy="8" r="3.5" /><path d="M5 20a7 7 0 0 1 14 0" /></Ic></span>
@@ -1201,6 +1269,7 @@ export default function KanbanV2() {
               ))}
             </div>
           </div>
+          )}
           {origens.length > 1 && (
             <div className="kbf-sec">
               <div className="kbf-cab">
@@ -1332,18 +1401,12 @@ export default function KanbanV2() {
             {pend.tipo === 'perdido' && (
               <div className="form-grid" style={{ marginTop: 12 }}>
                 <div className="campo">
-                  <label>Motivo da perda *</label>
-                  <select className="inp" value={motPerda} onChange={(e) => { setMotPerda(e.target.value); setMovErr(null); }}>
+                  <label>Por que não é elegível? *</label>
+                  <select className="inp" value={motNE} onChange={(e) => { setMotNE(e.target.value); setMovErr(null); }}>
                     <option value="">Selecione…</option>
-                    {MOTIVOS_PERDA.map(([v, r]) => <option key={v} value={v}>{r}</option>)}
+                    {MOTIVOS_NAO_ELEGIVEL.map(([v, r]) => <option key={v} value={v}>{r}</option>)}
                   </select>
                 </div>
-                {motPerda === 'outro' && (
-                  <div className="campo">
-                    <label>Descrição *</label>
-                    <textarea className="inp" rows={2} placeholder="Descreva o motivo" value={motPerdaDesc} onChange={(e) => { setMotPerdaDesc(e.target.value); setMovErr(null); }} />
-                  </div>
-                )}
               </div>
             )}
             {pend.tipo === 'reabertura' && (
@@ -1405,9 +1468,9 @@ function DetRow({ l, v }: { l: string; v: ReactNode }) {
    vs .hot (+30d ou SLA vermelho, trilho/tempo rubro) — com 51% do
    funil parado, só o .hot ganha o alarme forte para o vermelho valer.
    ================================================================ */
-function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, fichaInfo, optout, moving, arrastando, destacado, menuAberto, aoRef, aoClicar, aoMenu, aoDragStart, aoDragEnd, aoAbrirConversa }: {
+function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, repasse, fichaInfo, optout, moving, arrastando, destacado, menuAberto, aoRef, aoClicar, aoMenu, aoDragStart, aoDragEnd, aoAbrirConversa }: {
   l: KLead; colunas: KColuna[]; etiquetasCat: Etiqueta[]; naoLidas: number;
-  sla: SlaAlerta[]; fichaInfo: FichaBoardResumo | undefined; optout: boolean; moving: boolean; arrastando: boolean;
+  sla: SlaAlerta[]; repasse: VacuoRepasse | null; fichaInfo: FichaBoardResumo | undefined; optout: boolean; moving: boolean; arrastando: boolean;
   destacado: boolean; menuAberto: boolean;
   aoRef: (el: HTMLDivElement | null) => void; aoClicar: () => void; aoMenu: (btn: HTMLElement) => void;
   aoDragStart: (e: DragEvent) => void; aoDragEnd: () => void; aoAbrirConversa: () => void;
@@ -1433,7 +1496,6 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, fichaInfo, optout, mo
   // meta corrida: só a instituição (bancos ganharam a própria fileira de destaque)
   const metaPartes = [l.instituicao].filter(Boolean) as string[];
   const revN = fichaInfo?.revBancos.length ?? 0;
-  const metaTitle = metaPartes.join(' · ');
   // progresso do funil DO JEITO DO DONO (27/08): TODAS as etapas contam menos Perdido
   // (Lead novo, Qualificado, Documentação, Assinar, Fechado = 5). Entrada = 0/5; cada
   // avanço de coluna sobe 1; chegou no Fechado/ganho = 5/5 cheio (verde).
@@ -1443,7 +1505,6 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, fichaInfo, optout, mo
   const noGanho = l.status === 'ganho' || (colAtual ? (colAtual.resultado ?? 'neutro') === 'ganho' : false);
   const mostraProg = l.status !== 'perdido' && nEtapas > 1 && (noGanho || idxEtapa >= 0);
   const progVal = noGanho ? nEtapas : Math.max(0, idxEtapa);
-  const progPct = (progVal / Math.max(nEtapas, 1)) * 100;
   // v3 F2 — PRÓXIMO PASSO: 1 badge que diz o que FAZER (não só o que é). "Sem responsável" já vive
   // em âmbar na linha do atendente; a estagnação, no "parado Xd" ao lado — o badge não os repete.
   const badge = optout ? { cls: 'blk', txt: 'Não incomodar' }
@@ -1460,6 +1521,17 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, fichaInfo, optout, mo
   const fone = tituloTelefone(l.nome);
   const nomeCard = fone ?? nomeExibicao(l.nome);
 
+  // Kanban PRO (29/10, dono: "mais minimalista, profissional"): nome + 1 linha cinza + chips
+  // com ícone (situação · entrada · etapa) + pessoas à direita (responsável e a foto ILUSTRATIVA).
+  const subtitulo = [benefLbl, ...metaPartes].filter(Boolean).join(' · ');
+  const foto = fotoIlustrativa(l.nome, l.contatoId ?? l.id);
+  const estado = badge
+    ? { cls: badge.cls, txt: badge.cls === 'hot' && paradoAtivo ? `Retomar · ${dp}d` : badge.txt, msg: badge.cls === 'msg' }
+    : paradoAtivo ? { cls: hot ? 'hot' : 'warm', txt: `parado ${dp}d`, msg: false }
+    : { cls: '', txt: haDe(l.atualizadoEm || l.criadoEm), msg: false };
+  const estadoTitle = badge ? badge.txt + (paradoAtivo ? ` — sem trocar de coluna há ${dp} dia(s)` : '') + (dataFull ? ` · no funil desde ${dataFull}` : '')
+    : paradoAtivo ? `Sem trocar de coluna há ${dp} dia(s)` : 'Última atualização';
+
   return (
     <div
       ref={aoRef}
@@ -1469,36 +1541,37 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, fichaInfo, optout, mo
       onDragStart={aoDragStart}
       onDragEnd={aoDragEnd}
     >
-      {/* ⋮ absoluto no canto — em repouso o card é só informação (aparece no hover) */}
-      <span className="kb-menu-wrap">
-        <button type="button" className={'mbtn' + (menuAberto ? ' on' : '')} aria-label={'Ações do lead ' + l.nome} aria-expanded={menuAberto} onClick={(e) => { e.stopPropagation(); aoMenu(e.currentTarget); }}>
-          <IcPontos />
-        </button>
-        {/* o dropdown do card é renderizado em PORTAL no nível da página (fora do overflow da coluna) */}
+      {/* ações no canto, só no hover: conversa + ⋮ (o dropdown do card vai em PORTAL) */}
+      <span className="kc-acoes">
+        {l.conversaOrigemId && (
+          <button type="button" className="kc-wa" title="Abrir a conversa do cliente no WhatsApp" aria-label={'Abrir a conversa de ' + l.nome + ' no WhatsApp'}
+            onClick={(e) => { e.stopPropagation(); aoAbrirConversa(); }}>
+            <IcChat />
+          </button>
+        )}
+        <span className="kb-menu-wrap">
+          <button type="button" className={'mbtn' + (menuAberto ? ' on' : '')} aria-label={'Ações do lead ' + l.nome} aria-expanded={menuAberto} onClick={(e) => { e.stopPropagation(); aoMenu(e.currentTarget); }}>
+            <IcPontos />
+          </button>
+        </span>
       </span>
 
-      {/* L1: TAG de benefício colorida (a energia da referência) + data de entrada */}
-      {(benefLbl || dataCurta) && (
-        <div className="kc-eyebrow">
-          {benefLbl && <span className="kc-benef" title={'Tipo de benefício: ' + benefLbl}>{benefLbl}</span>}
-          {dataCurta && <span className="kc-data num" title={'No funil desde ' + dataFull}>{dataCurta}</span>}
-        </div>
-      )}
-
-      {/* L2 TÍTULO — o único elemento forte do card */}
       <div className="kc-r1">
         <span className="kc-nm" title={l.nome}>{fone ? <span className="num">{fone}</span> : nomeCard}{fone && <i className="kc-semnome">· sem nome</i>}</span>
-        {l.status === 'ganho' && <span className="kc-flag ganho" title="Fechado como ganho">Ganho</span>}
-        {l.status === 'perdido' && <span className="kc-flag perdido" title={'Perdido' + (l.motivoPerda ? ' · ' + rotuloMotivoPerda(l.motivoPerda) : '')}>Perdido</span>}
+        {(() => {
+          // Radar: negociação e cliente fechado têm avisos próprios; o selo diz o degrau, a dica diz a categoria
+          const av = sla.find((a) => a.tipo === 'vacuo_aviso' || a.tipo === 'vacuo_fechado');
+          if (!av) return null;
+          const n = estagioAviso(av.severidade);
+          return <span className={'sla-chip s-' + av.severidade} title={[av.titulo, av.detalhe].filter(Boolean).join(' — ')}>{n === 3 ? 'Último aviso' : n + 'º aviso'}</span>;
+        })()}
+        {repasse && <span className="kc-flag repasse" title={`Central de Avisos: repassado de ${repasse.deNome} para ${repasse.paraNome} por decisão do gestor${repasse.desfecho === 'fechado' ? `. ${repasse.paraNome} fechou` : ''}`}>Era de {repasse.deNome}</span>}
+        {l.status === 'ganho' && <span className="kc-flag ganho" title={'Fechado como ganho' + (repasse ? ` por ${repasse.paraNome} (era de ${repasse.deNome})` : '')}>Ganho</span>}
+        {l.status === 'perdido' && <span className="kc-flag perdido" title={'Perdido' + (l.motivoPerda ? ' · ' + rotuloPerdaCompleto(l.motivoPerda, l.motivoNaoElegivel) : '')}>Perdido</span>}
       </div>
+      {subtitulo && <div className="kc-meta" title={subtitulo}>{subtitulo}</div>}
 
-      {/* L3 META corrida: instituição */}
-      {metaPartes.length > 0 && (
-        <div className="kc-meta" title={metaTitle}>{metaPartes.join(' · ')}</div>
-      )}
-
-      {/* L3b BANCOS DA FICHA em DESTAQUE (dono: "muito importante"): o banco do cliente
-          (recebe) no chip mais forte do card (assinatura platina); REVs em contorno */}
+      {/* BANCOS DA FICHA (dono: "muito importante"): o banco do cliente em destaque; REVs em contorno */}
       {fichaInfo && (fichaInfo.bancoNome || revN > 0) && (
         <div className="kc-bancos" title={'Bancos da ficha' + (fichaInfo.bancoNome ? ` · recebe: ${fichaInfo.bancoNome}` : '') + (revN ? ` · REV: ${fichaInfo.revBancos.join(', ')}` : '')}>
           {fichaInfo.bancoNome && <span className="kc-banco prin">{fichaInfo.bancoNome}</span>}
@@ -1506,50 +1579,40 @@ function CardKc({ l, colunas, etiquetasCat, naoLidas, sla, fichaInfo, optout, mo
           {revN > 2 && <span className="kc-banco mais">+{revN - 2}</span>}
         </div>
       )}
-      {/* RESERVADO — estado do BOT no card (dono 27/08): quando a opção nascer no bot,
-          entra aqui (fonte provável: ia_sessoes da conversa). */}
 
-      {/* L5 PROGRESSO do funil: avançou X de N etapas (0/N na entrada; N/N no Fechado) */}
-      {mostraProg && (
-        <div className="kc-prog" title={noGanho ? `Fechado — completou as ${nEtapas} etapas` : `Avançou ${progVal} de ${nEtapas} etapas · está em ${colAtual?.nome ?? ''}`}>
-          <span className="trilho"><span className="fill" style={{ width: progPct + '%' }} /></span>
-          <span className="frac num">{progVal}/{nEtapas}</span>
-        </div>
-      )}
-
-      {/* L6 LEMBRETE — texto âmbar, sem caixa */}
       {l.lembrete && (
         <div className="kc-lem" title={'Lembrete: ' + l.lembrete}><IcSino /><span>{l.lembrete}</span></div>
       )}
 
-      {/* L6b ETIQUETAS coloridas — mesma linguagem da tag de benefício, na cor da etiqueta */}
+      {/* ETIQUETAS sempre visíveis (dono): chip neutro com o ponto na cor da etiqueta */}
       {todasEtiquetas.length > 0 && (
         <div className="kc-etqs">
           {todasEtiquetas.slice(0, 2).map((t) => {
             const cor = corDaEtiqueta(t, etiquetasCat);
-            return <span key={t} className="kc-etq" title={t} style={{ color: cor, background: cor + '24', borderColor: cor + '4D' }}>{t}</span>;
+            return <span key={t} className="kc-etq" title={t}><i style={{ background: cor }} />{t}</span>;
           })}
           {todasEtiquetas.length > 2 && <span className="kc-etq mais" title={todasEtiquetas.slice(2).join(' · ')}>+{todasEtiquetas.length - 2}</span>}
         </div>
       )}
 
-      {/* L7 RODAPÉ: gente + tempo + WhatsApp */}
-      <div className="kc-foot">
-        <span className={'kc-av' + (l.respNome ? '' : ' semdono')} title={l.respNome ? 'Responsável · ' + l.respNome : 'Sem responsável'}>{l.respNome ? initials(l.respNome) : '·'}</span>
-        <span className={'kc-resp' + (l.respNome ? '' : ' none')} title={l.respNome || 'Não atribuído'}>{l.respNome || 'Não atribuído'}</span>
-        <span className={'kc-time num' + (paradoAtivo ? (hot ? ' hot' : ' warm') : '')} title={paradoAtivo ? `Sem trocar de coluna há ${dp} dia(s)` : 'Última atualização'}>
-          {paradoAtivo ? `parado ${dp}d` : haDe(l.atualizadoEm || l.criadoEm)}
+      <div className="kc-pe">
+        <span className={'kc-chip est num ' + estado.cls} title={estadoTitle}>
+          {estado.msg ? <IcChat /> : badge && badge.cls !== 'hot' ? <IcAlerta /> : <IcRelogio />}
+          {estado.txt}
         </span>
-        {l.conversaOrigemId && (
-          <button type="button" className="kc-wa" title="Abrir a conversa do cliente no WhatsApp" aria-label={'Abrir a conversa de ' + l.nome + ' no WhatsApp'}
-            onClick={(e) => { e.stopPropagation(); aoAbrirConversa(); }}>
-            <IcChat />
-          </button>
+        {/* com ação no selo ("Retomar · 122d"), a data sai do pé para o selo caber inteiro (fica no title) */}
+        {dataCurta && !badge && <span className="kc-chip num" title={'No funil desde ' + dataFull}><IcCal />{dataCurta}</span>}
+        {mostraProg && (
+          <span className={'kc-chip num' + (noGanho ? ' ok' : '')} title={noGanho ? `Fechado — completou as ${nEtapas} etapas` : `Avançou ${progVal} de ${nEtapas} etapas · está em ${colAtual?.nome ?? ''}`}>
+            <IcEtapas />{progVal}/{nEtapas}
+          </span>
         )}
+        <span className="kc-pessoas">
+          <span className={'kc-av' + (l.respNome ? '' : ' semdono')} title={l.respNome ? 'Responsável · ' + l.respNome : 'Sem responsável'}
+            style={l.respNome ? ({ ['--av']: avatarColor(l.respNome) } as React.CSSProperties) : undefined}>{l.respNome ? initials(l.respNome) : '?'}</span>
+          <img className="kc-foto" src={foto} alt="" loading="lazy" decoding="async" width={26} height={26} title="Foto ilustrativa" draggable={false} />
+        </span>
       </div>
-
-      {/* L8 FAIXA DE AÇÃO full-width no pé — o call-to-action que o atendente varre */}
-      {badge && <span className={'kc-badge ' + badge.cls} title={badge.txt}>{badge.txt}</span>}
     </div>
   );
 }
@@ -1951,7 +2014,7 @@ function LeadModalV2({ demo, modo, lead, lf, setLf, selContato, setSelContato, s
                 <div className="kb-tags">
                   {clienteTags.map((t) => {
                     const cor = corDaEtiqueta(t, etiquetas);
-                    return <span key={t} className="kb-tag-ro" style={{ background: cor + '22', color: cor, borderColor: cor + '55' }}>{t}</span>;
+                    return <span key={t} className="kb-tag-ro" style={{ background: cor + '22', color: cor, borderColor: cor + '55', ['--c']: cor } as React.CSSProperties}>{t}</span>;
                   })}
                 </div>
               </div>
@@ -1966,7 +2029,7 @@ function LeadModalV2({ demo, modo, lead, lf, setLf, selContato, setSelContato, s
                     <button
                       key={t.nome} type="button"
                       className="kb-tag"
-                      style={on ? { background: t.cor + '22', color: t.cor, borderColor: t.cor + '66' } : undefined}
+                      style={on ? ({ background: t.cor + '22', color: t.cor, borderColor: t.cor + '66', ['--c']: t.cor } as React.CSSProperties) : undefined}
                       onClick={() => setLf((f) => ({ ...f, etiquetas: on ? f.etiquetas.filter((x) => x !== t.nome) : [...f.etiquetas, t.nome] }))}
                     >
                       {t.nome}
@@ -2075,10 +2138,10 @@ function DetalheModalV2({ demo, l, colunas, eventosDemo, fichaDemoStatus, aoFech
       <DetRow l="Etapa" v={colNome(l.colunaId)} />
       <DetRow l="Lembrete no card" v={l.lembrete ? <span className="kd-lem"><IcSino />{l.lembrete}</span> : null} />
       {l.contatoEtiquetas.length > 0 && (
-        <DetRow l="Etiquetas do cliente" v={<span className="kb-tags" style={{ justifyContent: 'flex-end' }}>{l.contatoEtiquetas.map((t) => { const cor = corDaEtiqueta(t, etiquetasCat); return <span key={t} className="kb-tag-ro" style={{ background: cor + '22', color: cor, borderColor: cor + '55' }}>{t}</span>; })}</span>} />
+        <DetRow l="Etiquetas do cliente" v={<span className="kb-tags" style={{ justifyContent: 'flex-end' }}>{l.contatoEtiquetas.map((t) => { const cor = corDaEtiqueta(t, etiquetasCat); return <span key={t} className="kb-tag-ro" style={{ background: cor + '22', color: cor, borderColor: cor + '55', ['--c']: cor } as React.CSSProperties}>{t}</span>; })}</span>} />
       )}
       {l.etiquetas.length > 0 && (
-        <DetRow l="Etiquetas do caso" v={<span className="kb-tags" style={{ justifyContent: 'flex-end' }}>{l.etiquetas.map((t) => { const cor = corDaEtiqueta(t, etiquetasCat); return <span key={t} className="kb-tag-ro" style={{ background: cor + '22', color: cor, borderColor: cor + '55' }}>{t}</span>; })}</span>} />
+        <DetRow l="Etiquetas do caso" v={<span className="kb-tags" style={{ justifyContent: 'flex-end' }}>{l.etiquetas.map((t) => { const cor = corDaEtiqueta(t, etiquetasCat); return <span key={t} className="kb-tag-ro" style={{ background: cor + '22', color: cor, borderColor: cor + '55', ['--c']: cor } as React.CSSProperties}>{t}</span>; })}</span>} />
       )}
       <DetRow l="Resumo do caso" v={l.observacoes ? <span className="kd-resumo">{l.observacoes}</span> : null} />
 
@@ -2139,6 +2202,11 @@ function DetalheModalV2({ demo, l, colunas, eventosDemo, fichaDemoStatus, aoFech
       {!demo && (
         <div className="kd-ficha">
           <RelacionamentoContatoBox contatoId={l.contatoId} conversaId={l.conversaOrigemId} canalId={l.canalOrigemId} />
+        </div>
+      )}
+      {!demo && (
+        <div className="kd-ficha">
+          <DocumentosInssBox contatoId={l.contatoId} />
         </div>
       )}
       </div>

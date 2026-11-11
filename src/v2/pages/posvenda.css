@@ -1,0 +1,164 @@
+/* ============================================================
+   Pós-venda — anatomia executiva do Dashboard (dashboard.css):
+   base MONOCROMÁTICA em rgba(var(--tint)); cor só como semântica
+   (rubro = aguardando resposta, âmbar = espera subindo). Caps nos
+   rótulos, números tabulares, vidro calmo — nenhum enfeite.
+   ALINHAMENTO: a página é UMA grade de 12 colunas (gap 12) — os 3
+   heróis (4+4+4) e a fileira de baixo (8+4) dividem as MESMAS
+   calhas; dentro dos cards, todo texto nasce no mesmo recuo do
+   padding do card (nenhum recuo interno extra).
+   ============================================================ */
+
+.v2 .pv-pg { max-width: 1220px; padding-bottom: 8px; }
+
+/* --- grade única --- */
+.v2 .pv-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 12px; }
+.v2 .pv-grid > .pv-hero { grid-column: span 4; }
+.v2 .pv-grid > .pv-main { grid-column: span 8; }
+.v2 .pv-grid > .pv-painel { grid-column: span 4; }
+.v2 .pv-grid > .pv-full { grid-column: span 12; }
+@media (max-width: 1060px) {
+  .v2 .pv-grid > .pv-hero { grid-column: span 12; }
+  .v2 .pv-grid > .pv-main, .v2 .pv-grid > .pv-painel { grid-column: span 12; }
+  .v2 .pv-painel { position: static; }
+}
+
+/* --- heróis (mesma régua do .db-hero) --- */
+.v2 .pv-hero {
+  position: relative; overflow: hidden; padding: 15px 17px 17px; border-radius: var(--r-card); min-height: 104px;
+  display: flex; flex-direction: column;
+  box-shadow: 0 10px 26px rgba(2, 4, 10, .28), inset 0 1px 0 rgba(255, 255, 255, .05);
+}
+:root[data-tema="light"] .v2 .pv-hero { box-shadow: var(--sombra-1); }
+.v2 .pv-hero .rot { font-size: 9.5px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--txt-3); }
+.v2 .pv-hero .val { font-size: 27px; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; margin-top: 8px; }
+.v2 .pv-hero .val.rub { color: var(--rubro); }
+/* o rodapé dos 3 heróis senta na MESMA linha de base (margin-top auto) */
+.v2 .pv-hero .pe { font-size: 11px; color: var(--txt-3); margin-top: auto; padding-top: 9px; }
+.v2 .pv-hero .pe b { color: var(--txt-2); font-weight: 600; }
+
+.v2 .pv-main { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+
+/* --- cartão de seção (mesma anatomia do .db-sec) --- */
+.v2 .pv-sec { padding: 15px 17px; border-radius: var(--r-card); }
+.v2 .pv-sec-cab { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; min-height: 30px; }
+.v2 .pv-sec-cab .t { font-size: 12.5px; font-weight: 600; }
+.v2 .pv-sec-cab .s { font-size: 11px; color: var(--txt-3); margin-top: 2px; }
+.v2 .pv-cont {
+  font-size: 11px; font-weight: 700; color: var(--rubro); align-self: center;
+  background: rgba(var(--rubro-rgb), .1); border: 1px solid rgba(var(--rubro-rgb), .22);
+  border-radius: 99px; padding: 2px 8px;
+}
+
+/* --- avatar de iniciais (mono, sem cor) --- */
+.v2 .pv-av {
+  flex: 0 0 auto; width: 30px; height: 30px; border-radius: 99px; display: inline-flex;
+  align-items: center; justify-content: center; font-size: 10px; font-weight: 600;
+  color: var(--txt-2); background: rgba(var(--tint), .07); border: 1px solid rgba(var(--tint), .08);
+  letter-spacing: .03em;
+}
+.v2 .pv-av.s { width: 24px; height: 24px; font-size: 8.5px; }
+.v2 .pv-av.g { width: 40px; height: 40px; font-size: 12px; }
+
+/* --- fila "Precisa de resposta": grade estrita — avatar · texto · espera · ação.
+       Sem padding lateral: o texto nasce no recuo do card, igual à tabela. --- */
+.v2 .pv-fila {
+  display: grid; grid-template-columns: 30px minmax(0, 1fr) 76px auto;
+  align-items: center; column-gap: 12px; padding: 11px 0; cursor: pointer;
+  border-bottom: 1px solid rgba(var(--tint), .045); transition: background .16s var(--ease);
+}
+.v2 .pv-fila:hover, .v2 .pv-fila.on { background: rgba(var(--tint), .028); }
+.v2 .pv-fila:last-child { border-bottom: none; }
+.v2 .pv-fila-tx { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.v2 .pv-fila-tx .nm { font-size: 12.5px; font-weight: 500; color: var(--txt); display: flex; align-items: center; gap: 7px; }
+.v2 .pv-fila-tx .nl {
+  display: inline-flex; min-width: 15px; height: 15px; align-items: center; justify-content: center;
+  border-radius: 99px; background: var(--rubro); color: #fff; font-size: 9px; font-weight: 700;
+  font-style: normal; padding: 0 4px;
+}
+.v2 .pv-fila-tx .pr { font-size: 11.5px; color: var(--txt-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* espera: valor tabular + rótulo caps, coluna fixa alinhada à direita */
+.v2 .pv-wait { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+.v2 .pv-wait b { font-size: 12.5px; font-weight: 600; color: var(--txt-2); }
+.v2 .pv-wait span { font-size: 9px; letter-spacing: .07em; text-transform: uppercase; color: var(--txt-3); }
+.v2 .pv-wait.ambar b { color: var(--ambar); }
+.v2 .pv-wait.vermelho b, .v2 .pv-wait.critico b { color: var(--rubro); }
+
+/* --- carteira: "tabela" em GRID (anatomia .db-traf do Dashboard) —
+       TODAS as linhas compartilham o MESMO template de colunas;
+       1ª coluna sem recuo (alinha com a fila acima), SITUAÇÃO rente
+       à borda direita do card (nenhum vão morto) --- */
+.v2 .pv-busca { width: 190px; height: 30px; font-size: 11.5px; }
+.v2 .pv-tab { display: flex; flex-direction: column; font-size: 12px; }
+.v2 .pv-tab .lin {
+  display: grid; grid-template-columns: minmax(0, 1fr) 112px 128px 150px;
+  column-gap: 12px; align-items: center; min-height: 42px; cursor: pointer;
+  border-bottom: 1px solid rgba(var(--tint), .045); transition: background .16s var(--ease);
+  color: var(--txt-2); white-space: nowrap;
+}
+.v2 .pv-tab .lin > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.v2 .pv-tab .lin:hover, .v2 .pv-tab .lin.on { background: rgba(var(--tint), .028); }
+.v2 .pv-tab .lin:last-child { border-bottom: none; }
+.v2 .pv-tab .lin.cab {
+  min-height: 30px; cursor: default; font-size: 10px; font-weight: 500;
+  letter-spacing: .05em; text-transform: uppercase; color: var(--txt-3);
+  border-bottom: 1px solid rgba(var(--tint), .08); background: none;
+}
+.v2 .pv-tab .lin.cab:hover { background: none; }
+.v2 .pv-tab .nm { color: var(--txt); font-weight: 500; display: flex; align-items: center; gap: 12px; }
+/* colunas do meio CENTRADAS sob os títulos; as pontas ancoram nas bordas */
+.v2 .pv-tab .ct { text-align: center; }
+.v2 .pv-tab .sit { text-align: right; }
+.v2 .pv-tab .sit.er { color: var(--rubro); font-weight: 500; }
+.v2 .pv-tab .sit.ok { color: var(--txt-3); }
+
+/* --- painel do cliente --- */
+.v2 .pv-painel { position: sticky; top: 14px; display: flex; flex-direction: column; gap: 13px; }
+.v2 .pv-p-cab { display: flex; align-items: center; gap: 11px; }
+.v2 .pv-p-id { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.v2 .pv-p-id b { font-size: 13.5px; font-weight: 600; }
+.v2 .pv-p-id .num { font-size: 11.5px; color: var(--txt-3); }
+/* pares rótulo/valor: caps à esquerda, valor à direita, fio entre as linhas */
+.v2 .pv-p-meta { display: flex; flex-direction: column; border-top: 1px solid rgba(var(--tint), .06); }
+.v2 .pv-p-meta .lin {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+  padding: 8px 0; border-bottom: 1px solid rgba(var(--tint), .05);
+}
+.v2 .pv-p-meta span { font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--txt-3); flex: 0 0 auto; }
+.v2 .pv-p-meta b { font-size: 12px; font-weight: 500; color: var(--txt-2); text-align: right; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .pv-p-sec { display: flex; flex-direction: column; gap: 7px; }
+.v2 .pv-p-sec .cap { font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--txt-3); }
+.v2 .pv-pend {
+  font-size: 12px; color: var(--txt-2); line-height: 1.45;
+  padding: 7px 10px 7px 12px; border-left: 2px solid var(--ambar);
+  background: rgba(var(--tint), .03); border-radius: 0 8px 8px 0;
+}
+.v2 .pv-mudo { font-size: 12px; color: var(--txt-3); line-height: 1.5; }
+
+/* --- telinha estilo WhatsApp: moldura arredondada, cabeçalho do contato e
+       fio com balões (cliente à esquerda, equipe à direita, rabinho no canto,
+       horário dentro do balão) — paleta da casa, nenhuma cor nova --- */
+.v2 .pv-fone { border: 1px solid var(--linha); border-radius: 14px; overflow: hidden; background: rgba(var(--tint), .02); }
+.v2 .pv-fone-top {
+  display: flex; align-items: center; gap: 9px; padding: 9px 12px;
+  background: rgba(var(--tint), .05); border-bottom: 1px solid rgba(var(--tint), .06);
+}
+.v2 .pv-fone-top .id { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.v2 .pv-fone-top .id b { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2 .pv-fone-top .id span { font-size: 9.5px; color: var(--txt-3); }
+.v2 .pv-fone-chat { display: flex; flex-direction: column; gap: 6px; padding: 12px 10px 14px; }
+.v2 .pv-bolha {
+  max-width: 86%; align-self: flex-start; display: flex; flex-direction: column;
+  background: rgba(var(--tint), .07); border-radius: 11px 11px 11px 4px;
+  padding: 6px 9px 4px; font-size: 12px; line-height: 1.4; color: var(--txt-2);
+}
+.v2 .pv-bolha.out {
+  align-self: flex-end; border-radius: 11px 11px 4px 11px;
+  background: rgba(var(--azul-rgb, 76, 141, 255), .16);
+}
+.v2 .pv-bolha .hr { font-size: 8.5px; color: var(--txt-3); align-self: flex-end; margin-top: 2px; }
+.v2 .pv-p-acoes { display: flex; margin-top: 1px; }
+.v2 .pv-p-acoes > * { flex: 1; justify-content: center; text-align: center; }
+
+/* --- vazio compacto (zero ≠ erro; mesma voz do Dashboard) --- */
+.v2 .pv-vazio { display: flex; align-items: center; gap: 8px; padding: 14px 2px; color: var(--txt-3); font-size: 11.5px; }

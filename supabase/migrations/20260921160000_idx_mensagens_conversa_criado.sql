@@ -1,0 +1,27 @@
+-- 2026-09-21 — Alívio de lentidão do INBOX (query mais pesada do sistema).
+--
+-- SINTOMA: segunda de manhã (call center no ar) a query de conversas do inbox
+-- estourava o statement_timeout de 8s em rajadas (43 de 50 timeouts do dia; no
+-- pior pico, centenas em 30min). Domingo (carga leve): 0 timeouts.
+--
+-- CAUSA RAIZ (confirmada por EXPLAIN): a lista do inbox embute as 10 últimas
+-- mensagens de cada conversa via LATERAL ordenado por `criado_em DESC`
+-- (src/data/whatsapp.ts, useWaConversations). O ÚNICO índice por conversa era
+-- idx_mensagens_conversa = (conversa_id, enviada_em DESC) — ordem por enviada_em,
+-- NÃO por criado_em. Resultado: para CADA conversa (~3.400), o Postgres lê TODAS
+-- as mensagens dela (média 31, máx 462) e faz um top-N heapsort por criado_em só
+-- pra devolver 10. ×4 páginas (paginação keyset de 18/09) e ×N atendentes no pico
+-- = 8s. 110k mensagens no total; 628 conversas com >50 mensagens.
+--
+-- FIX: índice casado com a ORDEM do embed. Elimina o Sort e faz o LIMIT 10 parar
+-- após 10 linhas por conversa em vez de varrer até 462. Efeito colateral mínimo:
+-- criado_em e conversa_id são imutáveis, então os UPDATEs de ACK de status (que
+-- mexem em status/enviada_em) não tocam este índice (seguem HOT-elegíveis quanto
+-- a ele); só os INSERTs de mensagem pagam a manutenção de +1 btree.
+--
+-- APLICAÇÃO: aplicado AO VIVO em produção via execute_sql com CONCURRENTLY (não
+-- trava escrita — seguro no pico). CONCURRENTLY não roda dentro de transação; num
+-- rebuild via `supabase db push` (que envolve a migration em BEGIN/COMMIT) remova
+-- a palavra CONCURRENTLY — numa base recém-criada o índice sai instantâneo.
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_mensagens_conversa_criado
+  ON public.mensagens (conversa_id, criado_em DESC);

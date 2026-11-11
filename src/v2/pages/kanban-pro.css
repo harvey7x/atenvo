@@ -1,0 +1,305 @@
+/* ============================================================
+   KANBAN PRO v2 — dono 29/10: "mais minimalista, profissional" (referência:
+   board claro, coluna cinza-clarinha, card branco limpo, chips pequenos
+   com ícone, pessoa à direita). No escuro: "cores mais escuras, mais
+   fortes" e SEM a borda amarela. Camada por cima de kanban.css e da
+   repaginada; só apresentação.
+
+   Prefixo P = html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro (0,6,1) — vence a
+   repaginada sem !important. Tokens do tema em --kp-* na raiz da página.
+   ============================================================ */
+
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro {
+  /* ESCURO: fundo bem fundo, cor firme */
+  --kp-col-bg: #0E0F12;
+  --kp-card: #16181C;
+  --kp-card-h: #1A1C21;
+  --kp-line: rgba(255, 255, 255, .07);
+  --kp-chip: rgba(255, 255, 255, .045);
+  --kp-txt: #F2F3F5;
+  --kp-txt-2: #A3A8B1;
+  --kp-txt-3: #6E737C;
+  --kp-sh: 0 1px 0 rgba(255, 255, 255, .03) inset, 0 1px 2px rgba(0, 0, 0, .5);
+  --kp-sh-h: 0 1px 0 rgba(255, 255, 255, .04) inset, 0 8px 22px rgba(0, 0, 0, .55);
+  --kp-red: #FF5C61;      --kp-red-bg: rgba(229, 72, 77, .17);
+  --kp-orange: #FF8A3D;   --kp-orange-bg: rgba(247, 107, 21, .16);
+  --kp-blue: #6AA5FF;     --kp-blue-bg: rgba(59, 130, 246, .18);
+  --kp-green: #3DD68C;    --kp-green-bg: rgba(48, 164, 108, .17);
+  --kp-seg-on: #23262C;
+  padding: 22px 26px 12px;
+}
+html:root[data-tema="light"] .v2 .kb-pro.kb-pro.kb-pro.kb-pro {
+  --kp-col-bg: #F5F6F8;
+  --kp-card: #FFFFFF;
+  --kp-card-h: #FFFFFF;
+  --kp-line: #E7E8EC;
+  --kp-chip: #F7F8FA;
+  --kp-txt: #111318;
+  --kp-txt-2: #5F6672;
+  --kp-txt-3: #8C929D;
+  --kp-sh: 0 1px 2px rgba(16, 24, 40, .05);
+  --kp-sh-h: 0 2px 4px rgba(16, 24, 40, .05), 0 10px 24px rgba(16, 24, 40, .09);
+  --kp-red: #D92D20;      --kp-red-bg: #FEF0EF;
+  --kp-orange: #C4320A;   --kp-orange-bg: #FFF2EA;
+  --kp-blue: #175CD3;     --kp-blue-bg: #EEF5FF;
+  --kp-green: #067647;    --kp-green-bg: #ECFDF3;
+  --kp-seg-on: #FFFFFF;
+}
+
+/* ---------- topo ---------- */
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-busca input { width: 320px; height: 34px; border-radius: 9px; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-barra {
+  gap: 8px; row-gap: 8px; margin: 2px 0 16px; padding: 0 0 14px; border-bottom: 1px solid var(--kp-line);
+}
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-ord,
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-filtro-origem {
+  display: inline-flex; align-items: center; gap: 2px; padding: 2px; flex-wrap: nowrap;
+  border-radius: 9px; background: var(--kp-chip); border: 1px solid var(--kp-line);
+}
+/* dono 29/10: "as duas coisas alinhadas, uma embaixo da outra" — linha 1: Ordenar · Foco · Equipe ·
+   Filtros · Exportar; linha 2: os canais, começando no mesmo ponto (a quebra é o ::before) */
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-barra::before { content: ""; flex-basis: 100%; height: 0; order: 2; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-barra > .kb-ord { order: 0; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-barra > .kb-fchip { order: 1; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-filtro-origem { order: 3; margin-left: 0; overflow-x: auto; scrollbar-width: none; max-width: 100%; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-ord-l { padding: 0 6px 0 8px; margin: 0; font-size: 11px; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--kp-txt-3); }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-ord .kb-fchip,
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-filtro-origem .kb-fchip {
+  height: 28px; padding: 0 11px; border: 0; border-radius: 7px; background: none; box-shadow: none;
+  font-size: 12px; font-weight: 500; color: var(--kp-txt-2); white-space: nowrap;
+}
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-ord .kb-fchip:hover,
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-filtro-origem .kb-fchip:hover { color: var(--kp-txt); background: none; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-ord .kb-fchip.on,
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-filtro-origem .kb-fchip.on {
+  background: var(--kp-seg-on); color: var(--kp-txt); box-shadow: 0 1px 2px rgba(16, 24, 40, .1), 0 0 0 1px var(--kp-line);
+}
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-fchip .c { font-size: 11px; font-weight: 500; color: var(--kp-txt-3); margin-left: 2px; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-barra > .kb-fchip {
+  height: 32px; padding: 0 12px; border-radius: 9px; font-size: 12px; font-weight: 500;
+  background: var(--kp-card); color: var(--kp-txt-2); border: 1px solid var(--kp-line); box-shadow: var(--kp-sh);
+}
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-barra > .kb-fchip:hover { color: var(--kp-txt); background: var(--kp-card-h); }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-barra > .kb-fchip.on { color: var(--kp-blue); background: var(--kp-blue-bg); border-color: transparent; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-barra > .kb-fchip.foco { color: var(--kp-red); }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-barra > .kb-fchip.foco.on { color: var(--kp-red); background: var(--kp-red-bg); border-color: transparent; }
+
+/* ---------- board ---------- */
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-cols { gap: 12px; padding-bottom: 4px; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-scroll { scrollbar-width: thin; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-col {
+  min-width: 276px; max-width: 312px; padding: 0; overflow: hidden;
+  background: var(--kp-col-bg); border: 1px solid transparent; border-radius: 12px; box-shadow: none;
+}
+html:root[data-tema="light"] .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-col { border-color: transparent; }
+/* sem o contorno dourado do "gargalo" da repaginada (dono 29/10: "um negócio amarelo na borda") */
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-col.gargalo:not(.col-drop) { border-color: transparent; box-shadow: none; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-col:not(.col-drop) { box-shadow: none; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-col.col-drop { border-color: color-mix(in srgb, var(--kp-blue) 55%, transparent); background: color-mix(in srgb, var(--kp-blue) 6%, var(--kp-col-bg)); }
+
+/* cabeçalho da coluna: ícone na cor da etapa + nome + contagem · + e ⋯ à direita */
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-cab { gap: 7px; padding: 12px 8px 6px 12px; border-bottom: 0; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-cab::before { content: none; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-cab-ic {
+  width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0;
+  border: 2px solid var(--c, var(--kp-txt-3)); box-sizing: border-box;
+}
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-cab .n { font-size: 13px; font-weight: 600; letter-spacing: -.005em; color: var(--kp-txt); }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-cab .q { font-size: 12.5px; font-weight: 500; color: var(--kp-txt-3); background: none; padding: 0; margin: 0; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-cab .tag-entrada { font-size: 9px; font-weight: 500; letter-spacing: .02em; text-transform: none; padding: 1px 6px; border-radius: 5px; color: var(--kp-txt-3); border: 1px solid var(--kp-line); background: none; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-col-add,
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-cab .mbtn,
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-cab .kb-col-toggle {
+  width: 24px; height: 24px; border-radius: 6px; border: 0; background: none; color: var(--kp-txt-3);
+  display: inline-flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; padding: 0; opacity: 1;
+}
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-col-add { margin-left: auto; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-col-add svg,
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-cab .mbtn svg,
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-cab .kb-col-toggle svg { width: 14px; height: 14px; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-col-add:hover,
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-cab .mbtn:hover,
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-cab .kb-col-toggle:hover { color: var(--kp-txt); background: var(--kp-chip); }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-cab .kb-col-toggle { order: 10; opacity: 0; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-cab:hover .kb-col-toggle { opacity: 1; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-cab .kb-menu-wrap { order: 9; }
+
+/* 2ª linha: leitura calma, sem cor */
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-subcab { gap: 4px; padding: 0 12px 10px 31px; font-size: 11px; min-height: 0; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-subcab .par,
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-subcab .par.zero,
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-subcab .rec { color: var(--kp-txt-3); font-weight: 400; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-subcab .glr { display: none; }
+
+/* corpo */
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-corpo { padding: 0 8px 8px; scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--kp-txt-3) 45%, transparent) transparent; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-vazia { font-size: 12px; padding: 26px 0 16px; color: var(--kp-txt-3); }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-add {
+  height: 32px; margin-top: 2px; border: 0; border-radius: 8px; background: none;
+  font-size: 12px; font-weight: 500; color: var(--kp-txt-3); justify-content: flex-start; padding: 0 8px;
+}
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-add:hover { color: var(--kp-txt); background: var(--kp-chip); border-color: transparent; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-mais {
+  width: 100%; height: 32px; margin: 0 0 6px; border-radius: 8px; cursor: pointer;
+  font: 500 12px var(--fonte); color: var(--kp-txt-2); background: none; border: 1px dashed var(--kp-line);
+}
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-mais:hover { color: var(--kp-txt); background: var(--kp-chip); }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-mais .num { color: var(--kp-txt-3); font-weight: 400; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .fantasma {
+  height: 72px; margin-bottom: 8px; border-radius: 10px; border: 0;
+  background: color-mix(in srgb, var(--kp-txt-3) 14%, transparent);
+}
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-col.recolhida { min-width: 46px; max-width: 46px; width: 46px; padding: 14px 0; gap: 12px; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-col.recolhida:hover { background: var(--kp-card); border-color: var(--kp-line); }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-col.ghost-col { background: none; border: 1px dashed var(--kp-line); }
+
+/* ---------- card ---------- */
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc {
+  padding: 12px 12px 10px; margin-bottom: 8px; border-radius: 10px;
+  background: var(--kp-card); border: 1px solid var(--kp-line); box-shadow: var(--kp-sh);
+  transition: transform .16s var(--ease), box-shadow .16s var(--ease), background .16s;
+}
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc:hover { transform: translateY(-1px); box-shadow: var(--kp-sh-h); background: var(--kp-card-h); border-color: var(--kp-line); }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc::before { content: none; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc.drag { transform: rotate(-2deg); box-shadow: 0 18px 40px rgba(16, 24, 40, .22); }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc.destaque { border-color: var(--kp-blue); box-shadow: 0 0 0 3px var(--kp-blue-bg), var(--kp-sh-h); }
+
+/* ações no hover (conversa + ⋯) */
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc-acoes {
+  position: absolute; top: 8px; right: 8px; display: flex; gap: 2px; opacity: 0; transition: opacity .12s;
+  background: var(--kp-card-h); border-radius: 7px;
+}
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc:hover .kc-acoes,
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc-acoes:has(.mbtn.on) { opacity: 1; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc-acoes .kb-menu-wrap { position: relative; top: auto; right: auto; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc-acoes .mbtn,
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc-acoes .kc-wa {
+  width: 24px; height: 24px; border-radius: 6px; opacity: 1; margin: 0;
+  display: inline-flex; align-items: center; justify-content: center; color: var(--kp-txt-3); background: none; border: 0; cursor: pointer;
+}
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc-acoes .mbtn:hover,
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc-acoes .mbtn.on { color: var(--kp-txt); background: var(--kp-chip); }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc-acoes .kc-wa:hover { color: var(--kp-green); background: var(--kp-green-bg); }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc-acoes svg { width: 13px; height: 13px; }
+
+/* título + linha cinza */
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc-r1 { margin-top: 0; gap: 6px; padding-right: 2px; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc-nm { font-size: 13.5px; font-weight: 600; letter-spacing: -.01em; color: var(--kp-txt); }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc-semnome { font-size: 11px; color: var(--kp-txt-3); }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc-meta { margin-top: 2px; font-size: 12px; color: var(--kp-txt-2); }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc-flag { border-radius: 6px; padding: 1px 6px; font-size: 9.5px; letter-spacing: .02em; text-transform: none; font-weight: 600; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc-flag.ganho { background: var(--kp-green-bg); color: var(--kp-green); }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc-flag.perdido { background: var(--kp-red-bg); color: var(--kp-red); }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc-flag.repasse { background: var(--kp-chip); color: var(--kp-txt-2); }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc .sla-chip { border-radius: 6px; font-size: 9.5px; padding: 1px 6px; }
+
+/* bancos, lembrete, etiquetas — neutros */
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc-bancos,
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc-etqs { margin-top: 8px; gap: 4px; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc-banco {
+  font-size: 10px; font-weight: 600; letter-spacing: .03em; padding: 2px 7px; border-radius: 6px;
+  color: var(--kp-txt-2); background: none; border: 1px solid var(--kp-line); box-shadow: none;
+}
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc-banco.prin { color: var(--kp-txt); background: var(--kp-chip); border-color: var(--kp-line); }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc-etq {
+  display: inline-flex; align-items: center; gap: 5px; max-width: 140px;
+  font-size: 11px; font-weight: 500; padding: 2px 7px; border-radius: 6px;
+  color: var(--kp-txt-2); background: var(--kp-chip); border: 1px solid var(--kp-line);
+}
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc-etq i { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc-etq.mais { color: var(--kp-txt-3); }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc-lem { margin-top: 8px; padding: 0; background: none; font-size: 11.5px; font-weight: 500; color: var(--kp-orange); }
+
+/* pé: chips com ícone + pessoas */
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc-pe { display: flex; align-items: center; gap: 5px; margin-top: 10px; min-width: 0; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc-chip {
+  display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 7px; flex-shrink: 0;
+  border-radius: 6px; border: 1px solid var(--kp-line); background: var(--kp-chip);
+  font-size: 11px; font-weight: 500; color: var(--kp-txt-2); white-space: nowrap;
+}
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc-chip svg { width: 12px; height: 12px; flex-shrink: 0; opacity: .85; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc-chip.est { flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc-chip.hot,
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc-chip.blk { color: var(--kp-red); background: var(--kp-red-bg); border-color: transparent; font-weight: 600; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc-chip.warm,
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc-chip.ficha { color: var(--kp-orange); background: var(--kp-orange-bg); border-color: transparent; font-weight: 600; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc-chip.msg { color: var(--kp-blue); background: var(--kp-blue-bg); border-color: transparent; font-weight: 600; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc-chip.ok { color: var(--kp-green); background: var(--kp-green-bg); border-color: transparent; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc-pessoas { margin-left: auto; display: inline-flex; align-items: center; flex-shrink: 0; padding-left: 4px; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc-av {
+  width: 20px; height: 20px; margin-right: -6px; position: relative; z-index: 1;
+  border-radius: 50%; font-size: 8.5px; font-weight: 700; font-style: normal;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, var(--av, #5a6f9a) 85%, #000);
+  color: #fff; box-shadow: 0 0 0 2px var(--kp-card);
+}
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc-av.semdono { background: var(--kp-chip); color: var(--kp-txt-3); box-shadow: 0 0 0 2px var(--kp-card), inset 0 0 0 1px var(--kp-line); }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kc-foto {
+  width: 26px; height: 26px; border-radius: 50%; object-fit: cover; display: block;
+  box-shadow: 0 0 0 2px var(--kp-card); background: var(--kp-chip);
+}
+
+/* modo denso continua valendo */
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-cols.denso .kc { padding: 8px 10px; margin-bottom: 5px; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-cols.denso .kc-pe { margin-top: 6px; }
+
+@media (max-width: 1080px) {
+  html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-busca input { width: 220px; }
+}
+
+/* ---------- carregando (dono 30/10: "carregando o Kanban, aguarde… bonita, profissional") ----------
+   Esboço das colunas ao fundo (sumindo para baixo) + cartão central com ícone, texto e progresso. */
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr {
+  position: relative; flex: 1; width: 100%; min-height: calc(100dvh - 120px);
+  display: flex; align-items: center; justify-content: center; overflow: hidden;
+}
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-fundo {
+  position: absolute; inset: 0; display: flex; gap: 14px; padding-top: 4px; pointer-events: none;
+  opacity: .7; -webkit-mask-image: linear-gradient(to bottom, #000 25%, transparent 92%); mask-image: linear-gradient(to bottom, #000 25%, transparent 92%);
+}
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-col {
+  flex: 0 0 286px; display: flex; flex-direction: column; gap: 9px; padding: 14px 10px; border-radius: 14px; background: var(--kp-col-bg);
+}
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-tit { height: 10px; width: 44%; margin: 2px 4px 8px; border-radius: 6px; background: var(--kp-line); }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-card {
+  position: relative; height: 72px; border-radius: 11px; overflow: hidden; background: var(--kp-card); box-shadow: var(--kp-sh);
+}
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-card::after {
+  content: ""; position: absolute; inset: 0; transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--kp-txt) 5%, transparent), transparent);
+}
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-caixa {
+  position: relative; z-index: 1; width: min(372px, calc(100% - 32px)); display: flex; flex-direction: column; align-items: center; text-align: center;
+  padding: 28px 28px 22px; border-radius: 16px; background: var(--kp-card); border: 1px solid var(--kp-line);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .04) inset, 0 24px 60px rgba(0, 0, 0, .55);
+}
+html:root[data-tema="light"] .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-caixa { box-shadow: 0 2px 6px rgba(16, 24, 40, .05), 0 24px 56px rgba(16, 24, 40, .14); }
+/* ícone: três colunas do quadro subindo e descendo */
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-ic { display: flex; align-items: flex-end; gap: 4px; height: 28px; margin-bottom: 14px; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-ic i { width: 7px; height: 100%; border-radius: 3px; background: var(--kp-blue); transform-origin: bottom; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-ic i:nth-child(1) { transform: scaleY(.55); }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-ic i:nth-child(2) { transform: scaleY(1); opacity: .8; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-ic i:nth-child(3) { transform: scaleY(.75); opacity: .6; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-caixa strong { font-size: 15.5px; font-weight: 600; letter-spacing: -.01em; color: var(--kp-txt); }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-txt { margin-top: 5px; max-width: 270px; font-size: 12.5px; line-height: 1.45; color: var(--kp-txt-2); }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-barra {
+  position: relative; display: block; width: 100%; height: 4px; margin-top: 18px; border-radius: 99px; overflow: hidden; background: var(--kp-chip);
+  box-shadow: 0 0 0 1px var(--kp-line) inset;
+}
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-barra i { display: block; height: 100%; width: 0; border-radius: inherit; background: var(--kp-blue); }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-barra.indet i { position: absolute; left: 0; width: 32%; }
+html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-num { margin-top: 9px; font-size: 11.5px; color: var(--kp-txt-3); font-variant-numeric: tabular-nums; }
+
+@keyframes kb-carr-coluna { 0%, 100% { transform: scaleY(.45); } 50% { transform: scaleY(1); } }
+@keyframes kb-carr-brilho { to { transform: translateX(100%); } }
+@keyframes kb-carr-indet { 0% { transform: translateX(-100%); } 100% { transform: translateX(320%); } }
+/* movimento: também no Modo Leve (o base.css zera tudo com !important) — é o sinal de que está
+   trabalhando; com "reduzir movimento" do sistema fica parado */
+@media (prefers-reduced-motion: no-preference) {
+  html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-ic i { animation: kb-carr-coluna 1.05s ease-in-out infinite !important; }
+  html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-ic i:nth-child(2) { animation-delay: -.35s !important; }
+  html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-ic i:nth-child(3) { animation-delay: -.7s !important; }
+  html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-card::after { animation: kb-carr-brilho 1.6s ease-in-out infinite !important; }
+  html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-barra i { transition: width .4s cubic-bezier(.2, .7, .2, 1) !important; }
+  html:root .v2 .kb-pro.kb-pro.kb-pro.kb-pro .kb-carr-barra.indet i { animation: kb-carr-indet 1.25s ease-in-out infinite !important; }
+}

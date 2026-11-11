@@ -1,0 +1,192 @@
+/* ==================================================================
+   LEMBRETE — o aviso na hora (dono 30/10: "na hora ela me lembra").
+   Prefixo único .lmb- (colisoesCss.test.ts), escopo .v2.
+   - Cartão de VIDRO ESCURO nos dois temas (a mesma família do cartão de
+     voz e do bom dia: a esfera é preta, o redemoinho é branco — no claro
+     ele vira uma ilha escura), ~340 px, no canto inferior direito, ACIMA
+     do balão do assistente; no /whatsapp, acima do compositor (regra do
+     dono: nada flutuando cobre o ENVIAR). --lmb-base (px do rodapé) vem
+     do componente.
+   - A esfera pequena (o CSS da esfera do balão, prefixo próprio), a
+     palavra "Lembrete", o texto grande, "Marcado para 13:00" e os botões
+     "Lembrar em 10 min" e "Ok". Vários de uma vez: as bordas dos
+     próximos aparecem atrás (pilha) e "1 de 3". Enquanto ela fala, a
+     esfera acende com a voz (--lmb-nivel, escrito a cada quadro).
+   - z-index 37 dentro do shell: acima do balão (35) e do cartão de voz
+     (36 — que, aberto, esconde o aviso), abaixo do toast de mensagem
+     (.notif 40), dos menus/modais/gavetas (80+) e dos avisos (1200+).
+   - Só preto e branco; zero emoji. No Leve, sem backdrop-filter (fundo
+     opaco). O topo para em 140 px (a regra do cartão de voz): sem
+     altura, o texto rola e o fim esmaece.
+   - Movimento: só no bloco "sem reduzir movimento", prefixo
+     html:root[data-perf] .v2 (vale no Leve e no Completo); o contínuo (o
+     redemoinho girando) só no Completo.
+   ================================================================== */
+
+.v2 .lmb-raiz { display: contents; }
+
+.v2 .lmb-caixa {
+  position: fixed; right: 20px; bottom: var(--lmb-base, 84px); z-index: 37;
+  width: min(340px, calc(100vw - 32px));
+}
+
+/* ---------------------------------------------------------------- o cartão */
+.v2 .lmb-aviso {
+  --lmb-txt: #EDEDEF;
+  --lmb-txt-2: rgba(237, 237, 239, .62);
+  /* .58: "Marcado para 13:00" e "1 de 3" passam do contraste AA (4,5:1) também no tema claro */
+  --lmb-txt-3: rgba(237, 237, 239, .58);
+  position: relative; z-index: 1; box-sizing: border-box;
+  display: flex; flex-direction: column;
+  /* o topo nunca passa da barra do sistema nem do cabeçalho da conversa no /whatsapp (140 px, a mesma regra do
+     cartão de voz): com o compositor alto (respondendo + texto longo) o cartão ENCOLHE — o texto rola, os botões
+     ficam — em vez de subir sobre Transferir/Arquivar/Dados. O piso (o alto, uma linha e os botões) só vale
+     numa janela baixa demais para qualquer cartão. */
+  max-height: max(180px, calc(100vh - var(--lmb-base, 84px) - 140px));
+  padding: 14px 16px 16px;
+  border-radius: 22px; overflow: hidden; isolation: isolate;
+  color: var(--lmb-txt); font-family: var(--fonte); text-align: left;
+  background:
+    radial-gradient(120% 74% at 0% 0%, rgba(255, 255, 255, .075), rgba(255, 255, 255, 0) 62%),
+    linear-gradient(180deg, rgba(23, 24, 28, .9), rgba(8, 9, 11, .95));
+  border: 1px solid rgba(255, 255, 255, .1);
+  -webkit-backdrop-filter: blur(26px) saturate(1.25); backdrop-filter: blur(26px) saturate(1.25);
+  box-shadow: 0 30px 70px -24px rgba(0, 0, 0, .72), 0 10px 26px rgba(0, 0, 0, .3), inset 0 1px 0 rgba(255, 255, 255, .07);
+}
+html:root[data-tema="light"] .v2 .lmb-aviso {
+  border-color: rgba(8, 9, 11, .6);
+  box-shadow: 0 30px 64px -26px rgba(15, 20, 35, .55), 0 10px 24px rgba(15, 20, 35, .18), inset 0 1px 0 rgba(255, 255, 255, .08);
+}
+/* fio de luz discreto no topo (o do cartão de voz) */
+.v2 .lmb-aviso::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; padding: 1px; pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .16), rgba(255, 255, 255, 0) 34%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+
+/* a pilha: as bordas dos próximos lembretes aparecem atrás, no alto */
+.v2 .lmb-camada {
+  position: absolute; z-index: 0; top: -7px; left: 12px; right: 12px; height: 56px; pointer-events: none;
+  border-radius: 20px; border: 1px solid rgba(255, 255, 255, .13);
+  background: linear-gradient(180deg, rgba(42, 43, 49, .95), rgba(18, 19, 22, .96));
+  box-shadow: 0 14px 30px -18px rgba(0, 0, 0, .6);
+}
+.v2 .lmb-camada.lmb-camada-2 {
+  top: -13px; left: 24px; right: 24px; opacity: .72;
+  background: linear-gradient(180deg, rgba(48, 49, 55, .93), rgba(20, 21, 24, .95));
+}
+html:root[data-tema="light"] .v2 .lmb-camada { border-color: rgba(8, 9, 11, .5); box-shadow: 0 14px 28px -18px rgba(15, 20, 35, .45); }
+@media (prefers-reduced-transparency: reduce) {
+  .v2 .lmb-aviso { background: #0E0F12; -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+/* Leve (o padrão do produto, tokens.css): sem backdrop-filter — o cartão pode ficar na tela por horas por cima
+   da conversa que rola, e o desfoque recalculado a cada quadro é o vilão das GPUs fracas. O vidro vira o mesmo
+   gradiente, opaco (o cartão já era 90–95% opaco: muda quase nada). */
+:root[data-perf="lite"] .v2 .lmb-aviso {
+  background:
+    radial-gradient(120% 74% at 0% 0%, rgba(255, 255, 255, .075), rgba(255, 255, 255, 0) 62%),
+    linear-gradient(180deg, #17181B, #08090B);
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+
+/* o alto: a esfera, "Lembrete" e "1 de 3" */
+.v2 .lmb-topo { flex: none; display: flex; align-items: center; gap: 10px; min-height: 30px; }
+.v2 .lmb-marca { font: 600 10.5px/1 var(--fonte); letter-spacing: .2em; text-transform: uppercase; color: var(--lmb-txt-2); }
+.v2 .lmb-conta {
+  margin-left: auto; font: 600 10.5px/1 var(--fonte); letter-spacing: .08em; color: var(--lmb-txt-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* o texto grande (até 200 caracteres: a letra diminui com o comprimento, nunca corta — sem altura, rola) */
+.v2 .lmb-texto {
+  flex: 0 1 auto; min-height: 0; overflow-y: auto; margin: 12px 0 0;
+  font: 600 19px/1.34 var(--fonte); letter-spacing: -.014em; color: #F5F5F6;
+  overflow-wrap: anywhere; scrollbar-width: thin;
+}
+.v2 .lmb-texto[data-tam="m"] { font-size: 17px; line-height: 1.38; letter-spacing: -.01em; }
+.v2 .lmb-texto[data-tam="p"] { font-size: 15px; line-height: 1.45; letter-spacing: -.004em; }
+/* o cartão encolheu (compositor alto numa janela baixa) e o texto rola: o fim esmaece — há mais texto */
+.v2 .lmb-texto[data-rola] {
+  -webkit-mask-image: linear-gradient(180deg, #000 calc(100% - 18px), transparent);
+  mask-image: linear-gradient(180deg, #000 calc(100% - 18px), transparent);
+}
+
+.v2 .lmb-hora {
+  flex: none; margin: 8px 0 0; display: flex; align-items: center; gap: 6px;
+  font: 500 12.5px/1.2 var(--fonte); color: var(--lmb-txt-3); font-variant-numeric: tabular-nums;
+}
+.v2 .lmb-hora svg { flex: none; }
+
+.v2 .lmb-acoes { flex: none; margin-top: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.v2 .lmb-botao {
+  height: 40px; padding: 0 12px; margin: 0; border-radius: 999px; cursor: pointer; white-space: nowrap;
+  border: 1px solid rgba(255, 255, 255, .14); background: rgba(255, 255, 255, .06);
+  color: var(--lmb-txt); font: 600 13px/1 var(--fonte); letter-spacing: -.003em;
+}
+.v2 .lmb-botao:hover { background: rgba(255, 255, 255, .11); border-color: rgba(255, 255, 255, .2); }
+.v2 .lmb-botao.lmb-forte { background: #F2F2F3; border-color: transparent; color: #0B0B0C; }
+.v2 .lmb-botao.lmb-forte:hover { background: #FFFFFF; }
+.v2 .lmb-botao:focus-visible { outline: 2px solid rgba(255, 255, 255, .62); outline-offset: 3px; }
+
+/* ---------------------------------------------------------------- a esfera (a do balão, pequena; P&B, CSS puro) */
+.v2 .lmb-esfera {
+  --lmb-nivel: 0;
+  position: relative; display: block; flex: none; width: 30px; height: 30px; border-radius: 50%; overflow: hidden;
+  background:
+    radial-gradient(44% 32% at 36% 24%, rgba(255, 255, 255, .2), rgba(255, 255, 255, 0) 72%),
+    radial-gradient(circle at 50% 56%, #18191d 0, #0b0c0e 58%, #030304 100%);
+  box-shadow: 0 6px 14px -6px rgba(0, 0, 0, .7), 0 0 0 1px rgba(255, 255, 255, .03);
+}
+/* o fio da borda: claro em cima à esquerda, some embaixo à direita */
+.v2 .lmb-esfera::after {
+  content: ""; position: absolute; inset: 0; border-radius: 50%; padding: 1px;
+  background: conic-gradient(from 225deg, rgba(255, 255, 255, .08), rgba(255, 255, 255, .62) 22%,
+    rgba(255, 255, 255, .5) 34%, rgba(255, 255, 255, .08) 58%, rgba(255, 255, 255, .04) 80%, rgba(255, 255, 255, .08));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+/* o redemoinho branco: dois braços de luz num anel, levemente desfocados */
+.v2 .lmb-esfera-giro {
+  position: absolute; inset: 15%; border-radius: 50%; opacity: .88;
+  background: conic-gradient(from 10deg, rgba(255, 255, 255, 0) 0deg, rgba(255, 255, 255, .92) 52deg,
+    rgba(255, 255, 255, .14) 118deg, rgba(255, 255, 255, 0) 168deg, rgba(255, 255, 255, .6) 236deg,
+    rgba(255, 255, 255, .06) 300deg, rgba(255, 255, 255, 0) 360deg);
+  -webkit-mask: radial-gradient(circle, transparent 0 28%, #000 44%, #000 58%, transparent 74%);
+  mask: radial-gradient(circle, transparent 0 28%, #000 44%, #000 58%, transparent 74%);
+  filter: blur(.7px);
+}
+/* ela falando: a esfera acende com a voz (no Leve, só o brilho parado) */
+.v2 .lmb-aviso[data-falando] .lmb-esfera {
+  transform: scale(calc(1.04 + var(--lmb-nivel) * .12));
+  box-shadow:
+    0 0 0 calc(1.5px + var(--lmb-nivel) * 2.5px) rgba(255, 255, 255, calc(.16 + var(--lmb-nivel) * .14)),
+    0 0 calc(14px + var(--lmb-nivel) * 24px) rgba(255, 255, 255, calc(.24 + var(--lmb-nivel) * .4));
+}
+.v2 .lmb-aviso[data-falando] .lmb-esfera-giro { opacity: 1; filter: blur(.5px) brightness(1.2); }
+
+/* só para o leitor de tela */
+.v2 .lmb-sr {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0; overflow: hidden;
+  clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+}
+
+/* tela estreita */
+@media (max-width: 420px) {
+  .v2 .lmb-caixa { right: 16px; }
+}
+
+/* ---------------------------------------------------------------- movimento */
+@media (prefers-reduced-motion: no-preference) {
+  html:root[data-perf] .v2 .lmb-aviso { animation: lmb-entra .3s var(--mo-enf, ease-out) backwards !important; }
+  html:root[data-perf] .v2 .lmb-camada { animation: lmb-surge .34s var(--mo-enf, ease-out) backwards !important; }
+  html:root[data-perf] .v2 .lmb-botao {
+    transition: background-color .14s var(--mo-pad, ease), border-color .14s var(--mo-pad, ease), color .14s var(--mo-pad, ease) !important;
+  }
+  html:root[data-perf] .v2 .lmb-esfera { transition: transform .1s linear, box-shadow .14s linear !important; }
+  /* contínuo, só no Completo */
+  html:root[data-perf="full"] .v2 .lmb-esfera-giro { animation: lmb-gira 9s linear infinite !important; }
+}
+@keyframes lmb-entra { from { opacity: 0; transform: translateY(14px) scale(.98); } }
+@keyframes lmb-surge { from { opacity: 0; transform: translateY(8px); } }
+@keyframes lmb-gira { to { transform: rotate(360deg); } }

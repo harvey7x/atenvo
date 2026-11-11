@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { classificarMovimento, traduzErroKanban } from './kanban';
+import { classificarMovimento, traduzErroKanban, bloqueioAdministrativo, bloqueioAssinar } from './kanban';
 
 // Decisão de movimento espelha o trigger opp_sync_fechamento (por RESULTADO, não pelo nome da coluna).
 describe('classificarMovimento', () => {
@@ -47,5 +47,19 @@ describe('traduzErroKanban', () => {
     const m = traduzErroKanban('ERROR: some raw sql 42P01');
     expect(m).toMatch(/não foi possível/i);
     expect(m).not.toMatch(/42P01|ERROR:/);
+  });
+});
+
+describe('travas do administrativo (Fechado 29/10 · Assinar 30/10)', () => {
+  it('Fechado: só o administrativo põe ou tira', () => {
+    expect(bloqueioAdministrativo('neutro', 'ganho')).toMatch(/O Fechado vem do sistema do administrativo/);
+    expect(bloqueioAdministrativo('ganho', 'neutro')).toMatch(/completo no sistema do administrativo/);
+    expect(bloqueioAdministrativo('neutro', 'neutro')).toBeNull();
+  });
+  it('Assinar: só o administrativo põe ou tira (pelo nome da coluna)', () => {
+    expect(bloqueioAssinar('Documentos', 'Assinar')).toMatch(/O Assinar vem do sistema do administrativo/);
+    expect(bloqueioAssinar('Assinar', 'Documentos')).toMatch(/aguardando assinatura no sistema do administrativo/);
+    expect(bloqueioAssinar('Lead Novo', 'Documentos')).toBeNull();
+    expect(traduzErroKanban('assinar_pelo_administrativo')).toMatch(/O Assinar vem do sistema do administrativo/);
   });
 });

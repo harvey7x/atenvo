@@ -19,8 +19,6 @@ import { ICONES } from './icones';
 import { NotificacaoResposta, type DadosNotificacao } from './NotificacaoResposta';
 import { useNotificacaoInbound } from '../hooks/useNotificacaoInbound';
 import { aplicarTema, lerTema, salvarTema, type Tema } from '../lib/tema';
-import { deveMostrarIntroDia, marcarIntroVista } from '../lib/introDia';
-import { IntroDia } from '../components/IntroDia';
 import { AvisoAtualizacao } from '../components/AvisoAtualizacao';
 import { LicencaGate } from '../components/LicencaGate';
 import { ConfiguracaoGate } from '../pages/configuracao/ConfiguracaoGate';
@@ -393,14 +391,6 @@ export default function AppShellV2() {
   const [tema, setTema] = useState<Tema>(() => lerTema(escopoTema));
   useEffect(() => { setTema(lerTema(escopoTema)); }, [escopoTema]); // recarrega a preferência quando o usuário resolve
 
-  // Intro do dia: primeira entrada de cada dia (o auth resolve assíncrono —
-  // só decide quando o user existe; virou a data local = mostra de novo)
-  const [introAberta, setIntroAberta] = useState(false);
-  useEffect(() => { if (user?.id && !isRevizaMode && deveMostrarIntroDia(user.id)) setIntroAberta(true); }, [user?.id]); // reviza: intro consulta números do Atenvo — fica de fora até ter versão própria
-  const concluirIntro = useCallback(() => {
-    marcarIntroVista(user?.id ?? undefined);
-    setIntroAberta(false);
-  }, [user?.id]);
   useEffect(() => { aplicarTema(tema); }, [tema]);
   // valor explícito (a intro do dia escolhe direto); o toggle da topbar cicla por cima
   const definirTema = useCallback((novo: Tema) => {
@@ -799,7 +789,6 @@ export default function AppShellV2() {
 
         {/* portais soltos: intro do dia + aviso de deploy (dono 28/08) + paleta ⌘K */}
         {paletaAberta && <PaletaBusca secoes={secoesPaleta} raiz={raizMenu} aoFechar={fecharPaleta} />}
-        <IntroDia aberta={introAberta} aoConcluir={concluirIntro} nome={nome} tema={tema} aoMudarTema={definirTema} />
         <AvisoAtualizacao />
       </div>
 

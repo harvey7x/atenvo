@@ -92,6 +92,13 @@
 
 /* ---- composição (AgendarMensagemModalV2) ---- */
 .v2 .agc { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 16px; }
+/* celular (modal de agendar aberto no /m): o preview de 280px empilha embaixo,
+   senão o formulário fica espremido a ~47px em 375px de tela. Empilhado, o
+   divisor vira linha de CIMA (o border-left ficaria um risco órfão à esquerda). */
+@media (max-width: 520px) {
+  .v2 .agc { grid-template-columns: 1fr; }
+  .v2 .agc-preview { border-left: 0; padding-left: 0; border-top: 1px solid var(--linha); padding-top: 12px; }
+}
 .v2 .agc-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .v2 .agc-bloco { border: 1px solid var(--linha); border-radius: 11px; padding: 10px 11px; }
 .v2 .agc-bloco-cab { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }

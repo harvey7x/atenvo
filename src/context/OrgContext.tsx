@@ -158,6 +158,10 @@ function OrgProviderAtenvo({ children }: { children: ReactNode }) {
   const { data: vinculosRaw, isLoading, isFetched, isError, refetch } = useQuery({
     queryKey: ['orgs', user?.id],
     enabled: realEnabled,
+    // visibilidade (22/10): papel trocado (ex.: admin → atendente) vale sem recarregar a página —
+    // a regra "só o admin vê todos" lê currentOrg.role. Consulta leve (1 linha por vínculo).
+    refetchOnWindowFocus: true,
+    refetchInterval: 120_000,
     queryFn: async (): Promise<Row[]> => {
       const { data, error } = await supabase!
         .from('organizacao_usuarios')

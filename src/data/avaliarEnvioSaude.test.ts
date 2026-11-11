@@ -17,9 +17,15 @@ describe('avaliarEnvioSaude', () => {
     expect(avaliarEnvioSaude(Array(8).fill('falhou')).estado).toBe('indisponivel');
   });
 
-  it('última saída falhou mas houve sucesso logo antes → instavel (caso RMKT atual)', () => {
-    // 17:21 falhou, 17:06 lida
-    expect(avaliarEnvioSaude(['falhou', 'lida']).estado).toBe('instavel');
+  it('UMA falha isolada na frente → ok (não acender o aviso à toa)', () => {
+    // A taxa basal de falha do provider é ~0,2%: com o gatilho antigo (consec>=1) qualquer falha
+    // solta acendia "instável" com o envio saudável, e o atendente aprendia a ignorar o aviso.
+    expect(avaliarEnvioSaude(['falhou', 'lida']).estado).toBe('ok');
+    expect(avaliarEnvioSaude(['falhou', 'lida', 'lida', 'entregue', 'lida']).estado).toBe('ok');
+  });
+
+  it('2 falhas seguidas na frente → instavel (aí sim há sinal)', () => {
+    expect(avaliarEnvioSaude(['falhou', 'falhou', 'lida', 'lida', 'lida']).estado).toBe('instavel');
   });
 
   it('sucesso na frente tira o indisponivel (consecutivas), mas taxa alta mantém instavel', () => {

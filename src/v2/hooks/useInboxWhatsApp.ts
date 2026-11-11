@@ -1,20 +1,24 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   WA_REAL, useWaConversations, useWaMensagens, useSendWaMessage, useAtribuirAtendimento,
   useWaCanais, useWaCanalEnvioSaude, useIniciarConversaWa,
-  waMarcarLida, waArquivar, removerMensagemFalha, subirMidiaWa,
+  waMarcarLida, waArquivar, waFixar, removerMensagemFalha, subirMidiaWa,
+  buscarConversasAgora, patchOtimistaLista, pedirBuscaAlvo,
 } from '@/data/whatsapp';
 import { WA_CONTACTS, type WaContact, type WaMessage } from '@/data/whatsappDemo';
 import { useHigieneConversa, useRegistrarAdiamento, HIGIENE_VAZIO } from '@/data/higiene';
-import { decidirDono, decidirNome, estadoHigiene, conversaAtiva } from '@/lib/higieneConversa';
+import { decidirDono, decidirNome, estadoHigiene, conversaAtiva, textoBloqueio } from '@/lib/higieneConversa';
+import { aguardarConfirmacaoEnvio } from '@/data/scripts';
 import { responsavelEfetivo } from '@/lib/conversaEtiquetas';
 import { HIGIENE_CORTE_ISO, HIGIENE_DIAS_ADAPTACAO } from '@/config/higiene';
 import { useBloqueiosOrg } from './bloqueiosOrg';
 import { useAuth } from '@/context/AuthContext';
 import { useOrg } from '@/context/OrgContext';
+import { useVisibilidade } from '@/lib/visibilidade';
 import {
-  aplicarEnvioOtimista, aplicarFalha, aplicarRetry, canalAutomatico, hidratarHistorico, marcarIdReal,
-  montarCorpoAssinado, novoCid, patchBolha, patchConversa, reconciliarLista, removerMensagemLocal, selecaoValida,
+  aplicarEnvioOtimista, aplicarFalha, aplicarRetry, canalAutomatico, conversaAtual, hidratarHistorico, marcarIdReal,
+  montarCorpoAssinado, novoCid, patchBolha, patchConversa, reconciliarLista, removerMensagemLocal, selecaoDescasada, selecaoValida,
 } from './inboxWhatsApp';
 import { previewUltimaMensagem } from '@/lib/conversaEtiquetas';
 
@@ -52,6 +56,8 @@ export function useInboxWhatsApp(opts: {
   const { aoAvisar } = opts;
   const { user } = useAuth();
   const { currentOrg } = useOrg();
+  const qc = useQueryClient();
+  const orgId = currentOrg.id;
   const demo = !WA_REAL;
 
   const live = useWaConversations();
@@ -77,9 +83,40 @@ export function useInboxWhatsApp(opts: {
     if (WA_REAL && currentId) { try { sessionStorage.setItem(CURR_KEY, currentId); } catch { /* privado */ } }
   }, [currentId]);
 
-  const msgsQ = useWaMensagens(WA_REAL ? currentId || null : null);
+  // visibilidade (22/10): quem não vê todos só baixa o histórico de conversa que está na PRÓPRIA
+  // lista (já recortada) — deep-link/sessão para conversa de outro não puxa as mensagens dela
+  const vis = useVisibilidade();
+  const visRef = useRef(vis);
+  visRef.current = vis;
+  const naListaVisivel = !!currentId && (vis.veTodos || (live.data ?? []).some((c) => c.id === currentId));
+  const msgsQ = useWaMensagens(WA_REAL && naListaVisivel ? currentId : null);
   const historicoRef = useRef<WaMessage[] | undefined>(undefined);
   historicoRef.current = msgsQ.data;
+
+  /* conversa selecionada que AINDA não está na lista (deep-link do toast "Ver conversa", alerta
+     de lead quente, restauração da sessão): busca-alvo imediata SÓ dela, em vez de esperar a
+     recarga completa. Enquanto a busca corre a seleção é PROTEGIDA (selecaoValida não troca para
+     a 1ª conversa); se a busca não a encontrar, a seleção cai na 1ª como sempre. Uma tentativa por id. */
+  const alvoPendenteRef = useRef<{ id: string; ate: number } | null>(null);
+  const tentadosRef = useRef(new Set<string>());
+  const buscarSelecionadaAusente = useCallback((id: string) => {
+    if (!WA_REAL || !id || tentadosRef.current.has(id)) return;
+    tentadosRef.current.add(id);
+    alvoPendenteRef.current = { id, ate: Date.now() + 15_000 };
+    void buscarConversasAgora(orgId, { ids: [id] }).then((ok) => {
+      const pend = alvoPendenteRef.current;
+      if (pend?.id !== id) return;
+      // falhou: a recarga completa já foi pedida — segue protegida por mais alguns segundos
+      if (!ok) { alvoPendenteRef.current = { id, ate: Date.now() + 8_000 }; return; }
+      alvoPendenteRef.current = null;
+      const lista = qc.getQueryData<WaContact[]>(['wa-conversas', orgId])?.filter((c) => visRef.current.podeVer(c.respId));
+      if (lista) setCurrentId((cur) => (cur === id ? selecaoValida(cur, lista) : cur));
+    });
+  }, [orgId, qc]);
+  const selecaoProtegida = (id: string): boolean => {
+    const pend = alvoPendenteRef.current;
+    return !!id && pend?.id === id && Date.now() < pend.ate;
+  };
 
   /* reconciliação da LISTA (v1 L251-260) — dep SÓ em live.data; a conversa
      aberta recebe de volta o histórico completo via refs (sem loop); bolhas
@@ -89,8 +126,16 @@ export function useInboxWhatsApp(opts: {
     const abertaId = currentIdRef.current;
     const hist = historicoRef.current;
     setContacts((cur) => reconciliarLista(cur, live.data!, abertaId, hist));
-    setCurrentId((id) => selecaoValida(id, live.data!));
+    if (abertaId && !live.data.some((c) => c.id === abertaId)) buscarSelecionadaAusente(abertaId);
+    setCurrentId((id) => (selecaoProtegida(id) ? id : selecaoValida(id, live.data!)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [live.data]);
+  /* seleção nova (deep-link) com a lista já carregada e sem a conversa: mesma busca-alvo */
+  useEffect(() => {
+    if (!WA_REAL || !currentId || !live.data) return;
+    if (!live.data.some((c) => c.id === currentId)) buscarSelecionadaAusente(currentId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentId]);
 
   /* hidratação do histórico completo (v1 L263-266) */
   useEffect(() => {
@@ -98,26 +143,50 @@ export function useInboxWhatsApp(opts: {
     setContacts((cur) => hidratarHistorico(cur, currentId, msgsQ.data!));
   }, [msgsQ.data, currentId]);
 
-  const current = contacts.find((c) => c.id === currentId) ?? contacts[0] ?? EMPTY_CONTACT;
+  // seleção fora da lista (deep-link durante a busca-alvo) = estado vazio, NUNCA a 1ª conversa:
+  // a tela/travas/canal seriam de outra conversa enquanto o envio iria para currentId
+  const current = conversaAtual(contacts, currentId, WA_REAL) ?? EMPTY_CONTACT;
+  const descasada = selecaoDescasada(WA_REAL, currentId, current.id);
 
   /* ---------- marcar-lida (v1 L340-382) ---------- */
   const selecaoUsuarioRef = useRef<string | null>(null);
   const marcandoLeituraRef = useRef(false);
+  // falha recente por conversa: o desfazer devolve o badge, o que re-dispararia este efeito —
+  // sem a pausa, uma RPC que sempre falha (ex.: sem_permissao) viraria um laço RPC → desfazer → RPC
+  const leituraFalhouRef = useRef<{ id: string; em: number } | null>(null);
   const markCurrentRead = useCallback(() => {
     if (!WA_REAL || !currentId) return;
     if (selecaoUsuarioRef.current !== currentId) return;      // restauração/programática NÃO marca
     if (document.visibilityState !== 'visible') return;
     if (!document.hasFocus()) return;
     if (marcandoLeituraRef.current) return;
+    const falhou = leituraFalhouRef.current;
+    if (falhou && falhou.id === currentId && Date.now() - falhou.em < 60_000) return;
     const c = contacts.find((x) => x.id === currentId);
     if (!c || (c.unread ?? 0) <= 0) return;
     marcandoLeituraRef.current = true;
-    waMarcarLida(currentId, true)
-      .then(() => void live.refetch())
-      .catch((e) => console.warn('[wa] marcar lida falhou:', String((e as Error)?.message ?? e).slice(0, 80)))
-      .finally(() => { marcandoLeituraRef.current = false; });
+    const alvo = currentId;
+    // Patch OTIMISTA no cache da lista (badge zera na hora) em vez da recarga completa IMEDIATA de
+    // antes — que rodava a cada mensagem recebida na conversa aberta e focada (18 requisições, ~36 MB).
+    // O UPDATE de conversas que volta pelo realtime confirma; no erro, desfaz + recarga completa.
+    const otimista = patchOtimistaLista(qc, orgId, alvo, { unread: 0 });
+    waMarcarLida(alvo, true)
+      .then(() => {
+        otimista.confirmar();
+        marcandoLeituraRef.current = false;
+        // chegou mensagem enquanto a RPC corria (o efeito foi barrado pela trava): confere de novo
+        window.setTimeout(() => markReadRef.current(), 0);
+      })
+      .catch((e) => {
+        marcandoLeituraRef.current = false;
+        leituraFalhouRef.current = { id: alvo, em: Date.now() };
+        otimista.desfazer();
+        console.warn('[wa] marcar lida falhou:', String((e as Error)?.message ?? e).slice(0, 80));
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentId, contacts]);
+  const markReadRef = useRef(markCurrentRead);
+  markReadRef.current = markCurrentRead;
   useEffect(() => { markCurrentRead(); }, [markCurrentRead]);
   useEffect(() => {
     const h = () => markCurrentRead();
@@ -235,15 +304,22 @@ export function useInboxWhatsApp(opts: {
   const [replyTo, setReplyTo] = useState<ReplyTo | null>(null);
 
   /* ---------- envio (v1 L669-743) ---------- */
-  const enviandoRef = useRef(false);
+  // Anti-duplo-clique por TEMPO, não por "requisição em voo": a trava antiga só soltava no
+  // onSettled — se a chamada ficava pendurada (rede piscou, aba dormiu, token renovando), TODO
+  // envio seguinte era ignorado em silêncio até recarregar a página. Agora cada mensagem sai na
+  // hora e independente; só bloqueia o MESMO texto repetido em < 1,5s (Enter duplo).
+  const ultimoEnvioRef = useRef<{ chave: string; em: number } | null>(null);
   const [retryId, setRetryId] = useState<string | null>(null);
   const [removendoId, setRemovendoId] = useState<string | null>(null);
 
   const sendMsg = useCallback((draft: string, assinaturaNome: string | null, aoAceitar: () => void) => {
     const v = draft.trim();
     if (!v) return;
-    if (enviandoRef.current) return;
     if (WA_REAL && !currentId) return;
+    if (descasada) { aoAvisar({ tom: 'erro', texto: 'Aguarde a conversa carregar para enviar.' }); return; }
+    const chaveEnvio = currentId + '|' + v;
+    const ult = ultimoEnvioRef.current;
+    if (ult && ult.chave === chaveEnvio && Date.now() - ult.em < 1500) return;
     if (canalRestrito) { aoAvisar({ tom: 'erro', texto: 'O número deste canal está com restrição no WhatsApp e está indisponível para envio. Selecione outro canal.' }); return; }
     if (canalIndisponivel) { aoAvisar({ tom: 'erro', texto: 'Este número está desconectado. Reconecte em Integrações para enviar.' }); return; }
     if (semDestino) { aoAvisar({ tom: 'erro', texto: 'Vincule um número confirmado para responder.' }); return; }
@@ -253,28 +329,25 @@ export function useInboxWhatsApp(opts: {
     const hh = ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
     const corpo = montarCorpoAssinado(v, assinaturaNome);
     const cid = novoCid(now.getTime());
+    ultimoEnvioRef.current = { chave: chaveEnvio, em: now.getTime() };
     const replyEnvio = replyTo ? { id: replyTo.id, idExt: replyTo.idExt, fromMe: replyTo.fromMe, preview: { remetente: replyTo.remetente, tipo: replyTo.tipo, texto: replyTo.texto } } : undefined;
     const quotedBolha = replyTo ? { remetente: replyTo.remetente, tipo: replyTo.tipo, texto: replyTo.texto } : undefined;
     setContacts((cur) => aplicarEnvioOtimista(cur, currentId, { dir: 'out', text: corpo, time: hh, tsISO: now.toISOString(), status: 'pendente', cid, quoted: quotedBolha }, v));
     aoAceitar();                                               // limpa o draft na página
     if (!WA_REAL) { aoAvisar({ tom: 'ok', texto: 'Mensagem enviada' }); setReplyTo(null); return; }
-    enviandoRef.current = true;
     const convAlvo = currentId;
     const marcarFalha = (erro: string) => setContacts((cur) => aplicarFalha(cur, convAlvo, cid, erro));
     const to = window.setTimeout(() => marcarFalha('Sem confirmação de envio a tempo. Tente novamente.'), 25_000);
-    sendMut.mutate(
-      { conversaId: currentId, text: v, canalId: replyCanalId || current.canalId, replyTo: replyEnvio },
-      {
-        onError: (e) => { window.clearTimeout(to); const msg = (e as Error)?.message || 'Falha no envio.'; marcarFalha(msg); aoAvisar({ tom: 'erro', texto: msg }); },
-        onSuccess: (idReal) => { window.clearTimeout(to); setReplyTo(null); if (idReal) setContacts((cur) => marcarIdReal(cur, convAlvo, cid, idReal)); },
-        onSettled: () => { enviandoRef.current = false; },
-      },
-    );
+    // mutateAsync (não mutate): com envios em paralelo, os callbacks do mutate() só disparam
+    // para a ÚLTIMA chamada — as anteriores ficariam sem confirmação e cairiam no timeout.
+    sendMut.mutateAsync({ conversaId: currentId, text: v, canalId: replyCanalId || current.canalId, replyTo: replyEnvio })
+      .then((idReal) => { window.clearTimeout(to); setReplyTo(null); if (idReal) setContacts((cur) => marcarIdReal(cur, convAlvo, cid, idReal)); })
+      .catch((e) => { window.clearTimeout(to); const msg = (e as Error)?.message || 'Falha no envio.'; marcarFalha(msg); aoAvisar({ tom: 'erro', texto: msg }); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentId, canalRestrito, canalIndisponivel, semDestino, optout, bloquearPorHigiene, replyTo, replyCanalId, current.canalId]);
+  }, [currentId, descasada, canalRestrito, canalIndisponivel, semDestino, optout, bloquearPorHigiene, replyTo, replyCanalId, current.canalId]);
 
   const retryMsg = useCallback((m: WaMessage) => {
-    if (!m.id || !currentId || retryId) return;
+    if (!m.id || !currentId || retryId || descasada) return;
     if (canalRestrito) { aoAvisar({ tom: 'erro', texto: 'O número deste canal está com restrição no WhatsApp e está indisponível para reenviar. Selecione outro canal.' }); return; }
     if (canalIndisponivel) { aoAvisar({ tom: 'erro', texto: 'Este número está desconectado. Reconecte em Integrações para enviar.' }); return; }
     if (semDestino) { aoAvisar({ tom: 'erro', texto: 'Vincule um número confirmado para responder.' }); return; }
@@ -282,28 +355,31 @@ export function useInboxWhatsApp(opts: {
     setRetryId(m.id);
     setContacts((cur) => aplicarRetry(cur, currentId, m.id!));
     if (!WA_REAL) { setRetryId(null); return; }
-    sendMut.mutate(
-      { conversaId: currentId, text: m.text ?? '', canalId: replyCanalId || current.canalId, retryMensagemId: m.id },
-      {
-        onError: (e) => aoAvisar({ tom: 'erro', texto: (e as Error)?.message || 'Falha no reenvio.' }),
-        onSettled: () => setRetryId(null),
-      },
-    );
+    // chamada pendurada não pode prender o "Reenviar" para sempre (mesmo bug do envio)
+    const soltar = window.setTimeout(() => setRetryId(null), 25_000);
+    sendMut.mutateAsync({ conversaId: currentId, text: m.text ?? '', canalId: replyCanalId || current.canalId, retryMensagemId: m.id })
+      .catch((e) => aoAvisar({ tom: 'erro', texto: (e as Error)?.message || 'Falha no reenvio.' }))
+      .finally(() => { window.clearTimeout(soltar); setRetryId(null); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentId, retryId, canalRestrito, canalIndisponivel, semDestino, optout, replyCanalId, current.canalId]);
+  }, [currentId, retryId, descasada, canalRestrito, canalIndisponivel, semDestino, optout, replyCanalId, current.canalId]);
 
   const removerFalha = useCallback(async (m: WaMessage) => {
     if (!m.id || removendoId) return;
     setRemovendoId(m.id);
     try {
-      if (WA_REAL) await removerMensagemFalha(m.id);
+      if (WA_REAL) {
+        await removerMensagemFalha(m.id);
+        // o DELETE não chega pelo canal filtrado e a mensagem removida pode ser o preview do card:
+        // busca-alvo da conversa (antes, a recarga completa de qualquer evento seguinte corrigia)
+        pedirBuscaAlvo(qc, orgId, { ids: [currentId] });
+      }
       setContacts((cur) => removerMensagemLocal(cur, currentId, m.id!));
       aoAvisar({ tom: 'ok', texto: 'Mensagem com falha removida.' });
     } catch (e) {
       aoAvisar({ tom: 'erro', texto: (e as Error)?.message || 'Falha ao remover.' });
     } finally { setRemovendoId(null); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentId, removendoId]);
+  }, [currentId, removendoId, orgId]);
 
   /* mídia — ciclo OTIMISTA: bolha imediata com preview local (objectURL) e o
      upload+envio correndo por trás. As guardas continuam lançando SÍNCRONO
@@ -311,6 +387,7 @@ export function useInboxWhatsApp(opts: {
      (o modal fecha) e falha posterior vira bolha 'falhou' + aviso. */
   const guardaMidia = () => {
     if (WA_REAL && !currentId) throw new Error('Selecione uma conversa.');   // v1 L746/L758/L775
+    if (descasada) throw new Error('Aguarde a conversa carregar para enviar.');
     if (optout) throw new Error('Contato marcado como não incomodar — mensagens bloqueadas.');
     if (!higieneBloqueia) return;
     // v1: motivo do bloqueio decide o texto (não o estado do dono)
@@ -348,7 +425,7 @@ export function useInboxWhatsApp(opts: {
       } finally { window.clearTimeout(to); }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentId, replyCanalId, current.canalId, currentOrg.id, replyTo, higieneBloqueia, higiene.motivoBloqueio, optout]);
+  }, [currentId, descasada, replyCanalId, current.canalId, currentOrg.id, replyTo, higieneBloqueia, higiene.motivoBloqueio, optout]);
   const enviarImagem = useCallback(async (file: File, caption: string) => {
     if (!WA_REAL) { guardaMidia(); aoAvisar({ tom: 'ok', texto: 'Mensagem enviada' }); return; }
     dispararMidia('imagem', file, caption);
@@ -361,12 +438,19 @@ export function useInboxWhatsApp(opts: {
   }, [dispararMidia]);
   const enviarAudio = useCallback(async (blob: Blob, mime: string, ext: string, diag?: Record<string, unknown>) => {
     if (!blob || !blob.size) throw new Error('Áudio vazio. Grave novamente.');   // tolera blob nulo (v1 L760)
-    if (!WA_REAL) { guardaMidia(); aoAvisar({ tom: 'ok', texto: 'Mensagem enviada' }); return; }
+    if (!WA_REAL) {
+      guardaMidia();
+      // demo: a bolha toca o áudio EXATAMENTE como sairia (já limpo + convertido) — dá pra conferir o resultado
+      const now = new Date();
+      const hh = ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
+      setContacts((cur) => aplicarEnvioOtimista(cur, currentId, { dir: 'out', tipo: 'audio', time: hh, tsISO: now.toISOString(), status: 'entregue', cid: novoCid(now.getTime()), localUrl: URL.createObjectURL(blob), mime, tamanho: blob.size }, '🎤 Áudio'));
+      aoAvisar({ tom: 'ok', texto: 'Mensagem enviada' }); return;
+    }
     const file = new File([blob], `audio.${ext}`, { type: mime });
     const origemAudio = diag?.origem === 'arquivo_anexado' ? 'arquivo_anexado' : 'gravacao_painel';
     dispararMidia('audio', file, '', { audioDiag: diag, origemAudio });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dispararMidia]);
+  }, [dispararMidia, currentId]);
   const enviarDocumento = useCallback(async (file: File, caption: string) => {
     if (!WA_REAL) { guardaMidia(); aoAvisar({ tom: 'ok', texto: 'Mensagem enviada' }); return; }
     dispararMidia('documento', file, caption);
@@ -385,7 +469,70 @@ export function useInboxWhatsApp(opts: {
     if (!WA_REAL) { aoAvisar({ tom: 'ok', texto: 'Contato compartilhado' }); return; }
     await sendMut.mutateAsync({ conversaId: currentId, canalId: replyCanalId || current.canalId, contato: { nome: nome.trim(), telefone: tel } });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentId, replyCanalId, current.canalId, higieneBloqueia, higiene.motivoBloqueio, optout]);
+  }, [currentId, descasada, replyCanalId, current.canalId, higieneBloqueia, higiene.motivoBloqueio, optout]);
+
+  /* ---------- envio via SCRIPT (ScriptSequenceModal) ----------
+     As MESMAS travas do composer, re-checadas A CADA etapa (o estado pode mudar
+     por realtime com o modal aberto — optout/higiene/canal): o caminho de script
+     não pode furar o que sendMsg bloqueia. Mesma ordem e mesmos textos do
+     composer. FONTE ÚNICA para desktop e mobile. */
+  const guardaScript = () => {
+    if (descasada) throw new Error('Aguarde a conversa carregar para enviar.');
+    if (canalRestrito) throw new Error('O número deste canal está com restrição no WhatsApp e está indisponível para envio. Selecione outro canal.');
+    if (canalIndisponivel) throw new Error('Este número está desconectado. Reconecte em Integrações para enviar.');
+    if (semDestino) throw new Error('Vincule um número confirmado para responder.');
+    if (optout) throw new Error('Contato marcado como não incomodar — mensagens bloqueadas.');
+    if (higieneBloqueia) throw new Error(textoBloqueio(higiene) ?? 'Atendimento sem responsável ou com cadastro incompleto — assuma e complete o nome para enviar.');
+  };
+  /** Bolha otimista de uma etapa de script (texto ou mídia do arsenal). */
+  const bolhaScript = (conv: string, b: Partial<WaMessage>, last: string) => {
+    const now = new Date();
+    const hh = ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
+    const cid = novoCid(now.getTime());
+    setContacts((cur) => aplicarEnvioOtimista(cur, conv, { dir: 'out', time: hh, tsISO: now.toISOString(), status: 'pendente', cid, ...b }, last));
+    return { conv, cid };
+  };
+  const scriptEnviarEtapa = useCallback(async (texto: string, retryMensagemId?: string) => {
+    guardaScript();
+    // demo devolve um id sintético: com `confirmar` presente o modal EXIGE id
+    // (sem ele a etapa marcava "Falhou · envio sem identificador" no demo)
+    if (demo) { aoAvisar({ tom: 'ok', texto: 'Mensagem enviada' }); return 'demo-script'; }
+    // bolha "enviando" NA HORA (o script roda em segundo plano): some quando a linha real chega
+    // (marcarIdReal → reconciliação por id); em erro vira "falhou" (o backend grava a falha com Reenviar).
+    const bolha = retryMensagemId ? null : bolhaScript(currentId, { tipo: 'texto', text: texto }, texto);
+    try {
+      const id = await sendMut.mutateAsync({ conversaId: currentId, canalId: replyCanalId || current.canalId, text: texto, retryMensagemId });
+      if (bolha && id) setContacts((cur) => marcarIdReal(cur, bolha.conv, bolha.cid, id));
+      return id ?? undefined;
+    } catch (e) {
+      if (bolha) setContacts((cur) => aplicarFalha(cur, bolha.conv, bolha.cid, (e as Error)?.message || 'Falha no envio.'));
+      throw e;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentId, descasada, replyCanalId, current.canalId, canalRestrito, canalIndisponivel, semDestino, optout, higieneBloqueia, higiene, demo]);
+  const scriptEnviarMidia = useCallback(async (m: { tipo: string; texto: string; mime?: string | null; nome?: string | null; tamanho?: number | null; storagePath?: string | null; previewUrl?: string }) => {
+    guardaScript();
+    if (!m.storagePath) throw new Error('Mídia do script sem arquivo. Reenvie o anexo na página de Scripts.');
+    if (demo) { aoAvisar({ tom: 'ok', texto: 'Mídia enviada' }); return; }
+    // A mídia do script já vive no bucket privado (script-midia); envia pelo mesmo caminho do compositor.
+    const tipoBolha = (['imagem', 'video', 'audio', 'documento'].includes(m.tipo) ? m.tipo : 'documento') as 'imagem' | 'video' | 'audio' | 'documento';
+    const bolha = bolhaScript(currentId,
+      { tipo: tipoBolha, text: m.texto || '', localUrl: m.previewUrl, nome: m.nome ?? undefined, mime: m.mime ?? undefined, tamanho: m.tamanho ?? undefined },
+      previewUltimaMensagem({ tipo: tipoBolha, texto: m.texto || null }));
+    try {
+      const id = await sendMut.mutateAsync({
+        conversaId: currentId, canalId: replyCanalId || current.canalId,
+        midiaPath: m.storagePath, midiaTipo: m.tipo, midiaMime: m.mime ?? undefined, midiaNome: m.nome ?? undefined, midiaTamanho: m.tamanho ?? undefined,
+        text: m.texto || undefined,
+      });
+      if (id) setContacts((cur) => marcarIdReal(cur, bolha.conv, bolha.cid, id));
+      if (id) await aguardarConfirmacaoEnvio(id); // sucesso = confirmação REAL do provedor (igual ao texto)
+    } catch (e) {
+      setContacts((cur) => aplicarFalha(cur, bolha.conv, bolha.cid, (e as Error)?.message || 'Falha no envio da mídia.'));
+      throw e;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentId, descasada, replyCanalId, current.canalId, canalRestrito, canalIndisponivel, semDestino, optout, higieneBloqueia, higiene, demo]);
 
   /* ---------- atribuição (v1 L806-867) — otimista com rollback ---------- */
   const [atribuindo, setAtribuindo] = useState(false);
@@ -436,20 +583,39 @@ export function useInboxWhatsApp(opts: {
   }, [current.id, current.respId, atribuindo]);
 
   /* ---------- ações do menu / painel ---------- */
+  // marcar lida / arquivar / fixar: patch OTIMISTA no cache da lista (patchOtimistaLista) em vez
+  // da recarga completa de antes; o UPDATE de conversas do realtime confirma (e o confirmar() no
+  // sucesso recarimba contra busca que leu antes do commit). Erro = desfaz os campos tocados +
+  // recarga completa (raro).
   const marcarLida = useCallback(async (lida: boolean) => {
     if (!current.id) return;
     if (!WA_REAL) { setContacts((cur) => patchConversa(cur, current.id, { unread: lida ? 0 : 1 })); return; }
-    try { await waMarcarLida(current.id, lida); await live.refetch(); }
-    catch (e) { aoAvisar({ tom: 'erro', texto: (e as Error)?.message || 'Falha ao marcar.' }); }
+    // mesma regra da RPC wa_marcar_lida: lida → 0; não lida → greatest(nao_lidas, 1)
+    const otimista = patchOtimistaLista(qc, orgId, current.id, { unread: lida ? 0 : Math.max(current.unread ?? 0, 1) });
+    try { await waMarcarLida(current.id, lida); otimista.confirmar(); }
+    catch (e) { otimista.desfazer(); aoAvisar({ tom: 'erro', texto: (e as Error)?.message || 'Falha ao marcar.' }); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current.id]);
+  }, [current.id, current.unread, orgId]);
   const arquivar = useCallback(async (arq: boolean) => {
     if (!current.id) return;
     if (!WA_REAL) { setContacts((cur) => patchConversa(cur, current.id, { arquivada: arq })); aoAvisar({ tom: 'ok', texto: arq ? 'Conversa arquivada' : 'Conversa desarquivada' }); return; }
-    try { await waArquivar(current.id, arq); await live.refetch(); aoAvisar({ tom: 'ok', texto: arq ? 'Conversa arquivada' : 'Conversa desarquivada' }); }
-    catch (e) { aoAvisar({ tom: 'erro', texto: (e as Error)?.message || 'Falha ao arquivar.' }); }
+    const otimista = patchOtimistaLista(qc, orgId, current.id, { arquivada: arq });
+    try { await waArquivar(current.id, arq); otimista.confirmar(); aoAvisar({ tom: 'ok', texto: arq ? 'Conversa arquivada' : 'Conversa desarquivada' }); }
+    catch (e) { otimista.desfazer(); aoAvisar({ tom: 'erro', texto: (e as Error)?.message || 'Falha ao arquivar.' }); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current.id]);
+  }, [current.id, orgId]);
+  // fixar/desfixar QUALQUER conversa (por id) — o pin de cada card manda o próprio id; o menu ⋯ usa a atual.
+  // Otimista (o card já fica azul na hora); sem toast de sucesso (o estado azul é o feedback).
+  const fixar = useCallback(async (fix: boolean, conversaId?: string) => {
+    const id = conversaId ?? current.id;
+    if (!id) return;
+    if (!WA_REAL) { setContacts((cur) => patchConversa(cur, id, { fixada: fix })); return; }
+    setContacts((cur) => patchConversa(cur, id, { fixada: fix }));   // otimista (local: pinta já)
+    const otimista = patchOtimistaLista(qc, orgId, id, { fixada: fix });   // e no cache (a reconciliação não desfaz)
+    try { await waFixar(id, fix); otimista.confirmar(); }
+    catch (e) { setContacts((cur) => patchConversa(cur, id, { fixada: !fix })); otimista.desfazer(); aoAvisar({ tom: 'erro', texto: (e as Error)?.message || 'Falha ao fixar.' }); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current.id, orgId]);
   /** patch local otimista de edição (nome/email/observações/responsável) — o await fica na página (acoes.atualizarContato). */
   const aplicarEdicaoLocal = useCallback((patch: Partial<WaContact>) => {
     if (current.id) setContacts((cur) => patchConversa(cur, current.id, patch));
@@ -459,7 +625,12 @@ export function useInboxWhatsApp(opts: {
   const iniciarNovaConversa = useCallback(async (canalId: string, telefone: string, nome: string): Promise<boolean> => {
     if (!WA_REAL) { aoAvisar({ tom: 'ok', texto: 'Disponível com o backend configurado' }); return false; }
     const r = await iniciarMut.mutateAsync({ canalId, telefone, nome: nome || undefined });
-    await live.refetch();
+    // busca-alvo SÓ da conversa (antes: recarga completa da lista inteira) — já mesclada no cache
+    // antes de selecionar. Se a busca falhar ou não trouxer a conversa, cai na recarga completa.
+    tentadosRef.current.add(r.conversaId);
+    const ok = await buscarConversasAgora(orgId, { ids: [r.conversaId] });
+    const naLista = (qc.getQueryData<WaContact[]>(['wa-conversas', orgId]) ?? []).some((c) => c.id === r.conversaId && visRef.current.podeVer(c.respId));
+    if (!ok || !naLista) await live.refetch();
     canalManualRef.current = canalId;
     setReplyCanalId(canalId);
     selecaoUsuarioRef.current = r.conversaId;
@@ -467,7 +638,7 @@ export function useInboxWhatsApp(opts: {
     if (r.reused) aoAvisar({ tom: 'ok', texto: 'Conversa existente aberta.' });
     return true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [orgId]);
 
   /* ---------- relógio de 1min (tempos relativos) ---------- */
   const [relogioMs, setRelogioMs] = useState(() => Date.now());
@@ -487,7 +658,8 @@ export function useInboxWhatsApp(opts: {
     replyTo, setReplyTo,
     sendMsg, retryMsg, removerFalha, retryId, removendoId,
     enviarImagem, enviarVideo, enviarAudio, enviarDocumento, enviarContato,
+    scriptEnviarEtapa, scriptEnviarMidia,
     atribuindo, assumir, devolver, transferir,
-    marcarLida, arquivar, aplicarEdicaoLocal, iniciarNovaConversa,
+    marcarLida, arquivar, fixar, aplicarEdicaoLocal, iniciarNovaConversa,
   };
 }

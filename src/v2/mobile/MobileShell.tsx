@@ -39,7 +39,11 @@ export default function MobileShell() {
     const raiz = document.documentElement;
     const aplica = () => {
       raiz.style.setProperty('--m-alt', vv.height + 'px');
-      window.scrollTo(0, 0);
+      // Com um MODAL aberto (.veu: agendar/scripts/mídia — position:fixed, sem --m-alt)
+      // o pan do WebKit é o que revela o campo focado acima do teclado — desfazê-lo
+      // deixaria o input escondido ATRÁS do teclado (achado da revisão 18/09).
+      // Sem modal, desfazer o pan é o que mantém o composer do chat no lugar.
+      if (!document.querySelector('.veu')) window.scrollTo(0, 0);
     };
     aplica();
     vv.addEventListener('resize', aplica);

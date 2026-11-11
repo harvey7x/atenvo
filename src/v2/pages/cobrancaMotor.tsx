@@ -1667,7 +1667,7 @@ function AbaEnviosReal({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (t: st
           <EstadoVazio titulo="Fila vazia" descricao="Quando houver clientes em ciclos com mensagens ativas, os disparos do dia aparecem aqui (sempre nascendo em simulação)." />
         </CardVidro>
       ) : (
-        <CardVidro spot sobe style={{ borderRadius: 'var(--r-card)', animationDelay: '.1s' }}>
+        <CardVidro spot sobe className="mo-fixo" style={{ borderRadius: 'var(--r-card)', animationDelay: '.1s' }}>
           <TabelaPadrao
             colunas={[
               { chave: 'cli', titulo: 'Cliente', render: (x: CobFilaItem) => x.cliente },
@@ -1735,7 +1735,7 @@ function AbaEnviosDemo({ gestor, aoAvisar }: { gestor: boolean; aoAvisar: (t: st
           <Chip ativo={filtro === 'erro'} onClick={() => setFiltro('erro')}>Com erro</Chip>
         </Chips>
       </div>
-      <CardVidro spot sobe style={{ borderRadius: 'var(--r-card)', animationDelay: '.18s' }}>
+      <CardVidro spot sobe className="mo-fixo" style={{ borderRadius: 'var(--r-card)', animationDelay: '.18s' }}>
         {lista.length === 0
           ? (fila.length === 0
             ? <EstadoVazio titulo="Nenhum envio ainda" descricao="Crie um envio ou aguarde a régua." />
@@ -1778,7 +1778,7 @@ function AbaAtendentesReal() {
     return <CardVidro spot sobe style={{ borderRadius: 'var(--r-card)' }}><EstadoVazio titulo="Sem clientes na cobrança" descricao="Cadastre clientes para acompanhar a carteira de cada atendente." /></CardVidro>;
   }
   return (
-    <CardVidro spot sobe style={{ borderRadius: 'var(--r-card)' }}>
+    <CardVidro spot sobe className="mo-fixo" style={{ borderRadius: 'var(--r-card)' }}>
       <TabelaPadrao
         colunas={[
           { chave: 'at', titulo: 'Atendente', render: (x) => x.atendente },
@@ -1861,7 +1861,7 @@ function AbaClientesReal({ gestor, aoNovo }: { gestor: boolean; aoNovo: () => vo
           <span><b>{semNumero} cliente{semNumero === 1 ? '' : 's'} sem número de WhatsApp.</b> Sem o número, a cobrança automática não chega a este cliente.</span>
         </div>
       )}
-      <CardVidro spot sobe style={{ borderRadius: 'var(--r-card)', animationDelay: '.06s' }}>
+      <CardVidro spot sobe className="mo-fixo" style={{ borderRadius: 'var(--r-card)', animationDelay: '.06s' }}>
         <TabelaPadrao
           colunas={[
             { chave: 'nome', titulo: 'Cliente', render: (x: ClienteCobranca) => <div className="cm-cli-nm">{!x.telefone && <span className="cm-cli-alerta" title="Sem número de WhatsApp"><IcAtencao /></span>}{x.nome}</div> },
@@ -1965,7 +1965,7 @@ function AbaClientesDemo({ gestor }: { gestor: boolean }) {
           <Chip ativo={deb === 'parou'} onClick={() => trocarDeb('parou')}>Débito parou ({contDeb.parou})</Chip>
         </Chips>
       </div>
-      <CardVidro spot sobe style={{ borderRadius: 'var(--r-card)', animationDelay: '.12s' }}>
+      <CardVidro spot sobe className="mo-fixo" style={{ borderRadius: 'var(--r-card)', animationDelay: '.12s' }}>
         {lista.length === 0
           ? <EstadoVazio titulo="Nenhum cliente neste filtro" descricao="Troque o segmento acima." />
           : <TabelaPadrao colunas={colunas} linhas={linhasPag} chave={(c) => c.id} aoClicarLinha={(c) => setSel(c)}

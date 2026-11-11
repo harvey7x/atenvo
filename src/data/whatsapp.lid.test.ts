@@ -3,6 +3,9 @@
 import { describe, it, expect } from 'vitest';
 import webhook from '../../supabase/functions/evolution-webhook/index.ts?raw';
 import wa from './whatsapp.ts?raw';
+// a regra do nome exibido mora em whatsappRealtime.ts (fonte única: mapConversa + patch de `contatos`)
+import waRt from './whatsappRealtime.ts?raw';
+import { nomeDoContato } from './whatsappRealtime';
 
 describe('@lid — o LID nunca vira nome', () => {
   it('webhook: sem PN e sem pushName real => "Identidade protegida" (nunca o lid cru)', () => {
@@ -28,10 +31,17 @@ describe('@lid — o LID nunca vira nome', () => {
   });
 
   it('data layer: exibição defensiva não mostra LID cru; resolvido mostra telefone', () => {
-    expect(wa).toContain('ehLidCru');
-    expect(wa).toContain('ehPlaceholder');
-    expect(wa).toMatch(/\/\^\[0-9\]\{12,\}\$\//);
+    expect(wa).toContain('nomeDoContato(');          // mapConversa usa a regra única
+    expect(waRt).toContain('ehLidCru');
+    expect(waRt).toContain('ehPlaceholder');
+    expect(waRt).toMatch(/\/\^\[0-9\]\{12,\}\$\//);
     // placeholder só quando NÃO há telefone; com telefone mostra o número
-    expect(wa).toMatch(/ehPlaceholder \? \(tel \?\? 'Identidade protegida'\)/);
+    expect(waRt).toMatch(/ehPlaceholder \? \(tel \?\? 'Identidade protegida'\)/);
+    // e o comportamento
+    expect(nomeDoContato('123456789012345', null, false)).toBe('Identidade protegida');
+    expect(nomeDoContato('123456789012345', null, true)).toBe('123456789012345');
+    expect(nomeDoContato('Identidade protegida', '5551999990000', true)).toBe('5551999990000');
+    expect(nomeDoContato('Maria Souza', null, false)).toBe('Maria Souza');
+    expect(nomeDoContato(null, null, false)).toBe('Contato');
   });
 });

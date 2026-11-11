@@ -24,6 +24,9 @@ export function KanbanContatoBox({ contatoId, conversaId, canalId, canalTipo, co
   if (!contatoId) return null;
   const lista = opps.data ?? [];
   const aberta = lista.find((o) => o.aberta);
+  // Cliente já GANHO (Fechado) no funil: não pode virar lead novo de novo. Mostra o estado fechado
+  // em vez de "Sem oportunidade aberta" + botão de adicionar (que ressuscitava o cliente).
+  const ganha = !aberta ? lista.find((o) => o.status === 'ganho') : undefined;
   const funis = funisQ.data ?? [];
   const origem = canalTipo === 'facebook' ? 'Facebook' : 'WhatsApp';
 
@@ -41,7 +44,12 @@ export function KanbanContatoBox({ contatoId, conversaId, canalId, canalTipo, co
         qc.invalidateQueries({ queryKey: ['kanban-leads'] }),
       ]);
       setModal(false); toast('Adicionado ao Kanban');
-    } catch (e) { setErr((e as Error).message || 'Falha ao adicionar.'); }
+    } catch (e) {
+      const msg = (e as Error).message || '';
+      setErr(msg.includes('cliente_ja_fechado_ganho')
+        ? 'Este cliente já está FECHADO (ganho). Não é possível recriá-lo como lead novo — reabra pelo Kanban se precisar.'
+        : (msg || 'Falha ao adicionar.'));
+    }
     finally { setBusy(false); }
   }
 
@@ -65,6 +73,14 @@ export function KanbanContatoBox({ contatoId, conversaId, canalId, canalTipo, co
             <FichaJudicialBox contatoId={contatoId} oportunidadeId={aberta.id} conversaId={conversaId ?? null} canalId={canalId ?? null}
               responsavelSugerido={{ id: aberta.respId ?? undefined, nome: aberta.respNome }} contatoAtual={{ telefone: contatoTelefone ?? '' }} oportunidadeAtual={{ tipoBeneficio: aberta.tipoBeneficio }} />
           </div>
+        </div>
+      ) : ganha ? (
+        <div className="kcb-card">
+          <div className="kcb-row"><span className="kcb-l">Situação</span><span className="kcb-v">✓ Cliente Fechado</span></div>
+          <div className="kcb-row"><span className="kcb-l">Funil</span><span className="kcb-v">{ganha.funilNome || '—'}</span></div>
+          <div className="kcb-row"><span className="kcb-l">Etapa</span><span className="kcb-v">{ganha.colunaNome || '—'}</span></div>
+          {ganha.respNome && <div className="kcb-row"><span className="kcb-l">Responsável</span><span className="kcb-v">{ganha.respNome}</span></div>}
+          <button type="button" className="kcb-btn" onClick={() => navigate(`/kanban?oportunidade=${ganha.id}`)}>Ver no Kanban</button>
         </div>
       ) : (
         <div className="kcb-empty">

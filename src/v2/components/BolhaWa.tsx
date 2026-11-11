@@ -20,6 +20,8 @@ export const IcDoc = () => <Ic><path d="M13 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h1
 const IcDownload = () => <Ic><path d="M12 3v12" /><path d="m7 11 5 5 5-5" /><path d="M5 21h14" /></Ic>;
 const IcTel = () => <Ic><path d="M5 4h4l2 5-2.5 1.5a12 12 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2" /></Ic>;
 const IcReply = () => <Ic><path d="M9 14 4 9l5-5" /><path d="M4 9h11a5 5 0 0 1 5 5v6" /></Ic>;
+const IcChave = () => <Ic><circle cx="8" cy="15" r="4" /><path d="m10.8 12.2 9-9" /><path d="m17 6 3 3" /><path d="m15 8 2 2" /></Ic>;
+const IcArroba = () => <Ic><circle cx="12" cy="12" r="4" /><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8" /></Ic>;
 const IcPlay = () => <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M8 5.5v13l11-6.5z" /></svg>;
 /* Glifo ÚNICO de IA do app — monocromático em currentColor, usado em TODOS os pontos de IA
    (barra de estado, label da mensagem, chip da lista, divisor de handoff): um desenho só = identidade. */
@@ -38,11 +40,14 @@ export const IcBot = () => (
    selo do bot (origemBot → "◈ Matheo"), áudio com onda + .transc,
    imagem/vídeo/documento, quoted, ticks, falha, responder.
    ================================================================ */
-export function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, optout, aoResponder, aoVerErro, aoRetry, aoRemover, aoLightbox, aoRecarregarAudio }: {
+export function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, optout, aoResponder, aoVerErro, aoRetry, aoRemover, aoLightbox, aoRecarregarAudio, aoIdentificar }: {
   m: WaMessage; demo: boolean; nomeCliente: string; retryId: string | null; removendoId: string | null; semDestino: boolean; optout: boolean;
   aoResponder: (m: WaMessage) => void; aoVerErro: (m: WaMessage) => void; aoRetry: (m: WaMessage) => void;
-  aoRemover: (m: WaMessage) => void; aoLightbox: (url: string) => void; aoRecarregarAudio: (m: WaMessage) => void;
+  aoRemover: (m: WaMessage) => void; aoLightbox: (url: string, nome?: string, mensagemId?: string) => void; aoRecarregarAudio: (m: WaMessage) => void;
+  /** "Identificar senha / e-mail" (dono 29/10) — só no inbox; o mobile não passa. `selecionado` = trecho marcado no balão */
+  aoIdentificar?: (m: WaMessage, campo: 'senha' | 'email', selecionado: string) => void;
 }) {
+  const raizRef = useRef<HTMLDivElement>(null);
   const [urlAssinada, setUrlAssinada] = useState<string | null>(null);
   const [urlErro, setUrlErro] = useState(false);
   // bolha otimista carrega a mídia LOCAL (objectURL) — renderiza na hora, sem URL assinada
@@ -57,7 +62,8 @@ export function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, 
     return () => { vivo = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [m.anexoPath, precisaUrl]);
-  const url = m.localUrl ?? urlAssinada;
+  // mídia do fluxo do robô não tem anexo no bucket privado: toca direto da URL pública (antes caía em "indisponível")
+  const url = m.localUrl ?? urlAssinada ?? (m.anexoPath ? null : m.midiaUrl ?? null);
   // enquanto a URL assinada não resolveu (anexo presente) é CARREGANDO, não "indisponível" (v1 não pisca)
   const carregandoMidia = precisaUrl && !url && !urlErro;
   const ack = m.dir === 'out' ? ackOf(m.status) : null;
@@ -92,9 +98,30 @@ export function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, 
   );
 
   return (
-    <div className={'bolha ' + (m.dir === 'out' ? 'env2' : 'rec') + (falhou ? ' falha' : '') + (m.origemBot ? ' bot' : '')}>
+    <div ref={raizRef} className={'bolha ' + (m.dir === 'out' ? 'env2' : 'rec') + (falhou ? ' falha' : '') + (m.origemBot ? ' bot' : '')}>
       {m.id && !semDestino && (
         <button type="button" className="resp-btn" title="Responder" aria-label="Responder" onClick={() => aoResponder(m)}><IcReply /></button>
+      )}
+      {/* Identificar senha do INSS / e-mail na mensagem do CLIENTE (texto ou transcrição). mousedown sem
+          default: o trecho marcado com o mouse continua selecionado e vira a sugestão. */}
+      {aoIdentificar && m.dir === 'in' && !!(m.text || m.transcricao) && (
+        <span className="ident-btns">
+          {(['senha', 'email'] as const).map((campo) => (
+            <button
+              key={campo} type="button" className="ident-btn"
+              title={campo === 'senha' ? 'Identificar senha do INSS' : 'Identificar e-mail'}
+              aria-label={campo === 'senha' ? 'Identificar senha do INSS' : 'Identificar e-mail'}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                const sel = window.getSelection();
+                const marcado = sel && !sel.isCollapsed && raizRef.current?.contains(sel.anchorNode) ? sel.toString() : '';
+                aoIdentificar(m, campo, marcado);
+              }}
+            >
+              {campo === 'senha' ? <IcChave /> : <IcArroba />}
+            </button>
+          ))}
+        </span>
       )}
       {/* marca de mensagem AUTOMÁTICA: linha enxuta [glifo] Matheo · IA no lugar da assinatura —
           rolando o fio fica óbvio o que foi o bot vs um humano. Sem caixa; acento na borda da
@@ -109,7 +136,7 @@ export function Bolha({ m, demo, nomeCliente, retryId, removendoId, semDestino, 
       {m.tipo === 'imagem' && (
         (url || demo)
           ? <>
-              {url ? <div className="m-media"><img className="m-img" loading="lazy" src={url} alt="Imagem" title="Ampliar" onClick={() => aoLightbox(url)} />{btnBaixar}</div> : <div className="audio-ind">Imagem de demonstração</div>}
+              {url ? <div className="m-media"><img className="m-img" loading="lazy" src={url} alt="Imagem" title="Ampliar" onClick={() => aoLightbox(url, nomeArquivoMidia(m), m.anexoPath ? m.id : undefined)} />{btnBaixar}</div> : <div className="audio-ind">Imagem de demonstração</div>}
               {m.text && <div className="m-cap"><WaTexto texto={m.text} /></div>}
             </>
           : carregandoMidia ? <div className="audio-ind">Carregando imagem…</div>
@@ -230,7 +257,7 @@ export function AudioBolha({ anexoPath, localUrl, segundos, demo, acaoNode }: { 
   const prog = durS > 0 ? pos / durS : 0;
   return (
     <div className="audio2">
-      <button type="button" className="play" title={demo ? 'Áudio de demonstração' : carregando ? 'Carregando…' : tocando ? 'Pausar' : 'Reproduzir'} onClick={toggle} disabled={demo || carregando}>
+      <button type="button" className="play" title={demo && !localUrl ? 'Áudio de demonstração' : carregando ? 'Carregando…' : tocando ? 'Pausar' : 'Reproduzir'} onClick={toggle} disabled={(demo && !localUrl) || carregando}>
         {tocando ? <svg viewBox="0 0 24 24" fill="currentColor" width="10" height="10" aria-hidden><path d="M7 5h3v14H7zM14 5h3v14h-3z" /></svg> : <IcPlay />}
       </button>
       <div className="onda" onClick={(e) => {

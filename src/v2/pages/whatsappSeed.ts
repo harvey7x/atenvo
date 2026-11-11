@@ -36,6 +36,12 @@ export function seedWa(): WaContact[] {
           transcricao: 'Meu nome é Maria Aparecida, eu recebo aposentadoria desde 2019 e vi uns descontos que eu não reconheço.',
           ...( { seconds: 34 } as Partial<WaMessage>),
         }),
+        // fotos "ruins" (escuras, tortas, amareladas) de documentos FICTÍCIOS — vitrine do visualizador com melhoria
+        IN('', '14:38', { tsISO: iso(agora - 4 * min), id: 'wm-5', tipo: 'imagem', localUrl: '/demo-midia/conta-luz-ficticia.jpg', nome: 'conta-luz.jpg', mime: 'image/jpeg' }),
+        IN('', '14:38', { tsISO: iso(agora - 4 * min), id: 'wm-6', tipo: 'imagem', localUrl: '/demo-midia/extrato-ficticio.jpg', nome: 'extrato.jpg', mime: 'image/jpeg' }),
+        // dados FICTÍCIOS — vitrine do "Identificar senha / e-mail" (o bot não capta senha; o atendente marca)
+        IN('Meu email é maria.aparecida.demo@gmail.com', '14:39', { tsISO: iso(agora - 3 * min), id: 'wm-7' }),
+        IN('A senha do meu INSS é Maria@2019', '14:39', { tsISO: iso(agora - 3 * min), id: 'wm-8' }),
       ],
     },
     {
@@ -105,6 +111,50 @@ export function seedWa(): WaContact[] {
       msgs: [
         OUT('Seu Sebastião, sua análise inicial está pronta — não achamos descontos indevidos. Qualquer coisa é só chamar!', '10:02', { tsISO: iso(agora - 278 * min), id: 'ws-1', viaTelefone: true }),
         IN('Obrigado, moço. Deus abençoe', '10:05', { tsISO: iso(agora - 275 * min), id: 'ws-2' }),
+      ],
+    },
+    /* ---- FECHADOS (ganho): moram na aba Fechados / pós-venda. Dois AGUARDANDO
+       resposta (acendem o selo vermelho da aba) e dois em dia. ---- */
+    {
+      ...base,
+      id: 'wa-odete', name: 'Odete F. Carvalho', phone: '5551987770006', contatoId: 'wa-odete-ct',
+      time: '12:50', unread: 2, lastAtMs: agora - 110 * min, aguardando: true, aguardandoDesde: iso(agora - 110 * min),
+      oppStatus: 'ganho', respId: 'u-mock', tags: ['Juros abusivos'],
+      last: 'O advogado já deu entrada no meu processo?', lastInter: 'há 1 h 50',
+      msgs: [
+        OUT('Dona Odete, seu contrato está fechado! Agora nossa equipe jurídica prepara a entrada do processo, tá bem?', '09:10', { tsISO: iso(agora - 330 * min), id: 'wo-1' }),
+        IN('Boa tarde! O advogado já deu entrada no meu processo?', '12:48', { tsISO: iso(agora - 112 * min), id: 'wo-2' }),
+        IN('Minha filha pediu pra eu perguntar, desculpa incomodar', '12:50', { tsISO: iso(agora - 110 * min), id: 'wo-3' }),
+      ],
+    },
+    {
+      ...base,
+      id: 'wa-pedro', name: 'Pedro Henrique Dias', phone: '5551987770007', contatoId: 'wa-pedro-ct',
+      time: '14:18', unread: 1, lastAtMs: agora - 24 * min, aguardando: true, aguardandoDesde: iso(agora - 24 * min),
+      oppStatus: 'ganho', respId: 'u-mock', tags: ['Revisão de contrato'],
+      last: 'Chegou uma carta do banco aqui, mando foto?', lastInter: 'há 24 min',
+      msgs: [
+        IN('Moço, chegou uma carta do banco aqui, mando foto?', '14:18', { tsISO: iso(agora - 24 * min), id: 'wp-1' }),
+      ],
+    },
+    {
+      ...base,
+      id: 'wa-neusa', name: 'Neusa Trindade', phone: '5551987770008', contatoId: 'wa-neusa-ct',
+      time: 'Ontem', unread: 0, lastAtMs: agora - 1320 * min, oppStatus: 'ganho', respId: 'u-mock', status: 'Fechada',
+      last: 'Você: Qualquer novidade do fórum eu te aviso…', lastInter: 'ontem', tags: ['Juros abusivos'],
+      msgs: [
+        IN('Tem novidade do meu caso?', '15:02', { tsISO: iso(agora - 1325 * min), id: 'wn-1' }),
+        OUT('Dona Neusa, seu processo segue andando normal — qualquer novidade do fórum eu te aviso por aqui, combinado?', '15:07', { tsISO: iso(agora - 1320 * min), id: 'wn-2' }),
+      ],
+    },
+    {
+      ...base,
+      id: 'wa-joaob', name: 'João Batista Ramos', phone: '5551987770010', contatoId: 'wa-joaob-ct',
+      time: 'Seg', unread: 0, lastAtMs: agora - 4300 * min, oppStatus: 'ganho', respId: 'u-mock', status: 'Fechada',
+      last: 'Você: Recebido, seu João! Já encaminhei…', lastInter: 'há 3 dias', tags: ['Revisão de contrato'],
+      msgs: [
+        IN('', '10:40', { tsISO: iso(agora - 4305 * min), id: 'wb-1', tipo: 'documento', nome: 'Comprovante_Residencia.pdf', mime: 'application/pdf', tamanho: 482_112 }),
+        OUT('Recebido, seu João! Já encaminhei pro jurídico — era o último documento que faltava.', '10:45', { tsISO: iso(agora - 4300 * min), id: 'wb-2' }),
       ],
     },
     {

@@ -1,0 +1,31 @@
+-- 2026-10-20 — Índice ia_eventos (conversa_id, criado_em) (passo 5 do plano de lentidão).
+--
+-- SINTOMA: emprestimo_pos_fluxo_tick roda TODO minuto e custa ~212 ms de média (pg_stat_statements,
+--   ~30 mil buffers por chamada; no cron, com a disputa de CPU do segundo :00, 456 ms de média em 24h).
+--
+-- CAUSA (EXPLAIN ANALYZE em produção, transação read-only, 2026-10-20):
+--   select * from emprestimo_pos_fluxo_candidatos(now()) = 251 ms e 139.453 buffers (0 linhas).
+--   No corpo expandido, a CTE fim_retorno faz
+--     exists (select 1 from ia_eventos e where e.conversa_id = cv.conversa_id and e.criado_em < v.volta_em
+--             and (e.tipo = 'triagem_govbr' or (e.tipo = 'chamou_humano' and ...)))
+--   e, sem índice em conversa_id, vira Bitmap Heap Scan via ia_eventos_tipo_criado (tipo, criado_em)
+--   filtrando conversa_id: 139 loops × 1,37 ms ≈ 190 ms e 123.894 buffers — 91% de todo o custo
+--   (Rows Removed by Filter ~1.955 por loop, Heap Blocks exact=120.842).
+--   ia_eventos hoje: só pkey, (sessao_id, criado_em) e (tipo, criado_em). 1.554 páginas (12,7 MB).
+--
+-- ESPERADO: por conversa há em média 11 eventos (máx 60) nas 310 conversas do cv; o EXISTS passa a
+--   ler o índice (2-3 páginas) + no máximo ~11 linhas do heap. SubPlan: ~124 mil → ~1-1,5 mil buffers,
+--   ~190 ms → poucos ms. Função inteira: ~139 mil → ~15-17 mil buffers, ~250 ms → ~60-70 ms.
+--   Custo de escrita: +1 btree em ~700 INSERTs/dia (INSERT PostgREST hoje 1,3 ms). Pura adição,
+--   sem mudança de resultado.
+--
+-- APLICAÇÃO: CREATE INDEX CONCURRENTLY NÃO roda dentro de transação. Este arquivo tem UM único
+--   comando de propósito: rodar sozinho com `supabase db query --linked -f <este arquivo>` (um
+--   comando só não abre bloco de transação). NÃO juntar com outro SQL no mesmo envio, e NÃO pôr
+--   SET antes. Não trava escrita. Se falhar (ex.: statement_timeout de 2 min esperando transação
+--   antiga), o índice fica INVALID e o IF NOT EXISTS passa a pular em silêncio: conferir
+--   pg_index.indisvalid e, se false, DROP INDEX CONCURRENTLY public.idx_ia_eventos_conversa_criado
+--   e rodar de novo. Num rebuild via `supabase db push` (que envolve a migration em BEGIN/COMMIT),
+--   remover a palavra CONCURRENTLY — numa base recém-criada o índice sai instantâneo.
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_ia_eventos_conversa_criado
+  ON public.ia_eventos (conversa_id, criado_em);

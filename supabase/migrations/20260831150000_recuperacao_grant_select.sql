@@ -1,0 +1,17 @@
+-- ============================================================================
+-- FIX (31/08): lista de sequências vinha VAZIA em produção.
+--
+-- O front lista `recuperacao_sequencias` com um SELECT DIRETO na tabela
+-- (src/data/recuperacao.ts → useSequencias). A RLS já existe e restringe a
+-- membros do org (policy rseq_sel = is_platform_admin() OR is_member(org)),
+-- MAS faltou o GRANT de tabela: o papel `authenticated` tomava
+-- "permission denied for table recuperacao_sequencias" ANTES da RLS ser
+-- avaliada, então a query falhava e a UI mostrava "Nenhuma sequência ainda"
+-- mesmo com a sequência salva (o save funciona porque vai por RPC
+-- security-definer, que ignora grant — igual o dashboard/leads).
+--
+-- Correção: conceder SELECT ao authenticated. As ESCRITAS continuam só por
+-- RPC (recuperacao_sequencia_salvar/excluir) — não concedo insert/update/delete.
+-- A RLS segue sendo a fronteira real (org-wide read via is_member).
+-- ============================================================================
+grant select on public.recuperacao_sequencias to authenticated;

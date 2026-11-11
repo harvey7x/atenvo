@@ -34,6 +34,8 @@ interface Props {
   responsavelSugerido?: { id?: string | null; nome?: string };
   contatoAtual?: ContatoAtual;
   oportunidadeAtual?: OportunidadeAtual;
+  /** senha do Meu INSS marcada no chat ("Identificar senha") — fica só na tela até a ficha ser salva */
+  senhaIdentificada?: string;
 }
 
 // IDADE não é campo de formulário: é sempre calculada (nascimento × data da ficha).
@@ -58,13 +60,15 @@ function fichaParaForm(f: FichaJudicial): Form {
   };
 }
 
+const ETAPAS = [['importar', 'Importar'], ['revisar', 'Revisar'], ['previa', 'Prévia']] as const;
+
 const IND: Record<CampoOrigem | 'manual', { txt: string; cls: string }> = {
   parser: { txt: 'Encontrado', cls: 'ok' }, calculado: { txt: 'Calculado', cls: 'ok' },
   sugerido: { txt: 'Sugerido', cls: 'warn' }, manual: { txt: 'Manual', cls: 'man' }, nao_encontrado: { txt: 'Revisar', cls: 'warn' },
   revisao_necessaria: { txt: 'Revisar', cls: 'warn' },
 };
 
-export function FichaJudicialModal({ open, onClose, vinculos, fichaInicial, modo = 'novo', responsavelSugerido, contatoAtual, oportunidadeAtual }: Props) {
+export function FichaJudicialModal({ open, onClose, vinculos, fichaInicial, modo = 'novo', responsavelSugerido, contatoAtual, oportunidadeAtual, senhaIdentificada }: Props) {
   const { toast } = useToast();
   const { user } = useAuth();
   const { data: usuarios = [] } = useOrgUsuarios();
@@ -78,7 +82,9 @@ export function FichaJudicialModal({ open, onClose, vinculos, fichaInicial, modo
   const [etapa, setEtapa] = useState<'importar' | 'revisar' | 'previa'>(fichaInicial ? (readOnly ? 'previa' : 'revisar') : 'importar');
   const [textoConsulta, setTextoConsulta] = useState(fichaInicial?.textoOriginal ?? '');
   const [textoOriginal, setTextoOriginal] = useState(fichaInicial?.textoOriginal ?? '');
-  const [form, setForm] = useState<Form>(fichaInicial ? { ...fichaParaForm(fichaInicial), responsavelId: fichaInicial.responsavelId || responsavelSugerido?.id || '' } : { ...FORM0, dataConsulta: hojeISO(), responsavelId: responsavelSugerido?.id ?? '', telefone: normalizaTelefone(contatoAtual?.telefone ?? '') });
+  const [form, setForm] = useState<Form>(fichaInicial
+    ? { ...fichaParaForm(fichaInicial), responsavelId: fichaInicial.responsavelId || responsavelSugerido?.id || '', senhaInss: fichaInicial.senhaInss || (readOnly ? '' : senhaIdentificada ?? '') }
+    : { ...FORM0, dataConsulta: hojeISO(), responsavelId: responsavelSugerido?.id ?? '', telefone: normalizaTelefone(contatoAtual?.telefone ?? ''), email: contatoAtual?.email ?? '', senhaInss: senhaIdentificada ?? '' });
   const [revisoes, setRevisoes] = useState<FichaRevisao[]>(fichaInicial?.revisoes ?? []);
   const [telImportado, setTelImportado] = useState(''); // telefone vindo do parser (só p/ divergência)
   const [origem, setOrigem] = useState<Record<string, CampoOrigem | 'manual'>>({});
@@ -93,6 +99,11 @@ export function FichaJudicialModal({ open, onClose, vinculos, fichaInicial, modo
 
   // ao fechar, volta a senha para o modo oculto (o valor em si é persistido no campo salvo)
   useEffect(() => { if (!open) setMostrarSenha(false); }, [open]);
+  // senha identificada no chat com o modal JÁ aberto: entra se o campo ainda está vazio (nunca sobrescreve)
+  useEffect(() => {
+    if (!open || readOnly || !senhaIdentificada) return;
+    setForm((f) => (f.senhaInss ? f : { ...f, senhaInss: senhaIdentificada }));
+  }, [open, readOnly, senhaIdentificada]);
 
   const setF = (patch: Partial<Form>, manual = true) => {
     setForm((f) => ({ ...f, ...patch }));
@@ -137,7 +148,7 @@ export function FichaJudicialModal({ open, onClose, vinculos, fichaInicial, modo
 
   function iniciarManual() {
     setParse(null);
-    setForm({ ...FORM0, dataConsulta: hojeISO(), responsavelId: responsavelSugerido?.id ?? '' });
+    setForm({ ...FORM0, dataConsulta: hojeISO(), responsavelId: responsavelSugerido?.id ?? '', senhaInss: form.senhaInss || senhaIdentificada || '', email: contatoAtual?.email ?? '' });
     setRevisoes([]); setOrigem({}); setTextoOriginal(''); setTelImportado('');
     setEtapa('revisar');
   }
@@ -225,7 +236,9 @@ export function FichaJudicialModal({ open, onClose, vinculos, fichaInicial, modo
   }
 
   async function salvarRascunho() {
-    if (busy) return; setBusy(true); setErro(null);
+    if (busy) return;
+    if (!supabase) { setErro('Demonstração: aqui a ficha seria salva como rascunho.'); return; }
+    setBusy(true); setErro(null);
     try {
       const snapshot = montarSnapshot();
       let f: FichaJudicial;
@@ -260,6 +273,7 @@ export function FichaJudicialModal({ open, onClose, vinculos, fichaInicial, modo
     if (busy) return;
     const v = validarFinalizacao();
     if (v) { setErro(v); return; }
+    if (!supabase) { setErro('Demonstração: aqui a ficha seria finalizada.'); return; }
     setBusy(true); setErro(null);
     try {
       const snapshot = montarSnapshot();
@@ -296,10 +310,22 @@ export function FichaJudicialModal({ open, onClose, vinculos, fichaInicial, modo
     return c;
   }, [contatoAtual, oportunidadeAtual, form]);
 
+  const passoAtual = ETAPAS.findIndex(([k]) => k === etapa);
   const titulo = (
-    <div>
-      <div>{readOnly ? 'Ficha judicial' : fichaInicial ? `Editar ficha (v${fichaInicial.versao})` : 'Nova ficha judicial'}</div>
-      <div className="fj-sub">{etapa === 'importar' ? 'Importar dados da consulta' : etapa === 'revisar' ? 'Revisar e completar' : 'Prévia da ficha'}</div>
+    <div className="fj-cab">
+      <div className="fj-cab-tx">
+        <div>{readOnly ? 'Ficha judicial' : fichaInicial ? `Editar ficha (v${fichaInicial.versao})` : 'Nova ficha judicial'}</div>
+        <div className="fj-sub">{etapa === 'importar' ? 'Importar dados da consulta' : etapa === 'revisar' ? 'Revisar e completar' : 'Prévia da ficha'}</div>
+      </div>
+      {!readOnly && (
+        <ol className="fj-passos" aria-label="Etapas da ficha">
+          {ETAPAS.map(([k, rot], i) => (
+            <li key={k} className={i < passoAtual ? 'feito' : i === passoAtual ? 'atual' : undefined} aria-current={i === passoAtual ? 'step' : undefined}>
+              <i className="fj-led" aria-hidden />{rot}
+            </li>
+          ))}
+        </ol>
+      )}
     </div>
   );
 
@@ -315,7 +341,7 @@ export function FichaJudicialModal({ open, onClose, vinculos, fichaInicial, modo
       : <><button className="atv-btn" onClick={() => setEtapa('revisar')} disabled={busy}>Voltar e editar</button><button className="atv-btn" onClick={copiar} disabled={busy}>Copiar ficha</button>{!readOnly && <button className="atv-btn" onClick={salvarRascunho} disabled={busy}>Salvar rascunho</button>}{!readOnly && <button className="atv-btn primary" onClick={finalizarFicha} disabled={busy}>{busy ? 'Finalizando…' : 'Finalizar ficha'}</button>}</>;
 
   return (
-    <Modal open={open} onClose={() => { if (!busy) onClose(); }} closeOnBackdrop={!busy} width={640} title={titulo} footer={rodape}>
+    <Modal open={open} onClose={() => { if (!busy) onClose(); }} closeOnBackdrop={!busy} width={640} title={titulo} footer={rodape} className="fj-modal vidro-pro">
       <div className="fj-body">
         {etapa === 'importar' && (
           <div className="fj-importar">
@@ -351,7 +377,7 @@ export function FichaJudicialModal({ open, onClose, vinculos, fichaInicial, modo
               {campo('UF', <input className="atv-input" maxLength={2} value={form.uf} onChange={(e) => setF({ uf: e.target.value.toUpperCase() })} disabled={readOnly} />, ind('uf'))}
               {campo('Telefone', <input className="atv-input" value={form.telefone} onChange={(e) => setF({ telefone: e.target.value })} disabled={readOnly} title="Vem do contato/conversa do Atenvo — o número do Promosys nunca é usado" />, form.telefone.trim() ? <span className="fj-ind ok">Do contato</span> : <span className="fj-ind warn">Sem telefone</span>)}
               {campo('E-mail', <input className="atv-input" value={form.email} onChange={(e) => setF({ email: e.target.value })} disabled={readOnly} />, ind('email'))}
-              {campo('Senha Meu INSS', <div className="fj-senha"><input className="atv-input" type={mostrarSenha ? 'text' : 'password'} value={form.senhaInss} onChange={(e) => setF({ senhaInss: e.target.value })} disabled={readOnly} autoComplete="off" placeholder="Aparece na ficha ao copiar" /><button type="button" className="fj-eye" onClick={() => setMostrarSenha((s) => !s)}>{mostrarSenha ? 'Ocultar' : 'Mostrar'}</button></div>, <span className="fj-ind ok">Sai na ficha</span>)}
+              {campo('Senha Meu INSS', <div className="fj-senha"><input className="atv-input" type={mostrarSenha ? 'text' : 'password'} value={form.senhaInss} onChange={(e) => setF({ senhaInss: e.target.value })} disabled={readOnly} autoComplete="off" placeholder="Aparece na ficha ao copiar" /><button type="button" className="fj-eye" onClick={() => setMostrarSenha((s) => !s)}>{mostrarSenha ? 'Ocultar' : 'Mostrar'}</button></div>, senhaIdentificada && form.senhaInss === senhaIdentificada ? <span className="fj-ind ok">Identificada no chat</span> : <span className="fj-ind ok">Sai na ficha</span>)}
               {campo('RG', <input className="atv-input" value={form.rg} onChange={(e) => setF({ rg: e.target.value })} disabled={readOnly} />)}
               {campo('Estado civil', <input className="atv-input" value={form.estadoCivil} onChange={(e) => setF({ estadoCivil: e.target.value })} disabled={readOnly} />)}
             </div>

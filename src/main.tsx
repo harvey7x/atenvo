@@ -16,6 +16,7 @@ import './v2/movimento.css'; // camada de movimento do Atenvo (22/10)
 import './v2/repaginada.css'; // visual do Atenvo (repaginada 27/10) — age com [data-repaginada] na raiz
 import './v2/reviza-visual.css'; // revisão fina das telas da Reviza na língua do Atenvo (depois da repaginada)
 import { aplicarRepaginada } from './v2/lib/repaginada';
+import { aplicarInboxPro } from './v2/lib/inboxPro';
 import { sinalizarAtualizacao } from './v2/lib/atualizacao';
 import { tentarRecarga } from '@/lib/recargaChunk';
 import { registerSW } from 'virtual:pwa-register';
@@ -139,6 +140,9 @@ if (typeof document !== 'undefined') document.documentElement.setAttribute('data
 
 // Visual do Atenvo FIXO na ALFA (sem comparador): marca [data-repaginada] antes do primeiro paint.
 if (typeof document !== 'undefined') aplicarRepaginada(true);
+
+// Atendimento renovado do Atenvo (inbox pro) FIXO: marca [data-inbox-pro] antes do primeiro paint (sem comparador)
+if (typeof document !== 'undefined') aplicarInboxPro(true);
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, retry: 1, refetchOnWindowFocus: false } },

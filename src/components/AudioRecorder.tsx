@@ -22,12 +22,23 @@ const EXT: Record<string, string> = { 'audio/mp4': 'm4a', 'audio/webm': 'webm', 
 function escolherMime(): string {
   const MR = (window as unknown as { MediaRecorder?: typeof MediaRecorder }).MediaRecorder;
   if (!MR) return '';
-  for (const c of CANDIDATOS) { try { if (MR.isTypeSupported(c)) return c; } catch { /* ignore */ } }
+  // iOS: contêiner 'audio/mp4' PURO primeiro — o isTypeSupported aceita a string
+  // com codecs, mas há versões do Safari que gravam VAZIO (0 bytes) com ela; o
+  // contêiner puro grava AAC do mesmo jeito e é o caminho estável no WebKit.
+  const ordem = ehIOS() ? ['audio/mp4', ...CANDIDATOS.filter((c) => c !== 'audio/mp4')] : CANDIDATOS;
+  for (const c of ordem) { try { if (MR.isTypeSupported(c)) return c; } catch { /* ignore */ } }
   return '';
 }
 const baseMime = (m: string) => (m.split(';')[0] || 'audio/webm');
 const mmss = (s: number) => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
 const SINAL_MIN = 0.03; // pico normalizado mínimo p/ considerar que houve som
+// iOS/iPadOS (WebKit): consumir a captura no Web Audio (mesmo via track CLONADA)
+// pode SILENCIAR a gravação do MediaRecorder — o inverso do bug do Chrome que o
+// clone resolve. Mesmo fix do AudioRecorderV2 (18/09): sem medidor no iOS, e a
+// checagem anti-mudo passa a ser SÓ a do ARQUIVO (medirBlob), a verdade final.
+const ehIOS = () =>
+  typeof navigator !== 'undefined' &&
+  (/iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
 
 // width/height explícitos: o dimensionamento por CSS só existe no escopo do compositor (.composer-bar);
 // reusado noutro lugar (ex.: modal de agendamento) o SVG renderizaria gigante sem estes atributos.
@@ -145,7 +156,7 @@ export function AudioRecorder({ disabled, onEnviar, permitirArquivo, rotuloEnvia
     if (!track || track.readyState !== 'live') { pararTracks(); setEstado('error'); setErro('Microfone sem faixa de áudio ativa.'); return; }
     setDeviceId(track.getSettings().deviceId ?? idDispositivo ?? '');
     void listarDispositivos();
-    montarMedidor(stream);
+    if (!ehIOS()) montarMedidor(stream);
     const mime = escolherMime(); mimeRef.current = mime;
     let rec: MediaRecorder;
     try { rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined); }
@@ -156,17 +167,28 @@ export function AudioRecorder({ disabled, onEnviar, permitirArquivo, rotuloEnvia
       const tipo = baseMime(mimeRef.current || rec.mimeType || 'audio/webm');
       const blob = new Blob(chunksRef.current, { type: tipo });
       blobRef.current = blob;
+      // gravação VAZIA (0 bytes): o WebKit às vezes encerra sem nenhum dataavailable.
+      // Falhar AQUI com orientação clara — deixar seguir viraria "Áudio vazio" só no envio.
+      if (blob.size < 1024) {
+        pararMedidor(); pararTracks(); pararTimer();
+        blobRef.current = null; limparPreview(); setSeg(0); setInfo(null);
+        setEstado('error');
+        setErro('A gravação saiu vazia ou corrompida. Toque em Tentar de novo — se repetir, feche apps que usem o microfone e recarregue a página.');
+        return;
+      }
       // DIAGNÓSTICO temporário (sanitizado, sem conteúdo de áudio): metadados do Blob + níveis + track.
       // observabilidade mínima: gravação pelo microfone → sempre voz/PTT (origem usada no roteamento do envio).
       diagRef.current = { correlation_id: correlationRef.current, origem: 'gravacao_painel', blob_mime: mimeRef.current || rec.mimeType || tipo, blob_size: blob.size };
       limparPreview(); setPreviewUrl(URL.createObjectURL(blob));
       pararMedidor(); pararTracks(); pararTimer();             // só encerra as tracks DEPOIS de montar o Blob
-      setInfo({ mime: tipo, size: blob.size, dur: 0, sinal: maxNivelRef.current >= SINAL_MIN, verificando: true });
+      setInfo({ mime: tipo, size: blob.size, dur: 0, sinal: ehIOS() ? true : maxNivelRef.current >= SINAL_MIN, verificando: true });
       setEstado('preview');
       void medirBlob(blob, tipo);                              // verdade absoluta: o arquivo gravado tem som?
     };
     rec.onerror = () => { pararMedidor(); pararTracks(); pararTimer(); setEstado('error'); setErro('Erro durante a gravação.'); };
-    try { rec.start(); } catch { pararTracks(); pararMedidor(); setEstado('error'); setErro('Não foi possível iniciar a gravação.'); return; }
+    // iOS: timeslice de 1s → ondataavailable periódico (o WebKit já PERDEU gravações
+    // inteiras quando tudo dependia do único evento final do stop)
+    try { if (ehIOS()) rec.start(1000); else rec.start(); } catch { pararTracks(); pararMedidor(); setEstado('error'); setErro('Não foi possível iniciar a gravação.'); return; }
     setSeg(0); setPicoVivo(0); setEstado('recording');
     timerRef.current = setInterval(() => { setPicoVivo(maxNivelRef.current); if (recRef.current?.state === 'recording') setSeg((s) => s + 1); }, 1000);
   }
@@ -175,7 +197,9 @@ export function AudioRecorder({ disabled, onEnviar, permitirArquivo, rotuloEnvia
   function continuar() { if (recRef.current?.state === 'paused') { recRef.current.resume(); setEstado('recording'); } }
   function finalizar() {
     const rec = recRef.current; if (!rec || rec.state === 'inactive') return;
-    try { rec.requestData(); } catch { /* ignore */ }   // garante o último chunk antes do stop
+    // requestData é instável no WebKit (pode invalidar o buffer); no iOS o timeslice
+    // do start(1000) já garante os chunks — só o stop() entrega o final
+    if (!ehIOS()) { try { rec.requestData(); } catch { /* ignore */ } }   // garante o último chunk antes do stop
     rec.stop();                                          // onstop monta o Blob e só então encerra as tracks
   }
   function cancelar() {
@@ -222,7 +246,7 @@ export function AudioRecorder({ disabled, onEnviar, permitirArquivo, rotuloEnvia
   }
 
   const nomeMic = (devices.find((d) => d.deviceId === deviceId)?.label || devices[0]?.label || '').slice(0, 30);
-  const semSinalVivo = (estado === 'recording' || estado === 'paused') && seg >= 2 && picoVivo < 0.02;
+  const semSinalVivo = !ehIOS() && (estado === 'recording' || estado === 'paused') && seg >= 2 && picoVivo < 0.02;
   const seletorMic = devices.length > 1 && (
     <select className="rec-select" value={deviceId} onChange={(e) => trocarDispositivo(e.target.value)} title="Microfone" disabled={estado === 'sending'}>
       {devices.map((d, i) => <option key={d.deviceId || i} value={d.deviceId}>{d.label || `Microfone ${i + 1}`}</option>)}
@@ -251,7 +275,7 @@ export function AudioRecorder({ disabled, onEnviar, permitirArquivo, rotuloEnvia
         <>
           <span className={'rec-dot' + (estado === 'recording' ? ' on' : '')} />
           <span className="rec-timer">{mmss(seg)}{estado === 'paused' ? ' (pausado)' : ''}</span>
-          <span className="rec-meter" title="Nível do microfone"><span ref={barRef} className="rec-meter-bar" /></span>
+          {!ehIOS() && <span className="rec-meter" title="Nível do microfone"><span ref={barRef} className="rec-meter-bar" /></span>}
           {semSinalVivo && <span className="rec-erro">Sem sinal — fale ou troque o microfone</span>}
           {seletorMic || (nomeMic && <span className="rec-meta" title={nomeMic}>{nomeMic}</span>)}
           {estado === 'recording'
@@ -268,7 +292,10 @@ export function AudioRecorder({ disabled, onEnviar, permitirArquivo, rotuloEnvia
           <span className="rec-meta">{info ? `${info.dur ? mmss(info.dur) + ' · ' : ''}${baseMime(info.mime)} · ${(info.size / 1024).toFixed(0)} KB` : ''}</span>
           {info?.verificando && <span className="rec-meta">verificando o áudio…</span>}
           {info && !info.verificando && !info.sinal && <span className="rec-erro">Nenhum som no áudio gravado. Troque o microfone e regrave.</span>}
-          {info && !info.verificando && info.sinal && <span className="rec-sinal">✓ som no áudio</span>}
+          {/* ✓ só quando o RMS foi MEDIDO de verdade; sem verificação (decode falhou/iOS)
+              é aviso neutro — afirmar ✓ num arquivo não-verificável enganava o atendente */}
+          {info && !info.verificando && info.sinal && info.rms !== undefined && <span className="rec-sinal">✓ som no áudio</span>}
+          {info && !info.verificando && info.sinal && info.rms === undefined && <span className="rec-meta">não deu pra verificar o som — ouça o preview antes de enviar</span>}
           {seletorMic}
           <button type="button" className="rec-btn ghost" onClick={() => iniciar(deviceId || undefined)} title="Gravar novamente">Regravar</button>
           <button type="button" className="rec-btn ghost" onClick={cancelar} title="Apagar">Apagar</button>

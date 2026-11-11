@@ -12,7 +12,9 @@ import { useAtivacaoDoContato } from '@/data/relacionamento';
 import { useEtiquetas, useOrgUsuarios } from '@/data/atendimento';
 import { corDaEtiqueta } from '@/types/atendimento';
 import { initials } from '@/lib/avatar';
+import { useVisibilidade } from '@/lib/visibilidade';
 import { formatarNumero } from '@/data/maturacao';
+import { DocumentosInssBox } from '@/components/DocumentosInssBox';
 import { useBloqueiosOrg } from '../hooks/bloqueiosOrg';
 import { tempoCelula, tempoRelativo } from '../lib/tempo';
 import {
@@ -56,7 +58,7 @@ function seedExtras(): ExtrasDemo {
   const iso = (t: number) => new Date(t).toISOString();
   const opp = (n: Partial<OppDoContato>): OppDoContato => ({
     id: 'op-' + Math.random().toString(36).slice(2), status: 'em_andamento', aberta: true, funilId: 'f1',
-    funilNome: 'Funil comercial', colunaId: null, colunaNome: 'Documentação', respId: null, respNome: 'Henrique', tipoServico: 'Revisão de contrato',
+    funilNome: 'Funil comercial', colunaId: null, colunaNome: 'Documentação', colunaCor: null, respId: null, respNome: 'Henrique', tipoServico: 'Revisão de contrato',
     tipoBeneficio: null, valor: null, valorDescontoMensal: null, valorRessarcimentoEstimado: null, valorRessarcido: null,
     origem: 'whatsapp', criadoEm: iso(agora - 96 * h), atualizadoEm: iso(agora - 5 * h), ...n,
   });
@@ -229,7 +231,7 @@ export default function ContatosV2() {
           <span className="cnt-etqs" title={c.tags.join(' · ')}>
             {c.tags.slice(0, 2).map((t) => {
               const cor = corDaEtiqueta(t, etiquetasCat);
-              return <em key={t} className="cnt-etq" style={{ color: cor, background: cor + '22', borderColor: cor + '4D' }}>{t}</em>;
+              return <em key={t} className="cnt-etq" style={{ color: cor, background: cor + '22', borderColor: cor + '4D', ['--c']: cor } as React.CSSProperties}>{t}</em>;
             })}
             {c.tags.length > 2 && <em className="cnt-etq mais">+{c.tags.length - 2}</em>}
           </span>
@@ -333,7 +335,7 @@ export default function ContatosV2() {
             {filtrando && <Chip limpar onClick={limpar}>Limpar</Chip>}
           </div>
 
-          <CardVidro spot sobe style={{ borderRadius: 12, animationDelay: '.12s' }}>
+          <CardVidro spot sobe className="mo-fixo" style={{ borderRadius: 12, animationDelay: '.12s' }}>
             {lista.length === 0 ? (
               <EstadoVazio
                 titulo="Nenhum contato neste filtro"
@@ -419,6 +421,8 @@ function FichaContato({ contato, demo, extras, bloqueado, cobSituacao, agsOrg, a
   aoFechar: () => void; aoAbrirConversa: () => void; aoAgendar: () => void;
   aoEditar: () => void; aoExcluir: () => void;
 }) {
+  // Cobranças (módulo) é só do admin desde 22/10 — o atalho some para os demais
+  const veCobrancas = useVisibilidade().veTodos;
   const navigate = useNavigate();
   const oppsQ = useOportunidadesDoContato(demo ? null : contato.id);
   const ativQ = useAtivacaoDoContato(demo ? null : contato.id);
@@ -505,10 +509,10 @@ function FichaContato({ contato, demo, extras, bloqueado, cobSituacao, agsOrg, a
           )}
         </div>
 
-        <div className="fx-b">
+        {/* Cobranças saiu do sistema (dono 22/10): o bloco só aparece se o contato TIVER cobrança */}
+        {veCobrancas && (demo ? !!cobSituacao : cobrancas.length > 0) && <div className="fx-b">
           <div className="fx-t">
             Cobranças
-            {(cobrancas.length > 0 || cobSituacao) && <BotaoMini onClick={() => navigate('/cobrancas')}>Ver todas</BotaoMini>}
           </div>
           {demo ? (
             cobSituacao
@@ -527,7 +531,7 @@ function FichaContato({ contato, demo, extras, bloqueado, cobSituacao, agsOrg, a
               </div>
             ))
           )}
-        </div>
+        </div>}
 
         <div className="fx-b">
           <div className="fx-t">Agendamentos</div>
@@ -558,6 +562,8 @@ function FichaContato({ contato, demo, extras, bloqueado, cobSituacao, agsOrg, a
             <div className="fx-vazio">Nenhuma régua ativa para este contato.</div>
           )}
         </div>
+
+        {!demo && <DocumentosInssBox contatoId={contato.id} />}
 
         {contato.obs && (
           <div className="fx-b">

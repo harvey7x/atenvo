@@ -1,7 +1,10 @@
 import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { buscarKeysetEmFaixas } from '@/data/paginacao';
+import { publicarProgresso } from '@/data/progressoCarga';
 import { useOrg } from '@/context/OrgContext';
+import { useVisibilidade } from '@/lib/visibilidade';
 
 export const KANBAN_REAL = isSupabaseConfigured && !!supabase;
 
@@ -18,15 +21,53 @@ export function classificarMovimento(resOrigem: ColResultado, resDestino: ColRes
   return 'neutro';                                   // neutra→neutra: move direto
 }
 
+/** 29/10: com o administrativo ligado, só ele põe ou tira o cliente do Fechado
+ *  (trigger opp_sync_fechamento recusa com 'fechado_pelo_administrativo'). A tela avisa antes. */
+export function bloqueioAdministrativo(resOrigem: ColResultado, resDestino: ColResultado): string | null {
+  if (resDestino === 'ganho') return 'O Fechado vem do sistema do administrativo: quando o cliente ficar completo lá, ele fecha sozinho aqui.';
+  if (resOrigem === 'ganho') return 'Este cliente está completo no sistema do administrativo. Para tirar do Fechado, mude o caso dele lá.';
+  return null;
+}
+
+/** 30/10: com os pendentes do CAF ligados (adm_status.assinar), o Assinar é só de quem está
+ *  "aguardando assinatura" lá (trigger adm_trava_assinar recusa com 'assinar_pelo_administrativo'). */
+export function bloqueioAssinar(nomeOrigem: string | null | undefined, nomeDestino: string | null | undefined): string | null {
+  const ehAssinar = (n?: string | null) => (n ?? '').trim().toUpperCase().startsWith('ASSINAR');
+  if (ehAssinar(nomeDestino)) return 'O Assinar vem do sistema do administrativo: quando o caso ficar "aguardando assinatura" lá, o cliente vem sozinho para cá.';
+  if (ehAssinar(nomeOrigem)) return 'Este cliente está aguardando assinatura no sistema do administrativo. Para tirar do Assinar, mude o caso dele lá.';
+  return null;
+}
+
 export const MOTIVOS_PERDA: [string, string][] = [
   ['sem_interesse', 'Sem interesse'], ['nao_respondeu', 'Não respondeu'], ['nao_elegivel', 'Não elegível'],
   ['concorrente', 'Fechou com concorrente'], ['dados_invalidos', 'Dados inválidos'], ['outro', 'Outro'],
 ];
 export const rotuloMotivoPerda = (v: string | null) => (v ? MOTIVOS_PERDA.find(([k]) => k === v)?.[1] ?? v : '');
 
+/** Sub-motivo OBRIGATÓRIO quando a perda é "Não elegível" (pedido do dono 10/09):
+ *  o relatório precisa dizer POR QUE o lead foi descartado. Valores casam com o
+ *  check do banco (oportunidades.motivo_nao_elegivel). */
+export const MOTIVOS_NAO_ELEGIVEL: [string, string][] = [
+  ['sem_beneficio_inss', 'Não recebe benefício do INSS'],
+  ['muitos_processos', 'Já tem muitos processos'],
+  ['sem_interesse', 'Cliente sem interesse'],
+  ['sem_emprestimo_banco', 'Sem empréstimo em banco parceiro'],
+  ['nao_mora_rs', 'Não mora no RS'],
+];
+export const rotuloMotivoNaoElegivel = (v: string | null) =>
+  (v ? MOTIVOS_NAO_ELEGIVEL.find(([k]) => k === v)?.[1] ?? v : 'Sem categoria');
+/** Rótulo completo da saída: "Não elegível — Já tem muitos processos" (demais motivos ficam como são). */
+export function rotuloPerdaCompleto(motivoPerda: string | null, motivoNE: string | null): string {
+  if (!motivoPerda) return '';
+  if (motivoPerda !== 'nao_elegivel' || !motivoNE) return rotuloMotivoPerda(motivoPerda);
+  return `${rotuloMotivoPerda(motivoPerda)} — ${rotuloMotivoNaoElegivel(motivoNE)}`;
+}
+
 /** Traduz erros do trigger/RLS/lock em mensagens legíveis (nunca SQL bruto). */
 export function traduzErroKanban(msg: string): string {
   const m = (msg || '').toLowerCase();
+  if (m.includes('fechado_pelo_administrativo')) return 'O Fechado vem do sistema do administrativo: mude o caso do cliente lá.';
+  if (m.includes('assinar_pelo_administrativo')) return 'O Assinar vem do sistema do administrativo: mude o caso do cliente lá.';
   if (m.includes('motivo_perda_desc')) return 'Descreva o motivo (você escolheu "Outro").';
   if (m.includes('motivo_perda')) return 'Selecione o motivo da perda.';
   if (m.includes('motivo_reabertura')) return 'Informe o motivo da reabertura.';
@@ -50,7 +91,7 @@ export interface KLead {
   // SLA (S4.3): tempo de entrada/última movimentação de coluna + prioridade
   entradaEm: string; movimentadoEm: string; prioridade: string | null;
   // fechamento (Etapa 2A): status do funil + snapshot
-  status: string; fechadoEm: string | null; motivoPerda: string | null; respNoFechamentoId: string | null;
+  status: string; fechadoEm: string | null; motivoPerda: string | null; motivoNaoElegivel: string | null; respNoFechamentoId: string | null;
   // domínio previdenciário
   tipoBeneficio: string | null; tipoServico: string; statusCancelamento: string; statusRessarcimento: string;
   numeroBeneficio: string | null; instituicao: string | null; tipoDesconto: string | null; dataInicioDesconto: string | null;
@@ -65,7 +106,7 @@ interface DbLead {
   telefone: string | null; responsavel_id: string | null; valor_estimado: number | null; origem: string | null;
   etiquetas: string[] | null; observacoes: string | null; lembrete: string | null; ordem: number; criado_em: string; atualizado_em: string;
   entrada_em: string; movimentado_em: string; prioridade: string | null;
-  status: string; fechado_em: string | null; motivo_perda: string | null; responsavel_no_fechamento_id: string | null;
+  status: string; fechado_em: string | null; motivo_perda: string | null; motivo_nao_elegivel: string | null; responsavel_no_fechamento_id: string | null;
   tipo_beneficio: string | null; tipo_servico: string; status_cancelamento: string; status_ressarcimento: string;
   numero_beneficio: string | null; instituicao: string | null; tipo_desconto: string | null; data_inicio_desconto: string | null;
   valor_desconto_mensal: number | null; valor_ressarcimento_estimado: number | null; valor_ressarcido: number | null;
@@ -89,7 +130,7 @@ function mapLead(l: DbLead): KLead {
     valor: l.valor_estimado, origem: l.origem || '', etiquetas: l.etiquetas ?? [],
     observacoes: l.observacoes || '', lembrete: l.lembrete ?? null, ordem: l.ordem, criadoEm: l.criado_em, atualizadoEm: l.atualizado_em,
     entradaEm: l.entrada_em, movimentadoEm: l.movimentado_em, prioridade: l.prioridade ?? null,
-    status: l.status || 'em_andamento', fechadoEm: l.fechado_em, motivoPerda: l.motivo_perda, respNoFechamentoId: l.responsavel_no_fechamento_id,
+    status: l.status || 'em_andamento', fechadoEm: l.fechado_em, motivoPerda: l.motivo_perda, motivoNaoElegivel: l.motivo_nao_elegivel ?? null, respNoFechamentoId: l.responsavel_no_fechamento_id,
     tipoBeneficio: l.tipo_beneficio, tipoServico: l.tipo_servico || 'analise_inicial',
     statusCancelamento: l.status_cancelamento || 'nao_se_aplica', statusRessarcimento: l.status_ressarcimento || 'nao_se_aplica',
     numeroBeneficio: l.numero_beneficio, instituicao: l.instituicao, tipoDesconto: l.tipo_desconto, dataInicioDesconto: l.data_inicio_desconto,
@@ -215,7 +256,7 @@ export function useFunisDaOrg() {
 }
 
 export interface OppDoContato {
-  id: string; status: string; aberta: boolean; funilId: string | null; funilNome: string; colunaId: string | null; colunaNome: string; respId: string | null; respNome: string;
+  id: string; status: string; aberta: boolean; funilId: string | null; funilNome: string; colunaId: string | null; colunaNome: string; colunaCor: string | null; respId: string | null; respNome: string;
   tipoServico: string; tipoBeneficio: string | null; valor: number | null; valorDescontoMensal: number | null;
   valorRessarcimentoEstimado: number | null; valorRessarcido: number | null; origem: string; criadoEm: string; atualizadoEm: string;
 }
@@ -227,17 +268,17 @@ export function useOportunidadesDoContato(contatoId: string | null) {
     queryKey: ['opp-do-contato', org, contatoId], enabled: KANBAN_REAL && !!contatoId,
     queryFn: async (): Promise<OppDoContato[]> => {
       const { data, error } = await supabase!.from('oportunidades')
-        .select('id, status, funil_id, coluna_id, responsavel_id, tipo_servico, tipo_beneficio, valor_estimado, valor_desconto_mensal, valor_ressarcimento_estimado, valor_ressarcido, origem, criado_em, atualizado_em, funis(nome), funil_colunas(nome), responsavel:usuarios!oportunidades_responsavel_id_fkey(nome)')
+        .select('id, status, funil_id, coluna_id, responsavel_id, tipo_servico, tipo_beneficio, valor_estimado, valor_desconto_mensal, valor_ressarcimento_estimado, valor_ressarcido, origem, criado_em, atualizado_em, funis(nome), funil_colunas(nome, cor), responsavel:usuarios!oportunidades_responsavel_id_fkey(nome)')
         .eq('organizacao_id', org).eq('contato_id', contatoId!).order('criado_em', { ascending: false });
       if (error) throw new Error(error.message);
       return (((data as unknown[]) ?? []) as Record<string, unknown>[]).map((r) => {
         const fn = one(r.funis as { nome: string } | { nome: string }[] | null);
-        const cl = one(r.funil_colunas as { nome: string } | { nome: string }[] | null);
+        const cl = one(r.funil_colunas as { nome: string; cor?: string | null } | { nome: string; cor?: string | null }[] | null);
         const rp = one(r.responsavel as { nome: string } | { nome: string }[] | null);
         const status = r.status as string;
         return {
           id: r.id as string, status, aberta: status === 'em_andamento', funilId: (r.funil_id as string) ?? null,
-          funilNome: fn?.nome || '', colunaId: (r.coluna_id as string) ?? null, colunaNome: cl?.nome || '', respId: (r.responsavel_id as string) ?? null, respNome: rp?.nome || '',
+          funilNome: fn?.nome || '', colunaId: (r.coluna_id as string) ?? null, colunaNome: cl?.nome || '', colunaCor: cl?.cor ?? null, respId: (r.responsavel_id as string) ?? null, respNome: rp?.nome || '',
           tipoServico: (r.tipo_servico as string) || 'analise_inicial', tipoBeneficio: (r.tipo_beneficio as string) ?? null,
           valor: (r.valor_estimado as number) ?? null, valorDescontoMensal: (r.valor_desconto_mensal as number) ?? null,
           valorRessarcimentoEstimado: (r.valor_ressarcimento_estimado as number) ?? null, valorRessarcido: (r.valor_ressarcido as number) ?? null,
@@ -264,7 +305,7 @@ export function useColunasFunil(funilId: string | null) {
   });
 }
 
-export interface MoverOppInput { id: string; colunaId: string; atualizadoEmEsperado: string; motivoPerda?: string | null; motivoPerdaDesc?: string | null; motivoReabertura?: string | null }
+export interface MoverOppInput { id: string; colunaId: string; atualizadoEmEsperado: string; motivoPerda?: string | null; motivoPerdaDesc?: string | null; motivoNaoElegivel?: string | null; motivoReabertura?: string | null }
 /** Move uma oportunidade de coluna FORA do quadro (painel WA/FB), com o MESMO contrato do Kanban:
  *  controle otimista (atualizado_em esperado), motivos exigidos pelo trigger e distinção conflito×permissão.
  *  Independe do funil carregado no quadro — resolve a ordem no fundo da coluna destino via consulta própria.
@@ -279,6 +320,7 @@ export function useMoverOportunidade() {
     const patch: Record<string, unknown> = { coluna_id: input.colunaId, ordem };
     if (input.motivoPerda !== undefined) patch.motivo_perda = input.motivoPerda ?? null;
     if (input.motivoPerdaDesc !== undefined) patch.motivo_perda_desc = input.motivoPerdaDesc ?? null;
+    if (input.motivoNaoElegivel !== undefined) patch.motivo_nao_elegivel = input.motivoNaoElegivel ?? null;
     if (input.motivoReabertura !== undefined) patch.motivo_reabertura = input.motivoReabertura ?? null;
     const { data, error } = await supabase!.from('oportunidades').update(patch)
       .eq('id', input.id).eq('organizacao_id', org).eq('atualizado_em', input.atualizadoEmEsperado).select('id');
@@ -311,17 +353,47 @@ async function garantirFunil(org: string): Promise<{ id: string; nome: string } 
   return (novo as { id: string; nome: string } | null) ?? null;
 }
 
+/* ---- Abertura rápida (dono 30/10: "tem como tirar o delay quando a gente entra no Kanban?") ----
+   - leads em 16 faixas de id em paralelo (antes: 8 páginas de 1000 em fila, ~10 s; agora ~2 s);
+   - o id do funil fica guardado no navegador: os cards começam a vir sem esperar a ida ao `funis`;
+   - o quadro fica 30 min na memória depois de sair da tela: voltar ao Kanban é imediato
+     (os dados aparecem na hora e se atualizam por baixo). */
+const KANBAN_GC_MS = 30 * 60_000;
+const chaveFunil = (org: string) => `atenvo-kb-funil:${org}`;
+function funilGuardado(org: string): { id: string; nome: string } | undefined {
+  try {
+    const f = JSON.parse(localStorage.getItem(chaveFunil(org)) ?? 'null') as { id?: unknown; nome?: unknown } | null;
+    return f && typeof f.id === 'string' ? { id: f.id, nome: String(f.nome ?? '') } : undefined;
+  } catch { return undefined; }
+}
+
+/** Canal do progresso da 1ª carga dos cards (tela "Carregando o Kanban", ver progressoCarga.ts). */
+export const PROGRESSO_KANBAN = 'kanban';
+
 /** Núcleo do Kanban: funil + colunas + leads (oportunidades em andamento) + ações + realtime. */
 export function useKanban() {
   const { currentOrg } = useOrg();
   const org = currentOrg.id;
   const qc = useQueryClient();
+  // visibilidade (22/10): quem não vê todos só vê os cards DELE (oportunidades.responsavel_id —
+  // o mesmo responsável que o card mostra; o gatilho de sincronia o mantém igual ao do contato)
+  const vis = useVisibilidade();
+  const soDe = vis.veTodos ? null : vis.uid;
 
-  const funilQ = useQuery({ queryKey: ['kanban-funil', org], enabled: KANBAN_REAL, queryFn: () => garantirFunil(org) });
+  const funilQ = useQuery({
+    queryKey: ['kanban-funil', org], enabled: KANBAN_REAL, gcTime: KANBAN_GC_MS,
+    // o guardado vale como "velho" (updatedAt 0): mostra na hora e confere com o banco por baixo
+    initialData: () => funilGuardado(org), initialDataUpdatedAt: 0,
+    queryFn: async () => {
+      const f = await garantirFunil(org);
+      try { if (f) localStorage.setItem(chaveFunil(org), JSON.stringify(f)); } catch { /* sem storage: só não acelera */ }
+      return f;
+    },
+  });
   const funilId = funilQ.data?.id ?? null;
 
   const colunasQ = useQuery({
-    queryKey: ['kanban-colunas', org, funilId], enabled: KANBAN_REAL && !!funilId, refetchInterval: 8000,
+    queryKey: ['kanban-colunas', org, funilId], enabled: KANBAN_REAL && !!funilId, refetchInterval: 8000, gcTime: KANBAN_GC_MS,
     queryFn: async (): Promise<KColuna[]> => {
       const { data, error } = await supabase!.from('funil_colunas').select('id, nome, cor, ordem, entrada, resultado, encerra_oportunidade').eq('organizacao_id', org).eq('funil_id', funilId!).eq('arquivada', false).order('ordem', { ascending: true });
       if (error) throw new Error(error.message);
@@ -330,15 +402,45 @@ export function useKanban() {
     },
   });
 
+  const chaveLeads = ['kanban-leads', org, funilId, soDe ?? 'todos'];
   const leadsQ = useQuery({
-    queryKey: ['kanban-leads', org, funilId], enabled: KANBAN_REAL && !!funilId, refetchInterval: 8000,
-    queryFn: async (): Promise<KLead[]> => {
-      const { data, error } = await supabase!.from('oportunidades')
-        .select('id, coluna_id, contato_id, conversa_origem_id, canal_origem_id, contato_nome, titulo, telefone, responsavel_id, valor_estimado, origem, etiquetas, observacoes, lembrete, ordem, criado_em, atualizado_em, entrada_em, movimentado_em, prioridade, status, fechado_em, motivo_perda, responsavel_no_fechamento_id, tipo_beneficio, tipo_servico, status_cancelamento, status_ressarcimento, numero_beneficio, instituicao, tipo_desconto, data_inicio_desconto, valor_desconto_mensal, valor_ressarcimento_estimado, valor_ressarcido, contatos(nome, telefone, email, etiquetas), responsavel:usuarios!oportunidades_responsavel_id_fkey(nome), canal_origem:canais(tipo, nome_interno, numero_conectado)')
-        .eq('organizacao_id', org).eq('funil_id', funilId!).in('status', ['em_andamento', 'ganho', 'perdido'])
-        .order('ordem', { ascending: true }).order('criado_em', { ascending: true });
-      if (error) throw new Error(error.message);
-      return ((data as unknown as DbLead[]) ?? []).map(mapLead);
+    queryKey: chaveLeads, enabled: KANBAN_REAL && !!funilId && (vis.veTodos || !!soDe), refetchInterval: 8000, gcTime: KANBAN_GC_MS,
+    queryFn: async ({ signal }): Promise<KLead[]> => {
+      // 1ª carga (tela vazia): 8 faixas ao mesmo tempo e progresso na tela — medido 30/10 com 7.813
+      // cards: 1 por vez 10,4 s · 6 → 2,7 s · 8 → 2,2 s · 16 → 2,0 s (o banco satura; não compensa).
+      // Atualização de fundo (a cada 8 s / realtime), com o quadro já na tela: 2 por vez (~5,6 s).
+      const primeira = qc.getQueryData(chaveLeads) === undefined;
+      if (primeira) publicarProgresso(PROGRESSO_KANBAN, { feitas: 0, total: 16, itens: 0 });
+      // PAGINAÇÃO (18/09): sem paginar, o PostgREST corta em 1000 (db-max-rows) e CARDS SOMEM do
+      // quadro (o funil passa de 1000 com em_andamento+ganho+perdido). KEYSET por id (imutável);
+      // a ordem do quadro (ordem asc, criado_em asc) é reaplicada em JS — paginar por `ordem`
+      // (mutável no drag-and-drop) pularia/duplicaria cards na fronteira.
+      const linhas = await buscarKeysetEmFaixas<DbLead & { id: string }>(
+        (faixa, cursor, tam, sinal) => {
+          let q = supabase!.from('oportunidades')
+            .select('id, coluna_id, contato_id, conversa_origem_id, canal_origem_id, contato_nome, titulo, telefone, responsavel_id, valor_estimado, origem, etiquetas, observacoes, lembrete, ordem, criado_em, atualizado_em, entrada_em, movimentado_em, prioridade, status, fechado_em, motivo_perda, motivo_nao_elegivel, responsavel_no_fechamento_id, tipo_beneficio, tipo_servico, status_cancelamento, status_ressarcimento, numero_beneficio, instituicao, tipo_desconto, data_inicio_desconto, valor_desconto_mensal, valor_ressarcimento_estimado, valor_ressarcido, contatos(nome, telefone, email, etiquetas), responsavel:usuarios!oportunidades_responsavel_id_fkey(nome), canal_origem:canais(tipo, nome_interno, numero_conectado)')
+            .eq('organizacao_id', org).eq('funil_id', funilId!).in('status', ['em_andamento', 'ganho', 'perdido'])
+            .order('id', { ascending: false }).limit(tam);
+          if (soDe) q = q.eq('responsavel_id', soDe);
+          if (faixa.de) q = q.gte('id', faixa.de);
+          if (faixa.ate) q = q.lt('id', faixa.ate);
+          if (cursor) q = q.lt('id', cursor);
+          if (sinal) q = q.abortSignal(sinal);
+          return q.then((r) => ({ data: (r.data as unknown as (DbLead & { id: string })[]) ?? null, error: r.error }));
+        },
+        (l) => l.id,
+        {
+          rotulo: 'kanban-leads', signal, simultaneas: primeira ? 8 : 2,
+          aoAvancar: primeira ? (feitas, total, itens) => publicarProgresso(PROGRESSO_KANBAN, { feitas, total, itens }) : undefined,
+        },
+      );
+      // reproduz .order('ordem', asc).order('criado_em', asc) — ordem asc com NULLS LAST (padrão Postgres)
+      linhas.sort((a, b) => {
+        const oa = a.ordem ?? Number.POSITIVE_INFINITY, ob = b.ordem ?? Number.POSITIVE_INFINITY;
+        if (oa !== ob) return oa - ob;
+        return String(a.criado_em ?? '').localeCompare(String(b.criado_em ?? ''));
+      });
+      return linhas.map(mapLead);
     },
   });
 
@@ -392,7 +494,8 @@ export function useKanban() {
       organizacao_id: org, funil_id: funilId, coluna_id: input.colunaId,
       contato_id: input.contatoId ?? null, contato_nome: input.contatoId ? null : input.nome, titulo: input.nome,
       conversa_origem_id: input.conversaOrigemId ?? null, canal_origem_id: input.canalOrigemId ?? null,
-      telefone: input.telefone || null, responsavel_id: input.responsavelId ?? null,
+      // visibilidade (22/10): lead criado por quem não vê todos nasce DELE (senão some do próprio board)
+      telefone: input.telefone || null, responsavel_id: input.responsavelId ?? soDe ?? null,
       valor_estimado: input.valor ?? null, origem: input.origem || null,
       etiquetas: input.etiquetas ?? [], observacoes: input.observacoes || null, lembrete: input.lembrete || null, ordem,
       tipo_beneficio: input.tipoBeneficio ?? null, tipo_servico: input.tipoServico ?? 'analise_inicial',
@@ -449,7 +552,8 @@ export function useKanban() {
     invalida();
   }
 
-  /** Arquiva o lead (status='cancelado') — sai do quadro sem exclusão física. */
+  /** Arquiva o lead (status='cancelado') — sai do quadro sem exclusão física. Card do Fechado com o
+   *  administrativo ligado: o banco recusa (adm_trava_status); a tela avisa antes. */
   async function arquivarLead(id: string) {
     const { error } = await supabase!.from('oportunidades').update({ status: 'cancelado' }).eq('id', id).eq('organizacao_id', org);
     if (error) throw new Error(error.message);
@@ -458,11 +562,12 @@ export function useKanban() {
   /** Move a oportunidade para outra coluna com CONTROLE OTIMISTA (atualizado_em esperado) e os motivos
    *  exigidos pelo trigger. Distingue conflito (linha mudou) de permissão (linha invisível/RLS). O banco
    *  é a fonte final de status/fechado_em/fechado_por/snapshot/histórico. Lança em erro (caller faz rollback). */
-  async function moverOportunidade(input: { id: string; colunaId: string; atualizadoEmEsperado: string; motivoPerda?: string | null; motivoPerdaDesc?: string | null; motivoReabertura?: string | null }) {
+  async function moverOportunidade(input: { id: string; colunaId: string; atualizadoEmEsperado: string; motivoPerda?: string | null; motivoPerdaDesc?: string | null; motivoNaoElegivel?: string | null; motivoReabertura?: string | null }) {
     const ordem = (leads.filter((l) => l.colunaId === input.colunaId).reduce((m, l) => Math.max(m, l.ordem), 0)) + 1;
     const patch: Record<string, unknown> = { coluna_id: input.colunaId, ordem };
     if (input.motivoPerda !== undefined) patch.motivo_perda = input.motivoPerda ?? null;
     if (input.motivoPerdaDesc !== undefined) patch.motivo_perda_desc = input.motivoPerdaDesc ?? null;
+    if (input.motivoNaoElegivel !== undefined) patch.motivo_nao_elegivel = input.motivoNaoElegivel ?? null;
     if (input.motivoReabertura !== undefined) patch.motivo_reabertura = input.motivoReabertura ?? null;
     const { data, error } = await supabase!.from('oportunidades')
       .update(patch)

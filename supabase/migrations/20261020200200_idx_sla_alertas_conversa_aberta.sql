@@ -1,0 +1,33 @@
+-- 2026-10-20 — Índice parcial sla_alertas (conversa_id) WHERE resolvido_em IS NULL
+--              (passo 5 do plano de lentidão).
+--
+-- SINTOMA: todo envio de mensagem humana custa ~10,5-11,3 ms no INSERT do PostgREST
+--   (~1.056-1.076 buffers), contra 2,2-3,8 ms e 46-120 buffers nos demais INSERTs de mensagens.
+--
+-- CAUSA: os gatilhos sla_mensagem_humano (AFTER INSERT em mensagens, todo envio humano) e
+--   sla_conversa_atendente (BEFORE UPDATE em conversas, ao assumir) fazem
+--     update sla_alertas set resolvido_em = now() ... where resolvido_em is null and conversa_id = X
+--   e sla_contato_assumido faz o mesmo com conversa_id in (...). Não existe índice em conversa_id:
+--   o plano usa idx_sla_alertas_org_ativo (organizacao_id) e filtra os ~9,7 mil alertas ativos da org.
+--   EXPLAIN ANALYZE do SELECT equivalente (produção, read-only, 2026-10-20), com conversa que tem
+--   alerta e com conversa sem alerta: Index Scan idx_sla_alertas_org_ativo, Rows Removed by Filter
+--   9.755, 872 buffers, 3,3 ms (o plano mediu 1.395 buffers e 7,9 ms em hora de pico, com tuplas mortas
+--   da reescrita por minuto).
+--
+-- ESPERADO: 2.438 alertas ativos têm conversa_id (no máximo 1 ativo por conversa); a busca vira
+--   Index Scan no índice parcial: ~3-4 buffers e < 0,1 ms por gatilho. INSERT de mensagem humana
+--   ~11 ms → ~3 ms, segurando lock de linha por menos tempo. Índice pequeno (~9,7 mil entradas);
+--   conversa_id nunca é atualizado e resolvido_em já é coluna de predicado dos índices parciais
+--   existentes, então a taxa de HOT update não muda. Pura adição, sem mudança de resultado.
+--
+-- APLICAÇÃO: CREATE INDEX CONCURRENTLY NÃO roda dentro de transação. Este arquivo tem UM único
+--   comando de propósito: rodar sozinho com `supabase db query --linked -f <este arquivo>` (um
+--   comando só não abre bloco de transação). NÃO juntar com outro SQL no mesmo envio, e NÃO pôr
+--   SET antes. Não trava escrita. Se falhar (ex.: statement_timeout de 2 min esperando transação
+--   antiga), o índice fica INVALID e o IF NOT EXISTS passa a pular em silêncio: conferir
+--   pg_index.indisvalid e, se false, DROP INDEX CONCURRENTLY public.idx_sla_alertas_conversa_ativo
+--   e rodar de novo. Num rebuild via `supabase db push` (que envolve a migration em BEGIN/COMMIT),
+--   remover a palavra CONCURRENTLY — numa base recém-criada o índice sai instantâneo.
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_sla_alertas_conversa_ativo
+  ON public.sla_alertas (conversa_id)
+  WHERE resolvido_em IS NULL;

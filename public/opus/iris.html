@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Chave da Iris</title>
+<style>
+  :root { --bg:#f4f6f5; --card:#fff; --ink:#14201a; --muted:#5b6b62; --ok:#0d6a4c; --off:#b3261e; --line:#d8e0dc; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0e1311; --card:#161d1a; --ink:#e6eee9; --muted:#9aaba1; --ok:#45c290; --off:#ff6b61; --line:#27322d; } }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; min-height:100vh; display:grid; place-items:center; padding:24px 16px; }
+  main { width:100%; max-width:420px; background:var(--card); border:1px solid var(--line); border-radius:18px; padding:28px 22px; text-align:center; }
+  h1 { font-size:22px; margin:0 0 4px; }
+  .sub { color:var(--muted); margin:0 0 22px; font-size:14px; }
+  .estado { font-size:30px; font-weight:700; margin:6px 0 4px; }
+  .estado.ligada { color:var(--ok); } .estado.desligada { color:var(--off); }
+  .detalhe { color:var(--muted); font-size:14px; min-height:22px; margin-bottom:22px; }
+  button { width:100%; font:inherit; font-size:20px; font-weight:700; border:0; border-radius:14px; padding:20px 12px; cursor:pointer; color:#fff; }
+  button.desligar { background:var(--off); } button.ligar { background:var(--ok); } button.confirma { background:#7a1410; outline:3px solid var(--off); }
+  button:disabled { opacity:.55; cursor:wait; }
+  button:focus-visible { outline:3px solid var(--ink); outline-offset:3px; }
+  .msg { margin-top:18px; font-size:14px; color:var(--muted); }
+  .msg a { color:inherit; }
+  ul { list-style:none; padding:0; margin:0 0 18px; font-size:14px; color:var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Chave da Iris</h1>
+  <p class="sub">Só o Matheus pode usar.</p>
+  <div id="estado" class="estado">...</div>
+  <div id="detalhe" class="detalhe">Conferindo...</div>
+  <ul id="canais"></ul>
+  <button id="botao" type="button" disabled>Aguarde</button>
+  <p id="msg" class="msg"></p>
+</main>
+<script>
+(function () {
+  var URL_SB = 'https://afmzuoavvnpfossiiypz.supabase.co';
+  var ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFmbXp1b2F2dm5wZm9zc2lpeXB6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5OTk2MTIsImV4cCI6MjA5NzU3NTYxMn0.tyIeWaBSqJxHR6WtnCWrHLWD5008_xfQIA-0oU9RNCc';
+  var CHAVE_SESSAO = 'sb-afmzuoavvnpfossiiypz-auth-token';
+  var $ = function (id) { return document.getElementById(id); };
+  var ligada = null, armado = null;
+
+  function token() {
+    try {
+      var s = JSON.parse(localStorage.getItem(CHAVE_SESSAO) || 'null');
+      s = s && (s.access_token ? s : s.currentSession);
+      if (!s || !s.access_token) return null;
+      if (s.expires_at && s.expires_at * 1000 < Date.now() + 5000) return 'expirada';
+      return s.access_token;
+    } catch (e) { return null; }
+  }
+  function aviso(t) { $('msg').innerHTML = t; }
+  function semSessao(expirada) {
+    $('estado').textContent = '---'; $('estado').className = 'estado';
+    $('detalhe').textContent = expirada ? 'A sua sessão venceu.' : 'Você não está logado neste navegador.';
+    $('botao').disabled = true; $('botao').textContent = 'Indisponível';
+    aviso('Abra o <a href="/">Atenvo</a>, entre com a sua conta e volte para esta página.');
+  }
+  function rpc(nome, corpo) {
+    var t = token();
+    if (!t || t === 'expirada') { semSessao(t === 'expirada'); return Promise.reject(new Error('sem_sessao')); }
+    return fetch(URL_SB + '/rest/v1/rpc/' + nome, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: ANON, Authorization: 'Bearer ' + t },
+      body: JSON.stringify(corpo || {})
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (j) {
+        if (!r.ok) { var e = new Error((j && (j.message || j.hint)) || ('HTTP ' + r.status)); e.status = r.status; throw e; }
+        return j;
+      });
+    });
+  }
+  function mostrar(e) {
+    ligada = !!e.ligada;
+    $('estado').textContent = ligada ? 'LIGADA' : 'DESLIGADA';
+    $('estado').className = 'estado ' + (ligada ? 'ligada' : 'desligada');
+    var cs = e.canais || [];
+    $('canais').innerHTML = cs.map(function (c) {
+      return '<li>' + c.nome + ': ' + (c.ligada ? 'ligada' : 'desligada' + (c.desligada_em ? ' em ' + c.desligada_em : '')) + (c.so_dono ? ' (só os contatos do Matheus)' : '') + '</li>';
+    }).join('');
+    $('detalhe').textContent = ligada ? 'A Iris está atendendo.' : 'A Iris parou de atender. Os outros atendimentos seguem normais.';
+    var b = $('botao'); armado = null; b.disabled = false;
+    b.className = ligada ? 'desligar' : 'ligar';
+    b.textContent = ligada ? 'DESLIGAR A IRIS' : 'Ligar a Iris de volta';
+    aviso('');
+  }
+  function falha(e) {
+    if (e && e.message === 'sem_sessao') return;
+    var forbidden = e && (e.status === 403 || /so_o_matheus/.test(e.message || ''));
+    $('detalhe').textContent = forbidden ? 'Esta chave é só do Matheus.' : 'Não consegui falar com o servidor.';
+    aviso(forbidden ? 'Entre com a conta do Matheus.' : 'Tente de novo. Detalhe: ' + String((e && e.message) || e).slice(0, 120));
+    $('botao').disabled = false; $('botao').className = ligada === false ? 'ligar' : 'desligar';
+  }
+  function carregar() { rpc('iris_estado').then(mostrar).catch(falha); }
+  $('botao').addEventListener('click', function () {
+    var b = $('botao');
+    if (ligada && !armado) {   // desligar pede um segundo toque (2 s), para não desligar sem querer
+      armado = setTimeout(function () { armado = null; mostrar({ ligada: true, canais: [] }); carregar(); }, 5000);
+      b.className = 'confirma'; b.textContent = 'TOQUE DE NOVO PARA CONFIRMAR';
+      return;
+    }
+    if (armado) { clearTimeout(armado); armado = null; }
+    b.disabled = true; b.textContent = 'Aguarde...';
+    rpc('iris_chave', { p_ligada: !ligada }).then(function (e) { mostrar(e); aviso(e.ligada ? 'Iris ligada.' : 'Iris desligada. Ela não responde mais ninguém.'); }).catch(falha);
+  });
+  carregar();
+})();
+</script>
+</body>
+</html>

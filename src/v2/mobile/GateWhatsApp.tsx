@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
 import { lazyComRecarga } from '@/lib/recargaChunk';
+import { ehCelular } from './GateMobileApp';
 
 /* ------------------------------------------------------------------
    Gate da rota /whatsapp: em CELULAR (tela estreita E ponteiro de
@@ -17,7 +18,7 @@ const WhatsAppV2 = lazyComRecarga(() => import('../pages/WhatsApp'));
 
 export default function GateWhatsApp() {
   const [params] = useSearchParams();
-  if (window.matchMedia('(max-width: 760px) and (pointer: coarse)').matches) {
+  if (ehCelular()) {
     const c = params.get('conversa');
     return <Navigate to={c ? `/m/${c}` : '/m'} replace />;
   }

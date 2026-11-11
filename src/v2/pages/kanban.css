@@ -376,6 +376,8 @@
 .v2 .kc-flag { font-size: 8.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; border-radius: 5px; padding: 1px 5px; flex-shrink: 0; }
 .v2 .kc-flag.ganho { background: var(--verde-bg); color: var(--verde); }
 .v2 .kc-flag.perdido { background: var(--rubro-bg); color: var(--rubro); }
+/* Guardião do vácuo: selo "era de X" (repasse) — discreto, caixa normal */
+.v2 .kc-flag.repasse { background: rgba(var(--tint), .07); color: var(--txt-2); text-transform: none; letter-spacing: 0; font-weight: 600; }
 
 /* L3 meta corrida */
 .v2 .kc-meta { margin-top: 3px; font-size: 10.5px; line-height: 1.4; color: var(--txt-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

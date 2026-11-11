@@ -1,0 +1,560 @@
+/* ============================================================
+   Dashboard v5 — seis blocos, nada além. Classes com prefixo d5-
+   (o guard de colisões v1 × v2 lê todo CSS do v2).
+   Linguagem: a do corporativo (serio.css) — superfície chapada do
+   cartão (.vidro já resolve por tema/modo), hairline de 1px, raio do
+   token, hierarquia por PESO. Nenhuma cor de fundo fixa: tudo sai de
+   --vidro-a/--linha/--tint/--txt*, então a página acompanha qualquer
+   base (escura, clara, mais clara). Cor de DADO = --dado-1 (fixa);
+   verde/rubro só como semântica (variação boa/ruim, número conectado).
+   Nada anima além do ícone de atualizar enquanto busca.
+   ============================================================ */
+
+.v2 .d5-pg {
+  --d5-gap: 16px;
+  --d5-px: 20px;                                   /* recuo interno dos cartões */
+  --d5-fio: var(--linha);
+  --d5-fio-forte: rgba(var(--tint), .16);
+  --d5-hover: rgba(var(--tint), .028);
+  --d5-trilho: rgba(var(--tint), .075);
+  --d5-foco: var(--platina-a);                     /* corp: o azul interativo */
+  max-width: 1600px;
+  margin: 0 auto;
+  padding-bottom: 28px;
+  display: flex; flex-direction: column; gap: var(--d5-gap);
+  /* as quebras de layout seguem a LARGURA DA PÁGINA (barra lateral aberta ou compacta),
+     não a da janela */
+  container: d5pg / inline-size;
+}
+/* trocou de período: os números anteriores ficam esmaecidos até a nova foto chegar */
+.v2 .d5-pg .d5-kpis, .v2 .d5-pg .d5-linha2, .v2 .d5-pg > .d5-sec { transition: opacity .15s var(--ease); }
+.v2 .d5-pg[aria-busy="true"] .d5-kpis,
+.v2 .d5-pg[aria-busy="true"] .d5-linha2,
+.v2 .d5-pg[aria-busy="true"] > .d5-sec { opacity: .55; }
+:root[data-perf="lite"] .v2 .d5-pg .d5-kpis, :root[data-perf="lite"] .v2 .d5-pg .d5-linha2,
+:root[data-perf="lite"] .v2 .d5-pg > .d5-sec { transition: none; }
+
+/* ---------------- utilitários ---------------- */
+.v2 .d5-sr {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+}
+.v2 .d5-mudo { color: var(--txt-3); }
+.v2 .d5-ib:focus-visible,
+.v2 .d5-ord:focus-visible,
+.v2 .d5-ajuda-btn:focus-visible,
+.v2 .d5-ne-btn:focus-visible { outline: 2px solid var(--d5-foco); outline-offset: 2px; }
+
+/* ---------------- cabeçalho ---------------- */
+.v2 .d5-cab {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 14px 24px; flex-wrap: wrap; padding-top: 2px; margin-bottom: 4px;
+}
+.v2 .d5-cab-tits { min-width: 0; }
+.v2 .d5-cab-tits h2 { font-size: 20px; font-weight: 600; letter-spacing: -.02em; line-height: 1.2; color: var(--txt); }
+.v2 .d5-cab-tits p {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 2px 0;
+  font-size: 12.5px; color: var(--txt-2); margin-top: 5px; font-variant-numeric: tabular-nums;
+}
+.v2 .d5-demo {
+  margin-left: 10px; vertical-align: 3px; font-size: 10.5px; font-weight: 500; letter-spacing: .01em;
+  padding: 2px 7px; border-radius: 4px; color: var(--txt-2);
+  background: rgba(var(--tint), .06); border: 1px solid var(--linha);
+}
+.v2 .d5-cab-ctl { display: flex; align-items: center; gap: 10px 18px; flex-wrap: wrap; }
+.v2 .d5-cab-per { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; }
+.v2 .d5-cab .segm button { font-size: 12.5px; padding: 5px 12px; }
+.v2 .d5-mes { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--txt-2); }
+.v2 .d5-mes .num { min-width: 92px; text-align: center; }
+.v2 .d5-datas { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--txt-3); }
+.v2 .d5-datas .inp { width: 140px; height: 32px; font-size: 12.5px; color-scheme: dark; }
+:root[data-tema="light"] .v2 .d5-datas .inp { color-scheme: light; }
+.v2 .d5-atual { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--txt-3); }
+.v2 .d5-ib {
+  width: 30px; height: 30px; padding: 0; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: var(--r-ctl); border: 1px solid var(--linha);
+  background: rgba(var(--tint), .03); color: var(--txt-2); cursor: pointer;
+  font-family: var(--fonte); transition: background .12s var(--ease), color .12s var(--ease);
+}
+.v2 .d5-ib:hover:not(:disabled) { color: var(--txt); background: rgba(var(--tint), .07); }
+.v2 .d5-ib:disabled { opacity: .45; cursor: default; }
+@keyframes d5-gira { to { transform: rotate(360deg); } }
+.v2 .d5-gira { animation: d5-gira .9s linear infinite; transform-origin: 50% 50%; }
+:root[data-perf="lite"] .v2 .d5-gira { animation: none; }
+@media (prefers-reduced-motion: reduce) { .v2 .d5-gira { animation: none; } }
+
+.v2 .d5-aviso {
+  font-size: 12.5px; color: var(--txt-2); padding: 10px 14px;
+  border-radius: var(--r-ctl); background: rgba(var(--tint), .035); border: 1px solid var(--linha);
+}
+.v2 .d5-erro { padding: 28px var(--d5-px); }
+
+/* ---------------- cartão de seção ---------------- */
+.v2 .d5-sec { padding: 18px var(--d5-px) 20px; border-radius: var(--r-card); min-width: 0; }
+.v2 .d5-sec-cab { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px 20px; margin-bottom: 16px; flex-wrap: wrap; }
+.v2 .d5-sec-tits { min-width: 0; }
+.v2 .d5-sec-tit {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 14px; font-weight: 600; letter-spacing: -.005em; line-height: 1.3; color: var(--txt);
+}
+.v2 .d5-sec-sub { font-size: 12px; color: var(--txt-3); margin-top: 4px; line-height: 1.45; max-width: 640px; }
+.v2 .d5-sec-sub b { color: var(--txt-2); font-weight: 600; }
+.v2 .d5-sec-acao { display: flex; align-items: center; padding-top: 2px; }
+
+/* ---------------- ajuda "i" e bolha flutuante ---------------- */
+.v2 .d5-ajuda { display: inline-flex; vertical-align: middle; }
+.v2 .d5-ajuda-btn {
+  width: 18px; height: 18px; padding: 0; border: 0; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: none; color: var(--txt-3); cursor: help; font-family: var(--fonte);
+  transition: color .12s var(--ease);
+}
+.v2 .d5-ajuda-btn:hover, .v2 .d5-ajuda-btn.on { color: var(--txt); }
+.v2 .d5-pop {
+  position: fixed; z-index: 140; pointer-events: none;
+  padding: 9px 11px; border-radius: 6px;
+  font-size: 12px; line-height: 1.5; font-weight: 400; text-align: left; letter-spacing: 0;
+  color: var(--txt); white-space: normal;
+  /* um degrau acima da superfície opaca do tema (no escuro clareia; no claro fica a carta branca) */
+  background: linear-gradient(rgba(var(--tint), .06), rgba(var(--tint), .06)), var(--surface);
+  border: 1px solid rgba(var(--tint), .14);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, .38);
+}
+:root[data-tema="light"] .v2 .d5-pop {
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgba(22, 25, 31, .06), 0 10px 28px rgba(22, 25, 31, .14);
+}
+.v2 .d5-pop-tx { display: block; color: var(--txt); }
+.v2 .d5-pop-tit { display: block; font-weight: 600; margin-bottom: 7px; color: var(--txt); }
+.v2 .d5-pop-lista { list-style: none; display: flex; flex-direction: column; gap: 5px; min-width: 230px; }
+.v2 .d5-pop-lista li { display: flex; justify-content: space-between; gap: 18px; color: var(--txt-2); }
+.v2 .d5-pop-lista b { color: var(--txt); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* ---------------- KPIs ---------------- */
+.v2 .d5-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--d5-gap); }
+.v2 .d5-kpi {
+  padding: 17px var(--d5-px) 16px; border-radius: var(--r-card);
+  display: flex; flex-direction: column; min-height: 126px; min-width: 0;
+}
+.v2 .d5-kpi-rot { display: flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 500; color: var(--txt-2); }
+.v2 .d5-kpi-fonte {
+  margin-left: auto; font-size: 9.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+  padding: 2px 6px; border-radius: 4px; color: var(--txt-2);
+  background: rgba(var(--tint), .06); border: 1px solid var(--linha);
+}
+.v2 .d5-kpi-val {
+  font-size: 30px; font-weight: 600; letter-spacing: -.025em; line-height: 1.1;
+  margin-top: 10px; color: var(--txt); white-space: nowrap;
+}
+.v2 .d5-kpi-un { font-size: 17px; font-weight: 500; letter-spacing: -.01em; color: var(--txt-2); white-space: pre; }
+.v2 .d5-kpi-pe { margin-top: 14px; min-height: 22px; display: flex; align-items: center; min-width: 0; }
+.v2 .d5-kpi-pe > .d5-var-ctx { line-height: 1.4; }
+.v2 .d5-kpi-leg { display: block; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.v2 .d5-var { display: inline-flex; align-items: center; gap: 4px 8px; flex-wrap: wrap; line-height: 1.4; }
+.v2 .d5-var-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11.5px; font-weight: 600; line-height: 1; padding: 4px 6px; border-radius: 4px;
+}
+.v2 .d5-var-chip svg { flex-shrink: 0; }
+.v2 .d5-var-dn { transform: rotate(180deg); }
+.v2 .d5-var-ok { color: var(--verde); background: var(--verde-bg); }
+.v2 .d5-var-er { color: var(--rubro); background: var(--rubro-bg); }
+.v2 .d5-var-ne { color: var(--txt-2); background: rgba(var(--tint), .07); }
+.v2 .d5-var-ctx { font-size: 12px; color: var(--txt-2); font-variant-numeric: tabular-nums; } /* o "vs …" explica a variação */
+
+/* ---------------- linha 2: por número (2/3) + motivos (1/3) ---------------- */
+.v2 .d5-linha2 {
+  display: grid; grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr);
+  gap: var(--d5-gap); align-items: stretch;
+}
+
+/* ---------------- robô (30/10): quatro números + a tabela por número ---------------- */
+/* os números ficam DENTRO do cartão da seção, separados por fio (cartão dentro de cartão pesa) */
+.v2 .d5-robo-nums {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 2px 0 16px; border: 1px solid var(--d5-fio); border-radius: 8px;
+  background: rgba(var(--tint), .018);
+}
+.v2 .d5-robo-n { padding: 13px 16px 12px; min-width: 0; }
+.v2 .d5-robo-n + .d5-robo-n { border-left: 1px solid var(--d5-fio); }
+.v2 .d5-robo-rot { display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 500; color: var(--txt-2); }
+.v2 .d5-robo-val { font-size: 24px; font-weight: 600; letter-spacing: -.02em; line-height: 1.15; margin-top: 7px; color: var(--txt); }
+.v2 .d5-robo-pe { margin-top: 6px; min-width: 0; }
+.v2 .d5-robo-pe > .d5-var-ctx { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 900px) {
+  .v2 .d5-robo-nums { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .v2 .d5-robo-n:nth-child(3) { border-left: 0; }
+  .v2 .d5-robo-n:nth-child(n + 3) { border-top: 1px solid var(--d5-fio); }
+}
+
+/* ---------------- tabelas ---------------- */
+/* a tabela encosta nas bordas do cartão (a linha de hover vai de ponta a ponta) */
+.v2 .d5-tab-rolo { overflow-x: auto; margin: 0 calc(-1 * var(--d5-px)); }
+.v2 .d5-tab { width: 100%; border-collapse: collapse; font-size: 13px; color: var(--txt); }
+.v2 .d5-tab th, .v2 .d5-tab td {
+  padding: 11px 12px; text-align: left; vertical-align: middle; height: auto;
+  border-bottom: 1px solid var(--d5-fio); font-weight: 400; color: var(--txt);
+}
+.v2 .d5-tab tr > :first-child { padding-left: var(--d5-px); }
+.v2 .d5-tab tr > :last-child { padding-right: var(--d5-px); }
+.v2 .d5-tab thead th {
+  /* anatomia da tabela da casa (caps pequenas sobre faixa de 2%), com o fio mais firme */
+  font-size: 10.5px; font-weight: 500; letter-spacing: .05em; text-transform: uppercase;
+  /* --txt-2: em 10,5px caixa-alta o --txt-3 (~3:1) ficava apagado demais para o que nomeia
+     as colunas */
+  color: var(--txt-2); background: rgba(var(--tint), .022);
+  padding-top: 9px; padding-bottom: 9px; white-space: nowrap;
+  border-top: 1px solid var(--d5-fio); border-bottom-color: var(--d5-fio-forte);
+}
+/* corpo: todas as células alinham pela LINHA DE BASE da 1ª linha — o número principal
+   de cada coluna fica na mesma altura, tenha a célula uma ou duas linhas */
+.v2 .d5-tab tbody > tr > *, .v2 .d5-tab tfoot > tr > * { vertical-align: baseline; line-height: 1.25; }
+.v2 .d5-tab tbody tr:last-child > * { border-bottom: 0; }
+.v2 .d5-tab tbody tr:hover { background: transparent; }
+.v2 .d5-tab tbody tr:hover > * { background: var(--d5-hover); }
+.v2 .d5-tab tfoot th, .v2 .d5-tab tfoot td {
+  border-bottom: 0; border-top: 1px solid var(--d5-fio-forte);
+  padding-top: 13px; padding-bottom: 0;
+}
+.v2 .d5-tab .d5-dir { text-align: right; }
+/* hierarquia por peso: contagens 500; nomes, tempos principais e a linha Total 600 */
+.v2 .d5-tab b.num, .v2 .d5-tab span.num { font-size: 13.5px; font-weight: 500; }
+.v2 .d5-tab tfoot b.num, .v2 .d5-tab tfoot span.num { font-weight: 600; }
+.v2 .d5-tab .d5-cel2 > b.num { font-weight: 600; } /* tempo principal (mediana) */
+.v2 .d5-tab col.d5-c-nome { width: auto; }
+.v2 .d5-tab col.d5-c-ent { width: 190px; }
+.v2 .d5-tab col.d5-c-n { width: 118px; }
+.v2 .d5-tab col.d5-c-t { width: 168px; }
+
+.v2 .d5-nome-in { display: flex; align-items: baseline; gap: 11px; min-width: 0; }
+.v2 .d5-cel2 { display: inline-flex; flex-direction: column; gap: 3px; line-height: 1.25; min-width: 0; vertical-align: baseline; }
+.v2 .d5-cel2-dir { align-items: flex-end; }
+.v2 .d5-cel2 > b { font-size: 13.5px; font-weight: 600; color: var(--txt); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2 .d5-cel2 > small { font-size: 11.5px; color: color-mix(in srgb, var(--txt-2) 55%, var(--txt-3)); white-space: nowrap; }
+/* legenda em pedaços: só quebra depois de um " · " (no espaço logo após o ponto). O ponto
+   leva margem própria: o espaço do Instrument Sans (0,2em) colava "dia·10". À direita,
+   margem + o espaço (0,2em) = a margem da esquerda */
+.v2 .d5-seg { white-space: nowrap; }
+.v2 .d5-sep { margin: 0 .18em 0 .38em; font-variant-numeric: normal; }
+/* telefone: o mesmo espaço estreito colava "(51)99426" — alarga só o espaço */
+.v2 .d5-tel { word-spacing: .2em; color: var(--txt-2); }   /* telefone é informação, não legenda */
+.v2 .d5-lin-antigo .d5-cel2 > b { color: var(--txt-2); font-weight: 500; }
+.v2 .d5-tot-rot > b { font-weight: 600; }
+
+.v2 .d5-ponto { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; background: rgba(var(--tint), .26);
+  align-self: flex-start; margin-top: 5px; /* no meio da 1ª linha (o nome) */ }
+.v2 .d5-ponto-ok { background: var(--verde); }
+
+/* entradas: trilho de participação + número; o % fica embaixo do número */
+.v2 .d5-ent { display: inline-flex; align-items: baseline; justify-content: flex-end; gap: 10px; }
+.v2 .d5-ent > b { min-width: 38px; text-align: right; }
+.v2 .d5-ent .d5-trilho { width: 84px; align-self: center; }
+.v2 .d5-trilho {
+  display: block; height: 6px; border-radius: 3px; overflow: hidden;
+  background: var(--d5-trilho);
+}
+.v2 .d5-trilho > i { display: block; height: 100%; border-radius: 3px; background: var(--dado-1); }
+/* barra relativa ao maior (sem % ao lado): sem trilho, para não parecer progresso */
+.v2 .d5-trilho-livre { background: transparent; }
+.v2 .d5-trilho.d5-trilho-g { height: 7px; border-radius: 4px; }
+.v2 .d5-trilho.d5-trilho-g > i { border-radius: 4px; }
+
+/* não elegíveis com bolha de motivos */
+.v2 .d5-ne-btn {
+  font: inherit; font-size: 13.5px; font-weight: 500; color: var(--txt); line-height: 1.25;
+  background: none; border: 0; padding: 2px 4px; margin: -2px -4px; border-radius: 4px; cursor: help;
+  text-decoration: underline dotted rgba(var(--tint), .32); text-decoration-thickness: 1px; text-underline-offset: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.v2 .d5-ne-btn:hover { background: rgba(var(--tint), .06); text-decoration-color: rgba(var(--tint), .6); }
+/* ---------------- anúncio e quem já estava no sistema (30/10): a quebra das entradas ---------------- */
+.v2 .d5-anuncio .d5-tab col.d5-c-orig { width: 34%; }
+.v2 .d5-ja { color: var(--azul); }
+.v2 .d5-orig { white-space: normal !important; line-height: 1.4; }
+
+/* ---------------- motivos ---------------- */
+.v2 .d5-mot { display: flex; flex-direction: column; }
+/* o cartão estica até a altura da tabela de números (mesma linha): a lista ocupa o meio e
+   cada motivo cresce por igual — até +26px de respiro embaixo da barra —, o que deixa
+   "Quem marcou" no pé, na linha do Total da tabela, em vez de uma faixa vazia embaixo */
+.v2 .d5-barras { list-style: none; display: flex; flex-direction: column; gap: 19px; flex: 1 0 auto; }
+.v2 .d5-barra { flex: 1 0 auto; max-height: 56px; }
+.v2 .d5-barra-tx { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 7px; }
+.v2 .d5-barra-rot { font-size: 12.5px; color: var(--txt-2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .d5-barra-v { display: inline-flex; align-items: baseline; gap: 8px; flex-shrink: 0; }
+.v2 .d5-barra-v b { font-size: 13px; font-weight: 600; color: var(--txt); }
+.v2 .d5-barra-v small { font-size: 11.5px; color: var(--txt-3); min-width: 34px; text-align: right; }
+
+.v2 .d5-quem { margin-top: 22px; }
+.v2 .d5-quem::before { content: ""; display: block; border-top: 1px solid var(--d5-fio); margin: 4px 0 16px; }
+.v2 .d5-quem-tit { font-size: 12px; font-weight: 500; color: var(--txt-2); margin-bottom: 10px; }
+.v2 .d5-quem-barra { display: flex; gap: 2px; height: 8px; border-radius: 4px; overflow: hidden; }
+.v2 .d5-quem-barra > i { display: block; height: 100%; flex-basis: 0; min-width: 3px; }
+.v2 .d5-quem-leg { list-style: none; display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 11px; font-size: 12px; color: var(--txt-2); }
+.v2 .d5-quem-leg li { display: inline-flex; align-items: center; gap: 6px; }
+.v2 .d5-quem-leg i { width: 8px; height: 8px; border-radius: 2px; display: block; }
+.v2 .d5-quem-leg b { font-weight: 600; color: var(--txt); font-variant-numeric: tabular-nums; }
+.v2 .d5-quem-leg small { color: var(--txt-3); font-variant-numeric: tabular-nums; }
+.v2 .d5-quem-ia { background: var(--dado-1); }
+.v2 .d5-quem-equipe { background: rgba(var(--dado-1-rgb), .45); }
+.v2 .d5-quem-regraRs { background: rgba(var(--tint), .3); }
+
+/* ---------------- atendentes ---------------- */
+.v2 .d5-tab-at th, .v2 .d5-tab-at td { padding-top: 12px; padding-bottom: 12px; }
+.v2 .d5-tab-at thead th { padding-top: 9px; padding-bottom: 9px; }
+/* o MESMO respiro entre todas as colunas: cada coluna numérica = o que ela pede (o maior
+   entre título e conteúdo, + 24px de padding) + uma fatia IGUAL da sobra; 100cqw é a
+   largura da página = a da tabela (a última coluna tem 20px de padding à direita, a 1ª 20px à
+   esquerda). O nome fica com o resto (a estimativa --d5-at-nome),
+   então o vão nome → Recebidos é o mesmo dos outros. Sem sobra, a fatia é zero. */
+.v2 .d5-tab-at {
+  --d5-at-nome: 130px; --d5-at-rec: 156px; --d5-at-gan: 126px; --d5-at-ne: 198px; --d5-at-resp: 268px; --d5-at-fech: 193px;
+  --d5-at-folga: max(0px, (100cqw - var(--d5-at-nome) - var(--d5-at-rec) - var(--d5-at-gan) - var(--d5-at-ne) - var(--d5-at-resp) - var(--d5-at-fech)) / 5);
+}
+.v2 .d5-tab-at col.d5-c-pessoa { width: auto; }
+.v2 .d5-tab-at col.d5-c-rec { width: calc(var(--d5-at-rec) + var(--d5-at-folga)); }
+.v2 .d5-tab-at col.d5-c-n { width: calc(var(--d5-at-gan) + var(--d5-at-folga)); }
+.v2 .d5-tab-at col.d5-c-ne { width: calc(var(--d5-at-ne) + var(--d5-at-folga)); }
+.v2 .d5-tab-at col.d5-c-resp { width: calc(var(--d5-at-resp) + var(--d5-at-folga)); }
+.v2 .d5-tab-at col.d5-c-fech { width: calc(var(--d5-at-fech) + var(--d5-at-folga)); }
+.v2 .d5-av {
+  width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 600; letter-spacing: .02em; color: var(--txt-2);
+  background: rgba(var(--tint), .07); border: 1px solid var(--d5-fio);
+}
+.v2 .d5-pessoa { font-size: 13.5px; font-weight: 600; color: var(--txt); white-space: nowrap; }
+.v2 .d5-th-ajuda { display: inline-flex; align-items: center; gap: 6px; vertical-align: middle; }
+/* no cabeçalho, um flex de BLOCO (sem linha de base): título com ou sem "i" fica na mesma
+   altura, e todos encostam embaixo (vertical-align: bottom) quando algum quebra em 2 linhas */
+.v2 .d5-tab thead th { vertical-align: bottom; }
+.v2 .d5-tab thead .d5-th-ajuda { display: flex; gap: 10px; }
+/* o "i" (16px) não aumenta a altura do título (12px): fica centrado nele sem empurrá-lo;
+   o vão de 10px deixa o anel de foco do botão de ordenar (2px + 2px) longe do "i" */
+.v2 .d5-tab thead .d5-ajuda { margin: -2px 0; }
+.v2 .d5-tab thead th.d5-dir .d5-th-ajuda { justify-content: flex-end; }
+/* coluna numérica: o "i" vem ANTES do rótulo (no fluxo) — o rótulo termina na borda dos
+   números e o "i" não encosta no título da coluna vizinha nem na borda do cartão */
+.v2 .d5-tab thead .d5-ajuda-btn { width: 16px; height: 16px; }
+.v2 .d5-ord {
+  font: inherit; color: inherit; background: none; border: 0; cursor: pointer;
+  text-transform: inherit; letter-spacing: inherit;
+  display: inline-flex; align-items: center; gap: 5px; padding: 2px 4px; margin: -2px -4px; border-radius: 4px;
+  transition: color .12s var(--ease);
+}
+.v2 .d5-ord:hover { color: var(--txt); }
+.v2 .d5-th-on .d5-ord { color: var(--txt); }
+.v2 .d5-ord-ic path { fill: currentColor; opacity: .25; }
+.v2 .d5-ord-asc .d5-ord-up, .v2 .d5-ord-desc .d5-ord-dn { opacity: 1; }
+
+/* ---------------- mapa dia × hora ---------------- */
+.v2 .d5-calor { overflow-x: auto; margin: 0 calc(-1 * var(--d5-px)); padding: 4px var(--d5-px) 2px; }
+.v2 .d5-calor-grade { display: flex; flex-direction: column; gap: 2px; min-width: 760px; }
+.v2 .d5-calor-lin {
+  display: grid; grid-template-columns: 84px repeat(24, minmax(0, 1fr)) 64px;
+  column-gap: 2px; align-items: center; border-radius: 6px;
+}
+.v2 .d5-calor-rot { font-size: 12px; color: var(--txt-2); white-space: nowrap; padding-right: 10px; overflow: hidden; text-overflow: ellipsis; }
+.v2 .d5-calor-h { font-size: 10.5px; color: var(--txt-2); text-align: center; padding-bottom: 5px; font-variant-numeric: tabular-nums; } /* eixo: lê-se o mapa por ele */
+.v2 .d5-calor-tot { text-align: right; font-size: 12px; font-weight: 500; color: var(--txt-2); padding-left: 12px; white-space: nowrap; }
+.v2 .d5-calor-cab .d5-calor-tot { font-size: 10.5px; font-weight: 400; color: var(--txt-2); padding-bottom: 5px; }
+.v2 .d5-cel { display: block; height: 26px; border-radius: 4px; }
+.v2 .d5-cel:hover { box-shadow: inset 0 0 0 1.5px rgba(var(--tint), .55); }
+/* escala sequencial de 5 degraus a partir da cor de dado: no escuro o topo CLAREIA
+   (mais luminância = mais entradas); no claro o topo ESCURECE. Zero = tinta neutra.
+   Escuro: os degraus sobem em passos IGUAIS de luminância (OKLab L ≈ .29 → .38 → .48 →
+   .57 → .66 → .76 sobre a carta #212327): 0, 1–2 e 3–5 se separam à primeira vista (com
+   alfa .2/.4 o 1–2 quase sumia no zero). */
+.v2 .d5-q0 { background: rgba(var(--tint), .045); }
+.v2 .d5-q1 { background: rgba(var(--dado-1-rgb), .3); }
+.v2 .d5-q2 { background: rgba(var(--dado-1-rgb), .54); }
+.v2 .d5-q3 { background: rgba(var(--dado-1-rgb), .76); }
+.v2 .d5-q4 { background: var(--dado-1); }
+.v2 .d5-q5 { background: color-mix(in srgb, var(--dado-1) 70%, #ffffff); }
+/* claro: zero NEUTRO com um fio (vazio lê vazio, não azul-claro) e o 1º degrau mais firme */
+:root[data-tema="light"] .v2 .d5-q0 { background: rgba(var(--tint), .04); box-shadow: inset 0 0 0 1px rgba(var(--tint), .05); }
+:root[data-tema="light"] .v2 .d5-q1 { background: rgba(var(--dado-1-rgb), .2); }
+:root[data-tema="light"] .v2 .d5-q2 { background: rgba(var(--dado-1-rgb), .36); }
+:root[data-tema="light"] .v2 .d5-q3 { background: rgba(var(--dado-1-rgb), .55); }
+:root[data-tema="light"] .v2 .d5-q4 { background: rgba(var(--dado-1-rgb), .82); }
+:root[data-tema="light"] .v2 .d5-q5 { background: color-mix(in srgb, var(--dado-1) 78%, #000000); }
+.v2 .d5-cel-futuro { background: transparent; box-shadow: inset 0 0 0 1px rgba(var(--tint), .07); }
+.v2 .d5-cel-futuro:hover { box-shadow: inset 0 0 0 1px rgba(var(--tint), .07); }
+/* hoje: rótulo e total no peso forte, o ponto e um contorno de 1px FORA das células —
+   nada por baixo delas (as células têm alfa: um fundo mudaria a cor do mesmo valor) */
+.v2 .d5-calor-hoje { outline: 1px solid var(--d5-fio-forte); outline-offset: 2px; }
+.v2 .d5-calor-hoje .d5-calor-rot, .v2 .d5-calor-hoje .d5-calor-tot { color: var(--txt); font-weight: 600; }
+.v2 .d5-calor-hoje .d5-calor-rot::before {
+  content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--dado-1); margin-right: 7px; vertical-align: 1px;
+}
+/* dia fora do período escolhido (mapa esticado para 7 dias): só contexto. Esmaece com a
+   MESMA cor de dado em alfa menor, em degraus iguais entre si (o zero continua neutro) —
+   nada de opacidade por cima do topo clareado/escurecido, que virava um cinza-azulado sujo */
+.v2 .d5-calor-fora .d5-q1 { background: rgba(var(--dado-1-rgb), .22); }
+.v2 .d5-calor-fora .d5-q2 { background: rgba(var(--dado-1-rgb), .34); }
+.v2 .d5-calor-fora .d5-q3 { background: rgba(var(--dado-1-rgb), .46); }
+.v2 .d5-calor-fora .d5-q4 { background: rgba(var(--dado-1-rgb), .58); }
+.v2 .d5-calor-fora .d5-q5 { background: rgba(var(--dado-1-rgb), .7); }
+:root[data-tema="light"] .v2 .d5-calor-fora .d5-q1 { background: rgba(var(--dado-1-rgb), .13); }
+:root[data-tema="light"] .v2 .d5-calor-fora .d5-q2 { background: rgba(var(--dado-1-rgb), .22); }
+:root[data-tema="light"] .v2 .d5-calor-fora .d5-q3 { background: rgba(var(--dado-1-rgb), .32); }
+:root[data-tema="light"] .v2 .d5-calor-fora .d5-q4 { background: rgba(var(--dado-1-rgb), .44); }
+:root[data-tema="light"] .v2 .d5-calor-fora .d5-q5 { background: rgba(var(--dado-1-rgb), .56); }
+.v2 .d5-calor-fora .d5-calor-rot, .v2 .d5-calor-fora .d5-calor-tot { color: var(--txt-3); }
+/* total por hora */
+.v2 .d5-calor-pe { margin-top: 10px; align-items: end; }
+.v2 .d5-calor-pe .d5-calor-rot { font-size: 11px; color: var(--txt-3); align-self: end; line-height: 1; }
+.v2 .d5-calor-pe .d5-calor-tot { align-self: end; line-height: 1; }
+.v2 .d5-calor-tot-pe { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.v2 .d5-calor-tot-pe b { font-weight: 600; color: var(--txt); }
+.v2 .d5-calor-tot-pe small { font-size: 10.5px; font-weight: 400; color: var(--txt-3); }
+.v2 .d5-hbar { height: 36px; display: flex; align-items: flex-end; }
+.v2 .d5-hbar > i { display: block; width: 100%; border-radius: 3px 3px 1px 1px; background: rgba(var(--dado-1-rgb), .55); }
+.v2 .d5-hbar:hover > i { background: var(--dado-1); }
+.v2 .d5-leg { list-style: none; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; font-size: 11px; color: var(--txt-3); }
+.v2 .d5-leg > li { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.v2 .d5-leg i { width: 14px; height: 10px; border-radius: 2px; display: block; }
+
+/* ---------------- vazio e carregando ---------------- */
+.v2 .d5-vazio { display: flex; flex-direction: column; gap: 4px; padding: 18px 0 8px; }
+.v2 .d5-vazio-t { font-size: 13px; color: var(--txt-2); }
+.v2 .d5-vazio-s { font-size: 12px; color: var(--txt-3); }
+.v2 .d5-sk-linhas { display: flex; flex-direction: column; gap: 10px; }
+
+/* ---------------- telas largas: trilhos maiores (sem vão entre nome e número) ---------------- */
+@media (min-width: 1680px) {
+  .v2 .d5-tab col.d5-c-ent { width: 250px; }
+  .v2 .d5-ent .d5-trilho { width: 140px; }
+  .v2 .d5-tab-at { --d5-at-rec: 212px; } /* trilho de 140px */
+}
+
+/* ---------------- telas menores ---------------- */
+@media (max-width: 1360px) {
+  .v2 .d5-calor-h-sec { visibility: hidden; }
+}
+@media (max-width: 1180px) {
+  .v2 .d5-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .v2 .d5-cab { align-items: flex-start; }
+}
+/* página estreita (janela ~1180–1320 com a barra aberta, ou menor): a tabela de números
+   não cabe em 2/3 — empilha, e os motivos se dividem em duas colunas (barras | quem
+   marcou). Atendentes: colunas mais justas e a legenda dos tempos pode quebrar (só entre
+   pedaços, .d5-seg). */
+@container d5pg (max-width: 1175px) {
+  .v2 .d5-linha2 { grid-template-columns: minmax(0, 1fr); }
+  .v2 .d5-mot { display: grid; grid-template-columns: minmax(0, 3fr) minmax(250px, 2fr); column-gap: 44px; align-items: start; }
+  .v2 .d5-mot > .d5-sec-cab { grid-column: 1 / -1; }
+  .v2 .d5-mot > .d5-quem { margin-top: 0; padding: 2px 0 2px 28px; border-left: 1px solid var(--d5-fio); align-self: center; }
+  .v2 .d5-mot > .d5-quem::before { display: none; }
+
+  .v2 .d5-tab-at { --d5-at-rec: 132px; } /* trilho de 60px */
+  .v2 .d5-tab-at .d5-cel2 > small { white-space: normal; text-align: right; }
+  .v2 .d5-tab-at .d5-ent .d5-trilho { width: 60px; }
+}
+/* bem estreita (janela ~1024–1210): os títulos das colunas também podem quebrar */
+@container d5pg (max-width: 1080px) {
+  .v2 .d5-tab-at col.d5-c-rec { width: 130px; }
+  .v2 .d5-tab-at col.d5-c-n { width: 96px; }
+  .v2 .d5-tab-at col.d5-c-ne { width: 140px; }
+  .v2 .d5-tab-at col.d5-c-resp { width: 200px; }
+  .v2 .d5-tab-at col.d5-c-fech { width: 170px; }
+  .v2 .d5-tab-at .d5-ent .d5-trilho { width: 48px; }
+  .v2 .d5-tab-at thead .d5-ord { text-align: right; }
+  .v2 .d5-tab-at thead .d5-ord-tx > span { display: block; }
+}
+
+/* ============================================================
+   CENTRALIZADO + VIDA NO HOVER (dono 22/10: "deixa mais centralizado… quando
+   passar por cima, algum efeito, para não ficar tão parado"). Só transform,
+   opacity, cor e sombra — nada de layout por frame, nada de filter. Durações nos
+   tokens da camada de movimento (movimento.css: --mo-r 120ms cor/press, --mo-m 180ms).
+   ============================================================ */
+/* título, número e legenda de cada coluna numérica no centro dela — Atendentes (22/10) e,
+   desde 29/10, todas as tabelas do painel (dono: "tudo centralizado") */
+.v2 .d5-tab .d5-dir { text-align: center; }
+.v2 .d5-tab thead th.d5-dir .d5-th-ajuda { justify-content: center; }
+.v2 .d5-tab thead .d5-ord { text-align: center; }
+.v2 .d5-tab .d5-cel2-dir { align-items: center; }
+.v2 .d5-tab .d5-cel2 > small { text-align: center; }
+.v2 .d5-tab-at .d5-ent { justify-content: center; }
+.v2 .d5-tab-at .d5-ent > b { min-width: 3ch; text-align: left; }  /* grupo barra+número com a mesma largura em toda linha: as barras começam na mesma borda */
+
+/* linhas das tabelas: faixa mais clara + fio azul entrando pela esquerda */
+.v2 .d5-tab tbody tr > * { transition: background-color var(--mo-m, 180ms) var(--ease), box-shadow var(--mo-m, 180ms) var(--ease); }
+.v2 .d5-tab tbody tr:hover > * { background: rgba(var(--tint), .045); }
+.v2 .d5-tab tbody tr:hover > :first-child { box-shadow: inset 3px 0 0 var(--azul); }
+.v2 .d5-tab .d5-pessoa, .v2 .d5-tab .d5-nome-in > b { display: inline-block; transition: transform var(--mo-m, 180ms) var(--ease); }
+.v2 .d5-tab tbody tr:hover .d5-pessoa, .v2 .d5-tab tbody tr:hover .d5-nome-in > b { transform: translateX(3px); }
+.v2 .d5-av { transition: border-color var(--mo-m, 180ms) var(--ease), background-color var(--mo-m, 180ms) var(--ease), color var(--mo-m, 180ms) var(--ease); }
+.v2 .d5-tab tbody tr:hover .d5-av { border-color: rgba(var(--azul-rgb), .55); background: rgba(var(--azul-rgb), .14); color: var(--txt); }
+/* barras: acendem no hover (cor mais clara, sem filter) e CRESCEM ao abrir a página */
+@keyframes d5-cresce { from { transform: scaleX(0); } }
+.v2 .d5-trilho > i { transform-origin: left center; animation: d5-cresce .7s var(--ease) both; transition: background-color var(--mo-r, 120ms) var(--ease); }
+.v2 .d5-tab tbody tr:hover .d5-trilho > i, .v2 .d5-barra:hover .d5-trilho > i { background-color: color-mix(in srgb, var(--dado-1) 78%, #fff); }
+.v2 .d5-barra-rot { transition: color var(--mo-r, 120ms) var(--ease); }
+.v2 .d5-barra:hover .d5-barra-rot { color: var(--txt); }
+
+/* cartões dos números: sobem 2px com sombra e fio azul suave */
+.v2 .d5-kpi { transition: transform var(--mo-m, 180ms) var(--ease), box-shadow var(--mo-m, 180ms) var(--ease); }
+.v2 .d5-kpi:hover { transform: translateY(-2px); box-shadow: 0 0 0 1px rgba(var(--azul-rgb), .32), 0 14px 30px -16px rgba(0, 0, 0, .55); }
+:root[data-tema="light"] .v2 .d5-kpi:hover { box-shadow: 0 0 0 1px rgba(var(--azul-rgb), .28), 0 14px 30px -16px rgba(22, 25, 31, .22); }
+
+/* mapa: a célula salta um pouco à frente das vizinhas */
+.v2 .d5-cel { transition: transform var(--mo-r, 120ms) var(--ease), box-shadow var(--mo-r, 120ms) var(--ease); }
+.v2 .d5-cel:hover { transform: scale(1.14); position: relative; z-index: 1; }
+.v2 .d5-hbar > i { transition: background-color var(--mo-r, 120ms) var(--ease), transform var(--mo-r, 120ms) var(--ease); transform-origin: bottom; }
+.v2 .d5-hbar:hover > i { transform: scaleY(1.06); }
+
+/* MODO LEVE (padrão das máquinas da equipe) desliga TODA transição com !important. Estes
+   efeitos são baratos (transform/cor em poucos elementos, só no hover) — ficam ligados
+   no Leve, mas NUNCA com "reduzir movimento" do sistema. */
+@media (prefers-reduced-motion: no-preference) {
+  :root[data-perf="lite"] .v2 .d5-pg .d5-tab tbody tr > * { transition: background-color var(--mo-m, 180ms) var(--ease), box-shadow var(--mo-m, 180ms) var(--ease) !important; }
+  :root[data-perf="lite"] .v2 .d5-pg .d5-pessoa, :root[data-perf="lite"] .v2 .d5-pg .d5-nome-in > b { transition: transform var(--mo-m, 180ms) var(--ease) !important; }
+  :root[data-perf="lite"] .v2 .d5-pg .d5-av { transition: border-color var(--mo-m, 180ms) var(--ease), background-color var(--mo-m, 180ms) var(--ease), color var(--mo-m, 180ms) var(--ease) !important; }
+  :root[data-perf="lite"] .v2 .d5-pg .d5-trilho > i { animation: d5-cresce .7s var(--ease) both !important; transition: background-color var(--mo-r, 120ms) var(--ease) !important; }
+  :root[data-perf="lite"] .v2 .d5-pg .d5-barra-rot { transition: color var(--mo-r, 120ms) var(--ease) !important; }
+  :root[data-perf="lite"] .v2 .d5-pg .d5-kpi { transition: transform var(--mo-m, 180ms) var(--ease), box-shadow var(--mo-m, 180ms) var(--ease) !important; }
+  :root[data-perf="lite"] .v2 .d5-pg .d5-cel { transition: transform var(--mo-r, 120ms) var(--ease), box-shadow var(--mo-r, 120ms) var(--ease) !important; }
+  :root[data-perf="lite"] .v2 .d5-pg .d5-hbar > i { transition: background-color var(--mo-r, 120ms) var(--ease), transform var(--mo-r, 120ms) var(--ease) !important; }
+}
+
+/* ---------- Carregando o Dashboard (dono 30/10: "aquela tela de carregando… do WhatsApp e do
+   Kanban") — por cima dos esqueletos na primeira abertura ---------- */
+.v2 .d5-pg { position: relative; }
+.v2 .d5-carr { position: absolute; left: 0; right: 0; top: 150px; display: flex; justify-content: center; padding: 0 16px; pointer-events: none; z-index: 2; }
+.v2 .d5-carr-caixa {
+  width: min(372px, 100%); display: flex; flex-direction: column; align-items: center; text-align: center;
+  padding: 28px 28px 24px; border-radius: 16px; pointer-events: auto;
+  background: linear-gradient(180deg, var(--vidro-a), var(--vidro-b)), var(--base); border: 1px solid var(--linha);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .04) inset, 0 24px 60px rgba(0, 0, 0, .5);
+}
+:root[data-tema="light"] .v2 .d5-carr-caixa { background: #FFFFFF; box-shadow: 0 2px 6px rgba(16, 24, 40, .05), 0 24px 56px rgba(16, 24, 40, .14); }
+/* ícone: quatro barras de gráfico subindo e descendo */
+.v2 .d5-carr-ic { display: flex; align-items: flex-end; gap: 4px; height: 28px; margin-bottom: 14px; }
+.v2 .d5-carr-ic i { width: 6px; height: 100%; border-radius: 3px; background: var(--dado-1); transform-origin: bottom; }
+.v2 .d5-carr-ic i:nth-child(1) { transform: scaleY(.45); opacity: .55; }
+.v2 .d5-carr-ic i:nth-child(2) { transform: scaleY(.8); opacity: .75; }
+.v2 .d5-carr-ic i:nth-child(3) { transform: scaleY(.6); opacity: .9; }
+.v2 .d5-carr-ic i:nth-child(4) { transform: scaleY(1); }
+.v2 .d5-carr-caixa strong { font-size: 15.5px; font-weight: 600; letter-spacing: -.01em; color: var(--txt); }
+.v2 .d5-carr-txt { margin-top: 5px; max-width: 280px; font-size: 12.5px; line-height: 1.45; color: var(--txt-2); }
+.v2 .d5-carr-barra {
+  position: relative; display: block; width: 100%; height: 4px; margin-top: 18px; border-radius: 99px; overflow: hidden;
+  background: rgba(var(--tint), .07); box-shadow: 0 0 0 1px var(--linha) inset;
+}
+.v2 .d5-carr-barra i { position: absolute; left: 0; top: 0; height: 100%; width: 32%; border-radius: inherit; background: var(--dado-1); }
+@keyframes d5-carr-barra { 0%, 100% { transform: scaleY(.4); } 50% { transform: scaleY(1); } }
+@keyframes d5-carr-indet { 0% { transform: translateX(-100%); } 100% { transform: translateX(320%); } }
+/* movimento também no Modo Leve (o base.css zera tudo com !important): é o sinal de que está
+   trabalhando; com "reduzir movimento" do sistema fica parado */
+@media (prefers-reduced-motion: no-preference) {
+  :root .v2 .d5-carr .d5-carr-ic i { animation: d5-carr-barra 1.1s ease-in-out infinite !important; }
+  :root .v2 .d5-carr .d5-carr-ic i:nth-child(2) { animation-delay: -.25s !important; }
+  :root .v2 .d5-carr .d5-carr-ic i:nth-child(3) { animation-delay: -.5s !important; }
+  :root .v2 .d5-carr .d5-carr-ic i:nth-child(4) { animation-delay: -.75s !important; }
+  :root .v2 .d5-carr .d5-carr-barra i { animation: d5-carr-indet 1.25s ease-in-out infinite !important; }
+}
