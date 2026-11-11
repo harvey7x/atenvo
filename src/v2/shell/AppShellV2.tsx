@@ -525,7 +525,8 @@ export default function AppShellV2() {
     // Reviza: Financeiro é restrito — comercial não vê o item
     .filter((i) => i.slug !== 'cobrancas/financeiro' || podeVerFinanceiro)
     // Reviza: matriz do dono — financeiro, comercial e cadastro só veem as suas seções
-    .filter((i) => !(ehFinanceiroR || ehComercialR || soCadastro) || menuDoPapel(i.slug));
+    // (só nos itens de Cobranças: o comercial que também atende vê o menu do Atendimento inteiro)
+    .filter((i) => !i.slug.startsWith('cobrancas/') || !(ehFinanceiroR || ehComercialR || soCadastro) || menuDoPapel(i.slug));
   // cargo exibido: na Reviza usa o papel REAL do banco (o role da org é só admin/gestor/atendente)
   const ROTULO_REVIZA: Record<string, string> = { admin: 'Administrador', gestor: 'Gestor', comercial: 'Comercial', financeiro: 'Financeiro', cadastro: 'Cadastro', atendente: 'Atendente' };
   const cargo = isRevizaMode && papelSessao?.papel ? (ROTULO_REVIZA[papelSessao.papel] ?? papelSessao.papel) : papel;
