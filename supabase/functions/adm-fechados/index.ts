@@ -11,6 +11,8 @@
 //
 // PENDENTES (30/10): com a API nova, lê também ?pendentes=1 (aguardando documentos/assinatura)
 // e grava em adm_pendentes antes do sincronizar — o Kanban segue o CAF em Documentos e Assinar.
+// 11/11: o CAF publicou; manda também o completo que deve documento, assinado/assinado_em/falta
+// (adm_pendencias → Fila da Iris, prioridade 0 "assinou e falta o histórico").
 //
 // PLACAR (29/10): quando a lista já vem com caso_id, também lê ?placar=DIA do mês do
 // campeonato (dia 11 → dia 10) e grava em adm_placar — o corrente a cada leitura, os
@@ -108,6 +110,12 @@ Deno.serve(async (req) => {
           vendedor: p.vendedor == null ? null : String(p.vendedor).slice(0, 80),
           estagio: String(p.estagio ?? '').slice(0, 40),
           estagio_em: DATA.test(String(p.estagio_em ?? '')) ? String(p.estagio_em) : null,
+          // 11/11 (Fila da Iris, prioridade 0): assinado + o que falta, nos códigos do CAF
+          assinado: p.assinado === true,
+          assinado_em: DATA.test(String(p.assinado_em ?? '')) ? String(p.assinado_em) : null,
+          falta: Array.isArray(p.falta)
+            ? (p.falta as unknown[]).filter((f): f is string => typeof f === 'string').slice(0, 20).map((f) => f.slice(0, 40))
+            : [],
         }));
         const { data: g, error: e } = await admin.rpc('adm_pendentes_gravar', { p_org: org, p_lista: limpos });
         pendentes = e ? `erro: ${e.message.slice(0, 120)}` : g;

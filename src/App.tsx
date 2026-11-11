@@ -59,6 +59,8 @@ const ConfiguracoesV2 = lazy(() => import('@/v2/pages/Configuracoes'));
 const IaV2 = lazy(() => import('@/v2/pages/Ia'));
 const RecuperacaoV2 = lazy(() => import('@/v2/pages/Recuperacao'));
 const PendenciasV2 = lazy(() => import('@/v2/pages/Pendencias'));
+// Fila da Iris (etapa 1, 11/11): SÓ o visual com dados fictícios — a página só abre no modo demonstração
+const FilaIrisV2 = lazy(() => import('@/v2/pages/FilaIris'));
 const PortabilidadesV2 = lazy(() => import('@/v2/pages/Portabilidades'));
 const PresenciaisV2 = lazy(() => import('@/v2/pages/Presenciais'));
 const FluxosV2 = lazy(() => import('@/v2/pages/Fluxos'));
@@ -138,6 +140,7 @@ const routes: RouteObject[] = [
           { path: 'presenciais', element: <Lz><PresenciaisV2 /></Lz> },
           { path: 'recuperacao', element: <Lz><RequireRoleV2 role="admin"><RecuperacaoV2 /></RequireRoleV2></Lz> },
           { path: 'pendencias', element: <Lz><PendenciasV2 /></Lz> },
+          { path: 'fila-iris', element: <Lz><FilaIrisV2 /></Lz> },
           { path: 'portabilidades', element: <Lz><PortabilidadesV2 /></Lz> },
           // Manual de vendas SAIU do sistema (dono 29/10: "não precisa mais ter") — link antigo cai no WhatsApp
           { path: 'manual', element: <Navigate to="/whatsapp" replace /> },

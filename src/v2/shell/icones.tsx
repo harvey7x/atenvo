@@ -13,6 +13,10 @@ function Ic({ children }: { children: ReactNode }) {
 }
 
 export const ICONES: Record<string, ReactNode> = {
+  // Fila da Iris: três linhas da fila (a de cima mais curta = prioridade) + o brilho da IA
+  'fila-iris': (
+    <Ic><path d="M4 7h9M4 12h13M4 17h16" /><path d="M18.5 3l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z" /></Ic>
+  ),
   dashboard: (
     <Ic><rect x="3" y="3" width="7" height="9" rx="1.5" /><rect x="14" y="3" width="7" height="5" rx="1.5" /><rect x="14" y="12" width="7" height="9" rx="1.5" /><rect x="3" y="16" width="7" height="5" rx="1.5" /></Ic>
   ),

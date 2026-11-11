@@ -29,6 +29,7 @@ import { LembreteAviso } from '../components/LembreteAviso';
 import { ComparadorVisual } from '../components/ComparadorVisual';
 import { DEMO_MODE } from '@/lib/demo';
 import { assinarAcento, lerAcento, salvarAcento, type Acento } from '../lib/acento';
+import { useAcessoFila } from '../hooks/useAcessoFila';
 
 /* ícones do chrome da topbar (traço fino, como o resto do v2) */
 /* gota de tinta — alternador do acento azul → verde → dourado (teste do dono 28/08) */
@@ -54,7 +55,7 @@ const IconeLua = () => (
    Relacionamento fica fora (adiada); Facebook, Scripts e Maturação são
    órfãs do mockup e entram nos grupos pela função. Badges chegam com as
    páginas reais — por ora ficam zerados (nada de número inventado). */
-type ItemNav = { slug: string; rotulo: string; admin?: boolean };
+type ItemNav = { slug: string; rotulo: string; admin?: boolean; /** só aparece para quem tem a Fila da Iris liberada (fila_iris_config) */ fila?: boolean };
 /* `fixo`: grupo preso ao pé da sidebar, sem rótulo, acima do usuário — fica
    sempre visível mesmo quando a lista de cima precisa rolar. */
 type GrupoNav = { rotulo: string; itens: ItemNav[]; fixo?: boolean };
@@ -67,6 +68,8 @@ const GRUPOS: GrupoNav[] = [
     rotulo: 'Operação',
     itens: [
       { slug: 'whatsapp', rotulo: 'WhatsApp' },
+      // Fila da Iris (dono 11/11): só para quem está liberado em fila_iris_config (os 5 atendentes + Murilo)
+      { slug: 'fila-iris', rotulo: 'Fila da Iris', fila: true },
       // Facebook e Disparo fora do menu (pedido do dono 27/08) — rotas seguem vivas por URL
       // Kanban desceu para a Gestão (dono 30/10)
       // Agendamentos e Contatos fora do menu (pedido do dono 30/10: "ocultar") — rotas seguem vivas por URL
@@ -450,6 +453,8 @@ export default function AppShellV2() {
   const papel = currentOrg ? (PAPEL_ROTULO[currentOrg.role] ?? currentOrg.role) : '—';
   const org = currentOrg?.name ?? 'Atenvo';
   const admin = !currentOrg || currentOrg.role === 'admin';
+  // Fila da Iris: o item só aparece para quem está liberado (fila_iris_config; demonstração: sempre)
+  const acessoFila = useAcessoFila();
   preparoBomDiaRef.current = { org: currentOrg?.id ?? '', nome };
 
   // Fase 2.0: troca de organização — só EXISTE para quem tem mais de um vínculo
@@ -529,7 +534,7 @@ export default function AppShellV2() {
           )}
           <nav className="sb-nav" ref={navRef} aria-label="Navegação principal">
             {modulo.grupos.filter((g) => !g.fixo).map((g) => {
-              const itens = g.itens.filter((i) => (admin || !i.admin) && !(gestorBomDia && ESCONDIDO_DO_GESTOR.has(i.slug)));
+              const itens = g.itens.filter((i) => (admin || !i.admin) && (!i.fila || acessoFila === true) && !(gestorBomDia && ESCONDIDO_DO_GESTOR.has(i.slug)));
               if (!itens.length) return null;
               return (
                 <div className="grupo" key={g.rotulo}>
@@ -540,7 +545,7 @@ export default function AppShellV2() {
             })}
           </nav>
           {modulo.grupos.filter((g) => g.fixo).map((g) => {
-            const itens = g.itens.filter((i) => (admin || !i.admin) && !(gestorBomDia && ESCONDIDO_DO_GESTOR.has(i.slug)));
+            const itens = g.itens.filter((i) => (admin || !i.admin) && (!i.fila || acessoFila === true) && !(gestorBomDia && ESCONDIDO_DO_GESTOR.has(i.slug)));
             if (!itens.length) return null;
             return (
               <nav className="sb-fixo" key={g.rotulo} aria-label={g.rotulo}>
