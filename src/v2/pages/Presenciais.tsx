@@ -182,7 +182,7 @@ export default function Presenciais() {
       <div className="ph sobe">
         <div>
           <h2>Presenciais</h2>
-          <p>Atendimentos presenciais marcados. Ao marcar, o grupo DOCUMENTOS CLIENTES CAF é avisado; no dia, às 8h, sai o lembrete.{demo ? ' · modo demonstração (nada é enviado)' : ''}</p>
+          <p>Atendimentos presenciais marcados. Ao marcar, o grupo DOCUMENTOS CLIENTES ALFA é avisado; no dia, às 8h, sai o lembrete.{demo ? ' · modo demonstração (nada é enviado)' : ''}</p>
         </div>
         <div className="acoes">
           <BotaoPrimario onClick={() => abrirNovo()}>＋ Marcar presencial</BotaoPrimario>
