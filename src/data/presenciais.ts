@@ -89,9 +89,12 @@ export function textoPresencial(tipo: 'marcado' | 'remarcado' | 'desmarcado', no
 
 export function textoLembrete(itens: { quando: string; nome: string; quem: string }[]): string | null {
   if (!itens.length) return null;
-  const linhas = [...itens].sort((x, y) => x.quando.localeCompare(y.quando) || x.nome.localeCompare(y.nome))
-    .map((i) => `${horaTxt(i.quando)} · ${i.nome} · marcado por ${i.quem}`);
-  return `📍 *HOJE TEM PRESENCIAL*\n${linhas.join('\n')}\nNão se esqueçam!`;
+  const blocos = [...itens].sort((x, y) => x.quando.localeCompare(y.quando) || x.nome.localeCompare(y.nome))
+    .map((i) => `*${horaTxt(i.quando)}* · ${nomeTxt(i.nome)}\n_Marcado por ${i.quem}_`);
+  const topo = itens.length === 1
+    ? '*📍  Presencial hoje*\n\nHoje tem cliente marcado:'
+    : `*📍  Presenciais hoje*\n\nHoje temos ${itens.length} clientes marcados:`;
+  return `${topo}\n\n${blocos.join('\n\n')}`;
 }
 
 /** Dia (YYYY-MM-DD) em São Paulo. */

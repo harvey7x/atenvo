@@ -32,7 +32,10 @@ describe('presenciais: textos do grupo (iguais ao banco)', () => {
       { quando: '2026-10-30T19:30:00Z', nome: 'Maria Souza', quem: 'Juliana' },
       { quando: '2026-10-30T17:00:00Z', nome: 'Hernani da Silva', quem: 'Isadora' },
     ])).toBe(
-      '📍 *HOJE TEM PRESENCIAL*\n14h · Hernani da Silva · marcado por Isadora\n16h30 · Maria Souza · marcado por Juliana\nNão se esqueçam!',
+      '*📍  Presenciais hoje*\n\nHoje temos 2 clientes marcados:\n\n*14h* · Hernani da Silva\n_Marcado por Isadora_\n\n*16h30* · Maria Souza\n_Marcado por Juliana_',
+    );
+    expect(textoLembrete([{ quando: '2026-11-16T19:30:00Z', nome: 'Tereza dos Santos leiria', quem: 'Giovana' }])).toBe(
+      '*📍  Presencial hoje*\n\nHoje tem cliente marcado:\n\n*16h30* · Tereza dos Santos Leiria\n_Marcado por Giovana_',
     );
     expect(textoLembrete([])).toBeNull();
   });
