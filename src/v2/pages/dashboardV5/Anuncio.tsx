@@ -15,7 +15,7 @@ import { Ajuda, Legenda, PontoStatus, Secao } from './comum';
 
 const AJUDA = {
   pelo: 'Clientes que mandaram a mensagem do anúncio para o número — os novos e os que já estavam no sistema —, contando cada dia, como o Gerenciador de Anúncios. É este o número para comparar com o Gerenciador.',
-  ja: 'Já tinham falado com a CAF antes e voltaram pela mensagem do anúncio. Eles estão somados nas entradas. Embaixo, por qual tráfego tinham entrado antes.',
+  ja: 'Já tinham falado com a ALFA antes e voltaram pela mensagem do anúncio. Eles estão somados nas entradas. Embaixo, por qual tráfego tinham entrado antes.',
   sem: 'Entradas que não vieram pela mensagem do anúncio: escreveram direto no número ou foram importadas à mão. O Gerenciador de Anúncios não conta essas.',
 };
 

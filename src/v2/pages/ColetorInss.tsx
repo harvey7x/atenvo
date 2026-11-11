@@ -101,7 +101,7 @@ export function ColetorInss() {
             </Passo>
             <Passo n={2} titulo="Baixe o Coletor"
               acao={botaoBaixar}
-              dica="Uso interno da CAF: não envie este arquivo para fora da empresa.">
+              dica="Uso interno da ALFA: não envie este arquivo para fora da empresa.">
               Arquivo <code>coletor-inss-windows.zip</code> (47 MB). Ele já vem com tudo o que precisa — não instale mais nada.
             </Passo>
             <Passo n={3} titulo="Extraia em C:\"
