@@ -8,7 +8,7 @@
    outro build — demo E o Atenvo de produção — usa o demo/localStorage,
    exatamente como antes da migração (nunca aponta pro banco errado).
    ===================================================================== */
-import { isRevizaMode, supabase } from '@/lib/supabase';
+import { isPrevia, isRevizaMode, supabase } from '@/lib/supabase';
 import { criarRepoDemo } from './cobrancaRepo.demo';
 import { criarRepoSupabase } from './cobrancaRepo.supabase';
 import type {
@@ -140,6 +140,6 @@ let _repo: CobrancaRepo | null = null;
 /** devolve o repositório certo p/ o modo atual (memoizado). */
 export function getCobrancaRepo(): CobrancaRepo {
   if (_repo) return _repo;
-  _repo = (isRevizaMode && supabase) ? criarRepoSupabase(supabase) : criarRepoDemo();
+  _repo = (isRevizaMode && supabase && !isPrevia) ? criarRepoSupabase(supabase) : criarRepoDemo();
   return _repo;
 }

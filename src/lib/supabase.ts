@@ -1,4 +1,21 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+/* ⚠ PENDENTE ANTES DE LEVAR ESTE VISUAL PRA REVIZA DE VERDADE (revisão de código, 09/11): os imports
+   estáticos de ./previa/* abaixo põem o modo prévia DENTRO do build de produção — dados fictícios,
+   bloqueio de rede, ~34 KB de JS e 4 mídias falsas (~215 KB) em dist/assets; e `String(void 0) === 'true'`
+   não é reduzido pelo minificador. Se VITE_PREVIA=true vazar pro ambiente do build, a produção usa o
+   cliente falso. Recomendação (testada): (1) este arquivo volta ao da base, sem import de ./previa, com
+   `isPrevia = import.meta.env.VITE_PREVIA === 'true'` (comparação direta, o bundler zera); (2) um
+   previa/supabaseJsPrevia.ts que chama bloquearRede() + montarSeloPrevia() e exporta
+   `createClient = () => criarSupabasePrevia()`; (3) no vite.config.previa.ts, alias de
+   '@supabase/supabase-js' para esse arquivo; (4) a mesma comparação direta em cobrancaAnalytics.ts;
+   opcional: define VITE_PREVIA = "false" no vite.config.ts de produção. */
+import { criarSupabasePrevia } from './previa/supabasePrevia';
+import { bloquearRede } from './previa/bloqueioRede';
+import { montarSeloPrevia } from './previa/selo';
+
+/** prévia de design (build de HTML único, dados fictícios, sem rede) */
+export const isPrevia = String(import.meta.env.VITE_PREVIA) === 'true';
+if (isPrevia) { bloquearRede(); montarSeloPrevia(); }
 
 /** Normaliza a URL do projeto Supabase: remove barras finais e um sufixo de endpoint
  *  colado por engano (ex.: ".../rest/v1", ".../auth/v1"). O supabase-js espera apenas a
@@ -38,7 +55,9 @@ export const supabaseEnv = { hasUrl: Boolean(url), hasKey: Boolean(anonKey) };
  * Cliente Supabase. É `null` quando não há env real configurado (modo demonstração).
  * Nenhuma credencial é embutida no código.
  */
-export const supabase: SupabaseClient | null = isSupabaseConfigured
+export const supabase: SupabaseClient | null = isPrevia
+  ? (criarSupabasePrevia() as unknown as SupabaseClient)
+  : isSupabaseConfigured
   ? createClient(url as string, anonKey as string, {
       auth: { persistSession: true, autoRefreshToken: true },
     })
