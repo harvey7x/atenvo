@@ -1,0 +1,93 @@
+/* ==================================================================
+   RECADO DO ADMINISTRADOR (dono 12/11) — prefixo único .rcd-, escopo .v2. A família do lembrete e do aviso
+   da Iris: vidro escuro nos dois temas, ~340 px, canto inferior direito; --rcd-base (px do rodapé)
+   vem do componente. z-index 39 (acima do aviso da Iris, 38). Filete âmbar; zero emoji.
+   ================================================================== */
+.v2 .rcd-caixa { position: fixed; right: 20px; bottom: var(--rcd-base, 20px); z-index: 39; width: min(340px, calc(100vw - 32px)); }
+.v2 .rcd-aviso {
+  --rcd-txt: #EDEDEF; --rcd-txt-2: rgba(237, 237, 239, .68); --rcd-txt-3: rgba(237, 237, 239, .58);
+  position: relative; z-index: 1; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px;
+  max-height: max(200px, calc(100vh - var(--rcd-base, 20px) - 140px));
+  padding: 13px 14px 14px 16px; border-radius: 18px; overflow: hidden; color: var(--rcd-txt); font-family: var(--fonte); text-align: left;
+  background: radial-gradient(120% 74% at 0% 0%, rgba(255, 255, 255, .07), rgba(255, 255, 255, 0) 62%), linear-gradient(180deg, rgba(23, 24, 28, .93), rgba(8, 9, 11, .97));
+  border: 1px solid rgba(255, 255, 255, .1); border-left: 3px solid var(--ambar);
+  -webkit-backdrop-filter: blur(22px) saturate(1.2); backdrop-filter: blur(22px) saturate(1.2);
+  box-shadow: 0 28px 64px -24px rgba(0, 0, 0, .7), 0 10px 24px rgba(0, 0, 0, .28), inset 0 1px 0 rgba(255, 255, 255, .07);
+  animation: rcd-entra .32s var(--ease) both;
+}
+html:root[data-tema="light"] .v2 .rcd-aviso { border-color: rgba(8, 9, 11, .6); border-left-color: var(--ambar); box-shadow: 0 28px 60px -26px rgba(15, 20, 35, .5), 0 10px 22px rgba(15, 20, 35, .16); }
+@keyframes rcd-entra { from { opacity: 0; transform: translateY(10px); } }
+@media (prefers-reduced-motion: reduce) { .v2 .rcd-aviso { animation: none; } }
+html:root[data-perf="lite"] .v2 .rcd-aviso { -webkit-backdrop-filter: none; backdrop-filter: none; background: #141518; animation: none; }
+.v2 .rcd-camada {
+  position: absolute; z-index: 0; top: -7px; left: 12px; right: 12px; height: 50px; pointer-events: none;
+  border-radius: 16px; border: 1px solid rgba(255, 255, 255, .13); background: linear-gradient(180deg, rgba(42, 43, 49, .95), rgba(18, 19, 22, .96));
+}
+.v2 .rcd-topo { display: flex; align-items: center; gap: 8px; }
+.v2 .rcd-marca { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--rcd-txt-2); }
+.v2 .rcd-marca svg { color: var(--ambar); }
+.v2 .rcd-conta { margin-left: auto; font-size: 11px; color: var(--rcd-txt-3); font-variant-numeric: tabular-nums; }
+.v2 .rcd-hora { margin-left: auto; font-size: 11px; color: var(--rcd-txt-3); }
+.v2 .rcd-conta + .rcd-hora { margin-left: 8px; }
+.v2 .rcd-miolo { min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 9px; }
+.v2 .rcd-cliente { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -.01em; }
+.v2 .rcd-msg { margin: 0; padding: 8px 11px; border-radius: 10px; background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .08); font-size: 13px; line-height: 1.45; color: var(--rcd-txt); overflow-wrap: anywhere; white-space: pre-line; }
+.v2 .rcd-feito { margin: 0; font-size: 13px; color: var(--rcd-txt-2); }
+.v2 .rcd-orig { margin: 0; font-size: 12px; color: var(--rcd-txt-3); overflow-wrap: anywhere; }
+.v2 .rcd-acoes { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.v2 .rcd-bt { height: 32px; padding: 0 12px; border-radius: 9px; border: 1px solid rgba(255, 255, 255, .14); background: rgba(255, 255, 255, .06); color: var(--rcd-txt); font: inherit; font-size: 12.5px; font-weight: 500; cursor: pointer; white-space: nowrap; }
+.v2 .rcd-bt:hover:not(:disabled) { background: rgba(255, 255, 255, .12); }
+.v2 .rcd-bt:disabled { opacity: .45; cursor: default; }
+.v2 .rcd-bt.rcd-forte { border-color: transparent; background: #EDEDEF; color: #0B0C0E; font-weight: 600; }
+.v2 .rcd-bt.rcd-forte:hover:not(:disabled) { background: #FFFFFF; }
+.v2 .rcd-bt.rcd-fraco { margin-left: auto; border-color: transparent; background: none; color: var(--rcd-txt-2); }
+.v2 .rcd-bt.rcd-fraco:hover { color: var(--rcd-txt); background: rgba(255, 255, 255, .06); }
+.v2 .rcd-bt:focus-visible, .v2 .rcd-op:focus-visible, .v2 .rcd-campo:focus-visible { outline: 2px solid rgba(255, 255, 255, .6); outline-offset: 2px; }
+.v2 .rcd-resp { display: flex; align-items: flex-start; gap: 6px; padding-top: 9px; border-top: 1px solid rgba(255, 255, 255, .08); }
+.v2 .rcd-campo {
+  flex: 1 1 auto; min-width: 0; resize: none; padding: 7px 9px; border-radius: 9px; border: 1px solid rgba(255, 255, 255, .14);
+  background: rgba(255, 255, 255, .05); color: var(--rcd-txt); font: inherit; font-size: 12.5px; line-height: 1.4;
+}
+.v2 .rcd-campo::placeholder { color: var(--rcd-txt-3); }
+.v2 .rcd-campo[readonly] { opacity: .7; }
+.v2 .rcd-campo-caixa { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.v2 .rcd-campo-caixa .rcd-campo { flex: none; width: 100%; box-sizing: border-box; }
+.v2 .rcd-dica { font-size: 11px; color: var(--rcd-txt-3); }
+.v2 .rcd-enviar { flex: none; }
+.v2 .rcd-repassar { display: flex; flex-direction: column; gap: 8px; }
+.v2 .rcd-rot { margin: 0; font-size: 11px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--rcd-txt-3); }
+.v2 .rcd-opcoes { display: flex; flex-wrap: wrap; gap: 5px; }
+.v2 .rcd-op { height: 28px; padding: 0 10px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, .14); background: rgba(255, 255, 255, .05); color: var(--rcd-txt); font: inherit; font-size: 12px; cursor: pointer; }
+.v2 .rcd-op:hover { background: rgba(255, 255, 255, .1); }
+.v2 .rcd-op[data-on] { background: #EDEDEF; color: #0B0C0E; border-color: transparent; font-weight: 600; }
+.v2 .rcd-op-gestor { flex-basis: 100%; }
+.v2 .rcd-erro { margin: 0; font-size: 12px; color: #F2B8B0; }
+
+/* ---------------------------------------------------------------- o recado do administrador NO MEIO DA TELA
+   (dono 12/11: "quero que apareça no meio da tela"). Véu que só escurece (a mesma regra da ficha do
+   cliente: sem desfoque no véu, senão o vidro do cartão some), cartão maior, foco dentro dele. */
+.v2 .rcd-veu {
+  position: fixed; inset: 0; z-index: 95; display: grid; grid-template-columns: minmax(0, 1fr); place-items: center; padding: 24px;
+  box-sizing: border-box; overflow-y: auto;
+  background: rgba(10, 12, 16, .46); animation: rcd-veu .2s var(--ease) both;
+}
+html:root[data-tema="light"] .v2 .rcd-veu { background: rgba(22, 28, 40, .30); }
+@keyframes rcd-veu { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .v2 .rcd-veu { animation: none; } }
+.v2 .rcd-veu .rcd-caixa-centro { position: relative; width: min(500px, 100%); }
+.v2 .rcd-veu .rcd-aviso { max-height: calc(100dvh - 48px); padding: 18px 20px 20px 22px; gap: 12px; border-radius: 20px; }
+.v2 .rcd-veu .rcd-marca { font-size: 12px; }
+.v2 .rcd-veu .rcd-cliente { font-size: 19px; }
+.v2 .rcd-veu .rcd-msg { font-size: 15px; padding: 11px 14px; }
+.v2 .rcd-veu .rcd-bt { height: 36px; padding: 0 14px; font-size: 13px; }
+.v2 .rcd-veu .rcd-campo { font-size: 13px; }
+.v2 .rcd-aviso:focus { outline: none; }
+
+/* ---------------------------------------------------------------- o retorno de cada ação (repassou, devolveu, volta em 10 min…) */
+.v2 .rcd-toast {
+  position: fixed; top: 64px; right: 20px; z-index: 120; max-width: min(420px, calc(100vw - 32px)); box-sizing: border-box;
+  padding: 11px 14px; border-radius: 12px; font-family: var(--fonte); font-size: 13px; line-height: 1.45; color: #EDEDEF;
+  background: linear-gradient(180deg, rgba(23, 24, 28, .95), rgba(8, 9, 11, .97)); border: 1px solid rgba(255, 255, 255, .12);
+  border-left: 3px solid var(--ambar); box-shadow: 0 16px 36px rgba(0, 0, 0, .45); animation: rcd-entra .2s var(--ease) both;
+}
+@media (prefers-reduced-motion: reduce) { .v2 .rcd-toast { animation: none; } }

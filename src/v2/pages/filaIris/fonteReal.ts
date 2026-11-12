@@ -9,6 +9,7 @@ import { useOrg } from '@/context/OrgContext';
 import { EQUIPE, equipeDoUid } from './dados';
 import { leadDeLinha, type Lead, type LinhaFila } from './lead';
 import { fimPeriodo, inicioPeriodo, type FonteFila, type NumeroAtendente, type Periodo } from './fonte';
+import { EVENTO_FILA_RECARREGAR } from './recados';
 
 /* ---------------------------------------------------------------- real (banco) */
 type LinhaNumero = { usuario_id: string; nome: string; recebidos: number; fechados: number };
@@ -65,8 +66,12 @@ export function useFonteReal(): FonteFila {
     void carregarNumeros();
     /* a fila muda sozinha (24 h, documentos, fechados): relê a cada 2 minutos */
     const t = window.setInterval(() => { void carregar(); }, 120_000);
+    /* um repasse pelo recado do administrador trocou o dono de um cliente: relê na hora */
+    const releia = () => { void carregar(); };
+    window.addEventListener(EVENTO_FILA_RECARREGAR, releia);
     return () => {
       window.clearInterval(t);
+      window.removeEventListener(EVENTO_FILA_RECARREGAR, releia);
       if (retentar.current != null) { window.clearTimeout(retentar.current); retentar.current = null; }
     };
   }, [carregar, carregarNumeros]);

@@ -22,6 +22,7 @@ import {
   IcBaixo, IcBusca, IcChave, IcCheck, IcConversa, IcCopiar, IcDoc, IcInfo, IcIris, IcMais, IcMarca, IcRelogio, IcSair, IcSeta, IcTelefone, IcVoltar, IcX,
 } from './icones';
 import { TEXTO_AVISO } from './avisosTexto';
+import { ATALHOS_RECADO, EVENTO_FILA_RECARREGAR, estadoDoRecado, fraseDoEstado, quandoFoi, type FonteRecados, type Recado } from './recados';
 import './filaIris.css';
 
 type Visao = 'minha' | 'equipe' | 'de';
@@ -437,10 +438,104 @@ function MarcarCliente({ marcas, aoMarcar, aoTirar }: {
   );
 }
 
+/** o recado do gestor para o dono do cliente, na ficha: o último recado deste cliente (e o que o atendente fez)
+    + o campo para escrever, com os atalhos */
+function RecadoNaFicha({ fonte, cliente, para, paraNome, avisar }: {
+  fonte: FonteRecados; cliente: Lead; para: string; paraNome: string; avisar: (t: string) => void;
+}) {
+  const [texto, setTexto] = useState('');
+  const [enviando, setEnviando] = useState(false);
+  const ultimo = fonte.enviados.find((r) => r.contatoId === cliente.id);
+  const nome = paraNome.split(/\s+/)[0];
+  const mandar = async () => {
+    const t = texto.trim();
+    if (!t || enviando) return;
+    setEnviando(true);
+    try {
+      const { paraNome: quem } = await fonte.enviar({ contatoId: cliente.id, conversaId: cliente.conversaId, cliente: cliente.nome, para, paraNome }, t);
+      const n = quem.split(/\s+/)[0] || nome;
+      setTexto('');
+      avisar(`Recado enviado para ${n}. Quando ${/a$/i.test(n) ? 'ela' : 'ele'} responder, aparece para você.`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Não deu para mandar o recado agora.';
+      /* o cliente mudou de dono desde que a fila foi lida: relê, e a ficha passa a mostrar o dono de agora */
+      if (/mudou de atendente/i.test(msg)) window.dispatchEvent(new Event(EVENTO_FILA_RECARREGAR));
+      avisar(msg);
+    } finally { setEnviando(false); }
+  };
+  return (
+    <section className="fi-bloco fi-recado">
+      <h3 className="fi-bloco-t">Recado para {nome}<span className="fi-bloco-n">aparece na tela {/a$/i.test(nome) ? 'dela' : 'dele'}, em qualquer página</span></h3>
+      {ultimo && (
+        <div className="fi-recado-ult" data-estado={estadoDoRecado(ultimo)}>
+          <span className="fi-recado-est">{fraseDoEstado(ultimo)}</span>
+          <span className="fi-recado-txt">{ultimo.de === fonte.eu ? 'Seu recado' : `Recado ${/a$/i.test(ultimo.deNome.split(/\s+/)[0]) ? 'da' : 'do'} ${ultimo.deNome.split(/\s+/)[0]}`}: “{ultimo.mensagem}”</span>
+          {ultimo.resposta && <span className="fi-recado-resp">“{ultimo.resposta}”</span>}
+        </div>
+      )}
+      <div className="fi-recado-atalhos">
+        {ATALHOS_RECADO.map((a) => (
+          <button key={a} type="button" className="fi-fm" onClick={() => setTexto((t) => (t.trim() ? `${t.trim()} ${a}` : a))}>{a.replace(/\.$/, '')}</button>
+        ))}
+      </div>
+      <div className="fi-recado-campo">
+        <textarea className="fi-falta-in fi-recado-in" rows={2} maxLength={400} value={texto} disabled={enviando}
+          placeholder={`Escreva o recado para ${nome}…`} aria-label={`Recado para ${nome}`}
+          onChange={(e) => setTexto(e.target.value)}
+          onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void mandar(); } }} />
+        <BotaoPrimario mini onClick={() => void mandar()} disabled={!texto.trim() || enviando}>Mandar recado</BotaoPrimario>
+      </div>
+    </section>
+  );
+}
+
+/** a lista de recados do gestor (na visão Equipe): o que mandei e o que cada um fez */
+function ListaRecados({ fonte, aoConversa }: { fonte: FonteRecados; aoConversa: (r: Recado) => void }) {
+  const [so, setSo] = useState<'todos' | 'aguardando'>('todos');
+  const lista = so === 'aguardando' ? fonte.enviados.filter((r) => estadoDoRecado(r) === 'aguardando') : fonte.enviados;
+  const aguardando = fonte.enviados.filter((r) => estadoDoRecado(r) === 'aguardando').length;
+  const recentes = fonte.enviados.filter((r) => r.criadoEm >= Date.now() - 7 * 86_400_000).length;
+  return (
+    <section className="fi-lista vidro fi-recados" aria-label="Recados para a equipe">
+      <header className="fi-lista-cab">
+        <h2>Recados para a equipe</h2>
+        <span className="fi-lista-n">{recentes ? `${plural(recentes, 'recado', 'recados')} nos últimos 7 dias` : 'nenhum recado nos últimos 7 dias'}</span>
+        <div className="fi-cab-ferr">
+          <Segmentado rotulo="Mostrar" valor={so} aoMudar={(v) => setSo(v as 'todos' | 'aguardando')}
+            opcoes={[{ valor: 'todos', rotulo: 'Todos' }, { valor: 'aguardando', rotulo: `Aguardando${aguardando ? ` (${aguardando})` : ''}` }]} />
+        </div>
+      </header>
+      {lista.length ? (
+        <ul className="fi-recados-lista">
+          {lista.map((r) => (
+            <li key={r.id} className="fi-recados-lin" data-estado={estadoDoRecado(r)}>
+              <span className="fi-recados-quem"><b>{r.cliente}</b><small>{r.de !== fonte.eu ? `de ${r.deNome.split(/\s+/)[0]} ` : ''}para {r.paraNome.split(/\s+/)[0]} · {quandoFoi(r.criadoEm)}</small></span>
+              <span className="fi-recados-msg" title={r.mensagem}>“{r.mensagem}”</span>
+              <span className="fi-recados-est">
+                <span className="fi-l1">{fraseDoEstado(r)}</span>
+                {r.resposta && <span className="fi-l2 fi-elip" title={r.resposta}>“{r.resposta}”</span>}
+              </span>
+              <button type="button" className="fi-bt-conv" onClick={() => aoConversa(r)} aria-label={`Abrir a conversa de ${r.cliente}`} title="Abrir a conversa no WhatsApp"><IcConversa t={15} /></button>
+            </li>
+          ))}
+        </ul>
+      ) : fonte.erro && !fonte.enviados.length ? (
+        <div className="fi-sec-vazio" role="alert"><b>Não deu para carregar os recados agora</b>
+          <span>{fonte.erro}</span></div>
+      ) : (
+        <div className="fi-sec-vazio"><b>{so === 'aguardando' ? 'Ninguém está devendo resposta' : 'Nenhum recado nos últimos 7 dias'}</b>
+          <span>{so === 'aguardando' ? 'Todos os recados já tiveram resposta.' : 'Para mandar um recado, abra a ficha de um cliente da equipe e escreva em “Recado para…”.'}</span></div>
+      )}
+    </section>
+  );
+}
+
 /** a ficha do cliente — janela de vidro no meio da tela (exportada para a amostra em cards) */
-export function JanelaCliente({ l, raiz, lista, aoTrocar, aoFechar, avisar, ehDono, aoMarcar, aoTirar, aoCorrigirDocs, aoTirarDaFila, abrirConversa }: {
+export function JanelaCliente({ l, raiz, lista, aoTrocar, aoFechar, avisar, ehDono, aoMarcar, aoTirar, aoCorrigirDocs, aoTirarDaFila, abrirConversa, recado }: {
   l: Lead; raiz: HTMLElement; lista: Lead[]; aoTrocar: (id: string) => void; aoFechar: () => void;
   avisar: (t: string) => void; ehDono: boolean;
+  /** o gestor olhando o cliente de outro atendente: o recado para o dono */
+  recado?: { fonte: FonteRecados; para: string; paraNome: string };
   aoMarcar: (tipo: TipoMarca, texto?: string) => void; aoTirar: (id: string) => void;
   aoCorrigirDocs: (estado: 'completos' | 'incompletos' | null) => void; aoTirarDaFila: () => void;
   abrirConversa?: (l: Lead) => void;
@@ -472,7 +567,7 @@ export function JanelaCliente({ l, raiz, lista, aoTrocar, aoFechar, avisar, ehDo
   }, [l.id]);
   const prenderTab = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key !== 'Tab') return;
-    const focos = [...e.currentTarget.querySelectorAll<HTMLElement>('button:not([disabled]), input')];
+    const focos = [...e.currentTarget.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), textarea:not([disabled])')];
     if (!focos.length) return;
     const i = focos.indexOf(document.activeElement as HTMLElement);
     if (e.shiftKey && i <= 0) { e.preventDefault(); focos[focos.length - 1].focus(); }
@@ -577,6 +672,7 @@ export function JanelaCliente({ l, raiz, lista, aoTrocar, aoFechar, avisar, ehDo
           </div>
 
           <div className="fi-modal-col">
+            {recado && <RecadoNaFicha fonte={recado.fonte} cliente={l} para={recado.para} paraNome={recado.paraNome} avisar={avisar} />}
             <MarcarCliente marcas={marcas} aoMarcar={aoMarcar} aoTirar={aoTirar} />
 
             <section className="fi-bloco">
@@ -706,8 +802,12 @@ function VerComo({ valor, aoMudar, leads }: { valor: string; aoMudar: (id: strin
 
 /* ---------------------------------------------------------------- a tela */
 
-export default function FilaIrisTela({ fonte, usuarioId, admin: adminReal, abrirConversa, abrirInicial, aoConsumirInicial }: {
+export default function FilaIrisTela({ fonte, usuarioId, admin: adminReal, abrirConversa, abrirInicial, aoConsumirInicial, recados, aoVerComo }: {
   fonte: FonteFila;
+  /** os recados do gestor (a mesma cara na prévia e no real) */
+  recados?: FonteRecados;
+  /** prévia: quem está no "Ver como" (os cartões do canto acompanham) */
+  aoVerComo?: (id: string) => void;
   /** o cliente (contato) que abre sozinho — o "Ver na fila" do aviso da Iris */
   abrirInicial?: string | null;
   /** o pedido foi atendido (abriu, ou o cliente não está mais na fila): a rota tira o ?cliente= */
@@ -829,7 +929,7 @@ export default function FilaIrisTela({ fonte, usuarioId, admin: adminReal, abrir
   }, [pedido, daFila, navegacao, fonte.carregando]);
 
   const limparFiltros = () => { setFiltro('todas'); setFiltroMarca('todas'); setBusca(''); setRecolhidas([]); };
-  const trocarVerComo = (id: string) => { setVerComo(id); setVisao('minha'); limparFiltros(); };
+  const trocarVerComo = (id: string) => { setVerComo(id); setVisao('minha'); limparFiltros(); aoVerComo?.(id); };
   const abrirFilaDe = (id: string, esperando = false) => {
     if (id === verComo && !semFilaPropria) setVisao('minha'); else { setAlvo(id); setVisao('de'); }
     limparFiltros();
@@ -974,6 +1074,14 @@ export default function FilaIrisTela({ fonte, usuarioId, admin: adminReal, abrir
                 numero={fonte.numeros(periodo)?.find((x) => x.atendente === a.id) ?? null} />
             ))}
           </div>
+          {recados && admin && (
+            <ListaRecados fonte={recados} aoConversa={(r) => {
+              const l = leads.find((x) => x.id === r.contatoId);
+              if (l) conversa(l);
+              else if (abrirConversa) abrirConversa({ conversaId: r.conversaId, nome: r.cliente } as Lead);
+              else avisar(`Prévia: aqui abre a conversa de ${r.cliente} no WhatsApp.`);
+            }} />
+          )}
           <section className="fi-lista vidro fi-lista-eq">
             <header className="fi-lista-cab">
               <h2>Clientes quentes da equipe</h2>
@@ -1059,6 +1167,11 @@ export default function FilaIrisTela({ fonte, usuarioId, admin: adminReal, abrir
         <JanelaCliente l={clienteAberto} raiz={raiz} lista={navegacao} aoTrocar={setAberto}
           aoFechar={fecharJanela} avisar={avisar} ehDono={meuId != null && meuId === clienteAberto.atendente}
           abrirConversa={conversa}
+          recado={recados && admin && !(meuId != null && meuId === clienteAberto.atendente)
+            /* só para um dono da equipe da fila (cliente sem dono ou fora dela: não há para quem mandar) */
+            && EQUIPE.some((a) => a.id === clienteAberto.atendente)
+            ? { fonte: recados, para: real ? atendente(clienteAberto.atendente).uid : clienteAberto.atendente, paraNome: atendente(clienteAberto.atendente).nome }
+            : undefined}
           aoMarcar={(tipo, texto) => fonte.marcar(clienteAberto.id, tipo, texto)}
           aoTirar={(mid) => fonte.tirarMarca(clienteAberto.id, mid)}
           aoCorrigirDocs={(estado) => {

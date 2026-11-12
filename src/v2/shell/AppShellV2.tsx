@@ -27,6 +27,7 @@ import { AvisoAtualizacao } from '../components/AvisoAtualizacao';
 import { AssistenteBalao, vozLiberadaPara } from '../components/AssistenteBalao';
 import { LembreteAviso } from '../components/LembreteAviso';
 import { AvisoIris } from '../components/AvisoIris';
+import { AvisoRecado } from '../components/AvisoRecado';
 import { ComparadorVisual } from '../components/ComparadorVisual';
 import { DEMO_MODE } from '@/lib/demo';
 import { assinarAcento, lerAcento, salvarAcento, type Acento } from '../lib/acento';
@@ -701,6 +702,8 @@ export default function AppShellV2() {
         <AssistenteBalao oculto={bomDia !== null} />
         {/* Lembretes por voz (dono 30/10): o aviso na hora, acima do balão; liberado junto com a voz */}
         <LembreteAviso oculto={bomDia !== null} ativo={vozLiberadaPara(user?.id)} />
+        {/* Recado do administrador (dono 12/11): o pedido para o atendente (no meio da tela) e a resposta dele, em qualquer página */}
+        <AvisoRecado oculto={bomDia !== null} acesso={acessoFila} />
         {/* Aviso da Iris (dono 12/11): "a Iris passou para você" em qualquer página; acima do lembrete */}
         <AvisoIris oculto={bomDia !== null} acesso={acessoFila} />
         {/* prévia da repaginada (27/10): comparador Antes/Depois, só no demo LOCAL

@@ -3,9 +3,10 @@
    - local: demonstração (clientes fictícios) e prévia (foto dos dados de hoje); marcações na página;
    - real: o banco (fonteReal.ts). Este arquivo não fala com o banco (a prévia em HTML usa só ele).
    ============================================================================ */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Marca, TipoMarca } from './dados';
 import { textosDoLead, type Lead } from './lead';
+import { EVENTO_DONO_LOCAL, registrarFilaLocal } from './recados';
 
 export type Periodo = 'hoje' | '7d' | 'mes' | 'mes_ant';
 export interface NumeroAtendente { atendente: string; recebidos: number; fechados: number }
@@ -73,6 +74,18 @@ export function useFonteLocal(inicial: Lead[], modo: 'demo' | 'previa', rotulo: 
     const n = f(l);
     return n ? [n] : [];
   }));
+  /* o recado do administrador da demonstração: consulta o dono/prioridade e troca o dono no repasse (como o banco) */
+  const atual = useRef(leads);
+  atual.current = leads;
+  useEffect(() => {
+    registrarFilaLocal((id) => { const l = atual.current.find((x) => x.id === id); return l ? { dono: l.atendente, cat: l.cat } : null; });
+    const trocar = (e: Event) => {
+      const d = (e as CustomEvent<{ contatoId: string; para: string }>).detail;
+      if (d) setLeads((t) => t.map((l) => (l.id === d.contatoId ? { ...l, atendente: d.para } : l)));
+    };
+    window.addEventListener(EVENTO_DONO_LOCAL, trocar);
+    return () => { window.removeEventListener(EVENTO_DONO_LOCAL, trocar); registrarFilaLocal(null); };
+  }, []);
   return useMemo<FonteFila>(() => ({
     modo, rotulo, carregando: false, erro: null, leads,
     marcar: (id, tipo, texto) => mexer(id, (l) => {

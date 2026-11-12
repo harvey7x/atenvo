@@ -30,8 +30,9 @@ export const SELETOR_JANELA = '.fi-veu, .p-modal';
 const PAUSA_VER_FILA_MS = 2500;
 const useLayoutIso = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
-/** a distância ao rodapé: a do lembrete (compositor do WhatsApp + balão) e, com o lembrete na tela, acima dele */
-function useBase(ativo: boolean): number {
+/** a distância ao rodapé: a do lembrete (compositor do WhatsApp + balão) e, com outro cartão do canto na tela
+    (`abaixo`: o lembrete, o recado do gestor), logo acima dele */
+export function useBaseNoCanto(ativo: boolean, abaixo: string): number {
   const { pathname } = useLocation();
   const [base, setBase] = useState(20);
   useLayoutIso(() => {
@@ -53,36 +54,39 @@ function useBase(ativo: boolean): number {
       let v = baseDoAviso({ altura: window.innerHeight, largura: window.innerWidth },
         comp ? { top: comp.top, height: comp.height, left: comp.left, right: comp.right } : null,
         br && br.width > 0 ? { largura: br.width, altura: br.height } : null);
-      const lmb = document.querySelector('.lmb-caixa')?.getBoundingClientRect();
-      if (lmb && lmb.height > 0) v = Math.max(v, Math.round(window.innerHeight - lmb.top + FOLGA));
+      for (const el of document.querySelectorAll(abaixo)) {
+        const r = el.getBoundingClientRect();
+        if (r.height > 0) v = Math.max(v, Math.round(window.innerHeight - r.top + FOLGA));
+      }
       setBase((x) => (x === v ? x : v));
     }
     medir();
     const iv = window.setInterval(medir, 700);
     window.addEventListener('resize', medir);
     return () => { window.clearInterval(iv); window.removeEventListener('resize', medir); ro?.disconnect(); };
-  }, [ativo, pathname]);
+  }, [ativo, pathname, abaixo]);
   return base;
 }
 
 /** o que há na tela que manda o aviso esperar (bom dia, cartão de voz, tela cheia do Radar, janela aberta) */
-function useOcupado(ativo: boolean): boolean {
+export function useOcupadoNoCanto(ativo: boolean, alemDisso = ''): boolean {
   const [oc, setOc] = useState(false);
   useEffect(() => {
     if (!ativo) { setOc(false); return; }
-    const conferir = () => { const v = !!document.querySelector(`${SELETOR_OCUPADO}, ${SELETOR_JANELA}`); setOc((x) => (x === v ? x : v)); };
+    const sel = `${SELETOR_OCUPADO}, ${SELETOR_JANELA}${alemDisso ? `, ${alemDisso}` : ''}`;
+    const conferir = () => { const v = !!document.querySelector(sel); setOc((x) => (x === v ? x : v)); };
     conferir();
     const iv = window.setInterval(conferir, 800);
     /* um clique pode abrir uma janela: confere logo depois (sem esperar o intervalo), como o lembrete */
     const aoClicar = () => { window.requestAnimationFrame(conferir); };
     document.addEventListener('click', aoClicar, true);
     return () => { window.clearInterval(iv); document.removeEventListener('click', aoClicar, true); };
-  }, [ativo]);
+  }, [ativo, alemDisso]);
   return oc;
 }
 
 /** o relógio do "há X" (o cartão parado numa página também envelhece) */
-function useAgora(ativo: boolean): number {
+export function useAgoraNoCanto(ativo: boolean): number {
   const [agora, setAgora] = useState(() => Date.now());
   useEffect(() => {
     if (!ativo) return;
@@ -121,7 +125,8 @@ export function AvisoIris({ oculto = false, acesso }: { oculto?: boolean; acesso
   const ativo = acesso === true;
   const { avisos, marcarVistos } = useAvisosIris(ativo);
   const navigate = useNavigate();
-  const ocupado = useOcupado(ativo && avisos.length > 0);
+  /* também espera o recado do administrador no meio da tela */
+  const ocupado = useOcupadoNoCanto(ativo && avisos.length > 0, '.rcd-veu');
   const [pausaAte, setPausaAte] = useState(0);
   useEffect(() => {
     if (!pausaAte) return;
@@ -141,8 +146,9 @@ export function AvisoIris({ oculto = false, acesso }: { oculto?: boolean; acesso
   const soltar = useCallback(() => { segurando.current = false; setExibidos(avisos); }, [avisos]);
 
   const visivel = ativo && exibidos.length > 0 && !oculto && !ocupado && !pausaAte;
-  const base = useBase(visivel);
-  const agora = useAgora(visivel);
+  /* acima do lembrete e do recado do gestor (o recado é mais importante: fica mais perto do canto) */
+  const base = useBaseNoCanto(visivel, '.lmb-caixa, .rcd-caixa');
+  const agora = useAgoraNoCanto(visivel);
   useNotificacaoDoNavegador(avisos, ativo);
 
   /* o leitor de tela: a região viva fica SEMPRE montada e o texto muda quando muda o que está na frente */

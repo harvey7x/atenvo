@@ -4,7 +4,7 @@
    - Sistema: a fila de verdade (public.fila_iris_itens), só para quem está liberado em
      fila_iris_config (11/11: os 5 atendentes + Murilo). Sem liberação, a rota cai no WhatsApp.
    ============================================================================ */
-import { Suspense, useCallback, useMemo } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { lazyComRecarga } from '@/lib/recargaChunk';
 import { DEMO_MODE } from '@/lib/demo';
@@ -14,6 +14,9 @@ import { useAcessoFila } from '../hooks/useAcessoFila';
 import { useFonteLocal } from './filaIris/fonte';
 import { useFonteReal } from './filaIris/fonteReal';
 import { leadsFicticios, type Lead } from './filaIris/lead';
+import { EQUIPE } from './filaIris/dados';
+import { definirEuLocal, useRecadosLocais } from './filaIris/recados';
+import { useRecadosReais } from './filaIris/recadosReal';
 
 const FilaIrisTela = lazyComRecarga(() => import('./filaIris/FilaIrisTela'));
 
@@ -30,7 +33,17 @@ function FilaDemo() {
   const iniciais = useMemo(() => leadsFicticios(), []);
   const fonte = useFonteLocal(iniciais, 'demo', 'Demonstração · clientes fictícios');
   const [cliente, consumir] = usePedidoCliente();
-  return <Suspense fallback={null}><FilaIrisTela fonte={fonte} abrirInicial={cliente} aoConsumirInicial={consumir} /></Suspense>;
+  /* demonstração: os recados ficam na página (o "Ver como" troca quem está olhando) */
+  const [eu, setEu] = useState('matheus');
+  const equipe = useMemo(() => EQUIPE.map((a) => ({ id: a.id, nome: a.nome })), []);
+  const recados = useRecadosLocais(eu, equipe);
+  /* o recado no meio da tela (no shell) acompanha o "Ver como" */
+  useEffect(() => { definirEuLocal(eu); }, [eu]);
+  return (
+    <Suspense fallback={null}>
+      <FilaIrisTela fonte={fonte} abrirInicial={cliente} aoConsumirInicial={consumir} recados={recados} aoVerComo={setEu} />
+    </Suspense>
+  );
 }
 
 function FilaReal() {
@@ -41,10 +54,13 @@ function FilaReal() {
   /* o aviso da Iris ("Ver na fila") chega com ?cliente=<contato>: a janela daquele cliente abre sozinha */
   const [cliente, consumir] = usePedidoCliente();
   const abrir = (l: Lead) => navigate(l.conversaId ? `/whatsapp?conversa=${encodeURIComponent(l.conversaId)}` : '/whatsapp');
+  /* os recados do gestor: a mesma consulta do cartão do canto (o cache é um só) */
+  const colegas = useMemo(() => EQUIPE.map((a) => ({ id: a.uid, nome: a.nome })), []);
+  const recados = useRecadosReais(true, colegas);
   return (
     <Suspense fallback={null}>
       <FilaIrisTela fonte={fonte} usuarioId={user?.id} admin={currentOrg?.role === 'admin'} abrirConversa={abrir}
-        abrirInicial={cliente} aoConsumirInicial={consumir} />
+        abrirInicial={cliente} aoConsumirInicial={consumir} recados={recados} />
     </Suspense>
   );
 }
