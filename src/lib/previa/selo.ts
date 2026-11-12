@@ -106,7 +106,8 @@ export function montarSeloPrevia(): void {
     // botões do topo; se o vão for pequeno, a versão curta
     const cabe = (x: number, w: number, de: number, ate: number) => x - w / 2 >= de + 12 && x + w / 2 <= ate - 12;
     const posicionar = () => {
-      const busca = document.querySelector('.p-topbar .busca');
+      // o limite da esquerda: a busca (topo antigo) ou a trilha "ambiente / página" (topo da ALFA, 12/11)
+      const busca = document.querySelector('.p-topbar .busca') ?? document.querySelector('.p-topbar .ba-trilha');
       const dir = document.querySelector('.p-topbar .top-dir');
       el.classList.remove('sp-curto');
       if (!busca || !dir || window.innerWidth <= 640) { el.style.left = '50%'; return; }
