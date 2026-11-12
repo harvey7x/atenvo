@@ -7,7 +7,7 @@
    do topo e, se nem assim couber, encolhe (só "Prévia · Ver como"). */
 import { ambientesDoPerfil, ROTULO_AMBIENTE } from '@/v2/data/modulos';
 
-const ESCONDE = '.gp-raiz.gp-cheia, .veu, .veu-drawer, .pal-veu, .fz-zoom';
+const ESCONDE = '.gp-raiz.gp-cheia, .veu, .veu-drawer, .pal-veu, .fz-zoom, .ba-veu';
 type PerfilPrevia = { id: string; nome: string; papel: string; ativo: boolean; modulos?: unknown };
 type ApiPrevia = { perfis: () => PerfilPrevia[]; eu: () => string; verComo: (id: string) => void; restaurar: () => void };
 const ROT_PAPEL: Record<string, string> = { admin: 'Administrador', gestor: 'Gestor', comercial: 'Comercial', financeiro: 'Financeiro', cadastro: 'Cadastro', atendente: 'Atendente' };
