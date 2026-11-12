@@ -3,7 +3,7 @@
    supabase/migrations/20261111200000_fila_iris.sql). Só as marcações são gravadas; a Iris, o robô,
    as conversas e os cards não mudam.
    ============================================================================ */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useOrg } from '@/context/OrgContext';
 import { EQUIPE, equipeDoUid } from './dados';
@@ -20,11 +20,24 @@ export function useFonteReal(): FonteFila {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [nums, setNums] = useState<Partial<Record<Periodo, NumeroAtendente[]>>>({});
+  /* queda de rede não pode parar a fila num aviso: tenta de novo sozinho (5 s, 10 s… até 4 vezes; o relógio de 2 min continua) */
+  const tentativa = useRef(0);
+  const retentar = useRef<number | null>(null);
 
   const carregar = useCallback(async () => {
     if (!supabase || !org) return;
     const { data, error } = await supabase.rpc('fila_iris_itens', { p_org: org, p_dono: null });
-    if (error) { setErro(error.message); setCarregando(false); return; }
+    if (error) {
+      tentativa.current += 1;
+      const rede = /failed to fetch|networkerror|load failed|network request failed/i.test(error.message);
+      setErro(rede ? 'sem conexão com o servidor agora — tentando de novo sozinho' : error.message);
+      setCarregando(false);
+      if (tentativa.current <= 4 && retentar.current == null) {
+        retentar.current = window.setTimeout(() => { retentar.current = null; void carregar(); }, Math.min(5000 * tentativa.current, 20000));
+      }
+      return;
+    }
+    tentativa.current = 0;
     setErro(null);
     setLeads(((data ?? []) as LinhaFila[]).map(leadDeLinha));
     setCarregando(false);
@@ -52,7 +65,10 @@ export function useFonteReal(): FonteFila {
     void carregarNumeros();
     /* a fila muda sozinha (24 h, documentos, fechados): relê a cada 2 minutos */
     const t = window.setInterval(() => { void carregar(); }, 120_000);
-    return () => window.clearInterval(t);
+    return () => {
+      window.clearInterval(t);
+      if (retentar.current != null) { window.clearTimeout(retentar.current); retentar.current = null; }
+    };
   }, [carregar, carregarNumeros]);
 
   const rpc = useCallback(async (nome: string, args: Record<string, unknown>) => {
