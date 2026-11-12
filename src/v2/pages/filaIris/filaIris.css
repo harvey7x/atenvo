@@ -795,3 +795,16 @@
     grid-template-columns: minmax(200px, 1fr) minmax(0, 1.3fr) minmax(0, 1.9fr) minmax(100px, .65fr) 36px;
   }
 }
+
+/* a passagem de bastão da Iris (dono 12/11): aviso sóbrio — âmbar só no filete, como toda observação */
+.v2 .fi-iris-chip {
+  display: inline-flex; align-items: center; gap: 5px; max-width: 100%; padding: 1px 7px 1px 6px;
+  border-radius: 4px; border: 1px solid var(--linha); border-left: 2px solid var(--ambar);
+  background: rgba(var(--tint), .035); color: var(--txt-2); font-weight: 500;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.v2 .fi-iris-chip svg { flex: none; color: var(--txt-3); }
+.v2 .fi-iris-aviso span { min-width: 0; line-height: 1.45; }
+.v2 .fi-iris-aviso b { font-weight: 600; }
+.v2 .fi-sec-novo { gap: 5px; color: var(--txt-2); }
+.v2 .fi-sec-novo svg { color: var(--txt-3); }

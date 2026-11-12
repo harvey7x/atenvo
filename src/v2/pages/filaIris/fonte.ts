@@ -23,6 +23,8 @@ export interface FonteFila {
   corrigirDocs: (id: string, estado: 'completos' | 'incompletos' | null) => void;
   tirarDaFila: (id: string) => void;
   numeros: (p: Periodo) => NumeroAtendente[] | null;
+  /** relê a fila agora (o real; local não precisa) — o "Ver na fila" do aviso da Iris pede a fila fresca */
+  recarregar?: () => Promise<void>;
 }
 
 /** começo do período (horário de Brasília). Mês = o mês da casa, do dia 11 ao dia 10 (regra do placar do CAF). */

@@ -89,5 +89,6 @@ export function useFonteReal(): FonteFila {
     },
     tirarDaFila: (id) => { void rpc('fila_iris_marcar', { p_contato: id, p_tipo: 'fora_da_fila', p_texto: 'tirado pelo atendente' }); },
     numeros: (p) => nums[p] ?? null,
-  }), [carregando, erro, leads, nums, rpc]);
+    recarregar: carregar,
+  }), [carregando, erro, leads, nums, rpc, carregar]);
 }

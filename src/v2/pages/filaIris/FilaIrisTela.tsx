@@ -19,8 +19,9 @@ import {
 } from './lead';
 import { textoPeriodo, type FonteFila, type NumeroAtendente, type Periodo } from './fonte';
 import {
-  IcBaixo, IcBusca, IcChave, IcCheck, IcConversa, IcCopiar, IcDoc, IcInfo, IcMais, IcMarca, IcRelogio, IcSair, IcSeta, IcTelefone, IcVoltar, IcX,
+  IcBaixo, IcBusca, IcChave, IcCheck, IcConversa, IcCopiar, IcDoc, IcInfo, IcIris, IcMais, IcMarca, IcRelogio, IcSair, IcSeta, IcTelefone, IcVoltar, IcX,
 } from './icones';
+import { TEXTO_AVISO } from './avisosTexto';
 import './filaIris.css';
 
 type Visao = 'minha' | 'equipe' | 'de';
@@ -104,9 +105,9 @@ function metaPrioridade(id: Categoria, lista: Lead[], minha: boolean): ReactNode
   if (aguardando) return <><i className="fi-pt" aria-hidden />{aguardando} aguardando {minha ? 'sua ' : ''}resposta</>;
   if (id === 'historico') return n ? `assinado${n > 1 ? 's' : ''} · falta o histórico` : 'nenhum pendente';
   if (id === 'sem_resposta') {
-    /* entra na fila 24 h depois da nossa última mensagem: "novos" = os que completaram as 24 h hoje */
-    const novos = lista.filter((l) => (minDesde(l.nu) ?? 99999) <= 48 * 60).length;
-    return novos ? `${plural(novos, 'entrou', 'entraram')} nas últimas 24h` : n ? 'sem resposta há mais de 24h' : 'ninguém parado';
+    /* a mesma régua do aviso: quem a Iris passou nas últimas 24 h */
+    const novos = lista.filter((l) => l.novo).length;
+    return novos ? `${novos} da Iris agora` : n ? 'sem resposta há mais de 24h' : 'ninguém parado';
   }
   if (id === 'quente') return n ? 'documentação completa' : 'nenhum agora';
   const so = lista.filter((l) => l.lista === 2).length;
@@ -210,6 +211,27 @@ function tempoDe(l: Lead): { t: string; alerta?: boolean } {
   return { t: l.ud ? haQuanto(minDesde(l.ud) ?? 0) : '—' };
 }
 
+/** o aviso da passagem de bastão (dono 12/11): o que a Iris deixou para fazer.
+    Fora da própria fila o texto fala do dono ("passou para Juliana"), no padrão do resto da tela. */
+function textoIris(l: Lead, sua: boolean, dono: string): { curto: string; titulo: string; faca: string } {
+  const quem = sua ? 'você' : dono;
+  if (l.cat === 'quente' && l.docsManual === 'completos') {
+    return { curto: 'Marcada completa · falta fechar', titulo: 'Documentação marcada completa pelo atendente',
+      faca: sua ? 'Falta você fechar.' : 'Falta fechar.' };
+  }
+  if (l.cat === 'quente') {
+    return { curto: `A Iris passou para ${quem}`, titulo: `A Iris atendeu completo e passou para ${quem}`,
+      /* o título já diz "atendeu completo": aqui só o que fazer */
+      faca: sua ? 'O cliente mandou toda a documentação. Falta você fechar.' : 'O cliente mandou toda a documentação. Falta fechar.' };
+  }
+  if (l.cat === 'documentacao') {
+    return { curto: `A Iris passou para ${quem}`, titulo: `A Iris passou para ${quem}`,
+      faca: sua ? TEXTO_AVISO.documentacao.faca : 'Faltou documentação e o cliente não respondeu. Precisa de ajuda para resolver.' };
+  }
+  return { curto: `A Iris passou para ${quem}`, titulo: `A Iris passou para ${quem}`,
+    faca: sua ? TEXTO_AVISO.sem_resposta.faca : 'O cliente ficou sem resposta. Precisa de um remarketing.' };
+}
+
 /** documento pessoal e comprovante: recebido (com o tique) ou faltando (tracejado) */
 function DocsMini({ l }: { l: Lead }) {
   return (
@@ -266,7 +288,11 @@ function Linha({ l, ativo, aoAbrir, aoConversa, mostrarDono, sua, destacar, semC
       </span>
       <span className="fi-col-sit">
         <span className="fi-l1 fi-elip" title={l.situacao}>{situacao}</span>
-        <Detalhe l={l} />
+        {l.novo
+          ? <span className="fi-l2 fi-iris-chip" title={`${textoIris(l, !!sua, dono.nome).titulo}. ${textoIris(l, !!sua, dono.nome).faca}`}>
+              <IcIris t={11} /><span className="fi-elip">{textoIris(l, !!sua, dono.nome).curto} · {haQuanto(minDesde(l.passouEm) ?? 0)}</span>
+            </span>
+          : <Detalhe l={l} />}
       </span>
       <span className="fi-col-msg">
         {msg
@@ -411,8 +437,8 @@ function MarcarCliente({ marcas, aoMarcar, aoTirar }: {
   );
 }
 
-/** a ficha do cliente — janela de vidro no meio da tela */
-function JanelaCliente({ l, raiz, lista, aoTrocar, aoFechar, avisar, ehDono, aoMarcar, aoTirar, aoCorrigirDocs, aoTirarDaFila, abrirConversa }: {
+/** a ficha do cliente — janela de vidro no meio da tela (exportada para a amostra em cards) */
+export function JanelaCliente({ l, raiz, lista, aoTrocar, aoFechar, avisar, ehDono, aoMarcar, aoTirar, aoCorrigirDocs, aoTirarDaFila, abrirConversa }: {
   l: Lead; raiz: HTMLElement; lista: Lead[]; aoTrocar: (id: string) => void; aoFechar: () => void;
   avisar: (t: string) => void; ehDono: boolean;
   aoMarcar: (tipo: TipoMarca, texto?: string) => void; aoTirar: (id: string) => void;
@@ -523,6 +549,12 @@ function JanelaCliente({ l, raiz, lista, aoTrocar, aoFechar, avisar, ehDono, aoM
               <div className="fi-esperando" role="status">
                 <b><i aria-hidden />Aguardando {ehDono ? 'sua ' : ''}resposta</b>
                 <span>Escreveu por último e ninguém respondeu · {haQuanto(minDesde(l.esperandoEm) ?? 0)} · {dataHora(l.esperandoEm)}</span>
+              </div>
+            )}
+            {l.novo && (
+              <div className="fi-nota-aviso fi-iris-aviso" role="status">
+                <IcIris t={14} />
+                <span><b>{textoIris(l, ehDono, dono.nome).titulo}</b> · {haQuanto(minDesde(l.passouEm) ?? 0)}<br />{textoIris(l, ehDono, dono.nome).faca}</span>
               </div>
             )}
             {l.nota && <div className="fi-nota-aviso"><IcInfo t={14} />{l.nota}</div>}
@@ -674,8 +706,12 @@ function VerComo({ valor, aoMudar, leads }: { valor: string; aoMudar: (id: strin
 
 /* ---------------------------------------------------------------- a tela */
 
-export default function FilaIrisTela({ fonte, usuarioId, admin: adminReal, abrirConversa }: {
+export default function FilaIrisTela({ fonte, usuarioId, admin: adminReal, abrirConversa, abrirInicial, aoConsumirInicial }: {
   fonte: FonteFila;
+  /** o cliente (contato) que abre sozinho — o "Ver na fila" do aviso da Iris */
+  abrirInicial?: string | null;
+  /** o pedido foi atendido (abriu, ou o cliente não está mais na fila): a rota tira o ?cliente= */
+  aoConsumirInicial?: () => void;
   /** no real: o usuário logado (a fila é a dele; "Ver como" é só da prévia) */
   usuarioId?: string;
   /** no real: é administrador da organização (vê a Equipe e os números) */
@@ -765,6 +801,32 @@ export default function FilaIrisTela({ fonte, usuarioId, admin: adminReal, abrir
 
   /* troca de pessoa/visão/filtro: fecha a janela */
   useEffect(() => { setAberto(null); }, [dono, visaoEf, filtro, filtroMarca]);
+
+  /* o aviso da Iris pediu este cliente: volta para a fila toda (sem filtro, busca nem seção recolhida), pede a
+     fila fresca (ele pode ter ACABADO de entrar) e abre a ficha; se ele não estiver mais na fila, avisa. Uma vez. */
+  const [pedido, setPedido] = useState<string | null>(null);
+  useEffect(() => {
+    if (!abrirInicial) return;
+    let vivo = true;
+    if (!semFilaPropria) setVisao('minha');
+    setFiltro('todas'); setFiltroMarca('todas'); setBusca(''); setRecolhidas([]);
+    void (async () => {
+      try { await fonte.recarregar?.(); } catch { /* a fila de agora serve */ }
+      if (vivo) setPedido(abrirInicial);
+    })();
+    return () => { vivo = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [abrirInicial]);
+  useEffect(() => {
+    if (!pedido || fonte.carregando) return;
+    const achou = daFila.some((l) => l.id === pedido);
+    if (achou && !navegacao.some((l) => l.id === pedido)) return; /* o filtro ainda está saindo: espera um render */
+    if (achou) setAberto(pedido);
+    else avisar('Este cliente não está mais na sua fila.');
+    setPedido(null);
+    aoConsumirInicial?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pedido, daFila, navegacao, fonte.carregando]);
 
   const limparFiltros = () => { setFiltro('todas'); setFiltroMarca('todas'); setBusca(''); setRecolhidas([]); };
   const trocarVerComo = (id: string) => { setVerComo(id); setVisao('minha'); limparFiltros(); };
@@ -868,6 +930,7 @@ export default function FilaIrisTela({ fonte, usuarioId, admin: adminReal, abrir
           <p className="fi-como-pe">
             Cada atendente vê os clientes que o robô distribuiu para ele, como hoje. A fila se organiza sozinha pelo andamento do atendimento.
             Quando o administrativo fecha o cliente, ele sai da fila e vai para a aba Fechados. Cliente no Remarketing não entra.
+            Cliente que a Iris acabou de passar chega com o aviso "A Iris passou para você" e fica no topo da seção por 24 horas.
             Clique numa prioridade do topo para filtrar e no título de uma seção para recolher.
             {fonte.modo === 'previa' && ' Prévia: foto da fila de hoje, só leitura; as marcações feitas aqui não são gravadas.'}
             {fonte.modo === 'demo' && ' Demonstração com clientes fictícios.'}
@@ -967,6 +1030,7 @@ export default function FilaIrisTela({ fonte, usuarioId, admin: adminReal, abrir
             ) : visiveis.map(({ info, itens }) => {
               const fechada = recolhida(info.id);
               const ag = itens.filter((l) => l.esperandoEm).length;
+              const novos = info.id === 'historico' ? 0 : itens.filter((l) => l.novo).length;
               return (
                 <div key={info.id} className="fi-grupo" data-cat={info.id} data-recolhida={fechada ? '' : undefined}>
                   <button type="button" className="fi-sec" aria-expanded={!fechada}
@@ -975,6 +1039,7 @@ export default function FilaIrisTela({ fonte, usuarioId, admin: adminReal, abrir
                     <span className="fi-sec-seta" aria-hidden><IcBaixo t={11} /></span>
                     <span className="fi-sec-t">Prioridade {info.ordem} · {info.rotulo}</span>
                     <span className="fi-sec-n num">{itens.length}</span>
+                    {novos > 0 && <span className="fi-sec-ag fi-sec-novo" title="A Iris passou nas últimas 24 horas; ficam no topo"><IcIris t={11} />{novos} da Iris agora</span>}
                     {ag > 0 && <span className="fi-sec-ag"><i className="fi-pt" aria-hidden />{ag} aguardando {visaoEf === 'minha' ? 'sua ' : ''}resposta</span>}
                     <span className="fi-sec-regra" title={`Ordem: ${info.regra}`}>{info.resumo}</span>
                   </button>

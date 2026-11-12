@@ -38,6 +38,10 @@ export interface Lead {
   assinadoEm?: number;
   /** quando o cliente entrou no funil (o card do Kanban) */
   entrouEm?: number;
+  /** quando a Iris passou o cliente para o atendente (derivado do andamento) */
+  passouEm?: number;
+  /** passou nas últimas 24 h: ganha o aviso e vai para o topo da seção */
+  novo?: boolean;
   nota: string;
   planilha: string;
   arq?: number;
@@ -177,15 +181,36 @@ export function textosDoLead(l: Pick<Lead, 'cat' | 'docPessoal' | 'comprovante' 
   return ['Parou de responder', 'Parou de responder'];
 }
 
+/* quando a Iris passou o cliente, pelo próprio andamento:
+   quente = completou a documentação (ou o atendente marcou completa);
+   documentação = 24 h depois do último documento/mensagem (a regra de entrada);
+   sem resposta = 24 h depois da nossa última mensagem. Prioridade 0 é do administrativo. */
+const JANELA_NOVO_MS = 24 * 3_600_000;
+function passouEmDe(cat: Categoria, t: { udoc?: number; ud?: number; nu?: number; manualEm?: number }): number | undefined {
+  if (cat === 'quente') return t.manualEm ?? t.udoc ?? t.ud;
+  /* espelha a regra de entrada da fila no banco: coalesce(último documento, última mensagem) + 24 h
+     (fila_iris_itens, migration 20261111200000) — por isso udoc ?? ud, e não o mais recente dos dois */
+  if (cat === 'documentacao') { const b = t.udoc ?? t.ud; return b ? b + JANELA_NOVO_MS : undefined; }
+  if (cat === 'sem_resposta') return t.nu ? t.nu + JANELA_NOVO_MS : undefined;
+  return undefined;
+}
+export function marcarNovo(l: Pick<Lead, 'cat' | 'udoc' | 'ud' | 'nu'>, manualEm?: number, agora = Date.now()): { passouEm?: number; novo?: boolean } {
+  const passouEm = passouEmDe(l.cat, { udoc: l.udoc, ud: l.ud, nu: l.nu, manualEm });
+  if (!passouEm || passouEm > agora + 300_000) return {};
+  return { passouEm, novo: agora - passouEm <= JANELA_NOVO_MS };
+}
+
 /** uma linha do banco → cliente da fila */
 export function leadDeLinha(r: LinhaFila, ordem: number): Lead {
   const marcas: Marca[] = [];
   let docsManual: Lead['docsManual'];
   let docsManualId: string | undefined;
+  let manualEm: number | undefined;
   for (const m of r.marcacoes ?? []) {
     if (m.tipo === 'docs_completos' || m.tipo === 'docs_incompletos') {
       docsManual = m.tipo === 'docs_completos' ? 'completos' : 'incompletos';
       docsManualId = m.id;
+      manualEm = Date.parse(m.em) || undefined;
     } else if ((TIPOS_MARCA as string[]).includes(m.tipo)) {
       marcas.push({ id: m.id, tipo: m.tipo as TipoMarca, texto: m.texto ?? undefined, vezes: m.vezes, em: Date.parse(m.em) });
     }
@@ -196,6 +221,7 @@ export function leadDeLinha(r: LinhaFila, ordem: number): Lead {
     falta: juntar(faltaEmTexto(r.falta ?? [])), faltaCodigos: r.falta ?? [],
   };
   const [situacao, curta] = textosDoLead(base);
+  const vinda = marcarNovo({ cat: r.categoria, udoc: base.udoc, ud: ms(r.ult_cliente_em), nu: base.nu }, docsManual === 'completos' ? manualEm : undefined);
   const lista = r.categoria === 'historico' ? 0 : r.categoria === 'quente' ? 1
     : r.categoria === 'documentacao' ? (r.doc_pessoal && !r.comprovante ? 2 : 3) : 5;
   return {
@@ -203,16 +229,20 @@ export function leadDeLinha(r: LinhaFila, ordem: number): Lead {
     fone: foneBonito(r.telefone), atendente: equipeDoUid(r.dono_id) ?? r.dono_id ?? '', lista,
     campanha: r.campanha ?? '—', funil: r.coluna ?? '', ud: ms(r.ult_cliente_em),
     esperandoEm: r.aguardando ? ms(r.ult_cliente_em) : undefined, disse: r.ult_cliente_texto ?? '',
-    docsManualId, assinadoEm: ms(r.assinado_em), entrouEm: ms(r.entrou_em), nota: '', planilha: '', situacao, curta, ordem, marcas,
+    docsManualId, assinadoEm: ms(r.assinado_em), entrouEm: ms(r.entrou_em), ...vinda, nota: '', planilha: '', situacao, curta, ordem, marcas,
   };
 }
 
-/** a ordem dentro de cada categoria: quem está aguardando resposta primeiro (quem escreveu mais
-    recentemente na frente), depois do mais recente para o mais antigo */
+/** a ordem dentro de cada categoria: quem a Iris acabou de passar (24 h) fica no topo, o mais novo
+    primeiro; depois quem está aguardando resposta; depois do mais recente para o mais antigo */
 export function ordenarLeads(l: Lead[]): Lead[] {
   const quando = (x: Lead) => (x.cat === 'sem_resposta' ? x.nu : (x.udoc ?? x.ud)) ?? 0;
   return [...l].sort((a, b) => {
     if (a.cat === 'historico' || b.cat === 'historico') return a.ordem - b.ordem;
+    const na = a.novo ? (a.passouEm ?? 0) : 0;
+    const nb = b.novo ? (b.passouEm ?? 0) : 0;
+    if (!!na !== !!nb) return na ? -1 : 1;
+    if (na && nb) return nb - na;
     const ea = a.esperandoEm ?? 0;
     const eb = b.esperandoEm ?? 0;
     if (!!ea !== !!eb) return ea ? -1 : 1;
@@ -253,7 +283,9 @@ export function leadsFicticios(): Lead[] {
     const t = agora - c.min * 60_000;
     const base = { cat: CAT_FICTICIA[c.cat], docPessoal, comprovante, udoc: c.cat === 'documentacao' ? t : undefined, nu: c.cat === 'sem_resposta' ? t : undefined, falta: '' };
     const [situacao, curta] = textosDoLead(base);
+    const vinda = marcarNovo({ cat: base.cat, udoc: base.udoc, ud: c.cat === 'quente' ? t : undefined, nu: base.nu });
     return {
+      ...vinda,
       ...base, id: c.id, nome: c.nome, fone: '(51) 9' + String(10000000 + ordem * 7919).slice(0, 4) + '-' + String(1000 + ordem * 37).slice(-4),
       atendente: c.atendente, lista: c.cat === 'quente' ? 1 : c.cat === 'documentacao' ? (ok === total - 1 ? 2 : 3) : 5,
       campanha: c.canal, funil: c.cat === 'quente' ? 'Documentos' : 'Lead Qualificado', ud: c.cat === 'sem_resposta' ? t - 3_600_000 : t,

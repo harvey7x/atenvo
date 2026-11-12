@@ -58,7 +58,7 @@ export const CATEGORIAS: InfoCategoria[] = [
   {
     id: 'quente', ordem: 1, rotulo: 'Clientes quentes',
     resumo: 'Mandou toda a documentação. Falta você fechar.',
-    regra: 'quem está aguardando resposta primeiro',
+    regra: 'quem a Iris acabou de passar primeiro; depois quem está aguardando resposta',
     entra: 'O cliente mandou toda a documentação (documento pessoal frente e verso e comprovante de residência). Sobe na hora.',
     vazioT: 'Nenhum cliente quente agora',
     vazio: 'Quando um cliente mandar toda a documentação, ele aparece aqui, no topo da fila.',
@@ -66,7 +66,7 @@ export const CATEGORIAS: InfoCategoria[] = [
   {
     id: 'documentacao', ordem: 2, rotulo: 'Documentação pendente',
     resumo: 'Mandou parte da documentação e parou há mais de 24h.',
-    regra: 'quem está aguardando resposta primeiro',
+    regra: 'quem a Iris acabou de passar primeiro; depois quem está aguardando resposta',
     entra: 'O cliente mandou parte da documentação, foi cobrado e ficou 24 horas sem mandar o resto.',
     vazioT: 'Nenhuma documentação pendente',
     vazio: 'Quando faltar algum documento para seguir, o cliente aparece aqui.',
@@ -74,7 +74,7 @@ export const CATEGORIAS: InfoCategoria[] = [
   {
     id: 'sem_resposta', ordem: 3, rotulo: 'Sem resposta',
     resumo: 'Parou de responder há mais de 24h. Recupere o contato.',
-    regra: 'quem parou mais recentemente primeiro',
+    regra: 'quem a Iris acabou de passar primeiro; depois quem parou mais recentemente',
     entra: 'O cliente começou o atendimento, recebeu a nossa mensagem e ficou 24 horas sem responder.',
     vazioT: 'Ninguém parado',
     vazio: 'Quando um cliente ficar 24 horas sem responder, ele aparece aqui para você recuperar.',
@@ -141,7 +141,7 @@ export const CLIENTES: ClienteFila[] = [
   { id: 'c02', nome: 'José Ribamar Costa', g: 'm', atendente: 'matheus', cat: 'quente', produto: 'revisao', canal: 'ANTONIO', financeiras: ['BMG'], min: 38, pref: 'mensagem', fala: 'Quero sim, pode encaminhar que eu assino.' },
   { id: 'c03', nome: 'Neusa Fernandes Lima', g: 'f', atendente: 'matheus', cat: 'quente', produto: 'rmc', canal: 'JUROS', pensionista: true, min: 12, pref: 'manha', fala: 'Mandei tudo. Amanhã cedo pode me ligar.' },
   { id: 'c04', nome: 'Antônio Carlos Siqueira', g: 'm', atendente: 'matheus', cat: 'documentacao', produto: 'revisao', canal: 'JUROS', financeiras: ['Facta', 'Mercantil'], docs: D('1101'), min: 95, fala: 'Vou pedir pro meu neto tirar esse extrato do INSS.' },
-  { id: 'c05', nome: 'Terezinha de Jesus Prado', g: 'f', atendente: 'matheus', cat: 'documentacao', produto: 'emprestimo', canal: 'EMPRESTIMO', docs: D('1000'), min: 300, fala: 'O comprovante tá no nome do meu marido, serve?' },
+  { id: 'c05', nome: 'Terezinha de Jesus Prado', g: 'f', atendente: 'matheus', cat: 'documentacao', produto: 'emprestimo', canal: 'EMPRESTIMO', docs: D('1000'), min: 1560, fala: 'O comprovante tá no nome do meu marido, serve?' },
   { id: 'c06', nome: 'Valdemar Rocha', g: 'm', atendente: 'matheus', cat: 'documentacao', produto: 'revisao', canal: 'ANTONIO', financeiras: ['Agibank'], docs: D('1110'), min: 50, fala: 'O contrato eu tenho em papel, posso mandar foto?' },
   { id: 'c07', nome: 'Iracema Gomes', g: 'f', atendente: 'matheus', cat: 'sem_resposta', produto: 'revisao', canal: 'JUROS', financeiras: ['Crefisa'], parou: 'aceite', tentativas: 1, min: 1560, fala: 'Vou ver com a minha filha e te falo.' },
   { id: 'c08', nome: 'Osvaldo Pereira Santos', g: 'm', atendente: 'matheus', cat: 'sem_resposta', produto: 'emprestimo', canal: 'EMPRESTIMO', parou: 'qualificacao', tentativas: 2, min: 4300, fala: 'Qual banco vocês são?' },
