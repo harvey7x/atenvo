@@ -42,6 +42,13 @@
      verde (ganho). Interação, foco e links seguem no acento. */
   --dado-1: #5B8DEF;
   --dado-1-rgb: 91, 141, 239;
+  /* Séries 2–5 (12/11, gráfico de ondas por campanha): mesma família tonal da --dado-1,
+     afastadas do verde (ganho), do âmbar (atenção) e do rubro (erro). Sempre usadas COM
+     tracejado distinto por série (daltônico e impressão não dependem só da cor). */
+  --dado-2: #9B7FE8;
+  --dado-3: #45AFC4;
+  --dado-4: #C77FA9;
+  --dado-5: #8FA3B8;
   --r-card: 16px;
   --r-ctl: 9px;
   --fonte: 'Instrument Sans Variable', 'Instrument Sans', system-ui, sans-serif;
@@ -120,6 +127,10 @@ html[data-demo] .v2 { --fx: 1; }
   --rubro-rgb: 178, 74, 60;
   --dado-1: #2F5FB8;              /* dado no claro: azul fechado, longe do âmbar e do verde */
   --dado-1-rgb: 47, 95, 184;
+  --dado-2: #6A48B8;              /* séries 2–5 no claro: mesma profundidade da --dado-1 */
+  --dado-3: #1F7E95;
+  --dado-4: #A14A77;
+  --dado-5: #5E7183;
   --tint: 22, 25, 31;             /* tinta = grafite: superfícies em alpha viram escuras */
   --platina-a: #E4E8ED;           /* assinatura: platina LUMINOSA — prata escovada (o primo claro */
   --platina-b: #BAC1CC;           /* do botão do dark), NÃO preto. Gradiente claro→médio metálico. */

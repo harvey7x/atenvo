@@ -790,3 +790,95 @@
   content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%;
   background: var(--rubro); margin-right: 6px; vertical-align: 1px;
 }
+
+/* ============================================================
+   ABAS do Dashboard (12/11) — Visão geral · Campanhas · Atendentes · Iris.
+   Período global acima; a linha de abas é navegação (esquerda), as tabelas
+   seguem a regra da casa: título e conteúdo centralizados, 1ª coluna à
+   esquerda. Cor de série SÓ por token (--dado-1…5) + tracejado distinto.
+   ============================================================ */
+.v2 .d5-abas { display: flex; }
+.v2 .d5-abas .segm button { font-size: 13px; padding: 6px 16px; }
+
+/* ---- quadros (melhor campanha / funil da Iris) ---- */
+.v2 .d5-qds { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.v2 .d5-qd {
+  display: flex; flex-direction: column; gap: 3px; min-width: 0;
+  border: 1px solid var(--d5-fio); border-radius: 12px; padding: 12px 14px 11px;
+}
+.v2 .d5-qd-t { font-size: 11px; letter-spacing: .02em; color: var(--txt-3); display: inline-flex; align-items: center; gap: 4px; }
+.v2 .d5-qd-camp { font-size: 17px; font-weight: 650; letter-spacing: -.01em; }
+.v2 .d5-qd-n { font-size: 22px; font-weight: 650; letter-spacing: -.02em; line-height: 1.15; }
+.v2 .d5-qd-n small { font-size: 12px; font-weight: 500; color: var(--txt-2); letter-spacing: 0; }
+.v2 .d5-qd-sub { font-size: 11.5px; color: var(--txt-3); }
+.v2 .d5-qd .d5-var { margin-top: 2px; }
+.v2 .d5-iris-qds { grid-template-columns: repeat(auto-fit, minmax(195px, 1fr)); }
+.v2 .d5-iris-c-forte { border-color: var(--d5-fio-forte); background: rgba(var(--tint), .035); }
+
+/* ---- gráfico de ondas ---- */
+.v2 .d5-ondas-ctl { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.v2 .d5-graf-rolo { overflow-x: auto; margin: 0 calc(-1 * var(--d5-px)); padding: 2px var(--d5-px) 0; }
+.v2 .d5-graf { position: relative; min-width: 680px; }
+.v2 .d5-graf-svg { display: block; width: 100%; height: auto; }
+.v2 .d5-graf-guia { stroke: var(--d5-fio); stroke-width: 1; }
+.v2 .d5-graf-eixo { fill: var(--txt-3); font-size: 10.5px; }
+.v2 .d5-graf-linha { stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.v2 .d5-graf-hits { position: absolute; inset: 0; }
+.v2 .d5-graf-hit {
+  position: absolute; top: 0; bottom: 0; transform: translateX(-50%);
+  min-width: 16px; background: transparent; border: 0; padding: 0; border-radius: 6px; cursor: default;
+}
+.v2 .d5-graf-hit:focus-visible { outline: 2px solid var(--d5-foco); outline-offset: -2px; }
+.v2 .d5-graf-tip-t { display: block; font-weight: 650; margin-bottom: 2px; }
+.v2 .d5-graf-nota { margin: 8px 0 0; font-size: 11.5px; color: var(--txt-3); }
+.v2 .d5-graf-leg { margin-bottom: 10px; }
+.v2 .d5-graf-leg svg { display: block; }
+.v2 .d5-ondas .d5-leg + .d5-graf-rolo { margin-top: 2px; }
+
+/* leitura das ondas (cresceu/caiu/recaída) */
+.v2 .d5-onda-leitura {
+  list-style: none; margin: 10px 0 0; padding: 0;
+  display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 12px; color: var(--txt-2);
+}
+.v2 .d5-onda-leitura li { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+.v2 .d5-camp-chip { display: inline-flex; align-items: center; gap: 5px; font-weight: 600; color: var(--txt); }
+.v2 .d5-camp-chip svg { display: block; }
+.v2 .d5-onda-tend.ok { color: var(--verde); font-weight: 600; }
+.v2 .d5-onda-tend.er { color: var(--rubro); font-weight: 600; }
+.v2 .d5-onda-rec { color: var(--ambar); font-weight: 600; }
+
+/* ---- funil em barras (parente / faltas de documento) ---- */
+.v2 .d5-par-topo { display: grid; grid-template-columns: 230px 1fr; gap: 14px; align-items: start; }
+.v2 .d5-par-funil { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+.v2 .d5-par-funil li {
+  display: grid; grid-template-columns: minmax(150px, 240px) 1fr 44px;
+  align-items: center; gap: 10px; font-size: 12.5px;
+}
+.v2 .d5-par-funil li b { text-align: right; }
+.v2 .d5-par-funil .d5-trilho { width: auto; }
+.v2 .d5-par-funil .d5-trilho i { background: var(--dado-1); }
+.v2 .d5-par-funil .d5-par-on { background: var(--verde); }
+.v2 .d5-par-sub { opacity: .78; }
+.v2 .d5-par-sub .d5-par-rot { padding-left: 14px; font-size: 12px; }
+.v2 .d5-par-desf { margin-top: 12px; font-size: 12.5px; color: var(--txt-2); }
+.v2 .d5-par-desf-t { display: block; font-size: 11px; color: var(--txt-3); margin-bottom: 3px; }
+.v2 .d5-parente .d5-graf-rolo { margin-top: 14px; }
+
+/* ---- miudezas das tabelas novas ---- */
+.v2 .d5-sem-relogio { color: var(--ambar); font-weight: 600; }
+.v2 .d5-tab-agora .d5-agora-vac { color: var(--rubro); }
+.v2 .d5-etapas { margin-top: 12px; font-size: 12px; color: var(--txt-3); }
+.v2 .d5-etapas-t { display: block; font-size: 11px; margin-bottom: 2px; }
+.v2 .d5-ret-origens { font-size: 12px; color: var(--txt-2); }
+
+/* ---- página estreita ---- */
+@container d5pg (max-width: 980px) {
+  .v2 .d5-qds { grid-template-columns: 1fr 1fr; }
+  .v2 .d5-par-topo { grid-template-columns: 1fr; }
+}
+@container d5pg (max-width: 640px) {
+  .v2 .d5-qds { grid-template-columns: 1fr; }
+  .v2 .d5-ondas-ctl { justify-content: flex-start; }
+  .v2 .d5-par-funil li { grid-template-columns: 1fr 44px; }
+  .v2 .d5-par-funil li .d5-trilho { display: none; }
+}

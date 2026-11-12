@@ -84,6 +84,11 @@ html:root[data-repaginada][data-repaginada]:not([data-tema="light"]) .v2.portal-
   --cor-ring: var(--dado-1);
   --dado-1: #4A78DA;
   --dado-1-rgb: 74, 120, 218;
+  /* séries 2–5 (ondas por campanha, 12/11), na mesma família do #4A78DA */
+  --dado-2: #8E70DC;
+  --dado-3: #3BA3B8;
+  --dado-4: #BC719D;
+  --dado-5: #8496AB;
   /* chrome dos componentes v1 reusados (ver tokens.css) acompanha a base nova */
   --surface-2: rgba(255, 255, 255, .03);
   --line-2: rgba(255, 255, 255, .07);

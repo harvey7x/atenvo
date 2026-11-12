@@ -127,9 +127,13 @@ export const DEMO_CANAIS: readonly CanalCfg[] = [
   { chave: 'juros', id: 'demo-canal-juros', nome: 'JUROS ABUSIVO (ANDRIUS)', numero: '555193930488', desde: '2026-07-30', ate: null,
     porDia: 19, domingo: 0.3, pNe: 0.17, motivos: MOTIVOS_JUROS, iaMin: 90, pGanho: 0.065, ganhoMedH: 110, ganhoSd: 1.2, rodizio: null,
     robo: { abre: 0.92, conclui: 0.55 }, anuncio: { retornos: 0.17, diretas: 0.05 } },
-  { chave: 'antonio', id: 'demo-canal-antonio', nome: 'ANTONIO CAMPANHA', numero: '555191655320', desde: '2026-10-21', ate: null,
+  { chave: 'antonio', id: 'demo-canal-antonio', nome: 'ANTONIO CAMPANHA', numero: '555191655320', desde: '2026-10-21', ate: '2026-11-09',
     porDia: 17, domingo: 0.7, pNe: 0.29, motivos: MOTIVOS_ANTONIO, iaMin: 6, pGanho: 0.03, ganhoMedH: 60, ganhoSd: 1, rodizio: ['demo-u-juliana', 'demo-u-matheus'],
     robo: { abre: 0.7, conclui: 0.88 }, anuncio: { retornos: 0.6, diretas: 0.01 } },
+  // ANTONIO 2.0 (09/11): o chip novo da campanha do Antônio — o antigo para no mesmo dia
+  { chave: 'antonio2', id: 'demo-canal-antonio2', nome: 'ANTONIO 2.0', numero: '555189551944', desde: '2026-11-09', ate: null,
+    porDia: 16, domingo: 0.7, pNe: 0.26, motivos: MOTIVOS_ANTONIO, iaMin: 6, pGanho: 0.03, ganhoMedH: 60, ganhoSd: 1, rodizio: ['demo-u-juliana', 'demo-u-matheus'],
+    robo: { abre: 0.75, conclui: 0.86 }, anuncio: { retornos: 0.32, diretas: 0.01 } },
   { chave: 'murillo', id: 'demo-canal-murillo', nome: 'MURILLO CHIP', numero: '555191035329', desde: '2026-07-31', ate: null,
     porDia: 0.16, domingo: 1, pNe: 0.1, motivos: MOTIVOS_JUROS, iaMin: 60, pGanho: 0.1, ganhoMedH: 70, ganhoSd: 1, rodizio: ['demo-u-matheus'], robo: null, anuncio: null },
   { chave: 'oficial', id: 'demo-canal-oficial', nome: 'OFICIAL', numero: '555191781390', desde: '2026-07-23', ate: '2026-08-07',
@@ -285,6 +289,7 @@ const ORIGENS_DEMO: Record<string, readonly (readonly [string, number])[]> = {
   emp: [['Empréstimo · Diego', 72], ['Juros abusivos · Andrius', 16], ['Empréstimo · Antônio', 7], ['Outros números', 5]],
   juros: [['Juros abusivos · Andrius', 70], ['Empréstimo · Diego', 26], ['Outros números', 4]],
   antonio: [['Empréstimo · Diego', 74], ['Juros abusivos · Andrius', 17], ['Empréstimo · Antônio', 9]],
+  antonio2: [['Empréstimo · Diego', 78], ['Juros abusivos · Andrius', 12], ['Outros números', 10]],
 };
 const cacheRetornos = new Map<string, RetornoDemo[]>();
 function retornosDoDia(c: CanalCfg, dia: string): RetornoDemo[] {
