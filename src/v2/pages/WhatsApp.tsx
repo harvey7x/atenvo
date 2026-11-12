@@ -38,6 +38,7 @@ import { pctProgresso, useProgressoCarga } from '@/data/progressoCarga';
 import { mensagemAssumir, useAlertasLeadQuente } from '@/data/alertasLeadQuente';
 import { AlertaLeadQuenteModal } from '../components/AlertaLeadQuenteModal';
 import { useIrisCarteira } from '../hooks/useEhIris';
+import { useAcessoFila } from '../hooks/useAcessoFila';
 import { useInboxWhatsApp, type AvisoInbox } from '../hooks/useInboxWhatsApp';
 import { assinaturaAtendente } from '../hooks/inboxWhatsApp';
 import { AudioRecorderV2 } from '../components/AudioRecorderV2';
@@ -400,6 +401,8 @@ const horaSP = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { hour
 
 export default function WhatsAppV2() {
   const nav = useNavigate();
+  /* "Abrir na fila" no cabeçalho: só para quem tem a Fila da Iris */
+  const acessoFila = useAcessoFila();
   const [params, setParams] = useSearchParams();
   const { user } = useAuth();
   const { currentOrg } = useOrg();
@@ -1386,10 +1389,11 @@ export default function WhatsAppV2() {
                   ? <BotaoMini title="Transferir atendimento" onClick={() => setTransferirAberto(true)}>Transferir</BotaoMini>
                   : <BotaoSec mini title="Assumir atendimento" disabled={inbox.atribuindo} onClick={inbox.assumir}>Assumir</BotaoSec>}
                 <BotaoMini title={current.arquivada ? 'Desarquivar conversa' : 'Arquivar conversa'} onClick={() => inbox.arquivar(!current.arquivada)}>{current.arquivada ? 'Desarquivar' : 'Arquivar'}</BotaoMini>
-                {current.id && (iaEstado?.existe || iaAtiva) && (
-                  <BotaoMini className={iaAtiva ? 'ia-on' : ''} disabled={iaToggle.isPending}
-                    title={iaAtiva ? ('IA atendendo' + (iaEstado?.etapa ? ' (' + iaEstado.etapa + ')' : '') + ' — clique para desligar e assumir') : (iaEstado?.aguardando_humano ? 'IA aguardando você assumir — clique para reativar a IA' : 'Ligar a IA nesta conversa')}
-                    onClick={alternarIa}>{iaAtiva ? 'IA ligada' : 'IA desligada'}</BotaoMini>
+                {/* dono 12/11: "pode remover o IA ligada, eu preciso de um botão de abrir na fila, que vai abrir na ficha
+                    do cliente" — o ligar/desligar a IA foi para o menu ⋮ */}
+                {acessoFila === true && current.contatoId && (
+                  <BotaoMini title="Abrir a ficha deste cliente na Fila da Iris"
+                    onClick={() => nav('/fila-iris?cliente=' + encodeURIComponent(current.contatoId!))}>Abrir na fila</BotaoMini>
                 )}
                 {!ctxAberto && <BotaoMini title="Abrir painel de dados do contato" onClick={() => setCtxAberto(true)}>Dados</BotaoMini>}
                 <button type="button" className={'ib2' + (foco ? ' on' : '')} title="Modo de foco (Esc para sair)" onClick={() => setFoco((f) => !f)}><IcFoco /></button>
@@ -1401,7 +1405,7 @@ export default function WhatsAppV2() {
                 sessão de IA. Superfície SÓLIDA de propósito (faixa de estado, não overlay → sem
                 glass; lite-safe por construção). Cor SÓ no semântico do estado.
                 "Assumir" grava o responsável mas NÃO para o bot sozinho (ele só para quando o
-                atendente manda mensagem ou pausa a IA no "IA ligada" do cabeçalho). */}
+                atendente manda mensagem ou desliga a IA no menu ⋮ da conversa). */}
             {iaBarSinal && (
               <div className={'wa-iabar ' + iaBarSinal.cls} role="status">
                 <span className="glifo" aria-hidden><IcBot /></span>
@@ -1410,7 +1414,7 @@ export default function WhatsAppV2() {
                 {iaBar?.etapa && <span className="etp" title={'Etapa atual do fluxo da IA: ' + iaBar.etapa}>· {etapaIaLabel(iaBar.etapa)}</span>}
                 {iaBarMotivo && <span className="mot" title="Por que a IA pediu um humano">· {iaBarMotivo}</span>}
                 {/* dono 29/10: "Pausar IA" e "Recomeçar atendimento" saíram da faixa (ela só mostra o estado).
-                    Pausar/reativar segue no "IA ligada/desligada" do cabeçalho; recomeçar foi para o menu ⋮. */}
+                    Desligar/ligar a IA e recomeçar ficam no menu ⋮ (o "IA ligada" saiu do cabeçalho em 12/11). */}
                 {!inbox.donoEfetivo && (
                   <span className="acts">
                     <BotaoMini disabled={inbox.atribuindo} title="Grava você como responsável. NÃO pausa a IA sozinho — ela só para quando você manda mensagem ou quando é pausada." onClick={inbox.assumir}>Assumir</BotaoMini>
@@ -1910,6 +1914,11 @@ export default function WhatsAppV2() {
               <button type="button" className="it" onClick={() => { setPop(null); void inbox.fixar(!current.fixada); }}>{current.fixada ? 'Desafixar conversa' : 'Fixar conversa no topo'}</button>
               <button type="button" className="it" onClick={() => { setPop(null); inbox.arquivar(!current.arquivada); }}>{current.arquivada ? 'Desarquivar conversa' : 'Arquivar conversa'}</button>
               {current.phone && <button type="button" className="it" onClick={() => { setPop(null); copiarTelefone(); }}>Copiar telefone</button>}
+              {current.id && (iaEstado?.existe || iaAtiva) && (
+                <button type="button" className="it" disabled={iaToggle.isPending}
+                  title={iaAtiva ? ('IA atendendo' + (iaEstado?.etapa ? ' (' + iaEstado.etapa + ')' : '') + ' — desliga e você assume') : (iaEstado?.aguardando_humano ? 'IA aguardando você assumir — reativa a IA' : 'Liga a IA nesta conversa')}
+                  onClick={() => { setPop(null); void alternarIa(); }}>{iaAtiva ? 'Desligar a IA nesta conversa' : 'Ligar a IA nesta conversa'}</button>
+              )}
               {iaBarSinal && (
                 <button type="button" className="it" disabled={iaRecomecar.isPending} title="Recomeçar o atendimento do ZERO — a IA reinicia pela pergunta do benefício e limpa o que já coletou. Use quando a pessoa voltar a chamar." onClick={() => { setPop(null); void recomecarIa(); }}>Recomeçar atendimento da IA</button>
               )}

@@ -919,10 +919,14 @@ export default function FilaIrisTela({ fonte, usuarioId, admin: adminReal, abrir
   }, [abrirInicial]);
   useEffect(() => {
     if (!pedido || fonte.carregando) return;
+    /* o administrador abrindo o cliente de outra pessoa da equipe ("Abrir na fila" do WhatsApp): vai para a fila
+       dela e abre a ficha lá (a ficha navega pela lista de quem é o cliente) */
+    const lead = leads.find((l) => l.id === pedido);
+    if (lead && admin && lead.atendente !== dono && EQUIPE.some((a) => a.id === lead.atendente)) { abrirFilaDe(lead.atendente); return; }
     const achou = daFila.some((l) => l.id === pedido);
     if (achou && !navegacao.some((l) => l.id === pedido)) return; /* o filtro ainda está saindo: espera um render */
     if (achou) setAberto(pedido);
-    else avisar('Este cliente não está mais na sua fila.');
+    else avisar(admin ? 'Este cliente não está na Fila da Iris agora.' : 'Este cliente não está na sua fila agora.');
     setPedido(null);
     aoConsumirInicial?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
