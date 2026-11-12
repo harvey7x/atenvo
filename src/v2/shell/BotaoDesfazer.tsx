@@ -15,8 +15,9 @@ function IconeDesfazer() {
 }
 
 const baseBtn: CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', gap: 7, height: 33, padding: '0 13px',
-  borderRadius: 9, border: '1px solid var(--linha)', background: 'transparent',
+  // 32px e raio 6: o mesmo dos botões da barra do topo da ALFA (barra-alfa.css); o fio segue o da barra
+  display: 'inline-flex', alignItems: 'center', gap: 7, height: 32, padding: '0 12px',
+  borderRadius: 6, border: '1px solid var(--ba-fio, var(--linha))', background: 'transparent',
   color: 'var(--txt)', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, whiteSpace: 'nowrap',
 };
 

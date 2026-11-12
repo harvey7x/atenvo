@@ -1,0 +1,336 @@
+/* =====================================================================
+   BARRA LATERAL + TOPO DA ALFA (12/11) — pele da referência "Dashboard Sidebar"
+   (fundo chapado, fio fino, texto 13px, títulos de grupo em caixa alta, item
+   ativo destacado, contador e atalho à direita, pé com Configurações e Sair),
+   com o DOURADO da Reviza no lugar do cinza: marca, item ativo, contadores e
+   foco. Vale só quando o html tem [data-barra-alfa] (Reviza real e demo — o
+   main.tsx liga); o Atenvo segue com a cápsula de sempre (shell.css).
+   Tudo prefixado por `html[data-barra-alfa] .v2` (ganha dos resets do v2);
+   o topo e a busca, que a repaginada já pinta, levam os atributos dela.
+   ===================================================================== */
+
+/* ---- tokens: escuro (padrão) e claro ---- */
+html[data-barra-alfa] .v2 {
+  --ba-fundo: #0F1012;
+  --ba-fio: rgba(255, 255, 255, .075);
+  --ba-txt: #F2F3F5;
+  --ba-mudo: #9EA2AA;
+  --ba-rotulo: #73777F;
+  --ba-hover: rgba(255, 255, 255, .05);
+  --ba-ativo: color-mix(in srgb, var(--azul) 15%, transparent);
+  --ba-ativo-ico: var(--azul);
+  --ba-ativo-tx: var(--ba-txt);
+  --ba-badge-bg: color-mix(in srgb, var(--azul) 16%, transparent);
+  --ba-badge-tx: var(--azul);
+  --ba-kbd-fio: rgba(255, 255, 255, .1);
+  --ba-kbd-bg: rgba(255, 255, 255, .04);
+  --ba-kbd-tx: #8A8E96;
+  --ba-menu: #17181B;
+  --ba-sombra-menu: 0 20px 25px -5px rgba(0, 0, 0, .35), 0 8px 10px -6px rgba(0, 0, 0, .3);
+  --ba-sombra-trilho: 14px 0 34px rgba(0, 0, 0, .42);
+  --ba-foco: color-mix(in srgb, var(--azul) 72%, transparent);
+  --ba-e: cubic-bezier(.4, 0, .2, 1);
+  --ba-cheia: 260px;
+}
+html[data-barra-alfa][data-tema="light"] .v2 {
+  --ba-fundo: #FFFFFF;
+  --ba-fio: #E6E7EA;
+  --ba-txt: #0C0D0F;
+  --ba-mudo: #61656D;
+  --ba-rotulo: #7E828A;
+  --ba-hover: rgba(15, 18, 24, .045);
+  --ba-ativo: color-mix(in srgb, var(--azul) 13%, transparent);
+  --ba-ativo-ico: var(--rv-tinta, #8C6608);
+  --ba-badge-bg: color-mix(in srgb, var(--azul) 14%, transparent);
+  --ba-badge-tx: var(--rv-tinta, #8C6608);
+  --ba-kbd-fio: #E2E3E6;
+  --ba-kbd-bg: #FAFAFB;
+  --ba-kbd-tx: #7E828A;
+  --ba-menu: #FFFFFF;
+  --ba-sombra-menu: 0 20px 25px -5px rgba(16, 24, 40, .1), 0 8px 10px -6px rgba(16, 24, 40, .08);
+  --ba-sombra-trilho: 14px 0 34px rgba(16, 24, 40, .1);
+}
+
+/* ---- o quadro: a barra ocupa a esquerda, o conteúdo começa depois dela ---- */
+html[data-barra-alfa] .v2 .p-app {
+  --ba-w: var(--ba-cheia);
+  padding-left: var(--ba-w);
+  transition: padding-left .28s var(--ba-e);
+}
+html[data-barra-alfa] .v2 .p-app[data-barra="trilho"] { --ba-w: 64px; }
+html[data-barra-alfa] .v2 .p-app[data-barra="gaveta"] { --ba-w: 0px; }
+
+/* ---- a barra ---- */
+html[data-barra-alfa] .v2 .ba-barra {
+  position: absolute; top: 0; bottom: 0; left: 0; z-index: 30;
+  width: var(--ba-cheia); overflow: hidden;
+  background: var(--ba-fundo); border-right: 1px solid var(--ba-fio);
+  color: var(--ba-txt); font-family: var(--fonte);
+  transition: width .24s var(--ba-e), box-shadow .24s var(--ba-e);
+}
+/* o miolo tem sempre a largura cheia: recolher só corta (nada se espreme, nada reflui) */
+html[data-barra-alfa] .v2 .ba-in {
+  display: flex; flex-direction: column;
+  width: calc(var(--ba-cheia) - 1px); height: 100%; padding: 12px;
+}
+
+/* recolhida (trilho): 64px, só os ícones; o mouse ou o Tab abre por cima do conteúdo */
+html[data-barra-alfa] .v2 .p-app[data-barra="trilho"] .ba-barra { width: 64px; transition-delay: .12s; }
+html[data-barra-alfa] .v2 .p-app[data-barra="trilho"] .ba-barra:is(:hover, :has(:focus-visible), [data-menu]) {
+  width: var(--ba-cheia); box-shadow: var(--ba-sombra-trilho); transition-delay: .05s;
+}
+html[data-barra-alfa] .v2 .p-app[data-barra="trilho"] .ba-barra:not(:hover):not(:has(:focus-visible)):not([data-menu])
+  :is(.ba-item-tx, .ba-item-lado, .ba-grupo-rot, .ba-ws-tx, .ba-ws-seta, .ba-versao) { opacity: 0; }
+html[data-barra-alfa] .v2 .p-app[data-barra="trilho"] .ba-barra:not(:hover):not(:has(:focus-visible)):not([data-menu]) .ba-ponto { opacity: 1; }
+
+/* celular (gaveta): some; o botão do topo abre por cima, com o véu atrás */
+html[data-barra-alfa] .v2 .p-app[data-barra="gaveta"] { --ba-cheia: min(280px, 86vw); }
+html[data-barra-alfa] .v2 .p-app[data-barra="gaveta"] .ba-barra {
+  z-index: 60; transform: translateX(-102%); visibility: hidden;
+  transition: transform .28s var(--ba-e), visibility 0s linear .28s;
+}
+html[data-barra-alfa] .v2 .p-app[data-barra="gaveta"][data-gaveta] .ba-barra {
+  transform: none; visibility: visible; box-shadow: 18px 0 48px rgba(0, 0, 0, .45);
+  transition: transform .28s var(--ba-e);
+}
+html[data-barra-alfa] .v2 .ba-veu {
+  position: absolute; inset: 0; z-index: 59;
+  background: rgba(6, 7, 9, .55); animation: ba-veu .2s ease;
+}
+html[data-barra-alfa][data-tema="light"] .v2 .ba-veu { background: rgba(16, 24, 40, .32); }
+@keyframes ba-veu { from { opacity: 0; } }
+
+/* ---- o "workspace": empresa + ambiente (troca Cobranças ⇄ Atendimento) ---- */
+html[data-barra-alfa] .v2 .ba-ws { position: relative; flex: none; margin-bottom: 12px; }
+html[data-barra-alfa] .v2 .ba-ws-gat {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  padding: 6px 6px 6px 4px; border: 0; border-radius: 8px;
+  background: none; color: inherit; font: inherit; text-align: left; cursor: pointer;
+  transition: background-color .15s var(--ba-e);
+}
+html[data-barra-alfa] .v2 .ba-ws-gat.estatico { cursor: default; }
+html[data-barra-alfa] .v2 .ba-ws-marca {
+  display: grid; place-items: center; flex: none; width: 32px; height: 32px; border-radius: 8px;
+  color: #2A1E06;
+  background: linear-gradient(140deg, #F9E3A1 0%, #E6B84F 50%, #B98322 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .4), inset 0 -1px 0 rgba(90, 60, 8, .25), 0 1px 2px rgba(0, 0, 0, .3);
+}
+html[data-barra-alfa] .v2 .ba-ws-tx { display: flex; flex-direction: column; flex: 1; min-width: 0; transition: opacity .15s; }
+html[data-barra-alfa] .v2 .ba-ws-nome,
+html[data-barra-alfa] .v2 .ba-ws-amb { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+html[data-barra-alfa] .v2 .ba-ws-nome { font-size: 13px; font-weight: 600; line-height: 16px; letter-spacing: .01em; color: var(--ba-txt); }
+html[data-barra-alfa] .v2 .ba-ws-amb { font-size: 11.5px; line-height: 15px; color: var(--ba-mudo); }
+html[data-barra-alfa] .v2 .ba-ws-seta {
+  flex: none; color: color-mix(in srgb, var(--ba-mudo) 65%, transparent);
+  transition: color .15s var(--ba-e), opacity .15s;
+}
+html[data-barra-alfa] .v2 .ba-menu {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 5;
+  display: flex; flex-direction: column; gap: 2px; padding: 4px;
+  border: 1px solid var(--ba-fio); border-radius: 8px;
+  background: var(--ba-menu); box-shadow: var(--ba-sombra-menu);
+  animation: ba-pop .12s ease;
+}
+html[data-barra-alfa] .v2 .ba-menu-item {
+  display: flex; align-items: center; width: 100%; padding: 8px 10px;
+  border: 0; border-radius: 6px; background: none; font: inherit;
+  font-size: 13px; line-height: 20px; text-align: left; cursor: pointer;
+  color: color-mix(in srgb, var(--ba-txt) 82%, transparent);
+  transition: background-color .15s var(--ba-e), color .15s var(--ba-e);
+}
+html[data-barra-alfa] .v2 .ba-menu-item[aria-checked="true"] { background: var(--ba-ativo); color: var(--ba-badge-tx); font-weight: 600; }
+@keyframes ba-pop { from { opacity: 0; transform: scale(.96); } }
+
+/* ---- os grupos: rolam sem barra; um esmaecido na borda avisa que tem mais ---- */
+html[data-barra-alfa] .v2 .ba-grupos {
+  display: flex; flex-direction: column; flex: 1; gap: 16px; min-height: 0;
+  margin-top: 4px; overflow-x: hidden; overflow-y: auto; scrollbar-width: none;
+}
+html[data-barra-alfa] .v2 .ba-grupos::-webkit-scrollbar { display: none; }
+html[data-barra-alfa] .v2 .ba-grupos[data-rolagem="abaixo"] { -webkit-mask-image: linear-gradient(180deg, #000 calc(100% - 30px), transparent); mask-image: linear-gradient(180deg, #000 calc(100% - 30px), transparent); }
+html[data-barra-alfa] .v2 .ba-grupos[data-rolagem="acima"] { -webkit-mask-image: linear-gradient(0deg, #000 calc(100% - 30px), transparent); mask-image: linear-gradient(0deg, #000 calc(100% - 30px), transparent); }
+html[data-barra-alfa] .v2 .ba-grupos[data-rolagem="ambos"] { -webkit-mask-image: linear-gradient(180deg, transparent, #000 30px, #000 calc(100% - 30px), transparent); mask-image: linear-gradient(180deg, transparent, #000 30px, #000 calc(100% - 30px), transparent); }
+html[data-barra-alfa] .v2 .ba-grupo { display: flex; flex-direction: column; flex: none; gap: 2px; }
+html[data-barra-alfa] .v2 .ba-grupo-rot {
+  margin-bottom: 4px; padding: 0 12px;
+  font-size: 11px; font-weight: 600; line-height: 16px; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--ba-rotulo); white-space: nowrap; transition: opacity .15s;
+}
+
+/* ---- um item ---- */
+html[data-barra-alfa] .v2 .ba-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  width: 100%; padding: 7px 10px 7px 12px; border: 0; border-radius: 6px;
+  background: none; font: inherit; font-size: 13px; line-height: 20px; text-align: left; text-decoration: none;
+  color: var(--ba-mudo); cursor: pointer; user-select: none;
+  transition: background-color .2s var(--ba-e), color .2s var(--ba-e);
+}
+html[data-barra-alfa] .v2 .ba-item-pri { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+html[data-barra-alfa] .v2 .ba-ico {
+  position: relative; display: flex; flex: none; width: 16px; height: 16px;
+  color: color-mix(in srgb, var(--ba-mudo) 82%, transparent); transition: color .2s var(--ba-e);
+}
+html[data-barra-alfa] .v2 .ba-ico svg { width: 16px; height: 16px; stroke-width: 1.5; }
+html[data-barra-alfa] .v2 .ba-item-tx { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; letter-spacing: .01em; transition: opacity .15s; }
+html[data-barra-alfa] .v2 .ba-item-lado { display: flex; align-items: center; flex: none; gap: 8px; transition: opacity .15s; }
+html[data-barra-alfa] .v2 .ba-item.on { background: var(--ba-ativo); color: var(--ba-ativo-tx); font-weight: 550; }
+html[data-barra-alfa] .v2 .ba-item.on .ba-ico { color: var(--ba-ativo-ico); }
+html[data-barra-alfa] .v2 .ba-kbd {
+  display: none; align-items: center; justify-content: center; height: 20px; padding: 0 6px;
+  border: 1px solid var(--ba-kbd-fio); border-radius: 4px; background: var(--ba-kbd-bg); color: var(--ba-kbd-tx);
+  font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace; font-size: 10px; font-weight: 500; line-height: 1;
+  box-shadow: 0 1px rgba(0, 0, 0, .06);
+}
+html[data-barra-alfa] .v2 .ba-item:focus-visible .ba-kbd { display: inline-flex; }
+html[data-barra-alfa] .v2 .ba-badge {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px;
+  border-radius: 999px; background: var(--ba-badge-bg); color: var(--ba-badge-tx);
+  font-size: 10.5px; font-weight: 650; line-height: 1;
+}
+/* o contador vira um ponto dourado no ícone quando a barra está recolhida */
+html[data-barra-alfa] .v2 .ba-ponto {
+  position: absolute; top: -2px; right: -3px; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--azul); box-shadow: 0 0 0 2px var(--ba-fundo); opacity: 0; transition: opacity .15s;
+}
+
+/* ---- o pé: Configurações (Atendimento), Sair e a versão ---- */
+html[data-barra-alfa] .v2 .ba-pe {
+  display: flex; flex-direction: column; flex: none; gap: 2px;
+  margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--ba-fio);
+}
+html[data-barra-alfa] .v2 .ba-versao {
+  padding: 8px 12px 0; font-size: 10.5px; line-height: 14px; letter-spacing: .02em;
+  color: var(--ba-rotulo); white-space: nowrap; transition: opacity .15s;
+}
+
+/* ---- foco e hover (hover só com mouse: no toque ele ficaria preso) ---- */
+html[data-barra-alfa] .v2 :is(.ba-item, .ba-ws-gat, .ba-menu-item, .ba-alternar):focus { outline: none; }
+html[data-barra-alfa] .v2 :is(.ba-item, .ba-ws-gat, .ba-menu-item, .ba-alternar):focus-visible { outline: 2px solid var(--ba-foco); outline-offset: -2px; }
+@media (hover: hover) {
+  html[data-barra-alfa] .v2 .ba-ws-gat:not(.estatico):hover { background: var(--ba-hover); }
+  html[data-barra-alfa] .v2 .ba-ws-gat:not(.estatico):hover .ba-ws-seta { color: var(--ba-txt); }
+  html[data-barra-alfa] .v2 .ba-menu-item:not([aria-checked="true"]):hover { background: var(--ba-hover); color: var(--ba-txt); }
+  html[data-barra-alfa] .v2 .ba-item:not(.on):hover { background: var(--ba-hover); color: color-mix(in srgb, var(--ba-txt) 92%, transparent); }
+  html[data-barra-alfa] .v2 .ba-item:not(.on):hover .ba-ico { color: color-mix(in srgb, var(--ba-txt) 78%, transparent); }
+  html[data-barra-alfa] .v2 .ba-item:hover .ba-kbd { display: inline-flex; }
+  html[data-barra-alfa] .v2 .ba-alternar:hover { background: var(--ba-hover); color: var(--ba-txt); }
+}
+
+/* ---- tela baixa: o ritmo aperta para o menu da Cobrança (16 itens) caber sem rolar ---- */
+@media (max-height: 900px) {
+  html[data-barra-alfa] .v2 .ba-in { padding: 10px 12px; }
+  html[data-barra-alfa] .v2 .ba-ws { margin-bottom: 8px; }
+  html[data-barra-alfa] .v2 .ba-grupos { gap: 10px; }
+  html[data-barra-alfa] .v2 .ba-grupo-rot { margin-bottom: 2px; }
+  html[data-barra-alfa] .v2 .ba-item { padding-top: 5px; padding-bottom: 5px; }
+  html[data-barra-alfa] .v2 .ba-pe { margin-top: 8px; padding-top: 8px; }
+  html[data-barra-alfa] .v2 .ba-versao { padding-top: 6px; }
+}
+@media (max-height: 790px) {
+  html[data-barra-alfa] .v2 .ba-grupos { gap: 8px; }
+  html[data-barra-alfa] .v2 .ba-item { padding-top: 4px; padding-bottom: 4px; }
+}
+
+/* =====================================================================
+   BARRA DO TOPO: chapada no tom da barra, fio embaixo; à esquerda o botão de
+   recolher e a trilha "ambiente / página"; à direita os botões fantasmas
+   ===================================================================== */
+html[data-barra-alfa][data-repaginada][data-repaginada] .v2.app-v2 .p-topbar {
+  height: 56px; padding: 0 16px; gap: 12px;
+  background: var(--ba-fundo); border-bottom: 1px solid var(--ba-fio);
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+html[data-barra-alfa] .v2 .ba-topo { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; }
+html[data-barra-alfa] .v2 .ba-alternar {
+  display: grid; place-items: center; flex: none; width: 32px; height: 32px; padding: 0;
+  border: 0; border-radius: 6px; background: none; color: var(--ba-mudo); cursor: pointer;
+  transition: background-color .15s var(--ba-e), color .15s var(--ba-e);
+}
+html[data-barra-alfa] .v2 .ba-alternar svg { display: block; }
+html[data-barra-alfa] .v2 .ba-trilha {
+  display: flex; align-items: center; gap: 8px; min-width: 0;
+  font-size: 14px; line-height: 20px; color: var(--ba-mudo);
+}
+html[data-barra-alfa] .v2 .ba-trilha-amb,
+html[data-barra-alfa] .v2 .ba-trilha-pag { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+html[data-barra-alfa] .v2 .ba-trilha-amb { flex: none; }
+html[data-barra-alfa] .v2 .ba-trilha-sep { flex: none; color: color-mix(in srgb, var(--ba-mudo) 55%, transparent); }
+html[data-barra-alfa] .v2 .ba-trilha-pag { font-weight: 550; color: var(--ba-txt); }
+html[data-barra-alfa][data-repaginada][data-repaginada] .v2.app-v2 .p-topbar .top-dir { gap: 6px; }
+html[data-barra-alfa][data-repaginada][data-repaginada] .v2.app-v2 .p-topbar .ib {
+  width: 32px; height: 32px; border-radius: 6px; border-color: transparent; background: transparent; color: var(--ba-mudo);
+}
+html[data-barra-alfa][data-repaginada][data-repaginada] .v2.app-v2 .p-topbar .ib:hover { background: var(--ba-hover); color: var(--ba-txt); }
+html[data-barra-alfa][data-repaginada][data-repaginada] .v2.app-v2 .p-topbar .ib .pt { top: 6px; right: 7px; border-color: var(--ba-fundo); }
+html[data-barra-alfa][data-repaginada][data-repaginada] .v2.app-v2 .p-topbar .ib:focus-visible { outline: 2px solid var(--ba-foco); outline-offset: -2px; }
+/* avatar: o círculo da referência, no dourado */
+html[data-barra-alfa][data-repaginada][data-repaginada] .v2.app-v2 .p-topbar .avatar.avatar-btn {
+  width: 32px; height: 32px; margin-left: 4px; font-size: 11.5px; font-weight: 650; letter-spacing: .02em;
+  color: var(--ba-badge-tx); background: var(--ba-badge-bg);
+  border: 1px solid color-mix(in srgb, var(--azul) 34%, transparent); box-shadow: none;
+}
+html[data-barra-alfa][data-repaginada][data-repaginada] .v2.app-v2 .p-topbar .avatar.avatar-btn:hover { border-color: color-mix(in srgb, var(--azul) 60%, transparent); }
+html[data-barra-alfa][data-repaginada][data-repaginada] .v2.app-v2 .p-topbar .avatar.avatar-btn:focus-visible { outline: 2px solid var(--ba-foco); outline-offset: 2px; }
+/* celular: sem a trilha do ambiente (só a página) e os botões mais juntos */
+@media (max-width: 760px) {
+  html[data-barra-alfa][data-repaginada][data-repaginada] .v2.app-v2 .p-topbar { padding: 0 10px; gap: 8px; }
+  html[data-barra-alfa] .v2 .ba-trilha-amb, html[data-barra-alfa] .v2 .ba-trilha-sep { display: none; }
+  html[data-barra-alfa] .v2 .ba-trilha { font-size: 13.5px; }
+  html[data-barra-alfa][data-repaginada][data-repaginada] .v2.app-v2 .p-topbar .top-dir { gap: 2px; }
+}
+
+/* =====================================================================
+   BUSCA (⌘K) na pele da referência: véu com desfoque, caixa de 576px a 15%
+   do topo, campo grande, ESC e fechar; resultados com o ativo no dourado
+   ===================================================================== */
+html[data-barra-alfa][data-repaginada][data-repaginada] .v2 .pal-veu.pal-veu {
+  background: color-mix(in srgb, var(--ba-fundo) 52%, transparent);
+  -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
+  padding: 15vh 16px 16px;
+}
+html[data-barra-alfa][data-repaginada][data-repaginada] .v2 .pal-caixa.pal-caixa {
+  width: 576px; max-height: min(470px, 72vh); border-radius: 12px;
+  background: var(--ba-menu); border: 1px solid var(--ba-fio);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, .5);
+  animation: ba-pop .18s ease;
+}
+html[data-barra-alfa][data-tema="light"][data-repaginada][data-repaginada] .v2 .pal-caixa.pal-caixa { box-shadow: 0 25px 50px -12px rgba(16, 24, 40, .22); }
+html[data-barra-alfa][data-repaginada][data-repaginada] .v2 .pal-topo.pal-topo { gap: 12px; padding: 0 12px 0 16px; border-bottom: 1px solid var(--ba-fio); color: var(--ba-mudo); }
+html[data-barra-alfa][data-repaginada][data-repaginada] .v2 .pal-topo.pal-topo > svg { width: 18px; height: 18px; color: color-mix(in srgb, var(--ba-mudo) 80%, transparent); }
+html[data-barra-alfa][data-repaginada][data-repaginada] .v2 .pal-inp.pal-inp { padding: 16px 0; font-size: 14px; line-height: 20px; color: var(--ba-txt); }
+html[data-barra-alfa][data-repaginada][data-repaginada] .v2 .pal-inp.pal-inp::placeholder { color: color-mix(in srgb, var(--ba-mudo) 72%, transparent); }
+html[data-barra-alfa][data-repaginada][data-repaginada] .v2 .pal-topo.pal-topo kbd {
+  height: 20px; display: inline-flex; align-items: center; padding: 0 6px; border-radius: 4px;
+  border: 1px solid var(--ba-kbd-fio); background: var(--ba-kbd-bg); color: var(--ba-kbd-tx);
+  font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace; font-size: 10px; font-weight: 500; cursor: pointer;
+}
+html[data-barra-alfa] .v2 .pal-fechar {
+  display: grid; place-items: center; flex: none; width: 28px; height: 28px; padding: 0;
+  border: 0; border-radius: 6px; background: none; color: color-mix(in srgb, var(--ba-mudo) 85%, transparent); cursor: pointer;
+}
+html[data-barra-alfa] .v2 .pal-fechar:hover { background: var(--ba-hover); color: var(--ba-txt); }
+html[data-barra-alfa] .v2 .pal-fechar:focus-visible { outline: 2px solid var(--ba-foco); outline-offset: -2px; }
+html[data-barra-alfa][data-repaginada][data-repaginada] .v2 .pal-lista.pal-lista { padding: 8px; }
+html[data-barra-alfa][data-repaginada][data-repaginada] .v2 .pal-glabel.pal-glabel {
+  padding: 8px 10px 4px; font-size: 11px; font-weight: 600; letter-spacing: .06em; color: var(--ba-rotulo);
+}
+html[data-barra-alfa][data-repaginada][data-repaginada] .v2 .pal-item.pal-item {
+  padding: 8px 10px; border-radius: 6px; font-size: 13px; line-height: 20px; color: var(--ba-mudo);
+}
+html[data-barra-alfa][data-repaginada][data-repaginada] .v2 .pal-item.pal-item.on { background: var(--ba-ativo); color: var(--ba-txt); }
+html[data-barra-alfa][data-repaginada][data-repaginada] .v2 .pal-item.pal-item .pal-ico svg { stroke-width: 1.5; }
+html[data-barra-alfa][data-repaginada][data-repaginada] .v2 .pal-item.pal-item.on .pal-ico { color: var(--ba-ativo-ico); }
+html[data-barra-alfa][data-repaginada][data-repaginada] .v2 .pal-meta.pal-meta { font-size: 12px; color: color-mix(in srgb, var(--ba-mudo) 78%, transparent); }
+html[data-barra-alfa][data-repaginada][data-repaginada] .v2 .pal-vazio.pal-vazio { padding: 28px 12px; text-align: center; font-size: 13px; font-weight: 500; color: var(--ba-mudo); }
+html[data-barra-alfa] .v2 .pal-rodape { display: none; }
+@media (max-width: 639px) { html[data-barra-alfa][data-repaginada][data-repaginada] .v2 .pal-topo.pal-topo kbd { display: none; } }
+
+/* ---- Modo de Performance (leve) e quem pediu menos movimento: sem animação nem desfoque ---- */
+html[data-barra-alfa][data-perf="lite"] .v2 :is(.p-app, .ba-barra, .ba-item, .ba-item-tx, .ba-item-lado, .ba-grupo-rot, .ba-ws-tx, .ba-ponto, .ba-versao),
+html[data-barra-alfa][data-perf="lite"] .v2 .ba-menu { transition: none !important; animation: none !important; }
+html[data-barra-alfa][data-perf="lite"][data-repaginada][data-repaginada] .v2 .pal-veu.pal-veu { -webkit-backdrop-filter: none; backdrop-filter: none; }
+@media (prefers-reduced-motion: reduce) {
+  html[data-barra-alfa] .v2 :is(.p-app, .ba-barra, .ba-item, .ba-item-tx, .ba-item-lado, .ba-grupo-rot, .ba-ws-tx, .ba-ponto, .ba-versao, .ba-menu, .ba-veu) {
+    transition-duration: .01ms !important; animation-duration: .01ms !important;
+  }
+}
