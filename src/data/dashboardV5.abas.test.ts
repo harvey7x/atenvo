@@ -164,6 +164,29 @@ describe('demo das abas — invariantes (mesmos leads, totais fecham)', () => {
     expect(demoCampanhasV5(j, AGORA)).toEqual(demoCampanhasV5(j, AGORA));
     expect(demoIrisV5(j, AGORA)).toEqual(demoIrisV5(j, AGORA));
   });
+
+  it('período curto: a série recua para os últimos 7 dias (régua do mapa), a tabela não', () => {
+    const j = { ...janela(periodoDash('hoje')), serieIniISO: '2026-11-06T00:00:00-03:00' };
+    const d = demoCampanhasV5(j, AGORA);
+    const dias = new Set(d.serie.map((p) => p.dia));
+    expect(dias.size).toBeGreaterThan(1);
+    expect([...dias].every((x) => x >= '2026-11-06')).toBe(true);
+    // a tabela continua SÓ no período: série filtrada aos dias do período bate com ela
+    for (const c of d.campanhas) {
+      const ent = soma(d.serie.filter((p) => p.campanha === c.campanha && p.dia >= '2026-11-12').map((p) => p.entradas));
+      expect(ent).toBe(c.entradas);
+    }
+    const i = demoIrisV5(j, AGORA);
+    expect(new Set(i.serie.map((p) => p.dia)).size).toBeGreaterThan(1);
+    const a = demoAtendentesAbaV5(j, AGORA);
+    const diasEq = new Set(a.serieGanhos.map((p) => p.dia));
+    // ganhos por atendente seguem contados SÓ no período
+    for (const at of a.atendentes) {
+      const g = soma(a.serieGanhos.filter((p) => p.usuarioId === at.usuarioId && p.dia >= '2026-11-12').map((p) => p.ganhos));
+      expect(g).toBe(at.ganhos);
+    }
+    expect(diasEq.size).toBeGreaterThanOrEqual(1);
+  });
 });
 
 /* ====================================================================== */

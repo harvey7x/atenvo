@@ -106,7 +106,8 @@ $$;
 -- ---------------------------------------------------------------- 1) CAMPANHAS
 create or replace function public.dash_v5c_dados(
   p_org uuid, p_ini timestamptz, p_fim timestamptz,
-  p_ini_ant timestamptz, p_fim_ant timestamptz)
+  p_ini_ant timestamptz, p_fim_ant timestamptz,
+  p_serie_ini timestamptz)
 returns jsonb
 language plpgsql stable
 set search_path = public
@@ -231,15 +232,17 @@ begin
       or coalesce(ent.n, 0) + coalesce(fk.ganhos, 0) + coalesce(fk.ne, 0) + coalesce(ak.pelo_anuncio, 0) > 0;
 
   -- ------------------ série diária (entradas / ganhos / ne por campanha) ------------------
+  -- a série pode começar ANTES do período (p_serie_ini): período curto desenha os
+  -- últimos 7 dias, como o mapa dia × hora — um dia só não faz onda
   with pontos as (
     select to_char(e.criado_em at time zone 'America/Sao_Paulo', 'YYYY-MM-DD') as dia,
            public.dash_v5_campanha(e.canal_origem_id) as camp, count(*) as e, 0 as g, 0 as n
-      from public.dash_v5_entradas(p_org, p_ini, p_fim) e group by 1, 2
+      from public.dash_v5_entradas(p_org, p_serie_ini, p_fim) e group by 1, 2
     union all
     select to_char(f.fechado_em at time zone 'America/Sao_Paulo', 'YYYY-MM-DD'),
            public.dash_v5_campanha(f.canal_origem_id),
            0, count(*) filter (where f.tipo = 'ganho'), count(*) filter (where f.tipo = 'ne')
-      from public.dash_v5_fechamentos(p_org, p_ini, p_fim) f group by 1, 2
+      from public.dash_v5_fechamentos(p_org, p_serie_ini, p_fim) f group by 1, 2
   )
   select coalesce(jsonb_agg(jsonb_build_object(
            'dia', z.dia, 'campanha', z.camp,
@@ -304,7 +307,7 @@ begin
 
   return jsonb_build_object(
     'gerado_em', v_agora,
-    'periodo',   jsonb_build_object('inicio', p_ini, 'fim', p_fim),
+    'periodo',   jsonb_build_object('inicio', p_ini, 'fim', p_fim, 'serie_inicio', p_serie_ini),
     'campanhas', v_campanhas,
     'serie',     v_serie,
     'anterior',  public.dash_v5c_resumo(p_org, p_ini_ant, p_fim_ant),
@@ -321,19 +324,21 @@ end;
 $$;
 
 create or replace function public.dashboard_v5_campanhas(
-  p_inicio     timestamptz,
-  p_fim        timestamptz,
-  p_org        uuid        default null,
-  p_inicio_ant timestamptz default null,
-  p_fim_ant    timestamptz default null)
+  p_inicio       timestamptz,
+  p_fim          timestamptz,
+  p_org          uuid        default null,
+  p_inicio_ant   timestamptz default null,
+  p_fim_ant      timestamptz default null,
+  p_serie_inicio timestamptz default null)
 returns jsonb
 language plpgsql stable security definer
 set search_path = public
 as $$
 declare
-  v_org     uuid;
-  v_ini_ant timestamptz;
-  v_fim_ant timestamptz;
+  v_org       uuid;
+  v_ini_ant   timestamptz;
+  v_fim_ant   timestamptz;
+  v_serie_ini timestamptz;
 begin
   v_org := public.dash_v5_abas_portao(p_inicio, p_fim, p_org);
   if p_inicio_ant is not null and p_fim_ant is not null then
@@ -342,7 +347,10 @@ begin
   else
     v_ini_ant := p_inicio - (p_fim - p_inicio); v_fim_ant := p_inicio;
   end if;
-  return public.dash_v5c_dados(v_org, p_inicio, p_fim, v_ini_ant, v_fim_ant);
+  -- série pode recuar antes do período (últimos 7 dias do front), nunca avançar
+  v_serie_ini := least(coalesce(p_serie_inicio, p_inicio), p_inicio);
+  if p_fim - v_serie_ini > interval '45 days' then raise exception 'periodo_longo'; end if;
+  return public.dash_v5c_dados(v_org, p_inicio, p_fim, v_ini_ant, v_fim_ant, v_serie_ini);
 end;
 $$;
 
@@ -355,7 +363,8 @@ $$;
 -- diária de ganhos e as fotos de agora (vácuo 3º aviso, carteira, parados >7d).
 create or replace function public.dash_v5a_dados(
   p_org uuid, p_ini timestamptz, p_fim timestamptz,
-  p_ini_ant timestamptz, p_fim_ant timestamptz)
+  p_ini_ant timestamptz, p_fim_ant timestamptz,
+  p_serie_ini timestamptz)
 returns jsonb
 language plpgsql stable
 set search_path = public
@@ -534,38 +543,41 @@ begin
    where coalesce(rec.n, 0) + coalesce(tr.n, 0) + coalesce(gan.ganhos, 0)
        + coalesce(nem.n, 0) + coalesce(rv.turnos, 0) > 0;
 
-  -- série diária de ganhos por atendente (pódio)
+  -- série diária de ganhos por atendente (pódio) — pode recuar antes do período
+  -- (últimos 7 dias, como o mapa): um dia só não faz onda
   select coalesce(jsonb_agg(jsonb_build_object('dia', z.dia, 'usuario_id', z.uid, 'ganhos', z.n)
                             order by z.dia, z.uid), '[]'::jsonb)
     into v_serie
     from (select to_char(f.fechado_em at time zone 'America/Sao_Paulo', 'YYYY-MM-DD') as dia,
                  f.credito_id as uid, count(*) as n
-            from public.dash_v5_fechamentos(p_org, p_ini, p_fim) f
+            from public.dash_v5_fechamentos(p_org, p_serie_ini, p_fim) f
            where f.tipo = 'ganho' and f.credito_id is not null
            group by 1, 2) z;
 
   return jsonb_build_object(
     'gerado_em',    now(),
-    'periodo',      jsonb_build_object('inicio', p_ini, 'fim', p_fim),
+    'periodo',      jsonb_build_object('inicio', p_ini, 'fim', p_fim, 'serie_inicio', p_serie_ini),
     'atendentes',   v_atendentes,
     'serie_ganhos', v_serie);
 end;
 $$;
 
 create or replace function public.dashboard_v5_atendentes(
-  p_inicio     timestamptz,
-  p_fim        timestamptz,
-  p_org        uuid        default null,
-  p_inicio_ant timestamptz default null,
-  p_fim_ant    timestamptz default null)
+  p_inicio       timestamptz,
+  p_fim          timestamptz,
+  p_org          uuid        default null,
+  p_inicio_ant   timestamptz default null,
+  p_fim_ant      timestamptz default null,
+  p_serie_inicio timestamptz default null)
 returns jsonb
 language plpgsql stable security definer
 set search_path = public
 as $$
 declare
-  v_org     uuid;
-  v_ini_ant timestamptz;
-  v_fim_ant timestamptz;
+  v_org       uuid;
+  v_ini_ant   timestamptz;
+  v_fim_ant   timestamptz;
+  v_serie_ini timestamptz;
 begin
   v_org := public.dash_v5_abas_portao(p_inicio, p_fim, p_org);
   if p_inicio_ant is not null and p_fim_ant is not null then
@@ -574,7 +586,9 @@ begin
   else
     v_ini_ant := p_inicio - (p_fim - p_inicio); v_fim_ant := p_inicio;
   end if;
-  return public.dash_v5a_dados(v_org, p_inicio, p_fim, v_ini_ant, v_fim_ant);
+  v_serie_ini := least(coalesce(p_serie_inicio, p_inicio), p_inicio);
+  if p_fim - v_serie_ini > interval '45 days' then raise exception 'periodo_longo'; end if;
+  return public.dash_v5a_dados(v_org, p_inicio, p_fim, v_ini_ant, v_fim_ant, v_serie_ini);
 end;
 $$;
 
@@ -661,7 +675,8 @@ $$;
 
 create or replace function public.dash_v5i_dados(
   p_org uuid, p_ini timestamptz, p_fim timestamptz,
-  p_ini_ant timestamptz, p_fim_ant timestamptz)
+  p_ini_ant timestamptz, p_fim_ant timestamptz,
+  p_serie_ini timestamptz)
 returns jsonb
 language plpgsql stable
 set search_path = public
@@ -741,6 +756,7 @@ begin
     into v_tempo;
 
   -- ------------------ série diária (atendidas × qualificadas × docs completos) ------------------
+  -- começa em p_serie_ini (período curto desenha os últimos 7 dias, como o mapa)
   with ses as (
     select s.id, s.criado_em, s.docs, s.dados, s.canal_id
       from public.ia_sessoes s
@@ -751,7 +767,7 @@ begin
            (m.metadados->>'sessao_id')::uuid as sid
       from public.mensagens m
      where m.organizacao_id = p_org
-       and m.criado_em >= p_ini and m.criado_em < p_fim
+       and m.criado_em >= p_serie_ini and m.criado_em < p_fim
        and m.direcao = 'saida' and m.origem = 'bot'
        and m.metadados->>'fluxo' = 'ia_sdr' and m.metadados ? 'sessao_id'
      group by 1, 2
@@ -764,7 +780,7 @@ begin
            0, count(distinct e.sessao_id), 0
       from public.ia_eventos e
       join ses s on s.id = e.sessao_id
-     where e.organizacao_id = p_org and e.criado_em >= p_ini and e.criado_em < p_fim
+     where e.organizacao_id = p_org and e.criado_em >= p_serie_ini and e.criado_em < p_fim
        and e.tipo = 'financeiras_decisao' and e.detalhe->>'passa' = 'true'
      group by 1
     union all
@@ -779,7 +795,7 @@ begin
                and (s.docs ? 'comprovante')
                and (coalesce(s.dados->>'email', '') <> ''
                     or coalesce((s.dados->>'email_a_criar')::boolean, false))) x
-     where x.conclusao_em >= p_ini and x.conclusao_em < p_fim
+     where x.conclusao_em >= p_serie_ini and x.conclusao_em < p_fim
      group by 1
   )
   select coalesce(jsonb_agg(jsonb_build_object(
@@ -829,7 +845,7 @@ begin
 
   return jsonb_build_object(
     'gerado_em',  now(),
-    'periodo',    jsonb_build_object('inicio', p_ini, 'fim', p_fim),
+    'periodo',    jsonb_build_object('inicio', p_ini, 'fim', p_fim, 'serie_inicio', p_serie_ini),
     'exatidao_atendidas', 'banda_5pct',
     'funil',      public.dash_v5i_funil(p_org, p_ini, p_fim),
     'funil_ant',  public.dash_v5i_funil(p_org, p_ini_ant, p_fim_ant),
@@ -842,19 +858,21 @@ end;
 $$;
 
 create or replace function public.dashboard_v5_iris(
-  p_inicio     timestamptz,
-  p_fim        timestamptz,
-  p_org        uuid        default null,
-  p_inicio_ant timestamptz default null,
-  p_fim_ant    timestamptz default null)
+  p_inicio       timestamptz,
+  p_fim          timestamptz,
+  p_org          uuid        default null,
+  p_inicio_ant   timestamptz default null,
+  p_fim_ant      timestamptz default null,
+  p_serie_inicio timestamptz default null)
 returns jsonb
 language plpgsql stable security definer
 set search_path = public
 as $$
 declare
-  v_org     uuid;
-  v_ini_ant timestamptz;
-  v_fim_ant timestamptz;
+  v_org       uuid;
+  v_ini_ant   timestamptz;
+  v_fim_ant   timestamptz;
+  v_serie_ini timestamptz;
 begin
   v_org := public.dash_v5_abas_portao(p_inicio, p_fim, p_org);
   if p_inicio_ant is not null and p_fim_ant is not null then
@@ -863,7 +881,9 @@ begin
   else
     v_ini_ant := p_inicio - (p_fim - p_inicio); v_fim_ant := p_inicio;
   end if;
-  return public.dash_v5i_dados(v_org, p_inicio, p_fim, v_ini_ant, v_fim_ant);
+  v_serie_ini := least(coalesce(p_serie_inicio, p_inicio), p_inicio);
+  if p_fim - v_serie_ini > interval '45 days' then raise exception 'periodo_longo'; end if;
+  return public.dash_v5i_dados(v_org, p_inicio, p_fim, v_ini_ant, v_fim_ant, v_serie_ini);
 end;
 $$;
 
@@ -871,14 +891,14 @@ $$;
 -- ---------------------------------------------------------------- grants
 revoke all on function public.dash_v5_abas_portao(timestamptz, timestamptz, uuid) from public, anon, authenticated;
 revoke all on function public.dash_v5c_resumo(uuid, timestamptz, timestamptz) from public, anon, authenticated;
-revoke all on function public.dash_v5c_dados(uuid, timestamptz, timestamptz, timestamptz, timestamptz) from public, anon, authenticated;
-revoke all on function public.dash_v5a_dados(uuid, timestamptz, timestamptz, timestamptz, timestamptz) from public, anon, authenticated;
+revoke all on function public.dash_v5c_dados(uuid, timestamptz, timestamptz, timestamptz, timestamptz, timestamptz) from public, anon, authenticated;
+revoke all on function public.dash_v5a_dados(uuid, timestamptz, timestamptz, timestamptz, timestamptz, timestamptz) from public, anon, authenticated;
 revoke all on function public.dash_v5i_funil(uuid, timestamptz, timestamptz) from public, anon, authenticated;
-revoke all on function public.dash_v5i_dados(uuid, timestamptz, timestamptz, timestamptz, timestamptz) from public, anon, authenticated;
+revoke all on function public.dash_v5i_dados(uuid, timestamptz, timestamptz, timestamptz, timestamptz, timestamptz) from public, anon, authenticated;
 
-revoke all on function public.dashboard_v5_campanhas(timestamptz, timestamptz, uuid, timestamptz, timestamptz) from public, anon;
-grant execute on function public.dashboard_v5_campanhas(timestamptz, timestamptz, uuid, timestamptz, timestamptz) to authenticated, service_role;
-revoke all on function public.dashboard_v5_atendentes(timestamptz, timestamptz, uuid, timestamptz, timestamptz) from public, anon;
-grant execute on function public.dashboard_v5_atendentes(timestamptz, timestamptz, uuid, timestamptz, timestamptz) to authenticated, service_role;
-revoke all on function public.dashboard_v5_iris(timestamptz, timestamptz, uuid, timestamptz, timestamptz) from public, anon;
-grant execute on function public.dashboard_v5_iris(timestamptz, timestamptz, uuid, timestamptz, timestamptz) to authenticated, service_role;
+revoke all on function public.dashboard_v5_campanhas(timestamptz, timestamptz, uuid, timestamptz, timestamptz, timestamptz) from public, anon;
+grant execute on function public.dashboard_v5_campanhas(timestamptz, timestamptz, uuid, timestamptz, timestamptz, timestamptz) to authenticated, service_role;
+revoke all on function public.dashboard_v5_atendentes(timestamptz, timestamptz, uuid, timestamptz, timestamptz, timestamptz) from public, anon;
+grant execute on function public.dashboard_v5_atendentes(timestamptz, timestamptz, uuid, timestamptz, timestamptz, timestamptz) to authenticated, service_role;
+revoke all on function public.dashboard_v5_iris(timestamptz, timestamptz, uuid, timestamptz, timestamptz, timestamptz) from public, anon;
+grant execute on function public.dashboard_v5_iris(timestamptz, timestamptz, uuid, timestamptz, timestamptz, timestamptz) to authenticated, service_role;

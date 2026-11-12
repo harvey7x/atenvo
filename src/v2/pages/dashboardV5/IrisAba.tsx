@@ -3,6 +3,7 @@ import type { IrisV5 } from '@/data/dashboardV5.abas.tipos';
 import { rotuloCampanha } from '@/data/dashboardV5.abas.tipos';
 import { baldesDe, fimComHoje, somarEmBaldes, type BaldeTipo } from '@/data/dashboardV5.series';
 import { fmtDuracaoH, fmtDuracaoMin, fmtInt, fmtPct, pctDe } from '@/data/dashboardV5.formato';
+import { janelaMapaV5 } from '@/data/dashboardV5.periodo';
 import type { Periodo } from '@/data/relatorios';
 import { Skeleton } from '../../components';
 import { Ajuda, Legenda, Secao, Variacao, Vazio } from './comum';
@@ -58,7 +59,9 @@ export function IrisAba({ d, periodo, hoje }: { d: IrisV5; periodo: Periodo; hoj
   const a = d.funilAnt;
   const fa = d.faltas;
   const balde: BaldeTipo = periodo.dias <= 14 ? 'dia' : 'semana';
-  const baldes = useMemo(() => baldesDe(periodo.iniDate, fimComHoje(periodo.fimDate, hoje), balde), [periodo, balde, hoje]);
+  // período curto desenha os últimos 7 dias (régua do mapa): um dia só não faz onda
+  const jm = useMemo(() => janelaMapaV5(periodo, hoje), [periodo, hoje]);
+  const baldes = useMemo(() => baldesDe(jm.iniDate, fimComHoje(periodo.fimDate, hoje), balde), [jm, periodo, balde, hoje]);
   const series = useMemo<SerieGraf[]>(() => [
     {
       id: 'atendidas', rotulo: 'Atendidas', cor: 'var(--dado-1)',
@@ -132,7 +135,7 @@ export function IrisAba({ d, periodo, hoje }: { d: IrisV5; periodo: Periodo; hoj
       </Secao>
 
       <Secao className="d5-ondas d5-ondas-iris" titulo="Ondas da Iris"
-        sub={`Atendidas, qualificadas e documentação completa por ${balde === 'dia' ? 'dia' : 'semana (seg–dom)'}.`}>
+        sub={`Atendidas, qualificadas e documentação completa por ${balde === 'dia' ? 'dia' : 'semana (seg–dom)'}${jm.estendido ? ' — período curto: desenhando os últimos 7 dias' : ''}.`}>
         <LegendaGraf series={series} />
         <GrafLinhas baldes={baldes} series={series}
           titulo={`Funil da Iris por ${balde === 'dia' ? 'dia' : 'semana'}`}

@@ -83,21 +83,25 @@ function resumoPorCampanha(leads: LeadDemo[], j: Janela, ag: number, aj: ReturnT
   return [...m.values()].sort((a, b) => b.entradas - a.entradas || a.campanha.localeCompare(b.campanha));
 }
 
-export function demoCampanhasV5(
-  janela: { iniISO: string; fimISO: string; antIniISO: string; antFimISO: string },
-  agora: Date, cenario?: CenarioDemoV5,
-): CampanhasV5 {
+/** janela das abas no demo — serieIniISO ausente = série começa com o período */
+export interface JanelaAbasDemo {
+  iniISO: string; fimISO: string; antIniISO: string; antFimISO: string; serieIniISO?: string;
+}
+
+export function demoCampanhasV5(janela: JanelaAbasDemo, agora: Date, cenario?: CenarioDemoV5): CampanhasV5 {
   const aj = ajusteDemoV5(cenario, agora);
   const ag = agora.getTime();
   const per: Janela = { ini: Date.parse(janela.iniISO), fim: Date.parse(janela.fimISO) };
   const ant: Janela = { ini: Date.parse(janela.antIniISO), fim: Date.parse(janela.antFimISO) };
+  // série do gráfico: período curto recua para os últimos 7 dias (régua do mapa)
+  const jSerie: Janela = { ini: Math.min(Date.parse(janela.serieIniISO ?? janela.iniISO), per.ini), fim: per.fim };
   const hoje = diaDe(ag);
   const diaIni = Date.parse(`${hoje}T00:00:00-03:00`);
   const semIni = Date.parse(`${semanaDe(hoje)}T00:00:00-03:00`);
   const mesIni = Date.parse(`${mesCafDe(hoje)}T00:00:00-03:00`);
   const mesAntIni = Date.parse(`${mesCafDe(addDias(diaDe(mesIni), -1))}T00:00:00-03:00`);
 
-  const desde = Math.min(per.ini, ant.ini, mesAntIni) - 95 * DIA;
+  const desde = Math.min(per.ini, ant.ini, mesAntIni, jSerie.ini) - 95 * DIA;
   const leads = leadsDemoV5(diaDe(desde), addDias(hoje, 1), aj);
   const rets = retornosDemoV5(diaDe(Math.min(per.ini, ant.ini)), addDias(hoje, 1), aj);
 
@@ -179,10 +183,10 @@ export function demoCampanhasV5(
   };
   for (const l of leads) {
     const c = campanhaDoCanalDemo(l.canalId);
-    if (dentro(l.criado, per, ag)) ponto(diaDe(l.criado), c).entradas++;
-    if (l.ne && dentro(l.ne.em, per, ag)) ponto(diaDe(l.ne.em), c).ne++;
+    if (dentro(l.criado, jSerie, ag)) ponto(diaDe(l.criado), c).entradas++;
+    if (l.ne && dentro(l.ne.em, jSerie, ag)) ponto(diaDe(l.ne.em), c).ne++;
     const g = ganhoDe(l, aj);
-    if (g && dentro(g.em, per, ag)) ponto(diaDe(g.em), c).ganhos++;
+    if (g && dentro(g.em, jSerie, ag)) ponto(diaDe(g.em), c).ganhos++;
   }
   const serie = [...pontos.values()].sort((a, b) => a.dia.localeCompare(b.dia) || a.campanha.localeCompare(b.campanha));
 
@@ -252,15 +256,13 @@ const FOTOS_DEMO: Record<string, { vac: number; cart: number; par7: number }> = 
   'demo-u-luiz': { vac: 30, cart: 305, par7: 159 },
 };
 
-export function demoAtendentesAbaV5(
-  janela: { iniISO: string; fimISO: string; antIniISO: string; antFimISO: string },
-  agora: Date, cenario?: CenarioDemoV5,
-): AtendentesAbaV5 {
+export function demoAtendentesAbaV5(janela: JanelaAbasDemo, agora: Date, cenario?: CenarioDemoV5): AtendentesAbaV5 {
   const aj = ajusteDemoV5(cenario, agora);
   const ag = agora.getTime();
   const per: Janela = { ini: Date.parse(janela.iniISO), fim: Date.parse(janela.fimISO) };
   const ant: Janela = { ini: Date.parse(janela.antIniISO), fim: Date.parse(janela.antFimISO) };
-  const leads = leadsDemoV5(diaDe(Math.min(per.ini, ant.ini) - 95 * DIA), addDias(diaDe(Math.min(per.fim, ag + DIA)), 1), aj);
+  const jSerie: Janela = { ini: Math.min(Date.parse(janela.serieIniISO ?? janela.iniISO), per.ini), fim: per.fim };
+  const leads = leadsDemoV5(diaDe(Math.min(per.ini, ant.ini, jSerie.ini) - 95 * DIA), addDias(diaDe(Math.min(per.fim, ag + DIA)), 1), aj);
 
   const serieMapa = new Map<string, number>();
   const atendentes: AtendenteAbaV5[] = DEMO_ATENDENTES.map((a) => {
@@ -275,12 +277,14 @@ export function demoAtendentesAbaV5(
       const g = ganhoDe(l, aj);
       if (g && g.credito === a.id) {
         if (dentro(g.em, ant, ag)) ganhosAnt++;
+        if (dentro(g.em, jSerie, ag)) {
+          const dia = diaDe(g.em);
+          serieMapa.set(`${dia}|${a.id}`, (serieMapa.get(`${dia}|${a.id}`) ?? 0) + 1);
+        }
         if (dentro(g.em, per, ag)) {
           ganhos++;
           const c = campanhaDoCanalDemo(l.canalId);
           porCamp.set(c, (porCamp.get(c) ?? 0) + 1);
-          const dia = diaDe(g.em);
-          serieMapa.set(`${dia}|${a.id}`, (serieMapa.get(`${dia}|${a.id}`) ?? 0) + 1);
           if (l.criado >= CORTE_QUALIDADE && g.em >= l.criado) {
             horasCli.push((g.em - l.criado) / HORA);
             horasAt.push((g.em - Math.max(l.criado, l.rotEm ?? l.criado)) / HORA);
@@ -386,14 +390,12 @@ function irisDoLead(l: LeadDemo, eraDesde: number): IrisLead | null {
   return { lead: l, campanha, criado: l.criado, respondeu, qual, prop, aceite, algumEm, conclusaoEm, estrito, identOk, identAlgum, comprOk, emailOk, etapa };
 }
 
-export function demoIrisV5(
-  janela: { iniISO: string; fimISO: string; antIniISO: string; antFimISO: string },
-  agora: Date, cenario?: CenarioDemoV5,
-): IrisV5 {
+export function demoIrisV5(janela: JanelaAbasDemo, agora: Date, cenario?: CenarioDemoV5): IrisV5 {
   const aj = ajusteDemoV5(cenario, agora);
   const ag = agora.getTime();
   const per: Janela = { ini: Date.parse(janela.iniISO), fim: Date.parse(janela.fimISO) };
   const ant: Janela = { ini: Date.parse(janela.antIniISO), fim: Date.parse(janela.antFimISO) };
+  const jSerie: Janela = { ini: Math.min(Date.parse(janela.serieIniISO ?? janela.iniISO), per.ini), fim: per.fim };
   const eraDesde = Date.parse(`${addDias(diaDe(ag), -32)}T00:00:00-03:00`);
   const leads = leadsDemoV5(diaDe(Math.max(eraDesde, Math.min(per.ini, ant.ini) - 10 * DIA)), addDias(diaDe(ag), 1), aj);
   const sessoes = leads.map((l) => irisDoLead(l, eraDesde)).filter((s): s is IrisLead => s !== null);
@@ -467,11 +469,11 @@ export function demoIrisV5(
   for (const s of sessoes) {
     const ativos = new Set<string>();
     for (const t of [s.criado + 2 * MIN, s.qual?.em, s.prop ?? undefined, s.conclusaoEm ?? undefined]) {
-      if (t != null && dentro(t, per, ag)) ativos.add(diaDe(t));
+      if (t != null && dentro(t, jSerie, ag)) ativos.add(diaDe(t));
     }
     for (const d of ativos) diaRec(d).atendidas++;
-    if (s.qual?.passa && dentro(s.qual.em, per, ag)) diaRec(diaDe(s.qual.em)).qualificadas++;
-    if (s.conclusaoEm != null && dentro(s.conclusaoEm, per, ag)) diaRec(diaDe(s.conclusaoEm)).docsCompletos++;
+    if (s.qual?.passa && dentro(s.qual.em, jSerie, ag)) diaRec(diaDe(s.qual.em)).qualificadas++;
+    if (s.conclusaoEm != null && dentro(s.conclusaoEm, jSerie, ag)) diaRec(diaDe(s.conclusaoEm)).docsCompletos++;
   }
 
   return {

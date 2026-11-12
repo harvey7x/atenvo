@@ -5,6 +5,7 @@ import {
   baldesDe, fimComHoje, leituraOnda, melhorCampanha, somarEmBaldes, type Balde, type BaldeTipo,
 } from '@/data/dashboardV5.series';
 import { fmtDuracaoH, fmtInt, fmtPct, pctDe, rotuloMotivoNe } from '@/data/dashboardV5.formato';
+import { janelaMapaV5 } from '@/data/dashboardV5.periodo';
 import type { Periodo } from '@/data/relatorios';
 import { Segmentado, Skeleton } from '../../components';
 import { Ajuda, Legenda, Secao, Variacao, Vazio } from './comum';
@@ -103,8 +104,10 @@ export function Campanhas({ d, periodo, hoje }: { d: CampanhasV5; periodo: Perio
   const resto = d.campanhas.filter((c) => ['outros', 'sem_campanha'].includes(c.campanha));
   const antPor = useMemo(() => new Map(d.anterior.map((a) => [a.campanha, a])), [d.anterior]);
 
+  // período curto desenha os ÚLTIMOS 7 DIAS (a régua do mapa): um dia só não faz onda
+  const jm = useMemo(() => janelaMapaV5(periodo, hoje), [periodo, hoje]);
   const { baldes, series, leituras } = useMemo(() => {
-    const bs: Balde[] = baldesDe(periodo.iniDate, fimComHoje(periodo.fimDate, hoje), balde);
+    const bs: Balde[] = baldesDe(jm.iniDate, fimComHoje(periodo.fimDate, hoje), balde);
     const ativos = CAMPANHAS_GRAF.filter((c) => d.serie.some((p) => p.campanha === c.slug)
       || campanhas.some((x) => x.campanha === c.slug));
     const ss: SerieGraf[] = ativos.map((c) => ({
@@ -122,7 +125,7 @@ export function Campanhas({ d, periodo, hoje }: { d: CampanhasV5; periodo: Perio
       .map((s) => leituraOnda(s.id, bs.map((b) => s.valores.get(b.chave) ?? 0), fechados))
       .filter((l) => l.tendencia != null || l.recaida);
     return { baldes: bs, series: ss, leituras: ls };
-  }, [d.serie, campanhas, periodo, balde, metrica, hoje]);
+  }, [d.serie, campanhas, periodo, balde, metrica, hoje, jm]);
 
   const tituloMetrica = METRICAS.find((m) => m.valor === metrica)!.rotulo;
   const avisoRetencao = d.retornosConfiavelDesde !== '' && periodo.iniDate < d.retornosConfiavelDesde;
@@ -143,7 +146,7 @@ export function Campanhas({ d, periodo, hoje }: { d: CampanhasV5; periodo: Perio
       </Secao>
 
       <Secao className="d5-ondas" titulo="Ondas por campanha"
-        sub={`${tituloMetrica} por ${balde === 'dia' ? 'dia' : balde === 'semana' ? 'semana (seg–dom)' : 'mês da casa (11 a 10)'} no período escolhido. A curva passa por todos os pontos medidos — nada é inventado entre eles.`}
+        sub={`${tituloMetrica} por ${balde === 'dia' ? 'dia' : balde === 'semana' ? 'semana (seg–dom)' : 'mês da casa (11 a 10)'}${jm.estendido ? ' — período curto: desenhando os últimos 7 dias' : ' no período escolhido'}. A curva passa por todos os pontos medidos — nada é inventado entre eles.`}
         acao={(
           <div className="d5-ondas-ctl">
             <Segmentado<MetricaOnda> opcoes={METRICAS} valor={metrica} aoMudar={setMetrica} rotulo="Métrica do gráfico" />

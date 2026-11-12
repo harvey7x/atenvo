@@ -3,6 +3,7 @@ import type { AtendenteAbaV5, AtendentesAbaV5 } from '@/data/dashboardV5.abas.ti
 import { rotuloCampanha } from '@/data/dashboardV5.abas.tipos';
 import { baldesDe, fimComHoje, somarEmBaldes, type BaldeTipo } from '@/data/dashboardV5.series';
 import { fmtDuracaoMin, fmtInt } from '@/data/dashboardV5.formato';
+import { janelaMapaV5 } from '@/data/dashboardV5.periodo';
 import type { Periodo } from '@/data/relatorios';
 import { Skeleton } from '../../components';
 import { Ajuda, Avatar, Legenda, Secao, TempoFechar, Variacao, Vazio } from './comum';
@@ -93,6 +94,8 @@ export function AtendentesAba({ d, periodo, hoje }: { d: AtendentesAbaV5; period
   const maxGanhos = Math.max(1, ...d.atendentes.map((a) => a.ganhos));
 
   const balde: BaldeTipo = periodo.dias <= 14 ? 'dia' : 'semana';
+  // período curto desenha os últimos 7 dias (régua do mapa): um dia só não faz onda
+  const jm = useMemo(() => janelaMapaV5(periodo, hoje), [periodo, hoje]);
   const serieEquipe = useMemo<SerieGraf[]>(() => {
     const comGanho = d.atendentes.filter((a) => a.ganhos > 0).slice(0, 5);
     return comGanho.map((a, i) => ({
@@ -106,7 +109,7 @@ export function AtendentesAba({ d, periodo, hoje }: { d: AtendentesAbaV5; period
       ),
     }));
   }, [d.atendentes, d.serieGanhos, balde]);
-  const baldes = useMemo(() => baldesDe(periodo.iniDate, fimComHoje(periodo.fimDate, hoje), balde), [periodo, balde, hoje]);
+  const baldes = useMemo(() => baldesDe(jm.iniDate, fimComHoje(periodo.fimDate, hoje), balde), [jm, periodo, balde, hoje]);
 
   const vacuoTotal = d.atendentes.reduce((s, a) => s + a.vacuo3o, 0);
 
@@ -187,7 +190,7 @@ export function AtendentesAba({ d, periodo, hoje }: { d: AtendentesAbaV5; period
 
       {serieEquipe.length > 0 && (
         <Secao className="d5-ondas d5-ondas-eq" titulo="Fechados da equipe, no tempo"
-          sub={`Fechados do placar por ${balde === 'dia' ? 'dia' : 'semana (seg–dom)'} no período escolhido. Fim de semana e feriado mostram 0 porque o administrativo lança em dia útil.`}>
+          sub={`Fechados do placar por ${balde === 'dia' ? 'dia' : 'semana (seg–dom)'}${jm.estendido ? ' — período curto: desenhando os últimos 7 dias' : ' no período escolhido'}. Fim de semana e feriado mostram 0 porque o administrativo lança em dia útil.`}>
           <LegendaGraf series={serieEquipe} />
           <GrafLinhas baldes={baldes} series={serieEquipe}
             titulo={`Fechados por atendente e ${balde === 'dia' ? 'dia' : 'semana'}`}

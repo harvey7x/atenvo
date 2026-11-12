@@ -1,9 +1,9 @@
 import { keepPreviousData, useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useOrg } from '@/context/OrgContext';
-import type { Periodo } from '@/data/relatorios';
+import { spHoje, type Periodo } from '@/data/relatorios';
 import { DASH_V5_REAL, traduzErroDashV5 } from '@/data/dashboardV5';
-import { periodoAnteriorV5 } from '@/data/dashboardV5.periodo';
+import { janelaMapaV5, periodoAnteriorV5 } from '@/data/dashboardV5.periodo';
 import { cenarioDemoV5 } from '@/data/dashboardV5.demo';
 import { demoAtendentesAbaV5, demoCampanhasV5, demoIrisV5 } from '@/data/dashboardV5.abas.demo';
 import type {
@@ -222,10 +222,19 @@ export function normalizarIrisV5(bruto: unknown): IrisV5 {
 }
 
 /* ---------------- hooks (um por aba, chamados só com a aba aberta) ---------------- */
-interface JanelaAbas { iniISO: string; fimISO: string; antIniISO: string; antFimISO: string }
-const janelaAbas = (periodo: Periodo, agora: Date): JanelaAbas => {
+export interface JanelaAbas {
+  iniISO: string; fimISO: string; antIniISO: string; antFimISO: string;
+  /** início da SÉRIE do gráfico: período curto recua para os últimos 7 dias
+   *  (a mesma régua do mapa dia × hora) — um dia só não faz onda */
+  serieIniISO: string;
+}
+const janelaAbas = (periodo: Periodo, agora: Date, hoje: string): JanelaAbas => {
   const ant = periodoAnteriorV5(periodo, agora);
-  return { iniISO: periodo.iniISO, fimISO: periodo.fimISO, antIniISO: ant.iniISO, antFimISO: ant.fimISO };
+  return {
+    iniISO: periodo.iniISO, fimISO: periodo.fimISO,
+    antIniISO: ant.iniISO, antFimISO: ant.fimISO,
+    serieIniISO: janelaMapaV5(periodo, hoje).iniISO,
+  };
 };
 
 function usarAba<T>(
@@ -235,8 +244,10 @@ function usarAba<T>(
 ): UseQueryResult<T> {
   const { currentOrg } = useOrg();
   const org = currentOrg.id;
+  const hoje = spHoje();
+  const serieIni = janelaMapaV5(periodo, hoje).iniISO;
   return useQuery({
-    queryKey: [nome, org, periodo.iniISO, periodo.fimISO, periodo.prevIniISO],
+    queryKey: [nome, org, periodo.iniISO, periodo.fimISO, periodo.prevIniISO, serieIni],
     enabled: !!org && ativo,
     staleTime: 60_000,
     gcTime: 30 * 60_000,
@@ -245,7 +256,7 @@ function usarAba<T>(
     placeholderData: keepPreviousData,
     queryFn: async (): Promise<T> => {
       const agora = new Date();
-      const j = janelaAbas(periodo, agora);
+      const j = janelaAbas(periodo, agora, hoje);
       if (!DASH_V5_REAL) return demo(j, agora, cenarioDemoV5());
       const { data, error } = await supabase!.rpc(rpc, {
         p_inicio: j.iniISO,
@@ -253,6 +264,7 @@ function usarAba<T>(
         p_org: org,
         p_inicio_ant: j.antIniISO,
         p_fim_ant: j.antFimISO,
+        p_serie_inicio: j.serieIniISO,
       });
       if (error) throw new Error(traduzErroDashV5(error));
       return normalizar(data);
