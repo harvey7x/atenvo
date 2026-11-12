@@ -101,7 +101,7 @@
 
 /* "Como funciona" */
 .v2 .fi-como { flex: none; position: relative; padding: 16px 48px 14px 18px; }
-.v2 .fi-como-cols { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; }
+.v2 .fi-como-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
 .v2 .fi-como-it { display: flex; flex-direction: column; gap: 4px; font-size: 13px; line-height: 1.5; color: var(--txt-2); }
 .v2 .fi-como-t { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; color: var(--txt); }
 .v2 .fi-como-t svg { color: var(--c); }
@@ -170,6 +170,14 @@
 .v2 .fi-col-cli { display: flex; align-items: center; gap: 12px; text-align: left; }
 .v2 .fi-lin-tx { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .v2 .fi-lin-nome { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* embaixo do nome, ao lado do telefone, "Entrou hoje" (dono 12/11: "uma marcaçãozinha… quando o cliente entrou hoje… de uma forma separada"):
+   contraste invertido (claro no escuro, escuro no claro) — sem cor de significado (azul = ativo, vermelho = aguardando,
+   âmbar = observação) */
+.v2 .fi-lin-l2 { min-width: 0; display: flex; align-items: center; gap: 7px; }
+.v2 .fi-hoje {
+  flex: none; display: inline-flex; align-items: center; height: 18px; padding: 0 7px; border-radius: 9px;
+  background: var(--txt); color: var(--base); font-size: 10.5px; font-weight: 600; letter-spacing: .01em; white-space: nowrap;
+}
 .v2 .fi-lin-prod { font-size: 12px; color: var(--txt-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .v2 .fi-elip { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .v2 .fi-col-sit { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 13px; color: var(--txt); }
@@ -512,7 +520,7 @@
 .v2 .fi-eq-per-rot { font-size: 13px; font-weight: 600; color: var(--txt); }
 .v2 .fi-eq-per-nota { margin-left: auto; font-size: 12px; color: var(--txt-3); }
 /* recebidos · fechados · taxa no cartão do atendente */
-.v2 .fi-eq-nums { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 1px solid var(--fi-borda); border-radius: 8px; }
+.v2 .fi-eq-nums { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid var(--fi-borda); border-radius: 8px; }
 .v2 .fi-eq-nums > span { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 7px 4px 6px; font-size: 11px; color: var(--txt-3); text-transform: lowercase; }
 .v2 .fi-eq-nums > span + span { border-left: 1px solid var(--fi-borda); }
 .v2 .fi-eq-nums b { font-size: 15px; font-weight: 600; color: var(--txt); letter-spacing: -.01em; }
@@ -526,8 +534,8 @@
    Cor: o acento só no que está ativo; vermelho só no ponto de "aguardando resposta"; verde só no tique do documento. */
 
 /* ---- painel do topo */
-.v2 .fi-painel { flex: none; display: grid; grid-template-columns: minmax(180px, .9fr) minmax(0, 4.4fr) minmax(260px, 1.35fr); overflow: hidden; }
-.v2 .fi-pn-prios { min-width: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.v2 .fi-painel { flex: none; display: grid; grid-template-columns: minmax(180px, .9fr) minmax(0, 3.4fr) minmax(300px, 1.5fr); overflow: hidden; }
+.v2 .fi-pn-prios { min-width: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .v2 .fi-pn {
   position: relative; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
   padding: 14px 16px 13px; border: 0; background: none; color: var(--txt); font: inherit; text-align: center;
@@ -756,7 +764,8 @@
 .v2 button.fi-eq-agora { cursor: pointer; }
 .v2 button.fi-eq-agora:hover { text-decoration: underline; text-underline-offset: 3px; }
 .v2 .fi-eq-agora[data-zero] { color: var(--txt-3); }
-.v2 .fi-eq-lin { grid-template-columns: 100px minmax(0, 1fr) 28px; }
+/* os nomes das seções (dono 12/11) são mais longos: o rótulo ganha o espaço, a barra encolhe */
+.v2 .fi-eq-lin { grid-template-columns: max-content minmax(18px, 1fr) 28px; }
 .v2 .fi-eq-n { text-align: right; }
 .v2 .fi-eq-lin[data-zero] .fi-eq-n { color: var(--txt-3); font-weight: 500; }
 .v2 .fi-eq-lin[data-zero] .fi-eq-barra i { display: none; }
@@ -784,7 +793,7 @@
 .v2 .fi-modal-nav .fi-x:not(:disabled) { color: var(--txt-2); }
 .v2 .fi-equipe { scrollbar-gutter: stable; }
 /* sem o bloco de números (demonstração, erro de rede), o painel fecha em duas áreas */
-.v2 .fi-painel:not(:has(.fi-pn-num)) { grid-template-columns: minmax(180px, .9fr) minmax(0, 4.4fr); }
+.v2 .fi-painel:not(:has(.fi-pn-num)) { grid-template-columns: minmax(180px, .9fr) minmax(0, 3.4fr); }
 
 /* Minha fila SEM a coluna Campanha · Kanban (dono 12/11): a última mensagem ganha o espaço */
 .v2 .fi-lista-cheia :is(.fi-colunas, .fi-lin) {
@@ -837,3 +846,13 @@
 .v2 .fi-recados-lin[data-estado="aguardando"] .fi-recados-est .fi-l1 { color: var(--txt-2); font-weight: 400; }
 .v2 .fi-recados-lin:not([data-estado="aguardando"]) .fi-recados-est .fi-l1 { font-weight: 500; }
 @media (max-width: 1280px) { .v2 .fi-recados-lin { grid-template-columns: minmax(160px, 1fr) minmax(0, 1.2fr) minmax(0, 1.2fr) 36px; column-gap: 12px; } }
+
+/* ---------------------------------------------------------------- listras de planilha (dono 12/11: "a Marli preta, a
+   Elizabeth um pouco cinza, meio que como se fosse uma planilha") — uma linha sim, outra não, um tom mais clara; o passar
+   do mouse e a linha aberta continuam por cima */
+.v2 .fi { --fi-zebra: rgba(var(--tint), .045); }
+:root[data-tema="light"] .v2 .fi { --fi-zebra: rgba(var(--tint), .032); }
+.v2 .fi .fi-lin:nth-of-type(even):not([data-ativo]):not(:hover) { background: var(--fi-zebra); }
+.v2 .fi .fi-lin:hover { background: rgba(var(--tint), .075); }
+:root[data-tema="light"] .v2 .fi .fi-lin:hover { background: rgba(var(--tint), .055); }
+.v2 .fi .fi-lin[data-ativo] { background: var(--fi-sel); }

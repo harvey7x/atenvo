@@ -1,6 +1,7 @@
 /* ============================================================================
    Fila da Iris — a TELA. A mesma na demonstração, na prévia (foto do dia) e no real (fonteReal.ts).
-   Prioridades: 0 Pegar histórico de crédito · 1 Clientes quentes · 2 Documentação pendente · 3 Sem resposta.
+   Seções (nomes do dono, 12/11): Prioridade · Documentação faltando · Cliente sem resposta ("Pegar histórico" saiu).
+   Linhas em listras de planilha; "Entrou hoje" marca quem chegou hoje; números do dia: recebidos · marcações · fechados.
    Topo: resumo (responder agora · as prioridades · os números). Fila: busca, filtros por marcação,
    seções que recolhem e linhas com a situação, a última mensagem do cliente e a campanha.
    Cada atendente vê só a própria fila; o administrador vê também a Equipe.
@@ -36,7 +37,10 @@ function corDe(chave: string): string {
   for (let i = 0; i < chave.length; i++) h = (h * 31 + chave.charCodeAt(i)) | 0;
   return PALETA_AV[Math.abs(h) % PALETA_AV.length];
 }
-const ROTULO_CURTO: Record<Categoria, string> = { historico: 'Pegar histórico', quente: 'Quentes', documentacao: 'Documentação', sem_resposta: 'Sem resposta' };
+const ROTULO_CURTO: Record<Categoria, string> = { historico: 'Pegar histórico', quente: 'Prioridade', documentacao: 'Documentação faltando', sem_resposta: 'Cliente sem resposta' };
+/** 0 h de hoje (o relógio do computador): "Entrou hoje", "marcações hoje" */
+const inicioDeHoje = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); };
+const hm = (t: number) => { const d = new Date(t); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
 const iniciais = (n: string) => {
   const p = n.split(/\s+/).map((w) => w.replace(/[^\p{L}]/gu, '')).filter(Boolean);
   return ((p[0]?.[0] ?? '') + (p.length > 1 ? p[p.length - 1][0] : '')).toUpperCase();
@@ -115,12 +119,13 @@ function metaPrioridade(id: Categoria, lista: Lead[], minha: boolean): ReactNode
   return so ? `em ${so} só falta o comprovante` : n ? 'falta documento' : 'nenhuma pendente';
 }
 
-type NumerosPainel = { titulo: string; nota: string; per: NumeroAtendente | null; hoje: NumeroAtendente | null };
+/** os números do topo: `per` = o que aparece grande (recebidos · marcações · fechados), `sub` = a linha de baixo */
+type NumerosPainel = { titulo: string; nota: string; per: NumeroAtendente | null; sub: string | null };
 
-/** o resumo do topo: responder agora · as quatro prioridades · os números (recebidos, fechados, taxa) */
-function Painel({ base, filtro, aoFiltrar, esperandoAtivo, aoEsperando, numeros, equipe, minha }: {
+/** o resumo do topo: responder agora · as três seções · os números (recebidos, marcações, fechados) */
+function Painel({ base, filtro, aoFiltrar, esperandoAtivo, aoEsperando, numeros, minha }: {
   base: Lead[]; filtro: Filtro; aoFiltrar?: (c: Categoria) => void;
-  esperandoAtivo: boolean; aoEsperando?: () => void; numeros: NumerosPainel | null; equipe: boolean; minha: boolean;
+  esperandoAtivo: boolean; aoEsperando?: () => void; numeros: NumerosPainel | null; minha: boolean;
 }) {
   const total = base.length;
   const esperando = base.filter((l) => l.esperandoEm);
@@ -132,12 +137,6 @@ function Painel({ base, filtro, aoFiltrar, esperandoAtivo, aoEsperando, numeros,
       <span className="fi-pn-s">{esperando.length ? `o mais antigo espera ${haQuanto(maisAntigo)}` : 'ninguém aguardando'}</span>
     </>
   );
-  const taxa = numeros?.per && numeros.per.recebidos ? (numeros.per.fechados / numeros.per.recebidos) * 100 : null;
-  const hojeDiferente = numeros?.hoje && numeros.per
-    && (numeros.hoje.recebidos !== numeros.per.recebidos || numeros.hoje.fechados !== numeros.per.fechados);
-  const subNumeros = hojeDiferente && numeros?.hoje
-    ? `hoje: ${plural(numeros.hoje.recebidos, 'recebido', 'recebidos')} · ${plural(numeros.hoje.fechados, 'fechado', 'fechados')}`
-    : equipe ? null : 'fechados = placar do CAF';
   return (
     <section className="fi-painel vidro" aria-label="Resumo da fila">
       {aoEsperando ? (
@@ -156,9 +155,7 @@ function Painel({ base, filtro, aoFiltrar, esperandoAtivo, aoEsperando, numeros,
           const ativo = filtro === info.id;
           const conteudo = (
             <>
-              <span className="fi-pn-r" title={`Prioridade ${info.ordem} · ${info.rotulo}${pctTxt ? ` · ${pctTxt}` : ''}`}>
-                Prioridade {info.ordem} · {ROTULO_CURTO[info.id]}
-              </span>
+              <span className="fi-pn-r" title={`${info.rotulo}${pctTxt ? ` · ${pctTxt}` : ''}`}>{ROTULO_CURTO[info.id]}</span>
               <b className="fi-pn-n num">{lista.length}</b>
               <span className="fi-pn-barra" aria-hidden><i style={{ width: `${Math.max(pct, lista.length ? 2 : 0)}%` }} /></span>
               <span className="fi-pn-s">{metaPrioridade(info.id, lista, minha)}</span>
@@ -178,11 +175,11 @@ function Painel({ base, filtro, aoFiltrar, esperandoAtivo, aoEsperando, numeros,
         <div className="fi-pn fi-pn-num" aria-label={numeros.titulo}>
           <span className="fi-pn-r">{numeros.titulo}<span className="fi-pn-r-nota">{numeros.nota}</span></span>
           <div className="fi-pn-stats">
-            <span><b className="num">{numeros.per?.recebidos ?? '—'}</b>{numeros.per?.recebidos === 1 ? 'recebido' : 'recebidos'}</span>
-            <span><b className="num">{numeros.per?.fechados ?? '—'}</b>{numeros.per?.fechados === 1 ? 'fechado' : 'fechados'}</span>
-            <span title="Taxa de fechamento: fechados ÷ recebidos no período"><b className="num">{taxa == null ? '—' : porcento(taxa)}</b>taxa</span>
+            <span title="Clientes que o robô distribuiu no período"><b className="num">{numeros.per?.recebidos ?? '—'}</b>{numeros.per?.recebidos === 1 ? 'recebido' : 'recebidos'}</span>
+            <span title="Marcações feitas no período (Ligar de novo, Senha do Meu INSS, Documentos, Falta: …)"><b className="num">{numeros.per?.marcacoes ?? '—'}</b>{numeros.per?.marcacoes === 1 ? 'marcação' : 'marcações'}</span>
+            <span title="Fechados = placar do CAF"><b className="num">{numeros.per?.fechados ?? '—'}</b>{numeros.per?.fechados === 1 ? 'fechado' : 'fechados'}</span>
           </div>
-          {subNumeros && <span className="fi-pn-s">{subNumeros}</span>}
+          {numeros.sub && <span className="fi-pn-s">{numeros.sub}</span>}
         </div>
       )}
     </section>
@@ -282,9 +279,12 @@ function Linha({ l, ativo, aoAbrir, aoConversa, mostrarDono, sua, destacar, semC
         <Avatar l={l} />
         <span className="fi-lin-tx">
           <b className="fi-lin-nome" title={l.nome}>{nomeMostrado}</b>
-          {!l.fone ? <span className="fi-lin-prod">sem telefone no cadastro</span>
-            : l.fone === l.nome ? <span className="fi-lin-prod">sem nome no cadastro</span>
-              : <span className="fi-lin-prod num">{l.fone}</span>}
+          <span className="fi-lin-l2">
+            {!l.fone ? <span className="fi-lin-prod">sem telefone no cadastro</span>
+              : l.fone === l.nome ? <span className="fi-lin-prod">sem nome no cadastro</span>
+                : <span className="fi-lin-prod num">{l.fone}</span>}
+            {l.entrouEm && l.entrouEm >= inicioDeHoje() && <span className="fi-hoje" title={`Entrou hoje às ${hm(l.entrouEm)}`}>Entrou hoje</span>}
+          </span>
         </span>
       </span>
       <span className="fi-col-sit">
@@ -630,7 +630,7 @@ export function JanelaCliente({ l, raiz, lista, aoTrocar, aoFechar, avisar, ehDo
           <div className="fi-modal-col">
             <div className="fi-sit" data-cat={l.cat}>
               <span className="fi-sit-tx">
-                <span className="fi-sit-rot">Prioridade {info.ordem} · {info.rotulo}</span>
+                <span className="fi-sit-rot">{info.rotulo}</span>
                 <span className="fi-sit-val" title={l.situacao !== l.curta ? l.situacao : undefined}>{l.curta}</span>
                 {tempo.t !== '—' && !l.esperandoEm && (
                   <span className="fi-sit-sub" data-alerta={tempo.alerta ? '' : undefined}>
@@ -740,8 +740,9 @@ function CartaoAtendente({ a, aoAbrir, leads, numero }: {
         <span className="fi-eq-agora" data-zero>Ninguém aguardando resposta</span>
       )}
       {numero && (
-        <div className="fi-eq-nums" aria-label="Recebidos e fechados no período">
+        <div className="fi-eq-nums" aria-label="Recebidos, marcações e fechados no período">
           <span><b className="num">{numero.recebidos}</b>{numero.recebidos === 1 ? 'recebido' : 'recebidos'}</span>
+          <span title="Marcações feitas no período"><b className="num">{numero.marcacoes ?? '—'}</b>{numero.marcacoes === 1 ? 'marcação' : 'marcações'}</span>
           <span><b className="num">{numero.fechados}</b>{numero.fechados === 1 ? 'fechado' : 'fechados'}</span>
           <span title="Taxa de fechamento: fechados ÷ recebidos no período"><b className="num">{taxa == null ? '—' : porcento(taxa)}</b>taxa</span>
         </div>
@@ -872,7 +873,7 @@ export default function FilaIrisTela({ fonte, usuarioId, admin: adminReal, abrir
   const visaoEf: Visao = !admin ? 'minha' : semFilaPropria && visao === 'minha' ? 'equipe' : visao;
   const dono = visaoEf === 'de' ? alvo : verComo;
 
-  const leads = fonte.leads;
+  const leads = useMemo(() => fonte.leads.filter((l) => l.cat !== 'historico'), [fonte.leads]);
   const daFila = useMemo(() => leads.filter((l) => l.atendente === dono), [leads, dono]);
   const base = visaoEf === 'equipe' ? leads : daFila;
   const grupos = useMemo(
@@ -953,13 +954,32 @@ export default function FilaIrisTela({ fonte, usuarioId, admin: adminReal, abrir
   const conversa = (l: Lead) => (abrirConversa ? abrirConversa(l) : avisar(`Prévia: aqui abre a conversa de ${doisNomes(l.nome)} no WhatsApp.`));
 
   /* os números do topo: na fila de alguém, os da pessoa; na Equipe, a soma do período escolhido */
+  /* marcações: o banco conta (fila_iris_marcacoes_numeros); sem ele (demonstração, prévia), as da fila carregada feitas hoje */
+  const marcasLocaisHoje = (quem: string | null) => {
+    const ini = inicioDeHoje();
+    return leads.filter((l) => quem == null || l.atendente === quem).reduce((t, l) => t + l.marcas.filter((m) => m.em >= ini).length, 0);
+  };
+  const comMarcas = (n: NumeroAtendente | null, p: Periodo): NumeroAtendente | null => (n && n.marcacoes == null && p === 'hoje'
+    ? { ...n, marcacoes: marcasLocaisHoje(n.atendente === 'equipe' ? null : n.atendente) } : n);
   const somar = (l: NumeroAtendente[] | null): NumeroAtendente | null => (l && l.length
-    ? l.reduce((t, x) => ({ atendente: 'equipe', recebidos: t.recebidos + x.recebidos, fechados: t.fechados + x.fechados }), { atendente: 'equipe', recebidos: 0, fechados: 0 })
+    ? l.reduce((t, x) => ({ atendente: 'equipe', recebidos: t.recebidos + x.recebidos, fechados: t.fechados + x.fechados,
+      marcacoes: t.marcacoes == null || x.marcacoes == null ? undefined : t.marcacoes + x.marcacoes }),
+    { atendente: 'equipe', recebidos: 0, fechados: 0, marcacoes: 0 } as NumeroAtendente)
     : null);
-  const daPessoa = (p: Periodo) => fonte.numeros(p)?.find((x) => x.atendente === dono) ?? null;
+  const daPessoa = (p: Periodo) => comMarcas(fonte.numeros(p)?.find((x) => x.atendente === dono) ?? null, p);
+  const taxaTxt = (n: NumeroAtendente | null) => (n && n.recebidos ? porcento((n.fechados / n.recebidos) * 100) : '—');
+  const linhaMes = (n: NumeroAtendente | null) => (n ? `mês da casa: ${plural(n.recebidos, 'recebido', 'recebidos')} · ${plural(n.fechados, 'fechado', 'fechados')} · taxa ${taxaTxt(n)}` : null);
+  /* dono 12/11: "a gente precisa saber quantos clientes a gente recebeu, quantas marcações a gente fez no dia" —
+     na fila de alguém, o DIA na frente e o mês da casa embaixo; na Equipe, o período escolhido e a taxa */
   const numerosPainel: NumerosPainel | null = visaoEf === 'equipe'
-    ? (fonte.numeros(periodo) ? { titulo: 'Equipe', nota: ({ hoje: 'hoje', '7d': '7 dias', mes: 'mês da casa', mes_ant: 'mês passado' } as const)[periodo], per: somar(fonte.numeros(periodo)), hoje: periodo === 'hoje' ? null : somar(fonte.numeros('hoje')) } : null)
-    : (daPessoa('mes') ? { titulo: visaoEf === 'de' ? `Números de ${donoInfo.nome}` : 'Meus números', nota: 'mês da casa', per: daPessoa('mes'), hoje: daPessoa('hoje') } : null);
+    ? (fonte.numeros(periodo) ? {
+      titulo: 'Equipe', nota: ({ hoje: 'hoje', '7d': '7 dias', mes: 'mês da casa', mes_ant: 'mês passado' } as const)[periodo],
+      per: comMarcas(somar(fonte.numeros(periodo)), periodo), sub: `taxa de fechamento ${taxaTxt(somar(fonte.numeros(periodo)))}`,
+    } : null)
+    : (daPessoa('hoje') || daPessoa('mes') ? {
+      titulo: visaoEf === 'de' ? `Números de ${donoInfo.nome}` : 'Meus números', nota: 'hoje',
+      per: daPessoa('hoje'), sub: linhaMes(daPessoa('mes')),
+    } : null);
 
   /* ↑ e ↓ passam o foco de linha em linha (vale para a Minha fila e para os quentes da Equipe) */
   const teclasRolo = (e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -1026,7 +1046,7 @@ export default function FilaIrisTela({ fonte, usuarioId, admin: adminReal, abrir
           <div className="fi-como-cols">
             {CATEGORIAS.map((k) => (
               <div key={k.id} className="fi-como-it" data-cat={k.id}>
-                <span className="fi-como-t">Prioridade {k.ordem} · {k.rotulo}</span>
+                <span className="fi-como-t">{k.rotulo}</span>
                 <span>{k.entra}</span>
               </div>
             ))}
@@ -1055,7 +1075,7 @@ export default function FilaIrisTela({ fonte, usuarioId, admin: adminReal, abrir
         </div>
       )}
 
-      <Painel base={base} equipe={visaoEf === 'equipe'} minha={visaoEf === 'minha'} filtro={visaoEf === 'equipe' ? 'todas' : filtro}
+      <Painel base={base} minha={visaoEf === 'minha'} filtro={visaoEf === 'equipe' ? 'todas' : filtro}
         aoFiltrar={visaoEf === 'equipe' ? undefined : (c) => setFiltro((f) => (f === c ? 'todas' : c))}
         esperandoAtivo={visaoEf !== 'equipe' && filtroMarca === 'esperando'}
         aoEsperando={visaoEf === 'equipe' ? undefined : () => setFiltroMarca((f) => (f === 'esperando' ? 'todas' : 'esperando'))}
@@ -1066,10 +1086,10 @@ export default function FilaIrisTela({ fonte, usuarioId, admin: adminReal, abrir
           {fonte.numeros(periodo) && (
             <div className="fi-eq-barra-per">
               <h2 className="fi-eq-h2">Por atendente</h2>
-              <span className="fi-eq-per-rot">Recebidos e fechados</span>
+              <span className="fi-eq-per-rot">Recebidos, marcações e fechados</span>
               <Segmentado rotulo="Período dos números" valor={periodo} aoMudar={setPeriodo}
                 opcoes={[{ valor: 'hoje', rotulo: 'Hoje' }, { valor: '7d', rotulo: '7 dias' }, { valor: 'mes', rotulo: 'Mês' }, { valor: 'mes_ant', rotulo: 'Mês passado' }]} />
-              <span className="fi-eq-per-nota">{textoPeriodo(periodo)} · recebidos = distribuídos pelo robô · fechados = placar do CAF · taxa = fechados ÷ recebidos</span>
+              <span className="fi-eq-per-nota">{textoPeriodo(periodo)} · recebidos = distribuídos pelo robô · marcações = feitas na fila · fechados = placar do CAF · taxa = fechados ÷ recebidos</span>
             </div>
           )}
           <div className="fi-eq-grade">
@@ -1147,9 +1167,9 @@ export default function FilaIrisTela({ fonte, usuarioId, admin: adminReal, abrir
                 <div key={info.id} className="fi-grupo" data-cat={info.id} data-recolhida={fechada ? '' : undefined}>
                   <button type="button" className="fi-sec" aria-expanded={!fechada}
                     onClick={() => { if (!filtrando) alternarSecao(info.id); }}
-                    title={filtrando ? 'Com filtro ou busca, todas as seções ficam abertas' : fechada ? 'Mostrar os clientes desta prioridade' : 'Recolher esta prioridade'}>
+                    title={filtrando ? 'Com filtro ou busca, todas as seções ficam abertas' : fechada ? 'Mostrar os clientes desta seção' : 'Recolher esta seção'}>
                     <span className="fi-sec-seta" aria-hidden><IcBaixo t={11} /></span>
-                    <span className="fi-sec-t">Prioridade {info.ordem} · {info.rotulo}</span>
+                    <span className="fi-sec-t">{info.rotulo}</span>
                     <span className="fi-sec-n num">{itens.length}</span>
                     {novos > 0 && <span className="fi-sec-ag fi-sec-novo" title="A Iris passou nas últimas 24 horas; ficam no topo"><IcIris t={11} />{novos} da Iris agora</span>}
                     {ag > 0 && <span className="fi-sec-ag"><i className="fi-pt" aria-hidden />{ag} aguardando {visaoEf === 'minha' ? 'sua ' : ''}resposta</span>}

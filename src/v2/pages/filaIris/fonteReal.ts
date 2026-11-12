@@ -13,6 +13,7 @@ import { EVENTO_FILA_RECARREGAR } from './recados';
 
 /* ---------------------------------------------------------------- real (banco) */
 type LinhaNumero = { usuario_id: string; nome: string; recebidos: number; fechados: number };
+type LinhaMarcacoes = { usuario_id: string; marcacoes: number };
 
 export function useFonteReal(): FonteFila {
   const { currentOrg } = useOrg();
@@ -51,11 +52,19 @@ export function useFonteReal(): FonteFila {
     const uid = admin ? null : (await supabase.auth.getSession()).data.session?.user.id ?? null;
     const res: Partial<Record<Periodo, NumeroAtendente[]>> = {};
     for (const p of ['hoje', '7d', 'mes', 'mes_ant'] as Periodo[]) {
-      const { data, error } = await supabase.rpc('fila_iris_numeros', { p_org: org, p_inicio: inicioPeriodo(p).toISOString(), p_fim: fimPeriodo(p).toISOString() });
+      const faixa = { p_org: org, p_inicio: inicioPeriodo(p).toISOString(), p_fim: fimPeriodo(p).toISOString() };
+      /* as marcações feitas no período (dono 12/11: "quantas marcações a gente fez no dia") vêm de outra função;
+         sem ela (falhou), a tela conta as da fila carregada */
+      const [{ data, error }, marc] = await Promise.all([
+        supabase.rpc('fila_iris_numeros', faixa),
+        supabase.rpc('fila_iris_marcacoes_numeros', faixa),
+      ]);
       if (error) continue;
+      const porUid = marc.error ? null : new Map(((marc.data ?? []) as LinhaMarcacoes[]).map((m) => [m.usuario_id, m.marcacoes]));
       res[p] = ((data ?? []) as LinhaNumero[])
         .filter((n) => admin || n.usuario_id === uid)
-        .map((n) => ({ atendente: equipeDoUid(n.usuario_id) ?? n.usuario_id, recebidos: n.recebidos, fechados: n.fechados }))
+        .map((n) => ({ atendente: equipeDoUid(n.usuario_id) ?? n.usuario_id, recebidos: n.recebidos, fechados: n.fechados,
+          marcacoes: porUid ? (porUid.get(n.usuario_id) ?? 0) : undefined }))
         .filter((n) => EQUIPE.some((a) => a.id === n.atendente));
     }
     setNums(res);

@@ -275,6 +275,7 @@ export function passosDoLead(l: Lead): EstadoPasso[] {
 const CAT_FICTICIA: Record<string, Categoria> = { quente: 'quente', documentacao: 'documentacao', sem_resposta: 'sem_resposta' };
 export function leadsFicticios(): Lead[] {
   const agora = Date.now();
+  const hoje0 = new Date(agora); hoje0.setHours(0, 0, 0, 0);
   return CLIENTES.map((c: ClienteFila, ordem) => {
     const total = DOCUMENTOS[c.produto].length;
     const ok = c.cat === 'quente' ? total : docsOk(c);
@@ -290,6 +291,8 @@ export function leadsFicticios(): Lead[] {
       atendente: c.atendente, lista: c.cat === 'quente' ? 1 : c.cat === 'documentacao' ? (ok === total - 1 ? 2 : 3) : 5,
       campanha: c.canal, funil: c.cat === 'quente' ? 'Documentos' : 'Lead Qualificado', ud: c.cat === 'sem_resposta' ? t - 3_600_000 : t,
       esperandoEm: ordem % 5 === 0 ? t : undefined, disse: c.fala, nota: '', planilha: '', situacao, curta, ordem, marcas: [],
+      /* "Entrou hoje": metade dos quentes chegou hoje; o resto, dias atrás */
+      entrouEm: c.cat === 'quente' && ordem % 2 === 0 ? Math.max(hoje0.getTime() + 60_000, t - 90 * 60_000) : t - (2 + (ordem % 5)) * 86_400_000,
     };
   });
 }

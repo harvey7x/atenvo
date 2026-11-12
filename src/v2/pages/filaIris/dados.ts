@@ -44,8 +44,9 @@ export interface InfoCategoria {
   vazio: string;
 }
 
-/* a ORDEM é a prioridade: quentes primeiro, sempre */
-export const CATEGORIAS: InfoCategoria[] = [
+/* a ORDEM é a prioridade: quentes primeiro, sempre. Nomes do dono (12/11: "eu não quero o nome de prioridade 1,
+   prioridade 2, prioridade 3… prioridade. Aí, documentação faltando. Cliente sem resposta") */
+const TODAS_CATEGORIAS: InfoCategoria[] = [
   {
     /* já assinaram; fecham assim que o histórico for tirado. Vem do administrativo (CAF). Fica com quem já está. */
     id: 'historico', ordem: 0, rotulo: 'Pegar histórico de créditos',
@@ -56,7 +57,7 @@ export const CATEGORIAS: InfoCategoria[] = [
     vazio: 'Quando um cliente assinar e faltar o histórico de créditos, ele aparece aqui, no topo.',
   },
   {
-    id: 'quente', ordem: 1, rotulo: 'Clientes quentes',
+    id: 'quente', ordem: 1, rotulo: 'Prioridade',
     resumo: 'Mandou toda a documentação. Falta você fechar.',
     regra: 'quem a Iris acabou de passar primeiro; depois quem está aguardando resposta',
     entra: 'O cliente mandou toda a documentação (documento pessoal frente e verso e comprovante de residência). Sobe na hora.',
@@ -64,7 +65,7 @@ export const CATEGORIAS: InfoCategoria[] = [
     vazio: 'Quando um cliente mandar toda a documentação, ele aparece aqui, no topo da fila.',
   },
   {
-    id: 'documentacao', ordem: 2, rotulo: 'Documentação pendente',
+    id: 'documentacao', ordem: 2, rotulo: 'Documentação faltando',
     resumo: 'Mandou parte da documentação e parou há mais de 24h.',
     regra: 'quem a Iris acabou de passar primeiro; depois quem está aguardando resposta',
     entra: 'O cliente mandou parte da documentação, foi cobrado e ficou 24 horas sem mandar o resto.',
@@ -72,7 +73,7 @@ export const CATEGORIAS: InfoCategoria[] = [
     vazio: 'Quando faltar algum documento para seguir, o cliente aparece aqui.',
   },
   {
-    id: 'sem_resposta', ordem: 3, rotulo: 'Sem resposta',
+    id: 'sem_resposta', ordem: 3, rotulo: 'Cliente sem resposta',
     resumo: 'Parou de responder há mais de 24h. Recupere o contato.',
     regra: 'quem a Iris acabou de passar primeiro; depois quem parou mais recentemente',
     entra: 'O cliente começou o atendimento, recebeu a nossa mensagem e ficou 24 horas sem responder.',
@@ -80,7 +81,10 @@ export const CATEGORIAS: InfoCategoria[] = [
     vazio: 'Quando um cliente ficar 24 horas sem responder, ele aparece aqui para você recuperar.',
   },
 ];
-export const infoCategoria = (c: Categoria) => CATEGORIAS.find((x) => x.id === c)!;
+/** as seções da fila: "Pegar histórico" saiu da fila (dono 12/11: "pode tirar o prioridade, pegar histórico… pode
+    remover da fila") — a categoria segue no tipo (o banco ainda manda), mas não entra na tela */
+export const CATEGORIAS: InfoCategoria[] = TODAS_CATEGORIAS.filter((c) => c.id !== 'historico');
+export const infoCategoria = (c: Categoria) => TODAS_CATEGORIAS.find((x) => x.id === c)!;
 
 export const PRODUTO: Record<Produto, string> = {
   revisao: 'Revisão de juros',

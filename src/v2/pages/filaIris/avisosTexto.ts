@@ -14,14 +14,14 @@ export interface AvisoIris {
 export const TEXTO_AVISO: Record<CategoriaAviso, { faca: string; curto: string; prioridade: string }> = {
   quente: {
     faca: 'A Iris atendeu completo: o cliente mandou toda a documentação. Falta você fechar.',
-    curto: 'completo, falta fechar', prioridade: 'Prioridade 1 · Quentes',
+    curto: 'completo, falta fechar', prioridade: 'Prioridade',
   },
   documentacao: {
     faca: 'Faltou documentação e o cliente não respondeu. Ajude ele a resolver.',
-    curto: 'faltou documentação', prioridade: 'Prioridade 2 · Documentação',
+    curto: 'faltou documentação', prioridade: 'Documentação faltando',
   },
   sem_resposta: {
     faca: 'O cliente ficou sem resposta. Faça um remarketing com ele.',
-    curto: 'ficou sem resposta', prioridade: 'Prioridade 3 · Sem resposta',
+    curto: 'ficou sem resposta', prioridade: 'Cliente sem resposta',
   },
 };

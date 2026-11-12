@@ -9,7 +9,7 @@ import { textosDoLead, type Lead } from './lead';
 import { registrarFilaLocal, useDonosLocais } from './recados';
 
 export type Periodo = 'hoje' | '7d' | 'mes' | 'mes_ant';
-export interface NumeroAtendente { atendente: string; recebidos: number; fechados: number }
+export interface NumeroAtendente { atendente: string; recebidos: number; fechados: number; /** marcações feitas no período (fila_iris_marcacoes_numeros) */ marcacoes?: number }
 
 export interface FonteFila {
   modo: 'demo' | 'previa' | 'real';
