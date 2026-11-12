@@ -31,12 +31,17 @@ export function useFonteReal(): FonteFila {
   }, [org]);
 
   const carregarNumeros = useCallback(async () => {
-    if (!supabase || !org || currentOrg?.role !== 'admin') return;
+    /* o administrador recebe a equipe toda; o atendente, só a PRÓPRIA linha (o banco já garante; aqui é o cinto) */
+    if (!supabase || !org) return;
+    const admin = currentOrg?.role === 'admin';
+    const uid = admin ? null : (await supabase.auth.getSession()).data.session?.user.id ?? null;
     const res: Partial<Record<Periodo, NumeroAtendente[]>> = {};
     for (const p of ['hoje', '7d', 'mes', 'mes_ant'] as Periodo[]) {
       const { data, error } = await supabase.rpc('fila_iris_numeros', { p_org: org, p_inicio: inicioPeriodo(p).toISOString(), p_fim: fimPeriodo(p).toISOString() });
       if (error) continue;
-      res[p] = ((data ?? []) as LinhaNumero[]).map((n) => ({ atendente: equipeDoUid(n.usuario_id) ?? n.usuario_id, recebidos: n.recebidos, fechados: n.fechados }))
+      res[p] = ((data ?? []) as LinhaNumero[])
+        .filter((n) => admin || n.usuario_id === uid)
+        .map((n) => ({ atendente: equipeDoUid(n.usuario_id) ?? n.usuario_id, recebidos: n.recebidos, fechados: n.fechados }))
         .filter((n) => EQUIPE.some((a) => a.id === n.atendente));
     }
     setNums(res);

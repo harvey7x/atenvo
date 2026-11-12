@@ -1,9 +1,9 @@
 /* ============================================================================
-   Fila da Iris — a TELA (etapa 1: só o visual), agora com os clientes REAIS da lista de 11/11
-   distribuídos na prévia (ver leads.ts). Nada aqui grava no sistema.
+   Fila da Iris — a TELA. A mesma na demonstração, na prévia (foto do dia) e no real (fonteReal.ts).
    Prioridades: 0 Pegar histórico de crédito · 1 Clientes quentes · 2 Documentação pendente · 3 Sem resposta.
+   Topo: resumo (responder agora · as prioridades · os números). Fila: busca, filtros por marcação,
+   seções que recolhem e linhas com a situação, a última mensagem do cliente e a campanha.
    Cada atendente vê só a própria fila; o administrador vê também a Equipe.
-   Na janela do cliente só aparece o que veio na lista (nada inventado sobre cliente de verdade).
    ============================================================================ */
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
@@ -12,12 +12,14 @@ import { criarRaizPortalV2 } from '../../components/portal';
 import {
   CATEGORIAS, EQUIPE, GRUPOS_MARCA, MARCAS, atendente, curtoMarca, equipeDoUid, grupoMarca, haQuanto, infoCategoria, ordenarMarcas, quando,
   textoMarca, turnoTexto,
-  type Atendente, type Categoria, type GrupoMarca, type InfoCategoria, type Marca, type TipoMarca,
+  type Atendente, type Categoria, type GrupoMarca, type Marca, type TipoMarca,
 } from './dados';
-import { PASSOS, ROTULO_LISTA, dataHora, minDesde, ordenarLeads, passosDoLead, type Lead } from './lead';
+import {
+  PASSOS, ROTULO_LISTA, campanhaBonita, dataHora, mensagemDoCliente, minDesde, ordenarLeads, passosDoLead, type Lead,
+} from './lead';
 import { textoPeriodo, type FonteFila, type NumeroAtendente, type Periodo } from './fonte';
 import {
-  IcBaixo, IcChave, IcCheck, IcConversa, IcDoc, IcInfo, IcMais, IcMarca, IcRelogio, IcSair, IcSeta, IcTelefone, IcVoltar, IcX,
+  IcBaixo, IcBusca, IcChave, IcCheck, IcConversa, IcCopiar, IcDoc, IcInfo, IcMais, IcMarca, IcRelogio, IcSair, IcSeta, IcTelefone, IcVoltar, IcX,
 } from './icones';
 import './filaIris.css';
 
@@ -34,7 +36,7 @@ function corDe(chave: string): string {
 }
 const ROTULO_CURTO: Record<Categoria, string> = { historico: 'Pegar histórico', quente: 'Quentes', documentacao: 'Documentação', sem_resposta: 'Sem resposta' };
 const iniciais = (n: string) => {
-  const p = n.split(/\s+/).filter(Boolean);
+  const p = n.split(/\s+/).map((w) => w.replace(/[^\p{L}]/gu, '')).filter(Boolean);
   return ((p[0]?.[0] ?? '') + (p.length > 1 ? p[p.length - 1][0] : '')).toUpperCase();
 };
 /* nome curto: primeiro + último ("Maria do Carmo Ribeiro" → "Maria Ribeiro") */
@@ -45,8 +47,15 @@ const doisNomes = (n: string) => {
 const artigo = (a: Atendente) => (a.nome === 'Luiz' || a.nome === 'Matheus' ? 'o' : 'a');
 const minAtras = (em: number) => Math.max(0, Math.round((Date.now() - em) / 60_000));
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
-/* campanha curta para a coluna ("Juros abusivo" → "Juros"; "não achei no sistema" → "—") */
-const campanhaCurta = (c: string) => (c === 'não achei no sistema' ? '—' : c === 'Juros abusivo' ? 'Juros' : c === 'EMPRESTIMO' ? 'Empréstimo' : c);
+const porcento = (v: number) => `${v.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`;
+/* busca sem acento e sem maiúscula; telefone só pelos dígitos */
+const semAcento = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+function passaBusca(l: Lead, termo: string): boolean {
+  if (!termo) return true;
+  const dig = termo.replace(/\D/g, '');
+  if (dig.length >= 3 && l.fone.replace(/\D/g, '').includes(dig)) return true;
+  return semAcento(l.nome).includes(semAcento(termo));
+}
 
 /* ---------------------------------------------------------------- peças */
 
@@ -63,71 +72,137 @@ function ChipsMarca({ marcas }: { marcas: Marca[] }) {
   const ord = ordenarMarcas(marcas);
   return (
     <>
-      {ord.slice(0, 3).map((m) => (
+      {ord.slice(0, 2).map((m) => (
         <span key={m.id} className="fi-chip-marca" data-grupo={grupoMarca(m.tipo)} title={`${textoMarca(m)} · marcado ${quando(minAtras(m.em))}`}>
           <IcTipoMarca tipo={m.tipo} t={12} />
           <span className="fi-elip">{curtoMarca(m)}</span>
           {m.tipo === 'nao_atendeu' && <b className="fi-chip-n num">{m.vezes ?? 1}x</b>}
         </span>
       ))}
-      {ord.length > 3 && <span className="fi-chip-mais" title={ord.slice(3).map(textoMarca).join(' · ')}>+{ord.length - 3}</span>}
+      {ord.length > 2 && <span className="fi-chip-mais" title={ord.slice(2).map(textoMarca).join(' · ')}>+{ord.length - 2}</span>}
     </>
   );
 }
 
 function Avatar({ l, tam = 40 }: { l: Lead; tam?: number }) {
-  return <span className="fi-av" data-cat={l.cat} style={{ width: tam, height: tam }}>{iniciais(l.nome)}</span>;
+  return (
+    <span className="fi-av-caixa">
+      <span className="fi-av" data-cat={l.cat} style={{ width: tam, height: tam }}>{iniciais(l.nome) || <IcTelefone t={15} />}</span>
+      {l.esperandoEm ? <i className="fi-av-pt" title="Aguardando resposta" /> : null}
+    </span>
+  );
 }
 
 function AvatarAtendente({ a, tam = 32 }: { a: Atendente; tam?: number }) {
   return <span className="fi-av fi-av-at" style={{ width: tam, height: tam, background: corDe(a.nome) }}>{a.nome[0]}</span>;
 }
 
-/** uma célula da faixa de prioridades (padrão do Painel da Equipe: rótulo, número, linha de apoio) */
-function CelulaPrioridade({ info, lista, ativo, aoClicar }: {
-  info: InfoCategoria; lista: Lead[]; ativo: boolean; aoClicar?: () => void;
-}) {
+/** o que aparece embaixo do número de cada prioridade (aguardando resposta vem antes de tudo) */
+function metaPrioridade(id: Categoria, lista: Lead[], minha: boolean): ReactNode {
   const n = lista.length;
   const aguardando = lista.filter((l) => l.esperandoEm).length;
-  let meta: ReactNode;
-  if (info.id === 'historico') meta = n ? 'assinados · falta o histórico de créditos' : 'nenhum pendente';
-  else if (info.id === 'sem_resposta') {
+  if (aguardando) return <><i className="fi-pt" aria-hidden />{aguardando} aguardando {minha ? 'sua ' : ''}resposta</>;
+  if (id === 'historico') return n ? `assinado${n > 1 ? 's' : ''} · falta o histórico` : 'nenhum pendente';
+  if (id === 'sem_resposta') {
     /* entra na fila 24 h depois da nossa última mensagem: "novos" = os que completaram as 24 h hoje */
     const novos = lista.filter((l) => (minDesde(l.nu) ?? 99999) <= 48 * 60).length;
-    meta = novos ? `${plural(novos, 'entrou', 'entraram')} nas últimas 24 h` : 'sem resposta há mais de 24 h';
-  } else if (aguardando) meta = <><em>{aguardando}</em> aguardando resposta</>;
-  else meta = info.id === 'quente' ? 'documentação completa' : `${lista.filter((l) => l.lista === 2).length} só falta o comprovante`;
-  const conteudo = (
+    return novos ? `${plural(novos, 'entrou', 'entraram')} nas últimas 24h` : n ? 'sem resposta há mais de 24h' : 'ninguém parado';
+  }
+  if (id === 'quente') return n ? 'documentação completa' : 'nenhum agora';
+  const so = lista.filter((l) => l.lista === 2).length;
+  return so ? `em ${so} só falta o comprovante` : n ? 'falta documento' : 'nenhuma pendente';
+}
+
+type NumerosPainel = { titulo: string; nota: string; per: NumeroAtendente | null; hoje: NumeroAtendente | null };
+
+/** o resumo do topo: responder agora · as quatro prioridades · os números (recebidos, fechados, taxa) */
+function Painel({ base, filtro, aoFiltrar, esperandoAtivo, aoEsperando, numeros, equipe, minha }: {
+  base: Lead[]; filtro: Filtro; aoFiltrar?: (c: Categoria) => void;
+  esperandoAtivo: boolean; aoEsperando?: () => void; numeros: NumerosPainel | null; equipe: boolean; minha: boolean;
+}) {
+  const total = base.length;
+  const esperando = base.filter((l) => l.esperandoEm);
+  const maisAntigo = esperando.reduce((m, l) => Math.max(m, minDesde(l.esperandoEm) ?? 0), 0);
+  const agora = (
     <>
-      <span className="fi-kpi-r">Prioridade {info.ordem} · {info.rotulo}</span>
-      <b className="fi-kpi-n num">{n}</b>
-      <span className="fi-kpi-s">{meta}</span>
+      <span className="fi-pn-r"><i className="fi-pt" aria-hidden />Responder agora</span>
+      <b className="fi-pn-n num">{esperando.length}</b>
+      <span className="fi-pn-s">{esperando.length ? `o mais antigo espera ${haQuanto(maisAntigo)}` : 'ninguém aguardando'}</span>
     </>
   );
-  if (!aoClicar) return <div className="fi-kpi" title={info.resumo}>{conteudo}</div>;
+  const taxa = numeros?.per && numeros.per.recebidos ? (numeros.per.fechados / numeros.per.recebidos) * 100 : null;
+  const hojeDiferente = numeros?.hoje && numeros.per
+    && (numeros.hoje.recebidos !== numeros.per.recebidos || numeros.hoje.fechados !== numeros.per.fechados);
+  const subNumeros = hojeDiferente && numeros?.hoje
+    ? `hoje: ${plural(numeros.hoje.recebidos, 'recebido', 'recebidos')} · ${plural(numeros.hoje.fechados, 'fechado', 'fechados')}`
+    : equipe ? null : 'fechados = placar do CAF';
   return (
-    <button type="button" className="fi-kpi" data-ativo={ativo ? '' : undefined} aria-pressed={ativo} onClick={aoClicar}
-      title={`${info.resumo} ${ativo ? 'Clique para mostrar a fila toda.' : 'Clique para ver só estes.'}`}>
-      {conteudo}
-    </button>
+    <section className="fi-painel vidro" aria-label="Resumo da fila">
+      {aoEsperando ? (
+        <button type="button" className="fi-pn fi-pn-agora" data-tem={esperando.length ? '' : undefined}
+          data-ativo={esperandoAtivo ? '' : undefined} aria-pressed={esperandoAtivo} onClick={aoEsperando} disabled={!esperando.length && !esperandoAtivo}
+          title={esperandoAtivo ? 'Mostrar a fila toda' : 'Mostrar só quem escreveu por último e ninguém respondeu'}>
+          {agora}
+        </button>
+      ) : <div className="fi-pn fi-pn-agora" data-tem={esperando.length ? '' : undefined}>{agora}</div>}
+
+      <div className="fi-pn-prios" role="group" aria-label="Prioridades da fila">
+        {CATEGORIAS.map((info) => {
+          const lista = base.filter((l) => l.cat === info.id);
+          const pct = total ? (lista.length / total) * 100 : 0;
+          const pctTxt = total ? `${Math.round(pct)}% da fila` : '';
+          const ativo = filtro === info.id;
+          const conteudo = (
+            <>
+              <span className="fi-pn-r" title={`Prioridade ${info.ordem} · ${info.rotulo}${pctTxt ? ` · ${pctTxt}` : ''}`}>
+                Prioridade {info.ordem} · {ROTULO_CURTO[info.id]}
+              </span>
+              <b className="fi-pn-n num">{lista.length}</b>
+              <span className="fi-pn-barra" aria-hidden><i style={{ width: `${Math.max(pct, lista.length ? 2 : 0)}%` }} /></span>
+              <span className="fi-pn-s">{metaPrioridade(info.id, lista, minha)}</span>
+            </>
+          );
+          return aoFiltrar ? (
+            <button key={info.id} type="button" className="fi-pn" data-cat={info.id} data-ativo={ativo ? '' : undefined} aria-pressed={ativo}
+              onClick={() => aoFiltrar(info.id)}
+              title={`${info.resumo}${pctTxt ? ` ${pctTxt.replace('% da', '% da sua')}.` : ''} ${ativo ? 'Clique para mostrar a fila toda.' : 'Clique para ver só estes.'}`}>
+              {conteudo}
+            </button>
+          ) : <div key={info.id} className="fi-pn" data-cat={info.id} title={`${info.resumo}${pctTxt ? ` ${pctTxt}.` : ''}`}>{conteudo}</div>;
+        })}
+      </div>
+
+      {numeros && (
+        <div className="fi-pn fi-pn-num" aria-label={numeros.titulo}>
+          <span className="fi-pn-r">{numeros.titulo}<span className="fi-pn-r-nota">{numeros.nota}</span></span>
+          <div className="fi-pn-stats">
+            <span><b className="num">{numeros.per?.recebidos ?? '—'}</b>{numeros.per?.recebidos === 1 ? 'recebido' : 'recebidos'}</span>
+            <span><b className="num">{numeros.per?.fechados ?? '—'}</b>{numeros.per?.fechados === 1 ? 'fechado' : 'fechados'}</span>
+            <span title="Taxa de fechamento: fechados ÷ recebidos no período"><b className="num">{taxa == null ? '—' : porcento(taxa)}</b>taxa</span>
+          </div>
+          {subNumeros && <span className="fi-pn-s">{subNumeros}</span>}
+        </div>
+      )}
+    </section>
   );
 }
 
-/** títulos das colunas (centralizados; só "Cliente" à esquerda) */
-function Colunas({ ultima }: { ultima: string }) {
+/** títulos das colunas (centralizados; só "Cliente" à esquerda). Sem `ultima`, a coluna da direita não existe
+    (pedido do dono 12/11: "pode [tirar] a campanha · kanban para dar mais espaço"). */
+function Colunas({ ultima }: { ultima?: string }) {
   return (
     <div className="fi-colunas" aria-hidden>
       <span className="fi-col-cli">Cliente</span>
       <span>Situação</span>
+      <span>Última mensagem do cliente</span>
       <span>Marcações</span>
-      <span>Última resposta</span>
-      <span>{ultima}</span>
+      {ultima ? <span>{ultima}</span> : null}
       <span />
     </div>
   );
 }
 
-/** o tempo da coluna "Última resposta" */
+/** o tempo (janela do cliente): quando escreveu, quando parou, a última resposta */
 function tempoDe(l: Lead): { t: string; alerta?: boolean } {
   if (l.esperandoEm) return { t: `escreveu ${haQuanto(minDesde(l.esperandoEm) ?? 0)}`, alerta: true };
   if (l.cat === 'historico') return { t: '—' };
@@ -135,36 +210,99 @@ function tempoDe(l: Lead): { t: string; alerta?: boolean } {
   return { t: l.ud ? haQuanto(minDesde(l.ud) ?? 0) : '—' };
 }
 
-/** uma linha da fila */
-function Linha({ l, ativo, aoAbrir, mostrarDono, marcas }: {
-  l: Lead; ativo: boolean; aoAbrir: () => void; mostrarDono?: boolean; marcas: Marca[];
-}) {
-  const tempo = tempoDe(l);
+/** documento pessoal e comprovante: recebido (com o tique) ou faltando (tracejado) */
+function DocsMini({ l }: { l: Lead }) {
   return (
-    <button type="button" className="fi-lin" data-cat={l.cat} data-ativo={ativo ? '' : undefined} onClick={aoAbrir}
-      aria-label={`Abrir ${l.nome}`}>
+    <span className="fi-docs-mini">
+      <span data-ok={l.docPessoal ? '' : undefined}>{l.docPessoal ? <IcCheck t={10} /> : <i aria-hidden />}Documento</span>
+      <span data-ok={l.comprovante ? '' : undefined}>{l.comprovante ? <IcCheck t={10} /> : <i aria-hidden />}Comprovante</span>
+      <span className="fi-sr">{`Documento pessoal ${l.docPessoal ? 'recebido' : 'faltando'}, comprovante ${l.comprovante ? 'recebido' : 'faltando'}`}</span>
+    </span>
+  );
+}
+
+/** a segunda linha da situação */
+function Detalhe({ l }: { l: Lead }) {
+  if (l.cat === 'historico') return <span className="fi-l2">{l.assinadoEm ? `assinado ${dataHora(l.assinadoEm)}` : 'assinado no administrativo'}</span>;
+  if (l.cat === 'sem_resposta') return <span className="fi-l2">{l.nu ? `nossa última mensagem ${dataHora(l.nu)}` : 'sem mensagem nossa'}</span>;
+  if (l.docsManual) return <span className="fi-l2">marcada à mão pelo atendente</span>;
+  if (l.cat === 'quente') {
+    const t = l.udoc ?? l.ud;
+    return <span className="fi-l2">{t ? `mandou tudo ${haQuanto(minDesde(t) ?? 0)}` : 'documento e comprovante recebidos'}</span>;
+  }
+  return <DocsMini l={l} />;
+}
+
+/** uma linha da fila (a linha abre a janela do cliente; o botão da direita abre a conversa) */
+function Linha({ l, ativo, aoAbrir, aoConversa, mostrarDono, sua, destacar, semCanal }: {
+  l: Lead; ativo: boolean; aoAbrir: () => void; aoConversa: () => void; mostrarDono?: boolean;
+  /** a fila é de quem está olhando ("aguardando SUA resposta") */
+  sua?: boolean;
+  /** termo buscado: se ele só existe no meio do nome, a linha mostra o nome completo */
+  destacar?: string;
+  /** sem a coluna Campanha · Kanban (a Minha fila; a campanha fica na janela) */
+  semCanal?: boolean;
+}) {
+  const msg = mensagemDoCliente(l.disse);
+  const dono = atendente(l.atendente);
+  const quandoEscreveu = l.ud ? `${haQuanto(minDesde(l.ud) ?? 0)} · ${dataHora(l.ud)}` : '';
+  const nomeCurto = doisNomes(l.nome);
+  const nomeMostrado = destacar && !semAcento(nomeCurto).includes(semAcento(destacar)) ? l.nome : nomeCurto;
+  /* em "Sem resposta" a situação carrega o que varia: há quanto tempo parou */
+  const situacao = l.cat === 'sem_resposta' && l.nu ? `${l.curta} ${haQuanto(minDesde(l.nu) ?? 0)}` : l.curta;
+  return (
+    <div className="fi-lin" role="button" tabIndex={0} data-id={l.id} data-cat={l.cat} data-ativo={ativo ? '' : undefined}
+      data-espera={l.esperandoEm ? '' : undefined} aria-label={`Abrir ${l.nome}`}
+      onClick={() => { if (window.getSelection()?.toString()) return; aoAbrir(); }}
+      onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); aoAbrir(); } }}>
       <span className="fi-col-cli">
         <Avatar l={l} />
         <span className="fi-lin-tx">
-          <b className="fi-lin-nome" title={l.nome}>{doisNomes(l.nome)}</b>
-          <span className="fi-lin-prod num">{l.fone}</span>
+          <b className="fi-lin-nome" title={l.nome}>{nomeMostrado}</b>
+          {!l.fone ? <span className="fi-lin-prod">sem telefone no cadastro</span>
+            : l.fone === l.nome ? <span className="fi-lin-prod">sem nome no cadastro</span>
+              : <span className="fi-lin-prod num">{l.fone}</span>}
         </span>
       </span>
       <span className="fi-col-sit">
-        {l.esperandoEm ? <span className="fi-espera" title={`Escreveu ${dataHora(l.esperandoEm)}: "${l.disse}"`}><i aria-hidden />Aguardando resposta</span> : null}
-        <span className="fi-elip" title={l.situacao}>{l.curta}</span>
-        {l.nota && <span className="fi-nota-pt" title={l.nota} aria-label={l.nota}><IcInfo t={13} /></span>}
+        <span className="fi-l1 fi-elip" title={l.situacao}>{situacao}</span>
+        <Detalhe l={l} />
       </span>
-      <span className="fi-col-marc"><ChipsMarca marcas={marcas} /></span>
-      <span className="fi-col-tempo" data-alerta={tempo.alerta ? '' : undefined}>{tempo.t}</span>
-      <span className="fi-col-canal" title={mostrarDono ? undefined : l.campanha}>{mostrarDono ? atendente(l.atendente).nome : campanhaCurta(l.campanha)}</span>
-      <span className="fi-col-seta" aria-hidden><IcSeta t={14} /></span>
-    </button>
+      <span className="fi-col-msg">
+        {msg
+          ? <span className="fi-l1 fi-elip" data-midia={msg.midia ? '' : undefined} title={msg.texto}>{msg.midia ? msg.texto : `“${msg.texto}”`}</span>
+          : <span className="fi-l1 fi-vazio">Nenhuma mensagem do cliente</span>}
+        {l.esperandoEm
+          ? <span className="fi-l2" data-alerta><i className="fi-pt" aria-hidden />aguardando {sua ? 'sua ' : ''}resposta · {haQuanto(minDesde(l.esperandoEm) ?? 0)}</span>
+          : quandoEscreveu ? <span className="fi-l2">{quandoEscreveu}</span> : null}
+      </span>
+      <span className="fi-col-marc"><ChipsMarca marcas={l.marcas} /></span>
+      {semCanal ? null : <span className="fi-col-canal">
+        {mostrarDono ? (
+          <>
+            <span className="fi-l1 fi-dono"><AvatarAtendente a={dono} tam={18} />{dono.nome}</span>
+            <span className="fi-l2 fi-elip">{campanhaBonita(l.campanha)}</span>
+          </>
+        ) : (
+          <>
+            <span className="fi-l1 fi-elip" title={l.campanha}>{campanhaBonita(l.campanha)}</span>
+            {l.funil ? <span className="fi-l2 fi-elip" title="Coluna no Kanban">{l.funil}</span> : null}
+          </>
+        )}
+      </span>}
+      <span className="fi-col-acao">
+        <button type="button" className="fi-bt-conv" onClick={(e) => { e.stopPropagation(); aoConversa(); }}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); }}
+          aria-label={`Abrir a conversa de ${l.nome}`} title="Abrir a conversa no WhatsApp">
+          <IcConversa t={15} />
+        </button>
+      </span>
+    </div>
   );
 }
 
 /** o caminho do cliente com a Iris, pelo que a lista diz */
-function Caminho({ l }: { l: Lead }) {
+function Caminho({ l, comQuem }: { l: Lead; comQuem: string }) {
   const est = passosDoLead(l);
   return (
     <ol className="fi-passos" data-cat={l.cat}>
@@ -173,7 +311,7 @@ function Caminho({ l }: { l: Lead }) {
           <span className="fi-passo-pt" aria-hidden>
             {est[i] === 'feito' ? <IcCheck t={11} /> : est[i] === 'parou' ? <IcX t={10} /> : null}
           </span>
-          <span className="fi-passo-rot">{rot}</span>
+          <span className="fi-passo-rot">{i === PASSOS.length - 1 ? comQuem : rot}</span>
           <span className="fi-sr">{est[i] === 'feito' ? ' (feito)' : est[i] === 'atual' ? ' (agora)' : est[i] === 'parou' ? ' (parou aqui)' : ''}</span>
         </li>
       ))}
@@ -206,7 +344,7 @@ function MarcarCliente({ marcas, aoMarcar, aoTirar }: {
       return (
         <button key={tipo} type="button" className="fi-tile" data-grupo={g} aria-expanded={escrevendo} onClick={() => setEscrevendo((v) => !v)}>
           <span className="fi-tile-ic"><IcMais t={13} /></span>
-          <span className="fi-tile-tx"><b>Falta outra coisa</b><small>{faltas.length ? plural(faltas.length, 'marcada', 'marcadas') : 'Escreva o que ficou faltando'}</small></span>
+          <span className="fi-tile-tx"><b>Falta outra coisa</b><small>{faltas.length ? plural(faltas.length, 'marcada', 'marcadas') : 'escreva o que ficou faltando'}</small></span>
         </button>
       );
     }
@@ -218,7 +356,7 @@ function MarcarCliente({ marcas, aoMarcar, aoTirar }: {
             <span className="fi-tile-ic"><IcTelefone t={14} /></span>
             <span className="fi-tile-tx">
               <b>{b.botao}</b>
-              <small>{ja ? `Ligar de novo · última tentativa ${quando(minAtras(ja.em))}` : 'Marca o cliente para ligar de novo'}</small>
+              {ja && <small>{`Ligar de novo · última tentativa ${quando(minAtras(ja.em))}`}</small>}
             </span>
             <span className="fi-tile-dir">{ja ? <b className="fi-tile-n num">{ja.vezes ?? 1}x</b> : <span className="fi-tile-mais">+1</span>}</span>
           </button>
@@ -230,7 +368,7 @@ function MarcarCliente({ marcas, aoMarcar, aoTirar }: {
       <button key={tipo} type="button" className="fi-tile" data-grupo={g} data-on={ja ? '' : undefined} aria-pressed={!!ja}
         onClick={() => (ja ? aoTirar(ja.id) : aoMarcar(tipo))} title={ja ? 'Resolvido: clique para tirar a marcação' : 'Clique para marcar'}>
         <span className="fi-tile-ic"><IcTipoMarca tipo={tipo} t={14} /></span>
-        <span className="fi-tile-tx"><b>{b.botao}</b><small>{ja ? `Marcado ${quando(minAtras(ja.em))}` : 'Clique para marcar'}</small></span>
+        <span className="fi-tile-tx"><b>{b.botao}</b>{ja && <small>{`Marcado ${quando(minAtras(ja.em))}`}</small>}</span>
         <span className="fi-tile-dir">{ja ? <span className="fi-tile-ok"><IcCheck t={11} /></span> : null}</span>
       </button>
     );
@@ -239,7 +377,7 @@ function MarcarCliente({ marcas, aoMarcar, aoTirar }: {
   return (
     <section className="fi-bloco fi-marcar">
       <h3 className="fi-bloco-t">Marcações{marcas.length > 0 && <span className="fi-marcar-tot num">{marcas.length}</span>}
-        <span className="fi-bloco-n">ficam salvas e aparecem na fila</span></h3>
+        <span className="fi-bloco-n">clique para marcar · fica salvo e aparece na fila</span></h3>
       {GRUPOS_MARCA.map((gr) => (
         <div key={gr.id} className="fi-marcar-grupo" data-grupo={gr.id}>
           <span className="fi-marcar-rot">{gr.rotulo}</span>
@@ -274,17 +412,17 @@ function MarcarCliente({ marcas, aoMarcar, aoTirar }: {
 }
 
 /** a ficha do cliente — janela de vidro no meio da tela */
-function JanelaCliente({ l, raiz, lista, aoTrocar, aoFechar, avisar, vendoComo, aoMarcar, aoTirar, aoCorrigirDocs, aoTirarDaFila, abrirConversa }: {
+function JanelaCliente({ l, raiz, lista, aoTrocar, aoFechar, avisar, ehDono, aoMarcar, aoTirar, aoCorrigirDocs, aoTirarDaFila, abrirConversa }: {
   l: Lead; raiz: HTMLElement; lista: Lead[]; aoTrocar: (id: string) => void; aoFechar: () => void;
-  avisar: (t: string) => void; vendoComo: Atendente;
+  avisar: (t: string) => void; ehDono: boolean;
   aoMarcar: (tipo: TipoMarca, texto?: string) => void; aoTirar: (id: string) => void;
   aoCorrigirDocs: (estado: 'completos' | 'incompletos' | null) => void; aoTirarDaFila: () => void;
   abrirConversa?: (l: Lead) => void;
 }) {
   const marcas = l.marcas;
+  const cartao = useRef<HTMLDivElement>(null);
   const info = infoCategoria(l.cat);
   const dono = atendente(l.atendente);
-  const ehDono = vendoComo.id === dono.id;
   const pos = lista.findIndex((x) => x.id === l.id);
   const ir = (d: number) => { const nx = lista[pos + d]; if (nx) aoTrocar(nx.id); };
 
@@ -293,6 +431,7 @@ function JanelaCliente({ l, raiz, lista, aoTrocar, aoFechar, avisar, vendoComo, 
     const tecla = (e: KeyboardEvent) => {
       const alvo = e.target as HTMLElement | null;
       if (alvo && (alvo.tagName === 'INPUT' || alvo.tagName === 'TEXTAREA')) return;
+      if (document.querySelector('.p-modal')) return; /* a confirmação aberta é quem manda */
       if (e.key === 'Escape') aoFechar();
       else if (e.key === 'ArrowRight') ir(1);
       else if (e.key === 'ArrowLeft') ir(-1);
@@ -301,10 +440,37 @@ function JanelaCliente({ l, raiz, lista, aoTrocar, aoFechar, avisar, vendoComo, 
     return () => document.removeEventListener('keydown', tecla);
   });
 
+  /* o foco entra no cartão ao abrir e ao trocar de cliente; Tab circula só aqui dentro */
+  useEffect(() => {
+    if (!cartao.current?.contains(document.activeElement)) cartao.current?.focus();
+  }, [l.id]);
+  const prenderTab = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'Tab') return;
+    const focos = [...e.currentTarget.querySelectorAll<HTMLElement>('button:not([disabled]), input')];
+    if (!focos.length) return;
+    const i = focos.indexOf(document.activeElement as HTMLElement);
+    if (e.shiftKey && i <= 0) { e.preventDefault(); focos[focos.length - 1].focus(); }
+    else if (!e.shiftKey && (i === focos.length - 1 || i < 0)) { e.preventDefault(); focos[0].focus(); }
+  };
+
+  const copiarFone = () => {
+    const d = l.fone.replace(/\D/g, '');
+    const planoB = () => {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = d; document.body.appendChild(ta); ta.select();
+        const ok = document.execCommand('copy'); ta.remove();
+        avisar(ok ? `Telefone copiado: ${l.fone}` : 'Não deu para copiar aqui.');
+      } catch { avisar('Não deu para copiar aqui.'); }
+    };
+    try { void navigator.clipboard.writeText(d).then(() => avisar(`Telefone copiado: ${l.fone}`), planoB); } catch { planoB(); }
+  };
   const tempo = tempoDe(l);
+  const msg = mensagemDoCliente(l.disse);
   const fatos: [string, string][] = [['Situação', ROTULO_LISTA[l.lista] ?? '—']];
   if (l.funil) fatos.push(['Coluna no Kanban', l.funil]);
-  fatos.push(['Campanha', l.campanha]);
+  fatos.push(['Campanha', campanhaBonita(l.campanha)]);
+  if (l.entrouEm) fatos.push(['Entrou no Kanban', dataHora(l.entrouEm)]);
   if (l.cat !== 'historico') {
     fatos.push(['Documento pessoal', l.docPessoal ? 'Recebido (frente e verso)' : 'Não recebido']);
     fatos.push(['Comprovante de residência', l.comprovante ? 'Recebido' : 'Não recebido']);
@@ -312,7 +478,7 @@ function JanelaCliente({ l, raiz, lista, aoTrocar, aoFechar, avisar, vendoComo, 
   if (l.falta) fatos.push(['O que falta', l.falta]);
   if (l.assinadoEm) fatos.push(['Assinado (última via aprovada)', dataHora(l.assinadoEm)]);
   if (l.udoc) fatos.push(['Último documento recebido', dataHora(l.udoc)]);
-  if (l.ud) fatos.push(['Última mensagem dele', dataHora(l.ud)]);
+  if (l.ud) fatos.push(['Última mensagem do cliente', dataHora(l.ud)]);
   if (l.nu) fatos.push(['Nossa última mensagem', dataHora(l.nu)]);
   if (l.arq != null) fatos.push(['Arquivos enviados', String(l.arq)]);
   if (l.msgs != null) fatos.push(['Mensagens nossas', String(l.msgs)]);
@@ -320,12 +486,16 @@ function JanelaCliente({ l, raiz, lista, aoTrocar, aoFechar, avisar, vendoComo, 
 
   return createPortal(
     <div className="fi-veu" onMouseDown={(e) => { if (e.target === e.currentTarget) aoFechar(); }}>
-      <div className="fi-modal vidro-pro" data-cat={l.cat} role="dialog" aria-modal="true" aria-label={`Cliente ${l.nome}`}>
+      <div className="fi-modal vidro-pro" data-cat={l.cat} role="dialog" aria-modal="true" aria-label={`Cliente ${l.nome}`}
+        ref={cartao} tabIndex={-1} onKeyDown={prenderTab}>
         <header className="fi-modal-cab">
           <Avatar l={l} tam={48} />
           <div className="fi-modal-quem">
             <h2>{l.nome}</h2>
-            <span><span className="num">{l.fone}</span> · {l.campanha}{l.funil ? ` · ${l.funil}` : ''} · Cliente de {dono.nome}</span>
+            <span>
+              <button type="button" className="fi-fone num" onClick={copiarFone} title="Copiar o telefone">{l.fone}<IcCopiar t={11} /></button>
+              {' · '}{campanhaBonita(l.campanha)} · Cliente de {dono.nome}
+            </span>
           </div>
           <div className="fi-modal-nav">
             <button type="button" className="fi-x" onClick={() => ir(-1)} disabled={pos <= 0} aria-label="Cliente anterior" title="Cliente anterior (←)"><IcVoltar t={14} /></button>
@@ -340,8 +510,8 @@ function JanelaCliente({ l, raiz, lista, aoTrocar, aoFechar, avisar, vendoComo, 
             <div className="fi-sit" data-cat={l.cat}>
               <span className="fi-sit-tx">
                 <span className="fi-sit-rot">Prioridade {info.ordem} · {info.rotulo}</span>
-                <span className="fi-sit-val">{l.situacao}</span>
-                {tempo.t !== '—' && (
+                <span className="fi-sit-val" title={l.situacao !== l.curta ? l.situacao : undefined}>{l.curta}</span>
+                {tempo.t !== '—' && !l.esperandoEm && (
                   <span className="fi-sit-sub" data-alerta={tempo.alerta ? '' : undefined}>
                     <IcRelogio t={12} />{tempo.alerta ? 'Escreveu' : l.cat === 'sem_resposta' ? 'Parou' : 'Última resposta'} {tempo.t.replace(/^(escreveu|parou) /, '')}
                   </span>
@@ -351,21 +521,26 @@ function JanelaCliente({ l, raiz, lista, aoTrocar, aoFechar, avisar, vendoComo, 
 
             {l.esperandoEm && (
               <div className="fi-esperando" role="status">
-                <b><i aria-hidden />Aguardando sua resposta</b>
-                <span>Escreveu por último e ninguém respondeu · {dataHora(l.esperandoEm)}</span>
-                <div className="fi-bolha-cli">{l.disse}</div>
+                <b><i aria-hidden />Aguardando {ehDono ? 'sua ' : ''}resposta</b>
+                <span>Escreveu por último e ninguém respondeu · {haQuanto(minDesde(l.esperandoEm) ?? 0)} · {dataHora(l.esperandoEm)}</span>
               </div>
             )}
             {l.nota && <div className="fi-nota-aviso"><IcInfo t={14} />{l.nota}</div>}
 
             <section className="fi-bloco">
               <h3 className="fi-bloco-t">Andamento do atendimento</h3>
-              <Caminho l={l} />
+              <Caminho l={l} comQuem={ehDono ? 'Com você' : `Com ${dono.nome}`} />
             </section>
 
-            <section className="fi-bloco">
-              <h3 className="fi-bloco-t">Conversa</h3>
-              <p className="fi-conv-nota">A conversa completa fica no WhatsApp. Use "Abrir conversa" para responder o cliente.</p>
+            <section className="fi-bloco fi-bloco-fim">
+              <h3 className="fi-bloco-t">Última mensagem do cliente</h3>
+              {msg ? (
+                <div className="fi-ultima">
+                  <div className="fi-bolha-cli" data-midia={msg.midia ? '' : undefined}>{msg.texto}</div>
+                  {l.ud ? <span className="fi-ultima-h">{haQuanto(minDesde(l.ud) ?? 0)} · {dataHora(l.ud)}</span> : null}
+                </div>
+              ) : <p className="fi-conv-nota">O cliente ainda não escreveu nesta conversa.</p>}
+              <p className="fi-conv-nota">A conversa completa fica no WhatsApp. Use “Abrir conversa” para responder ao cliente.</p>
             </section>
           </div>
 
@@ -393,7 +568,9 @@ function JanelaCliente({ l, raiz, lista, aoTrocar, aoFechar, avisar, vendoComo, 
 
         <footer className="fi-modal-pe">
           <span className="fi-modal-nota">
-            {ehDono ? 'Use ← e → para passar pelos clientes da fila.' : `Você está vendo a fila de ${dono.nome}. Quem atende é ${artigo(dono)} ${dono.nome}.`}
+            {ehDono
+              ? <><kbd className="fi-k">←</kbd> <kbd className="fi-k">→</kbd> passam pelos clientes da fila.</>
+              : <>Você está vendo a fila de {dono.nome} · quem atende é {artigo(dono)} {dono.nome} · <kbd className="fi-k">←</kbd> <kbd className="fi-k">→</kbd> passam pelos clientes.</>}
           </span>
           <BotaoSec onClick={aoTirarDaFila}><IcSair t={14} />Tirar da fila</BotaoSec>
           <BotaoPrimario onClick={() => (abrirConversa ? abrirConversa(l) : avisar(`Prévia: aqui abre a conversa de ${doisNomes(l.nome)} no WhatsApp.`))}>
@@ -406,8 +583,10 @@ function JanelaCliente({ l, raiz, lista, aoTrocar, aoFechar, avisar, vendoComo, 
   );
 }
 
-/** visão do administrador: um cartão por atendente */
-function CartaoAtendente({ a, aoAbrir, leads, numero }: { a: Atendente; aoAbrir: () => void; leads: Lead[]; numero?: NumeroAtendente | null }) {
+/** visão do administrador: um cartão por atendente (quem → agora → mês → composição) */
+function CartaoAtendente({ a, aoAbrir, leads, numero }: {
+  a: Atendente; aoAbrir: (esperando?: boolean) => void; leads: Lead[]; numero?: NumeroAtendente | null;
+}) {
   const meus = leads.filter((l) => l.atendente === a.id);
   const por = (cat: Categoria) => meus.filter((l) => l.cat === cat).length;
   const maxN = Math.max(1, ...EQUIPE.map((x) => Math.max(...CATEGORIAS.map((k) => leads.filter((l) => l.atendente === x.id && l.cat === k.id).length))));
@@ -419,22 +598,31 @@ function CartaoAtendente({ a, aoAbrir, leads, numero }: { a: Atendente; aoAbrir:
         <AvatarAtendente a={a} tam={34} />
         <span className="fi-eq-quem">
           <b>{a.nome}</b>
-          <span title={`Turno ${a.turno.ini}h–${a.turno.fim}h`}>{plural(meus.length, 'cliente', 'clientes')}</span>
+          <span title={`Turno ${turnoTexto(a)}`}>{plural(meus.length, 'cliente', 'clientes')}</span>
         </span>
-        <BotaoSec mini onClick={aoAbrir}>Ver fila<IcSeta t={12} /></BotaoSec>
+        <BotaoSec mini onClick={() => aoAbrir()}>Ver fila<IcSeta t={12} /></BotaoSec>
       </header>
+      {esperando ? (
+        <button type="button" className="fi-eq-agora" onClick={() => aoAbrir(true)}
+          title={`Abrir a fila de ${a.nome} só com quem aguarda resposta`}
+          aria-label={`Ver ${plural(esperando, 'cliente aguardando resposta', 'clientes aguardando resposta')} de ${a.nome}`}>
+          <i className="fi-pt" aria-hidden /><b className="num">{esperando}</b> aguardando resposta
+        </button>
+      ) : (
+        <span className="fi-eq-agora" data-zero>Ninguém aguardando resposta</span>
+      )}
       {numero && (
         <div className="fi-eq-nums" aria-label="Recebidos e fechados no período">
-          <span><b className="num">{numero.recebidos}</b>recebidos</span>
-          <span><b className="num">{numero.fechados}</b>fechados</span>
-          <span><b className="num">{taxa == null ? '—' : `${taxa.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`}</b>taxa</span>
+          <span><b className="num">{numero.recebidos}</b>{numero.recebidos === 1 ? 'recebido' : 'recebidos'}</span>
+          <span><b className="num">{numero.fechados}</b>{numero.fechados === 1 ? 'fechado' : 'fechados'}</span>
+          <span title="Taxa de fechamento: fechados ÷ recebidos no período"><b className="num">{taxa == null ? '—' : porcento(taxa)}</b>taxa</span>
         </div>
       )}
       <div className="fi-eq-linhas">
         {CATEGORIAS.map((k) => {
           const n = por(k.id);
           return (
-            <div key={k.id} className="fi-eq-lin" data-cat={k.id}>
+            <div key={k.id} className="fi-eq-lin" data-cat={k.id} data-zero={n === 0 ? '' : undefined}>
               <span className="fi-eq-rot">{ROTULO_CURTO[k.id]}</span>
               <span className="fi-eq-barra" aria-hidden><i style={{ width: `${(n / maxN) * 100}%` }} /></span>
               <b className="fi-eq-n num">{n}</b>
@@ -442,9 +630,6 @@ function CartaoAtendente({ a, aoAbrir, leads, numero }: { a: Atendente; aoAbrir:
           );
         })}
       </div>
-      <footer className="fi-eq-pe" data-alerta={esperando ? '' : undefined}>
-        {esperando ? <><i className="fi-pt" aria-hidden />{esperando} aguardando resposta</> : 'Ninguém aguardando resposta'}
-      </footer>
     </article>
   );
 }
@@ -476,7 +661,7 @@ function VerComo({ valor, aoMudar, leads }: { valor: string; aoMudar: (id: strin
             <button key={x.id} type="button" role="option" aria-selected={x.id === valor} className="fi-vc-op"
               onClick={() => { aoMudar(x.id); setAberto(false); }}>
               <AvatarAtendente a={x} tam={26} />
-              <span className="fi-vc-op-tx"><b>{x.nome}</b><small>{plural(leads.filter((l) => l.atendente === x.id).length, 'cliente', 'clientes')} · turno {x.turno.ini}h–{x.turno.fim}h</small></span>
+              <span className="fi-vc-op-tx"><b>{x.nome}</b><small>{plural(leads.filter((l) => l.atendente === x.id).length, 'cliente', 'clientes')} · turno {turnoTexto(x)}</small></span>
               {x.id === valor && <IcCheck t={12} />}
             </button>
           ))}
@@ -512,6 +697,24 @@ export default function FilaIrisTela({ fonte, usuarioId, admin: adminReal, abrir
   const [aberto, setAberto] = useState<string | null>(null);
   const [toast, setToast] = useState<{ t: string; n: number } | null>(null);
   const [comoFunciona, setComoFunciona] = useState(false);
+  const [busca, setBusca] = useState('');
+  const [recolhidas, setRecolhidas] = useState<Categoria[]>([]);
+  const campoBusca = useRef<HTMLInputElement>(null);
+  const termo = busca.trim();
+
+  /* "/" leva para a busca (fora de campos de texto e com a janela do cliente fechada) */
+  useEffect(() => {
+    const tecla = (e: KeyboardEvent) => {
+      const alvo = e.target as HTMLElement | null;
+      if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (alvo && (alvo.tagName === 'INPUT' || alvo.tagName === 'TEXTAREA' || alvo.isContentEditable)) return;
+      if (document.querySelector('.fi-veu')) return;
+      e.preventDefault();
+      campoBusca.current?.focus();
+    };
+    document.addEventListener('keydown', tecla);
+    return () => document.removeEventListener('keydown', tecla);
+  }, []);
 
   /* raiz de portal da página (janela do cliente + aviso ficam acima de tudo) */
   const [raiz, setRaiz] = useState<HTMLElement | null>(null);
@@ -542,14 +745,20 @@ export default function FilaIrisTela({ fonte, usuarioId, admin: adminReal, abrir
   );
   const passaMarca = (l: Lead) => filtroMarca === 'todas'
     || (filtroMarca === 'esperando' ? !!l.esperandoEm : l.marcas.some((m) => grupoMarca(m.tipo) === filtroMarca));
+  const filtrando = filtro !== 'todas' || filtroMarca !== 'todas' || !!termo;
+  /* os contadores dos filtros de marcação contam sobre a MESMA base que o clique vai mostrar */
+  const baseMarca = (filtro === 'todas' ? daFila : daFila.filter((l) => l.cat === filtro)).filter((l) => passaBusca(l, termo));
   const visiveis = (filtro === 'todas' ? grupos : grupos.filter((g) => g.info.id === filtro))
-    .map((g) => (filtroMarca === 'todas' ? g : { ...g, itens: g.itens.filter(passaMarca) }))
-    .filter((g) => filtroMarca === 'todas' || g.itens.length > 0);
-  const contaMarca = (g: GrupoMarca) => daFila.filter((l) => l.marcas.some((m) => grupoMarca(m.tipo) === g)).length;
-  const contaEsperando = daFila.filter((l) => l.esperandoEm).length;
-  const plana = visiveis.flatMap((g) => g.itens);
+    .map((g) => (filtroMarca === 'todas' && !termo ? g : { ...g, itens: g.itens.filter((l) => passaMarca(l) && passaBusca(l, termo)) }))
+    .filter((g) => (filtroMarca === 'todas' && !termo) || g.itens.length > 0);
+  const contaMarca = (g: GrupoMarca) => baseMarca.filter((l) => l.marcas.some((m) => grupoMarca(m.tipo) === g)).length;
+  /* recolher uma seção só vale sem filtro nenhum (filtrou ou buscou, tudo o que passou aparece) */
+  const recolhida = (c: Categoria) => !filtrando && recolhidas.includes(c);
+  const alternarSecao = (c: Categoria) => setRecolhidas((r) => (r.includes(c) ? r.filter((x) => x !== c) : [...r, c]));
+  const plana = visiveis.flatMap((g) => (recolhida(g.info.id) ? [] : g.itens));
   const quentesEquipe = useMemo(() => ordenarLeads(leads.filter((l) => l.cat === 'quente')), [leads]);
-  const navegacao = visaoEf === 'equipe' ? quentesEquipe : plana;
+  const quentesEquipeVis = termo ? quentesEquipe.filter((l) => passaBusca(l, termo)) : quentesEquipe;
+  const navegacao = visaoEf === 'equipe' ? quentesEquipeVis : plana;
   const clienteAberto = aberto ? navegacao.find((l) => l.id === aberto) : undefined;
   const total = daFila.length;
   const donoInfo = atendente(dono);
@@ -557,12 +766,63 @@ export default function FilaIrisTela({ fonte, usuarioId, admin: adminReal, abrir
   /* troca de pessoa/visão/filtro: fecha a janela */
   useEffect(() => { setAberto(null); }, [dono, visaoEf, filtro, filtroMarca]);
 
-  const trocarVerComo = (id: string) => { setVerComo(id); setVisao('minha'); setFiltro('todas'); setFiltroMarca('todas'); };
-  const abrirFilaDe = (id: string) => {
+  const limparFiltros = () => { setFiltro('todas'); setFiltroMarca('todas'); setBusca(''); setRecolhidas([]); };
+  const trocarVerComo = (id: string) => { setVerComo(id); setVisao('minha'); limparFiltros(); };
+  const abrirFilaDe = (id: string, esperando = false) => {
     if (id === verComo && !semFilaPropria) setVisao('minha'); else { setAlvo(id); setVisao('de'); }
-    setFiltro('todas'); setFiltroMarca('todas');
+    limparFiltros();
+    if (esperando) setFiltroMarca('esperando');
   };
-  const n = filtro === 'todas' && filtroMarca === 'todas' ? total : plana.length;
+  const n = filtrando ? visiveis.reduce((t, g) => t + g.itens.length, 0) : total;
+  const fecharJanela = () => {
+    const id = aberto;
+    setAberto(null);
+    if (!id) return;
+    requestAnimationFrame(() => {
+      const el = document.querySelector<HTMLElement>(`.fi-lin[data-id="${id}"]`);
+      el?.scrollIntoView({ block: 'nearest' });
+      el?.focus();
+    });
+  };
+  const conversa = (l: Lead) => (abrirConversa ? abrirConversa(l) : avisar(`Prévia: aqui abre a conversa de ${doisNomes(l.nome)} no WhatsApp.`));
+
+  /* os números do topo: na fila de alguém, os da pessoa; na Equipe, a soma do período escolhido */
+  const somar = (l: NumeroAtendente[] | null): NumeroAtendente | null => (l && l.length
+    ? l.reduce((t, x) => ({ atendente: 'equipe', recebidos: t.recebidos + x.recebidos, fechados: t.fechados + x.fechados }), { atendente: 'equipe', recebidos: 0, fechados: 0 })
+    : null);
+  const daPessoa = (p: Periodo) => fonte.numeros(p)?.find((x) => x.atendente === dono) ?? null;
+  const numerosPainel: NumerosPainel | null = visaoEf === 'equipe'
+    ? (fonte.numeros(periodo) ? { titulo: 'Equipe', nota: ({ hoje: 'hoje', '7d': '7 dias', mes: 'mês da casa', mes_ant: 'mês passado' } as const)[periodo], per: somar(fonte.numeros(periodo)), hoje: periodo === 'hoje' ? null : somar(fonte.numeros('hoje')) } : null)
+    : (daPessoa('mes') ? { titulo: visaoEf === 'de' ? `Números de ${donoInfo.nome}` : 'Meus números', nota: 'mês da casa', per: daPessoa('mes'), hoje: daPessoa('hoje') } : null);
+
+  /* ↑ e ↓ passam o foco de linha em linha (vale para a Minha fila e para os quentes da Equipe) */
+  const teclasRolo = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    const alvo = e.target as HTMLElement | null;
+    if (alvo && (alvo.tagName === 'INPUT' || alvo.tagName === 'TEXTAREA')) return;
+    e.preventDefault();
+    const linhas = [...e.currentTarget.querySelectorAll<HTMLElement>('.fi-lin')];
+    const i = linhas.indexOf(document.activeElement as HTMLElement);
+    (linhas[i + (e.key === 'ArrowDown' ? 1 : -1)] ?? linhas[i < 0 ? 0 : i])?.focus();
+  };
+
+  /* a busca do cabeçalho da fila (na Equipe ela varre só os quentes, e o texto avisa) */
+  const buscaDica = visaoEf === 'equipe' ? 'Buscar nos clientes quentes (nome ou telefone)' : 'Buscar pelo nome ou pelo telefone';
+  const campoDeBusca = (
+    <label className="fi-busca" title={`${buscaDica} · atalho: /`}>
+      <IcBusca t={14} />
+      <input ref={campoBusca} value={busca} onChange={(e) => setBusca(e.target.value)}
+        placeholder={visaoEf === 'equipe' ? 'Buscar nos quentes' : 'Nome ou telefone'}
+        aria-label={buscaDica}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') { setBusca(''); e.currentTarget.blur(); }
+          else if (e.key === 'Enter' && termo && navegacao[0]) { setAberto(navegacao[0].id); e.currentTarget.blur(); }
+          else if (e.key === 'ArrowDown') { e.preventDefault(); document.querySelector<HTMLElement>('.fi-lin')?.focus(); }
+        }} />
+      {busca ? <button type="button" className="fi-busca-x" onClick={() => { setBusca(''); campoBusca.current?.focus(); }} aria-label="Limpar a busca"><IcX t={10} /></button>
+        : <kbd className="fi-busca-k" aria-hidden>/</kbd>}
+    </label>
+  );
 
   return (
     <div className="fi">
@@ -570,9 +830,15 @@ export default function FilaIrisTela({ fonte, usuarioId, admin: adminReal, abrir
         <div className="fi-cab-tx">
           <h1>Fila da Iris</h1>
           <p className="fi-cab-sub">
-            <span>{fonte.rotulo}</span>
+            {visaoEf !== 'equipe' && (
+              <>
+                <span className="fi-cab-quem"><AvatarAtendente a={donoInfo} tam={18} />{donoInfo.nome} · turno {turnoTexto(donoInfo)}</span>
+                <span className="fi-sep" aria-hidden>·</span>
+              </>
+            )}
+            <span className="num">{fonte.carregando && !leads.length ? 'carregando…' : visaoEf === 'equipe' ? `${leads.length} clientes na equipe` : plural(total, 'cliente', 'clientes')}</span>
             <span className="fi-sep" aria-hidden>·</span>
-            <span className="num">{fonte.carregando ? 'carregando…' : visaoEf === 'equipe' ? `${leads.length} clientes na equipe` : plural(total, 'cliente', 'clientes')}</span>
+            <span>{fonte.rotulo}</span>
             <span className="fi-sep" aria-hidden>·</span>
             <button type="button" className="fi-link" onClick={() => setComoFunciona((v) => !v)} aria-expanded={comoFunciona}>
               <IcInfo t={13} />Como funciona
@@ -583,7 +849,7 @@ export default function FilaIrisTela({ fonte, usuarioId, admin: adminReal, abrir
           {!real && <VerComo valor={verComo} aoMudar={trocarVerComo} leads={leads} />}
           {admin && !semFilaPropria && (
             <Segmentado rotulo="Visão" valor={visaoEf === 'minha' ? 'minha' : 'equipe'}
-              aoMudar={(v) => { setVisao(v); setFiltro('todas'); setFiltroMarca('todas'); }}
+              aoMudar={(v) => { setVisao(v); limparFiltros(); }}
               opcoes={[{ valor: 'minha', rotulo: 'Minha fila' }, { valor: 'equipe', rotulo: 'Equipe' }]} />
           )}
         </div>
@@ -602,6 +868,7 @@ export default function FilaIrisTela({ fonte, usuarioId, admin: adminReal, abrir
           <p className="fi-como-pe">
             Cada atendente vê os clientes que o robô distribuiu para ele, como hoje. A fila se organiza sozinha pelo andamento do atendimento.
             Quando o administrativo fecha o cliente, ele sai da fila e vai para a aba Fechados. Cliente no Remarketing não entra.
+            Clique numa prioridade do topo para filtrar e no título de uma seção para recolher.
             {fonte.modo === 'previa' && ' Prévia: foto da fila de hoje, só leitura; as marcações feitas aqui não são gravadas.'}
             {fonte.modo === 'demo' && ' Demonstração com clientes fictícios.'}
           </p>
@@ -621,99 +888,112 @@ export default function FilaIrisTela({ fonte, usuarioId, admin: adminReal, abrir
         </div>
       )}
 
-      <div className="fi-faixa vidro" role="group" aria-label="Prioridades da fila">
-        {CATEGORIAS.map((info) => (
-          <CelulaPrioridade key={info.id} info={info}
-            lista={base.filter((l) => l.cat === info.id)}
-            ativo={visaoEf !== 'equipe' && filtro === info.id}
-            aoClicar={visaoEf === 'equipe' ? undefined : () => setFiltro((f) => (f === info.id ? 'todas' : info.id))} />
-        ))}
-      </div>
+      <Painel base={base} equipe={visaoEf === 'equipe'} minha={visaoEf === 'minha'} filtro={visaoEf === 'equipe' ? 'todas' : filtro}
+        aoFiltrar={visaoEf === 'equipe' ? undefined : (c) => setFiltro((f) => (f === c ? 'todas' : c))}
+        esperandoAtivo={visaoEf !== 'equipe' && filtroMarca === 'esperando'}
+        aoEsperando={visaoEf === 'equipe' ? undefined : () => setFiltroMarca((f) => (f === 'esperando' ? 'todas' : 'esperando'))}
+        numeros={numerosPainel} />
 
       {visaoEf === 'equipe' ? (
         <div className="fi-equipe">
           {fonte.numeros(periodo) && (
             <div className="fi-eq-barra-per">
+              <h2 className="fi-eq-h2">Por atendente</h2>
               <span className="fi-eq-per-rot">Recebidos e fechados</span>
               <Segmentado rotulo="Período dos números" valor={periodo} aoMudar={setPeriodo}
                 opcoes={[{ valor: 'hoje', rotulo: 'Hoje' }, { valor: '7d', rotulo: '7 dias' }, { valor: 'mes', rotulo: 'Mês' }, { valor: 'mes_ant', rotulo: 'Mês passado' }]} />
-              <span className="fi-eq-per-nota">{textoPeriodo(periodo)} · recebidos = distribuídos pelo robô · fechados = placar do CAF</span>
+              <span className="fi-eq-per-nota">{textoPeriodo(periodo)} · recebidos = distribuídos pelo robô · fechados = placar do CAF · taxa = fechados ÷ recebidos</span>
             </div>
           )}
           <div className="fi-eq-grade">
             {EQUIPE.map((a) => (
-              <CartaoAtendente key={a.id} a={a} aoAbrir={() => abrirFilaDe(a.id)} leads={leads}
+              <CartaoAtendente key={a.id} a={a} aoAbrir={(esp) => abrirFilaDe(a.id, esp)} leads={leads}
                 numero={fonte.numeros(periodo)?.find((x) => x.atendente === a.id) ?? null} />
             ))}
           </div>
           <section className="fi-lista vidro fi-lista-eq">
             <header className="fi-lista-cab">
               <h2>Clientes quentes da equipe</h2>
-              <span className="fi-lista-n">{plural(quentesEquipe.length, 'cliente', 'clientes')}</span>
+              <span className="fi-lista-n">{plural(quentesEquipeVis.length, 'cliente', 'clientes')}</span>
+              <div className="fi-cab-ferr">{campoDeBusca}</div>
             </header>
-            <Colunas ultima="Atendente" />
-            <div className="fi-rolo-eq">
-              {quentesEquipe.map((l) => (
-                <Linha key={l.id} l={l} ativo={l.id === aberto} mostrarDono aoAbrir={() => setAberto(l.id)} marcas={l.marcas} />
+            <Colunas ultima="Atendente · campanha" />
+            <div className="fi-rolo-eq" onKeyDown={teclasRolo}>
+              {quentesEquipeVis.map((l) => (
+                <Linha key={l.id} l={l} ativo={l.id === aberto} mostrarDono destacar={termo} aoAbrir={() => setAberto(l.id)} aoConversa={() => conversa(l)} />
               ))}
+              {!quentesEquipeVis.length && (
+                <div className="fi-sec-vazio"><b>{termo ? `Nenhum cliente quente com “${termo}”` : 'Nenhum cliente quente na equipe'}</b></div>
+              )}
             </div>
           </section>
         </div>
       ) : (
         <section className="fi-lista vidro fi-lista-cheia">
           <header className="fi-lista-cab">
-            <h2>{filtro === 'todas' ? (visaoEf === 'de' ? `Fila de ${donoInfo.nome}` : 'Minha fila') : infoCategoria(filtro).rotulo}</h2>
-            <span className="fi-lista-n">{plural(n, 'cliente', 'clientes')}</span>
-            {(filtro !== 'todas' || filtroMarca !== 'todas') && (
-              <button type="button" className="fi-limpar" onClick={() => { setFiltro('todas'); setFiltroMarca('todas'); }}>
-                Limpar filtro<IcX t={10} />
-              </button>
+            <h2>{filtro !== 'todas' ? infoCategoria(filtro).rotulo : filtroMarca === 'esperando' ? 'Aguardando resposta' : visaoEf === 'de' ? `Fila de ${donoInfo.nome}` : 'Minha fila'}</h2>
+            <span className="fi-lista-n">{fonte.carregando && !leads.length ? 'carregando…' : plural(n, 'cliente', 'clientes')}{filtrando && n !== total ? ` de ${total}` : ''}</span>
+            {filtrando && (
+              <button type="button" className="fi-limpar" onClick={limparFiltros}>Limpar filtro<IcX t={10} /></button>
             )}
-            <div className="fi-filtro-marca" role="group" aria-label="Filtrar a fila">
-              <span className="fi-filtro-rot">Filtrar</span>
-              <button type="button" className="fi-fm" data-grupo="esperando" aria-pressed={filtroMarca === 'esperando'}
-                disabled={!contaEsperando && filtroMarca !== 'esperando'}
-                onClick={() => setFiltroMarca((f) => (f === 'esperando' ? 'todas' : 'esperando'))}
-                title="Clientes que escreveram por último e ninguém respondeu">
-                <i className="fi-fm-pt" aria-hidden />Aguardando resposta<b className="num">{contaEsperando}</b>
-              </button>
-              {GRUPOS_MARCA.map((g) => {
-                const c = contaMarca(g.id);
-                return (
-                  <button key={g.id} type="button" className="fi-fm" data-grupo={g.id} aria-pressed={filtroMarca === g.id}
-                    disabled={!c && filtroMarca !== g.id}
-                    onClick={() => setFiltroMarca((f) => (f === g.id ? 'todas' : g.id))}
-                    title={filtroMarca === g.id ? 'Mostrar todos de novo' : `Mostrar só quem está marcado: ${g.filtro}`}>
-                    {g.id === 'ligacao' ? <IcTelefone t={12} /> : g.id === 'inss' ? <IcChave t={12} /> : <IcDoc t={12} />}
-                    {g.filtro}<b className="num">{c}</b>
-                  </button>
-                );
-              })}
+            <div className="fi-cab-ferr">
+              <div className="fi-filtro-marca" role="group" aria-label="Filtrar pelas marcações">
+                {GRUPOS_MARCA.map((g) => {
+                  const c = contaMarca(g.id);
+                  return (
+                    <button key={g.id} type="button" className="fi-fm" data-grupo={g.id} aria-pressed={filtroMarca === g.id}
+                      disabled={!c && filtroMarca !== g.id}
+                      onClick={() => setFiltroMarca((f) => (f === g.id ? 'todas' : g.id))}
+                      title={filtroMarca === g.id ? 'Mostrar todos de novo' : c ? `Mostrar só quem está marcado: ${g.filtro}` : `Ninguém marcado: ${g.filtro}`}>
+                      {g.id === 'ligacao' ? <IcTelefone t={12} /> : g.id === 'inss' ? <IcChave t={12} /> : <IcDoc t={12} />}
+                      {g.filtro}{c > 0 && <b className="num">{c}</b>}
+                    </button>
+                  );
+                })}
+              </div>
+              {campoDeBusca}
             </div>
           </header>
-          <Colunas ultima="Campanha" />
-          <div className="fi-rolo">
-            {visiveis.map(({ info, itens }) => (
-              <div key={info.id} className="fi-grupo" data-cat={info.id}>
-                <div className="fi-sec" title={`Ordem: ${info.regra}`}>
-                  <span className="fi-sec-t">Prioridade {info.ordem} · {info.rotulo}</span>
-                  <span className="fi-sec-n num">{itens.length}</span>
-                </div>
-                {itens.length ? itens.map((l) => (
-                  <Linha key={l.id} l={l} ativo={l.id === aberto} aoAbrir={() => setAberto(l.id)} marcas={l.marcas} />
-                )) : (
-                  <div className="fi-sec-vazio"><b>{info.vazioT}</b><span>{info.vazio}</span></div>
-                )}
+          <Colunas />
+          <div className="fi-rolo" onKeyDown={teclasRolo}>
+            {fonte.carregando && !leads.length ? (
+              <div className="fi-carregando" role="status"><span className="fi-carregando-pt" aria-hidden />Carregando a fila…</div>
+            ) : !visiveis.length ? (
+              <div className="fi-sec-vazio fi-vazio-geral">
+                <b>{termo ? `Nenhum cliente com “${termo}”` : 'Nenhum cliente neste filtro'}</b>
+                <span>{termo ? 'Confira o nome ou digite só uma parte do telefone.' : 'Tire o filtro para ver a fila toda.'}</span>
+                <button type="button" className="fi-link" onClick={limparFiltros}>Mostrar a fila toda</button>
               </div>
-            ))}
+            ) : visiveis.map(({ info, itens }) => {
+              const fechada = recolhida(info.id);
+              const ag = itens.filter((l) => l.esperandoEm).length;
+              return (
+                <div key={info.id} className="fi-grupo" data-cat={info.id} data-recolhida={fechada ? '' : undefined}>
+                  <button type="button" className="fi-sec" aria-expanded={!fechada}
+                    onClick={() => { if (!filtrando) alternarSecao(info.id); }}
+                    title={filtrando ? 'Com filtro ou busca, todas as seções ficam abertas' : fechada ? 'Mostrar os clientes desta prioridade' : 'Recolher esta prioridade'}>
+                    <span className="fi-sec-seta" aria-hidden><IcBaixo t={11} /></span>
+                    <span className="fi-sec-t">Prioridade {info.ordem} · {info.rotulo}</span>
+                    <span className="fi-sec-n num">{itens.length}</span>
+                    {ag > 0 && <span className="fi-sec-ag"><i className="fi-pt" aria-hidden />{ag} aguardando {visaoEf === 'minha' ? 'sua ' : ''}resposta</span>}
+                    <span className="fi-sec-regra" title={`Ordem: ${info.regra}`}>{info.resumo}</span>
+                  </button>
+                  {!fechada && (itens.length ? itens.map((l) => (
+                    <Linha key={l.id} l={l} ativo={l.id === aberto} sua={visaoEf === 'minha'} destacar={termo} semCanal aoAbrir={() => setAberto(l.id)} aoConversa={() => conversa(l)} />
+                  )) : (
+                    <div className="fi-sec-vazio"><b>{info.vazioT}</b><span>{info.vazio}</span></div>
+                  ))}
+                </div>
+              );
+            })}
           </div>
         </section>
       )}
 
       {raiz && clienteAberto && (
         <JanelaCliente l={clienteAberto} raiz={raiz} lista={navegacao} aoTrocar={setAberto}
-          aoFechar={() => setAberto(null)} avisar={avisar} vendoComo={eu}
-          abrirConversa={abrirConversa}
+          aoFechar={fecharJanela} avisar={avisar} ehDono={meuId != null && meuId === clienteAberto.atendente}
+          abrirConversa={conversa}
           aoMarcar={(tipo, texto) => fonte.marcar(clienteAberto.id, tipo, texto)}
           aoTirar={(mid) => fonte.tirarMarca(clienteAberto.id, mid)}
           aoCorrigirDocs={(estado) => {
@@ -725,7 +1005,7 @@ export default function FilaIrisTela({ fonte, usuarioId, admin: adminReal, abrir
       )}
       {raiz && (
         <ConfirmDialogV2 aberto={!!tirando} titulo="Tirar da fila?"
-          mensagem={tirando ? `${tirando.nome} sai da sua fila. A conversa e o card continuam como estão no WhatsApp e no Kanban.` : ''}
+          mensagem={tirando ? `${tirando.nome} sai da ${atendente(tirando.atendente).id === meuId ? 'sua fila' : `fila de ${atendente(tirando.atendente).nome}`}. A conversa e o card continuam como estão no WhatsApp e no Kanban.` : ''}
           rotuloConfirmar="Tirar da fila"
           aoCancelar={() => setTirando(null)}
           aoConfirmar={() => {

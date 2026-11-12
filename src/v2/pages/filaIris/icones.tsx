@@ -53,6 +53,10 @@ export const IcPlay = ({ t = 12 }: P) => <Svg t={t} sw={0}><path d="M8 5.5v13l10
 export const IcChave = ({ t = 14 }: P) => (
   <Svg t={t}><circle cx="8" cy="15" r="4" /><path d="M11 12l8.5-8.5M16 7l2.5 2.5M14 9l2 2" /></Svg>
 );
+export const IcCopiar = ({ t = 12 }: P) => (
+  <Svg t={t}><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" /></Svg>
+);
+export const IcBusca = ({ t = 14 }: P) => <Svg t={t}><circle cx="11" cy="11" r="6.5" /><path d="M20 20l-4.2-4.2" /></Svg>;
 export const IcMais = ({ t = 14 }: P) => <Svg t={t} sw={1.9}><path d="M12 5v14M5 12h14" /></Svg>;
 export const IcMarca = ({ t = 14 }: P) => (
   <Svg t={t}><path d="M6 3.5h12a1 1 0 011 1V21l-7-4.5L5 21V4.5a1 1 0 011-1z" /></Svg>

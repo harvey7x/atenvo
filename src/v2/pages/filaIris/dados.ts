@@ -48,7 +48,7 @@ export interface InfoCategoria {
 export const CATEGORIAS: InfoCategoria[] = [
   {
     /* já assinaram; fecham assim que o histórico for tirado. Vem do administrativo (CAF). Fica com quem já está. */
-    id: 'historico', ordem: 0, rotulo: 'Pegar histórico de crédito',
+    id: 'historico', ordem: 0, rotulo: 'Pegar histórico de créditos',
     resumo: 'Já assinaram. Falta o histórico de créditos.',
     regra: 'na ordem do administrativo',
     entra: 'No sistema do administrativo o cliente está assinado (todas as vias do kit aprovadas) e ainda falta o histórico de créditos, às vezes junto com outro documento. Fica com o vendedor do caso e sai quando o histórico chega.',
@@ -65,7 +65,7 @@ export const CATEGORIAS: InfoCategoria[] = [
   },
   {
     id: 'documentacao', ordem: 2, rotulo: 'Documentação pendente',
-    resumo: 'Mandou parte da documentação e parou há 24 h.',
+    resumo: 'Mandou parte da documentação e parou há mais de 24h.',
     regra: 'quem está aguardando resposta primeiro',
     entra: 'O cliente mandou parte da documentação, foi cobrado e ficou 24 horas sem mandar o resto.',
     vazioT: 'Nenhuma documentação pendente',
@@ -73,7 +73,7 @@ export const CATEGORIAS: InfoCategoria[] = [
   },
   {
     id: 'sem_resposta', ordem: 3, rotulo: 'Sem resposta',
-    resumo: 'Parou de responder há 24 h. Recupere.',
+    resumo: 'Parou de responder há mais de 24h. Recupere o contato.',
     regra: 'quem parou mais recentemente primeiro',
     entra: 'O cliente começou o atendimento, recebeu a nossa mensagem e ficou 24 horas sem responder.',
     vazioT: 'Ninguém parado',
@@ -199,11 +199,7 @@ export function ordenar(lista: ClienteFila[], cat: Categoria): ClienteFila[] {
 export function haQuanto(min: number): string {
   if (min < 1) return 'agora';
   if (min < 60) return `há ${min} min`;
-  if (min < 24 * 60) {
-    const h = Math.floor(min / 60);
-    const m = min % 60;
-    return m ? `há ${h} h ${String(m).padStart(2, '0')}` : `há ${h} h`;
-  }
+  if (min < 24 * 60) return `há ${Math.floor(min / 60)}h`;
   const d = Math.floor(min / (24 * 60));
   return d === 1 ? 'há 1 dia' : `há ${d} dias`;
 }

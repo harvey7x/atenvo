@@ -36,6 +36,8 @@ export interface Lead {
   faltaCodigos?: string[];
   /** prioridade 0: quando a última via do kit foi aprovada no CAF */
   assinadoEm?: number;
+  /** quando o cliente entrou no funil (o card do Kanban) */
+  entrouEm?: number;
   nota: string;
   planilha: string;
   arq?: number;
@@ -94,6 +96,51 @@ export function dataHora(t?: number): string {
   return `${p(d.getDate())}/${p(d.getMonth() + 1)} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
+const PARTICULA = new Set(['de', 'da', 'do', 'das', 'dos', 'e', 'di']);
+/** "AMANDA silva" → "Amanda Silva" (partículas minúsculas); nome vazio ou só com dígitos vira o telefone bonito */
+export function nomeBonito(n: string | null | undefined, tel?: string | null): string {
+  const t = (n ?? '').replace(/\s+/g, ' ').trim();
+  if (!t || /^[\d\s()+.-]+$/.test(t)) return foneBonito(t.replace(/\D/g, '') || tel);
+  return t.split(' ').map((w, i) => {
+    const m = w.toLowerCase();
+    if (i > 0 && PARTICULA.has(m)) return m;
+    return m.charAt(0).toUpperCase() + m.slice(1);
+  }).join(' ');
+}
+
+/** "11/11" */
+export function diaMes(t?: number): string {
+  if (!t) return '—';
+  const d = new Date(t);
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/** o nome da campanha como se lê ("ANTONIO CAMPANHA" → "Antonio Campanha", "JUROS ABUSIVO (ANDRIUS)" → "Juros Abusivo (Andrius)") */
+const PALAVRA: Record<string, string> = { emprestimo: 'Empréstimo', inss: 'INSS', ctwa: 'CTWA', de: 'de', da: 'da', do: 'do', e: 'e' };
+export function campanhaBonita(c: string | null | undefined): string {
+  const t = (c ?? '').replace(/\s+/g, ' ').trim();
+  if (!t || t === '—' || t === 'não achei no sistema') return '—';
+  return t.toLowerCase().split(' ').map((w, i) => {
+    const nu = w.replace(/[()]/g, '');
+    const fixo = PALAVRA[nu];
+    const pal = fixo && (i > 0 || fixo !== fixo.toLowerCase()) ? fixo : nu.charAt(0).toUpperCase() + nu.slice(1);
+    return w.replace(nu, pal);
+  }).join(' ');
+}
+
+/** a última mensagem do cliente como se lê: texto entre aspas, ou o que ele mandou ("Mandou um áudio") */
+const MIDIA: Record<string, string> = {
+  audio: 'Mandou um áudio', imagem: 'Mandou uma imagem', documento: 'Mandou um documento', video: 'Mandou um vídeo',
+  sticker: 'Mandou uma figurinha', figurinha: 'Mandou uma figurinha', localizacao: 'Mandou a localização', contato: 'Mandou um contato',
+};
+export function mensagemDoCliente(t: string | null | undefined): { texto: string; midia: boolean } | null {
+  const s = (t ?? '').replace(/\s+/g, ' ').trim();
+  if (!s) return null;
+  const m = s.match(/^\[(\w+)\]$/);
+  if (m) return { texto: MIDIA[m[1]] ?? 'Mandou um arquivo', midia: true };
+  return { texto: s, midia: false };
+}
+
 /** minutos desde um instante */
 export const minDesde = (t?: number) => (t ? Math.max(0, Math.round((Date.now() - t) / 60_000)) : undefined);
 
@@ -113,7 +160,8 @@ const faltaEmTexto = (c: string[]) => [...c].sort((a, b) => Number(b === 'histor
 export function textosDoLead(l: Pick<Lead, 'cat' | 'docPessoal' | 'comprovante' | 'docsManual' | 'udoc' | 'nu' | 'falta' | 'faltaCodigos'>): [string, string] {
   if (l.cat === 'historico') {
     const outros = (l.faltaCodigos ?? []).filter((f) => f !== 'historico').length;
-    return [`Assinado · falta ${l.falta || 'o histórico de créditos'}`, outros ? `Falta o histórico e mais ${outros}` : 'Falta o histórico'];
+    return [`Assinado · falta ${l.falta || 'o histórico de créditos'}`,
+      outros ? `Falta o histórico e mais ${outros} documento${outros > 1 ? 's' : ''}` : 'Falta o histórico'];
   }
   if (l.cat === 'quente') {
     return l.docsManual === 'completos'
@@ -124,10 +172,9 @@ export function textosDoLead(l: Pick<Lead, 'cat' | 'docPessoal' | 'comprovante' 
     if (l.docsManual === 'incompletos') return ['Documentação incompleta · marcada pelo atendente', 'Documentação incompleta'];
     const falta = [!l.docPessoal && 'documento pessoal (frente e verso)', !l.comprovante && 'comprovante de residência'].filter(Boolean) as string[];
     const curto = [!l.docPessoal && 'documento pessoal', !l.comprovante && 'comprovante'].filter(Boolean) as string[];
-    const quando = l.udoc ? ` · último documento ${dataHora(l.udoc)}` : '';
-    return falta.length ? [`Falta ${juntar(falta)}${quando}`, `Falta ${juntar(curto)}`] : [`Documentação incompleta${quando}`, 'Documentação incompleta'];
+    return falta.length ? [`Falta ${juntar(falta)}`, `Falta ${juntar(curto)}`] : ['Documentação incompleta', 'Documentação incompleta'];
   }
-  return [`Parou de responder${l.nu ? ` · nossa última mensagem ${dataHora(l.nu)}` : ''}`, 'Parou de responder'];
+  return ['Parou de responder', 'Parou de responder'];
 }
 
 /** uma linha do banco → cliente da fila */
@@ -152,11 +199,11 @@ export function leadDeLinha(r: LinhaFila, ordem: number): Lead {
   const lista = r.categoria === 'historico' ? 0 : r.categoria === 'quente' ? 1
     : r.categoria === 'documentacao' ? (r.doc_pessoal && !r.comprovante ? 2 : 3) : 5;
   return {
-    ...base, id: r.contato_id, conversaId: r.conversa_id ?? undefined, nome: (r.nome ?? '').trim() || foneBonito(r.telefone),
+    ...base, id: r.contato_id, conversaId: r.conversa_id ?? undefined, nome: nomeBonito(r.nome, r.telefone),
     fone: foneBonito(r.telefone), atendente: equipeDoUid(r.dono_id) ?? r.dono_id ?? '', lista,
     campanha: r.campanha ?? '—', funil: r.coluna ?? '', ud: ms(r.ult_cliente_em),
     esperandoEm: r.aguardando ? ms(r.ult_cliente_em) : undefined, disse: r.ult_cliente_texto ?? '',
-    docsManualId, assinadoEm: ms(r.assinado_em), nota: '', planilha: '', situacao, curta, ordem, marcas,
+    docsManualId, assinadoEm: ms(r.assinado_em), entrouEm: ms(r.entrou_em), nota: '', planilha: '', situacao, curta, ordem, marcas,
   };
 }
 
@@ -182,7 +229,14 @@ export function passosDoLead(l: Lead): EstadoPasso[] {
   switch (l.lista) {
     case 0: case 1: return [F, F, F, F, F, 'atual'];
     case 2: case 3: case 4: return [F, F, F, F, 'atual', 'pendente'];
-    case 5: return [F, 'parou', 'pendente', 'pendente', 'pendente', 'pendente'];
+    case 5: {
+      /* onde o cliente parou: pelo que ele chegou a fazer (documentos mandados ou a coluna do Kanban) */
+      const col = (l.funil ?? '').toLowerCase();
+      if (l.docPessoal || l.comprovante || l.udoc || col.includes('document')) return [F, F, F, F, 'parou', 'pendente'];
+      if (col.includes('assinar') || col.includes('aceite')) return [F, F, F, 'parou', 'pendente', 'pendente'];
+      if (col.includes('qualificado') || col.includes('proposta')) return [F, F, 'parou', 'pendente', 'pendente', 'pendente'];
+      return [F, 'parou', 'pendente', 'pendente', 'pendente', 'pendente'];
+    }
     default: return [F, F, 'atual', 'pendente', 'pendente', 'pendente'];
   }
 }
