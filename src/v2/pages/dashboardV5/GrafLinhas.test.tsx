@@ -11,7 +11,7 @@ const serie = (id: string, cor: string, valores: [string, number][], notas?: Ser
   valores: somarEmBaldes(valores.map(([dia, valor]) => ({ dia, valor })), 'dia'), notas,
 });
 
-describe('GrafLinhas (versão enxuta)', () => {
+describe('GrafLinhas (estilo da referência)', () => {
   const dados = [
     serie('a', 'var(--dado-1)', [['2026-11-06', 80], ['2026-11-08', 132], ['2026-11-12', 30]],
       [{ texto: 'caiu', tom: 'er' }]),
@@ -21,8 +21,8 @@ describe('GrafLinhas (versão enxuta)', () => {
   it('desenha em pixels reais: svg com largura e altura de verdade (sem esticar)', () => {
     const h = render(<GrafLinhas baldes={baldes} series={dados} titulo="Entradas" vazio="nada" />);
     expect(h).toContain('width="760"');
-    expect(h).toContain('height="236"');
-    expect(h).toContain('viewBox="0 0 760 236"');
+    expect(h).toContain('height="260"');
+    expect(h).toContain('viewBox="0 0 760 260"');
   });
 
   it('eixo com escala redonda (132 → 0 · 50 · 100 · 150)', () => {
@@ -30,13 +30,14 @@ describe('GrafLinhas (versão enxuta)', () => {
     for (const t of ['>0<', '>50<', '>100<', '>150<']) expect(h).toContain(t);
   });
 
-  it('legenda clicável com a leitura ao lado do nome; uma área só (a da série que mais somou)', () => {
+  it('legenda clicável com a leitura ao lado do nome; cada linha com a sua área em degradê', () => {
     const h = render(<GrafLinhas baldes={baldes} series={dados} titulo="Entradas" vazio="nada" />);
     expect((h.match(/aria-pressed="true"/g) ?? []).length).toBe(2);
     expect(h).toContain('Diego');
     expect(h).toContain('>caiu<');
     expect(h).toContain('>parou e voltou<');
-    expect((h.match(/class="d5-graf-area"/g) ?? []).length).toBe(1);
+    expect((h.match(/class="d5-graf-area"/g) ?? []).length).toBe(2);
+    expect((h.match(/<linearGradient/g) ?? []).length).toBe(2);
     expect((h.match(/class="d5-graf-linha"/g) ?? []).length).toBe(2);
     // nada de contorno por coluna nem tracejado
     expect(h).not.toContain('d5-graf-hit');

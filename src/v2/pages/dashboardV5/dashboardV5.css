@@ -816,31 +816,53 @@
 .v2 .d5-iris-qds { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 .v2 .d5-iris-c-forte { border-color: var(--d5-fio-forte); background: rgba(var(--tint), .035); }
 
-/* ---- gráfico de ondas (12/11, versão enxuta: desenhado em pixels reais) ---- */
-.v2 .d5-ondas-ctl { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
-.v2 .d5-ondas-ctl .segm button { font-size: 12px; padding: 4px 11px; }
+/* ---- gráfico de ondas (12/11, estilo da referência "Project Activity") ---- */
+/* topo do cartão: legenda + seletores compactos, à direita do título (como a referência) */
+.v2 .d5-ondas-ctl { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; justify-content: flex-end; }
+.v2 .d5-ondas-sels { display: inline-flex; gap: 8px; }
+.v2 .d5-sel { position: relative; display: inline-flex; align-items: center; }
+.v2 .d5-sel select {
+  appearance: none; -webkit-appearance: none; margin: 0; cursor: pointer;
+  font: inherit; font-size: 12px; font-weight: 500; color: var(--txt);
+  padding: 5px 28px 5px 11px; border-radius: 8px;
+  background: rgba(var(--tint), .05); border: 1px solid var(--d5-fio);
+  color-scheme: dark;
+  transition: border-color .12s var(--ease), background-color .12s var(--ease);
+}
+:root[data-tema="light"] .v2 .d5-sel select { color-scheme: light; }
+.v2 .d5-sel select:hover { background: rgba(var(--tint), .08); border-color: var(--d5-fio-forte); }
+.v2 .d5-sel select:focus-visible { outline: 2px solid var(--d5-foco); outline-offset: 1px; }
+.v2 .d5-sel svg { position: absolute; right: 9px; top: 50%; transform: translateY(-50%); pointer-events: none; color: var(--txt-3); }
+
 .v2 .d5-graf-bloco { min-width: 0; }
-.v2 .d5-graf { position: relative; outline: none; border-radius: 8px; cursor: default; }
+.v2 .d5-graf {
+  position: relative; outline: none; border-radius: 8px; cursor: default;
+  --d5-graf-area-topo: .46;                       /* degradê sob cada linha: forte junto dela… */
+  --d5-graf-area-meio: .14;                       /* …e some antes de chegar à base */
+}
+:root[data-tema="light"] .v2 .d5-graf { --d5-graf-area-topo: .26; --d5-graf-area-meio: .08; }
 .v2 .d5-graf:focus-visible { box-shadow: 0 0 0 2px var(--d5-foco); }
 .v2 .d5-graf-svg { display: block; overflow: visible; }
 .v2 .d5-graf-guia { stroke: var(--d5-fio); stroke-width: 1; opacity: .7; }
 .v2 .d5-graf-base { stroke: var(--d5-fio-forte); stroke-width: 1; }
 .v2 .d5-graf-eixo { fill: var(--txt-3); font-size: 11px; font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.v2 .d5-graf-stop-topo { stop-opacity: var(--d5-graf-area-topo); }
+.v2 .d5-graf-stop-meio { stop-opacity: var(--d5-graf-area-meio); }
+.v2 .d5-graf-stop-base { stop-opacity: 0; }
+.v2 .d5-graf-area { pointer-events: none; }
 .v2 .d5-graf-linha {
   fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round;
   transition: opacity .12s var(--ease);
 }
 .v2 .d5-graf-linha[data-apagada] { opacity: .18; }
-.v2 .d5-graf-area { pointer-events: none; }
 .v2 .d5-graf-mira { stroke: var(--d5-fio-forte); stroke-width: 1; }
-/* ponto sob a mira: anel na cor do cartão, como o marcador da referência */
+/* ponto sob a mira: halo suave + miolo com anel na cor do cartão (o marcador da referência) */
+.v2 .d5-graf-halo { opacity: .22; }
 .v2 .d5-graf-ponto { stroke: var(--vidro-a); stroke-width: 2; }
 
 /* legenda = botões: ponto na cor · nome · leitura curta; clicar esconde/mostra a linha */
-.v2 .d5-graf-leg {
-  list-style: none; margin: 0 0 12px; padding: 0;
-  display: flex; flex-wrap: wrap; gap: 4px 18px;
-}
+.v2 .d5-graf-leg { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.v2 .d5-graf-leg-acima { margin: 0 0 12px; }
 .v2 .d5-graf-leg-bt {
   display: inline-flex; align-items: center; gap: 7px; padding: 3px 0;
   border: 0; background: transparent; font: inherit; font-size: 12px; color: var(--txt-2); cursor: pointer;
@@ -857,10 +879,10 @@
 .v2 .d5-graf-leg-er { color: var(--rubro); }
 .v2 .d5-graf-leg-am { color: var(--ambar); }
 
-/* dica da mira: ao lado do ponto, dentro do gráfico (mesma superfície da bolha .d5-pop) */
+/* dica da mira: logo acima do ponto (ou ao lado), mesma superfície da bolha .d5-pop */
 .v2 .d5-graf-tip {
-  position: absolute; z-index: 2; pointer-events: none;
-  display: flex; flex-direction: column; gap: 5px; min-width: 170px;
+  position: absolute; z-index: 2; pointer-events: none; box-sizing: border-box; width: 196px;
+  display: flex; flex-direction: column; gap: 5px;
   padding: 9px 11px; border-radius: 8px;
   font-size: 12px; line-height: 1.4; color: var(--txt);
   background: linear-gradient(rgba(var(--tint), .06), rgba(var(--tint), .06)), var(--surface);
@@ -874,7 +896,7 @@
 .v2 .d5-graf-tip-t { font-weight: 650; font-size: 12px; margin-bottom: 1px; }
 .v2 .d5-graf-tip-l { display: flex; align-items: center; gap: 8px; color: var(--txt-2); }
 .v2 .d5-graf-tip-l i { width: 7px; height: 7px; border-radius: 50%; flex: none; }
-.v2 .d5-graf-tip-n { flex: 1; min-width: 0; }
+.v2 .d5-graf-tip-n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .v2 .d5-graf-tip-l b { color: var(--txt); font-weight: 650; }
 .v2 .d5-graf-tip-tot { margin-top: 2px; padding-top: 6px; border-top: 1px solid var(--d5-fio); }
 .v2 .d5-graf-tip-tot .d5-graf-tip-n { padding-left: 15px; }
@@ -883,8 +905,10 @@
 /* ---- funil em barras (parente / faltas de documento) ---- */
 .v2 .d5-par-topo { display: grid; grid-template-columns: 230px 1fr; gap: 14px; align-items: start; }
 .v2 .d5-par-funil { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+/* texto e barra DIVIDEM a largura (antes o texto crescia até 240px e, em cartão estreito,
+   a barra ficava com zero) */
 .v2 .d5-par-funil li {
-  display: grid; grid-template-columns: minmax(150px, 240px) 1fr 44px;
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(72px, 1.15fr) 44px;
   align-items: center; gap: 10px; font-size: 12.5px;
 }
 .v2 .d5-par-funil li b { text-align: right; }

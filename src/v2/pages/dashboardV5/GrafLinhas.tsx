@@ -1,24 +1,24 @@
 import {
-  useEffect, useId, useLayoutEffect, useMemo, useState,
+  useCallback, useEffect, useId, useLayoutEffect, useMemo, useState,
   type FocusEvent as ReactFocusEvent, type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
 import { escalaBonita, type Balde } from '@/data/dashboardV5.series';
 import { fmtInt } from '@/data/dashboardV5.formato';
 import { Vazio } from './comum';
 
-/* Gráfico de LINHAS multi-série ("ondas") — padrão da casa, versão enxuta (dono 12/11:
-   "deixe mais minimizado, profissional"). Regras:
-   - desenhado no TAMANHO REAL do cartão (ResizeObserver): texto de 11px e linha de 2px de
-     verdade — antes o SVG esticava com a largura e números/traços ficavam enormes;
-   - altura fixa e baixa; eixo com escala redonda (0 · 50 · 100 · 150), poucas guias claras;
-   - curva monótona (Fritsch–Carlson): passa por TODOS os pontos medidos e nunca inventa
-     pico ou vale entre eles — a suavidade é só visual;
-   - UMA área em degradê, a da série em destaque (a do nome sob o mouse na legenda, senão a
-     que mais somou no desenho) — várias áreas sobrepostas viravam borrão;
-   - legenda clicável: esconde/mostra a linha (a escala se refaz com as visíveis) e destaca
-     ao passar o mouse; cresceu/caiu/voltou ficam ao lado do nome;
-   - mira por coluna: linha-guia, pontos e a dica AO LADO do ponto, dentro do gráfico;
-     teclado: Tab foca, setas percorrem, Esc fecha; tabela invisível p/ leitor de tela;
+/* Gráfico de LINHAS multi-série ("ondas") no estilo da referência aprovada pelo dono
+   (12/11, "Project Activity": "eu quero assim"):
+   - cada linha com a SUA área em degradê, da cor da linha até sumir na base (as maiores
+     atrás, as menores na frente), curva suave e linha de 2px;
+   - desenhado no TAMANHO REAL do cartão (ResizeObserver): texto de 11px e traço de 2px de
+     verdade, nunca esticado; eixo com escala redonda (0 · 50 · 100 · 150 · 200);
+   - mira: linha-guia, ponto com halo nas linhas que têm valor e a dica LOGO ACIMA do ponto
+     (vai para o lado quando não cabe em cima);
+   - legenda = botões (esconde/mostra a linha; a escala se refaz; passar o mouse destaca):
+     pode morar no topo do cartão (useLinhasGraf + LegendaGraf) ou acima do desenho;
+   - a curva é monótona (Fritsch–Carlson): passa por TODOS os pontos medidos e nunca
+     inventa pico ou vale entre eles — a suavidade é só visual;
+   - teclado: Tab foca, setas percorrem, Esc fecha; tabela invisível p/ leitor de tela;
    - cor só por token (--dado-1…5), zero animação (só a troca de opacidade ≤ 120 ms). */
 
 export interface NotaSerie {
@@ -38,17 +38,75 @@ export interface SerieGraf {
   notas?: NotaSerie[];
 }
 
-const ALTURA_PADRAO = 236;
+/** Estado da legenda (linhas escondidas e a destacada) — fica com quem desenha o cartão
+ *  quando a legenda mora no topo dele, junto do título. */
+export interface ControleLinhas {
+  ocultas: ReadonlySet<string>;
+  destaque: string | null;
+  /** esconde/mostra; a última linha visível nunca some */
+  alternar: (id: string, totalSeries: number) => void;
+  destacar: (id: string | null) => void;
+}
+
+export function useLinhasGraf(): ControleLinhas {
+  const [ocultas, setOcultas] = useState<ReadonlySet<string>>(() => new Set());
+  const [destaque, setDestaque] = useState<string | null>(null);
+  const alternar = useCallback((id: string, totalSeries: number) => setOcultas((prev) => {
+    const prox = new Set(prev);
+    if (prox.has(id)) prox.delete(id);
+    else {
+      if (totalSeries - prox.size <= 1) return prev;
+      prox.add(id);
+    }
+    return prox;
+  }), []);
+  return useMemo(() => ({ ocultas, destaque, alternar, destacar: setDestaque }), [ocultas, destaque, alternar]);
+}
+
+/** Legenda em botões: ponto na cor · nome · leitura curta. Clicar esconde/mostra a linha. */
+export function LegendaGraf({ series, controle, className }: {
+  series: SerieGraf[]; controle: ControleLinhas; className?: string;
+}) {
+  if (series.length < 2) return null;
+  return (
+    <ul className={'d5-graf-leg' + (className ? ` ${className}` : '')} aria-label="Linhas do gráfico — clique para esconder ou mostrar">
+      {series.map((s) => {
+        const vis = !controle.ocultas.has(s.id);
+        return (
+          <li key={s.id}>
+            <button type="button" className="d5-graf-leg-bt" aria-pressed={vis}
+              aria-label={[s.rotulo, ...(vis ? (s.notas ?? []).map((nt) => nt.texto) : [])].join(', ')}
+              title={vis ? 'Esconder esta linha' : 'Mostrar esta linha'}
+              onClick={() => controle.alternar(s.id, series.length)}
+              onMouseEnter={() => vis && controle.destacar(s.id)} onMouseLeave={() => controle.destacar(null)}
+              onFocus={() => vis && controle.destacar(s.id)} onBlur={() => controle.destacar(null)}>
+              <i aria-hidden style={{ color: s.cor }} />
+              <span className="d5-graf-leg-nome">{s.rotulo}</span>
+              {vis && s.notas?.map((nt) => (
+                <span key={nt.texto} className={`d5-graf-leg-nota d5-graf-leg-${nt.tom}`}>{nt.texto}</span>
+              ))}
+            </button>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+const ALTURA_PADRAO = 260;
 const PAD_L = 40;
 const PAD_R = 14;
-const PAD_T = 14;
+const PAD_T = 16;
 const PAD_B = 26;
 /** largura usada antes da medição (e no servidor / nos testes) */
 const LARGURA_INICIAL = 760;
 /** espaço mínimo entre dois rótulos do eixo das datas */
 const ESPACO_ROTULO = 58;
+/** largura fixa da dica (deixa a conta de posição exata) */
+const LARGURA_DICA = 196;
 
 const useLayoutSeguro = typeof window === 'undefined' ? useEffect : useLayoutEffect;
+const limitar = (v: number, a: number, b: number) => Math.min(Math.max(v, a), Math.max(a, b));
 
 /** Curva monótona de Fritsch–Carlson: passa por todos os pontos, sem overshoot
  *  (entre dois pontos a curva nunca sai do intervalo deles — nada é inventado). */
@@ -82,17 +140,18 @@ function caminhoSuave(px: number[], py: number[]): string {
   return d;
 }
 
-export function GrafLinhas({ baldes, series, titulo, vazio, rodape, altura = ALTURA_PADRAO }: {
+export function GrafLinhas({ baldes, series, titulo, vazio, rodape, altura = ALTURA_PADRAO, controle }: {
   baldes: Balde[]; series: SerieGraf[]; titulo: string; vazio: string; rodape?: string; altura?: number;
+  /** estado da legenda quando ela mora no topo do cartão; sem ele, a legenda vem acima do desenho */
+  controle?: ControleLinhas;
 }) {
   const uid = useId().replace(/[^a-zA-Z0-9_-]/g, '');
   const idTabela = `g${uid}-tab`;
-  const idArea = `g${uid}-area`;
+  const interno = useLinhasGraf();
+  const ctl = controle ?? interno;
   const [el, setEl] = useState<HTMLDivElement | null>(null);
   const [W, setW] = useState(LARGURA_INICIAL);
   const [foco, setFoco] = useState<number | null>(null);
-  const [ocultas, setOcultas] = useState<ReadonlySet<string>>(() => new Set());
-  const [destaque, setDestaque] = useState<string | null>(null);
   const [anuncio, setAnuncio] = useState('');
 
   // mede o cartão (e acompanha a largura): o desenho é em pixels reais, não esticado
@@ -118,12 +177,14 @@ export function GrafLinhas({ baldes, series, titulo, vazio, rodape, altura = ALT
   const temDado = n > 0 && series.some((s) => (pontos.get(s.id) ?? []).some((v) => v > 0));
   if (!temDado) return <Vazio texto={vazio} />;
 
+  const { ocultas, destaque } = ctl;
   const visiveis = series.filter((s) => !ocultas.has(s.id));
   const valoresDe = (id: string) => pontos.get(id) ?? [];
   const soma = (id: string) => valoresDe(id).reduce((a, b) => a + b, 0);
-  const lider = destaque && !ocultas.has(destaque)
-    ? destaque
-    : visiveis.reduce<string | null>((best, s) => (best == null || soma(s.id) > soma(best) ? s.id : best), null);
+  const emDestaque = destaque && !ocultas.has(destaque) ? destaque : null;
+  // áreas: a maior atrás, a menor na frente; com uma linha em destaque, só a dela
+  const comArea = (emDestaque ? visiveis.filter((s) => s.id === emDestaque) : [...visiveis])
+    .sort((a, b) => soma(b.id) - soma(a.id));
 
   // geometria em pixels reais
   const H = altura;
@@ -143,16 +204,6 @@ export function GrafLinhas({ baldes, series, titulo, vazio, rodape, altura = ALT
     .map((s) => ({ id: s.id, rotulo: s.rotulo, cor: s.cor, v: valoresDe(s.id)[i] ?? 0 }))
     .sort((a, b) => b.v - a.v || a.rotulo.localeCompare(b.rotulo, 'pt-BR'));
   const textoDo = (i: number) => `${baldes[i]?.rotuloLongo ?? ''}: ${linhasDo(i).map((l) => `${l.rotulo} ${fmtInt(l.v)}`).join(', ')}`;
-
-  const alternar = (id: string) => setOcultas((prev) => {
-    const prox = new Set(prev);
-    if (prox.has(id)) prox.delete(id);
-    else {
-      if (series.length - prox.size <= 1) return prev; // a última linha visível fica
-      prox.add(id);
-    }
-    return prox;
-  });
 
   const indiceDoMouse = (clientX: number): number => {
     if (!el || n <= 1) return 0;
@@ -179,35 +230,30 @@ export function GrafLinhas({ baldes, series, titulo, vazio, rodape, altura = ALT
     if (teclado && foco == null) irPara(n - 1);
   };
 
-  const aDireita = foco != null && x(foco) < W * 0.6;
+  // dica: logo ACIMA do ponto mais alto da coluna; sem espaço em cima, ao lado dele
   const tip = foco != null ? linhasDo(foco) : [];
   const totalTip = tip.reduce((a, l) => a + l.v, 0);
+  let estiloDica: Record<string, string | number> | null = null;
+  if (foco != null) {
+    const linhasDica = tip.length + (tip.length > 1 ? 1 : 0);
+    const altDica = 32 + linhasDica * 19;
+    const comValor = tip.filter((l) => l.v > 0);
+    const yTopo = comValor.length ? Math.min(...comValor.map((l) => y(l.v))) : y0;
+    const xf = x(foco);
+    if (yTopo - 16 - altDica >= 0) {
+      estiloDica = { left: limitar(xf - LARGURA_DICA / 2, 0, W - LARGURA_DICA), top: yTopo - 16, transform: 'translateY(-100%)' };
+    } else {
+      const aDireita = xf + 18 + LARGURA_DICA <= W;
+      estiloDica = {
+        left: aDireita ? xf + 18 : xf - 18 - LARGURA_DICA,
+        top: limitar(yTopo - altDica / 2, 0, H - altDica),
+      };
+    }
+  }
 
   return (
     <div className="d5-graf-bloco">
-      {series.length > 1 && (
-        <ul className="d5-graf-leg" aria-label="Linhas do gráfico — clique para esconder ou mostrar">
-          {series.map((s) => {
-            const vis = !ocultas.has(s.id);
-            return (
-              <li key={s.id}>
-                <button type="button" className="d5-graf-leg-bt" aria-pressed={vis}
-                  aria-label={[s.rotulo, ...(vis ? (s.notas ?? []).map((nt) => nt.texto) : [])].join(', ')}
-                  title={vis ? 'Esconder esta linha' : 'Mostrar esta linha'}
-                  onClick={() => alternar(s.id)}
-                  onMouseEnter={() => vis && setDestaque(s.id)} onMouseLeave={() => setDestaque(null)}
-                  onFocus={() => vis && setDestaque(s.id)} onBlur={() => setDestaque(null)}>
-                  <i aria-hidden style={{ color: s.cor }} />
-                  <span className="d5-graf-leg-nome">{s.rotulo}</span>
-                  {vis && s.notas?.map((nt) => (
-                    <span key={nt.texto} className={`d5-graf-leg-nota d5-graf-leg-${nt.tom}`}>{nt.texto}</span>
-                  ))}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+      {!controle && <LegendaGraf series={series} controle={ctl} className="d5-graf-leg-acima" />}
 
       <div ref={setEl} className="d5-graf" tabIndex={0} role="img"
         aria-label={`${titulo}. Use as setas para percorrer os pontos.`} aria-describedby={idTabela}
@@ -215,12 +261,15 @@ export function GrafLinhas({ baldes, series, titulo, vazio, rodape, altura = ALT
         onMouseLeave={() => setFoco(null)}
         onKeyDown={aoTeclar} onFocus={aoFocar} onBlur={() => setFoco(null)}>
         <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="d5-graf-svg" aria-hidden focusable="false">
-          {lider && n > 1 && (
+          {n > 1 && (
             <defs>
-              <linearGradient id={idArea} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0" style={{ stopColor: series.find((s) => s.id === lider)?.cor }} stopOpacity=".16" />
-                <stop offset="1" style={{ stopColor: series.find((s) => s.id === lider)?.cor }} stopOpacity="0" />
-              </linearGradient>
+              {comArea.map((s) => (
+                <linearGradient key={s.id} id={`g${uid}-a-${s.id}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" className="d5-graf-stop-topo" style={{ stopColor: s.cor }} />
+                  <stop offset=".55" className="d5-graf-stop-meio" style={{ stopColor: s.cor }} />
+                  <stop offset="1" className="d5-graf-stop-base" style={{ stopColor: s.cor }} />
+                </linearGradient>
+              ))}
             </defs>
           )}
           {esc.ticks.map((t) => (
@@ -232,26 +281,29 @@ export function GrafLinhas({ baldes, series, titulo, vazio, rodape, altura = ALT
           {baldes.map((b, i) => ((n - 1 - i) % k === 0) && (
             <text key={b.chave} x={x(i)} y={H - 7} className="d5-graf-eixo" textAnchor={ancoraX(i)}>{b.rotulo}</text>
           ))}
-          {lider && n > 1 && (
-            <path className="d5-graf-area"
-              d={`${caminhoSuave(xs, valoresDe(lider).map(y))} L${x(n - 1).toFixed(1)} ${y0} L${x(0).toFixed(1)} ${y0} Z`}
-              fill={`url(#${idArea})`} />
-          )}
+          {n > 1 && comArea.map((s) => (
+            <path key={s.id} className="d5-graf-area"
+              d={`${caminhoSuave(xs, valoresDe(s.id).map(y))} L${x(n - 1).toFixed(1)} ${y0} L${x(0).toFixed(1)} ${y0} Z`}
+              fill={`url(#g${uid}-a-${s.id})`} />
+          ))}
           {foco != null && <line className="d5-graf-mira" x1={x(foco)} x2={x(foco)} y1={PAD_T - 6} y2={y0} />}
           {visiveis.map((s) => (
             <path key={s.id} className="d5-graf-linha" d={caminhoSuave(xs, valoresDe(s.id).map(y))}
-              style={{ stroke: s.cor }} data-apagada={destaque && destaque !== s.id ? '' : undefined} />
+              style={{ stroke: s.cor }} data-apagada={emDestaque && emDestaque !== s.id ? '' : undefined} />
           ))}
-          {/* pontos: na coluna sob a mira (ou sempre, quando o desenho tem um balde só) */}
-          {(foco != null || n === 1) && visiveis.map((s) => (
-            <circle key={s.id} cx={x(foco ?? 0)} cy={y(valoresDe(s.id)[foco ?? 0] ?? 0)} r="3.5"
-              className="d5-graf-ponto" style={{ fill: s.cor }} />
-          ))}
+          {/* ponto com halo: na coluna sob a mira (ou sempre, com um balde só), só onde há valor */}
+          {(foco != null || n === 1) && visiveis
+            .filter((s) => (valoresDe(s.id)[foco ?? 0] ?? 0) > 0)
+            .map((s) => (
+              <g key={s.id}>
+                <circle cx={x(foco ?? 0)} cy={y(valoresDe(s.id)[foco ?? 0] ?? 0)} r="9" className="d5-graf-halo" style={{ fill: s.cor }} />
+                <circle cx={x(foco ?? 0)} cy={y(valoresDe(s.id)[foco ?? 0] ?? 0)} r="4.5" className="d5-graf-ponto" style={{ fill: s.cor }} />
+              </g>
+            ))}
         </svg>
 
-        {foco != null && (
-          <div className="d5-graf-tip" aria-hidden
-            style={{ left: aDireita ? x(foco) + 14 : x(foco) - 14, top: PAD_T, transform: aDireita ? undefined : 'translateX(-100%)' }}>
+        {foco != null && estiloDica && (
+          <div className="d5-graf-tip" aria-hidden style={estiloDica}>
             <b className="d5-graf-tip-t">{baldes[foco]?.rotuloLongo}</b>
             {tip.map((l) => (
               <span key={l.id} className="d5-graf-tip-l">

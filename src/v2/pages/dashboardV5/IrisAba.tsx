@@ -7,7 +7,7 @@ import { janelaMapaV5 } from '@/data/dashboardV5.periodo';
 import type { Periodo } from '@/data/relatorios';
 import { Skeleton } from '../../components';
 import { Ajuda, Legenda, Secao, Variacao, Vazio } from './comum';
-import { GrafLinhas, type SerieGraf } from './GrafLinhas';
+import { GrafLinhas, LegendaGraf, useLinhasGraf, type SerieGraf } from './GrafLinhas';
 
 /* Aba IRIS (12/11): o funil dela (atendidas → qualificadas → proposta → aceite →
    documentação → FECHOU), o que falta de documento, o tempo até fechar, as ondas e
@@ -59,6 +59,7 @@ export function IrisAba({ d, periodo, hoje }: { d: IrisV5; periodo: Periodo; hoj
   const a = d.funilAnt;
   const fa = d.faltas;
   const balde: BaldeTipo = periodo.dias <= 14 ? 'dia' : 'semana';
+  const linhas = useLinhasGraf();
   // período curto desenha os últimos 7 dias (régua do mapa): um dia só não faz onda
   const jm = useMemo(() => janelaMapaV5(periodo, hoje), [periodo, hoje]);
   const baldes = useMemo(() => baldesDe(jm.iniDate, fimComHoje(periodo.fimDate, hoje), balde), [jm, periodo, balde, hoje]);
@@ -134,8 +135,9 @@ export function IrisAba({ d, periodo, hoje }: { d: IrisV5; periodo: Periodo; hoj
         ajuda={'Por dia: sessões em que a Iris falou, que passaram na porta das 5 financeiras e que fecharam a '
           + 'documentação. Com período curto o gráfico mostra os últimos 7 dias; os cartões acima continuam só no '
           + 'período escolhido. Clique no nome para esconder ou mostrar a linha.'}
-        sub={`Atendidas, qualificadas e documentação completa por ${balde === 'dia' ? 'dia' : 'semana'}${jm.estendido ? ' · últimos 7 dias' : ''}`}>
-        <GrafLinhas baldes={baldes} series={series}
+        sub={`Atendidas, qualificadas e documentação completa por ${balde === 'dia' ? 'dia' : 'semana'}${jm.estendido ? ' · últimos 7 dias' : ''}`}
+        acao={<div className="d5-ondas-ctl"><LegendaGraf series={series} controle={linhas} /></div>}>
+        <GrafLinhas baldes={baldes} series={series} controle={linhas}
           titulo={`Funil da Iris por ${balde === 'dia' ? 'dia' : 'semana'}`}
           vazio="Sem movimento da Iris neste período." />
       </Secao>

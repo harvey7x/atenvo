@@ -7,9 +7,9 @@ import {
 import { fmtDuracaoH, fmtInt, fmtPct, pctDe, rotuloMotivoNe } from '@/data/dashboardV5.formato';
 import { janelaMapaV5 } from '@/data/dashboardV5.periodo';
 import type { Periodo } from '@/data/relatorios';
-import { Segmentado, Skeleton } from '../../components';
+import { Skeleton } from '../../components';
 import { Ajuda, Legenda, Secao, Variacao, Vazio } from './comum';
-import { GrafLinhas, type NotaSerie, type SerieGraf } from './GrafLinhas';
+import { GrafLinhas, LegendaGraf, useLinhasGraf, type NotaSerie, type SerieGraf } from './GrafLinhas';
 
 /* Aba CAMPANHAS (12/11): o melhor do dia/semana/mês, as ondas por campanha
    (alternáveis dia · semana · mês CAF), a tabela do período, quem chegou já tendo
@@ -23,10 +23,28 @@ const METRICAS: { valor: MetricaOnda; rotulo: string }[] = [
   { valor: 'ne', rotulo: 'Não elegíveis' },
 ];
 const BALDES: { valor: BaldeTipo; rotulo: string }[] = [
-  { valor: 'dia', rotulo: 'Dia' },
-  { valor: 'semana', rotulo: 'Semana' },
-  { valor: 'mes', rotulo: 'Mês' },
+  { valor: 'dia', rotulo: 'Por dia' },
+  { valor: 'semana', rotulo: 'Por semana' },
+  { valor: 'mes', rotulo: 'Por mês' },
 ];
+
+/** Seletor compacto do topo do cartão (o "This Year ⌄" da referência): select nativo,
+ *  acessível, com a seta desenhada por cima. */
+function Seletor<V extends string>({ valor, opcoes, aoMudar, rotulo }: {
+  valor: V; opcoes: { valor: V; rotulo: string }[]; aoMudar: (v: V) => void; rotulo: string;
+}) {
+  return (
+    <label className="d5-sel">
+      <span className="d5-sr">{rotulo}</span>
+      <select value={valor} onChange={(e) => aoMudar(e.target.value as V)}>
+        {opcoes.map((o) => <option key={o.valor} value={o.valor}>{o.rotulo}</option>)}
+      </select>
+      <svg viewBox="0 0 12 12" width="10" height="10" aria-hidden>
+        <path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </label>
+  );
+}
 
 const AJUDA_FECHADOS = 'Fechado = caso completo no sistema do administrativo (a régua do placar do CAF), '
   + 'pelo número por onde o cliente entrou. Parceiros e casos tirados da conta não pontuam; fim de semana '
@@ -89,6 +107,7 @@ function CartaoQuadro({ titulo, quadro, metrica, comparacao }: {
 export function Campanhas({ d, periodo, hoje }: { d: CampanhasV5; periodo: Periodo; hoje: string }) {
   const [metrica, setMetrica] = useState<MetricaOnda>('entradas');
   const [balde, setBalde] = useState<BaldeTipo>(() => (periodo.dias <= 14 ? 'dia' : 'semana'));
+  const linhas = useLinhasGraf();
 
   const campanhas = d.campanhas.filter((c) => !['outros', 'sem_campanha'].includes(c.campanha));
   const resto = d.campanhas.filter((c) => ['outros', 'sem_campanha'].includes(c.campanha));
@@ -139,11 +158,14 @@ export function Campanhas({ d, periodo, hoje }: { d: CampanhasV5; periodo: Perio
         sub={`${tituloMetrica} por ${balde === 'dia' ? 'dia' : balde === 'semana' ? 'semana' : 'mês da casa'}${jm.estendido ? ' · últimos 7 dias' : ''}`}
         acao={(
           <div className="d5-ondas-ctl">
-            <Segmentado<MetricaOnda> opcoes={METRICAS} valor={metrica} aoMudar={setMetrica} rotulo="Métrica do gráfico" />
-            <Segmentado<BaldeTipo> opcoes={BALDES} valor={balde} aoMudar={setBalde} rotulo="Agrupamento do gráfico" />
+            <LegendaGraf series={series} controle={linhas} />
+            <span className="d5-ondas-sels">
+              <Seletor<MetricaOnda> opcoes={METRICAS} valor={metrica} aoMudar={setMetrica} rotulo="O que o gráfico mostra" />
+              <Seletor<BaldeTipo> opcoes={BALDES} valor={balde} aoMudar={setBalde} rotulo="Agrupar o gráfico" />
+            </span>
           </div>
         )}>
-        <GrafLinhas baldes={baldes} series={series}
+        <GrafLinhas baldes={baldes} series={series} controle={linhas}
           titulo={`${tituloMetrica} por campanha e ${balde === 'dia' ? 'dia' : balde === 'semana' ? 'semana' : 'mês'}`}
           vazio="Sem movimento para desenhar neste período."
           rodape={metrica === 'ganhos'

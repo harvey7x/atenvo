@@ -7,7 +7,7 @@ import { janelaMapaV5 } from '@/data/dashboardV5.periodo';
 import type { Periodo } from '@/data/relatorios';
 import { Skeleton } from '../../components';
 import { Ajuda, Avatar, Legenda, Secao, TempoFechar, Variacao, Vazio } from './comum';
-import { GrafLinhas, type SerieGraf } from './GrafLinhas';
+import { GrafLinhas, LegendaGraf, useLinhasGraf, type SerieGraf } from './GrafLinhas';
 
 /* Aba ATENDENTES (12/11): quem fecha mais (placar do CAF), os DOIS relógios com os
    excluídos à vista — "preciso de um resultado exato, não posso aceitar algo falso"
@@ -93,6 +93,7 @@ export function AtendentesAba({ d, periodo, hoje }: { d: AtendentesAbaV5; period
   const maxGanhos = Math.max(1, ...d.atendentes.map((a) => a.ganhos));
 
   const balde: BaldeTipo = periodo.dias <= 14 ? 'dia' : 'semana';
+  const linhasGraf = useLinhasGraf();
   // período curto desenha os últimos 7 dias (régua do mapa): um dia só não faz onda
   const jm = useMemo(() => janelaMapaV5(periodo, hoje), [periodo, hoje]);
   const serieEquipe = useMemo<SerieGraf[]>(() => {
@@ -191,8 +192,9 @@ export function AtendentesAba({ d, periodo, hoje }: { d: AtendentesAbaV5; period
           ajuda={'Fechados do placar do CAF por atendente. O administrativo lança em dia útil: fim de semana e feriado '
             + 'aparecem zerados sem ser queda de venda. Com período curto o gráfico mostra os últimos 7 dias; a tabela '
             + 'acima continua só no período escolhido. Clique no nome para esconder ou mostrar a linha.'}
-          sub={`Fechados do placar por ${balde === 'dia' ? 'dia' : 'semana'}${jm.estendido ? ' · últimos 7 dias' : ''}`}>
-          <GrafLinhas baldes={baldes} series={serieEquipe}
+          sub={`Fechados do placar por ${balde === 'dia' ? 'dia' : 'semana'}${jm.estendido ? ' · últimos 7 dias' : ''}`}
+          acao={<div className="d5-ondas-ctl"><LegendaGraf series={serieEquipe} controle={linhasGraf} /></div>}>
+          <GrafLinhas baldes={baldes} series={serieEquipe} controle={linhasGraf}
             titulo={`Fechados por atendente e ${balde === 'dia' ? 'dia' : 'semana'}`}
             vazio="Sem fechados lançados neste período." />
         </Secao>
