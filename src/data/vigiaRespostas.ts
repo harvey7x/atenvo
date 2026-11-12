@@ -1,12 +1,15 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { useOrg } from '@/context/OrgContext';
+import { demoVigia } from './vigiaRespostas.demo';
 
 /* ------------------------------------------------------------------
    Vigia de respostas 24h (dono 12/11): "um sistema rodando que nunca vai deixar um cliente sem
    resposta, a cada 3 minutos, 24 horas por dia, no dashboard". O banco roda a varredura sozinho
-   (cron guardiao_resposta, a cada 3 min); esta tela só LÊ: o batimento ("rodou há X min", vermelho
-   se parou) e a lista de quem ficou sem resposta, com o motivo e quem deve responder.
+   (cron guardiao_resposta, a cada 3 min); esta tela só LÊ: o batimento ("conferido há X min",
+   rubro se parou) e a lista de quem ficou sem resposta, com o motivo e quem deve responder.
+   A organização da lista (grupos por espera, filtros, ordem) fica em vigiaRespostas.vista.ts;
+   a fixture do modo demo em vigiaRespostas.demo.ts (re-exportada daqui).
    Demo é o contrato: em `vite --mode demo` o mesmo hook devolve a fixture com os mesmos tipos.
    ------------------------------------------------------------------ */
 
@@ -21,6 +24,8 @@ export interface VigiaSaude {
   vigiaOk: boolean;
   ultimoMinutos: number | null;
   ultimoErro: string | null;
+  /** quando a última conferência rodou (ultimo_batimento.rodou_em) */
+  ultimoEm: string | null;
   abertos: number;
   porSeveridade: Partial<Record<Severidade, number>>;
   resolvidos24h: number;
@@ -31,6 +36,7 @@ export interface VigiaCaso {
   casoId: string;
   conversaId: string;
   nome: string;
+  telefone: string | null;
   canal: string | null;
   dono: string | null;
   quemDeve: QuemDeve;
@@ -39,6 +45,7 @@ export interface VigiaCaso {
   esperaMin: number;
   tentativasCura: number;
   ultimaMsg: string | null;
+  abertoEm: string | null;
 }
 export interface VigiaDados { saude: VigiaSaude; casos: VigiaCaso[]; lidoEm: string }
 
@@ -50,6 +57,16 @@ export const MOTIVO_ROTULO: Record<MotivoVigia, string> = {
   humano_atrasado: 'Atendente ainda não respondeu',
   sem_dono: 'Sem atendente definido',
   canal_desconectado: 'Número desconectado',
+};
+/** a 2ª linha da coluna "Quem deve responder" (o rótulo longo fica no title) */
+export const MOTIVO_CURTO: Record<MotivoVigia, string> = {
+  iris_parada: 'parou de responder',
+  iris_travada: 'travada',
+  iris_na_fila: 'resposta atrasada',
+  robo_fluxo: 'não respondeu',
+  humano_atrasado: 'ainda não respondeu',
+  sem_dono: 'cliente sem responsável',
+  canal_desconectado: 'número desconectado',
 };
 export const QUEM_ROTULO: Record<QuemDeve, string> = { iris: 'Iris', robo: 'Robô', humano: 'Atendente' };
 
@@ -70,6 +87,7 @@ export function normalizarVigia(saudeBruta: unknown, listaBruta: unknown, lidoEm
       vigiaOk: s.vigia_ok === true,
       ultimoMinutos: ub ? num(ub.minutos, 0) : null,
       ultimoErro: ub ? txt(ub.erro) : null,
+      ultimoEm: ub ? txt(ub.rodou_em) : null,
       abertos: num(s.abertos),
       porSeveridade: Object.fromEntries(SEV.map((k) => [k, num(sev[k])])) as Partial<Record<Severidade, number>>,
       resolvidos24h: num(s.resolvidos_24h),
@@ -82,29 +100,17 @@ export function normalizarVigia(saudeBruta: unknown, listaBruta: unknown, lidoEm
       const sv = SEV.includes(x.severidade as Severidade) ? (x.severidade as Severidade) : 'atencao';
       return {
         casoId: String(x.caso_id ?? ''), conversaId: String(x.conversa_id ?? ''),
-        nome: txt(x.nome) ?? 'Cliente sem nome', canal: txt(x.canal), dono: txt(x.dono),
+        nome: txt(x.nome) ?? 'Cliente sem nome', telefone: txt(x.telefone), canal: txt(x.canal), dono: txt(x.dono),
         quemDeve: quem, motivo: (txt(x.motivo) ?? 'humano_atrasado') as MotivoVigia, severidade: sv,
         esperaMin: Math.max(0, num(x.espera_min)), tentativasCura: num(x.tentativas_cura), ultimaMsg: txt(x.ultima_msg),
+        abertoEm: txt(x.aberto_em),
       };
     }),
   };
 }
 
-/** Fixture do modo demo (mesmos tipos). */
-export function demoVigia(): VigiaDados {
-  const c = (i: number, nome: string, canal: string, dono: string, quemDeve: QuemDeve, motivo: MotivoVigia, severidade: Severidade, esperaMin: number, ultimaMsg: string): VigiaCaso =>
-    ({ casoId: `c${i}`, conversaId: `v${i}`, nome, canal, dono, quemDeve, motivo, severidade, esperaMin, tentativasCura: 0, ultimaMsg });
-  return {
-    lidoEm: new Date().toISOString(),
-    saude: { vigiaOk: true, ultimoMinutos: 1, ultimoErro: null, abertos: 4, porSeveridade: { atencao: 1, alta: 2, critica: 1 }, resolvidos24h: 37, curas24h: 5, rodadas24h: 480 },
-    casos: [
-      c(1, 'Maria de Fátima Souza', 'JUROS ABUSIVO', 'Juliana', 'humano', 'humano_atrasado', 'critica', 1900, 'Bom dia, alguma novidade?'),
-      c(2, 'José Carlos Pereira', 'EMPRESTIMO DIEGO', 'Luiz', 'humano', 'humano_atrasado', 'alta', 95, 'Já mandei os documentos'),
-      c(3, 'Ana Lúcia Ferreira', 'ANTONIO 2.0', 'Giovana', 'iris', 'iris_na_fila', 'alta', 62, 'Pode me ligar à tarde?'),
-      c(4, 'Pedro Henrique Lima', 'JUROS ABUSIVO', 'Isadora', 'robo', 'robo_fluxo', 'atencao', 9, 'Tenho sim'),
-    ],
-  };
-}
+/** Fixture do modo demo (vigiaRespostas.demo.ts) — re-exportada para o mock dos testes. */
+export { demoVigia };
 
 const TRINTA_S = 30_000;
 
@@ -119,7 +125,10 @@ export function useVigiaRespostas(ativo: boolean): UseQueryResult<VigiaDados> {
     refetchInterval: TRINTA_S,
     refetchOnWindowFocus: true,
     queryFn: async (): Promise<VigiaDados> => {
-      if (!VIGIA_REAL) return demoVigia();
+      if (!VIGIA_REAL) {
+        // só no demo: ?vigia=parado|erro|vazio|cortada troca a variante da fixture
+        return demoVigia({ variante: typeof location === 'undefined' ? null : new URLSearchParams(location.search).get('vigia') });
+      }
       const [s, l] = await Promise.all([
         supabase!.rpc('guardiao_resposta_saude', { p_org: org }),
         supabase!.rpc('guardiao_resposta_lista', { p_org: org }),
@@ -131,9 +140,12 @@ export function useVigiaRespostas(ativo: boolean): UseQueryResult<VigiaDados> {
   });
 }
 
-/** Rótulo curto da espera: "9 min", "1 h 35", "2 d". */
+/** Rótulo curto da espera: "9 min", "1 h 35", "1 d 7 h", "12 d" (de 3 dias em diante, só os dias). */
 export function fmtEspera(min: number): string {
   if (min < 60) return `${min} min`;
   if (min < 1440) return `${Math.floor(min / 60)} h${min % 60 ? ` ${String(min % 60).padStart(2, '0')}` : ''}`;
-  return `${Math.floor(min / 1440)} d`;
+  const d = Math.floor(min / 1440);
+  if (d >= 3) return `${d} d`;
+  const h = Math.floor((min % 1440) / 60);
+  return h ? `${d} d ${h} h` : `${d} d`;
 }

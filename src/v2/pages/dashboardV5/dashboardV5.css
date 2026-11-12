@@ -559,32 +559,226 @@
   :root .v2 .d5-carr .d5-carr-barra i { animation: d5-carr-indet 1.25s ease-in-out infinite !important; }
 }
 
-/* ---------------- Vigia de respostas 24h (12/11) ---------------- */
-.v2 .d5-vg-pulso { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: var(--txt-2); }
-.v2 .d5-vg-pulso i { width: 8px; height: 8px; border-radius: 50%; background: rgba(var(--tint), .3); flex-shrink: 0; }
-.v2 .d5-vg-pulso[data-ok="1"] i { background: var(--verde); }
-.v2 .d5-vg-pulso[data-ok="0"] { color: #d64545; font-weight: 600; }
-.v2 .d5-vg-pulso[data-ok="0"] i { background: #d64545; }
-.v2 .d5-vg-nums { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--d5-gap); padding: 4px 0 14px; }
-.v2 .d5-vg-nums > div { display: flex; flex-direction: column; gap: 2px; }
-.v2 .d5-vg-n { font-size: 26px; font-weight: 600; color: var(--txt); line-height: 1.1; }
-.v2 .d5-vg-n[data-zero="1"] { color: var(--verde); }
-.v2 .d5-vg-r { font-size: 12px; color: var(--txt-2); }
-.v2 .d5-vg-abas { display: flex; gap: 6px; padding-bottom: 10px; }
-.v2 .d5-vg-abas button {
-  font: inherit; font-size: 12.5px; padding: 5px 12px; border-radius: var(--r-ctl); cursor: pointer;
-  border: 1px solid var(--d5-fio); background: transparent; color: var(--txt-2);
+/* ---------------- Vigia de respostas (d5-vg-) ---------------- */
+/* Regras do bloco (guardadas por teste): cor SÓ por token — nenhum valor cravado —
+   e nenhum movimento além da resposta a hover/foco. Verde só no ponto do vigia
+   ligado e no check do vazio; rubro só no vigia parado e nas exceções de linha. */
+
+/* o vigia não depende do período: não esmaece quando o período do Dashboard muda */
+.v2 .d5-pg[aria-busy="true"] > .d5-sec.d5-vg { opacity: 1; }
+/* vigia parado: contorno rubro no cartão inteiro (o conteúdo segue visível: é a última foto) */
+.v2 .d5-vg-parado { outline: 1px solid rgba(var(--rubro-rgb), .5); outline-offset: -1px; }
+/* o esqueleto do vigia não tem brilho correndo */
+.v2 .d5-vg .skel::after { display: none; }
+
+/* selo de situação (cabeçalho, à direita) */
+.v2 .d5-vg-estado {
+  display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 10px;
+  border-radius: var(--r-ctl); border: 1px solid var(--d5-fio); background: transparent;
+  font: inherit; font-size: 12px; color: var(--txt-2); cursor: default;
+  transition: border-color var(--mo-r, 120ms) var(--ease);
 }
-.v2 .d5-vg-abas button[aria-selected="true"] { color: var(--txt); border-color: var(--d5-foco); background: rgba(var(--azul-rgb), .08); }
-.v2 .d5-vg-nome { display: flex; align-items: center; gap: 8px; font-weight: 500; }
-.v2 .d5-vg-msg { font-size: 12px; color: var(--txt-3); margin-top: 2px; max-width: 340px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.v2 .d5-vg-sev { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; background: rgba(var(--tint), .3); }
-.v2 .d5-vg-sev[data-sev="alta"] { background: #d9962b; }
-.v2 .d5-vg-sev[data-sev="critica"] { background: #d64545; }
-.v2 .d5-vg-espera[data-sev="alta"] { color: #d9962b; }
-.v2 .d5-vg-espera[data-sev="critica"] { color: #d64545; font-weight: 600; }
-.v2 .d5-vg-quem { font-size: 11.5px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--d5-fio); color: var(--txt-2); white-space: nowrap; }
-.v2 .d5-vg-cura { color: var(--txt-3); }
-.v2 .d5-vg-abrir { font-size: 12.5px; color: var(--d5-foco); text-decoration: none; }
-.v2 .d5-vg-abrir:hover { text-decoration: underline; }
-@container d5pg (max-width: 760px) { .v2 .d5-vg-nums { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.v2 .d5-vg-estado i { width: 7px; height: 7px; border-radius: 50%; background: var(--verde); flex-shrink: 0; }
+.v2 .d5-vg-estado[data-ok="0"] { color: var(--rubro); font-weight: 600; border-color: rgba(var(--rubro-rgb), .35); }
+.v2 .d5-vg-estado[data-ok="0"] i { background: var(--rubro); }
+.v2 .d5-vg-estado:hover { border-color: rgba(var(--tint), .22); }
+.v2 .d5-vg-estado:focus-visible { outline: 2px solid var(--d5-foco); outline-offset: 2px; }
+
+/* aviso de vigia parado e tela de erro (filete rubro à esquerda) */
+.v2 .d5-vg-alerta {
+  display: flex; flex-direction: column; gap: 3px; margin: 0 0 14px; padding: 10px 14px;
+  border-radius: var(--r-ctl); border: 1px solid rgba(var(--rubro-rgb), .3); border-left: 3px solid var(--rubro);
+  background: rgba(var(--tint), .03); font-size: 12.5px; color: var(--txt-2);
+}
+.v2 .d5-vg-alerta b { font-size: 13px; font-weight: 600; color: var(--txt); }
+.v2 .d5-vg-tentar { align-self: flex-start; margin-top: 5px; }
+
+/* faixa de espera: 4 células centralizadas numa caixa de fio (a mesma caixa do Robô) */
+.v2 .d5-vg-faixa {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 2px 0 16px; border: 1px solid var(--d5-fio); border-radius: var(--r-ctl);
+  background: rgba(var(--tint), .018); overflow: hidden;
+}
+.v2 .d5-vg-fx {
+  position: relative; min-width: 0; display: flex; flex-direction: column; align-items: center;
+  text-align: center; gap: 3px; padding: 13px 16px 12px; border: 0; background: none;
+  font: inherit; color: var(--txt);
+}
+.v2 .d5-vg-fx + .d5-vg-fx::before { content: ""; position: absolute; left: 0; top: 14px; bottom: 14px; width: 1px; background: var(--d5-fio); }
+.v2 button.d5-vg-fx { cursor: pointer; transition: background-color var(--mo-r, 120ms) var(--ease); }
+.v2 button.d5-vg-fx:hover { background: rgba(var(--tint), .03); }
+.v2 button.d5-vg-fx[aria-pressed="true"] { background: rgba(var(--azul-rgb), .06); }
+.v2 button.d5-vg-fx[aria-pressed="true"]::after {
+  content: ""; position: absolute; left: 24%; right: 24%; bottom: 0; height: 2px;
+  border-radius: 2px 2px 0 0; background: var(--azul);
+}
+.v2 button.d5-vg-fx:focus-visible { outline: 2px solid var(--d5-foco); outline-offset: -2px; }
+.v2 .d5-vg-fx-r { max-width: 100%; font-size: 12px; font-weight: 400; color: var(--txt-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2 .d5-vg-fx-n { font-size: 24px; font-weight: 600; letter-spacing: -.02em; line-height: 1.15; color: var(--txt); }
+.v2 .d5-vg-fx-n[data-zero] { color: var(--txt-3); }
+.v2 .d5-vg-fx-s { max-width: 100%; font-size: 12px; color: var(--txt-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* barra "quem deve responder": rótulo, chips, busca, contagem viva e limpar */
+.v2 .d5-vg-barra { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 6px; margin: 0 0 12px; }
+.v2 .d5-vg-barra-rot { font-size: 10.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--txt-2); margin-right: 4px; }
+.v2 .d5-vg-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+.v2 .d5-vg-barra-dir { margin-left: auto; display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--txt-2); }
+.v2 .d5-vg-chip {
+  display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 6px;
+  border-radius: var(--r-ctl); border: 1px solid rgba(var(--tint), .12); background: rgba(var(--tint), .03);
+  color: var(--txt-2); font: inherit; font-size: 12px; font-weight: 400; cursor: pointer;
+  transition: background-color var(--mo-r, 120ms) var(--ease), border-color var(--mo-r, 120ms) var(--ease), color var(--mo-r, 120ms) var(--ease);
+}
+.v2 .d5-vg-chip b {
+  min-width: 18px; height: 18px; padding: 0 5px; border-radius: calc(var(--r-ctl) / 2);
+  display: inline-grid; place-items: center; background: rgba(var(--tint), .08);
+  font-size: 11px; font-weight: 600; color: var(--txt);
+}
+.v2 .d5-vg-chip:hover:not(:disabled) { color: var(--txt); border-color: rgba(var(--tint), .22); }
+.v2 .d5-vg-chip[aria-pressed="true"] { background: rgba(var(--azul-rgb), .09); border-color: rgba(var(--azul-rgb), .4); color: var(--azul); font-weight: 600; }
+.v2 .d5-vg-chip:disabled { opacity: .45; cursor: default; }
+.v2 .d5-vg-chip:focus-visible { outline: 2px solid var(--d5-foco); outline-offset: 2px; }
+.v2 .d5-vg-av {
+  width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 8.5px; font-weight: 600; letter-spacing: .02em; color: var(--txt-2);
+  background: rgba(var(--tint), .08); box-shadow: inset 0 0 0 1px var(--d5-fio);
+}
+.v2 .d5-vg-av[data-vazio] { background: none; box-shadow: none; border: 1px dashed rgba(var(--tint), .3); }
+.v2 .d5-vg-av svg, .v2 .d5-vg-ic svg { width: 12px; height: 12px; }
+.v2 .d5-vg-ic { display: inline-flex; flex-shrink: 0; color: var(--txt-2); }
+.v2 .d5-vg-busca {
+  height: 28px; width: 220px; max-width: 100%; padding: 0 10px; border-radius: var(--r-ctl);
+  border: 1px solid var(--d5-fio); background: rgba(var(--tint), .03); color: var(--txt);
+  font: inherit; font-size: 12.5px;
+}
+.v2 .d5-vg-busca::placeholder { color: var(--txt-3); }
+.v2 .d5-vg-busca:hover { border-color: rgba(var(--tint), .22); }
+.v2 .d5-vg-busca:focus-visible { outline: 2px solid var(--d5-foco); outline-offset: -1px; }
+.v2 .d5-vg-conta { white-space: nowrap; }
+.v2 .d5-vg-limpar {
+  display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 9px;
+  border-radius: var(--r-ctl); cursor: pointer;
+  border: 1px solid rgba(var(--azul-rgb), .3); background: rgba(var(--azul-rgb), .08);
+  color: var(--azul); font: inherit; font-size: 11.5px; font-weight: 600;
+  transition: background-color var(--mo-r, 120ms) var(--ease);
+}
+.v2 .d5-vg-limpar:hover { background: rgba(var(--azul-rgb), .14); }
+.v2 .d5-vg-limpar:focus-visible { outline: 2px solid var(--d5-foco); outline-offset: 2px; }
+.v2 .d5-vg-nota { font-size: 12px; color: var(--txt-2); margin: -4px 0 10px; }
+.v2 .d5-vg-filtro-vazio { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 16px 0 6px; font-size: 12.5px; color: var(--txt-2); }
+
+/* tabela: larguras fixas (fixed) e tudo no meio da linha */
+.v2 .d5-vg-tab { table-layout: fixed; }
+.v2 .d5-vg-tab th.d5-vg-c-cli { width: 32%; }
+.v2 .d5-vg-tab th.d5-vg-c-quem { width: 176px; }
+.v2 .d5-vg-tab th.d5-vg-c-num { width: 150px; }
+.v2 .d5-vg-tab th.d5-vg-c-esp { width: 132px; }
+.v2 .d5-vg-tab th.d5-vg-c-ir { width: 72px; }
+.v2 .d5-vg-tab tbody > tr > * { vertical-align: middle; }
+.v2 .d5-vg-lin { cursor: pointer; }
+.v2 .d5-vg-cli { display: flex; align-items: center; gap: 11px; min-width: 0; }
+.v2 .d5-vg-cli-tx { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.v2 .d5-vg-cli-tx small { font-size: 12px; }
+.v2 .d5-vg-nome { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-decoration: none; color: var(--txt); }
+.v2 .d5-vg-nome:hover { text-decoration: underline; text-decoration-color: rgba(var(--tint), .35); text-underline-offset: 3px; }
+.v2 .d5-vg-nome:focus-visible { outline: 2px solid var(--d5-foco); outline-offset: 2px; border-radius: 3px; }
+.v2 .d5-vg-nome[data-sem-nome] { color: var(--txt-2); font-weight: 400; }
+.v2 .d5-vg-canal-mini { display: none; }
+.v2 .d5-vg-msg { display: inline-block; max-width: 100%; font-size: 12.5px; color: var(--txt-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
+.v2 .d5-vg-qm { display: inline-flex; align-items: center; justify-content: center; gap: 6px; max-width: 100%; }
+.v2 .d5-vg-qm-tx { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* (0,4,1) por cima do .d5-tab .d5-cel2 > b (0,3,1): "Sem atendente" é informação, não nome */
+.v2 .d5-vg-tab .d5-vg-qm[data-sem], .v2 .d5-vg-tab b.d5-vg-qm[data-sem] { color: var(--txt-2); font-weight: 400; }
+.v2 .d5-vg-tab .d5-cel2 > small { color: var(--txt-2); white-space: normal; }
+.v2 .d5-vg-tab small[data-alerta] { color: var(--rubro); font-weight: 600; }
+.v2 .d5-vg-tab small[data-alerta]::before {
+  content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--rubro); margin-right: 5px; vertical-align: 1px;
+}
+.v2 .d5-vg-num { display: inline-block; max-width: 100%; font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--txt-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
+.v2 .d5-vg-abrir { font-size: 12.5px; font-weight: 600; color: var(--azul); text-decoration: none; white-space: nowrap; }
+.v2 .d5-vg-abrir:hover { text-decoration: underline; text-underline-offset: 3px; }
+.v2 .d5-vg-abrir:focus-visible { outline: 2px solid var(--d5-foco); outline-offset: 2px; border-radius: 3px; }
+/* foco pelo teclado acende a linha como o hover */
+.v2 .d5-vg-tab tbody tr.d5-vg-lin:focus-within > * { background: rgba(var(--tint), .045); }
+.v2 .d5-vg-tab tbody tr.d5-vg-lin:focus-within > :first-child { box-shadow: inset 3px 0 0 var(--azul); }
+
+/* faixa de seção, "mostrar mais" e vazio */
+.v2 .d5-vg-tab tr.d5-vg-sec > th {
+  height: 34px; padding-top: 0; padding-bottom: 0; text-align: left;
+  font-size: 11px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--txt-2);
+  background: rgba(var(--tint), .02); border-top: 1px solid var(--d5-fio); border-bottom: 1px solid var(--d5-fio);
+}
+.v2 .d5-vg-tab tbody:first-of-type tr.d5-vg-sec > th { border-top: 0; }
+.v2 .d5-vg-sec-n { margin-left: 8px; font-size: 11.5px; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--txt-2); }
+.v2 .d5-vg-tab tr.d5-vg-mais > td { text-align: center; padding-top: 8px; padding-bottom: 8px; }
+.v2 .d5-vg-mais-bt {
+  display: inline-flex; align-items: center; height: 30px; padding: 0 14px; border-radius: var(--r-ctl); cursor: pointer;
+  border: 1px dashed rgba(var(--tint), .2); background: none; font: inherit; font-size: 11.5px; font-weight: 600; color: var(--txt-2);
+  transition: color var(--mo-r, 120ms) var(--ease), border-color var(--mo-r, 120ms) var(--ease);
+}
+.v2 .d5-vg-mais-bt:hover { color: var(--txt); border-color: rgba(var(--tint), .35); }
+.v2 .d5-vg-mais-bt:focus-visible { outline: 2px solid var(--d5-foco); outline-offset: 2px; }
+.v2 .d5-vg-tab tr.d5-vg-vazio > td { font-size: 12.5px; color: var(--txt-2); text-align: center; padding-top: 14px; padding-bottom: 14px; }
+/* o hover da casa (faixa + fio azul) fica só nas linhas de cliente — (0,4,2) vence o d5-tab (0,3,2) */
+.v2 .d5-vg-tab tbody tr:is(.d5-vg-mais, .d5-vg-vazio):hover > * { background: transparent; box-shadow: none; }
+.v2 .d5-vg-tab tbody tr.d5-vg-sec:hover > * { background: rgba(var(--tint), .02); box-shadow: none; }
+
+/* vazio geral (zero não é erro: check verde e a frase dos 3 minutos) */
+.v2 .d5-vg-zero { display: flex; align-items: flex-start; gap: 9px; padding: 14px 0 6px; }
+.v2 .d5-vg-zero-ic { display: inline-flex; margin-top: 1px; color: var(--verde); }
+.v2 .d5-vg-zero-tx { display: flex; flex-direction: column; gap: 3px; }
+.v2 .d5-vg-zero-tx b { font-size: 13px; font-weight: 600; color: var(--txt); }
+.v2 .d5-vg-zero-tx span { font-size: 12px; color: var(--txt-2); }
+
+/* página média: some a coluna Número; o nome do WhatsApp entra na linha do telefone */
+@container d5pg (max-width: 1080px) {
+  .v2 .d5-vg-tab .d5-vg-c-num { display: none; }
+  .v2 .d5-vg-canal-mini { display: inline; }
+}
+
+/* página estreita: a faixa em 2×2 e a tabela vira lista de cartões (role explícito no TSX
+   mantém a semântica de tabela quando o display muda) */
+@container d5pg (max-width: 760px) {
+  .v2 .d5-vg-faixa { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .v2 .d5-vg-fx:nth-child(3)::before { display: none; }
+  .v2 .d5-vg-fx:nth-child(3), .v2 .d5-vg-fx:nth-child(4) { border-top: 1px solid var(--d5-fio); }
+  .v2 .d5-vg-barra-dir { margin-left: 0; width: 100%; flex-wrap: wrap; gap: 8px 10px; }
+  .v2 .d5-vg-busca { width: 100%; }
+
+  .v2 .d5-vg-tab { display: block; }
+  .v2 .d5-vg-tab thead {
+    position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+  }
+  .v2 .d5-vg-tab tbody { display: block; }
+  .v2 .d5-vg-tab tr.d5-vg-sec, .v2 .d5-vg-tab tr.d5-vg-mais, .v2 .d5-vg-tab tr.d5-vg-vazio { display: block; }
+  .v2 .d5-vg-tab tr.d5-vg-sec > th { display: flex; align-items: center; }
+  .v2 .d5-vg-tab tr.d5-vg-mais > td, .v2 .d5-vg-tab tr.d5-vg-vazio > td { display: block; border-bottom: 0; }
+  .v2 .d5-vg-tab tr.d5-vg-lin {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px;
+    padding: 12px var(--d5-px); border-bottom: 1px solid var(--d5-fio);
+  }
+  .v2 .d5-vg-tab tr.d5-vg-lin > * { display: block; padding: 0; border: 0; min-width: 0; }
+  .v2 .d5-vg-lin .d5-vg-c-cli { grid-column: 1; grid-row: 1; }
+  .v2 .d5-vg-lin td.d5-vg-c-esp { grid-column: 2; grid-row: 1; text-align: right; }
+  .v2 .d5-vg-lin td.d5-vg-c-esp .d5-cel2 { align-items: flex-end; }
+  .v2 .d5-vg-lin td.d5-vg-c-esp .d5-cel2 > small { text-align: right; }
+  .v2 .d5-vg-lin td.d5-vg-c-msg { grid-column: 1 / -1; grid-row: 2; padding-left: 41px; text-align: left; }
+  .v2 .d5-vg-lin td.d5-vg-c-quem { grid-column: 1; grid-row: 3; padding-left: 41px; text-align: left; }
+  .v2 .d5-vg-lin td.d5-vg-c-quem .d5-cel2 { align-items: flex-start; }
+  .v2 .d5-vg-lin td.d5-vg-c-quem .d5-cel2 > small { text-align: left; }
+  .v2 .d5-vg-lin td.d5-vg-c-ir { grid-column: 2; grid-row: 3; text-align: right; align-self: end; }
+  .v2 .d5-vg-lin td.d5-vg-c-num { display: none; }
+  /* o hover pinta a linha-cartão inteira, sem o fio azul da 1ª célula */
+  .v2 .d5-vg-tab tbody tr.d5-vg-lin:hover { background: rgba(var(--tint), .045); }
+  .v2 .d5-vg-tab tbody tr.d5-vg-lin:hover > *, .v2 .d5-vg-tab tbody tr.d5-vg-lin:focus-within > * { background: transparent; box-shadow: none; }
+}
+
+/* bem estreita: recuo menor, número da faixa menor, chips maiores para o dedo */
+@container d5pg (max-width: 480px) {
+  .v2 .d5-sec.d5-vg { --d5-px: 14px; }
+  .v2 .d5-vg-fx-n { font-size: 22px; }
+  .v2 .d5-vg-chip { height: 30px; }
+}

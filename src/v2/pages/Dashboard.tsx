@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { DASH_V5_MAX_DIAS, DASH_V5_REAL, periodoDash, useDashV5, type PresetDash } from '@/data/dashboardV5';
 import { janelaMapaV5, periodoAnteriorV5, rotuloComparacaoV5 } from '@/data/dashboardV5.periodo';
 import { addDias, spHoje } from '@/data/relatorios';
@@ -71,6 +72,7 @@ export default function DashboardV2() {
 
   // `hoje` entra nas dependências: depois da meia-noite "Hoje" passa a ser o dia novo
   const periodo = useMemo(() => periodoDash(preset, ini, fim, mesCaf), [preset, ini, fim, mesCaf, hoje]); // eslint-disable-line react-hooks/exhaustive-deps
+  const qc = useQueryClient();
   const q = useDashV5(periodo);
   const d = q.data;
   const carregando = !d;
@@ -94,9 +96,13 @@ export default function DashboardV2() {
         ini={ini} fim={fim} setIni={setIni} setFim={setFim} hoje={hoje}
         mesCaf={mesCaf} setMesCaf={setMesCaf}
         geradoEm={d?.geradoEm ?? null} atualizando={q.isFetching}
-        aoAtualizar={() => { void q.refetch(); }}
+        aoAtualizar={() => { void q.refetch(); void qc.invalidateQueries({ queryKey: ['vigia-respostas'] }); }}
         demo={!DASH_V5_REAL}
       />
+
+      {/* Vigia de respostas (12/11): independe do período, não some com erro do dashboard_v5
+          e não esmaece com o aria-busy; só o gestor vê */}
+      <Vigia />
 
       {q.isError && !d ? (
         <CardVidro className="d5-sec d5-erro">
@@ -113,9 +119,6 @@ export default function DashboardV2() {
               {(q.error as Error)?.message || 'Não foi possível atualizar agora.'} Os números abaixo são da última leitura.
             </p>
           )}
-
-          {/* Vigia de respostas 24h (12/11): independe do período; só o gestor vê */}
-          <Vigia />
 
           {carregando ? <KpisSkeleton /> : <Kpis k={d.kpis} ant={d.kpisAnterior} comparacao={comparacao} />}
 
