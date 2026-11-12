@@ -164,8 +164,6 @@ export function separarRecados(todos: Recado[], eu: string | null): Pick<FonteRe
 }
 
 /* ---------------------------------------------------------------- local (demonstração e prévia) */
-/** a fila local troca o dono de um cliente quando a demonstração repassa (fonte.ts escuta: {contatoId, para}) */
-export const EVENTO_DONO_LOCAL = 'atenvo:fila-iris-dono-local';
 /** o que a loja local precisa saber da fila local (o dono e a prioridade de um cliente) — fonte.ts registra */
 type ConsultaLocal = (contatoId: string) => { dono: string; cat: string } | null;
 let consultaLocal: ConsultaLocal | null = null;
@@ -194,11 +192,17 @@ export function useEuLocal(): string {
   return euLocal;
 }
 
-/** põe recados de exemplo na loja local (a prévia mostra os dois lados logo ao abrir) */
-export function semearRecadosLocais(lista: Recado[]): void {
+/** põe recados de exemplo na loja local (a prévia mostra os dois lados logo ao abrir); `donos` = clientes que já
+    mudaram de dono por um repasse de exemplo */
+export function semearRecadosLocais(lista: Recado[], donos: Record<string, string> = {}): void {
   if (loja.recados.length) return;
   loja.recados = lista;
+  loja.donos = { ...donos };
   avisar();
+}
+/** os donos trocados pelos repasses da demonstração (a fila local aplica; vale em qualquer página) */
+export function useDonosLocais(): Record<string, string> {
+  return useSyncExternalStore(assinar, () => loja.donos, () => loja.donos);
 }
 
 /** a demonstração faz o que o banco faz (migration 20261112130000): as mesmas recusas, o repasse troca o dono na
@@ -260,7 +264,7 @@ export function useRecadosLocais(eu: string, equipe: Colega[]): FonteRecados {
         }
         /* o principal e os outros pendentes deste cliente para mim vão juntos; o administrador do principal já tem o
            cartão dele (os de outro administrador ganham o seu) */
-        const irmaos = loja.recados.filter((r) => r.contatoId === orig.contatoId && r.para === eu && r.id !== id && aberto(r));
+        const irmaos = loja.recados.filter((r) => r.contatoId === orig.contatoId && r.para === eu && r.id !== id && aberto(r) && !r.clienteRespondidoEm);
         const foram = new Set([id, ...irmaos.map((r) => r.id)]);
         loja.recados = loja.recados.map((r) => (!foram.has(r.id) ? r : {
           ...r, repassadoPara: para, repassadoParaNome: nome(para), resposta: mot, respondidoEm: agora, vistoEm: r.vistoEm ?? agora,
@@ -268,7 +272,7 @@ export function useRecadosLocais(eu: string, equipe: Colega[]): FonteRecados {
         }));
         /* o cliente muda de dono: na fila local e, como o gatilho do banco, encerra o pendente de quem deixou de ser o dono */
         loja.donos = { ...loja.donos, [orig.contatoId]: para };
-        loja.recados = loja.recados.map((r) => (r.contatoId === orig.contatoId && aberto(r) && r.para !== para
+        loja.recados = loja.recados.map((r) => (r.contatoId === orig.contatoId && aberto(r) && !r.clienteRespondidoEm && r.para !== para
           ? { ...r, encerrado: 'o cliente mudou de atendente', gestorVistoEm: r.gestorVistoEm ?? agora } : r));
         const copias = [orig, ...irmaos].filter((r) => r.de !== para).map((r, i): Recado => ({
           ...r, id: `rl-${agora}-r${i}`, para, paraNome: nome(para), criadoEm: agora + i, vistoEm: undefined,
@@ -278,7 +282,6 @@ export function useRecadosLocais(eu: string, equipe: Colega[]): FonteRecados {
         }));
         loja.recados = [...loja.recados, ...copias];
         avisar();
-        try { window.dispatchEvent(new CustomEvent(EVENTO_DONO_LOCAL, { detail: { contatoId: orig.contatoId, para } })); } catch { /* sem janela */ }
         return { ok: true, paraNome: nome(para) };
       },
       marcarVisto: (id) => { const r = loja.recados.find((x) => x.id === id); if (r && !r.vistoEm) mexer(id, (x) => ({ ...x, vistoEm: Date.now() })); },

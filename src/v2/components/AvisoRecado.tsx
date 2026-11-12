@@ -271,21 +271,25 @@ function PainelRecado({ rec, ativo, oculto }: { rec: FonteRecados; ativo: boolea
           <div className="rcd-caixa-centro">
             <CartaoRecadoAtendente recados={recebidos} colegas={rec.colegas} agora={agora} aoEscrever={setEscrevendo}
               aoResponderCliente={(r) => {
+                /* trocou de conversa: o "onde estava" não vale mais (nem para o próximo recado da pilha) */
                 devolverFoco.current = false;
+                focoAntes.current = null;
                 setEscrevendo(false);
                 marcarRespondendo(r.id, RESPONDENDO_MS);
                 setToast(`Responda ${primeiro(r.cliente)}: o recado se resolve sozinho quando a sua mensagem sair.`);
                 abrir(r.conversaId);
               }}
               aoResponder={async (r, texto) => {
-                await rec.responder(r.id, texto);
+                /* marcado antes: a fonte local muda na hora e o cartão sai antes da volta do await */
                 devolverFoco.current = true;
+                try { await rec.responder(r.id, texto); } catch (e) { devolverFoco.current = false; throw e; }
                 setEscrevendo(false);
                 setToast('Resposta enviada para o administrador.');
               }}
               aoRepassar={async (r, para, motivo) => {
-                const res = await rec.repassar(r.id, para, motivo);
                 devolverFoco.current = true;
+                let res: Awaited<ReturnType<typeof rec.repassar>>;
+                try { res = await rec.repassar(r.id, para, motivo); } catch (e) { devolverFoco.current = false; throw e; }
                 setEscrevendo(false);
                 if (!res.ok) { setToast(res.erro ?? 'Este cliente já não é seu: o recado foi encerrado.'); return; }
                 setToast(para

@@ -3,10 +3,10 @@
    - local: demonstração (clientes fictícios) e prévia (foto dos dados de hoje); marcações na página;
    - real: o banco (fonteReal.ts). Este arquivo não fala com o banco (a prévia em HTML usa só ele).
    ============================================================================ */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Marca, TipoMarca } from './dados';
 import { textosDoLead, type Lead } from './lead';
-import { EVENTO_DONO_LOCAL, registrarFilaLocal } from './recados';
+import { registrarFilaLocal, useDonosLocais } from './recados';
 
 export type Periodo = 'hoje' | '7d' | 'mes' | 'mes_ant';
 export interface NumeroAtendente { atendente: string; recebidos: number; fechados: number }
@@ -74,20 +74,17 @@ export function useFonteLocal(inicial: Lead[], modo: 'demo' | 'previa', rotulo: 
     const n = f(l);
     return n ? [n] : [];
   }));
-  /* o recado do administrador da demonstração: consulta o dono/prioridade e troca o dono no repasse (como o banco) */
-  const atual = useRef(leads);
-  atual.current = leads;
+  /* o recado do administrador da demonstração: o repasse troca o dono (a loja guarda; vale ao voltar para a página)
+     e a loja consulta o dono/prioridade de agora — o último retrato fica valendo em qualquer página */
+  const donos = useDonosLocais();
+  const comDono = useMemo(() => (Object.keys(donos).length
+    ? leads.map((l) => (donos[l.id] && donos[l.id] !== l.atendente ? { ...l, atendente: donos[l.id] } : l)) : leads), [leads, donos]);
   useEffect(() => {
-    registrarFilaLocal((id) => { const l = atual.current.find((x) => x.id === id); return l ? { dono: l.atendente, cat: l.cat } : null; });
-    const trocar = (e: Event) => {
-      const d = (e as CustomEvent<{ contatoId: string; para: string }>).detail;
-      if (d) setLeads((t) => t.map((l) => (l.id === d.contatoId ? { ...l, atendente: d.para } : l)));
-    };
-    window.addEventListener(EVENTO_DONO_LOCAL, trocar);
-    return () => { window.removeEventListener(EVENTO_DONO_LOCAL, trocar); registrarFilaLocal(null); };
-  }, []);
+    const retrato = new Map(comDono.map((l) => [l.id, { dono: l.atendente, cat: l.cat }]));
+    registrarFilaLocal((id) => retrato.get(id) ?? null);
+  }, [comDono]);
   return useMemo<FonteFila>(() => ({
-    modo, rotulo, carregando: false, erro: null, leads,
+    modo, rotulo, carregando: false, erro: null, leads: comDono,
     marcar: (id, tipo, texto) => mexer(id, (l) => {
       const agora = Date.now();
       if (tipo === 'nao_atendeu') {
@@ -102,5 +99,5 @@ export function useFonteLocal(inicial: Lead[], modo: 'demo' | 'previa', rotulo: 
     corrigirDocs: (id, estado) => mexer(id, (l) => comDocs(l, estado)),
     tirarDaFila: (id) => mexer(id, () => null),
     numeros: (p) => numeros?.[p] ?? null,
-  }), [leads, modo, rotulo, numeros]);
+  }), [comDono, modo, rotulo, numeros]);
 }

@@ -57,7 +57,8 @@ export function CartaoRecadoAtendente({ recados, colegas, agora, aoResponderClie
   const voltouDoRepasse = useRef(false);
   /* trocou o recado da frente: tudo do começo */
   useEffect(() => { setModo('base'); setTexto(''); setDestino(undefined); setErro(null); }, [r?.id]);
-  useEffect(() => { aoEscrever?.(texto.trim().length > 0); }, [texto, aoEscrever]);
+  /* escrevendo ou escolhendo para quem repassar: o contêiner segura este recado na frente */
+  useEffect(() => { aoEscrever?.(texto.trim().length > 0 || modo === 'repassar'); }, [texto, modo, aoEscrever]);
   /* o cartão saiu (ação, outra janela por cima): ninguém está mais escrevendo nele */
   useEffect(() => () => aoEscrever?.(false), [aoEscrever]);
   /* o foco acompanha o modo: entrou no repasse → a primeira pessoa; voltou → o botão Repassar */
